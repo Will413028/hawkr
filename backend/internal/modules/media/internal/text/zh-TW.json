@@ -1,0 +1,150 @@
+{
+  "default": {
+    "media.asset_not_found": {
+      "message": "找不到這個資產",
+      "description": "資產不存在，或已不是可讀取的狀態；兩者同一句。"
+    },
+    "media.asset_unavailable": {
+      "message": "這筆上傳的資產已不可用",
+      "description": "資產不是 ACTIVE（例如已被擁有者刪除）。"
+    },
+    "media.confirm_some_unusable": {
+      "message": "有圖片無法使用，請重新上傳",
+      "description": "多個欄位的確認都不合格而各自的訊息不同時，整體錯誤的一句。"
+    },
+    "media.image_required": {
+      "message": "請上傳圖片",
+      "description": "必填的圖片位置沒有圖，也沒有現有的圖。"
+    },
+    "media.image_unusable": {
+      "message": "圖片無法使用，請重新上傳",
+      "description": "轉正時引用的資產已退場（被換掉或刪除），要重新上傳。"
+    },
+    "media.public_content_empty": {
+      "message": "上傳的內容是空的",
+      "description": "伺服器內部直接寫入公開圖片時沒有內容。"
+    },
+    "media.public_content_unsupported": {
+      "message": "公開上傳只接受 JPEG、PNG、WebP、GIF 圖片",
+      "description": "伺服器內部直接寫入的內容辨認不出是支援的圖片格式。"
+    },
+    "media.public_upload_too_large": {
+      "message": "上傳的大小超過上限 {max} 位元組",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "伺服器內部直接寫入的公開圖片超過大小上限。"
+    },
+    "media.secure_busy": {
+      "message": "同時處理的機敏上傳太多，請稍後再試",
+      "description": "機敏上傳的同時處理名額已滿。"
+    },
+    "media.secure_chunk_index_mismatch": {
+      "message": "段序號不符，下一段是 {next}",
+      "params": {
+        "next": {
+          "type": "integer"
+        }
+      },
+      "description": "送來的段序號不是會話的下一段。"
+    },
+    "media.secure_chunk_length_mismatch": {
+      "message": "這一段必須剛好 {expected} 位元組",
+      "params": {
+        "expected": {
+          "type": "integer"
+        }
+      },
+      "description": "這一段的長度與依總大小算出的長度不符。"
+    },
+    "media.secure_content_empty": {
+      "message": "上傳的內容是空的",
+      "description": "機敏上傳第一段沒有內容。"
+    },
+    "media.secure_content_unsupported": {
+      "message": "機敏上傳只接受 PDF 與 JPEG、PNG、WebP、GIF 圖片",
+      "description": "第一段依 magic bytes 辨認不出 PDF 或支援的圖片。"
+    },
+    "media.secure_preview_unavailable": {
+      "message": "這筆上傳現在不能預覽",
+      "description": "機敏暫存不是 READY、已過期或沒有資產，所以不能預覽。"
+    },
+    "media.secure_size_mismatch": {
+      "message": "上傳的位元組數與宣告的 {size} 位元組不符",
+      "params": {
+        "size": {
+          "type": "integer"
+        }
+      },
+      "description": "伺服器內部直接寫入時，實際位元組數與宣告的大小不同。"
+    },
+    "media.secure_size_out_of_range": {
+      "message": "機敏上傳的大小必須在 1 到 {max} 位元組之間",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "宣告的總大小不在 1 到機敏上傳上限之間。"
+    },
+    "media.upload_already_used": {
+      "message": "這筆上傳已經被使用過，請重新上傳",
+      "description": "token 已在別的 transaction 確認過（Confirm 只在同一個 transaction 內冪等，B1-D23）。"
+    },
+    "media.upload_content_type_unsupported": {
+      "message": "不支援的圖片型別，只接受 JPEG、PNG、WebP、GIF",
+      "description": "宣告的內容型別不在圖片白名單內，或格式不合法。"
+    },
+    "media.upload_expired": {
+      "message": "這筆上傳已過期",
+      "description": "暫存上傳已過期或已被清除。"
+    },
+    "media.upload_md5_invalid": {
+      "message": "上傳的 MD5 必須是 16 位元組的 base64",
+      "description": "宣告的 MD5 不是 16 位元組的 base64。"
+    },
+    "media.upload_not_found": {
+      "message": "找不到這筆上傳",
+      "description": "token 不存在或不屬於呼叫者；兩者同一句，不洩漏 token 是否存在。"
+    },
+    "media.upload_not_ready": {
+      "message": "這筆上傳還沒處理完成",
+      "description": "上傳尚未到可確認的狀態。"
+    },
+    "media.upload_processing": {
+      "message": "這筆上傳正在被處理",
+      "description": "上傳正在處理中。"
+    },
+    "media.upload_rejected": {
+      "message": "這筆上傳被拒絕，不能確認",
+      "description": "處理時被拒絕的上傳不能確認。"
+    },
+    "media.upload_size_too_large": {
+      "message": "上傳的大小超過上限 {max} 位元組",
+      "params": {
+        "max": {
+          "type": "integer"
+        }
+      },
+      "description": "宣告的上傳大小超過公開上傳上限。"
+    },
+    "media.upload_size_zero": {
+      "message": "上傳的大小必須大於零",
+      "description": "宣告的上傳大小為零或負數。"
+    },
+    "media.uploader_invalid": {
+      "message": "上傳者不合法",
+      "description": "上傳者身分缺失或不合法。"
+    },
+    "media.visibility_public_required": {
+      "message": "這張圖片必須是公開圖片",
+      "description": "擁有者要求公開圖片，但上傳的是機敏檔。"
+    },
+    "media.visibility_secure_required": {
+      "message": "這個檔案必須以機敏上傳，請重新上傳",
+      "description": "擁有者要求機敏檔（證件、佐證），但上傳的是公開檔。"
+    }
+  }
+}

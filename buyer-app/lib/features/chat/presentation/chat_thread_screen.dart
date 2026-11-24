@@ -34,6 +34,7 @@ import '../../../shared/widgets/common_top_bar.dart';
 import '../../../shared/widgets/fruit_refresh_indicator.dart';
 import '../../../shared/widgets/notification_count_badge.dart';
 import '../../../shared/widgets/oss_image.dart';
+import '../../media/data/local_image_preview.dart';
 import '../../media/data/media_repository.dart';
 import '../../moderation/data/block_target.dart';
 import '../../moderation/data/report_target.dart';
@@ -74,7 +75,7 @@ class _Row {
             !message!.erased;
 
   String get key =>
-      message != null ? 'm${message!.seq}' : 'p$pending.requestId';
+      message != null ? 'm${message!.seq}' : 'p${pending!.requestId}';
 }
 
 Widget _buildInlineImage(String url) {
@@ -310,10 +311,13 @@ class ChatThreadScreen extends HookConsumerWidget {
           source: ImageSource.gallery,
         );
         if (image == null) return;
+        final file = File(image.path);
         final upload = await ref
             .read(mediaRepositoryProvider)
-            .uploadImage(file: File(image.path));
-        await notifier.sendImage(upload.stagedToken, upload.previewUrl);
+            .uploadImage(file: file);
+        // 伺服器在圖片就緒前沒有網址可顯示，送出中的氣泡用本機檔案的預覽。
+        final preview = await localImagePreviewDataUri(file);
+        await notifier.sendImage(upload.stagedToken, preview);
       } catch (e) {
         showError(e);
       }

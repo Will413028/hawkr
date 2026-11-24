@@ -12,10 +12,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// The three counts are the arithmetic §6.1.1 / §13.1 G5 states: 34 endpoints total,
-// of which 14 enter the delegated registry and 20 are named exceptions (six S
-// endpoints, three summary/audit queries, two media upload sessions, the seven
-// #2444 授權列治理端點, and the two §11.3 P1 跨工作階段查詢). 20 of the 34 skip
+// The three counts are the arithmetic §6.1.1 / §13.1 G5 states: 32 endpoints total,
+// of which 14 enter the delegated registry and 18 are named exceptions (six S
+// endpoints, three summary/audit queries, the seven
+// #2444 授權列治理端點, and the two §11.3 P1 跨工作階段查詢). 18 of the 32 skip
 // requireAdmin(). Writing it as "registry 沒有的就略過" instead would let any future
 // resource endpoint that forgot to register slip through with it.
 func TestDelegatedRouteInventory(t *testing.T) {
@@ -33,11 +33,11 @@ func TestDelegatedRouteInventory(t *testing.T) {
 	}
 
 	noAuth := registeredAdminNoAuth()
-	if len(noAuth) != 20 {
-		t.Errorf("credential-only 路由 = %d 支，A31 白名單恰為 20", len(noAuth))
+	if len(noAuth) != 18 {
+		t.Errorf("credential-only 路由 = %d 支，A31 白名單恰為 18", len(noAuth))
 	}
-	if len(adminNoAuthWhitelist) != 20 {
-		t.Errorf("adminNoAuthWhitelist = %d 條，恰為 20", len(adminNoAuthWhitelist))
+	if len(adminNoAuthWhitelist) != 18 {
+		t.Errorf("adminNoAuthWhitelist = %d 條，恰為 18", len(adminNoAuthWhitelist))
 	}
 	if p := checkAdminNoAuthWhitelist(mounted, noAuth, adminNoAuthWhitelist); len(p) != 0 {
 		t.Errorf("白名單雙向比對不通過：%v", p)
@@ -62,8 +62,8 @@ func TestDelegatedRouteInventory(t *testing.T) {
 		}
 	}
 
-	if total := len(admOnly) + len(noAuth); total != 34 {
-		t.Errorf("代行端點合計 %d 支，總表為 34", total)
+	if total := len(admOnly) + len(noAuth); total != 32 {
+		t.Errorf("代行端點合計 %d 支，總表為 32", total)
 	}
 }
 
@@ -124,8 +124,8 @@ func TestDelegatedRoutesAreAllRateLimitRegistered(t *testing.T) {
 	for _, k := range registeredAdminNoAuth() {
 		want[k] = struct{}{}
 	}
-	if len(want) != 34 {
-		t.Fatalf("代行端點合計 %d 支，總表為 34 —— 先修 TestDelegatedRouteInventory", len(want))
+	if len(want) != 32 {
+		t.Fatalf("代行端點合計 %d 支，總表為 32 —— 先修 TestDelegatedRouteInventory", len(want))
 	}
 
 	got := map[string]struct{}{}

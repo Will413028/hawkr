@@ -15,10 +15,8 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/agreement"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/exposure"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/stint"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
@@ -41,7 +39,7 @@ type Deps struct {
 	DB     *db.DB
 	Events *events.Bus
 	Jobs   jobs.ReportingEnqueuer
-	Media  media.Media
+	Media  model.Media
 	// Exposure 是可曝光的公告：申請的狀態是開通閘門（平台審核核准）的輸入，每個改變它的寫入在 transaction 的最後呼叫。
 	Exposure *exposure.Service
 	// Payment 是收款帳戶的擁有者（payment 模組）：核准的 transaction 內寫「建立中」的列並排入建立 job（收款開通 ADR D16、D28）。
@@ -139,10 +137,7 @@ func (s *Service) SaveDraft(ctx context.Context, in model.KYCDraftInput) (model.
 	if in.ExpectedVersion < 0 {
 		return model.KYCApplication{}, apperr.InvalidInputOn([]string{"ExpectedVersion"}, "版本不合法")
 	}
-	if _, ok := db.TxFrom(ctx); ok {
-		return model.KYCApplication{}, apperr.FailedPrecondition("儲存草稿必須在 transaction 外開始")
-	}
-	if err := validateDocumentInput(in); err != nil {
+	if err := validateDocumentInput(ctx, in); err != nil {
 		return model.KYCApplication{}, err
 	}
 	now := s.d.Now().UTC()
@@ -156,10 +151,6 @@ func (s *Service) SaveDraft(ctx context.Context, in model.KYCDraftInput) (model.
 		return model.KYCApplication{}, err
 	}
 	next, diff, err := applyDraft(base, in, create, now)
-	if err != nil {
-		return model.KYCApplication{}, err
-	}
-	uploaded, err := s.finalizeUploads(ctx, in)
 	if err != nil {
 		return model.KYCApplication{}, err
 	}
@@ -215,18 +206,20 @@ func (s *Service) SaveDraft(ctx context.Context, in model.KYCDraftInput) (model.
 		if err != nil {
 			return err
 		}
+		uploaded, err := s.confirmUploads(ctx, in)
+		if err != nil {
+			return err
+		}
 		docsAfter, retired, err := s.mergeDocuments(ctx, q, row, in, uploaded)
 		if err != nil {
+			return err
+		}
+		if err := markDeleted(ctx, s.d.Media, retired); err != nil {
 			return err
 		}
 		if current != nil {
 			// 退回指出的問題：這次寫入改掉的標成已處理（同一個 transaction，比對寫入前後的列與證件）。
 			if err := resolveIssues(ctx, q, row.ApplicationID, now, diff, docsBefore, docsAfter); err != nil {
-				return err
-			}
-		}
-		if len(uploaded) > 0 || len(retired) > 0 {
-			if err := mediaref.Changed(ctx, q, s.d.Jobs, now, mediaref.CertificationRef(row.ApplicationID), retired...); err != nil {
 				return err
 			}
 		}
@@ -468,7 +461,7 @@ func (s *Service) Cancel(ctx context.Context, in model.CancelKYCInput) (model.KY
 		if err != nil {
 			return err
 		}
-		if err := retireApplicationDocuments(ctx, q, s.d.Jobs, now, row.ApplicationID); err != nil {
+		if err := retireApplicationDocuments(ctx, q, s.d.Media, row.ApplicationID); err != nil {
 			return err
 		}
 		err = events.Publish(ctx, s.d.Events, model.KYCCancelled{

@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/gcis"
@@ -33,13 +34,16 @@ func (noRegistry) Lookup(context.Context, string) (gcis.Registration, bool, erro
 	return gcis.Registration{}, false, nil
 }
 
+// noMedia 是 seller 的 media port 的替身：這些測試不上傳也不讀檔案。
 type noMedia struct{}
 
-func (noMedia) Finalize(context.Context, media.Uploader, string, string) (media.Asset, error) {
-	return media.Asset{}, nil
+func (noMedia) Confirm(context.Context, media.Uploader, string, media.Visibility) (media.ConfirmedAsset, error) {
+	return media.ConfirmedAsset{}, errors.New("not used")
 }
-func (noMedia) Link(context.Context, media.Ref, []string) error   { return nil }
-func (noMedia) Unlink(context.Context, media.Ref, []string) error { return nil }
+func (noMedia) MarkDeleted(context.Context, []uuid.UUID) error { return nil }
+func (noMedia) ReadSecure(context.Context, uuid.UUID) (io.ReadCloser, string, error) {
+	return nil, "", errors.New("not used")
+}
 
 type noOrders struct{}
 
@@ -83,7 +87,7 @@ func TestLoggedInProductViewSucceedsWithoutProductServiceAndIsRolledUpLater(t *t
 	clock := func() time.Time { return now }
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	accounts := identity.New(identity.Deps{DB: d, Events: bus, Now: clock, Logger: logger})
-	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: queue, Now: clock, Logger: logger})
+	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Now: clock, Logger: logger})
 	kycMAC := sealtest.MAC(t)
 	products := &productStoresStub{err: errors.New("product service down")}
 	sellers := seller.New(seller.Deps{
@@ -163,9 +167,4 @@ func TestLoggedInProductViewSucceedsWithoutProductServiceAndIsRolledUpLater(t *t
 	if err := d.Conn(ctx).QueryRow(ctx, "SELECT day FROM seller.product_views_daily WHERE store_id = $1", store.StoreID).Scan(&day); err != nil || day.Format(time.DateOnly) != "2026-10-07" {
 		t.Fatalf("day=%v err=%v", day, err)
 	}
-}
-
-// ReadSecure 實作 media.Media；這些測試不讀機敏資產。
-func (noMedia) ReadSecure(context.Context, string, media.Ref) (media.SecureAsset, error) {
-	return media.SecureAsset{}, errors.New("not used")
 }

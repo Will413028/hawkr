@@ -199,11 +199,6 @@ func PostImageReplaceAndClear(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "不能同時換圖與清圖", Locale: uitext.ZhTW}
 }
 
-// PostImageUnusable 是模組句子 post.image_unusable；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func PostImageUnusable(l uitext.Locale) uitext.Message {
-	return uitext.Message{Text: "圖片無法使用，請重新上傳", Locale: uitext.ZhTW}
-}
-
 // PostNotFound 是模組句子 post.not_found；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func PostNotFound(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "找不到這篇貼文", Locale: uitext.ZhTW}

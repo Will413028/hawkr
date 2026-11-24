@@ -126,7 +126,7 @@ WHERE c.store_id = a.source_store_id AND c.reopened_at IS NULL
   AND sqlc.arg(now)::timestamptz > c.closed_at + make_interval(hours => sqlc.arg(hours)::int);
 
 -- name: PurgeKYCDocuments :many
--- 刪掉已清理的申請的證件列（asset ID 與 object key），回傳刪掉的 asset：呼叫方把它們記成退場，media 的引用由同步 job 解除。
+-- 刪掉已清理的申請的證件列（asset ID 與 object key），回傳刪掉的 asset：呼叫方在同一個 transaction 內交給 media.MarkDeleted。
 DELETE FROM seller.kyc_documents
 WHERE application_id = ANY(sqlc.arg(application_ids)::uuid[])
 RETURNING application_id, asset_id;

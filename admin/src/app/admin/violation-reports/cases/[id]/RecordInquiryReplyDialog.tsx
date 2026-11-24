@@ -8,7 +8,7 @@ import { GovernanceNoticeBanner } from "@/app/admin/merchants/[id]/GovernanceNot
 import { toLocalInputSeconds } from "@/app/admin/merchants/[id]/measure";
 import { Button, Dialog } from "@/components/UI";
 import { connectErrorText } from "@/lib/error-text";
-import { uploadImageToMedia } from "@/services/media-upload";
+import { uploadFailureText, uploadImageToMedia } from "@/services/media-upload";
 import {
 	buildInquiryReply,
 	emptyReplyForm,
@@ -21,7 +21,7 @@ import {
 	inquiryChannelText,
 } from "../../inquiry-text";
 
-/** 附件一律是機敏檔（B27）：經 gateway 到 media-service 的機敏上傳，回 staged token。 */
+/** 附件一律是機敏檔（B27）：經單體媒體模組的機敏分段上傳，回 staged token。 */
 const uploadSecure = (file: File) =>
 	uploadImageToMedia(file, { isSecure: true });
 
@@ -78,8 +78,8 @@ export default function RecordInquiryReplyDialog({
 				}
 				staged.push(token);
 			}
-		} catch {
-			setError(INQUIRY_FAILED_TEXT);
+		} catch (caught) {
+			setError(uploadFailureText(caught, INQUIRY_FAILED_TEXT));
 			setSubmitting(false);
 			return;
 		}

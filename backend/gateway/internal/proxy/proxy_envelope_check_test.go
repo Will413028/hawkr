@@ -43,7 +43,7 @@ func TestWriteUpstreamFailureEnvelope_ShapeAndEscaping(t *testing.T) {
 func TestWriteUpstreamFailureEnvelope_DoesNotLeakUpstreamError(t *testing.T) {
 	for _, status := range []UpstreamFailureStatus{FailClientFacing, FailThirdPartyWebhook} {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest(http.MethodGet, "/api/v1/app/media/secure_download", nil)
+		r := httptest.NewRequest(http.MethodGet, "/api/v1/app/invoices/documents/1", nil)
 		writeUpstreamFailureEnvelope(w, r, status,
 			errors.New(`dial tcp 10.42.7.13:9936: connect: connection refused`))
 

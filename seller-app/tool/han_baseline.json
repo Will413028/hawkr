@@ -740,7 +740,6 @@
       "封鎖此人": 1,
       "尚無訊息": 1,
       "檢舉訊息": 1,
-      "無法取得商家ID，請重新登入後再試": 1,
       "線上": 1,
       "複製": 1,
       "離線": 1
@@ -1059,14 +1058,6 @@
     "lib/features/dashboard/presentation/shipment_anomaly_alert_banner.dart": {
       "您有 {} 筆配送異常": 1,
       "點此查看並處理": 1
-    },
-    "lib/features/media/data/media_repository.dart": {
-      "OSS 上傳失敗: {}": 1,
-      "上傳失敗: {}": 1,
-      "私密文件上傳失敗: {}": 1
-    },
-    "lib/features/media/data/private_document_uploader.dart": {
-      "上傳沒有回 staged token": 1
     },
     "lib/features/media/data/protected_media_remote_service.dart": {
       "媒體下載失敗": 1,

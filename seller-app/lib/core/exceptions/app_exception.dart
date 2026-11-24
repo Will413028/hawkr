@@ -165,6 +165,17 @@ class TimeoutException implements AppException {
   String toString() => 'TimeoutException: $message';
 }
 
+/// 伺服器拒絕上傳的圖片；[message] 是 `RejectReason` 的使用者面文字。
+class UploadRejectedException implements AppException {
+  @override
+  final String message;
+
+  const UploadRejectedException({required this.message});
+
+  @override
+  String toString() => 'UploadRejectedException: $message';
+}
+
 /// 其他未分類錯誤
 class UnknownException implements AppException {
   @override

@@ -1,23 +1,46 @@
 import 'dart:io';
 import 'dart:typed_data';
+
+import 'package:hawkr_api/gen/hawkr/media/v1alpha1/media.connect.client.dart';
+import 'package:hawkr_api/errors.dart' show DefaultErrorText;
+import 'package:hawkr_api/transport.dart' show Code;
+import 'package:hawkr_api/upload.dart' as upload;
+import 'package:hawkr_ui_text/hawkr_ui_text.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/exceptions/app_exception.dart';
-import '../../../core/networking/oss_service.dart';
+import '../../../core/l10n/ui_locale.dart';
+import '../../../core/networking/connect_provider.dart';
 import '../../../shared/utils/image_processing_service.dart';
 import 'media_model.dart';
 
 part 'media_repository.g.dart';
 
 @riverpod
-MediaRepository mediaRepository(Ref ref) =>
-    MediaRepository(ref.watch(ossServiceProvider));
+MediaRepository mediaRepository(Ref ref) => MediaRepository(
+  client: ref.watch(mediaClientProvider),
+  http: upload.IoUploadHttp(),
+  locale: () => ref.read(uiLocaleProvider),
+  defaults: ref.watch(defaultErrorTextProvider),
+);
 
 class MediaRepository {
-  final OssService _ossService;
+  MediaRepository({
+    required MediaAppServiceClient client,
+    required upload.UploadHttp http,
+    required UiLocale Function() locale,
+    required DefaultErrorText defaults,
+  }) : _client = client,
+       _http = http,
+       _locale = locale,
+       _defaults = defaults;
 
-  MediaRepository(this._ossService);
+  final MediaAppServiceClient _client;
+  final upload.UploadHttp _http;
+  final UiLocale Function() _locale;
+  final DefaultErrorText _defaults;
 
-  /// 上傳圖片，回傳 [UploadResult]（含 previewUrl 與 stagedToken）
+  /// 上傳圖片（流程在 `hawkr_api` 的 `upload.dart`），回傳 READY 的 [UploadResult.stagedToken]。
+  /// 伺服器拒絕時丟帶拒絕原因文字的 [ServerException]。
   Future<UploadResult> uploadImage({
     required File file,
     String contentType = 'image/jpeg',
@@ -35,27 +58,20 @@ class MediaRepository {
     final uploadContentType = compression.compressed
         ? 'image/jpeg'
         : contentType;
-    final filename = compression.compressed
-        ? _asJpegFilename(file.uri.pathSegments.last)
-        : file.uri.pathSegments.last;
-
-    final result = await _ossService.uploadImage(
-      imageBytes: compression.bytes,
-      filename: filename,
-      contentType: uploadContentType,
-    );
-
-    if (result == null) throw const ServerException('圖片上傳失敗');
-
-    return UploadResult(
-      previewUrl: result.previewUrl,
-      stagedToken: result.stagedToken,
-    );
-  }
-
-  static String _asJpegFilename(String filename) {
-    final dotIndex = filename.lastIndexOf('.');
-    if (dotIndex <= 0) return '$filename.jpg';
-    return '${filename.substring(0, dotIndex)}.jpg';
+    try {
+      final token = await upload.uploadImage(
+        client: _client,
+        http: _http,
+        bytes: compression.bytes,
+        contentType: uploadContentType,
+      );
+      return UploadResult(stagedToken: token);
+    } on upload.UploadRejected catch (e) {
+      throw ServerException(
+        e.reason.uiText(_locale()) ?? _defaults(Code.internal),
+      );
+    } on upload.UploadFailure {
+      throw ServerException(_defaults(Code.unavailable));
+    }
   }
 }

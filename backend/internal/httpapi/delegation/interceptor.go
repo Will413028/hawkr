@@ -92,20 +92,37 @@ func (i *interceptor) enter(ctx context.Context, procedure string, header http.H
 	if !ok {
 		return ctx, fmt.Errorf("httpapi/delegation：%s 沒有能力宣告", procedure)
 	}
-	credential := header.Get(OperationSessionHeader)
-	s, err := i.sessions.ResolveDelegation(ctx, credential, false)
+	caller, err := Authorize(ctx, i.sessions, i.logger, procedure, method, header)
 	if err != nil {
-		if apperr.KindOf(err) == apperr.KindUnauthenticated {
-			i.logger.WarnContext(ctx, "代行憑證解析不到 session", "security_event", "delegation_credential_unresolved",
-				"procedure", procedure, "credential_present", credential != "", "trace_id", rpc.TraceID(ctx), "user_agent", header.Get("User-Agent"))
-		}
-		return ctx, err
-	}
-	caller := Caller{Session: s, Method: method, CorrelationID: rpc.TraceID(ctx), UserAgent: header.Get("User-Agent")}
-	if err := i.sessions.AuthorizeDelegated(ctx, caller); err != nil {
 		return ctx, err
 	}
 	return context.WithValue(ctx, callerKey{}, caller), nil
+}
+
+// Authorize 是 interceptor 與不經 Connect 的代行路由（後台檔案端點）共用的授權：讀 X-HK-Operation-Session，解析 session（解析不到回 unauthenticated 並記安全 log），
+// 再以 AuthorizeDelegated 檢查 session 此刻 ACTIVE 並帶有 method 的能力，被拒絕時寫一列 FAILED 稽核。procedure 只用在 log 與稽核的來源標示。
+func Authorize(ctx context.Context, sessions Sessions, logger *slog.Logger, procedure string, method moddelegation.DelegatedMethod, header http.Header) (Caller, error) {
+	credential := header.Get(OperationSessionHeader)
+	s, err := sessions.ResolveDelegation(ctx, credential, false)
+	if err != nil {
+		if apperr.KindOf(err) == apperr.KindUnauthenticated {
+			logger.WarnContext(ctx, "代行憑證解析不到 session", "security_event", "delegation_credential_unresolved",
+				"procedure", procedure, "credential_present", credential != "", "trace_id", rpc.TraceID(ctx), "user_agent", header.Get("User-Agent"))
+		}
+		return Caller{}, err
+	}
+	caller := Caller{Session: s, Method: method, CorrelationID: rpc.TraceID(ctx), UserAgent: header.Get("User-Agent")}
+	if err := sessions.AuthorizeDelegated(ctx, caller); err != nil {
+		return Caller{}, err
+	}
+	return caller, nil
+}
+
+// Touch 順延代行 session 的閒置逾時；請求成功之後才呼叫，失敗只記 error，不改變已完成的請求結果。interceptor 與不經 Connect 的代行路由共用。
+func Touch(ctx context.Context, sessions Sessions, logger *slog.Logger, sessionID int64) {
+	if err := sessions.TouchDelegation(ctx, sessionID); err != nil {
+		logger.ErrorContext(ctx, "代行 session 順延閒置逾時失敗", "session_id", sessionID, "err", err)
+	}
 }
 
 func (i *interceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
@@ -120,9 +137,7 @@ func (i *interceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 		}
 		// 請求成功才算活動：被拒絕或失敗的請求（含 handler 與元件內的拒絕）不順延閒置逾時；順延失敗不改變已完成的請求結果。
 		if c, cerr := CallerFrom(ctx); cerr == nil {
-			if terr := i.sessions.TouchDelegation(ctx, c.Session.ID); terr != nil {
-				i.logger.ErrorContext(ctx, "代行 session 順延閒置逾時失敗", "session_id", c.Session.ID, "err", terr)
-			}
+			Touch(ctx, i.sessions, i.logger, c.Session.ID)
 		}
 		return resp, nil
 	}

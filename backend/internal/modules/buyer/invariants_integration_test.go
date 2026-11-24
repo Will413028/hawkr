@@ -80,14 +80,14 @@ func TestProfilePartialUpdateAndPendingWrites(t *testing.T) {
 	must(t, fixture.module.UnsubscribeRestock(ctx, buyer.BuyerID, 10))
 	current, err := fixture.module.Profile(ctx, buyer.AccountID)
 	must(t, err)
-	token := "token"
+	token, _ := stageAvatar(t, fixture, buyer.AccountID)
 	updatedAvatar, err := fixture.module.UpdateProfile(ctx, UpdateProfileInput{
 		BuyerID:           buyer.BuyerID,
 		ExpectedVersion:   current.Version,
 		AvatarStagedToken: &token,
 	})
 	must(t, err)
-	if updatedAvatar.Avatar == nil || *updatedAvatar.Avatar != "avatar/token" {
+	if updatedAvatar.Avatar == nil || !strings.HasPrefix(*updatedAvatar.Avatar, "public/") {
 		t.Fatal(updatedAvatar)
 	}
 	for _, write := range []func() error{
@@ -206,7 +206,7 @@ func TestDeletionPIIBoundaries(t *testing.T) {
 	}
 }
 
-// 關閉買家的副作用：補貨取消、BuyerDeleted 恰好一次（時間是關閉當下）、排一個頭像釋放；重送不重複。
+// 關閉買家的副作用：補貨取消、BuyerDeleted 恰好一次（時間是關閉當下）；重送不重複。頭像的終態釋放在 media_integration_test.go。
 func TestCloseForDeletionEffects(t *testing.T) {
 	t.Parallel()
 	fixture := setup(t)
@@ -226,9 +226,6 @@ func TestCloseForDeletionEffects(t *testing.T) {
 	}
 	if count(t, fixture, "SELECT count(*) FROM buyer.restock_subscriptions WHERE buyer_id=$1", buyer.BuyerID) != 0 {
 		t.Fatal("closing left restock active")
-	}
-	if len(fixture.jobs.args) != 1 || fixture.jobs.args[0].Kind() != "buyer.media_sync" {
-		t.Fatal("closing did not enqueue exactly one avatar release", fixture.jobs.args)
 	}
 }
 

@@ -1363,9 +1363,6 @@
       "請先選擇規格": 1,
       "這是你的商品，買家購買功能已停用。": 1
     },
-    "lib/features/media/data/media_repository.dart": {
-      "圖片上傳失敗": 1
-    },
     "lib/features/member_card/presentation/spending_records_screen.dart": {
       "• 退回總額可以當成下次購物扣款使用": 1,
       "優惠券折抵": 1,

@@ -10,7 +10,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/orderservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/reviewrelay"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -19,9 +18,9 @@ import (
 )
 
 // newReview 組裝 review 模組並訂閱買家的刪除事件（單體規則 4 的原子狀態變更：同 transaction 只排清除 job，可見性由 buyer.pub_inactive_buyers() 提供）。serve 與 worker 都要呼叫：serve 的刪帳申請與 worker 的 CompletePending 都會發買家事件，worker 另外執行
-// 它的 job（媒體引用同步、刪帳清除與其保底掃描）。評價的寫入入口只有單體，所以 relay 在這裡接上，是 review.created、
+// 它的 job（刪帳清除與其保底掃描）。評價的寫入入口只有單體，所以 relay 在這裡接上，是 review.created、
 // review.hidden 唯一的 producer。
-func newReview(d *db.DB, bus *events.Bus, jc jobs.Enqueuer, buyers *buyer.Module, sellers *seller.Module, med media.Media, orders reviewOrderClient, log *slog.Logger) *review.Module {
+func newReview(d *db.DB, bus *events.Bus, jc jobs.Enqueuer, buyers *buyer.Module, sellers *seller.Module, med mediaPort, orders reviewOrderClient, log *slog.Logger) *review.Module {
 	m := review.New(review.Deps{
 		DB: d, Events: bus, Media: med, Jobs: jc, Buyers: buyers, Stores: sellers, Orders: reviewOrders{orders},
 		NewID: uuid.NewV7, Now: time.Now, Logger: log,

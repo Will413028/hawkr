@@ -18,9 +18,12 @@ import (
 
 // 賣家端的詢問：以帳號為範圍，擁有者是店家所屬的帳號。
 
-func (f *fixture) sellerReply(t *testing.T, accountID int64, inquiryID uuid.UUID, body string, tokens ...string) (SellerInquiry, error) {
+// sellerReply 以賣家的身分回覆詢問；每個 name 放一份機敏附件（內容是 evidencePDF(name)，上傳者是這個帳號）。
+func (f *fixture) sellerReply(t *testing.T, accountID int64, inquiryID uuid.UUID, body string, names ...string) (SellerInquiry, error) {
 	t.Helper()
-	return f.module.ReplyToInquiry(context.Background(), ReplyToInquiryInput{AccountID: accountID, InquiryID: inquiryID, Body: body, EvidenceTokens: tokens})
+	return f.module.ReplyToInquiry(context.Background(), ReplyToInquiryInput{
+		AccountID: accountID, InquiryID: inquiryID, Body: body, EvidenceTokens: f.evidence(t, media.Uploader{ID: accountID}, names...),
+	})
 }
 
 func (f *fixture) sellerList(t *testing.T, accountID int64, state *InquiryState) SellerInquiryPage {
@@ -53,12 +56,10 @@ func TestSellerCannotReadOrReplyToAnotherStoresInquiry(t *testing.T) {
 	wantKind(t, err, apperr.KindNotFound)
 	_, err = f.module.AccountInquiry(ctx, owner, uuid.NewV7())
 	wantKind(t, err, apperr.KindNotFound)
-	finalized := len(f.media.finalized)
-	_, err = f.sellerReply(t, stranger, i.ID, "不是我的店", "doc")
+	strangerToken, strangerAsset := f.stageSecure(t, media.Uploader{ID: stranger}, evidencePDF("doc"))
+	_, err = f.module.ReplyToInquiry(ctx, ReplyToInquiryInput{AccountID: stranger, InquiryID: i.ID, Body: "不是我的店", EvidenceTokens: []string{strangerToken}})
 	wantKind(t, err, apperr.KindNotFound)
-	if len(f.media.finalized) != finalized {
-		t.Fatal("不屬於這個帳號的詢問不能轉正附件")
-	}
+	f.wantAsset(t, strangerAsset, "STAGED")
 	if f.count(t, "SELECT count(*) FROM seller.case_inquiries WHERE reply_received_at IS NOT NULL") != 0 {
 		t.Fatal("別人的回覆寫入了")
 	}
@@ -108,7 +109,6 @@ func TestSellerReplyEndsTheInquiryAndIsVisibleToAdmin(t *testing.T) {
 		t.Fatal("不合法的輸入寫入了")
 	}
 
-	uploaders := len(f.media.uploaders)
 	got, err := f.sellerReply(t, owner, i.ID, "  已附上進貨單  ", "doc1", "doc2")
 	must(t, err)
 	r := got.Reply
@@ -116,9 +116,8 @@ func TestSellerReplyEndsTheInquiryAndIsVisibleToAdmin(t *testing.T) {
 		r.RepliedByAccountID != owner || r.RecordedByAdminID != 0 || !r.ReceivedAt.Equal(f.now) || !r.RecordedAt.Equal(f.now) || len(r.Evidence) != 0 {
 		t.Fatalf("reply=%+v", got)
 	}
-	newUploaders := f.media.uploaders[uploaders:]
-	if len(newUploaders) != 2 || newUploaders[0] != (media.Uploader{ID: owner}) || newUploaders[1] != (media.Uploader{ID: owner}) {
-		t.Fatalf("uploaders=%+v", newUploaders)
+	if n := f.activeEvidenceAssets(t, i.ID); n != 2 {
+		t.Fatalf("有效的附件資產=%d", n)
 	}
 	after := f.caseOf(t, c.ID)
 	if after.Version != before.Version+1 || !after.UpdatedAt.Equal(f.now) || after.AwaitingSeller() {
@@ -183,12 +182,10 @@ func TestSellerCannotReplyToAWithdrawnInquiry(t *testing.T) {
 	i := f.mustInquire(t, f.foodCase(t, s.StoreID).ID).Inquiry
 	_, err := f.module.WithdrawCaseInquiry(ctx, WithdrawCaseInquiryInput{InquiryID: i.ID, AdminID: inquiryWithdraw})
 	must(t, err)
-	finalized := len(f.media.finalized)
-	_, err = f.sellerReply(t, owner, i.ID, "太晚了", "doc")
+	lateToken, lateAsset := f.stageSecure(t, media.Uploader{ID: owner}, evidencePDF("doc"))
+	_, err = f.module.ReplyToInquiry(ctx, ReplyToInquiryInput{AccountID: owner, InquiryID: i.ID, Body: "太晚了", EvidenceTokens: []string{lateToken}})
 	wantBlocked(t, err, "這筆詢問已撤回")
-	if len(f.media.finalized) != finalized {
-		t.Fatal("已撤回的詢問不能轉正附件")
-	}
+	f.wantAsset(t, lateAsset, "STAGED")
 	got, err := f.module.AccountInquiry(ctx, owner, i.ID)
 	must(t, err)
 	if got.State() != InquiryStateWithdrawn || got.CanReply || got.Withdrawn == nil {

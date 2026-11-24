@@ -1,0 +1,22 @@
+{
+ "mutants": [
+  {
+   "id": "im-send-entry-lock-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/im/internal/write/send.go",
+   "old": "q.LockSendRequest(ctx, store.LockSendRequestParams{\n\t\t\tBuyerID: t.buyerID, StoreID: t.store.StoreID, SenderKind: string(sender), RequestID: in.RequestID,\n\t\t})",
+   "new": "error(nil)",
+   "test": "internal/modules/im ^TestSecondSendOfTheSameRequestWaitsOnTheEntryLock$",
+   "why": "Send 不取 request_id 的 advisory lock：同一個 request_id 的第二個 Send 不再等在入口，先去 Confirm（B1-D26）"
+  },
+  {
+   "id": "im-send-replay-in-transaction-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/im/internal/write/send.go",
+   "old": "\t\tif first, found, err := s.replay(ctx, l, in, t, body); err != nil || found {\n\t\t\tout = first\n\t\t\treturn err\n\t\t}\n",
+   "new": "",
+   "test": "internal/modules/im ^TestSecondSendOfTheSameRequestWaitsOnTheEntryLock$",
+   "why": "取得 advisory lock 之後不重做重送判定：輸家直接 Confirm 已被贏家認領的 token 而失敗，而不是回第一則（B1-D26）"
+  }
+ ]
+}

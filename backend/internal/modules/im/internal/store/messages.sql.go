@@ -52,7 +52,7 @@ type GetMessageForRelayRow struct {
 	SenderKind       string
 	MessageType      string
 	Content          *string
-	ImageAssetID     *string
+	ImageAssetID     *uuid.UUID
 	ImageObjectKey   *string
 	CreatedAt        time.Time
 	ErasedAt         *time.Time
@@ -89,7 +89,6 @@ const insertMessage = `-- name: InsertMessage :one
 
 INSERT INTO im.messages (id, conversation_id, seq, sender_kind, request_id, message_type, content, image_asset_id, image_object_key, created_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-ON CONFLICT ON CONSTRAINT messages_request_key DO NOTHING
 RETURNING id, conversation_id, seq, sender_kind, request_id, message_type, content, image_asset_id, image_object_key, created_at, erased_at
 `
 
@@ -101,13 +100,13 @@ type InsertMessageParams struct {
 	RequestID      uuid.UUID
 	MessageType    string
 	Content        *string
-	ImageAssetID   *string
+	ImageAssetID   *uuid.UUID
 	ImageObjectKey *string
 	Now            time.Time
 }
 
 // 訊息列：寫入、讀取、抹除。
-// 撞 (對話, 寄件方, request_id) 的唯一鍵時不寫、不回列（pgx.ErrNoRows）：呼叫端把整個 transaction 回滾（連同 AllocateSeq 推進的 seq）再重來，重讀第一則。
+// 呼叫端已持有 LockSendRequest 的鎖並做過重送判定，所以不會撞 (對話, 寄件方, request_id) 的唯一鍵；唯一鍵留作最後防線，撞到回錯誤（Internal）。
 func (q *Queries) InsertMessage(ctx context.Context, arg InsertMessageParams) (ImMessage, error) {
 	row := q.db.QueryRow(ctx, insertMessage,
 		arg.ID,
@@ -210,7 +209,7 @@ type ListMessagesAfterRow struct {
 	SenderKind     string
 	MessageType    string
 	Content        *string
-	ImageAssetID   *string
+	ImageAssetID   *uuid.UUID
 	ImageObjectKey *string
 	CreatedAt      time.Time
 	ErasedAt       *time.Time
@@ -274,7 +273,7 @@ type ListMessagesBeforeRow struct {
 	SenderKind     string
 	MessageType    string
 	Content        *string
-	ImageAssetID   *string
+	ImageAssetID   *uuid.UUID
 	ImageObjectKey *string
 	CreatedAt      time.Time
 	ErasedAt       *time.Time
@@ -330,7 +329,7 @@ type LockBuyerMessageBatchParams struct {
 
 type LockBuyerMessageBatchRow struct {
 	ID           uuid.UUID
-	ImageAssetID *string
+	ImageAssetID *uuid.UUID
 }
 
 // 抹除的一批：依 id 升序鎖住這個買家身分寄出、還沒抹除的訊息（重跑時只剩沒抹的）。
@@ -354,6 +353,28 @@ func (q *Queries) LockBuyerMessageBatch(ctx context.Context, arg LockBuyerMessag
 	return items, nil
 }
 
+const lockSendRequest = `-- name: LockSendRequest :exec
+SELECT pg_advisory_xact_lock(hashtextextended('im.send:' || $1::bigint::text || ':' || $2::bigint::text || ':' || $3::text || ':' || $4::uuid::text, 0))
+`
+
+type LockSendRequestParams struct {
+	BuyerID    int64
+	StoreID    int64
+	SenderKind string
+	RequestID  uuid.UUID
+}
+
+// 同一個 (買家, 店家, 寄件方, request_id) 的送出在這裡排隊（交易級 advisory lock，不鎖業務列，不在鎖序裡）：取得之後的 MessageByRequest 看得到前一個交易已提交的訊息。
+func (q *Queries) LockSendRequest(ctx context.Context, arg LockSendRequestParams) error {
+	_, err := q.db.Exec(ctx, lockSendRequest,
+		arg.BuyerID,
+		arg.StoreID,
+		arg.SenderKind,
+		arg.RequestID,
+	)
+	return err
+}
+
 const lockStoreMessageBatch = `-- name: LockStoreMessageBatch :many
 SELECT m.id, m.image_asset_id FROM im.messages AS m
 JOIN im.conversations AS c ON c.id = m.conversation_id
@@ -370,7 +391,7 @@ type LockStoreMessageBatchParams struct {
 
 type LockStoreMessageBatchRow struct {
 	ID           uuid.UUID
-	ImageAssetID *string
+	ImageAssetID *uuid.UUID
 }
 
 func (q *Queries) LockStoreMessageBatch(ctx context.Context, arg LockStoreMessageBatchParams) ([]LockStoreMessageBatchRow, error) {
@@ -417,7 +438,7 @@ type MessageByRequestRow struct {
 	SenderKind     string
 	MessageType    string
 	Content        *string
-	ImageAssetID   *string
+	ImageAssetID   *uuid.UUID
 	ImageObjectKey *string
 	CreatedAt      time.Time
 	ErasedAt       *time.Time
@@ -495,7 +516,7 @@ type MessagesForReportRow struct {
 	SenderKind     string
 	MessageType    string
 	Content        *string
-	ImageAssetID   *string
+	ImageAssetID   *uuid.UUID
 	CreatedAt      time.Time
 	ErasedAt       *time.Time
 	BuyerID        int64

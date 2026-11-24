@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 	"time"
@@ -52,6 +53,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/discovery/v1alpha1/discoveryv1alpha1connect"
 	identityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/identity/v1alpha1/identityv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/imageai/v1alpha1/imageaiv1alpha1connect"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/media/v1alpha1/mediav1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/moderation/v1alpha1/moderationv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/notification/v1alpha1/notificationv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/procurement/v1alpha1/procurementv1alpha1connect"
@@ -60,6 +62,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1/socialv1alpha1connect"
 	httpidentity "github.com/Will413028/hawkr/backend/internal/httpapi/identity"
 	httpimageai "github.com/Will413028/hawkr/backend/internal/httpapi/imageai"
+	httpmedia "github.com/Will413028/hawkr/backend/internal/httpapi/media"
 	httpmoderation "github.com/Will413028/hawkr/backend/internal/httpapi/moderation"
 	httpnotification "github.com/Will413028/hawkr/backend/internal/httpapi/notification"
 	httppayment "github.com/Will413028/hawkr/backend/internal/httpapi/payment"
@@ -78,6 +81,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/imageai"
+	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
@@ -125,6 +129,8 @@ type Deps struct {
 	CRM *crm.Module
 	// Moderation 是檢舉的送出與讀自己的檢舉（ModerationAppService）。
 	Moderation *moderation.Module
+	// Media 是公開圖片的暫存上傳（MediaAppService）；nil 時每個方法回 unavailable。
+	Media *media.Module
 	// Notification 是通知：登入帳號的收件匣、偏好、裝置 token 與訊號串流（NotificationAppService）與後台公告（NotificationAdminService）。
 	Notification *notification.Module
 	// Assistant 是買家助理（AssistantAppService）。
@@ -250,6 +256,14 @@ func NewHandler(deps Deps) (http.Handler, error) {
 	return assemble(deps, services, fileRoutes(deps)...)
 }
 
+// mediaUploads 把還沒接上的 media（nil 指標）轉成 nil 介面，NewDelegated 的 nil 判斷才成立。
+func mediaUploads(m *media.Module) httpmedia.DelegatedUploads {
+	if m == nil {
+		return nil
+	}
+	return m
+}
+
 // handlerOptions 是每個 Connect service 共用的 handler 選項：攔截器、讀取上限與壓縮門檻。New 與測試用同一份。
 func handlerOptions(log *slog.Logger) []connect.HandlerOption {
 	return []connect.HandlerOption{
@@ -269,12 +283,31 @@ type fileRoute struct {
 	permission adminperm.Permission
 }
 
-// fileRoutes 是單體的檔案回應：後台讀 KYC 證件圖片（限時授權、每次讀取寫稽核）與治理佐證（通報、措施上請求與詢問回覆的附件，每次讀取寫紀錄）。
+// fileRoutes 是單體的檔案端點：顧客的機敏檔分段上傳（B1-D17）與暫存預覽、代行營運的段上傳與暫存預覽（B1-D16，只以有效的代行 session 憑證授權，不是後台路由）；賣家讀自己申請的補充文件（顧客 session，B1-D19）；後台讀 KYC 證件圖片（限時授權、每次讀取寫稽核）與治理佐證（通報、措施上請求與詢問回覆的附件，每次讀取寫紀錄）。
 func fileRoutes(deps Deps) []fileRoute {
+	routes := sellerFileRoutes(deps)
+	if deps.Media != nil {
+		secure := httpmedia.NewSecureUploads(deps.Media, deps.Logger)
+		if deps.Delegation != nil {
+			secure.WithDelegation(deps.Delegation)
+		}
+		routes = append(routes,
+			fileRoute{pattern: httpmedia.ChunkRoute, handler: secure.Chunk()},
+			fileRoute{pattern: httpmedia.DelegatedChunkRoute, handler: secure.DelegatedChunk()},
+			fileRoute{pattern: httpmedia.PreviewRoute, handler: secure.Preview()},
+			fileRoute{pattern: httpmedia.DelegatedPreviewRoute, handler: secure.DelegatedPreview()})
+	}
+	return routes
+}
+
+func sellerFileRoutes(deps Deps) []fileRoute {
 	if deps.Seller == nil {
 		return nil
 	}
 	return []fileRoute{{
+		pattern: httpseller.OwnDocumentRoute,
+		handler: httpseller.NewOwnDocuments(deps.Seller, deps.Logger),
+	}, {
 		pattern:    httpseller.DocumentRoute,
 		handler:    httpseller.NewAdminDocuments(deps.Seller, deps.Logger),
 		permission: adminperm.SellerKYCDocumentsGet,
@@ -400,6 +433,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 		return nil, err
 	}
 	add(socialv1alpha1connect.NewSocialAppServiceHandler(socialApp, opts...))
+	add(mediav1alpha1connect.NewMediaAppServiceHandler(httpmedia.NewApp(deps.Media, deps.Logger), opts...))
 	reviewPublic, err := httpreview.NewPublic(deps.Review, deps.Buyer, deps.Images, deps.Logger)
 	if err != nil {
 		return nil, err
@@ -516,6 +550,11 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 		return nil, err
 	}
 	add(socialv1alpha1connect.NewSocialDelegatedServiceHandler(delegatedSocial, append(slices.Clone(opts), connect.WithInterceptors(socialDelegated))...))
+	mediaDelegated, err := httpdelegation.NewInterceptor(deps.Delegation, deps.Logger, httpmedia.DelegatedDeclaration)
+	if err != nil {
+		return nil, err
+	}
+	add(mediav1alpha1connect.NewMediaDelegatedServiceHandler(httpmedia.NewDelegated(deps.Delegation, mediaUploads(deps.Media), deps.Logger), append(slices.Clone(opts), connect.WithInterceptors(mediaDelegated))...))
 	if err := checkAdminDeclarations(out); err != nil {
 		return nil, err
 	}
@@ -590,10 +629,60 @@ func withTracing(tp trace.TracerProvider, next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
-	return otelhttp.NewHandler(h, "hawkr",
+	traced := otelhttp.NewHandler(restoreURL(h), "hawkr",
 		otelhttp.WithTracerProvider(tp),
 		otelhttp.WithPropagators(propagation.NewCompositeTextMapPropagator()),
 		otelhttp.WithSpanNameFormatter(spanName))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if red, ok := redactedTokenPath(r.URL.Path); ok {
+			// otelhttp 從請求的 URL 取 url.path、http.target 與 url.full 寫進 span：先以遮掉 token 的副本交給它，
+			// 內層再還原真的 URL（restoreURL）。
+			rc := r.Clone(context.WithValue(r.Context(), realURLKey{}, r.URL))
+			u := *r.URL
+			u.Path, u.RawPath = red, ""
+			rc.URL = &u
+			rc.RequestURI = u.RequestURI()
+			r = rc
+		}
+		traced.ServeHTTP(w, r)
+	})
+}
+
+type realURLKey struct{}
+
+// restoreURL 在 otelhttp 之內把 URL 換回真的（withTracing 為 token 路徑換成遮罩的副本）。
+func restoreURL(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if u, ok := r.Context().Value(realURLKey{}).(*url.URL); ok {
+			r = r.Clone(r.Context())
+			r.URL = u
+			r.RequestURI = u.RequestURI()
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+const (
+	secureUploadsPrefix          = "/api/files/secure_uploads/"
+	delegatedSecureUploadsPrefix = "/api/files/delegated/secure_uploads/"
+)
+
+// redactedTokenPath 把機敏上傳端點（顧客的 /api/files/secure_uploads/ 與代行營運的 /api/files/delegated/secure_uploads/）路徑裡的暫存 token 換成 {token}；
+// 不是這類路徑回 false。token 是持有即可預覽的憑據，不進 trace。
+func redactedTokenPath(path string) (string, bool) {
+	if !strings.Contains(path, "secure_uploads") {
+		return "", false
+	}
+	for _, prefix := range []string{secureUploadsPrefix, delegatedSecureUploadsPrefix} {
+		if rest, ok := strings.CutPrefix(path, prefix); ok {
+			_, tail, _ := strings.Cut(rest, "/")
+			if idx, isChunk := strings.CutPrefix(tail, "chunks/"); tail == "" || isChunk && idx != "" && !strings.Contains(idx, "/") {
+				return prefix + "{token}" + strings.TrimSuffix("/"+tail, "/"), true
+			}
+			return prefix + "{redacted}", true
+		}
+	}
+	return "/api/files/{redacted}", true
 }
 
 // spanName 以 procedure 命名 Connect 的請求；其他路徑只用 method，掃描器亂打的路徑不會變成大量的 span 名稱。

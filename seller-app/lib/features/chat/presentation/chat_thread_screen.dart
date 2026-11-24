@@ -20,7 +20,6 @@ import '../../../core/l10n/ui_locale.dart';
 import '../../../core/motion/hk_motion_transitions.dart';
 import '../../../shared/utils/floating_toast.dart';
 import '../../../shared/utils/hk_log.dart';
-import '../../../shared/utils/image_format_detector.dart';
 import '../../../shared/widgets/chat_conversation_chrome.dart';
 import '../../../shared/widgets/chat_input_bar.dart';
 import '../../../shared/widgets/hk_async_state_panel.dart';
@@ -28,8 +27,7 @@ import '../../../shared/widgets/optimized_image.dart';
 import '../../dashboard/data/dashboard_chat_unread_provider.dart';
 import '../../report/presentation/widgets/block_actions.dart';
 import '../../report/presentation/widgets/report_sheet.dart';
-import '../../seller/data/current_store.dart';
-import '../../seller/data/seller_repository.dart';
+import '../../media/data/media_repository.dart';
 import '../data/active_chat_gate.dart';
 import '../data/chat_model.dart';
 import '../data/chat_repository.dart';
@@ -179,27 +177,11 @@ class ChatThreadScreen extends HookConsumerWidget {
         if (picked == null) return;
         final bytes = await picked.readAsBytes();
         if (bytes.isEmpty) return;
-        final mid = ref.read(sellerStoreIdProvider);
-        if (mid == null) {
-          if (context.mounted) {
-            FloatingToast.error(context, '無法取得商家ID，請重新登入後再試');
-          }
-          return;
-        }
         sending.value = true;
-        final (ext, mime) = ImageFormatDetector.detect(bytes);
         final upload = await ref
-            .read(sellerRepositoryProvider)
-            .uploadMedia(
-              sellerId: mid,
-              bytes: bytes,
-              filename: 'chat_${DateTime.now().millisecondsSinceEpoch}.$ext',
-              mimeType: mime,
-            );
-        final stagedToken = upload['data']?['stagedToken']?.toString();
-        if (stagedToken == null || stagedToken.isEmpty) {
-          throw StateError('upload returned no staged token');
-        }
+            .read(mediaRepositoryProvider)
+            .uploadChatImage(bytes: bytes);
+        final stagedToken = upload.stagedToken;
         await notifier.sendImage(stagedToken);
       } on Object catch (e) {
         HKLog.logD('[ChatThread] image send error: $e');

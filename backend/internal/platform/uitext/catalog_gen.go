@@ -311,6 +311,38 @@ func (t Text) CrmCustomerType(v string) (string, bool) {
 	return "", false
 }
 
+// MediaRejectReason 是 media.RejectReason 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) MediaRejectReason(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "UNRECOGNIZED_FORMAT":
+			return "The file format was not recognized. Use a JPEG, PNG, WebP or GIF image.", true
+		case "SIZE_MISMATCH":
+			return "The file size does not match what was declared. Please upload it again.", true
+		case "CHECKSUM_MISMATCH":
+			return "The file was corrupted during upload. Please upload it again.", true
+		case "PROCESSING_FAILED":
+			return "The file could not be processed. Try a different image.", true
+		case "EXPIRED":
+			return "The upload timed out. Please upload it again.", true
+		}
+	}
+	switch v {
+	case "UNRECOGNIZED_FORMAT":
+		return "無法辨識檔案格式，請改用 JPEG、PNG、WebP 或 GIF 圖片。", true
+	case "SIZE_MISMATCH":
+		return "檔案大小與宣告的不一致，請重新上傳。", true
+	case "CHECKSUM_MISMATCH":
+		return "檔案在上傳過程中損毀，請重新上傳。", true
+	case "PROCESSING_FAILED":
+		return "檔案處理失敗，請換一張圖片再試。", true
+	case "EXPIRED":
+		return "上傳已逾時，請重新上傳。", true
+	}
+	return "", false
+}
+
 // ModerationCommunityReportOutcomeUnset 是 moderation.CommunityReport.outcome_unset 的文案。
 func (t Text) ModerationCommunityReportOutcomeUnset() string {
 	if t.Locale() == EN {

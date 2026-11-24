@@ -6,7 +6,7 @@
 
 ## 擁有的資料
 
-schema `moderation`（表在 `db/schema.sql`，發布的函式與複合型別在 `db/objects.sql`）：`cases`（案件與決定）、`reports`（檢舉，不存結果）、`case_snapshots`（內容快照與它引用的圖片資產）、`reporter_daily_counts`（每日上限）、`media_ref_sync` 與 `retired_assets`（快照圖片在 media 的引用同步）。讀取模型：無。
+schema `moderation`（表在 `db/schema.sql`，發布的函式與複合型別在 `db/objects.sql`）：`cases`（案件與決定）、`reports`（檢舉，不存結果）、`case_snapshots`（內容快照與它引用的圖片資產）、`reporter_daily_counts`（每日上限）（`asset_ids` 是 moderation 自己確認的圖片複本的 UUID）。讀取模型：無。
 
 ## 發布的讀取介面
 
@@ -15,7 +15,7 @@ schema `moderation`（表在 `db/schema.sql`，發布的函式與複合型別在
 ## 模組內部結構
 
 - 根套件只保留 `Module`、`New`、轉呼叫方法、對外型別別名與 River 登記。
-- `internal/model` 型別與值域；`report` 送出；`handle` 處理與結案；`snapshot` 快照（依對象種類的 tagged union）的正規化、雜湊與讀回；`retention` 快照與說明的保留期、買家刪除與店家退場的訂閱者；`mediaref` 快照圖片的 media 引用（演算法在 media）；`text` 伺服器句子（`make uitext`）；`view` 讀取與轉換；`store` 是 sqlc。`Retention`（`NewRetention`）是 worker 與事件組裝用的子集，不需要 social、seller、accountsuspension。
+- `internal/model` 型別與值域；`report` 送出；`handle` 處理與結案；`snapshot` 快照（依對象種類的 tagged union）的正規化、雜湊與讀回；`retention` 快照與說明的保留期、買家刪除與店家退場的訂閱者；`text` 伺服器句子（`make uitext`）；`view` 讀取與轉換；`store` 是 sqlc。`Retention`（`NewRetention`）是 worker 與事件組裝用的子集，不需要 social、seller、accountsuspension。
 - 依賴圖的唯一來源是 `internal/arch/modules.go`；依賴 social、review、im、seller、buyer、`accountsuspension`、media，不依賴 identity（停權只經 `accountsuspension`），不依賴 notification。
 
 ## 不變量
@@ -25,7 +25,7 @@ schema `moderation`（表在 `db/schema.sql`，發布的函式與複合型別在
 - 冪等：檢舉帶 `request_id` 時，`report_requests` 表以 `(reporter_buyer_id, request_id)` 為主鍵記下對應的檢舉與 `request_hash`（新建與併入既有檢舉都記，並行搶先時整輪重試）；同一位檢舉人的同一個 `request_id` 一律回第一次的檢舉，先於案件去重與每日額度，不看案件狀態（A7-D28 第 3 點）；內容不同是 InvalidInput。對外只回檢舉 ID 與收件時間，不露案件 ID。
 - 每日上限（`model.DailyReportLimit`）是單一 upsert（`BumpDailyCount`），重送已檢舉過的對象在扣額度之前回傳（`TestConcurrentSubmitsAreCappedAtTheDailyLimit`、`TestAtTheLimitAResendSucceedsButANewTargetIsRefused`）。
 - 快照每案每份內容一列，`UNIQUE (case_id, content_sha256)`；雜湊取 `snapshot.Encode` 正規化後的內容；結案滿 `model.SnapshotRetention` 後由 `moderation.purge_snapshots` 刪除（`TestSnapshotsArePurgedAfterTheRetentionAndCasesStay`）並清說明與冪等紀錄（`TestReportRequestsArePurgedWithTheDescriptions`），案件與檢舉列留著。
-- 快照引用的圖片在 media 有一筆以快照為 ref 的引用，引用只由同步 job 寫入，快照刪除才解除（`TestASnapshotHoldsItsImageUntilTheSnapshotIsPurged`）；檢舉人刪帳時同 transaction 清他的說明、冪等紀錄與每日計數列，檢舉列與 `reporter_buyer_id` 留著（`TestReporterDeletionClearsDescriptionsAndDailyCountButKeepsTheReports`）；店家退場同理。
+- 快照的圖片複本由送出時 `CopyPublic` 建立，只有保留期清理會 `MarkDeleted`，見 `internal/retention/AGENTS.md`。
 - 對象必須存在而且公開可讀，不能檢舉自己（含同一帳號的其他身分）；檢舉原因只能是 `policy.CommunityReporterSelectable()` 的八個值。
 - `OpenReportCounts` 只算進行中案件（`closed_at IS NULL`）的檢舉，已結案案件的檢舉不算，沒有進行中檢舉的貼文不在結果裡（`TestOpenReportCountsCountsOnlyReportsInOpenCases`）；`SocialAdminService.ListPosts` 在 `httpapi/social` 組合它與 social 的 `ListAdminPosts`，moderation 不依賴 social 的後台讀取。
 - `Cases` 列案件新到舊（keyset `(opened_at, id)`），狀態與對象種類空值是不篩、不合法的值回 InvalidInput（`TestCasesFilterByStateAndTargetKind`、`TestCasesKeysetPagingHasNoDuplicatesOrGaps`）。

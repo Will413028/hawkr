@@ -17,8 +17,8 @@ SELECT preview_image_asset_id, popup_image_asset_id FROM content.banners WHERE i
 `
 
 type BannerAssetsRow struct {
-	PreviewImageAssetID string
-	PopupImageAssetID   string
+	PreviewImageAssetID uuid.UUID
+	PopupImageAssetID   uuid.UUID
 }
 
 // 同步 job 讀的：banner 目前的兩張圖（沒有列時 pgx.ErrNoRows，也就是終態）。
@@ -111,8 +111,8 @@ type InsertBannerParams struct {
 	IsActive            bool
 	StartDate           *time.Time
 	EndDate             *time.Time
-	PreviewImageAssetID string
-	PopupImageAssetID   string
+	PreviewImageAssetID uuid.UUID
+	PopupImageAssetID   uuid.UUID
 }
 
 func (q *Queries) InsertBanner(ctx context.Context, arg InsertBannerParams) (ContentBanner, error) {
@@ -288,8 +288,8 @@ SELECT preview_image_asset_id, popup_image_asset_id FROM content.banners WHERE i
 `
 
 type LockBannerAssetsRow struct {
-	PreviewImageAssetID string
-	PopupImageAssetID   string
+	PreviewImageAssetID uuid.UUID
+	PopupImageAssetID   uuid.UUID
 }
 
 // 鎖住 banner 並回傳它目前的兩張圖的 asset ID（換圖與刪除要把被換掉的記成退場）。
@@ -334,8 +334,8 @@ type UpdateBannerParams struct {
 	IsActive            bool
 	StartDate           *time.Time
 	EndDate             *time.Time
-	PreviewImageAssetID *string
-	PopupImageAssetID   *string
+	PreviewImageAssetID *uuid.UUID
+	PopupImageAssetID   *uuid.UUID
 	ExpectedVersion     int64
 }
 

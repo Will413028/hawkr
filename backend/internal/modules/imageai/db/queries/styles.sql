@@ -26,9 +26,9 @@ INSERT INTO imageai.styles (
 RETURNING *;
 
 -- name: UpdateStyle :one
--- 條件式 UPDATE：版本不符時沒有列被更新（pgx.ErrNoRows）；缺圖的 token 為空時 thumbnail_* 沿用（呼叫端傳目前的值）。
+-- 條件式 UPDATE：版本不符時沒有列被更新（pgx.ErrNoRows）；沿用目前的縮圖時 thumbnail_key 傳目前的值、thumbnail_asset_id 傳 NULL。
 UPDATE imageai.styles
-SET label = @label, prompt = @prompt, thumbnail_key = @thumbnail_key, thumbnail_asset_id = @thumbnail_asset_id,
+SET label = @label, prompt = @prompt, thumbnail_key = @thumbnail_key, thumbnail_asset_id = COALESCE(sqlc.narg(thumbnail_asset_id), thumbnail_asset_id),
     display_order = @display_order, enabled = @enabled,
     version = version + 1, updated_at = @now
 WHERE id = @id AND version = @expected_version
@@ -53,6 +53,6 @@ RETURNING *;
 -- name: DeleteStyle :execrows
 DELETE FROM imageai.styles WHERE id = $1;
 
--- name: StyleThumbnailAsset :one
--- 同步 job 讀的：風格目前的縮圖資產（沒有列時 pgx.ErrNoRows，也就是終態；沒有縮圖是空字串）。
-SELECT thumbnail_asset_id FROM imageai.styles WHERE id = $1;
+-- name: LockStyleThumbnailAsset :one
+-- 鎖住風格並回傳目前的縮圖資產（沒有縮圖是 NULL；換圖與刪除要把被換掉的標記刪除）。
+SELECT thumbnail_asset_id FROM imageai.styles WHERE id = $1 FOR UPDATE;

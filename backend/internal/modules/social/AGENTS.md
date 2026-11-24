@@ -6,7 +6,7 @@
 
 ## 擁有的資料
 
-schema `social`（`db/schema.sql`；函式與 trigger 在 `db/objects.sql`，沒有 view），依子領域：貼文與 hashtag、排程發布（`post_schedules`）、留言與讚、討論區、計數、處分與隱藏、買家刪帳與內容下架的複本、瀏覽與分享、media 引用同步。表單見規格 §1。讀取模型：無。
+schema `social`（`db/schema.sql`；函式與 trigger 在 `db/objects.sql`，沒有 view），依子領域：貼文與 hashtag、排程發布（`post_schedules`）、留言與讚、討論區、計數、處分與隱藏、買家刪帳與內容下架的複本、瀏覽與分享。貼文圖的資產 ID 是 UUID，資產由 media 擁有。表單見規格 §1。讀取模型：無。
 
 ## 發布的讀取介面
 

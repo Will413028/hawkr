@@ -136,10 +136,9 @@ func startAdminStack(t *testing.T) *adminStack {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	bus := events.NewBus()
 	id := identity.New(identity.Deps{DB: d, Events: bus, Providers: identity.Providers{Admin: dev.Admins()}, Now: time.Now, Logger: log})
-	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: queue, Now: time.Now, Logger: log})
+	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
 	events.Subscribe(bus, buyers.OnAccountCreated)
 	fakeMedia := media.NewFake()
-	fakeMedia.Key = func(refType, token string) string { return refType + "/" + token }
 	sellers := seller.New(seller.Deps{
 		DB: d, Events: bus, Jobs: queue, Identity: id, Media: fakeMedia, Orders: noOrders{}, KYCMAC: sealtest.MAC(t),
 		ProductStores: noProducts{}, Registry: noRegistry{}, Now: time.Now, Logger: log,
@@ -149,7 +148,7 @@ func startAdminStack(t *testing.T) *adminStack {
 	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: sellers, Now: time.Now, Logger: log}
 	reader := seller.NewReader(d, time.Now)
 	socialModule := social.New(social.Deps{
-		DB: d, Events: bus, Media: fakeMedia, Jobs: queue, Buyers: buyers, Stores: reader, StoreBlocks: sellers, NewID: uuid.NewV7, Now: time.Now, Logger: log,
+		DB: d, Events: bus, Media: ownerMedia{}, Jobs: queue, Buyers: buyers, Stores: reader, StoreBlocks: sellers, NewID: uuid.NewV7, Now: time.Now, Logger: log,
 		ScheduleAuthorizers: map[social.ScheduleKind]social.ScheduleAuthorizer{social.ScheduleByDelegation: delegation.NewScheduleAuthorizer(delegationDeps)},
 	})
 	delegationDeps.Social = socialModule
@@ -158,7 +157,7 @@ func startAdminStack(t *testing.T) *adminStack {
 	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellers, Logger: log})
 	mod := moderation.New(moderation.Deps{
 		DB: d, Social: socialModule, Review: &review.Module{}, IM: &im.Module{}, Seller: sellers, Buyer: buyers, Suspension: suspension,
-		Media: fakeMedia, Jobs: queue, NewID: uuid.NewV7, Now: time.Now, Logger: log,
+		Media: fakeMedia, NewID: uuid.NewV7, Now: time.Now, Logger: log,
 	})
 	images, err := rpc.NewImages("https://media.example.test")
 	if err != nil {
@@ -251,7 +250,7 @@ func (s *adminStack) world(t *testing.T) world {
 		         WHERE conrelid = 'seller.kyc_applications'::regclass AND contype = 'c'
 		LOOP EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.t, r.conname); END LOOP; END $$`)
 	s.exec(t, `INSERT INTO seller.stores (store_code, account_id, store_name, logo_key, logo_asset_id, town_code, created_at, updated_at)
-		VALUES ($1, $1, '測試店', 'logo/k', 'logo-asset', '63000010', $2, $2)`, accountID, now)
+		VALUES ($1, $1, '測試店', 'logo/k', uuidv7(), '63000010', $2, $2)`, accountID, now)
 	if err := s.db.Conn(ctx).QueryRow(ctx, "SELECT store_id FROM seller.stores WHERE account_id = $1", accountID).Scan(&storeID); err != nil {
 		t.Fatal(err)
 	}
@@ -450,3 +449,12 @@ func TestDecideCaseClosesAndRejectsStaleEtags(t *testing.T) {
 		wantCode(t, "已結案再決定", err, connect.CodeAborted)
 	}
 }
+
+// ownerMedia 是 social 的 media 替身：每個 staged token 都確認成功，資產 ID 每次新產生。
+type ownerMedia struct{}
+
+func (ownerMedia) Confirm(_ context.Context, _ media.Uploader, token string, _ media.Visibility) (media.ConfirmedAsset, error) {
+	return media.ConfirmedAsset{ID: uuid.NewV7(), ObjectKey: "post/" + token + ".jpg", Visibility: media.VisibilityPublic}, nil
+}
+
+func (ownerMedia) MarkDeleted(context.Context, []uuid.UUID) error { return nil }

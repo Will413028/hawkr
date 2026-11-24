@@ -10,7 +10,7 @@ import (
 // 文件類欄位依原因碼決定要不要帶 asset：UNREADABLE、EXPIRED、MISMATCH、INVALID 必須帶，MISSING 一律不能帶，OTHER 兩者皆可；
 // 非文件類的欄位永遠不能帶。違反回 invalid_argument 並指到 DocumentAssetID。
 func TestValidateIssuesDocumentAssetRulesByCode(t *testing.T) {
-	const doc, plain = "business.company_documents", "business.company_name"
+	const doc, plain, a1 = "business.company_documents", "business.company_name", "0192a000-0000-7000-8000-0000000000a1"
 	cases := []struct {
 		name    string
 		field   string
@@ -18,17 +18,18 @@ func TestValidateIssuesDocumentAssetRulesByCode(t *testing.T) {
 		asset   string
 		wantErr bool
 	}{
-		{"UNREADABLE 帶 asset", doc, model.IssueUnreadable, "a1", false},
+		{"UNREADABLE 帶 asset", doc, model.IssueUnreadable, a1, false},
 		{"UNREADABLE 不帶 asset", doc, model.IssueUnreadable, "", true},
 		{"EXPIRED 不帶 asset", doc, model.IssueExpired, "", true},
 		{"MISMATCH 不帶 asset", doc, model.IssueMismatch, "", true},
 		{"INVALID 不帶 asset", doc, model.IssueInvalid, "", true},
-		{"INVALID 帶 asset", doc, model.IssueInvalid, "a1", false},
+		{"INVALID 帶 asset", doc, model.IssueInvalid, a1, false},
 		{"MISSING 不帶 asset", doc, model.IssueMissing, "", false},
-		{"MISSING 帶 asset", doc, model.IssueMissing, "a1", true},
+		{"MISSING 帶 asset", doc, model.IssueMissing, a1, true},
 		{"OTHER 不帶 asset", doc, model.IssueOther, "", false},
-		{"OTHER 帶 asset", doc, model.IssueOther, "a1", false},
-		{"非文件欄位不能帶 asset", plain, model.IssueOther, "a1", true},
+		{"OTHER 帶 asset", doc, model.IssueOther, a1, false},
+		{"非文件欄位不能帶 asset", plain, model.IssueOther, a1, true},
+		{"asset 不是 UUID", doc, model.IssueUnreadable, "not-a-uuid", true},
 		{"非文件欄位的 UNREADABLE 不帶 asset 照常", plain, model.IssueUnreadable, "", false},
 	}
 	for _, c := range cases {

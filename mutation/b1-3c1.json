@@ -1,0 +1,121 @@
+{
+ "mutants": [
+  {
+   "id": "aad-no-chunk-index",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/secure/secure.go",
+   "old": "\tout = binary.BigEndian.AppendUint32(out, c.Index)\n",
+   "new": "",
+   "test": "internal/modules/media/internal/secure ^TestChunks_SwappedChunksFailToDecrypt$",
+   "why": "AAD 拿掉上傳段序號：對調的兩段仍驗證通過，被換位置的段讀得出明文"
+  },
+  {
+   "id": "aad-no-chunk-count",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/secure/secure.go",
+   "old": "\tout = binary.BigEndian.AppendUint32(out, c.Count)\n",
+   "new": "",
+   "test": "internal/modules/media/internal/secure ^TestChunks_DroppingTheLastChunkChangesTheCountAndFails$",
+   "why": "AAD 拿掉上傳段總數：少了最後一段（總數改小）或總數被改大仍驗證通過，截斷不會被發現"
+  },
+  {
+   "id": "first-chunk-no-magic-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/secure_upload.go",
+   "old": "\t\tif err != nil {\n\t\t\treturn SecureChunkResult{}, s.rejectFirstChunk(ctx, row.ID, err)",
+   "new": "\t\tif false && err != nil {\n\t\t\treturn SecureChunkResult{}, s.rejectFirstChunk(ctx, row.ID, err)",
+   "test": "internal/modules/media ^TestSecureUpload_FirstChunkNotPDFOrImageRejectsSessionAndWritesNoObject$",
+   "why": "拿掉第 0 段的 magic-byte 檢查：宣告 PDF 實為任意位元組的內容不再被拒，會話不轉 REJECTED 且物件被寫入"
+  },
+  {
+   "id": "chunk-no-length-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/secure_upload.go",
+   "old": "\tif length != expected {\n\t\treturn SecureChunkResult{}, chunkLengthMismatch(ctx, expected)",
+   "new": "\tif false && length != expected {\n\t\treturn SecureChunkResult{}, chunkLengthMismatch(ctx, expected)",
+   "test": "internal/modules/media ^TestSecureUpload_ChunkLengthMismatchIsRejectedWithoutWrites$",
+   "why": "拿掉段長度檢查：宣告的 length 與該段應有長度不符仍被收下"
+  },
+  {
+   "id": "advance-no-next-index-condition",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/store/uploads.sql.go",
+   "old": "WHERE id = $3 AND state = 'UPLOADING' AND next_index = $4::integer AND expires_at > $2",
+   "new": "WHERE id = $3 AND state = 'UPLOADING' AND $4::integer IS NOT NULL AND expires_at > $2",
+   "test": "internal/modules/media ^TestAdvanceSecureUpload_SkippedIndexAdvancesNothing$",
+   "why": "條件式推進拿掉 next_index 條件：跳號的段也能推進會話"
+  },
+  {
+   "id": "lost-chunk-keeps-its-object",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/secure_upload.go",
+   "old": "\tcase (err == nil || errors.Is(err, pgx.ErrNoRows)) && errors.Is(cause, errLost):\n\t\ts.deleteChunkObject(ctx, row.ID, key)",
+   "new": "\tcase (err == nil || errors.Is(err, pgx.ErrNoRows)) && errors.Is(cause, errLost):\n\t\t_ = key",
+   "test": "internal/modules/media ^TestSecureUpload_ConcurrentSameChunkReadsBackTheWinnerAndDeletesTheLoserObject$",
+   "why": "推進失敗時不刪自己的物件：並行輸給對手的那一段留下沒人記錄的孤兒物件"
+  },
+  {
+   "id": "rewrap-skips-uploading-sessions",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/secure_read.go",
+   "old": "\t\t\tn, err := s.rewrapUpload(ctx, r, primary)",
+   "new": "\t\t\tn, err := 0, error(nil)\n\t\t\t_ = r",
+   "test": "internal/modules/media ^TestRewrapDEKs_UploadingSessionIsRewrappedAndCompletesWithOnlyTheNewKek$",
+   "why": "RewrapDEKs 不掃 UPLOADING 暫存列：輪替後只留新 KEK，上傳中的會話解不開 DEK"
+  },
+  {
+   "id": "rewrap-assets-before-uploading-sessions",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/secure_read.go",
+   "old": "\tuploads, uploadErr := s.rewrapUploads(ctx, primary)\n\tif s.afterRewrapUploads != nil {\n\t\ts.afterRewrapUploads(ctx)\n\t}\n\tassets, assetErr := s.rewrapAssets(ctx, primary)\n",
+   "new": "\tassets, assetErr := s.rewrapAssets(ctx, primary)\n\tif s.afterRewrapUploads != nil {\n\t\ts.afterRewrapUploads(ctx)\n\t}\n\tuploads, uploadErr := s.rewrapUploads(ctx, primary)\n",
+   "test": "internal/modules/media/internal/upload ^TestRewrapDEKs_AssetCompletedBetweenThePhasesIsStillRewrapped$",
+   "why": "先掃資產再掃上傳中的會話：兩者之間完成的上傳成為舊 kek_id 的資產，沒有被重新包裹"
+  },
+  {
+   "id": "put-secure-buffers-the-whole-body",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/secure_upload.go",
+   "old": "\tsrc := &exactReader{r: body}\n",
+   "new": "\tall, _ := io.ReadAll(body)\n\tsrc := &exactReader{r: bytes.NewReader(all)}\n\tbody = bytes.NewReader(nil)\n",
+   "test": "internal/modules/media/internal/upload ^TestPutSecure_BuffersOneChunkAtATimeNotTheWholeBody$",
+   "why": "PutSecure 先把整個 body 讀進記憶體再切段：寫第一段時 body 已被讀完"
+  },
+  {
+   "id": "unknown-commit-outcome-deletes-the-object",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/secure_upload.go",
+   "old": "\tcase (err == nil || errors.Is(err, pgx.ErrNoRows)) && errors.Is(cause, errLost):\n",
+   "new": "\tcase err == nil || errors.Is(err, pgx.ErrNoRows):\n",
+   "test": "internal/modules/media/internal/upload ^TestSettleLostChunk_OnlyARollbackDeletesTheObject$",
+   "why": "commit 結果不明也刪自己的物件：提交其實成功時會刪掉已記錄的段"
+  },
+  {
+   "id": "asset-delete-keeps-secure-chunk-rows",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/reclaim/reclaim.go",
+   "old": "s.q(ctx).DeleteSecureChunks(ctx, r.ID)",
+   "new": "error(nil)",
+   "test": "internal/modules/media ^TestDeleteAssets_RemovesTheSecureChunkRowsOfADeletedAsset$",
+   "why": "資產標為 DELETED 時不刪 secure_chunks 列：段記錄永遠留著"
+  },
+  {
+   "id": "upload-delete-keeps-secure-chunk-rows",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/reclaim/reclaim.go",
+   "old": "s.q(ctx).DeleteSecureChunks(ctx, *r.PlannedAssetID)",
+   "new": "error(nil)",
+   "test": "internal/modules/media ^TestCollectGarbage_RemovesTheSecureChunkRowsOfAnExpiredSession$",
+   "why": "暫存列標為 DELETED 時不刪 secure_chunks 列：過期會話的段記錄永遠留著"
+  },
+  {
+   "id": "close-at-boundary-keeps-reading",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/upload/secure_read.go",
+   "old": "\tr.err = errClosed\n\tif r.rc == nil {\n\t\tr.cur = nil\n\t\treturn nil\n\t}\n\terr := r.rc.Close()\n\tr.cur, r.rc = nil, nil\n\treturn err",
+   "new": "\tif r.rc == nil {\n\t\treturn nil\n\t}\n\tr.err = errClosed\n\terr := r.rc.Close()\n\tr.cur, r.rc = nil, nil\n\treturn err",
+   "test": "internal/modules/media/internal/upload ^TestChunkedReader_CloseAtASegmentBoundaryStopsLaterReads$",
+   "why": "段邊界 Close 不設錯誤：之後的 Read 仍開下一段的物件"
+  }
+ ]
+}

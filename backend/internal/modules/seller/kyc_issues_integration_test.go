@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"uuid"
 
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -61,8 +62,10 @@ func TestRejectKYCValidatesIssuesAgainstTheApplication(t *testing.T) {
 	ctx := context.Background()
 	_, _, individualSub := f.submitted(t)
 	_, _, companySub := f.companySubmission(t, func(in *KYCDraftInput) {
-		in.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: "co1"}, {StagedToken: "co2"}}
+		tokens, _ := f.stageDocs(t, in.AccountID, 2)
+		in.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: tokens[0]}, {StagedToken: tokens[1]}}
 	})
+	co1, co2 := companySub.Documents[0].AssetID, companySub.Documents[1].AssetID
 	long := strings.Repeat("字", 501)
 	const docs = "business.company_documents"
 	for name, c := range map[string]struct {
@@ -79,8 +82,8 @@ func TestRejectKYCValidatesIssuesAgainstTheApplication(t *testing.T) {
 		"empty message":                {false, []KYCIssue{{Field: "product_type", Code: IssueOther}}, "Issues[0].Message"},
 		"blank message":                {false, []KYCIssue{{Field: "product_type", Code: IssueOther, Message: " \n "}}, "Issues[0].Message"},
 		"overlong message":             {false, []KYCIssue{{Field: "product_type", Code: IssueOther, Message: long}}, "Issues[0].Message"},
-		"asset on a non document":      {true, []KYCIssue{{Field: "product_type", DocumentAssetID: "asset-co1", Code: IssueOther, Message: "x"}}, "Issues[0].DocumentAssetID"},
-		"asset not on the application": {true, []KYCIssue{documentIssue(docs, "asset-nope", IssueUnreadable)}, "Issues[0].DocumentAssetID"},
+		"asset on a non document":      {true, []KYCIssue{{Field: "product_type", DocumentAssetID: co1, Code: IssueOther, Message: "x"}}, "Issues[0].DocumentAssetID"},
+		"asset not on the application": {true, []KYCIssue{documentIssue(docs, uuid.NewV7().String(), IssueUnreadable)}, "Issues[0].DocumentAssetID"},
 		"business field on individual": {false, []KYCIssue{issueOn("business.tax_id", IssueMismatch)}, "Issues[0].Field"},
 		"document field on individual": {false, []KYCIssue{issueOn(docs, IssueMissing)}, "Issues[0].Field"},
 		// 文件類欄位依原因碼：看不清楚、過期、不一致、格式不符必須指定是哪一張；缺少不可以指定。
@@ -88,7 +91,7 @@ func TestRejectKYCValidatesIssuesAgainstTheApplication(t *testing.T) {
 		"expired without an asset":    {true, []KYCIssue{issueOn(docs, IssueExpired)}, "Issues[0].DocumentAssetID"},
 		"mismatch without an asset":   {true, []KYCIssue{issueOn(docs, IssueMismatch)}, "Issues[0].DocumentAssetID"},
 		"invalid without an asset":    {true, []KYCIssue{issueOn(docs, IssueInvalid)}, "Issues[0].DocumentAssetID"},
-		"missing with an asset":       {true, []KYCIssue{documentIssue(docs, "asset-co1", IssueMissing)}, "Issues[0].DocumentAssetID"},
+		"missing with an asset":       {true, []KYCIssue{documentIssue(docs, co1, IssueMissing)}, "Issues[0].DocumentAssetID"},
 	} {
 		sub := individualSub
 		if c.company {
@@ -113,9 +116,9 @@ func TestRejectKYCValidatesIssuesAgainstTheApplication(t *testing.T) {
 	}
 	// 合法的問題：說明去掉前後空白；文件類的欄位可以不指定特定一張。
 	rej := f.reject(t, companySub,
-		documentIssue(docs, "asset-co1", IssueUnreadable),
+		documentIssue(docs, co1, IssueUnreadable),
 		KYCIssue{Field: docs, Code: IssueMissing, Message: "  請重新上傳公司文件  "},
-		documentIssue(docs, "asset-co2", IssueOther),
+		documentIssue(docs, co2, IssueOther),
 		KYCIssue{Field: "business.tax_id", Code: IssueUnreadable, Message: "非文件欄位的看不清楚不需要 asset"},
 	)
 	last := rej.Reviews[len(rej.Reviews)-1]
@@ -306,12 +309,14 @@ func TestOutstandingCompanyDocumentIssuesFollowTheAssetNotThePosition(t *testing
 	ctx := context.Background()
 	accountID, _ := f.open(t)
 	in := companyDraft(accountID, taxIDOne)
-	in.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: "co1"}, {StagedToken: "co2"}}
+	tokens, _ := f.stageDocs(t, accountID, 3)
+	in.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: tokens[0]}, {StagedToken: tokens[1]}}
 	d := f.savedDraft(t, in)
+	co1, co2 := d.Documents[0].AssetID, d.Documents[1].AssetID
 	sub, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
 	must(t, err)
 	rej := f.reject(t, sub,
-		documentIssue("business.company_documents", "asset-co1", IssueExpired), documentIssue("business.company_documents", "asset-co2", IssueUnreadable),
+		documentIssue("business.company_documents", co1, IssueExpired), documentIssue("business.company_documents", co2, IssueUnreadable),
 		issueOn("business.tax_id", IssueMismatch),
 	)
 	mine := rej.KYCApplication
@@ -323,13 +328,13 @@ func TestOutstandingCompanyDocumentIssuesFollowTheAssetNotThePosition(t *testing
 		mine = out
 	}
 	// 順序反過來：兩張都還在。
-	save(KYCDraftInput{CompanyDocuments: &[]KYCDocumentRef{{AssetID: "asset-co2"}, {AssetID: "asset-co1"}}})
-	if got := f.outstanding(t, accountID); !slices.Equal(got, []string{"business.company_documents@asset-co1", "business.company_documents@asset-co2", "business.tax_id"}) {
+	save(KYCDraftInput{CompanyDocuments: &[]KYCDocumentRef{{AssetID: co2}, {AssetID: co1}}})
+	if got := f.outstanding(t, accountID); !slices.Equal(got, []string{"business.company_documents@" + co1, "business.company_documents@" + co2, "business.tax_id"}) {
 		t.Fatalf("reordered outstanding=%v", got)
 	}
 	// 換掉 co2：只有 co2 的問題算處理。
-	save(KYCDraftInput{CompanyDocuments: &[]KYCDocumentRef{{AssetID: "asset-co1"}, {StagedToken: "co3"}}})
-	if got := f.outstanding(t, accountID); !slices.Equal(got, []string{"business.company_documents@asset-co1", "business.tax_id"}) {
+	save(KYCDraftInput{CompanyDocuments: &[]KYCDocumentRef{{AssetID: co1}, {StagedToken: tokens[2]}}})
+	if got := f.outstanding(t, accountID); !slices.Equal(got, []string{"business.company_documents@" + co1, "business.tax_id"}) {
 		t.Fatalf("replaced outstanding=%v", got)
 	}
 	// 統編改掉才算；整份公司文件清空時 co1 也算處理。
@@ -373,14 +378,14 @@ func TestKYCReviewIssueChecksMatchGoAndRejectBadRows(t *testing.T) {
 	review := rej.Reviews[len(rej.Reviews)-1].ID.String()
 	insert := func(field, asset, code, message string, position int) error {
 		_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO seller.kyc_review_issues (issue_id, review_id, position, field, document_asset_id, code, message)
-			VALUES (uuidv7(), $1, $2, $3, NULLIF($4, ''), $5, $6)`, review, position, field, asset, code, message)
+			VALUES (uuidv7(), $1, $2, $3, NULLIF($4, '')::uuid, $5, $6)`, review, position, field, asset, code, message)
 		return err
 	}
-	if err := insert("business.company_documents", "asset-doc", "OTHER", "x", 5); err != nil {
+	if err := insert("business.company_documents", uuid.NewV7().String(), "OTHER", "x", 5); err != nil {
 		t.Fatalf("合法的列被擋下：%v", err)
 	}
 	for name, err := range map[string]error{
-		"asset on a non document": insert("product_type", "asset-x", "OTHER", "x", 6),
+		"asset on a non document": insert("product_type", uuid.NewV7().String(), "OTHER", "x", 6),
 		"unknown field":           insert("favourite_colour", "", "OTHER", "x", 7),
 		"unknown code":            insert("product_type", "", "FINAL", "x", 8),
 		"empty message":           insert("product_type", "", "OTHER", "", 9),

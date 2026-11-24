@@ -48,7 +48,6 @@ groups:
         expr: |
           absent(up{job="gateway", env="prod"})
           or absent(up{job="shipping-service", env="prod"})
-          or absent(up{job="media-service", env="prod"})
           or absent(up{job="product-service", env="prod"})
           or absent(up{job="order-service", env="prod"})
           or absent(up{job="aftersales-service", env="prod"})

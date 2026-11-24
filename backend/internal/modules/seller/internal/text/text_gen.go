@@ -367,6 +367,51 @@ func InquiryUnavailableWithdrawn() uitext.Message {
 	return uitext.Message{Text: "這筆詢問已撤回。", Locale: uitext.ZhTW}
 }
 
+// KycDocumentDuplicate 是模組句子 kyc.document_duplicate；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func KycDocumentDuplicate(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The same image cannot be used in two document slots", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "同一張圖片不能放進兩個證件位置", Locale: uitext.ZhTW}
+}
+
+// KycDocumentIdInvalid 是模組句子 kyc.document_id_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func KycDocumentIdInvalid(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The document image ID is invalid", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "證件圖片編號不合法", Locale: uitext.ZhTW}
+}
+
+// KycDocumentNotCurrent 是模組句子 kyc.document_not_current；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func KycDocumentNotCurrent(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The specified image is not a current document of this application", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "指定的圖片不是這份申請目前的證件", Locale: uitext.ZhTW}
+}
+
+// KycDocumentRefConflict 是模組句子 kyc.document_ref_conflict；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func KycDocumentRefConflict(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A document must reference either an existing image or a newly uploaded image, not both", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "證件只能指定現有的圖片或新上傳的圖片其中之一", Locale: uitext.ZhTW}
+}
+
+// KycDocumentRefMissing 是模組句子 kyc.document_ref_missing；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func KycDocumentRefMissing(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "An image is required", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "必須提供圖片", Locale: uitext.ZhTW}
+}
+
 // KycEditUnavailableApproved 是模組句子 kyc.edit_unavailable.approved；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func KycEditUnavailableApproved(l uitext.Locale) uitext.Message {
 	switch l {

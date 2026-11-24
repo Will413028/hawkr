@@ -30,13 +30,9 @@
 - 更新以 SQL 條件式版本比對；profile 與地址各自持有版本。
 - profile 在買家列鎖內合併：nil 保留，`DisplayName` 空字串拒絕，Phone、Gender、City、Job 空字串與 BirthDate 零值清為 NULL。並行的 profile 更新不遺失任何欄位。
 - gender、買家與會員狀態、會員 source 有 CHECK；寫入驗證與受限轉移由純函式驗證涵蓋。會員 source 的唯一儲存值是 ADMIN，SYSTEM_DEFAULT 只在記憶體合成權益。
-- 頭像引用只由 `buyer.media_sync` 同步 job 寫入（`internal/mediaref`，演算法是 `media.Sync`，規格見 `backend/docs/modules/media.md` §5）。
-- transaction 外才呼叫 media，而且只有 `Finalize`（轉正，不建立引用）。換圖禁止在呼叫者 transaction 內開始。
-- 換頭像在版本條件的 transaction 內寫 object key 與 asset ID（`buyers_avatar_asset_check` 要求成對），把被換掉的頭像記成退場（`retired_assets`），遞增 `media_ref_sync.seq` 並排入同步。
-- 已退場的頭像不能寫回：同一個 staged token 重新轉正會回到同一個資產，回 InvalidInput。
-- 關閉買家時把目前的頭像記成退場；關閉的買家沒有目前的資產，PII 清理不再另外處理引用。
-- 同步 job 以 `(ref_type, ref_id)` 去重（含執行中）：Link 買家列目前的頭像，精確 Unlink 退場的資產，結算時 seq 變了就再跑一輪。寫入與同步的先後靠 seq 與退場名單，不靠時間。
-- 唯一依賴時間的是新資產要在 media GC 的 7 天寬限（從資產建立起算）內被 Link。重試用盡或 job 遺失由 `buyer.media_sweep` 補排，監控訊號在 ADR `2026-10-03-media-references-owner-side`。
+- 換頭像在版本條件的 transaction 內：通過版本與合併後的文字驗證後 `Confirm` 新資產（必須是公開圖片），寫 object key 與 asset ID（UUID，`buyers_avatar_asset_check` 要求成對），並把被換掉的資產 `MarkDeleted`。任何一步失敗整筆回滾，新資產仍是暫存，由 media 的 GC 回收。
+- 關閉買家時在關閉的 transaction 內 `MarkDeleted` 目前的頭像；沒有頭像不動任何資產，重送冪等。
+- 實體刪除由 media 的 job 做，買家不排 job、不保存引用或退場名單。
 
 ## 4. 收貨地址
 
@@ -73,7 +69,7 @@
 
 ## 9. 讀取模型與輸入邊界
 
-- 清單只回 ID 與時間。`BatchDisplay` 對 CLOSED 回 `Deleted=true`、名稱與頭像為 nil；`BatchMeta` 與單筆 profile 不曝露 CLOSED 的 PII。
+- 清單只回 ID 與時間。`BatchDisplay` 對 CLOSED 回 `Deleted=true`、名稱、頭像與頭像資產 ID 為 nil；`BatchMeta` 與單筆 profile 不曝露 CLOSED 的 PII。
 - `ResolvePrincipals` 只回存活 stint；CLOSED 與未知 ID 不在 map，legacy adapter 由差集產生 `unresolved_ids`。`BuyerIDsByAccount` 最多回一個（含已關閉）。
 - 墓碑文字由 client（Connect 卡片的 `deleted`）與 legacy adapter 呈現，模組不存或回傳墓碑字串。
 - 公開 ID 必須為正數；批次 ID 上限 `MaxBatchSize`（100），空批次允許，只在模組檢查（handler 只解析 ID）；清單上限 100。檢查在存取資料庫之前。
@@ -91,5 +87,5 @@
 
 - buyer_id 與 address_id 是數字 ID，不是 UUID。
 - social-service 的 `GetSubscribersList` 由 legacy adapter 以有界 offset 轉接（`SubscribersOffset`）。gateway buyer REST 不由 legacy server 承接，不提供 offset 或 `GetSavedItems` 形狀。
-- 頭像引用的登記與解除只由同步 job 做，media 是遠端服務，所以換圖不能在呼叫者 transaction 內開始。
+- 換圖與關閉都在呼叫者的 transaction 內呼叫 media 的 `Confirm`、`MarkDeleted`（同一個 Postgres）。
 - 預設額度是 placeholder 常數。

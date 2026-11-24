@@ -3,9 +3,7 @@
 package characterization
 
 import (
-	"fmt"
 	"net/http"
-	"os"
 	"testing"
 	"time"
 
@@ -13,20 +11,8 @@ import (
 )
 
 // 這裡的測試打本機起的單體（入口，scripts/characterize.sh {{.Name}}）：Connect 由單體處理{{if .Legacy}}，舊的 REST 由單體轉給
-// gateway、再到舊的 {{.Legacy}}（legacy.sh 起它）{{end}}，只用本機的 Postgres 與 Redis；呼叫 media-service 的是這個測試聽的
-// 假服務。身分是腳本以 hawkr dev-token 簽的 token。
-
-// TestMain 起假的 media-service，位址由腳本同時設定給單體{{if .Legacy}}與舊服務{{end}}。
-func TestMain(m *testing.M) {
-	stop, err := ch.ServeFakeMedia(os.Getenv(ch.EnvFakeMediaAddr))
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	code := m.Run()
-	stop()
-	os.Exit(code)
-}
+// gateway、再到舊的 {{.Legacy}}（legacy.sh 起它）{{end}}，只用本機的 Postgres 與 Redis；單體的 media 模組連
+// 腳本指定的 S3 相容儲存。身分是腳本以 hawkr dev-token 簽的 token。
 {{if .Legacy}}
 // TestLegacy 經入口對舊的 gateway＋{{.Legacy}} 跑同一份情境（D8：先對舊實作跑過）。
 func TestLegacy(t *testing.T) {

@@ -33,7 +33,7 @@ func toDocuments(rows []store.SellerKycDocument) []model.KYCDocument {
 	out := make([]model.KYCDocument, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, model.KYCDocument{
-			Position: int(row.Position), AssetID: row.AssetID, ObjectKey: row.ObjectKey,
+			Position: int(row.Position), AssetID: row.AssetID.String(), ObjectKey: row.ObjectKey,
 		})
 	}
 	return out

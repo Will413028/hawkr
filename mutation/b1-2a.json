@@ -1,0 +1,103 @@
+{
+ "mutants": [
+  {
+   "id": "presign-content-length-unbound",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/storage/s3.go",
+   "old": "\t\tContentLength: aws.Int64(in.ContentLength),\n\t\tContentType:   aws.String(in.ContentType),\n\t\tContentMD5:",
+   "new": "\t\tContentType:   aws.String(in.ContentType),\n\t\tContentMD5:",
+   "test": "internal/modules/media/internal/storage ^TestPresignedPutSignsExactlyTheBoundHeaders$",
+   "why": "the presigned PUT no longer signs Content-Length, so a client could upload any size"
+  },
+  {
+   "id": "presign-md5-unbound",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/storage/s3.go",
+   "old": "\t\tContentMD5:    aws.String(in.ContentMD5),\n\t\tIfNoneMatch:",
+   "new": "\t\tIfNoneMatch:",
+   "test": "internal/modules/media/internal/storage ^TestPresignedPutSignsExactlyTheBoundHeaders$",
+   "why": "the presigned PUT no longer signs Content-MD5"
+  },
+  {
+   "id": "presign-if-none-match-unbound",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/storage/s3.go",
+   "old": "\t\tIfNoneMatch:   aws.String(\"*\"),\n\t}, s3.WithPresignExpires",
+   "new": "\t}, s3.WithPresignExpires",
+   "test": "internal/modules/media/internal/storage ^TestPresignedPutSignsExactlyTheBoundHeaders$",
+   "why": "the presigned PUT no longer signs If-None-Match, so a presigned URL can overwrite an existing object"
+  },
+  {
+   "id": "key-not-random-version",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/storage/keys.go",
+   "old": "b[6] = b[6]&0x0f | 0x40\n",
+   "new": "b[6] = b[6]&0x0f | 0x10\n",
+   "test": "internal/modules/media/internal/storage ^TestNewKey$",
+   "why": "generated keys are no longer uuid v4"
+  },
+  {
+   "id": "config-r2-bucket-optional",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/storage/config.go",
+   "old": "Bucket:          e.String(\"MEDIA_R2_BUCKET\"),",
+   "new": "Bucket:          e.StringOr(\"MEDIA_R2_BUCKET\", \"b\"),",
+   "test": "internal/modules/media/internal/storage ^TestConfigRejectsEverySingleMissingSetting$",
+   "why": "a missing r2 bucket silently falls back to a default instead of failing startup"
+  },
+  {
+   "id": "not-found-accepts-any-404",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/storage/s3.go",
+   "old": "\t\tcase \"\", \"UnknownError\":\n\t\tdefault:\n\t\t\treturn false\n\t\t}\n\t}\n\tvar re",
+   "new": "\t\t}\n\t}\n\tvar re",
+   "test": "internal/modules/media/internal/storage ^TestS3GetMapsOnlyMissingKeyToNotFound$",
+   "why": "NoSuchBucket (a 404) is mapped to ErrNotFound again"
+  },
+  {
+   "id": "not-found-always-true",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/storage/s3.go",
+   "old": "func isNotFound(err error) bool {\n",
+   "new": "func isNotFound(err error) bool {\n\treturn true\n",
+   "test": "internal/modules/media/internal/storage ^TestS3GetMapsOnlyMissingKeyToNotFound$",
+   "why": "every error is treated as a missing key"
+  },
+  {
+   "id": "delete-swallows-not-found",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/storage/s3.go",
+   "old": "\t\treturn fmt.Errorf(\"storage: delete: %w\", err)",
+   "new": "\t\tif isNotFound(err) || true {\n\t\t\treturn nil\n\t\t}\n\t\treturn fmt.Errorf(\"storage: delete: %w\", err)",
+   "test": "internal/modules/media/internal/storage ^TestS3DeleteIsIdempotentButSurfacesNoSuchBucket$",
+   "why": "Delete hides NoSuchBucket"
+  },
+  {
+   "id": "put-seekable-length-unchecked",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/storage/s3.go",
+   "old": "\t\tif remaining != in.Size {\n\t\t\treturn ErrSizeMismatch\n\t\t}\n\t} else {",
+   "new": "\t\t_ = remaining\n\t} else {",
+   "test": "internal/modules/media/internal/storage ^TestS3PutRejectsLengthMismatchBeforeSending$",
+   "why": "a seekable body whose length differs from Size reaches the server"
+  },
+  {
+   "id": "presign-md5-length-unchecked",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/storage/s3.go",
+   "old": "err != nil || len(raw) != md5DigestSize",
+   "new": "err != nil || len(raw) == 0",
+   "test": "internal/modules/media/internal/storage ^TestPresignRejectsIncompleteInput$",
+   "why": "a base64 value that is not 16 bytes is accepted as Content-MD5"
+  },
+  {
+   "id": "presign-expiry-uncapped",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/storage/s3.go",
+   "old": "\tcase in.Expires > MaxPresignExpiry:\n\t\treturn errors.New(\"storage: expiry exceeds the SigV4 limit of 7 days\")\n",
+   "new": "",
+   "test": "internal/modules/media/internal/storage ^TestPresignRejectsIncompleteInput$",
+   "why": "expiry above the SigV4 7 day limit is accepted"
+  }
+ ]
+}

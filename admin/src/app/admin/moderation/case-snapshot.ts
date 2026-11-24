@@ -135,7 +135,7 @@ export function snapshotView(
 				context: [],
 				fields: [
 					{ label: "顯示名稱", value: dash(content.value.displayName) },
-					{ label: "頭像", value: dash(content.value.avatar) },
+					{ label: "頭像", value: dash(content.value.avatarAssetId) },
 				],
 			};
 		case "review":

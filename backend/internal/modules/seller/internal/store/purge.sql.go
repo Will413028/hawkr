@@ -130,10 +130,10 @@ RETURNING application_id, asset_id
 
 type PurgeKYCDocumentsRow struct {
 	ApplicationID uuid.UUID
-	AssetID       string
+	AssetID       uuid.UUID
 }
 
-// 刪掉已清理的申請的證件列（asset ID 與 object key），回傳刪掉的 asset：呼叫方把它們記成退場，media 的引用由同步 job 解除。
+// 刪掉已清理的申請的證件列（asset ID 與 object key），回傳刪掉的 asset：呼叫方在同一個 transaction 內交給 media.MarkDeleted。
 func (q *Queries) PurgeKYCDocuments(ctx context.Context, applicationIds []uuid.UUID) ([]PurgeKYCDocumentsRow, error) {
 	rows, err := q.db.Query(ctx, purgeKYCDocuments, applicationIds)
 	if err != nil {
@@ -236,8 +236,8 @@ type RetireDueStoresRow struct {
 	StoreID      int64
 	StoreCode    int64
 	AccountID    int64
-	LogoAssetID  *string
-	CoverAssetID *string
+	LogoAssetID  *uuid.UUID
+	CoverAssetID *uuid.UUID
 }
 
 // 關店後兩段清理的時間條件，只有這一處（second_stage 選哪一段）：

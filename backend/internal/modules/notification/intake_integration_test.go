@@ -258,11 +258,6 @@ func (f *fakeStores) retire(storeID int64) {
 	f.retired[storeID] = true
 }
 
-// nopJobs 接受 buyer 排的 job（測試不展開它們）。
-type nopJobs struct{}
-
-func (nopJobs) Enqueue(context.Context, river.JobArgs, *river.InsertOpts) error { return nil }
-
 type fixture struct {
 	db       *db.DB
 	identity *identity.Module
@@ -306,7 +301,7 @@ func setupIntake(t *testing.T) *fixture {
 	log := slog.New(slog.NewTextHandler(logs, nil))
 	bus := events.NewBus()
 	id := identity.New(identity.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
-	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: nopJobs{}, Media: media.NewFake(), Now: time.Now, Logger: log})
+	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Media: media.NewFake(), Now: time.Now, Logger: log})
 	events.Subscribe[identity.AccountCreated](bus, buyers.OnAccountCreated)
 	stores := &fakeStores{retired: map[int64]bool{}}
 	rec := &recorder{}

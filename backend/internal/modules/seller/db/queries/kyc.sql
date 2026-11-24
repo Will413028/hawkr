@@ -180,13 +180,6 @@ WHERE a.status <> 'DRAFT' AND a.submitted_at IS NOT NULL
 ORDER BY a.submitted_at, a.application_id
 LIMIT sqlc.arg(page_size);
 
--- name: KYCDocumentAssets :many
--- 同步 job 讀的：申請目前指著的證件 asset（申請已取消時沒有）。
-SELECT d.asset_id
-FROM seller.kyc_documents d
-JOIN seller.kyc_applications a ON a.application_id = d.application_id
-WHERE d.application_id = $1 AND a.status <> 'CANCELLED';
-
 -- name: SnapshotMeasureIdentities :exec
 -- 措施建立時，若它帶身分效果（seller.identity_effect_measures 那一份定義：停權與非預告的終止合作），複製被處分帳號全部 stint 的身分 blind index 到措施擁有的快照：每個識別欄位金鑰環裡每一把金鑰算的 hash 各一筆，之後換鑰也查得到；
 -- 同一個 hash 只留一筆。來源是 account_identity_hashes（防詐保存，ADR 2026-11-13-seller-platform-review-and-identity-matching「身分比對與比對 hash」）：

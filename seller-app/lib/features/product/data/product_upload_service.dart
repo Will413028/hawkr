@@ -221,15 +221,9 @@ class ProductUploadService {
   Dio? _dio;
   MediaRepository? _mediaRepo;
 
-  /// Product gateway calls and media-session calls share the central app Dio,
-  /// so 401 logout and 9240 suspension behavior stay consistent.
-  ///
-  /// [MediaRepository] still creates an explicit unauthenticated Dio only for
-  /// the OSS presigned PUT boundary.
-  void useHttpClient(Dio dio) {
-    if (identical(_dio, dio)) return;
+  void useHttpClient(Dio dio, MediaRepository mediaRepository) {
     _dio = dio;
-    _mediaRepo = MediaRepository(dio);
+    _mediaRepo = mediaRepository;
   }
 
   Dio get _httpClient {
@@ -508,11 +502,9 @@ class ProductUploadService {
       for (int i = 0; i < results.length; i++) {
         final r = results[i];
         debugPrint(
-          '[Upload] result[$i]: hasStagedToken='
-          '${r.stagedToken?.isNotEmpty == true}, hasObjectKey='
-          '${r.objectKey.isNotEmpty}, hasUrl=${r.url.isNotEmpty}',
+          '[Upload] result[$i]: hasStagedToken=${r.stagedToken.isNotEmpty}',
         );
-        if (r.stagedToken != null && r.stagedToken!.isNotEmpty) {
+        if (r.stagedToken.isNotEmpty) {
           imageInputs.add({'stagedToken': r.stagedToken});
         }
       }
@@ -629,7 +621,7 @@ class ProductUploadService {
       );
 
       for (final r in results) {
-        if (r.stagedToken != null && r.stagedToken!.isNotEmpty) {
+        if (r.stagedToken.isNotEmpty) {
           imageInputs.add({'stagedToken': r.stagedToken});
         }
       }
@@ -730,6 +722,9 @@ class ProductUploadService {
 /// observing the singleton's in-memory queue.
 final productUploadServiceProvider = Provider<ProductUploadService>((ref) {
   final service = ProductUploadService();
-  service.useHttpClient(ref.watch(dioProvider));
+  service.useHttpClient(
+    ref.watch(dioProvider),
+    ref.watch(mediaRepositoryProvider),
+  );
   return service;
 });

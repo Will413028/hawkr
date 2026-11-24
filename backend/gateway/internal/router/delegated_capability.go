@@ -485,42 +485,13 @@ func requireDelegated(cap authz.AdminCapability, deps delegationDeps) gin.Handle
 	}
 }
 
-// requireDelegatedSessionOnly guards the two media upload-session endpoints
-// (§6.1.13): credential valid and session not terminal, nothing else. They carry no
-// capability (uploading only inserts a row in media's own table and touches no target
-// store state — what actually needs authorizing is attaching the image, which
-// storefront.write / products.write / posts.write already guard) and no :store_id to
-// compare against.
-//
-// "不驗 capability" and "算不算活動" are two different things: these routes still
-// count as activity. Swapping a batch of product images is the single easiest way to
-// sit past the idle window while touching no delegatedHandle route at all — every
-// step of it (picking files, cropping, uploading straight to R2) skips the Gateway.
-// Getting this wrong is silent: the operator is kicked out at save time with nothing
-// having warned them.
-func requireDelegatedSessionOnly(deps delegationDeps) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		session, ok := resolveDelegationSession(c, deps, true)
-		if !ok {
-			return
-		}
-		if denied := authz.AdminSessionDenial(session.GetStatus()); denied != 0 {
-			response.AbortBizStatus(c, denied, delegationDenyMessage(denied))
-			return
-		}
-		middleware.SetDelegationSession(c, session)
-		c.Next()
-	}
-}
-
-// ── 掛載 helper（四個，§6.1.0）────────────────────────────────────────────────
+// ── 掛載 helper（三個，§6.1.0）────────────────────────────────────────────────
 //
 // adminHandle          只要 requireAdmin()，不掛 capability guard
 // credentialHandle     不掛 requireAdmin()；credential 由 handler 自行讀取與解析
 // delegatedHandle      不掛 requireAdmin()；解析 credential ＋ 驗 capability／target／到期
-// sessionOnlyHandle    掛 requireDelegatedSessionOnly()（媒體兩支）
 
-// 五個 helper 一律呼叫 middleware.RegisterDelegatedRoute：限流命中時要回代行專用的
+// 四個 helper 一律呼叫 middleware.RegisterDelegatedRoute：限流命中時要回代行專用的
 // 9273（§6.1.0 行 2317）而不是裸 429，而限流跑在所有 handler 之前，唯一問得到的問題是
 // 「c.FullPath() 是不是代行路由」。登錄制與 capability 登錄同理由——14 支資源端點掛在
 // /sellers/:store_id/ 這一段，而同一段也可以掛非代行的端點；任何前綴規則都分不出兩者，
@@ -565,14 +536,4 @@ func delegatedHandle(g *gin.RouterGroup, method, relPath string, cap authz.Admin
 	registerAdminNoAuth(method, full)
 	middleware.RegisterDelegatedRoute(method, full)
 	g.Handle(method, relPath, requireDelegated(cap, deps), h)
-}
-
-// sessionOnlyHandle mounts a route behind requireDelegatedSessionOnly. It stays OUT
-// of the admin authz registry on purpose — the registry is the set of routes that
-// declared a capability, and the boot assertions read it as exactly that.
-func sessionOnlyHandle(g *gin.RouterGroup, method, relPath string, deps delegationDeps, h gin.HandlerFunc) {
-	full := ginJoinPath(g.BasePath(), relPath)
-	registerAdminNoAuth(method, full)
-	middleware.RegisterDelegatedRoute(method, full)
-	g.Handle(method, relPath, requireDelegatedSessionOnly(deps), h)
 }

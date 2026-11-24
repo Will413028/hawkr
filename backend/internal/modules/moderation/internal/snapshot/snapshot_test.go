@@ -2,6 +2,7 @@ package snapshot
 
 import (
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -60,11 +61,11 @@ func TestEncodeDoesNotMutateTheInput(t *testing.T) {
 }
 
 func TestBuyerProfileFieldsAreHashed(t *testing.T) {
-	a := Content{Kind: model.TargetBuyer, Buyer: &Buyer{DisplayName: "小明", Avatar: "k1"}}
-	b := Content{Kind: model.TargetBuyer, Buyer: &Buyer{DisplayName: "小明", Avatar: "k2"}}
-	c := Content{Kind: model.TargetBuyer, Buyer: &Buyer{DisplayName: "小華", Avatar: "k1"}}
+	a := Content{Kind: model.TargetBuyer, Buyer: &Buyer{DisplayName: "小明", AvatarAssetID: "a1"}}
+	b := Content{Kind: model.TargetBuyer, Buyer: &Buyer{DisplayName: "小明", AvatarAssetID: "a2"}}
+	c := Content{Kind: model.TargetBuyer, Buyer: &Buyer{DisplayName: "小華", AvatarAssetID: "a1"}}
 	_, ha := Encode(a)
-	for name, x := range map[string]Content{"頭像": b, "名稱": c} {
+	for name, x := range map[string]Content{"頭像資產": b, "名稱": c} {
 		if _, h := Encode(x); h == ha {
 			t.Errorf("%s 不同，雜湊不能相同", name)
 		}
@@ -294,5 +295,54 @@ func TestSocialAssetIDsAreSortedAndDeduplicated(t *testing.T) {
 	}
 	if got := (Content{Kind: model.TargetBuyer, Buyer: &Buyer{}}).AssetIDs(); got == nil || len(got) != 0 {
 		t.Fatalf("買家對象沒有圖片資產：%v", got)
+	}
+}
+
+func TestReplaceAssetsSwapsEveryReferenceWithoutTouchingTheOriginal(t *testing.T) {
+	to := map[string]string{"c1": "n1", "c2": "n2", "m1": "n3"}
+	orig := chat()
+	got := orig.ReplaceAssets(to)
+	if want := []string{"n1", "n2", "n3"}; !slices.Equal(got.AssetIDs(), want) {
+		t.Fatalf("換掉之後的圖片：%v，預期 %v", got.AssetIDs(), want)
+	}
+	if !slices.Equal(orig.AssetIDs(), []string{"c1", "c2", "m1"}) {
+		t.Fatalf("原內容被改動：%v", orig.AssetIDs())
+	}
+	if got.Chat.Body != orig.Chat.Body || len(got.Chat.Context) != len(orig.Chat.Context) {
+		t.Fatalf("只換圖片，其餘欄位不變：%+v", got.Chat)
+	}
+}
+
+func TestReplaceAssetsLeavesUnmappedIDsAndOtherKindsAlone(t *testing.T) {
+	if got := comment("x", "a", "b").ReplaceAssets(map[string]string{"a": "z"}).AssetIDs(); !slices.Equal(got, []string{"b", "z"}) {
+		t.Fatalf("沒對應的 ID 維持原樣：%v", got)
+	}
+	buyer := Content{Kind: model.TargetBuyer, Buyer: &Buyer{DisplayName: "a"}}
+	if got := buyer.ReplaceAssets(map[string]string{"a": "z"}); got.Buyer == nil || got.Buyer.DisplayName != "a" {
+		t.Fatalf("買家內容不變：%+v", got)
+	}
+}
+
+func TestBuyerSnapshotStoresOnlyTheAvatarAssetID(t *testing.T) {
+	text, _ := Encode(Content{Kind: model.TargetBuyer, Buyer: &Buyer{DisplayName: "a", AvatarAssetID: "id"}})
+	if strings.Contains(text, `"avatar"`) || !strings.Contains(text, `"avatar_asset_id":"id"`) {
+		t.Fatalf("快照只存頭像資產 ID：%s", text)
+	}
+}
+
+func TestBuyerAvatarIsAnEvidenceAssetThatIsSwappedForTheCopy(t *testing.T) {
+	orig := Content{Kind: model.TargetBuyer, Buyer: &Buyer{DisplayName: "a", AvatarAssetID: "src"}}
+	if got := orig.AssetIDs(); !slices.Equal(got, []string{"src"}) {
+		t.Fatalf("頭像是證據圖片：%v", got)
+	}
+	got := orig.ReplaceAssets(map[string]string{"src": "copy"})
+	if got.Buyer.AvatarAssetID != "copy" || got.Buyer.DisplayName != "a" {
+		t.Fatalf("頭像要換成複本的資產：%+v", got.Buyer)
+	}
+	if orig.Buyer.AvatarAssetID != "src" {
+		t.Fatalf("原內容被改動：%+v", orig.Buyer)
+	}
+	if none := (Content{Kind: model.TargetBuyer, Buyer: &Buyer{DisplayName: "a"}}); len(none.AssetIDs()) != 0 {
+		t.Fatalf("沒有頭像就沒有證據圖片：%v", none.AssetIDs())
 	}
 }

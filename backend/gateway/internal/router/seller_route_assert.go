@@ -60,7 +60,7 @@ func underAnyPrefix(path string, prefixes []string) bool {
 }
 
 // adminPrefix is the /api/v1/admin namespace root. Since 56 §A31 this prefix no
-// longer implies an admin identity — 20 of its routes are authenticated by an
+// longer implies an admin identity — 18 of its routes are authenticated by an
 // operation credential instead — which is exactly why checks (f) and (g) exist.
 var adminPrefix = APIV1Path + AdminPath
 
@@ -79,9 +79,9 @@ var delegatedPathForbiddenWords = []string{
 }
 
 // adminNoAuthWhitelist is the named list of the ONLY routes allowed to live under
-// /api/v1/admin without requireAdmin() (56 §8.1.2 第 4 條, A31). Exactly 20: the 14
+// /api/v1/admin without requireAdmin() (56 §8.1.2 第 4 條, A31). Exactly 18: the 14
 // delegated resource endpoints plus S3 GET current, S4 DELETE current,
-// GET current/summary, the two media upload-session endpoints and S6 handoff redeem.
+// GET current/summary and S6 handoff redeem.
 //
 // The check is bidirectional — an entry that is not mounted is as much a defect as a
 // route that is not listed — because a stale whitelist entry silently pre-authorises
@@ -93,9 +93,6 @@ var adminNoAuthWhitelist = []string{
 	"GET " + adminPrefix + "/delegated-operations/current/summary",
 	// S6 交接兌換
 	"POST " + adminPrefix + "/delegated-operations/handoff/redeem",
-	// 媒體 upload session（requireDelegatedSessionOnly）
-	"POST " + adminPrefix + "/delegated-operations/media/upload_sessions",
-	"POST " + adminPrefix + "/delegated-operations/media/upload_sessions/:session_id/complete",
 	// storefront（4）
 	"GET " + adminPrefix + "/sellers/:store_id/storefront",
 	"PATCH " + adminPrefix + "/sellers/:store_id/storefront",
@@ -208,7 +205,7 @@ func checkAdminNoAuthWhitelist(mounted map[string]struct{}, noAuth []string, whi
 //	(e) a delegated route path contains one of the 10 forbidden substrings;
 //	(f) a wildcard route exists under /api/v1/admin;
 //	(g) a route under /api/v1/admin skips requireAdmin() without being on the
-//	    20-entry A31 whitelist, or a whitelist entry is not mounted.
+//	    18-entry A31 whitelist, or a whitelist entry is not mounted.
 //
 // Panicking here means a mis-wired deploy dies at boot rather than shipping a
 // suspension bypass or an ungated delegated route (§12 boot 斷言即部署守門).
@@ -256,7 +253,7 @@ func assertRouteCoverage(r *gin.Engine) {
 	// (f) /admin 之下不得有 wildcard。
 	problems = append(problems, checkAdminNoWildcard(routes)...)
 
-	// (g) /admin 之下略過 requireAdmin() 的路由必須逐條命中 20 支具名白名單。
+	// (g) /admin 之下略過 requireAdmin() 的路由必須逐條命中 18 支具名白名單。
 	problems = append(problems, checkAdminNoAuthWhitelist(routeSet, registeredAdminNoAuth(), adminNoAuthWhitelist)...)
 
 	// 每一條經 delegatedHandle 註冊的路由都必須掛在 credential-only 群組上：掛回

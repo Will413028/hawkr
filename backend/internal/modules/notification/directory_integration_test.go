@@ -4,7 +4,6 @@ package notification
 
 import (
 	"context"
-	"errors"
 	"io"
 	"log/slog"
 	"slices"
@@ -49,17 +48,6 @@ type dirNoOrders struct{}
 func (dirNoOrders) HasOpenOrders(context.Context, int64) (bool, error)      { return false, nil }
 func (dirNoOrders) HasOpenStoreOrders(context.Context, int64) (bool, error) { return false, nil }
 
-type dirMedia struct{}
-
-func (dirMedia) Finalize(context.Context, media.Uploader, string, string) (media.Asset, error) {
-	return media.Asset{}, errors.New("not used")
-}
-func (dirMedia) Link(context.Context, media.Ref, []string) error   { return nil }
-func (dirMedia) Unlink(context.Context, media.Ref, []string) error { return nil }
-func (dirMedia) ReadSecure(context.Context, string, media.Ref) (media.SecureAsset, error) {
-	return media.SecureAsset{}, errors.New("not used")
-}
-
 // 正式的 NewDirectory 把真的 buyer 與 seller 組成公告的名單：買家的排序鍵是 buyer_id、店家的是 store_id（不是帳號 ID），店家帶 store_id，
 // 分頁不足一頁就是最後一頁。
 // mutation：Buyers 的 Cursor 改成 AccountID，或 Stores 漏填 StoreID → 這個測試紅。
@@ -74,10 +62,14 @@ func TestNewDirectoryListsBuyersAndStoresWithTheirOwnCursors(t *testing.T) {
 	bus := events.NewBus()
 	q := nopReportingJobs{}
 	id := identity.New(identity.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
-	b := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: q, Media: media.NewFake(), Now: time.Now, Logger: log})
+	b := buyer.New(buyer.Deps{DB: d, Events: bus, Media: media.NewFake(), Now: time.Now, Logger: log})
+	// 先建一個沒有買家的帳號，讓買家 ID 與帳號 ID 錯開，游標用錯欄位時分頁才會出錯。
+	if _, err := id.DevNewAccount(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 	events.Subscribe(bus, b.OnAccountCreated)
 	sl := seller.New(seller.Deps{
-		KYCMAC: sealtest.MAC(t), DB: d, Events: bus, Jobs: q, Identity: id, Media: dirMedia{}, Orders: dirNoOrders{}, ProductStores: dirNoProducts{}, Registry: dirNoRegistry{}, Now: time.Now, Logger: log,
+		KYCMAC: sealtest.MAC(t), DB: d, Events: bus, Jobs: q, Identity: id, Media: media.NewFake(), Orders: dirNoOrders{}, ProductStores: dirNoProducts{}, Registry: dirNoRegistry{}, Now: time.Now, Logger: log,
 		Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: q, Now: time.Now, Logger: log}),
 	})
 	dir := NewDirectory(b, sl)

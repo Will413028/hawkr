@@ -161,7 +161,7 @@ type InsertPostParams struct {
 	StoreID      int64
 	Body         string
 	ImageKey     *string
-	ImageAssetID *string
+	ImageAssetID *uuid.UUID
 	ProductID    *int64
 	Status       string
 	PublishedAt  *time.Time
@@ -550,7 +550,7 @@ type UpdatePostParams struct {
 	Body            string
 	ClearImage      bool
 	NewImageKey     *string
-	NewImageAssetID *string
+	NewImageAssetID *uuid.UUID
 	ProductID       *int64
 	Now             time.Time
 	ID              uuid.UUID

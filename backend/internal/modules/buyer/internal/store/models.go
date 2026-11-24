@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"uuid"
 )
 
 type BuyerBlockedBuyer struct {
@@ -31,7 +32,7 @@ type BuyerBuyer struct {
 	Phone         *string
 	Gender        *string
 	Avatar        *string
-	AvatarAssetID *string
+	AvatarAssetID *uuid.UUID
 	BirthDate     pgtype.Date
 	City          *string
 	Job           *string
@@ -47,26 +48,10 @@ type BuyerFavorite struct {
 	CreatedAt time.Time
 }
 
-type BuyerMediaRefSync struct {
-	RefType   string
-	RefID     string
-	Seq       int64
-	SyncedSeq int64
-	UpdatedAt time.Time
-}
-
 type BuyerRestockSubscription struct {
 	BuyerID   int64
 	ProductID int64
 	CreatedAt time.Time
-}
-
-type BuyerRetiredAsset struct {
-	RefType    string
-	RefID      string
-	AssetID    string
-	RetiredAt  time.Time
-	UnlinkedAt *time.Time
 }
 
 type BuyerSellerSubscription struct {

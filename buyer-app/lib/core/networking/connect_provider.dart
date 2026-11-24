@@ -5,6 +5,7 @@ import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/content/v1alpha1/content.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/discovery/v1alpha1/discovery.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/media/v1alpha1/media.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/review/v1alpha1/review.connect.client.dart';
@@ -93,6 +94,11 @@ SocialPublicServiceClient socialPublicClient(Ref ref) =>
 @Riverpod(keepAlive: true)
 SocialAppServiceClient socialAppClient(Ref ref) =>
     SocialAppServiceClient(ref.watch(connectAuthTransportProvider));
+
+/// 圖片上傳會話（`MediaAppService`），登入後呼叫。
+@Riverpod(keepAlive: true)
+MediaAppServiceClient mediaClient(Ref ref) =>
+    MediaAppServiceClient(ref.watch(connectAuthTransportProvider));
 
 /// 買家本人的封鎖與封鎖名單（`BuyerAppService`）：使用者主動的寫入，`ACCOUNT_SUSPENDED` 照使用者主動的寫入處理。
 @Riverpod(keepAlive: true)

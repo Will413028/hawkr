@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/Will413028/hawkr/backend/internal/legacy/mediaservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/orderservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/productservice"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
@@ -35,7 +34,7 @@ type sellerCommand struct {
 }
 
 // openSeller 組裝 sellerCommand，需要完整 seller 模組的子命令（reannounce-exposures、dev-seed）走這裡。子命令不呼叫 media、order、product 的服務
-// （clients 是惰性連線），但模組要求這些依賴，位址、KYC 金鑰與 serve 一樣必填。只讀店家的子命令（delegation-eligibility、admin-role）
+// （clients 是惰性連線），但模組要求這些依賴，位址、media 的儲存與 KEK 設定、KYC 金鑰與 serve 一樣必填。只讀店家的子命令（delegation-eligibility、admin-role）
 // 不走這裡，用 seller.NewReader，只要 DATABASE_URL。關閉用 Close。
 func openSeller(ctx context.Context, prepare func(*config.Env) error) (*sellerCommand, error) {
 	e := config.NewEnv()
@@ -46,13 +45,13 @@ func openSeller(ctx context.Context, prepare func(*config.Env) error) (*sellerCo
 	}
 	dbc := dbConfig(e)
 	internalSecret := e.StringOr("INTERNAL_SERVICE_HMAC_SECRET", "")
-	mediaCfg := mediaservice.Config{Addr: e.String("MEDIA_SERVICE_ADDR"), Secret: internalSecret}
 	orderAddr := e.String("ORDER_SERVICE_ADDR")
 	productAddr := e.String("PRODUCT_SERVICE_ADDR")
 	log := newLogger()
 	kycMAC := readKYCHashKeys(e)
 	paymentProvider := readPayment(e, log)
 	registry := readGCIS(e)
+	mediaCfg := readMedia(e)
 	if err := e.Err(); err != nil {
 		return nil, err
 	}
@@ -65,7 +64,7 @@ func openSeller(ctx context.Context, prepare func(*config.Env) error) (*sellerCo
 		d.Close()
 		return nil, err
 	}
-	med, err := mediaservice.New(mediaCfg)
+	med, err := newMedia(mediaCfg, d, jc, log)
 	if err != nil {
 		d.Close()
 		return nil, err

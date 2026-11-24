@@ -47,7 +47,7 @@ func TestValidateAuthorizationChange(t *testing.T) {
 		"重複的能力": func(c *model.DelegationAuthorizationChange) {
 			c.Capabilities = []model.Capability{"posts.read", "posts.read"}
 		},
-		"超過九個的能力數": func(c *model.DelegationAuthorizationChange) {
+		"超過十個的能力數": func(c *model.DelegationAuthorizationChange) {
 			c.Capabilities = append(model.Capabilities(), "posts.read")
 		},
 	}

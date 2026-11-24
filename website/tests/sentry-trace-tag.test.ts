@@ -32,7 +32,7 @@ test("tags API request context from a captured ApiClientError", () => {
 		code: 503,
 		traceId: "trace-503",
 	});
-	err.apiEndpoint = "/api/v1/app/media/upload_sessions";
+	err.apiEndpoint = "/api/v1/app/shipments";
 	err.apiMethod = "POST";
 	err.apiMode = "authed";
 	err.apiRole = "2";
@@ -41,7 +41,7 @@ test("tags API request context from a captured ApiClientError", () => {
 	});
 	assert.deepEqual(event.tags, {
 		backend_trace_id: "trace-503",
-		api_endpoint: "/api/v1/app/media/upload_sessions",
+		api_endpoint: "/api/v1/app/shipments",
 		api_method: "POST",
 		api_mode: "authed",
 		api_role: "2",

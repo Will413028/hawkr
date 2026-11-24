@@ -59,7 +59,7 @@ var (
 )
 
 // RegisterAdmin records that (method, path) declared cap. Called by the
-// delegatedHandle mount helper. Panics if cap is not one of the nine tokens —
+// delegatedHandle mount helper. Panics if cap is not one of the ten tokens —
 // including the empty string, which is what makes "forgot to declare a capability"
 // a boot failure instead of an unguarded delegated route.
 func RegisterAdmin(method, path string, cap AdminCapability) {

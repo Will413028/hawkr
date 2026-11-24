@@ -149,7 +149,7 @@ func setupAnnounce(t *testing.T, chunk int) *announceFixture {
 	clock := newSteppingClock()
 	bus := events.NewBus()
 	id := identity.New(identity.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
-	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: nopJobs{}, Media: media.NewFake(), Now: time.Now, Logger: log})
+	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Media: media.NewFake(), Now: time.Now, Logger: log})
 	events.Subscribe[identity.AccountCreated](bus, buyers.OnAccountCreated)
 	stores := &fakeStores{retired: map[int64]bool{}}
 	q := &jobQueue{}

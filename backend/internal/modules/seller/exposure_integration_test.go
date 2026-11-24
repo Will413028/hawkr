@@ -19,7 +19,7 @@ func (f *fixture) exposable(t *testing.T) (int64, Store) {
 	f.setPayment(t, s.StoreID, enabledSnapshot)
 	cur, err := f.module.Store(context.Background(), s.StoreID)
 	must(t, err)
-	s, err = f.module.UpdateProfile(context.Background(), UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: cur.Version, LogoToken: "logo", UploaderID: accountID})
+	s, err = f.module.UpdateProfile(context.Background(), UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: cur.Version, LogoToken: f.logoToken(t, accountID), UploaderID: accountID})
 	must(t, err)
 	return accountID, s
 }
@@ -52,7 +52,7 @@ func (f *fixture) logoed(t *testing.T, accountID int64, s Store) {
 	t.Helper()
 	cur, err := f.module.Store(context.Background(), s.StoreID)
 	must(t, err)
-	_, err = f.module.UpdateProfile(context.Background(), UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: cur.Version, LogoToken: "logo", UploaderID: accountID})
+	_, err = f.module.UpdateProfile(context.Background(), UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: cur.Version, LogoToken: f.logoToken(t, accountID), UploaderID: accountID})
 	must(t, err)
 }
 
@@ -153,13 +153,13 @@ func TestExposableStoresExcludesEachFailingCondition(t *testing.T) {
 			must(t, err)
 			cur, err := f.module.Store(ctx, s.StoreID)
 			must(t, err)
-			_, err = f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: cur.Version, LogoToken: "logo", UploaderID: accountID})
+			_, err = f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: cur.Version, LogoToken: f.logoToken(t, accountID), UploaderID: accountID})
 			must(t, err)
 			return s.StoreID
 		},
 		"no kyc application": func(t *testing.T, f *fixture) int64 {
 			accountID, s := f.open(t)
-			_, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: s.Version, LogoToken: "logo", UploaderID: accountID})
+			_, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: s.Version, LogoToken: f.logoToken(t, accountID), UploaderID: accountID})
 			must(t, err)
 			return s.StoreID
 		},
@@ -167,7 +167,7 @@ func TestExposableStoresExcludesEachFailingCondition(t *testing.T) {
 			accountID, s := f.approvedStore(t) // 申請已核准，收款帳戶還沒有建立。
 			cur, err := f.module.Store(ctx, s.StoreID)
 			must(t, err)
-			_, err = f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: cur.Version, LogoToken: "logo", UploaderID: accountID})
+			_, err = f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: cur.Version, LogoToken: f.logoToken(t, accountID), UploaderID: accountID})
 			must(t, err)
 			return s.StoreID
 		},

@@ -120,7 +120,6 @@ func TestEveryLegacySellerRPCReadsTheModule(t *testing.T) {
 	bus := events.NewBus()
 	id := identity.New(identity.Deps{DB: d, Events: bus, Now: func() time.Time { return now }, Logger: log})
 	fake := media.NewFake()
-	fake.Key = func(refType, token string) string { return refType + "/" + token }
 	mac := sealtest.MAC(t)
 	provider := payment.NewFake()
 	provider.AutoActive = true

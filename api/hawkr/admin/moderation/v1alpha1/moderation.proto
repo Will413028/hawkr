@@ -130,8 +130,8 @@ message SocialSnapshot {
 // BuyerSnapshot 是被檢舉買家的公開檔案快照。
 message BuyerSnapshot {
   string display_name = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
-  // 頭像的 object key；沒有頭像是空字串。
-  string avatar = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 頭像的資產 ID（moderation 自己保存的複本）；沒有頭像是空字串。
+  string avatar_asset_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
 }
 
 // ReviewSnapshot 是評價的快照；作者永遠是買家。
