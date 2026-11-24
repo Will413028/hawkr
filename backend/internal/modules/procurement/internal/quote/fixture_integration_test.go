@@ -104,7 +104,7 @@ func (f *fixture) revise() {
 	f.exec(`UPDATE procurement.request_revisions SET quantity = 5 WHERE id = $1`, f.revision)
 }
 
-// publish 預覽並執行一次發布，邀請測試會回價的店（inviteFirstStore 到 inviteLastStore；回價列的外鍵要求有邀請列），回發布 ID 與賣家可見內容的 hash。
+// publish 預覽並執行一次發布（候選集有效的前提是需求在 MATCHING，A9-D29(4)，所以先轉成 MATCHING），邀請測試會回價的店（inviteFirstStore 到 inviteLastStore；回價列的外鍵要求有邀請列），回發布 ID 與賣家可見內容的 hash。
 func (f *fixture) publish() (uuid.UUID, string) {
 	f.t.Helper()
 	ctx := context.Background()
@@ -120,6 +120,7 @@ func (f *fixture) publish() (uuid.UUID, string) {
 	}
 	f.exec(`INSERT INTO procurement.agent_runs (id, buyer_id, request_id, candidate_set_id, run_type, status, client_request_id, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, 'CANDIDATE_SEARCH', 'SUCCEEDED', $5, $6, $6)`, uuid.NewV7(), f.buyer, f.request, set, uuid.NewV7(), f.now)
+	f.exec(`UPDATE procurement.requests SET status = 'MATCHING' WHERE id = $1`, f.request)
 	p, err := svc.PreviewPublication(ctx, rfq.PreviewPublicationInput{
 		BuyerID: f.buyer, RequestID: f.request, ClientRequestID: uuid.NewV7(), ExpectedRevisionID: f.revision, LowerBoundAmount: 100, UpperBoundAmount: 200,
 		CandidateSetID: &set, SelectedCandidateIDs: cands,

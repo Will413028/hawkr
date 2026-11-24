@@ -103,7 +103,7 @@ func (q *Queries) DeleteInboxItems(ctx context.Context, arg DeleteInboxItemsPara
 		return nil, err
 	}
 	defer rows.Close()
-	var items []DeleteInboxItemsRow
+	items := []DeleteInboxItemsRow{}
 	for rows.Next() {
 		var i DeleteInboxItemsRow
 		if err := rows.Scan(&i.Audience, &i.StoreID); err != nil {
