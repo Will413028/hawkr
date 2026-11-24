@@ -221,7 +221,7 @@
    "stack": "go",
    "file": "backend/internal/modules/notification/internal/stream/listen.go",
    "old": "if now().Sub(upSince) >= stableAfter {",
-   "new": "if true {",
+   "new": "if now().Sub(upSince) >= 0 {",
    "test": "internal/modules/notification/internal/stream ^TestRunBackoffKeepsGrowingWhileTheConnectionFlaps$",
    "why": "A flapping LISTEN connection resets the backoff every time, so resync runs about twice a second."
   },
@@ -230,7 +230,7 @@
    "stack": "go",
    "file": "backend/internal/modules/notification/internal/stream/listen.go",
    "old": "if now().Sub(upSince) >= stableAfter {",
-   "new": "if false {",
+   "new": "if now().Sub(upSince) < 0 {",
    "test": "internal/modules/notification/internal/stream ^TestRunBackoffResetsAfterAStableConnection$",
    "why": "A connection that stayed up still keeps the grown backoff, so recovery after a long outage is slow forever."
   },

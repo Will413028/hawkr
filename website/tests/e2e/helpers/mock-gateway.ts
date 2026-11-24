@@ -1307,6 +1307,39 @@ async function mockChatDefaults(page: Page): Promise<void> {
 	}
 }
 
+/**
+ * 通知訊號串流（NotificationAppService/WatchNotifications）：賣家殼層開頁就會連。第一條連線回一個 inbox 訊號 frame
+ * 再以正常的 end-stream 訊框（沒有錯誤）結束，lib/notifications/watch.ts 因此進入 connected 並立刻重連；
+ * 之後的連線不回應（保持 connecting，不顯示「即時更新已暫停」），避免熱迴圈，也不會有 502 的網路失敗。
+ * 頁面或 context 關閉時，未回應的請求由 Playwright 一併中止。
+ */
+async function mockNotificationDefaults(page: Page): Promise<void> {
+	let served = false;
+	await page.route(
+		/\/api\/connect\/hawkr\.notification\.v1alpha1\.NotificationAppService\/WatchNotifications(?:\?|$)/,
+		(route) => {
+			if (served) return;
+			served = true;
+			const envelope = (flags: number, json: unknown): Buffer => {
+				const payload = Buffer.from(JSON.stringify(json));
+				const frame = Buffer.alloc(5 + payload.length);
+				frame.writeUInt8(flags, 0);
+				frame.writeUInt32BE(payload.length, 1);
+				payload.copy(frame, 5);
+				return frame;
+			};
+			void route.fulfill({
+				status: 200,
+				contentType: "application/connect+json",
+				body: Buffer.concat([
+					envelope(0x00, { inbox: { unreadCount: 0 } }),
+					envelope(0x02, {}),
+				]),
+			});
+		},
+	);
+}
+
 async function mockSocialDefaults(page: Page): Promise<void> {
 	const empty: Array<[RegExp, unknown]> = [
 		[socialMethod("SocialPublicService", "ListPosts"), { posts: [] }],
@@ -1380,6 +1413,7 @@ export async function setupGatewayMocks(
 	await mockSocialDefaults(page);
 	await mockReviewDefaults(page);
 	await mockChatDefaults(page);
+	await mockNotificationDefaults(page);
 	await mockCrmDefaults(page);
 
 	// 2b. 措施與申覆（ListMyMeasures）：預設空。

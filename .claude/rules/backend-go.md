@@ -13,3 +13,4 @@ paths:
 - 改到 `backend/go.mod`（含 subagent 跑過 `go get`）後，commit 前跑 `GOWORK=off go mod tidy` 確認沒有 diff（CI backend monolith 有 tidy drift 檢查）。
 - 刪除一個舊服務時，同一次變更在 `backend/docs/plans/2026-09-24-go-modular-monolith/rpc-servers.csv` 補上它每個 RPC 的 disposition，跑 `python3 backend/scripts/check-migration-inventory.py`（CI `backend migration inventory`）。
 - 推之前照 workflow 的範圍跑：backend-monolith 的 gofmt 只掃 `cmd`、`internal`；`backend/pkg` 與各服務的 gofmt、vet、test 在 backend-go-checks。
+- 測樂觀鎖衝突時送非零且不等於目前的版本（`Version+1`），不用 `Version-1`：版本從 1 開始，0 代表不檢查，測試會在沒碰到檢查的情況下過或錯。
