@@ -13,8 +13,8 @@
       "id": "block-buyer-deleted-removed",
       "stack": "go-integration",
       "file": "backend/internal/modules/procurement/internal/sellerside/sellerside.go",
-      "old": "case v.pub.BuyerID == nil:",
-      "new": "case false && v.pub.BuyerID == nil:",
+      "old": "case buyerID == nil:",
+      "new": "case false && buyerID == nil:",
       "test": "internal/modules/procurement/internal/sellerside ^TestBuyerDeletedKeepsTheInviteReadableButClosesWrites$",
       "why": "Writes stay open after the buyer is deleted although nobody can accept the quote any more."
     },
@@ -94,8 +94,8 @@
       "id": "replay-after-writable-check",
       "stack": "go-integration",
       "file": "backend/internal/modules/procurement/internal/sellerside/submit.go",
-      "old": "case err == nil:\n\t\t\tout, err = replay(first, resp, v, hash, now)",
-      "new": "case err == nil:\n\t\t\tif err := checkWritable(ctx, q, resp, v, now); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n\t\t\tout, err = replay(first, resp, v, hash, now)",
+      "old": "case err == nil:\n\t\t\tout, err = replay(first, resp, v, hash, in, expectedPublication, expectedResponse, now)",
+      "new": "case err == nil:\n\t\t\tif err := checkWritable(ctx, q, resp, v, now); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n\t\t\tout, err = replay(first, resp, v, hash, in, expectedPublication, expectedResponse, now)",
       "test": "internal/modules/procurement/internal/sellerside ^TestSubmitReplayReturnsTheFirstVersionBeforeAnyOtherCheck$",
       "why": "A retry after the seller declined (or the window closed) is rejected instead of replayed."
     },
@@ -103,8 +103,8 @@
       "id": "replay-after-publication-cas",
       "stack": "go-integration",
       "file": "backend/internal/modules/procurement/internal/sellerside/submit.go",
-      "old": "case err == nil:\n\t\t\tout, err = replay(first, resp, v, hash, now)",
-      "new": "case err == nil:\n\t\t\tif expectedPublication != v.pub.Version || in.ExpectedSellerFacingHash != v.hash {\n\t\t\t\treturn quote.VersionConflict(\"x\", quote.TargetPublication)\n\t\t\t}\n\t\t\tout, err = replay(first, resp, v, hash, now)",
+      "old": "case err == nil:\n\t\t\tout, err = replay(first, resp, v, hash, in, expectedPublication, expectedResponse, now)",
+      "new": "case err == nil:\n\t\t\tif expectedPublication != v.pub.Version || in.ExpectedSellerFacingHash != v.hash {\n\t\t\t\treturn quote.VersionConflict(\"x\", quote.TargetPublication)\n\t\t\t}\n\t\t\tout, err = replay(first, resp, v, hash, in, expectedPublication, expectedResponse, now)",
       "test": "internal/modules/procurement/internal/sellerside ^TestSubmitReplayReturnsTheFirstVersionBeforeAnyOtherCheck$",
       "why": "Replay is checked after the publication hash CAS."
     },
@@ -112,8 +112,8 @@
       "id": "replay-after-response-version-cas",
       "stack": "go-integration",
       "file": "backend/internal/modules/procurement/internal/sellerside/submit.go",
-      "old": "case err == nil:\n\t\t\tout, err = replay(first, resp, v, hash, now)",
-      "new": "case err == nil:\n\t\t\tif expectedResponse != resp.LatestVersion {\n\t\t\t\treturn quote.VersionConflict(\"x\", quote.TargetSellerResponse)\n\t\t\t}\n\t\t\tout, err = replay(first, resp, v, hash, now)",
+      "old": "case err == nil:\n\t\t\tout, err = replay(first, resp, v, hash, in, expectedPublication, expectedResponse, now)",
+      "new": "case err == nil:\n\t\t\tif expectedResponse != resp.LatestVersion {\n\t\t\t\treturn quote.VersionConflict(\"x\", quote.TargetSellerResponse)\n\t\t\t}\n\t\t\tout, err = replay(first, resp, v, hash, in, expectedPublication, expectedResponse, now)",
       "test": "internal/modules/procurement/internal/sellerside ^TestSubmitReplayReturnsTheFirstVersionBeforeAnyOtherCheck$",
       "why": "Replay is checked after the response version CAS, so a retry is judged as already submitted."
     },
@@ -121,8 +121,8 @@
       "id": "replay-content-not-compared",
       "stack": "go-integration",
       "file": "backend/internal/modules/procurement/internal/sellerside/submit.go",
-      "old": "if firstHash != hash {",
-      "new": "if false && firstHash != hash {",
+      "old": "if firstHash != hash || expectedPublication",
+      "new": "if expectedPublication",
       "test": "internal/modules/procurement/internal/sellerside ^TestSubmitReplayWithDifferentContentIsRejected$",
       "why": "The same client_request_id with different content is replayed instead of rejected."
     },
@@ -269,6 +269,60 @@
       "new": "ID: resp.ID, Version: next, ExpectedVersion: next, Now: now",
       "test": "internal/modules/procurement/internal/sellerside ^TestSubmitVersionAndPublicationChecks$",
       "why": "The latest_version bump no longer matches the locked row, so a submit fails."
+    },
+    {
+      "id": "draft-cap-in-shared-normalizer",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/sellerside/input.go",
+      "old": "d, _, err := NormalizeDraft(in)",
+      "new": "d, capped, err := NormalizeDraft(in)\n\tif err == nil && len(capped) > 16384 {\n\t\treturn normalized{}, invalid(\"Draft\", \"Draft too large\")\n\t}",
+      "test": "internal/modules/procurement/internal/sellerside ^TestSubmitIsNotCappedByTheDraftSize$",
+      "why": "A submit with per-field-valid content is refused by the draft-only size cap."
+    },
+    {
+      "id": "draft-size-violation-unmapped",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/sellerside/draft.go",
+      "old": "return errors.As(err, &pg) && pg.Code == \"23514\" && pg.ConstraintName == draftSizeConstraint",
+      "new": "return false && errors.As(err, &pg) && pg.Code == \"23514\" && pg.ConstraintName == draftSizeConstraint",
+      "test": "internal/modules/procurement/internal/sellerside ^TestDraftSizeIsMeasuredByTheDatabase$",
+      "why": "An oversized draft surfaces as INTERNAL instead of INVALID_ARGUMENT."
+    },
+    {
+      "id": "replay-ignores-expected-publication-version",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/sellerside/submit.go",
+      "old": " || expectedPublication != first.PublicationVersion",
+      "new": "",
+      "test": "internal/modules/procurement/internal/sellerside ^TestSubmitReplayWithDifferentExpectedFieldsIsRejected$",
+      "why": "A replay with a different expected_publication_version is served."
+    },
+    {
+      "id": "replay-ignores-expected-hash",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/sellerside/submit.go",
+      "old": " || in.ExpectedSellerFacingHash != v.hash || expectedResponse",
+      "new": " || expectedResponse",
+      "test": "internal/modules/procurement/internal/sellerside ^TestSubmitReplayWithDifferentExpectedFieldsIsRejected$",
+      "why": "A replay with a different expected_seller_facing_payload_hash is served."
+    },
+    {
+      "id": "replay-ignores-expected-response-version",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/sellerside/submit.go",
+      "old": " || expectedResponse != first.Version-1",
+      "new": "",
+      "test": "internal/modules/procurement/internal/sellerside ^TestSubmitReplayWithDifferentExpectedFieldsIsRejected$",
+      "why": "A replay with a different expected_seller_response_version is served."
+    },
+    {
+      "id": "page-token-kind-unchecked",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/procurement/internal/quote/list.go",
+      "old": "t.Kind != kind || ",
+      "new": "",
+      "test": "internal/modules/procurement/internal/sellerside ^TestListPageTokensAreBoundToTheirList$",
+      "why": "A page token from another list is accepted."
     }
   ]
 }

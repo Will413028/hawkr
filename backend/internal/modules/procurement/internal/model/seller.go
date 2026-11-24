@@ -15,8 +15,6 @@ const (
 	MaxQuoteUnitRunes           = 40
 	MaxQuantityTextRunes        = 32
 	MaxReasonCodeRunes          = 64
-	// MaxDraftBytes 是一份草稿序列化後的上限（與 seller_response_drafts_payload_check 同值）。
-	MaxDraftBytes = 16384
 	// Currency 是賣家回價的幣別：目前只有新台幣。
 	Currency = "TWD"
 )

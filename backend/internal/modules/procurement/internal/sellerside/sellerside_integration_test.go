@@ -4,6 +4,7 @@ package sellerside_test
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"strings"
 	"sync"
@@ -263,12 +264,102 @@ func TestSubmitReplayReturnsTheFirstVersionBeforeAnyOtherCheck(t *testing.T) {
 	if !replayed.Replayed || replayed.Version != 1 || replayed.Status != model.ResponseExpired {
 		t.Fatalf("婉拒與過期之後的重送 = %+v", replayed)
 	}
-	// 詢價內容的檢查也在重送之後：帶錯的 hash 的重送仍回放。
-	stale := in
-	stale.ExpectedSellerFacingHash = "stale"
-	if r, err := svc.Submit(ctx, stale); err != nil || !r.Replayed {
-		t.Fatalf("hash 不符的重送要回放：%+v %v", r, err)
+}
+
+func TestSubmitReplayWithDifferentExpectedFieldsIsRejected(t *testing.T) {
+	f := newFixture(t)
+	ctx := t.Context()
+	svc := f.service()
+	cid := uuid.NewV7()
+	in := f.submitIn(invitedStore, cid, "", f.validQuote())
+	_, err := svc.Submit(ctx, in)
+	must(t, err)
+	for name, mutate := range map[string]func(*sellerside.SubmitInput){
+		"expected_publication_version":        func(i *sellerside.SubmitInput) { i.ExpectedPublicationVersion = "2" },
+		"expected_seller_facing_payload_hash": func(i *sellerside.SubmitInput) { i.ExpectedSellerFacingHash = "stale" },
+		"expected_seller_response_version":    func(i *sellerside.SubmitInput) { i.ExpectedResponseVersion = "1" },
+	} {
+		changed := in
+		mutate(&changed)
+		_, err := svc.Submit(ctx, changed)
+		wantKind(t, err, apperr.KindInvalidInput)
+		if msg := err.Error(); !strings.Contains(msg, "client_request_id") {
+			t.Errorf("%s：要指向 client_request_id：%v", name, err)
+		}
 	}
+	if n := f.count("procurement.seller_response_versions"); n != 1 {
+		t.Fatalf("不同的重送不該建版本：%d", n)
+	}
+}
+
+// 草稿的大小只由 DB 的 CHECK（jsonb 文字的位元組數）量：Go 序列化未超過上限、jsonb 文字（鍵值之間多了空白）卻超過的草稿回 INVALID_ARGUMENT，不是 INTERNAL；
+// 含大量 < > & 的草稿（Go 轉義成六位元組，jsonb 不轉義）在上限之內要被收下。
+func TestDraftSizeIsMeasuredByTheDatabase(t *testing.T) {
+	f := newFixture(t)
+	ctx := t.Context()
+	svc := f.service()
+	control := func(n int) string { return strings.Repeat("\x01", n) }
+	var over model.QuoteInput
+	for m := 1000; m >= 0; m-- {
+		over = model.QuoteInput{SpecNote: control(m), TermsNote: control(1000), DeviationDisclosure: control(1000), ConversionBasis: control(500)}
+		if b, err := json.Marshal(over); err != nil {
+			t.Fatal(err)
+		} else if len(b) <= 16384 {
+			break
+		}
+	}
+	var jsonbBytes int
+	payload, _ := json.Marshal(over)
+	if err := f.d.Pool().QueryRow(ctx, `SELECT octet_length($1::jsonb::text)`, string(payload)).Scan(&jsonbBytes); err != nil {
+		t.Fatal(err)
+	}
+	if len(payload) > 16384 || jsonbBytes <= 16384 {
+		t.Fatalf("測資要 Go 序列化在上限內（%d）、jsonb 文字超過（%d）", len(payload), jsonbBytes)
+	}
+	_, err := svc.UpsertDraft(ctx, invitedStore, f.publication, "", over)
+	wantKind(t, err, apperr.KindInvalidInput)
+	if !strings.Contains(err.Error(), "Draft") {
+		t.Errorf("要指向 Draft：%v", err)
+	}
+	plain := model.QuoteInput{SpecNote: control(1000), TermsNote: control(1000), DeviationDisclosure: control(1000), ConversionBasis: control(500)}
+	_, err = svc.UpsertDraft(ctx, invitedStore, f.publication, "", plain)
+	wantKind(t, err, apperr.KindInvalidInput)
+	amp := model.QuoteInput{SpecNote: strings.Repeat("&", 1000), TermsNote: strings.Repeat("<", 1000), DeviationDisclosure: strings.Repeat(">", 1000), ConversionBasis: strings.Repeat("&", 500)}
+	if b, _ := json.Marshal(amp); len(b) <= 16384 {
+		t.Fatalf("測資要讓 Go 序列化超過 16384：%d", len(b))
+	}
+	if _, err := svc.UpsertDraft(ctx, invitedStore, f.publication, "", amp); err != nil {
+		t.Fatalf("& 很多但 jsonb 在上限內的草稿要收下：%v", err)
+	}
+}
+
+// 正式回價不受草稿大小限制：各欄位都在自己的上限內就收。
+func TestSubmitIsNotCappedByTheDraftSize(t *testing.T) {
+	f := newFixture(t)
+	q := f.validQuote()
+	q.SpecNote, q.TermsNote, q.DeviationDisclosure, q.ConversionBasis = strings.Repeat("&", 1000), strings.Repeat("<", 1000), strings.Repeat(">", 1000), strings.Repeat("&", 500)
+	if v := f.submit(invitedStore, "", q); v.Version != 1 {
+		t.Fatalf("送出 = %+v", v)
+	}
+}
+
+func TestListPageTokensAreBoundToTheirList(t *testing.T) {
+	f := newFixture(t)
+	ctx := t.Context()
+	svc := f.service()
+	if _, err := svc.List(ctx, invitedStore, 0, quote.EncodeToken(quote.TokenSellerResponses, f.now, uuid.NewV7())); err == nil {
+		t.Fatal("買家回價列表的 token 不能給賣家的詢價列表用")
+	} else {
+		wantKind(t, err, apperr.KindInvalidInput)
+	}
+	f.sibling(buyerID+1, f.now.Add(time.Hour))
+	first, err := svc.List(ctx, invitedStore, 1, "")
+	must(t, err)
+	if first.NextPageToken == "" {
+		t.Fatal("要有下一頁")
+	}
+	_, err = f.buyerQuotes().List(ctx, quote.ListInput{BuyerID: f.buyer, RequestID: f.request, PublicationID: f.publication, PageToken: first.NextPageToken})
+	wantKind(t, err, apperr.KindInvalidInput)
 }
 
 func TestSubmitReplayWithDifferentContentIsRejected(t *testing.T) {

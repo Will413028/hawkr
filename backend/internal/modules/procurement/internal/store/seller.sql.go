@@ -126,7 +126,7 @@ type GetSellerPublicationViewRow struct {
 	DeliveryState                     string
 }
 
-// 賣家端的讀寫（A9-3c-1、A9-3c-2）。賣家可見性的唯一依據是邀請列的 (publication_id, store_id)（A9-D44(2)）：下面的讀取都從邀請列出發，
+// 賣家端的讀寫。賣家可見性的唯一依據是邀請列的 (publication_id, store_id)（A9-D44(2)）：下面的讀取都從邀請列出發，
 // 不帶 buyer_id，買家刪除後（buyer_id 為 NULL）被邀請的店照常讀得到；沒有邀請列的店一列都查不到。
 // 一筆發給這家店的詢價，連同組出賣家可見內容要用的核准與需求版本（組法在 rfq.SellerFacingOf）。沒有列就是不存在或不是發給這家店。
 func (q *Queries) GetSellerPublicationView(ctx context.Context, arg GetSellerPublicationViewParams) (GetSellerPublicationViewRow, error) {
@@ -513,6 +513,18 @@ func (q *Queries) ListSellerResponseStates(ctx context.Context, arg ListSellerRe
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockPublicationBuyer = `-- name: LockPublicationBuyer :one
+SELECT buyer_id FROM procurement.rfq_publications WHERE id = $1 FOR SHARE
+`
+
+// 賣家寫入用：以 FOR SHARE 鎖發布列並回目前的 buyer_id（NULL 是買家已刪除）。BuyerDeleted 的 UPDATE 要等寫入提交，所以檢查與寫入之間不會插進買家刪除。鎖順序：店家列、回價身分列、發布列。
+func (q *Queries) LockPublicationBuyer(ctx context.Context, id uuid.UUID) (*int64, error) {
+	row := q.db.QueryRow(ctx, lockPublicationBuyer, id)
+	var buyer_id *int64
+	err := row.Scan(&buyer_id)
+	return buyer_id, err
 }
 
 const lockSellerResponseForStore = `-- name: LockSellerResponseForStore :one

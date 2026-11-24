@@ -31,7 +31,7 @@ type SubmitInput struct {
 // Submit 送出正式回價，產生不可變的新版本，hash 用 rfqhash.SellerResponse（quote.PayloadHash），與買家端列出的 payload_hash 同一個值。
 // 順序：欄位與報價內容驗證（回 INVALID_ARGUMENT，指向欄位）→ 詢價是否發給這家店（NOT_FOUND）→ 冪等重送 → 詢價內容的版本與 hash（ABORTED／VERSION_CONFLICT，publication）→
 // 停止寫入（FAILED_PRECONDITION／RFQ_RECIPIENT_CLOSED）→ 回價版本（ABORTED／VERSION_CONFLICT，seller_response：expected 不是目前的版本，或空字串卻已有正式回價）→ 有效期限要在未來。
-// 重送同一個 ClientRequestID：報價內容相同回第一次的版本（Replayed，不建新版本，先於所有版本與停止寫入的檢查，所以重送不會被判成已提交），內容不同回 INVALID_ARGUMENT（client_request_id）。
+// 重送同一個 ClientRequestID：報價內容與三個 expected 欄位都相同回第一次的版本（Replayed，不建新版本，先於所有版本與停止寫入的檢查，所以重送不會被判成已提交），任一不同回 INVALID_ARGUMENT（client_request_id）。
 func (s Service) Submit(ctx context.Context, in SubmitInput) (model.SellerResponseVersion, error) {
 	if err := s.check(); err != nil {
 		return model.SellerResponseVersion{}, err
@@ -78,7 +78,7 @@ func (s Service) Submit(ctx context.Context, in SubmitInput) (model.SellerRespon
 		first, err := q.GetSellerResponseVersionByKey(ctx, store.GetSellerResponseVersionByKeyParams{SellerResponseID: resp.ID, ClientRequestID: in.ClientRequestID})
 		switch {
 		case err == nil:
-			out, err = replay(first, resp, v, hash, now)
+			out, err = replay(first, resp, v, hash, in, expectedPublication, expectedResponse, now)
 			return err
 		case !errors.Is(err, pgx.ErrNoRows):
 			return fmt.Errorf("sellerside：讀取回價的冪等鍵：%w", err)
@@ -121,8 +121,8 @@ func (s Service) Submit(ctx context.Context, in SubmitInput) (model.SellerRespon
 	return out, err
 }
 
-// replay 回第一次送出的版本（內容的 hash 相同），不建新版本；內容不同回 INVALID_ARGUMENT（client_request_id）。
-func replay(first store.ProcurementSellerResponseVersion, resp store.ProcurementSellerResponse, v view, hash string, now time.Time) (model.SellerResponseVersion, error) {
+// replay 回第一次送出的版本（報價 hash 與三個 expected 欄位都相同），不建新版本；任一不同回 INVALID_ARGUMENT（client_request_id）。
+func replay(first store.ProcurementSellerResponseVersion, resp store.ProcurementSellerResponse, v view, hash string, in SubmitInput, expectedPublication, expectedResponse int32, now time.Time) (model.SellerResponseVersion, error) {
 	qt, err := quote.QuoteOf(first)
 	if err != nil {
 		return model.SellerResponseVersion{}, err
@@ -131,7 +131,8 @@ func replay(first store.ProcurementSellerResponseVersion, resp store.Procurement
 	if err != nil {
 		return model.SellerResponseVersion{}, err
 	}
-	if firstHash != hash {
+	// 第一次成功時 expected 值必然等於當時的狀態：發布版本等於存下的 publication_version、賣家可見內容的 hash 由不可變的列決定、回價版本是新版的前一版。
+	if firstHash != hash || expectedPublication != first.PublicationVersion || in.ExpectedSellerFacingHash != v.hash || expectedResponse != first.Version-1 {
 		return model.SellerResponseVersion{}, quote.IdempotencyMismatch()
 	}
 	out, err := versionOf(resp, first, v.payload, now)

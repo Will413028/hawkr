@@ -1,4 +1,4 @@
--- 賣家端的讀寫（A9-3c-1、A9-3c-2）。賣家可見性的唯一依據是邀請列的 (publication_id, store_id)（A9-D44(2)）：下面的讀取都從邀請列出發，
+-- 賣家端的讀寫。賣家可見性的唯一依據是邀請列的 (publication_id, store_id)（A9-D44(2)）：下面的讀取都從邀請列出發，
 -- 不帶 buyer_id，買家刪除後（buyer_id 為 NULL）被邀請的店照常讀得到；沒有邀請列的店一列都查不到。
 
 -- name: GetSellerPublicationView :one
@@ -45,6 +45,10 @@ ON CONFLICT (publication_id, store_id) DO NOTHING;
 -- name: LockSellerResponseForStore :one
 -- 賣家寫入用：鎖這家店對這筆詢價的身分列（與買家的 AcceptSellerQuote 鎖同一列，兩邊串行）。沒有列回 ErrNoRows。
 SELECT * FROM procurement.seller_responses WHERE publication_id = @publication_id AND store_id = @store_id FOR UPDATE;
+
+-- name: LockPublicationBuyer :one
+-- 賣家寫入用：以 FOR SHARE 鎖發布列並回目前的 buyer_id（NULL 是買家已刪除）。BuyerDeleted 的 UPDATE 要等寫入提交，所以檢查與寫入之間不會插進買家刪除。鎖順序：店家列、回價身分列、發布列。
+SELECT buyer_id FROM procurement.rfq_publications WHERE id = @id FOR SHARE;
 
 -- name: HasActiveAcceptance :one
 -- 這張需求有沒有進行中的成交（ACTIVE 的接受單；建單失敗解除鎖後不算）。不帶 buyer_id：買家刪除後接受單的 buyer_id 是 NULL。

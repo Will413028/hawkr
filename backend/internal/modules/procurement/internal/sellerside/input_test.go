@@ -155,18 +155,15 @@ func TestNormalizeDraftChecksShapeOnly(t *testing.T) {
 	}
 }
 
-// 每個欄位都在自己的字數上限內，但 JSON 會把 < > & 轉成六位元組的轉義：三個 1000 字的說明加 500 字的換算說明序列化後超過 16 KiB。
-func TestDraftSizeIsCappedByTheSerializedBytes(t *testing.T) {
-	in := model.QuoteInput{
-		SpecNote: strings.Repeat("<", 1000), TermsNote: strings.Repeat("<", 1000), DeviationDisclosure: strings.Repeat("<", 1000), ConversionBasis: strings.Repeat("<", 500),
+// 整份草稿的大小只由 DB 的 CHECK 量：Go 端不因為 JSON 把 < > & 轉成六位元組的轉義就拒絕（jsonb 存的是原字元）；正式回價也不受草稿大小限制。
+func TestNormalizeDoesNotCapTheSerializedSize(t *testing.T) {
+	in := validInput()
+	in.SpecNote, in.TermsNote, in.DeviationDisclosure, in.ConversionBasis = strings.Repeat("&", 1000), strings.Repeat("<", 1000), strings.Repeat(">", 1000), strings.Repeat("&", 500)
+	if _, payload, err := NormalizeDraft(in); err != nil || len(payload) <= 16384 {
+		t.Fatalf("草稿要通過（Go 序列化 %d 位元組）：%v", len(payload), err)
 	}
-	_, _, err := NormalizeDraft(in)
-	if msg := fieldOf(t, err); !strings.Contains(msg, "16384") {
-		t.Errorf("訊息 %q 要指出整份草稿超過上限", msg)
-	}
-	in.DeviationDisclosure, in.ConversionBasis = "", ""
-	if _, payload, err := NormalizeDraft(in); err != nil || len(payload) > model.MaxDraftBytes {
-		t.Fatalf("上限以內的草稿要通過：%v（%d 位元組）", err, len(payload))
+	if _, err := normalizeQuote(in); err != nil {
+		t.Fatalf("正式回價只受各欄位上限限制：%v", err)
 	}
 }
 

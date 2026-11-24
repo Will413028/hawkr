@@ -189,7 +189,7 @@ A9-D25 對開放問題的決定（Will 2026-11-21）：
 | 「已停止寫入」的儲存狀態（舊 `PUBLICATION_CLOSED`、`OTHER_WON`） | 有寫入者 | 否（S6 只留 `DECLINED`） | 由列推導，不存 | 已婉拒、需求有 ACTIVE 接受單、買家已刪（發布列 `buyer_id` 為 NULL）、`response_deadline` 已過（台北時區當日結束）；婉拒本身不受後三者限制；建單失敗解除 live 鎖後重新可寫（A9-D45(3)）。已知：不同店之間沒有互鎖，另一家店在接受提交的同時改價，改價版本會成為沒有讀取者的版本，無害 |
 | 撤回與婉拒的 command 表（`reason_code` 存在 command 列） | 冪等與稽核 | 否（S4） | 目標狀態的方法，`reason_code` 存在身分列 | `withdrawn_reason_code`、`write_closed_reason_code`（去頭尾空白、最多 64 字、空字串存 NULL，登記在 `trimmedColumns`）；`withdrawn_version` 是單值：版本 1 撤回後送出版本 2 再撤回，版本 1 顯示 SUPERSEDED，買家端只看目前版本，不處理 |
 | 版本表的 `outside_buyer_requested_range` 欄 | 讀取時用 | 否：買家端與賣家端都對核准區間現算（A9-D35(2)） | 不存 | 欄位刪除（migration `procurement_seller_side`）；賣家回應的 `outside_buyer_requested_range` 由 `quote.OutsideRange` 算 |
-| 草稿 JSONB 無上限 | 形狀不固定 | 部分：形狀不固定，但大小必須有界 | 文字欄沿用正式回價的字數上限，整份序列化 ≤ 16 KiB（DB CHECK 同值；JSON 轉義讓字數上限單獨擋不住它） | `NormalizeDraft` 去頭尾空白、驗列舉與負數；`lead_time_days` 改 `optional`，0 是當天出貨 |
+| 草稿 JSONB 無上限 | 形狀不固定 | 部分：形狀不固定，但大小必須有界 | 文字欄沿用正式回價的字數上限，整份 jsonb 文字 ≤ 16 KiB（只有 DB CHECK 量，違規對成 INVALID_ARGUMENT／`Draft`；Go 序列化與 jsonb 文字的位元組數不同，不在 Go 重算） | `NormalizeDraft` 去頭尾空白、驗列舉與負數；`lead_time_days` 改 `optional`，0 是當天出貨 |
 | 冪等重送的比對 | 重送不被判成已提交 | 成立 | 先於出版本、停止寫入與版本檢查 | 比對 `quote.PayloadHash`（`rfqhash.SellerResponse`，A9-D36）；數量正規化成三位小數、時間取 UTC 微秒，送出時算的 hash 才等於讀回來算的 |
 | `publication_version`、`expected_publication_version` | 重發 | 否：沒有重發，版本恆為 1 | 日後有重發才有意義 | 先留（契約欄位）；目前只有 `expected_seller_facing_payload_hash` 實際有效，版本檢查只是形式 |
 | 賣家可見內容的 hash 取法 | 與買家端同一份 | 成立 | `rfq.SellerFacingOf`（純函式，不載入受眾名單） | 賣家端與 `compile` 共用，不另寫一份 |

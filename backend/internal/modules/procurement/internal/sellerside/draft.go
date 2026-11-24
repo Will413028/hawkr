@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/model"
@@ -30,7 +31,15 @@ func ParseVersion(field, raw string) (int32, error) {
 	return int32(v), nil
 }
 
-// UpsertDraft 建立或更新這家店對這筆詢價的回價草稿（整份覆寫）。草稿只驗形狀與長度（NormalizeDraft），不驗必填欄位與金額恆等式，買家讀不到。
+// draftSizeConstraint 是草稿大小上限的 CHECK（jsonb 轉文字的位元組數 <= 16384）；大小只由它量，Go 端不重算（序列化格式不同，邊界會對不上）。
+const draftSizeConstraint = "seller_response_drafts_payload_check"
+
+func isDraftTooLarge(err error) bool {
+	var pg *pgconn.PgError
+	return errors.As(err, &pg) && pg.Code == "23514" && pg.ConstraintName == draftSizeConstraint
+}
+
+// UpsertDraft 建立或更新這家店對這筆詢價的回價草稿（整份覆寫）。草稿只驗形狀與長度（NormalizeDraft；整份太大由 DB 的 CHECK 擋，回 INVALID_ARGUMENT／Draft），不驗必填欄位與金額恆等式，買家讀不到。
 // expectedDraftVersion 是空字串表示建立第一版，草稿已存在卻帶空、或帶的版本不是目前的回 ABORTED／VERSION_CONFLICT（conflictTarget 是 draft）；版本格式不對回 INVALID_ARGUMENT（expected_draft_version）。
 // 詢價不是發給這家店的回 NOT_FOUND；停止寫入（見套件說明）回 FAILED_PRECONDITION／RFQ_RECIPIENT_CLOSED。
 func (s Service) UpsertDraft(ctx context.Context, storeID int64, publicationID uuid.UUID, expectedDraftVersion string, in model.QuoteInput) (model.SellerDraft, error) {
@@ -70,6 +79,9 @@ func (s Service) UpsertDraft(ctx context.Context, storeID int64, publicationID u
 		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			return quote.VersionConflict("草稿已經被更新過，請重新載入", TargetDraft)
+		}
+		if isDraftTooLarge(err) {
+			return invalid("Draft", "Draft 不得超過 16384 位元組")
 		}
 		if err != nil {
 			return fmt.Errorf("sellerside：寫入草稿：%w", err)

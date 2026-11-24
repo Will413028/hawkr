@@ -29,7 +29,7 @@ func (s Service) List(ctx context.Context, storeID int64, pageSize int32, pageTo
 	}
 	params := store.ListSellerPublicationViewsParams{StoreID: storeID, PageSize: pageSize + 1}
 	if pageToken != "" {
-		t, ok := quote.DecodeToken(pageToken)
+		t, ok := quote.DecodeToken(quote.TokenSellerPublications, pageToken)
 		if !ok {
 			return model.SellerPublicationPage{}, apperr.InvalidInputOn([]string{"page_token"}, "page_token 不是有效的分頁 token")
 		}
@@ -80,7 +80,7 @@ func (s Service) List(ctx context.Context, storeID int64, pageSize int32, pageTo
 		}
 		if more {
 			last := rows[len(rows)-1].ProcurementRfqPublication
-			out.NextPageToken = quote.EncodeToken(last.PublishedAt, last.ID)
+			out.NextPageToken = quote.EncodeToken(quote.TokenSellerPublications, last.PublishedAt, last.ID)
 		}
 		return nil
 	})

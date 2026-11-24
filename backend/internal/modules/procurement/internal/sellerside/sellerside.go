@@ -3,7 +3,7 @@
 // 可見性只看邀請列的 (publication_id, store_id)，不依賴 buyer_id：買家刪除（buyer_id 為 NULL）後被邀請的店照常讀得到，沒被邀請的店與不存在的詢價都是同一個 NOT_FOUND（A9-D44(2)）。
 // 賣家能力 CAP_MARKETING 在這裡檢查（讀取在查詢之前，寫入在 transaction 內先鎖店家列再檢查）；handler 只推導店家。
 // 寫入在下列情況回 FAILED_PRECONDITION／RFQ_RECIPIENT_CLOSED（A9-D45(3)）：賣家已婉拒、這張需求有 ACTIVE 的接受單、買家已刪除、回價期限已過；全部由列推導，沒有儲存的「已結案」狀態（S6）。
-// 寫入先鎖店家列（seller 在 procurement 之下），再鎖回價身分列（與買家的 AcceptSellerQuote 鎖同一列，兩邊串行）。
+// 寫入先鎖店家列（seller 在 procurement 之下），再鎖回價身分列（與買家的 AcceptSellerQuote 鎖同一列，兩邊串行），最後以 FOR SHARE 鎖發布列讀 buyer_id（BuyerDeleted 要等寫入提交）。
 package sellerside
 
 import (
@@ -177,10 +177,14 @@ func (s Service) lock(ctx context.Context, q *store.Queries, storeID int64, publ
 // checkWritable 檢查寫入的四個停止條件（A9-D45(3)）：已婉拒、買家已刪除、這張需求有 ACTIVE 的接受單、回價期限已過。
 // 先看身分列與發布列已有的事實，最後才查接受單。
 func checkWritable(ctx context.Context, q *store.Queries, resp store.ProcurementSellerResponse, v view, now time.Time) error {
+	buyerID, err := q.LockPublicationBuyer(ctx, v.pub.ID)
+	if err != nil {
+		return fmt.Errorf("sellerside：鎖發布列 %s：%w", v.pub.ID, err)
+	}
 	switch {
 	case resp.WriteClosedAt != nil:
 		return recipientClosed("你已婉拒這筆詢價")
-	case v.pub.BuyerID == nil:
+	case buyerID == nil:
 		return recipientClosed("買家已刪除，這筆詢價不再收報價")
 	case v.payload.ResponseDate != nil && rfq.DeadlinePassed(*v.payload.ResponseDate, now):
 		return recipientClosed("這筆詢價的回價期限已過")
