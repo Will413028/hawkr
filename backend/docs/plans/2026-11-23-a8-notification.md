@@ -134,7 +134,8 @@
     - **A8-3b content 側型別**（被擋於：A8-3a2）：social（留言、讚、追蹤的店發文）、buyer 追蹤店家、`product_restocked`（裁決表 §8.1#15，同為 fan-out）、review、im（只推播）的型別與訂閱；收件人可能是 BUYER 或 STORE 的拆成兩個型別；封鎖雙方不送。驗收：每型別一個「事件 → 收件匣」案例、封鎖略過 mutation。
     - **A8-3c 治理與交易側型別**（被擋於：A8-3a；需要收件人解析的型別另擋於 A8-3a2）：seller（含新事件 `CaseInquiryCreated`、`StorePendingDeletion` 確認信）、buyer `BuyerDeletionRequested` 確認信、moderation 與 social、review、im 的處分及檢舉事件（依 D24；開工時同步改 `event-adjudication.md` §8.3#7a-c）、檢舉確認與結果 `report_received`／`report_resolved`（參數只放參照）、payment `PayoutAccountChanged` 與 `payout_account_deadline`、accountsuspension、delegation、procurement `RfqPublished`。驗收：每型別一個案例、確認信地址不在任何 job 參數裡。
     - **A8-3e coupon 到期提醒型別**（2026-11-24 加：D26、D27 歸 A8-3 但未列入 3b／3c）（被擋於：A8-3a2、B7-4c）：`voucher_expiring` 型別與訂閱、行銷類推播的靜音時段延後（D26）、每券一則與送出前重查（D27）。驗收：見下。
-    - **A8-3d 覆蓋、重送與刪 relay**（被擋於：A8-3b、A8-3c、A8-3e）：事件↔型別覆蓋測試（移除一個訂閱 → 紅）、重送手段與 runbook、未觸達查詢、刪除上方列出的 relay 與 wire（`rg` 0 hit）。
+    - **A8-3d1 覆蓋測試與刪 relay**（2026-11-24 拆分：一個 session 做不完；被擋於：A8-3b、A8-3c、A8-3e）：事件↔型別覆蓋測試（每個被訂閱的單體事件都有對應型別、每個型別都有訂閱或明列為公告；移除一個訂閱 → 紅）、刪除上方列出的 relay 與 wire 及其 wire／golden 測試與 `pkg/mq` social 常數（`rg` 0 hit）。
+    - **A8-3d2 重送與未觸達查詢**（被擋於：A8-3a；可與 A8-3d1 並行）：依投遞紀錄重排永久失敗投遞的手段與 runbook；未觸達查詢 RPC（近 N 天交易必要型別沒有任何渠道送達的數量，後台唯讀，`api/` 契約與 TS／Dart 生成）與 admin 頁（照既有後台列表元件，A8-5 範圍寫的那頁）。
 
 - [x] **A8-4 主計畫承接條目**（被擋於：無；可與 A8-1 並行）
   - 範圍：主計畫「模組完成的定義」加一條：搬進單體的模組，舊服務發往 notification 的每個事件逐一裁決（定義通知型別並訂閱，或不做附理由），不經 `internal/legacy`。通知 ADR 加 2026-11-23 修訂。
@@ -238,7 +239,8 @@ ADR：通知 ADR 加 2026-11-23 修訂（D0、D0b、D5、D10–D13、寄件地�
 | A8-3b content 側型別 | 未開始 | | | |
 | A8-3c 治理與交易側型別 | 未開始 | | | |
 | A8-3e coupon 到期提醒型別 | 程式完成待 CI | 本機只跑 gofmt、make uitext、mutation --validate（機器負載高，未編譯）；依 Will 2026-11-24 指示跳過 code-review | 編譯、lint、單元與 integration、mutation 都待 CI | `4397a8c23` |
-| A8-3d 覆蓋、重送與刪 relay | 未開始 | | | |
+| A8-3d1 覆蓋測試與刪 relay | 未開始 | | | |
+| A8-3d2 重送與未觸達查詢 | 未開始 | | | |
 | A8-4 主計畫承接條目 | 完成 | `rg -n "通知型別" backend/docs/plans/2026-09-24-go-modular-monolith.md` 命中；ADR 修訂段存在 | | 本次 |
 | A8-5 website、admin | 完成 | 本機（主 session 重跑）：website lint、test:unit、test（3347，唯一失敗為既有逾時 flake `store-key.unit.test.ts`，單跑通過）、admin lint、test；分類與渠道文字進共用文案目錄（`c686bec9d`）；偏好頁一分類一列＋渠道開關、獨立公告頁（Will 2026-11-24）；D21 網站只對訊號帶的新 ID 彈提示；審查：第 1 輪 4 項全修、code-review 7 項（5 修，CR-1/CR-3 由 D21 根治）、D21 審查 2 項全修；CI `58c4e532d`／`2035d238f`：website CI、website e2e、admin CI、TS packages、mutation 綠 | 未觸達查詢頁屬 A8-3d（RPC 未建）；e2e 只在 CI 跑 | `ac8b4ca4f`..`58c4e532d` |
 | A8-6 兩支 App | 程式完成待驗收 | 本機（主 session 重跑）：兩支 App analyze、format、custom_lint、通知測試、hardcoded_han；深連結依 D20 路徑表（`deep-links.md`）；狀態重讀提示接串流與推播（D6）；iOS Notification Service Extension（D14）；審查兩輪＋最後修正（buyer 第 1 輪 10 項：blocking 2、fixed 8、rejected 2；seller 8 項：blocking 2；第 2 輪 seller 聊天連結 blocking 經 Will 同意以測試收尾）；CI `58c4e532d`：buyer-app CI、seller-app CI 綠 | 真機推播：擋於 Firebase 專案（`GoogleService-Info.plist` ×2 App ×3 環境、APNs key）與 Apple Developer 的 NSE App ID（Will）；完整 `flutter test` 只在 CI | `7c7832d9d`..`58c4e532d` |
