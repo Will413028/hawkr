@@ -364,7 +364,10 @@ func TestBothAudiencesAreDispatchedInTurn(t *testing.T) {
 func TestCreateWithTheSameRequestIDMakesOneAnnouncement(t *testing.T) {
 	f := setupAnnounce(t, 0)
 	rid := uuid.NewV4()
-	in := announce.CreateInput{Audiences: []string{"BUYER"}, Title: "Hello", Body: "World", RequestID: &rid}
+	in := announce.CreateInput{
+		Actor:     adminaudit.Actor{AdminID: 7, Action: "/hawkr.admin.notification.v1alpha1.NotificationAdminService/CreateAnnouncement"},
+		Audiences: []string{"BUYER"}, Title: "Hello", Body: "World", RequestID: &rid,
+	}
 
 	first := f.create(t, in)
 	second := f.create(t, in)

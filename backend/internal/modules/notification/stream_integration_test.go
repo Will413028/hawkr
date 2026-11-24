@@ -205,9 +205,10 @@ func TestListenReconnectEmitsAFullRereadSignal(t *testing.T) {
 	sub := watch(t, f, WatchParams{AccountID: acct, Audience: AudienceStore, StoreID: 7})
 	nextEvent(t, sub)
 
+	// 同一個 Postgres 上的其他測試也有 LISTEN 連線（各自的 database）：只終止這個測試 database 的，否則別的測試的 hub 會跟著重連而收到多餘的重讀訊號。
 	var n int
 	if err := f.db.Pool().QueryRow(context.Background(),
-		`SELECT count(pg_terminate_backend(pid)) FROM pg_stat_activity WHERE query = 'LISTEN '||$1 AND pid <> pg_backend_pid()`, stream.Channel).Scan(&n); err != nil || n != 1 {
+		`SELECT count(pg_terminate_backend(pid)) FROM pg_stat_activity WHERE query = 'LISTEN '||$1 AND datname = current_database() AND pid <> pg_backend_pid()`, stream.Channel).Scan(&n); err != nil || n != 1 {
 		t.Fatalf("應剛好終止一條 LISTEN 連線：%d %v", n, err)
 	}
 	if ev := nextEvent(t, sub); ev.Inbox == nil {
