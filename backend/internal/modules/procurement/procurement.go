@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"reflect"
 	"time"
 
 	"github.com/riverqueue/river"
@@ -20,6 +21,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/conversation"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/extract"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/provisioning"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/quote"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/resolver"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/retention"
@@ -54,7 +56,7 @@ const Schema = "procurement"
 // BuyerDeleted 是 buyer 關閉買家時同 transaction 發布的事件（本模組的訂閱者見 Module.OnBuyerDeleted）。
 type BuyerDeleted = buyer.BuyerDeleted
 
-// SellerStores 是候選搜尋過濾店家要用的 seller 方法：確認營業中、排除封鎖這位買家的店（*seller.Module 滿足它）。
+// SellerStores 是候選搜尋與發布詢價過濾店家要用的 seller 方法：確認營業中、排除封鎖這位買家的店（*seller.Module 滿足它）。
 type SellerStores interface {
 	ExposableStores(ctx context.Context, storeIDs []int64) ([]seller.ExposableStore, error)
 	StoresBlockingBuyer(ctx context.Context, buyerID int64, storeIDs []int64) (map[int64]bool, error)
@@ -65,7 +67,7 @@ type Deps struct {
 	DB     *db.DB
 	Now    func() time.Time
 	Logger *slog.Logger
-	// Sellers 是候選搜尋過濾店家的 seller 方法；與 Search、Taxonomy 一起給才登記 CANDIDATE_SEARCH 的 executor。
+	// Sellers 是候選搜尋與發布詢價過濾店家的 seller 方法；發布（預覽與執行）需要，沒給時發布回組裝錯誤；與 Search、Taxonomy 一起給才登記 CANDIDATE_SEARCH 的 executor。
 	Sellers SellerStores
 	// Search 是商品搜尋（分類 ID 或關鍵字，依銷量一頁一頁取），catalog 搬進單體前由 cmd/hawkr 以 internal/legacy 的 product 轉接。
 	Search ProductSearcher
@@ -82,11 +84,21 @@ type Deps struct {
 	Entitlements EntitlementReader
 	// Limits 是每位買家的送出上限，零值取預設（同時進行中 2、每分鐘送出 10）。
 	Limits run.Limits
+	// Orders 是接受報價之後建單要呼叫的舊 ordering（cmd/hawkr 以 internal/legacy/orderservice 轉接）；只有 AddOrderWorkers 需要，沒給時它 panic。
+	Orders OrderCreator
 	// Stores 是賣家端方法（SellerProcurementAppService）檢查賣家能力要用的 seller 方法（*seller.Module 滿足它）；只跑 worker 或只訂閱事件的程序可以不給，賣家端方法回組裝錯誤。
 	Stores SellerStoreGuard
 	// Events 是 ExecuteRfqPublication 在同 transaction 發布 RfqPublished 的事件匯流排；必給，沒給時 New panic。
 	Events *events.Bus
 }
+
+type (
+	// OrderCreator 是建單的 port：以接受單的 OrderRef 當冪等鍵呼叫舊 ordering 的 CreateRfqOrder；OrderCommand 與 OrderResult 是它的輸入與輸出。
+	OrderCreator = provisioning.Creator
+	OrderCommand = provisioning.Command
+	OrderResult  = provisioning.Result
+	OrderParties = provisioning.Parties
+)
 
 // SellerStoreGuard 是賣家端寫入的守門要用的 seller 方法：在 transaction 內鎖店家列，並讀店家此刻的狀態檢查賣家能力（*seller.Module 滿足它）。
 type SellerStoreGuard = sellerside.Stores
@@ -157,6 +169,8 @@ type Module struct {
 	candidates search.Reader
 	rfq        rfq.Service
 	quotes     quote.Service
+	orders     provisioning.Worker
+	ordersRec  provisioning.Reconciler
 	sellers    sellerside.Service
 }
 
@@ -204,9 +218,26 @@ func New(d Deps) *Module {
 	m.convs = conversation.Service{DB: d.DB, Now: d.Now, Canceller: m.canceller}
 	m.candidates = search.Reader{DB: d.DB}
 	m.rfq = rfq.Service{DB: d.DB, Now: d.Now, Events: d.Events}
+	if !isNil(d.Sellers) { // 沒給 Sellers 時兩個 port 留 nil：發布回組裝錯誤，不當成沒有封鎖
+		m.rfq.Blocks, m.rfq.Open = blockingStores{d.Sellers}, openStores{d.Sellers}
+	}
 	m.quotes = quote.Service{DB: d.DB, Now: d.Now, Jobs: d.Jobs}
+	m.orders = provisioning.Worker{DB: d.DB, Orders: d.Orders, Now: d.Now, Logger: d.Logger}
+	m.ordersRec = provisioning.Reconciler{DB: d.DB, Orders: d.Orders, Now: d.Now, Logger: d.Logger}
 	m.sellers = sellerside.Service{DB: d.DB, Now: d.Now, Stores: d.Stores}
 	return m
+}
+
+// isNil 回報介面是 nil 或裝著 nil 指標：後者 != nil，卻會在第一次呼叫時 nil dereference，要當成沒給。
+func isNil(v any) bool {
+	if v == nil {
+		return true
+	}
+	rv := reflect.ValueOf(v)
+	if k := rv.Kind(); k == reflect.Pointer || k == reflect.Map || k == reflect.Slice || k == reflect.Func || k == reflect.Interface || k == reflect.Chan {
+		return rv.IsNil()
+	}
+	return false
 }
 
 // executors 在呼叫端給的登記之外補上 TURN、CANDIDATE_SEARCH 與 CLARIFICATION_RESUME 的 executor。
@@ -216,7 +247,7 @@ func executors(d Deps, ledger run.Ledger, rs *resolver.Resolver) map[string]Exec
 	switch {
 	case hasLLM && d.Taxonomy == nil:
 		panic("procurement.New：Deps.LLM 要與 Deps.Taxonomy 一起給")
-	case d.Search != nil && d.Sellers == nil:
+	case d.Search != nil && isNil(d.Sellers):
 		panic("procurement.New：Deps.Search 要與 Deps.Sellers 一起給")
 	case d.Search != nil && d.Taxonomy == nil:
 		panic("procurement.New：Deps.Search 要與 Deps.Taxonomy 一起給")
@@ -257,6 +288,18 @@ func (m *Module) AddWorkers(workers *river.Workers) {
 	m.dispatcher.AddWorker(workers)
 	run.AddWorkers(workers, m.reconciler, m.purger)
 }
+
+// AddOrderWorkers 登記建單的 River worker（procurement.order_provisioning）與它的 reconciler；需要 Deps.Orders，沒給是組裝錯誤，panic。
+// 並行期單一生效者：舊服務處理建單到 A9-6，所以 cmd/hawkr 的 worker 角色不呼叫它，只有測試登記；A9-6 刪路由的同一個變更才接上。
+func (m *Module) AddOrderWorkers(workers *river.Workers) {
+	if m.orders.Orders == nil {
+		panic("procurement.AddOrderWorkers：Deps.Orders 必填")
+	}
+	provisioning.AddWorkers(workers, &m.orders, m.ordersRec)
+}
+
+// OrderPeriodicJobs 回傳建單 reconciler 的排程；與 AddOrderWorkers 一起（只有測試）使用。
+func (m *Module) OrderPeriodicJobs() []*river.PeriodicJob { return provisioning.PeriodicJobs() }
 
 // RunHub 維持 WatchRun 共用的 LISTEN 連線直到 ctx 結束（回傳 ctx.Err()）；serve 程序啟動時另開 goroutine 跑它。
 func (m *Module) RunHub(ctx context.Context) error { return m.hub.Run(ctx) }
@@ -522,7 +565,7 @@ func (m *Module) PreviewRfqPrice(ctx context.Context, in PreviewRfqPriceInput) (
 
 // PreviewRfqPublication 依需求現行版本、買家的單價區間與補充說明編出賣家看得到的內容，建立不可變的發布核准（24 小時有效），不發布、不通知。候選必須屬於有效的候選集（A9-D29(4)），核准存這個候選集，執行時重驗。
 // 區間不合法、補充說明過長、候選集與候選欄位不合、回價期限早於今天（台北時區）回 INVALID_ARGUMENT；需求、候選集不屬於買家回 NOT_FOUND；需求版本過時、候選集不是有效的候選集分別回 ABORTED／VERSION_CONFLICT
-// （request_revision、candidate_set）；需求狀態不是 REQUIREMENT_READY 或 MATCHING 回 FAILED_PRECONDITION／REQUIREMENT_NOT_READY。重送同一個 ClientRequestID 回第一次的核准，內容不同回 INVALID_ARGUMENT。發布時的封鎖檢查在 A9-3c。
+// （request_revision、candidate_set）；需求狀態不是 REQUIREMENT_READY 或 MATCHING 回 FAILED_PRECONDITION／REQUIREMENT_NOT_READY。受眾裡有封鎖這位買家或不是營業中的店，同樣回 VERSION_CONFLICT（candidate_set，不透露是哪一家，A9-D45(4)）；沒給 Deps.Sellers 或查詢失敗回一般錯誤。重送同一個 ClientRequestID 回第一次的核准，內容不同回 INVALID_ARGUMENT。
 func (m *Module) PreviewRfqPublication(ctx context.Context, in PreviewRfqPublicationInput) (PublicationPreview, error) {
 	return m.rfq.PreviewPublication(ctx, in)
 }
@@ -530,7 +573,7 @@ func (m *Module) PreviewRfqPublication(ctx context.Context, in PreviewRfqPublica
 // ExecuteRfqPublication 以核准的版本建立發布，同 transaction 寫入發布、邀請與 RfqPublished 事件，不建 run（A9-D31 Q3、Q4）。
 // 需求或核准不屬於買家回 NOT_FOUND；需求版本過時回 ABORTED／VERSION_CONFLICT（request_revision）；需求狀態不可發布回 FAILED_PRECONDITION／REQUIREMENT_NOT_READY；
 // 核准過時（不是這個需求的、版本不符、已執行、已過期、凍結的版本不是現行版本、回價期限已早於今天、hash 不符）回 ABORTED／VERSION_CONFLICT（publication_approval）；
-// 候選集已不是有效的候選集回 ABORTED／VERSION_CONFLICT（candidate_set）。重送同一個 ClientRequestID 回第一次的發布（Replayed），內容不同回 INVALID_ARGUMENT。
+// 候選集已不是有效的候選集，或受眾裡有封鎖這位買家、不是營業中的店，回 ABORTED／VERSION_CONFLICT（candidate_set）。重送同一個 ClientRequestID 回第一次的發布（Replayed），內容不同回 INVALID_ARGUMENT。
 func (m *Module) ExecuteRfqPublication(ctx context.Context, in ExecuteRfqPublicationInput) (Publication, error) {
 	return m.rfq.ExecutePublication(ctx, in)
 }

@@ -47,6 +47,9 @@ type OrderProvisioningArgs struct {
 	AcceptanceID uuid.UUID `json:"acceptanceId"`
 }
 
+// OrderMaxAttempts 是建單 job 的嘗試次數上限（含第一次）；最後一次嘗試失敗時 worker 把接受單標成建單失敗並解除 live 鎖（A9-D19 S6 修訂）。
+const OrderMaxAttempts = 5
+
 // Kind 是 job 的種類。
 func (OrderProvisioningArgs) Kind() string { return "procurement.order_provisioning" }
 

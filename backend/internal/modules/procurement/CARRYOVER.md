@@ -196,6 +196,23 @@ A9-D25 對開放問題的決定（Will 2026-11-21）：
 | 賣家可見內容的 hash 取法 | 與買家端同一份 | 成立 | `rfq.SellerFacingOf`（純函式，不載入受眾名單） | 賣家端與 `compile` 共用，不另寫一份 |
 | 賣家能力檢查 | 停權的店不能回價 | 成立 | 模組內 `seller.Authorize`（`CAP_MARKETING`），handler 只推導店家 | 讀取在查詢前，寫入在 transaction 內鎖店家列後讀店家此刻狀態；宣告表 `httpapi/sellerprocurement/declaration.go` |
 
+## 發布時的店家檢查與建單的沿用盤點（A9-3c-3、A9-3c-4，A9-D45(1)(4)、A9-D19 S6）
+
+| 機制 | 必要條件 | 今天是否成立 | 從零設計 | 結論 |
+|---|---|---|---|---|
+| 發布時不查封鎖與營業中（舊服務沒有這個檢查，新行為） | 搜尋時過濾過的候選，到發布之間不會變 | 否：預覽與執行之間可以隔 24 小時，店家可能封鎖買家或打烊 | 同意物件凍結受眾，執行時重驗受眾仍可發布；失敗不透露誰封鎖 | `rfq.Service.Blocks`、`Open`（重用 `candidate` 的兩個 port，分批由根套件的 `blockingStores`、`openStores` 做）；預覽與執行都查，任何一家不合整筆 VERSION_CONFLICT（`candidate_set`），訊息與候選集失效相同；讀取失敗不放行；沒給 port 發布回組裝錯誤 |
+| 舊建單 outbox（`order_provisioning_outbox`，`pkg/outbox.Worker`，5 次、退避 1 分到 1 小時） | 要可靠呼叫 ordering | 否：單體規則 4、5 | River job 在 tx 外呼叫 | `provisioning.Worker`（kind `procurement.order_provisioning`），`quote.OrderMaxAttempts` 5 次，退避用 River 預設（推論，未量測）；`Accept` 同 tx 排入並記下 `order_job_id` |
+| `acceptance_id` 當 ordering 的冪等鍵（Java `orders.acceptance_id BIGINT`，A9-D45(1)） | Java 側以 BIGINT 唯一索引去重 | 成立到 ordering 搬進單體（B8） | ordering 在單體內就直接用接受單的 UUID | `buyer_quote_acceptances.order_ref BIGINT GENERATED ALWAYS AS IDENTITY UNIQUE`，只用在 `CreateRfqOrder`，隨 B8 刪欄；舊值域是 TSID（約 10^17），identity 從 1 起，並行期不撞鍵（推論） |
+| 用盡重試後 outbox 列轉 failed 的 `OnTerminalFailed` hook（RETRY_EXHAUSTED） | 要有人把接受單標失敗 | 成立；單體的 `platform/jobs` 沒有 discard hook | 在 worker 內判斷最後一次嘗試，另有對帳保底 | `Work` 在 `Attempt >= MaxAttempts` 且錯誤是暫時性時先 `MarkOrderFailed`（解除 live 鎖）再回錯；關機取消不標失敗；標記本身失敗時留給 `provisioning.Reconciler` |
+| 建單 job 死了的保底（舊服務靠 outbox claim lease 重領） | job 可能被丟棄、取消、救援丟棄，或 worker 沒標就結束 | 成立（A9-D22 同類） | 對帳掃 CREATING_ORDER，以 job 狀態判斷 | `provisioning.Reconciler`（每分鐘）：job 已 discarded、cancelled、completed 卻沒收尾或不存在，標 `ORDER_JOB_LOST`；為此需要 `order_job_id`（同 `agent_runs.job_id`） |
+| 回應分類：500 可重試，`FulfillmentCommerceModelUnknown`、`PlatformCollectionNotConfigured` 分成別的原因，其餘終態 | lane 與平台代收設定由 ordering 回報 | 部分：WISH_POOL 刪除後只剩平台 lane（A9-D44），單體不依賴 `go-pkg` 的 bizcode | 只分成功、可重試、終態；原因細節留在 log | `provisioning.Classify`：500 與傳輸錯誤重試，其餘非 0 碼與「成功卻缺訂單號或付款期限」終態 `ORDER_SERVICE_REJECTED`；9504、9505 不再單獨成因（原因不對外顯示，`order_failure_reason` 沒有讀取者，細節在 log） |
+| 品名取自確認快照的 canonical payload（`ComposeRfqOrderLineName`） | 快照存在 | 否（A9-D35 刪快照） | 由需求版本與被接受的報價版本組出 | `GetOrderBasis` 取需求版本的品項（解析標籤優先）、報價版本的數量（`trim_scale` 去尾零）與單位，`provisioning.ItemName`；組不出是終態 `ITEM_NAME_UNAVAILABLE`，不用 sentinel |
+| 外部 lane 的結算店（`PROCUREMENT_SETTLEMENT_STORE_ID`）與 lane 分歧 | 站外業者 | 否（A9-D1、A9-D44 刪） | 賣方就是被接受的店 | 不搬；`CreateRfqOrder` 的 lane 固定 `PLATFORM`（`cmd/hawkr` 轉接） |
+| 買家已刪時的建單 | 舊服務的讀取一律帶買家範圍 | 否：BuyerDeleted 後 `buyer_id` 為 NULL（S10） | 沒有買家就不建單 | 直接標 `BUYER_DELETED`、不呼叫 ordering |
+| 並行期單一生效者 | 舊 ai-service 到 A9-6 仍處理建單 | 成立 | 同 | `Module.AddOrderWorkers`、`OrderPeriodicJobs` 只有測試登記，worker 角色不呼叫（`TestWorkerRoleDoesNotRegisterProcurementOrderProvisioning` 守門）；`Deps.Orders` 在 `cmd/hawkr` 只有轉接器（`procurementOrders`），A9-6 刪路由的同一個變更才接上 |
+
+標失敗之前再呼叫一次（A9-D45(1) 補充，Will 2026-11-24）：最後一次嘗試與 reconciler 在標 `ORDER_FAILED` 之前，先用同一個 `order_ref` 再呼叫一次 `CreateRfqOrder`；舊 order-service 對 `acceptanceId` 冪等（`OrderService.createRfqOrder` 回既有訂單），所以回應遺失而單已建好時取回訂單、標 `ORDER_CREATED`，不再有「標失敗後買家再接受而多一張訂單」。再呼叫仍失敗才標失敗（最後一次嘗試 `RETRY_EXHAUSTED`、reconciler `ORDER_JOB_LOST`）。回 `replayed` 時以 `GetOrderForAfterSales` 核對買家與店家：`order_ref` 從 1 起算，可能撞上舊 `orders.acceptance_id` 的別人的單，不符就標 `ORDER_SERVICE_REJECTED` 並以 error 記錄；買家與店家都相同但屬於別張單的撞號無法由回應判斷（`TestProvisionRejectsAReplayedOrderOfAnotherBuyerOrStore`、`TestLastAttemptRecallRecoversAnOrderWhoseResponseWasLost`、`TestReconcilerRecallsOrderingBeforeMarkingFailed`）。
+
 ## 與 ai-service 的差異
 
 資料沒有搬移（系統從未上線），schema 是新的 baseline。每一項對外看得到或 schema 上的差異一行。

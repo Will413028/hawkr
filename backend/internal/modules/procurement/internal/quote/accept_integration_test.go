@@ -45,6 +45,13 @@ func TestAcceptFreezesThePriceAndEnqueuesTheOrderJobInTheSameTransaction(t *test
 	if jobs := f.provisioningJobs(); len(jobs) != 1 || jobs[0] != a.ID.String() {
 		t.Fatalf("要恰好一個以接受單 ID 為參數的建單 job：%v", jobs)
 	}
+	var jobID *int64
+	var maxAttempts int
+	must(t, f.d.Pool().QueryRow(t.Context(), `SELECT a.order_job_id, j.max_attempts FROM procurement.buyer_quote_acceptances a
+		JOIN river.river_job j ON j.id = a.order_job_id WHERE a.id = $1`, a.ID).Scan(&jobID, &maxAttempts))
+	if jobID == nil || maxAttempts != quote.OrderMaxAttempts {
+		t.Fatalf("接受單要記下建單 job，且嘗試上限是 %d：job=%v max=%d", quote.OrderMaxAttempts, jobID, maxAttempts)
+	}
 }
 
 func TestAcceptReplayReturnsTheFirstAcceptanceWithoutANewRowOrJob(t *testing.T) {

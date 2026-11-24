@@ -133,7 +133,8 @@ var InternalDependencies = map[string]InternalGraph{
 		"planner":      {"model", "slots"},                                                   // 一輪釐清要問什麼、說哪一類話：問題挑選、act 優先序（A9-3b-2a）
 		"reply":        {"model", "planner", "slots", "text"},                                // act 模板與問題卡、被拒原因的語系文字，沒有 LLM 敘述（A9-D24）
 		"resolver":     {},                                                                   // 品項用詞對分類樹，人工同義詞（A9-D7）
-		"rfq":          {"model", "rfqhash", "search", "store"},                              // 詢價發布鏈：價格預覽、確認快照、發布核准、執行發布，hash 由不可變的列重算（A9-3b-3c、A9-D31）
+		"rfq":          {"candidate", "model", "rfqhash", "search", "store", "text"},         // 詢價發布鏈：價格預覽、確認快照、發布核准、執行發布，hash 由不可變的列重算（A9-3b-3c、A9-D31）
+		"provisioning": {"quote", "run", "store"},                                            // 接受報價後的建單 worker 與 reconciler：經 port 呼叫舊 ordering、用盡或拒絕標建單失敗並解除 live 鎖（A9-3c-4、A9-D45(1)）
 		"quote":        {"model", "rfq", "rfqhash", "run", "store"},                          // 買家對賣家回價的使用：列出目前版本、入圍清單、接受報價並同 transaction 排入建單 job（A9-3b-3d）
 		"rfqhash":      {},                                                                   // 價格預覽、確認快照、受眾與賣家可見內容的 hash（SHA-256 對固定欄位順序的 JSON，A9-D31 Q5）
 		"retention":    {"store"},                                                            // 買家關閉後刪除與匿名（S10）

@@ -187,10 +187,10 @@ func (r Reconciler) reconcileOne(ctx context.Context, states JobStates, id uuid.
 	return o.action, r.Ledger.converge(ctx, id, o)
 }
 
-// clientJobStates 用 worker ctx 裡的 River client 在目前的 transaction 讀 job。
-type clientJobStates struct{}
+// ClientJobStates 用 worker ctx 裡的 River client 在目前的 transaction 讀 job。
+type ClientJobStates struct{}
 
-func (clientJobStates) JobState(ctx context.Context, jobID int64) (rivertype.JobState, bool, error) {
+func (ClientJobStates) JobState(ctx context.Context, jobID int64) (rivertype.JobState, bool, error) {
 	c, err := river.ClientFromContextSafely[pgx.Tx](ctx)
 	if err != nil {
 		return "", false, err
@@ -220,7 +220,7 @@ type reconcileWorker struct {
 }
 
 func (w *reconcileWorker) Work(ctx context.Context, _ *river.Job[ReconcileArgs]) error {
-	_, err := w.reconciler.Reconcile(ctx, clientJobStates{})
+	_, err := w.reconciler.Reconcile(ctx, ClientJobStates{})
 	return err
 }
 

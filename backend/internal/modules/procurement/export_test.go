@@ -21,3 +21,6 @@ func (m *Module) ExecutorTypes() []string {
 	sort.Strings(out)
 	return out
 }
+
+// RfqStorePortsWired 讓測試驗證發布的封鎖與營業中檢查有沒有接上 Deps.Sellers。
+func (m *Module) RfqStorePortsWired() bool { return m.rfq.Blocks != nil && m.rfq.Open != nil }
