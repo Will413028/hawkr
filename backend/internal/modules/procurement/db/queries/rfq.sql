@@ -71,8 +71,8 @@ UPDATE procurement.rfq_publication_invites SET delivery_state = 'FAILED', delive
 WHERE id = @id AND delivery_state = 'QUEUED';
 
 -- name: ListStaleQueuedInvites :many
-SELECT id FROM procurement.rfq_publication_invites
-WHERE delivery_state = 'QUEUED' AND created_at < @before
+SELECT id, created_at FROM procurement.rfq_publication_invites
+WHERE delivery_state = 'QUEUED' AND created_at < @before AND (created_at, id) > (@after_created_at::timestamptz, @after_id::uuid)
 ORDER BY created_at, id
 LIMIT @max_rows;
 

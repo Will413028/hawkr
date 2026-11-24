@@ -32,7 +32,7 @@ type fakeInvites struct {
 	sent, failed []uuid.UUID
 	markErr      error
 	ctxErr       error
-	stale        []uuid.UUID
+	stale        []procurement.StaleInvite
 	staleBefore  time.Time
 }
 
@@ -54,9 +54,23 @@ func (f *fakeInvites) MarkInviteFailed(ctx context.Context, id uuid.UUID) error 
 	return nil
 }
 
-func (f *fakeInvites) StaleQueuedInvites(_ context.Context, before time.Time, _ int32) ([]uuid.UUID, error) {
+func afterCursor(inv, after procurement.StaleInvite) bool {
+	return inv.CreatedAt.After(after.CreatedAt) || inv.CreatedAt.Equal(after.CreatedAt) && inv.ID.String() > after.ID.String()
+}
+
+func (f *fakeInvites) StaleQueuedInvites(_ context.Context, before time.Time, after procurement.StaleInvite, limit int32) ([]procurement.StaleInvite, error) {
 	f.staleBefore = before
-	return f.stale, nil
+	var out []procurement.StaleInvite
+	for _, inv := range f.stale {
+		if len(out) == int(limit) {
+			break
+		}
+		if after != (procurement.StaleInvite{}) && !afterCursor(inv, after) {
+			continue
+		}
+		out = append(out, inv)
+	}
+	return out, nil
 }
 
 type fakeLive map[uuid.UUID]bool
@@ -114,7 +128,7 @@ func TestOnRfqPublishedReturnsTheEnqueueError(t *testing.T) {
 
 func TestSuccessfulSendMarksTheInviteSent(t *testing.T) {
 	invites, out := &fakeInvites{}, &fakeSender{}
-	if err := NewWorker(invites, out, nil).inviteCreated(t.Context(), args(), false); err != nil {
+	if err := NewWorker(invites, out, nil, &recordingJobs{}).inviteCreated(t.Context(), args(), false); err != nil {
 		t.Fatal(err)
 	}
 	if len(out.sent) != 1 || out.sent[0].Exchange != "procurement.events" || out.sent[0].RoutingKey != "procurement.rfq_publication_invite.created" {
@@ -127,7 +141,7 @@ func TestSuccessfulSendMarksTheInviteSent(t *testing.T) {
 
 func TestFailedSendBeforeTheLastAttemptMarksNothing(t *testing.T) {
 	invites, out := &fakeInvites{}, &fakeSender{err: errors.New("broker down")}
-	if err := NewWorker(invites, out, nil).inviteCreated(t.Context(), args(), false); err == nil {
+	if err := NewWorker(invites, out, nil, &recordingJobs{}).inviteCreated(t.Context(), args(), false); err == nil {
 		t.Fatal("送出失敗要回錯誤讓 River 重試")
 	}
 	if len(invites.sent)+len(invites.failed) != 0 {
@@ -137,7 +151,7 @@ func TestFailedSendBeforeTheLastAttemptMarksNothing(t *testing.T) {
 
 func TestFailedSendOnTheLastAttemptMarksTheInviteFailed(t *testing.T) {
 	invites, out := &fakeInvites{}, &fakeSender{err: errors.New("broker down")}
-	if err := NewWorker(invites, out, nil).inviteCreated(t.Context(), args(), true); err == nil {
+	if err := NewWorker(invites, out, nil, &recordingJobs{}).inviteCreated(t.Context(), args(), true); err == nil {
 		t.Fatal("用盡仍要回送出的錯誤")
 	}
 	if len(invites.failed) != 1 || invites.failed[0] != inviteA || len(invites.sent) != 0 {
@@ -171,7 +185,7 @@ func job(attempt, max int) *river.Job[InviteCreatedArgs] {
 
 func TestWorkTreatsAttemptEqualToMaxAttemptsAsTheLast(t *testing.T) {
 	invites, out := &fakeInvites{}, &fakeSender{err: errors.New("broker down")}
-	w := &typedWorker{w: NewWorker(invites, out, nil)}
+	w := &typedWorker{w: NewWorker(invites, out, nil, &recordingJobs{})}
 	if err := w.Work(t.Context(), job(maxAttempts, maxAttempts)); err == nil {
 		t.Fatal("用盡仍要回送出的錯誤")
 	}
@@ -182,7 +196,7 @@ func TestWorkTreatsAttemptEqualToMaxAttemptsAsTheLast(t *testing.T) {
 
 func TestWorkBeforeMaxAttemptsMarksNothing(t *testing.T) {
 	invites, out := &fakeInvites{}, &fakeSender{err: errors.New("broker down")}
-	w := &typedWorker{w: NewWorker(invites, out, nil)}
+	w := &typedWorker{w: NewWorker(invites, out, nil, &recordingJobs{})}
 	if err := w.Work(t.Context(), job(maxAttempts-1, maxAttempts)); err == nil {
 		t.Fatal("送出失敗要回錯誤")
 	}
@@ -191,27 +205,79 @@ func TestWorkBeforeMaxAttemptsMarksNothing(t *testing.T) {
 	}
 }
 
-func TestStateWriteFailureOnTheLastAttemptSnoozesInsteadOfDiscarding(t *testing.T) {
-	for name, tc := range map[string]struct {
-		sendErr error
-	}{"sent": {nil}, "exhausted": {errors.New("broker down")}} {
-		t.Run(name, func(t *testing.T) {
-			invites, out := &fakeInvites{markErr: errors.New("db down")}, &fakeSender{err: tc.sendErr}
-			err := NewWorker(invites, out, nil).inviteCreated(t.Context(), args(), true)
-			var snooze *rivertype.JobSnoozeError
-			if !errors.As(err, &snooze) {
-				t.Fatalf("err = %v，最後一次嘗試狀態寫入失敗要延後重跑而不是丟棄", err)
-			}
-		})
+func TestStateWriteFailureAfterASuccessfulSendQueuesAStateJobAndNeverResends(t *testing.T) {
+	invites, out, q := &fakeInvites{markErr: errors.New("db down")}, &fakeSender{}, &recordingJobs{}
+	for _, last := range []bool{false, true} {
+		if err := NewWorker(invites, out, nil, q).inviteCreated(t.Context(), args(), last); err != nil {
+			t.Fatalf("last=%v: err = %v，送出已成功，狀態寫入失敗要交給狀態 job 而不是讓送出 job 重跑", last, err)
+		}
+	}
+	if len(out.sent) != 2 {
+		t.Fatalf("sent = %d，每次呼叫各送一次、狀態失敗本身不得再送", len(out.sent))
+	}
+	want := InviteStateArgs{InviteID: inviteA, State: "SENT"}
+	if len(q.args) != 2 || q.args[0] != want {
+		t.Fatalf("jobs = %v，預期狀態 job %v", q.args, want)
 	}
 }
 
-func TestStateWriteFailureBeforeTheLastAttemptRetries(t *testing.T) {
-	invites := &fakeInvites{markErr: errors.New("db down")}
-	err := NewWorker(invites, &fakeSender{}, nil).inviteCreated(t.Context(), args(), false)
-	var snooze *rivertype.JobSnoozeError
-	if err == nil || errors.As(err, &snooze) {
-		t.Fatalf("err = %v，非最後一次要回一般錯誤走重試", err)
+func TestStateJobRetriesOnlyTheWriteAndEventuallyMarksSent(t *testing.T) {
+	invites, out := &fakeInvites{markErr: errors.New("db down")}, &fakeSender{}
+	w := NewWorker(invites, out, nil, &recordingJobs{})
+	sw := &stateWorker{w: w}
+	job := &river.Job[InviteStateArgs]{JobRow: &rivertype.JobRow{}, Args: InviteStateArgs{InviteID: inviteA, State: "SENT"}}
+	if err := sw.Work(t.Context(), job); err == nil {
+		t.Fatal("寫入失敗要回錯誤讓 River 重試")
+	}
+	invites.markErr = nil
+	if err := sw.Work(t.Context(), job); err != nil {
+		t.Fatal(err)
+	}
+	if len(invites.sent) != 1 || len(out.sent) != 0 {
+		t.Fatalf("sent=%v 送出次數=%d，狀態 job 只寫狀態、不送", invites.sent, len(out.sent))
+	}
+}
+
+func TestStateJobWithAnUnknownStateIsCancelled(t *testing.T) {
+	sw := &stateWorker{w: NewWorker(&fakeInvites{}, &fakeSender{}, nil, &recordingJobs{})}
+	err := sw.Work(t.Context(), &river.Job[InviteStateArgs]{JobRow: &rivertype.JobRow{}, Args: InviteStateArgs{InviteID: inviteA, State: "NOPE"}})
+	var cancel *rivertype.JobCancelError
+	if !errors.As(err, &cancel) {
+		t.Fatalf("err = %v，未知狀態不重試", err)
+	}
+}
+
+func TestStateJobHasFiniteAttemptsAndIsUniqueByInvite(t *testing.T) {
+	o := InviteStateArgs{}.InsertOpts()
+	if o.MaxAttempts != stateMaxAttempts || stateMaxAttempts <= 0 || !o.UniqueOpts.ByArgs {
+		t.Fatalf("InsertOpts = %+v", o)
+	}
+}
+
+func TestExhaustedSendWithAFailingWriteQueuesAFailedStateJobAndKeepsTheSendError(t *testing.T) {
+	sendErr := errors.New("broker down")
+	invites, q := &fakeInvites{markErr: errors.New("db down")}, &recordingJobs{}
+	err := NewWorker(invites, &fakeSender{err: sendErr}, nil, q).inviteCreated(t.Context(), args(), true)
+	if !errors.Is(err, sendErr) {
+		t.Fatalf("err = %v，要保留送出的錯誤", err)
+	}
+	if len(q.args) != 1 || q.args[0] != (InviteStateArgs{InviteID: inviteA, State: "FAILED"}) {
+		t.Fatalf("jobs = %v", q.args)
+	}
+}
+
+func TestSendWriteAndEnqueueFailuresAreAllReported(t *testing.T) {
+	sendErr, markErr, enqErr := errors.New("broker down"), errors.New("db down"), errors.New("queue down")
+	invites := &fakeInvites{markErr: markErr}
+	err := NewWorker(invites, &fakeSender{err: sendErr}, nil, &recordingJobs{fail: enqErr}).inviteCreated(t.Context(), args(), true)
+	for _, want := range []error{sendErr, markErr, enqErr} {
+		if !errors.Is(err, want) {
+			t.Fatalf("err = %v，缺少 %v", err, want)
+		}
+	}
+	err = NewWorker(invites, &fakeSender{}, nil, &recordingJobs{fail: enqErr}).inviteCreated(t.Context(), args(), false)
+	if !errors.Is(err, markErr) || !errors.Is(err, enqErr) {
+		t.Fatalf("err = %v，送出成功但寫入與排入都失敗時要回兩個錯誤", err)
 	}
 }
 
@@ -219,7 +285,7 @@ func TestStateIsWrittenEvenWhenTheSendContextIsGone(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	invites := &fakeInvites{}
-	if err := NewWorker(invites, &fakeSender{}, nil).inviteCreated(ctx, args(), false); err != nil {
+	if err := NewWorker(invites, &fakeSender{}, nil, &recordingJobs{}).inviteCreated(ctx, args(), false); err != nil {
 		t.Fatal(err)
 	}
 	if invites.ctxErr != nil || len(invites.sent) != 1 {
@@ -245,10 +311,14 @@ func TestRetryScheduleMatchesTheLegacyOutbox(t *testing.T) {
 	}
 }
 
+func staleAt(n int, id uuid.UUID) procurement.StaleInvite {
+	return procurement.StaleInvite{ID: id, CreatedAt: time.Date(2026, 11, 24, 0, n, 0, 0, time.UTC)}
+}
+
 func TestSweepMarksOnlyStaleInvitesWithoutALiveJob(t *testing.T) {
 	now := time.Date(2026, 11, 24, 12, 0, 0, 0, time.UTC)
-	invites := &fakeInvites{stale: []uuid.UUID{inviteA, inviteB}}
-	w := NewWorker(invites, nil, fakeLive{inviteB: true})
+	invites := &fakeInvites{stale: []procurement.StaleInvite{staleAt(1, inviteA), staleAt(2, inviteB)}}
+	w := NewWorker(invites, nil, fakeLive{inviteB: true}, &recordingJobs{})
 	w.Now = func() time.Time { return now }
 	n, err := w.Sweep(t.Context())
 	if err != nil {
@@ -259,5 +329,26 @@ func TestSweepMarksOnlyStaleInvitesWithoutALiveJob(t *testing.T) {
 	}
 	if want := now.Add(-staleAfter()); !invites.staleBefore.Equal(want) {
 		t.Fatalf("before = %v，預期 %v", invites.staleBefore, want)
+	}
+}
+
+func TestSweepPagesPastLiveRowsToReachALostInvite(t *testing.T) {
+	live := fakeLive{}
+	var stale []procurement.StaleInvite
+	for i := 0; i < 6; i++ {
+		id := uuid.NewV7()
+		live[id] = true
+		stale = append(stale, staleAt(i, id))
+	}
+	stale = append(stale, staleAt(10, inviteA))
+	invites := &fakeInvites{stale: stale}
+	w := NewWorker(invites, nil, live, &recordingJobs{})
+	w.batch = 2
+	n, err := w.Sweep(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 || len(invites.failed) != 1 || invites.failed[0] != inviteA {
+		t.Fatalf("n=%d failed=%v，排在前面的活躍列不得擋住後面遺失的邀請", n, invites.failed)
 	}
 }

@@ -690,30 +690,42 @@ func (q *Queries) ListInvites(ctx context.Context, arg ListInvitesParams) ([]Pro
 }
 
 const listStaleQueuedInvites = `-- name: ListStaleQueuedInvites :many
-SELECT id FROM procurement.rfq_publication_invites
-WHERE delivery_state = 'QUEUED' AND created_at < $1
+SELECT id, created_at FROM procurement.rfq_publication_invites
+WHERE delivery_state = 'QUEUED' AND created_at < $1 AND (created_at, id) > ($2::timestamptz, $3::uuid)
 ORDER BY created_at, id
-LIMIT $2
+LIMIT $4
 `
 
 type ListStaleQueuedInvitesParams struct {
-	Before  time.Time
-	MaxRows int32
+	Before         time.Time
+	AfterCreatedAt time.Time
+	AfterID        uuid.UUID
+	MaxRows        int32
 }
 
-func (q *Queries) ListStaleQueuedInvites(ctx context.Context, arg ListStaleQueuedInvitesParams) ([]uuid.UUID, error) {
-	rows, err := q.db.Query(ctx, listStaleQueuedInvites, arg.Before, arg.MaxRows)
+type ListStaleQueuedInvitesRow struct {
+	ID        uuid.UUID
+	CreatedAt time.Time
+}
+
+func (q *Queries) ListStaleQueuedInvites(ctx context.Context, arg ListStaleQueuedInvitesParams) ([]ListStaleQueuedInvitesRow, error) {
+	rows, err := q.db.Query(ctx, listStaleQueuedInvites,
+		arg.Before,
+		arg.AfterCreatedAt,
+		arg.AfterID,
+		arg.MaxRows,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []uuid.UUID{}
+	items := []ListStaleQueuedInvitesRow{}
 	for rows.Next() {
-		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
+		var i ListStaleQueuedInvitesRow
+		if err := rows.Scan(&i.ID, &i.CreatedAt); err != nil {
 			return nil, err
 		}
-		items = append(items, id)
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

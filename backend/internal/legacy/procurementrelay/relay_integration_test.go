@@ -12,6 +12,7 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
@@ -31,6 +32,7 @@ var epoch = time.Date(2026, 11, 24, 3, 0, 0, 0, time.UTC)
 type env struct {
 	t      *testing.T
 	d      *db.DB
+	queue  *jobs.Client
 	bus    *events.Bus
 	module *procurement.Module
 	pub    uuid.UUID
@@ -47,7 +49,7 @@ func newEnv(t *testing.T) *env {
 	bus := events.NewBus()
 	events.Subscribe(bus, OnRfqPublished(queue))
 	m := procurement.New(procurement.Deps{DB: d, Now: func() time.Time { return epoch }, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Events: bus})
-	e := &env{t: t, d: d, bus: bus, module: m, buyer: 1}
+	e := &env{t: t, d: d, queue: queue, bus: bus, module: m, buyer: 1}
 	e.seedPublication()
 	return e
 }
@@ -135,7 +137,7 @@ func TestPublishEnqueuesJobsThatSendTheEventAndMarkTheInvitesSent(t *testing.T) 
 		t.Fatalf("jobs = %+v，預期每個邀請一個、max_attempts %d", queued, maxAttempts)
 	}
 	out := &fakeSender{}
-	w := NewWorker(e.module, out, PoolJobs{Pool: e.d.Pool()})
+	w := NewWorker(e.module, out, ClientJobs{Client: e.queue}, e.queue)
 	for _, q := range queued {
 		if err := w.inviteCreated(t.Context(), q.args, false); err != nil {
 			t.Fatal(err)
@@ -161,7 +163,7 @@ func TestExhaustedRetriesMarkTheInviteFailed(t *testing.T) {
 	e := newEnv(t)
 	a := e.invite(0, 11)
 	args := InviteCreatedArgs{InviteID: a, PublicationID: e.pub, StoreID: 11}
-	w := NewWorker(e.module, &fakeSender{err: errors.New("broker down")}, PoolJobs{Pool: e.d.Pool()})
+	w := NewWorker(e.module, &fakeSender{err: errors.New("broker down")}, ClientJobs{Client: e.queue}, e.queue)
 	if err := w.inviteCreated(t.Context(), args, false); err == nil {
 		t.Fatal("送出失敗要回錯誤")
 	}
@@ -181,10 +183,10 @@ func TestRetryAfterSentDoesNotRegressTheState(t *testing.T) {
 	e := newEnv(t)
 	a := e.invite(0, 11)
 	args := InviteCreatedArgs{InviteID: a, PublicationID: e.pub, StoreID: 11}
-	if err := NewWorker(e.module, &fakeSender{}, PoolJobs{Pool: e.d.Pool()}).inviteCreated(t.Context(), args, false); err != nil {
+	if err := NewWorker(e.module, &fakeSender{}, ClientJobs{Client: e.queue}, e.queue).inviteCreated(t.Context(), args, false); err != nil {
 		t.Fatal(err)
 	}
-	_ = NewWorker(e.module, &fakeSender{err: errors.New("broker down")}, PoolJobs{Pool: e.d.Pool()}).inviteCreated(t.Context(), args, true)
+	_ = NewWorker(e.module, &fakeSender{err: errors.New("broker down")}, ClientJobs{Client: e.queue}, e.queue).inviteCreated(t.Context(), args, true)
 	if got := e.state(a); got != "SENT" {
 		t.Fatalf("state = %s，已 SENT 的邀請不得被改成 FAILED", got)
 	}
@@ -209,32 +211,67 @@ func TestRolledBackPublishEnqueuesNothing(t *testing.T) {
 	}
 }
 
-// 最後一次嘗試的狀態寫入失敗時 job 延後重跑，邀請之後仍收斂到 FAILED。
-func TestLastAttemptStateWriteFailureStillEndsFailed(t *testing.T) {
+// 送出成功而狀態寫入失敗：送出 job 完成、不重送；狀態 job 接手寫入，邀請最後是 SENT。
+func TestSendOkWriteFailsConvergesToSentWithoutASecondSend(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
 	a := e.invite(0, 11)
 	args := InviteCreatedArgs{InviteID: a, PublicationID: e.pub, StoreID: 11}
 	down := &flakyInvites{Invites: e.module, failures: 1}
-	w := NewWorker(down, &fakeSender{err: errors.New("broker down")}, PoolJobs{Pool: e.d.Pool()})
-	var snooze *rivertype.JobSnoozeError
-	if err := w.inviteCreated(t.Context(), args, true); !errors.As(err, &snooze) {
-		t.Fatalf("err = %v，預期延後重跑", err)
+	out := &fakeSender{}
+	w := NewWorker(down, out, ClientJobs{Client: e.queue}, e.queue)
+	if err := w.inviteCreated(t.Context(), args, true); err != nil {
+		t.Fatal(err)
 	}
 	if got := e.state(a); got != "QUEUED" {
 		t.Fatalf("寫入失敗後 state = %s，預期 QUEUED", got)
 	}
+	if live, err := w.Live.HasLiveJob(t.Context(), a); err != nil || !live {
+		t.Fatalf("狀態 job 應在排隊：live=%v err=%v", live, err)
+	}
+	sw := &stateWorker{w: w}
+	if err := sw.Work(t.Context(), &river.Job[InviteStateArgs]{JobRow: &rivertype.JobRow{}, Args: InviteStateArgs{InviteID: a, State: "SENT"}}); err != nil {
+		t.Fatal(err)
+	}
+	if got := e.state(a); got != "SENT" {
+		t.Fatalf("state = %s，預期 SENT", got)
+	}
+	if len(out.sent) != 1 {
+		t.Fatalf("送出 %d 次，預期 1", len(out.sent))
+	}
+}
+
+// 最後一次嘗試用盡而狀態寫入失敗：狀態 job 把邀請寫成 FAILED。
+func TestExhaustedSendWriteFailureConvergesToFailed(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	a := e.invite(0, 11)
+	args := InviteCreatedArgs{InviteID: a, PublicationID: e.pub, StoreID: 11}
+	down := &flakyInvites{Invites: e.module, failures: 1}
+	w := NewWorker(down, &fakeSender{err: errors.New("broker down")}, ClientJobs{Client: e.queue}, e.queue)
 	if err := w.inviteCreated(t.Context(), args, true); err == nil {
-		t.Fatal("重跑仍回送出的錯誤")
+		t.Fatal("用盡仍回送出的錯誤")
+	}
+	sw := &stateWorker{w: w}
+	if err := sw.Work(t.Context(), &river.Job[InviteStateArgs]{JobRow: &rivertype.JobRow{}, Args: InviteStateArgs{InviteID: a, State: "FAILED"}}); err != nil {
+		t.Fatal(err)
 	}
 	if got := e.state(a); got != "FAILED" {
-		t.Fatalf("重跑後 state = %s，預期 FAILED", got)
+		t.Fatalf("state = %s，預期 FAILED", got)
 	}
 }
 
 type flakyInvites struct {
 	Invites
 	failures int
+}
+
+func (f *flakyInvites) MarkInviteSent(ctx context.Context, id uuid.UUID) error {
+	if f.failures > 0 {
+		f.failures--
+		return errors.New("db down")
+	}
+	return f.Invites.MarkInviteSent(ctx, id)
 }
 
 func (f *flakyInvites) MarkInviteFailed(ctx context.Context, id uuid.UUID) error {
@@ -246,7 +283,7 @@ func (f *flakyInvites) MarkInviteFailed(ctx context.Context, id uuid.UUID) error
 }
 
 func (e *env) sweeper(at time.Time) *Worker {
-	w := NewWorker(e.module, &fakeSender{}, PoolJobs{Pool: e.d.Pool()})
+	w := NewWorker(e.module, &fakeSender{}, ClientJobs{Client: e.queue}, e.queue)
 	w.Now = func() time.Time { return at }
 	return w
 }
@@ -276,5 +313,45 @@ func TestSweepFailsStaleQueuedInvitesWithoutALiveJob(t *testing.T) {
 		if got := e.state(id); got != want {
 			t.Fatalf("invite %s state = %s，預期 %s", id, got, want)
 		}
+	}
+}
+
+func TestSweepDoesNotDowngradeAnInviteWithAPendingStateJob(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	pending, lost := e.invite(0, 11), e.invite(1, 22)
+	if err := e.queue.Enqueue(t.Context(), InviteStateArgs{InviteID: pending, State: "SENT"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	n, err := e.sweeper(epoch.Add(staleAfter() + time.Minute)).Sweep(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 || e.state(pending) != "QUEUED" || e.state(lost) != "FAILED" {
+		t.Fatalf("n=%d pending=%s lost=%s", n, e.state(pending), e.state(lost))
+	}
+}
+
+func TestSweepReachesALostInviteBehindMoreLiveRowsThanOneBatch(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	var liveInvites []procurement.RfqInvite
+	for i := 0; i < 5; i++ {
+		id := e.invite(i, int64(100+i))
+		liveInvites = append(liveInvites, procurement.RfqInvite{InviteID: id, StoreID: int64(100 + i)})
+	}
+	if err := e.d.InTx(t.Context(), func(ctx context.Context) error { return e.publish(ctx, liveInvites...) }); err != nil {
+		t.Fatal(err)
+	}
+	lost := e.invite(5, 200)
+	e.exec(`UPDATE procurement.rfq_publication_invites SET created_at = $1 WHERE id = $2`, epoch.Add(time.Minute), lost)
+	w := e.sweeper(epoch.Add(staleAfter() + time.Hour))
+	w.batch = 2
+	n, err := w.Sweep(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 || e.state(lost) != "FAILED" {
+		t.Fatalf("n=%d lost=%s，活躍列多於一頁時仍要收到遺失的邀請", n, e.state(lost))
 	}
 }

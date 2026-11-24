@@ -536,9 +536,13 @@ func (m *Module) MarkInviteFailed(ctx context.Context, inviteID uuid.UUID) error
 	return m.rfq.MarkInviteFailed(ctx, inviteID)
 }
 
-// StaleQueuedInvites 回傳建立時間早於 before、仍是 QUEUED 的邀請 ID（最舊的先，至多 limit 個），給投遞者的補掃找出沒人在處理的邀請。
-func (m *Module) StaleQueuedInvites(ctx context.Context, before time.Time, limit int32) ([]uuid.UUID, error) {
-	return m.rfq.StaleQueuedInvites(ctx, before, limit)
+// StaleInvite 是補掃游標的一格。
+type StaleInvite = rfq.StaleInvite
+
+// StaleQueuedInvites 回傳建立時間早於 before、仍是 QUEUED、排序鍵 (created_at, id) 在 after 之後的邀請（最舊的先，至多 limit 個），
+// 給投遞者的補掃找出沒人在處理的邀請；after 為零值時從頭開始。
+func (m *Module) StaleQueuedInvites(ctx context.Context, before time.Time, after StaleInvite, limit int32) ([]StaleInvite, error) {
+	return m.rfq.StaleQueuedInvites(ctx, before, after, limit)
 }
 
 // 買家對賣家回價的使用的型別。

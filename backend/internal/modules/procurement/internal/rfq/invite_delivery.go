@@ -21,7 +21,24 @@ func (s Service) MarkInviteFailed(ctx context.Context, inviteID uuid.UUID) error
 	return err
 }
 
-// StaleQueuedInvites 回傳建立時間早於 before、仍是 QUEUED 的邀請 ID（最舊的先，至多 limit 個）。
-func (s Service) StaleQueuedInvites(ctx context.Context, before time.Time, limit int32) ([]uuid.UUID, error) {
-	return store.New(s.DB.Conn(ctx)).ListStaleQueuedInvites(ctx, store.ListStaleQueuedInvitesParams{Before: before, MaxRows: limit})
+// StaleInvite 是補掃游標的一格：邀請 ID 與建立時間（排序鍵是 (created_at, id)）。
+type StaleInvite struct {
+	ID        uuid.UUID
+	CreatedAt time.Time
+}
+
+// StaleQueuedInvites 回傳建立時間早於 before、仍是 QUEUED、排序鍵 (created_at, id) 大於 after 的邀請（最舊的先，至多 limit 個）。
+// after 為零值 StaleInvite 時從頭開始；呼叫端以最後一筆當下一頁的游標。
+func (s Service) StaleQueuedInvites(ctx context.Context, before time.Time, after StaleInvite, limit int32) ([]StaleInvite, error) {
+	rows, err := store.New(s.DB.Conn(ctx)).ListStaleQueuedInvites(ctx, store.ListStaleQueuedInvitesParams{
+		Before: before, AfterCreatedAt: after.CreatedAt, AfterID: after.ID, MaxRows: limit,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]StaleInvite, len(rows))
+	for i, r := range rows {
+		out[i] = StaleInvite{ID: r.ID, CreatedAt: r.CreatedAt}
+	}
+	return out, nil
 }

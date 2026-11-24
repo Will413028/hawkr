@@ -13,7 +13,7 @@
    "id": "invite-never-marked-sent",
    "stack": "go-integration",
    "file": "backend/internal/legacy/procurementrelay/relay.go",
-   "old": "\t\treturn writeState(ctx, last, w.Invites.MarkInviteSent, a.InviteID)\n",
+   "old": "\t\treturn w.settle(ctx, a.InviteID, stateSent)\n",
    "new": "\t\treturn nil\n",
    "test": "internal/legacy/procurementrelay ^TestPublishEnqueuesJobsThatSendTheEventAndMarkTheInvitesSent$",
    "why": "A sent invite event never moves the invite from QUEUED to SENT."
@@ -40,35 +40,17 @@
    "id": "state-write-shares-the-send-context",
    "stack": "go",
    "file": "backend/internal/legacy/procurementrelay/relay.go",
-   "old": "context.WithTimeout(context.WithoutCancel(ctx), stateTimeout)",
-   "new": "context.WithTimeout(ctx, stateTimeout)",
+   "old": "wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), stateTimeout)",
+   "new": "wctx, cancel := context.WithTimeout(ctx, stateTimeout)",
    "test": "internal/legacy/procurementrelay ^TestStateIsWrittenEvenWhenTheSendContextIsGone$",
    "why": "A slow or cancelled send leaves no time for the delivery-state write, so the invite stays QUEUED."
-  },
-  {
-   "id": "last-attempt-state-write-failure-discards-the-job",
-   "stack": "go",
-   "file": "backend/internal/legacy/procurementrelay/relay.go",
-   "old": "\tif last {\n\t\treturn river.JobSnooze(stateRetryDelay)\n\t}\n",
-   "new": "\tif last {\n\t\treturn err\n\t}\n",
-   "test": "internal/legacy/procurementrelay ^TestStateWriteFailureOnTheLastAttemptSnoozesInsteadOfDiscarding$",
-   "why": "A failed state write on the last attempt discards the job and the invite stays QUEUED."
-  },
-  {
-   "id": "last-attempt-write-failure-never-ends-failed",
-   "stack": "go-integration",
-   "file": "backend/internal/legacy/procurementrelay/relay.go",
-   "old": "\tif last {\n\t\treturn river.JobSnooze(stateRetryDelay)\n\t}\n",
-   "new": "\tif last {\n\t\treturn nil\n\t}\n",
-   "test": "internal/legacy/procurementrelay ^TestLastAttemptStateWriteFailureStillEndsFailed$",
-   "why": "After a failed state write on the last attempt the invite never converges to FAILED."
   },
   {
    "id": "sweep-skipped",
    "stack": "go-integration",
    "file": "backend/internal/legacy/procurementrelay/relay.go",
-   "old": "ids, err := w.Invites.StaleQueuedInvites(ctx, w.Now().Add(-staleAfter()), sweepBatch)",
-   "new": "ids, err := []uuid.UUID(nil), error(nil)",
+   "old": "page, err := w.Invites.StaleQueuedInvites(ctx, before, cursor, w.batch)",
+   "new": "page, err := []procurement.StaleInvite(nil), error(nil)\n\t\t_, _ = before, cursor",
    "test": "internal/legacy/procurementrelay ^TestSweepFailsStaleQueuedInvitesWithoutALiveJob$",
    "why": "A lost job leaves its invite QUEUED forever."
   },
@@ -98,6 +80,51 @@
    "new": "maxAttempts = 20",
    "test": "internal/legacy/procurementrelay ^TestRetryScheduleMatchesTheLegacyOutbox$",
    "why": "The invite stays QUEUED for days instead of the legacy outbox's ~30 minutes."
+  },
+  {
+   "id": "write-failure-reruns-the-send",
+   "stack": "go",
+   "file": "backend/internal/legacy/procurementrelay/relay.go",
+   "old": "\tif markErr == nil {\n\t\treturn nil\n\t}\n",
+   "new": "\tif markErr == nil {\n\t\treturn nil\n\t}\n\tif true {\n\t\treturn markErr\n\t}\n",
+   "test": "internal/legacy/procurementrelay ^TestStateWriteFailureAfterASuccessfulSendQueuesAStateJobAndNeverResends$",
+   "why": "A failed state write after a delivered send fails the send job, so River reruns the send."
+  },
+  {
+   "id": "state-job-not-enqueued",
+   "stack": "go",
+   "file": "backend/internal/legacy/procurementrelay/relay.go",
+   "old": "w.Queue.Enqueue(ectx, InviteStateArgs{InviteID: id, State: state}, nil)",
+   "new": "func() error { _ = ectx; return nil }()",
+   "test": "internal/legacy/procurementrelay ^TestStateWriteFailureAfterASuccessfulSendQueuesAStateJobAndNeverResends$",
+   "why": "A failed state write enqueues no state job, so the invite stays QUEUED until the sweep fails it."
+  },
+  {
+   "id": "state-job-never-writes",
+   "stack": "go-integration",
+   "file": "backend/internal/legacy/procurementrelay/relay.go",
+   "old": "\treturn runWithOwnCtx(ctx, mark, job.Args.InviteID)\n",
+   "new": "\t_ = mark\n\treturn nil\n",
+   "test": "internal/legacy/procurementrelay ^TestSendOkWriteFailsConvergesToSentWithoutASecondSend$",
+   "why": "The state job completes without writing, so a delivered invite never reaches SENT."
+  },
+  {
+   "id": "sweep-stops-on-zero-progress",
+   "stack": "go",
+   "file": "backend/internal/legacy/procurementrelay/relay.go",
+   "old": "\t\tcursor = page[len(page)-1]\n",
+   "new": "\t\tif marked == 0 {\n\t\t\treturn marked, nil\n\t\t}\n\t\tcursor = page[len(page)-1]\n",
+   "test": "internal/legacy/procurementrelay ^TestSweepPagesPastLiveRowsToReachALostInvite$",
+   "why": "The sweep stops at the first page of live rows and never reaches a lost invite behind them."
+  },
+  {
+   "id": "sweep-ignores-state-jobs",
+   "stack": "go-integration",
+   "file": "backend/internal/legacy/procurementrelay/relay.go",
+   "old": "[]string{InviteCreatedArgs{}.Kind(), InviteStateArgs{}.Kind()}",
+   "new": "[]string{InviteCreatedArgs{}.Kind()}",
+   "test": "internal/legacy/procurementrelay ^TestSweepDoesNotDowngradeAnInviteWithAPendingStateJob$",
+   "why": "The sweep fails an invite whose state job is still pending."
   }
  ]
 }
