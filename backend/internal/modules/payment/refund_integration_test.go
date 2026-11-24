@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -31,6 +32,13 @@ func (f *chargeFixture) createRefund(t *testing.T, orderNo, key string, amount i
 
 func (f *chargeFixture) runRefund(id uuid.UUID, final bool) error {
 	return f.module.RefundPayment(context.Background(), id, final)
+}
+
+func (f *chargeFixture) syncRefund(t *testing.T, ctx context.Context, id uuid.UUID) bool {
+	t.Helper()
+	again, err := f.module.SyncPaymentRefund(ctx, id)
+	must(t, err)
+	return again
 }
 
 func (f *chargeFixture) refundCount(t *testing.T, orderNo string) int64 {
@@ -522,11 +530,11 @@ func TestARefundEventOnlyQueuesASyncThatRereadsTheProviderAndMarksTheEventProces
 		t.Fatal("handler 標記了事件已處理")
 	}
 	must(t, f.fake.SetRefundState(ext, ChargeRefundUnknown, ""))
-	if err := f.module.SyncPaymentRefund(context.Background(), r.ID); err == nil || f.refundText(t, "status", r.ID) != "REFUNDING" {
+	if _, err := f.module.SyncPaymentRefund(context.Background(), r.ID); err == nil || f.refundText(t, "status", r.ID) != "REFUNDING" {
 		t.Fatalf("不認得的狀態：%v，%s", err, f.refundText(t, "status", r.ID))
 	}
 	must(t, f.fake.SetRefundState(ext, ChargeRefundSucceeded, ""))
-	must(t, f.module.SyncPaymentRefund(context.Background(), r.ID))
+	f.syncRefund(t, context.Background(), r.ID)
 	if f.refundText(t, "status", r.ID) != "SUCCEEDED" || len(f.refundChanges) != 1 || f.refundChanges[0].Previous != RefundRefunding || len(f.autoDone) != 1 {
 		t.Fatalf("同步之後：%s，事件 %+v", f.refundText(t, "status", r.ID), f.refundChanges)
 	}
@@ -535,7 +543,7 @@ func TestARefundEventOnlyQueuesASyncThatRereadsTheProviderAndMarksTheEventProces
 	if pending {
 		t.Fatal("同步之後事件仍未處理")
 	}
-	must(t, f.module.SyncPaymentRefund(context.Background(), r.ID))
+	f.syncRefund(t, context.Background(), r.ID)
 	if len(f.refundChanges) != 1 {
 		t.Fatal("重複同步又發了事件")
 	}
@@ -557,12 +565,12 @@ func TestARefundThatFailsAtTheProviderAfterBeingAcceptedFreesTheQuota(t *testing
 	must(t, f.runRefund(r.ID, false))
 	ext := f.refundText(t, "external_refund_id", r.ID)
 	must(t, f.fake.SetRefundState(ext, ChargeRefundFailed, "declined"))
-	must(t, f.module.SyncPaymentRefund(context.Background(), r.ID))
+	f.syncRefund(t, context.Background(), r.ID)
 	if f.refundText(t, "status", r.ID) != "FAILED" || f.refundText(t, "failure_reason", r.ID) != "provider_failed:declined" || len(f.autoDone) != 0 {
 		t.Fatalf("失敗之後：%s %s", f.refundText(t, "status", r.ID), f.refundText(t, "failure_reason", r.ID))
 	}
 	must(t, f.fake.SetRefundState(ext, ChargeRefundPending, ""))
-	must(t, f.module.SyncPaymentRefund(context.Background(), r.ID))
+	f.syncRefund(t, context.Background(), r.ID)
 	if f.refundText(t, "status", r.ID) != "FAILED" || len(f.refundChanges) != 1 || len(f.anomalies) != 0 {
 		t.Fatalf("過期的讀取倒退了終局：%s，事件 %d，異常 %d", f.refundText(t, "status", r.ID), len(f.refundChanges), len(f.anomalies))
 	}
@@ -674,7 +682,7 @@ func TestResolvingARefundStageAnomalyChecksTheProviderEvidenceAndHandsBackToTheS
 	if ids := f.jobIDs(t, kindRefundSync, "refund_id"); len(ids) != 1 || ids[0] != r.ID {
 		t.Fatalf("同步 job=%v", ids)
 	}
-	must(t, f.module.SyncPaymentRefund(ctx, r.ID))
+	f.syncRefund(t, ctx, r.ID)
 	if f.refundText(t, "status", r.ID) != "SUCCEEDED" {
 		t.Fatalf("同步之後：%s", f.refundText(t, "status", r.ID))
 	}
@@ -703,4 +711,140 @@ func TestResolvingAReversalStageAnomalyQueuesTheRefundJob(t *testing.T) {
 	if ids := f.jobIDs(t, kindRefundCreate, "refund_id"); len(ids) != 1 || ids[0] != refund {
 		t.Fatalf("結案之後的退款 job=%v", ids)
 	}
+}
+
+// F1：累計上限的比較不溢位。付款 100、已有一筆 40，再要求 MaxInt64：taken+amount 回繞成負數會通過檢查。
+// mutation：refund-cap-overflow（改回 taken+in.Amount > pay.Amount）→ 這筆被接受，失敗。
+func TestARefundOfMaxInt64AfterAnExistingRefundIsRefusedByTheCap(t *testing.T) {
+	t.Parallel()
+	f := setupCharge(t)
+	f.paidPayment(t, "RX-1", 100)
+	f.createRefund(t, "RX-1", "a", 40, false)
+	_, err := f.module.CreatePaymentRefund(context.Background(), RefundRequest{OrderNo: "RX-1", Amount: math.MaxInt64, RequestKey: "b"})
+	wantKind(t, err, apperr.KindFailedPrecondition, "巨額退款")
+	if f.refundCount(t, "RX-1") != 1 {
+		t.Fatal("巨額退款寫了列")
+	}
+}
+
+// F2：同步讀取期間收到的退款事件不被併進執行中的 job 而遺失：同步回 again，由 worker 稍後再跑一輪。
+// mutation：refund-sync-no-again（SyncRefund 結尾改回直接 return nil, nil）→ again 為 false，失敗。
+func TestARefundEventArrivingWhileTheSyncReadsTheProviderAsksForAnotherRound(t *testing.T) {
+	t.Parallel()
+	var f *chargeFixture
+	var ext string
+	var fired bool
+	f = setupChargeWith(t, func(fake *ChargeFake) ChargeProvider {
+		return &afterGetRefund{ChargeProvider: fake, after: func() {
+			if fired || ext == "" {
+				return
+			}
+			fired = true
+			f.now = f.now.Add(time.Minute)
+			f.receive(t, "evt-during", ext)
+		}}
+	})
+	f.paidPayment(t, "RX-2", 100)
+	f.fake.NextRefundState(ChargeRefundPending)
+	r := f.createRefund(t, "RX-2", "k", 100, false)
+	must(t, f.runRefund(r.ID, false))
+	ext = f.refundText(t, "external_refund_id", r.ID)
+	must(t, f.fake.SetRefundState(ext, ChargeRefundSucceeded, ""))
+	f.now = f.now.Add(time.Minute)
+	if again := f.syncRefund(t, context.Background(), r.ID); !again {
+		t.Fatal("讀取期間收到的事件沒有要求再跑一輪")
+	}
+	f.now = f.now.Add(time.Minute)
+	if again := f.syncRefund(t, context.Background(), r.ID); again {
+		t.Fatal("事件已涵蓋卻仍要求再跑")
+	}
+}
+
+type afterGetRefund struct {
+	ChargeProvider
+	after func()
+}
+
+func (a *afterGetRefund) GetRefund(ctx context.Context, externalID string) (ChargeRefundSnapshot, error) {
+	snap, err := a.ChargeProvider.GetRefund(ctx, externalID)
+	a.after()
+	return snap, err
+}
+
+// F3：provider 已改成別的（付款屬於舊 provider）時退款在建立就被拒絕，不先撤回賣家的轉帳、不寫退款列也不排 job。
+// mutation：refund-create-no-refundable-check（拿掉 CreateRefund 的 refundable 檢查）→ 寫了 REVERSING 列並排撤回 job，失敗。
+func TestARefundForAPaymentOfAnotherProviderIsRefusedBeforeAnyReversal(t *testing.T) {
+	t.Parallel()
+	f := setupCharge(t)
+	p, tr := f.transferred(t, "RX-3")
+	f.exec(t, "UPDATE payment.payments SET provider = 'old_provider' WHERE id = $1", p.ID)
+	f.clearJobs()
+	_, err := f.module.CreatePaymentRefund(context.Background(), RefundRequest{OrderNo: "RX-3", Amount: 40, RequestKey: "k"})
+	wantKind(t, err, apperr.KindFailedPrecondition, "別的 provider 的付款")
+	if f.refundCount(t, "RX-3") != 0 || f.reversedOf(t, tr.ID) != 0 || len(f.jobIDs(t, kindTransferReversal, "refund_id")) != 0 || len(f.jobIDs(t, kindRefundCreate, "refund_id")) != 0 {
+		t.Fatal("被拒絕的退款留下了列或 job")
+	}
+}
+
+// F4：別的 provider 的付款上的退款：事件對不到（不排同步 job、事件標已處理），直接呼叫同步也不讀、不改列、不發 MoneyAnomaly。
+// mutation：refund-event-no-provider-filter（RefundByExternal 拿掉 provider 條件）→ 排了同步 job，失敗；refund-sync-no-provider-skip（SyncRefund 拿掉 provider 比對）→ 列被改成 SUCCEEDED，失敗。
+func TestARefundOfAPaymentOfAnotherProviderIsNeitherRoutedNorSynced(t *testing.T) {
+	t.Parallel()
+	f := setupCharge(t)
+	p := f.paidPayment(t, "RX-4", 100)
+	f.fake.NextRefundState(ChargeRefundPending)
+	r := f.createRefund(t, "RX-4", "k", 100, false)
+	must(t, f.runRefund(r.ID, false))
+	ext := f.refundText(t, "external_refund_id", r.ID)
+	f.exec(t, "UPDATE payment.payments SET provider = 'old_provider' WHERE id = $1", p.ID)
+	must(t, f.fake.SetRefundState(ext, ChargeRefundSucceeded, ""))
+	f.clearJobs()
+	f.receive(t, "evt-old", ext)
+	if len(f.jobIDs(t, kindRefundSync, "refund_id")) != 0 || !f.processed(t, "evt-old") {
+		t.Fatalf("別的 provider 的退款事件排了同步或沒標已處理：%v", f.jobIDs(t, kindRefundSync, "refund_id"))
+	}
+	f.syncRefund(t, context.Background(), r.ID)
+	if f.refundText(t, "status", r.ID) != "REFUNDING" || len(f.anomalies) != 0 || len(f.refundChanges) != 0 {
+		t.Fatalf("同步動了別的 provider 的退款：%s，事件 %+v", f.refundText(t, "status", r.ID), f.anomalies)
+	}
+}
+
+// F5：退款階段結案成功時，鎖住付款列後要確認付款的外部 ID 仍是核對證據時的那個；核對之後被改掉回 FailedPrecondition，列不動。
+// mutation：refund-resolve-parent-unchecked（拿掉對 pay.ExternalPaymentID 的比對）→ 結案成功，失敗。
+func TestResolvingARefundStageAnomalyFailsWhenThePaymentExternalIDChangedAfterTheEvidence(t *testing.T) {
+	t.Parallel()
+	var f *chargeFixture
+	var paymentID uuid.UUID
+	f = setupChargeWith(t, func(fake *ChargeFake) ChargeProvider {
+		return &afterFindRefund{ChargeProvider: fake, after: func() {
+			f.exec(t, "UPDATE payment.payments SET external_payment_id = 'pi_changed' WHERE id = $1", paymentID)
+		}}
+	})
+	p := f.paidPayment(t, "RX-5", 100)
+	paymentID = p.ID
+	r := f.createRefund(t, "RX-5", "k", 100, false)
+	f.fake.FailRefundAfterCreate(errors.New("回應逾時"))
+	if err := f.runRefund(r.ID, false); err == nil {
+		t.Fatal("回應遺失沒有回錯誤")
+	}
+	must(t, f.fake.SetRefundAmount(f.fake.RefundIDs()[0], 1))
+	must(t, f.runRefund(r.ID, false))
+	ext := f.fake.RefundIDs()[0]
+	must(t, f.fake.SetRefundAmount(ext, 100))
+	err := f.module.ResolveAnomaly(context.Background(), f.admin(), AnomalyRefund, r.ID, AnomalySucceeded, ext)
+	wantKind(t, err, apperr.KindFailedPrecondition, "付款外部 ID 變了")
+	if f.refundText(t, "status", r.ID) != "ANOMALY" || f.auditCount(t) != 0 {
+		t.Fatalf("結案改動了列：%s", f.refundText(t, "status", r.ID))
+	}
+}
+
+type afterFindRefund struct {
+	ChargeProvider
+	after func()
+}
+
+func (a *afterFindRefund) FindRefund(ctx context.Context, externalPaymentID, attemptID string) (ChargeRefundSnapshot, bool, error) {
+	snap, found, err := a.ChargeProvider.FindRefund(ctx, externalPaymentID, attemptID)
+	a.after()
+	return snap, found, err
 }

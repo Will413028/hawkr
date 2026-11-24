@@ -908,13 +908,20 @@ func (q *Queries) PendingTransferIDs(ctx context.Context, arg PendingTransferIDs
 }
 
 const refundByExternal = `-- name: RefundByExternal :one
-SELECT id, payment_id, request_key, amount, auto, status, reversal_amount, reversal_idempotency_key, reversal_called_at, reversal_external_id, reversal_lookup_failures, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
-FROM payment.refunds
-WHERE external_refund_id = $1
+SELECT r.id, r.payment_id, r.request_key, r.amount, r.auto, r.status, r.reversal_amount, r.reversal_idempotency_key, r.reversal_called_at, r.reversal_external_id, r.reversal_lookup_failures, r.idempotency_key, r.refund_called_at, r.refund_lookup_failures, r.external_refund_id, r.failure_reason, r.created_at, r.updated_at
+FROM payment.refunds r
+JOIN payment.payments p ON p.id = r.payment_id
+WHERE p.provider = $1 AND r.external_refund_id = $2
 `
 
-func (q *Queries) RefundByExternal(ctx context.Context, externalRefundID *string) (PaymentRefund, error) {
-	row := q.db.QueryRow(ctx, refundByExternal, externalRefundID)
+type RefundByExternalParams struct {
+	Provider         string
+	ExternalRefundID *string
+}
+
+// 事件的路由鍵對回退款列：只認付款屬於目前 provider 的退款（別的 provider 的退款 ID 不同源）。
+func (q *Queries) RefundByExternal(ctx context.Context, arg RefundByExternalParams) (PaymentRefund, error) {
+	row := q.db.QueryRow(ctx, refundByExternal, arg.Provider, arg.ExternalRefundID)
 	var i PaymentRefund
 	err := row.Scan(
 		&i.ID,

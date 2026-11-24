@@ -132,8 +132,11 @@ func (s *Service) CreateRefund(ctx context.Context, in model.RefundRequest) (mod
 		if err != nil {
 			return err
 		}
-		if taken+in.Amount > pay.Amount {
+		if in.Amount > pay.Amount-taken {
 			return apperr.FailedPrecondition("退款總額超過付款金額")
+		}
+		if !s.refundable(pay) {
+			return apperr.FailedPrecondition("付款目前不能退款（沒有外部付款或屬於別的付款服務）")
 		}
 		reversal, err := s.reservableReversal(ctx, q, pay, in.Amount)
 		if err != nil {
@@ -159,6 +162,12 @@ func (s *Service) CreateRefund(ctx context.Context, in model.RefundRequest) (mod
 		return model.Refund{}, err
 	}
 	return toRefund(out), nil
+}
+
+// refundable 回傳付款是否能由目前的 provider 退款：已入帳、有外部 ID、屬於目前的 provider。CreateRefund 與退款 job 共用，
+// 不成立時 job 一定把退款送進 ANOMALY，所以建立時就拒絕（不先撤回賣家的轉帳）。
+func (s *Service) refundable(pay store.PaymentPayment) bool {
+	return pay.ExternalPaymentID != nil && pay.Status == string(model.PaymentSucceeded) && pay.Provider == s.d.Provider.Name()
 }
 
 // reservableReversal 在已鎖付款列的 transaction 內依付款的轉帳算這筆退款要撤回的額度；轉帳還在進行或待人工核對時回 FailedPrecondition。
@@ -238,7 +247,7 @@ func (s *Service) refund(ctx context.Context, refundID uuid.UUID) error {
 	if err != nil {
 		return err
 	}
-	if pay.ExternalPaymentID == nil || pay.Status != string(model.PaymentSucceeded) || pay.Provider != s.d.Provider.Name() {
+	if !s.refundable(pay) {
 		return s.anomalyRefund(ctx, row, "payment_not_refundable", "")
 	}
 	now := s.d.Now().UTC()
@@ -369,23 +378,32 @@ func (s *Service) publishRefundResult(ctx context.Context, q *store.Queries, r s
 
 // SyncRefund 是退款同步 job（payment.refund_sync）的內容：REFUNDING 的退款在 transaction 外重讀 provider 的退款（不信事件內容），在 transaction 內依狀態進 SUCCEEDED 或 FAILED
 // （還在處理就維持 REFUNDING），並把讀取開始前收到的事件標為已處理。讀不到這筆退款（永久失敗）或與列不符進 ANOMALY。已不是 REFUNDING 的退款只標記事件。
-// 暫時性失敗與不認得的狀態回錯誤由 River 重試，事件保持未處理（掃描會重排）。呼叫方不能在 transaction 內呼叫。
-func (s *Service) SyncRefund(ctx context.Context, refundID uuid.UUID) error {
+// 暫時性失敗與不認得的狀態回錯誤由 River 重試，事件保持未處理（掃描會重排）。付款屬於別的 provider 的退款不讀也不標記（那個 provider 的退款 ID 與目前的無關，同付款同步丟棄別的 provider 快照）。
+// again 為 true 表示讀取期間又收到事件：呼叫方稍後再跑一輪（同付款同步）。呼叫方不能在 transaction 內呼叫。
+func (s *Service) SyncRefund(ctx context.Context, refundID uuid.UUID) (again bool, err error) {
 	if s.d.Provider == nil {
-		return nil
+		return false, nil
 	}
 	if _, ok := db.TxFrom(ctx); ok {
-		return errInTransaction
+		return false, errInTransaction
 	}
-	row, err := store.New(s.d.DB.Conn(ctx)).RefundByID(ctx, refundID)
+	q := store.New(s.d.DB.Conn(ctx))
+	row, err := q.RefundByID(ctx, refundID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil
+		return false, nil
 	}
 	if err != nil {
-		return err
+		return false, err
 	}
 	if row.ExternalRefundID == nil {
-		return nil
+		return false, nil
+	}
+	pay, err := q.PaymentByID(ctx, row.PaymentID)
+	if err != nil {
+		return false, err
+	}
+	if pay.Provider != s.d.Provider.Name() {
+		return false, nil
 	}
 	external, p := *row.ExternalRefundID, s.d.Provider
 	startedAt := s.d.Now().UTC()
@@ -396,17 +414,20 @@ func (s *Service) SyncRefund(ctx context.Context, refundID uuid.UUID) error {
 		switch {
 		case errors.Is(err, ErrPermanent):
 			if aerr := s.anomalyRefund(ctx, row, "refund_missing_at_provider", external); aerr != nil {
-				return aerr
+				return false, aerr
 			}
 		case err != nil:
-			return err
+			return false, err
 		default:
 			if err := s.acceptRefund(ctx, row, snap); err != nil {
-				return err
+				return false, err
 			}
 		}
 	}
-	return s.markEventsProcessed(ctx, p.Name(), external, startedAt)
+	if err := s.markEventsProcessed(ctx, p.Name(), external, startedAt); err != nil {
+		return false, err
+	}
+	return s.d.Inbox.RoutePending(ctx, p.Name(), external)
 }
 
 func (s *Service) markRefundCalled(ctx context.Context, refundID uuid.UUID, now time.Time) (*store.PaymentRefund, error) {

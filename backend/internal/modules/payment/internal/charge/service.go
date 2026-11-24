@@ -314,7 +314,7 @@ func toModel(r store.PaymentPayment, clientSecret string) model.Payment {
 func (s *Service) handleEvent(ctx context.Context, e inbox.Event) error {
 	row, err := store.New(s.d.DB.Conn(ctx)).PaymentByExternal(ctx, store.PaymentByExternalParams{Provider: e.Provider, ExternalPaymentID: &e.RouteKey})
 	if errors.Is(err, pgx.ErrNoRows) {
-		refund, rerr := store.New(s.d.DB.Conn(ctx)).RefundByExternal(ctx, &e.RouteKey)
+		refund, rerr := store.New(s.d.DB.Conn(ctx)).RefundByExternal(ctx, store.RefundByExternalParams{Provider: e.Provider, ExternalRefundID: &e.RouteKey})
 		if errors.Is(rerr, pgx.ErrNoRows) {
 			return s.d.Inbox.MarkProcessed(ctx, e.Provider, e.EventID, eventProcessor)
 		}

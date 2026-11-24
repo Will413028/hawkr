@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 	"time"
@@ -197,5 +198,21 @@ func TestTheFakeParsesRefundEventsAsRefundKind(t *testing.T) {
 	ev, err = f.ParseEvent(h, []byte("fake_pi_3"))
 	if err != nil || ev.Kind != EventPayment {
 		t.Fatalf("%+v %v", ev, err)
+	}
+}
+
+// fake 的累計上限比較不溢位：已有一筆 40 的退款後再退 MaxInt64 是永久拒絕。
+// mutation：fake-refund-cap-overflow（改回 taken+in.Amount > pi.snap.Amount）→ 回繞成負數而被接受，失敗。
+func TestTheFakeRefusesAHugeRefundAfterAnExistingOneInsteadOfOverflowing(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	f := NewFake()
+	pi := fakePaid(t, f, 100)
+	if _, err := f.CreateRefund(ctx, RefundInput{ExternalPaymentID: pi, Amount: 40, IdempotencyKey: "a"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.CreateRefund(ctx, RefundInput{ExternalPaymentID: pi, Amount: math.MaxInt64, IdempotencyKey: "b"}); !errors.Is(err, ErrPermanent) {
+		t.Fatalf("巨額退款：%v", err)
 	}
 }

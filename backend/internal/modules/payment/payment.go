@@ -569,7 +569,7 @@ func (m *Module) RefundPayment(ctx context.Context, refundID uuid.UUID, finalAtt
 	return m.charges.Refund(ctx, refundID, finalAttempt)
 }
 
-// SyncPaymentRefund 是退款同步 job（payment.refund_sync）的內容，給 worker 與測試呼叫：REFUNDING 的退款重讀 provider 後進 SUCCEEDED 或 FAILED。外部呼叫在 transaction 外。
-func (m *Module) SyncPaymentRefund(ctx context.Context, refundID uuid.UUID) error {
+// SyncPaymentRefund 是退款同步 job（payment.refund_sync）的內容，給 worker 與測試呼叫：REFUNDING 的退款重讀 provider 後進 SUCCEEDED 或 FAILED。外部呼叫在 transaction 外；again 為 true 表示讀取期間又收到事件，呼叫方稍後再跑一輪。
+func (m *Module) SyncPaymentRefund(ctx context.Context, refundID uuid.UUID) (again bool, err error) {
 	return m.charges.SyncRefund(ctx, refundID)
 }

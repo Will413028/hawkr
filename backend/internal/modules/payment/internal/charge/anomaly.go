@@ -285,7 +285,8 @@ func (s *Service) resolveRefund(ctx context.Context, q *store.Queries, id uuid.U
 	if err != nil {
 		return "", err
 	}
-	if _, err := q.LockPayment(ctx, r.PaymentID); err != nil {
+	pay, err := q.LockPayment(ctx, r.PaymentID)
+	if err != nil {
 		return "", err
 	}
 	var tr store.PaymentTransfer
@@ -321,7 +322,7 @@ func (s *Service) resolveRefund(ctx context.Context, q *store.Queries, id uuid.U
 		return reason, err
 	}
 	if !reversalStage {
-		if locked.IdempotencyKey != proof.key || proof.parent == "" {
+		if locked.IdempotencyKey != proof.key || proof.parent == "" || pay.ExternalPaymentID == nil || *pay.ExternalPaymentID != proof.parent {
 			return "", errEvidenceChanged
 		}
 		if _, err := q.ResolveRefundRefunding(ctx, store.ResolveRefundRefundingParams{ID: id, ExternalRefundID: &evidence, Now: now}); err != nil {

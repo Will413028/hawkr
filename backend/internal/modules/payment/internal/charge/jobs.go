@@ -256,7 +256,14 @@ type refundSyncWorker struct {
 
 // Work 執行一次退款同步。
 func (w *refundSyncWorker) Work(ctx context.Context, job *river.Job[RefundSyncArgs]) error {
-	return jobError(w.service.SyncRefund(ctx, job.Args.RefundID))
+	again, err := w.service.SyncRefund(ctx, job.Args.RefundID)
+	if err != nil {
+		return jobError(err)
+	}
+	if again {
+		return river.JobSnooze(resyncDelay)
+	}
+	return nil
 }
 
 // Timeout 是一次退款同步的時間上限。

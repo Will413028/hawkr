@@ -612,7 +612,7 @@ func (f *Fake) CreateRefund(ctx context.Context, in RefundInput) (RefundSnapshot
 			taken += r.snap.Amount
 		}
 	}
-	if taken+in.Amount > pi.snap.Amount {
+	if in.Amount > pi.snap.Amount-taken {
 		return RefundSnapshot{}, fmt.Errorf("%w：退款累計超過付款金額 %s", ErrPermanent, in.ExternalPaymentID)
 	}
 	f.next++

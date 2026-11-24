@@ -330,9 +330,11 @@ WHERE id = sqlc.arg(id) AND status = 'ANOMALY' AND NOT (reversal_amount > 0 AND 
 RETURNING *;
 
 -- name: RefundByExternal :one
-SELECT *
-FROM payment.refunds
-WHERE external_refund_id = sqlc.arg(external_refund_id);
+-- 事件的路由鍵對回退款列：只認付款屬於目前 provider 的退款（別的 provider 的退款 ID 不同源）。
+SELECT r.*
+FROM payment.refunds r
+JOIN payment.payments p ON p.id = r.payment_id
+WHERE p.provider = sqlc.arg(provider) AND r.external_refund_id = sqlc.arg(external_refund_id);
 
 -- name: RefundIDsByExternal :many
 -- 事件的路由鍵（provider 的退款 ID）對回退款列，給掃描補排有舊的未處理事件的退款同步。
