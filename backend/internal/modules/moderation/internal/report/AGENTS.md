@@ -9,3 +9,4 @@
 - 每日額度、去重與冪等的規則見模組 `AGENTS.md`。
 - 檢舉人是買家或店家（`SubmitInput.ReporterBuyerID`、`ReporterStoreID` 恰好一個為正）：店家只能檢舉 CHAT_MESSAGE，`MessageForReport` 以 `im.Party` 的店家核對對話方；本人核對（`notSelf`）以帳號比，店家取 `seller.Store` 的 `AccountID`；額度走 `BumpStoreDailyCount`。REVIEW_REPLY 由買家檢舉，經 `ReviewForReport` 讀回覆，沒有回覆或已被下架是 NotFound（`TestReviewReplyTakedownHidesOnlyTheReply`）。
 - 評價與聊天訊息的檢舉經 review 的 `ReviewForReport`、im 的 `MessageForReport`（唯讀、不鎖列、加入 `SubmitReport` 的 transaction）；聊天快照是被檢舉訊息加前後各 `ChatContextWindow` 則，前後文已隱藏或已抹除的是墓碑（`TestChatReportFreezesFiveBeforeAndAfterWithTombstones`）；非對話方與已隱藏的訊息是 NotFound（`TestReportAuthorizationForChatAndReview`）。
+- 送出事件（D24）：只有新增一筆檢舉才在同 transaction 發 `ReportReceived`；併入自己既有的檢舉與同一個 `request_id` 的重送在 `replay` 就返回，不發。`CaseReporters` 以 `(created_at, id)` 由小到大的 keyset 分頁讀案件的檢舉人（買家或店家），給結案通知 fan-out。守門：`TestSubmitPublishesReportReceivedOnlyForANewReport`、`TestCaseReportersPagesEveryReporterOnce`。

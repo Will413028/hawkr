@@ -2695,3 +2695,85 @@ func TestAPermanentRefusalOfAResolveOnAnAlreadyFailedRowStopsTheSweepAndKeepsThe
 		t.Fatal("管理員重試建立應清除失敗與拒絕標記")
 	}
 }
+
+// 同步存待補條件的最早期限（每次整列覆寫）與第一次啟用的時間（只寫一次）；事件帶這次讀到的期限，FirstActivation 只在第一次啟用的那一次為真。
+// mutation：FirstActivation 改成 applied.FirstActivatedAt != nil → 之後每次啟用都為真；first_activated_at 拿掉 COALESCE → 再啟用時被重設。
+func TestSyncStoresTheDeadlineAndFirstActivationAndPublishesThem(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	s := f.newStore(t)
+	deadline := f.now.Add(7 * 24 * time.Hour).UTC()
+
+	needs := needsSellerSnapshot
+	needs.RequirementsDeadline = &deadline
+	f.set(t, s, needs)
+	if a := f.account(t, s); a.RequirementsDeadline == nil || !a.RequirementsDeadline.Equal(deadline) || a.FirstActivatedAt != nil {
+		t.Fatalf("補件中：%+v", a)
+	}
+
+	f.now = f.now.Add(time.Hour)
+	activatedAt := f.now
+	f.set(t, s, enabledSnapshot)
+	if a := f.account(t, s); a.RequirementsDeadline != nil || a.FirstActivatedAt == nil || !a.FirstActivatedAt.Equal(activatedAt) {
+		t.Fatalf("第一次啟用：%+v", a)
+	}
+
+	f.now = f.now.Add(time.Hour)
+	f.set(t, s, needs)
+	f.now = f.now.Add(time.Hour)
+	f.set(t, s, enabledSnapshot)
+	if a := f.account(t, s); a.FirstActivatedAt == nil || !a.FirstActivatedAt.Equal(activatedAt) {
+		t.Fatalf("再啟用不得重設第一次啟用的時間：%+v", a)
+	}
+
+	if len(f.changes) != 4 {
+		t.Fatalf("events=%+v", f.changes)
+	}
+	type view struct {
+		first    bool
+		deadline *time.Time
+	}
+	var got []view
+	for _, e := range f.changes {
+		got = append(got, view{e.FirstActivation, e.RequirementsDeadline})
+	}
+	if got[0].first || got[0].deadline == nil || !got[0].deadline.Equal(deadline) ||
+		!got[1].first || got[1].deadline != nil ||
+		got[2].first || got[2].deadline == nil || !got[2].deadline.Equal(deadline) ||
+		got[3].first || got[3].deadline != nil {
+		t.Fatalf("事件欄位：%+v", got)
+	}
+}
+
+// 訂閱者失敗時整筆同步 rollback：期限與第一次啟用的時間都不寫，重試後仍是第一次啟用。
+// mutation：Publish 的錯誤被吞掉 → 帳戶已寫入第一次啟用的時間，失敗。
+func TestSyncRollbackKeepsTheFirstActivationForTheRetry(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	s := f.newStore(t)
+	external := f.ensure(t, s)
+	boom := errors.New("訂閱者失敗")
+	failing := true
+	events.Subscribe(f.bus, func(context.Context, PayoutAccountChanged) error {
+		if failing {
+			return boom
+		}
+		return nil
+	})
+	f.fake.Set(external, enabledSnapshot)
+	if _, err := f.module.SyncAccount(ctx, s); !errors.Is(err, boom) {
+		t.Fatalf("err=%v", err)
+	}
+	if a := f.account(t, s); a.FirstActivatedAt != nil || a.TransfersActive {
+		t.Fatalf("rollback 後的帳戶=%+v", a)
+	}
+	failing = false
+	f.changes = nil
+	if _, err := f.module.SyncAccount(ctx, s); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.changes) != 1 || !f.changes[0].FirstActivation {
+		t.Fatalf("重試要是第一次啟用：%+v", f.changes)
+	}
+}

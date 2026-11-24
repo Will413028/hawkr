@@ -32,6 +32,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
+	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
@@ -54,6 +56,7 @@ type Chats interface {
 // Deps 是處理案件的依賴，全部必填。
 type Deps struct {
 	DB         *db.DB
+	Events     *events.Bus
 	Social     *social.Module
 	Review     Reviews
 	IM         Chats
@@ -62,6 +65,7 @@ type Deps struct {
 	Suspension *accountsuspension.Module
 	Audit      *adminaudit.Log
 	Now        func() time.Time
+	NewID      func() uuid.UUID
 }
 
 // Service 是案件處理的 use case。
@@ -147,6 +151,9 @@ func (s *Service) Decide(ctx context.Context, in model.DecideInput) (model.CaseD
 		if err := s.close(ctx, q, in, res.measureID); err != nil {
 			return err
 		}
+		if err := s.publishClosed(ctx, c, in); err != nil {
+			return err
+		}
 		if err := s.audit(ctx, c, in, res); err != nil {
 			return err
 		}
@@ -190,6 +197,19 @@ func (s *Service) close(ctx context.Context, q *store.Queries, in model.DecideIn
 		return apperr.VersionConflict("%s", text.CaseStale())
 	}
 	return nil
+}
+
+// publishClosed 在結案的同一個 transaction 發 CaseClosedEvent：結果由決定推導，政策分類只在違規時帶。
+func (s *Service) publishClosed(ctx context.Context, c model.Case, in model.DecideInput) error {
+	decision := string(in.Decision)
+	e := model.CaseClosedEvent{
+		EventID: s.d.NewID(), OccurredAt: s.d.Now().UTC(), CaseID: c.ID, TargetKind: c.Target.Kind, Outcome: model.OutcomeOf(&decision),
+	}
+	if in.Decision == model.DecisionViolation {
+		category := policy.Category(in.Category)
+		e.Category = &category
+	}
+	return events.Publish(ctx, s.d.Events, e)
 }
 
 func ptr[T any](v T) *T { return &v }

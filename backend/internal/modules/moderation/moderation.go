@@ -28,6 +28,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
 //go:embed db/migrations/*.sql db/migrations/atlas.sum
@@ -67,6 +68,14 @@ type (
 	DecideInput = model.DecideInput
 	// ReverseInput 是撤銷 HIDE 決定的輸入。
 	ReverseInput = model.ReverseInput
+	// ReportReceived 是新增一筆檢舉時發布的事件。
+	ReportReceived = model.ReportReceived
+	// CaseClosedEvent 是案件結案時發布的事件。
+	CaseClosedEvent = model.CaseClosedEvent
+	// Reporter 是案件的一位檢舉人（買家或店家）。
+	Reporter = model.Reporter
+	// ReporterPage 是一頁案件的檢舉人。
+	ReporterPage = model.ReporterPage
 	// Reversal 是案件上 HIDE 決定的撤銷紀錄。
 	Reversal = model.Reversal
 	// Snapshot 是案件凍結的內容快照（依對象種類的 tagged union：Social、Buyer、Review、Chat 恰好一個有值）。
@@ -140,6 +149,7 @@ type Media interface {
 // Deps 是模組需要的外部依賴，全部必填（Logger 可為空）。
 type Deps struct {
 	DB         *db.DB
+	Events     *events.Bus
 	Social     *social.Module
 	Review     *review.Module
 	IM         *im.Module
@@ -163,14 +173,14 @@ type Module struct {
 
 // New 建立模組。
 func New(d Deps) *Module {
-	if d.DB == nil || d.Social == nil || d.Review == nil || d.IM == nil || d.Seller == nil || d.Buyer == nil || d.Suspension == nil || d.Media == nil || d.NewID == nil || d.Now == nil {
+	if d.DB == nil || d.Events == nil || d.Social == nil || d.Review == nil || d.IM == nil || d.Seller == nil || d.Buyer == nil || d.Suspension == nil || d.Media == nil || d.NewID == nil || d.Now == nil {
 		panic("moderation: missing dependency")
 	}
 	ret := NewRetention(RetentionDeps{DB: d.DB, Buyer: d.Buyer, Media: d.Media, Now: d.Now, Logger: d.Logger})
 	return &Module{
 		d:         d,
-		report:    report.New(report.Deps{DB: d.DB, Social: d.Social, Review: d.Review, IM: d.IM, Seller: d.Seller, Buyer: d.Buyer, Media: d.Media, NewID: d.NewID, Now: d.Now}),
-		handle:    handle.New(handle.Deps{DB: d.DB, Social: d.Social, Review: d.Review, IM: d.IM, Seller: d.Seller, Buyer: d.Buyer, Suspension: d.Suspension, Audit: adminaudit.New(d.DB, d.Now), Now: d.Now}),
+		report:    report.New(report.Deps{DB: d.DB, Events: d.Events, Social: d.Social, Review: d.Review, IM: d.IM, Seller: d.Seller, Buyer: d.Buyer, Media: d.Media, NewID: d.NewID, Now: d.Now}),
+		handle:    handle.New(handle.Deps{DB: d.DB, Events: d.Events, NewID: d.NewID, Social: d.Social, Review: d.Review, IM: d.IM, Seller: d.Seller, Buyer: d.Buyer, Suspension: d.Suspension, Audit: adminaudit.New(d.DB, d.Now), Now: d.Now}),
 		retention: ret,
 		view:      view.Reader{DB: d.DB},
 	}
@@ -253,6 +263,11 @@ func (m *Module) DecideCase(ctx context.Context, in DecideInput) (CaseDetail, er
 // 還原目前未還原的隱藏，並寫後台動作紀錄（Actor.Action 是動作名稱）。案件不存在回 NotFound；案件進行中、處置不是 HIDE 或已撤銷過回 FailedPrecondition。
 func (m *Module) ReverseHide(ctx context.Context, in ReverseInput) (CaseDetail, error) {
 	return m.handle.Reverse(ctx, in)
+}
+
+// CaseReporters 列案件的檢舉人（買家或店家），依 (檢舉時間, 檢舉 ID) 由小到大的 keyset；給結案通知分頁 fan-out，不含檢舉說明。
+func (m *Module) CaseReporters(ctx context.Context, caseID uuid.UUID, after *ReportCursor, size int32) (ReporterPage, error) {
+	return m.report.CaseReporters(ctx, caseID, after, size)
 }
 
 // Case 讀一個案件與它的全部檢舉；每筆檢舉的結果由案件的決定推導。案件不存在回 NotFound。

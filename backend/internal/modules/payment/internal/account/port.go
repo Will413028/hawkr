@@ -15,6 +15,7 @@ import (
 	"errors"
 	"net/http"
 	"slices"
+	"time"
 	"unicode/utf8"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/model"
@@ -85,11 +86,13 @@ type StatusDetail struct {
 // 保存給後台看。BankFingerprints 是目前掛在外部帳戶上的外部銀行帳號的 provider 識別碼（同一組銀行帳號在同一個 provider 內一致；沒有掛銀行帳號時
 // 為空，不含空字串）：只供防詐比對，不是機密但不存明文。
 type Snapshot struct {
-	Transfers        CapabilityState
-	Details          []StatusDetail
-	PayoutsActive    bool
-	Requirements     json.RawMessage
-	BankFingerprints []string
+	Transfers     CapabilityState
+	Details       []StatusDetail
+	PayoutsActive bool
+	Requirements  json.RawMessage
+	// RequirementsDeadline 是待補條件最早會讓帳戶受影響的時間（provider 回報的期限）；沒有待補條件或 provider 沒給期限是 nil。
+	RequirementsDeadline *time.Time
+	BankFingerprints     []string
 	// Closed 為真表示外部帳戶已在 provider 關閉（終局：不會再開啟）；其餘欄位沒有意義。StatusOf 把它推導成 DISABLED、原因碼 ReasonClosed。
 	Closed bool
 }

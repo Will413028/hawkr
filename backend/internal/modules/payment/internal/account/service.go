@@ -148,7 +148,7 @@ func ToModel(r store.PaymentAccount, now time.Time) model.PaymentAccount {
 		StoreID: r.StoreID, Provider: r.Provider, ExternalAccountID: r.ExternalAccountID,
 		RequirementCollection: model.RequirementCollection(r.RequirementCollection), Status: model.PaymentAccountStatus(r.Status),
 		TransfersActive: r.TransfersActive, PayoutsActive: r.PayoutsActive, Requirements: r.Requirements, StatusReason: r.StatusReason,
-		FetchedAt: r.FetchedAt, CreateFailedAt: r.CreateFailedAt, PurgeBlockedAt: r.PurgeBlockedAt, PurgeBlockedReason: r.PurgeBlockedReason,
+		FetchedAt: r.FetchedAt, RequirementsDeadline: r.RequirementsDeadline, FirstActivatedAt: r.FirstActivatedAt, CreateFailedAt: r.CreateFailedAt, PurgeBlockedAt: r.PurgeBlockedAt, PurgeBlockedReason: r.PurgeBlockedReason,
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 	}
 }

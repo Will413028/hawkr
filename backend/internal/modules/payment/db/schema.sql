@@ -27,6 +27,8 @@ CREATE SCHEMA payment;
 -- seller_read_claimed_at 是上次賣家觸發的讀取被受理的時刻（含失敗與並行的；條件式 UPDATE 搶名額），同步 job 不讀寫。
 -- purge_pending_at 是擁有者的清理已要求、還沒完成的時刻，與有沒有外部 ID 無關（清理 job 呼叫 provider 之前先標；刪列之前一直在）：本地列留著（保住 store_id 與外部 ID 或冪等鍵的對應），
 -- 不被建立、不進同步輪詢、不被賣家／管理員的重新整理讀，由 payment 的週期掃描重排「關閉後刪除」，關閉（沒有外部 ID 的列先以冪等鍵取得外部帳戶）成功才刪列。
+-- requirements_deadline 是同步讀到的待補條件的最早期限（Stripe v2 帳戶的 requirements.summary.minimum_deadline.time；沒有待補條件或沒有期限是 NULL），每次同步整列覆寫；
+-- first_activated_at 是轉帳能力第一次啟用的同步時間，之後不再改（之後停用、再啟用都不重設），只有那一次同步發布的 PayoutAccountChanged 帶 FirstActivation（D23）。
 -- purge_blocked_at 與 purge_blocked_reason 是清理的終局（D59、D60）：關閉被金流商拒絕、或標成等待清理後 7 天仍然關不掉或問不到金流商；列留著，不再被週期掃描重排，
 -- 出現在後台待辦 PAYMENT_ACCOUNT_PURGE_STUCK，由管理員「重試關閉」（清除終局並重新計算期限；原因是 unresolved_creation 的，冪等鍵保存期內以同一把鍵重送取回 ID 再關閉，超過保存期不能重試）或「已在金流商處理，刪除對應」（同一個 transaction 寫一筆 adminaudit 的後台紀錄並刪列，D62）。
 -- purge_replay_requested_at 是管理員對清理終局（unresolved_creation）的列要求「以同一把鍵重送」的時刻（RetryPurge 排入 Replay job 時寫，重送結束不論結果都清除，取回 ID 重啟清理時一併清除）：
@@ -57,6 +59,8 @@ CREATE TABLE payment.accounts (
     purge_blocked_at       TIMESTAMPTZ,
     purge_blocked_reason   TEXT,
     purge_replay_requested_at TIMESTAMPTZ,
+    requirements_deadline  TIMESTAMPTZ,
+    first_activated_at     TIMESTAMPTZ,
     CONSTRAINT accounts_store_id_check CHECK (store_id > 0),
     CONSTRAINT accounts_provider_check CHECK (provider ~ '^[a-z][a-z0-9_]{0,39}$'),
     CONSTRAINT accounts_external_id_check CHECK (external_account_id IS NULL OR char_length(external_account_id) BETWEEN 1 AND 255),
@@ -66,6 +70,8 @@ CREATE TABLE payment.accounts (
     CONSTRAINT accounts_enabled_check CHECK ((status = 'ENABLED') = transfers_active),
     CONSTRAINT accounts_snapshot_check CHECK (create_completed_at IS NOT NULL OR (fetched_at IS NULL AND NOT payouts_active AND status_reason IS NULL)),
     CONSTRAINT accounts_requirements_check CHECK (jsonb_typeof(requirements) = 'object'),
+    CONSTRAINT accounts_first_activated_check CHECK (NOT transfers_active OR first_activated_at IS NOT NULL),
+    CONSTRAINT accounts_deadline_snapshot_check CHECK (create_completed_at IS NOT NULL OR (requirements_deadline IS NULL AND first_activated_at IS NULL)),
     CONSTRAINT accounts_status_reason_check CHECK (status_reason IS NULL OR char_length(status_reason) BETWEEN 1 AND 200),
     CONSTRAINT accounts_create_failed_check CHECK (create_failed_at IS NULL OR create_completed_at IS NULL),
     CONSTRAINT accounts_create_refused_check CHECK (create_refused_at IS NULL OR create_failed_at IS NOT NULL),

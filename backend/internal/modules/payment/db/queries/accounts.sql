@@ -90,12 +90,14 @@ WHERE store_id = sqlc.arg(store_id) AND create_completed_at IS NULL AND create_f
 
 -- name: ApplyPaymentSnapshot :one
 -- 同步重讀外部帳戶之後整列覆寫快取；還沒完成建立（含半建立）的列不寫。讀取開始時間早於已存的 fetched_at 的不寫（較晚開始的讀取已經先寫入，較早開始的不能蓋掉
--- 較新的快取，D32）：沒有回傳列時呼叫方不標記 inbox 事件、不發布 PayoutAccountChanged。fetched_at 是 NULL（還沒有同步過）一律寫。
+-- 較新的快取，D32）：first_activated_at 只在還是 NULL 而這次轉帳能力啟用時寫（第一次啟用，之後不改）。沒有回傳列時呼叫方不標記 inbox 事件、不發布 PayoutAccountChanged。fetched_at 是 NULL（還沒有同步過）一律寫。
 UPDATE payment.accounts
 SET status = sqlc.arg(status),
     transfers_active = sqlc.arg(transfers_active),
     payouts_active = sqlc.arg(payouts_active),
     requirements = sqlc.arg(requirements),
+    requirements_deadline = sqlc.narg(requirements_deadline),
+    first_activated_at = COALESCE(first_activated_at, CASE WHEN sqlc.arg(transfers_active)::boolean THEN sqlc.arg(now)::timestamptz END),
     status_reason = sqlc.narg(status_reason),
     fetched_at = sqlc.arg(fetched_at),
     updated_at = sqlc.arg(now)

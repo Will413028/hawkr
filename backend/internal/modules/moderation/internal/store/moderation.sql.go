@@ -1133,6 +1133,58 @@ func (q *Queries) ReportWithOutcome(ctx context.Context, id uuid.UUID) (ReportWi
 	return i, err
 }
 
+const reportersOfCase = `-- name: ReportersOfCase :many
+SELECT id, created_at, reporter_buyer_id, reporter_store_id FROM moderation.reports
+WHERE case_id = $1 AND (created_at, id) > ($2::timestamptz, $3::uuid)
+ORDER BY created_at, id
+LIMIT $4::int
+`
+
+type ReportersOfCaseParams struct {
+	CaseID       uuid.UUID
+	AfterCreated time.Time
+	AfterID      uuid.UUID
+	MaxRows      int32
+}
+
+type ReportersOfCaseRow struct {
+	ID              uuid.UUID
+	CreatedAt       time.Time
+	ReporterBuyerID *int64
+	ReporterStoreID *int64
+}
+
+// 案件的檢舉人，依 (created_at, id) 由小到大的 keyset；第一頁的游標是零值。
+func (q *Queries) ReportersOfCase(ctx context.Context, arg ReportersOfCaseParams) ([]ReportersOfCaseRow, error) {
+	rows, err := q.db.Query(ctx, reportersOfCase,
+		arg.CaseID,
+		arg.AfterCreated,
+		arg.AfterID,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ReportersOfCaseRow{}
+	for rows.Next() {
+		var i ReportersOfCaseRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.ReporterBuyerID,
+			&i.ReporterStoreID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const reportsOfCase = `-- name: ReportsOfCase :many
 SELECT id, case_id, reporter_buyer_id, reporter_store_id, category, description, snapshot_id, created_at FROM moderation.reports WHERE case_id = $1 ORDER BY created_at, id
 `

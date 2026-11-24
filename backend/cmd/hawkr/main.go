@@ -249,7 +249,7 @@ func runServe(ctx context.Context) error {
 	crmModule := newCRM(d, bus, jc, buyerModule, sellerModule, log)
 	delegationDeps.Social = socialModule
 	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellerModule, Logger: log})
-	moderationModule := newModeration(d, socialModule, reviewModule, imModule, sellerModule, buyerModule, suspension, med, log)
+	moderationModule := newModeration(d, bus, socialModule, reviewModule, imModule, sellerModule, buyerModule, suspension, med, log)
 	subscribeProcurement(bus, d, log)
 	imageAIModule := newImageAI(d, imageAIConfig, sellerModule, llm.NewImage(llmConfig, log).Generator(), med, log)
 	subscribeImageAI(bus, imageAIModule)

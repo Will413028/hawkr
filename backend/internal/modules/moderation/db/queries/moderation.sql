@@ -107,6 +107,13 @@ RETURNING c.submitted;
 -- name: ReportsOfCase :many
 SELECT * FROM moderation.reports WHERE case_id = sqlc.arg(case_id) ORDER BY created_at, id;
 
+-- name: ReportersOfCase :many
+-- 案件的檢舉人，依 (created_at, id) 由小到大的 keyset；第一頁的游標是零值。
+SELECT id, created_at, reporter_buyer_id, reporter_store_id FROM moderation.reports
+WHERE case_id = sqlc.arg(case_id) AND (created_at, id) > (sqlc.arg(after_created)::timestamptz, sqlc.arg(after_id)::uuid)
+ORDER BY created_at, id
+LIMIT sqlc.arg(max_rows)::int;
+
 -- name: ReportIDsOfCase :many
 -- 認定引用的來源檢舉（最早的幾筆）。
 SELECT id FROM moderation.reports WHERE case_id = sqlc.arg(case_id) ORDER BY created_at, id LIMIT sqlc.arg(max_rows)::int;

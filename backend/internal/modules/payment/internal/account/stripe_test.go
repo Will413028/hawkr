@@ -488,3 +488,30 @@ func TestJobTimeoutCoversTheMostProviderCallsAJobCanMake(t *testing.T) {
 		t.Fatalf("呼叫數 %d 少於建立的取得與設定（清理的重送與關閉）", maxProviderCallsPerJob)
 	}
 }
+
+func TestStripeFetchReadsTheRequirementsDeadlineFromTheSummary(t *testing.T) {
+	capabilities := `"stripe_transfers":{"status":"restricted","status_details":[]},"payouts":{"status":"restricted","status_details":[]}`
+	body := func(requirements string) string {
+		return `{"id":"acct_1","configuration":{"recipient":{"capabilities":{"stripe_balance":{` + capabilities + `}}}},"requirements":` + requirements + `}`
+	}
+	for name, tc := range map[string]struct {
+		requirements string
+		want         string
+	}{
+		"有期限":        {`{"entries":[],"summary":{"minimum_deadline":{"status":"currently_due","time":"2026-12-01T03:04:05.123Z"}}}`, "2026-12-01T03:04:05.123Z"},
+		"沒有 summary": {`{"entries":[]}`, ""},
+		"沒有 time":    {`{"summary":{"minimum_deadline":{"status":"eventually_due"}}}`, ""},
+	} {
+		p := stripeProvider(t, model.CollectionProvider, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(body(tc.requirements))) }))
+		snap, err := p.FetchAccount(context.Background(), "acct_1")
+		if err != nil {
+			t.Fatalf("%s：%v", name, err)
+		}
+		switch {
+		case tc.want == "" && snap.RequirementsDeadline != nil:
+			t.Errorf("%s：不該有期限：%v", name, *snap.RequirementsDeadline)
+		case tc.want != "" && (snap.RequirementsDeadline == nil || snap.RequirementsDeadline.Format("2006-01-02T15:04:05.000Z") != tc.want):
+			t.Errorf("%s：期限 %v，want %s", name, snap.RequirementsDeadline, tc.want)
+		}
+	}
+}

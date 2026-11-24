@@ -30,6 +30,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/idempotency"
 	"github.com/Will413028/hawkr/backend/internal/platform/pagination"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
@@ -59,6 +60,7 @@ type Chats interface {
 // Deps 是送出檢舉的依賴，全部必填。
 type Deps struct {
 	DB     *db.DB
+	Events *events.Bus
 	Social *social.Module
 	Review Reviews
 	IM     Chats
@@ -366,6 +368,12 @@ func (s *Service) attempt(ctx context.Context, in model.SubmitInput, copies map[
 	if err := s.recordRequest(ctx, q, in, row.ID, hash); err != nil {
 		return model.SubmitResult{}, err
 	}
+	if err := events.Publish(ctx, s.d.Events, model.ReportReceived{
+		EventID: s.d.NewID(), OccurredAt: now, ReportID: row.ID, CaseID: c.ID, Target: in.Target,
+		ReporterBuyerID: in.ReporterBuyerID, ReporterStoreID: in.ReporterStoreID, Category: in.Category,
+	}); err != nil {
+		return model.SubmitResult{}, err
+	}
 	return model.SubmitResult{Report: view.Report(row, nil), Case: view.Case(attached), Created: true}, nil
 }
 
@@ -456,6 +464,35 @@ func (s *Service) MyStoreReports(ctx context.Context, storeID int64, after *mode
 		items[i] = reportItem(r.ModerationReport, r.TargetKind, r.ContentID, r.BuyerID, r.Decision, r.ClosedAt)
 	}
 	return reportPage(items, rows, more, func(r store.ListReportsOfStoreReporterRow) store.ModerationReport { return r.ModerationReport }), nil
+}
+
+// CaseReporters 是案件的檢舉人（買家或店家），依 (檢舉時間, 檢舉 ID) 由小到大的 keyset，給結案通知分頁 fan-out；案件沒有檢舉或不存在都回空頁。
+func (s *Service) CaseReporters(ctx context.Context, caseID uuid.UUID, after *model.ReportCursor, size int32) (model.ReporterPage, error) {
+	size, err := pagination.PageSize(size, model.DefaultPageSize, model.MaxPageSize)
+	if err != nil {
+		return model.ReporterPage{}, err
+	}
+	at, id := after.AfterKey()
+	rows, err := store.New(s.d.DB.Conn(ctx)).ReportersOfCase(ctx, store.ReportersOfCaseParams{CaseID: caseID, AfterCreated: at, AfterID: id, MaxRows: size + 1})
+	if err != nil {
+		return model.ReporterPage{}, fmt.Errorf("moderation：列出案件 %s 的檢舉人：%w", caseID, err)
+	}
+	rows, more := model.TrimPage(rows, size)
+	out := model.ReporterPage{Items: make([]model.Reporter, len(rows))}
+	for i, r := range rows {
+		out.Items[i] = model.Reporter{ReportID: r.ID}
+		if r.ReporterBuyerID != nil {
+			out.Items[i].BuyerID = *r.ReporterBuyerID
+		}
+		if r.ReporterStoreID != nil {
+			out.Items[i].StoreID = *r.ReporterStoreID
+		}
+	}
+	if more {
+		last := rows[len(rows)-1]
+		out.Next = &model.ReportCursor{CreatedAt: last.CreatedAt, ID: last.ID}
+	}
+	return out, nil
 }
 
 func reportItem(r store.ModerationReport, targetKind string, contentID *uuid.UUID, buyerID *int64, decision *string, closedAt *time.Time) model.ReportItem {

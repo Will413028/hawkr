@@ -335,3 +335,48 @@ type CasePage struct {
 	Cases []Case
 	Next  *CaseCursor
 }
+
+// ReportReceived 在新增一筆檢舉的 transaction 內發布（對象、檢舉人與類別；說明文字不在事件裡）。併入進行中案件而回傳既有檢舉、以及同一個 request_id 的重送都沒有新檢舉，不發。
+// 檢舉人是買家或店家，恰好一個是正數。
+type ReportReceived struct {
+	EventID         uuid.UUID
+	OccurredAt      time.Time
+	ReportID        uuid.UUID
+	CaseID          uuid.UUID
+	Target          Target
+	ReporterBuyerID int64
+	ReporterStoreID int64
+	Category        policy.Category
+}
+
+// CaseClosedEvent 在案件結案的 transaction 內發布（違規處置與不違規都發）。只帶案件 ID、對象種類、結果類別與認定的政策分類，不帶處置種類，也不帶檢舉人清單：
+// 消費端用 CaseReporters 分頁讀。Outcome 只有 OutcomeViolation 與 OutcomeNoViolation；Category 只在違規時有值，不違規是 nil。
+type CaseClosedEvent struct {
+	EventID    uuid.UUID
+	OccurredAt time.Time
+	CaseID     uuid.UUID
+	TargetKind TargetKind
+	Outcome    Outcome
+	Category   *policy.Category
+}
+
+// Reporter 是案件的一位檢舉人（買家或店家，恰好一個是正數）；ReportID 是那筆檢舉。
+type Reporter struct {
+	ReportID uuid.UUID
+	BuyerID  int64
+	StoreID  int64
+}
+
+// ReporterPage 是一頁案件的檢舉人，依 (檢舉時間, 檢舉 ID) 由小到大；Next 是下一頁的游標（沒有下一頁是 nil）。
+type ReporterPage struct {
+	Items []Reporter
+	Next  *ReportCursor
+}
+
+// AfterKey 回檢舉人清單（由小到大）的游標參數；nil（第一頁）回零值，讓每一頁走同一個 query。
+func (c *ReportCursor) AfterKey() (time.Time, uuid.UUID) {
+	if c == nil {
+		return time.Time{}, uuid.UUID{}
+	}
+	return c.CreatedAt, c.ID
+}
