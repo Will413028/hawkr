@@ -55,7 +55,7 @@ void main() {
     expect(glyphs, hasLength(labels.length));
   });
 
-  test('付款過期與 ATM 退款資料缺口有專屬文案', () {
+  test('付款過期有專屬文案', () {
     final expired = OrderStatusPresentation.fromOrder(
       Order(
         status: '0',
@@ -64,12 +64,8 @@ void main() {
             .toIso8601String(),
       ),
     );
-    final refund = OrderStatusPresentation.fromOrder(
-      const Order(status: '80', needRefundPage: true),
-    );
 
     expect(expired.label, '付款已逾期');
-    expect(refund.description, contains('退款帳戶'));
   });
 
   test('所有已知物流碼都可解析，異常碼不會被誤標成一般配送', () {

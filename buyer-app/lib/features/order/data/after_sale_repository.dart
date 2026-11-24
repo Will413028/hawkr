@@ -250,28 +250,4 @@ class AfterSaleRepository {
     }
     return msgStr.isNotEmpty ? msgStr : '提交申訴失敗';
   }
-
-  /// POST /app/orders/:order_no/refund_page — 取得 ATM 退款頁面 URL
-  Future<String> getRefundPageUrl(String orderNo) async {
-    try {
-      final resp = await _dio.post<Map<String, dynamic>>(
-        '/app/orders/$orderNo/refund_page',
-      );
-      final body = resp.data!;
-      if (body['code'] != 0) {
-        throw ServerException((body['message'] ?? '取得退款頁面失敗').toString());
-      }
-      final data = body['data'] as Map<String, dynamic>? ?? {};
-      // 後端 naming 不確定（OpenAPI 寫 redirect_url，實作可能用 redirectUrl）
-      final url = (data['redirectUrl'] ?? data['redirect_url'] ?? '')
-          .toString();
-      if (url.isEmpty) {
-        throw const ServerException('後端未回傳 redirect_url');
-      }
-      return url;
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 401) throw const UnauthorizedException();
-      throw const NetworkException();
-    }
-  }
 }

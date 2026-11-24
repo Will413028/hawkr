@@ -155,9 +155,6 @@ abstract class Order with _$Order {
     @Default('') String odno,
     @Default('') String validationNo,
     @Default('') String paymentMethod,
-    @Default('') String atmBankCode,
-    @Default('') String atmVirtualAccount,
-    @Default('') String atmExpireDate,
     // 付款期限（ISO 8601 UTC，僅 status='0' 時有值；超過後訂單會被系統自動取消，cancelReason 9101）
     @Default('') String paymentDeadline,
     @Default('') String itemCount,
@@ -184,10 +181,6 @@ abstract class Order with _$Order {
     @Default('') String cancelReason,
     @Default('') String cancelRemark,
     @Default('') String cancelByRole,
-
-    /// status=80 時若為 true，表示買家需手動填寫 ATM 退款銀行資訊。
-    /// 觸發 POST /app/orders/{order_no}/refund_page 取得 PayUni WebView URL。
-    @Default(false) bool needRefundPage,
 
     /// 賣家出貨上傳的商品照片（status>=20 後才會有值）
     @Default(<String>[]) List<String> shipmentPhotoUrls,

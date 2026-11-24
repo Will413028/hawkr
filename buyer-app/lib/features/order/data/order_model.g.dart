@@ -92,9 +92,6 @@ _Order _$OrderFromJson(Map<String, dynamic> json) => _Order(
   odno: json['odno'] as String? ?? '',
   validationNo: json['validationNo'] as String? ?? '',
   paymentMethod: json['paymentMethod'] as String? ?? '',
-  atmBankCode: json['atmBankCode'] as String? ?? '',
-  atmVirtualAccount: json['atmVirtualAccount'] as String? ?? '',
-  atmExpireDate: json['atmExpireDate'] as String? ?? '',
   paymentDeadline: json['paymentDeadline'] as String? ?? '',
   itemCount: json['itemCount'] as String? ?? '',
   sellerName: json['sellerName'] as String? ?? '',
@@ -111,7 +108,6 @@ _Order _$OrderFromJson(Map<String, dynamic> json) => _Order(
   cancelReason: json['cancelReason'] as String? ?? '',
   cancelRemark: json['cancelRemark'] as String? ?? '',
   cancelByRole: json['cancelByRole'] as String? ?? '',
-  needRefundPage: json['needRefundPage'] as bool? ?? false,
   shipmentPhotoUrls:
       (json['shipmentPhotoUrls'] as List<dynamic>?)
           ?.map((e) => e as String)
@@ -172,9 +168,6 @@ Map<String, dynamic> _$OrderToJson(_Order instance) => <String, dynamic>{
   'odno': instance.odno,
   'validationNo': instance.validationNo,
   'paymentMethod': instance.paymentMethod,
-  'atmBankCode': instance.atmBankCode,
-  'atmVirtualAccount': instance.atmVirtualAccount,
-  'atmExpireDate': instance.atmExpireDate,
   'paymentDeadline': instance.paymentDeadline,
   'itemCount': instance.itemCount,
   'sellerName': instance.sellerName,
@@ -191,7 +184,6 @@ Map<String, dynamic> _$OrderToJson(_Order instance) => <String, dynamic>{
   'cancelReason': instance.cancelReason,
   'cancelRemark': instance.cancelRemark,
   'cancelByRole': instance.cancelByRole,
-  'needRefundPage': instance.needRefundPage,
   'shipmentPhotoUrls': instance.shipmentPhotoUrls,
   'receiptPhotoUrls': instance.receiptPhotoUrls,
   'availablePaymentMethods': instance.availablePaymentMethods,

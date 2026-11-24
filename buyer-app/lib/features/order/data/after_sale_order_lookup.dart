@@ -13,7 +13,6 @@ class AfterSaleCaseSnapshot {
     required this.caseNo,
     required this.status,
     this.appealState = '',
-    this.needRefundPage = false,
   });
 
   final String caseNo;
@@ -22,10 +21,6 @@ class AfterSaleCaseSnapshot {
   /// 申訴狀態（'0'=未申訴；'10'/'20' 進入平台仲裁）。order card 需據此把
   /// 狀態顯示折疊成「申訴仲裁中」，否則只看 status 會顯示已拒絕 / 待處理。
   final String appealState;
-
-  /// ATM 訂單退款時，買家須前往 PayUni 退款頁填寫銀行帳戶（B-104）
-  /// true → order card 顯示「填寫退款資訊」取代「查看售後」
-  final bool needRefundPage;
 
   /// 案件是否在平台仲裁中（申訴未裁決）。
   bool get isUnderAppeal => AfterSaleStatus.isUnderAppeal(appealState);
@@ -61,7 +56,6 @@ class AfterSaleOrderLookup extends _$AfterSaleOrderLookup {
               caseNo: c.caseNo,
               status: c.status,
               appealState: c.appealState,
-              needRefundPage: c.needRefundPage,
             ),
       };
     } catch (_) {

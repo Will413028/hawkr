@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:hawkr_buyer/core/codemeta/shipping_presentation.dart';
 
@@ -163,7 +162,7 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
   ///
   /// 文案優先級（B-114 動態文案 > status-based 靜態文案）：
   /// 1. detail.refundTaskStatus 非空 → 用 [RefundTaskStatus.buyerProgressLabel]
-  ///    回傳的動態文案（含失敗重試 / 銀行處理中預計日期 / 入帳完成日期等）
+  ///    回傳的動態文案（排隊、處理中、完成、失敗）
   /// 2. fallback 到 status 對應的靜態文案
   Widget _buildSummaryCard({AfterSaleCase? detail}) {
     if (detail != null && BlackcatAfterSaleStatusCard.shouldShowFor(detail)) {
@@ -176,8 +175,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
       final label = RefundTaskStatus.buyerProgressLabel(
         taskStatus: detail.refundTaskStatus,
         failureMessage: detail.refundFailureMessage,
-        estimatedRefundDate: detail.estimatedRefundDate,
-        bankDate: detail.bankDate,
       );
       if (label.isNotEmpty) dynamicDesc = label;
     }
@@ -310,10 +307,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
             pickupAddress: order?.shippingAddress ?? '',
             contactPhone: order?.recipientPhone ?? '',
           ),
-          if (c.needRefundPage) ...[
-            SizedBox(height: AppSpacing.sm),
-            _buildRefundFormBanner(context, ref, c),
-          ],
           _buildActionButtons(context, ref, c),
         ],
       );
@@ -329,15 +322,10 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
           SizedBox(height: AppSpacing.sm),
           _build711ReturnCodeBox(c),
         ],
-        // 3. B-104 ATM 退款填表（高優先級，條件渲染）
-        if (c.needRefundPage) ...[
-          SizedBox(height: AppSpacing.sm),
-          _buildRefundFormBanner(context, ref, c),
-        ],
-        // 4. 申請原因 + 說明 + 照片
+        // 3. 申請原因 + 說明 + 照片
         SizedBox(height: AppSpacing.sm),
         _infoCard(_buildReasonSection(c)),
-        // 5. 物流進度（條件渲染）
+        // 4. 物流進度（條件渲染）
         if (hasLogistics) ...[
           SizedBox(height: AppSpacing.sm),
           _infoCard(_buildLogisticsSection(c)),
@@ -460,95 +448,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
         ),
       ],
     );
-  }
-
-  // ─── B-104 ATM 退款填表 Banner ────────────────
-  ///
-  /// 顯示條件：case.needRefundPage=true（ATM 退款需買家提供銀行帳戶）
-  /// 點擊呼叫 getRefundPageUrl 取 PayUni 填單 URL，推 webview
-  Widget _buildRefundFormBanner(
-    BuildContext context,
-    WidgetRef ref,
-    AfterSaleCase c,
-  ) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.danger.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(color: AppColors.danger, width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                AppIcons.priorityHigh,
-                size: 20.w,
-                color: AppIconColors.danger,
-              ),
-              SizedBox(width: AppSpacing.xs),
-              Expanded(
-                child: Text(
-                  '請填寫退款銀行帳戶',
-                  style: AppTypography.bodyBold.copyWith(
-                    color: AppColors.danger,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 6.h),
-          Text(
-            'ATM 訂單退款需買家提供銀行帳戶才能完成匯款。',
-            style: AppTypography.meta.copyWith(
-              color: AppTypography.colorPrimary.withValues(alpha: 0.8),
-            ),
-          ),
-          SizedBox(height: AppSpacing.sm),
-          SizedBox(
-            width: double.infinity,
-            height: HkControl.minTap,
-            child: ElevatedButton(
-              onPressed: () => _openRefundPage(context, ref, c),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.danger,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8.r),
-                ),
-              ),
-              child: HkButtonLabel(
-                '前往填寫',
-                style: AppTypography.bodyBold.copyWith(color: AppColors.bgCard),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _openRefundPage(
-    BuildContext context,
-    WidgetRef ref,
-    AfterSaleCase c,
-  ) async {
-    try {
-      final url = await ref
-          .read(afterSaleRepositoryProvider)
-          .getRefundPageUrl(c.orderNo);
-      if (!context.mounted) return;
-      await context.push(
-        '/refund/webview',
-        extra: {'redirectUrl': url, 'orderNo': c.orderNo},
-      );
-    } catch (e) {
-      if (context.mounted) {
-        showFloatingToast(context, '載入退款頁面失敗：$e', isSuccess: false);
-      }
-    }
   }
 
   // ─── 1. 案件基本資訊 ──────────────────────────

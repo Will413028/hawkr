@@ -107,9 +107,7 @@ class OrderStatusPresentation {
       ),
       '80' => OrderStatusPresentation(
         label: '已取消',
-        description: description(
-          order.needRefundPage ? '訂單已取消，請補填退款帳戶資料。' : _cancelDescription(order),
-        ),
+        description: description(_cancelDescription(order)),
         icon: HkIconName.orderCancelled,
         color: OrderColorTokens.neutral,
         softColor: OrderColorTokens.neutralSurface,
