@@ -579,32 +579,6 @@ public interface OrderRepository extends BaseMapper<OrderEntity> {
     }
 
     /**
-     * 快照付款資訊：僅更新 transaction_id / payment_method / ATM 欄位
-     * 使用條件式更新避免覆蓋 MQ 事件已確認的值（僅在欄位為空時寫入）
-     */
-    @Update("""
-        UPDATE orders
-        -- §2A.7 觸發點 #5（重複付款翻轉後 snapshot）需要覆寫 payment_method，
-        -- 所以移除原本的 immutability 限制（CASE WHEN payment_method IS NULL）。
-        -- 業務正確性由 payment-service 呼叫端負責（每次都用「當下查到的主 row.payment_type」）。
-        SET transaction_id = CASE WHEN #{transactionId} != '' THEN #{transactionId} ELSE transaction_id END,
-            payment_method = CASE WHEN #{paymentMethod} != '' THEN #{paymentMethod} ELSE payment_method END,
-            atm_bank_code = CASE WHEN #{atmBankCode} != '' THEN #{atmBankCode} ELSE atm_bank_code END,
-            atm_virtual_account = CASE WHEN #{atmVirtualAccount} != '' THEN #{atmVirtualAccount} ELSE atm_virtual_account END,
-            atm_expire_date = CASE WHEN #{atmExpireDate} != '' THEN #{atmExpireDate} ELSE atm_expire_date END,
-            updated_at = NOW()
-        WHERE order_no = #{orderNo}
-        """)
-    int snapshotPaymentInfo(
-            @Param("orderNo") String orderNo,
-            @Param("transactionId") String transactionId,
-            @Param("paymentMethod") String paymentMethod,
-            @Param("atmBankCode") String atmBankCode,
-            @Param("atmVirtualAccount") String atmVirtualAccount,
-            @Param("atmExpireDate") String atmExpireDate
-    );
-
-    /**
      * 查詢已到期的已送達訂單（待自動完成）。
      * 暫停中（countdown_paused_at IS NOT NULL）的訂單跳過，03 §5.8。
      */
