@@ -3,7 +3,6 @@ package router
 import (
 	"github.com/Will413028/hawkr/gateway/internal/handler"
 	"github.com/Will413028/hawkr/gateway/internal/middleware"
-	"github.com/Will413028/hawkr/gateway/internal/proxy"
 	"github.com/gin-gonic/gin"
 )
 
@@ -42,22 +41,12 @@ func SetupRoutes(r *gin.Engine, h *handler.Holder) {
 	admin.Use(middleware.StripDelegationReservedHeaders())
 	adminNoAuth.Use(middleware.StripDelegationReservedHeaders())
 
-	// 負責微服務路由（payment, media, product, order, cart）
+	// 負責微服務路由（media, product, order, cart）
 	registerProductRoutes(public, app, admin, h)
-	registerPaymentRoutes(app, admin, h)
 	registerOrderRoutes(app, admin, h)
 	registerCheckoutRoutes(app, h)
 	registerCartRoutes(public, app, h)
 	registerShippingRoutes(app, admin, h)
-
-	// PayUni Webhook（頂層路由，外部回調無需 JWT）
-	registerPayUniWebhookRoute(r)
-
-	// 付款結果回調頁面（頂層路由，PayUni 導回無需 JWT）
-	registerPaymentReturnRoute(r, h)
-
-	// PAYUNi 付款頁重導向（頂層路由，供 WebView 開啟無需 JWT）
-	registerPaymentRedirectRoute(r, h)
 
 	// 超商門市地圖回調（頂層路由，PayUni 導回 + WebView 開啟無需 JWT）
 	registerStoreMapReturnRoutes(r, h)
@@ -80,9 +69,6 @@ func SetupRoutes(r *gin.Engine, h *handler.Holder) {
 	// ADM 代行營運（56 號）：14 支走 ADM session、18 支走 operation credential。
 	registerDelegatedOperationRoutes(admin, adminNoAuth, h)
 
-	// Webhook 模擬器（代理到 payuni-webhook-service，開發測試工具）
-	registerWebhookSimulatorRoutes(r)
-
 	// 文件檢視器（僅 local/dev 環境）
 	registerDocsRoutes(r, h.Docs)
 
@@ -90,19 +76,4 @@ func SetupRoutes(r *gin.Engine, h *handler.Holder) {
 	// 漏宣告／禁字／殘留 wildcard／registry 漂移／略過 requireAdmin 卻不在白名單
 	// → panic fail-fast，不帶病上線（部署即炸）。
 	assertRouteCoverage(r)
-}
-
-// proxyToPath 建立代理，轉發到特定的後端路徑。
-// onUpstreamFailure 依這條路由的消費者類別宣告，見 proxy.UpstreamFailureStatus。
-func proxyToPath(serviceName, targetPath string, onUpstreamFailure proxy.UpstreamFailureStatus) gin.HandlerFunc {
-	// 在**註冊時**建好 handler，不要每個請求重建一次：CreateProxy 內的上游位址解析
-	// 失敗時會 panic（見 proxy.mustParseTarget），放在請求路徑上等於把「開機就炸」
-	// 退化回「每個請求 500」——那正是 #2813 要消滅的形狀。順帶省掉每請求配置一個
-	// httputil.ReverseProxy 的開銷。
-	h := proxy.CreateProxy(serviceName, onUpstreamFailure)
-	return func(c *gin.Context) {
-		// 覆寫請求路徑
-		c.Request.URL.Path = targetPath
-		h(c)
-	}
 }

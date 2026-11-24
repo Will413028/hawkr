@@ -24,7 +24,7 @@ import (
 const specPath = "../../../api/openapi/openapi.yaml"
 
 // maxRESTOperations 是清單的端點數上限，只准變少：模組搬遷刪掉 REST 路由後，把它改成新的端點數鎖住新低點。
-const maxRESTOperations = 324
+const maxRESTOperations = 308
 
 // 分類理由；路由隨模組搬遷刪除時從清單移除，不再補進規格。
 const (
@@ -32,7 +32,6 @@ const (
 	binaryProxy           = "反向代理到下游的 binary 串流，沒有 swag 註解"
 	notAnnotated          = "handler 沒有 swag 註解"
 	swagSkippedAnnotation = "swag 註解後面接的是 type 宣告，swag 沒有收錄"
-	payuniWebhookProxy    = "PayUni 的 webhook，反向代理到 payuni-webhook-service，沒有 swag 註解"
 	localDevTool          = "本機開發工具（APP_ENV=local／dev 才註冊），不屬於對外 API"
 )
 
@@ -61,11 +60,7 @@ var routesNotInSpec = map[string]string{
 	"GET /api/v1/app/seller/invoices/documents/{}/file/content":             binaryProxy,
 	"GET /api/v1/admin/notification-templates":                              notAnnotated,
 	"GET /api/v1/app/hashtags":                                              notAnnotated,
-	"POST /webhook/payuni/notify":                                           payuniWebhookProxy,
-	"GET /dev/webhook-simulator":                                            localDevTool,
-	"GET /dev/webhook-simulator/lookup":                                     localDevTool,
 	"GET /docs/{}":                                                          localDevTool,
-	"POST /dev/webhook-simulator/send":                                      localDevTool,
 	"POST /docs/login":                                                      localDevTool,
 }
 

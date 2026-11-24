@@ -15,7 +15,7 @@ import (
 
 // tier is a rate-limit sensitivity class. Endpoints map to a tier by their
 // matched route (c.FullPath), classified in one place (classifyTier) so the
-// exempt set — SSE/WS streams, the view beacon, health and PayUni callbacks —
+// exempt set — SSE/WS streams, the view beacon, health and the store-map callbacks —
 // lives in exactly one auditable location. Missing one exempt route would let a
 // reconnect storm on a long-lived stream trip the limiter and knock every
 // client off; scattering the rule across dozens of route files makes that
@@ -96,14 +96,11 @@ const publicNamespace = "/api/v1/public"
 
 // exemptExact are routes never rate limited, matched verbatim against gin's
 // FullPath (route params kept as ":id"). Long-lived SSE/WS connections and
-// low-JWT PayUni callbacks would be wrongly throttled — reconnect storms or
+// low-JWT store-map callbacks would be wrongly throttled — reconnect storms or
 // same-source-IP callback bursts — under a per-IP request limit.
 var exemptExact = map[string]struct{}{
 	"/api/v1/health":                   {}, // liveness probe
 	"/api/v1/app/notifications/stream": {}, // notification SSE
-	"/webhook/payuni/notify":           {}, // PayUni server-to-server callback
-	"/payment/return":                  {}, // PayUni return (GET + POST)
-	"/payment/redirect":                {}, // WebView payment-page opener
 	"/store_map/return":                {}, // PayUni CVS map return
 	"/store_map/redirect":              {}, // WebView CVS-map opener
 	"/.well-known/apple-developer-merchantid-domain-association.txt": {},
