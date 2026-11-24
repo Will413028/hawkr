@@ -59,7 +59,6 @@ describe("對話列表", () => {
 					conversationId: "conv-1",
 					title: "蘋果",
 					updatedAt: "2026-09-13T02:00:00.000Z",
-					primaryCategoryId: null,
 				},
 			],
 		});

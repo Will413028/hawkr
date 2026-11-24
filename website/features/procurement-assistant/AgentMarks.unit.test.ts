@@ -4,7 +4,6 @@ import { cleanup, render } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import HawkrAgentCapabilityIcon from "./HawkrAgentCapabilityIcon";
-import HawkrAgentConversationMarble from "./HawkrAgentConversationMarble";
 import HawkrAgentMark from "./HawkrAgentMark";
 import HawkrAgentSprite from "./HawkrAgentSprite";
 
@@ -81,36 +80,6 @@ describe("HawkrAgentSprite", () => {
 			React.createElement(HawkrAgentSprite, { state: "IDLE", disabled: true }),
 		);
 		expect(disabled.container.firstElementChild).toBeNull();
-	});
-});
-
-describe("HawkrAgentConversationMarble", () => {
-	it("已知分類帶可讀名稱與對應 glyph", () => {
-		const { container } = render(
-			React.createElement(HawkrAgentConversationMarble, {
-				primaryCategoryId: "vegetables",
-			}),
-		);
-		const marble = host(container);
-		expect(marble.getAttribute("role")).toBe("img");
-		expect(marble.getAttribute("aria-label")).toBe("大分類：蔬菜");
-		expect(marble.getAttribute("data-category")).toBe("vegetables");
-		expect(
-			marble.querySelector('[data-food-category="vegetables"] svg'),
-		).toBeTruthy();
-	});
-
-	it("分類不明時保持裝飾，不猜品類", () => {
-		const { container } = render(
-			React.createElement(HawkrAgentConversationMarble, {
-				primaryCategoryId: null,
-			}),
-		);
-		const marble = host(container);
-		expect(marble.getAttribute("aria-hidden")).toBe("true");
-		expect(marble.getAttribute("role")).toBeNull();
-		expect(marble.getAttribute("data-category")).toBe("unclassified");
-		expect(marble.querySelector("svg")).toBeNull();
 	});
 });
 

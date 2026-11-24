@@ -2,7 +2,6 @@ import {
 	CancelDisposition,
 	ConversationRole,
 } from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
-import type { HawkrAgentCategoryId } from "@/lib/animation/hawkr-agent-season";
 import { buyerProcurementClient } from "@/lib/connect/procurement";
 import {
 	recordedFromProto,
@@ -20,7 +19,6 @@ export interface AgentConversationSummary {
 	lastMessagePreview: string;
 	/** RFC3339。 */
 	updatedAt: string;
-	primaryCategoryId: HawkrAgentCategoryId | null;
 }
 
 export interface AgentConversationPage {
@@ -66,7 +64,6 @@ export async function fetchAgentConversations(params?: {
 			title: c.title,
 			lastMessagePreview: c.lastMessagePreview,
 			updatedAt: timestampIso(c.updateTime),
-			primaryCategoryId: null,
 		})),
 		hasMore: res.nextPageToken !== "",
 		nextCursorId: res.nextPageToken === "" ? null : res.nextPageToken,
