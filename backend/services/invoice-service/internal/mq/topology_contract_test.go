@@ -137,8 +137,8 @@ func TestTopologyParserFindsKnownQueues(t *testing.T) {
 			t.Fatalf("%q 的 retry.max_attempts = %d，want %d", q, v, ConsumerMaxRetries)
 		}
 	}
-	// 不相關的 queue 也要認得出來，證明解析器沒有只對 invoice 開特例。
-	if _, ok := got["notification.invoice"]; !ok {
-		t.Error("解析器沒認出 notification.invoice —— 它同樣帶 retry:")
+	// 沒有 retry 區塊的 queue 不能出現在結果裡，證明解析器不是對每個 queue 都回一個值。
+	if v, ok := got["coupon.buyer.deleted"]; ok {
+		t.Errorf("coupon.buyer.deleted 沒有 retry 區塊，解析器卻回了 %d", v)
 	}
 }

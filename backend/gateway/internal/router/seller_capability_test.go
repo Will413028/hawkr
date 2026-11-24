@@ -49,8 +49,6 @@ var expectedSellerRoutes = []routeCap{
 	{"GET", "/api/v1/app/seller/after_sales/:case_no/arbitration", authz.CapOrderFulfill},
 	{"POST", "/api/v1/app/seller/after_sales/:case_no/confirm_receipt", authz.CapOrderFulfill},
 	{"POST", "/api/v1/app/seller/after_sales/:case_no/resolve", authz.CapOrderFulfill},
-	{"GET", "/api/v1/app/sellers/me/notification-preferences", authz.CapNotification},
-	{"PUT", "/api/v1/app/sellers/me/notification-preferences", authz.CapNotification},
 	// 賣家市場行情查詢（P6+P7+#2786 categoryId 解析）：8/2 原裁決是唯讀市場資訊、
 	// 非賣家專屬資料，只掛 JWTAuth 不掛 capability——2026-08-27 推翻，改採「其餘
 	// 全鎖含純唯讀查看」原則（46 §3.4 dashboard/CRM 查詢/報表同款裁決）收斂進

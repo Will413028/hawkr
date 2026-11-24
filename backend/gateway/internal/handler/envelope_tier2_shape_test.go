@@ -1,15 +1,11 @@
 package handler
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	grpcclient "github.com/Will413028/hawkr/gateway/internal/grpc"
-	notificationpb "github.com/Will413028/hawkr/go-pkg/proto/notification"
 	"github.com/gin-gonic/gin"
-	"google.golang.org/grpc"
 )
 
 // Tier-2 envelope 收斂（issue #2198）：Page-trap 之外還有一批端點把業務欄位掛在
@@ -52,26 +48,6 @@ func doGetOn(t *testing.T, r *gin.Engine, path string) (*httptest.ResponseRecord
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	return w, parseJSON(t, w.Body)
-}
-
-func TestEnvelopeTier2_AdminReloadTemplates(t *testing.T) {
-	mock := &mockNotificationServiceClient{
-		ReloadTemplatesFn: func(ctx context.Context, in *notificationpb.ReloadTemplatesRequest, opts ...grpc.CallOption) (*notificationpb.ReloadTemplatesResponse, error) {
-			return &notificationpb.ReloadTemplatesResponse{Code: 0, ReloadedCount: "5"}, nil
-		},
-	}
-	h := &Holder{Notification: grpcclient.NewNotificationClientForTest(mock)}
-	r := gin.New()
-	r.POST("/api/v1/admin/notification-templates/reload", h.AdminReloadTemplates)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/notification-templates/reload", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-	assertHTTPStatus(t, w, http.StatusOK)
-	body := parseJSON(t, w.Body)
-	data := assertEnvelopeData(t, body)
-	if data["reloadedCount"] != "5" {
-		t.Errorf("data.reloadedCount = %v, want \"5\"", data["reloadedCount"])
-	}
 }
 
 // TestEnvelopeTier2_HealthIsTheOnlyException 釘住 10 檔 §2 例外清單：

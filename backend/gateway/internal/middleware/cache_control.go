@@ -26,9 +26,6 @@ import (
 // gin 的 c.Header 是 Header().Set 語意（value 為空字串才是 Del），所以 handler
 // 內若再寫一次 Cache-Control 會覆蓋這裡的值，自己寫 header 的 handler 要引用同一個
 // response.CacheControlPrivateNoStore 常數。
-//
-// internal/sse 的留言／通知 SSE hub 是另一個子系統、有自己的 header 寫入點，仍是
-// no-cache，不在 #2447 範圍內。
 func PrivateNoStore() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Header("Cache-Control", response.CacheControlPrivateNoStore)

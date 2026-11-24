@@ -593,35 +593,6 @@ groups:
           summary: "env={{ $labels.env }}：發票 queue {{ $labels.queue }} 有 {{ $value }} 則訊息進入 DLQ"
           description: "env={{ $labels.env }}：處置見 58 號 §12.5 R7：① 先判定失敗原因，修好之後才重放（直接重放一個必然失敗的訊息只會再進一次 DLQ）② 取 payload 用 management API 且 ackmode=reject_requeue_true 才不會消耗掉 ③ 重放前必須確認去重鍵沒有被清掉——安全性由 invoice_inbox_events 的 uq_invinbox_business_key 保證，有人把整列刪了就會對同一筆退款開出第二張折讓單。"
 
-      # ⑮ 雲端 email 供應商（Phase 2，MAIL_PROVIDER）——與 ①② 是不同的依賴。
-      #    配額是帳戶層級的一個數字 ⇒ 分母用 max by (env)（與 ② 的 max 同理，但與 recording rule
-      #    invoice:amego_rate_utilization:ratio 的 sum 方向相反，不可互相照抄）。
-      - alert: NotificationEmailQuotaNearLimit
-        expr: |
-          sum by (env) (increase(notification_email_sent_total[24h]))
-          / clamp_min(max by (env) (notification_email_quota_limit{window="daily"}), 1e-9)
-          > 0.8
-        for: 30m
-        labels:
-          severity: warning
-          channel: business
-        annotations:
-          summary: "env={{ $labels.env }}：email 日配額已用 {{ $value | humanizePercentage }}"
-          description: "env={{ $labels.env }}：先確認不是重試風暴（result=\"transport_error\" 是否同步上升），再看 58 號 §9.3.4 的 R6 預算表決定處置。若實際量已超出當初的估算，那是預算錯了不是配額小了 ⇒ 回頭改預算表。不得以「升級付費方案」當唯一修法。"
-
-      # ⑯ 配額用盡時供應商直接拒收，而那個失敗不會讓開票失敗（發票已經開出去了）⇒ 沒有這條就完全靜默。
-      #    症狀會以「未收到發票」申訴的形式落到賣家身上（3 個工作天 SLA、逾期計違規、90 天 3 次停權）
-      #    ——這就是它 severity 是 critical 的理由。
-      - alert: NotificationEmailRejected
-        expr: increase(notification_email_sent_total{result=~"quota_exceeded|rejected"}[15m]) > 0
-        for: 15m
-        labels:
-          severity: critical
-          channel: business
-        annotations:
-          summary: "env={{ $labels.env }}：有 {{ $value }} 封發票通知信被供應商拒收"
-          description: "env={{ $labels.env }}：處置見 58 號 §12.5 R8。查供應商後台的 rejection reason、確認 MAIL_QUOTA_* 與實際方案一致。短期止血改走站內通知並在 ADM 公告——那不是修復，法規要求的是發票送達。同時看申訴佇列：配額事故期間進來的申訴不應計入賣家的違規計數，需要 ADM 在裁決時明確標註。"
-
       # ⑰ 人工處理量超出負荷。門檻必須與 INVOICE_MANUAL_CAPACITY_PER_DAY 同值。
       #    selector 與 ⑤ 及 recording rule invoice:issue_bad:increase5m 逐字相同。
       - alert: InvoiceManualBacklogExceedsCapacity

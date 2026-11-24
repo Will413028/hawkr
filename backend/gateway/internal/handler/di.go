@@ -4,8 +4,6 @@ import (
 	"github.com/Will413028/hawkr/gateway/internal/buyerid"
 	"github.com/Will413028/hawkr/gateway/internal/config"
 	grpcclient "github.com/Will413028/hawkr/gateway/internal/grpc"
-	"github.com/Will413028/hawkr/gateway/internal/realtime"
-	"github.com/Will413028/hawkr/gateway/internal/sse"
 	"github.com/Will413028/hawkr/gateway/internal/storeid"
 	"go.uber.org/fx"
 )
@@ -34,7 +32,6 @@ func NewHolder(
 	order *grpcclient.OrderClient,
 	payment *grpcclient.PaymentClient,
 	cart *grpcclient.CartClient,
-	notification *grpcclient.NotificationClient,
 	shipping *grpcclient.ShippingClient,
 	coupon *grpcclient.CouponClient,
 	category *grpcclient.CategoryClient,
@@ -42,9 +39,6 @@ func NewHolder(
 	invoice *grpcclient.InvoiceServiceClient,
 	storeID *storeid.Resolver,
 	buyerID *buyerid.Resolver,
-	hub *sse.Hub,
-	registry *realtime.Registry,
-	notifCh *realtime.NotificationChannel,
 	cfg *config.Config,
 ) *Holder {
 	return &Holder{
@@ -55,7 +49,6 @@ func NewHolder(
 		Order:        order,
 		Payment:      payment,
 		Cart:         cart,
-		Notification: notification,
 		Shipping:     shipping,
 		Coupon:       coupon,
 		Category:     category,
@@ -63,9 +56,6 @@ func NewHolder(
 		Invoice:      invoice,
 		Store:        storeID,
 		BuyerID:      buyerID,
-		SSEHub:       hub,
-		RealtimeReg:  registry,
-		NotifChannel: notifCh,
 		MediaBaseURL: cfg.MediaBaseURL,
 		WebBaseURL:   cfg.WebBaseURL,
 		Delegation:   cfg.Delegation,

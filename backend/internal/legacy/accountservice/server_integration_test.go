@@ -4,7 +4,6 @@ package accountservice
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -20,11 +19,9 @@ import (
 	pb "github.com/Will413028/hawkr/backend/internal/legacy/gen/account"
 	"github.com/Will413028/hawkr/backend/internal/legacy/gen/account/accountconnect"
 	"github.com/Will413028/hawkr/backend/internal/legacy/grpcclient"
-	"github.com/Will413028/hawkr/backend/internal/legacy/rabbitmq"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
@@ -35,31 +32,22 @@ var pg *testdb.Server
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
 type fixture struct {
-	m         *identity.Module
-	db        *db.DB
-	dev       *identity.DevAuth
-	client    accountconnect.AccountServiceClient
-	published []rabbitmq.PublishArgs
+	m      *identity.Module
+	db     *db.DB
+	dev    *identity.DevAuth
+	client accountconnect.AccountServiceClient
 }
 
 // setup 起 identity 與 legacy 的 AccountService，client 以舊服務的方式（gRPC、h2c）呼叫。
 func setup(t *testing.T) *fixture {
 	t.Helper()
 	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(migrate.Module{Name: "identity", Dir: identity.Migrations()}))
-	jc, err := jobs.NewInsertOnly(d)
-	if err != nil {
-		t.Fatal(err)
-	}
 	dev, err := identity.NewDevAuth(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	f := &fixture{dev: dev, db: d}
 	bus := events.NewBus()
-	events.Subscribe(bus, OnAccountDeleted(func(ctx context.Context, a rabbitmq.PublishArgs) error {
-		f.published = append(f.published, a)
-		return jc.Enqueue(ctx, a, rabbitmq.InsertOpts())
-	}))
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	f.m = identity.New(identity.Deps{
 		DB: d, Events: bus, Providers: identity.Providers{},
@@ -161,24 +149,10 @@ func TestRolesAndDeletion(t *testing.T) {
 	if a, err := f.m.Account(ctx, id); err != nil || a.Deleted || !slices.Equal(a.Roles, []identity.Role{identity.RoleSeller}) {
 		t.Fatalf("帳號 = %+v, %v", a, err)
 	}
-	if len(f.published) != 0 {
-		t.Fatalf("事件 = %+v", f.published)
-	}
 	if err := f.m.DeleteAccount(ctx, id); err != nil {
 		t.Fatal(err)
 	}
-	if len(f.published) != 1 || f.published[0].Exchange != "hawkr.account" || f.published[0].RoutingKey != "account.deleted" {
-		t.Fatalf("事件 = %+v", f.published)
-	}
-	var e struct {
-		EventID   string `json:"event_id"`
-		EventType string `json:"event_type"`
-		AccountID int64  `json:"accountId"`
-	}
-	if err := json.Unmarshal(f.published[0].Body, &e); err != nil || e.EventType != "ACCOUNT_DELETED" || e.AccountID != id || e.EventID == "" || e.EventID != f.published[0].EventID {
-		t.Fatalf("account.deleted = %s, %v", f.published[0].Body, err)
-	}
-	if len(f.published) != 1 {
-		t.Fatalf("事件 %d 則", len(f.published))
+	if a, err := f.m.Account(ctx, id); err != nil || !a.Deleted {
+		t.Fatalf("刪除後的帳號 = %+v, %v", a, err)
 	}
 }

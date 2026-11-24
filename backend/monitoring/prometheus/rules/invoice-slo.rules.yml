@@ -55,16 +55,9 @@ groups:
 
       # AMEGO 速率佔比。limiter 是**行程內**的 ⇒ replicas=N 時實際上限＝N × QPS
       # ⇒ 分母用 sum by (env)。
-      # ⚠️ 與下一列方向相反，不可互相照抄：email 配額是**帳戶層級的一個數字** ⇒ 分母用 max。
       # ⚠️ 也與告警 InvoiceAmegoRateNearLimit（②）的 max 不同：② 的門檻是「單一副本有沒有把
       #    自己的 limiter 打滿」，本列是「全站相對真實上限用到多少」，兩者刻意不同義。
       - record: invoice:amego_rate_utilization:ratio
         expr: |
           sum by (env) (rate(invoice_amego_response_code_total[5m]))
           / clamp_min(sum by (env) (invoice_amego_client_rate_limit_qps), 1)
-
-      # email 日配額佔比（Phase 2）。分母用 max by (env)，理由見上一列。
-      - record: notification:email_daily_quota_utilization:ratio
-        expr: |
-          sum by (env) (increase(notification_email_sent_total[24h]))
-          / clamp_min(max by (env) (notification_email_quota_limit{window="daily"}), 1)

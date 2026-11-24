@@ -292,15 +292,6 @@ func (p *Publisher) PublishDelayed(ctx context.Context, exchange, routingKey str
 
 // ==================== Marketing Events (Coupon) ====================
 
-// 41 號設計書 §6.2：notification-service 首次成為 producer
-func (p *Publisher) PublishNotificationInboxNew(ctx context.Context, event *NotificationInboxNewEvent) error {
-	return p.Publish(ctx, ExchangeNotification, RoutingKeyNotificationInboxNew, event)
-}
-
-func (p *Publisher) PublishNotificationUnreadChanged(ctx context.Context, event *NotificationUnreadChangedEvent) error {
-	return p.Publish(ctx, ExchangeNotification, RoutingKeyNotificationUnreadChanged, event)
-}
-
 // Close closes the publisher and stops its reconnect watcher.
 func (p *Publisher) Close() error {
 	p.mu.Lock()

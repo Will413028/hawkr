@@ -7,7 +7,7 @@
   "check_a": [
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 30569,
+      "line_hint": 26794,
       "key": "acceptedByAccountId",
       "direction": "spec",
       "count": 1,
@@ -15,7 +15,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 24026,
+      "line_hint": 20284,
       "key": "actorAccountId",
       "direction": "spec",
       "count": 2,
@@ -23,7 +23,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 2554,
+      "line_hint": 2546,
       "key": "actor_account_id",
       "direction": "spec",
       "count": 1,
@@ -31,7 +31,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 27504,
+      "line_hint": 23729,
       "key": "approvedByAccountId",
       "direction": "spec",
       "count": 1,
@@ -39,7 +39,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 23535,
+      "line_hint": 19793,
       "key": "buyerAccountId",
       "direction": "spec",
       "count": 1,
@@ -47,7 +47,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 23636,
+      "line_hint": 19894,
       "key": "buyerAccountIds",
       "direction": "spec",
       "count": 2,
@@ -55,7 +55,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 29606,
+      "line_hint": 25831,
       "key": "createdByAccountId",
       "direction": "spec",
       "count": 1,
@@ -63,7 +63,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 25728,
+      "line_hint": 21979,
       "key": "issuerAccountId",
       "direction": "spec",
       "count": 1,
@@ -71,7 +71,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 27521,
+      "line_hint": 23746,
       "key": "requestedByAccountId",
       "direction": "spec",
       "count": 1,
@@ -79,7 +79,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 23993,
+      "line_hint": 20251,
       "key": "reviewedByAccountId",
       "direction": "spec",
       "count": 1,
@@ -87,7 +87,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 26374,
+      "line_hint": 22599,
       "key": "sellerAccountId",
       "direction": "spec",
       "count": 2,
@@ -95,19 +95,11 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 24010,
+      "line_hint": 20268,
       "key": "submittedByAccountId",
       "direction": "spec",
       "count": 1,
       "reason": "規格描述的是現有 wire，與 admin_product_certification.go 登記的同名條目同源、理由相同；那邊改名時一起改規格。"
-    },
-    {
-      "file": "api/openapi/openapi.yaml",
-      "line_hint": 5311,
-      "key": "targetAccountId",
-      "direction": "spec",
-      "count": 1,
-      "reason": "規格描述的是現有 wire，與 admin_notification_template.go 登記的同名條目同源、理由相同；那邊改名時一起改規格。"
     },
     {
       "file": "gateway/internal/handler/admin_delegated_audit.go",
@@ -124,14 +116,6 @@
       "direction": "outbound",
       "count": 1,
       "reason": "56 號代行營運契約明訂的欄位，語意正確不是漏改：delegated 的 target 同時要帶「營運鍵 storeId」與「登入 principal sellerAccountId」兩個值，前端拿它做 preflight ↔ create ↔ current 三者的逐欄回音比對（九欄對帳其中一欄）。這裡的 sellerAccountId 指的就是 accounts PK，改名成 storeId 會讓同一個物件出現兩個同義欄位、而對帳比的正好是它。"
-    },
-    {
-      "file": "gateway/internal/handler/admin_notification_template.go",
-      "line_hint": 295,
-      "key": "targetAccountId",
-      "direction": "inbound",
-      "count": 1,
-      "reason": "notification 的投遞對象本來就是登入 account（不是買賣家營運鍵），語意正確。列在此處只為讓「所有帶前綴的 account_id key」都有人看過一遍。"
     },
     {
       "file": "gateway/internal/handler/admin_product_certification.go",

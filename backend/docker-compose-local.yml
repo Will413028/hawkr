@@ -77,8 +77,6 @@ services:
       MEDIA_BASE_URL: ${MEDIA_BASE_URL:?MEDIA_BASE_URL 必填：媒體公開網域，如 https://media.example.com}
       PAYUNI_WEBHOOK_SERVICE_HOST: payuni-webhook-service
       PAYUNI_WEBHOOK_SERVICE_PORT: 9946
-      NOTIFICATION_SERVICE_HOST: notification-service
-      NOTIFICATION_SERVICE_GRPC_PORT: 10037
       # invoice-service（58 號設計書 §12.1.2 F）。三個 INVOICE_SERVICE_* 必須一起加：
       # 只漏第三個 ⇒ 發票查得到、PDF 下載不了，其餘全正常。
       INVOICE_SERVICE_HOST: invoice-service
@@ -945,85 +943,6 @@ services:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9950/actuator/health"]
       interval: 60s
       timeout: 10s
-      retries: 3
-      start_period: 60s
-    networks:
-      - hawkr-network
-
-  # ==========================================
-  # Notification Service (gRPC 10037；final architecture，無 HTTP management port)
-  # ==========================================
-
-  notification-service:
-    build:
-      context: .
-      dockerfile: services/notification-service/Dockerfile
-      target: dev
-      args:
-        GO_VERSION: ${GO_VERSION:?用 ./dev.sh 執行（從 .go-version 帶入）}
-    image: hawkr/notification-service:latest
-    container_name: notification-service
-    restart: unless-stopped
-    ports:
-      - "10037:10037"
-    volumes:
-      - ./services/notification-service:/app/services/notification-service
-      - ./pkg:/app/pkg
-      - go-build-cache:/root/.cache/go-build
-      - go-mod-cache:/go/pkg/mod
-    environment:
-      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
-      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
-      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
-      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
-      TZ: UTC
-      GRPC_PORT: 10037
-
-      # Database
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: hawkr_notification
-      DB_USER: dbadmin
-      DB_PASSWORD: Hawkr2024Admin
-
-      # RabbitMQ
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
-
-      # Buyer/Seller Service gRPC（chat-notification PII 清除流程列舉帳號歷史
-      # buyer_id/store_id surrogate；見 internal/client/buyer、internal/client/seller）
-      BUYER_SERVICE_GRPC_ADDR: host.docker.internal:9941
-      LEGACY_SELLER_GRPC_ADDR: host.docker.internal:9941
-
-      # 媒體域名基底（渲染 push imageUrl 時把 objectKey 組顯示 URL；49 §5.3 #10）
-      MEDIA_BASE_URL: ${MEDIA_BASE_URL:?MEDIA_BASE_URL 必填：媒體公開網域，如 https://media.example.com}
-
-      # Vendor Portal 邀請信（#2539 E1，pkg/mail）：log provider 不寄真信，只寫 log。
-      MAIL_PROVIDER: ${MAIL_PROVIDER:-log}
-      MAIL_FROM: supports@example.com
-      # 預設留空：log provider 寄不到任何人，不強制政策，維持「本機免設定即可跑」。
-      # 一旦本機把 MAIL_PROVIDER 切成 resend，缺政策就會啟動失敗（這是刻意的）。
-      MAIL_RECIPIENT_POLICY: ${MAIL_RECIPIENT_POLICY:-}
-      MAIL_REDIRECT_TO: ${MAIL_REDIRECT_TO:-}
-      MAIL_ALLOWED_RECIPIENTS: ${MAIL_ALLOWED_RECIPIENTS:-}
-      RESEND_API_KEY: ${RESEND_API_KEY:-}
-      VENDOR_PORTAL_BASE_URL: http://localhost:3000
-
-      # Firebase（推播用）
-      FIREBASE_CREDENTIALS_JSON: ${FIREBASE_CREDENTIALS_JSON:-}
-
-      # Dev Configs
-      GOPROXY: "https://proxy.golang.org,direct"   # 見檔頭「Go 服務 dev container 契約」：dev 嚴禁 off
-      GONOSUMDB: "*"
-      TRACING_ENABLED: "true"
-
-      # OpenTelemetry
-      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
-      OTEL_RESOURCE_ATTRIBUTES: service.environment=${APP_ENV:-dev}
-
-    healthcheck:
-      test: ["CMD-SHELL", "cd /app/services/notification-service && go run ./cmd/grpc-healthcheck -addr 127.0.0.1:10037"]
-      interval: 60s
-      timeout: 5s
       retries: 3
       start_period: 60s
     networks:

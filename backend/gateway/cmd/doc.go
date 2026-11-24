@@ -56,9 +56,6 @@
 // @tag.name 管理員 (Admin)
 // @tag.description 管理員操作
 //
-// @tag.name 通知 (Notification)
-// @tag.description 通知管理
-//
 // @tag.name 地址 (Address)
 // @tag.description 收貨地址管理
 //

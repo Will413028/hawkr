@@ -2,9 +2,7 @@ package rabbitmq
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -25,12 +23,6 @@ import (
 // 都要落在 infra/mq/topology/topology.yaml 宣告的 queue。清單由 internal/ 與 cmd/ 底下的原始碼導出，不手抄，也不寫死 package 名單：
 // 新增一個發送者就多一列。
 //
-// 這份掃描是唯一的原始碼掃描：結果寫成 testdata/routes.json（每個 (exchange, routing key, package) 一列，排序），
-// 消費端 notification-service 是另一個 Go module，不能 import 單體，改讀這份 manifest 檢查自己這一側。
-// 發送者變動而 manifest 沒更新時 TestPublishRoutesManifest 失敗；重新產生：
-//
-//	cd backend && GOWORK=off go test ./internal/legacy/rabbitmq/ -run TestPublishRoutesManifest -update
-//
 // 掃不全就失敗，不靜默略過：
 //   - PublishArgs 只允許出現在「字面值」與「函式參數型別」兩種位置。
 //   - 字面值的 Exchange、RoutingKey 必須是字串字面值或同 package 的 package 層 const，或是轉手函式（以函式參數填入）的參數。
@@ -40,11 +32,8 @@ import (
 //
 // 欄位正確性不在這裡（那是各 package 的 wire_test）。終點：最後一個舊 Publisher 使用者刪除時刪掉。
 
-var update = flag.Bool("update", false, "重寫 testdata/routes.json")
-
 const (
 	topologyFile  = "../../../infra/mq/topology/topology.yaml"
-	manifestFile  = "testdata/routes.json"
 	backendRoot   = "../../.."
 	publisherSelf = "../../legacy/rabbitmq"
 )
@@ -505,7 +494,7 @@ func checkNoShadow(pkg string, fn *ast.FuncDecl, names ...string) {
 	})
 }
 
-// topicMatch 是 AMQP topic exchange 的比對：* 一個字，# 零個以上的字（notification-service 的 relay_routes_test.go 因為是另一個 module 有同一份，改這裡要一併改那裡）。
+// topicMatch 是 AMQP topic exchange 的比對：* 一個字，# 零個以上的字。
 func topicMatch(pattern, key string) bool {
 	var match func(p, k []string) bool
 	match = func(p, k []string) bool {
@@ -534,31 +523,5 @@ func TestPublishedRoutesAreBoundInTopology(t *testing.T) {
 		if len(doc.boundQueues(r.Exchange, r.Key)) == 0 {
 			t.Errorf("%s 送出 %s/%s，topology.yaml 沒有任何 queue 綁到它：這個事件送出去沒有人收", r.Package, r.Exchange, r.Key)
 		}
-	}
-}
-
-// TestPublishRoutesManifest 讓 testdata/routes.json 與原始碼掃描結果一致；notification-service 讀這份檔。
-func TestPublishRoutesManifest(t *testing.T) {
-	got, err := json.MarshalIndent(publishRoutes(t), "", "  ")
-	if err != nil {
-		t.Fatal(err)
-	}
-	got = append(got, '\n')
-	if *update {
-		if err := os.MkdirAll(filepath.Dir(manifestFile), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(manifestFile, got, 0o644); err != nil {
-			t.Fatal(err)
-		}
-		return
-	}
-	want, err := os.ReadFile(manifestFile)
-	if err != nil {
-		t.Fatalf("讀不到 %s：%v。重新產生：cd backend && GOWORK=off go test ./internal/legacy/rabbitmq/ -run TestPublishRoutesManifest -update", manifestFile, err)
-	}
-	if !bytes.Equal(got, want) {
-		t.Fatalf("%s 與原始碼掃描結果不一致（新增、刪除或改了送出點？）。重新產生並一起提交：\n"+
-			"  cd backend && GOWORK=off go test ./internal/legacy/rabbitmq/ -run TestPublishRoutesManifest -update", manifestFile)
 	}
 }

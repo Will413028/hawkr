@@ -5,23 +5,15 @@ const (
 	ExchangePayment      = "hawkr.payment"
 	ExchangeInvoice      = "hawkr.invoice"
 	ExchangeMarketing    = "hawkr.marketing"
-	ExchangeNotification = "hawkr.notification"
 	ExchangeDelayed      = "hawkr.delayed"
 	ExchangeShipping     = "hawkr.shipping"
 	ExchangeReview       = "hawkr.review"
-	ExchangeContent      = "hawkr.content"
-	ExchangeAccount      = "hawkr.account"
 	ExchangeGovernance   = "hawkr.governance"
 	ExchangeBuyer        = "hawkr.buyer"
 	ExchangeSeller       = "hawkr.seller"
 	ExchangeSellerEvents = "seller.events"
 	ExchangeAftersales   = "aftersales.events"
-	ExchangeMerchant     = "hawkr.merchant"
 	ExchangeProcurement  = "procurement.events"
-
-	ExchangeDelegation = "hawkr.delegation"
-
-	ExchangeSellerWorkspace = "hawkr.seller_workspace"
 )
 
 const (
@@ -53,9 +45,6 @@ const (
 
 	RoutingKeyReviewCreated = "review.created"
 	RoutingKeyReviewHidden  = "review.hidden"
-
-	RoutingKeyNotificationInboxNew      = "notification.inbox.new"
-	RoutingKeyNotificationUnreadChanged = "notification.unread_changed"
 
 	RoutingKeySellerOrderUpdated     = "seller.order.updated"
 	RoutingKeySellerAfterSaleUpdated = "seller.after_sale.updated"
@@ -89,10 +78,4 @@ const (
 	QueueInvoiceOrderRefundFinalized = "invoice.order.refund.finalized"
 
 	QueueInvoiceOrderCancelled = "invoice.order.cancelled"
-
-	QueueNotificationAccountDeleted = "notification.account.deleted"
-
-	QueueNotificationBuyerDeleted = "notification.buyer.deleted"
-
-	QueueNotificationSellerDeleted = "notification.seller.deleted"
 )

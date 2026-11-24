@@ -1,12 +1,11 @@
-// Package reviewrelay 將 review 模組事件轉成還在 RabbitMQ 上的消費者（Java order 與 product 的評分聚合）所需的訊息；新通知由 notification 模組訂閱 review.ReviewCreated，不經這裡。notify_seller_account_id、buyer_nickname、buyer_avatar_key 只有舊 notification-service 讀，隨它在 A8-7 退場時一併拿掉。
+// Package reviewrelay 將 review 模組事件轉成還在 RabbitMQ 上的消費者（Java order 與 product 的評分聚合）所需的訊息；新通知由 notification 模組訂閱 review.ReviewCreated，不經這裡。
 //
-// 對應（送到 hawkr.review，source 是 review-service，wire 形狀由 wire_test 逐欄位釘住，模板讀的 key 由 golden_test 對照）：
+// 對應（送到 hawkr.review，source 是 review-service，wire 形狀由 wire_test 逐欄位釘住）：
 //
 //	review.ReviewCreated            → review.created
 //	review.ReviewAggregateChanged   → review.hidden（隱藏或還原）
 //
-// 兩種訊息的 review_id 一律是 0：新評價的 ID 是 UUIDv7，舊 wire 是 int64；讀它的只有 notification 模板放進推播 data 的 reviewId，
-// 四端都沒有讀（設計書 step-1-design.md §9 第 2 項）。
+// 兩種訊息的 review_id 一律是 0：新評價的 ID 是 UUIDv7，舊 wire 是 int64（設計書 step-1-design.md §9 第 2 項）。
 //
 // 統計（avg_rating、total_count、product_avg_rating、product_review_count）都在 job 執行時讀現況重算，不在寫入的 transaction 內算好存進
 // job：消費者（Java product）是全量覆寫，最後一個執行的 job 送的是它執行當下的最新值，任何執行順序最後都收斂到正確值（設計書 §4.2；
@@ -28,9 +27,7 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/Will413028/hawkr/backend/internal/legacy/rabbitmq"
-	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
@@ -90,28 +87,16 @@ type Reviews interface {
 	StoreStats(ctx context.Context, storeID int64) (review.StoreStats, error)
 }
 
-// Buyers 是 relay 補暱稱與頭像的 port；*buyer.Module 實作它。
-type Buyers interface {
-	BatchDisplay(ctx context.Context, ids []int64) ([]buyer.Display, error)
-}
-
-// Stores 是 relay 取店家帳號的 port；*seller.Module 實作它。
-type Stores interface {
-	Store(ctx context.Context, storeID int64) (seller.Store, error)
-}
-
 // Worker 組出舊 publisher 的 payload 並排入送出的 job。
 type Worker struct {
 	Reviews Reviews
-	Buyers  Buyers
-	Stores  Stores
 	Jobs    jobs.Enqueuer
 	Log     *slog.Logger
 }
 
 // NewWorker 建立 Worker。
-func NewWorker(reviews Reviews, buyers Buyers, stores Stores, queue jobs.Enqueuer, log *slog.Logger) *Worker {
-	return &Worker{Reviews: reviews, Buyers: buyers, Stores: stores, Jobs: queue, Log: log}
+func NewWorker(reviews Reviews, queue jobs.Enqueuer, log *slog.Logger) *Worker {
+	return &Worker{Reviews: reviews, Jobs: queue, Log: log}
 }
 
 type typedWorker[T river.JobArgs] struct {
@@ -148,23 +133,20 @@ func base(eventID string, at time.Time, eventType string) baseEvent {
 // reviewCreated 是舊 ReviewCreatedEvent：id 與計數是 JSON 數字，review_id 是 0。
 type reviewCreated struct {
 	baseEvent
-	ReviewID              int64    `json:"review_id"`
-	OrderNo               string   `json:"order_no"`
-	OrderItemID           int64    `json:"order_item_id"`
-	StoreID               int64    `json:"store_id"`
-	NotifySellerAccountID int64    `json:"notify_seller_account_id"`
-	BuyerID               int64    `json:"buyer_id"`
-	Rating                int32    `json:"rating"`
-	Content               string   `json:"content,omitempty"`
-	ImageKeys             []string `json:"image_keys,omitempty"`
-	CreatedAt             string   `json:"created_at,omitempty"`
-	AvgRating             float64  `json:"avg_rating"`
-	TotalCount            int64    `json:"total_count"`
-	ProductID             int64    `json:"product_id"`
-	ProductAvgRating      float64  `json:"product_avg_rating"`
-	ProductReviewCount    int64    `json:"product_review_count"`
-	BuyerNickname         string   `json:"buyer_nickname,omitempty"`
-	BuyerAvatarKey        string   `json:"buyer_avatar_key,omitempty"`
+	ReviewID           int64    `json:"review_id"`
+	OrderNo            string   `json:"order_no"`
+	OrderItemID        int64    `json:"order_item_id"`
+	StoreID            int64    `json:"store_id"`
+	BuyerID            int64    `json:"buyer_id"`
+	Rating             int32    `json:"rating"`
+	Content            string   `json:"content,omitempty"`
+	ImageKeys          []string `json:"image_keys,omitempty"`
+	CreatedAt          string   `json:"created_at,omitempty"`
+	AvgRating          float64  `json:"avg_rating"`
+	TotalCount         int64    `json:"total_count"`
+	ProductID          int64    `json:"product_id"`
+	ProductAvgRating   float64  `json:"product_avg_rating"`
+	ProductReviewCount int64    `json:"product_review_count"`
 }
 
 // reviewHidden 是舊 ReviewHiddenEvent：帶重算後的店與商品聚合，review_id 是 0。
@@ -232,56 +214,15 @@ func (w *Worker) reviewCreated(ctx context.Context, a ReviewCreatedArgs) error {
 	if err != nil {
 		return err
 	}
-	nickname, avatar, err := w.display(ctx, r.BuyerID)
-	if err != nil {
-		return err
-	}
-	notify, err := w.notifyAccount(ctx, r.StoreID)
-	if err != nil {
-		return err
-	}
 	keys := make([]string, len(r.Images))
 	for i, im := range r.Images {
 		keys[i] = im.ObjectKey
 	}
 	return w.enqueuePublish(ctx, a.EventID, exchangeReview, "review.created", reviewCreated{
 		baseEvent: base(a.EventID, a.Occurred, "REVIEW_CREATED"), OrderNo: r.OrderNo, OrderItemID: r.OrderItemID, StoreID: r.StoreID,
-		NotifySellerAccountID: notify, BuyerID: r.BuyerID, Rating: int32(r.Rating), //nolint:gosec // rating 由 reviews_rating_check 保證 1 到 5
+		BuyerID: r.BuyerID, Rating: int32(r.Rating), //nolint:gosec // rating 由 reviews_rating_check 保證 1 到 5
 		Content: r.Content, ImageKeys: keys,
 		CreatedAt: r.CreatedAt.UTC().Format(time.RFC3339), AvgRating: h.AvgRating, TotalCount: h.TotalCount, ProductID: r.ProductID,
-		ProductAvgRating: h.ProductAvgRating, ProductReviewCount: h.ProductReviewCount, BuyerNickname: nickname, BuyerAvatarKey: avatar,
+		ProductAvgRating: h.ProductAvgRating, ProductReviewCount: h.ProductReviewCount,
 	})
-}
-
-// display 回傳買家的暱稱與頭像 key；刪帳或查不到的買家沒有（舊系統同樣不帶）。
-func (w *Worker) display(ctx context.Context, buyerID int64) (nickname, avatar string, err error) {
-	list, err := w.Buyers.BatchDisplay(ctx, []int64{buyerID})
-	if err != nil {
-		return "", "", err
-	}
-	for _, d := range list {
-		if d.BuyerID != buyerID || d.Deleted {
-			continue
-		}
-		if d.DisplayName != nil {
-			nickname = *d.DisplayName
-		}
-		if d.Avatar != nil {
-			avatar = *d.Avatar
-		}
-	}
-	return nickname, avatar, nil
-}
-
-// notifyAccount 是收通知的賣家帳號；店家不存在是 0（舊行為，notification 不推）。
-func (w *Worker) notifyAccount(ctx context.Context, storeID int64) (int64, error) {
-	st, err := w.Stores.Store(ctx, storeID)
-	switch {
-	case err == nil:
-		return st.AccountID, nil
-	case apperr.KindOf(err) == apperr.KindNotFound:
-		return 0, nil
-	default:
-		return 0, err
-	}
 }

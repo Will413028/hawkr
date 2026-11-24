@@ -12,11 +12,7 @@ on:
   pull_request:
     paths: &integration_paths
       - 'backend/pkg/**'
-      - 'backend/services/notification-service/**'
       - 'backend/services/invoice-service/**'
-      # notification-service 的 TestPublishedRoutesHaveNotificationHandler 讀這兩個檔。
-      - 'backend/internal/legacy/rabbitmq/testdata/routes.json'
-      - 'backend/infra/mq/topology/topology.yaml'
       - '.github/workflows/backend-integration-tests.yml'
   push:
     branches: [main, dev]
@@ -46,10 +42,6 @@ jobs:
             all:
               - 'backend/pkg/**'
               - '.github/workflows/backend-integration-tests.yml'
-            notification-service:
-              - 'backend/services/notification-service/**'
-              - 'backend/internal/legacy/rabbitmq/testdata/routes.json'
-              - 'backend/infra/mq/topology/topology.yaml'
             invoice-service: ['backend/services/invoice-service/**']
       # 手動觸發、或動到 pkg／本 workflow 時全跑。
       - name: Resolve modules to test
@@ -59,7 +51,7 @@ jobs:
           CHANGES: ${{ steps.filter.outputs.changes }}
         run: |
           set -euo pipefail
-          services='["notification-service","invoice-service"]'
+          services='["invoice-service"]'
           if [ "$ALL" = "true" ]; then
             modules=$(jq -c '["pkg"] + map("services/" + .)' <<<"$services")
           else

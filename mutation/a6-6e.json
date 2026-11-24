@@ -13,7 +13,7 @@
    "id": "review-relay-worker-not-registered",
    "stack": "go",
    "file": "backend/cmd/hawkr/main.go",
-   "old": "\treviewrelay.NewWorker(reviewModule, buyerModule, sellerModule, jc, log).AddWorkers(workers)\n",
+   "old": "\treviewrelay.NewWorker(reviewModule, jc, log).AddWorkers(workers)\n",
    "new": "\tvar _ *reviewrelay.Worker\n",
    "test": "cmd/hawkr ^TestWorkerRunsTheRelaysAndTheCRMConsumer$",
    "why": "worker 沒登記 reviewrelay 的 job worker：事件排了 job 但沒人執行"
@@ -22,7 +22,7 @@
    "id": "review-relay-worker-referenced-not-called",
    "stack": "go",
    "file": "backend/cmd/hawkr/main.go",
-   "old": "\treviewrelay.NewWorker(reviewModule, buyerModule, sellerModule, jc, log).AddWorkers(workers)\n",
+   "old": "\treviewrelay.NewWorker(reviewModule, jc, log).AddWorkers(workers)\n",
    "new": "\t_ = reviewrelay.NewWorker\n",
    "test": "cmd/hawkr ^TestWorkerRunsTheRelaysAndTheCRMConsumer$",
    "why": "worker 只參照 reviewrelay.NewWorker 而沒呼叫登記：測試不能把參照當成呼叫"
