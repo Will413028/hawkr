@@ -40,8 +40,8 @@
    "id": "release-ignores-ended-campaign",
    "stack": "go-integration",
    "file": "backend/internal/modules/coupon/internal/voucher/voucher.go",
-   "old": "\t\tif model.CampaignStatus(crow.Status) == model.StatusEnded {",
-   "new": "\t\tif false && model.CampaignStatus(crow.Status) == model.StatusEnded {",
+   "old": "\t\tif !exists || model.CampaignStatus(crow.Status) == model.StatusEnded {",
+   "new": "\t\tif !exists || false && model.CampaignStatus(crow.Status) == model.StatusEnded {",
    "test": "internal/modules/coupon ^TestReleaseAfterEndVoidsInsteadOfRestoring$",
    "why": "Release 不看活動是否已結束：已結束活動的券回到 AVAILABLE，留下無人作廢的可用券，測試要紅。"
   },
