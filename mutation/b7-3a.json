@@ -140,7 +140,7 @@
    "stack": "go-integration",
    "file": "backend/internal/modules/coupon/internal/read/read.go",
    "old": "\t\t\t\tif err := qualifier.Check(ctx, c, in.BuyerID, now); err != nil {\n\t\t\t\t\tif rejection(err) != nil {\n\t\t\t\t\t\treturn err\n\t\t\t\t\t}\n\t\t\t\t\tcontinue\n\t\t\t\t}\n",
-   "new": "\t\t\t\t_ = now\n",
+   "new": "\t\t\t\t_ = now\n\t\t\t\t_ = qualifier\n",
    "test": "internal/modules/coupon ^TestListClaimableUsesTheClaimQualification$",
    "why": "可領列表不再問資格判定：列出停權店家的活動等領不到的活動，列表與領券又成兩份規則（BD1、BD2、BD11），測試要紅。"
   },

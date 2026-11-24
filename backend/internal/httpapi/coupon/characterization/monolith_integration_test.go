@@ -76,11 +76,7 @@ func (noDashboardOrders) StatusCounts(context.Context, int64) (httpseller.OrderS
 }
 
 // 圖片參照是全數字的 token，轉正一律成功。
-func newMedia() *media.Fake {
-	f := media.NewFake()
-	f.Key = func(refType, token string) string { return refType + "/" + token }
-	return f
-}
+func newMedia() *media.Fake { return media.NewFake() }
 
 // exposableStore 為帳號開一家可以公開曝光的店（直接寫 seller 的表，最小的列；與 social 的 integration fixture 相同，KYC 的約束先放寬）。
 func exposableStore(t *testing.T, d *db.DB, accountID int64) {
@@ -159,7 +155,7 @@ func startMonolith(t *testing.T) *monolith {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	bus := events.NewBus()
 	id := identity.New(identity.Deps{DB: d, Events: bus, Providers: identity.Providers{Admin: dev.Admins()}, Now: time.Now, Logger: log})
-	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: queue, Now: time.Now, Logger: log})
+	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
 	events.Subscribe(bus, buyers.OnAccountCreated)
 	sellers := seller.New(seller.Deps{
 		DB: d, Events: bus, Jobs: queue, Identity: id, Media: newMedia(), Orders: noOrders{}, KYCMAC: sealtest.MAC(t),
