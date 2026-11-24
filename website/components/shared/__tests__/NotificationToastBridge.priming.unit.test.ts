@@ -171,3 +171,42 @@ describe("NotificationToastBridge priming when the unread count settles without 
 		});
 	}
 });
+
+describe("NotificationToastBridge signal arriving while the baseline read is pending", () => {
+	it("does not toast baseline rows once the baseline resolves", async () => {
+		vi.stubGlobal("localStorage", memoryStorage());
+		vi.stubGlobal("sessionStorage", memoryStorage());
+		repo.fetchUnreadCount.mockResolvedValue(1);
+		const row = (id: string) => ({
+			id,
+			title: "訂單成立通知",
+			body: "",
+			deepLink: "",
+			read: false,
+			presentation: 1,
+		});
+		const baseline = deferred<{ items: ReturnType<typeof row>[] }>();
+		repo.listInboxItems.mockReturnValueOnce(baseline.promise);
+		repo.listInboxItems.mockResolvedValue({
+			items: [row("new-2"), row("old-1")],
+		});
+		mountBridge(Promise.resolve(SIGNED_IN), false);
+		await flush();
+		expect(repo.listInboxItems).toHaveBeenCalledTimes(1);
+
+		const onSignal = stream.onSignal.mock.lastCall?.[0] as (
+			signal: unknown,
+		) => void;
+		await act(async () =>
+			onSignal({ type: "inbox", unreadCount: 2, hints: [] }),
+		);
+		expect(toast.show).not.toHaveBeenCalled();
+
+		await act(async () => baseline.resolve({ items: [row("old-1")] }));
+		await flush();
+		expect(toast.show).toHaveBeenCalledTimes(1);
+		expect(toast.show.mock.calls[0]?.[0]).toMatchObject({
+			dedupeKey: "notif:new-2",
+		});
+	});
+});

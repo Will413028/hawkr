@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 
+import { StateRefreshHint } from "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb";
 import { act, cleanup, render } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { NOTIFICATION_SIGNAL_EVENT } from "@/lib/notifications/events";
 import type { NotificationSignal } from "@/lib/notifications/watch";
 
 const mocks = vi.hoisted(() => ({
@@ -140,6 +142,30 @@ describe("NotificationUnreadProvider 持有通知串流並分派訊號", () => {
 			watch.onSignal(inbox(1));
 		});
 		expect(mocks.invalidateNotificationLists).toHaveBeenCalledTimes(1);
+	});
+
+	it("異常斷線後重連，對狀態重讀訂閱者廣播全部提示（發票 hook 重讀）", async () => {
+		const detail: Array<{ hints: number[] }> = [];
+		const listener = (e: Event) =>
+			detail.push((e as CustomEvent<{ hints: number[] }>).detail);
+		window.addEventListener(NOTIFICATION_SIGNAL_EVENT, listener);
+		try {
+			const watch = mount();
+			await act(async () => {});
+			await act(async () => watch.onSignal(reconnected(false)));
+			expect(detail).toHaveLength(0);
+			await act(async () => watch.onSignal(reconnected(true)));
+			expect(detail).toHaveLength(1);
+			expect([...detail[0].hints].sort()).toEqual(
+				[
+					StateRefreshHint.ORDER,
+					StateRefreshHint.AFTER_SALE,
+					StateRefreshHint.SELLER_STATUS,
+				].sort(),
+			);
+		} finally {
+			window.removeEventListener(NOTIFICATION_SIGNAL_EVENT, listener);
+		}
 	});
 
 	it("壽命到期的正常結束再重連，不補讀", async () => {

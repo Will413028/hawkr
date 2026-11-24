@@ -52,7 +52,30 @@ export function toggleAudience(
 		: AUDIENCE_OPTIONS.filter((a) => a === audience || audiences.includes(a));
 }
 
-/** 建立請求：`requestId` 在同一次對話框裡固定，失敗重送時伺服器以它去重。 */
+export interface AnnouncementAttempt {
+	fingerprint: string;
+	requestId: string;
+}
+
+/**
+ * 同一個 request_id 重送內容不同，伺服器回 invalid_argument。所以只有內容（修剪後的標題、內容、受眾）
+ * 和上一次送出完全相同時才沿用上一次的 request_id（失敗重送去重）；內容改過就換新的。
+ */
+export function announcementAttempt(
+	form: AnnouncementForm,
+	previous: AnnouncementAttempt | null,
+	newRequestId: () => string,
+): AnnouncementAttempt {
+	const fingerprint = JSON.stringify([
+		trimGoSpace(form.title),
+		trimGoSpace(form.body),
+		[...form.audiences],
+	]);
+	if (previous && previous.fingerprint === fingerprint) return previous;
+	return { fingerprint, requestId: newRequestId() };
+}
+
+/** 建立請求：`requestId` 由 `announcementAttempt` 決定，內容相同的失敗重送時伺服器以它去重。 */
 export function createAnnouncementRequest(
 	form: AnnouncementForm,
 	requestId: string,

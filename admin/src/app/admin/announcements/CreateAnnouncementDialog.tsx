@@ -3,11 +3,13 @@
 import { createConnectQueryKey, useMutation } from "@connectrpc/connect-query";
 import { NotificationAdminService } from "@hawkr/api/gen/hawkr/admin/notification/v1alpha1/notification_pb";
 import { useQueryClient } from "@tanstack/react-query";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useRef, useState } from "react";
 import { Button, Dialog, useToast } from "@/components/UI";
 import {
+	type AnnouncementAttempt,
 	type AnnouncementForm,
 	AUDIENCE_OPTIONS,
+	announcementAttempt,
 	announcementFormError,
 	audienceText,
 	createAnnouncementRequest,
@@ -20,7 +22,8 @@ const CREATE_FAILED_TEXT = "發送失敗，請稍後再試。";
 
 /**
  * 發送系統公告。公告一律只寫英文，所有使用者看到同一份。
- * `request_id` 在對話框開著時固定：失敗後重送，伺服器以它去重，不會建出兩則。
+ * 內容不變的失敗重送沿用同一個 `request_id`，伺服器以它去重，不會建出兩則；內容改過就換新的
+ * （同一個 request_id 配不同內容會被伺服器拒絕）；成功後對話框關閉，再開是新的。
  */
 export default function CreateAnnouncementDialog({
 	onClose,
@@ -32,7 +35,7 @@ export default function CreateAnnouncementDialog({
 	const create = useMutation(
 		NotificationAdminService.method.createAnnouncement,
 	);
-	const [requestId] = useState(() => crypto.randomUUID());
+	const attemptRef = useRef<AnnouncementAttempt | null>(null);
 	const [form, setForm] = useState<AnnouncementForm>(emptyAnnouncementForm);
 	const [error, setError] = useState<string | null>(null);
 	const [submitting, setSubmitting] = useState(false);
@@ -46,10 +49,17 @@ export default function CreateAnnouncementDialog({
 			return;
 		}
 		setError(null);
+		const attempt = announcementAttempt(form, attemptRef.current, () =>
+			crypto.randomUUID(),
+		);
+		attemptRef.current = attempt;
 		setSubmitting(true);
 		try {
 			const result = await runAction(
-				() => create.mutateAsync(createAnnouncementRequest(form, requestId)),
+				() =>
+					create.mutateAsync(
+						createAnnouncementRequest(form, attempt.requestId),
+					),
 				{ fallback: CREATE_FAILED_TEXT, conflictText: CREATE_FAILED_TEXT },
 			);
 			if (!result.ok) {

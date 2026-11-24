@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { NotificationAudience } from "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb";
 import {
+	announcementAttempt,
 	announcementFormError,
 	audienceText,
 	createAnnouncementRequest,
@@ -52,4 +53,35 @@ test("建立請求帶修剪後的標題與內容、受眾與 request_id", () => 
 		body: "Down at 2am",
 		requestId: "req-1",
 	});
+});
+
+test("內容不變的重送沿用 request_id，內容或受眾改過就換新的", () => {
+	let n = 0;
+	const next = () => `id-${++n}`;
+	const form = {
+		title: "Maintenance",
+		body: "Down at 2am",
+		audiences: [NotificationAudience.BUYER, NotificationAudience.STORE],
+	};
+	const first = announcementAttempt(form, null, next);
+	assert.equal(first.requestId, "id-1");
+	// 只差前後空白：送出的內容相同，視為同一次
+	const retry = announcementAttempt(
+		{ ...form, title: " Maintenance " },
+		first,
+		next,
+	);
+	assert.equal(retry.requestId, "id-1");
+	const edited = announcementAttempt(
+		{ ...form, body: "Down at 3am" },
+		retry,
+		next,
+	);
+	assert.equal(edited.requestId, "id-2");
+	const audienceChanged = announcementAttempt(
+		{ ...form, body: "Down at 3am", audiences: [NotificationAudience.STORE] },
+		edited,
+		next,
+	);
+	assert.equal(audienceChanged.requestId, "id-3");
 });

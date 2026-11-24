@@ -1,5 +1,6 @@
 "use client";
 
+import { StateRefreshHint } from "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb";
 import { useQueryClient } from "@tanstack/react-query";
 import * as React from "react";
 import { useAuth } from "@/lib/auth/context";
@@ -42,6 +43,12 @@ import type { SseConnectionStatus } from "@/lib/sse/client";
  * Connection status is read with `useNotificationStreamStatus`. The seller
  * workspace has its own connection (`useSellerWorkspaceRealtime`).
  */
+
+const ALL_STATE_REFRESH_HINTS: number[] = [
+	StateRefreshHint.ORDER,
+	StateRefreshHint.AFTER_SALE,
+	StateRefreshHint.SELLER_STATUS,
+];
 
 const NotificationUnreadContext = React.createContext<UnreadCountState | null>(
 	null,
@@ -115,6 +122,15 @@ export function NotificationUnreadProvider({
 				} else if (signal.type === "reconnected" && signal.afterAbnormalEnd) {
 					void unreadRef.current.refresh();
 					invalidateRef.current();
+					// Signals during the gap may be lost: tell every state-refresh
+					// subscriber to re-read, as the backend does on reconnect.
+					const detail: NotificationSignalEventDetail = {
+						unreadCount: unreadRef.current.count,
+						hints: ALL_STATE_REFRESH_HINTS,
+					};
+					window.dispatchEvent(
+						new CustomEvent(NOTIFICATION_SIGNAL_EVENT, { detail }),
+					);
 				}
 			},
 			setStreamStatus,

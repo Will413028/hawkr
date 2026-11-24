@@ -150,6 +150,9 @@ export default function NotificationToastBridge() {
 	 * Message rows belong to the chat socket path above and never double-toast.
 	 */
 	const primedRef = React.useRef(false);
+	// Settles when the workspace's baseline read has finished; a signal that
+	// arrives earlier waits on it so baseline rows are never toasted.
+	const baselineRef = React.useRef<Promise<void>>(Promise.resolve());
 	const seenIdsRef = React.useRef(new Set<string>());
 	const workspaceKeyRef = React.useRef(workspaceKey);
 	workspaceKeyRef.current = workspaceKey;
@@ -160,6 +163,7 @@ export default function NotificationToastBridge() {
 		// Buyer and seller have independent inboxes. A role/account change starts
 		// a fresh baseline instead of reusing the previous inbox's seen set.
 		primedRef.current = false;
+		baselineRef.current = Promise.resolve();
 		seenIdsRef.current = new Set();
 	}, [workspaceKey]);
 
@@ -172,7 +176,10 @@ export default function NotificationToastBridge() {
 		// login" bug.
 		primedRef.current = true;
 		const requestedFor = workspaceKey;
-		void listInboxItems({ audience, pageSize: SIGNAL_PAGE_SIZE })
+		baselineRef.current = listInboxItems({
+			audience,
+			pageSize: SIGNAL_PAGE_SIZE,
+		})
 			.then((page) => {
 				if (workspaceKeyRef.current !== requestedFor) return;
 				for (const item of page.items) seenIdsRef.current.add(item.id);
@@ -188,8 +195,11 @@ export default function NotificationToastBridge() {
 		const onSignal = () => {
 			if (!primedRef.current) return;
 			const requestedFor = workspaceKeyRef.current;
+			const baseline = baselineRef.current;
 			void (async () => {
 				try {
+					await baseline;
+					if (cancelled || workspaceKeyRef.current !== requestedFor) return;
 					const page = await listInboxItems({
 						audience,
 						pageSize: SIGNAL_PAGE_SIZE,

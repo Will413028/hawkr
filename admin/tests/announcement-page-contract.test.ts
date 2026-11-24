@@ -14,9 +14,10 @@ test("建立公告走 NotificationAdminService.CreateAnnouncement，請求由 cr
 	);
 	assert.match(
 		dialog,
-		/create\.mutateAsync\(\s*createAnnouncementRequest\(form, requestId\),?\s*\)/,
+		/create\.mutateAsync\(\s*createAnnouncementRequest\(form, attempt\.requestId\),?\s*\)/,
 	);
-	// request_id 只在對話框掛載時產生一次，失敗重送沿用同一個。
+	// request_id 由 announcementAttempt 依內容決定：內容不變才沿用，改過就換新的。
+	assert.match(dialog, /announcementAttempt\(form, attemptRef\.current/);
 	assert.equal(dialog.match(/crypto\.randomUUID\(\)/g)?.length, 1);
 	// 送出前先驗欄位，不通過就不呼叫。
 	assert.ok(
