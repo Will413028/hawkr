@@ -2,11 +2,13 @@ import {
 	type InboxItem,
 	NotificationAudience,
 	type NotificationCategory,
+	type NotificationChannel,
+	type PreferenceEntry,
 } from "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb";
 import type { RoleSlot } from "@/lib/auth/active-role";
 import { notificationAppClient } from "@/lib/connect/notification";
 
-export type { InboxItem };
+export type { InboxItem, PreferenceEntry };
 
 /** 買家工作區讀 BUYER 收件匣，賣家工作區讀 STORE 收件匣。 */
 export function audienceForRole(role: RoleSlot): NotificationAudience {
@@ -60,4 +62,25 @@ export async function markAllInboxItemsRead(
 export async function deleteInboxItems(ids: string[]): Promise<void> {
 	if (ids.length === 0) return;
 	await notificationAppClient().batchDeleteInboxItems({ ids });
+}
+
+export async function fetchNotificationPreferences(
+	audience: NotificationAudience,
+): Promise<PreferenceEntry[]> {
+	const res = await notificationAppClient().getNotificationPreferences({
+		audience,
+	});
+	return res.entries;
+}
+
+/** 開關一個（分類、渠道）；回傳伺服器確認後的那一列。 */
+export async function updateNotificationPreference(params: {
+	audience: NotificationAudience;
+	category: NotificationCategory;
+	channel: NotificationChannel;
+	enabled: boolean;
+}): Promise<PreferenceEntry | undefined> {
+	const res =
+		await notificationAppClient().updateNotificationPreference(params);
+	return res.entry;
 }

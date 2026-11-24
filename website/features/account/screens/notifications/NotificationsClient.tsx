@@ -1,7 +1,10 @@
 "use client";
 
 import { timestampMs } from "@bufbuild/protobuf/wkt";
-import { InboxPresentation } from "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb";
+import {
+	InboxPresentation,
+	type NotificationCategory,
+} from "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb";
 import { gsap } from "gsap";
 import * as React from "react";
 import AppIcon, { type AppIconName } from "@/components/shared/AppIcon";
@@ -20,6 +23,7 @@ import { SellerMobileDisclosureList } from "@/features/seller-center/components/
 import { formatTaipeiShortDate } from "@/lib/date/taipei";
 import { useNotificationPreferences } from "@/lib/hooks/useNotificationPreferences";
 import { useNotificationList } from "@/lib/hooks/useNotifications";
+import { useUiText } from "@/lib/i18n/ui-text";
 import { usePathname } from "@/lib/intl/navigation";
 import { buildNotificationFilters } from "@/lib/notifications/filters";
 import type { InboxItem } from "@/lib/notifications/inbox";
@@ -121,27 +125,28 @@ function NotificationsContent({
 }: NotificationsClientProps & {
 	role: ReturnType<typeof notificationWorkspaceRole>;
 }) {
-	const [filter, setFilter] = React.useState("");
+	const [filter, setFilter] = React.useState<NotificationCategory | 0>(0);
 	const [pendingAction, setPendingAction] = React.useState<string | null>(null);
 	const pendingActionRef = React.useRef<string | null>(null);
-	const list = useNotificationList({ role });
+	const list = useNotificationList({ role, category: filter || undefined });
 	const { count: unreadCount, loading: unreadCountLoading } =
 		useNotificationUnread();
 	const streamStatus = useNotificationStreamStatus();
 
 	// 篩選 chips 與通知偏好同源（後端 category metadata），與偏好頁共用同一條 query。
 	// 失敗時 prefs 為 null → 只有「全部」chip，不擋通知列表。
-	const { prefs } = useNotificationPreferences(role);
+	const ut = useUiText();
+	const { entries } = useNotificationPreferences(role);
 	const filterOptions = React.useMemo(
-		() => buildNotificationFilters(prefs ?? []),
-		[prefs],
+		() => buildNotificationFilters(ut, entries ?? []),
+		[ut, entries],
 	);
 
 	// 切換 workspace（買家/賣家）時重置篩選。role 是觸發依賴（值改變即重置），
 	// effect 內未讀取它，故停用 exhaustive-deps 的移除建議。
 	// biome-ignore lint/correctness/useExhaustiveDependencies: role 為觸發依賴
 	React.useEffect(() => {
-		setFilter("");
+		setFilter(0);
 	}, [role]);
 
 	const handleItemClick = (item: InboxItem) => {
@@ -613,7 +618,7 @@ function NotificationGroup({
  * across the buyer workspace. Icon comes from the shared AccountEmpty
  * registry (notifications variant = bell).
  */
-function EmptyState({ filter }: { filter: string }) {
+function EmptyState({ filter }: { filter: NotificationCategory | 0 }) {
 	return (
 		<ScEmpty>
 			<AccountEmptyStateIcon variant="notifications" />
