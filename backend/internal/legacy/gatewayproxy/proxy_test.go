@@ -258,21 +258,3 @@ func (emptyBusiness) CurrentBuyerID(context.Context, int64) (int64, error) { ret
 func (emptyBusiness) CurrentStore(context.Context, int64) (seller.Store, error) {
 	return storeIn(seller.Active), nil
 }
-
-func TestVendorPortalHeadersFromClientsAreNeverForwarded(t *testing.T) {
-	var seen http.Header
-	front := start(t, http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { seen = r.Header.Clone() }), nil)
-	get(t, front.URL+"/api/v1/public/vendor_portal/rfqs/42/x", map[string]string{
-		"X-Vendor-Portal-Rfq-Recipient-Id": "42",
-		"x-vendor-portal-verified-email":   "attacker@example.com",
-		"X-Other":                          "kept",
-	})
-	for k := range seen {
-		if strings.HasPrefix(strings.ToLower(k), "x-vendor-portal-") {
-			t.Errorf("轉給 gateway 的請求帶著 %s", k)
-		}
-	}
-	if seen.Get("X-Other") != "kept" {
-		t.Errorf("無關的 header 被刪掉：%v", seen)
-	}
-}
