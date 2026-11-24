@@ -801,6 +801,53 @@ func (q *Queries) PaymentIDsByExternal(ctx context.Context, arg PaymentIDsByExte
 	return items, nil
 }
 
+const paymentsByOrderNos = `-- name: PaymentsByOrderNos :many
+SELECT id, order_no, store_id, buyer_id, amount, provider, description, status, external_payment_id, external_charge_id, paid_at, last_error, failure_reason, fetched_at, create_idempotency_key, create_called_at, create_lookup_failures, created_at, updated_at
+FROM payment.payments
+WHERE order_no = ANY($1::text[])
+`
+
+// 舊服務（legacy paymentserver）的批次讀取：回找得到的付款，找不到的不出現。
+func (q *Queries) PaymentsByOrderNos(ctx context.Context, orderNos []string) ([]PaymentPayment, error) {
+	rows, err := q.db.Query(ctx, paymentsByOrderNos, orderNos)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PaymentPayment{}
+	for rows.Next() {
+		var i PaymentPayment
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrderNo,
+			&i.StoreID,
+			&i.BuyerID,
+			&i.Amount,
+			&i.Provider,
+			&i.Description,
+			&i.Status,
+			&i.ExternalPaymentID,
+			&i.ExternalChargeID,
+			&i.PaidAt,
+			&i.LastError,
+			&i.FailureReason,
+			&i.FetchedAt,
+			&i.CreateIdempotencyKey,
+			&i.CreateCalledAt,
+			&i.CreateLookupFailures,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const pollablePaymentIDs = `-- name: PollablePaymentIDs :many
 SELECT id
 FROM payment.payments

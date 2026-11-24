@@ -12,6 +12,7 @@ payment 是收款與付款的模組（ADR `docs/adr/2026-09-24-go-modular-monoli
   - 對外契約的收款帳戶列舉（`PaymentAccountStatus`、`RequirementCollection`）與呼叫端宣告用的內嵌開通執行環境列舉（`EmbeddedOnboardingRuntime`）由 payment 擁有，在 `hawkr.payment.v1alpha1`（`api/hawkr/payment/v1alpha1/payment.proto`）；seller 與 admin payment 的 proto 都 import 它，共用文案目錄的 key 是 `payment.PaymentAccountStatus.*`、`payment.RequirementCollection.*`。
   - webhook：`ReceiveEvent`（HTTP 入口 `POST /webhooks/stripe`，`internal/httpapi/payment`）；付款事件 `ReceivePaymentEvent`（`POST /webhooks/stripe-payments`，獨立的 destination 與簽章密鑰）。
   - 付款：`CreatePayment`、`GetPayment`（買家，§9）、`ChargeConfigured`；job 的內容 `CreatePaymentIntent`、`SyncPayment`、`SweepPayments` 給 worker 與測試。
+  - 服務間讀取與關閉（過渡期 legacy paymentserver 用，§13）：`PaymentByOrderNo`、`PaymentsByOrderNos`、`RefundByRequestKey`、`RefundsByRequestKeys`、`LatestRefundsByOrderNos`、`CloseOrderPayment`；job 的內容 `CloseOrderPaymentAttempt`。
   - 退款：`CreatePaymentRefund`（§12）；job 的內容 `RefundPayment`、`SyncPaymentRefund`、`ReversePaymentTransfer` 給 worker 與測試。
   - 事件：`PayoutAccountChanged`、`PaymentChanged`、`RefundChanged`、`AutoRefundCompleted`（§5）。
 - 擁有者鍵是 `store_id`（seller 的店家；不建跨 schema FK）。出現第二種擁有者時再通用化（D28）。payment 是葉節點，不讀 seller：擁有者是否營運中經組裝點注入的 `Owners`（cmd/hawkr 以 `seller.Module.Store` 實作）。
@@ -117,3 +118,9 @@ payment 是收款與付款的模組（ADR `docs/adr/2026-09-24-go-modular-monoli
 - **結果**：`refund.*` 事件經 inbox handler（路由鍵是 provider 的退款 ID；只對付款屬於目前 provider 的退款，別的 provider 的退款 ID 不同源，事件標為已處理）只排以退款 ID 為唯一鍵的 `payment.refund_sync`、不標記已處理、不讀事件內容；同步在 transaction 外重讀（`GetRefund`），在一個 transaction 內（鎖付款列、轉帳列、退款列）把 `REFUNDING` 推到 `SUCCEEDED` 或 `FAILED`，並把讀取開始前收到的事件標為已處理，標記後若讀取期間又收到事件就回 `again`，worker 以 `JobSnooze(resyncDelay)` 再跑一輪（同付款同步）；付款屬於別的 provider 的退款不讀也不標記（同 §9 丟棄別的 provider 快照）；重讀不到（永久失敗）或與列不符進 `ANOMALY`（保留已知的外部 ID，`refunds_external_state_check` 因此允許 `ANOMALY`）。終局的列不被過期的「處理中」讀取倒退；終局之間衝突、列在 `ANOMALY` 或已被人工結案成失敗而 provider 又回成功時，記 error log 並發 `MoneyAnomaly`（`refunded_but_refund_*`）。終局同 transaction 發 `RefundChanged`（人工結案不發，§5），自動退款成功再發 `AutoRefundCompleted`（§5）；同一個 transaction 也喚醒等這筆退款的轉帳（§10）。
 - **補掃**：`PENDING` 閒置超過 10 分鐘補排 `payment.refund_create`（算在 created）；`REFUNDING` 閒置超過 30 分鐘補排 `payment.refund_sync`，inbox 有超過 1 分鐘還沒處理的退款事件的退款也補排同步（算在 synced）；`ANOMALY` 與終局不補排（partial index `refunds_open`）。
 - **ANOMALY 與額度**：`ANOMALY` 佔累計額度；`FAILED` 釋出。人工結案見 §11。
+
+## 13. 過渡期給舊服務的介面（計畫 B2 步驟 4）
+
+- 讀取（不驗呼叫者，不回 `client_secret`）：`PaymentByOrderNo`（沒有回 NotFound）、`PaymentsByOrderNos`、`RefundByRequestKey`（鍵對到多筆付款的退款回 FailedPrecondition）、`RefundsByRequestKeys`、`LatestRefundsByOrderNos`（每張訂單建立時間最新的一筆）；批次一次最多 500 筆、鍵不得為空。退款的 `OrderNo` 在建立與這些讀取都帶上。
+- 關閉：`CloseOrderPayment(orderNo)` 回是否排入 `payment.charge_close`；job 與狀態規則見 `internal/charge/AGENTS.md`。鎖順序：付款列（`LockPaymentByOrderNo`），之後不再鎖別的列。
+- 舊 gRPC 與 RabbitMQ 的對應、識別、狀態碼與差異見 `CARRYOVER.md` 與 `internal/legacy/paymentserver`、`internal/legacy/paymentrelay` 的套件說明；B8、B9 隨呼叫者搬進單體而刪除。

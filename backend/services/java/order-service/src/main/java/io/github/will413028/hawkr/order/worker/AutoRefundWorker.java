@@ -107,8 +107,10 @@ public class AutoRefundWorker {
 
         try {
             String reason = "訂單取消自動退款: " + task.getOrderNo();
+            // 冪等鍵 AUTO:{orderNo}:{tradeNo}：同一張訂單的自動退款重送得到同一筆；payment 模組以 AUTO: 前綴辨識自動退款（與 PaymentEventHandler 的預建同一慣例）
             String refundNo = paymentGrpcClient.createRefund(
-                    task.getTransactionId(), task.getAmount(), reason);
+                    task.getTransactionId(), task.getAmount(), reason,
+                    "AUTO:" + task.getOrderNo() + ":" + task.getTransactionId());
 
             autoRefundTxHandler.completeAutoRefund(task, refundNo);
             log.info("AutoRefundWorker.process.done",

@@ -41,11 +41,13 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/gatewayproxy"
 	"github.com/Will413028/hawkr/backend/internal/legacy/gen/account/accountconnect"
 	"github.com/Will413028/hawkr/backend/internal/legacy/gen/buyer/buyerconnect"
+	"github.com/Will413028/hawkr/backend/internal/legacy/gen/payment/paymentconnect"
 	"github.com/Will413028/hawkr/backend/internal/legacy/gen/seller/sellerconnect"
 	"github.com/Will413028/hawkr/backend/internal/legacy/imrelay"
 	"github.com/Will413028/hawkr/backend/internal/legacy/invoiceservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/mediaservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/orderservice"
+	"github.com/Will413028/hawkr/backend/internal/legacy/paymentserver"
 	"github.com/Will413028/hawkr/backend/internal/legacy/productservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/rabbitmq"
 	"github.com/Will413028/hawkr/backend/internal/legacy/reviewrelay"
@@ -225,7 +227,7 @@ func runServe(ctx context.Context) error {
 	})
 	subscribeBuyerLifecycle(bus, buyerModule)
 	box := newInbox(d, jc, log)
-	payments, owners := newPayment(d, bus, jc, box, paymentProvider, chargeProvider, log)
+	payments, owners := newPayment(d, bus, jc, box, paymentProvider, chargeProvider, paymentOrders{client: orders}, log)
 	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kycMAC, payments, registry, log)
 	owners.bind(sellerModule)
 	subscribeSellerPayout(bus, sellerModule)
@@ -240,6 +242,7 @@ func runServe(ctx context.Context) error {
 	}
 	subscribeSellerViews(bus, sellerModule)
 	subscribeSellerRelay(bus, jc)
+	subscribePaymentRelay(bus, jc)
 	subscribeBizCalendarRelay(bus, jc)
 	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: sellerModule, NewID: uuid.NewV7, Now: time.Now, Logger: log}
 	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, delegation.NewScheduleAuthorizer(delegationDeps), log)
@@ -343,6 +346,7 @@ func runServe(ctx context.Context) error {
 	legacyMux := http.NewServeMux()
 	legacyMux.Handle(accountconnect.NewAccountServiceHandler(accountservice.New(id, log)))
 	legacyMux.Handle(buyerconnect.NewBuyerServiceHandler(buyerserver.New(buyerModule)))
+	legacyMux.Handle(paymentconnect.NewPaymentServiceHandler(paymentserver.New(payments)))
 	legacyMux.Handle(sellerconnect.NewSellerServiceHandler(sellerserver.New(sellerModule, legacySellerRatings{reviewModule}, buyerModule, log)))
 	legacyMux.Handle(accountconnect.NewDelegationServiceHandler(delegationservice.New(del, log)))
 	// im 的即時通道（LISTEN 連線與存活標記）與 server 同一個生命週期：ctx 結束時 Run 返回、所有串流以 Shutdown 結束，Shutdown 才不會被開著的串流卡滿。
@@ -436,7 +440,7 @@ func runWorker(ctx context.Context) error {
 	})
 	subscribeBuyerLifecycle(bus, buyerModule)
 	box := newInbox(d, jc, log)
-	payments, owners := newPayment(d, bus, jc, box, paymentProvider, chargeProvider, log)
+	payments, owners := newPayment(d, bus, jc, box, paymentProvider, chargeProvider, paymentOrders{client: orders}, log)
 	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{client: products}, kycMAC, payments, registry, log)
 	owners.bind(sellerModule)
 	subscribeSellerPayout(bus, sellerModule)
@@ -451,6 +455,7 @@ func runWorker(ctx context.Context) error {
 	}
 	subscribeSellerViews(bus, sellerModule)
 	subscribeSellerRelay(bus, jc)
+	subscribePaymentRelay(bus, jc)
 	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: sellerModule, NewID: uuid.NewV7, Now: time.Now, Logger: log}
 	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, delegation.NewScheduleAuthorizer(delegationDeps), log)
 	subscribeSocialRelay(bus, jc)

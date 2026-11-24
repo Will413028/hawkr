@@ -1,0 +1,247 @@
+{
+ "mutants": [
+  {
+   "id": "relay-success-wrong-key",
+   "stack": "go",
+   "file": "backend/internal/legacy/paymentrelay/relay.go",
+   "old": "exchangePayment, \"payment.success\", paymentSuccess{",
+   "new": "exchangePayment, \"payment.succeeded\", paymentSuccess{",
+   "test": "internal/legacy/paymentrelay ^TestPaymentSuccessWire$",
+   "why": "付款入帳送到錯的 routing key，order 的 queue 收不到"
+  },
+  {
+   "id": "relay-success-wrong-key-integration",
+   "stack": "go-integration",
+   "file": "backend/internal/legacy/paymentrelay/relay.go",
+   "old": "exchangePayment, \"payment.success\", paymentSuccess{",
+   "new": "exchangePayment, \"payment.succeeded\", paymentSuccess{",
+   "test": "internal/legacy/paymentrelay ^TestEachRelayedEventQueuesOnePublishJobInTheCallersTransaction$",
+   "why": "同上，排入的 job 的 routing key 以資料庫的列斷言"
+  },
+  {
+   "id": "relay-closed-wrong-key",
+   "stack": "go",
+   "file": "backend/internal/legacy/paymentrelay/relay.go",
+   "old": "exchangePayment, \"payment.closed\", paymentClosed{",
+   "new": "exchangePayment, \"payment.expired\", paymentClosed{",
+   "test": "internal/legacy/paymentrelay ^TestPaymentClosedWire$",
+   "why": "取消的付款送成 payment.expired（模組沒有逾期這個狀態）"
+  },
+  {
+   "id": "relay-refund-failed-wrong-key",
+   "stack": "go",
+   "file": "backend/internal/legacy/paymentrelay/relay.go",
+   "old": "exchangePayment, \"refund.failed\", refundFailed{",
+   "new": "exchangePayment, \"refund.succeeded\", refundFailed{",
+   "test": "internal/legacy/paymentrelay ^TestRefundFailedWire$",
+   "why": "失敗的退款送成成功，aftersales 依 routing key 判斷成敗"
+  },
+  {
+   "id": "relay-refund-no-not-request-key",
+   "stack": "go",
+   "file": "backend/internal/legacy/paymentrelay/relay.go",
+   "old": "RefundNo: e.RequestKey, TradeNo: e.OrderNo, OrderID: e.OrderNo, Amount: e.Amount,\n\t\t\t\tCompletedAt",
+   "new": "RefundNo: e.RefundID.String(), TradeNo: e.OrderNo, OrderID: e.OrderNo, Amount: e.Amount,\n\t\t\t\tCompletedAt",
+   "test": "internal/legacy/paymentrelay ^TestRefundSucceededWire$",
+   "why": "refundNo 不是呼叫端的冪等鍵，aftersales 對不回退款任務"
+  },
+  {
+   "id": "relay-publish-not-in-transaction-unique",
+   "stack": "go",
+   "file": "backend/internal/legacy/paymentrelay/relay.go",
+   "old": "return q.Enqueue(ctx, rabbitmq.PublishArgs{EventID: eventID, Exchange: exchange, RoutingKey: key, Body: body}, rabbitmq.InsertOpts())",
+   "new": "return q.Enqueue(ctx, rabbitmq.PublishArgs{EventID: eventID, Exchange: exchange, RoutingKey: key, Body: body}, nil)",
+   "test": "internal/legacy/paymentrelay ^TestPaymentSuccessWire$",
+   "why": "排入送出的 job 不帶 InsertOpts：失去重試次數與 event_id 去重"
+  },
+  {
+   "id": "grant-skips-the-transfer-row",
+   "stack": "go-integration",
+   "file": "backend/internal/legacy/paymentserver/server.go",
+   "old": "tr, err := s.payments.RequestPaymentTransfer(ctx, orderNo)\n\tif err != nil {",
+   "new": "var tr payment.PaymentTransfer\n\tvar err error\n\tif err != nil {",
+   "test": "internal/legacy/paymentserver ^TestGrantPaymentWritesOneTransferRowAndQueuesItsJob$",
+   "why": "GrantPayment 回成功卻沒有寫轉帳列也沒有排 job"
+  },
+  {
+   "id": "grant-skips-the-transfer-row-unit",
+   "stack": "go",
+   "file": "backend/internal/legacy/paymentserver/server.go",
+   "old": "tr, err := s.payments.RequestPaymentTransfer(ctx, orderNo)\n\tif err != nil {",
+   "new": "var tr payment.PaymentTransfer\n\tvar err error\n\tif err != nil {",
+   "test": "internal/legacy/paymentserver ^TestGrantPaymentRetriesUnmetPreconditionsAsGRPCErrorsButNotFoundIsABusinessCode$",
+   "why": "同上，以模組的假替身斷言金額來自轉帳列"
+  },
+  {
+   "id": "grant-precondition-as-business-code",
+   "stack": "go",
+   "file": "backend/internal/legacy/paymentserver/server.go",
+   "old": "ok && code != codeFailedPrecondition {",
+   "new": "ok {",
+   "test": "internal/legacy/paymentserver ^TestGrantPaymentRetriesUnmetPreconditionsAsGRPCErrorsButNotFoundIsABusinessCode$",
+   "why": "撥款條件未成立回業務碼 428，order 的 worker 轉人工而不是重試"
+  },
+  {
+   "id": "refund-auto-never",
+   "stack": "go",
+   "file": "backend/internal/legacy/paymentserver/server.go",
+   "old": "Auto: strings.HasPrefix(key, autoRefundKeyPrefix),",
+   "new": "Auto: false,",
+   "test": "internal/legacy/paymentserver ^TestCreateRefundPassesTheKeyAndMarksOnlyAutoPrefixedKeysAsAutomatic$",
+   "why": "AUTO: 鍵的退款不標成自動退款"
+  },
+  {
+   "id": "refund-auto-always",
+   "stack": "go-integration",
+   "file": "backend/internal/legacy/paymentserver/server.go",
+   "old": "Auto: strings.HasPrefix(key, autoRefundKeyPrefix),",
+   "new": "Auto: true,",
+   "test": "internal/legacy/paymentserver ^TestRefundRoundTripThroughTheOldContract$",
+   "why": "案件退款也標成自動退款"
+  },
+  {
+   "id": "refund-key-is-the-order",
+   "stack": "go",
+   "file": "backend/internal/legacy/paymentserver/server.go",
+   "old": "OrderNo: strings.TrimSpace(m.GetTradeNo()), Amount: amount, RequestKey: key,",
+   "new": "OrderNo: strings.TrimSpace(m.GetTradeNo()), Amount: amount, RequestKey: m.GetTradeNo(),",
+   "test": "internal/legacy/paymentserver ^TestCreateRefundPassesTheKeyAndMarksOnlyAutoPrefixedKeysAsAutomatic$",
+   "why": "冪等鍵換成訂單編號：同一張訂單的第二筆退款被當成同一筆"
+  },
+  {
+   "id": "get-refund-wrong-key",
+   "stack": "go",
+   "file": "backend/internal/legacy/paymentserver/server.go",
+   "old": "s.payments.RefundByRequestKey(ctx, key)",
+   "new": "s.payments.RefundByRequestKey(ctx, req.Msg.GetRefundNo()+\"x\")",
+   "test": "internal/legacy/paymentserver ^TestGetRefundIsKeyedByTheCallersKey$",
+   "why": "GetRefund 不以呼叫端的冪等鍵查"
+  },
+  {
+   "id": "batch-case-keyed-by-order",
+   "stack": "go",
+   "file": "backend/internal/legacy/paymentserver/server.go",
+   "old": "entries[r.RequestKey] = &pb.ProviderStatusEntry{ProviderStatus: string(r.Status), ProviderMessage: r.FailureReason}",
+   "new": "entries[r.OrderNo] = &pb.ProviderStatusEntry{ProviderStatus: string(r.Status), ProviderMessage: r.FailureReason}",
+   "test": "internal/legacy/paymentserver ^TestBatchEntriesAreKeyedByCaseKeyAndOrderAndOmitMissing$",
+   "why": "依案件編號查的退款狀態以訂單編號為鍵，aftersales 對不回案件"
+  },
+  {
+   "id": "batch-order-keyed-by-case",
+   "stack": "go",
+   "file": "backend/internal/legacy/paymentserver/server.go",
+   "old": "entries[r.OrderNo] = &pb.ProviderStatusEntry{ProviderStatus: string(r.Status), ProviderMessage: r.FailureReason}",
+   "new": "entries[r.RequestKey] = &pb.ProviderStatusEntry{ProviderStatus: string(r.Status), ProviderMessage: r.FailureReason}",
+   "test": "internal/legacy/paymentserver ^TestBatchEntriesAreKeyedByCaseKeyAndOrderAndOmitMissing$",
+   "why": "依訂單編號查的退款狀態以冪等鍵為鍵"
+  },
+  {
+   "id": "anomaly-payment-maps-to-init",
+   "stack": "go",
+   "file": "backend/internal/legacy/paymentserver/server.go",
+   "old": "case payment.PaymentAnomaly:\n\t\treturn \"\", fmt.Errorf(\"paymentserver：付款 ANOMALY，結果待人工核對\")",
+   "new": "case payment.PaymentAnomaly:\n\t\treturn paymentStatusInit, nil",
+   "test": "internal/legacy/paymentserver ^TestPaymentStatusMapsEveryStateAndNeverInventsOne$",
+   "why": "付款真相未知被當成待付款，order 逾期取消可能取消已付款的訂單"
+  },
+  {
+   "id": "paid-maps-to-init",
+   "stack": "go",
+   "file": "backend/internal/legacy/paymentserver/server.go",
+   "old": "case payment.PaymentSucceeded:\n\t\treturn paymentStatusPaid, nil",
+   "new": "case payment.PaymentSucceeded:\n\t\treturn paymentStatusInit, nil",
+   "test": "internal/legacy/paymentserver ^TestActivePaymentStatusHasNoDataWhenThereIsNoPaymentAndFailsClosedOnAnomaly$",
+   "why": "已入帳回待付款，order 不會把訂單收斂成已付款"
+  },
+  {
+   "id": "facts-for-an-unpaid-payment",
+   "stack": "go",
+   "file": "backend/internal/legacy/paymentserver/server.go",
+   "old": "if p.Status != payment.PaymentSucceeded || p.PaidAt == nil {",
+   "new": "if p.PaidAt == nil {",
+   "test": "internal/legacy/paymentserver ^TestPaymentFactsOnlyExistForAPaidPaymentAndAlwaysCarryTheProviderTime$",
+   "why": "未入帳的付款也回付款事實，發票會對沒收到的錢開立"
+  },
+  {
+   "id": "close-message-inverted",
+   "stack": "go",
+   "file": "backend/internal/legacy/paymentserver/server.go",
+   "old": "if queued {\n\t\tmsg = closedMessage",
+   "new": "if !queued {\n\t\tmsg = closedMessage",
+   "test": "internal/legacy/paymentserver ^TestClosePaymentByOrderNoReportsWhetherAJobWasQueued$",
+   "why": "是否排入關閉 job 的回報顛倒"
+  },
+  {
+   "id": "close-never-queues",
+   "stack": "go-integration",
+   "file": "backend/internal/legacy/paymentserver/server.go",
+   "old": "queued, err := s.payments.CloseOrderPayment(ctx, orderNo)",
+   "new": "queued, err := false, error(nil)",
+   "test": "internal/legacy/paymentserver ^TestClosePaymentByOrderNoQueuesACancelOnlyForAnUnpaidPayment$",
+   "why": "ClosePaymentByOrderNo 回成功卻從不關閉付款"
+  },
+  {
+   "id": "close-for-order-enqueues-nothing",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/legacy_reads.go",
+   "old": "\t\tqueued = true\n\t\treturn s.d.Jobs.Enqueue(ctx, args, &opts)",
+   "new": "\t\tqueued = true\n\t\t_, _ = args, opts\n\t\treturn nil",
+   "test": "internal/modules/payment ^TestCloseOrderPaymentCancelsAnAwaitingIntentThroughAJob$",
+   "why": "回報已排入關閉 job 卻沒有排"
+  },
+  {
+   "id": "close-job-reads-instead-of-cancelling",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/legacy_reads.go",
+   "old": "snap, err := p.CancelPayment(callCtx, *att.ExternalPaymentID)",
+   "new": "snap, err := p.GetPayment(callCtx, *att.ExternalPaymentID)",
+   "test": "internal/modules/payment ^TestCloseOrderPaymentCancelsAnAwaitingIntentThroughAJob$",
+   "why": "關閉 job 只讀 PaymentIntent、不取消它"
+  },
+  {
+   "id": "close-job-gives-up-while-creating",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/legacy_reads.go",
+   "old": "\t\treturn errStillCreating\n",
+   "new": "\t\treturn nil\n",
+   "test": "internal/modules/payment ^TestCloseJobWaitsForACreatingPaymentAndGivesUpOnTheFinalAttempt$",
+   "why": "建立中的付款關閉 job 不重試就結束，之後建好的 PaymentIntent 沒被取消"
+  },
+  {
+   "id": "ambiguous-request-key-picks-one",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/legacy_reads.go",
+   "old": "\tcase 1:\n\t\treturn rows[0], nil\n\t}",
+   "new": "\tdefault:\n\t\treturn rows[0], nil\n\t}",
+   "test": "internal/modules/payment ^TestLegacyReadsByOrderNoAndRequestKey$",
+   "why": "同一把冪等鍵對到兩筆付款的退款時猜一筆回傳"
+  },
+  {
+   "id": "latest-refund-is-the-oldest",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/store/transfers.sql.go",
+   "old": "ORDER BY p.order_no, r.created_at DESC, r.id DESC",
+   "new": "ORDER BY p.order_no, r.created_at ASC, r.id DESC",
+   "test": "internal/modules/payment ^TestLegacyReadsByOrderNoAndRequestKey$",
+   "why": "每張訂單最新的退款變成最舊的"
+  },
+  {
+   "id": "refund-result-lacks-order-no",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/refund.go",
+   "old": "\tview.OrderNo = orderNo\n",
+   "new": "\tview.OrderNo = \"\"\n",
+   "test": "internal/modules/payment ^TestLegacyReadsByOrderNoAndRequestKey$",
+   "why": "建立退款的回傳沒有訂單編號，legacy 的 trade_no 會是空的"
+  },
+  {
+   "id": "payable-is-always-true",
+   "stack": "go",
+   "file": "backend/internal/legacy/orderservice/payment.go",
+   "old": "Payable: status == statusPendingPayment,",
+   "new": "Payable: true,",
+   "test": "internal/legacy/orderservice ^TestOrderForPaymentMapsTheOrderAndOnlyAPendingPaymentOrderIsPayable$",
+   "why": "已取消或已付款的訂單也可以建立付款"
+  }
+ ]
+}

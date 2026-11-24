@@ -617,3 +617,39 @@ func (m *Module) RefundPayment(ctx context.Context, refundID uuid.UUID, finalAtt
 func (m *Module) SyncPaymentRefund(ctx context.Context, refundID uuid.UUID) (again bool, err error) {
 	return m.charges.SyncRefund(ctx, refundID)
 }
+
+// PaymentByOrderNo 以訂單編號讀付款，不驗呼叫者，不回 client_secret（過渡期 legacy paymentserver 的服務間讀取：訂單的付款狀態、發票的付款事實）；沒有回 NotFound。
+func (m *Module) PaymentByOrderNo(ctx context.Context, orderNo string) (Payment, error) {
+	return m.charges.PaymentByOrderNo(ctx, orderNo)
+}
+
+// PaymentsByOrderNos 批次以訂單編號讀付款（一次最多 500 筆）；沒有付款的訂單不出現在結果裡，順序不保證。
+func (m *Module) PaymentsByOrderNos(ctx context.Context, orderNos []string) ([]Payment, error) {
+	return m.charges.PaymentsByOrderNos(ctx, orderNos)
+}
+
+// RefundByRequestKey 以建立退款時呼叫端給的冪等鍵讀退款（售後的案件 ID 對回）；沒有回 NotFound，同一把鍵對到多筆付款的退款回 FailedPrecondition。
+func (m *Module) RefundByRequestKey(ctx context.Context, requestKey string) (PaymentRefund, error) {
+	return m.charges.RefundByRequestKey(ctx, requestKey)
+}
+
+// RefundsByRequestKeys 批次以冪等鍵讀退款（一次最多 500 筆）；沒有的鍵不出現在結果裡。
+func (m *Module) RefundsByRequestKeys(ctx context.Context, requestKeys []string) ([]PaymentRefund, error) {
+	return m.charges.RefundsByRequestKeys(ctx, requestKeys)
+}
+
+// LatestRefundsByOrderNos 批次讀每張訂單最新的一筆退款（一次最多 500 筆）；沒有退款的訂單不出現在結果裡。
+func (m *Module) LatestRefundsByOrderNos(ctx context.Context, orderNos []string) ([]PaymentRefund, error) {
+	return m.charges.LatestRefundsByOrderNos(ctx, orderNos)
+}
+
+// CloseOrderPayment 是訂單取消或逾期時關閉這張訂單的付款（過渡期 legacy ClosePaymentByOrderNo 的去向，B8 改 in-process 呼叫）：還沒入帳、provider 還能取消的付款排入取消 PaymentIntent 的 job，
+// 回傳是否排入；沒有付款、已入帳、處理中或已終局回 false，不是錯誤。呼叫方不能在 transaction 內呼叫。
+func (m *Module) CloseOrderPayment(ctx context.Context, orderNo string) (bool, error) {
+	return m.charges.CloseForOrder(ctx, orderNo)
+}
+
+// CloseOrderPaymentAttempt 是關閉 job（payment.charge_close）的內容，給 worker 與測試呼叫；finalAttempt 為 true 時付款仍在建立中就放棄。外部呼叫在 transaction 外。
+func (m *Module) CloseOrderPaymentAttempt(ctx context.Context, paymentID uuid.UUID, finalAttempt bool) error {
+	return m.charges.Close(ctx, paymentID, finalAttempt)
+}

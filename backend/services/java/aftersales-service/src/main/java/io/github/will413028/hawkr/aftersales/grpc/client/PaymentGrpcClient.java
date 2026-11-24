@@ -109,35 +109,6 @@ public class PaymentGrpcClient {
         return resp;
     }
 
-    public GetRefundPageUrlResponse getRefundPageUrl(String tradeNo, String amount, String returnUrl) {
-        log.info("PaymentGrpcClient.getRefundPageUrl.start", "取得退款頁面 URL", "tradeNo", tradeNo);
-        var stub = grpcStubFactory.blocking("payment", PaymentServiceGrpc::newBlockingStub)
-                .withDeadlineAfter(INTERNAL_DEADLINE_SEC, TimeUnit.SECONDS);
-        var resp = stub.getRefundPageUrl(
-            GetRefundPageUrlRequest.newBuilder()
-                .setTradeNo(tradeNo)
-                .setAmount(amount)
-                .setReturnUrl(returnUrl)
-                .build()
-        );
-        log.info("PaymentGrpcClient.getRefundPageUrl.done", "取得退款頁面 URL 完成, code=" + resp.getCode(), "tradeNo", tradeNo);
-        return resp;
-    }
-
-    public DecryptPayUniResultResponse decryptPayUniResult(String encryptInfo, String hashInfo) {
-        log.info("PaymentGrpcClient.decryptPayUniResult.start", "解密 PayUni 加密資料");
-        var stub = grpcStubFactory.blocking("payment", PaymentServiceGrpc::newBlockingStub)
-                .withDeadlineAfter(INTERNAL_DEADLINE_SEC, TimeUnit.SECONDS);
-        var resp = stub.decryptPayUniResult(
-            DecryptPayUniResultRequest.newBuilder()
-                .setEncryptInfo(encryptInfo)
-                .setHashInfo(hashInfo)
-                .build()
-        );
-        log.info("PaymentGrpcClient.decryptPayUniResult.done", "解密完成, code=" + resp.getCode());
-        return resp;
-    }
-
     public GetRefundResponse getRefund(String refundNo) {
         var stub = grpcStubFactory.blocking("payment", PaymentServiceGrpc::newBlockingStub)
                 .withDeadlineAfter(INTERNAL_DEADLINE_SEC, TimeUnit.SECONDS);
@@ -154,24 +125,4 @@ public class PaymentGrpcClient {
                         .build());
     }
 
-    /** ATM 退款頁面受理成功（sync 階段，收斂規範 §4.4）：Payment 側 PROCESSING + estimatedRefundDate 落地。 */
-    public AckAtmRefundAcceptedResponse ackAtmRefundAccepted(String refundNo, String providerStatus,
-                                                              String providerMessage,
-                                                              String estimatedRefundDate) {
-        log.info("PaymentGrpcClient.ackAtmRefundAccepted.start",
-                "通知 Payment ATM 退款受理", "refundNo", refundNo);
-        var stub = grpcStubFactory.blocking("payment", PaymentServiceGrpc::newBlockingStub)
-                .withDeadlineAfter(INTERNAL_DEADLINE_SEC, TimeUnit.SECONDS);
-        var resp = stub.ackAtmRefundAccepted(
-            AckAtmRefundAcceptedRequest.newBuilder()
-                .setRefundNo(refundNo == null ? "" : refundNo)
-                .setProviderStatus(providerStatus == null ? "" : providerStatus)
-                .setProviderMessage(providerMessage == null ? "" : providerMessage)
-                .setEstimatedRefundDate(estimatedRefundDate == null ? "" : estimatedRefundDate)
-                .build()
-        );
-        log.info("PaymentGrpcClient.ackAtmRefundAccepted.done",
-                "通知完成 code=" + resp.getCode(), "refundNo", refundNo);
-        return resp;
-    }
 }

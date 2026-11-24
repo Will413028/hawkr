@@ -157,7 +157,9 @@ func (s *Service) CreateRefund(ctx context.Context, in model.RefundRequest) (mod
 	if err != nil {
 		return model.Refund{}, err
 	}
-	return toRefund(out), nil
+	view := toRefund(out)
+	view.OrderNo = orderNo
+	return view, nil
 }
 
 // refundable 回傳付款是否能由目前的 provider 退款：已入帳、有外部 ID、屬於目前的 provider。CreateRefund 與退款 job 共用，
