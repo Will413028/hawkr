@@ -38,6 +38,7 @@ import (
 	adminbizcalendarconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/bizcalendar/v1alpha1/bizcalendarv1alpha1connect"
 	adminbuyerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/buyer/v1alpha1/buyerv1alpha1connect"
 	admincontentconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/content/v1alpha1/contentv1alpha1connect"
+	admincouponconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/coupon/v1alpha1/couponv1alpha1connect"
 	adminidentityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/identity/v1alpha1/identityv1alpha1connect"
 	adminimageaiconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/imageai/v1alpha1/imageaiv1alpha1connect"
 	adminmoderationconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/moderation/v1alpha1/moderationv1alpha1connect"
@@ -72,6 +73,7 @@ import (
 	httpreviewqueue "github.com/Will413028/hawkr/backend/internal/httpapi/reviewqueue"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
+	httpsellerprocurement "github.com/Will413028/hawkr/backend/internal/httpapi/sellerprocurement"
 	httpsocial "github.com/Will413028/hawkr/backend/internal/httpapi/social"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant"
@@ -468,6 +470,7 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 		return nil, err
 	}
 	add(couponv1alpha1connect.NewCouponAppServiceHandler(couponApp, opts...))
+	add(admincouponconnect.NewCouponAdminServiceHandler(httpcoupon.NewAdmin(deps.Coupon), opts...))
 	moderationApp, err := httpmoderation.NewApp(deps.Moderation, deps.Seller, deps.Buyer, deps.IM, deps.Logger)
 	if err != nil {
 		return nil, err
@@ -550,6 +553,11 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	add(adminreviewqueueconnect.NewReviewQueueAdminServiceHandler(httpreviewqueue.NewAdmin(deps.ReviewQueue, sellerStoreNames{deps.Seller}, deps.Now), opts...))
 	add(assistantv1alpha1connect.NewAssistantAppServiceHandler(httpassistant.NewApp(deps.Assistant, deps.Buyer, deps.Logger), opts...))
 	add(procurementv1alpha1connect.NewBuyerProcurementAppServiceHandler(httpbuyerprocurement.NewApp(deps.Procurement, deps.Buyer, deps.Seller, deps.Images, deps.Logger), opts...))
+	sellerProcurementApp, err := httpsellerprocurement.NewApp(deps.Procurement, deps.Seller, deps.Logger)
+	if err != nil {
+		return nil, err
+	}
+	add(procurementv1alpha1connect.NewSellerProcurementAppServiceHandler(sellerProcurementApp, opts...))
 	add(imageaiv1alpha1connect.NewImageAiAppServiceHandler(httpimageai.NewApp(deps.ImageAI, deps.Seller, deps.Images, deps.Logger), append(slices.Clone(opts), connect.WithReadMaxBytes(imageAIMaxRequestBytes))...))
 	add(adminimageaiconnect.NewImageAiAdminServiceHandler(httpimageai.NewAdmin(deps.ImageAI, deps.Images), opts...))
 	// 代行工作區（SocialDelegatedService，A10 起各模組有自己的 <模組>DelegatedService）：憑證是 X-HK-Operation-Session 的代行 session，由 httpapi/delegation 的 interceptor 解析、

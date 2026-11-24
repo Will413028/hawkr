@@ -89,6 +89,8 @@ const (
 	MaxSourceIDLen = 128
 	// MaxIssueBatch 是 Issue 一次的買家數上限（逐張寫入，單 transaction 需要有界）。
 	MaxIssueBatch = 500
+	// MaxIssueRequestBuyers 是 Issue 請求裡買家 ID 的原始個數上限（去重前）：先擋掉過大的請求，再去重與查詢。
+	MaxIssueRequestBuyers = 2 * MaxIssueBatch
 	// MaxTargetBuyers 是建立活動時資格名單的買家數上限。
 	MaxTargetBuyers = 500
 	// DefaultSellerQuota 是沒有配額列的店家可同時進行的活動數。
@@ -261,6 +263,9 @@ const (
 	InvalidSourceOtherBuyer                 InvalidKey = "invalid.source_other_buyer"
 	InvalidStoreInvalid                     InvalidKey = "invalid.store_invalid"
 	InvalidOrderAmountInvalid               InvalidKey = "invalid.order_amount_invalid"
+	InvalidBuyerNotFound                    InvalidKey = "invalid.buyer_not_found"
+	InvalidStoreNotFound                    InvalidKey = "invalid.store_not_found"
+	InvalidStoreClosed                      InvalidKey = "invalid.store_closed"
 )
 
 // invalidText 是各欄位錯誤的使用者面句子。
@@ -300,6 +305,9 @@ var invalidText = map[InvalidKey]func(uitext.Locale) uitext.Message{
 	InvalidSourceOtherBuyer:                 text.InvalidSourceOtherBuyer,
 	InvalidStoreInvalid:                     text.InvalidStoreInvalid,
 	InvalidOrderAmountInvalid:               text.InvalidOrderAmountInvalid,
+	InvalidBuyerNotFound:                    text.InvalidBuyerNotFound,
+	InvalidStoreNotFound:                    text.InvalidStoreNotFound,
+	InvalidStoreClosed:                      text.InvalidStoreClosed,
 }
 
 // Invalid 回傳指出欄位 field 的 InvalidInput，訊息是 key 的使用者面句子（依 ctx 的語系）。
@@ -414,4 +422,20 @@ func PositiveUnique(ctx context.Context, field string, ids []int64) ([]int64, er
 		}
 	}
 	return out, nil
+}
+
+// ExpiringHandler 是 VoucherExpiring 必須有的 handler 名稱（events.SubscribeNamed）：沒有它，到期提醒不寫提醒紀錄也不發布。
+const ExpiringHandler = "coupon.voucher-expiring"
+
+// VoucherExpiring 在一張 AVAILABLE 的券進入到期提醒窗時、與提醒紀錄同一個 transaction 內發布一次（每張券至多一次）；
+// VoucherID 是下游冪等鍵。只有業務鍵與資料，使用者面的句子由訂閱的 notification 模組產生。CampaignTitle 是賣家或平台填的活動名稱原文。
+type VoucherExpiring struct {
+	EventID       uuid.UUID
+	OccurredAt    time.Time
+	BuyerID       int64
+	VoucherID     uuid.UUID
+	CampaignID    uuid.UUID
+	CampaignTitle string
+	// ExpiresAt 是活動的 end_at（UTC）。
+	ExpiresAt time.Time
 }

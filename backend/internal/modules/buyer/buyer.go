@@ -235,6 +235,13 @@ func (module *Module) ListLiveAccounts(ctx context.Context, afterBuyerID int64, 
 	return module.profile.ListLiveAccounts(ctx, afterBuyerID, limit)
 }
 
+// ListLiveFollowerAccounts 列出追蹤店家 storeID、追蹤時間不晚於 followedBy（事件發生時就已追蹤）、buyer_id 大於 afterBuyerID、尚未關閉（營運中與刪除中）
+// 的買家與其帳號，依 buyer_id 由小到大，最多 limit 筆（1 到 MaxLiveAccountsPage）；不足 limit 筆表示沒有更多。followedBy 是零值回 InvalidInput。
+// 給通知對追蹤者的 fan-out：不加鎖，寫入端以 ShareLockByAccount 守門。
+func (module *Module) ListLiveFollowerAccounts(ctx context.Context, storeID, afterBuyerID int64, limit int, followedBy time.Time) ([]AccountRef, error) {
+	return module.follow.ListLiveFollowerAccounts(ctx, storeID, afterBuyerID, limit, followedBy)
+}
+
 // AccountIDByBuyerID 讀取歷史或現任 stint 所屬的帳號鍵，不曝露個資。
 func (module *Module) AccountIDByBuyerID(ctx context.Context, buyerID int64) (int64, error) {
 	return module.profile.AccountIDByBuyerID(ctx, buyerID)

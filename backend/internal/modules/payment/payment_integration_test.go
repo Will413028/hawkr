@@ -65,9 +65,17 @@ type queue struct {
 	// fail 不是 nil 時，排入這個種類的 job 回 fail（只有一次）：模擬 handler 在 Go 端失敗而 transaction 本身沒有壞。
 	failKind string
 	fail     error
+	// before 不是 nil 時，每次排入先呼叫它（在取鎖之前，所以它可以阻塞而不擋住別的排入）：測試用它讓一個 transaction 停在已持有鎖、尚未提交的位置。
+	before func(args river.JobArgs)
 }
 
 func (q *queue) Enqueue(ctx context.Context, args river.JobArgs, opts *river.InsertOpts) error {
+	q.mu.Lock()
+	hook := q.before
+	q.mu.Unlock()
+	if hook != nil {
+		hook(args)
+	}
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if q.fail != nil && args.Kind() == q.failKind {

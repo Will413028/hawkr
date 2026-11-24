@@ -52,7 +52,7 @@ func (s Service) PreviewPublication(ctx context.Context, in PreviewPublicationIn
 			return err
 		}
 		now := s.Now()
-		if in.ResponseDeadline != nil && deadlinePassed(*in.ResponseDeadline, now) {
+		if in.ResponseDeadline != nil && DeadlinePassed(*in.ResponseDeadline, now) {
 			return apperr.InvalidInputOn([]string{"ResponseDeadline"}, "回價期限不得早於今天")
 		}
 		req, rev, err := lockRequest(ctx, q, in.BuyerID, in.RequestID, in.ExpectedRevisionID)
@@ -129,8 +129,8 @@ func checkInput(in PreviewPublicationInput) (string, error) {
 	return note, checkAudienceShape(in)
 }
 
-// deadlinePassed 回傳回價期限（當日）是否早於 now 在營業時區（台北）的今天；期限就是今天不算過。
-func deadlinePassed(deadline, now time.Time) bool { return dateOnly(deadline).Before(twtime.Day(now)) }
+// DeadlinePassed 回傳回價期限（當日）是否早於 now 在營業時區（台北）的今天；期限就是今天不算過。
+func DeadlinePassed(deadline, now time.Time) bool { return dateOnly(deadline).Before(twtime.Day(now)) }
 
 // checkAudienceShape 檢查受眾欄位，不讀資料庫：要有候選集與至少一個候選，且不重複；回價期限要是合法日期（零值不是）。
 func checkAudienceShape(in PreviewPublicationInput) error {

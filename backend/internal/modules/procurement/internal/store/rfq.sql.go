@@ -438,7 +438,7 @@ func (q *Queries) GetPublicationByClientRequest(ctx context.Context, arg GetPubl
 }
 
 const getSellerResponse = `-- name: GetSellerResponse :one
-SELECT id, publication_id, request_id, store_id, latest_version, withdrawn_version, withdrawn_at, write_closed_at, write_closed_reason, created_at, updated_at FROM procurement.seller_responses WHERE publication_id = $1 AND store_id = $2
+SELECT id, publication_id, request_id, store_id, latest_version, withdrawn_version, withdrawn_at, write_closed_at, write_closed_reason, withdrawn_reason_code, write_closed_reason_code, created_at, updated_at FROM procurement.seller_responses WHERE publication_id = $1 AND store_id = $2
 `
 
 type GetSellerResponseParams struct {
@@ -459,6 +459,8 @@ func (q *Queries) GetSellerResponse(ctx context.Context, arg GetSellerResponsePa
 		&i.WithdrawnAt,
 		&i.WriteClosedAt,
 		&i.WriteClosedReason,
+		&i.WithdrawnReasonCode,
+		&i.WriteClosedReasonCode,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

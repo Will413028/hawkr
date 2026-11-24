@@ -199,8 +199,8 @@ func (f *fixture) respondAt(created time.Time, publication uuid.UUID, storeID in
 		f.exec(`INSERT INTO procurement.seller_response_versions (
 				id, seller_response_id, version, response_type, spec_note, unit_basis_quantity, unit_basis_unit,
 				offered_quantity, offered_quantity_unit, conversion_basis, currency, goods_amount, shipping_amount, tax_amount, tax_inclusion_basis, total_amount,
-				valid_until, outside_buyer_requested_range, publication_version, client_request_id, submitted_at, created_at)
-			VALUES ($1, $2, $3, 'MANUAL_QUOTE', '', $4::text::numeric, 'KG', $5::text::numeric, $11, '', 'TWD', $6::bigint, 10, 5, 'TAX_EXCLUDED', $7::bigint, $8, false, 1, $9, $10, $10)`,
+				valid_until, publication_version, client_request_id, submitted_at, created_at)
+			VALUES ($1, $2, $3, 'MANUAL_QUOTE', '', $4::text::numeric, 'KG', $5::text::numeric, $11, '', 'TWD', $6::bigint, 10, 5, 'TAX_EXCLUDED', $7::bigint, $8, 1, $9, $10, $10)`,
 			uuid.NewV7(), id, int32(i+1), v.unitBasis, v.quantity, v.goods, v.goods+15, v.validUntil, uuid.NewV7(), v.submitted, v.unit)
 	}
 	f.exec(`UPDATE procurement.seller_responses SET latest_version = $2 WHERE id = $1`, id, int32(len(versions)))

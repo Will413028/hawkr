@@ -67,6 +67,7 @@ class AfterSaleResolutionServiceTest {
     private static final Long SELLER = 2683382637L;
     private static final Long BUYER = 2608240571L;
     private static final String CASE_NO = "A110159113";
+    private static final Long CASE_ID = 2700000000001L;
 
     @BeforeAll
     static void initTsid() {
@@ -75,6 +76,7 @@ class AfterSaleResolutionServiceTest {
 
     private AfterSaleCaseEntity pendingCase() {
         AfterSaleCaseEntity c = new AfterSaleCaseEntity();
+        c.setId(CASE_ID);
         c.setCaseNo(CASE_NO);
         c.setOrderNo("O400280260");
         c.setStoreId(SELLER);
@@ -99,7 +101,7 @@ class AfterSaleResolutionServiceTest {
     @Test
     void couponCompensation_grantFailed_throwsAndDoesNotCloseCase() {
         when(couponGrpcClient.grantSellerCompensationCoupon(
-                anyString(), anyString(), anyString(), anyString(), anyString(), anyString()))
+                anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(GrantSellerCompensationCouponResponse.newBuilder()
                         .setCode(GrpcResponseCode.INVALID_PARAM.code())
                         .setMessage("補償金額必須大於 0")
@@ -120,7 +122,7 @@ class AfterSaleResolutionServiceTest {
     @Test
     void couponCompensation_grantSuccess_insertsAndClosesCase() {
         when(couponGrpcClient.grantSellerCompensationCoupon(
-                anyString(), anyString(), anyString(), anyString(), anyString(), anyString()))
+                anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(GrantSellerCompensationCouponResponse.newBuilder()
                         .setCode(GrpcResponseCode.SUCCESS.code())
                         .setData(SellerCompensationCouponData.newBuilder().setTemplateId("9988").build())
@@ -132,6 +134,25 @@ class AfterSaleResolutionServiceTest {
 
         verify(resolutionMapper, times(1)).insert(any());
         verify(caseMapper, times(1)).closeByCouponCompensation(eq(CASE_NO), any());
+    }
+
+    // ---- D4：補償券的冪等鍵是售後單 id，必須送到 coupon ----
+    @Test
+    void couponCompensation_sendsTheCaseIdAsSourceId() {
+        when(couponGrpcClient.grantSellerCompensationCoupon(
+                anyString(), anyString(), anyString(), anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(GrantSellerCompensationCouponResponse.newBuilder()
+                        .setCode(GrpcResponseCode.SUCCESS.code())
+                        .setData(SellerCompensationCouponData.newBuilder().setTemplateId("9988").build())
+                        .build());
+        when(caseMapper.closeByCouponCompensation(anyString(), any())).thenReturn(1);
+
+        service.resolve(SELLER, CASE_NO, AfterSaleResolutionType.COUPON_COMPENSATION.value(),
+                null, null, null, null, 100L, 600L, "補償");
+
+        verify(couponGrpcClient).grantSellerCompensationCoupon(
+                eq(String.valueOf(SELLER)), eq(String.valueOf(BUYER)), eq("100"), eq("600"), eq("補償"),
+                eq(CASE_NO), eq(String.valueOf(CASE_ID)));
     }
 
     // ---- #1150 同類：退貨建單失敗不推進 ----

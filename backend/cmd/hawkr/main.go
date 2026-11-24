@@ -253,7 +253,7 @@ func runServe(ctx context.Context) error {
 	subscribeProcurement(bus, d, log)
 	imageAIModule := newImageAI(d, imageAIConfig, sellerModule, llm.NewImage(llmConfig, log).Generator(), med, log)
 	subscribeImageAI(bus, imageAIModule)
-	procurementModule := newProcurement(d, jc, buyerModule, sellerModule, bus, log)
+	procurementModule := newProcurement(d, jc, buyerModule, sellerModule, sellerModule, bus, log)
 	stopProcurementHub := startProcurementHub(ctx, procurementModule, log)
 	defer stopProcurementHub()
 	subscribeModeration(bus, moderationModule.Retention())
@@ -293,7 +293,7 @@ func runServe(ctx context.Context) error {
 		Review:       reviewModule,
 		IM:           imModule,
 		CRM:          crmModule,
-		Coupon:       newCoupon(d, sellerModule),
+		Coupon:       newCoupon(d, sellerModule, buyerModule),
 		Moderation:   moderationModule,
 		Notification: notificationModule,
 		Content: content.New(content.Deps{

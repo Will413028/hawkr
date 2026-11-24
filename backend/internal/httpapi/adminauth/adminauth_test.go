@@ -17,6 +17,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/bizcalendar/v1alpha1/bizcalendarv1alpha1connect"
+	couponv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/coupon/v1alpha1/couponv1alpha1connect"
 	imageaiv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/imageai/v1alpha1/imageaiv1alpha1connect"
 	moderationv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/moderation/v1alpha1/moderationv1alpha1connect"
 	notificationv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/notification/v1alpha1/notificationv1alpha1connect"
@@ -68,8 +69,8 @@ func TestDeclarationsMatchTheServiceDescriptors(t *testing.T) {
 	if err := Check(svcs); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(declarations), methodCount(t); got != want || got != 97 {
-		t.Fatalf("declarations=%d methods=%d，預期 97", got, want)
+	if got, want := len(declarations), methodCount(t); got != want || got != 106 {
+		t.Fatalf("declarations=%d methods=%d，預期 106", got, want)
 	}
 
 	for procedure := range declarations {
@@ -333,6 +334,12 @@ func TestEveryDeclarationHasAnAuditModeAndPaymentWritesAreAudited(t *testing.T) 
 	}
 	wantAudited := []string{
 		bizcalendarv1alpha1connect.BizCalendarAdminServiceImportHolidayCalendarProcedure,
+		couponv1alpha1connect.CouponAdminServiceCreateCampaignProcedure,
+		couponv1alpha1connect.CouponAdminServicePublishCampaignProcedure,
+		couponv1alpha1connect.CouponAdminServiceEndCampaignProcedure,
+		couponv1alpha1connect.CouponAdminServiceGrantVouchersProcedure,
+		couponv1alpha1connect.CouponAdminServiceVoidVoucherProcedure,
+		couponv1alpha1connect.CouponAdminServiceSetSellerQuotaProcedure,
 		imageaiv1alpha1connect.ImageAiAdminServiceCreateAiStyleProcedure,
 		imageaiv1alpha1connect.ImageAiAdminServiceUpdateAiStyleProcedure,
 		imageaiv1alpha1connect.ImageAiAdminServiceSetDefaultAiStyleProcedure,
@@ -484,6 +491,41 @@ func TestNotificationAdminMethodsDeclareTheirOwnPermission(t *testing.T) {
 		if !ok || d.permission != want.perm || d.exemptReason != "" || d.audit != want.audit {
 			t.Errorf("%s 的宣告 = %+v，預期權限 %s、紀錄模式 %s", procedure, d, want.perm, want.audit)
 		}
+	}
+}
+
+// coupon 的後台方法一個方法對一個權限；六支寫入留後台動作紀錄，三支唯讀（列活動、活動明細、列買家的券）不留，而且都不能是 auditPending。
+func TestCouponAdminMethodsDeclareTheirOwnPermission(t *testing.T) {
+	for procedure, want := range map[string]struct {
+		perm  adminperm.Permission
+		audit auditMode
+	}{
+		couponv1alpha1connect.CouponAdminServiceCreateCampaignProcedure:    {adminperm.CouponCampaignsCreate, auditAudited},
+		couponv1alpha1connect.CouponAdminServicePublishCampaignProcedure:   {adminperm.CouponCampaignsPublish, auditAudited},
+		couponv1alpha1connect.CouponAdminServiceEndCampaignProcedure:       {adminperm.CouponCampaignsEnd, auditAudited},
+		couponv1alpha1connect.CouponAdminServiceGrantVouchersProcedure:     {adminperm.CouponVouchersGrant, auditAudited},
+		couponv1alpha1connect.CouponAdminServiceVoidVoucherProcedure:       {adminperm.CouponVouchersVoid, auditAudited},
+		couponv1alpha1connect.CouponAdminServiceSetSellerQuotaProcedure:    {adminperm.CouponSellerQuotasUpdate, auditAudited},
+		couponv1alpha1connect.CouponAdminServiceListCampaignsProcedure:     {adminperm.CouponCampaignsList, auditReadOnly},
+		couponv1alpha1connect.CouponAdminServiceGetCampaignProcedure:       {adminperm.CouponCampaignsGet, auditReadOnly},
+		couponv1alpha1connect.CouponAdminServiceListBuyerVouchersProcedure: {adminperm.CouponVouchersList, auditReadOnly},
+	} {
+		d, ok := declarations[procedure]
+		if !ok || d.permission != want.perm || d.exemptReason != "" || d.audit != want.audit {
+			t.Errorf("%s 的宣告 = %+v，預期權限 %s、紀錄模式 %s", procedure, d, want.perm, want.audit)
+		}
+	}
+	if pending := AuditPendingProcedures(); slices.ContainsFunc(pending, func(p string) bool { return strings.Contains(p, ".coupon.") }) {
+		t.Errorf("coupon 的後台方法不得是 auditPending：%v", pending)
+	}
+	n := 0
+	for _, p := range AuditedProcedures() {
+		if strings.Contains(p, ".coupon.") {
+			n++
+		}
+	}
+	if n != 6 {
+		t.Errorf("coupon 的 audited 方法 = %d，預期 6", n)
 	}
 }
 

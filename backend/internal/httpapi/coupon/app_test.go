@@ -384,15 +384,17 @@ func TestSellerCampaignExpiredComesFromTheModule(t *testing.T) {
 	}
 }
 
-// MEMBER 的消費紀錄資料還沒有接上：店家不能建 MEMBER 活動，擋在入口，不呼叫模組。
-func TestCreateCampaignRejectsMemberTargetType(t *testing.T) {
+// MEMBER 活動可以建立：入口不再擋，資格由模組以消費紀錄投影判定；傳給模組的是 MEMBER。
+func TestCreateCampaignAcceptsMemberTargetType(t *testing.T) {
 	r := newRig(t)
+	r.module.created = campaign()
 	in := cashInput()
 	in.TargetType = pb.TargetType_TARGET_TYPE_MEMBER
-	_, err := r.app.CreateCampaign(signedIn(), connect.NewRequest(&pb.CreateCampaignRequest{Campaign: in}))
-	_, fields := reasonAndFields(err)
-	if codeOf(err) != connect.CodeInvalidArgument || !slices.Equal(fields, []string{"campaign.target_type"}) || len(r.module.calls) != 0 {
-		t.Fatalf("MEMBER：code=%v fields=%v calls=%v", codeOf(err), fields, r.module.calls)
+	if _, err := r.app.CreateCampaign(signedIn(), connect.NewRequest(&pb.CreateCampaignRequest{Campaign: in})); err != nil {
+		t.Fatal(err)
+	}
+	if r.module.createIn.TargetType != coupon.TargetMember || !slices.Equal(r.module.calls, []string{"CreateCampaign"}) {
+		t.Fatalf("target=%q calls=%v", r.module.createIn.TargetType, r.module.calls)
 	}
 }
 

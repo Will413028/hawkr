@@ -21,10 +21,42 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
+// Buyers 是「這些買家存在」的 port：領券與發券前確認買家還在，釋放時用來判斷買家是否已刪帳。讀取失敗回錯誤，不當成不存在。
+type Buyers interface {
+	Existing(ctx context.Context, ids []int64) ([]int64, error)
+}
+
+// buyerExists 回報買家是否存在；寫入在 ctx 的 transaction 內讀取，與刪帳的提交排序。
+func (s *Service) buyerExists(ctx context.Context, buyerID int64) (bool, error) {
+	got, err := s.d.Buyers.Existing(ctx, []int64{buyerID})
+	if err != nil {
+		return false, err
+	}
+	for _, id := range got {
+		if id == buyerID {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// requireBuyer 在買家不存在（已刪帳或從未存在）時回 InvalidInput。
+func (s *Service) requireBuyer(ctx context.Context, buyerID int64) error {
+	ok, err := s.buyerExists(ctx, buyerID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return model.Invalid(ctx, "BuyerID", model.InvalidBuyerIDInvalid)
+	}
+	return nil
+}
+
 // Deps 是券寫入路徑的依賴。
 type Deps struct {
 	DB      *db.DB
 	Qualify *qualify.Service
+	Buyers  Buyers
 	NewID   func() uuid.UUID
 	Now     func() time.Time
 }
@@ -93,6 +125,9 @@ func (s *Service) Claim(ctx context.Context, campaignID uuid.UUID, buyerID int64
 			return err
 		}
 		now := s.d.Now()
+		if err := s.requireBuyer(ctx, buyerID); err != nil {
+			return err
+		}
 		if err := s.d.Qualify.Check(ctx, c, buyerID, now); err != nil {
 			return err
 		}
@@ -135,7 +170,7 @@ func (s *Service) create(ctx context.Context, q *store.Queries, campaignID uuid.
 	return rows.Voucher(row), nil
 }
 
-// IssueInput 是 admin 指定發放的輸入。
+// IssueInput 是 admin 指定發放的輸入；只能發放平台發的非補償活動，店家發的與補償活動回 NotFound。
 type IssueInput struct {
 	CampaignID uuid.UUID
 	BuyerIDs   []int64
@@ -155,12 +190,15 @@ func (s *Service) Issue(ctx context.Context, in IssueInput) (IssueResult, error)
 	if in.AdminID <= 0 {
 		return IssueResult{}, model.Invalid(ctx, "AdminID", model.InvalidAdminIDInvalid)
 	}
-	if len(in.BuyerIDs) == 0 || len(in.BuyerIDs) > model.MaxIssueBatch {
+	if len(in.BuyerIDs) > model.MaxIssueRequestBuyers {
 		return IssueResult{}, model.Invalid(ctx, "BuyerIDs", model.InvalidBuyerCountInvalid)
 	}
 	buyers, err := model.PositiveUnique(ctx, "BuyerIDs", in.BuyerIDs)
 	if err != nil {
 		return IssueResult{}, err
+	}
+	if len(buyers) == 0 || len(buyers) > model.MaxIssueBatch {
+		return IssueResult{}, model.Invalid(ctx, "BuyerIDs", model.InvalidBuyerCountInvalid)
 	}
 	var res IssueResult
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
@@ -173,6 +211,9 @@ func (s *Service) Issue(ctx context.Context, in IssueInput) (IssueResult, error)
 			return err
 		}
 		c := rows.Campaign(crow)
+		if c.IssuerStoreID != nil || c.TargetType == model.TargetCompensation {
+			return model.NotFound(ctx, model.ReasonCampaignNotFound)
+		}
 		if c.TargetType != model.TargetDesignated {
 			return model.Precondition(ctx, model.ReasonNotDesignated)
 		}
@@ -182,6 +223,13 @@ func (s *Service) Issue(ctx context.Context, in IssueInput) (IssueResult, error)
 		}
 		if c.Expired(now) {
 			return model.Precondition(ctx, model.ReasonOutsideWindow)
+		}
+		existing, err := s.d.Buyers.Existing(ctx, buyers)
+		if err != nil {
+			return err
+		}
+		if len(existing) != len(buyers) {
+			return model.Invalid(ctx, "BuyerIDs", model.InvalidBuyerIDInvalid)
 		}
 		held, err := q.ListHeldBuyers(ctx, store.ListHeldBuyersParams{CampaignID: c.ID, BuyerIds: buyers})
 		if err != nil {
@@ -285,6 +333,9 @@ func (s *Service) IssueCompensation(ctx context.Context, in CompensationInput) (
 
 	var res CompensationResult
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		if err := s.requireBuyer(ctx, in.BuyerID); err != nil {
+			return err
+		}
 		q := s.q(ctx)
 		srcType := string(in.SourceType)
 		campaignID := s.d.NewID()
@@ -369,10 +420,13 @@ func heldBy(v store.CouponCouponVoucher, orderNo string) bool {
 	return (st == model.VoucherLocked || st == model.VoucherRedeemed) && v.OrderNo != nil && *v.OrderNo == orderNo
 }
 
-// Quote 驗券但不鎖：與 Lock 同一組檢查（資格、時間窗、店家範圍、門檻），回傳折抵金額。
+// Quote 驗券但不鎖：與 Lock 同一組檢查（資格、時間窗、店家範圍、門檻），回傳折抵金額。OrderNo 可以是空字串，表示這次驗券
+// 還沒有對應的訂單（Java 結帳預覽與建單前的驗券）；有值時必須合法，並讓「已由這筆訂單持有」的券略過資格重驗，與 Lock 的重送一致。
 func (s *Service) Quote(ctx context.Context, in LockInput) (LockResult, error) {
-	if err := validOrderNo(ctx, in.OrderNo); err != nil {
-		return LockResult{}, err
+	if in.OrderNo != "" {
+		if err := validOrderNo(ctx, in.OrderNo); err != nil {
+			return LockResult{}, err
+		}
 	}
 	var res LockResult
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
@@ -585,7 +639,7 @@ type ReleaseResult struct {
 }
 
 // Release 釋放持有這筆訂單的券（以 order_no 為鍵，D3 A）：鎖定中的回到可用；已核銷的（賣家取消已付款訂單）也回到可用。
-// 活動已結束時改為作廢（D5：結束之後沒有 AVAILABLE）。重送冪等。讀活動列時共享鎖，與結束活動排隊，所以不會在結束
+// 活動已結束（D5：結束之後沒有 AVAILABLE）或買家已刪帳時改為作廢。重送冪等。讀活動列時共享鎖，與結束活動排隊，所以不會在結束
 // 掃過之後才回到可用。
 func (s *Service) Release(ctx context.Context, orderNo string) (ReleaseResult, error) {
 	if err := validOrderNo(ctx, orderNo); err != nil {
@@ -607,7 +661,11 @@ func (s *Service) Release(ctx context.Context, orderNo string) (ReleaseResult, e
 		}
 		now := s.d.Now()
 		p := store.ReleaseVoucherParams{ID: cur.ID, OrderNo: &orderNo, ToStatus: string(model.VoucherAvailable), Now: now}
-		if model.CampaignStatus(crow.Status) == model.StatusEnded {
+		exists, err := s.buyerExists(ctx, cur.BuyerID)
+		if err != nil {
+			return err
+		}
+		if !exists || model.CampaignStatus(crow.Status) == model.StatusEnded {
 			p.ToStatus, p.VoidedAt = string(model.VoucherVoided), rows.TimePtr(now)
 		}
 		row, err := q.ReleaseVoucher(ctx, p)
@@ -622,6 +680,22 @@ func (s *Service) Release(ctx context.Context, orderNo string) (ReleaseResult, e
 		return s.logOp(ctx, q, store.InsertLogParams{CampaignID: row.CampaignID, VoucherID: uid(row.ID), BuyerID: &buyer, Action: "RELEASE", OrderNo: &orderNo})
 	})
 	return res, err
+}
+
+// ForCampaign 回傳買家在這個活動持有的券（每位買家在同一個活動至多一張，所以不需要挑選）；沒有領過或被發放過回 NotFound
+// （ReasonVoucherNotFound）。只讀，不改狀態。給把 Java 的活動識別對到券的轉接層用。
+func (s *Service) ForCampaign(ctx context.Context, buyerID int64, campaignID uuid.UUID) (model.Voucher, error) {
+	if buyerID <= 0 {
+		return model.Voucher{}, model.Invalid(ctx, "BuyerID", model.InvalidBuyerIDInvalid)
+	}
+	row, err := s.q(ctx).GetVoucherByCampaignBuyer(ctx, store.GetVoucherByCampaignBuyerParams{CampaignID: campaignID, BuyerID: buyerID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.Voucher{}, model.NotFound(ctx, model.ReasonVoucherNotFound)
+	}
+	if err != nil {
+		return model.Voucher{}, err
+	}
+	return rows.Voucher(row), nil
 }
 
 // VoidInput 是 admin 作廢單張券的輸入。

@@ -609,8 +609,8 @@ func TestSellerResponseVersionAllowsEmptyConversionBasis(t *testing.T) {
 				id, seller_response_id, version, response_type, spec_note,
 				unit_basis_quantity, unit_basis_unit, offered_quantity, offered_quantity_unit, conversion_basis, currency,
 				goods_amount, shipping_amount, tax_amount, tax_inclusion_basis, total_amount, valid_until,
-				outside_buyer_requested_range, publication_version, client_request_id, submitted_at, created_at)
-			VALUES ($1, $2, $3, 'MANUAL_QUOTE', '', 1, '件', 1, '件', $4, 'TWD', 100, 0, 0, 'TAX_INCLUDED', 100, $5, false, 1, $6, $5, $5)`,
+				publication_version, client_request_id, submitted_at, created_at)
+			VALUES ($1, $2, $3, 'MANUAL_QUOTE', '', 1, '件', 1, '件', $4, 'TWD', 100, 0, 0, 'TAX_INCLUDED', 100, $5, 1, $6, $5, $5)`,
 			id(), c.sellerResponse, version, basis, epoch, id())
 		return err
 	}

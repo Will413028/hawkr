@@ -287,7 +287,7 @@ export enum ErrorReason {
   RFQ_RESPONSE_EXPIRED = 31,
 
   /**
-   * 賣家對這筆詢價已經不能再寫入（搭配 failed_precondition）：賣家已婉拒，或詢價已結案、他人已成交。
+   * 賣家對這筆詢價已經不能再寫入（搭配 failed_precondition）：賣家已婉拒、這張需求已有進行中的成交、買家已刪除，或回價期限已過。
    * SellerProcurementAppService 的 SubmitSellerResponse、WithdrawSellerResponse、UpsertSellerResponseDraft。
    *
    * @generated from enum value: RFQ_RECIPIENT_CLOSED = 32;

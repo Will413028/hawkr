@@ -43,6 +43,15 @@ func InvalidBuyerIdInvalid(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "買家不正確", Locale: uitext.ZhTW}
 }
 
+// InvalidBuyerNotFound 是模組句子 invalid.buyer_not_found；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidBuyerNotFound(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The buyer does not exist", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "買家不存在", Locale: uitext.ZhTW}
+}
+
 // InvalidBuyerStoreIssuerInvalid 是模組句子 invalid.buyer_store_issuer_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func InvalidBuyerStoreIssuerInvalid(l uitext.Locale) uitext.Message {
 	switch l {
@@ -250,6 +259,15 @@ func InvalidSourceOtherBuyer(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "這個補償來源已經發給另一位買家", Locale: uitext.ZhTW}
 }
 
+// InvalidStoreClosed 是模組句子 invalid.store_closed；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidStoreClosed(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The store is closed, so a campaign limited to it cannot be created", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "店家已關閉，不能建立限定這家店的活動", Locale: uitext.ZhTW}
+}
+
 // InvalidStoreInvalid 是模組句子 invalid.store_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func InvalidStoreInvalid(l uitext.Locale) uitext.Message {
 	switch l {
@@ -257,6 +275,15 @@ func InvalidStoreInvalid(l uitext.Locale) uitext.Message {
 		return uitext.Message{Text: "The store is not valid", Locale: uitext.EN}
 	}
 	return uitext.Message{Text: "店家不正確", Locale: uitext.ZhTW}
+}
+
+// InvalidStoreNotFound 是模組句子 invalid.store_not_found；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func InvalidStoreNotFound(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "The store does not exist", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "店家不存在", Locale: uitext.ZhTW}
 }
 
 // InvalidStoreOrTargetInvalid 是模組句子 invalid.store_or_target_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。

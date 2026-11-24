@@ -172,15 +172,6 @@
    "why": "店家結束補償活動不再回 NotFound：買家的補償券被作廢，測試要紅。"
   },
   {
-   "id": "seller-member-campaign-accepted",
-   "stack": "go",
-   "file": "backend/internal/httpapi/coupon/app.go",
-   "old": "if in.GetTargetType() == pb.TargetType_TARGET_TYPE_MEMBER {",
-   "new": "if false {",
-   "test": "internal/httpapi/coupon ^TestCreateCampaignRejectsMemberTargetType$",
-   "why": "賣家能建 MEMBER 活動：投影接上之前，所有買家的可領列表與結帳券列表都因 Members port 失敗，測試要紅。"
-  },
-  {
    "id": "designated-list-accepts-non-customers",
    "stack": "go",
    "file": "backend/internal/httpapi/coupon/app.go",

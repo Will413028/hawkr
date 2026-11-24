@@ -68,6 +68,10 @@ type Fake struct {
 	refunds      map[string]*fakeRefund
 	refundByKey  map[string]string
 	refundErrs   []error
+	refundLost   []error
+	refundSeen   []string
+	refundCalls  int
+	refundNext   RefundState
 	transfers    map[string]*fakeTransfer
 	transferKeys map[string]string
 	transferErrs []error
@@ -77,6 +81,7 @@ type Fake struct {
 	reversalErrs []error
 	// transferLost 與 reversalLost 是「已建立、回應遺失」的錯誤佇列；transferCalls 與 reversalCalls 計呼叫次數（失敗的也算）。
 	transferSeen  []string
+	transferSums  []int64
 	reversalSeen  []string
 	transferLost  []error
 	reversalLost  []error
@@ -90,7 +95,7 @@ type Fake struct {
 // NewFake 建立 Fake。
 func NewFake() *Fake {
 	return &Fake{
-		intents: map[string]*fakeIntent{}, byKey: map[string]string{}, refunds: map[string]*fakeRefund{}, refundByKey: map[string]string{},
+		intents: map[string]*fakeIntent{}, byKey: map[string]string{}, refunds: map[string]*fakeRefund{}, refundByKey: map[string]string{}, refundNext: RefundSucceeded,
 		transfers: map[string]*fakeTransfer{}, transferKeys: map[string]string{}, reversals: map[string]ReversalSnapshot{}, reversalKeys: map[string]string{}, reversalOf: map[string]string{},
 	}
 }
@@ -130,6 +135,72 @@ func (f *Fake) FailRefund(errs ...error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	push(&f.refundErrs, errs)
+}
+
+// FailRefundAfterCreate 讓接下來的 CreateRefund 依序在退款已建立之後回這些錯誤（回應遺失，呼叫方沒有拿到 ID；排完就成功），用來造「呼叫過、結果不明」。
+func (f *Fake) FailRefundAfterCreate(errs ...error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	push(&f.refundLost, errs)
+}
+
+// NextRefundState 設定之後建立的退款的初始狀態（預設 RefundSucceeded；RefundPending 用來測 provider 還在處理）。
+func (f *Fake) NextRefundState(state RefundState) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.refundNext = state
+}
+
+// SetRefundState 讓退款變成這個狀態（含不認得的）；failureReason 只在 RefundFailed 有意義。
+func (f *Fake) SetRefundState(externalID string, state RefundState, failureReason string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	r, ok := f.refunds[externalID]
+	if !ok {
+		return fmt.Errorf("fake：沒有退款 %s", externalID)
+	}
+	r.snap.State, r.snap.FailureReason = state, failureReason
+	return nil
+}
+
+// SetRefundAmount 改 provider 那邊退款的金額（測試查回或建立的結果與列對不起來）。
+func (f *Fake) SetRefundAmount(externalID string, amount int64) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	r, ok := f.refunds[externalID]
+	if !ok {
+		return fmt.Errorf("fake：沒有退款 %s", externalID)
+	}
+	r.snap.Amount = amount
+	return nil
+}
+
+// RefundCalls 回傳 CreateRefund 的呼叫次數（失敗的呼叫也算）。
+func (f *Fake) RefundCalls() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.refundCalls
+}
+
+// RefundKeys 回傳每次 CreateRefund 收到的冪等鍵（依呼叫順序，失敗的呼叫也算）。
+func (f *Fake) RefundKeys() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.refundSeen...)
+}
+
+// RefundIDs 回傳 provider 那邊已建立的退款的外部 ID（依 ID 排序）。
+func (f *Fake) RefundIDs() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return sortedKeys(f.refunds)
+}
+
+// Refunds 回傳 provider 那邊已建立的退款數（同一把鍵只算一筆）。
+func (f *Fake) Refunds() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.refunds)
 }
 
 // FailTransfer 見 FailRefund。
@@ -218,6 +289,13 @@ func (f *Fake) TransferKeys() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return append([]string(nil), f.transferSeen...)
+}
+
+// TransferAmounts 回傳每次 CreateTransfer 收到的金額（依呼叫順序，失敗的呼叫也算）。
+func (f *Fake) TransferAmounts() []int64 {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]int64(nil), f.transferSums...)
 }
 
 // ReversalKeys 回傳每次 ReverseTransfer 收到的冪等鍵（依呼叫順序，失敗的呼叫也算）。
@@ -518,25 +596,40 @@ func (f *Fake) CancelPayment(ctx context.Context, externalID string) (Snapshot, 
 	return in.snap, nil
 }
 
-// CreateRefund 實作 Provider：同一個冪等鍵回同一筆退款；超過付款金額是永久失敗。
+// CreateRefund 實作 Provider：同一個冪等鍵回同一筆退款；付款未入帳、金額不是正數或累計（非失敗的退款加總）超過付款金額是永久失敗；
+// FailRefund 注入可重試拒絕與一般錯誤，FailRefundAfterCreate 注入「已建立、回應遺失」。
 func (f *Fake) CreateRefund(ctx context.Context, in RefundInput) (RefundSnapshot, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.check(ctx, "CreateRefund")
+	f.refundCalls++
+	f.refundSeen = append(f.refundSeen, in.IdempotencyKey)
 	if err := pop(&f.refundErrs); err != nil {
 		return RefundSnapshot{}, err
 	}
 	if id, ok := f.refundByKey[in.IdempotencyKey]; ok {
-		return f.refunds[id].snap, nil
+		return f.refunds[id].snap, pop(&f.refundLost)
 	}
 	pi, ok := f.intents[in.ExternalPaymentID]
-	if !ok || pi.snap.State != StateSucceeded || in.Amount <= 0 || in.Amount > pi.snap.Amount {
+	if !ok || pi.snap.State != StateSucceeded || in.Amount <= 0 {
 		return RefundSnapshot{}, fmt.Errorf("%w：不能退款 %s", ErrPermanent, in.ExternalPaymentID)
+	}
+	var taken int64
+	for _, r := range f.refunds {
+		if r.in.ExternalPaymentID == in.ExternalPaymentID && r.snap.State != RefundFailed {
+			taken += r.snap.Amount
+		}
+	}
+	if in.Amount > pi.snap.Amount-taken {
+		return RefundSnapshot{}, fmt.Errorf("%w：退款累計超過付款金額 %s", ErrPermanent, in.ExternalPaymentID)
 	}
 	f.next++
 	id := fmt.Sprintf("fake_re_%d", f.next)
-	snap := RefundSnapshot{ExternalID: id, State: RefundSucceeded, Amount: in.Amount}
+	snap := RefundSnapshot{ExternalID: id, State: f.refundNext, Amount: in.Amount}
 	f.refunds[id], f.refundByKey[in.IdempotencyKey] = &fakeRefund{in: in, snap: snap}, id
+	if err := pop(&f.refundLost); err != nil {
+		return RefundSnapshot{}, err
+	}
 	return snap, nil
 }
 
@@ -559,10 +652,14 @@ func (f *Fake) CreateTransfer(ctx context.Context, in TransferInput) (TransferSn
 	f.check(ctx, "CreateTransfer")
 	f.transferCalls++
 	f.transferSeen = append(f.transferSeen, in.IdempotencyKey)
+	f.transferSums = append(f.transferSums, in.Amount)
 	if err := pop(&f.transferErrs); err != nil {
 		return TransferSnapshot{}, err
 	}
 	if id, ok := f.transferKeys[in.IdempotencyKey]; ok {
+		if f.transfers[id].in.Amount != in.Amount {
+			return TransferSnapshot{}, fmt.Errorf("%w：同一把冪等鍵送了不同的金額", ErrPermanent)
+		}
 		return f.transfers[id].snap, pop(&f.transferLost)
 	}
 	if in.Amount <= 0 || in.SourceChargeID == "" || in.DestinationAccountID == "" {
@@ -606,7 +703,7 @@ func (f *Fake) ReverseTransfer(ctx context.Context, in ReversalInput) (ReversalS
 	return snap, nil
 }
 
-// ParseEvent 實作 Provider：沒有簽章，header 帶事件 ID，body 是 PaymentIntent ID（可帶 "|宣稱的狀態"，被忽略）。
+// ParseEvent 實作 Provider：沒有簽章，header 帶事件 ID，body 是 PaymentIntent ID 或退款 ID（fake_re_ 開頭是退款事件；可帶 "|宣稱的狀態"，被忽略）。
 func (f *Fake) ParseEvent(header http.Header, body []byte) (Event, error) {
 	if header.Get(FakeIgnoredEventHeader) != "" {
 		return Event{}, ErrIgnoredEvent
@@ -615,6 +712,9 @@ func (f *Fake) ParseEvent(header http.Header, body []byte) (Event, error) {
 	id := strings.TrimSpace(header.Get(FakeEventHeader))
 	if id == "" || object == "" {
 		return Event{}, errors.Join(ErrInvalidEvent, errors.New("缺少事件 ID 或 PaymentIntent"))
+	}
+	if strings.HasPrefix(object, "fake_re_") {
+		return Event{ID: id, Kind: EventRefund, ObjectID: object}, nil
 	}
 	return Event{ID: id, Kind: EventPayment, ObjectID: object}, nil
 }

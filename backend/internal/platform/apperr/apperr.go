@@ -191,7 +191,7 @@ var ReasonRunNotActive = newReason("RUN_NOT_ACTIVE")
 // ReasonRfqResponseExpired 表示被接受的賣家回價版本已過有效期；搭配 FailedPrecondition。
 var ReasonRfqResponseExpired = newReason("RFQ_RESPONSE_EXPIRED")
 
-// ReasonRfqRecipientClosed 表示賣家對這筆詢價已經不能再寫入（已婉拒、已結案或他人成交）；搭配 FailedPrecondition。
+// ReasonRfqRecipientClosed 表示賣家對這筆詢價已經不能再寫入（已婉拒、這張需求有進行中的成交、買家已刪除，或回價期限已過）；搭配 FailedPrecondition。
 var ReasonRfqRecipientClosed = newReason("RFQ_RECIPIENT_CLOSED")
 
 // ReasonRfqCheckoutAlreadyActive 表示同一張採購需求已有進行中的成交；搭配 FailedPrecondition，Metadata 的 orderNo 是既有訂單。

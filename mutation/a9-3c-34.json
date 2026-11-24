@@ -130,8 +130,8 @@
    "id": "serve-procurement-without-seller-module",
    "stack": "go",
    "file": "backend/cmd/hawkr/main.go",
-   "old": "newProcurement(d, jc, buyerModule, sellerModule, bus, log)",
-   "new": "newProcurement(d, jc, buyerModule, nil, bus, log)",
+   "old": "newProcurement(d, jc, buyerModule, sellerModule, sellerModule, bus, log)",
+   "new": "newProcurement(d, jc, buyerModule, nil, sellerModule, bus, log)",
    "test": "cmd/hawkr ^TestProcurementIsAssembledWithTheSellerModule$",
    "why": "serve assembles procurement without the seller module, so every publication fails the store check."
   },

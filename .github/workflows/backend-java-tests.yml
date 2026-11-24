@@ -51,6 +51,8 @@ jobs:
   # 與 unit 分開：失敗語意不同（本 job 紅也可能是容器環境問題），時間量級也差一截。
   integration-test:
     name: integration tests (testcontainers)
+    # 慢的 job：開往 dev 的 PR 不跑，merge 進 dev 的 push 與 dev→main PR 才跑。
+    if: github.event_name != 'pull_request' || github.base_ref == 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:

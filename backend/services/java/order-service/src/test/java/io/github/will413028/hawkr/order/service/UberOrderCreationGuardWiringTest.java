@@ -106,6 +106,7 @@ class UberOrderCreationGuardWiringTest {
                 mock(OrderOutboxMapper.class),
                 new OrderPolicyResolver(),
                 new UberOrderEligibilityGuard(),
+                mock(io.github.will413028.hawkr.order.service.CouponReleaseService.class),
                 new SimpleMeterRegistry());
     }
 

@@ -148,7 +148,7 @@
    "id": "rfq-execute-skips-deadline-recheck",
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/rfq/publication_execute.go",
-   "old": "(claimed.ResponseDeadline != nil && deadlinePassed(*claimed.ResponseDeadline, now))",
+   "old": "(claimed.ResponseDeadline != nil && DeadlinePassed(*claimed.ResponseDeadline, now))",
    "new": "false",
    "test": "internal/modules/procurement/internal/rfq ^TestExecuteRechecksTheResponseDeadlineInTaipei$",
    "why": "Execute no longer re-checks the response deadline against today in the business timezone."
@@ -157,8 +157,8 @@
    "id": "rfq-preview-skips-deadline-check",
    "stack": "go-integration",
    "file": "backend/internal/modules/procurement/internal/rfq/publication_preview.go",
-   "old": "if in.ResponseDeadline != nil && deadlinePassed(*in.ResponseDeadline, now) {",
-   "new": "if false && in.ResponseDeadline != nil && deadlinePassed(*in.ResponseDeadline, now) {",
+   "old": "if in.ResponseDeadline != nil && DeadlinePassed(*in.ResponseDeadline, now) {",
+   "new": "if false && in.ResponseDeadline != nil && DeadlinePassed(*in.ResponseDeadline, now) {",
    "test": "internal/modules/procurement/internal/rfq ^TestPreviewPublicationResponseDeadlineIsBoundedByTodayInTaipei$",
    "why": "Preview accepts a response deadline earlier than today."
   },
@@ -274,8 +274,8 @@
    "id": "assembly-drops-the-event-bus",
    "stack": "go",
    "file": "backend/cmd/hawkr/procurement.go",
-   "old": "Sellers: sellers, Events: bus})",
-   "new": "Sellers: sellers, Events: nil})",
+   "old": "Entitlements: entitlements, Sellers: sellers, Stores: stores, Events: bus})",
+   "new": "Entitlements: entitlements, Sellers: sellers, Stores: stores, Events: nil})",
    "test": "cmd/hawkr ^TestProcurementAssemblyPassesTheEventBus$",
    "why": "The serve assembly does not hand the event bus to the procurement module."
   }

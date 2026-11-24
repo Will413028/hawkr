@@ -87,6 +87,8 @@ jobs:
 
   integration:
     name: integration test（testcontainers）
+    # 慢的 job：開往 dev 的 PR 不跑，merge 進 dev 的 push 與 dev→main PR 才跑。
+    if: github.event_name != 'pull_request' || github.base_ref == 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -177,9 +179,11 @@ jobs:
           go vet -tags integration ./...
           go vet -tags gateway ./internal/httpapi/...
 
-      - name: go test -race（含依賴方向檢查）
+      - name: go test（含依賴方向檢查；-race 只在 push 與 dev→main PR）
         if: always()
-        run: go test -race ./...
+        env:
+          RACE: ${{ (github.event_name != 'pull_request' || github.base_ref == 'main') && '-race' || '' }}
+        run: go test ${RACE:+"$RACE"} ./...
 
       - name: 讀取 buf 的版本
         if: always()

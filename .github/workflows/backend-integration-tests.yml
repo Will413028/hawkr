@@ -73,7 +73,8 @@ jobs:
   integration:
     name: ${{ matrix.module }} integration
     needs: changes
-    if: needs.changes.outputs.modules != '[]'
+    # 開往 dev 的 PR 不跑，merge 進 dev 的 push 與 dev→main PR 才跑。
+    if: needs.changes.outputs.modules != '[]' && (github.event_name != 'pull_request' || github.base_ref == 'main')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:

@@ -198,6 +198,7 @@ public class PaymentEventHandler {
             CouponConsumptionTaskEntity couponTask = new CouponConsumptionTaskEntity();
             couponTask.setTaskId(TsidUtil.generate());
             couponTask.setOrderNo(orderId);
+            couponTask.setTaskType(OrderConstants.COUPON_TASK_TYPE_CONSUME);
             couponTask.setCouponInstanceId(couponInstanceId);
             couponTask.setBuyerId(order.getBuyerId());
             couponTask.setStatus(OrderConstants.TASK_STATUS_PENDING);
@@ -395,6 +396,7 @@ public class PaymentEventHandler {
         orderRepository.clearProcessingDeadline(orderNo);
         // #1368：庫存歸還 order.cancelled 與取消狀態同事務落 outbox（取代原 compensateAfterCancel TX 外直發）
         orderService.insertCancelledOutbox(orderNo);
+        orderService.enqueueCouponReleaseIfHeld(order);
         log.info("PaymentEventHandler.cancelExpired.success", "超時訂單已取消（TX 內）", "orderNo", orderNo);
         // [B-207] #1181：賣家工作區 realtime — 逾時取消
         orderEventPublisher.emitSellerOrderUpdated(
