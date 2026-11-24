@@ -1016,6 +1016,29 @@ func StoreMeasureIssuedWarningTitle(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "店家收到警告", Locale: uitext.ZhTW}
 }
 
+// StoreMeasureRequestDecidedAppealAcceptedBodyArgs 是 StoreMeasureRequestDecidedAppealAcceptedBody 的參數。
+type StoreMeasureRequestDecidedAppealAcceptedBodyArgs struct {
+	Time string
+}
+
+// StoreMeasureRequestDecidedAppealAcceptedBody 是模組句子 store_measure_request_decided.appeal_accepted.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreMeasureRequestDecidedAppealAcceptedBody(l uitext.Locale, a StoreMeasureRequestDecidedAppealAcceptedBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your appeal against a measure on your store was reviewed on " + a.Time + " and was accepted; the measure has been revoked. See the seller center.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "你對店家措施提出的申覆已於 " + a.Time + " 審理完畢，獲得通過，措施已撤銷。請到賣家中心查看。", Locale: uitext.ZhTW}
+}
+
+// StoreMeasureRequestDecidedAppealAcceptedTitle 是模組句子 store_measure_request_decided.appeal_accepted.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreMeasureRequestDecidedAppealAcceptedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your appeal was accepted", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "申覆已獲通過", Locale: uitext.ZhTW}
+}
+
 // StoreMeasureRequestDecidedAppealRejectedBodyArgs 是 StoreMeasureRequestDecidedAppealRejectedBody 的參數。
 type StoreMeasureRequestDecidedAppealRejectedBodyArgs struct {
 	Time string
@@ -1037,6 +1060,29 @@ func StoreMeasureRequestDecidedAppealRejectedTitle(l uitext.Locale) uitext.Messa
 		return uitext.Message{Text: "Your appeal was not accepted", Locale: uitext.EN}
 	}
 	return uitext.Message{Text: "申覆未獲通過", Locale: uitext.ZhTW}
+}
+
+// StoreMeasureRequestDecidedRemediationAcceptedBodyArgs 是 StoreMeasureRequestDecidedRemediationAcceptedBody 的參數。
+type StoreMeasureRequestDecidedRemediationAcceptedBodyArgs struct {
+	Time string
+}
+
+// StoreMeasureRequestDecidedRemediationAcceptedBody 是模組句子 store_measure_request_decided.remediation_accepted.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreMeasureRequestDecidedRemediationAcceptedBody(l uitext.Locale, a StoreMeasureRequestDecidedRemediationAcceptedBodyArgs) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your request to lift a measure was reviewed on " + a.Time + " and was accepted; the measure has ended. See the seller center.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "你提出的措施解除請求已於 " + a.Time + " 審理完畢，獲得通過，措施已結束。請到賣家中心查看。", Locale: uitext.ZhTW}
+}
+
+// StoreMeasureRequestDecidedRemediationAcceptedTitle 是模組句子 store_measure_request_decided.remediation_accepted.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreMeasureRequestDecidedRemediationAcceptedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your lift request was accepted", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "解除請求已獲通過", Locale: uitext.ZhTW}
 }
 
 // StoreMeasureRequestDecidedRemediationRejectedBodyArgs 是 StoreMeasureRequestDecidedRemediationRejectedBody 的參數。

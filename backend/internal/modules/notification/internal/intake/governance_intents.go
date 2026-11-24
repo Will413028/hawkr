@@ -2,6 +2,7 @@ package intake
 
 import (
 	"fmt"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
@@ -28,21 +29,25 @@ func measureCreatedIntent(e seller.MeasureCreated) (name string, params any, ok 
 	}, true
 }
 
-// requestDecidedIntent 決定請求裁定事件的型別：接受申覆時同 transaction 也發 MeasureRevoked、接受解除請求時也發 MeasureEnded，所以接受的裁定
-// 登記成 store_measure_revoked、store_measure_ended（同一個 MeasureID 的冪等鍵，同一次處置只通知一則）；駁回才是 store_measure_request_decided。
+// requestDecidedIntent 決定請求裁定事件的參數：接受與駁回都是 store_measure_request_decided（文案依裁定，D3）；接受申覆接著的撤銷、
+// 接受解除請求接著的結束由 measureRevokedNotified、measureEndedNotified 略過，所以同一次處置只通知一則。
 func requestDecidedIntent(e seller.MeasureRequestDecided) (name string, params any, err error) {
-	state := registry.StoreMeasureStateParams{StoreID: e.StoreID, MeasureID: e.MeasureID, OccurredAt: e.OccurredAt}
-	switch {
-	case e.Outcome == seller.RequestAccepted && e.Kind == seller.RequestKindAppeal:
-		return "store_measure_revoked", state, nil
-	case e.Outcome == seller.RequestAccepted && e.Kind == seller.RequestKindRemediation:
-		return "store_measure_ended", state, nil
-	case e.Outcome == seller.RequestRejected:
-		return "store_measure_request_decided", registry.StoreMeasureRequestDecidedParams{
-			StoreID: e.StoreID, MeasureID: e.MeasureID, RequestID: e.RequestID, RequestKind: string(e.Kind), OccurredAt: e.OccurredAt,
-		}, nil
+	if e.Outcome != seller.RequestAccepted && e.Outcome != seller.RequestRejected {
+		return "", nil, fmt.Errorf("措施請求的裁定 %q（種類 %q）沒有對應的通知型別", e.Outcome, e.Kind)
 	}
-	return "", nil, fmt.Errorf("措施請求的裁定 %q（種類 %q）沒有對應的通知型別", e.Outcome, e.Kind)
+	return "store_measure_request_decided", registry.StoreMeasureRequestDecidedParams{
+		StoreID: e.StoreID, MeasureID: e.MeasureID, RequestID: e.RequestID, RequestKind: string(e.Kind), Outcome: string(e.Outcome), OccurredAt: e.OccurredAt,
+	}, nil
+}
+
+// measureRevokedNotified 說明措施撤銷要不要通知：接受申覆的撤銷由同一次處置的 store_measure_request_decided 通知。
+func measureRevokedNotified(e seller.MeasureRevoked) bool {
+	return e.Reason != seller.RevokeAppealAccepted
+}
+
+// measureEndedNotified 說明措施結束要不要通知：接受解除請求的結束（帶 RequestID）由同一次處置的 store_measure_request_decided 通知。
+func measureEndedNotified(e seller.MeasureEnded) bool {
+	return e.RequestID == uuid.UUID{}
 }
 
 // moderationReportReceivedIntent 決定 moderation 檢舉確認的型別：買家檢舉人走 report_received，店家檢舉人走 store_report_received；恰好一個為正。

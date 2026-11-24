@@ -493,7 +493,7 @@
     },
     "store_measure_ended.title": {
       "message": "店家措施已結束",
-      "description": "標題：措施結束（store_measure_ended 型別；接受解除請求時由同一個冪等鍵併入）。"
+      "description": "標題：措施結束（store_measure_ended 型別；接受解除請求的結束由 store_measure_request_decided 通知）。"
     },
     "store_measure_issued.termination.body": {
       "message": "平台已於 {time} 對你的店家發出終止合作的措施。請到賣家中心查看事由與申覆方式。",
@@ -521,6 +521,19 @@
       "message": "店家收到警告",
       "description": "標題：店家收到警告措施（store_measure_issued 型別，種類 WARNING）。"
     },
+    "store_measure_request_decided.appeal_accepted.body": {
+      "message": "你對店家措施提出的申覆已於 {time} 審理完畢，獲得通過，措施已撤銷。請到賣家中心查看。",
+      "params": {
+        "time": {
+          "type": "string"
+        }
+      },
+      "description": "內文：申覆獲得通過（措施隨之撤銷，不另通知）。"
+    },
+    "store_measure_request_decided.appeal_accepted.title": {
+      "message": "申覆已獲通過",
+      "description": "標題：申覆獲得通過（store_measure_request_decided 型別，種類 APPEAL、裁定 ACCEPTED）。"
+    },
     "store_measure_request_decided.appeal_rejected.body": {
       "message": "你對店家措施提出的申覆已於 {time} 審理完畢，未獲通過。請到賣家中心查看。",
       "params": {
@@ -532,7 +545,20 @@
     },
     "store_measure_request_decided.appeal_rejected.title": {
       "message": "申覆未獲通過",
-      "description": "標題：申覆被駁回（store_measure_request_decided 型別，種類 APPEAL）。"
+      "description": "標題：申覆被駁回（store_measure_request_decided 型別，種類 APPEAL、裁定 REJECTED）。"
+    },
+    "store_measure_request_decided.remediation_accepted.body": {
+      "message": "你提出的措施解除請求已於 {time} 審理完畢，獲得通過，措施已結束。請到賣家中心查看。",
+      "params": {
+        "time": {
+          "type": "string"
+        }
+      },
+      "description": "內文：解除請求獲得通過（措施隨之結束，不另通知）。"
+    },
+    "store_measure_request_decided.remediation_accepted.title": {
+      "message": "解除請求已獲通過",
+      "description": "標題：解除請求獲得通過（store_measure_request_decided 型別，種類 REMEDIATION、裁定 ACCEPTED）。"
     },
     "store_measure_request_decided.remediation_rejected.body": {
       "message": "你提出的措施解除請求已於 {time} 審理完畢，未獲通過。請到賣家中心查看。",
@@ -545,7 +571,7 @@
     },
     "store_measure_request_decided.remediation_rejected.title": {
       "message": "解除請求未獲通過",
-      "description": "標題：解除請求被駁回（store_measure_request_decided 型別，種類 REMEDIATION）。"
+      "description": "標題：解除請求被駁回（store_measure_request_decided 型別，種類 REMEDIATION、裁定 REJECTED）。"
     },
     "store_measure_revised.body": {
       "message": "平台已於 {time} 更新對你的店家的措施內容（第 {revision} 版）。請到賣家中心查看。",
@@ -574,7 +600,7 @@
     },
     "store_measure_revoked.title": {
       "message": "店家措施已撤銷",
-      "description": "標題：措施撤銷（store_measure_revoked 型別；接受申覆時由同一個冪等鍵併入）。"
+      "description": "標題：措施撤銷（store_measure_revoked 型別；接受申覆的撤銷由 store_measure_request_decided 通知）。"
     },
     "store_pending_deletion.body": {
       "message": "我們於 {time} 收到你的帳號刪除申請，你的店家已停止經營並進入等待刪除，此申請無法撤回。若這不是你的操作，請盡快聯絡客服。",

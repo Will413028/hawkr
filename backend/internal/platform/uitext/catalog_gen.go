@@ -474,6 +474,8 @@ func (t Text) NotificationNotificationCategory(v string) (string, bool) {
 			return "Back in stock", true
 		case "ANNOUNCEMENT":
 			return "Announcements", true
+		case "PROCUREMENT":
+			return "Quote requests", true
 		}
 	}
 	switch v {
@@ -507,6 +509,8 @@ func (t Text) NotificationNotificationCategory(v string) (string, bool) {
 		return "補貨通知", true
 	case "ANNOUNCEMENT":
 		return "系統公告", true
+	case "PROCUREMENT":
+		return "詢價邀請", true
 	}
 	return "", false
 }

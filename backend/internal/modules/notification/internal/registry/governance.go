@@ -43,6 +43,12 @@ const (
 	RequestKindRemediation = "REMEDIATION"
 )
 
+// 措施請求的裁定結果（seller.RequestState 的 ACCEPTED、REJECTED）。
+const (
+	RequestOutcomeAccepted = "ACCEPTED"
+	RequestOutcomeRejected = "REJECTED"
+)
+
 // 詢問種類（seller.InquiryKind 的值）。
 const (
 	InquiryKindRecords     = "RECORDS"
@@ -75,8 +81,9 @@ const (
 	ReportOutcomeInsufficient = "INSUFFICIENT"
 	ReportOutcomeDuplicate    = "DUPLICATE"
 	ReportOutcomeAbusive      = "ABUSIVE"
-	// ModerationOutcomeViolation 是 moderation.Outcome 的違規值。
-	ModerationOutcomeViolation = "VIOLATION"
+	// ModerationOutcomeViolation、ModerationOutcomeNoViolation 是 moderation.Outcome 的兩個值。
+	ModerationOutcomeViolation   = "VIOLATION"
+	ModerationOutcomeNoViolation = "NO_VIOLATION"
 )
 
 func badParams(format string, a ...any) error {
@@ -262,8 +269,8 @@ var storeMeasureRevised = Define(withStore(Definition[StoreMeasureRevisedParams]
 	Example:  StoreMeasureRevisedParams{StoreID: 11, MeasureID: exampleMeasureID, Revision: 2, OccurredAt: exampleAt},
 }, inboxPush))
 
-// StoreMeasureStateParams 是 store_measure_ended 與 store_measure_revoked 的參數：措施結束或撤銷。接受解除請求或申覆時 seller 同 transaction 也發
-// MeasureRequestDecided，intake 把它對到這兩個型別（同一個 MeasureID 的冪等鍵），所以同一次處置只通知一則。
+// StoreMeasureStateParams 是 store_measure_ended 與 store_measure_revoked 的參數：措施結束或撤銷。接受解除請求或申覆而結束、撤銷時，
+// 這次處置由 store_measure_request_decided 通知（D3），intake 不登記這兩個型別。
 type StoreMeasureStateParams struct {
 	StoreID    int64     `json:"store_id"`
 	MeasureID  uuid.UUID `json:"measure_id"`
@@ -273,7 +280,7 @@ type StoreMeasureStateParams struct {
 var storeMeasureEnded = Define(withStore(Definition[StoreMeasureStateParams]{
 	Name:              "store_measure_ended",
 	StateHint:         model.StateHintSellerStatus,
-	IdempotencySource: "seller.MeasureEnded.MeasureID（接受解除請求的 MeasureRequestDecided 用同一個值）",
+	IdempotencySource: "seller.MeasureEnded.MeasureID",
 	IdempotencyKey:    func(p StoreMeasureStateParams) string { return p.MeasureID.String() },
 	OccurredAt:        func(p StoreMeasureStateParams) time.Time { return p.OccurredAt },
 	Expand:            storeExpand(func(p StoreMeasureStateParams) int64 { return p.StoreID }),
@@ -287,7 +294,7 @@ var storeMeasureEnded = Define(withStore(Definition[StoreMeasureStateParams]{
 var storeMeasureRevoked = Define(withStore(Definition[StoreMeasureStateParams]{
 	Name:              "store_measure_revoked",
 	StateHint:         model.StateHintSellerStatus,
-	IdempotencySource: "seller.MeasureRevoked.MeasureID（接受申覆的 MeasureRequestDecided 用同一個值）",
+	IdempotencySource: "seller.MeasureRevoked.MeasureID",
 	IdempotencyKey:    func(p StoreMeasureStateParams) string { return p.MeasureID.String() },
 	OccurredAt:        func(p StoreMeasureStateParams) time.Time { return p.OccurredAt },
 	Expand:            storeExpand(func(p StoreMeasureStateParams) int64 { return p.StoreID }),
@@ -298,13 +305,41 @@ var storeMeasureRevoked = Define(withStore(Definition[StoreMeasureStateParams]{
 	Example:  StoreMeasureStateParams{StoreID: 11, MeasureID: exampleMeasureID, OccurredAt: exampleAt},
 }, inboxPushEmail))
 
-// StoreMeasureRequestDecidedParams 是 store_measure_request_decided 的參數：申覆或解除請求被駁回（裁定為接受的由 store_measure_revoked、store_measure_ended 通知）。
+// StoreMeasureRequestDecidedParams 是 store_measure_request_decided 的參數：申覆或解除請求的裁定（接受或駁回，D3）；接受時接著的撤銷或結束不另通知。
 type StoreMeasureRequestDecidedParams struct {
 	StoreID     int64     `json:"store_id"`
 	MeasureID   uuid.UUID `json:"measure_id"`
 	RequestID   uuid.UUID `json:"request_id"`
 	RequestKind string    `json:"request_kind"`
+	Outcome     string    `json:"outcome"`
 	OccurredAt  time.Time `json:"occurred_at"`
+}
+
+func requestDecidedText(l uitext.Locale, p StoreMeasureRequestDecidedParams) (Content, error) {
+	t := messageTime(l, p.OccurredAt)
+	switch {
+	case p.RequestKind == RequestKindAppeal && p.Outcome == RequestOutcomeAccepted:
+		return Content{
+			Title: text.StoreMeasureRequestDecidedAppealAcceptedTitle(l),
+			Body:  text.StoreMeasureRequestDecidedAppealAcceptedBody(l, text.StoreMeasureRequestDecidedAppealAcceptedBodyArgs{Time: t}),
+		}, nil
+	case p.RequestKind == RequestKindAppeal && p.Outcome == RequestOutcomeRejected:
+		return Content{
+			Title: text.StoreMeasureRequestDecidedAppealRejectedTitle(l),
+			Body:  text.StoreMeasureRequestDecidedAppealRejectedBody(l, text.StoreMeasureRequestDecidedAppealRejectedBodyArgs{Time: t}),
+		}, nil
+	case p.RequestKind == RequestKindRemediation && p.Outcome == RequestOutcomeAccepted:
+		return Content{
+			Title: text.StoreMeasureRequestDecidedRemediationAcceptedTitle(l),
+			Body:  text.StoreMeasureRequestDecidedRemediationAcceptedBody(l, text.StoreMeasureRequestDecidedRemediationAcceptedBodyArgs{Time: t}),
+		}, nil
+	case p.RequestKind == RequestKindRemediation && p.Outcome == RequestOutcomeRejected:
+		return Content{
+			Title: text.StoreMeasureRequestDecidedRemediationRejectedTitle(l),
+			Body:  text.StoreMeasureRequestDecidedRemediationRejectedBody(l, text.StoreMeasureRequestDecidedRemediationRejectedBodyArgs{Time: t}),
+		}, nil
+	}
+	return Content{}, fmt.Errorf("請求種類 %q、裁定 %q 沒有文案", p.RequestKind, p.Outcome)
 }
 
 var storeMeasureRequestDecided = Define(withStore(Definition[StoreMeasureRequestDecidedParams]{
@@ -317,26 +352,14 @@ var storeMeasureRequestDecided = Define(withStore(Definition[StoreMeasureRequest
 		if p.RequestKind != RequestKindAppeal && p.RequestKind != RequestKindRemediation {
 			return nil, badParams("請求種類 %q 不是 APPEAL 或 REMEDIATION", p.RequestKind)
 		}
+		if p.Outcome != RequestOutcomeAccepted && p.Outcome != RequestOutcomeRejected {
+			return nil, badParams("裁定 %q 不是 ACCEPTED 或 REJECTED", p.Outcome)
+		}
 		return StoreRecipient(ctx, r, p.StoreID)
 	},
-	Text: func(l uitext.Locale, p StoreMeasureRequestDecidedParams) (Content, error) {
-		t := messageTime(l, p.OccurredAt)
-		switch p.RequestKind {
-		case RequestKindAppeal:
-			return Content{
-				Title: text.StoreMeasureRequestDecidedAppealRejectedTitle(l),
-				Body:  text.StoreMeasureRequestDecidedAppealRejectedBody(l, text.StoreMeasureRequestDecidedAppealRejectedBodyArgs{Time: t}),
-			}, nil
-		case RequestKindRemediation:
-			return Content{
-				Title: text.StoreMeasureRequestDecidedRemediationRejectedTitle(l),
-				Body:  text.StoreMeasureRequestDecidedRemediationRejectedBody(l, text.StoreMeasureRequestDecidedRemediationRejectedBodyArgs{Time: t}),
-			}, nil
-		}
-		return Content{}, fmt.Errorf("請求種類 %q 沒有文案", p.RequestKind)
-	},
+	Text:     requestDecidedText,
 	DeepLink: func(p StoreMeasureRequestDecidedParams) string { return measurePath(p.MeasureID) },
-	Example:  StoreMeasureRequestDecidedParams{StoreID: 11, MeasureID: exampleMeasureID, RequestID: exampleRequestID, RequestKind: RequestKindAppeal, OccurredAt: exampleAt},
+	Example:  StoreMeasureRequestDecidedParams{StoreID: 11, MeasureID: exampleMeasureID, RequestID: exampleRequestID, RequestKind: RequestKindAppeal, Outcome: RequestOutcomeRejected, OccurredAt: exampleAt},
 }, inboxPushEmail))
 
 // KYCDecisionParams 是 kyc_approved 與 kyc_rejected 的參數，取自 seller.KYCApproved、KYCRejected（不帶退回理由）。
@@ -587,7 +610,7 @@ var delegationOperationCompleted = Define(Definition[DelegationOperationComplete
 })
 
 // RfqInvitedParams 是 rfq_invited 的參數，取自 procurement.RfqPublished 的一筆邀請；不帶買家與詢價內容。邀請對象是店家，賣家端沒有可去的畫面。
-// 偏好分類沒有專屬的詢價分類（D4），歸互動裡的 CHAT。
+// 偏好分類是詢價邀請的 PROCUREMENT（D29：店家、預設開、可關）。
 type RfqInvitedParams struct {
 	StoreID       int64     `json:"store_id"`
 	PublicationID uuid.UUID `json:"publication_id"`
@@ -598,7 +621,7 @@ type RfqInvitedParams struct {
 var rfqInvited = Define(Definition[RfqInvitedParams]{
 	Name:              "rfq_invited",
 	Audiences:         []model.Audience{model.AudienceStore},
-	Category:          model.CategoryChat,
+	Category:          model.CategoryProcurement,
 	Presentation:      model.PresentationProcurement,
 	Channels:          inboxPush,
 	IdempotencySource: "procurement.RfqPublished.Invites[].InviteID",
@@ -781,7 +804,7 @@ var reportReceived = Define(Definition[ReportReceivedParams]{
 	Audiences:         []model.Audience{model.AudienceBuyer},
 	Category:          model.CategoryAccount,
 	Presentation:      model.PresentationAccount,
-	Channels:          inboxPush,
+	Channels:          inboxPushEmail,
 	IdempotencySource: "seller.ReportReceived 的 ReportID 與 SupplementID；moderation.ReportReceived.ReportID",
 	IdempotencyKey:    reportReceivedKey,
 	OccurredAt:        func(p ReportReceivedParams) time.Time { return p.OccurredAt },
@@ -804,7 +827,7 @@ var storeReportReceived = Define(Definition[ReportReceivedParams]{
 	Audiences:         []model.Audience{model.AudienceStore},
 	Category:          model.CategoryAccount,
 	Presentation:      model.PresentationAccount,
-	Channels:          inboxPush,
+	Channels:          inboxPushEmail,
 	IdempotencySource: "moderation.ReportReceived.ReportID（店家檢舉人）",
 	IdempotencyKey:    reportReceivedKey,
 	OccurredAt:        func(p ReportReceivedParams) time.Time { return p.OccurredAt },
@@ -948,36 +971,35 @@ func moderationOutcome(outcome string) (string, error) {
 	switch outcome {
 	case ModerationOutcomeViolation:
 		return ReportOutcomeActionTaken, nil
-	case ReportOutcomeNoViolation:
+	case ModerationOutcomeNoViolation:
 		return ReportOutcomeNoViolation, nil
 	}
 	return "", badParams("案件結果 %q 不是 VIOLATION 或 NO_VIOLATION", outcome)
 }
 
-// caseReporterTargets 分頁展開案件的檢舉人：Target.ID 是檢舉人在案件裡的名次（穩定、遞增），audience 對不上的檢舉人濾掉，游標與結束由底層的名次決定。
+// caseReporterTargets 分頁展開案件 audience 那一邊的檢舉人：Target.ID 與游標是檢舉人號碼（buyer_id 或 store_id，遞增），每個母意圖只讀自己那一邊。
 func caseReporterTargets(ctx context.Context, r Resolver, p ModerationCaseClosedParams, req PageRequest, audience model.Audience) (TargetPage, error) {
 	outcome, err := moderationOutcome(p.Outcome)
 	if err != nil {
 		return TargetPage{}, err
 	}
-	refs, err := r.CaseReporters(ctx, p.CaseID, req.After, req.Limit)
+	refs, err := r.CaseReporters(ctx, p.CaseID, audience, req.After, req.Limit)
 	if err != nil {
 		return TargetPage{}, fmt.Errorf("讀取案件的檢舉人：%w", err)
 	}
-	page := TargetPage{Next: req.After, Done: true}
-	if len(refs) > 0 {
-		page.Next, page.Done = refs[len(refs)-1].Rank, len(refs) < req.Limit
-	}
+	page := TargetPage{Next: req.After, Done: len(refs) < req.Limit}
 	for _, ref := range refs {
-		if (ref.BuyerID > 0) == (ref.StoreID > 0) {
-			return TargetPage{}, badParams("案件 %s 的第 %d 位檢舉人要恰好有買家或店家一個（%d、%d）", p.CaseID, ref.Rank, ref.BuyerID, ref.StoreID)
+		if ref.ID <= page.Next {
+			return TargetPage{}, fmt.Errorf("案件 %s 的檢舉人號碼 %d 沒有大於游標 %d", p.CaseID, ref.ID, page.Next)
 		}
-		if (audience == model.AudienceBuyer) != (ref.BuyerID > 0) {
-			continue
+		page.Next = ref.ID
+		child := ReportResolvedParams{ReportSource: ReportSourceModeration, ReportID: ref.ReportID, Outcome: outcome, OccurredAt: p.OccurredAt}
+		if audience == model.AudienceBuyer {
+			child.BuyerID = ref.ID
+		} else {
+			child.StoreID = ref.ID
 		}
-		page.Targets = append(page.Targets, Target{ID: ref.Rank, Params: ReportResolvedParams{
-			ReportSource: ReportSourceModeration, ReportID: ref.ReportID, BuyerID: ref.BuyerID, StoreID: ref.StoreID, Outcome: outcome, OccurredAt: p.OccurredAt,
-		}})
+		page.Targets = append(page.Targets, Target{ID: ref.ID, Params: child})
 	}
 	return page, nil
 }

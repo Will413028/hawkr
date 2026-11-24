@@ -240,6 +240,8 @@ return switch ((l, value)) {
 (UiLocale.en, 14) => 'Back in stock',
 (UiLocale.zhTW, 15) => '系統公告',
 (UiLocale.en, 15) => 'Announcements',
+(UiLocale.zhTW, 16) => '詢價邀請',
+(UiLocale.en, 16) => 'Quote requests',
 _ => null,
 };
 }

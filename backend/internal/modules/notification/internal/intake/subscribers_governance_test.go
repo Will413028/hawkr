@@ -19,7 +19,7 @@ import (
 
 // pureHelpers 是治理訂閱者在 Accept 之外允許呼叫的純函式（governance_intents.go，TestGovernanceIntentHelpersArePure 守住它們沒有 I/O）。
 var pureHelpers = []string{
-	"measureCreatedIntent", "requestDecidedIntent", "moderationReportReceivedIntent", "socialAuthorBuyer", "messageAuthorBuyer", "string",
+	"measureCreatedIntent", "requestDecidedIntent", "measureRevokedNotified", "measureEndedNotified", "moderationReportReceivedIntent", "socialAuthorBuyer", "messageAuthorBuyer", "string",
 }
 
 // 治理訂閱者同樣在來源的 transaction 內執行：只准呼叫 Accept（每個函式語法上剛好一處）與純函式，不讀別的模組、不碰資料庫。
@@ -65,6 +65,8 @@ func TestRegistryValuesMatchTheOwnersEnums(t *testing.T) {
 		{registry.MeasureKindTakedown, string(seller.MeasureContentTakedown)},
 		{registry.RequestKindAppeal, string(seller.RequestKindAppeal)},
 		{registry.RequestKindRemediation, string(seller.RequestKindRemediation)},
+		{registry.RequestOutcomeAccepted, string(seller.RequestAccepted)},
+		{registry.RequestOutcomeRejected, string(seller.RequestRejected)},
 		{registry.InquiryKindRecords, string(seller.InquiryKindRecords)},
 		{registry.InquiryKindExplanation, string(seller.InquiryKindExplanation)},
 		{registry.DeadlineTierSevenDays, string(payment.DeadlineSevenDays)},
@@ -75,7 +77,7 @@ func TestRegistryValuesMatchTheOwnersEnums(t *testing.T) {
 		{registry.ReportOutcomeDuplicate, string(seller.OutcomeDuplicate)},
 		{registry.ReportOutcomeAbusive, string(seller.OutcomeAbusive)},
 		{registry.ModerationOutcomeViolation, string(moderation.OutcomeViolation)},
-		{registry.ReportOutcomeNoViolation, string(moderation.OutcomeNoViolation)},
+		{registry.ModerationOutcomeNoViolation, string(moderation.OutcomeNoViolation)},
 	} {
 		if c.got != c.want {
 			t.Errorf("註冊表的值 %q 與擁有模組的值 %q 不同", c.got, c.want)
@@ -108,8 +110,11 @@ func TestEveryOwnerEnumValueRenders(t *testing.T) {
 			}
 		}
 		for _, k := range seller.RequestKindValues() {
-			if err := render(t, "store_measure_request_decided", registry.StoreMeasureRequestDecidedParams{StoreID: 1, MeasureID: id, RequestID: id, RequestKind: string(k), OccurredAt: at}, l); err != nil {
-				t.Errorf("請求 %s/%s：%v", k, l, err)
+			for _, o := range []seller.RequestState{seller.RequestAccepted, seller.RequestRejected} {
+				p := registry.StoreMeasureRequestDecidedParams{StoreID: 1, MeasureID: id, RequestID: id, RequestKind: string(k), Outcome: string(o), OccurredAt: at}
+				if err := render(t, "store_measure_request_decided", p, l); err != nil {
+					t.Errorf("請求 %s/%s/%s：%v", k, o, l, err)
+				}
 			}
 		}
 		for _, k := range seller.InquiryKindValues() {
@@ -153,38 +158,42 @@ func TestMeasureCreatedIntentPicksTheTypeByKind(t *testing.T) {
 	}
 }
 
-// 接受的裁定併入 MeasureRevoked、MeasureEnded 的冪等鍵（同一次處置一則）；駁回才是 store_measure_request_decided；其他裁定是錯誤。
-func TestRequestDecidedIntentFoldsAcceptedDecisionsIntoTheMeasureKey(t *testing.T) {
+// 接受與駁回的裁定都是 store_measure_request_decided（冪等鍵是請求 ID，參數帶裁定，D3）；其他裁定是錯誤。
+func TestRequestDecidedIntentRegistersEveryDecisionAsRequestDecided(t *testing.T) {
 	id := uuid.MustParse("0190a000-0000-7000-8000-000000000002")
 	req := uuid.MustParse("0190a000-0000-7000-8000-000000000003")
-	for _, c := range []struct {
-		kind    seller.RequestKind
-		outcome seller.RequestState
-		want    string
-	}{
-		{seller.RequestKindAppeal, seller.RequestAccepted, "store_measure_revoked"},
-		{seller.RequestKindRemediation, seller.RequestAccepted, "store_measure_ended"},
-		{seller.RequestKindAppeal, seller.RequestRejected, "store_measure_request_decided"},
-		{seller.RequestKindRemediation, seller.RequestRejected, "store_measure_request_decided"},
-	} {
-		name, params, err := requestDecidedIntent(seller.MeasureRequestDecided{MeasureID: id, RequestID: req, Kind: c.kind, Outcome: c.outcome, StoreID: 11})
-		if err != nil || name != c.want {
-			t.Errorf("%s/%s：%q %v", c.kind, c.outcome, name, err)
-			continue
-		}
-		e, _ := registry.Lookup(name)
-		raw, _ := json.Marshal(params)
-		key, err := e.IdempotencyKey(raw)
-		wantKey := name + ":" + id.String()
-		if c.want == "store_measure_request_decided" {
-			wantKey = name + ":" + req.String()
-		}
-		if err != nil || key != wantKey {
-			t.Errorf("%s/%s 的冪等鍵 %q（%v），預期 %q", c.kind, c.outcome, key, err, wantKey)
+	for _, kind := range seller.RequestKindValues() {
+		for _, outcome := range []seller.RequestState{seller.RequestAccepted, seller.RequestRejected} {
+			name, params, err := requestDecidedIntent(seller.MeasureRequestDecided{MeasureID: id, RequestID: req, Kind: kind, Outcome: outcome, StoreID: 11})
+			p, ok := params.(registry.StoreMeasureRequestDecidedParams)
+			if err != nil || name != "store_measure_request_decided" || !ok || p.Outcome != string(outcome) || p.RequestKind != string(kind) {
+				t.Errorf("%s/%s：%q %+v %v", kind, outcome, name, params, err)
+				continue
+			}
+			e, _ := registry.Lookup(name)
+			raw, _ := json.Marshal(params)
+			if key, err := e.IdempotencyKey(raw); err != nil || key != name+":"+req.String() {
+				t.Errorf("%s/%s 的冪等鍵 %q（%v）", kind, outcome, key, err)
+			}
 		}
 	}
 	if _, _, err := requestDecidedIntent(seller.MeasureRequestDecided{MeasureID: id, Kind: seller.RequestKindAppeal, Outcome: seller.RequestClosed}); err == nil {
 		t.Error("CLOSED 不是裁定結果，要回錯誤而不是靜默略過")
+	}
+}
+
+// 接受申覆的撤銷、接受解除請求的結束由裁定通知，不另發；其他撤銷原因與管理員直接結束照常通知。
+func TestMeasureRevokedAndEndedSkipTheAcceptedRequestDisposition(t *testing.T) {
+	for _, r := range seller.RevokeReasonValues() {
+		if got, want := measureRevokedNotified(seller.MeasureRevoked{Reason: r}), r != seller.RevokeAppealAccepted; got != want {
+			t.Errorf("撤銷原因 %s：notified=%v", r, got)
+		}
+	}
+	if measureEndedNotified(seller.MeasureEnded{RequestID: uuid.MustParse("0190a000-0000-7000-8000-000000000003")}) {
+		t.Error("接受解除請求的結束不另發")
+	}
+	if !measureEndedNotified(seller.MeasureEnded{}) {
+		t.Error("管理員直接結束要通知")
 	}
 }
 

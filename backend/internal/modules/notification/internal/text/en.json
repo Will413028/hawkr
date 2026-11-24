@@ -300,11 +300,23 @@
     "store_measure_issued.warning.title": {
       "message": "Your store received a warning"
     },
+    "store_measure_request_decided.appeal_accepted.body": {
+      "message": "Your appeal against a measure on your store was reviewed on {time} and was accepted; the measure has been revoked. See the seller center."
+    },
+    "store_measure_request_decided.appeal_accepted.title": {
+      "message": "Your appeal was accepted"
+    },
     "store_measure_request_decided.appeal_rejected.body": {
       "message": "Your appeal against a measure on your store was reviewed on {time} and was not accepted. See the seller center."
     },
     "store_measure_request_decided.appeal_rejected.title": {
       "message": "Your appeal was not accepted"
+    },
+    "store_measure_request_decided.remediation_accepted.body": {
+      "message": "Your request to lift a measure was reviewed on {time} and was accepted; the measure has ended. See the seller center."
+    },
+    "store_measure_request_decided.remediation_accepted.title": {
+      "message": "Your lift request was accepted"
     },
     "store_measure_request_decided.remediation_rejected.body": {
       "message": "Your request to lift a measure was reviewed on {time} and was not accepted. See the seller center."

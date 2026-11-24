@@ -31,72 +31,84 @@ func entryOf(t *testing.T, name string) Entry {
 	return e
 }
 
-// 結案的檢舉人 fan-out：買家與店家各走自己的母意圖，Target.ID 是名次，被濾掉的檢舉人不產生子意圖，游標與結束由底層名次決定；
-// 一頁全被濾掉也照樣往下一頁。
-func TestCaseClosedFanoutSplitsBuyersFromStoresAndPagesByRank(t *testing.T) {
+// 結案的檢舉人 fan-out：買家與店家各走自己的母意圖、只讀自己那一邊，Target.ID 與游標是檢舉人號碼，下一頁從游標之後讀（不從頭重走）。
+func TestCaseClosedFanoutReadsOnlyItsSideAndPagesFromTheCursor(t *testing.T) {
 	caseID := exampleCaseID
-	reporters := []ReporterRef{
-		{Rank: 1, ReportID: uuid.MustParse("0190a000-0000-7000-8000-0000000000a1"), BuyerID: 7},
-		{Rank: 2, ReportID: uuid.MustParse("0190a000-0000-7000-8000-0000000000a2"), StoreID: 21},
-		{Rank: 3, ReportID: uuid.MustParse("0190a000-0000-7000-8000-0000000000a3"), StoreID: 22},
-		{Rank: 4, ReportID: uuid.MustParse("0190a000-0000-7000-8000-0000000000a4"), BuyerID: 8},
-		{Rank: 5, ReportID: uuid.MustParse("0190a000-0000-7000-8000-0000000000a5"), StoreID: 23},
-	}
-	r := fakeResolver{reporters: map[uuid.UUID][]ReporterRef{caseID: reporters}}
+	r := fakeResolver{reporters: map[uuid.UUID]map[model.Audience][]ReporterRef{caseID: {
+		model.AudienceBuyer: {
+			{ID: 7, ReportID: uuid.MustParse("0190a000-0000-7000-8000-0000000000a1")},
+			{ID: 8, ReportID: uuid.MustParse("0190a000-0000-7000-8000-0000000000a4")},
+			{ID: 12, ReportID: uuid.MustParse("0190a000-0000-7000-8000-0000000000a6")},
+		},
+		model.AudienceStore: {
+			{ID: 21, ReportID: uuid.MustParse("0190a000-0000-7000-8000-0000000000a2")},
+			{ID: 22, ReportID: uuid.MustParse("0190a000-0000-7000-8000-0000000000a3")},
+		},
+	}}}
 	params := mustJSON(t, ModerationCaseClosedParams{CaseID: caseID, Outcome: ModerationOutcomeViolation, OccurredAt: exampleAt})
-	collect := func(parent string) (ids []int64, pages int) {
+	collect := func(parent string, store bool) (ids []int64, cursors []int64) {
 		e := entryOf(t, parent)
 		var after int64
 		for {
+			cursors = append(cursors, after)
 			page, err := e.Spawn(context.Background(), r, params, PageRequest{After: after, Limit: 2, OccurredAt: exampleAt})
 			if err != nil {
 				t.Fatalf("%s：%v", parent, err)
 			}
-			pages++
 			for _, it := range page.Items {
 				ids = append(ids, it.ID)
 				var p ReportResolvedParams
 				if err := json.Unmarshal(it.Params, &p); err != nil {
 					t.Fatal(err)
 				}
-				if p.ReportSource != ReportSourceModeration || p.Outcome != ReportOutcomeActionTaken || (p.BuyerID > 0) == (p.StoreID > 0) {
+				if p.ReportSource != ReportSourceModeration || p.Outcome != ReportOutcomeActionTaken || (store && p.StoreID != it.ID) || (!store && p.BuyerID != it.ID) {
 					t.Fatalf("%s 的子參數 %+v", parent, p)
 				}
 			}
 			if page.Done {
-				return ids, pages
+				return ids, cursors
 			}
 			after = page.Next
 		}
 	}
-	if ids, pages := collect("moderation_case_closed_buyers"); !slices.Equal(ids, []int64{1, 4}) || pages != 3 {
-		t.Errorf("買家檢舉人的名次 %v（%d 頁）", ids, pages)
+	if ids, cursors := collect("moderation_case_closed_buyers", false); !slices.Equal(ids, []int64{7, 8, 12}) || !slices.Equal(cursors, []int64{0, 8}) {
+		t.Errorf("買家檢舉人 %v，游標 %v", ids, cursors)
 	}
-	if ids, pages := collect("moderation_case_closed_stores"); !slices.Equal(ids, []int64{2, 3, 5}) || pages != 3 {
-		t.Errorf("店家檢舉人的名次 %v（%d 頁）", ids, pages)
+	if ids, cursors := collect("moderation_case_closed_stores", true); !slices.Equal(ids, []int64{21, 22}) || !slices.Equal(cursors, []int64{0, 22}) {
+		t.Errorf("店家檢舉人 %v，游標 %v", ids, cursors)
 	}
 }
 
-func TestCaseClosedFanoutRejectsAnUnknownOutcomeAndAMalformedReporter(t *testing.T) {
+func TestCaseClosedFanoutRejectsAnUnknownOutcomeAndANonIncreasingReporter(t *testing.T) {
 	caseID := exampleCaseID
-	r := fakeResolver{reporters: map[uuid.UUID][]ReporterRef{caseID: {{Rank: 1, ReportID: exampleReportID, BuyerID: 7, StoreID: 9}}}}
+	r := fakeResolver{reporters: map[uuid.UUID]map[model.Audience][]ReporterRef{caseID: {model.AudienceBuyer: {{ID: 7, ReportID: exampleReportID}}}}}
 	e := entryOf(t, "moderation_case_closed_buyers")
 	bad := mustJSON(t, ModerationCaseClosedParams{CaseID: caseID, Outcome: "OTHER", OccurredAt: exampleAt})
 	if _, err := e.Spawn(context.Background(), r, bad, PageRequest{Limit: 10}); !errors.Is(err, ErrBadParams) {
 		t.Errorf("不認得的案件結果要是永久錯誤：%v", err)
 	}
 	good := mustJSON(t, ModerationCaseClosedParams{CaseID: caseID, Outcome: ModerationOutcomeViolation, OccurredAt: exampleAt})
-	if _, err := e.Spawn(context.Background(), r, good, PageRequest{Limit: 10}); !errors.Is(err, ErrBadParams) {
-		t.Errorf("同時有買家與店家的檢舉人要是永久錯誤：%v", err)
+	if _, err := e.Spawn(context.Background(), r, good, PageRequest{Limit: 10}); err != nil {
+		t.Errorf("第一頁：%v", err)
 	}
+	if _, err := e.Spawn(context.Background(), staleReporters{r}, good, PageRequest{After: 7, Limit: 10}); err == nil {
+		t.Error("檢舉人號碼沒有大於游標要回錯誤")
+	}
+}
+
+// staleReporters 忽略游標、每次都從頭回：caseReporterTargets 要擋下不遞增的號碼。
+type staleReporters struct{ fakeResolver }
+
+func (s staleReporters) CaseReporters(ctx context.Context, caseID uuid.UUID, audience model.Audience, _ int64, limit int) ([]ReporterRef, error) {
+	return s.fakeResolver.CaseReporters(ctx, caseID, audience, 0, limit)
 }
 
 // moderation 的結果對到統一的類別：違規是 ACTION_TAKEN，不違規同名；子型別的文字只說結果類別。
 func TestModerationOutcomesMapToTheReportOutcomeCategories(t *testing.T) {
 	caseID := exampleCaseID
-	r := fakeResolver{reporters: map[uuid.UUID][]ReporterRef{caseID: {{Rank: 1, ReportID: exampleReportID, BuyerID: 7}}}}
+	r := fakeResolver{reporters: map[uuid.UUID]map[model.Audience][]ReporterRef{caseID: {model.AudienceBuyer: {{ID: 7, ReportID: exampleReportID}}}}}
 	e := entryOf(t, "moderation_case_closed_buyers")
-	for outcome, want := range map[string]string{ModerationOutcomeViolation: ReportOutcomeActionTaken, ReportOutcomeNoViolation: ReportOutcomeNoViolation} {
+	for outcome, want := range map[string]string{ModerationOutcomeViolation: ReportOutcomeActionTaken, ModerationOutcomeNoViolation: ReportOutcomeNoViolation} {
 		page, err := e.Spawn(context.Background(), r, mustJSON(t, ModerationCaseClosedParams{CaseID: caseID, Outcome: outcome, OccurredAt: exampleAt}), PageRequest{Limit: 10})
 		if err != nil || len(page.Items) != 1 {
 			t.Fatalf("%s：%+v %v", outcome, page, err)

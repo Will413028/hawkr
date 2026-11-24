@@ -691,7 +691,7 @@ func (echoResolver) StoreFollowers(context.Context, int64, int64, int, time.Time
 	return nil, nil
 }
 
-func (echoResolver) CaseReporters(context.Context, uuid.UUID, int64, int) ([]ReporterRef, error) {
+func (echoResolver) CaseReporters(context.Context, uuid.UUID, model.Audience, int64, int) ([]ReporterRef, error) {
 	return nil, nil
 }
 

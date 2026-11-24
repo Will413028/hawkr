@@ -19,7 +19,7 @@ type fakeResolver struct {
 	buyers    map[int64]int64
 	stores    map[int64]int64
 	followers []FollowerRef
-	reporters map[uuid.UUID][]ReporterRef
+	reporters map[uuid.UUID]map[model.Audience][]ReporterRef
 }
 
 func (f fakeResolver) BuyerAccounts(_ context.Context, ids []int64) (map[int64]int64, error) {
@@ -50,10 +50,10 @@ func (fakeResolver) BuyerBlocksStore(context.Context, int64, int64) (bool, error
 
 func (fakeResolver) StoreBlocksBuyer(context.Context, int64, int64) (bool, error) { return false, nil }
 
-func (f fakeResolver) CaseReporters(_ context.Context, caseID uuid.UUID, afterRank int64, limit int) ([]ReporterRef, error) {
+func (f fakeResolver) CaseReporters(_ context.Context, caseID uuid.UUID, audience model.Audience, afterID int64, limit int) ([]ReporterRef, error) {
 	var out []ReporterRef
-	for _, r := range f.reporters[caseID] {
-		if r.Rank > afterRank && len(out) < limit {
+	for _, r := range f.reporters[caseID][audience] {
+		if r.ID > afterID && len(out) < limit {
 			out = append(out, r)
 		}
 	}

@@ -42,13 +42,19 @@ func (s *Service) OnMeasureRevised(ctx context.Context, e seller.MeasureRevised)
 	return s.Accept(ctx, "store_measure_revised", registry.StoreMeasureRevisedParams{StoreID: e.StoreID, MeasureID: e.MeasureID, Revision: e.Revision, OccurredAt: e.OccurredAt})
 }
 
-// OnMeasureEnded 訂閱 seller.MeasureEnded。
+// OnMeasureEnded 訂閱 seller.MeasureEnded；接受解除請求的結束不另發（由裁定通知）。
 func (s *Service) OnMeasureEnded(ctx context.Context, e seller.MeasureEnded) error {
+	if !measureEndedNotified(e) {
+		return nil
+	}
 	return s.Accept(ctx, "store_measure_ended", registry.StoreMeasureStateParams{StoreID: e.StoreID, MeasureID: e.MeasureID, OccurredAt: e.OccurredAt})
 }
 
-// OnMeasureRevoked 訂閱 seller.MeasureRevoked。
+// OnMeasureRevoked 訂閱 seller.MeasureRevoked；接受申覆的撤銷不另發（由裁定通知）。
 func (s *Service) OnMeasureRevoked(ctx context.Context, e seller.MeasureRevoked) error {
+	if !measureRevokedNotified(e) {
+		return nil
+	}
 	return s.Accept(ctx, "store_measure_revoked", registry.StoreMeasureStateParams{StoreID: e.StoreID, MeasureID: e.MeasureID, OccurredAt: e.OccurredAt})
 }
 

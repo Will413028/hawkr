@@ -8,6 +8,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
+	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -24,11 +25,14 @@ type resolver struct {
 
 // CaseReporters 是 moderation 案件的檢舉人讀取（*moderation.Module 與 worker 用的 *moderation.CaseReader 都符合）。
 type CaseReporters interface {
-	CaseReporters(ctx context.Context, caseID uuid.UUID, after *moderation.ReportCursor, size int32) (moderation.ReporterPage, error)
+	CaseReporters(ctx context.Context, caseID uuid.UUID, side moderation.ReporterSide, afterID int64, size int32) (moderation.ReporterPage, error)
 }
 
-// NewResolver 把 buyer、seller 與 moderation 的檢舉人讀取組成 worker 端的收件人解析；reporters 只有結案的檢舉人 fan-out 用到。
+// NewResolver 把 buyer、seller 與 moderation 的檢舉人讀取組成 worker 端的收件人解析；三者都必填（缺一個是組裝錯誤，建構時就 panic，不等到第一個意圖）。
 func NewResolver(b *buyer.Module, s *seller.Module, reporters CaseReporters) Resolver {
+	if b == nil || s == nil || reporters == nil {
+		panic("notification.NewResolver：buyer、seller 與 reporters 都必填")
+	}
 	return resolver{buyers: b, stores: s, reporters: reporters}
 }
 
@@ -99,29 +103,29 @@ func (c storeCodes) StoreCodes(ctx context.Context, storeIDs []int64) (map[int64
 	return out, nil
 }
 
-// CaseReporters 以 moderation 的 keyset 從頭走到 afterRank 之後再取 limit 位：檢舉列不會被刪（只清說明），名次穩定；一個案件的檢舉人數有限，重走的成本是已走過的列數。
-func (r resolver) CaseReporters(ctx context.Context, caseID uuid.UUID, afterRank int64, limit int) ([]registry.ReporterRef, error) {
+// CaseReporters 從游標 afterID 之後讀 audience 那一邊的檢舉人，以 moderation 每頁的上限分頁，直到湊滿 limit 位或沒有更多；不從頭重走。
+func (r resolver) CaseReporters(ctx context.Context, caseID uuid.UUID, audience model.Audience, afterID int64, limit int) ([]registry.ReporterRef, error) {
+	side := moderation.ReporterSideBuyer
+	if audience == model.AudienceStore {
+		side = moderation.ReporterSideStore
+	}
 	var out []registry.ReporterRef
-	var after *moderation.ReportCursor
-	var rank int64
-	for {
-		page, err := r.reporters.CaseReporters(ctx, caseID, after, registry.MaxFollowerPage)
+	for after := afterID; len(out) < limit; {
+		page, err := r.reporters.CaseReporters(ctx, caseID, side, after, int32(min(limit-len(out), int(moderation.MyReportsMaxPageSize))))
 		if err != nil {
 			return nil, err
 		}
 		for _, it := range page.Items {
-			rank++
-			if rank <= afterRank {
-				continue
+			id := it.BuyerID
+			if side == moderation.ReporterSideStore {
+				id = it.StoreID
 			}
-			out = append(out, registry.ReporterRef{Rank: rank, ReportID: it.ReportID, BuyerID: it.BuyerID, StoreID: it.StoreID})
-			if len(out) == limit {
-				return out, nil
-			}
+			out = append(out, registry.ReporterRef{ID: id, ReportID: it.ReportID})
 		}
-		if page.Next == nil {
-			return out, nil
+		if page.Next == 0 {
+			break
 		}
 		after = page.Next
 	}
+	return out, nil
 }

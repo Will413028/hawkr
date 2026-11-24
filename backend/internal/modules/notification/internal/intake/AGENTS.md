@@ -13,5 +13,6 @@
 - 排頁 job 的唯一鍵不含 Completed、含 Running，只省工；正確性靠子意圖冪等鍵，重跑任何一頁都不重複。
 - 守門：`TestFanoutPagesFollowersAndRerunningCreatesNoDuplicates`、`TestFanoutPageJobStatesFollowRiverRulesAndExcludeCompleted`、`TestRiverAcceptsTheFanoutInsertOpts`、`TestFanoutContinuesPastAPageThatTheTypeFilteredEmpty`、`TestFanoutSkipsLateFollowersAndClampsAnOversizedChunk`。
 - `Resolver` 由根套件的 `NewResolver(buyer, seller, reporters)` 組成（店家讀 seller 的 `Store`，不用 legacy 的 `ResolvePrincipals`）；只有宣告 `Expand` 或 `Broadcast` 的型別用到。守門：`TestNewResolverReadsStoresAndStoreBlocksFromTheRealSeller`。
-- 治理與交易側的同步訂閱者在 `subscribers_governance.go`（`subscribe_governance.go` 登記，每個事件一個）：每個函式語法上剛好一處 `Accept`，只准加上 `governance_intents.go` 的純函式（由事件決定型別與參數，沒有 I/O）。接受的措施請求裁定併入措施撤銷與結束的冪等鍵；作者通知只給買家作者。守門：`TestGovernanceSubscribersOnlyAccept`、`TestGovernanceIntentHelpersArePure`、`TestRequestDecidedIntentFoldsAcceptedDecisionsIntoTheMeasureKey`、`TestAuthorNoticesAreOnlyForBuyerAuthors`。
-- `Resolver.CaseReporters`（根套件的實作以 moderation 的 keyset 從頭走到游標名次）給結案的檢舉人 fan-out；worker 組 `moderation.CaseReader`，serve 組完整 `moderation.Module`。
+- 治理與交易側的同步訂閱者在 `subscribers_governance.go`（`subscribe_governance.go` 登記，每個事件一個）：每個函式語法上剛好一處 `Accept`，只准加上 `governance_intents.go` 的純函式（由事件決定型別與參數，沒有 I/O）。措施請求的裁定（接受與駁回）都登記 `store_measure_request_decided`，接受申覆的撤銷（`RevokeAppealAccepted`）與接受解除請求的結束（帶 `RequestID`）不另登記（D3，同一次處置一則）；作者通知只給買家作者。
+- 治理訂閱者的守門：`TestGovernanceSubscribersOnlyAccept`、`TestGovernanceIntentHelpersArePure`、`TestRequestDecidedIntentRegistersEveryDecisionAsRequestDecided`、`TestMeasureRevokedAndEndedSkipTheAcceptedRequestDisposition`、`TestAuthorNoticesAreOnlyForBuyerAuthors`。
+- `Resolver.CaseReporters`（根套件的實作從游標接著讀 moderation 那一邊的檢舉人，游標是檢舉人號碼）給結案的檢舉人 fan-out；worker 組 `moderation.CaseReader`，serve 組完整 `moderation.Module`。

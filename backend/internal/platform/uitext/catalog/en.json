@@ -195,6 +195,9 @@
     "notification.NotificationCategory.NOTIFICATION_CATEGORY_PAYOUT": {
       "message": "Payouts"
     },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_PROCUREMENT": {
+      "message": "Quote requests"
+    },
     "notification.NotificationCategory.NOTIFICATION_CATEGORY_RESTOCK": {
       "message": "Back in stock"
     },

@@ -35,26 +35,34 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
 
-// fakeReporters 取代 moderation 的檢舉人讀取：依登記的順序分頁（游標是上一頁最後一位的時間），與 moderation.CaseReporters 同一個形狀。
+// fakeReporters 取代 moderation 的檢舉人讀取：與 moderation.CaseReporters 同一個形狀（一邊、依檢舉人號碼由小到大、從游標之後讀）；afters 記下每次讀的游標。
 type fakeReporters struct {
-	items []moderation.Reporter
+	items  []moderation.Reporter
+	afters []int64
 }
 
-func (f *fakeReporters) at(i int) time.Time { return epoch.Add(time.Duration(i+1) * time.Second) }
-
-func (f *fakeReporters) CaseReporters(_ context.Context, _ uuid.UUID, after *moderation.ReportCursor, size int32) (moderation.ReporterPage, error) {
-	start := 0
-	if after != nil {
-		for i := range f.items {
-			if !f.at(i).After(after.CreatedAt) {
-				start = i + 1
-			}
+func (f *fakeReporters) CaseReporters(_ context.Context, _ uuid.UUID, side moderation.ReporterSide, after int64, size int32) (moderation.ReporterPage, error) {
+	f.afters = append(f.afters, after)
+	var ids []int64
+	byID := map[int64]moderation.Reporter{}
+	for _, r := range f.items {
+		id := r.BuyerID
+		if side == moderation.ReporterSideStore {
+			id = r.StoreID
+		}
+		if id > after {
+			ids = append(ids, id)
+			byID[id] = r
 		}
 	}
-	end := min(start+int(size), len(f.items))
-	page := moderation.ReporterPage{Items: f.items[start:end]}
-	if end < len(f.items) {
-		page.Next = &moderation.ReportCursor{CreatedAt: f.at(end - 1), ID: f.items[end-1].ReportID}
+	slices.Sort(ids)
+	var page moderation.ReporterPage
+	for i, id := range ids {
+		if i == int(size) {
+			page.Next = ids[i-1]
+			break
+		}
+		page.Items = append(page.Items, byID[id])
 	}
 	return page, nil
 }
@@ -63,28 +71,32 @@ func (f *fakeReporters) CaseReporters(_ context.Context, _ uuid.UUID, after *mod
 func setupGovernance(t *testing.T, reporters CaseReporters) *fixture {
 	t.Helper()
 	t.Parallel()
+	if reporters == nil {
+		reporters = &fakeReporters{}
+	}
 	d := pg.NewDB(t, testdb.Migrations(
 		migrate.Module{Name: "identity", Dir: identity.Migrations()},
 		migrate.Module{Name: "buyer", Dir: buyer.Migrations()},
 		migrate.Module{Name: "seller", Dir: seller.Migrations()},
 		migrate.Module{Name: "notification", Dir: Migrations()},
 	))
+	clock := func() time.Time { return governanceAt }
 	logs := &syncBuffer{}
 	log := slog.New(slog.NewTextHandler(logs, nil))
 	bus := events.NewBus()
-	id := identity.New(identity.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
-	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Media: media.NewFake(), Now: time.Now, Logger: log})
+	id := identity.New(identity.Deps{DB: d, Events: bus, Now: clock, Logger: log})
+	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Media: media.NewFake(), Now: clock, Logger: log})
 	events.Subscribe(bus, buyers.OnAccountCreated)
 	q := nopReportingJobs{}
 	sl := seller.New(seller.Deps{
-		KYCMAC: sealtest.MAC(t), DB: d, Events: bus, Jobs: q, Identity: id, Media: media.NewFake(), Orders: dirNoOrders{}, ProductStores: dirNoProducts{}, Registry: dirNoRegistry{}, Now: time.Now, Logger: log,
-		Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: q, Now: time.Now, Logger: log}),
+		KYCMAC: sealtest.MAC(t), DB: d, Events: bus, Jobs: q, Identity: id, Media: media.NewFake(), Orders: dirNoOrders{}, ProductStores: dirNoProducts{}, Registry: dirNoRegistry{}, Now: clock, Logger: log,
+		Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, clock), Events: bus, Jobs: q, Now: clock, Logger: log}),
 	})
 	resolver := NewResolver(buyers, sl, reporters)
 	rec := &recorder{}
 	push, mail, contacts := fcm.NewFake(nil), resend.NewFake(nil), &fakeContacts{m: map[int64]identity.ContactEmail{}}
 	m := newModule(Deps{
-		DB: d, Identity: id, Buyer: buyers, Seller: sl, Resolver: resolver, Jobs: rec, Now: time.Now, NewID: uuid.NewV7, Logger: log,
+		DB: d, Identity: id, Buyer: buyers, Seller: sl, Resolver: resolver, Jobs: rec, Now: clock, NewID: uuid.NewV7, Logger: log,
 		Contacts: contacts, Locales: id, Push: push, Mail: mail, ImageURL: testImageURL, SuppressionKeys: testSuppressionKeys,
 	}, registry.Registry{})
 	m.SubscribeGovernance(bus)
@@ -94,7 +106,7 @@ func setupGovernance(t *testing.T, reporters CaseReporters) *fixture {
 func (f *fixture) governanceIntake(chunk int) *intake.Service {
 	return intake.New(intake.Deps{
 		DB: f.db, Accounts: f.identity, Buyers: f.buyer, Stores: f.sellerMod, Registry: registry.Registry{}, Resolver: f.resolver, Jobs: f.jobs,
-		FanoutChunk: chunk, Now: time.Now, NewID: uuid.NewV7, Logger: slog.New(slog.DiscardHandler),
+		FanoutChunk: chunk, Now: func() time.Time { return governanceAt }, NewID: uuid.NewV7, Logger: slog.New(slog.DiscardHandler),
 	})
 }
 
@@ -235,19 +247,42 @@ func TestStoreSideEventsCreateOneInboxRowForTheStoreOwner(t *testing.T) {
 	}
 }
 
-// 接受申覆或解除請求時 seller 同 transaction 也發 MeasureRevoked、MeasureEnded：同一次處置只通知一則（同一個 MeasureID 的冪等鍵）；
-// 駁回是 store_measure_request_decided。
-// mutation：requestDecidedIntent 把接受的裁定也登記成 store_measure_request_decided → 這個測試紅（多一列）。
-func TestAcceptedDecisionAndTheMeasureEventNotifyOnce(t *testing.T) {
+// 接受申覆或解除請求時 seller 同 transaction 也發 MeasureRevoked（APPEAL_ACCEPTED）、MeasureEnded（帶 RequestID）：同一次處置只有
+// store_measure_request_decided 一則（D3），文案依裁定；管理員直接撤銷或結束照常通知。
+// mutation：OnMeasureRevoked 或 OnMeasureEnded 不略過接受請求的處置 → 收件匣多一列，這個測試紅。
+func TestAcceptedDecisionIsTheOnlyNoticeForTheDisposition(t *testing.T) {
 	f := setupGovernance(t, nil)
+	ctx := context.Background()
 	owner, storeID := f.storeOwner(t)
-	revoked, ended := uuid.NewV7(), uuid.NewV7()
-	emit(t, f, seller.MeasureRequestDecided{StoreID: storeID, AccountID: owner, MeasureID: revoked, RequestID: uuid.NewV7(), Kind: seller.RequestKindAppeal, Outcome: seller.RequestAccepted, OccurredAt: governanceAt})
-	emit(t, f, seller.MeasureRevoked{StoreID: storeID, AccountID: owner, MeasureID: revoked, Reason: seller.RevokeAppealAccepted, OccurredAt: governanceAt})
-	emit(t, f, seller.MeasureEnded{StoreID: storeID, AccountID: owner, MeasureID: ended, OccurredAt: governanceAt})
-	emit(t, f, seller.MeasureRequestDecided{StoreID: storeID, AccountID: owner, MeasureID: ended, RequestID: uuid.NewV7(), Kind: seller.RequestKindRemediation, Outcome: seller.RequestAccepted, OccurredAt: governanceAt})
-	if got := f.inboxTypes(t, owner); !slices.Equal(got, []string{"store_measure_ended", "store_measure_revoked"}) {
-		t.Fatalf("兩次處置各一則：%v", got)
+	appealed, lifted := uuid.NewV7(), uuid.NewV7()
+	appealReq, liftReq := uuid.NewV7(), uuid.NewV7()
+	emit(t, f, seller.MeasureRevoked{StoreID: storeID, AccountID: owner, MeasureID: appealed, Reason: seller.RevokeAppealAccepted, OccurredAt: governanceAt})
+	emit(t, f, seller.MeasureRequestDecided{StoreID: storeID, AccountID: owner, MeasureID: appealed, RequestID: appealReq, Kind: seller.RequestKindAppeal, Outcome: seller.RequestAccepted, OccurredAt: governanceAt})
+	emit(t, f, seller.MeasureEnded{StoreID: storeID, AccountID: owner, MeasureID: lifted, RequestID: liftReq, OccurredAt: governanceAt})
+	emit(t, f, seller.MeasureRequestDecided{StoreID: storeID, AccountID: owner, MeasureID: lifted, RequestID: liftReq, Kind: seller.RequestKindRemediation, Outcome: seller.RequestAccepted, OccurredAt: governanceAt})
+	if got := f.inboxTypes(t, owner); !slices.Equal(got, []string{"store_measure_request_decided", "store_measure_request_decided"}) {
+		t.Fatalf("兩次接受的處置各一則裁定：%v", got)
+	}
+	var outcomes []string
+	rows, err := f.db.Pool().Query(ctx, `SELECT params->>'outcome' FROM notification.inbox_items WHERE account_id = $1 ORDER BY params->>'request_kind'`, owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var o string
+		if err := rows.Scan(&o); err != nil {
+			t.Fatal(err)
+		}
+		outcomes = append(outcomes, o)
+	}
+	if !slices.Equal(outcomes, []string{"ACCEPTED", "ACCEPTED"}) {
+		t.Fatalf("裁定要帶進參數：%v", outcomes)
+	}
+	emit(t, f, seller.MeasureRevoked{StoreID: storeID, AccountID: owner, MeasureID: uuid.NewV7(), Reason: seller.RevokeAdminCorrection, OccurredAt: governanceAt})
+	emit(t, f, seller.MeasureEnded{StoreID: storeID, AccountID: owner, MeasureID: uuid.NewV7(), OccurredAt: governanceAt})
+	if got := f.inboxTypes(t, owner); len(got) != 4 || !slices.Contains(got, "store_measure_revoked") || !slices.Contains(got, "store_measure_ended") {
+		t.Fatalf("管理員直接撤銷與結束各一則：%v", got)
 	}
 }
 
@@ -304,6 +339,65 @@ func TestConfirmationEmailsNeverPutTheAddressInAnyJobParams(t *testing.T) {
 		params = append(params, string(raw))
 	}
 	if len(params) < 4 {
+		t.Fatalf("要檢查的參數只有 %d 筆", len(params))
+	}
+	for _, p := range params {
+		if strings.Contains(p, "@") || strings.Contains(p, "example.com") {
+			t.Errorf("job 或意圖參數含位址：%s", p)
+		}
+	}
+}
+
+// 檢舉確認（seller 來源的買家檢舉人、moderation 來源的店家檢舉人）：收件匣、推播之外寄確認信；位址在寄送時向 identity 讀，不在意圖參數與 job 參數裡。
+// mutation：OnSellerReportReceived 把位址放進意圖參數 → 位址出現在意圖參數，這個測試紅。
+func TestReportReceivedConfirmationEmailsReadTheAddressAtDelivery(t *testing.T) {
+	f := setupGovernance(t, nil)
+	ctx := context.Background()
+	storeAccount, storeID := f.storeOwner(t)
+	buyerAccount, buyerID := f.newBuyer(t)
+	const storeAddress, buyerAddr = "reporting-store@example.com", "reporting-buyer@example.com"
+	f.contacts.set(storeAccount, storeAddress, identity.ContactEmailVerified)
+	f.contacts.set(buyerAccount, buyerAddr, identity.ContactEmailVerified)
+
+	emit(t, f, seller.ReportReceived{ReportID: uuid.NewV7(), StoreID: storeID, ReporterBuyerID: buyerID, Category: policy.Spam, OccurredAt: governanceAt})
+	emit(t, f, moderation.ReportReceived{EventID: uuid.NewV7(), OccurredAt: governanceAt, ReportID: uuid.NewV7(), CaseID: uuid.NewV7(), ReporterStoreID: storeID, Category: policy.Spam})
+
+	for _, account := range []int64{storeAccount, buyerAccount} {
+		if got := f.channels(t, account); !slices.Contains(got, "EMAIL") {
+			t.Fatalf("帳號 %d 的投遞紀錄 %v，預期含 EMAIL", account, got)
+		}
+		if err := f.deliver(f.deliveryID(t, account, "EMAIL"), false); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sent := f.mail.Sent()
+	if len(sent) != 2 || sent[0].Email.To == sent[1].Email.To {
+		t.Fatalf("寄出 %+v，預期兩位檢舉人各一封", sent)
+	}
+	for _, m := range sent {
+		if (m.Email.To != storeAddress && m.Email.To != buyerAddr) || m.Email.Subject == "" {
+			t.Errorf("寄出的信 %+v", m)
+		}
+	}
+	var params []string
+	rows, err := f.db.Pool().Query(ctx, `SELECT params::text FROM notification.intents`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var p string
+		if err := rows.Scan(&p); err != nil {
+			t.Fatal(err)
+		}
+		params = append(params, p)
+	}
+	deliveries, _ := f.jobs.deliverJobs()
+	for _, d := range deliveries {
+		raw, _ := json.Marshal(d)
+		params = append(params, string(raw))
+	}
+	if len(params) < 2 {
 		t.Fatalf("要檢查的參數只有 %d 筆", len(params))
 	}
 	for _, p := range params {
@@ -372,7 +466,9 @@ func TestReporterNoticesCoverBuyersAndStores(t *testing.T) {
 	}
 }
 
-// 結案的 fan-out：moderation.CaseClosedEvent 的母意圖分頁讀檢舉人，買家與店家檢舉人各自收到 report_resolved；每頁 2 位、共多頁，重跑整條鏈不重複。
+// 結案的 fan-out：moderation.CaseClosedEvent 的母意圖分頁讀自己那一邊的檢舉人，買家與店家檢舉人各自收到 report_resolved；每頁 2 位、共多頁，
+// 下一頁從游標接著讀，重跑整條鏈不重複。
+// mutation：resolver.CaseReporters 不從游標讀（每頁從頭）→ 這個測試紅。
 // mutation：店家的母意圖 moderation_case_closed_stores 不登記（ModerationCaseClosedParents 拿掉第二個）→ 店家檢舉人沒有列，這個測試紅。
 func TestCaseClosedFansOutToBuyerAndStoreReportersAcrossPages(t *testing.T) {
 	var items []moderation.Reporter
@@ -425,6 +521,15 @@ func TestCaseClosedFansOutToBuyerAndStoreReportersAcrossPages(t *testing.T) {
 	total := f.count(t, `SELECT count(*) FROM notification.inbox_items`)
 	if total != 5 {
 		t.Fatalf("共 %d 列，預期 5", total)
+	}
+	fromStart := 0
+	for _, a := range reporters.afters {
+		if a == 0 {
+			fromStart++
+		}
+	}
+	if fromStart != 2 || len(reporters.afters) < 4 {
+		t.Fatalf("每個母意圖只有第一頁從頭讀，之後從上一頁最後一位的號碼接著讀：%v", reporters.afters)
 	}
 	if err := f.db.InTx(context.Background(), func(ctx context.Context) error { return events.Publish(ctx, f.bus, closed) }); err != nil {
 		t.Fatal(err)

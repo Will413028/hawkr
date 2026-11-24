@@ -126,6 +126,11 @@ class NotificationCategory extends $pb.ProtobufEnum {
       NotificationCategory._(
           15, _omitEnumNames ? '' : 'NOTIFICATION_CATEGORY_ANNOUNCEMENT');
 
+  /// 詢價邀請（互動，只有店家）。
+  static const NotificationCategory NOTIFICATION_CATEGORY_PROCUREMENT =
+      NotificationCategory._(
+          16, _omitEnumNames ? '' : 'NOTIFICATION_CATEGORY_PROCUREMENT');
+
   static const $core.List<NotificationCategory> values = <NotificationCategory>[
     NOTIFICATION_CATEGORY_UNSPECIFIED,
     NOTIFICATION_CATEGORY_ORDER,
@@ -143,10 +148,11 @@ class NotificationCategory extends $pb.ProtobufEnum {
     NOTIFICATION_CATEGORY_COUPON,
     NOTIFICATION_CATEGORY_RESTOCK,
     NOTIFICATION_CATEGORY_ANNOUNCEMENT,
+    NOTIFICATION_CATEGORY_PROCUREMENT,
   ];
 
   static final $core.List<NotificationCategory?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 15);
+      $pb.ProtobufEnum.$_initByValueList(values, 16);
   static NotificationCategory? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
