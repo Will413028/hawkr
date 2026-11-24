@@ -412,8 +412,8 @@ func TestReportAuthorizationForChatAndReview(t *testing.T) {
 	if err := submit(party, TargetChatMessage, ids[1]); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("檢舉自己的訊息：%v", err)
 	}
-	f.hideMessage(t, ids[4])
-	if err := submit(party, TargetChatMessage, ids[4]); kindOf(err) != apperr.KindNotFound {
+	f.hideMessage(t, ids[5])
+	if err := submit(party, TargetChatMessage, ids[5]); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("已隱藏的訊息：%v", err)
 	}
 	if err := submit(party, TargetChatMessage, uuid.NewV7()); kindOf(err) != apperr.KindNotFound {
