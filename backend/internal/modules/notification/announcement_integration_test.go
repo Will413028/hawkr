@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -666,5 +667,8 @@ func TestAnnouncementFanOutSignalsTheRecipientsStream(t *testing.T) {
 	}
 	if ev.Inbox == nil || ev.Inbox.UnreadCount != 1 || ev.Inbox.LatestItemID == nil || *ev.Inbox.LatestItemID != rowID {
 		t.Fatalf("訂閱者應收到未讀 1 與公告列 %s：%+v", rowID, ev)
+	}
+	if !slices.Equal(ev.Inbox.NewItemIDs, []uuid.UUID{rowID}) {
+		t.Fatalf("公告扇出的訊號應帶這個收件人的新列 ID %s：%+v", rowID, ev.Inbox)
 	}
 }

@@ -116,8 +116,8 @@ func inboxReader(a *app.Service) func(context.Context, stream.Key, int64) (strea
 // dbSignals 把 worker 的收件匣變化轉成同 transaction 的 pg_notify（intake 不依賴 stream）。
 type dbSignals struct{ db *db.DB }
 
-func (s dbSignals) InboxChanged(ctx context.Context, accountID int64, audience model.Audience, storeID int64, hint model.StateHint) error {
-	return stream.NotifyInbox(ctx, s.db, stream.Key{AccountID: accountID, Audience: audience}, storeID, hint)
+func (s dbSignals) InboxChanged(ctx context.Context, accountID int64, audience model.Audience, storeID int64, hint model.StateHint, itemID uuid.UUID) error {
+	return stream.NotifyInbox(ctx, s.db, stream.Key{AccountID: accountID, Audience: audience}, storeID, hint, itemID)
 }
 
 // StateHint 是串流訊號帶的狀態重讀提示。

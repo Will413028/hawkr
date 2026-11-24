@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"time"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
@@ -30,7 +31,7 @@ type Registry interface {
 // Signals 是已讀與刪除通知串流訂閱者的出口（根套件以 stream.NotifyInbox 實作）。
 // 在改動收件匣的同一個 transaction 內呼叫（pg_notify 在 commit 後才送達，rollback 不送）；nil 表示不通知（沒有串流的組裝）。
 type Signals interface {
-	InboxChanged(ctx context.Context, accountID int64, audience model.Audience, storeID int64, hint model.StateHint) error
+	InboxChanged(ctx context.Context, accountID int64, audience model.Audience, storeID int64, hint model.StateHint, itemID uuid.UUID) error
 }
 
 // Deps 是 Service 的依賴。
@@ -103,5 +104,5 @@ func (s *Service) inboxChanged(ctx context.Context, accountID int64, audience st
 	if storeID != nil {
 		sid = *storeID
 	}
-	return s.d.Signals.InboxChanged(ctx, accountID, model.Audience(audience), sid, model.StateHintNone)
+	return s.d.Signals.InboxChanged(ctx, accountID, model.Audience(audience), sid, model.StateHintNone, uuid.Nil())
 }

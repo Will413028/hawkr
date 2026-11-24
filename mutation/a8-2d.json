@@ -238,7 +238,7 @@
    "id": "read-error-loses-dirty-mark",
    "stack": "go",
    "file": "backend/internal/modules/notification/internal/stream/hub.go",
-   "old": "\t\t\t\ts.restoreInbox(hints)",
+   "old": "\t\t\t\ts.restoreInbox(hints, items, truncated)",
    "new": "\t\t\t\t_ = hints",
    "test": "internal/modules/notification/internal/stream ^TestFailedReadKeepsTheDirtyMarkAndHints$",
    "why": "A failed content read drops the dirty mark and merged hints, so the change is never signalled."
