@@ -4,6 +4,8 @@ import io.github.will413028.hawkr.common.obs.grpc.GrpcStubFactory;
 import io.github.will413028.hawkr.coupon.grpc.ConsumeCouponRequest;
 import io.github.will413028.hawkr.coupon.grpc.ConsumeCouponResponse;
 import io.github.will413028.hawkr.coupon.grpc.CouponServiceGrpc;
+import io.github.will413028.hawkr.coupon.grpc.ReleaseCouponRequest;
+import io.github.will413028.hawkr.coupon.grpc.ReleaseCouponResponse;
 import io.github.will413028.hawkr.coupon.grpc.ReserveCouponRequest;
 import io.github.will413028.hawkr.coupon.grpc.ReserveCouponResponse;
 import io.grpc.Status;
@@ -91,5 +93,43 @@ class CheckoutCouponGrpcClientTest {
         assertThatThrownBy(() -> client.consumeCoupon("V1", 77L, "ORD-1"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("ORD-1");
+    }
+
+    @Test
+    @DisplayName("consumeCoupon 回 7009 → 拋專用例外，讓 worker 判斷訂單是否已取消")
+    void consumeNoVoucherIsATypedException() {
+        when(stub.consumeCoupon(any(ConsumeCouponRequest.class)))
+                .thenReturn(ConsumeCouponResponse.newBuilder().setSuccess(false).setCode(7009).build());
+
+        assertThatThrownBy(() -> client.consumeCoupon("V1", 77L, "ORD-1"))
+                .isInstanceOf(CouponNoVoucherForOrderException.class);
+    }
+
+    @Test
+    @DisplayName("releaseCouponByOrderNo 已知券 id → order_no 與 instance_id 都送（舊 coupon-service 要讀 instance_id）")
+    void releaseSendsInstanceIdWhenKnown() {
+        when(stub.releaseCoupon(any(ReleaseCouponRequest.class)))
+                .thenReturn(ReleaseCouponResponse.newBuilder().setSuccess(true).build());
+
+        client.releaseCouponByOrderNo("ORD-1", "V1");
+
+        ArgumentCaptor<ReleaseCouponRequest> sent = ArgumentCaptor.forClass(ReleaseCouponRequest.class);
+        verify(stub).releaseCoupon(sent.capture());
+        assertThat(sent.getValue().getOrderNo()).isEqualTo("ORD-1");
+        assertThat(sent.getValue().getInstanceId()).isEqualTo("V1");
+    }
+
+    @Test
+    @DisplayName("releaseCouponByOrderNo 不知道券 id → 只送 order_no")
+    void releaseOmitsInstanceIdWhenUnknown() {
+        when(stub.releaseCoupon(any(ReleaseCouponRequest.class)))
+                .thenReturn(ReleaseCouponResponse.newBuilder().setSuccess(true).build());
+
+        client.releaseCouponByOrderNo("ORD-1", null);
+
+        ArgumentCaptor<ReleaseCouponRequest> sent = ArgumentCaptor.forClass(ReleaseCouponRequest.class);
+        verify(stub).releaseCoupon(sent.capture());
+        assertThat(sent.getValue().getOrderNo()).isEqualTo("ORD-1");
+        assertThat(sent.getValue().getInstanceId()).isEmpty();
     }
 }

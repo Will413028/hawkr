@@ -634,7 +634,7 @@ func (s *Service) Release(ctx context.Context, orderNo string) (ReleaseResult, e
 }
 
 // ForCampaign 回傳買家在這個活動持有的券（每位買家在同一個活動至多一張，所以不需要挑選）；沒有領過或被發放過回 NotFound
-// （ReasonVoucherNotFound）。只讀，不改狀態。給 B8 之前把 Java 的活動識別對到券的轉接層用。
+// （ReasonVoucherNotFound）。只讀，不改狀態。給把 Java 的活動識別對到券的轉接層用。
 func (s *Service) ForCampaign(ctx context.Context, buyerID int64, campaignID uuid.UUID) (model.Voucher, error) {
 	if buyerID <= 0 {
 		return model.Voucher{}, model.Invalid(ctx, "BuyerID", model.InvalidBuyerIDInvalid)

@@ -33,6 +33,34 @@ final class OrderServiceTestHarness {
     private OrderServiceTestHarness() {
     }
 
+    /** 測試專用工廠：額外開放 {@code couponReleaseService} 可控（取消事務內的釋券任務測試）。 */
+    static OrderService withCouponRelease(OrderRepository orderRepository, CouponReleaseService couponReleaseService) {
+        return new OrderService(
+                orderRepository,
+                mock(OrderItemRepository.class),
+                mock(RefundRequestRepository.class),
+                mock(FinancialLogRepository.class),
+                mock(StockTxRecordRepository.class),
+                mock(CartCleanupRetryTaskRepository.class),
+                mock(AutoRefundTaskRepository.class),
+                mock(OrderNoGenerator.class),
+                mock(ProductGrpcClient.class),
+                mock(CartGrpcClient.class),
+                mock(OrderConfig.class),
+                mock(OrderEventPublisher.class),
+                mock(SellerGrpcClient.class),
+                mock(BuyerGrpcClient.class),
+                mock(AfterSalesGrpcClient.class),
+                mock(OrderCompletionTxHandler.class),
+                mock(OrderCreationTxHandler.class),
+                mock(OrderOutboxMapper.class),
+                new io.github.will413028.hawkr.order.checkout.OrderPolicyResolver(),
+                new io.github.will413028.hawkr.order.checkout.UberOrderEligibilityGuard(),
+                couponReleaseService,
+                new SimpleMeterRegistry()
+        );
+    }
+
     static OrderService withOrderRepository(OrderRepository orderRepository) {
         return withOrderRepository(orderRepository, mock(AfterSalesGrpcClient.class));
     }
@@ -65,6 +93,7 @@ final class OrderServiceTestHarness {
                 mock(OrderOutboxMapper.class),
                 new io.github.will413028.hawkr.order.checkout.OrderPolicyResolver(),
                 new io.github.will413028.hawkr.order.checkout.UberOrderEligibilityGuard(),
+                mock(io.github.will413028.hawkr.order.service.CouponReleaseService.class),
                 new SimpleMeterRegistry()
         );
     }
@@ -141,6 +170,7 @@ final class OrderServiceTestHarness {
                 orderOutboxMapper,
                 new io.github.will413028.hawkr.order.checkout.OrderPolicyResolver(),
                 new io.github.will413028.hawkr.order.checkout.UberOrderEligibilityGuard(),
+                mock(io.github.will413028.hawkr.order.service.CouponReleaseService.class),
                 new SimpleMeterRegistry()
         );
     }

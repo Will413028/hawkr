@@ -89,8 +89,8 @@ class OrderExpiryCancellationServiceTest {
 
         assertTrue(cancelled);
         verify(paymentEventHandler).cancelExpiredOrderInTx(ORDER_NO, OrderCancelReason.SELLER_SUSPENDED.value());
-        // 庫存歸還已改為 cancelExpiredOrderInTx 事務內落 order.cancelled outbox（#1368），此處只驗 釋券（寫入重試任務）
-        verify(couponReleaseService).release(ORDER_NO);
+        // 庫存歸還在 cancelExpiredOrderInTx 事務內落 order.cancelled outbox，此處只驗釋券
+        verify(couponReleaseService).release(ORDER_NO, "coupon-1");
     }
 
     @Test
@@ -104,7 +104,7 @@ class OrderExpiryCancellationServiceTest {
         assertFalse(cancelled);
         // fail-safe：gate 無法判定付款真相 → 不進 CAS 取消，交由下輪 PaymentDeadlineScheduler 重掃自癒
         verify(paymentEventHandler, never()).cancelExpiredOrderInTx(anyString(), anyString());
-        verify(couponReleaseService, never()).release(anyString());
+        verify(couponReleaseService, never()).release(anyString(), any());
     }
 
     @Test
@@ -119,7 +119,7 @@ class OrderExpiryCancellationServiceTest {
 
         assertFalse(cancelled);
         verify(paymentEventHandler, never()).cancelExpiredOrderInTx(anyString(), anyString());
-        verify(couponReleaseService, never()).release(anyString());
+        verify(couponReleaseService, never()).release(anyString(), any());
     }
 
     @Test
@@ -136,6 +136,6 @@ class OrderExpiryCancellationServiceTest {
 
         assertFalse(cancelled);
         // CAS 0 rows → cancelExpiredOrderInTx 內既不改狀態也不落 outbox，且不做 TX 外釋券補償
-        verify(couponReleaseService, never()).release(anyString());
+        verify(couponReleaseService, never()).release(anyString(), any());
     }
 }

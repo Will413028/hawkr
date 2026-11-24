@@ -143,27 +143,34 @@ public class CheckoutCouponGrpcClient {
                 .consumeCoupon(request);
 
         if (!response.getSuccess()) {
-            throw new IllegalStateException("消耗優惠券回傳非成功，orderNo=" + orderNo
-                    + ", code=" + response.getCode() + ", message=" + response.getMessage());
+            String detail = "消耗優惠券回傳非成功，orderNo=" + orderNo
+                    + ", code=" + response.getCode() + ", message=" + response.getMessage();
+            if (response.getCode() == CouponNoVoucherForOrderException.CODE) {
+                throw new CouponNoVoucherForOrderException(detail);
+            }
+            throw new IllegalStateException(detail);
         }
         log.info("CheckoutCouponGrpcClient.consumeCoupon.done", "消耗優惠券完成",
                 "orderNo", orderNo);
     }
 
     /**
-     * 釋放優惠券（取消、逾時、鎖券失敗補償）：以 order_no 為鍵，coupon 端冪等（D3），不送 instance_id。
+     * 釋放優惠券（取消、逾時、鎖券失敗補償）：以 order_no 為鍵，coupon 端冪等（D3）；已知 instance_id 時一併送出（Go 端不讀，仍在服務的舊 coupon-service 要讀）。
      *
      * <p>失敗一律拋出（gRPC 例外，或回應 success=false），由呼叫端重試：這支不吞例外，吞掉就沒有任何重試能補上
      * 漏掉的釋放。呼叫端是 {@code CouponReleaseService}（當場嘗試一次）與 {@code CouponConsumptionWorker}（任務重試）。
      *
-     * @param orderNo 訂單編號（coupon 端只釋放持有這筆訂單的券）
+     * @param orderNo          訂單編號（coupon 端只釋放持有這筆訂單的券）
+     * @param couponInstanceId 訂單記下的券 id；不知道（鎖券回應遺失）時傳 null 或空字串，不送
      */
-    public void releaseCouponByOrderNo(String orderNo) {
+    public void releaseCouponByOrderNo(String orderNo, String couponInstanceId) {
         log.info("CheckoutCouponGrpcClient.releaseCoupon.start", "釋放優惠券", "orderNo", orderNo);
 
-        ReleaseCouponRequest request = ReleaseCouponRequest.newBuilder()
-                .setOrderNo(orderNo)
-                .build();
+        ReleaseCouponRequest.Builder builder = ReleaseCouponRequest.newBuilder().setOrderNo(orderNo);
+        if (couponInstanceId != null && !couponInstanceId.isEmpty()) {
+            builder.setInstanceId(couponInstanceId);
+        }
+        ReleaseCouponRequest request = builder.build();
 
         ReleaseCouponResponse response = couponStub
                 .withDeadlineAfter(INTERNAL_READ_DEADLINE_SEC, TimeUnit.SECONDS)

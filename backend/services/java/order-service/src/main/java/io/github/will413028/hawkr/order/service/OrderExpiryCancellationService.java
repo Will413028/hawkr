@@ -164,10 +164,10 @@ public class OrderExpiryCancellationService {
         // 禁止呼叫 ClosePaymentByOrderNo：讓交易由 Payment Service ExpiredTransactionScheduler 自然過期，
         // 確保遲到的 PayUni Webhook 能正常觸發退款補償流程（見設計書 §8.5）
 
-        // 釋放優惠券：寫成 coupon_consumption_tasks 的釋券任務並當場嘗試，失敗由 CouponConsumptionWorker 重試
+        // 釋放優惠券：釋券任務已在取消事務內寫入，這裡當場嘗試加速，失敗由 CouponConsumptionWorker 重試
         String couponInstanceId = info.couponInstanceId();
         if (couponInstanceId != null && !couponInstanceId.isEmpty()) {
-            couponReleaseService.release(info.orderNo());
+            couponReleaseService.release(info.orderNo(), couponInstanceId);
         }
     }
 }

@@ -1089,8 +1089,9 @@ public class CheckoutService {
                     log.error("CheckoutService.confirm.compensate.failed", "補償操作失敗", compensateErr);
                 }
                 // reserve 可能在 coupon 端已成功、只是回應遺失或回寫 instance id 失敗：訂單沒有記下 instance id，
-                // 其他釋放路徑都找不到這張券。以 order_no 釋放（冪等；coupon 端沒鎖時是空操作），失敗由任務重試（D3）。
-                couponReleaseService.release(orderNo);
+                // 其他釋放路徑都找不到這張券；reserve 逾時時 Lock 也可能還在途中、晚於當場釋放才提交。
+                // 以 order_no 釋放（冪等；coupon 端沒鎖時是空操作）並排一筆延後到 reserve deadline 之後的任務（D3）。
+                couponReleaseService.releaseWithLateLockRecheck(orderNo);
                 throw new OrderBusinessException(GrpcResponseCode.COUPON_LOCK_FAILED, e.getMessage());
             }
         }

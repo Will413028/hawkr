@@ -56,7 +56,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 結帳鎖券失敗的補償（B7-4a、D3）：reserve 在 coupon 端可能已成功而訂單沒記下 instance id，補償要以 order_no 釋券。
+ * 結帳鎖券失敗的補償（D3）：reserve 在 coupon 端可能已成功而訂單沒記下 instance id，補償要以 order_no 釋券。
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -173,7 +173,7 @@ class CheckoutConfirmCouponCompensationTest {
                         .isEqualTo(GrpcResponseCode.COUPON_LOCK_FAILED.code()));
 
         verify(orderService).cancelOrder(BUYER_ID, ORDER_NO);
-        verify(couponReleaseService).release(ORDER_NO);
+        verify(couponReleaseService).releaseWithLateLockRecheck(ORDER_NO);
     }
 
     @Test
@@ -188,7 +188,7 @@ class CheckoutConfirmCouponCompensationTest {
         assertThatThrownBy(() -> service.confirm(baseRequest().build()))
                 .isInstanceOf(OrderBusinessException.class);
 
-        verify(couponReleaseService).release(ORDER_NO);
+        verify(couponReleaseService).releaseWithLateLockRecheck(ORDER_NO);
     }
 
     @Test
@@ -200,7 +200,7 @@ class CheckoutConfirmCouponCompensationTest {
 
         service.confirm(baseRequest().build());
 
-        verify(couponReleaseService, never()).release(anyString());
+        verify(couponReleaseService, never()).releaseWithLateLockRecheck(anyString());
     }
 
     @Test

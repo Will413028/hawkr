@@ -1455,7 +1455,7 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
             if (order == null) return;
             String couponInstanceId = order.getCouponInstanceId();
             if (couponInstanceId != null && !couponInstanceId.isEmpty()) {
-                couponReleaseService.release(orderNo);
+                couponReleaseService.release(orderNo, couponInstanceId);
             }
         } catch (Exception e) {
             log.error("OrderGrpcService.releaseCoupon.error", "釋放優惠券失敗", e);

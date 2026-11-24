@@ -1,6 +1,6 @@
-// Package couponserver 在 Java order 與 aftersales 改寫成 Go 之前（B8、B9），以舊的 gRPC 契約把它們對 coupon 的呼叫轉給
+// Package couponserver 在 Java order 與 aftersales 改寫成 Go 之前，以舊的 gRPC 契約把它們對 coupon 的呼叫轉給
 // coupon 模組：order 的驗券、核銷、釋放，aftersales 的補償券。其餘 CouponService 方法一律 Unimplemented：買家、賣家、admin 的
-// 入口已經是 Connect（B7-3）。B8、B9 隨 Java 的呼叫端刪除。
+// 入口已經是 Connect。本套件隨 Java 的呼叫端刪除。
 //
 // 契約與舊 coupon-service 相同（業務失敗用 code／message 的 envelope、gRPC 狀態是 OK），只有四處不同：
 //   - ReserveCoupon 多兩個必填欄位 store_id 與 order_amount（D10），讓模組的 Lock 照常重驗店家範圍與門檻（BD1、BD2）；

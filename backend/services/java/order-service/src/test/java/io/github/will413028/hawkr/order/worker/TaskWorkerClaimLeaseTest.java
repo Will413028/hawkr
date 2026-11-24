@@ -113,7 +113,7 @@ class TaskWorkerClaimLeaseTest {
         when(repo.findRetryable(anyInt())).thenReturn(List.of(couponTask()));
         when(repo.claimTask(anyLong(), any())).thenReturn(0);
 
-        new CouponConsumptionWorker(repo, coupon).process();
+        new CouponConsumptionWorker(repo, coupon, mock(io.github.will413028.hawkr.order.repository.OrderRepository.class)).process();
 
         verifyNoInteractions(coupon);
         verify(repo, never()).markDone(anyLong());
@@ -129,7 +129,7 @@ class TaskWorkerClaimLeaseTest {
         when(repo.claimTask(anyLong(), any())).thenReturn(1);
 
         LocalDateTime before = io.github.will413028.hawkr.common.utils.DateTimeUtils.nowUtc();
-        new CouponConsumptionWorker(repo, coupon).process();
+        new CouponConsumptionWorker(repo, coupon, mock(io.github.will413028.hawkr.order.repository.OrderRepository.class)).process();
 
         InOrder order = inOrder(repo, coupon);
         ArgumentCaptor<LocalDateTime> lease = ArgumentCaptor.forClass(LocalDateTime.class);

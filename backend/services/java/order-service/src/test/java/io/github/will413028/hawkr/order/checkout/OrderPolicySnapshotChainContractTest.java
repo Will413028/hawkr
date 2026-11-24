@@ -198,6 +198,7 @@ class OrderPolicySnapshotChainContractTest {
                 mock(BuyerGrpcClient.class), mock(AfterSalesGrpcClient.class),
                 mock(OrderCompletionTxHandler.class), txHandler, mock(OrderOutboxMapper.class),
                 new OrderPolicyResolver(), new UberOrderEligibilityGuard(),
+                mock(io.github.will413028.hawkr.order.service.CouponReleaseService.class),
                 new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
 
         service = new CheckoutService(productGrpcClient, sellerGrpcClient, buyerGrpcClient,
