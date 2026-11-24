@@ -47,7 +47,7 @@ func expirySetup(t *testing.T, batch int32, fail func(uuid.UUID) error) *expiryF
 }
 
 func (f *expiryFixture) newModule(bus *events.Bus, batch int32) *coupon.Module {
-	return coupon.New(coupon.Deps{DB: f.db, Stores: f.stores, Members: f.members, Buyers: f.buyers, StoreDirectory: f.dir, Events: bus, ExpiryBatchSize: batch, NewID: uuid.NewV7, Now: f.now})
+	return coupon.New(coupon.Deps{DB: f.db, Stores: f.stores, Buyers: f.buyers, StoreDirectory: f.dir, Events: bus, ExpiryBatchSize: batch, NewID: uuid.NewV7, Now: f.now})
 }
 
 func (f *expiryFixture) setNow(t time.Time) { f.clock.Store(t.UnixNano()) }
