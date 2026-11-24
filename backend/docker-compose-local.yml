@@ -482,10 +482,6 @@ services:
       STORE_PICKUP_TIMEOUT_HOURS: ${STORE_PICKUP_TIMEOUT_HOURS:-72}
       STORE_PICKUP_SCHEDULER_CRON: ${STORE_PICKUP_SCHEDULER_CRON:-0 */10 * * * ?}
       WARN_SCHEDULER_CRON: ${WARN_SCHEDULER_CRON:-0 */5 * * * ?}
-      # §5.21 RETURN_STUCK 偵測（application.yml hawkr.aftersales.return-stuck-alert.*）
-      # 值與 application.yml default 同步，本機 compose 行為不變；k8s 側刻意不宣告這兩個 key。
-      RETURN_STUCK_SCHEDULER_CRON: ${RETURN_STUCK_SCHEDULER_CRON:-0 0 3 * * ?}
-      RETURN_STUCK_DAYS: ${RETURN_STUCK_DAYS:-14}
       # 退款 worker（application.yml aftersales.refund.*）
       REFUND_WORKER_INTERVAL_MS: ${REFUND_WORKER_INTERVAL_MS:-10000}
       REFUND_MAX_RETRY_COUNT: ${REFUND_MAX_RETRY_COUNT:-10}

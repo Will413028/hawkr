@@ -5,7 +5,7 @@ package io.github.will413028.hawkr.common.obs.health;
  *
  * 任何「啟動時載入快取 / 啟動後初始化才能正確提供服務」的元件，必須實作此介面，
  * 否則 K8s readiness probe 會在 cache 尚未 warm 時就將流量導入，產生誤導性錯誤
- * （例如冷啟動視窗的結帳 ALL_SHIPPING_EXCEEDED）。
+ * （例如冷啟動視窗的結帳誤報）。
  *
  * 自動掃描：{@link ComponentReadinessHealthIndicator} 會收集所有實作此介面的
  * Spring bean，任一回傳 false 則 health endpoint 報 DOWN。

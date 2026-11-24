@@ -91,22 +91,6 @@ hawkr:
     enabled: true
     node-id-base: 700
     pod-index: ${POD_INDEX:0}
-  # §5.21 RETURN_STUCK 偵測 scheduler（ReturnStuckAlertScheduler）。
-  # 注意：這些屬性掛在 hawkr.* 底下，與本檔最下方的頂層 aftersales.* 是**不同 namespace**，
-  # 兩邊不要互相搬。原本完全沒宣告、只靠 @Value inline default 活著，是本服務唯一一支
-  # 旋鈕不在設定檔裡的 scheduler（2026-08-05 identity-naming triage 補齊）。
-  # ⚠️ 四個 default 與補齊前的 @Value inline default 逐字同值 —— 本次不改任何環境的生效行為；
-  #    k8s values 刻意不宣告這幾個 key，dev / prod 一律維持每天 03:00 UTC。
-  #    需要臨時提頻時用 process 層級覆寫（Spring 的 command-line arg 優先序最高），
-  #    例：--hawkr.aftersales.return-stuck-alert.cron='0 * * * * ?'（見 Task 4）。
-  aftersales:
-    return-stuck-alert:
-      enabled: ${RETURN_STUCK_ALERT_ENABLED:true}
-      cron: ${RETURN_STUCK_SCHEDULER_CRON:0 0 3 * * ?}
-      batch-size: ${RETURN_STUCK_ALERT_BATCH_SIZE:200}
-  shipping:
-    anomaly:
-      return-stuck-days: ${RETURN_STUCK_DAYS:14}
 
 # 可調參數
 aftersales:

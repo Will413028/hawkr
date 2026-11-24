@@ -41,8 +41,7 @@ class InputValidatorDisplayLengthTest {
         // "Ca" = 2 < 4 → 拒絕（正是 #1187 根因）
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
                 InputValidator.requireDisplayLengthBetween("Ca",
-                        PayUniShippingConstraints.CVS_RECIPIENT_NAME_MIN,
-                        PayUniShippingConstraints.CVS_RECIPIENT_NAME_MAX, "收件人姓名"));
+                        4, 10, "收件人姓名"));
         assertTrue(ex.getMessage().contains("長度過短"));
     }
 
@@ -51,8 +50,7 @@ class InputValidatorDisplayLengthTest {
         // "王" = 2 < 4 → 拒絕（PayUni 官方要求最短 2 中文字）
         assertThrows(IllegalArgumentException.class, () ->
                 InputValidator.requireDisplayLengthBetween("王",
-                        PayUniShippingConstraints.CVS_RECIPIENT_NAME_MIN,
-                        PayUniShippingConstraints.CVS_RECIPIENT_NAME_MAX, "收件人姓名"));
+                        4, 10, "收件人姓名"));
     }
 
     @Test

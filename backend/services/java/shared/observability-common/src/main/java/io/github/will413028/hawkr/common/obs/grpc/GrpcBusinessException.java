@@ -7,7 +7,7 @@ package io.github.will413028.hawkr.common.obs.grpc;
  * 直接回傳 {@link #code()} + {@link RuntimeException#getMessage()} 給前端，
  * 而非被 catch-all 吞掉為「系統錯誤」。</p>
  *
- * <p>各微服務的 BusinessException（如 ShippingBusinessException、OrderBusinessException）
+ * <p>各微服務的 BusinessException（如 OrderBusinessException）
  * 應實作此介面。</p>
  */
 public interface GrpcBusinessException {

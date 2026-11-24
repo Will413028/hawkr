@@ -16,8 +16,6 @@ import io.github.will413028.hawkr.common.utils.code.StockOperationStatus;
 import io.github.will413028.hawkr.common.utils.code.ProductStatus;
 import io.github.will413028.hawkr.common.utils.code.ShippingArea;
 import io.github.will413028.hawkr.common.utils.code.WeightUnit;
-import io.github.will413028.hawkr.common.utils.shipping.ShippingAreaResolver;
-import io.github.will413028.hawkr.common.utils.shipping.WeightConverter;
 import io.github.will413028.hawkr.common.utils.validation.InputValidator;
 import io.github.will413028.hawkr.product.domain.ProductPublicationPolicy;
 import io.github.will413028.hawkr.product.converter.ProductProtoConverter;

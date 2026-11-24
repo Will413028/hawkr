@@ -816,58 +816,6 @@ public interface AfterSaleCaseMapper extends BaseMapper<AfterSaleCaseEntity> {
                                @Param("now") java.time.LocalDateTime now);
 
     /**
-     * §5.21 issue #2294 L6：RETURN_STUCK 卡死告警的 <b>lease claim</b>。
-     *
-     * <p>把 {@code return_stuck_alerted_at} 推到 {@code leaseUntil}（= now + returnStuckDays）：
-     * affected=1 表示本 pod 搶到這一輪的告警權；affected=0 表示另一個 pod 已搶走且租約未到期。
-     * 租約到期後該列會被候選述詞重新撈回並再次告警——<b>這是刻意的</b>，卡死沒解除就該一直吵。
-     *
-     * <p>⚠️ 這支是 lease 不是「已告警旗標」：不得改成 {@code IS NULL} 的永久 CAS，
-     * 否則卡死案件只會被告警一次（規範《多副本排程搶佔規範》§二 第 4 步）。
-     * <p>⚠️ 刻意不寫 {@code updated_at}：那是本排程的候選判定欄，寫它會讓案件立刻退出候選集合。
-     */
-    @Update("""
-            UPDATE aftersale_cases
-               SET return_stuck_alerted_at = #{leaseUntil}
-             WHERE case_no = #{caseNo}
-               AND status = #{status}
-               AND (return_stuck_alerted_at IS NULL OR return_stuck_alerted_at <= #{now})
-            """)
-    int claimReturnStuckAlert(@Param("caseNo") String caseNo,
-                              @Param("status") String status,
-                              @Param("now") java.time.LocalDateTime now,
-                              @Param("leaseUntil") java.time.LocalDateTime leaseUntil);
-
-    /**
-     * §5.21 R4 追加（2026-08-08）：{@link #claimReturnStuckAlert} 的<b>釋放</b>——
-     * publish 沒有成功時把租約還原成 claim 之前的值，讓該案件在<b>下一個 tick</b>（每日）
-     * 就能重新告警，而不是等滿一整個 {@code returnStuckDays}（14 天）的冷卻。
-     *
-     * <p><b>為什麼 CAS 的條件是「租約仍等於我寫進去的那個值」</b>：這是唯一能證明
-     * 「這個租約還是我的」的述詞。若期間有人（另一個 pod 在租約到期後、或人工）重新 claim，
-     * 值就不同了，本次還原自動變成 0 列——<b>不會把別人的租約清掉</b>。
-     * 也因此 {@code caseNo} 之外一定要帶上 {@code expectedLeaseUntil}，不能只用 PK
-     * （《多副本排程搶佔規範》§一 規則 ⑦ 的同一個道理）。
-     *
-     * <p>⚠️ <b>這不是搶佔正確性的一部分，是失敗恢復的加速</b>：規範 §二 第 5 步明說
-     * 「catch 裡有回退不算回頭路」——進程消失時沒有任何 catch 會跑。租約本身
-     * （14 天後自動回到候選集合）仍然是唯一的正確性保證，本方法只把「MQ 短暫不可用」
-     * 這條**進程還活著**的路徑從 14 天縮到 1 天。
-     *
-     * @param expectedLeaseUntil claim 當時寫進去的租約值；不相符即放棄還原（回 0）
-     * @param restoreTo          還原目標＝claim 之前的舊值（可為 {@code null}）
-     */
-    @Update("""
-            UPDATE aftersale_cases
-               SET return_stuck_alerted_at = #{restoreTo,jdbcType=TIMESTAMP}
-             WHERE case_no = #{caseNo}
-               AND return_stuck_alerted_at = #{expectedLeaseUntil}
-            """)
-    int releaseReturnStuckAlertLease(@Param("caseNo") String caseNo,
-                                     @Param("expectedLeaseUntil") java.time.LocalDateTime expectedLeaseUntil,
-                                     @Param("restoreTo") java.time.LocalDateTime restoreTo);
-
-    /**
      * §5.3.8 ReturnTimeoutWorker 自動關案 transition（RETURN_PENDING 20 → AUTO_COMPLETED_RETURN_PENDING_TIMEOUT 33）。
      * <p>
      * 2026-06-15 新增；終態，不啟動退款。CAS 防競態：買家壓哨寄出 20→25 搶先 → affected=0 skip。

@@ -68,7 +68,7 @@ public final class GrpcErrorHandler {
                 responseObserver.onError(sre);
                 return;
             } else if (e instanceof GrpcBusinessException biz) {
-                // 業務異常（ShippingBusinessException、OrderBusinessException 等）— 回傳業務碼 + 具體訊息
+                // 業務異常（OrderBusinessException 等）— 回傳業務碼 + 具體訊息
                 // 日誌一律帶 exception class；若業務異常包裝了下游真實失敗（cause 非 null）則一併印 stack，
                 // 純業務拒絕（無 cause）不印 stack，避免常規流程刷 noise。
                 Throwable cause = e.getCause();
