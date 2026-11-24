@@ -62,6 +62,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: 安裝 libvips（media 模組以 cgo 連結）
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libvips-dev
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: backend/.go-version
@@ -85,12 +87,16 @@ jobs:
 
   integration:
     name: integration test（testcontainers）
+    # 慢的 job：開往 dev 的 PR 不跑，merge 進 dev 的 push 與 dev→main PR 才跑。
+    if: github.event_name != 'pull_request' || github.base_ref == 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: 安裝 libvips（media 模組以 cgo 連結）
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libvips-dev
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: backend/.go-version
@@ -138,6 +144,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: 安裝 libvips（media 模組以 cgo 連結）
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libvips-dev
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: backend/.go-version
@@ -171,9 +179,11 @@ jobs:
           go vet -tags integration ./...
           go vet -tags gateway ./internal/httpapi/...
 
-      - name: go test -race（含依賴方向檢查）
+      - name: go test（含依賴方向檢查；-race 只在 push 與 dev→main PR）
         if: always()
-        run: go test -race ./...
+        env:
+          RACE: ${{ (github.event_name != 'pull_request' || github.base_ref == 'main') && '-race' || '' }}
+        run: go test ${RACE:+"$RACE"} ./...
 
       - name: 讀取 buf 的版本
         if: always()

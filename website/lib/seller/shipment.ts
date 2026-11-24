@@ -153,7 +153,7 @@ export async function fetchShippingBusinessDays(): Promise<BusinessDay[]> {
 /**
  * POST /app/shipments/{order_no}/generate_home_label
  * @param shipDate yyyyMMdd（如 "20260512"）
- * @param stagedTokens 選填，出貨照片的 stagedToken（走 media/upload_sessions）
+ * @param stagedTokens 選填，出貨照片的 stagedToken（上傳完成後取得）
  */
 export async function generateHomeLabel(
 	orderNo: string,
@@ -200,10 +200,7 @@ export async function callTcat(
  * (synchronous from PayUni when `webhookReceived = true`; otherwise the
  * gateway will keep retrying and the seller should refresh later).
  */
-export async function printCvsLabel(
-	orderNo: string,
-	args?: { stagedTokens?: string[] },
-): Promise<CvsLabelResult> {
+export async function printCvsLabel(orderNo: string): Promise<CvsLabelResult> {
 	const tomorrow = new Date(Date.now() + 86400_000);
 	const yyyy = tomorrow.getFullYear();
 	const mm = String(tomorrow.getMonth() + 1).padStart(2, "0");
@@ -211,8 +208,7 @@ export async function printCvsLabel(
 	// 後端規格 PrintCvsLabelReq.shipDate 要 YYYYMMDD（無連字號）—— 與宅配
 	// generate_home_label 一致。先前誤送 "YYYY-MM-DD" 會讓 PayUni 取號失敗，
 	// 鎖殘留後續重試一律噴 [5047] 物流商呼叫進行中。
-	const body: Record<string, unknown> = { shipDate: `${yyyy}${mm}${dd}` };
-	if (args?.stagedTokens?.length) body.stagedTokens = args.stagedTokens;
+	const body = { shipDate: `${yyyy}${mm}${dd}` };
 
 	const env = await authedFetch<Record<string, unknown>>(
 		`/app/shipments/${encodeURIComponent(orderNo)}/print_cvs_label`,

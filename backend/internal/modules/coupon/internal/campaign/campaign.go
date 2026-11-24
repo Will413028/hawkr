@@ -179,10 +179,29 @@ func (s *Service) SetQuota(ctx context.Context, storeID int64, maxCount int32) e
 }
 
 // Publish 把 DRAFT 的活動發布成 ACTIVE。
-func (s *Service) Publish(ctx context.Context, id uuid.UUID) error {
+func (s *Service) Publish(ctx context.Context, id uuid.UUID) error { return s.publish(ctx, id, false) }
+
+// PublishPlatform 只發布平台發的非補償活動（後台路徑）；店家發的與補償活動回 NotFound，不洩漏存在與否。
+func (s *Service) PublishPlatform(ctx context.Context, id uuid.UUID) error {
+	return s.publish(ctx, id, true)
+}
+
+func (s *Service) publish(ctx context.Context, id uuid.UUID, platformOnly bool) error {
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		now := s.d.Now()
+		if platformOnly {
+			row, err := q.GetCampaign(ctx, id)
+			if errors.Is(err, pgx.ErrNoRows) {
+				return model.NotFound(ctx, model.ReasonCampaignNotFound)
+			}
+			if err != nil {
+				return err
+			}
+			if row.IssuerStoreID != nil || row.TargetType == string(model.TargetCompensation) {
+				return model.NotFound(ctx, model.ReasonCampaignNotFound)
+			}
+		}
 		n, err := q.PublishCampaign(ctx, store.PublishCampaignParams{ID: id, Now: now})
 		if err != nil {
 			return err
@@ -212,6 +231,8 @@ type EndInput struct {
 	// AdminID、StoreID 與 Reason 進稽核紀錄（StoreID 同時是賣家路徑的範圍限制）。
 	AdminID int64
 	Reason  string
+	// PlatformOnly 為 true 時只能結束平台發的非補償活動（後台路徑）；店家發的與補償活動回 NotFound。
+	PlatformOnly bool
 }
 
 // EndResult 是提前結束的結果。
@@ -221,6 +242,7 @@ type EndResult struct {
 }
 
 // End 提前結束活動（D5）：擋新的領取與鎖定、作廢 AVAILABLE 的券，LOCKED 的券照常核銷或釋放（BD8）。
+// 店家（StoreID）只能結束自己發的非補償活動：補償活動是系統替買家建立的，其他情形一律 NotFound（防枚舉）。
 // 先鎖活動列：與領券、發券排隊，結束之後進來的都看到 ENDED。已結束的活動重送是成功（Voided = 0）。
 func (s *Service) End(ctx context.Context, in EndInput) (EndResult, error) {
 	reason, err := model.NormalizeReason(ctx, in.Reason)
@@ -237,7 +259,10 @@ func (s *Service) End(ctx context.Context, in EndInput) (EndResult, error) {
 		if err != nil {
 			return err
 		}
-		if in.StoreID > 0 && (row.IssuerStoreID == nil || *row.IssuerStoreID != in.StoreID) {
+		if in.StoreID > 0 && (row.IssuerStoreID == nil || *row.IssuerStoreID != in.StoreID || model.TargetType(row.TargetType) == model.TargetCompensation) {
+			return model.NotFound(ctx, model.ReasonCampaignNotFound)
+		}
+		if in.PlatformOnly && (row.IssuerStoreID != nil || row.TargetType == string(model.TargetCompensation)) {
 			return model.NotFound(ctx, model.ReasonCampaignNotFound)
 		}
 		if model.CampaignStatus(row.Status) == model.StatusEnded {

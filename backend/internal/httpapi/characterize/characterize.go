@@ -46,6 +46,8 @@ var (
 	ErrNotFound        = errors.New("不存在")
 	ErrInvalid         = errors.New("輸入不合法")
 	ErrConflict        = errors.New("版本衝突")
+	// ErrRejected 標記服務以業務層 envelope 拒絕請求（區別於連線、逾時等傳輸錯誤）；可與上面的分類同時成立。
+	ErrRejected = errors.New("業務層拒絕")
 )
 
 // T 是情境用到的 testing.T 子集：突變測試以一個記錄失敗的 T 執行情境（Probe），確認情境真的抓得到錯的資料。

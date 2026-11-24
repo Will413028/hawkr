@@ -28,6 +28,8 @@ void main() {
       '/cart',
       '/chat',
       '/chat/room',
+      '/account/orders/ORD-1',
+      '/account/messages/store-1',
       '/orders/detail',
       '/settings/profile',
       '/wallet/coupons',

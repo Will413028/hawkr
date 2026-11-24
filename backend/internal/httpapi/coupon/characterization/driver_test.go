@@ -1,7 +1,8 @@
 // Package characterization 是 coupon 對外 API 的特性測試（ADR 2026-09-24-go-modular-monolith D8 的第一層
 // 安全網、ADR 2026-09-26-external-contract-protobuf-connect D4），共用的部分在 internal/httpapi/characterize。
 //
-// 情境只寫一次（scenarios_test.go），透過 Driver 操作：REST driver 經 gateway 打舊的 Java coupon-service。
+// 情境只寫一次（scenarios_test.go），透過 Driver 操作：REST driver 經 gateway 打舊的 Java coupon-service，Connect driver（connect_test.go、
+// monolith_integration_test.go）打單體的 CouponAppService 與 CouponAdminService（Admin*，管理員用 dev admin token）。
 //
 // 情境鎖定的是 Java coupon-service 當時的行為，沒有驗證那行為是否正確；疑似缺陷處以 BD 編號標明
 // （backend/docs/plans/2026-11-23-b7-coupon/defects.md），另案處理。計畫決定要改的行為（D2、BD 標「修」）寫成修正後的
@@ -41,6 +42,7 @@ var (
 	ErrNotActive     = errors.New("活動不是進行中")
 	ErrOutOfWindow   = errors.New("不在有效期間")
 	ErrNotClaimable  = errors.New("此券不需要領取")
+	ErrNotEligible   = errors.New("買家不符合活動的資格")
 )
 
 type CouponType string
@@ -66,7 +68,8 @@ const (
 	StatusActive   Status = "ACTIVE"
 	StatusInactive Status = "INACTIVE"
 	StatusExpired  Status = "EXPIRED"
-	StatusRevoked  Status = "REVOKED"
+	// StatusEnded 是賣家收回（舊的 REVOKED）或 admin 停用後的狀態：新的模型只有提前結束（D5）。
+	StatusEnded Status = "ENDED"
 )
 
 type Issuer string
@@ -189,6 +192,17 @@ type IssueResult struct {
 type Driver interface {
 	// Legacy 回報這是不是對舊的 coupon-service 跑（skipOnLegacy 用）。
 	Legacy() bool
+	// AdminRPC 回報這個 driver 是不是經 admin 的對外 API 操作（REST 與 Connect 都是）；不是的話，專門驗 admin RPC 行為的情境略過。
+	AdminRPC() bool
+
+	// StoreOf 是呼叫者（賣家）的店家 ID；BuyerAccount 與 BuyerID 是呼叫者（買家）的帳號 ID 與買家 ID。REST 是種子帳號的固定值，
+	// Connect 是情境各自建立的帳號。
+	StoreOf(c ch.Caller) string
+	BuyerAccount(c ch.Caller) string
+	BuyerID(c ch.Caller) string
+	// Unknown 是格式正確但不存在的模板或券 ID；Malformed 是格式錯誤的 ID。
+	Unknown() string
+	Malformed() string
 
 	ListMyCoupons(ctx context.Context, c ch.Caller, q ListQuery) (MyCoupons, error)
 	ListAvailable(ctx context.Context, c ch.Caller, q AvailableQuery) (AvailableList, error)

@@ -4,7 +4,9 @@ import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/content/v1alpha1/content.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/media/v1alpha1/media.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/review/v1alpha1/review.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/social/v1alpha1/social.connect.client.dart';
@@ -50,6 +52,11 @@ ContentPublicServiceClient contentClient(Ref ref) =>
 IdentityAppServiceClient identityClient(Ref ref) =>
     IdentityAppServiceClient(ref.watch(connectAuthTransportProvider));
 
+/// 圖片與機敏檔案的上傳會話（MediaAppService），登入後呼叫。
+@Riverpod(keepAlive: true)
+MediaAppServiceClient mediaClient(Ref ref) =>
+    MediaAppServiceClient(ref.watch(connectAuthTransportProvider));
+
 /// 賣家的店家、入駐與 KYC（SellerAppService），登入後呼叫。
 @Riverpod(keepAlive: true)
 SellerAppServiceClient sellerClient(Ref ref) =>
@@ -90,6 +97,11 @@ ReviewPublicServiceClient reviewPublicClient(Ref ref) =>
 @Riverpod(keepAlive: true)
 ModerationAppServiceClient moderationAppClient(Ref ref) =>
     ModerationAppServiceClient(ref.watch(connectAuthTransportProvider));
+
+/// 通知收件匣、偏好、裝置 token 與即時訊號串流（NotificationAppService，STORE 受眾），登入後呼叫。
+@Riverpod(keepAlive: true)
+NotificationAppServiceClient notificationClient(Ref ref) =>
+    NotificationAppServiceClient(ref.watch(connectAuthTransportProvider));
 
 /// 賣家入駐文件的現行版本（SellerPublicService），不需登入。
 @Riverpod(keepAlive: true)

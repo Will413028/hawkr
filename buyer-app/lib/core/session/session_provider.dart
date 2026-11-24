@@ -6,7 +6,6 @@ import 'package:hawkr_auth/restore_scheduler.dart';
 import '../../features/auth/data/auth_repository.dart';
 import '../../features/cart/data/cart_repository.dart';
 import '../storage/auth_storage.dart';
-import '../../features/notification/data/push/background_handler.dart';
 import '../../features/notification/data/push/manager.dart';
 import '../../features/order/data/receipt_photo_repository.dart';
 import '../../shared/utils/hk_log.dart';
@@ -164,7 +163,7 @@ class Session extends _$Session {
     state = AsyncData(current.copyWith(nickname: nickname));
   }
 
-  /// 登出：先註銷裝置（請求由中央 Dio 帶 session token，要在清除 token 之前送出），再在伺服器撤銷 session
+  /// 登出：先註銷裝置（請求由 transport 帶 session token，要在清除 token 之前送出），再在伺服器撤銷 session
   /// （`SignOut`），清除保存的 token，最後清除本機的帳號與快取。
   Future<void> logout() async {
     cancelRestore();
@@ -210,11 +209,7 @@ class Session extends _$Session {
   Future<void> _invalidateUserScopedCaches() async {
     // notification 列表/偏好、coupon 列表皆已改為 ref.watch(sessionProvider)，
     // 會自動重建，不在此 invalidate（避免循環依賴）。
-    // SharedPreferences 持久化、無帳號 scope，provider invalidate 救不了，
-    // 必須直接清底層存儲。
-    await Future.wait([
-      ref.read(receiptPhotoRepositoryProvider).clearAll(),
-      clearFcmProcessedIds(),
-    ]);
+    // 收據照片存在本機檔案，provider invalidate 救不了，必須直接清底層存儲。
+    await ref.read(receiptPhotoRepositoryProvider).clearAll();
   }
 }

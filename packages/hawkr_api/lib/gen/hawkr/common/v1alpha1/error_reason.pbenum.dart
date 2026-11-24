@@ -242,6 +242,30 @@ class ErrorReason extends $pb.ProtobufEnum {
   static const ErrorReason PROCUREMENT_RUN_IN_PROGRESS =
       ErrorReason._(42, _omitEnumNames ? '' : 'PROCUREMENT_RUN_IN_PROGRESS');
 
+  /// 優惠券活動不是進行中（搭配 failed_precondition）：尚未發布、已被結束。CouponAppService.ClaimCoupon。client 顯示 LocalizedMessage，重讀活動列表。
+  static const ErrorReason COUPON_CAMPAIGN_NOT_ACTIVE =
+      ErrorReason._(43, _omitEnumNames ? '' : 'COUPON_CAMPAIGN_NOT_ACTIVE');
+
+  /// 現在不在優惠券活動的時間窗內（搭配 failed_precondition）：還沒開始或已經結束。CouponAppService.ClaimCoupon。
+  static const ErrorReason COUPON_OUTSIDE_WINDOW =
+      ErrorReason._(44, _omitEnumNames ? '' : 'COUPON_OUTSIDE_WINDOW');
+
+  /// 買家不符合活動的資格（搭配 failed_precondition）：不在指定名單、在該店沒有消費紀錄。CouponAppService.ClaimCoupon。
+  static const ErrorReason COUPON_NOT_ELIGIBLE =
+      ErrorReason._(45, _omitEnumNames ? '' : 'COUPON_NOT_ELIGIBLE');
+
+  /// 發行活動的店家停權中（搭配 failed_precondition）：領取與鎖定（結帳選用）暫停，解除後自動恢復；已鎖定的券照常核銷或釋放。CouponAppService.ClaimCoupon。
+  static const ErrorReason COUPON_STORE_SUSPENDED =
+      ErrorReason._(46, _omitEnumNames ? '' : 'COUPON_STORE_SUSPENDED');
+
+  /// 活動已經領完（搭配 failed_precondition）：總發行量已達上限。CouponAppService.ClaimCoupon。client 顯示已領完。
+  static const ErrorReason COUPON_ISSUE_LIMIT_REACHED =
+      ErrorReason._(47, _omitEnumNames ? '' : 'COUPON_ISSUE_LIMIT_REACHED');
+
+  /// 店家同時進行的活動數已達上限（搭配 failed_precondition）：CouponAppService.CreateCampaign。client 提示先結束一個活動。
+  static const ErrorReason COUPON_QUOTA_EXCEEDED =
+      ErrorReason._(48, _omitEnumNames ? '' : 'COUPON_QUOTA_EXCEEDED');
+
   static const $core.List<ErrorReason> values = <ErrorReason>[
     ERROR_REASON_UNSPECIFIED,
     VERSION_CONFLICT,
@@ -285,10 +309,16 @@ class ErrorReason extends $pb.ProtobufEnum {
     ASSISTANT_TURN_IN_PROGRESS,
     ASSISTANT_TURN_FAILED,
     PROCUREMENT_RUN_IN_PROGRESS,
+    COUPON_CAMPAIGN_NOT_ACTIVE,
+    COUPON_OUTSIDE_WINDOW,
+    COUPON_NOT_ELIGIBLE,
+    COUPON_STORE_SUSPENDED,
+    COUPON_ISSUE_LIMIT_REACHED,
+    COUPON_QUOTA_EXCEEDED,
   ];
 
   static final $core.List<ErrorReason?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 42);
+      $pb.ProtobufEnum.$_initByValueList(values, 48);
   static ErrorReason? valueOf($core.int value) =>
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 

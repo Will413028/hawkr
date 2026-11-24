@@ -1,5 +1,4 @@
-import 'package:hawkr_buyer/core/exceptions/app_exception.dart';
-import 'package:hawkr_buyer/features/notification/data/notification_model.dart';
+import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:hawkr_buyer/features/notification/presentation/notification_controller.dart';
 import 'package:hawkr_buyer/features/notification/presentation/notifications_screen.dart';
 import 'package:flutter/material.dart';
@@ -8,24 +7,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:hawkr_buyer/l10n/gen/app_localizations.dart';
 
+import '../../support/notification_fakes.dart';
+
 class _PaginationErrorController extends NotificationListController {
   int retryCalls = 0;
 
   @override
   Future<NotificationListState> build() async {
     return NotificationListState(
-      notifications: [
-        NotificationItem(
-          id: 1,
-          type: 'SYSTEM',
-          title: '既有通知',
-          content: '這筆資料必須保留',
-          createdAt: DateTime(2026, 7, 27),
-        ),
-      ],
+      notifications: [inboxItem('1', title: '既有通知', body: '這筆資料必須保留')],
       unreadCount: 0,
-      hasMore: true,
-      paginationError: const NetworkException('下一頁暫時無法載入'),
+      nextPageToken: 'tok',
+      paginationError: ConnectException(Code.unavailable, 'page'),
     );
   }
 
@@ -74,7 +67,6 @@ void main() {
       await tester.pump();
 
       expect(find.text('既有通知'), findsOneWidget);
-      expect(find.text('下一頁暫時無法載入'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('notifications-pagination-error')),
         findsOneWidget,

@@ -318,13 +318,13 @@ class _RecordingDeviceGateway implements DeviceRegistrationGateway {
 
   @override
   Future<DeviceMutationOutcome> registerDevice({required String fcmToken}) =>
-      Future.value(const DeviceMutationOutcome.success(statusCode: 200));
+      Future.value(const DeviceMutationOutcome.success());
 
   @override
   Future<DeviceMutationOutcome> removeDevice({required String fcmToken}) {
     removeCalls.add(fcmToken);
     _events.add('removeDevice');
-    return Future.value(const DeviceMutationOutcome.success(statusCode: 204));
+    return Future.value(const DeviceMutationOutcome.success());
   }
 }
 

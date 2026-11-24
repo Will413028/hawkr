@@ -25,7 +25,12 @@ TIMEOUT_SECONDS = 15 * 60
 FRAMEWORK_TIMEOUT_SECONDS = TIMEOUT_SECONDS + 5 * 60
 REQUIRED = ("id", "stack", "file", "old", "new", "test", "why")
 FLUTTER_PREFIX = "flutter:"
-FIXED_STACKS = ("go-integration", "go", "website", "admin", "flutter:buyer-app", "flutter:seller-app")
+TS_PACKAGE_PREFIX = "ts-package:"
+DART_PACKAGE_PREFIX = "dart-package:"
+FIXED_STACKS = (
+    "go-integration", "go", "website", "admin", "flutter:buyer-app", "flutter:seller-app",
+    "ts-package:hawkr-api-ts", "dart-package:hawkr_api",
+)
 GO_MODULE_PREFIXES = ("go-integration:", "go:")
 
 KILLED = "KILLED"
@@ -85,6 +90,11 @@ def valid_stack(stack: str) -> bool:
     return g is not None and valid_module_dir(g[1])
 
 
+def package_dir(stack: str, repo: Path) -> Path:
+    """`ts-package:<名>`、`dart-package:<名>` 是 packages/<名> 這個共用套件。"""
+    return repo / "packages" / stack.split(":", 1)[1]
+
+
 def inside(repo: Path, path: Path) -> bool:
     return path.resolve().is_relative_to(repo.resolve())
 
@@ -97,11 +107,11 @@ FLUTTER_BUILD_ERROR = re.compile(r"Compilation failed|^\S+:\d+:\d+: Error: ", re
 def has_build_error(stack: str, output: str) -> bool:
     """測試指令失敗時，輸出是否帶有 mutant 本身壞掉的明確標記（轉換、語法或編譯錯誤）。
     沒有標記的失敗（含沒有測試摘要）一律當作測試擋下。"""
-    if stack == "website":
+    if stack == "website" or stack.startswith(TS_PACKAGE_PREFIX):
         return WEBSITE_BUILD_ERROR.search(output) is not None
     if stack == "admin":
         return ADMIN_BUILD_ERROR.search(output) is not None
-    if stack.startswith(FLUTTER_PREFIX):
+    if stack.startswith(FLUTTER_PREFIX) or stack.startswith(DART_PACKAGE_PREFIX):
         return FLUTTER_BUILD_ERROR.search(output) is not None
     return False
 
@@ -218,6 +228,16 @@ def build_command(stack: str, selector: str, repo: Path = REPO) -> Command:
         if rest:
             argv += [f"-t={rest}"]
         return Command(argv, repo / "website", env, stack)
+    if stack.startswith(TS_PACKAGE_PREFIX):
+        argv = ["pnpm", "exec", "vitest", "run", head]
+        if rest:
+            argv += [f"-t={rest}"]
+        return Command(argv, package_dir(stack, repo), env, stack)
+    if stack.startswith(DART_PACKAGE_PREFIX):
+        argv = ["dart", "test", head]
+        if rest:
+            argv += ["--plain-name", rest]
+        return Command(argv, package_dir(stack, repo), env, stack)
     app = stack[len(FLUTTER_PREFIX):]
     argv = ["bash", "scripts/ci-flutter-test.sh", "--no-pub", head]
     if rest:
@@ -238,6 +258,11 @@ def build_check_command(stack: str, selector: str, file: str, repo: Path = REPO)
         argv.append(f"./{head.strip('/')}/")
         env["GOWORK"] = "off"
         return Command(argv, repo / moddir, env, stack)
+    if stack.startswith(DART_PACKAGE_PREFIX):
+        pkg = package_dir(stack, repo)
+        if not inside(pkg, repo / file):
+            return None
+        return Command(["dart", "analyze", "--no-fatal-warnings", str(repo / file)], pkg, env, stack)
     if stack.startswith(FLUTTER_PREFIX):
         app = stack[len(FLUTTER_PREFIX):]
         if not inside(repo / app, repo / file):
@@ -255,6 +280,8 @@ def test_file(stack: str, selector: str, repo: Path = REPO) -> Path:
         return repo / "website" / head
     if stack == "admin":
         return repo / "admin" / head
+    if stack.startswith((TS_PACKAGE_PREFIX, DART_PACKAGE_PREFIX)):
+        return package_dir(stack, repo) / head
     return repo / stack[len(FLUTTER_PREFIX):] / head
 
 

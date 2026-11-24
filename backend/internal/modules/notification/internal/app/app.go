@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"time"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
@@ -19,6 +20,8 @@ import (
 // Accounts 是對 identity 的需求：以共享鎖鎖住存活的帳號列（commit 前不會被刪），並回報帳號是否已刪除。identity.Module 實作它。
 type Accounts interface {
 	ShareLockAccount(ctx context.Context, id int64) (deleted bool, err error)
+	// SetPreferredLocale 在呼叫者的 transaction 內把帳號的 preferred_locale 改成 locale（只在不同時寫）。
+	SetPreferredLocale(ctx context.Context, id int64, locale uitext.Locale) (bool, error)
 }
 
 // Registry 是型別註冊表；正式組裝用 registry.Registry，測試可以換成帶測試型別的版本。
@@ -30,7 +33,7 @@ type Registry interface {
 // Signals 是已讀與刪除通知串流訂閱者的出口（根套件以 stream.NotifyInbox 實作）。
 // 在改動收件匣的同一個 transaction 內呼叫（pg_notify 在 commit 後才送達，rollback 不送）；nil 表示不通知（沒有串流的組裝）。
 type Signals interface {
-	InboxChanged(ctx context.Context, accountID int64, audience model.Audience, storeID int64, hint model.StateHint) error
+	InboxChanged(ctx context.Context, accountID int64, audience model.Audience, storeID int64, hint model.StateHint, itemID uuid.UUID) error
 }
 
 // Deps 是 Service 的依賴。
@@ -103,5 +106,5 @@ func (s *Service) inboxChanged(ctx context.Context, accountID int64, audience st
 	if storeID != nil {
 		sid = *storeID
 	}
-	return s.d.Signals.InboxChanged(ctx, accountID, model.Audience(audience), sid, model.StateHintNone)
+	return s.d.Signals.InboxChanged(ctx, accountID, model.Audience(audience), sid, model.StateHintNone, uuid.Nil())
 }

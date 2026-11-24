@@ -3,6 +3,7 @@ package seller
 import (
 	"context"
 	"errors"
+	"io"
 	"log/slog"
 	"slices"
 	"strings"
@@ -69,7 +70,7 @@ func inquiryFixture(state model.InquiryState) model.AdminInquiry {
 	case model.InquiryStateReplied:
 		i.Reply = &model.InquiryReply{
 			Body: "已附上", Channel: model.InquiryChannelMessaging, ReceivedAt: governanceNow.Add(time.Hour), RecordedAt: governanceNow.Add(2 * time.Hour), RecordedByAdminID: 8,
-			Evidence: []model.Evidence{{AssetID: "asset-secret-1", ObjectKey: "key-secret-1", Position: 0}, {AssetID: "asset-secret-2", ObjectKey: "key-secret-2", Position: 1}},
+			Evidence: []model.Evidence{{AssetID: secretAssets[0], ObjectKey: "key-secret-1", Position: 0}, {AssetID: secretAssets[1], ObjectKey: "key-secret-2", Position: 1}},
 		}
 	case model.InquiryStateWithdrawn:
 		i.Withdrawn = &model.InquiryWithdrawal{At: governanceNow.Add(time.Hour), AdminID: 9, Cause: model.InquiryWithdrawCaseClosed}
@@ -127,7 +128,7 @@ func TestCaseInquiryCarriesStateDueAndAvailabilityWithoutReasons(t *testing.T) {
 			t.Errorf("evidence[%d]=%v，預期 %s", n, e, want)
 		}
 	}
-	if raw := protojson.Format(replied); strings.Contains(raw, "asset-secret") || strings.Contains(raw, "key-secret") {
+	if raw := protojson.Format(replied); leaksSecretAsset(raw) || strings.Contains(raw, "key-secret") {
 		t.Fatalf("附件的 asset ID 與 object key 不得出現在回應：%s", raw)
 	}
 	withdrawn := toCaseInquiry(inquiryFixture(model.InquiryStateWithdrawn))
@@ -339,7 +340,7 @@ func TestListCasesAwaitingSellerReachesTheModuleAndBindsThePageToken(t *testing.
 // 詢問附件的端點：以詢問 ID 與位置定址，交給模組的是 EvidenceInquiry。
 func TestInquiryEvidenceEndpointReadsByInquiryID(t *testing.T) {
 	inquiry := uuid.NewV7()
-	m := &evidenceModule{content: model.FileContent{Data: []byte("PDF"), ContentType: "application/pdf"}}
+	m := &evidenceModule{content: model.FileContent{Body: io.NopCloser(strings.NewReader("PDF")), ContentType: "application/pdf"}}
 	path := "/api/files/admin/seller/case_inquiries/" + inquiry.String() + "/evidence/1"
 	rec := serveEvidence(m, nil, adminCtx(42), path)
 	if rec.Code != 200 || rec.Body.String() != "PDF" || m.in != (model.ReadEvidenceInput{AdminID: 42, Kind: model.EvidenceInquiry, RefID: inquiry, Position: 1}) {

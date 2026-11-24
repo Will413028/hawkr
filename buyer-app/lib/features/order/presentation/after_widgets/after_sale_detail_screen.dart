@@ -90,13 +90,9 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
     }, [caseNo, orderSn]);
 
     ref.listen(afterSaleStatusStreamProvider, (_, next) {
-      next.whenData((event) {
-        final current = detail.value;
-        if (current == null) return;
-        if (event.caseNo == current.caseNo ||
-            event.orderNo == current.orderNo) {
-          load();
-        }
+      next.whenData((_) {
+        if (detail.value == null) return;
+        load();
       });
     });
 

@@ -49,6 +49,19 @@ func (i Images) Image(key string) *commonpb.Image {
 	return &commonpb.Image{UriTemplate: i.origin + "/i/{preset}/" + key}
 }
 
+// PushImagePreset 是推播圖片用的 preset（card：720x540 cover；iOS 的 notification service extension 下載後附在通知上）。
+// 名稱的唯一來源是 backend/workers/image-gateway/src/presets.ts（TestPushImagePresetIsAGatewayPreset）。
+const PushImagePreset = "card"
+
+// URL 回傳 key 在指定 preset 的絕對網址（{MEDIA_ORIGIN}/i/{preset}/{key}），給不經 Image 樣板的出口（推播由組推播的 worker 組完整 URL，ADR D6）；
+// 與 Image 同一個 origin 與路徑形狀。key 是空字串時回空字串。
+func (i Images) URL(key, preset string) string {
+	if key == "" {
+		return ""
+	}
+	return i.origin + "/i/" + preset + "/" + key
+}
+
 // ObjectKey 檢查模組給的圖片欄位是 object key：舊服務的資料可能存了完整網址，那不能組進 URI template，回 Unavailable。
 func ObjectKey(key string) error {
 	if strings.HasPrefix(key, "http://") || strings.HasPrefix(key, "https://") {

@@ -20,13 +20,13 @@ import (
 
 var deadline = time.Date(2026, 12, 15, 0, 0, 0, 0, time.UTC)
 
-func TestPreviewPublicationWishPoolHasNoRecipientsAndTheHashesAreRecomputable(t *testing.T) {
+func TestPreviewPublicationFreezesTheRecipientAndTheHashesAreRecomputable(t *testing.T) {
 	f := newFixture(t)
 	in := f.publicationIn()
 	in.ResponseDeadline = &deadline
 	p := f.approved(in)
-	if p.RecipientCount != 0 || p.PolicyID == nil || *p.PolicyID != rfq.WishPoolPolicyID || p.PolicyVersion == nil || *p.PolicyVersion != rfq.WishPoolPolicyVersion {
-		t.Fatalf("公開池：%+v", p)
+	if p.RecipientCount != 1 {
+		t.Fatalf("受眾數：%+v", p)
 	}
 	if p.ApprovalVersion != 1 || !p.ExpiresAt.Equal(f.now.Add(rfq.ApprovalTTL)) {
 		t.Fatalf("版本或到期時間：%+v", p)
@@ -57,8 +57,8 @@ func TestPreviewPublicationDirectKeepsTheSelectionOrderAndAudienceHashDependsOnI
 	set, c := f.searched(10, 20, 30)
 	forward := f.approved(f.directIn(set, c[0], c[2]))
 	reverse := f.approved(f.directIn(set, c[2], c[0]))
-	if forward.RecipientCount != 2 || forward.PolicyID != nil || forward.PolicyVersion != nil {
-		t.Fatalf("指定對象：%+v", forward)
+	if forward.RecipientCount != 2 {
+		t.Fatalf("發布：%+v", forward)
 	}
 	if forward.AudienceHash == reverse.AudienceHash {
 		t.Fatal("順序不同，受眾的 hash 要不同")
@@ -122,13 +122,9 @@ func TestPreviewPublicationShapeErrorsPointAtTheField(t *testing.T) {
 	f := newFixture(t)
 	set, c := f.searched(10, 20)
 
-	in := f.publicationIn()
-	in.AudienceMode = ""
-	_, err := f.service().PreviewPublication(ctx, in)
-	wantInvalid(t, err, "AudienceMode")
-	wish := f.publicationIn()
-	wish.CandidateSetID = &set
-	_, err = f.service().PreviewPublication(ctx, wish)
+	noSet := f.directIn(set, c[0])
+	noSet.CandidateSetID = uuid.UUID{}
+	_, err := f.service().PreviewPublication(ctx, noSet)
 	wantInvalid(t, err, "CandidateSetID")
 	_, err = f.service().PreviewPublication(ctx, f.directIn(set))
 	wantInvalid(t, err, "SelectedCandidateIDs")
@@ -193,7 +189,7 @@ func TestPreviewPublicationStoresTheRangeAndTheTrimmedNote(t *testing.T) {
 	}
 	row, err := store.New(f.d.Conn(ctx)).GetApproval(ctx, store.GetApprovalParams{ID: p.ApprovalID, RequestID: f.request, BuyerID: &f.buyer})
 	must(t, err)
-	if row.BuyerNote != "請盡快" || row.RangeLowerAmount != 100 || row.RangeUpperAmount != 200 || row.CandidateSetID != nil {
+	if row.BuyerNote != "請盡快" || row.RangeLowerAmount != 100 || row.RangeUpperAmount != 200 || row.CandidateSetID != f.lastSet {
 		t.Fatalf("核准存的欄位 = %+v", row)
 	}
 	exact := f.publicationIn()
@@ -289,9 +285,6 @@ func TestPreviewPublicationRejectsTheSameKeyWithDifferentContent(t *testing.T) {
 		},
 		"fewer":    func(i *rfq.PreviewPublicationInput) { i.SelectedCandidateIDs = []uuid.UUID{otherCands[0]} },
 		"deadline": func(i *rfq.PreviewPublicationInput) { i.ResponseDeadline = &deadline },
-		"mode": func(i *rfq.PreviewPublicationInput) {
-			i.AudienceMode, i.CandidateSetID, i.SelectedCandidateIDs = model.AudienceWishPool, nil, nil
-		},
 		"lower":    func(i *rfq.PreviewPublicationInput) { i.LowerBoundAmount++ },
 		"upper":    func(i *rfq.PreviewPublicationInput) { i.UpperBoundAmount++ },
 		"note":     func(i *rfq.PreviewPublicationInput) { i.BuyerNote = "x" },
@@ -299,7 +292,7 @@ func TestPreviewPublicationRejectsTheSameKeyWithDifferentContent(t *testing.T) {
 		"request":  func(i *rfq.PreviewPublicationInput) { i.RequestID = uuid.NewV7() },
 		// 同一批店、同樣的順序，但候選集是另一個：沒有比對候選集本身的話這個重送會被當成同一份
 		"candidate set": func(i *rfq.PreviewPublicationInput) {
-			i.CandidateSetID, i.SelectedCandidateIDs = &set, []uuid.UUID{c[0], c[1]}
+			i.CandidateSetID, i.SelectedCandidateIDs = set, []uuid.UUID{c[0], c[1]}
 		},
 	} {
 		changed := direct
@@ -316,12 +309,12 @@ func TestPreviewPublicationRejectsTheSameKeyWithDifferentContent(t *testing.T) {
 	}
 }
 
-func TestExecuteWishPoolCreatesThePublicationOneEventAndNoRun(t *testing.T) {
+func TestExecuteCreatesThePublicationOneEventAndNoRun(t *testing.T) {
 	f := newFixture(t)
 	p := f.approved(f.publicationIn())
 	pub, err := f.execute(f.executeIn(p))
 	must(t, err)
-	if pub.Replayed || pub.State != model.PublicationStatePublished || pub.AudienceMode != model.AudienceWishPool || pub.Version != 1 ||
+	if pub.Replayed || pub.State != model.PublicationStatePublished || pub.Version != 1 ||
 		pub.AudienceHash != p.AudienceHash || pub.SellerFacingHash != p.SellerFacingHash || !pub.PublishedAt.Equal(f.now) {
 		t.Fatalf("發布 = %+v，預覽 %+v", pub, p)
 	}
@@ -330,13 +323,13 @@ func TestExecuteWishPoolCreatesThePublicationOneEventAndNoRun(t *testing.T) {
 	}
 	evs := f.events()
 	if len(evs) != 1 || evs[0].PublicationID != pub.ID || evs[0].RequestID != f.request || evs[0].BuyerID != f.buyer || evs[0].ApprovalID != p.ApprovalID ||
-		evs[0].AudienceMode != model.AudienceWishPool || len(evs[0].Invites) != 0 {
+		len(evs[0].Invites) != 1 {
 		t.Fatalf("事件 = %+v", evs)
 	}
-	if n := f.count("procurement.rfq_publication_invites"); n != 0 {
-		t.Fatalf("公開池沒有邀請，得到 %d 列", n)
+	if n := f.count("procurement.rfq_publication_invites"); n != 1 {
+		t.Fatalf("一個受眾一列邀請，得到 %d 列", n)
 	}
-	if n := f.count("procurement.agent_runs"); n != 0 {
+	if n := f.count("procurement.agent_runs WHERE run_type <> 'CANDIDATE_SEARCH'"); n != 0 {
 		t.Fatalf("發布不建 run，得到 %d 列", n)
 	}
 }
@@ -577,7 +570,7 @@ func TestExecuteRequiresAReadyOrMatchingRequest(t *testing.T) {
 	}
 }
 
-// 指定對象的核准存候選集，執行時重驗它仍是有效的候選集；預覽之後同一版本又搜尋成功就失效。
+// 核准存候選集，執行時重驗它仍是有效的候選集；預覽之後同一版本又搜尋成功就失效。
 func TestExecuteDirectRechecksTheEffectiveCandidateSet(t *testing.T) {
 	f := newFixture(t)
 	set, c := f.searched(10, 20)
@@ -599,21 +592,11 @@ func TestExecuteDirectStillWorksWhileTheCandidateSetIsEffective(t *testing.T) {
 	p := f.approved(f.directIn(set, c[0], c[1]))
 	row, err := store.New(f.d.Conn(context.Background())).GetApproval(context.Background(), store.GetApprovalParams{ID: p.ApprovalID, RequestID: f.request, BuyerID: &f.buyer})
 	must(t, err)
-	if row.CandidateSetID == nil || *row.CandidateSetID != set {
+	if row.CandidateSetID != set {
 		t.Fatalf("核准要存候選集：%+v", row.CandidateSetID)
 	}
 	if _, err := f.execute(f.executeIn(p)); err != nil {
 		t.Fatalf("候選集仍有效要能執行：%v", err)
-	}
-}
-
-// 公開池沒有候選集，不做有效性檢查：之後的搜尋不影響它。
-func TestExecuteWishPoolIgnoresLaterSearches(t *testing.T) {
-	f := newFixture(t)
-	p := f.approved(f.publicationIn())
-	f.searched(10)
-	if _, err := f.execute(f.executeIn(p)); err != nil {
-		t.Fatalf("公開池要能執行：%v", err)
 	}
 }
 

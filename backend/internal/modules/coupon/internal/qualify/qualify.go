@@ -36,6 +36,31 @@ type Service struct{ d Deps }
 // New 建立資格判定。
 func New(d Deps) *Service { return &Service{d: d} }
 
+// storeCache 在一個請求內記住每家店的停權查詢結果（不併發使用），列表一輪的多張券共用同一次查詢。
+type storeCache struct {
+	inner     Stores
+	suspended map[int64]bool
+}
+
+func (c *storeCache) StoreSuspended(ctx context.Context, storeID int64) (bool, error) {
+	if v, ok := c.suspended[storeID]; ok {
+		return v, nil
+	}
+	v, err := c.inner.StoreSuspended(ctx, storeID)
+	if err != nil {
+		return false, err
+	}
+	c.suspended[storeID] = v
+	return v, nil
+}
+
+// PerRequest 回傳只在一個請求內使用的判定：同一家店的停權狀態只問 Stores 一次（失敗不記，原樣回錯誤）。列表用它，避免每一列各打一次 port。
+func (s *Service) PerRequest() *Service {
+	d := s.d
+	d.Stores = &storeCache{inner: s.d.Stores, suspended: map[int64]bool{}}
+	return &Service{d: d}
+}
+
 // Check 回報 buyerID 在 now 能不能領或使用 c：活動必須是 ACTIVE、now 在 [StartAt, EndAt]，而且符合 TargetType。
 // 不合格回 FailedPrecondition 與對應的業務原因；port 讀取失敗原樣回傳。
 func (s *Service) Check(ctx context.Context, c model.Campaign, buyerID int64, now time.Time) error {

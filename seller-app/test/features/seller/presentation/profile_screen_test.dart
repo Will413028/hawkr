@@ -6,7 +6,6 @@ import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_api/transport.dart';
 import 'package:hawkr_seller/core/refresh/refresh_clock.dart';
 import 'package:hawkr_seller/core/session/session_provider.dart';
-import 'package:hawkr_seller/features/notification/data/notification_model.dart';
 import 'package:hawkr_seller/features/notification/data/notification_repository.dart';
 import 'package:hawkr_seller/features/seller/data/current_store.dart';
 import 'package:hawkr_seller/features/seller/data/current_kyc.dart';
@@ -48,7 +47,7 @@ class _LoggedIn extends Session {
 
 class _Notifications implements NotificationRepository {
   @override
-  Future<UnreadCount> getUnreadCount() async => const UnreadCount();
+  Future<int> unreadCount() async => 0;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

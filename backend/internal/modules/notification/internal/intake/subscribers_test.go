@@ -11,9 +11,9 @@ import (
 	"testing"
 )
 
-// tokenPurgeSubscribers 是 subscribers.go 裡允許做排意圖以外事情的訂閱者：A8-3 的裝置 token 同步刪除（隨停權、帳號刪除在同一個
-// transaction 刪 token）。現在是空的；加進來要寫理由，並且只能刪 token。
-var tokenPurgeSubscribers = []string{}
+// tokenPurgeSubscribers 是 subscribers.go 裡允許做排意圖以外事情的訂閱者：裝置 token 的同步刪除（隨停權、帳號刪除在同一個
+// transaction 刪 token）。加進來要寫理由，並且只能刪 token（TestTokenPurgeSubscribersOnlyDeleteTokens）。
+var tokenPurgeSubscribers = []string{"PurgeTokensOnSuspended", "PurgeTokensOnAccountDeleted"}
 
 var majorVersion = regexp.MustCompile(`^v[0-9]+$`)
 
@@ -131,5 +131,33 @@ func TestAcceptAllowListResolvesPackages(t *testing.T) {
 	want := []string{"github.com/Will413028/hawkr/backend/internal/modules/seller.New", "fmt.Errorf", "github.com/jackc/pgx/v5.Connect", ".Lookup"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("calls = %v，預期 %v", got, want)
+	}
+}
+
+// 白名單內的訂閱者只准呼叫刪 token 的 helper，helper 只准刪 token（不排 job、不讀別的模組、不碰別的表）。
+func TestTokenPurgeSubscribersOnlyDeleteTokens(t *testing.T) {
+	fns, imports := funcs(t, "subscribers.go")
+	seen := 0
+	for _, fn := range fns {
+		if !slices.Contains(tokenPurgeSubscribers, fn.Name.Name) {
+			continue
+		}
+		seen++
+		if got := calls(fn, imports); len(got) != 1 || got[0] != ".deleteAccountTokens" {
+			t.Errorf("%s 呼叫了 %v；token 清除訂閱者只准呼叫 deleteAccountTokens", fn.Name.Name, got)
+		}
+	}
+	if seen != len(tokenPurgeSubscribers) {
+		t.Fatalf("subscribers.go 只有 %d 個白名單訂閱者，預期 %d", seen, len(tokenPurgeSubscribers))
+	}
+	const store = "github.com/Will413028/hawkr/backend/internal/modules/notification/internal/store"
+	allowed := []string{".Conn", store + ".New", ".DeleteDeviceTokensByAccount", "fmt.Errorf"}
+	helpers, himports := funcs(t, "tokens.go")
+	for _, fn := range helpers {
+		for _, c := range calls(fn, himports) {
+			if !slices.Contains(allowed, c) {
+				t.Errorf("%s 呼叫了 %s，不在 token 清除的允許清單 %v", fn.Name.Name, c, allowed)
+			}
+		}
 	}
 }

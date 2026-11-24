@@ -83,10 +83,11 @@ const (
 // MaxEvidence 是一次通報、申覆或詢問回覆最多的佐證圖片數。
 const MaxEvidence = 5
 
-// Evidence 是一張佐證：機敏檔（Will 2026-10-04，8g），只經後台的擁有者端點讀（ReadEvidence）。ObjectKey 給
-// media.ReadSecure，AssetID 給引用的收斂與讀取紀錄；兩者都不對外。
+// Evidence 是一張佐證：機敏檔（Will 2026-10-04，8g），只經後台的擁有者端點讀（ReadEvidence）。AssetID 給
+// media.ReadSecure 與讀取紀錄，ObjectKey 是 media 資產的 key；兩者都不對外。
 type Evidence struct {
-	AssetID, ObjectKey string
+	AssetID   uuid.UUID
+	ObjectKey string
 	// Position 與 SupplementID 只在讀取通報的佐證時有值：位置（連號，從 0 起）與帶來這張佐證的補充（原通報的佐證是 nil）。
 	Position     int
 	SupplementID *uuid.UUID

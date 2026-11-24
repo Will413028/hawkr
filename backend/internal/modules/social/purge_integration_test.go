@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -88,7 +87,7 @@ func TestBuyerDeletionEnqueuesAnIdempotentPurge(t *testing.T) {
 	}
 }
 
-// 店家退場（StoreRetired）：訂閱者只排清除 job；可見性在 job 之前由曝光規則擋住；job 軟刪貼文並釋放圖片引用、軟刪討論區留言與店家身分的留言；
+// 店家退場（StoreRetired）：訂閱者只排清除 job；可見性在 job 之前由曝光規則擋住；job 軟刪貼文並把圖片標記刪除、軟刪討論區留言與店家身分的留言；
 // 標籤的數量在讀取時算，退場之後不再算它的貼文（SD16）；重跑結果相同。
 func TestStoreRetirementEnqueuesAnIdempotentPurge(t *testing.T) {
 	t.Parallel()
@@ -99,10 +98,9 @@ func TestStoreRetirementEnqueuesAnIdempotentPurge(t *testing.T) {
 	b := f.newBuyer(t)
 	p := f.publishedPost(t, storeID, "貼文", "水果")
 	keep := f.publishedPost(t, otherID, "別家的貼文", "水果")
-	ref := media.Ref{Type: media.RefTypePost, ID: p.ID.String()}
-	mustV[media.SyncResult](t)(f.module.SyncMedia(ctx, ref))
-	if len(f.media.Referenced(ref)) != 1 {
-		t.Fatal("同步後有圖片引用")
+	postAsset, keepAsset := f.postAsset(t, p.ID), f.postAsset(t, keep.ID)
+	if f.assetState(t, postAsset) != "ACTIVE" {
+		t.Fatal("發布後貼文圖是 ACTIVE")
 	}
 	mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(b), social.ForumInput{StoreID: storeID, Body: "討論"}))
 	mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asStore(t, storeID), social.ForumInput{StoreID: storeID, Body: "店家的公告"}))
@@ -145,9 +143,11 @@ func TestStoreRetirementEnqueuesAnIdempotentPurge(t *testing.T) {
 			t.Fatal("別人的留言不動")
 		}
 	}
-	mustV[media.SyncResult](t)(f.module.SyncMedia(ctx, ref))
-	if len(f.media.Referenced(ref)) != 0 {
-		t.Fatalf("圖片引用已釋放：%v", f.media.Referenced(ref))
+	if got := f.assetState(t, postAsset); got != "DELETING" {
+		t.Fatalf("退場店家的貼文圖 state=%s，預期 DELETING", got)
+	}
+	if got := f.assetState(t, keepAsset); got != "ACTIVE" {
+		t.Fatalf("別家的貼文圖 state=%s，預期 ACTIVE", got)
 	}
 	f.assertStatsMatchTheDataset(t, "店家清除之後")
 	if _, err := f.module.PublicPost(ctx, social.Caller{}, p.ID); kindOf(err) != apperr.KindNotFound {

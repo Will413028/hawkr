@@ -1,0 +1,67 @@
+{
+ "mutants": [
+  {
+   "id": "hub-drops-ids-on-coalesce",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/stream/hub.go",
+   "old": "\ts.newItems = append(s.newItems, id)\n}",
+   "new": "\ts.newItems = append(s.newItems[:0], id)\n}",
+   "test": "internal/modules/notification/internal/stream ^TestNewItemIDsAreAnOrderedDeduplicatedUnionAcrossCoalescedSignals$",
+   "why": "Each new id overwrites the accumulated set, so coalesced signals lose all but the last id."
+  },
+  {
+   "id": "hub-drops-cap",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/stream/hub.go",
+   "old": "\tif len(s.newItems) >= MaxNewItemIDs {",
+   "new": "\tif len(s.newItems) >= MaxNewItemIDs && false {",
+   "test": "internal/modules/notification/internal/stream ^TestMoreThanTheCapMarksTruncatedAndDropsTheIDs$",
+   "why": "Without the cap the subscriber accumulates unbounded ids and never marks the signal truncated."
+  },
+  {
+   "id": "hub-restore-loses-ids",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/stream/hub.go",
+   "old": "\tfor _, id := range append(slices.Clone(items), pending...) {",
+   "new": "\tfor _, id := range pending {",
+   "test": "internal/modules/notification/internal/stream ^TestRestoreAfterReadFailureKeepsTheIDsAndMergesLaterOnes$",
+   "why": "A failed inbox read drops the ids already taken from the subscription, so those toasts are lost."
+  },
+  {
+   "id": "listen-dispatch-drops-item",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/stream/listen.go",
+   "old": "p.Store, model.StateHint(p.Hint), item)",
+   "new": "p.Store, model.StateHint(p.Hint), uuid.Nil())",
+   "test": "internal/modules/notification/internal/stream ^TestDispatchDeliversTheItemIDOfTheNotification$",
+   "why": "The hub ignores the item id carried by the NOTIFY payload."
+  },
+  {
+   "id": "notify-inbox-omits-item",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/stream/signal.go",
+   "old": "\t\tp.Item = itemID.String()",
+   "new": "\t\t_ = itemID",
+   "test": "internal/modules/notification ^(TestInboxWriteSignalsTheRecipientsStreamOnly|TestAggregatedBumpRepeatsTheSameItemID)$",
+   "why": "pg_notify no longer carries the created or bumped item id, so serve processes cannot toast it."
+  },
+  {
+   "id": "read-signal-carries-item",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/app/app.go",
+   "old": "model.StateHintNone, uuid.Nil())",
+   "new": "model.StateHintNone, uuid.NewV7())",
+   "test": "internal/modules/notification ^TestReadAndDeleteSignalsCarryNoItemIDs$",
+   "why": "Mark-read, delete and mark-all signals carry a fabricated new item id and would toast."
+  },
+  {
+   "id": "announcement-fanout-drops-id",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/announce/fanout.go",
+   "old": "r.StoreID, model.StateHintNone, id); err != nil {",
+   "new": "r.StoreID, model.StateHintNone, uuid.Nil()); err != nil {",
+   "test": "internal/modules/notification ^TestAnnouncementFanOutSignalsTheRecipientsStream$",
+   "why": "Announcement fan-out signals the recipient without the new row id."
+  }
+ ]
+}

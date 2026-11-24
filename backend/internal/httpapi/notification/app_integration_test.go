@@ -25,6 +25,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 var pg *testdb.Server
@@ -35,6 +36,10 @@ func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 type aliveAccounts struct{}
 
 func (aliveAccounts) ShareLockAccount(context.Context, int64) (bool, error) { return false, nil }
+
+func (aliveAccounts) SetPreferredLocale(context.Context, int64, uitext.Locale) (bool, error) {
+	return false, nil
+}
 
 // fakeStores 是帳號此刻的店：只有 stores 裡的帳號有店，沒有的回 not_found（同 seller.ActingStore）。
 type fakeStores struct{ stores map[int64]int64 }
@@ -140,8 +145,16 @@ func (s *stack) item(t *testing.T, account int64, audience string, storeID int64
 		store = &storeID
 	}
 	at := epoch.Add(time.Duration(updated) * time.Minute)
-	s.exec(t, `INSERT INTO notification.inbox_items (id, account_id, audience, store_id, type, params, occurred_at, read_at, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $7, $7)`, id, account, audience, store, typ, params, at, readAt)
+	var announcementID *uuid.UUID
+	if audience == "STORE" {
+		// 型別註冊表裡只有公告同時屬於 STORE 受眾（停權通知只給 BUYER），STORE 列一律放成公告列：先放它指向的公告。
+		aid := uuid.NewV7()
+		s.exec(t, `INSERT INTO notification.announcements (id, audiences, title, body, admin_id, created_at)
+			VALUES ($1, ARRAY['STORE'], 'Store notice', 'Store body', 1, $2)`, aid, at)
+		typ, params, announcementID = "announcement", `{"announcement_id":"`+aid.String()+`"}`, &aid
+	}
+	s.exec(t, `INSERT INTO notification.inbox_items (id, account_id, audience, store_id, type, params, occurred_at, read_at, created_at, updated_at, announcement_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $7, $7, $9)`, id, account, audience, store, typ, params, at, readAt, announcementID)
 	return id.String()
 }
 

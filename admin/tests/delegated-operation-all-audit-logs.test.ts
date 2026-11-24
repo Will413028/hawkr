@@ -153,6 +153,30 @@ test("跨工作階段的列共用同一份 parser，且每列的 actor／target 
 	);
 });
 
+test("被拒絕的上傳列（MEDIA_UPLOAD／media）可以解析，不會讓整頁 fail-closed", () => {
+	// B1-D16：上傳不寫成功的稽核，只有缺 media.upload 或 session 不可用時的 FAILED 列；
+	// 動作與資源種類不在值域內時整頁回 null，管理員看到的是「無法載入」而不是那一列。
+	const parsed = parseDelegatedAuditLogPage({
+		...PAGE,
+		records: [
+			{
+				...ENTRY,
+				action: "MEDIA_UPLOAD",
+				actionLabel: "上傳檔案（被拒絕）",
+				riskLevel: "low",
+				capability: "media.upload",
+				resourceType: "media",
+				resourceId: "",
+				resourceName: "",
+				result: "FAILED",
+			},
+		],
+	});
+	assert.ok(parsed);
+	assert.equal(parsed.records[0].action, "MEDIA_UPLOAD");
+	assert.equal(parsed.records[0].resourceType, "media");
+});
+
 test("真的空集合是合法回應，不得與解析失敗混為一談", () => {
 	// 「這家店從來沒被代行過」正是治理最想確認的結論。它必須解析成功且 records 為空，
 	// 而不是被當成壞掉的回應吞掉。

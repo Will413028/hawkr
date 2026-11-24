@@ -6,7 +6,7 @@
 
 ## 擁有的資料
 
-schema `identity`（`db/schema.sql`，欄位說明見規格 §9）。讀取模型：無。
+schema `identity`（`db/schema.sql`，欄位說明見規格 §9）。讀取模型：無。`accounts.preferred_locale`（zh-TW、en，預設 zh-TW）是非同步訊息的語系（多語系 ADR D1）：只在與目前的值不同時由 `SetPreferredLocale`（notification 的 `RegisterDeviceToken`）與 App 登入（`LoginInput.Locale`）更新，`PreferredLocale` 讀；CHECK 與 `PreferredLocales()` 由 `TestCodeValueChecksMatchTheGoTypes` 對齊。
 
 ## 發布的讀取介面
 

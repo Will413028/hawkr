@@ -7,7 +7,6 @@ import 'package:hawkr_buyer/core/session/auth_session_provider.dart';
 import 'package:hawkr_buyer/core/session/session_provider.dart';
 import 'package:hawkr_buyer/features/auth/data/auth_repository.dart';
 import 'package:hawkr_buyer/features/notification/data/push/manager.dart';
-import 'package:hawkr_buyer/features/notification/data/push/background_handler.dart';
 import 'package:hawkr_buyer/features/order/data/receipt_photo_local_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -135,8 +134,6 @@ void main() {
   test('冷啟動暫時失敗會自動退避重試', () async {
     final photos = SharedPreferencesReceiptPhotoLocalService();
     await photos.write('order-1', 'cached-photo');
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(fcmProcessedIdsKey, ['message-1']);
     var calls = 0;
     final auth = FakeAuthSession(signedIn: true);
     final c = containerWith(() async => auth, () async {
@@ -150,7 +147,6 @@ void main() {
     expect(calls, 2);
     expect(auth.calls, isEmpty);
     expect(await photos.read('order-1'), 'cached-photo');
-    expect(prefs.getStringList(fcmProcessedIdsKey), ['message-1']);
   });
 
   test('背景重試晚到的帳號不能覆寫主動登入', () async {

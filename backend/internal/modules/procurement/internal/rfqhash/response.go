@@ -7,8 +7,7 @@ import "time"
 type SellerResponseInput struct {
 	SchemaVersion       string
 	ResponseType        string
-	QualityGrade        string
-	InspectionNotes     string
+	SpecNote            string
 	UnitBasisQuantity   string
 	UnitBasisUnit       string
 	OfferedQuantity     string
@@ -32,7 +31,7 @@ func SellerResponse(in SellerResponseInput) (string, error) {
 	switch in.SchemaVersion {
 	case SchemaV1:
 		return sum(responseV1{
-			SchemaVersion: in.SchemaVersion, ResponseType: in.ResponseType, QualityGrade: in.QualityGrade, InspectionNotes: in.InspectionNotes,
+			SchemaVersion: in.SchemaVersion, ResponseType: in.ResponseType, SpecNote: in.SpecNote,
 			UnitBasisQuantity: in.UnitBasisQuantity, UnitBasisUnit: in.UnitBasisUnit, OfferedQuantity: in.OfferedQuantity, OfferedQuantityUnit: in.OfferedQuantityUnit,
 			ConversionBasis: in.ConversionBasis, Currency: in.Currency, GoodsAmount: in.GoodsAmount, ShippingAmount: in.ShippingAmount, TaxAmount: in.TaxAmount,
 			TaxInclusionBasis: in.TaxInclusionBasis, TotalAmount: in.TotalAmount, LeadTimeDays: in.LeadTimeDays, PromisedDelivery: instant(in.PromisedDelivery),
@@ -54,8 +53,7 @@ func instant(t *time.Time) *string {
 type responseV1 struct {
 	SchemaVersion       string  `json:"schemaVersion"`
 	ResponseType        string  `json:"responseType"`
-	QualityGrade        string  `json:"qualityGrade"`
-	InspectionNotes     string  `json:"inspectionNotes"`
+	SpecNote            string  `json:"specNote"`
 	UnitBasisQuantity   string  `json:"unitBasisQuantity"`
 	UnitBasisUnit       string  `json:"unitBasisUnit"`
 	OfferedQuantity     string  `json:"offeredQuantity"`

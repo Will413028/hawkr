@@ -386,6 +386,37 @@ GoRouter appRouter(Ref ref) {
         builder: (_, __) => const NotificationsScreen(),
       ),
 
+      // ── 通知深連結（website 路徑；以路徑上的 ID 載入，不靠 extra）──
+      GoRoute(
+        path: '/account/orders/:orderNo',
+        pageBuilder: (context, state) => floatingDetailPage<void>(
+          context: context,
+          key: state.pageKey,
+          child: OrderDetailScreen(orderSn: state.pathParameters['orderNo']),
+        ),
+      ),
+      GoRoute(
+        path: '/account/after-sales/:caseNo',
+        builder: (_, state) =>
+            AfterSaleDetailScreen(caseNo: state.pathParameters['caseNo']),
+      ),
+      GoRoute(
+        path: '/account/messages/:targetId',
+        builder: (_, state) =>
+            ChatThreadScreen(storeId: state.pathParameters['targetId']),
+      ),
+      GoRoute(
+        path: '/products/:id',
+        pageBuilder: (context, state) =>
+            floatingDetailPage<Map<String, dynamic>?>(
+              context: context,
+              key: state.pageKey,
+              child: MerchantItemDetailScreen(
+                skuId: state.pathParameters['id'],
+              ),
+            ),
+      ),
+
       // ── Wallet ──
       GoRoute(
         path: '/wallet/spending',

@@ -1,0 +1,157 @@
+{
+ "mutants": [
+  {
+   "id": "confirm-skips-uploader-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/upload.go",
+   "old": "if !ownedBy(row, uploader) {",
+   "new": "if false && (row.UploaderID != uploader.ID || row.UploaderAdmin != uploader.Admin) {",
+   "test": "internal/modules/media ^TestConfirm_RejectsNonUploader$",
+   "why": "Confirm no longer compares the caller with the uploader, so anyone holding the token can confirm"
+  },
+  {
+   "id": "confirm-ignores-state",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/store/uploads.sql.go",
+   "old": "WHERE u.id = $2 AND u.state = 'READY' AND u.expires_at > $1",
+   "new": "WHERE u.id = $2 AND u.expires_at > $1",
+   "test": "internal/modules/media ^TestConfirm_RejectsStagingNotYetReady$",
+   "why": "the conditional UPDATE in Confirm lost its state condition, so an upload that is not READY can be confirmed"
+  },
+  {
+   "id": "confirm-ignores-expiry",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/store/uploads.sql.go",
+   "old": "WHERE u.id = $2 AND u.state = 'READY' AND u.expires_at > $1",
+   "new": "WHERE u.id = $2 AND u.state = 'READY'",
+   "test": "internal/modules/media ^TestConfirm_RejectsExpiredStaging$",
+   "why": "Confirm accepts an expired staging row"
+  },
+  {
+   "id": "ready-ignores-expiry",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/store/uploads.sql.go",
+   "old": "WHERE id = $3 AND state = 'UPLOADED' AND expires_at > $2",
+   "new": "WHERE id = $3 AND state = 'UPLOADED'",
+   "test": "internal/modules/media ^TestProcess_ExpiredMidFlightLeavesNoOrphanObject$",
+   "why": "the READY transition no longer fails on an expired row, so processing creates an asset for an expired upload"
+  },
+  {
+   "id": "delete-failure-still-marks-deleted",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/reclaim/reclaim.go",
+   "old": "} else if err := s.d.Store.Delete(ctx, r.ObjectKey); err != nil {\n\t\treturn fmt.Errorf(\"media：刪除資產 %s 的物件：%w\", r.ID, err)\n\t}",
+   "new": "} else if err := s.d.Store.Delete(ctx, r.ObjectKey); err != nil {\n\t\ts.d.Logger.WarnContext(ctx, \"delete failed\", \"error\", err)\n\t}",
+   "test": "internal/modules/media ^TestDeleteJob_StorageFailureKeepsRowRetryable$",
+   "why": "a failed object delete is swallowed and the asset is marked DELETED while its object still exists"
+  },
+  {
+   "id": "ttl-sign-flipped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/upload.go",
+   "old": "expiresAt := now.Add(model.UploadTTL)",
+   "new": "expiresAt := now.Add(-model.UploadTTL)",
+   "test": "internal/modules/media ^TestBeginUpload_StoresOnlyTheTokenHashAndPresignsUnderTmp$",
+   "why": "the expiry is computed in the past, so every staging row is born expired"
+  },
+  {
+   "id": "process-expired-keeps-orphan-object",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/process.go",
+   "old": "if err := s.d.Store.Delete(ctx, *row.FinalKey); err != nil {",
+   "new": "if err := error(nil); err != nil {",
+   "test": "internal/modules/media ^TestProcess_ExpiredMidFlightLeavesNoOrphanObject$",
+   "why": "when the transition loses to expiry the freshly written final object is no longer deleted"
+  },
+  {
+   "id": "permanent-failure-is-retried",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/process.go",
+   "old": "case errors.As(err, &perm) && perm.Reason.Valid():",
+   "new": "case errors.As(err, &perm) && perm.Reason.Valid() && false:",
+   "test": "internal/modules/media ^TestProcess_PermanentFailureRejectsImmediately$",
+   "why": "a permanent failure is treated as transient and retried instead of rejected immediately"
+  },
+  {
+   "id": "retry-exhaustion-off-by-one",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/process.go",
+   "old": "case attempt >= maxAttempts:",
+   "new": "case attempt > maxAttempts:",
+   "test": "internal/modules/media ^TestProcess_TransientFailureRetriesThenRejects$",
+   "why": "the last allowed attempt no longer marks the row REJECTED"
+  },
+  {
+   "id": "mark-deleted-takes-staged",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/store/assets.sql.go",
+   "old": "WHERE c.asset_id = ANY($2::uuid[]) AND c.kind = 'CONFIRMED'",
+   "new": "WHERE c.asset_id = ANY($2::uuid[])",
+   "test": "internal/modules/media ^TestMarkDeleted_IgnoresAssetsOfReclaimedUploads$",
+   "why": "the owner's delete command can also request deletion of an asset that GC reclaimed (never confirmed)"
+  },
+  {
+   "id": "delete-assets-guard-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/reclaim/reclaim.go",
+   "old": "func (s *Service) DeleteAssets(ctx context.Context) (int, error) {\n\tif err := model.RequireNoTx(ctx); err != nil {\n\t\treturn 0, err\n\t}",
+   "new": "func (s *Service) DeleteAssets(ctx context.Context) (int, error) {",
+   "test": "internal/modules/media ^TestStorageEntryPointsRefuseAContextWithATransaction$",
+   "why": "DeleteAssets no longer refuses a context that carries a transaction"
+  },
+  {
+   "id": "confirm-reentry-ignores-asset-state",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/upload.go",
+   "old": "if requireActive && deriveState(a) != model.AssetActive {",
+   "new": "if false && requireActive && deriveState(a) != model.AssetActive {",
+   "test": "internal/modules/media ^TestConfirm_ReentryAfterMarkDeletedIsRejected$",
+   "why": "a replayed token returns an asset that the owner already deleted"
+  },
+  {
+   "id": "gc-skips-stuck-uploaded",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/store/uploads.sql.go",
+   "old": "OR (u.state = 'UPLOADED' AND u.expires_at <= $2)",
+   "new": "OR (false AND u.expires_at <= $2)",
+   "test": "internal/modules/media ^TestGC_ReclaimsStuckUploadedAfterGrace$",
+   "why": "GC ignores rows stuck in UPLOADED, so they are never reclaimed"
+  },
+  {
+   "id": "gc-ignores-uploaded-grace",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/store/uploads.sql.go",
+   "old": "OR (u.state = 'UPLOADED' AND u.expires_at <= $2)",
+   "new": "OR (u.state = 'UPLOADED' AND u.expires_at <= $1)",
+   "test": "internal/modules/media ^TestGC_KeepsUploadedWithinGrace$",
+   "why": "GC reclaims an UPLOADED row as soon as it expires, even while the process job may still run"
+  },
+  {
+   "id": "process-accepts-empty-content-type",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/process.go",
+   "old": "if res.ContentType == \"\" || res.SizeBytes < 0 {",
+   "new": "if false {",
+   "test": "internal/modules/media ^TestProcess_InvalidResultRejectsImmediately$",
+   "why": "an invalid process result is treated as transient and the row never leaves UPLOADED"
+  },
+  {
+   "id": "process-rejects-on-shutdown",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/process.go",
+   "old": "case errors.Is(ctx.Err(), context.Canceled):",
+   "new": "case false:",
+   "test": "internal/modules/media ^TestProcess_ShutdownOnLastAttemptDoesNotReject$",
+   "why": "a worker shutdown during the last attempt rejects the upload instead of letting River retry"
+  },
+  {
+   "id": "lost-keeps-object-unless-uploaded",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/process.go",
+   "old": "\t\tcase model.StatePending, model.StateUploading, model.StateRejected, model.StateDeleting, model.StateDeleted:\n",
+   "new": "\t\tcase model.StatePending, model.StateUploading, model.StateRejected, model.StateDeleting, model.StateDeleted:\n\t\t\treturn nil\n",
+   "test": "internal/modules/media ^TestProcess_LostToGCLeavesNoOrphanObject$",
+   "why": "a late processing job that lost to GC no longer deletes the final object it wrote when the row is not UPLOADED, leaving an orphan"
+  }
+ ]
+}

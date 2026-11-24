@@ -11,7 +11,6 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
-	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/quote"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/rfq"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
@@ -33,7 +32,7 @@ const buyer int64 = 1
 
 func ptr[T any](v T) *T { return &v }
 
-// fixture 是一位買家的一張需求（現行版本：小白菜、3 KG、台北市）、它的一次發布（公開池，買家預期單價 100 到 200 元每 KG）與一個可注入時間的服務。
+// fixture 是一位買家的一張需求（現行版本：小白菜、3 KG、台北市）、它的一次發布（指定一家店，買家預期單價 100 到 200 元每 KG）與一個可注入時間的服務。
 type fixture struct {
 	t           *testing.T
 	d           *db.DB
@@ -105,14 +104,26 @@ func (f *fixture) revise() {
 	f.exec(`UPDATE procurement.request_revisions SET quantity = 5 WHERE id = $1`, f.revision)
 }
 
-// publish 預覽並執行一次發布（公開池），回發布 ID 與賣家可見內容的 hash。
+// publish 預覽並執行一次發布（候選集有效的前提是需求在 MATCHING，A9-D29(4)，所以先轉成 MATCHING），邀請測試會回價的店（inviteFirstStore 到 inviteLastStore；回價列的外鍵要求有邀請列），回發布 ID 與賣家可見內容的 hash。
 func (f *fixture) publish() (uuid.UUID, string) {
 	f.t.Helper()
 	ctx := context.Background()
 	svc := rfq.Service{DB: f.d, Now: func() time.Time { return f.now }, Events: f.bus}
+	q := store.New(f.d.Conn(ctx))
+	set := uuid.NewV7()
+	must(f.t, q.InsertCandidateSet(ctx, store.InsertCandidateSetParams{ID: set, RequestID: f.request, RequestRevisionID: f.revision, BuyerID: f.buyer, Now: f.now}))
+	var cands []uuid.UUID
+	for s := int64(inviteFirstStore); s <= inviteLastStore; s++ {
+		cand := uuid.NewV7()
+		cands = append(cands, cand)
+		must(f.t, q.InsertCandidate(ctx, store.InsertCandidateParams{ID: cand, CandidateSetID: set, StoreID: s, SourceID: "p", Rank: int32(s - inviteFirstStore), Now: f.now}))
+	}
+	f.exec(`INSERT INTO procurement.agent_runs (id, buyer_id, request_id, candidate_set_id, run_type, status, client_request_id, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, 'CANDIDATE_SEARCH', 'SUCCEEDED', $5, $6, $6)`, uuid.NewV7(), f.buyer, f.request, set, uuid.NewV7(), f.now)
+	f.exec(`UPDATE procurement.requests SET status = 'MATCHING' WHERE id = $1`, f.request)
 	p, err := svc.PreviewPublication(ctx, rfq.PreviewPublicationInput{
 		BuyerID: f.buyer, RequestID: f.request, ClientRequestID: uuid.NewV7(), ExpectedRevisionID: f.revision, LowerBoundAmount: 100, UpperBoundAmount: 200,
-		AudienceMode: model.AudienceWishPool,
+		CandidateSetID: set, SelectedCandidateIDs: cands,
 	})
 	must(f.t, err)
 	pub, err := svc.ExecutePublication(ctx, rfq.ExecuteInput{
@@ -122,6 +133,8 @@ func (f *fixture) publish() (uuid.UUID, string) {
 	must(f.t, err)
 	return pub.ID, pub.SellerFacingHash
 }
+
+const inviteFirstStore, inviteLastStore = 10, 21
 
 // version 是賣家回價的一個版本（測試直接寫表）。
 type version struct {
@@ -143,11 +156,14 @@ func (f *fixture) respond(publication uuid.UUID, storeID int64, versions ...vers
 	return f.respondAt(start, publication, storeID, versions...)
 }
 
-// respondAt 同 respond，回價身分列的建立時間是 created。
+// respondAt 同 respond，回價身分列的建立時間是 created；店不在發布的邀請裡就補一列邀請（回價列的外鍵要求有邀請列）。
 func (f *fixture) respondAt(created time.Time, publication uuid.UUID, storeID int64, versions ...version) uuid.UUID {
 	f.t.Helper()
 	ctx := context.Background()
 	id := uuid.NewV7()
+	f.exec(`INSERT INTO procurement.rfq_publication_invites (id, publication_id, position, store_id, delivery_state_at, created_at, updated_at)
+		SELECT $1, $2, COALESCE(max(position), -1) + 1, $3, $4, $4, $4 FROM procurement.rfq_publication_invites WHERE publication_id = $2
+		ON CONFLICT (publication_id, store_id) DO NOTHING`, uuid.NewV7(), publication, storeID, created)
 	must(f.t, store.New(f.d.Conn(ctx)).InsertSellerResponse(ctx, store.InsertSellerResponseParams{ID: id, PublicationID: publication, RequestID: f.request, StoreID: storeID, Now: created}))
 	for i, v := range versions {
 		if v.quantity == "" {
@@ -166,10 +182,10 @@ func (f *fixture) respondAt(created time.Time, publication uuid.UUID, storeID in
 			v.submitted = start.Add(time.Duration(i+1) * time.Minute)
 		}
 		f.exec(`INSERT INTO procurement.seller_response_versions (
-				id, seller_response_id, version, response_type, offered_quality_grade, offered_quality_inspection_notes, unit_basis_quantity, unit_basis_unit,
+				id, seller_response_id, version, response_type, spec_note, unit_basis_quantity, unit_basis_unit,
 				offered_quantity, offered_quantity_unit, conversion_basis, currency, goods_amount, shipping_amount, tax_amount, tax_inclusion_basis, total_amount,
 				valid_until, outside_buyer_requested_range, publication_version, client_request_id, submitted_at, created_at)
-			VALUES ($1, $2, $3, 'MANUAL_QUOTE', 'A', '', $4::text::numeric, 'KG', $5::text::numeric, $11, '', 'TWD', $6::bigint, 10, 5, 'TAX_EXCLUDED', $7::bigint, $8, false, 1, $9, $10, $10)`,
+			VALUES ($1, $2, $3, 'MANUAL_QUOTE', '', $4::text::numeric, 'KG', $5::text::numeric, $11, '', 'TWD', $6::bigint, 10, 5, 'TAX_EXCLUDED', $7::bigint, $8, false, 1, $9, $10, $10)`,
 			uuid.NewV7(), id, int32(i+1), v.unitBasis, v.quantity, v.goods, v.goods+15, v.validUntil, uuid.NewV7(), v.submitted, v.unit)
 	}
 	f.exec(`UPDATE procurement.seller_responses SET latest_version = $2 WHERE id = $1`, id, int32(len(versions)))

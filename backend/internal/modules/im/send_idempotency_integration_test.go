@@ -7,7 +7,9 @@ import (
 	"errors"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/im"
@@ -115,7 +117,8 @@ func TestResendWithDifferentContentIsRejected(t *testing.T) {
 			t.Fatalf("%s：err = %v", name, err)
 		}
 	}
-	img := im.SendInput{RequestID: uuid.NewV4(), Sender: buyer, CounterpartID: s1, Type: im.TypeImage, StagedToken: "tok-a"}
+	tokenA, _ := f.stage(t, 1000+b1)
+	img := im.SendInput{RequestID: uuid.NewV4(), Sender: buyer, CounterpartID: s1, Type: im.TypeImage, StagedToken: tokenA}
 	first, err := f.sendWith(t, img)
 	if err != nil {
 		t.Fatal(err)
@@ -250,68 +253,124 @@ func TestResendOfAHiddenOrErasedMessageReturnsATombstone(t *testing.T) {
 	}
 }
 
-// plantRival 讓下一次 Send 在持有守門鎖之後、寫訊息之前，有另一條連線先寫入同一個 (對話, 寄件方, request_id) 並 commit，
-// 使這次 Send 的 InsertMessage 確定撞到唯一鍵（不靠並行的時序）。回傳被塞進去的那則的 ID。
-func (f *fixture) plantRival(t *testing.T, rid uuid.UUID, text string) uuid.UUID {
-	t.Helper()
-	planted := uuid.NewV4()
-	var once sync.Once
+// 並行的同一個 request_id 的圖片訊息（同一個 staged token）：入口的 advisory lock 讓輸家等贏家提交後走重送判定回同一則，
+// 不會走到 Confirm；只有一個資產被確認、只有一則訊息、seq 沒有空洞（B1-D26）。
+func TestConcurrentSameRequestIDImageSendsConfirmOneAsset(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	token, asset := f.stage(t, 1000+b1)
+	rid := uuid.NewV4()
+	const dup = 4
+	type result struct {
+		m   im.Message
+		err error
+	}
+	out := make(chan result, dup)
+	var wg sync.WaitGroup
+	for range dup {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			m, err := f.m.Send(context.Background(), im.SendInput{RequestID: rid, Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeImage, StagedToken: token})
+			out <- result{m, err}
+		}()
+	}
+	wg.Wait()
+	close(out)
+	var first uuid.UUID
+	for r := range out {
+		if r.err != nil {
+			t.Fatalf("並行的同 request_id 圖片送出：%v", r.err)
+		}
+		if r.m.Image == nil || r.m.Image.AssetID != asset {
+			t.Fatalf("回傳的訊息要帶被確認的資產：%+v", r.m)
+		}
+		if first != (uuid.UUID{}) && first != r.m.ID {
+			t.Fatalf("並行的同 request_id 回了不同的訊息：%s、%s", first, r.m.ID)
+		}
+		first = r.m.ID
+	}
+	if n := f.scalar(t, "SELECT count(*) FROM im.messages"); n != 1 {
+		t.Fatalf("訊息數 = %d，預期 1", n)
+	}
+	if n := f.scalar(t, "SELECT last_seq FROM im.conversations"); n != 1 {
+		t.Fatalf("last_seq = %d", n)
+	}
+	if n := f.scalar(t, "SELECT count(*) FROM media.upload_claims"); n != 1 {
+		t.Fatalf("確認的認領列數 = %d，預期 1", n)
+	}
+	if got := f.assetState(t, asset); got != "ACTIVE" {
+		t.Fatalf("資產 state=%s，預期 ACTIVE", got)
+	}
+}
+
+// 同一個 request_id 的第二個 Send 在第一個還沒提交時，要等在入口的 advisory lock 上，而不是先去 Confirm：
+// 第一個 Send 停在持有守門鎖之後（已持有 request_id 的鎖、還沒 Confirm），第二個必須等在鎖上；放行後兩個都回同一則，資產只被確認一次（B1-D26）。
+// 拿掉 `LockSendRequest` 時第二個 Send 不會等（立刻 Confirm 並提交），這個測試失敗。
+func TestSecondSendOfTheSameRequestWaitsOnTheEntryLock(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	token, asset := f.stage(t, 1000+b1)
+	in := im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeImage, StagedToken: token}
+	held, rel := make(chan struct{}), make(chan struct{})
+	var releaseOnce sync.Once
+	release := func() { releaseOnce.Do(func() { close(rel) }) }
+	// 失敗路徑（沒有等在入口鎖上）也要放行停住的第一個 Send，否則它的 transaction 一直不結束，資料庫清理會卡住。
+	t.Cleanup(release)
+	var first atomic.Bool
 	f.stores.afterLock = func() {
-		once.Do(func() {
-			_, err := f.db.Pool().Exec(context.Background(), `INSERT INTO im.messages (id, conversation_id, seq, sender_kind, request_id, message_type, content, created_at)
-				SELECT $1, id, 1000, 'BUYER', $2, 'TEXT', $3, now() FROM im.conversations`, planted, rid, text)
-			if err != nil {
-				t.Error(err)
-			}
-		})
+		if first.CompareAndSwap(false, true) {
+			close(held)
+			<-rel
+		}
 	}
-	t.Cleanup(func() { f.stores.afterLock = nil })
-	return planted
-}
-
-// 撞到 request_id 唯一鍵的 Send 要把整個 transaction 回滾（連同已配發的 seq）再重讀第一則：回的是對方寫入的那則，last_seq 不超前、沒有多出的訊息。
-func TestConflictingRequestIDRollsBackTheAllocatedSeqAndReturnsTheWinner(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	if _, err := f.sendWith(t, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "先建立對話"}); err != nil {
-		t.Fatal(err)
+	type result struct {
+		m   im.Message
+		err error
 	}
-	rid := uuid.NewV4()
-	planted := f.plantRival(t, rid, "同一則")
-	got, err := f.sendWith(t, im.SendInput{RequestID: rid, Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "同一則"})
-	if err != nil {
-		t.Fatal(err)
+	a, b := make(chan result, 1), make(chan result, 1)
+	go func() {
+		m, err := f.m.Send(context.Background(), in)
+		a <- result{m, err}
+	}()
+	select {
+	case <-held:
+	case r := <-a:
+		t.Fatalf("第一個 Send 沒有停在持鎖中：%+v", r)
+	case <-time.After(10 * time.Second):
+		t.Fatal("第一個 Send 沒有走到守門鎖")
 	}
-	if got.ID != planted || got.Seq != 1000 || got.Text == nil || *got.Text != "同一則" {
-		t.Fatalf("要回先寫入的那則：%+v", got)
+	go func() {
+		m, err := f.m.Send(context.Background(), in)
+		b <- result{m, err}
+	}()
+	waiting := make(chan error, 1)
+	go func() {
+		r := <-b
+		b <- r
+		waiting <- r.err
+	}()
+	f.waitLockWaiter(t, waiting)
+	release()
+	var ra, rb result
+	for got := 0; got < 2; got++ {
+		select {
+		case ra = <-a:
+		case rb = <-b:
+		case <-time.After(30 * time.Second):
+			t.Fatal("放行後兩個 Send 沒有在時限內回傳")
+		}
 	}
-	if n := f.scalar(t, "SELECT last_seq FROM im.conversations"); n != 1 {
-		t.Fatalf("last_seq = %d：撞鍵的 Send 配發的 seq 要隨回滾消失", n)
+	if ra.err != nil || rb.err != nil {
+		t.Fatalf("兩個 Send 都該成功：%v、%v", ra.err, rb.err)
 	}
-	if n := f.scalar(t, "SELECT count(*) FROM im.messages"); n != 2 {
-		t.Fatalf("訊息數 = %d", n)
+	if ra.m.ID != rb.m.ID || ra.m.Image == nil || ra.m.Image.AssetID != asset {
+		t.Fatalf("要回同一則、帶被確認的資產：%+v、%+v", ra.m, rb.m)
 	}
-}
-
-// Send 加入外層 transaction 時撞到同一個 request_id 不重試而是失敗，讓呼叫方整個回滾；不在外層 transaction 內才重試成功（上一個測試）。
-func TestConflictingRequestIDInsideAnOuterTransactionFailsInsteadOfRetrying(t *testing.T) {
-	t.Parallel()
-	f := setup(t)
-	if _, err := f.sendWith(t, im.SendInput{RequestID: uuid.NewV4(), Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "先建立對話"}); err != nil {
-		t.Fatal(err)
+	if n := f.scalar(t, "SELECT count(*) FROM im.messages"); n != 1 {
+		t.Fatalf("訊息數 = %d，預期 1", n)
 	}
-	rid := uuid.NewV4()
-	f.plantRival(t, rid, "同一則")
-	var got im.Message
-	err := f.db.InTx(context.Background(), func(ctx context.Context) error {
-		var err error
-		got, err = f.m.Send(ctx, im.SendInput{RequestID: rid, Sender: f.buyerParty(b1), CounterpartID: s1, Type: im.TypeText, Text: "同一則"})
-		return err
-	})
-	if err == nil {
-		t.Fatalf("外層 transaction 內撞到 request_id 要失敗，卻成功回了 %+v", got)
-	}
-	if n := f.scalar(t, "SELECT last_seq FROM im.conversations"); n != 1 {
-		t.Fatalf("last_seq = %d：外層回滾後不得留下空洞", n)
+	if n := f.scalar(t, "SELECT count(*) FROM media.upload_claims"); n != 1 {
+		t.Fatalf("確認的認領列數 = %d，預期 1", n)
 	}
 }

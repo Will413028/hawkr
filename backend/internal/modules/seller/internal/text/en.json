@@ -21,6 +21,21 @@
     "inquiry.seller_reply.unavailable.withdrawn": {
       "message": "This inquiry has been withdrawn, so no reply is needed."
     },
+    "kyc.document_duplicate": {
+      "message": "The same image cannot be used in two document slots"
+    },
+    "kyc.document_id_invalid": {
+      "message": "The document image ID is invalid"
+    },
+    "kyc.document_not_current": {
+      "message": "The specified image is not a current document of this application"
+    },
+    "kyc.document_ref_conflict": {
+      "message": "A document must reference either an existing image or a newly uploaded image, not both"
+    },
+    "kyc.document_ref_missing": {
+      "message": "An image is required"
+    },
     "kyc.edit_unavailable.approved": {
       "message": "Your seller verification is approved, so you do not need to edit or resubmit it."
     },

@@ -96,7 +96,7 @@ type InsertStyleParams struct {
 	Prompt           string
 	Category         string
 	ThumbnailKey     string
-	ThumbnailAssetID string
+	ThumbnailAssetID *uuid.UUID
 	DisplayOrder     int32
 	Enabled          bool
 	Now              time.Time
@@ -287,6 +287,18 @@ func (q *Queries) LockStyle(ctx context.Context, id uuid.UUID) (ImageaiStyle, er
 	return i, err
 }
 
+const lockStyleThumbnailAsset = `-- name: LockStyleThumbnailAsset :one
+SELECT thumbnail_asset_id FROM imageai.styles WHERE id = $1 FOR UPDATE
+`
+
+// 鎖住風格並回傳目前的縮圖資產（沒有縮圖是 NULL；換圖與刪除要把被換掉的標記刪除）。
+func (q *Queries) LockStyleThumbnailAsset(ctx context.Context, id uuid.UUID) (*uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, lockStyleThumbnailAsset, id)
+	var thumbnail_asset_id *uuid.UUID
+	err := row.Scan(&thumbnail_asset_id)
+	return thumbnail_asset_id, err
+}
+
 const markStyleDefault = `-- name: MarkStyleDefault :one
 UPDATE imageai.styles SET is_default = TRUE, version = version + 1, updated_at = $1
 WHERE id = $2
@@ -320,21 +332,9 @@ func (q *Queries) MarkStyleDefault(ctx context.Context, arg MarkStyleDefaultPara
 	return i, err
 }
 
-const styleThumbnailAsset = `-- name: StyleThumbnailAsset :one
-SELECT thumbnail_asset_id FROM imageai.styles WHERE id = $1
-`
-
-// 同步 job 讀的：風格目前的縮圖資產（沒有列時 pgx.ErrNoRows，也就是終態；沒有縮圖是空字串）。
-func (q *Queries) StyleThumbnailAsset(ctx context.Context, id uuid.UUID) (string, error) {
-	row := q.db.QueryRow(ctx, styleThumbnailAsset, id)
-	var thumbnail_asset_id string
-	err := row.Scan(&thumbnail_asset_id)
-	return thumbnail_asset_id, err
-}
-
 const updateStyle = `-- name: UpdateStyle :one
 UPDATE imageai.styles
-SET label = $1, prompt = $2, thumbnail_key = $3, thumbnail_asset_id = $4,
+SET label = $1, prompt = $2, thumbnail_key = $3, thumbnail_asset_id = COALESCE($4, thumbnail_asset_id),
     display_order = $5, enabled = $6,
     version = version + 1, updated_at = $7
 WHERE id = $8 AND version = $9
@@ -345,7 +345,7 @@ type UpdateStyleParams struct {
 	Label            string
 	Prompt           string
 	ThumbnailKey     string
-	ThumbnailAssetID string
+	ThumbnailAssetID *uuid.UUID
 	DisplayOrder     int32
 	Enabled          bool
 	Now              time.Time
@@ -353,7 +353,7 @@ type UpdateStyleParams struct {
 	ExpectedVersion  int64
 }
 
-// 條件式 UPDATE：版本不符時沒有列被更新（pgx.ErrNoRows）；缺圖的 token 為空時 thumbnail_* 沿用（呼叫端傳目前的值）。
+// 條件式 UPDATE：版本不符時沒有列被更新（pgx.ErrNoRows）；沿用目前的縮圖時 thumbnail_key 傳目前的值、thumbnail_asset_id 傳 NULL。
 func (q *Queries) UpdateStyle(ctx context.Context, arg UpdateStyleParams) (ImageaiStyle, error) {
 	row := q.db.QueryRow(ctx, updateStyle,
 		arg.Label,

@@ -1,4 +1,4 @@
-//go:build gateway
+//go:build gateway || integration
 
 package characterization
 
@@ -16,19 +16,23 @@ import (
 //
 // 標 skipOnLegacy 的是計畫決定要改的行為（D2、BD）：舊的一端跳過並附編號，單體的一端照新行為斷言。
 //
-// 固定的前提：買家的 token 是種子帳號 AccountBuyer、Buyer2 是 AccountBuyer2；賣家是兩家種子店家。ALL 型模板對買家的可見性
+// 兩個 driver 都跑這一份。身分與 ID 經 Driver 取（StoreOf、BuyerAccount、BuyerID、Unknown、Malformed）：REST 是種子帳號，Connect 是情境各自建立的帳號。
+// 單體與舊實作不同的地方以 d.Legacy() 分支並附編號（D2：錢包模型沒有 claim_required；D5：結束活動冪等；防枚舉：別人的資源回 not_found）。
+// 固定的前提（REST）：買家的 token 是種子帳號 AccountBuyer、Buyer2 是 AccountBuyer2；賣家是兩家種子店家。ALL 型模板對買家的可見性
 // 依買家註冊時間，單體的 legacy account 回的是秒、Java 當毫秒讀（疑似缺陷，另案追），所以情境不驗「註冊在模板之後的
 // 買家看不到 ALL 型模板」。
 var scenarios = []ch.Scenario[Driver]{
 	{Name: "anonymous callers are rejected", Run: func(ctx context.Context, t ch.T, d Driver) {
 		_, err := d.ListMyCoupons(ctx, ch.Anonymous, ListQuery{})
 		ch.WantKind(t, err, ch.ErrUnauthenticated)
-		_, err = d.Claim(ctx, ch.Anonymous, "1")
+		_, err = d.Claim(ctx, ch.Anonymous, d.Unknown())
 		ch.WantKind(t, err, ch.ErrUnauthenticated)
 		_, err = d.SellerList(ctx, ch.Anonymous, "", Page{})
 		ch.WantKind(t, err, ch.ErrUnauthenticated)
-		err = d.AdminPublish(ctx, ch.Anonymous, "1")
-		ch.WantKind(t, err, ch.ErrUnauthenticated)
+		if d.AdminRPC() {
+			err = d.AdminPublish(ctx, ch.Anonymous, d.Unknown())
+			ch.WantKind(t, err, ch.ErrUnauthenticated)
+		}
 	}},
 	{Name: "my coupons list decodes used records", Run: func(ctx context.Context, t ch.T, d Driver) {
 		// 已使用的券只能由 order 內部的 gRPC 產生，REST 造不出來，所以只驗列表的形狀：每筆都有 ID 與模板 ID。
@@ -45,15 +49,23 @@ var scenarios = []ch.Scenario[Driver]{
 		}
 	}},
 	{Name: "buyers cannot use seller routes", Run: func(ctx context.Context, t ch.T, d Driver) {
+		// 舊的賣家路由對沒有賣家身分的帳號回 403；Connect 的賣家方法以呼叫者此刻的店推導，沒有店回 not_found。
+		want := ch.ErrPermission
+		if !d.Legacy() {
+			want = ch.ErrNotFound
+		}
 		_, err := d.SellerCreate(ctx, ch.Buyer, cashInput("coupon-"+ch.Nonce(), TargetAll))
-		ch.WantKind(t, err, ch.ErrPermission)
+		ch.WantKind(t, err, want)
 		_, err = d.SellerList(ctx, ch.Buyer, "", Page{})
-		ch.WantKind(t, err, ch.ErrPermission)
+		ch.WantKind(t, err, want)
 	}},
 	{Name: "non admins cannot use admin routes", Run: func(ctx context.Context, t ch.T, d Driver) {
+		if skipWithoutAdminRPC(t, d) {
+			return
+		}
 		_, err := d.AdminCreate(ctx, ch.Buyer, cashInput("coupon-"+ch.Nonce(), TargetAll))
 		ch.WantKind(t, err, ch.ErrPermission)
-		err = d.AdminSetQuota(ctx, ch.Seller, StoreSeller, 10)
+		err = d.AdminSetQuota(ctx, ch.Seller, d.StoreOf(ch.Seller), 10)
 		ch.WantKind(t, err, ch.ErrPermission)
 	}},
 	{Name: "seller creates an active cash template visible in list and detail", Run: func(ctx context.Context, t ch.T, d Driver) {
@@ -67,10 +79,10 @@ var scenarios = []ch.Scenario[Driver]{
 			if got.Status != StatusActive || got.Type != TypeCash || got.Target != TargetAll || got.Issuer != IssuerSeller {
 				t.Errorf("%s：status/type/target/issuer = %s/%s/%s/%s，預期 ACTIVE/CASH/ALL/SELLER", name, got.Status, got.Type, got.Target, got.Issuer)
 			}
-			if got.StoreID != StoreSeller || got.IssuerStoreID != StoreSeller {
-				t.Errorf("%s：適用店家 %q、發行店家 %q，預期都是 %s", name, got.StoreID, got.IssuerStoreID, StoreSeller)
+			if got.StoreID != d.StoreOf(ch.Seller) || got.IssuerStoreID != d.StoreOf(ch.Seller) {
+				t.Errorf("%s：適用店家 %q、發行店家 %q，預期都是 %s", name, got.StoreID, got.IssuerStoreID, d.StoreOf(ch.Seller))
 			}
-			if got.Threshold != 200 || got.DiscountAmount != 50 || got.ClaimRequired {
+			if got.Threshold != 200 || got.DiscountAmount != 50 || (d.Legacy() && got.ClaimRequired) {
 				t.Errorf("%s：門檻 %d、折抵 %d、需領取 %v，預期 200、50、false", name, got.Threshold, got.DiscountAmount, got.ClaimRequired)
 			}
 		}
@@ -132,13 +144,19 @@ var scenarios = []ch.Scenario[Driver]{
 	}},
 	{Name: "seller member template is accepted", Run: func(ctx context.Context, t ch.T, d Driver) {
 		sellerReady(ctx, t, d)
+		if !d.Legacy() {
+			// 單體在消費紀錄的資料接上之前，賣家不能建 MEMBER 活動。
+			_, err := d.SellerCreate(ctx, ch.Seller, cashInput("coupon-"+ch.Nonce(), TargetMember))
+			ch.WantKind(t, err, ch.ErrInvalid)
+			return
+		}
 		created := ch.Must(t, ch.Ret(d.SellerCreate(ctx, ch.Seller, cashInput("coupon-"+ch.Nonce(), TargetMember))))
 		if got := mustFind(ctx, t, d, created.ID); got.Target != TargetMember || got.Status != StatusActive {
 			t.Errorf("target/status = %s/%s，預期 MEMBER/ACTIVE", got.Target, got.Status)
 		}
 	}},
 	{Name: "seller quota limits active templates and revoking frees a slot", Run: func(ctx context.Context, t ch.T, d Driver) {
-		if err := d.AdminSetQuota(ctx, ch.Admin, StoreSeller2, 2); err != nil {
+		if err := d.AdminSetQuota(ctx, ch.Admin, d.StoreOf(ch.Seller2), 2); err != nil {
 			t.Fatalf("設定配額：%v", err)
 		}
 		first := ch.Must(t, ch.Ret(d.SellerCreate(ctx, ch.Seller2, cashInput("coupon-"+ch.Nonce(), TargetAll))))
@@ -159,10 +177,10 @@ var scenarios = []ch.Scenario[Driver]{
 		if err := d.SellerRevoke(ctx, ch.Seller, created.ID, "test"); err != nil {
 			t.Fatalf("收回：%v", err)
 		}
-		if got := mustDetail(ctx, t, d, ch.Seller, created.ID).Template; got.Status != StatusRevoked {
-			t.Errorf("收回後 status = %s，預期 REVOKED", got.Status)
+		if got := mustDetail(ctx, t, d, ch.Seller, created.ID).Template; got.Status != StatusEnded {
+			t.Errorf("收回後 status = %s，預期 ENDED", got.Status)
 		}
-		revoked := sellerTemplates(ctx, t, d, ch.Seller, StatusRevoked)
+		revoked := sellerTemplates(ctx, t, d, ch.Seller, StatusEnded)
 		if _, ok := find(revoked, created.ID); !ok {
 			t.Errorf("以 REVOKED 篩選的列表看不到模板")
 		}
@@ -174,14 +192,22 @@ var scenarios = []ch.Scenario[Driver]{
 			t.Errorf("收回後買家的列表還看得到模板")
 		}
 		err := d.SellerRevoke(ctx, ch.Seller, created.ID, "again")
-		ch.WantKind(t, err, ErrWrongStatus)
+		if d.Legacy() {
+			ch.WantKind(t, err, ErrWrongStatus)
+		} else if err != nil {
+			t.Errorf("D5：結束已經結束的活動是冪等成功：%v", err)
+		}
 	}},
-	{Name: "seller revoke of someone else's or unknown template reports wrong status", Run: func(ctx context.Context, t ch.T, d Driver) {
+	{Name: "seller revoke of someone else's or unknown template reports wrong status or not found", Run: func(ctx context.Context, t ch.T, d Driver) {
 		sellerReady(ctx, t, d)
 		created := ch.Must(t, ch.Ret(d.SellerCreate(ctx, ch.Seller, cashInput("coupon-"+ch.Nonce(), TargetAll))))
-		// 收回的 UPDATE 同時比對店家與狀態，沒有命中一律是「狀態不允許」，不是「不存在」。
-		ch.WantKind(t, d.SellerRevoke(ctx, ch.Seller2, created.ID, "x"), ErrWrongStatus)
-		ch.WantKind(t, d.SellerRevoke(ctx, ch.Seller, "1", "x"), ErrWrongStatus)
+		// 舊的收回 UPDATE 同時比對店家與狀態，沒有命中一律是「狀態不允許」；單體依防枚舉回 not_found（別人的與不存在的完全相同）。
+		want := ErrWrongStatus
+		if !d.Legacy() {
+			want = ch.ErrNotFound
+		}
+		ch.WantKind(t, d.SellerRevoke(ctx, ch.Seller2, created.ID, "x"), want)
+		ch.WantKind(t, d.SellerRevoke(ctx, ch.Seller, d.Unknown(), "x"), want)
 		if got := mustDetail(ctx, t, d, ch.Seller, created.ID).Template; got.Status != StatusActive {
 			t.Errorf("別家賣家收回後 status = %s，預期仍是 ACTIVE", got.Status)
 		}
@@ -194,19 +220,19 @@ var scenarios = []ch.Scenario[Driver]{
 		platform := adminActive(ctx, t, d, cashInput("coupon-"+ch.Nonce(), TargetAll))
 		_, err = d.SellerDetail(ctx, ch.Seller, platform.ID)
 		ch.WantKind(t, err, ch.ErrNotFound)
-		_, err = d.SellerDetail(ctx, ch.Seller, "1")
+		_, err = d.SellerDetail(ctx, ch.Seller, d.Unknown())
 		ch.WantKind(t, err, ch.ErrNotFound)
-		_, err = d.SellerDetail(ctx, ch.Seller, "not-a-number")
+		_, err = d.SellerDetail(ctx, ch.Seller, d.Malformed())
 		ch.WantKind(t, err, ch.ErrInvalid)
 	}},
 	{Name: "seller designated template reaches only the named buyers", Run: func(ctx context.Context, t ch.T, d Driver) {
 		sellerReady(ctx, t, d)
 		in := cashInput("coupon-"+ch.Nonce(), TargetDesignated)
-		in.BuyerAccounts = []string{AccountBuyer2}
+		in.BuyerAccounts = []string{d.BuyerAccount(ch.Buyer2)}
 		created := ch.Must(t, ch.Ret(d.SellerCreate(ctx, ch.Seller, in)))
 		detail := mustDetail(ctx, t, d, ch.Seller, created.ID)
-		if len(detail.Template.TargetBuyers) != 1 || detail.Template.TargetBuyers[0] != BuyerID2 {
-			t.Errorf("指定買家 = %v，預期 [%s]", detail.Template.TargetBuyers, BuyerID2)
+		if len(detail.Template.TargetBuyers) != 1 || detail.Template.TargetBuyers[0] != d.BuyerID(ch.Buyer2) {
+			t.Errorf("指定買家 = %v，預期 [%s]", detail.Template.TargetBuyers, d.BuyerID(ch.Buyer2))
 		}
 		if _, ok := find(myCoupons(ctx, t, d, ch.Buyer2), created.ID); !ok {
 			t.Errorf("被指定的買家看不到模板")
@@ -222,8 +248,8 @@ var scenarios = []ch.Scenario[Driver]{
 	}},
 	{Name: "ending a campaign blocks new claims", Run: func(ctx context.Context, t ch.T, d Driver) {
 		draft := ch.Must(t, ch.Ret(d.AdminCreate(ctx, ch.Admin, cashInput("coupon-"+ch.Nonce(), TargetAll))))
-		if draft.Status != StatusDraft || draft.Issuer != IssuerAdmin || !draft.ClaimRequired || draft.StoreID != "" {
-			t.Errorf("admin 建立的 status/issuer/需領取/店家 = %s/%s/%v/%q，預期 DRAFT/ADMIN/true/空", draft.Status, draft.Issuer, draft.ClaimRequired, draft.StoreID)
+		if draft.Status != StatusDraft || draft.Issuer != IssuerAdmin || (d.Legacy() && !draft.ClaimRequired) || draft.StoreID != "" {
+			t.Errorf("admin 建立的 status/issuer/需領取/店家 = %s/%s/%v/%q，預期 DRAFT/ADMIN/true（只有舊的有這個旗標）/空", draft.Status, draft.Issuer, draft.ClaimRequired, draft.StoreID)
 		}
 		if _, ok := find(myCoupons(ctx, t, d, ch.Buyer), draft.ID); ok {
 			t.Errorf("草稿出現在買家的列表")
@@ -242,14 +268,18 @@ var scenarios = []ch.Scenario[Driver]{
 		if err := d.AdminDisable(ctx, ch.Admin, draft.ID); err != nil {
 			t.Fatalf("停用：%v", err)
 		}
-		ch.WantKind(t, d.AdminDisable(ctx, ch.Admin, draft.ID), ErrWrongStatus)
+		if d.Legacy() {
+			ch.WantKind(t, d.AdminDisable(ctx, ch.Admin, draft.ID), ErrWrongStatus)
+		} else if err := d.AdminDisable(ctx, ch.Admin, draft.ID); err != nil {
+			t.Errorf("D5：結束已經結束的活動是冪等成功：%v", err)
+		}
 		_, err = d.Claim(ctx, ch.Buyer, draft.ID)
 		ch.WantKind(t, err, ErrNotActive)
 		if _, ok := find(myCoupons(ctx, t, d, ch.Buyer), draft.ID); ok {
 			t.Errorf("停用後買家的列表還看得到模板")
 		}
-		ch.WantKind(t, d.AdminPublish(ctx, ch.Admin, "1"), ch.ErrNotFound)
-		ch.WantKind(t, d.AdminPublish(ctx, ch.Admin, "not-a-number"), ch.ErrInvalid)
+		ch.WantKind(t, d.AdminPublish(ctx, ch.Admin, d.Unknown()), ch.ErrNotFound)
+		ch.WantKind(t, d.AdminPublish(ctx, ch.Admin, d.Malformed()), ch.ErrInvalid)
 	}},
 	{Name: "claim is idempotent and counts once", Run: func(ctx context.Context, t ch.T, d Driver) {
 		tpl := adminActive(ctx, t, d, cashInput("coupon-"+ch.Nonce(), TargetAll))
@@ -285,13 +315,17 @@ var scenarios = []ch.Scenario[Driver]{
 	}},
 	{Name: "claim fails for unknown, malformed and not claimable templates", Run: func(ctx context.Context, t ch.T, d Driver) {
 		sellerReady(ctx, t, d)
-		_, err := d.Claim(ctx, ch.Buyer, "1")
+		_, err := d.Claim(ctx, ch.Buyer, d.Unknown())
 		ch.WantKind(t, err, ch.ErrNotFound)
-		_, err = d.Claim(ctx, ch.Buyer, "not-a-number")
+		_, err = d.Claim(ctx, ch.Buyer, d.Malformed())
 		ch.WantKind(t, err, ch.ErrInvalid)
 		sellerTpl := ch.Must(t, ch.Ret(d.SellerCreate(ctx, ch.Seller, cashInput("coupon-"+ch.Nonce(), TargetAll))))
 		_, err = d.Claim(ctx, ch.Buyer, sellerTpl.ID)
-		ch.WantKind(t, err, ErrNotClaimable)
+		if d.Legacy() {
+			ch.WantKind(t, err, ErrNotClaimable)
+		} else if err != nil {
+			t.Errorf("D2：沒有 claim_required，買家領得到賣家的 ALL 活動：%v", err)
+		}
 	}},
 	{Name: "claim outside the validity window fails", Run: func(ctx context.Context, t ch.T, d Driver) {
 		now := time.Now()
@@ -299,6 +333,10 @@ var scenarios = []ch.Scenario[Driver]{
 			"還沒開始": {now.Add(time.Hour), now.Add(2 * time.Hour)},
 			"已經結束": {now.Add(-2 * time.Hour), now.Add(-time.Hour)},
 		} {
+			if !d.Legacy() && w[1].Before(now) {
+				// 單體建立活動時要求結束時間在未來（模組 TestClaimRejectsInactiveAndOutOfWindowCampaigns 以注入的時鐘涵蓋已結束的時間窗）。
+				continue
+			}
 			in := cashInput("coupon-"+ch.Nonce(), TargetAll)
 			in.StartAt, in.EndAt = w[0], w[1]
 			tpl := adminActive(ctx, t, d, in)
@@ -312,10 +350,14 @@ var scenarios = []ch.Scenario[Driver]{
 	}},
 	{Name: "claim of a designated template is limited to the named buyers", Run: func(ctx context.Context, t ch.T, d Driver) {
 		in := cashInput("coupon-"+ch.Nonce(), TargetDesignated)
-		in.BuyerAccounts = []string{AccountBuyer2}
+		in.BuyerAccounts = []string{d.BuyerAccount(ch.Buyer2)}
 		tpl := adminActive(ctx, t, d, in)
 		_, err := d.Claim(ctx, ch.Buyer, tpl.ID)
-		ch.WantKind(t, err, ch.ErrPermission)
+		if d.Legacy() {
+			ch.WantKind(t, err, ch.ErrPermission)
+		} else {
+			ch.WantKind(t, err, ErrNotEligible)
+		}
 		ch.Must(t, ch.Ret(d.Claim(ctx, ch.Buyer2, tpl.ID)))
 		if _, ok := find(myCoupons(ctx, t, d, ch.Buyer), tpl.ID); ok {
 			t.Errorf("沒被指定的買家看得到模板")
@@ -363,22 +405,32 @@ var scenarios = []ch.Scenario[Driver]{
 		}
 	}},
 	{Name: "admin issue to designated buyers", Run: func(ctx context.Context, t ch.T, d Driver) {
+		if skipWithoutAdminRPC(t, d) {
+			return
+		}
 		tpl := adminActive(ctx, t, d, cashInput("coupon-"+ch.Nonce(), TargetDesignated))
-		res := ch.Must(t, ch.Ret(d.AdminIssue(ctx, ch.Admin, tpl.ID, []string{AccountBuyer2}, false)))
+		res := ch.Must(t, ch.Ret(d.AdminIssue(ctx, ch.Admin, tpl.ID, []string{d.BuyerAccount(ch.Buyer2)}, false)))
 		if res.Issued != 1 || res.Distributed != 0 {
 			t.Errorf("issued/distributed = %d/%d，預期 1/0", res.Issued, res.Distributed)
 		}
 		got := mustFindIn(t, myCoupons(ctx, t, d, ch.Buyer2), tpl.ID)
-		if got.Claimed {
-			t.Errorf("只指定不代領，買家不該顯示已領取")
+		// 舊的只指定名單、不代領；單體的指定發放就是建立買家的券（D2、D6），買家的錢包裡已經有這張券。
+		if got.Claimed == d.Legacy() {
+			t.Errorf("claimed = %v，預期 %v（舊的只指定不代領；單體發的是買家持有的券）", got.Claimed, !d.Legacy())
 		}
 		if _, ok := find(myCoupons(ctx, t, d, ch.Buyer), tpl.ID); ok {
 			t.Errorf("沒被指定的買家看得到模板")
 		}
 	}},
 	{Name: "admin issue with immediate distribution claims for the buyers", Run: func(ctx context.Context, t ch.T, d Driver) {
+		if skipWithoutAdminRPC(t, d) {
+			return
+		}
+		if skipOnMonolith(t, d, "D6：不保留代領（Distribute）；指定發放本身就建立買家的券") {
+			return
+		}
 		tpl := adminActive(ctx, t, d, cashInput("coupon-"+ch.Nonce(), TargetDesignated))
-		res := ch.Must(t, ch.Ret(d.AdminIssue(ctx, ch.Admin, tpl.ID, []string{AccountBuyer2}, true)))
+		res := ch.Must(t, ch.Ret(d.AdminIssue(ctx, ch.Admin, tpl.ID, []string{d.BuyerAccount(ch.Buyer2)}, true)))
 		if res.Issued != 1 || res.Distributed != 1 {
 			t.Errorf("issued/distributed = %d/%d，預期 1/1", res.Issued, res.Distributed)
 		}
@@ -388,24 +440,43 @@ var scenarios = []ch.Scenario[Driver]{
 		}
 	}},
 	{Name: "admin issue counts only newly designated buyers", Run: func(ctx context.Context, t ch.T, d Driver) {
+		if skipWithoutAdminRPC(t, d) {
+			return
+		}
 		if skipOnLegacy(t, d, "BD21：舊的 issuedCount 是請求的買家數，不是實際新增的名單數") {
 			return
 		}
 		tpl := adminActive(ctx, t, d, cashInput("coupon-"+ch.Nonce(), TargetDesignated))
-		first := ch.Must(t, ch.Ret(d.AdminIssue(ctx, ch.Admin, tpl.ID, []string{AccountBuyer2}, false)))
-		again := ch.Must(t, ch.Ret(d.AdminIssue(ctx, ch.Admin, tpl.ID, []string{AccountBuyer2}, false)))
+		first := ch.Must(t, ch.Ret(d.AdminIssue(ctx, ch.Admin, tpl.ID, []string{d.BuyerAccount(ch.Buyer2)}, false)))
+		again := ch.Must(t, ch.Ret(d.AdminIssue(ctx, ch.Admin, tpl.ID, []string{d.BuyerAccount(ch.Buyer2)}, false)))
 		if first.Issued != 1 || again.Issued != 0 {
 			t.Errorf("第一次 %d、重複 %d，預期 1、0", first.Issued, again.Issued)
 		}
 	}},
 	{Name: "admin issue needs an active template", Run: func(ctx context.Context, t ch.T, d Driver) {
+		if skipWithoutAdminRPC(t, d) {
+			return
+		}
 		draft := ch.Must(t, ch.Ret(d.AdminCreate(ctx, ch.Admin, cashInput("coupon-"+ch.Nonce(), TargetDesignated))))
-		_, err := d.AdminIssue(ctx, ch.Admin, draft.ID, []string{AccountBuyer2}, false)
-		ch.WantKind(t, err, ErrWrongStatus)
+		_, err := d.AdminIssue(ctx, ch.Admin, draft.ID, []string{d.BuyerAccount(ch.Buyer2)}, false)
+		// 舊的只回「狀態不允許」；單體帶 COUPON_CAMPAIGN_NOT_ACTIVE。
+		want := ErrWrongStatus
+		if !d.Legacy() {
+			want = ErrNotActive
+		}
+		ch.WantKind(t, err, want)
 	}},
 	{Name: "admin void rejects unknown vouchers and a missing reason", Run: func(ctx context.Context, t ch.T, d Driver) {
-		ch.WantKind(t, d.AdminVoid(ctx, ch.Admin, "1", "test"), ErrWrongStatus)
-		ch.WantKind(t, d.AdminVoid(ctx, ch.Admin, "1", ""), ch.ErrInvalid)
+		if skipWithoutAdminRPC(t, d) {
+			return
+		}
+		// 舊的對不存在的券回「狀態不允許」；單體回 not_found。
+		want := ErrWrongStatus
+		if !d.Legacy() {
+			want = ch.ErrNotFound
+		}
+		ch.WantKind(t, d.AdminVoid(ctx, ch.Admin, d.Unknown(), "test"), want)
+		ch.WantKind(t, d.AdminVoid(ctx, ch.Admin, d.Unknown(), ""), ch.ErrInvalid)
 	}},
 	{Name: "available coupons apply the threshold and estimate the discount", Run: func(ctx context.Context, t ch.T, d Driver) {
 		sellerReady(ctx, t, d)
@@ -415,6 +486,7 @@ var scenarios = []ch.Scenario[Driver]{
 			Title: "coupon-" + ch.Nonce(), Type: TypePercent, Target: TargetAll,
 			DiscountPercent: 10, MaxDiscount: 30, StartAt: start, EndAt: end,
 		})))
+		claimIfWallet(ctx, t, d, ch.Buyer, cash.ID, percent.ID)
 		for _, tc := range []struct {
 			amount       int64
 			wantCash     bool
@@ -425,7 +497,7 @@ var scenarios = []ch.Scenario[Driver]{
 			{amount: 300, wantCash: true, cashDiscount: 50, percent: 30},
 			{amount: 1000, wantCash: true, cashDiscount: 50, percent: 30},
 		} {
-			list := ch.Must(t, ch.Ret(d.ListAvailable(ctx, ch.Buyer, AvailableQuery{StoreID: StoreSeller, OrderAmount: tc.amount, Page: Page{Size: 100}})))
+			list := ch.Must(t, ch.Ret(d.ListAvailable(ctx, ch.Buyer, AvailableQuery{StoreID: d.StoreOf(ch.Seller), OrderAmount: tc.amount, Page: Page{Size: 100}})))
 			gotCash, hasCash := findAvailable(list.Records, cash.ID)
 			if hasCash != tc.wantCash {
 				t.Errorf("訂單 %d：現金券在列表 = %v，預期 %v", tc.amount, hasCash, tc.wantCash)
@@ -443,12 +515,12 @@ var scenarios = []ch.Scenario[Driver]{
 	{Name: "available coupons need a store and an order amount", Run: func(ctx context.Context, t ch.T, d Driver) {
 		_, err := d.ListAvailable(ctx, ch.Buyer, AvailableQuery{})
 		ch.WantKind(t, err, ch.ErrInvalid)
-		_, err = d.ListAvailable(ctx, ch.Buyer, AvailableQuery{StoreID: StoreSeller})
+		_, err = d.ListAvailable(ctx, ch.Buyer, AvailableQuery{StoreID: d.StoreOf(ch.Seller)})
 		ch.WantKind(t, err, ch.ErrInvalid)
 	}},
 	{Name: "available coupons hide unclaimed claim-required templates until claimed", Run: func(ctx context.Context, t ch.T, d Driver) {
 		tpl := adminActive(ctx, t, d, cashInput("coupon-"+ch.Nonce(), TargetAll))
-		q := AvailableQuery{StoreID: StoreSeller, OrderAmount: 1000, Page: Page{Size: 100}}
+		q := AvailableQuery{StoreID: d.StoreOf(ch.Seller), OrderAmount: 1000, Page: Page{Size: 100}}
 		before := ch.Must(t, ch.Ret(d.ListAvailable(ctx, ch.Buyer, q)))
 		if _, ok := findAvailable(before.Records, tpl.ID); ok {
 			t.Errorf("領券前結帳頁的可用券已經有這張")
@@ -469,9 +541,10 @@ var scenarios = []ch.Scenario[Driver]{
 		}
 		sellerReady(ctx, t, d)
 		for range 3 {
-			ch.Must(t, ch.Ret(d.SellerCreate(ctx, ch.Seller, cashInput("coupon-"+ch.Nonce(), TargetAll))))
+			created := ch.Must(t, ch.Ret(d.SellerCreate(ctx, ch.Seller, cashInput("coupon-"+ch.Nonce(), TargetAll))))
+			claimIfWallet(ctx, t, d, ch.Buyer, created.ID)
 		}
-		list := ch.Must(t, ch.Ret(d.ListAvailable(ctx, ch.Buyer, AvailableQuery{StoreID: StoreSeller, OrderAmount: 1000, Page: Page{Number: 1, Size: 1}})))
+		list := ch.Must(t, ch.Ret(d.ListAvailable(ctx, ch.Buyer, AvailableQuery{StoreID: d.StoreOf(ch.Seller), OrderAmount: 1000, Page: Page{Number: 1, Size: 1}})))
 		if len(list.Records) != 1 || list.Total < 3 {
 			t.Errorf("第一頁 %d 筆、total %d，預期 1 筆、total 至少 3", len(list.Records), list.Total)
 		}
@@ -505,7 +578,7 @@ func skipOnLegacy(t ch.T, d Driver, why string) bool {
 // sellerReady 把種子賣家的配額拉高：模板配額只算進行中的模板，各情境建立的模板不收回。
 func sellerReady(ctx context.Context, t ch.T, d Driver) {
 	t.Helper()
-	if err := d.AdminSetQuota(ctx, ch.Admin, StoreSeller, 100); err != nil {
+	if err := d.AdminSetQuota(ctx, ch.Admin, d.StoreOf(ch.Seller), 100); err != nil {
 		t.Fatalf("設定賣家配額：%v", err)
 	}
 }
@@ -581,4 +654,41 @@ func mustFind(ctx context.Context, t ch.T, d Driver, id string) Template {
 func mustDetail(ctx context.Context, t ch.T, d Driver, c ch.Caller, id string) SellerDetail {
 	t.Helper()
 	return ch.Must(t, ch.Ret(d.SellerDetail(ctx, c, id)))
+}
+
+// skipOnMonolith 在單體（Connect）一端跳過情境：計畫刪掉了舊實作的這個能力，情境只驗舊的一端。回傳 true 時情境直接結束。
+func skipOnMonolith(t ch.T, d Driver, why string) bool {
+	if d.Legacy() {
+		return false
+	}
+	s, ok := t.(interface{ Skipf(string, ...any) })
+	if !ok {
+		panic("skipOnMonolith：這個 T 不能跳過，情境不能在單體的一端靜默通過")
+	}
+	s.Skipf("單體不保留這個能力：%s", why)
+	return true
+}
+
+// skipWithoutAdminRPC 在沒有 admin 對外 API 的 driver 跳過專門驗 admin RPC 行為的情境。回傳 true 時情境直接結束。
+func skipWithoutAdminRPC(t ch.T, d Driver) bool {
+	if d.AdminRPC() {
+		return false
+	}
+	s, ok := t.(interface{ Skipf(string, ...any) })
+	if !ok {
+		panic("skipWithoutAdminRPC：這個 T 不能跳過，情境不能靜默通過")
+	}
+	s.Skipf("這個 driver 沒有 admin 對外 API：這個情境驗的是 admin RPC 本身")
+	return true
+}
+
+// claimIfWallet 在錢包模型（單體）先領券：結帳可用的券只列買家持有的券，沒有領過的活動不在裡面（D2）；舊的賣家模板不需要領取。
+func claimIfWallet(ctx context.Context, t ch.T, d Driver, c ch.Caller, ids ...string) {
+	t.Helper()
+	if d.Legacy() {
+		return
+	}
+	for _, id := range ids {
+		ch.Must(t, ch.Ret(d.Claim(ctx, c, id)))
+	}
 }

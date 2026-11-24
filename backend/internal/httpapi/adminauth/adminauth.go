@@ -17,6 +17,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/bizcalendar/v1alpha1/bizcalendarv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/buyer/v1alpha1/buyerv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/content/v1alpha1/contentv1alpha1connect"
+	couponv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/coupon/v1alpha1/couponv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/identity/v1alpha1/identityv1alpha1connect"
 	imageaiv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/imageai/v1alpha1/imageaiv1alpha1connect"
 	moderationv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/moderation/v1alpha1/moderationv1alpha1connect"
@@ -79,6 +80,16 @@ var declarations = map[string]declaration{
 	contentv1alpha1connect.ContentAdminServiceListAppVersionGatesProcedure:  requires(adminperm.ContentAppVersionGatesList, auditReadOnly),
 	contentv1alpha1connect.ContentAdminServiceCreateAppVersionGateProcedure: requires(adminperm.ContentAppVersionGatesCreate, auditPending),
 	contentv1alpha1connect.ContentAdminServiceUpdateAppVersionGateProcedure: requires(adminperm.ContentAppVersionGatesUpdate, auditPending),
+
+	couponv1alpha1connect.CouponAdminServiceCreateCampaignProcedure:    requires(adminperm.CouponCampaignsCreate, auditAudited),
+	couponv1alpha1connect.CouponAdminServicePublishCampaignProcedure:   requires(adminperm.CouponCampaignsPublish, auditAudited),
+	couponv1alpha1connect.CouponAdminServiceEndCampaignProcedure:       requires(adminperm.CouponCampaignsEnd, auditAudited),
+	couponv1alpha1connect.CouponAdminServiceGrantVouchersProcedure:     requires(adminperm.CouponVouchersGrant, auditAudited),
+	couponv1alpha1connect.CouponAdminServiceVoidVoucherProcedure:       requires(adminperm.CouponVouchersVoid, auditAudited),
+	couponv1alpha1connect.CouponAdminServiceSetSellerQuotaProcedure:    requires(adminperm.CouponSellerQuotasUpdate, auditAudited),
+	couponv1alpha1connect.CouponAdminServiceListCampaignsProcedure:     requires(adminperm.CouponCampaignsList, auditReadOnly),
+	couponv1alpha1connect.CouponAdminServiceGetCampaignProcedure:       requires(adminperm.CouponCampaignsGet, auditReadOnly),
+	couponv1alpha1connect.CouponAdminServiceListBuyerVouchersProcedure: requires(adminperm.CouponVouchersList, auditReadOnly),
 
 	imageaiv1alpha1connect.ImageAiAdminServiceListAiStylesForAdminProcedure: requires(adminperm.ImageaiAiStylesList, auditReadOnly),
 	imageaiv1alpha1connect.ImageAiAdminServiceCreateAiStyleProcedure:        requires(adminperm.ImageaiAiStylesCreate, auditAudited),

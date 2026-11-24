@@ -12,6 +12,7 @@ var storedCodeExceptions = []StoredCodeException{
 	{"delegation", "delegated_operation_sessions_capabilities_check", "能力是「資源.動作」的權限識別字（storefront.read），是 gateway 與 admin 的 allow-list 成員，不是列舉代碼；對外契約的形式"},
 	{"delegation", "admin_operation_audit_logs_capability_check", "同上：能力的權限識別字"},
 	{"delegation", "seller_delegation_authorizations_capabilities_check", "同上：能力的權限識別字"},
+	{"identity", "accounts_preferred_locale_check", "值是 BCP 47 語系標籤（zh-TW、en），與 uitext.Locale、Accept-Language 的協商結果同形（多語系 ADR D1 指定欄位與值域），不是列舉代碼"},
 	{"seller", "kyc_registration_checks_fields_check", "值是欄位路徑（business.company_name），對應 proto 的欄位名，不是列舉代碼"},
 	{"seller", "kyc_review_issues_field_check", "同上：欄位路徑，審核退件指向的表單欄位"},
 }

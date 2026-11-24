@@ -12,7 +12,7 @@
 #   ./generate.sh --java           # 僅 Java（直接覆蓋 common-core）
 #   ./generate.sh --go             # 僅 Go（輸出到 internal/platform/codemeta/：代碼表與單體的錯誤原因）
 #   ./generate.sh --go-errors      # 僅 Go 業務碼常數（直寫 pkg/errors/bizcode/bizcode.go）
-#   ./generate.sh --go-media       # 僅 Go media 引用類型常數（直寫 pkg/media/ref_type.go 與單體的 internal/modules/media/ref_type.go）
+#   ./generate.sh --go-media       # 僅 Go media 引用類型常數（直寫 pkg/media/ref_type.go）
 #   ./generate.sh --go-labels      # 僅 Go Value→Label 對照（直寫 pkg/codemeta/labels.go）
 #   ./generate.sh --go-registry    # 僅 Go registry：typed 常數 + AllXxx + FromCode/FromValue
 #                                  #   （直寫 pkg/codemeta/registry.go；清單見 GO_REGISTRY_ENUMS）
@@ -42,8 +42,6 @@ JAVA_ERROR_OUTPUT_FILE="$JAVA_OUTPUT_DIR/GrpcResponseCode.java"
 GO_OUTPUT_DIR="$PROJECT_ROOT/internal/platform/codemeta"
 GO_ERRORS_OUTPUT_FILE="$PROJECT_ROOT/pkg/errors/bizcode/bizcode.go"
 GO_MEDIA_OUTPUT_FILE="$PROJECT_ROOT/pkg/media/ref_type.go"
-# 單體的 media 模組（遷移期兩份並存；pkg/media 隨舊服務在遷移計畫階段 C 刪除）。
-GO_MEDIA_MONOLITH_OUTPUT_FILE="$PROJECT_ROOT/internal/modules/media/ref_type.go"
 GO_LABELS_OUTPUT_FILE="$PROJECT_ROOT/pkg/codemeta/labels.go"
 GO_REGISTRY_OUTPUT_FILE="$PROJECT_ROOT/pkg/codemeta/registry.go"
 # client 的生成物直接寫進 monorepo，CI（backend-monolith.yml）重新生成並檢查 drift。
@@ -1531,8 +1529,6 @@ main() {
         echo "🔵 生成 Go media 引用類型常數..."
         generate_go_media "$parsed_file" "$GO_MEDIA_OUTPUT_FILE"
         echo "   ✓ pkg/media/ref_type.go"
-        generate_go_media "$parsed_file" "$GO_MEDIA_MONOLITH_OUTPUT_FILE"
-        echo "   ✓ internal/modules/media/ref_type.go"
         echo ""
     fi
 

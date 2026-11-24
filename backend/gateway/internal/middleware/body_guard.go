@@ -9,23 +9,11 @@ import (
 )
 
 const (
-	defaultMaxBodyBytes   = 2 << 20  // 2MiB — general JSON API routes
-	uploadMaxBodyBytes    = 10 << 20 // 10MiB — image/CSV upload routes with client-side compression
-	kycUploadMaxBodyBytes = 20 << 20 // 20MiB — media/secure_upload: the one upload route with no client-side
-	// dimension resize (only JPEG quality re-encode), so a high-MP camera
-	// photo (ID card, bank passbook) can plausibly exceed the standard
-	// 10MiB tier. See hawkr_seller MediaRepository.uploadPrivateDocument
-	// vs. uploadWithSession (the latter compresses via ImageProcessingService,
-	// the former doesn't) — follow-up tracked to add client-side compression
-	// there; this is the immediate backend-side safety margin.
+	defaultMaxBodyBytes = 2 << 20  // 2MiB — general JSON API routes
+	uploadMaxBodyBytes  = 10 << 20 // 10MiB — image/CSV upload routes with client-side compression
 
-	defaultReadDeadline   = 30 * time.Second  // general routes: small JSON bodies, no reason to need longer
-	uploadReadDeadline    = 120 * time.Second // upload routes: 10MiB must survive slow mobile uplinks
-	kycUploadReadDeadline = 240 * time.Second // 20MiB tier: deadline doubled alongside the byte cap to hold
-	// the same ~0.67 Mbps minimum-bandwidth floor as uploadReadDeadline —
-	// raising only the byte cap without raising the deadline would tighten
-	// the effective bandwidth requirement and reintroduce the exact
-	// slow-connection failure mode this tiering was built to avoid.
+	defaultReadDeadline = 30 * time.Second  // general routes: small JSON bodies, no reason to need longer
+	uploadReadDeadline  = 120 * time.Second // upload routes: 10MiB must survive slow mobile uplinks
 )
 
 // bodyLimits pairs a route's accept-size cap with how long it's allowed to
@@ -49,8 +37,7 @@ type bodyLimits struct {
 // New routes are covered by the default tier automatically — this map only
 // needs entries for the exceptions.
 var uploadRoutes = map[string]bodyLimits{
-	"POST /api/v1/app/image_transformations":  {uploadMaxBodyBytes, uploadReadDeadline},
-	"PUT /api/v1/app/media/secure_upload/:id": {kycUploadMaxBodyBytes, kycUploadReadDeadline},
+	"POST /api/v1/app/image_transformations": {uploadMaxBodyBytes, uploadReadDeadline},
 }
 
 // BodyGuard bounds request body size and read duration before any handler

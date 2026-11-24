@@ -461,6 +461,58 @@ final class SocialAppClientProvider
 
 String _$socialAppClientHash() => r'f8da4bb52e94947a0c9f4e2619a24b9ca47673c8';
 
+/// 圖片上傳會話（`MediaAppService`），登入後呼叫。
+
+@ProviderFor(mediaClient)
+final mediaClientProvider = MediaClientProvider._();
+
+/// 圖片上傳會話（`MediaAppService`），登入後呼叫。
+
+final class MediaClientProvider
+    extends
+        $FunctionalProvider<
+          MediaAppServiceClient,
+          MediaAppServiceClient,
+          MediaAppServiceClient
+        >
+    with $Provider<MediaAppServiceClient> {
+  /// 圖片上傳會話（`MediaAppService`），登入後呼叫。
+  MediaClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'mediaClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$mediaClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<MediaAppServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  MediaAppServiceClient create(Ref ref) {
+    return mediaClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(MediaAppServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<MediaAppServiceClient>(value),
+    );
+  }
+}
+
+String _$mediaClientHash() => r'473fabd3f9cced88e92e2c5f2c57cb3075ad3f1c';
+
 /// 買家本人的封鎖與封鎖名單（`BuyerAppService`）：使用者主動的寫入，`ACCOUNT_SUSPENDED` 照使用者主動的寫入處理。
 
 @ProviderFor(buyerAppClient)
@@ -722,6 +774,59 @@ final class ChatAppClientProvider
 }
 
 String _$chatAppClientHash() => r'82a8a1be2af41db22b2bd53d0758cc34b233d64d';
+
+/// 買家的通知（`NotificationAppService`）：收件匣、偏好與推播裝置 token。
+
+@ProviderFor(notificationAppClient)
+final notificationAppClientProvider = NotificationAppClientProvider._();
+
+/// 買家的通知（`NotificationAppService`）：收件匣、偏好與推播裝置 token。
+
+final class NotificationAppClientProvider
+    extends
+        $FunctionalProvider<
+          NotificationAppServiceClient,
+          NotificationAppServiceClient,
+          NotificationAppServiceClient
+        >
+    with $Provider<NotificationAppServiceClient> {
+  /// 買家的通知（`NotificationAppService`）：收件匣、偏好與推播裝置 token。
+  NotificationAppClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'notificationAppClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$notificationAppClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<NotificationAppServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  NotificationAppServiceClient create(Ref ref) {
+    return notificationAppClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(NotificationAppServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<NotificationAppServiceClient>(value),
+    );
+  }
+}
+
+String _$notificationAppClientHash() =>
+    r'af58e060e604ac6f57920a0efdbde82b738e41c1';
 
 /// 評價的公開讀取：有 session 時帶 Bearer，伺服器才套用觀看者的封鎖；訪客不帶。
 

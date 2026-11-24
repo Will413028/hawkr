@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/store"
@@ -31,7 +32,9 @@ type payload struct {
 	Audience string `json:"u,omitempty"`
 	Store    int64  `json:"s,omitempty"`
 	Hint     string `json:"h,omitempty"`
-	Change   int    `json:"c,omitempty"`
+	// Item 是這則通知新建或聚合更新的收件匣列 ID（kindInbox 可選；一則 NOTIFY 至多一個）。
+	Item   string `json:"i,omitempty"`
+	Change int    `json:"c,omitempty"`
 }
 
 var errPayload = errors.New("notification/stream：不合法的通知")
@@ -72,9 +75,17 @@ func decode(s string) (payload, error) {
 		if h := model.StateHint(p.Hint); h != model.StateHintNone && !isHint(h) {
 			return payload{}, fmt.Errorf("%w：提示 %q", errPayload, p.Hint)
 		}
+		if p.Item != "" {
+			if _, err := uuid.Parse(p.Item); err != nil {
+				return payload{}, fmt.Errorf("%w：收件匣列 ID %q", errPayload, p.Item)
+			}
+		}
 	case kindWorkspace:
 		if p.Store <= 0 || !SellerChange(p.Change).valid() {
 			return payload{}, fmt.Errorf("%w：賣家工作區通知缺欄位", errPayload)
+		}
+		if p.Item != "" {
+			return payload{}, fmt.Errorf("%w：賣家工作區通知不帶收件匣列 ID", errPayload)
 		}
 	default:
 		return payload{}, fmt.Errorf("%w：種類 %q", errPayload, p.Kind)
@@ -93,8 +104,12 @@ func isHint(h model.StateHint) bool {
 
 // NotifyInbox 在 ctx 帶的 transaction 內（寫入收件匣的同一個）發出 (帳號, 受眾) 的收件匣通知；沒有 transaction 時立即送出。
 // BUYER 受眾 storeID 為 0。訊號可合併，重試重複發出無害。
-func NotifyInbox(ctx context.Context, d *db.DB, key Key, storeID int64, hint model.StateHint) error {
+// itemID 是這次新建或聚合更新的收件匣列（一則 NOTIFY 一個，不批次）；已讀、刪除等不新增通知的變化傳 uuid.Nil()。
+func NotifyInbox(ctx context.Context, d *db.DB, key Key, storeID int64, hint model.StateHint, itemID uuid.UUID) error {
 	p := payload{V: payloadVersion, Kind: kindInbox, Account: key.AccountID, Audience: string(key.Audience), Store: storeID, Hint: string(hint)}
+	if itemID != uuid.Nil() {
+		p.Item = itemID.String()
+	}
 	if _, err := decode(p.encode()); err != nil {
 		return fmt.Errorf("notification/stream：收件匣通知不合法（帳號 %d、受眾 %q、店 %d）", key.AccountID, key.Audience, storeID)
 	}

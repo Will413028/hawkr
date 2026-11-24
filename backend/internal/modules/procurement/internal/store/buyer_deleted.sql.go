@@ -33,6 +33,19 @@ func (q *Queries) AnonymizeBuyerApprovals(ctx context.Context, buyerID *int64) (
 	return result.RowsAffected(), nil
 }
 
+const anonymizeBuyerCandidateSets = `-- name: AnonymizeBuyerCandidateSets :execrows
+UPDATE procurement.candidate_sets SET buyer_id = NULL WHERE buyer_id = $1
+`
+
+// 留下來的候選集（被核准引用）buyer_id 設 NULL；候選列只有 store_id 與排序，沒有買家資料。
+func (q *Queries) AnonymizeBuyerCandidateSets(ctx context.Context, buyerID *int64) (int64, error) {
+	result, err := q.db.Exec(ctx, anonymizeBuyerCandidateSets, buyerID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const anonymizeBuyerPublications = `-- name: AnonymizeBuyerPublications :execrows
 UPDATE procurement.rfq_publications SET buyer_id = NULL WHERE buyer_id = $1
 `
@@ -59,9 +72,12 @@ func (q *Queries) AnonymizeBuyerRequests(ctx context.Context, buyerID *int64) (i
 }
 
 const deleteBuyerCandidateSets = `-- name: DeleteBuyerCandidateSets :execrows
-DELETE FROM procurement.candidate_sets WHERE buyer_id = $1
+DELETE FROM procurement.candidate_sets s
+WHERE s.buyer_id = $1::bigint
+  AND NOT EXISTS (SELECT 1 FROM procurement.rfq_publication_approvals a WHERE a.candidate_set_id = s.id)
 `
 
+// 被核准引用的候選集不刪（核准連到發布與賣家紀錄，FK 是 RESTRICT）；要在 DeleteUnpublishedBuyerRequests 之後執行，沒發布過的核准已先隨需求 CASCADE 刪除。
 func (q *Queries) DeleteBuyerCandidateSets(ctx context.Context, buyerID int64) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteBuyerCandidateSets, buyerID)
 	if err != nil {
@@ -76,7 +92,7 @@ DELETE FROM procurement.conversations WHERE buyer_id = $1
 `
 
 // 買家關閉（BuyerDeleted，S10）。買家資料刪除；賣家看得到的紀錄（已發布的詢價與其下游）保留並把 buyer_id 設 NULL（保留期跟詢價的生命週期）。
-// 順序：先清買家專屬的資料，再處理需求本身，最後清額度。
+// 順序：先清買家專屬的資料，再處理需求本身（候選集要排在未發布需求之後），最後清額度。
 func (q *Queries) DeleteBuyerConversations(ctx context.Context, buyerID int64) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteBuyerConversations, buyerID)
 	if err != nil {

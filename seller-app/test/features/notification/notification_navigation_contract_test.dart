@@ -6,16 +6,15 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// 從 `app_router.dart` 自動抽出「缺參數就渲染資料無效」的路由清單
 /// （判準＝該 `GoRoute(` 區塊內出現 `_invalidRouteData` 或「訂單資料無效」），
-/// 再掃三支通知導航檔的每一個 `push`／`go`，命中清單卻沒帶 `extra:` 就轉紅。
+/// 再掃通知導航檔的每一個 `push`／`go`，命中清單卻沒帶 `extra:` 就轉紅。
 ///
 /// ⚠️ 已知限制（誠實標註）：`/customer/detail` 的守衛在 `_CustomerDetailRoute`
 /// 這個 widget 裡而不在 `GoRoute(` 區塊內，因此不會被認成 guarded。目前沒有
 /// 任何通知路徑指向它；哪天有了，要把守衛搬進區塊或在這裡補一筆。
 void main() {
   const navigationFiles = [
-    'lib/features/notification/data/push/router.dart',
+    'lib/features/notification/data/deep_link.dart',
     'lib/features/notification/presentation/notifications_screen.dart',
-    'lib/features/notification/data/delegation_navigation.dart',
   ];
 
   final appRouter = _blankComments(

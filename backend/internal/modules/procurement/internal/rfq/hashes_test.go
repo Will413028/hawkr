@@ -26,7 +26,7 @@ func revisionRow() store.ProcurementRequestRevision {
 
 func approvalRow() store.ProcurementRfqPublicationApproval {
 	return store.ProcurementRfqPublicationApproval{
-		ID: uuid.NewV7(), SchemaVersion: rfqhash.SchemaV1, AudienceMode: model.AudienceWishPool, AudiencePolicyID: ptr("P"), AudiencePolicyVersion: ptr(int32(1)),
+		ID: uuid.NewV7(), SchemaVersion: rfqhash.SchemaV1,
 		RangeLowerAmount: 100, RangeUpperAmount: 200, BuyerNote: "請盡快", ResponseDeadline: ptr(day.AddDate(0, 0, -3)),
 	}
 }
@@ -133,21 +133,10 @@ func TestSellerHashCoversEveryPayloadField(t *testing.T) {
 }
 
 func TestAudienceHashCoversEveryApprovalField(t *testing.T) {
-	base := store.ProcurementRfqPublicationApproval{SchemaVersion: rfqhash.SchemaV1, AudienceMode: model.AudienceWishPool, AudiencePolicyID: ptr("P"), AudiencePolicyVersion: ptr(int32(1))}
+	base := store.ProcurementRfqPublicationApproval{SchemaVersion: rfqhash.SchemaV1}
 	want, err := rfqhash.Audience(audienceInput(base, nil))
 	if err != nil {
 		t.Fatal(err)
-	}
-	for name, mutate := range map[string]func(*store.ProcurementRfqPublicationApproval){
-		"mode":           func(a *store.ProcurementRfqPublicationApproval) { a.AudienceMode = model.AudienceDirectRecipients },
-		"policy id":      func(a *store.ProcurementRfqPublicationApproval) { a.AudiencePolicyID = ptr("Q") },
-		"policy version": func(a *store.ProcurementRfqPublicationApproval) { a.AudiencePolicyVersion = ptr(int32(2)) },
-	} {
-		a := base
-		mutate(&a)
-		if got, _ := rfqhash.Audience(audienceInput(a, nil)); got == want {
-			t.Errorf("改 %s，受眾的 hash 沒變", name)
-		}
 	}
 	if got, _ := rfqhash.Audience(audienceInput(base, []int64{1})); got == want {
 		t.Error("多一家店，受眾的 hash 沒變")
@@ -162,16 +151,12 @@ func TestAudienceShape(t *testing.T) {
 		in    PreviewPublicationInput
 		field string // 空字串表示合法
 	}{
-		{"wish pool", PreviewPublicationInput{AudienceMode: model.AudienceWishPool}, ""},
-		{"wish pool with a set", PreviewPublicationInput{AudienceMode: model.AudienceWishPool, CandidateSetID: &set}, "CandidateSetID"},
-		{"wish pool with candidates", PreviewPublicationInput{AudienceMode: model.AudienceWishPool, SelectedCandidateIDs: []uuid.UUID{a}}, "SelectedCandidateIDs"},
-		{"direct", PreviewPublicationInput{AudienceMode: model.AudienceDirectRecipients, CandidateSetID: &set, SelectedCandidateIDs: []uuid.UUID{a, b}}, ""},
-		{"direct without a set", PreviewPublicationInput{AudienceMode: model.AudienceDirectRecipients, SelectedCandidateIDs: []uuid.UUID{a}}, "CandidateSetID"},
-		{"direct without candidates", PreviewPublicationInput{AudienceMode: model.AudienceDirectRecipients, CandidateSetID: &set}, "SelectedCandidateIDs"},
-		{"direct with a duplicate", PreviewPublicationInput{AudienceMode: model.AudienceDirectRecipients, CandidateSetID: &set, SelectedCandidateIDs: []uuid.UUID{a, b, a}}, "SelectedCandidateIDs[2]"},
-		{"unknown mode", PreviewPublicationInput{AudienceMode: "ALL"}, "AudienceMode"},
-		{"empty mode", PreviewPublicationInput{}, "AudienceMode"},
-		{"zero deadline", PreviewPublicationInput{AudienceMode: model.AudienceWishPool, ResponseDeadline: &zero}, "ResponseDeadline"},
+		{"direct", PreviewPublicationInput{CandidateSetID: set, SelectedCandidateIDs: []uuid.UUID{a, b}}, ""},
+		{"direct without a set", PreviewPublicationInput{SelectedCandidateIDs: []uuid.UUID{a}}, "CandidateSetID"},
+		{"direct without candidates", PreviewPublicationInput{CandidateSetID: set}, "SelectedCandidateIDs"},
+		{"direct with a duplicate", PreviewPublicationInput{CandidateSetID: set, SelectedCandidateIDs: []uuid.UUID{a, b, a}}, "SelectedCandidateIDs[2]"},
+		{"empty", PreviewPublicationInput{}, "CandidateSetID"},
+		{"zero deadline", PreviewPublicationInput{ResponseDeadline: &zero}, "ResponseDeadline"},
 	} {
 		err := checkAudienceShape(tc.in)
 		if tc.field == "" {

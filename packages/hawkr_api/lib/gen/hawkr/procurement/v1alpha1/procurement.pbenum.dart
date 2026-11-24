@@ -456,33 +456,6 @@ class BlockKind extends $pb.ProtobufEnum {
   const BlockKind._(super.value, super.name);
 }
 
-/// AudienceMode 是詢價發給誰。
-class AudienceMode extends $pb.ProtobufEnum {
-  static const AudienceMode AUDIENCE_MODE_UNSPECIFIED =
-      AudienceMode._(0, _omitEnumNames ? '' : 'AUDIENCE_MODE_UNSPECIFIED');
-
-  /// 公開池：不指定對象，全站未停權的賣家。
-  static const AudienceMode AUDIENCE_MODE_WISH_POOL =
-      AudienceMode._(1, _omitEnumNames ? '' : 'AUDIENCE_MODE_WISH_POOL');
-
-  /// 指定對象：從候選搜尋的結果勾選。
-  static const AudienceMode AUDIENCE_MODE_DIRECT_RECIPIENTS = AudienceMode._(
-      2, _omitEnumNames ? '' : 'AUDIENCE_MODE_DIRECT_RECIPIENTS');
-
-  static const $core.List<AudienceMode> values = <AudienceMode>[
-    AUDIENCE_MODE_UNSPECIFIED,
-    AUDIENCE_MODE_WISH_POOL,
-    AUDIENCE_MODE_DIRECT_RECIPIENTS,
-  ];
-
-  static final $core.List<AudienceMode?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 2);
-  static AudienceMode? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const AudienceMode._(super.value, super.name);
-}
-
 /// PublicationState 是一次發布的狀態。
 class PublicationState extends $pb.ProtobufEnum {
   static const PublicationState PUBLICATION_STATE_UNSPECIFIED =
@@ -554,7 +527,7 @@ class SellerResponseType extends $pb.ProtobufEnum {
       SellerResponseType._(
           1, _omitEnumNames ? '' : 'SELLER_RESPONSE_TYPE_MANUAL_QUOTE');
 
-  /// 接受買家的非價格條款，但仍須自行填齊品相與全部金額。
+  /// 接受買家的非價格條款，但仍須自行填齊全部金額。
   static const SellerResponseType
       SELLER_RESPONSE_TYPE_ACCEPT_NON_PRICE_TERMS_WITH_QUOTE =
       SellerResponseType._(

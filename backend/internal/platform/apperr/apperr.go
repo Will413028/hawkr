@@ -221,6 +221,24 @@ var ReasonAssistantTurnInProgress = newReason("ASSISTANT_TURN_IN_PROGRESS")
 // ReasonAssistantTurnFailed 表示助理這一輪失敗，用於串流 error 事件的原因（事件在串流內，沒有搭配的 Connect code）。
 var ReasonAssistantTurnFailed = newReason("ASSISTANT_TURN_FAILED")
 
+// ReasonCouponCampaignNotActive 表示優惠券活動不是進行中（尚未發布、已被結束）；搭配 FailedPrecondition。
+var ReasonCouponCampaignNotActive = newReason("COUPON_CAMPAIGN_NOT_ACTIVE")
+
+// ReasonCouponOutsideWindow 表示現在不在優惠券活動的時間窗內；搭配 FailedPrecondition。
+var ReasonCouponOutsideWindow = newReason("COUPON_OUTSIDE_WINDOW")
+
+// ReasonCouponNotEligible 表示買家不符合優惠券活動的資格；搭配 FailedPrecondition。
+var ReasonCouponNotEligible = newReason("COUPON_NOT_ELIGIBLE")
+
+// ReasonCouponStoreSuspended 表示發行優惠券活動的店家停權中；搭配 FailedPrecondition。
+var ReasonCouponStoreSuspended = newReason("COUPON_STORE_SUSPENDED")
+
+// ReasonCouponIssueLimitReached 表示優惠券活動已經領完；搭配 FailedPrecondition。
+var ReasonCouponIssueLimitReached = newReason("COUPON_ISSUE_LIMIT_REACHED")
+
+// ReasonCouponQuotaExceeded 表示店家同時進行的優惠券活動數已達上限；搭配 FailedPrecondition。
+var ReasonCouponQuotaExceeded = newReason("COUPON_QUOTA_EXCEEDED")
+
 // FieldViolation 是一個輸入欄位的錯誤。Field 是模組輸入的欄位名（Go 的欄位名，巢狀以 . 連接、
 // 索引寫成 [n]），例如 Title、Action.Target、Ingredients[2].Name；對應到請求的路徑是傳輸層的事
 // （ADR 2026-09-25-api-error-model D4）。Message 給使用者看。

@@ -18,7 +18,6 @@ import (
 
 	adminsellerpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/seller/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
@@ -191,7 +190,7 @@ func TestUpdateProspectThroughTheWireWithImageUploads(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantLogo := "https://media.example.test/i/{preset}/" + media.RefTypeSellerProspectLogo + "/tok-logo"
+	wantLogo := "https://media.example.test/i/{preset}/public/tok-logo"
 	if withLogo.GetLogoImage().GetUriTemplate() != wantLogo || withLogo.GetLogoSourceUrl() != "https://source.example.com/logo" || withLogo.GetCoverImage() != nil ||
 		withLogo.GetDisplayName() != "乙商行（新）" || withLogo.GetRegion() != "宜蘭" || withLogo.GetCategory() != "" || withLogo.GetEtag() == a.GetEtag() ||
 		withLogo.GetLogoUpload() != nil || len(withLogo.GetContacts()) != 1 {

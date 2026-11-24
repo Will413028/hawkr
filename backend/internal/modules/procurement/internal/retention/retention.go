@@ -34,14 +34,20 @@ var steps = []step{
 	{"對話", []string{"conversations"}, func(ctx context.Context, q *store.Queries, b int64) (int64, error) {
 		return q.DeleteBuyerConversations(ctx, b)
 	}},
-	{"候選集", []string{"candidate_sets"}, func(ctx context.Context, q *store.Queries, b int64) (int64, error) {
-		return q.DeleteBuyerCandidateSets(ctx, b)
-	}},
 	{"報價清單", nil, func(ctx context.Context, q *store.Queries, b int64) (int64, error) {
 		return q.DeleteBuyerShortlists(ctx, &b)
 	}},
 	{"未發布的需求", []string{"requests"}, func(ctx context.Context, q *store.Queries, b int64) (int64, error) {
 		return q.DeleteUnpublishedBuyerRequests(ctx, &b)
+	}},
+	// 候選集排在未發布的需求之後：沒發布過的核准已隨需求刪除，剩下被核准引用的候選集保留並匿名（approvals.candidate_set_id 是 RESTRICT）。
+	{"候選集", []string{"candidate_sets"}, func(ctx context.Context, q *store.Queries, b int64) (int64, error) {
+		n, err := q.DeleteBuyerCandidateSets(ctx, b)
+		if err != nil {
+			return 0, err
+		}
+		m, err := q.AnonymizeBuyerCandidateSets(ctx, &b)
+		return n + m, err
 	}},
 	{"核准", []string{"rfq_publication_approvals"}, func(ctx context.Context, q *store.Queries, b int64) (int64, error) {
 		return q.AnonymizeBuyerApprovals(ctx, &b)

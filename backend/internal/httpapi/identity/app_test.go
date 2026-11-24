@@ -21,6 +21,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 var appNow = time.Date(2026, 10, 30, 12, 0, 0, 0, time.UTC)
@@ -220,6 +221,27 @@ func TestExchangeIdTokenIssuesAnAppSession(t *testing.T) {
 	}
 	if len(e.m.logins) != 1 || e.m.logins[0].Client != identity.ClientApp || e.m.logins[0].Identity.Subject != "g-1" || e.m.logins[0].PreviousToken != "" {
 		t.Fatalf("logins = %+v", e.m.logins)
+	}
+}
+
+// 登入只在請求真的帶了語系時記成帳號語系；沒帶時 Locale 為空，module 不更新 preferred_locale。
+func TestExchangeIdTokenRecordsOnlyARequestedLocale(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		ctx  context.Context
+		want uitext.Locale
+	}{
+		"帶 en":  {uitext.WithRequestedLocale(t.Context(), uitext.EN), uitext.EN},
+		"只有預設值": {uitext.WithLocale(t.Context(), uitext.ZhTW), ""},
+		"沒有語系":  {t.Context(), ""},
+	} {
+		e := newAppEnv(t)
+		if _, err := e.public.ExchangeIdToken(tc.ctx, exchangeRequest(pb.LoginProvider_LOGIN_PROVIDER_GOOGLE, "good-token", "nonce-1")); err != nil {
+			t.Fatal(err)
+		}
+		if got := e.m.logins[0].Locale; got != tc.want {
+			t.Errorf("%s：Login 的 Locale = %q，預期 %q", name, got, tc.want)
+		}
 	}
 }
 

@@ -78,6 +78,41 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.coupon.v1alpha1.CampaignStatus",
+      "dartClass": "CampaignStatus",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/coupon/v1alpha1/coupon.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.coupon.v1alpha1.DiscountType",
+      "dartClass": "DiscountType",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/coupon/v1alpha1/coupon.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.coupon.v1alpha1.TargetType",
+      "dartClass": "TargetType",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/coupon/v1alpha1/coupon.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.coupon.v1alpha1.VoucherOrigin",
+      "dartClass": "VoucherOrigin",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/coupon/v1alpha1/coupon.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.coupon.v1alpha1.VoucherStatus",
+      "dartClass": "VoucherStatus",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/coupon/v1alpha1/coupon.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.crm.v1alpha1.CustomerSort",
       "dartClass": "CustomerSort",
       "dartLibrary": "package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.pbenum.dart",
@@ -134,6 +169,20 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.media.v1alpha1.RejectReason",
+      "dartClass": "RejectReason",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/media/v1alpha1/media.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.media.v1alpha1.UploadState",
+      "dartClass": "UploadState",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/media/v1alpha1/media.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.moderation.v1alpha1.ReportOutcome",
       "dartClass": "ReportOutcome",
       "dartLibrary": "package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart",
@@ -172,14 +221,14 @@
       "name": "hawkr.notification.v1alpha1.NotificationCategory",
       "dartClass": "NotificationCategory",
       "dartLibrary": "package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pbenum.dart",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {
       "name": "hawkr.notification.v1alpha1.NotificationChannel",
       "dartClass": "NotificationChannel",
       "dartLibrary": "package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pbenum.dart",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {
@@ -264,13 +313,6 @@
       "dartClass": "RequirementCollection",
       "dartLibrary": "package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart",
       "inCatalog": true,
-      "serverOwned": false
-    },
-    {
-      "name": "hawkr.procurement.v1alpha1.AudienceMode",
-      "dartClass": "AudienceMode",
-      "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",
-      "inCatalog": false,
       "serverOwned": false
     },
     {

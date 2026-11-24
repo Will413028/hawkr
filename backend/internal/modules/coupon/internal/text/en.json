@@ -12,6 +12,9 @@
     "invalid.buyer_id_invalid": {
       "message": "The buyer is not valid"
     },
+    "invalid.buyer_not_found": {
+      "message": "The buyer does not exist"
+    },
     "invalid.buyer_store_issuer_invalid": {
       "message": "The buyer, store or issuer is not valid"
     },
@@ -81,8 +84,14 @@
     "invalid.source_other_buyer": {
       "message": "This compensation source was already issued to another buyer"
     },
+    "invalid.store_closed": {
+      "message": "The store is closed, so a campaign limited to it cannot be created"
+    },
     "invalid.store_invalid": {
       "message": "The store is not valid"
+    },
+    "invalid.store_not_found": {
+      "message": "The store does not exist"
     },
     "invalid.store_or_target_invalid": {
       "message": "The store or target list is not valid"

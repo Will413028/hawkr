@@ -27,17 +27,18 @@ const backgroundConnectProcedures = {
   '/hawkr.buyer.v1alpha1.BuyerAppService/ClearVisits',
   // 進入對話與收到訊息時自動標記已讀。
   '/hawkr.chat.v1alpha1.ChatAppService/MarkConversationRead',
+  // 開啟通知自動標記已讀（全部已讀是使用者點的，不在這裡）。
+  '/hawkr.notification.v1alpha1.NotificationAppService/MarkInboxItemRead',
+  // 推播裝置 token 的註冊與註銷。
+  '/hawkr.notification.v1alpha1.NotificationAppService/RegisterDeviceToken',
+  '/hawkr.notification.v1alpha1.NotificationAppService/DeleteDeviceToken',
 };
 
 bool isBackgroundConnectProcedure(String procedure) =>
     backgroundConnectProcedures.contains(procedure);
 
-/// 背景的 REST 寫入，依 HTTP method 與路徑（不含 host 與 query）。推播裝置 token 的註冊與註銷不在這裡：
-/// 它們靜默是因為 registrar 自己吞掉非 2xx（`lib/features/notification/data/push/device_registrar.dart`），沒有任何分類器看得到。
-final _backgroundRestWrites = <({String method, RegExp path})>[
-  // 開啟通知自動標記已讀（read-all 是使用者點的，不在這裡）。
-  (method: 'PATCH', path: RegExp(r'/app/notifications/\d+/read/?$')),
-];
+/// 背景的 REST 寫入，依 HTTP method 與路徑（不含 host 與 query）。目前沒有：舊的通知路由已改走 Connect。
+final _backgroundRestWrites = <({String method, RegExp path})>[];
 
 bool isBackgroundRestWrite(RequestOptions options) {
   final method = options.method.toUpperCase();

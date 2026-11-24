@@ -92,6 +92,15 @@
       "CUSTOMER_TYPE_VIP": "VIP"
     }
   },
+  "media": {
+    "RejectReason": {
+      "REJECT_REASON_CHECKSUM_MISMATCH": "The file was corrupted during upload. Please upload it again.",
+      "REJECT_REASON_EXPIRED": "The upload timed out. Please upload it again.",
+      "REJECT_REASON_PROCESSING_FAILED": "The file could not be processed. Try a different image.",
+      "REJECT_REASON_SIZE_MISMATCH": "The file size does not match what was declared. Please upload it again.",
+      "REJECT_REASON_UNRECOGNIZED_FORMAT": "The file format was not recognized. Use a JPEG, PNG, WebP or GIF image."
+    }
+  },
   "moderation": {
     "CommunityReport": {
       "outcome_unset": "Under review"
@@ -108,6 +117,30 @@
       "REPORT_TARGET_KIND_POST": "Post",
       "REPORT_TARGET_KIND_REVIEW": "Review",
       "REPORT_TARGET_KIND_REVIEW_REPLY": "Review reply"
+    }
+  },
+  "notification": {
+    "NotificationCategory": {
+      "NOTIFICATION_CATEGORY_ACCOUNT": "Account and policy",
+      "NOTIFICATION_CATEGORY_AFTERSALES": "Refunds and after-sales",
+      "NOTIFICATION_CATEGORY_ANNOUNCEMENT": "Announcements",
+      "NOTIFICATION_CATEGORY_CHAT": "Chat",
+      "NOTIFICATION_CATEGORY_COMMENT": "Comments",
+      "NOTIFICATION_CATEGORY_COUPON": "Coupons",
+      "NOTIFICATION_CATEGORY_FOLLOW": "New followers",
+      "NOTIFICATION_CATEGORY_FOLLOWED_STORE_POST": "Posts from stores you follow",
+      "NOTIFICATION_CATEGORY_LIKE": "Likes",
+      "NOTIFICATION_CATEGORY_ORDER": "Orders",
+      "NOTIFICATION_CATEGORY_PAYOUT": "Payouts",
+      "NOTIFICATION_CATEGORY_RESTOCK": "Back in stock",
+      "NOTIFICATION_CATEGORY_REVIEW": "Reviews",
+      "NOTIFICATION_CATEGORY_SHIPMENT": "Shipping",
+      "NOTIFICATION_CATEGORY_SHIPMENT_ANOMALY": "Delivery issues"
+    },
+    "NotificationChannel": {
+      "NOTIFICATION_CHANNEL_EMAIL": "Email",
+      "NOTIFICATION_CHANNEL_INBOX": "Inbox",
+      "NOTIFICATION_CHANNEL_PUSH": "Push"
     }
   },
   "payment": {

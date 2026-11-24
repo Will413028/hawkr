@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strconv"
 	"sync"
 	"testing"
@@ -158,6 +159,32 @@ func TestWatchMapsInboxAndSellerWorkspaceSignals(t *testing.T) {
 	defer fs.mu.Unlock()
 	if len(fs.params) != 1 || fs.params[0] != (notification.WatchParams{AccountID: account, Audience: notification.AudienceStore, StoreID: storeIDOfAcc}) {
 		t.Errorf("訂閱條件 = %+v", fs.params)
+	}
+}
+
+func TestWatchMapsNewItemIDsAndTruncation(t *testing.T) {
+	fs := newFake()
+	c := setupStream(t, fs, time.Minute)
+	a := uuid.MustParse("44444444-4444-4444-8444-444444444444")
+	b := uuid.MustParse("55555555-5555-4555-8555-555555555555")
+	fs.watcher.events <- notification.StreamEvent{Inbox: &notification.InboxSignal{UnreadCount: 2, NewItemIDs: []uuid.UUID{a, b}}}
+	fs.watcher.events <- notification.StreamEvent{Inbox: &notification.InboxSignal{UnreadCount: 30, NewItemsTruncated: true}}
+	st, err := watch(t, c, noStoreAcct, pb.NotificationAudience_NOTIFICATION_AUDIENCE_BUYER)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = st.Close() }()
+	if !st.Receive() {
+		t.Fatalf("串流提早結束：%v", st.Err())
+	}
+	if in := st.Msg().GetInbox(); !slices.Equal(in.GetNewInboxItemIds(), []string{a.String(), b.String()}) || in.GetNewItemsTruncated() {
+		t.Errorf("新通知 ID 應依序對映：%v", in)
+	}
+	if !st.Receive() {
+		t.Fatalf("串流提早結束：%v", st.Err())
+	}
+	if in := st.Msg().GetInbox(); len(in.GetNewInboxItemIds()) != 0 || !in.GetNewItemsTruncated() {
+		t.Errorf("truncated 應對映且不帶 ID：%v", in)
 	}
 }
 

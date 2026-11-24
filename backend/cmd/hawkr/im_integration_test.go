@@ -75,7 +75,7 @@ func TestIMDeletionTimingSubscribesOnlyToBuyerDeleted(t *testing.T) {
 	bus := events.NewBus()
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	fakeMedia := media.NewFake()
-	owner := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: queue, Media: fakeMedia, Now: time.Now, Logger: log})
+	owner := buyer.New(buyer.Deps{DB: d, Events: bus, Media: fakeMedia, Now: time.Now, Logger: log})
 	m := newIM(d, bus, queue, imTestBuyers{owner: owner}, imTestStores{}, fakeMedia, imNoOrders{}, log)
 	if err := owner.OnAccountCreated(ctx, identity.AccountCreated{AccountID: 7001, Name: "買家"}); err != nil {
 		t.Fatal(err)

@@ -264,21 +264,6 @@ final $typed_data.Uint8List blockKindDescriptor = $convert.base64Decode(
     'QUxFEAMSFgoSQkxPQ0tfS0lORF9XQVJOSU5HEAQSGAoUQkxPQ0tfS0lORF9ORVhUX1NURVAQBR'
     'IXChNCTE9DS19LSU5EX0NPTVBMRVRFEAY=');
 
-@$core.Deprecated('Use audienceModeDescriptor instead')
-const AudienceMode$json = {
-  '1': 'AudienceMode',
-  '2': [
-    {'1': 'AUDIENCE_MODE_UNSPECIFIED', '2': 0},
-    {'1': 'AUDIENCE_MODE_WISH_POOL', '2': 1},
-    {'1': 'AUDIENCE_MODE_DIRECT_RECIPIENTS', '2': 2},
-  ],
-};
-
-/// Descriptor for `AudienceMode`. Decode as a `google.protobuf.EnumDescriptorProto`.
-final $typed_data.Uint8List audienceModeDescriptor = $convert.base64Decode(
-    'CgxBdWRpZW5jZU1vZGUSHQoZQVVESUVOQ0VfTU9ERV9VTlNQRUNJRklFRBAAEhsKF0FVRElFTk'
-    'NFX01PREVfV0lTSF9QT09MEAESIwofQVVESUVOQ0VfTU9ERV9ESVJFQ1RfUkVDSVBJRU5UUxAC');
-
 @$core.Deprecated('Use publicationStateDescriptor instead')
 const PublicationState$json = {
   '1': 'PublicationState',
@@ -1904,25 +1889,24 @@ const PreviewRfqPublicationRequest$json = {
     },
     {'1': 'buyer_note', '3': 5, '4': 1, '5': 9, '10': 'buyerNote'},
     {
-      '1': 'audience_mode',
+      '1': 'candidate_set_id',
       '3': 6,
       '4': 1,
-      '5': 14,
-      '6': '.hawkr.procurement.v1alpha1.AudienceMode',
+      '5': 9,
       '8': {},
-      '10': 'audienceMode'
+      '10': 'candidateSetId'
     },
-    {'1': 'candidate_set_id', '3': 7, '4': 1, '5': 9, '10': 'candidateSetId'},
     {
       '1': 'selected_candidate_ids',
-      '3': 8,
+      '3': 7,
       '4': 3,
       '5': 9,
+      '8': {},
       '10': 'selectedCandidateIds'
     },
     {
       '1': 'response_deadline',
-      '3': 9,
+      '3': 8,
       '4': 1,
       '5': 11,
       '6': '.google.type.Date',
@@ -1943,12 +1927,11 @@ final $typed_data.Uint8List previewRfqPublicationRequestDescriptor = $convert.ba
     'ZW50UmVxdWVzdElkEjUKFGV4cGVjdGVkX3JldmlzaW9uX2lkGAMgASgJQgPgQQJSEmV4cGVjdG'
     'VkUmV2aXNpb25JZBJoChVidXllcl9yZXF1ZXN0ZWRfcmFuZ2UYBCABKAsyLy5oYXdrci5wcm9j'
     'dXJlbWVudC52MWFscGhhMS5CdXllclJlcXVlc3RlZFJhbmdlQgPgQQJSE2J1eWVyUmVxdWVzdG'
-    'VkUmFuZ2USHQoKYnV5ZXJfbm90ZRgFIAEoCVIJYnV5ZXJOb3RlElIKDWF1ZGllbmNlX21vZGUY'
-    'BiABKA4yKC5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5BdWRpZW5jZU1vZGVCA+BBAlIMYX'
-    'VkaWVuY2VNb2RlEigKEGNhbmRpZGF0ZV9zZXRfaWQYByABKAlSDmNhbmRpZGF0ZVNldElkEjQK'
-    'FnNlbGVjdGVkX2NhbmRpZGF0ZV9pZHMYCCADKAlSFHNlbGVjdGVkQ2FuZGlkYXRlSWRzEkMKEX'
-    'Jlc3BvbnNlX2RlYWRsaW5lGAkgASgLMhEuZ29vZ2xlLnR5cGUuRGF0ZUgAUhByZXNwb25zZURl'
-    'YWRsaW5liAEBQhQKEl9yZXNwb25zZV9kZWFkbGluZQ==');
+    'VkUmFuZ2USHQoKYnV5ZXJfbm90ZRgFIAEoCVIJYnV5ZXJOb3RlEi0KEGNhbmRpZGF0ZV9zZXRf'
+    'aWQYBiABKAlCA+BBAlIOY2FuZGlkYXRlU2V0SWQSOQoWc2VsZWN0ZWRfY2FuZGlkYXRlX2lkcx'
+    'gHIAMoCUID4EECUhRzZWxlY3RlZENhbmRpZGF0ZUlkcxJDChFyZXNwb25zZV9kZWFkbGluZRgI'
+    'IAEoCzIRLmdvb2dsZS50eXBlLkRhdGVIAFIQcmVzcG9uc2VEZWFkbGluZYgBAUIUChJfcmVzcG'
+    '9uc2VfZGVhZGxpbmU=');
 
 @$core.Deprecated('Use previewRfqPublicationResponseDescriptor instead')
 const PreviewRfqPublicationResponse$json = {
@@ -1980,29 +1963,7 @@ const PreviewRfqPublicationResponse$json = {
       '6': '.google.protobuf.Timestamp',
       '10': 'expireTime'
     },
-    {
-      '1': 'audience_policy_id',
-      '3': 7,
-      '4': 1,
-      '5': 9,
-      '9': 0,
-      '10': 'audiencePolicyId',
-      '17': true
-    },
-    {
-      '1': 'audience_policy_version',
-      '3': 8,
-      '4': 1,
-      '5': 5,
-      '9': 1,
-      '10': 'audiencePolicyVersion',
-      '17': true
-    },
-    {'1': 'recipient_count', '3': 9, '4': 1, '5': 5, '10': 'recipientCount'},
-  ],
-  '8': [
-    {'1': '_audience_policy_id'},
-    {'1': '_audience_policy_version'},
+    {'1': 'recipient_count', '3': 7, '4': 1, '5': 5, '10': 'recipientCount'},
   ],
 };
 
@@ -2014,11 +1975,8 @@ final $typed_data.Uint8List previewRfqPublicationResponseDescriptor = $convert.b
     '9hZF9oYXNoGAQgASgJUhdzZWxsZXJGYWNpbmdQYXlsb2FkSGFzaBJfChVzZWxsZXJfZmFjaW5n'
     'X3BheWxvYWQYBSABKAsyKy5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5TZWxsZXJGYWNpbm'
     'dSZnFSE3NlbGxlckZhY2luZ1BheWxvYWQSOwoLZXhwaXJlX3RpbWUYBiABKAsyGi5nb29nbGUu'
-    'cHJvdG9idWYuVGltZXN0YW1wUgpleHBpcmVUaW1lEjEKEmF1ZGllbmNlX3BvbGljeV9pZBgHIA'
-    'EoCUgAUhBhdWRpZW5jZVBvbGljeUlkiAEBEjsKF2F1ZGllbmNlX3BvbGljeV92ZXJzaW9uGAgg'
-    'ASgFSAFSFWF1ZGllbmNlUG9saWN5VmVyc2lvbogBARInCg9yZWNpcGllbnRfY291bnQYCSABKA'
-    'VSDnJlY2lwaWVudENvdW50QhUKE19hdWRpZW5jZV9wb2xpY3lfaWRCGgoYX2F1ZGllbmNlX3Bv'
-    'bGljeV92ZXJzaW9u');
+    'cHJvdG9idWYuVGltZXN0YW1wUgpleHBpcmVUaW1lEicKD3JlY2lwaWVudF9jb3VudBgHIAEoBV'
+    'IOcmVjaXBpZW50Q291bnQ=');
 
 @$core.Deprecated('Use executeRfqPublicationRequestDescriptor instead')
 const ExecuteRfqPublicationRequest$json = {
@@ -2083,31 +2041,23 @@ const ExecuteRfqPublicationResponse$json = {
       '6': '.hawkr.procurement.v1alpha1.PublicationState',
       '10': 'state'
     },
-    {
-      '1': 'audience_mode',
-      '3': 4,
-      '4': 1,
-      '5': 14,
-      '6': '.hawkr.procurement.v1alpha1.AudienceMode',
-      '10': 'audienceMode'
-    },
-    {'1': 'audience_hash', '3': 5, '4': 1, '5': 9, '10': 'audienceHash'},
+    {'1': 'audience_hash', '3': 4, '4': 1, '5': 9, '10': 'audienceHash'},
     {
       '1': 'seller_facing_payload_hash',
-      '3': 6,
+      '3': 5,
       '4': 1,
       '5': 9,
       '10': 'sellerFacingPayloadHash'
     },
     {
       '1': 'publish_time',
-      '3': 7,
+      '3': 6,
       '4': 1,
       '5': 11,
       '6': '.google.protobuf.Timestamp',
       '10': 'publishTime'
     },
-    {'1': 'replayed', '3': 8, '4': 1, '5': 8, '10': 'replayed'},
+    {'1': 'replayed', '3': 7, '4': 1, '5': 8, '10': 'replayed'},
   ],
 };
 
@@ -2116,12 +2066,10 @@ final $typed_data.Uint8List executeRfqPublicationResponseDescriptor = $convert.b
     'Ch1FeGVjdXRlUmZxUHVibGljYXRpb25SZXNwb25zZRIlCg5wdWJsaWNhdGlvbl9pZBgBIAEoCV'
     'INcHVibGljYXRpb25JZBIvChNwdWJsaWNhdGlvbl92ZXJzaW9uGAIgASgJUhJwdWJsaWNhdGlv'
     'blZlcnNpb24SQgoFc3RhdGUYAyABKA4yLC5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5QdW'
-    'JsaWNhdGlvblN0YXRlUgVzdGF0ZRJNCg1hdWRpZW5jZV9tb2RlGAQgASgOMiguaGF3a3IucHJv'
-    'Y3VyZW1lbnQudjFhbHBoYTEuQXVkaWVuY2VNb2RlUgxhdWRpZW5jZU1vZGUSIwoNYXVkaWVuY2'
-    'VfaGFzaBgFIAEoCVIMYXVkaWVuY2VIYXNoEjsKGnNlbGxlcl9mYWNpbmdfcGF5bG9hZF9oYXNo'
-    'GAYgASgJUhdzZWxsZXJGYWNpbmdQYXlsb2FkSGFzaBI9CgxwdWJsaXNoX3RpbWUYByABKAsyGi'
-    '5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wUgtwdWJsaXNoVGltZRIaCghyZXBsYXllZBgIIAEo'
-    'CFIIcmVwbGF5ZWQ=');
+    'JsaWNhdGlvblN0YXRlUgVzdGF0ZRIjCg1hdWRpZW5jZV9oYXNoGAQgASgJUgxhdWRpZW5jZUhh'
+    'c2gSOwoac2VsbGVyX2ZhY2luZ19wYXlsb2FkX2hhc2gYBSABKAlSF3NlbGxlckZhY2luZ1BheW'
+    'xvYWRIYXNoEj0KDHB1Ymxpc2hfdGltZRgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3Rh'
+    'bXBSC3B1Ymxpc2hUaW1lEhoKCHJlcGxheWVkGAcgASgIUghyZXBsYXllZA==');
 
 @$core.Deprecated('Use listConversationsRequestDescriptor instead')
 const ListConversationsRequest$json = {
@@ -2399,15 +2347,7 @@ const SellerQuote$json = {
       '8': {},
       '10': 'responseType'
     },
-    {
-      '1': 'offered_quality',
-      '3': 2,
-      '4': 1,
-      '5': 11,
-      '6': '.hawkr.procurement.v1alpha1.OfferedQuality',
-      '8': {},
-      '10': 'offeredQuality'
-    },
+    {'1': 'spec_note', '3': 2, '4': 1, '5': 9, '10': 'specNote'},
     {
       '1': 'unit_basis',
       '3': 3,
@@ -2468,36 +2408,21 @@ const SellerQuote$json = {
 /// Descriptor for `SellerQuote`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List sellerQuoteDescriptor = $convert.base64Decode(
     'CgtTZWxsZXJRdW90ZRJYCg1yZXNwb25zZV90eXBlGAEgASgOMi4uaGF3a3IucHJvY3VyZW1lbn'
-    'QudjFhbHBoYTEuU2VsbGVyUmVzcG9uc2VUeXBlQgPgQQJSDHJlc3BvbnNlVHlwZRJYCg9vZmZl'
-    'cmVkX3F1YWxpdHkYAiABKAsyKi5oYXdrci5wcm9jdXJlbWVudC52MWFscGhhMS5PZmZlcmVkUX'
-    'VhbGl0eUID4EECUg5vZmZlcmVkUXVhbGl0eRJECgp1bml0X2Jhc2lzGAMgASgLMiUuaGF3a3Iu'
-    'cHJvY3VyZW1lbnQudjFhbHBoYTEuVW5pdEJhc2lzUgl1bml0QmFzaXMSKQoQb2ZmZXJlZF9xdW'
-    'FudGl0eRgEIAEoCVIPb2ZmZXJlZFF1YW50aXR5EjIKFW9mZmVyZWRfcXVhbnRpdHlfdW5pdBgF'
-    'IAEoCVITb2ZmZXJlZFF1YW50aXR5VW5pdBIpChBjb252ZXJzaW9uX2Jhc2lzGAYgASgJUg9jb2'
-    '52ZXJzaW9uQmFzaXMSIQoMZ29vZHNfYW1vdW50GAcgASgDUgtnb29kc0Ftb3VudBInCg9zaGlw'
-    'cGluZ19hbW91bnQYCCABKANSDnNoaXBwaW5nQW1vdW50Eh0KCnRheF9hbW91bnQYCSABKANSCX'
-    'RheEFtb3VudBJdChN0YXhfaW5jbHVzaW9uX2Jhc2lzGAogASgOMi0uaGF3a3IucHJvY3VyZW1l'
-    'bnQudjFhbHBoYTEuVGF4SW5jbHVzaW9uQmFzaXNSEXRheEluY2x1c2lvbkJhc2lzEiEKDHRvdG'
-    'FsX2Ftb3VudBgLIAEoA1ILdG90YWxBbW91bnQSJAoObGVhZF90aW1lX2RheXMYDCABKAVSDGxl'
-    'YWRUaW1lRGF5cxJQChZwcm9taXNlZF9kZWxpdmVyeV90aW1lGA0gASgLMhouZ29vZ2xlLnByb3'
-    'RvYnVmLlRpbWVzdGFtcFIUcHJvbWlzZWREZWxpdmVyeVRpbWUSRAoQdmFsaWRfdW50aWxfdGlt'
-    'ZRgOIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBSDnZhbGlkVW50aWxUaW1lEh0KCn'
-    'Rlcm1zX25vdGUYDyABKAlSCXRlcm1zTm90ZRIxChRkZXZpYXRpb25fZGlzY2xvc3VyZRgQIAEo'
-    'CVITZGV2aWF0aW9uRGlzY2xvc3VyZQ==');
-
-@$core.Deprecated('Use offeredQualityDescriptor instead')
-const OfferedQuality$json = {
-  '1': 'OfferedQuality',
-  '2': [
-    {'1': 'grade', '3': 1, '4': 1, '5': 9, '10': 'grade'},
-    {'1': 'inspection_notes', '3': 2, '4': 1, '5': 9, '10': 'inspectionNotes'},
-  ],
-};
-
-/// Descriptor for `OfferedQuality`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List offeredQualityDescriptor = $convert.base64Decode(
-    'Cg5PZmZlcmVkUXVhbGl0eRIUCgVncmFkZRgBIAEoCVIFZ3JhZGUSKQoQaW5zcGVjdGlvbl9ub3'
-    'RlcxgCIAEoCVIPaW5zcGVjdGlvbk5vdGVz');
+    'QudjFhbHBoYTEuU2VsbGVyUmVzcG9uc2VUeXBlQgPgQQJSDHJlc3BvbnNlVHlwZRIbCglzcGVj'
+    'X25vdGUYAiABKAlSCHNwZWNOb3RlEkQKCnVuaXRfYmFzaXMYAyABKAsyJS5oYXdrci5wcm9jdX'
+    'JlbWVudC52MWFscGhhMS5Vbml0QmFzaXNSCXVuaXRCYXNpcxIpChBvZmZlcmVkX3F1YW50aXR5'
+    'GAQgASgJUg9vZmZlcmVkUXVhbnRpdHkSMgoVb2ZmZXJlZF9xdWFudGl0eV91bml0GAUgASgJUh'
+    'NvZmZlcmVkUXVhbnRpdHlVbml0EikKEGNvbnZlcnNpb25fYmFzaXMYBiABKAlSD2NvbnZlcnNp'
+    'b25CYXNpcxIhCgxnb29kc19hbW91bnQYByABKANSC2dvb2RzQW1vdW50EicKD3NoaXBwaW5nX2'
+    'Ftb3VudBgIIAEoA1IOc2hpcHBpbmdBbW91bnQSHQoKdGF4X2Ftb3VudBgJIAEoA1IJdGF4QW1v'
+    'dW50El0KE3RheF9pbmNsdXNpb25fYmFzaXMYCiABKA4yLS5oYXdrci5wcm9jdXJlbWVudC52MW'
+    'FscGhhMS5UYXhJbmNsdXNpb25CYXNpc1IRdGF4SW5jbHVzaW9uQmFzaXMSIQoMdG90YWxfYW1v'
+    'dW50GAsgASgDUgt0b3RhbEFtb3VudBIkCg5sZWFkX3RpbWVfZGF5cxgMIAEoBVIMbGVhZFRpbW'
+    'VEYXlzElAKFnByb21pc2VkX2RlbGl2ZXJ5X3RpbWUYDSABKAsyGi5nb29nbGUucHJvdG9idWYu'
+    'VGltZXN0YW1wUhRwcm9taXNlZERlbGl2ZXJ5VGltZRJEChB2YWxpZF91bnRpbF90aW1lGA4gAS'
+    'gLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcFIOdmFsaWRVbnRpbFRpbWUSHQoKdGVybXNf'
+    'bm90ZRgPIAEoCVIJdGVybXNOb3RlEjEKFGRldmlhdGlvbl9kaXNjbG9zdXJlGBAgASgJUhNkZX'
+    'ZpYXRpb25EaXNjbG9zdXJl');
 
 @$core.Deprecated('Use unitBasisDescriptor instead')
 const UnitBasis$json = {
@@ -4154,7 +4079,6 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.procurement.v1alpha1.BuyerFacingSellerResponse':
       BuyerFacingSellerResponse$json,
   '.hawkr.procurement.v1alpha1.SellerQuote': SellerQuote$json,
-  '.hawkr.procurement.v1alpha1.OfferedQuality': OfferedQuality$json,
   '.hawkr.procurement.v1alpha1.UnitBasis': UnitBasis$json,
   '.hawkr.procurement.v1alpha1.PutShortlistEntryRequest':
       PutShortlistEntryRequest$json,
@@ -4309,7 +4233,6 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
       GetSellerPublicationResponse$json,
   '.hawkr.procurement.v1alpha1.SellerResponseDraft': SellerResponseDraft$json,
   '.hawkr.procurement.v1alpha1.SellerQuote': SellerQuote$json,
-  '.hawkr.procurement.v1alpha1.OfferedQuality': OfferedQuality$json,
   '.hawkr.procurement.v1alpha1.UnitBasis': UnitBasis$json,
   '.hawkr.procurement.v1alpha1.SellerResponseVersion':
       SellerResponseVersion$json,

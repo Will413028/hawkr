@@ -191,7 +191,7 @@ func setup(t *testing.T) *fixture {
 	q := &queue{}
 	bus := events.NewBus()
 	now := func() time.Time { return epoch.Add(time.Duration(tick.Add(1)) * time.Second) }
-	owner := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: q, Media: media.NewFake(), Now: now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	owner := buyer.New(buyer.Deps{DB: d, Events: bus, Media: media.NewFake(), Now: now, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	id := identity.New(identity.Deps{DB: d, Events: bus, Now: now, Logger: log})
 	sl := seller.New(seller.Deps{KYCMAC: sealtest.MAC(t), DB: d, Events: bus, Jobs: q, Identity: id, Media: media.NewFake(), Orders: noOrders{}, ProductStores: noProducts{}, Registry: noRegistry{}, Now: now, Logger: log,

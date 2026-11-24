@@ -3,7 +3,6 @@ package seller
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"slices"
 	"strings"
 	"time"
@@ -54,12 +53,6 @@ var (
 	submitKYCPaths = kycSubmitPaths()
 	cancelKYCPaths = rpc.FieldPaths{"ExpectedVersion": "etag", "Reason": "reason"}
 )
-
-// secureDownloadURI 是申請證件的下載網址：目前是 gateway 的有授權下載（owner 驗證，只有上傳者能下載）；證件圖片的
-// media 引用改到業務列之後（B1）換成新的下載方式時只改這裡。
-func secureDownloadURI(assetID string) string {
-	return "/api/v1/app/media/secure_download/" + url.PathEscape(assetID)
-}
 
 func (h *App) SaveKYCDraft(ctx context.Context, req *connect.Request[pb.SaveKYCDraftRequest]) (*connect.Response[pb.SaveKYCDraftResponse], error) {
 	current, err := storeFrom(ctx)
@@ -260,7 +253,7 @@ func toKYC(ctx context.Context, a model.KYCApplication) *pb.KYCApplication {
 	}
 	slices.Sort(out.MissingStoreFields)
 	for _, d := range a.Documents {
-		doc := &pb.KYCDocument{AssetId: d.AssetID, DownloadUri: secureDownloadURI(d.AssetID)}
+		doc := &pb.KYCDocument{AssetId: d.AssetID, DownloadUri: ownDocumentURI(d.Position)}
 		if business := out.GetBusiness(); business != nil {
 			business.CompanyDocuments = append(business.CompanyDocuments, doc)
 		}

@@ -2,11 +2,11 @@
 
 ## 職責
 
-站內通知的收件匣、偏好、裝置 token、投遞紀錄與通知型別註冊表，取代 `services/notification-service`（遷移計畫 A8）。來源模組在自己的 transaction 內只排一個通知意圖 job；worker 解析收件人、套偏好、寫收件匣與投遞紀錄，每筆新投遞紀錄同 transaction 排 `notification.deliver` job（不送出）。已建：資料模型、型別註冊表、意圖管線、保留期與個資清除、後台公告；其餘對外方法、渠道 adapter 隨之後的步驟加入。行為規格的唯一來源是 `backend/docs/plans/2026-11-23-a8-notification.md`（D0–D18）與 ADR `docs/adr/2026-10-05-notification-module.md`。
+站內通知的收件匣、偏好、裝置 token、投遞紀錄與通知型別註冊表，取代 `services/notification-service`（遷移計畫 A8）。來源模組在自己的 transaction 內只排一個通知意圖 job；worker 解析收件人、套偏好、寫收件匣與投遞紀錄，每筆新投遞紀錄同 transaction 排 `notification.deliver` job（不送出）。已建：資料模型、註冊表、意圖管線、保留期與個資清除、公告、渠道 job（`internal/deliver`）、suppression webhook（`internal/suppress`）、token 清除。行為規格的唯一來源是 `backend/docs/plans/2026-11-23-a8-notification.md`（D0–D18）與 ADR `docs/adr/2026-10-05-notification-module.md`。
 
 ## 擁有的資料
 
-schema `notification`（`db/schema.sql`）：`intents`（意圖，冪等鍵 UNIQUE）、`inbox_items`（收件匣列）、`deliveries`（推播與 email 的投遞紀錄）、`device_tokens`、`preference_overrides`、`announcements`（後台公告）；suppression 表隨 A8-3 建。讀取模型：無。
+schema `notification`（`db/schema.sql`）：`intents`（意圖，冪等鍵 UNIQUE）、`inbox_items`（收件匣列）、`deliveries`（推播與 email 的投遞紀錄）、`device_tokens`、`preference_overrides`、`announcements`（後台公告）；`email_suppressions`（只存位址 HMAC）。
 
 ## 發布的讀取介面
 
@@ -17,7 +17,7 @@ schema `notification`（`db/schema.sql`）：`intents`（意圖，冪等鍵 UNIQ
 ## 模組內部結構
 
 - 根套件只保留 `Module`、`New`、`Migrations`、五個訂閱者入口（`On*`）、`AddWorkers` 與 `PeriodicJobs`；組裝在 `cmd/hawkr/notification.go`（serve 與 worker 都建並訂閱）。
-- `internal/intake`：意圖管線。`subscribers.go` 的同步訂閱者只呼叫 `Accept`（插 `intents` 列並排 `notification.process_intent` job）；`Process`（worker）在 transaction 外讀意圖、解析收件人、略過 actor 是收件人自己的意圖，再開 transaction：先 `identity.ShareLockAccount` 鎖收件帳號列、確認未刪除（已刪除或不存在就不寫），再依受眾以 `FOR KEY SHARE` 鎖買家列或店家列、已關閉或已退場就略過；略過時同 transaction 把該意圖參數換成 `'{}'`（D16），最後套偏好、寫收件匣與投遞紀錄並 `pg_notify`。
+- `internal/intake`：意圖管線與 fan-out；`subscribers.go` 的同步訂閱者只呼叫 `Accept`（插 `intents` 列並排 `notification.process_intent` job），`Process`（worker）解析收件人、鎖收件人、略過封鎖與自己、套偏好、寫收件匣與投遞紀錄；不變量見 `internal/intake/AGENTS.md`。
 - `internal/stream`：串流 hub；不變量見 `internal/stream/AGENTS.md`。
 - `internal/purge`：保留期清除與個資清除；不變量見 `internal/purge/AGENTS.md`。
 - `internal/announce`：後台公告與派送 job 鏈；見其 `AGENTS.md`。
@@ -35,10 +35,10 @@ schema `notification`（`db/schema.sql`）：`intents`（意圖，冪等鍵 UNIQ
 - 已讀、全部已讀、刪除同 transaction `pg_notify`，同收件人的串流訂閱者收到新未讀數。守門：`TestInboxReadAndDeleteSignalTheRecipientsOtherSubscribers`。
 - 依賴方向：notification 依賴來源模組的公開事件型別與讀取 API，來源模組不 import notification。守門：`internal/arch` 的依賴表。
 
-- 意圖冪等鍵＝型別名稱＋事件來源身分（`intents` UNIQUE 加 `ON CONFLICT`）；同步訂閱者只准呼叫 `intake.Accept`，`Accept` 只准插意圖列與排 job（A8-3 的 token 刪除訂閱者登記在 `tokenPurgeSubscribers`）。守門：`TestSameEventTwiceMakesOneIntentAndOneInboxRow`、`TestSynchronousSubscribersOnlyAccept`。
+- 意圖冪等鍵＝型別名稱＋事件來源身分（`intents` UNIQUE 加 `ON CONFLICT`）；同步訂閱者只准呼叫 `intake.Accept`，`Accept` 只准插意圖列與排 job（token 刪除訂閱者登記在 `tokenPurgeSubscribers`）。守門：`TestSameEventTwiceMakesOneIntentAndOneInboxRow`、`TestSynchronousSubscribersOnlyAccept`。
 - worker 的鎖順序是 identity 帳號列、買家列或店家列、notification 的列（`platform/lockorder`）；已刪除、關閉、退場的收件人不寫。守門：`TestIntentProcessedAfterBuyerDeletedOrStoreRetiredCreatesNothing`。
 - 保留期與個資清除（180 天硬刪、三個刪除事件各清自己範圍內的收件人）的規則與守門見 `internal/purge/AGENTS.md`。
-- 投遞紀錄是推播與 email 的唯一帳本，這一步只建 `PENDING` 並排 `notification.deliver` job（job 不送出，A8-3 接 adapter）。見 `CARRYOVER.md`。
+- 投遞紀錄是推播與 email 的唯一帳本：渠道 job 把 `PENDING` 定案為 `SENT` 或 `FAILED_PERMANENT`；規則見 `CARRYOVER.md`「渠道 job 與 token」。
 
 ## 不負責
 

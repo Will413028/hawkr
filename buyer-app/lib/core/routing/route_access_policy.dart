@@ -13,6 +13,7 @@ bool requiresLoginForRoute(String location) {
   if (exact.contains(location)) return true;
 
   const prefixes = [
+    '/account/',
     '/orders',
     '/settings',
     '/wallet',

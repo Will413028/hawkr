@@ -148,7 +148,7 @@ func QuoteOf(v store.ProcurementSellerResponseVersion) (model.SellerQuote, error
 		return model.SellerQuote{}, fmt.Errorf("quote：版本 %s 的報價數量：%w", v.ID, err)
 	}
 	return model.SellerQuote{
-		ResponseType: v.ResponseType, QualityGrade: v.OfferedQualityGrade, InspectionNotes: v.OfferedQualityInspectionNotes,
+		ResponseType: v.ResponseType, SpecNote: v.SpecNote,
 		UnitBasisQuantity: unitBasis, UnitBasisUnit: v.UnitBasisUnit, OfferedQuantity: offered, OfferedQuantityUnit: v.OfferedQuantityUnit,
 		ConversionBasis: v.ConversionBasis, Currency: v.Currency, GoodsAmount: v.GoodsAmount, ShippingAmount: v.ShippingAmount, TaxAmount: v.TaxAmount,
 		TaxInclusionBasis: v.TaxInclusionBasis, TotalAmount: v.TotalAmount, LeadTimeDays: v.LeadTimeDays, PromisedDelivery: v.PromisedDeliveryAt,
@@ -159,7 +159,7 @@ func QuoteOf(v store.ProcurementSellerResponseVersion) (model.SellerQuote, error
 // PayloadHash 回傳一個版本的內容 hash（A9-D36）：報價內容與幣別，不含 ID、版本號與送出時間。
 func PayloadHash(q model.SellerQuote) (string, error) {
 	return rfqhash.SellerResponse(rfqhash.SellerResponseInput{
-		SchemaVersion: rfqhash.SchemaV1, ResponseType: q.ResponseType, QualityGrade: q.QualityGrade, InspectionNotes: q.InspectionNotes,
+		SchemaVersion: rfqhash.SchemaV1, ResponseType: q.ResponseType, SpecNote: q.SpecNote,
 		UnitBasisQuantity: q.UnitBasisQuantity, UnitBasisUnit: q.UnitBasisUnit, OfferedQuantity: q.OfferedQuantity, OfferedQuantityUnit: q.OfferedQuantityUnit,
 		ConversionBasis: q.ConversionBasis, Currency: q.Currency, GoodsAmount: q.GoodsAmount, ShippingAmount: q.ShippingAmount, TaxAmount: q.TaxAmount,
 		TaxInclusionBasis: q.TaxInclusionBasis, TotalAmount: q.TotalAmount, LeadTimeDays: q.LeadTimeDays, PromisedDelivery: q.PromisedDelivery,

@@ -107,6 +107,9 @@ func (s *Service) Login(ctx context.Context, in model.LoginInput) (model.LoginRe
 		return model.LoginResult{}, apperr.InvalidInputOn([]string{"Client"}, "不支援的 client 種類 %q", in.Client)
 	}
 	in.Identity = id
+	if in.Locale != "" && !model.ValidLocale(in.Locale) {
+		return model.LoginResult{}, apperr.InvalidInputOn([]string{"Locale"}, "不支援的語系 %q", in.Locale)
+	}
 	for range maxAttempts {
 		var res model.LoginResult
 		err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
@@ -167,6 +170,11 @@ func (s *Service) login(ctx context.Context, in model.LoginInput) (model.LoginRe
 	if email := verifiedEmail(id); email != nil && !res.Created {
 		if _, err := q.UpdateAccountEmail(ctx, store.UpdateAccountEmailParams{ID: res.AccountID, Email: email, Now: now}); err != nil {
 			return res, fmt.Errorf("identity：更新寄件地址：%w", err)
+		}
+	}
+	if in.Locale != "" {
+		if _, err := q.SetPreferredLocale(ctx, store.SetPreferredLocaleParams{ID: res.AccountID, Locale: string(in.Locale), Now: now}); err != nil {
+			return res, fmt.Errorf("identity：更新語系：%w", err)
 		}
 	}
 	if in.PreviousToken != "" {

@@ -5,7 +5,9 @@ import type { Gender } from "@hawkr/api/gen/hawkr/buyer/v1alpha1/buyer_pb";
 import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy_category_pb";
 import type { StoreCardStatus } from "@hawkr/api/gen/hawkr/common/v1alpha1/store_card_pb";
 import type { CustomerSort, CustomerType } from "@hawkr/api/gen/hawkr/crm/v1alpha1/crm_pb";
+import type { RejectReason } from "@hawkr/api/gen/hawkr/media/v1alpha1/media_pb";
 import type { ReportOutcome, ReportTargetKind } from "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb";
+import type { NotificationCategory, NotificationChannel } from "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb";
 import type { PaymentAccountStatus, PaymentAnomalyKind, PaymentAnomalyOutcome, PaymentRefundStatus, PaymentReversalStatus, PaymentStatus, PaymentTopupStatus, PaymentTransferStatus, RequirementCollection } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import type { RejectionReason } from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
 import type { ReportOutcome as SellerReportOutcome } from "@hawkr/api/gen/hawkr/seller/v1alpha1/report_pb";
@@ -71,6 +73,11 @@ export type UiTextKey =
 	| "crm.CustomerSort.CUSTOMER_SORT_TOTAL_SPENT"
 	| "crm.CustomerType.CUSTOMER_TYPE_NORMAL"
 	| "crm.CustomerType.CUSTOMER_TYPE_VIP"
+	| "media.RejectReason.REJECT_REASON_CHECKSUM_MISMATCH"
+	| "media.RejectReason.REJECT_REASON_EXPIRED"
+	| "media.RejectReason.REJECT_REASON_PROCESSING_FAILED"
+	| "media.RejectReason.REJECT_REASON_SIZE_MISMATCH"
+	| "media.RejectReason.REJECT_REASON_UNRECOGNIZED_FORMAT"
 	| "moderation.CommunityReport.outcome_unset"
 	| "moderation.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION"
 	| "moderation.ReportOutcome.REPORT_OUTCOME_VIOLATION"
@@ -81,6 +88,24 @@ export type UiTextKey =
 	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_POST"
 	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_REVIEW"
 	| "moderation.ReportTargetKind.REPORT_TARGET_KIND_REVIEW_REPLY"
+	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_ACCOUNT"
+	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_AFTERSALES"
+	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_ANNOUNCEMENT"
+	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_CHAT"
+	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_COMMENT"
+	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_COUPON"
+	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_FOLLOW"
+	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_FOLLOWED_STORE_POST"
+	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_LIKE"
+	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_ORDER"
+	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_PAYOUT"
+	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_RESTOCK"
+	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_REVIEW"
+	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_SHIPMENT"
+	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_SHIPMENT_ANOMALY"
+	| "notification.NotificationChannel.NOTIFICATION_CHANNEL_EMAIL"
+	| "notification.NotificationChannel.NOTIFICATION_CHANNEL_INBOX"
+	| "notification.NotificationChannel.NOTIFICATION_CHANNEL_PUSH"
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED"
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED"
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED"
@@ -453,6 +478,21 @@ export function crmCustomerType(v: CustomerType): UiMessage | undefined {
 	return { key };
 }
 
+const MEDIA_REJECT_REASON: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "media.RejectReason.REJECT_REASON_UNRECOGNIZED_FORMAT",
+	2: "media.RejectReason.REJECT_REASON_SIZE_MISMATCH",
+	3: "media.RejectReason.REJECT_REASON_CHECKSUM_MISMATCH",
+	4: "media.RejectReason.REJECT_REASON_PROCESSING_FAILED",
+	5: "media.RejectReason.REJECT_REASON_EXPIRED",
+};
+
+/** media.RejectReason 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function mediaRejectReason(v: RejectReason): UiMessage | undefined {
+	const key = MEDIA_REJECT_REASON[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
 /** moderation.CommunityReport.outcome_unset */
 export function moderationCommunityReportOutcomeUnset(): UiMessage {
 	return { key: "moderation.CommunityReport.outcome_unset" };
@@ -483,6 +523,44 @@ const MODERATION_REPORT_TARGET_KIND: Readonly<Partial<Record<number, UiTextKey>>
 /** moderation.ReportTargetKind 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
 export function moderationReportTargetKind(v: ReportTargetKind): UiMessage | undefined {
 	const key = MODERATION_REPORT_TARGET_KIND[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const NOTIFICATION_NOTIFICATION_CATEGORY: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "notification.NotificationCategory.NOTIFICATION_CATEGORY_ORDER",
+	2: "notification.NotificationCategory.NOTIFICATION_CATEGORY_SHIPMENT",
+	3: "notification.NotificationCategory.NOTIFICATION_CATEGORY_SHIPMENT_ANOMALY",
+	4: "notification.NotificationCategory.NOTIFICATION_CATEGORY_AFTERSALES",
+	5: "notification.NotificationCategory.NOTIFICATION_CATEGORY_PAYOUT",
+	6: "notification.NotificationCategory.NOTIFICATION_CATEGORY_ACCOUNT",
+	7: "notification.NotificationCategory.NOTIFICATION_CATEGORY_CHAT",
+	8: "notification.NotificationCategory.NOTIFICATION_CATEGORY_REVIEW",
+	9: "notification.NotificationCategory.NOTIFICATION_CATEGORY_COMMENT",
+	10: "notification.NotificationCategory.NOTIFICATION_CATEGORY_LIKE",
+	11: "notification.NotificationCategory.NOTIFICATION_CATEGORY_FOLLOW",
+	12: "notification.NotificationCategory.NOTIFICATION_CATEGORY_FOLLOWED_STORE_POST",
+	13: "notification.NotificationCategory.NOTIFICATION_CATEGORY_COUPON",
+	14: "notification.NotificationCategory.NOTIFICATION_CATEGORY_RESTOCK",
+	15: "notification.NotificationCategory.NOTIFICATION_CATEGORY_ANNOUNCEMENT",
+};
+
+/** notification.NotificationCategory 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function notificationNotificationCategory(v: NotificationCategory): UiMessage | undefined {
+	const key = NOTIFICATION_NOTIFICATION_CATEGORY[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const NOTIFICATION_NOTIFICATION_CHANNEL: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "notification.NotificationChannel.NOTIFICATION_CHANNEL_INBOX",
+	2: "notification.NotificationChannel.NOTIFICATION_CHANNEL_PUSH",
+	3: "notification.NotificationChannel.NOTIFICATION_CHANNEL_EMAIL",
+};
+
+/** notification.NotificationChannel 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function notificationNotificationChannel(v: NotificationChannel): UiMessage | undefined {
+	const key = NOTIFICATION_NOTIFICATION_CHANNEL[v];
 	if (key === undefined) return undefined;
 	return { key };
 }

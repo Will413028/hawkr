@@ -5,6 +5,7 @@ package notification
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"testing"
 	"time"
@@ -88,6 +89,9 @@ func TestInboxWriteSignalsTheRecipientsStreamOnly(t *testing.T) {
 	}
 	if ev.Inbox == nil || ev.Inbox.UnreadCount != 1 || ev.Inbox.LatestItemID == nil || *ev.Inbox.LatestItemID != latest {
 		t.Fatalf("買家串流應收到未讀 1 與最新的收件匣 ID %s：%+v", latest, ev)
+	}
+	if !slices.Equal(ev.Inbox.NewItemIDs, []uuid.UUID{latest}) || ev.Inbox.NewItemsTruncated {
+		t.Fatalf("新建的通知 ID 應在訊號裡：%+v", ev.Inbox)
 	}
 	noEvent(t, storeSub)
 	noEvent(t, otherSub)
@@ -205,9 +209,10 @@ func TestListenReconnectEmitsAFullRereadSignal(t *testing.T) {
 	sub := watch(t, f, WatchParams{AccountID: acct, Audience: AudienceStore, StoreID: 7})
 	nextEvent(t, sub)
 
+	// 同一個 Postgres 上的其他測試也有 LISTEN 連線（各自的 database）：只終止這個測試 database 的，否則別的測試的 hub 會跟著重連而收到多餘的重讀訊號。
 	var n int
 	if err := f.db.Pool().QueryRow(context.Background(),
-		`SELECT count(pg_terminate_backend(pid)) FROM pg_stat_activity WHERE query = 'LISTEN '||$1 AND pid <> pg_backend_pid()`, stream.Channel).Scan(&n); err != nil || n != 1 {
+		`SELECT count(pg_terminate_backend(pid)) FROM pg_stat_activity WHERE query = 'LISTEN '||$1 AND datname = current_database() AND pid <> pg_backend_pid()`, stream.Channel).Scan(&n); err != nil || n != 1 {
 		t.Fatalf("應剛好終止一條 LISTEN 連線：%d %v", n, err)
 	}
 	if ev := nextEvent(t, sub); ev.Inbox == nil {
@@ -336,9 +341,119 @@ var errAfterNotify = errors.New("notify issued, then the transaction fails")
 // mutation：stream 的 notify 不走 ctx 的 transaction（改用連線池）→ 訊號在回滾前就送出，上面的 subtest 收到訊號而失敗。
 type failAfterNotify struct{ dbSignals }
 
-func (s failAfterNotify) InboxChanged(ctx context.Context, accountID int64, audience model.Audience, storeID int64, hint model.StateHint) error {
-	if err := s.dbSignals.InboxChanged(ctx, accountID, audience, storeID, hint); err != nil {
+func (s failAfterNotify) InboxChanged(ctx context.Context, accountID int64, audience model.Audience, storeID int64, hint model.StateHint, itemID uuid.UUID) error {
+	if err := s.dbSignals.InboxChanged(ctx, accountID, audience, storeID, hint, itemID); err != nil {
 		return err
 	}
 	return errAfterNotify
+}
+
+// 聚合更新（合併進同一則未讀通知）也送出那一列的 ID，且 ID 不變：client 以 ID 去重並更新 toast。
+// mutation：intake 的 deliver 不回傳 itemID（或 hub 合併時丟掉 ID）→ 沒有 ID，失敗。
+func TestAggregatedBumpRepeatsTheSameItemID(t *testing.T) {
+	f := setupIntake(t)
+	listen(t, f.module)
+	acct := f.newAccount(t)
+	a, b := f.newAccount(t), f.newAccount(t)
+	sub := watch(t, f, WatchParams{AccountID: acct, Audience: AudienceBuyer})
+	nextEvent(t, sub)
+
+	f.accept(t, "test_like", likeParams{AccountID: acct, EventID: "g1", PostID: "p", ActorID: a})
+	f.run(t)
+	first := nextEvent(t, sub)
+	f.accept(t, "test_like", likeParams{AccountID: acct, EventID: "g2", PostID: "p", ActorID: b})
+	f.run(t)
+	second := nextEvent(t, sub)
+	if len(first.Inbox.NewItemIDs) != 1 || !slices.Equal(first.Inbox.NewItemIDs, second.Inbox.NewItemIDs) {
+		t.Fatalf("聚合更新應再送同一個 ID：%v 之後 %v", first.Inbox.NewItemIDs, second.Inbox.NewItemIDs)
+	}
+	if got := f.inboxCount(t, acct); got != 1 {
+		t.Fatalf("兩個讚應合併成一列：%d", got)
+	}
+}
+
+// 已讀、全部已讀、刪除的訊號不帶新通知 ID。
+// mutation：app.inboxChanged 傳入非 Nil 的 ID → 已讀訊號帶了 ID，失敗。
+func TestReadAndDeleteSignalsCarryNoItemIDs(t *testing.T) {
+	f := setupIntake(t)
+	listen(t, f.module)
+	acct := f.newAccount(t)
+	other := f.newAccount(t)
+	f.accept(t, "test_like", likeParams{AccountID: acct, EventID: "r1", PostID: "p1", ActorID: other})
+	f.accept(t, "test_like", likeParams{AccountID: acct, EventID: "r2", PostID: "p2", ActorID: other})
+	f.run(t)
+	var ids []uuid.UUID
+	rows, err := f.db.Pool().Query(context.Background(), `SELECT id FROM notification.inbox_items WHERE account_id = $1 ORDER BY id`, acct)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, id)
+	}
+	rows.Close()
+	sub := watch(t, f, WatchParams{AccountID: acct, Audience: AudienceBuyer})
+	nextEvent(t, sub)
+	ctx := context.Background()
+	if err := f.module.MarkInboxItemRead(ctx, acct, ids[0]); err != nil {
+		t.Fatal(err)
+	}
+	if ev := nextEvent(t, sub); ev.Inbox == nil || len(ev.Inbox.NewItemIDs) != 0 || ev.Inbox.NewItemsTruncated {
+		t.Fatalf("已讀的訊號不帶 ID：%+v", ev)
+	}
+	if err := f.module.BatchDeleteInboxItems(ctx, acct, []uuid.UUID{ids[1]}); err != nil {
+		t.Fatal(err)
+	}
+	if ev := nextEvent(t, sub); ev.Inbox == nil || len(ev.Inbox.NewItemIDs) != 0 {
+		t.Fatalf("刪除的訊號不帶 ID：%+v", ev)
+	}
+	if _, err := f.module.MarkAllInboxItemsRead(ctx, Recipient{AccountID: acct, Audience: AudienceBuyer}); err != nil {
+		t.Fatal(err)
+	}
+	if ev := nextEvent(t, sub); ev.Inbox == nil || len(ev.Inbox.NewItemIDs) != 0 {
+		t.Fatalf("全部已讀的訊號不帶 ID：%+v", ev)
+	}
+}
+
+// 訂閱者來不及讀時訊號會合併：不論合併與否，每則新通知的 ID 都送達（超過上限的 truncated 由 hub 單元測試鎖，合併時序在整合測試裡不確定）。
+func TestEveryNewItemIDIsDeliveredWhetherOrNotSignalsCoalesce(t *testing.T) {
+	f := setupIntake(t)
+	listen(t, f.module)
+	acct := f.newAccount(t)
+	other := f.newAccount(t)
+	sub := watch(t, f, WatchParams{AccountID: acct, Audience: AudienceBuyer})
+	nextEvent(t, sub)
+
+	for i := range 3 {
+		f.accept(t, "test_like", likeParams{AccountID: acct, EventID: fmt.Sprintf("c%d", i), PostID: fmt.Sprintf("p%d", i), ActorID: other})
+	}
+	f.run(t)
+	var got []uuid.UUID
+	for range 3 {
+		ev := nextEvent(t, sub)
+		got = append(got, ev.Inbox.NewItemIDs...)
+		if len(got) >= 3 {
+			break
+		}
+	}
+	slices.SortFunc(got, uuid.UUID.Compare)
+	var want []uuid.UUID
+	rows, err := f.db.Pool().Query(context.Background(), `SELECT id FROM notification.inbox_items WHERE account_id = $1 ORDER BY id`, acct)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		want = append(want, id)
+	}
+	rows.Close()
+	if !slices.Equal(got, want) {
+		t.Fatalf("三則新通知的 ID 都應送達（合併與否都一樣）：%v，預期 %v", got, want)
+	}
 }

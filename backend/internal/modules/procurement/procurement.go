@@ -495,12 +495,6 @@ type (
 	Publication        = model.Publication
 )
 
-// 發布受眾的模式。
-const (
-	AudienceWishPool         = model.AudienceWishPool
-	AudienceDirectRecipients = model.AudienceDirectRecipients
-)
-
 // 詢價發布鏈的上限（BuyerNote 的字元數）。
 const MaxBuyerNoteRunes = rfq.MaxBuyerNoteRunes
 
@@ -518,9 +512,9 @@ func (m *Module) PreviewRfqPrice(ctx context.Context, in PreviewRfqPriceInput) (
 	return m.rfq.PreviewPrice(ctx, in)
 }
 
-// PreviewRfqPublication 依需求現行版本、買家的單價區間與補充說明編出賣家看得到的內容，建立不可變的發布核准（24 小時有效），不發布、不通知。DIRECT_RECIPIENTS 的候選必須屬於有效的候選集（A9-D29(4)），核准存這個候選集，執行時重驗。
-// 區間不合法、補充說明過長、欄位與模式不合、回價期限早於今天（台北時區）回 INVALID_ARGUMENT；需求、候選集不屬於買家回 NOT_FOUND；需求版本過時、候選集不是有效的候選集分別回 ABORTED／VERSION_CONFLICT
-// （request_revision、candidate_set）；需求狀態不是 REQUIREMENT_READY 或 MATCHING 回 FAILED_PRECONDITION／REQUIREMENT_NOT_READY。重送同一個 ClientRequestID 回第一次的核准，內容不同回 INVALID_ARGUMENT。公開池的收件人與發布時的封鎖檢查在 A9-3c。
+// PreviewRfqPublication 依需求現行版本、買家的單價區間與補充說明編出賣家看得到的內容，建立不可變的發布核准（24 小時有效），不發布、不通知。候選必須屬於有效的候選集（A9-D29(4)），核准存這個候選集，執行時重驗。
+// 區間不合法、補充說明過長、候選集與候選欄位不合、回價期限早於今天（台北時區）回 INVALID_ARGUMENT；需求、候選集不屬於買家回 NOT_FOUND；需求版本過時、候選集不是有效的候選集分別回 ABORTED／VERSION_CONFLICT
+// （request_revision、candidate_set）；需求狀態不是 REQUIREMENT_READY 或 MATCHING 回 FAILED_PRECONDITION／REQUIREMENT_NOT_READY。重送同一個 ClientRequestID 回第一次的核准，內容不同回 INVALID_ARGUMENT。發布時的封鎖檢查在 A9-3c。
 func (m *Module) PreviewRfqPublication(ctx context.Context, in PreviewRfqPublicationInput) (PublicationPreview, error) {
 	return m.rfq.PreviewPublication(ctx, in)
 }
@@ -528,7 +522,7 @@ func (m *Module) PreviewRfqPublication(ctx context.Context, in PreviewRfqPublica
 // ExecuteRfqPublication 以核准的版本建立發布，同 transaction 寫入發布、邀請與 RfqPublished 事件，不建 run（A9-D31 Q3、Q4）。
 // 需求或核准不屬於買家回 NOT_FOUND；需求版本過時回 ABORTED／VERSION_CONFLICT（request_revision）；需求狀態不可發布回 FAILED_PRECONDITION／REQUIREMENT_NOT_READY；
 // 核准過時（不是這個需求的、版本不符、已執行、已過期、凍結的版本不是現行版本、回價期限已早於今天、hash 不符）回 ABORTED／VERSION_CONFLICT（publication_approval）；
-// 指定對象的候選集已不是有效的候選集回 ABORTED／VERSION_CONFLICT（candidate_set）。重送同一個 ClientRequestID 回第一次的發布（Replayed），內容不同回 INVALID_ARGUMENT。
+// 候選集已不是有效的候選集回 ABORTED／VERSION_CONFLICT（candidate_set）。重送同一個 ClientRequestID 回第一次的發布（Replayed），內容不同回 INVALID_ARGUMENT。
 func (m *Module) ExecuteRfqPublication(ctx context.Context, in ExecuteRfqPublicationInput) (Publication, error) {
 	return m.rfq.ExecutePublication(ctx, in)
 }

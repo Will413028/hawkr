@@ -7,6 +7,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
 )
@@ -17,15 +18,17 @@ func TestDecodeRejectsMalformedPayloads(t *testing.T) {
 		t.Fatalf("合法的通知被拒絕：%v", err)
 	}
 	for name, p := range map[string]payload{
-		"版本不認得":     {V: 9, Kind: kindInbox, Account: 1, Audience: "BUYER"},
-		"種類不認得":     {V: payloadVersion, Kind: "x"},
-		"沒有帳號":      {V: payloadVersion, Kind: kindInbox, Audience: "BUYER"},
-		"BUYER 帶了店": {V: payloadVersion, Kind: kindInbox, Account: 1, Audience: "BUYER", Store: 3},
-		"STORE 沒有店": {V: payloadVersion, Kind: kindInbox, Account: 1, Audience: "STORE"},
-		"受眾不認得":     {V: payloadVersion, Kind: kindInbox, Account: 1, Audience: "X"},
-		"提示不認得":     {V: payloadVersion, Kind: kindInbox, Account: 1, Audience: "BUYER", Hint: "NOPE"},
-		"工作區沒有店":    {V: payloadVersion, Kind: kindWorkspace, Change: int(SellerOrder)},
-		"工作區變更不認得":  {V: payloadVersion, Kind: kindWorkspace, Store: 7, Change: 99},
+		"版本不認得":        {V: 9, Kind: kindInbox, Account: 1, Audience: "BUYER"},
+		"種類不認得":        {V: payloadVersion, Kind: "x"},
+		"沒有帳號":         {V: payloadVersion, Kind: kindInbox, Audience: "BUYER"},
+		"BUYER 帶了店":    {V: payloadVersion, Kind: kindInbox, Account: 1, Audience: "BUYER", Store: 3},
+		"STORE 沒有店":    {V: payloadVersion, Kind: kindInbox, Account: 1, Audience: "STORE"},
+		"受眾不認得":        {V: payloadVersion, Kind: kindInbox, Account: 1, Audience: "X"},
+		"提示不認得":        {V: payloadVersion, Kind: kindInbox, Account: 1, Audience: "BUYER", Hint: "NOPE"},
+		"收件匣列 ID 不合法":  {V: payloadVersion, Kind: kindInbox, Account: 1, Audience: "BUYER", Item: "not-a-uuid"},
+		"工作區沒有店":       {V: payloadVersion, Kind: kindWorkspace, Change: int(SellerOrder)},
+		"工作區變更不認得":     {V: payloadVersion, Kind: kindWorkspace, Store: 7, Change: 99},
+		"工作區帶了收件匣列 ID": {V: payloadVersion, Kind: kindWorkspace, Store: 7, Change: int(SellerOrder), Item: "0190a0a0-0000-7000-8000-000000000000"},
 	} {
 		if _, err := decode(p.encode()); !errors.Is(err, errPayload) {
 			t.Errorf("%s：應回 errPayload：%v", name, err)
@@ -44,7 +47,7 @@ func TestNotifyRejectsInvalidInputBeforeTouchingTheDatabase(t *testing.T) {
 	if err := NotifyWorkspace(ctx, nil, 7, 0); err == nil {
 		t.Fatal("未指定的變更應被拒絕")
 	}
-	if err := NotifyInbox(ctx, nil, storeKey(1), 0, model.StateHintNone); err == nil {
+	if err := NotifyInbox(ctx, nil, storeKey(1), 0, model.StateHintNone, uuid.Nil()); err == nil {
 		t.Fatal("STORE 沒有店應被拒絕")
 	}
 }
@@ -136,7 +139,9 @@ func TestRunDeliversNotificationsAndResyncsOnReconnect(t *testing.T) {
 	if err := <-done; err != nil {
 		t.Fatalf("ctx 結束 Run 應回 nil：%v", err)
 	}
-	if _, err := st.Next(context.Background()); !errors.Is(err, ErrClosed) {
+	closedCtx, stop := context.WithTimeout(context.Background(), 2*time.Second)
+	defer stop()
+	if _, err := st.Next(closedCtx); !errors.Is(err, ErrClosed) {
 		t.Fatalf("Run 結束後開著的訂閱應以 ErrClosed 結束：%v", err)
 	}
 	if _, err := h.Subscribe(buyer(1), 0); !errors.Is(err, ErrClosed) {
@@ -221,5 +226,20 @@ func TestRunWithoutInjectedClockDoesNotPanic(t *testing.T) {
 	}
 	if n < 3 {
 		t.Fatalf("應重連到第 3 次撥號：%d", n)
+	}
+}
+
+func TestDispatchDeliversTheItemIDOfTheNotification(t *testing.T) {
+	h := newHub(fakeRead, 8)
+	s := subscribe(t, h, buyer(1), 0)
+	next(t, s)
+	id := uuid.NewV7()
+	h.dispatch(payload{V: payloadVersion, Kind: kindInbox, Account: 1, Audience: "BUYER", Item: id.String()}.encode())
+	if ev := next(t, s); !slices.Equal(ev.Inbox.NewItemIDs, []uuid.UUID{id}) {
+		t.Fatalf("payload 的 ID 應進訊號：%+v", ev.Inbox)
+	}
+	h.dispatch(payload{V: payloadVersion, Kind: kindInbox, Account: 1, Audience: "BUYER"}.encode())
+	if ev := next(t, s); len(ev.Inbox.NewItemIDs) != 0 {
+		t.Fatalf("沒有 ID 的 payload 不帶 ID：%+v", ev.Inbox)
 	}
 }

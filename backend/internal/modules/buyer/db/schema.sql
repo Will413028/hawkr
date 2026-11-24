@@ -15,8 +15,8 @@ CREATE TABLE buyer.buyers (
     phone          TEXT,
     gender         TEXT,
     avatar         TEXT,
-    -- avatar 的 media asset ID：同步 job 登記引用時業務列目前指著的資產。
-    avatar_asset_id TEXT,
+    -- avatar 的 media asset ID（UUID v7）：換頭像在同一個 transaction 內 Confirm 新資產、MarkDeleted 被換掉的資產。
+    avatar_asset_id UUID,
     birth_date     DATE,
     city           TEXT,
     job            TEXT,
@@ -70,14 +70,14 @@ CREATE TABLE buyer.visit_history (
     PRIMARY KEY (buyer_id, product_id)
 );
 
--- 追蹤店家：關聯由 buyer 擁有，store_id 索引供店家粉絲查詢。
+-- 追蹤店家：關聯由 buyer 擁有，(store_id, buyer_id) 索引供店家粉絲查詢與依 buyer_id 的 keyset 分頁（追蹤者 fan-out）。
 CREATE TABLE buyer.seller_subscriptions (
     buyer_id   BIGINT NOT NULL REFERENCES buyer.buyers (buyer_id),
     store_id   BIGINT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,
     PRIMARY KEY (buyer_id, store_id)
 );
-CREATE INDEX subscriptions_store ON buyer.seller_subscriptions (store_id);
+CREATE INDEX subscriptions_store ON buyer.seller_subscriptions (store_id, buyer_id);
 
 -- 個人封鎖分兩張表，因為對象是兩種不同的東西：買家封鎖買家（對象在本模組，建外鍵）與買家封鎖店（店在 seller，不建跨模組外鍵）。
 -- 買家 ID 與店家 ID 是兩個號碼空間，分表後不可能把買家 7 當成店 7。發起者買家刪帳時由刪帳流程刪掉他發起的兩種列，
@@ -109,27 +109,3 @@ CREATE TABLE buyer.restock_subscriptions (
 );
 CREATE INDEX restock_product ON buyer.restock_subscriptions (product_id, buyer_id);
 
--- media 引用的同步版本：業務列改變 ref 的資產時在同一個 transaction 遞增 seq，同步 job 讀到 seq 之後做事，結算時只在 seq 沒變
--- 才記下 synced_seq，updated_at 是最後一次變動；保底掃描補排 synced_seq < seq 的 ref（internal/mediaref）。ref 的列不刪除：
--- 刪掉再建會讓 seq 從頭算，同步讀到的舊 seq 可能剛好相等而誤判為已同步。
-CREATE TABLE buyer.media_ref_sync (
-    ref_type   TEXT   NOT NULL,
-    ref_id     TEXT   NOT NULL,
-    seq        BIGINT NOT NULL DEFAULT 1,
-    synced_seq BIGINT NOT NULL DEFAULT 0,
-    updated_at TIMESTAMPTZ NOT NULL,
-    PRIMARY KEY (ref_type, ref_id)
-);
--- 保底掃描只看還沒同步完的 ref。
-CREATE INDEX media_ref_sync_unsynced ON buyer.media_ref_sync (updated_at) WHERE synced_seq < seq;
-
--- 被業務列換掉或終態釋放的資產：同步 job 精確解除它們的引用，寫入端拒絕把它們寫回同一個 ref。unlinked_at 是第一次解除成功的時間。
-CREATE TABLE buyer.retired_assets (
-    ref_type    TEXT        NOT NULL,
-    ref_id      TEXT        NOT NULL,
-    asset_id    TEXT        NOT NULL,
-    retired_at  TIMESTAMPTZ NOT NULL,
-    unlinked_at TIMESTAMPTZ,
-    PRIMARY KEY (ref_type, ref_id, asset_id)
-);
-CREATE INDEX retired_assets_retired_at ON buyer.retired_assets (retired_at);

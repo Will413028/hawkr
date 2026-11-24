@@ -32,8 +32,6 @@ func TestProxyRoutesDeclareFailureStatusByConsumer(t *testing.T) {
 	t.Run("router 套件：路由宣告", func(t *testing.T) {
 		// key = "檔名:代理建構函式:第一個參數（service 常數）"，value = 宣告的失敗模式。
 		expected := map[string]string{
-			// 機敏檔案串流：消費者是 web / admin / App。
-			"routes_media.go:CreateProxy:ServiceMedia": "proxy.FailClientFacing",
 			// 發票／收據 PDF 授權下載（58 §6.1.4）：買家／賣家／ADM 三條子路由同檔同
 			// 常數，消費者全是我們自己的前端 ⇒ 只需要這一列。
 			"routes_invoice.go:CreateProxy:ServiceInvoice": "proxy.FailClientFacing",

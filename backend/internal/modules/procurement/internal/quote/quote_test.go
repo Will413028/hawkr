@@ -144,7 +144,7 @@ func TestDecimal3AndMilli(t *testing.T) {
 
 func TestPayloadHashIsTheRecomputedContentHash(t *testing.T) {
 	v := store.ProcurementSellerResponseVersion{
-		ID: uuid.NewV7(), SellerResponseID: uuid.NewV7(), Version: 1, ResponseType: "MANUAL_QUOTE", OfferedQualityGrade: "A", UnitBasisQuantity: num(1, 0), UnitBasisUnit: "KG",
+		ID: uuid.NewV7(), SellerResponseID: uuid.NewV7(), Version: 1, ResponseType: "MANUAL_QUOTE", SpecNote: "規格如圖", UnitBasisQuantity: num(1, 0), UnitBasisUnit: "KG",
 		OfferedQuantity: num(3, 0), OfferedQuantityUnit: "KG", Currency: "TWD", GoodsAmount: 900, ShippingAmount: 100, TaxAmount: 50, TaxInclusionBasis: "TAX_EXCLUDED", TotalAmount: 1050,
 		ValidUntil: now, SubmittedAt: now, ClientRequestID: uuid.NewV7(),
 	}
@@ -167,6 +167,16 @@ func TestPayloadHashIsTheRecomputedContentHash(t *testing.T) {
 	q3, _ := QuoteOf(v)
 	if c, _ := PayloadHash(q3); a == c {
 		t.Error("金額改了 hash 要變")
+	}
+	v.GoodsAmount--
+	v.TotalAmount--
+	v.SpecNote = "規格不同"
+	q4, _ := QuoteOf(v)
+	if q4.SpecNote != "規格不同" {
+		t.Errorf("QuoteOf 沒帶 spec_note：%q", q4.SpecNote)
+	}
+	if d, _ := PayloadHash(q4); a == d {
+		t.Error("spec_note 改了 hash 要變")
 	}
 }
 

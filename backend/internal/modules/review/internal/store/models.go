@@ -41,22 +41,6 @@ type ReviewHide struct {
 	RestoreReason  *string
 }
 
-type ReviewMediaRefSync struct {
-	RefType   string
-	RefID     string
-	Seq       int64
-	SyncedSeq int64
-	UpdatedAt time.Time
-}
-
-type ReviewRetiredAsset struct {
-	RefType    string
-	RefID      string
-	AssetID    string
-	RetiredAt  time.Time
-	UnlinkedAt *time.Time
-}
-
 type ReviewReview struct {
 	ID           uuid.UUID
 	OrderNo      string
@@ -77,6 +61,6 @@ type ReviewReview struct {
 type ReviewReviewImage struct {
 	ReviewID  uuid.UUID
 	Position  int16
-	AssetID   string
+	AssetID   uuid.UUID
 	ObjectKey string
 }

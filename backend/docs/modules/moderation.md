@@ -6,7 +6,7 @@
 
 - 根套件公開 `Module`：`SubmitReport`、`MyReports`、`DecideCase`、`ReverseHide`（撤銷已結案的 HIDE 決定，§3.1）、`Case`、`CaseWithSnapshot`（同一個唯讀快照讀案件與最近一份凍結的內容快照，後台 `GetCase` 用）、`OpenReportCounts`（貼文在進行中案件裡的檢舉數，只算進行中案件，後台貼文列表 A7-2f-5 用）、`Cases`（後台列案件：狀態與對象種類篩選、`(opened_at, id)` 由大到小的 keyset，預設 20、上限 50）、`PurgeSnapshots`、`AddWorkers`、`PeriodicJobs`，以及只靠 DB、buyer、media 與 job 佇列的 `Retention`（`NewRetention`：快照與說明的保留期、快照圖片的 media 引用、買家刪除事件的訂閱者；worker 與事件組裝只組它，不組完整模組）。對外 API 是 `httpapi/moderation`：`ModerationAppService`（買家）與 `ModerationAdminService`（`ListCases`、`GetCase`、`DecideCase`、`ReverseHide`，權限 `moderation.cases.list`、`get`、`decide`、`reverse`）；`DecideCase` 在結案的同一個 transaction 寫後台動作紀錄（`platform/adminaudit`，對象 `moderation_case`，detail 只放決定、處置、類別、對象種類與版本，不放理由文字）。後台待辦在 A7-1e。
 - 依賴 social、review、im、seller、buyer、`accountsuspension`、media（快照圖片的引用）；不依賴 identity、不依賴 notification（A7-1d 不發事件，A8 依案件決定通知時再加）。
-- 擁有的資料：`moderation.cases`、`reports`、`case_snapshots`、`reporter_daily_counts`、`media_ref_sync`、`retired_assets`（快照圖片引用的同步，演算法在 media）；主鍵 UUIDv7，不建跨 schema FK。
+- 擁有的資料：`moderation.cases`、`reports`、`case_snapshots`、`reporter_daily_counts`（`case_snapshots.asset_ids` 是 UUID 陣列，指向 moderation 自己確認的圖片複本）；主鍵 UUIDv7，不建跨 schema FK。
 - 對象：貼文、留言、討論區留言、評價、聊天訊息（`content_id`）與買家（`buyer_id`）。另有店家對評價的回覆（`REVIEW_REPLY`，`content_id` 是評價 ID）。檢舉人是買家或店家（`reporter_buyer_id`、`reporter_store_id` 恰好一欄）：店家只能檢舉聊天訊息；評價、評價回覆與其他對象只有買家檢舉。
 - 發布：`moderation.pub_review_items(at)`（後台待辦，見 §7）；`db/objects.sql` 放函式與複合型別，`db/pub.sql` 是消費端 sqlc 讀的形狀。
 
@@ -18,7 +18,7 @@
 - 順序：帶 `request_id` 時最先以 (檢舉人, `request_id`) 查（`reports_request_key`），查到就回第一次的檢舉，不看案件現在的狀態、不吃額度，內容（對象、類別、說明的雜湊）不同回 InvalidInput（A7-D28 第 3 點）→ 先查這位檢舉人在這個對象的進行中案件裡有沒有檢舉，有就回傳既有的（`Created` 為假，不吃額度，不管內容現在還看不看得到）→ 沒有才做不鎖列的讀取（對象、作者、快照）→ 扣每日額度 → 開案或取進行中案件 → 掛進既有案件時 `version` 加一並鎖住案件列（已結案就整個重來；自己開的案件版本是 1）→ 快照 get-or-create（新快照在同 transaction 登記圖片引用）→ 寫檢舉。同一位檢舉人並行重送在最後一步撞唯一鍵：整個 transaction 回滾（額度與版本退回）重來，第二次回傳既有的。
 - 每日上限：每位檢舉人（買家與店家各自計數，上限相同）每個台北日（`platform/twtime.Day`）最多新增 20 筆，單一 upsert 原子地換日重算、未達上限才加一；到上限且是新檢舉回 ResourceExhausted，重試時間是到下一個台北午夜。
 - 案件：`INSERT … ON CONFLICT DO NOTHING` 之後讀進行中的案件；一個對象至多一個進行中案件（內容與買家兩個 partial UNIQUE），檢舉掛進它。結案後新檢舉開新案件。
-- 快照：內容由擁有者模組提供（social 的本文、媒體參照與作者；buyer 的公開顯示名稱與頭像；review 經 `ReviewForReport` 的評價、評分與店家回覆；im 經 `MessageForReport` 的被檢舉訊息與 seq 前後各 `ChatContextWindow`（5）則，前後文已隱藏或已抹除的是墓碑、不帶內容；兩者可讀規則同顯示路徑、不存在與不可讀都是 NotFound，檢舉人要是對話的一方）。快照是依對象種類的 tagged union（`snapshot.Content`：Social、Buyer、Review、Chat 恰好一個有值），聊天快照的圖片資產是被檢舉訊息與前後文圖片的聯集；快照由 `snapshot.Encode` 正規化（換行統一、去頭尾空白、媒體參照排序去重）後序列化成確定的 JSON，雜湊取 SHA-256；每案每份內容一列，內容改過才多一份；檢舉引用送出時的那份。快照引用的圖片資產（`asset_ids`）在 media 以 `(GOVERNANCE_EVIDENCE, 快照 ID)` 登記引用（A7-D21 證據保全）：引用只由同步 job 寫入，內容的作者換圖、刪貼文或店家退場釋放自己的引用時，圖片仍被快照引用，不會被 media 回收。買家頭像只存 object key，沒有 asset ID，不在保全範圍。
+- 快照：內容由擁有者模組提供（social 的本文、媒體參照與作者；buyer 的公開顯示名稱與頭像（頭像與其他證據圖片一樣複製成快照自己的資產）；review 經 `ReviewForReport` 的評價、評分與店家回覆；im 經 `MessageForReport` 的被檢舉訊息與 seq 前後各 `ChatContextWindow`（5）則，前後文已隱藏或已抹除的是墓碑、不帶內容；兩者可讀規則同顯示路徑、不存在與不可讀都是 NotFound，檢舉人要是對話的一方）。快照是依對象種類的 tagged union（`snapshot.Content`：Social、Buyer、Review、Chat 恰好一個有值），聊天快照的圖片資產是被檢舉訊息與前後文圖片的聯集；快照由 `snapshot.Encode` 正規化（換行統一、去頭尾空白、媒體參照排序去重）後序列化成確定的 JSON，雜湊取 SHA-256；每案每份內容一列，內容改過才多一份；檢舉引用送出時的那份。送出時每張來源圖片在 transaction 外經 media 的 `CopyPublic` 複製一份，建快照的 transaction 內 `Confirm` 複本，快照內容裡的圖片參照換成複本的資產 ID，`asset_ids` 記複本（B1-D20 證據保全）：作者換圖、刪貼文或店家退場只讓來源圖片 `MarkDeleted`，複本不受影響；moderation 從不 `MarkDeleted`，media 不認識快照。送出 transaction 回滾時複本留在未確認，由 media 回收。買家頭像只存 object key，沒有 asset ID，不在保全範圍。
 
 ## 3. 處理案件（DecideCase）
 
@@ -45,11 +45,11 @@
 
 ## 5. 快照保留期
 
-結案滿 184 天（與 seller 措施申覆期限同值，不短於它）由 `moderation.purge_snapshots`（每日，啟動時也跑一次）分批刪除快照（同 transaction 把快照引用的資產記成退場並排入同步 job，由 job 解除 media 的引用）並清掉該案檢舉的說明文字；`reports.snapshot_id` 因 `ON DELETE SET NULL` 清空；案件與檢舉列留著。進行中的案件的快照與說明不刪。
+結案滿 184 天（與 seller 措施申覆期限同值，不短於它）由 `moderation.purge_snapshots`（每日，啟動時也跑一次）分批刪除快照並清掉該案檢舉的說明文字；`reports.snapshot_id` 因 `ON DELETE SET NULL` 清空；案件與檢舉列留著。進行中的案件的快照與說明不刪。
 
 檢舉人刪帳（買家的 `BuyerDeletionRequested`、`BuyerDeleted`，同 transaction 的訂閱者，含同一帳號的歷史身分）：清掉他全部檢舉的說明與 `reporter_daily_counts` 的列；檢舉列與 `reporter_buyer_id`（假名鍵）留著（A7-D21）。
 
-鎖順序：moderation 的列排在 social、seller、buyer、`accountsuspension` 之後（`platform/lockorder.Modules`）；送出時依序是 `reporter_daily_counts`、`cases`、`case_snapshots`、`media_ref_sync`；處理時先呼叫擁有處分的模組、最後才寫 `cases`；刪帳訂閱者在 accountdeletion 鎖完買家與店家之後才鎖 `reports`、`reporter_daily_counts`。
+鎖順序：moderation 的列排在 social、seller、buyer、`accountsuspension` 之後（`platform/lockorder.Modules`）；送出時依序是 `reporter_daily_counts`、`cases`、`case_snapshots`；處理時先呼叫擁有處分的模組、最後才寫 `cases`；刪帳訂閱者在 accountdeletion 鎖完買家與店家之後才鎖 `reports`、`reporter_daily_counts`。
 
 ## 6. 終態與觸發
 

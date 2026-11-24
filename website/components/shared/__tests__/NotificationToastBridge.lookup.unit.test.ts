@@ -31,8 +31,9 @@ vi.mock("@/lib/chat/useChatStream", () => ({
 vi.mock("@/lib/chat/repo", () => ({
 	listConversations: chat.listConversations,
 }));
-vi.mock("@/lib/notifications/repo", () => ({
-	fetchNotifications: async () => ({ records: [] }),
+vi.mock("@/lib/notifications/inbox", () => ({
+	audienceForRole: () => 1,
+	listInboxItems: async () => ({ items: [] }),
 	fetchUnreadCount: async () => 0,
 }));
 vi.mock("@/lib/i18n/ui-text", () => ({ useUiText: () => () => "" }));

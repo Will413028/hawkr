@@ -374,8 +374,10 @@ func TestGetCaseMapsEachSnapshotKindToTheOneof(t *testing.T) {
 				x := s.GetSocial()
 				return x.GetAuthorId() == "7" && x.GetBody() == "本文" && len(x.GetAssetIds()) == 1
 			}},
-		"買家": {&moderation.Snapshot{Kind: moderation.TargetBuyer, Buyer: &moderation.BuyerSnapshot{DisplayName: "小明", Avatar: "k"}},
-			func(s *adminpb.CaseSnapshot) bool { return s.GetBuyer().GetDisplayName() == "小明" }},
+		"買家": {&moderation.Snapshot{Kind: moderation.TargetBuyer, Buyer: &moderation.BuyerSnapshot{DisplayName: "小明", AvatarAssetID: "k"}},
+			func(s *adminpb.CaseSnapshot) bool {
+				return s.GetBuyer().GetDisplayName() == "小明" && s.GetBuyer().GetAvatarAssetId() == "k"
+			}},
 		"評價": {&moderation.Snapshot{Kind: moderation.TargetReview, Review: &moderation.ReviewSnapshot{AuthorID: 9, SubjectStoreID: 4, ProductID: 5, Rating: 2, Body: "差", ReplyBody: "抱歉"}},
 			func(s *adminpb.CaseSnapshot) bool {
 				x := s.GetReview()

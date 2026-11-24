@@ -117,8 +117,8 @@ export function buildContentSecurityPolicy(
 		"frame-ancestors 'self'",
 		"form-action 'self' https:",
 		sources(
-			"script-src 'self' 'unsafe-inline' 'report-sample'",
-			"https://www.googletagmanager.com https://www.gstatic.com https://www.google.com https://apis.google.com https://accounts.google.com https://connect-js.stripe.com https://js.stripe.com",
+			"script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'report-sample'",
+			"https://www.googletagmanager.com https://www.gstatic.com https://www.google.com https://apis.google.com https://accounts.google.com https://pay.google.com https://applepay.cdn-apple.com https://connect-js.stripe.com https://js.stripe.com",
 		),
 		"style-src 'self' 'unsafe-inline' https://accounts.google.com",
 		"style-src-elem 'self' 'unsafe-inline' https://accounts.google.com",

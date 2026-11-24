@@ -65,8 +65,8 @@ func listPackages(t *testing.T, root string) []Package {
 
 // codemetaImporters 是還在 import internal/platform/codemeta 的套件。CodeMeta 凍結、隨模組搬遷退場
 // （ADR 2026-09-25-codemeta-retirement 過渡第 1 步），名單只准變短：新的 import 會失敗，不再 import 的
-// 也要從名單刪掉。遷移計畫 A2 收尾時名單清空（media 的上傳者改成模組自己的型別，舊的帳號類型由
-// internal/legacy/mediaservice 換算）；生成物留到階段 C 隨 CodeMeta 一起刪除。
+// 也要從名單刪掉。遷移計畫 A2 收尾時名單清空（media 的上傳者是模組自己的型別，不依賴舊的帳號類型）；
+// 生成物留到階段 C 隨 CodeMeta 一起刪除。
 var codemetaImporters []string
 
 func TestCodemetaImportsOnlyShrink(t *testing.T) {

@@ -311,6 +311,38 @@ func (t Text) CrmCustomerType(v string) (string, bool) {
 	return "", false
 }
 
+// MediaRejectReason 是 media.RejectReason 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) MediaRejectReason(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "UNRECOGNIZED_FORMAT":
+			return "The file format was not recognized. Use a JPEG, PNG, WebP or GIF image.", true
+		case "SIZE_MISMATCH":
+			return "The file size does not match what was declared. Please upload it again.", true
+		case "CHECKSUM_MISMATCH":
+			return "The file was corrupted during upload. Please upload it again.", true
+		case "PROCESSING_FAILED":
+			return "The file could not be processed. Try a different image.", true
+		case "EXPIRED":
+			return "The upload timed out. Please upload it again.", true
+		}
+	}
+	switch v {
+	case "UNRECOGNIZED_FORMAT":
+		return "無法辨識檔案格式，請改用 JPEG、PNG、WebP 或 GIF 圖片。", true
+	case "SIZE_MISMATCH":
+		return "檔案大小與宣告的不一致，請重新上傳。", true
+	case "CHECKSUM_MISMATCH":
+		return "檔案在上傳過程中損毀，請重新上傳。", true
+	case "PROCESSING_FAILED":
+		return "檔案處理失敗，請換一張圖片再試。", true
+	case "EXPIRED":
+		return "上傳已逾時，請重新上傳。", true
+	}
+	return "", false
+}
+
 // ModerationCommunityReportOutcomeUnset 是 moderation.CommunityReport.outcome_unset 的文案。
 func (t Text) ModerationCommunityReportOutcomeUnset() string {
 	if t.Locale() == EN {
@@ -403,6 +435,102 @@ func (t Text) ModerationReportTargetKind(v string) (string, bool) {
 		return "聊天訊息", true
 	case "REVIEW_REPLY":
 		return "評價回覆", true
+	}
+	return "", false
+}
+
+// NotificationNotificationCategory 是 notification.NotificationCategory 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) NotificationNotificationCategory(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "ORDER":
+			return "Orders", true
+		case "SHIPMENT":
+			return "Shipping", true
+		case "SHIPMENT_ANOMALY":
+			return "Delivery issues", true
+		case "AFTERSALES":
+			return "Refunds and after-sales", true
+		case "PAYOUT":
+			return "Payouts", true
+		case "ACCOUNT":
+			return "Account and policy", true
+		case "CHAT":
+			return "Chat", true
+		case "REVIEW":
+			return "Reviews", true
+		case "COMMENT":
+			return "Comments", true
+		case "LIKE":
+			return "Likes", true
+		case "FOLLOW":
+			return "New followers", true
+		case "FOLLOWED_STORE_POST":
+			return "Posts from stores you follow", true
+		case "COUPON":
+			return "Coupons", true
+		case "RESTOCK":
+			return "Back in stock", true
+		case "ANNOUNCEMENT":
+			return "Announcements", true
+		}
+	}
+	switch v {
+	case "ORDER":
+		return "訂單", true
+	case "SHIPMENT":
+		return "出貨", true
+	case "SHIPMENT_ANOMALY":
+		return "配送異常", true
+	case "AFTERSALES":
+		return "退款與售後", true
+	case "PAYOUT":
+		return "撥款", true
+	case "ACCOUNT":
+		return "帳號與治理", true
+	case "CHAT":
+		return "聊天", true
+	case "REVIEW":
+		return "評價", true
+	case "COMMENT":
+		return "留言", true
+	case "LIKE":
+		return "讚", true
+	case "FOLLOW":
+		return "新的追蹤者", true
+	case "FOLLOWED_STORE_POST":
+		return "追蹤的店家發文", true
+	case "COUPON":
+		return "優惠券", true
+	case "RESTOCK":
+		return "補貨通知", true
+	case "ANNOUNCEMENT":
+		return "系統公告", true
+	}
+	return "", false
+}
+
+// NotificationNotificationChannel 是 notification.NotificationChannel 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) NotificationNotificationChannel(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "INBOX":
+			return "Inbox", true
+		case "PUSH":
+			return "Push", true
+		case "EMAIL":
+			return "Email", true
+		}
+	}
+	switch v {
+	case "INBOX":
+		return "收件匣", true
+	case "PUSH":
+		return "推播", true
+	case "EMAIL":
+		return "Email", true
 	}
 	return "", false
 }

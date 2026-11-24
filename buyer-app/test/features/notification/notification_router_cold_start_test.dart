@@ -16,8 +16,7 @@ void main() {
 
       expect(
         NotificationRouter.navigate({
-          'type': 'ORDER_PAID',
-          'orderSn': 'ORD-COLD',
+          notificationDeepLinkKey: '/en/account/orders/ORD-COLD',
         }, messageId: 'cold-message-1'),
         NotificationEnqueueResult.queued,
       );
@@ -32,11 +31,10 @@ void main() {
             builder: (_, __) => const Scaffold(body: Text('home')),
           ),
           GoRoute(
-            path: '/orders/detail',
-            builder: (_, state) {
-              final extra = state.extra! as Map<String, dynamic>;
-              return Scaffold(body: Text('order:${extra['orderSn']}'));
-            },
+            path: '/account/orders/:orderNo',
+            builder: (_, state) => Scaffold(
+              body: Text('order:${state.pathParameters['orderNo']}'),
+            ),
           ),
         ],
       );
@@ -54,10 +52,8 @@ void main() {
 
       expect(
         NotificationRouter.navigate({
-          'type': 'ORDER_PAID',
-          'orderSn': 'ORD-COLD',
-          notificationSourceMessageIdKey: 'cold-message-1',
-        }),
+          notificationDeepLinkKey: '/en/account/orders/ORD-COLD',
+        }, messageId: 'cold-message-1'),
         NotificationEnqueueResult.duplicate,
       );
       await tester.pump();

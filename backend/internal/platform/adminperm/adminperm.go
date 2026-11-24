@@ -34,6 +34,15 @@ const (
 	ContentAppVersionGatesList             Permission = "content.app_version_gates.list"
 	ContentAppVersionGatesCreate           Permission = "content.app_version_gates.create"
 	ContentAppVersionGatesUpdate           Permission = "content.app_version_gates.update"
+	CouponCampaignsList                    Permission = "coupon.campaigns.list"
+	CouponCampaignsGet                     Permission = "coupon.campaigns.get"
+	CouponCampaignsCreate                  Permission = "coupon.campaigns.create"
+	CouponCampaignsPublish                 Permission = "coupon.campaigns.publish"
+	CouponCampaignsEnd                     Permission = "coupon.campaigns.end"
+	CouponVouchersList                     Permission = "coupon.vouchers.list"
+	CouponVouchersGrant                    Permission = "coupon.vouchers.grant"
+	CouponVouchersVoid                     Permission = "coupon.vouchers.void"
+	CouponSellerQuotasUpdate               Permission = "coupon.seller_quotas.update"
 	DelegationSessionsCreate               Permission = "delegation.sessions.create"
 	IdentityAccountsList                   Permission = "identity.accounts.list"
 	IdentityAccountsGet                    Permission = "identity.accounts.get"
@@ -136,6 +145,8 @@ func Catalog() []Permission {
 		BuyerBuyerStatsGet,
 		ContentBannersList, ContentBannersGet, ContentBannersCreate, ContentBannersUpdate, ContentBannersDelete,
 		ContentAppVersionGatesList, ContentAppVersionGatesCreate, ContentAppVersionGatesUpdate,
+		CouponCampaignsList, CouponCampaignsGet, CouponCampaignsCreate, CouponCampaignsPublish, CouponCampaignsEnd,
+		CouponVouchersList, CouponVouchersGrant, CouponVouchersVoid, CouponSellerQuotasUpdate,
 		DelegationSessionsCreate,
 		IdentityAccountsList, IdentityAccountsGet, IdentityAccountsDelete,
 		ImageaiAiStylesList, ImageaiAiStylesCreate, ImageaiAiStylesUpdate, ImageaiAiStylesDelete, ImageaiAiStylesSetDefault,

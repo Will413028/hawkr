@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"time"
+	"uuid"
 
 	"github.com/jackc/pgx/v5"
 
@@ -159,7 +160,11 @@ func (h *Hub) dispatch(raw string) {
 	}
 	switch p.Kind {
 	case kindInbox:
-		h.InboxChanged(Key{AccountID: p.Account, Audience: model.Audience(p.Audience)}, p.Store, model.StateHint(p.Hint))
+		var item uuid.UUID
+		if p.Item != "" {
+			item = uuid.MustParse(p.Item) // decode 已驗證
+		}
+		h.InboxChanged(Key{AccountID: p.Account, Audience: model.Audience(p.Audience)}, p.Store, model.StateHint(p.Hint), item)
 	case kindWorkspace:
 		h.workspaceChanged(p.Store, SellerChange(p.Change))
 	}

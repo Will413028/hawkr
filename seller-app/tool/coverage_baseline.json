@@ -275,7 +275,6 @@
     "lib/features/seller/data/onboarding_tasks.dart",
     "lib/features/seller/data/seller_agreements_repository.dart",
     "lib/features/seller/data/seller_onboarding.dart",
-    "lib/features/seller/data/seller_repository.dart",
     "lib/features/seller/data/seller_status_refresh.dart",
     "lib/features/seller/data/store_closing.dart",
     "lib/features/seller/data/store_editor.dart",

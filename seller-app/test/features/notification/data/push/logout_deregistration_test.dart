@@ -1,5 +1,9 @@
 import 'dart:async';
 
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.connect.spec.dart';
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pb.dart';
+import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_seller/config/flavor.dart';
 import 'package:hawkr_seller/features/notification/data/push/device_registrar.dart';
 import 'package:hawkr_seller/features/notification/data/push/manager.dart';
@@ -90,6 +94,33 @@ void main() {
     });
   });
 
+  test('登出經 DeleteDeviceToken 刪掉這台的 token（Connect，沒有 platform）', () async {
+    final deleted = <DeleteDeviceTokenRequest>[];
+    final registrar = NotificationDeviceRegistrar(
+      NotificationAppServiceClient(
+        FakeTransportBuilder().unary(NotificationAppService.deleteDeviceToken, (
+          r,
+          _,
+        ) {
+          deleted.add(r);
+          return DeleteDeviceTokenResponse();
+        }).build(),
+      ),
+    );
+    manager.seedLifecycleStateForTest(
+      registration: DeviceRegistrationCoordinator(
+        gateway: registrar,
+        retryDelays: const [],
+      ),
+      fcmToken: 'fcm-token',
+      isUserLoggedIn: true,
+    );
+
+    await manager.onUserLoggedOut(hasCredential: true);
+
+    expect(deleted.map((r) => r.token), ['fcm-token']);
+  });
+
   group('PushNotificationManager.onUserLoggedOut 不阻塞登出', () {
     testWidgets('後端 hang 住時，登出在 deadline 內返回，請求續留背景', (tester) async {
       final pending = Completer<DeviceMutationOutcome>();
@@ -118,7 +149,7 @@ void main() {
 
       // 逾時不是取消：請求已經送出，後端慢慢回來時仍然完成註銷。
       expect(gateway.removeCalls, ['fcm-token']);
-      pending.complete(const DeviceMutationOutcome.success(statusCode: 204));
+      pending.complete(const DeviceMutationOutcome.success());
       await tester.pump();
     });
 
@@ -160,9 +191,7 @@ void main() {
       expect(gateway.removeCalls, isEmpty);
 
       // 註冊落地後，註銷才在背景依序送出。
-      registerPending.complete(
-        const DeviceMutationOutcome.success(statusCode: 200),
-      );
+      registerPending.complete(const DeviceMutationOutcome.success());
       await tester.pump();
       expect(gateway.removeCalls, ['fcm-token']);
     });
@@ -182,7 +211,7 @@ class _RecordingGateway implements DeviceRegistrationGateway {
     registerCalls.add(fcmToken);
     final handler = onRegister;
     if (handler != null) return handler(fcmToken);
-    return Future.value(const DeviceMutationOutcome.success(statusCode: 200));
+    return Future.value(const DeviceMutationOutcome.success());
   }
 
   @override
@@ -190,6 +219,6 @@ class _RecordingGateway implements DeviceRegistrationGateway {
     removeCalls.add(fcmToken);
     final handler = onRemove;
     if (handler != null) return handler(fcmToken);
-    return Future.value(const DeviceMutationOutcome.success(statusCode: 204));
+    return Future.value(const DeviceMutationOutcome.success());
   }
 }

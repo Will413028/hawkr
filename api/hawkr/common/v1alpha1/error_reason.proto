@@ -148,4 +148,16 @@ enum ErrorReason {
   // 這個採購需求已經有一個 run 在進行中（搭配 failed_precondition）：SubmitTurn、StartCandidateSearch、ResumeRun。同一個需求同時只允許一個進行中的 run
   // （排隊、執行中、取消中）。client 等目前的 run 收到 finished 後再送出；等待輸入的 run 不算進行中。
   PROCUREMENT_RUN_IN_PROGRESS = 42;
+  // 優惠券活動不是進行中（搭配 failed_precondition）：尚未發布、已被結束。CouponAppService.ClaimCoupon。client 顯示 LocalizedMessage，重讀活動列表。
+  COUPON_CAMPAIGN_NOT_ACTIVE = 43;
+  // 現在不在優惠券活動的時間窗內（搭配 failed_precondition）：還沒開始或已經結束。CouponAppService.ClaimCoupon。
+  COUPON_OUTSIDE_WINDOW = 44;
+  // 買家不符合活動的資格（搭配 failed_precondition）：不在指定名單、在該店沒有消費紀錄。CouponAppService.ClaimCoupon。
+  COUPON_NOT_ELIGIBLE = 45;
+  // 發行活動的店家停權中（搭配 failed_precondition）：領取與鎖定（結帳選用）暫停，解除後自動恢復；已鎖定的券照常核銷或釋放。CouponAppService.ClaimCoupon。
+  COUPON_STORE_SUSPENDED = 46;
+  // 活動已經領完（搭配 failed_precondition）：總發行量已達上限。CouponAppService.ClaimCoupon。client 顯示已領完。
+  COUPON_ISSUE_LIMIT_REACHED = 47;
+  // 店家同時進行的活動數已達上限（搭配 failed_precondition）：CouponAppService.CreateCampaign。client 提示先結束一個活動。
+  COUPON_QUOTA_EXCEEDED = 48;
 }

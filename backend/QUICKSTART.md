@@ -6,7 +6,9 @@
 
 ```bash
 # macOS
-brew install postgresql atlas helm kubectl sqlc
+brew install postgresql atlas helm kubectl sqlc vips
+# 單體的 media 模組以 cgo 連 libvips；Ubuntu 是 apt-get install libvips-dev。
+# macOS 的 libarchive 是 keg-only，pkg-config 找不到時：export PKG_CONFIG_PATH="$(brew --prefix libarchive)/lib/pkgconfig"
 
 # 安裝 k3s（Linux VM，需 root）
 cd k8s && bash scripts/install-k3s-master.sh
@@ -195,28 +197,6 @@ atlas migrate validate --dir "file://migrations"
 
 # Go 服務：drop + recreate 專屬 DB 並套用完整 migration 歷史
 ./dev.sh seed
-```
-
-### Q: media-service 啟動失敗，出現 Flyway checksum mismatch？
-
-**症狀：** `kubectl logs deploy/media-service -n hawkr` 顯示：
-```
-Migration checksum mismatch for migration version 1
--> Applied to database : -705590836
--> Resolved locally    : 86485880
-```
-
-**原因：** 已執行的 migration 檔案被修改過（V1 凍結，違反 Flyway 規則）
-
-**解決方法：** 用 Flyway 官方 image 對該 DB 跑 `repair`（只改 `flyway_schema_history` 的 checksum，
-不執行任何 DDL、不碰業務表），再 rollout 重啟。PG 在 Infra VM 上，不在叢集內，所以直接連它：
-```bash
-docker run --rm \
-  -v $(pwd)/services/java/media-service/src/main/resources/db/migration:/flyway/sql:ro \
-  flyway/flyway:10 \
-  -url=jdbc:postgresql://${INFRA_HOST}:5432/hawkr_media \
-  -user=dbadmin -password=${DB_PASSWORD} -baselineOnMigrate=true repair
-kubectl rollout restart deploy/media-service -n hawkr
 ```
 
 ### Q: 想重新開始資料庫？

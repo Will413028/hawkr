@@ -1,0 +1,85 @@
+{
+ "mutants": [
+  {
+   "id": "begin-no-size-limit",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/upload/upload.go",
+   "old": "if in.Size > model.MaxPublicUploadSize {",
+   "new": "if in.Size > model.MaxPublicUploadSize && false {",
+   "test": "internal/httpapi/media ^TestBeginUploadOverTheLimitIsInvalidArgumentAndIssuesNoURL$",
+   "why": "拿掉大小上限檢查：超過上限的宣告不再被擋，仍會發預簽網址"
+  },
+  {
+   "id": "begin-no-content-type-allowlist",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/upload/upload.go",
+   "old": "\tif !ok {\n\t\treturn in, apperr.InvalidInputOn([]string{\"content_type\"}",
+   "new": "\tif false && !ok {\n\t\treturn in, apperr.InvalidInputOn([]string{\"content_type\"}",
+   "test": "internal/modules/media/internal/upload ^TestCreateUpload_RejectsUnknownMime$",
+   "why": "拿掉型別白名單：非 JPEG、PNG、WebP、GIF 的宣告仍會發預簽網址"
+  },
+  {
+   "id": "begin-no-size-limit-integration",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/upload.go",
+   "old": "if in.Size > model.MaxPublicUploadSize {",
+   "new": "if in.Size > model.MaxPublicUploadSize && false {",
+   "test": "internal/httpapi/media ^TestOverTheLimitIsInvalidArgumentWithNoURLAndNoRow$",
+   "why": "拿掉大小上限檢查：超過上限的宣告建了暫存列並發網址"
+  },
+  {
+   "id": "own-no-uploader-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/media/internal/upload/upload.go",
+   "old": "if !ownedBy(row, uploader) {",
+   "new": "if false && (row.UploaderID != uploader.ID || row.UploaderAdmin != uploader.Admin) {",
+   "test": "internal/httpapi/media ^TestAnotherUsersTokenIsNotFoundOnCompleteAndGet$",
+   "why": "拿掉上傳者檢查：別人的 staged token 能讀狀態與完成上傳"
+  },
+  {
+   "id": "handler-wrong-uploader",
+   "stack": "go",
+   "file": "backend/internal/httpapi/media/app.go",
+   "old": "media.Uploader{ID: p.ID}",
+   "new": "media.Uploader{ID: p.ID + 1}",
+   "test": "internal/httpapi/media ^TestBeginUploadPassesTheDeclarationAndReturnsTheSignedUpload$",
+   "why": "handler 不以呼叫者的帳號當上傳者"
+  },
+  {
+   "id": "get-drops-reject-reason",
+   "stack": "go",
+   "file": "backend/internal/httpapi/media/app.go",
+   "old": "if st.RejectReason != \"\" {",
+   "new": "if false {",
+   "test": "internal/httpapi/media ^TestGetUploadReportsRejectionAsStateAndReasonNotAnError$",
+   "why": "GetUpload 不回拒絕原因：REJECTED 的上傳 client 看不到為什麼"
+  },
+  {
+   "id": "storage-leaks-content-length",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/storage/s3.go",
+   "old": "\t\t\"Content-Type\":  in.ContentType,\n",
+   "new": "\t\t\"Content-Type\":  in.ContentType,\n\t\t\"Content-Length\": fmt.Sprint(in.ContentLength),\n",
+   "test": "internal/modules/media/internal/storage ^TestPresignedPutSignsExactlyTheBoundHeaders$",
+   "why": "預簽結果帶出 Content-Length：瀏覽器不允許腳本設定它，header 清單要交給 client 原樣送出"
+  },
+  {
+   "id": "begin-content-type-not-normalized",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/upload/upload.go",
+   "old": "\tin.ContentType = ct\n",
+   "new": "\t_ = ct\n",
+   "test": "internal/modules/media/internal/upload ^TestCreateUpload_NormalizesContentType$",
+   "why": "Content-Type 沒有正規化：簽章與 upload_headers 用 client 原樣宣告的大小寫與參數"
+  },
+  {
+   "id": "text-locale-ignored",
+   "stack": "go",
+   "file": "backend/internal/modules/media/internal/upload/upload.go",
+   "old": "func loc(ctx context.Context) uitext.Locale { return uitext.LocaleFrom(ctx) }",
+   "new": "func loc(ctx context.Context) uitext.Locale { _ = ctx; return uitext.ZhTW }",
+   "test": "internal/modules/media/internal/upload ^TestValidate_MessageFollowsLocale$",
+   "why": "忽略請求語系：en 請求拿到 zh-TW 的錯誤文字"
+  }
+ ]
+}

@@ -47,9 +47,9 @@
 |---|---|---|---|---|
 | 全部 | method policy `H:481-486`（`ActorAdmin`）；actor `OLD/internal/actor/actor.go:25-37` | 以 `x-account-type == "4"` 判斷 admin【量】 | AD8【量：DI:236】 | 改：`adminauth` 逐方法宣告（§3.2） |
 | ListAiStylesForAdmin | `H:156-189`；`U/style_usecase.go:82-107`；SQL `style.sql:1-4` | category 空＝全部，依 `sort_order, id`【量】 | — | 保留；回 `AiStyle`（含 `etag`、`Image`）（PA:22-25,101-108） |
-| CreateAiStyle | `H:191-229`；`U/style_usecase.go:130-151` | 先 `GenID()`，有 staged token 時先 `FinalizeAndLink`（跨服務）再寫 DB；或接受既有 `thumbnail_key`（驗 `public/` 前綴）；`sort_order` 解析失敗當 0（`:118-127`）；回應無資料【量】 | (a) media link 在 DB insert 之前、不同 tx：insert 失敗留下孤兒引用（`H:197-202`）【量】；(b) `UNIQUE(category,name)` 衝突以未分類 DB 錯誤回傳【推】；(c) 同時把 is_default=true 建立時不先清舊 default，撞 partial unique 才失敗【推：`style.sql` 只在 Update 清】 | 改：UUIDv7 ID；縮圖只收 staged token（PA:27,62-63「建立時必填」）；`media.FinalizeField`＋`media.SyncChanged` 與寫列同 tx（content banner 的作法：`modules/content/internal/images/images.go:63`、`internal/mediaref/mediaref.go:25,88`）【量】；名稱衝突回 already_exists【推】；`adminaudit.Record` 同 tx |
-| UpdateAiStyle | `H:231-290`；`U/style_usecase.go:154-243`；SQL `style.sql:14-53` | `has_*` 旗標部分更新；設 default 時同 tx 先清同分類 default 再標記（為避開 partial unique 的逐列檢查）；只有 `is_default=true` 會寫（false 被忽略）；換縮圖後 best-effort 釋放舊引用【量】 | (a) 無樂觀鎖【量】；(b) `is_default=false` 被靜默忽略（`:155-166`）【量】；(c) 舊縮圖釋放不在 tx 內（`H:282-287`）【量】；(d) DB 錯誤包成 code 400 通用訊息（`H:278-279`）【量】 | 改：`etag`＋`update_mask`（PA:5-9,119-123）；`default_style` 設 false 的語意要定 → §5 Q7；清舊 default＋標新 default 的兩句順序保留（`style.sql:14-43` 的理由仍成立）【量】；縮圖用 refsync 同 tx |
-| DeleteAiStyle | `H:292-313`；`U/style_usecase.go:246-266` | default 不可刪（400）；查詢錯誤一律回「style not found」400；刪後 best-effort 釋放引用【量】 | DB 故障偽裝成 not found（`:248-257`）【量】；釋放不在 tx【量】 | 改：etag 選填（PA:129-133）；not_found 與內部錯誤分開；default 不可刪的錯誤形狀未在契約 → §5 Q7；refsync 同 tx |
+| CreateAiStyle | `H:191-229`；`U/style_usecase.go:130-151` | 先 `GenID()`，有 staged token 時先 `FinalizeAndLink`（跨服務）再寫 DB；或接受既有 `thumbnail_key`（驗 `public/` 前綴）；`sort_order` 解析失敗當 0（`:118-127`）；回應無資料【量】 | (a) media link 在 DB insert 之前、不同 tx：insert 失敗留下孤兒引用（`H:197-202`）【量】；(b) `UNIQUE(category,name)` 衝突以未分類 DB 錯誤回傳【推】；(c) 同時把 is_default=true 建立時不先清舊 default，撞 partial unique 才失敗【推：`style.sql` 只在 Update 清】 | 改：UUIDv7 ID；縮圖只收 staged token（PA:27,62-63「建立時必填」）；`media.Confirm(…, VisibilityPublic)` 與被換掉縮圖的 `media.MarkDeleted` 和寫列同 tx（content banner 的作法：`modules/content/internal/images/images.go`；B1 之後沒有 mediaref 同步）【量】；名稱衝突回 already_exists【推】；`adminaudit.Record` 同 tx |
+| UpdateAiStyle | `H:231-290`；`U/style_usecase.go:154-243`；SQL `style.sql:14-53` | `has_*` 旗標部分更新；設 default 時同 tx 先清同分類 default 再標記（為避開 partial unique 的逐列檢查）；只有 `is_default=true` 會寫（false 被忽略）；換縮圖後 best-effort 釋放舊引用【量】 | (a) 無樂觀鎖【量】；(b) `is_default=false` 被靜默忽略（`:155-166`）【量】；(c) 舊縮圖釋放不在 tx 內（`H:282-287`）【量】；(d) DB 錯誤包成 code 400 通用訊息（`H:278-279`）【量】 | 改：`etag`＋`update_mask`（PA:5-9,119-123）；`default_style` 設 false 的語意要定 → §5 Q7；清舊 default＋標新 default 的兩句順序保留（`style.sql:14-43` 的理由仍成立）【量】；縮圖在同 tx `Confirm`（公開）並 `MarkDeleted` 被換掉的舊縮圖 |
+| DeleteAiStyle | `H:292-313`；`U/style_usecase.go:246-266` | default 不可刪（400）；查詢錯誤一律回「style not found」400；刪後 best-effort 釋放引用【量】 | DB 故障偽裝成 not found（`:248-257`）【量】；釋放不在 tx【量】 | 改：etag 選填（PA:129-133）；not_found 與內部錯誤分開；default 不可刪的錯誤形狀未在契約 → §5 Q7；刪除時同 tx `MarkDeleted` 縮圖 |
 | GetAiQuota | `H:315-344`；`U/quota_usecase.go:32-70` | 無個別設定回預設 10、`is_custom=false`；store_id 不驗存在；DB 錯誤吞成預設（`:38-60`）【量】 | 不存在的店也回 200（預設）；吞錯【量】 | 改：回 `AiQuota`（PA:82-99）；店不存在的處理 → §5 Q8；DB 錯誤上拋 |
 | UpdateAiQuota | `H:346-370`；`U/quota_usecase.go:73-91`；SQL `quota.sql:7-13` | `weekly_limit` 必須 0–1000（`:74-84`），upsert，無樂觀鎖【量】 | 0–1000 是程式常數，無規格來源【量】 | 改：PA:40-43 的 etag 語意（無列時不帶 etag 建立；有列沒帶 etag 回 ALREADY_EXISTS；過期 ABORTED）；上限 1000 寫進模組規格（§5 Q4） |
 | DeleteAiQuota | `H:372-391`；`quota.sql:15-16` | 無列也成功【量】 | — | 改：無個別設定回 NOT_FOUND（PA:45-46）【量】 |
@@ -58,7 +58,7 @@
 
 | 舊表 | 位置 | 去向 |
 |---|---|---|
-| `ai_styles`（TSID、`category CHECK`、`UNIQUE(category,name)`、`UNIQUE(category) WHERE is_default`、`thumbnail_key`） | `schema.sql:67-85` | 保留成 `imageai.styles`：`id UUID`（v7）、加 `version`（etag）、`category` 改 Go 型別＋CHECK、`thumbnail` 改 media 引用欄＋refsync 所需欄位（照 content banner）【推】 |
+| `ai_styles`（TSID、`category CHECK`、`UNIQUE(category,name)`、`UNIQUE(category) WHERE is_default`、`thumbnail_key`） | `schema.sql:67-85` | 保留成 `imageai.styles`：`id UUID`（v7）、加 `version`（etag）、`category` 改 Go 型別＋CHECK、`thumbnail` 改 `thumbnail_asset_id`（照 content banner）【推】 |
 | `ai_usage`（`(store_id, week_start)`、`usage_count`） | `schema.sql:87-96` | 保留成 `imageai.usage`：`used`、`CHECK (used >= 0)`，照 `procurement.usage`（`modules/procurement/db/schema.sql:474-482`）【量＋推】 |
 | `ai_quotas`（`store_id` PK、`weekly_limit`、`memo`） | `schema.sql:98-105` | 保留成 `imageai.quotas`：加 `version`（etag）、`CHECK (weekly_limit BETWEEN 0 AND <上限>)`【推】 |
 | `ai_usage_reservations` | `schema.sql:108-118` | 刪（A9-D9）【量：計畫】 |
@@ -140,7 +140,7 @@ AiStyle（admin）：`name`、`category` IMMUTABLE；`default_style`、`enabled`
 
 ### 3.5 media（縮圖）
 
-- 單體 `modules/media`：`FinalizeField`（staged token 轉正，`finalize.go:32-35`）、`SyncChanged`（同 tx 記退場並排同步 job，`media.go:56-59`）、`RefTypeAiStyle = "7114"`（`ref_type.go:23`）【量】。content banner 是同形範本（`content/internal/images/images.go:63`、`content/internal/mediaref/mediaref.go:25,35,88`）【量】。
+- 單體 `modules/media`（B1 之後）：公開 API 是 `Confirm(ctx, uploader, token, visibility)`（staged token 轉正，在擁有者的 transaction 內呼叫，回資產 ID）與 `MarkDeleted(ctx, assetIDs)`（同 tx 只新增刪除請求列），沒有 `FinalizeField`、`SyncChanged`、`RefTypeAiStyle` 與引用同步（`mediaref`）。content banner 是同形範本：`content/internal/images/images.go`。縮圖欄位 `thumbnail_asset_id` 在寫列的 transaction 內 `Confirm(…, VisibilityPublic)`，更新與刪除時 `MarkDeleted` 被換掉的縮圖（`backend/docs/plans/2026-11-21-b1-media/upload-routing.md` 第四節）。
 - media 的 `Media` 介面只有 Finalize／Link／Unlink／ReadSecure（`media/internal/model/model.go:42-56`），**沒有讀一般 staged 物件 bytes 的方法**【量】→ Q1 的「presigned 上傳原圖」選項要新增 media API。
 - 修圖結果不落地（舊版回 base64，client 自己再走上傳）【量：`ai-image.ts:427`、`H:458-467`】。
 
@@ -186,4 +186,4 @@ AiStyle（admin）：`name`、`category` IMMUTABLE；`default_style`、`enabled`
 
 - A9-4a：schema（3 表）、`platform/llm` 的 ImageAI 角色＋spike、配額 SQL＋並發與退款測試（計畫驗收的兩個 mutation）。
 - A9-4b：TransformImage、ListAiStyles use case＋handler＋掛 `ImageAiAppService`。
-- A9-4c：後台 7 支＋`adminperm` 7 個權限＋`adminauth` 宣告＋`adminaudit` 同 tx＋refsync 縮圖＋掛 `ImageAiAdminService`（啟動檢查 mutation）；`TestEveryServiceInTheContractIsMounted` 的缺漏清單不再含 imageai。
+- A9-4c：後台 7 支＋`adminperm` 7 個權限＋`adminauth` 宣告＋`adminaudit` 同 tx＋縮圖 `Confirm`＋`MarkDeleted` 同 tx＋掛 `ImageAiAdminService`（啟動檢查 mutation）；`TestEveryServiceInTheContractIsMounted` 的缺漏清單不再含 imageai。

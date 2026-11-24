@@ -8,14 +8,14 @@ part of 'private_document_uploader.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// 私密文件（認證證件、申訴佐證）走 legacy media 的 `secure_upload`，身分由傳輸層的 Bearer 決定；
-/// 回傳的 staged token 由送出該文件所屬的請求帶上。沒有 staged token 的回應是錯誤。
+/// 私密文件（認證證件、申訴佐證）走單體的機敏分段上傳，身分由 Bearer 決定；
+/// 回傳的 staged token 由送出該文件所屬的請求帶上。
 
 @ProviderFor(privateDocumentUploader)
 final privateDocumentUploaderProvider = PrivateDocumentUploaderProvider._();
 
-/// 私密文件（認證證件、申訴佐證）走 legacy media 的 `secure_upload`，身分由傳輸層的 Bearer 決定；
-/// 回傳的 staged token 由送出該文件所屬的請求帶上。沒有 staged token 的回應是錯誤。
+/// 私密文件（認證證件、申訴佐證）走單體的機敏分段上傳，身分由 Bearer 決定；
+/// 回傳的 staged token 由送出該文件所屬的請求帶上。
 
 final class PrivateDocumentUploaderProvider
     extends
@@ -25,8 +25,8 @@ final class PrivateDocumentUploaderProvider
           PrivateDocumentUploader
         >
     with $Provider<PrivateDocumentUploader> {
-  /// 私密文件（認證證件、申訴佐證）走 legacy media 的 `secure_upload`，身分由傳輸層的 Bearer 決定；
-  /// 回傳的 staged token 由送出該文件所屬的請求帶上。沒有 staged token 的回應是錯誤。
+  /// 私密文件（認證證件、申訴佐證）走單體的機敏分段上傳，身分由 Bearer 決定；
+  /// 回傳的 staged token 由送出該文件所屬的請求帶上。
   PrivateDocumentUploaderProvider._()
     : super(
         from: null,
@@ -62,4 +62,4 @@ final class PrivateDocumentUploaderProvider
 }
 
 String _$privateDocumentUploaderHash() =>
-    r'5dee47c2a78bdcde8766352c22d49bbe5c848abd';
+    r'ae1cc63262e1ecf015da4b76858c5b00e47e02c0';

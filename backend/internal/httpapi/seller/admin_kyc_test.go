@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -393,7 +394,7 @@ func TestDocumentEndpointAuthorizesAdminsAndMapsErrorsWithoutLeaking(t *testing.
 			t.Fatalf("%s：code=%d calls=%d", name, rec.Code, m.calls)
 		}
 	}
-	m := &docModule{content: model.FileContent{Data: []byte("IMG"), ContentType: "image/png"}}
+	m := &docModule{content: model.FileContent{Body: io.NopCloser(strings.NewReader("IMG")), ContentType: "image/png"}}
 	rec := serveDocument(t, m, adminCtx(42), path)
 	if rec.Code != 200 || rec.Body.String() != "IMG" || m.in.AdminID != 42 || m.in.Position != 0 || m.in.ApplicationID.String() != app {
 		t.Fatalf("code=%d in=%+v", rec.Code, m.in)
@@ -436,7 +437,7 @@ func TestDocumentEndpointNeverServesActiveContentTypes(t *testing.T) {
 		"image/jpeg": "image/jpeg", "IMAGE/PNG; charset=x": "image/png", "application/pdf": "application/pdf",
 		"text/html": "application/octet-stream", "image/svg+xml": "application/octet-stream", "": "application/octet-stream",
 	} {
-		rec := serveDocument(t, &docModule{content: model.FileContent{Data: []byte("x"), ContentType: ct}}, adminCtx(1), path)
+		rec := serveDocument(t, &docModule{content: model.FileContent{Body: io.NopCloser(strings.NewReader("x")), ContentType: ct}}, adminCtx(1), path)
 		if got := rec.Header().Get("Content-Type"); got != want {
 			t.Errorf("%q → %q，要 %q", ct, got, want)
 		}
@@ -473,9 +474,9 @@ func TestDocumentAccessListPagesWithAToken(t *testing.T) {
 	wantInvalidArgument(t, err)
 }
 
-// 文件讀取的錯誤各有自己的 HTTP 結果：引用還沒同步完是 503 加 Retry-After（warn）；media 不是機敏資產、或同步過了卻說沒有，是資料不一致，
+// 文件讀取的錯誤各有自己的 HTTP 結果：media 不是機敏資產、或我們有這份檔而 media 說沒有，是資料不一致，
 // 404 加 error log；403 與一般找不到 404 不記 error。
-func TestDocumentEndpointDistinguishesUnsyncedFromMissing(t *testing.T) {
+func TestDocumentEndpointClassifiesMediaFailures(t *testing.T) {
 	path := "/api/files/admin/seller/kyc_applications/" + uuid.NewV7().String() + "/documents/0"
 	for name, c := range map[string]struct {
 		err        error
@@ -483,11 +484,10 @@ func TestDocumentEndpointDistinguishesUnsyncedFromMissing(t *testing.T) {
 		retryAfter bool
 		level      string
 	}{
-		"not synced yet":     {fmt.Errorf("x：%w", model.ErrFileNotSynced), 503, true, "WARN"},
-		"synced but missing": {fmt.Errorf("x：%w", model.ErrFileMissing), 404, false, "ERROR"},
-		"not secure":         {fmt.Errorf("x：%w", media.ErrNotSecure), 404, false, "ERROR"},
-		"plain not found":    {apperr.NotFound("找不到這份文件"), 404, false, ""},
-		"forbidden":          {apperr.PermissionDenied("x"), 403, false, ""},
+		"missing in media": {fmt.Errorf("x：%w", model.ErrFileMissing), 404, false, "ERROR"},
+		"not secure":       {fmt.Errorf("x：%w", media.ErrNotSecure), 404, false, "ERROR"},
+		"plain not found":  {apperr.NotFound("找不到這份文件"), 404, false, ""},
+		"forbidden":        {apperr.PermissionDenied("x"), 403, false, ""},
 	} {
 		var logs strings.Builder
 		mux := http.NewServeMux()

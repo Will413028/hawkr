@@ -67,3 +67,17 @@ Future<bool> activeChatCovers(
   }
   return card?.id == storeId;
 }
+
+/// 使用者正開著的聊天室是不是店家 [storeId]（通知深連結 `/account/messages/{targetId}` 的 targetId 是店家）：
+/// 從店面進來直接比店家，從對話進來用 [storeIdOfConversation] 取對話的店家。
+bool activeChatIsStore(
+  ActiveChat gate,
+  String storeId,
+  String? Function(String conversationId) storeIdOfConversation,
+) {
+  if (storeId.isEmpty) return false;
+  if (gate.storeId == storeId) return true;
+  final conversationId = gate.conversationId;
+  return conversationId != null &&
+      storeIdOfConversation(conversationId) == storeId;
+}

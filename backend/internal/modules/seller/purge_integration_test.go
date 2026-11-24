@@ -9,8 +9,8 @@ import (
 	"slices"
 	"testing"
 	"time"
+	"uuid"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
@@ -44,7 +44,8 @@ func (f *fixture) loadedStore(t *testing.T, company bool) (int64, Store) {
 		draft.WebsiteURL = ptr("https://farm.example.invalid")
 		draft.CompanyPhone, draft.CompanyTownCode, draft.CompanyAddressDetail = ptr("0229010572"), ptr("63000050"), ptr("中山路 2 號")
 		draft.CompanyRegisterDate = ptr("2015-03-04")
-		draft.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: "co1"}}
+		tokens, _ := f.stageDocs(t, accountID, 1)
+		draft.CompanyDocuments = &[]KYCDocumentRef{{StagedToken: tokens[0]}}
 	}
 	d := f.savedDraft(t, draft)
 	sub, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
@@ -104,11 +105,14 @@ func TestPurgeClearsEveryPersonalColumn(t *testing.T) {
 		store   Store
 		app     string
 		company bool
+		docs    []uuid.UUID
 	}
 	var stints []stint
 	for _, company := range []bool{false, true} {
 		account, s := f.loadedStore(t, company)
-		stints = append(stints, stint{account, s, f.applicationID(t, s.StoreID), company})
+		st := stint{account: account, store: s, app: f.applicationID(t, s.StoreID), company: company}
+		st.docs = append(st.docs, f.documentAssets(t, st.app)...)
+		stints = append(stints, st)
 	}
 	for _, st := range stints {
 		store := f.row(t, "stores", "store_id", st.store.StoreID)
@@ -128,10 +132,8 @@ func TestPurgeClearsEveryPersonalColumn(t *testing.T) {
 		if f.count(t, "SELECT count(*) FROM seller.kyc_documents WHERE application_id=$1::uuid", st.app) != wantDocs {
 			t.Fatal("公司文件的數量不對")
 		}
-		certRef := media.Ref{Type: media.RefTypeCertification, ID: st.app}
-		f.syncMedia(t, certRef)
-		if int64(len(f.media.Referenced(certRef))) != wantDocs {
-			t.Fatalf("清理之前證件的引用應該已登記：%v", f.media.Referenced(certRef))
+		for _, id := range st.docs {
+			f.wantAsset(t, id, "ACTIVE")
 		}
 		_, err := f.module.CloseCurrent(ctx, st.account)
 		must(t, err)
@@ -157,15 +159,10 @@ func TestPurgeClearsEveryPersonalColumn(t *testing.T) {
 			t.Error("審核紀錄被清掉")
 		}
 	}
-	// 證件圖片的引用不在清理的 transaction 內解除：刪證件列的同時記成退場並排入同步 job，執行之後一張都不留。
+	// 證件圖片在清理的 transaction 內標為刪除（刪證件列的同一個 transaction）。
 	for _, st := range stints {
-		if !slices.Contains(f.jobs.kinds(), "seller.media_sync") {
-			t.Fatal("沒有排入證件引用的同步")
-		}
-		certRef := media.Ref{Type: media.RefTypeCertification, ID: st.app}
-		f.syncMedia(t, certRef)
-		if got := f.media.Referenced(certRef); len(got) != 0 {
-			t.Fatalf("證件引用沒有全部解除：%v", got)
+		for _, id := range st.docs {
+			f.wantAsset(t, id, "DELETING")
 		}
 	}
 	// 呈現層看到的 Store：已關閉、店名是空字串（墓碑由呈現層依 Status 決定）。

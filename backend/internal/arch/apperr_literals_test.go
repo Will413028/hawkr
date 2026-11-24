@@ -85,7 +85,7 @@ func TestModerationApperrCallsCarryNoSentenceLiterals(t *testing.T) {
 			t.Error(v)
 		}
 	}
-	if scanned < 8 || apperrCalls < 20 {
+	if scanned < 7 || apperrCalls < 20 {
 		t.Fatalf("只掃到 %d 個檔、%d 處 apperr：檢查範圍不對", scanned, apperrCalls)
 	}
 }

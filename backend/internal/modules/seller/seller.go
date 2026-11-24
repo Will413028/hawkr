@@ -14,7 +14,6 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/block"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/closing"
@@ -23,7 +22,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/governance"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/kyc"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/measure"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/onboarding"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/payout"
@@ -64,9 +62,10 @@ type Deps struct {
 	Events   *events.Bus
 	Jobs     jobs.ReportingEnqueuer
 	Identity *identity.Module
-	Media    media.Media
-	Orders   Orders
-	KYCMAC   *seal.MAC
+	// Media 是 media 模組（*media.Module）：寫入在自己的 transaction 內 Confirm 新資產，被換掉或終態的資產 MarkDeleted，機敏檔用 ReadSecure 讀。
+	Media  model.Media
+	Orders Orders
+	KYCMAC *seal.MAC
 	// Payment 是收款帳戶的擁有者（payment 模組，收款開通 ADR D28），必填：核准的 transaction 內請它寫「建立中」的帳戶列並排入建立 job，個資清理時請它
 	// 刪除帳戶列。沒有設定 provider 的 payment 模組讓核准不建立收款帳戶。
 	Payment *payment.Module
@@ -85,7 +84,6 @@ type Module struct {
 	profile    *profile.Service
 	suspension *suspension.Service
 	closing    *closing.Service
-	mediaSync  *media.RefSyncer
 	governance *governance.Service
 	measure    *measure.Service
 	kyc        *kyc.Service
@@ -126,7 +124,6 @@ func New(d Deps) *Module {
 		}),
 		suspension: suspensions,
 		closing:    closings,
-		mediaSync:  mediaref.NewSyncer(d.DB, d.Media, d.Jobs, d.Now, d.Logger),
 		governance: governance.New(governance.Deps{
 			DB: d.DB, Events: d.Events, Jobs: d.Jobs, Media: d.Media, Identity: d.Identity, Now: d.Now, Logger: d.Logger,
 		}),
@@ -135,13 +132,13 @@ func New(d Deps) *Module {
 		}),
 		kyc:    kycService,
 		payout: payout.New(payout.Deps{DB: d.DB, Jobs: d.Jobs, Exposure: exposures, Identities: kyc.NewFingerprints(d.KYCMAC)}),
-		purge:  purge.New(purge.Deps{DB: d.DB, Events: d.Events, Jobs: d.Jobs, Payment: d.Payment, Now: d.Now}),
+		purge:  purge.New(purge.Deps{DB: d.DB, Events: d.Events, Jobs: d.Jobs, Media: d.Media, Payment: d.Payment, Now: d.Now}),
 		prospect: prospect.New(prospect.Deps{
-			DB: d.DB, Events: d.Events, Jobs: d.Jobs, Media: d.Media, Now: d.Now,
+			DB: d.DB, Events: d.Events, Media: d.Media, Now: d.Now,
 		}),
 		block:   block.New(block.Deps{DB: d.DB, Now: d.Now}),
 		views:   views.New(views.Deps{DB: d.DB, ProductStores: d.ProductStores, Now: d.Now}),
-		devSeed: devseed.New(devseed.Deps{DB: d.DB, KYC: kycService, Events: d.Events, Jobs: d.Jobs, Now: d.Now}),
+		devSeed: devseed.New(devseed.Deps{DB: d.DB, KYC: kycService, Events: d.Events, Jobs: d.Jobs, Media: d.Media, Now: d.Now}),
 	}
 }
 
@@ -622,22 +619,8 @@ func (m *Module) CloseForDeletion(ctx context.Context, storeID int64) error {
 	return m.closing.CloseForDeletion(ctx, storeID)
 }
 
-// SyncMedia 同步一個 media ref 的引用：Link 業務列目前的資產，Unlink 退場的資產。ref 是店家的 logo 與封面（ref_id 是
-// store_id）、站外業者的 logo 與封面（prospect_id）、KYC 證件（application_id）或治理佐證（通報或違規的 ID）。它是
-// seller.media_sync job 的內容，給 worker 與測試呼叫；回傳是否要再跑一輪。
-func (m *Module) SyncMedia(ctx context.Context, ref media.Ref) (media.SyncResult, error) {
-	return m.mediaSync.Sync(ctx, ref)
-}
-
-// SweepMedia 執行 media 引用的保底掃描：清掉過期的退場紀錄，補排版本比已同步的新的 ref；回傳補排的 ref 數。它是
-// seller.media_sweep job 的內容，給 worker 與測試呼叫。
-func (m *Module) SweepMedia(ctx context.Context) (int, error) {
-	return m.mediaSync.Sweep(ctx)
-}
-
 // AddWorkers 登記本模組的 River worker。
 func (m *Module) AddWorkers(workers *river.Workers) {
-	mediaref.AddWorkers(workers, m.mediaSync)
 	m.suspension.AddWorkers(workers)
 	m.closing.AddWorkers(workers)
 	m.measure.AddWorkers(workers)
@@ -648,7 +631,7 @@ func (m *Module) AddWorkers(workers *river.Workers) {
 }
 
 // PeriodicJobs 回傳本模組的排程 job：第一次公開的記錄（每 15 分鐘）、措施的對帳、終止合作的對帳（每小時）、措施的結案掃描（每 5 分鐘）、關店滿保留期的個資清理（啟動即執行、每小時
-// 補跑）、商品瀏覽事件的彙總（每 5 分鐘）與過期事件的清理（每小時），以及 media 引用的保底掃描（每 15 分鐘），以及 KYC 登記資料查詢的掃描（補排遺失的查詢 job、把過期的 PENDING 收成終態，啟動即執行、每 1 分鐘）。
+// 補跑）、商品瀏覽事件的彙總（每 5 分鐘）與過期事件的清理（每小時），以及 KYC 登記資料查詢的掃描（補排遺失的查詢 job、把過期的 PENDING 收成終態，啟動即執行、每 1 分鐘）。
 func (m *Module) PeriodicJobs() []*river.PeriodicJob {
 	jobs := append(m.suspension.PeriodicJobs(), m.closing.PeriodicJobs()...)
 	jobs = append(jobs, m.measure.PeriodicJobs()...)
@@ -656,7 +639,7 @@ func (m *Module) PeriodicJobs() []*river.PeriodicJob {
 	jobs = append(jobs, m.profile.PeriodicJobs()...)
 	jobs = append(jobs, m.views.PeriodicJobs()...)
 	jobs = append(jobs, m.kyc.PeriodicJobs()...)
-	return append(jobs, mediaref.PeriodicJobs()...)
+	return jobs
 }
 
 // ReconcileExposure 讓每家店最後公告的可曝光與現在算出來的一致（不同的更新並發 StoreExposureChanged，可曝光時記下
@@ -671,8 +654,7 @@ type DevSeedStore = devseed.Store
 
 // SeedDevStores 在一個 transaction 內把本機開發的種子店家還原成 fixture（upsert，只動這幾家店與它們的子列，不碰別的店家）：固定的 store_id 與
 // store_code、已核准的 KYC（識別欄位以執行中的金鑰加密）、logo；公告列保留，version 只增不減。只給本機開發的
-// dev-seed 子命令使用：它直接寫列，繞過開店、送出、審核與綁定的狀態轉移；profile 有變時發 StoreProfileChanged，刪掉的證件與佐證經退場機制釋放
-// media 的引用；停權、關閉、等待刪除這些有下游消費者的生命週期狀態不還原，前提檢查發現就拒絕。寫完之後要 ReannounceExposures 讓下游知道可曝光。
+// dev-seed 子命令使用：它直接寫列，繞過開店、送出、審核與綁定的狀態轉移；profile 有變時發 StoreProfileChanged，刪掉的 KYC 證件的 media 資產 MarkDeleted（治理佐證的資產不動）；停權、關閉、等待刪除這些有下游消費者的生命週期狀態不還原，前提檢查發現就拒絕。寫完之後要 ReannounceExposures 讓下游知道可曝光。
 // 種子帳號名下有種子以外的未關閉店家時整個拒絕（見 CheckDevSeed）。必須在 transaction 外呼叫。
 func (m *Module) SeedDevStores(ctx context.Context, stores []DevSeedStore, seedAccountIDs []int64) error {
 	return m.devSeed.Seed(ctx, stores, seedAccountIDs)

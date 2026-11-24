@@ -6,6 +6,7 @@ import (
 	"slices"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -66,7 +67,7 @@ func TestInboxSignalReachesOnlyTheSameAccountAndAudience(t *testing.T) {
 	for _, s := range []*Subscription{b, st, other} {
 		next(t, s)
 	}
-	h.InboxChanged(buyer(1), 0, model.StateHintOrder)
+	h.InboxChanged(buyer(1), 0, model.StateHintOrder, uuid.Nil())
 	if ev := next(t, b); ev.Inbox == nil || !slices.Equal(ev.Inbox.Hints, []model.StateHint{model.StateHintOrder}) {
 		t.Fatalf("買家訂閱者應收到帶提示的訊號：%+v", ev)
 	}
@@ -80,7 +81,7 @@ func TestStoreInboxSignalIsScopedToTheStore(t *testing.T) {
 	b := subscribe(t, h, storeKey(1), 8)
 	next(t, a)
 	next(t, b)
-	h.InboxChanged(storeKey(1), 8, model.StateHintNone)
+	h.InboxChanged(storeKey(1), 8, model.StateHintNone, uuid.Nil())
 	if ev := next(t, b); ev.Inbox == nil || ev.Inbox.UnreadCount != 18 {
 		t.Fatalf("店 8 的訂閱者應收到訊號：%+v", ev)
 	}
@@ -91,10 +92,10 @@ func TestSignalsCoalesceAndHintsAreAUnion(t *testing.T) {
 	h := newHub(fakeRead, 8)
 	s := subscribe(t, h, buyer(1), 0)
 	next(t, s)
-	h.InboxChanged(buyer(1), 0, model.StateHintOrder)
-	h.InboxChanged(buyer(1), 0, model.StateHintOrder)
-	h.InboxChanged(buyer(1), 0, model.StateHintNone)
-	h.InboxChanged(buyer(1), 0, model.StateHintAfterSale)
+	h.InboxChanged(buyer(1), 0, model.StateHintOrder, uuid.Nil())
+	h.InboxChanged(buyer(1), 0, model.StateHintOrder, uuid.Nil())
+	h.InboxChanged(buyer(1), 0, model.StateHintNone, uuid.Nil())
+	h.InboxChanged(buyer(1), 0, model.StateHintAfterSale, uuid.Nil())
 	ev := next(t, s)
 	if ev.Inbox == nil || !slices.Equal(ev.Inbox.Hints, []model.StateHint{model.StateHintOrder, model.StateHintAfterSale}) {
 		t.Fatalf("提示應是不重複的聯集：%+v", ev)
@@ -188,16 +189,127 @@ func TestFailedReadKeepsTheDirtyMarkAndHints(t *testing.T) {
 	if ev := next(t, s); ev.Inbox == nil {
 		t.Fatalf("重試應再送第一則：%+v", ev)
 	}
-	h.InboxChanged(buyer(1), 0, model.StateHintOrder)
+	h.InboxChanged(buyer(1), 0, model.StateHintOrder, uuid.Nil())
 	fail = true
 	if _, err := s.Next(context.Background()); err == nil {
 		t.Fatal("讀取失敗應回錯誤")
 	}
-	h.InboxChanged(buyer(1), 0, model.StateHintAfterSale)
+	h.InboxChanged(buyer(1), 0, model.StateHintAfterSale, uuid.Nil())
 	fail = false
 	ev := next(t, s)
 	if ev.Inbox == nil || !slices.Equal(ev.Inbox.Hints, []model.StateHint{model.StateHintOrder, model.StateHintAfterSale}) {
 		t.Fatalf("失敗前取走的提示不該遺失，期間新來的也要合併：%+v", ev)
 	}
 	wantNone(t, s)
+}
+
+func ids(n int) []uuid.UUID {
+	out := make([]uuid.UUID, n)
+	for i := range out {
+		out[i] = uuid.NewV7()
+	}
+	return out
+}
+
+func TestNewItemIDsAreAnOrderedDeduplicatedUnionAcrossCoalescedSignals(t *testing.T) {
+	h := newHub(fakeRead, 8)
+	s := subscribe(t, h, buyer(1), 0)
+	if ev := next(t, s); len(ev.Inbox.NewItemIDs) != 0 || ev.Inbox.NewItemsTruncated {
+		t.Fatalf("連線建立的第一則不帶新通知 ID：%+v", ev.Inbox)
+	}
+	x := ids(2)
+	h.InboxChanged(buyer(1), 0, model.StateHintNone, x[0])
+	h.InboxChanged(buyer(1), 0, model.StateHintNone, x[1])
+	h.InboxChanged(buyer(1), 0, model.StateHintNone, x[0])
+	ev := next(t, s)
+	if !slices.Equal(ev.Inbox.NewItemIDs, x) || ev.Inbox.NewItemsTruncated {
+		t.Fatalf("合併的訊號應帶不重複的 ID 聯集（依到達順序）：%+v", ev.Inbox)
+	}
+	wantNone(t, s)
+	h.InboxChanged(buyer(1), 0, model.StateHintNone, x[0])
+	if ev := next(t, s); !slices.Equal(ev.Inbox.NewItemIDs, x[:1]) {
+		t.Fatalf("聚合更新在下一則訊號再次帶同一個 ID：%+v", ev.Inbox)
+	}
+}
+
+func TestSignalsWithoutANewItemCarryNoIDs(t *testing.T) {
+	h := newHub(fakeRead, 8)
+	s := subscribe(t, h, buyer(1), 0)
+	next(t, s)
+	h.InboxChanged(buyer(1), 0, model.StateHintNone, uuid.Nil())
+	if ev := next(t, s); len(ev.Inbox.NewItemIDs) != 0 || ev.Inbox.NewItemsTruncated {
+		t.Fatalf("已讀或刪除的訊號不帶 ID：%+v", ev.Inbox)
+	}
+}
+
+func TestMoreThanTheCapMarksTruncatedAndDropsTheIDs(t *testing.T) {
+	h := newHub(fakeRead, 8)
+	s := subscribe(t, h, buyer(1), 0)
+	next(t, s)
+	for _, id := range ids(MaxNewItemIDs) {
+		h.InboxChanged(buyer(1), 0, model.StateHintNone, id)
+	}
+	if ev := next(t, s); len(ev.Inbox.NewItemIDs) != MaxNewItemIDs || ev.Inbox.NewItemsTruncated {
+		t.Fatalf("剛好等於上限不算超過：%d 個、truncated=%v", len(ev.Inbox.NewItemIDs), ev.Inbox.NewItemsTruncated)
+	}
+	for _, id := range ids(MaxNewItemIDs + 1) {
+		h.InboxChanged(buyer(1), 0, model.StateHintNone, id)
+	}
+	ev := next(t, s)
+	if len(ev.Inbox.NewItemIDs) != 0 || !ev.Inbox.NewItemsTruncated {
+		t.Fatalf("超過上限應標 truncated 且不帶 ID：%d 個、truncated=%v", len(ev.Inbox.NewItemIDs), ev.Inbox.NewItemsTruncated)
+	}
+	h.InboxChanged(buyer(1), 0, model.StateHintNone, uuid.NewV7())
+	if ev := next(t, s); ev.Inbox.NewItemsTruncated || len(ev.Inbox.NewItemIDs) != 1 {
+		t.Fatalf("truncated 只管那一則訊號：%+v", ev.Inbox)
+	}
+}
+
+func TestRestoreAfterReadFailureKeepsTheIDsAndMergesLaterOnes(t *testing.T) {
+	fail := false
+	h := newHub(func(ctx context.Context, key Key, storeID int64) (Inbox, error) {
+		if fail {
+			return Inbox{}, errors.New("read failed")
+		}
+		return fakeRead(ctx, key, storeID)
+	}, 8)
+	s := subscribe(t, h, buyer(1), 0)
+	next(t, s)
+	x := ids(3)
+	h.InboxChanged(buyer(1), 0, model.StateHintNone, x[0])
+	h.InboxChanged(buyer(1), 0, model.StateHintNone, x[1])
+	fail = true
+	if _, err := s.Next(context.Background()); err == nil {
+		t.Fatal("讀取失敗應回錯誤")
+	}
+	h.InboxChanged(buyer(1), 0, model.StateHintNone, x[2])
+	fail = false
+	if ev := next(t, s); !slices.Equal(ev.Inbox.NewItemIDs, x) {
+		t.Fatalf("失敗前取走的 ID 不該遺失，期間新來的接在後面：%+v", ev.Inbox)
+	}
+	wantNone(t, s)
+}
+
+func TestRestoreOverTheCapBecomesTruncated(t *testing.T) {
+	fail := false
+	h := newHub(func(ctx context.Context, key Key, storeID int64) (Inbox, error) {
+		if fail {
+			return Inbox{}, errors.New("read failed")
+		}
+		return fakeRead(ctx, key, storeID)
+	}, 8)
+	s := subscribe(t, h, buyer(1), 0)
+	next(t, s)
+	for _, id := range ids(MaxNewItemIDs) {
+		h.InboxChanged(buyer(1), 0, model.StateHintNone, id)
+	}
+	fail = true
+	if _, err := s.Next(context.Background()); err == nil {
+		t.Fatal("讀取失敗應回錯誤")
+	}
+	h.InboxChanged(buyer(1), 0, model.StateHintNone, uuid.NewV7())
+	fail = false
+	if ev := next(t, s); !ev.Inbox.NewItemsTruncated || len(ev.Inbox.NewItemIDs) != 0 {
+		t.Fatalf("放回的 ID 加上新來的超過上限應標 truncated：%+v", ev.Inbox)
+	}
 }

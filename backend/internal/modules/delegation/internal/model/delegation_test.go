@@ -12,24 +12,24 @@ import (
 
 func strp(s string) *string { return &s }
 
-func TestCapabilitiesAreTheClosedNine(t *testing.T) {
+func TestCapabilitiesAreTheClosedTen(t *testing.T) {
 	want := []Capability{
 		"storefront.read", "storefront.write", "products.read", "products.write", "products.publish",
-		"posts.read", "posts.write", "posts.publish", "orders.read",
+		"posts.read", "posts.write", "posts.publish", "orders.read", "media.upload",
 	}
 	if got := Capabilities(); !slices.Equal(got, want) {
 		t.Fatalf("Capabilities() = %v", got)
 	}
 	for _, c := range []Capability{"STOREFRONT.READ", "orders.write", "payments.read", ""} {
 		if c.Valid() {
-			t.Errorf("%q 不在封閉的九個值內", c)
+			t.Errorf("%q 不在封閉的十個值內", c)
 		}
 	}
 }
 
 func TestAuditActionRules(t *testing.T) {
-	if n := len(AuditActions()); n != 19 {
-		t.Fatalf("登錄的動作 %d 個，預期 19", n)
+	if n := len(AuditActions()); n != 20 {
+		t.Fatalf("登錄的動作 %d 個，預期 20", n)
 	}
 	cases := []struct {
 		action AuditAction
@@ -56,7 +56,7 @@ func TestAuditActionRules(t *testing.T) {
 }
 
 func TestNotifySellerIsImpossibleForReadsRevealsAndCorrections(t *testing.T) {
-	never := []AuditAction{AuditStorefrontRead, AuditProductRead, AuditPostRead, AuditOrderRead, AuditOrderPIIReveal, AuditCorrection}
+	never := []AuditAction{AuditStorefrontRead, AuditProductRead, AuditPostRead, AuditOrderRead, AuditOrderPIIReveal, AuditCorrection, AuditMediaUpload}
 	for _, a := range AuditActions() {
 		if want := !slices.Contains(never, a); a.MayNotifySeller() != want {
 			t.Errorf("%s.MayNotifySeller() = %v，預期 %v", a, a.MayNotifySeller(), want)
@@ -145,5 +145,15 @@ func TestEveryDenialIsClassified(t *testing.T) {
 		if got, ok := DelegationDenialOf(err); !ok || got.Denial != d || got.Message() != "x" {
 			t.Errorf("DelegationDenialOf(%d) = %+v", d, got)
 		}
+	}
+}
+
+// MEDIA_UPLOAD 只為了讓被拒絕的上傳有合法動作值（B1-D16：上傳成功不寫稽核）：不能寫成功列、不通知賣家、不要求操作原因。
+func TestMediaUploadAuditIsDenialOnly(t *testing.T) {
+	if !AuditMediaUpload.Known() || !AuditMediaUpload.DenialOnly() || AuditMediaUpload.ReadDenial() || AuditMediaUpload.MayNotifySeller() || AuditMediaUpload.RiskLevel() != RiskLow {
+		t.Fatalf("MEDIA_UPLOAD 規則不符：known=%v denial=%v notify=%v risk=%v", AuditMediaUpload.Known(), AuditMediaUpload.ReadDenial(), AuditMediaUpload.MayNotifySeller(), AuditMediaUpload.RiskLevel())
+	}
+	if !ResourceMedia.Valid() || !CapabilityMediaUpload.Valid() {
+		t.Fatal("MEDIA 資源與 media.upload 能力必須在封閉集合內")
 	}
 }

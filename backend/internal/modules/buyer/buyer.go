@@ -15,17 +15,14 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer/internal/deletion"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer/internal/favorite"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer/internal/follow"
-	"github.com/Will413028/hawkr/backend/internal/modules/buyer/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer/internal/membership"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer/internal/profile"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer/internal/restock"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer/internal/visit"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
 //go:embed db/migrations/*.sql db/migrations/atlas.sum
@@ -42,10 +39,10 @@ func Migrations() fs.FS {
 
 // Deps 外部依賴；clock 由組裝點注入。
 type Deps struct {
-	DB             *db.DB
-	Events         *events.Bus
-	Jobs           jobs.Enqueuer
-	Media          media.Media
+	DB     *db.DB
+	Events *events.Bus
+	// Media 是 media 模組（*media.Module）：頭像在寫入的 transaction 內 Confirm，被換掉或終態的資產 MarkDeleted。
+	Media          model.Media
 	Now            func() time.Time
 	NicknameNumber func() int
 	Logger         *slog.Logger
@@ -62,7 +59,6 @@ type Module struct {
 	restock    *restock.Service
 	membership *membership.Service
 	deletion   *deletion.Service
-	mediaSync  *media.RefSyncer
 }
 
 // New 建立服務，外部依賴由組裝點提供。
@@ -77,7 +73,6 @@ func New(deps Deps) *Module {
 		profile: profile.New(profile.Deps{
 			DB:             deps.DB,
 			Media:          deps.Media,
-			Jobs:           deps.Jobs,
 			Now:            deps.Now,
 			NicknameNumber: deps.NicknameNumber,
 			Logger:         deps.Logger,
@@ -87,15 +82,14 @@ func New(deps Deps) *Module {
 		deletion: deletion.New(deletion.Deps{
 			DB:     deps.DB,
 			Events: deps.Events,
-			Jobs:   deps.Jobs,
+			Media:  deps.Media,
 			Now:    deps.Now,
 		}),
-		mediaSync: mediaref.NewSyncer(deps.DB, deps.Media, deps.Jobs, deps.Now, deps.Logger),
-		favorite:  favorite.New(favorite.Deps{DB: deps.DB, Events: deps.Events, Now: deps.Now}),
-		follow:    follow.New(follow.Deps{DB: deps.DB, Events: deps.Events, Now: deps.Now}),
-		block:     block.New(block.Deps{DB: deps.DB, Now: deps.Now}),
-		visit:     visit.New(visit.Deps{DB: deps.DB, Events: deps.Events, Now: deps.Now}),
-		restock:   restock.New(restock.Deps{DB: deps.DB, Events: deps.Events, Now: deps.Now}),
+		favorite: favorite.New(favorite.Deps{DB: deps.DB, Events: deps.Events, Now: deps.Now}),
+		follow:   follow.New(follow.Deps{DB: deps.DB, Events: deps.Events, Now: deps.Now}),
+		block:    block.New(block.Deps{DB: deps.DB, Now: deps.Now}),
+		visit:    visit.New(visit.Deps{DB: deps.DB, Events: deps.Events, Now: deps.Now}),
+		restock:  restock.New(restock.Deps{DB: deps.DB, Events: deps.Events, Now: deps.Now}),
 	}
 }
 
@@ -118,7 +112,7 @@ type Profile = model.Profile
 // DisplayName 空字串不合法；Phone/Gender/City/Job 空字串、BirthDate 零值清除該欄。
 type UpdateProfileInput = model.UpdateProfileInput
 
-// Display 顯示資料；CLOSED stint 回 Deleted 且名稱與頭像為 nil。
+// Display 顯示資料；CLOSED stint 回 Deleted 且名稱、頭像與頭像資產 ID 為 nil。
 type Display = model.Display
 
 // Address 買家擁有的收貨地址。
@@ -239,6 +233,13 @@ func (module *Module) ShareLockByAccount(ctx context.Context, accountID int64) (
 // （1 到 MaxLiveAccountsPage）；不足 limit 筆表示沒有更多。給通知公告這類對全體買家的大量派送：不加鎖，寫入端以 ShareLockByAccount 守門。
 func (module *Module) ListLiveAccounts(ctx context.Context, afterBuyerID int64, limit int) ([]AccountRef, error) {
 	return module.profile.ListLiveAccounts(ctx, afterBuyerID, limit)
+}
+
+// ListLiveFollowerAccounts 列出追蹤店家 storeID、追蹤時間不晚於 followedBy（事件發生時就已追蹤）、buyer_id 大於 afterBuyerID、尚未關閉（營運中與刪除中）
+// 的買家與其帳號，依 buyer_id 由小到大，最多 limit 筆（1 到 MaxLiveAccountsPage）；不足 limit 筆表示沒有更多。followedBy 是零值回 InvalidInput。
+// 給通知對追蹤者的 fan-out：不加鎖，寫入端以 ShareLockByAccount 守門。
+func (module *Module) ListLiveFollowerAccounts(ctx context.Context, storeID, afterBuyerID int64, limit int, followedBy time.Time) ([]AccountRef, error) {
+	return module.follow.ListLiveFollowerAccounts(ctx, storeID, afterBuyerID, limit, followedBy)
 }
 
 // AccountIDByBuyerID 讀取歷史或現任 stint 所屬的帳號鍵，不曝露個資。
@@ -456,30 +457,17 @@ func (module *Module) CloseForDeletion(ctx context.Context, buyerID int64) error
 	return module.deletion.CloseForDeletion(ctx, buyerID)
 }
 
-// SyncMedia 同步一個 media ref（頭像，ref_id 是 buyer_id）的引用：Link 買家列目前的頭像，Unlink 退場的頭像。它是
-// buyer.media_sync job 的內容，給 worker 與測試呼叫；回傳是否要再跑一輪。
-func (module *Module) SyncMedia(ctx context.Context, ref media.Ref) (media.SyncResult, error) {
-	return module.mediaSync.Sync(ctx, ref)
-}
-
-// SweepMedia 執行 media 引用的保底掃描：清掉過期的退場紀錄，補排版本比已同步的新的 ref；回傳補排的 ref 數。它是
-// buyer.media_sweep job 的內容，給 worker 與測試呼叫。
-func (module *Module) SweepMedia(ctx context.Context) (int, error) {
-	return module.mediaSync.Sweep(ctx)
-}
-
 // CleanupPII 按 buyer_id 分批清除已關閉超過 30 天的個資。
 func (module *Module) CleanupPII(ctx context.Context) error { return module.deletion.CleanupPII(ctx) }
 
 // AddWorkers 登記 River workers。
 func (module *Module) AddWorkers(workers *river.Workers) {
 	module.deletion.AddWorkers(workers)
-	mediaref.AddWorkers(workers, module.mediaSync)
 }
 
-// PeriodicJobs 回傳啟動即執行、每小時補跑的 PII 清理排程，以及 media 引用的保底掃描。
+// PeriodicJobs 回傳啟動即執行、每小時補跑的 PII 清理排程。
 func (module *Module) PeriodicJobs() []*river.PeriodicJob {
-	return append(module.deletion.PeriodicJobs(), mediaref.PeriodicJobs()...)
+	return module.deletion.PeriodicJobs()
 }
 
 // StatusValues 回傳全部合法值，供 CHECK 與契約驗證。

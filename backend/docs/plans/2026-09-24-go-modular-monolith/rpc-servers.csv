@@ -355,16 +355,16 @@ LogisticsFinanceService,ListProviderStatementsForAdmin,payment-service,removed: 
 LogisticsFinanceService,GetProviderStatementForAdmin,payment-service,removed: seller-managed shipping and the platform no longer collects or bears shipping fees (ADR 2026-11-15 and plan B10) so the RPC is deleted
 LogisticsFinanceService,ListFulfillmentExceptionCasesForAdmin,payment-service,removed: seller-managed shipping and the platform no longer collects or bears shipping fees (ADR 2026-11-15 and plan B10) so the RPC is deleted
 LogisticsFinanceService,GetFulfillmentExceptionCaseForAdmin,payment-service,removed: seller-managed shipping and the platform no longer collects or bears shipping fees (ADR 2026-11-15 and plan B10) so the RPC is deleted
-MediaService,CreateUploadSession,media-service,
-MediaService,CompleteUploadSession,media-service,
-MediaService,FinalizeImages,media-service,
-MediaService,LinkImages,media-service,
-MediaService,UnlinkImages,media-service,
-MediaService,ReleaseReferences,media-service,
-MediaService,ServerUploadAndFinalize,media-service,
-MediaService,ServerUploadSecureAndFinalize,media-service,
-MediaService,ServerReadSecureAsset,media-service,
-MediaService,BatchGetAssetMetadata,media-service,
+MediaService,CreateUploadSession,media-service,api: Connect `hawkr.media.v1alpha1.MediaAppService.BeginUpload`（公開，回預簽 PUT）與 `BeginSecureUpload`（機敏），代行版在 `MediaDelegatedService`；模組方法 `media.Module.BeginUpload`／`BeginSecureUpload`（B1-2）
+MediaService,CompleteUploadSession,media-service,api: Connect `MediaAppService.CompleteUpload`（機敏檔改走 `PUT /api/files/secure_uploads/{token}/chunks/{index}`）；模組方法 `media.Module.CompleteUpload`、`PutSecureChunk`（B1-2）
+MediaService,FinalizeImages,media-service,api: `media.Module.Confirm`，擁有者在自己的 transaction 內呼叫，只新增認領列（B1-D1、B1-D25）
+MediaService,LinkImages,media-service,removed: 引用只在擁有者表，不再有 asset_reference（ADR 2026-10-03 的 2026-11-22 修訂；B1-5）
+MediaService,UnlinkImages,media-service,api: `media.Module.MarkDeleted`，被換掉的資產由擁有者在 transaction 內只新增刪除請求列，media 的套用 job 處理（B1-D9、B1-D25）
+MediaService,ReleaseReferences,media-service,api: `media.Module.MarkDeleted`，帳號刪除或終態時擁有者對自己列出的資產發刪除請求（B1-D9、B1-D25）
+MediaService,ServerUploadAndFinalize,media-service,api: `media.Module.PutPublic`（B1-D14）
+MediaService,ServerUploadSecureAndFinalize,media-service,api: `media.Module.PutSecure`（B1-D14）
+MediaService,ServerReadSecureAsset,media-service,api: `media.Module.ReadSecure`，擁有者先授權並記存取紀錄（ADR 2026-10-03 的 2026-10-04 修訂）
+MediaService,BatchGetAssetMetadata,media-service,removed: 擁有者以 `Confirm` 回傳的 `ConfirmedAsset`（資產 ID、object key、可見性、型別、大小）存自己的欄位，不再向 media 反查（盤點 1.1 第 10 列）
 MediaService,ImportDownloadAsset,media-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
 MediaService,FinalizeImportAsset,media-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
 MediaService,BindStagedAsset,media-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）

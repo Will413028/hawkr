@@ -1365,7 +1365,7 @@ VALUES ($1, $2, $3, $4)
 type InsertRequestEvidenceParams struct {
 	RequestID uuid.UUID
 	Position  int32
-	AssetID   string
+	AssetID   uuid.UUID
 	ObjectKey string
 }
 

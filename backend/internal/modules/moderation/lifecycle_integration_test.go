@@ -10,7 +10,7 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
@@ -18,10 +18,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
-
-func (f *fixture) snapshotRef(id uuid.UUID) media.Ref {
-	return media.Ref{Type: media.RefTypeGovernanceEvidence, ID: id.String()}
-}
 
 func (f *fixture) deleteComment(t *testing.T, buyerID int64, id uuid.UUID) {
 	t.Helper()
@@ -134,48 +130,44 @@ func TestTakedownNoteCountsEveryReportButCitesTheEarliestTwenty(t *testing.T) {
 	}
 }
 
-// A7-D21 證據保全：快照引用的圖片在 media 有一筆以快照為 ref 的引用；貼文被清除、作者的引用釋放之後圖片仍被快照引用，快照刪除之後才釋放。
-func TestASnapshotHoldsItsImageUntilTheSnapshotIsPurged(t *testing.T) {
+// B1-D20 證據保全：快照裡的圖片是 moderation 自己確認的複本；擁有者清除貼文（MarkDeleted 來源圖片）之後複本仍是 ACTIVE，快照刪除之後複本也不被 moderation 刪除。
+func TestASnapshotKeepsItsOwnConfirmedCopyOfTheImage(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	w := f.world(t)
 	ctx := context.Background()
-	postRef := media.Ref{Type: media.RefTypePost, ID: w.post.ID.String()}
-	mustV[media.SyncResult](t)(f.social.SyncMedia(ctx, postRef))
-	assets := f.media.Referenced(postRef)
-	if len(assets) != 1 {
-		t.Fatalf("貼文的圖片引用 %v", assets)
+	var source uuid.UUID
+	if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT image_asset_id FROM social.posts WHERE id = $1", w.post.ID).Scan(&source); err != nil {
+		t.Fatal(err)
 	}
-	asset := assets[0]
 
 	reporter, _ := f.newBuyer(t)
 	r := f.submit(t, reporter, Target{Kind: TargetPost, ContentID: w.post.ID}, policy.MisleadingInfo)
 	snap := *r.Report.SnapshotID
-	ref := f.snapshotRef(snap)
-	if f.media.HasRef(ref, asset) {
-		t.Fatal("引用由同步 job 寫入，送出的 transaction 內不呼叫 media")
+	var owned []uuid.UUID
+	if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT asset_ids FROM moderation.case_snapshots WHERE id = $1", snap).Scan(&owned); err != nil {
+		t.Fatal(err)
 	}
-	if n := f.jobs.syncJobs(ref); n != 1 {
-		t.Fatalf("送出要在同 transaction 排入快照的同步 job，實際 %d 個", n)
+	if len(owned) != 1 || owned[0] == source {
+		t.Fatalf("快照要擁有一份不同於來源的複本：來源 %v，快照的圖片 %v", source, owned)
 	}
-	if n := f.count(t, "SELECT count(*) FROM moderation.media_ref_sync WHERE ref_type = $1 AND ref_id = $2 AND seq > synced_seq", ref.Type, ref.ID); n != 1 {
-		t.Fatal("送出要把快照的 ref 記成待同步")
+	var content string
+	if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT content::text FROM moderation.case_snapshots WHERE id = $1", snap).Scan(&content); err != nil {
+		t.Fatal(err)
 	}
-	must(t, f.module.Retention().SyncSnapshotMedia(ctx, snap))
-	if n := f.count(t, "SELECT count(*) FROM moderation.media_ref_sync WHERE ref_type = $1 AND ref_id = $2 AND seq = synced_seq", ref.Type, ref.ID); n != 1 {
-		t.Fatal("同步之後快照的 ref 要結算")
+	if !strings.Contains(content, owned[0].String()) || strings.Contains(content, source.String()) {
+		t.Fatalf("快照內容的圖片參照要換成複本 %v、不留來源 %v：%s", owned[0], source, content)
 	}
-	if !f.media.HasRef(ref, asset) {
-		t.Fatalf("同步之後快照要引用圖片：%v", f.media.Referenced(ref))
+	if st := f.assetState(t, owned[0]); st != "ACTIVE" {
+		t.Fatalf("複本在送出的 transaction 內確認，狀態 %s，預期 ACTIVE", st)
 	}
 
 	must(t, f.social.PurgeStoreContent(ctx, w.storeID))
-	mustV[media.SyncResult](t)(f.social.SyncMedia(ctx, postRef))
-	if len(f.media.Referenced(postRef)) != 0 {
-		t.Fatalf("貼文清除之後作者的引用釋放：%v", f.media.Referenced(postRef))
+	if st := f.assetState(t, source); st == "ACTIVE" {
+		t.Fatal("擁有者清除貼文之後來源圖片要被標記刪除")
 	}
-	if !f.media.HasRef(ref, asset) {
-		t.Fatal("貼文清除之後圖片仍要被快照引用")
+	if st := f.assetState(t, owned[0]); st != "ACTIVE" {
+		t.Fatalf("擁有者刪圖之後快照的複本狀態 %s，預期仍是 ACTIVE", st)
 	}
 
 	mustV[CaseDetail](t)(f.module.DecideCase(ctx, DecideInput{CaseID: r.Case.ID, Version: r.Case.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionNoViolation}))
@@ -183,18 +175,91 @@ func TestASnapshotHoldsItsImageUntilTheSnapshotIsPurged(t *testing.T) {
 	if n := mustV[int64](t)(f.module.PurgeSnapshots(ctx)); n != 1 {
 		t.Fatalf("刪了 %d 份快照", n)
 	}
-	if !f.media.HasRef(ref, asset) {
-		t.Fatal("引用只由同步 job 解除，刪快照的 transaction 內不呼叫 media")
+	if st := f.assetState(t, owned[0]); st == "ACTIVE" {
+		t.Fatalf("快照過保留期被刪除之後複本要被標記刪除，狀態 %s", st)
 	}
-	if n := f.jobs.syncJobs(ref); n != 2 {
-		t.Fatalf("刪快照要在同 transaction 再排入一個同步 job（共 2 個），實際 %d 個", n)
+}
+
+// 被檢舉買家的頭像與其他證據圖片同一條保全路徑：快照擁有自己的複本，買家換頭像之後複本仍是 ACTIVE，快照過保留期才標記刪除。
+func TestASnapshotKeepsItsOwnCopyOfTheReportedBuyersAvatar(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	target, targetAccount := f.newBuyer(t)
+	p, err := f.buyer.Profile(ctx, targetAccount)
+	must(t, err)
+	token := f.stage(t)
+	_, err = f.buyer.UpdateProfile(ctx, buyer.UpdateProfileInput{BuyerID: target, ExpectedVersion: p.Version, AvatarStagedToken: &token})
+	must(t, err)
+	var source uuid.UUID
+	if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT avatar_asset_id FROM buyer.buyers WHERE buyer_id = $1", target).Scan(&source); err != nil {
+		t.Fatal(err)
 	}
-	if n := f.count(t, "SELECT count(*) FROM moderation.media_ref_sync WHERE ref_type = $1 AND ref_id = $2 AND seq > synced_seq", ref.Type, ref.ID); n != 1 {
-		t.Fatal("刪快照要把快照的 ref 記成待同步")
+
+	reporter, _ := f.newBuyer(t)
+	r := f.submit(t, reporter, Target{Kind: TargetBuyer, BuyerID: target}, policy.Spam)
+	snap := *r.Report.SnapshotID
+	var owned []uuid.UUID
+	if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT asset_ids FROM moderation.case_snapshots WHERE id = $1", snap).Scan(&owned); err != nil {
+		t.Fatal(err)
 	}
-	must(t, f.module.Retention().SyncSnapshotMedia(ctx, snap))
-	if f.media.HasRef(ref, asset) {
-		t.Fatalf("快照刪除之後要釋放圖片引用：%v", f.media.Referenced(ref))
+	if len(owned) != 1 || owned[0] == source {
+		t.Fatalf("快照要擁有一份不同於買家頭像的複本：頭像 %v，快照的圖片 %v", source, owned)
+	}
+	var content string
+	if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT content::text FROM moderation.case_snapshots WHERE id = $1", snap).Scan(&content); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(content, owned[0].String()) || strings.Contains(content, source.String()) {
+		t.Fatalf("快照內容的頭像資產要換成複本 %v、不留來源 %v：%s", owned[0], source, content)
+	}
+
+	p, err = f.buyer.Profile(ctx, targetAccount)
+	must(t, err)
+	next := f.stage(t)
+	_, err = f.buyer.UpdateProfile(ctx, buyer.UpdateProfileInput{BuyerID: target, ExpectedVersion: p.Version, AvatarStagedToken: &next})
+	must(t, err)
+	if st := f.assetState(t, source); st == "ACTIVE" {
+		t.Fatal("買家換頭像之後來源頭像要被標記刪除")
+	}
+	if st := f.assetState(t, owned[0]); st != "ACTIVE" {
+		t.Fatalf("買家換頭像之後快照的複本狀態 %s，預期仍是 ACTIVE", st)
+	}
+
+	mustV[CaseDetail](t)(f.module.DecideCase(ctx, DecideInput{CaseID: r.Case.ID, Version: r.Case.Version, Actor: adminaudit.Actor{AdminID: 9, Action: "/test/Decide"}, Decision: DecisionNoViolation}))
+	f.advance(SnapshotRetention + time.Hour)
+	if n := mustV[int64](t)(f.module.PurgeSnapshots(ctx)); n != 1 {
+		t.Fatalf("刪了 %d 份快照", n)
+	}
+	if st := f.assetState(t, owned[0]); st == "ACTIVE" {
+		t.Fatalf("快照過保留期被刪除之後複本要被標記刪除，狀態 %s", st)
+	}
+}
+
+// 建快照的 transaction 回滾時，這一輪確認的複本回到未確認（STAGED），由 media 回收；沒有快照列指著它。
+func TestASnapshotRollbackLeavesTheCopyUnconfirmed(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	w := f.world(t)
+	ctx := context.Background()
+	for _, stmt := range []string{
+		`CREATE FUNCTION moderation.fail_report() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'forced failure after the copy is confirmed'; END $$`,
+		`CREATE TRIGGER fail_report BEFORE INSERT ON moderation.reports FOR EACH ROW EXECUTE FUNCTION moderation.fail_report()`,
+	} {
+		if _, err := f.db.Conn(ctx).Exec(ctx, stmt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	before := f.stagedAssets(t)
+	reporter, _ := f.newBuyer(t)
+	if _, err := f.module.SubmitReport(ctx, SubmitInput{ReporterBuyerID: reporter, Target: Target{Kind: TargetPost, ContentID: w.post.ID}, Category: policy.MisleadingInfo}); err == nil {
+		t.Fatal("寫入檢舉被觸發器擋下，送出要失敗")
+	}
+	if n := f.count(t, "SELECT count(*) FROM moderation.case_snapshots"); n != 0 {
+		t.Fatalf("回滾之後不該有快照列：%d", n)
+	}
+	if n := f.stagedAssets(t); n != before+1 {
+		t.Fatalf("回滾之後複本要留在 STAGED（未確認）：之前 %d，之後 %d", before, n)
 	}
 }
 

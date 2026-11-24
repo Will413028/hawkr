@@ -4,10 +4,10 @@
 
 ## 1. 範圍與公開介面
 
-- 擁有 schema `content`：`banners`、`app_version_gates`，以及 media 引用的同步狀態 `media_ref_sync` 與退場資產 `retired_assets`。沒有 `pub_*`，沒有讀取模型。
+- 擁有 schema `content`：`banners`、`app_version_gates`，asset ID 欄位是 UUID，資產由 media 擁有。沒有 `pub_*`，沒有讀取模型。
 - 根套件保留 `Module`、`New`、`Migrations`、公開型別別名與轉呼叫方法；整合測試以 `content_test` 經公開 API 驗證。
 - 根套件的 `Deps` 是組裝 API；`internal/model` 只定義對外型別；`internal/banner`、`internal/appversion` 各自宣告最小 `Deps` 並實作 use case 和規則。
-- `internal/images` 封裝 media 的圖片轉正；`internal/mediaref` 是 banner 圖片引用的同步；`internal/validation` 放共用的純輸入檢查；每頁筆數由 `internal/platform/pagination` 擁有；`internal/store` 是 sqlc 生成的查詢套件。
+- `internal/images` 封裝 media 的圖片確認與退場資產的集合差；`internal/validation` 放共用的純輸入檢查；每頁筆數由 `internal/platform/pagination` 擁有；`internal/store` 是 sqlc 生成的查詢套件。
 - 模組內依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`。
 - 寫入方法收到的 `adminID` 只用來告訴 media 圖片是誰上傳的；認證與授權在 http 層。
 - 部分更新（field mask）在 http 層：讀目前的資料、套上 mask 內的欄位，再以整筆的內容呼叫修改方法。
@@ -25,17 +25,13 @@
 - 啟用中的 banner 最多 20 則，超過時上架回 `FailedPrecondition`；計算不含正在修改的那一筆。
 - 主鍵是應用層產生的 UUIDv7，不設 DB 預設值。
 
-## 3. 圖片與引用同步
+## 3. 圖片與資產
 
 - banner 的預覽圖與彈窗圖各存 object key 與 asset ID（`preview_image_asset_id`、`popup_image_asset_id`），key 與 asset ID 成對、`NOT NULL`：圖片必填。
 - 寫入只帶新圖的 staged token，空字串表示沿用；沿用的 key 與 asset ID 取自模組自己讀到的現有資料。
-- 圖片只在 transaction 外 `Finalize`（轉正，不建立引用）；`Finalize` 不需要 banner 的 ID。轉正被 media 拒絕時，錯誤指向該圖片的欄位，且 content 自己的驗證錯誤先於 media 的錯誤。轉正失敗時不寫入任何東西；banner 不存在時不碰 media。
-- 引用只由 `content.media_sync` 同步 job 寫入（`internal/mediaref`）：新增、換圖與刪除在 transaction 內寫業務列、把被換掉的圖記成退場（`retired_assets`），並遞增該 ref 在 `media_ref_sync` 的 `seq` 後排入同步。
-- 同步 job 以 (ref_type, ref_id) 去重，Link 業務列目前的圖、精確 Unlink 退場的資產；沒有列的 ref（已刪除）沒有目前的資產。結算時只在 `seq` 沒變才記下 `synced_seq`，job 執行中業務列又變動則再跑一次。`media_ref_sync` 的列不刪除。
-- 已退場的圖不能寫回同一個 ref。
-- banner 的預覽與彈窗共用同一個 ref，同一個資產可以同時在兩個欄位：退場是「寫入前這個 ref 的所有資產減去寫入後的所有資產」（集合差，去重），不逐欄位比對；刪除用同一個函式。
-- 同步 job 失敗由 River 重試；重試用盡或 job 遺失由保底掃描（`content.media_sweep`）補排 `synced_seq < seq` 的 ref。
-- 外部呼叫（轉正）不在 DB transaction 內。
+- 新增與換圖在寫入 banner 的 transaction 內 `Confirm` 新資產（上傳者是管理員，必須是公開資產）；`Confirm` 不需要 banner 的 ID。任何一步失敗整筆回滾，新資產仍是暫存；banner 不存在或版本不符時不碰 media。media 拒絕確認時，media 的使用者面錯誤原樣回傳（B1-D18）。
+- 換圖與刪除時，被換掉或終態的資產在同一個 transaction 內 `MarkDeleted`（實體刪除由 media 的 job 做）。
+- banner 的預覽與彈窗各自指一個資產，同一個資產可以同時在兩個欄位：退場是「寫入前這個 ref 的所有資產減去寫入後的所有資產」（集合差，去重），不逐欄位比對；刪除用同一個函式。
 
 ## 4. 並發：版本與 etag
 
@@ -81,5 +77,4 @@
 
 ## 7. 已知限制
 
-- 新圖要在 media GC 的 7 天寬限（從資產建立起算）內被同步 job Link：轉正之後、同步完成之前，資產沒有引用。
 - asset ID 欄位不 backfill：本機有舊列（沒有 asset ID）的開發資料庫要重灌。

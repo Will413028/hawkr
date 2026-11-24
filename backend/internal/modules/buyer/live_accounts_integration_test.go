@@ -5,6 +5,7 @@ package buyer_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	. "github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -54,5 +55,82 @@ func TestListLiveAccountsPagesByBuyerIDAndExcludesClosed(t *testing.T) {
 		if _, err := fixture.module.ListLiveAccounts(ctx, c.after, c.limit); apperr.KindOf(err) != apperr.KindInvalidInput {
 			t.Errorf("%s：%v，預期 InvalidInput", name, err)
 		}
+	}
+}
+
+// ListLiveFollowerAccounts 只列追蹤指定店家且尚未關閉的買家（營運中與刪除中），依 buyer_id keyset 分頁；分頁參數不合法回 InvalidInput。
+func TestListLiveFollowerAccountsPagesByBuyerIDForOneStore(t *testing.T) {
+	t.Parallel()
+	fixture := setup(t)
+	ctx := context.Background()
+	first := profile(t, fixture, 21)
+	closing := profile(t, fixture, 22)
+	other := profile(t, fixture, 23)
+	last := profile(t, fixture, 24)
+	for _, b := range []Profile{first, closing, last} {
+		must(t, fixture.module.Follow(ctx, b.BuyerID, 5))
+	}
+	must(t, fixture.module.Follow(ctx, other.BuyerID, 6))
+	must(t, fixture.module.BeginDeletion(ctx, closing.BuyerID))
+
+	want := []AccountRef{{BuyerID: first.BuyerID, AccountID: 21}, {BuyerID: closing.BuyerID, AccountID: 22}, {BuyerID: last.BuyerID, AccountID: 24}}
+	var got []AccountRef
+	after, pages := int64(0), 0
+	for {
+		page, err := fixture.module.ListLiveFollowerAccounts(ctx, 5, after, 2, fixture.now)
+		must(t, err)
+		pages++
+		got = append(got, page...)
+		if len(page) < 2 {
+			break
+		}
+		after = page[len(page)-1].BuyerID
+	}
+	if len(got) != len(want) || pages != 2 {
+		t.Fatalf("得到 %v（%d 頁），預期 %v（2 頁）", got, pages, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("第 %d 筆 = %v，預期 %v", i, got[i], want[i])
+		}
+	}
+	if page, err := fixture.module.ListLiveFollowerAccounts(ctx, 99, 0, 5, fixture.now); err != nil || len(page) != 0 {
+		t.Errorf("沒有人追蹤的店 = %v（%v），預期空", page, err)
+	}
+	for name, c := range map[string]struct {
+		store, after int64
+		limit        int
+	}{"limit 0": {5, 0, 0}, "limit 過大": {5, 0, MaxLiveAccountsPage + 1}, "after 為負": {5, -1, 1}, "店不合法": {0, 0, 1}} {
+		if _, err := fixture.module.ListLiveFollowerAccounts(ctx, c.store, c.after, c.limit, fixture.now); apperr.KindOf(err) != apperr.KindInvalidInput {
+			t.Errorf("%s：%v，預期 InvalidInput", name, err)
+		}
+	}
+}
+
+// 追蹤時間晚於事件時間的買家不在名單裡（事件發生時他還沒追蹤）；追蹤時間剛好等於事件時間的在；followedBy 是零值回 InvalidInput。
+// mutation：查詢的 s.created_at <= followed_by 條件拿掉 → 事件之後才追蹤的買家也被列出，失敗。
+func TestListLiveFollowerAccountsExcludesFollowersAfterTheEvent(t *testing.T) {
+	t.Parallel()
+	fixture := setup(t)
+	ctx := context.Background()
+	early := profile(t, fixture, 31)
+	atEvent := profile(t, fixture, 32)
+	late := profile(t, fixture, 33)
+	eventAt := fixture.now
+	fixture.now = eventAt.Add(-time.Hour)
+	must(t, fixture.module.Follow(ctx, early.BuyerID, 7))
+	fixture.now = eventAt
+	must(t, fixture.module.Follow(ctx, atEvent.BuyerID, 7))
+	fixture.now = eventAt.Add(time.Second)
+	must(t, fixture.module.Follow(ctx, late.BuyerID, 7))
+
+	got, err := fixture.module.ListLiveFollowerAccounts(ctx, 7, 0, 10, eventAt)
+	must(t, err)
+	want := []AccountRef{{BuyerID: early.BuyerID, AccountID: 31}, {BuyerID: atEvent.BuyerID, AccountID: 32}}
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Fatalf("得到 %v，預期 %v", got, want)
+	}
+	if _, err := fixture.module.ListLiveFollowerAccounts(ctx, 7, 0, 10, time.Time{}); apperr.KindOf(err) != apperr.KindInvalidInput {
+		t.Errorf("零值 followedBy：%v，預期 InvalidInput", err)
 	}
 }

@@ -1,208 +1,99 @@
-import 'package:dio/dio.dart';
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pb.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../../core/exceptions/app_exception.dart';
-import '../../../core/networking/dio_provider.dart';
-import 'notification_model.dart';
+import '../../../core/networking/connect_provider.dart';
+
+export 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pb.dart'
+    show InboxItem, InboxSignal, PreferenceEntry, WatchNotificationsResponse;
+export 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pbenum.dart'
+    show
+        InboxPresentation,
+        NotificationCategory,
+        NotificationChannel,
+        StateRefreshHint,
+        SellerWorkspaceChange;
 
 part 'notification_repository.g.dart';
 
-@riverpod
-NotificationRepository notificationRepository(Ref ref) {
-  return NotificationRepository(ref.watch(dioProvider));
+@Riverpod(keepAlive: true)
+NotificationRepository notificationRepository(Ref ref) =>
+    NotificationRepository(ref.watch(notificationClientProvider));
+
+/// 收件匣的一頁；文字、深連結與呈現分類都是伺服器給的。
+class InboxPage {
+  const InboxPage({
+    required this.items,
+    required this.nextPageToken,
+    required this.totalSize,
+  });
+
+  final List<InboxItem> items;
+  final String nextPageToken;
+  final int totalSize;
 }
 
-/// 通知 Repository
-///
-/// 封裝所有通知相關 API 呼叫。
-/// 裝置管理 API 不在此 repository 中，未來歸 device feature。
+/// 通知（`NotificationAppService`，STORE 受眾）。失敗一律丟出 `ConnectException`，由呼叫端決定如何呈現。
 class NotificationRepository {
-  final Dio _dio;
+  NotificationRepository(this._client);
 
-  NotificationRepository(this._dio);
+  static const pageSize = 20;
+  static const _audience = NotificationAudience.NOTIFICATION_AUDIENCE_STORE;
 
-  static const _base = '/api/v1/app/notifications';
+  final NotificationAppServiceClient _client;
 
-  // ============================================================
-  // 通知列表
-  // ============================================================
-
-  /// 獲取通知列表（cursor-based 分頁）
-  /// GET /api/v1/app/notifications?pageSize=20&cursorId=xxx
-  /// Response: { code, data: { records: [...], total: "50", pageSize: "20", hasMore: true } }
-  Future<NotificationListResult> getNotifications({
-    int cursorId = 0,
-    int size = 20,
-  }) async {
-    try {
-      final params = <String, dynamic>{'pageSize': size};
-      if (cursorId > 0) {
-        params['cursorId'] = '$cursorId';
-      }
-      final response = await _dio.get(_base, queryParameters: params);
-
-      final data = response.data;
-      if (data['code'] == 0) {
-        final rawData = data['data'];
-        if (rawData is Map<String, dynamic>) {
-          return NotificationListResult.fromJson(rawData);
-        }
-        return const NotificationListResult();
-      }
-      throw AppException.fromApiError(
-        data['code'] as int,
-        data['message'] as String? ?? '獲取通知列表失敗',
-      );
-    } on DioException catch (e) {
-      throw AppException.fromDioException(e);
-    }
+  Future<InboxPage> listInbox({String pageToken = ''}) async {
+    final res = await _client.listInboxItems(
+      ListInboxItemsRequest(
+        audience: _audience,
+        pageSize: pageSize,
+        pageToken: pageToken,
+      ),
+    );
+    return InboxPage(
+      items: res.items,
+      nextPageToken: res.nextPageToken,
+      totalSize: res.totalSize,
+    );
   }
 
-  /// 獲取未讀數量
-  /// GET /api/v1/app/notifications/unread-count
-  /// Response: { code, data: { count: 5 } }
-  Future<UnreadCount> getUnreadCount() async {
-    try {
-      final response = await _dio.get('$_base/unread-count');
+  Future<int> unreadCount() async => (await _client.getUnreadCount(
+    GetUnreadCountRequest(audience: _audience),
+  )).unreadCount;
 
-      final data = response.data;
-      if (data['code'] == 0) {
-        final rawData = data['data'];
-        if (rawData is Map<String, dynamic>) {
-          return UnreadCount.fromJson(rawData);
-        }
-        return const UnreadCount();
-      }
-      throw AppException.fromApiError(
-        data['code'] as int,
-        data['message'] as String? ?? '獲取未讀數量失敗',
-      );
-    } on DioException catch (e) {
-      throw AppException.fromDioException(e);
-    }
+  Future<void> markRead(String id) async {
+    await _client.markInboxItemRead(MarkInboxItemReadRequest(id: id));
   }
 
-  // ============================================================
-  // 標記已讀
-  // ============================================================
+  Future<int> markAllRead() async => (await _client.markAllInboxItemsRead(
+    MarkAllInboxItemsReadRequest(audience: _audience),
+  )).updatedCount;
 
-  /// 標記單個通知為已讀（冪等）
-  /// PATCH /api/v1/app/notifications/{id}/read
-  Future<void> markAsRead(int notificationId) async {
-    try {
-      final response = await _dio.patch('$_base/$notificationId/read');
-
-      final data = response.data;
-      if (data['code'] != 0) {
-        throw AppException.fromApiError(
-          data['code'] as int,
-          data['message'] as String? ?? '標記已讀失敗',
-        );
-      }
-    } on DioException catch (e) {
-      throw AppException.fromDioException(e);
-    }
+  Future<void> deleteItems(List<String> ids) async {
+    if (ids.isEmpty) return;
+    await _client.batchDeleteInboxItems(BatchDeleteInboxItemsRequest(ids: ids));
   }
 
-  /// 標記全部已讀
-  /// PATCH /api/v1/app/notifications/read-all
-  /// Response: { code, data: { updated: 12 } }
-  Future<int> markAllAsRead() async {
-    try {
-      final response = await _dio.patch('$_base/read-all');
+  Future<List<PreferenceEntry>> preferences() async =>
+      (await _client.getNotificationPreferences(
+        GetNotificationPreferencesRequest(audience: _audience),
+      )).entries;
 
-      final data = response.data;
-      if (data['code'] == 0) {
-        return data['data']?['updated'] as int? ?? 0;
-      }
-      throw AppException.fromApiError(
-        data['code'] as int,
-        data['message'] as String? ?? '標記全部已讀失敗',
-      );
-    } on DioException catch (e) {
-      throw AppException.fromDioException(e);
-    }
-  }
+  Future<PreferenceEntry> updatePreference(
+    NotificationCategory category,
+    NotificationChannel channel,
+    bool enabled,
+  ) async => (await _client.updateNotificationPreference(
+    UpdateNotificationPreferenceRequest(
+      audience: _audience,
+      category: category,
+      channel: channel,
+      enabled: enabled,
+    ),
+  )).entry;
 
-  // ============================================================
-  // 刪除通知
-  // ============================================================
-
-  /// 批次刪除通知
-  /// DELETE /api/v1/app/notifications
-  /// Body: { "ids": [1, 2, 3] }
-  /// Response: { code, data: { deleted: 3 } }
-  Future<int> deleteNotifications(List<String> ids) async {
-    if (ids.isEmpty) return 0;
-    try {
-      final response = await _dio.delete(_base, data: {'ids': ids});
-
-      final data = response.data;
-      if (data['code'] == 0) {
-        final deleted = data['data']?['deleted'];
-        return deleted is int
-            ? deleted
-            : (int.tryParse('$deleted') ?? ids.length);
-      }
-      throw AppException.fromApiError(
-        data['code'] as int,
-        data['message'] as String? ?? '刪除通知失敗',
-      );
-    } on DioException catch (e) {
-      throw AppException.fromDioException(e);
-    }
-  }
-
-  // ============================================================
-  // 偏好設定（賣家通知偏好）
-  // ============================================================
-
-  static const _prefBase = '/api/v1/app/sellers/me/notification-preferences';
-
-  /// 獲取通知偏好設定
-  /// GET /app/sellers/me/notification-preferences
-  Future<List<NotificationPreferenceItem>> getPreferences() async {
-    try {
-      final response = await _dio.get(_prefBase);
-
-      final data = response.data;
-      if (data['code'] == 0) {
-        final nested = data['data'];
-        final list =
-            (nested is Map ? nested['preferences'] : null) as List<dynamic>?;
-        if (list == null) return [];
-        return list
-            .whereType<Map<String, dynamic>>()
-            .map((e) => NotificationPreferenceItem.fromJson(e))
-            .toList();
-      }
-      throw AppException.fromApiError(
-        data['code'] as int,
-        data['message'] as String? ?? '獲取偏好設定失敗',
-      );
-    } on DioException catch (e) {
-      throw AppException.fromDioException(e);
-    }
-  }
-
-  /// 更新單一通知類別開關
-  /// PUT /app/sellers/me/notification-preferences
-  Future<void> updatePreference(String category, bool enabled) async {
-    try {
-      final response = await _dio.put(
-        _prefBase,
-        data: {'category': category, 'enabled': enabled},
-      );
-
-      final data = response.data;
-      if (data['code'] != 0) {
-        throw AppException.fromApiError(
-          data['code'] as int,
-          data['message'] as String? ?? '更新偏好設定失敗',
-        );
-      }
-    } on DioException catch (e) {
-      throw AppException.fromDioException(e);
-    }
-  }
+  /// 即時訊號串流；斷線與重連由 `NotificationSignalService` 處理。
+  Stream<WatchNotificationsResponse> watch() => _client.watchNotifications(
+    WatchNotificationsRequest(audience: _audience),
+  );
 }

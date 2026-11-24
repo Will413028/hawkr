@@ -1,6 +1,6 @@
 // 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。
 import { Code } from "@connectrpc/connect";
-import { adminModerationCaseReportOutcomeUnset, assistantAssistantTool, buyerGender, buyerProfileDeletedName, buyerProfileGenderUnset, chatMessageUnsupportedKind, chatPreviewErased, chatPreviewHidden, chatPreviewImage, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, crmCustomerSort, crmCustomerType, moderationCommunityReportOutcomeUnset, moderationReportOutcome, moderationReportTargetKind, paymentPaymentAccountStatus, paymentPaymentAnomalyKind, paymentPaymentAnomalyOutcome, paymentPaymentRefundStatus, paymentPaymentReversalStatus, paymentPaymentStatus, paymentPaymentTopupStatus, paymentPaymentTransferStatus, paymentRequirementCollection, procurementRejectionReason, reviewReviewAuthorAnonymousName, reviewReviewRatingLabel1, reviewReviewRatingLabel2, reviewReviewRatingLabel3, reviewReviewRatingLabel4, reviewReviewRatingLabel5, sellerContentKind, sellerInquiryKind, sellerInquiryReplyChannel, sellerInquiryState, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRemovedContentsCleared, sellerMeasureRemovedContentsHeading, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerMeasureViewContentLink, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPaymentAccountPayoutsInactiveNote, sellerReportOutcome, sellerRevokeReason, sellerRiskGround, sellerSellerRequirement, sellerStoreField, sellerStoreReportOutcomeUnset, sellerTerminationGround, sellerViolationSeverity, socialCommentStatePlaceholder } from "../src/keys.gen";
+import { adminModerationCaseReportOutcomeUnset, assistantAssistantTool, buyerGender, buyerProfileDeletedName, buyerProfileGenderUnset, chatMessageUnsupportedKind, chatPreviewErased, chatPreviewHidden, chatPreviewImage, commonError, commonPolicyCategory, commonStoreCardClosedStore, commonStoreCardStatus, commonUnknown, crmCustomerSort, crmCustomerType, mediaRejectReason, moderationCommunityReportOutcomeUnset, moderationReportOutcome, moderationReportTargetKind, notificationNotificationCategory, notificationNotificationChannel, paymentPaymentAccountStatus, paymentPaymentAnomalyKind, paymentPaymentAnomalyOutcome, paymentPaymentRefundStatus, paymentPaymentReversalStatus, paymentPaymentStatus, paymentPaymentTopupStatus, paymentPaymentTransferStatus, paymentRequirementCollection, procurementRejectionReason, reviewReviewAuthorAnonymousName, reviewReviewRatingLabel1, reviewReviewRatingLabel2, reviewReviewRatingLabel3, reviewReviewRatingLabel4, reviewReviewRatingLabel5, sellerContentKind, sellerInquiryKind, sellerInquiryReplyChannel, sellerInquiryState, sellerKYCApplicationDecideTime, sellerKYCApplicationSubmitTime, sellerKYCField, sellerKYCStatus, sellerMeasureAppealDeadline, sellerMeasureBasis, sellerMeasureKind, sellerMeasureMetaKind, sellerMeasureMetaSeverity, sellerMeasureMetaTerminationGround, sellerMeasureRejectionCooldownWarning, sellerMeasureRemovedContentsCleared, sellerMeasureRemovedContentsHeading, sellerMeasureRequestKind, sellerMeasureRequestKindSubmittedNote, sellerMeasureRequestReplyNote, sellerMeasureRequestState, sellerMeasureRequestStateWithKind, sellerMeasureState, sellerMeasureSuspensionActiveOpen, sellerMeasureSuspensionActiveUntil, sellerMeasureSuspensionEnded, sellerMeasureTerminationEffective, sellerMeasureTerminationEffectiveEnded, sellerMeasureTerminationNotice, sellerMeasureTitleFallback, sellerMeasureTitleRisk, sellerMeasureTitleRiskFallback, sellerMeasureViewContentLink, sellerOnboardingActionButton, sellerOnboardingTaskIdDescription, sellerOnboardingTaskIdPanelDescription, sellerOnboardingTaskIdPanelTitle, sellerPaymentAccountPayoutsInactiveNote, sellerReportOutcome, sellerRevokeReason, sellerRiskGround, sellerSellerRequirement, sellerStoreField, sellerStoreReportOutcomeUnset, sellerTerminationGround, sellerViolationSeverity, socialCommentStatePlaceholder } from "../src/keys.gen";
 import { sellerMeasureRequestStateWithKindStaff } from "../src/zh-tw.gen";
 import type { UiMessage } from "../src/message";
 
@@ -52,6 +52,12 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"hawkr.crm.v1alpha1.CustomerType.CUSTOMER_TYPE_NORMAL": 1,
 	"hawkr.crm.v1alpha1.CustomerType.CUSTOMER_TYPE_UNSPECIFIED": 0,
 	"hawkr.crm.v1alpha1.CustomerType.CUSTOMER_TYPE_VIP": 2,
+	"hawkr.media.v1alpha1.RejectReason.REJECT_REASON_CHECKSUM_MISMATCH": 3,
+	"hawkr.media.v1alpha1.RejectReason.REJECT_REASON_EXPIRED": 5,
+	"hawkr.media.v1alpha1.RejectReason.REJECT_REASON_PROCESSING_FAILED": 4,
+	"hawkr.media.v1alpha1.RejectReason.REJECT_REASON_SIZE_MISMATCH": 2,
+	"hawkr.media.v1alpha1.RejectReason.REJECT_REASON_UNRECOGNIZED_FORMAT": 1,
+	"hawkr.media.v1alpha1.RejectReason.REJECT_REASON_UNSPECIFIED": 0,
 	"hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_NO_VIOLATION": 3,
 	"hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_UNSPECIFIED": 0,
 	"hawkr.moderation.v1alpha1.ReportOutcome.REPORT_OUTCOME_VIOLATION": 2,
@@ -63,6 +69,26 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"hawkr.moderation.v1alpha1.ReportTargetKind.REPORT_TARGET_KIND_REVIEW": 5,
 	"hawkr.moderation.v1alpha1.ReportTargetKind.REPORT_TARGET_KIND_REVIEW_REPLY": 7,
 	"hawkr.moderation.v1alpha1.ReportTargetKind.REPORT_TARGET_KIND_UNSPECIFIED": 0,
+	"hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_ACCOUNT": 6,
+	"hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_AFTERSALES": 4,
+	"hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_ANNOUNCEMENT": 15,
+	"hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_CHAT": 7,
+	"hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_COMMENT": 9,
+	"hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_COUPON": 13,
+	"hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_FOLLOW": 11,
+	"hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_FOLLOWED_STORE_POST": 12,
+	"hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_LIKE": 10,
+	"hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_ORDER": 1,
+	"hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_PAYOUT": 5,
+	"hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_RESTOCK": 14,
+	"hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_REVIEW": 8,
+	"hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_SHIPMENT": 2,
+	"hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_SHIPMENT_ANOMALY": 3,
+	"hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_UNSPECIFIED": 0,
+	"hawkr.notification.v1alpha1.NotificationChannel.NOTIFICATION_CHANNEL_EMAIL": 3,
+	"hawkr.notification.v1alpha1.NotificationChannel.NOTIFICATION_CHANNEL_INBOX": 1,
+	"hawkr.notification.v1alpha1.NotificationChannel.NOTIFICATION_CHANNEL_PUSH": 2,
+	"hawkr.notification.v1alpha1.NotificationChannel.NOTIFICATION_CHANNEL_UNSPECIFIED": 0,
 	"hawkr.payment.v1alpha1.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": 3,
 	"hawkr.payment.v1alpha1.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED": 5,
 	"hawkr.payment.v1alpha1.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED": 4,
@@ -330,6 +356,9 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	case "crm.CustomerType": {
 		return crmCustomerType(num("hawkr.crm.v1alpha1.CustomerType", c.value));
 	}
+	case "media.RejectReason": {
+		return mediaRejectReason(num("hawkr.media.v1alpha1.RejectReason", c.value));
+	}
 	case "moderation.CommunityReport.outcome_unset": {
 		return moderationCommunityReportOutcomeUnset();
 	}
@@ -338,6 +367,12 @@ export function goldenMessage(c: GoldenCase): UiMessage | undefined {
 	}
 	case "moderation.ReportTargetKind": {
 		return moderationReportTargetKind(num("hawkr.moderation.v1alpha1.ReportTargetKind", c.value));
+	}
+	case "notification.NotificationCategory": {
+		return notificationNotificationCategory(num("hawkr.notification.v1alpha1.NotificationCategory", c.value));
+	}
+	case "notification.NotificationChannel": {
+		return notificationNotificationChannel(num("hawkr.notification.v1alpha1.NotificationChannel", c.value));
 	}
 	case "payment.PaymentAccountStatus": {
 		return paymentPaymentAccountStatus(num("hawkr.payment.v1alpha1.PaymentAccountStatus", c.value));

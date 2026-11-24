@@ -65,11 +65,12 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
       return null;
     }, [summary.caseNo, summary.status]);
 
-    // FCM silent push: 本案件狀態變更自動刷新
+    // 本案件狀態變更（或伺服器要求全部重讀）自動刷新
     ref.listen(afterSaleStatusStreamProvider, (_, next) {
       next.whenData((event) {
         final current = detail.value ?? summary;
-        if (event.caseNo == current.caseNo ||
+        if (event.refreshesAll ||
+            event.caseNo == current.caseNo ||
             event.orderNo == current.orderNo) {
           load();
         }

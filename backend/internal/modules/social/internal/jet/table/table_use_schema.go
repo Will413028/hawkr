@@ -18,7 +18,6 @@ func UseSchema(schema string) {
 	ForumEntryStats = ForumEntryStats.FromSchema(schema)
 	Hides = Hides.FromSchema(schema)
 	InactiveAuthors = InactiveAuthors.FromSchema(schema)
-	MediaRefSync = MediaRefSync.FromSchema(schema)
 	PostHashtags = PostHashtags.FromSchema(schema)
 	PostLikes = PostLikes.FromSchema(schema)
 	PostSchedules = PostSchedules.FromSchema(schema)
@@ -26,7 +25,6 @@ func UseSchema(schema string) {
 	PostStats = PostStats.FromSchema(schema)
 	PostViews = PostViews.FromSchema(schema)
 	Posts = Posts.FromSchema(schema)
-	RetiredAssets = RetiredAssets.FromSchema(schema)
 	Sanctions = Sanctions.FromSchema(schema)
 	ViewSalts = ViewSalts.FromSchema(schema)
 }

@@ -80,7 +80,7 @@ var sensitiveKeys = map[string]struct{}{
 	// operation_credential／operationCredential 與 handoff_code／handoffCode。
 	"operationcredential": {},
 	"handoffcode":         {},
-	// 上傳用的預簽 URL（`/app/media/upload_sessions` 與代行版兩支的回應）。它比同一批
+	// 上傳用的預簽 URL（Connect 上傳流程的回應）。它比同一批
 	// 端點回的 staged token 更該遮：預簽 URL 的定義就是「授權寫在 URL 裡」，拿到它的人
 	// 不需要任何身分就能在有效期內覆寫那個暫存物件——而操作者接下來 complete 並掛上
 	// 店面的，正是那個被覆寫後的內容。§10.3 的判準「單獨持有即可操作的識別碼一律視為
@@ -128,10 +128,8 @@ var sensitiveKeys = map[string]struct{}{
 // normalizeKey 收斂之後這些鍵彼此並不相等，逐條列舉必然漏掉下一個新增的。
 //
 // 為什麼要遮：它是 media-service 簽出來的 JWT（`StagedTokenService.generateToken`，
-// claims 帶 session_id／account_id／scope），而 `admin_delegated_media.go` 與
-// `validateStagedToken` 都已經把「never logged」寫成不變式——在此之前那個不變式沒有
-// 任何機械保證，兩支代行媒體端點的 req_body 與 complete 端點的 resp_body 各洩漏一半。
-// 它單獨持有不足以轉正資產（`MediaAssetService.prepareFinalize` 比對 caller 的
+// claims 帶 session_id／account_id／scope），`validateStagedToken` 已經把
+// 「never logged」寫成不變式。它單獨持有不足以轉正資產（比對 caller 的
 // account_id），所以它不像 guestId 那樣是全權憑證；遮它是因為簽章憑證不該以明文停在
 // Loki 裡，而 log 讀者要追的是 upload session id（在 URL path 上），從來不是 token 值。
 //
