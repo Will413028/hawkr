@@ -512,6 +512,15 @@
    "new": "\tWakeRefundID uuid.UUID `json:\"wake_refund_id\"`",
    "test": "internal/modules/payment/internal/charge ^TestTheTransferWakeJobIsDistinctFromTheSnoozedOneByTheRefundID$",
    "why": "喚醒 job 的唯一鍵不含退款 ID：被同一筆轉帳 snooze 中的 job 合併，喚醒沒有效果。"
+  },
+  {
+   "id": "anomalous-refund-does-not-hold-the-cap",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/store/transfers.sql.go",
+   "old": "SELECT COALESCE(SUM(amount), 0)::bigint AS total\nFROM payment.refunds\nWHERE payment_id = $1 AND status <> 'FAILED'",
+   "new": "SELECT COALESCE(SUM(amount), 0)::bigint AS total\nFROM payment.refunds\nWHERE payment_id = $1 AND status NOT IN ('FAILED', 'ANOMALY')",
+   "test": "internal/modules/payment ^(TestAReversalConvergesByLookupAndAnAnomalousRefundStillHoldsItsQuota)$",
+   "why": "累計退款額度不計 ANOMALY 的退款：待核對的退款沒有佔額度，超過付款金額的再一筆退款被接受。"
   }
  ]
 }

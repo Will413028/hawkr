@@ -276,7 +276,7 @@ func TestResolvingATransferAnomalyWritesTheAuditInTheSameTransaction(t *testing.
 }
 
 // 撤回：結果不明過了視窗查回找到 → 收下（累加轉帳、撤回 REVERSED），不再呼叫 ReverseTransfer；查無滿等待才釋出預留（RELEASED，退款維持原狀）；
-// 可重試拒絕換新的撤回鍵；查回連續失敗進 ANOMALY，ANOMALY 的退款仍佔額度（轉帳金額扣掉它）。
+// 可重試拒絕換新的撤回鍵；查回連續失敗進 ANOMALY，ANOMALY 的退款仍佔累計退款額度（再退一元被拒）。
 // mutation：reverse() 在過了視窗之後仍呼叫 ReverseTransfer → 呼叫次數增加或重複累加，失敗。
 // mutation：NonFailedRefundTotal 排除 ANOMALY（status NOT IN ('FAILED','ANOMALY')）→ 額度沒有被佔，最後一段失敗。
 func TestAReversalConvergesByLookupAndAnAnomalousRefundStillHoldsItsQuota(t *testing.T) {
@@ -350,7 +350,7 @@ func TestAReversalConvergesByLookupAndAnAnomalousRefundStillHoldsItsQuota(t *tes
 	}
 	f.paidPayment(t, "C-7c", 100)
 	f.insertRefund(t, f.idOf(t, "C-7c"), "ANOMALY", 100, 0)
-	if _, err := f.module.RequestPaymentTransfer(ctx, "C-7c"); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if _, err := f.module.CreatePaymentRefund(ctx, RefundRequest{OrderNo: "C-7c", Amount: 1, RequestKey: "over-cap"}); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("ANOMALY 的退款沒有佔額度：%v", err)
 	}
 }
