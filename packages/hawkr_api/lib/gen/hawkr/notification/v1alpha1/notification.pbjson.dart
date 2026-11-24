@@ -695,6 +695,20 @@ const InboxSignal$json = {
       '6': '.hawkr.notification.v1alpha1.StateRefreshHint',
       '10': 'stateRefreshHints'
     },
+    {
+      '1': 'new_inbox_item_ids',
+      '3': 4,
+      '4': 3,
+      '5': 9,
+      '10': 'newInboxItemIds'
+    },
+    {
+      '1': 'new_items_truncated',
+      '3': 5,
+      '4': 1,
+      '5': 8,
+      '10': 'newItemsTruncated'
+    },
   ],
   '8': [
     {'1': '_latest_inbox_item_id'},
@@ -706,7 +720,9 @@ final $typed_data.Uint8List inboxSignalDescriptor = $convert.base64Decode(
     'CgtJbmJveFNpZ25hbBIhCgx1bnJlYWRfY291bnQYASABKAVSC3VucmVhZENvdW50EjQKFGxhdG'
     'VzdF9pbmJveF9pdGVtX2lkGAIgASgJSABSEWxhdGVzdEluYm94SXRlbUlkiAEBEl0KE3N0YXRl'
     'X3JlZnJlc2hfaGludHMYAyADKA4yLS5oYXdrci5ub3RpZmljYXRpb24udjFhbHBoYTEuU3RhdG'
-    'VSZWZyZXNoSGludFIRc3RhdGVSZWZyZXNoSGludHNCFwoVX2xhdGVzdF9pbmJveF9pdGVtX2lk');
+    'VSZWZyZXNoSGludFIRc3RhdGVSZWZyZXNoSGludHMSKwoSbmV3X2luYm94X2l0ZW1faWRzGAQg'
+    'AygJUg9uZXdJbmJveEl0ZW1JZHMSLgoTbmV3X2l0ZW1zX3RydW5jYXRlZBgFIAEoCFIRbmV3SX'
+    'RlbXNUcnVuY2F0ZWRCFwoVX2xhdGVzdF9pbmJveF9pdGVtX2lk');
 
 @$core.Deprecated('Use sellerWorkspaceSignalDescriptor instead')
 const SellerWorkspaceSignal$json = {

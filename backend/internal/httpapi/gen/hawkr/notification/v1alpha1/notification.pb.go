@@ -1651,6 +1651,12 @@ type InboxSignal struct {
 	// 引起這次訊號的通知所帶的狀態重讀提示。訊號可能把多則通知合併，所以是這些通知的提示的聯集（不重複）；
 	// 空表示不需要重讀（連線建立時的第一則也是）。不會含 STATE_REFRESH_HINT_UNSPECIFIED。
 	StateRefreshHints []StateRefreshHint `protobuf:"varint,3,rep,packed,name=state_refresh_hints,json=stateRefreshHints,proto3,enum=hawkr.notification.v1alpha1.StateRefreshHint" json:"state_refresh_hints,omitempty"`
+	// 上一則訊號之後在這條串流上新建的通知、或被聚合更新（合併進同一則未讀通知）的收件匣項目 ID，依到達順序、不重複；
+	// client 只對這些 ID 做 toast，不比對列表。聚合更新會讓同一個 ID 再出現，client 以 ID 去重並更新既有的 toast。
+	// 連線建立與重連的第一則、只有已讀或刪除變化時為空。每個 ID 在一條串流上至多送達一次：斷線期間的缺口不補送，收件匣與未讀數仍以列表為準。
+	NewInboxItemIds []string `protobuf:"bytes,4,rep,name=new_inbox_item_ids,json=newInboxItemIds,proto3" json:"new_inbox_item_ids,omitempty"`
+	// 為 true 表示累積的新通知超過上限（20 則）：new_inbox_item_ids 為空，client 重讀列表、不 toast。
+	NewItemsTruncated bool `protobuf:"varint,5,opt,name=new_items_truncated,json=newItemsTruncated,proto3" json:"new_items_truncated,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -1704,6 +1710,20 @@ func (x *InboxSignal) GetStateRefreshHints() []StateRefreshHint {
 		return x.StateRefreshHints
 	}
 	return nil
+}
+
+func (x *InboxSignal) GetNewInboxItemIds() []string {
+	if x != nil {
+		return x.NewInboxItemIds
+	}
+	return nil
+}
+
+func (x *InboxSignal) GetNewItemsTruncated() bool {
+	if x != nil {
+		return x.NewItemsTruncated
+	}
+	return false
 }
 
 // SellerWorkspaceSignal 是賣家工作區的資料有變化的訊號：client 重讀對應的列表與統計，不帶變化的內容。
@@ -1826,11 +1846,13 @@ const file_hawkr_notification_v1alpha1_notification_proto_rawDesc = "" +
 	"\x1aWatchNotificationsResponse\x12@\n" +
 	"\x05inbox\x18\x01 \x01(\v2(.hawkr.notification.v1alpha1.InboxSignalH\x00R\x05inbox\x12_\n" +
 	"\x10seller_workspace\x18\x02 \x01(\v22.hawkr.notification.v1alpha1.SellerWorkspaceSignalH\x00R\x0fsellerWorkspaceB\a\n" +
-	"\x05event\"\xde\x01\n" +
+	"\x05event\"\xbb\x02\n" +
 	"\vInboxSignal\x12!\n" +
 	"\funread_count\x18\x01 \x01(\x05R\vunreadCount\x124\n" +
 	"\x14latest_inbox_item_id\x18\x02 \x01(\tH\x00R\x11latestInboxItemId\x88\x01\x01\x12]\n" +
-	"\x13state_refresh_hints\x18\x03 \x03(\x0e2-.hawkr.notification.v1alpha1.StateRefreshHintR\x11stateRefreshHintsB\x17\n" +
+	"\x13state_refresh_hints\x18\x03 \x03(\x0e2-.hawkr.notification.v1alpha1.StateRefreshHintR\x11stateRefreshHints\x12+\n" +
+	"\x12new_inbox_item_ids\x18\x04 \x03(\tR\x0fnewInboxItemIds\x12.\n" +
+	"\x13new_items_truncated\x18\x05 \x01(\bR\x11newItemsTruncatedB\x17\n" +
 	"\x15_latest_inbox_item_id\"c\n" +
 	"\x15SellerWorkspaceSignal\x12J\n" +
 	"\x06change\x18\x01 \x01(\x0e22.hawkr.notification.v1alpha1.SellerWorkspaceChangeR\x06change*\x7f\n" +
