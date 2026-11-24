@@ -261,7 +261,6 @@ test("Agent 分頁的記號是靜態 Hawkr 標誌，不掛重播 handle", () => 
 	assert.match(hawkrAgentMark, /<BrandLogo variant="mark" size="fill" \/>/);
 	assert.doesNotMatch(hawkrAgentMark, /forwardRef/);
 	assert.doesNotMatch(sidebar, /playAgentTabMark|agentTabMarkRef/);
-
 });
 
 test("收合側欄保留兩顆直向 identity tabs，不因 hero 移除而失去 Agent 入口", () => {

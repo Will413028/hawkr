@@ -1,8 +1,6 @@
 /** @vitest-environment jsdom */
 
-import {
-	RunFailureReason,
-} from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
+import { RunFailureReason } from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
 import {
 	cleanup,
 	fireEvent,
@@ -209,10 +207,7 @@ describe("重整後的真實還原狀態", () => {
 	it("restoredStateFrom 產出的 publication-only 狀態必須判定為有成果", () => {
 		// ⛔ 不自己拼一個 state：用 production 的還原函式，才測得到
 		// 「candidateSet 固定為 null、stage 永遠不是 candidates」這兩個真實約束。
-		const restored = restoredStateFrom(
-			null,
-			publicationOnlySnapshot(),
-		);
+		const restored = restoredStateFrom(null, publicationOnlySnapshot());
 
 		expect(restored.candidateSet).toBeNull();
 		expect(restored.stage).not.toBe("candidates");

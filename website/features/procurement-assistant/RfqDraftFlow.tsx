@@ -628,9 +628,7 @@ export default function RfqDraftFlow({
 							<AppIcon name="info" size={18} aria-hidden="true" />
 							<div>
 								<strong>這份名單尚未固定</strong>
-								<p>
-									正式發布時才會固定邀請對象。
-								</p>
+								<p>正式發布時才會固定邀請對象。</p>
 							</div>
 						</div>
 					</div>

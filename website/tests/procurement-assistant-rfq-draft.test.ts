@@ -39,8 +39,14 @@ test("selected candidates open the typed RFQ price confirmation inside the works
 
 test("the live RFQ flow goes through the Connect price preview and publication RPCs, never legacy publication", () => {
 	assert.match(sessionHook, /buyerProcurementClient\(\)\.previewRfqPrice\(/);
-	assert.match(sessionHook, /buyerProcurementClient\(\)\.previewRfqPublication\(/);
-	assert.match(sessionHook, /buyerProcurementClient\(\)\.executeRfqPublication\(/);
+	assert.match(
+		sessionHook,
+		/buyerProcurementClient\(\)\.previewRfqPublication\(/,
+	);
+	assert.match(
+		sessionHook,
+		/buyerProcurementClient\(\)\.executeRfqPublication\(/,
+	);
 	assert.doesNotMatch(sessionHook, /rfq-confirmations|confirmRfqSnapshot/);
 	assert.doesNotMatch(rfqDraft, /quote-batches|onPublish|onPublished/);
 	assert.doesNotMatch(rfqDraft, /apiClient|\.authed\.|fetch\(/);
@@ -80,10 +86,7 @@ test("quantity, unit, city and delivery date are persisted-slot read-only fields
 test("approval stays fail closed without a canonical server basis", () => {
 	assert.match(rfqDraft, /hasPriceBasis\(preview\)/);
 	assert.match(rfqDraft, /價格資料尚未完整，或與目前需求單位不一致/);
-	assert.match(
-		priceContract,
-		/basisQuantity !== "" && basisUnit !== ""/,
-	);
+	assert.match(priceContract, /basisQuantity !== "" && basisUnit !== ""/);
 });
 
 test("publication preview and execute retries reuse their stored client request id", () => {
@@ -111,10 +114,7 @@ test("publication preview and execute retries reuse their stored client request 
 });
 
 test("the price acknowledgement is fail-closed and navigation locks while the publication mutation is in flight", () => {
-	assert.match(
-		rfqDraft,
-		/!approvalEnabled \|\|[\s\S]*?publicationLocked/,
-	);
+	assert.match(rfqDraft, /!approvalEnabled \|\|[\s\S]*?publicationLocked/);
 	assert.match(
 		rfqDraft,
 		/onInteractionLockChange\?\.\(\s*publicationState\.status === "loading" \|\|\s*executionState\.status === "loading",?\s*\)/,

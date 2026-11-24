@@ -180,7 +180,9 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 						durationMs: "800",
 					},
 				],
-				recordedThisTurn: [{ key: SLOT.item, label: "品項", value: "水果禮盒" }],
+				recordedThisTurn: [
+					{ key: SLOT.item, label: "品項", value: "水果禮盒" },
+				],
 				question: {
 					slotKey: SLOT.city,
 					prompt: "要送到哪個城市呢？",
@@ -1227,7 +1229,6 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		expect(turnBodies).toHaveLength(2);
 		expect(turnBodies[1].message).toBe("明天配送到桃園");
 	});
-
 
 	test("主對話獨立處理區顯示 N 列；heartbeat 與 step 完成不清軌，terminal 不留快照", async ({
 		page,

@@ -66,9 +66,7 @@ type StreamEnd =
 
 function isTransient(code: ProcurementFailureCode, err: ConnectError): boolean {
 	return (
-		code === "NETWORK_ERROR" ||
-		code === "SERVER_ERROR" ||
-		failureRetryable(err)
+		code === "NETWORK_ERROR" || code === "SERVER_ERROR" || failureRetryable(err)
 	);
 }
 

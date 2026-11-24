@@ -11,10 +11,7 @@ import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ProcurementCandidate } from "@/features/procurement-assistant/types";
 import RfqDraftFlow from "../RfqDraftFlow";
-import type {
-	RfqCommandResult,
-	RfqPricePreview,
-} from "../rfq-price-contract";
+import type { RfqCommandResult, RfqPricePreview } from "../rfq-price-contract";
 import type {
 	RfqPublicationApproval,
 	RfqPublicationExecuteCommand,
@@ -75,10 +72,7 @@ function result(
 	};
 }
 
-function storeCandidate(
-	id: string,
-	storeId?: string,
-): ProcurementCandidate {
+function storeCandidate(id: string, storeId?: string): ProcurementCandidate {
 	return {
 		candidateId: id,
 		displayName: `候選 ${id}`,

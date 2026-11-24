@@ -293,7 +293,10 @@ test.describe("procurement assistant — interrupt／resume（Connect）", {
 		});
 		await mockWatchRun(page, () => [
 			watchFrame.accepted("c1", "run-r", CONVERSATION_ID),
-			watchFrame.turnResult("c2", turnResultJson(IDS, { reply: "地瓜記下了。" })),
+			watchFrame.turnResult(
+				"c2",
+				turnResultJson(IDS, { reply: "地瓜記下了。" }),
+			),
 			watchFrame.finished("c3"),
 		]);
 

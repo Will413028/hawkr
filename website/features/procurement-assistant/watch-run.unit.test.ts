@@ -47,7 +47,9 @@ type Step =
 
 /** 一條連線的腳本：`at` 是連線開啟後的毫秒；到了 `end` 就正常結束。 */
 function connection(steps: Step[]) {
-	return async function* (signal: AbortSignal): AsyncGenerator<WatchRunResponse> {
+	return async function* (
+		signal: AbortSignal,
+	): AsyncGenerator<WatchRunResponse> {
 		let elapsed = 0;
 		for (const step of steps) {
 			await sleep(step.at - elapsed);
@@ -60,7 +62,9 @@ function connection(steps: Step[]) {
 	};
 }
 
-function scripted(connections: Array<(signal: AbortSignal) => AsyncGenerator<WatchRunResponse>>) {
+function scripted(
+	connections: Array<(signal: AbortSignal) => AsyncGenerator<WatchRunResponse>>,
+) {
 	const requests: WatchRunRequest[] = [];
 	const open: WatchOpen = (request, signal) => {
 		requests.push({ ...request });
@@ -127,9 +131,9 @@ describe("watchRun", () => {
 			"c6",
 			"c7",
 		]);
-		expect(
-			delivered.filter((e) => e.event.case === "finished"),
-		).toHaveLength(1);
+		expect(delivered.filter((e) => e.event.case === "finished")).toHaveLength(
+			1,
+		);
 	});
 
 	it("重連後伺服器重播已送達的事件：以 cursor 去重，只交一次", async () => {

@@ -180,26 +180,30 @@ describe("停止任務", () => {
 		[CancelDisposition.ALREADY_CANCELLED, "ALREADY_CANCELLED"],
 		[CancelDisposition.ALREADY_TERMINAL, "ALREADY_TERMINAL"],
 		[CancelDisposition.TOO_LATE, "TOO_LATE"],
-	])("處置 %s 是成功回應，原樣留在狀態裡，不得被塌成錯誤", async (disposition, expected) => {
-		const { result } = await renderWithPendingTurn();
-		rpc.handlers.cancelRun = () => cancelResponse(disposition);
-		await waitFor(() => {
-			expect(result.current.activeRun).not.toBeNull();
-		});
+	])(
+		"處置 %s 是成功回應，原樣留在狀態裡，不得被塌成錯誤",
+		async (disposition, expected) => {
+			const { result } = await renderWithPendingTurn();
+			rpc.handlers.cancelRun = () => cancelResponse(disposition);
+			await waitFor(() => {
+				expect(result.current.activeRun).not.toBeNull();
+			});
 
-		await act(async () => {
-			await result.current.cancelActiveRun();
-		});
+			await act(async () => {
+				await result.current.cancelActiveRun();
+			});
 
-		expect(result.current.cancelState).toEqual({
-			status: "settled",
-			disposition: expected,
-		});
-	});
+			expect(result.current.cancelState).toEqual({
+				status: "settled",
+				disposition: expected,
+			});
+		},
+	);
 
 	it("沒有可辨識的處置，畫面說無法確認而不是猜一個結果", async () => {
 		const { result } = await renderWithPendingTurn();
-		rpc.handlers.cancelRun = () => cancelResponse(CancelDisposition.UNSPECIFIED);
+		rpc.handlers.cancelRun = () =>
+			cancelResponse(CancelDisposition.UNSPECIFIED);
 		await waitFor(() => {
 			expect(result.current.activeRun).not.toBeNull();
 		});

@@ -41,10 +41,7 @@ test("assistant workspace uses the signed-off 55/45 shell and collapses without 
 });
 
 test("candidate workspace renders a semantic fact table from only current DTO fields", () => {
-	assert.match(
-		browser,
-		/<table[\s\S]*?aria-label="候選資料"/,
-	);
+	assert.match(browser, /<table[\s\S]*?aria-label="候選資料"/);
 	for (const heading of ["候選", "符合條件", "待確認", "資料時間", "狀態"]) {
 		assert.match(browser, new RegExp(`<th scope="col">${heading}</th>`));
 	}
@@ -417,4 +414,3 @@ test("接上入口沒有動到 runtime-snapshot 的惰性", () => {
 	assert.match(canvas, /"quote-invites": "詢價狀態工作台"/);
 	assert.match(canvas, /aria-label=\{CANVAS_LABEL\[workspaceView\]\}/);
 });
-

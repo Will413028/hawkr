@@ -334,7 +334,12 @@ describe("接受一個 exact version", () => {
 		expect(command.sellerResponseId).toBe("1234567890123456788");
 		expect(command.expectedSellerResponseVersion).toBe("1234567890123456791");
 		expect(command.expectedSellerFacingHash).toBe(SELLER_FACING_HASH);
-		expect(Object.keys(command).sort()).toEqual(["clientRequestId", "expectedSellerFacingHash", "expectedSellerResponseVersion", "sellerResponseId"]);
+		expect(Object.keys(command).sort()).toEqual([
+			"clientRequestId",
+			"expectedSellerFacingHash",
+			"expectedSellerResponseVersion",
+			"sellerResponseId",
+		]);
 	});
 
 	it("同一版本重試沿用同一把冪等鍵", async () => {
@@ -466,7 +471,11 @@ describe("接受失敗的處置", () => {
 
 	it("已在結帳中導去付款，並用伺服器給的既有單號", async () => {
 		await failWith(
-			buyerQuoteFailure("RFQ_CHECKOUT_ALREADY_ACTIVE", "已有進行中的成交", "HK20260913001"),
+			buyerQuoteFailure(
+				"RFQ_CHECKOUT_ALREADY_ACTIVE",
+				"已有進行中的成交",
+				"HK20260913001",
+			),
 		);
 		expect(
 			screen.getByRole("link", { name: "前往付款" }).getAttribute("href"),
@@ -474,7 +483,9 @@ describe("接受失敗的處置", () => {
 	});
 
 	it("已在結帳中但沒拿到單號時退回訂單列表，不猜一個單號", async () => {
-		await failWith(buyerQuoteFailure("RFQ_CHECKOUT_ALREADY_ACTIVE", "已有進行中的成交"));
+		await failWith(
+			buyerQuoteFailure("RFQ_CHECKOUT_ALREADY_ACTIVE", "已有進行中的成交"),
+		);
 		expect(
 			screen.getByRole("link", { name: "前往付款" }).getAttribute("href"),
 		).toBe("/account/orders");

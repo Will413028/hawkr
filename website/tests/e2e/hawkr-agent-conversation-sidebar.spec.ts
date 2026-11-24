@@ -26,10 +26,7 @@ test.describe("Hawkr Agent 對話側欄", { tag: ["@ui"] }, () => {
 		"側欄選中態只需在 desktop Chromium 驗一次",
 	);
 
-	test("每個對話一列，active row 沒有左側指示條", async ({
-		page,
-		baseURL,
-	}) => {
+	test("每個對話一列，active row 沒有左側指示條", async ({ page, baseURL }) => {
 		const appBaseURL = baseURL ?? "http://localhost:3000";
 		await seedStoredActiveRole(page, "buyer");
 		await setupGatewayMocks(page, {

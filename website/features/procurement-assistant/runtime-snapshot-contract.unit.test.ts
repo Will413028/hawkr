@@ -14,8 +14,8 @@ import type { BuyerQuoteAcceptanceResponse } from "./buyer-quote-contract";
 import {
 	deriveRfqProgress,
 	hasLiveRun,
-	runCancelCopy,
 	type RuntimeSnapshot,
+	runCancelCopy,
 	runtimeSnapshotFromProto,
 	selectCancellableRun,
 } from "./runtime-snapshot-contract";
@@ -41,7 +41,9 @@ function run(
 }
 
 function snapshot(
-	init: Parameters<typeof create<typeof GetRuntimeSnapshotResponseSchema>>[1] = {},
+	init: Parameters<
+		typeof create<typeof GetRuntimeSnapshotResponseSchema>
+	>[1] = {},
 ): RuntimeSnapshot {
 	return runtimeSnapshotFromProto(
 		create(GetRuntimeSnapshotResponseSchema, {

@@ -143,16 +143,10 @@ export async function mockProcurementUnary(
 			void fulfillConnect(route, handler(connectRequestMessage(route)));
 		} catch (error) {
 			if (!(error instanceof ConnectFailure)) throw error;
-			void fulfillConnectError(
-				route,
-				error.code,
-				error.message,
-				undefined,
-				[
-					...(error.reason ? [errorInfoDetail(error.reason)] : []),
-					localizedMessageDetail(error.message),
-				],
-			);
+			void fulfillConnectError(route, error.code, error.message, undefined, [
+				...(error.reason ? [errorInfoDetail(error.reason)] : []),
+				localizedMessageDetail(error.message),
+			]);
 		}
 	});
 }
@@ -207,16 +201,10 @@ export async function mockProcurementUnaryAbortable(
 			void fulfillConnect(route, out);
 		} catch (error) {
 			if (!(error instanceof ConnectFailure)) throw error;
-			void fulfillConnectError(
-				route,
-				error.code,
-				error.message,
-				undefined,
-				[
-					...(error.reason ? [errorInfoDetail(error.reason)] : []),
-					localizedMessageDetail(error.message),
-				],
-			);
+			void fulfillConnectError(route, error.code, error.message, undefined, [
+				...(error.reason ? [errorInfoDetail(error.reason)] : []),
+				localizedMessageDetail(error.message),
+			]);
 		}
 	});
 }

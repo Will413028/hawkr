@@ -1,8 +1,6 @@
 /** @vitest-environment jsdom */
 
-import {
-	RunFailureReason,
-} from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
+import { RunFailureReason } from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";

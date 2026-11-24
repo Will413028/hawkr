@@ -47,12 +47,15 @@ export function fakeProcurementClient(handlers: ProcurementHandlers) {
 	);
 }
 
-/** `@/lib/i18n/ui-text` 的替身：文字取固定值，讓測試不依賴 next-intl。 */
+const closedStoreText = () => "已關閉的店家";
+const defaultErrorText = (code: number) => `default-${code}`;
+
+/** `@/lib/i18n/ui-text` 的替身：文字取固定值，讓測試不依賴 next-intl。回傳的函式必須是穩定的引用（和正式的 hook 用 useMemo 一樣），否則依賴它的 useCallback／useEffect 每次 render 都重跑，無限重繪。 */
 export const uiTextStub = {
-	useUiText: () => () => "已關閉的店家",
-	uiTextFor: () => () => "已關閉的店家",
+	useUiText: () => closedStoreText,
+	uiTextFor: () => closedStoreText,
 	optionalText: (_ut: unknown, m: unknown) =>
 		m === undefined ? undefined : "x",
-	useDefaultErrorText: () => (code: number) => `default-${code}`,
-	defaultErrorTextFor: () => (code: number) => `default-${code}`,
+	useDefaultErrorText: () => defaultErrorText,
+	defaultErrorTextFor: () => defaultErrorText,
 };

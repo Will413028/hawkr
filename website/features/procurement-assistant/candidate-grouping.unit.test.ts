@@ -86,7 +86,11 @@ describe("groupPlatformCandidates", () => {
 
 	it("群組標題取店家卡片的名稱（沒有名稱時已由對應層換成關閉店家文字）", () => {
 		const { groups } = groupPlatformCandidates([
-			candidate({ candidateId: "1", storeId: "1001", displayName: "已關閉的店家" }),
+			candidate({
+				candidateId: "1",
+				storeId: "1001",
+				displayName: "已關閉的店家",
+			}),
 		]);
 		expect(groups[0].sellerName).toBe("已關閉的店家");
 	});

@@ -264,8 +264,6 @@ describe("activityFromProto", () => {
 		expect(row?.count).toBe("0");
 		expect(row?.parentRowId).toBe("9001");
 		expect(row?.status).toBe("PENDING");
-		expect(
-			activityFromProto(create(ActivitySchema, { code: "X" })),
-		).toBeNull();
+		expect(activityFromProto(create(ActivitySchema, { code: "X" }))).toBeNull();
 	});
 });

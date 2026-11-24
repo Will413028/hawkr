@@ -229,7 +229,12 @@ describe("BuyerQuoteComparison", () => {
 			.not.toBeInTheDocument();
 		expect(props.onAcceptQuote).toHaveBeenCalledOnce();
 		const command = vi.mocked(props.onAcceptQuote).mock.calls[0][0];
-		expect(Object.keys(command).sort()).toEqual(["clientRequestId", "expectedSellerFacingHash", "expectedSellerResponseVersion", "sellerResponseId"]);
+		expect(Object.keys(command).sort()).toEqual([
+			"clientRequestId",
+			"expectedSellerFacingHash",
+			"expectedSellerResponseVersion",
+			"sellerResponseId",
+		]);
 	});
 
 	it("says the quote changed and does not accept a newer version on its own", async () => {
@@ -237,7 +242,10 @@ describe("BuyerQuoteComparison", () => {
 			responses: [response()],
 			onAcceptQuote: vi.fn(async () => ({
 				ok: false as const,
-				error: buyerQuoteFailure("STALE_SELLER_RESPONSE", STALE_RESPONSE_DETAIL),
+				error: buyerQuoteFailure(
+					"STALE_SELLER_RESPONSE",
+					STALE_RESPONSE_DETAIL,
+				),
 			})),
 		});
 		await userEvent.click(acceptButton());

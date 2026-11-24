@@ -26,7 +26,11 @@ import { formatDate } from "@hawkr/api/proto/date";
 import { imageUri } from "@/lib/media/image";
 import type { AgentActivityEvent } from "./activity";
 import type { PublicNarrativeBlock, PublicNarrativeKind } from "./narrative";
-import { type AgentStep, type AgentStepStatus, isPublicAgentStepCode } from "./steps";
+import {
+	type AgentStep,
+	type AgentStepStatus,
+	isPublicAgentStepCode,
+} from "./steps";
 import type {
 	ClarifyQuestion,
 	ProcurementCandidate,

@@ -53,7 +53,8 @@ test.describe("procurement assistant — 受眾變更使核准失效", {
 				previewBodies.push(request);
 				// 第二次核准是針對新受眾的另一份 approval。
 				return publicationApprovalJson({
-					approvalId: approvalCalls === 1 ? RFQ_APPROVAL_ID : SECOND_APPROVAL_ID,
+					approvalId:
+						approvalCalls === 1 ? RFQ_APPROVAL_ID : SECOND_APPROVAL_ID,
 					recipientCount: approvalCalls === 1 ? 1 : 2,
 				});
 			},

@@ -120,7 +120,8 @@ function openConfirmation(
 /** 依序回傳 snapshot；用完之後一直回最後一個。 */
 function snapshots(...responses: Array<GetSnapshotResponse | Error>) {
 	const read = vi.fn(() => {
-		const next = responses[Math.min(read.mock.calls.length - 1, responses.length - 1)];
+		const next =
+			responses[Math.min(read.mock.calls.length - 1, responses.length - 1)];
 		if (next instanceof Error) throw next;
 		return next;
 	});
@@ -270,7 +271,10 @@ describe("WatchRun 的終態", () => {
 			throw reasonError(Code.FailedPrecondition, "REPLAY_CURSOR_EXPIRED");
 		};
 		const read = snapshots(
-			snapshotResponse({ revisionId: "rev-9", openConfirmation: openConfirmation() }),
+			snapshotResponse({
+				revisionId: "rev-9",
+				openConfirmation: openConfirmation(),
+			}),
 		);
 		rpc.handlers.getConversationMessages = () => ({
 			conversationId: "conv-1",
@@ -367,10 +371,7 @@ describe("普通選填問句的 snapshot 重試", () => {
 	it.each([
 		["新版 revision", { revisionId: "rev-2" }],
 		["已在搜尋候選", { status: RequestStatus.MATCHING }],
-		[
-			"新中斷未提供問題",
-			{ openConfirmation: openConfirmation(null) },
-		],
+		["新中斷未提供問題", { openConfirmation: openConfirmation(null) }],
 	])("%s 不沿用普通選填問題", async (_case, overrides) => {
 		const { result } = await arriveAtOptionalQuestion();
 		snapshots(snapshotResponse({ ...sameRevision, ...overrides }));
@@ -383,7 +384,10 @@ describe("普通選填問句的 snapshot 重試", () => {
 	it("新權威問題取代普通選填問題", async () => {
 		const { result } = await arriveAtOptionalQuestion();
 		snapshots(
-			snapshotResponse({ ...sameRevision, openConfirmation: openConfirmation() }),
+			snapshotResponse({
+				...sameRevision,
+				openConfirmation: openConfirmation(),
+			}),
 		);
 		await act(async () => {
 			await result.current.refreshCurrentSnapshot();
@@ -428,7 +432,11 @@ describe("分類中斷的權威問句還原", () => {
 	};
 
 	it("reload 還原問題並保留 opaque optionId 與 interrupt", async () => {
-		snapshots(snapshotResponse({ openConfirmation: openConfirmation(categoryQuestion) }));
+		snapshots(
+			snapshotResponse({
+				openConfirmation: openConfirmation(categoryQuestion),
+			}),
+		);
 		const { result } = renderProcurementSession("req-1");
 		await waitFor(() => expect(result.current.restoring).toBe(false));
 		expect(result.current.question).toMatchObject({
