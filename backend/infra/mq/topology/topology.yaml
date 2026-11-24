@@ -45,10 +45,6 @@ exchanges:
   type: topic
 - name: hawkr.seller_workspace
   type: topic
-- name: hawkr.shipping
-  type: topic
-- name: hawkr.shipping.dlx
-  type: topic
 - name: payment.events
   type: topic
 - name: payment.webhook.dlx
@@ -58,8 +54,6 @@ exchanges:
 - name: payuni.events
   type: topic
 - name: seller.events
-  type: topic
-- name: shipping.webhook.dlx
   type: topic
 queues:
 - name: aftersales.events.dlq
@@ -84,38 +78,6 @@ queues:
   bindings:
   - exchange: payuni.events
     key: payuni.unknown.fallback
-- name: aftersales.shipment.creation_failed
-  dlq:
-    via: aftersales.events.dlx
-    queue: aftersales.events.dlq
-    routing_key: dlq
-  bindings:
-  - exchange: hawkr.order
-    key: order.shipment.creation_failed
-- name: aftersales.shipment.processing.timeout
-  dlq:
-    via: aftersales.events.dlx
-    queue: aftersales.events.dlq
-    routing_key: dlq
-  bindings:
-  - exchange: hawkr.shipping
-    key: shipment.processing.timeout
-- name: aftersales.shipping.label
-  dlq:
-    via: aftersales.events.dlx
-    queue: aftersales.events.dlq
-    routing_key: dlq
-  bindings:
-  - exchange: hawkr.shipping
-    key: shipment.label.updated
-- name: aftersales.shipping.return.status
-  dlq:
-    via: aftersales.events.dlx
-    queue: aftersales.events.dlq
-    routing_key: dlq
-  bindings:
-  - exchange: hawkr.shipping
-    key: shipment.return.status_changed
 - name: cart.seller.profile.changed
   dlq:
     via: hawkr.cart.dlx
@@ -274,12 +236,6 @@ queues:
   bindings:
   - exchange: hawkr.seller
     key: seller.deleted
-- name: notification.shipping
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: hawkr.shipping
-    key: '#'
 - name: order.aftersales.awaiting.buyer.page
   dlq:
     via: hawkr.order.dlx
@@ -362,48 +318,6 @@ queues:
   bindings:
   - exchange: hawkr.seller
     key: seller.suspended
-- name: order.shipment.processing.cleared
-  dlq:
-    via: hawkr.order.dlx
-    routing_key: order.shipment.processing.cleared.dlq
-  bindings:
-  - exchange: hawkr.shipping
-    key: shipment.processing.cleared
-- name: order.shipping.created
-  dlq:
-    via: hawkr.order.dlx
-    routing_key: order.shipping.created.dlq
-  bindings:
-  - exchange: hawkr.shipping
-    key: shipment.created
-- name: order.shipping.delivered
-  dlq:
-    via: hawkr.order.dlx
-    routing_key: order.shipping.delivered.dlq
-  bindings:
-  - exchange: hawkr.shipping
-    key: shipment.delivered
-- name: order.shipping.label
-  dlq:
-    via: hawkr.order.dlx
-    routing_key: order.shipping.label.dlq
-  bindings:
-  - exchange: hawkr.shipping
-    key: shipment.label.updated
-- name: order.shipping.photo
-  dlq:
-    via: hawkr.order.dlx
-    routing_key: order.shipping.photo.dlq
-  bindings:
-  - exchange: hawkr.shipping
-    key: shipment.photo.updated
-- name: order.shipping.status
-  dlq:
-    via: hawkr.order.dlx
-    routing_key: order.shipping.status.dlq
-  bindings:
-  - exchange: hawkr.shipping
-    key: shipment.status.changed
 - name: payment.payuni.refund.accepted
   dlq:
     via: payment.webhook.dlx
@@ -502,38 +416,3 @@ queues:
   bindings:
   - exchange: hawkr.seller
     key: seller.exposure.changed
-- name: shipping.order.paid
-  dlq:
-    via: shipping.webhook.dlx
-    routing_key: shipping.order.paid.dlq
-  bindings:
-  - exchange: hawkr.order
-    key: order.paid
-- name: shipping.order.receipt.confirmed
-  dlq:
-    via: shipping.webhook.dlx
-    routing_key: shipping.order.receipt.confirmed.dlq
-  bindings:
-  - exchange: hawkr.order
-    key: order.receipt.confirmed
-- name: shipping.payuni.webhook
-  dlq:
-    via: shipping.webhook.dlx
-    routing_key: shipping.payuni.webhook.dlq
-  bindings:
-  - exchange: payuni.events
-    key: payuni.shipping.status
-- name: shipping.shipment.create_requested
-  dlq:
-    via: shipping.webhook.dlx
-    routing_key: shipping.shipment.create_requested.dlq
-  bindings:
-  - exchange: hawkr.order
-    key: order.shipment.create_requested
-- name: shipping.uber.webhook
-  dlq:
-    via: shipping.webhook.dlx
-    routing_key: shipping.uber.webhook.dlq
-  bindings:
-  - exchange: payuni.events
-    key: uber.shipping.status

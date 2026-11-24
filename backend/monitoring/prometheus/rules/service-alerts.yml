@@ -47,7 +47,6 @@ groups:
       - alert: ProdServiceAbsent
         expr: |
           absent(up{job="gateway", env="prod"})
-          or absent(up{job="shipping-service", env="prod"})
           or absent(up{job="product-service", env="prod"})
           or absent(up{job="order-service", env="prod"})
           or absent(up{job="aftersales-service", env="prod"})
@@ -516,22 +515,4 @@ groups:
         annotations:
           summary: "env={{ $labels.env }}：採購助手 LLM 抽取持續失敗，買家已經在收到降級回應"
           description: "extractor.Extract 持續回 error（timeout／provider 錯誤／額度用盡等），抽取器退回固定問法而非真正理解買家需求——這不是『快超出預算』，是**現在就在發生**的使用者體驗劣化，且 LLM 本身處於已開通狀態（ai_procurement_llm_enabled==1，排除了由 AIProcurementLLMDisabled 覆蓋、刻意未開通的那個狀態，避免同一件事被兩條告警重複計）。處置：查 EXTRACTOR_MODEL 所屬 provider（gemini／deepseek／gemma）當下的狀態頁與額度儀表板，確認是不是撞到 #1979 那類配額問題；同時看 ai-service log 的『procurement: graph extract_slots degraded』一行，裡面的 timeout 欄位可以分辨是逾時還是 provider 直接拒絕。"
-
-      - alert: ShippingPayuniProviderDisabled
-        expr: max by (env) (shipping_payuni_credentials_configured) == 0 and max by (env) (shipping_payuni_credentials_incomplete) == 0
-        for: 1h
-        labels:
-          severity: warning
-        annotations:
-          summary: "env={{ $labels.env }}：PayUni 物流尚未開通"
-          description: "shipping-service 所有 PayUni 呼叫（叫件／建單／標籤／門市地圖／建店）回 9705，一個位元組都不會送出去。⚠️ **運費計算不受影響**——它在結帳 hot path 上且完全不碰 PayUni，而在 #3329 之前 PAYUNI_AGENT_KEY 缺席會讓整個 Spring context 起不來、連運費計算一起死（實測坐實：Could not resolve placeholder 'payuni.agent.key'）。處置：補 hawkr-payuni secret 的 PAYUNI_AGENT_KEY 與 PAYUNI_AGENT_IV。"
-
-      - alert: ShippingPayuniProviderConfigIncomplete
-        expr: max by (env) (shipping_payuni_credentials_incomplete) == 1
-        for: 15m
-        labels:
-          severity: warning
-        annotations:
-          summary: "env={{ $labels.env }}：PayUni 物流憑證只設了一半"
-          description: "PAYUNI_AGENT_KEY 與 PAYUNI_AGENT_IV 必須成對。只有一個 ⇒ 配置錯誤，開機當下的 Error log 會指出來。"
 

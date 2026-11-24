@@ -34,17 +34,17 @@ import static org.mockito.Mockito.when;
  *
  * <p><b>為什麼期望值全部硬寫字面值</b>：若寫成 {@code MqConstants.EXCHANGE_PAYMENT}，
  * 常數被改動時測試會跟著改動而永遠通過（期望值來自被測物的另一種形態）。
- * 這裡的 {@code "payment.events"} / {@code "hawkr.shipping"} 是 36 號 catalog 的
+ * 這裡的 {@code "payment.events"} / {@code "hawkr.order"} 是 36 號 catalog 的
  * 契約字面值，刻意與 code 脫鉤。
  *
  * <p><b>鑑別力最高的一支是 {@link #exchangeWins_overRoutingKeyPrefix()}</b>：
- * 它造一列「routing key 看起來完全是 payment、exchange 卻是 shipping」的事件。
+ * 它造一列「routing key 看起來完全是 payment、exchange 卻是 order」的事件。
  * 任何「從 routing key 前綴猜 exchange」的實作都會在那一支轉紅，而其他支不會。
  */
 class PaymentOutboxExchangeContractTest {
 
     private static final String PAYMENT_EXCHANGE = "payment.events";
-    private static final String SHIPPING_EXCHANGE = "hawkr.shipping";
+    private static final String ORDER_EXCHANGE = "hawkr.order";
 
     private static OutboxEventEntity row(String exchange, String eventType, String routingKey) {
         OutboxEventEntity e = new OutboxEventEntity();
@@ -83,19 +83,19 @@ class PaymentOutboxExchangeContractTest {
     }
 
     @Test
-    @DisplayName("shipping 列 → 投遞到 hawkr.shipping（同一支 publisher、同一張表）")
-    void shippingRow_goesToShippingExchange() throws Exception {
+    @DisplayName("order 列 → 投遞到 hawkr.order（同一支 publisher、同一張表）")
+    void orderRow_goesToOrderExchange() throws Exception {
         ObsRabbitPublisher rabbit = mock(ObsRabbitPublisher.class);
         OutboxEventMapper mapper = claimGranted();
         when(rabbit.publishConfirmed(anyString(), anyString(), any(), anyString(), anyLong())).thenReturn(true);
 
         assertTrue(new PaymentOutboxPublisher(rabbit, mapper)
-                .publish(row(SHIPPING_EXCHANGE, "fulfillment.responsibility.finalized",
-                        "fulfillment.responsibility.finalized")));
+                .publish(row(ORDER_EXCHANGE, "order.paid",
+                        "order.paid")));
 
         ArgumentCaptor<String> ex = ArgumentCaptor.forClass(String.class);
         verify(rabbit).publishConfirmed(ex.capture(), anyString(), any(), anyString(), anyLong());
-        assertEquals(SHIPPING_EXCHANGE, ex.getValue(),
+        assertEquals(ORDER_EXCHANGE, ex.getValue(),
                 "publisher 必須讀該列的 exchange 欄；讀到 payment.events 代表它仍在 hardcode");
     }
 
@@ -103,7 +103,7 @@ class PaymentOutboxExchangeContractTest {
      * 🔴 本檔鑑別力最高的一支：routing key 與 exchange <b>刻意矛盾</b>。
      *
      * <p>{@code routing_key = "payment.success"}（看起來百分之百是 payment 事件）
-     * 而 {@code exchange = "hawkr.shipping"}。任何從 routing key／event type 前綴
+     * 而 {@code exchange = "hawkr.order"}。任何從 routing key／event type 前綴
      * 推導 exchange 的實作，都只會在這一支轉紅。
      */
     @Test
@@ -114,11 +114,11 @@ class PaymentOutboxExchangeContractTest {
         when(rabbit.publishConfirmed(anyString(), anyString(), any(), anyString(), anyLong())).thenReturn(true);
 
         new PaymentOutboxPublisher(rabbit, mapper)
-                .publish(row(SHIPPING_EXCHANGE, "payment.success", "payment.success"));
+                .publish(row(ORDER_EXCHANGE, "payment.success", "payment.success"));
 
         ArgumentCaptor<String> ex = ArgumentCaptor.forClass(String.class);
         verify(rabbit).publishConfirmed(ex.capture(), eq("payment.success"), any(), anyString(), anyLong());
-        assertEquals(SHIPPING_EXCHANGE, ex.getValue(),
+        assertEquals(ORDER_EXCHANGE, ex.getValue(),
                 "exchange 必須來自列上的欄位，不是從 routing key 前綴推導出來的");
     }
 

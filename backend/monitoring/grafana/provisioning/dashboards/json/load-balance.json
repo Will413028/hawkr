@@ -194,7 +194,7 @@
       "id": 9,
       "options": {
         "code": { "language": "plaintext", "showLineNumbers": false, "showMiniMap": false },
-        "content": "`pod` label 已於 2026-08-20 confirm 生效（SSH 進監控機直查 Prometheus `label/pod/values` 有實際 pod name）；**只有 1 條線** = `$job` 確實只有 1 個 replica，不是資料異常。prod 目前僅 gateway / cart-service / payment-service / payuni-webhook-service / order-service 是多副本。**Java job 這兩張圖仍會空白**：Java 的資料源是 spanmetrics（remote-write 進來，沒有 `pod` label），尚未接上這裡。",
+        "content": "`pod` label 已於 2026-08-20 confirm 生效（SSH 進監控機直查 Prometheus `label/pod/values` 有實際 pod name）；**只有 1 條線** = `$job` 確實只有 1 個 replica，不是資料異常。prod 目前僅 gateway / cart-service / payment-service / order-service 是多副本。**Java job 這兩張圖仍會空白**：Java 的資料源是 spanmetrics（remote-write 進來，沒有 `pod` label），尚未接上這裡。",
         "mode": "markdown"
       },
       "title": "",

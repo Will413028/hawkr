@@ -125,14 +125,14 @@ class OutboxEnqueueTransactionIntegrationTest {
     @DisplayName("T3｜真 TransactionTemplate 交易內 → enqueue 成功且 commit 後列真的在 DB 裡")
     void t3_realTransactionIsAcceptedAndRowPersists() {
         OutboxEventEntity written = tx.execute(status -> writer.enqueue(
-                "hawkr.shipping", "fulfillment.responsibility.finalized", "t3.rk", "{\"a\":1}"));
+                "hawkr.order", "order.paid", "t3.rk", "{\"a\":1}"));
 
         assertNotNull(written);
         assertNotNull(written.getId(), "id 應由 DB 回填");
         assertEquals(1L, countByRoutingKey("t3.rk"), "commit 之後那一列必須存在");
 
         OutboxEventEntity reread = outboxMapper.selectById(written.getId());
-        assertEquals("hawkr.shipping", reread.getExchange(),
+        assertEquals("hawkr.order", reread.getExchange(),
                 "exchange 必須原樣落庫（read-back，不是相信寫入當下的物件）");
         assertEquals("8221", reread.getStatus());
     }

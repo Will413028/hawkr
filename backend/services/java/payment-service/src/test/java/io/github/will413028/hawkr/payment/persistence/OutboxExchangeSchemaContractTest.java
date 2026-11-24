@@ -102,8 +102,8 @@ class OutboxExchangeSchemaContractTest {
     @DisplayName("DEFAULT 必須是 payment.events（舊 pod 寫入的語意正確值）")
     void defaultIsPaymentEvents() {
         assertTrue(V11.contains("DEFAULT 'payment.events'"), "DEFAULT 值不是 payment.events");
-        assertFalse(V11.contains("DEFAULT 'hawkr.shipping'"),
-                "DEFAULT 不得是 shipping：舊 pod 的寫入會被填成錯的 exchange");
+        assertFalse(V11.contains("DEFAULT 'hawkr.order'"),
+                "DEFAULT 不得是其他領域的 exchange：舊 pod 的寫入會被填成錯的 exchange");
     }
 
     /**

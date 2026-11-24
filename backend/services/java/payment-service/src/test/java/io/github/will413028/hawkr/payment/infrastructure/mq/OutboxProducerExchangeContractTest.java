@@ -114,7 +114,7 @@ class OutboxProducerExchangeContractTest {
      * 🔴 36 §3.3.1 / 65：業務 metric 不得下沉到 generic path。
      *
      * <p>{@code hawkr_payment_total} 是 {@code business-alerts.yml} 的
-     * {@code PaymentFailureSpike} 的分母。未來 fulfillment 事件若走 generic enqueue 而它會計數，
+     * {@code PaymentFailureSpike} 的分母。非付款事件若走 generic enqueue 而它會計數，
      * 付款失敗率被稀釋 ⇒ 告警在最需要的時候不響，而且完全無聲。
      */
     @Test
@@ -127,11 +127,11 @@ class OutboxProducerExchangeContractTest {
 
         enterTransaction();
         OutboxEventEntity returned = writer.enqueue(
-                "hawkr.shipping", "fulfillment.responsibility.finalized",
-                "fulfillment.responsibility.finalized", "{}");
+                "hawkr.order", "order.paid",
+                "order.paid", "{}");
 
-        assertEquals("hawkr.shipping", returned.getExchange());
-        assertEquals("hawkr.shipping", captureInsert(mapper).getExchange());
+        assertEquals("hawkr.order", returned.getExchange());
+        assertEquals("hawkr.order", captureInsert(mapper).getExchange());
 
         assertEquals(0.0, registry.counter("hawkr_payment").count(),
                 "generic path 遞增了 hawkr_payment ⇒ PaymentFailureSpike 的分母被非付款事件稀釋");

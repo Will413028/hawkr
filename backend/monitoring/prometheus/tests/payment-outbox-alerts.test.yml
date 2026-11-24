@@ -51,7 +51,7 @@ tests:
   # for:0m ⇒ 一出現 DEAD 列就告警，並帶出是哪個 exchange。
   - interval: 1m
     input_series:
-      - series: 'payment_outbox_dead_rows{env="dev",exchange="hawkr.shipping"}'
+      - series: 'payment_outbox_dead_rows{env="dev",exchange="payment.events"}'
         values: '0 0 1+0x10'
     alert_rule_test:
       - eval_time: 1m
@@ -60,10 +60,10 @@ tests:
       - eval_time: 5m
         alertname: PaymentOutboxDeadRows
         exp_alerts:
-          - exp_labels: {env: dev, exchange: hawkr.shipping, severity: warning, channel: business}
+          - exp_labels: {env: dev, exchange: payment.events, severity: warning, channel: business}
             exp_annotations:
-              summary: "env=dev：payment outbox_events 出現 DEAD 列（exchange=hawkr.shipping）"
-              description: "env=dev：payment_outbox_dead_rows{exchange=\"hawkr.shipping\"} 大於 0，代表某筆事件已耗盡重試次數進入 DEAD（8224）。DEAD 是無人推走的終態——候選述詞 status IN ('8221','8223') 不含它，不會有任何程式路徑再碰它，**該事件等於永久遺失**。請查 last_error 判斷原因（常見：exchange 無效被 fail-closed 擋下、routing key 無 binding 而 unroutable）。處置完成（補發或註記後清除該列）前本告警會持續 firing，這是刻意的。查法：SELECT id, exchange, routing_key, retry_count, last_error, created_at FROM outbox_events WHERE status = '8224' ORDER BY created_at;"
+              summary: "env=dev：payment outbox_events 出現 DEAD 列（exchange=payment.events）"
+              description: "env=dev：payment_outbox_dead_rows{exchange=\"payment.events\"} 大於 0，代表某筆事件已耗盡重試次數進入 DEAD（8224）。DEAD 是無人推走的終態——候選述詞 status IN ('8221','8223') 不含它，不會有任何程式路徑再碰它，**該事件等於永久遺失**。請查 last_error 判斷原因（常見：exchange 無效被 fail-closed 擋下、routing key 無 binding 而 unroutable）。處置完成（補發或註記後清除該列）前本告警會持續 firing，這是刻意的。查法：SELECT id, exchange, routing_key, retry_count, last_error, created_at FROM outbox_events WHERE status = '8224' ORDER BY created_at;"
 
   # 零 DEAD（collector 恆輸出 0 值 series）→ 不得觸發。
   - interval: 1m

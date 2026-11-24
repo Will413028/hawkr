@@ -34,11 +34,11 @@ class OutboxEventFactoryExchangeTest {
     @DisplayName("合法 exchange → 原樣寫進 entity（不改寫、不正規化）")
     void validExchange_isPersistedVerbatim() {
         OutboxEventEntity e = OutboxEventFactory.newPendingEntity(
-                "hawkr.shipping", "fulfillment.responsibility.finalized",
-                "fulfillment.responsibility.finalized", "{}", NOW);
+                "hawkr.order", "order.paid",
+                "order.paid", "{}", NOW);
 
-        assertEquals("hawkr.shipping", e.getExchange());
-        assertEquals("fulfillment.responsibility.finalized", e.getEventType());
+        assertEquals("hawkr.order", e.getExchange());
+        assertEquals("order.paid", e.getEventType());
         assertEquals(OutboxEventStatus.PENDING.value(), e.getStatus());
         assertEquals(0, e.getRetryCount());
         assertEquals(NOW, e.getCreatedAt());

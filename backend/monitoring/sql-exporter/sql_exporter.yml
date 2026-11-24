@@ -1,11 +1,10 @@
-# SQL Exporter — 業務正確性 metrics（issue #1353 ATM 退款卡單 / #898 假日資料覆蓋）
+# SQL Exporter — 業務正確性 metrics（issue #1353 ATM 退款卡單）
 #
 # 依 §22：偵測歸 observability（本 exporter），非 application @Scheduled/reconciler。
 # 部署：co-located 於各 infra 主機（dev-infra / prod-infra），連「本地」的業務 DB
 #       （dev = 本地 Postgres、prod = Aliyun RDS）。env 標籤由 Prometheus scrape target 提供。
 # DSN：不寫死於此檔；由環境變數注入（含密碼，走各主機 infra/.env），本檔以 ${VAR} 引用：
 #   AFTERSALES_DSN 例：postgresql://dbadmin:<pwd>@postgres:5432/hawkr_aftersales?sslmode=disable（dev）
-#   SHIPPING_DSN   例：postgresql://dbadmin:<pwd>@postgres:5432/hawkr_shipping?sslmode=disable（dev）
 #   PAYMENT_DSN    例：postgresql://dbadmin:<pwd>@postgres:5432/hawkr_payment?sslmode=disable（dev）
 #   ACCOUNT_DSN    例：postgresql://dbadmin:<pwd>@postgres:5432/hawkr_account?sslmode=disable（dev）
 #   INVOICE_DSN    例：postgresql://dbadmin:<pwd>@postgres:5432/hawkr_invoice?sslmode=disable（dev）
@@ -28,13 +27,6 @@ jobs:
     static_configs:
       - targets:
           aftersales: '${AFTERSALES_DSN}'
-
-  - job_name: shipping
-    collectors:
-      - holiday
-    static_configs:
-      - targets:
-          shipping: '${SHIPPING_DSN}'
 
   - job_name: payment
     collectors:
@@ -76,19 +68,6 @@ collectors:
           WHERE status = '15'
             AND payment_method = '2004'
             AND updated_at < now() - interval '5 days'
-
-  # #898：假日資料尚有幾天覆蓋 = MAX(holiday_date) - CURRENT_DATE（hawkr_shipping.holidays）
-  # 空表 / 資料耗盡 → 回 -1（觸發 critical），提醒下年度資料未匯入。
-  - collector_name: holiday
-    metrics:
-      - metric_name: hawkr_holiday_coverage_days
-        type: gauge
-        help: 'Days of holiday data coverage remaining = MAX(holiday_date) - today; -1 if empty (issue #898)'
-        values:
-          - coverage_days
-        query: |
-          SELECT COALESCE(MAX(holiday_date) - CURRENT_DATE, -1)::float8 AS coverage_days
-          FROM holidays
 
   # #1369：ATM rescue 待人工退款積壓（取代原孤兒事件 payment.rescue.requires_manual）。
   # rescue_action='8902'（REFUND_PENDING_MANUAL）表 ATM rescue 需人工頁面版完成退款；
@@ -144,7 +123,7 @@ collectors:
   #    ⚠️ **部署順序**：payment-service 的 V11 migration 要**先**套用到該環境，再部署本設定
   #    （exchange 欄在 V11 才存在）。做反的話 dead 那支查不到欄位 ⇒ 該 job 每次 scrape 出錯。
   #
-  # ⚠️ exchange 當 label：值域由 36 §3.3.1 界定（payment.events／hawkr.shipping），
+  # ⚠️ exchange 當 label：值域由 36 §3.3.1 界定（payment.events），
   #    有界且正是本波要看的維度。routing_key 不當 label（十種以上且會再長）。
   - collector_name: payment_outbox
     metrics:
@@ -189,7 +168,7 @@ collectors:
         query: |
           SELECT COALESCE(o.exchange, v.exchange) AS exchange,
                  COALESCE(o.cnt, 0)::float8 AS cnt
-          FROM (VALUES ('payment.events'), ('hawkr.shipping')) AS v(exchange)
+          FROM (VALUES ('payment.events')) AS v(exchange)
           FULL OUTER JOIN (
             SELECT exchange, count(*) AS cnt
             FROM outbox_events

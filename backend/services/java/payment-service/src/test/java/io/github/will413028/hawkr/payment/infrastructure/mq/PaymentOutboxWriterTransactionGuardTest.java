@@ -135,10 +135,10 @@ class PaymentOutboxWriterTransactionGuardTest {
         TransactionSynchronizationManager.initSynchronization();
         TransactionSynchronizationManager.setActualTransactionActive(true);
 
-        var entity = writer.enqueue("hawkr.shipping", "fulfillment.responsibility.finalized",
-                "fulfillment.responsibility.finalized", "{}");
+        var entity = writer.enqueue("hawkr.order", "order.paid",
+                "order.paid", "{}");
 
-        assertEquals("hawkr.shipping", entity.getExchange());
+        assertEquals("hawkr.order", entity.getExchange());
         org.mockito.Mockito.verify(mapper).insert(entity);
     }
 }

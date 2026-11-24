@@ -12,8 +12,6 @@
 # | payment_outbox_backlog_rows                   | sql_exporter（payment DB）             | （趨勢用，門檻走 age 那支） |
 # | payment_outbox_oldest_backlog_age_seconds     | sql_exporter（payment DB）             | PaymentOutboxBacklogStuck |
 # | payment_outbox_dead_rows                      | sql_exporter（payment DB）             | PaymentOutboxDeadRows |
-# | hawkr_shipping_provider_status_unknown_total | shipping-service（Micrometer Counter） | ShippingProviderStatusUnknown |
-# | hawkr_shipping_provider_not_status_event_total | shipping-service（正常流量，趨勢用） | （刻意無告警） |
 # | vendor_portal_invite_email_total              | notification-service（promauto Counter）| VendorPortalInviteEmailPermanentFailureRatioHigh |
 # | vendor_portal_invite_exchange_total            | gateway（promauto Counter）             | 無自動告警，result=rejected 供人工排查猜測 token 的訊號 |
 #
@@ -39,35 +37,6 @@ groups:
         annotations:
           summary: "有 {{ $value }} 筆 ATM 退款卡在 AWAITING_WEBHOOK 超過 5 天（§6.7 疑遺失）"
           description: "env={{ $labels.env }}：refund_task 停在 AWAITING_WEBHOOK(15) 逾門檻，PayUni 退款轉匯結果 webhook(§6.7) 疑未送達。處置見 runbook：backend/docs/基礎建設/ATM 退款結果 Webhook 遺失維運處置.md"
-
-  # ── 假日資料覆蓋度（issue #898）─────────────────────────────────
-  # shipping-service HolidayService 依賴 holidays 表（admin 人工從政府 CSV 匯入）。下年度資料未上傳時
-  # generate_home_label 的 shipDate/deliveryDate 驗證會 fail、宅配出貨卡死。metric 由 sql_exporter 查
-  # holidays 表產出：hawkr_holiday_coverage_days = MAX(holiday_date) - CURRENT_DATE（尚有幾天覆蓋）。
-  # §22：偵測歸 observability，補資料本身走 admin import（維運）。channel=business → dev-警報/prod-警報。
-  # 門檻對應 #898 T-60/30/7 倒推：覆蓋剩 <60/<7 天分兩級（tier + repeat 近似其推播節奏）。
-  - name: holiday-coverage-alerts
-    interval: 300s
-    rules:
-      - alert: HolidayDataCoverageLow
-        # 與 Critical(<7) 互斥，避免覆蓋 <7 天時同頻道重複推播
-        expr: hawkr_holiday_coverage_days < 60 and hawkr_holiday_coverage_days >= 7
-        for: 6h
-        labels:
-          severity: warning
-          channel: business
-        annotations:
-          summary: "假日資料覆蓋僅剩 {{ $value }} 天，下年度資料恐未上傳"
-          description: "env={{ $labels.env }}：holidays 表最大覆蓋日距今 {{ $value }} 天（<60）。請 admin 從政府 CSV 匯入下年度假日（POST /api/v1/admin/holidays/import），否則跨年後宅配 generate_home_label 驗證會 fail。"
-      - alert: HolidayDataCoverageCritical
-        expr: hawkr_holiday_coverage_days < 7
-        for: 1h
-        labels:
-          severity: critical
-          channel: business
-        annotations:
-          summary: "假日資料覆蓋僅剩 {{ $value }} 天（緊急），下年度資料尚未上傳"
-          description: "env={{ $labels.env }}：holidays 覆蓋 <7 天，逼近耗盡。下年度假日未匯入將導致宅配出貨整條卡死，請立即匯入。"
 
   # ── 訂單歸零（issue #1369）─────────────────────────────────────
   # order-service 建單成功收斂點 export hawkr_orders_created_total（Micrometer Counter
@@ -878,52 +847,6 @@ groups:
         annotations:
           summary: "env={{ $labels.env }}：{{ $labels.path }} 持續讓業務碼 {{ $labels.code }} 走到成功出口（已被 carrier 改寫）"
           description: "env={{ $labels.env }}：**這不是使用者面的事故** —— carrier 已經把回應改寫成正確的業務碼回應，前端收到的是對的。它是一個**程式碼衛生**訊號：該 handler 拿著非零 code 走到 response.OK/Page/GrpcResult，代表少了 `if resp.GetCode() != 0 { response.Biz(...); return }` 那一段。修法：照 path 找到 handler，補上守門（invoice 三個檔的 71 個呼叫點是現成範例）。⚠️ 這條刻意用 for: 30m 而不是立即告警 —— 一次性的路徑（例如剛上線的新端點）不值得吵醒人，持續出現才代表有人漏寫。⚠️ 若這個數字長期非零而沒人處理，carrier 就從安全網退化成常態依賴，那正是 06 §3.9 外殼 6 的形狀。"
-
-  # ==========================================================================
-  # 物流履約（shipping-service）
-  #
-  # 這個 group 在 2026-09-10 之前是空的：shipping-service 全服務零 micrometer
-  # counter（對照組 order-service 5 個），Prometheus 對它只有 liveness。
-  # Independent QA 的原話：「unknown status 被保存只是第一步；如果沒有任何監控，
-  # 實務上仍是 silent failure」。
-  # ==========================================================================
-  - name: shipping-alerts
-    interval: 300s
-    rules:
-      # 物流商開始回傳我方 adapter 認不得的貨態 —— 通常是對方改了碼表。
-      #
-      # 🔴 這條的意義是**趨勢**不是單筆：單筆已經有 raw 值落在
-      # shipments.provider_status 與 WARN log 裡；沒人看的是「它開始變多了」。
-      #
-      # ⚠️ **兩個 dev 實測出來的陷阱，兩個都已在 code 側修掉，這裡記下判準**：
-      #
-      # ① **不得與「回調不帶貨態欄位」共用 counter**。PayUni 建單結果回報只有
-      #    TradeStatus 沒有 ShipStatus，會走進同一個處置分支，但那是**正常流量**。
-      #    共用時 sum by (env, shipping_method) 會跨 outcome 加總 ⇒ 每次正常建單都告警。
-      #    ⇒ 它有自己的指標 hawkr_shipping_provider_not_status_event_total，不進本條。
-      #
-      # ② **counter 必須在服務啟動時預先展開成 0**（ShippingService 建構子對 5 個配送方式做）。
-      #    Micrometer 的 counter 在第一次觀測前不出現在 /metrics 上，而序列從「不存在」
-      #    跳到 1 **不算 increase** ⇒ 不展開的話，每個 pod 生命週期內的第一筆會靜默，
-      #    而「第一筆」正是最需要被看到的。dev 實測：序列有 22 個取樣點、值恆為 1，
-      #    increase(...[1h]) 求值為空。
-      - alert: ShippingProviderStatusUnknown
-        # 🔴 selector 帶 outcome!="not_a_status_event" 是**跨版本安全**用的，不是冗餘：
-        #    prod 目前跑的是拆指標**之前**的版本（promote 分支在修復 merge 進 dev 之前切出），
-        #    那一版把正常流量（PayUni 建單結果回報只有 TradeStatus）也放進這支 counter 的
-        #    outcome label 裡 ⇒ 不濾掉的話 prod 會被正常建單觸發告警。
-        #    修復版沒有 outcome label，而 Prometheus 對「缺少的 label」視為空字串、
-        #    "" != "not_a_status_event" 成立 ⇒ 同一條 expr 對兩個版本都正確。
-        #    等修復 promote 到 main、prod 跑上新版之後，這個 selector 變成無害的冗餘，
-        #    可以連同本註解一起移除。
-        expr: sum by (env, shipping_method) (increase(hawkr_shipping_provider_status_unknown_total{outcome!="not_a_status_event"}[1h])) > 0
-        for: 15m
-        labels:
-          severity: warning
-          channel: business
-        annotations:
-          summary: "env={{ $labels.env }}：配送方式 {{ $labels.shipping_method }} 有 {{ $value }} 筆無法辨識的物流商貨態"
-          description: "env={{ $labels.env }}：物流商回了 adapter 認不得的貨態碼，raw 值已保存但狀態機沒有推進——那些單子的平台狀態停在原地，買賣家看到的進度是舊的。診斷：① 撈 raw 值 `SELECT shipment_no, provider_status, provider_message, updated_at FROM shipments WHERE provider_status IS NOT NULL AND updated_at > NOW() - INTERVAL '2 hours' ORDER BY updated_at DESC` ② 對照 log event `ShippingService.providerStatus.unknown` 取 source（WEBHOOK／WEBHOOK_NO_ADAPTER／QUERY）判斷是哪條入口 ③ 拿 raw 值對第三方文件的貨態表，是新增碼就補 ShipmentStatusMapper 的映射、是我方漏 map 就補 adapter ④ 補完後那些卡住的單子要手動推進，映射補上不會回溯。⚠️ 本條**不含** provider_not_status_event（回調不帶貨態欄位）——那是正常流量。"
 
   # ── 站外業者邀請信網域信譽前哨（Vendor Portal E1 #2539）──
   - name: vendor-portal-alerts
