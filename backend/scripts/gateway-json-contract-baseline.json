@@ -7,7 +7,7 @@
   "check_a": [
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 30569,
+      "line_hint": 24961,
       "key": "acceptedByAccountId",
       "direction": "spec",
       "count": 1,
@@ -15,7 +15,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 24026,
+      "line_hint": 19290,
       "key": "actorAccountId",
       "direction": "spec",
       "count": 2,
@@ -23,7 +23,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 2554,
+      "line_hint": 2483,
       "key": "actor_account_id",
       "direction": "spec",
       "count": 1,
@@ -31,7 +31,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 27504,
+      "line_hint": 22078,
       "key": "approvedByAccountId",
       "direction": "spec",
       "count": 1,
@@ -39,7 +39,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 23535,
+      "line_hint": 18838,
       "key": "buyerAccountId",
       "direction": "spec",
       "count": 1,
@@ -47,7 +47,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 23636,
+      "line_hint": 18932,
       "key": "buyerAccountIds",
       "direction": "spec",
       "count": 2,
@@ -55,7 +55,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 29606,
+      "line_hint": 24001,
       "key": "createdByAccountId",
       "direction": "spec",
       "count": 1,
@@ -63,7 +63,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 25728,
+      "line_hint": 20437,
       "key": "issuerAccountId",
       "direction": "spec",
       "count": 1,
@@ -71,7 +71,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 27521,
+      "line_hint": 22095,
       "key": "requestedByAccountId",
       "direction": "spec",
       "count": 1,
@@ -79,7 +79,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 23993,
+      "line_hint": 19257,
       "key": "reviewedByAccountId",
       "direction": "spec",
       "count": 1,
@@ -87,7 +87,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 26374,
+      "line_hint": 21034,
       "key": "sellerAccountId",
       "direction": "spec",
       "count": 2,
@@ -95,7 +95,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 24010,
+      "line_hint": 19274,
       "key": "submittedByAccountId",
       "direction": "spec",
       "count": 1,
@@ -103,7 +103,7 @@
     },
     {
       "file": "api/openapi/openapi.yaml",
-      "line_hint": 5311,
+      "line_hint": 5238,
       "key": "targetAccountId",
       "direction": "spec",
       "count": 1,
@@ -183,7 +183,7 @@
     },
     {
       "file": "gateway/internal/handler/invoice_admin.go",
-      "line_hint": 1493,
+      "line_hint": 1488,
       "key": "actor_account_id",
       "direction": "swagger",
       "count": 1,
@@ -191,7 +191,7 @@
     },
     {
       "file": "gateway/internal/handler/invoice_dto.go",
-      "line_hint": 390,
+      "line_hint": 384,
       "key": "acceptedByAccountId",
       "direction": "outbound",
       "count": 1,
@@ -199,7 +199,7 @@
     },
     {
       "file": "gateway/internal/handler/invoice_dto.go",
-      "line_hint": 108,
+      "line_hint": 102,
       "key": "actorAccountId",
       "direction": "outbound",
       "count": 1,
@@ -207,7 +207,7 @@
     },
     {
       "file": "gateway/internal/handler/invoice_dto.go",
-      "line_hint": 299,
+      "line_hint": 293,
       "key": "approvedByAccountId",
       "direction": "outbound",
       "count": 1,
@@ -215,7 +215,7 @@
     },
     {
       "file": "gateway/internal/handler/invoice_dto.go",
-      "line_hint": 346,
+      "line_hint": 340,
       "key": "createdByAccountId",
       "direction": "outbound",
       "count": 1,
@@ -223,7 +223,7 @@
     },
     {
       "file": "gateway/internal/handler/invoice_dto.go",
-      "line_hint": 298,
+      "line_hint": 292,
       "key": "requestedByAccountId",
       "direction": "outbound",
       "count": 1,

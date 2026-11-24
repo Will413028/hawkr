@@ -83,10 +83,6 @@ tags:
   description: 商家商品：商家商品管理
 - name: Share
   description: 分享
-- name: Shipping
-  description: 物流：物流出貨、標籤列印、物流建店、運費試算
-- name: StoreMap
-  description: 超商門市地圖
 - name: Subscription
   description: 訂閱：訂閱商家
 - name: VendorPortal
@@ -427,65 +423,6 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '409':
           description: AFTERSALE_INVALID_STATUS (status 不在 20/25/27/28)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/admin/after_sales/{case_no}/retry_print_return_label:
-    post:
-      operationId: retryPrintReturnLabel
-      summary: 人工重試 7-11 退貨出貨便列印（Admin）
-      description: |-
-        用於系統自動重試仍未取得出貨便代碼時的平台管理員介入。重置 label_retry_count 並再次觸發 PayUni print_label。
-        僅允許 7-11 退貨（returnShippingMethod=3002）、狀態 20/25、尚未回填代碼（partnerId 為空）的案件使用。
-      tags:
-      - AfterSales
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: case_no
-        in: path
-        description: 案件編號
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  message:
-                    type: string
-        '401':
-          description: 未登入或 token 無效
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: 非管理員（admin access required）
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: 9001 售後單不存在
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '409':
-          description: 9013 出貨便代碼已產生，無需重試 / 9014 售後案件狀態不允許重試列印
           content:
             application/json:
               schema:
@@ -2984,8 +2921,6 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/SellerInvoiceDocumentItem'
-                      shipmentStatusDegraded:
-                        type: boolean
                       total:
                         type: string
                   message:
@@ -6786,101 +6721,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/admin/seller_shipment_settings:
-    get:
-      operationId: listSellerShipmentSettingsForAdmin
-      summary: 列建店異常
-      description: Admin 查詢 PayUni 建店審核失敗的賣家物流設定。預設 filter onboarding_status=REJECTED
-      tags:
-      - AdminAbnormal
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: page
-        in: query
-        description: 頁碼，整數字串
-        schema:
-          type: string
-          default: '1'
-      - name: page_size
-        in: query
-        description: 每頁筆數，整數字串，最大 100
-        schema:
-          type: string
-          default: '20'
-      - name: abnormal_only
-        in: query
-        description: 僅異常；合法值：true / false
-        schema:
-          type: string
-          default: 'true'
-      - name: provider_status
-        in: query
-        description: PayUni 原始狀態碼 exact match
-        schema:
-          type: string
-      - name: onboarding_status
-        in: query
-        description: OnboardingStatus value，多值逗號分隔
-        schema:
-          type: string
-      - name: shipping_type
-        in: query
-        description: 合法值：CVS_C2C / HOME_DELIVERY
-        schema:
-          type: string
-      - name: store_id
-        in: query
-        description: 依賣家過濾
-        schema:
-          type: string
-      - name: created_from
-        in: query
-        description: 建立時間起 (ISO 8601 UTC)
-        schema:
-          type: string
-      - name: created_to
-        in: query
-        description: 建立時間迄 (ISO 8601 UTC)
-        schema:
-          type: string
-      - name: sort
-        in: query
-        description: 排序；合法值：updated_at_desc / updated_at_asc / created_at_desc / created_at_asc
-        schema:
-          type: string
-          default: updated_at_desc
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/AdminSellerShipmentSettingListResp'
-                  message:
-                    type: string
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/admin/sellers/{store_id}/delegated-operation/preflight:
     get:
       operationId: getDelegatedOperationPreflight
@@ -7033,374 +6873,6 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '424':
           description: Failed Dependency
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/admin/shipments:
-    get:
-      operationId: listShipmentsForAdmin
-      summary: 列物流異常
-      description: Admin 查詢 PayUni 物流建單失敗 / 異常的記錄。abnormal_only=true 時僅回異常態（CREATE_FAILED / ABNORMAL / 退貨異常等）
-      tags:
-      - AdminAbnormal
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: page
-        in: query
-        description: 頁碼，整數字串
-        schema:
-          type: string
-          default: '1'
-      - name: page_size
-        in: query
-        description: 每頁筆數，整數字串，最大 100
-        schema:
-          type: string
-          default: '20'
-      - name: abnormal_only
-        in: query
-        description: 僅異常；合法值：true / false
-        schema:
-          type: string
-          default: 'true'
-      - name: provider_status
-        in: query
-        description: PayUni 原始狀態碼 exact match（如 E001）
-        schema:
-          type: string
-      - name: status
-        in: query
-        description: 平台 ShippingStatus value，多值逗號分隔
-        schema:
-          type: string
-      - name: is_return
-        in: query
-        description: 是否退貨；合法值：true / false / 留空=全部
-        schema:
-          type: string
-      - name: shipping_method
-        in: query
-        description: 配送方式；合法值：3001=TAQBIN / 3002=SEVEN_ELEVEN_STORE_PICKUP
-        schema:
-          type: string
-      - name: store_id
-        in: query
-        description: 依賣家過濾
-        schema:
-          type: string
-      - name: order_no
-        in: query
-        description: 依訂單號過濾
-        schema:
-          type: string
-      - name: created_from
-        in: query
-        description: 建立時間起 (ISO 8601 UTC)
-        schema:
-          type: string
-      - name: created_to
-        in: query
-        description: 建立時間迄 (ISO 8601 UTC)
-        schema:
-          type: string
-      - name: sort
-        in: query
-        description: 排序；合法值：updated_at_desc / updated_at_asc / created_at_desc / created_at_asc
-        schema:
-          type: string
-          default: updated_at_desc
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/AdminShipmentListResp'
-                  message:
-                    type: string
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/admin/shipments/anomalies:
-    get:
-      operationId: listShipmentAnomaliesForAdmin
-      summary: Admin 平台級配送異常監控
-      description: Admin 查詢全平台配送異常列表，可依 store_id / anomaly_type / severity 過濾。資料由 shipments LEFT JOIN ack 表 SQL 推導，與賣家端共用同一資料來源。
-      tags:
-      - AdminAbnormal
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: store_id
-        in: query
-        description: 依賣家過濾
-        schema:
-          type: string
-      - name: anomaly_type
-        in: query
-        description: ShipmentAnomalyType.value 過濾；合法值：TCAT_CALL_FAILED / CVS_LABEL_UNPRINTED / PROVIDER_STATUS_ABNORMAL / PACKAGE_LOST / DELIVERY_OVERDUE / PAYUNI_LGS_NO_CODE / RETURN_STUCK
-        schema:
-          type: string
-      - name: severity
-        in: query
-        description: ShipmentAnomalySeverity.value 過濾；合法值：HIGH / MEDIUM / LOW
-        schema:
-          type: string
-      - name: show_acknowledged
-        in: query
-        description: 是否包含已 ack/ignored 的單；合法值：true / false
-        schema:
-          type: string
-          default: 'false'
-      - name: page
-        in: query
-        description: 頁碼，整數字串
-        schema:
-          type: string
-          default: '1'
-      - name: page_size
-        in: query
-        description: 每頁筆數，整數字串
-        schema:
-          type: string
-          default: '20'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/ListShipmentAnomaliesForAdminResponse'
-                  message:
-                    type: string
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '500':
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/admin/shipments/anomalies/{shipment_id}/{anomaly_type}/acknowledge:
-    post:
-      operationId: acknowledgeShipmentAnomalyForAdmin
-      summary: Admin 標記配送異常為「已處理」
-      description: Admin 對特定 shipment 的特定 anomaly_type 標記為「已處理」（actor_type=ADMIN，與賣家 ack 互不覆蓋）。複合 key 為 (shipment_id, anomaly_type)，不需事前查詢 ack id。
-      tags:
-      - AdminAbnormal
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: shipment_id
-        in: path
-        description: shipments.id（TSID 數字字串）
-        required: true
-        schema:
-          type: string
-      - name: anomaly_type
-        in: path
-        description: ShipmentAnomalyType.value；合法值：TCAT_CALL_FAILED / CVS_LABEL_UNPRINTED / PROVIDER_STATUS_ABNORMAL / PACKAGE_LOST / DELIVERY_OVERDUE / PAYUNI_LGS_NO_CODE / RETURN_STUCK
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/AcknowledgeShipmentAnomalyResponse'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '500':
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/admin/shipments/anomalies/{shipment_id}/{anomaly_type}/ignore:
-    post:
-      operationId: ignoreShipmentAnomalyForAdmin
-      summary: Admin 標記配送異常為「已忽略」
-      description: Admin 對特定 shipment 的特定 anomaly_type 標記為「已忽略」（actor_type=ADMIN，action=IGNORED，與賣家 ack 互不覆蓋）。複合 key 為 (shipment_id, anomaly_type)，不需事前查詢 ack id。
-      tags:
-      - AdminAbnormal
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: shipment_id
-        in: path
-        description: shipments.id（TSID 數字字串）
-        required: true
-        schema:
-          type: string
-      - name: anomaly_type
-        in: path
-        description: ShipmentAnomalyType.value；合法值：TCAT_CALL_FAILED / CVS_LABEL_UNPRINTED / PROVIDER_STATUS_ABNORMAL / PACKAGE_LOST / DELIVERY_OVERDUE / PAYUNI_LGS_NO_CODE / RETURN_STUCK
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/AcknowledgeShipmentAnomalyResponse'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '500':
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/admin/shipments/{id}:
-    get:
-      operationId: getShipmentForAdmin
-      summary: 取物流詳情
-      description: Admin 查詢單筆物流單詳情，含完整 provider_status / provider_message 與寄收件人資訊
-      tags:
-      - AdminAbnormal
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: id
-        in: path
-        description: Shipment TSID
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/AdminShipmentDetailResp'
-                  message:
-                    type: string
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
           content:
             application/json:
               schema:
@@ -10527,60 +9999,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/checkout/shipping_fee:
-    post:
-      operationId: checkoutShippingFee
-      summary: 運費精算
-      description: 選擇配送方式與填寫地址後呼叫，精確計算運費
-      tags:
-      - Checkout
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      requestBody:
-        description: 運費精算請求
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CheckoutShippingFeeRequest'
-        x-originalParamName: request
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/CheckoutShippingFeeDataResponse'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/app/checkout/validate:
     post:
       operationId: checkoutValidate
@@ -13177,59 +12595,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/orders/{order_no}/logistics:
-    get:
-      operationId: getOrderLogistics
-      summary: 查看訂單物流追蹤
-      description: 買家查看自己訂單的物流追蹤，後端即時向 PayUni 同步當前狀態並回傳單點狀態。Ownership 由 shipping-service 驗證；無託運單號時回 DB 當前狀態。
-      tags:
-      - Shipping
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: order_no
-        in: path
-        description: 訂單編號
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/OrderLogisticsResp'
-                  message:
-                    type: string
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/app/orders/{order_no}/refund_page:
     post:
       operationId: getRefundPageUrl
@@ -15119,8 +14484,6 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/SellerInvoiceDocumentItem'
-                      shipmentStatusDegraded:
-                        type: boolean
                       total:
                         type: string
                   message:
@@ -17482,1390 +16845,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/shipments/anomalies:
-    get:
-      operationId: listSellerShipmentAnomalies
-      summary: 列賣家配送異常 dashboard
-      description: 賣家查詢自己的配送異常列表，含 ack 狀態。資料由 shipments 表 LEFT JOIN ack 表 SQL 推導，不存第二份狀態表。預設僅回未 ack 的異常單；show_acknowledged=true 包含已處理/已忽略。
-      tags:
-      - Shipping
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: anomaly_type
-        in: query
-        description: ShipmentAnomalyType.value 過濾；合法值：TCAT_CALL_FAILED / CVS_LABEL_UNPRINTED / PROVIDER_STATUS_ABNORMAL / PACKAGE_LOST / DELIVERY_OVERDUE / PAYUNI_LGS_NO_CODE / RETURN_STUCK
-        schema:
-          type: string
-      - name: severity
-        in: query
-        description: ShipmentAnomalySeverity.value 過濾；合法值：HIGH / MEDIUM / LOW
-        schema:
-          type: string
-      - name: show_acknowledged
-        in: query
-        description: 是否包含已 ack/ignored 的單；合法值：true / false
-        schema:
-          type: string
-          default: 'false'
-      - name: page
-        in: query
-        description: 頁碼，整數字串
-        schema:
-          type: string
-          default: '1'
-      - name: page_size
-        in: query
-        description: 每頁筆數，整數字串
-        schema:
-          type: string
-          default: '20'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/ListSellerShipmentAnomaliesResponse'
-                  message:
-                    type: string
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '500':
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/shipments/anomalies/stats:
-    get:
-      operationId: getSellerShipmentAnomalyStats
-      summary: 賣家配送異常統計
-      description: 賣家配送異常的統計概覽，依 anomaly_type 與 severity 分組計數，供賣家 dashboard 紅點/分類條使用。僅計算未 ack 的異常單。
-      tags:
-      - Shipping
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/GetSellerShipmentAnomalyStatsResponse'
-                  message:
-                    type: string
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '500':
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/shipments/anomalies/{shipment_id}/{anomaly_type}/acknowledge:
-    post:
-      operationId: acknowledgeShipmentAnomaly
-      summary: 賣家標記異常為「已處理」
-      description: 賣家對特定 shipment 的特定 anomaly_type 標記為「已處理」（upsert shipment_anomaly_acknowledgments）。複合 key 為 (shipment_id, anomaly_type)，不需事前查詢 ack id。
-      tags:
-      - Shipping
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: shipment_id
-        in: path
-        description: shipments.id（TSID 數字字串）
-        required: true
-        schema:
-          type: string
-      - name: anomaly_type
-        in: path
-        description: ShipmentAnomalyType.value；合法值：TCAT_CALL_FAILED / CVS_LABEL_UNPRINTED / PROVIDER_STATUS_ABNORMAL / PACKAGE_LOST / DELIVERY_OVERDUE / PAYUNI_LGS_NO_CODE / RETURN_STUCK
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/AcknowledgeShipmentAnomalyResponse'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '500':
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/shipments/anomalies/{shipment_id}/{anomaly_type}/ignore:
-    post:
-      operationId: ignoreShipmentAnomaly
-      summary: 賣家標記異常為「已忽略」
-      description: 賣家對特定 shipment 的特定 anomaly_type 標記為「已忽略」（upsert shipment_anomaly_acknowledgments，action=IGNORED）。複合 key 為 (shipment_id, anomaly_type)，不需事前查詢 ack id。
-      tags:
-      - Shipping
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: shipment_id
-        in: path
-        description: shipments.id（TSID 數字字串）
-        required: true
-        schema:
-          type: string
-      - name: anomaly_type
-        in: path
-        description: ShipmentAnomalyType.value；合法值：TCAT_CALL_FAILED / CVS_LABEL_UNPRINTED / PROVIDER_STATUS_ABNORMAL / PACKAGE_LOST / DELIVERY_OVERDUE / PAYUNI_LGS_NO_CODE / RETURN_STUCK
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/AcknowledgeShipmentAnomalyResponse'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '500':
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/shipments/batch_generate_home_label:
-    post:
-      operationId: batchGenerateHomeLabel
-      summary: 批次宅配取號 PDF
-      description: 賣家一次觸發多筆宅配物流單取號 + PDF 上傳 OSS。後端 fan-out 並行（Virtual Threads + Semaphore），同步等待全部完成。單次上限與並行數由環境變數控制（預設 50 / 10）。採部分成功模式，每筆獨立回傳結果。**不接受出貨照片**（請改用單筆 API）。
-      tags:
-      - Shipping
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      requestBody:
-        description: 批次宅配取號項目（每筆含 orderNo + shipDate + deliveryDate?）
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BatchGenerateHomeLabelReq'
-        x-originalParamName: body
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/BatchHomeLabelDataResp'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/shipments/batch_print_cvs_label:
-    post:
-      operationId: batchPrintCvsLabel
-      summary: 批次超商出貨單列印
-      description: 賣家一次觸發多筆超商物流單的 PayUni 列印，同批次自動依溫層/物流商分組呼叫。出貨便代碼由 Webhook 逐筆非同步回填。單次最多 50 筆，採部分成功模式。
-      tags:
-      - Shipping
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      requestBody:
-        description: 訂單編號列表與出貨日期（yyyy-MM-dd 或 yyyyMMdd）
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BatchPrintCvsLabelReq'
-        x-originalParamName: body
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/BatchCvsLabelDataResp'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/shipments/{order_no}/call_tcat:
-    post:
-      operationId: callTcat
-      summary: 呼叫黑貓預約取件
-      description: 賣家對已取號的宅配物流單呼叫黑貓預約取件，需先完成 generate_home_label 取號。取件選項會存入 DB 再傳給 PayUni。
-      tags:
-      - Shipping
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: order_no
-        in: path
-        description: 訂單編號
-        required: true
-        schema:
-          type: string
-      requestBody:
-        description: 預約取件選項（全部選填）
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CallTcatReq'
-        x-originalParamName: body
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/CallTcatDataResp'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/shipments/{order_no}/confirm:
-    post:
-      operationId: confirmCvsShipment
-      summary: 超商確認出貨
-      description: 超商賣家確認出貨，推進訂單狀態為配送中。出貨照片選填。
-      tags:
-      - Shipping
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: order_no
-        in: path
-        description: 訂單編號
-        required: true
-        schema:
-          type: string
-      requestBody:
-        description: 確認出貨參數
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ConfirmCvsShipmentReq'
-        x-originalParamName: body
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/shipments/{order_no}/generate_home_label:
-    post:
-      operationId: generateHomeLabel
-      summary: 產宅配託運單 PDF
-      description: 賣家對已建立的宅配物流單產生託運單 PDF，後端呼叫 PayUni 取號並上傳 CDN，回傳 PDF URL
-      tags:
-      - Shipping
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: order_no
-        in: path
-        description: 訂單編號
-        required: true
-        schema:
-          type: string
-      requestBody:
-        description: 出貨日期與配達日期（yyyy-MM-dd 或 yyyyMMdd）
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GenerateHomeLabelReq'
-        x-originalParamName: body
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/HomeLabelDataResp'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/shipments/{order_no}/print_cvs_label:
-    post:
-      operationId: printCvsLabel
-      summary: 超商出貨單列印
-      description: 賣家對已建立的超商物流單觸發 PayUni 列印，同步等待最多 55 秒取得交貨便代碼。若超時則回傳 webhookReceived=false，前端可在訂單詳情頁後續查詢。
-      tags:
-      - Shipping
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: order_no
-        in: path
-        description: 訂單編號
-        required: true
-        schema:
-          type: string
-      requestBody:
-        description: 出貨日期（yyyy-MM-dd 或 yyyyMMdd）
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PrintCvsLabelReq'
-        x-originalParamName: body
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/CvsLabelDataResp'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/shipments/{order_no}/tracking:
-    get:
-      operationId: getSellerShipmentTracking
-      summary: 賣家查看訂單物流追蹤
-      description: 賣家查看自己訂單的物流追蹤，後端即時向 PayUni 同步當前狀態並回傳單點狀態。Ownership 由 shipping-service 驗 store_id。is_return 可選正向/退貨單。
-      tags:
-      - Shipping
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: order_no
-        in: path
-        description: 訂單編號
-        required: true
-        schema:
-          type: string
-      - name: is_return
-        in: query
-        description: true=退貨單, 預設 false=正向單
-        schema:
-          type: boolean
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/OrderLogisticsResp'
-                  message:
-                    type: string
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/shipping_business_days:
-    get:
-      operationId: listBusinessDays
-      summary: 查詢可出貨工作天
-      description: 回傳明日起 7 個工作天，供前台日曆元件標記可選日期
-      tags:
-      - Shipping
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/BusinessDaysDataResp'
-                  message:
-                    type: string
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/shipping_methods:
-    get:
-      operationId: listSellerShippingMethods
-      summary: 查詢賣家可用配送方式
-      description: 回傳賣家所有可能的配送方式槽位（宅配/超商），含各自的啟用狀態與建店資訊
-      tags:
-      - Shipping
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/SellerShippingMethodResp'
-                  message:
-                    type: string
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/shipping_onboardings:
-    get:
-      operationId: listShippingOnboardings
-      summary: 列出建店設定
-      description: 賣家取得自己所有物流建店設定（超商/宅配）
-      tags:
-      - Shipping
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/ShippingOnboardingViewResp'
-                  message:
-                    type: string
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/shipping_onboardings/cvs:
-    post:
-      operationId: onboardCvsShipping
-      summary: 超商 C2C 建店
-      description: 賣家申請超商 C2C 物流建店（7-ELEVEN），呼叫 PayUni 建店 API 取得物流代碼
-      tags:
-      - Shipping
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      requestBody:
-        description: 'returnStoreCode: 6碼退貨門市，senderName: 寄件人姓名，senderPhone: 寄件人電話'
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/OnboardCvsReq'
-        x-originalParamName: body
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/shipping_onboardings/home_delivery:
-    post:
-      operationId: onboardHomeDeliveryShipping
-      summary: 宅配建店
-      description: 賣家申請宅配物流建店（黑貓），呼叫 PayUni 建店 API 取得物流代碼
-      tags:
-      - Shipping
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      requestBody:
-        description: 商品類別代碼（0001~0015）+ 寄件人/退貨地址資訊
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/OnboardHomeReq'
-        x-originalParamName: body
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/shipping_onboardings/{onboarding_id}:
-    get:
-      operationId: getShippingOnboarding
-      summary: 查詢建店詳情
-      description: 賣家查詢單一物流建店設定詳情
-      tags:
-      - Shipping
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: onboarding_id
-        in: path
-        description: 建店設定 ID
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/ShippingOnboardingViewResp'
-                  message:
-                    type: string
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/shipping_onboardings/{onboarding_id}/toggle:
-    post:
-      operationId: toggleShippingOnboarding
-      summary: 切換建店設定啟用/停用
-      description: 賣家切換物流建店設定的啟用/停用狀態，純平台內部操作，不與 PayUni 溝通
-      tags:
-      - Shipping
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: onboarding_id
-        in: path
-        description: 建店設定 ID
-        required: true
-        schema:
-          type: string
-      requestBody:
-        description: 啟用/停用
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ToggleShippingOnboardingReq'
-        x-originalParamName: body
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/shipping_quotes:
-    post:
-      operationId: calculateShippingOptions
-      summary: 計算可用配送選項與運費
-      description: 依據商品包裝尺寸與重量，計算所有可用的配送選項與對應運費
-      tags:
-      - Shipping
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      requestBody:
-        description: 運費計算請求
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CalculateShippingOptionsRequest'
-        x-originalParamName: request
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/ShippingCalculationDataItem'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/store_map_sessions:
-    post:
-      operationId: getStoreMapParams
-      summary: 取得超商門市地圖參數
-      description: 取得 PayUni 門市地圖 Form POST 所需的加密參數，前端用 redirectUrl 開啟 WebView（App）或 popup（Web）
-      tags:
-      - StoreMap
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      requestBody:
-        description: 'appType: buyer/seller/web（決定回調 302 目標：buyer/seller→App deep link，web→{WEB_FRONTEND_URL}/store-map/return），mobileTag: Y(手機版)/N(PC版)，預設 Y；web 建議傳 N'
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GetStoreMapParamsReq'
-        x-originalParamName: body
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/StoreMapFormDataResp'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '503':
-          description: Service Unavailable
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/store_pickups:
-    get:
-      operationId: listBuyerStorePickups
-      summary: 取得常用門市列表
-      description: 買家取得自己所有常用取貨門市，依預設優先、建立時間降序排列
-      tags:
-      - Shipping
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/BuyerStorePickupResp'
-                  message:
-                    type: string
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-    post:
-      operationId: addBuyerStorePickup
-      summary: 新增常用門市
-      description: 買家新增常用取貨門市，每人最多 20 筆。設為預設時自動清除其他預設門市。
-      tags:
-      - Shipping
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      requestBody:
-        description: 門市資訊
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/AddStorePickupReq'
-        x-originalParamName: body
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/BuyerStorePickupResp'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/store_pickups/{store_pickup_id}:
-    delete:
-      operationId: deleteBuyerStorePickup
-      summary: 刪除常用門市
-      description: 買家刪除已儲存的常用取貨門市
-      tags:
-      - Shipping
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: store_pickup_id
-        in: path
-        description: 門市記錄 ID
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-    put:
-      operationId: updateBuyerStorePickup
-      summary: 修改常用門市
-      description: 買家修改已儲存的常用取貨門市。設為預設時自動清除其他預設門市。
-      tags:
-      - Shipping
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: store_pickup_id
-        in: path
-        description: 門市記錄 ID
-        required: true
-        schema:
-          type: string
-      requestBody:
-        description: 門市資訊
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateStorePickupReq'
-        x-originalParamName: body
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/BuyerStorePickupResp'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/health:
     get:
       operationId: healthSelf
@@ -20602,73 +18581,6 @@ paths:
             text/plain:
               schema:
                 type: string
-  /store_map/redirect:
-    get:
-      operationId: storeMapRedirect
-      summary: 重導向到 PayUni 門市地圖頁
-      description: 以後端產生的一次性 opaque id 取回 canonical 表單資料並自動 Form POST 到 PayUni 門市地圖，供 APP WebView 直接開啟
-      tags:
-      - StoreMap
-      parameters:
-      - name: id
-        in: query
-        description: 後端產生的一次性 redirect id
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: 自動提交到 PayUni 的 HTML 頁面
-          content:
-            text/html:
-              schema:
-                type: string
-        '400':
-          description: 缺少參數
-          content:
-            text/html:
-              schema:
-                type: string
-        '404':
-          description: 連結已失效或不存在
-          content:
-            text/html:
-              schema:
-                type: string
-        '503':
-          description: 服務不可用
-          content:
-            text/html:
-              schema:
-                type: string
-  /store_map/return:
-    post:
-      operationId: storeMapReturn
-      summary: 門市選擇結果回調
-      description: PayUni 門市地圖選店完成後的回調，解密門市資訊後 302 redirect 到 Deep Link 導回 App
-      tags:
-      - StoreMap
-      parameters:
-      - name: app
-        in: query
-        description: APP 類型（buyer/seller），預設 buyer
-        schema:
-          type: string
-      responses:
-        '302':
-          description: Redirect to Deep Link
-        '400':
-          description: 參數錯誤
-          content:
-            text/plain:
-              schema:
-                type: string
-        '503':
-          description: 服務不可用
-          content:
-            text/plain:
-              schema:
-                type: string
 components:
   schemas:
     AcceptSelfIssueAttestationRequest:
@@ -20678,15 +18590,6 @@ components:
           type: boolean
         termsVersion:
           type: string
-    AcknowledgeShipmentAnomalyResponse:
-      type: object
-      properties:
-        ackId:
-          type: string
-          description: shipment_anomaly_acknowledgments.id（數字字串）
-        actedAt:
-          type: string
-          description: ISO 8601 UTC
     ActOnInvoiceComplaintForAdminData:
       type: object
       properties:
@@ -20719,27 +18622,6 @@ components:
         cutoverAt:
           type: string
         expectedVersion:
-          type: string
-    AddStorePickupReq:
-      type: object
-      required:
-      - receiverName
-      - receiverPhone
-      - storeAddress
-      - storeCode
-      - storeName
-      properties:
-        isDefault:
-          type: boolean
-        receiverName:
-          type: string
-        receiverPhone:
-          type: string
-        storeAddress:
-          type: string
-        storeCode:
-          type: string
-        storeName:
           type: string
     AddToCartRequest:
       type: object
@@ -21044,13 +18926,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ProviderExchangeItem'
-        shipmentStatus:
-          type: string
-        shipmentStatusDegraded:
-          type: boolean
-          description: |-
-            shipmentStatusDegraded ＝ 這一筆的 shipmentStatus 沒有取到（shipping-service
-            不可用）。true ⇒ 空字串是「查不到」不是「還沒出貨」（#3089 第 7 項）。
     AdminIssueCouponsRequest:
       type: object
       required:
@@ -21136,14 +19011,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OrderItemViewResponse'
-        labelExpireAt:
-          type: string
-        labelKey:
-          type: string
-          description: 託運單 PDF objectKey（SSOT；49 §6.1）
-        labelUrl:
-          type: string
-          description: 託運單 PDF 顯示 URL（Gateway 組）
         logoKey:
           type: string
           description: 商家 logo objectKey（SSOT；49 §6.1）
@@ -21152,11 +19019,7 @@ components:
           description: 商家 logo 顯示 URL（Gateway 組）
         needRefundPage:
           type: boolean
-        odno:
-          type: string
         orderNo:
-          type: string
-        partnerId:
           type: string
         paymentDeadline:
           type: string
@@ -21165,8 +19028,6 @@ components:
           type: string
           description: 付款方式（PaymentMethod value；合法值以 CodeMeta 業務類型碼.md 為準，2001-2004；未付款為空字串）
         pickupStoreName:
-          type: string
-        processingDeadline:
           type: string
         providerMessage:
           type: string
@@ -21182,23 +19043,7 @@ components:
           type: string
         sellerName:
           type: string
-        shipmentPhotoKeys:
-          type: array
-          description: 出貨照片 objectKey（SSOT）
-          items:
-            type: string
-        shipmentPhotoUrls:
-          type: array
-          description: 出貨照片顯示 URL（Gateway 組）
-          items:
-            type: string
         shippingAddress:
-          type: string
-        shippingMethod:
-          type: string
-        shippingStatus:
-          type: string
-        shippingStatusDesc:
           type: string
         status:
           type: string
@@ -21212,8 +19057,6 @@ components:
         storeId:
           type: string
         totalActualAmount:
-          type: string
-        validationNo:
           type: string
     AdminPaymentRefundListResp:
       type: object
@@ -21565,239 +19408,6 @@ components:
         shipTradeNo:
           type: string
           description: 僅 SHIPPING 有值
-    AdminSellerShipmentSettingListResp:
-      type: object
-      properties:
-        page:
-          type: string
-        pageSize:
-          type: string
-        records:
-          type: array
-          items:
-            $ref: '#/components/schemas/AdminSellerShipmentSettingSummaryResp'
-        total:
-          type: string
-    AdminSellerShipmentSettingSummaryResp:
-      type: object
-      properties:
-        createdAt:
-          type: string
-        enabled:
-          type: string
-          description: '"true" / "false"'
-        eshipId:
-          type: string
-        goodsType:
-          type: string
-        merId:
-          type: string
-        onboardingStatus:
-          type: string
-          description: OnboardingStatus value
-        partnerId:
-          type: string
-        payuniSubmitStatus:
-          type: string
-          description: 'PayUniSubmitStatus value: "4301"~"4304"'
-        providerMessage:
-          type: string
-        providerStatus:
-          type: string
-        settingId:
-          type: string
-        shippingType:
-          type: string
-          description: 合法值：CVS_C2C / HOME_DELIVERY
-        storeId:
-          type: string
-        updatedAt:
-          type: string
-    AdminShipmentAnomalyRecordResp:
-      type: object
-      properties:
-        ackAction:
-          type: string
-          description: admin 端處置：ACKNOWLEDGED / IGNORED / 空字串
-        actedAt:
-          type: string
-          description: admin 端處置時間（ISO 8601 UTC）
-        anomalyType:
-          type: string
-        anomalyTypeLabel:
-          type: string
-        detectedAt:
-          type: string
-        orderNo:
-          type: string
-        sellerAckAction:
-          type: string
-          description: 'issue #1327：賣家端處置（唯讀揭露）'
-        sellerActedAt:
-          type: string
-          description: 'issue #1327：賣家端處置時間（ISO 8601 UTC）'
-        severity:
-          type: string
-        shipmentId:
-          type: string
-        shipmentStatus:
-          type: string
-        shippingMethod:
-          type: string
-        storeId:
-          type: string
-    AdminShipmentDetailResp:
-      type: object
-      properties:
-        buyerId:
-          type: string
-          description: 買家 buyer 代理鍵
-        createdAt:
-          type: string
-        cvsStoreCode:
-          type: string
-          description: 超商取貨門市代碼（原 storeId，與上方 storeId 代理鍵無關，純屬巧合曾同名）
-        cvsStoreName:
-          type: string
-          description: 超商取貨門市名稱（原 storeName）
-        goodsType:
-          type: string
-        isReturn:
-          type: string
-        labelKey:
-          type: string
-          description: 託運單 PDF objectKey（SSOT；49 §6.1）
-        labelPrintStatus:
-          type: string
-          description: 'LabelPrintStatus value: "4101"~"4104"'
-        labelUrl:
-          type: string
-          description: 託運單 PDF 顯示 URL（Gateway 組）
-        lastReconciledAt:
-          type: string
-        lgsType:
-          type: string
-        merId:
-          type: string
-        odno:
-          type: string
-        orderNo:
-          type: string
-        partnerId:
-          type: string
-        providerErrorAt:
-          type: string
-        providerErrorCode:
-          type: string
-          description: ProviderErrorCode 非空＝provider 層失敗，abnormalOnly 的判準（provider_status 不是）
-        providerErrorMessage:
-          type: string
-        providerMessage:
-          type: string
-        providerStatus:
-          type: string
-        providerStatusTime:
-          type: string
-        recipientAddress:
-          type: string
-        recipientName:
-          type: string
-        recipientPhone:
-          type: string
-        senderName:
-          type: string
-        senderPhone:
-          type: string
-        shipTradeNo:
-          type: string
-        shipType:
-          type: string
-        shipmentId:
-          type: string
-        shipmentNo:
-          type: string
-        shipmentPhotoKeys:
-          type: array
-          description: 出貨照片 objectKey（SSOT；49 §6.1）
-          items:
-            type: string
-        shipmentPhotoUrls:
-          type: array
-          description: 出貨照片顯示 URL（Gateway 組）
-          items:
-            type: string
-        shippingMethod:
-          type: string
-        spec:
-          type: string
-        status:
-          type: string
-        storeId:
-          type: string
-          description: 賣家 store 代理鍵
-        tcatCallStatus:
-          type: string
-          description: 'TcatCallStatus value: "4201"~"4204"'
-        tcatCallTime:
-          type: string
-        tradeAmt:
-          type: string
-        updatedAt:
-          type: string
-        validationNo:
-          type: string
-    AdminShipmentListResp:
-      type: object
-      properties:
-        page:
-          type: string
-        pageSize:
-          type: string
-        records:
-          type: array
-          items:
-            $ref: '#/components/schemas/AdminShipmentSummaryResp'
-        total:
-          type: string
-    AdminShipmentSummaryResp:
-      type: object
-      properties:
-        createdAt:
-          type: string
-        isReturn:
-          type: string
-          description: '"true" / "false"'
-        merId:
-          type: string
-        orderNo:
-          type: string
-        providerErrorCode:
-          type: string
-          description: ProviderErrorCode 非空＝provider 層失敗，abnormalOnly 的判準（provider_status 不是）
-        providerErrorMessage:
-          type: string
-        providerMessage:
-          type: string
-          description: PayUni 原始貨態訊息
-        providerStatus:
-          type: string
-          description: PayUni 原始貨態碼（正常軌跡證據，不代表異常）
-        shipTradeNo:
-          type: string
-        shipmentId:
-          type: string
-        shipmentNo:
-          type: string
-        shippingMethod:
-          type: string
-          description: 合法值：3001=TAQBIN, 3002=SEVEN_ELEVEN_STORE_PICKUP
-        status:
-          type: string
-          description: ShippingStatus value
-        storeId:
-          type: string
-        updatedAt:
-          type: string
     AdminUpdateCouponQuotaRequest:
       type: object
       required:
@@ -22110,44 +19720,6 @@ components:
           type: string
         weeklyUsage:
           type: string
-    AllowedAction:
-      type: object
-      properties:
-        action:
-          type: string
-          description: FulfillmentAction 值域（snake_case）
-        actor:
-          type: string
-          description: |-
-            Actor 是「誰有資格執行這個動作」——AccountType 值域（"1" 買家 / "2" 賣家 / "4" 管理員）。
-
-            🔴 這一格是**對外可驗證的**，不只是內部過濾條件：
-            沒有它，「後端有正確區分 actor」這件事對前端與 QA 都只能相信、無法查。
-            回應本身已依 viewer 過濾過，所以這裡的值恆等於呼叫者的身分——
-            那正是重點：**它讓「這條動作屬於誰」變成契約的一部分而不是實作細節**。
-        disabledReasonCode:
-          type: string
-          description: 業務碼；Enabled=false 時必填
-        disabledReasonText:
-          type: string
-        enabled:
-          type: boolean
-        href:
-          type: string
-          description: 完整路徑，前端只跟隨
-        method:
-          type: string
-          description: GET | POST
-    AnomalyTypeCountResp:
-      type: object
-      properties:
-        anomalyType:
-          type: string
-        anomalyTypeLabel:
-          type: string
-        count:
-          type: string
-          description: 整數字串
     AppealEventResponse:
       type: object
       properties:
@@ -22230,23 +19802,6 @@ components:
         paymentType:
           type: string
           description: PaymentMethod value（2001 信用卡 / 2002 Apple Pay / 2003 Google Pay / 2004 ATM）
-    AvailableShippingOptionResponse:
-      type: object
-      properties:
-        deliveryTemp:
-          type: string
-        fee:
-          type: string
-        feePayer:
-          type: string
-        freeShippingEligible:
-          type: boolean
-        freeShippingThreshold:
-          type: string
-        label:
-          type: string
-        shippingMethod:
-          type: string
     BatchChangeProductCategoryRequest:
       type: object
       required:
@@ -22260,95 +19815,6 @@ components:
           type: string
         targetCategoryId:
           type: string
-    BatchCvsLabelDataResp:
-      type: object
-      properties:
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/BatchCvsLabelResultResp'
-        successCount:
-          type: string
-        totalCount:
-          type: string
-    BatchCvsLabelResultResp:
-      type: object
-      properties:
-        message:
-          type: string
-        orderNo:
-          type: string
-        shipmentNo:
-          type: string
-        success:
-          type: boolean
-    BatchGenerateHomeLabelReq:
-      type: object
-      required:
-      - items
-      properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/BatchHomeLabelItemReq'
-          minItems: 1
-    BatchHomeLabelDataResp:
-      type: object
-      properties:
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/BatchHomeLabelResultResp'
-        successCount:
-          type: string
-        totalCount:
-          type: string
-    BatchHomeLabelItemReq:
-      type: object
-      required:
-      - orderNo
-      - shipDate
-      properties:
-        deliveryDate:
-          type: string
-          description: 選填（接受 yyyy-MM-dd 或 yyyyMMdd），未填則後端自動補 shipDate + 1 工作天
-        orderNo:
-          type: string
-        shipDate:
-          type: string
-          description: 出貨日期，接受 yyyy-MM-dd 或 yyyyMMdd
-    BatchHomeLabelResultResp:
-      type: object
-      properties:
-        labelKey:
-          type: string
-          description: 託運單 PDF objectKey（SSOT；49 §6.1）
-        labelUrl:
-          type: string
-          description: 託運單 PDF 顯示 URL（Gateway 組）
-        message:
-          type: string
-        orderNo:
-          type: string
-        shipmentNo:
-          type: string
-        success:
-          type: boolean
-    BatchPrintCvsLabelReq:
-      type: object
-      required:
-      - orderNos
-      - shipDate
-      properties:
-        orderNos:
-          type: array
-          items:
-            type: string
-          maxItems: 50
-          minItems: 1
-        shipDate:
-          type: string
-          description: 出貨日期，接受 yyyy-MM-dd 或 yyyyMMdd
     BatchSoftDeleteCategoryRequest:
       type: object
       required:
@@ -22365,22 +19831,6 @@ components:
           type: string
         text:
           type: string
-    BusinessDayResp:
-      type: object
-      properties:
-        date:
-          type: string
-          description: YYYY-MM-DD
-        dayOfWeek:
-          type: string
-          description: 一/二/三/四/五
-    BusinessDaysDataResp:
-      type: object
-      properties:
-        businessDays:
-          type: array
-          items:
-            $ref: '#/components/schemas/BusinessDayResp'
     BuyerInvoiceDocumentItem:
       type: object
       properties:
@@ -22403,77 +19853,6 @@ components:
           type: string
         uid:
           type: string
-    BuyerStorePickupResp:
-      type: object
-      properties:
-        createdAt:
-          type: string
-        id:
-          type: string
-        isDefault:
-          type: string
-          description: '"true" / "false"'
-        receiverName:
-          type: string
-        receiverPhone:
-          type: string
-        storeAddress:
-          type: string
-        storeCode:
-          type: string
-        storeName:
-          type: string
-        updatedAt:
-          type: string
-    CalculateShippingOptionsRequest:
-      type: object
-      required:
-      - height
-      - length
-      - weight
-      - weightUnit
-      - width
-      properties:
-        height:
-          type: string
-          description: 高（cm）
-        length:
-          type: string
-          description: 長（cm）
-        receiverArea:
-          type: string
-          description: 收件區域（選填，由 Product Service 決定預設值）
-        senderArea:
-          type: string
-          description: 寄件區域（選填，由 Product Service 決定預設值）
-        weight:
-          type: string
-          description: 重量值
-        weightUnit:
-          type: string
-          description: 重量單位：KG, CATTY, GRAM
-        width:
-          type: string
-          description: 寬（cm）
-    CallTcatDataResp:
-      type: object
-      properties:
-        callTime:
-          type: string
-        shipmentNo:
-          type: string
-    CallTcatReq:
-      type: object
-      properties:
-        isContact:
-          type: string
-          description: 是否需要事先電聯 Y/N（選填，預設 Y）
-        isTrolley:
-          type: string
-          description: 是否需要推車 Y/N（選填，預設 N）
-        memo:
-          type: string
-          description: 給宅配人員備註（選填，最長 100 位）
     CancelInvoiceJobForAdminRequest:
       type: object
       properties:
@@ -22657,19 +20036,12 @@ components:
       - items
       - recipientName
       - recipientPhone
-      - shippingMethod
       properties:
         checkoutId:
           type: string
         couponTemplateId:
           type: string
           description: 使用者選擇的優惠券模板 ID
-        cvsStoreCode:
-          type: string
-          description: 超商取貨門市店號，6 碼數字；僅 shippingMethod=3002 可帶
-        cvsStoreName:
-          type: string
-          description: 超商取貨門市名稱
         deliveryTemp:
           type: string
         invoice:
@@ -22686,24 +20058,14 @@ components:
             $ref: '#/components/schemas/CheckoutItemRequest'
         orderRemark:
           type: string
-        receiverZipCode:
-          type: string
         recipientName:
           type: string
         recipientPhone:
           type: string
         shippingAddress:
           type: string
-        shippingMethod:
-          type: string
         shippingNote:
           type: string
-        storeId:
-          type: string
-          description: Deprecated：cvsStoreCode 的舊名，語意完全相同（**不是**賣家 store_id）
-        storeName:
-          type: string
-          description: Deprecated：cvsStoreName 的舊名
     CheckoutInvoiceAmountResponse:
       type: object
       properties:
@@ -22884,7 +20246,6 @@ components:
       required:
       - deliveryTemp
       - items
-      - shippingMethod
       properties:
         consolidated:
           type: boolean
@@ -22892,73 +20253,15 @@ components:
         couponTemplateId:
           type: string
           description: 使用者選擇的優惠券模板 ID
-        cvsStoreCode:
-          type: string
-          description: 超商取貨門市店號，6 碼數字；僅 shippingMethod=3002 可帶
         deliveryTemp:
           type: string
         items:
           type: array
           items:
             $ref: '#/components/schemas/CheckoutItemRequest'
-        receiverZipCode:
-          type: string
-        shippingMethod:
-          type: string
-        storeId:
-          type: string
-          description: Deprecated：cvsStoreCode 的舊名，語意完全相同（**不是**賣家 store_id）
-    CheckoutShippingFeeDataResponse:
-      type: object
-      properties:
-        deliveryTemp:
-          type: string
-        estimatedTotal:
-          type: string
-        feePayer:
-          type: string
-        freeShippingEligible:
-          type: boolean
-        freeShippingThreshold:
-          type: string
-        orderSubtotal:
-          type: string
-        shippingFee:
-          type: string
-        shippingMethod:
-          type: string
-        shippingRoute:
-          type: string
-    CheckoutShippingFeeRequest:
-      type: object
-      required:
-      - deliveryTemp
-      - items
-      - shippingMethod
-      properties:
-        cvsStoreCode:
-          type: string
-          description: 超商取貨門市店號，6 碼數字；僅 shippingMethod=3002 可帶
-        deliveryTemp:
-          type: string
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/CheckoutItemRequest'
-        receiverZipCode:
-          type: string
-        shippingMethod:
-          type: string
-        storeId:
-          type: string
-          description: Deprecated：cvsStoreCode 的舊名，語意完全相同（**不是**賣家 store_id）
     CheckoutValidateDataResponse:
       type: object
       properties:
-        availableShippingOptions:
-          type: array
-          items:
-            $ref: '#/components/schemas/AvailableShippingOptionResponse'
         deliveryTempIntersection:
           type: array
           items:
@@ -23032,14 +20335,6 @@ components:
           type: string
         responseId:
           type: string
-    ConfirmCvsShipmentReq:
-      type: object
-      properties:
-        stagedTokens:
-          type: array
-          description: 出貨照片 stagedToken（選填）
-          items:
-            type: string
     ConfirmReceiptRequest:
       type: object
       properties:
@@ -23414,12 +20709,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CreateOrderItemRequest'
-        shippingFee:
-          type: string
-        shippingFeePayer:
-          type: string
-        shippingMethod:
-          type: string
         storeId:
           type: string
         totalActualAmount:
@@ -23557,23 +20846,6 @@ components:
           type: string
         widthCm:
           type: string
-    CvsLabelDataResp:
-      type: object
-      properties:
-        odno:
-          type: string
-          description: 出貨單編號（8 碼，超時為空）
-        partnerId:
-          type: string
-          description: 出貨便母代碼（3 碼，超時為空）
-        shipmentNo:
-          type: string
-        validationNo:
-          type: string
-          description: C2C 驗證碼（4 碼，超時為空）
-        webhookReceived:
-          type: boolean
-          description: 是否在等待期內收到 Webhook
     DeactivateProviderAccountForAdminData:
       type: object
       properties:
@@ -23840,10 +21112,6 @@ components:
         recipient:
           $ref: '#/components/schemas/DelegatedOrderListRecipient'
         shippingMethod:
-          type: string
-        shippingStatus:
-          type: string
-        shippingStatusLabel:
           type: string
         status:
           type: string
@@ -24321,22 +21589,6 @@ components:
         imageUrl:
           type: string
           description: 完整 URL（Gateway 由 imageKey 組；49 §6.1）
-    GenerateHomeLabelReq:
-      type: object
-      required:
-      - shipDate
-      properties:
-        deliveryDate:
-          type: string
-          description: 選填（接受 yyyy-MM-dd 或 yyyyMMdd），未填則後端自動補 shipDate + 1 工作天
-        shipDate:
-          type: string
-          description: 出貨日期，接受 yyyy-MM-dd 或 yyyyMMdd
-        stagedTokens:
-          type: array
-          description: 出貨照片 stagedToken（選填）
-          items:
-            type: string
     GetInvoiceOverviewForAdminData:
       type: object
       properties:
@@ -24399,35 +21651,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PopularHashtagItem'
-    GetSellerShipmentAnomalyStatsResponse:
-      type: object
-      properties:
-        byType:
-          type: array
-          description: 依 anomaly_type 分組
-          items:
-            $ref: '#/components/schemas/AnomalyTypeCountResp'
-        highSeverityCount:
-          type: string
-          description: HIGH 嚴重度數量
-        lowSeverityCount:
-          type: string
-          description: LOW 嚴重度數量
-        mediumSeverityCount:
-          type: string
-          description: MEDIUM 嚴重度數量
-        total:
-          type: string
-          description: 全部異常單數（未 ack）
-    GetStoreMapParamsReq:
-      type: object
-      required:
-      - appType
-      properties:
-        appType:
-          type: string
-        mobileTag:
-          type: string
     GrantDelegationAuthorizationRequest:
       type: object
       properties:
@@ -24460,17 +21683,6 @@ components:
         productCount:
           type: string
           description: 引用數量（hashtag.product_count 即時值，字串型別）
-    HomeLabelDataResp:
-      type: object
-      properties:
-        labelKey:
-          type: string
-          description: 託運單 PDF objectKey（SSOT；49 §6.1）
-        labelUrl:
-          type: string
-          description: 託運單 PDF 顯示 URL（Gateway 組）
-        shipmentNo:
-          type: string
     InlineRunDTO:
       type: object
       properties:
@@ -24860,32 +22072,6 @@ components:
             $ref: '#/components/schemas/MessageItem'
         sessionId:
           type: string
-    ListSellerShipmentAnomaliesResponse:
-      type: object
-      properties:
-        page:
-          type: string
-        pageSize:
-          type: string
-        records:
-          type: array
-          items:
-            $ref: '#/components/schemas/ShipmentAnomalyRecordResp'
-        total:
-          type: string
-    ListShipmentAnomaliesForAdminResponse:
-      type: object
-      properties:
-        page:
-          type: string
-        pageSize:
-          type: string
-        records:
-          type: array
-          items:
-            $ref: '#/components/schemas/AdminShipmentAnomalyRecordResp'
-        total:
-          type: string
     ManualUnlockInfo:
       type: object
       properties:
@@ -25059,60 +22245,6 @@ components:
             $ref: '#/components/schemas/OrderStatusCountResponse'
         total:
           type: string
-    OnboardCvsReq:
-      type: object
-      required:
-      - returnStoreCode
-      - senderName
-      - senderPhone
-      properties:
-        returnStoreAddress:
-          type: string
-        returnStoreCode:
-          type: string
-        returnStoreName:
-          type: string
-        senderName:
-          type: string
-        senderPhone:
-          type: string
-    OnboardHomeReq:
-      type: object
-      required:
-      - productCategory
-      - senderAddressDetail
-      - senderCity
-      - senderDistrict
-      - senderName
-      - senderPhone
-      - senderPostalCode
-      properties:
-        productCategory:
-          type: string
-        returnAddressDetail:
-          type: string
-        returnCity:
-          type: string
-        returnDistrict:
-          type: string
-        returnName:
-          type: string
-        returnPhone:
-          type: string
-        returnPostalCode:
-          type: string
-        senderAddressDetail:
-          type: string
-        senderCity:
-          type: string
-        senderDistrict:
-          type: string
-        senderName:
-          type: string
-        senderPhone:
-          type: string
-        senderPostalCode:
-          type: string
     OrderDetailResponse:
       type: object
       properties:
@@ -25161,14 +22293,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OrderItemDetailResponse'
-        labelExpireAt:
-          type: string
-        labelKey:
-          type: string
-          description: 託運單 PDF objectKey（SSOT；49 §6.1）
-        labelUrl:
-          type: string
-          description: 託運單 PDF 顯示 URL（Gateway 組）
         logoKey:
           type: string
           description: 商家 logo objectKey（SSOT；49 §6.1）
@@ -25177,13 +22301,9 @@ components:
           description: 商家 logo 顯示 URL（Gateway 組）
         needRefundPage:
           type: boolean
-        odno:
-          type: string
         orderNo:
           type: string
         orderRemark:
-          type: string
-        partnerId:
           type: string
         payTime:
           type: string
@@ -25196,8 +22316,6 @@ components:
         paymentMethod:
           type: string
         pickupStoreName:
-          type: string
-        processingDeadline:
           type: string
         providerMessage:
           type: string
@@ -25237,16 +22355,6 @@ components:
           type: string
         shipmentNo:
           type: string
-        shipmentPhotoKeys:
-          type: array
-          description: 出貨照片 objectKey（SSOT，前端 buildImageUrl 組顯示；49 §6.1）
-          items:
-            type: string
-        shipmentPhotoUrls:
-          type: array
-          description: 出貨照片顯示 URL（Gateway 組）
-          items:
-            type: string
         shippingAddress:
           type: string
         shippingArea:
@@ -25258,10 +22366,6 @@ components:
         shippingMethod:
           type: string
         shippingNote:
-          type: string
-        shippingStatus:
-          type: string
-        shippingStatusDesc:
           type: string
         status:
           type: string
@@ -25279,8 +22383,6 @@ components:
           type: string
         transactionId:
           type: string
-        validationNo:
-          type: string
     OrderGroupPreviewResponse:
       type: object
       properties:
@@ -25288,9 +22390,6 @@ components:
           type: string
         discountAmount:
           type: string
-        freeShippingEligible:
-          type: boolean
-          description: 最終免運判定（折扣後）
         groupIndex:
           type: string
         items:
@@ -25301,12 +22400,6 @@ components:
           type: string
         shippingFee:
           type: string
-        shippingFeePayer:
-          type: string
-        shippingLabel:
-          type: string
-        shippingMethod:
-          type: string
         storeCode:
           type: string
           description: 賣家 canonical 短碼；storeId 是內部代理鍵，賣家頁連結走 store_code。與 sellerName 同源
@@ -25314,9 +22407,6 @@ components:
           type: string
         subtotalOriginalAmount:
           type: string
-        tentativeFreeShippingEligible:
-          type: boolean
-          description: 暫定免運判定（折扣前；前端比對 tentative != final 提示「使用此券將失去免運」）
     OrderInvoiceData:
       type: object
       properties:
@@ -25419,53 +22509,6 @@ components:
         unitPrice:
           type: string
           description: 實際成交單價快照（無特價=listPrice，有特價=當時 sale_price）
-    OrderLogisticsResp:
-      type: object
-      properties:
-        allowedActions:
-          type: array
-          description: |-
-            AllowedActions 是「這筆配送單現在能做什麼」的唯一出口。
-            🔴 前端**不得**自行從 status 推導可做什麼，也不得自行組 URL——
-            後者同樣需要 provider 知識，而 href 由後端給就等於新增 provider 時前端零改動。
-            業務判斷（能不能按、為什麼不能）來自 shipping-service；href + method 由本層補上。
-          items:
-            $ref: '#/components/schemas/AllowedAction'
-        createdAt:
-          type: string
-          description: 物流單建立時間（ISO 8601）
-        cvsStoreCode:
-          type: string
-          description: 超商門市代號（取代語意不誠實的 store_id）
-        orderNo:
-          type: string
-        providerMessage:
-          type: string
-          description: PayUni 狀態說明
-        providerStatus:
-          type: string
-          description: PayUni 原始狀態碼
-        recipientName:
-          type: string
-          description: 收件人姓名（買家本人）
-        shipTradeNo:
-          type: string
-          description: 託運單號（PayUni 物流序號）
-        shippingMethod:
-          type: string
-          description: CONVENIENCE_STORE / HOME_DELIVERY
-        status:
-          type: string
-          description: 內部物流狀態碼（數字字串）
-        statusLabel:
-          type: string
-          description: 狀態人類可讀文案（ShippingStatus.label）
-        statusTime:
-          type: string
-          description: 最新狀態更新時間（ISO 8601）
-        storeName:
-          type: string
-          description: 超商門市名稱（超商配送）
     OrderReviewRecord:
       type: object
       properties:
@@ -25579,14 +22622,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OrderItemViewResponse'
-        labelExpireAt:
-          type: string
-        labelKey:
-          type: string
-          description: 託運單 PDF objectKey（SSOT；49 §6.1）
-        labelUrl:
-          type: string
-          description: 託運單 PDF 顯示 URL（Gateway 組）
         logoKey:
           type: string
           description: 商家 logo objectKey（SSOT；49 §6.1）
@@ -25595,18 +22630,12 @@ components:
           description: 商家 logo 顯示 URL（Gateway 組）
         needRefundPage:
           type: boolean
-        odno:
-          type: string
         orderNo:
-          type: string
-        partnerId:
           type: string
         paymentDeadline:
           type: string
           description: 付款期限（ISO 8601 UTC，僅 status=0 時有值）
         pickupStoreName:
-          type: string
-        processingDeadline:
           type: string
         providerMessage:
           type: string
@@ -25622,23 +22651,9 @@ components:
           type: string
         sellerName:
           type: string
-        shipmentPhotoKeys:
-          type: array
-          description: 出貨照片 objectKey（SSOT）
-          items:
-            type: string
-        shipmentPhotoUrls:
-          type: array
-          description: 出貨照片顯示 URL（Gateway 組）
-          items:
-            type: string
         shippingAddress:
           type: string
         shippingMethod:
-          type: string
-        shippingStatus:
-          type: string
-        shippingStatusDesc:
           type: string
         status:
           type: string
@@ -25652,8 +22667,6 @@ components:
         storeId:
           type: string
         totalActualAmount:
-          type: string
-        validationNo:
           type: string
     OriginSummaryItem:
       type: object
@@ -25774,12 +22787,6 @@ components:
         hashtag:
           type: string
           description: 區間內最多 ACTIVE 商品使用的原始大小寫版本
-    PrintCvsLabelReq:
-      type: object
-      properties:
-        shipDate:
-          type: string
-          description: 出貨日期，接受 yyyy-MM-dd 或 yyyyMMdd（首次列印必填，重複列印可不傳）
     ProcurementAgentRunArtifactDTO:
       type: object
       properties:
@@ -27608,9 +24615,6 @@ components:
         resolutionType:
           type: string
           description: 決策類型（1=退貨退款, 2=部分退款, 3=全額免退, 4=優惠券補償, 5=拒絕）
-        returnShippingMethod:
-          type: string
-          description: 退貨物流方式（3001=黑貓宅急便, 3002=7-11店到店）（resolutionType=1 時必填）
     ResolveResultResponse:
       type: object
       properties:
@@ -28081,8 +25085,6 @@ components:
           type: string
         paidAt:
           type: string
-        shipmentStatus:
-          type: string
         summary:
           $ref: '#/components/schemas/InvoiceDocumentSummary'
         updatedAt:
@@ -28491,26 +25493,6 @@ components:
           type: string
         summary:
           $ref: '#/components/schemas/InvoiceDocumentSummary'
-    SellerShippingMethodResp:
-      type: object
-      properties:
-        available:
-          type: boolean
-        description:
-          type: string
-        displayName:
-          type: string
-        enabled:
-          type: string
-          description: '"true" / "false" / ""（未建店）'
-        onboardingId:
-          type: string
-        onboardingRequired:
-          type: boolean
-        onboardingStatus:
-          type: string
-        shippingMethod:
-          type: string
     SellerSkuDraft:
       type: object
       properties:
@@ -28653,66 +25635,6 @@ components:
           type: string
         url:
           type: string
-    ShipmentAnomalyRecordResp:
-      type: object
-      properties:
-        ackAction:
-          type: string
-          description: ShipmentAnomalyAckAction.value，空字串表未處理；合法值：ACKNOWLEDGED / IGNORED
-        actedAt:
-          type: string
-          description: ISO 8601 UTC，未處理時為空字串
-        anomalyType:
-          type: string
-          description: ShipmentAnomalyType.value，合法值：TCAT_CALL_FAILED / CVS_LABEL_UNPRINTED / PROVIDER_STATUS_ABNORMAL / PACKAGE_LOST / DELIVERY_OVERDUE / PAYUNI_LGS_NO_CODE / RETURN_STUCK
-        anomalyTypeLabel:
-          type: string
-          description: ShipmentAnomalyType.label（如「黑貓叫件未完成」）
-        detectedAt:
-          type: string
-          description: ISO 8601 UTC（推導，shipments 相關時間欄位最大值）
-        orderNo:
-          type: string
-          description: 訂單編號
-        severity:
-          type: string
-          description: ShipmentAnomalySeverity.value，合法值：HIGH / MEDIUM / LOW
-        shipmentId:
-          type: string
-          description: shipments.id（數字字串）
-        shipmentStatus:
-          type: string
-          description: ShippingStatus.value（當前 shipments.status）
-        shippingMethod:
-          type: string
-          description: ShippingMethod.value，合法值：3001=TAQBIN / 3002=SEVEN_ELEVEN_STORE_PICKUP
-    ShippingCalculationDataItem:
-      type: object
-      properties:
-        dimensionSum:
-          type: string
-        longestSide:
-          type: string
-        shippingOptions:
-          type: array
-          items:
-            $ref: '#/components/schemas/ShippingOptionItem'
-        volumeSize:
-          type: string
-        weightGrams:
-          type: string
-    ShippingLimitsItem:
-      type: object
-      properties:
-        maxDimensionSum:
-          type: string
-          description: 材積上限 L+W+H (cm)
-        maxLongestSide:
-          type: string
-          description: 最長邊上限 (cm)，"0" 表示無限制
-        maxWeightGrams:
-          type: string
-          description: 重量上限 (g)
     ShippingMethodResponse:
       type: object
       properties:
@@ -28724,93 +25646,6 @@ components:
           type: string
         type:
           type: string
-    ShippingOnboardingViewResp:
-      type: object
-      properties:
-        createdAt:
-          type: string
-        enabled:
-          type: string
-          description: '"true" / "false"'
-        eshipId:
-          type: string
-        labelCompanyName:
-          type: string
-        onboardingId:
-          type: string
-        onboardingStatus:
-          type: string
-          description: 建店狀態碼
-        partnerId:
-          type: string
-        payuniSubmitStatus:
-          type: string
-          description: 'PayUniSubmitStatus value: "4301"~"4304"；前端依 SUCCEEDED 判斷宅配地址 readonly'
-        productCategory:
-          type: string
-        providerMessage:
-          type: string
-          description: PayUni 原始訊息
-        providerStatus:
-          type: string
-          description: PayUni 原始啟用狀態（收斂規範 §4.1 SoT；欄位原名 setStatus 已改名）
-        returnAddressDetail:
-          type: string
-        returnCity:
-          type: string
-        returnDistrict:
-          type: string
-        returnName:
-          type: string
-        returnPhone:
-          type: string
-        returnPostalCode:
-          type: string
-        returnStoreAddress:
-          type: string
-          description: 退貨門市地址（超商才有）
-        returnStoreCode:
-          type: string
-          description: 退貨門市代碼（超商才有）
-        returnStoreName:
-          type: string
-          description: 退貨門市名稱（超商才有）
-        senderAddressDetail:
-          type: string
-        senderCity:
-          type: string
-        senderDistrict:
-          type: string
-        senderName:
-          type: string
-        senderPhone:
-          type: string
-        senderPostalCode:
-          type: string
-        shippingType:
-          type: string
-          description: 物流類型（CVS_C2C=超商店到店, HOME_DELIVERY=宅配）
-        updatedAt:
-          type: string
-    ShippingOptionItem:
-      type: object
-      properties:
-        displayName:
-          type: string
-          description: 配送方式顯示名
-        estimatedDays:
-          type: string
-          description: 預計到貨天數（暫空）
-        fee:
-          type: string
-          description: 運費（TWD）
-        limits:
-          description: 尺寸/重量限制
-          allOf:
-          - $ref: '#/components/schemas/ShippingLimitsItem'
-        shippingMethod:
-          type: string
-          description: 配送方式 Enum code
     SkuItem:
       type: object
       properties:
@@ -28894,21 +25729,6 @@ components:
             Text 是這一步的 LLM 敘述（例如「甘藍條件有效，無拒絕欄位。」），跟固定的
             Label 是兩回事。narrator 逾時或被 guard 擋下時為空——消費端必須能退回
             Label，不能假設一定有值。
-    StoreMapFormDataResp:
-      type: object
-      properties:
-        encryptInfo:
-          type: string
-        formAction:
-          type: string
-        hashInfo:
-          type: string
-        merId:
-          type: string
-        redirectUrl:
-          type: string
-        version:
-          type: string
     SubmitAppealRequest:
       type: object
       required:
@@ -29106,12 +25926,6 @@ components:
           type: string
         noteId:
           type: string
-    ToggleShippingOnboardingReq:
-      type: object
-      properties:
-        enabled:
-          type: boolean
-          description: true=啟用, false=停用
     TurnResultDTO:
       type: object
       properties:
@@ -29339,27 +26153,6 @@ components:
         weight:
           type: string
         widthCm:
-          type: string
-    UpdateStorePickupReq:
-      type: object
-      required:
-      - receiverName
-      - receiverPhone
-      - storeAddress
-      - storeCode
-      - storeName
-      properties:
-        isDefault:
-          type: boolean
-        receiverName:
-          type: string
-        receiverPhone:
-          type: string
-        storeAddress:
-          type: string
-        storeCode:
-          type: string
-        storeName:
           type: string
     UppFormDataResponse:
       type: object
