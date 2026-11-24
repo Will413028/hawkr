@@ -15,7 +15,7 @@ INFRA_SERVICES=(postgres redis rabbitmq otel-collector)
 GO_SERVICES=(gateway ai-service notification-service invoice-service)
 
 # Java 服務（需 rebuild image 才能更新）
-JAVA_SERVICES=(payment-service product-service order-service cart-service coupon-service shipping-service aftersales-service payuni-webhook-service)
+JAVA_SERVICES=(product-service order-service cart-service coupon-service shipping-service aftersales-service payuni-webhook-service)
 
 # 全部應用服務
 ALL_APP_SERVICES=("${GO_SERVICES[@]}" "${JAVA_SERVICES[@]}")
@@ -246,7 +246,7 @@ start_ngrok() {
 }
 
 # ─── 注入 GATEWAY_URL 到 Java 服務 ────────────────────────────────────────────
-# payment-service、shipping-service 需要 GATEWAY_URL 來組裝外部回調 URL
+# shipping-service 需要 GATEWAY_URL 來組裝外部回調 URL
 # 同步更新 .env 中所有 ngrok URL（GATEWAY_URL、PAYUNI_*_URL）
 inject_gateway_url() {
   local ngrok_url="$1"
@@ -262,13 +262,13 @@ inject_gateway_url() {
 
   # 檢查服務是否正在運行
   local running
-  running=$(docker ps --format '{{.Names}}' | grep -E '^(payment-service|shipping-service|aftersales-service)$' || true)
+  running=$(docker ps --format '{{.Names}}' | grep -E '^(shipping-service|aftersales-service)$' || true)
   if [[ -z "$running" ]]; then
     return
   fi
 
-  info "重啟 payment-service、shipping-service、aftersales-service 套用新 URL..."
-  $COMPOSE up -d --no-deps payment-service shipping-service aftersales-service 2>/dev/null
+  info "重啟 shipping-service、aftersales-service 套用新 URL..."
+  $COMPOSE up -d --no-deps shipping-service aftersales-service 2>/dev/null
   ok "GATEWAY_URL 已更新：$ngrok_url"
 }
 
@@ -297,7 +297,7 @@ cmd_rebuild() {
   if [[ $# -gt 0 ]]; then
     # 手動指定服務
     for svc in "$@"; do
-      # 支援簡寫（如 payment → payment-service）；gateway 本身沒有 -service 後綴
+      # 支援簡寫（如 order → order-service）；gateway 本身沒有 -service 後綴
       if [[ "$svc" != *-service ]] && ! is_go_service "$svc"; then
         svc="${svc}-service"
       fi
@@ -341,7 +341,7 @@ cmd_rebuild() {
 
     if [[ ${#services_to_rebuild[@]} -eq 0 ]]; then
       ok "沒有偵測到 Java 服務程式碼變更"
-      info "提示：可手動指定 → ./dev.sh rebuild payment shipping"
+      info "提示：可手動指定 → ./dev.sh rebuild order shipping"
       return 0
     fi
   fi
@@ -498,7 +498,7 @@ cmd_logs() {
     cmd+=" ${services[*]}"
   else
     # 預設只看我們負責的服務 + gateway
-    cmd+=" gateway payment-service product-service order-service cart-service coupon-service shipping-service"
+    cmd+=" gateway product-service order-service cart-service coupon-service shipping-service"
   fi
 
   title "查看日誌"
@@ -690,7 +690,7 @@ cmd_seed() {
 # ─── 指令：restart ───────────────────────────────────────────────────────────
 cmd_restart() {
   if [[ $# -eq 0 ]]; then
-    warn "請指定服務名稱，例如：./dev.sh restart shipping payment"
+    warn "請指定服務名稱，例如：./dev.sh restart shipping order"
     return 1
   fi
 
@@ -727,7 +727,7 @@ cmd_help() {
 
     down            停止全部服務
 
-    restart <服務>  重啟指定服務（支援簡寫：payment = payment-service）
+    restart <服務>  重啟指定服務（支援簡寫：order = order-service）
                     例：./dev.sh restart shipping gateway
 
   ─── Java 服務更新 ──────────────────────────────────────────
@@ -738,7 +738,7 @@ cmd_help() {
                     • 不自動偵測 Go 服務（改 code 由 Air 自動生效，不需 rebuild）
 
     rebuild <服務>  手動指定要 rebuild 的服務（Java 或 Go 皆可）
-                    例：./dev.sh rebuild payment shipping
+                    例：./dev.sh rebuild order shipping
                     例：./dev.sh rebuild order  (自動補 -service)
                     例：./dev.sh rebuild ai-service    (Go：重建 dev image)
 
@@ -789,7 +789,7 @@ cmd_help() {
       gateway 以 Connect 代理給它（MONOLITH_HOST 預設 host.docker.internal）
 
     Java 服務（改完需 ./dev.sh rebuild）：
-      payment, product, order, cart, coupon,
+      product, order, cart, coupon,
       shipping, aftersales, payuni-webhook
 
     基礎設施：
