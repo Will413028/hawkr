@@ -27,10 +27,6 @@
       "sharp": "0.35.5",
       "undici": "7.30.1"
     },
-    "postcss": {
-      "nanoid": "3.3.18",
-      "source-map-js": "1.2.2"
-    },
     "vitest": {
       "vite": "8.1.6"
     }
@@ -38,8 +34,6 @@
   "//overrides": {
     "miniflare > sharp": "Security floor. EXCEEDS-UPSTREAM: miniflare — it pins sharp 0.34.5 exactly. REMOVE-WHEN: requesters-demand >=0.35.5. Version must be published >=2 weeks.",
     "miniflare > undici": "Security floor. EXCEEDS-UPSTREAM: miniflare — it pins undici 7.28.0 exactly. REMOVE-WHEN: requesters-demand >=7.30.1. Version must be published >=2 weeks.",
-    "postcss > nanoid": "Security floor inside postcss's declared range. REMOVE-WHEN: requesters-demand >=3.3.18. Version must be published >=2 weeks.",
-    "postcss > source-map-js": "Security floor inside postcss's declared range. REMOVE-WHEN: requesters-demand >=1.2.2. Version must be published >=2 weeks.",
     "vitest > vite": "Security floor inside vitest's declared range. REMOVE-WHEN: requesters-demand >=8.1.6. Version must be published >=2 weeks."
   }
 }
