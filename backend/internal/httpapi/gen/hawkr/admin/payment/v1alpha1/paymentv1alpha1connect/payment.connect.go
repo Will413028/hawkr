@@ -96,7 +96,7 @@ type PaymentAdminServiceClient interface {
 	// ListPaymentRefunds 列退款，建立時間新的在前，每筆附撤回列（人工結案撤回要用撤回列 ID）。篩選條件都可省略；page_token 只能用在同一組篩選。需要權限 payment.refunds.list。
 	ListPaymentRefunds(context.Context, *connect.Request[v1alpha1.ListPaymentRefundsRequest]) (*connect.Response[v1alpha1.ListPaymentRefundsResponse], error)
 	// ResolvePaymentAnomaly 是對 ANOMALY 的付款、轉帳、退款、撤回或補差額轉帳的人工結案：管理員核對金流商之後結案成成功（附金流商物件 ID 為證據）或失敗。
-	// 領域變更與一筆後台紀錄在同一個交易。物件不存在回 not_found；物件不在 ANOMALY 或證據不合回 failed_precondition 或 invalid_argument（依模組）。需要權限 payment.anomalies.resolve。
+	// 必填結案原因代碼（reason）與備註（note，去除首尾空白後 1 到 255 個字元），連同領域變更寫進同一個交易的一筆後台紀錄。物件不存在回 not_found；缺原因、原因與結果不相容、備註空白或過長回 invalid_argument（指到出錯的欄位）；物件不在 ANOMALY 或證據不合回 failed_precondition 或 invalid_argument（依模組）。需要權限 payment.anomalies.resolve。
 	ResolvePaymentAnomaly(context.Context, *connect.Request[v1alpha1.ResolvePaymentAnomalyRequest]) (*connect.Response[v1alpha1.ResolvePaymentAnomalyResponse], error)
 }
 
@@ -267,7 +267,7 @@ type PaymentAdminServiceHandler interface {
 	// ListPaymentRefunds 列退款，建立時間新的在前，每筆附撤回列（人工結案撤回要用撤回列 ID）。篩選條件都可省略；page_token 只能用在同一組篩選。需要權限 payment.refunds.list。
 	ListPaymentRefunds(context.Context, *connect.Request[v1alpha1.ListPaymentRefundsRequest]) (*connect.Response[v1alpha1.ListPaymentRefundsResponse], error)
 	// ResolvePaymentAnomaly 是對 ANOMALY 的付款、轉帳、退款、撤回或補差額轉帳的人工結案：管理員核對金流商之後結案成成功（附金流商物件 ID 為證據）或失敗。
-	// 領域變更與一筆後台紀錄在同一個交易。物件不存在回 not_found；物件不在 ANOMALY 或證據不合回 failed_precondition 或 invalid_argument（依模組）。需要權限 payment.anomalies.resolve。
+	// 必填結案原因代碼（reason）與備註（note，去除首尾空白後 1 到 255 個字元），連同領域變更寫進同一個交易的一筆後台紀錄。物件不存在回 not_found；缺原因、原因與結果不相容、備註空白或過長回 invalid_argument（指到出錯的欄位）；物件不在 ANOMALY 或證據不合回 failed_precondition 或 invalid_argument（依模組）。需要權限 payment.anomalies.resolve。
 	ResolvePaymentAnomaly(context.Context, *connect.Request[v1alpha1.ResolvePaymentAnomalyRequest]) (*connect.Response[v1alpha1.ResolvePaymentAnomalyResponse], error)
 }
 

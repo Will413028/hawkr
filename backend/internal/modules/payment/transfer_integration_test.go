@@ -52,8 +52,8 @@ func (f *chargeFixture) insertRefund(t *testing.T, paymentID uuid.UUID, status s
 	t.Helper()
 	ctx := context.Background()
 	id := uuid.NewV7()
-	_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO payment.refunds (id, payment_id, request_key, amount, status, reversal_amount, failure_reason, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5::text, $6, CASE WHEN $5::text IN ('FAILED', 'ANOMALY') THEN 'x' END, $7, $7)`, id, paymentID, id.String(), amount, status, reversalAmount, f.now)
+	_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO payment.refunds (id, payment_order_id, request_key, amount, status, reversal_amount, failure_reason, created_at, updated_at)
+VALUES ($1, (SELECT id FROM payment.payment_orders WHERE payment_id = $2), $3, $4, $5::text, $6, CASE WHEN $5::text IN ('FAILED', 'ANOMALY') THEN 'x' END, $7, $7)`, id, paymentID, id.String(), amount, status, reversalAmount, f.now)
 	must(t, err)
 	return id
 }
@@ -73,16 +73,16 @@ func (f *chargeFixture) insertReversal(t *testing.T, paymentID uuid.UUID, refund
 	t.Helper()
 	ctx := context.Background()
 	id := uuid.NewV7()
-	_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO payment.refunds (id, payment_id, request_key, amount, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason,
+	_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO payment.refunds (id, payment_order_id, request_key, amount, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason,
 	external_refund_id, refund_called_at, failure_reason, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5::text, $6::text, $7, CASE WHEN $6::text = 'REVERSED' THEN $7::bigint ELSE 0 END, CASE WHEN $6::text IN ('RELEASED', 'ANOMALY') THEN 'x' END,
+VALUES ($1, (SELECT id FROM payment.payment_orders WHERE payment_id = $2), $3, $4, $5::text, $6::text, $7, CASE WHEN $6::text = 'REVERSED' THEN $7::bigint ELSE 0 END, CASE WHEN $6::text IN ('RELEASED', 'ANOMALY') THEN 'x' END,
 	CASE WHEN $5::text IN ('REFUNDING', 'SUCCEEDED', 'FAILED') THEN 're_' || $3 END, CASE WHEN $5::text IN ('REFUNDING', 'SUCCEEDED', 'FAILED') THEN $8::timestamptz END,
 	CASE WHEN $5::text IN ('FAILED', 'ANOMALY') THEN 'x' END, $8, $8)`, id, paymentID, id.String(), amount, refundStatus, reversalStatus, reversalAmount, f.now)
 	must(t, err)
 	switch reversalStatus {
 	case "REVERSING", "REVERSED", "RELEASED", "ANOMALY":
-		_, err = f.db.Conn(ctx).Exec(ctx, `INSERT INTO payment.refund_reversals (id, refund_id, payment_id, seq, target_refund_id, target_external_id, amount, status, reason, called_at, external_id, created_at, updated_at)
-VALUES ($1, $2, $3, 0, NULL, COALESCE((SELECT external_transfer_id FROM payment.transfers WHERE payment_id = $3 AND status = 'SUCCEEDED'), 'tr_none'), $4, $5::text,
+		_, err = f.db.Conn(ctx).Exec(ctx, `INSERT INTO payment.refund_reversals (id, refund_id, payment_order_id, seq, target_refund_id, target_external_id, amount, status, reason, called_at, external_id, created_at, updated_at)
+VALUES ($1, $2, (SELECT id FROM payment.payment_orders WHERE payment_id = $3), 0, NULL, COALESCE((SELECT external_transfer_id FROM payment.transfers WHERE payment_order_id = (SELECT id FROM payment.payment_orders WHERE payment_id = $3) AND status = 'SUCCEEDED'), 'tr_none'), $4, $5::text,
 	CASE WHEN $5::text IN ('RELEASED', 'ANOMALY') THEN 'x' END, CASE WHEN $5::text = 'REVERSED' THEN $6::timestamptz END, CASE WHEN $5::text = 'REVERSED' THEN 'trr_' || $2::uuid::text END, $6, $6)`,
 			uuid.NewV7(), id, paymentID, reversalAmount, reversalStatus, f.now)
 		must(t, err)
@@ -154,7 +154,7 @@ func TestRequestTransferWritesThePendingRowAndTheJobWithoutCallingTheProvider(t 
 	f.insertRefund(t, p.ID, "FAILED", 20, 0)
 	f.clearJobs()
 	tr := f.requestTransfer(t, "T-1")
-	if tr.Status != TransferPending || tr.Amount != 70 || tr.StoreID != 7 || tr.PaymentID != p.ID {
+	if tr.Status != TransferPending || tr.Amount != 70 || tr.StoreID != 7 || len(p.Orders) != 1 || tr.PaymentOrderID != p.Orders[0].ID {
 		t.Fatalf("轉帳=%+v", tr)
 	}
 	if got := f.transferText(t, "destination_account_id", tr.ID); got != "acct_seller_7" {
@@ -255,7 +255,7 @@ func (f *chargeFixture) idOf(t *testing.T, orderNo string) uuid.UUID {
 	t.Helper()
 	ctx := context.Background()
 	var id uuid.UUID
-	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT id FROM payment.payments WHERE order_no = $1", orderNo).Scan(&id))
+	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT id FROM payment.payments WHERE id = (SELECT payment_id FROM payment.payment_orders WHERE order_no = $1)", orderNo).Scan(&id))
 	return id
 }
 

@@ -1,9 +1,21 @@
--- name: InsertPayment :execrows
--- 建立付款的 transaction 寫「建立中」的列（沒有外部 ID）。order_no 唯一（D8：一張訂單一個 PaymentIntent）：同一張訂單已有列時不寫（ON CONFLICT DO NOTHING），
--- 呼叫端再讀既有的列決定怎麼處理。
-INSERT INTO payment.payments (id, order_no, store_id, buyer_id, amount, provider, description, created_at, updated_at)
-VALUES (sqlc.arg(id), sqlc.arg(order_no), sqlc.arg(store_id), sqlc.arg(buyer_id), sqlc.arg(amount), sqlc.arg(provider), sqlc.arg(description), sqlc.arg(now), sqlc.arg(now))
+-- name: InsertPayment :exec
+-- 建立付款的 transaction 寫「建立中」的付款群組列（沒有外部 ID；amount 是各訂單應收的總額）。訂單應收由 InsertPaymentOrder 在同一個 transaction 寫入。
+INSERT INTO payment.payments (id, buyer_id, amount, provider, description, created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(buyer_id), sqlc.arg(amount), sqlc.arg(provider), sqlc.arg(description), sqlc.arg(now), sqlc.arg(now));
+
+-- name: InsertPaymentOrder :execrows
+-- 付款底下寫一張訂單應收。order_no 唯一（一張訂單只屬於一筆付款）：已屬於別的付款時不寫（ON CONFLICT DO NOTHING，回 0 列），呼叫端回滾整個 transaction 再讀既有的列決定怎麼處理。
+INSERT INTO payment.payment_orders (id, payment_id, order_no, store_id, amount, created_at)
+VALUES (sqlc.arg(id), sqlc.arg(payment_id), sqlc.arg(order_no), sqlc.arg(store_id), sqlc.arg(amount), sqlc.arg(now))
 ON CONFLICT (order_no) DO NOTHING;
+
+-- name: UpdatePaymentOrderTerms :one
+-- 買家對還沒入帳的付款重付：訂單應收的店家與金額以重讀的訂單為準（付款已重設回建立中，沒有轉帳與退款）。
+UPDATE payment.payment_orders
+SET store_id = sqlc.arg(store_id),
+    amount = sqlc.arg(amount)
+WHERE id = sqlc.arg(id)
+RETURNING *;
 
 -- name: PaymentByID :one
 SELECT *
@@ -11,9 +23,11 @@ FROM payment.payments
 WHERE id = $1;
 
 -- name: PaymentByOrderNo :one
-SELECT *
-FROM payment.payments
-WHERE order_no = $1;
+-- 訂單應收所屬的付款（群組）。
+SELECT p.*
+FROM payment.payments p
+JOIN payment.payment_orders o ON o.payment_id = p.id
+WHERE o.order_no = $1;
 
 -- name: PaymentByExternal :one
 -- PaymentIntent 的外部 ID 經歷程表對回付款列：舊嘗試（付款列已換新 ID）的 ID 也對得到。
@@ -145,7 +159,6 @@ SET status = 'CREATING',
     create_idempotency_key = gen_random_uuid(),
     provider = sqlc.arg(provider),
     description = sqlc.arg(description),
-    store_id = sqlc.arg(store_id),
     buyer_id = sqlc.arg(buyer_id),
     amount = sqlc.arg(amount),
     updated_at = sqlc.arg(now)
@@ -266,7 +279,8 @@ ORDER BY payment_id
 LIMIT sqlc.arg(batch);
 
 -- name: PaymentsByOrderNos :many
--- 舊服務（legacy paymentserver）的批次讀取：回找得到的付款，找不到的不出現。
-SELECT *
-FROM payment.payments
-WHERE order_no = ANY(sqlc.arg(order_nos)::text[]);
+-- 舊服務（legacy paymentserver）的批次讀取：每張找得到的訂單應收回一列（付款群組與那張訂單應收），找不到的不出現。
+SELECT sqlc.embed(p), sqlc.embed(o)
+FROM payment.payment_orders o
+JOIN payment.payments p ON p.id = o.payment_id
+WHERE o.order_no = ANY(sqlc.arg(order_nos)::text[]);

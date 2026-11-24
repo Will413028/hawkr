@@ -1,20 +1,20 @@
 -- name: MarkRefundsDeducted :exec
--- 轉帳 claim 算定金額時（呼叫端已鎖付款列與轉帳列）依當下的退款重寫「已算進轉帳金額」：非 FAILED 的退款為真，FAILED 的為假（算定時它已不在金額裡，不必補）。
+-- 轉帳 claim 算定金額時（呼叫端已鎖付款列、訂單應收列與轉帳列）依當下的退款重寫「已算進轉帳金額」：非 FAILED 的退款為真，FAILED 的為假（算定時它已不在金額裡，不必補）。
 UPDATE payment.refunds
 SET transfer_deducted = (status <> 'FAILED')
-WHERE payment_id = $1 AND transfer_deducted <> (status <> 'FAILED');
+WHERE payment_order_id = $1 AND transfer_deducted <> (status <> 'FAILED');
 
 -- name: ClearRefundsDeducted :exec
--- 轉帳終局失敗（沒有搬錢）：沒有任何退款算進一筆有效轉帳的金額。呼叫端已鎖付款列與轉帳列。
+-- 轉帳終局失敗（沒有搬錢）：沒有任何退款算進一筆有效轉帳的金額。呼叫端已鎖付款列、訂單應收列與轉帳列。
 UPDATE payment.refunds
 SET transfer_deducted = false
-WHERE payment_id = $1 AND transfer_deducted;
+WHERE payment_order_id = $1 AND transfer_deducted;
 
 -- name: WaitingTopups :many
--- 付款底下補差額在 WAITING 的退款（已失敗、轉帳金額含它），依 ID 升序鎖。呼叫端已鎖付款列與轉帳列。
+-- 訂單應收底下補差額在 WAITING 的退款（已失敗、轉帳金額含它），依 ID 升序鎖。呼叫端已鎖付款列、訂單應收列與轉帳列。
 SELECT *
 FROM payment.refunds
-WHERE payment_id = $1 AND topup_status = 'WAITING'
+WHERE payment_order_id = $1 AND topup_status = 'WAITING'
 ORDER BY id
 FOR UPDATE;
 

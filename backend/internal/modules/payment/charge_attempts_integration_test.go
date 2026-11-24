@@ -83,7 +83,7 @@ func TestANewPaymentIsWrittenWithItsDescriptionAndItsFirstAttempt(t *testing.T) 
 	f.orders.put(PaymentOrder{OrderNo: "O-N1", BuyerID: 11, StoreID: 7, Amount: 100, Payable: true, Description: "藍色 T 恤"})
 	f.fake.FailCreate(errors.New("逾時"))
 	p := f.create(t, 11, "O-N1")
-	if p.Status != PaymentCreating || f.text(t, "SELECT description FROM payment.payments WHERE order_no = 'O-N1'") != "藍色 T 恤" {
+	if p.Status != PaymentCreating || f.text(t, "SELECT description FROM payment.payments WHERE id = (SELECT payment_id FROM payment.payment_orders WHERE order_no = 'O-N1')") != "藍色 T 恤" {
 		t.Fatalf("付款=%+v", p)
 	}
 	if f.count(t, "SELECT count(*) FROM payment.payment_attempts WHERE payment_id = $1 AND superseded_at IS NULL AND idempotency_key::text = $2", p.ID, f.keyOf(t, "O-N1")) != 1 {
@@ -112,7 +112,7 @@ func TestALateSuccessOfTheOldIntentAfterARepayIsRecordedAndTheNewIntentIsCancele
 	if f.statusOf(t, "O-R2a") != PaymentSucceeded || f.externalOf(t, "O-R2a") != oldExt || f.effectiveExternal(t, "O-R2a") != oldExt || f.changesTo(PaymentSucceeded) != 1 || !f.processed(t, "evt_old") {
 		t.Fatalf("狀態=%s 外部 ID=%s 有效=%s 事件 %d 次 已處理=%v", f.statusOf(t, "O-R2a"), f.externalOf(t, "O-R2a"), f.effectiveExternal(t, "O-R2a"), f.changesTo(PaymentSucceeded), f.processed(t, "evt_old"))
 	}
-	if f.text(t, "SELECT external_charge_id FROM payment.payments WHERE order_no = 'O-R2a'") == "" || f.count(t, "SELECT count(*) FROM payment.payment_attempts WHERE payment_id = $1 AND superseded_at IS NULL", p.ID) != 1 {
+	if f.text(t, "SELECT external_charge_id FROM payment.payments WHERE id = (SELECT payment_id FROM payment.payment_orders WHERE order_no = 'O-R2a')") == "" || f.count(t, "SELECT count(*) FROM payment.payment_attempts WHERE payment_id = $1 AND superseded_at IS NULL", p.ID) != 1 {
 		t.Fatal("入帳沒有記 charge，或有效的嘗試不是一個")
 	}
 	cancels := slices.Compact(slices.Sorted(slices.Values(f.attemptIDs(t, kindChargeCancel))))
@@ -265,14 +265,14 @@ func TestACreatingRowOfAnotherProviderThatWasCalledGoesToAnomalyInsteadOfBeingRe
 	f.fake.FailCreate(errors.New("逾時"))
 	p := f.create(t, 11, "O-R4")
 	oldKey := f.keyOf(t, "O-R4")
-	f.exec(t, "UPDATE payment.payments SET provider = 'retired_provider' WHERE order_no = 'O-R4'")
+	f.exec(t, "UPDATE payment.payments SET provider = 'retired_provider' WHERE id = (SELECT payment_id FROM payment.payment_orders WHERE order_no = 'O-R4')")
 	f.exec(t, "UPDATE payment.payment_attempts SET provider = 'retired_provider' WHERE payment_id = $1", p.ID)
 	f.now = f.now.Add(PaymentNotFoundAfter + time.Minute)
 	must(t, f.module.CreatePaymentIntent(ctx, p.ID, false))
-	if f.statusOf(t, "O-R4") != PaymentAnomaly || f.text(t, "SELECT failure_reason FROM payment.payments WHERE order_no = 'O-R4'") != "provider_changed_after_call" {
+	if f.statusOf(t, "O-R4") != PaymentAnomaly || f.text(t, "SELECT failure_reason FROM payment.payments WHERE id = (SELECT payment_id FROM payment.payment_orders WHERE order_no = 'O-R4')") != "provider_changed_after_call" {
 		t.Fatalf("狀態=%s", f.statusOf(t, "O-R4"))
 	}
-	if f.text(t, "SELECT provider FROM payment.payments WHERE order_no = 'O-R4'") != "retired_provider" || f.keyOf(t, "O-R4") != oldKey || f.fake.Intents() != 0 || f.fake.LookupCalls() != 0 {
+	if f.text(t, "SELECT provider FROM payment.payments WHERE id = (SELECT payment_id FROM payment.payment_orders WHERE order_no = 'O-R4')") != "retired_provider" || f.keyOf(t, "O-R4") != oldKey || f.fake.Intents() != 0 || f.fake.LookupCalls() != 0 {
 		t.Fatal("不該改綁、換鍵、呼叫或查回目前的 provider")
 	}
 	if len(f.anomalies) != 1 || f.anomalies[0].Kind != AnomalyPayment || f.anomalies[0].ObjectID != p.ID || !f.anomalyInTx[0] {
@@ -290,10 +290,10 @@ func TestACreatingRowOfAnotherProviderThatWasNeverCalledIsReboundAtOnce(t *testi
 	f.order("O-R4b", 11, 7, 100)
 	f.fake.FailCreate(errors.New("逾時"))
 	p := f.create(t, 11, "O-R4b")
-	f.exec(t, "UPDATE payment.payments SET provider = 'retired_provider', create_called_at = NULL WHERE order_no = 'O-R4b'")
+	f.exec(t, "UPDATE payment.payments SET provider = 'retired_provider', create_called_at = NULL WHERE id = (SELECT payment_id FROM payment.payment_orders WHERE order_no = 'O-R4b')")
 	f.exec(t, "UPDATE payment.payment_attempts SET provider = 'retired_provider', called_at = NULL WHERE payment_id = $1", p.ID)
 	must(t, f.module.CreatePaymentIntent(context.Background(), p.ID, false))
-	if f.text(t, "SELECT provider FROM payment.payments WHERE order_no = 'O-R4b'") != ChargeFakeName || f.statusOf(t, "O-R4b") != PaymentAwaitingPayment {
+	if f.text(t, "SELECT provider FROM payment.payments WHERE id = (SELECT payment_id FROM payment.payment_orders WHERE order_no = 'O-R4b')") != ChargeFakeName || f.statusOf(t, "O-R4b") != PaymentAwaitingPayment {
 		t.Fatalf("狀態=%s", f.statusOf(t, "O-R4b"))
 	}
 }
@@ -305,8 +305,8 @@ func TestASnapshotForAnAttemptOfAnotherProviderIsDiscarded(t *testing.T) {
 	f := setupCharge(t)
 	f.order("O-R4c", 11, 7, 100)
 	f.fake.OnCreate = func() {
-		f.exec(t, "UPDATE payment.payments SET provider = 'retired_provider' WHERE order_no = 'O-R4c'")
-		f.exec(t, "UPDATE payment.payment_attempts SET provider = 'retired_provider' WHERE payment_id = (SELECT id FROM payment.payments WHERE order_no = 'O-R4c')")
+		f.exec(t, "UPDATE payment.payments SET provider = 'retired_provider' WHERE id = (SELECT payment_id FROM payment.payment_orders WHERE order_no = 'O-R4c')")
+		f.exec(t, "UPDATE payment.payment_attempts SET provider = 'retired_provider' WHERE payment_id = (SELECT id FROM payment.payments WHERE id = (SELECT payment_id FROM payment.payment_orders WHERE order_no = 'O-R4c'))")
 	}
 	p := f.create(t, 11, "O-R4c")
 	if p.Status != PaymentCreating || f.externalOf(t, "O-R4c") != "" || f.count(t, "SELECT count(*) FROM payment.payment_attempts WHERE external_payment_id IS NOT NULL") != 0 {

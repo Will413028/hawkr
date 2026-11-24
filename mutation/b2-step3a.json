@@ -48,11 +48,11 @@
   {
    "id": "one-intent-per-order-index-not-unique",
    "stack": "go-integration",
-   "file": "backend/internal/modules/payment/db/migrations/20261123130033_payment_charges.sql",
-   "old": "CREATE UNIQUE INDEX \"payments_order\"",
-   "new": "CREATE INDEX \"payments_order\"",
+   "file": "backend/internal/modules/payment/db/migrations/20261124122631_payment_orders.sql",
+   "old": "CREATE UNIQUE INDEX \"payment_orders_order\"",
+   "new": "CREATE INDEX \"payment_orders_order\"",
    "test": "internal/modules/payment ^TestASecondCreatePaymentForTheSameOrderProducesNoSecondIntent$",
-   "why": "payments_order 不是唯一索引：ON CONFLICT (order_no) 沒有可對應的唯一索引，同一張訂單的第二次建立失敗，不再沿用同一列。"
+   "why": "payment_orders_order 不是唯一索引：同一張訂單可以屬於兩筆付款，第二次建立付款寫出第二個 PaymentIntent 的列，不再沿用既有的付款。"
   },
   {
    "id": "one-intent-per-order-on-conflict-removed",
@@ -138,16 +138,16 @@
   {
    "id": "active-transfer-index-not-unique",
    "stack": "go-integration",
-   "file": "backend/internal/modules/payment/db/migrations/20261123145729_payment_unresolved_convergence.sql",
-   "old": "CREATE UNIQUE INDEX \"transfers_active_payment\"",
-   "new": "CREATE INDEX \"transfers_active_payment\"",
+   "file": "backend/internal/modules/payment/db/migrations/20261124122631_payment_orders.sql",
+   "old": "CREATE UNIQUE INDEX \"transfers_active_order\"",
+   "new": "CREATE INDEX \"transfers_active_order\"",
    "test": "internal/modules/payment ^TestTheSchemaGuardsTheTransferAndRefundInvariants$",
-   "why": "transfers_active_payment 不是唯一索引：一筆付款可以有兩筆有效轉帳。"
+   "why": "transfers_active_order 不是唯一索引：INSERT 的 ON CONFLICT DO NOTHING 不再擋，同一張訂單應收的第二次請求寫進第二筆，不再回傳同一筆有效轉帳。"
   },
   {
    "id": "refund-request-key-not-unique",
    "stack": "go-integration",
-   "file": "backend/internal/modules/payment/db/migrations/20261123130033_payment_charges.sql",
+   "file": "backend/internal/modules/payment/db/migrations/20261124122631_payment_orders.sql",
    "old": "CREATE UNIQUE INDEX \"refunds_request\"",
    "new": "CREATE INDEX \"refunds_request\"",
    "test": "internal/modules/payment ^TestTheSchemaGuardsTheTransferAndRefundInvariants$",
@@ -202,17 +202,17 @@
    "id": "new-payment-without-description",
    "stack": "go",
    "file": "backend/internal/modules/payment/internal/charge/attempt.go",
-   "old": "\t\tDescription: paymentDescription(order), Now: now,\n",
-   "new": "\t\tNow: now,\n",
-   "test": "internal/modules/payment/internal/charge ^TestNewPaymentParamsCarryTheDescription$",
+   "old": ", Description: paymentDescription(orders[0]), Now: now}",
+   "new": ", Now: now}",
+   "test": "internal/modules/payment/internal/charge ^TestNewPaymentParamsCarryTheDescriptionAndTheTotalOfTheOrders$",
    "why": "R2-1：新建付款寫列的參數不帶說明，payments_description_check 擋下每一筆新付款。"
   },
   {
    "id": "new-payment-without-description-integration",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/attempt.go",
-   "old": "\t\tDescription: paymentDescription(order), Now: now,\n",
-   "new": "\t\tNow: now,\n",
+   "old": ", Description: paymentDescription(orders[0]), Now: now}",
+   "new": ", Now: now}",
    "test": "internal/modules/payment ^TestANewPaymentIsWrittenWithItsDescriptionAndItsFirstAttempt$",
    "why": "R2-1：同上，integration 看到新付款建不起來。"
   },

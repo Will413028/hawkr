@@ -4,7 +4,7 @@
    "id": "refund-cap-removed",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/refund.go",
-   "old": "\t\tif in.Amount > pay.Amount-taken {\n\t\t\treturn apperr.FailedPrecondition(\"退款總額超過付款金額\")\n\t\t}",
+   "old": "\t\tif in.Amount > order.Amount-taken {\n\t\t\treturn apperr.FailedPrecondition(\"退款總額超過這張訂單的應收金額\")\n\t\t}",
    "new": "\t\t_ = taken",
    "test": "internal/modules/payment ^(TestCreateRefundWritesThePendingRowAndTheJobEnforcesTheCapAndIsIdempotentByKey|TestTwoConcurrentRefundsThatTogetherExceedThePaymentCreateExactlyOne)$",
    "why": "拿掉累計上限：第 101 元的退款被接受，併發的兩筆（各 60）都成立。"
@@ -13,7 +13,7 @@
    "id": "refund-rotate-key-before-lookup",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/refund.go",
-   "old": "\tif !inResendWindow(row.RefundCalledAt, now) {\n\t\treturn s.lookupRefund(ctx, row, pay, now)\n\t}",
+   "old": "\tif !inResendWindow(row.RefundCalledAt, now) {\n\t\treturn s.lookupRefund(ctx, row, pay, order, now)\n\t}",
    "new": "\tif !inResendWindow(row.RefundCalledAt, now) {\n\t\tif rerr := s.rotateRefundKey(ctx, refundID, row.IdempotencyKey, now); rerr != nil {\n\t\t\treturn rerr\n\t\t}\n\t}",
    "test": "internal/modules/payment ^(TestAnUnknownRefundIsReplayedInTheWindowAndFoundByLookupAfterItWithoutASecondRefund)$",
    "why": "結果不明且過了視窗時先換新鍵、不查回就重建：provider 出現第二筆退款，沒有查回。"
@@ -22,8 +22,8 @@
    "id": "refund-anomaly-does-not-hold-quota",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/store/transfers.sql.go",
-   "old": "SELECT COALESCE(SUM(amount), 0)::bigint AS total\nFROM payment.refunds\nWHERE payment_id = $1 AND status <> 'FAILED'",
-   "new": "SELECT COALESCE(SUM(amount), 0)::bigint AS total\nFROM payment.refunds\nWHERE payment_id = $1 AND status NOT IN ('FAILED', 'ANOMALY')",
+   "old": "SELECT COALESCE(SUM(amount), 0)::bigint AS total\nFROM payment.refunds\nWHERE payment_order_id = $1 AND status <> 'FAILED'",
+   "new": "SELECT COALESCE(SUM(amount), 0)::bigint AS total\nFROM payment.refunds\nWHERE payment_order_id = $1 AND status NOT IN ('FAILED', 'ANOMALY')",
    "test": "internal/modules/payment ^(TestRepeatedRefundLookupFailuresPutTheRefundInAnomalyWhichHoldsTheQuotaAndStopsTheSweep)$",
    "why": "ANOMALY 不算進累計額度：進了 ANOMALY 的退款不再佔額度，新的退款被接受。"
   },
@@ -31,19 +31,19 @@
    "id": "refund-failed-still-holds-quota",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/store/transfers.sql.go",
-   "old": "SELECT COALESCE(SUM(amount), 0)::bigint AS total\nFROM payment.refunds\nWHERE payment_id = $1 AND status <> 'FAILED'",
-   "new": "SELECT COALESCE(SUM(amount), 0)::bigint AS total\nFROM payment.refunds\nWHERE payment_id = $1 AND status <> 'NO_SUCH_STATUS'",
+   "old": "SELECT COALESCE(SUM(amount), 0)::bigint AS total\nFROM payment.refunds\nWHERE payment_order_id = $1 AND status <> 'FAILED'",
+   "new": "SELECT COALESCE(SUM(amount), 0)::bigint AS total\nFROM payment.refunds\nWHERE payment_order_id = $1 AND status <> 'NO_SUCH_STATUS'",
    "test": "internal/modules/payment ^(TestAPermanentRefundRefusalFailsTheRefundFreesTheQuotaAndPublishesOnlyRefundChanged|TestARefundThatFailsAtTheProviderAfterBeingAcceptedFreesTheQuota)$",
    "why": "FAILED 的退款仍佔額度：失敗之後同額的新退款被擋下。"
   },
   {
-   "id": "refund-payment-lock-dropped",
+   "id": "refund-order-lock-dropped",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/store/transfers.sql.go",
-   "old": "FROM payment.payments\nWHERE order_no = $1\nFOR UPDATE\n`",
-   "new": "FROM payment.payments\nWHERE order_no = $1\n`",
+   "old": "FROM payment.payment_orders\nWHERE order_no = $1\nFOR UPDATE\n`",
+   "new": "FROM payment.payment_orders\nWHERE order_no = $1\n`",
    "test": "internal/modules/payment ^(TestTwoConcurrentRefundsThatTogetherExceedThePaymentCreateExactlyOne)$",
-   "why": "付款列的 FOR UPDATE 拿掉：併發的退款不再互相等待，加總看不到對方未提交的列。"
+   "why": "訂單應收列的 FOR UPDATE 拿掉：同一張訂單的併發退款不再互相等待，加總看不到對方未提交的列（退款上限以訂單應收列的鎖序列化）。"
   },
   {
    "id": "refund-request-key-lookup-removed",
@@ -175,8 +175,8 @@
    "id": "refund-cap-overflow",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/refund.go",
-   "old": "if in.Amount > pay.Amount-taken {",
-   "new": "if taken+in.Amount > pay.Amount {",
+   "old": "if in.Amount > order.Amount-taken {",
+   "new": "if taken+in.Amount > order.Amount {",
    "test": "internal/modules/payment ^(TestARefundOfMaxInt64AfterAnExistingRefundIsRefusedByTheCap)$",
    "why": "累計上限改回會回繞的加法：MaxInt64 的退款被接受。"
   },

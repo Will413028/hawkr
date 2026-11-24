@@ -83,8 +83,52 @@ func check(t *testing.T, a rabbitmq.PublishArgs, payload map[string]any, key str
 
 func changed(status payment.PaymentStatus) payment.PaymentChanged {
 	return payment.PaymentChanged{
-		OccurredAt: occurred, PaymentID: uuid.NewV7(), OrderNo: "O20261124001", StoreID: 91, BuyerID: 7, Amount: 350, Provider: "stripe",
+		OccurredAt: occurred, PaymentID: uuid.NewV7(), BuyerID: 7, Amount: 350, Provider: "stripe",
+		Orders: []payment.PaymentOrderReceivable{{ID: uuid.NewV7(), OrderNo: "O20261124001", StoreID: 91, Amount: 350}},
 		Status: status, Previous: payment.PaymentAwaitingPayment,
+	}
+}
+
+// 一筆付款對 N 張訂單應收：舊訊息以訂單編號為鍵，每張訂單各送一則，金額是那張訂單的應收（不是付款總額），事件 ID 各自不同。
+// mutation：OnPaymentChanged 只送第一張訂單 → 這個測試失敗。
+func TestAPaymentOfTwoOrdersRelaysOneMessagePerOrderWithItsOwnAmount(t *testing.T) {
+	t.Parallel()
+	e := changed(payment.PaymentSucceeded)
+	e.PaidAt = &paidAt
+	e.Amount = 350
+	e.Orders = []payment.PaymentOrderReceivable{{OrderNo: "OA", StoreID: 91, Amount: 100}, {OrderNo: "OB", StoreID: 92, Amount: 250}}
+	q := &recordingJobs{}
+	if err := OnPaymentChanged(q)(context.Background(), e); err != nil {
+		t.Fatal(err)
+	}
+	if len(q.args) != 2 {
+		t.Fatalf("enqueued %d jobs, want one per order", len(q.args))
+	}
+	seen := map[string]float64{}
+	ids := map[string]bool{}
+	for _, a := range q.args {
+		pa, ok := a.(rabbitmq.PublishArgs)
+		if !ok {
+			t.Fatalf("job type = %T", a)
+		}
+		var payload map[string]any
+		if err := json.Unmarshal(pa.Body, &payload); err != nil {
+			t.Fatal(err)
+		}
+		seen[payload["order_id"].(string)] = payload["amount"].(float64)
+		ids[pa.EventID] = true
+	}
+	if seen["OA"] != 100 || seen["OB"] != 250 || len(ids) != 2 {
+		t.Fatalf("per-order amounts = %v, distinct event ids = %d", seen, len(ids))
+	}
+}
+
+func TestAPaymentWithoutOrdersIsRefusedInsteadOfRelayingNothing(t *testing.T) {
+	t.Parallel()
+	e := changed(payment.PaymentSucceeded)
+	e.Orders = nil
+	if err := OnPaymentChanged(&recordingJobs{})(context.Background(), e); err == nil {
+		t.Fatal("a payment without order receivables must not be silently dropped")
 	}
 }
 
@@ -194,7 +238,11 @@ func TestRoutingKeysMatchEventsCSV(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 	rows, err := csv.NewReader(f).ReadAll()
 	if err != nil {
 		t.Fatal(err)

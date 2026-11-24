@@ -53,13 +53,25 @@ func (s *Service) ListPayments(ctx context.Context, f model.PaymentFilter, after
 	if err != nil {
 		return model.PaymentRecordPage{}, fmt.Errorf("charge：列出付款：%w", err)
 	}
-	more := int32(len(rows)) > size
+	more := len(rows) > int(size)
 	if more {
 		rows = rows[:size]
 	}
+	ids := make([]uuid.UUID, len(rows))
+	for i, r := range rows {
+		ids[i] = r.ID
+	}
+	orderRows, err := store.New(s.d.DB.Conn(ctx)).AdminPaymentOrders(ctx, ids)
+	if err != nil {
+		return model.PaymentRecordPage{}, fmt.Errorf("charge：列出付款的訂單應收：%w", err)
+	}
+	ordersOf := make(map[uuid.UUID][]store.PaymentPaymentOrder, len(rows))
+	for _, o := range orderRows {
+		ordersOf[o.PaymentID] = append(ordersOf[o.PaymentID], store.PaymentPaymentOrder{ID: o.ID, PaymentID: o.PaymentID, OrderNo: o.OrderNo, StoreID: o.StoreID, Amount: o.Amount})
+	}
 	out := model.PaymentRecordPage{Records: make([]model.PaymentRecord, len(rows))}
 	for i, r := range rows {
-		rec := model.PaymentRecord{Payment: toModel(r, ""), UpdatedAt: r.UpdatedAt}
+		rec := model.PaymentRecord{Payment: toModel(r, ordersOf[r.ID], ""), UpdatedAt: r.UpdatedAt}
 		if r.ExternalPaymentID != nil {
 			rec.ExternalPaymentID = *r.ExternalPaymentID
 		}
@@ -87,7 +99,7 @@ func (s *Service) ListTransfers(ctx context.Context, f model.TransferFilter, aft
 	if err != nil {
 		return model.TransferRecordPage{}, fmt.Errorf("charge：列出轉帳：%w", err)
 	}
-	more := int32(len(rows)) > size
+	more := len(rows) > int(size)
 	if more {
 		rows = rows[:size]
 	}
@@ -95,10 +107,11 @@ func (s *Service) ListTransfers(ctx context.Context, f model.TransferFilter, aft
 	for i, r := range rows {
 		rec := model.TransferRecord{
 			Transfer: model.Transfer{
-				ID: r.ID, PaymentID: r.PaymentID, StoreID: r.StoreID, Amount: r.Amount, ReversedAmount: r.ReversedAmount,
+				ID: r.ID, PaymentOrderID: r.PaymentOrderID, StoreID: r.StoreID, Amount: r.Amount, ReversedAmount: r.ReversedAmount,
 				Status: model.TransferStatus(r.Status), CreatedAt: r.CreatedAt,
 			},
-			OrderNo: r.OrderNo,
+			PaymentID: r.PaymentID,
+			OrderNo:   r.OrderNo,
 		}
 		if r.FailureReason != nil {
 			rec.FailureReason = *r.FailureReason
@@ -128,7 +141,7 @@ func (s *Service) ListRefunds(ctx context.Context, f model.RefundFilter, after *
 	if err != nil {
 		return model.RefundRecordPage{}, fmt.Errorf("charge：列出退款：%w", err)
 	}
-	more := int32(len(rows)) > size
+	more := len(rows) > int(size)
 	if more {
 		rows = rows[:size]
 	}
@@ -155,9 +168,10 @@ func (s *Service) ListRefunds(ctx context.Context, f model.RefundFilter, after *
 	for i, r := range rows {
 		rec := model.RefundRecord{
 			Refund: model.Refund{
-				ID: r.ID, PaymentID: r.PaymentID, RequestKey: r.RequestKey, Amount: r.Amount, Auto: r.Auto, Status: model.RefundStatus(r.Status),
+				ID: r.ID, PaymentOrderID: r.PaymentOrderID, OrderNo: r.OrderNo, RequestKey: r.RequestKey, Amount: r.Amount, Auto: r.Auto, Status: model.RefundStatus(r.Status),
 				ReversalAmount: r.ReversalAmount, ReversalStatus: model.ReversalStatus(r.ReversalStatus), TopupStatus: model.TopupStatus(r.TopupStatus), CreatedAt: r.CreatedAt,
 			},
+			PaymentID: r.PaymentID,
 			OrderNo:   r.OrderNo,
 			Reversals: byRefund[r.ID],
 		}

@@ -5,7 +5,7 @@
 // source: hawkr/payment/v1alpha1/payment.proto
 
 // payment 模組的買家付款 API，以及模組擁有的列舉（收款帳戶、付款、轉帳、退款）：賣家端（hawkr.seller.v1alpha1）、買家與後台（hawkr.admin.payment.v1alpha1）看到同一組值。
-// 付款只對應一張訂單（order_no）：金額、店家與可付與否由訂單一方決定（payment 不收 client 傳來的金額）；web 以 Stripe Payment Element、App 以 PaymentSheet
+// 付款以訂單（order_no）為鍵：金額、店家與可付與否由訂單一方決定（payment 不收 client 傳來的金額）；一筆付款可以對 N 張訂單（B8 的多店結帳），目前 client 一次付一張；web 以 Stripe Payment Element、App 以 PaymentSheet
 // 用 client_secret 完成付款（計畫 B2 D3、ADR D64），付款結果以 webhook 為準，client 以 GetPayment 重讀，不信任 client 回報的結果。
 
 package paymentv1alpha1
@@ -639,12 +639,72 @@ func (PaymentAnomalyOutcome) EnumDescriptor() ([]byte, []int) {
 	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{9}
 }
 
-// Payment 是買家對一張訂單的付款。
+// PaymentAnomalyResolutionReason 是人工結案的原因代碼（只給後台）：ANOMALY 結案時管理員必選，與自由文字備註一起寫進後台動作紀錄。
+type PaymentAnomalyResolutionReason int32
+
+const (
+	PaymentAnomalyResolutionReason_PAYMENT_ANOMALY_RESOLUTION_REASON_UNSPECIFIED PaymentAnomalyResolutionReason = 0
+	// 金流商已執行、本地沒有記到結果（只搭配結果 SUCCEEDED）。
+	PaymentAnomalyResolutionReason_PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_EXECUTED_NOT_RECORDED PaymentAnomalyResolutionReason = 1
+	// 金流商沒有執行這次呼叫（只搭配結果 FAILED）。
+	PaymentAnomalyResolutionReason_PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_NOT_EXECUTED PaymentAnomalyResolutionReason = 2
+	// 重複：同一件事已由另一筆紀錄處理（搭配任一結果）。
+	PaymentAnomalyResolutionReason_PAYMENT_ANOMALY_RESOLUTION_REASON_DUPLICATE PaymentAnomalyResolutionReason = 3
+	// 其他原因，細節寫在備註（搭配任一結果）。
+	PaymentAnomalyResolutionReason_PAYMENT_ANOMALY_RESOLUTION_REASON_OTHER PaymentAnomalyResolutionReason = 4
+)
+
+// Enum value maps for PaymentAnomalyResolutionReason.
+var (
+	PaymentAnomalyResolutionReason_name = map[int32]string{
+		0: "PAYMENT_ANOMALY_RESOLUTION_REASON_UNSPECIFIED",
+		1: "PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_EXECUTED_NOT_RECORDED",
+		2: "PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_NOT_EXECUTED",
+		3: "PAYMENT_ANOMALY_RESOLUTION_REASON_DUPLICATE",
+		4: "PAYMENT_ANOMALY_RESOLUTION_REASON_OTHER",
+	}
+	PaymentAnomalyResolutionReason_value = map[string]int32{
+		"PAYMENT_ANOMALY_RESOLUTION_REASON_UNSPECIFIED":                    0,
+		"PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_EXECUTED_NOT_RECORDED": 1,
+		"PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_NOT_EXECUTED":          2,
+		"PAYMENT_ANOMALY_RESOLUTION_REASON_DUPLICATE":                      3,
+		"PAYMENT_ANOMALY_RESOLUTION_REASON_OTHER":                          4,
+	}
+)
+
+func (x PaymentAnomalyResolutionReason) Enum() *PaymentAnomalyResolutionReason {
+	p := new(PaymentAnomalyResolutionReason)
+	*p = x
+	return p
+}
+
+func (x PaymentAnomalyResolutionReason) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PaymentAnomalyResolutionReason) Descriptor() protoreflect.EnumDescriptor {
+	return file_hawkr_payment_v1alpha1_payment_proto_enumTypes[10].Descriptor()
+}
+
+func (PaymentAnomalyResolutionReason) Type() protoreflect.EnumType {
+	return &file_hawkr_payment_v1alpha1_payment_proto_enumTypes[10]
+}
+
+func (x PaymentAnomalyResolutionReason) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PaymentAnomalyResolutionReason.Descriptor instead.
+func (PaymentAnomalyResolutionReason) EnumDescriptor() ([]byte, []int) {
+	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{10}
+}
+
+// Payment 是買家對一張訂單的付款（order_no 是請求的那張訂單）。
 type Payment struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	OrderNo string                 `protobuf:"bytes,1,opt,name=order_no,json=orderNo,proto3" json:"order_no,omitempty"`
 	Status  PaymentStatus          `protobuf:"varint,2,opt,name=status,proto3,enum=hawkr.payment.v1alpha1.PaymentStatus" json:"status,omitempty"`
-	// 付款金額（訂單的整數金額，不帶幣別）。
+	// 付款金額（這筆付款的總額，不帶幣別；一次付一張訂單時就是訂單的金額）。
 	Amount int64 `protobuf:"varint,3,opt,name=amount,proto3" json:"amount,omitempty"`
 	// 入帳時間；沒有入帳時不設。
 	PaidTime *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=paid_time,json=paidTime,proto3" json:"paid_time,omitempty"`
@@ -1106,11 +1166,17 @@ const file_hawkr_payment_v1alpha1_payment_proto_rawDesc = "" +
 	"\x15PaymentAnomalyOutcome\x12'\n" +
 	"#PAYMENT_ANOMALY_OUTCOME_UNSPECIFIED\x10\x00\x12%\n" +
 	"!PAYMENT_ANOMALY_OUTCOME_SUCCEEDED\x10\x01\x12\"\n" +
-	"\x1ePAYMENT_ANOMALY_OUTCOME_FAILED\x10\x022\xf0\x01\n" +
+	"\x1ePAYMENT_ANOMALY_OUTCOME_FAILED\x10\x02*\xb4\x02\n" +
+	"\x1ePaymentAnomalyResolutionReason\x121\n" +
+	"-PAYMENT_ANOMALY_RESOLUTION_REASON_UNSPECIFIED\x10\x00\x12D\n" +
+	"@PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_EXECUTED_NOT_RECORDED\x10\x01\x12;\n" +
+	"7PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_NOT_EXECUTED\x10\x02\x12/\n" +
+	"+PAYMENT_ANOMALY_RESOLUTION_REASON_DUPLICATE\x10\x03\x12+\n" +
+	"'PAYMENT_ANOMALY_RESOLUTION_REASON_OTHER\x10\x042\xeb\x01\n" +
 	"\x11PaymentAppService\x12q\n" +
-	"\rCreatePayment\x12,.hawkr.payment.v1alpha1.CreatePaymentRequest\x1a-.hawkr.payment.v1alpha1.CreatePaymentResponse\"\x03\x90\x02\x02\x12h\n" +
+	"\rCreatePayment\x12,.hawkr.payment.v1alpha1.CreatePaymentRequest\x1a-.hawkr.payment.v1alpha1.CreatePaymentResponse\"\x03\x90\x02\x02\x12c\n" +
 	"\n" +
-	"GetPayment\x12).hawkr.payment.v1alpha1.GetPaymentRequest\x1a*.hawkr.payment.v1alpha1.GetPaymentResponse\"\x03\x90\x02\x02B\x85\x02\n" +
+	"GetPayment\x12).hawkr.payment.v1alpha1.GetPaymentRequest\x1a*.hawkr.payment.v1alpha1.GetPaymentResponseB\x85\x02\n" +
 	"\x1acom.hawkr.payment.v1alpha1B\fPaymentProtoP\x01Z_github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/payment/v1alpha1;paymentv1alpha1\xa2\x02\x03HPX\xaa\x02\x16Hawkr.Payment.V1alpha1\xca\x02\x16Hawkr\\Payment\\V1alpha1\xe2\x02\"Hawkr\\Payment\\V1alpha1\\GPBMetadata\xea\x02\x18Hawkr::Payment::V1alpha1b\x06proto3"
 
 var (
@@ -1125,39 +1191,40 @@ func file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP() []byte {
 	return file_hawkr_payment_v1alpha1_payment_proto_rawDescData
 }
 
-var file_hawkr_payment_v1alpha1_payment_proto_enumTypes = make([]protoimpl.EnumInfo, 10)
+var file_hawkr_payment_v1alpha1_payment_proto_enumTypes = make([]protoimpl.EnumInfo, 11)
 var file_hawkr_payment_v1alpha1_payment_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_hawkr_payment_v1alpha1_payment_proto_goTypes = []any{
-	(PaymentStatus)(0),             // 0: hawkr.payment.v1alpha1.PaymentStatus
-	(PaymentAccountStatus)(0),      // 1: hawkr.payment.v1alpha1.PaymentAccountStatus
-	(RequirementCollection)(0),     // 2: hawkr.payment.v1alpha1.RequirementCollection
-	(EmbeddedOnboardingRuntime)(0), // 3: hawkr.payment.v1alpha1.EmbeddedOnboardingRuntime
-	(PaymentRefundStatus)(0),       // 4: hawkr.payment.v1alpha1.PaymentRefundStatus
-	(PaymentTransferStatus)(0),     // 5: hawkr.payment.v1alpha1.PaymentTransferStatus
-	(PaymentReversalStatus)(0),     // 6: hawkr.payment.v1alpha1.PaymentReversalStatus
-	(PaymentTopupStatus)(0),        // 7: hawkr.payment.v1alpha1.PaymentTopupStatus
-	(PaymentAnomalyKind)(0),        // 8: hawkr.payment.v1alpha1.PaymentAnomalyKind
-	(PaymentAnomalyOutcome)(0),     // 9: hawkr.payment.v1alpha1.PaymentAnomalyOutcome
-	(*Payment)(nil),                // 10: hawkr.payment.v1alpha1.Payment
-	(*PaymentSession)(nil),         // 11: hawkr.payment.v1alpha1.PaymentSession
-	(*StripePaymentSession)(nil),   // 12: hawkr.payment.v1alpha1.StripePaymentSession
-	(*CreatePaymentRequest)(nil),   // 13: hawkr.payment.v1alpha1.CreatePaymentRequest
-	(*CreatePaymentResponse)(nil),  // 14: hawkr.payment.v1alpha1.CreatePaymentResponse
-	(*GetPaymentRequest)(nil),      // 15: hawkr.payment.v1alpha1.GetPaymentRequest
-	(*GetPaymentResponse)(nil),     // 16: hawkr.payment.v1alpha1.GetPaymentResponse
-	(*timestamppb.Timestamp)(nil),  // 17: google.protobuf.Timestamp
+	(PaymentStatus)(0),                  // 0: hawkr.payment.v1alpha1.PaymentStatus
+	(PaymentAccountStatus)(0),           // 1: hawkr.payment.v1alpha1.PaymentAccountStatus
+	(RequirementCollection)(0),          // 2: hawkr.payment.v1alpha1.RequirementCollection
+	(EmbeddedOnboardingRuntime)(0),      // 3: hawkr.payment.v1alpha1.EmbeddedOnboardingRuntime
+	(PaymentRefundStatus)(0),            // 4: hawkr.payment.v1alpha1.PaymentRefundStatus
+	(PaymentTransferStatus)(0),          // 5: hawkr.payment.v1alpha1.PaymentTransferStatus
+	(PaymentReversalStatus)(0),          // 6: hawkr.payment.v1alpha1.PaymentReversalStatus
+	(PaymentTopupStatus)(0),             // 7: hawkr.payment.v1alpha1.PaymentTopupStatus
+	(PaymentAnomalyKind)(0),             // 8: hawkr.payment.v1alpha1.PaymentAnomalyKind
+	(PaymentAnomalyOutcome)(0),          // 9: hawkr.payment.v1alpha1.PaymentAnomalyOutcome
+	(PaymentAnomalyResolutionReason)(0), // 10: hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason
+	(*Payment)(nil),                     // 11: hawkr.payment.v1alpha1.Payment
+	(*PaymentSession)(nil),              // 12: hawkr.payment.v1alpha1.PaymentSession
+	(*StripePaymentSession)(nil),        // 13: hawkr.payment.v1alpha1.StripePaymentSession
+	(*CreatePaymentRequest)(nil),        // 14: hawkr.payment.v1alpha1.CreatePaymentRequest
+	(*CreatePaymentResponse)(nil),       // 15: hawkr.payment.v1alpha1.CreatePaymentResponse
+	(*GetPaymentRequest)(nil),           // 16: hawkr.payment.v1alpha1.GetPaymentRequest
+	(*GetPaymentResponse)(nil),          // 17: hawkr.payment.v1alpha1.GetPaymentResponse
+	(*timestamppb.Timestamp)(nil),       // 18: google.protobuf.Timestamp
 }
 var file_hawkr_payment_v1alpha1_payment_proto_depIdxs = []int32{
 	0,  // 0: hawkr.payment.v1alpha1.Payment.status:type_name -> hawkr.payment.v1alpha1.PaymentStatus
-	17, // 1: hawkr.payment.v1alpha1.Payment.paid_time:type_name -> google.protobuf.Timestamp
-	11, // 2: hawkr.payment.v1alpha1.Payment.session:type_name -> hawkr.payment.v1alpha1.PaymentSession
-	12, // 3: hawkr.payment.v1alpha1.PaymentSession.stripe:type_name -> hawkr.payment.v1alpha1.StripePaymentSession
-	10, // 4: hawkr.payment.v1alpha1.CreatePaymentResponse.payment:type_name -> hawkr.payment.v1alpha1.Payment
-	10, // 5: hawkr.payment.v1alpha1.GetPaymentResponse.payment:type_name -> hawkr.payment.v1alpha1.Payment
-	13, // 6: hawkr.payment.v1alpha1.PaymentAppService.CreatePayment:input_type -> hawkr.payment.v1alpha1.CreatePaymentRequest
-	15, // 7: hawkr.payment.v1alpha1.PaymentAppService.GetPayment:input_type -> hawkr.payment.v1alpha1.GetPaymentRequest
-	14, // 8: hawkr.payment.v1alpha1.PaymentAppService.CreatePayment:output_type -> hawkr.payment.v1alpha1.CreatePaymentResponse
-	16, // 9: hawkr.payment.v1alpha1.PaymentAppService.GetPayment:output_type -> hawkr.payment.v1alpha1.GetPaymentResponse
+	18, // 1: hawkr.payment.v1alpha1.Payment.paid_time:type_name -> google.protobuf.Timestamp
+	12, // 2: hawkr.payment.v1alpha1.Payment.session:type_name -> hawkr.payment.v1alpha1.PaymentSession
+	13, // 3: hawkr.payment.v1alpha1.PaymentSession.stripe:type_name -> hawkr.payment.v1alpha1.StripePaymentSession
+	11, // 4: hawkr.payment.v1alpha1.CreatePaymentResponse.payment:type_name -> hawkr.payment.v1alpha1.Payment
+	11, // 5: hawkr.payment.v1alpha1.GetPaymentResponse.payment:type_name -> hawkr.payment.v1alpha1.Payment
+	14, // 6: hawkr.payment.v1alpha1.PaymentAppService.CreatePayment:input_type -> hawkr.payment.v1alpha1.CreatePaymentRequest
+	16, // 7: hawkr.payment.v1alpha1.PaymentAppService.GetPayment:input_type -> hawkr.payment.v1alpha1.GetPaymentRequest
+	15, // 8: hawkr.payment.v1alpha1.PaymentAppService.CreatePayment:output_type -> hawkr.payment.v1alpha1.CreatePaymentResponse
+	17, // 9: hawkr.payment.v1alpha1.PaymentAppService.GetPayment:output_type -> hawkr.payment.v1alpha1.GetPaymentResponse
 	8,  // [8:10] is the sub-list for method output_type
 	6,  // [6:8] is the sub-list for method input_type
 	6,  // [6:6] is the sub-list for extension type_name
@@ -1178,7 +1245,7 @@ func file_hawkr_payment_v1alpha1_payment_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_payment_v1alpha1_payment_proto_rawDesc), len(file_hawkr_payment_v1alpha1_payment_proto_rawDesc)),
-			NumEnums:      10,
+			NumEnums:      11,
 			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,

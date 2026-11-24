@@ -453,5 +453,62 @@ class PaymentAnomalyOutcome extends $pb.ProtobufEnum {
   const PaymentAnomalyOutcome._(super.value, super.name);
 }
 
+/// PaymentAnomalyResolutionReason 是人工結案的原因代碼（只給後台）：ANOMALY 結案時管理員必選，與自由文字備註一起寫進後台動作紀錄。
+class PaymentAnomalyResolutionReason extends $pb.ProtobufEnum {
+  static const PaymentAnomalyResolutionReason
+      PAYMENT_ANOMALY_RESOLUTION_REASON_UNSPECIFIED =
+      PaymentAnomalyResolutionReason._(
+          0,
+          _omitEnumNames
+              ? ''
+              : 'PAYMENT_ANOMALY_RESOLUTION_REASON_UNSPECIFIED');
+
+  /// 金流商已執行、本地沒有記到結果（只搭配結果 SUCCEEDED）。
+  static const PaymentAnomalyResolutionReason
+      PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_EXECUTED_NOT_RECORDED =
+      PaymentAnomalyResolutionReason._(
+          1,
+          _omitEnumNames
+              ? ''
+              : 'PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_EXECUTED_NOT_RECORDED');
+
+  /// 金流商沒有執行這次呼叫（只搭配結果 FAILED）。
+  static const PaymentAnomalyResolutionReason
+      PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_NOT_EXECUTED =
+      PaymentAnomalyResolutionReason._(
+          2,
+          _omitEnumNames
+              ? ''
+              : 'PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_NOT_EXECUTED');
+
+  /// 重複：同一件事已由另一筆紀錄處理（搭配任一結果）。
+  static const PaymentAnomalyResolutionReason
+      PAYMENT_ANOMALY_RESOLUTION_REASON_DUPLICATE =
+      PaymentAnomalyResolutionReason._(3,
+          _omitEnumNames ? '' : 'PAYMENT_ANOMALY_RESOLUTION_REASON_DUPLICATE');
+
+  /// 其他原因，細節寫在備註（搭配任一結果）。
+  static const PaymentAnomalyResolutionReason
+      PAYMENT_ANOMALY_RESOLUTION_REASON_OTHER =
+      PaymentAnomalyResolutionReason._(
+          4, _omitEnumNames ? '' : 'PAYMENT_ANOMALY_RESOLUTION_REASON_OTHER');
+
+  static const $core.List<PaymentAnomalyResolutionReason> values =
+      <PaymentAnomalyResolutionReason>[
+    PAYMENT_ANOMALY_RESOLUTION_REASON_UNSPECIFIED,
+    PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_EXECUTED_NOT_RECORDED,
+    PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_NOT_EXECUTED,
+    PAYMENT_ANOMALY_RESOLUTION_REASON_DUPLICATE,
+    PAYMENT_ANOMALY_RESOLUTION_REASON_OTHER,
+  ];
+
+  static final $core.List<PaymentAnomalyResolutionReason?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 4);
+  static PaymentAnomalyResolutionReason? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const PaymentAnomalyResolutionReason._(super.value, super.name);
+}
+
 const $core.bool _omitEnumNames =
     $core.bool.fromEnvironment('protobuf.omit_enum_names');

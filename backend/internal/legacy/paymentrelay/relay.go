@@ -11,11 +11,11 @@
 //
 // 不轉送：
 //   - payment.expired：模組只有 CANCELED，不區分逾期與主動關閉；兩者在 Java order 的消費端都只記 log（逾期取消由 order 自己的排程負責），所以以 payment.closed 代表。
-//   - payment.conflict、payment.rescue.*：隨 PayUni 的 CONFLICT 與 rescue 刪除（D5 以訂單一方發起的自動退款取代）；自動退款完成的通知由 A8 的 notification 訂閱 AutoRefundCompleted。
+//   - payment.conflict、payment.rescue.*：隨舊金流商的 CONFLICT 與 rescue 刪除（D5 以訂單一方發起的自動退款取代）；自動退款完成的通知由 A8 的 notification 訂閱 AutoRefundCompleted。
 //   - MoneyAnomaly：給告警，不是舊服務的事件。
 //
 // 欄位語意：舊契約的 trade_no 與 order_id 都是訂單編號（一張訂單一筆付款，D8）；退款的 refundNo 是呼叫端建立退款時給的冪等鍵（aftersales 以它對回退款任務）；
-// payment_type 是空字串（付款沒有付款方式欄位，order 沿用訂單上的）；provider_trade_no、payuniStatus 與 ATM 日期是空字串（PayUni 專屬或 port 不外露）。
+// payment_type 是空字串（付款沒有付款方式欄位，order 沿用訂單上的）；provider_trade_no、舊的 provider 狀態欄位與 ATM 日期是空字串（舊金流商專屬或 port 不外露）。
 package paymentrelay
 
 import (
@@ -92,23 +92,23 @@ type refundSucceeded struct {
 	OrderID             string `json:"orderId"`
 	Amount              int64  `json:"amount"`
 	ProviderRefundNo    string `json:"providerRefundNo"`
-	PayuniStatus        string `json:"payuniStatus"`
-	PayuniMessage       string `json:"payuniMessage"`
+	ProviderStatus      string `json:"payuniStatus"`
+	ProviderMessage     string `json:"payuniMessage"`
 	EstimatedRefundDate string `json:"estimatedRefundDate"`
 	BankDate            string `json:"bankDate"`
 	CompletedAt         string `json:"completedAt"`
 	OccurredAtCamel     string `json:"occurredAt"`
 }
 
-// refundFailed 是舊 RefundFailed 的 payload（camelCase，沒有 status：消費端依 routing key 判斷成敗）；payuniMessage 是失敗原因。
+// refundFailed 是舊 RefundFailed 的 payload（camelCase，沒有 status：消費端依 routing key 判斷成敗）；失敗原因放在舊的訊息欄位。
 type refundFailed struct {
 	envelope
 	RefundNo        string `json:"refundNo"`
 	TradeNo         string `json:"tradeNo"`
 	OrderID         string `json:"orderId"`
 	Amount          int64  `json:"amount"`
-	PayuniStatus    string `json:"payuniStatus"`
-	PayuniMessage   string `json:"payuniMessage"`
+	ProviderStatus  string `json:"payuniStatus"`
+	ProviderMessage string `json:"payuniMessage"`
 	OccurredAtCamel string `json:"occurredAt"`
 }
 
@@ -117,34 +117,50 @@ func env(id, eventType, aggregateType, aggregateID string, occurred time.Time) e
 }
 
 // OnPaymentChanged 在發布 PaymentChanged 的 transaction 內把入帳、建立失敗與取消轉成舊的 payment.* 訊息；其他狀態（等待、處理中、建立中、ANOMALY）不轉送。
+// 舊訊息以訂單編號為鍵、一則一張訂單：付款底下每張訂單應收各送一則（金額是那張訂單的應收；過渡期 N 是 1，與舊行為相同）。
 func OnPaymentChanged(q jobs.Enqueuer) func(context.Context, payment.PaymentChanged) error {
 	return func(ctx context.Context, e payment.PaymentChanged) error {
-		id := uuid.NewV7().String()
 		buyer := fmt.Sprint(e.BuyerID)
 		switch e.Status {
-		case payment.PaymentSucceeded:
-			payTime := ""
-			if e.PaidAt != nil {
-				payTime = at(*e.PaidAt)
-			}
-			return enqueuePublish(ctx, q, id, exchangePayment, "payment.success", paymentSuccess{
-				envelope: env(id, "payment.success", aggregatePayment, e.OrderNo, e.OccurredAt),
-				TradeNo:  e.OrderNo, OrderID: e.OrderNo, BuyerID: buyer, Amount: e.Amount, PayTime: payTime,
-			})
-		case payment.PaymentCreateFailed:
-			return enqueuePublish(ctx, q, id, exchangePayment, "payment.failed", paymentFailed{
-				envelope: env(id, "payment.failed", aggregatePayment, e.OrderNo, e.OccurredAt),
-				TradeNo:  e.OrderNo, OrderID: e.OrderNo, BuyerID: buyer, Amount: e.Amount, ProviderMessage: e.LastError,
-			})
-		case payment.PaymentCanceled:
-			return enqueuePublish(ctx, q, id, exchangePayment, "payment.closed", paymentClosed{
-				envelope: env(id, "payment.closed", aggregatePayment, e.OrderNo, e.OccurredAt),
-				TradeNo:  e.OrderNo, OrderID: e.OrderNo, BuyerID: buyer, Amount: e.Amount, ClosedAt: at(e.OccurredAt),
-			})
+		case payment.PaymentSucceeded, payment.PaymentCreateFailed, payment.PaymentCanceled:
 		case payment.PaymentCreating, payment.PaymentAwaitingPayment, payment.PaymentProcessing, payment.PaymentAnomaly:
 			return nil
+		default:
+			return fmt.Errorf("paymentrelay：不認得的付款狀態 %q", e.Status)
 		}
-		return fmt.Errorf("paymentrelay：不認得的付款狀態 %q", e.Status)
+		if len(e.Orders) == 0 {
+			return fmt.Errorf("paymentrelay：付款 %s 沒有訂單應收", e.PaymentID)
+		}
+		for _, o := range e.Orders {
+			id := uuid.NewV7().String()
+			var err error
+			switch e.Status {
+			case payment.PaymentSucceeded:
+				payTime := ""
+				if e.PaidAt != nil {
+					payTime = at(*e.PaidAt)
+				}
+				err = enqueuePublish(ctx, q, id, exchangePayment, "payment.success", paymentSuccess{
+					envelope: env(id, "payment.success", aggregatePayment, o.OrderNo, e.OccurredAt),
+					TradeNo:  o.OrderNo, OrderID: o.OrderNo, BuyerID: buyer, Amount: o.Amount, PayTime: payTime,
+				})
+			case payment.PaymentCreateFailed:
+				err = enqueuePublish(ctx, q, id, exchangePayment, "payment.failed", paymentFailed{
+					envelope: env(id, "payment.failed", aggregatePayment, o.OrderNo, e.OccurredAt),
+					TradeNo:  o.OrderNo, OrderID: o.OrderNo, BuyerID: buyer, Amount: o.Amount, ProviderMessage: e.LastError,
+				})
+			case payment.PaymentCanceled:
+				err = enqueuePublish(ctx, q, id, exchangePayment, "payment.closed", paymentClosed{
+					envelope: env(id, "payment.closed", aggregatePayment, o.OrderNo, e.OccurredAt),
+					TradeNo:  o.OrderNo, OrderID: o.OrderNo, BuyerID: buyer, Amount: o.Amount, ClosedAt: at(e.OccurredAt),
+				})
+			case payment.PaymentCreating, payment.PaymentAwaitingPayment, payment.PaymentProcessing, payment.PaymentAnomaly:
+			}
+			if err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 }
 
@@ -163,7 +179,7 @@ func OnRefundChanged(q jobs.Enqueuer) func(context.Context, payment.RefundChange
 			return enqueuePublish(ctx, q, id, exchangePayment, "refund.failed", refundFailed{
 				envelope: env(id, "refund.failed", aggregateRefund, e.RequestKey, e.OccurredAt),
 				RefundNo: e.RequestKey, TradeNo: e.OrderNo, OrderID: e.OrderNo, Amount: e.Amount,
-				PayuniMessage: e.FailureReason, OccurredAtCamel: at(e.OccurredAt),
+				ProviderMessage: e.FailureReason, OccurredAtCamel: at(e.OccurredAt),
 			})
 		case payment.RefundPending, payment.RefundRefunding, payment.RefundAnomaly:
 			return nil

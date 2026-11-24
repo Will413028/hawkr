@@ -162,6 +162,12 @@
       "PAYMENT_ANOMALY_OUTCOME_FAILED": "Provider did not execute it",
       "PAYMENT_ANOMALY_OUTCOME_SUCCEEDED": "Provider executed it"
     },
+    "PaymentAnomalyResolutionReason": {
+      "PAYMENT_ANOMALY_RESOLUTION_REASON_DUPLICATE": "Duplicate",
+      "PAYMENT_ANOMALY_RESOLUTION_REASON_OTHER": "Other",
+      "PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_EXECUTED_NOT_RECORDED": "Provider executed it, not recorded locally",
+      "PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_NOT_EXECUTED": "Provider did not execute the call"
+    },
     "PaymentRefundStatus": {
       "PAYMENT_REFUND_STATUS_ANOMALY": "Needs review",
       "PAYMENT_REFUND_STATUS_FAILED": "Refund failed",

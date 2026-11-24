@@ -1,0 +1,166 @@
+{
+ "mutants": [
+  {
+   "id": "refund-cap-uses-the-payment-total",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/refund.go",
+   "old": "if in.Amount > order.Amount-taken {",
+   "new": "if in.Amount > pay.Amount-taken {",
+   "test": "internal/modules/payment ^TestTwoOrderReceivablesUnderOnePaymentGetIndependentRefundCaps$",
+   "why": "退款上限改用整筆付款的總額而不是這張訂單的應收：A 退滿 100 之後再退 1 元仍通過（總額 350 還沒用完），各訂單的上限不再獨立。"
+  },
+  {
+   "id": "refund-total-spans-the-whole-payment",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/store/transfers.sql.go",
+   "old": "FROM payment.refunds\nWHERE payment_order_id = $1 AND status <> 'FAILED'",
+   "new": "FROM payment.refunds\nWHERE payment_order_id IN (SELECT id FROM payment.payment_orders WHERE payment_id = (SELECT payment_id FROM payment.payment_orders WHERE id = $1)) AND status <> 'FAILED'",
+   "test": "internal/modules/payment ^(TestTwoOrderReceivablesUnderOnePaymentGetIndependentRefundCaps|TestTheTransferAmountClaimDeductsOnlyThatOrdersRefunds)$",
+   "why": "非失敗退款加總跨整筆付款：B 的上限被 A 的退款吃掉、B 的轉帳金額也被 A 的退款扣掉，兩張訂單應收不再獨立。"
+  },
+  {
+   "id": "transfer-uniqueness-spans-the-whole-payment",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/db/migrations/20261124122631_payment_orders.sql",
+   "old": "CREATE UNIQUE INDEX \"transfers_active_order\" ON \"payment\".\"transfers\" (\"payment_order_id\") WHERE",
+   "new": "CREATE UNIQUE INDEX \"transfers_active_order\" ON \"payment\".\"transfers\" ((1)) WHERE",
+   "test": "internal/modules/payment ^TestTwoOrderReceivablesUnderOnePaymentGetIndependentTransfers$",
+   "why": "有效轉帳的唯一索引不分訂單應收（整張表只能有一筆有效轉帳）：同一筆付款的第二張訂單寫不出轉帳。"
+  },
+  {
+   "id": "reversal-targets-another-orders-transfer",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/store/transfers.sql.go",
+   "old": "FROM payment.transfers\nWHERE payment_order_id = $1 AND status = 'SUCCEEDED'",
+   "new": "FROM payment.transfers\nWHERE payment_order_id <> $1 AND status = 'SUCCEEDED'",
+   "test": "internal/modules/payment ^TestARefundOnOrderANeverReversesOrderBsTransfer$",
+   "why": "撤回的目標轉帳挑到別張訂單應收的成功轉帳：A 的退款撤回了 B 的轉帳，B 的轉帳 reversed_amount 不是 0。"
+  },
+  {
+   "id": "created-lower-bound-dropped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/convergence.go",
+   "old": "func createdLowerBound(calledAt time.Time) time.Time { return calledAt.Add(-ListClockSkew).UTC() }",
+   "new": "func createdLowerBound(calledAt time.Time) time.Time { return time.Time{} }",
+   "test": "internal/modules/payment ^TestAfterTheResendWindowAnUnknownCreateIsNeverReplayedWithoutProvenAbsence$",
+   "why": "查回不帶 created 下限：fake 看到的下限是零值，不是第一次呼叫減時鐘誤差；真的 Stripe 列表會變成沒有下限（看不完也不能證明不存在）。"
+  },
+  {
+   "id": "created-lower-bound-dropped-in-the-unit",
+   "stack": "go",
+   "file": "backend/internal/modules/payment/internal/charge/convergence.go",
+   "old": "func createdLowerBound(calledAt time.Time) time.Time { return calledAt.Add(-ListClockSkew).UTC() }",
+   "new": "func createdLowerBound(calledAt time.Time) time.Time { return calledAt.UTC() }",
+   "test": "internal/modules/payment/internal/charge ^TestTheCreatedLowerBoundIsTheFirstCallMinusTheClockSkew$",
+   "why": "下限沒有減時鐘誤差：本機時鐘比 provider 慢時，剛建立的物件會被排除在列表之外而誤判不存在。"
+  },
+  {
+   "id": "stripe-list-drops-the-created-filter",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/payment.go",
+   "old": "return &sdk.RangeQueryParams{GreaterThanOrEqual: after.Unix()}, nil",
+   "new": "return nil, nil",
+   "test": "internal/modules/payment/internal/charge ^TestStripeFindsListOnlyObjectsCreatedAfterTheLowerBoundAndRefuseWithoutOne$",
+   "why": "Stripe 的列表查回不帶 created[gte]：列表變成整個平台的歷史，請求送出去卻沒有下限。"
+  },
+  {
+   "id": "resend-window-never-closes",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/convergence.go",
+   "old": "return calledAt == nil || now.Sub(*calledAt) < ResendWindow",
+   "new": "return true",
+   "test": "internal/modules/payment ^TestAfterTheResendWindowAnUnknownCreateIsNeverReplayedWithoutProvenAbsence$",
+   "why": "過了 ResendWindow 仍重送建立呼叫：建立呼叫次數增加（舊鍵超過保存期重送，可能建出第二個 PaymentIntent）。"
+  },
+  {
+   "id": "lookup-failure-counts-as-not-found",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/create.go",
+   "old": "\t\treturn s.createLookupFailed(ctx, row, err)",
+   "new": "\t\treturn s.failCreate(ctx, row.ID, failedNotFound)",
+   "test": "internal/modules/payment ^TestAfterTheResendWindowAnUnknownCreateIsNeverReplayedWithoutProvenAbsence$",
+   "why": "查回失敗當成查無：沒有證明不存在就進 CREATE_FAILED，買家可以換新鍵重付，provider 那邊可能已經有一筆。"
+  },
+  {
+   "id": "grant-checks-terms-before-the-existing-transfer",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/transfer.go",
+   "old": "\t\texisting, err := q.ActiveTransferByOrder(ctx, order.ID)\n\t\tif err == nil {\n\t\t\tout = existing\n\t\t\treturn nil\n\t\t}",
+   "new": "\t\texisting, err := q.ActiveTransferByOrder(ctx, order.ID)\n\t\tif err == nil && pay.Status != string(model.PaymentSucceeded) {\n\t\t\tout = existing\n\t\t\treturn nil\n\t\t}",
+   "test": "internal/modules/payment ^TestAGrantRequestRepeatedAfterTheTransferExistsSucceedsIdempotently$",
+   "why": "已有有效轉帳時仍重新檢查條件：帳戶事後停用，重複的撥款請求得到 FailedPrecondition 而不是同一筆轉帳。"
+  },
+  {
+   "id": "resolve-reason-not-validated",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/anomaly.go",
+   "old": "\tif !slices.Contains(model.AnomalyResolutionReasonValues(), reason) {",
+   "new": "\tif false && !slices.Contains(model.AnomalyResolutionReasonValues(), reason) {",
+   "test": "internal/modules/payment ^TestResolvingAnAnomalyRecordsTheReasonAndNoteInTheAuditRowAndRejectsBadOnes$",
+   "why": "人工結案不檢查原因代碼：沒有原因或不認得的原因也能結案。"
+  },
+  {
+   "id": "resolve-note-not-recorded",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/anomaly.go",
+   "old": ", \"resolution_reason\": string(reason), \"note\": note}",
+   "new": ", \"resolution_reason\": string(reason)}",
+   "test": "internal/modules/payment ^TestResolvingAnAnomalyRecordsTheReasonAndNoteInTheAuditRowAndRejectsBadOnes$",
+   "why": "後台紀錄的 detail 不帶備註：結案留下的紀錄看不到管理員寫的理由。"
+  },
+  {
+   "id": "resolve-reason-not-recorded",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/anomaly.go",
+   "old": "\"resolution_reason\": string(reason), ",
+   "new": "",
+   "test": "internal/modules/payment ^TestResolvingAnAnomalyRecordsTheReasonAndNoteInTheAuditRowAndRejectsBadOnes$",
+   "why": "後台紀錄的 detail 不帶原因代碼。"
+  },
+  {
+   "id": "resolve-note-not-trimmed",
+   "stack": "go",
+   "file": "backend/internal/modules/payment/internal/charge/anomaly.go",
+   "old": "\tnote = trimtext.Trim(note)\n",
+   "new": "\tnote = strings.ToUpper(note)\n\t_ = trimtext.Trim\n",
+   "test": "internal/modules/payment/internal/charge ^TestValidateResolutionChecksTheReasonAgainstTheOutcomeAndBoundsTheNote$",
+   "why": "備註沒有去頭尾空白（也不檢查空白備註）。"
+  },
+  {
+   "id": "handler-resolve-reason-unchecked",
+   "stack": "go",
+   "file": "backend/internal/httpapi/payment/admin.go",
+   "old": "\tif reason == \"\" {\n\t\treturn nil, rpc.RequiredField(\"reason\", \"reason 必填\")\n\t}\n",
+   "new": "",
+   "test": "internal/httpapi/payment ^TestResolvePaymentAnomalyRequiresAReasonAndANonBlankBoundedNote$",
+   "why": "handler 不檢查 reason：沒設原因的請求進到模組。"
+  },
+  {
+   "id": "handler-resolve-note-unchecked",
+   "stack": "go",
+   "file": "backend/internal/httpapi/payment/admin.go",
+   "old": "\tif note == \"\" {\n\t\treturn nil, rpc.RequiredField(\"note\", \"note 必填\")\n\t}\n",
+   "new": "",
+   "test": "internal/httpapi/payment ^TestResolvePaymentAnomalyRequiresAReasonAndANonBlankBoundedNote$",
+   "why": "handler 不檢查 note：空白備註的請求進到模組。"
+  },
+  {
+   "id": "handler-resolve-note-length-unchecked",
+   "stack": "go",
+   "file": "backend/internal/httpapi/payment/admin.go",
+   "old": "if utf8.RuneCountInString(note) > payment.AnomalyResolutionNoteMaxRunes {",
+   "new": "if false && utf8.RuneCountInString(note) > payment.AnomalyResolutionNoteMaxRunes {",
+   "test": "internal/httpapi/payment ^TestResolvePaymentAnomalyRequiresAReasonAndANonBlankBoundedNote$",
+   "why": "handler 不檢查備註長度上限。"
+  },
+  {
+   "id": "relay-sends-only-the-first-order",
+   "stack": "go",
+   "file": "backend/internal/legacy/paymentrelay/relay.go",
+   "old": "\t\tfor _, o := range e.Orders {",
+   "new": "\t\tfor _, o := range e.Orders[:1] {",
+   "test": "internal/legacy/paymentrelay ^TestAPaymentOfTwoOrdersRelaysOneMessagePerOrderWithItsOwnAmount$",
+   "why": "舊事件 relay 一筆付款只送第一張訂單：其他訂單沒有收到 payment.success。"
+  }
+ ]
+}

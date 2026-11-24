@@ -274,6 +274,13 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason",
+      "dartClass": "PaymentAnomalyResolutionReason",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.payment.v1alpha1.PaymentRefundStatus",
       "dartClass": "PaymentRefundStatus",
       "dartLibrary": "package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart",

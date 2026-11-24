@@ -376,8 +376,14 @@ const (
 	PaymentStateUnknown         = charge.StateUnknown
 )
 
-// Payment 是買家對一張訂單的付款。
+// Payment 是買家一次結帳的付款：一個 PaymentIntent 對 Orders 底下 N 張訂單應收（D13）。
 type Payment = model.Payment
+
+// PaymentOrderReceivable 是付款底下一張訂單的應收（訂單編號、店家與金額）；退款上限與轉帳都以它為單位。
+type PaymentOrderReceivable = model.PaymentOrder
+
+// OrderPayment 是從一張訂單應收看到的付款（以訂單編號為鍵的服務間讀取）：付款群組與被問到的那張訂單應收。
+type OrderPayment = model.OrderPayment
 
 // PaymentStatus 是付款的狀態。
 type PaymentStatus = model.PaymentStatus
@@ -426,6 +432,8 @@ var ErrChargeRetryableRefusal = charge.ErrRetryableRefusal
 type (
 	AnomalyKind    = model.AnomalyKind
 	AnomalyOutcome = model.AnomalyOutcome
+	// AnomalyResolutionReason 是人工結案的原因代碼。
+	AnomalyResolutionReason = model.AnomalyResolutionReason
 )
 
 // 進入 ANOMALY 的物件種類與人工結案的結果。
@@ -437,12 +445,25 @@ const (
 	AnomalyTopup     = model.AnomalyTopup
 	AnomalySucceeded = model.AnomalySucceeded
 	AnomalyFailed    = model.AnomalyFailed
+
+	ResolutionProviderExecutedNotRecorded = model.ResolutionProviderExecutedNotRecorded
+	ResolutionProviderNotExecuted         = model.ResolutionProviderNotExecuted
+	ResolutionDuplicate                   = model.ResolutionDuplicate
+	ResolutionOther                       = model.ResolutionOther
 )
 
+// AnomalyResolutionNoteMaxRunes 是人工結案備註的長度上限（去除首尾空白後，以 rune 計）。
+const AnomalyResolutionNoteMaxRunes = model.ResolutionNoteMaxRunes
+
+// AnomalyResolutionReasonValues 回傳全部人工結案的原因代碼。
+func AnomalyResolutionReasonValues() []AnomalyResolutionReason {
+	return model.AnomalyResolutionReasonValues()
+}
+
 // ResolveAnomaly 是後台對 ANOMALY 的付款、轉帳、退款、撤回（AnomalyReversal）或補差額轉帳（AnomalyTopup）的人工結案；撤回的 id 是撤回列 ID，補差額轉帳的 id 是退款 ID：核對 provider 之後結案成成功（evidence 是 provider 物件 ID，必填）或失敗，
-// 領域變更與一筆 adminaudit 在同一個 transaction。語意與鎖順序見 charge.Service.ResolveAnomaly。
-func (m *Module) ResolveAnomaly(ctx context.Context, actor AdminActor, kind AnomalyKind, id uuid.UUID, outcome AnomalyOutcome, evidence string) error {
-	return m.charges.ResolveAnomaly(ctx, actor, kind, id, outcome, evidence)
+// reason 與 note（必填）連同領域變更寫進同一個 transaction 的一筆 adminaudit。語意與鎖順序見 charge.Service.ResolveAnomaly。
+func (m *Module) ResolveAnomaly(ctx context.Context, actor AdminActor, kind AnomalyKind, id uuid.UUID, outcome AnomalyOutcome, reason AnomalyResolutionReason, note, evidence string) error {
+	return m.charges.ResolveAnomaly(ctx, actor, kind, id, outcome, reason, note, evidence)
 }
 
 // ErrChargePermanent 標示付款 provider 重試也不會成功的失敗。
@@ -460,6 +481,12 @@ const PaymentResendWindow = charge.ResendWindow
 // PaymentNotFoundAfter 是從第一次呼叫起，查回「查無」才算確定不存在的時間（24 小時），之後才可以換新鍵重建。
 const PaymentNotFoundAfter = charge.NotFoundAfter
 
+// PaymentListClockSkew 是查回的 created 下限對時鐘誤差的餘裕：下限是這把鍵第一次呼叫前記下的時刻減它。
+const PaymentListClockSkew = charge.ListClockSkew
+
+// TransferGroupOf 是付款的 transfer_group（一個 charge、N 筆轉帳都帶它）：付款群組的 ID。
+func TransferGroupOf(paymentID uuid.UUID) string { return charge.TransferGroupOf(paymentID) }
+
 // PaymentLookupFailureLimit 是連續查回失敗幾次之後進 ANOMALY。
 const PaymentLookupFailureLimit = charge.LookupFailureLimit
 
@@ -469,10 +496,12 @@ const PaymentIdempotencyRetention = charge.IdempotencyRetention
 // ChargeConfigured 回傳是否設定了付款 provider。
 func (m *Module) ChargeConfigured() bool { return m.charges.Configured() }
 
-// CreatePayment 建立買家對一張訂單的付款（計畫 D7 修訂、D8）：transaction 內寫付款列與補做 job，提交之後在請求內、transaction 外帶冪等鍵建立 PaymentIntent 並回 client_secret；
-// provider 失敗或逾時回狀態 CREATING 的付款（pending），補做 job 以同一把鍵接手，呼叫端用 GetPayment 重讀。同一張訂單只有一個 PaymentIntent。呼叫方先確認呼叫者是買家，且不能在 transaction 內呼叫。
-func (m *Module) CreatePayment(ctx context.Context, buyerID int64, orderNo string) (Payment, error) {
-	return m.charges.CreatePayment(ctx, buyerID, orderNo)
+// CreatePayment 建立買家一次結帳的付款（計畫 D7 修訂、D8、D13）：orderNos 是這次結帳的訂單（過渡期 Java 一次一張；B8 的多店結帳傳 N 張，介面不變），付款金額是各訂單應收的總額；
+// transaction 內寫付款群組列、每張訂單應收一列與補做 job，提交之後在請求內、transaction 外帶冪等鍵建立 PaymentIntent 並回 client_secret；
+// provider 失敗或逾時回狀態 CREATING 的付款（pending），補做 job 以同一把鍵接手，呼叫端用 GetPayment 重讀。同一張訂單只屬於一筆付款、一筆付款同時只有一個有效 PaymentIntent。
+// 呼叫方先確認呼叫者是買家，且不能在 transaction 內呼叫。
+func (m *Module) CreatePayment(ctx context.Context, buyerID int64, orderNos []string) (Payment, error) {
+	return m.charges.CreatePayment(ctx, buyerID, orderNos)
 }
 
 // GetPayment 讀買家自己的付款，AWAITING_PAYMENT 時向 provider 讀 client_secret 一併回傳（不存）；不是呼叫者的付款回 NotFound。呼叫方不能在 transaction 內呼叫。
@@ -619,16 +648,17 @@ func (m *Module) SyncPaymentRefund(ctx context.Context, refundID uuid.UUID) (aga
 }
 
 // PaymentByOrderNo 以訂單編號讀付款，不驗呼叫者，不回 client_secret（過渡期 legacy paymentserver 的服務間讀取：訂單的付款狀態、發票的付款事實）；沒有回 NotFound。
-func (m *Module) PaymentByOrderNo(ctx context.Context, orderNo string) (Payment, error) {
+// 回付款群組與被問到的那張訂單應收（Order.Amount 是這張訂單的應收，Payment.Amount 是整筆付款的總額）。
+func (m *Module) PaymentByOrderNo(ctx context.Context, orderNo string) (OrderPayment, error) {
 	return m.charges.PaymentByOrderNo(ctx, orderNo)
 }
 
-// PaymentsByOrderNos 批次以訂單編號讀付款（一次最多 500 筆）；沒有付款的訂單不出現在結果裡，順序不保證。
-func (m *Module) PaymentsByOrderNos(ctx context.Context, orderNos []string) ([]Payment, error) {
+// PaymentsByOrderNos 批次以訂單編號讀付款（一次最多 500 筆），每張找得到的訂單回一列；沒有付款的訂單不出現在結果裡，順序不保證。
+func (m *Module) PaymentsByOrderNos(ctx context.Context, orderNos []string) ([]OrderPayment, error) {
 	return m.charges.PaymentsByOrderNos(ctx, orderNos)
 }
 
-// RefundByRequestKey 以建立退款時呼叫端給的冪等鍵讀退款（售後的案件 ID 對回）；沒有回 NotFound，同一把鍵對到多筆付款的退款回 FailedPrecondition。
+// RefundByRequestKey 以建立退款時呼叫端給的冪等鍵讀退款（售後的案件 ID 對回）；沒有回 NotFound，同一把鍵對到多張訂單的退款回 FailedPrecondition。
 func (m *Module) RefundByRequestKey(ctx context.Context, requestKey string) (PaymentRefund, error) {
 	return m.charges.RefundByRequestKey(ctx, requestKey)
 }
@@ -649,9 +679,9 @@ func (m *Module) CloseOrderPayment(ctx context.Context, orderNo string) (bool, e
 	return m.charges.CloseForOrder(ctx, orderNo)
 }
 
-// CloseOrderPaymentAttempt 是關閉 job（payment.charge_close）的內容，給 worker 與測試呼叫；finalAttempt 為 true 時付款仍在建立中就放棄。外部呼叫在 transaction 外。
-func (m *Module) CloseOrderPaymentAttempt(ctx context.Context, paymentID uuid.UUID, finalAttempt bool) error {
-	return m.charges.Close(ctx, paymentID, finalAttempt)
+// CloseOrderPaymentAttempt 是關閉 job（payment.charge_close）的內容，給 worker 與測試呼叫；付款的建立還沒收斂時不放棄（job snooze 等它），收斂之後才取消。外部呼叫在 transaction 外。
+func (m *Module) CloseOrderPaymentAttempt(ctx context.Context, paymentID uuid.UUID) error {
+	return m.charges.Close(ctx, paymentID)
 }
 
 // 後台的付款、轉帳與退款清單（新的在前、keyset）：記錄型別是對外視圖加上 provider 的外部 ID 與訂單編號，不含 client secret。

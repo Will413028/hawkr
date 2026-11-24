@@ -83,23 +83,31 @@ func (s *Service) create(ctx context.Context, paymentID uuid.UUID, timeout time.
 	if called.Status != string(model.PaymentCreating) {
 		return createResult{row: called}, nil
 	}
+	orders, err := store.New(s.d.DB.Conn(ctx)).PaymentOrdersOfPayment(ctx, paymentID)
+	if err != nil {
+		return createResult{}, err
+	}
+	orderNos := make([]string, len(orders))
+	for i, o := range orders {
+		orderNos[i] = o.OrderNo
+	}
 	startedAt := s.d.Now().UTC()
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	snap, err := p.CreatePayment(callCtx, CreateInput{
-		PaymentID: called.ID, OrderNo: called.OrderNo, StoreID: called.StoreID, Amount: called.Amount, Description: called.Description,
-		TransferGroup: called.OrderNo, IdempotencyKey: called.CreateIdempotencyKey.String(),
+		PaymentID: called.ID, OrderNos: orderNos, Amount: called.Amount, Description: called.Description,
+		TransferGroup: TransferGroupOf(called.ID), IdempotencyKey: called.CreateIdempotencyKey.String(),
 	})
-	switch classifyCall(err) {
+	switch s.classify(ctx, "create_payment", err) {
 	case callRefused:
-		s.d.Logger.WarnContext(ctx, "payment：provider 永久拒絕建立 PaymentIntent", "payment_id", paymentID.String(), "order_no", called.OrderNo, "err", err)
+		s.d.Logger.WarnContext(ctx, "payment：provider 永久拒絕建立 PaymentIntent", "payment_id", paymentID.String(), "err", err)
 		return s.failCreate(ctx, paymentID, failedRefused)
 	case callRetryable:
 		if !firstCall(row.CreateCalledAt, called.CreateCalledAt, now) {
-			s.d.Logger.WarnContext(ctx, "payment：重送建立 PaymentIntent 被拒絕，但這把鍵之前的呼叫結果不明，不換鍵", "payment_id", paymentID.String(), "order_no", called.OrderNo, "err", err)
+			s.d.Logger.WarnContext(ctx, "payment：重送建立 PaymentIntent 被拒絕，但這把鍵之前的呼叫結果不明，不換鍵", "payment_id", paymentID.String(), "err", err)
 			return createResult{}, err
 		}
-		s.d.Logger.WarnContext(ctx, "payment：provider 拒絕建立 PaymentIntent、沒有執行，換新冪等鍵重試", "payment_id", paymentID.String(), "order_no", called.OrderNo, "err", err)
+		s.d.Logger.WarnContext(ctx, "payment：provider 拒絕建立 PaymentIntent、沒有執行，換新冪等鍵重試", "payment_id", paymentID.String(), "err", err)
 		if rerr := s.rotateCreateKey(ctx, paymentID, called.CreateIdempotencyKey, now); rerr != nil {
 			return createResult{}, errors.Join(err, rerr)
 		}
@@ -141,7 +149,7 @@ func (s *Service) lookupCreate(ctx context.Context, row store.PaymentPayment, no
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	startedAt := s.d.Now().UTC()
-	snap, found, err := s.d.Provider.FindPayment(callCtx, row.CreateIdempotencyKey.String())
+	snap, found, err := s.d.Provider.FindPayment(callCtx, row.CreateIdempotencyKey.String(), createdLowerBound(*row.CreateCalledAt))
 	if err != nil {
 		return s.createLookupFailed(ctx, row, err)
 	}
@@ -158,7 +166,7 @@ func (s *Service) lookupCreate(ctx context.Context, row store.PaymentPayment, no
 	if now.Sub(*row.CreateCalledAt) < NotFoundAfter {
 		return createResult{}, fmt.Errorf("%w：付款 %s", errNotFoundYet, row.ID)
 	}
-	s.d.Logger.WarnContext(ctx, "payment：查回證明 provider 沒有這個 PaymentIntent，進 CREATE_FAILED", "payment_id", row.ID.String(), "order_no", row.OrderNo)
+	s.d.Logger.WarnContext(ctx, "payment：查回證明 provider 沒有這個 PaymentIntent，進 CREATE_FAILED", "payment_id", row.ID.String())
 	return s.failCreate(ctx, row.ID, failedNotFound)
 }
 
@@ -370,7 +378,7 @@ func (s *Service) writeRow(ctx context.Context, q *store.Queries, locked store.P
 				return applyResult{}, err
 			}
 		}
-		s.d.Logger.WarnContext(ctx, "payment：provider 的快照與付款列的終局狀態衝突，不覆蓋", "payment_id", locked.ID.String(), "order_no", locked.OrderNo, "status", locked.Status, "snapshot_state", string(snap.State))
+		s.d.Logger.WarnContext(ctx, "payment：provider 的快照與付款列的終局狀態衝突，不覆蓋", "payment_id", locked.ID.String(), "status", locked.Status, "snapshot_state", string(snap.State))
 		return applyResult{row: locked, judged: true}, nil
 	}
 	params := store.ApplyPaymentIntentSnapshotParams{
@@ -388,8 +396,12 @@ func (s *Service) writeRow(ctx context.Context, q *store.Queries, locked store.P
 		return applyResult{}, err
 	}
 	if next != model.PaymentStatus(locked.Status) {
+		orders, oerr := q.PaymentOrdersOfPayment(ctx, written.ID)
+		if oerr != nil {
+			return applyResult{}, oerr
+		}
 		err = events.Publish(ctx, s.d.Events, model.PaymentChanged{
-			OccurredAt: written.UpdatedAt, PaymentID: written.ID, OrderNo: written.OrderNo, StoreID: written.StoreID, BuyerID: written.BuyerID, Amount: written.Amount,
+			OccurredAt: written.UpdatedAt, PaymentID: written.ID, BuyerID: written.BuyerID, Amount: written.Amount, Orders: toPaymentOrders(orders),
 			Provider: written.Provider, Status: next, Previous: model.PaymentStatus(locked.Status), PaidAt: written.PaidAt, LastError: derefString(written.LastError),
 		})
 		if err != nil {

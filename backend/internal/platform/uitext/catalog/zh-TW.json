@@ -400,6 +400,22 @@
       "message": "金流商已執行",
       "description": "核對金流商之後確認它確實執行了（要附金流商物件 ID 為證據）。"
     },
+    "payment.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_DUPLICATE": {
+      "message": "重複",
+      "description": "重複：同一件事已由另一筆紀錄處理（搭配任一結果）。"
+    },
+    "payment.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_OTHER": {
+      "message": "其他",
+      "description": "其他原因，細節寫在備註（搭配任一結果）。"
+    },
+    "payment.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_EXECUTED_NOT_RECORDED": {
+      "message": "金流商已執行、本地沒記到",
+      "description": "金流商已執行、本地沒有記到結果（只搭配結果 SUCCEEDED）。"
+    },
+    "payment.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_NOT_EXECUTED": {
+      "message": "金流商沒有執行",
+      "description": "金流商沒有執行這次呼叫（只搭配結果 FAILED）。"
+    },
     "payment.PaymentRefundStatus.PAYMENT_REFUND_STATUS_ANOMALY": {
       "message": "待人工處理",
       "description": "與金流商對不起來：仍佔額度，待營運人工結案。"

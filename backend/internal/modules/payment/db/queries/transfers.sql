@@ -1,44 +1,76 @@
 -- name: LockPaymentByOrderNo :one
--- 轉帳 use case 以訂單編號鎖付款列（付款列先於轉帳列與退款列）。
+-- 轉帳與退款 use case 以訂單編號鎖那張訂單應收所屬的付款列（付款列先於訂單應收列、轉帳列與退款列）。
+SELECT p.*
+FROM payment.payments p
+JOIN payment.payment_orders o ON o.payment_id = p.id
+WHERE o.order_no = $1
+FOR UPDATE OF p;
+
+-- name: LockPaymentOrderByOrderNo :one
+-- 呼叫端已鎖付款列之後鎖訂單編號對應的訂單應收列（付款列先於訂單應收列）。
 SELECT *
-FROM payment.payments
+FROM payment.payment_orders
 WHERE order_no = $1
 FOR UPDATE;
+
+-- name: LockPaymentOrder :one
+-- 鎖訂單應收列（呼叫端已鎖付款列；序列化這張訂單的退款額度、轉帳金額與撤回）。
+SELECT *
+FROM payment.payment_orders
+WHERE id = $1
+FOR UPDATE;
+
+-- name: PaymentOrderByID :one
+SELECT *
+FROM payment.payment_orders
+WHERE id = $1;
+
+-- name: PaymentOrderByOrderNo :one
+SELECT *
+FROM payment.payment_orders
+WHERE order_no = $1;
+
+-- name: PaymentOrdersOfPayment :many
+-- 付款底下的訂單應收，依 ID 升序（同付款多列的鎖順序）。
+SELECT *
+FROM payment.payment_orders
+WHERE payment_id = $1
+ORDER BY id;
 
 -- name: NonFailedRefundTotal :one
 -- 付款已有的非失敗退款加總（進行中的也算）：轉帳金額是付款金額扣掉它。
 SELECT COALESCE(SUM(amount), 0)::bigint AS total
 FROM payment.refunds
-WHERE payment_id = $1 AND status <> 'FAILED';
+WHERE payment_order_id = $1 AND status <> 'FAILED';
 
 -- name: InFlightRefundTotal :one
 -- 付款還沒終局的退款加總（PENDING、REFUNDING、ANOMALY）：它們失敗時賣家要收到這筆錢，轉帳不能先當成全額退款終結。
 SELECT COALESCE(SUM(amount), 0)::bigint AS total
 FROM payment.refunds
-WHERE payment_id = $1 AND status IN ('PENDING', 'REFUNDING', 'ANOMALY');
+WHERE payment_order_id = $1 AND status IN ('PENDING', 'REFUNDING', 'ANOMALY');
 
 -- name: InFlightRefundIDs :many
 -- 付款還沒終局的退款 ID（與 InFlightRefundTotal 同一組狀態）：轉帳等它們終局時，log 指出擋住的是哪幾筆。
 SELECT id
 FROM payment.refunds
-WHERE payment_id = $1 AND status IN ('PENDING', 'REFUNDING', 'ANOMALY')
+WHERE payment_order_id = $1 AND status IN ('PENDING', 'REFUNDING', 'ANOMALY')
 ORDER BY id;
 
 -- name: InsertTransfer :execrows
--- 一筆付款最多一筆有效（不是 FAILED 的）轉帳，只由唯一索引 transfers_active_payment 守（哪些狀態佔位只寫在索引的條件裡）：已有有效轉帳時不寫（ON CONFLICT DO NOTHING，不指定索引），呼叫端再讀既有的那筆。
-INSERT INTO payment.transfers (id, payment_id, store_id, amount, destination_account_id, created_at, updated_at)
-VALUES (sqlc.arg(id), sqlc.arg(payment_id), sqlc.arg(store_id), sqlc.arg(amount), sqlc.arg(destination_account_id), sqlc.arg(now), sqlc.arg(now))
+-- 一張訂單應收最多一筆有效（不是 FAILED 的）轉帳，只由唯一索引 transfers_active_order 守（哪些狀態佔位只寫在索引的條件裡）：已有有效轉帳時不寫（ON CONFLICT DO NOTHING，不指定索引），呼叫端再讀既有的那筆。
+INSERT INTO payment.transfers (id, payment_order_id, store_id, amount, destination_account_id, created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(payment_order_id), sqlc.arg(store_id), sqlc.arg(amount), sqlc.arg(destination_account_id), sqlc.arg(now), sqlc.arg(now))
 ON CONFLICT DO NOTHING;
 
--- name: ActiveTransferByPayment :one
+-- name: ActiveTransferByOrder :one
 SELECT *
 FROM payment.transfers
-WHERE payment_id = $1 AND status <> 'FAILED';
+WHERE payment_order_id = $1 AND status <> 'FAILED';
 
--- name: SucceededTransferByPayment :one
+-- name: SucceededTransferByOrder :one
 SELECT *
 FROM payment.transfers
-WHERE payment_id = $1 AND status = 'SUCCEEDED';
+WHERE payment_order_id = $1 AND status = 'SUCCEEDED';
 
 -- name: TransferByID :one
 SELECT *
@@ -173,7 +205,7 @@ RETURNING *;
 -- 可以開始撤回的退款：預留在 WAITING、provider 已接受退款（REFUNDING 或 SUCCEEDED）。呼叫端已鎖付款列與轉帳列；退款列依 ID 升序鎖。
 SELECT *
 FROM payment.refunds
-WHERE payment_id = $1 AND reversal_status = 'WAITING' AND status IN ('REFUNDING', 'SUCCEEDED')
+WHERE payment_order_id = $1 AND reversal_status = 'WAITING' AND status IN ('REFUNDING', 'SUCCEEDED')
 ORDER BY id
 FOR UPDATE;
 
@@ -189,7 +221,7 @@ RETURNING *;
 -- 付款底下預留在 WAITING 的退款，依建立順序（再依 ID）鎖：轉帳 claim 時整批釋出、轉帳人工結案時依核實的額度重新分配。呼叫端已鎖付款列與轉帳列。
 SELECT *
 FROM payment.refunds
-WHERE payment_id = $1 AND reversal_status = 'WAITING'
+WHERE payment_order_id = $1 AND reversal_status = 'WAITING'
 ORDER BY created_at, id
 FOR UPDATE;
 
@@ -204,19 +236,19 @@ RETURNING *;
 -- name: RefundByRequestKey :one
 SELECT *
 FROM payment.refunds
-WHERE payment_id = sqlc.arg(payment_id) AND request_key = sqlc.arg(request_key);
+WHERE payment_order_id = sqlc.arg(payment_order_id) AND request_key = sqlc.arg(request_key);
 
 -- name: PendingReversalTotal :one
 -- 已預留、還沒成立的撤回額度，逐列算：WAITING 的退款還沒分成撤回列，以預留額計；其餘以撤回列計（REVERSING 與 ANOMALY 的撤回列佔住額度，REVERSED、RELEASED 的不佔），
 -- 與撤回目標的剩餘額（OpenReversalTotalOnTransfer、ReversibleTopups）同一個口徑。
 SELECT (
-    COALESCE((SELECT SUM(w.reversal_amount) FROM payment.refunds AS w WHERE w.payment_id = $1 AND w.reversal_status = 'WAITING'), 0)
-    + COALESCE((SELECT SUM(v.amount) FROM payment.refund_reversals AS v WHERE v.payment_id = $1 AND v.status IN ('REVERSING', 'ANOMALY')), 0)
+    COALESCE((SELECT SUM(w.reversal_amount) FROM payment.refunds AS w WHERE w.payment_order_id = $1 AND w.reversal_status = 'WAITING'), 0)
+    + COALESCE((SELECT SUM(v.amount) FROM payment.refund_reversals AS v WHERE v.payment_order_id = $1 AND v.status IN ('REVERSING', 'ANOMALY')), 0)
 )::bigint AS total;
 
 -- name: InsertRefund :one
-INSERT INTO payment.refunds (id, payment_id, request_key, amount, auto, reversal_status, reversal_amount, created_at, updated_at)
-VALUES (sqlc.arg(id), sqlc.arg(payment_id), sqlc.arg(request_key), sqlc.arg(amount), sqlc.arg(auto), sqlc.arg(reversal_status), sqlc.arg(reversal_amount), sqlc.arg(now), sqlc.arg(now))
+INSERT INTO payment.refunds (id, payment_order_id, request_key, amount, auto, reversal_status, reversal_amount, created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(payment_order_id), sqlc.arg(request_key), sqlc.arg(amount), sqlc.arg(auto), sqlc.arg(reversal_status), sqlc.arg(reversal_amount), sqlc.arg(now), sqlc.arg(now))
 RETURNING *;
 
 -- name: MarkRefundCalled :one
@@ -315,14 +347,16 @@ RETURNING *;
 -- 事件的路由鍵對回退款列：只認付款屬於目前 provider 的退款（別的 provider 的退款 ID 不同源）。
 SELECT r.*
 FROM payment.refunds r
-JOIN payment.payments p ON p.id = r.payment_id
+JOIN payment.payment_orders o ON o.id = r.payment_order_id
+JOIN payment.payments p ON p.id = o.payment_id
 WHERE p.provider = sqlc.arg(provider) AND r.external_refund_id = sqlc.arg(external_refund_id);
 
 -- name: RefundIDsByExternal :many
 -- 事件的路由鍵（provider 的退款 ID）對回退款列，給掃描補排有舊的未處理事件的退款同步。
 SELECT r.id
 FROM payment.refunds r
-JOIN payment.payments p ON p.id = r.payment_id
+JOIN payment.payment_orders o ON o.id = r.payment_order_id
+JOIN payment.payments p ON p.id = o.payment_id
 WHERE p.provider = sqlc.arg(provider) AND r.external_refund_id = ANY(sqlc.arg(external_refund_ids)::text[]);
 
 -- name: CallableRefundIDs :many
@@ -342,16 +376,16 @@ ORDER BY id
 LIMIT sqlc.arg(batch);
 
 -- name: RefundsByRequestKeys :many
--- 舊服務（legacy paymentserver）以呼叫端的冪等鍵（售後的案件 ID）讀退款：鍵只在同一筆付款內唯一，所以可能回多列，由呼叫方判斷。
-SELECT sqlc.embed(r), p.order_no
+-- 舊服務（legacy paymentserver）以呼叫端的冪等鍵（售後的案件 ID）讀退款：鍵只在同一張訂單應收內唯一，所以可能回多列，由呼叫方判斷。
+SELECT sqlc.embed(r), o.order_no
 FROM payment.refunds r
-JOIN payment.payments p ON p.id = r.payment_id
+JOIN payment.payment_orders o ON o.id = r.payment_order_id
 WHERE r.request_key = ANY(sqlc.arg(request_keys)::text[]);
 
 -- name: LatestRefundsByOrderNos :many
 -- 每張訂單最新的一筆退款（建立時間，同時間依 ID）。
-SELECT DISTINCT ON (p.order_no) sqlc.embed(r), p.order_no
+SELECT DISTINCT ON (o.order_no) sqlc.embed(r), o.order_no
 FROM payment.refunds r
-JOIN payment.payments p ON p.id = r.payment_id
-WHERE p.order_no = ANY(sqlc.arg(order_nos)::text[])
-ORDER BY p.order_no, r.created_at DESC, r.id DESC;
+JOIN payment.payment_orders o ON o.id = r.payment_order_id
+WHERE o.order_no = ANY(sqlc.arg(order_nos)::text[])
+ORDER BY o.order_no, r.created_at DESC, r.id DESC;

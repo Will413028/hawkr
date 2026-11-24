@@ -183,6 +183,9 @@ const resyncDelay = 2 * time.Second
 // pollInterval 是掃描的週期。
 const pollInterval = 15 * time.Minute
 
+// closeWaitDelay 是關閉付款等建立收斂時 job 的 snooze 間隔（不計嘗試）。
+const closeWaitDelay = 5 * time.Minute
+
 // transferWaitDelay 是轉帳等進行中的退款終局時 job 的 snooze 間隔，與掃描同一個週期；退款進終局時的喚醒 job 才是快路徑。
 const transferWaitDelay = pollInterval
 

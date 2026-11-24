@@ -167,7 +167,7 @@ func TestASegmentAnomalyHoldsTheReservationAndIsResolvedPerSegment(t *testing.T)
 			evidence = id
 		}
 	}
-	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, uuid.MustParse(segID), AnomalySucceeded, evidence))
+	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, uuid.MustParse(segID), AnomalySucceeded, ResolutionProviderExecutedNotRecorded, "核對 provider 之後確認已執行", evidence))
 	if f.reversalOf(t, r.ID) != "REVERSED" || f.refundText(t, "reversal_recovered", r.ID) != "100" || f.refundText(t, "topup_reversed_amount", topup.ID) != "30" || f.auditCount(t) != 1 {
 		t.Fatalf("結案之後：%s，recovered %s，補差額撤回 %s", f.reversalOf(t, r.ID), f.refundText(t, "reversal_recovered", r.ID), f.refundText(t, "topup_reversed_amount", topup.ID))
 	}
@@ -217,7 +217,7 @@ func TestConcurrentRefundsNeverReverseMoreThanEachTransferOrTheTotal(t *testing.
 	if f.reversedOf(t, tr.ID) != 70 || f.refundText(t, "topup_reversed_amount", topup.ID) != "30" || f.reversalOf(t, a.ID) != "REVERSED" || f.reversalOf(t, b.ID) != "REVERSED" || len(f.fake.ReversalIDs()) != 3 {
 		t.Fatalf("併發之後：原轉帳 %d，補差額 %s，彙總 %s %s，provider 撤回 %d", f.reversedOf(t, tr.ID), f.refundText(t, "topup_reversed_amount", topup.ID), f.reversalOf(t, a.ID), f.reversalOf(t, b.ID), len(f.fake.ReversalIDs()))
 	}
-	if f.count(t, "SELECT COALESCE(SUM(amount), 0) FROM payment.refund_reversals WHERE payment_id = $1 AND status = 'REVERSED'", tr.PaymentID) != 100 {
+	if f.count(t, "SELECT COALESCE(SUM(amount), 0) FROM payment.refund_reversals WHERE payment_order_id = $1 AND status = 'REVERSED'", tr.PaymentOrderID) != 100 {
 		t.Fatal("撤回列的總額不是 100")
 	}
 	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.refunds SET topup_reversed_amount = amount + 1 WHERE id = $1", topup.ID)
@@ -271,7 +271,7 @@ func TestTheRefundAggregateIsAnomalyWhileAnotherSegmentIsStillReversing(t *testi
 	if f.reversalOf(t, r.ID) != "ANOMALY" || f.refundText(t, "reversal_recovered", r.ID) != "30" || f.refundText(t, "topup_reversed_amount", topup.ID) != "30" {
 		t.Fatalf("重試之後：%s，recovered %s", f.reversalOf(t, r.ID), f.refundText(t, "reversal_recovered", r.ID))
 	}
-	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, f.reversalID(t, r.ID), AnomalyFailed, ""))
+	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, f.reversalID(t, r.ID), AnomalyFailed, ResolutionProviderNotExecuted, "核對 provider 之後確認沒有執行", ""))
 	if f.reversalOf(t, r.ID) != "RELEASED" || f.refundText(t, "reversal_reason", r.ID) != "admin_resolved" || f.refundText(t, "reversal_recovered", r.ID) != "30" || f.reversedOf(t, tr.ID) != 50 {
 		t.Fatalf("結案之後：%s %s，recovered %s", f.reversalOf(t, r.ID), f.refundText(t, "reversal_reason", r.ID), f.refundText(t, "reversal_recovered", r.ID))
 	}

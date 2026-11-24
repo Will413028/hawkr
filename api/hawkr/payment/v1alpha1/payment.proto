@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 // payment 模組的買家付款 API，以及模組擁有的列舉（收款帳戶、付款、轉帳、退款）：賣家端（hawkr.seller.v1alpha1）、買家與後台（hawkr.admin.payment.v1alpha1）看到同一組值。
-// 付款只對應一張訂單（order_no）：金額、店家與可付與否由訂單一方決定（payment 不收 client 傳來的金額）；web 以 Stripe Payment Element、App 以 PaymentSheet
+// 付款以訂單（order_no）為鍵：金額、店家與可付與否由訂單一方決定（payment 不收 client 傳來的金額）；一筆付款可以對 N 張訂單（B8 的多店結帳），目前 client 一次付一張；web 以 Stripe Payment Element、App 以 PaymentSheet
 // 用 client_secret 完成付款（計畫 B2 D3、ADR D64），付款結果以 webhook 為準，client 以 GetPayment 重讀，不信任 client 回報的結果。
 package hawkr.payment.v1alpha1;
 
@@ -19,10 +19,8 @@ service PaymentAppService {
   }
 
   // GetPayment 讀買家自己的付款（沒有付款或不是呼叫者的回 not_found）。狀態 AWAITING_PAYMENT 時帶 session（client secret 是每次向 provider 讀的，不存）；
-  // provider 那邊已往前（買家剛付款）時不帶 session、狀態仍是 AWAITING_PAYMENT，背景同步後再讀會是 PROCESSING 或 SUCCEEDED。回應含 client secret，一律 POST，不可被快取。
-  rpc GetPayment(GetPaymentRequest) returns (GetPaymentResponse) {
-    option idempotency_level = IDEMPOTENT;
-  }
+  // provider 那邊已往前（買家剛付款）時不帶 session、狀態仍是 AWAITING_PAYMENT，背景同步後再讀會是 PROCESSING 或 SUCCEEDED。回應含 client secret，不標 NO_SIDE_EFFECTS（那會允許 GET 與快取），所以一律 POST。
+  rpc GetPayment(GetPaymentRequest) returns (GetPaymentResponse);
 }
 
 // PaymentStatus 是付款的狀態，只由金流商回報的 PaymentIntent 狀態推導。
@@ -44,11 +42,11 @@ enum PaymentStatus {
   PAYMENT_STATUS_ANOMALY = 7;
 }
 
-// Payment 是買家對一張訂單的付款。
+// Payment 是買家對一張訂單的付款（order_no 是請求的那張訂單）。
 message Payment {
   string order_no = 1;
   PaymentStatus status = 2;
-  // 付款金額（訂單的整數金額，不帶幣別）。
+  // 付款金額（這筆付款的總額，不帶幣別；一次付一張訂單時就是訂單的金額）。
   int64 amount = 3;
   // 入帳時間；沒有入帳時不設。
   google.protobuf.Timestamp paid_time = 4;
@@ -203,4 +201,17 @@ enum PaymentAnomalyOutcome {
   PAYMENT_ANOMALY_OUTCOME_SUCCEEDED = 1;
   // 核對金流商之後確認它沒有執行。
   PAYMENT_ANOMALY_OUTCOME_FAILED = 2;
+}
+
+// PaymentAnomalyResolutionReason 是人工結案的原因代碼（只給後台）：ANOMALY 結案時管理員必選，與自由文字備註一起寫進後台動作紀錄。
+enum PaymentAnomalyResolutionReason {
+  PAYMENT_ANOMALY_RESOLUTION_REASON_UNSPECIFIED = 0;
+  // 金流商已執行、本地沒有記到結果（只搭配結果 SUCCEEDED）。
+  PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_EXECUTED_NOT_RECORDED = 1;
+  // 金流商沒有執行這次呼叫（只搭配結果 FAILED）。
+  PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_NOT_EXECUTED = 2;
+  // 重複：同一件事已由另一筆紀錄處理（搭配任一結果）。
+  PAYMENT_ANOMALY_RESOLUTION_REASON_DUPLICATE = 3;
+  // 其他原因，細節寫在備註（搭配任一結果）。
+  PAYMENT_ANOMALY_RESOLUTION_REASON_OTHER = 4;
 }

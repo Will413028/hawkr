@@ -202,10 +202,10 @@
    "id": "close-job-gives-up-while-creating",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/legacy_reads.go",
-   "old": "\t\treturn errStillCreating\n",
-   "new": "\t\treturn nil\n",
-   "test": "internal/modules/payment ^TestCloseJobWaitsForACreatingPaymentAndGivesUpOnTheFinalAttempt$",
-   "why": "建立中的付款關閉 job 不重試就結束，之後建好的 PaymentIntent 沒被取消"
+   "old": "\t\t\treturn fmt.Errorf(\"%w：%w\", errStillCreating, cerr)",
+   "new": "\t\t\t_ = cerr\n\t\t\treturn nil",
+   "test": "internal/modules/payment ^TestCloseJobWaitsForACreatingPaymentToConvergeThenCancelsItWithoutAnOrphanIntent$",
+   "why": "建立中的付款遇到建立暫時失敗就結束關閉 job：之後建好的 PaymentIntent 沒被取消（孤兒）；現在必須等建立收斂再取消。"
   },
   {
    "id": "ambiguous-request-key-picks-one",
@@ -220,8 +220,8 @@
    "id": "latest-refund-is-the-oldest",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/store/transfers.sql.go",
-   "old": "ORDER BY p.order_no, r.created_at DESC, r.id DESC",
-   "new": "ORDER BY p.order_no, r.created_at ASC, r.id DESC",
+   "old": "ORDER BY o.order_no, r.created_at DESC, r.id DESC",
+   "new": "ORDER BY o.order_no, r.created_at ASC, r.id DESC",
    "test": "internal/modules/payment ^TestLegacyReadsByOrderNoAndRequestKey$",
    "why": "每張訂單最新的退款變成最舊的"
   },

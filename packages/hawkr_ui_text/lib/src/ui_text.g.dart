@@ -322,6 +322,25 @@ extension PaymentPaymentAnomalyOutcomeUiText on hawkr_payment_v1alpha1_payment.P
   String? uiText(UiLocale l) => _paymentPaymentAnomalyOutcome(l, value);
 }
 
+String? _paymentPaymentAnomalyResolutionReason(UiLocale l, int value) {
+return switch ((l, value)) {
+(UiLocale.zhTW, 1) => '金流商已執行、本地沒記到',
+(UiLocale.en, 1) => 'Provider executed it, not recorded locally',
+(UiLocale.zhTW, 2) => '金流商沒有執行',
+(UiLocale.en, 2) => 'Provider did not execute the call',
+(UiLocale.zhTW, 3) => '重複',
+(UiLocale.en, 3) => 'Duplicate',
+(UiLocale.zhTW, 4) => '其他',
+(UiLocale.en, 4) => 'Other',
+_ => null,
+};
+}
+
+extension PaymentPaymentAnomalyResolutionReasonUiText on hawkr_payment_v1alpha1_payment.PaymentAnomalyResolutionReason {
+  /// payment.PaymentAnomalyResolutionReason 的名詞；UNSPECIFIED 與不認得的值回 null，要顯示「未知」的呼叫端自己用 commonUnknown(l)。
+  String? uiText(UiLocale l) => _paymentPaymentAnomalyResolutionReason(l, value);
+}
+
 String? _paymentPaymentRefundStatus(UiLocale l, int value) {
 return switch ((l, value)) {
 (UiLocale.zhTW, 1) => '待送出',

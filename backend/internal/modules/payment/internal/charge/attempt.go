@@ -74,12 +74,18 @@ func lateOutcomeOf(row model.PaymentStatus, snap State) lateOutcome {
 	return lateRecord
 }
 
-// newPaymentParams 是建立付款時寫「建立中」列的參數：說明存在列上（payments_description_check 不接受空字串）。
-func newPaymentParams(id uuid.UUID, order Order, provider string, now time.Time) store.InsertPaymentParams {
-	return store.InsertPaymentParams{
-		ID: id, OrderNo: order.OrderNo, StoreID: order.StoreID, BuyerID: order.BuyerID, Amount: order.Amount, Provider: provider,
-		Description: paymentDescription(order), Now: now,
+// newPaymentParams 是建立付款時寫「建立中」群組列的參數：金額是各訂單應收的總額，說明存在列上（payments_description_check 不接受空字串；N 張訂單時用第一張的商品名稱）。
+func newPaymentParams(id uuid.UUID, buyerID int64, orders []Order, provider string, now time.Time) store.InsertPaymentParams {
+	return store.InsertPaymentParams{ID: id, BuyerID: buyerID, Amount: totalOf(orders), Provider: provider, Description: paymentDescription(orders[0]), Now: now}
+}
+
+// totalOf 是各訂單應收的總額。
+func totalOf(orders []Order) int64 {
+	var total int64
+	for _, o := range orders {
+		total += o.Amount
 	}
+	return total
 }
 
 // applyLate 處理被取代的嘗試的快照（呼叫方已鎖付款列、已把狀態記進嘗試列）：付款列只在舊 PaymentIntent 晚到成功時才動。
@@ -94,13 +100,13 @@ func (s *Service) applyLate(ctx context.Context, q *store.Queries, locked store.
 			return applyResult{}, err
 		}
 		s.d.Logger.ErrorContext(ctx, "payment：同一張訂單的兩個 PaymentIntent 都入帳（重複入帳），不自動退款，待訂單一方或後台處理",
-			"payment_id", locked.ID.String(), "order_no", locked.OrderNo, "paid_external_payment_id", derefString(locked.ExternalPaymentID), "excess_external_payment_id", snap.ExternalID)
+			"payment_id", locked.ID.String(), "paid_external_payment_id", derefString(locked.ExternalPaymentID), "excess_external_payment_id", snap.ExternalID)
 	case lateAdopt:
 		if _, keep, err := Next(model.PaymentStatus(locked.Status), snap); err != nil || keep {
 			if err != nil {
 				return applyResult{row: locked}, err
 			}
-			s.d.Logger.WarnContext(ctx, "payment：舊 PaymentIntent 的入帳與付款列的狀態衝突，不採用", "payment_id", locked.ID.String(), "order_no", locked.OrderNo, "status", locked.Status)
+			s.d.Logger.WarnContext(ctx, "payment：舊 PaymentIntent 的入帳與付款列的狀態衝突，不採用", "payment_id", locked.ID.String(), "status", locked.Status)
 			return applyResult{row: locked, judged: true}, nil
 		}
 		prev, err := q.SupersedeEffectiveAttempt(ctx, store.SupersedeEffectiveAttemptParams{PaymentID: locked.ID, Now: ptr(s.d.Now().UTC())})

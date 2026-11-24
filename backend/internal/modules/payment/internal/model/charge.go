@@ -41,7 +41,7 @@ const (
 	TransferPending TransferStatus = "PENDING"
 	// TransferSucceeded provider 已建立轉帳。
 	TransferSucceeded TransferStatus = "SUCCEEDED"
-	// TransferFailed 終局失敗，不佔「一筆付款最多一筆有效轉帳」。
+	// TransferFailed 終局失敗，不佔「一張訂單應收最多一筆有效轉帳」。
 	TransferFailed TransferStatus = "FAILED"
 	// TransferAnomaly 與 provider 對不起來或前置條件不成立：不能確定沒有搬錢，所以仍佔位，補掃不再重試，由後台人工結案。
 	TransferAnomaly TransferStatus = "ANOMALY"
@@ -52,10 +52,10 @@ func TransferStatusValues() []TransferStatus {
 	return []TransferStatus{TransferPending, TransferSucceeded, TransferFailed, TransferAnomaly}
 }
 
-// Transfer 是付款轉給賣家的轉帳（transfers 的對外視圖）；ReversedAmount 是累計已撤回的額度。Amount 在 job 第一次送出（claim）之前只是暫定值（付款金額減寫列當下的非失敗退款），送出時才算定。
+// Transfer 是訂單應收轉給賣家的轉帳（transfers 的對外視圖）；ReversedAmount 是累計已撤回的額度。Amount 在 job 第一次送出（claim）之前只是暫定值（訂單應收金額減寫列當下這張訂單的非失敗退款），送出時才算定。
 type Transfer struct {
 	ID             uuid.UUID
-	PaymentID      uuid.UUID
+	PaymentOrderID uuid.UUID
 	StoreID        int64
 	Amount         int64
 	ReversedAmount int64
@@ -135,11 +135,17 @@ func TopupStatusValues() []TopupStatus {
 	return []TopupStatus{TopupNone, TopupWaiting, TopupSending, TopupDone, TopupReleased, TopupAnomaly}
 }
 
-// Payment 是買家對一張訂單的付款。金額是整數、不帶幣別（D9）。
+// PaymentOrder 是付款底下一張訂單的應收（payment_orders 的對外視圖，D13）：Amount 是這張訂單的應收金額（整數、不帶幣別，D9），也是它的退款上限與轉帳金額的起點。
+type PaymentOrder struct {
+	ID      uuid.UUID
+	OrderNo string
+	StoreID int64
+	Amount  int64
+}
+
+// Payment 是買家一次結帳的付款（一個 PaymentIntent 對 Orders 底下 N 張訂單應收，D13；過渡期 N 是 1）。Amount 是各訂單應收的總額，金額是整數、不帶幣別（D9）。
 type Payment struct {
 	ID        uuid.UUID
-	OrderNo   string
-	StoreID   int64
 	BuyerID   int64
 	Amount    int64
 	Provider  string
@@ -147,8 +153,16 @@ type Payment struct {
 	PaidAt    *time.Time
 	LastError string
 	CreatedAt time.Time
+	// Orders 是付款底下的訂單應收，依 ID 升序，至少一張。
+	Orders []PaymentOrder
 	// ClientSecret 是買家端完成付款的憑證，只在狀態是 AWAITING_PAYMENT 時由 CreatePayment 與 GetPayment 向 provider 讀來回傳，不存。其餘狀態與讀取失敗時是空字串。
 	ClientSecret string
+}
+
+// OrderPayment 是從一張訂單應收看到的付款（舊服務與訂單一方以訂單編號為鍵的讀取）：Payment 是群組，Order 是被問到的那張訂單應收。
+type OrderPayment struct {
+	Payment
+	Order PaymentOrder
 }
 
 // PaymentChanged 在付款的狀態改變的 transaction 內發布（寫入快照時狀態與上次不同才發）：訂單一方（過渡期經 relay 給 Java order）據此得知付款成功或取消，
@@ -156,12 +170,12 @@ type Payment struct {
 type PaymentChanged struct {
 	OccurredAt time.Time
 	PaymentID  uuid.UUID
-	OrderNo    string
-	StoreID    int64
 	BuyerID    int64
-	Amount     int64
-	Provider   string
-	Status     PaymentStatus
+	// Amount 是各訂單應收的總額；Orders 是付款底下的訂單應收（每張訂單一列，各自帶金額與店家），訂單一方依它逐張訂單處理。
+	Amount   int64
+	Orders   []PaymentOrder
+	Provider string
+	Status   PaymentStatus
 	// Previous 是這次寫入之前的狀態。
 	Previous  PaymentStatus
 	PaidAt    *time.Time
@@ -198,7 +212,9 @@ type MoneyAnomaly struct {
 	Kind       AnomalyKind
 	ObjectID   uuid.UUID
 	PaymentID  uuid.UUID
-	Reason     string
+	// PaymentOrderID 是物件所屬的訂單應收；付款本身（AnomalyPayment）屬於整筆付款，沒有它，是零值。
+	PaymentOrderID uuid.UUID
+	Reason         string
 }
 
 // AnomalyOutcome 是人工結案的結果：AnomalySucceeded 是 provider 確實執行了（附 provider 物件 ID 為證據），AnomalyFailed 是確認 provider 沒有執行。
@@ -210,7 +226,30 @@ const (
 	AnomalyFailed    AnomalyOutcome = "FAILED"
 )
 
-// RefundRequest 是建立退款的輸入：OrderNo 指向付款；RequestKey 是呼叫端給的冪等鍵（同一筆付款內唯一，同一把鍵重送得到同一筆退款）；
+// AnomalyResolutionReason 是人工結案的原因代碼（寫進後台動作紀錄）：管理員必選，與備註一起記下為什麼這樣結案。
+type AnomalyResolutionReason string
+
+// 人工結案的原因代碼。
+const (
+	// ResolutionProviderExecutedNotRecorded provider 已執行、本地沒有記到結果（只搭配 AnomalySucceeded）。
+	ResolutionProviderExecutedNotRecorded AnomalyResolutionReason = "PROVIDER_EXECUTED_NOT_RECORDED"
+	// ResolutionProviderNotExecuted provider 沒有執行這次呼叫（只搭配 AnomalyFailed）。
+	ResolutionProviderNotExecuted AnomalyResolutionReason = "PROVIDER_NOT_EXECUTED"
+	// ResolutionDuplicate 重複：同一件事已由另一筆紀錄處理（搭配任一結果）。
+	ResolutionDuplicate AnomalyResolutionReason = "DUPLICATE"
+	// ResolutionOther 其他原因，細節寫在備註（搭配任一結果）。
+	ResolutionOther AnomalyResolutionReason = "OTHER"
+)
+
+// AnomalyResolutionReasonValues 回傳全部人工結案的原因代碼，與 proto 的 PaymentAnomalyResolutionReason 相同（不含 UNSPECIFIED）。
+func AnomalyResolutionReasonValues() []AnomalyResolutionReason {
+	return []AnomalyResolutionReason{ResolutionProviderExecutedNotRecorded, ResolutionProviderNotExecuted, ResolutionDuplicate, ResolutionOther}
+}
+
+// ResolutionNoteMaxRunes 是人工結案備註的長度上限（去除首尾空白後，以 rune 計）：備註進 adminaudit 的 detail（上限 2048 位元組），255 個字元最多約 765 位元組。
+const ResolutionNoteMaxRunes = 255
+
+// RefundRequest 是建立退款的輸入：OrderNo 指向訂單應收；RequestKey 是呼叫端給的冪等鍵（同一張訂單應收內唯一，同一把鍵重送得到同一筆退款）；
 // Auto 標示自動退款（D5 修訂：由訂單一方判斷與發起，payment 只標記）。
 type RefundRequest struct {
 	OrderNo    string
@@ -221,9 +260,9 @@ type RefundRequest struct {
 
 // Refund 是退款的對外視圖。ReversalAmount 是這筆退款在 provider 接受之後要向賣家收回的額度（轉帳還沒承諾金額、沒有轉帳或沒有可撤額度時是 0），ReversalStatus 是收回的狀態。
 type Refund struct {
-	ID        uuid.UUID
-	PaymentID uuid.UUID
-	// OrderNo 是退款所屬付款的訂單編號（建立與讀取時帶上，給只認訂單編號的呼叫方）。
+	ID             uuid.UUID
+	PaymentOrderID uuid.UUID
+	// OrderNo 是退款所屬訂單應收的訂單編號（建立與讀取時帶上，給只認訂單編號的呼叫方）。
 	OrderNo        string
 	RequestKey     string
 	Amount         int64

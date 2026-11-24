@@ -8,7 +8,7 @@ import type { CustomerSort, CustomerType } from "@hawkr/api/gen/hawkr/crm/v1alph
 import type { RejectReason } from "@hawkr/api/gen/hawkr/media/v1alpha1/media_pb";
 import type { ReportOutcome, ReportTargetKind } from "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb";
 import type { NotificationCategory, NotificationChannel } from "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb";
-import type { PaymentAccountStatus, PaymentAnomalyKind, PaymentAnomalyOutcome, PaymentRefundStatus, PaymentReversalStatus, PaymentStatus, PaymentTopupStatus, PaymentTransferStatus, RequirementCollection } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
+import type { PaymentAccountStatus, PaymentAnomalyKind, PaymentAnomalyOutcome, PaymentAnomalyResolutionReason, PaymentRefundStatus, PaymentReversalStatus, PaymentStatus, PaymentTopupStatus, PaymentTransferStatus, RequirementCollection } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import type { RejectionReason } from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
 import type { ReportOutcome as SellerReportOutcome } from "@hawkr/api/gen/hawkr/seller/v1alpha1/report_pb";
 import type { ContentKind, InquiryKind, InquiryReplyChannel, InquiryState, KYCField, KYCStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, OnboardingAction, OnboardingTaskId, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
@@ -118,6 +118,10 @@ export type UiTextKey =
 	| "payment.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_TRANSFER"
 	| "payment.PaymentAnomalyOutcome.PAYMENT_ANOMALY_OUTCOME_FAILED"
 	| "payment.PaymentAnomalyOutcome.PAYMENT_ANOMALY_OUTCOME_SUCCEEDED"
+	| "payment.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_DUPLICATE"
+	| "payment.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_OTHER"
+	| "payment.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_EXECUTED_NOT_RECORDED"
+	| "payment.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_NOT_EXECUTED"
 	| "payment.PaymentRefundStatus.PAYMENT_REFUND_STATUS_ANOMALY"
 	| "payment.PaymentRefundStatus.PAYMENT_REFUND_STATUS_FAILED"
 	| "payment.PaymentRefundStatus.PAYMENT_REFUND_STATUS_PENDING"
@@ -603,6 +607,20 @@ const PAYMENT_PAYMENT_ANOMALY_OUTCOME: Readonly<Partial<Record<number, UiTextKey
 /** payment.PaymentAnomalyOutcome 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
 export function paymentPaymentAnomalyOutcome(v: PaymentAnomalyOutcome): UiMessage | undefined {
 	const key = PAYMENT_PAYMENT_ANOMALY_OUTCOME[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const PAYMENT_PAYMENT_ANOMALY_RESOLUTION_REASON: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "payment.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_EXECUTED_NOT_RECORDED",
+	2: "payment.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_NOT_EXECUTED",
+	3: "payment.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_DUPLICATE",
+	4: "payment.PaymentAnomalyResolutionReason.PAYMENT_ANOMALY_RESOLUTION_REASON_OTHER",
+};
+
+/** payment.PaymentAnomalyResolutionReason 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function paymentPaymentAnomalyResolutionReason(v: PaymentAnomalyResolutionReason): UiMessage | undefined {
+	const key = PAYMENT_PAYMENT_ANOMALY_RESOLUTION_REASON[v];
 	if (key === undefined) return undefined;
 	return { key };
 }

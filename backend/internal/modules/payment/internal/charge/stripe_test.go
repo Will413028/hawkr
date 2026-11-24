@@ -31,6 +31,9 @@ const (
 	stripeTestAttemptID = "0192f0a0-0000-7000-8000-000000000001"
 )
 
+// stripeTestCreatedAfter 是查回的 created 下限（固定值，不取目前時間）。
+var stripeTestCreatedAfter = time.Date(2026, 11, 23, 4, 0, 0, 0, time.UTC)
+
 type fixture struct {
 	Status int             `json:"status"`
 	Body   json.RawMessage `json:"body"`
@@ -184,7 +187,7 @@ func withID(obj map[string]any, id string) map[string]any {
 func stripeCalls(a *Stripe) map[string]func(context.Context) error {
 	return map[string]func(context.Context) error{
 		"CreatePayment": func(ctx context.Context) error {
-			_, err := a.CreatePayment(ctx, CreateInput{PaymentID: uuid.NewV4(), OrderNo: "order_A", StoreID: 7, Amount: 10000, TransferGroup: "order_A", IdempotencyKey: stripeTestAttemptID})
+			_, err := a.CreatePayment(ctx, CreateInput{PaymentID: uuid.NewV4(), OrderNos: []string{"order_A"}, Amount: 10000, TransferGroup: "group_A", IdempotencyKey: stripeTestAttemptID})
 			return err
 		},
 		"CreateRefund": func(ctx context.Context) error {
@@ -358,15 +361,21 @@ func TestStripeEveryOutboundCallCarriesADeadline(t *testing.T) {
 	a, ctx := rig.adapter, context.Background()
 	piID, _ := pi.object(t)["id"].(string)
 	calls := map[string]func() error{
-		"CreatePayment":   func() error { return stripeCalls(a)["CreatePayment"](ctx) },
-		"FindPayment":     func() error { _, _, err := a.FindPayment(ctx, stripeTestAttemptID); return err },
-		"GetPayment":      func() error { _, err := a.GetPayment(ctx, piID); return err },
-		"CancelPayment":   func() error { _, err := a.CancelPayment(ctx, piID); return err },
-		"CreateRefund":    func() error { return stripeCalls(a)["CreateRefund"](ctx) },
-		"FindRefund":      func() error { _, _, err := a.FindRefund(ctx, piID, stripeTestAttemptID); return err },
-		"GetRefund":       func() error { _, err := a.GetRefund(ctx, "re_x"); return err },
-		"CreateTransfer":  func() error { return stripeCalls(a)["CreateTransfer"](ctx) },
-		"FindTransfer":    func() error { _, _, err := a.FindTransfer(ctx, "order_A", stripeTestAttemptID); return err },
+		"CreatePayment": func() error { return stripeCalls(a)["CreatePayment"](ctx) },
+		"FindPayment":   func() error { _, _, err := a.FindPayment(ctx, stripeTestAttemptID, stripeTestCreatedAfter); return err },
+		"GetPayment":    func() error { _, err := a.GetPayment(ctx, piID); return err },
+		"CancelPayment": func() error { _, err := a.CancelPayment(ctx, piID); return err },
+		"CreateRefund":  func() error { return stripeCalls(a)["CreateRefund"](ctx) },
+		"FindRefund": func() error {
+			_, _, err := a.FindRefund(ctx, piID, stripeTestAttemptID, stripeTestCreatedAfter)
+			return err
+		},
+		"GetRefund":      func() error { _, err := a.GetRefund(ctx, "re_x"); return err },
+		"CreateTransfer": func() error { return stripeCalls(a)["CreateTransfer"](ctx) },
+		"FindTransfer": func() error {
+			_, _, err := a.FindTransfer(ctx, "group_A", stripeTestAttemptID, stripeTestCreatedAfter)
+			return err
+		},
 		"ReverseTransfer": func() error { return stripeCalls(a)["ReverseTransfer"](ctx) },
 		"FindReversal":    func() error { _, _, err := a.FindReversal(ctx, "tr_x", stripeTestAttemptID); return err },
 	}
@@ -390,14 +399,14 @@ func TestStripeCreatePaymentSendsCentsUSDGroupMetadataAndKey(t *testing.T) {
 	pi := loadFixture(t, "payment_intent_confirmed_expanded")
 	rig := newStripeRig(t, fixed(pi))
 	pid := uuid.NewV4()
-	snap, err := rig.adapter.CreatePayment(t.Context(), CreateInput{PaymentID: pid, OrderNo: "order_A", StoreID: 7, Amount: 10000, Description: "desc", TransferGroup: "order_A", IdempotencyKey: stripeTestAttemptID})
+	snap, err := rig.adapter.CreatePayment(t.Context(), CreateInput{PaymentID: pid, OrderNos: []string{"order_A", "order_B"}, Amount: 10000, Description: "desc", TransferGroup: "group_A", IdempotencyKey: stripeTestAttemptID})
 	if err != nil {
 		t.Fatal(err)
 	}
 	req := rig.last(t)
 	want := map[string]string{
-		"amount": "10000", "currency": StripeCurrency, "transfer_group": "order_A", "description": "desc",
-		"metadata[attempt_id]": stripeTestAttemptID, "metadata[payment_id]": pid.String(), "metadata[store_id]": "7", "metadata[order_no]": "order_A",
+		"amount": "10000", "currency": StripeCurrency, "transfer_group": "group_A", "description": "desc",
+		"metadata[attempt_id]": stripeTestAttemptID, "metadata[payment_id]": pid.String(), "metadata[order_count]": "2", "metadata[order_nos]": "order_A,order_B",
 		"automatic_payment_methods[enabled]": "true",
 	}
 	for k, v := range want {
@@ -643,7 +652,7 @@ func TestStripeFindTransferFiltersByTransferGroupAndMatchesTheAttempt(t *testing
 	otherGroup := withMeta(withID(tr, "tr_other_group"), stripeTestAttemptID)
 	rig := newStripeRig(t, func(w http.ResponseWriter, req recordedRequest) {
 		items := []map[string]any{otherAttempt}
-		if req.Query.Get("transfer_group") == "order_A" {
+		if req.Query.Get("transfer_group") == "group_A" {
 			items = append(items, inGroup)
 		} else {
 			items = append(items, otherGroup, inGroup)
@@ -651,17 +660,17 @@ func TestStripeFindTransferFiltersByTransferGroupAndMatchesTheAttempt(t *testing
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write(listBody(t, false, items...))
 	})
-	got, found, err := rig.adapter.FindTransfer(t.Context(), "order_A", stripeTestAttemptID)
+	got, found, err := rig.adapter.FindTransfer(t.Context(), "group_A", stripeTestAttemptID, stripeTestCreatedAfter)
 	if err != nil || !found || got.ExternalID != "tr_in_group" || got.Amount != 9000 {
 		t.Fatalf("got %+v found %v err %v", got, found, err)
 	}
-	if rig.last(t).Path != "/v1/transfers" || rig.last(t).Query.Get("transfer_group") != "order_A" {
+	if rig.last(t).Path != "/v1/transfers" || rig.last(t).Query.Get("transfer_group") != "group_A" {
 		t.Errorf("request = %s %v", rig.last(t).Path, rig.last(t).Query)
 	}
-	if _, found, err = rig.adapter.FindTransfer(t.Context(), "order_A", "no-such-attempt"); err != nil || found {
+	if _, found, err = rig.adapter.FindTransfer(t.Context(), "group_A", "no-such-attempt", stripeTestCreatedAfter); err != nil || found {
 		t.Fatalf("a missing attempt must be found=false without an error, got found %v err %v", found, err)
 	}
-	if _, _, err = rig.adapter.FindTransfer(t.Context(), "", stripeTestAttemptID); err == nil {
+	if _, _, err = rig.adapter.FindTransfer(t.Context(), "", stripeTestAttemptID, stripeTestCreatedAfter); err == nil {
 		t.Fatal("a lookup without a transfer_group must fail instead of listing every transfer")
 	}
 }
@@ -681,7 +690,7 @@ func TestStripeFindRefundAndReversalListTheirParent(t *testing.T) {
 		}
 		_, _ = w.Write(listBody(t, false, withMeta(withID(rv, "trr_hit"), stripeTestAttemptID)))
 	})
-	r, found, err := rig.adapter.FindRefund(t.Context(), "pi_src", stripeTestAttemptID)
+	r, found, err := rig.adapter.FindRefund(t.Context(), "pi_src", stripeTestAttemptID, stripeTestCreatedAfter)
 	if err != nil || !found || r.ExternalID != "re_hit" || r.State != RefundSucceeded {
 		t.Fatalf("refund %+v found %v err %v", r, found, err)
 	}
@@ -694,7 +703,7 @@ func TestStripeFindRefundAndReversalListTheirParent(t *testing.T) {
 	}
 }
 
-// FindPayment 沒有可篩選的欄位：跨頁比對；翻不完不能回「找不到」。
+// FindPayment 沒有 metadata 可篩選：在 created 下限之後的範圍內跨頁比對，一直翻到列表結束；沒看完不能回「找不到」。
 func TestStripeFindPaymentPagesAndNeverClaimsAbsenceWhenItCannotFinish(t *testing.T) {
 	base := loadFixture(t, "payment_intent_confirmed_expanded").object(t)
 	t.Run("finds the attempt on a later page", func(t *testing.T) {
@@ -706,7 +715,7 @@ func TestStripeFindPaymentPagesAndNeverClaimsAbsenceWhenItCannotFinish(t *testin
 			}
 			_, _ = w.Write(listBody(t, true, withMeta(withID(base, "pi_page1"), "someone-else")))
 		})
-		snap, found, err := rig.adapter.FindPayment(t.Context(), stripeTestAttemptID)
+		snap, found, err := rig.adapter.FindPayment(t.Context(), stripeTestAttemptID, stripeTestCreatedAfter)
 		if err != nil || !found || snap.ExternalID != "pi_page2" || snap.State != StateSucceeded {
 			t.Fatalf("snap %+v found %v err %v", snap, found, err)
 		}
@@ -719,22 +728,109 @@ func TestStripeFindPaymentPagesAndNeverClaimsAbsenceWhenItCannotFinish(t *testin
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write(listBody(t, false, withMeta(withID(base, "pi_a"), "someone-else")))
 		})
-		if _, found, err := rig.adapter.FindPayment(t.Context(), stripeTestAttemptID); err != nil || found {
+		if _, found, err := rig.adapter.FindPayment(t.Context(), stripeTestAttemptID, stripeTestCreatedAfter); err != nil || found {
 			t.Fatalf("found %v err %v", found, err)
 		}
 	})
-	t.Run("an unfinished scan is an error, not found=false", func(t *testing.T) {
+	t.Run("a page that fails midway is an error, not found=false", func(t *testing.T) {
 		var n int
 		rig := newStripeRig(t, func(w http.ResponseWriter, _ recordedRequest) {
 			n++
 			w.Header().Set("Content-Type", "application/json")
+			if n > 3 {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(`{"error":{"type":"api_error","message":"boom"}}`))
+				return
+			}
 			_, _ = w.Write(listBody(t, true, withMeta(withID(base, "pi_"+strconv.Itoa(n)), "someone-else")))
 		})
-		snap, found, err := rig.adapter.FindPayment(t.Context(), stripeTestAttemptID)
+		snap, found, err := rig.adapter.FindPayment(t.Context(), stripeTestAttemptID, stripeTestCreatedAfter)
 		if err == nil || found {
 			t.Fatalf("snap %+v found %v err %v, want an error", snap, found, err)
 		}
+		if n < 4 {
+			t.Fatalf("only %d pages were requested: the scan must keep paging past any fixed page cap", n)
+		}
 	})
+	t.Run("a long list is read to its end with no page cap", func(t *testing.T) {
+		const pages = 60
+		var n int
+		rig := newStripeRig(t, func(w http.ResponseWriter, _ recordedRequest) {
+			n++
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write(listBody(t, n < pages, withMeta(withID(base, "pi_"+strconv.Itoa(n)), "someone-else")))
+		})
+		if _, found, err := rig.adapter.FindPayment(t.Context(), stripeTestAttemptID, stripeTestCreatedAfter); err != nil || found || n != pages {
+			t.Fatalf("found %v err %v pages %d, want a finished scan over %d pages", found, err, n, pages)
+		}
+	})
+}
+
+// 查回一律帶 created 下限（created[gte]，Unix 秒）：PaymentIntent、退款、轉帳三種列表都帶；沒有下限回錯誤，不發請求（沒有下限的列表是整個平台的歷史）。
+// mutation：createdFilter 不帶下限（platform/stripe）→ 這個測試失敗。
+func TestStripeFindsListOnlyObjectsCreatedAfterTheLowerBoundAndRefuseWithoutOne(t *testing.T) {
+	base := loadFixture(t, "payment_intent_confirmed_expanded").object(t)
+	rig := newStripeRig(t, func(w http.ResponseWriter, _ recordedRequest) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(listBody(t, false, withMeta(withID(base, "pi_a"), "someone-else")))
+	})
+	want := strconv.FormatInt(stripeTestCreatedAfter.Unix(), 10)
+	ctx := t.Context()
+	for name, call := range map[string]func() error{
+		"payment_intents": func() error {
+			_, _, err := rig.adapter.FindPayment(ctx, stripeTestAttemptID, stripeTestCreatedAfter)
+			return err
+		},
+		"refunds": func() error {
+			_, _, err := rig.adapter.FindRefund(ctx, "pi_src", stripeTestAttemptID, stripeTestCreatedAfter)
+			return err
+		},
+		"transfers": func() error {
+			_, _, err := rig.adapter.FindTransfer(ctx, "group_A", stripeTestAttemptID, stripeTestCreatedAfter)
+			return err
+		},
+	} {
+		if err := call(); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if got := rig.last(t).Query.Get("created[gte]"); got != want {
+			t.Errorf("%s: created[gte] = %q, want %q", name, got, want)
+		}
+	}
+	before := rig.count()
+	for name, call := range map[string]func() error{
+		"payment_intents": func() error { _, _, err := rig.adapter.FindPayment(ctx, stripeTestAttemptID, time.Time{}); return err },
+		"refunds": func() error {
+			_, _, err := rig.adapter.FindRefund(ctx, "pi_src", stripeTestAttemptID, time.Time{})
+			return err
+		},
+		"transfers": func() error {
+			_, _, err := rig.adapter.FindTransfer(ctx, "group_A", stripeTestAttemptID, time.Time{})
+			return err
+		},
+	} {
+		if err := call(); err == nil {
+			t.Errorf("%s: a lookup without a created lower bound must fail", name)
+		}
+	}
+	if rig.count() != before {
+		t.Errorf("a lookup without a lower bound sent %d requests", rig.count()-before)
+	}
+}
+
+// 401／403 仍是「不明」（同鍵重送），但帶上 AuthRejectedError 讓呼叫方告警（D-F）。
+// mutation：classifyMoney 拿掉 401／403 的分支 → 這個測試失敗。
+func TestStripeAuthFailuresStayUnknownButCarryTheAuthRejectedError(t *testing.T) {
+	for _, status := range []int{http.StatusUnauthorized, http.StatusForbidden} {
+		err := classifyMoney(&stripe.APIError{Status: status, Code: "invalid_api_key", Message: "x"})
+		var rejected *AuthRejectedError
+		if !errors.As(err, &rejected) || rejected.Status != status || rejected.Code != "invalid_api_key" {
+			t.Fatalf("status %d: err = %v, want an AuthRejectedError", status, err)
+		}
+		if classifyCall(err) != callUnknown {
+			t.Errorf("status %d: classified as %v, want callUnknown (same-key resend, no reclassification)", status, classifyCall(err))
+		}
+	}
 }
 
 func signedPaymentEvent(t *testing.T, secret string, payload map[string]any) (http.Header, []byte) {
@@ -795,7 +891,7 @@ func TestStripeNameIsAValidProviderCodeDistinctFromTheAccountAdapter(t *testing.
 		t.Fatalf("name %q collides with another inbox provider", StripeName)
 	}
 	for _, r := range StripeName {
-		if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '_') {
+		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '_' {
 			t.Fatalf("name %q has a character outside lowercase alphanumerics and underscore", StripeName)
 		}
 	}

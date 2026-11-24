@@ -18,7 +18,7 @@ SET topup_status = 'ANOMALY',
     topup_reason = $1,
     updated_at = $2
 WHERE id = $3 AND topup_status = 'SENDING'
-RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+RETURNING id, payment_order_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 `
 
 type AnomalyRefundTopupParams struct {
@@ -33,7 +33,7 @@ func (q *Queries) AnomalyRefundTopup(ctx context.Context, arg AnomalyRefundTopup
 	var i PaymentRefund
 	err := row.Scan(
 		&i.ID,
-		&i.PaymentID,
+		&i.PaymentOrderID,
 		&i.RequestKey,
 		&i.Amount,
 		&i.Auto,
@@ -67,7 +67,7 @@ SET topup_status = 'DONE',
     topup_external_id = $1,
     updated_at = $2
 WHERE id = $3 AND topup_status = 'SENDING'
-RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+RETURNING id, payment_order_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 `
 
 type ApplyRefundTopupParams struct {
@@ -82,7 +82,7 @@ func (q *Queries) ApplyRefundTopup(ctx context.Context, arg ApplyRefundTopupPara
 	var i PaymentRefund
 	err := row.Scan(
 		&i.ID,
-		&i.PaymentID,
+		&i.PaymentOrderID,
 		&i.RequestKey,
 		&i.Amount,
 		&i.Auto,
@@ -144,12 +144,12 @@ func (q *Queries) ClearRefundTopupLookupFailures(ctx context.Context, id uuid.UU
 const clearRefundsDeducted = `-- name: ClearRefundsDeducted :exec
 UPDATE payment.refunds
 SET transfer_deducted = false
-WHERE payment_id = $1 AND transfer_deducted
+WHERE payment_order_id = $1 AND transfer_deducted
 `
 
-// 轉帳終局失敗（沒有搬錢）：沒有任何退款算進一筆有效轉帳的金額。呼叫端已鎖付款列與轉帳列。
-func (q *Queries) ClearRefundsDeducted(ctx context.Context, paymentID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, clearRefundsDeducted, paymentID)
+// 轉帳終局失敗（沒有搬錢）：沒有任何退款算進一筆有效轉帳的金額。呼叫端已鎖付款列、訂單應收列與轉帳列。
+func (q *Queries) ClearRefundsDeducted(ctx context.Context, paymentOrderID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, clearRefundsDeducted, paymentOrderID)
 	return err
 }
 
@@ -158,7 +158,7 @@ UPDATE payment.refunds
 SET topup_called_at = COALESCE(topup_called_at, $1::timestamptz),
     updated_at = $1
 WHERE id = $2 AND topup_status = 'SENDING'
-RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+RETURNING id, payment_order_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 `
 
 type MarkRefundTopupCalledParams struct {
@@ -172,7 +172,7 @@ func (q *Queries) MarkRefundTopupCalled(ctx context.Context, arg MarkRefundTopup
 	var i PaymentRefund
 	err := row.Scan(
 		&i.ID,
-		&i.PaymentID,
+		&i.PaymentOrderID,
 		&i.RequestKey,
 		&i.Amount,
 		&i.Auto,
@@ -203,12 +203,12 @@ func (q *Queries) MarkRefundTopupCalled(ctx context.Context, arg MarkRefundTopup
 const markRefundsDeducted = `-- name: MarkRefundsDeducted :exec
 UPDATE payment.refunds
 SET transfer_deducted = (status <> 'FAILED')
-WHERE payment_id = $1 AND transfer_deducted <> (status <> 'FAILED')
+WHERE payment_order_id = $1 AND transfer_deducted <> (status <> 'FAILED')
 `
 
-// 轉帳 claim 算定金額時（呼叫端已鎖付款列與轉帳列）依當下的退款重寫「已算進轉帳金額」：非 FAILED 的退款為真，FAILED 的為假（算定時它已不在金額裡，不必補）。
-func (q *Queries) MarkRefundsDeducted(ctx context.Context, paymentID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, markRefundsDeducted, paymentID)
+// 轉帳 claim 算定金額時（呼叫端已鎖付款列、訂單應收列與轉帳列）依當下的退款重寫「已算進轉帳金額」：非 FAILED 的退款為真，FAILED 的為假（算定時它已不在金額裡，不必補）。
+func (q *Queries) MarkRefundsDeducted(ctx context.Context, paymentOrderID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, markRefundsDeducted, paymentOrderID)
 	return err
 }
 
@@ -218,7 +218,7 @@ SET topup_status = 'RELEASED',
     topup_reason = $1,
     updated_at = $2
 WHERE id = $3 AND topup_status = ANY($4::text[])
-RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+RETURNING id, payment_order_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 `
 
 type ReleaseRefundTopupParams struct {
@@ -239,7 +239,7 @@ func (q *Queries) ReleaseRefundTopup(ctx context.Context, arg ReleaseRefundTopup
 	var i PaymentRefund
 	err := row.Scan(
 		&i.ID,
-		&i.PaymentID,
+		&i.PaymentOrderID,
 		&i.RequestKey,
 		&i.Amount,
 		&i.Auto,
@@ -276,7 +276,7 @@ SET topup_status = 'DONE',
     topup_lookup_failures = 0,
     updated_at = $2
 WHERE id = $3 AND topup_status = 'ANOMALY'
-RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+RETURNING id, payment_order_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 `
 
 type ResolveRefundTopupDoneParams struct {
@@ -291,7 +291,7 @@ func (q *Queries) ResolveRefundTopupDone(ctx context.Context, arg ResolveRefundT
 	var i PaymentRefund
 	err := row.Scan(
 		&i.ID,
-		&i.PaymentID,
+		&i.PaymentOrderID,
 		&i.RequestKey,
 		&i.Amount,
 		&i.Auto,
@@ -325,7 +325,7 @@ SET topup_status = 'RELEASED',
     topup_reason = $1,
     updated_at = $2
 WHERE id = $3 AND topup_status = 'ANOMALY'
-RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+RETURNING id, payment_order_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 `
 
 type ResolveRefundTopupReleasedParams struct {
@@ -340,7 +340,7 @@ func (q *Queries) ResolveRefundTopupReleased(ctx context.Context, arg ResolveRef
 	var i PaymentRefund
 	err := row.Scan(
 		&i.ID,
-		&i.PaymentID,
+		&i.PaymentOrderID,
 		&i.RequestKey,
 		&i.Amount,
 		&i.Auto,
@@ -375,7 +375,7 @@ SET topup_idempotency_key = gen_random_uuid(),
     topup_lookup_failures = 0,
     updated_at = $1
 WHERE id = $2 AND topup_status = 'SENDING' AND topup_idempotency_key = $3
-RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+RETURNING id, payment_order_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 `
 
 type RotateRefundTopupKeyParams struct {
@@ -390,7 +390,7 @@ func (q *Queries) RotateRefundTopupKey(ctx context.Context, arg RotateRefundTopu
 	var i PaymentRefund
 	err := row.Scan(
 		&i.ID,
-		&i.PaymentID,
+		&i.PaymentOrderID,
 		&i.RequestKey,
 		&i.Amount,
 		&i.Auto,
@@ -458,7 +458,7 @@ UPDATE payment.refunds
 SET topup_status = 'SENDING',
     updated_at = $1
 WHERE id = $2 AND topup_status = 'WAITING'
-RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+RETURNING id, payment_order_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 `
 
 type StartRefundTopupParams struct {
@@ -472,7 +472,7 @@ func (q *Queries) StartRefundTopup(ctx context.Context, arg StartRefundTopupPara
 	var i PaymentRefund
 	err := row.Scan(
 		&i.ID,
-		&i.PaymentID,
+		&i.PaymentOrderID,
 		&i.RequestKey,
 		&i.Amount,
 		&i.Auto,
@@ -501,16 +501,16 @@ func (q *Queries) StartRefundTopup(ctx context.Context, arg StartRefundTopupPara
 }
 
 const waitingTopups = `-- name: WaitingTopups :many
-SELECT id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+SELECT id, payment_order_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 FROM payment.refunds
-WHERE payment_id = $1 AND topup_status = 'WAITING'
+WHERE payment_order_id = $1 AND topup_status = 'WAITING'
 ORDER BY id
 FOR UPDATE
 `
 
-// 付款底下補差額在 WAITING 的退款（已失敗、轉帳金額含它），依 ID 升序鎖。呼叫端已鎖付款列與轉帳列。
-func (q *Queries) WaitingTopups(ctx context.Context, paymentID uuid.UUID) ([]PaymentRefund, error) {
-	rows, err := q.db.Query(ctx, waitingTopups, paymentID)
+// 訂單應收底下補差額在 WAITING 的退款（已失敗、轉帳金額含它），依 ID 升序鎖。呼叫端已鎖付款列、訂單應收列與轉帳列。
+func (q *Queries) WaitingTopups(ctx context.Context, paymentOrderID uuid.UUID) ([]PaymentRefund, error) {
+	rows, err := q.db.Query(ctx, waitingTopups, paymentOrderID)
 	if err != nil {
 		return nil, err
 	}
@@ -520,7 +520,7 @@ func (q *Queries) WaitingTopups(ctx context.Context, paymentID uuid.UUID) ([]Pay
 		var i PaymentRefund
 		if err := rows.Scan(
 			&i.ID,
-			&i.PaymentID,
+			&i.PaymentOrderID,
 			&i.RequestKey,
 			&i.Amount,
 			&i.Auto,

@@ -4,8 +4,8 @@
    "id": "pay-uses-request-buyer",
    "stack": "go",
    "file": "backend/internal/httpapi/payment/app.go",
-   "old": "p, err := h.m.CreatePayment(ctx, buyerID, req.Msg.GetOrderNo())",
-   "new": "p, err := h.m.CreatePayment(ctx, buyerID*0, req.Msg.GetOrderNo())",
+   "old": "p, err := h.m.CreatePayment(ctx, buyerID, []string{req.Msg.GetOrderNo()})",
+   "new": "p, err := h.m.CreatePayment(ctx, buyerID*0, []string{req.Msg.GetOrderNo()})",
    "test": "internal/httpapi/payment ^TestPaymentAppUsesTheCallersBuyerIDNotAnythingFromTheRequest$",
    "why": "CreatePayment 不再用呼叫者的買家 ID：付款歸屬檢查失效"
   },
@@ -40,9 +40,9 @@
    "id": "resolve-wrong-actor",
    "stack": "go",
    "file": "backend/internal/httpapi/payment/admin.go",
-   "old": "h.m.ResolveAnomaly(ctx, actor, kind, id, outcome, req.Msg.GetEvidence())",
-   "new": "h.m.ResolveAnomaly(ctx, payment.AdminActor{}, kind, id, outcome, req.Msg.GetEvidence())",
-   "test": "internal/httpapi/payment ^TestResolvePaymentAnomalyPassesKindIDOutcomeAndTheCallingAdmin$",
+   "old": "h.m.ResolveAnomaly(ctx, actor, kind, id, outcome, reason, note, req.Msg.GetEvidence())",
+   "new": "h.m.ResolveAnomaly(ctx, payment.AdminActor{}, kind, id, outcome, reason, note, req.Msg.GetEvidence())",
+   "test": "internal/httpapi/payment ^TestResolvePaymentAnomalyPassesKindIDOutcomeReasonNoteAndTheCallingAdmin$",
    "why": "人工結案不記操作的管理員：後台紀錄失去操作者"
   },
   {

@@ -69,7 +69,7 @@ func TestADeductedRefundThatFailsGetsExactlyOneTopUpTransferToTheSeller(t *testi
 	if f.topupOf(t, r.ID) != "DONE" || ext == "" || ext == f.transferText(t, "external_transfer_id", tr.ID) || !slices.Contains(f.fake.TransferIDs(), ext) || f.fake.Transfers() != 2 {
 		t.Fatalf("補差額之後：%s，外部 ID %q，provider 的轉帳 %v", f.topupOf(t, r.ID), ext, f.fake.TransferIDs())
 	}
-	if f.count(t, "SELECT count(*) FROM payment.transfers WHERE payment_id = $1", tr.PaymentID) != 1 || f.transferText(t, "amount", tr.ID) != "70" || f.transferText(t, "status", tr.ID) != "SUCCEEDED" || f.reversedOf(t, tr.ID) != 0 {
+	if f.count(t, "SELECT count(*) FROM payment.transfers WHERE payment_order_id = $1", tr.PaymentOrderID) != 1 || f.transferText(t, "amount", tr.ID) != "70" || f.transferText(t, "status", tr.ID) != "SUCCEEDED" || f.reversedOf(t, tr.ID) != 0 {
 		t.Fatalf("轉帳列被補差額改動：%s 金額 %s", f.transferText(t, "status", tr.ID), f.transferText(t, "amount", tr.ID))
 	}
 	must(t, f.module.TopUpPaymentTransfer(ctx, r.ID, false))
@@ -316,7 +316,7 @@ func TestATopUpAnomalyIsResolvedOnlyAgainstTheProvidersEvidence(t *testing.T) {
 	if f.fake.TransferCalls() != calls {
 		t.Fatal("ANOMALY 的補差額被重送")
 	}
-	wantKind(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTopup, r.ID, AnomalySucceeded, f.transferText(t, "external_transfer_id", tr.ID)), apperr.KindFailedPrecondition, "證據是轉帳而不是補差額")
+	wantKind(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTopup, r.ID, AnomalySucceeded, ResolutionProviderExecutedNotRecorded, "核對 provider 之後確認已執行", f.transferText(t, "external_transfer_id", tr.ID)), apperr.KindFailedPrecondition, "證據是轉帳而不是補差額")
 	var ext string
 	for _, id := range f.fake.TransferIDs() {
 		if id != f.transferText(t, "external_transfer_id", tr.ID) {
@@ -324,7 +324,7 @@ func TestATopUpAnomalyIsResolvedOnlyAgainstTheProvidersEvidence(t *testing.T) {
 		}
 	}
 	audits := f.auditCount(t)
-	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTopup, r.ID, AnomalySucceeded, ext))
+	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyTopup, r.ID, AnomalySucceeded, ResolutionProviderExecutedNotRecorded, "核對 provider 之後確認已執行", ext))
 	if f.topupOf(t, r.ID) != "DONE" || f.refundText(t, "topup_external_id", r.ID) != ext || f.auditCount(t) != audits+1 {
 		t.Fatalf("結案成功之後：%s %s", f.topupOf(t, r.ID), f.refundText(t, "topup_external_id", r.ID))
 	}
@@ -338,7 +338,7 @@ func TestATopUpAnomalyIsResolvedOnlyAgainstTheProvidersEvidence(t *testing.T) {
 		f2.fake.FailLookup(errLost)
 		_ = f2.module.TopUpPaymentTransfer(ctx, r2.ID, false)
 	}
-	must(t, f2.module.ResolveAnomaly(ctx, f2.admin(), AnomalyTopup, r2.ID, AnomalyFailed, ""))
+	must(t, f2.module.ResolveAnomaly(ctx, f2.admin(), AnomalyTopup, r2.ID, AnomalyFailed, ResolutionProviderNotExecuted, "核對 provider 之後確認沒有執行", ""))
 	if f2.topupOf(t, r2.ID) != "RELEASED" || f2.refundText(t, "topup_reason", r2.ID) != "admin_resolved" {
 		t.Fatalf("結案成失敗之後：%s", f2.topupOf(t, r2.ID))
 	}

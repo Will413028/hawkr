@@ -56,9 +56,9 @@ func TestEachRelayedEventQueuesOnePublishJobInTheCallersTransaction(t *testing.T
 	rolledBack := errors.New("rollback")
 	err = d.InTx(ctx, func(ctx context.Context) error {
 		for _, e := range []payment.PaymentChanged{
-			{OccurredAt: occurred, PaymentID: uuid.NewV7(), OrderNo: "O1", BuyerID: 1, Amount: 10, Status: payment.PaymentSucceeded, PaidAt: &paid},
-			{OccurredAt: occurred, PaymentID: uuid.NewV7(), OrderNo: "O2", BuyerID: 1, Amount: 10, Status: payment.PaymentCreateFailed},
-			{OccurredAt: occurred, PaymentID: uuid.NewV7(), OrderNo: "O3", BuyerID: 1, Amount: 10, Status: payment.PaymentCanceled},
+			{OccurredAt: occurred, PaymentID: uuid.NewV7(), BuyerID: 1, Amount: 10, Orders: []payment.PaymentOrderReceivable{{OrderNo: "O1", StoreID: 7, Amount: 10}}, Status: payment.PaymentSucceeded, PaidAt: &paid},
+			{OccurredAt: occurred, PaymentID: uuid.NewV7(), BuyerID: 1, Amount: 10, Orders: []payment.PaymentOrderReceivable{{OrderNo: "O2", StoreID: 7, Amount: 10}}, Status: payment.PaymentCreateFailed},
+			{OccurredAt: occurred, PaymentID: uuid.NewV7(), BuyerID: 1, Amount: 10, Orders: []payment.PaymentOrderReceivable{{OrderNo: "O3", StoreID: 7, Amount: 10}}, Status: payment.PaymentCanceled},
 		} {
 			if err := OnPaymentChanged(queue)(ctx, e); err != nil {
 				return err
@@ -87,7 +87,7 @@ func TestEachRelayedEventQueuesOnePublishJobInTheCallersTransaction(t *testing.T
 	}
 
 	err = d.InTx(ctx, func(ctx context.Context) error {
-		if err := OnPaymentChanged(queue)(ctx, payment.PaymentChanged{OccurredAt: occurred, PaymentID: uuid.NewV7(), OrderNo: "O9", BuyerID: 1, Amount: 10, Status: payment.PaymentCanceled}); err != nil {
+		if err := OnPaymentChanged(queue)(ctx, payment.PaymentChanged{OccurredAt: occurred, PaymentID: uuid.NewV7(), BuyerID: 1, Amount: 10, Orders: []payment.PaymentOrderReceivable{{OrderNo: "O9", StoreID: 7, Amount: 10}}, Status: payment.PaymentCanceled}); err != nil {
 			return err
 		}
 		return rolledBack
