@@ -361,6 +361,9 @@ func (s *Service) acceptRefund(ctx context.Context, row store.PaymentRefund, sna
 			if target == model.RefundRefunding {
 				return nil
 			}
+			if err := s.wakeTransfer(ctx, q, row.ID, row.PaymentID); err != nil {
+				return err
+			}
 			return s.publishRefundResult(ctx, q, written, model.RefundStatus(locked.Status))
 		}
 		if err := s.afterRefundFailed(ctx, written); err != nil {
@@ -370,6 +373,9 @@ func (s *Service) acceptRefund(ctx context.Context, row store.PaymentRefund, sna
 			if err := s.startTopups(ctx, q, row.PaymentID); err != nil {
 				return err
 			}
+		}
+		if err := s.wakeTransfer(ctx, q, row.ID, row.PaymentID); err != nil {
+			return err
 		}
 		return s.publishRefundResult(ctx, q, written, model.RefundStatus(locked.Status))
 	})
@@ -405,6 +411,22 @@ func (s *Service) afterRefundFailed(ctx context.Context, r store.PaymentRefund) 
 		return s.publishAnomaly(ctx, model.AnomalyRefund, r.ID, r.PaymentID, "refund_failed_after_reversal")
 	}
 	return nil
+}
+
+// wakeTransfer 在退款進終局的 transaction 內讓等它的轉帳立刻重新 claim：付款有效的轉帳還是 PENDING、金額沒承諾（called_at 為空）時排入喚醒 job（claimTransfer 的 errRefundsInFlight 在等的就是這個）。
+// 呼叫方已鎖付款列與轉帳列；轉帳不存在、已承諾金額或已終局時什麼都不做。
+func (s *Service) wakeTransfer(ctx context.Context, q *store.Queries, refundID, paymentID uuid.UUID) error {
+	t, err := q.ActiveTransferByPayment(ctx, paymentID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if t.Status != string(model.TransferPending) || t.CalledAt != nil {
+		return nil
+	}
+	return enqueueTransferWake(ctx, s.d.Jobs, t.ID, refundID)
 }
 
 // publishRefundResult 在退款進入終局的 transaction 內發 RefundChanged，自動退款成功再發 AutoRefundCompleted。付款列只讀（鎖順序已由呼叫方守）。
@@ -595,6 +617,9 @@ func (s *Service) failRefund(ctx context.Context, refundID uuid.UUID, reason str
 			if err := s.startTopups(ctx, q, prev.PaymentID); err != nil {
 				return err
 			}
+		}
+		if err := s.wakeTransfer(ctx, q, refundID, prev.PaymentID); err != nil {
+			return err
 		}
 		return s.publishRefundResult(ctx, q, r, model.RefundStatus(prev.Status))
 	})

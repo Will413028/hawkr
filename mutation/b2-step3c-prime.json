@@ -418,7 +418,7 @@
    "id": "claim-ignores-in-flight-refunds-when-nothing-is-left",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/transfer.go",
-   "old": "\t\t\t\tif inFlight > 0 {\n\t\t\t\t\treturn fmt.Errorf(\"%w：轉帳 %s\", errRefundsInFlight, transferID)\n\t\t\t\t}\n",
+   "old": "\t\t\t\tif inFlight > 0 {\n\t\t\t\t\tblocking, err := q.InFlightRefundIDs(ctx, pay.ID)\n\t\t\t\t\tif err != nil {\n\t\t\t\t\t\treturn err\n\t\t\t\t\t}\n\t\t\t\t\treturn &refundsInFlightError{transferID: transferID, refundIDs: blocking}\n\t\t\t\t}\n",
    "new": "\t\t\t\t_ = inFlight\n",
    "test": "internal/modules/payment ^(TestATransferCoveredByInFlightRefundsWaitsForThemAndPaysTheSellerWhenTheyFail|TestARefundBeforeTheTransferIsSentMakesTheTransferPayLessAndNeedsNoReversal)$",
    "why": "退款涵蓋整筆但還有進行中的退款時轉帳仍直接 FAILED（fully_refunded）：那些退款之後失敗，賣家永遠收不到錢。"
@@ -431,6 +431,87 @@
    "new": "\t\tif inFlight >= 0 {\n\t\t\treturn terms, apperr.FailedPrecondition(\"付款已全額退款，沒有可轉的金額\"), nil\n\t\t}\n",
    "test": "internal/modules/payment ^(TestATransferCoveredByInFlightRefundsWaitsForThemAndPaysTheSellerWhenTheyFail)$",
    "why": "進行中的退款涵蓋整筆付款時 RequestTransfer 仍拒絕：退款之後失敗沒有轉帳列，賣家永遠收不到錢。"
+  },
+  {
+   "id": "wake-skipped-when-a-refund-succeeds",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/refund.go",
+   "old": "\t\t\tif err := s.wakeTransfer(ctx, q, row.ID, row.PaymentID); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n\t\t\treturn s.publishRefundResult(ctx, q, written, model.RefundStatus(locked.Status))",
+   "new": "\t\t\treturn s.publishRefundResult(ctx, q, written, model.RefundStatus(locked.Status))",
+   "test": "internal/modules/payment ^TestARefundReachingATerminalStateWakesTheTransferWaitingOnIt$",
+   "why": "provider 同步到退款 SUCCEEDED 時不喚醒等它的轉帳：沒有為轉帳排 job。"
+  },
+  {
+   "id": "wake-skipped-when-a-synced-refund-fails",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/refund.go",
+   "old": "\t\t}\n\t\tif err := s.wakeTransfer(ctx, q, row.ID, row.PaymentID); err != nil {\n\t\t\treturn err\n\t\t}\n\t\treturn s.publishRefundResult(ctx, q, written, model.RefundStatus(locked.Status))",
+   "new": "\t\t}\n\t\treturn s.publishRefundResult(ctx, q, written, model.RefundStatus(locked.Status))",
+   "test": "internal/modules/payment ^TestARefundReachingATerminalStateWakesTheTransferWaitingOnIt$",
+   "why": "provider 同步到退款 FAILED 時不喚醒等它的轉帳：沒有為轉帳排 job。"
+  },
+  {
+   "id": "wake-skipped-when-a-refund-call-is-refused",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/refund.go",
+   "old": "\t\tif err := s.wakeTransfer(ctx, q, refundID, prev.PaymentID); err != nil {\n\t\t\treturn err\n\t\t}\n",
+   "new": "",
+   "test": "internal/modules/payment ^TestARefundReachingATerminalStateWakesTheTransferWaitingOnIt$",
+   "why": "退款呼叫被 provider 永久拒絕（failRefund）時不喚醒等它的轉帳：沒有為轉帳排 job。"
+  },
+  {
+   "id": "wake-skipped-when-an-anomaly-is-resolved-as-failed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/anomaly.go",
+   "old": "\t\tif err := s.wakeTransfer(ctx, q, id, r.PaymentID); err != nil {\n\t\t\treturn reason, err\n\t\t}\n",
+   "new": "",
+   "test": "internal/modules/payment ^TestARefundReachingATerminalStateWakesTheTransferWaitingOnIt$",
+   "why": "退款異常人工結案成失敗時不喚醒等它的轉帳：沒有為轉帳排 job。"
+  },
+  {
+   "id": "wake-ignores-whether-the-transfer-is-waiting",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/refund.go",
+   "old": "\tif t.Status != string(model.TransferPending) || t.CalledAt != nil {\n\t\treturn nil\n\t}\n",
+   "new": "\tif t.ID == uuid.Nil() {\n\t\treturn nil\n\t}\n",
+   "test": "internal/modules/payment ^TestARefundReachingATerminalStateDoesNotWakeATransferThatAlreadyCommittedItsAmount$",
+   "why": "喚醒不看轉帳是否還在等：已成立的轉帳也被排 job。"
+  },
+  {
+   "id": "waiting-for-refunds-is-swallowed-on-the-final-attempt",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/transfer.go",
+   "old": "\t\ts.d.Logger.WarnContext(ctx, \"payment：轉帳等進行中的退款終局\", \"transfer_id\", transferID.String(), \"refund_ids\", ids)\n\t\treturn err\n",
+   "new": "\t\ts.d.Logger.WarnContext(ctx, \"payment：轉帳等進行中的退款終局\", \"transfer_id\", transferID.String(), \"refund_ids\", ids)\n",
+   "test": "internal/modules/payment ^TestARefundReachingATerminalStateWakesTheTransferWaitingOnIt$",
+   "why": "最後一次嘗試把等待當成暫時性失敗吞掉（回 nil）：final 為 true 的等待沒有回錯誤。"
+  },
+  {
+   "id": "waiting-log-omits-the-blocking-refunds",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/transfer.go",
+   "old": "\"refund_ids\", ids)",
+   "new": "\"refund_count\", len(ids))",
+   "test": "internal/modules/payment ^TestARefundReachingATerminalStateWakesTheTransferWaitingOnIt$",
+   "why": "等待的 log 不帶擋住轉帳的退款 ID：看不出哪一筆退款卡住。"
+  },
+  {
+   "id": "waiting-transfer-fails-the-job-instead-of-snoozing",
+   "stack": "go",
+   "file": "backend/internal/modules/payment/internal/charge/jobs.go",
+   "old": "\t\treturn river.JobSnooze(transferWaitDelay)\n",
+   "new": "\t\treturn jobError(err)\n",
+   "test": "internal/modules/payment/internal/charge ^TestAWaitingTransferSnoozesTheJobInsteadOfFailingIt$",
+   "why": "等進行中的退款時回錯誤而不是 snooze：計一次失敗的嘗試。"
+  },
+  {
+   "id": "wake-job-merged-with-the-snoozed-job",
+   "stack": "go",
+   "file": "backend/internal/modules/payment/internal/charge/jobs.go",
+   "old": "\tWakeRefundID uuid.UUID `json:\"wake_refund_id\" river:\"unique\"`",
+   "new": "\tWakeRefundID uuid.UUID `json:\"wake_refund_id\"`",
+   "test": "internal/modules/payment/internal/charge ^TestTheTransferWakeJobIsDistinctFromTheSnoozedOneByTheRefundID$",
+   "why": "喚醒 job 的唯一鍵不含退款 ID：被同一筆轉帳 snooze 中的 job 合併，喚醒沒有效果。"
   }
  ]
 }

@@ -455,6 +455,34 @@ func (q *Queries) FailTransfer(ctx context.Context, arg FailTransferParams) (Pay
 	return i, err
 }
 
+const inFlightRefundIDs = `-- name: InFlightRefundIDs :many
+SELECT id
+FROM payment.refunds
+WHERE payment_id = $1 AND status IN ('PENDING', 'REFUNDING', 'ANOMALY')
+ORDER BY id
+`
+
+// 付款還沒終局的退款 ID（與 InFlightRefundTotal 同一組狀態）：轉帳等它們終局時，log 指出擋住的是哪幾筆。
+func (q *Queries) InFlightRefundIDs(ctx context.Context, paymentID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, inFlightRefundIDs, paymentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const inFlightRefundTotal = `-- name: InFlightRefundTotal :one
 SELECT COALESCE(SUM(amount), 0)::bigint AS total
 FROM payment.refunds

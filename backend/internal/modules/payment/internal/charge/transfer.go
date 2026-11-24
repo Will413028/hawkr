@@ -128,12 +128,22 @@ func toTransfer(r store.PaymentTransfer) model.Transfer {
 //     查無要滿 NotFoundAfter 才進 FAILED（之後 RequestTransfer 才建得出新的一筆、換新鍵），未滿回錯誤稍後再查；查回連續失敗 LookupFailureLimit 次進 ANOMALY。
 //   - 付款沒有 charge、provider 回的外部 ID 或金額與列不符進 ANOMALY（佔住唯一索引、補掃不再重試、發 MoneyAnomaly；job 完成）。
 //
-// 已不是 PENDING 的列什麼都不做。final 為 true 時暫時性失敗只記警示 log 並回 nil，留給週期掃描。呼叫方不能在 transaction 內呼叫。
+// 已不是 PENDING 的列什麼都不做。退款涵蓋整筆付款但還有進行中的（errRefundsInFlight）時記警示 log（轉帳與擋住它的退款 ID）並回該錯誤，不受 final 影響，job 以 snooze 等它們終局。
+// final 為 true 時其他暫時性失敗只記警示 log 並回 nil，留給週期掃描。呼叫方不能在 transaction 內呼叫。
 func (s *Service) Transfer(ctx context.Context, transferID uuid.UUID, final bool) error {
 	if _, ok := db.TxFrom(ctx); ok {
 		return errInTransaction
 	}
 	err := s.transfer(ctx, transferID)
+	var waiting *refundsInFlightError
+	if errors.As(err, &waiting) {
+		ids := make([]string, len(waiting.refundIDs))
+		for i, id := range waiting.refundIDs {
+			ids[i] = id.String()
+		}
+		s.d.Logger.WarnContext(ctx, "payment：轉帳等進行中的退款終局", "transfer_id", transferID.String(), "refund_ids", ids)
+		return err
+	}
 	if err != nil && final && !errors.Is(err, ErrPermanent) {
 		s.d.Logger.WarnContext(ctx, "payment：轉帳用完重試，留給週期掃描", "transfer_id", transferID.String(), "err", err)
 		return nil
@@ -302,7 +312,11 @@ func (s *Service) claimTransfer(ctx context.Context, transferID uuid.UUID, now t
 					return err
 				}
 				if inFlight > 0 {
-					return fmt.Errorf("%w：轉帳 %s", errRefundsInFlight, transferID)
+					blocking, err := q.InFlightRefundIDs(ctx, pay.ID)
+					if err != nil {
+						return err
+					}
+					return &refundsInFlightError{transferID: transferID, refundIDs: blocking}
 				}
 			}
 			if err := s.releaseWaitingReversals(ctx, q, pay.ID, reversalDeducted); err != nil {

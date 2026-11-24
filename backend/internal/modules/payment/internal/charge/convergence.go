@@ -3,6 +3,7 @@ package charge
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"uuid"
@@ -41,8 +42,21 @@ func classifyCall(err error) callOutcome {
 var errNotFoundYet = errors.New("charge: 查回查無，但還沒過最短等待時間")
 
 // errRefundsInFlight 標示退款已涵蓋整筆付款、但其中還有沒終局的退款（PENDING、REFUNDING、ANOMALY）：轉帳不能先當成全額退款終結，它們失敗時賣家要收到這筆錢。
-// 轉帳保持 PENDING、金額不承諾，稍後（River 重試、週期掃描）重新 claim。
+// 轉帳保持 PENDING、金額不承諾：job 以 transferWaitDelay snooze（不計嘗試），退款進終局時由同一個 transaction 排入的喚醒 job 立刻重新 claim。
+// 擋住的退款卡在 ANOMALY 時，轉帳一直等到人工結案那筆退款；每次 snooze 回來都記一筆警示 log，帶轉帳與擋住它的退款 ID。
 var errRefundsInFlight = errors.New("charge: 退款涵蓋整筆付款但還有進行中的，轉帳等它們終局")
+
+// refundsInFlightError 是 errRefundsInFlight 帶上轉帳與擋住它的退款。
+type refundsInFlightError struct {
+	transferID uuid.UUID
+	refundIDs  []uuid.UUID
+}
+
+func (e *refundsInFlightError) Error() string {
+	return fmt.Sprintf("%v：轉帳 %s", errRefundsInFlight, e.transferID)
+}
+
+func (e *refundsInFlightError) Is(target error) bool { return target == errRefundsInFlight }
 
 // inResendWindow 回傳這把鍵是否還可以重送：沒呼叫過，或第一次呼叫起還在 ResendWindow 內。
 func inResendWindow(calledAt *time.Time, now time.Time) bool {

@@ -394,7 +394,12 @@ func (s *Service) resolveRefund(ctx context.Context, q *store.Queries, id uuid.U
 			return reason, err
 		}
 		if transferSucceeded {
-			return reason, s.startTopups(ctx, q, r.PaymentID)
+			if err := s.startTopups(ctx, q, r.PaymentID); err != nil {
+				return reason, err
+			}
+		}
+		if err := s.wakeTransfer(ctx, q, id, r.PaymentID); err != nil {
+			return reason, err
 		}
 		return reason, nil
 	}

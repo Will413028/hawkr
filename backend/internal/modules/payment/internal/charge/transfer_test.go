@@ -3,9 +3,11 @@ package charge
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/riverqueue/river"
+	"uuid"
 )
 
 // 轉帳與撤回的錯誤分類：只有 ErrPermanent 取消 job（不重試）；平台餘額不足與逾時是一般錯誤，job 照常重試。
@@ -76,5 +78,42 @@ func TestFakeRefusesTheSameTransferKeyWithAnotherAmount(t *testing.T) {
 	}
 	if got := f.TransferAmounts(); len(got) != 2 || got[0] != 100 || got[1] != 60 || f.Transfers() != 1 {
 		t.Fatalf("金額=%v，轉帳 %d 筆", got, f.Transfers())
+	}
+}
+
+// 轉帳等進行中的退款終局是預期的等待：job 以 transferWaitDelay snooze（不計嘗試、不是錯誤），其他錯誤照 jobError。
+// mutation：transferJobResult 對 errRefundsInFlight 改回回傳錯誤 → 不是 snooze，失敗。
+func TestAWaitingTransferSnoozesTheJobInsteadOfFailingIt(t *testing.T) {
+	t.Parallel()
+	waiting := fmt.Errorf("外層：%w", &refundsInFlightError{transferID: uuid.New(), refundIDs: []uuid.UUID{uuid.New()}})
+	var snooze *river.JobSnoozeError
+	if err := transferJobResult(waiting); !errors.As(err, &snooze) || snooze.Duration != transferWaitDelay {
+		t.Fatalf("等進行中的退款沒有 snooze：%v", err)
+	}
+	if err := transferJobResult(nil); err != nil {
+		t.Fatalf("成功：%v", err)
+	}
+	other := errors.New("insufficient available funds")
+	if err := transferJobResult(other); !errors.Is(err, other) || errors.As(err, &snooze) {
+		t.Fatalf("其他錯誤不該 snooze：%v", err)
+	}
+	var cancel *river.JobCancelError
+	if err := transferJobResult(fmt.Errorf("%w：被拒絕", ErrPermanent)); !errors.As(err, &cancel) {
+		t.Fatalf("永久失敗沒有取消 job：%v", err)
+	}
+}
+
+// 喚醒轉帳的 job 以退款 ID 進唯一鍵：同一筆轉帳正在 snooze 的 job（WakeRefundID 為零值）不會把它合併掉，同一筆退款重複喚醒則合併。
+// mutation：TransferArgs.WakeRefundID 拿掉 river:"unique" → 喚醒被 snooze 中的 job 合併而沒有效果，失敗。
+func TestTheTransferWakeJobIsDistinctFromTheSnoozedOneByTheRefundID(t *testing.T) {
+	t.Parallel()
+	for _, name := range []string{"TransferID", "WakeRefundID"} {
+		field, ok := reflect.TypeOf(TransferArgs{}).FieldByName(name)
+		if !ok || field.Tag.Get("river") != "unique" {
+			t.Fatalf("%s 不在唯一鍵內：%v", name, field.Tag)
+		}
+	}
+	if opts := (TransferArgs{}).InsertOpts(); !opts.UniqueOpts.ByArgs {
+		t.Fatalf("轉帳 job 不依參數去重：%+v", opts.UniqueOpts)
 	}
 }

@@ -75,8 +75,10 @@ func enqueueCancel(ctx context.Context, jc jobs.Enqueuer, attemptID uuid.UUID) e
 }
 
 // TransferArgs 是建立轉帳的 job，以轉帳 ID 為唯一鍵：RequestTransfer 在寫列的同一個 transaction 排入，由它在 transaction 外帶列上的冪等鍵呼叫 provider。
+// WakeRefundID 不是零值時是「這筆退款進終局，轉帳等的條件變了」的喚醒：它進唯一鍵，所以不會被同一筆轉帳正在 snooze 的 job 合併掉。
 type TransferArgs struct {
-	TransferID uuid.UUID `json:"transfer_id" river:"unique"`
+	TransferID   uuid.UUID `json:"transfer_id" river:"unique"`
+	WakeRefundID uuid.UUID `json:"wake_refund_id" river:"unique"`
 }
 
 // Kind 是 River 的 job 種類。
@@ -87,6 +89,13 @@ func (TransferArgs) InsertOpts() river.InsertOpts { return jobs.UniqueByArgs(max
 
 func enqueueTransfer(ctx context.Context, jc jobs.Enqueuer, id uuid.UUID) error {
 	args := TransferArgs{TransferID: id}
+	opts := args.InsertOpts()
+	return jc.Enqueue(ctx, args, &opts)
+}
+
+// enqueueTransferWake 在退款進終局的 transaction 內排入喚醒轉帳的 job（同一筆退款只排一次）。
+func enqueueTransferWake(ctx context.Context, jc jobs.Enqueuer, id, refundID uuid.UUID) error {
+	args := TransferArgs{TransferID: id, WakeRefundID: refundID}
 	opts := args.InsertOpts()
 	return jc.Enqueue(ctx, args, &opts)
 }
@@ -174,6 +183,17 @@ const resyncDelay = 2 * time.Second
 // pollInterval 是掃描的週期。
 const pollInterval = 15 * time.Minute
 
+// transferWaitDelay 是轉帳等進行中的退款終局時 job 的 snooze 間隔，與掃描同一個週期；退款進終局時的喚醒 job 才是快路徑。
+const transferWaitDelay = pollInterval
+
+// transferJobResult 把一次轉帳的結果轉成 River 的回傳：等進行中的退款是預期的等待，snooze（不計嘗試、不當成錯誤）；其他照 jobError。
+func transferJobResult(err error) error {
+	if errors.Is(err, errRefundsInFlight) {
+		return river.JobSnooze(transferWaitDelay)
+	}
+	return jobError(err)
+}
+
 func jobError(err error) error {
 	if errors.Is(err, ErrPermanent) {
 		return river.JobCancel(err)
@@ -232,9 +252,9 @@ type transferWorker struct {
 	service *Service
 }
 
-// Work 執行一次轉帳：provider 的永久拒絕進終局、不重試；平台餘額不足等暫時性失敗回錯誤由 River 重試。
+// Work 執行一次轉帳：provider 的永久拒絕進終局、不重試；平台餘額不足等暫時性失敗回錯誤由 River 重試；等進行中的退款終局時 snooze。
 func (w *transferWorker) Work(ctx context.Context, job *river.Job[TransferArgs]) error {
-	return jobError(w.service.Transfer(ctx, job.Args.TransferID, job.Attempt >= job.MaxAttempts))
+	return transferJobResult(w.service.Transfer(ctx, job.Args.TransferID, job.Attempt >= job.MaxAttempts))
 }
 
 // Timeout 是一次轉帳的時間上限。

@@ -17,6 +17,13 @@ SELECT COALESCE(SUM(amount), 0)::bigint AS total
 FROM payment.refunds
 WHERE payment_id = $1 AND status IN ('PENDING', 'REFUNDING', 'ANOMALY');
 
+-- name: InFlightRefundIDs :many
+-- 付款還沒終局的退款 ID（與 InFlightRefundTotal 同一組狀態）：轉帳等它們終局時，log 指出擋住的是哪幾筆。
+SELECT id
+FROM payment.refunds
+WHERE payment_id = $1 AND status IN ('PENDING', 'REFUNDING', 'ANOMALY')
+ORDER BY id;
+
 -- name: InsertTransfer :execrows
 -- 一筆付款最多一筆有效（不是 FAILED 的）轉帳，只由唯一索引 transfers_active_payment 守（哪些狀態佔位只寫在索引的條件裡）：已有有效轉帳時不寫（ON CONFLICT DO NOTHING，不指定索引），呼叫端再讀既有的那筆。
 INSERT INTO payment.transfers (id, payment_id, store_id, amount, destination_account_id, created_at, updated_at)
