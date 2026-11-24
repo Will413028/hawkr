@@ -1,64 +1,64 @@
 proto_service,rpc,implementing_deployable,disposition
-AIAdminService,ListAiStylesForAdmin,ai-service,
-AIAdminService,CreateAiStyle,ai-service,
-AIAdminService,UpdateAiStyle,ai-service,
-AIAdminService,DeleteAiStyle,ai-service,
-AIAdminService,GetAiQuota,ai-service,
-AIAdminService,UpdateAiQuota,ai-service,
-AIAdminService,DeleteAiQuota,ai-service,
-AIAssistantService,SellerChat,ai-service,
-AIAssistantService,SellerOrders,ai-service,
-AIAssistantService,SellerInventory,ai-service,
-AIAssistantService,SellerPayment,ai-service,
+AIAdminService,ListAiStylesForAdmin,ai-service,api: ImageAiAdminService.ListAiStylesForAdmin（admin Connect，modules/imageai，A9-4c）
+AIAdminService,CreateAiStyle,ai-service,api: ImageAiAdminService.CreateAiStyle（admin Connect，modules/imageai，A9-4c）
+AIAdminService,UpdateAiStyle,ai-service,api: ImageAiAdminService.UpdateAiStyle（admin Connect，modules/imageai，A9-4c）
+AIAdminService,DeleteAiStyle,ai-service,api: ImageAiAdminService.DeleteAiStyle（admin Connect，modules/imageai，A9-4c）
+AIAdminService,GetAiQuota,ai-service,api: ImageAiAdminService.GetAiQuota（admin Connect，modules/imageai，A9-4c）
+AIAdminService,UpdateAiQuota,ai-service,api: ImageAiAdminService.UpdateAiQuota（admin Connect，modules/imageai，A9-4c）
+AIAdminService,DeleteAiQuota,ai-service,api: ImageAiAdminService.DeleteAiQuota（admin Connect，modules/imageai，A9-4c）
+AIAssistantService,SellerChat,ai-service,removed: 賣家助理隨 A9-D2 刪除（單體的 assistant 只服務買家，無對應 RPC）
+AIAssistantService,SellerOrders,ai-service,removed: 賣家助理隨 A9-D2 刪除（單體的 assistant 只服務買家，無對應 RPC）
+AIAssistantService,SellerInventory,ai-service,removed: 賣家助理隨 A9-D2 刪除（單體的 assistant 只服務買家，無對應 RPC）
+AIAssistantService,SellerPayment,ai-service,removed: 賣家助理隨 A9-D2 刪除（單體的 assistant 只服務買家，無對應 RPC）
 AIAssistantService,SellerPrice,ai-service,removed: 隨 pricebook 刪除（0fca1761）
-AIAssistantService,SellerProductListingChat,ai-service,
-AIAssistantService,SellerProductAutofill,ai-service,
-AIAssistantService,SellerLatestSession,ai-service,
-AIAssistantService,BuyerOrders,ai-service,
-AIAssistantService,BuyerTracking,ai-service,
-AIAssistantService,BuyerReturnPolicy,ai-service,
+AIAssistantService,SellerProductListingChat,ai-service,removed: 刊登助理隨 A9-D2 刪除
+AIAssistantService,SellerProductAutofill,ai-service,removed: product-autofill 隨 A9-D2 刪除
+AIAssistantService,SellerLatestSession,ai-service,removed: 賣家助理隨 A9-D2 刪除（單體的 assistant 只服務買家，無對應 RPC）
+AIAssistantService,BuyerOrders,ai-service,api: AssistantAppService.SendAssistantMessage 加 WatchAssistantTurn（topic ORDERS，modules/assistant，A9-D12）
+AIAssistantService,BuyerTracking,ai-service,api: AssistantAppService.SendAssistantMessage 加 WatchAssistantTurn（topic TRACKING，modules/assistant，A9-D12）
+AIAssistantService,BuyerReturnPolicy,ai-service,api: AssistantAppService.SendAssistantMessage 加 WatchAssistantTurn（topic RETURN_POLICY，固定文案進 text/*.json，modules/assistant）
 AIAssistantService,BuyerSeasonal,ai-service,removed: 隨 pricebook 刪除（0fca1761）
-AIAssistantService,BuyerSellerMatch,ai-service,
-AIAssistantService,BuyerChat,ai-service,
-AIAssistantService,BuyerLatestSession,ai-service,
-AIImageService,TransformImage,ai-service,
-AIImageService,ListAiStyles,ai-service,
-AIProcurementService,SubmitTurn,ai-service,
-AIProcurementService,SubmitTurnStream,ai-service,
-AIProcurementService,GetSnapshot,ai-service,
-AIProcurementService,StartCandidateSearch,ai-service,
-AIProcurementService,GetCandidateSearch,ai-service,
-AIProcurementService,ToggleSelection,ai-service,
-AIProcurementService,SubmitAnswer,ai-service,
-AIProcurementService,Rewind,ai-service,
-AIProcurementService,PreviewRfqPrice,ai-service,
-AIProcurementService,ConfirmRfqSnapshot,ai-service,
-AIProcurementService,PreviewRfqPublication,ai-service,
-AIProcurementService,ExecuteRfqPublication,ai-service,
-AIProcurementService,GetRfqPublicationInviteSellerView,ai-service,
-AIProcurementService,ListConversations,ai-service,
-AIProcurementService,GetConversationMessages,ai-service,
-AIProcurementService,GetRuntimeSnapshot,ai-service,
-AIProcurementService,ListSellerPublications,ai-service,
-AIProcurementService,GetSellerPublication,ai-service,
-AIProcurementService,UpsertSellerResponseDraft,ai-service,
-AIProcurementService,GetVendorPortalResponseDraft,ai-service,
-AIProcurementService,UpsertVendorPortalResponseDraft,ai-service,
-AIProcurementService,SubmitVendorPortalResponse,ai-service,
-AIProcurementService,WithdrawVendorPortalResponse,ai-service,
-AIProcurementService,DeclineVendorPortalRfqPublication,ai-service,
-AIProcurementService,SubmitSellerResponse,ai-service,
-AIProcurementService,WithdrawSellerResponse,ai-service,
-AIProcurementService,DeclineRfqPublication,ai-service,
-AIProcurementService,ListSellerResponses,ai-service,
-AIProcurementService,PutShortlistEntry,ai-service,
-AIProcurementService,DeleteShortlistEntry,ai-service,
-AIProcurementService,AcceptSellerQuote,ai-service,
-AIProcurementService,RenameConversation,ai-service,
-AIProcurementService,DeleteConversation,ai-service,
-AIProcurementService,WatchRunEvents,ai-service,
-AIProcurementService,CancelRun,ai-service,
-AIProcurementService,ResumeRun,ai-service,
+AIAssistantService,BuyerSellerMatch,ai-service,removed: seller-match 隨 A9-D2 刪除
+AIAssistantService,BuyerChat,ai-service,api: AssistantAppService.SendAssistantMessage 加 WatchAssistantTurn（modules/assistant，A9-D12）
+AIAssistantService,BuyerLatestSession,ai-service,api: AssistantAppService.GetLatestAssistantSession（modules/assistant）
+AIImageService,TransformImage,ai-service,api: ImageAiAppService.TransformImage（Connect unary，modules/imageai，A9-4b）
+AIImageService,ListAiStyles,ai-service,api: ImageAiAppService.ListAiStyles（Connect unary，modules/imageai，A9-4b）
+AIProcurementService,SubmitTurn,ai-service,api: BuyerProcurementAppService.SubmitTurn（modules/procurement）
+AIProcurementService,SubmitTurnStream,ai-service,api: BuyerProcurementAppService.SubmitTurn 加 WatchRun（Connect server streaming，A9-D4）
+AIProcurementService,GetSnapshot,ai-service,api: BuyerProcurementAppService.GetSnapshot（modules/procurement）
+AIProcurementService,StartCandidateSearch,ai-service,api: BuyerProcurementAppService.StartCandidateSearch（modules/procurement）
+AIProcurementService,GetCandidateSearch,ai-service,api: BuyerProcurementAppService.GetCandidateSearch（modules/procurement）
+AIProcurementService,ToggleSelection,ai-service,api: BuyerProcurementAppService.ToggleSelection（modules/procurement）
+AIProcurementService,SubmitAnswer,ai-service,api: BuyerProcurementAppService.SubmitAnswer（modules/procurement）
+AIProcurementService,Rewind,ai-service,api: BuyerProcurementAppService.Rewind（modules/procurement）
+AIProcurementService,PreviewRfqPrice,ai-service,api: BuyerProcurementAppService.PreviewRfqPrice（modules/procurement，拿掉 pricebook 後的形狀）
+AIProcurementService,ConfirmRfqSnapshot,ai-service,removed: 確認快照隨 A9-D35 刪除，發布詢價直接用需求版本（PreviewRfqPublication、ExecuteRfqPublication）
+AIProcurementService,PreviewRfqPublication,ai-service,api: BuyerProcurementAppService.PreviewRfqPublication（modules/procurement）
+AIProcurementService,ExecuteRfqPublication,ai-service,api: BuyerProcurementAppService.ExecuteRfqPublication（modules/procurement；同 transaction 發布 RfqPublished，procurementrelay 轉成 notification 的邀請事件）
+AIProcurementService,GetRfqPublicationInviteSellerView,ai-service,removed: 站外業者入口隨 A9-D1 刪除
+AIProcurementService,ListConversations,ai-service,api: BuyerProcurementAppService.ListConversations（modules/procurement）
+AIProcurementService,GetConversationMessages,ai-service,api: BuyerProcurementAppService.GetConversationMessages（modules/procurement）
+AIProcurementService,GetRuntimeSnapshot,ai-service,api: BuyerProcurementAppService.GetRuntimeSnapshot（modules/procurement）
+AIProcurementService,ListSellerPublications,ai-service,api: SellerProcurementAppService.ListSellerPublications（modules/procurement）
+AIProcurementService,GetSellerPublication,ai-service,api: SellerProcurementAppService.GetSellerPublication（modules/procurement）
+AIProcurementService,UpsertSellerResponseDraft,ai-service,api: SellerProcurementAppService.UpsertSellerResponseDraft（modules/procurement）
+AIProcurementService,GetVendorPortalResponseDraft,ai-service,removed: 站外業者入口隨 A9-D1 刪除
+AIProcurementService,UpsertVendorPortalResponseDraft,ai-service,removed: 站外業者入口隨 A9-D1 刪除
+AIProcurementService,SubmitVendorPortalResponse,ai-service,removed: 站外業者入口隨 A9-D1 刪除
+AIProcurementService,WithdrawVendorPortalResponse,ai-service,removed: 站外業者入口隨 A9-D1 刪除
+AIProcurementService,DeclineVendorPortalRfqPublication,ai-service,removed: 站外業者入口隨 A9-D1 刪除
+AIProcurementService,SubmitSellerResponse,ai-service,api: SellerProcurementAppService.SubmitSellerResponse（modules/procurement）
+AIProcurementService,WithdrawSellerResponse,ai-service,api: SellerProcurementAppService.WithdrawSellerResponse（modules/procurement）
+AIProcurementService,DeclineRfqPublication,ai-service,api: SellerProcurementAppService.DeclineRfqPublication（modules/procurement）
+AIProcurementService,ListSellerResponses,ai-service,api: BuyerProcurementAppService.ListSellerResponses（modules/procurement）
+AIProcurementService,PutShortlistEntry,ai-service,api: BuyerProcurementAppService.PutShortlistEntry（modules/procurement）
+AIProcurementService,DeleteShortlistEntry,ai-service,api: BuyerProcurementAppService.DeleteShortlistEntry（modules/procurement）
+AIProcurementService,AcceptSellerQuote,ai-service,api: BuyerProcurementAppService.AcceptSellerQuote（modules/procurement；接受後建單 job 經 legacy ordering 的 CreateRfqOrder）
+AIProcurementService,RenameConversation,ai-service,api: BuyerProcurementAppService.RenameConversation（modules/procurement）
+AIProcurementService,DeleteConversation,ai-service,api: BuyerProcurementAppService.DeleteConversation（modules/procurement）
+AIProcurementService,WatchRunEvents,ai-service,api: BuyerProcurementAppService.WatchRun（Connect server streaming，A9-D4）
+AIProcurementService,CancelRun,ai-service,api: BuyerProcurementAppService.CancelRun（modules/procurement）
+AIProcurementService,ResumeRun,ai-service,api: BuyerProcurementAppService.ResumeRun（modules/procurement）
 AccountService,GoogleOAuth,account-service,http: IdentityPublicService.SignIn（Google）
 AccountService,AppleOAuth,account-service,http: IdentityPublicService.SignIn（Apple）
 AccountService,VerifyGoogleIdToken,account-service,removed: vendor portal 的 Google 驗證搬到單體 VendorPortalInviteeService.VerifySession（計畫 A3b 步驟 8i），舊 gateway 的 step_up 路由與 legacy 的實作一併刪除
@@ -529,7 +529,7 @@ ProductService,CreateProductFromImportInternal,product-service,removed: 商品�
 ProductService,BatchCheckSellerProductNames,product-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
 ProductService,ValidateProductDraft,product-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
 ProductService,GetProductsBriefInternal,product-service,removed: 商品匯入整個刪除，Will 2026-11-15 範圍裁切（ADR 2026-10-27-general-ecommerce-scope-cut 的 2026-11-15 修訂）
-RecommendationService,PersonalizedRecommend,ai-service,
+RecommendationService,PersonalizedRecommend,ai-service,removed: 個人化推薦隨 A9-D2 刪除（gateway 固定傳匿名，沒有個人化接線，沒有 website 或 buyer-app 的消費者）
 ReviewService,GetProductReviews,review-service,api: ReviewPublicService.ListProductReviews
 ReviewService,GetReview,review-service,api: ReviewAppService.GetReview
 ReviewService,ReplyReview,review-service,api: ReviewAppService.ReplyReview
