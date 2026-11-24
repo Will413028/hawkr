@@ -314,7 +314,7 @@ func (m *Module) PurgeAccount(ctx context.Context, storeID int64, finalAttempt b
 	return m.accounts.Purge(ctx, storeID, finalAttempt)
 }
 
-// ScanPayoutDeadlines 是每日掃描（payment.deadline_scan）的內容，給 worker 與測試呼叫：對期限落在未來 7 天內的帳戶各發布一次 PayoutDeadlineApproaching；回傳發布數。
+// ScanPayoutDeadlines 是每小時掃描（payment.deadline_scan）的內容，給 worker 與測試呼叫：對期限落在未來 7 天內的帳戶各發布一次 PayoutDeadlineApproaching；回傳發布數。
 func (m *Module) ScanPayoutDeadlines(ctx context.Context) (published int, err error) {
 	return m.accounts.ScanDeadlines(ctx)
 }

@@ -173,7 +173,7 @@ func (s *Service) AddWorkers(workers *river.Workers) {
 	river.AddWorker(workers, &deadlineScanWorker{service: s})
 }
 
-// PeriodicJobs 回傳啟動即執行、每 15 分鐘的掃描與每日的補件期限掃描。
+// PeriodicJobs 回傳啟動即執行、每 15 分鐘的掃描與每小時的補件期限掃描。
 func (s *Service) PeriodicJobs() []*river.PeriodicJob {
 	return []*river.PeriodicJob{
 		river.NewPeriodicJob(

@@ -346,7 +346,7 @@ func TestRequestQueuesOneAccountCreationAndAReplayedCreateKeepsOneExternalAccoun
 		t.Fatalf("建立後排入的同步 job=%v", got)
 	}
 	must(t, f.module.EnsureAccount(ctx, s, false))
-	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.accounts SET external_account_id = NULL, create_completed_at = NULL, status = 'NOT_CREATED' WHERE store_id = $1", s)
+	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.accounts SET external_account_id = NULL, create_completed_at = NULL, status = 'NOT_CREATED', requirements_deadline = NULL, first_activated_at = NULL WHERE store_id = $1", s)
 	must(t, err)
 	second := f.ensure(t, s)
 	var stored string
@@ -705,8 +705,8 @@ func TestSweepQueuesSyncForOpenAndLiftableStatusesOnly(t *testing.T) {
 	f := setup(t)
 	insert := func(storeID int64, status, external, reason any) {
 		_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO payment.accounts
-			(store_id, provider, external_account_id, requirement_collection, status, transfers_active, status_reason, create_called_at, create_completed_at, created_at, updated_at)
-			VALUES ($1, 'fake', $2, 'PROVIDER', $3, $3 = 'ENABLED', $4, CASE WHEN $2::text IS NULL THEN NULL ELSE $5::timestamptz END, CASE WHEN $2::text IS NULL THEN NULL ELSE $5::timestamptz END, $5, $5)`, storeID, external, status, reason, f.now.Add(-time.Hour))
+			(store_id, provider, external_account_id, requirement_collection, status, transfers_active, first_activated_at, status_reason, create_called_at, create_completed_at, created_at, updated_at)
+			VALUES ($1, 'fake', $2, 'PROVIDER', $3, $3 = 'ENABLED', CASE WHEN $3 = 'ENABLED' THEN $5::timestamptz END, $4, CASE WHEN $2::text IS NULL THEN NULL ELSE $5::timestamptz END, CASE WHEN $2::text IS NULL THEN NULL ELSE $5::timestamptz END, $5, $5)`, storeID, external, status, reason, f.now.Add(-time.Hour))
 		must(t, err)
 	}
 	byStatus := map[AccountStatus]int64{}

@@ -18,18 +18,19 @@ const (
 	deadlineWindow  = 7 * 24 * time.Hour
 	deadlineLastDay = 24 * time.Hour
 	deadlineBatch   = 200
-	// deadlineScanInterval 是補件期限掃描的週期（每日一次；期限與檔位相同的重複發布由消費者去重）。
-	deadlineScanInterval = 24 * time.Hour
+	// deadlineScanInterval 是補件期限掃描的週期：每小時一次，ONE_DAY 檔位最晚在期限前 23 小時發出、SEVEN_DAYS 最晚在進入窗口後一小時發出；
+	// 期限與檔位相同的重複發布由消費者去重。
+	deadlineScanInterval = time.Hour
 )
 
-// DeadlineScanArgs 是每日的補件期限掃描。
+// DeadlineScanArgs 是每小時的補件期限掃描。
 type DeadlineScanArgs struct{}
 
 // Kind 是 River 的 job 種類。
 func (DeadlineScanArgs) Kind() string { return "payment.deadline_scan" }
 
 // InsertOpts 把同一段時間內的排程與重啟合併。
-func (DeadlineScanArgs) InsertOpts() river.InsertOpts { return jobs.SweepOpts(time.Hour) }
+func (DeadlineScanArgs) InsertOpts() river.InsertOpts { return jobs.SweepOpts(deadlineScanInterval) }
 
 type deadlineScanWorker struct {
 	river.WorkerDefaults[DeadlineScanArgs]
@@ -56,7 +57,7 @@ func TierFor(remaining time.Duration) model.DeadlineTier {
 }
 
 // ScanDeadlines 對補件期限落在 (now, now+7 天] 的帳戶各發布一次 PayoutDeadlineApproaching（每批在同一個 transaction 內讀取並發布），回傳發布數。
-// 每日執行：同一個期限在 7 天窗口內會被發布多次，檔位只有兩種，消費者以「店家＋期限＋檔位」去重，所以每個檔位只會通知一次；期限改了就是新的提醒。
+// 每小時執行：同一個期限在 7 天窗口內會被發布多次，檔位只有兩種，消費者以「店家＋期限＋檔位」去重，所以每個檔位只會通知一次；期限改了就是新的提醒。
 func (s *Service) ScanDeadlines(ctx context.Context) (int, error) {
 	now := s.d.Now().UTC()
 	until := now.Add(deadlineWindow)

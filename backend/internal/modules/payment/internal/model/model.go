@@ -135,7 +135,7 @@ const (
 	DeadlineOneDay    DeadlineTier = "ONE_DAY"
 )
 
-// PayoutDeadlineApproaching 由每日掃描在待補條件的最早期限進入 7 天窗口之後、每次掃描對每個帳戶發布一次（同一個期限與檔位會重複發布，消費者以「店家＋期限＋檔位」去重）：
+// PayoutDeadlineApproaching 由每小時的掃描在待補條件的最早期限進入 7 天窗口之後、每次掃描對每個帳戶發布一次（同一個期限與檔位會重複發布，消費者以「店家＋期限＋檔位」去重）：
 // 事件只帶店家、期限與檔位，不帶待補條件的內容（D23）。
 type PayoutDeadlineApproaching struct {
 	OccurredAt time.Time
