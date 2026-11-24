@@ -12,7 +12,7 @@ import * as React from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ProcurementCandidate } from "@/lib/api/openapi-types";
+import type { ProcurementCandidate } from "@/features/procurement-assistant/types";
 import RfqDraftFlow from "../RfqDraftFlow";
 import type {
 	RfqCommandResult,

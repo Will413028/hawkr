@@ -3,17 +3,11 @@
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import { Button } from "@/components/ui";
-import type {
-	ProcurementCandidate,
-	ProcurementSlots,
-} from "@/lib/api/openapi-types";
 import CandidateBrowser from "./CandidateBrowser";
 import QuoteBatchSummary from "./QuoteBatchSummary";
 import RfqDraftFlow from "./RfqDraftFlow";
 import type {
 	RfqCommandResult,
-	RfqConfirmation,
-	RfqConfirmationCommand,
 	RfqPricePreview,
 	RfqPricePreviewCommand,
 } from "./rfq-price-contract";
@@ -23,7 +17,11 @@ import type {
 	RfqPublicationPreviewCommand,
 	RfqPublicationResult,
 } from "./rfq-publication-contract";
-import type { PublishedRfqPublication } from "./useProcurementSession";
+import type {
+	ProcurementCandidate,
+	ProcurementSlots,
+	PublishedRfqPublication,
+} from "./types";
 import { useRfqRuntimeSnapshot } from "./useRfqRuntimeSnapshot";
 
 type WorkspaceView = "candidates" | "rfq-draft" | "quote-invites";
@@ -63,9 +61,6 @@ interface CandidateCanvasProps {
 	onExecuteRfqPublication: (
 		command: RfqPublicationExecuteCommand,
 	) => Promise<RfqCommandResult<RfqPublicationResult>>;
-	onConfirmRfqSnapshot: (
-		command: RfqConfirmationCommand,
-	) => Promise<RfqCommandResult<RfqConfirmation>>;
 	onRefreshSnapshot: () => Promise<boolean>;
 	rfqPriceRangeEnabled: boolean;
 	rfqApprovalEnabled: boolean;
@@ -88,7 +83,6 @@ export default function CandidateCanvas({
 	hidden = false,
 	headingRef,
 	onPreviewRfqPrice,
-	onConfirmRfqSnapshot,
 	onPreviewRfqPublication,
 	onExecuteRfqPublication,
 	onRefreshSnapshot,
@@ -235,7 +229,6 @@ export default function CandidateCanvas({
 							onBackToCandidates={() => setWorkspaceView("candidates")}
 							onReturnToConversation={onReturnToConversation}
 							onPreviewRfqPrice={onPreviewRfqPrice}
-							onConfirmRfqSnapshot={onConfirmRfqSnapshot}
 							onPreviewRfqPublication={onPreviewRfqPublication}
 							onExecuteRfqPublication={onExecuteRfqPublication}
 							onRefreshSnapshot={onRefreshSnapshot}

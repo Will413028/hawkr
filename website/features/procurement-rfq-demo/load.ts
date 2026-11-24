@@ -1,29 +1,17 @@
-import {
-	type RfqConfirmationCommand,
-	type RfqPricePreviewCommand,
-	rfqConfirmationSchema,
-	rfqPricePreviewSchema,
-} from "@/features/procurement-assistant/rfq-price-contract";
-import {
-	normalizeRawProcurementSlots,
-	type RawProcurementSlots,
-} from "@/features/procurement-assistant/session-logic";
-import { apiClient } from "@/lib/api/client";
-import type { ProcurementCandidateSearch } from "@/lib/api/openapi-types";
+import { commonStoreCardClosedStore } from "@hawkr/ui-text/keys";
+import { candidateFromProto } from "@/features/procurement-assistant/proto-map";
+import { pricePreviewFromProto } from "@/features/procurement-assistant/rfq-price-contract";
+import { fetchProcurementSnapshot } from "@/features/procurement-assistant/snapshot";
+import type { ProcurementSnapshot } from "@/features/procurement-assistant/types";
+import { buyerProcurementClient } from "@/lib/connect/procurement";
+import { uiTextFor } from "@/lib/i18n/ui-text";
+import { activeLocale } from "@/lib/intl/active-locale";
 import type {
 	DemoCandidate,
 	DemoContext,
-	DemoPreviewIdentity,
 	DemoQuoteTotalRange,
 	DemoRequirement,
 } from "./types";
-
-interface SnapshotResponse {
-	requestId: string;
-	revisionId: string;
-	slots: RawProcurementSlots;
-	runs?: unknown;
-}
 
 export class DemoRequirementIncompleteError extends Error {
 	readonly missing: string[];
@@ -34,12 +22,8 @@ export class DemoRequirementIncompleteError extends Error {
 	}
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function toRequirement(snapshot: SnapshotResponse): DemoRequirement {
-	const slots = normalizeRawProcurementSlots(snapshot.slots) ?? {};
+function toRequirement(snapshot: ProcurementSnapshot): DemoRequirement {
+	const slots = snapshot.slots;
 	return {
 		requestId: snapshot.requestId,
 		revisionId: snapshot.revisionId,
@@ -47,49 +31,49 @@ function toRequirement(snapshot: SnapshotResponse): DemoRequirement {
 		quantity: slots.quantity ?? null,
 		unit: slots.unit ?? null,
 		packaging: slots.packaging ?? null,
-		deliveryCity: slots.delivery_city ?? null,
-		deliveryDate: slots.delivery_date ?? null,
-		budgetPerUnit: slots.budget_per_unit ?? null,
+		deliveryCity: slots.deliveryCity ?? null,
+		deliveryDate: slots.deliveryDate ?? null,
+		budgetPerUnit: slots.budgetPerUnit ?? null,
 	};
 }
 
-function latestCandidateSearchRunId(runs: unknown): string | null {
-	if (!Array.isArray(runs)) return null;
-	for (const entry of runs) {
-		if (!isRecord(entry)) continue;
-		if (entry.runType !== "CANDIDATE_SEARCH") continue;
-		const runId = entry.runId;
-		if (typeof runId === "string" && runId !== "") return runId;
-	}
-	return null;
+function latestCandidateSearchRunId(
+	snapshot: ProcurementSnapshot,
+): string | null {
+	const run = snapshot.runs.find(
+		(entry) => entry.runType === "CANDIDATE_SEARCH",
+	);
+	return run?.runId || null;
 }
 
 async function fetchSelectedCandidates(
 	requestId: string,
 	runId: string,
 ): Promise<DemoCandidate[]> {
-	const env = await apiClient.authed.get<ProcurementCandidateSearch>(
-		`/buyers/me/procurement/requests/${encodeURIComponent(requestId)}/candidate-searches/${encodeURIComponent(runId)}`,
+	const closedStoreName = uiTextFor(activeLocale())(
+		commonStoreCardClosedStore(),
 	);
-	const all = [
-		...(env.data.candidates?.platform ?? []),
-		...(env.data.candidates?.external ?? []),
-	];
-	return all
+	const res = await buyerProcurementClient().getCandidateSearch({
+		requestId,
+		runId,
+	});
+	return res.candidates
 		.filter((candidate) => candidate.selected)
-		.map((candidate) => ({
-			candidateId: candidate.candidateId,
-			displayName: candidate.displayName,
-			lane: candidate.lane,
-			sellerName: candidate.sellerName ?? null,
-			matchedFactCount: candidate.matchedFacts?.length ?? 0,
-			unverifiableFactCount: candidate.unverifiableFacts?.length ?? 0,
-		}));
+		.map((candidate) => {
+			const view = candidateFromProto(candidate, closedStoreName);
+			return {
+				candidateId: view.candidateId,
+				displayName: view.displayName,
+				lane: view.lane,
+				matchedFactCount: view.matchedFacts.length,
+				unverifiableFactCount: view.unverifiableFacts.length,
+			};
+		});
 }
 
 export interface PricePreviewOutcome {
 	quoteTotalRange: DemoQuoteTotalRange | null;
-	preview: DemoPreviewIdentity | null;
+	/** 試算沒有成功的原因；成功時是 null。 */
 	reason: string | null;
 }
 
@@ -97,81 +81,40 @@ export async function runPricePreview(
 	requirement: DemoRequirement,
 	buyerRange: { lower: number; upper: number },
 ): Promise<PricePreviewOutcome> {
-	const empty: PricePreviewOutcome = {
-		quoteTotalRange: null,
-		preview: null,
-		reason: null,
-	};
 	if (!requirement.deliveryCity) {
-		return { ...empty, reason: "MISSING_DELIVERY_CITY" };
+		return { quoteTotalRange: null, reason: "MISSING_DELIVERY_CITY" };
 	}
-	const command: RfqPricePreviewCommand = {
-		expectedRevisionId: requirement.revisionId,
-		clientRequestId: `rfq-demo-${requirement.revisionId}-${Date.now()}`,
-		deliveryCity: requirement.deliveryCity,
-		buyerRequestedRange: {
-			currency: "TWD" as const,
-			priceComponent: "GOODS_ONLY" as const,
-			lowerBoundAmount: String(buyerRange.lower),
-			upperBoundAmount: String(buyerRange.upper),
-		},
-	};
 	try {
-		const env = await apiClient.authed.post<unknown>(
-			`/buyers/me/procurement/requests/${encodeURIComponent(requirement.requestId)}/rfq-price-previews`,
-			{ json: command },
-		);
-		const parsed = rfqPricePreviewSchema.safeParse(env.data);
-		if (!parsed.success) return { ...empty, reason: "INVALID_RESPONSE" };
-		const preview = parsed.data;
-		const identity: DemoPreviewIdentity = {
-			pricePreviewId: preview.pricePreviewId,
-			version: preview.version,
-			payloadHash: preview.payloadHash,
+		const res = await buyerProcurementClient().previewRfqPrice({
+			requestId: requirement.requestId,
+			expectedRevisionId: requirement.revisionId,
+			buyerRequestedRange: {
+				lowerBoundAmount: BigInt(buyerRange.lower),
+				upperBoundAmount: BigInt(buyerRange.upper),
+			},
+		});
+		const preview = pricePreviewFromProto(res);
+		if (!preview) return { quoteTotalRange: null, reason: "INVALID_RESPONSE" };
+		const total = preview.quoteTotalRange;
+		return {
+			quoteTotalRange: total
+				? {
+						lower: Number(total.lowerBoundAmount),
+						upper: Number(total.upperBoundAmount),
+						quantity: total.quantity,
+						quantityUnit: total.quantityUnit,
+					}
+				: null,
+			reason: null,
 		};
-		const totals: DemoQuoteTotalRange | null = preview.quoteTotalRange
-			? {
-					lower: Number(preview.quoteTotalRange.lowerBoundAmount),
-					upper: Number(preview.quoteTotalRange.upperBoundAmount),
-					quantity: preview.quoteTotalRange.quantity,
-					quantityUnit: preview.quoteTotalRange.quantityUnit,
-				}
-			: null;
-		return { quoteTotalRange: totals, preview: identity, reason: null };
 	} catch {
-		return { ...empty, reason: "PREVIEW_REJECTED" };
+		return { quoteTotalRange: null, reason: "PREVIEW_REJECTED" };
 	}
-}
-
-export async function confirmRfqSnapshot(
-	requirement: DemoRequirement,
-	preview: DemoPreviewIdentity,
-): Promise<{ confirmedSnapshotId: string; payloadHash: string }> {
-	const command: RfqConfirmationCommand = {
-		clientRequestId: `rfq-demo-confirm-${preview.pricePreviewId}-${preview.version}`,
-		expectedRevisionId: requirement.revisionId,
-		pricePreviewId: preview.pricePreviewId,
-		pricePreviewVersion: preview.version,
-		payloadHash: preview.payloadHash,
-		buyerNote: "",
-	};
-	const env = await apiClient.authed.post<unknown>(
-		`/buyers/me/procurement/requests/${encodeURIComponent(requirement.requestId)}/rfq-confirmations`,
-		{ json: command },
-	);
-	const parsed = rfqConfirmationSchema.safeParse(env.data);
-	if (!parsed.success) throw new Error("confirmation response invalid");
-	return {
-		confirmedSnapshotId: parsed.data.confirmedRfqSnapshotId,
-		payloadHash: parsed.data.payloadHash,
-	};
 }
 
 export async function loadDemoContext(requestId: string): Promise<DemoContext> {
-	const env = await apiClient.authed.get<SnapshotResponse>(
-		`/buyers/me/procurement/requests/${encodeURIComponent(requestId)}/snapshot`,
-	);
-	const requirement = toRequirement(env.data);
+	const snapshot = await fetchProcurementSnapshot(requestId);
+	const requirement = toRequirement(snapshot);
 
 	const missing: string[] = [];
 	if (!requirement.item) missing.push("品項");
@@ -179,7 +122,7 @@ export async function loadDemoContext(requestId: string): Promise<DemoContext> {
 	if (!requirement.unit) missing.push("單位");
 	if (missing.length > 0) throw new DemoRequirementIncompleteError(missing);
 
-	const runId = latestCandidateSearchRunId(env.data.runs);
+	const runId = latestCandidateSearchRunId(snapshot);
 	let candidates: DemoCandidate[] = [];
 	let candidatesUnavailableReason: string | null = null;
 	if (!runId) {
@@ -200,6 +143,5 @@ export async function loadDemoContext(requestId: string): Promise<DemoContext> {
 		candidates,
 		candidatesUnavailableReason,
 		quoteTotalRange: null,
-		preview: null,
 	};
 }

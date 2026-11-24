@@ -1,4 +1,4 @@
-import type { ProcurementCandidate } from "@/lib/api/openapi-types";
+import type { ProcurementCandidate } from "@/features/procurement-assistant/types";
 
 /**
  * 候選按商家收斂（B-246 / backend #2377）。
@@ -32,7 +32,7 @@ import type { ProcurementCandidate } from "@/lib/api/openapi-types";
 /** 一家商家，以及它底下被合併掉的候選。 */
 export interface CandidateSellerGroup {
 	storeId: string;
-	/** 缺店名時退回「商家 {storeId}」，不留空字串讓標題整個消失。 */
+	/** 店家卡片的名稱；沒有名稱時是「已關閉的店家」。 */
 	sellerName: string;
 	/** 缺 storeCode 時為 null：不得用 storeId 組連結，該路徑正在被收掉。 */
 	storeCode: string | null;
@@ -53,8 +53,6 @@ export interface CandidateSellerGroup {
 	unverifiableFacts: ProcurementCandidate["unverifiableFacts"];
 	/** 群組內最新的資料時間。 */
 	factsAsOf: string;
-	/** 群組內最高的比對分數（同上，目前每筆相同）。 */
-	score: number;
 }
 
 export interface GroupedPlatformCandidates {
@@ -107,14 +105,13 @@ export function groupPlatformCandidates(
 		if (!existing) {
 			byStore.set(storeId, {
 				storeId,
-				sellerName: candidate.sellerName || `商家 ${storeId}`,
+				sellerName: candidate.displayName,
 				storeCode: candidate.storeCode || null,
 				logoUrl: candidate.logoUrl || null,
 				candidates: [candidate],
 				matchedFacts: [...candidate.matchedFacts],
 				unverifiableFacts: [...candidate.unverifiableFacts],
 				factsAsOf: candidate.factsAsOf,
-				score: candidate.score,
 			});
 			continue;
 		}
@@ -125,7 +122,6 @@ export function groupPlatformCandidates(
 		if (candidate.factsAsOf > existing.factsAsOf) {
 			existing.factsAsOf = candidate.factsAsOf;
 		}
-		if (candidate.score > existing.score) existing.score = candidate.score;
 	}
 
 	return { groups: [...byStore.values()], ungrouped };

@@ -9,7 +9,7 @@ import {
 } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ProcurementCandidate } from "@/lib/api/openapi-types";
+import type { ProcurementCandidate } from "@/features/procurement-assistant/types";
 import RfqDraftFlow from "../RfqDraftFlow";
 import type {
 	RfqCommandResult,

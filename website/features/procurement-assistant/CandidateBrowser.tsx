@@ -8,7 +8,7 @@ import type {
 	ProcurementCandidate,
 	ProcurementCandidateSearch,
 	ProcurementLane,
-} from "@/lib/api/openapi-types";
+} from "@/features/procurement-assistant/types";
 import { formatTaipeiDateTime } from "@/lib/date/taipei";
 import Link from "@/lib/intl/native-link";
 import {
@@ -19,7 +19,6 @@ import {
 	groupPlatformCandidates,
 	sellerSelectionState,
 } from "./candidate-grouping";
-import { hasPartialLaneFailure } from "./session-logic";
 
 /** lane 對買家的說法。**只有這一份**——`AssistantWorkspace` 的候選詳情面板
  * 原本各自寫死一組同義字串，清單改了詳情不會跟著改。 */
@@ -96,20 +95,6 @@ function CandidateIdentity({
 				)}
 			</span>
 			<strong>{name}</strong>
-		</span>
-	);
-}
-
-/** 比對分數方塊。窄版靠 CSS 貼到卡片右上角自成一塊，所以「比對」與「94 分」要是
- * 兩個具名子元素——留成裸文字節點時，grid 會把它們拆成各自佔一列的匿名 item，
- * 「94」與「分」會上下分家。 */
-function CandidateScore({ score }: { score: number }) {
-	return (
-		<span className="assistant-candidate-row__score">
-			<span className="assistant-candidate-row__score-label">比對</span>
-			<span className="assistant-candidate-row__score-value">
-				<b>{score}</b> 分
-			</span>
 		</span>
 	);
 }
@@ -193,7 +178,7 @@ function CandidateRow({
 				<CandidateIdentity
 					lane={candidate.lane}
 					name={candidate.displayName}
-					logoUrl={candidate.brandLogoUrl}
+					logoUrl={candidate.logoUrl}
 				/>
 				<span className="assistant-candidate-row__meta">
 					<span
@@ -202,7 +187,6 @@ function CandidateRow({
 					>
 						{LANE_LABEL[candidate.lane]}
 					</span>
-					<CandidateScore score={candidate.score} />
 				</span>
 			</td>
 
@@ -361,7 +345,6 @@ function SellerRow({
 					<span className="assistant-candidate-row__lane" data-lane="PLATFORM">
 						{LANE_LABEL.PLATFORM}
 					</span>
-					<CandidateScore score={group.score} />
 					<span className="assistant-candidate-row__match-count">
 						{group.candidates.length} 項符合的商品
 					</span>
@@ -652,13 +635,6 @@ export default function CandidateBrowser({
 					</h3>
 					<p>勾選加入比較清單，不會通知商家。</p>
 				</div>
-				{/* 契約凍結後 run 狀態不再帶「部分成功」這個資訊：判準是「run 成功但有 lane
-				    失敗」，那正是新值域對部分成功的定義。 */}
-				{hasPartialLaneFailure(candidateSet) ? (
-					<Chip variant="flat" color="warning" size="sm">
-						部分來源未完成
-					</Chip>
-				) : null}
 			</header>
 
 			{candidatesStale ? (

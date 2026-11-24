@@ -2,27 +2,27 @@
 
 import AppIcon from "@/components/shared/AppIcon";
 import { Button, Chip } from "@/components/ui";
-import type {
-	ProcurementCandidateSearch,
-	ProcurementLaneStatus,
-} from "@/lib/api/openapi-types";
+import type { ProcurementCandidateSearch } from "./types";
 
-const LANE_LABEL = { PLATFORM: "平台賣家", EXTERNAL: "外部業者" } as const;
+const LANE_LABEL = { PLATFORM: "平台賣家" } as const;
 
-/**
- * key 型別直接引用 ProcurementLaneStatus，不再手寫字面值 union——這樣值域一改，
- * 這張表少一個 key 就是編譯錯誤。之前手寫的版本漏一個值只會在執行期查表回
- * undefined，那一列的文字整個空白，沒有任何訊號。
- */
-const LANE_STATUS_LABEL: Record<ProcurementLaneStatus, string> = {
+type SearchStatus = "PENDING" | "SUCCEEDED" | "FAILED";
+
+const SEARCH_STATUS_LABEL: Record<SearchStatus, string> = {
 	PENDING: "搜尋中",
 	SUCCEEDED: "已完成",
 	FAILED: "失敗",
 };
 
-/** lane 已成功。 */
-function isLaneSucceeded(status: ProcurementLaneStatus): boolean {
-	return status === "SUCCEEDED";
+/** 搜尋 run 的狀態收斂成進度列的三態：還沒有結果、成功、失敗（取消與失敗同樣沒有候選）。 */
+function searchStatusOf(
+	candidateSet: ProcurementCandidateSearch | null,
+): SearchStatus {
+	if (!candidateSet) return "PENDING";
+	if (candidateSet.status === "SUCCEEDED") return "SUCCEEDED";
+	if (candidateSet.status === "FAILED" || candidateSet.status === "CANCELLED")
+		return "FAILED";
+	return "PENDING";
 }
 
 /** 輪詢掛掉時的重試入口。抽出來是因為 searching 階段有兩種畫面（合併後的軌、
@@ -77,25 +77,21 @@ export default function CandidateSearchProgress({
 				<SearchPollErrorAlert onRetryPolling={onRetryPolling} />
 			) : (
 				<ol className="assistant-progress__list">
-					{(["PLATFORM", "EXTERNAL"] as const).map((lane) => {
-						const status = candidateSet
-							? lane === "PLATFORM"
-								? candidateSet.platformLaneStatus
-								: candidateSet.externalLaneStatus
-							: "PENDING";
+					{(["PLATFORM"] as const).map((lane) => {
+						const status = searchStatusOf(candidateSet);
 						return (
 							<li
 								key={lane}
-								data-status={isLaneSucceeded(status) ? "completed" : "current"}
+								data-status={status === "SUCCEEDED" ? "completed" : "current"}
 							>
 								<AppIcon
-									name={isLaneSucceeded(status) ? "check" : "clock"}
+									name={status === "SUCCEEDED" ? "check" : "clock"}
 									size={17}
 									aria-hidden="true"
 								/>
 								<div>
 									<strong>{LANE_LABEL[lane]}</strong>
-									<span>{LANE_STATUS_LABEL[status]}</span>
+									<span>{SEARCH_STATUS_LABEL[status]}</span>
 								</div>
 							</li>
 						);

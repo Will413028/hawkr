@@ -1,17 +1,15 @@
 "use client";
 
+import { Code } from "@connectrpc/connect";
+import { parseDate } from "@hawkr/api/proto/date";
+import { commonStoreCardClosedStore } from "@hawkr/ui-text/keys";
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import * as React from "react";
 import { ApiClientError, apiClient } from "@/lib/api/client";
-import type {
-	ProcurementCandidate,
-	ProcurementCandidateSearch,
-	ProcurementRunStatus,
-	ProcurementSlots,
-	ProcurementSnapshot,
-} from "@/lib/api/openapi-types";
+import { buyerProcurementClient } from "@/lib/connect/procurement";
 import { toast } from "@/lib/feedback/toast";
 import { useQueryIdentity } from "@/lib/hooks/useQueryIdentity";
+import { useDefaultErrorText, useUiText } from "@/lib/i18n/ui-text";
 import { toBrowserHref } from "@/lib/navigation/resolve-url";
 import { type QueryIdentity, queryKeys } from "@/lib/query/keys";
 import type { AgentActivityEvent } from "./activity";
@@ -23,47 +21,45 @@ import {
 } from "./conversations";
 import {
 	CONVERSATION_GONE,
+	invalidResponseFailure,
 	type ProcurementError,
-	parseProcurementError,
+	type ProcurementFailure,
 	procurementErrorFromStatus,
+	procurementFailureFrom,
 } from "./errors";
+import { turnResultFromLegacy } from "./legacy-turn-result";
 import {
-	type RfqCommandFailure,
+	candidateSearchFromProto,
+	slotKeyFromCode,
+	turnResultFromProto,
+} from "./proto-map";
+import {
+	pricePreviewFromProto,
 	type RfqCommandResult,
-	type RfqConfirmation,
-	type RfqConfirmationCommand,
 	type RfqPricePreview,
 	type RfqPricePreviewCommand,
-	rfqConfirmationSchema,
-	rfqPricePreviewSchema,
 } from "./rfq-price-contract";
 import {
-	publicationExecuteBody,
-	publicationPreviewBody,
+	approvalFromProto,
+	publicationResultFromProto,
 	type RfqPublicationApproval,
 	type RfqPublicationExecuteCommand,
 	type RfqPublicationPreviewCommand,
 	type RfqPublicationResult,
-	rfqPublicationApprovalSchema,
-	rfqPublicationResultSchema,
 } from "./rfq-publication-contract";
 import { assistantConversationPath } from "./routes";
 import {
 	type CancellableRun,
 	type RunCancelDisposition,
-	runCancelResultSchema,
-	runtimeSnapshotSchema,
+	runtimeSnapshotFromProto,
 	selectCancellableRun,
 } from "./runtime-snapshot-contract";
 import {
 	applyOptimisticSelection,
 	deriveStageFromStatus,
 	isTerminalCandidateStatus,
-	mapSlots,
 	type NormalizedProcurementTurnResult,
-	normalizeCandidateSelectionResult,
 	normalizeProcurementTurnResult,
-	type RawProcurementSlots,
 	slotLabel,
 } from "./session-logic";
 import {
@@ -75,6 +71,7 @@ import {
 	type SessionOperation,
 	type SessionOperationGuard,
 } from "./session-operation";
+import { fetchProcurementSnapshot } from "./snapshot";
 import type { AgentStep } from "./steps";
 import { monotonicNow, trackHawkrAgentFirstStepLatency } from "./telemetry";
 import {
@@ -86,12 +83,15 @@ import {
 } from "./turn-stream";
 import type {
 	ClarifyQuestion,
-	CropDisambiguation,
-	CropDisambiguationOption,
+	ProcurementCandidate,
+	ProcurementCandidateSearch,
 	ProcurementChatTurn,
+	ProcurementInterrupt,
+	ProcurementSlots,
+	ProcurementSnapshot,
 	ProcurementStage,
-	RecordedField,
-	RejectedField,
+	ProcurementTurnResult,
+	PublishedRfqPublication,
 } from "./types";
 
 const MAX_MESSAGE_RUNES = 2000;
@@ -115,232 +115,10 @@ const CANDIDATE_SELECTION_UNCONFIRMED: ProcurementError = Object.freeze({
 	detail: "無法確認這筆候選的選取狀態，請重新搜尋後再操作。",
 });
 
-const priceBasisUnavailable: RfqCommandFailure = {
-	code: "PRICE_INPUT_INVALID",
-	detail: "目前數量或單位無法形成可確認的價格基準。",
-	retryable: false,
-};
-
-function rfqCommandFailure(
-	error: unknown,
-	operation: "preview" | "confirmation",
-): RfqCommandFailure {
-	if (!(error instanceof ApiClientError)) {
-		return {
-			code: "NETWORK_ERROR",
-			detail: "連線中斷，無法確認這次操作的結果。請用原操作重試。",
-			retryable: true,
-		};
-	}
-
-	const byReason: Partial<Record<string, RfqCommandFailure>> = {
-		BUYER_REQUESTED_RANGE_REQUIRED: priceBasisUnavailable,
-		QUANTITY_UNIT_UNCONVERTIBLE: priceBasisUnavailable,
-		STALE_REVISION:
-			operation === "confirmation"
-				? {
-						code: "PRICE_PREVIEW_STALE",
-						detail: "這份價格試算已過期或不屬於目前版本，請重新試算。",
-						retryable: false,
-					}
-				: {
-						code: "STALE_REVISION",
-						detail: "需求已更新，這份價格試算不再適用。",
-						retryable: false,
-					},
-		IDEMPOTENCY_KEY_CONFLICT: {
-			code: "IDEMPOTENCY_KEY_CONFLICT",
-			detail: "這次操作識別碼已綁定其他內容，未建立新結果。",
-			retryable: false,
-		},
-		REQUEST_NOT_FOUND: {
-			code: "REQUEST_NOT_FOUND",
-			detail: "找不到這筆採購需求，請回到對話重新確認。",
-			retryable: false,
-		},
-		RESOURCE_NOT_FOUND: {
-			code: "RESOURCE_NOT_FOUND",
-			detail: "找不到這份價格試算，請重新試算後再確認。",
-			retryable: false,
-		},
-	};
-	const mapped = byReason[error.reason];
-	if (mapped) return mapped;
-	if (error.status === 401) {
-		return {
-			code: "UNAUTHORIZED",
-			detail: "登入已失效，請重新登入後再試。",
-			retryable: false,
-		};
-	}
-	if (error.status === 403) {
-		return {
-			code: "FORBIDDEN",
-			detail: "目前帳號沒有執行這項操作的權限。",
-			retryable: false,
-		};
-	}
-	if (error.status === 408 || error.status === 429) {
-		return {
-			code: "RATE_LIMITED",
-			detail:
-				error.status === 429
-					? "價格服務請求過於頻繁，請稍候並用原操作重試。"
-					: "價格服務逾時，無法確認這次操作的結果。請用原操作重試。",
-			retryable: true,
-		};
-	}
-	if (error.status >= 500) {
-		return {
-			code: "SERVER_ERROR",
-			detail: "價格服務暫時忙碌，無法確認這次操作的結果。請用原操作重試。",
-			retryable: true,
-		};
-	}
-	return {
-		code: "UNKNOWN_ERROR",
-		detail: error.message || "目前無法完成這項操作。",
-		retryable: false,
-	};
-}
-
-function normalizeOptions(
-	raw: unknown,
-): Array<{ optionId: string; label: string; value: string }> {
-	if (!Array.isArray(raw)) return [];
-	return raw.flatMap((o) => {
-		if (!o || typeof o !== "object") return [];
-		const opt = o as Record<string, unknown>;
-		if (
-			typeof opt.optionId !== "string" ||
-			typeof opt.label !== "string" ||
-			typeof opt.value !== "string"
-		)
-			return [];
-		return [{ optionId: opt.optionId, label: opt.label, value: opt.value }];
-	});
-}
-
-function normalizeQuestion(raw: unknown): ClarifyQuestion | null {
-	if (!raw || typeof raw !== "object") return null;
-	const r = raw as Record<string, unknown>;
-	if (typeof r.slotKey !== "string" || typeof r.prompt !== "string")
-		return null;
-	const unitOptions = normalizeOptions(r.unitOptions);
-	return {
-		slotKey: r.slotKey,
-		prompt: r.prompt,
-		options: normalizeOptions(r.options),
-		unitOptions: unitOptions.length > 0 ? unitOptions : undefined,
-		allowFreeText: r.allowFreeText !== false,
-		source: r.source === "PHRASE_LLM" ? "PHRASE_LLM" : "FIXED",
-		canSkip: r.canSkip === true,
-	};
-}
-
-function normalizeRecorded(raw: unknown): RecordedField[] {
-	if (!Array.isArray(raw)) return [];
-	return raw.flatMap((item) => {
-		if (!item || typeof item !== "object") return [];
-		const r = item as Record<string, unknown>;
-		if (typeof r.key !== "string" || typeof r.value !== "string") return [];
-		return [
-			{
-				key: r.key,
-				label: typeof r.label === "string" && r.label ? r.label : r.key,
-				value: r.value,
-			},
-		];
-	});
-}
-
-function normalizeRejected(raw: unknown): RejectedField[] {
-	if (!Array.isArray(raw)) return [];
-	return raw.flatMap((item) => {
-		if (!item || typeof item !== "object") return [];
-		const r = item as Record<string, unknown>;
-		if (typeof r.key !== "string" || typeof r.reason !== "string") return [];
-		return [{ key: r.key, reason: r.reason }];
-	});
-}
-
-function normalizeCropDisambiguation(raw: unknown): CropDisambiguation | null {
-	if (!raw || typeof raw !== "object") return null;
-	const r = raw as Record<string, unknown>;
-	if (typeof r.prompt !== "string") return null;
-	const options = Array.isArray(r.options)
-		? r.options.flatMap((o) => {
-				if (!o || typeof o !== "object") return [];
-				const opt = o as Record<string, unknown>;
-				if (typeof opt.optionId !== "string" || typeof opt.label !== "string")
-					return [];
-				return [
-					{
-						optionId: opt.optionId,
-						label: opt.label,
-					},
-				];
-			})
-		: [];
-	return { prompt: r.prompt, options };
-}
-
-function normalizeOpenConfirmation(
-	raw: unknown,
-): { interruptId: string; reason: string } | null {
-	if (!raw || typeof raw !== "object") return null;
-	const r = raw as Record<string, unknown>;
-	if (
-		typeof r.interruptId !== "string" ||
-		typeof r.confirmationKind !== "string"
-	)
-		return null;
-	return { interruptId: r.interruptId, reason: r.confirmationKind };
-}
-
-function normalizeOpenConfirmationQuestion(
-	raw: unknown,
-): ClarifyQuestion | null {
-	if (!normalizeOpenConfirmation(raw)) return null;
-	return normalizeQuestion((raw as Record<string, unknown>).question);
-}
-
-export interface PublishedRfqPublication {
-	publicationId: string;
-	version: string;
-	publishedAt: string;
-}
-
-function normalizePublishedPublication(
-	raw: unknown,
-): PublishedRfqPublication | null {
-	if (!raw || typeof raw !== "object") return null;
-	const r = raw as Record<string, unknown>;
-	if (typeof r.publicationId !== "string" || r.publicationId === "")
-		return null;
-	return {
-		publicationId: r.publicationId,
-		version: typeof r.version === "string" ? r.version : "",
-		publishedAt: typeof r.publishedAt === "string" ? r.publishedAt : "",
-	};
-}
-
-interface RawSnapshot {
-	requestId: string;
-	revisionId: string;
-	status: ProcurementSnapshot["status"];
-	slots: RawProcurementSlots;
-	missingRequired: string[];
-	cropDisambiguation?: unknown;
-	runs?: unknown;
-	activeRunId?: string;
-	openConfirmation?: unknown;
-	publishedPublication?: unknown;
-}
-
 export interface ProcurementResumeOutcome {
 	resolved: boolean;
-	turnResult?: unknown;
+	/** 回答中斷排入的 run；結果從這個 run 的事件取得。 */
+	runId?: string;
 }
 
 interface TerminalTelemetryObservation {
@@ -375,40 +153,14 @@ function terminalTelemetryObservation(
  * 「這一輪已經到終點」而不是「已為您取消」，把它們塌成同一個成功態就會讓
  * 買家以為自己的停止作廢了一個已完成的結果（設計書明文「不得謊報取消
  * 成功」）。所以 disposition 原樣帶到畫面層。
- *
- * `stale` 是第五種、**伺服器沒講過結果**的情況：CAS 版本過期，重讀快照之後
- * 也拿不到新的 token。這時唯一誠實的話是「狀態已經變了，請重新整理確認」，
- * 不能挑一個最像的 disposition 填上去。
  */
 export type RunCancelState =
 	| { status: "idle" }
 	| { status: "requesting" }
 	| { status: "settled"; disposition: RunCancelDisposition }
-	| { status: "stale" }
 	| { status: "error"; detail: string };
 
 const IDLE_CANCEL_STATE: RunCancelState = { status: "idle" };
-
-const INVALID_CANCEL_ACK: RunCancelState = {
-	status: "error",
-	detail: "無法確認這次停止的結果，請重新整理確認目前狀態。",
-};
-
-const STALE_CANCEL_STATE: RunCancelState = {
-	status: "stale",
-	// 不編 disposition：伺服器沒有回過這次命令的結果。
-};
-
-/**
- * CAS 沒過。
- *
- * 這支端點用 409 表達「手上的 `expectedRunVersion` 已經不是現在的版本」。只認
- * 狀態碼、不押某一個 `reason` 常數：reason 字串在不同 gateway 版本之間沒有
- * 保證，押錯會讓一個「重讀一次就好」的情況被端成「停止失敗」。
- */
-function isRunVersionConflict(error: unknown): boolean {
-	return error instanceof ApiClientError && error.status === 409;
-}
 
 interface SessionState {
 	stage: ProcurementStage;
@@ -431,12 +183,11 @@ interface SessionState {
 	pollError: boolean;
 	candidatesStale: boolean;
 	error: ProcurementError | null;
-	cropDisambiguation: CropDisambiguation | null;
-	pendingInterrupt: { interruptId: string; reason: string } | null;
+	pendingInterrupt: ProcurementInterrupt | null;
 	publishedPublication: PublishedRfqPublication | null;
 	/**
-	 * 現在按下停止會停到的那一個 run（含 CAS token）。null＝**這一輪沒有可送出
-	 * 的取消命令**，畫面要讓按鈕維持不可用，而不是送一個會被 400 擋下的請求。
+	 * 現在按下停止會停到的那一個 run。null＝**這一輪沒有可送出的取消命令**，
+	 * 畫面要讓按鈕維持不可用。
 	 */
 	activeRun: CancellableRun | null;
 	cancelState: RunCancelState;
@@ -465,7 +216,6 @@ export function initialState(): SessionState {
 		pollError: false,
 		candidatesStale: false,
 		error: null,
-		cropDisambiguation: null,
 		pendingInterrupt: null,
 		publishedPublication: null,
 		activeRun: null,
@@ -476,10 +226,9 @@ export function initialState(): SessionState {
 
 export function restoredStateFrom(
 	transcript: AgentTranscript | null,
-	snapshot: RawSnapshot,
+	snapshot: ProcurementSnapshot,
 ): Partial<SessionState> {
-	const slots = mapSlots(snapshot.slots);
-	const question = normalizeOpenConfirmationQuestion(snapshot.openConfirmation);
+	const slots = snapshot.slots;
 	const filled = (Object.keys(slots) as Array<keyof ProcurementSlots>)
 		.filter((key) => slots[key] !== undefined)
 		.map((key) => `${slotLabel(key)}=${String(slots[key])}`);
@@ -490,6 +239,7 @@ export function restoredStateFrom(
 		recordedThisTurn: m.recordedThisTurn,
 		createdAt: Date.parse(m.createdAt) || 0,
 	}));
+	const confirmation = snapshot.openConfirmation;
 	return {
 		requestId: snapshot.requestId,
 		revisionId: snapshot.revisionId,
@@ -498,14 +248,11 @@ export function restoredStateFrom(
 		slots,
 		missingRequired: snapshot.missingRequired,
 		stage: deriveStageFromStatus(snapshot.status),
-		question,
-		cropDisambiguation: question
-			? null
-			: normalizeCropDisambiguation(snapshot.cropDisambiguation),
-		pendingInterrupt: normalizeOpenConfirmation(snapshot.openConfirmation),
-		publishedPublication: normalizePublishedPublication(
-			snapshot.publishedPublication,
-		),
+		question: confirmation?.question ?? null,
+		pendingInterrupt: confirmation
+			? { interruptId: confirmation.interruptId, reason: confirmation.reason }
+			: null,
+		publishedPublication: snapshot.publishedPublication,
 		runId: null,
 		activeRun: null,
 		cancelState: IDLE_CANCEL_STATE,
@@ -529,11 +276,18 @@ function readCachedRestore(
 		queryKeys.assistant.transcript(identity, conversationId),
 	);
 	if (!transcript?.requestId) return null;
-	const snapshot = queryClient.getQueryData<RawSnapshot>(
+	const snapshot = queryClient.getQueryData<ProcurementSnapshot>(
 		queryKeys.assistant.snapshot(identity, transcript.requestId),
 	);
 	if (!snapshot) return null;
 	return restoredStateFrom(transcript, snapshot);
+}
+
+function staleContextFailure(detail: string): RfqCommandResult<never> {
+	return {
+		ok: false,
+		error: { code: "STALE_CONTEXT", detail, retryable: false },
+	};
 }
 
 function writeConversationUrl(conversationId: string) {
@@ -650,6 +404,9 @@ export function useProcurementSession(
 ) {
 	const queryClient = useQueryClient();
 	const queryIdentity = useQueryIdentity();
+	const defaults = useDefaultErrorText();
+	const ut = useUiText();
+	const closedStoreName = ut(commonStoreCardClosedStore());
 
 	const [state, setState] = React.useState<SessionState>(() => {
 		const cached = readCachedRestore(
@@ -713,15 +470,10 @@ export function useProcurementSession(
 	const [pollRetryToken, setPollRetryToken] = React.useState(0);
 
 	const fetchSnapshot = React.useCallback(
-		(requestId: string): Promise<RawSnapshot> =>
+		(requestId: string): Promise<ProcurementSnapshot> =>
 			queryClient.fetchQuery({
 				queryKey: queryKeys.assistant.snapshot(queryIdentity, requestId),
-				queryFn: async () => {
-					const env = await apiClient.authed.get<RawSnapshot>(
-						`/buyers/me/procurement/requests/${requestId}/snapshot`,
-					);
-					return env.data;
-				},
+				queryFn: () => fetchProcurementSnapshot(requestId),
 				staleTime: 0,
 			}),
 		[queryClient, queryIdentity],
@@ -846,45 +598,36 @@ export function useProcurementSession(
 						)
 					)
 						return existing;
-					const pendingInterrupt = normalizeOpenConfirmation(
-						snapshot.openConfirmation,
-					);
-					const rawConfirmation = snapshot.openConfirmation as
-						| Record<string, unknown>
-						| undefined;
-					const cropDisambiguation = normalizeCropDisambiguation(
-						snapshot.cropDisambiguation,
-					);
+					const confirmation = snapshot.openConfirmation;
 					const preserveRegularQuestion =
 						snapshot.requestId === existing.requestId &&
 						snapshot.revisionId === existing.revisionId &&
 						(snapshot.status === "CLARIFYING" ||
 							snapshot.status === "REQUIREMENT_READY") &&
-						snapshot.openConfirmation == null &&
-						!existing.pendingInterrupt &&
-						!cropDisambiguation &&
-						existing.question?.slotKey !== "crop_disambiguation";
-					const question =
-						normalizeOpenConfirmationQuestion(snapshot.openConfirmation) ??
-						((rawConfirmation?.question === undefined &&
-							pendingInterrupt &&
-							pendingInterrupt.interruptId ===
+						confirmation === null &&
+						!existing.pendingInterrupt;
+					const keepExistingQuestion =
+						(confirmation !== null &&
+							confirmation.question === null &&
+							confirmation.interruptId ===
 								existing.pendingInterrupt?.interruptId) ||
-						preserveRegularQuestion
-							? existing.question
-							: null);
+						preserveRegularQuestion;
 					return {
 						...existing,
 						revisionId: snapshot.revisionId,
-						slots: mapSlots(snapshot.slots),
+						slots: snapshot.slots,
 						missingRequired: snapshot.missingRequired,
 						stage: deriveStageFromStatus(snapshot.status),
-						question,
-						cropDisambiguation: question ? null : cropDisambiguation,
-						pendingInterrupt,
-						publishedPublication: normalizePublishedPublication(
-							snapshot.publishedPublication,
-						),
+						question:
+							confirmation?.question ??
+							(keepExistingQuestion ? existing.question : null),
+						pendingInterrupt: confirmation
+							? {
+									interruptId: confirmation.interruptId,
+									reason: confirmation.reason,
+								}
+							: null,
+						publishedPublication: snapshot.publishedPublication,
 						runId: null,
 						candidateSet: null,
 						pollError: false,
@@ -899,7 +642,10 @@ export function useProcurementSession(
 		}, [fetchSnapshot, invalidateCandidateSelections, sessionGenerationGuard]);
 
 	const resume = React.useCallback(
-		async (payload: unknown): Promise<ProcurementResumeOutcome> => {
+		async (response: {
+			optionId?: string;
+			freeText?: string;
+		}): Promise<ProcurementResumeOutcome> => {
 			const current = stateRef.current;
 			if (!current.requestId || !current.pendingInterrupt) {
 				return { resolved: false };
@@ -914,12 +660,17 @@ export function useProcurementSession(
 				) && stateRef.current.pendingInterrupt?.interruptId === interruptId;
 			const clientRequestId = crypto.randomUUID();
 			try {
-				const env = await apiClient.authed.post<unknown>(
-					`/buyers/me/procurement/runs/${interruptId}/resume`,
-					{
-						json: { interruptId, clientRequestId, payload },
+				const res = await buyerProcurementClient().resumeRun({
+					interruptId,
+					clientRequestId,
+					response: {
+						case: "clarification",
+						value: {
+							optionId: response.optionId ?? "",
+							freeText: response.freeText ?? "",
+						},
 					},
-				);
+				});
 				if (!isCurrentInterrupt()) return { resolved: false };
 				setState((s) =>
 					sessionGenerationGuard.isCurrent(sessionIdentity, s.requestId) &&
@@ -927,48 +678,25 @@ export function useProcurementSession(
 						? { ...s, pendingInterrupt: null, error: null }
 						: s,
 				);
-				const raw = (env.data as { result?: unknown } | null | undefined)
-					?.result;
-				return { resolved: true, turnResult: raw ?? undefined };
+				return { resolved: true, runId: res.runId };
 			} catch (err) {
 				if (!isCurrentInterrupt()) return { resolved: false };
-				const detail =
-					err instanceof ApiClientError
-						? procurementErrorFromStatus(err.status, err.reason, err.message)
-								.detail
-						: "恢復失敗，請重試";
-				toast.error(detail);
+				toast.error(procurementFailureFrom(err, defaults).detail);
 				await refreshCurrentSnapshot();
 				return { resolved: false };
 			}
 		},
-		[refreshCurrentSnapshot, sessionGenerationGuard],
+		[defaults, refreshCurrentSnapshot, sessionGenerationGuard],
 	);
 
 	const applyTurnResult = React.useCallback(
 		async (
-			rawData: unknown,
+			data: ProcurementTurnResult,
 			assistantTurnId: string,
 			operation: SessionOperation,
 			terminalTelemetry: TerminalTelemetryObservation | null,
 		) => {
 			if (!operationGuard.isCurrent(operation)) return;
-			const data = normalizeProcurementTurnResult(rawData);
-			if (!data) {
-				setState((s) =>
-					operationGuard.isCurrent(operation)
-						? {
-								...s,
-								pendingTurn: false,
-								liveSteps: [],
-								liveActivity: [],
-								error: TURN_RESULT_INVALID,
-								terminalTelemetry,
-							}
-						: s,
-				);
-				return;
-			}
 			if (!operationGuard.acceptsResult(operation, data.requestId)) {
 				setState((s) =>
 					operationGuard.isCurrent(operation)
@@ -989,14 +717,9 @@ export function useProcurementSession(
 				role: "assistant",
 				text: data.reply,
 				blocks: data.blocks,
-				recordedThisTurn: (() => {
-					const recorded = normalizeRecorded(data.recordedThisTurn);
-					return recorded.length > 0 ? recorded : undefined;
-				})(),
-				rejectedThisTurn: (() => {
-					const rejected = normalizeRejected(data.rejected);
-					return rejected.length > 0 ? rejected : undefined;
-				})(),
+				recordedThisTurn:
+					data.recordedThisTurn.length > 0 ? data.recordedThisTurn : undefined,
+				rejectedThisTurn: data.rejected.length > 0 ? data.rejected : undefined,
 				createdAt: Date.now(),
 			};
 			const conversationId = data.conversationId || null;
@@ -1009,24 +732,16 @@ export function useProcurementSession(
 					requestId: data.requestId,
 					revisionId: data.revisionId,
 					conversationId: conversationId ?? s.conversationId,
-					slots: mapSlots(data.slots),
+					slots: data.slots,
 					missingRequired: data.missingRequired,
-					question: normalizeQuestion(data.question),
+					question: data.question,
 					turns: [...s.turns, assistantTurn],
 					justCompletedTurnId: assistantTurn.id,
 					pendingTurn: false,
 					liveSteps: [],
 					liveActivity: [],
 					terminalTelemetry,
-					cropDisambiguation: normalizeCropDisambiguation(
-						data.cropDisambiguation,
-					),
-					pendingInterrupt: data.interruptId
-						? {
-								interruptId: data.interruptId,
-								reason: data.interruptKind ?? "",
-							}
-						: null,
+					pendingInterrupt: data.interrupt,
 					...(revisionChanged
 						? {
 								runId: null,
@@ -1076,6 +791,40 @@ export function useProcurementSession(
 			queryClient,
 			queryIdentity,
 		],
+	);
+
+	const applyLegacyTurnResult = React.useCallback(
+		async (
+			rawData: unknown,
+			assistantTurnId: string,
+			operation: SessionOperation,
+			terminalTelemetry: TerminalTelemetryObservation | null,
+		) => {
+			if (!operationGuard.isCurrent(operation)) return;
+			const normalized = normalizeProcurementTurnResult(rawData);
+			if (!normalized) {
+				setState((s) =>
+					operationGuard.isCurrent(operation)
+						? {
+								...s,
+								pendingTurn: false,
+								liveSteps: [],
+								liveActivity: [],
+								error: TURN_RESULT_INVALID,
+								terminalTelemetry,
+							}
+						: s,
+				);
+				return;
+			}
+			await applyTurnResult(
+				turnResultFromLegacy(normalized),
+				assistantTurnId,
+				operation,
+				terminalTelemetry,
+			);
+		},
+		[applyTurnResult, operationGuard],
 	);
 
 	const submitTurn = React.useCallback(
@@ -1156,7 +905,7 @@ export function useProcurementSession(
 					);
 					if (!operationGuard.isCurrent(operation)) return;
 					if (streamed) {
-						await applyTurnResult(
+						await applyLegacyTurnResult(
 							streamed,
 							`${operation.clientRequestId}-assistant`,
 							operation,
@@ -1184,7 +933,7 @@ export function useProcurementSession(
 					);
 					if (!operationGuard.isCurrent(operation)) return;
 					const syncTerminalObservedAt = monotonicNow();
-					await applyTurnResult(
+					await applyLegacyTurnResult(
 						env.data,
 						`${operation.clientRequestId}-assistant`,
 						operation,
@@ -1303,7 +1052,7 @@ export function useProcurementSession(
 			await execute();
 		},
 		[
-			applyTurnResult,
+			applyLegacyTurnResult,
 			operationGuard,
 			refreshCurrentSnapshot,
 			sessionGenerationGuard,
@@ -1380,15 +1129,6 @@ export function useProcurementSession(
 					freeText: answer.freeText,
 				});
 				if (!operationGuard.isCurrent(operation)) return;
-				if (outcome.resolved && outcome.turnResult !== undefined) {
-					await applyTurnResult(
-						outcome.turnResult,
-						`${clientRequestId}-assistant`,
-						operation,
-						terminalTelemetryObservation(monotonicNow(), operation.generation),
-					);
-					return;
-				}
 				setState((s) =>
 					operationGuard.isCurrent(operation)
 						? {
@@ -1410,28 +1150,39 @@ export function useProcurementSession(
 			}
 
 			try {
-				const env = await apiClient.authed.post<unknown>(
-					`/buyers/me/procurement/requests/${operation.requestId}/answers`,
+				const res = await buyerProcurementClient().submitAnswer(
 					{
-						signal: operation.signal,
-						json: {
-							slotKey: answer.slotKey,
-							optionId: answer.optionId,
-							freeText: answer.freeText,
-							unitOptionId: answer.unitOptionId,
-							skip: answer.skip,
-							expectedRevisionId: current.revisionId,
-							clientRequestId,
-						},
+						requestId: operation.requestId ?? "",
+						slotKey: slotKeyFromCode(answer.slotKey),
+						optionId: answer.optionId ?? "",
+						freeText: answer.freeText ?? "",
+						unitOptionId: answer.unitOptionId ?? "",
+						skip: answer.skip ?? false,
+						expectedRevisionId: current.revisionId,
+						clientRequestId,
 					},
+					{ signal: operation.signal },
 				);
 				if (!operationGuard.isCurrent(operation)) return;
 				const terminalTelemetry = terminalTelemetryObservation(
 					monotonicNow(),
 					operation.generation,
 				);
+				if (!res.result) {
+					setState((s) =>
+						operationGuard.isCurrent(operation)
+							? {
+									...s,
+									pendingTurn: false,
+									error: TURN_RESULT_INVALID,
+									terminalTelemetry,
+								}
+							: s,
+					);
+					return;
+				}
 				await applyTurnResult(
-					env.data,
+					turnResultFromProto(res.result),
 					`${clientRequestId}-assistant`,
 					operation,
 					terminalTelemetry,
@@ -1442,13 +1193,10 @@ export function useProcurementSession(
 					monotonicNow(),
 					operation.generation,
 				);
-				const parsed =
-					err instanceof ApiClientError
-						? procurementErrorFromStatus(err.status, err.reason, err.message)
-						: { code: "NETWORK_ERROR", detail: "答案送出失敗，請重試" };
-				if (parsed.code === "STALE_REVISION" && operation.requestId) {
+				const failure = procurementFailureFrom(err, defaults);
+				if (failure.code === "STALE_REVISION" && operation.requestId) {
 					invalidateCandidateSelections();
-					toast.error("需求已在其他裝置更新，剛才的回答未送出，請重新確認");
+					toast.error(failure.detail);
 					setState((s) =>
 						operationGuard.isCurrent(operation)
 							? {
@@ -1474,7 +1222,7 @@ export function useProcurementSession(
 								? {
 										...s,
 										revisionId: snapshot.revisionId,
-										slots: mapSlots(snapshot.slots),
+										slots: snapshot.slots,
 										missingRequired: snapshot.missingRequired,
 										stage: deriveStageFromStatus(snapshot.status),
 									}
@@ -1485,13 +1233,19 @@ export function useProcurementSession(
 				}
 				setState((s) =>
 					operationGuard.isCurrent(operation)
-						? { ...s, pendingTurn: false, error: parsed, terminalTelemetry }
+						? {
+								...s,
+								pendingTurn: false,
+								error: failure,
+								terminalTelemetry,
+							}
 						: s,
 				);
 			}
 		},
 		[
 			applyTurnResult,
+			defaults,
 			fetchSnapshot,
 			invalidateCandidateSelections,
 			operationGuard,
@@ -1504,7 +1258,8 @@ export function useProcurementSession(
 	const rewindSlot = React.useCallback(
 		async (slotKey: string) => {
 			const current = stateRef.current;
-			if (!current.requestId || current.pendingTurn) return;
+			if (!current.requestId || !current.revisionId || current.pendingTurn)
+				return;
 			const clientRequestId = crypto.randomUUID();
 			sessionGenerationGuard.invalidate();
 			setRestoring(false);
@@ -1526,20 +1281,35 @@ export function useProcurementSession(
 					: s,
 			);
 			try {
-				const env = await apiClient.authed.post<unknown>(
-					`/buyers/me/procurement/requests/${operation.requestId}/rewinds`,
+				const res = await buyerProcurementClient().rewind(
 					{
-						signal: operation.signal,
-						json: { slotKey, clientRequestId },
+						requestId: operation.requestId ?? "",
+						slotKey: slotKeyFromCode(slotKey),
+						clientRequestId,
+						expectedRevisionId: current.revisionId,
 					},
+					{ signal: operation.signal },
 				);
 				if (!operationGuard.isCurrent(operation)) return;
 				const terminalTelemetry = terminalTelemetryObservation(
 					monotonicNow(),
 					operation.generation,
 				);
+				if (!res.result) {
+					setState((s) =>
+						operationGuard.isCurrent(operation)
+							? {
+									...s,
+									pendingTurn: false,
+									error: TURN_RESULT_INVALID,
+									terminalTelemetry,
+								}
+							: s,
+					);
+					return;
+				}
 				await applyTurnResult(
-					env.data,
+					turnResultFromProto(res.result),
 					`${clientRequestId}-assistant`,
 					operation,
 					terminalTelemetry,
@@ -1555,24 +1325,14 @@ export function useProcurementSession(
 						? {
 								...s,
 								pendingTurn: false,
-								error:
-									err instanceof ApiClientError
-										? procurementErrorFromStatus(
-												err.status,
-												err.reason,
-												err.message,
-											)
-										: {
-												code: "NETWORK_ERROR",
-												detail: "修改失敗，請重試",
-											},
+								error: procurementFailureFrom(err, defaults),
 								terminalTelemetry,
 							}
 						: s,
 				);
 			}
 		},
-		[applyTurnResult, operationGuard, sessionGenerationGuard],
+		[applyTurnResult, defaults, operationGuard, sessionGenerationGuard],
 	);
 
 	const startSearch = React.useCallback(async () => {
@@ -1593,19 +1353,18 @@ export function useProcurementSession(
 				: s,
 		);
 		try {
-			const env = await apiClient.authed.post<{
-				requestId: string;
-				runId: string;
-				status: ProcurementRunStatus;
-			}>(`/buyers/me/procurement/requests/${requestId}/candidate-searches`);
-			if (!isCurrentSession() || env.data.requestId !== requestId) return;
+			const res = await buyerProcurementClient().startCandidateSearch({
+				requestId,
+				clientRequestId: crypto.randomUUID(),
+			});
+			if (!isCurrentSession() || res.requestId !== requestId) return;
 			invalidateCandidateSelections();
 			setState((s) =>
 				sessionGenerationGuard.isCurrent(sessionIdentity, s.requestId)
 					? {
 							...s,
 							stage: "searching",
-							runId: env.data.runId,
+							runId: res.runId,
 							candidateSet: null,
 							pollError: false,
 							candidatesStale: false,
@@ -1615,7 +1374,11 @@ export function useProcurementSession(
 			);
 		} catch (err) {
 			if (!isCurrentSession()) return;
-			if (err instanceof ApiClientError && err.status === 409) {
+			const failure = procurementFailureFrom(err, defaults);
+			if (
+				failure.code === "PROCUREMENT_RUN_IN_PROGRESS" ||
+				failure.code === "REQUIREMENT_NOT_READY"
+			) {
 				const snapshot = await fetchSnapshot(requestId).catch(() => null);
 				if (!isCurrentSession()) return;
 				setState((s) =>
@@ -1626,7 +1389,7 @@ export function useProcurementSession(
 									snapshot?.requestId === requestId
 										? deriveStageFromStatus(snapshot.status)
 										: s.stage,
-								error: parseProcurementError(err.reason, err.message),
+								error: failure,
 							}
 						: s,
 				);
@@ -1634,20 +1397,16 @@ export function useProcurementSession(
 			}
 			setState((s) =>
 				sessionGenerationGuard.isCurrent(sessionIdentity, s.requestId)
-					? {
-							...s,
-							error:
-								err instanceof ApiClientError
-									? parseProcurementError(err.reason, err.message)
-									: {
-											code: "NETWORK_ERROR",
-											detail: "候選搜尋建立失敗，請重試",
-										},
-						}
+					? { ...s, error: failure }
 					: s,
 			);
 		}
-	}, [fetchSnapshot, invalidateCandidateSelections, sessionGenerationGuard]);
+	}, [
+		defaults,
+		fetchSnapshot,
+		invalidateCandidateSelections,
+		sessionGenerationGuard,
+	]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: pollRetryToken is the explicit user-triggered retry signal, not a value read inside the effect body.
 	React.useEffect(() => {
@@ -1668,17 +1427,21 @@ export function useProcurementSession(
 
 		const poll = async () => {
 			try {
-				const env = await apiClient.authed.get<ProcurementCandidateSearch>(
-					`/buyers/me/procurement/requests/${requestId}/candidate-searches/${runId}`,
+				const search = candidateSearchFromProto(
+					await buyerProcurementClient().getCandidateSearch({
+						requestId,
+						runId,
+					}),
+					closedStoreName,
 				);
 				if (
 					!isCurrentPoll() ||
-					env.data.requestId !== requestId ||
-					env.data.runId !== runId
+					search.requestId !== requestId ||
+					search.runId !== runId
 				)
 					return;
 				failureCount = 0;
-				if (isTerminalCandidateStatus(env.data.status)) {
+				if (isTerminalCandidateStatus(search.status)) {
 					setState((s) =>
 						!cancelled &&
 						sessionGenerationGuard.isCurrent(sessionIdentity, s.requestId) &&
@@ -1686,7 +1449,7 @@ export function useProcurementSession(
 							? {
 									...s,
 									stage: "candidates",
-									candidateSet: env.data,
+									candidateSet: search,
 								}
 							: s,
 					);
@@ -1721,6 +1484,7 @@ export function useProcurementSession(
 		state.runId,
 		pollRetryToken,
 		sessionGenerationGuard,
+		closedStoreName,
 	]);
 
 	const retryPolling = React.useCallback(() => {
@@ -1795,23 +1559,14 @@ export function useProcurementSession(
 
 			let invalidResponse = false;
 			try {
-				const env = await apiClient.authed.post<unknown>(
-					`/buyers/me/procurement/requests/${requestId}/selections`,
-					{
-						json: {
-							candidateSetId,
-							lane: currentCandidate.lane,
-							candidateId: currentCandidate.candidateId,
-							selected: nextSelected,
-						},
-					},
-				);
+				const res = await buyerProcurementClient().toggleSelection({
+					requestId,
+					candidateSetId,
+					candidateId: currentCandidate.candidateId,
+					selected: nextSelected,
+				});
 				if (!isCurrentSelection()) return;
-				const response = normalizeCandidateSelectionResult(
-					env.data,
-					currentCandidate.candidateId,
-				);
-				if (!response) {
+				if (res.candidateId !== currentCandidate.candidateId) {
 					invalidResponse = true;
 					throw new Error("invalid candidate selection response");
 				}
@@ -1820,17 +1575,16 @@ export function useProcurementSession(
 					s.candidateSet?.candidateSetId === candidateSetId
 						? {
 								...s,
-								candidateSet: applySelectedValue(
-									s.candidateSet,
-									response.selected,
-								),
+								candidateSet: applySelectedValue(s.candidateSet, res.selected),
 							}
 						: s,
 				);
 			} catch (err) {
 				if (!isCurrentSelection()) return;
+				const failure = procurementFailureFrom(err, defaults);
 				const selectionUnconfirmed =
-					invalidResponse || !(err instanceof ApiClientError);
+					invalidResponse || failure.code === "NETWORK_ERROR";
+				const candidateSetStale = failure.code === "STALE_CANDIDATE_SET";
 				setState((s) =>
 					sessionGenerationGuard.isCurrent(sessionIdentity, s.requestId) &&
 					s.candidateSet?.candidateSetId === candidateSetId
@@ -1845,7 +1599,9 @@ export function useProcurementSession(
 											candidatesStale: true,
 											error: CANDIDATE_SELECTION_UNCONFIRMED,
 										}
-									: {}),
+									: candidateSetStale
+										? { candidatesStale: true, error: failure }
+										: {}),
 							}
 						: s,
 				);
@@ -1853,20 +1609,7 @@ export function useProcurementSession(
 					toast.error(CANDIDATE_SELECTION_UNCONFIRMED.detail);
 					return;
 				}
-				if (err instanceof ApiClientError) {
-					const parsed = parseProcurementError(err.reason, err.message);
-					if (parsed.code === "CANDIDATE_FACTS_STALE") {
-						setState((s) =>
-							sessionGenerationGuard.isCurrent(sessionIdentity, s.requestId) &&
-							s.candidateSet?.candidateSetId === candidateSetId
-								? { ...s, candidatesStale: true, error: parsed }
-								: s,
-						);
-						return;
-					}
-					toast.error(parsed.detail || "勾選失敗，請重試");
-					return;
-				}
+				if (!candidateSetStale) toast.error(failure.detail);
 			} finally {
 				const shouldClearPending = selectionGuard.isCurrent(selectionIdentity);
 				selectionGuard.finish(selectionIdentity);
@@ -1879,7 +1622,16 @@ export function useProcurementSession(
 				}
 			}
 		},
-		[selectionGuard, sessionGenerationGuard],
+		[defaults, selectionGuard, sessionGenerationGuard],
+	);
+
+	const markCandidatesStale = React.useCallback(
+		(failure: ProcurementFailure) => {
+			setState((s) =>
+				s.candidateSet ? { ...s, candidatesStale: true, error: failure } : s,
+			);
+		},
+		[],
 	);
 
 	const previewRfqPrice = React.useCallback(
@@ -1892,14 +1644,9 @@ export function useProcurementSession(
 				!current.revisionId ||
 				current.revisionId !== command.expectedRevisionId
 			) {
-				return {
-					ok: false,
-					error: {
-						code: "STALE_CONTEXT",
-						detail: "目前畫面不是這份需求版本，請回到對話重新整理。",
-						retryable: false,
-					},
-				};
+				return staleContextFailure(
+					"目前畫面不是這份需求版本，請回到對話重新整理。",
+				);
 			}
 			const requestId = current.requestId;
 			const revisionId = current.revisionId;
@@ -1910,120 +1657,33 @@ export function useProcurementSession(
 					stateRef.current.requestId,
 				) && stateRef.current.revisionId === revisionId;
 			try {
-				const env = await apiClient.authed.post<unknown>(
-					`/buyers/me/procurement/requests/${requestId}/rfq-price-previews`,
-					{ json: command },
-				);
-				if (!isCurrentRfq()) {
-					return {
-						ok: false,
-						error: {
-							code: "STALE_CONTEXT",
-							detail: "需求已切換，舊的價格試算未套用。",
-							retryable: false,
-						},
-					};
-				}
-				const parsed = rfqPricePreviewSchema.safeParse(env.data);
-				if (!parsed.success) {
-					return {
-						ok: false,
-						error: {
-							code: "INVALID_RESPONSE",
-							detail:
-								"價格服務回傳不完整，無法確認這次操作的結果。請用原操作重試。",
-							retryable: true,
-						},
-					};
-				}
-				return { ok: true, data: parsed.data };
-			} catch (error) {
-				if (!isCurrentRfq()) {
-					return {
-						ok: false,
-						error: {
-							code: "STALE_CONTEXT",
-							detail: "需求已切換，舊的價格試算未套用。",
-							retryable: false,
-						},
-					};
-				}
-				return { ok: false, error: rfqCommandFailure(error, "preview") };
-			}
-		},
-		[sessionGenerationGuard],
-	);
-
-	const confirmRfqSnapshot = React.useCallback(
-		async (
-			command: RfqConfirmationCommand,
-		): Promise<RfqCommandResult<RfqConfirmation>> => {
-			const current = stateRef.current;
-			if (
-				!current.requestId ||
-				!current.revisionId ||
-				current.revisionId !== command.expectedRevisionId
-			) {
-				return {
-					ok: false,
-					error: {
-						code: "STALE_CONTEXT",
-						detail: "目前畫面不是這份需求版本，請回到對話重新整理。",
-						retryable: false,
+				const res = await buyerProcurementClient().previewRfqPrice({
+					requestId,
+					expectedRevisionId: command.expectedRevisionId,
+					buyerRequestedRange: {
+						lowerBoundAmount: BigInt(
+							command.buyerRequestedRange.lowerBoundAmount,
+						),
+						upperBoundAmount: BigInt(
+							command.buyerRequestedRange.upperBoundAmount,
+						),
 					},
-				};
-			}
-			const requestId = current.requestId;
-			const revisionId = current.revisionId;
-			const sessionIdentity = sessionGenerationGuard.capture(requestId);
-			const isCurrentRfq = () =>
-				sessionGenerationGuard.isCurrent(
-					sessionIdentity,
-					stateRef.current.requestId,
-				) && stateRef.current.revisionId === revisionId;
-			try {
-				const env = await apiClient.authed.post<unknown>(
-					`/buyers/me/procurement/requests/${requestId}/rfq-confirmations`,
-					{ json: command },
-				);
+				});
 				if (!isCurrentRfq()) {
-					return {
-						ok: false,
-						error: {
-							code: "STALE_CONTEXT",
-							detail: "需求已切換，舊的確認結果未套用。",
-							retryable: false,
-						},
-					};
+					return staleContextFailure("需求已切換，舊的價格試算未套用。");
 				}
-				const parsed = rfqConfirmationSchema.safeParse(env.data);
-				if (!parsed.success) {
-					return {
-						ok: false,
-						error: {
-							code: "INVALID_RESPONSE",
-							detail:
-								"確認服務回傳不完整，無法確認這次操作的結果。請用原操作重試；這個畫面不會宣稱已固定。",
-							retryable: true,
-						},
-					};
-				}
-				return { ok: true, data: parsed.data };
+				const preview = pricePreviewFromProto(res);
+				if (!preview)
+					return { ok: false, error: invalidResponseFailure(defaults) };
+				return { ok: true, data: preview };
 			} catch (error) {
 				if (!isCurrentRfq()) {
-					return {
-						ok: false,
-						error: {
-							code: "STALE_CONTEXT",
-							detail: "需求已切換，舊的確認結果未套用。",
-							retryable: false,
-						},
-					};
+					return staleContextFailure("需求已切換，舊的價格試算未套用。");
 				}
-				return { ok: false, error: rfqCommandFailure(error, "confirmation") };
+				return { ok: false, error: procurementFailureFrom(error, defaults) };
 			}
 		},
-		[sessionGenerationGuard],
+		[defaults, sessionGenerationGuard],
 	);
 
 	const previewRfqPublication = React.useCallback(
@@ -2036,14 +1696,9 @@ export function useProcurementSession(
 				!current.revisionId ||
 				current.revisionId !== command.expectedRevisionId
 			) {
-				return {
-					ok: false,
-					error: {
-						code: "STALE_CONTEXT",
-						detail: "目前畫面不是這份需求版本，請回到對話重新整理。",
-						retryable: false,
-					},
-				};
+				return staleContextFailure(
+					"目前畫面不是這份需求版本，請回到對話重新整理。",
+				);
 			}
 			const requestId = current.requestId;
 			const revisionId = current.revisionId;
@@ -2054,48 +1709,43 @@ export function useProcurementSession(
 					stateRef.current.requestId,
 				) && stateRef.current.revisionId === revisionId;
 			try {
-				const env = await apiClient.authed.post<unknown>(
-					`/buyers/me/procurement/requests/${requestId}/rfq-publications/preview`,
-					{ json: publicationPreviewBody(command) },
-				);
+				const res = await buyerProcurementClient().previewRfqPublication({
+					requestId,
+					clientRequestId: command.clientRequestId,
+					expectedRevisionId: command.expectedRevisionId,
+					buyerRequestedRange: {
+						lowerBoundAmount: BigInt(
+							command.buyerRequestedRange.lowerBoundAmount,
+						),
+						upperBoundAmount: BigInt(
+							command.buyerRequestedRange.upperBoundAmount,
+						),
+					},
+					buyerNote: command.buyerNote,
+					candidateSetId: command.candidateSetId,
+					selectedCandidateIds: command.selectedCandidateIds,
+					responseDeadline: command.responseDeadline
+						? parseDate(command.responseDeadline)
+						: undefined,
+				});
 				if (!isCurrentRfq()) {
-					return {
-						ok: false,
-						error: {
-							code: "STALE_CONTEXT",
-							detail: "需求已切換，舊的核准結果未套用。",
-							retryable: false,
-						},
-					};
+					return staleContextFailure("需求已切換，舊的核准結果未套用。");
 				}
-				const parsed = rfqPublicationApprovalSchema.safeParse(env.data);
-				if (!parsed.success) {
-					return {
-						ok: false,
-						error: {
-							code: "INVALID_RESPONSE",
-							detail:
-								"發布核准回傳不完整，無法確認這次操作的結果。請用原操作重試；這個畫面不會宣稱已核准。",
-							retryable: true,
-						},
-					};
-				}
-				return { ok: true, data: parsed.data };
+				const approval = approvalFromProto(res);
+				if (!approval)
+					return { ok: false, error: invalidResponseFailure(defaults) };
+				return { ok: true, data: approval };
 			} catch (error) {
 				if (!isCurrentRfq()) {
-					return {
-						ok: false,
-						error: {
-							code: "STALE_CONTEXT",
-							detail: "需求已切換，舊的核准結果未套用。",
-							retryable: false,
-						},
-					};
+					return staleContextFailure("需求已切換，舊的核准結果未套用。");
 				}
-				return { ok: false, error: rfqCommandFailure(error, "confirmation") };
+				const failure = procurementFailureFrom(error, defaults);
+				if (failure.code === "STALE_CANDIDATE_SET")
+					markCandidatesStale(failure);
+				return { ok: false, error: failure };
 			}
 		},
-		[sessionGenerationGuard],
+		[defaults, markCandidatesStale, sessionGenerationGuard],
 	);
 
 	const executeRfqPublication = React.useCallback(
@@ -2108,14 +1758,9 @@ export function useProcurementSession(
 				!current.revisionId ||
 				current.revisionId !== command.expectedRevisionId
 			) {
-				return {
-					ok: false,
-					error: {
-						code: "STALE_CONTEXT",
-						detail: "目前畫面不是這份需求版本，請回到對話重新整理。",
-						retryable: false,
-					},
-				};
+				return staleContextFailure(
+					"目前畫面不是這份需求版本，請回到對話重新整理。",
+				);
 			}
 			const requestId = current.requestId;
 			const revisionId = current.revisionId;
@@ -2126,72 +1771,47 @@ export function useProcurementSession(
 					stateRef.current.requestId,
 				) && stateRef.current.revisionId === revisionId;
 			try {
-				const env = await apiClient.authed.post<unknown>(
-					`/buyers/me/procurement/requests/${requestId}/rfq-publications`,
-					{ json: publicationExecuteBody(command) },
-				);
+				const res = await buyerProcurementClient().executeRfqPublication({
+					requestId,
+					clientRequestId: command.clientRequestId,
+					approvalId: command.approval.approvalId,
+					approvalVersion: command.approval.approvalVersion,
+					expectedRevisionId: command.expectedRevisionId,
+					payloadHash: command.approval.sellerFacingPayloadHash,
+				});
 				if (!isCurrentRfq()) {
-					return {
-						ok: false,
-						error: {
-							code: "STALE_CONTEXT",
-							detail: "需求已切換，舊的發布結果未套用。",
-							retryable: false,
-						},
-					};
+					return staleContextFailure("需求已切換，舊的發布結果未套用。");
 				}
-				const parsed = rfqPublicationResultSchema.safeParse(env.data);
-				if (!parsed.success) {
-					return {
-						ok: false,
-						error: {
-							code: "INVALID_RESPONSE",
-							detail:
-								"發布結果回傳不完整，無法確認這次操作的結果。請用原操作重試；這個畫面不會宣稱已發布。",
-							retryable: true,
-						},
-					};
-				}
-				return { ok: true, data: parsed.data };
+				const result = publicationResultFromProto(res);
+				if (!result)
+					return { ok: false, error: invalidResponseFailure(defaults) };
+				return { ok: true, data: result };
 			} catch (error) {
 				if (!isCurrentRfq()) {
-					return {
-						ok: false,
-						error: {
-							code: "STALE_CONTEXT",
-							detail: "需求已切換，舊的發布結果未套用。",
-							retryable: false,
-						},
-					};
+					return staleContextFailure("需求已切換，舊的發布結果未套用。");
 				}
-				return { ok: false, error: rfqCommandFailure(error, "confirmation") };
+				const failure = procurementFailureFrom(error, defaults);
+				if (failure.code === "STALE_CANDIDATE_SET")
+					markCandidatesStale(failure);
+				return { ok: false, error: failure };
 			}
 		},
-		[sessionGenerationGuard],
+		[defaults, markCandidatesStale, sessionGenerationGuard],
 	);
 
 	/**
-	 * 讀出「現在按下停止會停到哪一個 run」。
+	 * 讀取現在按下停止會停到哪一個 run。
 	 *
-	 * `GET .../conversations/{id}/runtime-snapshot` 是瀏覽器唯一拿得到
-	 * `runVersion` 的地方——turn 的 SSE 與同步 `/turns` 都不帶 run 身分，所以
-	 * 沒有這一次讀取就沒有 CAS token，停止鈕也就沒有誠實可按的版本。
-	 *
-	 * 讀失敗、端點還沒上線、或快照解析不過一律**安靜地**回 null：這是一顆
-	 * affordance 的背景讀取，把它的失敗升級成 toast 只會在畫面上多一句與買家
-	 * 當下動作無關的紅字，而按鈕維持不可用已經正確表達了「現在停不了」。
+	 * 讀失敗一律安靜地回 null：這是一顆 affordance 的背景讀取，把它的失敗升級成 toast
+	 * 只會在畫面上多一句與買家當下動作無關的紅字，而按鈕維持不可用已經正確表達了「現在停不了」。
 	 */
 	const readActiveRun = React.useCallback(
 		async (conversationId: string): Promise<CancellableRun | null> => {
 			try {
-				const env = await apiClient.authed.get<unknown>(
-					`/buyers/me/procurement/conversations/${encodeURIComponent(
-						conversationId,
-					)}/runtime-snapshot`,
-				);
-				const parsed = runtimeSnapshotSchema.safeParse(env.data);
-				if (!parsed.success) return null;
-				return selectCancellableRun(parsed.data);
+				const res = await buyerProcurementClient().getRuntimeSnapshot({
+					conversationId,
+				});
+				return selectCancellableRun(runtimeSnapshotFromProto(res));
 			} catch {
 				return null;
 			}
@@ -2257,6 +1877,13 @@ export function useProcurementSession(
 	 *   3. **不編 disposition。** 回執解析不過就說「無法確認結果」，不挑一個
 	 *      最像的值填上去。
 	 */
+	/**
+	 * 送出取消命令。
+	 *
+	 *   1. 沒有 `activeRun` 就不送。呼叫端（按鈕）本來就該是 disabled，這裡再擋一次。
+	 *   2. 回 OK 不是「已取消」：`disposition` 原樣帶到畫面層，不挑一個最像的值填上去。
+	 *   3. 回應沒有可辨識的處置時說「無法確認結果」。
+	 */
 	const cancelActiveRun = React.useCallback(async (): Promise<void> => {
 		const current = stateRef.current;
 		const run = current.activeRun;
@@ -2269,80 +1896,28 @@ export function useProcurementSession(
 				sessionIdentity,
 				stateRef.current.requestId,
 			) && stateRef.current.activeRun?.runId === run.runId;
-		const settle = (next: RunCancelState, activeRun?: CancellableRun | null) =>
+		const settle = (next: RunCancelState) =>
 			setState((s) =>
-				s.activeRun?.runId === run.runId
-					? {
-							...s,
-							cancelState: next,
-							...(activeRun === undefined ? {} : { activeRun }),
-						}
-					: s,
+				s.activeRun?.runId === run.runId ? { ...s, cancelState: next } : s,
 			);
 		settle({ status: "requesting" });
 
-		let raw: unknown;
 		try {
-			raw = await cancelProcurementRun({
-				runId: run.runId,
-				expectedRunVersion: run.runVersion,
-			});
+			const result = await cancelProcurementRun(run.runId);
+			if (!isCurrentCancel()) return;
+			if (result.disposition === null) {
+				settle({ status: "error", detail: defaults(Code.Internal) });
+				return;
+			}
+			settle({ status: "settled", disposition: result.disposition });
 		} catch (error) {
 			if (!isCurrentCancel()) return;
-			if (!isRunVersionConflict(error)) {
-				settle({
-					status: "error",
-					detail:
-						error instanceof ApiClientError
-							? procurementErrorFromStatus(
-									error.status,
-									error.reason,
-									error.message,
-								).detail
-							: "停止沒有送出，請重試。",
-				});
-				return;
-			}
-			const fresh = await readActiveRun(conversationId);
-			if (!isCurrentCancel()) return;
-			if (!fresh || fresh.runId !== run.runId) {
-				settle(STALE_CANCEL_STATE, fresh);
-				return;
-			}
-			try {
-				raw = await cancelProcurementRun({
-					runId: fresh.runId,
-					expectedRunVersion: fresh.runVersion,
-				});
-			} catch (retryError) {
-				if (!isCurrentCancel()) return;
-				settle(
-					isRunVersionConflict(retryError)
-						? STALE_CANCEL_STATE
-						: {
-								status: "error",
-								detail:
-									retryError instanceof ApiClientError
-										? procurementErrorFromStatus(
-												retryError.status,
-												retryError.reason,
-												retryError.message,
-											).detail
-										: "停止沒有送出，請重試。",
-							},
-					isRunVersionConflict(retryError) ? null : undefined,
-				);
-				return;
-			}
+			settle({
+				status: "error",
+				detail: procurementFailureFrom(error, defaults).detail,
+			});
 		}
-		if (!isCurrentCancel()) return;
-		const parsed = runCancelResultSchema.safeParse(raw);
-		if (!parsed.success) {
-			settle(INVALID_CANCEL_ACK);
-			return;
-		}
-		settle({ status: "settled", disposition: parsed.data.cancelDisposition });
-	}, [readActiveRun, sessionGenerationGuard]);
+	}, [defaults, sessionGenerationGuard]);
 
 	return {
 		...state,
@@ -2357,7 +1932,6 @@ export function useProcurementSession(
 		retryPolling,
 		toggleSelection,
 		previewRfqPrice,
-		confirmRfqSnapshot,
 		previewRfqPublication,
 		executeRfqPublication,
 		refreshCurrentSnapshot,

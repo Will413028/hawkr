@@ -1,136 +1,138 @@
 // @vitest-environment jsdom
+import { create } from "@bufbuild/protobuf";
+import { timestampFromDate } from "@bufbuild/protobuf/wkt";
+import { Code, ConnectError } from "@connectrpc/connect";
+import { StoreCardSchema } from "@hawkr/api/gen/hawkr/common/v1alpha1/store_card_pb";
+import {
+	AcceptSellerQuoteResponseSchema,
+	BuyerFacingSellerResponseSchema,
+	ListSellerResponsesResponseSchema,
+	OrderProvisioningState,
+	QuoteAcceptability,
+	SellerResponseType,
+	TaxInclusionBasis,
+} from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
 import { renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiClientError } from "@/lib/api/client";
 import { useBuyerQuoteComparison } from "./useBuyerQuoteComparison";
 
 /**
- * 買家端報價比較與接受的**傳輸契約**。
- *
- * 元件行為在 `__tests__/BuyerQuoteComparison.test.ts`，這裡只釘住四件會在接線
- * 當天才看得出對錯的事：端點路徑、哪一支帶冪等鍵、body 有沒有夾帶金額、
- * 回應解析不過時要 fail closed 而不是只顯示解析得出來的那幾筆。
+ * 買家端報價比較與接受的傳輸契約。元件行為在 `__tests__/BuyerQuoteComparison.test.ts`，
+ * 這裡釘住請求形狀（哪一支帶 client_request_id、有沒有夾帶金額）與回應轉換。
  */
 
-const { getMock, putMock, deleteMock, postMock } = vi.hoisted(() => ({
-	getMock: vi.fn(),
-	putMock: vi.fn(),
-	deleteMock: vi.fn(),
-	postMock: vi.fn(),
+const rpc = vi.hoisted(() => ({
+	handlers: {} as Record<string, (request: never) => unknown>,
 }));
 
-vi.mock("@/lib/api/client", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("@/lib/api/client")>();
-	return {
-		...actual,
-		apiClient: {
-			...actual.apiClient,
-			authed: {
-				...actual.apiClient.authed,
-				get: getMock,
-				put: putMock,
-				delete: deleteMock,
-				post: postMock,
-			},
-		},
-	};
+vi.mock("@/lib/connect/procurement", async () => {
+	const { fakeProcurementClient } = await import("./testing/fake-procurement");
+	return { buyerProcurementClient: () => fakeProcurementClient(rpc.handlers) };
+});
+vi.mock("@/lib/i18n/ui-text", async () => {
+	const { uiTextStub } = await import("./testing/fake-procurement");
+	return uiTextStub;
 });
 
-const REQUEST_ID = "1234567890123456788";
-const RESPONSE_ID = "1234567890123456789";
-const VERSION_ID = "1234567890123456791";
+const REQUEST_ID = "req-1";
+const PUBLICATION_ID = "pub-1";
+const RESPONSE_ID = "resp-1";
+const VERSION_ID = "ver-1";
 
-function wireRow(overrides: Record<string, unknown> = {}) {
-	return {
+function protoRow(init: { shortlisted?: boolean; payloadHash?: string } = {}) {
+	return create(BuyerFacingSellerResponseSchema, {
 		sellerResponseId: RESPONSE_ID,
 		sellerResponseVersion: VERSION_ID,
-		status: "SUBMITTED",
-		payloadHash: "a".repeat(64),
-		submittedAt: "2026-09-13T02:00:00Z",
-		seller: {
-			displayName: "範例鮮果合作社",
-			partyType: "PLATFORM_SELLER",
+		payloadHash: init.payloadHash ?? "a".repeat(64),
+		submitTime: timestampFromDate(new Date("2026-09-13T02:00:00Z")),
+		store: create(StoreCardSchema, {
+			id: "s1",
 			storeCode: "greenfield",
-		},
+			name: "範例鮮果合作社",
+		}),
 		quote: {
-			responseType: "MANUAL_QUOTE",
-			offeredQuality: { grade: "特級", inspectionNotes: "" },
+			responseType: SellerResponseType.MANUAL_QUOTE,
+			specNote: "抽驗三箱",
 			unitBasis: { quantity: "1", unit: "KG" },
 			offeredQuantity: "500",
 			offeredQuantityUnit: "KG",
-			conversionBasis: "",
-			currency: "TWD",
-			goodsAmount: "18000",
-			shippingAmount: "0",
-			taxAmount: "900",
-			taxInclusionBasis: "TAX_EXCLUDED",
-			totalAmount: "18900",
-			leadTimeDays: "3",
-			promisedDeliveryAt: "",
-			validUntil: "",
-			termsNote: "",
-			deviationDisclosure: "",
+			goodsAmount: 18000n,
+			shippingAmount: 0n,
+			taxAmount: 900n,
+			taxInclusionBasis: TaxInclusionBasis.TAX_EXCLUDED,
+			totalAmount: 18900n,
 		},
-		outsideBuyerRequestedRange: false,
-		shortlisted: false,
-		acceptability: "ACCEPTABLE",
-		...overrides,
-	};
-}
-
-function ackData(overrides: Record<string, unknown> = {}) {
-	return {
-		buyerAcceptanceId: "1234567890123456805",
-		sellerResponseId: RESPONSE_ID,
-		sellerResponseVersion: VERSION_ID,
-		acceptedDealPrice: "18900",
-		currency: "TWD",
-		acceptedAt: "2026-09-13T03:00:00Z",
-		orderProvisioningState: "CREATING_ORDER",
-		orderNo: "",
-		paymentDeadline: "",
-		replayed: false,
-		...overrides,
-	};
+		shortlisted: init.shortlisted ?? false,
+		acceptability: QuoteAcceptability.ACCEPTABLE,
+	});
 }
 
 afterEach(() => {
+	rpc.handlers = {};
 	vi.clearAllMocks();
 });
 
-async function mountLoaded(data: unknown = [wireRow()]) {
-	getMock.mockResolvedValue({ code: 0, data });
-	const hook = renderHook(() => useBuyerQuoteComparison(REQUEST_ID));
+async function mountLoaded(rows = [protoRow()]) {
+	rpc.handlers.listSellerResponses = vi.fn(() =>
+		create(ListSellerResponsesResponseSchema, { sellerResponses: rows }),
+	);
+	const hook = renderHook(() =>
+		useBuyerQuoteComparison(REQUEST_ID, PUBLICATION_ID),
+	);
 	await waitFor(() => {
 		expect(hook.result.current.list.status).not.toBe("loading");
 	});
 	return hook;
 }
 
+const target = {
+	sellerResponseId: RESPONSE_ID,
+	sellerResponseVersion: VERSION_ID,
+};
+
 describe("比較清單讀取", () => {
-	it("打的是 seller-responses 端點", async () => {
-		await mountLoaded();
-		expect(getMock).toHaveBeenCalledWith(
-			`/buyers/me/procurement/requests/${REQUEST_ID}/seller-responses`,
-		);
+	it("以需求與發布讀清單，並把金額與店家轉成畫面模型", async () => {
+		const { result } = await mountLoaded();
+		const list = result.current.list;
+		expect(list.status).toBe("success");
+		if (list.status !== "success") return;
+		expect(list.responses[0]).toMatchObject({
+			sellerResponseId: RESPONSE_ID,
+			seller: { displayName: "範例鮮果合作社", storeCode: "greenfield" },
+			quote: {
+				totalAmount: "18900",
+				specNote: "抽驗三箱",
+				taxInclusionBasis: "TAX_EXCLUDED",
+				leadTimeDays: "",
+			},
+			acceptability: "ACCEPTABLE",
+		});
+		const handler = rpc.handlers.listSellerResponses as ReturnType<
+			typeof vi.fn
+		>;
+		expect(handler.mock.calls[0][0]).toMatchObject({
+			requestId: REQUEST_ID,
+			publicationId: PUBLICATION_ID,
+		});
 	});
 
-	it("解析不過時整份 fail closed，不呈現半份清單", async () => {
-		const { result } = await mountLoaded([
-			wireRow(),
-			wireRow({ payloadHash: "nope" }),
-		]);
-		expect(result.current.list.status).toBe("error");
-		if (result.current.list.status === "error") {
-			expect(result.current.list.error.code).toBe("INVALID_RESPONSE");
-		}
+	it("沒有發布編號時不發請求，回「目前沒有可比較的詢價」", async () => {
+		const handler = vi.fn();
+		rpc.handlers.listSellerResponses = handler;
+		const { result } = renderHook(() =>
+			useBuyerQuoteComparison(REQUEST_ID, null),
+		);
+		await waitFor(() => expect(result.current.list.status).toBe("error"));
+		expect(handler).not.toHaveBeenCalled();
 	});
 
-	it("伺服器錯誤翻成畫面用的失敗，不外洩內部訊息", async () => {
-		getMock.mockRejectedValue(
-			new ApiClientError("upstream exploded", 503, 503, null, ""),
+	it("伺服器錯誤翻成畫面用的失敗，文字取預設文字而不是內部訊息", async () => {
+		rpc.handlers.listSellerResponses = () => {
+			throw new ConnectError("upstream exploded", Code.Unavailable);
+		};
+		const { result } = renderHook(() =>
+			useBuyerQuoteComparison(REQUEST_ID, PUBLICATION_ID),
 		);
-		const { result } = renderHook(() => useBuyerQuoteComparison(REQUEST_ID));
 		await waitFor(() => expect(result.current.list.status).toBe("error"));
 		if (result.current.list.status === "error") {
 			expect(result.current.list.error.code).toBe("SERVER_ERROR");
@@ -140,42 +142,32 @@ describe("比較清單讀取", () => {
 });
 
 describe("加入與移出比較", () => {
-	it("PUT 到帶版本的 shortlist 路徑，且不帶冪等鍵", async () => {
+	it("加入帶需求與版本，不帶 client_request_id", async () => {
 		const { result } = await mountLoaded();
-		putMock.mockResolvedValue({ code: 0, data: {} });
-		await result.current.setShortlisted(
-			{ sellerResponseId: RESPONSE_ID, sellerResponseVersion: VERSION_ID },
-			true,
-		);
-		expect(putMock).toHaveBeenCalledWith(
-			`/buyers/me/procurement/requests/${REQUEST_ID}/shortlist/${RESPONSE_ID}/versions/${VERSION_ID}`,
-			{},
-		);
-		expect(JSON.stringify(putMock.mock.calls[0])).not.toContain(
-			"Idempotency-Key",
-		);
+		const put = vi.fn(() => ({}));
+		rpc.handlers.putShortlistEntry = put;
+		await result.current.setShortlisted(target, true);
+		expect(put.mock.calls[0][0]).toMatchObject({
+			requestId: REQUEST_ID,
+			...target,
+		});
+		expect(put.mock.calls[0][0]).not.toHaveProperty("clientRequestId");
 	});
 
-	it("移除走 DELETE，路徑同一條", async () => {
-		const { result } = await mountLoaded();
-		deleteMock.mockResolvedValue({ code: 0, data: {} });
-		await result.current.setShortlisted(
-			{ sellerResponseId: RESPONSE_ID, sellerResponseVersion: VERSION_ID },
-			false,
-		);
-		expect(deleteMock).toHaveBeenCalledWith(
-			`/buyers/me/procurement/requests/${REQUEST_ID}/shortlist/${RESPONSE_ID}/versions/${VERSION_ID}`,
-			{},
-		);
+	it("移除走 deleteShortlistEntry", async () => {
+		const { result } = await mountLoaded([protoRow({ shortlisted: true })]);
+		const del = vi.fn(() => ({}));
+		rpc.handlers.deleteShortlistEntry = del;
+		await result.current.setShortlisted(target, false);
+		expect(del).toHaveBeenCalledTimes(1);
 	});
 
 	it("失敗時把那一列還原，不留下伺服器不承認的狀態", async () => {
 		const { result } = await mountLoaded();
-		putMock.mockRejectedValue(new ApiClientError("nope", 500, 500, null, ""));
-		const outcome = await result.current.setShortlisted(
-			{ sellerResponseId: RESPONSE_ID, sellerResponseVersion: VERSION_ID },
-			true,
-		);
+		rpc.handlers.putShortlistEntry = () => {
+			throw new ConnectError("nope", Code.Internal);
+		};
+		const outcome = await result.current.setShortlisted(target, true);
 		expect(outcome.ok).toBe(false);
 		await waitFor(() => {
 			const list = result.current.list;
@@ -187,100 +179,64 @@ describe("加入與移出比較", () => {
 });
 
 describe("接受一個 exact version", () => {
-	it("POST 到 buyer-quote-acceptances，冪等鍵走 header、body 只有三個 CAS 欄位", async () => {
-		const { result } = await mountLoaded();
-		postMock.mockResolvedValue({ code: 0, data: ackData() });
-		await result.current.acceptQuote({
-			idempotencyKey: "bqa-test",
-			sellerResponseId: RESPONSE_ID,
-			expectedSellerResponseVersion: VERSION_ID,
-			expectedRfqSnapshotHash: "b".repeat(64),
-		});
-		const [path, options] = postMock.mock.calls[0];
-		expect(path).toBe(
-			`/buyers/me/procurement/requests/${REQUEST_ID}/buyer-quote-acceptances`,
-		);
-		expect(options.headers).toEqual({ "Idempotency-Key": "bqa-test" });
-		expect(Object.keys(options.json).sort()).toEqual([
-			"expectedRfqSnapshotHash",
-			"expectedSellerResponseVersion",
-			"sellerResponseId",
-		]);
-		expect(JSON.stringify(options.json)).not.toContain("Amount");
-	});
+	const command = {
+		clientRequestId: "6f1d3c1e-2a40-4a5e-9d0b-1f2e3d4c5b6a",
+		sellerResponseId: RESPONSE_ID,
+		expectedSellerResponseVersion: VERSION_ID,
+		expectedSellerFacingHash: "b".repeat(64),
+	};
 
-	it("ACK 缺欄位時不宣稱已接受", async () => {
+	it("請求只有版本、內容雜湊與 client_request_id，不夾帶金額", async () => {
 		const { result } = await mountLoaded();
-		postMock.mockResolvedValue({
-			code: 0,
-			data: { buyerAcceptanceId: RESPONSE_ID },
-		});
-		const outcome = await result.current.acceptQuote({
-			idempotencyKey: "bqa-test",
-			sellerResponseId: RESPONSE_ID,
-			expectedSellerResponseVersion: VERSION_ID,
-			expectedRfqSnapshotHash: "b".repeat(64),
-		});
-		expect(outcome.ok).toBe(false);
-		if (!outcome.ok) expect(outcome.error.code).toBe("INVALID_RESPONSE");
-	});
-
-	it("STALE_SELLER_RESPONSE 原樣傳給畫面，不在資料層自動改接受最新版", async () => {
-		const { result } = await mountLoaded();
-		postMock.mockRejectedValue(
-			new ApiClientError(
-				"seller response changed",
-				409,
-				409,
-				null,
-				"STALE_SELLER_RESPONSE",
-			),
+		const accept = vi.fn(() =>
+			create(AcceptSellerQuoteResponseSchema, {
+				buyerAcceptanceId: "acc-1",
+				sellerResponseId: RESPONSE_ID,
+				sellerResponseVersion: VERSION_ID,
+				acceptedDealPrice: 18900n,
+				orderProvisioningState: OrderProvisioningState.CREATING_ORDER,
+			}),
 		);
-		const outcome = await result.current.acceptQuote({
-			idempotencyKey: "bqa-test",
-			sellerResponseId: RESPONSE_ID,
-			expectedSellerResponseVersion: VERSION_ID,
-			expectedRfqSnapshotHash: "b".repeat(64),
+		rpc.handlers.acceptSellerQuote = accept;
+		const outcome = await result.current.acceptQuote(command);
+		const request = accept.mock.calls[0][0] as Record<string, unknown>;
+		expect(request).toMatchObject({
+			requestId: REQUEST_ID,
+			clientRequestId: command.clientRequestId,
+			expectedSellerFacingHash: command.expectedSellerFacingHash,
 		});
-		expect(postMock).toHaveBeenCalledTimes(1);
-		expect(outcome.ok).toBe(false);
-		if (!outcome.ok) {
-			expect(outcome.error.code).toBe("STALE_SELLER_RESPONSE");
+		expect(Object.keys(request).filter((k) => /amount|price/i.test(k))).toEqual(
+			[],
+		);
+		expect(outcome.ok).toBe(true);
+		if (outcome.ok) {
+			expect(outcome.data).toMatchObject({
+				acceptedDealPrice: "18900",
+				orderProvisioningState: "CREATING_ORDER",
+				orderNo: "",
+				paymentDeadline: "",
+			});
 		}
 	});
 
-	it("結帳中會把錯誤 payload 上的既有訂單編號帶出來", async () => {
+	it("版本衝突原樣傳給畫面，不在資料層自動改接受最新版", async () => {
 		const { result } = await mountLoaded();
-		postMock.mockRejectedValue(
-			new ApiClientError(
-				"checkout active",
-				409,
-				409,
-				{ orderNo: "HK20260913001" },
-				"RFQ_CHECKOUT_ALREADY_ACTIVE",
-			),
-		);
-		const outcome = await result.current.acceptQuote({
-			idempotencyKey: "bqa-test",
-			sellerResponseId: RESPONSE_ID,
-			expectedSellerResponseVersion: VERSION_ID,
-			expectedRfqSnapshotHash: "b".repeat(64),
+		const accept = vi.fn(() => {
+			throw new ConnectError("conflict", Code.Aborted);
 		});
+		rpc.handlers.acceptSellerQuote = accept;
+		const outcome = await result.current.acceptQuote(command);
+		expect(accept).toHaveBeenCalledTimes(1);
 		expect(outcome.ok).toBe(false);
-		if (!outcome.ok) expect(outcome.error.orderNo).toBe("HK20260913001");
 	});
 });
 
-describe("冪等鍵產生器", () => {
-	it("每次一把新的，格式符合 Gateway 的字元與長度限制", async () => {
+describe("client_request_id 產生器", () => {
+	it("每次一個新的 UUID", async () => {
 		const { result } = await mountLoaded();
-		const first = result.current.newIdempotencyKey();
-		const second = result.current.newIdempotencyKey();
+		const first = result.current.newClientRequestId();
+		const second = result.current.newClientRequestId();
 		expect(first).not.toBe(second);
-		for (const key of [first, second]) {
-			expect(key).toMatch(/^[A-Za-z0-9._:-]+$/);
-			expect(key.length).toBeGreaterThanOrEqual(8);
-			expect(key.length).toBeLessThanOrEqual(128);
-		}
+		expect(first).toMatch(/^[0-9a-f-]{36}$/);
 	});
 });

@@ -9,7 +9,7 @@ import {
 } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ProcurementCandidateSearch } from "@/lib/api/openapi-types";
+import type { ProcurementCandidateSearch } from "@/features/procurement-assistant/types";
 import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 import AssistantWorkspace from "../AssistantWorkspace";
 import { hasProcurementResults } from "../session-logic";

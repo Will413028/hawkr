@@ -3,7 +3,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ProcurementCandidateSearch } from "@/lib/api/openapi-types";
+import type { ProcurementCandidateSearch } from "@/features/procurement-assistant/types";
 import AgentTaskPanel from "./AgentTaskPanel";
 import type { AgentActivityEvent } from "./activity";
 
@@ -180,14 +180,13 @@ describe("AgentTaskPanel 搜尋狀態", () => {
 		expect(container.querySelector('[role="status"], [aria-live]')).toBeNull();
 	});
 
-	it("沒有搜尋事件時以輪詢的真實 lane 狀態呈現，不回放 turn 列", () => {
+	it("沒有搜尋事件時以輪詢的真實搜尋狀態呈現，不回放 turn 列", () => {
 		const candidateSet: ProcurementCandidateSearch = {
 			requestId: "request-1",
 			runId: "run-1",
 			candidateSetId: "candidates-1",
 			status: "RUNNING",
-			platformLaneStatus: "SUCCEEDED",
-			externalLaneStatus: "PENDING",
+			failureReason: "",
 			candidates: { platform: [], external: [] },
 		};
 		const { rerender } = renderPanel({ pending: true, liveActivity: [row] });
@@ -199,8 +198,8 @@ describe("AgentTaskPanel 搜尋狀態", () => {
 			}),
 		);
 		expect(screen.getByText("正在搜尋候選")).toBeTruthy();
-		expect(screen.getByText("已完成")).toBeTruthy();
-		expect(screen.getByText("外部業者")).toBeTruthy();
+		expect(screen.getByText("平台賣家")).toBeTruthy();
+		expect(screen.getByText("搜尋中")).toBeTruthy();
 		expect(screen.queryByTestId("agent-activity-rail")).toBeNull();
 		expect(screen.queryByText("理解採購需求")).toBeNull();
 	});

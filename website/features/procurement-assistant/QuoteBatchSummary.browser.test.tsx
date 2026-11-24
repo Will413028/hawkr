@@ -3,37 +3,28 @@ import { page } from "vitest/browser";
 import { renderWithIntl } from "@/tests/browser/render";
 import type { BuyerQuoteAcceptanceResponse } from "./buyer-quote-contract";
 import QuoteBatchSummary from "./QuoteBatchSummary";
-import {
-	type PublicationResultView,
-	publicationResultDataSchema,
-} from "./runtime-snapshot-contract";
+import type { PublishedRfqPublication } from "@/features/procurement-assistant/types";
 
 function publicationWith(
 	counts: Partial<{
 		recipientCount: number;
 		queuedCount: number;
-		notSentCount: number;
 	}> = {},
-): PublicationResultView {
+): PublishedRfqPublication {
 	return {
-		artifactVersion: "3",
+		publicationId: "1234567890123456788",
+		version: "3",
 		publishedAt: "2026-08-20T12:36:00Z",
-		data: publicationResultDataSchema.parse({
-			publicationId: "1234567890123456788",
-			version: "1",
-			sellerFacingPayloadHash: "b".repeat(64),
-			recipientCount: 0,
-			queuedCount: 0,
-			notSentCount: 0,
-			...counts,
-		}),
+		recipientCount: 0,
+		queuedCount: 0,
+		sellerFacingHash: "b".repeat(64),
+		...counts,
 	};
 }
 
 const publication = publicationWith({
 	recipientCount: 5,
 	queuedCount: 4,
-	notSentCount: 1,
 });
 
 const acceptedCreatingOrder: BuyerQuoteAcceptanceResponse = {
@@ -61,8 +52,6 @@ function setup(overrides: Partial<Props> = {}) {
 			deliveryDate: "2026-08-25",
 		},
 		buyerRequestedRange: {
-			currency: "TWD",
-			priceComponent: "GOODS_ONLY",
 			lowerBoundAmount: "58",
 			upperBoundAmount: "70",
 			basisQuantity: "1",

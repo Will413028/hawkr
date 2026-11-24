@@ -4,7 +4,7 @@ import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import { Drawer } from "@/components/shared/Drawer";
 import { Button, Chip } from "@/components/ui";
-import type { ProcurementCandidate } from "@/lib/api/openapi-types";
+import type { ProcurementCandidate } from "@/features/procurement-assistant/types";
 import { formatTaipeiDateTime } from "@/lib/date/taipei";
 import { useKeyboardInset } from "@/lib/hooks/useKeyboardInset";
 import Link from "@/lib/intl/native-link";
@@ -89,7 +89,6 @@ function CandidateDetail({ candidate }: { candidate: ProcurementCandidate }) {
 				>
 					{LANE_LABEL[candidate.lane]}
 				</Chip>
-				<span>比對分數 {candidate.score}</span>
 			</div>
 			<section>
 				<h3>已確認</h3>
@@ -614,12 +613,6 @@ export default function AssistantWorkspace({
 							/>
 						}
 						question={canClarify ? session.question : null}
-						cropDisambiguation={session.cropDisambiguation}
-						onChooseCropDisambiguation={
-							session.pendingInterrupt
-								? (option) => void session.resume({ optionId: option.optionId })
-								: undefined
-						}
 						onPickOption={(option) => void session.submitAnswer(option)}
 						onSubmitFreeText={({ slotKey, freeText }) =>
 							void session.submitAnswer({ slotKey, freeText })
@@ -770,7 +763,6 @@ export default function AssistantWorkspace({
 						onInteractionLockChange={setResultInteractionLocked}
 						headingRef={candidateHeadingRef}
 						onPreviewRfqPrice={session.previewRfqPrice}
-						onConfirmRfqSnapshot={session.confirmRfqSnapshot}
 						onPreviewRfqPublication={session.previewRfqPublication}
 						onExecuteRfqPublication={session.executeRfqPublication}
 						onRefreshSnapshot={session.refreshCurrentSnapshot}

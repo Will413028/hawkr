@@ -4,7 +4,7 @@ import type {
 	ProcurementItemResolution,
 	ProcurementSlots,
 	ProcurementSnapshot,
-} from "@/lib/api/openapi-types";
+} from "@/features/procurement-assistant/types";
 import type { PublicNarrativeBlock, PublicNarrativeKind } from "./narrative";
 import type { ClarifyQuestion, ProcurementStage } from "./types";
 
@@ -203,7 +203,6 @@ export interface NormalizedProcurementTurnResult {
 	textFallback?: string; // #2549 Phase 2 新增
 	question?: unknown;
 	recordedThisTurn?: unknown;
-	cropDisambiguation?: unknown;
 	/** doc57 run ledger 的 interrupt 標記——只有這一輪落在 WAITING_FOR_INPUT
 	 * 才會出現。unary SubmitTurn 與串流終態的 RUN_FINISHED.result 是同一份
 	 * TurnResult（backend gateway/internal/proxy/ai_assistant_stream.go 的
@@ -335,30 +334,11 @@ export function normalizeProcurementTurnResult(
 			typeof raw.textFallback === "string" ? raw.textFallback : undefined,
 		question: raw.question,
 		recordedThisTurn: raw.recordedThisTurn,
-		cropDisambiguation: raw.cropDisambiguation,
 		interruptId:
 			typeof raw.interruptId === "string" ? raw.interruptId : undefined,
 		interruptKind:
 			typeof raw.interruptKind === "string" ? raw.interruptKind : undefined,
 	};
-}
-
-export interface NormalizedCandidateSelectionResult {
-	candidateId: string;
-	selected: boolean;
-}
-
-export function normalizeCandidateSelectionResult(
-	raw: unknown,
-	expectedCandidateId: string,
-): NormalizedCandidateSelectionResult | null {
-	if (
-		!isRecord(raw) ||
-		raw.candidateId !== expectedCandidateId ||
-		typeof raw.selected !== "boolean"
-	)
-		return null;
-	return { candidateId: expectedCandidateId, selected: raw.selected };
 }
 
 export function mapSlots(raw: unknown): ProcurementSlots {
@@ -407,13 +387,6 @@ export function slotLabel(key: string): string {
 }
 
 /**
- * snapshot 的 status 是後端權威狀態。CLARIFYING 以外一律落到 "ready"——
- * MATCHING／CANDIDATES_READY 沒有可復原的 runId（GetSnapshot 不回傳它），
- * 但 POST /candidate-searches 對同一 revision 是冪等的（重複呼叫回傳既有
- * run，若已終態就直接帶終態候選回來），所以「ready」stage 的「開始搜尋
- * 候選」按鈕天然就是這兩個狀態的復原路徑，不需要後端另外加欄位。
- */
-/**
  * 「這個 session 現在有沒有可看的成果」。⛔ 這是唯一判準：面板的掛載條件與
  * 「看得到／打得開」的條件必須是同一個函式。
  *
@@ -433,6 +406,7 @@ export function hasProcurementResults(state: {
 	);
 }
 
+/** 需求狀態是後端權威：CLARIFYING 以外一律落到 "ready"，「開始搜尋候選」按鈕是 MATCHING 的復原路徑。 */
 export function deriveStageFromStatus(
 	status: ProcurementSnapshot["status"],
 ): ProcurementStage {
@@ -440,44 +414,14 @@ export function deriveStageFromStatus(
 }
 
 /**
- * run 是否已進終態。這是輪詢的唯一終止條件（useProcurementSession 每 1.5s 打一次
- * GET candidate-searches），漏判一個終態值 = 無限輪詢、畫面永遠停在「正在搜尋候選」。
- *
- * 改名前的 `COMPLETED` / `PARTIAL` 已於本波移除：backend 已部署改名版本，DB 既有列也已由
- * migration 收斂。⚠️ 漏判**不會**有錯誤訊號——輪詢拿到的是 200 OK，只是永遠不終止。
+ * 候選搜尋的 run 是否已進終態。這是輪詢的唯一終止條件（每 1.5s 讀一次），
+ * 漏判一個終態值就是無限輪詢、畫面永遠停在「正在搜尋候選」，而且沒有任何錯誤訊號。
  */
 export function isTerminalCandidateStatus(
 	status: ProcurementCandidateSearch["status"],
 ): boolean {
-	return status === "SUCCEEDED" || status === "FAILED";
-}
-
-/**
- * run 是否成功結束（相對於 FAILED）。改名前這需要同時比對 COMPLETED 與 PARTIAL，
- * 因為「部分成功」曾是獨立終態；新值域裡部分成功就是 SUCCEEDED + 某條 lane FAILED，
- * 所以成功終態只剩一個。函式保留（而非讓呼叫端散寫 `=== "SUCCEEDED"`）是因為
- * hasPartialLaneFailure 的語意直接建立在它上面。
- */
-export function isSucceededCandidateStatus(
-	status: ProcurementCandidateSearch["status"],
-): boolean {
-	return status === "SUCCEEDED";
-}
-
-/**
- * 是否要提示「部分來源未完成」。契約凍結後 run 狀態不再帶這個資訊——判斷依據是
- * 「run 成功但有 lane 失敗」，這也是新值域對「部分成功」的定義本身。
- */
-export function hasPartialLaneFailure(
-	search: Pick<
-		ProcurementCandidateSearch,
-		"status" | "platformLaneStatus" | "externalLaneStatus"
-	>,
-): boolean {
-	if (!isSucceededCandidateStatus(search.status)) return false;
 	return (
-		search.platformLaneStatus === "FAILED" ||
-		search.externalLaneStatus === "FAILED"
+		status === "SUCCEEDED" || status === "FAILED" || status === "CANCELLED"
 	);
 }
 

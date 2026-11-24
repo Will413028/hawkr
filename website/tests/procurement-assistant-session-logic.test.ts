@@ -15,7 +15,7 @@ import {
 	shouldAutofocusHandoff,
 	slotLabel,
 } from "../features/procurement-assistant/session-logic";
-import type { ProcurementCandidate } from "../lib/api/openapi-types";
+import type { ProcurementCandidate } from "@/features/procurement-assistant/types";
 
 test("exact retry 沿用 clientRequestId；只要使用者改過文字就建立新 key", () => {
 	let sequence = 0;
