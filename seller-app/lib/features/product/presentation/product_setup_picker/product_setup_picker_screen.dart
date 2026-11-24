@@ -7,8 +7,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../../shared/widgets/setup_bottom_bar.dart';
 import '../../data/product_repository.dart';
-import '../ai_assistant_button.dart';
-import '../product_listing_draft_controller.dart';
 import '../product_setup_progress_bar.dart';
 import '../product_setup_top_bar.dart';
 import 'picker_category_search_row.dart';
@@ -94,7 +92,6 @@ class ProductSetupPickerScreen extends HookConsumerWidget {
     final searchCtrl = useTextEditingController();
     final leftListController = useScrollController();
     final rightListController = useScrollController();
-    final draft = ref.watch(productListingDraftControllerProvider);
 
     final majors = useState<List<String>>(List<String>.from(_defaultTopTabs));
     final subByMajor = useState<Map<String, List<String>>>({});
@@ -126,37 +123,6 @@ class ProductSetupPickerScreen extends HookConsumerWidget {
     final subcats = useState<List<String>>([]);
     final activeSubcat = useState<String?>(null);
     final selectedItem = useState<Map<String, dynamic>?>(null);
-
-    // AI 填入分類時自動啟用「下一步」按鈕
-    useEffect(() {
-      final catIdStr = draft.categoryId;
-      if (catIdStr == null || catIdStr.isEmpty) return null;
-      if (selectedItem.value != null) return null;
-      if (catIdToL3Name.value.isEmpty) return null;
-      final parsedId = int.tryParse(catIdStr);
-      if (parsedId == null) return null;
-      final l3Name = catIdToL3Name.value[parsedId];
-      final l2Name = catIdToL2.value[parsedId] ?? '';
-      String l1Key = activeTop.value;
-      for (final entry in subByMajor.value.entries) {
-        if (entry.value.contains(l2Name)) {
-          l1Key = entry.key;
-          break;
-        }
-      }
-      selectedItem.value = {
-        'id': parsedId,
-        '_selectedL3': l3Name,
-        '_selectedL2': l2Name.isNotEmpty ? l2Name : null,
-        '_selectedL1': l1Key,
-        'isCandidateCategory': false,
-      };
-      if (l2Name.isNotEmpty) {
-        activeTop.value = l1Key;
-        activeSubcat.value = l2Name;
-      }
-      return null;
-    }, [draft.patchVersion, catIdToL3Name.value.length]);
 
     void rebuildSubcats({bool preserveSelection = true}) {
       final list = List<String>.from(
@@ -466,12 +432,7 @@ class ProductSetupPickerScreen extends HookConsumerWidget {
       backgroundColor: AppColors.bgPrimary,
       body: Column(
         children: [
-          ProductSetupTopBar(
-            title: '新增商品',
-            trailing: kAiProductListingAssistantEnabled
-                ? const AiAssistantButton()
-                : null,
-          ),
+          ProductSetupTopBar(title: '新增商品'),
           const ProductSetupProgressBar(currentStep: 1),
           SizedBox(height: 12.h),
           PickerCategorySearchRow(

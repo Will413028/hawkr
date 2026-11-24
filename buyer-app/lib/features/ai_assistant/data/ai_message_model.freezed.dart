@@ -12,276 +12,10 @@ part of 'ai_message_model.dart';
 // dart format off
 T _$identity<T>(T value) => value;
 /// @nodoc
-mixin _$AiOrderItem {
-
- String get orderId; String get status; int get amountTwd; int get createTimeMs;
-/// Create a copy of AiOrderItem
-/// with the given fields replaced by the non-null parameter values.
-@JsonKey(includeFromJson: false, includeToJson: false)
-@pragma('vm:prefer-inline')
-$AiOrderItemCopyWith<AiOrderItem> get copyWith => _$AiOrderItemCopyWithImpl<AiOrderItem>(this as AiOrderItem, _$identity);
-
-
-
-@override
-bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is AiOrderItem&&(identical(other.orderId, orderId) || other.orderId == orderId)&&(identical(other.status, status) || other.status == status)&&(identical(other.amountTwd, amountTwd) || other.amountTwd == amountTwd)&&(identical(other.createTimeMs, createTimeMs) || other.createTimeMs == createTimeMs));
-}
-
-
-@override
-int get hashCode => Object.hash(runtimeType,orderId,status,amountTwd,createTimeMs);
-
-@override
-String toString() {
-  return 'AiOrderItem(orderId: $orderId, status: $status, amountTwd: $amountTwd, createTimeMs: $createTimeMs)';
-}
-
-
-}
-
-/// @nodoc
-abstract mixin class $AiOrderItemCopyWith<$Res>  {
-  factory $AiOrderItemCopyWith(AiOrderItem value, $Res Function(AiOrderItem) _then) = _$AiOrderItemCopyWithImpl;
-@useResult
-$Res call({
- String orderId, String status, int amountTwd, int createTimeMs
-});
-
-
-
-
-}
-/// @nodoc
-class _$AiOrderItemCopyWithImpl<$Res>
-    implements $AiOrderItemCopyWith<$Res> {
-  _$AiOrderItemCopyWithImpl(this._self, this._then);
-
-  final AiOrderItem _self;
-  final $Res Function(AiOrderItem) _then;
-
-/// Create a copy of AiOrderItem
-/// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? orderId = null,Object? status = null,Object? amountTwd = null,Object? createTimeMs = null,}) {
-  return _then(_self.copyWith(
-orderId: null == orderId ? _self.orderId : orderId // ignore: cast_nullable_to_non_nullable
-as String,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
-as String,amountTwd: null == amountTwd ? _self.amountTwd : amountTwd // ignore: cast_nullable_to_non_nullable
-as int,createTimeMs: null == createTimeMs ? _self.createTimeMs : createTimeMs // ignore: cast_nullable_to_non_nullable
-as int,
-  ));
-}
-
-}
-
-
-/// Adds pattern-matching-related methods to [AiOrderItem].
-extension AiOrderItemPatterns on AiOrderItem {
-/// A variant of `map` that fallback to returning `orElse`.
-///
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case final Subclass value:
-///     return ...;
-///   case _:
-///     return orElse();
-/// }
-/// ```
-
-@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _AiOrderItem value)?  $default,{required TResult orElse(),}){
-final _that = this;
-switch (_that) {
-case _AiOrderItem() when $default != null:
-return $default(_that);case _:
-  return orElse();
-
-}
-}
-/// A `switch`-like method, using callbacks.
-///
-/// Callbacks receives the raw object, upcasted.
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case final Subclass value:
-///     return ...;
-///   case final Subclass2 value:
-///     return ...;
-/// }
-/// ```
-
-@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _AiOrderItem value)  $default,){
-final _that = this;
-switch (_that) {
-case _AiOrderItem():
-return $default(_that);case _:
-  throw StateError('Unexpected subclass');
-
-}
-}
-/// A variant of `map` that fallback to returning `null`.
-///
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case final Subclass value:
-///     return ...;
-///   case _:
-///     return null;
-/// }
-/// ```
-
-@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _AiOrderItem value)?  $default,){
-final _that = this;
-switch (_that) {
-case _AiOrderItem() when $default != null:
-return $default(_that);case _:
-  return null;
-
-}
-}
-/// A variant of `when` that fallback to an `orElse` callback.
-///
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case Subclass(:final field):
-///     return ...;
-///   case _:
-///     return orElse();
-/// }
-/// ```
-
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String orderId,  String status,  int amountTwd,  int createTimeMs)?  $default,{required TResult orElse(),}) {final _that = this;
-switch (_that) {
-case _AiOrderItem() when $default != null:
-return $default(_that.orderId,_that.status,_that.amountTwd,_that.createTimeMs);case _:
-  return orElse();
-
-}
-}
-/// A `switch`-like method, using callbacks.
-///
-/// As opposed to `map`, this offers destructuring.
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case Subclass(:final field):
-///     return ...;
-///   case Subclass2(:final field2):
-///     return ...;
-/// }
-/// ```
-
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String orderId,  String status,  int amountTwd,  int createTimeMs)  $default,) {final _that = this;
-switch (_that) {
-case _AiOrderItem():
-return $default(_that.orderId,_that.status,_that.amountTwd,_that.createTimeMs);case _:
-  throw StateError('Unexpected subclass');
-
-}
-}
-/// A variant of `when` that fallback to returning `null`
-///
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case Subclass(:final field):
-///     return ...;
-///   case _:
-///     return null;
-/// }
-/// ```
-
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String orderId,  String status,  int amountTwd,  int createTimeMs)?  $default,) {final _that = this;
-switch (_that) {
-case _AiOrderItem() when $default != null:
-return $default(_that.orderId,_that.status,_that.amountTwd,_that.createTimeMs);case _:
-  return null;
-
-}
-}
-
-}
-
-/// @nodoc
-
-
-class _AiOrderItem implements AiOrderItem {
-  const _AiOrderItem({required this.orderId, required this.status, required this.amountTwd, this.createTimeMs = 0});
-  
-
-@override final  String orderId;
-@override final  String status;
-@override final  int amountTwd;
-@override@JsonKey() final  int createTimeMs;
-
-/// Create a copy of AiOrderItem
-/// with the given fields replaced by the non-null parameter values.
-@override @JsonKey(includeFromJson: false, includeToJson: false)
-@pragma('vm:prefer-inline')
-_$AiOrderItemCopyWith<_AiOrderItem> get copyWith => __$AiOrderItemCopyWithImpl<_AiOrderItem>(this, _$identity);
-
-
-
-@override
-bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _AiOrderItem&&(identical(other.orderId, orderId) || other.orderId == orderId)&&(identical(other.status, status) || other.status == status)&&(identical(other.amountTwd, amountTwd) || other.amountTwd == amountTwd)&&(identical(other.createTimeMs, createTimeMs) || other.createTimeMs == createTimeMs));
-}
-
-
-@override
-int get hashCode => Object.hash(runtimeType,orderId,status,amountTwd,createTimeMs);
-
-@override
-String toString() {
-  return 'AiOrderItem(orderId: $orderId, status: $status, amountTwd: $amountTwd, createTimeMs: $createTimeMs)';
-}
-
-
-}
-
-/// @nodoc
-abstract mixin class _$AiOrderItemCopyWith<$Res> implements $AiOrderItemCopyWith<$Res> {
-  factory _$AiOrderItemCopyWith(_AiOrderItem value, $Res Function(_AiOrderItem) _then) = __$AiOrderItemCopyWithImpl;
-@override @useResult
-$Res call({
- String orderId, String status, int amountTwd, int createTimeMs
-});
-
-
-
-
-}
-/// @nodoc
-class __$AiOrderItemCopyWithImpl<$Res>
-    implements _$AiOrderItemCopyWith<$Res> {
-  __$AiOrderItemCopyWithImpl(this._self, this._then);
-
-  final _AiOrderItem _self;
-  final $Res Function(_AiOrderItem) _then;
-
-/// Create a copy of AiOrderItem
-/// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? orderId = null,Object? status = null,Object? amountTwd = null,Object? createTimeMs = null,}) {
-  return _then(_AiOrderItem(
-orderId: null == orderId ? _self.orderId : orderId // ignore: cast_nullable_to_non_nullable
-as String,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
-as String,amountTwd: null == amountTwd ? _self.amountTwd : amountTwd // ignore: cast_nullable_to_non_nullable
-as int,createTimeMs: null == createTimeMs ? _self.createTimeMs : createTimeMs // ignore: cast_nullable_to_non_nullable
-as int,
-  ));
-}
-
-
-}
-
-/// @nodoc
 mixin _$AiMessage {
 
  String get role;// 'user' | 'assistant'
- String get content; DateTime get timestamp; List<AiOrderItem>? get orderList;
+ String get content; DateTime get timestamp;
 /// Create a copy of AiMessage
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -292,16 +26,16 @@ $AiMessageCopyWith<AiMessage> get copyWith => _$AiMessageCopyWithImpl<AiMessage>
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is AiMessage&&(identical(other.role, role) || other.role == role)&&(identical(other.content, content) || other.content == content)&&(identical(other.timestamp, timestamp) || other.timestamp == timestamp)&&const DeepCollectionEquality().equals(other.orderList, orderList));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is AiMessage&&(identical(other.role, role) || other.role == role)&&(identical(other.content, content) || other.content == content)&&(identical(other.timestamp, timestamp) || other.timestamp == timestamp));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,role,content,timestamp,const DeepCollectionEquality().hash(orderList));
+int get hashCode => Object.hash(runtimeType,role,content,timestamp);
 
 @override
 String toString() {
-  return 'AiMessage(role: $role, content: $content, timestamp: $timestamp, orderList: $orderList)';
+  return 'AiMessage(role: $role, content: $content, timestamp: $timestamp)';
 }
 
 
@@ -312,7 +46,7 @@ abstract mixin class $AiMessageCopyWith<$Res>  {
   factory $AiMessageCopyWith(AiMessage value, $Res Function(AiMessage) _then) = _$AiMessageCopyWithImpl;
 @useResult
 $Res call({
- String role, String content, DateTime timestamp, List<AiOrderItem>? orderList
+ String role, String content, DateTime timestamp
 });
 
 
@@ -329,13 +63,12 @@ class _$AiMessageCopyWithImpl<$Res>
 
 /// Create a copy of AiMessage
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? role = null,Object? content = null,Object? timestamp = null,Object? orderList = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? role = null,Object? content = null,Object? timestamp = null,}) {
   return _then(_self.copyWith(
 role: null == role ? _self.role : role // ignore: cast_nullable_to_non_nullable
 as String,content: null == content ? _self.content : content // ignore: cast_nullable_to_non_nullable
 as String,timestamp: null == timestamp ? _self.timestamp : timestamp // ignore: cast_nullable_to_non_nullable
-as DateTime,orderList: freezed == orderList ? _self.orderList : orderList // ignore: cast_nullable_to_non_nullable
-as List<AiOrderItem>?,
+as DateTime,
   ));
 }
 
@@ -420,10 +153,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String role,  String content,  DateTime timestamp,  List<AiOrderItem>? orderList)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String role,  String content,  DateTime timestamp)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _AiMessage() when $default != null:
-return $default(_that.role,_that.content,_that.timestamp,_that.orderList);case _:
+return $default(_that.role,_that.content,_that.timestamp);case _:
   return orElse();
 
 }
@@ -441,10 +174,10 @@ return $default(_that.role,_that.content,_that.timestamp,_that.orderList);case _
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String role,  String content,  DateTime timestamp,  List<AiOrderItem>? orderList)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String role,  String content,  DateTime timestamp)  $default,) {final _that = this;
 switch (_that) {
 case _AiMessage():
-return $default(_that.role,_that.content,_that.timestamp,_that.orderList);case _:
+return $default(_that.role,_that.content,_that.timestamp);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -461,10 +194,10 @@ return $default(_that.role,_that.content,_that.timestamp,_that.orderList);case _
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String role,  String content,  DateTime timestamp,  List<AiOrderItem>? orderList)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String role,  String content,  DateTime timestamp)?  $default,) {final _that = this;
 switch (_that) {
 case _AiMessage() when $default != null:
-return $default(_that.role,_that.content,_that.timestamp,_that.orderList);case _:
+return $default(_that.role,_that.content,_that.timestamp);case _:
   return null;
 
 }
@@ -476,22 +209,13 @@ return $default(_that.role,_that.content,_that.timestamp,_that.orderList);case _
 
 
 class _AiMessage implements AiMessage {
-  const _AiMessage({required this.role, required this.content, required this.timestamp, final  List<AiOrderItem>? orderList}): _orderList = orderList;
+  const _AiMessage({required this.role, required this.content, required this.timestamp});
   
 
 @override final  String role;
 // 'user' | 'assistant'
 @override final  String content;
 @override final  DateTime timestamp;
- final  List<AiOrderItem>? _orderList;
-@override List<AiOrderItem>? get orderList {
-  final value = _orderList;
-  if (value == null) return null;
-  if (_orderList is EqualUnmodifiableListView) return _orderList;
-  // ignore: implicit_dynamic_type
-  return EqualUnmodifiableListView(value);
-}
-
 
 /// Create a copy of AiMessage
 /// with the given fields replaced by the non-null parameter values.
@@ -503,16 +227,16 @@ _$AiMessageCopyWith<_AiMessage> get copyWith => __$AiMessageCopyWithImpl<_AiMess
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _AiMessage&&(identical(other.role, role) || other.role == role)&&(identical(other.content, content) || other.content == content)&&(identical(other.timestamp, timestamp) || other.timestamp == timestamp)&&const DeepCollectionEquality().equals(other._orderList, _orderList));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _AiMessage&&(identical(other.role, role) || other.role == role)&&(identical(other.content, content) || other.content == content)&&(identical(other.timestamp, timestamp) || other.timestamp == timestamp));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,role,content,timestamp,const DeepCollectionEquality().hash(_orderList));
+int get hashCode => Object.hash(runtimeType,role,content,timestamp);
 
 @override
 String toString() {
-  return 'AiMessage(role: $role, content: $content, timestamp: $timestamp, orderList: $orderList)';
+  return 'AiMessage(role: $role, content: $content, timestamp: $timestamp)';
 }
 
 
@@ -523,7 +247,7 @@ abstract mixin class _$AiMessageCopyWith<$Res> implements $AiMessageCopyWith<$Re
   factory _$AiMessageCopyWith(_AiMessage value, $Res Function(_AiMessage) _then) = __$AiMessageCopyWithImpl;
 @override @useResult
 $Res call({
- String role, String content, DateTime timestamp, List<AiOrderItem>? orderList
+ String role, String content, DateTime timestamp
 });
 
 
@@ -540,13 +264,12 @@ class __$AiMessageCopyWithImpl<$Res>
 
 /// Create a copy of AiMessage
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? role = null,Object? content = null,Object? timestamp = null,Object? orderList = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? role = null,Object? content = null,Object? timestamp = null,}) {
   return _then(_AiMessage(
 role: null == role ? _self.role : role // ignore: cast_nullable_to_non_nullable
 as String,content: null == content ? _self.content : content // ignore: cast_nullable_to_non_nullable
 as String,timestamp: null == timestamp ? _self.timestamp : timestamp // ignore: cast_nullable_to_non_nullable
-as DateTime,orderList: freezed == orderList ? _self._orderList : orderList // ignore: cast_nullable_to_non_nullable
-as List<AiOrderItem>?,
+as DateTime,
   ));
 }
 

@@ -77,8 +77,8 @@ func newOrderFixture(t *testing.T) *orderFixture {
 	if _, err := d.Pool().Exec(ctx, `INSERT INTO procurement.seller_response_versions (
 			id, seller_response_id, version, response_type, spec_note, unit_basis_quantity, unit_basis_unit,
 			offered_quantity, offered_quantity_unit, conversion_basis, currency, goods_amount, shipping_amount, tax_amount, tax_inclusion_basis, total_amount,
-			valid_until, outside_buyer_requested_range, publication_version, client_request_id, submitted_at, created_at)
-		VALUES ($1, $2, 1, 'MANUAL_QUOTE', '', 1, '件', 12.500, '件', '', 'TWD', 1000, 100, 50, 'TAX_EXCLUDED', 1150, $3, false, 1, $4, $5, $5)`,
+			valid_until, publication_version, client_request_id, submitted_at, created_at)
+		VALUES ($1, $2, 1, 'MANUAL_QUOTE', '', 1, '件', 12.500, '件', '', 'TWD', 1000, 100, 50, 'TAX_EXCLUDED', 1150, $3, 1, $4, $5, $5)`,
 		id(), c.sellerResponse, epoch.Add(time.Hour), id(), epoch); err != nil {
 		t.Fatal(err)
 	}

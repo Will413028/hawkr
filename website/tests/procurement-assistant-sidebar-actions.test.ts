@@ -164,10 +164,12 @@ test("icon rail 仍以真實 viewport 判定；歷史列改為永遠可見的靜
 		/const compactSectionTabs = hasAgentSection && collapsed && iconRailViewport;/,
 	);
 
-	// 大分類彈珠不是只有收合 rail 才顯示；展開清單也要能一眼辨認品類。
-	assert.match(sidebar, /<HawkrAgentConversationMarble/);
+	// 契約沒有對話分類欄位，列上不畫分類圖示。
+	assert.doesNotMatch(
+		sidebar,
+		/HawkrAgentConversationMarble|primaryCategoryId/,
+	);
 	assert.doesNotMatch(sidebar, /resolveHawkrAgentSeason|season=/);
-	assert.match(sidebar, /primaryCategoryId=\{row\.primaryCategoryId\}/);
 	assert.doesNotMatch(sidebar, /showAgentRowMarks/);
 	assert.doesNotMatch(sidebar, /chat-sidebar__agent-mark/);
 });
@@ -255,25 +257,10 @@ test("重複的 Agent hero 已移除；雙分頁直接承載賣家與 Agent iden
 	assert.match(agentTab, /hideBadge/);
 });
 
-test("Agent 分頁的記號是靜態 Hawkr 標誌，不掛重播 handle；歷史對話的品類圖示帶可讀名稱", () => {
+test("Agent 分頁的記號是靜態 Hawkr 標誌，不掛重播 handle", () => {
 	assert.match(hawkrAgentMark, /<BrandLogo variant="mark" size="fill" \/>/);
 	assert.doesNotMatch(hawkrAgentMark, /forwardRef/);
 	assert.doesNotMatch(sidebar, /playAgentTabMark|agentTabMarkRef/);
-
-	const marble = readFileSync(
-		path.join(
-			root,
-			"features/procurement-assistant/HawkrAgentConversationMarble.tsx",
-		),
-		"utf8",
-	);
-	assert.match(marble, /role: "img" as const/);
-	assert.match(
-		marble,
-		/`大分類：\$\{HAWKR_AGENT_CATEGORY_METADATA\[primaryCategoryId\]\.label\}`/,
-	);
-	assert.match(marble, /: \{ "aria-hidden": true \}/);
-	assert.match(marble, /<FoodCategoryIcon/);
 });
 
 test("收合側欄保留兩顆直向 identity tabs，不因 hero 移除而失去 Agent 入口", () => {

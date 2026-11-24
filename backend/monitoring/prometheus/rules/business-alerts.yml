@@ -14,7 +14,6 @@
 # | payment_outbox_dead_rows                      | sql_exporter（payment DB）             | PaymentOutboxDeadRows |
 # | hawkr_shipping_provider_status_unknown_total | shipping-service（Micrometer Counter） | ShippingProviderStatusUnknown |
 # | hawkr_shipping_provider_not_status_event_total | shipping-service（正常流量，趨勢用） | （刻意無告警） |
-# | vendor_portal_invite_exchange_total            | gateway（promauto Counter）             | 無自動告警，result=rejected 供人工排查猜測 token 的訊號 |
 #
 # 尚未 export（未來需求，暫不告警）：hawkr_payuni_errors_total / hawkr_cart_created_total /
 # hawkr_checkout_completed_total / hawkr_inventory_lock_total / hawkr_inventory_lock_failed_total。
@@ -894,4 +893,3 @@ groups:
         annotations:
           summary: "env={{ $labels.env }}：配送方式 {{ $labels.shipping_method }} 有 {{ $value }} 筆無法辨識的物流商貨態"
           description: "env={{ $labels.env }}：物流商回了 adapter 認不得的貨態碼，raw 值已保存但狀態機沒有推進——那些單子的平台狀態停在原地，買賣家看到的進度是舊的。診斷：① 撈 raw 值 `SELECT shipment_no, provider_status, provider_message, updated_at FROM shipments WHERE provider_status IS NOT NULL AND updated_at > NOW() - INTERVAL '2 hours' ORDER BY updated_at DESC` ② 對照 log event `ShippingService.providerStatus.unknown` 取 source（WEBHOOK／WEBHOOK_NO_ADAPTER／QUERY）判斷是哪條入口 ③ 拿 raw 值對第三方文件的貨態表，是新增碼就補 ShipmentStatusMapper 的映射、是我方漏 map 就補 adapter ④ 補完後那些卡住的單子要手動推進，映射補上不會回溯。⚠️ 本條**不含** provider_not_status_event（回調不帶貨態欄位）——那是正常流量。"
-

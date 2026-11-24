@@ -3,24 +3,24 @@
 import {
 	cleanup,
 	fireEvent,
-	render,
+	render as renderWithoutIntl,
 	screen,
 	waitFor,
 } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ProcurementCandidate } from "@/lib/api/openapi-types";
+import type { ProcurementCandidate } from "@/features/procurement-assistant/types";
+import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 import RfqDraftFlow from "../RfqDraftFlow";
-import type {
-	RfqCommandResult,
-	RfqConfirmation,
-	RfqPricePreview,
-} from "../rfq-price-contract";
+import type { RfqCommandResult, RfqPricePreview } from "../rfq-price-contract";
 import type {
 	RfqPublicationApproval,
 	RfqPublicationExecuteCommand,
 	RfqPublicationResult,
 } from "../rfq-publication-contract";
+
+const render = (ui: React.ReactElement) =>
+	renderWithoutIntl(ui, { wrapper: IntlTestWrapper });
 
 type PublicationExecute = (
 	command: RfqPublicationExecuteCommand,
@@ -38,27 +38,14 @@ const baseSlots = {
 
 function preview(): RfqPricePreview {
 	return {
-		pricePreviewId: "1234567890123456799",
-		version: "1",
 		buyerRequestedRange: {
-			currency: "TWD",
-			priceComponent: "GOODS_ONLY",
 			lowerBoundAmount: "58",
 			upperBoundAmount: "70",
 			basisQuantity: "1",
 			basisUnit: "KG",
 		},
-		payloadHash: "a".repeat(64),
 		quoteTotalRange: null,
 	} as RfqPricePreview;
-}
-
-function confirmation(): RfqConfirmation {
-	return {
-		confirmedRfqSnapshotId: "1234567890123456802",
-		payloadHash: "c".repeat(64),
-		expiresAt: "2026-08-22T12:36:00Z",
-	};
 }
 
 function approval(
@@ -69,11 +56,8 @@ function approval(
 		approvalVersion: "1",
 		audienceHash: "d".repeat(64),
 		sellerFacingPayloadHash: "e".repeat(64),
-		sellerFacingPayloadJson: '{"item":"蘋果"}',
 		expiresAt: "2026-08-22T12:36:00Z",
-		audiencePolicyId: "WISH_POOL_ALL_ACTIVE_SELLERS_V1",
-		audiencePolicyVersion: "1",
-		recipientCount: "0",
+		recipientCount: 1,
 		...overrides,
 	};
 }
@@ -84,8 +68,6 @@ function result(
 	return {
 		publicationId: "1234567890123456804",
 		publicationVersion: "1",
-		state: "PUBLISHED",
-		audienceMode: "DIRECT_RECIPIENTS",
 		audienceHash: "d".repeat(64),
 		sellerFacingPayloadHash: "e".repeat(64),
 		publishedAt: "2026-08-22T12:40:00Z",
@@ -94,17 +76,10 @@ function result(
 	};
 }
 
-function laneCandidate(
-	id: string,
-	lane: "PLATFORM" | "EXTERNAL",
-	storeId?: string,
-): ProcurementCandidate {
+function storeCandidate(id: string, storeId?: string): ProcurementCandidate {
 	return {
 		candidateId: id,
-		sourceId: `product-${id}`,
-		lane,
 		displayName: `候選 ${id}`,
-		score: 90,
 		matchedFacts: [],
 		unverifiableFacts: [],
 		factsAsOf: "2026-08-14T12:00:00Z",
@@ -135,10 +110,7 @@ async function renderAtReconfirm(
 			candidates: options.candidates ?? [
 				{
 					candidateId: "seller-green",
-					sourceId: "product-green",
-					lane: "PLATFORM" as const,
 					displayName: "範例鮮果合作社",
-					score: 94,
 					matchedFacts: [],
 					unverifiableFacts: [],
 					factsAsOf: "2026-08-14T12:00:00Z",
@@ -150,13 +122,6 @@ async function renderAtReconfirm(
 			onPreviewRfqPrice: vi.fn(
 				async () =>
 					({ ok: true, data: preview() }) as RfqCommandResult<RfqPricePreview>,
-			),
-			onConfirmRfqSnapshot: vi.fn(
-				async () =>
-					({
-						ok: true,
-						data: confirmation(),
-					}) as RfqCommandResult<RfqConfirmation>,
 			),
 			onRefreshSnapshot: async () => true,
 			onPreviewRfqPublication: vi.fn(
@@ -334,10 +299,7 @@ describe("RfqDraftFlow — A13 發布受眾預設", () => {
 		const onPreview = vi.fn();
 		const candidate = {
 			candidateId: "seller-green",
-			sourceId: "product-green",
-			lane: "PLATFORM" as const,
 			displayName: "範例鮮果合作社",
-			score: 94,
 			matchedFacts: [],
 			unverifiableFacts: [],
 			factsAsOf: "2026-08-14T12:00:00Z",
@@ -354,13 +316,6 @@ describe("RfqDraftFlow — A13 發布受眾預設", () => {
 			onPreviewRfqPrice: vi.fn(
 				async () =>
 					({ ok: true, data: preview() }) as RfqCommandResult<RfqPricePreview>,
-			),
-			onConfirmRfqSnapshot: vi.fn(
-				async () =>
-					({
-						ok: true,
-						data: confirmation(),
-					}) as RfqCommandResult<RfqConfirmation>,
 			),
 			onRefreshSnapshot: async () => true,
 			onPreviewRfqPublication: onPreview,
@@ -405,44 +360,23 @@ describe("RfqDraftFlow — A13 發布受眾預設", () => {
 		expect(onPreview).not.toHaveBeenCalled();
 	});
 
-	it("不再提供許願池這個選項", async () => {
-		await renderAtReconfirm(okExecute());
-
-		expect(screen.queryByRole("radio", { name: "投入許願池" })).toBeNull();
-		expect(screen.queryByText(/投入許願池/)).toBeNull();
-	});
-
 	it("發布對象的家數與候選頁一致：同商家多筆只算一家", async () => {
 		await renderAtReconfirm(okExecute(), {
 			candidates: [
-				laneCandidate("a", "PLATFORM", "77"),
-				laneCandidate("b", "PLATFORM", "77"),
-				laneCandidate("c", "PLATFORM", "88"),
+				storeCandidate("a", "77"),
+				storeCandidate("b", "77"),
+				storeCandidate("c", "88"),
 			],
 		});
 
-		expect(screen.getByText("平台賣家 2 家")).toBeTruthy();
+		expect(screen.getByText("賣家 2 家")).toBeTruthy();
 	});
 
-	it("混選兩條 lane 時分別列出平台與站外家數", async () => {
+	it("沒有 storeId 的候選各算一家", async () => {
 		await renderAtReconfirm(okExecute(), {
-			candidates: [
-				laneCandidate("a", "PLATFORM", "77"),
-				laneCandidate("b", "PLATFORM", "77"),
-				laneCandidate("c", "EXTERNAL"),
-				laneCandidate("d", "EXTERNAL"),
-			],
+			candidates: [storeCandidate("c"), storeCandidate("d")],
 		});
 
-		expect(screen.getByText("平台賣家 1 家 · 站外業者 2 家")).toBeTruthy();
-	});
-
-	it("只有一條 lane 時不列出 0 家的那一項", async () => {
-		await renderAtReconfirm(okExecute(), {
-			candidates: [laneCandidate("c", "EXTERNAL")],
-		});
-
-		expect(screen.getByText("站外業者 1 家")).toBeTruthy();
-		expect(screen.queryByText(/平台賣家/)).toBeNull();
+		expect(screen.getByText("賣家 2 家")).toBeTruthy();
 	});
 });

@@ -6,23 +6,22 @@
 import {
 	cleanup,
 	fireEvent,
-	render,
+	render as renderWithoutIntl,
 	screen,
 	waitFor,
 } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { IntlTestWrapper } from "@/tests/mocks/intl-test-wrapper";
 import RfqDraftFlow from "../RfqDraftFlow";
+import type { RfqCommandResult, RfqPricePreview } from "../rfq-price-contract";
 import type {
-	RfqCommandResult,
-	RfqConfirmation,
-	RfqPricePreview,
-} from "../rfq-price-contract";
-import {
-	publicationPreviewBody,
-	type RfqPublicationApproval,
-	type RfqPublicationPreviewCommand,
+	RfqPublicationApproval,
+	RfqPublicationPreviewCommand,
 } from "../rfq-publication-contract";
+
+const render = (ui: React.ReactElement) =>
+	renderWithoutIntl(ui, { wrapper: IntlTestWrapper });
 
 type PublicationPreview = (
 	command: RfqPublicationPreviewCommand,
@@ -57,26 +56,13 @@ const baseSlots = {
 
 function preview(): RfqPricePreview {
 	return {
-		pricePreviewId: "1234567890123456799",
-		version: "1",
 		buyerRequestedRange: {
-			currency: "TWD",
-			priceComponent: "GOODS_ONLY",
 			lowerBoundAmount: "58",
 			upperBoundAmount: "70",
 			basisQuantity: "1",
 			basisUnit: "KG",
 		},
-		payloadHash: "a".repeat(64),
 		quoteTotalRange: null,
-	} as RfqPricePreview;
-}
-
-function confirmation(): RfqConfirmation {
-	return {
-		confirmedRfqSnapshotId: "1234567890123456802",
-		payloadHash: "c".repeat(64),
-		expiresAt: "2026-09-16T12:36:00Z",
 	};
 }
 
@@ -86,11 +72,8 @@ function approval(): RfqPublicationApproval {
 		approvalVersion: "1",
 		audienceHash: "d".repeat(64),
 		sellerFacingPayloadHash: "e".repeat(64),
-		sellerFacingPayloadJson: '{"item":"蘋果"}',
 		expiresAt: "2026-09-16T12:36:00Z",
-		audiencePolicyId: "WISH_POOL_ALL_ACTIVE_SELLERS_V1",
-		audiencePolicyVersion: "1",
-		recipientCount: "1",
+		recipientCount: 1,
 	};
 }
 
@@ -121,7 +104,6 @@ async function renderAtReconfirm(
 	),
 ) {
 	const data = preview();
-	const confirmed = confirmation();
 	render(
 		React.createElement(RfqDraftFlow, {
 			requestId: "1234567890123456788",
@@ -131,10 +113,7 @@ async function renderAtReconfirm(
 			candidates: [
 				{
 					candidateId: "seller-green",
-					sourceId: "product-green",
-					lane: "PLATFORM" as const,
 					displayName: "範例鮮果合作社",
-					score: 94,
 					matchedFacts: [],
 					unverifiableFacts: [],
 					factsAsOf: "2026-09-10T12:00:00Z",
@@ -145,10 +124,6 @@ async function renderAtReconfirm(
 			onReturnToConversation: () => {},
 			onPreviewRfqPrice: vi.fn(
 				async () => ({ ok: true, data }) as RfqCommandResult<RfqPricePreview>,
-			),
-			onConfirmRfqSnapshot: vi.fn(
-				async () =>
-					({ ok: true, data: confirmed }) as RfqCommandResult<RfqConfirmation>,
 			),
 			onRefreshSnapshot: async () => true,
 			onPreviewRfqPublication,
@@ -212,7 +187,6 @@ describe("RfqDraftFlow — 回覆期限", () => {
 		});
 		const [command] = commands;
 		expect(command.responseDeadline).toBe("2026-09-20");
-		expect(publicationPreviewBody(command).responseDeadline).toBe("2026-09-20");
 	});
 
 	// 選填是既有行為，不得因為多了這一欄就變成必填。
@@ -233,9 +207,9 @@ describe("RfqDraftFlow — 回覆期限", () => {
 		});
 	});
 
-	// ⛔ gateway 那側是 `*string` + `omitempty`：送空字串會被讀成「有給截止日而且
-	// 是空的」並寫進賣家看到的內容。沒填就整個 key 不出現。
-	it("沒填時 body 裡整個沒有 responseDeadline 這個 key", async () => {
+	// 沒填時 command 的 responseDeadline 是 undefined（對應 proto 的 optional 欄位不設），
+	// 不是空字串。
+	it("沒填時 command 的 responseDeadline 是 undefined", async () => {
 		const { fn: onPreviewRfqPublication, commands } = publicationSpy();
 		await renderAtReconfirm(onPreviewRfqPublication);
 
@@ -246,7 +220,7 @@ describe("RfqDraftFlow — 回覆期限", () => {
 			expect(onPreviewRfqPublication).toHaveBeenCalledTimes(1);
 		});
 		const [command] = commands;
-		expect("responseDeadline" in publicationPreviewBody(command)).toBe(false);
+		expect(command.responseDeadline).toBeUndefined();
 	});
 
 	// 下限用的是台北曆日：這一刻 UTC 還是 09-13，台北已經是 09-14。
@@ -297,12 +271,12 @@ describe("RfqDraftFlow — 回覆期限", () => {
 		fireEvent.click(reconfirmCheckbox());
 		fireEvent.click(screen.getByRole("button", { name: "確認並準備發布" }));
 		await waitFor(() => {
-			expect(screen.getByText("WISH_POOL_ALL_ACTIVE_SELLERS_V1")).toBeTruthy();
+			expect(screen.getByText("1 位候選")).toBeTruthy();
 		});
 
 		fireEvent.change(deadlineInput(), { target: { value: "2026-09-21" } });
 
-		expect(screen.queryByText("WISH_POOL_ALL_ACTIVE_SELLERS_V1")).toBeNull();
+		expect(screen.queryByText("1 位候選")).toBeNull();
 		expect(
 			screen
 				.getByRole("button", { name: "確認並準備發布" })

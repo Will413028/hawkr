@@ -12,8 +12,6 @@ import '../../../shared/widgets/rich_text_editor_text_block.dart';
 import '../../../shared/widgets/setup_bottom_bar.dart';
 import '../data/hashtag_extractor.dart';
 import '../data/product_repository.dart';
-import 'ai_assistant_button.dart';
-import 'product_listing_draft_controller.dart';
 import 'product_setup_progress_bar.dart';
 import 'product_setup_top_bar.dart';
 
@@ -92,89 +90,6 @@ class ProductSetupInfoScreen extends HookConsumerWidget {
     final subCategoryOverlay = useState<OverlayEntry?>(null);
     final categoryFieldKey = useMemoized(() => GlobalKey());
     final subCategoryFieldKey = useMemoized(() => GlobalKey());
-
-    // 將 catalogId 反查 L1/L2/L3 並填入欄位
-    void applyCatalogId(String catalogId) {
-      // 分類樹尚未載入，靜默等待（useEffect 依賴 l3NameToId.value.length，載入後會重試）
-      if (l3NameToId.value.isEmpty) return;
-
-      void showError() {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (context.mounted) FloatingToast.error(context, '分類對應失敗，請手動選擇');
-        });
-      }
-
-      final candidateId = int.tryParse(catalogId);
-      if (candidateId == null) {
-        showError();
-        return;
-      }
-      String? foundL3;
-      for (final e in l3NameToId.value.entries) {
-        if (e.value == candidateId) {
-          foundL3 = e.key;
-          break;
-        }
-      }
-      if (foundL3 == null) {
-        showError();
-        return;
-      }
-      String? foundL2;
-      for (final e in l3ByL2.value.entries) {
-        if (e.value.contains(foundL3)) {
-          foundL2 = e.key;
-          break;
-        }
-      }
-      if (foundL2 == null) {
-        showError();
-        return;
-      }
-      String? foundL1;
-      for (final e in l2ByL1.value.entries) {
-        if (e.value.contains(foundL2)) {
-          foundL1 = e.key;
-          break;
-        }
-      }
-      if (foundL1 == null) {
-        showError();
-        return;
-      }
-      selectedL1.value = foundL1;
-      l2Categories.value = l2ByL1.value[foundL1] ?? [];
-      categoryController.text = foundL2;
-      l3Categories.value = l3ByL2.value[foundL2] ?? [];
-      subCategoryController.text = foundL3;
-    }
-
-    // 對話式 AI 助手累積的 pending draft：進入本頁時把空欄位套進 local controller。
-    // 只有 controller 為空時才套，避免覆蓋使用者手動輸入。
-    final pendingDraft = ref.watch(productListingDraftControllerProvider);
-    useEffect(() {
-      if (pendingDraft.name != null &&
-          pendingDraft.name!.isNotEmpty &&
-          nameController.text.isEmpty) {
-        nameController.text = pendingDraft.name!;
-      }
-      if (pendingDraft.origin != null &&
-          pendingDraft.origin!.isNotEmpty &&
-          originController.text.isEmpty) {
-        originController.text = pendingDraft.origin!;
-      }
-      if (pendingDraft.description != null &&
-          pendingDraft.description!.isNotEmpty &&
-          descriptionController.text.isEmpty) {
-        descriptionController.text = pendingDraft.description!;
-      }
-      if (pendingDraft.categoryId != null &&
-          pendingDraft.categoryId!.isNotEmpty &&
-          categoryController.text.isEmpty) {
-        applyCatalogId(pendingDraft.categoryId!);
-      }
-      return null;
-    }, [pendingDraft.patchVersion, l3NameToId.value.length]);
 
     void dismissCategoryOverlay() {
       categoryOverlay.value?.remove();
@@ -609,9 +524,6 @@ class ProductSetupInfoScreen extends HookConsumerWidget {
           ProductSetupTopBar(
             title: isEditMode ? '編輯商品' : '新增商品',
             subtitle: '商品資訊設定',
-            trailing: kAiProductListingAssistantEnabled
-                ? const AiAssistantButton()
-                : null,
           ),
 
           // 主要內容

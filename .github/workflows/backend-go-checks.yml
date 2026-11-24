@@ -186,7 +186,6 @@ jobs:
           set -e
           for module in \
               gateway pkg \
-              services/ai-service \
               services/invoice-service; do
             echo "=== $module ==="
             (cd "$module" && go mod tidy)

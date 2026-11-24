@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:hawkr_api/gen/hawkr/assistant/v1alpha1/assistant.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/buyer/v1alpha1/buyer.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/content/v1alpha1/content.connect.client.dart';
@@ -125,6 +126,11 @@ PaymentAppServiceClient paymentAppClient(Ref ref) =>
 @Riverpod(keepAlive: true)
 ChatAppServiceClient chatAppClient(Ref ref) =>
     ChatAppServiceClient(ref.watch(connectAuthTransportProvider));
+
+/// 買家的 AI 助理（`AssistantAppService`）：送出訊息、觀看一輪的回覆串流（每條最長 100 秒，client 以 cursor 接續）、最近的對話。
+@Riverpod(keepAlive: true)
+AssistantAppServiceClient assistantAppClient(Ref ref) =>
+    AssistantAppServiceClient(ref.watch(connectAuthTransportProvider));
 
 /// 買家的通知（`NotificationAppService`）：收件匣、偏好與推播裝置 token。
 @Riverpod(keepAlive: true)

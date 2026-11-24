@@ -47,12 +47,8 @@ var scenarios = []ch.Scenario[Driver]{
 				t.Errorf("分類 %s 的上層 %s 不在樹裡", c.ID, c.ParentID)
 			}
 		}
-		second := false
-		for _, c := range cats {
-			second = second || (c.Leaf && c.ParentID != "")
-		}
-		if !second {
-			t.Fatalf("分類樹沒有第二層的葉節點（商品掛第二層，D8）：%+v", cats)
+		if leaf := leafOf(t, cats); leaf == "" || depth(cats, leaf) < 2 {
+			t.Fatalf("分類樹沒有上層以下的葉節點（商品掛最深的葉節點，D8）：%+v", cats)
 		}
 	}},
 	{Name: "seller reads back what was created", Run: func(ctx context.Context, t ch.T, d Driver) {
@@ -312,22 +308,29 @@ func skipOnLegacy(t ch.T, d Driver, why string) bool {
 	return true
 }
 
-// leafOf 回傳一個掛得了商品的葉節點：優先有上層的（D8 的兩層分類，商品掛第二層；Java 同樣要第二層）。
+// leafOf 回傳一個掛得了商品的葉節點：最深的那一層（D8 是兩層；Java 要第三層，ProductService.java:304-314）。
 func leafOf(t ch.T, cats []Category) string {
 	t.Helper()
-	top := ""
+	best, bestDepth := "", 0
 	for _, c := range cats {
-		if !c.Leaf {
-			continue
-		}
-		if c.ParentID != "" {
-			return c.ID
-		}
-		if top == "" {
-			top = c.ID
+		if d := depth(cats, c.ID); c.Leaf && d > bestDepth {
+			best, bestDepth = c.ID, d
 		}
 	}
-	return top
+	return best
+}
+
+// depth 是節點的層數，第一層是 1。
+func depth(cats []Category, id string) int {
+	parent := map[string]string{}
+	for _, c := range cats {
+		parent[c.ID] = c.ParentID
+	}
+	n := 0
+	for cur := id; cur != "" && n <= len(cats); cur = parent[cur] {
+		n++
+	}
+	return n
 }
 
 // createWith 建立商品；沒給分類時掛在第一個葉節點。

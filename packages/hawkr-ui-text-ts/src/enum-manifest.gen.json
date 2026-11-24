@@ -585,7 +585,7 @@
       "name": "hawkr.procurement.v1alpha1.CancelDisposition",
       "tsName": "CancelDisposition",
       "tsModule": "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {
@@ -634,7 +634,7 @@
       "name": "hawkr.procurement.v1alpha1.QuoteAcceptability",
       "tsName": "QuoteAcceptability",
       "tsModule": "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {
@@ -655,7 +655,7 @@
       "name": "hawkr.procurement.v1alpha1.RunFailureReason",
       "tsName": "RunFailureReason",
       "tsModule": "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {

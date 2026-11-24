@@ -843,6 +843,66 @@ func (t Text) PaymentRequirementCollection(v string) (string, bool) {
 	return "", false
 }
 
+// ProcurementCancelDisposition 是 procurement.CancelDisposition 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) ProcurementCancelDisposition(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "REQUESTED":
+			return "Stop requested. Wrapping up this round.", true
+		case "ALREADY_CANCELLED":
+			return "This round was already stopped, so nothing was sent again.", true
+		case "ALREADY_TERMINAL":
+			return "This round had already finished. Its completed result is still valid and was not voided by this stop.", true
+		case "TOO_LATE":
+			return "This round already finished and was sent, so it was too late to stop. Its completed result is still valid.", true
+		}
+	}
+	switch v {
+	case "REQUESTED":
+		return "已送出停止，正在收尾這一輪。", true
+	case "ALREADY_CANCELLED":
+		return "這一輪先前已經停止，這次沒有重複送出。", true
+	case "ALREADY_TERMINAL":
+		return "這一輪已經跑完了，已完成的結果仍然有效，沒有被這次停止作廢。", true
+	case "TOO_LATE":
+		return "這一輪已經完成並送出，來不及停止；已完成的結果仍然有效。", true
+	}
+	return "", false
+}
+
+// ProcurementQuoteAcceptability 是 procurement.QuoteAcceptability 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) ProcurementQuoteAcceptability(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "ACCEPTABLE":
+			return "Can be accepted", true
+		case "EXPIRED":
+			return "Past its validity period", true
+		case "WITHDRAWN":
+			return "Withdrawn by the seller", true
+		case "SUPERSEDED":
+			return "Replaced by a newer version", true
+		case "INELIGIBLE":
+			return "Not eligible to be accepted", true
+		}
+	}
+	switch v {
+	case "ACCEPTABLE":
+		return "可接受", true
+	case "EXPIRED":
+		return "已逾有效期", true
+	case "WITHDRAWN":
+		return "賣家已撤回", true
+	case "SUPERSEDED":
+		return "已被新版本取代", true
+	case "INELIGIBLE":
+		return "不符合接受資格", true
+	}
+	return "", false
+}
+
 // ProcurementRejectionReason 是 procurement.RejectionReason 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) ProcurementRejectionReason(v string) (string, bool) {
@@ -903,6 +963,42 @@ func (t Text) ProcurementRejectionReason(v string) (string, bool) {
 		return "品項分類沒有名稱", true
 	case "RESOLUTION_UNKNOWN_KIND":
 		return "品項分類的判定方式不明", true
+	}
+	return "", false
+}
+
+// ProcurementRunFailureReason 是 procurement.RunFailureReason 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) ProcurementRunFailureReason(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "WORKER_LOST":
+			return "This round was interrupted. Please send it again.", true
+		case "SEARCH_FAILED":
+			return "The candidate search failed. Please search again.", true
+		case "TURN_PIPELINE_ERROR":
+			return "Something went wrong while processing this round. Please send it again.", true
+		case "MODEL_UNAVAILABLE":
+			return "Hawkr Agent can't reply right now. Please send it again later.", true
+		case "ITEM_CATEGORY_UNAVAILABLE":
+			return "The item category has changed. Please choose the item again.", true
+		case "ANSWER_REJECTED":
+			return "This answer could not be used. Please answer again.", true
+		}
+	}
+	switch v {
+	case "WORKER_LOST":
+		return "這一輪處理中斷了，請重新送出。", true
+	case "SEARCH_FAILED":
+		return "候選搜尋失敗，請重新搜尋。", true
+	case "TURN_PIPELINE_ERROR":
+		return "這一輪處理時發生錯誤，請重新送出。", true
+	case "MODEL_UNAVAILABLE":
+		return "Hawkr Agent 暫時無法回覆，請稍後重新送出。", true
+	case "ITEM_CATEGORY_UNAVAILABLE":
+		return "品項分類已調整，請重新選擇品項。", true
+	case "ANSWER_REJECTED":
+		return "這個回答無法採用，請重新回答。", true
 	}
 	return "", false
 }

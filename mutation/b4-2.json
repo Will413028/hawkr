@@ -1,0 +1,67 @@
+{
+ "mutants": [
+  {
+   "id": "insert-conflicts-on-the-wrong-key",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/stock.sql.go",
+   "old": "ON CONFLICT (idempotency_key) DO NOTHING",
+   "new": "ON CONFLICT (id) DO NOTHING",
+   "test": "internal/modules/catalog ^TestConcurrentSameKeyDeductsOnce$",
+   "why": "冪等鍵不再是判重點（CD1 回歸）：同一個鍵的併發重送各自插入操作列，不是只扣一次，測試要紅。"
+  },
+  {
+   "id": "restore-quantity-not-capped",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/stock/stock.go",
+   "old": "if it.Quantity > want[it.SkuID] {",
+   "new": "if it.Quantity > 1<<30 {",
+   "test": "internal/modules/catalog ^TestRestoreFollowsTheOriginalDeduction$",
+   "why": "歸還不再以原扣減為上限（CD2 回歸）：超量歸還與歸還原扣減沒有的 SKU 都被放行，測試要紅。"
+  },
+  {
+   "id": "deduct-without-stock-guard",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/stock.sql.go",
+   "old": "AND stock_qty >= $1::integer",
+   "new": "AND $1::integer > 0",
+   "test": "internal/modules/catalog ^TestInsufficientStockRollsBackTheWholeOperation$",
+   "why": "扣減不再有 stock_qty >= n 的條件：庫存不足不是回 InsufficientStockError，而是撞到 CHECK，測試要紅。"
+  },
+  {
+   "id": "restore-does-not-lock-the-deduction",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/stock/stock.go",
+   "old": "if _, err := q.LockStockOperation(ctx, deduct.ID); err != nil {\n\t\t\treturn err\n\t\t}",
+   "new": "_ = deduct.ID",
+   "test": "internal/modules/catalog ^TestConcurrentRestoresNeverExceedTheDeduction$",
+   "why": "歸還不鎖原扣減：併發歸還各自讀到同一個剩餘量，總歸還量超過原扣減，測試要紅。"
+  },
+  {
+   "id": "items-not-sorted-before-locking",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/stock/stock.go",
+   "old": "slices.SortFunc(out, func(a, b model.StockItem) int { return bytes.Compare(a.SkuID[:], b.SkuID[:]) })",
+   "new": "",
+   "test": "internal/modules/catalog ^TestMultiItemDeductsInOppositeOrderDoNotDeadlock$",
+   "why": "多品項扣減不依 SKU ID 排序鎖定：相反順序的兩筆互相等待而死結，測試要紅。"
+  },
+  {
+   "id": "replay-ignores-quantity",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/stock/stock.go",
+   "old": "if m.SkuID != items[i].SkuID || m.Delta != delta {",
+   "new": "if m.SkuID != items[i].SkuID {",
+   "test": "internal/modules/catalog ^TestReplaySameKeyIsNoOpAndDifferentContentIsRejected$",
+   "why": "同一個鍵以不同數量重送被當成相同的重送：回成功卻沒有扣減呼叫方要的量，測試要紅。"
+  },
+  {
+   "id": "any-category-takes-products",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/categories.sql.go",
+   "old": "WHERE c.id = $1 AND c.parent_id IS NOT NULL\n      AND NOT EXISTS (SELECT 1 FROM catalog.categories ch WHERE ch.parent_id = c.id))",
+   "new": "WHERE c.id = $1)",
+   "test": "internal/modules/catalog ^TestOnlyLeafCategoriesTakeProducts$",
+   "why": "葉節點檢查拿掉：頂層分組也能掛商品，測試要紅。"
+  }
+ ]
+}

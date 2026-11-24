@@ -4,6 +4,8 @@ import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/content/v1alpha1/content.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/imageai/v1alpha1/imageai.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/media/v1alpha1/media.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.connect.client.dart';
@@ -102,6 +104,16 @@ ModerationAppServiceClient moderationAppClient(Ref ref) =>
 @Riverpod(keepAlive: true)
 NotificationAppServiceClient notificationClient(Ref ref) =>
     NotificationAppServiceClient(ref.watch(connectAuthTransportProvider));
+
+/// 賣家的 AI 修圖與風格（ImageAiAppService），登入後呼叫；額度打呼叫者目前的店。
+@Riverpod(keepAlive: true)
+ImageAiAppServiceClient imageAiClient(Ref ref) =>
+    ImageAiAppServiceClient(ref.watch(connectAuthTransportProvider));
+
+/// 賣家收到的詢價與回價（SellerProcurementAppService），登入後呼叫。
+@Riverpod(keepAlive: true)
+SellerProcurementAppServiceClient sellerProcurementClient(Ref ref) =>
+    SellerProcurementAppServiceClient(ref.watch(connectAuthTransportProvider));
 
 /// 賣家入駐文件的現行版本（SellerPublicService），不需登入。
 @Riverpod(keepAlive: true)

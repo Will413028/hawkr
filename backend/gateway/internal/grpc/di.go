@@ -17,10 +17,6 @@ var Module = fx.Module("grpc",
 	fx.Provide(NewCartClient),
 	fx.Provide(NewShippingClient),
 	fx.Provide(NewCouponClient),
-	fx.Provide(newAIServiceConn),
-	fx.Provide(NewAIClient),
-	fx.Provide(NewAIAssistantClient),
-	fx.Provide(NewAIProcurementClient),
 	fx.Provide(NewCategoryClient),
 	fx.Provide(NewAftersalesClient),
 	fx.Provide(NewInvoiceServiceClient),
@@ -29,19 +25,18 @@ var Module = fx.Module("grpc",
 
 type clientClosers struct {
 	fx.In
-	Account       *AccountClient
-	Seller        *SellerClient
-	Buyer         *BuyerClient
-	Product       *ProductClient
-	Order         *OrderClient
-	Payment       *PaymentClient
-	Cart          *CartClient
-	Shipping      *ShippingClient
-	Coupon        *CouponClient
-	AIServiceConn *aiServiceConn
-	Category      *CategoryClient
-	Aftersales    *AftersalesClient
-	Invoice       *InvoiceServiceClient
+	Account    *AccountClient
+	Seller     *SellerClient
+	Buyer      *BuyerClient
+	Product    *ProductClient
+	Order      *OrderClient
+	Payment    *PaymentClient
+	Cart       *CartClient
+	Shipping   *ShippingClient
+	Coupon     *CouponClient
+	Category   *CategoryClient
+	Aftersales *AftersalesClient
+	Invoice    *InvoiceServiceClient
 }
 
 func registerLifecycle(lc fx.Lifecycle, l *zap.Logger, c clientClosers) {
@@ -52,7 +47,7 @@ func registerLifecycle(lc fx.Lifecycle, l *zap.Logger, c clientClosers) {
 				c.Account, c.Seller, c.Buyer, c.Product, c.Order,
 				c.Payment, c.Cart,
 				c.Shipping,
-				c.Coupon, c.AIServiceConn, c.Category,
+				c.Coupon, c.Category,
 				c.Aftersales,
 				c.Invoice,
 			}

@@ -24,9 +24,8 @@ import (
 //     header 送出，之後再改 header map 不會上線。
 //
 // gin 的 c.Header 是 Header().Set 語意（value 為空字串才是 Del），所以 handler
-// 內若再寫一次 Cache-Control 會覆蓋這裡的值。AI／採購這條路徑上自己寫 SSE header
-// 的兩個地方（proxy.serveAIAssistantStreamWith 與 handler.ProxyBuyerReturnPolicySSE）
-// 因此引用同一個 response.CacheControlPrivateNoStore 常數。
+// 內若再寫一次 Cache-Control 會覆蓋這裡的值，自己寫 header 的 handler 要引用同一個
+// response.CacheControlPrivateNoStore 常數。
 func PrivateNoStore() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Header("Cache-Control", response.CacheControlPrivateNoStore)

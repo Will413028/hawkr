@@ -80,7 +80,6 @@ final Map<String, SellerCapability?> routeCapabilities = {
 
   SettingsRoutes.profile: _accountClose,
   SettingsRoutes.chat: _chatRead,
-  SettingsRoutes.chatAiAssistant: _marketing,
   SettingsRoutes.chatThread: _chatRead,
   SettingsRoutes.shipping: _productManage,
   SettingsRoutes.notifications: _notification,

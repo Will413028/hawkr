@@ -1,54 +1,48 @@
-import 'package:dio/dio.dart';
+import 'package:hawkr_api/dates.dart' show formatDate;
+import 'package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pb.dart'
+    as pb;
+import 'package:hawkr_api/taipei_time.dart' show Timestamp;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../../core/networking/dio_provider.dart';
-import 'procurement_error.dart';
+import '../../../core/networking/connect_provider.dart';
 import 'seller_quote_model.dart';
 
 part 'seller_quote_repository.g.dart';
 
-const String kIdempotencyKeyHeader = 'Idempotency-Key';
-
+/// 賣家收到的詢價與回價（`SellerProcurementAppService`）。錯誤原樣丟出 `ConnectException`，
+/// 由 controller 依 reason 分流、以 `errorText` 顯示。
 class SellerQuoteRepository {
-  SellerQuoteRepository(this._dio);
+  SellerQuoteRepository(this._client);
 
-  final Dio _dio;
+  final SellerProcurementAppServiceClient _client;
 
-  static const String basePath = '/api/v1/app/sellers/me/procurement';
-
-  static String publicationPath(String publicationId) =>
-      '$basePath/publications/$publicationId';
-
+  /// 發給呼叫者的詢價，最新的在前；逐頁讀完。
   Future<List<SellerPublicationListItem>> listPublications() async {
-    try {
-      final response = await _dio.get('$basePath/publications');
-      return _listPayload(
-        response.data,
-      ).map(_parseListItem).whereType<SellerPublicationListItem>().toList();
-    } on DioException catch (e) {
-      throw ProcurementException.from(e);
-    }
+    final items = <SellerPublicationListItem>[];
+    var token = '';
+    do {
+      final page = await _client.listSellerPublications(
+        pb.ListSellerPublicationsRequest(pageSize: 50, pageToken: token),
+      );
+      items.addAll(page.publications.map(_listItem));
+      token = page.nextPageToken;
+    } while (token.isNotEmpty);
+    return items;
   }
 
   Future<SellerPublicationDetail> getPublicationDetail(
     String publicationId,
   ) async {
-    try {
-      final response = await _dio.get(publicationPath(publicationId));
-      final body = _objectPayload(response.data);
-      final summary = _parseSummary(body);
-      if (body == null || summary == null) {
-        throw const ProcurementException(message: '載入詢價內容失敗');
-      }
-      return SellerPublicationDetail(
-        publication: summary.publication,
-        sellerFacingPayload: summary.sellerFacingPayload,
-        draft: _parseDraft(body['draft']),
-        latestResponse: _parseVersion(body['latestResponse']),
-      );
-    } on DioException catch (e) {
-      throw ProcurementException.from(e);
-    }
+    final r = await _client.getSellerPublication(
+      pb.GetSellerPublicationRequest(publicationId: publicationId),
+    );
+    return SellerPublicationDetail(
+      publication: _publication(r.publication),
+      sellerFacingPayload: _payload(r.sellerFacingPayload),
+      draft: r.hasDraft() ? _draft(r.draft) : null,
+      latestResponse: r.hasLatestResponse() ? _version(r.latestResponse) : null,
+    );
   }
 
   Future<SellerResponseDraftResponse> saveDraft({
@@ -56,22 +50,14 @@ class SellerQuoteRepository {
     required SellerQuotePayload draft,
     required String expectedDraftVersion,
   }) async {
-    try {
-      final response = await _dio.put(
-        '${publicationPath(publicationId)}/response-draft',
-        data: <String, dynamic>{
-          'expectedDraftVersion': expectedDraftVersion,
-          'draft': draft.toJson(),
-        },
-      );
-      final parsed = _parseDraft(_objectPayload(response.data));
-      if (parsed == null) {
-        throw const ProcurementException(message: '儲存草稿失敗');
-      }
-      return parsed;
-    } on DioException catch (e) {
-      throw ProcurementException.from(e);
-    }
+    final r = await _client.upsertSellerResponseDraft(
+      pb.UpsertSellerResponseDraftRequest(
+        publicationId: publicationId,
+        expectedDraftVersion: expectedDraftVersion,
+        draft: quoteToProto(draft),
+      ),
+    );
+    return _draft(r.draft);
   }
 
   Future<SellerResponseVersionResponse> submitResponse({
@@ -80,221 +66,203 @@ class SellerQuoteRepository {
     required String expectedPublicationVersion,
     required String expectedSellerFacingPayloadHash,
     required String expectedSellerResponseVersion,
-    required String idempotencyKey,
+    required String clientRequestId,
   }) async {
-    try {
-      final response = await _dio.post(
-        '${publicationPath(publicationId)}/seller-responses',
-        data: <String, dynamic>{
-          'expectedPublicationVersion': expectedPublicationVersion,
-          'expectedSellerFacingPayloadHash': expectedSellerFacingPayloadHash,
-          'expectedSellerResponseVersion': expectedSellerResponseVersion,
-          'quote': quote.toJson(),
-        },
-        options: _idempotent(idempotencyKey),
-      );
-      return _requireVersion(response.data, '送出回價失敗');
-    } on DioException catch (e) {
-      throw ProcurementException.from(e);
-    }
+    final r = await _client.submitSellerResponse(
+      pb.SubmitSellerResponseRequest(
+        publicationId: publicationId,
+        clientRequestId: clientRequestId,
+        expectedPublicationVersion: expectedPublicationVersion,
+        expectedSellerFacingPayloadHash: expectedSellerFacingPayloadHash,
+        expectedSellerResponseVersion: expectedSellerResponseVersion,
+        quote: quoteToProto(quote),
+      ),
+    );
+    return _version(r.sellerResponse);
   }
 
-  Future<SellerResponseVersionResponse> withdrawResponse({
+  /// 撤回指定版本的正式回價；操作本身冪等，不帶 request id。[reasonCode] 空字串表示沒有填。
+  Future<SellerResponseClosure> withdrawResponse({
     required String publicationId,
     required String sellerResponseId,
     required String expectedSellerResponseVersion,
-    required String idempotencyKey,
+    String reasonCode = '',
   }) async {
-    try {
-      final response = await _dio.post(
-        '${publicationPath(publicationId)}/seller-responses/'
-        '$sellerResponseId/withdraw',
-        data: <String, dynamic>{
-          'expectedSellerResponseVersion': expectedSellerResponseVersion,
-        },
-        options: _idempotent(idempotencyKey),
-      );
-      return _requireVersion(response.data, '撤回回價失敗');
-    } on DioException catch (e) {
-      throw ProcurementException.from(e);
-    }
-  }
-
-  Future<void> declinePublication({
-    required String publicationId,
-    required String idempotencyKey,
-    String reason = '',
-  }) async {
-    try {
-      await _dio.post(
-        '${publicationPath(publicationId)}/decline',
-        data: <String, dynamic>{if (reason.isNotEmpty) 'reason': reason},
-        options: _idempotent(idempotencyKey),
-      );
-    } on DioException catch (e) {
-      throw ProcurementException.from(e);
-    }
-  }
-
-  Options _idempotent(String idempotencyKey) => Options(
-    headers: <String, dynamic>{kIdempotencyKeyHeader: idempotencyKey},
-  );
-
-  SellerResponseVersionResponse _requireVersion(
-    dynamic body,
-    String failureMessage,
-  ) {
-    final parsed = _parseVersion(_objectPayload(body));
-    if (parsed == null) throw ProcurementException(message: failureMessage);
-    return parsed;
-  }
-
-  static Map<String, dynamic>? _objectPayload(dynamic body) {
-    if (body is! Map) return null;
-    final inner = body['data'];
-    if (inner is Map) return Map<String, dynamic>.from(inner);
-    return Map<String, dynamic>.from(body);
-  }
-
-  static List<dynamic> _listPayload(dynamic body) {
-    if (body is List) return body;
-    if (body is! Map) return const [];
-    final inner = body['data'];
-    if (inner is List) return inner;
-    if (inner is Map) {
-      final rows = inner['publications'];
-      if (rows is List) return rows;
-    }
-    final rows = body['publications'];
-    if (rows is List) return rows;
-    return const [];
-  }
-
-  static SellerPublicationListItem? _parseListItem(dynamic raw) {
-    final summary = _parseSummary(raw);
-    if (summary == null) return null;
-    final row = Map<String, dynamic>.from(raw as Map);
-    return SellerPublicationListItem(
-      summary: summary,
-      latestResponseStatus: _string(row['latestResponseStatus']),
-      hasDraft: row['hasDraft'] == true,
-    );
-  }
-
-  static SellerPublicationSummary? _parseSummary(dynamic raw) {
-    if (raw is! Map) return null;
-    final publication = raw['publication'];
-    if (publication is! Map) return null;
-    return SellerPublicationSummary(
-      publication: _parsePublication(Map<String, dynamic>.from(publication)),
-      sellerFacingPayload: _parseSellerFacingPayload(
-        raw['sellerFacingPayload'],
+    final r = await _client.withdrawSellerResponse(
+      pb.WithdrawSellerResponseRequest(
+        publicationId: publicationId,
+        sellerResponseId: sellerResponseId,
+        expectedSellerResponseVersion: expectedSellerResponseVersion,
+        reasonCode: reasonCode,
       ),
     );
+    return _closure(r.closure);
   }
 
-  static SellerFacingPublication _parsePublication(Map<String, dynamic> row) {
-    return SellerFacingPublication(
-      publicationId: _string(row['publicationId']),
-      publicationVersion: _string(row['publicationVersion']),
-      inviteId: _string(row['inviteId']),
-      lane: _string(row['lane']),
-      sellerFacingPayloadHash: _string(row['sellerFacingPayloadHash']),
-      deliveryState: _string(row['deliveryState']),
-      publishedAt: _string(row['publishedAt']),
+  /// 婉拒一筆詢價；操作本身冪等，不帶 request id。[reasonCode] 空字串表示沒有填。
+  Future<SellerResponseClosure> declinePublication({
+    required String publicationId,
+    String reasonCode = '',
+  }) async {
+    final r = await _client.declineRfqPublication(
+      pb.DeclineRfqPublicationRequest(
+        publicationId: publicationId,
+        reasonCode: reasonCode,
+      ),
+    );
+    return _closure(r.closure);
+  }
+
+  static SellerPublicationListItem _listItem(pb.SellerPublicationListItem i) =>
+      SellerPublicationListItem(
+        summary: SellerPublicationSummary(
+          publication: _publication(i.publication),
+          sellerFacingPayload: _payload(i.sellerFacingPayload),
+        ),
+        // 有回價但狀態不認得時是 UNSPECIFIED（畫面顯示「請更新 App」），沒有回價是 null。
+        latestResponseStatus: i.hasLatestResponseStatus()
+            ? i.latestResponseStatus
+            : null,
+        hasDraft: i.hasDraft,
+      );
+
+  static SellerFacingPublication _publication(pb.SellerPublicationSummary s) =>
+      SellerFacingPublication(
+        publicationId: s.publicationId,
+        publicationVersion: s.publicationVersion,
+        sellerFacingPayloadHash: s.sellerFacingPayloadHash,
+      );
+
+  static SellerFacingPayload _payload(pb.SellerFacingRfq r) =>
+      SellerFacingPayload(
+        item: r.item,
+        itemLabel: r.itemLabel,
+        quantity: r.hasQuantity() ? '${r.quantity}' : '',
+        unit: r.hasUnit() ? r.unit : '',
+        packaging: r.hasPackaging() ? r.packaging : '',
+        deliveryCity: r.deliveryCity,
+        deliveryDate: r.hasDeliveryDate() ? formatDate(r.deliveryDate) : '',
+        responseDeadline: r.hasResponseDeadline()
+            ? formatDate(r.responseDeadline)
+            : '',
+        buyerNote: r.buyerNote,
+      );
+
+  static SellerResponseDraftResponse _draft(pb.SellerResponseDraft d) =>
+      SellerResponseDraftResponse(
+        draftVersion: d.draftVersion,
+        draft: quoteFromProto(d.draft),
+      );
+
+  static SellerResponseVersionResponse _version(pb.SellerResponseVersion v) =>
+      SellerResponseVersionResponse(
+        sellerResponseId: v.sellerResponseId,
+        sellerResponseVersion: v.sellerResponseVersion,
+        publicationId: v.publicationId,
+        status: v.status,
+        payloadHash: v.payloadHash,
+        supersededByVersion: v.supersededByVersion,
+        outsideBuyerRequestedRange: v.outsideBuyerRequestedRange,
+        quote: quoteFromProto(v.quote),
+        replayed: v.replayed,
+      );
+
+  static SellerResponseClosure _closure(pb.SellerResponseClosure c) =>
+      SellerResponseClosure(
+        sellerResponseId: c.sellerResponseId,
+        latestVersion: c.latestVersion,
+        withdrawnVersion: c.withdrawnVersion,
+      );
+}
+
+/// 表單內容轉成契約的 `SellerQuote`。空欄位不設；金額是非負整數字串（驗證在 `validateSellerQuote`），
+/// 草稿不驗，格式不合的欄位不送。
+pb.SellerQuote quoteToProto(SellerQuotePayload q) {
+  final quote = pb.SellerQuote(
+    responseType: q.responseType,
+    specNote: q.specNote,
+    offeredQuantity: q.offeredQuantity.trim(),
+    offeredQuantityUnit: q.offeredQuantityUnit.trim(),
+    conversionBasis: q.conversionBasis,
+    taxInclusionBasis: q.taxInclusionBasis,
+    termsNote: q.termsNote,
+    deviationDisclosure: q.deviationDisclosure,
+  );
+  if (q.unitBasis.quantity.trim().isNotEmpty ||
+      q.unitBasis.unit.trim().isNotEmpty) {
+    quote.unitBasis = pb.UnitBasis(
+      quantity: q.unitBasis.quantity.trim(),
+      unit: q.unitBasis.unit.trim(),
     );
   }
+  final goods = _int64(q.goodsAmount);
+  if (goods != null) quote.goodsAmount = goods;
+  final shipping = _int64(q.shippingAmount);
+  if (shipping != null) quote.shippingAmount = shipping;
+  final tax = _int64(q.taxAmount);
+  if (tax != null) quote.taxAmount = tax;
+  final total = _int64(q.totalAmount);
+  if (total != null) quote.totalAmount = total;
+  final lead = int.tryParse(q.leadTimeDays.trim());
+  if (lead != null) quote.leadTimeDays = lead;
+  final promised = _timestamp(q.promisedDeliveryAt);
+  if (promised != null) quote.promisedDeliveryTime = promised;
+  final valid = _timestamp(q.validUntil);
+  if (valid != null) quote.validUntilTime = valid;
+  return quote;
+}
 
-  static SellerFacingPayload _parseSellerFacingPayload(dynamic raw) {
-    if (raw is! Map) return const SellerFacingPayload();
-    return SellerFacingPayload(
-      item: _string(raw['item']),
-      itemLabel: _string(raw['itemLabel']),
-      quantity: _string(raw['quantity']),
-      unit: _string(raw['unit']),
-      packaging: _string(raw['packaging']),
-      deliveryCity: _string(raw['deliveryCity']),
-      deliveryDate: _string(raw['deliveryDate']),
-      responseDeadline: _string(raw['responseDeadline']),
-    );
-  }
+SellerQuotePayload quoteFromProto(pb.SellerQuote q) => SellerQuotePayload(
+  responseType: q.responseType,
+  specNote: q.specNote,
+  unitBasis: q.hasUnitBasis()
+      ? QuoteUnitBasis(quantity: q.unitBasis.quantity, unit: q.unitBasis.unit)
+      : const QuoteUnitBasis(),
+  offeredQuantity: q.offeredQuantity,
+  offeredQuantityUnit: q.offeredQuantityUnit,
+  conversionBasis: q.conversionBasis,
+  goodsAmount: _amount(q.goodsAmount),
+  shippingAmount: _amount(q.shippingAmount),
+  taxAmount: _amount(q.taxAmount),
+  taxInclusionBasis: q.taxInclusionBasis,
+  totalAmount: _amount(q.totalAmount),
+  leadTimeDays: q.hasLeadTimeDays() ? '${q.leadTimeDays}' : '',
+  promisedDeliveryAt: q.hasPromisedDeliveryTime()
+      ? _rfc3339(q.promisedDeliveryTime)
+      : '',
+  validUntil: q.hasValidUntilTime() ? _rfc3339(q.validUntilTime) : '',
+  termsNote: q.termsNote,
+  deviationDisclosure: q.deviationDisclosure,
+);
 
-  static SellerResponseDraftResponse? _parseDraft(dynamic raw) {
-    if (raw is! Map) return null;
-    final row = Map<String, dynamic>.from(raw);
-    return SellerResponseDraftResponse(
-      draftVersion: _string(row['draftVersion']),
-      updatedAt: _string(row['updatedAt']),
-      draft: _parseQuote(row['draft']),
-    );
-  }
+/// 生成碼的 int64 欄位是 `Int64`；值由欄位的預設值（0）加上去取得，seller-app 不必直接依賴 fixnum。
+final _zero = pb.SellerQuote().goodsAmount;
 
-  static SellerResponseVersionResponse? _parseVersion(dynamic raw) {
-    if (raw is! Map) return null;
-    final row = Map<String, dynamic>.from(raw);
-    if (_string(row['sellerResponseId']).isEmpty &&
-        _string(row['sellerResponseVersion']).isEmpty) {
-      return null;
-    }
-    return SellerResponseVersionResponse(
-      sellerResponseId: _string(row['sellerResponseId']),
-      sellerResponseVersion: _string(row['sellerResponseVersion']),
-      publicationId: _string(row['publicationId']),
-      status: _string(row['status']),
-      payloadHash: _string(row['payloadHash']),
-      submittedAt: _string(row['submittedAt']),
-      supersededByVersion: _string(row['supersededByVersion']),
-      outsideBuyerRequestedRange: row['outsideBuyerRequestedRange'] == true,
-      quote: _parseQuote(row['quote']),
-      replayed: row['replayed'] == true,
-    );
-  }
+/// 非負整數字串（TWD 金額，遠小於 2^53）轉 int64；格式不合回 null。型別由 [_zero] 推得。
+dynamic _int64(String raw) {
+  final v = raw.trim();
+  return RegExp(r'^\d{1,15}$').hasMatch(v) ? _zero + int.parse(v) : null;
+}
 
-  static SellerQuotePayload _parseQuote(dynamic raw) {
-    if (raw is! Map) return const SellerQuotePayload();
-    final row = Map<String, dynamic>.from(raw);
-    final quality = row['offeredQuality'];
-    final basis = row['unitBasis'];
-    return SellerQuotePayload(
-      responseType: _string(row['responseType']),
-      offeredQuality: quality is Map
-          ? OfferedQuality(
-              grade: _string(quality['grade']),
-              inspectionNotes: _string(quality['inspectionNotes']),
-            )
-          : const OfferedQuality(),
-      unitBasis: basis is Map
-          ? UnitBasis(
-              quantity: _string(basis['quantity']),
-              unit: _string(basis['unit']),
-            )
-          : const UnitBasis(),
-      offeredQuantity: _string(row['offeredQuantity']),
-      offeredQuantityUnit: _string(row['offeredQuantityUnit']),
-      conversionBasis: _string(row['conversionBasis']),
-      currency: _string(row['currency'], fallback: kQuoteCurrencyTwd),
-      goodsAmount: _string(row['goodsAmount']),
-      shippingAmount: _string(row['shippingAmount']),
-      taxAmount: _string(row['taxAmount']),
-      taxInclusionBasis: _string(row['taxInclusionBasis']),
-      totalAmount: _string(row['totalAmount']),
-      leadTimeDays: _string(row['leadTimeDays']),
-      promisedDeliveryAt: _string(row['promisedDeliveryAt']),
-      validUntil: _string(row['validUntil']),
-      termsNote: _string(row['termsNote']),
-      deviationDisclosure: _string(row['deviationDisclosure']),
-    );
-  }
+String _amount(Object v) => v == _zero ? '' : v.toString();
 
-  static String _string(dynamic raw, {String fallback = ''}) {
-    if (raw == null) return fallback;
-    final value = raw.toString().trim();
-    if (value.isEmpty || value == 'null') return fallback;
-    return value;
-  }
+Timestamp? _timestamp(String raw) {
+  final v = raw.trim();
+  if (v.isEmpty) return null;
+  final parsed = DateTime.tryParse(v);
+  if (parsed == null) return null;
+  return Timestamp.fromDateTime(parsed.toUtc());
+}
+
+String _rfc3339(Timestamp t) {
+  final utc = t.toDateTime(); // UTC
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${utc.year.toString().padLeft(4, '0')}-${two(utc.month)}-'
+      '${two(utc.day)}T${two(utc.hour)}:${two(utc.minute)}:'
+      '${two(utc.second)}Z';
 }
 
 @riverpod
 SellerQuoteRepository sellerQuoteRepository(Ref ref) {
-  return SellerQuoteRepository(ref.watch(dioProvider));
+  return SellerQuoteRepository(ref.watch(sellerProcurementClientProvider));
 }

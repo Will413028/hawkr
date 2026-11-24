@@ -5,17 +5,17 @@
 // 順序固定先送後標：反過來會留下「說已送出但沒送」；標記失敗而重試造成的重送，由 notification 的
 // (user_id, user_type, event_type, reference_id) 唯一索引吸收，reference_id 是 inviteId，每個邀請唯一。
 //
-// 重試與舊 ai-service 的發布 outbox 相同：最多 5 次，第 n 次失敗後等 2^n 分鐘（上限 1 小時），約 30 分鐘後轉 FAILED。
+// 重試與舊 AI 服務 的發布 outbox 相同：最多 5 次，第 n 次失敗後等 2^n 分鐘（上限 1 小時），約 30 分鐘後轉 FAILED。
 // 狀態寫入用自己的 ctx（不受送出逾時影響）。送出成功後狀態寫入失敗時，不重跑送出：改排一個只寫狀態的小 job
 // （InviteStateArgs，以邀請 unique、有限次重試），送出的 job 隨即完成；連小 job 都排不進去才回錯誤（送出 job 重試，重送由 notification 的唯一索引吸收）。
 // job 本身不見的情況（程序崩潰後被 River 救援丟棄、panic、狀態 job 用盡）由週期補掃收斂：建立超過重試期間仍是 QUEUED、
 // 且沒有進行中的送出 job 或狀態 job 的邀請轉 FAILED。
 //
-// wire 與舊 ai-service 的 inviteCreatedPayload 逐欄位相同（wire_test、golden_test 守住鍵名與型別），沒有 envelope，body 就是 payload；
+// wire 與舊 AI 服務的 inviteCreatedPayload 逐欄位相同（golden_test 守住鍵名與型別），沒有 envelope，body 就是 payload；
 // 差別只有 inviteId 與 publicationId 的值是 UUID 字串而非十進位 TSID，storeId 仍是 bigint 字串。
 // EXTERNAL 邀請不轉送 procurement.rfq_publication_invite.external_created。
 //
-// 只在測試啟用，cmd/hawkr 不接線；隨 notification 搬進單體而刪除。
+// cmd/hawkr 在 serve 與 worker 訂閱 OnRfqPublished，worker 登記 Worker 與補掃排程；隨 notification 搬進單體而刪除。
 package procurementrelay
 
 import (
@@ -38,7 +38,7 @@ const (
 	exchangeProcurement  = "procurement.events"
 	routingKeyInviteMade = "procurement.rfq_publication_invite.created"
 
-	// 重試次數與退避沿用舊 ai-service 的發布 outbox（publicationoutbox：maxAttempts 5、2^n 分鐘、上限 1 小時）。
+	// 重試次數與退避沿用舊 AI 服務 的發布 outbox（publicationoutbox：maxAttempts 5、2^n 分鐘、上限 1 小時）。
 	maxAttempts = 5
 	baseBackoff = time.Minute
 	maxBackoff  = time.Hour
@@ -266,7 +266,7 @@ func (w *Worker) Sweep(ctx context.Context) (int, error) {
 	}
 }
 
-// inviteCreatedPayload 是舊 ai-service 的 inviteCreatedPayload（commerce/publication_execute.go）：三個鍵、全字串。
+// inviteCreatedPayload 是舊 AI 服務 的 inviteCreatedPayload（commerce/publication_execute.go）：三個鍵、全字串。
 type inviteCreatedPayload struct {
 	InviteID      string `json:"inviteId"`
 	PublicationID string `json:"publicationId"`

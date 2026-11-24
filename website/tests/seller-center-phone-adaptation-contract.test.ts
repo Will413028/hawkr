@@ -124,15 +124,6 @@ test("product and profile fixed actions stay usable at 320px", () => {
 	);
 	assert.match(productForm, /className="product-form__mobile-toolbar/);
 	assert.match(productForm, /className="product-form__mobile-more"/);
-	assert.match(productForm, /aria-describedby="product-form-ai-desc"/);
-	assert.match(
-		productForm,
-		/id="product-form-ai-desc" className="sr-only">\s*開啟 AI 上架助手/,
-	);
-	assert.match(
-		productForm,
-		/className="product-form__ai-label">AI 助手<\/span>/,
-	);
 	assert.match(
 		productForm,
 		/submitFromButton\(mobileProminentAction\.action\)/,
@@ -143,7 +134,10 @@ test("product and profile fixed actions stay usable at 320px", () => {
 	);
 
 	const productStart = css.indexOf(".product-form__title-row,");
-	const productEnd = css.indexOf(".ai-panel__backdrop", productStart);
+	const productEnd = css.indexOf(
+		"Seller Orders — full table view",
+		productStart,
+	);
 	assert.ok(productStart >= 0 && productEnd > productStart);
 	const productPhoneStyles = css.slice(productStart, productEnd);
 	assert.match(productPhoneStyles, /@media \(max-width: 960px\)/);
@@ -158,10 +152,6 @@ test("product and profile fixed actions stay usable at 320px", () => {
 	assert.match(
 		productPhoneStyles,
 		/\.product-form__mobile-more > summary\s*\{[^}]*width:\s*44px[^}]*height:\s*44px/s,
-	);
-	assert.match(
-		productPhoneStyles,
-		/@media \(max-width: 360px\)[\s\S]*\.product-form__ai-label\s*\{/,
 	);
 
 	const profileStart = css.indexOf(

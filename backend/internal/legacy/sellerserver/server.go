@@ -355,7 +355,7 @@ func (s *Server) ListStoreIDsByAccount(ctx context.Context, req *connect.Request
 	return connect.NewResponse(&pb.ListStoreIDsByAccountResponse{StoreIds: ids}), nil
 }
 
-// GetSellerStats 的 total_products、total_orders、total_sales 一直是 0（舊 server 也沒填，ai-service 只讀 rating 與 followers），
+// GetSellerStats 的 total_products、total_orders、total_sales 一直是 0（舊 server 也沒填，舊 AI 服務只讀 rating 與 followers），
 // 不填。評分與粉絲數各自降級（舊 server 的行為）：讀不到的那一欄留 0、記 warn（含店家與欄位），另一欄照填；店家本身讀不到
 // 仍是錯誤。
 func (s *Server) GetSellerStats(ctx context.Context, req *connect.Request[pb.GetSellerStatsRequest]) (*connect.Response[pb.SellerStatsResponse], error) {

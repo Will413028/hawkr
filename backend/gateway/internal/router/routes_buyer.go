@@ -8,8 +8,7 @@ import (
 
 // registerBuyerRoutes retains paths owned by other modules while the buyer
 // profile, address, favorite, follow, visit, and restock clients use Connect.
-func registerBuyerRoutes(public, app *gin.RouterGroup, h *handler.Holder) {
-	public.GET(RecommendationsPath, h.GetRecommendations)
+func registerBuyerRoutes(app *gin.RouterGroup, h *handler.Holder) {
 	buyers := app.Group("/buyers/me")
 	buyers.Use(middleware.JWTAuth())
 }

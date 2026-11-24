@@ -1,24 +1,39 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import {
+	fulfillConnect,
 	seedStoredActiveRole,
 	setupGatewayMocks,
 } from "./helpers/mock-gateway";
+import { mockProcurementUnary } from "./helpers/mock-procurement-connect";
 import { gotoStreamed } from "./helpers/streamed-navigation";
 
 // V.11.1 對執行中的 composer 有兩條明文要求：停用時要講清楚為什麼不能輸入，
 // 以及右下角必須有一顆「停止處理」。稿 01 的像素逐字畫著 placeholder
 // 「執行中，暫時無法輸入訊息...」與那顆停止鈕。
 //
-// 「規劃中」那個標記已經退場：後端把取消觀察器接上 turn pipeline、並把
-// `runVersion` 放進 runtime snapshot 之後，這顆按鈕是真的能停的。但它仍然只在
-// **拿得到這一輪的 runId ＋ runVersion** 時才按得下去——沒有 CAS token 的取消
-// 請求只會換回一個 400，而買家看到的會是「停止失敗」。所以本檔兩支測試分別鎖
-// 住那兩半：token 拿不到時看得到但按不下去，拿得到時按下去真的送出命令。
+// 「規劃中」那個標記已經退場：這顆按鈕是真的能停的，但它仍然只在**拿得到這一輪的
+// runId**（runtime snapshot 的 activeRunId 指到一個未終態的 run）時才按得下去。
+// 所以本檔兩支測試分別鎖住那兩半：runId 拿不到時看得到但按不下去，拿得到時按下去
+// 真的送出 CancelRun。
 const PATH = "/account/messages/assistant/demo";
-/** 帶 conversationId 的深連結；runtime-snapshot 以它為 key。 */
+/** 帶 conversationId 的深連結；GetRuntimeSnapshot 以它為 key。 */
 const CONVERSATION_ID = "1234567890123456780";
 const REQUEST_ID = "1234567890123456781";
 const RUN_ID = "1234567890123456801";
+const SUBMIT_TURN_URL =
+	/\/api\/connect\/hawkr\.procurement\.v1alpha1\.BuyerProcurementAppService\/SubmitTurn(?:\?|$)/;
+
+/** SubmitTurn 停在飛行中：pending 是這個 spec 觀察的狀態，讓它持續夠久才斷言得到，否則會變成跟回應賽跑的 flake。 */
+async function holdSubmitTurn(page: Page, ms: number) {
+	await page.route(SUBMIT_TURN_URL, async (route) => {
+		await new Promise((resolve) => setTimeout(resolve, ms));
+		await fulfillConnect(route, {
+			requestId: REQUEST_ID,
+			conversationId: CONVERSATION_ID,
+			runId: RUN_ID,
+		}).catch(() => undefined);
+	});
+}
 
 test.describe("procurement composer — 執行中的停用態", { tag: ["@ui"] }, () => {
 	test.skip(
@@ -52,38 +67,16 @@ test.describe("procurement composer — 執行中的停用態", { tag: ["@ui"] }
 			.context()
 			.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
 
-		await page.route(
-			"**/api/v1/app/buyers/me/procurement/requests/*/snapshot",
-			(route) =>
-				route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							requestId: "1234567890123456788",
-							revisionId: "1234567890123456790",
-							status: "CLARIFYING",
-							slots: {},
-							missingRequired: ["item"],
-						},
-					}),
-				}),
-		);
-
-		// turn 停在飛行中：pending 是這支 spec 唯一要觀察的狀態，讓它持續夠久
-		// 才斷言得到，否則會變成跟回應賽跑的 flake。
-		await page.route(
-			"**/api/v1/app/buyers/me/procurement/turns",
-			async (route) => {
-				await new Promise((resolve) => setTimeout(resolve, 10_000));
-				return route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({ code: 0, data: {} }),
-				});
-			},
-		);
+		await mockProcurementUnary(page, "GetSnapshot", () => ({
+			requestId: REQUEST_ID,
+			revisionId: "1234567890123456790",
+			status: "REQUEST_STATUS_CLARIFYING",
+			slots: {},
+			missingRequired: ["SLOT_KEY_ITEM"],
+			runs: [],
+			activeRunId: "",
+		}));
+		await holdSubmitTurn(page, 10_000);
 
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
@@ -103,9 +96,9 @@ test.describe("procurement composer — 執行中的停用態", { tag: ["@ui"] }
 			"執行中，暫時無法輸入訊息...",
 		);
 
-		// 這一份 fixture 沒有 runtime snapshot（catch-all 回空物件），所以拿不到
-		// 這一輪的 CAS token。按鈕必須看得到但按不下去：消失等於讓人以為自己漏看
-		// 了，按得下去則會送出一個必然被 400 擋下的請求。
+		// 這一份 fixture 還沒有對話（SubmitTurn 尚未回應），讀不到 runtime snapshot，
+		// 所以拿不到這一輪的 runId。按鈕必須看得到但按不下去：消失等於讓人以為自己漏看
+		// 了，按得下去則會送出一個沒有對象的取消。
 		const stop = page.getByTestId("agent-stop-run");
 		await expect(stop).toBeVisible();
 		await expect(stop).toBeDisabled();
@@ -121,7 +114,7 @@ test.describe("procurement composer — 執行中的停用態", { tag: ["@ui"] }
 		expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
 	});
 
-	test("拿得到 runId 與 runVersion 時按得下去，送出的命令帶著 CAS token", async ({
+	test("拿得到 runId 時按得下去，送出的取消命令帶著那個 runId", async ({
 		page,
 		baseURL,
 	}) => {
@@ -148,109 +141,52 @@ test.describe("procurement composer — 執行中的停用態", { tag: ["@ui"] }
 			.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
 
 		// 深連結還原：transcript 給 requestId，snapshot 給需求狀態。
-		await page.route(
-			`**/api/v1/app/buyers/me/procurement/conversations/${CONVERSATION_ID}/messages`,
-			(route) =>
-				route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							conversationId: CONVERSATION_ID,
-							requestId: REQUEST_ID,
-							status: "CLARIFYING",
-							title: "蘋果 100 公斤",
-							records: [],
-						},
-					}),
-				}),
-		);
-		await page.route(
-			"**/api/v1/app/buyers/me/procurement/requests/*/snapshot",
-			(route) =>
-				route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							requestId: REQUEST_ID,
-							revisionId: "1234567890123456790",
-							status: "CLARIFYING",
-							slots: {},
-							missingRequired: ["quantity"],
-						},
-					}),
-				}),
-		);
+		await mockProcurementUnary(page, "GetConversationMessages", () => ({
+			conversationId: CONVERSATION_ID,
+			requestId: REQUEST_ID,
+			status: "REQUEST_STATUS_CLARIFYING",
+			title: "蘋果 100 公斤",
+			messages: [],
+		}));
+		await mockProcurementUnary(page, "GetSnapshot", () => ({
+			requestId: REQUEST_ID,
+			revisionId: "1234567890123456790",
+			status: "REQUEST_STATUS_CLARIFYING",
+			slots: {},
+			missingRequired: ["SLOT_KEY_QUANTITY"],
+			runs: [],
+			activeRunId: "",
+		}));
 
-		// 停止鈕的 CAS token 唯一來源。
-		await page.route(
-			"**/api/v1/app/buyers/me/procurement/conversations/*/runtime-snapshot",
-			(route) =>
-				route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							conversationId: CONVERSATION_ID,
-							requestId: REQUEST_ID,
-							status: "CLARIFYING",
-							title: "蘋果 100 公斤",
-							messages: [],
-							activeRunId: RUN_ID,
-							runs: [
-								{
-									runId: RUN_ID,
-									runType: "TURN",
-									status: "RUNNING",
-									lastSeqId: "3",
-									minAvailableSeqId: "1",
-									terminal: false,
-									runVersion: "7",
-								},
-							],
-							artifacts: [],
-						},
-					}),
-				}),
-		);
-
-		await page.route(
-			"**/api/v1/app/buyers/me/procurement/turns",
-			async (route) => {
-				await new Promise((resolve) => setTimeout(resolve, 20_000));
-				return route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({ code: 0, data: {} }),
-				});
-			},
-		);
+		// 停止鈕的 runId 唯一來源。
+		await mockProcurementUnary(page, "GetRuntimeSnapshot", () => ({
+			conversationId: CONVERSATION_ID,
+			requestId: REQUEST_ID,
+			status: "REQUEST_STATUS_CLARIFYING",
+			title: "蘋果 100 公斤",
+			messages: [],
+			activeRunId: RUN_ID,
+			runs: [
+				{
+					runId: RUN_ID,
+					runType: "RUN_TYPE_TURN",
+					status: "RUN_STATUS_RUNNING",
+					lastCursor: "3",
+					terminal: false,
+				},
+			],
+		}));
+		await holdSubmitTurn(page, 20_000);
 
 		const cancelBodies: unknown[] = [];
-		await page.route(
-			`**/api/v1/app/buyers/me/procurement/runs/${RUN_ID}/cancel`,
-			(route) => {
-				cancelBodies.push(route.request().postDataJSON());
-				return route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({
-						code: 0,
-						data: {
-							cancelDisposition: "REQUESTED",
-							runId: RUN_ID,
-							runStatus: "CANCELLING",
-							runVersion: "8",
-							schemaVersion: "1",
-						},
-					}),
-				});
-			},
-		);
+		await mockProcurementUnary(page, "CancelRun", (request) => {
+			cancelBodies.push(request);
+			return {
+				runId: RUN_ID,
+				runStatus: "RUN_STATUS_CANCEL_REQUESTED",
+				cancelDisposition: "CANCEL_DISPOSITION_REQUESTED",
+			};
+		});
 
 		await page.addInitScript(() => {
 			sessionStorage.setItem("hawkr:initial-loader-seen", "1");
@@ -275,6 +211,6 @@ test.describe("procurement composer — 執行中的停用態", { tag: ["@ui"] }
 		await expect(page.getByTestId("agent-stop-status")).toContainText(
 			"已送出停止，正在收尾這一輪。",
 		);
-		expect(cancelBodies).toEqual([{ expectedRunVersion: "7", reason: "" }]);
+		expect(cancelBodies).toEqual([{ runId: RUN_ID }]);
 	});
 });

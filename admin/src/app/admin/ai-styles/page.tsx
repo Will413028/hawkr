@@ -1,15 +1,27 @@
 "use client";
 
+import { create } from "@bufbuild/protobuf";
+import { createClient } from "@connectrpc/connect";
+import { useTransport } from "@connectrpc/connect-query";
+import {
+	type AiQuota,
+	AiQuotaSchema,
+	AiStyleSchema,
+	ImageAiAdminService,
+	type AiStyle as ProtoAiStyle,
+} from "@hawkr/api/gen/hawkr/admin/imageai/v1alpha1/imageai_pb";
+import { AiStyleCategory } from "@hawkr/api/gen/hawkr/imageai/v1alpha1/imageai_pb";
+import { fieldMask } from "@hawkr/api/proto/field-mask";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import type React from "react";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Dialog } from "@/components/UI";
-import { api } from "@/services/api";
+import { errorMessage } from "@/lib/error-text";
 import { useEnvironment } from "@/services/environment";
 import { uploadImageToMedia } from "@/services/media-upload";
-import { resolveOssUrl } from "@/utils/oss";
+import { imageUri } from "@/utils/image";
 
 interface AiStyle {
 	id: string;
@@ -18,16 +30,10 @@ interface AiStyle {
 	prompt: string;
 	thumbnailUrl: string;
 	sortOrder: string;
-	category: "product" | "post";
+	category: CategoryFilter;
 	isDefault: boolean;
 	enabled: boolean;
-	createdAt: string;
-	updatedAt: string;
-}
-
-interface ListResponse {
-	code: number;
-	data: AiStyle[];
+	etag: string;
 }
 
 interface QuotaData {
@@ -36,13 +42,42 @@ interface QuotaData {
 	isCustom: boolean;
 	weeklyUsage: string;
 	memo: string;
-	updatedAt: string;
+	etag: string;
 }
 
-interface QuotaResponse {
-	code: number;
-	data: QuotaData;
+const CATEGORY_TO_PROTO: Record<CategoryFilter, AiStyleCategory> = {
+	product: AiStyleCategory.PRODUCT,
+	post: AiStyleCategory.POST,
+};
+
+function toAiStyle(style: ProtoAiStyle): AiStyle {
+	return {
+		id: style.id,
+		name: style.name,
+		label: style.label,
+		prompt: style.prompt,
+		thumbnailUrl: imageUri(style.thumbnail, "thumb") ?? "",
+		sortOrder: String(style.displayOrder),
+		category: style.category === AiStyleCategory.POST ? "post" : "product",
+		isDefault: style.defaultStyle,
+		enabled: style.enabled,
+		etag: style.etag,
+	};
 }
+
+function toQuotaData(quota: AiQuota): QuotaData {
+	return {
+		storeId: quota.storeId,
+		weeklyLimit: String(quota.weeklyLimit),
+		isCustom: quota.custom,
+		weeklyUsage: String(quota.weeklyUsage),
+		memo: quota.memo,
+		etag: quota.etag,
+	};
+}
+
+/** 風格修改時送出的欄位（proto snake_case）。換縮圖時另加 thumbnail_staged_token。 */
+const STYLE_FORM_FIELDS = ["label", "prompt", "display_order", "enabled"];
 
 type CategoryFilter = "product" | "post";
 
@@ -54,6 +89,11 @@ const CATEGORY_LABELS: Record<CategoryFilter, string> = {
 const AiStyleManagement: React.FC = () => {
 	const { environment } = useEnvironment();
 	const queryClient = useQueryClient();
+	const transport = useTransport();
+	const client = useMemo(
+		() => createClient(ImageAiAdminService, transport),
+		[transport],
+	);
 
 	// 風格管理
 	const [editingStyle, setEditingStyle] = useState<AiStyle | null>(null);
@@ -95,10 +135,10 @@ const AiStyleManagement: React.FC = () => {
 			{ env: environment, category: categoryFilter },
 		],
 		queryFn: async () => {
-			const res = await api.get<ListResponse>(
-				`/api/v1/admin/ai_styles?category=${categoryFilter}`,
-			);
-			return res?.data ?? [];
+			const res = await client.listAiStylesForAdmin({
+				category: CATEGORY_TO_PROTO[categoryFilter],
+			});
+			return res.aiStyles.map(toAiStyle);
 		},
 	});
 	const invalidateStyles = () =>
@@ -128,7 +168,7 @@ const AiStyleManagement: React.FC = () => {
 		setFormLabel(style.label);
 		setFormPrompt(style.prompt);
 		setFormThumbnailFile(null);
-		setThumbnailPreview(resolveOssUrl(style.thumbnailUrl));
+		setThumbnailPreview(style.thumbnailUrl || null);
 		setThumbnailError("");
 		setFormSortOrder(style.sortOrder);
 		setFormEnabled(style.enabled);
@@ -168,42 +208,45 @@ const AiStyleManagement: React.FC = () => {
 				thumbnailStagedToken = await uploadImageToMedia(formThumbnailFile);
 			}
 
+			const displayOrder = Number.parseInt(formSortOrder, 10) || 0;
 			if (editingStyle) {
-				const payload: Record<string, unknown> = {
-					label: formLabel,
-					prompt: formPrompt,
-					sortOrder: formSortOrder,
-					enabled: formEnabled,
-				};
-				if (thumbnailStagedToken) {
-					payload.thumbnailStagedToken = thumbnailStagedToken;
-				}
-				await api.put(`/api/v1/admin/ai_styles/${editingStyle.id}`, payload);
+				const paths = [...STYLE_FORM_FIELDS];
+				if (thumbnailStagedToken) paths.push("thumbnail_staged_token");
+				await client.updateAiStyle({
+					aiStyle: create(AiStyleSchema, {
+						id: editingStyle.id,
+						etag: editingStyle.etag,
+						label: formLabel,
+						prompt: formPrompt,
+						displayOrder,
+						enabled: formEnabled,
+						thumbnailStagedToken: thumbnailStagedToken ?? "",
+					}),
+					updateMask: fieldMask(AiStyleSchema, paths),
+				});
 			} else {
 				if (!formName.trim()) {
 					alert("識別名為必填");
 					setSaving(false);
 					return;
 				}
-				const payload: Record<string, unknown> = {
-					name: formName,
-					label: formLabel,
-					prompt: formPrompt,
-					sortOrder: formSortOrder,
-					category: formCategory,
-					isDefault: false,
-					enabled: formEnabled,
-				};
-				if (thumbnailStagedToken) {
-					payload.thumbnailStagedToken = thumbnailStagedToken;
-				}
-				await api.post("/api/v1/admin/ai_styles", payload);
+				await client.createAiStyle({
+					aiStyle: create(AiStyleSchema, {
+						name: formName,
+						label: formLabel,
+						prompt: formPrompt,
+						displayOrder,
+						category: CATEGORY_TO_PROTO[formCategory],
+						enabled: formEnabled,
+						thumbnailStagedToken: thumbnailStagedToken ?? "",
+					}),
+				});
 			}
 			setShowForm(false);
 			resetForm();
 			invalidateStyles();
 		} catch (err: unknown) {
-			alert(`儲存失敗：${err instanceof Error ? err.message : "未知錯誤"}`);
+			alert(`儲存失敗：${errorMessage(err)}`);
 		} finally {
 			setSaving(false);
 		}
@@ -216,21 +259,26 @@ const AiStyleManagement: React.FC = () => {
 		}
 		if (!confirm(`確定要刪除「${style.label}」？`)) return;
 		try {
-			await api.delete(`/api/v1/admin/ai_styles/${style.id}`);
+			await client.deleteAiStyle({ id: style.id, etag: style.etag });
 			invalidateStyles();
 		} catch (err: unknown) {
-			alert(`刪除失敗：${err instanceof Error ? err.message : "未知錯誤"}`);
+			alert(`刪除失敗：${errorMessage(err)}`);
 		}
 	};
 
 	const handleToggleEnabled = async (style: AiStyle) => {
 		try {
-			await api.put(`/api/v1/admin/ai_styles/${style.id}`, {
-				enabled: !style.enabled,
+			await client.updateAiStyle({
+				aiStyle: create(AiStyleSchema, {
+					id: style.id,
+					etag: style.etag,
+					enabled: !style.enabled,
+				}),
+				updateMask: fieldMask(AiStyleSchema, ["enabled"]),
 			});
 			invalidateStyles();
 		} catch (err: unknown) {
-			alert(`更新失敗：${err instanceof Error ? err.message : "未知錯誤"}`);
+			alert(`更新失敗：${errorMessage(err)}`);
 		}
 	};
 
@@ -240,16 +288,15 @@ const AiStyleManagement: React.FC = () => {
 		setQuotaLoading(true);
 		setQuotaData(null);
 		try {
-			const res = await api.get<QuotaResponse>(
-				`/api/v1/admin/ai_quotas/${quotaStoreId}`,
-			);
-			if (res?.data) {
-				setQuotaData(res.data);
-				setQuotaLimit(res.data.weeklyLimit);
-				setQuotaMemo(res.data.memo);
+			const res = await client.getAiQuota({ storeId: quotaStoreId.trim() });
+			if (res.aiQuota) {
+				const data = toQuotaData(res.aiQuota);
+				setQuotaData(data);
+				setQuotaLimit(data.weeklyLimit);
+				setQuotaMemo(data.memo);
 			}
 		} catch (err: unknown) {
-			alert(`查詢失敗：${err instanceof Error ? err.message : "未知錯誤"}`);
+			alert(`查詢失敗：${errorMessage(err)}`);
 		} finally {
 			setQuotaLoading(false);
 		}
@@ -264,14 +311,19 @@ const AiStyleManagement: React.FC = () => {
 		}
 		setQuotaSaving(true);
 		try {
-			await api.put(`/api/v1/admin/ai_quotas/${quotaStoreId}`, {
-				weeklyLimit: quotaLimit,
-				memo: quotaMemo,
+			await client.updateAiQuota({
+				aiQuota: create(AiQuotaSchema, {
+					storeId: quotaStoreId.trim(),
+					weeklyLimit: limit,
+					memo: quotaMemo,
+					etag: quotaData?.etag ?? "",
+				}),
+				updateMask: fieldMask(AiQuotaSchema, ["weekly_limit", "memo"]),
 			});
 			alert("儲存成功");
 			handleQueryQuota();
 		} catch (err: unknown) {
-			alert(`儲存失敗：${err instanceof Error ? err.message : "未知錯誤"}`);
+			alert(`儲存失敗：${errorMessage(err)}`);
 		} finally {
 			setQuotaSaving(false);
 		}
@@ -281,11 +333,14 @@ const AiStyleManagement: React.FC = () => {
 		if (!quotaStoreId.trim()) return;
 		if (!confirm("確定要恢復預設額度（10 次/週）？")) return;
 		try {
-			await api.delete(`/api/v1/admin/ai_quotas/${quotaStoreId}`);
+			await client.deleteAiQuota({
+				storeId: quotaStoreId.trim(),
+				etag: quotaData?.etag ?? "",
+			});
 			alert("已恢復預設");
 			handleQueryQuota();
 		} catch (err: unknown) {
-			alert(`操作失敗：${err instanceof Error ? err.message : "未知錯誤"}`);
+			alert(`操作失敗：${errorMessage(err)}`);
 		}
 	};
 
@@ -434,10 +489,7 @@ const AiStyleManagement: React.FC = () => {
 										<td style={{ padding: "10px 12px" }}>
 											{style.thumbnailUrl ? (
 												<Image
-													src={
-														resolveOssUrl(style.thumbnailUrl) ??
-														style.thumbnailUrl
-													}
+													src={style.thumbnailUrl}
 													alt={style.label}
 													width={48}
 													height={48}

@@ -26,8 +26,7 @@ import (
 // 不可用、PayUni 不再重送、付款狀態永久不同步才會被發現。
 //
 // ⚠️ **兩個套件都要掃**。只掃 router 會漏掉 proxy 套件內直接呼叫
-// `writeUpstreamFailureEnvelope` 的路徑——`ai_assistant_stream.go` 現在
-// 就是這個形狀（值寫死正確，但不受表約束）。
+// `writeUpstreamFailureEnvelope` 的路徑（值寫死正確，但不受表約束）。
 func TestProxyRoutesDeclareFailureStatusByConsumer(t *testing.T) {
 	t.Run("router 套件：路由宣告", func(t *testing.T) {
 		// key = "檔名:代理建構函式:第一個參數（service 常數）"，value = 宣告的失敗模式。
@@ -73,12 +72,6 @@ func TestProxyRoutesDeclareFailureStatusByConsumer(t *testing.T) {
 			// 是為了在有人把它寫死成某個常數時轉紅（那會讓上面那張表失去效力）。
 			"reverse_proxy.go:CreateProxy":                "onUpstreamFailure",
 			"reverse_proxy.go:CreateProxyWithPathRewrite": "onUpstreamFailure",
-			// ai-service 的 SSE 路徑：消費者全是我們自己的前端（web AI 助手、兩支 App
-			// 的採購助手），沒有第三方送信端。
-			"ai_assistant_stream.go:serveAIAssistantStreamWith": "FailClientFacing",
-			// Task 12：GET replay 端點，消費者同樣是我們自己的前端（web 的
-			// procurement-assistant 頁重新整理／重連時的重播來源），沒有第三方送信端。
-			"ai_run_events_stream.go:serveAIProcurementRunEventsStreamWith": "FailClientFacing",
 		}
 		got := scan(t, filepath.Join("..", "proxy"), func(fn string, call *ast.CallExpr, file, enclosing string) (string, string, bool) {
 			if fn != "writeUpstreamFailureEnvelope" {

@@ -357,6 +357,33 @@
     "payment.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER": {
       "message": "Provider-hosted"
     },
+    "procurement.CancelDisposition.CANCEL_DISPOSITION_ALREADY_CANCELLED": {
+      "message": "This round was already stopped, so nothing was sent again."
+    },
+    "procurement.CancelDisposition.CANCEL_DISPOSITION_ALREADY_TERMINAL": {
+      "message": "This round had already finished. Its completed result is still valid and was not voided by this stop."
+    },
+    "procurement.CancelDisposition.CANCEL_DISPOSITION_REQUESTED": {
+      "message": "Stop requested. Wrapping up this round."
+    },
+    "procurement.CancelDisposition.CANCEL_DISPOSITION_TOO_LATE": {
+      "message": "This round already finished and was sent, so it was too late to stop. Its completed result is still valid."
+    },
+    "procurement.QuoteAcceptability.QUOTE_ACCEPTABILITY_ACCEPTABLE": {
+      "message": "Can be accepted"
+    },
+    "procurement.QuoteAcceptability.QUOTE_ACCEPTABILITY_EXPIRED": {
+      "message": "Past its validity period"
+    },
+    "procurement.QuoteAcceptability.QUOTE_ACCEPTABILITY_INELIGIBLE": {
+      "message": "Not eligible to be accepted"
+    },
+    "procurement.QuoteAcceptability.QUOTE_ACCEPTABILITY_SUPERSEDED": {
+      "message": "Replaced by a newer version"
+    },
+    "procurement.QuoteAcceptability.QUOTE_ACCEPTABILITY_WITHDRAWN": {
+      "message": "Withdrawn by the seller"
+    },
     "procurement.RejectionReason.REJECTION_REASON_BUDGET_RANGE": {
       "message": "The budget per unit is out of range"
     },
@@ -395,6 +422,24 @@
     },
     "procurement.RejectionReason.REJECTION_REASON_UNIT_NOT_ALLOWED": {
       "message": "This unit is not supported"
+    },
+    "procurement.RunFailureReason.RUN_FAILURE_REASON_ANSWER_REJECTED": {
+      "message": "This answer could not be used. Please answer again."
+    },
+    "procurement.RunFailureReason.RUN_FAILURE_REASON_ITEM_CATEGORY_UNAVAILABLE": {
+      "message": "The item category has changed. Please choose the item again."
+    },
+    "procurement.RunFailureReason.RUN_FAILURE_REASON_MODEL_UNAVAILABLE": {
+      "message": "Hawkr Agent can't reply right now. Please send it again later."
+    },
+    "procurement.RunFailureReason.RUN_FAILURE_REASON_SEARCH_FAILED": {
+      "message": "The candidate search failed. Please search again."
+    },
+    "procurement.RunFailureReason.RUN_FAILURE_REASON_TURN_PIPELINE_ERROR": {
+      "message": "Something went wrong while processing this round. Please send it again."
+    },
+    "procurement.RunFailureReason.RUN_FAILURE_REASON_WORKER_LOST": {
+      "message": "This round was interrupted. Please send it again."
     },
     "review.Review.rating_label_1": {
       "message": "Very dissatisfied"

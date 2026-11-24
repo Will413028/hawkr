@@ -4,7 +4,6 @@
 
 GO_SERVICES := \
 	gateway \
-	services/ai-service \
 	services/invoice-service
 
 # Go services with their own Atlas-managed DB (all GO_SERVICES except gateway, which has none)

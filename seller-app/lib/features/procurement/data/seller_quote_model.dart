@@ -1,95 +1,69 @@
-// ignore_for_file: invalid_annotation_target
-
 import 'package:freezed_annotation/freezed_annotation.dart';
-
-import '../../../core/codemeta/code_meta.dart';
+import 'package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart';
 
 part 'seller_quote_model.freezed.dart';
-part 'seller_quote_model.g.dart';
 
-const String kQuoteCurrencyTwd = 'TWD';
+/// 賣家在表單上可以選的回應方式。
+const List<SellerResponseType> kSelectableResponseTypes = [
+  SellerResponseType.SELLER_RESPONSE_TYPE_MANUAL_QUOTE,
+  SellerResponseType.SELLER_RESPONSE_TYPE_ACCEPT_NON_PRICE_TERMS_WITH_QUOTE,
+];
 
-Map<String, dynamic> _offeredQualityToJson(OfferedQuality value) =>
-    value.toJson();
-Map<String, dynamic> _unitBasisToJson(UnitBasis value) => value.toJson();
-Map<String, dynamic> _quoteToJson(SellerQuotePayload value) => value.toJson();
-
-@freezed
-abstract class OfferedQuality with _$OfferedQuality {
-  const factory OfferedQuality({
-    @Default('') String grade,
-    @Default('') String inspectionNotes,
-  }) = _OfferedQuality;
-
-  factory OfferedQuality.fromJson(Map<String, dynamic> json) =>
-      _$OfferedQualityFromJson(json);
-}
+/// 賣家在表單上可以選的含稅基準。
+const List<TaxInclusionBasis> kSelectableTaxBases = [
+  TaxInclusionBasis.TAX_INCLUSION_BASIS_TAX_INCLUDED,
+  TaxInclusionBasis.TAX_INCLUSION_BASIS_TAX_EXCLUDED,
+];
 
 @freezed
-abstract class UnitBasis with _$UnitBasis {
-  const factory UnitBasis({
+abstract class QuoteUnitBasis with _$QuoteUnitBasis {
+  const factory QuoteUnitBasis({
     @Default('') String quantity,
     @Default('') String unit,
-  }) = _UnitBasis;
-
-  factory UnitBasis.fromJson(Map<String, dynamic> json) =>
-      _$UnitBasisFromJson(json);
+  }) = _QuoteUnitBasis;
 }
 
+/// 回價表單的內容。欄位是使用者輸入的字串；送出時才轉成契約型別（`SellerQuote`）。
+/// 金額是非負整數（TWD，幣別由伺服器補上），時間是 RFC3339 字串。
 @freezed
 abstract class SellerQuotePayload with _$SellerQuotePayload {
   const factory SellerQuotePayload({
-    @Default('') String responseType,
+    @Default(SellerResponseType.SELLER_RESPONSE_TYPE_UNSPECIFIED)
+    SellerResponseType responseType,
 
-    @JsonKey(toJson: _offeredQualityToJson)
-    @Default(OfferedQuality())
-    OfferedQuality offeredQuality,
-
-    @JsonKey(toJson: _unitBasisToJson)
-    @Default(UnitBasis())
-    UnitBasis unitBasis,
-
+    /// 賣家對規格的補充說明，選填。
+    @Default('') String specNote,
+    @Default(QuoteUnitBasis()) QuoteUnitBasis unitBasis,
     @Default('') String offeredQuantity,
-
     @Default('') String offeredQuantityUnit,
-
     @Default('') String conversionBasis,
-
-    @Default(kQuoteCurrencyTwd) String currency,
-
     @Default('') String goodsAmount,
-
     @Default('') String shippingAmount,
-
     @Default('') String taxAmount,
-
-    @Default('') String taxInclusionBasis,
-
+    @Default(TaxInclusionBasis.TAX_INCLUSION_BASIS_UNSPECIFIED)
+    TaxInclusionBasis taxInclusionBasis,
     @Default('') String totalAmount,
-
     @Default('') String leadTimeDays,
-
     @Default('') String promisedDeliveryAt,
-
     @Default('') String validUntil,
-
     @Default('') String termsNote,
-
     @Default('') String deviationDisclosure,
   }) = _SellerQuotePayload;
 
   const SellerQuotePayload._();
 
-  factory SellerQuotePayload.fromJson(Map<String, dynamic> json) =>
-      _$SellerQuotePayloadFromJson(json);
+  SellerResponseType? get responseTypeValue =>
+      responseType == SellerResponseType.SELLER_RESPONSE_TYPE_UNSPECIFIED
+      ? null
+      : responseType;
 
-  ProcurementSellerResponseType? get responseTypeValue =>
-      ProcurementSellerResponseType.fromCode(responseType);
-
-  ProcurementTaxInclusionBasis? get taxInclusionBasisValue =>
-      ProcurementTaxInclusionBasis.fromCode(taxInclusionBasis);
+  TaxInclusionBasis? get taxInclusionBasisValue =>
+      taxInclusionBasis == TaxInclusionBasis.TAX_INCLUSION_BASIS_UNSPECIFIED
+      ? null
+      : taxInclusionBasis;
 }
 
+/// 一個正式回價版本（不可變）。
 @freezed
 abstract class SellerResponseVersionResponse
     with _$SellerResponseVersionResponse {
@@ -97,27 +71,21 @@ abstract class SellerResponseVersionResponse
     @Default('') String sellerResponseId,
     @Default('') String sellerResponseVersion,
     @Default('') String publicationId,
-
-    @Default('') String status,
+    @Default(SellerResponseStatus.SELLER_RESPONSE_STATUS_UNSPECIFIED)
+    SellerResponseStatus status,
     @Default('') String payloadHash,
-    @Default('') String submittedAt,
-
     @Default('') String supersededByVersion,
-
     @Default(false) bool outsideBuyerRequestedRange,
-    @JsonKey(toJson: _quoteToJson)
-    @Default(SellerQuotePayload())
-    SellerQuotePayload quote,
+    @Default(SellerQuotePayload()) SellerQuotePayload quote,
     @Default(false) bool replayed,
   }) = _SellerResponseVersionResponse;
 
   const SellerResponseVersionResponse._();
 
-  factory SellerResponseVersionResponse.fromJson(Map<String, dynamic> json) =>
-      _$SellerResponseVersionResponseFromJson(json);
-
-  ProcurementSellerResponseStatus? get statusValue =>
-      ProcurementSellerResponseStatus.fromCode(status);
+  SellerResponseStatus? get statusValue =>
+      status == SellerResponseStatus.SELLER_RESPONSE_STATUS_UNSPECIFIED
+      ? null
+      : status;
 
   bool get isLatestVersion => supersededByVersion.isEmpty;
 }
@@ -126,43 +94,26 @@ abstract class SellerResponseVersionResponse
 abstract class SellerResponseDraftResponse with _$SellerResponseDraftResponse {
   const factory SellerResponseDraftResponse({
     @Default('') String draftVersion,
-    @Default('') String updatedAt,
-    @JsonKey(toJson: _quoteToJson)
-    @Default(SellerQuotePayload())
-    SellerQuotePayload draft,
+    @Default(SellerQuotePayload()) SellerQuotePayload draft,
   }) = _SellerResponseDraftResponse;
-
-  factory SellerResponseDraftResponse.fromJson(Map<String, dynamic> json) =>
-      _$SellerResponseDraftResponseFromJson(json);
 }
 
 @freezed
 abstract class SellerFacingPublication with _$SellerFacingPublication {
   const factory SellerFacingPublication({
     @Default('') String publicationId,
-
     @Default('') String publicationVersion,
-    @Default('') String inviteId,
-
-    @Default('') String lane,
-
     @Default('') String sellerFacingPayloadHash,
-
-    @Default('') String deliveryState,
-    @Default('') String publishedAt,
   }) = _SellerFacingPublication;
-
-  factory SellerFacingPublication.fromJson(Map<String, dynamic> json) =>
-      _$SellerFacingPublicationFromJson(json);
 }
 
+/// 賣家看到的詢價內容（只含白名單欄位）；日期是 `YYYY-MM-DD`，沒有的欄位是空字串。
 @freezed
 abstract class SellerFacingPayload with _$SellerFacingPayload {
   const factory SellerFacingPayload({
     @Default('') String item,
     @Default('') String itemLabel,
     @Default('') String quantity,
-
     @Default('') String unit,
     @Default('') String packaging,
     @Default('') String deliveryCity,
@@ -172,9 +123,6 @@ abstract class SellerFacingPayload with _$SellerFacingPayload {
   }) = _SellerFacingPayload;
 
   const SellerFacingPayload._();
-
-  factory SellerFacingPayload.fromJson(Map<String, dynamic> json) =>
-      _$SellerFacingPayloadFromJson(json);
 
   bool get hasBuyerNote => buyerNote.trim().isNotEmpty;
 
@@ -207,9 +155,7 @@ abstract class SellerPublicationSummary with _$SellerPublicationSummary {
 abstract class SellerPublicationListItem with _$SellerPublicationListItem {
   const factory SellerPublicationListItem({
     required SellerPublicationSummary summary,
-
-    @Default('') String latestResponseStatus,
-
+    SellerResponseStatus? latestResponseStatus,
     @Default(false) bool hasDraft,
   }) = _SellerPublicationListItem;
 
@@ -219,17 +165,23 @@ abstract class SellerPublicationListItem with _$SellerPublicationListItem {
 
   SellerFacingPayload get sellerFacingPayload => summary.sellerFacingPayload;
 
-  ProcurementSellerResponseStatus? get latestResponseStatusValue =>
-      ProcurementSellerResponseStatus.fromCode(latestResponseStatus);
+  bool get hasSubmittedResponse => latestResponseStatus != null;
+}
 
-  bool get hasSubmittedResponse => latestResponseStatus.isNotEmpty;
+/// 回價被撤回或婉拒後的結案狀態。
+@freezed
+abstract class SellerResponseClosure with _$SellerResponseClosure {
+  const factory SellerResponseClosure({
+    @Default('') String sellerResponseId,
+    @Default('') String latestVersion,
+    @Default('') String withdrawnVersion,
+  }) = _SellerResponseClosure;
 }
 
 @freezed
 abstract class SellerPublicationDetail with _$SellerPublicationDetail {
   const factory SellerPublicationDetail({
     required SellerFacingPublication publication,
-
     @Default(SellerFacingPayload()) SellerFacingPayload sellerFacingPayload,
     SellerResponseDraftResponse? draft,
     SellerResponseVersionResponse? latestResponse,

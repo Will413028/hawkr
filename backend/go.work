@@ -5,6 +5,5 @@ use (
 	./gateway
 	./monitoring/discord-webhook-gateway
 	./pkg
-	./services/ai-service
 	./services/invoice-service
 )

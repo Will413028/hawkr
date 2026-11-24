@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ProcurementCandidate } from "@/lib/api/openapi-types";
+import type { ProcurementCandidate } from "@/features/procurement-assistant/types";
 import {
 	candidatesToToggleForSeller,
 	canGroupBySeller,
@@ -12,10 +12,7 @@ function candidate(
 	overrides: Partial<ProcurementCandidate> & { candidateId: string },
 ): ProcurementCandidate {
 	return {
-		sourceId: `prod-${overrides.candidateId}`,
-		lane: "PLATFORM",
 		displayName: `候選 ${overrides.candidateId}`,
-		score: 90,
 		matchedFacts: [],
 		unverifiableFacts: [],
 		factsAsOf: "2026-08-22T02:00:00Z",
@@ -55,9 +52,9 @@ describe("groupPlatformCandidates", () => {
 	// 否則使用者會看到同一家商家出現兩次。
 	it("同一家商家的多個商品合成一組", () => {
 		const { groups, ungrouped } = groupPlatformCandidates([
-			candidate({ candidateId: "1", storeId: "1001", sellerName: "青果行 A" }),
-			candidate({ candidateId: "2", storeId: "1001", sellerName: "青果行 A" }),
-			candidate({ candidateId: "3", storeId: "2002", sellerName: "青果行 B" }),
+			candidate({ candidateId: "1", storeId: "1001", displayName: "青果行 A" }),
+			candidate({ candidateId: "2", storeId: "1001", displayName: "青果行 A" }),
+			candidate({ candidateId: "3", storeId: "2002", displayName: "青果行 B" }),
 		]);
 
 		expect(groups).toHaveLength(2);
@@ -87,11 +84,15 @@ describe("groupPlatformCandidates", () => {
 		expect(ungrouped.map((c) => c.candidateId)).toEqual(["2"]);
 	});
 
-	it("缺店名時退回可讀標題，不留空字串", () => {
+	it("群組標題取店家卡片的名稱（沒有名稱時已由對應層換成關閉店家文字）", () => {
 		const { groups } = groupPlatformCandidates([
-			candidate({ candidateId: "1", storeId: "1001", sellerName: "" }),
+			candidate({
+				candidateId: "1",
+				storeId: "1001",
+				displayName: "已關閉的店家",
+			}),
 		]);
-		expect(groups[0].sellerName).toBe("商家 1001");
+		expect(groups[0].sellerName).toBe("已關閉的店家");
 	});
 
 	// storeCode 缺值不得退回 storeId 組連結：`/sellers/{storeId}` 那條路徑正在被收掉。
@@ -107,7 +108,7 @@ describe("groupPlatformCandidates", () => {
 			candidate({
 				candidateId: "1",
 				storeId: "1001",
-				sellerName: "青果行 A",
+				displayName: "青果行 A",
 				storeCode: "25ABCDEFGH",
 				logoUrl: "https://media.test/i/original/seller/1001/logo.jpg",
 			}),
@@ -150,23 +151,20 @@ describe("群組的查核結果與時間", () => {
 		expect(groups[0].unverifiableFacts).toHaveLength(1);
 	});
 
-	it("factsAsOf 取群組內最新、score 取最高", () => {
+	it("factsAsOf 取群組內最新", () => {
 		const { groups } = groupPlatformCandidates([
 			candidate({
 				candidateId: "1",
 				storeId: "1001",
 				factsAsOf: "2026-08-21T00:00:00Z",
-				score: 3,
 			}),
 			candidate({
 				candidateId: "2",
 				storeId: "1001",
 				factsAsOf: "2026-08-22T00:00:00Z",
-				score: 6,
 			}),
 		]);
 		expect(groups[0].factsAsOf).toBe("2026-08-22T00:00:00Z");
-		expect(groups[0].score).toBe(6);
 	});
 });
 
@@ -242,12 +240,12 @@ describe("countSelectedRecipients", () => {
 		).toBe(2);
 	});
 
-	// EXTERNAL lane 的站外業者沒有 storeId，畫面上本來就是一家一列。
+	// 帶不出 storeId 的候選畫面上本來就是一家一列。
 	it("帶不出 storeId 的候選各自算一家", () => {
 		expect(
 			countSelectedRecipients([
-				candidate({ candidateId: "1", lane: "EXTERNAL", selected: true }),
-				candidate({ candidateId: "2", lane: "EXTERNAL", selected: true }),
+				candidate({ candidateId: "1", selected: true }),
+				candidate({ candidateId: "2", selected: true }),
 			]),
 		).toBe(2);
 	});

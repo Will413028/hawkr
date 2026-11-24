@@ -1,22 +1,20 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import { Button } from "@/components/ui";
 import type {
 	ProcurementCandidate,
 	ProcurementSlots,
-} from "@/lib/api/openapi-types";
+} from "@/features/procurement-assistant/types";
 import { formatTaipeiDateTime, formatTaipeiIsoDate } from "@/lib/date/taipei";
 import { countSelectedRecipients } from "./candidate-grouping";
 import {
 	BUYER_NOTE_MAX_LENGTH,
-	hasConfirmablePriceBasis,
-	priceBasisOf,
+	hasPriceBasis,
 	type RfqCommandFailure,
 	type RfqCommandResult,
-	type RfqConfirmation,
-	type RfqConfirmationCommand,
 	type RfqPricePreview,
 	type RfqPricePreviewCommand,
 	validateBuyerDesiredRange,
@@ -24,7 +22,6 @@ import {
 import {
 	publicationAudienceIdentityOf,
 	type RfqPublicationApproval,
-	type RfqPublicationAudience,
 	type RfqPublicationExecuteCommand,
 	type RfqPublicationPreviewCommand,
 	type RfqPublicationResult,
@@ -41,9 +38,6 @@ interface RfqDraftFlowProps {
 	onPreviewRfqPrice: (
 		command: RfqPricePreviewCommand,
 	) => Promise<RfqCommandResult<RfqPricePreview>>;
-	onConfirmRfqSnapshot: (
-		command: RfqConfirmationCommand,
-	) => Promise<RfqCommandResult<RfqConfirmation>>;
 	onRefreshSnapshot: () => Promise<boolean>;
 	onPreviewRfqPublication: (
 		command: RfqPublicationPreviewCommand,
@@ -62,14 +56,9 @@ type RemoteState<T> =
 	| { status: "success"; data: T }
 	| { status: "error"; error: RfqCommandFailure };
 
-interface StoredPreviewCommand {
+interface StoredPublicationPreviewId {
 	fingerprint: string;
-	command: RfqPricePreviewCommand;
-}
-
-interface StoredConfirmationCommand {
-	fingerprint: string;
-	command: RfqConfirmationCommand;
+	clientRequestId: string;
 }
 
 const STEP_LABELS = ["需求版本", "預計邀請", "價格確認", "快照確認"] as const;
@@ -92,6 +81,29 @@ function createClientRequestId(): string {
 
 function shortIdentity(value: string): string {
 	return value.length <= 12 ? value : `${value.slice(0, 6)}…${value.slice(-6)}`;
+}
+
+function isStaleRevision(failure: RfqCommandFailure): boolean {
+	return failure.code === "STALE_REVISION" || failure.code === "STALE_CONTEXT";
+}
+
+function RefreshSnapshotButton({
+	loading,
+	onRefresh,
+}: {
+	loading: boolean;
+	onRefresh: () => void;
+}) {
+	return (
+		<Button
+			variant="bordered"
+			isLoading={loading}
+			loadingLabel="讀取中…"
+			onClick={onRefresh}
+		>
+			讀取最新需求
+		</Button>
+	);
 }
 
 function QuoteTotalRange({ preview }: { preview: RfqPricePreview }) {
@@ -121,7 +133,6 @@ export default function RfqDraftFlow({
 	onBackToCandidates,
 	onReturnToConversation,
 	onPreviewRfqPrice,
-	onConfirmRfqSnapshot,
 	onRefreshSnapshot,
 	onPreviewRfqPublication,
 	onExecuteRfqPublication,
@@ -129,15 +140,13 @@ export default function RfqDraftFlow({
 	onPublicationExecuted,
 	approvalEnabled,
 }: RfqDraftFlowProps) {
+	const t = useTranslations("procurementAssistant");
 	const [step, setStep] = React.useState(0);
 	const [furthestStep, setFurthestStep] = React.useState(0);
 	const [desiredPriceLower, setDesiredPriceLower] = React.useState("");
 	const [desiredPriceUpper, setDesiredPriceUpper] = React.useState("");
 	const [previewState, setPreviewState] = React.useState<
 		RemoteState<RfqPricePreview>
-	>({ status: "idle" });
-	const [confirmationState, setConfirmationState] = React.useState<
-		RemoteState<RfqConfirmation>
 	>({ status: "idle" });
 	const [snapshotReconfirmed, setSnapshotReconfirmed] = React.useState(false);
 	const [buyerNote, setBuyerNote] = React.useState("");
@@ -146,19 +155,9 @@ export default function RfqDraftFlow({
 	const [responseDeadline, setResponseDeadline] = React.useState("");
 	const hasRecipients = candidates.length > 0;
 	const recipientBreakdown = React.useMemo(() => {
-		const platform = countSelectedRecipients(
-			candidates.filter((candidate) => candidate.lane === "PLATFORM"),
-		);
-		const external = countSelectedRecipients(
-			candidates.filter((candidate) => candidate.lane === "EXTERNAL"),
-		);
-		return [
-			platform > 0 ? `平台賣家 ${platform} 家` : "",
-			external > 0 ? `站外業者 ${external} 家` : "",
-		]
-			.filter(Boolean)
-			.join(" · ");
-	}, [candidates]);
+		const recipients = countSelectedRecipients(candidates);
+		return recipients > 0 ? t("sellerCount", { count: recipients }) : "";
+	}, [candidates, t]);
 	const [publicationState, setPublicationState] = React.useState<
 		RemoteState<RfqPublicationApproval>
 	>({ status: "idle" });
@@ -197,14 +196,10 @@ export default function RfqDraftFlow({
 		clientRequestId: string;
 	} | null>(null);
 	const [refreshingSnapshot, setRefreshingSnapshot] = React.useState(false);
-	const previewCommandRef = React.useRef<StoredPreviewCommand | null>(null);
-	const confirmationCommandRef = React.useRef<StoredConfirmationCommand | null>(
-		null,
-	);
+	const publicationPreviewIdRef =
+		React.useRef<StoredPublicationPreviewId | null>(null);
 	const previewOperationRef = React.useRef(0);
-	const confirmationOperationRef = React.useRef(0);
 	const previewInFlightRef = React.useRef<number | null>(null);
-	const confirmationInFlightRef = React.useRef<number | null>(null);
 	const resultHeadingRef = React.useRef<HTMLHeadingElement>(null);
 
 	const quantity = slots.quantity ? String(slots.quantity) : "";
@@ -220,10 +215,6 @@ export default function RfqDraftFlow({
 	]
 		.filter(Boolean)
 		.join("\n");
-	const platformCount = candidates.filter(
-		(candidate) => candidate.lane === "PLATFORM",
-	).length;
-	const externalCount = candidates.length - platformCount;
 	const hasRequiredContext = Boolean(
 		requestId && revisionId && quantity && unit && deliveryCity,
 	);
@@ -238,28 +229,21 @@ export default function RfqDraftFlow({
 			: null;
 	const desiredRangeBlocking = Boolean(desiredRangeError);
 	const preview = previewState.status === "success" ? previewState.data : null;
-	const confirmationLocked =
-		confirmationState.status === "loading" ||
-		confirmationState.status === "success";
-	const confirmableBasis = preview
-		? hasConfirmablePriceBasis(preview, unit)
-		: false;
-	const canConfirm = Boolean(
+	// 發布一旦送出（或已成功），價格與說明都不能再改：核准已經被用掉。
+	const publicationLocked =
+		executionState.status === "loading" || executionState.status === "success";
+	const confirmableBasis = preview ? hasPriceBasis(preview) : false;
+	const canProceed = Boolean(
 		approvalEnabled &&
 			preview &&
 			confirmableBasis &&
 			snapshotReconfirmed &&
-			!refreshingSnapshot &&
-			confirmationState.status === "idle",
+			!refreshingSnapshot,
 	);
 
 	const clearDerivedPriceState = React.useCallback(() => {
 		previewOperationRef.current += 1;
-		confirmationOperationRef.current += 1;
-		previewCommandRef.current = null;
-		confirmationCommandRef.current = null;
 		setPreviewState({ status: "idle" });
-		setConfirmationState({ status: "idle" });
 		setSnapshotReconfirmed(false);
 		invalidatePublicationApproval();
 	}, [invalidatePublicationApproval]);
@@ -276,217 +260,146 @@ export default function RfqDraftFlow({
 	}, [invalidatePublicationApproval, publicationAudienceIdentity]);
 
 	React.useEffect(() => {
-		onInteractionLockChange?.(confirmationState.status === "loading");
+		onInteractionLockChange?.(
+			publicationState.status === "loading" ||
+				executionState.status === "loading",
+		);
 		return () => onInteractionLockChange?.(false);
-	}, [confirmationState.status, onInteractionLockChange]);
+	}, [publicationState.status, executionState.status, onInteractionLockChange]);
 
-	const runPreview = React.useCallback(
-		async (reuseExistingCommand: boolean) => {
+	const runPreview = React.useCallback(async () => {
+		if (
+			previewInFlightRef.current === previewOperationRef.current ||
+			publicationLocked ||
+			!requestId ||
+			!revisionId
+		)
+			return;
+		if (!deliveryCity || !quantity || !unit) {
+			setPreviewState({
+				status: "error",
+				error: {
+					code: "STALE_CONTEXT",
+					detail: "需求缺少數量、單位或配送城市，請回到對話補充。",
+					retryable: false,
+				},
+			});
+			return;
+		}
+		if (desiredRangeBlocking) {
+			return;
+		}
+
+		const command: RfqPricePreviewCommand = {
+			expectedRevisionId: revisionId,
+			buyerRequestedRange: {
+				lowerBoundAmount: desiredPriceLower.trim(),
+				upperBoundAmount: desiredPriceUpper.trim(),
+			},
+		};
+		setSnapshotReconfirmed(false);
+		invalidatePublicationApproval();
+		const operation = previewOperationRef.current + 1;
+		previewOperationRef.current = operation;
+		previewInFlightRef.current = operation;
+		setPreviewState({ status: "loading" });
+		try {
+			const result = await onPreviewRfqPrice(command);
+			if (previewOperationRef.current !== operation) return;
 			if (
-				previewInFlightRef.current === previewOperationRef.current ||
-				confirmationLocked ||
-				!requestId ||
-				!revisionId
-			)
-				return;
-			if (!deliveryCity || !quantity || !unit) {
+				result.ok &&
+				(result.data.buyerRequestedRange.lowerBoundAmount !==
+					command.buyerRequestedRange.lowerBoundAmount ||
+					result.data.buyerRequestedRange.upperBoundAmount !==
+						command.buyerRequestedRange.upperBoundAmount)
+			) {
 				setPreviewState({
 					status: "error",
 					error: {
-						code: "STALE_CONTEXT",
-						detail: "需求缺少數量、單位或配送城市，請回到對話補充。",
-						retryable: false,
+						code: "INVALID_RESPONSE",
+						detail: "取得的區間與本次設定不一致，請重試。",
+						retryable: true,
 					},
 				});
 				return;
 			}
-			if (desiredRangeBlocking) {
-				return;
+			setPreviewState(
+				result.ok
+					? { status: "success", data: result.data }
+					: { status: "error", error: result.error },
+			);
+		} finally {
+			if (previewInFlightRef.current === operation) {
+				previewInFlightRef.current = null;
 			}
-
-			const commandInput = {
-				expectedRevisionId: revisionId,
-				deliveryCity,
-				buyerRequestedRange: {
-					currency: "TWD" as const,
-					priceComponent: "GOODS_ONLY" as const,
-					lowerBoundAmount: desiredPriceLower.trim(),
-					upperBoundAmount: desiredPriceUpper.trim(),
-				},
-			};
-			const fingerprint = JSON.stringify(commandInput);
-			const existing = previewCommandRef.current;
-			const command =
-				reuseExistingCommand && existing?.fingerprint === fingerprint
-					? existing.command
-					: { ...commandInput, clientRequestId: createClientRequestId() };
-			previewCommandRef.current = { fingerprint, command };
-			confirmationCommandRef.current = null;
-			confirmationOperationRef.current += 1;
-			setConfirmationState({ status: "idle" });
-			setSnapshotReconfirmed(false);
-			const operation = previewOperationRef.current + 1;
-			previewOperationRef.current = operation;
-			previewInFlightRef.current = operation;
-			setPreviewState({ status: "loading" });
-			try {
-				const result = await onPreviewRfqPrice(command);
-				if (previewOperationRef.current !== operation) return;
-				if (
-					result.ok &&
-					(result.data.buyerRequestedRange.lowerBoundAmount !==
-						command.buyerRequestedRange.lowerBoundAmount ||
-						result.data.buyerRequestedRange.upperBoundAmount !==
-							command.buyerRequestedRange.upperBoundAmount)
-				) {
-					setPreviewState({
-						status: "error",
-						error: {
-							code: "INVALID_RESPONSE",
-							detail: "取得的區間與本次設定不一致，請重試。",
-							retryable: true,
-						},
-					});
-					return;
-				}
-				setPreviewState(
-					result.ok
-						? { status: "success", data: result.data }
-						: { status: "error", error: result.error },
-				);
-			} finally {
-				if (previewInFlightRef.current === operation) {
-					previewInFlightRef.current = null;
-				}
-			}
-		},
-		[
-			deliveryCity,
-			desiredPriceLower,
-			desiredPriceUpper,
-			desiredRangeBlocking,
-			onPreviewRfqPrice,
-			quantity,
-			requestId,
-			revisionId,
-			confirmationLocked,
-			unit,
-		],
-	);
+		}
+	}, [
+		deliveryCity,
+		desiredPriceLower,
+		desiredPriceUpper,
+		desiredRangeBlocking,
+		invalidatePublicationApproval,
+		onPreviewRfqPrice,
+		publicationLocked,
+		quantity,
+		requestId,
+		revisionId,
+		unit,
+	]);
 
 	React.useEffect(() => {
-		if (
-			previewState.status !== "error" &&
-			confirmationState.status !== "error" &&
-			confirmationState.status !== "success"
-		)
-			return;
+		if (previewState.status !== "error") return;
 		resultHeadingRef.current?.focus();
-	}, [confirmationState.status, previewState.status]);
-
-	const runConfirmation = React.useCallback(
-		async (reuseExistingCommand: boolean) => {
-			if (
-				confirmationInFlightRef.current === confirmationOperationRef.current ||
-				!approvalEnabled ||
-				!snapshotReconfirmed ||
-				confirmationState.status === "success" ||
-				!requestId ||
-				!revisionId ||
-				!preview ||
-				!hasConfirmablePriceBasis(preview, unit)
-			)
-				return;
-			const commandInput = {
-				expectedRevisionId: revisionId,
-				pricePreviewId: preview.pricePreviewId,
-				pricePreviewVersion: preview.version,
-				payloadHash: preview.payloadHash,
-				buyerNote: buyerNote.trim(),
-			};
-			const fingerprint = JSON.stringify(commandInput);
-			const existing = confirmationCommandRef.current;
-			const command =
-				reuseExistingCommand && existing?.fingerprint === fingerprint
-					? existing.command
-					: { ...commandInput, clientRequestId: createClientRequestId() };
-			confirmationCommandRef.current = { fingerprint, command };
-			const operation = confirmationOperationRef.current + 1;
-			confirmationOperationRef.current = operation;
-			confirmationInFlightRef.current = operation;
-			setConfirmationState({ status: "loading" });
-			try {
-				const result = await onConfirmRfqSnapshot(command);
-				if (confirmationOperationRef.current !== operation) return;
-				setConfirmationState(
-					result.ok
-						? { status: "success", data: result.data }
-						: { status: "error", error: result.error },
-				);
-				if (result.ok) {
-					setStep(RECONFIRM_STEP);
-					setFurthestStep((current) => Math.max(current, RECONFIRM_STEP));
-				}
-			} finally {
-				if (confirmationInFlightRef.current === operation) {
-					confirmationInFlightRef.current = null;
-				}
-			}
-		},
-		[
-			approvalEnabled,
-			buyerNote,
-			confirmationState.status,
-			onConfirmRfqSnapshot,
-			preview,
-			requestId,
-			revisionId,
-			snapshotReconfirmed,
-			unit,
-		],
-	);
+	}, [previewState.status]);
 
 	const runPublicationPreview = React.useCallback(async () => {
-		const snapshot =
-			confirmationState.status === "success" ? confirmationState.data : null;
 		if (
 			publicationInFlightRef.current ||
 			!hasRecipients ||
 			!publicationReconfirmed ||
 			responseDeadlineError ||
-			!snapshot ||
+			!preview ||
 			!revisionId ||
 			publicationState.status === "success"
 		)
 			return;
-		const audience: RfqPublicationAudience = {
-			mode: "DIRECT_RECIPIENTS",
+		const selectedCandidateIds = candidates.map(
+			(candidate) => candidate.candidateId,
+		);
+		const input = {
+			expectedRevisionId: revisionId,
+			buyerRequestedRange: {
+				lowerBoundAmount: preview.buyerRequestedRange.lowerBoundAmount,
+				upperBoundAmount: preview.buyerRequestedRange.upperBoundAmount,
+			},
+			buyerNote: buyerNote.trim(),
 			candidateSetId,
-			selectedCandidateIds: candidates.map(
-				(candidate) => candidate.candidateId,
-			),
+			selectedCandidateIds,
+			responseDeadline: responseDeadline || undefined,
 		};
+		// 同一份內容的重試沿用同一個 client_request_id；內容一變就是新的一次動作。
+		const fingerprint = JSON.stringify(input);
+		const stored = publicationPreviewIdRef.current;
+		const clientRequestId =
+			stored?.fingerprint === fingerprint
+				? stored.clientRequestId
+				: createClientRequestId();
+		publicationPreviewIdRef.current = { fingerprint, clientRequestId };
 		const operation = publicationOperationRef.current + 1;
 		publicationOperationRef.current = operation;
 		publicationInFlightRef.current = true;
 		setPublicationState({ status: "loading" });
 		try {
 			const result = await onPreviewRfqPublication({
-				previewClientRequestId: createClientRequestId(),
-				expectedRevisionId: revisionId,
-				confirmedRfqSnapshotId: snapshot.confirmedRfqSnapshotId,
-				audience,
-				responseDeadline,
+				clientRequestId,
+				...input,
 			});
 			// 晚到的回應對應的是已經被換掉的那一份受眾，丟棄。
 			if (publicationOperationRef.current !== operation) return;
-			// 記下這份核准是對「哪一份名單」發的：用送出去的那個 audience，不是
+			// 記下這份核准是對「哪一份名單」發的：用送出去的那份名單，不是
 			// 現在畫面上的值，兩者在這裡相同，但前者才是核准的真正對象。
 			publicationApprovalIdentityRef.current = result.ok
-				? publicationAudienceIdentityOf(
-						audience.candidateSetId,
-						audience.selectedCandidateIds,
-					)
+				? publicationAudienceIdentityOf(candidateSetId, selectedCandidateIds)
 				: null;
 			setPublicationState(
 				result.ok
@@ -497,11 +410,12 @@ export default function RfqDraftFlow({
 			publicationInFlightRef.current = false;
 		}
 	}, [
-		hasRecipients,
+		buyerNote,
 		candidateSetId,
 		candidates,
-		confirmationState,
+		hasRecipients,
 		onPreviewRfqPublication,
+		preview,
 		publicationReconfirmed,
 		publicationState.status,
 		responseDeadline,
@@ -551,6 +465,10 @@ export default function RfqDraftFlow({
 					: { status: "error", error: outcome.error },
 			);
 			if (outcome.ok) onPublicationExecuted?.();
+			else if (outcome.error.code === "STALE_APPROVAL") {
+				// 核准已不是現行的那一份：作廢它，讓買家重新取得核准再送出。
+				invalidatePublicationApproval();
+			}
 		} finally {
 			executionInFlightRef.current = false;
 		}
@@ -580,26 +498,20 @@ export default function RfqDraftFlow({
 	};
 
 	const goToStep = (nextStep: number) => {
-		if (confirmationLocked && nextStep !== 2 && nextStep !== RECONFIRM_STEP)
+		if (publicationLocked && nextStep !== 2 && nextStep !== RECONFIRM_STEP)
 			return;
-		if (nextStep === RECONFIRM_STEP && confirmationState.status !== "success")
+		if (nextStep === RECONFIRM_STEP && !(preview && snapshotReconfirmed))
 			return;
 		setStep(nextStep);
 		setFurthestStep((current) => Math.max(current, nextStep));
 	};
 
 	const activeError =
-		confirmationState.status === "error"
-			? confirmationState.error
-			: previewState.status === "error"
-				? previewState.error
-				: null;
-	const confirmed =
-		confirmationState.status === "success" ? confirmationState.data : null;
-	const previewBasis = preview ? priceBasisOf(preview) : null;
+		previewState.status === "error" ? previewState.error : null;
 	const basisSuffix =
-		previewBasis?.basisQuantity && previewBasis.basisUnit
-			? `／${previewBasis.basisQuantity} ${previewBasis.basisUnit}`
+		preview?.buyerRequestedRange.basisQuantity &&
+		preview.buyerRequestedRange.basisUnit
+			? `／${preview.buyerRequestedRange.basisQuantity} ${preview.buyerRequestedRange.basisUnit}`
 			: "";
 
 	return (
@@ -622,7 +534,7 @@ export default function RfqDraftFlow({
 						type="button"
 						disabled={
 							index > furthestStep ||
-							(confirmationLocked && index !== 2 && index !== RECONFIRM_STEP)
+							(publicationLocked && index !== 2 && index !== RECONFIRM_STEP)
 						}
 						aria-current={step === index ? "step" : undefined}
 						data-complete={index < step || undefined}
@@ -696,9 +608,6 @@ export default function RfqDraftFlow({
 								</span>
 								<div>
 									<h3>預計邀請 {candidates.length} 筆候選</h3>
-									<p>
-										平台 {platformCount} 筆 · 外部 {externalCount} 筆
-									</p>
 								</div>
 								<button type="button" onClick={onBackToCandidates}>
 									調整名單
@@ -708,20 +617,10 @@ export default function RfqDraftFlow({
 								{candidates.map((candidate) => (
 									<article key={candidate.candidateId}>
 										<span className="assistant-rfq-draft__recipient-mark">
-											<AppIcon
-												name={candidate.lane === "PLATFORM" ? "bag" : "goods"}
-												size={19}
-												aria-hidden="true"
-											/>
+											<AppIcon name="bag" size={19} aria-hidden="true" />
 										</span>
 										<div>
 											<strong>{candidate.displayName}</strong>
-											<span>
-												{candidate.lane === "PLATFORM"
-													? "平台候選"
-													: "外部候選"}{" "}
-												· 比對 {candidate.score} 分
-											</span>
 										</div>
 									</article>
 								))}
@@ -731,9 +630,7 @@ export default function RfqDraftFlow({
 							<AppIcon name="info" size={18} aria-hidden="true" />
 							<div>
 								<strong>這份名單尚未固定</strong>
-								<p>
-									本次確認只固定需求版本與價格範圍；正式發布時才會固定邀請對象。
-								</p>
+								<p>{t("recipientsNotFixed")}</p>
 							</div>
 						</div>
 					</div>
@@ -810,52 +707,23 @@ export default function RfqDraftFlow({
 									</h3>
 									<p>{activeError.detail}</p>
 									<div>
-										{activeError.code === "STALE_REVISION" ||
-										activeError.code === "STALE_CONTEXT" ? (
-											<Button
-												variant="bordered"
-												isLoading={refreshingSnapshot}
-												loadingLabel="讀取中…"
-												onClick={() => void handleRefreshSnapshot()}
-											>
-												讀取最新需求
-											</Button>
-										) : null}
-										{activeError.code === "RESOURCE_NOT_FOUND" ||
-										activeError.code === "PRICE_PREVIEW_STALE" ? (
-											<Button
-												variant="bordered"
-												onClick={() => void runPreview(false)}
-											>
-												重新試算
-											</Button>
+										{isStaleRevision(activeError) ? (
+											<RefreshSnapshotButton
+												loading={refreshingSnapshot}
+												onRefresh={() => void handleRefreshSnapshot()}
+											/>
 										) : null}
 										{activeError.retryable ? (
 											<Button
 												variant="bordered"
-												onClick={() =>
-													void (confirmationState.status === "error"
-														? runConfirmation(true)
-														: runPreview(true))
-												}
+												onClick={() => void runPreview()}
 											>
 												以原操作重試
 											</Button>
 										) : null}
-										{activeError.code === "IDEMPOTENCY_KEY_CONFLICT" ? (
-											<Button
-												variant="bordered"
-												onClick={() =>
-													void (confirmationState.status === "error"
-														? runConfirmation(false)
-														: runPreview(false))
-												}
-											>
-												建立新的操作
-											</Button>
-										) : null}
-										{activeError.code === "PRICE_INPUT_INVALID" ||
-										activeError.code === "REQUEST_NOT_FOUND" ? (
+										{activeError.code === "INVALID_ARGUMENT" ||
+										activeError.code === "REQUIREMENT_NOT_READY" ||
+										activeError.code === "CONVERSATION_GONE" ? (
 											<Button
 												variant="bordered"
 												onClick={onReturnToConversation}
@@ -895,7 +763,7 @@ export default function RfqDraftFlow({
 														setDesiredPriceLower(event.currentTarget.value);
 														clearDerivedPriceState();
 													}}
-													disabled={confirmationLocked}
+													disabled={publicationLocked}
 													inputMode="numeric"
 													pattern="[1-9][0-9]*"
 													aria-describedby="assistant-rfq-desired-range-error"
@@ -915,7 +783,7 @@ export default function RfqDraftFlow({
 														setDesiredPriceUpper(event.currentTarget.value);
 														clearDerivedPriceState();
 													}}
-													disabled={confirmationLocked}
+													disabled={publicationLocked}
 													inputMode="numeric"
 													pattern="[1-9][0-9]*"
 													aria-describedby="assistant-rfq-desired-range-error"
@@ -926,8 +794,8 @@ export default function RfqDraftFlow({
 											</span>
 										</label>
 										<Button
-											disabled={confirmationLocked || desiredRangeBlocking}
-											onClick={() => void runPreview(false)}
+											disabled={publicationLocked || desiredRangeBlocking}
+											onClick={() => void runPreview()}
 										>
 											取得無參考價試算
 										</Button>
@@ -972,8 +840,8 @@ export default function RfqDraftFlow({
 											</div>
 											<Button
 												variant="bordered"
-												disabled={confirmationLocked}
-												onClick={() => void runPreview(false)}
+												disabled={publicationLocked}
+												onClick={() => void runPreview()}
 											>
 												重新產生價格試算
 											</Button>
@@ -993,17 +861,15 @@ export default function RfqDraftFlow({
 									<AppIcon name="lock" size={19} aria-hidden="true" />
 								</span>
 								<div>
-									<h3
-										id="assistant-rfq-snapshot-title"
-										ref={confirmed ? resultHeadingRef : undefined}
-										tabIndex={confirmed ? -1 : undefined}
-									>
-										確認本次需求與價格
-									</h3>
-									<p>確認後會固定這一版需求與希望區間。</p>
+									<h3 id="assistant-rfq-snapshot-title">確認本次需求與價格</h3>
+									<p>{t("snapshotApprovalHint")}</p>
 								</div>
 								<span className="assistant-rfq-snapshot__state">
-									{confirmed ? "已確認" : preview ? "可確認" : "等待價格"}
+									{snapshotReconfirmed
+										? "已確認"
+										: preview
+											? "可確認"
+											: "等待價格"}
 								</span>
 							</header>
 							<div className="assistant-rfq-snapshot__facts">
@@ -1014,14 +880,6 @@ export default function RfqDraftFlow({
 								<div>
 									<small>邀請名單</small>
 									<strong>尚待正式發布固定</strong>
-								</div>
-								<div>
-									<small>確認編號</small>
-									<strong>
-										{confirmed
-											? shortIdentity(confirmed.confirmedRfqSnapshotId)
-											: "尚未產生"}
-									</strong>
 								</div>
 							</div>
 							{preview && !confirmableBasis ? (
@@ -1038,70 +896,66 @@ export default function RfqDraftFlow({
 									</div>
 								</div>
 							) : null}
-							{confirmed ? (
-								<div
-									className="assistant-rfq-snapshot__confirmed"
-									role="status"
+							<div className="assistant-rfq-snapshot__note">
+								<label htmlFor="assistant-rfq-buyer-note">
+									<strong>給供應商的補充說明</strong>
+									<small>
+										選填。這段字會原文轉給供應商，最多 {BUYER_NOTE_MAX_LENGTH}{" "}
+										字。
+									</small>
+								</label>
+								<textarea
+									id="assistant-rfq-buyer-note"
+									rows={3}
+									maxLength={BUYER_NOTE_MAX_LENGTH}
+									value={buyerNote}
+									disabled={
+										!preview ||
+										!confirmableBasis ||
+										!approvalEnabled ||
+										publicationLocked
+									}
+									placeholder="例如：中大果，不要有壓傷"
+									onChange={(event) => {
+										setBuyerNote(event.currentTarget.value);
+										invalidatePublicationApproval();
+									}}
+								/>
+								<p
+									className="assistant-rfq-snapshot__note-count"
+									aria-live="polite"
 								>
-									<strong>需求版本與價格範圍已固定，等待發布。</strong>
-								</div>
-							) : (
-								<>
-									<div className="assistant-rfq-snapshot__note">
-										<label htmlFor="assistant-rfq-buyer-note">
-											<strong>給供應商的補充說明</strong>
-											<small>
-												選填。這段字會原文轉給供應商，最多{" "}
-												{BUYER_NOTE_MAX_LENGTH} 字。
-											</small>
-										</label>
-										<textarea
-											id="assistant-rfq-buyer-note"
-											rows={3}
-											maxLength={BUYER_NOTE_MAX_LENGTH}
-											value={buyerNote}
-											disabled={
-												!preview || !confirmableBasis || !approvalEnabled
-											}
-											placeholder="例如：中大果，不要有壓傷"
-											onChange={(event) =>
-												setBuyerNote(event.currentTarget.value)
-											}
-										/>
-										<p
-											className="assistant-rfq-snapshot__note-count"
-											aria-live="polite"
-										>
-											{buyerNote.length} / {BUYER_NOTE_MAX_LENGTH}
-										</p>
-									</div>
-									<label className="assistant-rfq-snapshot__confirmation">
-										<input
-											type="checkbox"
-											checked={snapshotReconfirmed}
-											disabled={
-												!preview || !confirmableBasis || !approvalEnabled
-											}
-											onChange={(event) =>
-												setSnapshotReconfirmed(event.currentTarget.checked)
-											}
-										/>
-										<span>
-											<strong>我已核對這份需求版本與價格範圍</strong>
-											<small>
-												{!approvalEnabled
-													? "此環境尚未啟用價格確認。"
-													: "這次確認不包含候選名單、截止時間與通知設定。"}
-											</small>
-										</span>
-									</label>
-								</>
-							)}
+									{buyerNote.length} / {BUYER_NOTE_MAX_LENGTH}
+								</p>
+							</div>
+							<label className="assistant-rfq-snapshot__confirmation">
+								<input
+									type="checkbox"
+									checked={snapshotReconfirmed}
+									disabled={
+										!preview ||
+										!confirmableBasis ||
+										!approvalEnabled ||
+										publicationLocked
+									}
+									onChange={(event) =>
+										setSnapshotReconfirmed(event.currentTarget.checked)
+									}
+								/>
+								<span>
+									<strong>我已核對這份需求版本與價格範圍</strong>
+									<small>
+										{!approvalEnabled
+											? "此環境尚未啟用價格確認。"
+											: "這次確認不包含候選名單、截止時間與通知設定。"}
+									</small>
+								</span>
+							</label>
 						</section>
 					</div>
 				) : null}
 
-				{step === RECONFIRM_STEP && confirmed && preview ? (
+				{step === RECONFIRM_STEP && preview ? (
 					<div className="assistant-rfq-reconfirm">
 						<header className="assistant-rfq-reconfirm__intro">
 							<h3
@@ -1186,32 +1040,30 @@ export default function RfqDraftFlow({
 								</p>
 							</section>
 
-							<section
-								className="assistant-rfq-reconfirm__block assistant-rfq-reconfirm__block--trace"
-								aria-labelledby="assistant-rfq-reconfirm-trace"
-							>
-								<h4 id="assistant-rfq-reconfirm-trace">4. 快照追蹤</h4>
-								<dl>
-									<div>
-										<dt>pricePreviewId</dt>
-										<dd>{preview.pricePreviewId}</dd>
-									</div>
-									<div>
-										<dt>snapshotHash</dt>
-										<dd title={confirmed.payloadHash}>
-											{shortIdentity(confirmed.payloadHash)}
-										</dd>
-									</div>
-									{confirmed.expiresAt ? (
+							{publicationState.status === "success" ? (
+								<section
+									className="assistant-rfq-reconfirm__block assistant-rfq-reconfirm__block--trace"
+									aria-labelledby="assistant-rfq-reconfirm-trace"
+								>
+									<h4 id="assistant-rfq-reconfirm-trace">4. 快照追蹤</h4>
+									<dl>
+										<div>
+											<dt>snapshotHash</dt>
+											<dd title={publicationState.data.sellerFacingPayloadHash}>
+												{shortIdentity(
+													publicationState.data.sellerFacingPayloadHash,
+												)}
+											</dd>
+										</div>
 										<div>
 											<dt>有效至</dt>
 											<dd>
-												{`${formatTaipeiDateTime(confirmed.expiresAt)}（Asia/Taipei）`}
+												{`${formatTaipeiDateTime(publicationState.data.expiresAt)}（Asia/Taipei）`}
 											</dd>
 										</div>
-									) : null}
-								</dl>
-							</section>
+									</dl>
+								</section>
+							) : null}
 						</div>
 
 						<div className="assistant-rfq-reconfirm__deadline">
@@ -1275,14 +1127,6 @@ export default function RfqDraftFlow({
 								</strong>
 								<dl>
 									<div>
-										<dt>受眾政策</dt>
-										<dd>{publicationState.data.audiencePolicyId}</dd>
-									</div>
-									<div>
-										<dt>政策版本</dt>
-										<dd>{publicationState.data.audiencePolicyVersion}</dd>
-									</div>
-									<div>
 										<dt>受眾範圍</dt>
 										<dd>{`${publicationState.data.recipientCount} 位候選`}</dd>
 									</div>
@@ -1306,17 +1150,19 @@ export default function RfqDraftFlow({
 								<div>
 									<strong>無法取得發布核准</strong>
 									<p>{publicationState.error.detail}</p>
+									{isStaleRevision(publicationState.error) ? (
+										<RefreshSnapshotButton
+											loading={refreshingSnapshot}
+											onRefresh={() => void handleRefreshSnapshot()}
+										/>
+									) : null}
 								</div>
 							</div>
 						) : null}
 
 						{executionState.status === "success" ? (
 							<div className="assistant-rfq-reconfirm__published" role="status">
-								<strong>
-									{executionState.data.audienceMode === "WISH_POOL"
-										? "已發布至許願池"
-										: "已建立發布，邀請已排入處理"}
-								</strong>
+								<strong>已建立發布，邀請已排入處理</strong>
 								<p>
 									已建立發布，正在處理。這不代表賣家已看到、已報價或已成交。
 								</p>
@@ -1348,6 +1194,12 @@ export default function RfqDraftFlow({
 								<div>
 									<strong>無法送出邀請</strong>
 									<p>{executionState.error.detail}</p>
+									{isStaleRevision(executionState.error) ? (
+										<RefreshSnapshotButton
+											loading={refreshingSnapshot}
+											onRefresh={() => void handleRefreshSnapshot()}
+										/>
+									) : null}
 								</div>
 							</div>
 						) : null}
@@ -1364,8 +1216,8 @@ export default function RfqDraftFlow({
 								? "名單只供正式發布時使用"
 								: step === RECONFIRM_STEP
 									? "這一步只取得發布核准，還不會送出"
-									: confirmed
-										? "價格已固定，接著確認要發給誰"
+									: canProceed
+										? t("priceConfirmedNext")
 										: "先取得並確認價格試算"}
 					</strong>
 					<small>重新整理後目前無法還原價格確認，需要重新核對。</small>
@@ -1416,20 +1268,14 @@ export default function RfqDraftFlow({
 							<Button
 								variant="bordered"
 								color="default"
-								disabled={confirmationLocked}
+								disabled={publicationLocked}
 								onClick={() => goToStep(1)}
 							>
 								上一步
 							</Button>
 							<Button
-								disabled={!canConfirm && !confirmed}
-								isLoading={confirmationState.status === "loading"}
-								loadingLabel="確認中…"
-								onClick={() =>
-									confirmed
-										? goToStep(RECONFIRM_STEP)
-										: void runConfirmation(true)
-								}
+								disabled={!canProceed}
+								onClick={() => goToStep(RECONFIRM_STEP)}
 								endContent={
 									<AppIcon name="lock" size={17} aria-hidden="true" />
 								}

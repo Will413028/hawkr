@@ -10,6 +10,10 @@ function read(relativePath: string): string {
 	return readFileSync(path.join(root, relativePath), "utf8");
 }
 
+const zhMessages = JSON.parse(read("messages/zh-TW.json")) as {
+	procurementAssistant: Record<string, string>;
+};
+
 const browser = read("features/procurement-assistant/CandidateBrowser.tsx");
 const canvas = read("features/procurement-assistant/CandidateCanvas.tsx");
 const draftFlow = read("features/procurement-assistant/RfqDraftFlow.tsx");
@@ -43,8 +47,9 @@ test("assistant workspace uses the signed-off 55/45 shell and collapses without 
 test("candidate workspace renders a semantic fact table from only current DTO fields", () => {
 	assert.match(
 		browser,
-		/<table[\s\S]*?aria-label=\{`\$\{LANE_LABEL\[lane\]\}候選資料`\}/,
+		/<table[\s\S]*?aria-label=\{t\("candidateTableLabel"\)\}/,
 	);
+	assert.equal(zhMessages.procurementAssistant.candidateTableLabel, "候選資料");
 	for (const heading of ["候選", "符合條件", "待確認", "資料時間", "狀態"]) {
 		assert.match(browser, new RegExp(`<th scope="col">${heading}</th>`));
 	}
@@ -57,8 +62,7 @@ test("candidate workspace renders a semantic fact table from only current DTO fi
 	assert.match(browser, /candidate\.factsAsOf/);
 	assert.match(browser, /待進一步查核/);
 	assert.doesNotMatch(browser, /待商家確認/);
-	assert.match(browser, /PLATFORM: "平台賣家"/);
-	assert.match(browser, /EXTERNAL: "外部業者"/);
+	assert.doesNotMatch(browser, /外部業者|EXTERNAL|ProcurementLane/);
 	// 候選卡仍然只講 server 已提供的事實：供應量／配送條件從來沒有進過 DTO，
 	// 不得由前端推導或用商品欄位冒充。
 	assert.doesNotMatch(browser, /供應量|配送條件/);
@@ -75,8 +79,7 @@ test("candidate workspace renders a semantic fact table from only current DTO fi
  * 東西**）仍然成立，只是判準要從「不准出現這些欄位」換成「收斂必須由資料決定」。
  *
  * 所以現在釘的是：候選收斂成商家沒有任何模式開關，唯一入口是 canGroupBySeller 的
- * 資料判準。這同時涵蓋 backend 尚未部署的空窗期、部署窗口內新舊資料混雜、以及
- * EXTERNAL lane（站外業者沒有平台賣家）。
+ * 資料判準。這同時涵蓋 backend 尚未部署的空窗期與部署窗口內新舊資料混雜。
  */
 test("seller rollup is data-driven, never a toggle that can be empty", () => {
 	// 沒有模式切換器：舊的 previewAvailable/MODE_ITEMS 不得回來，也不得換個名字重生。
@@ -115,7 +118,7 @@ test("seller rows carry recipient identity only, never product-level price", () 
 	assert.doesNotMatch(browser, /標價|成交價/);
 	assert.doesNotMatch(browser, /priceMin|priceMax|listed-price/);
 	assert.match(browser, /正式報價才代表賣家願意承接/);
-	// 商品縮圖同理：EXTERNAL lane 根本沒有商品，做了對主要 lane 也是空的。
+	// 商品縮圖同理：候選沒有商品層的資料。
 	assert.doesNotMatch(browser, /imageUrl|imageKey|candidate-row__thumb/);
 
 	// 商家列講的是「幾項符合的商品」（一個計數），不是把商品列出來。
@@ -186,25 +189,14 @@ test("成果才開側欄，收起與改需求都有焦點返回", () => {
 	assert.match(workspace, /hidden=\{!resultsVisible\}/);
 });
 
-test("lane vocabulary has exactly one source, and the narrow card lays it out per the mockup", () => {
-	// 候選詳情面板原本自己寫死一組同義字串（`平台來源`／`外部來源`），清單改了
-	// 詳情不會跟著改——這支就是那個 drift 的守門。斷言的是「有沒有第二份」，
-	// 不是「文案是什麼」：文案本身已由上一支測試釘在 CandidateBrowser。
-	assert.match(
-		workspace,
-		/import \{ LANE_LABEL \} from "\.\/CandidateBrowser"/,
-	);
-	assert.match(workspace, /LANE_LABEL\[candidate\.lane\]/);
+test("candidate rows have no lane vocabulary, and the narrow card lays out name and match count", () => {
+	// 契約只有一種候選（店家）：沒有 lane 詞彙、沒有比對分數。
+	assert.doesNotMatch(workspace, /LANE_LABEL|candidate\.lane/);
 	assert.doesNotMatch(workspace, /"平台賣家"|"外部業者"|"平台來源"|"外部來源"/);
 
-	// 窄容器（畫布可能是窄分割面板）把同一組語意列排成卡片。比對分數要自成一個
-	// grid area 貼右欄，不能留在 meta 那串文字裡——否則卡片右上角是空的。
+	// 窄容器（畫布可能是窄分割面板）把同一組語意列排成卡片。
 	assert.match(css, /@container \(max-width: 620px\)/);
-	assert.match(css, /grid-template-areas:\s*\n\s*"name score"/);
-	assert.match(
-		css,
-		/\.assistant-candidate-row__score \{[\s\S]*?grid-area: score;/,
-	);
+	assert.match(css, /grid-template-areas:\s*\n\s*"name"\s*\n\s*"matches"/);
 
 	// `__meta` 必須 display: contents，它的子元素才會成為 identity 的 grid item。
 	// 少了這一條，上面那些 grid-area 全部落空、版面靜默退回舊樣式。
@@ -298,21 +290,11 @@ test("右欄只含成果，思考固定留在主對話", () => {
  * 這一組釘的是「兩條 lane 在卡片上分得出來」與「命中的條件看得出是哪一種」——
  * 都是視覺承載的資訊，沒有任何一條是靠文案講出來的，所以退化了不會有其他測試轉紅。
  */
-test("候選卡用 lane 代號與逐列 glyph 承載資訊，不靠讀文字分辨", () => {
-	// 兩條 lane 各自的代號圖示。缺了它，站外業者那一列左邊是空的，
-	// 兩條 lane 的可信度差異在卡片上完全看不出來。
-	assert.match(browser, /const LANE_AVATAR_ICON: Record<ProcurementLane/);
-	assert.match(browser, /PLATFORM: "home"/);
-	assert.match(browser, /EXTERNAL: "box"/);
-	// 單一候選列與收斂後的商家列共用同一個身分區塊，不是只有商家列有頭像。
+test("候選卡用店面圖示與逐列 glyph 承載資訊，不靠讀文字分辨", () => {
+	// 單一候選列與收斂後的商家列共用同一個身分區塊，沒有 logo 時用店面圖示。
 	assert.match(browser, /function CandidateIdentity\(/);
+	assert.match(browser, /<AppIcon name="home" size=\{19\} \/>/);
 	assert.doesNotMatch(browser, /assistant-candidate-seller/);
-	for (const call of ["lane={candidate.lane}", 'lane="PLATFORM"']) {
-		assert.ok(
-			browser.includes(call),
-			`CandidateIdentity 必須由兩種列各自帶入 lane（缺 ${call}）`,
-		);
-	}
 
 	// matchedFacts 逐列給字形：整欄同一個勾不帶任何資訊。key 的值域是後端
 	// domain.SlotKey，值域外退回勾（B2 擴充 slot 時多出來的列仍要列得出來）。
@@ -338,60 +320,20 @@ test("候選卡用 lane 代號與逐列 glyph 承載資訊，不靠讀文字分�
 	assert.match(browser, /name="warning"/);
 });
 
-test("lane badge 與比對分數方塊在所有寬度都成立，不只窄容器", () => {
-	// 這兩塊原本只寫在 @container 裡，寬版把 lane 印成沒有顏色的裸文字。
-	// 判準是「規則在容器查詢之前就出現」——只斷言選擇器存在沒有鑑別力，
-	// 窄版區塊裡有同名選擇器。
-	// 錨在 at-rule 本身（前導換行＋大括號），不是它的字面字串——這個檔案的註解
-	// 也提到同一句話，用字串會切在註解上，寬版那半段跟著整個消失。
-	const narrowStart = css.indexOf("\n@container (max-width: 620px) {");
-	assert.ok(narrowStart > 0);
-	const wide = css.slice(0, narrowStart);
-	assert.match(
-		wide,
-		/\.assistant-candidate-row__lane \{[\s\S]*?border-radius: var\(--radius-pill\);/,
+test("候選卡沒有 lane 標籤與比對分數", () => {
+	assert.doesNotMatch(
+		browser,
+		/data-lane|CandidateScore|assistant-candidate-row__lane|assistant-candidate-row__score/,
 	);
-	assert.match(
-		wide,
-		/\.assistant-candidate-row__lane\[data-lane="EXTERNAL"\] \{[\s\S]*?--hkui-warning/,
-	);
-	// 顏色鍵在 badge 自己的 data-lane 上，不鍵在祖先的 lane 面板上——
-	// 判準的來源是那一列候選本身。
 	assert.doesNotMatch(
 		css,
-		/\.assistant-lane\[data-lane="EXTERNAL"\] \.assistant-candidate-row__lane/,
+		/assistant-candidate-row__lane|assistant-candidate-row__score|data-lane/,
 	);
-	assert.match(
-		browser,
-		/className="assistant-candidate-row__lane"\s*\n?\s*data-lane=/,
-	);
-
-	// 分數方塊的「比對」與「94 分」要是具名子元素：留成裸文字節點時，窄版那個
-	// grid 會把它們拆成各自佔一列的匿名 item，「94」與「分」上下分家。
-	assert.match(browser, /function CandidateScore\(/);
-	assert.match(browser, /assistant-candidate-row__score-label/);
-	assert.match(browser, /assistant-candidate-row__score-value/);
-	assert.doesNotMatch(browser, /比對 <b>/);
 });
 
-test("lane 分頁是實心膠囊，且沿用唯一那份 lane 詞彙", () => {
-	assert.match(browser, /variant="solid"/);
-	assert.doesNotMatch(browser, /variant="underlined"/);
-	// 選中態要由主色實心承擔：solid variant 自己只換成 elevated 表面，
-	// 在這個工作台裡跟未選中幾乎分不出來。
-	assert.match(
-		css,
-		/\[role="tablist"\] button\[data-selected="true"\] \{[\s\S]*?background: var\(--theme-action-primary\);[\s\S]*?color: var\(--hkui-primary-foreground\);/,
-	);
-	// 分頁文字用 LANE_LABEL，不再另寫一組同義字。
-	assert.match(
-		browser,
-		/\{LANE_LABEL\.PLATFORM\} <b>\{platform\.length\}<\/b>/,
-	);
-	assert.match(
-		browser,
-		/\{LANE_LABEL\.EXTERNAL\} <b>\{external\.length\}<\/b>/,
-	);
+test("候選名單是單一面板，沒有來源分頁", () => {
+	assert.doesNotMatch(browser, /<Tabs|variant="solid"|laneQueries|activeLane/);
+	assert.doesNotMatch(css, /assistant-tab-label/);
 	assert.doesNotMatch(browser, /平台來源|外部來源/);
 });
 
@@ -479,27 +421,4 @@ test("接上入口沒有動到 runtime-snapshot 的惰性", () => {
 	// 走不到時看不出來，走得到就是螢幕閱讀器上的錯標。
 	assert.match(canvas, /"quote-invites": "詢價狀態工作台"/);
 	assert.match(canvas, /aria-label=\{CANVAS_LABEL\[workspaceView\]\}/);
-});
-
-test("external candidates render their own brand logo without borrowing platform seller identity", () => {
-	// 單一候選那一列（EXTERNAL lane 走這條）要把站外業者自己的品牌圖傳進去，
-	// 否則 446 家有 logo 的業者在候選卡上永遠只看得到 lane 代號圖示。
-	assert.match(browser, /logoUrl=\{candidate\.brandLogoUrl\}/);
-
-	// 但**不得** fallback 到 candidate.logoUrl：那一欄是平台商家的身分快照，
-	// 混用會讓站外業者在畫面上看起來像已入駐的平台商家。
-	assert.doesNotMatch(
-		browser,
-		/candidate\.brandLogoUrl\s*\?\?\s*candidate\.logoUrl/,
-	);
-	assert.doesNotMatch(
-		browser,
-		/candidate\.logoUrl\s*\?\?\s*candidate\.brandLogoUrl/,
-	);
-
-	// 分組仍只看 storeId——品牌圖不得變成分組或身分判準。
-	assert.doesNotMatch(
-		read("features/procurement-assistant/candidate-grouping.ts"),
-		/brandLogo|brandCover/,
-	);
 });

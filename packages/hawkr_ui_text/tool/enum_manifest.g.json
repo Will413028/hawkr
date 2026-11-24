@@ -333,7 +333,7 @@
       "name": "hawkr.procurement.v1alpha1.CancelDisposition",
       "dartClass": "CancelDisposition",
       "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {
@@ -382,7 +382,7 @@
       "name": "hawkr.procurement.v1alpha1.QuoteAcceptability",
       "dartClass": "QuoteAcceptability",
       "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {
@@ -403,7 +403,7 @@
       "name": "hawkr.procurement.v1alpha1.RunFailureReason",
       "dartClass": "RunFailureReason",
       "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {

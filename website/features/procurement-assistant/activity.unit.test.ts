@@ -1,72 +1,12 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
 	type AgentActivityEvent,
 	activityLabel,
 	activityStatusLabel,
 	groupActivityRows,
-	normalizeActivityEvent,
+	lastRunningActivity,
+	mergeLiveActivity,
 } from "./activity";
-
-describe("normalizeActivityEvent", () => {
-	it("解析合法 entry snapshot（text 空字串）", () => {
-		expect(
-			normalizeActivityEvent({ rowId: "123", code: "EXTRACT_SLOTS", text: "" }),
-		).toEqual({
-			rowId: "123",
-			code: "EXTRACT_SLOTS",
-			label: "",
-			status: "RUNNING",
-			text: "",
-		});
-	});
-
-	it("解析合法 completion snapshot", () => {
-		expect(
-			normalizeActivityEvent({
-				rowId: "123",
-				code: "EXTRACT_SLOTS",
-				text: "抓到你要的蘋果",
-			}),
-		).toEqual({
-			rowId: "123",
-			code: "EXTRACT_SLOTS",
-			label: "",
-			status: "SUCCEEDED",
-			text: "抓到你要的蘋果",
-		});
-	});
-
-	it("非物件回傳 null", () => {
-		expect(normalizeActivityEvent("not an object")).toBeNull();
-		expect(normalizeActivityEvent(null)).toBeNull();
-		expect(normalizeActivityEvent(undefined)).toBeNull();
-	});
-
-	it("缺 rowId 或 rowId 是空字串回傳 null", () => {
-		expect(
-			normalizeActivityEvent({ code: "EXTRACT_SLOTS", text: "" }),
-		).toBeNull();
-		expect(
-			normalizeActivityEvent({ rowId: "", code: "EXTRACT_SLOTS", text: "" }),
-		).toBeNull();
-	});
-
-	it("缺 code 或 code 是空字串回傳 null", () => {
-		expect(normalizeActivityEvent({ rowId: "1", text: "" })).toBeNull();
-		expect(
-			normalizeActivityEvent({ rowId: "1", code: "", text: "" }),
-		).toBeNull();
-	});
-
-	it("text 不是字串回傳 null", () => {
-		expect(
-			normalizeActivityEvent({ rowId: "1", code: "EXTRACT_SLOTS", text: null }),
-		).toBeNull();
-	});
-});
 
 describe("activityLabel", () => {
 	it("entry snapshot 顯示通用佔位文字", () => {
@@ -128,91 +68,6 @@ describe("activityLabel", () => {
 	});
 });
 
-// 把「後端真的送出來的 bytes」接上「前端 fail-closed 的消費端」。在此之前這
-// 兩半各自被測，中間沒有人把它們連起來：
-//   - agui-fixtures.unit.test.ts 只驗 AG-UI 信封。@ag-ui/core 的
-//     CustomEventSchema 是 BaseEventSchema.extend({ ..., value: z.any() })，
-//     z.any() 連 undefined 都收，所以它對 activity payload 什麼都不保證。
-//   - 本檔其餘案例全是手寫 inline 物件，碰不到真實 fixture。
-// 於是後端若把 rowId 改名成 row_id：gateway 的 golden test 會過（fixture 由同一份
-// 程式重生）、zod 閘門也會過（z.any()），而 normalizeActivityEvent 會對每一筆
-// 回 null——整條 rail 從 UI 消失，卻沒有任何測試轉紅。這個 describe 補的就是
-// 這一刀。
-//
-// 涵蓋範圍誠實標注：它只釘住一個 canonical frame，而它的意義建立在這份 fixture
-// 就是 gateway golden test 逐位元組比對的那一份上——那是它成立的基礎，不是它的弱點。
-const FIXTURE_DIR = join(
-	fileURLToPath(new URL("../../", import.meta.url)),
-	"../backend/gateway/internal/proxy/testdata/agui-frames",
-);
-
-/** 讀一份 .sse fixture，回傳每個 frame 的 `value`（AG-UI CUSTOM 的酬載）。 */
-function fixtureValues(name: string): unknown[] {
-	return readFileSync(join(FIXTURE_DIR, name), "utf8")
-		.split("\n")
-		.filter((line) => line.startsWith("data:"))
-		.map((line) => JSON.parse(line.slice(5).replace(/^\s/, "")))
-		.map((frame: { value?: unknown }) => frame.value);
-}
-
-describe("normalizeActivityEvent 對 gateway 產生的真實 frame", () => {
-	it("custom-activity.sse（graph 路徑）的 value 通得過 fail-closed 解析", () => {
-		const values = fixtureValues("custom-activity.sse");
-		expect(values).toHaveLength(1);
-		const event = normalizeActivityEvent(values[0]);
-
-		// 不是 null ⇒ 後端的欄位名與型別仍然對得上消費端的契約。
-		expect(event).not.toBeNull();
-		expect(event?.rowId).toBe("7489");
-		expect(event?.code).toBe("EXTRACT_SLOTS");
-		expect(event?.text).toBe("整理你的採購條件");
-		// T23 之後恆存在的兩欄。fixture 停在舊形狀時這兩行是唯一會轉紅的地方。
-		expect(event?.label).toBe("抓出品項、數量和交期");
-		expect(event?.status).toBe("SUCCEEDED");
-	});
-});
-
-// 這個 describe 的價值在「跨 repo 逐位元組閘門讓這份 fixture 等於 gateway 真實
-// 輸出」這個前提上：它把後端真的送出來的 bytes 一路餵到 groupActivityRows，
-// 涵蓋設計稿 01 右欄那三件既有 fixture 零覆蓋的事——沒有 narrator 的空 text、
-// 巢狀 lane 子列、以及「缺席 ≠ 0」的家數。
-describe("候選搜尋 rail 的真實 frame（T23，無 narrator）", () => {
-	const events = fixtureValues("custom-activity-candidate-search-rail.sse").map(
-		(value) => {
-			const event = normalizeActivityEvent(value);
-			expect(event).not.toBeNull();
-			return event as NonNullable<ReturnType<typeof normalizeActivityEvent>>;
-		},
-	);
-
-	it("三列的 text 全空，顯示文字一律來自 label", () => {
-		expect(events.map((e) => e.text)).toEqual(["", "", ""]);
-		expect(events.map(activityLabel)).toEqual([
-			"搜尋候選供應商",
-			"翻平台上的賣家",
-			"整理成給你的建議",
-		]);
-	});
-
-	it("狀態來自 status 軸，含尚未跑到的 PENDING 列", () => {
-		expect(events.map((e) => e.status)).toEqual([
-			"RUNNING",
-			"SUCCEEDED",
-			"PENDING",
-		]);
-	});
-
-	it("lane 子列掛在父列底下，未跑到的步驟仍是 top-level", () => {
-		const grouped = groupActivityRows(events);
-		expect(grouped.map((r) => r.rowId)).toEqual(["9001", "9004"]);
-		expect(grouped[0].children.map((c) => c.code)).toEqual(["SEARCH_PLATFORM"]);
-	});
-
-	it("只有真的有計數概念的那一列帶 count，其餘是 undefined 而不是 0", () => {
-		expect(events.map((e) => e.count)).toEqual([undefined, "12", undefined]);
-	});
-});
-
 // T23 候選搜尋 rail（backend PR #3157）。這條 run 沒有 StepNarrator，所以它的
 // 每一列 `text` 恆為空字串——顯示文字只能來自後端的固定字串表 `label`
 // （domain.StepLabels，wire 上恆非空）。舊版消費端把 `text === ""` 當成「還在
@@ -228,91 +83,6 @@ describe("T23 候選搜尋 rail 的列（無 narrator，text 恆空）", () => {
 				text: "",
 			}),
 		).toBe("搜尋候選供應商");
-	});
-});
-
-describe("normalizeActivityEvent 的 status 軸", () => {
-	it("wire 帶合法 status 時直接採用", () => {
-		expect(
-			normalizeActivityEvent({
-				rowId: "1",
-				code: "SEARCH_CANDIDATES",
-				label: "搜尋候選供應商",
-				text: "",
-				status: "PENDING",
-			})?.status,
-		).toBe("PENDING");
-	});
-
-	it("status 缺席時退回舊的 text 推導，不讓部署窗口內的列整批消失", () => {
-		expect(
-			normalizeActivityEvent({ rowId: "1", code: "EXTRACT_SLOTS", text: "" })
-				?.status,
-		).toBe("RUNNING");
-		expect(
-			normalizeActivityEvent({
-				rowId: "1",
-				code: "EXTRACT_SLOTS",
-				text: "抓到你要的蘋果",
-			})?.status,
-		).toBe("SUCCEEDED");
-	});
-
-	it("未知 status 退回推導而不是丟掉整列——status 不是 privacy boundary，丟列只會讓 rail 無聲變短", () => {
-		const event = normalizeActivityEvent({
-			rowId: "1",
-			code: "EXTRACT_SLOTS",
-			label: "抓出品項、數量和交期",
-			text: "",
-			status: "SOMETHING_NEW",
-		});
-		expect(event).not.toBeNull();
-		expect(event?.status).toBe("RUNNING");
-	});
-});
-
-// 「缺席 ≠ 帶零值」是 T23 wire 的明文不變式（graph_dispatch.go 的註解：補 "0"／""
-// 會讓 consumer 分不出「沒有」與「是 0」）。flow 53 實測過這件事：PLATFORM 查到
-// 0 家時送 count:"0"，而父列與 SUMMARIZE 整個欄位不存在。
-describe("normalizeActivityEvent 的 parentRowId／count", () => {
-	it("有值時原樣保留（count 是十進位字串，不轉 number）", () => {
-		const event = normalizeActivityEvent({
-			rowId: "9002",
-			code: "SEARCH_PLATFORM",
-			label: "翻平台上的賣家",
-			text: "",
-			status: "SUCCEEDED",
-			parentRowId: "9001",
-			count: "12",
-		});
-		expect(event?.parentRowId).toBe("9001");
-		expect(event?.count).toBe("12");
-	});
-
-	it('count 為 "0" 是真的 0 家，不得當成缺席', () => {
-		expect(
-			normalizeActivityEvent({
-				rowId: "9002",
-				code: "SEARCH_PLATFORM",
-				label: "翻平台上的賣家",
-				text: "",
-				status: "SUCCEEDED",
-				parentRowId: "9001",
-				count: "0",
-			})?.count,
-		).toBe("0");
-	});
-
-	it('缺席時是 undefined，不得補成 "0" 或空字串', () => {
-		const event = normalizeActivityEvent({
-			rowId: "9001",
-			code: "SEARCH_CANDIDATES",
-			label: "搜尋候選供應商",
-			text: "",
-			status: "RUNNING",
-		});
-		expect(event?.parentRowId).toBeUndefined();
-		expect(event?.count).toBeUndefined();
 	});
 });
 
@@ -395,7 +165,7 @@ describe("groupActivityRows", () => {
 	});
 });
 
-describe("mergeLiveActivity（住 activity.ts，兩條 transport 共用）", () => {
+describe("mergeLiveActivity", () => {
 	const base: AgentActivityEvent = {
 		rowId: "9001",
 		code: "SEARCH_CANDIDATES",
@@ -404,15 +174,13 @@ describe("mergeLiveActivity（住 activity.ts，兩條 transport 共用）", () 
 		text: "",
 	};
 
-	it("同一個 rowId 就地覆寫，不長成第二列", async () => {
-		const { mergeLiveActivity } = await import("./activity");
+	it("同一個 rowId 就地覆寫，不長成第二列", () => {
 		const merged = mergeLiveActivity([base], { ...base, status: "RUNNING" });
 		expect(merged).toHaveLength(1);
 		expect(merged[0].status).toBe("RUNNING");
 	});
 
-	it("新的 rowId 依抵達順序附加在後面", async () => {
-		const { mergeLiveActivity } = await import("./activity");
+	it("新的 rowId 依抵達順序附加在後面", () => {
 		const merged = mergeLiveActivity([base], {
 			...base,
 			rowId: "9002",
@@ -421,8 +189,7 @@ describe("mergeLiveActivity（住 activity.ts，兩條 transport 共用）", () 
 		expect(merged.map((e) => e.rowId)).toEqual(["9001", "9002"]);
 	});
 
-	it("空 text 的 entry 事件不得覆蓋已顯示的完成敘述（reconnect replay 防呆）", async () => {
-		const { mergeLiveActivity } = await import("./activity");
+	it("空 text 的 entry 事件不得覆蓋已顯示的完成敘述（reconnect replay 防呆）", () => {
 		const completed = { ...base, text: "已找到 12 家" };
 		const events = [completed];
 		const merged = mergeLiveActivity(events, { ...base, text: "" });
@@ -431,24 +198,6 @@ describe("mergeLiveActivity（住 activity.ts，兩條 transport 共用）", () 
 		// （useRunActivityStream 的 setActivity）靠
 		// 這個 identity 才不會每收到一次 replay 就重繪整條軌。
 		expect(merged).toBe(events);
-	});
-
-	it("parseActivityEventJson 對壞掉的 JSON 回 null，不丟例外", async () => {
-		const { parseActivityEventJson } = await import("./activity");
-		expect(parseActivityEventJson("{not json")).toBeNull();
-	});
-
-	it("parseActivityEventJson 對合法 frame value 回正規化後的列", async () => {
-		const { parseActivityEventJson } = await import("./activity");
-		const event = parseActivityEventJson(
-			JSON.stringify({
-				rowId: "9002",
-				code: "SEARCH_PLATFORM",
-				text: "",
-				count: "12",
-			}),
-		);
-		expect(event?.count).toBe("12");
 	});
 });
 
@@ -477,15 +226,13 @@ describe("lastRunningActivity", () => {
 		},
 	];
 
-	it("取最後一個 RUNNING 的列，不是最後抵達的列", async () => {
-		const { lastRunningActivity } = await import("./activity");
+	it("取最後一個 RUNNING 的列，不是最後抵達的列", () => {
 		// declarePlan 開場就把整份清單以 PENDING 送出，所以最後抵達的是還沒跑到
 		// 的 SUMMARIZE——播報它等於講一句當下為假的話。
 		expect(lastRunningActivity(rows)?.code).toBe("SEARCH_PLATFORM");
 	});
 
-	it("沒有任何 RUNNING 時回 null", async () => {
-		const { lastRunningActivity } = await import("./activity");
+	it("沒有任何 RUNNING 時回 null", () => {
 		expect(
 			lastRunningActivity(
 				rows.map((r) => ({ ...r, status: "SUCCEEDED" as const })),
@@ -493,8 +240,32 @@ describe("lastRunningActivity", () => {
 		).toBeNull();
 	});
 
-	it("空清單回 null", async () => {
-		const { lastRunningActivity } = await import("./activity");
+	it("空清單回 null", () => {
 		expect(lastRunningActivity([])).toBeNull();
+	});
+});
+
+// 回歸守門：mergeLiveActivity 的「entry 不得覆寫已完成的 text」護欄看 text。候選搜尋四列的 text 恆空，
+// 護欄對它們永遠不觸發，status 才推得動；把護欄簡化成看 status 會鎖死這四列。
+describe("mergeLiveActivity 對沒有 narrator 的列", () => {
+	it("text 恆空的列仍能依序推進 PENDING → RUNNING → SUCCEEDED", () => {
+		const base = {
+			rowId: "9002",
+			code: "SEARCH_PLATFORM",
+			label: "翻平台上的賣家",
+			text: "",
+		} as const;
+
+		let rows = mergeLiveActivity([], { ...base, status: "PENDING" });
+		rows = mergeLiveActivity(rows, { ...base, status: "RUNNING" });
+		rows = mergeLiveActivity(rows, {
+			...base,
+			status: "SUCCEEDED",
+			count: "12",
+		});
+
+		expect(rows).toHaveLength(1);
+		expect(rows[0].status).toBe("SUCCEEDED");
+		expect(rows[0].count).toBe("12");
 	});
 });

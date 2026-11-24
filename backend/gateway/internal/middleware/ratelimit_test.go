@@ -22,19 +22,14 @@ func rlEngine(limiter *ratelimit.Limiter, policy middleware.RateLimitPolicy) *gi
 	ok := func(c *gin.Context) { c.String(http.StatusOK, "ok") }
 
 	// exempt — SSE / WS / beacon / health / PayUni callbacks.
-	// The AI assistant and Hawkr 幫找 routes used to be here; #2505 moved them into
-	// the default tier, and they are registered under "tiered" below.
 	r.GET("/api/v1/health", ok)
 	r.POST("/webhook/payuni/notify", ok)
 	r.GET("/payment/return", ok)
 	r.POST("/store_map/return", ok)
 
 	// tiered
-	r.GET("/api/v1/public/products", ok)                         // moderate
-	r.GET("/api/v1/app/orders", ok)                              // default
-	r.POST("/api/v1/app/sellers/me/assistant/chat", ok)          // default (#2505)
-	r.POST("/api/v1/app/buyers/me/assistant/orders", ok)         // default (#2505)
-	r.POST("/api/v1/app/buyers/me/procurement/turns/stream", ok) // default (#2505)
+	r.GET("/api/v1/public/products", ok) // moderate
+	r.GET("/api/v1/app/orders", ok)      // default
 	return r
 }
 
@@ -78,42 +73,6 @@ func TestRateLimiter_ExemptPathsNeverLimited(t *testing.T) {
 			if code := doReq(r, e.method, e.path); code != http.StatusOK {
 				t.Fatalf("exempt %s %s: request #%d got %d, want 200 (must never be rate limited)", e.method, e.path, i+1, code)
 			}
-		}
-	}
-}
-
-// TestRateLimiter_AIRoutesEnforce429 is the behavioural half of #2505: the three
-// AI trees are not merely classified as tierDefault, they are actually refused
-// once that tier's quota is spent. The classification table
-// (ratelimit_ai_routes_test.go) proves the verdict; this proves the consequence.
-//
-// The three probes are one per tree, and deliberately include the SSE turn
-// endpoint: the exemption existed for its sake, and it is the one that bills a
-// paid model per request.
-func TestRateLimiter_AIRoutesEnforce429(t *testing.T) {
-	policy := middleware.RateLimitPolicy{
-		ModeratePerWindow: 100, DefaultPerWindow: 2,
-		ModerateSSRPerWindow: 1000, ModerateCIPerWindow: 1000,
-		Window: time.Minute, FallbackCapacity: 1000,
-	}
-
-	for _, probe := range []struct{ method, path string }{
-		{"POST", "/api/v1/app/sellers/me/assistant/chat"},
-		{"POST", "/api/v1/app/buyers/me/assistant/orders"},
-		{"POST", "/api/v1/app/buyers/me/procurement/turns/stream"},
-	} {
-		// All three share ONE default bucket per subject, so each probe needs a
-		// fresh limiter — otherwise probe #2 starts against a drained quota and
-		// would "pass" for the wrong reason.
-		limiter, _ := newLimiter(t, 1000)
-		r := rlEngine(limiter, policy)
-		for i := 1; i <= 2; i++ {
-			if code := doReq(r, probe.method, probe.path); code != http.StatusOK {
-				t.Fatalf("%s %s request #%d: got %d, want 200", probe.method, probe.path, i, code)
-			}
-		}
-		if code := doReq(r, probe.method, probe.path); code != http.StatusTooManyRequests {
-			t.Errorf("%s %s request #3: got %d, want 429 — this route must not be rate-limit exempt (#2505)", probe.method, probe.path, code)
 		}
 	}
 }

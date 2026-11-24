@@ -1,14 +1,13 @@
-import 'package:hawkr_seller/core/codemeta/code_meta.dart';
+import 'package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart';
 import 'package:hawkr_seller/features/procurement/data/seller_quote_model.dart';
 import 'package:hawkr_seller/features/procurement/presentation/seller_quote_validation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// 一份「除了要測的那一項之外都合法」的 payload。
 SellerQuotePayload _completeQuote({
-  ProcurementSellerResponseType type =
-      ProcurementSellerResponseType.manualQuote,
-  String grade = '特級',
-  String inspectionNotes = '外觀無壓傷，到貨 24 小時內驗收',
+  SellerResponseType type =
+      SellerResponseType.SELLER_RESPONSE_TYPE_MANUAL_QUOTE,
+  String specNote = '外觀無壓傷，到貨 24 小時內驗收',
   String goods = '10000',
   String shipping = '500',
   String tax = '525',
@@ -16,19 +15,16 @@ SellerQuotePayload _completeQuote({
   String validUntil = '2026-12-31T15:00:00Z',
 }) {
   return SellerQuotePayload(
-    responseType: type.code,
-    offeredQuality: OfferedQuality(
-      grade: grade,
-      inspectionNotes: inspectionNotes,
-    ),
-    unitBasis: const UnitBasis(quantity: '1', unit: '公斤'),
+    responseType: type,
+    specNote: specNote,
+    unitBasis: const QuoteUnitBasis(quantity: '1', unit: '公斤'),
     offeredQuantity: '500',
     offeredQuantityUnit: '公斤',
     conversionBasis: '1 箱 ＝ 10 公斤',
     goodsAmount: goods,
     shippingAmount: shipping,
     taxAmount: tax,
-    taxInclusionBasis: ProcurementTaxInclusionBasis.taxExcluded.code,
+    taxInclusionBasis: TaxInclusionBasis.TAX_INCLUSION_BASIS_TAX_EXCLUDED,
     totalAmount: total,
     leadTimeDays: '3',
     promisedDeliveryAt: '2026-12-20T02:00:00Z',
@@ -79,36 +75,23 @@ void main() {
     });
   });
 
-  group('產品規則 1：實際品相不得由平台代填', () {
-    test('沒填品相等級就不能送出', () {
-      final result = validateSellerQuote(_completeQuote(grade: ''), now: _now);
-      expect(result.isSubmittable, isFalse);
-      expect(result.errorFor(SellerQuoteField.qualityGrade), isNotNull);
-    });
-
-    test('沒填驗收說明就不能送出', () {
+  group('規格說明（spec_note）選填、不由平台代填', () {
+    test('不填規格說明也能送出', () {
       final result = validateSellerQuote(
-        _completeQuote(inspectionNotes: '   '),
+        _completeQuote(specNote: ''),
         now: _now,
       );
-      expect(result.isSubmittable, isFalse);
-      expect(
-        result.errorFor(SellerQuoteField.qualityInspectionNotes),
-        isNotNull,
-      );
+      expect(result.isSubmittable, isTrue);
     });
 
-    test('空白表單的品相是空的——不會被上一次報價帶入', () {
-      const blank = SellerQuotePayload();
-      expect(blank.offeredQuality, const OfferedQuality());
-      expect(blank.offeredQuality.grade, isEmpty);
-      expect(blank.offeredQuality.inspectionNotes, isEmpty);
+    test('空白表單的規格說明是空的——不會被上一次報價帶入', () {
+      expect(const SellerQuotePayload().specNote, isEmpty);
     });
   });
 
   group('產品規則 2：ACCEPT_NON_PRICE_TERMS_WITH_QUOTE 不是少填金額的捷徑', () {
     test('兩個 responseType 的必填清單完全相同', () {
-      for (final type in ProcurementSellerResponseType.values) {
+      for (final type in kSelectableResponseTypes) {
         final missingAmounts = validateSellerQuote(
           _completeQuote(
             type: type,
@@ -122,7 +105,7 @@ void main() {
         expect(
           missingAmounts.isSubmittable,
           isFalse,
-          reason: '${type.code} 少填金額也必須擋下',
+          reason: '${type.name} 少填金額也必須擋下',
         );
         for (final field in const [
           SellerQuoteField.goodsAmount,
@@ -139,8 +122,6 @@ void main() {
       expect(
         kRequiredQuoteFields,
         containsAll(const [
-          SellerQuoteField.qualityGrade,
-          SellerQuoteField.qualityInspectionNotes,
           SellerQuoteField.unitBasisQuantity,
           SellerQuoteField.unitBasisUnit,
           SellerQuoteField.goodsAmount,
@@ -153,55 +134,40 @@ void main() {
     });
 
     test('兩個值都填齊就都能送出', () {
-      for (final type in ProcurementSellerResponseType.values) {
+      for (final type in kSelectableResponseTypes) {
         expect(
           validateSellerQuote(
             _completeQuote(type: type),
             now: _now,
           ).isSubmittable,
           isTrue,
-          reason: type.code,
+          reason: type.name,
         );
       }
     });
   });
 
   group('值域', () {
-    test('v6.0 範例裡的 SELLER_QUOTE 不是合法值', () {
-      expect(ProcurementSellerResponseType.fromCode('SELLER_QUOTE'), isNull);
+    test('UNSPECIFIED 的 responseType 不能送出', () {
       final result = validateSellerQuote(
-        _completeQuote().copyWith(responseType: 'SELLER_QUOTE'),
+        _completeQuote().copyWith(
+          responseType: SellerResponseType.SELLER_RESPONSE_TYPE_UNSPECIFIED,
+        ),
         now: _now,
       );
       expect(result.errorFor(SellerQuoteField.responseType), isNotNull);
     });
 
-    test('responseType 只有兩個值', () {
-      expect(ProcurementSellerResponseType.values.map((e) => e.code), [
-        'MANUAL_QUOTE',
-        'ACCEPT_NON_PRICE_TERMS_WITH_QUOTE',
-      ]);
-    });
-
-    test('taxInclusionBasis 只有兩個值，缺一不可送出', () {
-      expect(ProcurementTaxInclusionBasis.values.map((e) => e.code), [
-        'TAX_INCLUDED',
-        'TAX_EXCLUDED',
-      ]);
+    test('可選的 responseType 與含稅基準各兩個值，含稅基準缺一不可送出', () {
+      expect(kSelectableResponseTypes, hasLength(2));
+      expect(kSelectableTaxBases, hasLength(2));
       final result = validateSellerQuote(
-        _completeQuote().copyWith(taxInclusionBasis: ''),
+        _completeQuote().copyWith(
+          taxInclusionBasis: TaxInclusionBasis.TAX_INCLUSION_BASIS_UNSPECIFIED,
+        ),
         now: _now,
       );
       expect(result.errorFor(SellerQuoteField.taxInclusionBasis), isNotNull);
-    });
-
-    test('currency v1 恆為 TWD', () {
-      expect(const SellerQuotePayload().currency, 'TWD');
-      final result = validateSellerQuote(
-        _completeQuote().copyWith(currency: 'USD'),
-        now: _now,
-      );
-      expect(result.errorFor(SellerQuoteField.currency), isNotNull);
     });
   });
 
@@ -218,13 +184,27 @@ void main() {
     });
 
     test('恆等式成立時 computedTotal 只是提示，不改寫使用者輸入', () {
-      final quote = _completeQuote(total: '11025.00');
+      final quote = _completeQuote(total: '11025');
       final result = validateSellerQuote(quote, now: _now);
       expect(result.amountIdentityHolds, isTrue);
       expect(result.isSubmittable, isTrue);
       // 使用者填的字面值原封不動。
-      expect(quote.totalAmount, '11025.00');
+      expect(quote.totalAmount, '11025');
       expect(result.computedTotal, '11025');
+    });
+
+    test('金額是非負整數：小數與負號都不接受', () {
+      for (final bad in ['1200.5', '-5', '1,200']) {
+        final result = validateSellerQuote(
+          _completeQuote(goods: bad),
+          now: _now,
+        );
+        expect(
+          result.errorFor(SellerQuoteField.goodsAmount),
+          isNotNull,
+          reason: bad,
+        );
+      }
     });
 
     test('金額格式不合時報格式錯誤', () {

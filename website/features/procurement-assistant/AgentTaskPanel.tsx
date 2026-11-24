@@ -1,6 +1,6 @@
 "use client";
 
-import type { ProcurementCandidateSearch } from "@/lib/api/openapi-types";
+import type { ProcurementCandidateSearch } from "@/features/procurement-assistant/types";
 import AgentActivityRail from "./AgentActivityRail";
 import type { AgentActivityEvent } from "./activity";
 import type { AgentMotionState } from "./agent-motion";

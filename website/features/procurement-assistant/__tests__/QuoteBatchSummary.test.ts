@@ -9,13 +9,12 @@ import {
 } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ProcurementSlots } from "@/lib/api/openapi-types";
+import type {
+	ProcurementSlots,
+	PublishedRfqPublication,
+} from "@/features/procurement-assistant/types";
 import type { BuyerQuoteAcceptanceResponse } from "../buyer-quote-contract";
 import QuoteBatchSummary from "../QuoteBatchSummary";
-import {
-	type PublicationResultView,
-	publicationResultDataSchema,
-} from "../runtime-snapshot-contract";
 import type { RfqDealTruthCounts } from "../useRfqRuntimeSnapshot";
 
 /**
@@ -41,21 +40,16 @@ function publicationWith(
 	counts: Partial<{
 		recipientCount: number;
 		queuedCount: number;
-		notSentCount: number;
 	}> = {},
-): PublicationResultView {
+): PublishedRfqPublication {
 	return {
-		artifactVersion: "3",
+		publicationId: "1234567890123456788",
+		version: "3",
 		publishedAt: "2026-08-20T12:36:00Z",
-		data: publicationResultDataSchema.parse({
-			publicationId: "1234567890123456788",
-			version: "1",
-			sellerFacingPayloadHash: "b".repeat(64),
-			recipientCount: 0,
-			queuedCount: 0,
-			notSentCount: 0,
-			...counts,
-		}),
+		recipientCount: 0,
+		queuedCount: 0,
+		sellerFacingHash: "b".repeat(64),
+		...counts,
 	};
 }
 
@@ -150,8 +144,6 @@ describe("① 詢價快照", () => {
 	it("伺服器給了區間才顯示", () => {
 		mount({
 			buyerRequestedRange: {
-				currency: "TWD",
-				priceComponent: "GOODS_ONLY",
 				lowerBoundAmount: "58",
 				upperBoundAmount: "70",
 				basisQuantity: "1",
@@ -397,7 +389,6 @@ describe("這次發布的收件人", () => {
 			publication: publicationWith({
 				recipientCount: 5,
 				queuedCount: 4,
-				notSentCount: 1,
 			}),
 		});
 		expect(factValue("收件人")).toBe("5");

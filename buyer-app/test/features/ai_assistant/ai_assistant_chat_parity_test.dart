@@ -9,7 +9,10 @@ import 'package:hawkr_buyer/features/ai_assistant/presentation/ai_assistant_scre
 import 'package:hawkr_buyer/features/ai_assistant/presentation/widgets/ai_assistant_avatar.dart';
 import 'package:hawkr_buyer/shared/widgets/chat_conversation_chrome.dart';
 import 'package:hawkr_buyer/shared/widgets/chat_input_bar.dart';
-import 'package:dio/dio.dart';
+import 'package:hawkr_api/gen/hawkr/assistant/v1alpha1/assistant.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/assistant/v1alpha1/assistant.pbenum.dart';
+import 'package:hawkr_api/testing.dart';
+import '../../support/default_error_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -217,11 +220,12 @@ void main() {
 }
 
 class _FakeAiAssistantRepository extends AiAssistantRepository {
-  _FakeAiAssistantRepository._(this.dio) : super(dio);
+  _FakeAiAssistantRepository()
+    : super(
+        AssistantAppServiceClient(FakeTransportBuilder().build()),
+        defaults: zhDefaultErrorText,
+      );
 
-  factory _FakeAiAssistantRepository() => _FakeAiAssistantRepository._(Dio());
-
-  final Dio dio;
   final Completer<void> _replyDone = Completer<void>();
   int requests = 0;
 
@@ -232,16 +236,15 @@ class _FakeAiAssistantRepository extends AiAssistantRepository {
   }
 
   @override
-  Stream<AiSseEvent> streamChat({
-    BuyerAssistantEndpoint endpoint = BuyerAssistantEndpoint.chat,
-    String? message,
+  Stream<AiTurnEvent> streamChat({
+    required AssistantTopic topic,
+    required String message,
     String? sessionId,
-    String? imageUrl,
   }) async* {
     requests++;
     await _replyDone.future;
-    yield const AiSseEvent(type: 'text', data: '已找到您的訂單。');
-    yield const AiSseEvent(type: 'done', data: '{}', terminal: true);
+    yield const AiTextDelta('已找到您的訂單。');
+    yield const AiTurnFinished('');
   }
 
   void finishReply() {
@@ -250,6 +253,5 @@ class _FakeAiAssistantRepository extends AiAssistantRepository {
 
   Future<void> dispose() async {
     if (!_replyDone.isCompleted) _replyDone.complete();
-    dio.close(force: true);
   }
 }
