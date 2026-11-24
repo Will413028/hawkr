@@ -27,6 +27,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/intake"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/purge"
+	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/reach"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/stream"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/suppress"
@@ -116,6 +117,7 @@ type Module struct {
 	app      *app.Service
 	announce *announce.Service
 	deliver  *deliver.Service
+	reach    *reach.Service
 	suppress *suppress.Service
 	hub      *stream.Hub
 
@@ -152,6 +154,7 @@ func newModule(d Deps, reg app.Registry) *Module {
 			DB: d.DB, Locks: locks, Contacts: d.Contacts, Locales: d.Locales, Registry: reg, Validity: d.Validity, Sources: appSvc,
 			Push: d.Push, ImageURL: d.ImageURL, Mail: d.Mail, Suppression: hasher, Now: d.Now, Logger: d.Logger,
 		}),
+		reach:    reach.New(reach.Deps{DB: d.DB, Audit: adminaudit.New(d.DB, d.Now), Jobs: d.Jobs, Registry: reg, Now: d.Now, NewID: d.NewID}),
 		suppress: suppress.New(suppress.Deps{DB: d.DB, Inbox: d.Inbox, WebhookSecret: d.ResendWebhookSecret, Hasher: hasher, Now: d.Now}),
 		hub:      hub, pool: d.DB, listenCfg: d.ListenConnConfig,
 	}

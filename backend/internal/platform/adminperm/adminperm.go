@@ -62,6 +62,8 @@ const (
 	ModerationCasesReverse                 Permission = "moderation.cases.reverse"
 	NotificationAnnouncementsList          Permission = "notification.announcements.list"
 	NotificationAnnouncementsCreate        Permission = "notification.announcements.create"
+	NotificationDeliveriesResend           Permission = "notification.deliveries.resend"
+	NotificationUnreachedNotificationsList Permission = "notification.unreached_notifications.list"
 	PaymentAccountsGet                     Permission = "payment.accounts.get"
 	PaymentAccountsRefresh                 Permission = "payment.accounts.refresh"
 	PaymentAccountsRetryCreate             Permission = "payment.accounts.retry_create"
@@ -153,7 +155,7 @@ func Catalog() []Permission {
 		ImageaiAiQuotasGet, ImageaiAiQuotasUpdate, ImageaiAiQuotasDelete,
 		LegacyGatewayForward,
 		ModerationCasesList, ModerationCasesGet, ModerationCasesDecide, ModerationCasesReverse,
-		NotificationAnnouncementsList, NotificationAnnouncementsCreate,
+		NotificationAnnouncementsList, NotificationAnnouncementsCreate, NotificationDeliveriesResend, NotificationUnreachedNotificationsList,
 		PaymentAccountsGet, PaymentAccountsRefresh, PaymentAccountsRetryCreate, PaymentAccountsRetryPurge, PaymentAccountsDeleteMapping,
 		PaymentPaymentsList, PaymentTransfersList, PaymentRefundsList, PaymentAnomaliesResolve,
 		ReviewQueueItemsList,

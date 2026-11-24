@@ -10,6 +10,8 @@
 // 公告一律只寫英文：單一 title 與 body，不分語系、不依收件人的語系選擇，所有使用者看到同一份
 // （限公告，是多語系 ADR 的例外；其餘後台文字仍是 zh-TW）。公告在使用者端的分類是 NOTIFICATION_CATEGORY_ANNOUNCEMENT：
 // 收件匣一定收到，推播可在偏好關閉。
+//
+// 投遞紀錄是推播與 email 觸達與否的唯一來源（收件匣不是渠道；收件匣列本身就是「已進收件匣」的紀錄），重送與未觸達查詢都只讀它。
 
 package notificationv1alpha1
 
@@ -30,6 +32,102 @@ const (
 	// Verify that runtime/protoimpl is sufficiently up-to-date.
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
+
+// DeliveryFailureReason 是投遞紀錄的永久失敗原因。
+type DeliveryFailureReason int32
+
+const (
+	DeliveryFailureReason_DELIVERY_FAILURE_REASON_UNSPECIFIED DeliveryFailureReason = 0
+	// 收件人已刪除或退場。不重送。
+	DeliveryFailureReason_DELIVERY_FAILURE_REASON_RECIPIENT_GONE DeliveryFailureReason = 1
+	// 通知意圖已被保留期清除。不重送。
+	DeliveryFailureReason_DELIVERY_FAILURE_REASON_INTENT_MISSING DeliveryFailureReason = 2
+	// 通知型別已不在註冊表。不重送。
+	DeliveryFailureReason_DELIVERY_FAILURE_REASON_TYPE_UNREGISTERED DeliveryFailureReason = 3
+	// 組字失敗或參數快照無法解析。不重送。
+	DeliveryFailureReason_DELIVERY_FAILURE_REASON_RENDER_FAILED DeliveryFailureReason = 4
+	// 收件人沒有可推播的裝置 token。可重送。
+	DeliveryFailureReason_DELIVERY_FAILURE_REASON_NO_DEVICE_TOKEN DeliveryFailureReason = 5
+	// 推播服務回報 token 已失效。可重送。
+	DeliveryFailureReason_DELIVERY_FAILURE_REASON_TOKEN_UNREGISTERED DeliveryFailureReason = 6
+	// 推播服務拒絕這則推播。可重送。
+	DeliveryFailureReason_DELIVERY_FAILURE_REASON_PUSH_REJECTED DeliveryFailureReason = 7
+	// 收件人沒有已驗證的信箱。可重送。
+	DeliveryFailureReason_DELIVERY_FAILURE_REASON_NO_EMAIL_ADDRESS DeliveryFailureReason = 8
+	// 位址在停寄名單。不重送。
+	DeliveryFailureReason_DELIVERY_FAILURE_REASON_EMAIL_SUPPRESSED DeliveryFailureReason = 9
+	// 寄信服務拒絕這封信。可重送。
+	DeliveryFailureReason_DELIVERY_FAILURE_REASON_EMAIL_REJECTED DeliveryFailureReason = 10
+	// 暫時性失敗用盡重試次數。可重送。
+	DeliveryFailureReason_DELIVERY_FAILURE_REASON_RETRIES_EXHAUSTED DeliveryFailureReason = 11
+	// 送出前重查發現來源事實已不成立，刻意不送。不重送。
+	DeliveryFailureReason_DELIVERY_FAILURE_REASON_NO_LONGER_VALID DeliveryFailureReason = 12
+	// 投遞紀錄的渠道不是推播或 email。不重送。
+	DeliveryFailureReason_DELIVERY_FAILURE_REASON_CHANNEL_UNSUPPORTED DeliveryFailureReason = 13
+)
+
+// Enum value maps for DeliveryFailureReason.
+var (
+	DeliveryFailureReason_name = map[int32]string{
+		0:  "DELIVERY_FAILURE_REASON_UNSPECIFIED",
+		1:  "DELIVERY_FAILURE_REASON_RECIPIENT_GONE",
+		2:  "DELIVERY_FAILURE_REASON_INTENT_MISSING",
+		3:  "DELIVERY_FAILURE_REASON_TYPE_UNREGISTERED",
+		4:  "DELIVERY_FAILURE_REASON_RENDER_FAILED",
+		5:  "DELIVERY_FAILURE_REASON_NO_DEVICE_TOKEN",
+		6:  "DELIVERY_FAILURE_REASON_TOKEN_UNREGISTERED",
+		7:  "DELIVERY_FAILURE_REASON_PUSH_REJECTED",
+		8:  "DELIVERY_FAILURE_REASON_NO_EMAIL_ADDRESS",
+		9:  "DELIVERY_FAILURE_REASON_EMAIL_SUPPRESSED",
+		10: "DELIVERY_FAILURE_REASON_EMAIL_REJECTED",
+		11: "DELIVERY_FAILURE_REASON_RETRIES_EXHAUSTED",
+		12: "DELIVERY_FAILURE_REASON_NO_LONGER_VALID",
+		13: "DELIVERY_FAILURE_REASON_CHANNEL_UNSUPPORTED",
+	}
+	DeliveryFailureReason_value = map[string]int32{
+		"DELIVERY_FAILURE_REASON_UNSPECIFIED":         0,
+		"DELIVERY_FAILURE_REASON_RECIPIENT_GONE":      1,
+		"DELIVERY_FAILURE_REASON_INTENT_MISSING":      2,
+		"DELIVERY_FAILURE_REASON_TYPE_UNREGISTERED":   3,
+		"DELIVERY_FAILURE_REASON_RENDER_FAILED":       4,
+		"DELIVERY_FAILURE_REASON_NO_DEVICE_TOKEN":     5,
+		"DELIVERY_FAILURE_REASON_TOKEN_UNREGISTERED":  6,
+		"DELIVERY_FAILURE_REASON_PUSH_REJECTED":       7,
+		"DELIVERY_FAILURE_REASON_NO_EMAIL_ADDRESS":    8,
+		"DELIVERY_FAILURE_REASON_EMAIL_SUPPRESSED":    9,
+		"DELIVERY_FAILURE_REASON_EMAIL_REJECTED":      10,
+		"DELIVERY_FAILURE_REASON_RETRIES_EXHAUSTED":   11,
+		"DELIVERY_FAILURE_REASON_NO_LONGER_VALID":     12,
+		"DELIVERY_FAILURE_REASON_CHANNEL_UNSUPPORTED": 13,
+	}
+)
+
+func (x DeliveryFailureReason) Enum() *DeliveryFailureReason {
+	p := new(DeliveryFailureReason)
+	*p = x
+	return p
+}
+
+func (x DeliveryFailureReason) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (DeliveryFailureReason) Descriptor() protoreflect.EnumDescriptor {
+	return file_hawkr_admin_notification_v1alpha1_notification_proto_enumTypes[0].Descriptor()
+}
+
+func (DeliveryFailureReason) Type() protoreflect.EnumType {
+	return &file_hawkr_admin_notification_v1alpha1_notification_proto_enumTypes[0]
+}
+
+func (x DeliveryFailureReason) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use DeliveryFailureReason.Descriptor instead.
+func (DeliveryFailureReason) EnumDescriptor() ([]byte, []int) {
+	return file_hawkr_admin_notification_v1alpha1_notification_proto_rawDescGZIP(), []int{0}
+}
 
 // Announcement 是一則系統公告。
 type Announcement struct {
@@ -344,6 +442,456 @@ func (x *ListAnnouncementsResponse) GetNextPageToken() string {
 	return ""
 }
 
+type ResendDeliveriesRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 失敗時間窗 [fail_time_start, fail_time_end)：兩端必填，start 必須早於 end，end 不可在未來，窗長上限 90 天。
+	FailTimeStart *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=fail_time_start,json=failTimeStart,proto3" json:"fail_time_start,omitempty"`
+	FailTimeEnd   *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=fail_time_end,json=failTimeEnd,proto3" json:"fail_time_end,omitempty"`
+	// 通知分類；UNSPECIFIED 表示不限。
+	Category v1alpha1.NotificationCategory `protobuf:"varint,3,opt,name=category,proto3,enum=hawkr.notification.v1alpha1.NotificationCategory" json:"category,omitempty"`
+	// 渠道，只能是 PUSH 或 EMAIL；UNSPECIFIED 表示不限，INBOX 回 invalid_argument。
+	Channel v1alpha1.NotificationChannel `protobuf:"varint,4,opt,name=channel,proto3,enum=hawkr.notification.v1alpha1.NotificationChannel" json:"channel,omitempty"`
+	// 失敗原因；空表示全部可重送的原因，含不可重送的原因回 invalid_argument。
+	Reasons []DeliveryFailureReason `protobuf:"varint,5,rep,packed,name=reasons,proto3,enum=hawkr.admin.notification.v1alpha1.DeliveryFailureReason" json:"reasons,omitempty"`
+	// 收件人帳號；0 表示不限。
+	AccountId int64 `protobuf:"varint,6,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	// 一次最多重排的筆數，預設 100，上限 500。
+	MaxCount int32 `protobuf:"varint,7,opt,name=max_count,json=maxCount,proto3" json:"max_count,omitempty"`
+	// 為 true 只計算不改資料。
+	DryRun        bool `protobuf:"varint,8,opt,name=dry_run,json=dryRun,proto3" json:"dry_run,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResendDeliveriesRequest) Reset() {
+	*x = ResendDeliveriesRequest{}
+	mi := &file_hawkr_admin_notification_v1alpha1_notification_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResendDeliveriesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResendDeliveriesRequest) ProtoMessage() {}
+
+func (x *ResendDeliveriesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_notification_v1alpha1_notification_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResendDeliveriesRequest.ProtoReflect.Descriptor instead.
+func (*ResendDeliveriesRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_notification_v1alpha1_notification_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ResendDeliveriesRequest) GetFailTimeStart() *timestamppb.Timestamp {
+	if x != nil {
+		return x.FailTimeStart
+	}
+	return nil
+}
+
+func (x *ResendDeliveriesRequest) GetFailTimeEnd() *timestamppb.Timestamp {
+	if x != nil {
+		return x.FailTimeEnd
+	}
+	return nil
+}
+
+func (x *ResendDeliveriesRequest) GetCategory() v1alpha1.NotificationCategory {
+	if x != nil {
+		return x.Category
+	}
+	return v1alpha1.NotificationCategory(0)
+}
+
+func (x *ResendDeliveriesRequest) GetChannel() v1alpha1.NotificationChannel {
+	if x != nil {
+		return x.Channel
+	}
+	return v1alpha1.NotificationChannel(0)
+}
+
+func (x *ResendDeliveriesRequest) GetReasons() []DeliveryFailureReason {
+	if x != nil {
+		return x.Reasons
+	}
+	return nil
+}
+
+func (x *ResendDeliveriesRequest) GetAccountId() int64 {
+	if x != nil {
+		return x.AccountId
+	}
+	return 0
+}
+
+func (x *ResendDeliveriesRequest) GetMaxCount() int32 {
+	if x != nil {
+		return x.MaxCount
+	}
+	return 0
+}
+
+func (x *ResendDeliveriesRequest) GetDryRun() bool {
+	if x != nil {
+		return x.DryRun
+	}
+	return false
+}
+
+type ResendDeliveriesResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 重排的筆數（dry_run 時是會重排的筆數）。
+	ResendCount int32 `protobuf:"varint,1,opt,name=resend_count,json=resendCount,proto3" json:"resend_count,omitempty"`
+	// 還有符合條件、因 max_count 而沒處理的投遞。
+	HasMore       bool `protobuf:"varint,2,opt,name=has_more,json=hasMore,proto3" json:"has_more,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResendDeliveriesResponse) Reset() {
+	*x = ResendDeliveriesResponse{}
+	mi := &file_hawkr_admin_notification_v1alpha1_notification_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResendDeliveriesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResendDeliveriesResponse) ProtoMessage() {}
+
+func (x *ResendDeliveriesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_notification_v1alpha1_notification_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResendDeliveriesResponse.ProtoReflect.Descriptor instead.
+func (*ResendDeliveriesResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_notification_v1alpha1_notification_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ResendDeliveriesResponse) GetResendCount() int32 {
+	if x != nil {
+		return x.ResendCount
+	}
+	return 0
+}
+
+func (x *ResendDeliveriesResponse) GetHasMore() bool {
+	if x != nil {
+		return x.HasMore
+	}
+	return false
+}
+
+type ListUnreachedNotificationsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 往回看的天數，預設 7，上限 90。
+	Days int32 `protobuf:"varint,1,opt,name=days,proto3" json:"days,omitempty"`
+	// 預設 20，上限 50。
+	PageSize      int32  `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken     string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListUnreachedNotificationsRequest) Reset() {
+	*x = ListUnreachedNotificationsRequest{}
+	mi := &file_hawkr_admin_notification_v1alpha1_notification_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListUnreachedNotificationsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListUnreachedNotificationsRequest) ProtoMessage() {}
+
+func (x *ListUnreachedNotificationsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_notification_v1alpha1_notification_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListUnreachedNotificationsRequest.ProtoReflect.Descriptor instead.
+func (*ListUnreachedNotificationsRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_notification_v1alpha1_notification_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ListUnreachedNotificationsRequest) GetDays() int32 {
+	if x != nil {
+		return x.Days
+	}
+	return 0
+}
+
+func (x *ListUnreachedNotificationsRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListUnreachedNotificationsRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+// UnreachedChannel 是一個渠道的失敗結果。
+type UnreachedChannel struct {
+	state         protoimpl.MessageState       `protogen:"open.v1"`
+	Channel       v1alpha1.NotificationChannel `protobuf:"varint,1,opt,name=channel,proto3,enum=hawkr.notification.v1alpha1.NotificationChannel" json:"channel,omitempty"`
+	FailureReason DeliveryFailureReason        `protobuf:"varint,2,opt,name=failure_reason,json=failureReason,proto3,enum=hawkr.admin.notification.v1alpha1.DeliveryFailureReason" json:"failure_reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnreachedChannel) Reset() {
+	*x = UnreachedChannel{}
+	mi := &file_hawkr_admin_notification_v1alpha1_notification_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnreachedChannel) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnreachedChannel) ProtoMessage() {}
+
+func (x *UnreachedChannel) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_notification_v1alpha1_notification_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnreachedChannel.ProtoReflect.Descriptor instead.
+func (*UnreachedChannel) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_notification_v1alpha1_notification_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *UnreachedChannel) GetChannel() v1alpha1.NotificationChannel {
+	if x != nil {
+		return x.Channel
+	}
+	return v1alpha1.NotificationChannel(0)
+}
+
+func (x *UnreachedChannel) GetFailureReason() DeliveryFailureReason {
+	if x != nil {
+		return x.FailureReason
+	}
+	return DeliveryFailureReason_DELIVERY_FAILURE_REASON_UNSPECIFIED
+}
+
+// UnreachedNotification 是一個收件人沒有觸達的一則通知。
+type UnreachedNotification struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 這個收件人這則通知的投遞參考（其中一筆投遞的 id），也是分頁排序的次要鍵。
+	DeliveryId string `protobuf:"bytes,1,opt,name=delivery_id,json=deliveryId,proto3" json:"delivery_id,omitempty"`
+	IntentId   string `protobuf:"bytes,2,opt,name=intent_id,json=intentId,proto3" json:"intent_id,omitempty"`
+	// 通知型別的名稱（註冊表的 type）。
+	Type      string                        `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
+	Category  v1alpha1.NotificationCategory `protobuf:"varint,4,opt,name=category,proto3,enum=hawkr.notification.v1alpha1.NotificationCategory" json:"category,omitempty"`
+	Audience  v1alpha1.NotificationAudience `protobuf:"varint,5,opt,name=audience,proto3,enum=hawkr.notification.v1alpha1.NotificationAudience" json:"audience,omitempty"`
+	AccountId int64                         `protobuf:"varint,6,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	// STORE 受眾的店家 ID；BUYER 受眾為 0。
+	StoreId int64 `protobuf:"varint,7,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
+	// 通知意圖建立的時間。
+	CreateTime    *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	Channels      []*UnreachedChannel    `protobuf:"bytes,9,rep,name=channels,proto3" json:"channels,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnreachedNotification) Reset() {
+	*x = UnreachedNotification{}
+	mi := &file_hawkr_admin_notification_v1alpha1_notification_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnreachedNotification) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnreachedNotification) ProtoMessage() {}
+
+func (x *UnreachedNotification) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_notification_v1alpha1_notification_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnreachedNotification.ProtoReflect.Descriptor instead.
+func (*UnreachedNotification) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_notification_v1alpha1_notification_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *UnreachedNotification) GetDeliveryId() string {
+	if x != nil {
+		return x.DeliveryId
+	}
+	return ""
+}
+
+func (x *UnreachedNotification) GetIntentId() string {
+	if x != nil {
+		return x.IntentId
+	}
+	return ""
+}
+
+func (x *UnreachedNotification) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *UnreachedNotification) GetCategory() v1alpha1.NotificationCategory {
+	if x != nil {
+		return x.Category
+	}
+	return v1alpha1.NotificationCategory(0)
+}
+
+func (x *UnreachedNotification) GetAudience() v1alpha1.NotificationAudience {
+	if x != nil {
+		return x.Audience
+	}
+	return v1alpha1.NotificationAudience(0)
+}
+
+func (x *UnreachedNotification) GetAccountId() int64 {
+	if x != nil {
+		return x.AccountId
+	}
+	return 0
+}
+
+func (x *UnreachedNotification) GetStoreId() int64 {
+	if x != nil {
+		return x.StoreId
+	}
+	return 0
+}
+
+func (x *UnreachedNotification) GetCreateTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreateTime
+	}
+	return nil
+}
+
+func (x *UnreachedNotification) GetChannels() []*UnreachedChannel {
+	if x != nil {
+		return x.Channels
+	}
+	return nil
+}
+
+type ListUnreachedNotificationsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 窗內未觸達的總筆數（不只這一頁）。
+	UnreachedCount int64                    `protobuf:"varint,1,opt,name=unreached_count,json=unreachedCount,proto3" json:"unreached_count,omitempty"`
+	Notifications  []*UnreachedNotification `protobuf:"bytes,2,rep,name=notifications,proto3" json:"notifications,omitempty"`
+	NextPageToken  string                   `protobuf:"bytes,3,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ListUnreachedNotificationsResponse) Reset() {
+	*x = ListUnreachedNotificationsResponse{}
+	mi := &file_hawkr_admin_notification_v1alpha1_notification_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListUnreachedNotificationsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListUnreachedNotificationsResponse) ProtoMessage() {}
+
+func (x *ListUnreachedNotificationsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_notification_v1alpha1_notification_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListUnreachedNotificationsResponse.ProtoReflect.Descriptor instead.
+func (*ListUnreachedNotificationsResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_notification_v1alpha1_notification_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ListUnreachedNotificationsResponse) GetUnreachedCount() int64 {
+	if x != nil {
+		return x.UnreachedCount
+	}
+	return 0
+}
+
+func (x *ListUnreachedNotificationsResponse) GetNotifications() []*UnreachedNotification {
+	if x != nil {
+		return x.Notifications
+	}
+	return nil
+}
+
+func (x *ListUnreachedNotificationsResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
 var File_hawkr_admin_notification_v1alpha1_notification_proto protoreflect.FileDescriptor
 
 const file_hawkr_admin_notification_v1alpha1_notification_proto_rawDesc = "" +
@@ -375,10 +923,66 @@ const file_hawkr_admin_notification_v1alpha1_notification_proto_rawDesc = "" +
 	"page_token\x18\x02 \x01(\tR\tpageToken\"\x9a\x01\n" +
 	"\x19ListAnnouncementsResponse\x12U\n" +
 	"\rannouncements\x18\x01 \x03(\v2/.hawkr.admin.notification.v1alpha1.AnnouncementR\rannouncements\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken2\xc4\x02\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xeb\x03\n" +
+	"\x17ResendDeliveriesRequest\x12G\n" +
+	"\x0ffail_time_start\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x02R\rfailTimeStart\x12C\n" +
+	"\rfail_time_end\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x02R\vfailTimeEnd\x12M\n" +
+	"\bcategory\x18\x03 \x01(\x0e21.hawkr.notification.v1alpha1.NotificationCategoryR\bcategory\x12J\n" +
+	"\achannel\x18\x04 \x01(\x0e20.hawkr.notification.v1alpha1.NotificationChannelR\achannel\x12R\n" +
+	"\areasons\x18\x05 \x03(\x0e28.hawkr.admin.notification.v1alpha1.DeliveryFailureReasonR\areasons\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x06 \x01(\x03R\taccountId\x12\x1b\n" +
+	"\tmax_count\x18\a \x01(\x05R\bmaxCount\x12\x17\n" +
+	"\adry_run\x18\b \x01(\bR\x06dryRun\"b\n" +
+	"\x18ResendDeliveriesResponse\x12&\n" +
+	"\fresend_count\x18\x01 \x01(\x05B\x03\xe0A\x03R\vresendCount\x12\x1e\n" +
+	"\bhas_more\x18\x02 \x01(\bB\x03\xe0A\x03R\ahasMore\"s\n" +
+	"!ListUnreachedNotificationsRequest\x12\x12\n" +
+	"\x04days\x18\x01 \x01(\x05R\x04days\x12\x1b\n" +
+	"\tpage_size\x18\x02 \x01(\x05R\bpageSize\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x03 \x01(\tR\tpageToken\"\xbf\x01\n" +
+	"\x10UnreachedChannel\x12J\n" +
+	"\achannel\x18\x01 \x01(\x0e20.hawkr.notification.v1alpha1.NotificationChannelR\achannel\x12_\n" +
+	"\x0efailure_reason\x18\x02 \x01(\x0e28.hawkr.admin.notification.v1alpha1.DeliveryFailureReasonR\rfailureReason\"\xd9\x03\n" +
+	"\x15UnreachedNotification\x12$\n" +
+	"\vdelivery_id\x18\x01 \x01(\tB\x03\xe0A\bR\n" +
+	"deliveryId\x12\x1b\n" +
+	"\tintent_id\x18\x02 \x01(\tR\bintentId\x12\x12\n" +
+	"\x04type\x18\x03 \x01(\tR\x04type\x12M\n" +
+	"\bcategory\x18\x04 \x01(\x0e21.hawkr.notification.v1alpha1.NotificationCategoryR\bcategory\x12M\n" +
+	"\baudience\x18\x05 \x01(\x0e21.hawkr.notification.v1alpha1.NotificationAudienceR\baudience\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x06 \x01(\x03R\taccountId\x12\x19\n" +
+	"\bstore_id\x18\a \x01(\x03R\astoreId\x12@\n" +
+	"\vcreate_time\x18\b \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"createTime\x12O\n" +
+	"\bchannels\x18\t \x03(\v23.hawkr.admin.notification.v1alpha1.UnreachedChannelR\bchannels\"\xda\x01\n" +
+	"\"ListUnreachedNotificationsResponse\x12,\n" +
+	"\x0funreached_count\x18\x01 \x01(\x03B\x03\xe0A\x03R\x0eunreachedCount\x12^\n" +
+	"\rnotifications\x18\x02 \x03(\v28.hawkr.admin.notification.v1alpha1.UnreachedNotificationR\rnotifications\x12&\n" +
+	"\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken*\x8f\x05\n" +
+	"\x15DeliveryFailureReason\x12'\n" +
+	"#DELIVERY_FAILURE_REASON_UNSPECIFIED\x10\x00\x12*\n" +
+	"&DELIVERY_FAILURE_REASON_RECIPIENT_GONE\x10\x01\x12*\n" +
+	"&DELIVERY_FAILURE_REASON_INTENT_MISSING\x10\x02\x12-\n" +
+	")DELIVERY_FAILURE_REASON_TYPE_UNREGISTERED\x10\x03\x12)\n" +
+	"%DELIVERY_FAILURE_REASON_RENDER_FAILED\x10\x04\x12+\n" +
+	"'DELIVERY_FAILURE_REASON_NO_DEVICE_TOKEN\x10\x05\x12.\n" +
+	"*DELIVERY_FAILURE_REASON_TOKEN_UNREGISTERED\x10\x06\x12)\n" +
+	"%DELIVERY_FAILURE_REASON_PUSH_REJECTED\x10\a\x12,\n" +
+	"(DELIVERY_FAILURE_REASON_NO_EMAIL_ADDRESS\x10\b\x12,\n" +
+	"(DELIVERY_FAILURE_REASON_EMAIL_SUPPRESSED\x10\t\x12*\n" +
+	"&DELIVERY_FAILURE_REASON_EMAIL_REJECTED\x10\n" +
+	"\x12-\n" +
+	")DELIVERY_FAILURE_REASON_RETRIES_EXHAUSTED\x10\v\x12+\n" +
+	"'DELIVERY_FAILURE_REASON_NO_LONGER_VALID\x10\f\x12/\n" +
+	"+DELIVERY_FAILURE_REASON_CHANNEL_UNSUPPORTED\x10\r2\x83\x05\n" +
 	"\x18NotificationAdminService\x12\x91\x01\n" +
 	"\x12CreateAnnouncement\x12<.hawkr.admin.notification.v1alpha1.CreateAnnouncementRequest\x1a=.hawkr.admin.notification.v1alpha1.CreateAnnouncementResponse\x12\x93\x01\n" +
-	"\x11ListAnnouncements\x12;.hawkr.admin.notification.v1alpha1.ListAnnouncementsRequest\x1a<.hawkr.admin.notification.v1alpha1.ListAnnouncementsResponse\"\x03\x90\x02\x01B\xd2\x02\n" +
+	"\x11ListAnnouncements\x12;.hawkr.admin.notification.v1alpha1.ListAnnouncementsRequest\x1a<.hawkr.admin.notification.v1alpha1.ListAnnouncementsResponse\"\x03\x90\x02\x01\x12\x8b\x01\n" +
+	"\x10ResendDeliveries\x12:.hawkr.admin.notification.v1alpha1.ResendDeliveriesRequest\x1a;.hawkr.admin.notification.v1alpha1.ResendDeliveriesResponse\x12\xae\x01\n" +
+	"\x1aListUnreachedNotifications\x12D.hawkr.admin.notification.v1alpha1.ListUnreachedNotificationsRequest\x1aE.hawkr.admin.notification.v1alpha1.ListUnreachedNotificationsResponse\"\x03\x90\x02\x01B\xd2\x02\n" +
 	"%com.hawkr.admin.notification.v1alpha1B\x11NotificationProtoP\x01Zogithub.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/notification/v1alpha1;notificationv1alpha1\xa2\x02\x03HAN\xaa\x02!Hawkr.Admin.Notification.V1alpha1\xca\x02!Hawkr\\Admin\\Notification\\V1alpha1\xe2\x02-Hawkr\\Admin\\Notification\\V1alpha1\\GPBMetadata\xea\x02$Hawkr::Admin::Notification::V1alpha1b\x06proto3"
 
 var (
@@ -393,31 +997,57 @@ func file_hawkr_admin_notification_v1alpha1_notification_proto_rawDescGZIP() []b
 	return file_hawkr_admin_notification_v1alpha1_notification_proto_rawDescData
 }
 
-var file_hawkr_admin_notification_v1alpha1_notification_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_hawkr_admin_notification_v1alpha1_notification_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_hawkr_admin_notification_v1alpha1_notification_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_hawkr_admin_notification_v1alpha1_notification_proto_goTypes = []any{
-	(*Announcement)(nil),               // 0: hawkr.admin.notification.v1alpha1.Announcement
-	(*CreateAnnouncementRequest)(nil),  // 1: hawkr.admin.notification.v1alpha1.CreateAnnouncementRequest
-	(*CreateAnnouncementResponse)(nil), // 2: hawkr.admin.notification.v1alpha1.CreateAnnouncementResponse
-	(*ListAnnouncementsRequest)(nil),   // 3: hawkr.admin.notification.v1alpha1.ListAnnouncementsRequest
-	(*ListAnnouncementsResponse)(nil),  // 4: hawkr.admin.notification.v1alpha1.ListAnnouncementsResponse
-	(v1alpha1.NotificationAudience)(0), // 5: hawkr.notification.v1alpha1.NotificationAudience
-	(*timestamppb.Timestamp)(nil),      // 6: google.protobuf.Timestamp
+	(DeliveryFailureReason)(0),                 // 0: hawkr.admin.notification.v1alpha1.DeliveryFailureReason
+	(*Announcement)(nil),                       // 1: hawkr.admin.notification.v1alpha1.Announcement
+	(*CreateAnnouncementRequest)(nil),          // 2: hawkr.admin.notification.v1alpha1.CreateAnnouncementRequest
+	(*CreateAnnouncementResponse)(nil),         // 3: hawkr.admin.notification.v1alpha1.CreateAnnouncementResponse
+	(*ListAnnouncementsRequest)(nil),           // 4: hawkr.admin.notification.v1alpha1.ListAnnouncementsRequest
+	(*ListAnnouncementsResponse)(nil),          // 5: hawkr.admin.notification.v1alpha1.ListAnnouncementsResponse
+	(*ResendDeliveriesRequest)(nil),            // 6: hawkr.admin.notification.v1alpha1.ResendDeliveriesRequest
+	(*ResendDeliveriesResponse)(nil),           // 7: hawkr.admin.notification.v1alpha1.ResendDeliveriesResponse
+	(*ListUnreachedNotificationsRequest)(nil),  // 8: hawkr.admin.notification.v1alpha1.ListUnreachedNotificationsRequest
+	(*UnreachedChannel)(nil),                   // 9: hawkr.admin.notification.v1alpha1.UnreachedChannel
+	(*UnreachedNotification)(nil),              // 10: hawkr.admin.notification.v1alpha1.UnreachedNotification
+	(*ListUnreachedNotificationsResponse)(nil), // 11: hawkr.admin.notification.v1alpha1.ListUnreachedNotificationsResponse
+	(v1alpha1.NotificationAudience)(0),         // 12: hawkr.notification.v1alpha1.NotificationAudience
+	(*timestamppb.Timestamp)(nil),              // 13: google.protobuf.Timestamp
+	(v1alpha1.NotificationCategory)(0),         // 14: hawkr.notification.v1alpha1.NotificationCategory
+	(v1alpha1.NotificationChannel)(0),          // 15: hawkr.notification.v1alpha1.NotificationChannel
 }
 var file_hawkr_admin_notification_v1alpha1_notification_proto_depIdxs = []int32{
-	5, // 0: hawkr.admin.notification.v1alpha1.Announcement.audiences:type_name -> hawkr.notification.v1alpha1.NotificationAudience
-	6, // 1: hawkr.admin.notification.v1alpha1.Announcement.create_time:type_name -> google.protobuf.Timestamp
-	5, // 2: hawkr.admin.notification.v1alpha1.CreateAnnouncementRequest.audiences:type_name -> hawkr.notification.v1alpha1.NotificationAudience
-	0, // 3: hawkr.admin.notification.v1alpha1.CreateAnnouncementResponse.announcement:type_name -> hawkr.admin.notification.v1alpha1.Announcement
-	0, // 4: hawkr.admin.notification.v1alpha1.ListAnnouncementsResponse.announcements:type_name -> hawkr.admin.notification.v1alpha1.Announcement
-	1, // 5: hawkr.admin.notification.v1alpha1.NotificationAdminService.CreateAnnouncement:input_type -> hawkr.admin.notification.v1alpha1.CreateAnnouncementRequest
-	3, // 6: hawkr.admin.notification.v1alpha1.NotificationAdminService.ListAnnouncements:input_type -> hawkr.admin.notification.v1alpha1.ListAnnouncementsRequest
-	2, // 7: hawkr.admin.notification.v1alpha1.NotificationAdminService.CreateAnnouncement:output_type -> hawkr.admin.notification.v1alpha1.CreateAnnouncementResponse
-	4, // 8: hawkr.admin.notification.v1alpha1.NotificationAdminService.ListAnnouncements:output_type -> hawkr.admin.notification.v1alpha1.ListAnnouncementsResponse
-	7, // [7:9] is the sub-list for method output_type
-	5, // [5:7] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	12, // 0: hawkr.admin.notification.v1alpha1.Announcement.audiences:type_name -> hawkr.notification.v1alpha1.NotificationAudience
+	13, // 1: hawkr.admin.notification.v1alpha1.Announcement.create_time:type_name -> google.protobuf.Timestamp
+	12, // 2: hawkr.admin.notification.v1alpha1.CreateAnnouncementRequest.audiences:type_name -> hawkr.notification.v1alpha1.NotificationAudience
+	1,  // 3: hawkr.admin.notification.v1alpha1.CreateAnnouncementResponse.announcement:type_name -> hawkr.admin.notification.v1alpha1.Announcement
+	1,  // 4: hawkr.admin.notification.v1alpha1.ListAnnouncementsResponse.announcements:type_name -> hawkr.admin.notification.v1alpha1.Announcement
+	13, // 5: hawkr.admin.notification.v1alpha1.ResendDeliveriesRequest.fail_time_start:type_name -> google.protobuf.Timestamp
+	13, // 6: hawkr.admin.notification.v1alpha1.ResendDeliveriesRequest.fail_time_end:type_name -> google.protobuf.Timestamp
+	14, // 7: hawkr.admin.notification.v1alpha1.ResendDeliveriesRequest.category:type_name -> hawkr.notification.v1alpha1.NotificationCategory
+	15, // 8: hawkr.admin.notification.v1alpha1.ResendDeliveriesRequest.channel:type_name -> hawkr.notification.v1alpha1.NotificationChannel
+	0,  // 9: hawkr.admin.notification.v1alpha1.ResendDeliveriesRequest.reasons:type_name -> hawkr.admin.notification.v1alpha1.DeliveryFailureReason
+	15, // 10: hawkr.admin.notification.v1alpha1.UnreachedChannel.channel:type_name -> hawkr.notification.v1alpha1.NotificationChannel
+	0,  // 11: hawkr.admin.notification.v1alpha1.UnreachedChannel.failure_reason:type_name -> hawkr.admin.notification.v1alpha1.DeliveryFailureReason
+	14, // 12: hawkr.admin.notification.v1alpha1.UnreachedNotification.category:type_name -> hawkr.notification.v1alpha1.NotificationCategory
+	12, // 13: hawkr.admin.notification.v1alpha1.UnreachedNotification.audience:type_name -> hawkr.notification.v1alpha1.NotificationAudience
+	13, // 14: hawkr.admin.notification.v1alpha1.UnreachedNotification.create_time:type_name -> google.protobuf.Timestamp
+	9,  // 15: hawkr.admin.notification.v1alpha1.UnreachedNotification.channels:type_name -> hawkr.admin.notification.v1alpha1.UnreachedChannel
+	10, // 16: hawkr.admin.notification.v1alpha1.ListUnreachedNotificationsResponse.notifications:type_name -> hawkr.admin.notification.v1alpha1.UnreachedNotification
+	2,  // 17: hawkr.admin.notification.v1alpha1.NotificationAdminService.CreateAnnouncement:input_type -> hawkr.admin.notification.v1alpha1.CreateAnnouncementRequest
+	4,  // 18: hawkr.admin.notification.v1alpha1.NotificationAdminService.ListAnnouncements:input_type -> hawkr.admin.notification.v1alpha1.ListAnnouncementsRequest
+	6,  // 19: hawkr.admin.notification.v1alpha1.NotificationAdminService.ResendDeliveries:input_type -> hawkr.admin.notification.v1alpha1.ResendDeliveriesRequest
+	8,  // 20: hawkr.admin.notification.v1alpha1.NotificationAdminService.ListUnreachedNotifications:input_type -> hawkr.admin.notification.v1alpha1.ListUnreachedNotificationsRequest
+	3,  // 21: hawkr.admin.notification.v1alpha1.NotificationAdminService.CreateAnnouncement:output_type -> hawkr.admin.notification.v1alpha1.CreateAnnouncementResponse
+	5,  // 22: hawkr.admin.notification.v1alpha1.NotificationAdminService.ListAnnouncements:output_type -> hawkr.admin.notification.v1alpha1.ListAnnouncementsResponse
+	7,  // 23: hawkr.admin.notification.v1alpha1.NotificationAdminService.ResendDeliveries:output_type -> hawkr.admin.notification.v1alpha1.ResendDeliveriesResponse
+	11, // 24: hawkr.admin.notification.v1alpha1.NotificationAdminService.ListUnreachedNotifications:output_type -> hawkr.admin.notification.v1alpha1.ListUnreachedNotificationsResponse
+	21, // [21:25] is the sub-list for method output_type
+	17, // [17:21] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_admin_notification_v1alpha1_notification_proto_init() }
@@ -430,13 +1060,14 @@ func file_hawkr_admin_notification_v1alpha1_notification_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_admin_notification_v1alpha1_notification_proto_rawDesc), len(file_hawkr_admin_notification_v1alpha1_notification_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   5,
+			NumEnums:      1,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_hawkr_admin_notification_v1alpha1_notification_proto_goTypes,
 		DependencyIndexes: file_hawkr_admin_notification_v1alpha1_notification_proto_depIdxs,
+		EnumInfos:         file_hawkr_admin_notification_v1alpha1_notification_proto_enumTypes,
 		MessageInfos:      file_hawkr_admin_notification_v1alpha1_notification_proto_msgTypes,
 	}.Build()
 	File_hawkr_admin_notification_v1alpha1_notification_proto = out.File

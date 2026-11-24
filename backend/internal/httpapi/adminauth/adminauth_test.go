@@ -485,8 +485,10 @@ func TestNotificationAdminMethodsDeclareTheirOwnPermission(t *testing.T) {
 		perm  adminperm.Permission
 		audit auditMode
 	}{
-		notificationv1alpha1connect.NotificationAdminServiceCreateAnnouncementProcedure: {adminperm.NotificationAnnouncementsCreate, auditAudited},
-		notificationv1alpha1connect.NotificationAdminServiceListAnnouncementsProcedure:  {adminperm.NotificationAnnouncementsList, auditReadOnly},
+		notificationv1alpha1connect.NotificationAdminServiceCreateAnnouncementProcedure:         {adminperm.NotificationAnnouncementsCreate, auditAudited},
+		notificationv1alpha1connect.NotificationAdminServiceListAnnouncementsProcedure:          {adminperm.NotificationAnnouncementsList, auditReadOnly},
+		notificationv1alpha1connect.NotificationAdminServiceResendDeliveriesProcedure:           {adminperm.NotificationDeliveriesResend, auditAudited},
+		notificationv1alpha1connect.NotificationAdminServiceListUnreachedNotificationsProcedure: {adminperm.NotificationUnreachedNotificationsList, auditReadOnly},
 	} {
 		d, ok := declarations[procedure]
 		if !ok || d.permission != want.perm || d.exemptReason != "" || d.audit != want.audit {

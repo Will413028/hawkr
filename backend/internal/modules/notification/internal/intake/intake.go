@@ -83,8 +83,10 @@ type ProcessArgs struct {
 func (ProcessArgs) Kind() string { return "notification.process_intent" }
 
 // DeliverArgs 是一筆投遞紀錄（推播或 email）的渠道 job；以投遞紀錄 ID 唯一，由 deliver 套件的 worker 執行。
+// RequeuedAt 只有重送排的 job 帶（重排的時間，微秒）：River 的唯一鍵預設連已完成的 job 也算，沒有它，24 小時內完成過的 job 會讓重送的 job 被略過。
 type DeliverArgs struct {
 	DeliveryID uuid.UUID `json:"delivery_id"`
+	RequeuedAt int64     `json:"requeued_at,omitempty"`
 }
 
 // Kind 是 River 的 job 種類。

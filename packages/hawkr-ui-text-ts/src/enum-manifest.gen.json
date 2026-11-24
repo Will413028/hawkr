@@ -22,6 +22,13 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.admin.notification.v1alpha1.DeliveryFailureReason",
+      "tsName": "DeliveryFailureReason",
+      "tsModule": "@hawkr/api/gen/hawkr/admin/notification/v1alpha1/notification_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.admin.reviewqueue.v1alpha1.ReviewQueueItemKind",
       "tsName": "ReviewQueueItemKind",
       "tsModule": "@hawkr/api/gen/hawkr/admin/reviewqueue/v1alpha1/review_queue_pb",
