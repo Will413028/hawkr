@@ -1077,7 +1077,7 @@ public class CheckoutService {
         // reserveCoupon 接受 templateId，回傳 instanceId 寫入 orders.coupon_instance_id
         if (couponTemplateId != null && !couponTemplateId.isEmpty()) {
             try {
-                String instanceId = couponGrpcClient.reserveCoupon(couponTemplateId, buyerId, orderNo);
+                String instanceId = couponGrpcClient.reserveCoupon(couponTemplateId, buyerId, orderNo, storeId, orderSubtotal);
                 orderService.updateCouponInstanceId(orderNo, instanceId);
             } catch (Exception e) {
                 log.error("CheckoutService.confirm.reserveCoupon.failed", "優惠券鎖定失敗，取消訂單", e);

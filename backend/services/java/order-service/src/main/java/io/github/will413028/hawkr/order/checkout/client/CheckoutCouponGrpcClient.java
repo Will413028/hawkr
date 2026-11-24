@@ -87,9 +87,11 @@ public class CheckoutCouponGrpcClient {
      * @param templateId     優惠券 Template ID
      * @param buyerId 買家 buyer_id
      * @param orderNo        關聯訂單編號
+     * @param storeId        賣家 store_id surrogate（coupon 端 Lock 重驗店家範圍，D10）
+     * @param orderAmount    訂單原價小計（新台幣元；coupon 端 Lock 重驗門檻，D10）
      * @return 新建的 Instance ID（寫入 orders.coupon_instance_id）
      */
-    public String reserveCoupon(String templateId, long buyerId, String orderNo) {
+    public String reserveCoupon(String templateId, long buyerId, String orderNo, long storeId, long orderAmount) {
         log.info("CheckoutCouponGrpcClient.reserveCoupon.start", "鎖定優惠券",
                 "templateId", templateId);
 
@@ -97,6 +99,8 @@ public class CheckoutCouponGrpcClient {
                 .setTemplateId(templateId)
                 .setBuyerId(buyerId)
                 .setOrderNo(orderNo)
+                .setStoreId(String.valueOf(storeId))
+                .setOrderAmount(String.valueOf(orderAmount))
                 .build();
 
         // coupon-service 失敗時會拋 StatusRuntimeException，由上層 RPC catch-all 處理
@@ -115,39 +119,35 @@ public class CheckoutCouponGrpcClient {
     }
 
     /**
-     * 消耗優惠券（付款成功後標記已使用）
-     * 軟依賴：失敗僅記錄警告，不阻斷主流程
+     * 消耗優惠券（付款成功後標記已使用）：以 order_no 為鍵，coupon 端冪等，重送回成功。
      *
-     * @param instanceId     優惠券 Instance ID
-     * @param buyerId 買家 buyer_id
+     * <p>失敗一律拋出（gRPC 例外，或回應 success=false），由 {@code CouponConsumptionWorker} 以退避重試：這支不吞例外，
+     * 吞掉就會讓 worker 把任務標成完成，券永遠停在鎖定。
+     *
+     * @param instanceId     優惠券 Instance ID（coupon 端不讀）
+     * @param buyerId        買家 buyer_id（coupon 端不讀）
      * @param orderNo        訂單編號
      */
     public void consumeCoupon(String instanceId, long buyerId, String orderNo) {
-        try {
-            log.info("CheckoutCouponGrpcClient.consumeCoupon.start", "消耗優惠券",
-                    "instanceId", instanceId);
+        log.info("CheckoutCouponGrpcClient.consumeCoupon.start", "消耗優惠券",
+                "instanceId", instanceId);
 
-            ConsumeCouponRequest request = ConsumeCouponRequest.newBuilder()
-                    .setInstanceId(instanceId)
-                    .setBuyerId(buyerId)
-                    .setOrderNo(orderNo)
-                    .build();
+        ConsumeCouponRequest request = ConsumeCouponRequest.newBuilder()
+                .setInstanceId(instanceId)
+                .setBuyerId(buyerId)
+                .setOrderNo(orderNo)
+                .build();
 
-            ConsumeCouponResponse response = couponStub
-                    .withDeadlineAfter(INTERNAL_READ_DEADLINE_SEC, TimeUnit.SECONDS)
-                    .consumeCoupon(request);
+        ConsumeCouponResponse response = couponStub
+                .withDeadlineAfter(INTERNAL_READ_DEADLINE_SEC, TimeUnit.SECONDS)
+                .consumeCoupon(request);
 
-            if (!response.getSuccess()) {
-                log.warn("CheckoutCouponGrpcClient.consumeCoupon.bizError",
-                        "消耗優惠券回傳非成功，instanceId=" + instanceId + ", orderNo=" + orderNo);
-            } else {
-                log.info("CheckoutCouponGrpcClient.consumeCoupon.done", "消耗優惠券完成",
-                        "orderNo", orderNo);
-            }
-        } catch (Exception e) {
-            log.warn("CheckoutCouponGrpcClient.consumeCoupon.error",
-                    "消耗優惠券 gRPC 失敗（訂單已付款），instanceId=" + instanceId);
+        if (!response.getSuccess()) {
+            throw new IllegalStateException("消耗優惠券回傳非成功，orderNo=" + orderNo
+                    + ", code=" + response.getCode() + ", message=" + response.getMessage());
         }
+        log.info("CheckoutCouponGrpcClient.consumeCoupon.done", "消耗優惠券完成",
+                "orderNo", orderNo);
     }
 
     /**

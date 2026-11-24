@@ -50,6 +50,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -163,7 +164,7 @@ class CheckoutConfirmCouponCompensationTest {
     void reserveFailureReleasesTheCouponByOrderNo() {
         when(couponGrpcClient.validateCoupon(anyString(), anyLong(), anyLong(), anyLong()))
                 .thenReturn(CouponValidateResult.newBuilder().setValid(true).setDiscountAmount("0").build());
-        when(couponGrpcClient.reserveCoupon(anyString(), anyLong(), anyString()))
+        when(couponGrpcClient.reserveCoupon(anyString(), anyLong(), anyString(), anyLong(), anyLong()))
                 .thenThrow(new RuntimeException("response lost"));
 
         assertThatThrownBy(() -> service.confirm(baseRequest().build()))
@@ -180,7 +181,7 @@ class CheckoutConfirmCouponCompensationTest {
     void instanceIdWriteBackFailureReleasesTheCouponByOrderNo() {
         when(couponGrpcClient.validateCoupon(anyString(), anyLong(), anyLong(), anyLong()))
                 .thenReturn(CouponValidateResult.newBuilder().setValid(true).setDiscountAmount("0").build());
-        when(couponGrpcClient.reserveCoupon(anyString(), anyLong(), anyString())).thenReturn("INSTANCE-1");
+        when(couponGrpcClient.reserveCoupon(anyString(), anyLong(), anyString(), anyLong(), anyLong())).thenReturn("INSTANCE-1");
         org.mockito.Mockito.doThrow(new RuntimeException("db down"))
                 .when(orderService).updateCouponInstanceId(ORDER_NO, "INSTANCE-1");
 
@@ -195,10 +196,27 @@ class CheckoutConfirmCouponCompensationTest {
     void reserveSuccessDoesNotRelease() {
         when(couponGrpcClient.validateCoupon(anyString(), anyLong(), anyLong(), anyLong()))
                 .thenReturn(CouponValidateResult.newBuilder().setValid(true).setDiscountAmount("0").build());
-        when(couponGrpcClient.reserveCoupon(anyString(), anyLong(), anyString())).thenReturn("INSTANCE-1");
+        when(couponGrpcClient.reserveCoupon(anyString(), anyLong(), anyString(), anyLong(), anyLong())).thenReturn("INSTANCE-1");
 
         service.confirm(baseRequest().build());
 
         verify(couponReleaseService, never()).release(anyString());
+    }
+
+    @Test
+    @DisplayName("鎖券帶上驗券用的店家與訂單小計，coupon 端 Lock 才能重驗範圍與門檻（D10）")
+    void reserveSendsTheSameStoreAndSubtotalAsValidate() {
+        when(couponGrpcClient.validateCoupon(anyString(), anyLong(), anyLong(), anyLong()))
+                .thenReturn(CouponValidateResult.newBuilder().setValid(true).setDiscountAmount("0").build());
+        when(couponGrpcClient.reserveCoupon(anyString(), anyLong(), anyString(), anyLong(), anyLong())).thenReturn("INSTANCE-1");
+
+        service.confirm(baseRequest().build());
+
+        org.mockito.ArgumentCaptor<Long> validateStore = org.mockito.ArgumentCaptor.forClass(Long.class);
+        org.mockito.ArgumentCaptor<Long> validateAmount = org.mockito.ArgumentCaptor.forClass(Long.class);
+        verify(couponGrpcClient).validateCoupon(eq("TPL-1"), eq(BUYER_ID), validateStore.capture(), validateAmount.capture());
+        verify(couponGrpcClient).reserveCoupon("TPL-1", BUYER_ID, ORDER_NO, validateStore.getValue(), validateAmount.getValue());
+        assertThat(validateStore.getValue()).isPositive();
+        assertThat(validateAmount.getValue()).isPositive();
     }
 }

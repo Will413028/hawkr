@@ -68,6 +68,21 @@ class CouponConsumptionWorkerReleaseTest {
     }
 
     @Test
+    @DisplayName("CONSUME 失敗（coupon 不可用）→ 不標完成，走 updateFailed 排下一次重試（退避）")
+    void consumeFailureIsRetriedNotMarkedDone() {
+        CouponConsumptionTaskEntity t = task(OrderConstants.COUPON_TASK_TYPE_CONSUME);
+        t.setCouponInstanceId("CI-9");
+        t.setBuyerId(3001L);
+        doThrow(new IllegalStateException("coupon down")).when(coupon).consumeCoupon("CI-9", 3001L, "ORD-R");
+
+        run(t);
+
+        verify(repo, never()).markDone(anyLong());
+        // retryCount 2 → 60 * 2^2 秒
+        verify(repo).updateFailed(eq(3003L), eq(OrderConstants.TASK_STATUS_FAILED), contains("coupon down"), eq(240));
+    }
+
+    @Test
     @DisplayName("超過最大重試次數的 RELEASE 任務 → 轉人工，不再呼叫 coupon")
     void exhaustedReleaseTaskGoesToManualIntervention() {
         CouponConsumptionTaskEntity t = task(OrderConstants.COUPON_TASK_TYPE_RELEASE);
