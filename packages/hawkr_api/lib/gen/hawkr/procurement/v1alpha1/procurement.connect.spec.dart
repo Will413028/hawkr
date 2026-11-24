@@ -91,8 +91,8 @@ abstract final class BuyerProcurementAppService {
   );
 
   /// PreviewRfqPublication 依需求現行版本、買家的單價範圍與補充說明編出要發給賣家的內容，並建立不可變、只能執行一次的發布核准（有效 24 小時），
-  /// 不發布、不通知。核准存單價範圍、補充說明、回價期限、受眾與（指定對象時）候選集。
-  /// 需求版本過時回 ABORTED，conflictTarget 是 request_revision；指定對象時的候選集不是有效的候選集（見 ToggleSelection）回 ABORTED，conflictTarget 是 candidate_set。
+  /// 不發布、不通知。核准存單價範圍、補充說明、回價期限、受眾與候選集。
+  /// 需求版本過時回 ABORTED，conflictTarget 是 request_revision；候選集不是有效的候選集（見 ToggleSelection）回 ABORTED，conflictTarget 是 candidate_set。
   /// 需求狀態不是 REQUIREMENT_READY 或 MATCHING，或還沒有單位，回 FAILED_PRECONDITION，reason 是 REQUIREMENT_NOT_READY。
   /// 候選集不屬於呼叫者回 NOT_FOUND；單價範圍不合法、buyer_note 超過 500 字、受眾欄位不合（沒帶候選集或候選、候選重複、候選不在候選集裡）、
   /// 回價期限不是合法日期或早於今天（台北時區）回 INVALID_ARGUMENT。
@@ -106,7 +106,7 @@ abstract final class BuyerProcurementAppService {
   /// ExecuteRfqPublication 以發布核准的版本執行發布。成功只代表伺服器已建立發布，不代表已投遞或賣家已看到；不建 run。
   /// 需求版本過時回 ABORTED，conflictTarget 是 request_revision；核准不是這個需求的、版本不符、已執行過、已過期、凍結的需求版本已不是現行版本、
   /// 核准的回價期限已早於今天（台北時區），或 payload_hash 與核准的內容不符回 ABORTED，conflictTarget 是 publication_approval；
-  /// 指定對象的候選集已不是有效的候選集回 ABORTED，conflictTarget 是 candidate_set；核准不屬於呼叫者回 NOT_FOUND。
+  /// 候選集已不是有效的候選集回 ABORTED，conflictTarget 是 candidate_set；核准不屬於呼叫者回 NOT_FOUND。
   /// 需求狀態不是 REQUIREMENT_READY 或 MATCHING 回 FAILED_PRECONDITION，reason 是 REQUIREMENT_NOT_READY。
   /// 重送同一個 client_request_id 回第一次的發布（replayed 為 true），內容不同回 INVALID_ARGUMENT。
   static const executeRfqPublication = connect.Spec(

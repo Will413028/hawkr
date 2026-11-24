@@ -171,7 +171,6 @@ CREATE TABLE procurement.rfq_publication_approvals (
     buyer_note TEXT NOT NULL DEFAULT '',
     candidate_set_id UUID REFERENCES procurement.candidate_sets (id) ON DELETE SET NULL,
     response_deadline DATE,
-    audience_mode TEXT NOT NULL,
     state TEXT NOT NULL,
     schema_version TEXT NOT NULL,
     client_request_id UUID NOT NULL,
@@ -181,7 +180,6 @@ CREATE TABLE procurement.rfq_publication_approvals (
     updated_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT rfq_publication_approvals_buyer_check CHECK (buyer_id > 0),
     CONSTRAINT rfq_publication_approvals_version_check CHECK (version >= 1),
-    CONSTRAINT rfq_publication_approvals_mode_check CHECK (audience_mode = 'DIRECT_RECIPIENTS'),
     CONSTRAINT rfq_publication_approvals_state_check CHECK (state IN ('PENDING', 'EXECUTING', 'SUCCEEDED')),
     CONSTRAINT rfq_publication_approvals_schema_check CHECK (char_length(schema_version) >= 1),
     CONSTRAINT rfq_publication_approvals_range_check CHECK (range_lower_amount > 0 AND range_upper_amount >= range_lower_amount),
@@ -243,7 +241,7 @@ CREATE TABLE procurement.rfq_publication_invites (
 CREATE UNIQUE INDEX rfq_publication_invites_store ON procurement.rfq_publication_invites (publication_id, store_id);
 CREATE UNIQUE INDEX rfq_publication_invites_position ON procurement.rfq_publication_invites (publication_id, position);
 
--- 一家店對一次發布的回價（身分列）。沒有 buyer_id（由 request 推出）、沒有列版本（回價版次是 latest_version）。
+-- 一家店對一次發布的回價（身分列）。只有被邀請的店能有回價列：(publication_id, store_id) 參照邀請列，邀請列是賣家可見性的唯一依據（A9-D44）。沒有 buyer_id（由 request 推出）、沒有列版本（回價版次是 latest_version）。
 -- write_closed_reason 只收有寫入者的 DECLINED（S6）。
 CREATE TABLE procurement.seller_responses (
     id UUID PRIMARY KEY,
@@ -257,6 +255,7 @@ CREATE TABLE procurement.seller_responses (
     write_closed_reason TEXT,
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT seller_responses_invite_fk FOREIGN KEY (publication_id, store_id) REFERENCES procurement.rfq_publication_invites (publication_id, store_id),
     CONSTRAINT seller_responses_store_check CHECK (store_id > 0),
     CONSTRAINT seller_responses_latest_check CHECK (latest_version >= 0),
     CONSTRAINT seller_responses_withdrawn_pair CHECK ((withdrawn_version IS NULL) = (withdrawn_at IS NULL)),

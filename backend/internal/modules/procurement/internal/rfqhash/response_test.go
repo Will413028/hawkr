@@ -7,7 +7,7 @@ import (
 
 func responseBase() SellerResponseInput {
 	return SellerResponseInput{
-		SchemaVersion: SchemaV2, ResponseType: "MANUAL_QUOTE", SpecNote: "規格如圖", UnitBasisQuantity: "1.000", UnitBasisUnit: "KG",
+		SchemaVersion: SchemaV1, ResponseType: "MANUAL_QUOTE", SpecNote: "規格如圖", UnitBasisQuantity: "1.000", UnitBasisUnit: "KG",
 		OfferedQuantity: "3.000", OfferedQuantityUnit: "KG", ConversionBasis: "一箱三公斤", Currency: "TWD", GoodsAmount: 900, ShippingAmount: 100, TaxAmount: 50,
 		TaxInclusionBasis: "TAX_EXCLUDED", TotalAmount: 1050, LeadTimeDays: ptr(int32(3)), PromisedDelivery: ptr(time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC)),
 		ValidUntil: time.Date(2026, 12, 5, 8, 0, 0, 0, time.UTC), TermsNote: "月結", DeviationDisclosure: "無",
@@ -22,14 +22,14 @@ func TestSellerResponseIsDeterministicAndPinned(t *testing.T) {
 	if b, _ := SellerResponse(responseBase()); a != b || len(a) != 64 {
 		t.Fatalf("同輸入要同 hash：%q %q", a, b)
 	}
-	const golden = "8fd699858a71ddb27c97622e13f6a57d13af7a8fa0403ac98197f5633eb6b2c9"
+	const golden = "fa3fa58aa30805fb0124ce81552486fc9faead34f9ddebf9107181ca3b439eb2"
 	if a != golden {
 		t.Errorf("golden 變了：%s", a)
 	}
 }
 
 func TestSellerResponseRejectsUnknownSchemaVersions(t *testing.T) {
-	for _, v := range []string{"", "v0", "v1", "v3", "V2"} {
+	for _, v := range []string{"", "v0", "v2", "V1"} {
 		in := responseBase()
 		in.SchemaVersion = v
 		if got, err := SellerResponse(in); err == nil {

@@ -159,7 +159,7 @@ func QuoteOf(v store.ProcurementSellerResponseVersion) (model.SellerQuote, error
 // PayloadHash 回傳一個版本的內容 hash（A9-D36）：報價內容與幣別，不含 ID、版本號與送出時間。
 func PayloadHash(q model.SellerQuote) (string, error) {
 	return rfqhash.SellerResponse(rfqhash.SellerResponseInput{
-		SchemaVersion: rfqhash.SchemaV2, ResponseType: q.ResponseType, SpecNote: q.SpecNote,
+		SchemaVersion: rfqhash.SchemaV1, ResponseType: q.ResponseType, SpecNote: q.SpecNote,
 		UnitBasisQuantity: q.UnitBasisQuantity, UnitBasisUnit: q.UnitBasisUnit, OfferedQuantity: q.OfferedQuantity, OfferedQuantityUnit: q.OfferedQuantityUnit,
 		ConversionBasis: q.ConversionBasis, Currency: q.Currency, GoodsAmount: q.GoodsAmount, ShippingAmount: q.ShippingAmount, TaxAmount: q.TaxAmount,
 		TaxInclusionBasis: q.TaxInclusionBasis, TotalAmount: q.TotalAmount, LeadTimeDays: q.LeadTimeDays, PromisedDelivery: q.PromisedDelivery,

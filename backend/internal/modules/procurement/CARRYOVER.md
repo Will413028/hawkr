@@ -134,7 +134,7 @@ A9-D25 對開放問題的決定（Will 2026-11-21）：
 | 發布 outbox（INVITE_CREATED／EXTERNAL）與 `rfq_publication_commands` | 跨服務可靠外送；冪等收據 | 否：單體規則 4（M11、S4） | 同 transaction 寫發布、邀請與一則模組事件，投遞由訂閱者做 | `model.RfqPublished` 在 `ExecuteRfqPublication` 的 transaction 內 `events.Publish`；relay 與通知在 A9-3c（Q4）。冪等鍵放在 `rfq_publications` |
 | 核准、確認快照、預覽各存 hash 與 canonical payload 複本，執行時比對存下的 hash | 被參照的列可變 | 否：參照的列不可變（S5） | hash 由不可變的列重算，比對「呼叫端帶來的」與「重算的」 | `internal/rfqhash`（SHA-256 對固定欄位順序的 JSON，原像含 `schemaVersion`）；預覽、執行與讀取端都用 `rfq.compile`／`rfq.SellerFacingHash` 同一個對照（Q5、A9-D35） |
 | 受眾與賣家可見內容兩種 hash 各自的原像（預覽範圍與確認快照的 hash 隨 A9-D35 刪除） | 各自獨立演進 | 成立 | 同演算法、各自一個型別，欄位不共用 | `rfqhash` 的 `Audience`、`SellerFacing`；`TestEvery*FieldChangesTheHash`、`TestAssembledSellerHashCoversEveryApprovalAndRevisionField` 守欄位覆蓋 |
-| 核准存 `candidate_set_id` 並在執行時重驗（A9-D35 推翻 A9-D29(4) 的「候選集不存進核准」） | 當初的理由是「受眾已凍結在 `_recipients`，有效性在預覽時檢查過」 | 否：這只防到預覽當下，擋不住預覽之後同一版本重新搜尋、產生新的有效候選集 | 同意物件存它同意當時依據的候選集，執行時問它現在還是不是有效的 | 指定對象的核准存 `rfq_publication_approvals.candidate_set_id`（`ON DELETE SET NULL`：買家關閉刪候選集時，保留的核准不連帶刪除）；`ExecuteRfqPublication` 以 `search.IsEffective` 重驗，失效回 `VERSION_CONFLICT`（`candidate_set`）。受眾 hash 仍只含模式、政策與有序店家 ID（候選集 ID 不進 hash：它不是賣家看到的內容） |
+| 核准存 `candidate_set_id` 並在執行時重驗（A9-D35 推翻 A9-D29(4) 的「候選集不存進核准」） | 當初的理由是「受眾已凍結在 `_recipients`，有效性在預覽時檢查過」 | 否：這只防到預覽當下，擋不住預覽之後同一版本重新搜尋、產生新的有效候選集 | 同意物件存它同意當時依據的候選集，執行時問它現在還是不是有效的 | 核准存 `rfq_publication_approvals.candidate_set_id`（`ON DELETE SET NULL`：買家關閉刪候選集時，保留的核准不連帶刪除）；`ExecuteRfqPublication` 以 `search.IsEffective` 重驗，失效回 `VERSION_CONFLICT`（`candidate_set`）。受眾 hash 只含有序店家 ID（候選集 ID 不進 hash：它不是賣家看到的內容） |
 | EXTERNAL 站外收件人（prospect lane） | vendor portal | 否（A9-D1 刪） | 只有平台店家 | 邀請只有 `store_id` |
 | 執行的 `canonical_request_hash` 判斷重送是否同一次請求 | 命令表存雜湊 | 否：沒有命令表 | 重送比對冪等鍵所在實體的欄位 | 比對需求、核准、核准版本、讀到的版本與 payload hash；核准版本存在 `rfq_publications.approval_version`（核准本身成功後版本已前進，不能從核准讀回）。發布預覽的重送另比對區間、補充說明、模式、期限、候選集與受眾 |
 | 單一仲裁者：`ClaimApprovalForExecute` 的 CAS（state、version、buyer、`expires_at`） | exactly-one 與零寫入 | 成立 | 同 | 過期、已執行、版本不符都只由這個 UPDATE 判定，Go 不重複檢查；拒絕路徑整筆 rollback，核准維持 PENDING |
@@ -173,7 +173,7 @@ A9-D25 對開放問題的決定（Will 2026-11-21）：
 | 執行：核准過期（APPROVAL_STALE） | VERSION_CONFLICT `publication_approval`，核准維持 PENDING；`expires_at` 當下已過期 | `TestExecuteAnExpiredApprovalIsAVersionConflictAndLeavesItPending`、`TestExecuteApprovalExpiryBoundary` |
 | 執行：DIRECT 受眾名單是空的／hash 不符 | 名單空：VERSION_CONFLICT `publication_approval`；hash 不再存，名單即來源，沒有「存下的 hash 不符」 | `Service.ExecutePublication` |
 | 執行：核准不屬於買家 | NOT_FOUND（舊：CAS 失敗統稱 stale；新契約 not-owned → NOT_FOUND） | `TestExecuteStaleBranchesLeaveTheApprovalPending` |
-| 執行：UnknownAudienceMode、PublicationNotFound（Internal） | 不存在：模式有 CHECK，發布與核准在同 transaction 建立 | schema |
+| 執行：UnknownAudienceMode、PublicationNotFound（Internal） | 不存在：沒有受眾模式（A9-D44 之後受眾只有指定對象，欄位與列舉已刪），發布與核准在同 transaction 建立 | schema |
 | 執行：建 ledger run 與 artifact | 不建（Q3） | `TestExecuteCreatesThePublicationOneEventAndNoRun` |
 | 執行：invite 與 outbox 同 transaction | invite 與 `RfqPublished` 事件同 transaction；任何一步失敗全部還原 | `TestExecuteIsAtomicWhenTheEventSubscriberFails`、`TestExecuteIsAtomicWhenAnInviteInsertFails`、`TestExecuteConcurrentRetriesCreateOnePublicationAndOneEvent` |
 
@@ -195,7 +195,7 @@ A9-D25 對開放問題的決定（Will 2026-11-21）：
 - 略過已有值的選填欄（A9-3b-3b）：SubmitAnswer 對已填的 PACKAGING、BUDGET_PER_UNIT 送 `skip` 仍把它記進 `skipped_slots` 並寫一個內容不變的新版本；舊 ai-service 同（`services/ai-service/internal/procurement/usecase/answer.go:98-103` 的略過只擋必填與報價必填欄，不看現有值），照搬、不加拒絕。
 - 版本祖先（A9-D33(3)）：`parent_revision_id` 是內容祖先而不是被取代者；Rewind 的新版（來源 REWIND）內容同目標版、祖先是目標版（git 在舊 commit 上開分支、LangGraph time travel），不重新啟用舊版；取代順序由 `revision_no` 與現行表示。目標沿祖先鏈計算：最近一個改動該格的版本的祖先，所以再倒回同一格會繼續往前退。沒有可倒回的內容回 FAILED_PRECONDITION，不加 ErrorReason。
 - SubmitAnswer 只收確定性回答（A9-D33(1)）：選項、數量、略過、對到唯一末層的品項文字；提問卡與中斷永遠由 run 擁有（業界：LangGraph interrupt、OpenAI `required_action` 屬於 run／thread）。UNIT、ITEM_DISAMBIGUATION、ITEM_RESOLUTION 不是回答的欄位。
-- 詢價：核准、發布無 hash 與快照複本、無 `candidate_set_policy_version`、`price_preview_version`；核准存 `candidate_set_id`（A9-D35，指定對象時，`ON DELETE SET NULL`）；沒有確認快照與價格預覽兩張表（A9-D35）；hash 由 Go 重算，S3、S5；接受單無 `version`、`request_hash`、`lane`。
+- 詢價：核准、發布無 hash 與快照複本、無 `candidate_set_policy_version`、`price_preview_version`；核准存 `candidate_set_id`（A9-D35，`ON DELETE SET NULL`）；沒有確認快照與價格預覽兩張表（A9-D35）；hash 由 Go 重算，S3、S5；接受單無 `version`、`request_hash`、`lane`。
 - 狀態值收斂（S6）：發布 `PUBLISHED`；`write_closed_reason` 只有 `DECLINED`；接受單 `state` 為 `ACTIVE`、`ORDER_FAILED`（新增，A9-D19 修訂：建單失敗解除 live 鎖）；邀請 `delivery_state` 無 `NOT_SENT`。proto `PublicationState` 刪 `SUPERSEDED`、`CANCELLED`。
 - 回價：版本無驗證欄位與 hash 複本；賣家回價身分列無 `buyer_id`、`version`；品相欄位（品級、檢驗備註）已換成選填 `spec_note`（A9-D44）；`conversion_basis` 仍是契約欄位。
 - run：無 `controller_kind`、`version`、`domain_ref_type`、`domain_ref_id`（改 typed 外鍵）；`agent_run_inputs` 無 `retention_class`、`input_schema_version`，買家原文是具名欄位；`agent_run_events` 主鍵改 `(run_id, seq)`、無 `schema_version`、`trace_id`；`agent_run_interrupts` 無 `expires_at`、`response_schema_version`（3b 確認是否有寫入者）、`run_artifacts` 無 `domain_ref_*`、`updated_at`。

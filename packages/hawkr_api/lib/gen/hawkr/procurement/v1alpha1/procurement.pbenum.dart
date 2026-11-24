@@ -456,28 +456,6 @@ class BlockKind extends $pb.ProtobufEnum {
   const BlockKind._(super.value, super.name);
 }
 
-/// AudienceMode 是詢價發給誰。
-class AudienceMode extends $pb.ProtobufEnum {
-  static const AudienceMode AUDIENCE_MODE_UNSPECIFIED =
-      AudienceMode._(0, _omitEnumNames ? '' : 'AUDIENCE_MODE_UNSPECIFIED');
-
-  /// 指定對象：從候選搜尋的結果勾選；發布時凍結的邀請列是賣家可見性的唯一依據。
-  static const AudienceMode AUDIENCE_MODE_DIRECT_RECIPIENTS = AudienceMode._(
-      1, _omitEnumNames ? '' : 'AUDIENCE_MODE_DIRECT_RECIPIENTS');
-
-  static const $core.List<AudienceMode> values = <AudienceMode>[
-    AUDIENCE_MODE_UNSPECIFIED,
-    AUDIENCE_MODE_DIRECT_RECIPIENTS,
-  ];
-
-  static final $core.List<AudienceMode?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 1);
-  static AudienceMode? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const AudienceMode._(super.value, super.name);
-}
-
 /// PublicationState 是一次發布的狀態。
 class PublicationState extends $pb.ProtobufEnum {
   static const PublicationState PUBLICATION_STATE_UNSPECIFIED =

@@ -6,9 +6,6 @@ import (
 	"uuid"
 )
 
-// 發布受眾的模式（等於 rfq_publication_approvals.audience_mode 與 CHECK 的值）。
-const AudienceDirectRecipients = "DIRECT_RECIPIENTS"
-
 // PublicationStatePublished 是發布目前唯一的狀態（rfq_publications.state 的 CHECK）。
 const PublicationStatePublished = "PUBLISHED"
 
@@ -57,7 +54,6 @@ type Publication struct {
 	ID               uuid.UUID
 	Version          int32
 	State            string
-	AudienceMode     string
 	AudienceHash     string
 	SellerFacingHash string
 	PublishedAt      time.Time
@@ -75,7 +71,6 @@ type RfqInvite struct {
 type RfqPublished struct {
 	PublicationID, RequestID, ApprovalID uuid.UUID
 	BuyerID                              int64
-	AudienceMode                         string
 	PublishedAt                          time.Time
 	Invites                              []RfqInvite
 }

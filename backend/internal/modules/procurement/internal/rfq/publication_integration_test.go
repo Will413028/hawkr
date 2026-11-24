@@ -122,13 +122,9 @@ func TestPreviewPublicationShapeErrorsPointAtTheField(t *testing.T) {
 	f := newFixture(t)
 	set, c := f.searched(10, 20)
 
-	in := f.publicationIn()
-	in.AudienceMode = ""
-	_, err := f.service().PreviewPublication(ctx, in)
-	wantInvalid(t, err, "AudienceMode")
 	noSet := f.directIn(set, c[0])
 	noSet.CandidateSetID = nil
-	_, err = f.service().PreviewPublication(ctx, noSet)
+	_, err := f.service().PreviewPublication(ctx, noSet)
 	wantInvalid(t, err, "CandidateSetID")
 	_, err = f.service().PreviewPublication(ctx, f.directIn(set))
 	wantInvalid(t, err, "SelectedCandidateIDs")
@@ -318,7 +314,7 @@ func TestExecuteCreatesThePublicationOneEventAndNoRun(t *testing.T) {
 	p := f.approved(f.publicationIn())
 	pub, err := f.execute(f.executeIn(p))
 	must(t, err)
-	if pub.Replayed || pub.State != model.PublicationStatePublished || pub.AudienceMode != model.AudienceDirectRecipients || pub.Version != 1 ||
+	if pub.Replayed || pub.State != model.PublicationStatePublished || pub.Version != 1 ||
 		pub.AudienceHash != p.AudienceHash || pub.SellerFacingHash != p.SellerFacingHash || !pub.PublishedAt.Equal(f.now) {
 		t.Fatalf("發布 = %+v，預覽 %+v", pub, p)
 	}
@@ -327,7 +323,7 @@ func TestExecuteCreatesThePublicationOneEventAndNoRun(t *testing.T) {
 	}
 	evs := f.events()
 	if len(evs) != 1 || evs[0].PublicationID != pub.ID || evs[0].RequestID != f.request || evs[0].BuyerID != f.buyer || evs[0].ApprovalID != p.ApprovalID ||
-		evs[0].AudienceMode != model.AudienceDirectRecipients || len(evs[0].Invites) != 1 {
+		len(evs[0].Invites) != 1 {
 		t.Fatalf("事件 = %+v", evs)
 	}
 	if n := f.count("procurement.rfq_publication_invites"); n != 1 {

@@ -106,7 +106,7 @@ func (s Service) ExecutePublication(ctx context.Context, in ExecuteInput) (model
 			return fmt.Errorf("rfq：收尾發布核准 n=%d：%w", n, err)
 		}
 		if err := events.Publish(ctx, s.Events, model.RfqPublished{
-			PublicationID: pub.ID, RequestID: in.RequestID, ApprovalID: claimed.ID, BuyerID: in.BuyerID, AudienceMode: claimed.AudienceMode, PublishedAt: now, Invites: invites,
+			PublicationID: pub.ID, RequestID: in.RequestID, ApprovalID: claimed.ID, BuyerID: in.BuyerID, PublishedAt: now, Invites: invites,
 		}); err != nil {
 			return fmt.Errorf("rfq：發布事件：%w", err)
 		}
@@ -148,7 +148,7 @@ func replayPublication(ctx context.Context, q *store.Queries, in ExecuteInput) (
 
 func publicationOf(p store.ProcurementRfqPublication, a store.ProcurementRfqPublicationApproval, c compiled, replayed bool) model.Publication {
 	return model.Publication{
-		ID: p.ID, Version: p.Version, State: p.State, AudienceMode: a.AudienceMode, AudienceHash: c.audienceHash, SellerFacingHash: c.sellerHash,
+		ID: p.ID, Version: p.Version, State: p.State, AudienceHash: c.audienceHash, SellerFacingHash: c.sellerHash,
 		PublishedAt: p.PublishedAt, Replayed: replayed,
 	}
 }

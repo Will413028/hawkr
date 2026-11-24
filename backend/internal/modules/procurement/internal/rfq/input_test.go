@@ -8,13 +8,12 @@ import (
 
 	"uuid"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
 func directRecipients() PreviewPublicationInput {
 	set := uuid.NewV7()
-	return PreviewPublicationInput{LowerBoundAmount: 100, UpperBoundAmount: 200, AudienceMode: model.AudienceDirectRecipients, CandidateSetID: &set, SelectedCandidateIDs: []uuid.UUID{uuid.NewV7()}}
+	return PreviewPublicationInput{LowerBoundAmount: 100, UpperBoundAmount: 200, CandidateSetID: &set, SelectedCandidateIDs: []uuid.UUID{uuid.NewV7()}}
 }
 
 func TestCheckInputReportsEachInvalidInputOnItsField(t *testing.T) {
@@ -30,8 +29,6 @@ func TestCheckInputReportsEachInvalidInputOnItsField(t *testing.T) {
 		{"note over the limit", func(i *PreviewPublicationInput) { i.BuyerNote = strings.Repeat("字", MaxBuyerNoteRunes+1) }, "BuyerNote"},
 		{"note only the padding pushes it over", func(i *PreviewPublicationInput) { i.BuyerNote = "  " + strings.Repeat("字", MaxBuyerNoteRunes) + "  " }, ""},
 		{"no candidate set", func(i *PreviewPublicationInput) { i.CandidateSetID = nil }, "CandidateSetID"},
-		{"zero mode", func(i *PreviewPublicationInput) { i.AudienceMode = "" }, "AudienceMode"},
-		{"unknown mode", func(i *PreviewPublicationInput) { i.AudienceMode = "ALL" }, "AudienceMode"},
 	} {
 		in := directRecipients()
 		tc.edit(&in)

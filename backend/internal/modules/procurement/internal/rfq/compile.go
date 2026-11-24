@@ -69,7 +69,7 @@ func SellerFacingHash(ctx context.Context, q *store.Queries, buyerID int64, requ
 }
 
 func audienceInput(a store.ProcurementRfqPublicationApproval, storeIDs []int64) rfqhash.AudienceInput {
-	return rfqhash.AudienceInput{SchemaVersion: a.SchemaVersion, Mode: a.AudienceMode, StoreIDs: storeIDs}
+	return rfqhash.AudienceInput{SchemaVersion: a.SchemaVersion, StoreIDs: storeIDs}
 }
 
 func sellerInput(schemaVersion string, p model.SellerFacing) rfqhash.SellerFacingInput {

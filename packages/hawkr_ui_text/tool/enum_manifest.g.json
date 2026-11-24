@@ -218,13 +218,6 @@
       "serverOwned": false
     },
     {
-      "name": "hawkr.procurement.v1alpha1.AudienceMode",
-      "dartClass": "AudienceMode",
-      "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",
-      "inCatalog": false,
-      "serverOwned": false
-    },
-    {
       "name": "hawkr.procurement.v1alpha1.BlockKind",
       "dartClass": "BlockKind",
       "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",

@@ -11,7 +11,6 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
-	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/quote"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/rfq"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
@@ -105,20 +104,25 @@ func (f *fixture) revise() {
 	f.exec(`UPDATE procurement.request_revisions SET quantity = 5 WHERE id = $1`, f.revision)
 }
 
-// publish 預覽並執行一次發布（指定一家店），回發布 ID 與賣家可見內容的 hash。
+// publish 預覽並執行一次發布，邀請測試會回價的店（inviteFirstStore 到 inviteLastStore；回價列的外鍵要求有邀請列），回發布 ID 與賣家可見內容的 hash。
 func (f *fixture) publish() (uuid.UUID, string) {
 	f.t.Helper()
 	ctx := context.Background()
 	svc := rfq.Service{DB: f.d, Now: func() time.Time { return f.now }, Events: f.bus}
 	q := store.New(f.d.Conn(ctx))
-	set, cand := uuid.NewV7(), uuid.NewV7()
+	set := uuid.NewV7()
 	must(f.t, q.InsertCandidateSet(ctx, store.InsertCandidateSetParams{ID: set, RequestID: f.request, RequestRevisionID: f.revision, BuyerID: f.buyer, Now: f.now}))
-	must(f.t, q.InsertCandidate(ctx, store.InsertCandidateParams{ID: cand, CandidateSetID: set, StoreID: 10, SourceID: "p", Rank: 0, Now: f.now}))
+	var cands []uuid.UUID
+	for s := int64(inviteFirstStore); s <= inviteLastStore; s++ {
+		cand := uuid.NewV7()
+		cands = append(cands, cand)
+		must(f.t, q.InsertCandidate(ctx, store.InsertCandidateParams{ID: cand, CandidateSetID: set, StoreID: s, SourceID: "p", Rank: int32(s - inviteFirstStore), Now: f.now}))
+	}
 	f.exec(`INSERT INTO procurement.agent_runs (id, buyer_id, request_id, candidate_set_id, run_type, status, client_request_id, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, 'CANDIDATE_SEARCH', 'SUCCEEDED', $5, $6, $6)`, uuid.NewV7(), f.buyer, f.request, set, uuid.NewV7(), f.now)
 	p, err := svc.PreviewPublication(ctx, rfq.PreviewPublicationInput{
 		BuyerID: f.buyer, RequestID: f.request, ClientRequestID: uuid.NewV7(), ExpectedRevisionID: f.revision, LowerBoundAmount: 100, UpperBoundAmount: 200,
-		AudienceMode: model.AudienceDirectRecipients, CandidateSetID: &set, SelectedCandidateIDs: []uuid.UUID{cand},
+		CandidateSetID: &set, SelectedCandidateIDs: cands,
 	})
 	must(f.t, err)
 	pub, err := svc.ExecutePublication(ctx, rfq.ExecuteInput{
@@ -128,6 +132,8 @@ func (f *fixture) publish() (uuid.UUID, string) {
 	must(f.t, err)
 	return pub.ID, pub.SellerFacingHash
 }
+
+const inviteFirstStore, inviteLastStore = 10, 21
 
 // version 是賣家回價的一個版本（測試直接寫表）。
 type version struct {

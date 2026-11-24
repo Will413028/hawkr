@@ -15,6 +15,7 @@ import (
 	"uuid"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
@@ -102,7 +103,7 @@ func seed(ctx context.Context, t *testing.T, q *store.Queries, buyerID int64, pu
 	}
 	c.approval, c.publication, c.invite, c.sellerResponse, c.acceptance = id(), id(), id(), id(), id()
 	n, err = q.InsertApproval(ctx, store.InsertApprovalParams{
-		ID: c.approval, BuyerID: &buyerID, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 400, RangeUpperAmount: 600, BuyerNote: "請盡快", CandidateSetID: &c.candidateSet, AudienceMode: "DIRECT_RECIPIENTS",
+		ID: c.approval, BuyerID: &buyerID, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 400, RangeUpperAmount: 600, BuyerNote: "請盡快", CandidateSetID: &c.candidateSet,
 		SchemaVersion: "v1", ClientRequestID: id(), Now: epoch, ExpiresAt: epoch.Add(time.Hour),
 	})
 	rows("InsertApproval", n, err)
@@ -330,7 +331,7 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 	}
 	expiredApproval := id()
 	if n, err := q.InsertApproval(ctx, store.InsertApprovalParams{
-		ID: expiredApproval, BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 1, RangeUpperAmount: 2, CandidateSetID: &c.candidateSet, AudienceMode: "DIRECT_RECIPIENTS",
+		ID: expiredApproval, BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 1, RangeUpperAmount: 2, CandidateSetID: &c.candidateSet,
 		SchemaVersion: "v1", ClientRequestID: id(), Now: epoch, ExpiresAt: epoch.Add(time.Hour),
 	}); err != nil || n != 1 {
 		t.Fatalf("InsertApproval（過期測試）n=%d err=%v", n, err)
@@ -570,6 +571,19 @@ func TestBuyerDeletedIsAtomicWhenALaterStepFails(t *testing.T) {
 }
 
 // R2-1：conversion_basis 在契約不是必填，空字串要能寫入；超過 500 個字元仍被擋。
+// A9-D44(2)：邀請列是賣家可見性的唯一依據，沒被邀請的店不能有回價列；被邀請的店可以。
+func TestSellerResponseRequiresAnInviteForTheStore(t *testing.T) {
+	ctx := context.Background()
+	d := newDB(t)
+	q := store.New(d.Pool())
+	c := seed(ctx, t, q, 62, true)
+	err := q.InsertSellerResponse(ctx, store.InsertSellerResponseParams{ID: id(), PublicationID: c.publication, RequestID: c.request, StoreID: storeID + 1, Now: epoch})
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != "23503" || pgErr.ConstraintName != "seller_responses_invite_fk" {
+		t.Fatalf("沒被邀請的店寫回價列要被外鍵擋下，得到 %v", err)
+	}
+}
+
 func TestSellerResponseVersionAllowsEmptyConversionBasis(t *testing.T) {
 	ctx := context.Background()
 	d := newDB(t)
@@ -602,7 +616,7 @@ func TestMarkApprovalSucceededSurvivesBuyerDeletion(t *testing.T) {
 	c := seed(ctx, t, q, 71, false)
 	approval := id()
 	if n, err := q.InsertApproval(ctx, store.InsertApprovalParams{
-		ID: approval, BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 1, RangeUpperAmount: 2, AudienceMode: "DIRECT_RECIPIENTS",
+		ID: approval, BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 1, RangeUpperAmount: 2,
 		SchemaVersion: "v1", ClientRequestID: id(), Now: epoch, ExpiresAt: epoch.Add(time.Hour),
 	}); err != nil || n != 1 {
 		t.Fatalf("InsertApproval n=%d err=%v", n, err)

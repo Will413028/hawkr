@@ -463,13 +463,6 @@
       "serverOwned": false
     },
     {
-      "name": "hawkr.procurement.v1alpha1.AudienceMode",
-      "tsName": "AudienceMode",
-      "tsModule": "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb",
-      "inCatalog": false,
-      "serverOwned": false
-    },
-    {
       "name": "hawkr.procurement.v1alpha1.BlockKind",
       "tsName": "BlockKind",
       "tsModule": "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb",

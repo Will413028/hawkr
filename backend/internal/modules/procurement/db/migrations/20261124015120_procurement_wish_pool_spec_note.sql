@@ -1,0 +1,10 @@
+-- Delete WISH_POOL approvals (A9-D44); publications, invites, responses and recipients go with them by ON DELETE CASCADE.
+DELETE FROM "procurement"."rfq_publication_approvals" WHERE "audience_mode" <> 'DIRECT_RECIPIENTS';
+-- Delete responses from stores that were never invited (the new invite foreign key requires an invite row).
+DELETE FROM "procurement"."seller_responses" r WHERE NOT EXISTS (SELECT 1 FROM "procurement"."rfq_publication_invites" i WHERE i."publication_id" = r."publication_id" AND i."store_id" = r."store_id");
+-- Modify "rfq_publication_approvals" table
+ALTER TABLE "procurement"."rfq_publication_approvals" DROP CONSTRAINT "rfq_publication_approvals_candidate_set_check", DROP CONSTRAINT "rfq_publication_approvals_mode_check", DROP CONSTRAINT "rfq_publication_approvals_policy_check", DROP COLUMN "audience_mode", DROP COLUMN "audience_policy_id", DROP COLUMN "audience_policy_version";
+-- Modify "seller_response_versions" table
+ALTER TABLE "procurement"."seller_response_versions" DROP CONSTRAINT "seller_response_versions_notes_check", DROP CONSTRAINT "seller_response_versions_quality_grade_check", ADD CONSTRAINT "seller_response_versions_spec_note_check" CHECK ((char_length(spec_note) <= 1000) AND (spec_note !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'::text)), DROP COLUMN "offered_quality_grade", DROP COLUMN "offered_quality_inspection_notes", ADD COLUMN "spec_note" text NOT NULL DEFAULT '';
+-- Modify "seller_responses" table
+ALTER TABLE "procurement"."seller_responses" ADD CONSTRAINT "seller_responses_invite_fk" FOREIGN KEY ("publication_id", "store_id") REFERENCES "procurement"."rfq_publication_invites" ("publication_id", "store_id") ON UPDATE NO ACTION ON DELETE NO ACTION;

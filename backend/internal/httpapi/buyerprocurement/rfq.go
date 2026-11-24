@@ -23,7 +23,7 @@ var (
 	pricePaths   = rpc.FieldPaths{"LowerBoundAmount": "buyer_requested_range.lower_bound_amount", "UpperBoundAmount": "buyer_requested_range.upper_bound_amount"}
 	publishPaths = rpc.FieldPaths{
 		"LowerBoundAmount": "buyer_requested_range.lower_bound_amount", "UpperBoundAmount": "buyer_requested_range.upper_bound_amount", "BuyerNote": "buyer_note",
-		"AudienceMode": "audience_mode", "CandidateSetID": "candidate_set_id", "SelectedCandidateIDs[]": "selected_candidate_ids[]",
+		"CandidateSetID": "candidate_set_id", "SelectedCandidateIDs[]": "selected_candidate_ids[]",
 		"ResponseDeadline": "response_deadline", "client_request_id": "client_request_id",
 	}
 	executePaths = rpc.FieldPaths{"client_request_id": "client_request_id"}
@@ -88,13 +88,9 @@ func (h *App) PreviewRfqPublication(ctx context.Context, req *connect.Request[pb
 	if r == nil {
 		return nil, rpc.RequiredField("buyer_requested_range", "buyer_requested_range 不能是空的")
 	}
-	mode, err := audienceModeFromProto(msg.GetAudienceMode())
-	if err != nil {
-		return nil, err
-	}
 	in := procurement.PreviewRfqPublicationInput{
 		BuyerID: buyerID, RequestID: requestID, ClientRequestID: cid, ExpectedRevisionID: expected,
-		LowerBoundAmount: r.GetLowerBoundAmount(), UpperBoundAmount: r.GetUpperBoundAmount(), BuyerNote: msg.GetBuyerNote(), AudienceMode: mode,
+		LowerBoundAmount: r.GetLowerBoundAmount(), UpperBoundAmount: r.GetUpperBoundAmount(), BuyerNote: msg.GetBuyerNote(),
 	}
 	if raw := msg.GetCandidateSetId(); raw != "" {
 		id, err := rpc.ParseUUID("candidate_set_id", raw)
@@ -165,34 +161,10 @@ func (h *App) ExecuteRfqPublication(ctx context.Context, req *connect.Request[pb
 	if err != nil {
 		return nil, err
 	}
-	mode, err := audienceModeToProto(pub.AudienceMode)
-	if err != nil {
-		return nil, err
-	}
 	return connect.NewResponse(&pb.ExecuteRfqPublicationResponse{
-		PublicationId: pub.ID.String(), PublicationVersion: strconv.FormatInt(int64(pub.Version), 10), State: state, AudienceMode: mode,
+		PublicationId: pub.ID.String(), PublicationVersion: strconv.FormatInt(int64(pub.Version), 10), State: state,
 		AudienceHash: pub.AudienceHash, SellerFacingPayloadHash: pub.SellerFacingHash, PublishTime: timestamppb.New(pub.PublishedAt), Replayed: pub.Replayed,
 	}), nil
-}
-
-// audienceModeFromProto 把 proto 的受眾模式轉成模組的代碼；UNSPECIFIED 與不認得的值是請求錯誤。
-func audienceModeFromProto(m pb.AudienceMode) (string, error) {
-	switch m {
-	case pb.AudienceMode_AUDIENCE_MODE_DIRECT_RECIPIENTS:
-		return procurement.AudienceDirectRecipients, nil
-	case pb.AudienceMode_AUDIENCE_MODE_UNSPECIFIED:
-		return "", rpc.RequiredField("audience_mode", "audience_mode 不能是空的")
-	default:
-		return "", rpc.RequiredField("audience_mode", "audience_mode 不認得")
-	}
-}
-
-func audienceModeToProto(code string) (pb.AudienceMode, error) {
-	v, ok := pb.AudienceMode_value["AUDIENCE_MODE_"+code]
-	if !ok || v == int32(pb.AudienceMode_AUDIENCE_MODE_UNSPECIFIED) {
-		return 0, fmt.Errorf("buyerprocurement：受眾模式 %q 沒有對應的 AudienceMode", code)
-	}
-	return pb.AudienceMode(v), nil
 }
 
 func publicationStateToProto(code string) (pb.PublicationState, error) {

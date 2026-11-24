@@ -1,10 +1,10 @@
 -- name: InsertApproval :execrows
 INSERT INTO procurement.rfq_publication_approvals (
     id, buyer_id, request_id, request_revision_id, range_lower_amount, range_upper_amount, buyer_note, candidate_set_id, response_deadline,
-    audience_mode, state, schema_version, client_request_id, generated_at, expires_at, created_at, updated_at)
+    state, schema_version, client_request_id, generated_at, expires_at, created_at, updated_at)
 VALUES (
     @id, @buyer_id, @request_id, @request_revision_id, @range_lower_amount, @range_upper_amount, @buyer_note, @candidate_set_id, @response_deadline,
-    @audience_mode, 'PENDING', @schema_version, @client_request_id, @now, @expires_at, @now, @now)
+    'PENDING', @schema_version, @client_request_id, @now, @expires_at, @now, @now)
 ON CONFLICT (buyer_id, client_request_id) DO NOTHING;
 
 -- name: GetApproval :one

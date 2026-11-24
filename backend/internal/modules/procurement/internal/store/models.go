@@ -183,7 +183,6 @@ type ProcurementRfqPublicationApproval struct {
 	BuyerNote         string
 	CandidateSetID    *uuid.UUID
 	ResponseDeadline  *time.Time
-	AudienceMode      string
 	State             string
 	SchemaVersion     string
 	ClientRequestID   uuid.UUID

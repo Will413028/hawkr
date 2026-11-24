@@ -29,8 +29,8 @@ type SellerResponseInput struct {
 // SellerResponse 回傳回價版本的內容 hash：SHA-256 的小寫十六進位（A9-D36）。
 func SellerResponse(in SellerResponseInput) (string, error) {
 	switch in.SchemaVersion {
-	case SchemaV2:
-		return sum(responseV2{
+	case SchemaV1:
+		return sum(responseV1{
 			SchemaVersion: in.SchemaVersion, ResponseType: in.ResponseType, SpecNote: in.SpecNote,
 			UnitBasisQuantity: in.UnitBasisQuantity, UnitBasisUnit: in.UnitBasisUnit, OfferedQuantity: in.OfferedQuantity, OfferedQuantityUnit: in.OfferedQuantityUnit,
 			ConversionBasis: in.ConversionBasis, Currency: in.Currency, GoodsAmount: in.GoodsAmount, ShippingAmount: in.ShippingAmount, TaxAmount: in.TaxAmount,
@@ -50,7 +50,7 @@ func instant(t *time.Time) *string {
 	return &s
 }
 
-type responseV2 struct {
+type responseV1 struct {
 	SchemaVersion       string  `json:"schemaVersion"`
 	ResponseType        string  `json:"responseType"`
 	SpecNote            string  `json:"specNote"`
