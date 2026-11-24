@@ -739,14 +739,13 @@ func TestSearchOrders_NoBuyerFilter_PassesThroughEmpty(t *testing.T) {
 	}
 }
 
-// 49 §5.3 #3：訂單詳情出貨/收貨照片、評論附圖，proto 值為 objectKey，
+// 49 §5.3 #3：訂單詳情收貨照片、評論附圖，proto 值為 objectKey，
 // Gateway 回 {語意}Keys（裸 key）+ {語意}Urls（BuildURL 組），值形正確且對存量完整 URL passthrough。
 func TestConvertOrderDetail_PhotoAndReviewDualField(t *testing.T) {
 	const base = "https://test-media.example.com"
 	d := &orderpb.OrderDetailView{
-		OrderNo:           "O1",
-		ShipmentPhotoKeys: []string{"public/shipping/1/a.jpg"},
-		ReceiptPhotoKeys:  []string{"public/order/1/r.jpg", "https://lh3.googleusercontent.com/x"},
+		OrderNo:          "O1",
+		ReceiptPhotoKeys: []string{"public/order/1/r.jpg", "https://lh3.googleusercontent.com/x"},
 		Review: &orderpb.OrderReviewView{
 			Rating:    "5",
 			ImageKeys: []string{"public/review/1/i.jpg"},
@@ -754,12 +753,6 @@ func TestConvertOrderDetail_PhotoAndReviewDualField(t *testing.T) {
 	}
 	r := convertOrderDetail(d, base)
 
-	if len(r.ShipmentPhotoKeys) != 1 || r.ShipmentPhotoKeys[0] != "public/shipping/1/a.jpg" {
-		t.Errorf("ShipmentPhotoKeys = %v, want bare key", r.ShipmentPhotoKeys)
-	}
-	if len(r.ShipmentPhotoUrls) != 1 || r.ShipmentPhotoUrls[0] != base+"/i/original/public/shipping/1/a.jpg" {
-		t.Errorf("ShipmentPhotoUrls = %v, want composed URL", r.ShipmentPhotoUrls)
-	}
 	// 收貨照片：本平台 key 組 URL；外部 http（Google）passthrough 不重複組
 	if r.ReceiptPhotoUrls[0] != base+"/i/original/public/order/1/r.jpg" {
 		t.Errorf("ReceiptPhotoUrls[0] = %q, want composed", r.ReceiptPhotoUrls[0])

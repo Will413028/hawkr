@@ -18,9 +18,8 @@ type mockProductServiceClient struct {
 	DeleteProductFn                func(ctx context.Context, in *productpb.DeleteProductRequest, opts ...grpc.CallOption) (*productpb.DeleteProductResponse, error)
 	GetPublicSellerCitiesSummaryFn func(ctx context.Context, in *productpb.GetPublicSellerCitiesSummaryRequest, opts ...grpc.CallOption) (*productpb.GetPublicSellerCitiesSummaryResponse, error)
 
-	CalculateShippingOptionsFn func(ctx context.Context, in *productpb.CalculateShippingOptionsRequest, opts ...grpc.CallOption) (*productpb.CalculateShippingOptionsResponse, error)
-	PurgeProductCacheFn        func(ctx context.Context, in *productpb.PurgeProductCacheRequest, opts ...grpc.CallOption) (*productpb.PurgeProductCacheResponse, error)
-	VerifyCertificationFn      func(ctx context.Context, in *productpb.VerifyCertificationRequest, opts ...grpc.CallOption) (*productpb.VerifyCertificationResponse, error)
+	PurgeProductCacheFn   func(ctx context.Context, in *productpb.PurgeProductCacheRequest, opts ...grpc.CallOption) (*productpb.PurgeProductCacheResponse, error)
+	VerifyCertificationFn func(ctx context.Context, in *productpb.VerifyCertificationRequest, opts ...grpc.CallOption) (*productpb.VerifyCertificationResponse, error)
 }
 
 func (m *mockProductServiceClient) GetProductList(ctx context.Context, in *productpb.GetProductListRequest, opts ...grpc.CallOption) (*productpb.GetProductListResponse, error) {
@@ -92,12 +91,6 @@ func (m *mockProductServiceClient) GetRelatedProducts(ctx context.Context, in *p
 func (m *mockProductServiceClient) DeleteProduct(ctx context.Context, in *productpb.DeleteProductRequest, opts ...grpc.CallOption) (*productpb.DeleteProductResponse, error) {
 	if m.DeleteProductFn != nil {
 		return m.DeleteProductFn(ctx, in, opts...)
-	}
-	return nil, nil
-}
-func (m *mockProductServiceClient) CalculateShippingOptions(ctx context.Context, in *productpb.CalculateShippingOptionsRequest, opts ...grpc.CallOption) (*productpb.CalculateShippingOptionsResponse, error) {
-	if m.CalculateShippingOptionsFn != nil {
-		return m.CalculateShippingOptionsFn(ctx, in, opts...)
 	}
 	return nil, nil
 }

@@ -90,14 +90,13 @@ func legacyEnvelopeGuard() gogrpc.UnaryClientInterceptor {
 }
 
 // ---------------------------------------------------------------------------
-// 可腳本化的 order-service 替身（四支結帳 RPC 全含）
+// 可腳本化的 order-service 替身（三支結帳 RPC）
 // ---------------------------------------------------------------------------
 
 type checkoutScript struct {
-	preview     *orderpb.CheckoutPreviewResponse
-	confirm     *orderpb.CheckoutConfirmResponse
-	validate    *orderpb.CheckoutValidateResponse
-	shippingFee *orderpb.CheckoutShippingFeeResponse
+	preview  *orderpb.CheckoutPreviewResponse
+	confirm  *orderpb.CheckoutConfirmResponse
+	validate *orderpb.CheckoutValidateResponse
 	// byCheckoutID 讓同一台 server 依請求內容回不同腳本，供併發污染測試使用。
 	byCheckoutID map[string]*orderpb.CheckoutConfirmResponse
 }
@@ -122,10 +121,6 @@ func (g *checkoutGoldenServer) CheckoutConfirm(_ context.Context, req *orderpb.C
 
 func (g *checkoutGoldenServer) CheckoutValidate(context.Context, *orderpb.CheckoutValidateRequest) (*orderpb.CheckoutValidateResponse, error) {
 	return g.s.validate, nil
-}
-
-func (g *checkoutGoldenServer) CheckoutShippingFee(context.Context, *orderpb.CheckoutShippingFeeRequest) (*orderpb.CheckoutShippingFeeResponse, error) {
-	return g.s.shippingFee, nil
 }
 
 type stackMode int
@@ -176,7 +171,6 @@ func newCheckoutGoldenRouter(t *testing.T, s *checkoutScript, mode stackMode) ht
 	app.Use(fakeJWTAuth())
 	{
 		app.POST("/validate", h.CheckoutValidate)
-		app.POST("/shipping_fee", h.CheckoutShippingFee)
 		app.POST("/preview", h.CheckoutPreview)
 		app.POST("/confirm", h.CheckoutConfirm)
 	}
@@ -286,10 +280,9 @@ type goldenCase struct {
 func checkoutGoldenCases() []goldenCase {
 	base := func() *checkoutScript {
 		return &checkoutScript{
-			preview:     goldenPreviewOK(),
-			confirm:     goldenConfirmOK(),
-			validate:    &orderpb.CheckoutValidateResponse{Code: 0, Message: "success", Data: &orderpb.CheckoutValidateData{Valid: true}},
-			shippingFee: &orderpb.CheckoutShippingFeeResponse{Code: 0, Message: "success", Data: &orderpb.CheckoutShippingFeeData{}},
+			preview:  goldenPreviewOK(),
+			confirm:  goldenConfirmOK(),
+			validate: &orderpb.CheckoutValidateResponse{Code: 0, Message: "success", Data: &orderpb.CheckoutValidateData{Valid: true}},
 		}
 	}
 	return []goldenCase{
@@ -381,16 +374,6 @@ func checkoutGoldenCases() []goldenCase {
 				s := base()
 				s.validate = &orderpb.CheckoutValidateResponse{Code: 0, Message: "success",
 					Data: &orderpb.CheckoutValidateData{Valid: false, UnavailableItems: goldenUnavailable()}}
-				return s
-			},
-		},
-		{
-			name: "shipping_fee/4091", path: "/app/checkout/shipping_fee",
-			body: map[string]any{"shippingMethod": "3002", "deliveryTemp": "3201", "receiverZipCode": "100",
-				"items": []map[string]any{{"skuId": "510", "quantity": "5", "productId": "8"}}},
-			script: func() *checkoutScript {
-				s := base()
-				s.shippingFee = &orderpb.CheckoutShippingFeeResponse{Code: 4091, Message: "運費已變動"}
 				return s
 			},
 		},

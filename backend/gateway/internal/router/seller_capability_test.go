@@ -74,25 +74,6 @@ var expectedSellerRoutes = []routeCap{
 	// 非賣家專屬資料，只掛 JWTAuth 不掛 capability——2026-08-27 推翻，改採「其餘
 	// 全鎖含純唯讀查看」原則（46 §3.4 dashboard/CRM 查詢/報表同款裁決）收斂進
 	// CAP_MARKETING（BLOCK-if-suspended，停權賣家不可見）。
-	{"POST", "/api/v1/app/shipments/:order_no/call_tcat", authz.CapOrderFulfill},
-	{"POST", "/api/v1/app/shipments/:order_no/confirm", authz.CapOrderFulfill},
-	{"POST", "/api/v1/app/shipments/:order_no/generate_home_label", authz.CapOrderFulfill},
-	{"POST", "/api/v1/app/shipments/:order_no/print_cvs_label", authz.CapOrderFulfill},
-	{"GET", "/api/v1/app/shipments/:order_no/tracking", authz.CapOrderFulfill},
-	{"GET", "/api/v1/app/shipments/anomalies", authz.CapOrderFulfill},
-	{"POST", "/api/v1/app/shipments/anomalies/:shipment_id/:anomaly_type/acknowledge", authz.CapOrderFulfill},
-	{"POST", "/api/v1/app/shipments/anomalies/:shipment_id/:anomaly_type/ignore", authz.CapOrderFulfill},
-	{"GET", "/api/v1/app/shipments/anomalies/stats", authz.CapOrderFulfill},
-	{"POST", "/api/v1/app/shipments/batch_generate_home_label", authz.CapOrderFulfill},
-	{"POST", "/api/v1/app/shipments/batch_print_cvs_label", authz.CapOrderFulfill},
-	{"GET", "/api/v1/app/shipping_business_days", authz.CapOrderFulfill},
-	{"GET", "/api/v1/app/shipping_methods", authz.CapProductManage},
-	{"GET", "/api/v1/app/shipping_onboardings", authz.CapProductManage},
-	{"GET", "/api/v1/app/shipping_onboardings/:onboarding_id", authz.CapProductManage},
-	{"POST", "/api/v1/app/shipping_onboardings/:onboarding_id/toggle", authz.CapShippingSetup},
-	{"POST", "/api/v1/app/shipping_onboardings/cvs", authz.CapShippingSetup},
-	{"POST", "/api/v1/app/shipping_onboardings/home_delivery", authz.CapShippingSetup},
-	{"POST", "/api/v1/app/shipping_quotes", authz.CapProductManage},
 	// ---- 58 號《電子發票服務》賣家面（§8.1.6(b) 逐條裁決表）----
 	// 25 條 ＝ CapInvoiceTaxRemedy 8（救濟管道，停權白名單）＋ CapInvoiceManage 13
 	// （擴張型與唯讀查看，BLOCK）＋ CapOrderFulfill 4（履行既有訂單義務）。

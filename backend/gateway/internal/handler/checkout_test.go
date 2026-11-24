@@ -24,7 +24,6 @@ func setupCheckoutRouter(h *Holder) *gin.Engine {
 	app.Use(fakeJWTAuth())
 	{
 		app.POST("/validate", h.CheckoutValidate)
-		app.POST("/shipping_fee", h.CheckoutShippingFee)
 		app.POST("/preview", h.CheckoutPreview)
 		app.POST("/confirm", h.CheckoutConfirm)
 	}
@@ -48,15 +47,6 @@ func TestCheckoutValidate_Success(t *testing.T) {
 				Data: &orderpb.CheckoutValidateData{
 					Valid:                    true,
 					DeliveryTempIntersection: []string{"CHILLED"},
-					AvailableShippingOptions: []*orderpb.AvailableShippingOption{
-						{
-							ShippingMethod: "TAQBIN",
-							DeliveryTemp:   "CHILLED",
-							Label:          "宅配冷藏",
-							Fee:            "150",
-							FeePayer:       "BUYER",
-						},
-					},
 				},
 			}, nil
 		},
@@ -119,9 +109,6 @@ func TestCheckoutPreview_Success(t *testing.T) {
 			if in.BuyerId != 100 {
 				t.Errorf("BuyerId = %d, want 100", in.BuyerId)
 			}
-			if in.ShippingMethod != "TAQBIN" {
-				t.Errorf("ShippingMethod = %q, want TAQBIN", in.ShippingMethod)
-			}
 			return &orderpb.CheckoutPreviewResponse{
 				Code:    0,
 				Message: "success",
@@ -139,8 +126,7 @@ func TestCheckoutPreview_Success(t *testing.T) {
 	h := &Holder{Order: grpcclient.NewOrderClientForTest(mock), BuyerID: buyerGrandfatherResolverForTest()}
 	router := setupCheckoutRouter(h)
 	body, _ := json.Marshal(map[string]interface{}{
-		"shippingMethod": "TAQBIN",
-		"deliveryTemp":   "CHILLED",
+		"deliveryTemp": "CHILLED",
 		"items": []map[string]string{
 			{"skuId": "SKU001", "quantity": "2", "productId": "PROD001"},
 		},
@@ -177,8 +163,7 @@ func TestCheckoutPreview_GrpcError(t *testing.T) {
 	h := &Holder{Order: grpcclient.NewOrderClientForTest(mock), BuyerID: buyerGrandfatherResolverForTest()}
 	router := setupCheckoutRouter(h)
 	body, _ := json.Marshal(map[string]interface{}{
-		"shippingMethod": "TAQBIN",
-		"deliveryTemp":   "CHILLED",
+		"deliveryTemp": "CHILLED",
 		"items": []map[string]string{
 			{"skuId": "SKU001", "quantity": "2", "productId": "PROD001"},
 		},
@@ -221,7 +206,6 @@ func TestCheckoutConfirm_Success(t *testing.T) {
 	router := setupCheckoutRouter(h)
 	body, _ := json.Marshal(map[string]interface{}{
 		"checkoutId":     "chk-uuid-001",
-		"shippingMethod": "TAQBIN",
 		"deliveryTemp":   "CHILLED",
 		"recipientName":  "王小明",
 		"recipientPhone": "0912345678",
@@ -263,7 +247,6 @@ func TestCheckoutConfirm_BadRequest(t *testing.T) {
 	router := setupCheckoutRouter(h)
 	// Missing required "checkoutId" field
 	body, _ := json.Marshal(map[string]interface{}{
-		"shippingMethod": "TAQBIN",
 		"deliveryTemp":   "CHILLED",
 		"recipientName":  "王小明",
 		"recipientPhone": "0912345678",
@@ -280,48 +263,6 @@ func TestCheckoutConfirm_BadRequest(t *testing.T) {
 	assertHTTPStatus(t, w, http.StatusBadRequest)
 	resp := parseJSON(t, w.Body)
 	assertCode(t, resp, 400)
-}
-
-// ==================== CheckoutShippingFee ====================
-
-func TestCheckoutShippingFee_Success(t *testing.T) {
-	mock := &mockOrderServiceClient{
-		CheckoutShippingFeeFn: func(ctx context.Context, in *orderpb.CheckoutShippingFeeRequest, opts ...grpc.CallOption) (*orderpb.CheckoutShippingFeeResponse, error) {
-			if in.BuyerId != 100 {
-				t.Errorf("BuyerId = %d, want 100", in.BuyerId)
-			}
-			return &orderpb.CheckoutShippingFeeResponse{
-				Code: 0, Message: "success",
-				Data: &orderpb.CheckoutShippingFeeData{ShippingMethod: "TAQBIN", DeliveryTemp: "CHILLED", ShippingFee: "150", EstimatedTotal: "1150"},
-			}, nil
-		},
-	}
-
-	h := &Holder{Order: grpcclient.NewOrderClientForTest(mock), BuyerID: buyerGrandfatherResolverForTest()}
-	router := setupCheckoutRouter(h)
-	body, _ := json.Marshal(map[string]interface{}{
-		"shippingMethod": "TAQBIN",
-		"deliveryTemp":   "CHILLED",
-		"items": []map[string]string{
-			{"skuId": "SKU001", "quantity": "2", "productId": "PROD001"},
-		},
-	})
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/app/checkout/shipping_fee", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Account-Id", "100")
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	assertHTTPStatus(t, w, http.StatusOK)
-	resp := parseJSON(t, w.Body)
-	assertCode(t, resp, 0)
-	data, ok := resp["data"].(map[string]interface{})
-	if !ok {
-		t.Fatal("missing data field")
-	}
-	if data["shippingFee"] != "150" {
-		t.Errorf("shippingFee = %v, want 150", data["shippingFee"])
-	}
 }
 
 // ==================== ② buyer store-stint re-key: surrogate pinning ====================
@@ -351,33 +292,6 @@ func TestCheckoutValidate_UsesResolvedBuyerID(t *testing.T) {
 	}
 }
 
-func TestCheckoutShippingFee_UsesResolvedBuyerID(t *testing.T) {
-	var captured *orderpb.CheckoutShippingFeeRequest
-	mock := &mockOrderServiceClient{
-		CheckoutShippingFeeFn: func(ctx context.Context, in *orderpb.CheckoutShippingFeeRequest, opts ...grpc.CallOption) (*orderpb.CheckoutShippingFeeResponse, error) {
-			captured = in
-			return &orderpb.CheckoutShippingFeeResponse{Code: 0, Data: &orderpb.CheckoutShippingFeeData{}}, nil
-		},
-	}
-	h := &Holder{Order: grpcclient.NewOrderClientForTest(mock), BuyerID: buyerResolverForTest(8001)}
-	router := setupCheckoutRouter(h)
-	body, _ := json.Marshal(map[string]interface{}{
-		"shippingMethod": "TAQBIN",
-		"deliveryTemp":   "CHILLED",
-		"items":          []map[string]string{{"skuId": "SKU001", "quantity": "2", "productId": "PROD001"}},
-	})
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/app/checkout/shipping_fee", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Account-Id", "100")
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	assertHTTPStatus(t, w, http.StatusOK)
-	if captured == nil || captured.BuyerId != 8001 {
-		t.Errorf("BuyerId = %+v, want 8001 (resolved buyer_id, not JWT account_id 100)", captured)
-	}
-}
-
 func TestCheckoutPreview_UsesResolvedBuyerID(t *testing.T) {
 	var captured *orderpb.CheckoutPreviewRequest
 	mock := &mockOrderServiceClient{
@@ -389,9 +303,8 @@ func TestCheckoutPreview_UsesResolvedBuyerID(t *testing.T) {
 	h := &Holder{Order: grpcclient.NewOrderClientForTest(mock), BuyerID: buyerResolverForTest(8001)}
 	router := setupCheckoutRouter(h)
 	body, _ := json.Marshal(map[string]interface{}{
-		"shippingMethod": "TAQBIN",
-		"deliveryTemp":   "CHILLED",
-		"items":          []map[string]string{{"skuId": "SKU001", "quantity": "2", "productId": "PROD001"}},
+		"deliveryTemp": "CHILLED",
+		"items":        []map[string]string{{"skuId": "SKU001", "quantity": "2", "productId": "PROD001"}},
 	})
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/app/checkout/preview", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -417,7 +330,6 @@ func TestCheckoutConfirm_UsesResolvedBuyerID(t *testing.T) {
 	router := setupCheckoutRouter(h)
 	body, _ := json.Marshal(map[string]interface{}{
 		"checkoutId":     "chk-1",
-		"shippingMethod": "TAQBIN",
 		"deliveryTemp":   "CHILLED",
 		"recipientName":  "王小明",
 		"recipientPhone": "0912345678",
@@ -447,7 +359,6 @@ func TestCheckoutConfirm_NoCurrentBuyer403(t *testing.T) {
 	router := setupCheckoutRouter(h)
 	body, _ := json.Marshal(map[string]interface{}{
 		"checkoutId":     "chk-1",
-		"shippingMethod": "TAQBIN",
 		"deliveryTemp":   "CHILLED",
 		"recipientName":  "王小明",
 		"recipientPhone": "0912345678",

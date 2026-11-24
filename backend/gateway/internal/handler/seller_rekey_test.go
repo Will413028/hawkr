@@ -8,7 +8,6 @@ import (
 
 	grpcclient "github.com/Will413028/hawkr/gateway/internal/grpc"
 	productpb "github.com/Will413028/hawkr/go-pkg/proto/product"
-	shippingpb "github.com/Will413028/hawkr/go-pkg/proto/shipping"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
 )
@@ -22,7 +21,6 @@ func setupSellerRekeyRouter(h *Holder) *gin.Engine {
 		app.GET("/products/:id", h.GetSellerProductDetail)
 		app.DELETE("/products/:id", h.DeleteSellerProduct)
 		app.GET("/products/:id/skus", h.GetSellerProductSkus)
-		app.GET("/shipping_methods", h.ListSellerShippingMethods)
 	}
 	return r
 }
@@ -143,23 +141,6 @@ func TestDeleteSellerProduct_PassesSurrogate(t *testing.T) {
 	assertHTTPStatus(t, w, 200)
 	if gotReqAccountID != rekeyTestSurrogate {
 		t.Errorf("DeleteProductRequest.StoreId = %d, want surrogate %d", gotReqAccountID, rekeyTestSurrogate)
-	}
-}
-
-func TestListSellerShippingMethods_PassesSurrogate(t *testing.T) {
-	var gotReqAccountID int64
-	mock := &mockShippingServiceClient{
-		ListSellerShippingMethodsFn: func(_ context.Context, in *shippingpb.ListSellerShippingMethodsRequest, _ ...grpc.CallOption) (*shippingpb.ListSellerShippingMethodsResponse, error) {
-			gotReqAccountID = in.StoreId
-			return &shippingpb.ListSellerShippingMethodsResponse{Code: 0}, nil
-		},
-	}
-	h := &Holder{Shipping: grpcclient.NewShippingClientForTest(mock), Store: storeResolverForTest(rekeyTestSurrogate)}
-	w := doRekeyReq(t, setupSellerRekeyRouter(h), "GET", "/api/v1/app/shipping_methods")
-
-	assertHTTPStatus(t, w, 200)
-	if gotReqAccountID != rekeyTestSurrogate {
-		t.Errorf("ListSellerShippingMethodsRequest.StoreId = %d, want surrogate %d", gotReqAccountID, rekeyTestSurrogate)
 	}
 }
 

@@ -180,9 +180,6 @@ func (m *mockSellerServiceClient) BatchGetSellerMeta(ctx context.Context, in *se
 	}
 	return &sellerpb.BatchGetSellerMetaResponse{Sellers: sellers}, nil
 }
-func (m *mockSellerServiceClient) GetSellerShippingProfile(ctx context.Context, in *sellerpb.GetSellerShippingProfileRequest, opts ...grpc.CallOption) (*sellerpb.GetSellerShippingProfileResponse, error) {
-	return nil, nil
-}
 
 // ---- B-169 governance / food-safety / appeal stubs (added with PR #727) ----
 // 這 18 個 RPC 在 gateway test 目前沒被直接呼叫；補空 stub 讓 mock 滿足 interface 即可。
@@ -360,7 +357,6 @@ type mockOrderServiceClient struct {
 	CreateOrderFn                func(ctx context.Context, in *orderpb.CreateOrderRequest, opts ...grpc.CallOption) (*orderpb.CreateOrderResponse, error)
 	SearchOrdersFn               func(ctx context.Context, in *orderpb.SearchOrdersRequest, opts ...grpc.CallOption) (*orderpb.SearchOrdersResponse, error)
 	ListAbnormalOrdersForAdminFn func(ctx context.Context, in *orderpb.ListAbnormalOrdersForAdminRequest, opts ...grpc.CallOption) (*orderpb.ListAbnormalOrdersForAdminResponse, error)
-	CheckoutShippingFeeFn        func(ctx context.Context, in *orderpb.CheckoutShippingFeeRequest, opts ...grpc.CallOption) (*orderpb.CheckoutShippingFeeResponse, error)
 }
 
 func (m *mockOrderServiceClient) GetBuyerOrdersForSeller(ctx context.Context, in *orderpb.GetBuyerOrdersForSellerRequest, opts ...grpc.CallOption) (*orderpb.GetBuyerOrdersForSellerResponse, error) {
@@ -466,11 +462,4 @@ func (m *mockOrderServiceClient) ListAbnormalOrdersForAdmin(ctx context.Context,
 		return m.ListAbnormalOrdersForAdminFn(ctx, in, opts...)
 	}
 	return &orderpb.ListAbnormalOrdersForAdminResponse{}, nil
-}
-
-func (m *mockOrderServiceClient) CheckoutShippingFee(ctx context.Context, in *orderpb.CheckoutShippingFeeRequest, opts ...grpc.CallOption) (*orderpb.CheckoutShippingFeeResponse, error) {
-	if m.CheckoutShippingFeeFn != nil {
-		return m.CheckoutShippingFeeFn(ctx, in, opts...)
-	}
-	return &orderpb.CheckoutShippingFeeResponse{}, nil
 }

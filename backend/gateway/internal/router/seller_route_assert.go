@@ -22,11 +22,6 @@ var appPrefix = APIV1Path + AppPath
 // deny-by-default net for those; this strict-prefix check is the boot backstop.
 var strictSellerPrefixes = []string{
 	appPrefix + "/products",
-	appPrefix + "/shipments",
-	appPrefix + "/shipping_onboardings",
-	appPrefix + "/shipping_methods",
-	appPrefix + "/shipping_business_days",
-	appPrefix + "/shipping_quotes",
 	appPrefix + "/categories",
 	appPrefix + "/hashtags",
 	appPrefix + "/seller/after_sales", // 單數 /seller/，與 /sellers 區隔
