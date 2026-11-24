@@ -16,7 +16,7 @@ void main() {
 
       expect(
         NotificationRouter.navigate({
-          notificationDeepLinkKey: '/orders/detail?orderSn=ORD-COLD',
+          notificationDeepLinkKey: '/en/account/orders/ORD-COLD',
         }, messageId: 'cold-message-1'),
         NotificationEnqueueResult.queued,
       );
@@ -31,9 +31,9 @@ void main() {
             builder: (_, __) => const Scaffold(body: Text('home')),
           ),
           GoRoute(
-            path: '/orders/detail',
+            path: '/account/orders/:orderNo',
             builder: (_, state) => Scaffold(
-              body: Text('order:${state.uri.queryParameters['orderSn']}'),
+              body: Text('order:${state.pathParameters['orderNo']}'),
             ),
           ),
         ],
@@ -52,7 +52,7 @@ void main() {
 
       expect(
         NotificationRouter.navigate({
-          notificationDeepLinkKey: '/orders/detail?orderSn=ORD-COLD',
+          notificationDeepLinkKey: '/en/account/orders/ORD-COLD',
         }, messageId: 'cold-message-1'),
         NotificationEnqueueResult.duplicate,
       );

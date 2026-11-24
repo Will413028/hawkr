@@ -94,26 +94,18 @@ class OrderDetailScreen extends HookConsumerWidget {
     if (orderSn != null) {
       final orderAsync = ref.watch(orderDetailControllerProvider(orderSn!));
 
-      // FCM Silent Push: 訂單狀態變更，僅當事件 orderSn 與本頁訂單相符才 refresh
+      // 狀態重讀提示：訂單狀態變更 → 重讀本頁訂單
       ref.listen(orderStatusStreamProvider, (_, next) {
-        next.whenData((event) {
-          if (event.orderSn == orderSn || event.orderId == orderSn) {
-            ref
-                .read(orderDetailControllerProvider(orderSn!).notifier)
-                .refresh();
-          }
+        next.whenData((_) {
+          ref.read(orderDetailControllerProvider(orderSn!).notifier).refresh();
         });
       });
 
-      // FCM Silent Push: 售後案件變更，僅與本訂單相關才 refresh
+      // 狀態重讀提示：售後案件變更 → 重讀本訂單與售後
       ref.listen(afterSaleStatusStreamProvider, (_, next) {
-        next.whenData((event) {
-          if (event.orderNo == orderSn) {
-            ref
-                .read(orderDetailControllerProvider(orderSn!).notifier)
-                .refresh();
-            ref.invalidate(_orderAfterSaleCaseProvider(orderSn!));
-          }
+        next.whenData((_) {
+          ref.read(orderDetailControllerProvider(orderSn!).notifier).refresh();
+          ref.invalidate(_orderAfterSaleCaseProvider(orderSn!));
         });
       });
 

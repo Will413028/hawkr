@@ -128,14 +128,14 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen>
       }
     });
 
-    // FCM Silent Push: 訂單狀態變更（賣家出貨、後端推進狀態等）→ 自動刷新列表
+    // 訂單狀態變更（賣家出貨、後端推進狀態等）→ 自動刷新列表
     ref.listen(orderStatusStreamProvider, (_, next) {
       next.whenData((_) {
         if (mounted) _refreshCurrentTab();
       });
     });
 
-    // FCM Silent Push: 售後案件狀態變更（賣家回覆售後等）→ 自動刷新列表
+    // 售後案件狀態變更（賣家回覆售後等）→ 自動刷新列表
     ref.listen(afterSaleStatusStreamProvider, (_, next) {
       next.whenData((_) {
         if (mounted) _refreshCurrentTab();

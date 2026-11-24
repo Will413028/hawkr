@@ -117,26 +117,33 @@ void main() {
     });
   }
 
-  test('post, product and order detail routes share one overlay page', () {
-    final source = File('lib/core/routing/app_router.dart').readAsStringSync();
-    expect('floatingDetailPage<'.allMatches(source), hasLength(3));
-    for (final path in [
-      '/merchant-product',
-      '/orders/detail',
-      '/social/post/:postId',
-    ]) {
-      expect(
-        source,
-        matches(
-          RegExp(
-            "path: '$path',[\\s\\S]*?pageBuilder:[\\s\\S]*?"
-            'floatingDetailPage<',
+  test(
+    'post, product, order and notification deep-link detail routes share one overlay page',
+    () {
+      final source = File(
+        'lib/core/routing/app_router.dart',
+      ).readAsStringSync();
+      expect('floatingDetailPage<'.allMatches(source), hasLength(5));
+      for (final path in [
+        '/merchant-product',
+        '/orders/detail',
+        '/social/post/:postId',
+        '/account/orders/:orderNo',
+        '/products/:id',
+      ]) {
+        expect(
+          source,
+          matches(
+            RegExp(
+              "path: '$path',[\\s\\S]*?pageBuilder:[\\s\\S]*?"
+              'floatingDetailPage<',
+            ),
           ),
-        ),
-        reason: path,
-      );
-    }
-  });
+          reason: path,
+        );
+      }
+    },
+  );
 }
 
 GoRouter _detailRouter({

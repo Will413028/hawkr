@@ -38,7 +38,7 @@ import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 /// - 操作按鈕（取消售後 / 重新申請）
 ///
 /// 資料由 caseNo 調用 [afterSaleRepositoryProvider.getAfterSaleDetail] 異步載入，
-/// 並訂閱 [afterSaleStatusStreamProvider] 實現 FCM Silent Push 自動刷新。
+/// 並訂閱 [afterSaleStatusStreamProvider] 自動刷新。
 class AfterSaleExpandedSection extends HookConsumerWidget {
   const AfterSaleExpandedSection({
     super.key,
@@ -82,15 +82,11 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
       return null;
     }, [snapshot.caseNo, lookupAsync]);
 
-    // FCM silent push: 本案件狀態變更自動刷新
+    // 狀態重讀提示：售後狀態變更自動刷新
     ref.listen(afterSaleStatusStreamProvider, (_, next) {
-      next.whenData((event) {
-        final current = detail.value;
-        if (current == null) return;
-        if (event.caseNo == current.caseNo ||
-            event.orderNo == current.orderNo) {
-          load();
-        }
+      next.whenData((_) {
+        if (detail.value == null) return;
+        load();
       });
     });
 

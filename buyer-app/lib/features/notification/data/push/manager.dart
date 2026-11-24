@@ -16,6 +16,13 @@ import '../../../../shared/utils/hk_log.dart';
 import '../../../../shared/widgets/fcm_debug_overlay.dart';
 import '../../../../shared/widgets/hk_button_label.dart';
 import '../../presentation/notification_banner.dart';
+import '../../presentation/notification_controller.dart';
+import '../../../chat/data/active_chat_gate.dart';
+import '../../../chat/data/chat_repository.dart';
+import '../notification_repository.dart';
+import '../state_refresh.dart';
+import 'destination.dart';
+import 'deep_link.dart';
 import 'device_registrar.dart';
 import 'router.dart';
 
@@ -48,6 +55,7 @@ class PushNotificationManager {
 
   /// 以 Connect client 送出的裝置註冊（[injectContainer] 建立）；憑證由 transport 的 auth interceptor 帶。
   NotificationDeviceRegistrar? _registrar;
+  ProviderContainer? _container;
 
   // ── 狀態 ──────────────────────────────────────────────────
 
@@ -56,7 +64,7 @@ class PushNotificationManager {
 
   String? _fcmToken;
 
-  /// 上次成功嘗試註冊裝置的時間，供 [onAppResumed] 節流用。
+  /// 上次成功註冊裝置的時間，供 [onAppResumed] 節流用。
   DateTime? _lastRegisteredAt;
 
   /// 回前景重新註冊的節流間隔：24h 內已註冊過就跳過，避免每次 resume 都打後端。
@@ -66,6 +74,7 @@ class PushNotificationManager {
   String? get fcmToken => _fcmToken;
 
   void injectContainer(ProviderContainer container) {
+    _container = container;
     _registrar = NotificationDeviceRegistrar(
       container.read(notificationAppClientProvider),
     );
@@ -267,8 +276,9 @@ class PushNotificationManager {
       HKLog.logW('[FCM] 裝置註冊尚未初始化');
       return;
     }
-    await registrar.registerDevice(fcmToken: fcmToken);
-    _lastRegisteredAt = DateTime.now();
+    if (await registrar.registerDevice(fcmToken: fcmToken)) {
+      _lastRegisteredAt = DateTime.now();
+    }
   }
 
   // ── 訊息處理 ──────────────────────────────────────────────
@@ -276,6 +286,14 @@ class PushNotificationManager {
   /// 前台訊息處理：顯示 Overlay Banner。標題、內文與圖片都是伺服器組好的（FCM `notification` 欄位），
   /// 不在這裡組字。
   void _handleForegroundMessage(RemoteMessage message) {
+    // 狀態重讀提示不依賴有沒有可見文字，先叫訂單、售後畫面重讀。
+    dispatchStateRefreshHints(stateRefreshHintsFromPush(message.data));
+    if (_isViewingChatOf(message.data)) {
+      HKLog.logD(
+        '[FCM] chat already open for this notification, banner skipped',
+      );
+      return;
+    }
     final notification = message.notification;
     final title = notification?.title ?? '';
     final body = notification?.body ?? '';
@@ -292,6 +310,38 @@ class PushNotificationManager {
     );
   }
 
+  /// 深連結指向的聊天室就是使用者正開著的那一間。
+  bool _isViewingChatOf(Map<String, dynamic> data) {
+    final container = _container;
+    if (container == null) return false;
+    final targetId = chatTargetOfDeepLink(
+      data[notificationDeepLinkKey]?.toString() ?? '',
+    );
+    if (targetId == null) return false;
+    final repo = container.read(chatRepositoryProvider);
+    return activeChatIsStore(
+      container.read(activeChatGateProvider),
+      targetId,
+      (conversationId) => repo.storeCards[conversationId]?.id,
+    );
+  }
+
+  /// 點通知（banner、系統通知）：有 `inbox_item_id` 就標已讀，再導覽。
+  void _onNotificationTapped(Map<String, dynamic> data, String? messageId) {
+    final container = _container;
+    if (container != null && _isUserLoggedIn) {
+      unawaited(
+        markTappedInboxItemRead(data, (id) async {
+          await container.read(notificationRepositoryProvider).markRead(id);
+          await container
+              .read(notificationListControllerProvider.notifier)
+              .silentRefresh();
+        }),
+      );
+    }
+    NotificationRouter.navigate(data, messageId: messageId);
+  }
+
   /// 後台點擊 / 冷啟動訊息處理
   void _handleMessageOpenedApp(RemoteMessage message) {
     // 非 prod 下，含 "Test" 關鍵字的訊息直接彈 Dialog 展示 payload
@@ -299,7 +349,7 @@ class PushNotificationManager {
       _showTestDialog(message);
       return;
     }
-    NotificationRouter.navigate(message.data, messageId: message.messageId);
+    _onNotificationTapped(message.data, message.messageId);
   }
 
   // ── Overlay Banner ────────────────────────────────────────
@@ -340,7 +390,7 @@ class PushNotificationManager {
         imageUrl: imageUrl,
         onTap: () {
           removeSafely();
-          NotificationRouter.navigate(data, messageId: messageId);
+          _onNotificationTapped(data, messageId);
         },
         onClose: removeSafely,
       ),

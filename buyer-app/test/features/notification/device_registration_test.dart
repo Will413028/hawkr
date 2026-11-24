@@ -66,6 +66,7 @@ void main() {
         })
         .unary(NotificationAppService.deleteDeviceToken, (req, _) {
           deleted.add(req);
+          auth.calls.add('deleteDeviceToken');
           if (deleteFails) {
             throw ConnectException(Code.unauthenticated, 'session revoked');
           }
@@ -127,7 +128,8 @@ void main() {
         await h.c.read(sessionProvider.notifier).logout();
 
         expect(h.deleted.single.token, 'fcm-1');
-        expect(h.auth.calls, ['clear']);
+        // 註銷在清除 session 之前送出（之後憑證就沒了）。
+        expect(h.auth.calls, ['deleteDeviceToken', 'clear']);
         expect(h.c.read(sessionProvider).value, isNull);
 
         await h.c.read(sessionProvider.notifier).logout();

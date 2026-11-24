@@ -57,6 +57,11 @@ class NotificationRepository {
     return response.unreadCount;
   }
 
+  /// 即時訊號串流（`WatchNotifications`）：只傳「該重讀了」，內容以列表為準。
+  Stream<pb.WatchNotificationsResponse> watch() => _client.watchNotifications(
+    pb.WatchNotificationsRequest(audience: _audience),
+  );
+
   Future<void> markRead(String id) async {
     await _client.markInboxItemRead(pb.MarkInboxItemReadRequest(id: id));
   }

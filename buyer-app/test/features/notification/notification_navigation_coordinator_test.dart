@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('NotificationDestinationResolver', () {
-    test('hands the server deep link to the router without parsing it', () {
+    test('hands the server deep link to the router unchanged', () {
       final action = NotificationDestinationResolver.resolve({
         notificationDeepLinkKey: ' /orders/ORD-42 ',
         'type': 'ignored',
@@ -12,25 +12,30 @@ void main() {
       expect(action?.deepLink, '/orders/ORD-42');
     });
 
-    test('missing, empty and non-app deep links are ignored', () {
-      expect(NotificationDestinationResolver.resolve(const {}), isNull);
-      expect(
-        NotificationDestinationResolver.resolve({notificationDeepLinkKey: ''}),
-        isNull,
-      );
-      expect(
-        NotificationDestinationResolver.resolve({
-          notificationDeepLinkKey: 'https://example.com/x',
-        }),
-        isNull,
-      );
-      expect(
-        NotificationDestinationResolver.resolve({
-          notificationDeepLinkKey: '//example.com/x',
-        }),
-        isNull,
-      );
-    });
+    test(
+      'missing and empty deep links open the inbox; external ones are ignored',
+      () {
+        expect(NotificationDestinationResolver.resolve(const {}), isNotNull);
+        expect(
+          NotificationDestinationResolver.resolve({
+            notificationDeepLinkKey: '',
+          })?.deepLink,
+          '',
+        );
+        expect(
+          NotificationDestinationResolver.resolve({
+            notificationDeepLinkKey: 'https://example.com/x',
+          }),
+          isNull,
+        );
+        expect(
+          NotificationDestinationResolver.resolve({
+            notificationDeepLinkKey: '//example.com/x',
+          }),
+          isNull,
+        );
+      },
+    );
   });
 
   group('NotificationNavigationCoordinator', () {

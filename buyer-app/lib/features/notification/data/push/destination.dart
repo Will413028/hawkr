@@ -1,32 +1,38 @@
 import 'dart:collection';
 import 'dart:convert';
 
-/// FCM `data` 裡的深連結鍵。伺服器組好 App 內目的地（`InboxItem.deep_link` 同一個值），client 只交給路由，
-/// 不解析、不依通知型別分支。
+import 'deep_link.dart';
+
+/// FCM `data` 裡的深連結鍵。伺服器組好的 website 路徑（`InboxItem.deep_link` 同一個值，可帶 `/en` 前綴），
+/// 對應到 App 畫面由 [resolveNotificationLocation] 負責。
 const notificationDeepLinkKey = 'deep_link';
+
+/// FCM `data` 裡的收件匣通知 ID 與狀態重讀提示（逗號分隔的 proto enum 名稱）。
+const notificationInboxItemIdKey = 'inbox_item_id';
+const notificationStateRefreshHintsKey = 'state_refresh_hints';
 
 /// 要交給路由的目的地。
 class NotificationAction {
   const NotificationAction({required this.deepLink, required this.payload});
 
+  /// 空字串表示沒有目的地（開收件匣）。
   final String deepLink;
   final Map<String, dynamic> payload;
 }
 
-/// 推播 payload 的解析：沒有深連結或不是 App 內路徑就回 null，不會到 Navigator。
+/// 推播 payload 的解析：深連結缺或空就開收件匣，不是 App 內路徑回 null，不會到 Navigator。
 class NotificationDestinationResolver {
   const NotificationDestinationResolver._();
 
   static NotificationAction? resolve(Map<String, dynamic> rawPayload) {
     final payload = Map<String, dynamic>.unmodifiable(rawPayload);
     final link = payload[notificationDeepLinkKey]?.toString().trim() ?? '';
-    if (!isAppDeepLink(link)) return null;
+    if (resolveNotificationLocation(link) == null) return null;
     return NotificationAction(deepLink: link, payload: payload);
   }
 
-  /// App 內路徑（`/` 開頭、不是 `//host`）才交給路由；空字串表示沒有目的地。
   static bool isAppDeepLink(String link) =>
-      link.startsWith('/') && !link.startsWith('//');
+      resolveNotificationLocation(link) != null;
 }
 
 /// Stable identity shared by the foreground and background-open paths.

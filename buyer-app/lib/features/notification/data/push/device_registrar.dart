@@ -16,10 +16,11 @@ class NotificationDeviceRegistrar {
 
   final NotificationAppServiceClient _client;
 
-  Future<void> registerDevice({required String fcmToken}) async {
+  /// 註冊成功回 true；空 token 與失敗回 false。
+  Future<bool> registerDevice({required String fcmToken}) async {
     if (fcmToken.isEmpty) {
       HKLog.logW('[NotificationService] registerDevice skipped: empty token');
-      return;
+      return false;
     }
     try {
       await _client.registerDeviceToken(
@@ -29,8 +30,10 @@ class NotificationDeviceRegistrar {
         ),
       );
       HKLog.logI('[NotificationService] Device registered');
+      return true;
     } catch (e, s) {
       HKLog.logE('[NotificationService] registerDevice error', e, s);
+      return false;
     }
   }
 

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/routing/app_router.dart';
 import '../../../../shared/utils/hk_log.dart';
+import 'deep_link.dart';
 import 'destination.dart';
 
 /// Notification navigation entry point.
@@ -71,8 +72,9 @@ class NotificationRouter {
 
   /// 把伺服器給的深連結交給 GoRouter；不是 App 內路徑就不動作並回 false。
   static bool pushDeepLink(BuildContext context, String deepLink) {
-    if (!NotificationDestinationResolver.isAppDeepLink(deepLink)) return false;
-    context.push(deepLink);
+    final location = resolveNotificationLocation(deepLink);
+    if (location == null) return false;
+    context.push(location);
     return true;
   }
 

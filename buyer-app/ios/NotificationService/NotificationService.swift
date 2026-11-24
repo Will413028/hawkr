@@ -9,6 +9,7 @@ class NotificationService: UNNotificationServiceExtension {
   private var contentHandler: ((UNNotificationContent) -> Void)?
   private var bestAttemptContent: UNMutableNotificationContent?
   private var downloadTask: URLSessionDownloadTask?
+  private let lock = NSLock()
 
   override func didReceive(
     _ request: UNNotificationRequest,
@@ -24,13 +25,13 @@ class NotificationService: UNNotificationServiceExtension {
       let url = URL(string: urlString),
       url.scheme == "https"
     else {
-      contentHandler(request.content)
+      deliver(request.content)
       return
     }
 
     let task = URLSession.shared.downloadTask(with: url) { [weak self] location, response, error in
       guard let self = self else { return }
-      defer { self.contentHandler?(self.bestAttemptContent ?? content) }
+      defer { self.deliver(self.bestAttemptContent ?? content) }
       guard let location = location, error == nil else { return }
       let ext = Self.fileExtension(for: response?.mimeType, url: url)
       let target = FileManager.default.temporaryDirectory
@@ -50,9 +51,19 @@ class NotificationService: UNNotificationServiceExtension {
 
   override func serviceExtensionTimeWillExpire() {
     downloadTask?.cancel()
-    if let contentHandler = contentHandler, let content = bestAttemptContent {
-      contentHandler(content)
+    if let content = bestAttemptContent {
+      deliver(content)
     }
+  }
+
+  /// Calls the content handler at most once: the download completion and the expiry callback
+  /// can both fire, and iOS requires a single call.
+  private func deliver(_ content: UNNotificationContent) {
+    lock.lock()
+    let handler = contentHandler
+    contentHandler = nil
+    lock.unlock()
+    handler?(content)
   }
 
   private static func fileExtension(for mimeType: String?, url: URL) -> String {

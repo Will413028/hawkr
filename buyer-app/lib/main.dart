@@ -40,6 +40,7 @@ import 'features/chat/data/chat_realtime.dart';
 import 'features/chat/data/chat_repository.dart';
 import 'features/seller/data/store_card_display.dart';
 import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.pb.dart' as chat_pb;
+import 'features/notification/data/notification_signals_provider.dart';
 import 'features/notification/data/push/manager.dart';
 import 'features/notification/data/push/router.dart';
 import 'shared/utils/hk_log.dart';
@@ -249,6 +250,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     // 監聽聊天串流的新訊息事件（StreamEvents）
     // Eagerly create chatRepository (registers WidgetsBindingObserver via constructor).
     _messageSub = ref.read(chatRealtimeProvider).events.listen(_onChatEvent);
+    // 通知即時訊號：登入中常駐，驅動未讀數、收件匣與訂單、售後的重讀。
+    ref.read(notificationSignalsProvider);
   }
 
   @override
