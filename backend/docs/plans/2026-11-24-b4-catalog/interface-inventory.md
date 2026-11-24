@@ -136,10 +136,10 @@
 | shipping `CalculateShippingOptions` | `J/grpc/client/ShippingGrpcClient.java:53` | `ProductGrpcService.java:1395`【量】 | Java shipping-service【量】 | 部分（溫層分組） | |
 | shipping `GetSellerShippingConfig` | `ShippingGrpcClient.java:92` | `ProductService.java:1016`（onboarding 指紋，進快取 key）【推】 | Java shipping-service【推】 | | |
 | shipping `ValidateProductShipping` | `ShippingGrpcClient.java:117` | `ProductService.java:2142`（建立／更新時驗 SKU 配送方式含溫層）【推】 | Java shipping-service【推】 | 部分 | |
-| media `FinalizeImages` | `J/grpc/client/MediaGrpcClient.java:83` | `ProductService.java:1911`、`:1953`、`:2464`、`:2519`【量】 | media（單體 `B/internal/modules/media` 是否接手本 RPC 本次未查）【推】 | | |
-| media `LinkImages` | `MediaGrpcClient.java:132` | `ProductMediaReferenceLinker.java:75`、`:86`；`ProductService.java:2554`、`:2565`、`:2587`、`:2622`【量】 | 同上【推】 | | |
-| media `UnlinkImages` | `MediaGrpcClient.java:156` | `ProductService.java:2596`、`:2631`【量】 | 同上【推】 | | |
-| media `ReleaseReferences` | `MediaGrpcClient.java:182` | `ProductService.java:2648`、`:2653`【量】 | 同上【推】 | | |
+| media `FinalizeImages` | `J/grpc/client/MediaGrpcClient.java:83` | `ProductService.java:1911`、`:1953`、`:2464`、`:2519`【量】 | 無處理者：Java media-service 已在 B1-10 刪除（`2f7d70c52`），單體與 `internal/legacy` 沒有 `MediaService` gRPC server（`rg -n "MediaServiceHandler|mediaconnect.New.*Handler" --type go -g '!*_test.go' internal cmd` 除生成碼外 0 筆）；B1 前提已接受 Java 呼叫端的上傳流程本機失敗至改寫（B1-D7、D11）。catalog 改用 Go media 模組的 `Confirm`／`MarkDeleted`（D17）【量，B4-0】 | | |
+| media `LinkImages` | `MediaGrpcClient.java:132` | `ProductMediaReferenceLinker.java:75`、`:86`；`ProductService.java:2554`、`:2565`、`:2587`、`:2622`【量】 | 同上【量，B4-0】 | | |
+| media `UnlinkImages` | `MediaGrpcClient.java:156` | `ProductService.java:2596`、`:2631`【量】 | 同上【量，B4-0】 | | |
+| media `ReleaseReferences` | `MediaGrpcClient.java:182` | `ProductService.java:2648`、`:2653`【量】 | 同上【量，B4-0】 | | |
 | 政府認證查驗（HTTP） | `J/service/GovCertificationService.java`、設定 `J/config/GovApiProperties.java`、`R/application.yml:95-102` | `VerifyCertification`、`CertificationVerifyConsumer`、reverify【推】 | 外部 | 刪 | |
 
 ## 6. DB 表（`R/db/migration`，DB `hawkr_product`）

@@ -21,7 +21,7 @@ CD3. **收藏數是無集合的 ±1 計數器，事件順序顛倒或下限截�
    - 沒有測試：`rg -l FavoriteCountService backend/services/java/product-service/src/test` 無結果【量】。
 
 CD4. **評分快照覆寫沒有版本比較，`review.created` 與 `review.hidden` 亂序會留下舊值**（嚴重度：低）【推】
-   - 證據：`J/service/ReviewStatsService.java` 直接以事件帶的平均分與則數 `updateReviewStats`，沒有 `version` 或時間戳條件。兩個 routing key 共用一個 queue（`RabbitMqConfig.java:249-277`），單一 consumer 時大致有序，但重送（DLQ 回灌、`MqErrorHandler` 重試）會讓較舊的快照晚到並覆蓋新值。事件 payload 有沒有可用的序號，本次未查（`backend/internal/legacy/reviewrelay/relay.go`）。
+   - 證據：`J/service/ReviewStatsService.java` 直接以事件帶的平均分與則數 `updateReviewStats`，沒有 `version` 或時間戳條件。兩個 routing key 共用一個 queue（`RabbitMqConfig.java:249-277`），單一 consumer 時大致有序，但重送（DLQ 回灌、`MqErrorHandler` 重試）會讓較舊的快照晚到並覆蓋新值。B4-0 查證：payload 沒有序號或版本欄，只有 `event_id`、`timestamp`（`backend/internal/legacy/reviewrelay/relay.go:136-178`）；聚合值在 relay job 執行時重讀（`:196-204`），不是事件發生時的快照，所以亂序只發生在兩個 job 重讀後交付順序顛倒時【量讀碼】。D3 改成 review 同步呼叫 `SetRating` 傳絕對值，不再依賴事件順序。
 
 CD5. **`sales_count_event_dedup` 與 `stock_transaction` 沒有清理，持續成長**（嚴重度：低）【量】
    - 證據：`rg -n '@Scheduled' backend/services/java/product-service/src/main` 只有 `IdempotencyCleanupJob`、`FavoriteEventDedupCleanupJob`；兩表（V11:10、V1:209）無其他刪除路徑（`rg -n 'DELETE FROM (sales_count_event_dedup|stock_transaction)' backend/services/java/product-service` 本次未跑，屬【推】）。
@@ -39,7 +39,7 @@ CD8. **order-service 的 `ProductGrpcClient` 有兩個沒有呼叫端的方法**
    - 證據：`backend/services/java/order-service/src/main/java/io/github/will413028/hawkr/order/grpc/client/ProductGrpcClient.java:114`（`getStock`）、`:133`（`getPublicProduct`）；`rg -n 'productGrpcClient\.(getStock|getPublicProduct)' backend/services/java/order-service/src/main` 無結果。
 
 CD9. **`GetProduct` 只靠 request 的 `store_id` 判斷擁有者，handler 內沒有角色或身分檢查**（嚴重度：中，視 gateway 是否一律覆寫 `store_id`）【推】
-   - 證據：`J/grpc/ProductGrpcService.java:340-` 讀 `request.getStoreId()`（`:342`），授權掃描沒有命中任何 `GrpcAuthContext` 呼叫（interface-inventory §1 的 awk 結果）【量】。gateway 的 `seller_product.go`、`seller_sku.go` 是否一律以登入身分覆寫 `store_id`、ai-service 帶什麼值，本次未逐一讀【推】。同類的還有 `GetProductList` 的賣家視角（`ProductServiceListGuardTest` 有 3 個守門測試，未讀斷言）。
+   - 證據：`J/grpc/ProductGrpcService.java:340-` 讀 `request.getStoreId()`（`:342`），授權掃描沒有命中任何 `GrpcAuthContext` 呼叫（interface-inventory §1 的 awk 結果）【量】。gateway（B4-0 查證）：`seller_product.go:726` 與 `seller_sku.go:103` 以 `resolveStoreID` 從登入身分推導；但 `seller_sku.go:58-63` 與 `product.go:724-731` 在賣家角色下呼叫 `CurrentStoreID`，**失敗時保留 account ID 當 `store_id` 傳給 `GetProduct`**，帳號 ID 與店家 ID 撞值時可讀到他店未上架商品【量讀碼，撞值後果為推】。D4 改由呼叫者推導店家、不收 `store_id`，一併消除。ai-service 帶的值未讀（D12 隨 A9 刪除）。同類的還有 `GetProductList` 的賣家視角（`ProductServiceListGuardTest` 有 3 個守門測試，未讀斷言）。
 
 CD10. **`product_sku.id` 用 BIGSERIAL、`product.id` 與 `hashtag.id` 用應用層 TSID，同一聚合兩種 ID 方案**（嚴重度：無，設計觀察）【量】
    - 證據：V1:148（`id BIGSERIAL`）對 V1:54（`id BIGINT PRIMARY KEY -- TSID`）。SKU id 外流到 cart、order（`stock_transaction.payload`、`BatchGetSkuCartInfo`），可被枚舉。B4 計畫已要求商品 ID 換 UUID（content banner 一項），SKU 是否一起換未寫。
