@@ -50,7 +50,7 @@
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/refund.go",
    "old": "\t\tif err == nil {\n\t\t\tif existing.Amount != in.Amount",
-   "new": "\t\tif false {\n\t\t\tif existing.Amount",
+   "new": "\t\tif false {\n\t\t\tif existing.Amount != in.Amount",
    "test": "internal/modules/payment ^(TestCreateRefundWritesThePendingRowAndTheJobEnforcesTheCapAndIsIdempotentByKey)$",
    "why": "同一把 request_key 重送不再回既有的退款：回空的退款（沒有 ID）。"
   },
@@ -221,7 +221,7 @@
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/refund.go",
    "old": "\tif pay.Provider != s.d.Provider.Name() {\n\t\treturn false, nil\n\t}\n\texternal, p :=",
-   "new": "\texternal, p :=",
+   "new": "\t_ = pay\n\texternal, p :=",
    "test": "internal/modules/payment ^(TestARefundOfAPaymentOfAnotherProviderIsNeitherRoutedNorSynced)$",
    "why": "SyncRefund 拿掉 provider 比對：別的 provider 的退款被讀取並改成 SUCCEEDED。"
   },
@@ -230,7 +230,7 @@
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/anomaly.go",
    "old": " || pay.ExternalPaymentID == nil || *pay.ExternalPaymentID != proof.parent {",
-   "new": " {",
+   "new": " || (false && pay.ExternalPaymentID == nil) {",
    "test": "internal/modules/payment ^(TestResolvingARefundStageAnomalyFailsWhenThePaymentExternalIDChangedAfterTheEvidence)$",
    "why": "退款階段結案不比對鎖定的付款外部 ID：核對之後被改掉仍結案成功。"
   }
