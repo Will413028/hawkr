@@ -7,5 +7,4 @@ use (
 	./pkg
 	./services/ai-service
 	./services/invoice-service
-	./services/notification-service
 )
