@@ -186,14 +186,14 @@
       "name": "hawkr.notification.v1alpha1.NotificationCategory",
       "dartClass": "NotificationCategory",
       "dartLibrary": "package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pbenum.dart",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {
       "name": "hawkr.notification.v1alpha1.NotificationChannel",
       "dartClass": "NotificationChannel",
       "dartLibrary": "package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pbenum.dart",
-      "inCatalog": false,
+      "inCatalog": true,
       "serverOwned": false
     },
     {

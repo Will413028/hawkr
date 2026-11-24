@@ -119,6 +119,30 @@
       "REPORT_TARGET_KIND_REVIEW_REPLY": "Review reply"
     }
   },
+  "notification": {
+    "NotificationCategory": {
+      "NOTIFICATION_CATEGORY_ACCOUNT": "Account and policy",
+      "NOTIFICATION_CATEGORY_AFTERSALES": "Refunds and after-sales",
+      "NOTIFICATION_CATEGORY_ANNOUNCEMENT": "Announcements",
+      "NOTIFICATION_CATEGORY_CHAT": "Chat",
+      "NOTIFICATION_CATEGORY_COMMENT": "Comments",
+      "NOTIFICATION_CATEGORY_COUPON": "Coupons",
+      "NOTIFICATION_CATEGORY_FOLLOW": "New followers",
+      "NOTIFICATION_CATEGORY_FOLLOWED_STORE_POST": "Posts from stores you follow",
+      "NOTIFICATION_CATEGORY_LIKE": "Likes",
+      "NOTIFICATION_CATEGORY_ORDER": "Orders",
+      "NOTIFICATION_CATEGORY_PAYOUT": "Payouts",
+      "NOTIFICATION_CATEGORY_RESTOCK": "Back in stock",
+      "NOTIFICATION_CATEGORY_REVIEW": "Reviews",
+      "NOTIFICATION_CATEGORY_SHIPMENT": "Shipping",
+      "NOTIFICATION_CATEGORY_SHIPMENT_ANOMALY": "Delivery issues"
+    },
+    "NotificationChannel": {
+      "NOTIFICATION_CHANNEL_EMAIL": "Email",
+      "NOTIFICATION_CHANNEL_INBOX": "Inbox",
+      "NOTIFICATION_CHANNEL_PUSH": "Push"
+    }
+  },
   "payment": {
     "PaymentAccountStatus": {
       "PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": "Setup needed",

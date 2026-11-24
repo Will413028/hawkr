@@ -11,6 +11,7 @@ import 'package:hawkr_api/gen/hawkr/common/v1alpha1/store_card.pbenum.dart' as h
 import 'package:hawkr_api/gen/hawkr/crm/v1alpha1/crm.pbenum.dart' as hawkr_crm_v1alpha1_crm;
 import 'package:hawkr_api/gen/hawkr/media/v1alpha1/media.pbenum.dart' as hawkr_media_v1alpha1_media;
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.pbenum.dart' as hawkr_moderation_v1alpha1_moderation;
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pbenum.dart' as hawkr_notification_v1alpha1_notification;
 import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart' as hawkr_payment_v1alpha1_payment;
 import 'package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart' as hawkr_procurement_v1alpha1_procurement;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/report.pbenum.dart' as hawkr_seller_v1alpha1_report;
@@ -73,6 +74,26 @@ const _enumNumber = <String, int>{
 	'hawkr.moderation.v1alpha1.ReportTargetKind.REPORT_TARGET_KIND_REVIEW': 5,
 	'hawkr.moderation.v1alpha1.ReportTargetKind.REPORT_TARGET_KIND_REVIEW_REPLY': 7,
 	'hawkr.moderation.v1alpha1.ReportTargetKind.REPORT_TARGET_KIND_UNSPECIFIED': 0,
+	'hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_ACCOUNT': 6,
+	'hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_AFTERSALES': 4,
+	'hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_ANNOUNCEMENT': 15,
+	'hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_CHAT': 7,
+	'hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_COMMENT': 9,
+	'hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_COUPON': 13,
+	'hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_FOLLOW': 11,
+	'hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_FOLLOWED_STORE_POST': 12,
+	'hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_LIKE': 10,
+	'hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_ORDER': 1,
+	'hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_PAYOUT': 5,
+	'hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_RESTOCK': 14,
+	'hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_REVIEW': 8,
+	'hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_SHIPMENT': 2,
+	'hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_SHIPMENT_ANOMALY': 3,
+	'hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_UNSPECIFIED': 0,
+	'hawkr.notification.v1alpha1.NotificationChannel.NOTIFICATION_CHANNEL_EMAIL': 3,
+	'hawkr.notification.v1alpha1.NotificationChannel.NOTIFICATION_CHANNEL_INBOX': 1,
+	'hawkr.notification.v1alpha1.NotificationChannel.NOTIFICATION_CHANNEL_PUSH': 2,
+	'hawkr.notification.v1alpha1.NotificationChannel.NOTIFICATION_CHANNEL_UNSPECIFIED': 0,
 	'hawkr.payment.v1alpha1.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED': 3,
 	'hawkr.payment.v1alpha1.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED': 5,
 	'hawkr.payment.v1alpha1.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED': 4,
@@ -285,6 +306,10 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return hawkr_moderation_v1alpha1_moderation.ReportOutcome.valueOf(_n('hawkr.moderation.v1alpha1.ReportOutcome', value))!.uiText(l);
     case 'moderation.ReportTargetKind':
       return hawkr_moderation_v1alpha1_moderation.ReportTargetKind.valueOf(_n('hawkr.moderation.v1alpha1.ReportTargetKind', value))!.uiText(l);
+    case 'notification.NotificationCategory':
+      return hawkr_notification_v1alpha1_notification.NotificationCategory.valueOf(_n('hawkr.notification.v1alpha1.NotificationCategory', value))!.uiText(l);
+    case 'notification.NotificationChannel':
+      return hawkr_notification_v1alpha1_notification.NotificationChannel.valueOf(_n('hawkr.notification.v1alpha1.NotificationChannel', value))!.uiText(l);
     case 'payment.PaymentAccountStatus':
       return hawkr_payment_v1alpha1_payment.PaymentAccountStatus.valueOf(_n('hawkr.payment.v1alpha1.PaymentAccountStatus', value))!.uiText(l);
     case 'payment.RequirementCollection':

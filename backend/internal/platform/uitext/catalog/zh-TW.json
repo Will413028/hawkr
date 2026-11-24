@@ -280,6 +280,78 @@
       "message": "評價回覆",
       "description": "店家對評價的回覆；id 是評價 ID（回覆沒有自己的 ID）。"
     },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_ACCOUNT": {
+      "message": "帳號與治理",
+      "description": "帳號與治理（交易必要）。"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_AFTERSALES": {
+      "message": "退款與售後",
+      "description": "退款與售後（交易必要）。"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_ANNOUNCEMENT": {
+      "message": "系統公告",
+      "description": "後台系統公告（兩個受眾都有；收件匣一定收到，推播可在偏好關閉）。"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_CHAT": {
+      "message": "聊天",
+      "description": "聊天（互動）。"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_COMMENT": {
+      "message": "留言",
+      "description": "留言（互動）。"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_COUPON": {
+      "message": "優惠券",
+      "description": "優惠券（行銷，只有買家）。"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_FOLLOW": {
+      "message": "新的追蹤者",
+      "description": "被追蹤（互動，只有店家）。"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_FOLLOWED_STORE_POST": {
+      "message": "追蹤的店家發文",
+      "description": "追蹤的店發文（互動，只有買家）。"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_LIKE": {
+      "message": "讚",
+      "description": "讚（互動）。"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_ORDER": {
+      "message": "訂單",
+      "description": "訂單（交易必要）。"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_PAYOUT": {
+      "message": "撥款",
+      "description": "撥款（交易必要，只有店家）。"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_RESTOCK": {
+      "message": "補貨通知",
+      "description": "補貨（行銷，只有買家）。"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_REVIEW": {
+      "message": "評價",
+      "description": "評價（互動，只有店家）。"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_SHIPMENT": {
+      "message": "出貨",
+      "description": "出貨（交易必要）。"
+    },
+    "notification.NotificationCategory.NOTIFICATION_CATEGORY_SHIPMENT_ANOMALY": {
+      "message": "配送異常",
+      "description": "配送異常（交易必要，只有店家；推播也不可關）。"
+    },
+    "notification.NotificationChannel.NOTIFICATION_CHANNEL_EMAIL": {
+      "message": "Email",
+      "description": "Email。"
+    },
+    "notification.NotificationChannel.NOTIFICATION_CHANNEL_INBOX": {
+      "message": "收件匣",
+      "description": "收件匣。"
+    },
+    "notification.NotificationChannel.NOTIFICATION_CHANNEL_PUSH": {
+      "message": "推播",
+      "description": "App 推播。"
+    },
     "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED": {
       "message": "待設定",
       "description": "賣家要補資料（包含新帳戶尚未開通）：重新取得開通 session 完成。"
