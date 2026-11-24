@@ -12,7 +12,7 @@ COMPOSE="docker compose -f $COMPOSE_FILE"
 INFRA_SERVICES=(postgres redis rabbitmq otel-collector)
 
 # Go 服務（Air hot-reload，改完自動生效）
-GO_SERVICES=(gateway ai-service notification-service invoice-service)
+GO_SERVICES=(gateway notification-service invoice-service)
 
 # Java 服務（需 rebuild image 才能更新）
 JAVA_SERVICES=(payment-service product-service order-service cart-service coupon-service shipping-service aftersales-service payuni-webhook-service)
@@ -627,12 +627,11 @@ cmd_status() {
 #     的方式；就地 apply 需要幫已污染的歷史狀態猜 baseline，等於把污染攤平成「已驗證」。
 #   - Java 服務：Flyway 於服務啟動時自動套用，seed 不代勞、不重放。
 # 全程 fail-loud（無 `|| true` / 錯誤吞噬）：任何一步失敗立即中止並印出真實錯誤。
-GO_SEED_SERVICES=(notification-service ai-service invoice-service)
+GO_SEED_SERVICES=(notification-service invoice-service)
 
 go_seed_db_for() {
   case "$1" in
     notification-service) echo "hawkr_notification" ;;
-    ai-service)           echo "hawkr_ai" ;;
     invoice-service)      echo "hawkr_invoice" ;;
     *) err "go_seed_db_for: 未知服務 $1"; exit 1 ;;
   esac
@@ -740,7 +739,7 @@ cmd_help() {
     rebuild <服務>  手動指定要 rebuild 的服務（Java 或 Go 皆可）
                     例：./dev.sh rebuild payment shipping
                     例：./dev.sh rebuild order  (自動補 -service)
-                    例：./dev.sh rebuild ai-service    (Go：重建 dev image)
+                    例：./dev.sh rebuild notification-service    (Go：重建 dev image)
 
                     Go 服務何時需要手動 rebuild：./dev.sh status 報
                     「Up 但 Air build 失敗」時——dev image 烘進 layer 的

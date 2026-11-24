@@ -9,7 +9,6 @@
       "modules": [
         "gateway",
         "pkg",
-        "services/ai-service",
         "services/invoice-service",
         "services/notification-service"
       ],
@@ -35,7 +34,6 @@
         ".",
         "gateway",
         "pkg",
-        "services/ai-service",
         "services/invoice-service",
         "services/notification-service"
       ],

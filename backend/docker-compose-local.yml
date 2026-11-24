@@ -75,12 +75,6 @@ services:
       SHIPPING_SERVICE_GRPC_PORT: 9931
       # 圖片 objectKey → 顯示 URL 的域名唯一來源（49 號 §6.1）；Gateway 組 {語意}Url 欄位
       MEDIA_BASE_URL: ${MEDIA_BASE_URL:?MEDIA_BASE_URL 必填：媒體公開網域，如 https://media.example.com}
-      AI_SERVICE_HOST: ai-service
-      AI_SERVICE_GRPC_PORT: 9939
-      # Task 12：doc 57 §13 的 gateway 側 capability flag，gate GET
-      # /app/buyers/me/procurement/runs/:runId/events（run ledger 事件重播／
-      # 即時訂閱 SSE）。預設 false。
-      PROCUREMENT_REPLAY_SSE_ENABLED: ${PROCUREMENT_REPLAY_SSE_ENABLED:-false}
       PAYUNI_WEBHOOK_SERVICE_HOST: payuni-webhook-service
       PAYUNI_WEBHOOK_SERVICE_PORT: 9946
       NOTIFICATION_SERVICE_HOST: notification-service
@@ -832,94 +826,6 @@ services:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9946/actuator/health"]
       interval: 60s
       timeout: 10s
-      retries: 3
-      start_period: 60s
-    networks:
-      - hawkr-network
-
-  # ==========================================
-  # AI Service (gRPC 9939；final architecture，無 HTTP management port)
-  # ==========================================
-
-  ai-service:
-    build:
-      context: .
-      dockerfile: services/ai-service/Dockerfile
-      target: dev
-      args:
-        GO_VERSION: ${GO_VERSION:?用 ./dev.sh 執行（從 .go-version 帶入）}
-    image: hawkr/ai-service:latest
-    container_name: ai-service
-    restart: unless-stopped
-    ports:
-      - "9939:9939"
-    volumes:
-      - ./services/ai-service:/app/services/ai-service
-      - ./pkg:/app/pkg
-      - go-build-cache:/root/.cache/go-build
-      - go-mod-cache:/go/pkg/mod
-    environment:
-      # 內部身分 HMAC 簽章（#1366）；permissive 過渡期缺 secret 不簽/不驗，本地可於 .env 設 secret 測試簽章。
-      INTERNAL_AUTH_MODE: ${INTERNAL_AUTH_MODE:-permissive}
-      INTERNAL_SERVICE_HMAC_SECRET: ${INTERNAL_SERVICE_HMAC_SECRET:-}
-      INTERNAL_SERVICE_HMAC_SECRET_PREV: ${INTERNAL_SERVICE_HMAC_SECRET_PREV:-}
-      TZ: UTC
-      LEGACY_BUYER_GRPC_HOST: host.docker.internal
-      LEGACY_BUYER_GRPC_PORT: 9941
-      LEGACY_SELLER_GRPC_HOST: host.docker.internal
-      LEGACY_SELLER_GRPC_PORT: 9941
-      GRPC_PORT: 9939
-      ENV: ${ENV:-development}
-
-      # Database
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_NAME: hawkr_ai
-      DB_USER: dbadmin
-      DB_PASSWORD: Hawkr2024Admin
-
-      # Redis
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: HawkrRedis2026
-
-      # RabbitMQ
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USERNAME: guest
-      RABBITMQ_PASSWORD: guest
-      RABBITMQ_VHOST: /
-
-      STORAGE_BACKEND: ${STORAGE_BACKEND:-oss}
-      OSS_ENDPOINT: ${OSS_ENDPOINT}
-      OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID}
-      OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET}
-      OSS_BUCKET_NAME: ${OSS_BUCKET_NAME}
-      OSS_PRIVATE_BUCKET: ${OSS_PRIVATE_BUCKET}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
-
-      # Gemini AI
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      EXTRACTOR_MODEL: ${EXTRACTOR_MODEL:-}
-
-      # EXTERNAL lane 的訂單賣方 store（doc 64 §6.4.8）。⚠️ 必須是單體的 seller 模組真的查得到的 store，不只是設定值。
-      PROCUREMENT_SETTLEMENT_STORE_ID: ${PROCUREMENT_SETTLEMENT_STORE_ID:-0}
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      LLM_TOKEN_BUDGET_PER_MINUTE: ${LLM_TOKEN_BUDGET_PER_MINUTE:-}
-      GOMEMLIMIT: ${GOMEMLIMIT:-460MiB}
-      TRANSFORM_INFLIGHT_BYTES_BUDGET: ${TRANSFORM_INFLIGHT_BYTES_BUDGET:-268435456}
-
-      # OpenTelemetry
-      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
-      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=${ENV:-development}
-      GOPROXY: "https://proxy.golang.org,direct"   # 見檔頭「Go 服務 dev container 契約」：dev 嚴禁 off
-      GONOSUMDB: "*"
-
-    healthcheck:
-      test: ["CMD-SHELL", "cd /app/services/ai-service && go run ./cmd/grpc-healthcheck -addr 127.0.0.1:9939 -service hawkr.ai.AIImageService"]
-      interval: 60s
-      timeout: 5s
       retries: 3
       start_period: 60s
     networks:
