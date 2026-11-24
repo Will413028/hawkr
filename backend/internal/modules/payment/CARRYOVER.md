@@ -81,3 +81,5 @@
 ## A8-3c：補件期限與第一次啟用（D23）
 
 同步另存 `requirements_deadline`（Stripe v2 帳戶 `requirements.summary.minimum_deadline.time`，v2 沒有 v1 的 `current_deadline`；沒有待補條件或沒有期限是 NULL，每次覆寫）與 `first_activated_at`（轉帳能力第一次啟用的同步時間，只寫一次，之後停用再啟用不重設）；`PayoutAccountChanged` 加 `FirstActivation`（只在寫入 `first_activated_at` 的那次同步為真）與 `RequirementsDeadline`。守門：`TestSyncStoresTheDeadlineAndFirstActivationAndPublishesThem`、`TestSyncRollbackKeepsTheFirstActivationForTheRetry`。
+
+每日掃描 `payment.deadline_scan`（`ScanPayoutDeadlines`，啟動即執行、每 24 小時）對 `requirements_deadline` 落在未來 7 天內、已完成建立且沒有等待清理的帳戶，各在同一個 transaction 內發布 `PayoutDeadlineApproaching{StoreID, Deadline, Tier}`：期限前超過一天是 `SEVEN_DAYS`，一天以內是 `ONE_DAY`（`TierFor`）。同一個期限每天都會再發布，去重在消費者（notification 的 `payout_account_deadline` 冪等鍵＝店家＋期限＋檔位），所以每個檔位只通知一次，期限被 Stripe 改掉就是新的提醒；事件不帶待補條件內容。守門：`TestScanPayoutDeadlinesPublishesTheTierForAccountsInsideTheWindow`、`TestTierForSplitsTheWindowAtTheLastDay`。

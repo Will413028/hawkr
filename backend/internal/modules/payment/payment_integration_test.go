@@ -4,6 +4,7 @@ package payment_test
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -2775,5 +2776,54 @@ func TestSyncRollbackKeepsTheFirstActivationForTheRetry(t *testing.T) {
 	}
 	if len(f.changes) != 1 || !f.changes[0].FirstActivation {
 		t.Fatalf("重試要是第一次啟用：%+v", f.changes)
+	}
+}
+
+// 每日掃描對期限落在未來 7 天內的帳戶各發布一次 PayoutDeadlineApproaching：超過一天是 SEVEN_DAYS，一天以內是 ONE_DAY；窗口外、已過期與沒有期限的帳戶不發布；
+// 事件在 transaction 內發布，重跑掃描對同一組帳戶發布同樣的事件（去重在消費者）。
+// mutation：TierFor 的門檻拿掉（一律 SEVEN_DAYS）→ 第二個帳戶的檔位不符；查詢的上界改成 30 天 → 窗口外的帳戶也發布。
+func TestScanPayoutDeadlinesPublishesTheTierForAccountsInsideTheWindow(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	type seen struct {
+		store    int64
+		deadline time.Time
+		tier     DeadlineTier
+		inTx     bool
+	}
+	var got []seen
+	events.Subscribe(f.bus, func(ctx context.Context, e PayoutDeadlineApproaching) error {
+		_, ok := db.TxFrom(ctx)
+		got = append(got, seen{e.StoreID, e.Deadline, e.Tier, ok})
+		return nil
+	})
+	withDeadline := func(d time.Duration) (int64, time.Time) {
+		s := f.newStore(t)
+		deadline := f.now.Add(d).UTC()
+		snap := needsSellerSnapshot
+		snap.RequirementsDeadline = &deadline
+		f.set(t, s, snap)
+		return s, deadline
+	}
+	week, weekAt := withDeadline(5 * 24 * time.Hour)
+	last, lastAt := withDeadline(12 * time.Hour)
+	withDeadline(10 * 24 * time.Hour)
+	withDeadline(-time.Hour)
+	none := f.newStore(t)
+	f.set(t, none, needsSellerSnapshot)
+
+	for run := 1; run <= 2; run++ {
+		got = nil
+		n, err := f.module.ScanPayoutDeadlines(ctx)
+		if err != nil || n != 2 {
+			t.Fatalf("第 %d 次掃描：published=%d err=%v", run, n, err)
+		}
+		want := []seen{{week, weekAt, DeadlineSevenDays, true}, {last, lastAt, DeadlineOneDay, true}}
+		slices.SortFunc(got, func(a, b seen) int { return cmp.Compare(a.store, b.store) })
+		slices.SortFunc(want, func(a, b seen) int { return cmp.Compare(a.store, b.store) })
+		if !slices.Equal(got, want) {
+			t.Fatalf("第 %d 次掃描的事件：\n got  %+v\n want %+v", run, got, want)
+		}
 	}
 }

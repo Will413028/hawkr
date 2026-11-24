@@ -523,6 +523,54 @@ func (q *Queries) PaymentAccountByStore(ctx context.Context, storeID int64) (Pay
 	return i, err
 }
 
+const paymentAccountDeadlines = `-- name: PaymentAccountDeadlines :many
+SELECT store_id, requirements_deadline
+FROM payment.accounts
+WHERE create_completed_at IS NOT NULL AND purge_pending_at IS NULL
+  AND requirements_deadline > $1::timestamptz AND requirements_deadline <= $2::timestamptz
+  AND store_id > $3
+ORDER BY store_id
+LIMIT $4
+`
+
+type PaymentAccountDeadlinesParams struct {
+	Now          time.Time
+	Until        time.Time
+	AfterStoreID int64
+	Batch        int32
+}
+
+type PaymentAccountDeadlinesRow struct {
+	StoreID              int64
+	RequirementsDeadline *time.Time
+}
+
+// 補件期限提醒（D23）：期限落在 (now, until] 內、已完成建立且沒有等待清理的帳戶，依 store_id 分批。
+func (q *Queries) PaymentAccountDeadlines(ctx context.Context, arg PaymentAccountDeadlinesParams) ([]PaymentAccountDeadlinesRow, error) {
+	rows, err := q.db.Query(ctx, paymentAccountDeadlines,
+		arg.Now,
+		arg.Until,
+		arg.AfterStoreID,
+		arg.Batch,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PaymentAccountDeadlinesRow{}
+	for rows.Next() {
+		var i PaymentAccountDeadlinesRow
+		if err := rows.Scan(&i.StoreID, &i.RequirementsDeadline); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const paymentAccountStoreIDsByExternal = `-- name: PaymentAccountStoreIDsByExternal :many
 SELECT store_id
 FROM payment.accounts

@@ -127,6 +127,23 @@ type PayoutAccountChanged struct {
 	RequirementsDeadline *time.Time
 }
 
+// DeadlineTier 是補件期限提醒的檔位：期限前超過一天是 SEVEN_DAYS（提醒窗口 7 天），最後一天是 ONE_DAY。
+type DeadlineTier string
+
+const (
+	DeadlineSevenDays DeadlineTier = "SEVEN_DAYS"
+	DeadlineOneDay    DeadlineTier = "ONE_DAY"
+)
+
+// PayoutDeadlineApproaching 由每日掃描在待補條件的最早期限進入 7 天窗口之後、每次掃描對每個帳戶發布一次（同一個期限與檔位會重複發布，消費者以「店家＋期限＋檔位」去重）：
+// 事件只帶店家、期限與檔位，不帶待補條件的內容（D23）。
+type PayoutDeadlineApproaching struct {
+	OccurredAt time.Time
+	StoreID    int64
+	Deadline   time.Time
+	Tier       DeadlineTier
+}
+
 // Positive 檢查 ID 都是正數。
 func Positive(ids ...int64) error {
 	for _, id := range ids {

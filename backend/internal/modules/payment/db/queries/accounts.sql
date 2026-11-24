@@ -131,6 +131,16 @@ WHERE (a.status IN ('UNDER_REVIEW', 'ACTION_REQUIRED')
 ORDER BY a.store_id
 LIMIT sqlc.arg(batch);
 
+-- name: PaymentAccountDeadlines :many
+-- 補件期限提醒（D23）：期限落在 (now, until] 內、已完成建立且沒有等待清理的帳戶，依 store_id 分批。
+SELECT store_id, requirements_deadline
+FROM payment.accounts
+WHERE create_completed_at IS NOT NULL AND purge_pending_at IS NULL
+  AND requirements_deadline > sqlc.arg(now)::timestamptz AND requirements_deadline <= sqlc.arg(until)::timestamptz
+  AND store_id > sqlc.arg(after_store_id)
+ORDER BY store_id
+LIMIT sqlc.arg(batch);
+
 -- name: PaymentAccountStoreIDsByExternal :many
 -- 外部帳戶 ID 對應的擁有者（inbox 的路由鍵是外部帳戶 ID）；半建立與等待清理的帳戶不排同步。
 SELECT store_id

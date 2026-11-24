@@ -170,15 +170,23 @@ func (s *Service) AddWorkers(workers *river.Workers) {
 	river.AddWorker(workers, &syncWorker{service: s})
 	river.AddWorker(workers, &sweepWorker{service: s})
 	river.AddWorker(workers, &purgeWorker{service: s})
+	river.AddWorker(workers, &deadlineScanWorker{service: s})
 }
 
-// PeriodicJobs 回傳啟動即執行、每 15 分鐘的掃描。
+// PeriodicJobs 回傳啟動即執行、每 15 分鐘的掃描與每日的補件期限掃描。
 func (s *Service) PeriodicJobs() []*river.PeriodicJob {
-	return []*river.PeriodicJob{river.NewPeriodicJob(
-		river.PeriodicInterval(pollInterval),
-		func() (river.JobArgs, *river.InsertOpts) { return SweepArgs{}, nil },
-		&river.PeriodicJobOpts{ID: "payment.account_sweep", RunOnStart: true},
-	)}
+	return []*river.PeriodicJob{
+		river.NewPeriodicJob(
+			river.PeriodicInterval(pollInterval),
+			func() (river.JobArgs, *river.InsertOpts) { return SweepArgs{}, nil },
+			&river.PeriodicJobOpts{ID: "payment.account_sweep", RunOnStart: true},
+		),
+		river.NewPeriodicJob(
+			river.PeriodicInterval(deadlineScanInterval),
+			func() (river.JobArgs, *river.InsertOpts) { return DeadlineScanArgs{}, nil },
+			&river.PeriodicJobOpts{ID: "payment.deadline_scan", RunOnStart: true},
+		),
+	}
 }
 
 // PurgeArgs 是擁有者個資清理時「關閉外部帳戶後刪除帳戶列」的 job（ForgetOwners 在清理的 transaction 內排入），以 store_id 為唯一鍵。
