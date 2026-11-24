@@ -274,7 +274,7 @@ test("買家的補充說明進發布預覽的 client request id 指紋，而且�
 test("補充說明只從輸入框來，不從對話抽取", () => {
 	assert.doesNotMatch(
 		sessionHook,
-		/buyerNote(?!: command\.buyerNote)/,
+		/(?<!command\.)buyerNote(?!: command\.buyerNote)/,
 		"session hook 只能把發布預覽 command 的 buyerNote 原樣轉給 RPC——它不是 slot、不經 LLM 抽取。" +
 			"2026-08-17 移除的 spec 就是走那條路（backend #2476／website #498）",
 	);

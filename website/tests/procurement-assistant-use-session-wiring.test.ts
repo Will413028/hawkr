@@ -310,6 +310,6 @@ test("executeRfqPublication 沿用 preview 的 STALE_CONTEXT 守衛", () => {
 	const body = hook.slice(start, start + 3000);
 
 	assert.match(body, /current\.revisionId !== command\.expectedRevisionId/);
-	assert.match(body, /STALE_CONTEXT/);
+	assert.match(body, /staleContextFailure\(/);
 	assert.match(body, /sessionGenerationGuard\.capture\(requestId\)/);
 });

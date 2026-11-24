@@ -10,6 +10,10 @@ function read(relativePath: string): string {
 	return readFileSync(path.join(root, relativePath), "utf8");
 }
 
+const zhMessages = JSON.parse(read("messages/zh-TW.json")) as {
+	procurementAssistant: Record<string, string>;
+};
+
 function stripComments(source: string): string {
 	return source
 		.replace(/\/\*[\s\S]*?\*\//g, "")
@@ -40,7 +44,11 @@ test("price slice names the price acknowledgement separately from publication", 
 });
 
 test("the price acknowledgement only claims the requirement version and price range", () => {
-	assert.match(draft, /確認後會以這一版需求與希望區間準備發布核准/);
+	assert.match(draft, /t\("snapshotApprovalHint"\)/);
+	assert.equal(
+		zhMessages.procurementAssistant.snapshotApprovalHint,
+		"確認後會以這一版需求與希望區間準備發布核准。",
+	);
 	assert.match(draft, /這次確認不包含候選名單、截止時間與通知設定/);
 	assert.doesNotMatch(draft, /候選名單已固定|邀請已建立|通知已排入處理/);
 });
@@ -63,7 +71,7 @@ test("published summary keeps its own delivery truth disclaimer", () => {
 	// 唯一的分界。
 	assert.match(
 		summary,
-		/已建立 1 組詢價・\$\{publication\.data\.recipientCount\} 筆邀請/,
+		/已建立 1 組詢價・\$\{publication\.recipientCount\} 筆邀請/,
 	);
 	assert.match(summary, /通知已排入處理；不代表通知或聯絡已送達。/);
 	// ⛔ 三個 count 是發布當下的意圖分布，不是投遞結果：`queuedCount` 標的是

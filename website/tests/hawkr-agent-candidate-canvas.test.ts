@@ -10,6 +10,10 @@ function read(relativePath: string): string {
 	return readFileSync(path.join(root, relativePath), "utf8");
 }
 
+const zhMessages = JSON.parse(read("messages/zh-TW.json")) as {
+	procurementAssistant: Record<string, string>;
+};
+
 const browser = read("features/procurement-assistant/CandidateBrowser.tsx");
 const canvas = read("features/procurement-assistant/CandidateCanvas.tsx");
 const draftFlow = read("features/procurement-assistant/RfqDraftFlow.tsx");
@@ -41,7 +45,14 @@ test("assistant workspace uses the signed-off 55/45 shell and collapses without 
 });
 
 test("candidate workspace renders a semantic fact table from only current DTO fields", () => {
-	assert.match(browser, /<table[\s\S]*?aria-label="候選資料"/);
+	assert.match(
+		browser,
+		/<table[\s\S]*?aria-label=\{t\("candidateTableLabel"\)\}/,
+	);
+	assert.equal(
+		zhMessages.procurementAssistant.candidateTableLabel,
+		"候選資料",
+	);
 	for (const heading of ["候選", "符合條件", "待確認", "資料時間", "狀態"]) {
 		assert.match(browser, new RegExp(`<th scope="col">${heading}</th>`));
 	}
