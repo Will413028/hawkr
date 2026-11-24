@@ -33,13 +33,14 @@ schema `coupon`（`db/schema.sql`）：`coupon_campaigns`（活動）、`coupon_
 - 賣家的活動數配額在鎖住配額列之後檢查（BD15）；現金折抵不得超過門檻，門檻 0 是無門檻（BD32，`TestCreateCampaignRejectsDiscountAboveThreshold`、`campaigns_discount_within_threshold_check`）。
 - 後台寫入只經 `Admin*` 方法（帶 `adminaudit.Actor`）：領域變更與 `adminaudit.Record` 同一個 transaction，管理員身分取自 actor、不取自輸入（`TestAdminWritesRecordOneAuditRowEach`、`TestAdminAuditAndDomainChangeCommitOrRollBackTogether`）；後台列表不含補償活動（`TestAdminListCampaignsFiltersAndPages`）。
 - 每個狀態轉換與稽核紀錄在同一個 transaction，寫入失敗整筆失敗；所有寫入在呼叫方的 transaction 內（`db.InTx` 加入它）。
+- 到期提醒（`internal/expiry`）：週期 job 把 UTC 日窗內的 AVAILABLE 券在 transaction 內發 `VoucherExpiring`，單列游標 `expiry_reminder_cursor` 同 tx 前進，重跑不重發；註冊只在測試，`cmd/hawkr` 隨 B7-5、A8-3 接（`TestExpiryReminderEmitsOncePerVoucherAcrossAUTCDayBoundary`）。
 - 時間用注入的 `Now`，欄位一律 `timestamptz`；到期從 `end_at` 推導，沒有改狀態的排程。
 
 ## 不負責
 
 - 結帳與訂單狀態：ordering（B8）；B8 前由 `legacy/couponserver` 以自己的 transaction 包 Lock、Redeem、Release。
 - 店家停權狀態、MEMBER 的消費紀錄：`Stores`、`Members` port 由組裝點提供（seller 的 API、B7-4 的投影）；本模組不 import `ordering` 與 `internal/legacy`。
-- 刪帳事件的訂閱、MEMBER 投影、到期提醒 job 與 `VoucherExpiring` 事件：B7-4。通知：notification 模組訂閱事件。
+- 刪帳事件的訂閱、MEMBER 投影：B7-4b。通知：notification 模組訂閱事件。
 - Connect handler 在 `internal/httpapi/coupon`（賣家能力宣告表、顯示資料組裝）；`Stores` 的正式 adapter 在 `cmd/hawkr/coupon.go`。
 
 ## 決策紀錄

@@ -10,14 +10,18 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/riverqueue/river"
+
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/admin"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/campaign"
+	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/expiry"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/qualify"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/read"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/voucher"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
 //go:embed db/migrations/*.sql db/migrations/atlas.sum
@@ -40,6 +44,8 @@ type Deps struct {
 	// Buyers 與 StoreDirectory 是後台寫入前的存在檢查（admin 建立限店活動與指定發放）。
 	Buyers         Buyers
 	StoreDirectory StoreDirectory
+	// Events 是 VoucherExpiring 的發布點；只有到期提醒需要，沒給時 AddWorkers 與 PeriodicJobs 會 panic。
+	Events *events.Bus
 	// NewID 產生活動與券的主鍵，組裝點給 uuid.NewV7（ADR 2026-09-25-row-identity-by-data-kind）。
 	NewID func() uuid.UUID
 	// Now 是目前時間；測試注入固定值。
@@ -153,6 +159,9 @@ type Module struct {
 	campaign *campaign.Service
 	voucher  *voucher.Service
 	read     *read.Service
+	expiry   *expiry.Service
+	// expiryReady 表示 Deps.Events 有給。
+	expiryReady bool
 }
 
 // New 建立模組。
@@ -168,6 +177,7 @@ func New(d Deps) *Module {
 		campaign: camp,
 		voucher:  vouch,
 		read:     read.New(read.Deps{DB: d.DB, Qualify: q, Now: d.Now}),
+		expiry:   expiry.New(expiry.Deps{DB: d.DB, Events: d.Events, NewID: d.NewID, Now: d.Now}), expiryReady: d.Events != nil,
 	}
 }
 
@@ -258,3 +268,22 @@ func (m *Module) GetSellerCampaign(ctx context.Context, storeID int64, id uuid.U
 func (m *Module) GetVoucher(ctx context.Context, buyerID int64, id uuid.UUID) (VoucherView, error) {
 	return m.read.GetVoucher(ctx, buyerID, id)
 }
+
+// AddWorkers 登記到期提醒的 River worker。由組裝點接上（B7-4c 只在測試接線，cmd/hawkr 隨 B7-5 與 A8-3）。
+func (m *Module) AddWorkers(workers *river.Workers) {
+	if !m.expiryReady {
+		panic("coupon：到期提醒需要 Deps.Events")
+	}
+	expiry.AddWorkers(workers, m.expiry)
+}
+
+// PeriodicJobs 回傳到期提醒的排程（啟動即跑、每小時；窗以 UTC 日計，游標讓重跑不重發）。
+func (m *Module) PeriodicJobs() []*river.PeriodicJob {
+	if !m.expiryReady {
+		panic("coupon：到期提醒需要 Deps.Events")
+	}
+	return expiry.PeriodicJobs()
+}
+
+// RunExpiryReminder 立即處理一次到期提醒並回傳發布的事件數；給測試與維運補跑，job 呼叫的是同一個方法。
+func (m *Module) RunExpiryReminder(ctx context.Context) (int, error) { return m.expiry.Run(ctx) }

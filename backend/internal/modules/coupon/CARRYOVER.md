@@ -40,6 +40,7 @@ coupon-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 | 賣家 DESIGNATED 的自發自用防護（解析 principal 比對） | 賣家不能發券給自己 | 成立 | 身分比對在入口，核心不重複 | B7-3a 完成：在 `httpapi/coupon.CreateCampaign` 比對名單與呼叫者的買家身分（名單的 ID 是買家 ID，與 CRM 客戶的 `buyer_id` 同一種，不再是帳號 ID，不需要 principal 解析），相同回 invalid_argument 並指出 `campaign.designated_buyer_ids`（`TestCreateCampaignRejectsSelfDesignation`） |
 | `CouponTargetTypeRules`（賣家只能 ALL、MEMBER、DESIGNATED） | 限制賣家可建立的資格 | 成立 | 權限在入口與核心都檢查 | `CreateCampaign` 只接受 ALL、DESIGNATED（MEMBER 的消費紀錄投影接上之前，入口回 invalid_argument 指向 `campaign.target_type`）；COMPENSATION 只經 `IssueCompensation`；賣家的 DESIGNATED 名單不得為空，而且只能是這家店的 CRM 客戶（Will 2026-11-24，入口以 `crm.GetCustomer` 檢查，不是客戶回 invalid_argument 指向 `campaign.designated_buyer_ids[n]`）；賣家的活動一律是自己的店；店家不能結束補償活動（NotFound） |
 | 無 FK（所有關聯靠應用層） | 避免跨服務耦合 | 同 schema 內不成立：沒有理由不用 FK | 同 schema 用 FK，跨 schema 不建（單體規則 2） | 券與資格名單 FK 到活動（同 schema）；沒有跨 schema FK（`buyer_id`、`store_id` 是業務鍵）；稽核紀錄不設 FK（只追加，不擋刪除） |
+| `CouponExpiringWarningJob`：每日 01:00（JVM 時區）、`days=1`、`instance_id` 游標、逐筆發 MQ、publish 失敗被吞（at-most-once） | 到期前提醒買家一次 | 成立；但時區混用（cron 用 JVM 預設、窗用 UTC）與吞錯不成立 | River periodic job，游標與事件同 transaction，訂閱者失敗整批回滾 | 每小時一次、窗以 UTC 日計（到下一個 UTC 日結束，提前量 24–48 小時）；游標 `(end_at, voucher_id)` 持久化在單列表，只前進；只算 AVAILABLE；領券時已落在游標以前的券不補提醒；不呼叫 Buyer.ResolvePrincipals（帳號解析歸 notification） |
 
 ## 傳輸層的沿用盤點
 
@@ -64,7 +65,7 @@ coupon-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 | `CouponInstanceStatus`（UNUSED、RESERVED、USED、REVOKED、EXPIRED…） | proto enum `VoucherStatus`（AVAILABLE、LOCKED、REDEEMED、VOIDED）；EXPIRED→`Voucher.expired`（推導）；來源另有 `VoucherOrigin`（CLAIM、GRANT、COMPENSATION） |
 | `IssuerType` | 不對外：模組的 `Issuer`（`issuer_type` CHECK）；client 從方法知道身分，店家看到的都是自己的活動 |
 | `CouponRedemptionAction` | 不對外：`coupon_redemption_logs.action` 的 CHECK（CLAIM、ISSUE、LOCK、REDEEM、RELEASE、VOID、END_CAMPAIGN） |
-| `CouponEventType`（`coupon.issued`、`coupon.expiring`） | `coupon.issued` 不搬（D7、BD27）；`coupon.expiring` 是 in-process 事件 `VoucherExpiring`（B7-4） |
+| `CouponEventType`（`coupon.issued`、`coupon.expiring`） | `coupon.issued` 不搬（D7、BD27）；`coupon.expiring` 是 in-process 事件 `VoucherExpiring`（B7-4c，`internal/expiry`） |
 
 | 舊錯誤碼 | 去向 |
 |---|---|

@@ -72,6 +72,12 @@ type CouponCouponVoucher struct {
 	UpdatedAt  time.Time
 }
 
+type CouponExpiryReminderCursor struct {
+	Singleton bool
+	EndAt     time.Time
+	VoucherID uuid.UUID
+}
+
 type CouponSellerCouponQuota struct {
 	StoreID          int64
 	MaxCampaignCount int32

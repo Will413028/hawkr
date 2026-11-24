@@ -423,3 +423,16 @@ func PositiveUnique(ctx context.Context, field string, ids []int64) ([]int64, er
 	}
 	return out, nil
 }
+
+// VoucherExpiring 在一張 AVAILABLE 的券進入到期提醒窗時、同一個 transaction 內發布一次（每張券至多一次）；
+// 只有業務鍵與資料，使用者面的句子由訂閱的 notification 模組產生。CampaignTitle 是賣家或平台填的活動名稱原文。
+type VoucherExpiring struct {
+	EventID       uuid.UUID
+	OccurredAt    time.Time
+	BuyerID       int64
+	VoucherID     uuid.UUID
+	CampaignID    uuid.UUID
+	CampaignTitle string
+	// ExpiresAt 是活動的 end_at（UTC）。
+	ExpiresAt time.Time
+}

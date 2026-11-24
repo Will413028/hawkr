@@ -1,0 +1,40 @@
+{
+ "mutants": [
+  {
+   "id": "expiry-cursor-not-advanced",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/expiry/expiry.go",
+   "old": "\t\treturn q.AdvanceExpiryCursor(ctx, next)",
+   "new": "\t\treturn nil",
+   "test": "internal/modules/coupon ^TestExpiryReminderEmitsOncePerVoucherAcrossAUTCDayBoundary$",
+   "why": "游標不前進：同一個時鐘重跑會重發同一張券的 VoucherExpiring，重跑測試要紅。"
+  },
+  {
+   "id": "expiry-window-by-local-day",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/expiry/expiry.go",
+   "old": "\tt := now.UTC()",
+   "new": "\tt := now.In(time.FixedZone(\"UTC+8\", 8*3600))",
+   "test": "internal/modules/coupon ^TestExpiryReminderEmitsOncePerVoucherAcrossAUTCDayBoundary$",
+   "why": "以本機時區（UTC+8）判斷日界：UTC 12/1 17:30 時窗多出一天，後到期的券提早被提醒，日界測試要紅。"
+  },
+  {
+   "id": "expiry-horizon-by-local-day-unit",
+   "stack": "go",
+   "file": "backend/internal/modules/coupon/internal/expiry/expiry.go",
+   "old": "\tt := now.UTC()",
+   "new": "\tt := now.In(time.FixedZone(\"UTC+8\", 8*3600))",
+   "test": "internal/modules/coupon/internal/expiry ^TestHorizonIsEndOfTheNextUTCDay$",
+   "why": "同上，單元層：Horizon 以非 UTC 日計，日界案例要紅。"
+  },
+  {
+   "id": "expiry-includes-locked",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/store/expiry.sql.go",
+   "old": "WHERE v.status = 'AVAILABLE'",
+   "new": "WHERE v.status IN ('AVAILABLE', 'LOCKED')",
+   "test": "internal/modules/coupon ^TestExpiryReminderEmitsOncePerVoucherAcrossAUTCDayBoundary$",
+   "why": "LOCKED 的券也被提醒：只有 AVAILABLE 算的斷言要紅（改的是生成檔內的 SQL 字串，執行的查詢與 expiry.sql 同文）。"
+  }
+ ]
+}
