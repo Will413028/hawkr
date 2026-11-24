@@ -1,0 +1,12 @@
+{"mutants": [
+  {"id": "inquiry-event-error-swallowed", "stack": "go-integration", "file": "backend/internal/modules/seller/internal/governance/inquiry.go",
+   "old": "AccountID: storeRow.AccountID, Kind: in.Kind, DueAt: dueAt,\n\t\t}); err != nil {\n\t\t\treturn err\n\t\t}",
+   "new": "AccountID: storeRow.AccountID, Kind: in.Kind, DueAt: dueAt,\n\t\t}); err != nil {\n\t\t\t_ = err\n\t\t}",
+   "test": "internal/modules/seller ^TestCreateInquiryEventFailureRollsBackTheInquiry$",
+   "why": "訂閱者失敗不再讓詢問 rollback：事件不在同一個 transaction 的保證消失"},
+  {"id": "inquiry-event-wrong-account", "stack": "go-integration", "file": "backend/internal/modules/seller/internal/governance/inquiry.go",
+   "old": "AccountID: storeRow.AccountID, Kind: in.Kind, DueAt: dueAt,",
+   "new": "AccountID: locked.StoreID, Kind: in.Kind, DueAt: dueAt,",
+   "test": "internal/modules/seller ^TestCreateInquiryPublishesCaseInquiryCreatedOnceInTheSameTransaction$",
+   "why": "事件的 AccountID 不再是店家所屬帳號，通知收件人會錯"}
+]}
