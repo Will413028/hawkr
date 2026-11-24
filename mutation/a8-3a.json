@@ -1,0 +1,31 @@
+{
+ "mutants": [
+  {
+   "id": "email-permanent-classified-transient",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/deliver/email.go",
+   "old": "case errors.Is(err, resend.ErrPermanent):",
+   "new": "case errors.Is(err, resend.ErrTransient):",
+   "test": "internal/modules/notification ^TestEmailTransientErrorIsRetriedOnceAndPermanentErrorIsNot$",
+   "why": "A permanent email error is no longer recorded as a permanent failure: it falls through to the retry path, and a transient error is failed instead of retried."
+  },
+  {
+   "id": "push-permanent-retried",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/deliver/push.go",
+   "old": "case transient > 0 || auth > 0:",
+   "new": "case transient > 0 || auth > 0 || permanent > 0:",
+   "test": "internal/modules/notification ^TestPushPermanentErrorIsNotRetriedAndKeepsTheToken$",
+   "why": "A permanent push error is treated like a transient one: the job returns an error and River retries it instead of marking the delivery permanently failed."
+  },
+  {
+   "id": "push-ignores-the-audience-app",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/store/delivery.sql.go",
+   "old": "WHERE account_id = $1 AND app = $2\nORDER BY token",
+   "new": "WHERE account_id = $1 AND $2::text <> ''\nORDER BY token",
+   "test": "internal/modules/notification ^TestBuyerAudienceNeverPushesToTheSellerApp$",
+   "why": "The device token lookup no longer filters by App, so a BUYER-audience push also reaches the account's seller App token (and vice versa)."
+  }
+ ]
+}

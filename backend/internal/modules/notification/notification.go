@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"math"
+	"net/http"
 	"time"
 	"uuid"
 
@@ -20,15 +21,20 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/announce"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/app"
+	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/deliver"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/intake"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/purge"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/stream"
+	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/suppress"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/fcm"
+	"github.com/Will413028/hawkr/backend/internal/platform/inbox"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
+	"github.com/Will413028/hawkr/backend/internal/platform/resend"
 )
 
 //go:embed db/migrations/*.sql db/migrations/atlas.sum
@@ -49,6 +55,12 @@ type Buyers = intake.Buyers
 // Stores 是 worker 對 seller 的需求（*seller.Module 滿足它）：以 FOR KEY SHARE 鎖住收件店家列，店家已退場回 NotFound。
 type Stores = intake.Stores
 
+// Contacts 是渠道 job 對 identity 的需求（*identity.Module 滿足它）：帳號的聯絡信箱與來源，只寄已驗證的信箱。
+type Contacts = deliver.Contacts
+
+// Locales 回傳帳號的 preferred_locale：推播與 email 在送出時依它組字（identity 擁有這個欄位）。
+type Locales = deliver.Locales
+
 // Deps 是模組需要的外部依賴；新增 use case 時由根套件逐欄組裝。
 type Deps struct {
 	DB       *db.DB
@@ -59,6 +71,14 @@ type Deps struct {
 	Now      func() time.Time
 	NewID    func() uuid.UUID
 	Logger   *slog.Logger
+	// Contacts、Locales、Push、Mail 是渠道 job（推播與 email）的依賴；Push 與 Mail 在沒有設定真實 provider 的環境是各自的替身（platform/fcm、platform/resend 的 Fake）。
+	Contacts Contacts
+	Locales  Locales
+	Push     fcm.Sender
+	Mail     resend.Sender
+	// Inbox 是 platform 的 webhook inbox：給了就登記 Resend 的退信與投訴事件（每個行程只建一個模組）；ResendWebhookSecret 為空時 webhook 回 FailedPrecondition。
+	Inbox               *inbox.Inbox
+	ResendWebhookSecret string
 	// Directory 列出公告的收件人（*buyer.Module 與 *seller.Module 經 NewDirectory 組成）；只有公告派送用，沒有公告的測試可以不給。
 	Directory announce.Directory
 	// ListenConnConfig 是串流 LISTEN 專用連線的設定，必須指向直連或 session 模式的 Postgres，不能經 transaction pooling；nil 時以主連線池的設定另開（不從池借）。
@@ -71,6 +91,8 @@ type Module struct {
 	purge    *purge.Service
 	app      *app.Service
 	announce *announce.Service
+	deliver  *deliver.Service
+	suppress *suppress.Service
 	hub      *stream.Hub
 
 	pool      *db.DB
@@ -83,6 +105,7 @@ func New(d Deps) *Module { return newModule(d, registry.Registry{}) }
 func newModule(d Deps, reg app.Registry) *Module {
 	appSvc := app.New(app.Deps{DB: d.DB, Accounts: d.Identity, Registry: reg, Signals: dbSignals{d.DB}, Now: d.Now, Logger: d.Logger})
 	hub := stream.NewHub(inboxReader(appSvc), d.Logger, d.Now)
+	locks := intake.Locks{Accounts: d.Identity, Buyers: d.Buyer, Stores: d.Seller}
 	return &Module{
 		intake: intake.New(intake.Deps{
 			DB: d.DB, Accounts: d.Identity, Buyers: d.Buyer, Stores: d.Seller, Registry: reg, Signals: dbSignals{d.DB}, Jobs: d.Jobs, Now: d.Now, NewID: d.NewID, Logger: d.Logger,
@@ -93,7 +116,12 @@ func newModule(d Deps, reg app.Registry) *Module {
 			DB: d.DB, Locks: intake.Locks{Accounts: d.Identity, Buyers: d.Buyer, Stores: d.Seller}, Directory: d.Directory,
 			Audit: adminaudit.New(d.DB, d.Now), Signals: dbSignals{d.DB}, Jobs: d.Jobs, Now: d.Now, NewID: d.NewID, Logger: d.Logger,
 		}),
-		hub: hub, pool: d.DB, listenCfg: d.ListenConnConfig,
+		deliver: deliver.New(deliver.Deps{
+			DB: d.DB, Locks: locks, Contacts: d.Contacts, Locales: d.Locales, Registry: reg, Sources: appSvc,
+			Push: d.Push, Mail: d.Mail, Now: d.Now, Logger: d.Logger,
+		}),
+		suppress: suppress.New(suppress.Deps{DB: d.DB, Inbox: d.Inbox, WebhookSecret: d.ResendWebhookSecret, Now: d.Now}),
+		hub:      hub, pool: d.DB, listenCfg: d.ListenConnConfig,
 	}
 }
 
@@ -215,12 +243,29 @@ func (m *Module) OnStoreRetired(ctx context.Context, e seller.StoreRetired) erro
 	return m.purge.OnStoreRetired(ctx, e)
 }
 
-// AddWorkers 登記 River worker（意圖展開、保留期清除、個資清除）。由 cmd/hawkr 的 worker 接上。
+// PurgeTokensOnSuspended 是 accountsuspension.Suspended 的同步訂閱者：在發布的 transaction 內刪掉帳號的全部裝置 token（店家停權不走這個事件，token 不動）。
+func (m *Module) PurgeTokensOnSuspended(ctx context.Context, e accountsuspension.Suspended) error {
+	return m.intake.PurgeTokensOnSuspended(ctx, e)
+}
+
+// PurgeTokensOnAccountDeleted 是 identity.AccountDeleted 的同步訂閱者：在發布的 transaction 內刪掉帳號的全部裝置 token。
+func (m *Module) PurgeTokensOnAccountDeleted(ctx context.Context, e identity.AccountDeleted) error {
+	return m.intake.PurgeTokensOnAccountDeleted(ctx, e)
+}
+
+// ReceiveResendEvent 是 Resend 退信與投訴 webhook 的入口：驗簽、同一個 transaction 寫 platform/inbox 並排入派送 job（commit 之後才回 2xx）。
+// 沒有設定密鑰回 FailedPrecondition，簽章或格式不合回 InvalidInput。
+func (m *Module) ReceiveResendEvent(ctx context.Context, header http.Header, body []byte) error {
+	return m.suppress.Receive(ctx, header, body)
+}
+
+// AddWorkers 登記 River worker（意圖展開、渠道投遞、保留期清除、個資清除）。由 cmd/hawkr 的 worker 接上。
 func (m *Module) AddWorkers(workers *river.Workers) {
 	m.intake.AddWorkers(workers)
+	m.deliver.AddWorkers(workers)
 	purge.AddWorkers(workers, m.purge)
 	m.announce.AddWorkers(workers)
 }
 
-// PeriodicJobs 回傳週期 job：保留期清除。
+// PeriodicJobs 回傳週期 job：保留期清除與過期裝置 token 清除。
 func (m *Module) PeriodicJobs() []*river.PeriodicJob { return purge.PeriodicJobs() }

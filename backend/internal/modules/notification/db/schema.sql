@@ -157,3 +157,13 @@ CREATE TABLE notification.preference_overrides (
     CONSTRAINT preference_overrides_category_check CHECK (category ~ '^[A-Z][A-Z0-9_]{0,62}$'),
     CONSTRAINT preference_overrides_channel_check CHECK (channel IN ('INBOX', 'PUSH', 'EMAIL'))
 );
+
+-- email suppression 名單：Resend 回報永久退信或收件人投訴的位址，之後不再寄（寄給它們會傷寄件網域的信譽）。address 是 emailaddr.Normalize 之後的位址
+-- （小寫）。只由 Resend 的退信與投訴 webhook（經 platform/inbox）寫入，email 渠道 job 送出前查。
+CREATE TABLE notification.email_suppressions (
+    address    TEXT        PRIMARY KEY,
+    reason     TEXT        NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT email_suppressions_address_check CHECK (address = lower(address) AND char_length(address) BETWEEN 3 AND 254),
+    CONSTRAINT email_suppressions_reason_check CHECK (reason IN ('BOUNCE', 'COMPLAINT'))
+);

@@ -348,6 +348,7 @@ func assemble(deps Deps, services []service, files ...fileRoute) (http.Handler, 
 	h = csrf.Handler(h)
 	h = withPaymentWebhook(deps.Payment, deps.Logger, h)
 	h = withChargeWebhook(deps.Payment, deps.Logger, h)
+	h = withResendWebhook(deps.Notification, deps.Logger, h)
 	return withTracing(deps.Tracer, h), nil
 }
 
@@ -363,6 +364,14 @@ func withPaymentWebhook(events httppayment.Events, log *slog.Logger, next http.H
 func withChargeWebhook(events httppayment.ChargeEvents, log *slog.Logger, next http.Handler) http.Handler {
 	root := http.NewServeMux()
 	root.Handle(httppayment.ChargeWebhookRoute, httppayment.NewChargeWebhook(events, log))
+	root.Handle("/", next)
+	return root
+}
+
+// withResendWebhook 在 next 之外掛上 Resend 的退信與投訴 webhook；理由同 withPaymentWebhook（簽章就是驗證）。
+func withResendWebhook(events httpnotification.ResendEvents, log *slog.Logger, next http.Handler) http.Handler {
+	root := http.NewServeMux()
+	root.Handle(httpnotification.ResendWebhookRoute, httpnotification.NewResendWebhook(events, log))
 	root.Handle("/", next)
 	return root
 }

@@ -76,8 +76,7 @@ type ProcessArgs struct {
 // Kind 是 River 的 job 種類。
 func (ProcessArgs) Kind() string { return "notification.process_intent" }
 
-// DeliverArgs 是一筆投遞紀錄（推播或 email）的渠道 job；以投遞紀錄 ID 唯一。A8-3 把渠道 adapter 接進這個 job，這一步它不送出、
-// 不改紀錄（紀錄留在 PENDING）。
+// DeliverArgs 是一筆投遞紀錄（推播或 email）的渠道 job；以投遞紀錄 ID 唯一，由 deliver 套件的 worker 執行。
 type DeliverArgs struct {
 	DeliveryID uuid.UUID `json:"delivery_id"`
 }
@@ -228,7 +227,7 @@ func (s *Service) deliver(ctx context.Context, intent store.NotificationIntent, 
 			continue
 		}
 		if model.DeliveryChannel(ch) {
-			// 投遞紀錄是推播與 email 的唯一帳本；每筆新紀錄在同一個 transaction 排一個渠道 job（A8-3 把 adapter 接進它，這一步 job 不送出）。
+			// 投遞紀錄是推播與 email 的唯一帳本；每筆新紀錄在同一個 transaction 排一個渠道 job（deliver 套件執行）。
 			// 紀錄已存在（重試）時 job 已隨第一次的 transaction 排過，不再排。
 			id, err := q.InsertDelivery(ctx, store.InsertDeliveryParams{
 				ID: s.d.NewID(), IntentID: intent.ID, AccountID: r.Recipient.AccountID, Audience: string(spec.Audience()),

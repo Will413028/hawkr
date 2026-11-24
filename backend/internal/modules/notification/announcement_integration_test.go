@@ -127,6 +127,7 @@ func (d testDirectory) Stores(_ context.Context, after int64, limit int) ([]anno
 type announceFixture struct {
 	db       *db.DB
 	identity *identity.Module
+	buyers   *buyer.Module
 	svc      *announce.Service
 	inbox    *app.Service
 	jobs     *jobQueue
@@ -158,7 +159,7 @@ func setupAnnounce(t *testing.T, chunk int) *announceFixture {
 		Audit: adminaudit.New(d, clock.Now), Signals: dbSignals{d}, Jobs: q, Now: clock.Now, NewID: uuid.NewV7, Logger: log, Chunk: chunk,
 	})
 	inbox := app.New(app.Deps{DB: d, Accounts: id, Registry: registry.Registry{}, Now: time.Now, Logger: log})
-	return &announceFixture{db: d, identity: id, svc: svc, inbox: inbox, jobs: q, dir: dir, stores: stores, clock: clock}
+	return &announceFixture{db: d, identity: id, buyers: buyers, svc: svc, inbox: inbox, jobs: q, dir: dir, stores: stores, clock: clock}
 }
 
 func (f *announceFixture) newAccount(t *testing.T) int64 {

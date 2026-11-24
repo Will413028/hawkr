@@ -122,13 +122,18 @@ func (w *sweepWorker) Work(ctx context.Context, _ *river.Job[SweepArgs]) error {
 // Timeout 是一次清除的時間上限；超過時 job 重試，從剩下的列接著做。
 func (w *sweepWorker) Timeout(*river.Job[SweepArgs]) time.Duration { return 5 * time.Minute }
 
-// PeriodicJobs 回傳啟動即執行、每 SweepInterval 的保留期清除。
+// PeriodicJobs 回傳啟動即執行、每 SweepInterval 的保留期清除與過期裝置 token 清除。
 func PeriodicJobs() []*river.PeriodicJob {
 	return []*river.PeriodicJob{
 		river.NewPeriodicJob(
 			river.PeriodicInterval(SweepInterval),
 			func() (river.JobArgs, *river.InsertOpts) { return SweepArgs{}, nil },
 			&river.PeriodicJobOpts{ID: "notification.retention_sweep", RunOnStart: true},
+		),
+		river.NewPeriodicJob(
+			river.PeriodicInterval(SweepInterval),
+			func() (river.JobArgs, *river.InsertOpts) { return TokenSweepArgs{}, nil },
+			&river.PeriodicJobOpts{ID: "notification.token_sweep", RunOnStart: true},
 		),
 	}
 }
@@ -144,4 +149,5 @@ func (s *Service) log() *slog.Logger {
 func AddWorkers(workers *river.Workers, s *Service) {
 	river.AddWorker(workers, &sweepWorker{svc: s})
 	river.AddWorker(workers, &recipientWorker{svc: s})
+	river.AddWorker(workers, &tokenSweepWorker{svc: s})
 }

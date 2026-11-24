@@ -26,8 +26,10 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
+	"github.com/Will413028/hawkr/backend/internal/platform/fcm"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
+	"github.com/Will413028/hawkr/backend/internal/platform/resend"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
@@ -245,6 +247,10 @@ type fixture struct {
 	jobs     *recorder
 	module   *Module
 	logs     *syncBuffer
+	push     *fcm.Fake
+	mail     *resend.Fake
+	contacts *fakeContacts
+	locales  *fakeLocales
 }
 
 type syncBuffer struct {
@@ -280,13 +286,19 @@ func setupIntake(t *testing.T) *fixture {
 	events.Subscribe[identity.AccountCreated](bus, buyers.OnAccountCreated)
 	stores := &fakeStores{retired: map[int64]bool{}}
 	rec := &recorder{}
-	m := newModule(Deps{DB: d, Identity: id, Buyer: buyers, Seller: stores, Jobs: rec, Now: time.Now, NewID: uuid.NewV7, Logger: log}, testRegistry{})
+	push, mail, contacts, locales := fcm.NewFake(nil), resend.NewFake(nil), &fakeContacts{m: map[int64]identity.ContactEmail{}}, &fakeLocales{m: map[int64]uitext.Locale{}}
+	m := newModule(Deps{
+		DB: d, Identity: id, Buyer: buyers, Seller: stores, Jobs: rec, Now: time.Now, NewID: uuid.NewV7, Logger: log,
+		Contacts: contacts, Locales: locales, Push: push, Mail: mail,
+	}, testRegistry{})
 	events.Subscribe[accountsuspension.Suspended](bus, m.OnSuspended)
+	events.Subscribe[accountsuspension.Suspended](bus, m.PurgeTokensOnSuspended)
 	events.Subscribe[accountsuspension.Unsuspended](bus, m.OnUnsuspended)
 	events.Subscribe[identity.AccountDeleted](bus, m.OnAccountDeleted)
+	events.Subscribe[identity.AccountDeleted](bus, m.PurgeTokensOnAccountDeleted)
 	events.Subscribe[buyer.BuyerDeleted](bus, m.OnBuyerDeleted)
 	events.Subscribe[seller.StoreRetired](bus, m.OnStoreRetired)
-	return &fixture{db: d, identity: id, buyer: buyers, stores: stores, bus: bus, jobs: rec, module: m, logs: logs}
+	return &fixture{db: d, identity: id, buyer: buyers, stores: stores, bus: bus, jobs: rec, module: m, logs: logs, push: push, mail: mail, contacts: contacts, locales: locales}
 }
 
 func (f *fixture) newAccount(t *testing.T) int64 {
