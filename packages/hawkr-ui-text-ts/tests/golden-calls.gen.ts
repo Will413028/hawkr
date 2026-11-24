@@ -83,8 +83,6 @@ const ENUM_NUMBER: Readonly<Record<string, number>> = {
 	"hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_PROCUREMENT": 16,
 	"hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_RESTOCK": 14,
 	"hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_REVIEW": 8,
-	"hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_SHIPMENT": 2,
-	"hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_SHIPMENT_ANOMALY": 3,
 	"hawkr.notification.v1alpha1.NotificationCategory.NOTIFICATION_CATEGORY_UNSPECIFIED": 0,
 	"hawkr.notification.v1alpha1.NotificationChannel.NOTIFICATION_CHANNEL_EMAIL": 3,
 	"hawkr.notification.v1alpha1.NotificationChannel.NOTIFICATION_CHANNEL_INBOX": 1,

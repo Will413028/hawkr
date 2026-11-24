@@ -212,10 +212,6 @@ String? _notificationNotificationCategory(UiLocale l, int value) {
 return switch ((l, value)) {
 (UiLocale.zhTW, 1) => '訂單',
 (UiLocale.en, 1) => 'Orders',
-(UiLocale.zhTW, 2) => '出貨',
-(UiLocale.en, 2) => 'Shipping',
-(UiLocale.zhTW, 3) => '配送異常',
-(UiLocale.en, 3) => 'Delivery issues',
 (UiLocale.zhTW, 4) => '退款與售後',
 (UiLocale.en, 4) => 'Refunds and after-sales',
 (UiLocale.zhTW, 5) => '撥款',

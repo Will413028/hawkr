@@ -134,9 +134,7 @@
       "NOTIFICATION_CATEGORY_PAYOUT": "Payouts",
       "NOTIFICATION_CATEGORY_PROCUREMENT": "Quote requests",
       "NOTIFICATION_CATEGORY_RESTOCK": "Back in stock",
-      "NOTIFICATION_CATEGORY_REVIEW": "Reviews",
-      "NOTIFICATION_CATEGORY_SHIPMENT": "Shipping",
-      "NOTIFICATION_CATEGORY_SHIPMENT_ANOMALY": "Delivery issues"
+      "NOTIFICATION_CATEGORY_REVIEW": "Reviews"
     },
     "NotificationChannel": {
       "NOTIFICATION_CHANNEL_EMAIL": "Email",

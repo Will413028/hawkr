@@ -102,8 +102,6 @@ export type UiTextKey =
 	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_PROCUREMENT"
 	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_RESTOCK"
 	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_REVIEW"
-	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_SHIPMENT"
-	| "notification.NotificationCategory.NOTIFICATION_CATEGORY_SHIPMENT_ANOMALY"
 	| "notification.NotificationChannel.NOTIFICATION_CHANNEL_EMAIL"
 	| "notification.NotificationChannel.NOTIFICATION_CHANNEL_INBOX"
 	| "notification.NotificationChannel.NOTIFICATION_CHANNEL_PUSH"
@@ -534,8 +532,6 @@ export function moderationReportTargetKind(v: ReportTargetKind): UiMessage | und
 
 const NOTIFICATION_NOTIFICATION_CATEGORY: Readonly<Partial<Record<number, UiTextKey>>> = {
 	1: "notification.NotificationCategory.NOTIFICATION_CATEGORY_ORDER",
-	2: "notification.NotificationCategory.NOTIFICATION_CATEGORY_SHIPMENT",
-	3: "notification.NotificationCategory.NOTIFICATION_CATEGORY_SHIPMENT_ANOMALY",
 	4: "notification.NotificationCategory.NOTIFICATION_CATEGORY_AFTERSALES",
 	5: "notification.NotificationCategory.NOTIFICATION_CATEGORY_PAYOUT",
 	6: "notification.NotificationCategory.NOTIFICATION_CATEGORY_ACCOUNT",

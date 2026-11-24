@@ -56,16 +56,6 @@ class NotificationCategory extends $pb.ProtobufEnum {
       NotificationCategory._(
           1, _omitEnumNames ? '' : 'NOTIFICATION_CATEGORY_ORDER');
 
-  /// 出貨（交易必要）。
-  static const NotificationCategory NOTIFICATION_CATEGORY_SHIPMENT =
-      NotificationCategory._(
-          2, _omitEnumNames ? '' : 'NOTIFICATION_CATEGORY_SHIPMENT');
-
-  /// 配送異常（交易必要，只有店家；推播也不可關）。
-  static const NotificationCategory NOTIFICATION_CATEGORY_SHIPMENT_ANOMALY =
-      NotificationCategory._(
-          3, _omitEnumNames ? '' : 'NOTIFICATION_CATEGORY_SHIPMENT_ANOMALY');
-
   /// 退款與售後（交易必要）。
   static const NotificationCategory NOTIFICATION_CATEGORY_AFTERSALES =
       NotificationCategory._(
@@ -134,8 +124,6 @@ class NotificationCategory extends $pb.ProtobufEnum {
   static const $core.List<NotificationCategory> values = <NotificationCategory>[
     NOTIFICATION_CATEGORY_UNSPECIFIED,
     NOTIFICATION_CATEGORY_ORDER,
-    NOTIFICATION_CATEGORY_SHIPMENT,
-    NOTIFICATION_CATEGORY_SHIPMENT_ANOMALY,
     NOTIFICATION_CATEGORY_AFTERSALES,
     NOTIFICATION_CATEGORY_PAYOUT,
     NOTIFICATION_CATEGORY_ACCOUNT,
