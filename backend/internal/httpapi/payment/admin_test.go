@@ -240,7 +240,7 @@ func TestListPaymentsMapsEveryFieldAndPaginatesWithAFilterBoundToken(t *testing.
 	if len(r.GetOrders()) != 2 || r.GetOrders()[1].GetOrderNo() != "O2" || r.GetOrders()[1].GetStoreId() != "9" || r.GetOrders()[1].GetAmount() != 50 || r.GetOrders()[0].GetId() == "" {
 		t.Fatalf("orders=%v", r.GetOrders())
 	}
-	if r.GetId() != id.String() || r.GetOrderNo() != "O1" || r.GetStoreId() != "7" || r.GetBuyerId() != "8" || r.GetAmount() != 120 || r.GetProvider() != "stripe" || r.GetExternalPaymentId() != "pi_1" ||
+	if r.GetId() != id.String() || r.GetOrders()[0].GetOrderNo() != "O1" || r.GetOrders()[0].GetStoreId() != "7" || r.GetBuyerId() != "8" || r.GetAmount() != 120 || r.GetProvider() != "stripe" || r.GetExternalPaymentId() != "pi_1" ||
 		r.GetStatus() != st || r.GetPaidTime() == nil || r.GetLastError() != "card_declined" || r.GetCreateTime() == nil || r.GetUpdateTime() == nil {
 		t.Fatalf("payment=%v", r)
 	}

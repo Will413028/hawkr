@@ -738,12 +738,9 @@ func (x *PaymentOrder) GetAmount() int64 {
 
 // Payment 是後台看到的付款（含金流商的外部 ID 與失敗原因）：一筆付款（一個金流商付款物件）對 orders 底下 N 張訂單應收（過渡期 N 是 1）。
 type Payment struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// 第一張訂單的訂單編號與店家：N 是 1 時就是這筆付款的訂單；N 大於 1 時看 orders。
-	OrderNo string `protobuf:"bytes,2,opt,name=order_no,json=orderNo,proto3" json:"order_no,omitempty"`
-	StoreId string `protobuf:"bytes,3,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
-	BuyerId string `protobuf:"bytes,4,opt,name=buyer_id,json=buyerId,proto3" json:"buyer_id,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Id      string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	BuyerId string                 `protobuf:"bytes,4,opt,name=buyer_id,json=buyerId,proto3" json:"buyer_id,omitempty"`
 	// 付款金額（各訂單應收的總額，不帶幣別）。
 	Amount int64 `protobuf:"varint,5,opt,name=amount,proto3" json:"amount,omitempty"`
 	// 金流商的代碼（例如 stripe）。
@@ -798,20 +795,6 @@ func (*Payment) Descriptor() ([]byte, []int) {
 func (x *Payment) GetId() string {
 	if x != nil {
 		return x.Id
-	}
-	return ""
-}
-
-func (x *Payment) GetOrderNo() string {
-	if x != nil {
-		return x.OrderNo
-	}
-	return ""
-}
-
-func (x *Payment) GetStoreId() string {
-	if x != nil {
-		return x.StoreId
 	}
 	return ""
 }
@@ -1277,7 +1260,7 @@ type ListPaymentsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 只列這個狀態的付款；不設是不篩。
 	Status *v1alpha1.PaymentStatus `protobuf:"varint,1,opt,name=status,proto3,enum=hawkr.payment.v1alpha1.PaymentStatus,oneof" json:"status,omitempty"`
-	// 只列這張訂單的付款（完全比對）；空字串是不篩。
+	// 只列含這張訂單的付款（付款底下任一張訂單的訂單編號完全比對）；空字串是不篩。
 	OrderNo string `protobuf:"bytes,2,opt,name=order_no,json=orderNo,proto3" json:"order_no,omitempty"`
 	// 每頁筆數：預設 20，上限 100；負數回 invalid_argument。
 	PageSize      int32  `protobuf:"varint,3,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
@@ -1826,11 +1809,9 @@ const file_hawkr_admin_payment_v1alpha1_payment_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x19\n" +
 	"\border_no\x18\x02 \x01(\tR\aorderNo\x12\x19\n" +
 	"\bstore_id\x18\x03 \x01(\tR\astoreId\x12\x16\n" +
-	"\x06amount\x18\x04 \x01(\x03R\x06amount\"\xcf\x04\n" +
+	"\x06amount\x18\x04 \x01(\x03R\x06amount\"\xb9\x04\n" +
 	"\aPayment\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x19\n" +
-	"\border_no\x18\x02 \x01(\tR\aorderNo\x12\x19\n" +
-	"\bstore_id\x18\x03 \x01(\tR\astoreId\x12\x19\n" +
 	"\bbuyer_id\x18\x04 \x01(\tR\abuyerId\x12\x16\n" +
 	"\x06amount\x18\x05 \x01(\x03R\x06amount\x12\x1a\n" +
 	"\bprovider\x18\x06 \x01(\tR\bprovider\x12=\n" +
@@ -1845,7 +1826,7 @@ const file_hawkr_admin_payment_v1alpha1_payment_proto_rawDesc = "" +
 	"createTime\x12;\n" +
 	"\vupdate_time\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"updateTime\x12B\n" +
-	"\x06orders\x18\x0e \x03(\v2*.hawkr.admin.payment.v1alpha1.PaymentOrderR\x06orders\"\xc3\x03\n" +
+	"\x06orders\x18\x0e \x03(\v2*.hawkr.admin.payment.v1alpha1.PaymentOrderR\x06ordersJ\x04\b\x02\x10\x03J\x04\b\x03\x10\x04R\border_noR\bstore_id\"\xc3\x03\n" +
 	"\x0fPaymentTransfer\x12\x13\n" +
 	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x1d\n" +
 	"\n" +

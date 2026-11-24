@@ -149,9 +149,8 @@ message PaymentOrder {
 // Payment 是後台看到的付款（含金流商的外部 ID 與失敗原因）：一筆付款（一個金流商付款物件）對 orders 底下 N 張訂單應收（過渡期 N 是 1）。
 message Payment {
   string id = 1 [(google.api.field_behavior) = IDENTIFIER];
-  // 第一張訂單的訂單編號與店家：N 是 1 時就是這筆付款的訂單；N 大於 1 時看 orders。
-  string order_no = 2;
-  string store_id = 3;
+  reserved 2, 3;
+  reserved "order_no", "store_id";
   string buyer_id = 4;
   // 付款金額（各訂單應收的總額，不帶幣別）。
   int64 amount = 5;
@@ -232,7 +231,7 @@ message PaymentRefund {
 message ListPaymentsRequest {
   // 只列這個狀態的付款；不設是不篩。
   optional hawkr.payment.v1alpha1.PaymentStatus status = 1;
-  // 只列這張訂單的付款（完全比對）；空字串是不篩。
+  // 只列含這張訂單的付款（付款底下任一張訂單的訂單編號完全比對）；空字串是不篩。
   string order_no = 2;
   // 每頁筆數：預設 20，上限 100；負數回 invalid_argument。
   int32 page_size = 3;

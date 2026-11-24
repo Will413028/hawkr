@@ -170,16 +170,12 @@ func toAdminPayment(r payment.PaymentRecord) *adminpb.Payment {
 	for i, o := range r.Orders {
 		orders[i] = &adminpb.PaymentOrder{Id: o.ID.String(), OrderNo: o.OrderNo, StoreId: rpc.FormatID(o.StoreID), Amount: o.Amount}
 	}
-	out := &adminpb.Payment{
+	return &adminpb.Payment{
 		Id: r.ID.String(), Orders: orders, BuyerId: rpc.FormatID(r.BuyerID), Amount: r.Amount, Provider: r.Provider,
 		Status:            rpc.EnumToProto[paymentpb.PaymentStatus](r.Status),
 		ExternalPaymentId: r.ExternalPaymentID, PaidTime: optTimestamp(r.PaidAt), LastError: r.LastError, FailureReason: r.FailureReason,
 		CreateTime: timestamppb.New(r.CreatedAt), UpdateTime: timestamppb.New(r.UpdatedAt),
 	}
-	if len(r.Orders) > 0 {
-		out.OrderNo, out.StoreId = r.Orders[0].OrderNo, rpc.FormatID(r.Orders[0].StoreID)
-	}
-	return out
 }
 
 func toAdminTransfer(r payment.TransferRecord) *adminpb.PaymentTransfer {
