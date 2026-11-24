@@ -28,24 +28,6 @@
    "why": "worker 只參照 reviewrelay.NewWorker 而沒呼叫登記：測試不能把參照當成呼叫"
   },
   {
-   "id": "im-relay-not-subscribed",
-   "stack": "go",
-   "file": "backend/cmd/hawkr/im.go",
-   "old": "\tsubscribeIMRelay(bus, jc)\n\treturn m\n",
-   "new": "\t_ = subscribeIMRelay\n\treturn m\n",
-   "test": "cmd/hawkr ^TestIMRelayIsSubscribedByNewIM$",
-   "why": "newIM 不再訂閱 im.MessageSent：單體送出的聊天訊息沒有離線推播"
-  },
-  {
-   "id": "im-relay-worker-not-registered",
-   "stack": "go",
-   "file": "backend/cmd/hawkr/main.go",
-   "old": "\timrelay.NewWorker(imModule, buyerModule, sellerModule, jc, log).AddWorkers(workers)\n",
-   "new": "\tvar _ *imrelay.Worker\n",
-   "test": "cmd/hawkr ^TestWorkerRunsTheRelaysAndTheCRMConsumer$",
-   "why": "worker 沒登記 imrelay 的 job worker"
-  },
-  {
    "id": "crm-consumer-not-run",
    "stack": "go",
    "file": "backend/cmd/hawkr/main.go",

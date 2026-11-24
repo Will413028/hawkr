@@ -62,11 +62,9 @@
 | 信用卡 | 1 | Visa、MasterCard、JCB、銀聯。一次付清（含國內/外卡）、分期（3/6/9/12/18/24/30 期）、Apple Pay、Google Pay™、Samsung Pay |
 | ATM 轉帳 | 2 | 支援單繳帳號（一次性虛擬帳號） |
 | 超商代碼繳費 | 3 | 持超商代碼至全台統一超商，使用多媒體事務機列印繳費單臨櫃付款 |
-| 貨到付款 | 5 | 7-ELEVEN 門市取貨付款，需開通物流 |
 | 愛金卡 (ICash) | 6 | icash Pay 支付，需申請審核開通 |
 | AFTEE 先享後付 | 7 | 先享後付，需申請審核開通 |
 | LINE Pay | 9 | 需至 LINE Pay 平台申請取得 ID 與 KEY |
-| 宅配貨到付款 | 10 | 黑貓宅配送貨到府付款，需開通物流 |
 | 街口支付 (JKoPay) | 11 | 需申請審核開通 |
 | 信用卡記憶卡號 | — | 付款時選擇記憶卡號，下次自動帶出 |
 | 信用卡 Token | — | 首次交易約定後，後續可幕後授權。需申請審核開通並綁定 IP |
@@ -151,7 +149,6 @@ PAYUNi 整合式支付頁（UPP）提供 RWD 設計的支付頁面，整合所�
 | SamsungPay | C | Int | Samsung Pay |
 | API3D | C | Int | 指定 3D |
 | Union3D | C | Int | 指定銀聯 Unionpay |
-| Ship | C | Int | 貨到付款 |
 | TradeInvoice | C | Int | 電子發票 |
 
 #### 首次信用卡 Token 交易參數
@@ -186,36 +183,6 @@ PAYUNi 整合式支付頁（UPP）提供 RWD 設計的支付頁面，整合所�
 | Coupon | C | Int | 是否啟用優惠券 | 1=啟用，2=停用 |
 | CouponNotifyURL | C | String | 優惠券發券背景通知網址 | 將優惠券通知指定網址 |
 
-#### 物流服務參數
-
-| 參數 | 必要 | 類型 | 說明 | 備註 |
-|------|------|------|------|------|
-| ShipTag | C | Int | 是否啟用物流 | 1=啟用物流（預設含取貨不付款及取貨付款）。不啟用則不帶入該參數 |
-| LgsType | C | String | 物流通路 | `B2C`=大宗寄倉，`C2C`=店到店，`HOME`=黑貓宅配。不啟用物流則不帶入 |
-| ShipType | C | Int | 通路類別 | 1=7-ELEVEN，2=黑貓宅配。若物流通路為 B2C 或 C2C 請帶 1，為 HOME 請帶 2 |
-| GoodsType | C | Int | 寄件型態 | 1=常溫，2=冷凍，3=冷藏。冷藏僅黑貓宅配支援 |
-| Consignee | C | String | 取件人姓名 | 限制長度 10。最長 5 個中文字、最短至少 2 個中文字或 4 個英文字 |
-| ConsigneeMobile | C | String | 取件人手機號碼 | 限填手機號碼 09 開頭，半形數字 |
-| ConsigneeAddress | C | String | 取件人地址 | 不啟用黑貓物流則不帶入 |
-| ConsigneeAddressFix | C | Int | 取件人地址固定 | 1=不可修改。若無帶此參數，則收件人地址預設可修改 |
-
-#### 物流參數使用範例
-
-| ShipTag=1 | Ship=1 | 指定支付工具參數 | 支付頁顯示結果 |
-|-----------|--------|--------------|------------|
-| V | | | 取貨付款 + 商店預設支付工具（搭配物流取貨不付款） |
-| V | | V | 指定支付工具（搭配物流取貨不付款） |
-| V | V | V | 取貨付款 + 指定支付工具（搭配物流取貨不付款） |
-| | V | | 取貨付款 |
-| | V | V | 取貨付款 + 指定支付工具（無物流） |
-
-**備註**：
-
-1. 當帶 ShipTag=1 時，表示啟用物流（預設含取貨不付款及取貨付款），若有帶支付工具參數時，則依參數設定有帶 Ship=1 時才有取貨付款
-2. 當帶 Ship=1 且未帶 ShipTag=1 時，僅有取貨付款，無取貨不付款
-3. 當有啟用物流時（Ship=1 或 ShipTag=1），則需傳遞 LgsType、ShipType、GoodsType、Consignee、ConsigneeMobile 參數
-4. 若沒有帶（Ship=1 或 ShipTag=1）時，則視為一般交易，無物流服務，亦不產生物流單
-
 ### 2.4 返回參數（EncryptInfo）
 
 #### 通用返回參數
@@ -229,7 +196,7 @@ PAYUNi 整合式支付頁（UPP）提供 RWD 設計的支付頁面，整合所�
 | TradeNo | String | UNi 序號 | |
 | TradeAmt | Int | 訂單金額 | |
 | TradeStatus | Int | 訂單狀態 | 0=取號成功，1=已付款，2=付款失敗，3=付款取消，8=訂單待確認 |
-| PaymentType | Int | 支付工具 | 1=信用卡，2=ATM 轉帳，3=代碼，5=貨到付款（超商取貨付款），6=愛金卡，7=後支付，9=LinePay，10=宅配到付，11=JKoPay |
+| PaymentType | Int | 支付工具 | 1=信用卡，2=ATM 轉帳，3=代碼，6=愛金卡，7=後支付，9=LinePay，11=JKoPay |
 | Gateway | Int | 交易標記 | 固定 2=整合式支付頁 UNiPaypage (UPP) |
 | BuyerHash | String | 買方會員 Token Hash | Token 專用返回參數。需在初次交易帶入 BuyerToken，並由買方登入或註冊買方會員，完成交易後回傳 |
 
@@ -272,24 +239,6 @@ PAYUNi 整合式支付頁（UPP）提供 RWD 設計的支付頁面，整合所�
 | PayNo | String | 繳費代碼 | |
 | ExpireDate | String | 繳費截止時間 | 格式：`YYYY-MM-DD HH:II:SS` |
 
-#### 純取貨（ShipTag=1）/ 貨到付款（PaymentType=5）
-
-| 參數 | 類型 | 說明 | 備註 |
-|------|------|------|------|
-| PartnerId | String | 母代碼 | LgsType=B2C，長度限制 3 |
-| ShipTradeNo | String | UNi 物流序號 | |
-| GoodsType | Int | 寄件型態 | 1=常溫，2=冷凍 |
-| LgsType | String | 物流型態 | `B2C`=大宗寄倉，`C2C`=店到店 |
-| ShipType | Int | 通路類別 | 1=7-ELEVEN |
-| ServiceType | Int | 取貨方式 | 1=取貨付款，3=取貨不付款 |
-| ShipAmt | Int | 取貨付款金額 | |
-| StoreID | String | 取件門市代碼 | |
-| StoreName | String | 取件門市名稱 | |
-| StoreAddr | String | 取件門市地址 | |
-| Consignee | String | 收件人名稱 | 限制長度 10 |
-| ConsigneeMobile | String | 收件人手機號碼 | |
-| ConsigneeMail | String | 收件人電子信箱 | |
-
 #### 愛金卡（PaymentType=6）
 
 | 參數 | 類型 | 說明 | 備註 |
@@ -310,25 +259,6 @@ PAYUNi 整合式支付頁（UPP）提供 RWD 設計的支付頁面，整合所�
 |------|------|------|------|
 | PayNo | String | LINEPay 交易號碼 | |
 | PayTime | String | 付款日期時間 | 格式：`YYYY-MM-DD HH:II:SS` |
-
-#### 宅配到付（PaymentType=10）
-
-| 參數 | 類型 | 說明 | 備註 |
-|------|------|------|------|
-| TradeType | Int | 宅配類別 | 固定 1=正物流 |
-| ShipTradeNo | String | 物流單號 | |
-| GoodsType | Int | 寄件型態 | 1=常溫，2=冷凍，3=冷藏 |
-| LgsType | String | 物流型態 | `HOME`=黑貓宅配 |
-| ShipType | Int | 通路類別 | 2=黑貓宅配 |
-| ServiceType | Int | 取貨方式 | 1=取貨付款，3=取貨不付款 |
-| ShipAmt | Int | 取貨付款金額 | |
-| Consignee | String | 收件人名稱 | 限制長度 10 |
-| ConsigneeMobile | String | 收件人手機號碼 | |
-| ConsigneeTel | String | 收件人聯絡電話 | 區碼+號碼。若有帶時回 `00-00000000`，若交易當下沒帶時回 `-` |
-| ConsigneeAddress | String | 收件人地址 | |
-| DeliveryTimeTag | String | 希望配達時段 | `01`=13 時前，`02`=14-18 時，`04`=不指定 |
-| ProductTypeId | String | 商品類別代碼 | 0001~0015（見物流 API 總覽） |
-| ProdDesc | String | 商品名稱 | |
 
 #### 街口支付（PaymentType=11）
 
@@ -411,36 +341,6 @@ PAYUNi 提供 ATM 轉帳單串機制，可滿足幕後取號交易。會員須�
 | OrderAmt | Y | Int | 原訂單金額 | |
 | CouponNotifyURL | C | String | 優惠券發券背景通知網址 | |
 
-#### 物流參數（取貨不付款）
-
-若有開啟物流功能時，使用虛擬帳號幕後 API 做純門市取貨/純送貨到宅（即取貨不付款），則需傳遞以下參數：
-
-| 參數 | 必要 | 類型 | 說明 | 備註 |
-|------|------|------|------|------|
-| ServiceType | Y | String | 取件方式 | 固定為 3=取貨不付款 |
-| Consignee | Y | String | 取件人姓名 | 限制長度 10 |
-| ConsigneeMobile | Y | String | 取件人手機號碼 | 限填 09 開頭半形數字 |
-| LgsType | Y | String | 物流型態 | `B2C`=大宗寄倉，`C2C`=店到店，`HOME`=黑貓宅配 |
-| GoodsType | Y | Int | 寄件型態 | 1=常溫，2=冷凍，3=冷藏。僅黑貓宅配支援冷藏溫層 |
-| ShipType | Y | Int | 通路類別 | 1=7-ELEVEN，2=黑貓宅配 |
-
-**超商取貨不付款（ShipType=1）額外參數**：
-
-| 參數 | 必要 | 類型 | 說明 | 備註 |
-|------|------|------|------|------|
-| StoreID | Y | String | 取件門市代碼 | 例如：`916712` |
-
-**黑貓宅配取貨不付款（ShipType=2）額外參數**：
-
-| 參數 | 必要 | 類型 | 說明 | 備註 |
-|------|------|------|------|------|
-| ConsigneeTelAreaCode | C | String | 收件人電話區碼 | 至少 2 碼、最多 3 碼數字 |
-| ConsigneeTel | C | String | 收件人電話號碼 | 最多 8 碼數字 |
-| ConsigneeAddress | Y | String | 收件人地址 | 最長 120 位。格式應為：縣市+鄉鎮市區+段弄巷街+號(+樓) |
-| DeliveryTimeTag | Y | String | 希望配達時段 | `01`=13 時前，`02`=14-18 時，`04`=不指定 |
-
-**備註**：有帶 ServiceType 時，當作取貨不付款，並檢查格式。
-
 ### 3.4 返回參數（EncryptInfo）
 
 #### 基本返回
@@ -472,40 +372,6 @@ PAYUNi 提供 ATM 轉帳單串機制，可滿足幕後取號交易。會員須�
 | CampaignNo | String | 活動序號 |
 | CouponName | String | 優惠券名稱 |
 | CouponNo | String | 優惠券序號 |
-
-#### 物流取貨不付款返回
-
-| 參數 | 類型 | 說明 | 備註 |
-|------|------|------|------|
-| ShipTradeNo | String | UNi 物流序號 | |
-| ServiceType | Int | 取件方式 | 固定為 3=取貨不付款 |
-| LgsType | String | 物流型態 | `B2C` / `C2C` / `HOME` |
-| GoodsType | Int | 寄件型態 | 1=常溫，2=冷凍，3=冷藏 |
-| ShipType | Int | 通路類別 | 1=7-ELEVEN，2=黑貓宅配 |
-| ShipAmt | Int | 取貨付款金額 | 固定為 0 |
-| Consignee | String | 取件人姓名 | |
-| ConsigneeMobile | String | 取件人手機號碼 | |
-
-**超商取貨不付款（ShipType=1）額外返回**：
-
-| 參數 | 類型 | 說明 | 備註 |
-|------|------|------|------|
-| PartnerId | String | 母代碼 | |
-| StoreID | String | 門市代碼 | 例如：`916712` |
-| StoreName | String | 門市名稱 | |
-| StoreAddr | String | 門市地址 | |
-| ConsigneeMail | String | 取件人電子信箱 | |
-
-**黑貓宅配取貨不付款（ShipType=2）額外返回**：
-
-| 參數 | 類型 | 說明 | 備註 |
-|------|------|------|------|
-| TradeType | Int | 宅配類別 | 固定為 1=正物流 |
-| ConsigneeTel | String | 收件人聯絡電話 | 區碼+號碼。若有帶時回 `00-00000000`，若交易當下沒帶時回 `-` |
-| ConsigneeAddress | String | 收件人地址 | |
-| DeliveryTimeTag | String | 希望配達時段 | `01`=13 時前，`02`=14-18 時，`04`=不指定 |
-| ProductTypeId | String | 商品類別代碼 | 0001~0015 |
-| ProdDesc | String | 商品名稱 | |
 
 ---
 
@@ -569,34 +435,6 @@ PAYUNi 提供 Apple Pay 單串機制，可滿足 Apple Pay 幕後授權交易。
 | OrderAmt | Y | Int | 原訂單金額 |
 | CouponNotifyURL | C | String | 優惠券發券背景通知網址 |
 
-#### 物流參數（取貨不付款）
-
-若有開啟物流功能時，使用 Apple Pay 幕後 API 做純門市取貨/純送貨到宅（即取貨不付款），則需傳遞以下參數：
-
-| 參數 | 必要 | 類型 | 說明 | 備註 |
-|------|------|------|------|------|
-| ServiceType | Y | String | 取件方式 | 固定為 3=取貨不付款 |
-| Consignee | Y | String | 取件人姓名 | 限制長度 10。中文 5 個字，英文 10 個字 |
-| ConsigneeMobile | Y | String | 取件人手機號碼 | 限填手機號碼，半形數字 |
-| LgsType | Y | String | 物流型態 | `B2C`=大宗寄倉，`C2C`=店到店，`HOME`=黑貓宅配 |
-| GoodsType | Y | Int | 寄件型態 | 1=常溫，2=冷凍，3=冷藏。僅黑貓宅配支援冷藏溫層 |
-| ShipType | Y | Int | 通路類別 | 1=7-ELEVEN，2=黑貓宅配 |
-
-**超商取貨不付款（ShipType=1）額外參數**：
-
-| 參數 | 必要 | 類型 | 說明 | 備註 |
-|------|------|------|------|------|
-| StoreID | Y | String | 取件門市代碼 | 例如：`916712` |
-
-**黑貓宅配取貨不付款（ShipType=2）額外參數**：
-
-| 參數 | 必要 | 類型 | 說明 | 備註 |
-|------|------|------|------|------|
-| ConsigneeTelAreaCode | C | String | 收件人電話區碼 | 至少 2 碼、最多 3 碼數字 |
-| ConsigneeTel | C | String | 收件人電話號碼 | 最多 8 碼數字 |
-| ConsigneeAddress | Y | String | 收件人地址 | 最長 120 位。格式應為：縣市+鄉鎮市區+段弄巷街+號(+樓) |
-| DeliveryTimeTag | Y | String | 希望配達時段 | `01`=13 時前，`02`=14-18 時，`04`=不指定 |
-
 ### 4.5 返回參數（EncryptInfo）
 
 #### 基本返回
@@ -640,35 +478,6 @@ PAYUNi 提供 Apple Pay 單串機制，可滿足 Apple Pay 幕後授權交易。
 | CampaignNo | String | 活動序號 |
 | CouponName | String | 優惠券名稱 |
 | CouponNo | String | 優惠券序號 |
-
-#### 物流取貨不付款返回
-
-| 參數 | 類型 | 說明 | 備註 |
-|------|------|------|------|
-| ShipTradeNo | String | UNi 物流序號 | |
-| ServiceType | Int | 取件方式 | 固定為 3=取貨不付款 |
-| LgsType | String | 物流型態 | `B2C`=大宗寄倉，`C2C`=店到店，`HOME`=黑貓宅配 |
-| GoodsType | Int | 寄件型態 | 1=常溫，2=冷凍，3=冷藏 |
-| ShipType | Int | 通路類別 | 1=7-ELEVEN，2=黑貓宅配 |
-| ShipAmt | Int | 取貨付款金額 | 固定為 0 |
-| Consignee | String | 取件人姓名 | |
-| ConsigneeMail | String | 取件人電子信箱 | |
-| ConsigneeMobile | String | 取件人手機號碼 | |
-
-**超商取貨不付款（ShipType=1）額外返回**：
-
-| 參數 | 類型 | 說明 | 備註 |
-|------|------|------|------|
-| StoreID | String | 取件門市代碼 | 例如：`916712` |
-| StoreName | String | 取件門市名稱 | |
-| StoreAddr | String | 取件門市地址 | |
-
-**黑貓宅配取貨不付款（ShipType=2）額外返回**：
-
-| 參數 | 類型 | 說明 | 備註 |
-|------|------|------|------|
-| ConsigneeAddress | String | 收件人地址 | |
-| DeliveryTimeTag | String | 希望配達時段 | `01`=13 時前，`02`=14-18 時，`04`=不指定 |
 
 ### 4.6 AppleObject 參數說明
 
@@ -860,36 +669,6 @@ PAYUNi 提供 Google Pay 單串機制，可滿足 Google Pay 幕後授權交易�
 | OrderAmt | Y | Int | 原訂單金額 |
 | CouponNotifyURL | C | String | 優惠券發券背景通知網址 |
 
-#### 物流參數（取貨不付款）
-
-若有開啟物流功能時，使用 Google Pay 幕後 API 做純門市取貨/純送貨到宅（即取貨不付款），則需傳遞以下參數：
-
-| 參數 | 必要 | 類型 | 說明 | 備註 |
-|------|------|------|------|------|
-| ServiceType | Y | String | 取件方式 | 固定為 3=取貨不付款 |
-| Consignee | Y | String | 取件人姓名 | 限制長度 10。中文 5 個字，英文 10 個字 |
-| ConsigneeMobile | Y | String | 取件人手機號碼 | 限填手機號碼 09 開頭，半形數字 |
-| LgsType | Y | String | 物流型態 | `B2C`=大宗寄倉，`C2C`=店到店，`HOME`=黑貓宅配 |
-| GoodsType | Y | Int | 寄件型態 | 1=常溫，2=冷凍，3=冷藏。僅黑貓宅配支援冷藏溫層 |
-| ShipType | Y | Int | 通路類別 | 1=7-ELEVEN，2=黑貓宅配 |
-
-**超商取貨不付款（ShipType=1）額外參數**：
-
-| 參數 | 必要 | 類型 | 說明 | 備註 |
-|------|------|------|------|------|
-| StoreID | Y | String | 取件門市代碼 | 例如：`916712` |
-
-**黑貓宅配取貨不付款（ShipType=2）額外參數**：
-
-| 參數 | 必要 | 類型 | 說明 | 備註 |
-|------|------|------|------|------|
-| ConsigneeTelAreaCode | C | String | 收件人電話區碼 | 至少 2 碼、最多 3 碼數字 |
-| ConsigneeTel | C | String | 收件人電話號碼 | 最多 8 碼數字 |
-| ConsigneeAddress | Y | String | 收件人地址 | 最長 120 位。格式應為：縣市+鄉鎮市區+段弄巷街+號(+樓) |
-| DeliveryTimeTag | Y | String | 希望配達時段 | `01`=13 時前，`02`=14-18 時，`04`=不指定 |
-
-**備註**：有帶 ServiceType 時，當作取貨不付款，並檢查格式。
-
 ### 5.5 返回參數（EncryptInfo）
 
 #### 基本返回
@@ -943,33 +722,6 @@ PAYUNi 提供 Google Pay 單串機制，可滿足 Google Pay 幕後授權交易�
 | CampaignNo | String | 活動序號 |
 | CouponName | String | 優惠券名稱 |
 | CouponNo | String | 優惠券序號 |
-
-#### 物流取貨不付款返回
-
-| 參數 | 類型 | 說明 | 備註 |
-|------|------|------|------|
-| ShipTradeNo | String | UNi 物流序號 | |
-| ServiceType | Int | 取件方式 | 固定為 3=取貨不付款 |
-| LgsType | String | 物流型態 | `B2C`=大宗寄倉，`C2C`=店到店，`HOME`=黑貓宅配 |
-| GoodsType | Int | 寄件型態 | 1=常溫，2=冷凍，3=冷藏 |
-| ShipType | Int | 通路類別 | 1=7-ELEVEN，2=黑貓宅配 |
-| ShipAmt | Int | 取貨付款金額 | 固定為 0 |
-| Consignee | String | 取件人姓名 | |
-| ConsigneeMail | String | 取件人電子信箱 | |
-| ConsigneeMobile | String | 取件人手機號碼 | |
-
-**超商取貨不付款（ShipType=1）額外返回**：
-
-| 參數 | 類型 | 說明 | 備註 |
-|------|------|------|------|
-| StoreID | String | 門市代碼 | 例如：`916712` |
-
-**黑貓宅配取貨不付款（ShipType=2）額外返回**：
-
-| 參數 | 類型 | 說明 | 備註 |
-|------|------|------|------|
-| ConsigneeAddress | String | 收件人地址 | |
-| DeliveryTimeTag | String | 希望配達時段 | `01`=13 時前，`02`=14-18 時，`04`=不指定 |
 
 ### 5.6 GoogleObject 參數說明
 

@@ -202,29 +202,9 @@ CodeMetaValidator.validate(WeightUnit.class, unitCode, "unit");
 
 ## 7. 共用工具
 
-### 7.1 運費計算 — 一律呼叫 shipping-service gRPC
+### 7.1 運費計算（已退場）
 
-**運費金額的唯一真實來源是 shipping-service**：RPC `CalculateShippingOptions`（定義於 `api/proto/shipping/shipping.proto`）。common-core **不提供**運費金額計算，只提供區域判定、單位換算等純函式，供其他微服務在本地做前置判斷與過濾。
-
-common-core 運費輔助工具（唯一合法位置：`services/java/shared/common-core/src/main/java/io/github/will413028/hawkr/common/utils/shipping/`）：
-
-| 類別 | 說明 |
-|------|------|
-| `ShippingAreaResolver` | 三碼郵遞區號 → `ShippingArea`（本島 / 離島）；`resolveRoute()` 由寄件 + 收件郵遞區號判定 `ShippingRoute` |
-| `WeightConverter` | `convertToGrams(weight, WeightUnit)`，各重量單位統一換算為公克 |
-| `DeliveryZone` | 內部計算用配送區域（由寄件 / 收件區域組合判定，供費率查表） |
-| `SellerShippingFilter` | 依賣家當下已開通的配送方式過濾 shipping options，並計算 onboarding 指紋（`toMethodKey()` / `isAvailable()` / `onboardingSig()`） |
-
-相關 Enum（`common-core/utils/code/`）：`ShippingMethod`、`ShippingTemperature`、`ShippingArea`、`ShippingRoute`、`WeightUnit` — 合法值一律以 [業務類型碼](../代碼管理（CodeMeta）/業務類型碼.md) 為準。
-
-**強制規則**：
-1. 需要「運費金額」→ **一律呼叫 shipping-service gRPC `CalculateShippingOptions`**，**禁止**在各微服務內自行實作運費計算邏輯（含「簡化版」）
-2. 只需判斷配送區域 / 換算重量單位 → 使用上表 common-core 工具，禁止各自實作
-3. 費率級距是 shipping-service 的 `shipping_fee_tiers` 表（由 `ShippingFeeService` 讀取），費率變更只動這裡，禁止在別處放死常數
-4. 上表工具是給**其他服務本地使用**的（現行呼叫端：product-service、order-service），shipping-service 自身不依賴它們
-5. 第 3 個服務需要某項 shipping 計算 → 先查 common-core，沒有則抽上去；common-core 不支援目前需求（新配送方式、新計價邏輯等）**必須先提出討論**，不得自行繞過
-
-完整設計見 [21-運費計算模組（Shipping Fee Module）詳細設計書](../詳細設計書/21-運費計算模組（Shipping%20Fee%20Module）詳細設計書.md) 與 [06-物流微服務（Shipping Service）詳細設計書](../詳細設計書/06-物流微服務（Shipping%20Service）詳細設計書.md)。
+Java shipping-service 與 common-core 的運費輔助工具（區域判定、重量換算、賣家配送方式過濾）隨 B3 刪除；運費改由賣家自訂固定規則，報價是 seller 模組的純函式（見 [21-運費計算模組](../詳細設計書/21-運費計算模組（Shipping%20Fee%20Module）詳細設計書.md)）。Java 端不計算運費，B3 到 B8 之間結帳運費固定為 0。
 
 ### 7.2 其他共用靜態工具
 
@@ -329,7 +309,6 @@ management.endpoint.health.group.readiness.include=*
 4. 若元件以「lazy + circuit breaker」消除冷啟動視窗（如 `ShippingFeeCacheClient`，詳見 20 §4.9），則不需實作 `ComponentReadiness`
 
 **參考實作**：
-- `shipping-service`：`ShippingFeeService`、`HolidayService`（同進程 DB cache）
 - `order-service`：`ShippingFeeCacheClient` 走 lazy + CB 路線，不實作此介面（見 20 §4.9）
 
 ---

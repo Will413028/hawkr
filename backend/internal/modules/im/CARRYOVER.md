@@ -18,7 +18,7 @@ im-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模
 | M6 媒體：送出時 `FinalizeAndLink`、脫敏時 `ReleaseChatReferences` | media 呼叫與業務列寫入要一致，媒體呼叫不得在 DB transaction 內 | 不成立：失敗時留下孤兒 link | 與 review、social 同：transaction 外 `Finalize`，transaction 內寫列＋同步版本＋排同步 job，同步 job 依業務列現況 Link／Unlink | B1-5b：刪除 `mediaref`、`media_ref_sync`、`retired_assets`：送出時在 transaction 內 `Confirm`，抹除時每批同 transaction `MarkDeleted`；`image_asset_id` 是 UUID，舊的圖片訊息由 migration 轉成抹除的墓碑 |
 | M8 MQ 消費者：`buyer.deleted`、`seller.deleted`、`account.deleted`、`seller.suspended` | 刪帳與退場要驅動 im 抹除 | 成立 | 同庫內下層通知上層用同 transaction 的模組事件（單體規則 4） | 改：只訂 `buyer.BuyerDeleted` 與 `seller.StoreRetired`（只排 `im.erase_party` job，不存複本）；不訂 identity 的 `AccountDeleted`（只有帳號鍵，要列舉歷史身分才能用，那是 ID3 的根源），不訂 `BuyerDeletionRequested`（等待刪除的買家仍能登入，為開啟中的訂單聯絡店家，A6-D14 W4；前提 2a1 開工時以 `identity/internal/model/model.go:123` 與 `sessions.sql` 確認）；`seller.StoreSuspended` 的強制斷線屬 2b |
 | M9 對話列表讀時補名稱頭像，不存個資 | 列表要顯示對方 | 成立（顯示需要），但不能存快照 | 讀時批次補，已刪帳回旗標不回名稱 | 沿用：模組不存快照；`buyer.BatchDisplay` 由 httpapi 在 A6-5 補 |
-| M11 事件：fat event（`chat.message.sent`）、`go` 協程發送、無 outbox | Java notification 依賴舊 wire | 成立（A6-6e 前仍由舊 im-service 發） | 模組事件只帶領域鍵，同 transaction 發布；relay 在 transaction 外組 wire payload | 改：`MessageSent` 只帶領域鍵、同 transaction 發布（ID7）；wire 形狀由 `legacy/imrelay` 維持，`conversation_id`、`message_id` 的值從房名、TSID 變成 UUID 字串（型別不變，設計書 §9 第 5 項），A6-6e 才接進 `cmd/hawkr` |
+| M11 事件：fat event（`chat.message.sent`）、`go` 協程發送、無 outbox | Java notification 依賴舊 wire | 成立（A6-6e 前仍由舊 im-service 發） | 模組事件只帶領域鍵，同 transaction 發布；relay 在 transaction 外組 wire payload | 改：`MessageSent` 只帶領域鍵、同 transaction 發布（ID7）；`legacy/imrelay` 曾維持舊 wire（A8-3d1 已刪，離線推播由 notification 的 `chat_message_buyer`、`chat_message_store` 承接） |
 | M12 封鎖：`IsBlocked(sender, receiver)` 在送出與列表時，沒有訂單例外；列表過濾有封鎖的對話 | 封鎖要在送出時生效 | 成立，但 A6-D1 要求有進行中的訂單時仍可以聊 | 封鎖時保留進行中交易的溝通 | 改：G3 雙向擋，有進行中的訂單或售後時放行（`Orders` port）；列表不再因封鎖隱藏對話（設計書 §9 第 4 項），由 A6-5 標示無法送出的原因 |
 | M13 詞典過濾 `pkg/moderation.Check`，只查文字 | 髒字詞典只有一份 | 不成立：單體有 `platform/textfilter` | 唯一詞典 | 改：G5 跑 `platform/textfilter`；卡片訊息 2a 不支援（W6），所以沒有繞過詞典的路 |
 | M14 principal 解析：每次送出兩次 RPC 嚴格解析雙方，查不到 Unavailable | 事件收件人與授權要知道身分 | 不成立：單體內 `buyer_id`、`store_id` 就是業務鍵 | 身分在入口解析，模組只收已解析的身分 | 改：`Party` 由 httpapi 從 session 解析；對方存在性在首則訊息查 `buyer.ProfileByBuyerID`／`seller.Store`；買家帳號用 `buyer.AccountIDByBuyerID`（只要帳號鍵，不讀個資）；`chat.message.sent` 的收件人身分空間（買家 buyer_id、賣家 account_id）由 relay 照舊組 |
@@ -31,7 +31,7 @@ im-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模
 | 未讀：兩欄計數與 `is_read` 三套寫法，送出不歸零寄件人自己的未讀 | 要有總未讀與每個對話的未讀 | 成立 | `last_seq - 自己的已讀游標`；回覆時視為已讀 | 改：兩個游標在對話列上（聊天只有兩方，不建 participants 表）；`AllocateSeq` 同句推進寄件人的游標（設計書 §9 第 2 項）；讀取方法不寫游標，已讀只走 `MarkRead`、`MarkAllRead` |
 | 停權賣家的訂單綁定（`order_no`、`order_binding_verified_at`，client 帶 `order_no`、`NOT IN (0,80)`、綁定永久有效） | 停權時仍可為進行中的訂單聯絡 | 成立，但判準太寬（已完成與已退款也算） | 停權只保留履約必要的溝通 | 改（W1 (c)、W2 (i)）：G1 與 G3 共用一個「進行中」判定，每次送出時查，不存綁定欄位；以 `legacy/orderservice` 的 `HasOrderBetween` 取最近一筆再以 `OrderParties` 看狀態 ∈ {10,20,30,32,35,40}。已知看不到「最近一筆已結案、較舊的一筆還在配送」，錯的方向是多擋；退場點 B8（ordering 搬遷時 port 換成精確的 in-process 查詢） |
 | 卡片訊息：client 帶任意 JSON，預覽取 `extra["preview"]`，詞典只查文字 | 聊天裡引用商品或訂單 | 成立，但沒有形狀的欄位繞過詞典 | 卡片是伺服器擁有的參照，顯示內容由平台依參照組出 | 不搬（W6 (b)）：`message_type` 只有 `TEXT`、`IMAGE`；卡片連同形狀在 A6-5 定 proto 時以往前的 migration 加 |
-| `chat.message.sent` 的 `content_preview` 中文句子（「傳送了一張圖片」等） | 推播要有預覽文字 | 成立 | 共用文案目錄 | 改：圖片預覽取共用文案目錄的 `chat.Preview.image`（`legacy/imrelay` 以 `uitext.For(uitext.ZhTW)` 讀，舊 notification 只認 zh-TW；`TestPreviewSentences` 比對目錄值）；文字訊息預覽仍是訊息本文截斷到 100 字；退場點 A8（relay 刪除） |
+| `chat.message.sent` 的 `content_preview` 中文句子（「傳送了一張圖片」等） | 推播要有預覽文字 | 成立 | 共用文案目錄 | 改：圖片預覽取共用文案目錄的 `chat.Preview.image`（`legacy/imrelay` 已於 A8-3d1 刪除）；文字訊息預覽仍是訊息本文截斷到 100 字 |
 | `LockParty` advisory lock 與 `inactive_parties` 複本（A6-2；A6-3c 已刪） | 送出的寫入與「身分進入刪除」要有先後，否則抹除 job 看不到之後才 commit 的訊息 | 成立（先後），但複本與 advisory lock 的理由都不成立：理由一「避開跨模組鎖序」只因擁有者 API 沒有形狀，理由二「刪帳申請中仍可聊天」已由 `LockNotClosed` 放行 PENDING_DELETION 提供 | 同一個身分的狀態變更與依賴它的寫入以擁有者的列鎖串行 | 改：`Send` 在 `inTx` 內先取 `buyer.LockNotClosed`、再取 `seller.LockNotRetired`（`FOR KEY SHARE`；擁有者轉移的 `FOR UPDATE` 與它互斥，店家退場的 `RetireDueStores` 是 `SKIP LOCKED`，被守門鎖住的店這一輪跳過、下一輪再退）；鎖序買家先於店家，由 lockorder 機械檢查（Modules 順序 buyer、seller 在 im 之前）；前提「`Send` 不先持買家或店家的列鎖」本步已重看、不再成立。規定：兩把鎖取在 `inTx` 內、`guard` 的 RPC 之後、`AllocateSeq` 之前；取到後才算這次寫入看到的狀態；不得把 `guard` 或 legacy 呼叫搬進 `inTx`（列鎖會跨網路呼叫）；機械化是 `TestSendCallsOrdersOutsideTheWriteTransaction`（W7 (b)） |
 | `im.erase_sweep` 每 15 分鐘的保底掃描 | job 用完 `MaxAttempts` 被丟棄後，身分已在 `buyer.pub_closed_buyers()`／`seller.pub_retired_stores()` 又還有未抹除的訊息 | 成立 | 週期性對帳補排 | 新增：來源是擁有者的 pub（A6-3c 起）；唯一性以 `SweepInterval` 為時間窗（預設的 ByState 含 completed，會讓掃描被擋約一天）；抹除本身冪等可重跑 |
 | `im.hides` 訊息隱藏紀錄 | 隱藏要可多次、可還原，並且能追溯 | 成立 | 形狀同 `review.hides`、`social.hides`：還原留列、同一則訊息未還原的隱藏至多一筆 | 新增：本模組只有資料與讀取（`Hidden`），隱藏與還原的決定由 moderation 呼叫 `Hide`／`Restore` |
@@ -47,7 +47,7 @@ im-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模
 | H3 每連線 256 格緩衝，滿了丟 | 慢消費者不能拖住別人 | 成立 | 不緩衝內容；合併待處理訊號 | 取代：`pending` 以對話合併，超過上限 `Resync{all}` |
 | H4 `Broadcast`、`BroadcastExcept`、`ConnectionCount` | 有呼叫端 | 不成立 | 沒有呼叫端就不存在 | 刪除 |
 | H5 `SendToUser(Role)` 按 userID＋loginRole 找連線 | 買家與店家身分要分開 | 成立 | 按 (kind, id) 找 | 取代：`partyKey`（ID6） |
-| H6 WS 與推播雙軌送達，靠 `seq_id` 去重 | 串流不是送達保證 | 成立 | 推播另走，去重靠 seq 與訊息 ID | 保留原則：推播仍由 `legacy/imrelay` |
+| H6 WS 與推播雙軌送達，靠 `seq_id` 去重 | 串流不是送達保證 | 成立 | 推播另走，去重靠 seq 與訊息 ID | 保留原則：推播由 notification 模組承接（`legacy/imrelay` 已於 A8-3d1 刪除） |
 | H7 presence 在 hub 記憶體、`lastSeen` | 多進程要看到全體 | 不成立：多進程只看到連在自己身上的人 | 共享狀態＋過期 | 取代：`im.presence_streams`，不保存最後上線時間（A6-D5） |
 | H8 `presence_sub` 幀，任何人可訂任何人 | 在線狀態只給有對話的對方 | 成立（舊碼無授權＝ID2） | 以共有對話授權的讀取 | 取代：`Presence`，不是共有對話整個 NotFound |
 | H9 presence 帶 `lastSeenAt` | A6-D5 不給最後上線時間 | 不成立 | 不給 | 刪除（型別沒有時間欄位） |
@@ -111,7 +111,6 @@ im-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模
 - 列表不因封鎖隱藏對話。
 - `chat.message.sent` 的 `conversation_id`、`message_id` 是 UUID 字串。
 
-`legacy/imrelay` 的 `typedWorker`、`baseEvent` 與其他舊 relay 的同名機制刻意重複（relay 是暫時的，notification 搬進單體後刪除），不抽共用。
 
 ## A6-3c 停用身分改由擁有者守門的沿用盤點
 

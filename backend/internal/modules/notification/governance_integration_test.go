@@ -99,7 +99,7 @@ func setupGovernance(t *testing.T, reporters CaseReporters) *fixture {
 		DB: d, Identity: id, Buyer: buyers, Seller: sl, Resolver: resolver, Validity: noVouchers{}, Jobs: rec, Now: clock, NewID: uuid.NewV7, Logger: log,
 		Contacts: contacts, Locales: id, Push: push, Mail: mail, ImageURL: testImageURL, SuppressionKeys: testSuppressionKeys,
 	}, registry.Registry{})
-	m.SubscribeGovernance(bus)
+	m.Subscribe(bus)
 	return &fixture{db: d, identity: id, buyer: buyers, sellerMod: sl, bus: bus, jobs: rec, module: m, logs: logs, push: push, mail: mail, contacts: contacts, resolver: resolver}
 }
 
@@ -170,7 +170,7 @@ func (f *fixture) storeOwner(t *testing.T) (account, storeID int64) {
 var governanceAt = time.Date(2026, 11, 23, 4, 30, 0, 0, time.UTC)
 
 // 店家面型別：每個來源事件在 worker 解析成店主帳號與店，寫進該店的收件匣，並依型別的渠道排推播與 email 投遞紀錄；停權措施不另發（由 StoreSuspended 通知）。
-// mutation：intake 拿掉任何一個 events.Subscribe（subscribe_governance.go）→ 對應列的收件匣是空的，這個測試紅。
+// mutation：拿掉 subscriptions.go 裡治理側的任何一列 → 對應列的收件匣是空的，這個測試紅。
 func TestStoreSideEventsCreateOneInboxRowForTheStoreOwner(t *testing.T) {
 	f := setupGovernance(t, nil)
 	owner, storeID := f.storeOwner(t)

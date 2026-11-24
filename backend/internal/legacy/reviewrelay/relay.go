@@ -1,4 +1,4 @@
-// Package reviewrelay 將 review 模組事件轉成還在 RabbitMQ 上的消費者（Java product 的評分聚合、notification 的賣家通知）所需的訊息。
+// Package reviewrelay 將 review 模組事件轉成還在 RabbitMQ 上的消費者（Java order 與 product 的評分聚合）所需的訊息；新通知由 notification 模組訂閱 review.ReviewCreated，不經這裡。notify_seller_account_id、buyer_nickname、buyer_avatar_key 只有舊 notification-service 讀，隨它在 A8-7 退場時一併拿掉。
 //
 // 對應（送到 hawkr.review，source 是 review-service，wire 形狀由 wire_test 逐欄位釘住，模板讀的 key 由 golden_test 對照）：
 //

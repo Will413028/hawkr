@@ -105,3 +105,5 @@ FulfillmentExceptionCategory（案件分類，另一個碼表）：… ／ RESPO
 - 若 Uber 帳單的 adjustment 欄位**無法分辨成因**（Scoped Review 要查證的事項之一）
   ⇒ 判定只能靠我方的事件軌跡推斷，那會提高「provider 原因」那一格的比例，
   但**不改變本表的歸屬規則**。
+
+物流商已依 `2026-11-15-fulfillment-seller-managed-shipping.md` 退場（Java shipping、`payuni-webhook-service` 與 Uber 程式於 B3 刪除）；本檔提到的物流商只作歷史脈絡。

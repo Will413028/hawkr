@@ -72,6 +72,7 @@ var InternalDependencies = map[string]InternalGraph{
 		"intake":   {"model", "registry", "store"},
 		"model":    {},
 		"purge":    {"model", "store"},
+		"reach":    {"deliver", "intake", "model", "registry", "store"},
 		"registry": {"model", "text"},
 		"store":    {},
 		"stream":   {"model", "store"},

@@ -1,0 +1,67 @@
+{
+ "mutants": [
+  {
+   "id": "follow-subscription-removed",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/subscriptions.go",
+   "old": "\t\tnotify(m.OnSellerFollowed, \"store_followed\"),\n",
+   "new": "",
+   "test": "internal/modules/notification ^TestSubscriptionsMatchTheEventAdjudication$",
+   "why": "拿掉 buyer.SellerFollowed 的訂閱：store_followed 沒有訂閱者，覆蓋測試與裁決表對照都紅"
+  },
+  {
+   "id": "follow-subscription-removed-type-coverage",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/subscriptions.go",
+   "old": "\t\tnotify(m.OnSellerFollowed, \"store_followed\"),\n",
+   "new": "",
+   "test": "internal/modules/notification ^TestEveryRegisteredTypeHasASubscriptionOrIsAnnouncementOrSpawned$",
+   "why": "拿掉訂閱後 store_followed 不是公告也不是 fan-out 子型別，型別覆蓋測試紅"
+  },
+  {
+   "id": "chat-store-subscription-removed",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/subscriptions.go",
+   "old": "\t\tnotify(m.OnMessageSentToStore, \"chat_message_store\"),\n",
+   "new": "",
+   "test": "internal/modules/notification ^TestEveryRegisteredTypeHasASubscriptionOrIsAnnouncementOrSpawned$",
+   "why": "拿掉 im.MessageSent 給店家的訂閱：chat_message_store 沒有訂閱者"
+  },
+  {
+   "id": "delegation-subscription-removed",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/subscriptions.go",
+   "old": "\t\tnotify(in.OnDelegationOperationCompleted, \"delegation_operation_completed\"),\n",
+   "new": "",
+   "test": "internal/modules/notification ^TestSubscriptionsMatchTheEventAdjudication$",
+   "why": "拿掉 delegation 代行完成的訂閱：裁決表要求有這個事件的訂閱"
+  },
+  {
+   "id": "post-published-wrong-type",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/subscriptions.go",
+   "old": "notify(m.OnPostPublished, \"post_published\"),",
+   "new": "notify(m.OnPostPublished, \"post_published_item\"),",
+   "test": "internal/modules/notification ^TestEverySubscriptionMapsToRegisteredTypes$",
+   "why": "訂閱登記 fan-out 子型別：同步訂閱者不能登記 Spawned 型別"
+  },
+  {
+   "id": "store-retired-erasure-removed",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/subscriptions.go",
+   "old": "\t\terase(m.OnStoreRetired),\n",
+   "new": "",
+   "test": "internal/modules/notification ^TestErasureSubscriptionsCoverTheDeletionEvents$",
+   "why": "拿掉店家退場的個資清除訂閱"
+  },
+  {
+   "id": "subscription-without-type",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/subscriptions.go",
+   "old": "notify(in.OnKYCRejected, \"kyc_rejected\"),",
+   "new": "notify(in.OnKYCRejected),",
+   "test": "internal/modules/notification ^TestEverySubscriptionMapsToRegisteredTypes$",
+   "why": "訂閱沒有對應任何型別也不是清除訂閱者"
+  }
+ ]
+}

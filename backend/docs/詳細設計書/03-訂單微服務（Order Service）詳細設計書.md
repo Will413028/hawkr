@@ -1,5 +1,7 @@
 # 訂單微服務（Order Service）詳細設計書
 
+> 🔴 **B3 退場說明（ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md` 2026-11-24 修訂）**：Java shipping-service 與 `payuni-webhook-service` 已刪除，出貨改賣家自寄，出貨記錄（0..N 筆）與含出貨的訂單狀態機歸 B8 ordering 交付。本書中 `shipment.*` 事件、`ShippingEventConsumer`、`shipping_status` 與物流推進守門等段落描述 B3 之前的 Java 現況，B8 改寫 ordering 時由新設計取代；B3 到 B8 之間訂單停在已付款、結帳運費固定 0。
+
 > ⚠️ **錯誤處理慣例**：本設計書內所有 sequence diagram 之 gRPC client 呼叫，error path 統一依 [`Java gRPC 錯誤處理規範.md §7.0`](../開發規範/Java%20gRPC%20%E9%8C%AF%E8%AA%A4%E8%99%95%E7%90%86%E8%A6%8F%E7%AF%84.md)（現行 envelope-code 約定，最高優先）。個別 diagram 僅繪製 happy path。**寫入型 RPC**（grant / create / refund 等）呼叫後**必須**檢查 `resp.getCode()`，非 `SUCCESS(0)` 時禁止用 `resp.getData()` 推進本地狀態機（失敗動作依 §7.0「有 / 無不可逆前置」分類）；查詢型 RPC 可不檢查。錯誤處理一律依 §7.0 的 envelope-code 約定。
 
 ## 1. 服務概述與責任邊界
@@ -130,7 +132,7 @@ order-service/
 **另外三條同樣不得產生的語意（本書特有，來自既有路徑的相似外觀）**
 
 - **不觸發任何發票作廢／折讓**：買家已付款、款項結算給賣家 ⇒ 依既有發票規則**維持原發票**。🔴 **不得**因狀態名含 `FAILED` 就推導出折讓或作廢（發票行為的主場不在本書，本書只約束「不要因為這個狀態而動它」）。
-- **≠ `SHIPMENT_CREATE_TIMEOUT`（9103）路徑**：`order.shipment.creation_failed` 走的是「取消 ＋ 全額退款」（`CANCELLED(80)`），因為那是**平台／系統側建單失敗、商品從未離開賣家**。兩者外觀都像「配送沒成功」，語意完全相反，**不得合流**（見 §8.11）。
+- **≠ `SHIPMENT_CREATE_TIMEOUT`（9103）路徑**：`order.shipment.creation_failed` 走的是「取消 ＋ 全額退款」（`CANCELLED(80)`），因為那是**平台／系統側建單失敗、商品從未離開賣家**。兩者外觀都像「配送沒成功」，語意完全相反，**不得合流**（B3 已刪除建單兜底，見 §8.11）。
 - **不計入賣家履約失敗 KPI**：買家可歸責的失敗不記賣家 fault。🔴 Seller KPI 的 fault 輸入**必須錨在履約層的 `ResponsibilityCause`**，**明令禁止**改讀「有沒有物流應收」或結算對象來推導——那兩者與責任歸屬只是相關，不是同一件事。
 
 #### 狀態轉換規則
@@ -266,37 +268,7 @@ order-service/
 
 #### 物流狀態碼 → 訂單狀態推進規則
 
-PayUni 物流貨態狀態碼定義詳見 `../第三方整合/PayUni 物流官方 API 總覽.md` §12。
-自定義碼（3 位數）詳見 `06-物流微服務（Shipping Service）詳細設計書.md` **§2.1**。
-
-| 碼 | 中文 | ShippingStatus code | 訂單狀態推進 |
-|--------|------|-------------------|------------|
-| 91 | 未處理 | UNPROCESSED | → 待出貨(20) |
-| 92 | 處理中 | PROCESSING | → 待出貨(20) |
-| 21 | 待出貨 | PENDING_SHIPMENT | → 待出貨(20) |
-| **210** | **已叫件** | **TCAT_CALLED** | **→ 配送中(30)**（自定義碼） |
-| **920** | **已取得交貨便代碼** | **CVS_CODE_RECEIVED** | **→ 待出貨(20)**（自定義碼） |
-| **921** | **賣家確認出貨** | **SELLER_CONFIRMED** | **→ 配送中(30)**（自定義碼） |
-| 31 | 配送中 | IN_TRANSIT | → 配送中(30)（含自 35 恢復，見上方「物流推進守門：單調前進 + 異常恢復」） |
-| 32 | 待取貨 | WAITING_PICKUP | → 待取貨(32)（含自 35 恢復，見上方「物流推進守門：單調前進 + 異常恢復」） |
-| 11 | 已取貨 | PICKED_UP | → 已送達(40) |
-| 33 | 異常訂單 | ABNORMAL | → 物流異常(35) |
-| 43 | 賠償訂單 | COMPENSATION | → 物流異常(35) |
-| 44 | 包裹遺失 | PACKAGE_LOST | → 物流異常(35) |
-| 46 | 包裹拋棄 | PACKAGE_ABANDONED | → 物流異常(35) |
-| 51 | 一般退貨 | RETURN_GENERAL | → 物流異常(35) |
-| 52 | 買家未取 | BUYER_NOT_PICKED | → 物流異常(35) |
-| 53 | 廠退 | RETURN_TO_WAREHOUSE | → 物流異常(35) |
-| 55 | 賣家未取 | SELLER_NOT_PICKED | → 物流異常(35) |
-| 56 | 已轉宅配退回 | RETURN_BY_HOME_DELIVERY | → 物流異常(35) |
-| 81 | 門市關轉 | STORE_TRANSFER | → 物流異常(35) |
-| 82 | 待轉宅配退回 | PENDING_HOME_RETURN | → 物流異常(35) |
-| 22 | 物流驗收 | LOGISTICS_CHECK | 不推進（僅更新 shipping_status） |
-| 41 | 已取消 | CANCELLED | 不推進（人工 API 推進訂單取消） |
-
-> 🔴 **本表只做狀態推進，不做責任判定（強制）**：`51 一般退貨` / `52 買家未取` / `53 廠退` / `55 賣家未取` / `56 已轉宅配退回` 等碼的中文標籤**看起來像責任歸屬，但它們不是**——那是物流商對「沒有完成交付」的描述，不是「誰該負責」的判斷。
-> ⇒ 🔴 **嚴禁**由本表任何一列直接推導出責任判定（特別是「`52 買家未取` ⇒ 買家可歸責 ⇒ 不退款」這條捷徑）。責任判定由履約層依多種證據（provider 結果、交付嘗試紀錄、聯繫紀錄、賣家／平台事實）獨立收斂，證據不足時的正確落點是**未判定**、訂單停在 `35`，而**不是**先假設某一方。進入 `DELIVERY_FAILED_NO_REFUND(54)` 的唯一依據是那個獨立判定**已 financially final** 的結果，不是本表。
-> ⚠️ 本表的碼是 **`ShippingStatus`**（配送軸），與 `OrderStatus`（訂單軸）是**不同命名空間**，不得互推。🔴 新終態的值**刻意錯開**為 `54`，正是為了避免與本表的 `55 賣家未取`（責任方相反）同號——見 §2.1「為什麼是 `54`」。
+物流商貨態碼（PayUni 物流）到訂單狀態的推進表已刪除：Java shipping 與貨態事件隨 B3 退場（ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md`），出貨由賣家回填、訂單狀態由出貨記錄推導，狀態機歸 B8 ordering，名稱與轉移在 B8 計畫決定。
 
 #### 買賣家訂單列表 Tab 分組
 
@@ -435,7 +407,7 @@ flowchart TD
 
 **互斥保證**：active 與 terminal-override 兩集合互斥（同一 case 不可能同時成立）；訂單先判售後覆蓋、後判 order.status，任一訂單僅落一桶。
 
-🔴 **dashboard count 一律以 `order.status` 為準，不得引入 `shipping_status`（已出貨）維度**：黑貓叫件（`shipping_status=210/TCAT_CALLED`）、超商確認出貨（`921/SELLER_CONFIRMED`）之後，`ShippingEventConsumer` 就會把 `order.status` 由 10/20 推進至 `IN_TRANSIT(30)`（見[本節物流狀態碼 → 訂單狀態推進規則](#物流狀態碼--訂單狀態推進規則)）⇒ 以 `order.status` 為準即達穩態一致。MQ 推進前的秒級窗口由前端 `isTcatCalled` 樂觀更新呈現。加 `shipping_status` 特例會讓 dashboard 的桶與訂單列表的 status filter **脫節**——兩個數字對不上時無法判斷哪一邊才對。
+🔴 **dashboard count 一律以 `order.status` 為準，不得引入 `shipping_status`（已出貨）維度**：賣家出貨之後，訂單會由 10/20 推進至 `IN_TRANSIT(30)`（見[本節物流狀態碼 → 訂單狀態推進規則](#物流狀態碼--訂單狀態推進規則)）⇒ 以 `order.status` 為準即達穩態一致。加 `shipping_status` 特例會讓 dashboard 的桶與訂單列表的 status filter **脫節**——兩個數字對不上時無法判斷哪一邊才對。
 
 **計算時序**
 
@@ -510,7 +482,7 @@ UPDATE orders SET status = #{newStatus} WHERE order_no = #{orderNo} AND status I
 |---|---|---|---|
 | Coupon Reserve 成功回填 instance_id（by `OrderService.updateCouponInstanceId`） | `updateCouponInstanceIdIfAbsent(orderNo, instanceId)` | `coupon_instance_id`（不轉 status） | `SET coupon_instance_id=? WHERE order_no=? AND coupon_instance_id IS NULL` |
 
-> 賣家發貨 PAID→PENDING_SHIPMENT 的同步入口（舊 `OrderService.shipOrder` / `ShipOrder` RPC）已由 Shipping Service 取代並移除；現行賣家出貨經 shipping-service（黑貓叫件 / 超商確認），order.status 由 `ShippingEventConsumer` 消費物流 webhook 推進（見[物流狀態碼 → 訂單狀態推進規則](#物流狀態碼--訂單狀態推進規則)）。
+> 賣家發貨 PAID→PENDING_SHIPMENT 的同步入口（舊 `OrderService.shipOrder` / `ShipOrder` RPC）已由 Shipping Service 取代並移除；出貨改賣家自寄，出貨記錄與訂單狀態推進歸 B8 ordering（見[物流狀態碼 → 訂單狀態推進規則](#物流狀態碼--訂單狀態推進規則)的退場說明）。
 
 **禁止**：`orderRepository.updateById(orderEntity)`（全欄位覆蓋會把其他併發路徑剛寫入的欄位用 stale 值蓋回）。`updateById` 僅允許用於確保單寫者的 admin CRUD 場景；訂單一律走自訂 SQL。
 
@@ -656,7 +628,7 @@ WHERE 條件均要求 task 處於 `PROCESSING(10)`，避免：
 | auto_complete_at | TIMESTAMPTZ | NO | 自動完成時間（送達時 = `delivered_at` + 60 小時；倒數恢復時 += 累計暫停時長，詳見 [§5.8](#58-自動完成倒數的暫停與恢復)） |
 | countdown_paused_at | TIMESTAMPTZ | NO | 倒數暫停時刻（NULL = 倒數中；NOT NULL = 已暫停，當前時刻不消耗倒數）。由 AfterSales MQ 事件觸發寫入/清空 |
 | countdown_pause_count | SMALLINT | YES | Default: 0。累計暫停次數（觀測用，不影響邏輯） |
-| processing_deadline | TIMESTAMPTZ | NO | 賣家處理期限快照（UTC），由 `shipment.created` 寫入、`shipment.processing.cleared` 清空。NULL = 未付款／已處理／已取消（Uber 亦有賣家處理期限，見 [09 §5.9.1](09-售後微服務（AfterSales%20Service）詳細設計書.md)）。權威來源在 `shipments.processing_deadline`（[09 §5.9](../詳細設計書/09-售後微服務（AfterSales%20Service）詳細設計書.md#59-賣家處理期限自動取消processing-deadline-auto-cancel)） |
+| processing_deadline | TIMESTAMPTZ | NO | 賣家處理期限快照（UTC），由 `shipment.created` 寫入、`shipment.processing.cleared` 清空。NULL = 未付款／已處理／已取消。權威來源在 `shipments.processing_deadline`（[09 §5.9](../詳細設計書/09-售後微服務（AfterSales%20Service）詳細設計書.md#59-賣家處理期限自動取消processing-deadline-auto-cancel)） |
 | delivered_at | TIMESTAMPTZ | NO | 送達時間（供 AfterSales 60hr 時效驗證） |
 | cancel_reason | VARCHAR(200) | NO | 取消原因 value（OrderCancelReason，91xx 系統 / 92xx 賣家；buyer 自願取消為 NULL）。詳見 [09 §5.9.11](../詳細設計書/09-售後微服務（AfterSales%20Service）詳細設計書.md#5911-codemeta) |
 | cancel_remark | VARCHAR(500) | NO | 取消備註（賣家自填理由，僅 OTHER / SUGGEST_SPLIT 等需展示自填文字時使用） |
@@ -932,14 +904,7 @@ WHERE 條件均要求 task 處於 `PROCESSING(10)`，避免：
 >
 > 🚨 **`status` 存的是 CodeMeta value 不是 enum 名**：`'8221'`＝`OutboxEventStatus.PENDING`、`'8222'`＝`SENT`、`'8223'`＝`FAILED`、`'8224'`＝`DEAD`（SSOT＝[代碼管理（CodeMeta）／內部技術碼](../代碼管理（CodeMeta）/內部技術碼.md)；DB 註解見 `V3__add_order_outbox_and_shipment_backstop.sql`）。**寫成 `status IN ('PENDING',…)` 的述詞與部分索引一筆都撈不到 ⇒ 整條 outbox 靜默停擺**。另：`OutboxEventStatus` **沒有 `RETRYING`**，重試中的狀態就是 `FAILED('8223')`。
 
-`orders` 表新增 Backstop（§8.11）重試追蹤欄位：
-
-| 欄位 | 型態 | 說明 |
-|---|---|---|
-| shipment_create_attempts | SMALLINT NOT NULL DEFAULT 0 | 建單重試次數 |
-| shipment_create_next_retry_at | TIMESTAMPTZ | 下次重試時間（backoff） |
-
-部分索引：`idx_orders_shipment_backstop (pay_time) WHERE status='10' AND shipping_status IS NULL`（🔴 **索引述詞必須被掃描述詞「蘊含」，不是「逐字一致」**：掃描條件含 `pay_time < NOW()-grace`，而 `NOW()` 非 `IMMUTABLE`，**放進 index predicate 會讓 migration 直接失敗**。索引只放兩個常量條件即可被使用；⚠️ 兩者若不相容，部分索引會靜默不被使用，那是**無聲的效能退化**）
+（原 Backstop 的 `shipment_create_attempts`、`shipment_create_next_retry_at` 與 `idx_orders_shipment_backstop` 已隨 B3 刪除，見 §8.11。）
 
 > Schema 變更走 `V3__add_order_outbox_and_shipment_backstop.sql`（V1 凍結，見 [38-Flyway 自動同步與 DB 自動初始化](./38-Flyway%20自動同步與%20DB%20自動初始化（Flyway%20Auto%20Sync%20%26%20DB%20Auto%20Init）詳細設計書.md)）。
 
@@ -1249,8 +1214,7 @@ message GetSellerOrderDetailRequest { int64 store_id = 1; string order_no = 2; }
 message GetSellerOrderDetailResponse { int32 code = 1; string message = 2; OrderDetailView data = 3; }
 ```
 
-> **order-service 沒有賣家出貨 RPC**：賣家出貨由 shipping-service 承接（黑貓叫件 / 超商確認），
-> order.status 的 PAID→PENDING_SHIPMENT 推進由 `ShippingEventConsumer` 消費物流事件完成（見 §2.1、§5.5）。
+> **order-service 沒有賣家出貨 RPC**：賣家出貨記錄與訂單狀態推進歸 B8 ordering（ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md` 2026-11-24 修訂），Java shipping 與 `ShippingEventConsumer` 隨 B3 退場。
 > `api/proto/order/order.proto` **無** `ShipOrder` 方法，也不得重新加入。
 
 #### 管理端 RPC
@@ -1478,8 +1442,6 @@ rpc GetSellerShippingConfig(GetSellerShippingConfigRequest) returns (GetSellerSh
 |---|---|---|---|
 | `order.paid` | `hawkr.order` | 付款成功（payment.success 消費後，經 `order_outbox` 可靠投遞，§3.12/§8.10） | Shipping 自動建物流單；Notification **僅買家**「訂單付款成功」推播（賣家的「買家已下單」推播綁 `shipment.created`，不綁本事件） |
 | `order.sales.accumulated` | `hawkr.order` | 付款成功（**與 `order.paid` 同一事務寫 `order_outbox`**，§3.12/§8.10；🔴 不得改回 afterCommit best-effort） | Product 累計 `sales_count`（詳見 [35 設計書](35-商品列表排序與銷量反正規化（Product%20Sort%20%26%20Sales%20Count）詳細設計書.md)） |
-| `order.shipment.create_requested` | `hawkr.order` | Backstop 重試建單（付款後逾寬限仍無物流單，§8.11） | Shipping 冪等 `createShipmentFromOrder` |
-| `order.shipment.creation_failed` | `hawkr.order` | Backstop 重試上限仍無物流單（§8.11） | AfterSales 系統取消 + 退款（reason `SHIPMENT_CREATE_TIMEOUT` 9103） |
 | `order.cancelled` | `hawkr.order` | 訂單取消（買家/超時/賣家） | Product 庫存歸還 |
 | `order.receipt.confirmed` | `hawkr.order` | 確認收貨（手動/自動） | Shipping 標記 receipt_confirmed |
 | `order.completed` | `hawkr.order` | 訂單完成 | 下游撥款等 |
@@ -1521,7 +1483,6 @@ rpc GetSellerShippingConfig(GetSellerShippingConfigRequest) returns (GetSellerSh
 | Routing Key | 業務語意 | order-service 處理 |
 |---|---|---|
 | `shipment.created` | 物流單建立 | 寫入 `orders.processing_deadline`（見 §5.9） |
-| `shipment.label.updated` | 超商出貨便代碼回填 | 更新訂單顯示用代碼 |
 | `shipment.photo.updated` | 出貨照片更新 | 更新訂單照片欄位 |
 | `shipment.status.changed` | 物流狀態變更 | 推進訂單狀態 |
 | `shipment.delivered` | 物流送達 | 推進至 DELIVERED |
@@ -1904,10 +1865,6 @@ CodeMetaValidator.validate(OrderCancelByRole.class, cancelByRole, "cancelByRole"
 > 訂單狀態維持 PAID(10)，不推進。後續由物流狀態變更事件（isPendingShipment / isConfirmedShipment）推進。
 >
 > `processing_deadline` 來自 payload 的 `processingDeadline` 欄位（ISO 8601 UTC；空字串時寫 NULL）。<br/>🔴 **Order 端存的是「推導後的結果」，不是任何人直接設定的值。** 3003 的來源公式為 `payment_time + seller_prep_sla + platform_grace_period`——**賣家設的是 `prep_sla`，不是 `processing_deadline`**。<br/>🔴 **本欄是 snapshot，不得被回溯改寫**：賣家日後調整 `prep_sla` **只影響之後成立的訂單**；已付款訂單沿用付款／履約受理當下 snapshot 的 prep SLA。⚠️ 否則賣家可以用「把 prep SLA 調長」規避自己已經逾期的訂單，**買家保護被賣家單方面關掉**。<br/>🔴 **本欄與「物流商的約定取件時間」是兩個不同的時鐘，不得互推（強制）**：本欄（賣家硬處理期限）以**實際付款時間**起算；3003 送給物流商的取件時間讀的是**報價當下凍結的絕對時間 snapshot**，🔴 **禁止**在建單當下用 `payment_time + prep_sla` 或新的 `now` 重算。兩者刻意共用同一份 `prep_sla` snapshot、但**起算點不同**——這不是重複的時鐘，是兩件不同的事。<br/>⚠️ **`prep_sla` 到期不在本欄表達，也不觸發任何 Order 端動作**——它只觸發提醒／告警（09 §5.9.1）；**本欄承載的是唯一的強制取消點**，詳見 [§5.9](../詳細設計書/09-售後微服務（AfterSales%20Service）詳細設計書.md#59-賣家處理期限自動取消processing-deadline-auto-cancel)。
-
-#### shipment.label.updated（超商出貨便代碼）
-
-`UPDATE orders SET partner_id=?, odno=?, validation_no=? WHERE order_no=? AND partner_id IS NULL`
 
 #### shipment.photo.updated
 
@@ -2796,268 +2753,9 @@ UPDATE order_outbox
 > 🚨 **枚舉的是 CodeMeta value 不是 enum 名**（`'8221'/'8222'/'8223'/'8224'`）；寫成 `'PENDING'` 之類會讓述詞與部分索引雙雙零命中 ⇒ **outbox 靜默全停**。`OutboxEventStatus` **沒有 `RETRYING`**。
 > **通則**：候選述詞一律正面列出「要處理的狀態」，**禁止用 `<>` / `NOT IN`** —— 新增終態時不會有人回頭改它（[規範 §六](../開發規範/多副本排程搶佔規範.md)）。
 
-### 8.11 ShipmentCreationBackstopScheduler（付款後建單兜底）
+### 8.11 ShipmentCreationBackstopScheduler（已退場）
 
-**業務 SLA 兜底**（非 reconciliation/drift；等同 §8.5 對未付款訂單的逾期取消，符合[後端服務責任邊界規範](../開發規範/後端服務責任邊界規範.md)）：付款後超過寬限期仍無物流單者，先重試建單（容忍暫時性網路/PayUni 故障），超過重試上限仍失敗 → 系統取消 + 啟動退款。
-
-| 項目 | 說明 |
-|------|------|
-| 排程 | fixedDelay 預設 5 分鐘（`ORDER_SHIPMENT_BACKSTOP_INTERVAL_MS`），開關 `ORDER_SHIPMENT_BACKSTOP_ENABLED` |
-| 掃描 | `orders WHERE status='10' AND shipping_status IS NULL AND pay_time < NOW()-grace AND (shipment_create_next_retry_at IS NULL OR <=NOW())`。<br/>🔴 **述詞不得改用 `(shipment_no IS NULL OR shipment_no='')`**——`orders.shipment_no` 裝的是 **provider 側識別字**（§5.5 的回填 SQL 寫進去的是 payload 的 `ship_trade_no`），而 3003 在 `FL-1` 完成當下**還沒有** provider 側識別字 ⇒ 每一筆正常的 Uber 訂單都會恆久命中候選。逐 provider 對照見 §8.11.1 |
-| 重試 | `attempts < max`：publish `order.shipment.create_requested`（Shipping 冪等建單）；`attempts++` / `next_retry_at=NOW()+backoff` |
-| 取消 | `attempts >= max`：publish `order.shipment.creation_failed`（AfterSales 取消+退款，reason `SHIPMENT_CREATE_TIMEOUT` 9103，含 ATM 兩段式） |
-| 終止 | `orders.shipping_status` 一旦**非 `NULL`**（＝ Shipping 已把 fulfillment lifecycle 投影回 Order）即移出掃描；取消後 `status≠10` 不再命中。<br/>🔴 **退出條件不是「`shipment_no` 回填」**：那會讓人以為要等到「拿到 provider 單號」，而 3003／3004 的退出點比它早得多。完整退出條件見 §8.11.1 的 Backstop Ownership Contract。 |
-| 兩階段 | TX 內更新 attempts；TX 外 publish（事件不在事務內，避免 finally/事務交互） |
-
-判定依據：`orders.shipping_status IS NULL` ⟺ **Shipping 尚未接手這筆訂單的 fulfillment lifecycle**（由 §5.5 的物流事件消費寫入，無需額外 gRPC）。<br/>🔴 **不得改寫成「`shipping_status IS NOT NULL` ⟺ `FL-1` 已完成」**——那句話對 `991`／`990` 是假的（§8.11.1 Case E／F）。
-
-🔴 **2026-09-13 Design Closure：本排程的前提必須回灌，否則它會把一個已定案的業務規則整個繞過去。**
-
-**舊前提**：「付款後就該有**物流商側的**物流單，沒有就是系統出錯」。
-
-這個前提對 **3001／3002 成立**：它們在付款當下由 `createShipmentFromOrder()` 呼叫
-PayUni `createHomeShipment`／`createCvsShipment` 取得物流單號（`FL-1`，見 §5.5 的回填 SQL）
-⇒ **沒有物流單號確實代表出了錯**，本排程對它們的判斷是對的。
-
-🔴 **但它對 3004 不成立，理由是 provider 的客觀差異**：3004 的逐筆取號（`/trade`）由**賣家**發動
-⇒ 它在付款當下**只建立本地配送單**，物流商側的識別字要等賣家取號之後才存在。
-⚠️ **這不是「新通路都只建本地列」的通則**，是這一個 provider 的分界。
-
-⚠️ **3003（即時配送）不是這一類，不要把它歸進來**：
-**物流商確實沒有一支「只建立物流資料、完全不安排履約」的建單 API**（這是 provider 的客觀事實，仍然成立），
-而 3003 V1 的做法是**接受這一點**——在**付款當下**就送出 Create Delivery，並帶上**報價當下凍結的未來取件時間**。
-⇒ 3003 在 `FL-1` 完成當下**已經取得** provider 側識別字。它之所以仍屬 `FL-1`，理由是**我方在該時點觀察不到外送員指派**，
-🔴 **不是**「物流商還沒開始安排」——本書**不得**再寫「Create Delivery 就代表當場派車／開始計費」這類對 provider 內部行為的推測。
-⚠️ 賣家在 3003 的動作是**宣告備妥**（`REPORT_READY`），它觸發的是**更新既有 Delivery 的取件時間**，
-**不是建單、也不是派車**；`FL-2` 的 actor 是物流商依約定取件時間排程，**不是賣家**。
-
-🔴 **本節不要求改動 3001／3002 的付款後建單流程**——那是既有且正確的業務流程。
-要改的只有**候選述詞的錨點**：它目前錨在「有沒有物流商側的單號」，而那個錨對 3003 天生為空。
-
-⚠️ **兩種情境在本排程眼中長得一模一樣，而處置相反**：
-
-| 情境 | 資料上 | 正確處置 | 誤判的後果 |
-|---|---|---|---|
-| `FL-1` 真的沒建出來 | 訂單已付款、**`orders.shipping_status` 仍為 `NULL`**（沒有收到 `shipment.created`） | 重試補做**該 provider 的** `FL-1`；耗盡則放棄並取消退款 | 不補 ⇒ 賣家永遠看不到這筆單 |
-| 賣家還沒發動 `FL-2` | 訂單已付款、**`orders.shipping_status = '91'`** | 🔴 **不歸本排程管**——由該通路的賣家處理期限（[09 §5.9](09-售後微服務（AfterSales%20Service）詳細設計書.md)）處理 | ① 重試會**替賣家發動 `FL-2`**，繞過「賣家決定」這條規則（⚠️ 此半**只對 3001／3002／3004 成立**——3003 的 `FL-2` 由物流商依約定取件時間排程、不由賣家發動） ② 放棄門檻到達時**把一筆正常訂單自動取消＋全額退款**，賣家連一次機會都沒有（**對所有 provider 都成立，含 3003**） |
-
-**三條回灌要求（同一個修法的三半，只做其中一兩條會留下另一邊的洞）**
-
-| # | 要求 |
-|---|---|
-| ① | **候選述詞錨在「該 provider 的 `FL-1` 有沒有完成」**，不得錨在任何**只有 `FL-2` 成功才會回填**的欄位。⚠️ 對 3001／3002／**3003**，`FL-1` 完成的證據都包含物流商側識別字（**不變**；3003 在付款當下送出 Create Delivery 即取得）；對 **3004**，`FL-1` 完成的證據是**本地配送單存在**，因為它的物流商側識別字要等賣家取號（`FL-2` 側）才有 |
-| ② | 🔴 **重試動作只能補做 `FL-1`，不得發動 `FL-2`**——本排程發出的重建請求，下游必須止於**該 provider 的 `FL-1`**。⚠️ 對 3001／3002 那包含**重新呼叫 PayUni 建單取號**（本來就該補做的事）；對 **3003** 那包含**呼叫物流商 Create Delivery**——它是 3003 `FL-1` 的一部分，🔴 補做時必須**沿用同一份報價 snapshot 與同一個 idempotency key**，不得重算取件時間；對 **3004** 則止於建立本地配送單，因為它的 `FL-1` 只有那一步 |
-| ③ | **「賣家還沒發動」不是本排程的候選**，它有自己的出口與自己的時鐘 |
-
-🔴 **驗收必須雙向**：造一筆「`FL-1` 已建、賣家未發動」⇒ **不得**被本排程碰；
-造一筆「`FL-1` 真的沒建出來」⇒ **仍須**被補做。
-⚠️ **同一段程式碼同時是安全網與殺手，只從單一情境出發的修法會把另一邊弄壞。**
-
-#### 8.11.1 🔴 Backstop Ownership Contract：候選述詞的欄位與語意
-
-🔴 **`orders.shipment_no` 不是「有沒有物流單」的證據，不得拿來當候選述詞。** §5.5 的回填 SQL：
-
-```sql
-UPDATE orders SET shipment_no=?, ship_time=NOW(), shipping_status='91', label_url=?, processing_deadline=?
-WHERE order_no=? AND shipment_no IS NULL
-```
-
-`shipment_no` 寫的是 `shipment.created` payload 的 **`ship_trade_no`**（provider 側識別字），
-而同一則 payload 另有 `shipment_no`（我方本地配送單編號）**未被使用**。
-⇒ **`orders.shipment_no` 是「provider 側識別字存在嗎」，不是「本地配送單存在嗎」。**
-
-對 **3004** 而言，`FL-1` 完成當下**還沒有** provider 側識別字（逐筆取號由賣家發動，屬 `FL-2` 側）
-⇒ 該欄為空是**正常狀態**，而舊述詞把它讀成「建單失敗」。
-⚠️ **3003 不是這個反例**——它在付款當下送出 Create Delivery 即取得 provider 側識別字。改錨的決定**不因此動搖**：
-述詞必須錨在「Shipping 有沒有把 lifecycle 投影回來」，而不是逐 provider 去猜哪一家在什麼時點才有識別字。
-
-**判定欄位與判定語意**
-
-```
-候選 ⟺ orders.shipping_status IS NULL
-```
-
-
-
-**舊寫法（已作廢，不得再出現在任何設計文件）**：
-
-```
-❌ FL-1 completed  ⟺  orders.shipping_status IS NOT NULL
-```
-
-⚠️ **它對 `991`／`990` 是假的**：3004（7-11 大宗寄倉）的 `/trade` 逾時會寫 `CREATE_UNKNOWN(991)`
-並以 `shipment.status.changed(991)` 投影回 Order（[06 §2.1 物流狀態機](06-物流微服務（Shipping%20Service）詳細設計書.md) 逐字：
-`991` 落到 `onShipmentStatusChanged` 的最後一個 `else`，症狀是**只更新 `shipping_status`、訂單軸不動、也不報錯**）
-⇒ 此時 `orders.shipping_status = '991'`，而該筆的 **`FL-1` 根本還沒確認成功**。
-**「非 `NULL` ⇒ `FL-1` 已完成」在這一格直接為假。**
-
-**新語意（定版）**
-
-| `orders.shipping_status` | 語意 | generic Order backstop |
-|---|---|---|
-| `NULL` | **Order 尚未收到任何 Shipping 側的 fulfillment lifecycle 投影** ⇒ Shipping 還沒接手這筆訂單 | ✅ **仍然擁有 recovery**（候選 YES） |
-| **非 `NULL`**（`91` / `990` / `991` / `992` / 或任何其他合法物流態） | **Shipping domain 已經明確接手 fulfillment lifecycle**——它可能是「已建單」、也可能是「建單結果未知／失敗，正由 Shipping 自己的 recovery 鏈收斂」 | ❌ **必須退出**（候選 NO） |
-
-> 🔴 **Backstop Ownership Contract（provider-neutral，本節的最高層規則）**
->
-> **Order 的 `ShipmentCreationBackstopScheduler` 只負責「Shipping 還沒有接手」的訂單。
-> 一旦 Shipping 透過正式的 shipment lifecycle event 把 `shipping_status` 投影回 Order，
-> generic Order backstop 必須退出，recovery 的所有權歸 Shipping（或 Shipping 指定的賣家／Admin 動作）。**
->
-> ⚠️ **它要防的不是「多跑一次」，是兩條 recovery chain 對同一筆訂單同時動作**：
-> Shipping 正在對 `991` 做 `/query` 回查收斂，而 Order 同時重新發 `order.shipment.create_requested`
-> ⇒ **可能建出第二張物流單、重複計費**（逐字：
-> 「`991` 期間**不得**建第二筆 `provider_shipments`；`/query` 回查無**不構成**重建理由」），
-> 或在回查查到「其實建單成功」之前就先取消＋全額退款。
->
-> 🔴 **這條 contract 不逐 provider 分支，也不列舉狀態值。** 它只問一件事：
-> **Shipping 有沒有把 lifecycle 投影回來。** 新增任何 provider、任何新狀態值，都不需要回來改本述詞。
-
-🔴 **它為什麼仍然是 provider-aware 的**——不是因為 SQL 逐 provider 分支，而是因為
-**`shipment.created` 只會在「該 provider 自己的 `FL-1` 完成」之後才發出**，而各 provider 的 `FL-1` 內容本來就不同：
-
-| provider | 它的 `FL-1` 包含什麼 | `shipment.created` 何時發出 |
-|---|---|---|
-| 3001／3002 | 本地配送單 ＋ **向 PayUni 建單並取得物流單號** | PayUni 呼叫**成功之後** |
-| 3003 | 本地配送單 ＋ **向物流商 Create Delivery 取得 delivery 識別字**（帶報價當下凍結的未來取件時間）。🔴 它仍屬 `FL-1`，理由是**我方觀察不到外送員指派**，不是「物流商還沒開始安排」 | Create Delivery 成功**之後** |
-| **3004** 🆕 | **只有**本地配送單（`shipments` 列，`91 READY_TO_CREATE`）。🔴 **`/trade` 逐筆取號不屬 `FL-1`**——它由**賣家**發動，屬 `FL-2` 側 | **付款後本地列建立之後**（⚠️ **不要拿 3003 當類比**：3003 的 `FL-1` 含 provider 建單，3004 不含） |
-
-🔴 **3004 那一列是 Case E／F 的前提，寫錯的後果與 Case C 同形**：
-若施工者把 `/trade` 取號讀成 `FL-1`、因而把 `shipment.created` 延到取號成功才發，
-則**每一筆 3004 訂單在賣家取號之前 `orders.shipping_status` 都是 `NULL`**
-⇒ 全部落進兜底候選 ⇒ 在放棄門檻（付款後約 3 小時）被系統自動取消＋全額退款。
-⚠️ **3004 的 `FL-1` 止於本地配送單**（`UNPROCESSED(91)` 的語意是「**`FL-1` 已完成、`FL-2` 尚未發動**」）。🔴 **不得**以「與 3003 同形」當理由——3003 的 `FL-1` **包含**向物流商建單，兩者只是「`91` 都代表 `FL-1` 已完成」，`FL-1` 的**內容**並不相同。
-
-🔴 **這個性質由「誰會發出 `shipment.created`」保證，不是由「有沒有列」保證。**
-（[06 §8.1 本地交易邊界](06-物流微服務（Shipping%20Service）詳細設計書.md) 逐字：
-`@Transactional`：冪等檢查 → gRPC 查詢 → **PayUni 呼叫** → INSERT shipments → INSERT status_log → **MQ publish**，
-整個建單流程在同一交易內。）
-
-⚠️ **這裡有一個很容易寫錯的細節，寫錯會讓 Case A 的保護看起來比實際更牢固：**
-PayUni 建單失敗時**不是「什麼都沒留下」**——shipping-service 會以**獨立短交易**
-（`REQUIRES_NEW`，不受外層回滾影響）落下一筆 **`CREATE_FAILED(990)` 失敗殼**
-（[06 §2.5 PayUni 物流欄位約束防護](06-物流微服務（Shipping%20Service）詳細設計書.md) 逐字：「落 `CREATE_FAILED` shell、`ship_trade_no` 為空」）。
-⇒ **`shipments` 裡有列，只是那一列代表失敗。**
-
-🔴 **所以 Case A 成立的真正理由是：失敗殼「不發 `shipment.created`」，因此 `orders.shipping_status` 維持 `NULL`。**
-**不是**「沒有列」。
-⚠️ **這個區別很重要**：若日後有人讓失敗殼也發出 `shipment.created`（或補一條帶 status 的事件），
-Case A 會**靜默**失效——而「沒有列」那個說法會讓人以為還有另一道保護擋著，實際上沒有。
-⇒ 這正是下方那條不變式要守的東西。
-
-⚠️ **因此這是一條必須被明文守住的不變式，不是可以假設的現況**：
-
-> 🔴 **任何 provider 都不得在自己的 `FL-1` 完成之前發出 `shipment.created`。**
-> 違反它，本述詞會**靜默**失去對該 provider 的偵測能力（訂單看起來已建單，實際沒有）。
-
-**六個 case（缺一不可，驗收必須逐項造出來）**
-
-| Case | 情境 | `shipping_status` | candidate | backstop 做什麼 |
-|---|---|---|---|---|
-| **A** | **3001** PayUni `createHomeShipment` 失敗 | `NULL`（交易回滾，無事件） | ✅ **YES** | 補做該 provider 的 `FL-1`＝**重新呼叫 PayUni 建單取號**。重試耗盡 ⇒ 放棄並取消退款 |
-| **B** | **3001** provider create 成功、賣家尚未 `callTcat` | `'91'` | ❌ **NO** | 🔴 **什麼都不做。** 賣家還沒發動 `FL-2` 不歸本排程管——它歸賣家出貨期限（[09 §5.9](09-售後微服務（AfterSales%20Service）詳細設計書.md)） |
-| **C** | **3003** `FL-1` 成功（本地配送單 ＋ 物流商 Create Delivery 已建）、尚未進入 `FL-2`（我方尚未觀察到外送員指派），賣家亦尚未 `REPORT_READY` | `'91'` | ❌ **NO** | 🔴 **什麼都不做。** 這是即時配送每一筆訂單都會經過的正常階段 |
-| **D** | **3003** `FL-1` 真的沒建出來 | `NULL` | ✅ **YES** | 補做該 provider 的 `FL-1`＝**建立本地配送單 ＋ 呼叫物流商 Create Delivery**。🔴 **補做時必須沿用同一份報價 snapshot 與同一個 idempotency key**（不得重算取件時間、不得建出第二筆 delivery）；建立結果不明時走該 provider 的結果回查收斂，**不得盲目重建**。⚠️ 本格**不得**寫成「只補本地列、絕對不得呼叫 Create Delivery」——那會讓 backstop 補出一張**沒有物流商單**的殼，永遠不會有人來取貨 |
-| **E** 🆕 | **3004** `/trade` 逾時 ⇒ Shipping 寫 `CREATE_UNKNOWN(991)` ⇒ 發 `shipment.status.changed(991)` | `'991'`（⚠️ 即使該投影延遲未達，也仍是付款當下 `shipment.created` 寫下的 `'91'`——**兩種情況都非 `NULL`**） | ❌ **NO** | 🔴 **什麼都不做。** recovery 歸 Shipping 的 `ShipmentCreateUnknownRecheckScheduler` 以 `/query` 回查收斂：成功→`91`／確定失敗→`990`／超出回查窗→`41`＋人工。<br/>🔴 **絕對不得盲目重建**（`991` 期間不得建第二筆 `provider_shipments`，`/query` 回查無**不構成**重建理由） |
-| **F** 🆕 | **3004** `991` 經 `/query` 判定確定失敗 ⇒ 轉 `CREATE_FAILED(990)`（狀態轉移 ⇒ 發 `shipment.status.changed(990)`） | `'990'` | ❌ **NO** | 🔴 **什麼都不做。** `990` 的 recovery 由 **Shipping／賣家／Admin** 擁有：賣家走 `POST /app/shipments/:order_no/resubmit`（補件重建），或 Admin 取消（→`41`＋退款鏈）。<br/>⚠️ **這裡的 `990` 與 Case A 的 `990` 不是同一件事**，見下方對照 |
-
-⚠️ **B 與 D 在舊述詞下的結果是相反的錯**：舊述詞讓 C 變成 YES（正常 Uber 訂單被取消退款），
-而若改成「本地列存在就算完成」則會讓 A 變成 NO——**因為失敗殼本身就是一筆列**（見上方紅字），3001 的 PayUni 失敗會被讀成「已完成」，永遠沒人補。
-🔴 **兩個方向都要造出來測，只驗一邊必然放過另一邊。**
-
-🔴 **Case A 的 `990` 與 Case F 的 `990` 是兩件不同的事，而 Ownership Contract 正好把它們分開**
-
-| | Case A 的 `990` | Case F 的 `990` |
-|---|---|---|
-| 怎麼產生 | `FL-1` 當下 PayUni 建單失敗 ⇒ `persistFailedShipmentShell`（`REQUIRES_NEW`）落下失敗殼 | 既有 shipment 從 `991` 經 `/query` 判定失敗 ⇒ **狀態轉移** |
-| 有沒有 lifecycle 事件投影回 Order | ❌ **沒有**（失敗殼**不發** `shipment.created`，也不是狀態轉移 ⇒ 不發 `shipment.status.changed`） | ✅ **有**（`shipment.status.changed(990)`） |
-| `orders.shipping_status` | `NULL` | `'990'`（此前已是 `'91'`／`'991'`，同樣非 `NULL`） |
-| candidate | ✅ **YES** | ❌ **NO** |
-| 誰擁有 recovery | **Order backstop**（Shipping 從未接手過這筆） | **Shipping／賣家／Admin**（Shipping 早已接手） |
-
-⚠️ **所以「看到 `990` 就退出」是錯的抽象，「看到 Shipping 投影就退出」才是對的抽象。**
-前者會讓 Case A 永遠沒人補（買家付了錢、沒有物流單、沒有退款、沒有告警）；
-後者對兩者都給出正確答案，**而且不需要在 SQL 裡列舉任何狀態值**。
-
-🔴 **這條 contract 依賴一個必須被明文守住的前提**：
-
-> **Shipping 對一筆訂單的「接手」與「第一次 lifecycle 投影」必須同時發生。**
-> 具體表現為兩條，缺一即靜默失效：
-> ① **不得在 `FL-1` 完成之前發出 `shipment.created`**——違反 ⇒ backstop 對該 provider 失去偵測能力（Case A／D 被誤判成 NO）；
-> ② **失敗殼不得發出任何 lifecycle 事件**（`shipment.created` 與 `shipment.status.changed` 皆不得）——違反 ⇒ Case A 靜默失效。
-> ⚠️ **反過來，Shipping 一旦已經接手（例如 3004 的 `'91'`），後續所有異常態（`991`／`990`／`992`）都必須照常投影**，
-> 否則 Order 會以為「Shipping 還沒接手」而重新介入——那正是本 contract 要防的 chain collision。
-
-🔴 **Case E 的投影機制**
-
-`shipment.status.changed` 的 consumer 走 `OrderRepository.updateShippingStatus`／`updateShippingStatusAndLabel`，
-兩支的 `WHERE` 子句**逐字都是** `WHERE order_no = #{orderNo}`——**沒有任何 `shipping_status` 守衛**。
-javadoc 逐字：「PayUni 狀態碼**不遞增**（91→92→21→31），**不可用數值比較防併發**。**直接覆蓋更新**
-（Shipping Service 已在 Java 層驗證轉移合法性）。」
-⇒ **`shipping_status` 由 `NULL` 或 `'91'` 寫成 `'991'` 都是無條件成功的**，Case E 的投影不會被任何冪等守衛擋掉。
-
-🔴 **不得為本事件加上「`shipping_status >= toStatus` 跳過」這類冪等守衛**：照那個守衛推理會得出「`NULL` 進不來、Case E 不成立」的相反結論，而 PayUni 狀態碼本來就不遞增。
-
-🔴 **3004 還有第二道、更早的退出點（兩道都成立，不互相取代）**
-
-3004 的 `/trade` 逐筆取號由**賣家**發動，
-而 `shipments` 列在**付款後**就由既有建單鏈建出（`91`）並發 `shipment.created`
-⇒ 進入 `991` 之前 `orders.shipping_status` **早已是 `'91'`**。
-⇒ **3004 的 `991` 本來就不在 `shipping_status IS NULL` 的候選集裡**，
-`991` 的投影只是讓「已退出」這件事在資料上更明顯，**不是退出本身的成因**。
-⚠️ **這一點必須寫下來**：它同時回答了「`991` 會不會讓 §8.11.1 的述詞失效」——
-不會，因為 3004 的 `991` 發生在 `FL-1` **之後**，述詞的失效條件是「在 Shipping 接手**之前**寫 `shipping_status`」。
-
-
-**為什麼不新增欄位**
-
-| 候選 | 判定 |
-|---|---|
-| **`orders.shipping_status IS NULL`**（採用） | 由 `shipment.created` 的同一句 UPDATE 寫入，**所有 provider 共用同一條路徑**；欄位可為 `NULL`（§3.1 的部分索引 `WHERE shipping_status IS NOT NULL` 即證），且只由 Shipping 的 MQ 事件寫 ⇒ **第一則事件之前必為 `NULL`**。<br/>🔴 本述詞需要的不變式**只有一條——「非 `NULL` 之後不會回到 `NULL`」**。<br/>⚠️ **不得寫成「單調前進、不回退」**：那與本節上方引的 javadoc 逐字衝突（「PayUni 狀態碼**不遞增**（91→92→21→31），**不可用數值比較防併發**」）。`shipping_status` 的**值**本來就不單調（`91→92→21→31`、`991→990`），照「單調前進」施工去加守衛，會把 Case F 的 `991→990` 投影擋掉 |
-| 新增 `local_shipment_no`／`fulfillment_created_at` | ❌ **不需要**。它們承載的資訊與上一列**完全相同**，只是換一個名字；新增欄位要付 migration ＋ 回填 ＋ 兩處述詞同步的代價，而**不會多回答任何一個問題**。🔴 **不得為了抽象純度新增欄位** |
-| 沿用 `orders.shipment_no` | ❌ 它是 provider 側識別字（見上） |
-
-⚠️ **`shipping_status` 的語意負擔**：它是**「Shipping 側 fulfillment lifecycle 的投影」**，
-本述詞讀的是**「有沒有投影」**（`NULL` vs 非 `NULL`），**不是**「投影的值代表成功還是失敗」。
-🔴 **本節刻意不把它讀成「`FL-1` 已完成」**——`991`／`990` 就是「有投影但 `FL-1` 未成功」的反例（Case E／F）。
-🔴 **若未來有任何路徑會在「Shipping 尚未接手」時就寫 `shipping_status`，本述詞立刻失效** ——
-那時才是新增專屬欄位的時機，而不是現在。
-⚠️ **不要因為名稱不完美就新增 `fulfillment_owned`／`shipping_workflow_started`／`local_shipment_no`**：
-逐一檢查 Case A–F，**沒有任何一格是現欄位答不出來的** ⇒ 新欄位不會多回答任何一個問題，只多付 migration ＋ 回填 ＋ 兩處述詞同步的代價。
-
-**多副本搶佔 —— 兩個分支各一道 lease 閘門**
-
-| 分支 | 閘門（在 publish **之前**） | 租約欄 | 租約長度 |
-|---|---|---|---|
-| **重試**（`attempts < max`） | `bumpShipmentCreateAttempt` 加 lease CAS 述詞（新增第三參數 `now`）：`AND (shipment_create_next_retry_at IS NULL OR <= #{now})` | `orders.shipment_create_next_retry_at`（既有） | `backoffMinutes`（預設 30 分） |
-| **放棄**（`attempts >= max`） | 新增 `claimShipmentBackstopGiveUp`，**同樣是 lease 不是永久旗標** | 同上 | **同 `backoffMinutes`** |
-
-- **候選 SQL 只有下界**（`status='10' AND shipping_status IS NULL AND pay_time < graceCutoff`）⇒ **候選窗口寬度 = ∞**，兩個租約長度都合格。
-
-> 🚨 **give-up 租約的上界不是由候選窗口決定的。**
-> 🔴 **不得只用「候選窗口 = ∞ ⇒ 上界無條件成立」來決定 give-up 的租約長度**（那個上界是述詞層的，不是業務層的）。這個租約同時是
-> **`publishShipmentCreationFailed` 靜默失敗後的救援窗口**：該 publish 走 `OrderEventPublisher.publish`，
-> [**吞掉所有例外**](#publisher-失敗語意ordereventpublisher)，所以 claim 已寫入、事件卻沒送出去時呼叫端拿不到任何訊號，該訂單只能等租約到期才會再被掃到。
-> ⇒ 取一個很長的值（例如 1440 分）就等於 **買家已付款、無物流單、無取消、無退款、無告警 24 小時**，而且落在金流路徑上。
-> **上界取同一支排程的重試節奏 `backoffMinutes`** —— give-up 是這條鏈路的**終局救援**，
-> 沒有理由比非終局的重試分支更慢 ⇒ 不變式 **`giveUpLease ≤ backoffMinutes`**。
-> 實作上**共用同一個設定值**（不另立 `giveUpLeaseMinutes` 之類的旋鈕），讓不變式結構上恆成立。
-> 重複的成本可接受：下游 `cancelShipmentBySystem` 冪等（`uk_seller_cancel_order_no`）。
-> ⚠️ **只斷言「租約 = 某設定值、且是未來時間」的測試驗不到這條不變式**——上界必須單獨釘（對預設值斷言 `leaseMinutes ≤ backoffMinutes`）。
-> 🚨 **租約基準取「claim 當下」，不是 tick 起點**（[規範 §三 第 6 點](../開發規範/多副本排程搶佔規範.md)）。
-> 兩個分支寫進 DB 的到期時間都由 `DateTimeUtils.nowUtc().plusMinutes(backoffMinutes)` **在該筆的 claim 當下**求值，而不是 tick 開頭那個 `now`。
-> 共用 tick 起點時，第 k 筆的**有效**租約 = `backoffMinutes − (前 k−1 筆的耗時)`，不變式退化成「**批次總耗時** < 租約」；取 claim 當下之後降為「**單筆**最壞耗時 < 租約」。
-> - **候選述詞用的 `now` 維持 tick 起點**（同時也是 CAS 的上界）：那個方向讓可搶佔集合更小，是保守的。
-> - ⚠️ **今天這支排程的判定式並不成立**：`BATCH_SIZE = 100`、單筆只有一次本地 MQ publish ⇒ `100 × 毫秒 ≪ 30 分`，共用 tick 起點也不會出事。**但那是參數巧合不是結構保證** —— 往這個迴圈裡加一次 gRPC（例如查快照組 payload）就會破，而且破的時候沒有任何錯誤訊息。
-> - ⇒ **本項的價值在回歸保護，不在修 bug**。機械保證＝`ShipmentCreationBackstopSchedulerClaimTest.leaseBaselineIsTakenPerItemNotPerTick`（讓第一筆的副作用耗掉可觀測時間，斷言第二筆的租約**嚴格晚於**第一筆；共用 tick 起點時兩者完全相等 ⇒ 轉紅）。⚠️ 只斷言「租約是未來時間 / 租約 = now + backoff」的測試對這個缺陷**照樣綠**。
-
-- 🚨 **give-up 分支的語意是「一個 `backoffMinutes` 之後再試」，不是「永久放棄」。** 這一點必須寫在這裡，因為方法名（`giveUp`）與直覺相反：若改成永久旗標，`order.shipment.creation_failed` 一旦 publish 失敗就**永久遺失**——訂單卡在 `PAID` 無物流單、無人取消、無人退款、無告警。
-- **新增觀測欄 `orders.shipment_backstop_given_up_at`**（`V{N+1}`，與 §8.10 的 H1-DEAD 索引合併為同一支 migration）：
-  - **它是觀測欄，不是租約欄、不進候選述詞** —— 純粹讓運維讀得出「這筆已經走到過 give-up」。
-  - 對應 `sql_exporter` 指標與告警：`shipment_backstop_given_up_at IS NOT NULL AND status='10'` 的筆數持續 > 0 ⇒ 代表 give-up 已觸發但訂單仍未離開 `PAID`（取消／退款鏈路沒接上），需人工介入。
-- **行為變化**：修完後 `shipment.creation.failed` 從「每 5 分鐘一次直到訂單離開 PAID」變成「每 `backoffMinutes`（預設 30 分）一次」。下游 `cancelShipmentBySystem` 本來就冪等（`uk_seller_cancel_order_no`），消費端無回歸。
-
-> **殘留的 stuck 訂單**以一次性維運 SQL「推入」既有取消＋退款管線處理。🔴 **不得裸改 `status=80`**——那會跳過退款，而訂單的錢已經收了。不寫進 application code（見[後端服務責任邊界規範](../開發規範/後端服務責任邊界規範.md)）。
+付款後建單兜底隨 Java shipping 退場一併刪除（B3，ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md`）：出貨改賣家自寄，沒有「付款後平台向物流商建單」這一步，也就沒有建單逾時要兜底。`order.shipment.create_requested`、`order.shipment.creation_failed`、`orders.shipment_create_attempts`、`shipment_create_next_retry_at` 與 `idx_orders_shipment_backstop` 隨之刪除；逾期未出貨的取消改為 B8 ordering 的狀態機（用賣家運費設定的處理天數），見主計畫 B8。
 
 ### 8.12 不符 60 語意的存量訂單如何清整
 
@@ -3081,13 +2779,11 @@ javadoc 逐字：「PayUni 狀態碼**不遞增**（91→92→21→31），**不
 
 > **盤點範圍＝本服務全部 `@Scheduled` 方法**（grep 時注意扣除 javadoc 內的 `{@code @Scheduled}` 提及）。
 > ⚠️ 🔴 **grep `@Scheduled` 不是排程的全集**：`PaymentDeadlineScheduler`（[§8.5](#85-paymentdeadlinescheduler付款超時取消)）以 `SchedulingConfigurer.addFixedDelayTask` 在 `configureTasks` 內註冊，**檔內沒有 `@Scheduled`**，那條 grep 掃不到它。它每 15 秒跑一輪、逐筆對逾期未付款訂單做副作用，**必須一併判定**，故已列入下表。
-> 下表涵蓋**適用**的 9 支（10 列，`ShipmentCreationBackstopScheduler` 兩分支各一列）；另有 **3 支經六步判定為不適用**，逐支理由列在本節末的「判定為『不適用』的三支」。
+> 下表涵蓋**適用**的 8 支（8 列）；另有 **3 支經六步判定為不適用**，逐支理由列在本節末的「判定為『不適用』的三支」。
 
 | 排程 / Worker | 節 | 副作用 | 租約欄 | 租約長度 | 候選窗口 | migration |
 |---|---|---|---|---|---|---|
 | `OrderOutboxPublisherScheduler` | [§8.10](#810-orderoutboxpublisherscheduler事件可靠投遞) | publish `order_outbox` 承載的**六種**事件（清單見 [§3.12](#312-訂單事件發件匣-order_outbox事件可靠投遞載體)） | `order_outbox.next_retry_at`（既有） | 60 秒 | ∞ | 需要（H1-DEAD 索引 ＋ 下列觀測欄，合一支） |
-| `ShipmentCreationBackstopScheduler`（重試分支） | [§8.11](#811-shipmentcreationbackstopscheduler付款後建單兜底) | publish `order.shipment.create_requested` | `orders.shipment_create_next_retry_at`（既有） | `backoffMinutes` | ∞ | 同上（僅觀測欄） |
-| `ShipmentCreationBackstopScheduler`（放棄分支） | §8.11 | publish `order.shipment.creation_failed` | 同上 | **同 `backoffMinutes`**（上界綁定，見 §8.11 的 🚨） | ∞ | 同上 |
 | `StockCompensationWorker`（兩個掃描範圍） | [§8.1](#81-stockcompensationworker庫存補償) | gRPC `RestoreStock` | `stock_tx_records.next_retry_time`（既有） | 5 分鐘 | ∞ | 否 |
 | `AutoRefundWorker` | [§8.2](#82-autorefundworker取消後收到付款的退款) | gRPC `CreateRefund` | `auto_refund_tasks.next_retry_time`（既有） | **120 秒**（下界綁定，見下方註） | ∞ | 否 |
 | `CartCleanupRetryWorker` | [§8.7](#87-cartcleanupretryworker) | gRPC `RemoveItemsByCheckoutId` | `cart_cleanup_retry_tasks.next_retry_time`（既有） | tick × 3 | ∞ | 否 |
@@ -3118,7 +2814,7 @@ javadoc 逐字：「PayUni 狀態碼**不遞增**（91→92→21→31），**不
 
 #### 判定為「不適用」的三支（必答，不得只列適用的）
 
-上表 10 列涵蓋 **9 支**排程（`ShipmentCreationBackstopScheduler` 的重試／放棄兩分支各佔一列）；本服務其餘 **3 支**經[規範 §二](../開發規範/多副本排程搶佔規範.md)六步判定為不需要搶佔，逐支理由如下。**8 + 3 = 11 = 本服務 `@Scheduled` 方法總數**（計數依據見上方盤點範圍註）；上表第 9 支 `PaymentDeadlineScheduler` 走 `SchedulingConfigurer` 註冊、不帶 `@Scheduled`，不計入這個 11。
+上表 8 列涵蓋 **8 支**排程；本服務其餘 **3 支**經[規範 §二](../開發規範/多副本排程搶佔規範.md)六步判定為不需要搶佔，逐支理由如下。**7 + 3 = 10 = 本服務 `@Scheduled` 方法總數（`ShipmentCreationBackstopScheduler` 已隨 B3 刪除）**（計數依據見上方盤點範圍註）；上表第 8 支 `PaymentDeadlineScheduler` 走 `SchedulingConfigurer` 註冊、不帶 `@Scheduled`，不計入這個 10。
 
 > 🔴 **判定為不適用的排程也必須列出理由**：只列適用的，讀者無法分辨「判過了不用改」與「漏掃了」（[規範 §五](../開發規範/多副本排程搶佔規範.md)）。
 
@@ -3217,11 +2913,6 @@ flowchart TD
 | `hawkr.order.auto-complete-batch-size` | `AUTO_COMPLETE_BATCH_SIZE` | 100 | 自動完成批次大小 |
 | `hawkr.order.outbox.publish-interval-ms` | `ORDER_OUTBOX_PUBLISH_INTERVAL_MS` | 5000 | order.paid Outbox 輪詢間隔（§8.10） |
 | `hawkr.order.payout-hold-recheck-seconds` | `ORDER_PAYOUT_HOLD_RECHECK_SECONDS` | 600 | 撥款無時間界 hold（售後進行中／申訴審理中／反查失敗）的重問間隔（[§8.8.1](#881-撥款資格閘門payout-holdbackend3262)） |
-| `hawkr.order.shipment-backstop.enabled` | `ORDER_SHIPMENT_BACKSTOP_ENABLED` | true | 建單兜底開關（§8.11） |
-| `hawkr.order.shipment-backstop.interval-ms` | `ORDER_SHIPMENT_BACKSTOP_INTERVAL_MS` | 300000 | 建單兜底掃描間隔 |
-| `hawkr.order.shipment-backstop.grace-minutes` | `ORDER_SHIPMENT_BACKSTOP_GRACE_MINUTES` | 30 | 付款後寬限期（首次重試前緩衝） |
-| `hawkr.order.shipment-backstop.max-attempts` | `ORDER_SHIPMENT_BACKSTOP_MAX_ATTEMPTS` | 5 | 重試上限，超過取消退款 |
-| `hawkr.order.shipment-backstop.backoff-minutes` | `ORDER_SHIPMENT_BACKSTOP_BACKOFF_MINUTES` | 30 | 重試間隔（容忍較長故障） |
 | `hawkr.order.countdown-recovery-scan-cron` | `COUNTDOWN_RECOVERY_SCAN_CRON` | `0 0 3 * * ?` | 倒數對帳兜底 worker 排程（每日 03:00 UTC，[§5.8.7](#587-事件遺失兜底)） |
 | `order.cleanup.cron` | — | `0 0 2 * * SUN` | TaskCleanupJob 排程 |
 | `order.cleanup.task-retention-days` | — | 30 | 已完成任務保留天數 |

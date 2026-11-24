@@ -222,7 +222,6 @@
 | API | Method | 說明 |
 |-----|--------|------|
 | `/api/v1/app/orders/:order_no` | GET | 取得訂單詳情 |
-| `/api/v1/shipping/*` | GET | 取得物流資訊 |
 
 #### order_payment_details_screen (訂單支付詳情)
 | API | Method | 說明 |
@@ -239,11 +238,6 @@
 |-----|--------|------|
 | `/api/v1/products/:id/reviews` | POST | 提交商品評價 |
 | `/api/v1/media/*` | POST | 上傳評價圖片 |
-
-#### tracking_screen (物流追蹤頁)
-| API | Method | 說明 |
-|-----|--------|------|
-| `/api/v1/shipping/*` | GET | 取得物流追蹤資訊 |
 
 #### dispute_screen (爭議處理頁)
 | API | Method | 說明 |
@@ -472,18 +466,13 @@
 | API | Method | 說明 |
 |-----|--------|------|
 | `/api/v1/app/orders/:order_no?view=seller` | GET | 取得訂單詳情（賣家視角） |
-| `/api/v1/app/orders/:order_no/ship` | POST | 發貨（填寫物流單號） |
+| `/api/v1/app/orders/:order_no/ship` | POST | 發貨 |
 
 #### order_dispute_screen (訂單爭議頁)
 | API | Method | 說明 |
 |-----|--------|------|
 | `/api/v1/disputes/*` | GET | 取得爭議詳情 |
 | `/api/v1/disputes/*` | PUT | 處理爭議 |
-
-#### logistics_tracking_screen (物流追蹤頁)
-| API | Method | 說明 |
-|-----|--------|------|
-| `/api/v1/shipping/*` | GET | 取得物流資訊 |
 
 #### after_sales_screen (售後服務頁)
 | API | Method | 說明 |

@@ -8,10 +8,10 @@
 // 不轉送的事件：StoreClosed 與 StoreReopened（關店可逆：下游的刪除動作等退場（第一段清理）的 StoreRetired；停權與可曝光的變化各有自己的事件）、StoreOpened（舊的 seller.onboarded 在 topology 沒有 queue、notification 也沒有模板）、StorePendingDeletion
 // （等待刪除不另設 routing key，店家不可曝光由 seller.exposure.changed 涵蓋，ADR 2026-10-05-store-exposure-to-legacy 決策 4）、
 // 平台審核的事件（KYCSubmitted、KYCApproved、KYCRejected、KYCCancelled：不再轉成舊的 merchant.verification.*，
-// 審核與收款開通的結果通知由 A8 的 notification 模組承接）、治理事件（A8 的 notification 訂閱）。
+// 審核與收款開通的結果通知由 notification 模組承接）、治理事件（notification 模組訂閱）。
 // review.created、review.hidden 的 consumer 單體不新增（seller 沒有 rating 欄位）。
 //
-// 隨 seller 的消費者（Java product、order、coupon，Go 的 im、social、notification、cart）搬進單體而退場。
+// 隨 seller 的消費者（Java product、order、coupon、cart）搬進單體而退場。通知由 notification 模組直接訂閱單體事件，不經這裡。
 package sellerrelay
 
 import (
@@ -47,7 +47,7 @@ type storeFields struct {
 }
 
 // StoreRetiredArgs 轉成 seller.deleted。關店可逆（終止合作的申覆期間內可以恢復），所以 StoreClosed 不轉送；退場（第一段清理）發的 StoreRetired
-// 才是不可逆的點，下游（product、social、im、notification）此時才刪除店家的資料。
+// 才是不可逆的點，下游此時才刪除店家的資料。
 type StoreRetiredArgs struct{ storeFields }
 
 // StoreSuspendedArgs 轉成 seller.suspended；PeriodID 是 wire 的 suspensionId。

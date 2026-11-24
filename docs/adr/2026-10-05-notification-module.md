@@ -98,3 +98,5 @@ notification-service（設計書 12、13）的現況：
 - 決策 5 加：型別可宣告聚合鍵，未讀時合併成一列（讚、追蹤）；保留期 180 天。
 - 決策 8：寄件地址改為 identity 在每次登入同步的已驗證 email（`identity.ContactEmail`，Clerk 已移除）；Apple 私密轉寄網域登記刪除（沒有 Apple 登入）；寄信服務為 Resend 新帳號（免費額度足夠；真實寄信等網域） 與交易信子網域。follower、post 歸互動分類，行銷只剩 coupon、restock。
 - 決策 9：取貨簡訊候選失效（B3 改賣家自寄，平台不建超商取貨單）。
+
+物流商已依 `2026-11-15-fulfillment-seller-managed-shipping.md` 退場（Java shipping、`payuni-webhook-service` 與 Uber 程式於 B3 刪除）；本檔提到的物流商只作歷史脈絡。

@@ -69,8 +69,8 @@ func TestDeclarationsMatchTheServiceDescriptors(t *testing.T) {
 	if err := Check(svcs); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := len(declarations), methodCount(t); got != want || got != 110 {
-		t.Fatalf("declarations=%d methods=%d，預期 110", got, want)
+	if got, want := len(declarations), methodCount(t); got != want || got != 112 {
+		t.Fatalf("declarations=%d methods=%d，預期 112", got, want)
 	}
 
 	for procedure := range declarations {
@@ -349,6 +349,7 @@ func TestEveryDeclarationHasAnAuditModeAndPaymentWritesAreAudited(t *testing.T) 
 		moderationv1alpha1connect.ModerationAdminServiceDecideCaseProcedure,
 		moderationv1alpha1connect.ModerationAdminServiceReverseHideProcedure,
 		notificationv1alpha1connect.NotificationAdminServiceCreateAnnouncementProcedure,
+		notificationv1alpha1connect.NotificationAdminServiceResendDeliveriesProcedure,
 		paymentv1alpha1connect.PaymentAdminServiceDeletePaymentAccountMappingProcedure,
 		paymentv1alpha1connect.PaymentAdminServiceRetryPaymentAccountCreateProcedure,
 		paymentv1alpha1connect.PaymentAdminServiceRetryPaymentAccountPurgeProcedure,
@@ -485,8 +486,10 @@ func TestNotificationAdminMethodsDeclareTheirOwnPermission(t *testing.T) {
 		perm  adminperm.Permission
 		audit auditMode
 	}{
-		notificationv1alpha1connect.NotificationAdminServiceCreateAnnouncementProcedure: {adminperm.NotificationAnnouncementsCreate, auditAudited},
-		notificationv1alpha1connect.NotificationAdminServiceListAnnouncementsProcedure:  {adminperm.NotificationAnnouncementsList, auditReadOnly},
+		notificationv1alpha1connect.NotificationAdminServiceCreateAnnouncementProcedure:         {adminperm.NotificationAnnouncementsCreate, auditAudited},
+		notificationv1alpha1connect.NotificationAdminServiceListAnnouncementsProcedure:          {adminperm.NotificationAnnouncementsList, auditReadOnly},
+		notificationv1alpha1connect.NotificationAdminServiceResendDeliveriesProcedure:           {adminperm.NotificationDeliveriesResend, auditAudited},
+		notificationv1alpha1connect.NotificationAdminServiceListUnreachedNotificationsProcedure: {adminperm.NotificationUnreachedNotificationsList, auditReadOnly},
 	} {
 		d, ok := declarations[procedure]
 		if !ok || d.permission != want.perm || d.exemptReason != "" || d.audit != want.audit {

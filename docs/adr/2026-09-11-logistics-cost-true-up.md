@@ -99,3 +99,5 @@ provider 的實際調整**不得修改**：
    `2026-09-11-responsibility-based-cost-attribution.md` 管**那筆額外成本算誰的**。兩者是正交的兩個問題，不要混談。
 5. 🔴 **未送達 ⇒ 不向賣家收「配送服務費」仍然成立**（`2026-09-11-responsibility-based-cost-attribution.md` 承接段）
    ——但**額外成本依 `2026-09-11-responsibility-based-cost-attribution.md` 的成因表歸屬**，不因為「沒送到」就沒有人負擔。
+
+物流商已依 `2026-11-15-fulfillment-seller-managed-shipping.md` 退場（Java shipping、`payuni-webhook-service` 與 Uber 程式於 B3 刪除）；本檔提到的物流商只作歷史脈絡。

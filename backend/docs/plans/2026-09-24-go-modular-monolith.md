@@ -222,9 +222,9 @@
   - 違規申訴的期限或「不能申訴」原因欄位（`can_appeal` 以外）。觸發：條款加上期限時。
   - SubmitKYC、統編查詢的限流用程序內計數。觸發：單體多於一個 instance 時改共用儲存。
   - 商業登記非 01 的名稱查詢對照。觸發：取得需要授權 IP 的名稱查詢端點的樣本時。
-  - `SHIPPING_SETUP` 條件放寬成「PayUni 已註冊」並實測 C2C 與宅配能否在審核中建店；物流 Connect 方法宣告 `SHIPPING_SETUP`。觸發：取得 PayUni sandbox 帳號，或物流搬進單體時。
+  - `SHIPPING_SETUP` 條件放寬成「PayUni 已註冊」並實測 C2C 與宅配能否在審核中建店；物流 Connect 方法宣告 `SHIPPING_SETUP`。作廢：超商與宅配開通隨 B3 刪除，不再放寬這個條件（`SHIPPING_SETUP` 的去留見 B3 子計畫）。
   - 物流表單改送鄉鎮代碼，刪 `taiwan_cities_data`、website 的同形表、兩端的臺台轉換與 `townByName`。觸發：開始搬物流模組，或取得 PayUni sandbox 時。
-  - shipping 的 Uber 報價需要經緯度，沒有經緯度的地址報價失敗。觸發：shipping 搬進單體或接上地理編碼時，由那一步決定來源與降級。
+  - shipping 的 Uber 報價需要經緯度，沒有經緯度的地址報價失敗。作廢：Uber 與運費報價隨 B3 刪除（ADR `2026-11-15-fulfillment-seller-managed-shipping.md` 修訂），不再需要經緯度。
   - coupon 收券人清單的電話是空的（電話在 buyer）。觸發：coupon 搬進單體時（A6 crm 接上 buyer 電話查詢時可提前）。
   - sitemap 店家超過 45,000 家要分片（現在全部輸出並回報 Sentry）。觸發：店家數超過 45,000 時。
   - 第 6 刀 code-review 第 2 輪 5 個 nit（記憶滿 500 筆整個清空、`preview-host-noindex` 測試的 reset 位置、`lib/forum` 依賴 `lib/seller` 的共用記憶、`GetStore` 失敗時跳過討論串檢查、sitemap 測試名與斷言不符）。觸發：下次改店家或討論串 guard、sitemap 時一起修。
@@ -347,25 +347,25 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
     - Java 呼叫端與舊 Go 服務遷出後的 media 殘留清理（Java media-service 本身已在 B1-10 刪除）：四個 Java 呼叫端的 `MediaGrpcClient`、`java-proto` 的 `media.proto`、`api/proto/media`、`internal/legacy/gen/media`、CodeMeta 中仍被引用的 `AssetReferenceType` 值。觸發：最後一個 Java 呼叫端（B3、B4、B8、B9）與 Go invoice-service、ai-service 遷出。
     - Java 服務的 21 條上傳流程恢復（子計畫附件 `upload-routing.md` 第三節）。觸發：B3、B4、B8、B9 各自改寫時改用 Go media 的 `Confirm`。
     - 舊 Go 服務的 3 條上傳流程恢復（同附件第四節，B1-D11；評價圖、聊天傳圖已隨 A6-6 改走單體的 `Confirm`，B1-9）。觸發：稅籍證明與發票解鎖佐證是 B10；AI 風格縮圖已在 B1-9 改成 `imageai` 在自己的 transaction 內 `Confirm` 與 `MarkDeleted`。
-    - 服務內部直傳的接線：託運單 PDF 走 `PutSecure`、`PutPublic` 只收圖片（B1-D14）。觸發：B3 fulfillment 改寫；B1 只提供 port 與測試。
+    - 服務內部直傳的接線：託運單 PDF 走 `PutSecure`（B1-D14）。作廢：託運單隨物流商退場不存在（ADR `2026-11-15-fulfillment-seller-managed-shipping.md` 2026-11-24 修訂），B3 不接；`PutPublic` 只收圖片的限制不變，`PutSecure` 留給之後有機敏檔案直傳的模組。
     - 公開圖片 CDN 快取拉長：目前 `Cache-Control: public, max-age=3600`（Will 2026-11-23）。觸發：有了「刪除資產時清 CDN 快取」的機制。
 - [ ] **B2 payment**：計畫與進度見 `2026-11-23-b2-payment.md`。物流財務與責任判定已刪（commit `5883f499e`）。收款模式改為 separate charges and transfers，轉帳機制在 B2 做（收款開通 ADR D20 修訂，Will 2026-11-23）。
   - 不改寫、直接刪（Will 2026-11-23）：PayUni 特有的流程 `AtmReactivationService`、`PendingPaymentReconcile*`、`PaymentReturnController`、`PaymentPageService`、`UnknownPaymentFallbackConsumer`、`PayUniRefund*Consumer`、`RescueRefundConsumer`，由 Stripe 的 webhook（inbox、event id 去重）與冪等鍵取代。
   - `createRefund` 依 D5 修正。
   - 換金流（收款開通 ADR D1、D5）：付款不再走 PayUni，改經 payment port，作品集的 adapter 是 Stripe Connect 測試模式；付款建立、webhook（先寫 inbox、event id 去重）都走 port。`internal/legacy/sellerserver` 回給 Java 的 `payuni_mer_id` 改由 port 的外部帳戶 ID 取代；Java 與 Go 舊服務的 PayUni 程式隨本步刪除。
-- [ ] **B3 fulfillment**
+- [ ] **B3 fulfillment**（不建 `fulfillment` 模組）
   - 子計畫與進度：`2026-11-24-b3-fulfillment.md`（前提重審 P1–P6 已決 2026-11-24：出貨歸 B8 ordering、運費設定歸 seller、物流 port 延後；R1–R6 已決；本段以下的條目若與子計畫衝突，以子計畫為準）。
-  - 出貨主線改成賣家自寄（ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md`）：設計書 69「商家自有出貨」（`fulfillment_mode = SELLER_MANAGED`）從橫向能力升為唯一上線的出貨方式。賣家回填物流業者與追蹤號碼；出貨狀態由賣家更新或買家確認收貨，逾期未出貨、逾期自動完成與配送異常轉售後由伺服器的狀態機決定。運費只用賣家自訂的固定規則，不做即時報價。
-    - 理由：台灣在地物流商的多賣家模式都要簽約（綠界的平台商 PlatformID 要專案合作開通、物流沒有平台商測試編號；PayUni 代理商 API 要簽約，2026-10-29 決定不簽）；國外的 Shippo Platform Account 要人工開通，EasyPost 開子帳號只能用正式金鑰，兩家都不支援台灣超商。作品集要展示的是出貨單與訂單的狀態機、模組分界與事件，自寄就能完整跑通。
-    - 保留供應商中立的物流 port（建單、取標籤、貨態 webhook 先寫 inbox、以事件 ID 去重），每個賣家帶一個外部帳戶 ID 欄位；作品集只放模擬 adapter，用來跑建單到貨態回傳的流程與測試。真實物流商（綠界的平台商模式等）在決定上線並簽約後才寫 adapter。
-    - 不帶過來：PayUni 物流與 `payuni-webhook-service` 的超商、宅配建單與貨態；超商門市電子地圖、追蹤號碼的自動查詢、即時運費報價。client 上依賴這些的介面在本步一起刪或改成自寄流程（UI 流程改動先取得同意）。
-    - 不改寫、直接刪的 Java 程式（Will 2026-11-23）：shipping 除運費規則與出貨狀態外全部（Tcat、PayUni 建單、`ShipmentLabel*`、`BatchHomeLabelService`、`StoreMapService`、`BuyerStorePickupService`、`OnboardingService`、`ShipmentAnomalyService`、貨態與標籤對帳排程）；order 的 `ShipmentCreationBackstopScheduler`、`ShippingFeeGrpcFetcher`。有 client 介面的要先取得 UI 同意：超商門市地圖（buyer-app `store_map_webview_screen.dart`、`store_pickup_form_screen.dart`，website `lib/checkout/store-pickups.ts`）、seller-app 配送異常看板（`features/shipment_anomaly/`）。
-    - `payuni-webhook-service` 整個刪除：B2 拿掉 PayUni 金流、本步拿掉 PayUni 物流、Uber 已裁切後沒有用途；連同 gateway 的 `routes_webhook_simulator.go` 與 `routes_payment.go` 裡的代理。
-    - 開工前：盤點設計書 65–70 裡假設平台串接物流商的段落，改寫或刪除；`internal/legacy/sellerserver` 回給 Java 的物流 `MerId` 隨 Java shipping 退場刪除。
-    - 假日（A3 計畫 10f-4，2026-11-22）：假日資料的擁有者已搬到單體 `internal/platform/bizcalendar`，Java shipping 的 `holidays` 表沒有寫入入口了，但 `HolidayService` 的宅配處理期限還在讀它，資料過期後算出的期限偏早。Java shipping 退場時一併刪除 `HolidayService`、`holidays` 表與 4 支沒有呼叫者的 RPC（`ImportHolidays`、`ImportHolidaysFromContent`、`GetHolidayCoverage`、`GetHolidaysInternal`；`rg -l "GetHolidaysInternal|ImportHolidays|GetHolidayCoverage" backend --glob '*.go' --glob '!**/gen/**' --glob '!*.pb.go'` 無結果）。
+  - 範圍（ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md` 與其 2026-11-24 修訂）：出貨只做賣家自寄；`internal/modules/seller` 擁有賣家的運費設定（固定運費、免運門檻可空、處理天數 1–7、預設 3 個工作日）與純函式報價，經 Connect 對外，賣家設定畫面在本步做；出貨記錄與含出貨的訂單狀態機歸 B8 ordering，不在本步。`internal/arch/modules.go` 刪除 `fulfillment` 模組與指向它的邊。
+    - 理由：台灣在地物流商的多賣家模式都要簽約（綠界的平台商 PlatformID 要專案合作開通、物流沒有平台商測試編號；PayUni 代理商 API 要簽約，2026-10-29 決定不簽）；國外的 Shippo Platform Account 要人工開通，EasyPost 開子帳號只能用正式金鑰，兩家都不支援台灣超商。業界做法（Etsy、eBay、Amazon、Shopee）把賣家自寄的出貨記在訂單底下，獨立出貨模組的必要條件隨物流商退場消失。
+    - 物流 port 與模擬 adapter 延後到決定上線並簽物流合約時（ADR 修訂 D3）；webhook inbox 去重的示範由 B2 payment 承擔。
+    - 不帶過來：PayUni 物流與 `payuni-webhook-service` 的超商、宅配建單與貨態；超商門市電子地圖、追蹤號碼的自動查詢、即時運費報價。client 上依賴這些的介面在本步一起刪（UI 流程改動先取得同意）。
+    - 直接刪、不改寫、不留 stub 也不寫轉接（Will 2026-11-23、2026-11-24）：Java shipping-service 整個（Tcat、PayUni 建單、`ShipmentLabel*`、`BatchHomeLabelService`、`StoreMapService`、`BuyerStorePickupService`、`OnboardingService`、`ShipmentAnomalyService`、貨態與標籤對帳排程、運費規則與 `HolidayService`）、`payuni-webhook-service` 整個（連同 gateway 的 `routes_webhook_simulator.go` 與 `routes_payment.go` 裡的代理）、Uber 程式，以及 Java order、aftersales、product 與 Go invoice-service 裡依賴 shipping 的程式（order 的 `ShipmentCreationBackstopScheduler`、`ShippingFeeGrpcFetcher`）。B3 到 B8 之間 Java 訂單停在已付款、結帳運費固定 0；訂單完成、轉帳觸發、crm 的 `order.completed` 與有已付款訂單的賣家關店在這段期間不會發生（系統未上線）。有 client 介面的要先取得 UI 同意：超商門市地圖（buyer-app `store_map_webview_screen.dart`、`store_pickup_form_screen.dart`，website `lib/checkout/store-pickups.ts`）、seller-app 配送異常看板（`features/shipment_anomaly/`）。
+    - 開工前的設計書盤點已併入子計畫步驟 1、7：設計書 65、06、20–23 改寫成自寄或加退場說明；`internal/legacy/sellerserver` 回給 Java 的物流 `MerId` 隨 Java shipping 退場刪除。
+    - 假日：假日資料的擁有者已搬到單體 `internal/platform/bizcalendar`（A3 計畫 10f-4，2026-11-22）。Java `HolidayService` 與 `holidays` 表隨 shipping 刪除；原先列的 4 支匯入 RPC（`ImportHolidays` 等）在 proto 與程式裡不存在（B3 `interface-inventory.md` D6），沒有要刪的 RPC。
+    - 延後出去的項目：出貨記錄、狀態機與收貨畫面見 B8；退貨物流見 B9；配送溫層欄位與 `shipping_ambient.go` 見 B4、B6。
   - 刪除 Uber 即時配送（ADR `2026-10-27-general-ecommerce-scope-cut.md` D4）：Java shipping 的 Uber 程式、payuni-webhook-service 的 Uber webhook、只服務它們的 proto RPC 與生成物、CodeMeta 的 Uber 值域、`.env.template` 與 `docker-compose-local.yml` 的 Uber 設定、`backend/docs/runbooks/uber-quote-retention/`，4 份 Uber ADR 標 superseded；設計書 03、06、09、58 描述 3003（Uber）的段落與 `backend/docs/runbooks/uber-quote-retention.md` 一併刪除；清單見原執行計畫 `2026-10-27-ecommerce-scope-cut` 的「延後」（計畫已刪除，見 ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂；Will 2026-10-29）。
-  - 上一項的清單與觸發條件的來源是原執行計畫 `2026-10-27-ecommerce-scope-cut` 的「延後」（計畫已刪除，見 ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂）；補充範圍：CodeMeta 的 Uber 值域是 `ShippingMethod` 3003、`UberDeliveryOutcome`、`ShipmentAnomalyType` 的 4 個 UBER 值與錯誤碼 9024（`pkg/errors/bizcode`），Java 仍實作的 proto（order、shipping）裡的 Uber 欄位與 RPC 隨之刪除，client 裡斷言「3003 一律 unsupported」的回歸測試（website `lib/checkout/shipping-requirements.unit.test.ts`、`lib/seller/shipment-provider.unit.test.ts`，buyer-app `test/core/codemeta/shipping_presentation_test.dart`）在值域刪除時一起改。
-  - 4 份 Uber ADR 在 B3 刪 Java 程式時標 superseded（指向 ADR `2026-10-27-general-ecommerce-scope-cut.md` D4）：`2026-09-11-uber-commerce-model-seller-direct`、`2026-09-11-uber-logistics-fee-charge-trigger`、`2026-09-14-uber-create-idempotency-precommit-key`、`2026-09-06-uber-webhook-slice-in-payuni-webhook-service`。
+  - 上一項的清單與觸發條件的來源是原執行計畫 `2026-10-27-ecommerce-scope-cut` 的「延後」（計畫已刪除，見 ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂）；補充範圍：CodeMeta 的 Uber 值域是 `ShippingMethod` 3003、`UberDeliveryOutcome`、`ShipmentAnomalyType` 的 4 個 UBER 值與錯誤碼 9024（`pkg/errors/bizcode`），Java 仍實作的 proto（order、shipping）裡的 Uber 欄位與 RPC 隨之刪除，client 裡斷言「3003 一律 unsupported」的回歸測試（website `lib/checkout/shipping-requirements.unit.test.ts`、`lib/seller/shipment-provider.unit.test.ts`，buyer-app `test/core/codemeta/shipping_presentation_test.dart`）在值域刪除時一起改。對外契約不帶配送方式：`ShippingMethod` 3001、3002、3003 刪除，3005（RFQ 站外出貨）由 procurement 以自己的欄位表達（B3 R2，Will 2026-11-24）。
+  - 4 份 Uber ADR 與免運補貼、物流財務、運費快取、結帳免運降級 4 份 ADR 在 B3 標 superseded（指向 ADR `2026-11-15-fulfillment-seller-managed-shipping.md`）：`2026-09-11-uber-commerce-model-seller-direct`、`2026-09-11-uber-logistics-fee-charge-trigger`、`2026-09-14-uber-create-idempotency-precommit-key`、`2026-09-06-uber-webhook-slice-in-payuni-webhook-service`、`2026-09-11-free-shipping-subsidy-attribution`、`2026-09-11-logistics-finance-domain-ownership`、`2026-09-18-shipping-fee-cache-no-warmup-no-scheduler`、`2026-09-18-checkout-free-shipping-and-degradation`。
 - [ ] **B4 catalog**
   - 計畫與進度見 `2026-11-24-b4-catalog.md`（本段以下的條目若與子計畫衝突，以子計畫為準）。
   - 不建 `store_state` 讀取模型：catalog 的列表在 SQL 內 join `seller.pub_exposable_stores(at)`（時間用請求的 clock），取代停權快照（ADR 2026-09-24 修訂段，2026-10-18；簡報 `backend/docs/plans/2026-10-18-a7-social/d3-read-model-brief.md` §4.2）。
@@ -381,9 +381,18 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
     - CodeMeta `ShippingTemperature`、`ProductCertification*` 值域與 design token 之外的生成物。
 - [x] **B5 productimport**：不改寫，整個移除（Will 2026-11-15 範圍裁切，ADR `2026-10-27-general-ecommerce-scope-cut` 文末的 2026-11-15 修訂）。Java product-import-service、gateway 的 `/app/product_import_jobs` 端點、product 與 media 的匯入專用 RPC 與資料表、MQ 拓撲與 CodeMeta 值域一併刪除。
 - [ ] **B6 cart**
+  - 運費預覽用 seller 模組的報價純函式（in-process 呼叫，`cart → seller` 是 `modules.go` 既有的邊；B3 交付，Will 2026-11-24）：輸入賣家的運費設定與商品小計，回傳運費；cart 不存運費或配送方式，結帳時由 B8 ordering 呼叫同一個函式並把結果快照進訂單。
   - 延後項（原執行計畫 `2026-10-27-ecommerce-scope-cut`「延後」，計畫已刪除，見 ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂，2026-10-29）：購物車與結帳契約裡的配送溫層（`cart.proto` 的 `delivery_temp`、`溫層`，order 的 `deliveryTemp`）。買家端 client 現在原樣回傳伺服器配送選項的 `deliveryTemp`（ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂的 D8：Java 以它查運費、材積上限、免運與運費負擔，寫死常溫會讓冷藏、冷凍商品算錯）：website `lib/checkout/draft.ts`、`lib/checkout/repo.ts`、`features/cart/cartUiStore.ts`、`features/checkout/screens/CheckoutClient.tsx`，buyer-app `features/cart/data/cart_repository.dart`、`checkout_payment_sheet.dart`。觸發：B6 cart 改寫（與 B8 ordering 的結帳）不帶溫層欄位時，三處 client 的欄位與測試一起刪。
 - [ ] **B7 coupon**：計畫與進度見 `2026-11-23-b7-coupon.md`。
 - [ ] **B8 ordering**
+  - 出貨記錄、含出貨的訂單狀態機歸 ordering，不建 `fulfillment` 模組（ADR `2026-11-15-fulfillment-seller-managed-shipping.md` 2026-11-24 修訂 D1，B3 `premise-review.md` P1；Will 2026-11-24）。細節（表結構、狀態名、事件）在 B8 計畫決定，本條只列範圍：
+    - 出貨記錄 0..N 筆（承運商、追蹤號碼、出貨時間），作品集先開放整單一筆；訂單的出貨狀態由出貨記錄推導。
+    - 含出貨的訂單狀態機：賣家回填出貨；逾期未出貨取消（期限用賣家運費設定的處理天數）；逾期自動完成；買家確認收貨；買家回報「未收到」轉售後（B9）。
+    - 承運商清單（賣家回填時選用）。
+    - client 的賣家出貨畫面與買家收貨畫面（UI 流程改動先取得同意）。
+    - 下游由 ordering 呼叫，不反向讀出貨狀態：ordering→invoice 的開票呼叫、ordering→payment 的轉帳觸發。
+    - 結帳呼叫 seller 的報價純函式（B3 交付），把運費快照進訂單；契約不帶配送方式。
+    - 開工前先補出貨的特性測試：B3 沒有保留任何 Java 出貨或運費端點的語意，這份責任在本步（B3 計畫「驗收基線」）。
   - checkout 在單一 transaction 內完成：鎖購物車、扣庫存、建單、鎖定優惠券。
   - 發票快照移交給 invoice。
   - 訂單上的物流投影欄與付款副本刪除。
@@ -392,7 +401,7 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - agent 的「接受報價 → 建單」改在同一個 transaction 內完成，並標記 RFQ ADR 為 superseded。
 - [ ] **B9 aftersales**
   - 作品集範圍（Will 2026-11-23）：只做主線——買家取消（未出貨）→ 退款；買家申請退貨 → 賣家同意或拒絕 → 買家自寄並回填追蹤號碼 → 賣家確認收貨 → 退款；逾期由伺服器狀態機推進（賣家不回應、買家逾期未寄）。不做：平台介入裁決（`AfterSaleResolutionService`）與只為它存在的流程；部分退款只保留「指定金額，不超過可退上限」一種，不照搬各種變形。
-  - 不改寫、直接刪（Will 2026-11-23）：平台建退貨物流單的 `ShipmentLabelConsumer`、`AfterSaleLabelRetryService`、`ShipmentCreationFailedConsumer`、`ReturnShipmentStatusConsumer`、`StorePickupTimeoutScheduler`，與 PayUni 特有的 `UnknownRefundFallbackConsumer`，以及只發營運告警的 `ReturnStuckAlertScheduler`（作品集沒有人值班接告警）；退貨改成買家自寄、回填追蹤號碼。
+  - 不改寫、直接刪（Will 2026-11-23）：平台建退貨物流單的 `ShipmentLabelConsumer`、`AfterSaleLabelRetryService`、`ShipmentCreationFailedConsumer`、`ReturnShipmentStatusConsumer`、`StorePickupTimeoutScheduler`，與 PayUni 特有的 `UnknownRefundFallbackConsumer`，以及只發營運告警的 `ReturnStuckAlertScheduler`（作品集沒有人值班接告警）；退貨改成買家自寄、回填追蹤號碼。退貨物流是買家自寄：買家填承運商與追蹤號碼，賣家確認收貨，不經物流商（ADR `2026-11-15-fulfillment-seller-managed-shipping.md` 2026-11-24 修訂；B3 不做，B9 開工時做）。
   - 取消、退款任務、優惠券補償在同一個 transaction 內完成。
   - 設定「進行中售後」旗標。
   - `refund_tasks`、`auto_refund_tasks`、`payment_refunds` 收斂成一張退款命令表：payment 的退款列（B2 `RequestRefund`，呼叫端冪等鍵）加上 payment 的 job 就是重試機制，aftersales 不另建重試任務表。

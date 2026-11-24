@@ -1,0 +1,76 @@
+{
+ "mutants": [
+  {
+   "id": "resend-ignores-suppression",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/reach/reach.go",
+   "old": "deliver.ReasonNoEmailAddress, deliver.ReasonEmailRejected, deliver.ReasonRetriesExhausted,\n}",
+   "new": "deliver.ReasonNoEmailAddress, deliver.ReasonEmailRejected, deliver.ReasonRetriesExhausted, deliver.ReasonSuppressed,\n}",
+   "test": "internal/modules/notification ^TestResendRequeuesOnlyEligibleFailedDeliveriesOnce$",
+   "why": "Resend treats email_suppressed failures as resendable, so a suppressed address is requeued."
+  },
+  {
+   "id": "resend-no-longer-valid",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/reach/reach.go",
+   "old": "deliver.ReasonNoEmailAddress, deliver.ReasonEmailRejected, deliver.ReasonRetriesExhausted,\n}",
+   "new": "deliver.ReasonNoEmailAddress, deliver.ReasonEmailRejected, deliver.ReasonRetriesExhausted, deliver.ReasonNoLongerValid,\n}",
+   "test": "internal/modules/notification ^TestResendRequeuesOnlyEligibleFailedDeliveriesOnce$",
+   "why": "Resend requeues deliveries that were deliberately not sent because the source fact stopped holding."
+  },
+  {
+   "id": "resend-deleted-recipient",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/reach/reach.go",
+   "old": "deliver.ReasonNoEmailAddress, deliver.ReasonEmailRejected, deliver.ReasonRetriesExhausted,\n}",
+   "new": "deliver.ReasonNoEmailAddress, deliver.ReasonEmailRejected, deliver.ReasonRetriesExhausted, deliver.ReasonRecipientGone,\n}",
+   "test": "internal/modules/notification ^TestResendRequeuesOnlyEligibleFailedDeliveriesOnce$",
+   "why": "Resend requeues deliveries whose recipient was deleted or retired."
+  },
+  {
+   "id": "resend-already-succeeded",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/store/reach.sql.go",
+   "old": "WHERE d.status = 'FAILED_PERMANENT'\n      AND d.failure_reason = ANY($2::text[])\n      AND d.updated_at >= $3::timestamptz AND d.updated_at < $4::timestamptz\n      AND ($5::text IS NULL OR d.channel = $5::text)\n      AND ($6::bigint IS NULL OR d.account_id = $6::bigint)\n      AND ($7::text[] IS NULL OR i.type = ANY($7::text[]))\n    ORDER BY d.updated_at, d.id\n    LIMIT $8\n    FOR UPDATE OF d SKIP LOCKED\n)\nUPDATE notification.deliveries d\nSET status = 'PENDING', failure_reason = NULL, updated_at = $1::timestamptz\nFROM picked\nWHERE d.id = picked.id AND d.status = 'FAILED_PERMANENT'",
+   "new": "WHERE d.status IN ('FAILED_PERMANENT', 'SENT')\n      AND (d.failure_reason = ANY($2::text[]) OR d.status = 'SENT')\n      AND d.updated_at >= $3::timestamptz AND d.updated_at < $4::timestamptz\n      AND ($5::text IS NULL OR d.channel = $5::text)\n      AND ($6::bigint IS NULL OR d.account_id = $6::bigint)\n      AND ($7::text[] IS NULL OR i.type = ANY($7::text[]))\n    ORDER BY d.updated_at, d.id\n    LIMIT $8\n    FOR UPDATE OF d SKIP LOCKED\n)\nUPDATE notification.deliveries d\nSET status = 'PENDING', failure_reason = NULL, updated_at = $1::timestamptz\nFROM picked\nWHERE d.id = picked.id",
+   "test": "internal/modules/notification ^TestResendRequeuesOnlyEligibleFailedDeliveriesOnce$",
+   "why": "Resend selects SENT deliveries too, so an already succeeded delivery would be reset and sent twice."
+  },
+  {
+   "id": "unreached-inbox-counts-as-reached",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/store/reach.sql.go",
+   "old": "    JOIN notification.intents i ON i.id = d.intent_id\n    WHERE i.created_at >= $1::timestamptz",
+   "new": "    JOIN notification.intents i ON i.id = d.intent_id\n    WHERE i.created_at >= $1::timestamptz AND NOT EXISTS (SELECT 1 FROM notification.inbox_items x WHERE x.account_id = d.account_id AND x.audience = d.audience)",
+   "test": "internal/modules/notification ^TestUnreachedCountsOnlyTransactionalRecipientsWithoutAnySuccessfulChannel$",
+   "why": "The unreached count treats a recipient with an inbox row as reached although the inbox is not a channel."
+  },
+  {
+   "id": "unreached-list-inbox-counts-as-reached",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/store/reach.sql.go",
+   "old": "\nJOIN notification.intents i ON i.id = d.intent_id\nWHERE i.created_at >= $1::timestamptz",
+   "new": "\nJOIN notification.intents i ON i.id = d.intent_id\nWHERE i.created_at >= $1::timestamptz AND NOT EXISTS (SELECT 1 FROM notification.inbox_items x WHERE x.account_id = d.account_id AND x.audience = d.audience)",
+   "test": "internal/modules/notification ^TestUnreachedCountsOnlyTransactionalRecipientsWithoutAnySuccessfulChannel$",
+   "why": "The unreached list treats a recipient with an inbox row as reached although the inbox is not a channel."
+  },
+  {
+   "id": "unreached-counts-pending",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/store/reach.sql.go",
+   "old": "HAVING bool_and(d.status = 'FAILED_PERMANENT' AND d.failure_reason <> ALL($3::text[]))\n) g",
+   "new": "HAVING bool_and(d.status <> 'SENT' AND (d.failure_reason IS NULL OR d.failure_reason <> ALL($3::text[])))\n) g",
+   "test": "internal/modules/notification ^TestUnreachedCountsOnlyTransactionalRecipientsWithoutAnySuccessfulChannel$",
+   "why": "The unreached count includes deliveries still pending, which have not failed yet."
+  },
+  {
+   "id": "unreached-any-failure-counts",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/store/reach.sql.go",
+   "old": "HAVING bool_and(d.status = 'FAILED_PERMANENT' AND d.failure_reason <> ALL($3::text[]))\n) g",
+   "new": "HAVING bool_or(d.status = 'FAILED_PERMANENT' AND d.failure_reason <> ALL($3::text[]))\n) g",
+   "test": "internal/modules/notification ^TestUnreachedCountsOnlyTransactionalRecipientsWithoutAnySuccessfulChannel$",
+   "why": "The unreached count includes a recipient whose other channel succeeded."
+  }
+ ]
+}

@@ -7,15 +7,11 @@ import (
 	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
-	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
-	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification"
-	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
-	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/config"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -99,29 +95,7 @@ func newNotification(d *db.DB, id *identity.Module, b *buyer.Module, sl *seller.
 
 // subscribeNotification 讓來源事件在發布的 transaction 內排成通知意圖 job（D10），刪除與退場事件排成個資清除 job（D16）；
 // 停權與刪帳號另在同一個 transaction 刪掉帳號的裝置 token（唯一不只排 job 的訂閱者，通知 ADR 決策 4）。
-func subscribeNotification(bus *events.Bus, m *notification.Module) {
-	events.Subscribe[accountsuspension.Suspended](bus, m.OnSuspended)
-	events.Subscribe[accountsuspension.Suspended](bus, m.PurgeTokensOnSuspended)
-	events.Subscribe[accountsuspension.Unsuspended](bus, m.OnUnsuspended)
-	events.Subscribe[social.CommentCreated](bus, m.OnCommentCreated)
-	events.Subscribe[social.CommentReplied](bus, m.OnCommentRepliedToBuyer)
-	events.Subscribe[social.CommentReplied](bus, m.OnCommentRepliedToStore)
-	events.Subscribe[social.CommentLiked](bus, m.OnCommentLikedBuyerAuthor)
-	events.Subscribe[social.CommentLiked](bus, m.OnCommentLikedStoreAuthor)
-	events.Subscribe[social.PostLiked](bus, m.OnPostLiked)
-	events.Subscribe[social.PostPublished](bus, m.OnPostPublished)
-	events.Subscribe[buyer.SellerFollowed](bus, m.OnSellerFollowed)
-	events.Subscribe[buyer.RestockTargeted](bus, m.OnRestockTargeted)
-	events.Subscribe[review.ReviewCreated](bus, m.OnReviewCreated)
-	events.SubscribeNamed(bus, coupon.ExpiringHandler, m.OnVoucherExpiring)
-	events.Subscribe[im.MessageSent](bus, m.OnMessageSentToBuyer)
-	events.Subscribe[im.MessageSent](bus, m.OnMessageSentToStore)
-	events.Subscribe[identity.AccountDeleted](bus, m.OnAccountDeleted)
-	events.Subscribe[identity.AccountDeleted](bus, m.PurgeTokensOnAccountDeleted)
-	events.Subscribe[buyer.BuyerDeleted](bus, m.OnBuyerDeleted)
-	events.Subscribe[seller.StoreRetired](bus, m.OnStoreRetired)
-	m.SubscribeGovernance(bus)
-}
+func subscribeNotification(bus *events.Bus, m *notification.Module) { m.Subscribe(bus) }
 
 func readSuppressionKeys(e *config.Env) notification.SuppressionKeys {
 	cur, prev := e.StringOr("EMAIL_SUPPRESSION_HMAC_KEY", ""), e.StringOr("EMAIL_SUPPRESSION_HMAC_KEY_PREVIOUS", "")

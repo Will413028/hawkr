@@ -43,7 +43,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/gen/buyer/buyerconnect"
 	"github.com/Will413028/hawkr/backend/internal/legacy/gen/payment/paymentconnect"
 	"github.com/Will413028/hawkr/backend/internal/legacy/gen/seller/sellerconnect"
-	"github.com/Will413028/hawkr/backend/internal/legacy/imrelay"
 	"github.com/Will413028/hawkr/backend/internal/legacy/invoiceservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/orderservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/paymentserver"
@@ -52,7 +51,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/reviewrelay"
 	"github.com/Will413028/hawkr/backend/internal/legacy/sellerrelay"
 	"github.com/Will413028/hawkr/backend/internal/legacy/sellerserver"
-	"github.com/Will413028/hawkr/backend/internal/legacy/socialrelay"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant"
@@ -207,13 +205,11 @@ func runServe(ctx context.Context) error {
 	}
 	bus := events.NewBus()
 	calendar := bizcalendar.New(d, adminaudit.New(d, time.Now), bus)
-	// 刪除帳號、確認代行的寫入時，以同一個 transaction 排入送給舊服務的事件（RabbitMQ 的 account.deleted、
-	// delegation.operation.completed），由 worker 送出。
+	// 刪除帳號的寫入時，以同一個 transaction 排入送給舊服務的事件（RabbitMQ 的 account.deleted），由 worker 送出。
 	enqueueLegacy := func(ctx context.Context, a rabbitmq.PublishArgs) error {
 		return jc.Enqueue(ctx, a, rabbitmq.InsertOpts())
 	}
 	events.Subscribe(bus, accountservice.OnAccountDeleted(enqueueLegacy))
-	events.Subscribe(bus, delegationservice.OnDelegationOperationCompleted(enqueueLegacy))
 	subscribeBuyerEvents(bus, jc)
 	id := newIdentity(d, bus, idc, log)
 	webLogin, err := newWebLogin(verifierCtx, id, web, idc, log)
@@ -249,7 +245,6 @@ func runServe(ctx context.Context) error {
 	subscribeBizCalendarRelay(bus, jc)
 	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: sellerModule, NewID: uuid.NewV7, Now: time.Now, Logger: log}
 	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, delegation.NewScheduleAuthorizer(delegationDeps), log)
-	subscribeSocialRelay(bus, jc)
 	reviewModule := newReview(d, bus, jc, buyerModule, sellerModule, med, orders, log)
 	imModule := newIM(d, bus, jc, buyerModule, sellerModule, med, orders, log)
 	crmModule := newCRM(d, bus, jc, buyerModule, sellerModule, log)
@@ -472,7 +467,6 @@ func runWorker(ctx context.Context) error {
 	subscribePaymentRelay(bus, jc)
 	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: sellerModule, NewID: uuid.NewV7, Now: time.Now, Logger: log}
 	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, delegation.NewScheduleAuthorizer(delegationDeps), log)
-	subscribeSocialRelay(bus, jc)
 	reviewModule := newReview(d, bus, jc, buyerModule, sellerModule, med, orders, log)
 	imModule := newIM(d, bus, jc, buyerModule, sellerModule, med, orders, log)
 	crmModule := newCRM(d, bus, jc, buyerModule, sellerModule, log)
@@ -526,9 +520,7 @@ func runWorker(ctx context.Context) error {
 	procurementSweep := addProcurementRelay(workers, procurementModule, publisher, jc)
 	buyerrelay.NewWorker(buyerModule, products, sellerModule, jc, log).AddWorkers(workers)
 	sellerrelay.NewWorker(sellerModule, jc, log).AddWorkers(workers)
-	socialrelay.NewWorker(buyerModule, sellerModule, socialModule, jc, log).AddWorkers(workers)
 	reviewrelay.NewWorker(reviewModule, buyerModule, sellerModule, jc, log).AddWorkers(workers)
-	imrelay.NewWorker(imModule, buyerModule, sellerModule, jc, log).AddWorkers(workers)
 	bizcalendarrelay.NewWorker(calendar, invoices, time.Now, log).AddWorkers(workers)
 	periodic := append(id.PeriodicJobs(), buyerModule.PeriodicJobs()...)
 	periodic = append(periodic, deletion.PeriodicJobs()...)

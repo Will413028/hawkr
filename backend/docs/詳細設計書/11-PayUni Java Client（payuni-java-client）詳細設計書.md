@@ -10,9 +10,7 @@
 - 核心功能：
     - AES-256-GCM 加密 / 解密 + SHA256 簽章 / 驗簽（與 PayUni PHP 官方範例完全相容）
     - 金流 API（信用卡 UPP、Apple Pay、Google Pay、ATM、交易查詢、退款／取消、ATM 轉匯退款、撥款與撥款查詢、代理商收付；逐項見 §7.1）
-    - 物流 API（超商／宅配建單與退貨單、標籤取號與列印、黑貓取件、物流查詢、建店；逐項見 §8.1）
     - Webhook 解析器（自動分類事件類型 + 強型別事件物件；型別與判別條件見 §10.1）
-    - 物流 Enum（貨態碼 / 物流商 / 通路 / 溫層 / 服務類型 / 配送時段，見 §9）
     - 代理商模式（IsPlatForm=1）透明支援
 - 設計原則：
     - **不依賴 Spring**：純 Java 模組，使用端自行配置 Bean
@@ -69,34 +67,6 @@ services/java/shared/payuni-java-client/
 │   │   ├── PayUniPaymentEndpoint.java       API 路徑/版本常數
 │   │   └── model/
 │   │       └── UppFormData.java             UPP 表單資料 (Record)
-│   ├── shipping/                        — 物流 API
-│   │   ├── ShippingClient.java              物流客戶端
-│   │   ├── PayUniShippingEndpoint.java      API 路徑/版本常數
-│   │   ├── ShipType.java                    物流商（7-ELEVEN / 大嘴鳥）
-│   │   ├── LgsType.java                     通路類型（B2C / C2C / HOME / C2B）
-│   │   ├── GoodsType.java                   商品溫層（常溫 / 冷凍 / 冷藏）
-│   │   ├── ServiceType.java                 服務類型（取貨付款 / 取貨不付款）
-│   │   ├── DeliveryTimeTag.java             配送時段
-│   │   ├── request/                         請求物件 (Records)
-│   │   │   ├── CallTcatRequest.java
-│   │   │   ├── CreateCvsShipmentRequest.java
-│   │   │   ├── CreateHomeRefundRequest.java
-│   │   │   ├── CreateHomeShipmentRequest.java
-│   │   │   ├── OnboardCvsRequest.java
-│   │   │   ├── OnboardHomeRequest.java
-│   │   │   ├── PrintCvsLabelRequest.java
-│   │   │   ├── QueryShipmentRequest.java
-│   │   │   └── ScheduleHomeLabelRequest.java
-│   │   └── response/                        回應物件 (Records)
-│   │       ├── CallTcatResponse.java
-│   │       ├── CreateCvsShipmentResponse.java
-│   │       ├── CreateHomeRefundResponse.java
-│   │       ├── CreateHomeShipmentResponse.java
-│   │       ├── OnboardShippingResponse.java
-│   │       ├── PrintCvsLabelDirectResponse.java
-│   │       ├── PrintCvsLabelResponse.java
-│   │       ├── QueryShipmentResponse.java
-│   │       └── ScheduleHomeLabelResponse.java
 │   └── webhook/                         — Webhook 解析
 │       ├── PayUniWebhookParser.java         驗簽 + 解密 + 自動分類
 │       ├── WebhookType.java                 事件類型 Enum（§10.1）
@@ -105,8 +75,6 @@ services/java/shared/payuni-java-client/
 │       └── event/                           強型別事件物件（§10.5）
 │           ├── PayUniWebhookEvent.java      Sealed Interface
 │           ├── PaymentUopEvent.java
-│           ├── ShippingStatusEvent.java
-│           ├── ShippingPrintEvent.java
 │           ├── AgentNotifyEvent.java
 │           ├── RefundNotifyEvent.java
 │           └── RefundAcceptedEvent.java
@@ -126,7 +94,7 @@ services/java/shared/payuni-java-client/
 | GroupId | ArtifactId | Version | Scope | 說明 |
 |---------|-----------|---------|-------|------|
 | `org.slf4j` | `slf4j-api` | 2.0.11 | **provided** | 日誌 API（由使用端提供實作） |
-| `com.squareup.okhttp3` | `okhttp` | 4.12.0 | **optional** | HTTP 客戶端（僅 PaymentClient / ShippingClient 需要） |
+| `com.squareup.okhttp3` | `okhttp` | 4.12.0 | **optional** | HTTP 客戶端（僅 PaymentClient 需要） |
 | `com.fasterxml.jackson.core` | `jackson-databind` | 2.16.1 | **optional** | JSON 解析（僅 PayUniHttpClient 需要） |
 | `org.junit.jupiter` | `junit-jupiter` | 5.10.1 | test | 單元測試 |
 | `org.slf4j` | `slf4j-simple` | 2.0.11 | test | 測試用日誌實作 |
@@ -183,11 +151,6 @@ public class PayUniConfig {
         return new PaymentClient(httpClient, "https://api.payuni.com.tw",
                 "https://your-domain.com/webhooks/payuni/payment",
                 "https://your-domain.com/payment/return");
-    }
-
-    @Bean
-    public ShippingClient shippingClient(PayUniHttpClient httpClient) {
-        return new ShippingClient(httpClient);
     }
 }
 ```
@@ -323,7 +286,7 @@ public PayUniHttpClient(PayUniCryptoService cryptoService, String baseUrl, Objec
 
 ```mermaid
 sequenceDiagram
-    participant Client as PaymentClient / ShippingClient
+    participant Client as PaymentClient
     participant Http as PayUniHttpClient
     participant Crypto as PayUniCryptoService
     participant PayUni as PayUni API
@@ -393,7 +356,7 @@ public record PayUniApiResponse(
 
 **類別**：`io.github.will413028.hawkr.payuni.http.PayUniRequestLogger`
 
-金流爭議稽核需要「我方送了什麼、PayUni 回了什麼、耗時多久、驗簽/解密是否通過」的完整落庫（落庫設計見 [05 §11](./05-支付服務（Payment%20Service）詳細設計書.md#11-payuni-互動-audit-loggingpayuni_audit_logs)、[06 §10](./06-物流微服務（Shipping%20Service）詳細設計書.md#10-payuni-互動-audit-loggingpayuni_audit_logs)）。本 client 只負責在**每次 exchange 結束時觸發一次 hook**，不負責 DB。
+金流爭議稽核需要「我方送了什麼、PayUni 回了什麼、耗時多久、驗簽/解密是否通過」的完整落庫（落庫設計見 [05 §11](./05-支付服務（Payment%20Service）詳細設計書.md#11-payuni-互動-audit-loggingpayuni_audit_logs)）。本 client 只負責在**每次 exchange 結束時觸發一次 hook**，不負責 DB。
 
 **介面（單一聚合 hook）**：
 
@@ -441,7 +404,7 @@ public interface PayUniRequestLogger {
 
 ```mermaid
 sequenceDiagram
-    participant Client as PaymentClient / ShippingClient
+    participant Client as PaymentClient
     participant Http as PayUniHttpClient
     participant PayUni as PayUni API
     participant Logger as PayUniRequestLogger（服務端實作）
@@ -462,7 +425,7 @@ sequenceDiagram
     Http-->>Client: PayUniApiResponse / 拋例外
 ```
 
-**注入**：服務端 `PayUniConfig` 建 `PayUniHttpClient` 後 `client.setRequestLogger(auditLogger)`（payment 見 05 §11.4，shipping 見 06 §10）。
+**注入**：服務端 `PayUniConfig` 建 `PayUniHttpClient` 後 `client.setRequestLogger(auditLogger)`（見 05 §11.4）。
 
 ---
 
@@ -538,7 +501,7 @@ public PaymentClient(
 | 10 | `PayUniApiResponse cancelOfflineRefund(String merId, String providerTradeNo)` | `/api/trade/offline/cancel_refund` | v1.0 | 取消 ATM 退款轉匯（僅限發動退款當日可取消） |
 | 11 | **`PayUniApiResponse grant(String agentId, String merId, String providerTradeNo, long amount)`** | `/api/trade/grant` | v1.0 | **代理商發動撥款指示。與其他 API 不同，外層使用 AgentID 而非 MerID，不帶 IsPlatForm（透過 PayUniHttpClient.callAgentApi 呼叫）** |
 | 12 | `PayUniApiResponse grantQuery(String merId, String queryDate, int page)` | `/api/trade/grant_query` | v1.0 | 撥款入帳明細查詢。外層用 **MerID + IsPlatForm=1**（走 `callApi`），與 `grant` 的 AgentID 外層不同。`queryDate` 為 `YYYY-MM-DD`（PayUni 台北時區日曆日，限查 30 天內）；每頁固定 500 筆，`page` 從 1 起。回傳 `Result[]`（`TradeNo` / `ExecuteAmt` / `FundsAmt` / `Type`）＋ `PageInfo`（`Current` / `Total`） |
-| 13 | `PayUniApiResponse agentFee(String agentId, String merId, String tradeNo, long amount, String feeType, String balType, String agentMerId)` | `/api/agent/agent_fee` | v1.0 | 代理商多功能收付（向賣家收費／退還）。`feeType` 物流＝4；`balType` 1＝正向（向賣家收）、2＝負向（退還賣家）；`agentMerId` 為 null／空白時依平台預設。🔴 `amount` 是**實際要送出的 gross**，gross-up 由呼叫端先做完 |
+| 13 | `PayUniApiResponse agentFee(String agentId, String merId, String tradeNo, long amount, String feeType, String balType, String agentMerId)` | `/api/agent/agent_fee` | v1.0 | 代理商多功能收付（向賣家收費／退還）。`balType` 1＝正向（向賣家收）、2＝負向（退還賣家）；`agentMerId` 為 null／空白時依平台預設。🔴 `amount` 是**實際要送出的 gross**，gross-up 由呼叫端先做完 |
 | 14 | `PayUniApiResponse agentFeeQuery(String agentId, String merId, String tradeNo, long amount)` | `/api/agent/agent_fee_query` | v1.0 | 多功能收付交易查詢。查詢 key 是 **(MerID, TradeNo, Amt)** 三元組 ⇒ `amount` 必須是當初送出的那個 gross，帶錯金額查不到。「查不到」與「尚未撥款」可分辨：前者無此筆、後者 `FundDate='0000-00-00'`，呼叫端要分開處置。🔴 回傳的 `Fee` 是**實際手續費**，是「平台到底收到多少」的唯一來源，**不得用預估值冒充** |
 | 15 | `Map<String, String> parseWebhook(String encryptInfo, String hashInfo)` | — | — | Webhook 解析（驗簽失敗回傳 null） |
 
@@ -644,288 +607,9 @@ flowchart TD
 
 ---
 
-### **8. 物流 API (Shipping)**
+### **8–9. 物流 API 與物流 Enum（已退場）**
 
-#### **8.1 ShippingClient**
-
-**類別**：`io.github.will413028.hawkr.payuni.shipping.ShippingClient`
-
-**建構子**：
-
-```java
-public ShippingClient(PayUniHttpClient httpClient)
-public ShippingClient(PayUniHttpClient httpClient, String notifyUrl)
-```
-
-`notifyUrl` 為物流 webhook 回調位址；不帶時由呼叫端自行在 request 內指定。
-
-**Public API**：
-
-| # | 方法簽名 | PayUni API | 版本 | 說明 |
-|---|---------|-----------|------|------|
-| 1 | `CreateCvsShipmentResponse createCvsShipment(String merId, CreateCvsShipmentRequest req)` | `/api/logistics/trade` | v1.3 | 超商物流單建立 |
-| 2 | `CreateHomeShipmentResponse createHomeShipment(String merId, CreateHomeShipmentRequest req)` | `/api/home_delivery/trade` | v1.2 | 宅配單建立（背景） |
-| 3 | `CreateHomeRefundResponse createHomeRefund(String merId, CreateHomeRefundRequest req)` | `/api/home_delivery/refund` | v1.0 | 宅配退貨單建立（黑貓退貨）。黑貓司機於 `ShipDate` 至退貨人地址收件 |
-| 4 | `ScheduleHomeLabelResponse scheduleHomeLabel(String merId, ScheduleHomeLabelRequest req)` | `/api/home_delivery/get_obt_number_pdf` | v1.0 | 預約宅配取號（PDF 標籤） |
-| 5 | `String scheduleHomeLabelHtml(String merId, ScheduleHomeLabelRequest req)` | 同上 | v1.0 | 同一支 API 的 **HTML 回傳版**（PayUni 實際回的是 HTML form 不是 JSON）。二階段 PDF 下載用：先取 form 參數，再 POST `cat_file_download` 取 PDF |
-| 6 | `PrintCvsLabelDirectResponse printCvsLabel(String merId, PrintCvsLabelRequest req)` | `/api/logistics/print_label` | v1.0 | 超商出貨單列印（後端代理模式）。PayUni 回 HTML：成功含 `<img src="...">`，處理中含 `window.alert("...LAB02022")`。無法解析圖片 URL 或回處理中 ⇒ 拋 `PayUniApiException` |
-| 7 | `void triggerCvsPrint(String merId, PrintCvsLabelRequest req)` | 同上 | v1.0 | 同一支 API 的**僅觸發**版（不解析圖片 URL）。出貨便代碼由 Webhook（`ApiType=Print`）逐筆回填。`ShipTradeNo` 可逗號分隔多筆，**最多 50 筆且需相同 `GoodsType`／`LgsType`／`ShipType`** |
-| 8 | `CallTcatResponse callTcat(String merId, CallTcatRequest req)` | `/api/home_delivery/call_cat` | v1.0 | 黑貓預約取件 |
-| 9 | `QueryShipmentResponse queryShipment(String merId, QueryShipmentRequest req)` | `/api/logistics/query` | v1.1 | 物流單查詢 |
-| 10 | `OnboardShippingResponse onboardCvsShipping(String merId, OnboardCvsRequest req)` | `/api/logistics/setting` | v1.0 | 超商 C2C 建店 |
-| 11 | `OnboardShippingResponse onboardHomeDelivery(String merId, OnboardHomeRequest req)` | `/api/home_delivery/setting` | v1.0 | 宅配建店 |
-
-> 門市地圖 `/api/logistics/ship_map`（v1.1）與 PDF 下載 `cat_file_download` 的 path 常數
-> 同樣定義在 `PayUniShippingEndpoint`，由呼叫端直接組表單，不經上表方法。
-
-> **PayUni 物流欄位長度約束**（收件人姓名 / 地址 / 商品名稱）：常數集中於 common-core 的 `PayUniShippingConstraints`（**非本模組** — payuni-java-client 未被 order-service 依賴，故置於兩端共用的 common-core），計長驗證/截斷邏輯由 common-core `InputValidator` 提供。完整約束值與套用點見 [26-輸入驗證模組 §2.3 R10/R11 + §3.1/§3.3](../詳細設計書/26-輸入驗證模組（Java%20InputValidator）詳細設計書.md)。
-
-#### **8.2 請求物件（Request Records）**
-
-**CreateCvsShipmentRequest**：
-
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| `merTradeNo` | `String` | 商店訂單編號 |
-| `shipType` | `String` | 物流商類型（1=7-ELEVEN, 2=大嘴鳥） |
-| `lgsType` | `String` | 通路類型（B2C / C2C） |
-| `goodsType` | `String` | 商品溫層（1=常溫, 2=冷凍, 3=冷藏） |
-| `serviceType` | `String` | 服務類型（1=取貨付款, 3=取貨不付款） |
-| `senderName` | `String` | 寄件人姓名 |
-| `senderPhone` | `String` | 寄件人電話 |
-| `receiverName` | `String` | 收件人姓名 |
-| `receiverPhone` | `String` | 收件人電話 |
-| `storeId` | `String` | 門市代號 |
-| `tradeAmt` | `String` | 交易金額 |
-| `goodsName` | `String` | 商品名稱 |
-
-**CreateHomeShipmentRequest**：
-
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| `merTradeNo` | `String` | 商店訂單編號 |
-| `goodsType` | `String` | 商品溫層 |
-| `senderName` | `String` | 寄件人姓名 |
-| `senderPhone` | `String` | 寄件人電話 |
-| `senderZipCode` | `String` | 寄件人郵遞區號 |
-| `senderAddress` | `String` | 寄件人地址 |
-| `receiverName` | `String` | 收件人姓名 |
-| `receiverPhone` | `String` | 收件人電話 |
-| `receiverZipCode` | `String` | 收件人郵遞區號 |
-| `receiverAddress` | `String` | 收件人地址 |
-| `deliveryTimeTag` | `String` | 配送時段標記 |
-| `tradeAmt` | `String` | 交易金額 |
-| `goodsName` | `String` | 商品名稱 |
-
-**QueryShipmentRequest**：
-
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| `shipTradeNo` | `String` | 物流交易編號（與 merTradeNo 擇一） |
-| `merTradeNo` | `String` | 商店訂單編號（與 shipTradeNo 擇一） |
-
-**ScheduleHomeLabelRequest**：
-
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| `shipTradeNo` | `String` | 物流交易編號 |
-
-**CreateHomeRefundRequest**（宅配退貨單）：
-
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| `merTradeNo` | `String` | 商店訂單編號 |
-| `shipTradeNo` | `String` | 原出貨的物流交易編號 |
-| `goodsType` | `String` | 商品溫層 |
-| `consigneeName` / `consigneePhone` / `consigneeAddress` | `String` | 收件方（退貨目的地＝賣家） |
-| `consignorName` / `consignorPhone` / `consignorAddress` | `String` | 寄件方（退貨發起＝買家） |
-| `deliveryTimeTag` | `String` | 配送時段標記 |
-| `spec` | `String` | 包裹規格 |
-| `shipDate` | `String` | 黑貓司機到府收件日 |
-| `goodsName` | `String` | 商品名稱 |
-| `memo` | `String` | 備註 |
-
-**PrintCvsLabelRequest**（超商出貨單列印）：
-
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| `shipTradeNo` | `String` | 物流交易編號；`triggerCvsPrint` 可逗號分隔多筆（上限 50，須同 `goodsType`／`lgsType`／`shipType`） |
-| `goodsType` | `String` | 商品溫層 |
-| `lgsType` | `String` | 通路類型 |
-| `shipType` | `String` | 物流商類型 |
-| `shipDate` | `String` | 出貨日 |
-
-**CallTcatRequest**（黑貓預約取件）：
-
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| `contactName` / `contactMobile` / `contactAddress` | `String` | 取件聯絡人與地址 |
-| `normalQuantity` / `coldQuantity` / `freezeQuantity` | `String` | 常溫／冷藏／冷凍件數 |
-| `isContact` | `String` | 是否需先電話聯繫 |
-| `isTrolley` | `String` | 是否需推車 |
-| `memo` | `String` | 備註 |
-
-**OnboardCvsRequest**（超商 C2C 建店）：
-
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| `goodsType` | `String` | 1=常溫, 2=冷凍 |
-| `lgsType` | `String` | `C2C` |
-| `shipType` | `String` | `1`（7-ELEVEN） |
-| `labelCompanyName` | `String` | 標籤上顯示的商店名稱 |
-| `contactName` / `contactTel` / `contactMail` | `String` | 聯絡人資料 |
-| `storeId` | `String` | 退貨門市代碼 |
-| `notifyUrl` | `String` | Webhook 回調位址 |
-
-**OnboardHomeRequest**（宅配建店）：
-
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| `lgsType` | `String` | `HOME` |
-| `shipType` | `String` | `2`（黑貓） |
-| `senderName` / `senderMobile` / `senderAddress` | `String` | 寄件人資料 |
-| `productTypeId` | `String` | 商品類別代號 |
-| `notifyUrl` | `String` | Webhook 回調位址 |
-
-#### **8.3 回應物件（Response Records）**
-
-所有 Response 均提供 `static from(PayUniApiResponse)` 工廠方法與 `boolean isSuccess()` 便利方法。
-
-**CreateCvsShipmentResponse**：
-
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| `apiResponse` | `PayUniApiResponse` | 原始 API 回應 |
-| `shipTradeNo` | `String` | 物流交易編號 |
-| `shipStatus` | `String` | 物流狀態碼 |
-
-**CreateHomeShipmentResponse**：
-
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| `apiResponse` | `PayUniApiResponse` | 原始 API 回應 |
-| `shipTradeNo` | `String` | 物流交易編號 |
-| `shipStatus` | `String` | 物流狀態碼 |
-
-**QueryShipmentResponse**：
-
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| `apiResponse` | `PayUniApiResponse` | 原始 API 回應 |
-| `shipTradeNo` | `String` | 物流交易編號 |
-| `shipStatus` | `String` | 物流狀態碼 |
-| `shipStatusTime` | `String` | 狀態變更時間 |
-| `merTradeNo` | `String` | 商店訂單編號 |
-
-**ScheduleHomeLabelResponse**：
-
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| `apiResponse` | `PayUniApiResponse` | 原始 API 回應 |
-| `labelUrl` | `String` | 標籤下載 URL |
-| `shipTradeNo` | `String` | 物流交易編號 |
-
-**CreateHomeRefundResponse**：
-
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| `apiResponse` | `PayUniApiResponse` | 原始 API 回應 |
-| `shipTradeNo` | `String` | 退貨單的物流交易編號 |
-| `obtNumber` | `String` | 託運單號 |
-| `merTradeNo` | `String` | 商店訂單編號 |
-
-**PrintCvsLabelDirectResponse**：
-
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| `imageUrl` | `String` | 自 PayUni HTML 解析出的標籤圖片 URL |
-
-**PrintCvsLabelResponse**（表單轉交模式，供前端自行 POST）：
-
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| `apiResponse` | `PayUniApiResponse` | 原始 API 回應 |
-| `formActionUrl` | `String` | 表單送出位址 |
-| `encryptInfo` / `hashInfo` | `String` | 加密參數與簽章 |
-
-**CallTcatResponse**：
-
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| `apiResponse` | `PayUniApiResponse` | 原始 API 回應 |
-| `callTime` | `String` | 預約取件時間 |
-
-**OnboardShippingResponse**（超商與宅配建店共用）：
-
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| `apiResponse` | `PayUniApiResponse` | 原始 API 回應 |
-| `partnerId` | `String` | PayUni 配發的合作夥伴識別 |
-| `eshipId` | `String` | 物流商配發的店號 |
-| `setStatus` | `String` | 建店狀態碼 |
-
-#### **8.4 PayUniShippingEndpoint（常數類）**
-
-| 常數 | 值 | 版本常數 | 說明 |
-|------|-----|---|------|
-| `PATH_CVS_SHIPMENT` | `/api/logistics/trade` | `1.3` | 超商物流單建立 |
-| `PATH_HOME_SHIPMENT` | `/api/home_delivery/trade` | `1.2` | 宅配單建立（背景） |
-| `PATH_HOME_LABEL` | `/api/home_delivery/get_obt_number_pdf` | `1.0` | 預約宅配取號 |
-| `PATH_PRINT_CVS_LABEL` | `/api/logistics/print_label` | `1.0` | 超商出貨單列印 |
-| `PATH_CALL_TCAT` | `/api/home_delivery/call_cat` | `1.0` | 黑貓預約取件 |
-| `PATH_QUERY_SHIPMENT` | `/api/logistics/query` | `1.1` | 物流單查詢 |
-| `PATH_CVS_ONBOARD` | `/api/logistics/setting` | `1.0` | 超商 C2C 建店 |
-| `PATH_HOME_ONBOARD` | `/api/home_delivery/setting` | `1.0` | 宅配建店 |
-| `PATH_STORE_MAP` | `/api/logistics/ship_map` | `1.1` | 門市地圖 |
-| `PATH_HOME_REFUND` | `/api/home_delivery/refund` | `1.0` | 宅配退貨單建立 |
-| `PATH_CAT_FILE_DOWNLOAD` | `cat_file_download` | — | 二階段 PDF 下載（相對路徑，非 `/api/` 前綴） |
-
-每個 `PATH_*` 都有對應的 `VERSION_*` 常數，值如上表第三欄。
-
----
-
-### **9. 物流 Enum 定義**
-
-#### **9.1 ShipType（物流商）**
-
-| Enum 值 | Code | 說明 |
-|---------|------|------|
-| `SEVEN` | `"1"` | 7-ELEVEN |
-| `TAQBIN` | `"2"` | 黑貓宅急便 |
-
-#### **9.2 LgsType（通路類型）**
-
-| Enum 值 | Code | 說明 |
-|---------|------|------|
-| `B2C` | `"B2C"` | 超商取貨（店到店） |
-| `C2C` | `"C2C"` | 超商寄件（消費者到店） |
-| `HOME` | `"HOME"` | 宅配到府 |
-| `C2B` | `"C2B"` | 超商退貨（消費者到店退） |
-
-#### **9.3 GoodsType（商品溫層）**
-
-| Enum 值 | Code | 說明 |
-|---------|------|------|
-| `NORMAL` | `"1"` | 常溫 |
-| `FROZEN` | `"2"` | 冷凍 |
-| `REFRIGERATED` | `"3"` | 冷藏 |
-
-#### **9.4 ServiceType（服務類型）**
-
-| Enum 值 | Code | 說明 |
-|---------|------|------|
-| `CASH_ON_DELIVERY` | `"1"` | 取貨付款 |
-| `NO_CASH_ON_DELIVERY` | `"3"` | 取貨不付款 |
-
-#### **9.5 DeliveryTimeTag（配送時段）**
-
-| Enum 值 | Code | 說明 |
-|---------|------|------|
-| `BEFORE_13` | `"01"` | 13 時前 |
-| `AFTERNOON` | `"02"` | 14-18 時 |
-| `ANY` | `"04"` | 不指定 |
-
----
+`ShippingClient`、物流 Request／Response、`PayUniShippingEndpoint` 與物流 Enum（貨態碼、物流商、通路、溫層、服務類型、配送時段）隨物流商退場刪除（B3，ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md`）；本模組只剩金流與代理商 API，隨 B2 的 PayUni 程式一併刪除。
 
 ### **10. Webhook 解析器**
 
@@ -936,8 +620,6 @@ public ShippingClient(PayUniHttpClient httpClient, String notifyUrl)
 | `REFUND_NOTIFY` | payload 含 `RefundStatus` | 退款結果通知（ATM async webhook，含 `RefundStatus` / `BankDate`；匯款完成／失敗）。🔴 **必須先於 `PAYMENT_UOP` 判斷**——退款 webhook 同樣帶外層 `TradeStatus`，唯一鍵是內層 `RefundStatus` |
 | `REFUND_ACCEPTED` | 含 `EstimatedRefundDate` 且無 `RefundStatus` | 退款受理通知（sync return URL 的 async 副本） |
 | `PAYMENT_UOP` | 其餘含付款欄位者 | 付款結果通知（UOP） |
-| `SHIPPING_STATUS` | 含物流貨態欄位 | 物流貨態通知（建單結果 / 狀態變更） |
-| `SHIPPING_PRINT` | `ApiType=Print` | 超商列印結果通知（含交貨便代碼） |
 | `AGENT_NOTIFY` | 含商家狀態欄位 | 代理商通知（商家狀態異動） |
 | `UNKNOWN` | 含 `PeriodTradeNo`（週期扣款通知），或以上皆不命中 | 無法辨識的類型。🔴 週期扣款通知必須先於 `PAYMENT_UOP` 判為 `UNKNOWN`，否則帶 `TradeAmt`／`TradeStatus` 的 payload 會被誤判成一次性付款。分派見 10 號 §4.5.3 |
 
@@ -973,13 +655,7 @@ sequenceDiagram
     Parser->>Crypto: decrypt(encryptInfo)
     Crypto-->>Parser: Map<String, String> data
     Parser->>Parser: resolveType(data)
-    alt ApiType = "Print"
-        Parser->>Parser: → SHIPPING_PRINT
-        Parser->>Parser: 建立 ShippingPrintEvent
-    else 含 ShipTradeNo + LgsType
-        Parser->>Parser: → SHIPPING_STATUS
-        Parser->>Parser: 建立 ShippingStatusEvent
-    else 含 TradeAmt + TradeStatus
+    alt 含 TradeAmt + TradeStatus
         Parser->>Parser: → PAYMENT_UOP
         Parser->>Parser: 建立 PaymentUopEvent
     else 含 NotifyType
@@ -991,9 +667,7 @@ sequenceDiagram
     Parser-->>WH: WebhookParseResult(type, event, rawMap, encryptInfo, hashInfo)
 ```
 
-> **分類優先順序**：SHIPPING_PRINT（ApiType=Print）> SHIPPING_STATUS > PAYMENT_UOP > AGENT_NOTIFY > UNKNOWN
->
-> **注意**：SHIPPING_PRINT 必須最先判斷，因為 Print Webhook 也含 ShipTradeNo + LgsType，若不先檢查 ApiType 會被誤判為 SHIPPING_STATUS。
+> **分類優先順序**：PAYMENT_UOP > AGENT_NOTIFY > UNKNOWN（退款判別的先後見 §10.1）
 
 #### **10.3 WebhookParseResult (Record)**
 
@@ -1023,7 +697,7 @@ public WebhookVerifyException(String message)
 
 ```java
 public sealed interface PayUniWebhookEvent
-    permits PaymentUopEvent, ShippingStatusEvent, ShippingPrintEvent, AgentNotifyEvent,
+    permits PaymentUopEvent, AgentNotifyEvent,
             RefundNotifyEvent, RefundAcceptedEvent
 ```
 
@@ -1042,18 +716,6 @@ public sealed interface PayUniWebhookEvent
 | `message` | `String` | 回應訊息 |
 | `tradeDate` | `String` | 交易時間 |
 
-**ShippingStatusEvent (Record)**：
-
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| `merId` | `String` | 商家編號 |
-| `shipTradeNo` | `String` | 物流交易編號 |
-| `shipStatus` | `String` | 物流狀態碼 |
-| `shipStatusTime` | `String` | 狀態變更時間 |
-| `shipType` | `String` | 物流類型 |
-| `lgsType` | `String` | 通路類型 |
-| `message` | `String` | 訊息 |
-
 **AgentNotifyEvent (Record)**：
 
 | 欄位 | 型別 | 說明 |
@@ -1062,17 +724,6 @@ public sealed interface PayUniWebhookEvent
 | `merStatus` | `String` | 商家狀態 |
 | `merStatusNote` | `String` | 狀態說明 |
 | `executeTime` | `String` | 執行時間（格式：`yyyyMMddHHmmss`） |
-
-**ShippingPrintEvent (Record)**：
-
-| 欄位 | 型別 | 說明 |
-|------|------|------|
-| `merId` | `String` | 商家編號 |
-| `shipTradeNo` | `String` | 物流交易編號 |
-| `partnerId` | `String` | 合作夥伴識別 |
-| `odno` | `String` | 交貨便代碼 |
-| `validationNo` | `String` | 驗證碼 |
-| `goodsType` / `lgsType` / `shipType` | `String` | 溫層／通路／物流商 |
 
 **RefundNotifyEvent (Record)**：
 
@@ -1141,8 +792,6 @@ public sealed interface PayUniWebhookEvent
 | 必測場景 | 驗證內容 |
 |---|---|
 | 付款成功／失敗 | `PAYMENT_UOP` ＋ `PaymentUopEvent`，全欄位正確；`TradeStatus=2` 為失敗 |
-| 物流貨態 | `SHIPPING_STATUS` ＋ `ShippingStatusEvent` |
-| 超商列印回填 | `SHIPPING_PRINT` ＋ `ShippingPrintEvent` |
 | 商家狀態異動 | `AGENT_NOTIFY` ＋ `AgentNotifyEvent` |
 | 🔴 退款判別優先序 | 同時含 `TradeStatus` 與 `RefundStatus` 的 payload **必須**分類成 `REFUND_NOTIFY` 而非 `PAYMENT_UOP` |
 | 退款受理 | 含 `EstimatedRefundDate` 無 `RefundStatus` ⇒ `REFUND_ACCEPTED` |
@@ -1174,7 +823,6 @@ public sealed interface PayUniWebhookEvent
 | `model` | 商家金鑰憑證與 API 信封 Record |
 | `resolver` | 金鑰解析介面（使用端實作） |
 | `payment` | 金流 API 客戶端（§7）＋ 路徑／版本常數 |
-| `shipping` | 物流 API 客戶端（§8）＋ 路徑／版本常數 ＋ 物流 Enum（§9）＋ request／response Record |
 | `webhook` | 驗簽 → 解密 → 自動分類 → 強型別事件物件（§10） |
 
 ---
@@ -1184,8 +832,6 @@ public sealed interface PayUniWebhookEvent
 #### **14.1 核心原則**
 
 **金流 API**：MerTradeNo 使用 `{orderNo}{3位序號}`（如 `O400280260001`）。每次付款嘗試使用不同序號，繞開 PayUni C1 約束（同 MerTradeNo 10 分鐘限制）。詳見 Payment Service 設計書 §2A.3.6。
-
-**物流 API**：MerTradeNo 仍使用 `orderNo`（正向）或 `RO{orderNo去O}`（退貨），不受付款序號影響。
 
 禁止各微服務自行生成獨立的 MerTradeNo（如 `TRD{timestamp}`、`S{TSID}` 等）。
 
@@ -1200,29 +846,22 @@ public sealed interface PayUniWebhookEvent
 | Google Pay 支付 | `MerTradeNo` | **`trade_no`** | 同上 |
 | ATM 虛擬帳號 | `MerTradeNo` | **`trade_no`** | 同上 |
 | 交易查詢 | `MerTradeNo` | **`trade_no`** | 以 trade_no 查詢對應的 PayUni 交易 |
-| 建立超商物流單（正向） | `MerTradeNo` | `orderNo` | 物流單與訂單 1:1（不含付款序號） |
-| 建立宅配物流單（正向） | `MerTradeNo` | `orderNo` | 同上 |
-| **建立超商退貨物流單** | `MerTradeNo` | **`RO{orderNo去O}`** | **退貨物流：R 前綴 + 原訂單編號數字部分，如 `RO400280260`（11 碼）** |
-| **建立宅配退貨物流單** | `MerTradeNo` | **`RO{orderNo去O}`** | **同上** |
-| 物流單查詢 | `MerTradeNo`（選填） | `orderNo` 或 `RO{...}` | 以 ShipTradeNo 為主，MerTradeNo 為輔 |
 
-> **長度驗證**：`trade_no` 格式為 `O{9位數字}{3位序號}`（如 `O400280260001`），長度 13 字元；退貨物流 `RO{9位數字}`，長度 11 字元。均符合 PayUni MerTradeNo 限制（≤25 字元，`[A-Za-z0-9_-]`）。
+> **長度驗證**：`trade_no` 格式為 `O{9位數字}{3位序號}`（如 `O400280260001`），長度 13 字元。均符合 PayUni MerTradeNo 限制（≤25 字元，`[A-Za-z0-9_-]`）。
 >
-> **Webhook 識別**：下游服務消費 Webhook 事件時，依 MerTradeNo 前綴判斷：`O` 開頭 = 金流或正向物流（金流的 MerTradeNo 含 3 位序號尾碼，物流不含），`R` 開頭 = 退貨物流。金流 webhook 的 MerTradeNo 直接對應 `payment_transactions.trade_no`（UNIQUE）。
+> **Webhook 識別**：金流 webhook 的 MerTradeNo 直接對應 `payment_transactions.trade_no`（見 §14.4）。
 
 #### **14.3 禁止事項**
 
 | 禁止行為 | 正確做法 |
 |---------|---------|
 | Payment Service 自行生成 `TRD{timestamp}{random}` 當 MerTradeNo | 使用 `orderNo` |
-| Shipping Service 自行生成 `S{TSID}` 當 MerTradeNo | 使用 `orderNo` |
 | 各微服務定義獨立的 MerTradeNo 生成邏輯 | 統一由 Order Service 生成 `orderNo`，下游微服務透傳 |
 
 #### **14.4 Webhook 回查路徑**
 
 ```
 PayUni 金流 Webhook → MerTradeNo = trade_no (O400280260001) → payment_transactions.trade_no（UNIQUE 精準查找）
-PayUni 物流 Webhook → ShipTradeNo（PayUni 回傳的）→ shipments.ship_trade_no 回查
 ```
 
 > 金流 Webhook 的 MerTradeNo ＝ `payment_transactions.trade_no`（UNIQUE），可精準鎖定該次付款嘗試。

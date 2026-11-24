@@ -198,7 +198,6 @@ try {
 | Order | `OrderNotFoundException`, `InvalidStatusException`, `InsufficientStockException`, `CheckoutExpiredException`, `CheckoutPriceChangedException` | 固定語意 |
 | Cart | `CartBusinessException` | `GrpcResponseCode` |
 | Coupon | `CouponBusinessException` | `GrpcResponseCode` |
-| Shipping | `ShippingBusinessException` | `GrpcResponseCode` |
 | Media | `MediaServiceException` | gRPC Status Code |
 | Product | `ProductNotFoundException`, `ProductAccessDeniedException`, `IdempotencyConflictException` | 固定語意 |
 | Payment | `IllegalStateException`, `DataIntegrityViolationException` | Java 內建 |
@@ -486,7 +485,6 @@ public final class GrpcClientErrorTranslator {
 | order | `OrderBusinessException` | `(GrpcResponseCode, String)` |
 | cart | `CartBusinessException` | `(GrpcResponseCode, String)` |
 | coupon | `CouponBusinessException` | `(GrpcResponseCode, String)` |
-| shipping | `ShippingBusinessException` | `(GrpcResponseCode, String)` |
 | product | `ProductBusinessException`（若無，新增） | `(GrpcResponseCode, String)` |
 | aftersales | `AfterSalesBusinessException`（若無，新增） | `(GrpcResponseCode, String)` |
 | media | `MediaServiceException` 或新增 `MediaBusinessException` | `(GrpcResponseCode, String)` |
@@ -531,11 +529,10 @@ try {
 
 | 服務 | 現存違規處數（2026-04-08） | 檔案 |
 |---|---:|---|
-| order-service | 8（envelope code）+ 5（RuntimeException） | `grpc/client/*GrpcClient.java` × 3、`checkout/client/*GrpcClient.java` × 2、`checkout/CheckoutService.java`、`checkout/ShippingFeeCacheClient.java`、`grpc/OrderGrpcService.java` |
+| order-service | 8（envelope code）+ 5（RuntimeException） | `grpc/client/*GrpcClient.java` × 3、`checkout/client/*GrpcClient.java` × 2、`checkout/CheckoutService.java`、`grpc/OrderGrpcService.java` |
 | aftersales-service | 8（envelope code） | `grpc/AfterSalesGrpcService.java`、`service/AfterSaleResolutionService.java`、`service/AfterSaleCaseService.java`、`service/RefundPageService.java`、`service/SellerCancelService.java` |
 | coupon-service | 1 | `grpc/client/AccountGrpcClient.java` |
 | product-service | 1（envelope code）+ 2（RuntimeException） | `grpc/ProductGrpcService.java`、`grpc/client/*GrpcClient.java` |
-| shipping-service | 3（envelope code）+ 4（RuntimeException） | `service/OnboardingService.java`、`service/ShippingService.java`、`client/MediaGrpcClient.java` |
 
 ---
 
