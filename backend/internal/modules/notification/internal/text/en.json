@@ -15,6 +15,48 @@
     "audience.invalid": {
       "message": "The notification audience is not valid."
     },
+    "chat_message_buyer.body": {
+      "message": "A store sent you a message."
+    },
+    "chat_message_buyer.title": {
+      "message": "New message"
+    },
+    "chat_message_store.body": {
+      "message": "A buyer sent you a message."
+    },
+    "chat_message_store.title": {
+      "message": "New message"
+    },
+    "comment_created.body": {
+      "message": "Someone commented on your post."
+    },
+    "comment_created.title": {
+      "message": "New comment"
+    },
+    "comment_liked_buyer.body": {
+      "message": "Someone liked your comment."
+    },
+    "comment_liked_buyer.title": {
+      "message": "Your comment got a like"
+    },
+    "comment_liked_store.body": {
+      "message": "Someone liked your store's comment."
+    },
+    "comment_liked_store.title": {
+      "message": "Your comment got a like"
+    },
+    "comment_replied_buyer.body": {
+      "message": "Someone replied to your comment."
+    },
+    "comment_replied_buyer.title": {
+      "message": "New reply"
+    },
+    "comment_replied_store.body": {
+      "message": "Someone replied to your store's comment."
+    },
+    "comment_replied_store.title": {
+      "message": "New reply"
+    },
     "device_app.invalid": {
       "message": "The app for the push token must be the buyer app or the seller app."
     },
@@ -27,11 +69,35 @@
     "inbox_item.not_found": {
       "message": "Notification not found."
     },
+    "post_liked.body": {
+      "message": "Someone liked your post."
+    },
+    "post_liked.title": {
+      "message": "Your post got a like"
+    },
+    "post_published_item.body": {
+      "message": "A store you follow just published a new post."
+    },
+    "post_published_item.title": {
+      "message": "A store you follow posted"
+    },
     "preference.cannot_disable": {
       "message": "This notification cannot be turned off."
     },
     "preference.not_available": {
       "message": "This notification setting is not available."
+    },
+    "review_created.body": {
+      "message": "A buyer reviewed your product."
+    },
+    "review_created.title": {
+      "message": "New review"
+    },
+    "store_followed.body": {
+      "message": "A buyer started following your store."
+    },
+    "store_followed.title": {
+      "message": "New follower"
     }
   }
 }

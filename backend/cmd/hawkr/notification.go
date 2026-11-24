@@ -10,8 +10,11 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
+	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification"
+	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/config"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -88,7 +91,7 @@ func readNotificationProviders(ctx context.Context, e *config.Env, log *slog.Log
 // 帳號語系讀 identity（preferred_locale，多語系 ADR D1）。
 func newNotification(d *db.DB, id *identity.Module, b *buyer.Module, sl *seller.Module, jc jobs.Enqueuer, box *inbox.Inbox, p notificationProviders, images rpc.Images, log *slog.Logger) *notification.Module {
 	return notification.New(notification.Deps{
-		DB: d, Identity: id, Buyer: b, Seller: sl, Directory: notification.NewDirectory(b, sl), Resolver: notification.NewResolver(b, sl), Jobs: jc, Now: time.Now, NewID: uuid.NewV7, Logger: log,
+		DB: d, Identity: id, Buyer: b, Seller: sl, Directory: notification.NewDirectory(b, sl), Resolver: notification.NewResolver(b, sl), StoreCodes: notification.NewStoreCodes(sl), Jobs: jc, Now: time.Now, NewID: uuid.NewV7, Logger: log,
 		Contacts: id, Locales: id, Push: p.push, Mail: p.mail, ImageURL: pushImageURL(images), SuppressionKeys: p.suppression, Inbox: box, ResendWebhookSecret: p.webhookSecret,
 	})
 }
@@ -99,6 +102,17 @@ func subscribeNotification(bus *events.Bus, m *notification.Module) {
 	events.Subscribe[accountsuspension.Suspended](bus, m.OnSuspended)
 	events.Subscribe[accountsuspension.Suspended](bus, m.PurgeTokensOnSuspended)
 	events.Subscribe[accountsuspension.Unsuspended](bus, m.OnUnsuspended)
+	events.Subscribe[social.CommentCreated](bus, m.OnCommentCreated)
+	events.Subscribe[social.CommentReplied](bus, m.OnCommentRepliedToBuyer)
+	events.Subscribe[social.CommentReplied](bus, m.OnCommentRepliedToStore)
+	events.Subscribe[social.CommentLiked](bus, m.OnCommentLikedBuyerAuthor)
+	events.Subscribe[social.CommentLiked](bus, m.OnCommentLikedStoreAuthor)
+	events.Subscribe[social.PostLiked](bus, m.OnPostLiked)
+	events.Subscribe[social.PostPublished](bus, m.OnPostPublished)
+	events.Subscribe[buyer.SellerFollowed](bus, m.OnSellerFollowed)
+	events.Subscribe[review.ReviewCreated](bus, m.OnReviewCreated)
+	events.Subscribe[im.MessageSent](bus, m.OnMessageSentToBuyer)
+	events.Subscribe[im.MessageSent](bus, m.OnMessageSentToStore)
 	events.Subscribe[identity.AccountDeleted](bus, m.OnAccountDeleted)
 	events.Subscribe[identity.AccountDeleted](bus, m.PurgeTokensOnAccountDeleted)
 	events.Subscribe[buyer.BuyerDeleted](bus, m.OnBuyerDeleted)

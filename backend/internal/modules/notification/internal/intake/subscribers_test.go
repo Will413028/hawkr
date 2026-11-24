@@ -5,9 +5,11 @@ import (
 	"go/parser"
 	"go/token"
 	"path"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -81,20 +83,31 @@ func funcs(t *testing.T, file string) ([]*ast.FuncDecl, map[string]string) {
 
 // 同步訂閱者在來源的 transaction 內執行，失敗會讓來源 rollback：除了白名單的 token 清除，只准呼叫 Accept。
 func TestSynchronousSubscribersOnlyAccept(t *testing.T) {
-	fns, imports := funcs(t, "subscribers.go")
-	if len(fns) == 0 {
-		t.Fatal("subscribers.go 沒有訂閱者")
+	files, err := filepath.Glob("subscribers*.go")
+	if err != nil || len(files) == 0 {
+		t.Fatalf("找不到 subscribers*.go（%v）", err)
 	}
-	for _, fn := range fns {
-		if slices.Contains(tokenPurgeSubscribers, fn.Name.Name) {
-			continue
+	total := 0
+	for _, file := range slices.DeleteFunc(files, func(f string) bool { return strings.HasSuffix(f, "_test.go") }) {
+		fns, imports := funcs(t, file)
+		for _, fn := range fns {
+			if slices.Contains(tokenPurgeSubscribers, fn.Name.Name) || slices.Contains(pureSubscriberHelpers, fn.Name.Name) {
+				continue
+			}
+			total++
+			got := slices.DeleteFunc(calls(fn, imports), func(c string) bool { return slices.Contains(pureSubscriberHelpers, c) })
+			if len(got) != 1 || got[0] != ".Accept" {
+				t.Errorf("%s 的 %s 呼叫了 %v；同步訂閱者只准呼叫 Accept", file, fn.Name.Name, got)
+			}
 		}
-		got := calls(fn, imports)
-		if len(got) != 1 || got[0] != ".Accept" {
-			t.Errorf("%s 呼叫了 %v；同步訂閱者只准呼叫 Accept", fn.Name.Name, got)
-		}
+	}
+	if total == 0 {
+		t.Fatal("subscribers*.go 沒有訂閱者")
 	}
 }
+
+// pureSubscriberHelpers 是訂閱者可以呼叫的純函式（只把事件欄位換成參數欄位，不碰資料）；本身也不算訂閱者。
+var pureSubscriberHelpers = []string{"partyOf"}
 
 // Accept 是同步路徑上唯一碰資料的函式：只登記意圖列、排 job，不讀偏好、不寫收件匣、不鎖帳號。
 func TestAcceptOnlyInsertsTheIntentAndEnqueues(t *testing.T) {

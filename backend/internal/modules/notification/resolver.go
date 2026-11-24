@@ -68,3 +68,23 @@ func (r resolver) StoreFollowers(ctx context.Context, storeID, afterBuyerID int6
 	}
 	return out, nil
 }
+
+type storeCodes struct{ stores *seller.Module }
+
+// NewStoreCodes 把 seller 組成讀取店家 store_code 的來源：只有曾經公開過的店有 store_code 可用（StoreCards 的規則），其餘不在結果裡、深連結留空。
+func NewStoreCodes(s *seller.Module) StoreCodes { return storeCodes{stores: s} }
+
+func (c storeCodes) StoreCodes(ctx context.Context, storeIDs []int64) (map[int64]int64, error) {
+	ids := slices.Compact(slices.Sorted(slices.Values(storeIDs)))
+	out := make(map[int64]int64, len(ids))
+	for chunk := range slices.Chunk(ids, seller.MaxBatchSize) {
+		cards, err := c.stores.StoreCards(ctx, chunk)
+		if err != nil {
+			return nil, err
+		}
+		for _, card := range cards {
+			out[card.StoreID] = card.StoreCode
+		}
+	}
+	return out, nil
+}

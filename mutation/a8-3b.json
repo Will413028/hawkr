@@ -1,0 +1,94 @@
+{
+  "mutants": [
+    {
+      "id": "comment-created-no-block-check",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/notification/internal/registry/content.go",
+      "old": "StoreRecipient(ctx, r, p.StoreID, p.Actor.principal())",
+      "new": "StoreRecipient(ctx, r, p.StoreID)",
+      "test": "internal/modules/notification ^TestContentTypesSkipBlockedPairsInBothDirections$",
+      "why": "comment_created 的收件店家不再把留言者當 actor，買家封鎖店與店封鎖買家都不再略過"
+    },
+    {
+      "id": "comment-replied-buyer-no-block-check",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/notification/internal/registry/content.go",
+      "old": "BuyerRecipient(ctx, r, p.ReplyTo.ID, p.Actor.principal())",
+      "new": "BuyerRecipient(ctx, r, p.ReplyTo.ID)",
+      "test": "internal/modules/notification ^TestContentTypesSkipBlockedPairsInBothDirections$",
+      "why": "comment_replied_buyer 的收件買家不再把回覆者當 actor，買家之間的封鎖不再略過"
+    },
+    {
+      "id": "comment-like-key-removed",
+      "stack": "go",
+      "file": "backend/internal/modules/notification/internal/registry/content.go",
+      "old": "\"comment_like:\" + p.CommentID.String()",
+      "new": "\"comment_liked:\" + p.CommentID.String()",
+      "test": "internal/modules/notification/internal/registry ^TestGoldenContentRendering$",
+      "why": "留言讚的聚合鍵改了形狀（同一則留言的讚不再以固定鍵合併）"
+    },
+    {
+      "id": "post-like-key-removed",
+      "stack": "go",
+      "file": "backend/internal/modules/notification/internal/registry/content.go",
+      "old": "\"post_like:\" + p.PostID.String()",
+      "new": "\"post_liked:\" + p.PostID.String()",
+      "test": "internal/modules/notification/internal/registry ^TestGoldenContentRendering$",
+      "why": "貼文讚的聚合鍵改了形狀"
+    },
+    {
+      "id": "follow-key-removed",
+      "stack": "go",
+      "file": "backend/internal/modules/notification/internal/registry/content.go",
+      "old": "\"follow:\" + strconv.FormatInt(p.StoreID, 10)",
+      "new": "\"followed:\" + strconv.FormatInt(p.StoreID, 10)",
+      "test": "internal/modules/notification/internal/registry ^TestGoldenContentRendering$",
+      "why": "追蹤的聚合鍵改了形狀"
+    },
+    {
+      "id": "review-subscription-removed",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/notification/notification.go",
+      "old": "return m.intake.OnReviewCreated(ctx, e)",
+      "new": "return nil",
+      "test": "internal/modules/notification ^TestEachContentEventReachesItsRecipient$",
+      "why": "拿掉 review.ReviewCreated 的訂閱：評價事件不再變成通知"
+    },
+    {
+      "id": "follow-subscription-removed",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/notification/notification.go",
+      "old": "return m.intake.OnSellerFollowed(ctx, e)",
+      "new": "return nil",
+      "test": "internal/modules/notification ^TestEachContentEventReachesItsRecipient$",
+      "why": "拿掉 buyer.SellerFollowed 的訂閱：追蹤事件不再變成通知"
+    },
+    {
+      "id": "locale-prefix-dropped",
+      "stack": "go",
+      "file": "backend/internal/modules/notification/internal/registry/registry.go",
+      "old": "return \"/en\" + link",
+      "new": "return link",
+      "test": "internal/modules/notification/internal/registry ^TestDeepLinkGetsTheLocalePrefixCentrally$",
+      "why": "en 文字的深連結不再加 /en 前綴"
+    },
+    {
+      "id": "store-id-instead-of-store-code",
+      "stack": "go",
+      "file": "backend/internal/modules/notification/internal/registry/content.go",
+      "old": "Loaded{StoreCode: codes[storeID(p)]}",
+      "new": "Loaded{StoreCode: storeID(p)}",
+      "test": "internal/modules/notification/internal/registry ^TestContentLoadResolvesStoreCodesInOneCall$",
+      "why": "深連結改用 store_id 當路徑段，不經 store_code 對照"
+    },
+    {
+      "id": "store-id-instead-of-store-code-e2e",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/notification/internal/registry/content.go",
+      "old": "Loaded{StoreCode: codes[storeID(p)]}",
+      "new": "Loaded{StoreCode: storeID(p)}",
+      "test": "internal/modules/notification ^TestContentDeepLinkUsesTheStoreCodeAndLocalePrefix$",
+      "why": "同上，整合層：收件匣的深連結要是 store_code 而不是 store_id"
+    }
+  ]
+}

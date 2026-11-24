@@ -33,6 +33,62 @@
       "message": "通知的受眾不正確。",
       "description": "請求的 audience 沒給或不認得：NotificationAppService 需要受眾的方法。"
     },
+    "chat_message_buyer.body": {
+      "message": "店家傳了一則訊息給你。",
+      "description": "收件匣與推播的內文：聊天新訊息的推播（chat_message_buyer 型別，收件人是買家）。"
+    },
+    "chat_message_buyer.title": {
+      "message": "新訊息",
+      "description": "收件匣與推播的標題：聊天新訊息的推播（chat_message_buyer 型別，收件人是買家）。"
+    },
+    "chat_message_store.body": {
+      "message": "買家傳了一則訊息給你。",
+      "description": "收件匣與推播的內文：聊天新訊息的推播（chat_message_store 型別，收件人是店家）。"
+    },
+    "chat_message_store.title": {
+      "message": "新訊息",
+      "description": "收件匣與推播的標題：聊天新訊息的推播（chat_message_store 型別，收件人是店家）。"
+    },
+    "comment_created.body": {
+      "message": "有人在你的貼文下留言。",
+      "description": "收件匣與推播的內文：貼文收到新留言（comment_created 型別，收件人是店家）。"
+    },
+    "comment_created.title": {
+      "message": "收到新留言",
+      "description": "收件匣與推播的標題：貼文收到新留言（comment_created 型別，收件人是店家）。"
+    },
+    "comment_liked_buyer.body": {
+      "message": "有人對你的留言按讚。",
+      "description": "收件匣與推播的內文：留言被按讚（comment_liked_buyer 型別，收件人是買家）。"
+    },
+    "comment_liked_buyer.title": {
+      "message": "留言收到讚",
+      "description": "收件匣與推播的標題：留言被按讚（comment_liked_buyer 型別，收件人是買家）。"
+    },
+    "comment_liked_store.body": {
+      "message": "有人對貴店的留言按讚。",
+      "description": "收件匣與推播的內文：留言被按讚（comment_liked_store 型別，收件人是店家）。"
+    },
+    "comment_liked_store.title": {
+      "message": "留言收到讚",
+      "description": "收件匣與推播的標題：留言被按讚（comment_liked_store 型別，收件人是店家）。"
+    },
+    "comment_replied_buyer.body": {
+      "message": "有人回覆了你的留言。",
+      "description": "收件匣與推播的內文：留言收到回覆（comment_replied_buyer 型別，收件人是買家）。"
+    },
+    "comment_replied_buyer.title": {
+      "message": "收到新回覆",
+      "description": "收件匣與推播的標題：留言收到回覆（comment_replied_buyer 型別，收件人是買家）。"
+    },
+    "comment_replied_store.body": {
+      "message": "有人回覆了貴店的留言。",
+      "description": "收件匣與推播的內文：留言收到回覆（comment_replied_store 型別，收件人是店家）。"
+    },
+    "comment_replied_store.title": {
+      "message": "收到新回覆",
+      "description": "收件匣與推播的標題：留言收到回覆（comment_replied_store 型別，收件人是店家）。"
+    },
     "device_app.invalid": {
       "message": "推播 token 所屬的 App 必須是買家 App 或賣家 App。",
       "description": "RegisterDeviceToken 的 app 沒給或不認得。"
@@ -49,6 +105,22 @@
       "message": "找不到這則通知。",
       "description": "通知不存在或不是呼叫者的（兩者同一句，不洩漏存在與否）：已讀、刪除（NotificationAppService）。"
     },
+    "post_liked.body": {
+      "message": "有人對你的貼文按讚。",
+      "description": "收件匣與推播的內文：貼文被按讚（post_liked 型別，收件人是店家）。"
+    },
+    "post_liked.title": {
+      "message": "貼文收到讚",
+      "description": "收件匣與推播的標題：貼文被按讚（post_liked 型別，收件人是店家）。"
+    },
+    "post_published_item.body": {
+      "message": "你追蹤的店家剛發佈了一則貼文。",
+      "description": "收件匣與推播的內文：追蹤的店家發佈貼文（post_published_item 型別，收件人是追蹤者）。"
+    },
+    "post_published_item.title": {
+      "message": "追蹤的店家發佈了新貼文",
+      "description": "收件匣與推播的標題：追蹤的店家發佈貼文（post_published_item 型別，收件人是追蹤者）。"
+    },
     "preference.cannot_disable": {
       "message": "這個通知無法關閉。",
       "description": "偏好設定要關閉不可關閉的 (分類, 渠道)：UpdateNotificationPreference。"
@@ -56,6 +128,22 @@
     "preference.not_available": {
       "message": "沒有這個通知設定。",
       "description": "偏好設定的 (受眾, 分類, 渠道) 不在註冊表實際送達的組合內：UpdateNotificationPreference。"
+    },
+    "review_created.body": {
+      "message": "有買家評價了你的商品。",
+      "description": "收件匣與推播的內文：商品收到新評價（review_created 型別，收件人是店家）。"
+    },
+    "review_created.title": {
+      "message": "收到新評價",
+      "description": "收件匣與推播的標題：商品收到新評價（review_created 型別，收件人是店家）。"
+    },
+    "store_followed.body": {
+      "message": "有買家開始追蹤你的店家。",
+      "description": "收件匣與推播的內文：店家被追蹤（store_followed 型別，收件人是店家）。"
+    },
+    "store_followed.title": {
+      "message": "新的追蹤者",
+      "description": "收件匣與推播的標題：店家被追蹤（store_followed 型別，收件人是店家）。"
     }
   }
 }

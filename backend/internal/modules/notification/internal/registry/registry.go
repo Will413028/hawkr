@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strings"
 	"time"
 	"uuid"
 
@@ -86,13 +87,15 @@ type Definition[P any] struct {
 	// Text 依語系組字。需要讀取時解析的內容（參數只存 ID）的型別改用 Load 與 TextLoaded，兩者擇一。
 	Text func(l uitext.Locale, p P) (Content, error)
 	// Load 在讀取時向擁有資料的地方（Sources）一次解析一批參數裡的 ID（一頁一次查詢），回傳與 ps 等長、同序的結果，交給 TextLoaded 組字；
-	// 查不到的 ID 留零值的 Loaded（TextLoaded 會拒絕），讀取本身失敗才回 error。有 Load 就一定要有 TextLoaded，反之亦然。
+	// 查不到的 ID 留零值的 Loaded（TextLoaded 會拒絕；DeepLinkLoaded 回空連結），讀取本身失敗才回 error。有 Load 就一定要有 TextLoaded 或 DeepLinkLoaded，反之亦然。
 	Load       func(ctx context.Context, src Sources, ps []P) ([]Loaded, error)
 	TextLoaded func(l uitext.Locale, p P, ld Loaded) (Content, error)
 	// ExampleLoaded 是範例參數對應的 Load 結果（自檢與固定輸出測試用）。
 	ExampleLoaded Loaded
-	// DeepLink 回傳深連結；留空表示沒有目的地。
+	// DeepLink 回傳深連結（website 相對路徑，不含語系前綴；前綴由組字時依文字語系統一加上）；留空表示沒有目的地。
 	DeepLink func(P) string
+	// DeepLinkLoaded 是路徑需要讀取時才查得到的值（例如店家的 store_code）的深連結，取 Load 的結果；與 DeepLink 擇一，一定要有 Load。
+	DeepLinkLoaded func(p P, ld Loaded) string
 	// ImageKey 回傳推播圖片的物件 key（D14，商品類型別帶）；留空表示沒有圖。
 	ImageKey func(P) string
 	// Example 是固定輸出測試與註冊表自檢用的範例參數。
@@ -106,10 +109,16 @@ type AnnouncementText struct{ Title, Body string }
 type Sources interface {
 	// Announcements 一次讀多則公告；查不到的 ID 不在結果裡。
 	Announcements(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]AnnouncementText, error)
+	// StoreCodes 一次讀多家店的 store_code（store_id 到 store_code）；不存在與沒有公開頁的店不在結果裡。
+	StoreCodes(ctx context.Context, storeIDs []int64) (map[int64]int64, error)
 }
 
 // Loaded 是 Load 解析出來的內容；沒有 Load 的型別是零值。
-type Loaded struct{ Announcement *AnnouncementText }
+type Loaded struct {
+	Announcement *AnnouncementText
+	// StoreCode 是參數裡那家店的 store_code；0 表示沒解析到（深連結留空）。
+	StoreCode int64
+}
 
 // Recipient 是型別從參數取出的收件人：(帳號, 受眾) 的帳號與 STORE 受眾的店。受眾本身是型別的屬性（Spec.Audience）。
 type Recipient struct {
@@ -372,9 +381,7 @@ func (e *entry[P]) render(l uitext.Locale, p P, ld Loaded) (Rendered, error) {
 		return Rendered{}, fmt.Errorf("通知型別 %s：%w", d.Name, err)
 	}
 	r := Rendered{Title: c.Title.Text, Body: c.Body.Text, Presentation: d.Presentation, StateHint: d.StateHint, Locale: l}
-	if d.DeepLink != nil {
-		r.DeepLink = d.DeepLink(p)
-	}
+	r.DeepLink = localizedLink(l, e.deepLink(p, ld))
 	if d.ImageKey != nil {
 		r.ImageKey = d.ImageKey(p)
 	}
@@ -383,6 +390,24 @@ func (e *entry[P]) render(l uitext.Locale, p P, ld Loaded) (Rendered, error) {
 		r.ActorAccounts = d.Actors(p)
 	}
 	return r, nil
+}
+
+func (e *entry[P]) deepLink(p P, ld Loaded) string {
+	switch {
+	case e.d.DeepLinkLoaded != nil:
+		return e.d.DeepLinkLoaded(p, ld)
+	case e.d.DeepLink != nil:
+		return e.d.DeepLink(p)
+	}
+	return ""
+}
+
+// localizedLink 依文字語系加深連結的語系前綴（D20）：en 加 /en，zh-TW 不加；空連結維持空。
+func localizedLink(l uitext.Locale, link string) string {
+	if link == "" || l != uitext.EN {
+		return link
+	}
+	return "/en" + link
 }
 
 func (e *entry[P]) Resolve(params json.RawMessage) (Resolved, error) {
@@ -606,11 +631,17 @@ func (e *entry[P]) validate() []error {
 	} else if d.AggregationKey != nil && d.AggregationKey(d.Example) == "" {
 		bad("範例參數的聚合鍵是空的")
 	}
+	if d.DeepLink != nil && d.DeepLinkLoaded != nil {
+		bad("DeepLink 與 DeepLinkLoaded 只能有一個")
+	}
+	if link := e.deepLink(d.Example, d.ExampleLoaded); link != "" && (!strings.HasPrefix(link, "/") || strings.HasPrefix(link, "//") || strings.HasPrefix(link, "/en/") || link == "/en") {
+		bad("範例的深連結 %q 要是不含語系前綴的 website 相對路徑", link)
+	}
 	switch {
 	case (d.Text == nil) == (d.TextLoaded == nil):
 		bad("Text 與 TextLoaded 要有且只有一個")
-	case (d.Load != nil) != (d.TextLoaded != nil):
-		bad("Load 與 TextLoaded 要成對")
+	case (d.Load != nil) != (d.TextLoaded != nil || d.DeepLinkLoaded != nil):
+		bad("Load 要與 TextLoaded 或 DeepLinkLoaded 成對")
 	default:
 		for _, l := range []uitext.Locale{uitext.ZhTW, uitext.EN} {
 			want := l
@@ -701,7 +732,7 @@ func (e *entry[P]) validateBroadcast() []error {
 		bad("fan-out 沒有 Targets")
 	}
 	if d.Fanout || d.Spawned || d.Recipient != nil || d.Expand != nil || d.Actors != nil || d.Aggregatable || d.AggregationKey != nil ||
-		len(d.Audiences) > 0 || len(d.Channels) > 0 || d.Text != nil || d.TextLoaded != nil || d.Load != nil {
+		len(d.Audiences) > 0 || len(d.Channels) > 0 || d.Text != nil || d.TextLoaded != nil || d.Load != nil || d.DeepLinkLoaded != nil {
 		bad("fan-out 母意圖不產生收件匣列，不能有受眾、渠道、文案、收件人、Expand、actor、聚合、Fanout 或 Spawned")
 	}
 	if d.Category != "" || d.Presentation != "" || d.StateHint != model.StateHintNone || d.FixedLocale != "" || d.DeepLink != nil || d.ImageKey != nil ||

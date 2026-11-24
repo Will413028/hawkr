@@ -63,6 +63,132 @@ func AudienceInvalid(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "通知的受眾不正確。", Locale: uitext.ZhTW}
 }
 
+// ChatMessageBuyerBody 是模組句子 chat_message_buyer.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ChatMessageBuyerBody(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A store sent you a message.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "店家傳了一則訊息給你。", Locale: uitext.ZhTW}
+}
+
+// ChatMessageBuyerTitle 是模組句子 chat_message_buyer.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ChatMessageBuyerTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "New message", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "新訊息", Locale: uitext.ZhTW}
+}
+
+// ChatMessageStoreBody 是模組句子 chat_message_store.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ChatMessageStoreBody(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A buyer sent you a message.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "買家傳了一則訊息給你。", Locale: uitext.ZhTW}
+}
+
+// ChatMessageStoreTitle 是模組句子 chat_message_store.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ChatMessageStoreTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "New message", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "新訊息", Locale: uitext.ZhTW}
+}
+
+// CommentCreatedBody 是模組句子 comment_created.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func CommentCreatedBody(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Someone commented on your post.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "有人在你的貼文下留言。", Locale: uitext.ZhTW}
+}
+
+// CommentCreatedTitle 是模組句子 comment_created.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func CommentCreatedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "New comment", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "收到新留言", Locale: uitext.ZhTW}
+}
+
+// CommentLikedBuyerBody 是模組句子 comment_liked_buyer.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func CommentLikedBuyerBody(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Someone liked your comment.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "有人對你的留言按讚。", Locale: uitext.ZhTW}
+}
+
+// CommentLikedBuyerTitle 是模組句子 comment_liked_buyer.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func CommentLikedBuyerTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your comment got a like", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "留言收到讚", Locale: uitext.ZhTW}
+}
+
+// CommentLikedStoreBody 是模組句子 comment_liked_store.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func CommentLikedStoreBody(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Someone liked your store's comment.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "有人對貴店的留言按讚。", Locale: uitext.ZhTW}
+}
+
+// CommentLikedStoreTitle 是模組句子 comment_liked_store.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func CommentLikedStoreTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your comment got a like", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "留言收到讚", Locale: uitext.ZhTW}
+}
+
+// CommentRepliedBuyerBody 是模組句子 comment_replied_buyer.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func CommentRepliedBuyerBody(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Someone replied to your comment.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "有人回覆了你的留言。", Locale: uitext.ZhTW}
+}
+
+// CommentRepliedBuyerTitle 是模組句子 comment_replied_buyer.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func CommentRepliedBuyerTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "New reply", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "收到新回覆", Locale: uitext.ZhTW}
+}
+
+// CommentRepliedStoreBody 是模組句子 comment_replied_store.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func CommentRepliedStoreBody(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Someone replied to your store's comment.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "有人回覆了貴店的留言。", Locale: uitext.ZhTW}
+}
+
+// CommentRepliedStoreTitle 是模組句子 comment_replied_store.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func CommentRepliedStoreTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "New reply", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "收到新回覆", Locale: uitext.ZhTW}
+}
+
 // DeviceAppInvalid 是模組句子 device_app.invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func DeviceAppInvalid(l uitext.Locale) uitext.Message {
 	switch l {
@@ -99,6 +225,42 @@ func InboxItemNotFound(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "找不到這則通知。", Locale: uitext.ZhTW}
 }
 
+// PostLikedBody 是模組句子 post_liked.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PostLikedBody(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Someone liked your post.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "有人對你的貼文按讚。", Locale: uitext.ZhTW}
+}
+
+// PostLikedTitle 是模組句子 post_liked.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PostLikedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "Your post got a like", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "貼文收到讚", Locale: uitext.ZhTW}
+}
+
+// PostPublishedItemBody 是模組句子 post_published_item.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PostPublishedItemBody(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A store you follow just published a new post.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "你追蹤的店家剛發佈了一則貼文。", Locale: uitext.ZhTW}
+}
+
+// PostPublishedItemTitle 是模組句子 post_published_item.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func PostPublishedItemTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A store you follow posted", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "追蹤的店家發佈了新貼文", Locale: uitext.ZhTW}
+}
+
 // PreferenceCannotDisable 是模組句子 preference.cannot_disable；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func PreferenceCannotDisable(l uitext.Locale) uitext.Message {
 	switch l {
@@ -115,4 +277,40 @@ func PreferenceNotAvailable(l uitext.Locale) uitext.Message {
 		return uitext.Message{Text: "This notification setting is not available.", Locale: uitext.EN}
 	}
 	return uitext.Message{Text: "沒有這個通知設定。", Locale: uitext.ZhTW}
+}
+
+// ReviewCreatedBody 是模組句子 review_created.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ReviewCreatedBody(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A buyer reviewed your product.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "有買家評價了你的商品。", Locale: uitext.ZhTW}
+}
+
+// ReviewCreatedTitle 是模組句子 review_created.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func ReviewCreatedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "New review", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "收到新評價", Locale: uitext.ZhTW}
+}
+
+// StoreFollowedBody 是模組句子 store_followed.body；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreFollowedBody(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "A buyer started following your store.", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "有買家開始追蹤你的店家。", Locale: uitext.ZhTW}
+}
+
+// StoreFollowedTitle 是模組句子 store_followed.title；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
+func StoreFollowedTitle(l uitext.Locale) uitext.Message {
+	switch l {
+	case uitext.EN:
+		return uitext.Message{Text: "New follower", Locale: uitext.EN}
+	}
+	return uitext.Message{Text: "新的追蹤者", Locale: uitext.ZhTW}
 }
