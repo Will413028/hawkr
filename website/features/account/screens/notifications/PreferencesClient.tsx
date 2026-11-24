@@ -1,5 +1,15 @@
 "use client";
 
+import { errorText } from "@hawkr/api/connect/errors";
+import type {
+	NotificationCategory,
+	NotificationChannel,
+} from "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb";
+import {
+	commonUnknown,
+	notificationNotificationCategory,
+	notificationNotificationChannel,
+} from "@hawkr/ui-text/keys";
 import * as React from "react";
 import AppIcon from "@/components/shared/AppIcon";
 import { SellerPageShell } from "@/components/shared/SellerPageShell";
@@ -8,68 +18,55 @@ import {
 	useInvalidateNotificationPreferences,
 	useNotificationPreferences,
 } from "@/lib/hooks/useNotificationPreferences";
+import {
+	optionalText,
+	type UiText,
+	useDefaultErrorText,
+	useUiText,
+} from "@/lib/i18n/ui-text";
 import { usePathname } from "@/lib/intl/navigation";
-import { updateNotificationPreference } from "@/lib/notifications/repo";
-import type { NotificationPreferenceItem } from "@/lib/notifications/types";
+import {
+	audienceForRole,
+	type PreferenceEntry,
+	updateNotificationPreference,
+} from "@/lib/notifications/inbox";
 import { notificationWorkspaceRole } from "@/lib/notifications/workspace";
 
 /**
  * Buyer/seller notification preference centre.
  *
- * Backend (`/app/{buyers|sellers}/me/notification-preferences`) stores
- * one `enabled` flag per category, no per-channel split — the UI here
- * mirrors that 1:1. Toggling a row PUTs the single category immediately
- * (optimistic + rollback on error); the "儲存" button is gone because
- * there's nothing left to batch.
+ * The server returns one entry per (category, channel) it actually delivers
+ * for the audience, and whether the user may turn it off (`canDisable`). The
+ * page shows one row per category with a switch for each channel returned for
+ * that category; entries that cannot be disabled are locked on. Toggling a
+ * switch calls `UpdateNotificationPreference` immediately (optimistic +
+ * rollback on error). Category and channel names come from the shared ui-text
+ * catalog.
  */
 
-// Fallback descriptors used until the backend's first response lands.
-// Server response titles/descriptions take precedence so categories can
-// be added/renamed server-side without a client redeploy.
-const CATEGORY_FALLBACK: Record<
-	string,
-	{ title: string; description: string }
-> = {
-	order_update: { title: "新訂單更新", description: "訂單狀態改變時通知" },
-	refund_update: { title: "退貨訂單更新", description: "退貨申請與包裹狀態" },
-	system: { title: "系統公告", description: "平台規範與重要通知" },
-	chat: { title: "聊天通知", description: "聊天訊息提醒" },
-	coupon: { title: "優惠卷通知", description: "優惠卷發送與到期通知" },
-	post: { title: "賣家貼文通知", description: "追蹤賣家發文與貼文提醒" },
-	message: { title: "賣家留言通知", description: "留言提醒" },
-	restock: { title: "補貨通知", description: "追蹤的售完商品補貨時通知" },
-	follower: { title: "追蹤/收藏/瀏覽通知", description: "潛在商機提醒" },
-	shipment_anomaly: {
-		title: "配送異常通知",
-		description: "出貨/配送異常即時提醒（強制接收，無法關閉）",
-	},
-};
+const entryKey = (
+	category: NotificationCategory,
+	channel: NotificationChannel,
+) => `${category}:${channel}`;
 
-/**
- * Categories the backend forces on per role (notification design doc §3.1).
- *
- * Backend now returns `forced=true` on the matching pref row (proto
- * `NotificationPreferenceItem.forced`, gateway DTO `forced` 欄位、§3.1）—
- * `pref.forced` is the primary source. This map remains as a defensive
- * fallback in case a stale notification-service build omits the field.
- *
- * Sellers cannot disable `shipment_anomaly` because a missed alert directly
- * causes a buyer-side issue. Buyer has no forced category (議題 3：
- * `shipment_anomaly` is seller-only — not in BuyerCategories).
- */
-const FORCED_BY_ROLE: Record<"buyer" | "seller", ReadonlyArray<string>> = {
-	buyer: [],
-	seller: ["shipment_anomaly"],
-};
+interface CategoryGroup {
+	category: NotificationCategory;
+	entries: PreferenceEntry[];
+}
 
-const FALLBACK_PREFS: NotificationPreferenceItem[] = Object.entries(
-	CATEGORY_FALLBACK,
-).map(([category, meta]) => ({
-	category,
-	title: meta.title,
-	description: meta.description,
-	enabled: true,
-}));
+function groupByCategory(entries: PreferenceEntry[]): CategoryGroup[] {
+	const groups: CategoryGroup[] = [];
+	for (const entry of entries) {
+		const group = groups.find((g) => g.category === entry.category);
+		if (group) group.entries.push(entry);
+		else groups.push({ category: entry.category, entries: [entry] });
+	}
+	return groups;
+}
+
+function nounText(ut: UiText, m: Parameters<typeof optionalText>[1]): string {
+	return optionalText(ut, m) ?? ut(commonUnknown());
+}
 
 export default function PreferencesClient() {
 	const pathname = usePathname();
@@ -82,87 +79,79 @@ function PreferencesContent({
 }: {
 	role: ReturnType<typeof notificationWorkspaceRole>;
 }) {
-	const [prefs, setPrefs] = React.useState<NotificationPreferenceItem[]>([]);
-	const [pendingCategory, setPendingCategory] = React.useState<string | null>(
-		null,
+	const ut = useUiText();
+	const defaults = useDefaultErrorText();
+	const [entries, setEntries] = React.useState<PreferenceEntry[]>([]);
+	const [pendingKeys, setPendingKeys] = React.useState<ReadonlySet<string>>(
+		new Set(),
 	);
 	const [error, setError] = React.useState<string | null>(null);
 	const [savedAt, setSavedAt] = React.useState<number | null>(null);
 
 	const {
-		prefs: remotePrefs,
+		entries: remoteEntries,
 		loading,
-		error: loadErrorRaw,
+		error: loadError,
 	} = useNotificationPreferences(role);
 	const invalidatePreferences = useInvalidateNotificationPreferences();
-	const loadError = loadErrorRaw
-		? `${loadErrorRaw}（顯示預設設定，切換後會嘗試儲存）`
-		: null;
 	const displayError = error ?? loadError;
 
 	// Seed the editable list from the shared read ONCE per role (per mount). We
 	// own the optimistic toggle locally, so we must NOT re-seed when the shared
-	// query refetches — the post-toggle invalidate (or a cross-toggle refetch)
-	// would otherwise clobber the just-flipped value or, on a stale GET-after-PUT,
-	// revert it. The cache stays the source of truth for the NEXT mount; this
-	// mount keeps its optimistic state. Empty/failed read → fallback rows (first
-	// toggle creates the row server-side).
+	// query refetches — the post-toggle invalidate would otherwise clobber the
+	// just-flipped value or, on a stale GET-after-PUT, revert it. The cache stays
+	// the source of truth for the NEXT mount.
 	const seededRoleRef = React.useRef<string | null>(null);
 	React.useEffect(() => {
-		if (loading || seededRoleRef.current === role) return;
+		if (loading || remoteEntries == null || seededRoleRef.current === role)
+			return;
 		seededRoleRef.current = role;
-		setPrefs(
-			remotePrefs && remotePrefs.length > 0 ? remotePrefs : FALLBACK_PREFS,
-		);
-	}, [remotePrefs, loading, role]);
+		setEntries(remoteEntries);
+	}, [remoteEntries, loading, role]);
 
-	// `shipment_anomaly` (and any future forced category) is locked-on for
-	// the matching role — we treat the server flag as the truth, then fall
-	// back to the role-keyed list so the lock still shows on backends that
-	// haven't shipped the `forced` field yet.
-	const forcedSet = React.useMemo(() => {
-		return new Set<string>(FORCED_BY_ROLE[role]);
-	}, [role]);
-
-	const isForced = React.useCallback(
-		(p: NotificationPreferenceItem) =>
-			Boolean(p.forced) || forcedSet.has(p.category),
-		[forcedSet],
-	);
-
-	// Optimistic toggle: flip the UI immediately, PUT to backend, roll back
-	// on failure. One-flag-per-row matches the openapi PUT body shape
-	// `{ category, enabled }` — no bulk save needed.
-	const handleToggle = async (category: string, nextEnabled: boolean) => {
-		// Defensive — the input is disabled for forced rows, but a
-		// click that races a re-render could still call this; bail out
-		// before hitting the API.
-		const target = prefs.find((p) => p.category === category);
-		if (target && isForced(target)) return;
-
-		setPrefs((prev) =>
-			prev.map((p) =>
-				p.category === category ? { ...p, enabled: nextEnabled } : p,
+	const setEnabled = (target: PreferenceEntry, enabled: boolean) =>
+		setEntries((prev) =>
+			prev.map((e) =>
+				e.category === target.category && e.channel === target.channel
+					? { ...e, enabled }
+					: e,
 			),
 		);
-		setPendingCategory(category);
+
+	// Optimistic toggle: flip the UI immediately, call the RPC, roll back on
+	// failure. One switch per (category, channel).
+	const handleToggle = async (
+		target: PreferenceEntry,
+		nextEnabled: boolean,
+	) => {
+		// The input is disabled for locked entries, but a click that races a
+		// re-render could still call this; bail out before hitting the API.
+		if (!target.canDisable) return;
+		setEnabled(target, nextEnabled);
+		const key = entryKey(target.category, target.channel);
+		setPendingKeys((prev) => new Set(prev).add(key));
 		setError(null);
 		setSavedAt(null);
 		try {
-			await updateNotificationPreference(category, nextEnabled, { role });
+			await updateNotificationPreference({
+				audience: audienceForRole(role),
+				category: target.category,
+				channel: target.channel,
+				enabled: nextEnabled,
+			});
 			setSavedAt(Date.now());
 			// Sync the shared cache so a remount (or the notifications list) sees
-			// the new value instead of the 30s-stale pre-toggle list.
+			// the new value instead of the stale pre-toggle list.
 			void invalidatePreferences(role);
 		} catch (e) {
-			setPrefs((prev) =>
-				prev.map((p) =>
-					p.category === category ? { ...p, enabled: !nextEnabled } : p,
-				),
-			);
-			setError(e instanceof Error ? e.message : "儲存失敗");
+			setEnabled(target, !nextEnabled);
+			setError(errorText(e, defaults));
 		} finally {
-			setPendingCategory(null);
+			setPendingKeys((prev) => {
+				const next = new Set(prev);
+				next.delete(key);
+				return next;
+			});
 		}
 	};
 
@@ -171,35 +160,7 @@ function PreferencesContent({
 			? "/seller-center/notifications"
 			: "/account/notifications";
 
-	const labelFor = (p: NotificationPreferenceItem) => {
-		const fb = CATEGORY_FALLBACK[p.category];
-		return {
-			title: p.title || fb?.title || p.category,
-			description: p.description || fb?.description || "",
-		};
-	};
-
-	// Backend 已實作 forced 欄位 (proto / domain.IsForcedCategory)，正常情況下
-	// shipment_anomaly 會以 forced=true 出現於賣家 GET 回應中。此處的 synthesise
-	// 邏輯保留為防禦性 fallback：若 notification-service 為舊版本（缺 forced 欄位
-	// 或忘了把 shipment_anomaly 加進 SellerCategories），UI 仍會顯示鎖定 row。
-	// Buyer 不 synthesise（議題 3：shipment_anomaly 為賣家專屬，從 BuyerCategories 移除）。
-	const displayedPrefs = React.useMemo<NotificationPreferenceItem[]>(() => {
-		const seen = new Set(prefs.map((p) => p.category));
-		const extras: NotificationPreferenceItem[] = [];
-		for (const category of forcedSet) {
-			if (seen.has(category)) continue;
-			const fb = CATEGORY_FALLBACK[category];
-			extras.push({
-				category,
-				title: fb?.title,
-				description: fb?.description,
-				enabled: true,
-				forced: true,
-			});
-		}
-		return [...prefs, ...extras];
-	}, [prefs, forcedSet]);
+	const groups = React.useMemo(() => groupByCategory(entries), [entries]);
 
 	return (
 		<div className="bg-transparent">
@@ -220,70 +181,42 @@ function PreferencesContent({
 				) : (
 					<>
 						<ul className="list-none m-0 p-0 flex flex-col gap-[var(--hkui-space-2)]">
-							{displayedPrefs.map((p) => {
-								const meta = labelFor(p);
-								const isPending = pendingCategory === p.category;
-								const forced = isForced(p);
-								// Forced rows: backend keeps enabled=true (or returns it
-								// missing), but the UI always shows "已開啟" and the toggle
-								// is disabled so the seller can't even attempt to flip it.
-								const effectiveEnabled = forced ? true : p.enabled;
+							{groups.map((group) => {
+								const locked = group.entries.every((e) => !e.canDisable);
 								return (
 									<li
-										key={p.category}
+										key={group.category}
 										className="flex items-center justify-between gap-[var(--hkui-space-4)] p-[var(--hkui-space-4)_var(--hkui-space-5)] bg-[var(--hkui-content1)] border border-[var(--hkui-divider)] rounded-[var(--hkui-radius-lg)]"
 									>
 										<div className="flex flex-col gap-[2px]">
 											<span className="text-[length:var(--hkui-text-medium)] font-semibold text-[var(--hkui-foreground)]">
-												{meta.title}
+												{nounText(
+													ut,
+													notificationNotificationCategory(group.category),
+												)}
 											</span>
-											{meta.description ? (
-												<span className="text-[length:var(--hkui-text-small)] text-[var(--hkui-foreground-soft)]">
-													{meta.description}
-												</span>
-											) : null}
-											{forced ? (
+											{locked ? (
 												<span className="text-[length:var(--hkui-text-tiny)] text-[var(--hkui-foreground-muted,var(--hkui-foreground-soft))]">
 													強制接收，無法關閉
 												</span>
 											) : null}
 										</div>
-										<label
-											className={`inline-flex min-h-11 items-center gap-[var(--hkui-space-3)] select-none shrink-0 transition-opacity duration-200 ${
-												isPending
-													? "opacity-60 pointer-events-none cursor-pointer"
-													: forced
-														? "cursor-not-allowed"
-														: "cursor-pointer"
-											}`}
-										>
-											<input
-												type="checkbox"
-												className="absolute opacity-0 pointer-events-none w-px h-px"
-												checked={effectiveEnabled}
-												disabled={isPending || forced}
-												onChange={(e) =>
-													void handleToggle(p.category, e.target.checked)
-												}
-											/>
-											<div
-												className={`relative w-11 h-[26px] rounded-full transition-colors duration-[var(--hkui-dur-base)] ease-[var(--hkui-ease)] ${effectiveEnabled ? "bg-[var(--hkui-primary)]" : "bg-[var(--hkui-default-200,rgb(var(--color-ink-950-rgb)/0.18))]"}`}
-												aria-hidden="true"
-											>
-												<span
-													className={`absolute top-[3px] left-[3px] w-5 h-5 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.18)] transition-transform duration-[var(--hkui-dur-base)] ease-[var(--hkui-ease)] ${effectiveEnabled ? "translate-x-[18px]" : ""}`}
+										<div className="flex flex-col items-end gap-[var(--hkui-space-1)] shrink-0">
+											{group.entries.map((entry) => (
+												<ChannelSwitch
+													key={entryKey(entry.category, entry.channel)}
+													entry={entry}
+													label={nounText(
+														ut,
+														notificationNotificationChannel(entry.channel),
+													)}
+													pending={pendingKeys.has(
+														entryKey(entry.category, entry.channel),
+													)}
+													onToggle={(next) => void handleToggle(entry, next)}
 												/>
-											</div>
-											<span
-												className={`text-[length:var(--hkui-text-tiny)] min-w-[3.5em] transition-colors duration-[var(--hkui-dur-base)] ease-[var(--hkui-ease)] ${effectiveEnabled ? "text-[var(--hkui-primary)] font-medium" : "text-[var(--hkui-foreground-soft)]"}`}
-											>
-												{forced
-													? "強制開啟"
-													: effectiveEnabled
-														? "已開啟"
-														: "已關閉"}
-											</span>
-										</label>
+											))}
+										</div>
 									</li>
 								);
 							})}
@@ -310,5 +243,54 @@ function PreferencesContent({
 				)}
 			</SellerPageShell>
 		</div>
+	);
+}
+
+function ChannelSwitch({
+	entry,
+	label,
+	pending,
+	onToggle,
+}: {
+	entry: PreferenceEntry;
+	label: string;
+	pending: boolean;
+	onToggle: (next: boolean) => void;
+}) {
+	const locked = !entry.canDisable;
+	// Locked entries are always delivered: show them on whatever the stored flag.
+	const effectiveEnabled = locked ? true : entry.enabled;
+	return (
+		<label
+			className={`inline-flex min-h-11 items-center gap-[var(--hkui-space-3)] select-none transition-opacity duration-200 ${
+				pending
+					? "opacity-60 pointer-events-none cursor-pointer"
+					: locked
+						? "cursor-not-allowed"
+						: "cursor-pointer"
+			}`}
+		>
+			<input
+				type="checkbox"
+				className="absolute opacity-0 pointer-events-none w-px h-px"
+				checked={effectiveEnabled}
+				disabled={pending || locked}
+				onChange={(e) => onToggle(e.target.checked)}
+			/>
+			<div
+				className={`relative w-11 h-[26px] rounded-full transition-colors duration-[var(--hkui-dur-base)] ease-[var(--hkui-ease)] ${effectiveEnabled ? "bg-[var(--hkui-primary)]" : "bg-[var(--hkui-default-200,rgb(var(--color-ink-950-rgb)/0.18))]"}`}
+				aria-hidden="true"
+			>
+				<span
+					className={`absolute top-[3px] left-[3px] w-5 h-5 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.18)] transition-transform duration-[var(--hkui-dur-base)] ease-[var(--hkui-ease)] ${effectiveEnabled ? "translate-x-[18px]" : ""}`}
+				/>
+			</div>
+			<span
+				className={`text-[length:var(--hkui-text-tiny)] min-w-[3.5em] transition-colors duration-[var(--hkui-dur-base)] ease-[var(--hkui-ease)] ${effectiveEnabled ? "text-[var(--hkui-primary)] font-medium" : "text-[var(--hkui-foreground-soft)]"}`}
+			>
+				{label}
+				{locked ? <span className="block">強制開啟</span> : null}
+			</span>
+		</label>
 	);
 }

@@ -126,6 +126,17 @@ var customerEffects = map[string]Effect{
 	"/hawkr.moderation.v1alpha1.ModerationAppService/ListMyReports":      EffectRead,
 	"/hawkr.moderation.v1alpha1.ModerationAppService/ListMyStoreReports": EffectRead,
 
+	// MediaAppService：上傳是寫入（停權的帳號不能開始新的上傳）；讀處理狀態停權的帳號也可以。
+	"/hawkr.media.v1alpha1.MediaAppService/BeginUpload":       EffectWrite,
+	"/hawkr.media.v1alpha1.MediaAppService/CompleteUpload":    EffectWrite,
+	"/hawkr.media.v1alpha1.MediaAppService/GetUpload":         EffectRead,
+	"/hawkr.media.v1alpha1.MediaAppService/BeginSecureUpload": EffectWrite,
+	// MediaDelegatedService：憑證是代行 session，不讀帳號；宣告仍要誠實標示方法的性質。
+	"/hawkr.media.v1alpha1.MediaDelegatedService/BeginSecureUpload": EffectWrite,
+	"/hawkr.media.v1alpha1.MediaDelegatedService/BeginUpload":       EffectWrite,
+	"/hawkr.media.v1alpha1.MediaDelegatedService/CompleteUpload":    EffectWrite,
+	"/hawkr.media.v1alpha1.MediaDelegatedService/GetUpload":         EffectRead,
+
 	// SocialAppService
 	"/hawkr.social.v1alpha1.SocialAppService/SharePost":             EffectWrite,
 	"/hawkr.social.v1alpha1.SocialAppService/LikePost":              EffectWrite,
@@ -167,6 +178,14 @@ var customerEffects = map[string]Effect{
 	"/hawkr.review.v1alpha1.ReviewAppService/ListMyReviews":       EffectRead,
 	"/hawkr.review.v1alpha1.ReviewAppService/ListOwnStoreReviews": EffectRead,
 
+	// CouponAppService：領券寫入；結束活動是店家的收縮型寫入，停權的帳號不在這裡放行（店家的停權由賣家能力宣告處理）。
+	"/hawkr.coupon.v1alpha1.CouponAppService/ListMyVouchers":         EffectRead,
+	"/hawkr.coupon.v1alpha1.CouponAppService/ListClaimableCampaigns": EffectRead,
+	"/hawkr.coupon.v1alpha1.CouponAppService/ClaimCoupon":            EffectWrite,
+	"/hawkr.coupon.v1alpha1.CouponAppService/CreateCampaign":         EffectWrite,
+	"/hawkr.coupon.v1alpha1.CouponAppService/ListCampaigns":          EffectRead,
+	"/hawkr.coupon.v1alpha1.CouponAppService/GetCampaign":            EffectRead,
+	"/hawkr.coupon.v1alpha1.CouponAppService/EndCampaign":            EffectWrite,
 	// CrmAppService
 	"/hawkr.crm.v1alpha1.CrmAppService/ListCustomers":     EffectRead,
 	"/hawkr.crm.v1alpha1.CrmAppService/GetCustomer":       EffectRead,

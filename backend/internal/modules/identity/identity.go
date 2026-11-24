@@ -22,6 +22,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
+	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
 //go:embed db/migrations/*.sql db/migrations/atlas.sum
@@ -192,6 +193,9 @@ const (
 func LoginProviders() []Provider { return model.ProviderValues() }
 func ClientKinds() []ClientKind  { return model.ClientKinds() }
 
+// PreferredLocales 回傳 preferred_locale 的支援清單（zh-TW、en）。
+func PreferredLocales() []uitext.Locale { return model.Locales() }
+
 // WebSessionCookieMaxAge 是 web 的 session cookie 的 Max-Age：等於 session 的絕對逾時（ADR 2026-10-30-identity-self-hosted-federated-login D1），
 // 閒置逾時由伺服器判斷。
 const WebSessionCookieMaxAge = session.Absolute
@@ -255,6 +259,17 @@ func (m *Module) Accounts(ctx context.Context, ids []int64) ([]Account, error) {
 // 自填的信箱未驗證，不是寄件地址（通知只寄 Source 是 ContactEmailVerified 的）。帳號不存在回 NotFound。在呼叫方的 transaction 內呼叫時讀它的狀態。
 func (m *Module) ContactEmail(ctx context.Context, accountID int64) (ContactEmail, bool, error) {
 	return m.account.ContactEmail(ctx, accountID)
+}
+
+// PreferredLocale 回傳帳號的 preferred_locale（非同步訊息的語系，多語系 ADR D1）；帳號不存在回 NotFound。
+func (m *Module) PreferredLocale(ctx context.Context, accountID int64) (uitext.Locale, error) {
+	return m.account.PreferredLocale(ctx, accountID)
+}
+
+// SetPreferredLocale 把帳號的 preferred_locale 更新為 locale，只在與目前的值不同時寫（回 true）；已刪除或不存在的帳號不動。語系不在支援清單內回 InvalidInput。
+// 在呼叫方的 transaction 內呼叫；notification 的 RegisterDeviceToken（App 每次啟動、回前景都呼叫）與 App 登入用它記下「最後一次生效的 UI 語系」。
+func (m *Module) SetPreferredLocale(ctx context.Context, accountID int64, locale uitext.Locale) (bool, error) {
+	return m.account.SetPreferredLocale(ctx, accountID, locale)
 }
 
 // SetSelfEnteredEmail 設定帳號自填的聯絡信箱（trim、小寫、格式與長度同 emailaddr.Normalize）。只在帳號沒有已驗證的 email 時可設，

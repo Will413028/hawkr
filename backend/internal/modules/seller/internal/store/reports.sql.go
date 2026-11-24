@@ -346,35 +346,6 @@ func (q *Queries) DuplicateBuyerReport(ctx context.Context, arg DuplicateBuyerRe
 	return i, err
 }
 
-const evidenceAssets = `-- name: EvidenceAssets :many
-SELECT asset_id FROM seller.report_evidence WHERE report_id = $1
-UNION ALL
-SELECT asset_id FROM seller.measure_request_evidence WHERE request_id = $1
-UNION ALL
-SELECT asset_id FROM seller.case_inquiry_reply_evidence WHERE inquiry_id = $1
-`
-
-// 以 ref_id（通報、請求或詢問的 ID）登記的佐證中，業務列目前指著的 asset（同步 job 讀的）。
-func (q *Queries) EvidenceAssets(ctx context.Context, refID uuid.UUID) ([]string, error) {
-	rows, err := q.db.Query(ctx, evidenceAssets, refID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []string{}
-	for rows.Next() {
-		var asset_id string
-		if err := rows.Scan(&asset_id); err != nil {
-			return nil, err
-		}
-		items = append(items, asset_id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const insertEvidenceAccess = `-- name: InsertEvidenceAccess :exec
 INSERT INTO seller.evidence_accesses (access_id, report_id, submission_seq, request_id, position, admin_id, accessed_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -476,7 +447,7 @@ type InsertReportEvidenceParams struct {
 	SubmissionSeq int16
 	Position      int32
 	SupplementID  *uuid.UUID
-	AssetID       string
+	AssetID       uuid.UUID
 	ObjectKey     string
 }
 

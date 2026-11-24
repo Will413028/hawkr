@@ -17,12 +17,10 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/live"
-	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/purge"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/read"
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/write"
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
@@ -55,7 +53,8 @@ type Deps struct {
 	DB     *db.DB
 	Events *events.Bus
 	Jobs   jobs.Enqueuer
-	Media  media.Media
+	// Media 是 media 模組（*media.Module）：圖片訊息在寫入的 transaction 內 Confirm，抹除的訊息的圖 MarkDeleted。
+	Media  model.Media
 	Buyers Buyers
 	Stores Stores
 	Orders Orders
@@ -151,7 +150,6 @@ func ReasonOf(err error) Reason { return model.ReasonOf(err) }
 type Module struct {
 	write     *write.Service
 	read      *read.Service
-	mediaSync *media.RefSyncer
 	purge     *purge.Service
 	hub       *live.Hub
 	listenCfg *pgx.ConnConfig
@@ -180,12 +178,11 @@ func New(d Deps) *Module {
 	return &Module{
 		hub: live.NewHub(rd, live.DBStreams{DB: d.DB}, lc), listenCfg: d.ListenConnConfig, pool: d.DB,
 		write: write.New(write.Deps{
-			DB: d.DB, Events: d.Events, Media: d.Media, Jobs: d.Jobs, Buyers: d.Buyers, Stores: d.Stores, Orders: d.Orders,
+			DB: d.DB, Events: d.Events, Media: d.Media, Buyers: d.Buyers, Stores: d.Stores, Orders: d.Orders,
 			NewID: d.NewID, Now: d.Now, Logger: d.Logger,
 		}),
-		read:      rd,
-		purge:     purge.New(purge.Deps{DB: d.DB, Jobs: d.Jobs, NewID: d.NewID, Now: d.Now, Logger: d.Logger}),
-		mediaSync: mediaref.NewSyncer(d.DB, d.Media, d.Jobs, d.Now, d.Logger),
+		read:  rd,
+		purge: purge.New(purge.Deps{DB: d.DB, Jobs: d.Jobs, Media: d.Media, NewID: d.NewID, Now: d.Now, Logger: d.Logger}),
 	}
 }
 
@@ -299,24 +296,15 @@ func (m *Module) ErasePartyMessages(ctx context.Context, kind PartyKind, id int6
 // SweepErase 補排已關閉的買家與已退場的店家中仍有未抹除訊息的身分的抹除 job（保底掃描的內容，給 worker 與測試呼叫）。
 func (m *Module) SweepErase(ctx context.Context) (int, error) { return m.purge.Sweep(ctx) }
 
-// SyncMedia 同步一個 ref 的 media 引用（job 與測試用）。
-func (m *Module) SyncMedia(ctx context.Context, ref media.Ref) (media.SyncResult, error) {
-	return m.mediaSync.Sync(ctx, ref)
-}
-
-// SweepMedia 補排版本比已同步的新的 ref。
-func (m *Module) SweepMedia(ctx context.Context) (int, error) { return m.mediaSync.Sweep(ctx) }
-
-// AddWorkers 登記 River worker（媒體引用同步與保底掃描、抹除與其保底掃描、存活標記清理）。由 cmd/hawkr 接上。
+// AddWorkers 登記 River worker（抹除與其保底掃描、存活標記清理）。由 cmd/hawkr 接上。
 func (m *Module) AddWorkers(workers *river.Workers) {
-	mediaref.AddWorkers(workers, m.mediaSync)
 	purge.AddWorkers(workers, m.purge)
 	live.AddWorkers(workers, live.DBStreams{DB: m.pool})
 }
 
-// PeriodicJobs 回傳保底掃描的排程（媒體引用、抹除、存活標記清理）。
+// PeriodicJobs 回傳保底掃描的排程（抹除、存活標記清理）。
 func (m *Module) PeriodicJobs() []*river.PeriodicJob {
-	return slices.Concat(mediaref.PeriodicJobs(), purge.PeriodicJobs(), live.PeriodicJobs())
+	return slices.Concat(purge.PeriodicJobs(), live.PeriodicJobs())
 }
 
 // OnMeasureCreated 是 seller 建立內容下架措施時同 transaction 的訂閱者（單體規則 4 的原子狀態變更）：只處理店家寄出的聊天訊息（Contents 裡種類是 CHAT_MESSAGE 的對象），

@@ -12,6 +12,10 @@ import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.client.da
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.spec.dart';
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.pb.dart'
     show Account, GetSessionResponse;
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.connect.spec.dart';
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pb.dart'
+    show GetUnreadCountResponse;
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.spec.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart'
@@ -295,6 +299,17 @@ class _SellerAppHarness {
             ) {
               return GetStoreUnreadCountResponse();
             }).build(),
+          ),
+        ),
+        // 儀表板的通知未讀數走 Connect（GetUnreadCount）。
+        notificationClientProvider.overrideWithValue(
+          NotificationAppServiceClient(
+            FakeTransportBuilder().unary(
+              NotificationAppService.getUnreadCount,
+              (_, _) {
+                return GetUnreadCountResponse();
+              },
+            ).build(),
           ),
         ),
         postLoginSideEffectsProvider.overrideWithValue(

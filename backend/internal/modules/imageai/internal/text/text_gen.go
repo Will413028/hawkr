@@ -131,15 +131,6 @@ func AdminStyleThumbnailRequired(l uitext.Locale) uitext.Message {
 	return uitext.Message{Text: "新增風格必須上傳縮圖", Locale: uitext.ZhTW}
 }
 
-// AdminStyleThumbnailUnusable 是模組句子 admin.style_thumbnail_unusable；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
-func AdminStyleThumbnailUnusable(l uitext.Locale) uitext.Message {
-	switch l {
-	case uitext.EN:
-		return uitext.Message{Text: "The thumbnail cannot be used. Please upload it again", Locale: uitext.EN}
-	}
-	return uitext.Message{Text: "縮圖無法使用，請重新上傳", Locale: uitext.ZhTW}
-}
-
 // StyleCategoryInvalid 是模組句子 style.category_invalid；Message.Locale 是實際使用的語系（該語系缺字時是 zh-TW）。
 func StyleCategoryInvalid(l uitext.Locale) uitext.Message {
 	switch l {

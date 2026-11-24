@@ -634,8 +634,8 @@ func (x *SocialSnapshot) GetAuthoredTime() *timestamppb.Timestamp {
 type BuyerSnapshot struct {
 	state       protoimpl.MessageState `protogen:"open.v1"`
 	DisplayName string                 `protobuf:"bytes,1,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
-	// 頭像的 object key；沒有頭像是空字串。
-	Avatar        string `protobuf:"bytes,2,opt,name=avatar,proto3" json:"avatar,omitempty"`
+	// 頭像的資產 ID（moderation 自己保存的複本）；沒有頭像是空字串。
+	AvatarAssetId string `protobuf:"bytes,2,opt,name=avatar_asset_id,json=avatarAssetId,proto3" json:"avatar_asset_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -677,9 +677,9 @@ func (x *BuyerSnapshot) GetDisplayName() string {
 	return ""
 }
 
-func (x *BuyerSnapshot) GetAvatar() string {
+func (x *BuyerSnapshot) GetAvatarAssetId() string {
 	if x != nil {
-		return x.Avatar
+		return x.AvatarAssetId
 	}
 	return ""
 }
@@ -1739,10 +1739,10 @@ const file_hawkr_admin_moderation_v1alpha1_moderation_proto_rawDesc = "" +
 	"\x04body\x18\x03 \x01(\tB\x03\xe0A\x03R\x04body\x12 \n" +
 	"\tasset_ids\x18\x04 \x03(\tB\x03\xe0A\x03R\bassetIds\x12I\n" +
 	"\rauthored_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03H\x00R\fauthoredTime\x88\x01\x01B\x10\n" +
-	"\x0e_authored_time\"T\n" +
+	"\x0e_authored_time\"d\n" +
 	"\rBuyerSnapshot\x12&\n" +
-	"\fdisplay_name\x18\x01 \x01(\tB\x03\xe0A\x03R\vdisplayName\x12\x1b\n" +
-	"\x06avatar\x18\x02 \x01(\tB\x03\xe0A\x03R\x06avatar\"\xcf\x02\n" +
+	"\fdisplay_name\x18\x01 \x01(\tB\x03\xe0A\x03R\vdisplayName\x12+\n" +
+	"\x0favatar_asset_id\x18\x02 \x01(\tB\x03\xe0A\x03R\ravatarAssetId\"\xcf\x02\n" +
 	"\x0eReviewSnapshot\x12 \n" +
 	"\tauthor_id\x18\x01 \x01(\tB\x03\xe0A\x03R\bauthorId\x12\x1e\n" +
 	"\bstore_id\x18\x02 \x01(\tB\x03\xe0A\x03R\astoreId\x12\"\n" +

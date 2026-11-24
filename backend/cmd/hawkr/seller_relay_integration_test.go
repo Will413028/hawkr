@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
@@ -46,10 +45,8 @@ func newSellerRelayFixture(t *testing.T) *sellerRelayFixture {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	accounts := identity.New(identity.Deps{DB: d, Events: bus, Now: clock, Logger: logger})
 	kycMAC := sealtest.MAC(t)
-	kycImages := media.NewFake()
-	kycImages.Key = func(refType, token string) string { return refType + "/" + token }
 	sellers := seller.New(seller.Deps{
-		DB: d, Events: bus, Jobs: queue, Identity: accounts, Media: kycImages, Orders: noOrders{}, ProductStores: &productStoresStub{}, Registry: noRegistry{},
+		DB: d, Events: bus, Jobs: queue, Identity: accounts, Media: noMedia{}, Orders: noOrders{}, ProductStores: &productStoresStub{}, Registry: noRegistry{},
 		KYCMAC: kycMAC, Now: clock, Logger: logger,
 		Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: queue, Now: clock, Logger: logger}),
 	})

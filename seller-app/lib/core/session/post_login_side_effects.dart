@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/chat/data/chat_session.dart';
 import '../../features/order/data/order_status_notifier.dart';
+import '../../features/notification/data/notification_signal_service.dart';
 import '../../features/notification/data/push/manager.dart';
 import '../../features/seller/data/current_store.dart';
 
@@ -27,6 +28,7 @@ class RealPostLoginSideEffects implements PostLoginSideEffects {
   void onLogin() {
     OrderStatusNotifier.instance.startListening();
     _ref.read(chatSessionProvider).start();
+    _ref.read(notificationSignalServiceProvider).start();
     PushNotificationManager.instance.onUserLoggedIn();
   }
 
@@ -34,6 +36,7 @@ class RealPostLoginSideEffects implements PostLoginSideEffects {
   Future<void> onSessionRestored() async {
     OrderStatusNotifier.instance.startListening();
     _ref.read(chatSessionProvider).start();
+    _ref.read(notificationSignalServiceProvider).start();
     PushNotificationManager.instance.onUserLoggedIn();
     // 由 Session.initialize() 呼叫：等 currentStoreProvider 讀完 GetMyStore。它只依賴 session 的帳號，
     // 不會重新進入 initialize()。

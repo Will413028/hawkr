@@ -23,6 +23,9 @@ const MaxPerAccount = 8
 // retryAfter 是超過上限時給 client 的重試建議。
 const retryAfter = 5 * time.Second
 
+// MaxNewItemIDs 是一個訂閱者在兩則訊號之間累積的新通知 ID 上限（估計值：夠一次 toast 一批，不是量測值）；超過就標 truncated、不再帶 ID。
+const MaxNewItemIDs = 20
+
 // SellerChange 是賣家工作區哪一類資料變了。
 type SellerChange int
 
@@ -48,6 +51,11 @@ type Inbox struct {
 	LatestItemID *uuid.UUID
 	// Hints 是這次訊號合併的通知所帶的狀態重讀提示的聯集（不重複、不含空值）；連線建立時的第一則為空。
 	Hints []model.StateHint
+	// NewItemIDs 是上一則訊號之後新建或聚合更新的收件匣列 ID（依到達順序、不重複）；連線建立的第一則、只有已讀或刪除變化時為空。
+	// 每個 ID 在一條串流上至多送達一次，斷線期間的缺口不補送。
+	NewItemIDs []uuid.UUID
+	// NewItemsTruncated 為 true 表示累積的新通知超過 MaxNewItemIDs：NewItemIDs 為空，client 重讀列表、不 toast。
+	NewItemsTruncated bool
 }
 
 // Event 是串流的一則訊號：Inbox 與 Workspace 恰有一個有值（Workspace 為零表示是 Inbox）。
@@ -141,7 +149,8 @@ func remove[K comparable](m map[K]map[*Subscription]struct{}, k K, s *Subscripti
 
 // InboxChanged 把收件匣通知扇出給本行程 (帳號, 受眾) 的訂閱者（由 LISTEN 收到的通知觸發，不直接由寫入端呼叫）。
 // hint 是這則通知的狀態重讀提示，空值不加提示。STORE 受眾只送給訂閱同一家店的串流。
-func (h *Hub) InboxChanged(key Key, storeID int64, hint model.StateHint) {
+// itemID 是新建或聚合更新的收件匣列 ID，uuid.Nil() 表示沒有新通知（已讀、刪除）。
+func (h *Hub) InboxChanged(key Key, storeID int64, hint model.StateHint, itemID uuid.UUID) {
 	h.mu.Lock()
 	subs := make([]*Subscription, 0, len(h.byKey[key]))
 	for s := range h.byKey[key] {
@@ -156,6 +165,7 @@ func (h *Hub) InboxChanged(key Key, storeID int64, hint model.StateHint) {
 			if hint != model.StateHintNone && !slices.Contains(s.hints, hint) {
 				s.hints = append(s.hints, hint)
 			}
+			s.addItem(itemID)
 		})
 	}
 }
@@ -189,7 +199,22 @@ type Subscription struct {
 	first      bool
 	inboxDirty bool
 	hints      []model.StateHint
+	newItems   []uuid.UUID
+	truncated  bool
 	changes    []SellerChange
+}
+
+// addItem 把新通知 ID 併進累積的集合（呼叫端持有 s.mu）：超過上限就改標 truncated 並丟掉已累積的 ID。
+func (s *Subscription) addItem(id uuid.UUID) {
+	if id == uuid.Nil() || s.truncated || slices.Contains(s.newItems, id) {
+		return
+	}
+	if len(s.newItems) >= MaxNewItemIDs {
+		s.truncated = true
+		s.newItems = nil
+		return
+	}
+	s.newItems = append(s.newItems, id)
 }
 
 // ErrClosed 是訂閱已關閉。
@@ -220,15 +245,16 @@ func (s *Subscription) Next(ctx context.Context) (Event, error) {
 		switch {
 		case s.first || s.inboxDirty:
 			s.first, s.inboxDirty = false, false
-			hints := s.hints
-			s.hints = nil
+			hints, items, truncated := s.hints, s.newItems, s.truncated
+			s.hints, s.newItems, s.truncated = nil, nil, false
 			s.mu.Unlock()
 			in, err := s.hub.read(ctx, s.key, s.storeID)
 			if err != nil {
-				s.restoreInbox(hints)
+				s.restoreInbox(hints, items, truncated)
 				return Event{}, err
 			}
 			in.Hints = hints
+			in.NewItemIDs, in.NewItemsTruncated = items, truncated
 			return Event{Inbox: &in}, nil
 		case len(s.changes) > 0:
 			c := s.changes[0]
@@ -245,8 +271,8 @@ func (s *Subscription) Next(ctx context.Context) (Event, error) {
 	}
 }
 
-// restoreInbox 在讀取內容失敗時把已取走的收件匣標記放回去：下一次 Next 重讀，這次合併的提示不遺失（與期間新來的提示取聯集）。
-func (s *Subscription) restoreInbox(hints []model.StateHint) {
+// restoreInbox 在讀取內容失敗時把已取走的收件匣標記放回去：下一次 Next 重讀，這次合併的提示與新通知 ID 不遺失（與期間新來的取聯集，合計超過上限就標 truncated）。
+func (s *Subscription) restoreInbox(hints []model.StateHint, items []uuid.UUID, truncated bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.inboxDirty = true
@@ -254,6 +280,15 @@ func (s *Subscription) restoreInbox(hints []model.StateHint) {
 		if !slices.Contains(s.hints, h) {
 			s.hints = append(s.hints, h)
 		}
+	}
+	// 取走的 ID 排在期間新來的前面，維持到達順序。
+	pending := s.newItems
+	s.newItems = nil
+	if truncated {
+		s.truncated = true
+	}
+	for _, id := range append(slices.Clone(items), pending...) {
+		s.addItem(id)
 	}
 }
 

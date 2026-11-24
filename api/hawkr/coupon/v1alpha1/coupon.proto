@@ -1,0 +1,294 @@
+syntax = "proto3";
+
+// coupon 模組給買家與店家的 API：買家的券（錢包）與可領的活動、店家發的活動。資源被兩種身分共用，所以是同一個 CouponAppService，
+// 身分由方法決定：ListMyVouchers、ListClaimableCampaigns、ClaimCoupon 以呼叫者的買家身分，CreateCampaign、ListCampaigns、
+// GetCampaign、EndCampaign 以呼叫者此刻的店（店家不由請求指定）。後台的活動、指定發放與作廢在 hawkr.admin.coupon.v1alpha1。
+//
+// 模型：活動（Campaign）是折抵規則、總量與資格；券（Voucher）是買家持有的一張。領券、指定發放、系統補償都只是建立一張券；
+// 每位買家在同一個活動至多持有一張。到期從活動的 end_time 推導（Voucher.expired），不是狀態。
+//
+// ID 是不透明的字串（活動與券是 UUID，買家與店家是過渡期的十進位整數字串），client 不解析、不轉數字
+// （ADR 2026-09-25-row-identity-by-data-kind D5）。金額是新台幣元的整數。
+package hawkr.coupon.v1alpha1;
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+import "hawkr/common/v1alpha1/store_card.proto";
+
+// CouponAppService 是登入帳號的優惠券。
+service CouponAppService {
+  // ListMyVouchers 列出呼叫者（買家）持有的券，新到舊。statuses 為空是全部狀態；到期的券仍是 AVAILABLE，以 expired 呈現。
+  // 帶 checkout 時是結帳情境：statuses 必須為空或只含 AVAILABLE，只回這筆訂單現在用得上的券（與鎖券同一組檢查：狀態、時間窗、店家停權、資格、店家範圍、門檻、折抵大於 0），
+  // 每張附 estimated_discount。page_token 只能用在同一組 statuses 與 checkout。
+  rpc ListMyVouchers(ListMyVouchersRequest) returns (ListMyVouchersResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ListClaimableCampaigns 列出呼叫者現在領得到的活動，新到舊：進行中、在時間窗內、還有名額、呼叫者符合資格、而且還沒有這個活動的券（與 ClaimCoupon 同一個資格判定）。
+  // store_id 有值時只列該店與全平台的活動。page_token 只能用在同一個 store_id。
+  rpc ListClaimableCampaigns(ListClaimableCampaignsRequest) returns (ListClaimableCampaignsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ClaimCoupon 領取活動的券，回傳領到的券。已經領過回既有的那張（冪等，不再計數）。活動不存在回 not_found；不是進行中、不在時間窗、發行店家停權、
+  // 不符合資格回 failed_precondition（reason 見 ErrorReason 的 COUPON_*）；領完了回 failed_precondition 與 COUPON_ISSUE_LIMIT_REACHED；
+  // 曾經領過但券已被作廢回 failed_precondition。
+  rpc ClaimCoupon(ClaimCouponRequest) returns (ClaimCouponResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // CreateCampaign 以呼叫者此刻的店建立活動，直接生效（ACTIVE）。需要賣家能力 CAP_MARKETING。每家店同時進行的活動數有上限（預設 5），超過回
+  // failed_precondition 與 COUPON_QUOTA_EXCEEDED。DESIGNATED 的名單不得為空、不得含呼叫者自己的買家身分。欄位不合法回 invalid_argument 並指出欄位。
+  rpc CreateCampaign(CreateCampaignRequest) returns (CreateCampaignResponse);
+
+  // ListCampaigns 列出呼叫者此刻的店自己發的活動，新到舊（不含系統建立的補償活動）。需要賣家能力 CAP_MARKETING（唯讀也要）。
+  // 回應附店家的活動配額與同時進行中的活動數。page_token 只能用在同一個 status。
+  rpc ListCampaigns(ListCampaignsRequest) returns (ListCampaignsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetCampaign 讀店家自己的活動：名單（DESIGNATED）與各狀態的券數。需要賣家能力 CAP_MARKETING。不存在與不是這家店發的一律 not_found。
+  rpc GetCampaign(GetCampaignRequest) returns (GetCampaignResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // EndCampaign 提前結束店家自己的活動：擋掉新的領取與鎖定，作廢還沒被使用的券（AVAILABLE），已被訂單鎖定的券照常核銷或釋放。收縮型動作，
+  // 需要賣家能力 CAP_CONTENT_CONTRACT（停權的店家仍可結束自己的活動）。已經結束的重送成功。不存在與不是這家店發的一律 not_found。
+  rpc EndCampaign(EndCampaignRequest) returns (EndCampaignResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+}
+
+// DiscountType 是折抵方式。
+enum DiscountType {
+  DISCOUNT_TYPE_UNSPECIFIED = 0;
+  // 現金折抵固定金額。
+  DISCOUNT_TYPE_CASH = 1;
+  // 百分比折抵，有折抵上限。
+  DISCOUNT_TYPE_PERCENT = 2;
+}
+
+// TargetType 是活動的資格。
+enum TargetType {
+  TARGET_TYPE_UNSPECIFIED = 0;
+  // 每一位買家。
+  TARGET_TYPE_ALL = 1;
+  // 在該店有消費紀錄的買家。
+  TARGET_TYPE_MEMBER = 2;
+  // 名單內的買家。
+  TARGET_TYPE_DESIGNATED = 3;
+  // 售後或營運補償：只有收補償的那位買家，由系統建立。
+  TARGET_TYPE_COMPENSATION = 4;
+}
+
+// CampaignStatus 是活動的狀態。到期不是狀態：看 Campaign 的 end_time。
+enum CampaignStatus {
+  CAMPAIGN_STATUS_UNSPECIFIED = 0;
+  CAMPAIGN_STATUS_DRAFT = 1;
+  CAMPAIGN_STATUS_ACTIVE = 2;
+  // 提前結束。
+  CAMPAIGN_STATUS_ENDED = 3;
+}
+
+// VoucherStatus 是券的狀態。到期的券仍是 AVAILABLE，以 Voucher.expired 呈現。
+enum VoucherStatus {
+  VOUCHER_STATUS_UNSPECIFIED = 0;
+  // 可使用。
+  VOUCHER_STATUS_AVAILABLE = 1;
+  // 已被一筆訂單鎖定。
+  VOUCHER_STATUS_LOCKED = 2;
+  // 已使用（訂單核銷）。
+  VOUCHER_STATUS_REDEEMED = 3;
+  // 已作廢（活動被結束或營運作廢）。
+  VOUCHER_STATUS_VOIDED = 4;
+}
+
+// VoucherOrigin 是券的來源。
+enum VoucherOrigin {
+  VOUCHER_ORIGIN_UNSPECIFIED = 0;
+  // 買家自己領取。
+  VOUCHER_ORIGIN_CLAIM = 1;
+  // 指定發放。
+  VOUCHER_ORIGIN_GRANT = 2;
+  // 補償。
+  VOUCHER_ORIGIN_COMPENSATION = 3;
+}
+
+// CashDiscount 是現金折抵。
+message CashDiscount {
+  // 折抵金額，至少 1。
+  int64 amount = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// PercentDiscount 是百分比折抵：訂單金額乘以 percent 除以 100（整數截斷），不超過 max_amount。
+message PercentDiscount {
+  // 1 到 99。
+  int32 percent = 1 [(google.api.field_behavior) = REQUIRED];
+  // 折抵上限，至少 1。
+  int64 max_amount = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+// Campaign 是活動的公開部分：買家與店家都看得到的規則。
+message Campaign {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  string title = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  oneof discount {
+    CashDiscount cash = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+    PercentDiscount percent = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  }
+  // 訂單金額的門檻；0 是沒有門檻。
+  int64 threshold_amount = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  TargetType target_type = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 適用的店家；不設是全平台。這家店不顯示（沒公開過）時也不設，client 不區分兩者，以 store_id 判斷適用範圍。
+  optional hawkr.common.v1alpha1.StoreCard store = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 適用的店家 ID；不設是全平台。
+  optional string store_id = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 生效時間窗。
+  google.protobuf.Timestamp start_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp end_time = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Voucher 是買家持有的一張券。
+message Voucher {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  Campaign campaign = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  VoucherStatus status = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  VoucherOrigin origin = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 活動的時間窗已過（只對 AVAILABLE 有意義；到期的券不能使用）。
+  bool expired = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 預估折抵金額，新台幣元；只有帶 checkout 的 ListMyVouchers 才設。
+  optional int64 estimated_discount = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Checkout 是結帳情境：哪一家店、訂單金額多少。
+message Checkout {
+  string store_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 新台幣元，至少 1。
+  int64 order_amount = 2 [(google.api.field_behavior) = REQUIRED];
+}
+
+message ListMyVouchersRequest {
+  // 預設 20，上限 100；0 用預設，超過上限以上限計，負數回 invalid_argument。
+  int32 page_size = 1;
+  string page_token = 2;
+  repeated VoucherStatus statuses = 3;
+  optional Checkout checkout = 4;
+}
+
+message ListMyVouchersResponse {
+  repeated Voucher vouchers = 1;
+  // 空字串表示最後一頁。
+  string next_page_token = 2;
+}
+
+message ListClaimableCampaignsRequest {
+  // 預設 20，上限 100；0 用預設，超過上限以上限計，負數回 invalid_argument。
+  int32 page_size = 1;
+  string page_token = 2;
+  optional string store_id = 3;
+}
+
+message ListClaimableCampaignsResponse {
+  repeated Campaign campaigns = 1;
+  string next_page_token = 2;
+}
+
+message ClaimCouponRequest {
+  string campaign_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message ClaimCouponResponse {
+  Voucher voucher = 1;
+}
+
+// SellerCampaign 是店家看到的活動：公開規則加上狀態與發行數。
+message SellerCampaign {
+  Campaign campaign = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  CampaignStatus status = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 總發行量；不設是無上限（與 0 不同：上限至少 1）。
+  optional int32 total_issue_limit = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 已發行（已被領取或發放）的張數。
+  int32 issued_count = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 活動的時間窗已過。
+  bool expired = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 提前結束的時間；沒有結束時不設。
+  optional google.protobuf.Timestamp ended_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// CampaignInput 是建立活動的內容。
+message CampaignInput {
+  // 1 到 100 個字元（去掉前後空白後）。
+  string title = 1 [(google.api.field_behavior) = REQUIRED];
+  oneof discount {
+    CashDiscount cash = 2;
+    PercentDiscount percent = 3;
+  }
+  // 門檻，至少 0；現金折抵的金額不得超過門檻（門檻 0 不套用）。
+  int64 threshold_amount = 4;
+  // 店家只能建 ALL 與 DESIGNATED；MEMBER 目前回 invalid_argument（消費紀錄的資料還沒有接上）。
+  TargetType target_type = 5 [(google.api.field_behavior) = REQUIRED];
+  google.protobuf.Timestamp start_time = 6 [(google.api.field_behavior) = REQUIRED];
+  // 必須晚於現在與 start_time。
+  google.protobuf.Timestamp end_time = 7 [(google.api.field_behavior) = REQUIRED];
+  // 總發行量；不設是無上限，設了至少 1（0 回 invalid_argument，不當成無上限）。
+  optional int32 total_issue_limit = 8;
+  // DESIGNATED 的名單（買家 ID），最多 500 位；只能是這家店的 CRM 客戶，不是客戶的 ID 回 invalid_argument；其他資格不得帶。
+  repeated string designated_buyer_ids = 9;
+}
+
+message CreateCampaignRequest {
+  CampaignInput campaign = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message CreateCampaignResponse {
+  SellerCampaign campaign = 1;
+}
+
+message ListCampaignsRequest {
+  // 預設 20，上限 100；0 用預設，超過上限以上限計，負數回 invalid_argument。
+  int32 page_size = 1;
+  string page_token = 2;
+  // 只列這個狀態；不設是全部。明確送出 CAMPAIGN_STATUS_UNSPECIFIED 回 invalid_argument。
+  optional CampaignStatus status = 3;
+}
+
+message ListCampaignsResponse {
+  repeated SellerCampaign campaigns = 1;
+  string next_page_token = 2;
+  // 店家同時進行中的活動數上限。
+  int32 max_active_campaigns = 3;
+  // 目前同時進行中的活動數（進行中、時間窗沒過、不含補償）。
+  int32 active_campaigns = 4;
+}
+
+message GetCampaignRequest {
+  string campaign_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+// DesignatedBuyer 是 DESIGNATED 名單裡的一位買家；暱稱由 buyer 補（買家已刪除時不設）。
+message DesignatedBuyer {
+  string buyer_id = 1;
+  optional string name = 2;
+}
+
+message GetCampaignResponse {
+  SellerCampaign campaign = 1;
+  repeated DesignatedBuyer designated_buyers = 2;
+  // 各狀態的券數。
+  int32 available_count = 3;
+  int32 locked_count = 4;
+  int32 redeemed_count = 5;
+  int32 voided_count = 6;
+}
+
+message EndCampaignRequest {
+  string campaign_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message EndCampaignResponse {
+  SellerCampaign campaign = 1;
+  // 這次作廢的券數。
+  int32 voided_vouchers = 2;
+}

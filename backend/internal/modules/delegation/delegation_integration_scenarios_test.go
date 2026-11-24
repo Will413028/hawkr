@@ -271,7 +271,7 @@ func TestPreflightDenials(t *testing.T) {
 	f.storeFn = downFn
 	p := preflight(outsider, testStore)
 	wantDenied(p, DenialAdminNotAllowlisted)
-	if p.TargetKnown || p.Target.StoreID != testStore || len(p.Capabilities) != 9 {
+	if p.TargetKnown || p.Target.StoreID != testStore || len(p.Capabilities) != 10 {
 		t.Fatalf("還沒讀到店家 = %+v", p)
 	}
 	// 讀不到店家不是拒絕。
@@ -1450,7 +1450,7 @@ func TestDelegationCodeValuesMatchTheChecks(t *testing.T) {
 		{"admin_operation_audit_logs_capability_check", fromCapabilities(model.Capabilities())},
 		{"admin_operation_audit_logs_result_check", []string{string(model.AuditPending), string(model.AuditSucceeded), string(model.AuditFailed)}},
 		{"admin_operation_audit_logs_origin_check", []string{string(model.AuditInteractive), string(model.AuditScheduled)}},
-		{"admin_operation_audit_logs_resource_type_check", []string{string(model.ResourceStorefront), string(ResourceProduct), string(model.ResourcePost), string(model.ResourceOrder)}},
+		{"admin_operation_audit_logs_resource_type_check", []string{string(model.ResourceStorefront), string(ResourceProduct), string(model.ResourcePost), string(model.ResourceOrder), string(model.ResourceMedia)}},
 		{"admin_operation_audit_logs_risk_level_check", []string{string(model.RiskLow), string(RiskMedium), string(model.RiskHigh)}},
 		{"seller_delegation_authorizations_source_check", []string{string(model.AuthorizationContract), string(model.AuthorizationTicket), string(model.AuthorizationPlatformPolicy)}},
 		{"admin_operation_audit_logs_action_check", auditActionStrings()},

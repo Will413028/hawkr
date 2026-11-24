@@ -9,7 +9,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// Accounts 是模組對 identity 的需求（*identity.Module 滿足它）：以共享鎖鎖住存活的帳號列，並回報帳號是否已刪除。
+// Accounts 是模組對 identity 的需求（*identity.Module 滿足它）：以共享鎖鎖住存活的帳號列並回報帳號是否已刪除，以及在同一個 transaction 內更新 preferred_locale。
 type Accounts = app.Accounts
 
 // 登入帳號讀寫自己通知的型別（NotificationAppService 的 unary 方法用）。

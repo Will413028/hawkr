@@ -5,7 +5,6 @@ package content_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"regexp"
@@ -21,7 +20,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
@@ -30,36 +28,51 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// fakeMedia 在 media.Fake（引用語意）之上記錄轉正；staged token 以 "bad" 開頭時轉正失敗，以 "gone" 開頭時回
-// media-service 的「token 無效」（InvalidInput，錯誤文字帶下游的訊息）。onFinalize 不為 nil 時，每次轉正前先呼叫它，
-// 用來在「比對版本之後、寫入之前」插入別人的寫入。
+// fakeMedia 是 model.Media 的替身：每個 staged token 對應固定的資產 ID，token 以 "bad" 開頭時 Confirm 失敗，以 "gone" 開頭時回
+// FailedPrecondition（media 的「暫存已失效」）。真正的 transaction 語意由
+// media_integration_test.go 以真的 media 模組守。
 type fakeMedia struct {
-	*media.Fake
-	mu         sync.Mutex
-	finalized  []finalizeCall
-	onFinalize func()
+	mu        sync.Mutex
+	ids       map[string]uuid.UUID
+	confirmed []confirmCall
+	deleted   []uuid.UUID
 }
 
-type finalizeCall struct {
+type confirmCall struct {
 	uploader media.Uploader
 	token    string
-	refType  string
 }
 
-func (f *fakeMedia) Finalize(ctx context.Context, u media.Uploader, token, refType string) (media.Asset, error) {
-	if f.onFinalize != nil {
-		f.onFinalize()
+func (f *fakeMedia) id(token string) uuid.UUID {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.ids == nil {
+		f.ids = map[string]uuid.UUID{}
 	}
-	if len(token) >= 3 && token[:3] == "bad" {
-		return media.Asset{}, errors.New("staged token 無效")
+	if _, ok := f.ids[token]; !ok {
+		f.ids[token] = uuid.NewV7()
 	}
-	if len(token) >= 4 && token[:4] == "gone" {
-		return media.Asset{}, fmt.Errorf("mediaservice：轉正（code=404）：staged token expired：%w：%w", media.ErrStagedTokenRejected, apperr.InvalidInput("圖片無法使用，請重新上傳"))
+	return f.ids[token]
+}
+
+func (f *fakeMedia) Confirm(_ context.Context, u media.Uploader, token string, _ media.Visibility) (media.ConfirmedAsset, error) {
+	if strings.HasPrefix(token, "bad") {
+		return media.ConfirmedAsset{}, errors.New("staged token 無效")
+	}
+	if strings.HasPrefix(token, "gone") {
+		return media.ConfirmedAsset{}, apperr.FailedPrecondition("圖片已失效，請重新上傳")
 	}
 	f.mu.Lock()
-	f.finalized = append(f.finalized, finalizeCall{u, token, refType})
+	f.confirmed = append(f.confirmed, confirmCall{u, token})
 	f.mu.Unlock()
-	return f.Fake.Finalize(ctx, u, token, refType)
+	return media.ConfirmedAsset{ID: f.id(token), ObjectKey: "public/7109/" + token + ".jpg", Visibility: media.VisibilityPublic}, nil
+}
+
+func (f *fakeMedia) MarkDeleted(_ context.Context, ids []uuid.UUID) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.deleted = append(f.deleted, ids...)
+	return nil
 }
 
 // fakeSocial 以測試設定的集合回答「貼文公開可讀」（規則本身由 social 的整合測試守）。
@@ -100,32 +113,17 @@ const activeBannerLimit = 20
 
 func setup(t *testing.T) *fixture {
 	t.Helper()
-	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(migrate.Module{Name: "content", Dir: content.Migrations()}))
-	jc, err := jobs.NewInsertOnly(d)
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &fixture{social: &fakeSocial{readable: map[uuid.UUID]bool{}}, db: d, media: &fakeMedia{Fake: media.NewFake()}, now: time.Date(2026, 9, 25, 12, 0, 0, 0, time.UTC), newID: uuid.NewV7}
+	d := pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "content", Dir: content.Migrations()}))
+	f := &fixture{social: &fakeSocial{readable: map[uuid.UUID]bool{}}, db: d, media: &fakeMedia{}, now: time.Date(2026, 9, 25, 12, 0, 0, 0, time.UTC), newID: uuid.NewV7}
 	f.m = content.New(content.Deps{
 		DB:     d,
 		Social: f.social,
 		Media:  f.media,
-		Jobs:   jc,
 		NewID:  func() uuid.UUID { return f.newID() },
 		Now:    func() time.Time { return f.now },
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 	return f
-}
-
-// sync 執行 ref 的同步 job 一輪。
-func (f *fixture) sync(t *testing.T, ref media.Ref) media.SyncResult {
-	t.Helper()
-	res, err := f.m.SyncMedia(context.Background(), ref)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return res
 }
 
 func wantKind(t *testing.T, err error, want apperr.Kind) {
@@ -149,25 +147,23 @@ func bannerInput() content.BannerInput {
 	}
 }
 
-func TestCreateBannerFinalizesBothImagesAndTheSyncJobLinksThem(t *testing.T) {
+func TestCreateBannerConfirmsBothImages(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	b, err := f.m.CreateBanner(context.Background(), adminID, bannerInput())
 	if err != nil {
 		t.Fatal(err)
 	}
-	ref := media.Ref{Type: media.RefTypeBanner, ID: b.ID.String()}
 	admin := media.Uploader{ID: adminID, Admin: true}
-	want := []finalizeCall{{admin, "p1", media.RefTypeBanner}, {admin, "q1", media.RefTypeBanner}}
-	if !slices.Equal(f.media.finalized, want) {
-		t.Fatalf("轉正 = %+v", f.media.finalized)
+	want := []confirmCall{{admin, "p1"}, {admin, "q1"}}
+	if !slices.Equal(f.media.confirmed, want) {
+		t.Fatalf("確認 = %+v", f.media.confirmed)
 	}
-	if got := f.media.Referenced(ref); len(got) != 0 {
-		t.Fatalf("寫入不得建立引用：%v", got)
+	if len(f.media.deleted) != 0 {
+		t.Fatalf("新增不得標記刪除：%v", f.media.deleted)
 	}
-	f.sync(t, ref)
-	if got := f.media.Referenced(ref); fmt.Sprint(got) != "[asset-p1 asset-q1]" {
-		t.Fatalf("同步之後的引用 = %v", got)
+	if got := assetIDs(t, f, b.ID); got != [2]uuid.UUID{f.media.id("p1"), f.media.id("q1")} {
+		t.Fatalf("banner 的資產 = %v", got)
 	}
 	got, err := f.m.Banner(context.Background(), b.ID)
 	if err != nil {
@@ -199,8 +195,8 @@ func TestCreateBannerValidatesBeforeTouchingMedia(t *testing.T) {
 			mutate(&in)
 			_, err := f.m.CreateBanner(context.Background(), adminID, in)
 			wantKind(t, err, apperr.KindInvalidInput)
-			if len(f.media.finalized) != 0 {
-				t.Fatalf("驗證失敗仍轉正了圖片：%+v", f.media.finalized)
+			if len(f.media.confirmed) != 0 {
+				t.Fatalf("驗證失敗仍確認了圖片：%+v", f.media.confirmed)
 			}
 		})
 	}
@@ -223,7 +219,7 @@ func TestCreateBannerWritesNothingWhenFinalizeFails(t *testing.T) {
 	}
 }
 
-func TestUpdateBannerRetiresExactlyTheReplacedImages(t *testing.T) {
+func TestUpdateBannerMarksExactlyTheReplacedImagesDeleted(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
@@ -231,39 +227,44 @@ func TestUpdateBannerRetiresExactlyTheReplacedImages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ref := media.Ref{Type: media.RefTypeBanner, ID: b.ID.String()}
-	f.sync(t, ref)
 
-	// 只換預覽圖：只有被換掉的預覽圖退場，沿用的彈窗圖照舊。
+	// 只換預覽圖：只有被換掉的預覽圖標記刪除，沿用的彈窗圖照舊。
 	in := bannerInput()
 	in.PreviewImageToken, in.PopupImageToken = "p2", ""
 	b, err = f.m.UpdateBanner(ctx, content.UpdateBannerInput{AdminID: adminID, ID: b.ID, Version: b.Version, Banner: in})
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.sync(t, ref)
-	if got := f.media.Referenced(ref); fmt.Sprint(got) != "[asset-p2 asset-q1]" {
-		t.Fatalf("只換預覽圖之後的引用 = %v", got)
+	if want := []uuid.UUID{f.media.id("p1")}; !slices.Equal(f.media.deleted, want) {
+		t.Fatalf("只換預覽圖之後標記刪除 = %v，預期 %v", f.media.deleted, want)
+	}
+	if got := assetIDs(t, f, b.ID); got != [2]uuid.UUID{f.media.id("p2"), f.media.id("q1")} {
+		t.Fatalf("只換預覽圖之後的資產 = %v", got)
 	}
 
-	// 兩張都換：舊的兩張都退場。
+	// 兩張都換：舊的兩張都標記刪除。
+	f.media.deleted = nil
 	in.PreviewImageToken, in.PopupImageToken = "p3", "q3"
 	got, err := f.m.UpdateBanner(ctx, content.UpdateBannerInput{AdminID: adminID, ID: b.ID, Version: b.Version, Banner: in})
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.sync(t, ref)
-	if refs := f.media.Referenced(ref); fmt.Sprint(refs) != "[asset-p3 asset-q3]" {
-		t.Fatalf("兩張都換之後的引用 = %v", refs)
+	if want := []uuid.UUID{f.media.id("p2"), f.media.id("q1")}; !slices.Equal(f.media.deleted, want) {
+		t.Fatalf("兩張都換之後標記刪除 = %v，預期 %v", f.media.deleted, want)
 	}
 	if got.PopupImageKey != "public/7109/q3.jpg" {
 		t.Errorf("彈窗圖 = %q", got.PopupImageKey)
 	}
+}
 
-	// 已退場的圖不能寫回：同一個 staged token 重新轉正會回到同一個資產。
-	in.PreviewImageToken, in.PopupImageToken = "p2", ""
-	_, err = f.m.UpdateBanner(ctx, content.UpdateBannerInput{AdminID: adminID, ID: b.ID, Version: got.Version, Banner: in})
-	wantKind(t, err, apperr.KindInvalidInput)
+func assetIDs(t *testing.T, f *fixture, id uuid.UUID) [2]uuid.UUID {
+	t.Helper()
+	var out [2]uuid.UUID
+	if err := f.db.Conn(context.Background()).QueryRow(context.Background(),
+		"SELECT preview_image_asset_id, popup_image_asset_id FROM content.banners WHERE id=$1", id).Scan(&out[0], &out[1]); err != nil {
+		t.Fatal(err)
+	}
+	return out
 }
 
 // 沒有帶新圖的欄位沿用這筆 banner 現在的圖，不轉正任何東西。
@@ -275,34 +276,32 @@ func TestUpdateBannerKeepsItsCurrentImages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.media.finalized = nil
+	f.media.confirmed = nil
 	in := bannerInput()
 	in.PreviewImageToken, in.PopupImageToken = "", ""
 	got, err := f.m.UpdateBanner(ctx, content.UpdateBannerInput{AdminID: adminID, ID: b.ID, Version: b.Version, Banner: in})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.PreviewImageKey != b.PreviewImageKey || got.PopupImageKey != b.PopupImageKey || len(f.media.finalized) != 0 {
-		t.Fatalf("圖片 = %q、%q，轉正 %+v", got.PreviewImageKey, got.PopupImageKey, f.media.finalized)
+	if got.PreviewImageKey != b.PreviewImageKey || got.PopupImageKey != b.PopupImageKey || len(f.media.confirmed) != 0 {
+		t.Fatalf("圖片 = %q、%q，確認 %+v", got.PreviewImageKey, got.PopupImageKey, f.media.confirmed)
 	}
 }
 
-// media 拒絕 staged token 時，錯誤指出是哪一張圖，給使用者的文字由模組寫，下游的訊息只留在錯誤的文字裡。
-func TestRejectedImageIsReportedOnItsField(t *testing.T) {
+// media 拒絕確認 staged token 時，欄位錯誤指向該 token、訊息用 media 給使用者的文字，media 原本的錯誤留在 cause，banner 不寫入。
+func TestMediaRejectionOfAnImageSurfacesUnchanged(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	in := bannerInput()
 	in.PopupImageToken = "gone1"
 	_, err := f.m.CreateBanner(context.Background(), adminID, in)
+	wantKind(t, err, apperr.KindInvalidInput)
 	var ae *apperr.Error
-	if !errors.As(err, &ae) || ae.Kind() != apperr.KindInvalidInput {
-		t.Fatalf("err = %v，預期 InvalidInput", err)
+	if !errors.As(err, &ae) || ae.Message != "圖片已失效，請重新上傳" || len(ae.FieldViolations()) != 1 || ae.FieldViolations()[0].Field != "PopupImageToken" {
+		t.Fatalf("err = %v", err)
 	}
-	if ae.Message != "彈窗圖無法使用，請重新上傳" || len(ae.FieldViolations()) != 1 || ae.FieldViolations()[0].Field != "PopupImageToken" {
-		t.Fatalf("文字 %q、欄位 %+v", ae.Message, ae.FieldViolations())
-	}
-	if !strings.Contains(err.Error(), "staged token expired") {
-		t.Fatalf("下游的訊息要留在錯誤的文字裡給 log：%v", err)
+	if !strings.Contains(err.Error(), "failed_precondition") {
+		t.Fatalf("media 原本的錯誤不在 cause：%v", err)
 	}
 }
 
@@ -311,8 +310,8 @@ func TestUpdateBannerThatDoesNotExistTouchesNoMedia(t *testing.T) {
 	f := setup(t)
 	_, err := f.m.UpdateBanner(context.Background(), content.UpdateBannerInput{AdminID: adminID, ID: uuid.NewV7(), Version: 1, Banner: bannerInput()})
 	wantKind(t, err, apperr.KindNotFound)
-	if len(f.media.finalized) != 0 {
-		t.Fatalf("不存在的 banner 仍轉正了圖片：%+v", f.media.finalized)
+	if len(f.media.confirmed) != 0 {
+		t.Fatalf("不存在的 banner 仍確認了圖片：%+v", f.media.confirmed)
 	}
 }
 
@@ -362,11 +361,11 @@ func TestBannersCanOnlyBeActivatedUpToTheLimit(t *testing.T) {
 		}
 		last = b
 	}
-	finalized := len(f.media.finalized)
+	confirmed := len(f.media.confirmed)
 	_, err := f.m.CreateBanner(ctx, adminID, bannerInput())
 	wantKind(t, err, apperr.KindFailedPrecondition)
-	if len(f.media.finalized) != finalized {
-		t.Fatal("超過上限仍轉正了圖片")
+	if len(f.media.confirmed) != confirmed {
+		t.Fatal("超過上限仍確認了圖片")
 	}
 
 	// 下架的可以新增，但把它改成上架也受上限限制。
@@ -398,7 +397,7 @@ func TestBannersCanOnlyBeActivatedUpToTheLimit(t *testing.T) {
 	}
 }
 
-func TestDeleteBannerRetiresItsImages(t *testing.T) {
+func TestDeleteBannerMarksItsImagesDeleted(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
@@ -406,14 +405,11 @@ func TestDeleteBannerRetiresItsImages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ref := media.Ref{Type: media.RefTypeBanner, ID: b.ID.String()}
-	f.sync(t, ref)
 	if err := f.m.DeleteBanner(ctx, b.ID, 0); err != nil {
 		t.Fatal(err)
 	}
-	f.sync(t, ref)
-	if got := f.media.Referenced(ref); len(got) != 0 {
-		t.Fatalf("刪除之後引用應全部解除：%v", got)
+	if want := []uuid.UUID{f.media.id("p1"), f.media.id("q1")}; !slices.Equal(f.media.deleted, want) {
+		t.Fatalf("刪除之後標記刪除 = %v，預期 %v", f.media.deleted, want)
 	}
 	_, err = f.m.Banner(ctx, b.ID)
 	wantKind(t, err, apperr.KindNotFound)
@@ -476,13 +472,13 @@ func TestUpdateBannerRejectsAStaleVersionBeforeFinalizing(t *testing.T) {
 	}
 
 	// 第二個人從同一個版本開始改，還換了圖：在轉正之前就被拒。
-	f.media.finalized = nil
+	f.media.confirmed = nil
 	in.Title = "第二個人改的"
 	in.PreviewImageToken = "p2"
 	_, err = f.m.UpdateBanner(ctx, content.UpdateBannerInput{AdminID: adminID, ID: b.ID, Version: b.Version, Banner: in})
 	wantKind(t, err, apperr.KindVersionConflict)
-	if len(f.media.finalized) != 0 {
-		t.Fatalf("版本已經不符，卻還轉正了圖：%+v", f.media.finalized)
+	if len(f.media.confirmed) != 0 {
+		t.Fatalf("版本已經不符，卻還確認了圖：%+v", f.media.confirmed)
 	}
 	got, err := f.m.Banner(ctx, b.ID)
 	if err != nil {
@@ -494,37 +490,6 @@ func TestUpdateBannerRejectsAStaleVersionBeforeFinalizing(t *testing.T) {
 
 	_, err = f.m.UpdateBanner(ctx, content.UpdateBannerInput{AdminID: adminID, ID: b.ID, Version: 0, Banner: in})
 	wantKind(t, err, apperr.KindInvalidInput)
-}
-
-// 比對版本之後、寫入之前有別人寫入：以條件式 UPDATE 為準，後寫入的一方被拒。
-func TestUpdateBannerLosesToAWriteAfterItsVersionCheck(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	f := setup(t)
-	b, err := f.m.CreateBanner(ctx, adminID, bannerInput())
-	if err != nil {
-		t.Fatal(err)
-	}
-	f.media.onFinalize = func() {
-		f.media.onFinalize = nil
-		in := bannerInput()
-		in.Title = "搶先寫入"
-		in.PreviewImageToken, in.PopupImageToken = "", ""
-		if _, err := f.m.UpdateBanner(ctx, content.UpdateBannerInput{AdminID: adminID, ID: b.ID, Version: b.Version, Banner: in}); err != nil {
-			t.Error(err)
-		}
-	}
-	in := bannerInput()
-	in.PreviewImageToken, in.PopupImageToken = "p2", ""
-	_, err = f.m.UpdateBanner(ctx, content.UpdateBannerInput{AdminID: adminID, ID: b.ID, Version: b.Version, Banner: in})
-	wantKind(t, err, apperr.KindVersionConflict)
-	got, err := f.m.Banner(ctx, b.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.Title != "搶先寫入" || got.Version != b.Version+1 {
-		t.Fatalf("banner = %q（版本 %d）", got.Title, got.Version)
-	}
 }
 
 // 兩個人同時從同一個版本修改同一筆食譜：只有一個人寫入，另一個人拿到版本衝突。
@@ -709,7 +674,7 @@ func TestBannerScheduleCheckMatchesTheGoRule(t *testing.T) {
 		}
 		_, err := f.db.Pool().Exec(context.Background(),
 			`INSERT INTO content.banners (id, title, preview_image_key, popup_image_key, preview_image_asset_id, popup_image_asset_id, action_type, start_date, end_date)
-			 VALUES ($1, '排程', 'k', 'k', 'a', 'a', 'POPUP', $2, $3)`, uuid.NewV7(), start, end)
+			 VALUES ($1, '排程', 'k', 'k', $4, $4, 'POPUP', $2, $3)`, uuid.NewV7(), start, end, uuid.NewV7())
 		if err != nil && !strings.Contains(err.Error(), "banners_schedule_check") {
 			t.Fatalf("結束減開始 = %v：%v", end.Sub(start), err)
 		}
@@ -733,7 +698,7 @@ func TestBannerPostTargetMustBeCanonicalInTheDatabase(t *testing.T) {
 	} {
 		_, err := f.db.Pool().Exec(context.Background(),
 			`INSERT INTO content.banners (id, title, preview_image_key, popup_image_key, preview_image_asset_id, popup_image_asset_id, action_type, action_target)
-			 VALUES ($1, '貼文', 'k', 'k', 'a', 'a', 'POST', $2)`, uuid.NewV7(), target)
+			 VALUES ($1, '貼文', 'k', 'k', $3, $3, 'POST', $2)`, uuid.NewV7(), target, uuid.NewV7())
 		if wantOK && err != nil {
 			t.Errorf("標準形式 %q 被拒絕：%v", target, err)
 		}
@@ -774,11 +739,6 @@ func TestAppTargetChecksMatchTheGoTypes(t *testing.T) {
 	}
 }
 
-// ReadSecure 實作 media.Media；這些測試不讀機敏資產。
-func (*fakeMedia) ReadSecure(context.Context, string, media.Ref) (media.SecureAsset, error) {
-	return media.SecureAsset{}, errors.New("not used")
-}
-
 func postBannerInput(postID uuid.UUID) content.BannerInput {
 	in := bannerInput()
 	in.Action = content.BannerAction{Type: content.BannerActionPost, Target: postID.String()}
@@ -793,8 +753,8 @@ func TestCreateBannerRequiresThePostToBePubliclyReadable(t *testing.T) {
 	notReadable := uuid.New()
 	_, err := f.m.CreateBanner(ctx, adminID, postBannerInput(notReadable))
 	wantKind(t, err, apperr.KindInvalidInput)
-	if len(f.media.finalized) != 0 {
-		t.Errorf("被拒的建立轉正了 %d 張圖", len(f.media.finalized))
+	if len(f.media.confirmed) != 0 {
+		t.Errorf("被拒的建立轉正了 %d 張圖", len(f.media.confirmed))
 	}
 	page, err := f.m.ListBanners(ctx, nil, 50)
 	if err != nil {

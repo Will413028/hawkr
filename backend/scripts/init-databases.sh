@@ -87,7 +87,6 @@ fi
 DATABASES=(
   "hawkr"
   "hawkr_seller"
-  "hawkr_media"
   "hawkr_shipping"
   "hawkr_ai"
   "hawkr_payment"

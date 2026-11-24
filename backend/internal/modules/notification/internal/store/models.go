@@ -47,6 +47,12 @@ type NotificationDeviceToken struct {
 	LastRegisteredAt time.Time
 }
 
+type NotificationEmailSuppression struct {
+	AddressHash []byte
+	Reason      string
+	CreatedAt   time.Time
+}
+
 type NotificationInboxItem struct {
 	ID              uuid.UUID
 	AccountID       int64

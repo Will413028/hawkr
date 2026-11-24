@@ -40,7 +40,7 @@ type Stores interface {
 // Signals 是 worker 通知串流訂閱者的出口（根套件以 stream.NotifyInbox 實作）。
 // 在寫入收件匣的同一個 transaction 內呼叫（pg_notify 在 commit 後才送達，rollback 不送）；nil 表示不通知（沒有串流的組裝）。
 type Signals interface {
-	InboxChanged(ctx context.Context, accountID int64, audience model.Audience, storeID int64, hint model.StateHint) error
+	InboxChanged(ctx context.Context, accountID int64, audience model.Audience, storeID int64, hint model.StateHint, itemID uuid.UUID) error
 }
 
 // Registry 是型別註冊表；正式組裝用 registry 套件的 Lookup，測試可以換成帶測試型別的版本。
@@ -76,8 +76,7 @@ type ProcessArgs struct {
 // Kind 是 River 的 job 種類。
 func (ProcessArgs) Kind() string { return "notification.process_intent" }
 
-// DeliverArgs 是一筆投遞紀錄（推播或 email）的渠道 job；以投遞紀錄 ID 唯一。A8-3 把渠道 adapter 接進這個 job，這一步它不送出、
-// 不改紀錄（紀錄留在 PENDING）。
+// DeliverArgs 是一筆投遞紀錄（推播或 email）的渠道 job；以投遞紀錄 ID 唯一，由 deliver 套件的 worker 執行。
 type DeliverArgs struct {
 	DeliveryID uuid.UUID `json:"delivery_id"`
 }
@@ -154,14 +153,14 @@ func (s *Service) Process(ctx context.Context, intentID uuid.UUID) error {
 			s.logGone(ctx, intent, gone)
 			return s.scrubSkipped(ctx, intent.ID)
 		}
-		wroteInbox, err := s.deliver(ctx, intent, spec, resolved)
+		wroteInbox, itemID, err := s.deliver(ctx, intent, spec, resolved)
 		if err != nil {
 			return err
 		}
 		// 同 transaction 內 pg_notify：commit 後才送達所有 serve 行程（worker 與 serve 是不同行程，記憶體內的通知到不了）；
 		// payload 只有業務鍵，訊號內容由 serve 端讀取；訊號可合併，重試重複通知無害。
 		if wroteInbox && s.d.Signals != nil {
-			if err := s.d.Signals.InboxChanged(ctx, resolved.Recipient.AccountID, spec.Audience(), resolved.Recipient.StoreID, spec.StateHint); err != nil {
+			if err := s.d.Signals.InboxChanged(ctx, resolved.Recipient.AccountID, spec.Audience(), resolved.Recipient.StoreID, spec.StateHint, itemID); err != nil {
 				return err
 			}
 		}
@@ -203,7 +202,7 @@ func (s *Service) log() *slog.Logger {
 }
 
 // deliver 寫入每個渠道的紀錄，回報這次有沒有碰收件匣（寫入或已連結的重試都算，由呼叫端在同一個 transaction 內通知串流）。
-func (s *Service) deliver(ctx context.Context, intent store.NotificationIntent, spec registry.Spec, r registry.Resolved) (bool, error) {
+func (s *Service) deliver(ctx context.Context, intent store.NotificationIntent, spec registry.Spec, r registry.Resolved) (bool, uuid.UUID, error) {
 	q := store.New(s.d.DB.Conn(ctx))
 	var storeID *int64
 	if r.Recipient.StoreID > 0 {
@@ -213,7 +212,7 @@ func (s *Service) deliver(ctx context.Context, intent store.NotificationIntent, 
 		AccountID: r.Recipient.AccountID, Audience: string(spec.Audience()), Category: string(spec.Category),
 	})
 	if err != nil {
-		return false, fmt.Errorf("讀取偏好：%w", err)
+		return false, uuid.Nil(), fmt.Errorf("讀取偏好：%w", err)
 	}
 	override := make(map[model.Channel]bool, len(overrides))
 	for _, o := range overrides {
@@ -222,12 +221,13 @@ func (s *Service) deliver(ctx context.Context, intent store.NotificationIntent, 
 	enabled := func(ch model.Channel) bool { return model.Enabled(spec.Audience(), spec.Category, ch, override) }
 	now := s.d.Now()
 	touchedInbox := false
+	var itemID uuid.UUID
 	for _, ch := range spec.Channels {
 		if !enabled(ch) {
 			continue
 		}
 		if model.DeliveryChannel(ch) {
-			// 投遞紀錄是推播與 email 的唯一帳本；每筆新紀錄在同一個 transaction 排一個渠道 job（A8-3 把 adapter 接進它，這一步 job 不送出）。
+			// 投遞紀錄是推播與 email 的唯一帳本；每筆新紀錄在同一個 transaction 排一個渠道 job（deliver 套件執行）。
 			// 紀錄已存在（重試）時 job 已隨第一次的 transaction 排過，不再排。
 			id, err := q.InsertDelivery(ctx, store.InsertDeliveryParams{
 				ID: s.d.NewID(), IntentID: intent.ID, AccountID: r.Recipient.AccountID, Audience: string(spec.Audience()),
@@ -237,28 +237,30 @@ func (s *Service) deliver(ctx context.Context, intent store.NotificationIntent, 
 				continue
 			}
 			if err != nil {
-				return false, fmt.Errorf("寫入投遞紀錄：%w", err)
+				return false, uuid.Nil(), fmt.Errorf("寫入投遞紀錄：%w", err)
 			}
 			if err := s.d.Jobs.Enqueue(ctx, DeliverArgs{DeliveryID: id}, &river.InsertOpts{UniqueOpts: river.UniqueOpts{ByArgs: true}}); err != nil {
-				return false, fmt.Errorf("排入渠道 job：%w", err)
+				return false, uuid.Nil(), fmt.Errorf("排入渠道 job：%w", err)
 			}
 			continue
 		}
-		if err := s.writeInbox(ctx, q, intent, spec, r, storeID, now); err != nil {
-			return false, err
+		id, err := s.writeInbox(ctx, q, intent, spec, r, storeID, now)
+		if err != nil {
+			return false, uuid.Nil(), err
 		}
 		touchedInbox = true
+		itemID = id
 	}
-	return touchedInbox, nil
+	return touchedInbox, itemID, nil
 }
 
-func (s *Service) writeInbox(ctx context.Context, q *store.Queries, intent store.NotificationIntent, spec registry.Spec, r registry.Resolved, storeID *int64, now time.Time) error {
+func (s *Service) writeInbox(ctx context.Context, q *store.Queries, intent store.NotificationIntent, spec registry.Spec, r registry.Resolved, storeID *int64, now time.Time) (uuid.UUID, error) {
 	linked, err := q.InboxItemIntentLinked(ctx, intent.ID)
 	if err != nil {
-		return fmt.Errorf("檢查收件匣連結：%w", err)
+		return uuid.Nil(), fmt.Errorf("檢查收件匣連結：%w", err)
 	}
 	if linked {
-		return nil
+		return uuid.Nil(), nil
 	}
 	var aggKey *string
 	if r.AggregationKey != "" {
@@ -273,10 +275,10 @@ func (s *Service) writeInbox(ctx context.Context, q *store.Queries, intent store
 		Params: intent.Params, AggregationKey: aggKey, ActorAccountIds: actors, OccurredAt: intent.OccurredAt, Now: now,
 	})
 	if err != nil {
-		return fmt.Errorf("寫入收件匣：%w", err)
+		return uuid.Nil(), fmt.Errorf("寫入收件匣：%w", err)
 	}
 	if err := q.LinkInboxItemIntent(ctx, store.LinkInboxItemIntentParams{IntentID: intent.ID, InboxItemID: itemID}); err != nil {
-		return fmt.Errorf("寫入收件匣連結：%w", err)
+		return uuid.Nil(), fmt.Errorf("寫入收件匣連結：%w", err)
 	}
-	return nil
+	return itemID, nil
 }

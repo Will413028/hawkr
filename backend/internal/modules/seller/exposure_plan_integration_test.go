@@ -20,7 +20,7 @@ func (f *fixture) makeSeededStoresExposable(t *testing.T) {
 	must(t, f.db.InTx(ctx, func(ctx context.Context) error {
 		c := f.db.Conn(ctx)
 		for _, stmt := range []string{
-			`UPDATE seller.stores SET logo_key = 'logo/' || store_id, logo_asset_id = 'asset-' || store_id, town_code = '63000010'
+			`UPDATE seller.stores SET logo_key = 'logo/' || store_id, logo_asset_id = uuidv7(), town_code = '63000010'
 				WHERE store_code > 2900000000`,
 			`INSERT INTO seller.kyc_applications (application_id, store_id, status, seller_type, submitted_at, submission_seq, decided_at, created_at, updated_at)
 				SELECT md5('kyc' || store_id)::uuid, store_id, 'APPROVED', 'INDIVIDUAL', $1, 1, $1, $1, $1

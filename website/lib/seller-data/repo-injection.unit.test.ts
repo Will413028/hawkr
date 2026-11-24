@@ -99,7 +99,7 @@ describe("② 賣家路徑：同一批函式一個都不能 throw", () => {
 		expect(urls.some((url) => url.includes("/adm/"))).toBe(false);
 	});
 
-	it("媒體上傳走到建立工作階段那一步（回應缺欄才失敗，不是被護欄擋下）", async () => {
+	it("媒體上傳送出 BeginUpload（回應缺欄才失敗，不是被護欄擋下）", async () => {
 		const { urls } = stubBrowserFetch({ code: 0, data: {} });
 		const error = await uploadImageFile(
 			new File([new Uint8Array([1])], "a.png", { type: "image/png" }),
@@ -107,8 +107,7 @@ describe("② 賣家路徑：同一批函式一個都不能 throw", () => {
 			{ compress: false },
 		).catch((e) => e);
 		expect(error).not.toBeInstanceOf(DelegatedRuntimeTransportError);
-		expect(String((error as Error).message)).toContain("建立上傳工作階段失敗");
-		expect(urls[0]).toContain("/app/media/upload_sessions");
+		expect(urls[0]).toContain("MediaAppService/BeginUpload");
 	});
 });
 
@@ -140,7 +139,7 @@ describe("③ 注入的 fetcher：代行執行期照常運作", () => {
 				undefined,
 				{ compress: false },
 			)
-			.catch(() => undefined); // 缺 uploadUrl，只驗它打到了注入的路徑
+			.catch(() => undefined); // 缺 stagedToken，只驗它打到了注入的路徑
 
 		expect(seen.map((call) => call.path)).toEqual([
 			"/products?page=2&page_size=10",

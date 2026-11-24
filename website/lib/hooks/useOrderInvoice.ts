@@ -1,5 +1,6 @@
 "use client";
 
+import { StateRefreshHint } from "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as React from "react";
 import { accountQueryFn, accountQueryPending } from "@/lib/auth/account-query";
@@ -11,8 +12,8 @@ import {
 } from "@/lib/invoices/buyer-repo";
 import type { OrderInvoice } from "@/lib/invoices/types";
 import {
-	NOTIFICATION_NEW_EVENT,
-	type NotificationNewEventDetail,
+	NOTIFICATION_SIGNAL_EVENT,
+	type NotificationSignalEventDetail,
 } from "@/lib/notifications/events";
 import { queryKeys } from "@/lib/query/keys";
 import { useQueryIdentity } from "./useQueryIdentity";
@@ -41,12 +42,10 @@ function isNotApplicable(error: unknown): boolean {
  *
  * **零輪詢**（§0.4 ④）。三個刷新來源，全部事件驅動：
  *
- *   1. **通知**——root layout 的 `NotificationUnreadProvider` 已經開著唯一一條通知
- *      SSE，並把每一筆 `notification.new` 用
- *      `NOTIFICATION_NEW_EVENT` 廣播到 window 上。這裡聽那個 window 事件，
- *      **不另開第二條 `useNotificationStream`**：多開一條會多佔一個同源連線額度，
- *      而且兩個訂閱者的 Last-Event-ID resume cursor 會互相覆蓋。
- *      買家可見的發票通知每一列的 `refType` 都是 `ORDER`、`refId` 都是 `order_no`。
+ *   1. **通知**——root layout 的 `NotificationUnreadProvider` 已經開著唯一一條通知串流，
+ *      並把每個收件匣訊號用 `NOTIFICATION_SIGNAL_EVENT` 廣播到 window 上。這裡聽那個 window 事件，
+ *      **不另開第二條串流**：多開一條會多佔一個同源連線額度。訊號不帶通知內容，
+ *      只帶狀態重讀提示：提示含 `ORDER`（訂單狀態有變）就重讀這張訂單的發票。
  *   2. **使用者主動重整**——呼叫端在 `PROCESSING` 時渲染一顆「重新整理」文字鍵。
  *   3. **頁面重新可見**——`refetchOnWindowFocus` 明寫為 `true`：本 repo 的
  *      QueryClient 預設把它關掉了（`lib/query/client.ts`），不寫就沒有這個行為。
@@ -70,16 +69,14 @@ export function useOrderInvoice(orderNo: string): UseOrderInvoiceResult {
 	React.useEffect(() => {
 		if (status !== "signedIn" || !orderNo) return;
 		const onNotification = (event: Event) => {
-			const detail = (event as CustomEvent<NotificationNewEventDetail>).detail;
-			const item = detail?.item;
-			if (!item) return;
-			if (item.refType !== "ORDER") return;
-			if (String(item.refId ?? "") !== orderNo) return;
+			const detail = (event as CustomEvent<NotificationSignalEventDetail>)
+				.detail;
+			if (!detail?.hints.includes(StateRefreshHint.ORDER)) return;
 			void queryClient.invalidateQueries({ queryKey });
 		};
-		window.addEventListener(NOTIFICATION_NEW_EVENT, onNotification);
+		window.addEventListener(NOTIFICATION_SIGNAL_EVENT, onNotification);
 		return () => {
-			window.removeEventListener(NOTIFICATION_NEW_EVENT, onNotification);
+			window.removeEventListener(NOTIFICATION_SIGNAL_EVENT, onNotification);
 		};
 	}, [status, orderNo, queryClient, queryKey]);
 

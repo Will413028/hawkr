@@ -11,21 +11,16 @@ import (
 	"time"
 	"uuid"
 
-	"github.com/riverqueue/river"
-
 	"github.com/Will413028/hawkr/backend/internal/modules/imageai/internal/admin"
 	"github.com/Will413028/hawkr/backend/internal/modules/imageai/internal/limit"
-	"github.com/Will413028/hawkr/backend/internal/modules/imageai/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/imageai/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/imageai/internal/quota"
 	"github.com/Will413028/hawkr/backend/internal/modules/imageai/internal/style"
 	"github.com/Will413028/hawkr/backend/internal/modules/imageai/internal/transform"
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/config"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/llm"
 )
 
@@ -121,9 +116,8 @@ type Deps struct {
 	MaxConcurrent int
 	// Stores 讓後台確認店家存在（*seller.Module）；後台的額度方法才需要。
 	Stores StoreReader
-	// Media 與 Jobs 是風格縮圖的轉正與引用同步（後台的風格方法與 worker 才需要）。
-	Media media.Media
-	Jobs  jobs.Enqueuer
+	// Media 是 media 模組（*media.Module）：風格縮圖在寫入的 transaction 內 Confirm，被換掉或終態的資產 MarkDeleted（後台的風格方法才需要）。
+	Media model.Media
 	// NewID 產生風格的 ID（UUIDv7）；後台新增風格才需要。
 	NewID func() uuid.UUID
 }
@@ -145,7 +139,6 @@ type Module struct {
 	styles    *style.Service
 	transform *transform.Service
 	admin     *admin.Service
-	mediaSync *media.RefSyncer
 }
 
 // New 建立模組。
@@ -160,14 +153,11 @@ func New(d Deps) *Module {
 		quota: q, limiter: l, styles: style.New(d.DB),
 		transform: transform.New(transform.Deps{Slots: l, Quota: q, Guard: d.Seller, Tx: d.DB.InTx, Generator: d.Images, Log: d.Log}),
 	}
-	if d.Media != nil && d.Jobs != nil {
-		m.mediaSync = mediaref.NewSyncer(d.DB, d.Media, d.Jobs, d.Now, d.Log)
-	}
 	m.admin = admin.New(admin.Deps{
 		Tx:     d.DB.InTx,
 		Q:      admin.QueriesOf(d.DB),
 		Audit:  adminaudit.New(d.DB, d.Now),
-		Thumbs: &mediaref.Thumbnails{DB: d.DB, Media: d.Media, Jobs: d.Jobs},
+		Media:  d.Media,
 		Stores: adminStores{read: d.Stores, guard: d.Seller},
 		Used: func(ctx context.Context, storeID int64) (int32, error) {
 			return q.Used(ctx, storeID, quota.WeekStart(d.Now()))
@@ -228,21 +218,6 @@ func (m *Module) RefundQuota(ctx context.Context, storeID int64, periodStart tim
 func (m *Module) OnStoreRetired(ctx context.Context, e StoreRetired) error {
 	return m.quota.OnStoreRetired(ctx, e.StoreID)
 }
-
-// SyncMedia 同步一個 media ref（風格縮圖，ref_id 是風格的 UUID）的引用：Link 風格目前的圖，Unlink 退場的圖。它是 imageai.media_sync job 的內容，
-// 給 worker 與測試呼叫；回傳是否要再跑一輪。
-func (m *Module) SyncMedia(ctx context.Context, ref media.Ref) (media.SyncResult, error) {
-	return m.mediaSync.Sync(ctx, ref)
-}
-
-// SweepMedia 執行 media 引用的保底掃描：清掉過期的退場紀錄，補排版本比已同步的新的 ref；回傳補排的 ref 數。它是 imageai.media_sweep job 的內容。
-func (m *Module) SweepMedia(ctx context.Context) (int, error) { return m.mediaSync.Sweep(ctx) }
-
-// AddWorkers 登記本模組的 River worker（media 引用同步）。
-func (m *Module) AddWorkers(workers *river.Workers) { mediaref.AddWorkers(workers, m.mediaSync) }
-
-// PeriodicJobs 回傳 media 引用的保底掃描（啟動即執行、每 15 分鐘）。
-func (m *Module) PeriodicJobs() []*river.PeriodicJob { return mediaref.PeriodicJobs() }
 
 // ListStylesForAdmin 列出風格（含停用的），依顯示順序；category 為 nil 是全部用途，不合法回 InvalidInput（欄位 Category）。
 func (m *Module) ListStylesForAdmin(ctx context.Context, category *StyleCategory) ([]AdminStyle, error) {

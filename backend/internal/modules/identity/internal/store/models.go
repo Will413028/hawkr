@@ -17,6 +17,7 @@ type IdentityAccount struct {
 	SuspendedAt       *time.Time
 	DeletedAt         *time.Time
 	DeletionPendingAt *time.Time
+	PreferredLocale   string
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 }

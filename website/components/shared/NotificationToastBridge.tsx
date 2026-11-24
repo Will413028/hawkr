@@ -8,14 +8,15 @@
  *     disconnects it) so toasts fire app-wide, not just on chat pages. Skips
  *     the user's own messages and stays quiet while they're in the messages UI.
  *
- *   • New orders / notifications — watches the notification unread count; when
- *     it climbs (after the initial prime) it pulls the latest inbox items and
- *     toasts the fresh, unread, non-message ones. Message-type inbox rows are
- *     left to the socket path above so a message never double-toasts.
+ *   • New orders / notifications — the notification stream's inbox signal names
+ *     the new inbox item ids; exactly those are toasted (visible tab only).
+ *     Message-type inbox rows are left to the socket path above so a message
+ *     never double-toasts.
  *
  * Renders nothing — mount it once inside the toast + unread providers.
  */
 
+import { InboxPresentation } from "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb";
 import * as React from "react";
 import { useAuth } from "@/lib/auth/context";
 import { previewText } from "@/lib/chat/map";
@@ -26,26 +27,21 @@ import { useChatStream } from "@/lib/chat/useChatStream";
 import { chatSideOf } from "@/lib/chat/workspace";
 import { useUiText } from "@/lib/i18n/ui-text";
 import { stripLocale } from "@/lib/intl/paths";
+import { imageUri } from "@/lib/media/image";
 import {
-	NOTIFICATION_NEW_EVENT,
-	type NotificationNewEventDetail,
+	NOTIFICATION_SIGNAL_EVENT,
+	type NotificationSignalEventDetail,
 } from "@/lib/notifications/events";
-import { fetchNotifications } from "@/lib/notifications/repo";
-import { resolveNotification } from "@/lib/notifications/resolve";
+import {
+	audienceForRole,
+	type InboxItem,
+	listInboxItems,
+} from "@/lib/notifications/inbox";
 import { useNotificationToast } from "@/lib/notifications/toast-context";
-import { useNotificationUnread } from "@/lib/notifications/unread-context";
 import { notificationWorkspaceRole } from "@/lib/notifications/workspace";
 
-// Notification ids are 64-bit TSIDs (time-ordered, monotonic) — serialized
-// as a string once they exceed Number.MAX_SAFE_INTEGER (see
-// `useNotificationStream.ts`'s `normNotificationItem`). BigInt comparison
-// is the only safe way to order them regardless of representation.
-function idToBigInt(id: number | string): bigint {
-	return typeof id === "number" ? BigInt(Math.trunc(id)) : BigInt(id);
-}
-
-/** Cards shown for one burst before the remainder collapses into a summary. */
-const MAX_TOASTS_PER_TICK = 3;
+/** Inbox rows read per signal: the server sends at most 20 new ids per signal. */
+const SIGNAL_PAGE_SIZE = 20;
 /** Upper bound on the per-effect "already toasted" memo. */
 const SEEN_MESSAGE_LIMIT = 500;
 
@@ -65,7 +61,6 @@ function isMessagesArea(rawPathname: string): boolean {
 export default function NotificationToastBridge() {
 	const { activeRole, status, identity } = useAuth();
 	const signedIn = status === "signedIn";
-	const { count, loading, baselineReady } = useNotificationUnread();
 	const { show } = useNotificationToast();
 
 	const myId = identity?.accountId != null ? String(identity.accountId) : "";
@@ -145,182 +140,72 @@ export default function NotificationToastBridge() {
 	);
 	useChatStream(chatSide, signedIn, onChatEvent);
 
-	/* ── New orders / notifications (via unread-count increase) ─── */
-	const primedRef = React.useRef(false);
-	const prevCountRef = React.useRef(0);
-	// High-water mark: the largest notification id already accounted for
-	// (toasted, or known to exist before we started watching). Anything
-	// with id <= this is never "new" — same cursor concept as the SSE
-	// transport's own Last-Event-ID, applied at the toast-decision layer
-	// so both paths below agree on one definition of "new" instead of
-	// count arithmetic guessing which rows changed.
-	const highWaterMarkRef = React.useRef<bigint>(BigInt(0));
-
+	/* ── New orders / notifications (via the inbox signal) ───────────────
+	 * The server decides what is new: an inbox signal carries `newInboxItemIds`
+	 * (rows created or aggregated since the previous signal on this stream) and
+	 * only those rows are toasted, with the server-composed title, body and deep
+	 * link. There is no get-by-id RPC, so the newest page is read once per
+	 * signal and the ids picked from it. An aggregated bump repeats an id; the
+	 * toast context replaces the toast that has the same `dedupeKey`.
+	 * A truncated signal (too many new rows), a signal without ids (initial,
+	 * reconnect, read, delete) and a hidden tab toast nothing. Message rows
+	 * belong to the chat socket path above and never double-toast.
+	 */
 	const workspaceKeyRef = React.useRef(workspaceKey);
 	workspaceKeyRef.current = workspaceKey;
+	const audience = audienceForRole(activeRole ?? "buyer");
 
 	React.useEffect(() => {
-		void workspaceKey;
-		// Buyer and seller have independent inboxes. A role/account change starts
-		// a fresh baseline instead of reusing the previous inbox's high-water mark.
-		primedRef.current = false;
-		prevCountRef.current = 0;
-		highWaterMarkRef.current = BigInt(0);
-	}, [workspaceKey]);
-
-	/* ── New orders / notifications (via SSE notification.new event) ─────
-	 * Primary path. `useUnreadCount` re-publishes the SSE payload on
-	 * `hk:notification:new` so we can toast immediately with the row data
-	 * the server already pushed — no need to round-trip back to the inbox
-	 * REST endpoint. The legacy count-rise effect below still runs as a
-	 * fallback (e.g. cross-tab mark-unread bumps the count without firing
-	 * `notification.new`), and dedupes against this path via
-	 * `highWaterMarkRef` so the same row never double-toasts.
-	 */
-	React.useEffect(() => {
-		if (!signedIn) return;
-		const onNotificationNew = (e: Event) => {
-			const detail = (e as CustomEvent<NotificationNewEventDetail>).detail;
-			const item = detail?.item;
-			if (!item) return;
-			// The direct SSE path already accounts for this unread-count rise. Move
-			// the fallback baseline forward now so the count effect below does not
-			// issue a redundant inbox GET for the same event.
-			prevCountRef.current = Math.max(
-				prevCountRef.current,
-				Math.max(0, detail.unreadCount),
-			);
-			// Chat-type rows are handled by the socket path above so an SSE-
-			// pushed message-type inbox row doesn't double-toast with the
-			// websocket one.
-			if (item.type === "message") return;
-			if (item.isRead) return;
-			const itemId = idToBigInt(item.id);
-			if (itemId <= highWaterMarkRef.current) return;
-			if (isMessagesArea(window.location.pathname)) return;
-			highWaterMarkRef.current = itemId;
-			const role =
-				activeRole ?? notificationWorkspaceRole(window.location.pathname);
-			const resolved = resolveNotification(item, role);
-			show({
-				kind: item.type === "order" ? "order" : "system",
-				title: resolved.title,
-				body: resolved.body,
-				imageUrl: item.imageUrl,
-				href: resolved.href,
-				dedupeKey: `notif:${item.id}`,
-				// Same notification title (e.g.「貼文被回覆」) collapses into one stack.
-				groupKey: `notif:${resolved.title}`,
-			});
-		};
-		window.addEventListener(NOTIFICATION_NEW_EVENT, onNotificationNew);
-		return () =>
-			window.removeEventListener(NOTIFICATION_NEW_EVENT, onNotificationNew);
-	}, [activeRole, signedIn, show]);
-
-	React.useEffect(() => {
-		void workspaceKey;
 		if (!signedIn) return;
 		let cancelled = false;
-		// Establish the real baseline only once the count is the server's answer
-		// for this workspace (`baselineReady`). The count is 0 before that, so
-		// priming earlier would treat the initial 0→N load as N new toasts —
-		// that's the "dumps everything on login" bug. A level, not a loading
-		// edge: batched renders can skip the transient loading=true state.
-		if (!primedRef.current) {
-			if (baselineReady) {
-				primedRef.current = true;
-				prevCountRef.current = count;
-				// Mark everything that already exists (read or unread) as
-				// pre-dating this session, regardless of backlog size — the
-				// single newest row's id is the cutoff, no need to page
-				// through the whole unread list.
-				const requestedFor = workspaceKey;
-				void fetchNotifications({ pageSize: 1 })
-					.then((res) => {
-						if (workspaceKeyRef.current !== requestedFor) return;
-						const latest = res.records[0];
-						if (!latest) return;
-						const latestId = idToBigInt(latest.id);
-						if (latestId > highWaterMarkRef.current) {
-							highWaterMarkRef.current = latestId;
-						}
-					})
-					.catch(() => {
-						/* best-effort — worst case the backlog can resurface once */
+		const onSignal = (event: Event) => {
+			const detail = (event as CustomEvent<NotificationSignalEventDetail>)
+				.detail;
+			const ids = detail?.newInboxItemIds ?? [];
+			if (detail?.newItemsTruncated || ids.length === 0) return;
+			if (document.visibilityState !== "visible") return;
+			const requestedFor = workspaceKeyRef.current;
+			void (async () => {
+				try {
+					const page = await listInboxItems({
+						audience,
+						pageSize: SIGNAL_PAGE_SIZE,
 					});
-			}
-			return () => {
-				cancelled = true;
-			};
-		}
-		// Only act on settled counts; ignore the in-flight true state of polls.
-		if (loading) return;
-		const prev = prevCountRef.current;
-		prevCountRef.current = count;
-		if (count <= prev) return;
-
-		const gained = count - prev;
-		void (async () => {
-			try {
-				const res = await fetchNotifications({ pageSize: 10 });
-				if (cancelled) return;
-				const fresh = res.records
-					.filter(
-						(n) =>
-							!n.isRead &&
-							n.type !== "message" &&
-							idToBigInt(n.id) > highWaterMarkRef.current,
-					)
-					.slice(0, gained);
-				// A burst of distinct titles used to stack one full-width card per
-				// row down the screen. Show the newest few and collapse the rest
-				// into a single count line.
-				const shown = fresh.slice(0, MAX_TOASTS_PER_TICK);
-				const overflow = fresh.slice(MAX_TOASTS_PER_TICK);
-				// Every row in the burst still moves the high-water mark, or the
-				// collapsed ones would toast again on the next count rise.
-				for (const n of fresh) {
-					const nId = idToBigInt(n.id);
-					if (nId > highWaterMarkRef.current) highWaterMarkRef.current = nId;
+					if (cancelled || workspaceKeyRef.current !== requestedFor) return;
+					if (document.visibilityState !== "visible") return;
+					if (isMessagesArea(window.location.pathname)) return;
+					const wanted = new Set(ids);
+					const fresh = page.items.filter(
+						(n: InboxItem) =>
+							wanted.has(n.id) &&
+							!n.read &&
+							n.presentation !== InboxPresentation.MESSAGE,
+					);
+					// Oldest first so the newest ends up on top of the stack.
+					for (const n of [...fresh].reverse()) {
+						show({
+							kind:
+								n.presentation === InboxPresentation.ORDER ? "order" : "system",
+							title: n.title,
+							body: n.body,
+							imageUrl: imageUri(n.image, "thumb"),
+							href: n.deepLink || undefined,
+							dedupeKey: `notif:${n.id}`,
+							// Same notification title (e.g.「貼文被回覆」) collapses into one stack.
+							groupKey: `notif:${n.title}`,
+						});
+					}
+				} catch {
+					/* transient fetch error — the list refetch still shows the rows */
 				}
-				// Oldest first so the newest ends up on top of the stack.
-				for (const n of [...shown].reverse()) {
-					const role =
-						activeRole ?? notificationWorkspaceRole(window.location.pathname);
-					const resolved = resolveNotification(n, role);
-					show({
-						kind: n.type === "order" ? "order" : "system",
-						title: resolved.title,
-						body: resolved.body,
-						imageUrl: n.imageUrl,
-						href: resolved.href,
-						dedupeKey: `notif:${n.id}`,
-						groupKey: `notif:${resolved.title}`,
-					});
-				}
-				if (overflow.length > 0) {
-					const overflowRole =
-						activeRole ?? notificationWorkspaceRole(window.location.pathname);
-					show({
-						kind: "system",
-						title: `還有 ${overflow.length} 則新通知`,
-						href:
-							overflowRole === "seller"
-								? "/seller-center/notifications"
-								: "/account/notifications",
-						dedupeKey: `notif:overflow:${overflow[0].id}`,
-						groupKey: "notif:overflow",
-					});
-				}
-			} catch {
-				/* transient fetch error — the next increase will retry */
-			}
-		})();
+			})();
+		};
+		window.addEventListener(NOTIFICATION_SIGNAL_EVENT, onSignal);
 		return () => {
 			cancelled = true;
+			window.removeEventListener(NOTIFICATION_SIGNAL_EVENT, onSignal);
 		};
-	}, [activeRole, baselineReady, count, signedIn, loading, show, workspaceKey]);
+	}, [audience, signedIn, show]);
 
 	return null;
 }

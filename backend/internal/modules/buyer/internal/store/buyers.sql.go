@@ -10,39 +10,22 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"uuid"
 )
 
-const avatarAsset = `-- name: AvatarAsset :one
-SELECT status, avatar_asset_id
-FROM buyer.buyers
-WHERE buyer_id = $1
-`
-
-type AvatarAssetRow struct {
-	Status        string
-	AvatarAssetID *string
-}
-
-// 同步 job 讀的：買家目前的頭像 asset（沒有頭像時是 NULL）。
-func (q *Queries) AvatarAsset(ctx context.Context, buyerID int64) (AvatarAssetRow, error) {
-	row := q.db.QueryRow(ctx, avatarAsset, buyerID)
-	var i AvatarAssetRow
-	err := row.Scan(&i.Status, &i.AvatarAssetID)
-	return i, err
-}
-
 const batchDisplay = `-- name: BatchDisplay :many
-SELECT buyer_id, display_name, avatar, (status = 'CLOSED')::boolean AS deleted
+SELECT buyer_id, display_name, avatar, avatar_asset_id, (status = 'CLOSED')::boolean AS deleted
 FROM buyer.buyers
 WHERE buyer_id = ANY($1::bigint[])
 ORDER BY buyer_id
 `
 
 type BatchDisplayRow struct {
-	BuyerID     int64
-	DisplayName *string
-	Avatar      *string
-	Deleted     bool
+	BuyerID       int64
+	DisplayName   *string
+	Avatar        *string
+	AvatarAssetID *uuid.UUID
+	Deleted       bool
 }
 
 // 回傳原始 nullable 個資與 Deleted；模組對已關閉 stint 隱藏個資。
@@ -59,6 +42,7 @@ func (q *Queries) BatchDisplay(ctx context.Context, dollar_1 []int64) ([]BatchDi
 			&i.BuyerID,
 			&i.DisplayName,
 			&i.Avatar,
+			&i.AvatarAssetID,
 			&i.Deleted,
 		); err != nil {
 			return nil, err
@@ -574,7 +558,7 @@ RETURNING buyer_id, account_id, status, version, display_name, phone, gender, av
 
 type UpdateAvatarParams struct {
 	Avatar        *string
-	AvatarAssetID *string
+	AvatarAssetID *uuid.UUID
 	UpdatedAt     time.Time
 	BuyerID       int64
 	Version       int64

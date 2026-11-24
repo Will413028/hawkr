@@ -25,7 +25,6 @@
 
 import * as React from "react";
 import { BackLink } from "@/components/shared/BackLink";
-import Link from "@/components/shared/Link";
 import { SellerPageShell } from "@/components/shared/SellerPageShell";
 import Button from "@/components/ui/Button";
 import {
@@ -39,7 +38,6 @@ import {
 	useSubmitSellerTaxProfile,
 } from "@/lib/hooks/useSellerInvoiceRemedy";
 import { formatFileSize } from "@/lib/invoices/display";
-import { sellerTaxDocumentHref } from "@/lib/invoices/seller-repo";
 import {
 	hasIntakeLimit,
 	isSelfIssueAccepted,
@@ -318,9 +316,6 @@ function SubmittedSection({ profile }: { profile: SellerTaxProfile }) {
 }
 
 function DocumentRow({ document }: { document: SellerTaxDocument }) {
-	// 已上傳但後端還沒換發 objectKey 時 `fileAssetId` 為空 ⇒ **不渲染下載連結**，
-	// 點下去必定 404（§S02 的「已上傳未存草稿」態）。
-	const href = sellerTaxDocumentHref(document);
 	const size = formatFileSize(document.fileSize);
 
 	return (
@@ -336,15 +331,6 @@ function DocumentRow({ document }: { document: SellerTaxDocument }) {
 						.join(" · ")}
 				</span>
 			</span>
-			{href ? (
-				<Link href={href} className="shrink-0 text-sm underline">
-					下載
-				</Link>
-			) : (
-				<span className="shrink-0 text-[0.75rem] text-[var(--hkui-foreground-soft)]">
-					尚未可下載
-				</span>
-			)}
 		</li>
 	);
 }

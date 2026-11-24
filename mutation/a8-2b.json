@@ -122,7 +122,7 @@
    "stack": "go-integration",
    "file": "backend/internal/modules/notification/internal/app/inbox.go",
    "old": "\"error\", err)\n\t\t\tcontinue",
-   "new": "\"error\", err)\n\t\t\treturn Page{}, err",
+   "new": "\"error\", err)\n\t\t\treturn nil, err",
    "test": "internal/modules/notification ^TestListInboxSkipsARowThatCannotRender$",
    "why": "一列組不出文字就讓整份收件匣失敗"
   },

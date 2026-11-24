@@ -12,7 +12,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
@@ -20,15 +19,11 @@ import (
 func TestAccountCreationProvisionsBuyerInSameTransaction(t *testing.T) {
 	ctx := context.Background()
 	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(migrate.Module{Name: "identity", Dir: identity.Migrations()}, migrate.Module{Name: "buyer", Dir: buyer.Migrations()}))
-	queue, err := jobs.NewInsertOnly(d)
-	if err != nil {
-		t.Fatal(err)
-	}
 	bus := events.NewBus()
 	clock := func() time.Time { return time.Date(2026, 9, 30, 0, 0, 0, 0, time.UTC) }
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	accounts := identity.New(identity.Deps{DB: d, Events: bus, Now: clock, Logger: logger})
-	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: queue, Now: clock, Logger: logger})
+	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Now: clock, Logger: logger})
 	subscribeBuyerLifecycle(bus, buyers)
 	login, err := accounts.Login(ctx, identity.LoginInput{
 		Identity: identity.ProviderIdentity{Provider: identity.ProviderGoogle, Subject: "google-created", Name: "新買家"},

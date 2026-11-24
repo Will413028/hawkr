@@ -50,10 +50,11 @@ type ReviewReply struct {
 	AuthoredAt time.Time `json:"authored_at,omitzero"`
 }
 
-// Buyer 是被檢舉買家的公開檔案。
+// Buyer 是被檢舉買家的公開檔案。AvatarAssetID 是頭像的 media 資產：檢舉當下是買家的頭像資產，快照建好之後是 moderation 自己的複本
+// （與其他證據圖片同一條保全路徑）；沒有頭像是空字串。
 type Buyer struct {
-	DisplayName string `json:"display_name"`
-	Avatar      string `json:"avatar"`
+	DisplayName   string `json:"display_name"`
+	AvatarAssetID string `json:"avatar_asset_id,omitempty"`
 }
 
 // Review 是評價的快照：作者永遠是買家；SubjectStoreID 是評價所屬的店家（上下文，不是作者，所以不放在 StoreOf 看的欄位）；ReplyBody 是店家回覆，當作上下文。
@@ -123,12 +124,16 @@ func (c Content) StoreID() int64 {
 	return 0
 }
 
-// AssetIDs 回傳快照引用的全部圖片資產（證據保全）：被檢舉內容的圖片，聊天加上前後文的圖片；排序去重。
+// AssetIDs 回傳快照引用的全部圖片資產（證據保全）：被檢舉內容的圖片（買家是頭像），聊天加上前後文的圖片；排序去重。
 func (c Content) AssetIDs() []string {
 	var refs []string
 	switch {
 	case c.Social != nil:
 		refs = c.Social.MediaRefs
+	case c.Buyer != nil:
+		if c.Buyer.AvatarAssetID != "" {
+			refs = []string{c.Buyer.AvatarAssetID}
+		}
 	case c.Review != nil:
 		refs = c.Review.MediaRefs
 	case c.Chat != nil:
@@ -178,6 +183,48 @@ func (c Content) Validate() error {
 	return nil
 }
 
+// ReplaceAssets 回傳把圖片資產 ID 依 to 換掉的內容（證據快照改引用自己的複本）：to 沒有的 ID 維持原樣；不修改傳入的內容。
+func (c Content) ReplaceAssets(to map[string]string) Content {
+	swap := func(in []string) []string {
+		if in == nil {
+			return nil
+		}
+		out := make([]string, len(in))
+		for i, id := range in {
+			if v, ok := to[id]; ok {
+				id = v
+			}
+			out[i] = id
+		}
+		return out
+	}
+	if c.Social != nil {
+		s := *c.Social
+		s.MediaRefs = swap(s.MediaRefs)
+		c.Social = &s
+	}
+	if c.Buyer != nil && c.Buyer.AvatarAssetID != "" {
+		b := *c.Buyer
+		b.AvatarAssetID = swap([]string{b.AvatarAssetID})[0]
+		c.Buyer = &b
+	}
+	if c.Review != nil {
+		r := *c.Review
+		r.MediaRefs = swap(r.MediaRefs)
+		c.Review = &r
+	}
+	if c.Chat != nil {
+		ch := *c.Chat
+		ch.MediaRefs = swap(ch.MediaRefs)
+		ch.Context = slices.Clone(ch.Context)
+		for i := range ch.Context {
+			ch.Context[i].MediaRefs = swap(ch.Context[i].MediaRefs)
+		}
+		c.Chat = &ch
+	}
+	return c
+}
+
 func body(s string) string {
 	return trimtext.Trim(strings.ReplaceAll(strings.ReplaceAll(s, "\r\n", "\n"), "\r", "\n"))
 }
@@ -204,7 +251,7 @@ func Normalize(c Content) Content {
 	}
 	if c.Buyer != nil {
 		b := *c.Buyer
-		b.DisplayName, b.Avatar = trimtext.Trim(b.DisplayName), trimtext.Trim(b.Avatar)
+		b.DisplayName, b.AvatarAssetID = trimtext.Trim(b.DisplayName), trimtext.Trim(b.AvatarAssetID)
 		c.Buyer = &b
 	}
 	if c.Review != nil {

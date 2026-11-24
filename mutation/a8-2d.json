@@ -221,7 +221,7 @@
    "stack": "go",
    "file": "backend/internal/modules/notification/internal/stream/listen.go",
    "old": "if now().Sub(upSince) >= stableAfter {",
-   "new": "if true {",
+   "new": "if now().Sub(upSince) >= 0 {",
    "test": "internal/modules/notification/internal/stream ^TestRunBackoffKeepsGrowingWhileTheConnectionFlaps$",
    "why": "A flapping LISTEN connection resets the backoff every time, so resync runs about twice a second."
   },
@@ -230,7 +230,7 @@
    "stack": "go",
    "file": "backend/internal/modules/notification/internal/stream/listen.go",
    "old": "if now().Sub(upSince) >= stableAfter {",
-   "new": "if false {",
+   "new": "if now().Sub(upSince) < 0 {",
    "test": "internal/modules/notification/internal/stream ^TestRunBackoffResetsAfterAStableConnection$",
    "why": "A connection that stayed up still keeps the grown backoff, so recovery after a long outage is slow forever."
   },
@@ -238,7 +238,7 @@
    "id": "read-error-loses-dirty-mark",
    "stack": "go",
    "file": "backend/internal/modules/notification/internal/stream/hub.go",
-   "old": "\t\t\t\ts.restoreInbox(hints)",
+   "old": "\t\t\t\ts.restoreInbox(hints, items, truncated)",
    "new": "\t\t\t\t_ = hints",
    "test": "internal/modules/notification/internal/stream ^TestFailedReadKeepsTheDirtyMarkAndHints$",
    "why": "A failed content read drops the dirty mark and merged hints, so the change is never signalled."
@@ -273,11 +273,11 @@
   {
    "id": "workspace-invalidates-on-any-reconnect",
    "stack": "website",
-   "file": "website/lib/hooks/useSellerWorkspaceRealtime.ts",
+   "file": "website/lib/notifications/unread-context.tsx",
    "old": "signal.type === \"reconnected\" && signal.afterAbnormalEnd",
    "new": "signal.type === \"reconnected\"",
-   "test": "lib/hooks/useSellerWorkspaceRealtime.unit.test.ts 壽命到期的正常結束後重連不失效",
-   "why": "Every reconnect fully invalidates the workspace, even after a normal lifetime end."
+   "test": "lib/notifications/unread-context.unit.test.ts 賣家工作區訊號與異常重連由同一條串流轉發，且只開一條",
+   "why": "The provider forwards every reconnect to the seller workspace, even after a normal lifetime end."
   }
  ]
 }

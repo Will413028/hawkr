@@ -65,6 +65,10 @@ func toResponse(ev notification.StreamEvent) (*pb.WatchNotificationsResponse, er
 			id := ev.Inbox.LatestItemID.String()
 			in.LatestInboxItemId = &id
 		}
+		for _, id := range ev.Inbox.NewItemIDs {
+			in.NewInboxItemIds = append(in.NewInboxItemIds, id.String())
+		}
+		in.NewItemsTruncated = ev.Inbox.NewItemsTruncated
 		for _, h := range ev.Inbox.Hints {
 			hint, err := hintToProto(h)
 			if err != nil {

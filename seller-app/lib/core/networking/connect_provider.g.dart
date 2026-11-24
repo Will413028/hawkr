@@ -199,6 +199,58 @@ final class IdentityClientProvider
 
 String _$identityClientHash() => r'073ae0319f0c732d9244e8a20a6cb8736e257511';
 
+/// 圖片與機敏檔案的上傳會話（MediaAppService），登入後呼叫。
+
+@ProviderFor(mediaClient)
+final mediaClientProvider = MediaClientProvider._();
+
+/// 圖片與機敏檔案的上傳會話（MediaAppService），登入後呼叫。
+
+final class MediaClientProvider
+    extends
+        $FunctionalProvider<
+          MediaAppServiceClient,
+          MediaAppServiceClient,
+          MediaAppServiceClient
+        >
+    with $Provider<MediaAppServiceClient> {
+  /// 圖片與機敏檔案的上傳會話（MediaAppService），登入後呼叫。
+  MediaClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'mediaClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$mediaClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<MediaAppServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  MediaAppServiceClient create(Ref ref) {
+    return mediaClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(MediaAppServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<MediaAppServiceClient>(value),
+    );
+  }
+}
+
+String _$mediaClientHash() => r'473fabd3f9cced88e92e2c5f2c57cb3075ad3f1c';
+
 /// 賣家的店家、入駐與 KYC（SellerAppService），登入後呼叫。
 
 @ProviderFor(sellerClient)
@@ -620,6 +672,59 @@ final class ModerationAppClientProvider
 
 String _$moderationAppClientHash() =>
     r'8b3fcf02b8505f77423f433df99664ee1a4bf171';
+
+/// 通知收件匣、偏好、裝置 token 與即時訊號串流（NotificationAppService，STORE 受眾），登入後呼叫。
+
+@ProviderFor(notificationClient)
+final notificationClientProvider = NotificationClientProvider._();
+
+/// 通知收件匣、偏好、裝置 token 與即時訊號串流（NotificationAppService，STORE 受眾），登入後呼叫。
+
+final class NotificationClientProvider
+    extends
+        $FunctionalProvider<
+          NotificationAppServiceClient,
+          NotificationAppServiceClient,
+          NotificationAppServiceClient
+        >
+    with $Provider<NotificationAppServiceClient> {
+  /// 通知收件匣、偏好、裝置 token 與即時訊號串流（NotificationAppService，STORE 受眾），登入後呼叫。
+  NotificationClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'notificationClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$notificationClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<NotificationAppServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  NotificationAppServiceClient create(Ref ref) {
+    return notificationClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(NotificationAppServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<NotificationAppServiceClient>(value),
+    );
+  }
+}
+
+String _$notificationClientHash() =>
+    r'ff4e279d2b0a07465dcf20087d699f25f100cfd1';
 
 /// 賣家入駐文件的現行版本（SellerPublicService），不需登入。
 

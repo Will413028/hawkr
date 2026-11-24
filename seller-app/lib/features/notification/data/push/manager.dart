@@ -3,40 +3,39 @@ import 'package:hawkr_seller/core/theme/app_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icon_colors.dart';
 import 'package:hawkr_seller/shared/icons/app_icons.dart';
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app.dart';
 import '../../../../config/firebase_config.dart';
 import '../../../../config/flavor.dart';
-import '../../../../core/networking/dio_provider.dart';
+import '../../../../core/networking/connect_provider.dart';
 import '../../../../shared/utils/hk_log.dart';
 import '../../../../shared/utils/secret_redaction.dart';
 import '../../../../shared/widgets/fcm_debug_overlay.dart';
 import '../../../chat/data/active_chat_gate.dart';
-import '../../../order/data/after_sale_status_notifier.dart';
-import '../../../order/data/order_status_notifier.dart';
+import '../deep_link.dart';
+import '../../../dashboard/data/dashboard_notification_unread_provider.dart';
+import '../../presentation/notification_controller.dart';
+import '../state_refresh.dart';
 import '../../presentation/notification_banner.dart';
 import 'apns_token_wait.dart';
 import 'device_registrar.dart';
-import 'local_notifier.dart';
-import 'router.dart';
-import 'seller_status_push.dart';
 
 /// 推播通知管理器（協調器 / SSOT）
 ///
 /// 職責：
-/// - 初始化 FCM 與本地通知（協調各 Service）
-/// - 管理 FCM Token 生命週期
-/// - 分發前台訊息（Overlay Banner）
+/// - 初始化 FCM
+/// - 管理 FCM Token 生命週期與裝置註冊
+/// - 前台可見推播（FCM `notification` 欄位）：Overlay Banner
+/// - 點擊推播：交給伺服器給的 `deep_link`（[NotificationDeepLink]）
 /// - 記錄 Debug 訊息總線
-/// - 委派導航至 [NotificationRouter]
-/// - 委派本地通知至 [LocalNotificationService]
+///
+/// 推播一律是可見通知（APNs alert）；沒有 `notification` 欄位的訊息不顯示。狀態重讀由通知串流
+/// （`NotificationSignalService`）負責，這裡不依通知型別分支。
 class PushNotificationManager {
   static final PushNotificationManager _instance =
       PushNotificationManager._internal();
@@ -56,9 +55,10 @@ class PushNotificationManager {
   /// 並以中央 Dio 建立受保護的裝置註冊 gateway。
   void injectContainer(ProviderContainer container) {
     _container = container;
-    final dio = container.read(dioProvider);
     _registration = DeviceRegistrationCoordinator(
-      gateway: NotificationDeviceRegistrar(dio),
+      gateway: NotificationDeviceRegistrar(
+        container.read(notificationClientProvider),
+      ),
     );
   }
 
@@ -67,10 +67,6 @@ class PushNotificationManager {
   /// 第一次使用時才取 [FirebaseMessaging.instance]：Firebase 沒有設定時它會拋
   /// `core/no-app`，所有入口先以 [isFirebaseInitialized] 擋掉。
   late final FirebaseMessaging _messaging = FirebaseMessaging.instance;
-
-  final LocalNotificationService _localNotification = LocalNotificationService(
-    FlutterLocalNotificationsPlugin(),
-  );
 
   // ── 狀態 ──────────────────────────────────────────────────
 
@@ -107,10 +103,6 @@ class PushNotificationManager {
   void handleMessageOpenedAppForTest(RemoteMessage message) =>
       _handleMessageOpenedApp(message);
 
-  @visibleForTesting
-  void navigateFromPayloadForTest(String payload) =>
-      _navigateFromPayload(payload);
-
   /// 測試接縫：本類是硬 singleton，`_fcmToken` 只能由 FirebaseMessaging 給、
   /// `_registration` 只能由 [injectContainer] 以真 Dio 建立。沒有這個接縫，
   /// 「無憑證 / 未登入時不得送出裝置註銷」這道守衛（#106 迴圈的唯一防線）
@@ -139,14 +131,6 @@ class PushNotificationManager {
     const [],
   );
 
-  // ── FCM 訊息總線（供 UI 層監聽刷新） ─────────────────────
-  final StreamController<RemoteMessage> _inboxController =
-      StreamController<RemoteMessage>.broadcast();
-
-  /// 收到任何 FCM 前景訊息 / 點擊後台通知時的廣播 stream。
-  /// UI 層（通知頁、訂單頁等）訂閱後可即時刷新列表。
-  Stream<RemoteMessage> get onInboxMessage => _inboxController.stream;
-
   // ── StreamSubscription ────────────────────────────────────
 
   StreamSubscription<RemoteMessage>? _onMessageSub;
@@ -174,27 +158,19 @@ class PushNotificationManager {
     try {
       HKLog.logI('[FCM] 開始初始化');
 
-      // 步驟 1：初始化本地通知
-      await _localNotification.initialize(
-        onTap: (response) {
-          HKLog.logD('[FCM] 本地通知點擊: ${response.payload}');
-          _navigateFromPayload(response.payload);
-        },
-      );
-
-      // 步驟 2：iOS 前台通知顯示選項
+      // 步驟 1：iOS 前台通知顯示選項
       // alert:false → 前台時由 Flutter Overlay Banner 接管，抑制 iOS 系統通知
-      // 後台/終止狀態下，OS 仍會依 notification 欄位自動顯示系統通知
+      // 後台/終止狀態下，OS 依 notification 欄位顯示系統通知
       await _messaging.setForegroundNotificationPresentationOptions(
         alert: false,
         badge: true,
         sound: false,
       );
 
-      // 步驟 3：設置監聽器 (核心代码)
+      // 步驟 2：設置監聽器
       _setupListeners();
 
-      // 步驟 4：檢查冷啟動來源
+      // 步驟 3：檢查冷啟動來源
       await _checkInitialLaunch();
 
       _initialized = true;
@@ -230,7 +206,6 @@ class PushNotificationManager {
 
       _recordDebugMessage(m, source: 'onMessage');
       _handleForegroundMessage(m);
-      _inboxController.add(m);
     });
 
     // 背景點擊通知返回 App（App in background，非冷啟動）
@@ -238,7 +213,6 @@ class PushNotificationManager {
       HKLog.logD('[FCM] onMessageOpenedApp: ${m.messageId}');
       _recordDebugMessage(m, source: 'onMessageOpenedApp');
       _handleMessageOpenedApp(m);
-      _inboxController.add(m);
     });
 
     HKLog.logD('[FCM] 監聽器設置完成');
@@ -247,23 +221,11 @@ class PushNotificationManager {
   // ── 冷啟動檢查 ────────────────────────────────────────────
 
   Future<void> _checkInitialLaunch() async {
-    // 4a：FCM 系統通知冷啟動（帶 notification 欄位的 push）
     final initialMessage = await _messaging.getInitialMessage();
     if (initialMessage != null) {
       HKLog.logI('[FCM] 從 FCM 通知冷啟動');
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _handleMessageOpenedApp(initialMessage);
-      });
-      return;
-    }
-
-    // 4b：靜默推播 → flutter_local_notifications 顯示的通知冷啟動
-    final launchDetails = await _localNotification.getLaunchDetails();
-    if (launchDetails?.didNotificationLaunchApp == true) {
-      final payload = launchDetails!.notificationResponse?.payload;
-      HKLog.logI('[FCM] 從本地通知冷啟動: $payload');
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _navigateFromPayload(payload);
       });
     }
   }
@@ -335,110 +297,59 @@ class PushNotificationManager {
 
   // ── 訊息處理 ──────────────────────────────────────────────
 
-  /// 前台訊息處理：顯示 Overlay Banner
-  ///
-  /// 後端始終在 notification 欄位或 data payload 中提供 title / body，
-  /// chat_message 額外 fallback 至 content_preview（向後相容）。
+  /// 前台訊息處理：顯示 Overlay Banner。文字、圖片與深連結都是伺服器給的；沒有 `notification` 欄位的訊息不顯示。
   void _handleForegroundMessage(RemoteMessage message) {
-    final data = message.data;
-    final type = _notificationType(data);
+    // 串流不通時前景推播是唯一的訊號：先依 `state_refresh_hints` 重讀（和串流同一份對照），不論要不要顯示 banner。
+    final container = _container;
+    if (container != null) {
+      container
+          .read(stateRefreshActionsProvider)
+          .applyInbox(
+            parseStateRefreshHints(
+              message.data['state_refresh_hints']?.toString(),
+            ),
+          );
+    }
+    final notification = message.notification;
+    if (notification == null) return;
+    final title = notification.title ?? '';
+    final body = notification.body ?? '';
+    if (title.isEmpty && body.isEmpty) return;
 
-    HKLog.logD('[FCM] foreground type=$type dataKeys=${data.keys.toList()}');
+    final link = NotificationDeepLink.parse(
+      message.data['deep_link']?.toString(),
+    );
 
-    // 前景收到的 status-update silent push 先 dispatch 到對應 notifier，
-    // 讓訂單列表 / 詳情 / dashboard 的 ref.listen 自動刷新。
-    // 不走 NotificationRouter.navigate 避免誤把使用者導去別的頁面。
-    _dispatchSilentStatusUpdate(data);
-
-    if (_isSilentPush(data)) {
-      HKLog.logD('[FCM] silent push，略過前台 Banner');
+    // 使用者已經在那個聊天室裡：不再彈前景 banner，避免雙重通知。
+    final activeChat = _container?.read(activeChatGateProvider);
+    if (activeChat != null && link.isOpenIn(activeChat)) {
+      HKLog.logD('[FCM] 跳過 banner：使用者已在該聊天室');
       return;
     }
 
-    // 優先使用 FCM notification 欄位；其次用 data payload 中的 title/body
-    final fcmTitle =
-        message.notification?.title ?? data['title'] as String? ?? '';
-    final fcmBody = message.notification?.body ?? data['body'] as String? ?? '';
+    _showBanner(
+      title: title,
+      body: body,
+      imageUrl: notification.apple?.imageUrl,
+      link: link,
+      inboxItemId: message.data['inbox_item_id']?.toString(),
+    );
+  }
 
-    // 右側大頭照：先看 data.imageUrl（契約），再 fallback 到 FCM 平台欄位
-    final imageUrl =
-        data['imageUrl'] as String? ??
-        data['image_url'] as String? ??
-        message.notification?.apple?.imageUrl;
-
-    // chat_message：補充 refId 供 NotificationRouter 識別跳轉目標，
-    // 並在 body 為空時 fallback 至 content_preview
-    if (type == 'chat_message' || type == 'CHAT_MESSAGE') {
-      final conversationId = data['conversation_id']?.toString() ?? '';
-      final senderId = _firstNonEmpty(data, [
-        'sender_id',
-        'senderId',
-        'from_user_id',
-        'fromUserId',
-        'from_id',
-        'fromId',
-      ]);
-
-      // 使用者已經在跟這個人的聊天室裡 → 不再彈前景 banner，避免雙重通知。
-      // senderId 與 conversationId 任一比對到就跳過：participantId / senderId 可能
-      // 因 namespace 不同對不上，conversationId 是 server 端唯一 ID 比對最穩。
-      final gate = _container?.read(activeChatGateProvider);
-      final activePeer = gate?.peerId;
-      final activeConv = gate?.conversationId;
-      final matchesPeer =
-          senderId.isNotEmpty && activePeer != null && activePeer == senderId;
-      final matchesConv =
-          conversationId.isNotEmpty &&
-          activeConv != null &&
-          activeConv == conversationId;
-      if (matchesPeer || matchesConv) {
-        HKLog.logD(
-          '[FCM] 跳過 chat_message banner：使用者已在聊天室內 '
-          'senderId=$senderId conversationId=$conversationId',
-        );
-        return;
-      }
-
-      final senderName = _firstNonEmpty(data, [
-        'sender_name',
-        'senderName',
-        'from_name',
-        'fromName',
-      ]);
-      final senderAvatar = _firstNonEmpty(data, [
-        'sender_avatar',
-        'senderAvatar',
-        'sender_avatar_url',
-        'senderAvatarUrl',
-        'avatar_url',
-        'avatarUrl',
-      ]);
-      final title = fcmTitle.isNotEmpty
-          ? fcmTitle
-          : (senderName.isNotEmpty ? senderName : '新訊息');
-      final body = fcmBody.isNotEmpty
-          ? fcmBody
-          : data['content_preview']?.toString() ?? '';
-      if (title.isNotEmpty || body.isNotEmpty) {
-        _showBanner(
-          title: title,
-          body: body,
-          imageUrl: senderAvatar.isNotEmpty ? senderAvatar : imageUrl,
-          data: {...data, 'refId': conversationId},
-        );
-      }
+  /// 點擊推播：把對應的收件匣項目標為已讀（`inbox_item_id`）；失敗由 `markAsRead` 吞掉，不影響導航。
+  void _markInboxItemRead(String? inboxItemId) {
+    final container = _container;
+    if (container == null || inboxItemId == null || inboxItemId.isEmpty) {
       return;
     }
-
-    // 其他類型 — 直接使用後端提供的 title/body
-    if (fcmTitle.isNotEmpty || fcmBody.isNotEmpty) {
-      _showBanner(
-        title: fcmTitle,
-        body: fcmBody,
-        imageUrl: imageUrl,
-        data: data,
-      );
-    }
+    unawaited(
+      container
+          .read(notificationListControllerProvider.notifier)
+          .markAsRead(inboxItemId)
+          .then(
+            (_) => container.invalidate(dashboardNotificationUnreadProvider),
+          ),
+    );
   }
 
   /// 後台點擊 / 冷啟動訊息處理
@@ -449,94 +360,8 @@ class PushNotificationManager {
       _showTestDialog(message);
       return;
     }
-    _signalSellerStatus(message.data);
-    NotificationRouter.navigate(message.data);
-  }
-
-  /// 認證或 PayUni 狀態的通知事件：重讀一次。前景收到的事件在 [_dispatchSilentStatusUpdate] 已經重讀過，之後點橫幅只導覽；
-  /// 從背景或冷啟動點通知進來（[_handleMessageOpenedApp]、[_navigateFromPayload]）沒有前景的處理，在這裡重讀一次。
-  void _signalSellerStatus(Map<String, dynamic> data) {
-    if (isSellerStatusPushType(_notificationType(data))) {
-      refreshSellerStatusFromPush(_container);
-    }
-  }
-
-  /// 前景 silent push 的 side-effect-free dispatch：只餵事件給 stream provider，
-  /// 不做頁面導航（導航留給使用者點擊通知時的 _handleMessageOpenedApp）。
-  ///
-  /// 事件分類鍵位的 fallback 順序：`type` → `refType` → `eventType`
-  /// 後端 silent push payload 有時用 `refType: "ORDER_STATUS"` 搭配
-  /// `eventType: "ORDER_PAID"` 來標記事件類別，故需多欄位 fallback。
-  void _dispatchSilentStatusUpdate(Map<String, dynamic> data) {
-    final raw = _notificationType(data);
-    if (raw == null || raw.isEmpty) return;
-
-    final key = raw.toUpperCase();
-    HKLog.logD('[FCM] dispatchSilentStatusUpdate key=$key');
-
-    switch (key) {
-      // 訂單類（新訂單／付款／出貨／送達／取消 皆觸發訂單列表刷新）
-      case 'AFTER_SALE_REQUEST':
-      case 'AFTERSALE':
-      case 'AFTER_SALE':
-      case 'AFTER_SALE_STATUS':
-      case 'RETURN_SHIPPED':
-      case 'REFUND_REQUESTED':
-      case 'REFUND_APPROVED':
-      case 'REFUND_REJECTED':
-      case 'REFUND_COMPLETED':
-      case 'ORDER_REFUNDED':
-        AfterSaleStatusNotifier.instance.handlePushNotification(data);
-      case 'ORDER':
-      case 'NEW_ORDER':
-      case 'ORDER_CREATED':
-      case 'ORDER_PAID':
-      case 'ORDER_SHIPPED':
-      case 'ORDER_DELIVERED':
-      case 'ORDER_COMPLETED':
-      case 'ORDER_CANCELLED':
-      case 'ORDER_STATUS':
-        OrderStatusNotifier.instance.handlePushNotification(data);
-      default:
-        if (isSellerStatusPushType(key)) {
-          refreshSellerStatusFromPush(_container);
-        }
-    }
-  }
-
-  String? _notificationType(Map<String, dynamic> data) {
-    final eventType = data['eventType']?.toString();
-    if (isSellerStatusPushType(eventType)) return eventType;
-    return (data['type'] ?? data['refType'] ?? eventType)?.toString();
-  }
-
-  String _firstNonEmpty(Map<String, dynamic> data, List<String> keys) {
-    for (final key in keys) {
-      final value = data[key]?.toString().trim();
-      if (value != null && value.isNotEmpty) return value;
-    }
-    return '';
-  }
-
-  bool _isSilentPush(Map<String, dynamic> data) {
-    final mode = (data['push_mode'] ?? data['pushMode'] ?? data['mode'])
-        ?.toString();
-    if (mode?.toLowerCase() == 'silent') return true;
-
-    final silent = data['silent']?.toString().toLowerCase();
-    return silent == 'true' || silent == '1';
-  }
-
-  /// 從本地通知 payload（jsonEncode(data)）解析並導航
-  void _navigateFromPayload(String? payload) {
-    if (payload == null || payload.isEmpty) return;
-    try {
-      final data = Map<String, dynamic>.from(jsonDecode(payload) as Map);
-      _signalSellerStatus(data);
-      NotificationRouter.navigate(data);
-    } catch (e) {
-      HKLog.logE('[FCM] 解析本地通知 payload 失敗', e);
-    }
+    _markInboxItemRead(message.data['inbox_item_id']?.toString());
+    NotificationDeepLink.parse(message.data['deep_link']?.toString()).open();
   }
 
   // ── Overlay Banner ────────────────────────────────────────
@@ -545,7 +370,8 @@ class PushNotificationManager {
   void _showBanner({
     required String title,
     required String body,
-    required Map<String, dynamic> data,
+    required NotificationDeepLink link,
+    String? inboxItemId,
     String? imageUrl,
   }) {
     final overlay = MyApp.navigatorKey.currentState?.overlay;
@@ -569,11 +395,11 @@ class PushNotificationManager {
       builder: (_) => NotificationBanner(
         title: title,
         body: body,
-        type: data['type']?.toString(),
         imageUrl: imageUrl,
         onTap: () {
           removeSafely();
-          NotificationRouter.navigate(data);
+          _markInboxItemRead(inboxItemId);
+          link.open();
         },
         onClose: removeSafely,
       ),
@@ -801,10 +627,7 @@ class PushNotificationManager {
           },
         );
     if (!outcome.isSuccess) {
-      HKLog.logW(
-        '[FCM] 裝置註銷未確認成功（disposition=${outcome.disposition.name}, '
-        'status=${outcome.statusCode ?? 0}）',
-      );
+      HKLog.logW('[FCM] 裝置註銷未確認成功（disposition=${outcome.disposition.name}）');
     }
   }
 
@@ -813,7 +636,6 @@ class PushNotificationManager {
     _onMessageSub?.cancel();
     _onMessageOpenedSub?.cancel();
     _onTokenRefreshSub?.cancel();
-    _inboxController.close();
     if (_activeBannerEntry?.mounted == true) _activeBannerEntry!.remove();
     _activeBannerEntry = null;
     _initialized = false;

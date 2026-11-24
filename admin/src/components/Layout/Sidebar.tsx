@@ -173,9 +173,9 @@ const navGroups: Array<{ section: string; items: NavItem[] }> = [
 		items: [
 			{ href: "/admin/banners", label: "管理 Banner", icon: "image" },
 			{
-				href: "/admin/notification-templates",
-				label: "通知模板管理",
-				icon: "notifications",
+				href: "/admin/announcements",
+				label: "系統公告",
+				icon: "campaign",
 			},
 			{ href: "/admin/ai-styles", label: "AI 修圖管理", icon: "wand_stars" },
 			{

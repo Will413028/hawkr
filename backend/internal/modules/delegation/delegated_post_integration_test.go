@@ -794,3 +794,33 @@ func TestOwnerPostWritesLeaveNoAuditRows(t *testing.T) {
 		t.Fatalf("店主的寫入留下 %d 列稽核，預期 0", n)
 	}
 }
+
+// 代行上傳（B1-D16）：缺 media.upload 的 session 被拒絕並留一列 FAILED（MEDIA_UPLOAD／MEDIA／CAPABILITY_DENIED，不通知賣家）；有能力的 session 通過檢查，
+// 而且成功的上傳（開會話與段上傳都不經 delegation 寫入）在這個 session 底下不留任何稽核列。
+func TestMediaUploadDenialLeavesAFailedRowAndSuccessLeavesNone(t *testing.T) {
+	f := build(t, true)
+	methodUpload := DelegatedMethod{Capability: CapabilityMediaUpload, Action: AuditMediaUpload, Resource: ResourceMedia}
+	read := func(c DelegatedCaller) error {
+		return f.m.DelegatedRead(context.Background(), c, func(context.Context, seller.Store) error { return nil })
+	}
+	no := f.newOperator(t, "noupload", CapabilityPostsRead)
+	if d, ok := DelegationDenialOf(read(f.caller(t, no, methodUpload))); !ok || d.Denial != DenialCapabilityDenied {
+		t.Fatalf("缺 media.upload：%v，預期 DenialCapabilityDenied", d)
+	}
+	row := f.failedRow(t, no.session.Session.ID, "MEDIA_UPLOAD")
+	if row.n != 1 || row.capability != "media.upload" || row.notify {
+		t.Fatalf("FAILED 列 = %+v", row)
+	}
+	wantFailureReason(t, "缺 media.upload", row.failureReason, "CAPABILITY_DENIED")
+	if n := f.count(t, `SELECT count(*) FROM delegation.admin_operation_audit_logs WHERE session_id = $1 AND action = 'MEDIA_UPLOAD' AND resource_type = 'MEDIA'`, no.session.Session.ID); n != 1 {
+		t.Fatalf("MEDIA 資源的稽核列 %d 列，預期 1", n)
+	}
+
+	yes := f.newOperator(t, "upload", CapabilityMediaUpload)
+	if err := read(f.caller(t, yes, methodUpload)); err != nil {
+		t.Fatal(err)
+	}
+	if n := f.count(t, `SELECT count(*) FROM delegation.admin_operation_audit_logs WHERE session_id = $1`, yes.session.Session.ID); n != 0 {
+		t.Fatalf("成功的上傳留下 %d 列稽核，預期 0", n)
+	}
+}

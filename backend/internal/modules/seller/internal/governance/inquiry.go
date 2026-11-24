@@ -15,7 +15,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/stint"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/store"
@@ -267,7 +266,7 @@ func (s *Service) RecordInquiryReply(ctx context.Context, in model.RecordCaseInq
 	if n := utf8.RuneCountInString(body); n == 0 || n > model.InquiryReplyMaxRunes {
 		return model.RecordCaseInquiryReplyResult{}, invalidOn("Body", text.InquiryBodyLength())
 	}
-	if err := mediaref.EvidenceTokens(in.EvidenceTokens); err != nil {
+	if err := model.CheckEvidenceTokens(in.EvidenceTokens); err != nil {
 		return model.RecordCaseInquiryReplyResult{}, err
 	}
 	received := in.ReceivedAt.UTC().Truncate(time.Microsecond)
@@ -276,12 +275,8 @@ func (s *Service) RecordInquiryReply(ctx context.Context, in model.RecordCaseInq
 	} else if err != nil {
 		return model.RecordCaseInquiryReplyResult{}, err
 	}
-	evidence, err := mediaref.FinalizeEvidence(ctx, s.d.Media, media.Uploader{ID: in.AdminID, Admin: true}, in.EvidenceTokens)
-	if err != nil {
-		return model.RecordCaseInquiryReplyResult{}, err
-	}
 	var result model.RecordCaseInquiryReplyResult
-	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
+	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := store.New(s.d.DB.Conn(ctx))
 		locked, err := s.lockInquiry(ctx, q, in.InquiryID)
 		if err != nil {
@@ -312,15 +307,14 @@ func (s *Service) RecordInquiryReply(ctx context.Context, in model.RecordCaseInq
 		}); err != nil {
 			return err
 		}
+		evidence, err := model.ConfirmEvidence(ctx, s.d.Media, media.Uploader{ID: in.AdminID, Admin: true}, in.EvidenceTokens)
+		if err != nil {
+			return err
+		}
 		for i, e := range evidence {
 			if err := q.InsertCaseInquiryEvidence(ctx, store.InsertCaseInquiryEvidenceParams{
 				InquiryID: inquiry.ID, Position: int32(i), AssetID: e.AssetID, ObjectKey: e.ObjectKey, //nolint:gosec // 位置最多 MaxEvidence
 			}); err != nil {
-				return err
-			}
-		}
-		if len(evidence) > 0 {
-			if err := mediaref.Changed(ctx, q, s.d.Jobs, now, mediaref.EvidenceRef(inquiry.ID)); err != nil {
 				return err
 			}
 		}

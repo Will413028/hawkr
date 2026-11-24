@@ -58,3 +58,10 @@ description = "Stripe log 遮蔽測試的假金鑰（SECRETKEY123 之類的固�
 condition = "AND"
 paths = ['''^backend/internal/platform/stripe/redact_test\.go$''']
 rules = ["stripe-access-token", "generic-api-key"]
+
+[[allowlists]]
+description = "notification 停寄名單 integration 測試的假 Resend webhook 簽章密鑰：只在測試裡簽與驗自己產生的 payload，沒有對應的 Resend 帳號"
+condition = "AND"
+paths = ['''^backend/internal/modules/notification/suppression_integration_test\.go$''']
+regexTarget = "line"
+regexes = ['''const resendSecret = ''']

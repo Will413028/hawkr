@@ -10,6 +10,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/imageai/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/imageai/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/modules/imageai/internal/text"
+	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 )
@@ -78,22 +79,17 @@ func (s *Service) CreateStyle(ctx context.Context, in model.CreateStyleInput) (m
 	if in.ThumbnailToken == "" {
 		return model.AdminStyle{}, apperr.InvalidInputOn([]string{"ThumbnailToken"}, "%s", text.AdminStyleThumbnailRequired(l))
 	}
-	// 先驗證再轉正：驗證失敗時不該讓圖片掛在一個永遠不會建立的風格上。
-	key, asset, err := s.d.Thumbs.Finalize(ctx, in.Actor.AdminID, in.ThumbnailToken, text.AdminStyleThumbnailUnusable(l).Text)
-	if err != nil {
-		return model.AdminStyle{}, err
-	}
 	id := s.d.NewID()
 	var row store.ImageaiStyle
 	err = s.d.Tx(ctx, func(ctx context.Context) error {
 		now := s.d.Now().UTC()
 		q := s.d.Q(ctx)
-		if err := s.d.Thumbs.Reject(ctx, id, asset); err != nil {
+		thumb, err := confirmThumbnail(ctx, s.d.Media, in.Actor.AdminID, in.ThumbnailToken)
+		if err != nil {
 			return err
 		}
-		var err error
 		row, err = q.InsertStyle(ctx, store.InsertStyleParams{
-			ID: id, Name: name, Label: label, Prompt: prompt, Category: string(in.Category), ThumbnailKey: key, ThumbnailAssetID: asset,
+			ID: id, Name: name, Label: label, Prompt: prompt, Category: string(in.Category), ThumbnailKey: thumb.ObjectKey, ThumbnailAssetID: &thumb.ID,
 			DisplayOrder: in.DisplayOrder, Enabled: in.Enabled, Now: now,
 		})
 		switch {
@@ -101,9 +97,6 @@ func (s *Service) CreateStyle(ctx context.Context, in model.CreateStyleInput) (m
 			return apperr.AlreadyExists("%s", text.AdminStyleNameTaken(l))
 		case err != nil:
 			return fmt.Errorf("admin：新增風格：%w", err)
-		}
-		if err := s.d.Thumbs.Changed(ctx, now, id); err != nil {
-			return err
 		}
 		return s.record(ctx, in.Actor, styleTarget, id.String(), map[string]any{"name": name, "category": string(in.Category), "enabled": in.Enabled})
 	})
@@ -114,7 +107,7 @@ func (s *Service) CreateStyle(ctx context.Context, in model.CreateStyleInput) (m
 }
 
 // UpdateStyle 整筆覆寫風格可改的欄位（name、category 建立後不能改）。Version 是讀取時拿到的版本，與目前的不符回 VersionConflict、不寫入；
-// 轉正新圖之前先比對一次，少一些注定被拒的轉正，最後以條件式 UPDATE 為準。
+// 版本在鎖住風格列後比對，最後以條件式 UPDATE 為準；新縮圖在鎖住風格列之後的 transaction 內 Confirm，任何一步失敗整筆回滾，新圖仍是暫存。
 // 預設風格不能在這裡改（換預設是 SetDefault）；停用目前的預設風格回 FailedPrecondition（A9-D39）。
 func (s *Service) UpdateStyle(ctx context.Context, in model.UpdateStyleInput) (model.AdminStyle, error) {
 	l := loc(ctx)
@@ -124,26 +117,6 @@ func (s *Service) UpdateStyle(ctx context.Context, in model.UpdateStyleInput) (m
 	label, prompt, err := validateText(ctx, in.Label, in.Prompt)
 	if err != nil {
 		return model.AdminStyle{}, err
-	}
-	cur, err := s.d.Q(ctx).GetStyle(ctx, in.ID)
-	if notFound(err) {
-		return model.AdminStyle{}, styleNotFound(ctx)
-	}
-	if err != nil {
-		return model.AdminStyle{}, fmt.Errorf("admin：讀取風格 %s：%w", in.ID, err)
-	}
-	if cur.Version != in.Version {
-		return model.AdminStyle{}, styleStale(ctx)
-	}
-	if cur.IsDefault && !in.Enabled {
-		return model.AdminStyle{}, apperr.FailedPrecondition("%s", text.AdminStyleDefaultMustBeEnabled(l))
-	}
-	var newKey, newAsset string
-	if in.ThumbnailToken != "" {
-		newKey, newAsset, err = s.d.Thumbs.Finalize(ctx, in.Actor.AdminID, in.ThumbnailToken, text.AdminStyleThumbnailUnusable(l).Text)
-		if err != nil {
-			return model.AdminStyle{}, err
-		}
 	}
 	var row store.ImageaiStyle
 	err = s.d.Tx(ctx, func(ctx context.Context) error {
@@ -159,18 +132,20 @@ func (s *Service) UpdateStyle(ctx context.Context, in model.UpdateStyleInput) (m
 		if old.Version != in.Version {
 			return styleStale(ctx)
 		}
-		key, asset := old.ThumbnailKey, old.ThumbnailAssetID
-		if newAsset != "" {
-			if err := s.d.Thumbs.Reject(ctx, in.ID, newAsset); err != nil {
+		key := old.ThumbnailKey
+		var newAsset *uuid.UUID
+		if in.ThumbnailToken != "" {
+			thumb, err := confirmThumbnail(ctx, s.d.Media, in.Actor.AdminID, in.ThumbnailToken)
+			if err != nil {
 				return err
 			}
-			key, asset = newKey, newAsset
+			key, newAsset = thumb.ObjectKey, &thumb.ID
 		}
 		if old.IsDefault && !in.Enabled {
 			return apperr.FailedPrecondition("%s", text.AdminStyleDefaultMustBeEnabled(l))
 		}
 		row, err = q.UpdateStyle(ctx, store.UpdateStyleParams{
-			ID: in.ID, Label: label, Prompt: prompt, ThumbnailKey: key, ThumbnailAssetID: asset, DisplayOrder: in.DisplayOrder,
+			ID: in.ID, Label: label, Prompt: prompt, ThumbnailKey: key, ThumbnailAssetID: newAsset, DisplayOrder: in.DisplayOrder,
 			Enabled: in.Enabled, Now: now, ExpectedVersion: in.Version,
 		})
 		switch {
@@ -179,16 +154,12 @@ func (s *Service) UpdateStyle(ctx context.Context, in model.UpdateStyleInput) (m
 		case err != nil:
 			return fmt.Errorf("admin：修改風格 %s：%w", in.ID, err)
 		}
-		if newAsset != "" {
-			var retired []string
-			if old.ThumbnailAssetID != "" && old.ThumbnailAssetID != newAsset {
-				retired = []string{old.ThumbnailAssetID}
-			}
-			if err := s.d.Thumbs.Changed(ctx, now, in.ID, retired...); err != nil {
+		if newAsset != nil {
+			if err := s.d.Media.MarkDeleted(ctx, media.RetiredAssets(media.AssetIDs(old.ThumbnailAssetID), media.AssetIDs(newAsset))); err != nil {
 				return err
 			}
 		}
-		return s.record(ctx, in.Actor, styleTarget, in.ID.String(), map[string]any{"version": row.Version, "changed": changedFields(old, row, newAsset != "")})
+		return s.record(ctx, in.Actor, styleTarget, in.ID.String(), map[string]any{"version": row.Version, "changed": changedFields(old, row, newAsset != nil)})
 	})
 	if err != nil {
 		return model.AdminStyle{}, err
@@ -267,11 +238,10 @@ func changedFields(old, now store.ImageaiStyle, thumbnail bool) []string {
 	return out
 }
 
-// DeleteStyle 刪除風格並把它的縮圖記成退場、排入引用的同步。version 為 0 表示不檢查版本；不為 0 時必須與目前的相符。
+// DeleteStyle 刪除風格並在同一個 transaction 內把它的縮圖標記刪除（終態：沒有列就沒有目前的資產）。version 為 0 表示不檢查版本；不為 0 時必須與目前的相符。
 // 用途的預設風格不能刪（A9-D39，FailedPrecondition）。
 func (s *Service) DeleteStyle(ctx context.Context, actor model.Actor, id uuid.UUID, version int64) error {
 	return s.d.Tx(ctx, func(ctx context.Context) error {
-		now := s.d.Now().UTC()
 		q := s.d.Q(ctx)
 		old, err := q.LockStyle(ctx, id)
 		if notFound(err) {
@@ -289,13 +259,14 @@ func (s *Service) DeleteStyle(ctx context.Context, actor model.Actor, id uuid.UU
 		if _, err := q.DeleteStyle(ctx, id); err != nil {
 			return fmt.Errorf("admin：刪除風格 %s：%w", id, err)
 		}
-		var retired []string
-		if old.ThumbnailAssetID != "" {
-			retired = []string{old.ThumbnailAssetID}
-		}
-		if err := s.d.Thumbs.Changed(ctx, now, id, retired...); err != nil {
+		if err := s.d.Media.MarkDeleted(ctx, media.RetiredAssets(media.AssetIDs(old.ThumbnailAssetID), nil)); err != nil {
 			return err
 		}
 		return s.record(ctx, actor, styleTarget, id.String(), map[string]any{"name": old.Name, "category": old.Category})
 	})
+}
+
+// confirmThumbnail 在寫入風格列的 transaction 內確認縮圖的 staged token（公開可讀）；不可用回指向 ThumbnailToken 的欄位錯誤。
+func confirmThumbnail(ctx context.Context, m model.Media, adminID int64, token string) (media.ConfirmedAsset, error) {
+	return media.ConfirmField(ctx, m, media.Uploader{ID: adminID, Admin: true}, "ThumbnailToken", token, media.VisibilityPublic)
 }

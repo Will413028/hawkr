@@ -656,11 +656,11 @@ func TestMessagesNeverLeakObjectKeysAccountIDsOrTombstoneContent(t *testing.T) {
 	hidden := sampleMessage(1)
 	hidden.Hidden, hidden.Text = true, &txt
 	erased := sampleMessage(2)
-	erased.Erased, erased.Type, erased.Image = true, im.TypeImage, &im.Image{AssetID: "a2", ObjectKey: "chat/secret-erased.jpg"}
+	erased.Erased, erased.Type, erased.Image = true, im.TypeImage, &im.Image{AssetID: uuid.UUID{0xa2}, ObjectKey: "chat/secret-erased.jpg"}
 	erased.Text = &txt
 	live := sampleMessage(3)
 	live.SenderKind, live.Type, live.Text = im.PartyStore, im.TypeImage, nil
-	live.Image = &im.Image{AssetID: "a3", ObjectKey: "chat/secret-live.jpg"}
+	live.Image = &im.Image{AssetID: uuid.UUID{0xa3}, ObjectKey: "chat/secret-live.jpg"}
 	e.reads.msgPage = im.MessagePage{Items: []im.Message{hidden, erased, live}, HasMore: true, PeerReadSeq: 2}
 	resp, err := e.app.ListMessages(signedIn(), connect.NewRequest(&pb.ListMessagesRequest{ConversationId: convID.String()}))
 	if err != nil {
@@ -682,7 +682,7 @@ func TestMessagesNeverLeakObjectKeysAccountIDsOrTombstoneContent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, leak := range []string{"secret-erased", "ObjectKey", "objectKey", "不該出現", `"a3"`, "accountId"} {
+	for _, leak := range []string{"secret-erased", "ObjectKey", "objectKey", "不該出現", uuid.UUID{0xa3}.String(), "accountId"} {
 		if strings.Contains(string(raw), leak) {
 			t.Errorf("回應不得含 %q：%s", leak, raw)
 		}

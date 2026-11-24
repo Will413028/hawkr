@@ -4,8 +4,9 @@ package buyer_test
 
 import (
 	"context"
-	"fmt"
+	"strings"
 	"testing"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -115,7 +116,7 @@ func TestAvatarVersionCAS(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	p := profile(t, f, 1)
-	token := "staged"
+	token, _ := stageAvatar(t, f, p.AccountID)
 	updated, err := f.module.UpdateProfile(ctx, buyer.UpdateProfileInput{
 		BuyerID:           p.BuyerID,
 		ExpectedVersion:   p.Version,
@@ -125,17 +126,17 @@ func TestAvatarVersionCAS(t *testing.T) {
 	if updated.Version != p.Version+1 {
 		t.Fatalf("version=%d", updated.Version)
 	}
-	before := fmt.Sprint(f.media.Calls())
+	next, nextAsset := stageAvatar(t, f, p.AccountID)
 	_, err = f.module.UpdateProfile(ctx, buyer.UpdateProfileInput{
 		BuyerID:           p.BuyerID,
 		ExpectedVersion:   p.Version,
-		AvatarStagedToken: &token,
+		AvatarStagedToken: &next,
 	})
 	if apperr.KindOf(err) != apperr.KindVersionConflict {
 		t.Fatalf("stale avatar error=%v", err)
 	}
-	if fmt.Sprint(f.media.Calls()) != before {
-		t.Fatal("stale avatar promoted")
+	if got := assetState(t, f, nextAsset); got != "STAGED" {
+		t.Fatalf("stale avatar confirmed the new asset: %s", got)
 	}
 }
 
@@ -187,7 +188,7 @@ func TestAvatarAndTextInOneUpdate(t *testing.T) {
 	ctx := context.Background()
 	p := profile(t, f, 1)
 	newName := "新暱稱"
-	token := "staged-combined"
+	token, _ := stageAvatar(t, f, p.AccountID)
 	updated, err := f.module.UpdateProfile(ctx, buyer.UpdateProfileInput{
 		BuyerID:           p.BuyerID,
 		ExpectedVersion:   p.Version,
@@ -195,12 +196,21 @@ func TestAvatarAndTextInOneUpdate(t *testing.T) {
 		AvatarStagedToken: &token,
 	})
 	must(t, err)
-	if updated.DisplayName != "新暱稱" || updated.Avatar == nil || *updated.Avatar != "avatar/staged-combined" {
+	if updated.DisplayName != "新暱稱" || updated.Avatar == nil || !strings.HasPrefix(*updated.Avatar, "public/") {
 		t.Fatalf("avatar + text update incomplete: %+v", updated)
 	}
 	if updated.Version != p.Version+2 {
 		// text update bumps version by 1, avatar update bumps version by 1 in the same transaction
 		t.Fatalf("expected version %d, got %d", p.Version+2, updated.Version)
+	}
+	ds, err := f.module.BatchDisplay(ctx, []int64{p.BuyerID})
+	must(t, err)
+	var stored uuid.UUID
+	if err := f.database.Conn(ctx).QueryRow(ctx, "SELECT avatar_asset_id FROM buyer.buyers WHERE buyer_id = $1", p.BuyerID).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if len(ds) != 1 || ds[0].AvatarAssetID == nil || *ds[0].AvatarAssetID != stored {
+		t.Fatalf("BatchDisplay avatar asset = %v, want %v", ds, stored)
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
+	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
 )
 
@@ -22,4 +23,17 @@ func (s *Service) OnUnsuspended(ctx context.Context, e accountsuspension.Unsuspe
 	return s.Accept(ctx, "account_unsuspended", registry.AccountUnsuspendedParams{
 		AccountID: e.AccountID, SuspensionID: e.SuspensionID, ReleasedAt: e.ReleasedAt,
 	})
+}
+
+// 下面兩個是白名單內的訂閱者（subscribers_test.go 的 tokenPurgeSubscribers）：停權與刪帳號時在發布的同一個 transaction 刪掉帳號的全部裝置 token，
+// 之後不會再有推播送到這些裝置。只刪 token，不讀別的模組、不排 job。
+
+// PurgeTokensOnSuspended 訂閱 accountsuspension.Suspended。店家停權（store suspension）不是這個事件，token 不動。
+func (s *Service) PurgeTokensOnSuspended(ctx context.Context, e accountsuspension.Suspended) error {
+	return s.deleteAccountTokens(ctx, e.AccountID)
+}
+
+// PurgeTokensOnAccountDeleted 訂閱 identity.AccountDeleted。
+func (s *Service) PurgeTokensOnAccountDeleted(ctx context.Context, e identity.AccountDeleted) error {
+	return s.deleteAccountTokens(ctx, e.AccountID)
 }

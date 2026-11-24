@@ -31,7 +31,7 @@ func fieldsOf(err error) []string {
 	return out
 }
 
-func TestCreateStyleRejectsInvalidInputWithoutFinalizingTheThumbnail(t *testing.T) {
+func TestCreateStyleRejectsInvalidInputWithoutConfirmingTheThumbnail(t *testing.T) {
 	for name, mut := range map[string]struct {
 		f     func(*model.CreateStyleInput)
 		field string
@@ -53,8 +53,8 @@ func TestCreateStyleRejectsInvalidInputWithoutFinalizingTheThumbnail(t *testing.
 			if got := fieldsOf(err); !slices.Equal(got, []string{mut.field}) {
 				t.Fatalf("欄位 = %v，預期 [%s]", got, mut.field)
 			}
-			if len(h.thumbs.finalized) != 0 || len(h.q.styles) != 0 || len(h.audit.entries) != 0 {
-				t.Fatalf("驗證失敗不該轉正縮圖或寫入：%v %v %v", h.thumbs.finalized, h.q.styles, h.audit.entries)
+			if len(h.media.confirmed) != 0 || len(h.q.styles) != 0 || len(h.audit.entries) != 0 {
+				t.Fatalf("驗證失敗不該確認縮圖或寫入：%v %v %v", h.media.confirmed, h.q.styles, h.audit.entries)
 			}
 		})
 	}
@@ -73,7 +73,7 @@ func TestCreateStylePromptAcceptsExactly500CharactersAfterTrimming(t *testing.T)
 	}
 }
 
-func TestCreateStyleStoresTheFinalizedThumbnailAndWritesTheAuditInTheSameTransaction(t *testing.T) {
+func TestCreateStyleStoresTheConfirmedThumbnailAndWritesTheAuditInTheSameTransaction(t *testing.T) {
 	h := newHarness(t)
 	s, err := h.s.CreateStyle(context.Background(), createInput())
 	if err != nil {
@@ -83,11 +83,11 @@ func TestCreateStyleStoresTheFinalizedThumbnailAndWritesTheAuditInTheSameTransac
 		t.Fatalf("回傳的風格 = %+v", s)
 	}
 	row := h.q.styles[s.ID]
-	if row.ThumbnailAssetID != "asset-t1" {
-		t.Fatalf("asset = %q", row.ThumbnailAssetID)
+	if row.ThumbnailAssetID == nil || *row.ThumbnailAssetID != assetOf("t1") {
+		t.Fatalf("asset = %v", row.ThumbnailAssetID)
 	}
-	if len(h.thumbs.changed) != 1 || len(h.thumbs.changed[0]) != 0 {
-		t.Fatalf("Changed 呼叫 = %v，新增時預期一次、沒有退場資產", h.thumbs.changed)
+	if len(h.media.deleted) != 0 {
+		t.Fatalf("新增不得標記刪除：%v", h.media.deleted)
 	}
 	if len(h.audit.entries) != 1 {
 		t.Fatalf("稽核 = %v，預期一筆（fakeAudit 只在 transaction 內接受）", h.audit.entries)
@@ -114,8 +114,8 @@ func TestCreateStyleDuplicateNameIsAlreadyExists(t *testing.T) {
 	h.seed("clean", "PRODUCT", false, "a")
 	_, err := h.s.CreateStyle(context.Background(), createInput())
 	wantKind(t, err, apperr.KindAlreadyExists)
-	if len(h.audit.entries) != 0 || len(h.thumbs.changed) != 0 {
-		t.Fatal("衝突時不該寫稽核或排同步")
+	if len(h.audit.entries) != 0 || len(h.media.deleted) != 0 {
+		t.Fatal("衝突時不該寫稽核或標記刪除")
 	}
 	// 同名但不同用途可以。
 	in := createInput()
@@ -170,7 +170,7 @@ func TestUpdateStyleRequiresTheVersion(t *testing.T) {
 	}
 }
 
-func TestUpdateStyleStaleVersionIsRejectedBeforeFinalizingTheThumbnail(t *testing.T) {
+func TestUpdateStyleStaleVersionIsRejectedBeforeConfirmingTheThumbnail(t *testing.T) {
 	h := newHarness(t)
 	s := h.seed("a", "PRODUCT", false, "a")
 	in := updateInput(s.ID, s.Version+1)
@@ -180,8 +180,8 @@ func TestUpdateStyleStaleVersionIsRejectedBeforeFinalizingTheThumbnail(t *testin
 	if reasonOf(err) != apperr.ReasonVersionConflict {
 		t.Fatalf("reason = %v", reasonOf(err))
 	}
-	if len(h.thumbs.finalized) != 0 || len(h.audit.entries) != 0 {
-		t.Fatal("版本不符時不該轉正縮圖或寫稽核")
+	if len(h.media.confirmed) != 0 || len(h.audit.entries) != 0 {
+		t.Fatal("版本不符時不該確認縮圖或寫稽核")
 	}
 }
 
@@ -203,15 +203,15 @@ func TestUpdateStyleKeepsTheThumbnailWithoutATokenAndBumpsTheVersion(t *testing.
 	if got.Version != s.Version+1 || got.ThumbnailKey != s.ThumbnailKey || got.Label != "新名" || got.DisplayOrder != 5 || got.Name != "a" || got.Category != model.CategoryProduct {
 		t.Fatalf("got = %+v", got)
 	}
-	if len(h.thumbs.finalized) != 0 || len(h.thumbs.changed) != 0 {
-		t.Fatalf("沒換圖不該轉正或排同步：%v %v", h.thumbs.finalized, h.thumbs.changed)
+	if len(h.media.confirmed) != 0 || len(h.media.deleted) != 0 {
+		t.Fatalf("沒換圖不該確認或標記刪除：%v %v", h.media.confirmed, h.media.deleted)
 	}
 	if len(h.audit.entries) != 1 || h.audit.entries[0].TargetType != "ai_style" {
 		t.Fatalf("稽核 = %v", h.audit.entries)
 	}
 }
 
-func TestUpdateStyleReplacingTheThumbnailRetiresTheOldAsset(t *testing.T) {
+func TestUpdateStyleReplacingTheThumbnailMarksTheOldAssetDeleted(t *testing.T) {
 	h := newHarness(t)
 	s := h.seed("a", "PRODUCT", false, "old")
 	in := updateInput(s.ID, s.Version)
@@ -220,15 +220,15 @@ func TestUpdateStyleReplacingTheThumbnailRetiresTheOldAsset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.ThumbnailKey != "public/new.jpg" || h.q.styles[s.ID].ThumbnailAssetID != "asset-new" {
+	if got.ThumbnailKey != "public/new.jpg" || *h.q.styles[s.ID].ThumbnailAssetID != assetOf("new") {
 		t.Fatalf("縮圖沒換：%+v", got)
 	}
-	if len(h.thumbs.changed) != 1 || !slices.Equal(h.thumbs.changed[0], []string{"old"}) || !slices.Equal(h.thumbs.rejected, []string{"asset-new"}) {
-		t.Fatalf("changed=%v rejected=%v", h.thumbs.changed, h.thumbs.rejected)
+	if !slices.Equal(h.media.confirmed, []string{"new"}) || !slices.Equal(h.media.deleted, []uuid.UUID{assetOf("old")}) {
+		t.Fatalf("confirmed=%v deleted=%v", h.media.confirmed, h.media.deleted)
 	}
 }
 
-func TestUpdateStyleGivingAThumbnailToAStyleWithoutOneRetiresNothing(t *testing.T) {
+func TestUpdateStyleGivingAThumbnailToAStyleWithoutOneMarksNothingDeleted(t *testing.T) {
 	h := newHarness(t)
 	s := h.seed("seed", "PRODUCT", true, "")
 	in := updateInput(s.ID, s.Version)
@@ -236,21 +236,21 @@ func TestUpdateStyleGivingAThumbnailToAStyleWithoutOneRetiresNothing(t *testing.
 	if _, err := h.s.UpdateStyle(context.Background(), in); err != nil {
 		t.Fatal(err)
 	}
-	if len(h.thumbs.changed) != 1 || len(h.thumbs.changed[0]) != 0 {
-		t.Fatalf("changed = %v，預期一次且沒有退場資產（空 asset ID 不是資產）", h.thumbs.changed)
+	if len(h.media.deleted) != 0 {
+		t.Fatalf("deleted = %v，預期沒有（原本沒有縮圖資產）", h.media.deleted)
 	}
 }
 
-func TestUpdateStyleTokenThatCannotBeFinalizedLeavesTheStyleUntouched(t *testing.T) {
+func TestUpdateStyleTokenThatCannotBeConfirmedLeavesTheStyleUntouched(t *testing.T) {
 	h := newHarness(t)
-	h.thumbs.failToken = "bad"
+	h.media.failToken = "bad"
 	s := h.seed("a", "PRODUCT", false, "a")
 	in := updateInput(s.ID, s.Version)
 	in.ThumbnailToken = "bad"
 	_, err := h.s.UpdateStyle(context.Background(), in)
 	wantKind(t, err, apperr.KindInvalidInput)
 	if h.q.styles[s.ID].Version != s.Version || len(h.audit.entries) != 0 {
-		t.Fatal("轉正失敗不該改風格或寫稽核")
+		t.Fatal("確認失敗不該改風格或寫稽核")
 	}
 }
 
@@ -391,12 +391,12 @@ func TestDeleteStyleRefusesTheDefaultStyle(t *testing.T) {
 	d := h.seed("d", "PRODUCT", true, "a")
 	err := h.s.DeleteStyle(context.Background(), actor, d.ID, 0)
 	wantKind(t, err, apperr.KindFailedPrecondition)
-	if _, ok := h.q.styles[d.ID]; !ok || len(h.audit.entries) != 0 || len(h.thumbs.changed) != 0 {
-		t.Fatal("預設風格不能刪，也不該寫稽核或釋放縮圖")
+	if _, ok := h.q.styles[d.ID]; !ok || len(h.audit.entries) != 0 || len(h.media.deleted) != 0 {
+		t.Fatal("預設風格不能刪，也不該寫稽核或標記刪除縮圖")
 	}
 }
 
-func TestDeleteStyleReleasesTheThumbnailAndAudits(t *testing.T) {
+func TestDeleteStyleMarksTheThumbnailDeletedAndAudits(t *testing.T) {
 	h := newHarness(t)
 	s := h.seed("a", "PRODUCT", false, "a")
 	if err := h.s.DeleteStyle(context.Background(), actor, s.ID, 0); err != nil {
@@ -405,8 +405,8 @@ func TestDeleteStyleReleasesTheThumbnailAndAudits(t *testing.T) {
 	if _, ok := h.q.styles[s.ID]; ok {
 		t.Fatal("風格沒被刪")
 	}
-	if len(h.thumbs.changed) != 1 || !slices.Equal(h.thumbs.changed[0], []string{"a"}) {
-		t.Fatalf("changed = %v，預期退場 [a]", h.thumbs.changed)
+	if !slices.Equal(h.media.deleted, []uuid.UUID{assetOf("a")}) {
+		t.Fatalf("deleted = %v，預期 [a]", h.media.deleted)
 	}
 	if len(h.audit.entries) != 1 || h.audit.entries[0].TargetID != s.ID.String() {
 		t.Fatalf("稽核 = %v", h.audit.entries)
@@ -427,14 +427,14 @@ func TestDeleteStyleChecksTheVersionOnlyWhenGiven(t *testing.T) {
 	wantKind(t, h.s.DeleteStyle(context.Background(), actor, s.ID, 0), apperr.KindNotFound)
 }
 
-func TestDeleteStyleWithoutAThumbnailRetiresNothing(t *testing.T) {
+func TestDeleteStyleWithoutAThumbnailMarksNothingDeleted(t *testing.T) {
 	h := newHarness(t)
 	s := h.seed("a", "PRODUCT", false, "")
 	if err := h.s.DeleteStyle(context.Background(), actor, s.ID, 0); err != nil {
 		t.Fatal(err)
 	}
-	if len(h.thumbs.changed) != 1 || len(h.thumbs.changed[0]) != 0 {
-		t.Fatalf("changed = %v", h.thumbs.changed)
+	if len(h.media.deleted) != 0 {
+		t.Fatalf("deleted = %v", h.media.deleted)
 	}
 }
 

@@ -28,7 +28,7 @@ Hawkr 的後台管理平台，用於管理商戶、會員、商品、訂單、Ba
 - **賣家管理**：列表、篩選、認證審核（統編與公司補充文件）、PAYUNi 金流狀態同步、批准 / 停用 / 刪除
 - **分類審核**：賣家提交的商品分類審核
 - **Banner 管理**：列表 + Fabric.js/Konva 編輯器
-- **通知模板**：模板管理
+- **系統公告**：發送與列表
 - **AI 修圖**：AI Style 管理
 - **文案管理**：站內文案編輯
 
@@ -71,7 +71,7 @@ src/
 │       ├── merchants/              # 賣家管理 + [id] 認證詳情
 │       ├── category-audit/
 │       ├── banners/                # Banner 列表 + editor/
-│       ├── notification-templates/
+│       ├── announcements/
 │       ├── ai-styles/
 │       ├── dev-tools/
 │       └── (disputes | transactions | members | products | analytics | seo)/

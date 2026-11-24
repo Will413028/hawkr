@@ -112,6 +112,30 @@ func TestEndCampaignIsScopedToTheIssuingStore(t *testing.T) {
 	wantReason(t, err, coupon.ReasonCampaignNotFound)
 }
 
+// 店家不能結束自己店發出的補償活動：回 NOT_FOUND，活動與買家的券都不變，也不寫稽核。
+func TestEndCampaignRejectsStoreEndingACompensationCampaign(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	r, err := f.m.IssueCompensation(context.Background(), coupon.CompensationInput{
+		SourceType: coupon.SourceAftersalesCase, SourceID: "AS-end", BuyerID: buyer1, StoreID: storeA,
+		Amount: 100, MinOrderAmount: 500, EndAt: base.Add(30 * windowLen), Title: "售後補償券", Issuer: coupon.Issuer{StoreID: storeA},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.m.EndCampaign(context.Background(), coupon.EndCampaignInput{CampaignID: r.Campaign.ID, StoreID: storeA})
+	wantReason(t, err, coupon.ReasonCampaignNotFound)
+	if got := f.scalar("SELECT count(*) FROM coupon.coupon_campaigns WHERE source_id = 'AS-end' AND status = 'ACTIVE'"); got != 1 {
+		t.Fatalf("活動不該被結束，ACTIVE 的有 %d 個", got)
+	}
+	if got := f.scalar("SELECT count(*) FROM coupon.coupon_vouchers WHERE source_id = 'AS-end' AND status = 'AVAILABLE'"); got != 1 {
+		t.Fatalf("券不該被作廢，AVAILABLE 的有 %d 張", got)
+	}
+	if got := f.scalar("SELECT count(*) FROM coupon.coupon_redemption_logs WHERE action = 'END_CAMPAIGN'"); got != 0 {
+		t.Fatalf("不該有結束活動的稽核，有 %d 筆", got)
+	}
+}
+
 // BD32：建立時折抵金額不得超過門檻；門檻 0（無門檻）不套用。DB 的 CHECK 是後備：直接寫入同樣被擋下。
 func TestCreateCampaignRejectsDiscountAboveThreshold(t *testing.T) {
 	t.Parallel()

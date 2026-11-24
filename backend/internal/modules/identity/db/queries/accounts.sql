@@ -82,3 +82,9 @@ WHERE id = sqlc.arg(id) AND deleted_at IS NULL AND email IS DISTINCT FROM sqlc.a
 UPDATE identity.accounts
 SET self_entered_email = sqlc.arg(self_entered_email), updated_at = sqlc.arg(now)::timestamptz
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
+
+-- name: SetPreferredLocale :execrows
+-- 語系與目前的值不同時才寫（相同是 no-op，不動 updated_at、不留下列鎖）；墓碑不更新。受影響列數 1 表示有改。
+UPDATE identity.accounts
+SET preferred_locale = sqlc.arg(locale), updated_at = sqlc.arg(now)::timestamptz
+WHERE id = sqlc.arg(id) AND deleted_at IS NULL AND preferred_locale <> sqlc.arg(locale);

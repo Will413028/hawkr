@@ -9,7 +9,6 @@ import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.pb.dart';
 import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_auth/hawkr_auth.dart' show SignInFailed;
 import 'package:hawkr_buyer/features/order/data/receipt_photo_local_service.dart';
-import 'package:hawkr_buyer/features/notification/data/push/background_handler.dart';
 import 'package:hawkr_api/transport.dart'
     show Code, ConnectException, ErrorDetail, HeadersExtension;
 import 'package:hawkr_buyer/config/flavor.dart';
@@ -279,8 +278,6 @@ void main() {
               );
           final photos = SharedPreferencesReceiptPhotoLocalService();
           await photos.write('order-1', 'photo');
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setStringList(fcmProcessedIdsKey, ['push-1']);
           final h = harness(authSession: FakeAuthSession(signedIn: restore));
           if (restore) {
             expect(
@@ -292,7 +289,6 @@ void main() {
           }
           expect(h.c.read(sessionProvider).value?.userId, 'acc_01J8Z');
           expect(await photos.read('order-1'), 'photo');
-          expect(prefs.getStringList(fcmProcessedIdsKey), ['push-1']);
           expect(messages, contains(contains('cache owner')));
           await Future<void>.delayed(Duration.zero);
         },
@@ -304,8 +300,6 @@ void main() {
     await AuthStorage.setCacheOwner('acc_01J8Z');
     final photos = SharedPreferencesReceiptPhotoLocalService();
     await photos.write('order-1', 'photo');
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(fcmProcessedIdsKey, ['push-1']);
     var calls = 0;
     final h = harness(
       authSession: FakeAuthSession(signedIn: true),
@@ -318,7 +312,6 @@ void main() {
     expect(await signIn(h.c, OAuthProvider.google), isTrue);
     await Future<void>.delayed(Duration.zero);
     expect(await photos.read('order-1'), 'photo');
-    expect(prefs.getStringList(fcmProcessedIdsKey), ['push-1']);
   });
 
   test('切換帳號才清 user cache', () async {

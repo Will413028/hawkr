@@ -23,8 +23,8 @@ func TestAdminCapabilitiesMatchGolden(t *testing.T) {
 			golden = append(golden, line)
 		}
 	}
-	if len(golden) != 9 {
-		t.Fatalf("golden 檔有 %d 行，capability 是封閉九值", len(golden))
+	if len(golden) != 10 {
+		t.Fatalf("golden 檔有 %d 行，capability 是封閉十值", len(golden))
 	}
 	if len(AllAdminCapabilities) != len(golden) {
 		t.Fatalf("Go 常數 %d 個、golden %d 行", len(AllAdminCapabilities), len(golden))
@@ -46,7 +46,7 @@ func TestIsKnownAdminRejectsNonMembers(t *testing.T) {
 	// 履約禁區機器名與賣家 token 同樣不得被誤認。
 	for _, c := range []AdminCapability{"", "fulfillment", "shipment.write", "orders.write", "CAP_ORDER_FULFILL", "products.bulk", "audit.read"} {
 		if IsKnownAdmin(c) {
-			t.Errorf("%q 不在封閉九值內，不得被認為已知", c)
+			t.Errorf("%q 不在封閉十值內，不得被認為已知", c)
 		}
 	}
 }

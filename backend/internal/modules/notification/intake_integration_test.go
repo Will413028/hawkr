@@ -26,8 +26,10 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
+	"github.com/Will413028/hawkr/backend/internal/platform/fcm"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
+	"github.com/Will413028/hawkr/backend/internal/platform/resend"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
@@ -110,6 +112,23 @@ var testPush = registry.Define(registry.Definition[pushParams]{
 	Example: pushParams{AccountID: 1, EventID: "e"},
 })
 
+// testPushImage 是帶圖片 key 的推播型別（商品類型別的形狀，D14）。
+const testImageKey = "public/product/p1/a.jpg"
+
+var testPushImage = registry.Define(registry.Definition[pushParams]{
+	Name: "test_push_image", Audiences: []model.Audience{model.AudienceBuyer}, Category: model.CategoryLike, Presentation: model.PresentationSocial,
+	Channels:          []model.Channel{model.ChannelInbox, model.ChannelPush},
+	IdempotencySource: "test.PushImage.EventID",
+	IdempotencyKey:    func(p pushParams) string { return p.EventID },
+	OccurredAt:        func(pushParams) time.Time { return epoch },
+	Recipient:         func(p pushParams) registry.Recipient { return registry.Recipient{AccountID: p.AccountID} },
+	ImageKey:          func(pushParams) string { return testImageKey },
+	Text: func(l uitext.Locale, _ pushParams) (registry.Content, error) {
+		return registry.Content{Title: uitext.Message{Text: "t", Locale: l}, Body: uitext.Message{Text: "b", Locale: l}}, nil
+	},
+	Example: pushParams{AccountID: 1, EventID: "e"},
+})
+
 var testLike = registry.Define(registry.Definition[likeParams]{
 	Name: "test_like", Audiences: []model.Audience{model.AudienceBuyer}, Category: model.CategoryLike, Presentation: model.PresentationSocial,
 	Channels:          []model.Channel{model.ChannelInbox},
@@ -185,6 +204,12 @@ var testStorePushOnly = registry.Define(registry.Definition[storeNoteParams]{
 	Example: storeNoteParams{AccountID: 1, StoreID: 1, EventID: "e"},
 })
 
+// testSuppressionKeys 是 email suppression 的測試密鑰（目前加輪替用的舊密鑰）。
+var testSuppressionKeys = SuppressionKeys{Current: []byte("test-suppression-key-current-0000000"), Previous: []byte("test-suppression-key-previous-000000")}
+
+// testImageURL 與 cmd/hawkr 組裝的形狀相同：{MEDIA_ORIGIN}/i/{push preset}/{key}。
+func testImageURL(key string) string { return "https://media.example/i/card/" + key }
+
 type testRegistry struct{}
 
 func (testRegistry) Lookup(name string) (registry.Entry, bool) {
@@ -193,6 +218,8 @@ func (testRegistry) Lookup(name string) (registry.Entry, bool) {
 		return testLike, true
 	case "test_push":
 		return testPush, true
+	case "test_push_image":
+		return testPushImage, true
 	case "test_agg_twin":
 		return testTwin, true
 	case "test_store_note":
@@ -204,7 +231,7 @@ func (testRegistry) Lookup(name string) (registry.Entry, bool) {
 }
 
 func (testRegistry) All() []registry.Entry {
-	return append(registry.All(), testLike, testPush, testTwin, testStoreNote, testStorePushOnly)
+	return append(registry.All(), testLike, testPush, testPushImage, testTwin, testStoreNote, testStorePushOnly)
 }
 
 // fakeStores 取代 seller：測試只需要「店家是否已退場」。沒登記的店視為存在、營運中。
@@ -231,11 +258,6 @@ func (f *fakeStores) retire(storeID int64) {
 	f.retired[storeID] = true
 }
 
-// nopJobs 接受 buyer 排的 job（測試不展開它們）。
-type nopJobs struct{}
-
-func (nopJobs) Enqueue(context.Context, river.JobArgs, *river.InsertOpts) error { return nil }
-
 type fixture struct {
 	db       *db.DB
 	identity *identity.Module
@@ -245,6 +267,9 @@ type fixture struct {
 	jobs     *recorder
 	module   *Module
 	logs     *syncBuffer
+	push     *fcm.Fake
+	mail     *resend.Fake
+	contacts *fakeContacts
 }
 
 type syncBuffer struct {
@@ -276,17 +301,23 @@ func setupIntake(t *testing.T) *fixture {
 	log := slog.New(slog.NewTextHandler(logs, nil))
 	bus := events.NewBus()
 	id := identity.New(identity.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
-	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: nopJobs{}, Media: media.NewFake(), Now: time.Now, Logger: log})
+	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Media: media.NewFake(), Now: time.Now, Logger: log})
 	events.Subscribe[identity.AccountCreated](bus, buyers.OnAccountCreated)
 	stores := &fakeStores{retired: map[int64]bool{}}
 	rec := &recorder{}
-	m := newModule(Deps{DB: d, Identity: id, Buyer: buyers, Seller: stores, Jobs: rec, Now: time.Now, NewID: uuid.NewV7, Logger: log}, testRegistry{})
+	push, mail, contacts := fcm.NewFake(nil), resend.NewFake(nil), &fakeContacts{m: map[int64]identity.ContactEmail{}}
+	m := newModule(Deps{
+		DB: d, Identity: id, Buyer: buyers, Seller: stores, Jobs: rec, Now: time.Now, NewID: uuid.NewV7, Logger: log,
+		Contacts: contacts, Locales: id, Push: push, Mail: mail, ImageURL: testImageURL, SuppressionKeys: testSuppressionKeys,
+	}, testRegistry{})
 	events.Subscribe[accountsuspension.Suspended](bus, m.OnSuspended)
+	events.Subscribe[accountsuspension.Suspended](bus, m.PurgeTokensOnSuspended)
 	events.Subscribe[accountsuspension.Unsuspended](bus, m.OnUnsuspended)
 	events.Subscribe[identity.AccountDeleted](bus, m.OnAccountDeleted)
+	events.Subscribe[identity.AccountDeleted](bus, m.PurgeTokensOnAccountDeleted)
 	events.Subscribe[buyer.BuyerDeleted](bus, m.OnBuyerDeleted)
 	events.Subscribe[seller.StoreRetired](bus, m.OnStoreRetired)
-	return &fixture{db: d, identity: id, buyer: buyers, stores: stores, bus: bus, jobs: rec, module: m, logs: logs}
+	return &fixture{db: d, identity: id, buyer: buyers, stores: stores, bus: bus, jobs: rec, module: m, logs: logs, push: push, mail: mail, contacts: contacts}
 }
 
 func (f *fixture) newAccount(t *testing.T) int64 {

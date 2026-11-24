@@ -225,6 +225,8 @@
 
 ### A6-7a 媒體引用同步抽成 platform（A6-D27；被擋於：無；擋 A6-7 收尾）
 
+> 被 B1-5 取代（B1-9，2026-11-23）：B1 刪除 `mediaref` 與引用同步，共用外殼 `media/sync_shell.go` 與 `mutation/a6-7a-mediaref.json` 不併入 B1 分支；下面是 dev 上當時的紀錄。
+
 - 範圍：`mediaref` 的 7 份複本（buyer、content、im、moderation、review、seller、social）改用泛型同步外殼；外殼放在 `internal/modules/media`（依賴 media 的型別，platform 不能 import 模組，故不放 platform）；各模組只留引用類型、`currentAssets` 與 store 的接線。前例：`platform/jobs` 的 `UniqueByArgs`／`SweepOpts` 收齊 14 處（A6-3c1）。
 - 消費端：`rg -l 'mediaref' backend/internal backend/cmd`。
 - 不能動的部分：各模組的 media 呼叫在 DB transaction 外、引用列在模組自己的 schema（單體規則 5）；River job 種類名稱與唯一性。

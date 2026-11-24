@@ -141,9 +141,6 @@ func newGuardEngineWithAudit(stub *stubSessionResolver, stores *stubStoreState, 
 			}
 			c.JSON(http.StatusOK, gin.H{"code": 0})
 		})
-	g.Handle(http.MethodPost, "/media/upload_sessions",
-		requireDelegatedSessionOnly(deps),
-		func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"code": 0}) })
 	return r
 }
 
@@ -408,23 +405,7 @@ func TestStoreStateResolverUnwiredFailsClosed(t *testing.T) {
 	}
 }
 
-// 媒體 upload session 兩支不跑第 8 項：它們不碰 target store，沒有「這家店還能不能被
-// 代行」可問（而它們仍然要算活動，見 TestCountsAsActivityIsDecidedByGuard）。
-func TestSessionOnlyGuardSkipsStoreState(t *testing.T) {
-	stub := &stubSessionResolver{resp: okSession("active", "2685914682", "products.write")}
-	stores := &stubStoreState{resp: operableStore("suspended")}
-	r := newGuardEngineWith(stub, stores, &stubRevoker{})
-	if status, _ := doReq(t, r, http.MethodPost, "/g/media/upload_sessions", "dopc_x"); status != http.StatusOK {
-		t.Fatalf("媒體 upload session 應放行，實得 %d", status)
-	}
-	if stores.calls != 0 {
-		t.Fatalf("媒體 guard 查了 %d 次店家狀態，預期 0", stores.calls)
-	}
-}
-
-// counts_as_activity 由「路由註冊在哪個 middleware 下」決定，填 true 的 guard 恰為兩個。
-// 媒體兩支漏填是靜默的：換一批商品圖正是最容易停留超過 idle 窗口、又完全不打
-// delegatedHandle 路由的動作，操作者會在按儲存時才被踢掉，中途沒有任何訊號。
+// counts_as_activity 由「路由註冊在哪個 middleware 下」決定，填 true 的 guard 恰為一個。
 func TestCountsAsActivityIsDecidedByGuard(t *testing.T) {
 	stub := &stubSessionResolver{resp: okSession("active", "2685914682", "products.write")}
 	r := newGuardEngine(stub)
@@ -432,15 +413,12 @@ func TestCountsAsActivityIsDecidedByGuard(t *testing.T) {
 	if status, _ := doReq(t, r, http.MethodPatch, "/g/sellers/2685914682/products/77", "dopc_x"); status != http.StatusOK {
 		t.Fatalf("代行資源路由應放行，實得 %d", status)
 	}
-	if status, _ := doReq(t, r, http.MethodPost, "/g/media/upload_sessions", "dopc_x"); status != http.StatusOK {
-		t.Fatalf("媒體 upload session 應放行，實得 %d", status)
-	}
-	if len(stub.activity) != 2 {
-		t.Fatalf("resolver 被呼叫 %d 次，預期 2", len(stub.activity))
+	if len(stub.activity) != 1 {
+		t.Fatalf("resolver 被呼叫 %d 次，預期 1", len(stub.activity))
 	}
 	for i, got := range stub.activity {
 		if !got {
-			t.Errorf("第 %d 次呼叫 counts_as_activity=false，兩個 guard 都必須填 true", i+1)
+			t.Errorf("第 %d 次呼叫 counts_as_activity=false，guard 必須填 true", i+1)
 		}
 	}
 }

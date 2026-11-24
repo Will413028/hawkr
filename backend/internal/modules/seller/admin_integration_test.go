@@ -96,7 +96,7 @@ func TestClosureSchemaConstraints(t *testing.T) {
 		"a deletion record with a measure":     "UPDATE seller.store_closures SET closed_by = 'ACCOUNT_DELETION', closed_by_measure_id = '" + measureID + "'" + current,
 		"a reopening before the closing":       "UPDATE seller.store_closures SET reopened_at = closed_at - interval '1 second'" + current,
 		"a second current closure":             "INSERT INTO seller.store_closures (store_id, closed_at, closed_by) SELECT store_id, closed_at + interval '1 second', 'ACCOUNT_OWNER' FROM seller.store_closures" + current,
-		"a purged store that still has a logo": "UPDATE seller.stores SET pii_purged_at = now(), store_name = NULL, logo_key = 'x', logo_asset_id = 'x' WHERE store_id = $1",
+		"a purged store that still has a logo": "UPDATE seller.stores SET pii_purged_at = now(), store_name = NULL, logo_key = 'x', logo_asset_id = uuidv7() WHERE store_id = $1",
 	} {
 		if _, err := f.db.Conn(ctx).Exec(ctx, sql, s.StoreID); err == nil {
 			t.Fatalf("DB accepted %s: %s", name, sql)

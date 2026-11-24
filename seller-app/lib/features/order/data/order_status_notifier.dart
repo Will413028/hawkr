@@ -46,12 +46,12 @@ class OrderStatusEvent {
 /// 訂單狀態通知器
 ///
 /// 功能：
-/// 1. 監聽 FCM Silent Push (Data Message) 的 ORDER_STATUS 類型
+/// 1. 轉發通知串流的訂單重讀訊號（`NotificationSignalService`）
 /// 2. 作為備用機制的低頻率 polling（每 60 秒，僅在需要時）
 /// 3. 提供 Stream 讓 UI 監聽訂單狀態變更
 ///
 /// 架構：
-/// - 主要機制: Silent Push (即時更新，無干擾)
+/// - 主要機制: 通知串流的重讀訊號
 /// - 備用機制: Low-frequency Polling (確保送達)
 ///
 /// 使用方式：
@@ -118,42 +118,12 @@ class OrderStatusNotifier {
     HKLog.logI('[OrderStatusNotifier] Stopped listening');
   }
 
-  /// 處理來自 FCM 的訂單狀態更新 (Silent Push)
-  ///
-  /// 由 [PushNotificationManager] 呼叫
-  ///
-  /// Silent Push payload 範例:
-  /// ```json
-  /// {
-  ///   "action": "REFRESH_STATUS",
-  ///   "refType": "ORDER_STATUS",
-  ///   "eventType": "ORDER_PAID",
-  ///   "orderId": "123456",
-  ///   "orderSn": "HK202401250001"
-  /// }
-  /// ```
-  void handlePushNotification(Map<String, dynamic> data) {
-    HKLog.logI('[OrderStatusNotifier] Received silent push: $data');
+  /// 伺服器訊號（通知串流的狀態重讀提示、賣家工作區訊號、斷線重連）：訂單可能變了，各畫面重讀。
+  void emitRefresh() =>
+      _emitEvent(OrderStatusEvent(eventType: refreshEventType));
 
-    try {
-      final eventType =
-          data['eventType']?.toString() ??
-          data['event']?.toString() ??
-          'UNKNOWN';
-
-      final event = OrderStatusEvent(
-        orderId: data['orderId']?.toString(),
-        orderSn: data['orderSn']?.toString(),
-        eventType: eventType,
-        status: int.tryParse(data['status']?.toString() ?? ''),
-        data: data,
-      );
-
-      _emitEvent(event);
-    } catch (e) {
-      HKLog.logE('[OrderStatusNotifier] Parse push data error', e);
-    }
-  }
+  /// [emitRefresh] 發出的事件型別。
+  static const refreshEventType = 'REFRESH';
 
   /// 手動觸發訂單事件（用於 WebSocket 遷移期間的相容性）
   void emitOrderEvent(Map<String, dynamic> data) {

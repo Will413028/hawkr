@@ -42,7 +42,7 @@ func (s *Service) Archive(ctx context.Context, in model.ArchiveProspectInput) (m
 			if row, err = q.ArchiveProspect(ctx, store.ArchiveProspectParams{ProspectID: row.ProspectID, AdminID: &in.AdminID, Now: s.d.Now().UTC()}); err != nil {
 				return err
 			}
-			if err := retireImages(ctx, q, s.d.Jobs, s.d.Now().UTC(), locked); err != nil {
+			if err := s.retireImages(ctx, locked); err != nil {
 				return err
 			}
 			if err := events.Publish(ctx, s.d.Events, model.ProspectArchived{
@@ -217,7 +217,7 @@ func (s *Service) Merge(ctx context.Context, in model.MergeProspectsInput) (mode
 		}); err != nil {
 			return err
 		}
-		if err := retireImages(ctx, q, s.d.Jobs, now, loser); err != nil {
+		if err := s.retireImages(ctx, loser); err != nil {
 			return err
 		}
 		// 輸家的封存只由 ProspectMerged 表達（不另發 ProspectStatusArchived）。

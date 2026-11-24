@@ -45,10 +45,10 @@ SET display_name = sqlc.arg(display_name),
     priority_letter = sqlc.narg(priority_letter),
     priority_stars = sqlc.arg(priority_stars),
     logo_key = CASE WHEN sqlc.arg(set_logo)::boolean THEN sqlc.narg(logo_key)::text ELSE logo_key END,
-    logo_asset_id = CASE WHEN sqlc.arg(set_logo)::boolean THEN sqlc.narg(logo_asset_id)::text ELSE logo_asset_id END,
+    logo_asset_id = CASE WHEN sqlc.arg(set_logo)::boolean THEN sqlc.narg(logo_asset_id)::uuid ELSE logo_asset_id END,
     logo_source_url = CASE WHEN sqlc.arg(set_logo)::boolean THEN sqlc.narg(logo_source_url)::text ELSE logo_source_url END,
     cover_key = CASE WHEN sqlc.arg(set_cover)::boolean THEN sqlc.narg(cover_key)::text ELSE cover_key END,
-    cover_asset_id = CASE WHEN sqlc.arg(set_cover)::boolean THEN sqlc.narg(cover_asset_id)::text ELSE cover_asset_id END,
+    cover_asset_id = CASE WHEN sqlc.arg(set_cover)::boolean THEN sqlc.narg(cover_asset_id)::uuid ELSE cover_asset_id END,
     cover_source_url = CASE WHEN sqlc.arg(set_cover)::boolean THEN sqlc.narg(cover_source_url)::text ELSE cover_source_url END,
     updated_by_admin_id = sqlc.arg(admin_id),
     updated_at = sqlc.arg(now),
@@ -90,10 +90,6 @@ SET status = 'CONVERTED',
     version = version + 1
 WHERE prospect_id = sqlc.arg(prospect_id) AND status = 'ACTIVE'
 RETURNING *;
-
--- name: ProspectImageAssets :one
--- 同步 job 讀的列：目前那一張 logo、封面的 asset ID；封存的列沒有圖片（CHECK），所以沒有目前的資產。
-SELECT prospect_id, logo_asset_id, cover_asset_id FROM seller.prospects WHERE prospect_id = $1;
 
 -- name: ProspectContacts :many
 -- 業者的聯絡方式（原值）；同類型主要的在前。

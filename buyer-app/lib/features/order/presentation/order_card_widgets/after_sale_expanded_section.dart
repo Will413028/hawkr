@@ -20,7 +20,6 @@ import '../../../../shared/widgets/step_indicator.dart';
 import '../../data/after_sale_model.dart';
 import '../../data/after_sale_order_lookup.dart';
 import '../../data/after_sale_repository.dart';
-import '../../data/after_sale_status_notifier.dart';
 import '../../data/order_model.dart';
 import '../widgets/return_logistics_timeline.dart';
 import '../../../../shared/time/taipei_display.dart';
@@ -38,7 +37,7 @@ import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 /// - 操作按鈕（取消售後 / 重新申請）
 ///
 /// 資料由 caseNo 調用 [afterSaleRepositoryProvider.getAfterSaleDetail] 異步載入，
-/// 並訂閱 [afterSaleStatusStreamProvider] 實現 FCM Silent Push 自動刷新。
+/// 並隨 [afterSaleOrderLookupProvider] 的重撈刷新。
 class AfterSaleExpandedSection extends HookConsumerWidget {
   const AfterSaleExpandedSection({
     super.key,
@@ -82,17 +81,8 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
       return null;
     }, [snapshot.caseNo, lookupAsync]);
 
-    // FCM silent push: 本案件狀態變更自動刷新
-    ref.listen(afterSaleStatusStreamProvider, (_, next) {
-      next.whenData((event) {
-        final current = detail.value;
-        if (current == null) return;
-        if (event.caseNo == current.caseNo ||
-            event.orderNo == current.orderNo) {
-          load();
-        }
-      });
-    });
+    // 售後狀態重讀提示由列表畫面處理（重撈 afterSaleOrderLookupProvider），上方 useEffect 隨之重讀；
+    // 卡片自己不監聽，避免每張展開卡片各打一次請求。
 
     return Column(
       children: [

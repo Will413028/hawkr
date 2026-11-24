@@ -57,8 +57,6 @@ tags:
   description: 基礎設施
 - name: Invoice
   description: 電子發票
-- name: Media
-  description: 媒體：檔案上傳與下載
 - name: Notification
   description: 通知：通知管理
 - name: NotificationRealtime
@@ -668,7 +666,7 @@ paths:
     post:
       operationId: proxyCreateAiStyle
       summary: 新增 AI 修圖風格
-      description: thumbnailStagedToken：透過 media service 上傳後取得的 staged token，後端會自動 finalize 並寫入 thumbnailUrl
+      description: thumbnailStagedToken：經媒體上傳流程（MediaAppService）取得的 staged token，後端會自動 finalize 並寫入 thumbnailUrl
       tags:
       - AIImage
       security:
@@ -758,7 +756,7 @@ paths:
     put:
       operationId: proxyUpdateAiStyle
       summary: 修改 AI 修圖風格
-      description: thumbnailStagedToken：透過 media service 上傳後取得的 staged token，後端會自動 finalize 並覆寫 thumbnailUrl；不傳則保留原有縮圖
+      description: thumbnailStagedToken：經媒體上傳流程（MediaAppService）取得的 staged token，後端會自動 finalize 並覆寫 thumbnailUrl；不傳則保留原有縮圖
       tags:
       - AIImage
       security:
@@ -11463,107 +11461,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/media/upload_sessions:
-    post:
-      operationId: createUploadSession
-      summary: 建立上傳會話
-      description: 建立媒體檔案的上傳會話，取得上傳 URL
-      tags:
-      - Media
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      requestBody:
-        description: 上傳會話請求資料
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateUploadSessionInput'
-        x-originalParamName: request
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/CreateUploadSessionOutput'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/media/upload_sessions/{id}/complete:
-    post:
-      operationId: completeUploadSession
-      summary: 完成上傳會話
-      description: 完成指定的上傳會話，取得暫存 Token 與預覽 URL
-      tags:
-      - Media
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: id
-        in: path
-        description: 上傳會話 ID
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/CompleteUploadSessionOutput'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/app/notifications:
     delete:
       operationId: deleteNotifications
@@ -12354,7 +12251,7 @@ paths:
     post:
       operationId: confirmReceipt
       summary: 確認收貨
-      description: 買家對已送達訂單確認收貨，提前完成訂單。可選擇附上收貨照片（先呼叫 media-service 取得 stagedTokens）。若未主動確認，系統將在送達後 3 天自動完成。確認後系統將非同步進行撥款指示
+      description: 買家對已送達訂單確認收貨，提前完成訂單。可選擇附上收貨照片（先經媒體上傳流程（MediaAppService）取得 stagedTokens）。若未主動確認，系統將在送達後 3 天自動完成。確認後系統將非同步進行撥款指示
       tags:
       - Order
       security:
@@ -23135,13 +23032,6 @@ components:
           type: string
         responseId:
           type: string
-    CompleteUploadSessionOutput:
-      type: object
-      properties:
-        previewUrl:
-          type: string
-        stagedToken:
-          type: string
     ConfirmCvsShipmentReq:
       type: object
       properties:
@@ -23155,7 +23045,7 @@ components:
       properties:
         stagedTokens:
           type: array
-          description: 買家收貨照片 stagedToken（選填，由 media-service 預上傳取得）
+          description: 買家收貨照片 stagedToken（選填，經媒體上傳流程（MediaAppService）預上傳取得）
           items:
             type: string
     ConfirmReturnReceiptRequest:
@@ -23666,32 +23556,6 @@ components:
         weight:
           type: string
         widthCm:
-          type: string
-    CreateUploadSessionInput:
-      type: object
-      required:
-      - contentType
-      - fileSize
-      - filename
-      properties:
-        contentType:
-          type: string
-        fileSize:
-          type: string
-        filename:
-          type: string
-        isSecure:
-          type: boolean
-    CreateUploadSessionOutput:
-      type: object
-      properties:
-        expiresIn:
-          type: string
-        isSecure:
-          type: boolean
-        sessionId:
-          type: string
-        uploadUrl:
           type: string
     CvsLabelDataResp:
       type: object

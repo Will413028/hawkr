@@ -1,5 +1,5 @@
-"use client";
-
+import { errorText } from "@hawkr/api/connect/errors";
+import type { NotificationCategory } from "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb";
 import {
 	type InfiniteData,
 	useInfiniteQuery,
@@ -10,17 +10,17 @@ import * as React from "react";
 import { accountQueryFn, accountQueryPending } from "../auth/account-query";
 import type { RoleSlot } from "../auth/active-role";
 import { useAccountStatus } from "../auth/use-account-status";
+import { useDefaultErrorText } from "../i18n/ui-text";
 import { invalidateNotificationLists } from "../notifications/cache";
 import {
-	deleteNotifications,
-	fetchNotifications,
-	markAllNotificationsRead,
-	markNotificationRead,
-} from "../notifications/repo";
-import type {
-	NotificationItem,
-	NotificationListResult,
-} from "../notifications/types";
+	audienceForRole,
+	deleteInboxItems,
+	type InboxItem,
+	type InboxPage,
+	listInboxItems,
+	markAllInboxItemsRead,
+	markInboxItemRead,
+} from "../notifications/inbox";
 import { useNotificationUnread } from "../notifications/unread-context";
 import { type QueryIdentity, queryKeys } from "../query/keys";
 import { useQueryIdentity } from "./useQueryIdentity";
@@ -28,35 +28,31 @@ import { useQueryIdentity } from "./useQueryIdentity";
 /**
  * Notification list hook (workspace-role scoped).
  *
- * Cursor-paginated list with an explicit load-more action + optimistic
- * mark-as-read / delete. Scrolling alone never requests another page.
- * Mutate paths also sync the shared
+ * Page-token-paginated list (`ListInboxItems`) with an explicit load-more
+ * action + optimistic mark-as-read / delete. Scrolling alone never requests
+ * another page. Title, body and deep link are composed by the server; the
+ * client renders them as given. Mutate paths also sync the shared
  * `NotificationUnreadProvider` so the navbar bell reflects changes
- * instantly without waiting for its 30s poll.
+ * instantly; the stream's inbox signal refetches the active list.
  *
- * The unread badge itself lives in `lib/notifications/unread-context` —
- * import `useNotificationUnread` from there.
- *
- * The route role scopes cache keys and notification destinations. Transport
- * still follows the authenticated stored active role, enforced by the route
- * guard before this hook mounts.
+ * The route role picks the inbox audience and scopes cache keys.
  */
 
 /* ===== List page ===== */
 
 interface UseNotificationListOptions {
 	pageSize?: number;
-	category?: string;
-	role?: RoleSlot;
+	category?: NotificationCategory;
+	role: RoleSlot;
 }
 
 export function notificationListQueryKey(
 	identity: QueryIdentity,
-	options: UseNotificationListOptions = {},
+	options: UseNotificationListOptions,
 ) {
 	const pageSize = options.pageSize ?? 20;
 	return queryKeys.notifications.list(identity, {
-		role: options.role ?? "",
+		role: options.role,
 		pageSize,
 		category: options.category ?? "",
 	});
@@ -64,45 +60,44 @@ export function notificationListQueryKey(
 
 export function fetchNotificationListPage(
 	options: UseNotificationListOptions,
-	cursorId: string | null,
+	pageToken: string | null,
 ) {
-	return fetchNotifications({
-		pageSize: options.pageSize ?? 20,
+	return listInboxItems({
+		audience: audienceForRole(options.role),
 		category: options.category,
-		cursorId: cursorId ?? undefined,
-		role: options.role,
+		pageSize: options.pageSize ?? 20,
+		pageToken: pageToken ?? undefined,
 	});
 }
 
-export function nextNotificationListPage(lastPage: NotificationListResult) {
-	return lastPage.hasMore ? lastPage.nextCursorId : undefined;
+export function nextNotificationListPage(lastPage: InboxPage) {
+	return lastPage.nextPageToken || undefined;
 }
 
 interface UseNotificationListResult {
-	items: NotificationItem[];
+	items: InboxItem[];
 	loading: boolean; // initial / refresh
 	loadingMore: boolean;
 	hasMore: boolean;
 	error: string | null;
 	refresh: () => Promise<void>;
 	loadMore: () => Promise<void>;
-	markRead: (id: NotificationItem["id"]) => Promise<void>;
+	markRead: (id: InboxItem["id"]) => Promise<void>;
 	markAllRead: () => Promise<void>;
-	remove: (ids: Array<NotificationItem["id"]>) => Promise<void>;
+	remove: (ids: Array<InboxItem["id"]>) => Promise<void>;
 }
 
-type NotificationPages = InfiniteData<NotificationListResult>;
+type NotificationPages = InfiniteData<InboxPage>;
 
 function flattenNotificationPages(
 	data: NotificationPages | undefined,
-): NotificationItem[] {
+): InboxItem[] {
 	const seen = new Set<string>();
-	const items: NotificationItem[] = [];
+	const items: InboxItem[] = [];
 	for (const page of data?.pages ?? []) {
-		for (const item of page.records) {
-			const id = String(item.id);
-			if (seen.has(id)) continue;
-			seen.add(id);
+		for (const item of page.items) {
+			if (seen.has(item.id)) continue;
+			seen.add(item.id);
 			items.push(item);
 		}
 	}
@@ -110,13 +105,14 @@ function flattenNotificationPages(
 }
 
 export function useNotificationList(
-	options: UseNotificationListOptions = {},
+	options: UseNotificationListOptions,
 ): UseNotificationListResult {
 	const pageSize = options.pageSize ?? 20;
 	const filterCategory = options.category;
 	const role = options.role;
 	const status = useAccountStatus();
 	const identity = useQueryIdentity();
+	const defaults = useDefaultErrorText();
 	const {
 		decrement: decrementUnread,
 		setCount: setUnreadCount,
@@ -144,14 +140,14 @@ export function useNotificationList(
 		placeholderData: (previousData) => previousData,
 	});
 	const updatePages = React.useCallback(
-		(updater: (item: NotificationItem) => NotificationItem | null) => {
+		(updater: (item: InboxItem) => InboxItem | null) => {
 			queryClient.setQueryData<NotificationPages>(listKey, (current) => {
 				if (!current) return current;
 				return {
 					...current,
 					pages: current.pages.map((page) => ({
 						...page,
-						records: page.records.flatMap((item) => {
+						items: page.items.flatMap((item) => {
 							const next = updater(item);
 							return next ? [next] : [];
 						}),
@@ -166,8 +162,7 @@ export function useNotificationList(
 	// mounted until success so its initiating Button can report pending state.
 	// Every path still cancels late refetches and keeps the unread bell in sync.
 	const markReadMutation = useMutation({
-		mutationFn: (id: NotificationItem["id"]) =>
-			markNotificationRead(id, { role }),
+		mutationFn: (id: InboxItem["id"]) => markInboxItemRead(id),
 		onMutate: async (id) => {
 			await queryClient.cancelQueries({ queryKey: listKey });
 			const snapshot = queryClient.getQueryData<NotificationPages>(listKey);
@@ -176,8 +171,8 @@ export function useNotificationList(
 			let wasUnread = false;
 			updatePages((n) => {
 				if (n.id !== id) return n;
-				wasUnread = !n.isRead;
-				return { ...n, isRead: true };
+				wasUnread = !n.read;
+				return { ...n, read: true };
 			});
 			if (wasUnread) decrementUnread(1);
 			return { snapshot, wasUnread };
@@ -194,11 +189,11 @@ export function useNotificationList(
 	});
 
 	const markAllReadMutation = useMutation({
-		mutationFn: () => markAllNotificationsRead({ role }),
+		mutationFn: () => markAllInboxItemsRead(audienceForRole(role)),
 		onMutate: async () => {
 			await queryClient.cancelQueries({ queryKey: listKey });
 			const snapshot = queryClient.getQueryData<NotificationPages>(listKey);
-			updatePages((n) => ({ ...n, isRead: true }));
+			updatePages((n) => ({ ...n, read: true }));
 			setUnreadCount(0);
 			return { snapshot };
 		},
@@ -212,20 +207,19 @@ export function useNotificationList(
 	});
 
 	const removeMutation = useMutation({
-		mutationFn: (ids: Array<NotificationItem["id"]>) =>
-			deleteNotifications(ids, { role }),
+		mutationFn: (ids: Array<InboxItem["id"]>) => deleteInboxItems(ids),
 		onMutate: async (ids) => {
 			await queryClient.cancelQueries({ queryKey: listKey });
 			const snapshot = queryClient.getQueryData<NotificationPages>(listKey);
-			const idSet = new Set(ids.map(String));
+			const idSet = new Set(ids);
 			const unreadRemoved = flattenNotificationPages(snapshot).filter(
-				(n) => idSet.has(String(n.id)) && !n.isRead,
+				(n) => idSet.has(n.id) && !n.read,
 			).length;
 			return { idSet, unreadRemoved };
 		},
 		onSuccess: (_result, _ids, ctx) => {
 			if (ctx) {
-				updatePages((n) => (ctx.idSet.has(String(n.id)) ? null : n));
+				updatePages((n) => (ctx.idSet.has(n.id) ? null : n));
 				if (ctx.unreadRemoved > 0) decrementUnread(ctx.unreadRemoved);
 			}
 			void invalidateNotificationLists(queryClient, identity, "none");
@@ -241,7 +235,7 @@ export function useNotificationList(
 	// Thin wrappers: the optimistic + rollback work lives in the mutation
 	// lifecycle above; these just fire-and-forget (failures self-revert).
 	const markRead = React.useCallback(
-		(id: NotificationItem["id"]) =>
+		(id: InboxItem["id"]) =>
 			markReadMutation.mutateAsync(id).then(
 				() => {},
 				() => {},
@@ -259,7 +253,7 @@ export function useNotificationList(
 	);
 
 	const remove = React.useCallback(
-		(ids: Array<NotificationItem["id"]>) => {
+		(ids: Array<InboxItem["id"]>) => {
 			if (ids.length === 0) return Promise.resolve();
 			return removeMutation.mutateAsync(ids).then(
 				() => {},
@@ -269,7 +263,7 @@ export function useNotificationList(
 		[removeMutation],
 	);
 
-	const error =
+	const failure =
 		listQuery.error ??
 		markReadMutation.error ??
 		markAllReadMutation.error ??
@@ -280,7 +274,7 @@ export function useNotificationList(
 		loading: accountQueryPending(status, listQuery.isLoading),
 		loadingMore: listQuery.isFetchingNextPage,
 		hasMore: Boolean(listQuery.hasNextPage),
-		error: error instanceof Error ? error.message : null,
+		error: failure ? errorText(failure, defaults) : null,
 		refresh: async () => {
 			await listQuery.refetch();
 		},

@@ -1,13 +1,10 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pb.dart';
+import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 
-import '../../../../core/networking/dio_provider.dart'
-    show kBackgroundWriteExtra, kSkipAuthInterceptorExtra;
 import '../../../../shared/utils/hk_log.dart';
-
-const String _devicesPath = '/api/v1/app/notifications/device-token';
 
 enum DeviceMutationDisposition { success, retryableFailure, rejected, skipped }
 
@@ -16,25 +13,21 @@ enum DeviceMutationDisposition { success, retryableFailure, rejected, skipped }
 /// Response bodies are intentionally not retained: they may echo a device
 /// token and must not accidentally flow into logs, crashes, or telemetry.
 class DeviceMutationOutcome {
-  const DeviceMutationOutcome._(this.disposition, {this.statusCode});
+  const DeviceMutationOutcome._(this.disposition);
 
-  const DeviceMutationOutcome.success({int? statusCode})
-    : this._(DeviceMutationDisposition.success, statusCode: statusCode);
+  const DeviceMutationOutcome.success()
+    : this._(DeviceMutationDisposition.success);
 
-  const DeviceMutationOutcome.retryableFailure({int? statusCode})
-    : this._(
-        DeviceMutationDisposition.retryableFailure,
-        statusCode: statusCode,
-      );
+  const DeviceMutationOutcome.retryableFailure()
+    : this._(DeviceMutationDisposition.retryableFailure);
 
-  const DeviceMutationOutcome.rejected({int? statusCode})
-    : this._(DeviceMutationDisposition.rejected, statusCode: statusCode);
+  const DeviceMutationOutcome.rejected()
+    : this._(DeviceMutationDisposition.rejected);
 
   const DeviceMutationOutcome.skipped()
     : this._(DeviceMutationDisposition.skipped);
 
   final DeviceMutationDisposition disposition;
-  final int? statusCode;
 
   bool get isSuccess => disposition == DeviceMutationDisposition.success;
   bool get isRetryable =>
@@ -47,141 +40,69 @@ abstract interface class DeviceRegistrationGateway {
   Future<DeviceMutationOutcome> removeDevice({required String fcmToken});
 }
 
-/// Gateway-backed device registration.
+/// `NotificationAppService.RegisterDeviceToken`／`DeleteDeviceToken`。
 ///
-/// The injected Dio must be the app's central [dioProvider] client, which owns
-/// auth injection, 401 logout, and 9240 suspension.
+/// 請求只帶 token 與這支 App（`SELLER_APP`），沒有 platform。client 必須是登入後的 Connect client：
+/// 身分注入與 unauthenticated 登出由 transport 負責。
 class NotificationDeviceRegistrar implements DeviceRegistrationGateway {
-  NotificationDeviceRegistrar(this._dio, {String? platform})
-    : _platformOverride = platform;
+  NotificationDeviceRegistrar(this._client);
 
-  final Dio _dio;
-  final String? _platformOverride;
-
-  String get _platform {
-    final override = _platformOverride;
-    if (override != null) return override;
-    if (kIsWeb) return 'web';
-    return 'ios';
-  }
+  final NotificationAppServiceClient _client;
 
   @override
   Future<DeviceMutationOutcome> registerDevice({
     required String fcmToken,
   }) async {
     if (fcmToken.isEmpty) return const DeviceMutationOutcome.skipped();
-
     try {
-      final response = await _dio.post<dynamic>(
-        _devicesPath,
-        data: {'token': fcmToken, 'platform': _platform},
-        options: Options(
-          extra: const {kBackgroundWriteExtra: true},
-          validateStatus: (_) => true,
+      await _client.registerDeviceToken(
+        RegisterDeviceTokenRequest(
+          token: fcmToken,
+          app: NotificationApp.NOTIFICATION_APP_SELLER_APP,
         ),
       );
-      final outcome = _outcomeForStatus(response.statusCode);
-      if (outcome.isSuccess) {
-        HKLog.logI(
-          '[NotificationService] Device registered '
-          '(status=${response.statusCode ?? 0})',
-        );
-      } else {
-        HKLog.logW(
-          '[NotificationService] registerDevice failed '
-          '(status=${response.statusCode ?? 0}, '
-          'retryable=${outcome.isRetryable})',
-        );
-      }
-      return outcome;
-    } on DioException catch (error) {
-      final outcome = _outcomeForDioException(error);
+      HKLog.logI('[NotificationService] Device registered');
+      return const DeviceMutationOutcome.success();
+    } catch (error) {
+      final outcome = _outcomeFor(error);
       HKLog.logW(
-        '[NotificationService] registerDevice transport failure '
-        '(type=${error.type}, retryable=${outcome.isRetryable})',
+        '[NotificationService] registerDevice failed '
+        '(retryable=${outcome.isRetryable})',
       );
       return outcome;
-    } catch (_) {
-      HKLog.logW(
-        '[NotificationService] registerDevice unexpected transport failure',
-      );
-      return const DeviceMutationOutcome.retryableFailure();
     }
   }
 
   @override
   Future<DeviceMutationOutcome> removeDevice({required String fcmToken}) async {
-    if (fcmToken.isEmpty) {
-      return const DeviceMutationOutcome.skipped();
-    }
-
+    if (fcmToken.isEmpty) return const DeviceMutationOutcome.skipped();
     try {
-      final response = await _dio.delete<dynamic>(
-        _devicesPath,
-        data: {'token': fcmToken},
-        // 註銷發生在登出流程中，憑證隨時可能已失效；那個 401 是預期結果，
-        // 不該觸發 refresh / logout，否則 logout 會再發一次註銷（#106 迴圈）。
-        options: Options(
-          extra: const {kSkipAuthInterceptorExtra: true},
-          validateStatus: (_) => true,
-        ),
+      await _client.deleteDeviceToken(
+        DeleteDeviceTokenRequest(token: fcmToken),
       );
-      final outcome = _outcomeForStatus(response.statusCode);
-      if (outcome.isSuccess) {
-        HKLog.logI(
-          '[NotificationService] Device removed '
-          '(status=${response.statusCode ?? 0})',
-        );
-      } else {
-        HKLog.logW(
-          '[NotificationService] removeDevice failed '
-          '(status=${response.statusCode ?? 0})',
-        );
-      }
-      return outcome;
-    } on DioException catch (error) {
-      final outcome = _outcomeForDioException(error);
+      HKLog.logI('[NotificationService] Device removed');
+      return const DeviceMutationOutcome.success();
+    } catch (error) {
+      final outcome = _outcomeFor(error);
       HKLog.logW(
-        '[NotificationService] removeDevice transport failure '
-        '(type=${error.type})',
+        '[NotificationService] removeDevice failed '
+        '(retryable=${outcome.isRetryable})',
       );
       return outcome;
-    } catch (_) {
-      HKLog.logW(
-        '[NotificationService] removeDevice unexpected transport failure',
-      );
-      return const DeviceMutationOutcome.retryableFailure();
     }
   }
 }
 
-DeviceMutationOutcome _outcomeForStatus(int? statusCode) {
-  final status = statusCode ?? 0;
-  if (status >= 200 && status < 300) {
-    return DeviceMutationOutcome.success(statusCode: status);
-  }
-  if (status == 408 ||
-      status == 425 ||
-      status == 429 ||
-      status >= 500 ||
-      status == 0) {
-    return DeviceMutationOutcome.retryableFailure(statusCode: status);
-  }
-  return DeviceMutationOutcome.rejected(statusCode: status);
-}
-
-DeviceMutationOutcome _outcomeForDioException(DioException error) {
-  final status = error.response?.statusCode;
-  if (status != null) return _outcomeForStatus(status);
-  return switch (error.type) {
-    DioExceptionType.connectionTimeout ||
-    DioExceptionType.sendTimeout ||
-    DioExceptionType.receiveTimeout ||
-    DioExceptionType.connectionError ||
-    DioExceptionType.unknown => const DeviceMutationOutcome.retryableFailure(),
-    DioExceptionType.badCertificate ||
-    DioExceptionType.badResponse ||
-    DioExceptionType.cancel => const DeviceMutationOutcome.rejected(),
+DeviceMutationOutcome _outcomeFor(Object error) {
+  final code = ConnectException.from(error).code;
+  return switch (code) {
+    Code.unavailable ||
+    Code.deadlineExceeded ||
+    Code.resourceExhausted ||
+    Code.internal ||
+    Code.unknown ||
+    Code.aborted => const DeviceMutationOutcome.retryableFailure(),
+    _ => const DeviceMutationOutcome.rejected(),
   };
 }
 

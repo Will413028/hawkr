@@ -5,7 +5,9 @@ import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/content/v1alpha1/content.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/discovery/v1alpha1/discovery.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/identity/v1alpha1/identity.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/media/v1alpha1/media.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/moderation/v1alpha1/moderation.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/review/v1alpha1/review.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/report.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
@@ -93,6 +95,11 @@ SocialPublicServiceClient socialPublicClient(Ref ref) =>
 SocialAppServiceClient socialAppClient(Ref ref) =>
     SocialAppServiceClient(ref.watch(connectAuthTransportProvider));
 
+/// 圖片上傳會話（`MediaAppService`），登入後呼叫。
+@Riverpod(keepAlive: true)
+MediaAppServiceClient mediaClient(Ref ref) =>
+    MediaAppServiceClient(ref.watch(connectAuthTransportProvider));
+
 /// 買家本人的封鎖與封鎖名單（`BuyerAppService`）：使用者主動的寫入，`ACCOUNT_SUSPENDED` 照使用者主動的寫入處理。
 @Riverpod(keepAlive: true)
 BuyerAppServiceClient buyerAppClient(Ref ref) =>
@@ -112,6 +119,11 @@ ModerationAppServiceClient moderationAppClient(Ref ref) =>
 @Riverpod(keepAlive: true)
 ChatAppServiceClient chatAppClient(Ref ref) =>
     ChatAppServiceClient(ref.watch(connectAuthTransportProvider));
+
+/// 買家的通知（`NotificationAppService`）：收件匣、偏好與推播裝置 token。
+@Riverpod(keepAlive: true)
+NotificationAppServiceClient notificationAppClient(Ref ref) =>
+    NotificationAppServiceClient(ref.watch(connectAuthTransportProvider));
 
 /// 評價的公開讀取：有 session 時帶 Bearer，伺服器才套用觀看者的封鎖；訪客不帶。
 @Riverpod(keepAlive: true)

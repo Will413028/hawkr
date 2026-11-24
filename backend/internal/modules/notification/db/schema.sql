@@ -157,3 +157,15 @@ CREATE TABLE notification.preference_overrides (
     CONSTRAINT preference_overrides_category_check CHECK (category ~ '^[A-Z][A-Z0-9_]{0,62}$'),
     CONSTRAINT preference_overrides_channel_check CHECK (channel IN ('INBOX', 'PUSH', 'EMAIL'))
 );
+
+-- email suppression 名單（通知計畫 D22）：Resend 回報永久退信或收件人投訴的位址，之後不再寄（寄給它們會傷寄件網域的信譽）。
+-- 只存 emailaddr.Normalize 之後位址的 HMAC-SHA256（伺服器密鑰；查詢時以同一把密鑰雜湊，輪替期間再加舊密鑰），不存位址本身，所以沒有個資、無限期保留。
+-- reason：HARD_BOUNCE 永久退信（管理員可移除）、COMPLAINT 投訴（不可移除）；暫時性退信不進名單。只由 Resend 的退信與投訴 webhook（經 platform/inbox）寫入，
+-- email 渠道 job 送出前查。
+CREATE TABLE notification.email_suppressions (
+    address_hash BYTEA       PRIMARY KEY,
+    reason       TEXT        NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL,
+    CONSTRAINT email_suppressions_address_hash_check CHECK (octet_length(address_hash) = 32),
+    CONSTRAINT email_suppressions_reason_check CHECK (reason IN ('HARD_BOUNCE', 'COMPLAINT'))
+);

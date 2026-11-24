@@ -20,11 +20,8 @@ class NotificationBanner extends StatefulWidget {
   /// 通知內文（可為空，為空時不顯示內文行）
   final String body;
 
-  /// FCM type，用於選擇 icon 與主題色（可選）
-  final String? type;
-
-  /// 右側大頭照（買家 / 使用者頭像），來源為 FCM payload 的 imageUrl，
-  /// 為空時僅顯示左側 type icon。
+  /// 右側大頭照（買家 / 使用者頭像），來源為 FCM 通知的圖片，
+  /// 為空時僅顯示左側 icon。
   final String? imageUrl;
 
   /// 點擊橫幅正文時觸發（通常執行頁面跳轉）
@@ -37,7 +34,6 @@ class NotificationBanner extends StatefulWidget {
     super.key,
     required this.title,
     required this.body,
-    this.type,
     this.imageUrl,
     required this.onTap,
     required this.onClose,
@@ -86,47 +82,10 @@ class _NotificationBannerState extends State<NotificationBanner>
     super.dispose();
   }
 
-  // ── 根據 type 選擇 icon ───────────────────────────────────────
+  // 呈現固定：文字、圖片都是伺服器給的，client 不依通知型別選圖示。
+  IconData get _icon => AppIcons.notificationsRounded;
 
-  IconData get _icon {
-    switch (widget.type?.toUpperCase()) {
-      case 'CHAT_MESSAGE':
-        return AppIcons.chatBubbleOutline;
-      case 'ORDER':
-      case 'ORDER_PAID':
-      case 'ORDER_CREATED':
-      case 'ORDER_STATUS':
-      case 'ORDER_DELIVERED':
-        return AppIcons.receiptLongRounded;
-      case 'SELLER_REVIEW_STATUS':
-      case 'CERTIFICATION_APPROVED':
-      case 'CERTIFICATION_REJECTED':
-      case 'CERTIFICATION_PENDING_INFO':
-        return AppIcons.verifiedRounded;
-      case 'COUPON_RECEIVED':
-        return AppIcons.localOfferRounded;
-      case 'PAYUNI_STATUS':
-        return AppIcons.accountBalanceWalletRounded;
-      default:
-        return AppIcons.notificationsRounded;
-    }
-  }
-
-  Color get _accentColor {
-    switch (widget.type?.toUpperCase()) {
-      case 'CHAT_MESSAGE':
-        return AppColors.primary;
-      case 'SELLER_REVIEW_STATUS':
-      case 'CERTIFICATION_APPROVED':
-      case 'CERTIFICATION_REJECTED':
-      case 'CERTIFICATION_PENDING_INFO':
-        return AppColors.warning;
-      case 'COUPON_RECEIVED':
-        return AppColors.primary;
-      default:
-        return AppColors.primary;
-    }
-  }
+  Color get _accentColor => AppColors.primary;
 
   @override
   Widget build(BuildContext context) {

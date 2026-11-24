@@ -48,20 +48,9 @@ var delegatedForbiddenFields = []string{
 	"imageurl", "imageurls", "logourl", "coverurl", "previewurl",
 }
 
-// delegatedForbiddenFieldExceptions 是上面那份清單的具名例外，鍵為 `DTO.欄位名`。
-//
-// 例外要逐個具名、不得以「某個 DTO 整個豁免」的形式存在：後者會讓那個 DTO 日後長出
-// 任何一個禁用欄位都不再被守到。目前只有一條 ——
-//
-// DelegatedMediaCompleteData.previewUrl：`previewurl` 進禁列的理由是「資源 DTO 的媒體
-// 欄位只回 objectKey，URL 由前端組」，而這支不是資源 DTO，是三步上傳第 ③ 步的回執
-// （56 §6.1.13 的步驟表明載回傳 `stagedToken` ＋ `previewUrl`）。賣家自助那支
-// （handler/media.go CompleteUploadSession）一直都回這兩欄，而代行工作區與賣家共用同一
-// 支瀏覽器端上傳函式（website lib/media/upload.ts），它在任一欄缺席時 fail-fast ⇒ 少了
-// 它，代行的每一次圖片上傳都在位元組已經進 R2 之後才失敗。
-var delegatedForbiddenFieldExceptions = map[string]struct{}{
-	"DelegatedMediaCompleteData.previewUrl": {},
-}
+// delegatedForbiddenFieldExceptions 是禁用欄位清單的具名例外，鍵為 `DTO.欄位名`。
+// 例外逐個具名，不得以整個 DTO 豁免的形式存在。
+var delegatedForbiddenFieldExceptions = map[string]struct{}{}
 
 // delegatedResponseDTOs 是四類資源端點與稽核端點對外吐出的每一個 struct。
 // 新增一個代行 DTO 卻忘了列進來，這支測試就守不到它——所以清單本身也是契約的一部分。
@@ -75,8 +64,6 @@ func delegatedResponseDTOs() map[string]any {
 		"DelegatedSessionSummary":         DelegatedSessionSummary{},
 		"DelegatedOperationSessionRecord": DelegatedOperationSessionRecord{},
 		"DelegatedBatchUnpublishData":     DelegatedBatchUnpublishData{},
-		"DelegatedMediaUploadSessionData": DelegatedMediaUploadSessionData{},
-		"DelegatedMediaCompleteData":      DelegatedMediaCompleteData{},
 		"DelegatedRecipientContactData":   DelegatedRecipientContactData{},
 		// 每一支寫入端點的統一出口。它一度不在清單內，而它正是所有代行寫入
 		// 回應的形狀 —— 漏掉它等於整條寫入路徑沒有被這支契約守到。
@@ -115,32 +102,6 @@ func TestDelegatedDTOs_CarryNoFulfilmentOrFinanceFields(t *testing.T) {
 		if !usedExceptions[key] {
 			t.Errorf("例外 %q 已不對應任何 DTO 欄位，請一併移除", key)
 		}
-	}
-}
-
-// DelegatedMediaCompleteData 是三步上傳第 ③ 步的回執，兩欄缺一不可（56 §6.1.13）。
-//
-// 這支端點的失敗形狀特別貴：位元組已經 PUT 進 R2、gateway 也回了 200，前端才在
-// 「上傳完成回應缺少 previewUrl 或 stagedToken」這一步 fail-fast ⇒ 操作者看到的是一次
-// 沒有任何後端錯誤的上傳失敗。賣家自助那支（handler/media.go）一直都回兩欄，代行這支
-// 一度只回一欄，兩邊對同一個瀏覽器端函式給出不同形狀的回應。
-func TestDelegatedMediaCompleteData_CarriesBothStagedTokenAndPreviewURL(t *testing.T) {
-	raw, err := json.Marshal(DelegatedMediaCompleteData{StagedToken: "stg_x", PreviewURL: "seller/2685914682/logo.jpg"})
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-	var m map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &m); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	for _, want := range []string{"stagedToken", "previewUrl"} {
-		if _, ok := m[want]; !ok {
-			t.Errorf("DelegatedMediaCompleteData 缺少 %q（實際 keys=%v）", want, delegatedSortedKeys(m))
-		}
-	}
-	// 白名單：這支回執只承載這兩樣，不得順手多帶 objectKey 以外的媒體資訊或憑證。
-	if len(m) != 2 {
-		t.Errorf("DelegatedMediaCompleteData 欄位數 = %d, want 2（實際 keys=%v）", len(m), delegatedSortedKeys(m))
 	}
 }
 

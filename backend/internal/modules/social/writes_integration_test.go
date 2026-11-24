@@ -4,6 +4,7 @@ package social_test
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -446,32 +447,93 @@ func TestBuyerWritesRequireAnActiveBuyer(t *testing.T) {
 	}
 }
 
-// 換圖在 transaction 內寫業務列並排入引用同步；舊的圖記成退場，由同步 job 精確解除；轉正在 transaction 之外。
-func TestPostImageReplacementRetiresTheOldAsset(t *testing.T) {
+// 換圖在同一個 transaction 內 Confirm 新資產、把舊資產標為刪除；回滾時新資產仍是暫存。
+func TestPostImageReplacementConfirmsTheNewAssetAndMarksTheOldDeleted(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	storeID, _ := f.exposableStore(t)
+	st := f.store(t, storeID)
+	// 草稿：已發布的貼文必須有 1 張照片，不能清掉圖。
+	p := mustV[social.Post](t)(f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "x", ImageToken: "first"}, nil))
+	first := f.postAsset(t, p.ID)
+	if got := f.assetState(t, first); got != "ACTIVE" {
+		t.Fatalf("新增後 state=%s，預期 ACTIVE", got)
+	}
+	up := mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("y"), ImageToken: "second"}, nil))
+	if up.ImageKey == p.ImageKey {
+		t.Fatal("圖換了")
+	}
+	second := f.postAsset(t, p.ID)
+	if got := f.assetState(t, second); got != "ACTIVE" {
+		t.Fatalf("新資產 state=%s，預期 ACTIVE", got)
+	}
+	if got := f.assetState(t, first); got != "DELETING" {
+		t.Fatalf("舊資產 state=%s，預期 DELETING", got)
+	}
+	// 清掉圖：目前的資產標為刪除。
+	if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: up.Version, ClearImage: true}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.assetState(t, second); got != "DELETING" {
+		t.Fatalf("清掉圖之後 state=%s，預期 DELETING", got)
+	}
+}
+
+// 已確認過的 token 不能再用（B1-D23：只在同一個 transaction 內冪等）：client 不重送沒變的 token；重送被拒絕，目前的圖仍是 ACTIVE、貼文不變。
+func TestResendingTheCurrentImageTokenIsRejectedAndKeepsTheAssetActive(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	storeID, _ := f.exposableStore(t)
+	st := f.store(t, storeID)
+	p := mustV[social.Post](t)(f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "x", ImageToken: "same", Publish: true}, nil))
+	current := f.postAsset(t, p.ID)
+	_, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("y"), ImageToken: "same"}, nil)
+	if kindOf(err) != apperr.KindInvalidInput || !errors.Is(err, media.ErrUploadAlreadyConfirmed) {
+		t.Fatalf("重送已確認的 token：%v，預期被拒絕（原因是 failed_precondition）", err)
+	}
+	if got := f.assetState(t, current); got != "ACTIVE" {
+		t.Fatalf("重送同一個 token 之後目前的圖 state=%s，預期仍是 ACTIVE", got)
+	}
+	if after := f.postAsset(t, p.ID); after != current {
+		t.Fatalf("被拒絕的更新改了貼文的圖：%s -> %s", current, after)
+	}
+}
+
+// 回滾：換圖的 transaction 在 Confirm 之後失敗（版本以外的後續寫入出錯），新資產仍是暫存、舊資產與貼文不變。
+func TestRolledBackPostImageReplacementLeavesTheNewAssetStaged(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := setup(t)
 	storeID, _ := f.exposableStore(t)
 	st := f.store(t, storeID)
 	p := mustV[social.Post](t)(f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "x", ImageToken: "first", Publish: true}, nil))
-	ref := media.Ref{Type: media.RefTypePost, ID: p.ID.String()}
-	if r := mustV[media.SyncResult](t)(f.module.SyncMedia(ctx, ref)); r.Again {
-		t.Fatal("第一次同步一次就完成")
+	first := f.postAsset(t, p.ID)
+	fail := true
+	events.Subscribe(f.bus, func(context.Context, social.PostUpdated) error {
+		if fail {
+			return errors.New("boom")
+		}
+		return nil
+	})
+	in := social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("y"), ImageToken: "second"}
+	if _, err := f.module.UpdatePost(ctx, st, in, nil); err == nil {
+		t.Fatal("訂閱者失敗應讓換圖回滾")
 	}
-	if n := len(f.media.Referenced(ref)); n != 1 {
-		t.Fatalf("同步後有一個引用：%d", n)
+	if got := f.assetState(t, first); got != "ACTIVE" {
+		t.Fatalf("回滾後舊資產 state=%s，預期 ACTIVE", got)
 	}
-	up := mustV[social.Post](t)(f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("y"), ImageToken: "second"}, nil))
-	if up.ImageKey == p.ImageKey {
-		t.Fatal("圖換了")
+	if got := f.postAsset(t, p.ID); got != first {
+		t.Fatalf("回滾後貼文的資產 = %s，預期 %s", got, first)
 	}
-	mustV[media.SyncResult](t)(f.module.SyncMedia(ctx, ref))
-	if n := len(f.media.Referenced(ref)); n != 1 {
-		t.Fatalf("舊的引用已解除、只剩新的：%d", n)
+	staged, err := media.CountAssetsInState(ctx, f.db, media.AssetStaged)
+	if err != nil || staged != 1 {
+		t.Fatalf("回滾後新資產仍是暫存：%d %v", staged, err)
 	}
-	retired := f.scalar(t, "SELECT count(*) FROM social.retired_assets WHERE ref_id = $1", p.ID.String())
-	if retired != 1 {
-		t.Fatalf("舊圖記成退場：%d", retired)
+	fail = false
+	if _, err := f.module.UpdatePost(ctx, st, in, nil); err != nil {
+		t.Fatalf("回滾後同一個 token 重送應成功：%v", err)
 	}
 }
 

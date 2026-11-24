@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"slices"
 	"strings"
 	"testing"
@@ -87,7 +88,10 @@ func (f *fakeQ) UpdateStyle(_ context.Context, a store.UpdateStyleParams) (store
 	if !ok || s.Version != a.ExpectedVersion {
 		return store.ImageaiStyle{}, pgx.ErrNoRows
 	}
-	s.Label, s.Prompt, s.ThumbnailKey, s.ThumbnailAssetID = a.Label, a.Prompt, a.ThumbnailKey, a.ThumbnailAssetID
+	s.Label, s.Prompt, s.ThumbnailKey = a.Label, a.Prompt, a.ThumbnailKey
+	if a.ThumbnailAssetID != nil {
+		s.ThumbnailAssetID = a.ThumbnailAssetID
+	}
 	s.DisplayOrder, s.Enabled, s.Version, s.UpdatedAt = a.DisplayOrder, a.Enabled, s.Version+1, a.Now
 	f.styles[a.ID] = s
 	return s, nil
@@ -189,28 +193,37 @@ func (a *fakeAudit) Record(ctx context.Context, e adminaudit.Entry) error {
 	return nil
 }
 
-type fakeThumbs struct {
-	finalized []string
-	rejected  []string
-	changed   [][]string
+// assetOf 是測試用的資產 ID：由名稱決定的 UUID。
+func assetOf(name string) uuid.UUID {
+	return media.AssetFor(name)
+}
+
+// fakeMedia 記錄 Confirm 與 MarkDeleted；兩者都必須在 transaction 內呼叫。
+type fakeMedia struct {
+	confirmed []string
+	deleted   []uuid.UUID
 	failToken string
 }
 
-func (f *fakeThumbs) Finalize(_ context.Context, _ int64, token, _ string) (string, string, error) {
-	if token == f.failToken {
-		return "", "", apperr.InvalidInputOn([]string{"ThumbnailToken"}, "縮圖無法使用")
+func (f *fakeMedia) Confirm(ctx context.Context, _ media.Uploader, token string, want media.Visibility) (media.ConfirmedAsset, error) {
+	if ctx.Value(txKey{}) == nil {
+		panic("Confirm 必須在 transaction 內呼叫")
 	}
-	f.finalized = append(f.finalized, token)
-	return "public/" + token + ".jpg", "asset-" + token, nil
+	if want != media.VisibilityPublic {
+		panic("風格縮圖必須是公開可讀")
+	}
+	if token == f.failToken {
+		return media.ConfirmedAsset{}, apperr.InvalidInputOn([]string{"ThumbnailToken"}, "縮圖無法使用")
+	}
+	f.confirmed = append(f.confirmed, token)
+	return media.ConfirmedAsset{ID: assetOf(token), ObjectKey: "public/" + token + ".jpg", Visibility: media.VisibilityPublic}, nil
 }
 
-func (f *fakeThumbs) Reject(_ context.Context, _ uuid.UUID, assetID string) error {
-	f.rejected = append(f.rejected, assetID)
-	return nil
-}
-
-func (f *fakeThumbs) Changed(_ context.Context, _ time.Time, _ uuid.UUID, retired ...string) error {
-	f.changed = append(f.changed, append([]string(nil), retired...))
+func (f *fakeMedia) MarkDeleted(ctx context.Context, ids []uuid.UUID) error {
+	if ctx.Value(txKey{}) == nil {
+		panic("MarkDeleted 必須在 transaction 內呼叫")
+	}
+	f.deleted = append(f.deleted, ids...)
 	return nil
 }
 
@@ -234,7 +247,7 @@ type harness struct {
 	s      *Service
 	q      *fakeQ
 	audit  *fakeAudit
-	thumbs *fakeThumbs
+	media  *fakeMedia
 	stores fakeStores
 	ids    int
 	used   int32
@@ -247,14 +260,14 @@ var (
 
 func newHarness(t *testing.T) *harness {
 	t.Helper()
-	h := &harness{q: newFakeQ(), audit: &fakeAudit{}, thumbs: &fakeThumbs{}, stores: fakeStores{missing: map[int64]bool{}}}
+	h := &harness{q: newFakeQ(), audit: &fakeAudit{}, media: &fakeMedia{}, stores: fakeStores{missing: map[int64]bool{}}}
 	h.s = New(Deps{
 		Tx: func(ctx context.Context, fn func(context.Context) error) error {
 			return fn(context.WithValue(ctx, txKey{}, true))
 		},
 		Q:      func(context.Context) Queries { return h.q },
 		Audit:  h.audit,
-		Thumbs: h.thumbs,
+		Media:  h.media,
 		Stores: h.stores,
 		Used:   func(context.Context, int64) (int32, error) { return h.used, nil },
 		NewID: func() uuid.UUID {
@@ -271,11 +284,14 @@ func (h *harness) seed(name, category string, isDefault bool, asset string) stor
 	h.ids++
 	id := uuid.MustParse("10000000-0000-7000-8000-" + strings.Repeat("0", 11) + string(rune('0'+h.ids)))
 	key := ""
+	var assetID *uuid.UUID
 	if asset != "" {
 		key = "public/" + asset + ".jpg"
+		id := assetOf(asset)
+		assetID = &id
 	}
 	s := store.ImageaiStyle{
-		ID: id, Name: name, Label: name, Prompt: "p", Category: category, ThumbnailKey: key, ThumbnailAssetID: asset,
+		ID: id, Name: name, Label: name, Prompt: "p", Category: category, ThumbnailKey: key, ThumbnailAssetID: assetID,
 		IsDefault: isDefault, Enabled: true, Version: 3, CreatedAt: t0, UpdatedAt: t0,
 	}
 	h.q.styles[id] = s

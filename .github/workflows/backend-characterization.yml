@@ -25,6 +25,8 @@ on:
       - 'backend/scripts/characterize.sh'
       - 'backend/docker-compose-infra.yml'
       - 'backend/scripts/init-databases.sh'
+      - 'backend/scripts/garage-init.sh'
+      - 'backend/monitoring/garage/**'
       - 'backend/infra/seed-data/**'
       - '.github/workflows/backend-characterization.yml'
   push:
@@ -83,6 +85,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: 安裝 libvips（media 模組以 cgo 連結）
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libvips-dev
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: backend/.go-version
@@ -103,13 +107,22 @@ jobs:
       # characterize.sh 用 lsof 檢查 port；runner image 沒有時才裝。
       - name: 確認 lsof
         run: command -v lsof >/dev/null || { sudo apt-get update && sudo apt-get install -y lsof; }
-      # 只起腳本與舊服務要的 Postgres、Redis 與 RabbitMQ（容器名 hawkr-postgres 是腳本 docker exec 的目標）。
-      - name: 起 Postgres、Redis 與 RabbitMQ
-        run: docker compose -f docker-compose-infra.yml up -d --wait postgres redis rabbitmq
+      # 只起腳本與舊服務要的 Postgres、Redis、RabbitMQ 與 Garage（單體的 media 模組接 S3 相容儲存，B1-D15；容器名 hawkr-postgres 是腳本 docker exec 的目標）。
+      - name: 起 Postgres、Redis、RabbitMQ 與 Garage
+        run: |
+          docker compose -f docker-compose-infra.yml up -d --wait postgres redis rabbitmq garage
+          bash scripts/garage-init.sh
       - name: 特性測試
         env:
           MODULE: ${{ matrix.module }}
-        run: scripts/characterize.sh "$MODULE"
+          MEDIA_S3_ENDPOINT: http://localhost:3900
+          MEDIA_S3_REGION: garage
+          MEDIA_S3_BUCKET: media-local
+        run: |
+          set -a
+          . .dev/garage.env
+          set +a
+          scripts/characterize.sh "$MODULE"
       - name: 容器 log（失敗時）
         if: failure()
-        run: docker compose -f docker-compose-infra.yml logs --no-color postgres redis rabbitmq | tail -n 200
+        run: docker compose -f docker-compose-infra.yml logs --no-color postgres redis rabbitmq garage | tail -n 200

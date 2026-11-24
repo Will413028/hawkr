@@ -37,7 +37,7 @@ import (
 //
 // ── 掃描範圍的兩個歷史盲區，兩者都已由本檔的推導方式關掉 ────────────────────────
 //
-// ① **client 白名單**：原本只認 `h.Account` 與 `h.Media`，而三類資源端點的呼叫點
+// ① **client 白名單**：原本只認 `h.Account` 與一個舊 client，而三類資源端點的呼叫點
 // 全部走 `h.Seller`／`h.Product`／`h.Order` —— 也就是說主體完全不在守備範圍
 // 內。手抄的白名單漏一個 client，就對那個 client 的所有呼叫點靜默失明。現在 client 集合
 // 由 holder.go 的 Holder 型別推導（見 delegationGrpcClientFields），新增 client 自動納管。
@@ -130,10 +130,10 @@ func delegationGrpcClientFields(t *testing.T) map[string]bool {
 		}
 		return false
 	})
-	// 自我量測：推導失準最可能的症狀同樣是「一個都沒推到而全綠」。Account 與 Media 是
-	// 本閘門建立時就在守的兩個，它們不在集合裡就代表解析壞了。
-	if !out["Account"] || !out["Media"] {
-		t.Fatalf("從 holder.go 推導出的 gRPC client 欄位不含 Account／Media（推到 %v）——解析八成失準了", delegationSortedKeys(out))
+	// 自我量測：推導失準最可能的症狀同樣是「一個都沒推到而全綠」。Account 與 Seller 是
+	// 本閘門一定要守的 client，它們不在集合裡就代表解析壞了。
+	if !out["Account"] || !out["Seller"] {
+		t.Fatalf("從 holder.go 推導出的 gRPC client 欄位不含 Account／Seller（推到 %v）——解析八成失準了", delegationSortedKeys(out))
 	}
 	return out
 }

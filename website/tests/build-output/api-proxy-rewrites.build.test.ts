@@ -37,6 +37,7 @@ const api = new URL(process.env.API_BASE_URL ?? "");
 for (const [source, destination] of [
 	["/api/connect/:path*", `${api.origin}/:path*`],
 	["/api/auth/:path*", `${api.origin}/api/auth/:path*`],
+	["/api/files/:path*", `${api.origin}/api/files/:path*`],
 	["/api/v1/:path*", `${api.origin}${api.pathname.replace(/\/+$/, "")}/:path*`],
 ] as const) {
 	test(`beforeFiles forwards ${source} to the monolith`, () => {
@@ -46,12 +47,17 @@ for (const [source, destination] of [
 	});
 }
 
-test("beforeFiles has exactly the three API prefixes among its /api rewrites", () => {
+test("beforeFiles has exactly the four API prefixes among its /api rewrites", () => {
 	assert.deepEqual(
 		beforeFiles()
 			.map((r) => r.source)
 			.filter((source) => source.startsWith("/api/"))
 			.sort(),
-		["/api/auth/:path*", "/api/connect/:path*", "/api/v1/:path*"],
+		[
+			"/api/auth/:path*",
+			"/api/connect/:path*",
+			"/api/files/:path*",
+			"/api/v1/:path*",
+		],
 	);
 });

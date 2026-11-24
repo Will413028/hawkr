@@ -418,7 +418,7 @@ func TestKYCResponseCarriesNoInputOnlyFieldsAndNoObjectKeys(t *testing.T) {
 		}
 	}
 	if docs := out.GetBusiness().GetCompanyDocuments(); len(docs) != 2 || docs[0].GetAssetId() != "co-1" || docs[1].GetAssetId() != "co-2" ||
-		docs[0].GetDownloadUri() != "/api/v1/app/media/secure_download/co-1" {
+		docs[0].GetDownloadUri() != "/api/files/seller/kyc/0" {
 		t.Fatalf("documents=%v", out)
 	}
 	if text := out.String() + prototext.Format(out); strings.Contains(text, "secret-key") {

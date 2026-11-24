@@ -5,7 +5,6 @@ package seller_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"regexp"
@@ -74,62 +73,6 @@ func (q *queue) kinds() []string {
 	return out
 }
 
-// images 是 media 的替身（media.Fake 的引用語意），記下轉正的 ref 類型，並確認媒體呼叫都在 transaction 外。
-type images struct {
-	*media.Fake
-	mu        sync.Mutex
-	finalized []string
-	// uploaders 是每次成功轉正的上傳者（與 finalized 同序）。
-	uploaders []media.Uploader
-	// onFinalize 在轉正之後執行，用來製造「轉正之後、寫入之前」的交錯。
-	onFinalize func()
-	// rejected 是 media 拒絕轉正的 token 與回的錯誤（無效、過期或不屬於這個帳號的 token）。
-	rejected map[string]error
-}
-
-func (i *images) Finalize(ctx context.Context, u media.Uploader, token, refType string) (media.Asset, error) {
-	i.mu.Lock()
-	rejected := i.rejected[token]
-	i.mu.Unlock()
-	if rejected != nil {
-		return media.Asset{}, rejected
-	}
-	asset, err := i.Fake.Finalize(ctx, u, token, refType)
-	if err != nil {
-		return asset, err
-	}
-	i.mu.Lock()
-	i.finalized = append(i.finalized, refType)
-	i.uploaders = append(i.uploaders, u)
-	hook := i.onFinalize
-	i.onFinalize = nil
-	i.mu.Unlock()
-	if hook != nil {
-		hook()
-	}
-	return asset, nil
-}
-
-func newImages() *images {
-	fake := media.NewFake()
-	fake.Key = func(refType, token string) string { return refType + "/" + token }
-	return &images{Fake: fake}
-}
-
-// sync 執行 ref 的同步 job 一輪。
-func (f *fixture) syncMedia(t *testing.T, ref media.Ref) media.SyncResult {
-	t.Helper()
-	res, err := f.module.SyncMedia(context.Background(), ref)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return res
-}
-
-func (f *fixture) storeRef(refType string, id int64) media.Ref {
-	return media.Ref{Type: refType, ID: strconv.FormatInt(id, 10)}
-}
-
 // storeOrders 是店家未結訂單 port 的替身：open、err 決定回答，calls 記下被問的 store_id，onCall 在查詢時執行一次（鎖外），
 // 並確認查詢發生在 transaction 外（遠端呼叫不得在交易內）。
 type storeOrders struct {
@@ -181,7 +124,7 @@ type fixture struct {
 	module   *Module
 	bus      *events.Bus
 	jobs     *queue
-	media    *images
+	media    *mediaProbe
 	payment  *payment.Fake
 	// payments 是 payment 模組（provider 是 payment 這個 fake）：核准經它寫收款帳戶列，同步發的 PayoutAccountChanged 由 f.module 訂閱。
 	payments *payment.Module
@@ -197,9 +140,9 @@ func setup(t *testing.T) *fixture {
 	t.Helper()
 	d := pg.NewDB(t, testdb.Migrations(
 		migrate.Module{Name: inbox.Schema, Dir: inbox.Migrations()}, migrate.Module{Name: "identity", Dir: identity.Migrations()},
-		migrate.Module{Name: "payment", Dir: payment.Migrations()}, migrate.Module{Name: "seller", Dir: Migrations()},
+		migrate.Module{Name: "payment", Dir: payment.Migrations()}, migrate.Module{Name: "media", Dir: media.Migrations()}, migrate.Module{Name: "seller", Dir: Migrations()},
 	))
-	f := &fixture{db: d, bus: events.NewBus(), jobs: &queue{}, media: newImages(), payment: payment.NewFake(), orders: &storeOrders{}, products: &fakeProductStores{}, registry: &fakeRegistry{t: t}, now: time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)}
+	f := &fixture{db: d, bus: events.NewBus(), jobs: &queue{}, payment: payment.NewFake(), orders: &storeOrders{}, products: &fakeProductStores{}, registry: &fakeRegistry{t: t}, now: time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	f.identity = identity.New(identity.Deps{DB: d, Events: f.bus, Now: func() time.Time { return f.now }, Logger: log})
 	clock := func() time.Time { return f.now }
@@ -207,6 +150,7 @@ func setup(t *testing.T) *fixture {
 		DB: d, Audit: adminaudit.New(d, time.Now), Events: f.bus, Jobs: f.jobs, Inbox: inbox.New(inbox.Deps{DB: d, Jobs: f.jobs, Now: clock, Logger: log}), Provider: f.payment,
 		Owners: fixtureOwners{f}, Now: clock, Logger: log,
 	})
+	f.media = f.newMedia(t)
 	f.module = f.newModule(t, f.jobs)
 	events.Subscribe(f.bus, func(ctx context.Context, e payment.PayoutAccountChanged) error {
 		return f.module.OnPayoutAccountChanged(ctx, e)
@@ -522,42 +466,41 @@ func TestUpdateProfileKeepsOmittedFieldsAndClearsExplicitEmpty(t *testing.T) {
 	}
 }
 
-// 文字驗證失敗的換圖請求不消耗 staged token：沒有轉正，用同一個 token 修正後重送成功。
+// 文字驗證失敗的換圖請求不消耗 staged token：資產仍是暫存，用同一個 token 修正後重送成功。
 func TestRejectedProfileUpdateDoesNotConsumeTheStagedToken(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	accountID, s := f.open(t)
-	_, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: s.Version, ContactPhone: ptr("not-a-phone"), LogoToken: "logo1", UploaderID: accountID})
+	token, asset := f.stagePublic(t, media.Uploader{ID: accountID})
+	_, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: s.Version, ContactPhone: ptr("not-a-phone"), LogoToken: token, UploaderID: accountID})
 	if apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("err=%v", err)
 	}
-	if len(f.media.finalized) != 0 {
-		t.Fatalf("token finalized by a rejected request: %v", f.media.finalized)
-	}
-	updated, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: s.Version, ContactPhone: ptr("0912345678"), LogoToken: "logo1", UploaderID: accountID})
+	f.wantAsset(t, asset, "STAGED")
+	updated, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: s.Version, ContactPhone: ptr("0912345678"), LogoToken: token, UploaderID: accountID})
 	must(t, err)
-	if len(f.media.finalized) != 1 || updated.LogoKey == nil {
-		t.Fatalf("retry: finalized=%v store=%+v", f.media.finalized, updated)
+	f.wantAsset(t, asset, "ACTIVE")
+	if updated.LogoKey == nil {
+		t.Fatalf("retry: store=%+v", updated)
 	}
 }
 
-// 其他的前置拒絕（版本、能力）同樣發生在轉正之前。
-func TestStaleVersionAndSuspensionRejectBeforeFinalize(t *testing.T) {
+// 其他的拒絕（版本、能力）同樣不確認 token：資產維持暫存。
+func TestStaleVersionAndSuspensionRejectBeforeConfirm(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	accountID, s := f.open(t)
-	if _, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: s.Version + 5, LogoToken: "logo1", UploaderID: accountID}); apperr.KindOf(err) != apperr.KindVersionConflict {
+	token, asset := f.stagePublic(t, media.Uploader{ID: accountID})
+	if _, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: s.Version + 5, LogoToken: token, UploaderID: accountID}); apperr.KindOf(err) != apperr.KindVersionConflict {
 		t.Fatalf("err=%v", err)
 	}
 	f.suspend(t, s.StoreID)
-	if _, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: s.Version, LogoToken: "logo1", UploaderID: accountID}); err == nil {
+	if _, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: s.Version, LogoToken: token, UploaderID: accountID}); err == nil {
 		t.Fatal("suspended store accepted a logo")
 	}
-	if len(f.media.finalized) != 0 {
-		t.Fatalf("finalized=%v", f.media.finalized)
-	}
+	f.wantAsset(t, asset, "STAGED")
 }
 
 // 完成新手引導只設旗標：已存的值不再通過現行驗證（這裡是不在內政部表裡的鄉鎮市區代碼）也能完成；重送冪等，版本要相符。
@@ -614,82 +557,84 @@ func TestUpdateProfileVersionCAS(t *testing.T) {
 	}
 }
 
-func TestImagesLinkByStoreIDAndUseVersion(t *testing.T) {
+// logo 與封面在寫入店家列的同一個 transaction 內確認，key 與 asset ID 一起存；換圖以版本為條件。
+func TestImagesAreConfirmedWithTheStoreRowAndUseVersion(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	accountID, s := f.open(t)
-	withLogo, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: s.Version, LogoToken: "logo1", UploaderID: accountID})
+	logoToken, logo := f.stagePublic(t, media.Uploader{ID: accountID})
+	coverToken, cover := f.stagePublic(t, media.Uploader{ID: accountID})
+	withLogo, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: s.Version, LogoToken: logoToken, UploaderID: accountID})
 	must(t, err)
-	if withLogo.LogoKey == nil || *withLogo.LogoKey != media.RefTypeSellerLogo+"/logo1" || withLogo.Version != s.Version+1 {
+	if withLogo.LogoKey == nil || *withLogo.LogoKey != f.objectKey(t, logo) || withLogo.Version != s.Version+1 {
 		t.Fatalf("store=%+v", withLogo)
 	}
-	logoRef := f.storeRef(media.RefTypeSellerLogo, s.StoreID)
-	if f.media.finalized[0] != media.RefTypeSellerLogo || len(f.media.Referenced(logoRef)) != 0 ||
-		!slices.Contains(f.jobs.kinds(), "seller.media_sync") {
-		t.Fatalf("finalized=%+v references=%v jobs=%v", f.media.finalized, f.media.Referenced(logoRef), f.jobs.kinds())
+	f.wantAsset(t, logo, "ACTIVE")
+	if got := f.storeAssets(t, s.StoreID); got.logo == nil || *got.logo != logo || got.cover != nil {
+		t.Fatalf("assets=%+v", got)
 	}
-	f.syncMedia(t, logoRef)
-	if got := f.media.Referenced(logoRef); fmt.Sprint(got) != "[asset-logo1]" {
-		t.Fatalf("references=%v", got)
+	_, err = f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: s.Version, CoverToken: coverToken, UploaderID: accountID})
+	if apperr.KindOf(err) != apperr.KindVersionConflict {
+		t.Fatalf("stale cover: %v", err)
 	}
-	_, err = f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: s.Version, CoverToken: "cover1", UploaderID: accountID})
-	if apperr.KindOf(err) != apperr.KindVersionConflict || len(f.media.finalized) != 1 {
-		t.Fatalf("stale cover: %v finalized=%d", err, len(f.media.finalized))
-	}
-	withCover, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: withLogo.Version, CoverToken: "cover1", UploaderID: accountID})
+	f.wantAsset(t, cover, "STAGED")
+	withCover, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: withLogo.Version, CoverToken: coverToken, UploaderID: accountID})
 	must(t, err)
 	if withCover.CoverKey == nil || *withCover.LogoKey != *withLogo.LogoKey {
 		t.Fatalf("store=%+v", withCover)
 	}
-	must(t, f.db.InTx(ctx, func(ctx context.Context) error {
-		_, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: withCover.Version, LogoToken: "x", UploaderID: accountID})
-		if apperr.KindOf(err) != apperr.KindFailedPrecondition {
-			t.Fatalf("image change inside a transaction: %v", err)
-		}
-		return nil
-	}))
+	f.wantAsset(t, cover, "ACTIVE")
+	f.wantAsset(t, logo, "ACTIVE")
 }
 
-// 文字欄位、logo 與封面在同一個版本條件的 transaction 一起寫入：衝突時三者都沒有寫入，轉正的引用靠收斂釋放。
+// 文字欄位、logo 與封面在同一個版本條件的 transaction 一起寫入：衝突時三者都沒有寫入，新資產仍是暫存；換掉的舊圖標為刪除。
 func TestProfileAndImagesAreWrittenInOneVersionedTransaction(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	accountID, s := f.open(t)
+	up := media.Uploader{ID: accountID}
+	logo1Token, logo1 := f.stagePublic(t, up)
+	coverToken, cover := f.stagePublic(t, up)
 	updated, err := f.module.UpdateProfile(ctx, UpdateProfileInput{
-		StoreID: s.StoreID, ExpectedVersion: s.Version, Prize: ptr("金牌"), LogoToken: "logo1", CoverToken: "cover1", UploaderID: accountID,
+		StoreID: s.StoreID, ExpectedVersion: s.Version, Prize: ptr("金牌"), LogoToken: logo1Token, CoverToken: coverToken, UploaderID: accountID,
 	})
 	must(t, err)
 	if *updated.Prize != "金牌" || updated.LogoKey == nil || updated.CoverKey == nil || updated.Version <= s.Version {
 		t.Fatalf("store=%+v", updated)
 	}
-	if fmt.Sprint(f.media.finalized) != fmt.Sprint([]string{media.RefTypeSellerLogo, media.RefTypeSellerCover}) {
-		t.Fatalf("finalized=%+v", f.media.finalized)
-	}
-	// 沒有文字欄位改變時，換圖照樣寫入。
-	only, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: updated.Version, LogoToken: "logo2", UploaderID: accountID})
+	f.wantAsset(t, logo1, "ACTIVE")
+	f.wantAsset(t, cover, "ACTIVE")
+	// 沒有文字欄位改變時，換圖照樣寫入，被換掉的 logo 標為刪除，封面不動。
+	logo2Token, logo2 := f.stagePublic(t, up)
+	only, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: updated.Version, LogoToken: logo2Token, UploaderID: accountID})
 	must(t, err)
-	if *only.LogoKey != media.RefTypeSellerLogo+"/logo2" || *only.CoverKey != *updated.CoverKey {
+	if *only.LogoKey != f.objectKey(t, logo2) || *only.CoverKey != *updated.CoverKey {
 		t.Fatalf("store=%+v", only)
 	}
+	f.wantAsset(t, logo2, "ACTIVE")
+	f.wantAsset(t, logo1, "DELETING")
+	f.wantAsset(t, cover, "ACTIVE")
 
-	f.media.onFinalize = func() {
-		_, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: only.Version, Prize: ptr("銅牌")})
-		must(t, err)
-	}
-	_, err = f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: only.Version, Prize: ptr("銀牌"), LogoToken: "logo3", UploaderID: accountID})
+	// 讀取之後別人先改了：以舊版本換圖與文字衝突，整筆回滾。
+	bumped, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: only.Version, Prize: ptr("銅牌")})
+	must(t, err)
+	logo3Token, logo3 := f.stagePublic(t, up)
+	_, err = f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: only.Version, Prize: ptr("銀牌"), LogoToken: logo3Token, UploaderID: accountID})
 	if apperr.KindOf(err) != apperr.KindVersionConflict {
 		t.Fatalf("err=%v", err)
 	}
 	current, err := f.module.Store(ctx, s.StoreID)
 	must(t, err)
-	if *current.Prize != "銅牌" || *current.LogoKey != *only.LogoKey {
+	if *current.Prize != "銅牌" || *current.LogoKey != *only.LogoKey || current.Version != bumped.Version {
 		t.Fatalf("conflicting update left a partial write: %+v", current)
 	}
+	f.wantAsset(t, logo3, "STAGED")
+	f.wantAsset(t, logo2, "ACTIVE")
 }
 
-// 空字串沿用現在的圖；只有空白的 token 是 InvalidInput，指向對應的模組欄位，而且不轉正任何圖。
+// 空字串沿用現在的圖；只有空白的 token 是 InvalidInput，指向對應的模組欄位。
 func TestWhitespaceStagedTokenIsInvalidInput(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -702,53 +647,44 @@ func TestWhitespaceStagedTokenIsInvalidInput(t *testing.T) {
 		in.StoreID, in.ExpectedVersion, in.UploaderID = s.StoreID, s.Version, accountID
 		_, err := f.module.UpdateProfile(ctx, in)
 		var ae *apperr.Error
-		if !errors.As(err, &ae) || ae.Kind() != apperr.KindInvalidInput || len(ae.FieldViolations()) != 1 || ae.FieldViolations()[0].Field != field || len(f.media.finalized) != 0 {
-			t.Fatalf("%s: err=%v finalized=%d", field, err, len(f.media.finalized))
+		if !errors.As(err, &ae) || ae.Kind() != apperr.KindInvalidInput || len(ae.FieldViolations()) != 1 || ae.FieldViolations()[0].Field != field {
+			t.Fatalf("%s: err=%v", field, err)
 		}
 	}
 }
 
-// 關店可逆：logo 與封面連同 media 的引用留到個資清理才釋放（記成退場並排入同步），關店本身不排入引用的同步。
+// 關店可逆：logo 與封面留到個資清理才標為刪除，關店本身不動 media。
 func TestCloseKeepsTheImagesUntilThePurgeReleasesThem(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	accountID, s := f.open(t)
-	withLogo, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: s.Version, LogoToken: "logo1", UploaderID: accountID})
+	up := media.Uploader{ID: accountID}
+	logoToken, logo := f.stagePublic(t, up)
+	coverToken, cover := f.stagePublic(t, up)
+	withLogo, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: s.Version, LogoToken: logoToken, UploaderID: accountID})
 	must(t, err)
-	_, err = f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: withLogo.Version, CoverToken: "cover1", UploaderID: accountID})
+	_, err = f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: withLogo.Version, CoverToken: coverToken, UploaderID: accountID})
 	must(t, err)
-	for _, ref := range []media.Ref{f.storeRef(media.RefTypeSellerLogo, s.StoreID), f.storeRef(media.RefTypeSellerCover, s.StoreID)} {
-		f.syncMedia(t, ref)
-	}
-	f.jobs.args = nil
 	closed, err := f.module.CloseCurrent(ctx, accountID)
 	must(t, err)
-	if closed.LogoKey == nil || closed.CoverKey == nil || slices.Contains(f.jobs.kinds(), "seller.media_sync") {
-		t.Fatalf("closed=%+v jobs=%v", closed, f.jobs.kinds())
+	if closed.LogoKey == nil || closed.CoverKey == nil {
+		t.Fatalf("closed=%+v", closed)
 	}
-	for _, ref := range []media.Ref{f.storeRef(media.RefTypeSellerLogo, s.StoreID), f.storeRef(media.RefTypeSellerCover, s.StoreID)} {
-		f.syncMedia(t, ref)
-		if got := f.media.Referenced(ref); len(got) != 1 {
-			t.Fatalf("%s 的引用在關店之後仍在：%v", ref.Type, got)
-		}
-	}
+	f.wantAsset(t, logo, "ACTIVE")
+	f.wantAsset(t, cover, "ACTIVE")
 	f.now = f.now.Add(StoreRetention + time.Second)
 	n, err := f.module.PurgePII(ctx)
 	must(t, err)
-	if n != 1 || !slices.Contains(f.jobs.kinds(), "seller.media_sync") {
-		t.Fatalf("n=%d jobs=%v", n, f.jobs.kinds())
+	if n != 1 {
+		t.Fatalf("n=%d", n)
 	}
 	purged := f.storeRow(t, s.StoreID)
 	if purged.LogoKey != nil || purged.CoverKey != nil {
 		t.Fatalf("清理釋放 logo 與封面：%+v", purged)
 	}
-	for _, ref := range []media.Ref{f.storeRef(media.RefTypeSellerLogo, s.StoreID), f.storeRef(media.RefTypeSellerCover, s.StoreID)} {
-		f.syncMedia(t, ref)
-		if got := f.media.Referenced(ref); len(got) != 0 {
-			t.Fatalf("%s 的引用清理之後要全部解除：%v", ref.Type, got)
-		}
-	}
+	f.wantAsset(t, logo, "DELETING")
+	f.wantAsset(t, cover, "DELETING")
 }
 
 // RISK 停權與結束：事件、同一段停權期間、結束後的冪等。
@@ -1091,9 +1027,11 @@ func TestCapabilitiesGateStoreWrites(t *testing.T) {
 	if _, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: s.Version, Prize: ptr("金牌")}); apperr.KindOf(err) != apperr.KindPermissionDenied {
 		t.Fatalf("suspended profile write: %v", err)
 	}
-	if _, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: s.Version, LogoToken: "x", UploaderID: accountID}); apperr.KindOf(err) != apperr.KindPermissionDenied || len(f.media.finalized) != 0 {
-		t.Fatalf("suspended logo write: %v finalized=%d", err, len(f.media.finalized))
+	token, asset := f.stagePublic(t, media.Uploader{ID: accountID})
+	if _, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: s.Version, LogoToken: token, UploaderID: accountID}); apperr.KindOf(err) != apperr.KindPermissionDenied {
+		t.Fatalf("suspended logo write: %v", err)
 	}
+	f.wantAsset(t, asset, "STAGED")
 	if _, err := f.module.ActingStore(ctx, accountID, CapOrderFulfill); err != nil {
 		t.Fatalf("suspended seller must still fulfil: %v", err)
 	}
@@ -1150,27 +1088,41 @@ func TestUpdateProfileWithoutChangesIsANoOp(t *testing.T) {
 	}
 }
 
-// 轉正之後寫入失敗（這裡是版本衝突）：轉正沒有建立引用，所以沒有補償路徑，也沒有任何引用或排入的同步 job。
-func TestImageFailureAfterFinalizeLeavesNoReference(t *testing.T) {
+// logo 與封面必須是公開圖片：機敏檔在寫入的 transaction 內被拒絕（欄位違規指到 LogoToken），整筆回滾，資產仍是暫存。
+func TestStoreImagesMustBePublicAssets(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	accountID, s := f.open(t)
+	token, asset := f.stageSecure(t, media.Uploader{ID: accountID}, evidencePDF("logo"))
+	_, err := f.module.UpdateProfile(context.Background(), UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: s.Version, LogoToken: token, UploaderID: accountID})
+	var ae *apperr.Error
+	if !errors.As(err, &ae) || ae.Kind() != apperr.KindInvalidInput || len(ae.FieldViolations()) != 1 || ae.FieldViolations()[0].Field != "LogoToken" {
+		t.Fatalf("機敏檔當 logo：%v", err)
+	}
+	f.wantAsset(t, asset, "STAGED")
+	if got := f.storeAssets(t, s.StoreID); got.logo != nil {
+		t.Fatalf("logo 寫入了：%+v", got)
+	}
+}
+
+// 確認之後寫入失敗（這裡是版本衝突）：整筆回滾，新資產仍是暫存，沒有 job 排入，店家列沒有 logo。
+func TestImageFailureAfterConfirmRollsBackTheConfirm(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	accountID, s := f.open(t)
-	f.media.onFinalize = func() {
-		if _, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: s.Version, Prize: ptr("金牌")}); err != nil {
-			t.Error(err)
-		}
+	token, asset := f.stagePublic(t, media.Uploader{ID: accountID})
+	if _, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: s.Version, Prize: ptr("金牌")}); err != nil {
+		t.Fatal(err)
 	}
 	f.jobs.args = nil
-	if _, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: s.Version, LogoToken: "logo1", UploaderID: accountID}); apperr.KindOf(err) != apperr.KindVersionConflict {
+	if _, err := f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: s.Version, LogoToken: token, UploaderID: accountID}); apperr.KindOf(err) != apperr.KindVersionConflict {
 		t.Fatalf("err=%v", err)
 	}
-	if kinds := f.jobs.kinds(); slices.Contains(kinds, "seller.media_sync") {
-		t.Fatalf("失敗的寫入不該排入同步：%v", kinds)
+	if kinds := f.jobs.kinds(); len(kinds) != 0 {
+		t.Fatalf("失敗的寫入不該排入 job：%v", kinds)
 	}
-	if got := f.media.Referenced(f.storeRef(media.RefTypeSellerLogo, s.StoreID)); len(got) != 0 {
-		t.Fatalf("引用 = %v", got)
-	}
+	f.wantAsset(t, asset, "STAGED")
 	current, err := f.module.Store(ctx, s.StoreID)
 	must(t, err)
 	if current.LogoKey != nil {

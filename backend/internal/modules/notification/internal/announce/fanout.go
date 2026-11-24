@@ -190,8 +190,9 @@ func (s *Service) writeInbox(ctx context.Context, ann store.NotificationAnnounce
 			return err
 		}
 		q := store.New(s.d.DB.Conn(ctx))
+		id := s.d.NewID()
 		n, err := q.InsertAnnouncementInbox(ctx, store.InsertAnnouncementInboxParams{
-			ID: s.d.NewID(), AccountID: r.AccountID, Audience: string(aud), StoreID: storeID(r),
+			ID: id, AccountID: r.AccountID, Audience: string(aud), StoreID: storeID(r),
 			OccurredAt: ann.CreatedAt, Now: s.d.Now(), AnnouncementID: ann.ID,
 		})
 		if err != nil {
@@ -205,7 +206,7 @@ func (s *Service) writeInbox(ctx context.Context, ann store.NotificationAnnounce
 		}
 		if s.d.Signals != nil {
 			// 與收件匣列同一個 transaction：commit 後才送達，rollback 不送；公告沒有狀態重讀提示。
-			if err := s.d.Signals.InboxChanged(ctx, r.AccountID, aud, r.StoreID, model.StateHintNone); err != nil {
+			if err := s.d.Signals.InboxChanged(ctx, r.AccountID, aud, r.StoreID, model.StateHintNone, id); err != nil {
 				return err
 			}
 		}

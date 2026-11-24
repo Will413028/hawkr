@@ -55,7 +55,7 @@ func TestSellerInquiryResponseOmitsInternalFields(t *testing.T) {
 	replied.AttachmentCount = 2
 	replied.Reply = &model.InquiryReply{
 		Body: "已附上", Channel: model.InquiryChannelSellerCenter, ReceivedAt: replied.CreatedAt.Add(time.Hour), RecordedAt: replied.CreatedAt.Add(time.Hour),
-		RepliedByAccountID: 9, Evidence: []model.Evidence{{AssetID: "a", ObjectKey: "secret-key", Position: 0}},
+		RepliedByAccountID: 9, Evidence: []model.Evidence{{AssetID: secretAssets[0], ObjectKey: "secret-key", Position: 0}},
 	}
 	out := toSellerInquiry(replied)
 	if out.GetState() != pb.InquiryState_INQUIRY_STATE_REPLIED || out.GetCanReply() || out.GetReplyDeadline() != nil ||

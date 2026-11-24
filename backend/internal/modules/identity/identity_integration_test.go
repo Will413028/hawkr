@@ -387,6 +387,7 @@ func TestCodeValueChecksMatchTheGoTypes(t *testing.T) {
 		{"admin_role_events_role_check", adminRoleValues()},
 		{"admin_role_events_action_check", []string{string(AdminRoleActionGrant), string(AdminRoleActionRevoke)}},
 		{"admin_role_events_source_check", []string{string(AdminRoleSourceCLI)}},
+		{"accounts_preferred_locale_check", localeValues()},
 	}
 	if len(cases[0].want) != len(Roles()) {
 		t.Fatal("Roles() 與測試的值域不一致")
@@ -407,6 +408,14 @@ func TestCodeValueChecksMatchTheGoTypes(t *testing.T) {
 			t.Errorf("%s 允許 %v，Go 的值域是 %v（%s）", c.constraint, got, c.want, strings.TrimSpace(def))
 		}
 	}
+}
+
+func localeValues() []string {
+	var out []string
+	for _, l := range PreferredLocales() {
+		out = append(out, string(l))
+	}
+	return out
 }
 
 func categoryValues() []string {

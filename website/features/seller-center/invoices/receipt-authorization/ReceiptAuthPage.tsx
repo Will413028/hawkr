@@ -26,7 +26,6 @@ import {
 	useConfirmReceiptAuthorization,
 	useSellerReceiptAuthorization,
 } from "@/lib/hooks/useSellerReceiptAuthorization";
-import { receiptApprovalBasisHref } from "@/lib/invoices/seller-repo";
 import { resolveCdnUrl } from "@/lib/media/cdn";
 import { SellerCardGridSkeleton } from "../../components/SellerSkeletons";
 import { isRevokedOrExpired, receiptAuthGateCopy } from "./receiptAuthGate";
@@ -90,9 +89,6 @@ export function ReceiptAuthPage() {
 	const templateUrl = authorization.receiptTemplateKey
 		? resolveCdnUrl(authorization.receiptTemplateKey)
 		: "";
-	const basisHref = authorization.approvalBasisAvailable
-		? receiptApprovalBasisHref(authorization.approvalBasisAssetId)
-		: "";
 
 	return (
 		<SellerPageShell
@@ -150,17 +146,7 @@ export function ReceiptAuthPage() {
 					/>
 				</dl>
 				<div className="mt-3 pt-3 border-t border-divider">
-					{basisHref ? (
-						<a
-							href={basisHref}
-							target="_blank"
-							rel="noopener noreferrer"
-							className="text-[0.6875rem] font-extrabold text-hk-accent underline"
-						>
-							查看核定依據文件
-							<span className="sr-only">（在新分頁開啟）</span>
-						</a>
-					) : approved ? (
+					{approved ? (
 						// 🔴 兩種 unavailableReason 對賣家的文案逐字相同——區分只在後端稽核。
 						<small
 							role="status"

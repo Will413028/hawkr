@@ -286,8 +286,8 @@ func TestAReporterCannotReportTheirOwnStore(t *testing.T) {
 			t.Errorf("%s：%v", name, err)
 		}
 	}
-	if n := f.count(t, "SELECT count(*) FROM seller.reports"); n != 0 || len(f.media.finalized) != 0 {
-		t.Fatalf("被擋下的檢舉寫入了 %d 筆、轉正了 %d 張圖", n, len(f.media.finalized))
+	if n := f.count(t, "SELECT count(*) FROM seller.reports"); n != 0 {
+		t.Fatalf("被擋下的檢舉寫入了 %d 筆", n)
 	}
 	neverOwn := loggedIn
 	neverOwn.StoreID, neverOwn.AccountID = never.StoreID, f.mustAccountOf(t, never.StoreID)
@@ -352,7 +352,7 @@ func TestAReportWithAnOutcomeIsNoLongerDeduplicated(t *testing.T) {
 	}
 }
 
-// 補充：重複的送出併入原通報（只新增），佐證接在後面編號、帶 supplement_id，引用仍登記在通報 ID；通報的版本前進、案件的版本不變；每次送出各發一個 ReportReceived。
+// 補充：重複的送出併入原通報（只新增），佐證接在後面編號、帶 supplement_id，三張佐證都在送出的 transaction 內確認；通報的版本前進、案件的版本不變；每次送出各發一個 ReportReceived。
 func TestSupplementsAttachToTheOriginalReport(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -361,35 +361,35 @@ func TestSupplementsAttachToTheOriginalReport(t *testing.T) {
 	accountID, s := f.open(t)
 	f.everExposed(t, s.StoreID)
 	buyerAccount := accountID + 1000
+	buyer := media.Uploader{ID: buyerAccount}
+	e1Token, e1 := f.stageSecure(t, buyer, evidencePDF("e1"))
+	e2Token, e2 := f.stageSecure(t, buyer, evidencePDF("e2"))
 	first, err := f.module.SubmitReport(ctx, SubmitReportInput{
-		StoreID: s.StoreID, ReporterBuyerID: 5, AccountID: buyerAccount, Category: policy.Fraud, Description: "原本的內容", EvidenceTokens: []string{"e1", "e2"},
+		StoreID: s.StoreID, ReporterBuyerID: 5, AccountID: buyerAccount, Category: policy.Fraud, Description: "原本的內容", EvidenceTokens: []string{e1Token, e2Token},
 	})
 	must(t, err)
 	c := f.mustTriage(t, first.ReportID, policy.Fraud, severityPtr(SeverityMedium))
 	caseBefore := f.caseOf(t, *c.CaseID)
 	f.jobs.args = nil
 	f.now = f.now.Add(time.Hour)
+	// 暫存有存活期限：時間走過一小時之後才放，補充送出時才還沒過期。
+	e3Token, e3 := f.stageSecure(t, buyer, evidencePDF("e3"))
 	second, err := f.module.SubmitReport(ctx, SubmitReportInput{
-		StoreID: s.StoreID, ReporterBuyerID: 5, AccountID: buyerAccount, Category: policy.Fraud, Description: "  補充：又看到一次  ", EvidenceTokens: []string{"e3"},
+		StoreID: s.StoreID, ReporterBuyerID: 5, AccountID: buyerAccount, Category: policy.Fraud, Description: "  補充：又看到一次  ", EvidenceTokens: []string{e3Token},
 	})
 	must(t, err)
 	if !second.Supplemented || second.ReportID != first.ReportID || second.Report == nil || second.Report.Description != "原本的內容" || second.Report.Version != c.Version+1 {
 		t.Fatalf("second=%+v", second)
 	}
-	if !slices.Contains(f.jobs.kinds(), "seller.media_sync") {
-		t.Fatalf("補充的佐證要排入引用的同步：%v", f.jobs.kinds())
-	}
 	detail := f.reportOf(t, first.ReportID)
 	if detail.SupplementCount != 1 || len(detail.Supplements) != 1 || detail.Supplements[0].Description != "補充：又看到一次" || !detail.Supplements[0].CreatedAt.Equal(f.now) ||
 		!slices.Equal(detail.Supplements[0].EvidencePositions, []int{2}) || detail.LatestSupplementAt == nil || !detail.LatestSupplementAt.Equal(f.now) ||
 		len(detail.Evidence) != 3 || detail.Evidence[2].Position != 2 || detail.Evidence[2].SupplementID == nil || *detail.Evidence[2].SupplementID != detail.Supplements[0].ID ||
-		detail.Evidence[0].SupplementID != nil || detail.Evidence[2].AssetID != "asset-e3" {
+		detail.Evidence[0].SupplementID != nil || detail.Evidence[2].AssetID != e3 {
 		t.Fatalf("detail=%+v", detail)
 	}
-	ref := media.Ref{Type: media.RefTypeGovernanceEvidence, ID: first.ReportID.String()}
-	f.syncMedia(t, ref)
-	if got := f.media.Referenced(ref); fmt.Sprint(got) != "[asset-e1 asset-e2 asset-e3]" {
-		t.Fatalf("引用仍登記在通報 ID，原通報與補充的佐證都在：%v", got)
+	for _, id := range []uuid.UUID{e1, e2, e3} {
+		f.wantAsset(t, id, "ACTIVE")
 	}
 	// 補充改通報的版本，不改案件的版本（案件顯示「有新的補充」，直到下一次案件層級的處理）。
 	caseAfter := f.caseOf(t, *c.CaseID)
@@ -417,7 +417,7 @@ func TestSupplementsAttachToTheOriginalReport(t *testing.T) {
 	}
 }
 
-// 每筆通報最多 10 則補充：第 11 次送出回 failed_precondition（已轉正的佐證沒有引用），什麼都不存、不發事件。
+// 每筆通報最多 10 則補充：第 11 次送出回 failed_precondition，整筆回滾（佐證仍是暫存），什麼都不存、不發事件。
 func TestSupplementLimitIsTen(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -439,15 +439,17 @@ func TestSupplementLimitIsTen(t *testing.T) {
 			t.Fatalf("第 %d 則補充：%+v %v", i+1, r, err)
 		}
 	}
-	f.jobs.args, f.media.finalized = nil, nil
-	_, err = submit("第 11 則", "over")
+	f.jobs.args = nil
+	overToken, over := f.stageSecure(t, media.Uploader{ID: accountID + 1000}, evidencePDF("over"))
+	_, err = submit("第 11 則", overToken)
 	wantBlocked(t, err, "這筆檢舉已經補充 10 次，不能再補充。")
 	if n := f.count(t, "SELECT count(*) FROM seller.report_supplements WHERE report_id = $1", original.ReportID); n != MaxSupplements {
 		t.Fatalf("supplements=%d", n)
 	}
-	if n := f.count(t, "SELECT count(*) FROM seller.report_evidence"); n != 0 || slices.Contains(f.jobs.kinds(), "seller.media_sync") {
-		t.Fatalf("超過上限的佐證沒有存下也沒有排入同步：evidence=%d jobs=%v", n, f.jobs.kinds())
+	if n := f.count(t, "SELECT count(*) FROM seller.report_evidence"); n != 0 || len(f.jobs.kinds()) != 0 {
+		t.Fatalf("超過上限的佐證沒有存下也沒有排入 job：evidence=%d jobs=%v", n, f.jobs.kinds())
 	}
+	f.wantAsset(t, over, "STAGED")
 	if got := len(received.all()); got != 1+MaxSupplements {
 		t.Fatalf("被擋下的第 11 次不發事件：%d", got)
 	}
@@ -611,49 +613,45 @@ func TestAdminInboxKeysetHasNoGapsOrDuplicates(t *testing.T) {
 	}
 }
 
-// 佐證以通報 ID 為 ref：轉正不建立引用，寫入的 transaction 排入同步。轉正之後撞到重複時，這次的內容與佐證併入原通報成為補充（位置接在後面），一樣排入同步。
-func TestReportEvidenceIsLinkedByTheSyncJobUnderTheReportID(t *testing.T) {
+// 通報的佐證在送出的 transaction 內確認（只確認、從不標為刪除）。撞到重複時，這次的內容與佐證併入原通報成為補充（位置接在後面），一樣在同一個 transaction 內確認。
+func TestReportEvidenceIsConfirmedInTheSubmittingTransaction(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	accountID, s := f.open(t)
 	f.everExposed(t, s.StoreID)
 	buyerAccount := accountID + 1000 // 檢舉人的帳號不是店家的擁有者
+	buyer := media.Uploader{ID: buyerAccount}
+	e1Token, e1 := f.stageSecure(t, buyer, evidencePDF("e1"))
+	e2Token, e2 := f.stageSecure(t, buyer, evidencePDF("e2"))
 	r, err := f.module.SubmitReport(ctx, SubmitReportInput{
 		StoreID: s.StoreID, ReporterBuyerID: 5, AccountID: buyerAccount, Category: policy.FoodSafety,
-		Description: "附圖", EvidenceTokens: []string{"e1", "e2"},
+		Description: "附圖", EvidenceTokens: []string{e1Token, e2Token},
 	})
 	must(t, err)
-	if len(r.Report.Evidence) != 2 || len(f.media.finalized) != 2 || f.media.finalized[0] != media.RefTypeGovernanceEvidence {
-		t.Fatalf("report=%+v finalized=%+v", r.Report, f.media.finalized)
+	if len(r.Report.Evidence) != 2 {
+		t.Fatalf("report=%+v", r.Report)
 	}
-	ref := media.Ref{Type: media.RefTypeGovernanceEvidence, ID: r.Report.ID.String()}
-	if got := f.media.Referenced(ref); len(got) != 0 {
-		t.Fatalf("寫入不得建立引用：%v", got)
-	}
+	f.wantAsset(t, e1, "ACTIVE")
+	f.wantAsset(t, e2, "ACTIVE")
 	detail := f.reportOf(t, r.Report.ID)
-	if len(detail.Evidence) != 2 || detail.Evidence[1].AssetID != "asset-e2" {
+	if len(detail.Evidence) != 2 || detail.Evidence[1].AssetID != e2 {
 		t.Fatalf("evidence=%+v", detail.Evidence)
 	}
-	f.syncMedia(t, ref)
-	if got := f.media.Referenced(ref); fmt.Sprint(got) != "[asset-e1 asset-e2]" {
-		t.Fatalf("同步之後的引用 = %v", got)
-	}
 
-	// 轉正之後、寫入之前，同一位檢舉人的另一次送出搶先寫入：這次的送出併入那一筆（補充），佐證接在後面。
-	f.media.onFinalize = func() {
-		if _, err := f.module.SubmitReport(ctx, SubmitReportInput{StoreID: s.StoreID, ReporterBuyerID: 6, Category: policy.Fraud, Description: "搶先"}); err != nil {
-			t.Error(err)
-		}
+	// 同一位檢舉人的另一次送出先寫入：這次的送出併入那一筆（補充），佐證接在後面。
+	if _, err := f.module.SubmitReport(ctx, SubmitReportInput{StoreID: s.StoreID, ReporterBuyerID: 6, Category: policy.Fraud, Description: "搶先"}); err != nil {
+		t.Fatal(err)
 	}
-	f.jobs.args = nil
+	e3Token, e3 := f.stageSecure(t, media.Uploader{ID: buyerAccount + 1}, evidencePDF("e3"))
 	dup, err := f.module.SubmitReport(ctx, SubmitReportInput{
-		StoreID: s.StoreID, ReporterBuyerID: 6, AccountID: buyerAccount + 1, Category: policy.Fraud, Description: "附圖", EvidenceTokens: []string{"e3"},
+		StoreID: s.StoreID, ReporterBuyerID: 6, AccountID: buyerAccount + 1, Category: policy.Fraud, Description: "附圖", EvidenceTokens: []string{e3Token},
 	})
 	must(t, err)
-	if !dup.Supplemented || !slices.Contains(f.jobs.kinds(), "seller.media_sync") {
-		t.Fatalf("撞到重複的送出併入原通報，佐證要排入同步：dup=%+v jobs=%v", dup, f.jobs.kinds())
+	if !dup.Supplemented {
+		t.Fatalf("撞到重複的送出併入原通報：dup=%+v", dup)
 	}
+	f.wantAsset(t, e3, "ACTIVE")
 	merged := f.reportOf(t, dup.ReportID)
 	if len(merged.Evidence) != 1 || merged.Evidence[0].Position != 0 || merged.Evidence[0].SupplementID == nil || len(merged.Supplements) != 1 {
 		t.Fatalf("merged=%+v", merged)
@@ -819,28 +817,20 @@ func TestFindingCategoryIsLimitedToWhatThePlatformCanAssess(t *testing.T) {
 	}
 }
 
-// 申覆的佐證以請求 ID 登記引用，請求 ID 在轉正之後才產生：轉正與 commit 之間不可能有人為這個 ref 同步；同步 job 在寫入之後登記
-// 業務列指著的資產。
-func TestAppealEvidenceIsLinkedByTheSyncJobUnderTheRequestID(t *testing.T) {
+// 申覆的佐證在提出申覆的 transaction 內確認（請求 ID 在 transaction 內才產生），只確認、從不標為刪除。
+func TestAppealEvidenceIsConfirmedInTheSubmittingTransaction(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	accountID, _, m := f.appealable(t)
-	f.media.AfterFinalize = func(context.Context, media.Asset) {
-		f.media.AfterFinalize = nil
-		f.syncMedia(t, media.Ref{Type: media.RefTypeGovernanceEvidence, ID: m.ID.String()})
-	}
-	f.appeal(t, accountID, m, "已改善", "x1")
-	request := f.measureOf(t, m.ID).Appeal().ID
-	ref := media.Ref{Type: media.RefTypeGovernanceEvidence, ID: request.String()}
-	if got := f.media.Referenced(ref); len(got) != 0 {
-		t.Fatalf("寫入不得建立引用：%v", got)
-	}
-	f.syncMedia(t, ref)
-	if got := f.media.Referenced(ref); fmt.Sprint(got) != "[asset-x1]" {
-		t.Fatalf("references=%v", got)
-	}
-	if got := f.media.Referenced(media.Ref{Type: media.RefTypeGovernanceEvidence, ID: m.ID.String()}); len(got) != 0 {
-		t.Fatalf("措施 ID 不是佐證的 ref：%v", got)
+	token, asset := f.stageSecure(t, media.Uploader{ID: accountID}, evidencePDF("x1"))
+	_, err := f.module.SubmitAppeal(context.Background(), SubmitAppealInput{
+		AccountID: accountID, MeasureID: m.ID, ExpectedVersion: m.SellerVersion(), Reason: "已改善", EvidenceTokens: []string{token},
+	})
+	must(t, err)
+	f.wantAsset(t, asset, "ACTIVE")
+	evidence := f.measureOf(t, m.ID).Appeal().Evidence
+	if len(evidence) != 1 {
+		t.Fatalf("evidence=%+v", evidence)
 	}
 }
 

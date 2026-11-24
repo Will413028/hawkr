@@ -93,7 +93,6 @@ crm-service,coupon-service,1,1
 crm-service,order-service,1,1
 invoice-service,buyer-service,1,1
 invoice-service,payment-service,1,1
-media-service,seller-service,1,1
 notification-service,buyer-service,1,1
 payuni-webhook-service,shipping-service,1,1
 pricebook-service,product-service,1,1

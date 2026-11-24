@@ -1,5 +1,6 @@
 "use client";
 
+import { StateRefreshHint } from "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as React from "react";
 import { accountQueryFn, accountQueryPending } from "@/lib/auth/account-query";
@@ -11,8 +12,8 @@ import {
 } from "@/lib/invoices/buyer-repo";
 import type { InvoiceComplaint } from "@/lib/invoices/types";
 import {
-	NOTIFICATION_NEW_EVENT,
-	type NotificationNewEventDetail,
+	NOTIFICATION_SIGNAL_EVENT,
+	type NotificationSignalEventDetail,
 } from "@/lib/notifications/events";
 import { queryKeys } from "@/lib/query/keys";
 import { useQueryIdentity } from "./useQueryIdentity";
@@ -35,8 +36,7 @@ export interface UseInvoiceComplaintResult {
  * 一件發票申訴案件（58A §B07，端點 15）。
  *
  * **零輪詢**（§0.4 ④）。刷新來源與 `useOrderInvoice` 相同：既有那條唯一的通知
- * SSE 廣播到 window 上的 `notification.new`（P9 `invoice.complaint.responded`
- * 會產生買家可見通知，`refType === "ORDER"`、`refId === order_no`）＋ 使用者
+ * 串流廣播到 window 上的收件匣訊號（提示含 `ORDER` 就重讀）＋ 使用者
  * 主動重整 ＋ `refetchOnWindowFocus`。
  */
 export function useInvoiceComplaint(
@@ -70,18 +70,16 @@ export function useInvoiceComplaint(
 	React.useEffect(() => {
 		if (!enabled || status !== "signedIn") return;
 		const onNotification = (event: Event) => {
-			const detail = (event as CustomEvent<NotificationNewEventDetail>).detail;
-			const item = detail?.item;
-			if (!item) return;
-			if (item.refType !== "ORDER") return;
-			if (String(item.refId ?? "") !== orderNo) return;
+			const detail = (event as CustomEvent<NotificationSignalEventDetail>)
+				.detail;
+			if (!detail?.hints.includes(StateRefreshHint.ORDER)) return;
 			void queryClient.invalidateQueries({ queryKey });
 		};
-		window.addEventListener(NOTIFICATION_NEW_EVENT, onNotification);
+		window.addEventListener(NOTIFICATION_SIGNAL_EVENT, onNotification);
 		return () => {
-			window.removeEventListener(NOTIFICATION_NEW_EVENT, onNotification);
+			window.removeEventListener(NOTIFICATION_SIGNAL_EVENT, onNotification);
 		};
-	}, [enabled, status, orderNo, queryClient, queryKey]);
+	}, [enabled, status, queryClient, queryKey]);
 
 	const error = complaintQuery.error;
 	const notFound =

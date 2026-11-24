@@ -8,6 +8,7 @@ environment:
 # 生成器與 runtime 的版本一起固定：生成物依賴 runtime 的 API，升級時兩者一起升、重新生成。
 dependencies:
   connectrpc: 2.0.1
+  crypto: 3.0.7
   fixnum: 1.1.1
   # 分辨「沒收到回應」要認得 http2 的 TransportException（errors.dart）；版本與 connectrpc 解析到的相同。
   http2: 2.3.1

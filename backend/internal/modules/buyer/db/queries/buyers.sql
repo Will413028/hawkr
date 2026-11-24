@@ -76,12 +76,6 @@ SET avatar = sqlc.arg(avatar),
 WHERE buyer_id = sqlc.arg(buyer_id) AND version = sqlc.arg(version)
 RETURNING *;
 
--- name: AvatarAsset :one
--- 同步 job 讀的：買家目前的頭像 asset（沒有頭像時是 NULL）。
-SELECT status, avatar_asset_id
-FROM buyer.buyers
-WHERE buyer_id = $1;
-
 -- name: BatchProfiles :many
 -- 批次讀取未關閉且未清除個資的 profile。
 SELECT *
@@ -91,7 +85,7 @@ ORDER BY buyer_id;
 
 -- name: BatchDisplay :many
 -- 回傳原始 nullable 個資與 Deleted；模組對已關閉 stint 隱藏個資。
-SELECT buyer_id, display_name, avatar, (status = 'CLOSED')::boolean AS deleted
+SELECT buyer_id, display_name, avatar, avatar_asset_id, (status = 'CLOSED')::boolean AS deleted
 FROM buyer.buyers
 WHERE buyer_id = ANY($1::bigint[])
 ORDER BY buyer_id;

@@ -41,6 +41,20 @@ func LocaleFrom(ctx context.Context) Locale {
 	return DefaultLocale
 }
 
+type requestedKey struct{}
+
+// WithRequestedLocale 標記 ctx 的請求語系是呼叫者自己用 Accept-Language 表達並協商成功的（不是預設值補上的）。
+// 只有 `rpc` 的協商會寫；要記成帳號偏好語系的呼叫端用 RequestedLocale，沒帶語系的請求不得用預設值蓋掉已存的偏好。
+func WithRequestedLocale(ctx context.Context, l Locale) context.Context {
+	return context.WithValue(WithLocale(ctx, l), requestedKey{}, l)
+}
+
+// RequestedLocale 回呼叫者明確表達的請求語系；沒有 Accept-Language、協商失敗或固定語系的入口回 false。
+func RequestedLocale(ctx context.Context) (Locale, bool) {
+	l, ok := ctx.Value(requestedKey{}).(Locale)
+	return l, ok && l != ""
+}
+
 // Text 是某個語系與受眾的目錄查詢。zero value 等於 For(DefaultLocale)。
 type Text struct {
 	locale Locale

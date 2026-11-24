@@ -14,7 +14,6 @@ import (
 
 	"github.com/riverqueue/river"
 
-	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/rows"
 	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/store"
@@ -45,6 +44,7 @@ type Deps struct {
 	DB     *db.DB
 	Events *events.Bus
 	Jobs   jobs.Enqueuer
+	Media  model.Media
 	Stores Stores
 	NewID  func() uuid.UUID
 	Now    func() time.Time
@@ -161,18 +161,14 @@ func (s *Service) purgeBatch(ctx context.Context, buyerID int64) (int, error) {
 			return fmt.Errorf("review：刪除評價：%w", err)
 		}
 		now := s.d.Now().UTC()
+		var assets []uuid.UUID
 		for _, id := range ids {
-			list := images[id]
-			if len(list) == 0 {
-				continue
+			for _, im := range images[id] {
+				assets = append(assets, im.AssetID)
 			}
-			assets := make([]string, len(list))
-			for i, im := range list {
-				assets[i] = im.AssetID
-			}
-			if err := mediaref.Changed(ctx, q, s.d.Jobs, now, mediaref.ReviewRef(id), assets...); err != nil {
-				return err
-			}
+		}
+		if err := s.d.Media.MarkDeleted(ctx, assets); err != nil {
+			return err
 		}
 		for _, t := range distinctTargets(stores, products) {
 			if err := events.Publish(ctx, s.d.Events, model.ReviewAggregateChanged{EventID: s.d.NewID(), OccurredAt: now, StoreID: t.StoreID, ProductID: t.ProductID}); err != nil {

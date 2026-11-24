@@ -18,14 +18,14 @@ CREATE SCHEMA social;
 -- 發布過的（PUBLISHED、UNPUBLISHED）一定有：published_at 是第一次發布的時間，之後不變（下架不清它，再發布沿用）（動態牆與熱門的時間窗都以它為準）。
 -- 公開要件（恰好一張圖、內文必填）在轉為 PUBLISHED 時由寫入端檢查，草稿可以不完整，所以內文可以是空字串。version 是樂觀鎖，
 -- 對外是 etag（ADR 2026-09-25-optimistic-concurrency-etag）；按讚、瀏覽等計數不在這張表，放在 post_stats，不和編輯搶鎖。
--- image_key 是顯示用的 object key，image_asset_id 是 media 的資產 ID：同步 job 以它為業務列目前的資產（internal/mediaref）。
+-- image_key 是顯示用的 object key，image_asset_id 是 media 的資產 ID（UUID v7）：寫入在同一個 transaction 內 Confirm 新資產、MarkDeleted 被換掉或終態的資產。
 -- product_id 是商品（Java catalog，B4 前的 BIGINT 業務鍵），寫入時驗證存在、上架中且屬於該店，讀取時不重驗。
 CREATE TABLE social.posts (
     id             UUID        PRIMARY KEY,
     store_id       BIGINT      NOT NULL,
     body           TEXT        NOT NULL DEFAULT '',
     image_key      TEXT,
-    image_asset_id TEXT,
+    image_asset_id UUID,
     product_id     BIGINT,
     status         TEXT        NOT NULL,
     published_at   TIMESTAMPTZ,
@@ -370,28 +370,3 @@ CREATE TABLE social.post_shares (
     CONSTRAINT post_shares_buyer_check CHECK (buyer_id > 0)
 );
 CREATE INDEX post_shares_buyer ON social.post_shares (buyer_id, post_id);
-
--- media 引用的同步版本：業務列改變 ref 的資產時在同一個 transaction 遞增 seq，同步 job 讀到 seq 之後做事，結算時只在 seq 沒變
--- 才記下 synced_seq，updated_at 是最後一次變動；保底掃描補排 synced_seq < seq 的 ref（internal/mediaref）。ref 的列不刪除：
--- 刪掉再建會讓 seq 從頭算，同步讀到的舊 seq 可能剛好相等而誤判為已同步。
-CREATE TABLE social.media_ref_sync (
-    ref_type   TEXT   NOT NULL,
-    ref_id     TEXT   NOT NULL,
-    seq        BIGINT NOT NULL DEFAULT 1,
-    synced_seq BIGINT NOT NULL DEFAULT 0,
-    updated_at TIMESTAMPTZ NOT NULL,
-    PRIMARY KEY (ref_type, ref_id)
-);
--- 保底掃描只看還沒同步完的 ref。
-CREATE INDEX media_ref_sync_unsynced ON social.media_ref_sync (updated_at) WHERE synced_seq < seq;
-
--- 被業務列換掉或終態釋放的資產：同步 job 精確解除它們的引用，寫入端拒絕把它們寫回同一個 ref。unlinked_at 是第一次解除成功的時間。
-CREATE TABLE social.retired_assets (
-    ref_type    TEXT        NOT NULL,
-    ref_id      TEXT        NOT NULL,
-    asset_id    TEXT        NOT NULL,
-    retired_at  TIMESTAMPTZ NOT NULL,
-    unlinked_at TIMESTAMPTZ,
-    PRIMARY KEY (ref_type, ref_id, asset_id)
-);
-CREATE INDEX retired_assets_retired_at ON social.retired_assets (retired_at);

@@ -491,15 +491,6 @@ void main() {
       expect(h.auth.fetches, 0);
     });
 
-    test('背景寫入（開通知自動已讀）收到 ACCOUNT_SUSPENDED：靜默', () async {
-      final h = await dioHarness(HttpStatus.forbidden);
-      await send(h.dio, 'PATCH', '/app/notifications/5/read');
-
-      expect(h.c.read(accountRestrictionProvider), isNull);
-      expect(h.c.read(suspendedActionNoticeProvider), 0);
-      expect(h.auth.fetches, 0);
-    });
-
     test('rejected() 拋例外：請求仍以 DioException 結束', () async {
       final h = harness();
       await h.c.read(sessionProvider.future);
@@ -526,14 +517,6 @@ void main() {
         dio.post<dynamic>('/app/favorites'),
         throwsA(isA<DioException>()),
       );
-    });
-
-    test('使用者點的全部已讀仍是主動寫入：進受限狀態並提示', () async {
-      final h = await dioHarness(HttpStatus.forbidden);
-      await send(h.dio, 'PATCH', '/app/notifications/read-all');
-
-      expect(h.c.read(accountRestrictionProvider), isNotNull);
-      expect(h.c.read(suspendedActionNoticeProvider), 1);
     });
 
     for (final type in [ResponseType.bytes, ResponseType.stream]) {

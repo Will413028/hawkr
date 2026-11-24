@@ -6,14 +6,14 @@ part 'dashboard_notification_unread_provider.g.dart';
 
 /// 儀表板通知未讀數 Provider
 ///
-/// 呼叫 NotificationRepository.getUnreadCount() 取得未讀通知數量。
+/// 呼叫 NotificationRepository.unreadCount() 取得未讀通知數量。
 /// 僅用於 Dashboard 鈴鐺紅點顯示，由下拉刷新時 invalidate。
 @riverpod
 Future<int> dashboardNotificationUnread(Ref ref) async {
   try {
     final repo = ref.read(notificationRepositoryProvider);
-    final result = await repo.getUnreadCount();
-    return result.count;
+    final result = await repo.unreadCount();
+    return result;
   } catch (_) {
     return 0;
   }

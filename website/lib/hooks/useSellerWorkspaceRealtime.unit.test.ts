@@ -1,21 +1,17 @@
 // @vitest-environment jsdom
 
-import { NotificationAudience } from "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb";
 import { act, cleanup, render } from "@testing-library/react";
 import * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { NotificationSignal } from "@/lib/notifications/watch";
+import {
+	SELLER_WORKSPACE_SIGNAL_EVENT,
+	type SellerWorkspaceSignalEventDetail,
+} from "@/lib/notifications/events";
 import type { SseConnectionStatus } from "@/lib/sse/client";
 
 const mocks = vi.hoisted(() => ({
 	invalidateQueries: vi.fn(),
-	watches: [] as Array<{
-		audience: number;
-		onSignal: (s: unknown) => void;
-		onStatus: (s: string) => void;
-		stop: ReturnType<typeof vi.fn>;
-		resume: ReturnType<typeof vi.fn>;
-	}>,
+	status: { value: "idle" as string },
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -25,21 +21,12 @@ vi.mock("./useQueryIdentity", () => {
 	const identity = { accountId: "acc-1", activeRole: "seller" };
 	return { useQueryIdentity: () => identity };
 });
+vi.mock("@/lib/notifications/unread-context", () => ({
+	useNotificationStreamStatus: () => mocks.status.value,
+}));
 vi.mock("@/lib/notifications/watch", () => ({
-	watchNotifications: (
-		audience: number,
-		onSignal: (s: unknown) => void,
-		onStatus: (s: string) => void,
-	) => {
-		const handle = {
-			audience,
-			onSignal,
-			onStatus,
-			stop: vi.fn(),
-			resume: vi.fn(),
-		};
-		mocks.watches.push(handle);
-		return handle;
+	watchNotifications: () => {
+		throw new Error("the hook must not open its own stream");
 	},
 }));
 
@@ -55,17 +42,18 @@ function Subscriber({ enabled = true }: { enabled?: boolean }) {
 }
 
 const FAMILIES_PER_INVALIDATION = 6;
-const signal = (s: NotificationSignal) => mocks.watches.at(-1)?.onSignal(s);
-const workspaceEvent = () =>
-	signal({ type: "sellerWorkspace", change: "order" });
-const reconnected = (afterAbnormalEnd = true) =>
-	signal({ type: "reconnected", afterAbnormalEnd });
+const emit = (kind: SellerWorkspaceSignalEventDetail["kind"]) =>
+	window.dispatchEvent(
+		new CustomEvent(SELLER_WORKSPACE_SIGNAL_EVENT, { detail: { kind } }),
+	);
+const workspaceEvent = () => emit("change");
+const reconnected = () => emit("reconnected");
 
 describe("useSellerWorkspaceRealtime", () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
 		mocks.invalidateQueries.mockClear();
-		mocks.watches.length = 0;
+		mocks.status.value = "idle";
 		lastStatus = "idle";
 	});
 	afterEach(() => {
@@ -73,17 +61,20 @@ describe("useSellerWorkspaceRealtime", () => {
 		vi.useRealTimers();
 	});
 
-	it("開一條 STORE 受眾的串流，連線狀態由回傳值暴露", () => {
+	it("不自己開串流，連線狀態取自 provider 的單一串流", () => {
+		mocks.status.value = "connected";
 		render(React.createElement(Subscriber));
-		expect(mocks.watches).toHaveLength(1);
-		expect(mocks.watches[0]?.audience).toBe(NotificationAudience.STORE);
-		act(() => mocks.watches[0]?.onStatus("connected"));
 		expect(lastStatus).toBe("connected");
 	});
 
-	it("enabled 為 false 時不開連線", () => {
+	it("enabled 為 false 時不回應事件，狀態為 idle", () => {
+		mocks.status.value = "connected";
 		render(React.createElement(Subscriber, { enabled: false }));
-		expect(mocks.watches).toHaveLength(0);
+		act(() => {
+			workspaceEvent();
+			vi.advanceTimersByTime(SELLER_WORKSPACE_DEBOUNCE_MS * 2);
+		});
+		expect(mocks.invalidateQueries).not.toHaveBeenCalled();
 		expect(lastStatus).toBe("idle");
 	});
 
@@ -103,15 +94,6 @@ describe("useSellerWorkspaceRealtime", () => {
 		expect(mocks.invalidateQueries).toHaveBeenCalledTimes(
 			FAMILIES_PER_INVALIDATION,
 		);
-	});
-
-	it("inbox 訊號不讓工作區失效", () => {
-		render(React.createElement(Subscriber));
-		act(() => {
-			signal({ type: "inbox", unreadCount: 1, hints: [] });
-			vi.advanceTimersByTime(SELLER_WORKSPACE_DEBOUNCE_MS * 2);
-		});
-		expect(mocks.invalidateQueries).not.toHaveBeenCalled();
 	});
 
 	it("失效的是工作區的整組 family，不是單一 query", () => {
@@ -154,21 +136,10 @@ describe("useSellerWorkspaceRealtime", () => {
 		);
 	});
 
-	it("壽命到期的正常結束後重連不失效（只有錯誤結束後才整批重讀）", () => {
-		render(React.createElement(Subscriber));
-		act(() => {
-			reconnected(false);
-			vi.advanceTimersByTime(SELLER_WORKSPACE_DEBOUNCE_MS * 2);
-		});
-		expect(mocks.invalidateQueries).not.toHaveBeenCalled();
-	});
-
 	it("卸載後不再回應事件，也不會留下 timer", () => {
 		const { unmount } = render(React.createElement(Subscriber));
 		act(() => workspaceEvent());
-		const stop = mocks.watches[0]?.stop;
 		unmount();
-		expect(stop).toHaveBeenCalledTimes(1);
 		act(() => {
 			vi.advanceTimersByTime(SELLER_WORKSPACE_DEBOUNCE_MS * 2);
 			workspaceEvent();

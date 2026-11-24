@@ -10,7 +10,7 @@ part of 'dashboard_notification_unread_provider.dart';
 // ignore_for_file: type=lint, type=warning
 /// 儀表板通知未讀數 Provider
 ///
-/// 呼叫 NotificationRepository.getUnreadCount() 取得未讀通知數量。
+/// 呼叫 NotificationRepository.unreadCount() 取得未讀通知數量。
 /// 僅用於 Dashboard 鈴鐺紅點顯示，由下拉刷新時 invalidate。
 
 @ProviderFor(dashboardNotificationUnread)
@@ -19,7 +19,7 @@ final dashboardNotificationUnreadProvider =
 
 /// 儀表板通知未讀數 Provider
 ///
-/// 呼叫 NotificationRepository.getUnreadCount() 取得未讀通知數量。
+/// 呼叫 NotificationRepository.unreadCount() 取得未讀通知數量。
 /// 僅用於 Dashboard 鈴鐺紅點顯示，由下拉刷新時 invalidate。
 
 final class DashboardNotificationUnreadProvider
@@ -27,7 +27,7 @@ final class DashboardNotificationUnreadProvider
     with $FutureModifier<int>, $FutureProvider<int> {
   /// 儀表板通知未讀數 Provider
   ///
-  /// 呼叫 NotificationRepository.getUnreadCount() 取得未讀通知數量。
+  /// 呼叫 NotificationRepository.unreadCount() 取得未讀通知數量。
   /// 僅用於 Dashboard 鈴鐺紅點顯示，由下拉刷新時 invalidate。
   DashboardNotificationUnreadProvider._()
     : super(
@@ -55,4 +55,4 @@ final class DashboardNotificationUnreadProvider
 }
 
 String _$dashboardNotificationUnreadHash() =>
-    r'849cdc95ba3b903315e9fda74d4d396be551ae7f';
+    r'fb8bc9e55e9ea76d014446bb88bd24b343ea80cf';

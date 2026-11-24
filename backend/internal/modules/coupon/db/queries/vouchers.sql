@@ -56,3 +56,15 @@ VALUES (sqlc.arg(campaign_id), sqlc.narg(voucher_id), sqlc.narg(buyer_id), sqlc.
 
 -- name: GetVoucherBySource :one
 SELECT * FROM coupon.coupon_vouchers WHERE source_type = sqlc.arg(source_type) AND source_id = sqlc.arg(source_id);
+
+-- name: ListBuyerVouchers :many
+-- 買家的券（錢包）；statuses 為空陣列是全部狀態。
+SELECT * FROM coupon.coupon_vouchers
+WHERE buyer_id = sqlc.arg(buyer_id)
+  AND (cardinality(sqlc.arg(statuses)::text[]) = 0 OR status = ANY(sqlc.arg(statuses)::text[]))
+  AND (sqlc.narg(after_created_at)::timestamptz IS NULL OR (created_at, id) < (sqlc.narg(after_created_at)::timestamptz, sqlc.narg(after_id)::uuid))
+ORDER BY created_at DESC, id DESC
+LIMIT sqlc.arg(max_rows);
+
+-- name: CountCampaignVouchers :many
+SELECT status, count(*)::int AS n FROM coupon.coupon_vouchers WHERE campaign_id = sqlc.arg(campaign_id) GROUP BY status;

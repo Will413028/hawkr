@@ -553,20 +553,6 @@ func TestOnlyCustomerAccountsReachTheService(t *testing.T) {
 	}
 }
 
-// 串流尚未實作，回 unimplemented。
-func TestWatchNotificationsIsNotImplementedYet(t *testing.T) {
-	t.Parallel()
-	s := setup(t)
-	stream, err := s.client.WatchNotifications(t.Context(), as(connect.NewRequest(&pb.WatchNotificationsRequest{Audience: buyer}), 7))
-	if err == nil {
-		for stream.Receive() {
-		}
-		err = stream.Err()
-		_ = stream.Close()
-	}
-	wantCode(t, err, connect.CodeUnimplemented)
-}
-
 // 輸入檢查的句子只有模組文字一個來源：依請求語系回，handler 不另寫句子。
 func TestValidationSentencesFollowTheRequestLocale(t *testing.T) {
 	t.Parallel()

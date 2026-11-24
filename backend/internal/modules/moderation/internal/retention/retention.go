@@ -1,4 +1,4 @@
-// Package retention 是檢舉資料的保留期（A7-D20、A7-D21）：結案滿 model.SnapshotRetention 之後由排程 job 刪除內容快照（釋放快照在 media 的圖片引用）並清除檢舉的說明文字與冪等紀錄（request_hash 是說明的雜湊）；
+// Package retention 是檢舉資料的保留期（A7-D20、A7-D21）：結案滿 model.SnapshotRetention 之後由排程 job 刪除內容快照（快照的圖片複本是 moderation 自己 Confirm 的資產，由擁有者的刪除不會 MarkDeleted，只有這裡在快照過保留期時 MarkDeleted，B1-D20）並清除檢舉的說明文字與冪等紀錄（request_hash 是說明的雜湊）；
 // 檢舉人刪帳時（買家的刪除事件）或店家退場時（seller.StoreRetired），同 transaction 清掉他（該店）全部檢舉的說明、冪等紀錄與每日計數列。檢舉的 snapshot_id 由 ON DELETE SET NULL 清空，案件與檢舉列
 // （含 reporter_buyer_id、reporter_store_id，業務鍵）留著。進行中的案件（沒有結案時間）的快照與說明不清。
 package retention
@@ -14,8 +14,6 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
-	"github.com/Will413028/hawkr/backend/internal/modules/media"
-	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/mediaref"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
@@ -30,31 +28,23 @@ const batchSize = 500
 type Deps struct {
 	DB     *db.DB
 	Buyer  *buyer.Module
-	Media  media.Media
-	Jobs   jobs.Enqueuer
+	Media  Media
 	Now    func() time.Time
 	Logger *slog.Logger
 }
 
-// Service 是保留期清理與檢舉人資料清除的 use case。
-type Service struct {
-	d      Deps
-	holds  mediaref.Holds
-	syncer *media.RefSyncer
+// Media 是保留期清理對 media 的依賴（*media.Module）：刪除過期快照時把它擁有的圖片複本 MarkDeleted，ctx 必須帶 transaction。
+type Media interface {
+	MarkDeleted(ctx context.Context, assetIDs []uuid.UUID) error
 }
+
+// Service 是保留期清理與檢舉人資料清除的 use case。
+type Service struct{ d Deps }
 
 // New 建立服務。
-func New(d Deps) *Service {
-	return &Service{d: d, holds: mediaref.Holds{DB: d.DB, Jobs: d.Jobs}, syncer: mediaref.NewSyncer(d.DB, d.Media, d.Jobs, d.Now, d.Logger)}
-}
+func New(d Deps) *Service { return &Service{d: d} }
 
-// Holds 是快照的圖片引用登記，給送出檢舉的 use case 在它的 transaction 內呼叫。
-func (s *Service) Holds() mediaref.Holds { return s.holds }
-
-// Syncer 是快照圖片引用的同步（測試與營運直接跑一輪用）。
-func (s *Service) Syncer() *media.RefSyncer { return s.syncer }
-
-// PurgeSnapshots 刪除結案超過保留期的案件的快照（釋放圖片引用）並清掉檢舉的說明與冪等紀錄，回傳刪除的快照數；冪等。
+// PurgeSnapshots 刪除結案超過保留期的案件的快照並清掉檢舉的說明與冪等紀錄，回傳刪除的快照數；冪等。
 func (s *Service) PurgeSnapshots(ctx context.Context) (int64, error) {
 	cutoff := s.d.Now().UTC().Add(-model.SnapshotRetention)
 	var total int64
@@ -96,7 +86,7 @@ func (s *Service) drain(ctx context.Context, what string, batch func(q *store.Qu
 	}
 }
 
-// purgeBatch 在一個 transaction 內鎖住一批過期的快照、把它們引用的資產記成退場並排入同步 job（解除 media 的引用），再刪除快照。
+// purgeBatch 在一個 transaction 內鎖住一批過期的快照再刪除。
 func (s *Service) purgeBatch(ctx context.Context, cutoff time.Time) (int64, error) {
 	var deleted int64
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
@@ -105,21 +95,36 @@ func (s *Service) purgeBatch(ctx context.Context, cutoff time.Time) (int64, erro
 		if err != nil {
 			return err
 		}
-		now := s.d.Now().UTC()
-		ids := make([]uuid.UUID, len(rows))
-		for i, r := range rows {
-			ids[i] = r.ID
-			if err := s.holds.Release(ctx, q, r.ID, now, r.AssetIds); err != nil {
-				return err
-			}
+		owned, err := q.DeleteSnapshots(ctx, rows)
+		if err != nil {
+			return err
 		}
-		deleted, err = q.DeleteSnapshots(ctx, ids)
-		return err
+		deleted = int64(len(owned))
+		return s.retireAssets(ctx, owned)
 	})
 	if err != nil {
 		return 0, fmt.Errorf("moderation：清除過期的快照：%w", err)
 	}
 	return deleted, nil
+}
+
+// retireAssets 把刪掉的快照擁有的圖片複本 MarkDeleted（複本是 moderation 自己 Confirm 的資產，保留期滿後沒有人再需要）；沒有資產時不呼叫 media。
+func (s *Service) retireAssets(ctx context.Context, owned [][]uuid.UUID) error {
+	var assets []uuid.UUID
+	for _, ids := range owned {
+		for _, id := range ids {
+			if !slices.Contains(assets, id) {
+				assets = append(assets, id)
+			}
+		}
+	}
+	if len(assets) == 0 {
+		return nil
+	}
+	if err := s.d.Media.MarkDeleted(ctx, assets); err != nil {
+		return fmt.Errorf("moderation：標記快照圖片刪除：%w", err)
+	}
+	return nil
 }
 
 // OnBuyerDeletionRequested 是買家進入刪除中時同 transaction 的訂閱者（單體規則 4 的原子狀態變更）：清掉這位檢舉人（含同一帳號的歷史身分）全部檢舉的說明、冪等紀錄與每日計數列；
@@ -195,17 +200,14 @@ func (w *purgeWorker) Work(ctx context.Context, _ *river.Job[PurgeSnapshotsArgs]
 
 func (w *purgeWorker) Timeout(*river.Job[PurgeSnapshotsArgs]) time.Duration { return 30 * time.Minute }
 
-// AddWorkers 登記清除與快照圖片引用同步的 worker。
-func (s *Service) AddWorkers(workers *river.Workers) {
-	river.AddWorker(workers, &purgeWorker{svc: s})
-	mediaref.AddWorkers(workers, s.syncer)
-}
+// AddWorkers 登記清除的 worker。
+func (s *Service) AddWorkers(workers *river.Workers) { river.AddWorker(workers, &purgeWorker{svc: s}) }
 
-// PeriodicJobs 是每日清除過期快照（啟動時也跑一次）與快照圖片引用的保底掃描。
+// PeriodicJobs 是每日清除過期快照（啟動時也跑一次）。
 func (s *Service) PeriodicJobs() []*river.PeriodicJob {
-	return append([]*river.PeriodicJob{river.NewPeriodicJob(
+	return []*river.PeriodicJob{river.NewPeriodicJob(
 		river.PeriodicInterval(24*time.Hour),
 		func() (river.JobArgs, *river.InsertOpts) { return PurgeSnapshotsArgs{}, nil },
 		&river.PeriodicJobOpts{ID: "moderation.purge_snapshots", RunOnStart: true},
-	)}, mediaref.PeriodicJobs()...)
+	)}
 }

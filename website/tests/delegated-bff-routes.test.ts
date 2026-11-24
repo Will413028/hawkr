@@ -172,24 +172,7 @@ const ROUTES: RouteCase[] = [
 		gateway: "/admin/sellers/4/orders/HK260728001/recipient-contact",
 	},
 
-	// ── 媒體 upload session（2 支）────────────────────────────────────────
-	{
-		module: "media/upload_sessions",
-		method: "POST",
-		handler: "POST",
-		params: {},
-		bff: "/adm/api/media/upload_sessions",
-		gateway: "/admin/delegated-operations/media/upload_sessions",
-	},
-	{
-		module: "media/upload_sessions/[sessionId]/complete",
-		method: "POST",
-		handler: "POST",
-		params: { sessionId: "9f1c0a20-2b6d-4d1e-9a77-8b0a1c2d3e4f" },
-		bff: "/adm/api/media/upload_sessions/9f1c0a20-2b6d-4d1e-9a77-8b0a1c2d3e4f/complete",
-		gateway:
-			"/admin/delegated-operations/media/upload_sessions/9f1c0a20-2b6d-4d1e-9a77-8b0a1c2d3e4f/complete",
-	},
+	// 媒體 upload session 是 Connect（MediaDelegatedService），見 delegated-media-bff-routes.test.ts。
 ];
 
 type Handler = (
@@ -318,7 +301,7 @@ test("沒有 credential cookie：401 且一次都不打 gateway", async () => {
 
 test("非 GET 缺 X-Requested-With 或 Origin 不符：403，且不打 gateway", async () => {
 	const mutations = ROUTES.filter((route) => route.method !== "GET");
-	assert.ok(mutations.length >= 10, "mutation 路由數不對，這張表可能被改壞了");
+	assert.ok(mutations.length >= 8, "mutation 路由數不對，這張表可能被改壞了");
 	for (const route of mutations) {
 		const handler = await loadHandler(route);
 		for (const overrides of [
@@ -384,12 +367,6 @@ test("path param 值域：不是數字／訂單編號的一律 400，且不組�
 				(r) => r.module === "orders/[storeId]/[orderNo]",
 			) as RouteCase,
 			params: { storeId: "4", orderNo: "HK1?x=1" },
-		},
-		{
-			route: ROUTES.find(
-				(r) => r.module === "media/upload_sessions/[sessionId]/complete",
-			) as RouteCase,
-			params: { sessionId: "../../current" },
 		},
 	];
 	for (const { route, params } of cases) {

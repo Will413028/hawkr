@@ -167,6 +167,18 @@ const (
 	// 這個採購需求已經有一個 run 在進行中（搭配 failed_precondition）：SubmitTurn、StartCandidateSearch、ResumeRun。同一個需求同時只允許一個進行中的 run
 	// （排隊、執行中、取消中）。client 等目前的 run 收到 finished 後再送出；等待輸入的 run 不算進行中。
 	ErrorReason_PROCUREMENT_RUN_IN_PROGRESS ErrorReason = 42
+	// 優惠券活動不是進行中（搭配 failed_precondition）：尚未發布、已被結束。CouponAppService.ClaimCoupon。client 顯示 LocalizedMessage，重讀活動列表。
+	ErrorReason_COUPON_CAMPAIGN_NOT_ACTIVE ErrorReason = 43
+	// 現在不在優惠券活動的時間窗內（搭配 failed_precondition）：還沒開始或已經結束。CouponAppService.ClaimCoupon。
+	ErrorReason_COUPON_OUTSIDE_WINDOW ErrorReason = 44
+	// 買家不符合活動的資格（搭配 failed_precondition）：不在指定名單、在該店沒有消費紀錄。CouponAppService.ClaimCoupon。
+	ErrorReason_COUPON_NOT_ELIGIBLE ErrorReason = 45
+	// 發行活動的店家停權中（搭配 failed_precondition）：領取與鎖定（結帳選用）暫停，解除後自動恢復；已鎖定的券照常核銷或釋放。CouponAppService.ClaimCoupon。
+	ErrorReason_COUPON_STORE_SUSPENDED ErrorReason = 46
+	// 活動已經領完（搭配 failed_precondition）：總發行量已達上限。CouponAppService.ClaimCoupon。client 顯示已領完。
+	ErrorReason_COUPON_ISSUE_LIMIT_REACHED ErrorReason = 47
+	// 店家同時進行的活動數已達上限（搭配 failed_precondition）：CouponAppService.CreateCampaign。client 提示先結束一個活動。
+	ErrorReason_COUPON_QUOTA_EXCEEDED ErrorReason = 48
 )
 
 // Enum value maps for ErrorReason.
@@ -214,6 +226,12 @@ var (
 		40: "ASSISTANT_TURN_IN_PROGRESS",
 		41: "ASSISTANT_TURN_FAILED",
 		42: "PROCUREMENT_RUN_IN_PROGRESS",
+		43: "COUPON_CAMPAIGN_NOT_ACTIVE",
+		44: "COUPON_OUTSIDE_WINDOW",
+		45: "COUPON_NOT_ELIGIBLE",
+		46: "COUPON_STORE_SUSPENDED",
+		47: "COUPON_ISSUE_LIMIT_REACHED",
+		48: "COUPON_QUOTA_EXCEEDED",
 	}
 	ErrorReason_value = map[string]int32{
 		"ERROR_REASON_UNSPECIFIED":     0,
@@ -258,6 +276,12 @@ var (
 		"ASSISTANT_TURN_IN_PROGRESS":   40,
 		"ASSISTANT_TURN_FAILED":        41,
 		"PROCUREMENT_RUN_IN_PROGRESS":  42,
+		"COUPON_CAMPAIGN_NOT_ACTIVE":   43,
+		"COUPON_OUTSIDE_WINDOW":        44,
+		"COUPON_NOT_ELIGIBLE":          45,
+		"COUPON_STORE_SUSPENDED":       46,
+		"COUPON_ISSUE_LIMIT_REACHED":   47,
+		"COUPON_QUOTA_EXCEEDED":        48,
 	}
 )
 
@@ -292,7 +316,8 @@ var File_hawkr_common_v1alpha1_error_reason_proto protoreflect.FileDescriptor
 
 const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\n" +
-	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xfe\b\n" +
+	"(hawkr/common/v1alpha1/error_reason.proto\x12\x15hawkr.common.v1alpha1*\xa9\n" +
+	"\n" +
 	"\vErrorReason\x12\x1c\n" +
 	"\x18ERROR_REASON_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10VERSION_CONFLICT\x10\x01\x12\x14\n" +
@@ -336,7 +361,13 @@ const file_hawkr_common_v1alpha1_error_reason_proto_rawDesc = "" +
 	"\x12IMAGE_NOT_PRODUCED\x10'\x12\x1e\n" +
 	"\x1aASSISTANT_TURN_IN_PROGRESS\x10(\x12\x19\n" +
 	"\x15ASSISTANT_TURN_FAILED\x10)\x12\x1f\n" +
-	"\x1bPROCUREMENT_RUN_IN_PROGRESS\x10*\"\x04\b\"\x10\"*\x13RFQ_ALREADY_AWARDEDB\x82\x02\n" +
+	"\x1bPROCUREMENT_RUN_IN_PROGRESS\x10*\x12\x1e\n" +
+	"\x1aCOUPON_CAMPAIGN_NOT_ACTIVE\x10+\x12\x19\n" +
+	"\x15COUPON_OUTSIDE_WINDOW\x10,\x12\x17\n" +
+	"\x13COUPON_NOT_ELIGIBLE\x10-\x12\x1a\n" +
+	"\x16COUPON_STORE_SUSPENDED\x10.\x12\x1e\n" +
+	"\x1aCOUPON_ISSUE_LIMIT_REACHED\x10/\x12\x19\n" +
+	"\x15COUPON_QUOTA_EXCEEDED\x100\"\x04\b\"\x10\"*\x13RFQ_ALREADY_AWARDEDB\x82\x02\n" +
 	"\x19com.hawkr.common.v1alpha1B\x10ErrorReasonProtoP\x01Z]github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1;commonv1alpha1\xa2\x02\x03HCX\xaa\x02\x15Hawkr.Common.V1alpha1\xca\x02\x15Hawkr\\Common\\V1alpha1\xe2\x02!Hawkr\\Common\\V1alpha1\\GPBMetadata\xea\x02\x17Hawkr::Common::V1alpha1b\x06proto3"
 
 var (

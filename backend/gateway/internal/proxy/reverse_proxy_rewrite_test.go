@@ -20,7 +20,7 @@ import (
 // 編譯得過、單看程式碼也看不出來，只有真的打一次才會現形。
 //
 // 留成正式測試而非臨時檔的理由：遷移前 CreateProxy 的路徑改寫**零測試覆蓋**，
-// 而它是 media 上傳／下載／預覽與賣家 PATCH 的唯一轉發路徑，改錯等於那些路由
+// 而它是發票 PDF 串流與賣家 PATCH 的唯一轉發路徑，改錯等於那些路由
 // 全部 404 在下游。
 
 // startFakeUpstream 起一個假的下游服務，並把 services[serviceName] 暫時指向它。
@@ -69,19 +69,19 @@ func startGateway(t *testing.T, method, pattern string, h gin.HandlerFunc) *http
 }
 
 // CreateProxy：/api/v1 前綴必須被 strip，Host 必須改成上游的 host:port。
-// 這是 media 三條路由（secure_upload / secure_download / secure_preview）與
+// 這是發票 PDF 串流路由與
 // 賣家 PATCH /app/sellers/:id 實際依賴的行為。
 func TestCreateProxy_StripsAPIPrefixAndSetsHost(t *testing.T) {
-	lastRequest := startFakeUpstream(t, "media")
-	upstreamHost := services["media"].Host + ":" + services["media"].Port
+	lastRequest := startFakeUpstream(t, "invoice")
+	upstreamHost := services["invoice"].Host + ":" + services["invoice"].Port
 
 	gw := startGateway(t, http.MethodGet,
-		"/api/v1/app/media/secure_download/:asset_id",
-		CreateProxy("media", FailClientFacing))
+		"/api/v1/app/invoices/documents/:asset_id",
+		CreateProxy("invoice", FailClientFacing))
 
 	// 帶一個偽造的 X-Forwarded-For，順便釘住「覆寫而非附加」的語意。
 	req, err := http.NewRequest(http.MethodGet,
-		gw.URL+"/api/v1/app/media/secure_download/abc123?token=t1&preset=thumb", nil)
+		gw.URL+"/api/v1/app/invoices/documents/abc123?token=t1&preset=thumb", nil)
 	if err != nil {
 		t.Fatalf("build request: %v", err)
 	}
@@ -103,8 +103,8 @@ func TestCreateProxy_StripsAPIPrefixAndSetsHost(t *testing.T) {
 		t.Fatal("上游沒收到任何請求")
 	}
 
-	// ① 前綴 strip：下游期望 /app/media/... 而不是 /api/v1/app/media/...
-	if want := "/app/media/secure_download/abc123"; got.URL.Path != want {
+	// ① 前綴 strip：下游期望 /app/invoices/... 而不是 /api/v1/app/invoices/...
+	if want := "/app/invoices/documents/abc123"; got.URL.Path != want {
 		t.Errorf("上游收到的 path = %q, want %q（/api/v1 前綴未被 strip ⇒ 下游 404）",
 			got.URL.Path, want)
 	}

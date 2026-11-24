@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -126,6 +127,7 @@ func (d testDirectory) Stores(_ context.Context, after int64, limit int) ([]anno
 type announceFixture struct {
 	db       *db.DB
 	identity *identity.Module
+	buyers   *buyer.Module
 	svc      *announce.Service
 	inbox    *app.Service
 	jobs     *jobQueue
@@ -147,7 +149,7 @@ func setupAnnounce(t *testing.T, chunk int) *announceFixture {
 	clock := newSteppingClock()
 	bus := events.NewBus()
 	id := identity.New(identity.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
-	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: nopJobs{}, Media: media.NewFake(), Now: time.Now, Logger: log})
+	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Media: media.NewFake(), Now: time.Now, Logger: log})
 	events.Subscribe[identity.AccountCreated](bus, buyers.OnAccountCreated)
 	stores := &fakeStores{retired: map[int64]bool{}}
 	q := &jobQueue{}
@@ -157,7 +159,7 @@ func setupAnnounce(t *testing.T, chunk int) *announceFixture {
 		Audit: adminaudit.New(d, clock.Now), Signals: dbSignals{d}, Jobs: q, Now: clock.Now, NewID: uuid.NewV7, Logger: log, Chunk: chunk,
 	})
 	inbox := app.New(app.Deps{DB: d, Accounts: id, Registry: registry.Registry{}, Now: time.Now, Logger: log})
-	return &announceFixture{db: d, identity: id, svc: svc, inbox: inbox, jobs: q, dir: dir, stores: stores, clock: clock}
+	return &announceFixture{db: d, identity: id, buyers: buyers, svc: svc, inbox: inbox, jobs: q, dir: dir, stores: stores, clock: clock}
 }
 
 func (f *announceFixture) newAccount(t *testing.T) int64 {
@@ -364,7 +366,10 @@ func TestBothAudiencesAreDispatchedInTurn(t *testing.T) {
 func TestCreateWithTheSameRequestIDMakesOneAnnouncement(t *testing.T) {
 	f := setupAnnounce(t, 0)
 	rid := uuid.NewV4()
-	in := announce.CreateInput{Audiences: []string{"BUYER"}, Title: "Hello", Body: "World", RequestID: &rid}
+	in := announce.CreateInput{
+		Actor:     adminaudit.Actor{AdminID: 7, Action: "/hawkr.admin.notification.v1alpha1.NotificationAdminService/CreateAnnouncement"},
+		Audiences: []string{"BUYER"}, Title: "Hello", Body: "World", RequestID: &rid,
+	}
 
 	first := f.create(t, in)
 	second := f.create(t, in)
@@ -663,5 +668,8 @@ func TestAnnouncementFanOutSignalsTheRecipientsStream(t *testing.T) {
 	}
 	if ev.Inbox == nil || ev.Inbox.UnreadCount != 1 || ev.Inbox.LatestItemID == nil || *ev.Inbox.LatestItemID != rowID {
 		t.Fatalf("訂閱者應收到未讀 1 與公告列 %s：%+v", rowID, ev)
+	}
+	if !slices.Equal(ev.Inbox.NewItemIDs, []uuid.UUID{rowID}) {
+		t.Fatalf("公告扇出的訊號應帶這個收件人的新列 ID %s：%+v", rowID, ev.Inbox)
 	}
 }

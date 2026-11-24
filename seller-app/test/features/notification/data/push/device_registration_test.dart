@@ -1,72 +1,93 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:typed_data';
 
-import 'package:hawkr_seller/core/networking/dio_provider.dart'
-    show kBackgroundWriteExtra, kSkipAuthInterceptorExtra;
-import 'package:hawkr_seller/features/notification/data/push/device_registrar.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.connect.spec.dart';
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pb.dart';
+import 'package:hawkr_api/testing.dart';
+import 'package:hawkr_api/transport.dart' show Code, ConnectException;
+import 'package:hawkr_seller/features/notification/data/push/device_registrar.dart';
+
+NotificationDeviceRegistrar _registrar(FakeTransportBuilder t) =>
+    NotificationDeviceRegistrar(NotificationAppServiceClient(t.build()));
 
 void main() {
   group('NotificationDeviceRegistrar', () {
-    test('註冊標記為背景寫入、註銷標記為略過登入攔截（停權時兩者都靜默）', () async {
-      final adapter = _StatusAdapter(204);
-      final dio = Dio(BaseOptions(baseUrl: 'https://example.test'))
-        ..httpClientAdapter = adapter;
-      final registrar = NotificationDeviceRegistrar(dio, platform: 'ios');
-
-      await registrar.registerDevice(fcmToken: 'device-token');
-      expect(adapter.request?.extra[kBackgroundWriteExtra], isTrue);
-
-      await registrar.removeDevice(fcmToken: 'device-token');
-      expect(adapter.request?.extra[kSkipAuthInterceptorExtra], isTrue);
-    });
-
-    test('uses injected auth client and classifies 5xx as retryable', () async {
-      const sentinel = 'KNOWN-SECRET-SENTINEL';
-      final adapter = _StatusAdapter(503);
-      final dio = Dio(BaseOptions(baseUrl: 'https://example.test'))
-        ..interceptors.add(
-          InterceptorsWrapper(
-            onRequest: (options, handler) {
-              options.headers['Authorization'] = 'Bearer $sentinel';
-              handler.next(options);
+    test(
+      'register sends the token and SELLER_APP, no platform field',
+      () async {
+        final requests = <RegisterDeviceTokenRequest>[];
+        final registrar = _registrar(
+          FakeTransportBuilder().unary(
+            NotificationAppService.registerDeviceToken,
+            (r, _) {
+              requests.add(r);
+              return RegisterDeviceTokenResponse();
             },
           ),
-        )
-        ..httpClientAdapter = adapter;
-      final registrar = NotificationDeviceRegistrar(dio, platform: 'ios');
+        );
 
-      final outcome = await registrar.registerDevice(fcmToken: 'device-token');
+        final outcome = await registrar.registerDevice(
+          fcmToken: 'device-token',
+        );
 
-      expect(outcome.disposition, DeviceMutationDisposition.retryableFailure);
-      expect(adapter.request?.headers['Authorization'], 'Bearer $sentinel');
-      expect(adapter.request?.data, {
-        'token': 'device-token',
-        'platform': 'ios',
-      });
+        expect(outcome.isSuccess, isTrue);
+        expect(requests.single.token, 'device-token');
+        expect(
+          requests.single.app,
+          NotificationApp.NOTIFICATION_APP_SELLER_APP,
+        );
+        expect(
+          requests.single.info_.fieldInfo.values.map((f) => f.name),
+          isNot(contains('platform')),
+        );
+      },
+    );
+
+    test('remove sends DeleteDeviceToken with the token', () async {
+      final requests = <DeleteDeviceTokenRequest>[];
+      final registrar = _registrar(
+        FakeTransportBuilder().unary(NotificationAppService.deleteDeviceToken, (
+          r,
+          _,
+        ) {
+          requests.add(r);
+          return DeleteDeviceTokenResponse();
+        }),
+      );
+
+      final outcome = await registrar.removeDevice(fcmToken: 'device-token');
+
+      expect(outcome.isSuccess, isTrue);
+      expect(requests.single.token, 'device-token');
     });
 
-    test('classifies non-retryable 4xx without throwing', () async {
-      final dio = Dio(BaseOptions(baseUrl: 'https://example.test'))
-        ..httpClientAdapter = _StatusAdapter(400);
-      final registrar = NotificationDeviceRegistrar(dio, platform: 'ios');
-
-      final outcome = await registrar.registerDevice(fcmToken: 'device-token');
-
-      expect(outcome.disposition, DeviceMutationDisposition.rejected);
-      expect(outcome.statusCode, 400);
+    test('empty tokens are skipped without a request', () async {
+      final registrar = _registrar(FakeTransportBuilder());
+      expect(
+        (await registrar.registerDevice(fcmToken: '')).disposition,
+        DeviceMutationDisposition.skipped,
+      );
+      expect(
+        (await registrar.removeDevice(fcmToken: '')).disposition,
+        DeviceMutationDisposition.skipped,
+      );
     });
 
-    test('classifies transport timeout as retryable', () async {
-      final dio = Dio(BaseOptions(baseUrl: 'https://example.test'))
-        ..httpClientAdapter = _TimeoutAdapter();
-      final registrar = NotificationDeviceRegistrar(dio, platform: 'ios');
-
-      final outcome = await registrar.registerDevice(fcmToken: 'device-token');
-
-      expect(outcome.disposition, DeviceMutationDisposition.retryableFailure);
+    test('unavailable is retryable, invalid_argument is rejected', () async {
+      for (final (code, expected) in [
+        (Code.unavailable, DeviceMutationDisposition.retryableFailure),
+        (Code.invalidArgument, DeviceMutationDisposition.rejected),
+      ]) {
+        final registrar = _registrar(
+          FakeTransportBuilder().unary(
+            NotificationAppService.registerDeviceToken,
+            (r, _) => throw ConnectException(code, 'x'),
+          ),
+        );
+        final outcome = await registrar.registerDevice(fcmToken: 't');
+        expect(outcome.disposition, expected, reason: '$code');
+      }
     });
   });
 
@@ -85,7 +106,7 @@ void main() {
       expect(identical(first, second), isTrue);
       expect(gateway.registerCalls, ['fcm-token']);
 
-      pending.complete(const DeviceMutationOutcome.success(statusCode: 200));
+      pending.complete(const DeviceMutationOutcome.success());
       expect((await first).isSuccess, isTrue);
       expect((await second).isSuccess, isTrue);
       expect(gateway.registerCalls, hasLength(1));
@@ -95,9 +116,9 @@ void main() {
       final delays = <Duration>[];
       final now = DateTime.utc(2026, 7, 27, 8);
       final gateway = _SequenceGateway([
-        const DeviceMutationOutcome.retryableFailure(statusCode: 503),
-        const DeviceMutationOutcome.retryableFailure(statusCode: 429),
-        const DeviceMutationOutcome.success(statusCode: 204),
+        const DeviceMutationOutcome.retryableFailure(),
+        const DeviceMutationOutcome.retryableFailure(),
+        const DeviceMutationOutcome.success(),
       ]);
       final coordinator = DeviceRegistrationCoordinator(
         gateway: gateway,
@@ -117,8 +138,8 @@ void main() {
 
     test('4xx failure is retried on a later resume, not throttled', () async {
       final gateway = _SequenceGateway([
-        const DeviceMutationOutcome.rejected(statusCode: 400),
-        const DeviceMutationOutcome.success(statusCode: 200),
+        const DeviceMutationOutcome.rejected(),
+        const DeviceMutationOutcome.success(),
       ]);
       final coordinator = DeviceRegistrationCoordinator(
         gateway: gateway,
@@ -144,8 +165,8 @@ void main() {
 
     test('token rotation bypasses an existing success throttle', () async {
       final gateway = _SequenceGateway([
-        const DeviceMutationOutcome.success(statusCode: 200),
-        const DeviceMutationOutcome.success(statusCode: 200),
+        const DeviceMutationOutcome.success(),
+        const DeviceMutationOutcome.success(),
       ]);
       final coordinator = DeviceRegistrationCoordinator(
         gateway: gateway,
@@ -168,9 +189,7 @@ void main() {
         onRegister: (_) {
           invocation++;
           if (invocation == 1) return active.future;
-          return Future.value(
-            const DeviceMutationOutcome.success(statusCode: 200),
-          );
+          return Future.value(const DeviceMutationOutcome.success());
         },
       );
       final coordinator = DeviceRegistrationCoordinator(
@@ -185,7 +204,7 @@ void main() {
       expect((await superseded).disposition, DeviceMutationDisposition.skipped);
       expect(gateway.registerCalls, ['old-token']);
 
-      active.complete(const DeviceMutationOutcome.success(statusCode: 200));
+      active.complete(const DeviceMutationOutcome.success());
       await old;
       expect((await newest).isSuccess, isTrue);
 
@@ -195,8 +214,7 @@ void main() {
 
     test('removal of an empty token never reaches the gateway', () async {
       final gateway = _FakeGateway(
-        onRegister: (_) async =>
-            const DeviceMutationOutcome.success(statusCode: 200),
+        onRegister: (_) async => const DeviceMutationOutcome.success(),
       );
       final coordinator = DeviceRegistrationCoordinator(
         gateway: gateway,
@@ -212,10 +230,8 @@ void main() {
     test('401 removal is terminal — no retry, exactly one call', () async {
       final delays = <Duration>[];
       final gateway = _FakeGateway(
-        onRegister: (_) async =>
-            const DeviceMutationOutcome.success(statusCode: 200),
-        onRemove: (_) async =>
-            const DeviceMutationOutcome.rejected(statusCode: 401),
+        onRegister: (_) async => const DeviceMutationOutcome.success(),
+        onRemove: (_) async => const DeviceMutationOutcome.rejected(),
       );
       final coordinator = DeviceRegistrationCoordinator(
         gateway: gateway,
@@ -226,7 +242,6 @@ void main() {
       final outcome = await coordinator.remove('fcm-token');
 
       expect(outcome.disposition, DeviceMutationDisposition.rejected);
-      expect(outcome.statusCode, 401);
       expect(gateway.removeCalls, ['fcm-token']);
       expect(delays, isEmpty);
     });
@@ -235,16 +250,13 @@ void main() {
       final delays = <Duration>[];
       var attempt = 0;
       final gateway = _FakeGateway(
-        onRegister: (_) async =>
-            const DeviceMutationOutcome.success(statusCode: 200),
+        onRegister: (_) async => const DeviceMutationOutcome.success(),
         onRemove: (_) async {
           attempt++;
           if (attempt < 3) {
-            return const DeviceMutationOutcome.retryableFailure(
-              statusCode: 503,
-            );
+            return const DeviceMutationOutcome.retryableFailure();
           }
-          return const DeviceMutationOutcome.success(statusCode: 204);
+          return const DeviceMutationOutcome.success();
         },
       );
       final coordinator = DeviceRegistrationCoordinator(
@@ -263,8 +275,7 @@ void main() {
     test('deduplicates concurrent removal for the same token', () async {
       final pending = Completer<DeviceMutationOutcome>();
       final gateway = _FakeGateway(
-        onRegister: (_) async =>
-            const DeviceMutationOutcome.success(statusCode: 200),
+        onRegister: (_) async => const DeviceMutationOutcome.success(),
         onRemove: (_) => pending.future,
       );
       final coordinator = DeviceRegistrationCoordinator(
@@ -278,7 +289,7 @@ void main() {
       expect(identical(first, second), isTrue);
       expect(gateway.removeCalls, ['fcm-token']);
 
-      pending.complete(const DeviceMutationOutcome.success(statusCode: 204));
+      pending.complete(const DeviceMutationOutcome.success());
       expect((await first).isSuccess, isTrue);
       expect((await second).isSuccess, isTrue);
       expect(gateway.removeCalls, hasLength(1));
@@ -288,10 +299,8 @@ void main() {
         'budget, and logout-time reset does not refund it', () async {
       final now = DateTime.utc(2026, 7, 29, 8);
       final gateway = _FakeGateway(
-        onRegister: (_) async =>
-            const DeviceMutationOutcome.success(statusCode: 200),
-        onRemove: (_) async =>
-            const DeviceMutationOutcome.rejected(statusCode: 401),
+        onRegister: (_) async => const DeviceMutationOutcome.success(),
+        onRemove: (_) async => const DeviceMutationOutcome.rejected(),
       );
       final coordinator = DeviceRegistrationCoordinator(
         gateway: gateway,
@@ -320,10 +329,8 @@ void main() {
     test('breaker budget recovers after the window elapses', () async {
       var now = DateTime.utc(2026, 7, 29, 8);
       final gateway = _FakeGateway(
-        onRegister: (_) async =>
-            const DeviceMutationOutcome.success(statusCode: 200),
-        onRemove: (_) async =>
-            const DeviceMutationOutcome.success(statusCode: 204),
+        onRegister: (_) async => const DeviceMutationOutcome.success(),
+        onRemove: (_) async => const DeviceMutationOutcome.success(),
       );
       final coordinator = DeviceRegistrationCoordinator(
         gateway: gateway,
@@ -358,7 +365,7 @@ void main() {
         },
         onRemove: (_) async {
           order.add('remove');
-          return const DeviceMutationOutcome.success(statusCode: 204);
+          return const DeviceMutationOutcome.success();
         },
       );
       final coordinator = DeviceRegistrationCoordinator(
@@ -372,7 +379,7 @@ void main() {
 
       expect(order, ['register']);
 
-      pending.complete(const DeviceMutationOutcome.success(statusCode: 200));
+      pending.complete(const DeviceMutationOutcome.success());
       await registration;
       expect((await removal).isSuccess, isTrue);
       expect(order, ['register', 'remove']);
@@ -384,7 +391,7 @@ void main() {
       final gateway = _FakeGateway(
         onRegister: (_) async {
           order.add('register');
-          return const DeviceMutationOutcome.success(statusCode: 200);
+          return const DeviceMutationOutcome.success();
         },
         onRemove: (_) {
           order.add('remove');
@@ -404,7 +411,7 @@ void main() {
 
       expect(order, ['remove']);
 
-      pending.complete(const DeviceMutationOutcome.success(statusCode: 204));
+      pending.complete(const DeviceMutationOutcome.success());
       await removal;
       expect((await registration).isSuccess, isTrue);
       expect(order, ['remove', 'register']);
@@ -421,7 +428,7 @@ void main() {
 
       final operation = coordinator.register('old-session-token');
       coordinator.reset();
-      pending.complete(const DeviceMutationOutcome.success(statusCode: 200));
+      pending.complete(const DeviceMutationOutcome.success());
       await operation;
 
       expect(coordinator.lastSuccessfulAt, isNull);
@@ -449,7 +456,7 @@ class _FakeGateway implements DeviceRegistrationGateway {
     removeCalls.add(fcmToken);
     final handler = onRemove;
     if (handler != null) return handler(fcmToken);
-    return Future.value(const DeviceMutationOutcome.success(statusCode: 204));
+    return Future.value(const DeviceMutationOutcome.success());
   }
 }
 
@@ -469,49 +476,6 @@ class _SequenceGateway implements DeviceRegistrationGateway {
 
   @override
   Future<DeviceMutationOutcome> removeDevice({required String fcmToken}) async {
-    return const DeviceMutationOutcome.success(statusCode: 204);
+    return const DeviceMutationOutcome.success();
   }
-}
-
-class _StatusAdapter implements HttpClientAdapter {
-  _StatusAdapter(this.statusCode);
-
-  final int statusCode;
-  RequestOptions? request;
-
-  @override
-  Future<ResponseBody> fetch(
-    RequestOptions options,
-    Stream<Uint8List>? requestStream,
-    Future<void>? cancelFuture,
-  ) async {
-    request = options;
-    return ResponseBody.fromString(
-      jsonEncode({'code': statusCode}),
-      statusCode,
-      headers: {
-        Headers.contentTypeHeader: [Headers.jsonContentType],
-      },
-    );
-  }
-
-  @override
-  void close({bool force = false}) {}
-}
-
-class _TimeoutAdapter implements HttpClientAdapter {
-  @override
-  Future<ResponseBody> fetch(
-    RequestOptions options,
-    Stream<Uint8List>? requestStream,
-    Future<void>? cancelFuture,
-  ) {
-    throw DioException(
-      requestOptions: options,
-      type: DioExceptionType.connectionTimeout,
-    );
-  }
-
-  @override
-  void close({bool force = false}) {}
 }

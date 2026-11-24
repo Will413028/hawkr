@@ -75,14 +75,6 @@ type noProducts struct{}
 
 func (noProducts) StoreIDs(context.Context, []int64) (map[int64]int64, error) { return nil, nil }
 
-type testMedia struct{}
-
-func (testMedia) Finalize(context.Context, media.Uploader, string, string) (media.Asset, error) {
-	return media.Asset{}, errors.New("not used")
-}
-func (testMedia) Link(context.Context, media.Ref, []string) error   { return nil }
-func (testMedia) Unlink(context.Context, media.Ref, []string) error { return nil }
-
 // testOrders 是訂單 port 的替身：買家側（open、err）與店家側（storeOpen、storeErr）各自設定。onStoreCall 在店家側的查詢
 // 時執行一次（鎖外），用來製造「查完訂單、進交易之前」的交錯。
 type testOrders struct {
@@ -141,10 +133,10 @@ func setupWith(t *testing.T, extra ...migrate.Module) *fixture {
 	queue := &testQueue{}
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	id := identity.New(identity.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
-	b := buyer.New(buyer.Deps{DB: d, Events: bus, Jobs: queue, Now: time.Now, Logger: log})
+	b := buyer.New(buyer.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
 	kycMAC := sealtest.MAC(t)
 	orders := &testOrders{}
-	sl := seller.New(seller.Deps{KYCMAC: kycMAC, DB: d, Events: bus, Jobs: queue, Identity: id, Media: testMedia{}, Orders: orders, ProductStores: noProducts{}, Registry: noRegistry{}, Now: time.Now, Logger: log, Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: queue, Now: time.Now, Logger: log})})
+	sl := seller.New(seller.Deps{KYCMAC: kycMAC, DB: d, Events: bus, Jobs: queue, Identity: id, Media: media.NewFake(), Orders: orders, ProductStores: noProducts{}, Registry: noRegistry{}, Now: time.Now, Logger: log, Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: queue, Now: time.Now, Logger: log})})
 	m := New(Deps{DB: d, Identity: id, Buyer: b, Seller: sl, Orders: orders, Now: time.Now})
 	return &fixture{db: d, identity: id, buyer: b, seller: sl, orders: orders, module: m, queue: queue, bus: bus}
 }
@@ -980,9 +972,4 @@ func TestStoreReplacedAfterTheOrdersCheckWritesNothing(t *testing.T) {
 	if err != nil || current.StoreID == first.StoreID || current.Status != seller.Active {
 		t.Fatalf("current=%+v err=%v", current, err)
 	}
-}
-
-// ReadSecure 實作 media.Media；這些測試不讀機敏資產。
-func (testMedia) ReadSecure(context.Context, string, media.Ref) (media.SecureAsset, error) {
-	return media.SecureAsset{}, errors.New("not used")
 }

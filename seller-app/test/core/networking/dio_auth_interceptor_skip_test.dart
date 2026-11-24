@@ -119,14 +119,12 @@ void main() {
 
   /// 這個旗標是「請把 401 當成預期結果」——用錯地方的代價是：真正失效的
   /// session 不再觸發登出，使用者卡在一個每支 API 都 401 的死
-  /// session 裡，而且沒有任何測試會失敗。它只有一個正當用途（登出流程中的
-  /// 裝置註銷），所以用「哪些檔可以出現它」把使用面鎖死。App 版本 gate 改走
+  /// session 裡，而且沒有任何測試會失敗。目前沒有 production 使用點
+  /// （裝置註銷已改走 Connect），所以用「哪些檔可以出現它」把使用面鎖死在宣告檔。App 版本 gate 改走
   /// Connect 的公開 service（不經過 Dio、不帶身分），不再需要它。
   test('架構 gate：kSkipAuthInterceptorExtra 只准出現在既定的路徑', () {
     const declaration = 'lib/core/networking/dio_provider.dart';
-    const deviceRegistrar =
-        'lib/features/notification/data/push/device_registrar.dart';
-    const allowed = {declaration, deviceRegistrar};
+    const allowed = {declaration};
 
     final users = <String>[];
     for (final entity in Directory('lib').listSync(recursive: true)) {

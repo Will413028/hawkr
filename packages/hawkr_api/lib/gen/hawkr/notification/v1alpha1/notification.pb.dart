@@ -149,7 +149,11 @@ class InboxItem extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearBody() => $_clearField(5);
 
-  /// 點擊後的 App 內目的地；空字串表示沒有目的地。格式由伺服器定義，client 只交給路由，不解析。
+  /// 點擊後的目的地；空字串表示沒有目的地。格式：website 相對路徑（以 `/` 開頭、不含 host），收件人語系是 en 時
+  /// 帶 `/en` 前綴、zh-TW 不帶（多語系 ADR D1）；路徑一定是既有的 website 路由。推播 data 的 `deep_link` 鍵是同一個值。
+  /// client 把路徑對應到自己的畫面（universal link／App Links 接受 `/en/…`），不認得的路徑開收件匣。
+  /// 路徑表（目的地、參數、受眾、沒有 website 路由的目的地）見計畫附件
+  /// `backend/docs/plans/2026-11-23-a8-notification/deep-links.md`。
   @$pb.TagNumber(6)
   $core.String get deepLink => $_getSZ(5);
   @$pb.TagNumber(6)
@@ -1648,12 +1652,16 @@ class InboxSignal extends $pb.GeneratedMessage {
     $core.int? unreadCount,
     $core.String? latestInboxItemId,
     $core.Iterable<StateRefreshHint>? stateRefreshHints,
+    $core.Iterable<$core.String>? newInboxItemIds,
+    $core.bool? newItemsTruncated,
   }) {
     final result = InboxSignal._();
     if (unreadCount != null) result.unreadCount = unreadCount;
     if (latestInboxItemId != null) result.latestInboxItemId = latestInboxItemId;
     if (stateRefreshHints != null)
       result.stateRefreshHints.addAll(stateRefreshHints);
+    if (newInboxItemIds != null) result.newInboxItemIds.addAll(newInboxItemIds);
+    if (newItemsTruncated != null) result.newItemsTruncated = newItemsTruncated;
     return result;
   }
 
@@ -1678,6 +1686,8 @@ class InboxSignal extends $pb.GeneratedMessage {
         valueOf: StateRefreshHint.valueOf,
         enumValues: StateRefreshHint.values,
         defaultEnumValue: StateRefreshHint.STATE_REFRESH_HINT_UNSPECIFIED)
+    ..pPS(4, _omitFieldNames ? '' : 'newInboxItemIds')
+    ..aOB(5, _omitFieldNames ? '' : 'newItemsTruncated')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1725,6 +1735,22 @@ class InboxSignal extends $pb.GeneratedMessage {
   /// 空表示不需要重讀（連線建立時的第一則也是）。不會含 STATE_REFRESH_HINT_UNSPECIFIED。
   @$pb.TagNumber(3)
   $pb.PbList<StateRefreshHint> get stateRefreshHints => $_getList(2);
+
+  /// 上一則訊號之後在這條串流上新建的通知、或被聚合更新（合併進同一則未讀通知）的收件匣項目 ID，依到達順序、不重複；
+  /// client 只對這些 ID 做 toast，不比對列表。聚合更新會讓同一個 ID 再出現，client 以 ID 去重並更新既有的 toast。
+  /// 連線建立與重連的第一則、只有已讀或刪除變化時為空。每個 ID 在一條串流上至多送達一次：斷線期間的缺口不補送，收件匣與未讀數仍以列表為準。
+  @$pb.TagNumber(4)
+  $pb.PbList<$core.String> get newInboxItemIds => $_getList(3);
+
+  /// 為 true 表示累積的新通知超過上限（20 則）：new_inbox_item_ids 為空，client 重讀列表、不 toast。
+  @$pb.TagNumber(5)
+  $core.bool get newItemsTruncated => $_getBF(4);
+  @$pb.TagNumber(5)
+  set newItemsTruncated($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasNewItemsTruncated() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearNewItemsTruncated() => $_clearField(5);
 }
 
 /// SellerWorkspaceSignal 是賣家工作區的資料有變化的訊號：client 重讀對應的列表與統計，不帶變化的內容。

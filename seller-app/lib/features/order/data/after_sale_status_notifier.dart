@@ -2,11 +2,9 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../../shared/utils/hk_log.dart';
-
 part 'after_sale_status_notifier.g.dart';
 
-/// 售後案件狀態變更事件（FCM Silent Push 驅動）。
+/// 售後案件狀態變更事件。
 class AfterSaleStatusEvent {
   AfterSaleStatusEvent({
     required this.caseNo,
@@ -18,7 +16,19 @@ class AfterSaleStatusEvent {
     DateTime? timestamp,
   }) : timestamp = timestamp ?? DateTime.now();
 
+  /// 不指定案件、要求全部重讀的事件。
+  AfterSaleStatusEvent.refreshAll()
+    : caseNo = '',
+      orderNo = null,
+      status = null,
+      previousStatus = null,
+      actor = null,
+      data = null,
+      timestamp = DateTime.now();
+
   final String caseNo;
+
+  bool get refreshesAll => caseNo.isEmpty;
   final String? orderNo;
   final String? status;
   final String? previousStatus;
@@ -50,30 +60,9 @@ class AfterSaleStatusNotifier {
 
   Stream<AfterSaleStatusEvent> get eventStream => _eventController.stream;
 
-  void handlePushNotification(Map<String, dynamic> data) {
-    HKLog.logI('[AfterSaleStatusNotifier] Received push: $data');
-    try {
-      final caseNo = data['caseNo']?.toString() ?? data['refId']?.toString();
-      if (caseNo == null || caseNo.isEmpty) {
-        HKLog.logW('[AfterSaleStatusNotifier] No caseNo, drop event');
-        return;
-      }
-      final event = AfterSaleStatusEvent(
-        caseNo: caseNo,
-        orderNo: data['orderNo']?.toString(),
-        status: data['status']?.toString(),
-        previousStatus:
-            data['previousStatus']?.toString() ??
-            data['previous_status']?.toString(),
-        actor: data['actor']?.toString(),
-        data: data,
-      );
-      _eventController.add(event);
-      HKLog.logI('[AfterSaleStatusNotifier] Emit $event');
-    } catch (e) {
-      HKLog.logE('[AfterSaleStatusNotifier] parse error', e);
-    }
-  }
+  /// 伺服器訊號（通知串流的售後重讀提示、賣家工作區訊號、斷線重連）：不知道是哪一案，各畫面都重讀。
+  void emitRefreshAll() =>
+      _eventController.add(AfterSaleStatusEvent.refreshAll());
 
   void dispose() => _eventController.close();
 }

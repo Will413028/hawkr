@@ -46,7 +46,7 @@ export async function request<T>(
 		const response = await fetch(`${baseUrl}${endpoint}`, config);
 		clearTimeout(timeoutId);
 
-		// 後台呼叫的 REST（/admin、/app/media）只在沒有身分時回 401（非管理員是 403）：session 已經失效，
+		// 後台呼叫的 REST（/admin）只在沒有身分時回 401（非管理員是 403）：session 已經失效，
 		// 與 Connect 的 unauthenticated 一樣登出並回到 Access。
 		if (response.status === 401) {
 			console.warn("API returned 401 for:", endpoint);

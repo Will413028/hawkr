@@ -99,10 +99,6 @@
       "message": "不能同時換圖與清圖",
       "description": "修改貼文同時要求換圖與清圖。"
     },
-    "post.image_unusable": {
-      "message": "圖片無法使用，請重新上傳",
-      "description": "圖片 token 被 media 拒絕（過期、已用過或不屬於呼叫者）。"
-    },
     "post.not_found": {
       "message": "找不到這篇貼文",
       "description": "貼文不存在、已刪除，或是別家店未公開（草稿、下架）的貼文；別家已發布的貼文改用 post.owner_only。"
