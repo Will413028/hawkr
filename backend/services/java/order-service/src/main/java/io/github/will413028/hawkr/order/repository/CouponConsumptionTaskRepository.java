@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import io.github.will413028.hawkr.order.constant.OrderConstants;
 import io.github.will413028.hawkr.order.entity.CouponConsumptionTaskEntity;
 import org.apache.ibatis.annotations.Delete;
+import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
@@ -109,6 +110,65 @@ public interface CouponConsumptionTaskRepository extends BaseMapper<CouponConsum
             @Param("lastError") String lastError,
             @Param("retryDelaySeconds") int retryDelaySeconds
     );
+
+    /**
+     * 寫入釋券任務（D3）：以 order_no 為鍵，同一筆訂單只有一筆（唯一鍵 (order_no, task_type)），重複寫入不報錯。
+     *
+     * @return 1 = 新建；0 = 這筆訂單已有釋券任務
+     */
+    default int enqueueRelease(long taskId, String orderNo, String couponInstanceId) {
+        return enqueueTask(taskId, orderNo, OrderConstants.COUPON_TASK_TYPE_RELEASE, couponInstanceId,
+                OrderConstants.TASK_STATUS_PENDING, OrderConstants.DEFAULT_MAX_RETRY_COUNT);
+    }
+
+    @Insert("""
+        INSERT INTO coupon_consumption_tasks
+            (task_id, order_no, task_type, coupon_instance_id, status, retry_count, max_retry_count, next_retry_time)
+        VALUES (#{taskId}, #{orderNo}, #{taskType}, #{couponInstanceId}, #{status}, 0, #{maxRetryCount}, NOW())
+        ON CONFLICT (order_no, task_type) DO NOTHING
+    """)
+    int enqueueTask(
+            @Param("taskId") long taskId,
+            @Param("orderNo") String orderNo,
+            @Param("taskType") String taskType,
+            @Param("couponInstanceId") String couponInstanceId,
+            @Param("status") String status,
+            @Param("maxRetryCount") int maxRetryCount);
+
+    /**
+     * 寫入延後執行的釋券任務：{@code next_retry_time} 是現在加 {@code delaySeconds}。這筆訂單已有釋券任務時改成待處理、
+     * 重設重試次數並套用同一個延後時間，確保延後的那一次一定還會跑。
+     */
+    @Insert("""
+        INSERT INTO coupon_consumption_tasks
+            (task_id, order_no, task_type, coupon_instance_id, status, retry_count, max_retry_count, next_retry_time)
+        VALUES (#{taskId}, #{orderNo}, #{taskType}, #{couponInstanceId}, #{status}, 0, #{maxRetryCount}, NOW() + make_interval(secs => #{delaySeconds}))
+        ON CONFLICT (order_no, task_type) DO UPDATE
+            SET status = EXCLUDED.status, retry_count = 0, next_retry_time = EXCLUDED.next_retry_time, updated_at = NOW()
+    """)
+    int enqueueTaskAfter(
+            @Param("taskId") long taskId,
+            @Param("orderNo") String orderNo,
+            @Param("taskType") String taskType,
+            @Param("couponInstanceId") String couponInstanceId,
+            @Param("status") String status,
+            @Param("maxRetryCount") int maxRetryCount,
+            @Param("delaySeconds") int delaySeconds);
+
+    default int enqueueReleaseAfter(long taskId, String orderNo, String couponInstanceId, int delaySeconds) {
+        return enqueueTaskAfter(taskId, orderNo, OrderConstants.COUPON_TASK_TYPE_RELEASE, couponInstanceId,
+                OrderConstants.TASK_STATUS_PENDING, OrderConstants.DEFAULT_MAX_RETRY_COUNT, delaySeconds);
+    }
+
+    /**
+     * 釋券已由呼叫端當場完成時，把這筆訂單的釋券任務標成完成（worker 不必再打 coupon）。
+     */
+    default int markReleaseDone(String orderNo) {
+        return markDoneByOrderNoAndType(orderNo, OrderConstants.COUPON_TASK_TYPE_RELEASE, OrderConstants.TASK_STATUS_DONE);
+    }
+
+    @Update("UPDATE coupon_consumption_tasks SET status = #{status}, updated_at = NOW() WHERE order_no = #{orderNo} AND task_type = #{taskType}")
+    int markDoneByOrderNoAndType(@Param("orderNo") String orderNo, @Param("taskType") String taskType, @Param("status") String status);
 
     /**
      * 標記任務完成

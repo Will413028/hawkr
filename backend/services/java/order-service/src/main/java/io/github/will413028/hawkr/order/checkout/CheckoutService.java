@@ -20,6 +20,7 @@ import io.github.will413028.hawkr.coupon.grpc.CouponValidateResult;
 import io.grpc.StatusRuntimeException;
 import io.github.will413028.hawkr.order.checkout.CheckoutValidator.*;
 import io.github.will413028.hawkr.order.checkout.client.CheckoutCouponGrpcClient;
+import io.github.will413028.hawkr.order.service.CouponReleaseService;
 import io.github.will413028.hawkr.common.grpc.PrincipalResolution;
 import io.github.will413028.hawkr.common.grpc.UnresolvedPrincipalException;
 import io.github.will413028.hawkr.order.checkout.client.SellerGrpcClient;
@@ -79,6 +80,7 @@ public class CheckoutService {
     private final BuyerGrpcClient buyerGrpcClient;
     private final ShippingGrpcClient shippingGrpcClient;
     private final CheckoutCouponGrpcClient couponGrpcClient;
+    private final CouponReleaseService couponReleaseService;
     private final InvoiceGrpcClient invoiceGrpcClient;
     private final CheckoutValidator checkoutValidator;
     private final OrderService orderService;
@@ -102,7 +104,8 @@ public class CheckoutService {
                            CheckoutValidator checkoutValidator,
                            OrderService orderService,
                            OrderPolicyResolver orderPolicyResolver,
-                           StringRedisTemplate redisTemplate) {
+                           StringRedisTemplate redisTemplate,
+                           CouponReleaseService couponReleaseService) {
         this.productGrpcClient = productGrpcClient;
         this.sellerGrpcClient = sellerGrpcClient;
         this.buyerGrpcClient = buyerGrpcClient;
@@ -113,6 +116,7 @@ public class CheckoutService {
         this.orderService = orderService;
         this.orderPolicyResolver = orderPolicyResolver;
         this.redisTemplate = redisTemplate;
+        this.couponReleaseService = couponReleaseService;
     }
 
     // ==================== 自買防護 ====================
@@ -1073,7 +1077,7 @@ public class CheckoutService {
         // reserveCoupon 接受 templateId，回傳 instanceId 寫入 orders.coupon_instance_id
         if (couponTemplateId != null && !couponTemplateId.isEmpty()) {
             try {
-                String instanceId = couponGrpcClient.reserveCoupon(couponTemplateId, buyerId, orderNo);
+                String instanceId = couponGrpcClient.reserveCoupon(couponTemplateId, buyerId, orderNo, storeId, orderSubtotal);
                 orderService.updateCouponInstanceId(orderNo, instanceId);
             } catch (Exception e) {
                 log.error("CheckoutService.confirm.reserveCoupon.failed", "優惠券鎖定失敗，取消訂單", e);
@@ -1084,6 +1088,10 @@ public class CheckoutService {
                 } catch (Exception compensateErr) {
                     log.error("CheckoutService.confirm.compensate.failed", "補償操作失敗", compensateErr);
                 }
+                // reserve 可能在 coupon 端已成功、只是回應遺失或回寫 instance id 失敗：訂單沒有記下 instance id，
+                // 其他釋放路徑都找不到這張券；reserve 逾時時 Lock 也可能還在途中、晚於當場釋放才提交。
+                // 以 order_no 釋放（冪等；coupon 端沒鎖時是空操作）並排一筆延後到 reserve deadline 之後的任務（D3）。
+                couponReleaseService.releaseWithLateLockRecheck(orderNo);
                 throw new OrderBusinessException(GrpcResponseCode.COUPON_LOCK_FAILED, e.getMessage());
             }
         }

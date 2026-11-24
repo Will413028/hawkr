@@ -95,6 +95,7 @@ public class OrderService {
     // issue #1369 業務健康 metric：建單成功計數（Prometheus 對 Counter 自動補 _total →
     // 暴露為 hawkr_orders_created_total，供 business-alerts.yml ZeroOrders 規則）
     private final Counter ordersCreatedCounter;
+    private final CouponReleaseService couponReleaseService;
 
     public OrderService(
             OrderRepository orderRepository,
@@ -117,8 +118,10 @@ public class OrderService {
             OrderOutboxMapper orderOutboxMapper,
             io.github.will413028.hawkr.order.checkout.OrderPolicyResolver orderPolicyResolver,
             io.github.will413028.hawkr.order.checkout.UberOrderEligibilityGuard uberOrderEligibilityGuard,
+            CouponReleaseService couponReleaseService,
             MeterRegistry meterRegistry
     ) {
+        this.couponReleaseService = couponReleaseService;
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.refundRequestRepository = refundRequestRepository;
@@ -470,6 +473,7 @@ public class OrderService {
         }
         // #1368：庫存歸還事件與取消狀態同事務落 outbox（取代原 TX 外 best-effort 直發，杜絕遺失）
         insertCancelledOutbox(orderNo);
+        enqueueCouponReleaseIfHeld(order);
         // [B-207] #1181：賣家工作區 realtime — 買家取消待付款訂單（afterCommit）
         eventPublisher.emitSellerOrderUpdated(
                 order.getStoreId(), orderNo, OrderEventPublisher.SRC_SYSTEM,
@@ -498,7 +502,22 @@ public class OrderService {
             return 0;
         }
         insertCancelledOutbox(orderNo);
+        enqueueCouponReleaseIfHeld(orderRepository.findByOrderNo(orderNo));
         return updated;
+    }
+
+    /**
+     * 訂單持有優惠券時，在取消的 transaction 內寫入釋券任務（與狀態變更、order.cancelled outbox 同時提交或回滾）。
+     * 取消提交後呼叫端的當場釋放只是加速，漏了也由任務補上。沒有記下券 id 的訂單由各自的補償路徑處理。
+     */
+    public void enqueueCouponReleaseIfHeld(OrderEntity order) {
+        if (order == null) {
+            return;
+        }
+        String couponInstanceId = order.getCouponInstanceId();
+        if (couponInstanceId != null && !couponInstanceId.isEmpty()) {
+            couponReleaseService.enqueueInTx(order.getOrderNo(), couponInstanceId);
+        }
     }
 
     /**

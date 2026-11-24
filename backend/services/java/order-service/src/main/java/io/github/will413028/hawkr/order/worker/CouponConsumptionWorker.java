@@ -5,6 +5,10 @@ import io.github.will413028.hawkr.common.utils.DateTimeUtils;
 import io.github.will413028.hawkr.order.constant.OrderConstants;
 import io.github.will413028.hawkr.order.entity.CouponConsumptionTaskEntity;
 import io.github.will413028.hawkr.order.checkout.client.CheckoutCouponGrpcClient;
+import io.github.will413028.hawkr.order.checkout.client.CouponNoVoucherForOrderException;
+import io.github.will413028.hawkr.order.entity.OrderEntity;
+import io.github.will413028.hawkr.order.repository.OrderRepository;
+import io.github.will413028.hawkr.common.utils.code.OrderStatus;
 import io.github.will413028.hawkr.order.repository.CouponConsumptionTaskRepository;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -14,7 +18,7 @@ import java.util.List;
 /**
  * 優惠券核銷補償 Worker
  *
- * 付款成功後非同步執行優惠券核銷，失敗時自動重試。
+ * 付款成功後非同步執行優惠券核銷、訂單取消後非同步釋放優惠券（task_type 區分），失敗時自動重試。
  * 避免 Coupon Service 暫時不可用導致優惠券永久鎖定。
  *
  * <p><b>搶佔語意（issue #2294 C5）</b>：claim 是 <b>lease on {@code next_retry_time}</b>
@@ -45,11 +49,14 @@ public class CouponConsumptionWorker {
 
     private final CouponConsumptionTaskRepository couponConsumptionTaskRepository;
     private final CheckoutCouponGrpcClient checkoutCouponGrpcClient;
+    private final OrderRepository orderRepository;
 
     public CouponConsumptionWorker(CouponConsumptionTaskRepository couponConsumptionTaskRepository,
-                                   CheckoutCouponGrpcClient checkoutCouponGrpcClient) {
+                                   CheckoutCouponGrpcClient checkoutCouponGrpcClient,
+                                   OrderRepository orderRepository) {
         this.couponConsumptionTaskRepository = couponConsumptionTaskRepository;
         this.checkoutCouponGrpcClient = checkoutCouponGrpcClient;
+        this.orderRepository = orderRepository;
     }
 
     /**
@@ -83,11 +90,7 @@ public class CouponConsumptionWorker {
                 "taskId", String.valueOf(task.getTaskId()));
 
         try {
-            checkoutCouponGrpcClient.consumeCoupon(
-                    task.getCouponInstanceId(),
-                    task.getBuyerId(),
-                    task.getOrderNo()
-            );
+            runTask(task);
 
             couponConsumptionTaskRepository.markDone(task.getTaskId());
             log.info("CouponConsumptionWorker.process.done", "優惠券核銷成功",
@@ -101,6 +104,38 @@ public class CouponConsumptionWorker {
                     e.getMessage(),
                     retryDelay
             );
+        }
+    }
+
+    /**
+     * 依 task_type 執行：CONSUME 核銷、RELEASE 以 order_no 釋券（失敗拋出，由呼叫端走重試）。
+     * 不認得的型別（含 null）拋出，不當成核銷：寫錯型別的任務重試到上限後轉人工，不會悄悄做錯事。
+     */
+    private void runTask(CouponConsumptionTaskEntity task) {
+        String type = task.getTaskType();
+        if (OrderConstants.COUPON_TASK_TYPE_CONSUME.equals(type)) {
+            consume(task);
+        } else if (OrderConstants.COUPON_TASK_TYPE_RELEASE.equals(type)) {
+            checkoutCouponGrpcClient.releaseCouponByOrderNo(task.getOrderNo(), task.getCouponInstanceId());
+        } else {
+            throw new IllegalStateException("不認得的 coupon 任務型別：" + type);
+        }
+    }
+
+    /**
+     * 核銷。coupon 回「這筆訂單沒有持有券」（7009）時：訂單已取消（取消時券已釋放）是終態，任務視為完成；
+     * 其他情況券遺失，照樣拋出走重試與轉人工。
+     */
+    private void consume(CouponConsumptionTaskEntity task) {
+        try {
+            checkoutCouponGrpcClient.consumeCoupon(task.getCouponInstanceId(), task.getBuyerId(), task.getOrderNo());
+        } catch (CouponNoVoucherForOrderException e) {
+            OrderEntity order = orderRepository.findByOrderNo(task.getOrderNo());
+            if (order == null || !OrderStatus.CANCELLED.value().equals(order.getStatus())) {
+                throw e;
+            }
+            log.info("CouponConsumptionWorker.consume.orderCancelled", "訂單已取消且券已釋放，核銷任務視為完成",
+                    "orderNo", task.getOrderNo());
         }
     }
 

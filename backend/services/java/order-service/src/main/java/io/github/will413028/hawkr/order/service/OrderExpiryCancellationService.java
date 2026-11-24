@@ -4,7 +4,6 @@ import io.github.will413028.hawkr.common.obs.log.ObsLogger;
 import io.github.will413028.hawkr.common.utils.DateTimeUtils;
 import io.github.will413028.hawkr.common.utils.code.GrpcResponseCode;
 import io.github.will413028.hawkr.common.utils.code.PaymentTransactionStatus;
-import io.github.will413028.hawkr.order.checkout.client.CheckoutCouponGrpcClient;
 import io.github.will413028.hawkr.order.grpc.client.PaymentGrpcClient;
 import io.github.will413028.hawkr.order.mq.PaymentEventHandler;
 import io.github.will413028.hawkr.order.util.HashUtil;
@@ -35,16 +34,16 @@ public class OrderExpiryCancellationService {
 
     private final PaymentGrpcClient paymentGrpcClient;
     private final PaymentEventHandler paymentEventHandler;
-    private final CheckoutCouponGrpcClient checkoutCouponGrpcClient;
+    private final CouponReleaseService couponReleaseService;
 
     public OrderExpiryCancellationService(
             PaymentGrpcClient paymentGrpcClient,
             PaymentEventHandler paymentEventHandler,
-            CheckoutCouponGrpcClient checkoutCouponGrpcClient
+            CouponReleaseService couponReleaseService
     ) {
         this.paymentGrpcClient = paymentGrpcClient;
         this.paymentEventHandler = paymentEventHandler;
-        this.checkoutCouponGrpcClient = checkoutCouponGrpcClient;
+        this.couponReleaseService = couponReleaseService;
     }
 
     /**
@@ -165,14 +164,10 @@ public class OrderExpiryCancellationService {
         // 禁止呼叫 ClosePaymentByOrderNo：讓交易由 Payment Service ExpiredTransactionScheduler 自然過期，
         // 確保遲到的 PayUni Webhook 能正常觸發退款補償流程（見設計書 §8.5）
 
-        // 釋放優惠券（失敗由 Coupon AutoReleaseJob 兜底）
-        try {
-            String couponInstanceId = info.couponInstanceId();
-            if (couponInstanceId != null && !couponInstanceId.isEmpty()) {
-                checkoutCouponGrpcClient.releaseCoupon(couponInstanceId, info.orderNo());
-            }
-        } catch (Exception e) {
-            log.error("OrderExpiryCancellationService.releaseCoupon.error", "釋放優惠券失敗", e);
+        // 釋放優惠券：釋券任務已在取消事務內寫入，這裡當場嘗試加速，失敗由 CouponConsumptionWorker 重試
+        String couponInstanceId = info.couponInstanceId();
+        if (couponInstanceId != null && !couponInstanceId.isEmpty()) {
+            couponReleaseService.release(info.orderNo(), couponInstanceId);
         }
     }
 }

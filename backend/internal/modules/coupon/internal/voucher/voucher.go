@@ -375,10 +375,13 @@ func heldBy(v store.CouponCouponVoucher, orderNo string) bool {
 	return (st == model.VoucherLocked || st == model.VoucherRedeemed) && v.OrderNo != nil && *v.OrderNo == orderNo
 }
 
-// Quote 驗券但不鎖：與 Lock 同一組檢查（資格、時間窗、店家範圍、門檻），回傳折抵金額。
+// Quote 驗券但不鎖：與 Lock 同一組檢查（資格、時間窗、店家範圍、門檻），回傳折抵金額。OrderNo 可以是空字串，表示這次驗券
+// 還沒有對應的訂單（Java 結帳預覽與建單前的驗券）；有值時必須合法，並讓「已由這筆訂單持有」的券略過資格重驗，與 Lock 的重送一致。
 func (s *Service) Quote(ctx context.Context, in LockInput) (LockResult, error) {
-	if err := validOrderNo(ctx, in.OrderNo); err != nil {
-		return LockResult{}, err
+	if in.OrderNo != "" {
+		if err := validOrderNo(ctx, in.OrderNo); err != nil {
+			return LockResult{}, err
+		}
 	}
 	var res LockResult
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
@@ -628,6 +631,22 @@ func (s *Service) Release(ctx context.Context, orderNo string) (ReleaseResult, e
 		return s.logOp(ctx, q, store.InsertLogParams{CampaignID: row.CampaignID, VoucherID: uid(row.ID), BuyerID: &buyer, Action: "RELEASE", OrderNo: &orderNo})
 	})
 	return res, err
+}
+
+// ForCampaign 回傳買家在這個活動持有的券（每位買家在同一個活動至多一張，所以不需要挑選）；沒有領過或被發放過回 NotFound
+// （ReasonVoucherNotFound）。只讀，不改狀態。給把 Java 的活動識別對到券的轉接層用。
+func (s *Service) ForCampaign(ctx context.Context, buyerID int64, campaignID uuid.UUID) (model.Voucher, error) {
+	if buyerID <= 0 {
+		return model.Voucher{}, model.Invalid(ctx, "BuyerID", model.InvalidBuyerIDInvalid)
+	}
+	row, err := s.q(ctx).GetVoucherByCampaignBuyer(ctx, store.GetVoucherByCampaignBuyerParams{CampaignID: campaignID, BuyerID: buyerID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.Voucher{}, model.NotFound(ctx, model.ReasonVoucherNotFound)
+	}
+	if err != nil {
+		return model.Voucher{}, err
+	}
+	return rows.Voucher(row), nil
 }
 
 // VoidInput 是 admin 作廢單張券的輸入。
