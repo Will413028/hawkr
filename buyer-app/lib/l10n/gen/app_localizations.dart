@@ -217,6 +217,54 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'店家'**
   String get chatStoreFallbackName;
+
+  /// Loading overlay text while a payment is being created or confirmed.
+  ///
+  /// In zh, this message translates to:
+  /// **'處理中...'**
+  String get paymentProcessing;
+
+  /// Dialog title after the payment is confirmed as succeeded.
+  ///
+  /// In zh, this message translates to:
+  /// **'付款成功'**
+  String get paymentSucceededTitle;
+
+  /// Dialog title when a payment is canceled, failed, pending or needs support.
+  ///
+  /// In zh, this message translates to:
+  /// **'付款未完成'**
+  String get paymentNotCompletedTitle;
+
+  /// Message after the payment is confirmed as succeeded.
+  ///
+  /// In zh, this message translates to:
+  /// **'付款已完成，感謝你的購買。'**
+  String get paymentSucceededMessage;
+
+  /// Message when the payment result is not final after the capped re-reads.
+  ///
+  /// In zh, this message translates to:
+  /// **'付款處理中，請稍後到「我的訂單」確認結果。'**
+  String get paymentPendingMessage;
+
+  /// Message when the buyer closes the payment sheet.
+  ///
+  /// In zh, this message translates to:
+  /// **'你已取消付款，訂單仍待付款，可到「我的訂單」重新付款。'**
+  String get paymentCanceledMessage;
+
+  /// Message when the payment attempt failed or was canceled by the provider.
+  ///
+  /// In zh, this message translates to:
+  /// **'付款沒有完成，訂單仍待付款，可到「我的訂單」重新付款。'**
+  String get paymentFailedMessage;
+
+  /// Message when the payment is in ANOMALY; the buyer cannot retry.
+  ///
+  /// In zh, this message translates to:
+  /// **'這筆付款需要客服協助處理，暫時無法重新付款，請聯絡客服。'**
+  String get paymentAnomalyMessage;
 }
 
 class _AppLocalizationsDelegate

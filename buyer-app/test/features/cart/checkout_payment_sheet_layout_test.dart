@@ -1,13 +1,10 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'dart:ui' show CheckedState, SemanticsAction, Tristate;
-
-import 'package:hawkr_buyer/core/codemeta/code_meta.dart';
+import 'package:hawkr_buyer/core/codemeta/code_meta.dart'
+    show ShippingTemperature;
 import 'package:hawkr_buyer/features/cart/data/cart_model.dart';
 import 'package:hawkr_buyer/features/cart/presentation/widgets/checkout_payment_sheet.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart'
-    show debugDefaultTargetPlatformOverride;
 import 'package:flutter/material.dart';
 import 'package:hawkr_buyer/features/address/data/address_model.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -36,24 +33,6 @@ class _CheckoutPreviewAdapter implements HttpClientAdapter {
           'totalShippingFee': '12345',
           'totalDiscount': '12345678',
           'totalActualAmount': '111123456',
-          'availablePaymentMethods': [
-            {
-              'paymentType': PaymentMethod.applePay.value,
-              'eligible': true,
-              'ineligibleReason': '',
-            },
-            {
-              'paymentType': PaymentMethod.atm.value,
-              'eligible': true,
-              'ineligibleReason': '',
-            },
-            {
-              'paymentType': PaymentMethod.creditCard.value,
-              'eligible': false,
-              'ineligibleReason':
-                  PaymentMethodIneligibleReason.amountAboveMax.value,
-            },
-          ],
         },
       }),
       200,
@@ -70,7 +49,6 @@ class _CheckoutPreviewAdapter implements HttpClientAdapter {
 Future<void> _pumpCheckoutSheet(
   WidgetTester tester, {
   required Dio dio,
-  required ValueChanged<String> onPayMethodChanged,
   // 預設維持 '3001'，既有 case 行為不變；unsupported 那組 case 才覆寫它。
   String shippingMethod = '3001',
   String deliveryTemp = '3203',
@@ -113,15 +91,7 @@ Future<void> _pumpCheckoutSheet(
             onClearCoupons: () {},
             onNavigateToOrders: () {},
             onNavigateHome: () {},
-            onNavigateToPaymentWebview:
-                ({
-                  required String redirectUrl,
-                  required String tradeNo,
-                  required String orderNo,
-                  required String amount,
-                }) {},
             onInvalidateCartCount: () {},
-            onPayMethodChanged: onPayMethodChanged,
           ),
           dio: dio,
           parentContext: context,
@@ -143,7 +113,6 @@ void main() {
     await _pumpCheckoutSheet(
       tester,
       dio: dio,
-      onPayMethodChanged: (_) {},
       deliveryTemp: ShippingTemperature.frozen.value,
     );
     await tester.pump();
@@ -155,135 +124,34 @@ void main() {
     });
   });
 
-  testWidgets(
-    'checkout amounts reflow and payment methods expose selected radio semantics',
-    (tester) async {
-      final semantics = tester.ensureSemantics();
-      final dio = Dio(BaseOptions(baseUrl: 'https://checkout.test'))
-        ..httpClientAdapter = _CheckoutPreviewAdapter();
-      addTearDown(dio.close);
-      String? selectedPayType;
-
-      try {
-        await _pumpCheckoutSheet(
-          tester,
-          dio: dio,
-          onPayMethodChanged: (value) => selectedPayType = value,
-        );
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 100));
-
-        expect(find.text('NT\$ 123456789'), findsOneWidget);
-        expect(find.text('NT\$ -12345678'), findsOneWidget);
-        expect(find.text('NT\$ 111123456'), findsOneWidget);
-
-        final couponButton = find.ancestor(
-          of: find.text('選擇優惠券'),
-          matching: find.byType(FilledButton),
-        );
-        expect(tester.getSize(couponButton).height, greaterThanOrEqualTo(48));
-        final couponLabel = tester.widget<Text>(find.text('選擇優惠券'));
-        expect(couponLabel.maxLines, 1);
-        expect(couponLabel.softWrap, isFalse);
-
-        // 預設平台（測試環境是 android）也只有 Apple Pay：App 只發 iOS。
-        expect(find.bySemanticsLabel('Google Pay'), findsNothing);
-        final applePayTarget = find.bySemanticsLabel('Apple Pay');
-        final applePaySemantics = tester
-            .getSemantics(applePayTarget)
-            .getSemanticsData();
-        expect(applePaySemantics.flagsCollection.isSelected, Tristate.isTrue);
-        expect(applePaySemantics.flagsCollection.isChecked, CheckedState.none);
-        expect(
-          applePaySemantics.flagsCollection.isInMutuallyExclusiveGroup,
-          isTrue,
-        );
-        expect(applePaySemantics.flagsCollection.isButton, isTrue);
-
-        final atmTarget = find.bySemanticsLabel('ATM 虛擬轉帳');
-        expect(atmTarget, findsOneWidget);
-        expect(tester.getSize(atmTarget).height, greaterThanOrEqualTo(48));
-        var atmSemantics = tester.getSemantics(atmTarget).getSemanticsData();
-        expect(atmSemantics.flagsCollection.isSelected, Tristate.isFalse);
-        expect(atmSemantics.flagsCollection.isInMutuallyExclusiveGroup, isTrue);
-        final atmLabel = tester.widget<Text>(find.text('ATM 虛擬轉帳'));
-        expect(atmLabel.maxLines, 1);
-        expect(atmLabel.softWrap, isFalse);
-
-        final creditCardTarget = find.bySemanticsLabel('信用卡');
-        final creditCardSemantics = tester
-            .getSemantics(creditCardTarget)
-            .getSemanticsData();
-        expect(creditCardSemantics.flagsCollection.isEnabled, Tristate.isFalse);
-        expect(
-          creditCardSemantics.flagsCollection.isSelected,
-          Tristate.isFalse,
-        );
-        expect(
-          creditCardSemantics.flagsCollection.isInMutuallyExclusiveGroup,
-          isTrue,
-        );
-        expect(creditCardSemantics.hasAction(SemanticsAction.tap), isFalse);
-        expect(find.text('金額超過此付款方式上限'), findsOneWidget);
-        await tester.tap(find.text('信用卡'));
-        await tester.pump();
-        expect(selectedPayType, isNull);
-
-        await tester.tap(atmTarget);
-        await tester.pump();
-        expect(selectedPayType, PaymentMethod.atm.value);
-        atmSemantics = tester.getSemantics(atmTarget).getSemanticsData();
-        expect(atmSemantics.flagsCollection.isSelected, Tristate.isTrue);
-        expect(
-          tester
-              .getSemantics(applePayTarget)
-              .getSemanticsData()
-              .flagsCollection
-              .isSelected,
-          Tristate.isFalse,
-        );
-        expect(tester.takeException(), isNull);
-      } finally {
-        semantics.dispose();
-      }
-    },
-  );
-
-  testWidgets('payment methods expose selected radio-group semantics on iOS', (
+  testWidgets('checkout amounts reflow and the payment method list is gone', (
     tester,
   ) async {
-    final semantics = tester.ensureSemantics();
-    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     final dio = Dio(BaseOptions(baseUrl: 'https://checkout.test'))
       ..httpClientAdapter = _CheckoutPreviewAdapter();
     addTearDown(dio.close);
 
-    try {
-      await _pumpCheckoutSheet(tester, dio: dio, onPayMethodChanged: (_) {});
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
+    await _pumpCheckoutSheet(tester, dio: dio);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
 
-      final applePaySemantics = tester
-          .getSemantics(find.bySemanticsLabel('Apple Pay'))
-          .getSemanticsData();
-      expect(applePaySemantics.flagsCollection.isSelected, Tristate.isTrue);
-      expect(applePaySemantics.flagsCollection.isChecked, CheckedState.none);
-      expect(
-        applePaySemantics.flagsCollection.isInMutuallyExclusiveGroup,
-        isTrue,
-      );
+    expect(find.text('NT\$ 123456789'), findsOneWidget);
+    expect(find.text('NT\$ -12345678'), findsOneWidget);
+    expect(find.text('NT\$ 111123456'), findsOneWidget);
 
-      final atmSemantics = tester
-          .getSemantics(find.bySemanticsLabel('ATM 虛擬轉帳'))
-          .getSemanticsData();
-      expect(atmSemantics.flagsCollection.isSelected, Tristate.isFalse);
-      expect(atmSemantics.flagsCollection.isChecked, CheckedState.none);
-      expect(atmSemantics.flagsCollection.isInMutuallyExclusiveGroup, isTrue);
-      expect(tester.takeException(), isNull);
-    } finally {
-      debugDefaultTargetPlatformOverride = null;
-      semantics.dispose();
-    }
+    final couponButton = find.ancestor(
+      of: find.text('選擇優惠券'),
+      matching: find.byType(FilledButton),
+    );
+    expect(tester.getSize(couponButton).height, greaterThanOrEqualTo(48));
+    final couponLabel = tester.widget<Text>(find.text('選擇優惠券'));
+    expect(couponLabel.maxLines, 1);
+    expect(couponLabel.softWrap, isFalse);
+
+    expect(find.text('付款方式'), findsNothing);
+    expect(find.text('ATM 虛擬轉帳'), findsNothing);
+    expect(find.text('信用卡'), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   // ─────────────────────────────────────────────────────────────────────
@@ -312,7 +180,6 @@ void main() {
     await _pumpCheckoutSheet(
       tester,
       dio: dio,
-      onPayMethodChanged: (_) {},
       // 3003：Uber 即時配送（已刪除的功能），App 端無對應 UI。
       shippingMethod: '3003',
     );
@@ -326,12 +193,7 @@ void main() {
     final dio = Dio(BaseOptions(baseUrl: 'https://checkout.test'))
       ..httpClientAdapter = _CheckoutPreviewAdapter();
 
-    await _pumpCheckoutSheet(
-      tester,
-      dio: dio,
-      onPayMethodChanged: (_) {},
-      shippingMethod: '3005',
-    );
+    await _pumpCheckoutSheet(tester, dio: dio, shippingMethod: '3005');
     await tester.pumpAndSettle();
 
     // ⚠️ 這一條刻意與上一條分開：只測 3003 的話，
@@ -345,7 +207,7 @@ void main() {
     final dio = Dio(BaseOptions(baseUrl: 'https://checkout.test'))
       ..httpClientAdapter = _CheckoutPreviewAdapter();
 
-    await _pumpCheckoutSheet(tester, dio: dio, onPayMethodChanged: (_) {});
+    await _pumpCheckoutSheet(tester, dio: dio);
     await tester.pumpAndSettle();
 
     // 沒有這一條，上面兩條可能只是在證明「這個畫面永遠顯示那句話」。

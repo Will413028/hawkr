@@ -7,7 +7,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:hawkr_buyer/core/codemeta/code_meta.dart'
     hide OrderStatus, OrderItemStatus;
 
-import '../../../core/payment/pay_token_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
@@ -26,10 +25,10 @@ import '../data/after_sale_repository.dart';
 import '../data/order_model.dart';
 import 'order_detail_controller.dart';
 import '../data/order_repository.dart';
-import '../data/payment_repository.dart';
 import 'confirm_receipt_dialog.dart';
 import 'order_card_widgets/order_card_widgets.dart';
 import 'order_list_controller.dart';
+import 'pay_order.dart';
 import 'order_detail_transition.dart';
 import 'order_status_presentation.dart';
 import 'receipt_photo_controller.dart';
@@ -274,14 +273,7 @@ class _OrderCardState extends ConsumerState<OrderCard> {
                 order: order,
                 detailOrder: _detailOrder,
               ),
-              onRetryPayment: () => showRetryPaymentSheet(
-                context,
-                order: _detailOrder ?? order,
-                currentPayType:
-                    _detailOrder?.paymentMethod ?? order.paymentMethod,
-                onPaymentSelected: (payType) =>
-                    _executePayment(context, payType),
-              ),
+              onRetryPayment: () => _executePayment(context),
               onOpenRefundPage: () => _openRefundPage(context, ref),
               onConfirmReceipt: () => _confirmReceipt(context),
               onReview: () => _handleReview(context),
@@ -525,80 +517,14 @@ class _OrderCardState extends ConsumerState<OrderCard> {
     }
   }
 
-  Future<void> _executePayment(BuildContext context, String payType) async {
+  Future<void> _executePayment(BuildContext context) async {
     if (_isPayLoading) return;
     setState(() => _isPayLoading = true);
     try {
-      String? applePayToken;
-      if (payType == PaymentMethod.applePay.value) {
-        applePayToken = await _requestApplePayToken(context);
-        if (applePayToken == null) return;
-      }
-
-      final payRepo = ref.read(paymentRepositoryProvider);
-      debugPrint('[RetryPay] orderNo=${order.orderSn} payType=$payType');
-      final result = await payRepo.createPayment(
-        orderNo: order.orderSn,
-        paymentType: payType,
-        applePayToken: applePayToken,
-      );
-      if (!context.mounted) return;
-
-      if (payType == PaymentMethod.atm.value) {
-        await _fetchOrderDetail();
-        if (!context.mounted) return;
-        ref.read(orderListControllerProvider.notifier).refresh();
-        showFloatingToast(context, '已切換為 ATM 轉帳，請查看匯款資訊', isSuccess: true);
-        return;
-      }
-
-      final responsePaymentType =
-          result['paymentType']?.toString() ??
-          result['paymentMethod']?.toString() ??
-          '';
-      final paidWithoutRedirect =
-          _paymentResultIsPaid(result['status']) &&
-          (responsePaymentType == PaymentMethod.zeroAmount.value ||
-              _amountIsZero(
-                result['amount']?.toString() ?? order.totalActualAmount,
-              ));
-      if (paidWithoutRedirect) {
-        await _fetchOrderDetail();
-        if (!context.mounted) return;
-        ref.read(orderListControllerProvider.notifier).refresh();
-        showFloatingToast(context, '折抵後無需付款，訂單已完成付款', isSuccess: true);
-        return;
-      }
-
-      final redirectUrl = result['redirectUrl']?.toString() ?? '';
-      final tradeNo = result['tradeNo']?.toString() ?? '';
-      final amount = result['amount']?.toString() ?? order.totalActualAmount;
-      if (redirectUrl.isNotEmpty) {
-        if (!context.mounted) return;
-        await context.push(
-          '/payment/webview',
-          extra: {
-            'redirectUrl': redirectUrl,
-            'tradeNo': tradeNo,
-            'orderNo': order.orderSn,
-            'amount': amount,
-          },
-        );
-        if (mounted) {
-          ref.read(orderListControllerProvider.notifier).refresh();
-        }
-      } else {
-        if (!context.mounted) return;
-        showFloatingToast(context, '無法取得付款頁面', isSuccess: false);
-      }
-    } catch (e) {
-      if (context.mounted) {
-        showFloatingToast(
-          context,
-          '付款失敗：${e.toString().replaceAll('Exception: ', '')}',
-          isSuccess: false,
-        );
-      }
+      await payOrder(context, ref, order.orderSn);
+      if (!mounted) return;
+      await _fetchOrderDetail();
+      ref.read(orderListControllerProvider.notifier).refresh();
     } finally {
       if (mounted) setState(() => _isPayLoading = false);
     }
@@ -626,52 +552,6 @@ class _OrderCardState extends ConsumerState<OrderCard> {
     } finally {
       if (mounted) setState(() => _isPayLoading = false);
     }
-  }
-
-  Future<String?> _requestApplePayToken(BuildContext context) async {
-    final payTokenService = PayTokenService();
-    try {
-      await payTokenService.init();
-      if (!context.mounted) return null;
-      if (!payTokenService.isApplePayAvailable) {
-        showFloatingToast(
-          context,
-          '此裝置尚未啟用 Apple Pay，請選擇其他付款方式',
-          isSuccess: false,
-        );
-        return null;
-      }
-      return await payTokenService.requestToken(
-        amount: _retryPaymentAmount,
-        label: 'Hawkr 訂單',
-      );
-    } on PaymentCancelledException {
-      if (context.mounted) {
-        showFloatingToast(context, 'Apple Pay 付款已取消', isSuccess: false);
-      }
-      return null;
-    } on PaymentTokenUnavailableException catch (e) {
-      if (context.mounted) {
-        showFloatingToast(context, '付款失敗：$e', isSuccess: false);
-      }
-      return null;
-    } catch (e, stackTrace) {
-      debugPrint('[OrderCard] Apple Pay request failed: $e');
-      debugPrintStack(stackTrace: stackTrace);
-      if (context.mounted) {
-        showFloatingToast(context, 'Apple Pay 授權失敗，請稍後再試', isSuccess: false);
-      }
-      return null;
-    } finally {
-      payTokenService.dispose();
-    }
-  }
-
-  String get _retryPaymentAmount {
-    final detailAmount = _detailOrder?.totalActualAmount ?? '';
-    if (detailAmount.isNotEmpty) return detailAmount;
-    if (order.totalActualAmount.isNotEmpty) return order.totalActualAmount;
-    return '0';
   }
 
   Future<void> _confirmReceipt(BuildContext context) async {
@@ -725,18 +605,4 @@ class _OrderCardState extends ConsumerState<OrderCard> {
       await ref.read(orderListControllerProvider.notifier).refresh();
     }
   }
-}
-
-bool _paymentResultIsPaid(dynamic value) {
-  final status = value?.toString().trim().toUpperCase() ?? '';
-  return status == '1' ||
-      status == 'PAID' ||
-      status == 'SUCCESS' ||
-      status == '1102';
-}
-
-bool _amountIsZero(String value) {
-  final cleaned = value.replaceAll(RegExp(r'[^0-9.-]'), '');
-  if (cleaned.isEmpty) return false;
-  return (num.tryParse(cleaned) ?? -1) == 0;
 }
