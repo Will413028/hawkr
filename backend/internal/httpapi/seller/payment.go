@@ -3,6 +3,7 @@ package seller
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"connectrpc.com/connect"
@@ -10,6 +11,7 @@ import (
 
 	paymentpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/payment/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1/sellerv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
@@ -39,6 +41,9 @@ type Payments interface {
 	PaymentReader
 	CreateOnboardingSession(ctx context.Context, storeID int64, returnURL, refreshURL string, runtimes []payment.EmbeddedRuntime) (payment.OnboardingSession, error)
 	SyncAccountUnlessFresh(ctx context.Context, storeID int64) error
+	// ListEarnings 與 OrderEarnings 是賣家入帳帳本（D15）：以 handler 從能力檢查取得的店家為範圍，模組只回這家店的列。
+	ListEarnings(ctx context.Context, storeID int64, f payment.EarningsFilter, after *payment.RecordCursor, size int32) (payment.EarningsPage, error)
+	OrderEarnings(ctx context.Context, storeID int64, orderNo string) (payment.OrderEarnings, error)
 }
 
 func optTimestamp(t *time.Time) *timestamppb.Timestamp {
@@ -132,4 +137,75 @@ func (h *App) RefreshMyPaymentAccount(ctx context.Context, _ *connect.Request[pb
 		return nil, err
 	}
 	return connect.NewResponse(&pb.RefreshMyPaymentAccountResponse{}), nil
+}
+
+// earningsToProto 轉成帳本的一列；種類與狀態由模組的值對應到 proto 的列舉。
+func earningsToProto(e payment.EarningsEntry) *paymentpb.EarningsEntry {
+	return &paymentpb.EarningsEntry{
+		Id:         e.ID.String(),
+		Type:       rpc.EnumToProto[paymentpb.EarningsEntryType](e.Type),
+		OrderNo:    e.OrderNo,
+		Amount:     e.Amount,
+		Status:     rpc.EnumToProto[paymentpb.EarningsEntryStatus](e.Status),
+		CreateTime: timestamppb.New(e.CreatedAt),
+	}
+}
+
+func optTime(t *timestamppb.Timestamp) *time.Time {
+	if t == nil {
+		return nil
+	}
+	v := t.AsTime()
+	return &v
+}
+
+// ListMyEarnings 列出呼叫者店家的入帳帳本；店家只從能力檢查取得，請求不帶店家，所以別家店的列不可能被讀到。
+func (h *App) ListMyEarnings(ctx context.Context, req *connect.Request[pb.ListMyEarningsRequest]) (*connect.Response[pb.ListMyEarningsResponse], error) {
+	current, err := storeFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	f := payment.EarningsFilter{OrderNo: req.Msg.GetOrderNo(), From: optTime(req.Msg.GetFromTime()), To: optTime(req.Msg.GetToTime())}
+	scope := rpc.FilterScope(sellerv1alpha1connect.SellerAppServiceListMyEarningsProcedure,
+		strconv.FormatInt(current.StoreID, 10), f.OrderNo, timeKey(f.From), timeKey(f.To))
+	after, err := rpc.ValidCursor[payment.RecordCursor](scope, req.Msg.GetPageToken())
+	if err != nil {
+		return nil, err
+	}
+	page, err := h.payments.ListEarnings(ctx, current.StoreID, f, after, req.Msg.GetPageSize())
+	if err != nil {
+		return nil, err
+	}
+	out := &pb.ListMyEarningsResponse{Entries: make([]*paymentpb.EarningsEntry, len(page.Entries))}
+	for i, e := range page.Entries {
+		out.Entries[i] = earningsToProto(e)
+	}
+	if page.Next != nil {
+		out.NextPageToken = rpc.TokenFor(scope, page.Next)
+	}
+	return connect.NewResponse(out), nil
+}
+
+func timeKey(t *time.Time) string {
+	if t == nil {
+		return ""
+	}
+	return t.UTC().Format(time.RFC3339Nano)
+}
+
+// GetMyOrderEarnings 回傳呼叫者店家一張訂單的入帳列與已完成列的淨額；別家店的訂單與沒有付款的訂單都回 not_found（由模組判定）。
+func (h *App) GetMyOrderEarnings(ctx context.Context, req *connect.Request[pb.GetMyOrderEarningsRequest]) (*connect.Response[pb.GetMyOrderEarningsResponse], error) {
+	current, err := storeFrom(ctx)
+	if err != nil {
+		return nil, err
+	}
+	got, err := h.payments.OrderEarnings(ctx, current.StoreID, req.Msg.GetOrderNo())
+	if err != nil {
+		return nil, err
+	}
+	out := &pb.GetMyOrderEarningsResponse{Entries: make([]*paymentpb.EarningsEntry, len(got.Entries)), NetAmount: got.NetAmount}
+	for i, e := range got.Entries {
+		out.Entries[i] = earningsToProto(e)
+	}
+	return connect.NewResponse(out), nil
 }

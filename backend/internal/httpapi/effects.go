@@ -275,6 +275,8 @@ var customerEffects = map[string]Effect{
 	"/hawkr.seller.v1alpha1.SellerAppService/SubmitKYC":                      EffectWrite,
 	"/hawkr.seller.v1alpha1.SellerAppService/CancelKYC":                      EffectWrite,
 	"/hawkr.seller.v1alpha1.SellerAppService/GetMyPaymentAccount":            EffectRead,
+	"/hawkr.seller.v1alpha1.SellerAppService/ListMyEarnings":                 EffectRead,
+	"/hawkr.seller.v1alpha1.SellerAppService/GetMyOrderEarnings":             EffectRead,
 	"/hawkr.seller.v1alpha1.SellerAppService/CreatePaymentOnboardingSession": EffectWrite,
 	"/hawkr.seller.v1alpha1.SellerAppService/LookupBusinessRegistration":     EffectRead,
 	"/hawkr.seller.v1alpha1.SellerAppService/ListMyMeasures":                 EffectRead,
