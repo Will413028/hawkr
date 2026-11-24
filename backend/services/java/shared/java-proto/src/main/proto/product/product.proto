@@ -85,11 +85,6 @@ service ProductService {
     // 軟刪除商品（僅限擁有者，僅草稿(4001)/未上架(4003)狀態）
     rpc DeleteProduct (DeleteProductRequest) returns (DeleteProductResponse);
 
-    // ==================== 運費計算（賣家建立商品時使用） ====================
-
-    // 計算可用配送選項與運費（依溫層分組）
-    rpc CalculateShippingOptions (CalculateShippingOptionsRequest) returns (CalculateShippingOptionsResponse);
-
     // ==================== 認證驗證（賣家驗證農業認證編號） ====================
 
     // 驗證認證編號是否存在於政府開放資料平台 — 僅限 Seller (account_type: 2, 3)
@@ -821,60 +816,6 @@ message ProductForCheckoutInfo {
     string height_cm = 16;
     repeated ShippingMethod shipping_methods = 17;  // SKU 層級配送方式 + 免運門檻 + fee_payer
     string temperature = 18;             // SKU 主要溫層（取 shipping_methods[0].temperature 或 ShippingTemperature value）
-}
-
-// ========== CalculateShippingOptions（運費計算） ==========
-
-// 運費計算請求
-message CalculateShippingOptionsRequest {
-    int64 store_id = 1;        // 賣家 store 代理鍵（Gateway 已解析為現任 store surrogate 才傳入）
-    string length = 2;          // 長 (cm)
-    string width = 3;           // 寬 (cm)
-    string height = 4;          // 高 (cm)
-    string weight = 5;          // 重量值
-    string weight_unit = 6;     // WeightUnit: KG, CATTY, GRAM
-    string sender_area = 7;     // ShippingArea: MAIN_ISLAND, OFFSHORE_ISLAND（由 Product Service 內部透過 Seller Service 的 zip_code 推導，Gateway 不傳）
-    string receiver_area = 8;   // ShippingArea: MAIN_ISLAND, OFFSHORE_ISLAND（固定 MAIN_ISLAND，Gateway 不傳）
-}
-
-// 運費計算回應
-message CalculateShippingOptionsResponse {
-    int32 code = 1;
-    string message = 2;
-    ShippingCalculationData data = 3;
-}
-
-// 運費計算結果
-message ShippingCalculationData {
-    repeated AvailableTemperatureProto available_temperatures = 1;  // 可配送溫層
-    repeated ShippingOptionProto shipping_options = 2;              // 運送方式（每個 method×temperature 組合一筆）
-    string volume_size = 3;      // 材積（L×W×H÷27000，保留兩位小數）
-    string weight_grams = 4;     // 轉換後重量 (g)
-    string dimension_sum = 5;    // L+W+H (cm)
-    string longest_side = 6;     // 最長邊 (cm)
-}
-
-// 可配送溫層
-message AvailableTemperatureProto {
-    string temperature = 1;    // ShippingTemperature value
-    string display_name = 2;   // 溫層顯示名（常溫/冷藏/冷凍）
-}
-
-// 單一運送方式選項（method × temperature 組合）
-message ShippingOptionProto {
-    string shipping_method = 1;        // ShippingMethod value
-    string display_name = 2;           // 配送方式顯示名（黑貓宅急便/7-11店到店）
-    string temperature = 3;            // ShippingTemperature value
-    string fee = 4;                    // 運費 (TWD)
-    string estimated_days = 5;         // 預計到貨天數（暫空）
-    ShippingLimitsProto limits = 6;    // 該組合的尺寸/重量限制
-}
-
-// 配送限制
-message ShippingLimitsProto {
-    string max_dimension_sum = 1;   // 材積上限 L+W+H (cm)，"0" 表示無特定限制
-    string max_longest_side = 2;    // 最長邊上限 (cm)，"0" 表示無特定限制
-    string max_weight_grams = 3;    // 重量上限 (g)
 }
 
 // ========== GetRelatedProducts（相關商品） ==========

@@ -14,11 +14,7 @@ public class AfterSalesEventMqConfig {
 
     // ==================== Consumer Queue 常數（引用 MqConstants）====================
 
-    public static final String QUEUE_RETURN_STATUS = MqConstants.QUEUE_AFTERSALES_RETURN_SHIPMENT_STATUS;
     public static final String QUEUE_REFUND_RESULT = MqConstants.QUEUE_AFTERSALES_REFUND_RESULT;
-    public static final String QUEUE_PROCESSING_TIMEOUT = MqConstants.QUEUE_AFTERSALES_SHIPMENT_PROCESSING_TIMEOUT;
-    public static final String QUEUE_SHIPMENT_LABEL = MqConstants.QUEUE_AFTERSALES_SHIPMENT_LABEL;
-    public static final String QUEUE_SHIPMENT_CREATION_FAILED = MqConstants.QUEUE_AFTERSALES_SHIPMENT_CREATION_FAILED;
 
     // ==================== Exchange Beans ====================
 
@@ -54,23 +50,6 @@ public class AfterSalesEventMqConfig {
         return BindingBuilder.bind(aftersalesDlq).to(aftersalesDlxExchange).with("dlq");
     }
 
-    // ==================== Consumer Queue: 退貨物流狀態變更 ====================
-
-    @Bean
-    public Queue returnStatusQueue() {
-        return QueueBuilder.durable(QUEUE_RETURN_STATUS)
-                .withArgument("x-dead-letter-exchange", MqConstants.EXCHANGE_AFTERSALES_DLX)
-                .withArgument("x-dead-letter-routing-key", "dlq")
-                .build();
-    }
-
-    @Bean
-    public Binding returnStatusBinding(Queue returnStatusQueue) {
-        return BindingBuilder.bind(returnStatusQueue)
-                .to(new TopicExchange(MqConstants.EXCHANGE_SHIPPING, true, false))
-                .with(MqConstants.ROUTING_KEY_RETURN_SHIPMENT_STATUS_CHANGED);
-    }
-
     // ==================== Consumer Queue: 退款結果（綁定 succeeded + failed）====================
 
     @Bean
@@ -93,59 +72,6 @@ public class AfterSalesEventMqConfig {
         return BindingBuilder.bind(refundResultQueue)
                 .to(new TopicExchange(MqConstants.EXCHANGE_PAYMENT, true, false))
                 .with(MqConstants.ROUTING_KEY_REFUND_FAILED);
-    }
-
-    // ==================== Consumer Queue: §5.9 賣家處理逾期 ====================
-
-    @Bean
-    public Queue processingTimeoutQueue() {
-        return QueueBuilder.durable(QUEUE_PROCESSING_TIMEOUT)
-                .withArgument("x-dead-letter-exchange", MqConstants.EXCHANGE_AFTERSALES_DLX)
-                .withArgument("x-dead-letter-routing-key", "dlq")
-                .build();
-    }
-
-    @Bean
-    public Binding processingTimeoutBinding(Queue processingTimeoutQueue) {
-        return BindingBuilder.bind(processingTimeoutQueue)
-                .to(new TopicExchange(MqConstants.EXCHANGE_SHIPPING, true, false))
-                .with(MqConstants.ROUTING_KEY_SHIPMENT_PROCESSING_TIMEOUT);
-    }
-
-    // ==================== Consumer Queue: §8.11 Backstop 建單逾時取消 ====================
-
-    @Bean
-    public Queue shipmentCreationFailedQueue() {
-        return QueueBuilder.durable(QUEUE_SHIPMENT_CREATION_FAILED)
-                .withArgument("x-dead-letter-exchange", MqConstants.EXCHANGE_AFTERSALES_DLX)
-                .withArgument("x-dead-letter-routing-key", "dlq")
-                .build();
-    }
-
-    @Bean
-    public Binding shipmentCreationFailedBinding(Queue shipmentCreationFailedQueue) {
-        return BindingBuilder.bind(shipmentCreationFailedQueue)
-                .to(new TopicExchange(MqConstants.EXCHANGE_ORDER, true, false))
-                .with(MqConstants.ROUTING_KEY_ORDER_SHIPMENT_CREATION_FAILED);
-    }
-
-    // ==================== Consumer Queue: §5.3.6 7-11 退貨出貨便代碼 ====================
-    // 綁定相同 routing key (shipment.label.updated)，與 order.shipping.label 並行消費。
-    // Consumer 以 payload.isReturn 分流，僅處理 isReturn=true。
-
-    @Bean
-    public Queue shipmentLabelQueue() {
-        return QueueBuilder.durable(QUEUE_SHIPMENT_LABEL)
-                .withArgument("x-dead-letter-exchange", MqConstants.EXCHANGE_AFTERSALES_DLX)
-                .withArgument("x-dead-letter-routing-key", "dlq")
-                .build();
-    }
-
-    @Bean
-    public Binding shipmentLabelBinding(Queue shipmentLabelQueue) {
-        return BindingBuilder.bind(shipmentLabelQueue)
-                .to(new TopicExchange(MqConstants.EXCHANGE_SHIPPING, true, false))
-                .with(MqConstants.ROUTING_KEY_SHIPMENT_LABEL_UPDATED);
     }
 
     // ==================== Consumer Queue: §2.2 業務 pivot (2026-05-14) PayUni UNKNOWN webhook fallback ====================

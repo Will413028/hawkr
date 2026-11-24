@@ -8,7 +8,6 @@ import io.github.will413028.hawkr.aftersales.entity.AfterSaleResolutionEntity;
 import io.github.will413028.hawkr.aftersales.entity.RefundTaskEntity;
 import io.github.will413028.hawkr.aftersales.exception.AfterSalesBusinessException;
 import io.github.will413028.hawkr.aftersales.grpc.client.CouponGrpcClient;
-import io.github.will413028.hawkr.aftersales.grpc.client.ShippingGrpcClient;
 import io.github.will413028.hawkr.aftersales.mapper.AfterSaleCaseMapper;
 import io.github.will413028.hawkr.aftersales.mapper.AfterSaleResolutionMapper;
 import io.github.will413028.hawkr.aftersales.mapper.RefundTaskMapper;
@@ -21,7 +20,6 @@ import io.github.will413028.hawkr.common.utils.proto.ProtoConversionUtils;
 import io.github.will413028.hawkr.common.utils.TsidUtil;
 import io.github.will413028.hawkr.coupon.grpc.GrantSellerCompensationCouponResponse;
 import io.github.will413028.hawkr.payment.grpc.CreateRefundResponse;
-import io.github.will413028.hawkr.shipping.grpc.CreateReturnShipmentResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,7 +41,6 @@ public class AfterSaleResolutionService {
     private final AfterSaleCaseMapper caseMapper;
     private final AfterSaleResolutionMapper resolutionMapper;
     private final RefundTaskMapper refundTaskMapper;
-    private final ShippingGrpcClient shippingGrpcClient;
     private final CouponGrpcClient couponGrpcClient;
     private final AfterSaleAuditService auditService;
     private final AfterSalesProperties properties;
@@ -66,7 +63,6 @@ public class AfterSaleResolutionService {
      * @param caseNo                售後單編號
      * @param resolutionType        決議類型（AfterSaleResolutionType code）
      * @param refundAmount          退款金額（部分退款用）
-     * @param returnShippingMethod  退貨配送方式（退貨退款用）
      * @param rejectReason          拒絕原因 code（拒絕用）
      * @param rejectMessage         拒絕說明（拒絕用，可選）
      * @param couponAmount          優惠券面額（優惠券補償用）
@@ -75,7 +71,7 @@ public class AfterSaleResolutionService {
      */
     @Transactional
     public void resolve(Long storeId, String caseNo, String resolutionType,
-                        Long refundAmount, String returnShippingMethod,
+                        Long refundAmount,
                         String rejectReason, String rejectMessage,
                         Long couponAmount, Long couponMinSpend, String couponMessage) {
         // 1. 驗證決議類型
@@ -120,7 +116,8 @@ public class AfterSaleResolutionService {
         }
 
         switch (type) {
-            case RETURN_REFUND -> handleReturnRefund(caseEntity, storeId, returnShippingMethod);
+            // 平台沒有退貨物流，賣家不能要求退貨退款
+            case RETURN_REFUND -> throw new AfterSalesBusinessException(GrpcResponseCode.INVALID_PARAM);
             case PARTIAL_REFUND -> handlePartialRefund(caseEntity, storeId, refundAmount);
             case FULL_REFUND_NO_RETURN -> handleFullRefundNoReturn(caseEntity, storeId);
             case COUPON_COMPENSATION -> handleCouponCompensation(caseEntity, storeId, couponAmount, couponMinSpend, couponMessage);
@@ -131,102 +128,6 @@ public class AfterSaleResolutionService {
     }
 
     // ==================== 各類型處理 ====================
-
-    /**
-     * 退貨退款：建立退貨物流 → 更新狀態為待退貨。
-     */
-    private void handleReturnRefund(AfterSaleCaseEntity caseEntity, Long storeId,
-                                     String returnShippingMethod) {
-        // §5.2.1.1 必須是合法 ShippingMethod value，禁止字面 code（如 "SEVEN_ELEVEN_STORE_PICKUP"）
-        // null / blank 由 CodeMetaValidator 統一拋 INVALID_PARAM
-        CodeMetaValidator.requireValidValue(ShippingMethod.class, returnShippingMethod, "return_shipping_method");
-
-        // §5.2.1.2 enforcement：return 必須 = forward；Uber 暫不支援
-        String forwardMethod = caseEntity.getShippingMethod();
-        if (ShippingMethod.UBER_INSTANT.value().equals(forwardMethod)) {
-            throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_RETURN_NOT_SUPPORTED_FOR_UBER);
-        }
-        if (!returnShippingMethod.equals(forwardMethod)) {
-            throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_RETURN_METHOD_MISMATCH);
-        }
-
-        String caseNo = caseEntity.getCaseNo();
-
-        // 呼叫 Shipping 建立退貨物流
-        CreateReturnShipmentResponse shipResp;
-        if (ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value().equals(returnShippingMethod)) {
-            shipResp = shippingGrpcClient.createReturnCvsShipment(
-                    caseEntity.getOrderNo(),
-                    ProtoConversionUtils.formatLong(caseEntity.getStoreId()),
-                    caseEntity.getMerId(),
-                    caseEntity.getBuyerName(),
-                    caseEntity.getBuyerPhone(),
-                    caseEntity.getDeliveryTemp(),
-                    ProtoConversionUtils.formatLong(caseEntity.getRefundableAmount())
-            );
-        } else {
-            shipResp = shippingGrpcClient.createReturnHomeShipment(
-                    caseEntity.getOrderNo(),
-                    ProtoConversionUtils.formatLong(caseEntity.getStoreId()),
-                    caseEntity.getMerId(),
-                    caseEntity.getBuyerName(),
-                    caseEntity.getBuyerPhone(),
-                    caseEntity.getBuyerCity(),
-                    caseEntity.getBuyerDistrict(),
-                    caseEntity.getBuyerAddressDetail(),
-                    caseEntity.getBuyerPostalCode(),
-                    caseEntity.getDeliveryTemp()
-            );
-        }
-
-        // envelope-code 檢查（依《Java gRPC 錯誤處理規範》§7.0 現行約定）：
-        // shipping-service 建單失敗以 envelope code≠0 回傳（onNext，非 StatusRuntimeException），必須檢查。
-        // 屬「無不可逆前置」情境 → throw 透傳下游訊息，@Transactional rollback，case 維持 PENDING
-        // 不推進 RETURN_PENDING（#1150 同類：原本不檢查 code 直接取 getData() 推進，物流單實際未建成）。
-        if (shipResp.getCode() != GrpcResponseCode.SUCCESS.code()) {
-            throw new AfterSalesBusinessException(
-                    GrpcResponseCode.RETURN_SHIPMENT_FAILED, shipResp.getMessage());
-        }
-
-        // 插入決議記錄
-        AfterSaleResolutionEntity resolution = new AfterSaleResolutionEntity();
-        resolution.setId(TsidUtil.generate());
-        resolution.setCaseNo(caseNo);
-        resolution.setResolutionType(AfterSaleResolutionType.RETURN_REFUND.value());
-        resolution.setRefundAmount(caseEntity.getRefundableAmount());
-        resolution.setReturnShippingMethod(returnShippingMethod);
-        resolution.setResolvedBy(storeId);
-        resolutionMapper.insert(resolution);
-
-        // §2.1 INV-3：mapper 自訂 SQL transition（PENDING → RETURN_PENDING）
-        // §5.3.8 2026-06-15 新增：同 SQL stamp ship_back_deadline_at = NOW + return.timeout-days（預設 7 天）
-        String shipTradeNo = shipResp.getData().getShipTradeNo();
-        java.time.LocalDateTime shipBackDeadlineAt = DateTimeUtils.nowUtc()
-                .plusDays(properties.getReturnConfig().getTimeoutDays());
-        int updated = caseMapper.markReturnPending(
-                caseNo,
-                shipResp.getData().getShipmentNo(),
-                returnShippingMethod,
-                (shipTradeNo != null && !shipTradeNo.isBlank()) ? shipTradeNo : null,
-                shipBackDeadlineAt);
-        if (updated == 0) {
-            throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_INVALID_STATUS);
-        }
-
-        auditService.log(caseNo, null, storeId, AfterSaleAuditActor.SELLER.value(), AfterSaleAuditAction.RESOLVE_RETURN_REFUND.value(),
-                Map.of("returnShippingMethod", returnShippingMethod,
-                        "shipmentNo", shipResp.getData().getShipmentNo()));
-
-        log.info("AfterSaleResolutionService.returnRefund.success",
-                "退貨退款決議完成, shipmentNo=" + shipResp.getData().getShipmentNo(), "caseNo", caseNo);
-
-        afterSalesEventPublisher.publishCaseTransition(
-                AfterSalesEventType.CASE_RETURN_APPROVED.value(),
-                MqConstants.EVENT_TYPE_AFTERSALES_CASE_RETURN_APPROVED,
-                caseNo, caseEntity.getOrderNo(),
-                caseEntity.getBuyerId(), caseEntity.getStoreId(),
-                "seller");
-    }
 
     /**
      * 部分退款：驗證金額 → 建立退款任務 → 更新狀態。

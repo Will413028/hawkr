@@ -78,7 +78,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
     private final StringRedisTemplate redisTemplate;
     private final StockService stockService;
     private final SellerGrpcClient sellerGrpcClient;
-    private final io.github.will413028.hawkr.product.grpc.client.ShippingGrpcClient shippingGrpcClient;
     private final ProductSkuRepository skuRepository;
     private final GovCertificationService govCertificationService;
     private final io.github.will413028.hawkr.product.service.HashtagService hashtagService;
@@ -95,7 +94,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
             StringRedisTemplate redisTemplate,
             StockService stockService,
             SellerGrpcClient sellerGrpcClient,
-            io.github.will413028.hawkr.product.grpc.client.ShippingGrpcClient shippingGrpcClient,
             ProductSkuRepository skuRepository,
             GovCertificationService govCertificationService,
             io.github.will413028.hawkr.product.service.HashtagService hashtagService,
@@ -111,7 +109,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
         this.redisTemplate = redisTemplate;
         this.stockService = stockService;
         this.sellerGrpcClient = sellerGrpcClient;
-        this.shippingGrpcClient = shippingGrpcClient;
         this.skuRepository = skuRepository;
         this.govCertificationService = govCertificationService;
         this.hashtagService = hashtagService;
@@ -1331,160 +1328,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
         };
     }
 
-    // ==================== CalculateShippingOptions（運費計算） ====================
-
-    /**
-     * 計算可用配送選項與運費（依溫層分組）
-     * 賣家建立商品時使用，根據包裝尺寸和重量計算可用的配送方式與運費
-     */
-    @Override
-    public void calculateShippingOptions(CalculateShippingOptionsRequest request,
-                                          StreamObserver<CalculateShippingOptionsResponse> responseObserver) {
-        try {
-            // 授權：僅 SELLER 可使用
-            GrpcAuthContext.requireAccountType(AccountType.SELLER);
-
-            // 驗證並解析必填欄位（支援小數字串，四捨五入為整數 cm）
-            int lengthCm = parseDimensionCm(request.getLength(), "length");
-            int widthCm = parseDimensionCm(request.getWidth(), "width");
-            int heightCm = parseDimensionCm(request.getHeight(), "height");
-
-            // 解析重量單位
-            String weightUnitStr = request.getWeightUnit();
-            if (weightUnitStr == null || weightUnitStr.isEmpty()) {
-                responseObserver.onNext(CalculateShippingOptionsResponse.newBuilder()
-                        .setCode(GrpcResponseCode.INVALID_PARAM.code())
-                        .setMessage("weight_unit 為必填欄位（3301=KG/3302=CATTY/3303=GRAM）")
-                        .build());
-                responseObserver.onCompleted();
-                return;
-            }
-            if (!WeightUnit.isValidValue(weightUnitStr)) {
-                responseObserver.onNext(CalculateShippingOptionsResponse.newBuilder()
-                        .setCode(GrpcResponseCode.INVALID_PARAM.code())
-                        .setMessage("無效的重量單位: " + weightUnitStr + "，允許值: 3301(KG), 3302(CATTY), 3303(GRAM)")
-                        .build());
-                responseObserver.onCompleted();
-                return;
-            }
-            WeightUnit weightUnit = WeightUnit.fromValue(weightUnitStr);
-
-            // 轉換重量為公克
-            long weightGrams = WeightConverter.convertToGrams(request.getWeight(), weightUnit);
-
-            // 透過 Seller Service 取得賣家 zip_code → 推導出貨地區
-            long storeId = request.getStoreId();
-            SellerMeta sellerMeta = sellerGrpcClient.getSellerMeta(storeId);
-            // TODO: 待 seller.proto SellerMeta 新增 zip_code 欄位後，改用 sellerMeta.getZipCode()
-            String zipCode = (sellerMeta != null) ? "" : "";
-            ShippingArea senderArea = ShippingAreaResolver.resolve(zipCode);
-            // 收件地區固定為本島（Phase 1 僅支援寄送至台灣本島）
-            ShippingArea receiverArea = ShippingArea.MAIN_ISLAND;
-
-            // 透過 ShippingRoute 推導 DeliveryZoneKey value（與 ShippingFeeCacheClient.toDeliveryZone 對應）
-            io.github.will413028.hawkr.common.utils.code.ShippingRoute route =
-                    io.github.will413028.hawkr.common.utils.code.helper.ShippingRouteRules.resolve(senderArea, receiverArea);
-            String deliveryZone = switch (route) {
-                case DOMESTIC -> io.github.will413028.hawkr.common.utils.code.DeliveryZoneKey.DOMESTIC.value();
-                case TO_OFFSHORE, FROM_OFFSHORE -> io.github.will413028.hawkr.common.utils.code.DeliveryZoneKey.OFFSHORE.value();
-                case OFFSHORE_TO_OFFSHORE -> io.github.will413028.hawkr.common.utils.code.DeliveryZoneKey.INTER_ISLAND.value();
-            };
-
-            // 呼叫 Shipping Service 計算配送選項（傳入 storeId，只回傳賣家已開通的配送方式）
-            io.github.will413028.hawkr.shipping.grpc.CalculateShippingOptionsResponse shippingResp =
-                    shippingGrpcClient.calculateShippingOptions(
-                            String.valueOf(lengthCm), String.valueOf(widthCm), String.valueOf(heightCm),
-                            String.valueOf(weightGrams), deliveryZone, storeId);
-
-            // shipping-service 失敗時會拋 StatusRuntimeException，由 catch-all 處理；
-            // 此處只需檢查業務結果是否為空
-            // 檢查是否有可用選項；無選項時透傳 shipping-service 回報的真正原因碼 + 訊息
-            // （SELLER_NOT_ONBOARDED 未開通 / SHIPPING_ALL_METHODS_EXCEED_LIMITS 超尺寸重量），
-            // 避免一律誤指「商品尺寸超過限制」。
-            if (shippingResp.getTemperatureGroupsList().isEmpty()) {
-                int reasonCode = shippingResp.getCode();
-                String reasonMsg = shippingResp.getMessage();
-                // shipping 未回報具體原因時（版本 skew）的保底
-                if (reasonCode == GrpcResponseCode.SUCCESS.code()) {
-                    reasonCode = GrpcResponseCode.SHIPPING_ALL_METHODS_EXCEED_LIMITS.code();
-                }
-                if (reasonMsg == null || reasonMsg.isBlank()
-                        || GrpcResponseCode.SUCCESS.message().equals(reasonMsg)) {
-                    reasonMsg = GrpcResponseCode.SHIPPING_ALL_METHODS_EXCEED_LIMITS.message();
-                }
-                responseObserver.onNext(CalculateShippingOptionsResponse.newBuilder()
-                        .setCode(reasonCode)
-                        .setMessage(reasonMsg)
-                        .build());
-                responseObserver.onCompleted();
-                return;
-            }
-
-            // 計算材積 L×W×H÷27000
-            String volumeSize = String.format("%.2f", (double)(lengthCm * widthCm * heightCm) / 27000.0);
-
-            // 將 Shipping Service 回應映射到 Product Service 的 Proto 格式
-            ShippingCalculationData.Builder dataBuilder = ShippingCalculationData.newBuilder()
-                    .setVolumeSize(volumeSize)
-                    .setWeightGrams(shippingResp.getWeightGrams())
-                    .setDimensionSum(shippingResp.getDimensionSum())
-                    .setLongestSide(shippingResp.getLongestSide());
-
-            // 收集可配送溫層
-            for (io.github.will413028.hawkr.shipping.grpc.ShippingOptionGroup group : shippingResp.getTemperatureGroupsList()) {
-                dataBuilder.addAvailableTemperatures(AvailableTemperatureProto.newBuilder()
-                        .setTemperature(group.getTemperature())
-                        .setDisplayName(group.getDisplayName())
-                        .build());
-
-                // 攤平運送方式：每個 method × temperature 組合一筆
-                for (io.github.will413028.hawkr.shipping.grpc.ShippingOptionDetail detail : group.getMethodsList()) {
-                    dataBuilder.addShippingOptions(ShippingOptionProto.newBuilder()
-                            .setShippingMethod(detail.getShippingMethod())
-                            .setDisplayName(detail.getDisplayName())
-                            .setTemperature(group.getTemperature())
-                            .setFee(detail.getFee())
-                            .setEstimatedDays(detail.getEstimatedDays())
-                            .setLimits(ShippingLimitsProto.newBuilder()
-                                    .setMaxDimensionSum(detail.getMaxDimensionSum())
-                                    .setMaxLongestSide(detail.getMaxLongestSide())
-                                    .setMaxWeightGrams(detail.getMaxWeightGrams())
-                                    .build())
-                            .build());
-                }
-            }
-
-            responseObserver.onNext(CalculateShippingOptionsResponse.newBuilder()
-                    .setCode(GrpcResponseCode.SUCCESS.code())
-                    .setMessage(GrpcResponseCode.SUCCESS.message())
-                    .setData(dataBuilder.build())
-                    .build());
-
-            int tempCount = shippingResp.getTemperatureGroupsCount();
-            log.info("ProductGrpcService.calculateShippingOptions.success",
-                    "運費計算成功，可用溫層數=" + tempCount,
-                    "volumeSize", volumeSize);
-
-        } catch (IllegalArgumentException e) {
-            log.warn("ProductGrpcService.calculateShippingOptions.invalidParam", "參數錯誤: " + e.getMessage());
-            responseObserver.onNext(CalculateShippingOptionsResponse.newBuilder()
-                    .setCode(GrpcResponseCode.INVALID_PARAM.code())
-                    .setMessage(e.getMessage())
-                    .build());
-        } catch (StatusRuntimeException e) {
-            responseObserver.onNext(CalculateShippingOptionsResponse.newBuilder()
-                    .setCode(e.getStatus().getCode() == Status.Code.UNAUTHENTICATED
-                            ? GrpcResponseCode.UNAUTHORIZED.code()
-                            : GrpcResponseCode.PERMISSION_DENIED.code())
-                    .setMessage(e.getStatus().getDescription())
-                    .build());
-        } catch (Exception e) {
-            GrpcErrorHandler.handleException(responseObserver, CalculateShippingOptionsResponse.newBuilder(), e, "ProductGrpcService", "calculateShippingOptions");
-            return;
-        }
-        responseObserver.onCompleted();
-    }
-
     // ==================== GetProductSimple（Cart Service 呼叫） ====================
 
     @Override
@@ -1944,7 +1787,7 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                     .status(ProductStatus.ACTIVE.value())
                     .page(1)
                     .pageSize(limit + 1)
-                    .publicApi(true) // 02 §2.7.2：公開讀路徑，套 onboarding filter
+                    .publicApi(true)
                     .build();
 
             ProductListResultDTO result = productService.getProductList(query);

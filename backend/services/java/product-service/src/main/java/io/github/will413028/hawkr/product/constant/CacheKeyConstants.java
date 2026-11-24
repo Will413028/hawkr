@@ -9,13 +9,13 @@ public final class CacheKeyConstants {
 
     /**
      * 商品詳情快取 Key 前綴
-     * 格式: prod:detail:{product_id}:{onboarding_sig}（02 §2.7.2）
+     * 格式: prod:detail:{product_id}
      */
     public static final String PRODUCT_DETAIL_PREFIX = "prod:detail:";
 
     /**
      * 商品列表快取 Key 前綴
-     * 格式: prod:list:{store_id}:{query_hash}:{list_onboarding_sig}（02 §2.7.2）
+     * 格式: prod:list:{store_id}:{query_hash}
      */
     public static final String PRODUCT_LIST_PREFIX = "prod:list:";
 
@@ -26,21 +26,13 @@ public final class CacheKeyConstants {
     public static final String CATEGORY_ALL = "cat:all";
 
     /**
-     * 建立商品詳情快取 Key（含 onboarding 指紋）
+     * 建立商品詳情快取 Key
      *
      * @param productId 商品 ID
-     * @param onboardingSig 賣家 onboarding 指紋（{@code SellerShippingFilter.onboardingSig}）
      * @return 快取 Key
      */
-    public static String detailKey(String productId, String onboardingSig) {
-        return PRODUCT_DETAIL_PREFIX + productId + ":" + onboardingSig;
-    }
-
-    /**
-     * 商品詳情 wildcard pattern（按 productId 批次清除，無論 onboarding_sig）
-     */
-    public static String detailKeyPattern(String productId) {
-        return PRODUCT_DETAIL_PREFIX + productId + ":*";
+    public static String detailKey(String productId) {
+        return PRODUCT_DETAIL_PREFIX + productId;
     }
 
     /**
@@ -57,18 +49,11 @@ public final class CacheKeyConstants {
     }
 
     /**
-     * 建立商品詳情快取 Key（別名方法）
+     * 建立商品列表快取 Key
      */
-    public static String productDetailKey(String productId, String onboardingSig) {
-        return detailKey(productId, onboardingSig);
-    }
-
-    /**
-     * 建立商品列表快取 Key（含 list onboarding 指紋；02 §2.7.2）
-     */
-    public static String productListKey(Long storeId, String queryHash, String listOnboardingSig) {
+    public static String productListKey(Long storeId, String queryHash) {
         long storeIdValue = storeId != null ? storeId : 0L;
-        return String.format("%s%d:%s:%s", PRODUCT_LIST_PREFIX, storeIdValue, queryHash, listOnboardingSig);
+        return String.format("%s%d:%s", PRODUCT_LIST_PREFIX, storeIdValue, queryHash);
     }
 
     /**

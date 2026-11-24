@@ -40,7 +40,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
     private final AfterSaleResolutionService resolutionService;
     private final ReturnReceiptService returnReceiptService;
     private final SellerCancelService sellerCancelService;
-    private final AfterSaleLabelRetryService labelRetryService;
     private final AfterSaleAppealService appealService;
     private final PlatformDecisionService platformDecisionService;
     private final io.github.will413028.hawkr.aftersales.service.AfterSalePayoutHoldService payoutHoldService;
@@ -54,7 +53,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
     private final io.github.will413028.hawkr.aftersales.grpc.client.PaymentGrpcClient paymentGrpcClient;
     private final io.github.will413028.hawkr.aftersales.grpc.client.BuyerGrpcClient buyerGrpcClient;
     private final io.github.will413028.hawkr.aftersales.grpc.client.SellerGrpcClient sellerGrpcClient;
-    private final io.github.will413028.hawkr.aftersales.grpc.client.ShippingGrpcClient shippingGrpcClient;
     private final io.github.will413028.hawkr.aftersales.grpc.client.OrderGrpcClient orderGrpcClient;
     private final io.github.will413028.hawkr.aftersales.service.AtmRefundReconciler atmRefundReconciler;
     // handleRefundPageReturn 的 REF02037 / 缺陷 B 對帳分支含多筆寫入（task transition + close case
@@ -69,7 +67,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                                   AfterSaleResolutionService resolutionService,
                                   ReturnReceiptService returnReceiptService,
                                   SellerCancelService sellerCancelService,
-                                  AfterSaleLabelRetryService labelRetryService,
                                   AfterSaleAppealService appealService,
                                   PlatformDecisionService platformDecisionService,
                                   io.github.will413028.hawkr.aftersales.service.AfterSalePayoutHoldService payoutHoldService,
@@ -83,7 +80,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                                   io.github.will413028.hawkr.aftersales.grpc.client.PaymentGrpcClient paymentGrpcClient,
                                   io.github.will413028.hawkr.aftersales.grpc.client.BuyerGrpcClient buyerGrpcClient,
                                   io.github.will413028.hawkr.aftersales.grpc.client.SellerGrpcClient sellerGrpcClient,
-                                  io.github.will413028.hawkr.aftersales.grpc.client.ShippingGrpcClient shippingGrpcClient,
                                   io.github.will413028.hawkr.aftersales.grpc.client.OrderGrpcClient orderGrpcClient,
                                   io.github.will413028.hawkr.aftersales.service.AtmRefundReconciler atmRefundReconciler,
                                   org.springframework.transaction.PlatformTransactionManager txManager) {
@@ -91,7 +87,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
         this.resolutionService = resolutionService;
         this.returnReceiptService = returnReceiptService;
         this.sellerCancelService = sellerCancelService;
-        this.labelRetryService = labelRetryService;
         this.appealService = appealService;
         this.platformDecisionService = platformDecisionService;
         this.payoutHoldService = payoutHoldService;
@@ -105,7 +100,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
         this.paymentGrpcClient = paymentGrpcClient;
         this.buyerGrpcClient = buyerGrpcClient;
         this.sellerGrpcClient = sellerGrpcClient;
-        this.shippingGrpcClient = shippingGrpcClient;
         this.orderGrpcClient = orderGrpcClient;
         this.atmRefundReconciler = atmRefundReconciler;
         this.refundReconcileTxTemplate =
@@ -367,7 +361,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                     request.getCaseNo(),
                     resolutionType,
                     refundAmount,
-                    request.getReturnShippingMethod(),
                     request.getRejectReason(),
                     request.getRejectMessage(),
                     couponAmount,
@@ -433,29 +426,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
         } catch (Exception e) {
             GrpcErrorHandler.handleException(observer, ConfirmReturnReceiptResponse.newBuilder(),
                     e, CLASS_NAME, "confirmReturnReceipt");
-        }
-    }
-
-    @Override
-    public void retryPrintReturnLabel(io.github.will413028.hawkr.aftersales.grpc.RetryPrintReturnLabelRequest request,
-                                       StreamObserver<io.github.will413028.hawkr.aftersales.grpc.RetryPrintReturnLabelResponse> observer) {
-        try {
-            // §5.3.6：admin/ops 介入重試 7-11 退貨出貨便代碼
-            GrpcAuthContext.requireAccountType(AccountType.ADMIN);
-            long accountId = request.getAccountId();
-            String caseNo = request.getCaseNo();
-
-            labelRetryService.retryManual(accountId, caseNo);
-
-            observer.onNext(io.github.will413028.hawkr.aftersales.grpc.RetryPrintReturnLabelResponse.newBuilder()
-                    .setCode(GrpcResponseCode.SUCCESS.code())
-                    .setMessage(GrpcResponseCode.SUCCESS.message())
-                    .build());
-            observer.onCompleted();
-        } catch (Exception e) {
-            GrpcErrorHandler.handleException(observer,
-                    io.github.will413028.hawkr.aftersales.grpc.RetryPrintReturnLabelResponse.newBuilder(),
-                    e, CLASS_NAME, "retryPrintReturnLabel");
         }
     }
 
@@ -615,7 +585,7 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
 
     /**
      * 批次解析一組 case 的 providerStatus / providerMessage（收斂規範 §6.3 禁止 N+1）。
-     * REFUND_PROCESSING → 本地 refund_tasks 批次查；RETURN_SHIPPING → Shipping batch RPC（isReturn=true）。
+     * REFUND_PROCESSING → 本地 refund_tasks 批次查；其他狀態沒有 provider 狀態。
      */
     private Map<String, ProviderStatusPair> batchResolveCaseProviderStatus(
             List<AfterSaleCaseEntity> cases) {
@@ -623,15 +593,10 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
         if (cases == null || cases.isEmpty()) return out;
 
         List<String> refundCaseNos = new java.util.ArrayList<>();
-        List<AfterSaleCaseEntity> returnCases = new java.util.ArrayList<>();
         for (AfterSaleCaseEntity c : cases) {
-            String st = c.getStatus();
-            if (AfterSaleCaseStatus.REFUND_PROCESSING.value().equals(st)) {
-                if (c.getCaseNo() != null && !c.getCaseNo().isBlank()) {
-                    refundCaseNos.add(c.getCaseNo());
-                }
-            } else if (AfterSaleCaseStatus.RETURN_SHIPPING.value().equals(st)) {
-                returnCases.add(c);
+            if (AfterSaleCaseStatus.REFUND_PROCESSING.value().equals(c.getStatus())
+                    && c.getCaseNo() != null && !c.getCaseNo().isBlank()) {
+                refundCaseNos.add(c.getCaseNo());
             }
         }
 
@@ -659,11 +624,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                         nullToEmpty(e.getValue().getPayuniStatus()),
                         nullToEmpty(e.getValue().getPayuniMessage())));
             }
-        }
-
-        // Bucket 2: RETURN_SHIPPING — 一次 batch RPC 到 Shipping
-        if (!returnCases.isEmpty()) {
-            out.putAll(resolveReturnShippingProviderStatus(returnCases));
         }
 
         return out;
@@ -876,7 +836,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
     /**
      * 依 case 當下 status 決定 providerStatus / providerMessage 取源：
      * - 退款相關（REFUND_PROCESSING）→ refund_tasks.payuni_*（本地 snapshot）
-     * - 退貨物流相關（RETURN_SHIPPING）→ 呼 Shipping.BatchGetProviderStatusByOrderIds(isReturn=true)（單筆）
      * - 其他狀態 → 空字串
      */
     private ProviderStatusPair resolveCaseProviderStatus(AfterSaleCaseEntity caseEntity,
@@ -893,42 +852,7 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
             return new ProviderStatusPair(nullToEmpty(task.getPayuniStatus()),
                     nullToEmpty(task.getPayuniMessage()));
         }
-        if (AfterSaleCaseStatus.RETURN_SHIPPING.value().equals(status)) {
-            return resolveReturnShippingProviderStatus(List.of(caseEntity)).getOrDefault(
-                    caseEntity.getCaseNo(), ProviderStatusPair.EMPTY);
-        }
         return ProviderStatusPair.EMPTY;
-    }
-
-    /**
-     * 批次取 RETURN_SHIPPING case 的 provider 狀態（呼叫 Shipping.BatchGetProviderStatusByOrderIds(isReturn=true)）。
-     * 部分失敗容忍：整體失敗則所有 case 欄位回空，不阻擋主回應。
-     */
-    private Map<String, ProviderStatusPair> resolveReturnShippingProviderStatus(List<AfterSaleCaseEntity> cases) {
-        Map<String, ProviderStatusPair> out = new HashMap<>();
-        if (cases == null || cases.isEmpty()) return out;
-        List<String> orderNos = cases.stream()
-                .map(AfterSaleCaseEntity::getOrderNo)
-                .filter(n -> n != null && !n.isBlank())
-                .distinct()
-                .toList();
-        if (orderNos.isEmpty()) return out;
-        try {
-            var resp = shippingGrpcClient.batchGetProviderStatusByOrderIds(orderNos, true);
-            Map<String, io.github.will413028.hawkr.shipping.grpc.ProviderStatusEntry> entries = resp.getEntriesMap();
-            for (AfterSaleCaseEntity c : cases) {
-                var entry = entries.get(c.getOrderNo());
-                if (entry != null) {
-                    out.put(c.getCaseNo(), new ProviderStatusPair(
-                            nullToEmpty(entry.getProviderStatus()),
-                            nullToEmpty(entry.getProviderMessage())));
-                }
-            }
-        } catch (Exception e) {
-            log.warn("AfterSalesGrpcService.resolveReturnShipping.fail",
-                    "批次 Shipping provider 查詢失敗，欄位留空: " + e.getMessage());
-        }
-        return out;
     }
 
     /**
@@ -1370,28 +1294,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                             "批次聚合退款 provider 狀態失敗: " + ex.getMessage());
                 }
             }
-            // 物流 provider 聚合（退貨物流異常狀態）— 以 order_no 為 key，is_return=true
-            java.util.List<String> shippingOrderNos = new java.util.ArrayList<>();
-            String returnPendingVal = io.github.will413028.hawkr.common.utils.code.AfterSaleCaseStatus.RETURN_PENDING.value();
-            String returnShippingVal = io.github.will413028.hawkr.common.utils.code.AfterSaleCaseStatus.RETURN_SHIPPING.value();
-            for (AfterSaleCaseEntity e : result.getRecords()) {
-                if (returnPendingVal.equals(e.getStatus()) || returnShippingVal.equals(e.getStatus())) {
-                    if (e.getOrderNo() != null) shippingOrderNos.add(e.getOrderNo());
-                }
-            }
-            java.util.Map<String, io.github.will413028.hawkr.shipping.grpc.ProviderStatusEntry> shippingMap = java.util.Collections.emptyMap();
-            if (!shippingOrderNos.isEmpty()) {
-                try {
-                    var resp = shippingGrpcClient.batchGetProviderStatusByOrderIds(shippingOrderNos, true);
-                    if (resp.getCode() == 0) {
-                        shippingMap = resp.getEntriesMap();
-                    }
-                } catch (Exception ex) {
-                    log.warn("AfterSalesGrpcService.listAfterSaleCasesForAdmin.batchShippingFailed",
-                            "批次聚合物流 provider 狀態失敗: " + ex.getMessage());
-                }
-            }
-
             ListAfterSaleCasesForAdminData.Builder dataBuilder = ListAfterSaleCasesForAdminData.newBuilder()
                     .setTotal(String.valueOf(result.getTotal()))
                     .setPage(String.valueOf(result.getCurrent()))
@@ -1401,12 +1303,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                 String ps = "", pm = "";
                 if (refundStatusVal.equals(e.getStatus())) {
                     var entry = refundMap.get(e.getCaseNo());
-                    if (entry != null) {
-                        ps = entry.getProviderStatus();
-                        pm = entry.getProviderMessage();
-                    }
-                } else if (returnPendingVal.equals(e.getStatus()) || returnShippingVal.equals(e.getStatus())) {
-                    var entry = shippingMap.get(e.getOrderNo());
                     if (entry != null) {
                         ps = entry.getProviderStatus();
                         pm = entry.getProviderMessage();
@@ -1490,15 +1386,12 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
     /**
      * §29 依 case 當下 status 聚合 provider_*。
      * REFUND_PROCESSING → 呼叫 Payment.GetRefund(refund_no=case_no)
-     * RETURN_PENDING / RETURN_SHIPPING → 依 order_no 查 Shipping (is_return=true)
      * 其他 → null
      */
     private AdminProviderContext buildProviderContextForCase(AfterSaleCaseEntity caseEntity) {
         if (caseEntity == null || caseEntity.getStatus() == null) return null;
         String status = caseEntity.getStatus();
         String refundStatus = io.github.will413028.hawkr.common.utils.code.AfterSaleCaseStatus.REFUND_PROCESSING.value();
-        String returnPending = io.github.will413028.hawkr.common.utils.code.AfterSaleCaseStatus.RETURN_PENDING.value();
-        String returnShipping = io.github.will413028.hawkr.common.utils.code.AfterSaleCaseStatus.RETURN_SHIPPING.value();
 
         if (refundStatus.equals(status)) {
             try {
@@ -1515,26 +1408,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
             } catch (Exception ex) {
                 log.warn("AfterSalesGrpcService.buildProviderContextForCase.refundFailed",
                         "查詢退款 provider 狀態失敗: " + ex.getMessage());
-            }
-        } else if (returnPending.equals(status) || returnShipping.equals(status)) {
-            // 退貨物流：用批次 RPC（傳單一 order_no）
-            try {
-                var resp = shippingGrpcClient.batchGetProviderStatusByOrderIds(
-                        java.util.List.of(caseEntity.getOrderNo()), true);
-                if (resp.getCode() == 0) {
-                    var entry = resp.getEntriesMap().get(caseEntity.getOrderNo());
-                    if (entry != null) {
-                        return AdminProviderContext.newBuilder()
-                                .setProviderSource(ProviderSource.SHIPPING.value())
-                                .setProviderStatus(nullToEmpty(entry.getProviderStatus()))
-                                .setProviderMessage(nullToEmpty(entry.getProviderMessage()))
-                                .setShipTradeNo(nullToEmpty(caseEntity.getShipTradeNo()))
-                                .build();
-                    }
-                }
-            } catch (Exception ex) {
-                log.warn("AfterSalesGrpcService.buildProviderContextForCase.shippingFailed",
-                        "查詢退貨物流 provider 狀態失敗: " + ex.getMessage());
             }
         }
         return null;

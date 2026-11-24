@@ -45,13 +45,13 @@ public class ProductCacheService {
         this.objectMapper = objectMapper;
     }
 
-    // ==================== 商品詳情快取（02 §2.7.2 含 onboarding 指紋） ====================
+    // ==================== 商品詳情快取 ====================
 
     /**
-     * 取得商品詳情快取（key 含 onboarding 指紋）
+     * 取得商品詳情快取
      */
-    public Optional<ProductDetailDTO> getProductDetail(String productId, String onboardingSig) {
-        String key = CacheKeyConstants.productDetailKey(productId, onboardingSig);
+    public Optional<ProductDetailDTO> getProductDetail(String productId) {
+        String key = CacheKeyConstants.detailKey(productId);
         String json;
         try {
             json = redisTemplate.opsForValue().get(key);
@@ -83,10 +83,10 @@ public class ProductCacheService {
     }
 
     /**
-     * 寫入商品詳情快取（key 含 onboarding 指紋）
+     * 寫入商品詳情快取
      */
-    public void cacheProductDetail(String productId, String onboardingSig, ProductDetailDTO dto) {
-        String key = CacheKeyConstants.productDetailKey(productId, onboardingSig);
+    public void cacheProductDetail(String productId, ProductDetailDTO dto) {
+        String key = CacheKeyConstants.detailKey(productId);
         try {
             String json = objectMapper.writeValueAsString(dto);
             redisTemplate.opsForValue().set(key, json, DETAIL_TTL);
@@ -100,15 +100,13 @@ public class ProductCacheService {
     }
 
     /**
-     * 清除商品詳情快取（02 §2.7：key 含 onboarding 指紋，必須 pattern wildcard delete）
+     * 清除商品詳情快取
      */
     public void evictProductDetail(String productId) {
-        String pattern = CacheKeyConstants.detailKeyPattern(productId);
+        String key = CacheKeyConstants.detailKey(productId);
         try {
-            // 非阻塞 SCAN + UNLINK 取代阻塞式 KEYS + DEL（清除範圍不變，見 RedisPatternEvictor）
-            long removed = RedisPatternEvictor.scanUnlink(redisTemplate, pattern);
-            if (removed > 0) {
-                log.info("success", "清除快取成功，刪除 " + removed + " 筆", "product_id", productId);
+            if (Boolean.TRUE.equals(redisTemplate.unlink(key))) {
+                log.info("success", "清除快取成功", "product_id", productId);
             }
         } catch (DataAccessException e) {
             // Redis 失聯 → log.warn 不阻斷觸發清除的寫入業務（02 §2.7.3）
@@ -314,16 +312,14 @@ public class ProductCacheService {
 
     /**
      * 生成列表快取鍵
-     * 格式：prod:list:{ownerId}:{queryHash}（02 §2.7.2：list 不在 key 加 onboarding sig，改為 cache 存「pre-filter snapshot」，
-     * 由 ProductService 在 cache 取出後逐項套 onboarding filter — 避免 cache lookup 與 sig 計算雞生蛋問題）
+     * 格式：prod:list:{ownerId}:{queryHash}
      */
     public String generateListCacheKey(ProductQueryDTO query) {
         // storeId 優先（公開 API 篩選指定賣家），否則用 ownerStoreId（賣家管理）
         Long ownerId = query.getStoreId() != null ? query.getStoreId()
                 : (query.getOwnerStoreId() != null ? query.getOwnerStoreId() : 0L);
         String queryHash = hashQuery(query);
-        // 留空 listOnboardingSig 占位 — 統一 key 結構，但 list 路徑不放真正 sig
-        return CacheKeyConstants.productListKey(ownerId, queryHash, "all");
+        return CacheKeyConstants.productListKey(ownerId, queryHash);
     }
 
     /**

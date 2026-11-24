@@ -20,19 +20,11 @@ import io.github.will413028.hawkr.product.entity.ProductSkuEntity;
 import io.github.will413028.hawkr.product.entity.projection.SkuNameProjection;
 import io.github.will413028.hawkr.product.exception.ProductNotFoundException;
 import io.github.will413028.hawkr.product.exception.ProductPublicNotFoundException;
-import io.github.will413028.hawkr.common.utils.shipping.SellerShippingFilter;
-import io.github.will413028.hawkr.common.utils.shipping.WeightConverter;
-import io.github.will413028.hawkr.shipping.grpc.GetSellerShippingConfigResponse;
-import io.github.will413028.hawkr.shipping.grpc.SellerShippingConfigItem;
 import io.github.will413028.hawkr.product.grpc.client.MediaGrpcClient;
 import io.github.will413028.hawkr.product.grpc.client.SellerGrpcClient;
-import io.github.will413028.hawkr.product.grpc.client.ShippingGrpcClient;
 import io.github.will413028.hawkr.product.repository.ProductRepository;
 import io.github.will413028.hawkr.product.repository.ProductSkuRepository;
 import io.github.will413028.hawkr.seller.grpc.SellerMeta;
-import io.github.will413028.hawkr.shipping.grpc.ValidateProductShippingResponse;
-import io.github.will413028.hawkr.shipping.grpc.ValidateShippingItem;
-import io.github.will413028.hawkr.shipping.grpc.ValidateShippingResult;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,7 +52,6 @@ public class ProductService {
     private final ProductCacheService cacheService;
     private final CategoryService categoryService;
     private final SellerGrpcClient sellerGrpcClient;
-    private final ShippingGrpcClient shippingGrpcClient;
     private final HashtagService hashtagService;
     private final ProductCascadeService productCascadeService;
     private final SellerInfoAssembler sellerInfoAssembler;
@@ -85,7 +76,6 @@ public class ProductService {
             ProductCacheService cacheService,
             CategoryService categoryService,
             SellerGrpcClient sellerGrpcClient,
-            ShippingGrpcClient shippingGrpcClient,
             HashtagService hashtagService,
             ProductCascadeService productCascadeService,
             SellerInfoAssembler sellerInfoAssembler,
@@ -105,7 +95,6 @@ public class ProductService {
         this.cacheService = cacheService;
         this.categoryService = categoryService;
         this.sellerGrpcClient = sellerGrpcClient;
-        this.shippingGrpcClient = shippingGrpcClient;
         this.hashtagService = hashtagService;
         this.productCascadeService = productCascadeService;
         this.sellerInfoAssembler = sellerInfoAssembler;
@@ -355,9 +344,6 @@ public class ProductService {
                     requirePositive(skuDTO.getHeightCm(), "包裝高度");
                 }
             }
-
-            // 3.1 驗證 SKU 配送方式合法性（賣家開通狀態 + 材積/重量限制）
-            validateSkuShippingMethods(dto.getStoreId(), dto.getSkus());
 
             // 4. 建立商品 SKU
             List<ProductSkuEntity> skus = new ArrayList<>();
@@ -612,9 +598,6 @@ public class ProductService {
                     requirePositive(skuDTO.getHeightCm(), "包裝高度");
                 }
             }
-
-            // 4.1 驗證 SKU 配送方式合法性（賣家開通狀態 + 材積/重量限制）
-            validateSkuShippingMethods(dto.getStoreId(), dto.getSkus());
 
             // 5. 處理 SKU 更新
             List<ProductSkuEntity> skus = updateSkus(productId, dto.getSkus());
@@ -924,7 +907,7 @@ public class ProductService {
      * @throws ProductNotFoundException 商品不存在或非 ACTIVE 狀態
      */
     public ProductDetailDTO getPublicProduct(String productId) {
-        // 0. 先查 DB 取得 seller，計算 onboarding 指紋（cache key 用，02 §2.7.2）
+        // 0. 先查 DB 確認商品存在
         Long id = Long.parseLong(productId);
         Optional<ProductEntity> found = productRepository.findByIdIncludingDeleted(id);
         if (found.isEmpty()) {
@@ -941,12 +924,8 @@ public class ProductService {
                 .notFoundCode(true, publicationState)
                 .ifPresent(code -> { throw new ProductPublicNotFoundException(productId, code); });
 
-        Long storeId = entity.getStoreId();
-        OnboardingSnapshot onboarding = fetchOnboardingSnapshot(storeId);
-        String onboardingSig = SellerShippingFilter.onboardingSig(storeId, onboarding.availableKeys);
-
-        // 1. 用 (productId, onboardingSig) 查 Redis 快取
-        Optional<ProductDetailDTO> cached = cacheService.getProductDetail(productId, onboardingSig);
+        // 1. 查 Redis 快取
+        Optional<ProductDetailDTO> cached = cacheService.getProductDetail(productId);
         if (cached.isPresent()) {
             return cached.get();
         }
@@ -954,11 +933,8 @@ public class ProductService {
         // 4. 查詢 SKU
         List<ProductSkuEntity> skus = productSkuRepository.findByProductId(id);
 
-        // 5. 轉換為 DTO（含 product 原始 shipping_methods）
+        // 5. 轉換為 DTO
         ProductDetailDTO result = productEntityConverter.toDetailDTO(entity, skus, isStoreExposable(entity));
-
-        // 5.1 套用 onboarding filter（02 §2.7.2）：剔除賣家當下未啟用的 shipping methods
-        applyOnboardingFilterToDetail(result, onboarding.availableKeys);
 
         // 6. 填充三層分類（不限狀態，§2.5.2 買家破口修復）
         if (entity.getCategory() != null) {
@@ -985,109 +961,12 @@ public class ProductService {
         // 8.1 填充 hashtag list（02 §5.5；快取會包含此 list，TTL 1h）
         result.setHashtags(buildHashtagItemDTOs(id));
 
-        // 9. 寫入 Redis 快取（含 onboarding 指紋）
-        cacheService.cacheProductDetail(productId, onboardingSig, result);
+        // 9. 寫入 Redis 快取
+        cacheService.cacheProductDetail(productId, result);
 
         log.info("success", "公開查詢商品成功，product_id=" + productId);
 
         return result;
-    }
-
-    // ==================== 02 §2.7.2 onboarding-aware read path 共用 ====================
-
-    /**
-     * 賣家 onboarding 狀態快照（per-request 用，包含已啟用方式 key set + 指紋）。
-     */
-    private static final class OnboardingSnapshot {
-        final Set<String> availableKeys;
-        OnboardingSnapshot(Set<String> availableKeys) {
-            this.availableKeys = availableKeys;
-        }
-    }
-
-    /**
-     * 從 shipping-service 取得單一 seller 當下已啟用配送方式集合（02 §2.7.2）。
-     *
-     * <p>fail-graceful：RPC 失敗或 code!=0 時 log.warn 並回傳「entity 原 shipping_methods 視同已啟用」
-     * 的兜底集合，避免公開商品頁因 shipping-service 短暫故障整體掛掉（與 03 結帳 fail-close 不同）。
-     */
-    private OnboardingSnapshot fetchOnboardingSnapshot(long storeId) {
-        try {
-            GetSellerShippingConfigResponse resp = shippingGrpcClient.getSellerShippingConfig(storeId);
-            if (resp.getCode() != 0) {
-                log.warn("fetchOnboardingSnapshot.nonZeroCode",
-                        "shipping-service 回應非零碼 storeId=" + storeId
-                                + " code=" + resp.getCode() + "；degrade to permissive set");
-                return permissiveSnapshot();
-            }
-            Set<String> available = new HashSet<>();
-            for (SellerShippingConfigItem cfg : resp.getConfigsList()) {
-                if (cfg.getAvailable()) {
-                    available.add(SellerShippingFilter.toMethodKey(cfg.getShippingMethod(), cfg.getGoodsType()));
-                }
-            }
-            return new OnboardingSnapshot(available);
-        } catch (Exception e) {
-            log.warn("fetchOnboardingSnapshot.failed",
-                    "shipping-service 取得失敗 storeId=" + storeId
-                            + " err=" + e.getMessage() + "；degrade to permissive set");
-            return permissiveSnapshot();
-        }
-    }
-
-    /**
-     * 兜底集合：含特殊標記 "*:*" 讓 filter 全放行（shipping-service 不可達時不阻擋公開瀏覽）。
-     */
-    private OnboardingSnapshot permissiveSnapshot() {
-        return new OnboardingSnapshot(Set.of("*:*"));
-    }
-
-    /**
-     * 套用 onboarding filter 至 ProductDetailDTO 的 shippingMethods 與 deliveryTemp。
-     */
-    private void applyOnboardingFilterToDetail(ProductDetailDTO dto, Set<String> availableKeys) {
-        if (availableKeys.contains("*:*")) {
-            return; // 兜底放行，shipping-service 故障時不過濾
-        }
-        if (dto.getShippingMethods() == null || dto.getShippingMethods().isEmpty()) {
-            return;
-        }
-        List<ShippingMethodDTO> kept = new ArrayList<>();
-        Set<String> tempUnion = new LinkedHashSet<>();
-        for (ShippingMethodDTO sm : dto.getShippingMethods()) {
-            if (SellerShippingFilter.isAvailable(sm.getType(), sm.getTemperature(), availableKeys)) {
-                kept.add(sm);
-                if (sm.getTemperature() != null && !sm.getTemperature().isEmpty()) {
-                    tempUnion.add(sm.getTemperature());
-                }
-            }
-        }
-        dto.setShippingMethods(kept);
-        dto.setDeliveryTemp(new ArrayList<>(tempUnion));
-    }
-
-    /**
-     * 套用 onboarding filter 至 ProductListItemDTO 的 shippingMethods 與 deliveryTemp。
-     */
-    private void applyOnboardingFilterToListItem(ProductListItemDTO item, Set<String> availableKeys) {
-        if (availableKeys.contains("*:*")) {
-            return;
-        }
-        if (item.getShippingMethods() == null || item.getShippingMethods().isEmpty()) {
-            return;
-        }
-        List<io.github.will413028.hawkr.product.entity.ProductSkuEntity.ShippingMethodItem> kept = new ArrayList<>();
-        Set<String> tempUnion = new LinkedHashSet<>();
-        for (io.github.will413028.hawkr.product.entity.ProductSkuEntity.ShippingMethodItem sm : item.getShippingMethods()) {
-            if (SellerShippingFilter.isAvailable(sm.getType(), sm.getTemperature(), availableKeys)) {
-                kept.add(sm);
-                if (sm.getTemperature() != null && !sm.getTemperature().isEmpty()) {
-                    tempUnion.add(sm.getTemperature());
-                }
-            }
-        }
-        item.setShippingMethods(kept);
-        item.setDeliveryTemp(new ArrayList<>(tempUnion));
     }
 
     /**
@@ -1188,15 +1067,11 @@ public class ProductService {
         // 生成快取鍵
         String cacheKey = cacheService.generateListCacheKey(query);
 
-        // 1. 先查快取（cache 存 pre-filter snapshot，public 場景仍須套 onboarding filter）
+        // 1. 先查快取
         Optional<ProductListResultDTO> cached = cacheService.getProductList(cacheKey);
         if (cached.isPresent()) {
             log.info("cacheHit", "列表快取命中", "cache_key", cacheKey);
-            ProductListResultDTO cachedResult = cached.get();
-            if (query.isPublicApi()) {
-                applyOnboardingFilterToList(cachedResult);
-            }
-            return cachedResult;
+            return cached.get();
         }
 
         // 2. 分類層級偵測（cache miss 才執行；02 §5.3.1 多值聯集）：
@@ -1359,7 +1234,7 @@ public class ProductService {
         // deliveryTemp 派生已移到 ProductEntityConverter.toListItemDTO（02 §5.3.6 本期改為從 product.shipping_methods 派生）
         // 不再需要 product_sku.shipping_method JSONB GROUP BY pipeline
 
-        // 5. 組裝結果（pre-filter；shipping_methods 為 product 原始 snapshot）
+        // 5. 組裝結果
         ProductListResultDTO listResult = ProductListResultDTO.builder()
                 .products(items)
                 .total(result.getTotal())
@@ -1367,37 +1242,11 @@ public class ProductService {
                 .pageSize(query.getPageSize())
                 .build();
 
-        // 5. 寫入快取（pre-filter snapshot，避免 stale；02 §2.7.2）
+        // 5. 寫入快取
         cacheService.cacheProductList(cacheKey, listResult);
 
         log.info("success", "查詢商品列表成功，total=" + result.getTotal() + "，page=" + query.getPage());
-
-        // 6. 對外回傳前套 onboarding filter（02 §2.7.2 公開 read path；賣家中心不過濾）
-        if (query.isPublicApi()) {
-            applyOnboardingFilterToList(listResult);
-        }
         return listResult;
-    }
-
-    /**
-     * 套用 onboarding filter 到列表結果（02 §2.7.2）。
-     * per-request memoize per-seller onboarding snapshot，避免 N+1 gRPC。
-     */
-    private void applyOnboardingFilterToList(ProductListResultDTO listResult) {
-        if (listResult == null || listResult.getProducts() == null || listResult.getProducts().isEmpty()) {
-            return;
-        }
-        // 不對賣家中心 / admin 視角過濾 — 只對 publicApi 過濾
-        // 列表進入此 method 一律視為「公開」場景；賣家中心走的是 getSellerProducts 等另外路徑
-        Map<Long, OnboardingSnapshot> perSeller = new HashMap<>();
-        for (ProductListItemDTO item : listResult.getProducts()) {
-            Long sellerId = item.getStoreId();
-            if (sellerId == null) {
-                continue;
-            }
-            OnboardingSnapshot snap = perSeller.computeIfAbsent(sellerId, this::fetchOnboardingSnapshot);
-            applyOnboardingFilterToListItem(item, snap.availableKeys);
-        }
     }
 
     private ProductListResultDTO emptyResult(ProductQueryDTO query) {
@@ -2094,69 +1943,6 @@ public class ProductService {
     /**
      * 更新商品價格範圍
      */
-    /**
-     * 驗證 SKU 配送方式合法性（賣家開通狀態 + 材積/重量限制）
-     * 跳過無配送方式或缺少材積資料的 SKU
-     */
-    private void validateSkuShippingMethods(Long storeId, List<ProductSkuDTO> skus) {
-        if (skus == null || skus.isEmpty()) {
-            return;
-        }
-
-        List<ValidateShippingItem> items = new ArrayList<>();
-        for (ProductSkuDTO sku : skus) {
-            if (sku.getShippingMethods() == null || sku.getShippingMethods().isEmpty()) {
-                continue;
-            }
-            // 跳過缺少材積或重量的 SKU
-            if (sku.getLengthCm() == null || sku.getWidthCm() == null
-                    || sku.getHeightCm() == null || sku.getWeight() == null || sku.getUnit() == null) {
-                continue;
-            }
-
-            long weightGrams = WeightConverter.convertToGrams(
-                    sku.getWeight().toPlainString(), WeightUnit.fromValue(sku.getUnit()));
-
-            String skuName = sku.getSkuName() != null ? sku.getSkuName() : "未命名";
-            for (ShippingMethodDTO sm : sku.getShippingMethods()) {
-                if (sm.getType() == null || sm.getType().isEmpty()) {
-                    continue;
-                }
-                items.add(ValidateShippingItem.newBuilder()
-                        .setSkuName(skuName)
-                        .setShippingMethod(sm.getType())
-                        .setTemperature(sm.getTemperature() != null ? sm.getTemperature() : "")
-                        .setLengthCm(String.valueOf(sku.getLengthCm().intValue()))
-                        .setWidthCm(String.valueOf(sku.getWidthCm().intValue()))
-                        .setHeightCm(String.valueOf(sku.getHeightCm().intValue()))
-                        .setWeightGrams(String.valueOf(weightGrams))
-                        .build());
-            }
-        }
-
-        if (items.isEmpty()) {
-            return;
-        }
-
-        ValidateProductShippingResponse response =
-                shippingGrpcClient.validateProductShipping(storeId, items);
-
-        if (!response.getAllValid()) {
-            StringBuilder sb = new StringBuilder();
-            for (ValidateShippingResult r : response.getResultsList()) {
-                if (!r.getValid()) {
-                    if (sb.length() > 0) {
-                        sb.append("; ");
-                    }
-                    sb.append("SKU「").append(r.getSkuName()).append("」的 ")
-                      .append(r.getShippingMethod()).append("/").append(r.getTemperature())
-                      .append(" 驗證失敗：").append(r.getRejectionMessage());
-                }
-            }
-            throw new IllegalArgumentException("配送方式驗證失敗：" + sb);
-        }
-    }
-
     /**
      * 計算商品的三組價格冗餘欄位（02 設計書 §2.8 / §3.2）：
      * - priceMin / priceMax：以「實際成交單價」彙總（effective_price = sale_price ?? price）

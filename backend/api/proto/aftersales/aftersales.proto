@@ -46,9 +46,6 @@ service AfterSalesService {
     // 取消出貨（從 Order Service 遷移，API 路徑不變）
     rpc CancelShipment(CancelShipmentRequest) returns (CancelShipmentResponse);
 
-    // 7-11 退貨出貨便代碼人工重試列印（§5.3.6 admin/ops 介入用）
-    rpc RetryPrintReturnLabel(RetryPrintReturnLabelRequest) returns (RetryPrintReturnLabelResponse);
-
     // ==================== 申訴與平台裁決（§10） ====================
 
     // 買家提交申訴
@@ -217,7 +214,8 @@ message ResolveAfterSaleCaseRequest {
     string resolution_type = 3;        // AfterSaleResolutionType value（1=退貨退款, 2=部分退款, 3=全額退款免退貨, 4=補償券, 5=拒絕）
     // 退款相關
     string refund_amount = 4;
-    string return_shipping_method = 5;   // 3001 / 3002
+    reserved 5;
+    reserved "return_shipping_method";
     // 優惠券相關
     string coupon_amount = 6;
     string coupon_min_spend = 7;
@@ -253,17 +251,6 @@ message ConfirmReturnReceiptRequest {
 }
 
 message ConfirmReturnReceiptResponse {
-    int32 code = 1;
-    string message = 2;
-}
-
-// 人工介入重試 7-11 退貨列印（§5.3.6，ADMIN 權限）
-message RetryPrintReturnLabelRequest {
-    int64 account_id = 1;                // Gateway 注入（admin）
-    string case_no = 2;
-}
-
-message RetryPrintReturnLabelResponse {
     int32 code = 1;
     string message = 2;
 }
