@@ -6,7 +6,7 @@ import type { PolicyCategory } from "@hawkr/api/gen/hawkr/common/v1alpha1/policy
 import type { StoreCardStatus } from "@hawkr/api/gen/hawkr/common/v1alpha1/store_card_pb";
 import type { CustomerSort, CustomerType } from "@hawkr/api/gen/hawkr/crm/v1alpha1/crm_pb";
 import type { ReportOutcome, ReportTargetKind } from "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb";
-import type { PaymentAccountStatus, RequirementCollection } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
+import type { PaymentAccountStatus, PaymentAnomalyKind, PaymentAnomalyOutcome, PaymentRefundStatus, PaymentReversalStatus, PaymentStatus, PaymentTopupStatus, PaymentTransferStatus, RequirementCollection } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import type { RejectionReason } from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
 import type { ReportOutcome as SellerReportOutcome } from "@hawkr/api/gen/hawkr/seller/v1alpha1/report_pb";
 import type { ContentKind, InquiryKind, InquiryReplyChannel, InquiryState, KYCField, KYCStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, OnboardingAction, OnboardingTaskId, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
@@ -86,6 +86,41 @@ export type UiTextKey =
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED"
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_NOT_CREATED"
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW"
+	| "payment.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_PAYMENT"
+	| "payment.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_REFUND"
+	| "payment.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_REVERSAL"
+	| "payment.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_TOPUP"
+	| "payment.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_TRANSFER"
+	| "payment.PaymentAnomalyOutcome.PAYMENT_ANOMALY_OUTCOME_FAILED"
+	| "payment.PaymentAnomalyOutcome.PAYMENT_ANOMALY_OUTCOME_SUCCEEDED"
+	| "payment.PaymentRefundStatus.PAYMENT_REFUND_STATUS_ANOMALY"
+	| "payment.PaymentRefundStatus.PAYMENT_REFUND_STATUS_FAILED"
+	| "payment.PaymentRefundStatus.PAYMENT_REFUND_STATUS_PENDING"
+	| "payment.PaymentRefundStatus.PAYMENT_REFUND_STATUS_REFUNDING"
+	| "payment.PaymentRefundStatus.PAYMENT_REFUND_STATUS_SUCCEEDED"
+	| "payment.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_ANOMALY"
+	| "payment.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_NONE"
+	| "payment.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_RELEASED"
+	| "payment.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_REVERSED"
+	| "payment.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_REVERSING"
+	| "payment.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_WAITING"
+	| "payment.PaymentStatus.PAYMENT_STATUS_ANOMALY"
+	| "payment.PaymentStatus.PAYMENT_STATUS_AWAITING_PAYMENT"
+	| "payment.PaymentStatus.PAYMENT_STATUS_CANCELED"
+	| "payment.PaymentStatus.PAYMENT_STATUS_CREATE_FAILED"
+	| "payment.PaymentStatus.PAYMENT_STATUS_CREATING"
+	| "payment.PaymentStatus.PAYMENT_STATUS_PROCESSING"
+	| "payment.PaymentStatus.PAYMENT_STATUS_SUCCEEDED"
+	| "payment.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_ANOMALY"
+	| "payment.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_DONE"
+	| "payment.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_NONE"
+	| "payment.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_RELEASED"
+	| "payment.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_SENDING"
+	| "payment.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_WAITING"
+	| "payment.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_ANOMALY"
+	| "payment.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_FAILED"
+	| "payment.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_PENDING"
+	| "payment.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_SUCCEEDED"
 	| "payment.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM"
 	| "payment.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER"
 	| "procurement.RejectionReason.REJECTION_REASON_BUDGET_RANGE"
@@ -463,6 +498,111 @@ const PAYMENT_PAYMENT_ACCOUNT_STATUS: Readonly<Partial<Record<number, UiTextKey>
 /** payment.PaymentAccountStatus 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
 export function paymentPaymentAccountStatus(v: PaymentAccountStatus): UiMessage | undefined {
 	const key = PAYMENT_PAYMENT_ACCOUNT_STATUS[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const PAYMENT_PAYMENT_ANOMALY_KIND: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "payment.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_PAYMENT",
+	2: "payment.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_TRANSFER",
+	3: "payment.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_REFUND",
+	4: "payment.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_REVERSAL",
+	5: "payment.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_TOPUP",
+};
+
+/** payment.PaymentAnomalyKind 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function paymentPaymentAnomalyKind(v: PaymentAnomalyKind): UiMessage | undefined {
+	const key = PAYMENT_PAYMENT_ANOMALY_KIND[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const PAYMENT_PAYMENT_ANOMALY_OUTCOME: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "payment.PaymentAnomalyOutcome.PAYMENT_ANOMALY_OUTCOME_SUCCEEDED",
+	2: "payment.PaymentAnomalyOutcome.PAYMENT_ANOMALY_OUTCOME_FAILED",
+};
+
+/** payment.PaymentAnomalyOutcome 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function paymentPaymentAnomalyOutcome(v: PaymentAnomalyOutcome): UiMessage | undefined {
+	const key = PAYMENT_PAYMENT_ANOMALY_OUTCOME[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const PAYMENT_PAYMENT_REFUND_STATUS: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "payment.PaymentRefundStatus.PAYMENT_REFUND_STATUS_PENDING",
+	2: "payment.PaymentRefundStatus.PAYMENT_REFUND_STATUS_REFUNDING",
+	3: "payment.PaymentRefundStatus.PAYMENT_REFUND_STATUS_SUCCEEDED",
+	4: "payment.PaymentRefundStatus.PAYMENT_REFUND_STATUS_FAILED",
+	5: "payment.PaymentRefundStatus.PAYMENT_REFUND_STATUS_ANOMALY",
+};
+
+/** payment.PaymentRefundStatus 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function paymentPaymentRefundStatus(v: PaymentRefundStatus): UiMessage | undefined {
+	const key = PAYMENT_PAYMENT_REFUND_STATUS[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const PAYMENT_PAYMENT_REVERSAL_STATUS: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "payment.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_NONE",
+	2: "payment.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_WAITING",
+	3: "payment.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_REVERSING",
+	4: "payment.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_REVERSED",
+	5: "payment.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_RELEASED",
+	6: "payment.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_ANOMALY",
+};
+
+/** payment.PaymentReversalStatus 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function paymentPaymentReversalStatus(v: PaymentReversalStatus): UiMessage | undefined {
+	const key = PAYMENT_PAYMENT_REVERSAL_STATUS[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const PAYMENT_PAYMENT_STATUS: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "payment.PaymentStatus.PAYMENT_STATUS_CREATING",
+	2: "payment.PaymentStatus.PAYMENT_STATUS_AWAITING_PAYMENT",
+	3: "payment.PaymentStatus.PAYMENT_STATUS_PROCESSING",
+	4: "payment.PaymentStatus.PAYMENT_STATUS_SUCCEEDED",
+	5: "payment.PaymentStatus.PAYMENT_STATUS_CANCELED",
+	6: "payment.PaymentStatus.PAYMENT_STATUS_CREATE_FAILED",
+	7: "payment.PaymentStatus.PAYMENT_STATUS_ANOMALY",
+};
+
+/** payment.PaymentStatus 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function paymentPaymentStatus(v: PaymentStatus): UiMessage | undefined {
+	const key = PAYMENT_PAYMENT_STATUS[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const PAYMENT_PAYMENT_TOPUP_STATUS: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "payment.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_NONE",
+	2: "payment.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_WAITING",
+	3: "payment.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_SENDING",
+	4: "payment.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_DONE",
+	5: "payment.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_RELEASED",
+	6: "payment.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_ANOMALY",
+};
+
+/** payment.PaymentTopupStatus 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function paymentPaymentTopupStatus(v: PaymentTopupStatus): UiMessage | undefined {
+	const key = PAYMENT_PAYMENT_TOPUP_STATUS[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const PAYMENT_PAYMENT_TRANSFER_STATUS: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "payment.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_PENDING",
+	2: "payment.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_SUCCEEDED",
+	3: "payment.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_FAILED",
+	4: "payment.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_ANOMALY",
+};
+
+/** payment.PaymentTransferStatus 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function paymentPaymentTransferStatus(v: PaymentTransferStatus): UiMessage | undefined {
+	const key = PAYMENT_PAYMENT_TRANSFER_STATUS[v];
 	if (key === undefined) return undefined;
 	return { key };
 }

@@ -1,0 +1,94 @@
+{
+ "mutants": [
+  {
+   "id": "pay-uses-request-buyer",
+   "stack": "go",
+   "file": "backend/internal/httpapi/payment/app.go",
+   "old": "p, err := h.m.CreatePayment(ctx, buyerID, req.Msg.GetOrderNo())",
+   "new": "p, err := h.m.CreatePayment(ctx, buyerID*0, req.Msg.GetOrderNo())",
+   "test": "internal/httpapi/payment ^TestPaymentAppUsesTheCallersBuyerIDNotAnythingFromTheRequest$",
+   "why": "CreatePayment 不再用呼叫者的買家 ID：付款歸屬檢查失效"
+  },
+  {
+   "id": "pay-session-without-secret",
+   "stack": "go",
+   "file": "backend/internal/httpapi/payment/app.go",
+   "old": "\tif p.ClientSecret == \"\" {\n\t\treturn out, nil",
+   "new": "\tif false {\n\t\treturn out, nil",
+   "test": "internal/httpapi/payment ^TestPaymentAppReturnsTheStripeSessionOnlyWhenTheModuleReturnedASecret$",
+   "why": "沒有 secret 也回 session：provider 已往前的付款會給 client 空的 client secret"
+  },
+  {
+   "id": "pay-status-hardcoded",
+   "stack": "go",
+   "file": "backend/internal/httpapi/payment/app.go",
+   "old": "Status:  rpc.EnumToProto[paymentpb.PaymentStatus](p.Status),",
+   "new": "Status:  paymentpb.PaymentStatus_PAYMENT_STATUS_SUCCEEDED,",
+   "test": "internal/httpapi/payment ^TestPaymentAppReturnsTheStripeSessionOnlyWhenTheModuleReturnedASecret$",
+   "why": "狀態一律回已付款：client 會把未付款當成功"
+  },
+  {
+   "id": "pay-no-publishable-key-check",
+   "stack": "go",
+   "file": "backend/internal/httpapi/payment/app.go",
+   "old": "\t\tif h.publishableKey == \"\" {\n\t\t\treturn nil, errNoPublishableKey\n\t\t}\n",
+   "new": "",
+   "test": "internal/httpapi/payment ^TestPaymentAppFailsInsteadOfReturningASessionTheClientCannotUse$",
+   "why": "沒有公開金鑰仍回 session：client 無法初始化 Stripe"
+  },
+  {
+   "id": "resolve-wrong-actor",
+   "stack": "go",
+   "file": "backend/internal/httpapi/payment/admin.go",
+   "old": "h.m.ResolveAnomaly(ctx, actor, kind, id, outcome, req.Msg.GetEvidence())",
+   "new": "h.m.ResolveAnomaly(ctx, payment.AdminActor{}, kind, id, outcome, req.Msg.GetEvidence())",
+   "test": "internal/httpapi/payment ^TestResolvePaymentAnomalyPassesKindIDOutcomeAndTheCallingAdmin$",
+   "why": "人工結案不記操作的管理員：後台紀錄失去操作者"
+  },
+  {
+   "id": "resolve-kind-swapped",
+   "stack": "go",
+   "file": "backend/internal/httpapi/payment/admin.go",
+   "old": "paymentpb.PaymentAnomalyKind_PAYMENT_ANOMALY_KIND_TRANSFER: payment.AnomalyTransfer,",
+   "new": "paymentpb.PaymentAnomalyKind_PAYMENT_ANOMALY_KIND_TRANSFER: payment.AnomalyRefund,",
+   "test": "internal/httpapi/payment ^TestPaymentEnumsMatchTheModuleValues$",
+   "why": "轉帳的結案打到退款：人工結案改錯物件"
+  },
+  {
+   "id": "list-ignores-status-filter",
+   "stack": "go",
+   "file": "backend/internal/httpapi/payment/admin.go",
+   "old": "f := payment.PaymentFilter{OrderNo: req.Msg.GetOrderNo()}\n\tif req.Msg.Status != nil {",
+   "new": "f := payment.PaymentFilter{OrderNo: req.Msg.GetOrderNo()}\n\tif false {",
+   "test": "internal/httpapi/payment ^TestListPaymentsMapsEveryFieldAndPaginatesWithAFilterBoundToken$",
+   "why": "狀態篩選被丟掉：營運查 ANOMALY 會看到全部"
+  },
+  {
+   "id": "list-token-not-bound-to-filter",
+   "stack": "go",
+   "file": "backend/internal/httpapi/payment/admin.go",
+   "old": "scope := rpc.FilterScope(paymentv1alpha1connect.PaymentAdminServiceListPaymentsProcedure, string(f.Status), f.OrderNo)",
+   "new": "scope := rpc.FilterScope(paymentv1alpha1connect.PaymentAdminServiceListPaymentsProcedure)",
+   "test": "internal/httpapi/payment ^TestListPaymentsMapsEveryFieldAndPaginatesWithAFilterBoundToken$",
+   "why": "page token 不綁篩選：換篩選後翻頁會漏或重複"
+  },
+  {
+   "id": "admin-anomaly-only-dropped",
+   "stack": "admin",
+   "file": "admin/src/app/admin/anomalies/payment-lists.ts",
+   "old": "anomalyOnly: filters.anomalyOnly,",
+   "new": "anomalyOnly: false,",
+   "test": "tests/anomaly-payment-lists.test.ts refund anomaly_only follows the checkbox",
+   "why": "退款清單的只看異常勾選不送到後端：營運看不到待結案的退款"
+  },
+  {
+   "id": "admin-status-all-sends-unspecified",
+   "stack": "admin",
+   "file": "admin/src/app/admin/anomalies/payment-lists.ts",
+   "old": "return status === 0 ? undefined : status;",
+   "new": "return status;",
+   "test": "tests/anomaly-payment-lists.test.ts selecting ANOMALY sends that status; all sends none",
+   "why": "選「全部」時送出 UNSPECIFIED：後端回 invalid_argument，清單打不開"
+  }
+ ]
+}

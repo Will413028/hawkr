@@ -4,7 +4,7 @@
 // 	protoc        (unknown)
 // source: hawkr/admin/payment/v1alpha1/payment.proto
 
-// payment 模組給後台的 API（收款開通 ADR D28、D30）：收款帳戶的讀取、重新整理、重試建立，以及清理無法完成時的重試關閉與刪除對應。收款帳戶由 payment 模組擁有，擁有者現階段是店家
+// payment 模組給後台的 API（收款開通 ADR D28、D30）：收款帳戶的讀取、重新整理、重試建立，以及清理無法完成時的重試關閉與刪除對應；付款、轉帳與退款的查詢，以及 ANOMALY 的人工結案。收款帳戶由 payment 模組擁有，擁有者現階段是店家
 // （store_id）；賣家自己的收款帳戶讀取與開通 session 留在 SellerAppService（seller 確認店家擁有者之後呼叫 payment）。狀態與收件方式的列舉沿用
 // hawkr.payment.v1alpha1 的定義（賣家與後台看到同一組值）。
 
@@ -666,6 +666,997 @@ func (*DeletePaymentAccountMappingResponse) Descriptor() ([]byte, []int) {
 	return file_hawkr_admin_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{10}
 }
 
+// Payment 是後台看到的付款（含金流商的外部 ID 與失敗原因）。
+type Payment struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Id      string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	OrderNo string                 `protobuf:"bytes,2,opt,name=order_no,json=orderNo,proto3" json:"order_no,omitempty"`
+	StoreId string                 `protobuf:"bytes,3,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
+	BuyerId string                 `protobuf:"bytes,4,opt,name=buyer_id,json=buyerId,proto3" json:"buyer_id,omitempty"`
+	// 付款金額（訂單的整數金額，不帶幣別）。
+	Amount int64 `protobuf:"varint,5,opt,name=amount,proto3" json:"amount,omitempty"`
+	// 金流商的代碼（例如 stripe）。
+	Provider string                 `protobuf:"bytes,6,opt,name=provider,proto3" json:"provider,omitempty"`
+	Status   v1alpha1.PaymentStatus `protobuf:"varint,7,opt,name=status,proto3,enum=hawkr.payment.v1alpha1.PaymentStatus" json:"status,omitempty"`
+	// 金流商的付款物件 ID；還沒建立時是空字串。
+	ExternalPaymentId string `protobuf:"bytes,8,opt,name=external_payment_id,json=externalPaymentId,proto3" json:"external_payment_id,omitempty"`
+	// 入帳時間；沒有入帳時不設。
+	PaidTime *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=paid_time,json=paidTime,proto3" json:"paid_time,omitempty"`
+	// 最近一次嘗試失敗的金流商原因碼（只給後台）；沒有時是空字串。
+	LastError string `protobuf:"bytes,10,opt,name=last_error,json=lastError,proto3" json:"last_error,omitempty"`
+	// 進入 CREATE_FAILED 或 ANOMALY 的原因；其餘狀態是空字串。
+	FailureReason string                 `protobuf:"bytes,11,opt,name=failure_reason,json=failureReason,proto3" json:"failure_reason,omitempty"`
+	CreateTime    *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	UpdateTime    *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Payment) Reset() {
+	*x = Payment{}
+	mi := &file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Payment) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Payment) ProtoMessage() {}
+
+func (x *Payment) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Payment.ProtoReflect.Descriptor instead.
+func (*Payment) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *Payment) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Payment) GetOrderNo() string {
+	if x != nil {
+		return x.OrderNo
+	}
+	return ""
+}
+
+func (x *Payment) GetStoreId() string {
+	if x != nil {
+		return x.StoreId
+	}
+	return ""
+}
+
+func (x *Payment) GetBuyerId() string {
+	if x != nil {
+		return x.BuyerId
+	}
+	return ""
+}
+
+func (x *Payment) GetAmount() int64 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
+func (x *Payment) GetProvider() string {
+	if x != nil {
+		return x.Provider
+	}
+	return ""
+}
+
+func (x *Payment) GetStatus() v1alpha1.PaymentStatus {
+	if x != nil {
+		return x.Status
+	}
+	return v1alpha1.PaymentStatus(0)
+}
+
+func (x *Payment) GetExternalPaymentId() string {
+	if x != nil {
+		return x.ExternalPaymentId
+	}
+	return ""
+}
+
+func (x *Payment) GetPaidTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.PaidTime
+	}
+	return nil
+}
+
+func (x *Payment) GetLastError() string {
+	if x != nil {
+		return x.LastError
+	}
+	return ""
+}
+
+func (x *Payment) GetFailureReason() string {
+	if x != nil {
+		return x.FailureReason
+	}
+	return ""
+}
+
+func (x *Payment) GetCreateTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreateTime
+	}
+	return nil
+}
+
+func (x *Payment) GetUpdateTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdateTime
+	}
+	return nil
+}
+
+// PaymentTransfer 是後台看到的轉帳（付款轉給賣家）。
+type PaymentTransfer struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Id        string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	PaymentId string                 `protobuf:"bytes,2,opt,name=payment_id,json=paymentId,proto3" json:"payment_id,omitempty"`
+	OrderNo   string                 `protobuf:"bytes,3,opt,name=order_no,json=orderNo,proto3" json:"order_no,omitempty"`
+	StoreId   string                 `protobuf:"bytes,4,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
+	Amount    int64                  `protobuf:"varint,5,opt,name=amount,proto3" json:"amount,omitempty"`
+	// 已向賣家收回（撤回）的金額。
+	ReversedAmount int64                          `protobuf:"varint,6,opt,name=reversed_amount,json=reversedAmount,proto3" json:"reversed_amount,omitempty"`
+	Status         v1alpha1.PaymentTransferStatus `protobuf:"varint,7,opt,name=status,proto3,enum=hawkr.payment.v1alpha1.PaymentTransferStatus" json:"status,omitempty"`
+	// 金流商的轉帳物件 ID；還沒有時是空字串。
+	ExternalTransferId string `protobuf:"bytes,8,opt,name=external_transfer_id,json=externalTransferId,proto3" json:"external_transfer_id,omitempty"`
+	// 失敗或 ANOMALY 的原因；其餘狀態是空字串。
+	FailureReason string                 `protobuf:"bytes,9,opt,name=failure_reason,json=failureReason,proto3" json:"failure_reason,omitempty"`
+	CreateTime    *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PaymentTransfer) Reset() {
+	*x = PaymentTransfer{}
+	mi := &file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PaymentTransfer) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PaymentTransfer) ProtoMessage() {}
+
+func (x *PaymentTransfer) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PaymentTransfer.ProtoReflect.Descriptor instead.
+func (*PaymentTransfer) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *PaymentTransfer) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *PaymentTransfer) GetPaymentId() string {
+	if x != nil {
+		return x.PaymentId
+	}
+	return ""
+}
+
+func (x *PaymentTransfer) GetOrderNo() string {
+	if x != nil {
+		return x.OrderNo
+	}
+	return ""
+}
+
+func (x *PaymentTransfer) GetStoreId() string {
+	if x != nil {
+		return x.StoreId
+	}
+	return ""
+}
+
+func (x *PaymentTransfer) GetAmount() int64 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
+func (x *PaymentTransfer) GetReversedAmount() int64 {
+	if x != nil {
+		return x.ReversedAmount
+	}
+	return 0
+}
+
+func (x *PaymentTransfer) GetStatus() v1alpha1.PaymentTransferStatus {
+	if x != nil {
+		return x.Status
+	}
+	return v1alpha1.PaymentTransferStatus(0)
+}
+
+func (x *PaymentTransfer) GetExternalTransferId() string {
+	if x != nil {
+		return x.ExternalTransferId
+	}
+	return ""
+}
+
+func (x *PaymentTransfer) GetFailureReason() string {
+	if x != nil {
+		return x.FailureReason
+	}
+	return ""
+}
+
+func (x *PaymentTransfer) GetCreateTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreateTime
+	}
+	return nil
+}
+
+// PaymentReversal 是退款向賣家收回款項的一次金流商撤回呼叫。
+type PaymentReversal struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 撤回列 ID（人工結案撤回用）。
+	Id     string                         `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Amount int64                          `protobuf:"varint,2,opt,name=amount,proto3" json:"amount,omitempty"`
+	Status v1alpha1.PaymentReversalStatus `protobuf:"varint,3,opt,name=status,proto3,enum=hawkr.payment.v1alpha1.PaymentReversalStatus" json:"status,omitempty"`
+	// RELEASED 或 ANOMALY 的原因；其餘狀態是空字串。
+	Reason string `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	// 金流商的撤回物件 ID；還沒有時是空字串。
+	ExternalId    string                 `protobuf:"bytes,5,opt,name=external_id,json=externalId,proto3" json:"external_id,omitempty"`
+	CreateTime    *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PaymentReversal) Reset() {
+	*x = PaymentReversal{}
+	mi := &file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PaymentReversal) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PaymentReversal) ProtoMessage() {}
+
+func (x *PaymentReversal) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PaymentReversal.ProtoReflect.Descriptor instead.
+func (*PaymentReversal) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *PaymentReversal) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *PaymentReversal) GetAmount() int64 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
+func (x *PaymentReversal) GetStatus() v1alpha1.PaymentReversalStatus {
+	if x != nil {
+		return x.Status
+	}
+	return v1alpha1.PaymentReversalStatus(0)
+}
+
+func (x *PaymentReversal) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *PaymentReversal) GetExternalId() string {
+	if x != nil {
+		return x.ExternalId
+	}
+	return ""
+}
+
+func (x *PaymentReversal) GetCreateTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreateTime
+	}
+	return nil
+}
+
+// PaymentRefund 是後台看到的退款。
+type PaymentRefund struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Id        string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	PaymentId string                 `protobuf:"bytes,2,opt,name=payment_id,json=paymentId,proto3" json:"payment_id,omitempty"`
+	OrderNo   string                 `protobuf:"bytes,3,opt,name=order_no,json=orderNo,proto3" json:"order_no,omitempty"`
+	Amount    int64                  `protobuf:"varint,4,opt,name=amount,proto3" json:"amount,omitempty"`
+	// 是否為自動退款（訂單已不可付時由系統發起）。
+	Auto   bool                         `protobuf:"varint,5,opt,name=auto,proto3" json:"auto,omitempty"`
+	Status v1alpha1.PaymentRefundStatus `protobuf:"varint,6,opt,name=status,proto3,enum=hawkr.payment.v1alpha1.PaymentRefundStatus" json:"status,omitempty"`
+	// 這筆退款要向賣家收回的金額。
+	ReversalAmount int64                          `protobuf:"varint,7,opt,name=reversal_amount,json=reversalAmount,proto3" json:"reversal_amount,omitempty"`
+	ReversalStatus v1alpha1.PaymentReversalStatus `protobuf:"varint,8,opt,name=reversal_status,json=reversalStatus,proto3,enum=hawkr.payment.v1alpha1.PaymentReversalStatus" json:"reversal_status,omitempty"`
+	TopupStatus    v1alpha1.PaymentTopupStatus    `protobuf:"varint,9,opt,name=topup_status,json=topupStatus,proto3,enum=hawkr.payment.v1alpha1.PaymentTopupStatus" json:"topup_status,omitempty"`
+	// 金流商的退款物件 ID；還沒有時是空字串。
+	ExternalRefundId string `protobuf:"bytes,10,opt,name=external_refund_id,json=externalRefundId,proto3" json:"external_refund_id,omitempty"`
+	// 失敗或 ANOMALY 的原因；其餘狀態是空字串。
+	FailureReason string `protobuf:"bytes,11,opt,name=failure_reason,json=failureReason,proto3" json:"failure_reason,omitempty"`
+	// 呼叫端（售後或自動退款）建立退款時給的冪等鍵。
+	RequestKey    string                 `protobuf:"bytes,12,opt,name=request_key,json=requestKey,proto3" json:"request_key,omitempty"`
+	Reversals     []*PaymentReversal     `protobuf:"bytes,13,rep,name=reversals,proto3" json:"reversals,omitempty"`
+	CreateTime    *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PaymentRefund) Reset() {
+	*x = PaymentRefund{}
+	mi := &file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PaymentRefund) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PaymentRefund) ProtoMessage() {}
+
+func (x *PaymentRefund) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PaymentRefund.ProtoReflect.Descriptor instead.
+func (*PaymentRefund) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *PaymentRefund) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *PaymentRefund) GetPaymentId() string {
+	if x != nil {
+		return x.PaymentId
+	}
+	return ""
+}
+
+func (x *PaymentRefund) GetOrderNo() string {
+	if x != nil {
+		return x.OrderNo
+	}
+	return ""
+}
+
+func (x *PaymentRefund) GetAmount() int64 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
+func (x *PaymentRefund) GetAuto() bool {
+	if x != nil {
+		return x.Auto
+	}
+	return false
+}
+
+func (x *PaymentRefund) GetStatus() v1alpha1.PaymentRefundStatus {
+	if x != nil {
+		return x.Status
+	}
+	return v1alpha1.PaymentRefundStatus(0)
+}
+
+func (x *PaymentRefund) GetReversalAmount() int64 {
+	if x != nil {
+		return x.ReversalAmount
+	}
+	return 0
+}
+
+func (x *PaymentRefund) GetReversalStatus() v1alpha1.PaymentReversalStatus {
+	if x != nil {
+		return x.ReversalStatus
+	}
+	return v1alpha1.PaymentReversalStatus(0)
+}
+
+func (x *PaymentRefund) GetTopupStatus() v1alpha1.PaymentTopupStatus {
+	if x != nil {
+		return x.TopupStatus
+	}
+	return v1alpha1.PaymentTopupStatus(0)
+}
+
+func (x *PaymentRefund) GetExternalRefundId() string {
+	if x != nil {
+		return x.ExternalRefundId
+	}
+	return ""
+}
+
+func (x *PaymentRefund) GetFailureReason() string {
+	if x != nil {
+		return x.FailureReason
+	}
+	return ""
+}
+
+func (x *PaymentRefund) GetRequestKey() string {
+	if x != nil {
+		return x.RequestKey
+	}
+	return ""
+}
+
+func (x *PaymentRefund) GetReversals() []*PaymentReversal {
+	if x != nil {
+		return x.Reversals
+	}
+	return nil
+}
+
+func (x *PaymentRefund) GetCreateTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreateTime
+	}
+	return nil
+}
+
+type ListPaymentsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 只列這個狀態的付款；不設是不篩。
+	Status *v1alpha1.PaymentStatus `protobuf:"varint,1,opt,name=status,proto3,enum=hawkr.payment.v1alpha1.PaymentStatus,oneof" json:"status,omitempty"`
+	// 只列這張訂單的付款（完全比對）；空字串是不篩。
+	OrderNo string `protobuf:"bytes,2,opt,name=order_no,json=orderNo,proto3" json:"order_no,omitempty"`
+	// 每頁筆數：預設 20，上限 100；負數回 invalid_argument。
+	PageSize      int32  `protobuf:"varint,3,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken     string `protobuf:"bytes,4,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPaymentsRequest) Reset() {
+	*x = ListPaymentsRequest{}
+	mi := &file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPaymentsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPaymentsRequest) ProtoMessage() {}
+
+func (x *ListPaymentsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPaymentsRequest.ProtoReflect.Descriptor instead.
+func (*ListPaymentsRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *ListPaymentsRequest) GetStatus() v1alpha1.PaymentStatus {
+	if x != nil && x.Status != nil {
+		return *x.Status
+	}
+	return v1alpha1.PaymentStatus(0)
+}
+
+func (x *ListPaymentsRequest) GetOrderNo() string {
+	if x != nil {
+		return x.OrderNo
+	}
+	return ""
+}
+
+func (x *ListPaymentsRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListPaymentsRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+type ListPaymentsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Payments      []*Payment             `protobuf:"bytes,1,rep,name=payments,proto3" json:"payments,omitempty"`
+	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPaymentsResponse) Reset() {
+	*x = ListPaymentsResponse{}
+	mi := &file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPaymentsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPaymentsResponse) ProtoMessage() {}
+
+func (x *ListPaymentsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPaymentsResponse.ProtoReflect.Descriptor instead.
+func (*ListPaymentsResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *ListPaymentsResponse) GetPayments() []*Payment {
+	if x != nil {
+		return x.Payments
+	}
+	return nil
+}
+
+func (x *ListPaymentsResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
+type ListPaymentTransfersRequest struct {
+	state  protoimpl.MessageState          `protogen:"open.v1"`
+	Status *v1alpha1.PaymentTransferStatus `protobuf:"varint,1,opt,name=status,proto3,enum=hawkr.payment.v1alpha1.PaymentTransferStatus,oneof" json:"status,omitempty"`
+	// 只列這張訂單的轉帳（完全比對）；空字串是不篩。
+	OrderNo string `protobuf:"bytes,2,opt,name=order_no,json=orderNo,proto3" json:"order_no,omitempty"`
+	// 每頁筆數：預設 20，上限 100；負數回 invalid_argument。
+	PageSize      int32  `protobuf:"varint,3,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken     string `protobuf:"bytes,4,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPaymentTransfersRequest) Reset() {
+	*x = ListPaymentTransfersRequest{}
+	mi := &file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPaymentTransfersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPaymentTransfersRequest) ProtoMessage() {}
+
+func (x *ListPaymentTransfersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPaymentTransfersRequest.ProtoReflect.Descriptor instead.
+func (*ListPaymentTransfersRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *ListPaymentTransfersRequest) GetStatus() v1alpha1.PaymentTransferStatus {
+	if x != nil && x.Status != nil {
+		return *x.Status
+	}
+	return v1alpha1.PaymentTransferStatus(0)
+}
+
+func (x *ListPaymentTransfersRequest) GetOrderNo() string {
+	if x != nil {
+		return x.OrderNo
+	}
+	return ""
+}
+
+func (x *ListPaymentTransfersRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListPaymentTransfersRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+type ListPaymentTransfersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Transfers     []*PaymentTransfer     `protobuf:"bytes,1,rep,name=transfers,proto3" json:"transfers,omitempty"`
+	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPaymentTransfersResponse) Reset() {
+	*x = ListPaymentTransfersResponse{}
+	mi := &file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPaymentTransfersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPaymentTransfersResponse) ProtoMessage() {}
+
+func (x *ListPaymentTransfersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPaymentTransfersResponse.ProtoReflect.Descriptor instead.
+func (*ListPaymentTransfersResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *ListPaymentTransfersResponse) GetTransfers() []*PaymentTransfer {
+	if x != nil {
+		return x.Transfers
+	}
+	return nil
+}
+
+func (x *ListPaymentTransfersResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
+type ListPaymentRefundsRequest struct {
+	state  protoimpl.MessageState        `protogen:"open.v1"`
+	Status *v1alpha1.PaymentRefundStatus `protobuf:"varint,1,opt,name=status,proto3,enum=hawkr.payment.v1alpha1.PaymentRefundStatus,oneof" json:"status,omitempty"`
+	// 只列這張訂單的退款（完全比對）；空字串是不篩。
+	OrderNo string `protobuf:"bytes,2,opt,name=order_no,json=orderNo,proto3" json:"order_no,omitempty"`
+	// 為真時只列退款、收回或補差額任一個在 ANOMALY 的退款（人工結案的待辦）。
+	AnomalyOnly bool `protobuf:"varint,3,opt,name=anomaly_only,json=anomalyOnly,proto3" json:"anomaly_only,omitempty"`
+	// 每頁筆數：預設 20，上限 100；負數回 invalid_argument。
+	PageSize      int32  `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken     string `protobuf:"bytes,5,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPaymentRefundsRequest) Reset() {
+	*x = ListPaymentRefundsRequest{}
+	mi := &file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPaymentRefundsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPaymentRefundsRequest) ProtoMessage() {}
+
+func (x *ListPaymentRefundsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPaymentRefundsRequest.ProtoReflect.Descriptor instead.
+func (*ListPaymentRefundsRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *ListPaymentRefundsRequest) GetStatus() v1alpha1.PaymentRefundStatus {
+	if x != nil && x.Status != nil {
+		return *x.Status
+	}
+	return v1alpha1.PaymentRefundStatus(0)
+}
+
+func (x *ListPaymentRefundsRequest) GetOrderNo() string {
+	if x != nil {
+		return x.OrderNo
+	}
+	return ""
+}
+
+func (x *ListPaymentRefundsRequest) GetAnomalyOnly() bool {
+	if x != nil {
+		return x.AnomalyOnly
+	}
+	return false
+}
+
+func (x *ListPaymentRefundsRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListPaymentRefundsRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+type ListPaymentRefundsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Refunds       []*PaymentRefund       `protobuf:"bytes,1,rep,name=refunds,proto3" json:"refunds,omitempty"`
+	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPaymentRefundsResponse) Reset() {
+	*x = ListPaymentRefundsResponse{}
+	mi := &file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPaymentRefundsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPaymentRefundsResponse) ProtoMessage() {}
+
+func (x *ListPaymentRefundsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPaymentRefundsResponse.ProtoReflect.Descriptor instead.
+func (*ListPaymentRefundsResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *ListPaymentRefundsResponse) GetRefunds() []*PaymentRefund {
+	if x != nil {
+		return x.Refunds
+	}
+	return nil
+}
+
+func (x *ListPaymentRefundsResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
+type ResolvePaymentAnomalyRequest struct {
+	state protoimpl.MessageState      `protogen:"open.v1"`
+	Kind  v1alpha1.PaymentAnomalyKind `protobuf:"varint,1,opt,name=kind,proto3,enum=hawkr.payment.v1alpha1.PaymentAnomalyKind" json:"kind,omitempty"`
+	// 物件 ID：付款、轉帳、退款的 ID；撤回是撤回列 ID；補差額轉帳是退款 ID。
+	Id      string                         `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
+	Outcome v1alpha1.PaymentAnomalyOutcome `protobuf:"varint,3,opt,name=outcome,proto3,enum=hawkr.payment.v1alpha1.PaymentAnomalyOutcome" json:"outcome,omitempty"`
+	// 結案成功時必填：核對到的金流商物件 ID；結案成失敗時可省略。
+	Evidence      string `protobuf:"bytes,4,opt,name=evidence,proto3" json:"evidence,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolvePaymentAnomalyRequest) Reset() {
+	*x = ResolvePaymentAnomalyRequest{}
+	mi := &file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolvePaymentAnomalyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolvePaymentAnomalyRequest) ProtoMessage() {}
+
+func (x *ResolvePaymentAnomalyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolvePaymentAnomalyRequest.ProtoReflect.Descriptor instead.
+func (*ResolvePaymentAnomalyRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *ResolvePaymentAnomalyRequest) GetKind() v1alpha1.PaymentAnomalyKind {
+	if x != nil {
+		return x.Kind
+	}
+	return v1alpha1.PaymentAnomalyKind(0)
+}
+
+func (x *ResolvePaymentAnomalyRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ResolvePaymentAnomalyRequest) GetOutcome() v1alpha1.PaymentAnomalyOutcome {
+	if x != nil {
+		return x.Outcome
+	}
+	return v1alpha1.PaymentAnomalyOutcome(0)
+}
+
+func (x *ResolvePaymentAnomalyRequest) GetEvidence() string {
+	if x != nil {
+		return x.Evidence
+	}
+	return ""
+}
+
+type ResolvePaymentAnomalyResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolvePaymentAnomalyResponse) Reset() {
+	*x = ResolvePaymentAnomalyResponse{}
+	mi := &file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolvePaymentAnomalyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolvePaymentAnomalyResponse) ProtoMessage() {}
+
+func (x *ResolvePaymentAnomalyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolvePaymentAnomalyResponse.ProtoReflect.Descriptor instead.
+func (*ResolvePaymentAnomalyResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_admin_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{22}
+}
+
 var File_hawkr_admin_payment_v1alpha1_payment_proto protoreflect.FileDescriptor
 
 const file_hawkr_admin_payment_v1alpha1_payment_proto_rawDesc = "" +
@@ -713,13 +1704,115 @@ const file_hawkr_admin_payment_v1alpha1_payment_proto_rawDesc = "" +
 	"\aaccount\x18\x01 \x01(\v2,.hawkr.admin.payment.v1alpha1.PaymentAccountR\aaccount\"D\n" +
 	"\"DeletePaymentAccountMappingRequest\x12\x1e\n" +
 	"\bstore_id\x18\x01 \x01(\tB\x03\xe0A\x02R\astoreId\"%\n" +
-	"#DeletePaymentAccountMappingResponse2\x94\x06\n" +
+	"#DeletePaymentAccountMappingResponse\"\x8b\x04\n" +
+	"\aPayment\x12\x13\n" +
+	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x19\n" +
+	"\border_no\x18\x02 \x01(\tR\aorderNo\x12\x19\n" +
+	"\bstore_id\x18\x03 \x01(\tR\astoreId\x12\x19\n" +
+	"\bbuyer_id\x18\x04 \x01(\tR\abuyerId\x12\x16\n" +
+	"\x06amount\x18\x05 \x01(\x03R\x06amount\x12\x1a\n" +
+	"\bprovider\x18\x06 \x01(\tR\bprovider\x12=\n" +
+	"\x06status\x18\a \x01(\x0e2%.hawkr.payment.v1alpha1.PaymentStatusR\x06status\x12.\n" +
+	"\x13external_payment_id\x18\b \x01(\tR\x11externalPaymentId\x127\n" +
+	"\tpaid_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\bpaidTime\x12\x1d\n" +
+	"\n" +
+	"last_error\x18\n" +
+	" \x01(\tR\tlastError\x12%\n" +
+	"\x0efailure_reason\x18\v \x01(\tR\rfailureReason\x12;\n" +
+	"\vcreate_time\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"createTime\x12;\n" +
+	"\vupdate_time\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"updateTime\"\x99\x03\n" +
+	"\x0fPaymentTransfer\x12\x13\n" +
+	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x1d\n" +
+	"\n" +
+	"payment_id\x18\x02 \x01(\tR\tpaymentId\x12\x19\n" +
+	"\border_no\x18\x03 \x01(\tR\aorderNo\x12\x19\n" +
+	"\bstore_id\x18\x04 \x01(\tR\astoreId\x12\x16\n" +
+	"\x06amount\x18\x05 \x01(\x03R\x06amount\x12'\n" +
+	"\x0freversed_amount\x18\x06 \x01(\x03R\x0ereversedAmount\x12E\n" +
+	"\x06status\x18\a \x01(\x0e2-.hawkr.payment.v1alpha1.PaymentTransferStatusR\x06status\x120\n" +
+	"\x14external_transfer_id\x18\b \x01(\tR\x12externalTransferId\x12%\n" +
+	"\x0efailure_reason\x18\t \x01(\tR\rfailureReason\x12;\n" +
+	"\vcreate_time\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"createTime\"\xfb\x01\n" +
+	"\x0fPaymentReversal\x12\x13\n" +
+	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x16\n" +
+	"\x06amount\x18\x02 \x01(\x03R\x06amount\x12E\n" +
+	"\x06status\x18\x03 \x01(\x0e2-.hawkr.payment.v1alpha1.PaymentReversalStatusR\x06status\x12\x16\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\x12\x1f\n" +
+	"\vexternal_id\x18\x05 \x01(\tR\n" +
+	"externalId\x12;\n" +
+	"\vcreate_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"createTime\"\x9f\x05\n" +
+	"\rPaymentRefund\x12\x13\n" +
+	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x1d\n" +
+	"\n" +
+	"payment_id\x18\x02 \x01(\tR\tpaymentId\x12\x19\n" +
+	"\border_no\x18\x03 \x01(\tR\aorderNo\x12\x16\n" +
+	"\x06amount\x18\x04 \x01(\x03R\x06amount\x12\x12\n" +
+	"\x04auto\x18\x05 \x01(\bR\x04auto\x12C\n" +
+	"\x06status\x18\x06 \x01(\x0e2+.hawkr.payment.v1alpha1.PaymentRefundStatusR\x06status\x12'\n" +
+	"\x0freversal_amount\x18\a \x01(\x03R\x0ereversalAmount\x12V\n" +
+	"\x0freversal_status\x18\b \x01(\x0e2-.hawkr.payment.v1alpha1.PaymentReversalStatusR\x0ereversalStatus\x12M\n" +
+	"\ftopup_status\x18\t \x01(\x0e2*.hawkr.payment.v1alpha1.PaymentTopupStatusR\vtopupStatus\x12,\n" +
+	"\x12external_refund_id\x18\n" +
+	" \x01(\tR\x10externalRefundId\x12%\n" +
+	"\x0efailure_reason\x18\v \x01(\tR\rfailureReason\x12\x1f\n" +
+	"\vrequest_key\x18\f \x01(\tR\n" +
+	"requestKey\x12K\n" +
+	"\treversals\x18\r \x03(\v2-.hawkr.admin.payment.v1alpha1.PaymentReversalR\treversals\x12;\n" +
+	"\vcreate_time\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"createTime\"\xbb\x01\n" +
+	"\x13ListPaymentsRequest\x12B\n" +
+	"\x06status\x18\x01 \x01(\x0e2%.hawkr.payment.v1alpha1.PaymentStatusH\x00R\x06status\x88\x01\x01\x12\x19\n" +
+	"\border_no\x18\x02 \x01(\tR\aorderNo\x12\x1b\n" +
+	"\tpage_size\x18\x03 \x01(\x05R\bpageSize\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x04 \x01(\tR\tpageTokenB\t\n" +
+	"\a_status\"\x81\x01\n" +
+	"\x14ListPaymentsResponse\x12A\n" +
+	"\bpayments\x18\x01 \x03(\v2%.hawkr.admin.payment.v1alpha1.PaymentR\bpayments\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xcb\x01\n" +
+	"\x1bListPaymentTransfersRequest\x12J\n" +
+	"\x06status\x18\x01 \x01(\x0e2-.hawkr.payment.v1alpha1.PaymentTransferStatusH\x00R\x06status\x88\x01\x01\x12\x19\n" +
+	"\border_no\x18\x02 \x01(\tR\aorderNo\x12\x1b\n" +
+	"\tpage_size\x18\x03 \x01(\x05R\bpageSize\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x04 \x01(\tR\tpageTokenB\t\n" +
+	"\a_status\"\x93\x01\n" +
+	"\x1cListPaymentTransfersResponse\x12K\n" +
+	"\ttransfers\x18\x01 \x03(\v2-.hawkr.admin.payment.v1alpha1.PaymentTransferR\ttransfers\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xea\x01\n" +
+	"\x19ListPaymentRefundsRequest\x12H\n" +
+	"\x06status\x18\x01 \x01(\x0e2+.hawkr.payment.v1alpha1.PaymentRefundStatusH\x00R\x06status\x88\x01\x01\x12\x19\n" +
+	"\border_no\x18\x02 \x01(\tR\aorderNo\x12!\n" +
+	"\fanomaly_only\x18\x03 \x01(\bR\vanomalyOnly\x12\x1b\n" +
+	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x05 \x01(\tR\tpageTokenB\t\n" +
+	"\a_status\"\x8b\x01\n" +
+	"\x1aListPaymentRefundsResponse\x12E\n" +
+	"\arefunds\x18\x01 \x03(\v2+.hawkr.admin.payment.v1alpha1.PaymentRefundR\arefunds\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xe7\x01\n" +
+	"\x1cResolvePaymentAnomalyRequest\x12C\n" +
+	"\x04kind\x18\x01 \x01(\x0e2*.hawkr.payment.v1alpha1.PaymentAnomalyKindB\x03\xe0A\x02R\x04kind\x12\x13\n" +
+	"\x02id\x18\x02 \x01(\tB\x03\xe0A\x02R\x02id\x12L\n" +
+	"\aoutcome\x18\x03 \x01(\x0e2-.hawkr.payment.v1alpha1.PaymentAnomalyOutcomeB\x03\xe0A\x02R\aoutcome\x12\x1f\n" +
+	"\bevidence\x18\x04 \x01(\tB\x03\xe0A\x01R\bevidence\"\x1f\n" +
+	"\x1dResolvePaymentAnomalyResponse2\xc7\n" +
+	"\n" +
 	"\x13PaymentAdminService\x12\x89\x01\n" +
 	"\x11GetPaymentAccount\x126.hawkr.admin.payment.v1alpha1.GetPaymentAccountRequest\x1a7.hawkr.admin.payment.v1alpha1.GetPaymentAccountResponse\"\x03\x90\x02\x01\x12\x90\x01\n" +
 	"\x15RefreshPaymentAccount\x12:.hawkr.admin.payment.v1alpha1.RefreshPaymentAccountRequest\x1a;.hawkr.admin.payment.v1alpha1.RefreshPaymentAccountResponse\x12\x9c\x01\n" +
 	"\x19RetryPaymentAccountCreate\x12>.hawkr.admin.payment.v1alpha1.RetryPaymentAccountCreateRequest\x1a?.hawkr.admin.payment.v1alpha1.RetryPaymentAccountCreateResponse\x12\x99\x01\n" +
 	"\x18RetryPaymentAccountPurge\x12=.hawkr.admin.payment.v1alpha1.RetryPaymentAccountPurgeRequest\x1a>.hawkr.admin.payment.v1alpha1.RetryPaymentAccountPurgeResponse\x12\xa2\x01\n" +
-	"\x1bDeletePaymentAccountMapping\x12@.hawkr.admin.payment.v1alpha1.DeletePaymentAccountMappingRequest\x1aA.hawkr.admin.payment.v1alpha1.DeletePaymentAccountMappingResponseB\xaa\x02\n" +
+	"\x1bDeletePaymentAccountMapping\x12@.hawkr.admin.payment.v1alpha1.DeletePaymentAccountMappingRequest\x1aA.hawkr.admin.payment.v1alpha1.DeletePaymentAccountMappingResponse\x12z\n" +
+	"\fListPayments\x121.hawkr.admin.payment.v1alpha1.ListPaymentsRequest\x1a2.hawkr.admin.payment.v1alpha1.ListPaymentsResponse\"\x03\x90\x02\x01\x12\x92\x01\n" +
+	"\x14ListPaymentTransfers\x129.hawkr.admin.payment.v1alpha1.ListPaymentTransfersRequest\x1a:.hawkr.admin.payment.v1alpha1.ListPaymentTransfersResponse\"\x03\x90\x02\x01\x12\x8c\x01\n" +
+	"\x12ListPaymentRefunds\x127.hawkr.admin.payment.v1alpha1.ListPaymentRefundsRequest\x1a8.hawkr.admin.payment.v1alpha1.ListPaymentRefundsResponse\"\x03\x90\x02\x01\x12\x90\x01\n" +
+	"\x15ResolvePaymentAnomaly\x12:.hawkr.admin.payment.v1alpha1.ResolvePaymentAnomalyRequest\x1a;.hawkr.admin.payment.v1alpha1.ResolvePaymentAnomalyResponseB\xaa\x02\n" +
 	" com.hawkr.admin.payment.v1alpha1B\fPaymentProtoP\x01Zegithub.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/payment/v1alpha1;paymentv1alpha1\xa2\x02\x03HAP\xaa\x02\x1cHawkr.Admin.Payment.V1alpha1\xca\x02\x1cHawkr\\Admin\\Payment\\V1alpha1\xe2\x02(Hawkr\\Admin\\Payment\\V1alpha1\\GPBMetadata\xea\x02\x1fHawkr::Admin::Payment::V1alpha1b\x06proto3"
 
 var (
@@ -734,7 +1827,7 @@ func file_hawkr_admin_payment_v1alpha1_payment_proto_rawDescGZIP() []byte {
 	return file_hawkr_admin_payment_v1alpha1_payment_proto_rawDescData
 }
 
-var file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
 var file_hawkr_admin_payment_v1alpha1_payment_proto_goTypes = []any{
 	(*PaymentAccount)(nil),                      // 0: hawkr.admin.payment.v1alpha1.PaymentAccount
 	(*GetPaymentAccountRequest)(nil),            // 1: hawkr.admin.payment.v1alpha1.GetPaymentAccountRequest
@@ -747,40 +1840,88 @@ var file_hawkr_admin_payment_v1alpha1_payment_proto_goTypes = []any{
 	(*RetryPaymentAccountPurgeResponse)(nil),    // 8: hawkr.admin.payment.v1alpha1.RetryPaymentAccountPurgeResponse
 	(*DeletePaymentAccountMappingRequest)(nil),  // 9: hawkr.admin.payment.v1alpha1.DeletePaymentAccountMappingRequest
 	(*DeletePaymentAccountMappingResponse)(nil), // 10: hawkr.admin.payment.v1alpha1.DeletePaymentAccountMappingResponse
-	(v1alpha1.PaymentAccountStatus)(0),          // 11: hawkr.payment.v1alpha1.PaymentAccountStatus
-	(v1alpha1.RequirementCollection)(0),         // 12: hawkr.payment.v1alpha1.RequirementCollection
-	(*structpb.Struct)(nil),                     // 13: google.protobuf.Struct
-	(*timestamppb.Timestamp)(nil),               // 14: google.protobuf.Timestamp
+	(*Payment)(nil),                             // 11: hawkr.admin.payment.v1alpha1.Payment
+	(*PaymentTransfer)(nil),                     // 12: hawkr.admin.payment.v1alpha1.PaymentTransfer
+	(*PaymentReversal)(nil),                     // 13: hawkr.admin.payment.v1alpha1.PaymentReversal
+	(*PaymentRefund)(nil),                       // 14: hawkr.admin.payment.v1alpha1.PaymentRefund
+	(*ListPaymentsRequest)(nil),                 // 15: hawkr.admin.payment.v1alpha1.ListPaymentsRequest
+	(*ListPaymentsResponse)(nil),                // 16: hawkr.admin.payment.v1alpha1.ListPaymentsResponse
+	(*ListPaymentTransfersRequest)(nil),         // 17: hawkr.admin.payment.v1alpha1.ListPaymentTransfersRequest
+	(*ListPaymentTransfersResponse)(nil),        // 18: hawkr.admin.payment.v1alpha1.ListPaymentTransfersResponse
+	(*ListPaymentRefundsRequest)(nil),           // 19: hawkr.admin.payment.v1alpha1.ListPaymentRefundsRequest
+	(*ListPaymentRefundsResponse)(nil),          // 20: hawkr.admin.payment.v1alpha1.ListPaymentRefundsResponse
+	(*ResolvePaymentAnomalyRequest)(nil),        // 21: hawkr.admin.payment.v1alpha1.ResolvePaymentAnomalyRequest
+	(*ResolvePaymentAnomalyResponse)(nil),       // 22: hawkr.admin.payment.v1alpha1.ResolvePaymentAnomalyResponse
+	(v1alpha1.PaymentAccountStatus)(0),          // 23: hawkr.payment.v1alpha1.PaymentAccountStatus
+	(v1alpha1.RequirementCollection)(0),         // 24: hawkr.payment.v1alpha1.RequirementCollection
+	(*structpb.Struct)(nil),                     // 25: google.protobuf.Struct
+	(*timestamppb.Timestamp)(nil),               // 26: google.protobuf.Timestamp
+	(v1alpha1.PaymentStatus)(0),                 // 27: hawkr.payment.v1alpha1.PaymentStatus
+	(v1alpha1.PaymentTransferStatus)(0),         // 28: hawkr.payment.v1alpha1.PaymentTransferStatus
+	(v1alpha1.PaymentReversalStatus)(0),         // 29: hawkr.payment.v1alpha1.PaymentReversalStatus
+	(v1alpha1.PaymentRefundStatus)(0),           // 30: hawkr.payment.v1alpha1.PaymentRefundStatus
+	(v1alpha1.PaymentTopupStatus)(0),            // 31: hawkr.payment.v1alpha1.PaymentTopupStatus
+	(v1alpha1.PaymentAnomalyKind)(0),            // 32: hawkr.payment.v1alpha1.PaymentAnomalyKind
+	(v1alpha1.PaymentAnomalyOutcome)(0),         // 33: hawkr.payment.v1alpha1.PaymentAnomalyOutcome
 }
 var file_hawkr_admin_payment_v1alpha1_payment_proto_depIdxs = []int32{
-	11, // 0: hawkr.admin.payment.v1alpha1.PaymentAccount.status:type_name -> hawkr.payment.v1alpha1.PaymentAccountStatus
-	12, // 1: hawkr.admin.payment.v1alpha1.PaymentAccount.requirement_collection:type_name -> hawkr.payment.v1alpha1.RequirementCollection
-	13, // 2: hawkr.admin.payment.v1alpha1.PaymentAccount.requirements:type_name -> google.protobuf.Struct
-	14, // 3: hawkr.admin.payment.v1alpha1.PaymentAccount.fetch_time:type_name -> google.protobuf.Timestamp
-	14, // 4: hawkr.admin.payment.v1alpha1.PaymentAccount.create_failed_time:type_name -> google.protobuf.Timestamp
-	14, // 5: hawkr.admin.payment.v1alpha1.PaymentAccount.create_time:type_name -> google.protobuf.Timestamp
-	14, // 6: hawkr.admin.payment.v1alpha1.PaymentAccount.update_time:type_name -> google.protobuf.Timestamp
-	14, // 7: hawkr.admin.payment.v1alpha1.PaymentAccount.purge_blocked_time:type_name -> google.protobuf.Timestamp
-	14, // 8: hawkr.admin.payment.v1alpha1.PaymentAccount.purge_pending_time:type_name -> google.protobuf.Timestamp
+	23, // 0: hawkr.admin.payment.v1alpha1.PaymentAccount.status:type_name -> hawkr.payment.v1alpha1.PaymentAccountStatus
+	24, // 1: hawkr.admin.payment.v1alpha1.PaymentAccount.requirement_collection:type_name -> hawkr.payment.v1alpha1.RequirementCollection
+	25, // 2: hawkr.admin.payment.v1alpha1.PaymentAccount.requirements:type_name -> google.protobuf.Struct
+	26, // 3: hawkr.admin.payment.v1alpha1.PaymentAccount.fetch_time:type_name -> google.protobuf.Timestamp
+	26, // 4: hawkr.admin.payment.v1alpha1.PaymentAccount.create_failed_time:type_name -> google.protobuf.Timestamp
+	26, // 5: hawkr.admin.payment.v1alpha1.PaymentAccount.create_time:type_name -> google.protobuf.Timestamp
+	26, // 6: hawkr.admin.payment.v1alpha1.PaymentAccount.update_time:type_name -> google.protobuf.Timestamp
+	26, // 7: hawkr.admin.payment.v1alpha1.PaymentAccount.purge_blocked_time:type_name -> google.protobuf.Timestamp
+	26, // 8: hawkr.admin.payment.v1alpha1.PaymentAccount.purge_pending_time:type_name -> google.protobuf.Timestamp
 	0,  // 9: hawkr.admin.payment.v1alpha1.GetPaymentAccountResponse.account:type_name -> hawkr.admin.payment.v1alpha1.PaymentAccount
 	0,  // 10: hawkr.admin.payment.v1alpha1.RefreshPaymentAccountResponse.account:type_name -> hawkr.admin.payment.v1alpha1.PaymentAccount
 	0,  // 11: hawkr.admin.payment.v1alpha1.RetryPaymentAccountCreateResponse.account:type_name -> hawkr.admin.payment.v1alpha1.PaymentAccount
 	0,  // 12: hawkr.admin.payment.v1alpha1.RetryPaymentAccountPurgeResponse.account:type_name -> hawkr.admin.payment.v1alpha1.PaymentAccount
-	1,  // 13: hawkr.admin.payment.v1alpha1.PaymentAdminService.GetPaymentAccount:input_type -> hawkr.admin.payment.v1alpha1.GetPaymentAccountRequest
-	3,  // 14: hawkr.admin.payment.v1alpha1.PaymentAdminService.RefreshPaymentAccount:input_type -> hawkr.admin.payment.v1alpha1.RefreshPaymentAccountRequest
-	5,  // 15: hawkr.admin.payment.v1alpha1.PaymentAdminService.RetryPaymentAccountCreate:input_type -> hawkr.admin.payment.v1alpha1.RetryPaymentAccountCreateRequest
-	7,  // 16: hawkr.admin.payment.v1alpha1.PaymentAdminService.RetryPaymentAccountPurge:input_type -> hawkr.admin.payment.v1alpha1.RetryPaymentAccountPurgeRequest
-	9,  // 17: hawkr.admin.payment.v1alpha1.PaymentAdminService.DeletePaymentAccountMapping:input_type -> hawkr.admin.payment.v1alpha1.DeletePaymentAccountMappingRequest
-	2,  // 18: hawkr.admin.payment.v1alpha1.PaymentAdminService.GetPaymentAccount:output_type -> hawkr.admin.payment.v1alpha1.GetPaymentAccountResponse
-	4,  // 19: hawkr.admin.payment.v1alpha1.PaymentAdminService.RefreshPaymentAccount:output_type -> hawkr.admin.payment.v1alpha1.RefreshPaymentAccountResponse
-	6,  // 20: hawkr.admin.payment.v1alpha1.PaymentAdminService.RetryPaymentAccountCreate:output_type -> hawkr.admin.payment.v1alpha1.RetryPaymentAccountCreateResponse
-	8,  // 21: hawkr.admin.payment.v1alpha1.PaymentAdminService.RetryPaymentAccountPurge:output_type -> hawkr.admin.payment.v1alpha1.RetryPaymentAccountPurgeResponse
-	10, // 22: hawkr.admin.payment.v1alpha1.PaymentAdminService.DeletePaymentAccountMapping:output_type -> hawkr.admin.payment.v1alpha1.DeletePaymentAccountMappingResponse
-	18, // [18:23] is the sub-list for method output_type
-	13, // [13:18] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	27, // 13: hawkr.admin.payment.v1alpha1.Payment.status:type_name -> hawkr.payment.v1alpha1.PaymentStatus
+	26, // 14: hawkr.admin.payment.v1alpha1.Payment.paid_time:type_name -> google.protobuf.Timestamp
+	26, // 15: hawkr.admin.payment.v1alpha1.Payment.create_time:type_name -> google.protobuf.Timestamp
+	26, // 16: hawkr.admin.payment.v1alpha1.Payment.update_time:type_name -> google.protobuf.Timestamp
+	28, // 17: hawkr.admin.payment.v1alpha1.PaymentTransfer.status:type_name -> hawkr.payment.v1alpha1.PaymentTransferStatus
+	26, // 18: hawkr.admin.payment.v1alpha1.PaymentTransfer.create_time:type_name -> google.protobuf.Timestamp
+	29, // 19: hawkr.admin.payment.v1alpha1.PaymentReversal.status:type_name -> hawkr.payment.v1alpha1.PaymentReversalStatus
+	26, // 20: hawkr.admin.payment.v1alpha1.PaymentReversal.create_time:type_name -> google.protobuf.Timestamp
+	30, // 21: hawkr.admin.payment.v1alpha1.PaymentRefund.status:type_name -> hawkr.payment.v1alpha1.PaymentRefundStatus
+	29, // 22: hawkr.admin.payment.v1alpha1.PaymentRefund.reversal_status:type_name -> hawkr.payment.v1alpha1.PaymentReversalStatus
+	31, // 23: hawkr.admin.payment.v1alpha1.PaymentRefund.topup_status:type_name -> hawkr.payment.v1alpha1.PaymentTopupStatus
+	13, // 24: hawkr.admin.payment.v1alpha1.PaymentRefund.reversals:type_name -> hawkr.admin.payment.v1alpha1.PaymentReversal
+	26, // 25: hawkr.admin.payment.v1alpha1.PaymentRefund.create_time:type_name -> google.protobuf.Timestamp
+	27, // 26: hawkr.admin.payment.v1alpha1.ListPaymentsRequest.status:type_name -> hawkr.payment.v1alpha1.PaymentStatus
+	11, // 27: hawkr.admin.payment.v1alpha1.ListPaymentsResponse.payments:type_name -> hawkr.admin.payment.v1alpha1.Payment
+	28, // 28: hawkr.admin.payment.v1alpha1.ListPaymentTransfersRequest.status:type_name -> hawkr.payment.v1alpha1.PaymentTransferStatus
+	12, // 29: hawkr.admin.payment.v1alpha1.ListPaymentTransfersResponse.transfers:type_name -> hawkr.admin.payment.v1alpha1.PaymentTransfer
+	30, // 30: hawkr.admin.payment.v1alpha1.ListPaymentRefundsRequest.status:type_name -> hawkr.payment.v1alpha1.PaymentRefundStatus
+	14, // 31: hawkr.admin.payment.v1alpha1.ListPaymentRefundsResponse.refunds:type_name -> hawkr.admin.payment.v1alpha1.PaymentRefund
+	32, // 32: hawkr.admin.payment.v1alpha1.ResolvePaymentAnomalyRequest.kind:type_name -> hawkr.payment.v1alpha1.PaymentAnomalyKind
+	33, // 33: hawkr.admin.payment.v1alpha1.ResolvePaymentAnomalyRequest.outcome:type_name -> hawkr.payment.v1alpha1.PaymentAnomalyOutcome
+	1,  // 34: hawkr.admin.payment.v1alpha1.PaymentAdminService.GetPaymentAccount:input_type -> hawkr.admin.payment.v1alpha1.GetPaymentAccountRequest
+	3,  // 35: hawkr.admin.payment.v1alpha1.PaymentAdminService.RefreshPaymentAccount:input_type -> hawkr.admin.payment.v1alpha1.RefreshPaymentAccountRequest
+	5,  // 36: hawkr.admin.payment.v1alpha1.PaymentAdminService.RetryPaymentAccountCreate:input_type -> hawkr.admin.payment.v1alpha1.RetryPaymentAccountCreateRequest
+	7,  // 37: hawkr.admin.payment.v1alpha1.PaymentAdminService.RetryPaymentAccountPurge:input_type -> hawkr.admin.payment.v1alpha1.RetryPaymentAccountPurgeRequest
+	9,  // 38: hawkr.admin.payment.v1alpha1.PaymentAdminService.DeletePaymentAccountMapping:input_type -> hawkr.admin.payment.v1alpha1.DeletePaymentAccountMappingRequest
+	15, // 39: hawkr.admin.payment.v1alpha1.PaymentAdminService.ListPayments:input_type -> hawkr.admin.payment.v1alpha1.ListPaymentsRequest
+	17, // 40: hawkr.admin.payment.v1alpha1.PaymentAdminService.ListPaymentTransfers:input_type -> hawkr.admin.payment.v1alpha1.ListPaymentTransfersRequest
+	19, // 41: hawkr.admin.payment.v1alpha1.PaymentAdminService.ListPaymentRefunds:input_type -> hawkr.admin.payment.v1alpha1.ListPaymentRefundsRequest
+	21, // 42: hawkr.admin.payment.v1alpha1.PaymentAdminService.ResolvePaymentAnomaly:input_type -> hawkr.admin.payment.v1alpha1.ResolvePaymentAnomalyRequest
+	2,  // 43: hawkr.admin.payment.v1alpha1.PaymentAdminService.GetPaymentAccount:output_type -> hawkr.admin.payment.v1alpha1.GetPaymentAccountResponse
+	4,  // 44: hawkr.admin.payment.v1alpha1.PaymentAdminService.RefreshPaymentAccount:output_type -> hawkr.admin.payment.v1alpha1.RefreshPaymentAccountResponse
+	6,  // 45: hawkr.admin.payment.v1alpha1.PaymentAdminService.RetryPaymentAccountCreate:output_type -> hawkr.admin.payment.v1alpha1.RetryPaymentAccountCreateResponse
+	8,  // 46: hawkr.admin.payment.v1alpha1.PaymentAdminService.RetryPaymentAccountPurge:output_type -> hawkr.admin.payment.v1alpha1.RetryPaymentAccountPurgeResponse
+	10, // 47: hawkr.admin.payment.v1alpha1.PaymentAdminService.DeletePaymentAccountMapping:output_type -> hawkr.admin.payment.v1alpha1.DeletePaymentAccountMappingResponse
+	16, // 48: hawkr.admin.payment.v1alpha1.PaymentAdminService.ListPayments:output_type -> hawkr.admin.payment.v1alpha1.ListPaymentsResponse
+	18, // 49: hawkr.admin.payment.v1alpha1.PaymentAdminService.ListPaymentTransfers:output_type -> hawkr.admin.payment.v1alpha1.ListPaymentTransfersResponse
+	20, // 50: hawkr.admin.payment.v1alpha1.PaymentAdminService.ListPaymentRefunds:output_type -> hawkr.admin.payment.v1alpha1.ListPaymentRefundsResponse
+	22, // 51: hawkr.admin.payment.v1alpha1.PaymentAdminService.ResolvePaymentAnomaly:output_type -> hawkr.admin.payment.v1alpha1.ResolvePaymentAnomalyResponse
+	43, // [43:52] is the sub-list for method output_type
+	34, // [34:43] is the sub-list for method input_type
+	34, // [34:34] is the sub-list for extension type_name
+	34, // [34:34] is the sub-list for extension extendee
+	0,  // [0:34] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_admin_payment_v1alpha1_payment_proto_init() }
@@ -788,13 +1929,16 @@ func file_hawkr_admin_payment_v1alpha1_payment_proto_init() {
 	if File_hawkr_admin_payment_v1alpha1_payment_proto != nil {
 		return
 	}
+	file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[15].OneofWrappers = []any{}
+	file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[17].OneofWrappers = []any{}
+	file_hawkr_admin_payment_v1alpha1_payment_proto_msgTypes[19].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_admin_payment_v1alpha1_payment_proto_rawDesc), len(file_hawkr_admin_payment_v1alpha1_payment_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   23,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

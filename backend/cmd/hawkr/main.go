@@ -165,6 +165,8 @@ func runServe(ctx context.Context) error {
 	kycMAC := readKYCHashKeys(e)
 	paymentProvider := readPayment(e, log)
 	chargeProvider := readCharge(e, log)
+	// 買家付款的 client 初始化用的公開金鑰（不是 secret）；與收款開通的 STRIPE_PUBLISHABLE_KEY 是同一把平台金鑰。
+	paymentPublishableKey := e.StringOr("STRIPE_PUBLISHABLE_KEY", "")
 	registry := readGCIS(e)
 	llmConfig := llm.ReadConfig(e)
 	imageAIConfig := imageai.ReadConfig(e)
@@ -304,30 +306,31 @@ func runServe(ctx context.Context) error {
 			Now:    time.Now,
 			Logger: log,
 		}),
-		Identity:        id,
-		WebLogin:        webLogin,
-		AppLogin:        appLogin,
-		Buyer:           buyerModule,
-		Seller:          sellerModule,
-		Payment:         payments,
-		BizCalendar:     calendar,
-		Discovery:       discoveryModule,
-		ReviewQueue:     reviewqueue.New(reviewqueue.Deps{DB: d}),
-		Stats:           stats,
-		DashboardOrders: sellerDashboardOrders{orders},
-		SocialProducts:  socialCards{products},
-		BuyerPorts:      httpbuyer.Ports{Products: buyerProducts{products}, Stores: sellerModule, Orders: buyerOrders{orders}, CRM: crmModule},
-		Deletion:        deletion,
-		Delegation:      del,
-		Images:          images,
-		WebOrigin:       web,
-		Origins:         origins,
-		OriginAuth:      originAuth,
-		ClientIP:        clientIP,
-		Legacy:          gateway,
-		LegacyPrefixes:  gatewayproxy.Prefixes,
-		Now:             time.Now,
-		Logger:          log,
+		Identity:              id,
+		WebLogin:              webLogin,
+		AppLogin:              appLogin,
+		Buyer:                 buyerModule,
+		Seller:                sellerModule,
+		Payment:               payments,
+		PaymentPublishableKey: paymentPublishableKey,
+		BizCalendar:           calendar,
+		Discovery:             discoveryModule,
+		ReviewQueue:           reviewqueue.New(reviewqueue.Deps{DB: d}),
+		Stats:                 stats,
+		DashboardOrders:       sellerDashboardOrders{orders},
+		SocialProducts:        socialCards{products},
+		BuyerPorts:            httpbuyer.Ports{Products: buyerProducts{products}, Stores: sellerModule, Orders: buyerOrders{orders}, CRM: crmModule},
+		Deletion:              deletion,
+		Delegation:            del,
+		Images:                images,
+		WebOrigin:             web,
+		Origins:               origins,
+		OriginAuth:            originAuth,
+		ClientIP:              clientIP,
+		Legacy:                gateway,
+		LegacyPrefixes:        gatewayproxy.Prefixes,
+		Now:                   time.Now,
+		Logger:                log,
 	})
 	if err != nil {
 		return err
