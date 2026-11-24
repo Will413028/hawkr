@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import * as React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -85,10 +85,9 @@ function deferred<T>() {
 	return { promise, resolve };
 }
 
-const flush = () =>
-	act(async () => {
-		await new Promise((done) => setTimeout(done, 20));
-	});
+const flush = () => act(async () => {});
+
+const settle = (assertion: () => void) => waitFor(assertion);
 
 const IDENTITY = { accountId: "1", isSeller: false };
 const SIGNED_IN: SessionState = { status: "signedIn", identity: IDENTITY };
@@ -147,7 +146,12 @@ describe("NotificationToastBridge priming when the unread count settles without 
 				globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
 			).IS_REACT_ACT_ENVIRONMENT = false;
 			session.resolve(SIGNED_IN);
-			await new Promise((done) => setTimeout(done, 50));
+			await vi.waitFor(() =>
+				expect(repo.listInboxItems).toHaveBeenCalledWith({
+					audience: 1,
+					pageSize: 10,
+				}),
+			);
 			(
 				globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
 			).IS_REACT_ACT_ENVIRONMENT = true;
@@ -166,8 +170,7 @@ describe("NotificationToastBridge priming when the unread count settles without 
 			await act(async () =>
 				onSignal({ type: "inbox", unreadCount: 2, hints: [] }),
 			);
-			await flush();
-			expect(toast.show).toHaveBeenCalledTimes(1);
+			await settle(() => expect(toast.show).toHaveBeenCalledTimes(1));
 		});
 	}
 });
@@ -191,8 +194,7 @@ describe("NotificationToastBridge signal arriving while the baseline read is pen
 			items: [row("new-2"), row("old-1")],
 		});
 		mountBridge(Promise.resolve(SIGNED_IN), false);
-		await flush();
-		expect(repo.listInboxItems).toHaveBeenCalledTimes(1);
+		await settle(() => expect(repo.listInboxItems).toHaveBeenCalledTimes(1));
 
 		const onSignal = stream.onSignal.mock.lastCall?.[0] as (
 			signal: unknown,
@@ -203,8 +205,7 @@ describe("NotificationToastBridge signal arriving while the baseline read is pen
 		expect(toast.show).not.toHaveBeenCalled();
 
 		await act(async () => baseline.resolve({ items: [row("old-1")] }));
-		await flush();
-		expect(toast.show).toHaveBeenCalledTimes(1);
+		await settle(() => expect(toast.show).toHaveBeenCalledTimes(1));
 		expect(toast.show.mock.calls[0]?.[0]).toMatchObject({
 			dedupeKey: "notif:new-2",
 		});
