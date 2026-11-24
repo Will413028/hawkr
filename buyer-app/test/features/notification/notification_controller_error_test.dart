@@ -1,21 +1,22 @@
 import 'dart:collection';
 
-import 'package:hawkr_buyer/core/exceptions/app_exception.dart';
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pb.dart'
+    as pb;
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.connect.client.dart';
+import 'package:hawkr_api/testing.dart';
+import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:hawkr_buyer/core/session/session_model.dart';
 import 'package:hawkr_buyer/core/session/session_provider.dart';
-import 'package:hawkr_buyer/features/notification/data/notification_model.dart';
 import 'package:hawkr_buyer/features/notification/data/notification_repository.dart';
 import 'package:hawkr_buyer/features/notification/presentation/notification_controller.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 void main() {
   group('NotificationListController initial load', () {
-    final scenarios = <({String name, AppException error})>[
-      (name: 'network', error: const NetworkException()),
-      (name: 'business', error: const ServerException('business failure')),
-      (name: 'timeout', error: const TimeoutException()),
+    final scenarios = <({String name, Object error})>[
+      (name: 'unavailable', error: ConnectException(Code.unavailable, 'x')),
+      (name: 'internal', error: ConnectException(Code.internal, 'y')),
     ];
 
     for (final scenario in scenarios) {
@@ -45,11 +46,11 @@ void main() {
     test(
       'load-more error preserves records and retry appends next page',
       () async {
-        const paginationError = NetworkException('page unavailable');
+        final paginationError = ConnectException(Code.unavailable, 'page');
         final repository = _FakeNotificationRepository([
-          _page([_item(1)], hasMore: true),
+          _page([_item('1')], next: 'tok1'),
           paginationError,
-          _page([_item(2)], hasMore: false),
+          _page([_item('2')], next: ''),
         ]);
         final container = _containerFor(repository);
         addTearDown(container.dispose);
@@ -58,7 +59,7 @@ void main() {
         final initial = await container.read(
           notificationListControllerProvider.future,
         );
-        expect(initial.notifications.map((item) => item.id), [1]);
+        expect(initial.notifications.map((item) => item.id), ['1']);
 
         final controller = container.read(
           notificationListControllerProvider.notifier,
@@ -72,7 +73,7 @@ void main() {
           container.read(notificationListControllerProvider).hasError,
           isFalse,
         );
-        expect(failedPage.notifications.map((item) => item.id), [1]);
+        expect(failedPage.notifications.map((item) => item.id), ['1']);
         expect(failedPage.paginationError, same(paginationError));
         expect(failedPage.isLoadingMore, isFalse);
         expect(failedPage.hasMore, isTrue);
@@ -85,16 +86,16 @@ void main() {
         final retried = container
             .read(notificationListControllerProvider)
             .requireValue;
-        expect(retried.notifications.map((item) => item.id), [1, 2]);
+        expect(retried.notifications.map((item) => item.id), ['1', '2']);
         expect(retried.paginationError, isNull);
         expect(retried.hasMore, isFalse);
-        expect(repository.cursors, [0, 1, 1]);
+        expect(repository.tokens, ['', 'tok1', 'tok1']);
       },
     );
 
     test('empty successful page never reads last notification id', () async {
       final repository = _FakeNotificationRepository([
-        _page(const [], hasMore: true),
+        _page(const [], next: 'tok'),
       ]);
       final container = _containerFor(repository);
       addTearDown(container.dispose);
@@ -134,45 +135,30 @@ class _ActiveSession extends Session {
 class _FakeNotificationRepository extends NotificationRepository {
   _FakeNotificationRepository(Iterable<Object> responses)
     : _responses = Queue<Object>.of(responses),
-      super(Dio());
+      super(NotificationAppServiceClient(FakeTransportBuilder().build()));
 
   final Queue<Object> _responses;
-  final List<int> cursors = [];
+  final List<String> tokens = [];
   int notificationCalls = 0;
 
   @override
-  Future<NotificationListResult> getNotifications({
-    int cursorId = 0,
-    int size = 20,
+  Future<InboxPage> listInbox({
+    String pageToken = '',
+    int pageSize = 20,
   }) async {
     notificationCalls++;
-    cursors.add(cursorId);
+    tokens.add(pageToken);
     final response = _responses.removeFirst();
-    if (response is AppException) throw response;
-    return response as NotificationListResult;
+    if (response is Exception) throw response;
+    return response as InboxPage;
   }
 
   @override
-  Future<UnreadCount> getUnreadCount() async => const UnreadCount(count: 1);
+  Future<int> unreadCount() async => 1;
 }
 
-NotificationListResult _page(
-  List<NotificationItem> records, {
-  required bool hasMore,
-}) {
-  return NotificationListResult(
-    records: records,
-    total: records.length,
-    hasMore: hasMore,
-  );
-}
+InboxPage _page(List<pb.InboxItem> items, {required String next}) =>
+    InboxPage(items: items, nextPageToken: next);
 
-NotificationItem _item(int id) {
-  return NotificationItem(
-    id: id,
-    type: 'ORDER',
-    title: 'Order $id',
-    content: 'Updated',
-    createdAt: DateTime(2026, 7, 27),
-  );
-}
+pb.InboxItem _item(String id) =>
+    pb.InboxItem(id: id, title: 'Order $id', body: 'Updated');

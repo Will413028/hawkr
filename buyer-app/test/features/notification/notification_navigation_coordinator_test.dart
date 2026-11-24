@@ -3,108 +3,78 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('NotificationDestinationResolver', () {
-    test('resolves typed destinations without Navigator state', () {
-      final order = NotificationDestinationResolver.resolve({
-        'type': 'ORDER_SHIPPED',
-        'orderSn': 'ORD-42',
-      });
-      final chat = NotificationDestinationResolver.resolve({
-        'eventType': 'chat_message',
-        'conversation_id': 'chat-9',
+    test('hands the server deep link to the router without parsing it', () {
+      final action = NotificationDestinationResolver.resolve({
+        notificationDeepLinkKey: ' /orders/ORD-42 ',
+        'type': 'ignored',
       });
 
-      expect(order?.destination.kind, NotificationDestinationKind.orderDetail);
-      expect(order?.destination.referenceId, 'ORD-42');
-      expect(order?.statusRefresh, NotificationStatusRefresh.order);
-      expect(chat?.destination.kind, NotificationDestinationKind.chatRoom);
-      expect(chat?.destination.referenceId, 'chat-9');
+      expect(action?.deepLink, '/orders/ORD-42');
     });
 
-    test('unknown and malformed actionable payloads are ignored', () {
+    test('missing, empty and non-app deep links are ignored', () {
+      expect(NotificationDestinationResolver.resolve(const {}), isNull);
       expect(
-        NotificationDestinationResolver.resolve({'type': 'NOT_A_REAL_TYPE'}),
-        isNull,
-      );
-      expect(
-        NotificationDestinationResolver.resolve({'type': 'POST_NEW_COMMENT'}),
+        NotificationDestinationResolver.resolve({notificationDeepLinkKey: ''}),
         isNull,
       );
       expect(
         NotificationDestinationResolver.resolve({
-          'type': 'RESTOCK_AVAILABLE',
-          'productId': '  ',
+          notificationDeepLinkKey: 'https://example.com/x',
         }),
         isNull,
       );
-      expect(NotificationDestinationResolver.resolve(const {}), isNull);
+      expect(
+        NotificationDestinationResolver.resolve({
+          notificationDeepLinkKey: '//example.com/x',
+        }),
+        isNull,
+      );
     });
   });
 
   group('NotificationNavigationCoordinator', () {
-    test(
-      'cold-start payload queues, then delivers once when auth/router are ready',
-      () {
-        var ready = false;
-        final delivered = <NotificationAction>[];
-        final coordinator = NotificationNavigationCoordinator(
-          isReady: () => ready,
-          execute: (action) {
-            delivered.add(action);
-            return true;
-          },
-        );
+    test('cold-start payload queues, then delivers once when ready', () {
+      var ready = false;
+      final delivered = <NotificationAction>[];
+      final coordinator = NotificationNavigationCoordinator(
+        isReady: () => ready,
+        execute: (action) {
+          delivered.add(action);
+          return true;
+        },
+      );
 
-        final fcmPayload = <String, dynamic>{
-          'type': 'ORDER_PAID',
-          'orderSn': 'ORD-1',
-        };
-        final localPayload = <String, dynamic>{
-          ...fcmPayload,
-          notificationSourceMessageIdKey: 'fcm-123',
-        };
+      final payload = <String, dynamic>{notificationDeepLinkKey: '/orders/1'};
 
-        expect(
-          coordinator.enqueue(fcmPayload, sourceMessageId: 'fcm-123'),
-          NotificationEnqueueResult.queued,
-        );
-        // The same delivery can arrive from onMessageOpenedApp and the local
-        // notification callback while the first request is still pending.
-        expect(
-          coordinator.enqueue(fcmPayload, sourceMessageId: 'fcm-123'),
-          NotificationEnqueueResult.duplicate,
-        );
-        expect(
-          coordinator.enqueue(localPayload),
-          NotificationEnqueueResult.duplicate,
-        );
-        expect(delivered, isEmpty);
+      expect(
+        coordinator.enqueue(payload, sourceMessageId: 'fcm-123'),
+        NotificationEnqueueResult.queued,
+      );
+      expect(
+        coordinator.enqueue(payload, sourceMessageId: 'fcm-123'),
+        NotificationEnqueueResult.duplicate,
+      );
+      expect(delivered, isEmpty);
 
-        ready = true;
-        expect(coordinator.flush(), 1);
-        expect(delivered, hasLength(1));
-        expect(
-          delivered.single.destination.kind,
-          NotificationDestinationKind.orderDetail,
-        );
-
-        expect(
-          coordinator.enqueue(localPayload),
-          NotificationEnqueueResult.duplicate,
-        );
-        expect(delivered, hasLength(1));
-      },
-    );
+      ready = true;
+      expect(coordinator.flush(), 1);
+      expect(delivered.single.deepLink, '/orders/1');
+      expect(
+        coordinator.enqueue(payload, sourceMessageId: 'fcm-123'),
+        NotificationEnqueueResult.duplicate,
+      );
+      expect(delivered, hasLength(1));
+    });
 
     test('canonical payload identity is independent of map key order', () {
       final first = NotificationMessageIdentity.fromPayload({
-        'type': 'CHAT_MESSAGE',
-        'refId': 'conversation-1',
+        notificationDeepLinkKey: '/chat/1',
         'nested': {'b': 2, 'a': 1},
       });
       final second = NotificationMessageIdentity.fromPayload({
         'nested': {'a': 1, 'b': 2},
-        'refId': 'conversation-1',
-        'type': 'CHAT_MESSAGE',
+        notificationDeepLinkKey: '/chat/1',
       });
 
       expect(first, second);
@@ -112,11 +82,11 @@ void main() {
 
     test('pending queue and delivered identity history are bounded', () {
       var ready = false;
-      final delivered = <String?>[];
+      final delivered = <String>[];
       final coordinator = NotificationNavigationCoordinator(
         isReady: () => ready,
         execute: (action) {
-          delivered.add(action.destination.referenceId);
+          delivered.add(action.deepLink);
           return true;
         },
         maxPending: 2,
@@ -125,8 +95,7 @@ void main() {
 
       for (var index = 1; index <= 3; index++) {
         coordinator.enqueue({
-          'type': 'ORDER',
-          'orderSn': 'order-$index',
+          notificationDeepLinkKey: '/orders/$index',
           'message_id': 'message-$index',
         });
       }
@@ -134,13 +103,12 @@ void main() {
 
       ready = true;
       expect(coordinator.flush(), 2);
-      expect(delivered, ['order-2', 'order-3']);
+      expect(delivered, ['/orders/2', '/orders/3']);
       expect(coordinator.deliveredIdentityCount, 2);
 
       expect(
         coordinator.enqueue({
-          'type': 'ORDER',
-          'orderSn': 'order-4',
+          notificationDeepLinkKey: '/orders/4',
           'message_id': 'message-4',
         }),
         NotificationEnqueueResult.delivered,

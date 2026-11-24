@@ -4,7 +4,6 @@ import 'dart:async';
 
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -41,7 +40,6 @@ import 'features/chat/data/chat_realtime.dart';
 import 'features/chat/data/chat_repository.dart';
 import 'features/seller/data/store_card_display.dart';
 import 'package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.pb.dart' as chat_pb;
-import 'features/notification/data/push/background_handler.dart';
 import 'features/notification/data/push/manager.dart';
 import 'features/notification/data/push/router.dart';
 import 'shared/utils/hk_log.dart';
@@ -200,9 +198,6 @@ Future<Widget> _bootstrapApplication() async {
   PushNotificationManager.instance.injectContainer(container);
 
   if (!_appStoreScreenshotMode && !_e2eMode && isFirebaseInitialized) {
-    // 註冊背景推播處理（須在 Firebase 初始化之後、runApp 之前呼叫）
-    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
     // 初始化推播通知管理器（在 bootstrap 內完成，確保監聽器在 UI 就緒前已註冊）
     await _initializeFirebaseMessaging();
   }

@@ -1,5 +1,8 @@
 import 'package:hawkr_buyer/core/layout/app_text_size.dart';
-import 'package:hawkr_buyer/features/notification/data/notification_model.dart';
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pb.dart'
+    as pb;
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pbenum.dart';
+import 'package:hawkr_buyer/features/notification/presentation/preference_labels.dart';
 import 'package:hawkr_buyer/features/notification/presentation/notification_settings_screen.dart';
 import 'package:hawkr_buyer/features/notification/presentation/widgets/notification_type_icon.dart';
 import 'package:flutter/material.dart';
@@ -8,11 +11,21 @@ import 'package:flutter_test/flutter_test.dart';
 import '../../support/production_layout_test_harness.dart';
 
 void main() {
-  const preference = NotificationPreferenceItem(
-    category: 'restock',
-    title: '補貨與商品重新上架通知',
-    description: '追蹤商品完成補貨或重新開放購買時，第一時間通知我查看最新庫存狀態',
-  );
+  const category = NotificationCategory.NOTIFICATION_CATEGORY_RESTOCK;
+  final entries = [
+    pb.PreferenceEntry(
+      category: category,
+      channel: NotificationChannel.NOTIFICATION_CHANNEL_PUSH,
+      enabled: true,
+      canDisable: true,
+    ),
+    pb.PreferenceEntry(
+      category: category,
+      channel: NotificationChannel.NOTIFICATION_CHANNEL_INBOX,
+      enabled: true,
+      canDisable: false,
+    ),
+  ];
 
   for (final scenario in <({Size size, double scale, AppTextSize textSize})>[
     (size: const Size(320, 568), scale: 1, textSize: AppTextSize.large),
@@ -33,9 +46,10 @@ void main() {
             body: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: NotificationPreferenceCard(
-                preference: preference,
+                category: category,
+                entries: entries,
                 iconKind: NotificationIconKind.system,
-                onChanged: (_) {},
+                onChanged: (_, __) {},
               ),
             ),
           ),
@@ -43,22 +57,27 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(tester.takeException(), isNull);
-        expect(find.text(preference.title), findsOneWidget);
-        expect(find.text(preference.description), findsOneWidget);
+        final title = notificationCategoryLabel(category);
+        expect(find.text(title), findsOneWidget);
 
         final card = tester.getRect(
-          find.byKey(const ValueKey('notification-preference-restock')),
+          find.byKey(
+            const ValueKey(
+              'notification-preference-NOTIFICATION_CATEGORY_RESTOCK',
+            ),
+          ),
         );
         expect(card.left, greaterThanOrEqualTo(0));
         expect(card.right, lessThanOrEqualTo(scenario.size.width));
 
-        for (final text in <String>[preference.title, preference.description]) {
-          final textRect = tester.getRect(find.text(text));
-          expect(card.contains(textRect.topLeft), isTrue);
-          expect(card.contains(textRect.bottomRight), isTrue);
-        }
+        final switches = tester
+            .widgetList<Switch>(find.byType(Switch))
+            .toList();
+        expect(switches, hasLength(2));
+        expect(switches[0].onChanged, isNotNull);
+        expect(switches[1].onChanged, isNull, reason: 'locked channel');
         expect(
-          tester.getSize(find.byType(Switch)).height,
+          tester.getSize(find.byType(Switch).first).height,
           greaterThanOrEqualTo(48),
         );
         if (scenario.size.width == 320 && scenario.scale == 2) {

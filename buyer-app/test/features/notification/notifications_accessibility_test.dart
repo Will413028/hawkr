@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:ui' show CheckedState, Tristate;
 
-import 'package:hawkr_buyer/features/notification/data/notification_model.dart';
 import 'package:hawkr_buyer/features/notification/presentation/notification_controller.dart';
 import 'package:hawkr_buyer/features/notification/presentation/notifications_screen.dart';
 import 'package:flutter/material.dart';
+import '../../support/notification_fakes.dart';
 import 'package:hawkr_buyer/shared/time/taipei_display.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,16 +16,7 @@ class _FixedNotificationListController extends NotificationListController {
   Future<NotificationListState> build() async {
     return NotificationListState(
       unreadCount: 1,
-      hasMore: false,
-      notifications: [
-        NotificationItem(
-          id: 101,
-          type: 'SYSTEM',
-          title: '訂單提醒',
-          content: '商品已準備出貨',
-          createdAt: DateTime(2020, 7, 26, 8),
-        ),
-      ],
+      notifications: [inboxItem('101')],
     );
   }
 

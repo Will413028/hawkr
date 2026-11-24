@@ -3,16 +3,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/routing/app_router.dart';
 import '../../../../shared/utils/hk_log.dart';
-import '../../../order/data/after_sale_status_notifier.dart';
-import '../../../order/data/order_status_notifier.dart';
-import '../../../product/presentation/merchant_item_detail_screen.dart';
 import 'destination.dart';
 
 /// Notification navigation entry point.
 ///
 /// Payload parsing and delivery ordering live in pure, testable classes. This
-/// adapter is responsible only for checking app readiness and translating a
-/// typed destination into the existing GoRouter routes.
+/// adapter is responsible only for checking app readiness and handing the server's
+/// deep link to GoRouter.
 class NotificationRouter {
   NotificationRouter._();
 
@@ -68,68 +65,15 @@ class NotificationRouter {
   static bool _execute(NotificationAction action) {
     final context = rootNavigatorKey.currentContext;
     if (context == null) return false;
-
-    final destination = action.destination;
-    final referenceId = destination.referenceId;
-    HKLog.logI(
-      '[NotificationRouter] ${action.normalizedType} '
-      '→ ${destination.kind.name} ($referenceId)',
-    );
-
-    switch (destination.kind) {
-      case NotificationDestinationKind.orders:
-        context.go('/?tab=3');
-      case NotificationDestinationKind.orderDetail:
-        if (referenceId == null || referenceId.isEmpty) return false;
-        context.push('/orders/detail', extra: {'orderSn': referenceId});
-      case NotificationDestinationKind.afterSaleDetail:
-        if (referenceId == null || referenceId.isEmpty) return false;
-        context.push(
-          '/settings/after-sale/detail',
-          extra: {'caseNo': referenceId},
-        );
-      case NotificationDestinationKind.chat:
-        context.push('/chat');
-      case NotificationDestinationKind.chatRoom:
-        if (referenceId == null || referenceId.isEmpty) return false;
-        context.push(
-          '/chat/room',
-          extra: {'conversationId': referenceId, 'merchantId': ''},
-        );
-      case NotificationDestinationKind.coupons:
-        context.push('/wallet/coupons');
-      case NotificationDestinationKind.socialPost:
-        if (referenceId == null || referenceId.isEmpty) return false;
-        context.push('/social/post/$referenceId');
-      case NotificationDestinationKind.product:
-        if (referenceId == null || referenceId.isEmpty) return false;
-        context.push(
-          '/merchant-product',
-          extra: MerchantItemDetailScreen(skuId: referenceId),
-        );
-      case NotificationDestinationKind.none:
-        break;
-    }
-
-    _dispatchStatusRefresh(action);
-    return true;
+    HKLog.logI('[NotificationRouter] → ${action.deepLink}');
+    return pushDeepLink(context, action.deepLink);
   }
 
-  static void _dispatchStatusRefresh(NotificationAction action) {
-    switch (action.statusRefresh) {
-      case NotificationStatusRefresh.none:
-        return;
-      case NotificationStatusRefresh.order:
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          OrderStatusNotifier.instance.handlePushNotification(action.payload);
-        });
-      case NotificationStatusRefresh.afterSale:
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          AfterSaleStatusNotifier.instance.handlePushNotification(
-            action.payload,
-          );
-        });
-    }
+  /// 把伺服器給的深連結交給 GoRouter；不是 App 內路徑就不動作並回 false。
+  static bool pushDeepLink(BuildContext context, String deepLink) {
+    if (!NotificationDestinationResolver.isAppDeepLink(deepLink)) return false;
+    context.push(deepLink);
+    return true;
   }
 
   static void _scheduleFlush() {

@@ -1,13 +1,17 @@
-import 'dart:io';
-
 import 'package:hawkr_buyer/config/flavor.dart';
-import 'package:hawkr_buyer/core/networking/dio_provider.dart';
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.connect.spec.dart';
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pb.dart'
+    as pb;
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pbenum.dart';
+import 'package:hawkr_api/testing.dart';
+import 'package:hawkr_api/transport.dart' show Code, ConnectException;
+import 'package:hawkr_buyer/core/networking/connect_provider.dart';
 import 'package:hawkr_buyer/core/session/auth_session_provider.dart';
 import 'package:hawkr_buyer/core/session/force_logout_provider.dart';
 import 'package:hawkr_buyer/core/session/session_provider.dart';
 import 'package:hawkr_buyer/features/auth/data/auth_repository.dart';
 import 'package:hawkr_buyer/features/notification/data/push/manager.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -17,15 +21,14 @@ import '../../support/fake_auth_session.dart';
 import '../../support/firebase_core_mock.dart';
 import '../../support/secure_storage_mock.dart';
 
-const _devicesPath = '/api/v1/app/notifications/device-token';
-
 class _AccountRepository extends Fake implements AuthRepository {
   @override
   Future<AccountSnapshot> currentAccount() async =>
       const AccountSnapshot(accountId: 'acc_01J8Z');
 }
 
-/// 裝置註冊走中央 Dio：憑證只由 auth interceptor 從 session token 帶上，manager 不持有 session token。
+/// 裝置註冊走 Connect 的 `NotificationAppService`：憑證只由 auth transport 帶上，manager 不持有 session token。
+/// 請求不帶 `platform`，只帶 App 類型。
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -42,28 +45,46 @@ void main() {
     addTearDown(manager.seedLifecycleStateForTest);
   });
 
-  /// 以登入中的 session token 與 GetSession 還原 session；裝置註冊的請求回 [deviceStatus]。
+  /// 以登入中的 session token 與 GetSession 還原 session；裝置 token 的請求記進 [registered] 與 [deleted]。
   Future<
-    ({ProviderContainer c, List<RequestOptions> sent, FakeAuthSession auth})
+    ({
+      ProviderContainer c,
+      List<pb.RegisterDeviceTokenRequest> registered,
+      List<pb.DeleteDeviceTokenRequest> deleted,
+      FakeAuthSession auth,
+    })
   >
-  restore({int deviceStatus = HttpStatus.ok}) async {
+  restore({bool deleteFails = false}) async {
     mockSecureStorage({});
     final auth = FakeAuthSession(signedIn: true);
+    final registered = <pb.RegisterDeviceTokenRequest>[];
+    final deleted = <pb.DeleteDeviceTokenRequest>[];
+    final transport = FakeTransportBuilder()
+        .unary(NotificationAppService.registerDeviceToken, (req, _) {
+          registered.add(req);
+          return pb.RegisterDeviceTokenResponse();
+        })
+        .unary(NotificationAppService.deleteDeviceToken, (req, _) {
+          deleted.add(req);
+          if (deleteFails) {
+            throw ConnectException(Code.unauthenticated, 'session revoked');
+          }
+          return pb.DeleteDeviceTokenResponse();
+        })
+        .build();
     final container = ProviderContainer(
       overrides: [
         authSessionProvider.overrideWith((ref) async => auth),
         authRepositoryProvider.overrideWith((ref) => _AccountRepository()),
+        notificationAppClientProvider.overrideWithValue(
+          NotificationAppServiceClient(transport),
+        ),
       ],
     );
     addTearDown(container.dispose);
-    final sent = <RequestOptions>[];
-    container.read(dioProvider).httpClientAdapter = _RecordingAdapter(
-      deviceStatus,
-      sent,
-    );
     manager.injectContainer(container);
     await container.read(sessionProvider.future);
-    return (c: container, sent: sent, auth: auth);
+    return (c: container, registered: registered, deleted: deleted, auth: auth);
   }
 
   test('冷啟動恢復 session → 以恢復的 session 憑證註冊裝置', () async {
@@ -77,11 +98,14 @@ void main() {
     final h = await restore();
     await pumpEventQueue();
 
-    final register = h.sent.single;
-    expect(register.method, 'POST');
-    expect(register.uri.path, _devicesPath);
-    expect(register.headers['Authorization'], 'Bearer live');
-    expect(register.data, {'token': 'fcm-1', 'platform': 'ios'});
+    final register = h.registered.single;
+    expect(register.token, 'fcm-1');
+    expect(register.app, NotificationApp.NOTIFICATION_APP_BUYER_APP);
+    // 契約沒有 platform 欄位：請求只有 token 與 app。
+    expect(register.toProto3Json(), {
+      'token': 'fcm-1',
+      'app': 'NOTIFICATION_APP_BUYER_APP',
+    });
   });
 
   group('登出時註銷裝置', () {
@@ -102,21 +126,17 @@ void main() {
 
         await h.c.read(sessionProvider.notifier).logout();
 
-        final remove = h.sent.single;
-        expect(remove.method, 'DELETE');
-        expect(remove.uri.path, _devicesPath);
-        expect(remove.headers['Authorization'], 'Bearer live');
-        expect(remove.data, {'token': 'fcm-1'});
+        expect(h.deleted.single.token, 'fcm-1');
         expect(h.auth.calls, ['clear']);
         expect(h.c.read(sessionProvider).value, isNull);
 
         await h.c.read(sessionProvider.notifier).logout();
-        expect(h.sent, hasLength(1));
+        expect(h.deleted, hasLength(1));
       },
     );
 
     test('強制登出（session 已失效，註銷收到 401）→ 照樣清除，不再觸發強制登出', () async {
-      final h = await restore(deviceStatus: HttpStatus.unauthorized);
+      final h = await restore(deleteFails: true);
       manager.seedLifecycleStateForTest(
         fcmToken: 'fcm-1',
         isUserLoggedIn: true,
@@ -124,7 +144,7 @@ void main() {
 
       await h.c.read(sessionProvider.notifier).logout();
 
-      expect(h.sent.single.method, 'DELETE');
+      expect(h.deleted.single.token, 'fcm-1');
       expect(h.c.read(forceLogoutProvider), isFalse);
       expect(h.c.read(sessionProvider).value, isNull);
     });
@@ -135,33 +155,7 @@ void main() {
 
       await h.c.read(sessionProvider.notifier).logout();
 
-      expect(h.sent, isEmpty);
+      expect(h.deleted, isEmpty);
     });
   });
-}
-
-class _RecordingAdapter implements HttpClientAdapter {
-  _RecordingAdapter(this.status, this.sent);
-
-  final int status;
-  final List<RequestOptions> sent;
-
-  @override
-  Future<ResponseBody> fetch(
-    RequestOptions options,
-    Stream<List<int>>? requestStream,
-    Future<void>? cancelFuture,
-  ) async {
-    sent.add(options);
-    return ResponseBody.fromString(
-      '{}',
-      status,
-      headers: {
-        Headers.contentTypeHeader: [Headers.jsonContentType],
-      },
-    );
-  }
-
-  @override
-  void close({bool force = false}) {}
 }

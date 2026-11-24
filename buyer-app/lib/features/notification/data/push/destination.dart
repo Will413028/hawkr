@@ -1,230 +1,35 @@
 import 'dart:collection';
 import 'dart:convert';
 
-/// Key embedded into local-notification payloads so the main isolate can
-/// correlate a tap with the originating FCM delivery.
-const notificationSourceMessageIdKey = '_fcmMessageId';
+/// FCM `data` 裡的深連結鍵。伺服器組好 App 內目的地（`InboxItem.deep_link` 同一個值），client 只交給路由，
+/// 不解析、不依通知型別分支。
+const notificationDeepLinkKey = 'deep_link';
 
-enum NotificationDestinationKind {
-  orders,
-  orderDetail,
-  afterSaleDetail,
-  chat,
-  chatRoom,
-  coupons,
-  socialPost,
-  product,
-  none,
-}
-
-enum NotificationStatusRefresh { none, order, afterSale }
-
-/// A typed, UI-independent navigation target resolved from a push payload.
-class NotificationDestination {
-  const NotificationDestination(this.kind, {this.referenceId});
-
-  final NotificationDestinationKind kind;
-  final String? referenceId;
-}
-
-/// The complete action produced by payload resolution.
-///
-/// [payload] is retained only for the existing order/after-sale refresh
-/// notifiers. Navigation code does not parse the untyped map again.
+/// 要交給路由的目的地。
 class NotificationAction {
-  const NotificationAction({
-    required this.destination,
-    required this.normalizedType,
-    required this.payload,
-    this.statusRefresh = NotificationStatusRefresh.none,
-  });
+  const NotificationAction({required this.deepLink, required this.payload});
 
-  final NotificationDestination destination;
-  final String normalizedType;
+  final String deepLink;
   final Map<String, dynamic> payload;
-  final NotificationStatusRefresh statusRefresh;
 }
 
-/// Pure notification contract resolver. Unknown or malformed actionable
-/// payloads return null instead of reaching the Navigator.
+/// 推播 payload 的解析：沒有深連結或不是 App 內路徑就回 null，不會到 Navigator。
 class NotificationDestinationResolver {
   const NotificationDestinationResolver._();
 
   static NotificationAction? resolve(Map<String, dynamic> rawPayload) {
     final payload = Map<String, dynamic>.unmodifiable(rawPayload);
-    final type = _firstNonEmpty(payload, const [
-      'type',
-      'refType',
-      'eventType',
-    ]);
-    if (type.isEmpty) return null;
-
-    final normalized = type.toUpperCase();
-    final refId = _firstNonEmpty(payload, const ['refId']);
-
-    switch (normalized) {
-      case 'ORDER':
-      case 'ORDER_PAID':
-      case 'ORDER_SHIPPED':
-      case 'ORDER_ARRIVED':
-      case 'ORDER_CANCELLED':
-      case 'ORDER_CREATED':
-      case 'ORDER_DELIVERED':
-      case 'ORDER_COMPLETED':
-      case 'ORDER_STATUS':
-        final orderSn = _firstNonEmpty(payload, const [
-          'order_id',
-          'orderSn',
-          'orderNo',
-          'refId',
-        ]);
-        return NotificationAction(
-          destination: orderSn.isEmpty
-              ? const NotificationDestination(
-                  NotificationDestinationKind.orders,
-                )
-              : NotificationDestination(
-                  NotificationDestinationKind.orderDetail,
-                  referenceId: orderSn,
-                ),
-          normalizedType: normalized,
-          payload: payload,
-          statusRefresh: NotificationStatusRefresh.order,
-        );
-
-      case 'AFTERSALE':
-      case 'AFTER_SALE':
-      case 'AFTER_SALE_STATUS':
-      case 'RETURN_SHIPPED':
-      case 'REFUND':
-      case 'REFUND_REQUESTED':
-      case 'REFUND_COMPLETED':
-      case 'REFUND_APPROVED':
-      case 'REFUND_REJECTED':
-      case 'ORDER_REFUNDED':
-        final caseNo = _firstNonEmpty(payload, const [
-          'caseNo',
-          'case_no',
-          'refId',
-        ]);
-        final orderSn = _firstNonEmpty(payload, const [
-          'order_id',
-          'orderSn',
-          'orderNo',
-        ]);
-        return NotificationAction(
-          destination: caseNo.isNotEmpty
-              ? NotificationDestination(
-                  NotificationDestinationKind.afterSaleDetail,
-                  referenceId: caseNo,
-                )
-              : orderSn.isNotEmpty
-              ? NotificationDestination(
-                  NotificationDestinationKind.orderDetail,
-                  referenceId: orderSn,
-                )
-              : const NotificationDestination(
-                  NotificationDestinationKind.orders,
-                ),
-          normalizedType: normalized,
-          payload: payload,
-          statusRefresh: NotificationStatusRefresh.afterSale,
-        );
-
-      case 'CHAT':
-      case 'CHAT_MESSAGE':
-        final conversationId = _firstNonEmpty(payload, const [
-          'conversation_id',
-          'conversationId',
-          'refId',
-        ]);
-        return NotificationAction(
-          destination: conversationId.isEmpty
-              ? const NotificationDestination(NotificationDestinationKind.chat)
-              : NotificationDestination(
-                  NotificationDestinationKind.chatRoom,
-                  referenceId: conversationId,
-                ),
-          normalizedType: normalized,
-          payload: payload,
-        );
-
-      case 'COUPON_RECEIVED':
-      case 'COUPON_EXPIRING':
-      case 'COUPON_FREE_SHIPPING':
-      case 'PROMOTION':
-        return NotificationAction(
-          destination: const NotificationDestination(
-            NotificationDestinationKind.coupons,
-          ),
-          normalizedType: normalized,
-          payload: payload,
-        );
-
-      case 'POST_FOLLOWED_AUTHOR':
-      case 'POST_FRIEND_REMIND':
-      case 'POST_NEW_COMMENT':
-      case 'POST_COMMENT_REPLY':
-      case 'POST_LIKE':
-      case 'POST_CREATED':
-        final postId = refId.isNotEmpty
-            ? refId
-            : _firstNonEmpty(payload, const ['postId', 'post_id']);
-        if (postId.isEmpty) return null;
-        return NotificationAction(
-          destination: NotificationDestination(
-            NotificationDestinationKind.socialPost,
-            referenceId: postId,
-          ),
-          normalizedType: normalized,
-          payload: payload,
-        );
-
-      case 'RESTOCK_AVAILABLE':
-        final productId = _firstNonEmpty(payload, const [
-          'product_id',
-          'productId',
-          'refId',
-        ]);
-        if (productId.isEmpty) return null;
-        return NotificationAction(
-          destination: NotificationDestination(
-            NotificationDestinationKind.product,
-            referenceId: productId,
-          ),
-          normalizedType: normalized,
-          payload: payload,
-        );
-
-      case 'SYSTEM_MAINTENANCE':
-      case 'TERMS_UPDATE':
-      case 'PAYUNI_STATUS':
-        return NotificationAction(
-          destination: const NotificationDestination(
-            NotificationDestinationKind.none,
-          ),
-          normalizedType: normalized,
-          payload: payload,
-        );
-
-      default:
-        return null;
-    }
+    final link = payload[notificationDeepLinkKey]?.toString().trim() ?? '';
+    if (!isAppDeepLink(link)) return null;
+    return NotificationAction(deepLink: link, payload: payload);
   }
 
-  static String _firstNonEmpty(
-    Map<String, dynamic> payload,
-    List<String> keys,
-  ) {
-    for (final key in keys) {
-      final value = payload[key]?.toString().trim();
-      if (value != null && value.isNotEmpty) return value;
-    }
-    return '';
-  }
+  /// App 內路徑（`/` 開頭、不是 `//host`）才交給路由；空字串表示沒有目的地。
+  static bool isAppDeepLink(String link) =>
+      link.startsWith('/') && !link.startsWith('//');
 }
 
-/// Stable identity shared by FCM, background-open and local-notification paths.
+/// Stable identity shared by the foreground and background-open paths.
 class NotificationMessageIdentity {
   const NotificationMessageIdentity._();
 
@@ -234,7 +39,6 @@ class NotificationMessageIdentity {
   }) {
     final explicit = _firstNonEmpty([
       sourceMessageId,
-      payload[notificationSourceMessageIdKey],
       payload['message_id'],
       payload['messageId'],
       payload['notification_id'],

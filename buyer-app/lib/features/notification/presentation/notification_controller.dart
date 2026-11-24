@@ -1,8 +1,10 @@
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pb.dart'
+    as pb;
+import 'package:hawkr_api/gen/hawkr/notification/v1alpha1/notification.pbenum.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart'; // 手寫 FutureProvider：3.0 annotation 不再 re-export
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/session/session_provider.dart';
-import '../data/notification_model.dart';
 import '../data/notification_repository.dart';
 
 part 'notification_controller.g.dart';
@@ -15,24 +17,26 @@ Duration? _disableNotificationAutomaticRetry(int _, Object __) => null;
 
 /// 通知列表狀態
 class NotificationListState {
-  final List<NotificationItem> notifications;
+  final List<pb.InboxItem> notifications;
   final int unreadCount;
-  final bool hasMore;
+  final String nextPageToken;
   final bool isLoadingMore;
   final Object? paginationError;
 
   const NotificationListState({
     this.notifications = const [],
     this.unreadCount = 0,
-    this.hasMore = false,
+    this.nextPageToken = '',
     this.isLoadingMore = false,
     this.paginationError,
   });
 
+  bool get hasMore => nextPageToken.isNotEmpty;
+
   NotificationListState copyWith({
-    List<NotificationItem>? notifications,
+    List<pb.InboxItem>? notifications,
     int? unreadCount,
-    bool? hasMore,
+    String? nextPageToken,
     bool? isLoadingMore,
     Object? paginationError,
     bool clearPaginationError = false,
@@ -40,7 +44,7 @@ class NotificationListState {
     return NotificationListState(
       notifications: notifications ?? this.notifications,
       unreadCount: unreadCount ?? this.unreadCount,
-      hasMore: hasMore ?? this.hasMore,
+      nextPageToken: nextPageToken ?? this.nextPageToken,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       paginationError: clearPaginationError
           ? null
@@ -74,17 +78,15 @@ class NotificationListController extends _$NotificationListController {
     // 同時載入通知列表和未讀數量。錯誤必須保留為 AsyncError，讓 UI
     // 區分「真的沒有通知」與「尚未成功載入」。
     final results = await Future.wait([
-      _repo.getNotifications(size: _pageSize),
-      _repo.getUnreadCount(),
+      _repo.listInbox(pageSize: _pageSize),
+      _repo.unreadCount(),
     ]);
 
-    final listResult = results[0] as NotificationListResult;
-    final unread = results[1] as UnreadCount;
-
+    final page = results[0] as InboxPage;
     return NotificationListState(
-      notifications: listResult.records,
-      unreadCount: unread.count,
-      hasMore: listResult.hasMore,
+      notifications: page.items,
+      unreadCount: results[1] as int,
+      nextPageToken: page.nextPageToken,
     );
   }
 
@@ -121,7 +123,7 @@ class NotificationListController extends _$NotificationListController {
     if (current.notifications.isEmpty) {
       state = AsyncValue.data(
         current.copyWith(
-          hasMore: false,
+          nextPageToken: '',
           isLoadingMore: false,
           clearPaginationError: true,
         ),
@@ -135,16 +137,15 @@ class NotificationListController extends _$NotificationListController {
     );
 
     try {
-      final lastId = current.notifications.last.id;
-      final result = await _repo.getNotifications(
-        cursorId: lastId,
-        size: _pageSize,
+      final result = await _repo.listInbox(
+        pageToken: current.nextPageToken,
+        pageSize: _pageSize,
       );
 
       state = AsyncValue.data(
         current.copyWith(
-          notifications: [...current.notifications, ...result.records],
-          hasMore: result.hasMore,
+          notifications: [...current.notifications, ...result.items],
+          nextPageToken: result.nextPageToken,
           isLoadingMore: false,
           clearPaginationError: true,
         ),
@@ -158,17 +159,17 @@ class NotificationListController extends _$NotificationListController {
   }
 
   /// 標記單個通知為已讀
-  Future<void> markAsRead(int notificationId) async {
+  Future<void> markAsRead(String notificationId) async {
     final current = state.value;
     if (current == null) return;
 
     try {
-      await _repo.markAsRead(notificationId);
+      await _repo.markRead(notificationId);
 
       // 更新本地狀態
       final updated = current.notifications.map((n) {
-        if (n.id == notificationId && !n.isRead) {
-          return n.copyWith(isRead: true, readAt: DateTime.now());
+        if (n.id == notificationId && !n.read) {
+          return n.rebuild((b) => b.read = true);
         }
         return n;
       }).toList();
@@ -189,16 +190,16 @@ class NotificationListController extends _$NotificationListController {
     final current = state.value;
     if (current == null) return;
 
-    final target = current.notifications.cast<NotificationItem?>().firstWhere(
-      (n) => '${n!.id}' == notificationId,
+    final target = current.notifications.cast<pb.InboxItem?>().firstWhere(
+      (n) => n!.id == notificationId,
       orElse: () => null,
     );
 
     // Optimistic: 立即從列表移除
     final updated = current.notifications
-        .where((n) => '${n.id}' != notificationId)
+        .where((n) => n.id != notificationId)
         .toList();
-    final unreadDelta = (target != null && !target.isRead) ? 1 : 0;
+    final unreadDelta = (target != null && !target.read) ? 1 : 0;
 
     state = AsyncValue.data(
       current.copyWith(
@@ -208,7 +209,7 @@ class NotificationListController extends _$NotificationListController {
     );
 
     try {
-      await _repo.deleteNotifications([notificationId]);
+      await _repo.deleteItems([notificationId]);
     } catch (_) {
       // 靜默失敗，不回滾
     }
@@ -226,26 +227,26 @@ class NotificationListController extends _$NotificationListController {
 
     final idSet = ids.toSet();
     final targets = current.notifications
-        .where((n) => idSet.contains('${n.id}'))
+        .where((n) => idSet.contains(n.id))
         .toList();
-    final unreadDelta = targets.where((n) => !n.isRead).length;
+    final unreadDelta = targets.where((n) => !n.read).length;
 
     // Optimistic: 立即從列表移除
     state = AsyncValue.data(
       current.copyWith(
         notifications: current.notifications
-            .where((n) => !idSet.contains('${n.id}'))
+            .where((n) => !idSet.contains(n.id))
             .toList(),
         unreadCount: (current.unreadCount - unreadDelta).clamp(0, 999),
       ),
     );
-    await _repo.deleteNotifications(ids);
+    await _repo.deleteItems(ids);
   }
 
   /// 標記全部已讀
   Future<int> markAllAsRead() async {
     try {
-      final count = await _repo.markAllAsRead();
+      final count = await _repo.markAllRead();
       if (count > 0) {
         await refresh();
       }
@@ -260,43 +261,51 @@ class NotificationListController extends _$NotificationListController {
 // 通知偏好設定 Controller
 // ============================================================
 
-/// 通知偏好設定 AsyncNotifier
-///
-/// 透過後端 API 讀寫通知偏好（6 個 category toggle）。
+/// 通知偏好 AsyncNotifier：伺服器依買家受眾列出實際會送出的（分類、渠道）項目，畫面只呈現這些。
 @Riverpod(keepAlive: true)
 class NotificationPreferencesController
     extends _$NotificationPreferencesController {
   NotificationRepository get _repo => ref.read(notificationRepositoryProvider);
 
   @override
-  Future<List<NotificationPreferenceItem>> build() async {
+  Future<List<pb.PreferenceEntry>> build() async {
     // 未登入不打需登入的 API，避免 401 風暴；session 變動會自動重建。
     final session = ref.watch(sessionProvider).value;
     if (!hasUsableSession(session)) {
       return const [];
     }
-    return await _repo.getPreferences();
+    return await _repo.preferences();
   }
 
-  /// 更新單一 category 的開關
-  Future<bool> updatePreference(String category, bool enabled) async {
+  /// 更新單一（分類、渠道）的開關；失敗時回滾並回傳 false。
+  Future<bool> updatePreference(
+    NotificationCategory category,
+    NotificationChannel channel,
+    bool enabled,
+  ) async {
     final current = state.value;
     if (current == null) return false;
 
-    // Optimistic update
-    final optimistic = current.map((item) {
-      if (item.category == category) {
-        return item.copyWith(enabled: enabled);
-      }
-      return item;
-    }).toList();
-    state = AsyncValue.data(optimistic);
+    bool matches(pb.PreferenceEntry e) =>
+        e.category == category && e.channel == channel;
+    state = AsyncValue.data([
+      for (final e in current)
+        if (matches(e)) e.rebuild((b) => b.enabled = enabled) else e,
+    ]);
 
     try {
-      await _repo.updatePreference(category, enabled);
+      final saved = await _repo.updatePreference(
+        category: category,
+        channel: channel,
+        enabled: enabled,
+      );
+      final latest = state.value ?? current;
+      state = AsyncValue.data([
+        for (final e in latest)
+          if (matches(e)) saved else e,
+      ]);
       return true;
     } catch (_) {
-      // Rollback on failure
       state = AsyncValue.data(current);
       return false;
     }
@@ -305,7 +314,7 @@ class NotificationPreferencesController
   /// 重新載入偏好設定
   Future<void> reload() async {
     state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => _repo.getPreferences());
+    state = await AsyncValue.guard(() => _repo.preferences());
   }
 }
 
@@ -320,12 +329,11 @@ class NotificationPreferencesController
 final notificationUnreadCountProvider = FutureProvider.autoDispose<int>((
   ref,
 ) async {
-  // 訪客（無 token）打 /app/notifications/unread-count 必 401，直接回 0 不打 API。
+  // 訪客（無 token）呼叫需登入的 API 必被拒，直接回 0 不打 API。
   final session = ref.watch(sessionProvider).value;
   if (!hasUsableSession(session)) {
     return 0;
   }
   final repo = ref.watch(notificationRepositoryProvider);
-  final result = await repo.getUnreadCount();
-  return result.count;
+  return repo.unreadCount();
 });

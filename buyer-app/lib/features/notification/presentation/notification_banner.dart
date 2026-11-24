@@ -20,9 +20,6 @@ class NotificationBanner extends StatefulWidget {
   /// 通知內文（可為空，為空時不顯示內文行）
   final String body;
 
-  /// FCM type，用於選擇 icon 與主題色（可選）
-  final String? type;
-
   /// 右側大頭照（賣家 / 好友頭像），來源為 FCM payload 的 imageUrl，
   /// 為空時僅顯示左側 type icon。
   final String? imageUrl;
@@ -37,7 +34,6 @@ class NotificationBanner extends StatefulWidget {
     super.key,
     required this.title,
     required this.body,
-    this.type,
     this.imageUrl,
     required this.onTap,
     required this.onClose,
@@ -86,26 +82,7 @@ class _NotificationBannerState extends State<NotificationBanner>
     super.dispose();
   }
 
-  // ── 根據 type 選擇 icon ───────────────────────────────────────
-
-  IconData get _icon {
-    switch (widget.type?.toUpperCase()) {
-      case 'CHAT_MESSAGE':
-        return AppIcons.chatBubbleOutline;
-      case 'ORDER':
-      case 'ORDER_PAID':
-      case 'ORDER_CREATED':
-      case 'ORDER_STATUS':
-      case 'ORDER_DELIVERED':
-        return AppIcons.receiptLongRounded;
-      case 'COUPON_RECEIVED':
-        return AppIcons.localOfferRounded;
-      case 'PAYUNI_STATUS':
-        return AppIcons.accountBalanceWalletRounded;
-      default:
-        return AppIcons.notificationsRounded;
-    }
-  }
+  IconData get _icon => AppIcons.notificationsRounded;
 
   Color get _accentColor => AppColors.primary;
 

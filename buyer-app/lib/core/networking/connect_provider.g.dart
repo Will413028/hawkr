@@ -671,6 +671,59 @@ final class ChatAppClientProvider
 
 String _$chatAppClientHash() => r'82a8a1be2af41db22b2bd53d0758cc34b233d64d';
 
+/// 買家的通知（`NotificationAppService`）：收件匣、偏好與推播裝置 token。
+
+@ProviderFor(notificationAppClient)
+final notificationAppClientProvider = NotificationAppClientProvider._();
+
+/// 買家的通知（`NotificationAppService`）：收件匣、偏好與推播裝置 token。
+
+final class NotificationAppClientProvider
+    extends
+        $FunctionalProvider<
+          NotificationAppServiceClient,
+          NotificationAppServiceClient,
+          NotificationAppServiceClient
+        >
+    with $Provider<NotificationAppServiceClient> {
+  /// 買家的通知（`NotificationAppService`）：收件匣、偏好與推播裝置 token。
+  NotificationAppClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'notificationAppClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$notificationAppClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<NotificationAppServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  NotificationAppServiceClient create(Ref ref) {
+    return notificationAppClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(NotificationAppServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<NotificationAppServiceClient>(value),
+    );
+  }
+}
+
+String _$notificationAppClientHash() =>
+    r'af58e060e604ac6f57920a0efdbde82b738e41c1';
+
 /// 評價的公開讀取：有 session 時帶 Bearer，伺服器才套用觀看者的封鎖；訪客不帶。
 
 @ProviderFor(reviewPublicClient)

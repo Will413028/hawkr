@@ -51,7 +51,7 @@ final class NotificationListControllerProvider
 }
 
 String _$notificationListControllerHash() =>
-    r'2fe6b0325c6413531bdf61d8686f2b02d69acc10';
+    r'1e993da9625f802d32ce61bcd3b1becf395d628a';
 
 /// 通知列表 AsyncNotifier
 ///
@@ -82,26 +82,20 @@ abstract class _$NotificationListController
   }
 }
 
-/// 通知偏好設定 AsyncNotifier
-///
-/// 透過後端 API 讀寫通知偏好（6 個 category toggle）。
+/// 通知偏好 AsyncNotifier：伺服器依買家受眾列出實際會送出的（分類、渠道）項目，畫面只呈現這些。
 
 @ProviderFor(NotificationPreferencesController)
 final notificationPreferencesControllerProvider =
     NotificationPreferencesControllerProvider._();
 
-/// 通知偏好設定 AsyncNotifier
-///
-/// 透過後端 API 讀寫通知偏好（6 個 category toggle）。
+/// 通知偏好 AsyncNotifier：伺服器依買家受眾列出實際會送出的（分類、渠道）項目，畫面只呈現這些。
 final class NotificationPreferencesControllerProvider
     extends
         $AsyncNotifierProvider<
           NotificationPreferencesController,
-          List<NotificationPreferenceItem>
+          List<pb.PreferenceEntry>
         > {
-  /// 通知偏好設定 AsyncNotifier
-  ///
-  /// 透過後端 API 讀寫通知偏好（6 個 category toggle）。
+  /// 通知偏好 AsyncNotifier：伺服器依買家受眾列出實際會送出的（分類、渠道）項目，畫面只呈現這些。
   NotificationPreferencesControllerProvider._()
     : super(
         from: null,
@@ -124,32 +118,30 @@ final class NotificationPreferencesControllerProvider
 }
 
 String _$notificationPreferencesControllerHash() =>
-    r'f6b4faaf5f4e0765190fc25b1c08bac1d2308dd9';
+    r'ba616e5514277602517e9496acecab6111829987';
 
-/// 通知偏好設定 AsyncNotifier
-///
-/// 透過後端 API 讀寫通知偏好（6 個 category toggle）。
+/// 通知偏好 AsyncNotifier：伺服器依買家受眾列出實際會送出的（分類、渠道）項目，畫面只呈現這些。
 
 abstract class _$NotificationPreferencesController
-    extends $AsyncNotifier<List<NotificationPreferenceItem>> {
-  FutureOr<List<NotificationPreferenceItem>> build();
+    extends $AsyncNotifier<List<pb.PreferenceEntry>> {
+  FutureOr<List<pb.PreferenceEntry>> build();
   @$mustCallSuper
   @override
   void runBuild() {
     final ref =
         this.ref
             as $Ref<
-              AsyncValue<List<NotificationPreferenceItem>>,
-              List<NotificationPreferenceItem>
+              AsyncValue<List<pb.PreferenceEntry>>,
+              List<pb.PreferenceEntry>
             >;
     final element =
         ref.element
             as $ClassProviderElement<
               AnyNotifier<
-                AsyncValue<List<NotificationPreferenceItem>>,
-                List<NotificationPreferenceItem>
+                AsyncValue<List<pb.PreferenceEntry>>,
+                List<pb.PreferenceEntry>
               >,
-              AsyncValue<List<NotificationPreferenceItem>>,
+              AsyncValue<List<pb.PreferenceEntry>>,
               Object?,
               Object?
             >;
