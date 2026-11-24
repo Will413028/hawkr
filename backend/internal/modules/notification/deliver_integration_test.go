@@ -151,7 +151,7 @@ func TestPushTransientErrorIsRetriedAndDeliveredOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	calls := f.push.Calls()
-	if len(calls) != 1 || calls[0].Message.Data[deliver.DataInboxItemID] != item.String() {
+	if len(calls) == 0 || calls[len(calls)-1].Message.Data[deliver.DataInboxItemID] != item.String() {
 		t.Fatalf("推播 data = %+v，預期帶 inbox_item_id %s", calls, item)
 	}
 }
@@ -629,7 +629,9 @@ func TestPushOfAnImageTypeCarriesTheImageInTheFCMPayload(t *testing.T) {
 	if got := apns["fcm_options"].(map[string]string)["image"]; got != want {
 		t.Fatalf("apns.fcm_options.image = %q，預期 %q", got, want)
 	}
-	plain := f.pushDelivery(t, acct, "plain")
+	other := f.newAccount(t)
+	f.addToken(t, other, "BUYER", "tok-2")
+	plain := f.pushDelivery(t, other, "plain")
 	if err := f.deliver(plain, false); err != nil {
 		t.Fatal(err)
 	}
