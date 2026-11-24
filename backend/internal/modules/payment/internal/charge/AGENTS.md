@@ -14,7 +14,7 @@
 - 狀態只由快照推導（`Next`）：入帳是終局；取消後入帳由成功勝出；不認得的狀態、金額不符不寫入。守門：`TestNextFollowsTheDecisionTable`、`TestSucceededIsNeverOverwrittenAndALateSuccessBeatsACancel`。
 - handler 只排同步 job（付款 ID 唯一鍵）、不標記已處理、不讀事件內容；同步重讀後同 transaction 發 `PaymentChanged`（狀態改變才發）並標記讀取開始前收到的事件；入帳缺 charge 或入帳時間是暫時性的（`errIncompleteSuccess`）：不標記、job 重試。守門：`TestTheEventHandlerNeverTrustsTheEventContent`。
 - 付款說明存在列上（至多 200 字，沒有商品名用訂單編號）。守門：`TestPaymentDescriptionTrimsFallsBackToTheOrderNoAndCapsByRunes`。
-- provider 名稱與收款帳戶不同，webhook 路由（`POST /webhooks/stripe-payments`）、簽章密鑰（`STRIPE_PAYMENT_WEBHOOK_SECRET`）、本文上限與 log 標籤都獨立。守門：`TestAChargeProviderNamedLikeTheAccountProviderPanicsAtAssembly`。
+- provider 名稱 `stripe_payments` 與收款帳戶不同，webhook 路由與簽章密鑰獨立。Stripe adapter（`stripe.go`）的錯誤三分依 HTTP 狀態，查回用強一致列表、不用 Search。守門：`TestAChargeProviderNamedLikeTheAccountProviderPanicsAtAssembly`、`TestStripeMoneyErrorsAreClassifiedIntoThreeWays`。
 - 補掃：閒置的建立中列、久未讀的未結案付款、被取代又未結案的舊嘗試、有舊的未處理事件的付款。守門：`TestSweepQueuesIdleCreatesStaleReadsAndOldUnprocessedEvents`。
 - client_secret 不存，`GetPayment` 等待付款時向 provider 讀。守門：`TestGetPaymentReturnsTheSecretOnlyWhileAwaitingAndOnlyToTheOwner`。
 - 轉帳：transaction 只寫 PENDING 列與 job，有效轉帳唯一靠 `transfers_active_payment`（含 ANOMALY）。金額在每把冪等鍵第一次送出時鎖付款列算定（`claimTransfer`，D11），同鍵不變、換新鍵才重算；全額退款先等進行中的退款終局。守門：`TestAConcurrentRefundAndTheTransferSendNeverOverpay`。撤回：一次呼叫一列 `refund_reversals`。

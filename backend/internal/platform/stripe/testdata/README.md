@@ -22,3 +22,5 @@ recipient account): `payment_intent_confirmed` (USD PaymentIntent with `transfer
 (400: platform total balance below the transfer, even with `source_transaction`), `transfer_reversal_recipient_drained`
 (200: reversal succeeds after the recipient paid out, leaving a negative recipient balance), `event_destination_snapshot`
 (v2 event destination with `event_payload: snapshot`) and `event_destination_snapshot_rejects_thin` (400).
+
+B2 step 3d: `payment_intent_confirmed_expanded` is derived from `payment_intent_confirmed` (not a recording): `latest_charge` replaced by the expanded charge object (`id`, `created`) as the API reference describes, for the adapter paid-at mapping.

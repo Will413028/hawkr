@@ -1,0 +1,139 @@
+{
+ "mutants": [
+  {
+   "id": "429-classified-permanent",
+   "stack": "go",
+   "file": "backend/internal/modules/payment/internal/charge/stripe.go",
+   "old": "\tcase api.Status == http.StatusTooManyRequests, api.Code == stripeBalanceInsufficient && api.Status >= 400 && api.Status < 500:\n\t\treturn fmt.Errorf(\"%w：%w\", ErrRetryableRefusal, err)\n\tcase api.Permanent():\n\t\treturn fmt.Errorf(\"%w：%w\", ErrPermanent, err)\n\t}\n\treturn err\n}\n\n// classifyRead",
+   "new": "\tcase api.Code == stripeBalanceInsufficient && api.Status >= 400 && api.Status < 500:\n\t\treturn fmt.Errorf(\"%w：%w\", ErrRetryableRefusal, err)\n\tcase api.Permanent(), api.Status == http.StatusTooManyRequests:\n\t\treturn fmt.Errorf(\"%w：%w\", ErrPermanent, err)\n\t}\n\treturn err\n}\n\n// classifyRead",
+   "test": "internal/modules/payment/internal/charge ^TestStripeMoneyErrorsAreClassifiedIntoThreeWays$",
+   "why": "429 被當成終局拒絕，限流的呼叫永遠不會重試"
+  },
+  {
+   "id": "5xx-classified-retryable-refusal",
+   "stack": "go",
+   "file": "backend/internal/modules/payment/internal/charge/stripe.go",
+   "old": "\tcase api.Status == http.StatusTooManyRequests, api.Code == stripeBalanceInsufficient && api.Status >= 400 && api.Status < 500:\n\t\treturn fmt.Errorf(\"%w：%w\", ErrRetryableRefusal, err)\n\tcase api.Permanent():\n\t\treturn fmt.Errorf(\"%w：%w\", ErrPermanent, err)\n\t}\n\treturn err\n}\n\n// classifyRead",
+   "new": "\tcase api.Status == http.StatusTooManyRequests, api.Code == stripeBalanceInsufficient && api.Status >= 400 && api.Status < 500:\n\t\treturn fmt.Errorf(\"%w：%w\", ErrRetryableRefusal, err)\n\tcase api.Status >= 500:\n\t\treturn fmt.Errorf(\"%w：%w\", ErrRetryableRefusal, err)\n\tcase api.Permanent():\n\t\treturn fmt.Errorf(\"%w：%w\", ErrPermanent, err)\n\t}\n\treturn err\n}\n\n// classifyRead",
+   "test": "internal/modules/payment/internal/charge ^TestStripeMoneyErrorsAreClassifiedIntoThreeWays$",
+   "why": "5xx（結果不明）被當成沒執行的拒絕，換新鍵重送可能重複搬錢"
+  },
+  {
+   "id": "balance-insufficient-classified-permanent",
+   "stack": "go",
+   "file": "backend/internal/modules/payment/internal/charge/stripe.go",
+   "old": "\tcase api.Status == http.StatusTooManyRequests, api.Code == stripeBalanceInsufficient && api.Status >= 400 && api.Status < 500:",
+   "new": "\tcase api.Status == http.StatusTooManyRequests:",
+   "test": "internal/modules/payment/internal/charge ^TestStripeMoneyErrorsAreClassifiedIntoThreeWays$",
+   "why": "平台餘額不足被當成終局，轉帳補錢後也不會再試"
+  },
+  {
+   "id": "transport-error-classified-refusal",
+   "stack": "go",
+   "file": "backend/internal/modules/payment/internal/charge/stripe.go",
+   "old": "\tif !errors.As(err, &api) {\n\t\treturn err\n\t}\n\tswitch {",
+   "new": "\tif !errors.As(err, &api) {\n\t\treturn fmt.Errorf(\"%w：%w\", ErrRetryableRefusal, err)\n\t}\n\tswitch {",
+   "test": "internal/modules/payment/internal/charge ^TestStripeTransportFailuresAreUnknown$",
+   "why": "連線中斷與逾時（不明）被當成沒執行的拒絕"
+  },
+  {
+   "id": "any-409-classified-permanent",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/client.go",
+   "old": "\t\treturn e.Code == \"idempotency_error\"",
+   "new": "\t\treturn true",
+   "test": "internal/modules/payment/internal/charge ^TestStripeMoneyErrorsAreClassifiedIntoThreeWays$",
+   "why": "同一把鍵仍在執行的 409 被當成終局，結果不明的呼叫被標失敗"
+  },
+  {
+   "id": "unreadable-success-passes",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/payment.go",
+   "old": "\t\treturn PaymentIntent{}, errors.New(\"stripe：PaymentIntent 的回應沒有 id\")",
+   "new": "\t\treturn PaymentIntent{ID: \"pi_unknown\"}, nil",
+   "test": "internal/modules/payment/internal/charge ^TestStripeAnUnreadableSuccessIsUnknown$",
+   "why": "讀不懂的 2xx 被當成成功"
+  },
+  {
+   "id": "missing-deadline",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/client.go",
+   "old": "\tctx, cancel := context.WithTimeout(ctx, c.timeout)",
+   "new": "\tctx, cancel := context.WithCancel(ctx)",
+   "test": "internal/modules/payment/internal/charge ^TestStripeEveryOutboundCallCarriesADeadline$",
+   "why": "出站呼叫沒有 deadline"
+  },
+  {
+   "id": "find-transfer-ignores-transfer-group",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/payment.go",
+   "old": "\t\tparams := &sdk.TransferListParams{TransferGroup: sdk.String(transferGroup)}",
+   "new": "\t\tparams := &sdk.TransferListParams{}",
+   "test": "internal/modules/payment/internal/charge ^TestStripeFindTransferFiltersByTransferGroupAndMatchesTheAttempt$",
+   "why": "查回轉帳不依 transfer_group 篩選，會對到別的訂單的轉帳"
+  },
+  {
+   "id": "find-transfer-ignores-attempt",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/payment.go",
+   "old": "\t\tif t.Metadata[MetaAttemptID] == attemptID {",
+   "new": "\t\tif true {",
+   "test": "internal/modules/payment/internal/charge ^TestStripeFindTransferFiltersByTransferGroupAndMatchesTheAttempt$",
+   "why": "查回轉帳不比對 attempt_id，回傳群組內第一筆"
+  },
+  {
+   "id": "find-refund-ignores-payment-intent",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/payment.go",
+   "old": "\t\tparams := &sdk.RefundListParams{PaymentIntent: sdk.String(paymentIntentID)}",
+   "new": "\t\tparams := &sdk.RefundListParams{}",
+   "test": "internal/modules/payment/internal/charge ^TestStripeFindRefundAndReversalListTheirParent$",
+   "why": "查回退款不依 payment_intent 篩選"
+  },
+  {
+   "id": "find-payment-unfinished-scan-claims-absence",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/payment.go",
+   "old": "\treturn fmt.Errorf(\"stripe：列表超過 %d 頁仍未看完，不能證明不存在\", maxListPages)",
+   "new": "\treturn nil",
+   "test": "internal/modules/payment/internal/charge ^TestStripeFindPaymentPagesAndNeverClaimsAbsenceWhenItCannotFinish$",
+   "why": "翻不完就回「找不到」，會讓呼叫方換新鍵重建"
+  },
+  {
+   "id": "cancel-paid-intent-is-error",
+   "stack": "go",
+   "file": "backend/internal/modules/payment/internal/charge/stripe.go",
+   "old": "(snap.State != StateCanceled && snap.State != StateSucceeded)",
+   "new": "snap.State != StateCanceled",
+   "test": "internal/modules/payment/internal/charge ^TestStripeCancelPayment$",
+   "why": "取消已入帳的付款變成錯誤而不是入帳的快照"
+  },
+  {
+   "id": "currency-not-usd",
+   "stack": "go",
+   "file": "backend/internal/modules/payment/internal/charge/stripe.go",
+   "old": "const StripeCurrency = \"usd\"",
+   "new": "const StripeCurrency = \"twd\"",
+   "test": "internal/modules/payment/internal/charge ^TestStripeCreatePaymentSendsCentsUSDGroupMetadataAndKey$",
+   "why": "幣別不是 USD（D67），轉帳會因幣別不符被拒"
+  },
+  {
+   "id": "payment-event-signature-unchecked",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/webhook_payment.go",
+   "old": "c.whsecret); err != nil {",
+   "new": "c.whsecret); err != nil && false {",
+   "test": "internal/modules/payment/internal/charge ^TestStripeParseEvent$",
+   "why": "付款事件不驗簽章"
+  },
+  {
+   "id": "get-payment-without-latest-charge-expand",
+   "stack": "go",
+   "file": "backend/internal/platform/stripe/payment.go",
+   "old": "\tparams := &sdk.PaymentIntentRetrieveParams{}\n\tparams.AddExpand(expandLatestCharge)",
+   "new": "\tparams := &sdk.PaymentIntentRetrieveParams{}",
+   "test": "internal/modules/payment/internal/charge ^TestStripePaymentIntentWithoutExpandedChargeHasNoPaidAt$",
+   "why": "讀 PaymentIntent 不展開 latest_charge，入帳時間永遠是零值"
+  }
+ ]
+}
