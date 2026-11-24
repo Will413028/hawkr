@@ -95,9 +95,12 @@ ON CONFLICT (store_id) DO UPDATE SET exposable = true;
 INSERT INTO category (name, parent_id, status)
 SELECT child, p.id, '9004'
 FROM category p
-JOIN (VALUES ('葉菜', '蔬菜'), ('根莖', '蔬菜'), ('柑橘', '水果')) AS c(child, parent) ON c.parent = p.name AND p.parent_id IS NULL
+JOIN (VALUES ('葉菜', '蔬菜'), ('根莖', '蔬菜'), ('柑橘', '水果')) AS c(child, parent) ON c.parent = p.name AND COALESCE(p.parent_id, 0) = 0
 ON CONFLICT DO NOTHING;
+SELECT 1 / count(*) FROM category WHERE COALESCE(parent_id, 0) <> 0;
 SQL
+  # 分類樹整表快取在 Redis 的 cat:all（CategoryCacheService）；寫入後清掉，第一次讀才看得到第二層。
+  docker exec hawkr-redis redis-cli -a "$REDIS_PASSWORD" --no-auth-warning DEL cat:all >/dev/null
   gateway_env+=(
     PRODUCT_SERVICE_HOST=127.0.0.1 PRODUCT_SERVICE_GRPC_PORT="$JAVA_GRPC_PORT" PRODUCT_SERVICE_PORT="$JAVA_HTTP_PORT"
     LEGACY_BUYER_GRPC_HOST=127.0.0.1 LEGACY_BUYER_GRPC_PORT="$LEGACY_PORT"
