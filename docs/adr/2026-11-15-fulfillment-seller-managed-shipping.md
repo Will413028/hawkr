@@ -55,3 +55,4 @@ B3 開工前的前提重審（`backend/docs/plans/2026-11-24-b3-fulfillment/prem
 - **D3 修訂**：物流 port 與模擬 adapter 延後到決定上線並簽約時；webhook inbox 去重的示範由 B2 的 payment 承擔。
 - **過渡期**：B3 刪除 Java shipping 與 Java 端所有依賴它的程式（不留 stub、不寫轉接）；B3 到 B8 之間 Java 訂單停在已付款、結帳運費固定 0，訂單完成、轉帳、crm 的完成事件與賣家關店在這段期間不會被觸發（系統未上線）。
 - 「後果」段的作品集重點改為：訂單的狀態機（含出貨）在 B8 交付，B3 交付運費設定與舊物流的清理。
+- 對外契約不帶「配送方式」：每筆訂單都是賣家自寄，`ShippingMethod` 3001／3002／3003 刪除，3005（RFQ 站外出貨）由 procurement 以自己的欄位表達；B6、B8 的契約不帶配送方式（B3 R2，Will 2026-11-24）。

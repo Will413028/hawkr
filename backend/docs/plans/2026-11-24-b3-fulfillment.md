@@ -14,7 +14,7 @@
 - Java 端依賴 shipping 的程式一律刪除，不留回空的 stub、不寫轉接（P3；已確認）。
 - gateway `shipping_ambient.go` 與配送溫層（`deliveryTemp`、`ShippingTemperature`）歸 B4／B6，B3 不碰（Will 2026-11-24；已確認）。
 - B6 cart 依賴本計畫的報價函式（Will 2026-11-24；已確認）。
-- B4 D10 依 P6 重開（catalog 不存配送方式）：B4 session 尚未改它的計畫（未確認；擋步驟 4 的 product-service 部分與步驟 6 的商品設定頁）。
+- B4 D10 依 P6 重開（catalog 不存配送方式）：B4 session 尚未改它的計畫（未確認，Will 2026-11-24 轉告 B4 session；擋步驟 4 的 product-service 部分與步驟 6 的商品設定頁）。
 - 設計書 69 已刪，主計畫與 ADR 的引用過期（`caller-inventory.md` §6；已確認）。主計畫假日段的 4 支匯入 RPC 不存在（`interface-inventory.md` D6；已確認）。
 
 **驗收基線：** 未跑；步驟 0 建立。Java shipping-service 沒有整合測試（`interface-inventory.md` §0）。不寫特性測試：新設計裡沒有任何 Java 出貨或運費端點保留同一語意（運費模型與出貨擁有者都換了），主計畫「開工前先有特性測試」的對象在本階段是空集合；出貨的特性測試責任移到 B8。
@@ -103,16 +103,16 @@ v1 題目的去向：D1–D6、D9、D15 被 P1–P6 取代；D7（承運商清�
 
 | # | 問題 | 建議 | 狀態 | 擋住 |
 |---|---|---|---|---|
-| R1 | UI 改動（v1 D12 的第 1、4、5、6 組在 B3；第 2、3、7 組移到 B8） | 全同意；第 4 組的運費設定新畫面先交線框 | 未決 | 3、6 |
-| R2 | 配送方式從契約拿掉（v1 D10） | 拿掉；3005 交給 procurement 自己表達；B6、B8 的契約不帶配送方式 | 未決 | 2、6 |
-| R3 | 賣家新訂單推播（v1 D11） | 改綁 `order.paid`（過渡期由 Java order 發），不再依賴 `shipment.created` | 未決 | 4 |
-| R4 | 文件與 ADR superseded（v1 D13） | 設計書依步驟 7 改寫；4 份 Uber ADR、`free-shipping-subsidy-attribution`、`logistics-finance-domain-ownership`、`shipping-fee-cache-no-warmup-no-scheduler`、`checkout-free-shipping-and-degradation` 標 superseded | 未決 | 1、7 |
-| R6 | seller 既有 `SELLER_CAPABILITY_SHIPPING_SETUP`（`CapShippingSetup`，上手清單的「物流設定」能力） | 改成「運費設定已填」：賣家建好運費設定才算完成這個能力，名稱改為 `SHIPPING_FEE_SETUP`；運費設定的寫入以既有賣家身分檢查（只寫自己的 `store`）；或刪掉這個能力、不擋上手流程 | 未決 | 2、3 |
-| R5 | 與 B4 的刪除次序（v1 D14） | B3 刪 gateway handler 時帶走對 `shipping_ambient.go` 的引用，檔案本身由 B4 刪；誰先合進 dev，後者 rebase | 未決 | 4、5 |
+| R1 | UI 改動（v1 D12 的第 1、4、5、6 組在 B3；第 2、3、7 組移到 B8） | 全同意；第 4 組的運費設定新畫面先交線框 | 已決 2026-11-24 Will（照建議） | 3、6 |
+| R2 | 配送方式從契約拿掉（v1 D10） | 拿掉；3005 交給 procurement 自己表達；B6、B8 的契約不帶配送方式 | 已決 2026-11-24 Will（照建議） | 2、6 |
+| R3 | 賣家新訂單推播（v1 D11） | 改綁 `order.paid`（過渡期由 Java order 發），不再依賴 `shipment.created` | 已決 2026-11-24 Will（照建議） | 4 |
+| R4 | 文件與 ADR superseded（v1 D13） | 設計書依步驟 7 改寫；4 份 Uber ADR、`free-shipping-subsidy-attribution`、`logistics-finance-domain-ownership`、`shipping-fee-cache-no-warmup-no-scheduler`、`checkout-free-shipping-and-degradation` 標 superseded | 已決 2026-11-24 Will（照建議） | 1、7 |
+| R6 | seller 既有 `SELLER_CAPABILITY_SHIPPING_SETUP`（`CapShippingSetup`，上手清單的「物流設定」能力） | 改成「運費設定已填」：賣家建好運費設定才算完成這個能力，名稱改為 `SHIPPING_FEE_SETUP`；運費設定的寫入以既有賣家身分檢查（只寫自己的 `store`）；或刪掉這個能力、不擋上手流程 | 已決 2026-11-24 Will（照建議） | 2、3 |
+| R5 | 與 B4 的刪除次序（v1 D14） | B3 刪 gateway handler 時帶走對 `shipping_ambient.go` 的引用，檔案本身由 B4 刪；誰先合進 dev，後者 rebase | 已決 2026-11-24 Will（照建議） | 4、5 |
 
 既有缺陷（`interface-inventory.md` §12，24 條）：全部隨 Java 刪除消失；出貨相關的 D1、D2、D4、D7、D10 在 B8 設計出貨時當反例參考。拍板 R1–R5 時一併確認。
 
-拍板順序：R1–R6 彼此獨立，可一次拍。
+R1–R6 已決 2026-11-24 Will（照建議；R6 選「改成運費設定已填、改名 `SHIPPING_FEE_SETUP`」）。既有缺陷處置一併確認。
 
 計畫審查（v2，2026-11-24）：findings 7（blocking 1）；修 6、升為決定題 1（F3→R6）、駁回 0。
 
