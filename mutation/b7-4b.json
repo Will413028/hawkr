@@ -53,6 +53,24 @@
    "new": "WHERE buyer_id = $2 AND $1::bigint > 0)",
    "test": "internal/legacy/couponconsumer ^TestReplayedOrderCompletedProjectsOnceAndDrivesMemberEligibility$",
    "why": "MEMBER 資格不分店家（在別家店消費也算會員），別家店消費不算的斷言要紅。"
+  },
+  {
+   "id": "release-ignores-deleted-buyer",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/voucher/voucher.go",
+   "old": "if !exists || model.CampaignStatus(crow.Status) == model.StatusEnded {",
+   "new": "if (!exists && false) || model.CampaignStatus(crow.Status) == model.StatusEnded {",
+   "test": "internal/modules/coupon ^TestDeletedBuyerCannotHoldOrReceiveVouchers$",
+   "why": "Release 不看買家是否已刪帳：持鎖的券回到 AVAILABLE 而不是作廢，Voided 與 VOIDED 的斷言要紅。"
+  },
+  {
+   "id": "membership-record-skips-existence-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/coupon/internal/membership/membership.go",
+   "old": "if !slices.Contains(existing, buyerID) {",
+   "new": "if false && !slices.Contains(existing, buyerID) {",
+   "test": "internal/modules/coupon ^TestRecordOrderCompletedSkipsADeletedBuyer$",
+   "why": "投影寫入不檢查買家是否存在：已刪帳買家的事件重新插入一列，投影列數與 recorded 的斷言要紅。"
   }
  ]
 }

@@ -21,10 +21,42 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
+// Buyers 是「這些買家存在」的 port：領券與發券前確認買家還在，釋放時用來判斷買家是否已刪帳。讀取失敗回錯誤，不當成不存在。
+type Buyers interface {
+	Existing(ctx context.Context, ids []int64) ([]int64, error)
+}
+
+// buyerExists 回報買家是否存在；寫入在 ctx 的 transaction 內讀取，與刪帳的提交排序。
+func (s *Service) buyerExists(ctx context.Context, buyerID int64) (bool, error) {
+	got, err := s.d.Buyers.Existing(ctx, []int64{buyerID})
+	if err != nil {
+		return false, err
+	}
+	for _, id := range got {
+		if id == buyerID {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// requireBuyer 在買家不存在（已刪帳或從未存在）時回 InvalidInput。
+func (s *Service) requireBuyer(ctx context.Context, buyerID int64) error {
+	ok, err := s.buyerExists(ctx, buyerID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return model.Invalid(ctx, "BuyerID", model.InvalidBuyerIDInvalid)
+	}
+	return nil
+}
+
 // Deps 是券寫入路徑的依賴。
 type Deps struct {
 	DB      *db.DB
 	Qualify *qualify.Service
+	Buyers  Buyers
 	NewID   func() uuid.UUID
 	Now     func() time.Time
 }
@@ -93,6 +125,9 @@ func (s *Service) Claim(ctx context.Context, campaignID uuid.UUID, buyerID int64
 			return err
 		}
 		now := s.d.Now()
+		if err := s.requireBuyer(ctx, buyerID); err != nil {
+			return err
+		}
 		if err := s.d.Qualify.Check(ctx, c, buyerID, now); err != nil {
 			return err
 		}
@@ -188,6 +223,13 @@ func (s *Service) Issue(ctx context.Context, in IssueInput) (IssueResult, error)
 		}
 		if c.Expired(now) {
 			return model.Precondition(ctx, model.ReasonOutsideWindow)
+		}
+		existing, err := s.d.Buyers.Existing(ctx, buyers)
+		if err != nil {
+			return err
+		}
+		if len(existing) != len(buyers) {
+			return model.Invalid(ctx, "BuyerIDs", model.InvalidBuyerIDInvalid)
 		}
 		held, err := q.ListHeldBuyers(ctx, store.ListHeldBuyersParams{CampaignID: c.ID, BuyerIds: buyers})
 		if err != nil {
@@ -291,6 +333,9 @@ func (s *Service) IssueCompensation(ctx context.Context, in CompensationInput) (
 
 	var res CompensationResult
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		if err := s.requireBuyer(ctx, in.BuyerID); err != nil {
+			return err
+		}
 		q := s.q(ctx)
 		srcType := string(in.SourceType)
 		campaignID := s.d.NewID()
@@ -591,7 +636,7 @@ type ReleaseResult struct {
 }
 
 // Release 釋放持有這筆訂單的券（以 order_no 為鍵，D3 A）：鎖定中的回到可用；已核銷的（賣家取消已付款訂單）也回到可用。
-// 活動已結束時改為作廢（D5：結束之後沒有 AVAILABLE）。重送冪等。讀活動列時共享鎖，與結束活動排隊，所以不會在結束
+// 活動已結束（D5：結束之後沒有 AVAILABLE）或買家已刪帳時改為作廢。重送冪等。讀活動列時共享鎖，與結束活動排隊，所以不會在結束
 // 掃過之後才回到可用。
 func (s *Service) Release(ctx context.Context, orderNo string) (ReleaseResult, error) {
 	if err := validOrderNo(ctx, orderNo); err != nil {
@@ -613,7 +658,11 @@ func (s *Service) Release(ctx context.Context, orderNo string) (ReleaseResult, e
 		}
 		now := s.d.Now()
 		p := store.ReleaseVoucherParams{ID: cur.ID, OrderNo: &orderNo, ToStatus: string(model.VoucherAvailable), Now: now}
-		if model.CampaignStatus(crow.Status) == model.StatusEnded {
+		exists, err := s.buyerExists(ctx, cur.BuyerID)
+		if err != nil {
+			return err
+		}
+		if !exists || model.CampaignStatus(crow.Status) == model.StatusEnded {
 			p.ToStatus, p.VoidedAt = string(model.VoucherVoided), rows.TimePtr(now)
 		}
 		row, err := q.ReleaseVoucher(ctx, p)

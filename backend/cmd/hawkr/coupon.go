@@ -64,7 +64,7 @@ func (b couponBuyers) Existing(ctx context.Context, ids []int64) ([]int64, error
 	return out, nil
 }
 
-// newCoupon 組裝 coupon 模組。這裡只有 Connect 需要的部分：MEMBER 投影的 consumer、買家刪帳訂閱與到期提醒還沒有接上（B7-5）。
+// newCoupon 組裝 coupon 模組。只組裝 Connect 需要的部分；MEMBER 投影的 consumer、買家刪帳訂閱與到期提醒尚未接上。
 func newCoupon(d *db.DB, sellers *seller.Module, buyers *buyer.Module) *coupon.Module {
 	stores := couponStores{sellers}
 	return coupon.New(coupon.Deps{DB: d, Stores: stores, Buyers: couponBuyers{buyers}, StoreDirectory: stores, NewID: uuid.NewV7, Now: time.Now})

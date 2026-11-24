@@ -1,7 +1,7 @@
 // Package couponconsumer 把舊 Java 服務的 order.completed 事件接到 coupon 模組的 MEMBER 消費紀錄投影（過渡：ordering 搬進單體後，
-// 改由訂單完成的同 transaction 事件餵入並 backfill，B8）。
-// handler 解碼、驗證後直接呼叫 coupon 的 RecordOrderCompleted：投影是 (店家, 買家) 的 upsert，重放天然冪等，不需要再排 job 去重。
-// cmd/hawkr 的 worker 在 B7-5 才接上 Run；在那之前只有測試接線。
+// 改由訂單完成的同 transaction 事件餵入）。
+// handler 解碼、驗證後直接呼叫 coupon 的 RecordOrderCompleted：投影是 (店家, 買家) 的 upsert，重放天然冪等，不需要再排 job 去重；
+// 買家已刪帳的事件由 coupon 略過，handler 照常 ack。
 package couponconsumer
 
 import (

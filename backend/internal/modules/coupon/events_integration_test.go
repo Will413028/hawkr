@@ -132,3 +132,68 @@ func TestMemberEligibilityFollowsTheProjection(t *testing.T) {
 		}
 	}
 }
+
+// 買家刪帳後：持鎖訂單的 Release 把券作廢而不是回到可用；領券、指定發放、補償發券都拒絕不存在的買家。
+// Release 不看買家是否存在時，券回到 AVAILABLE，這個測試變紅。
+func TestDeletedBuyerCannotHoldOrReceiveVouchers(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+
+	locked := f.claim(f.campaign(), buyer1)
+	if _, err := f.m.Lock(ctx, f.lockInput(locked, "O-GONE")); err != nil {
+		t.Fatal(err)
+	}
+	f.buyers.mu.Lock()
+	f.buyers.missing[buyer1] = true
+	f.buyers.mu.Unlock()
+
+	rel, err := f.m.Release(ctx, "O-GONE")
+	if err != nil || !rel.Released || !rel.Voided {
+		t.Fatalf("Release = %+v err=%v，要 Released 且 Voided", rel, err)
+	}
+	if got := f.voucherStatus(locked.ID); got != "VOIDED" {
+		t.Fatalf("已刪帳買家的券 = %s，要 VOIDED", got)
+	}
+
+	if _, err := f.m.Claim(ctx, f.campaign().ID, buyer1); err == nil {
+		t.Fatal("已刪帳的買家不該領得到券")
+	}
+	designated := f.campaign(func(in *coupon.CreateCampaignInput) {
+		in.TargetType, in.TargetBuyers = coupon.TargetDesignated, []int64{buyer2}
+	})
+	if _, err := f.m.Issue(ctx, coupon.IssueInput{CampaignID: designated.ID, AdminID: adminID, BuyerIDs: []int64{buyer1}}); err == nil {
+		t.Fatal("已刪帳的買家不該被指定發放")
+	}
+	if _, err := f.m.IssueCompensation(ctx, coupon.CompensationInput{
+		SourceType: coupon.SourceAftersalesCase, SourceID: "AS-gone", BuyerID: buyer1, StoreID: storeA,
+		Amount: 100, MinOrderAmount: 500, EndAt: base.Add(30 * windowLen), Title: "售後補償券", Issuer: coupon.Issuer{StoreID: storeA},
+	}); err == nil {
+		t.Fatal("已刪帳的買家不該收到補償券")
+	}
+	if n := f.count("SELECT count(*) FROM coupon.coupon_vouchers WHERE buyer_id = $1 AND status <> 'VOIDED'", buyer1); n != 0 {
+		t.Fatalf("已刪帳的買家還有 %d 張有效的券", n)
+	}
+}
+
+// 已刪帳買家的 order.completed（延遲或重送）不寫投影：存在時寫入，刪帳後 ack 並略過，不留下列。
+// 投影寫入不檢查買家是否存在時，刪帳後仍有一列，這個測試變紅。
+func TestRecordOrderCompletedSkipsADeletedBuyer(t *testing.T) {
+	t.Parallel()
+	f := setup(t)
+	ctx := context.Background()
+	f.buyers.mu.Lock()
+	f.buyers.missing[buyer2] = true
+	f.buyers.mu.Unlock()
+
+	recorded, err := f.m.RecordOrderCompleted(ctx, storeA, buyer2)
+	if err != nil || recorded {
+		t.Fatalf("recorded=%v err=%v，已刪帳買家要 false 且無錯誤", recorded, err)
+	}
+	if n := f.count("SELECT count(*) FROM coupon.store_buyer_membership WHERE buyer_id = $1", buyer2); n != 0 {
+		t.Fatalf("已刪帳買家有 %d 列投影，要 0", n)
+	}
+	if recorded, err := f.m.RecordOrderCompleted(ctx, storeA, buyer1); err != nil || !recorded {
+		t.Fatalf("存在的買家：recorded=%v err=%v，要 true", recorded, err)
+	}
+}

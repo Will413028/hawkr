@@ -162,17 +162,17 @@ type Module struct {
 // New 建立模組。
 func New(d Deps) *Module {
 	if d.DB == nil || d.Stores == nil || d.Buyers == nil || d.StoreDirectory == nil || d.NewID == nil || d.Now == nil {
-		panic("coupon：DB、Stores、Members、Buyers、StoreDirectory、NewID 與 Now 是必要的")
+		panic("coupon：DB、Stores、Buyers、StoreDirectory、NewID 與 Now 是必要的")
 	}
 	q := qualify.New(qualify.Deps{DB: d.DB, Stores: d.Stores})
 	camp := campaign.New(campaign.Deps{DB: d.DB, NewID: d.NewID, Now: d.Now})
-	vouch := voucher.New(voucher.Deps{DB: d.DB, Qualify: q, NewID: d.NewID, Now: d.Now})
+	vouch := voucher.New(voucher.Deps{DB: d.DB, Qualify: q, Buyers: d.Buyers, NewID: d.NewID, Now: d.Now})
 	return &Module{
 		admin:    admin.New(admin.Deps{DB: d.DB, Audit: adminaudit.New(d.DB, d.Now), Campaign: camp, Voucher: vouch, Buyers: d.Buyers, Directory: d.StoreDirectory}),
 		campaign: camp,
 		voucher:  vouch,
 		read:     read.New(read.Deps{DB: d.DB, Qualify: q, Now: d.Now}),
-		member:   membership.New(membership.Deps{DB: d.DB, Now: d.Now}),
+		member:   membership.New(membership.Deps{DB: d.DB, Buyers: d.Buyers, Now: d.Now}),
 		purge:    purge.New(purge.Deps{DB: d.DB, Now: d.Now}),
 	}
 }
