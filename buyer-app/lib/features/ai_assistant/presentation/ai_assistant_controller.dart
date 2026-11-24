@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
-
+import 'package:hawkr_api/gen/hawkr/assistant/v1alpha1/assistant.pbenum.dart'
+    show AssistantTopic;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../data/ai_assistant_repository.dart';
@@ -34,52 +34,38 @@ class AiAssistantController extends _$AiAssistantController {
   }
 
   Future<void> sendMessage(String text) async {
-    return _dispatch(
-      endpoint: BuyerAssistantEndpoint.chat,
-      message: text,
-      userBubbleText: text,
-    );
+    return _dispatch(topic: AssistantTopic.ASSISTANT_TOPIC_CHAT, text: text);
   }
 
   Future<void> sendQuickAction({
-    required BuyerAssistantEndpoint endpoint,
+    required AssistantTopic topic,
     required String defaultMessage,
   }) async {
-    return _dispatch(
-      endpoint: endpoint,
-      message: null,
-      userBubbleText: defaultMessage,
-    );
+    return _dispatch(topic: topic, text: defaultMessage);
   }
 
   Future<void> _dispatch({
-    required BuyerAssistantEndpoint endpoint,
-    required String? message,
-    required String userBubbleText,
+    required AssistantTopic topic,
+    required String text,
   }) async {
     if (_streaming) return;
-    if (userBubbleText.trim().isEmpty) return;
+    final message = text.trim();
+    if (message.isEmpty) return;
 
     state = [
       ...state,
-      AiMessage(
-        role: 'user',
-        content: userBubbleText.trim(),
-        timestamp: DateTime.now(),
-      ),
+      AiMessage(role: 'user', content: message, timestamp: DateTime.now()),
       AiMessage(role: 'assistant', content: '', timestamp: DateTime.now()),
     ];
 
     _streaming = true;
-
+    final repository = ref.read(aiAssistantRepositoryProvider);
     try {
-      final stream = ref
-          .read(aiAssistantRepositoryProvider)
-          .streamChat(
-            endpoint: endpoint,
-            message: message,
-            sessionId: _sessionId,
-          );
+      final stream = repository.streamChat(
+        topic: topic,
+        message: message,
+        sessionId: _sessionId,
+      );
 
       final events = StreamIterator(stream);
       final removeDisposeListener = ref.onDispose(
@@ -88,36 +74,25 @@ class AiAssistantController extends _$AiAssistantController {
       try {
         while (await events.moveNext()) {
           if (!ref.mounted) return;
-          final event = events.current;
-          // 終止判斷一律看 event.terminal，不看 event.type——type 對
-          // tool_result/CUSTOM 事件而言是後端可控的自由字串，哪天有個工具
-          // 剛好叫 done/error，靠字串比對就會被誤判成提前終止（見
-          // AiSseEvent.terminal 的說明）。語意分支（要不要 append 文字、
-          // 存 sessionId、顯示錯誤）仍然看 event.type，一字不改。
-          if (event.terminal) {
-            if (event.type == 'error') {
-              _appendToLast('\n\n（${_parseErrorMessage(event.data)}）');
-            } else {
-              try {
-                final m = jsonDecode(event.data) as Map<String, dynamic>;
-                final sid = (m['sessionId'] ?? '').toString();
-                if (sid.isNotEmpty) _sessionId = sid;
-              } catch (_) {}
-            }
-            break;
-          } else if (event.type == 'text') {
-            _appendToLast(event.data);
-          } else if (event.type == 'tool_result') {
-            final orders = parseOrderListResult(event.data);
-            if (orders.isNotEmpty) _setOrderListOnLast(orders);
+          switch (events.current) {
+            case AiTextDelta(:final text):
+              _appendToLast(text);
+            case AiToolResult():
+              break;
+            case AiTurnFinished(:final sessionId):
+              if (sessionId.isNotEmpty) _sessionId = sessionId;
+            case AiTurnFailed(:final message):
+              _appendToLast('\n\n（$message）');
           }
         }
       } finally {
         removeDisposeListener();
         await events.cancel();
       }
-    } catch (_) {
-      if (ref.mounted) _appendToLast('\n\n（無法連接 AI 服務，請稍後再試）');
+    } catch (error) {
+      if (ref.mounted) {
+        _appendToLast('\n\n（${repository.failureText(error)}）');
+      }
     } finally {
       _streaming = false;
     }
@@ -132,30 +107,6 @@ class AiAssistantController extends _$AiAssistantController {
         role: last.role,
         content: last.content + chunk,
         timestamp: last.timestamp,
-        orderList: last.orderList,
-      ),
-    ];
-  }
-
-  String _parseErrorMessage(String data) {
-    try {
-      final m = jsonDecode(data) as Map<String, dynamic>;
-      final msg = (m['message'] ?? '').toString();
-      if (msg.isNotEmpty) return msg;
-    } catch (_) {}
-    return '系統忙碌中，請稍後再試';
-  }
-
-  void _setOrderListOnLast(List<AiOrderItem> orders) {
-    if (state.isEmpty) return;
-    final last = state.last;
-    state = [
-      ...state.sublist(0, state.length - 1),
-      AiMessage(
-        role: last.role,
-        content: last.content,
-        timestamp: last.timestamp,
-        orderList: orders,
       ),
     ];
   }

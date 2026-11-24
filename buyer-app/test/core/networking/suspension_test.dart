@@ -21,7 +21,6 @@ import 'package:hawkr_buyer/config/flavor.dart';
 import 'package:hawkr_buyer/core/networking/connect_provider.dart';
 import 'package:hawkr_buyer/core/networking/dio_provider.dart';
 import 'package:hawkr_buyer/core/session/account_restriction.dart';
-import 'package:hawkr_buyer/features/ai_assistant/data/ai_assistant_repository.dart';
 import 'package:hawkr_buyer/core/session/auth_session_provider.dart';
 import 'package:hawkr_buyer/core/session/force_logout_provider.dart';
 import 'package:hawkr_buyer/core/session/session_model.dart';
@@ -562,52 +561,6 @@ void main() {
 
       expect(h.c.read(accountRestrictionProvider), isNull);
       expect(h.auth.fetches, 0);
-    });
-  });
-
-  group('自己放行非 2xx 的呼叫', () {
-    test('AI 小幫手送出訊息收到 403 ACCOUNT_SUSPENDED：進受限狀態並提示', () async {
-      final h = harness();
-      await h.c.read(sessionProvider.future);
-      final dio = Dio(BaseOptions(baseUrl: 'https://x.test'))
-        ..httpClientAdapter = _Status(
-          403,
-          [],
-          '{"code":403,"message":"x","reason":"ACCOUNT_SUSPENDED"}',
-        );
-      final repo = AiAssistantRepository(
-        dio,
-        onSuspended: () =>
-            h.c.read(accountRestrictionProvider.notifier).rejected(),
-      );
-
-      await expectLater(
-        repo.streamChat(message: 'hi').drain<void>(),
-        throwsA(anything),
-      );
-      await Future<void>.delayed(Duration.zero);
-
-      expect(h.c.read(accountRestrictionProvider), isNotNull);
-      expect(h.c.read(suspendedActionNoticeProvider), 1);
-    });
-
-    test('AI 小幫手的 403 沒有 reason：不是停權', () async {
-      final h = harness();
-      await h.c.read(sessionProvider.future);
-      final dio = Dio(BaseOptions(baseUrl: 'https://x.test'))
-        ..httpClientAdapter = _Status(403, [], '{"code":403,"message":"x"}');
-      final repo = AiAssistantRepository(
-        dio,
-        onSuspended: () =>
-            h.c.read(accountRestrictionProvider.notifier).rejected(),
-      );
-
-      await expectLater(
-        repo.streamChat(message: 'hi').drain<void>(),
-        throwsA(anything),
-      );
-
-      expect(h.c.read(accountRestrictionProvider), isNull);
     });
   });
 }

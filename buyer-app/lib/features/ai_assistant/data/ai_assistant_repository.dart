@@ -1,190 +1,183 @@
 import 'dart:async';
-import 'dart:convert';
 
-import 'package:dio/dio.dart';
+import 'package:hawkr_api/errors.dart' show errorText, DefaultErrorText;
+import 'package:hawkr_api/gen/hawkr/assistant/v1alpha1/assistant.connect.client.dart';
+import 'package:hawkr_api/gen/hawkr/assistant/v1alpha1/assistant.pb.dart' as pb;
+import 'package:hawkr_api/gen/hawkr/assistant/v1alpha1/assistant.pbenum.dart';
+import 'package:hawkr_api/transport.dart' show Code, ConnectException;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:uuid/uuid.dart';
 
-import '../../../core/networking/agui_sse.dart';
-import '../../../core/networking/dio_provider.dart';
-import '../../../core/networking/suspension_signal.dart';
-import '../../../core/session/account_restriction.dart';
-import '../../../shared/utils/amount_utils.dart';
+import '../../../core/l10n/ui_locale.dart';
+import '../../../core/networking/connect_provider.dart';
 import 'ai_message_model.dart';
 
 part 'ai_assistant_repository.g.dart';
 
-/// App 內部語意事件；[type] 例：text / done / error / tool_result /
-/// draft_patch / step_detail，controller 靠字串比對分派內容。
-///
-/// [terminal] 只在事件源自 AG-UI `RUN_FINISHED` / `RUN_ERROR`（見
-/// `AgUiEvent.terminal`）時為 true。理由跟 `AgUiEvent.terminal` 一樣：
-/// [type] 對 tool_result／CUSTOM 事件而言是後端可控的自由字串，哪天有個
-/// 工具或 CUSTOM 事件剛好叫 `done`／`error`，靠 `type == 'done' || type
-/// == 'error'` 判斷串流是否該終止就會誤判、把工具結果誤當控制流訊號，
-/// 呼叫端（controller）的迴圈會被提前 break，使用者看到空氣泡——這正是
-/// AG-UI SSE 改依 JSON type 分派要根除的失敗形狀，不可在這一層重新引入。
-/// 判斷是否終止一律看 [terminal]，[type] 只用來決定語意分支（append 文字
-/// / 存 tool 結果 / 顯示錯誤 / 存 sessionId）。
-class AiSseEvent {
-  const AiSseEvent({
-    required this.type,
-    required this.data,
-    this.terminal = false,
-  });
-  final String type;
-  final String data;
-  final bool terminal;
+/// 一輪回覆串流上的事件（已轉成 App 的形狀）。[AiTurnFinished] 與 [AiTurnFailed] 是最後一個事件。
+sealed class AiTurnEvent {
+  const AiTurnEvent();
 }
 
-/// 買家 AI 小幫手後端 endpoint（issue #447）
-///
-/// 注意：buyer Dio baseUrl 已包含 `/api/v1`，路徑不需重複前綴。
-enum BuyerAssistantEndpoint {
-  chat('/app/buyers/me/assistant/chat'),
-  orders('/app/buyers/me/assistant/orders'),
-  tracking('/app/buyers/me/assistant/tracking'),
-  returnPolicy('/app/buyers/me/assistant/return-policy');
-
-  const BuyerAssistantEndpoint(this.path);
-  final String path;
+/// 回覆文字的增量。
+final class AiTextDelta extends AiTurnEvent {
+  const AiTextDelta(this.text);
+  final String text;
 }
 
+/// 助理使用了工具；內容不對外，只有工具與成功與否。
+final class AiToolResult extends AiTurnEvent {
+  const AiToolResult(this.tool, {required this.succeeded});
+  final AssistantTool tool;
+  final bool succeeded;
+}
+
+/// 這一輪正常結束。
+final class AiTurnFinished extends AiTurnEvent {
+  const AiTurnFinished(this.sessionId);
+  final String sessionId;
+}
+
+/// 這一輪失敗；[message] 是伺服器依語系組好的文字。
+final class AiTurnFailed extends AiTurnEvent {
+  const AiTurnFailed(this.message);
+  final String message;
+}
+
+/// 買家的 AI 助理（`AssistantAppService`）。
+///
+/// 送出（unary，帶 `client_request_id`）與觀看（server streaming）分開：伺服器每條串流最長 100 秒就正常
+/// 結束，沒有收到 finished 或 error 就是被截斷，以最後一個事件的 cursor 重新訂閱接續。cursor 是不透明的字串，
+/// 接續之後伺服器不重送已送出的事件；仍以 cursor 去重，重送的事件只處理一次。
 class AiAssistantRepository {
-  AiAssistantRepository(this._dio, {void Function()? onSuspended})
-    : _onSuspended = onSuspended;
-  final Dio _dio;
+  AiAssistantRepository(
+    this._client, {
+    required DefaultErrorText defaults,
+    Future<void> Function(Duration)? delay,
+    String Function()? mint,
+    this.maxConsecutiveFailures = 3,
+  }) : _defaults = defaults,
+       _delay = delay ?? Future<void>.delayed,
+       _mint = mint ?? const Uuid().v4;
 
-  /// 送出訊息被停權擋下（403 `ACCOUNT_SUSPENDED`）時呼叫。
-  final void Function()? _onSuspended;
+  final AssistantAppServiceClient _client;
+  final DefaultErrorText _defaults;
+  final Future<void> Function(Duration) _delay;
+  final String Function() _mint;
 
-  Stream<AiSseEvent> streamChat({
-    BuyerAssistantEndpoint endpoint = BuyerAssistantEndpoint.chat,
-    String? message,
+  /// 連續幾次沒收到任何新事件就失敗（斷線、unavailable）；伺服器正常的 100 秒結束不計。
+  final int maxConsecutiveFailures;
+
+  /// 送出一則訊息並回傳這一輪的事件，直到 finished 或 error。連線錯誤以 [ConnectException] 丟出。
+  Stream<AiTurnEvent> streamChat({
+    required AssistantTopic topic,
+    required String message,
     String? sessionId,
-    String? imageUrl,
-  }) {
-    final controller = StreamController<AiSseEvent>();
-    _startStream(controller, endpoint, message, sessionId, imageUrl);
-    return controller.stream;
+  }) async* {
+    final sent = await _client.sendAssistantMessage(
+      pb.SendAssistantMessageRequest(
+        topic: topic,
+        message: message,
+        sessionId: sessionId ?? '',
+        clientRequestId: _mint(),
+      ),
+    );
+    yield* _watch(sent.turnId, sent.sessionId);
   }
 
-  Future<void> _startStream(
-    StreamController<AiSseEvent> controller,
-    BuyerAssistantEndpoint endpoint,
-    String? message,
-    String? sessionId,
-    String? imageUrl,
-  ) async {
-    try {
-      final body = <String, dynamic>{
-        if (sessionId != null && sessionId.isNotEmpty) 'sessionId': sessionId,
-        if (message != null && message.isNotEmpty) 'message': message,
-        if (imageUrl != null && imageUrl.isNotEmpty) 'imageUrl': imageUrl,
-      };
-
-      final response = await _dio.post<ResponseBody>(
-        endpoint.path,
-        data: body,
-        options: Options(
-          responseType: ResponseType.stream,
-          receiveTimeout: const Duration(minutes: 3),
-          headers: {'Accept': 'text/event-stream'},
-          validateStatus: (_) => true,
-        ),
-      );
-
-      if (response.statusCode != 200) {
-        if (await isRestSuspension(response)) _onSuspended?.call();
-        controller.addError(
-          Exception('AI service error: ${response.statusCode}'),
-        );
-        await controller.close();
-        return;
-      }
-
-      final stream = response.data!;
-
-      await for (final event in decodeAgUiSse(stream.stream)) {
-        controller.add(
-          AiSseEvent(
-            type: event.name,
-            data: event.data,
-            terminal: event.terminal,
-          ),
-        );
-        // 判斷是否終止一律看 event.terminal，不看 event.name——name 對
-        // TOOL_CALL_RESULT/CUSTOM 是後端可控的自由字串，字串比對 'done'/
-        // 'error' 會被剛好同名的工具或自訂事件誤判成提前終止。
-        if (event.terminal) {
-          await controller.close();
-          return;
+  Stream<AiTurnEvent> _watch(String turnId, String sessionId) async* {
+    var cursor = '';
+    final seen = <String>{};
+    var failures = 0;
+    while (true) {
+      var progressed = false;
+      try {
+        await for (final e in _client.watchAssistantTurn(
+          pb.WatchAssistantTurnRequest(turnId: turnId, cursor: cursor),
+        )) {
+          if (e.cursor.isNotEmpty) {
+            if (!seen.add(e.cursor)) continue;
+            cursor = e.cursor;
+          }
+          progressed = true;
+          final event = _convert(e, sessionId);
+          if (event == null) continue;
+          yield event;
+          if (event is AiTurnFinished || event is AiTurnFailed) return;
         }
-      }
-    } catch (e) {
-      controller.addError(e);
-    } finally {
-      if (!controller.isClosed) {
-        await controller.close();
+        // 被截斷（100 秒到）：立刻接續；一個事件都沒有時隔一秒，避免緊密迴圈。
+        failures = progressed ? 0 : failures + 1;
+        if (failures >= maxConsecutiveFailures) {
+          throw ConnectException(Code.unavailable, 'assistant stream stalled');
+        }
+        if (!progressed) await _delay(const Duration(seconds: 1));
+      } on ConnectException catch (e) {
+        if (!_transient(e)) rethrow;
+        failures = progressed ? 1 : failures + 1;
+        if (failures >= maxConsecutiveFailures) rethrow;
+        await _delay(Duration(seconds: failures));
       }
     }
   }
 
-  /// 載入最新一段對話歷史（後端 24h TTL）。
+  static bool _transient(ConnectException e) =>
+      e.code == Code.unavailable ||
+      e.code == Code.unknown ||
+      e.code == Code.deadlineExceeded;
+
+  AiTurnEvent? _convert(pb.WatchAssistantTurnResponse e, String sessionId) {
+    switch (e.whichEvent()) {
+      case pb.WatchAssistantTurnResponse_Event.text:
+        return AiTextDelta(e.text.text);
+      case pb.WatchAssistantTurnResponse_Event.toolResult:
+        return AiToolResult(
+          e.toolResult.tool,
+          succeeded: e.toolResult.succeeded,
+        );
+      case pb.WatchAssistantTurnResponse_Event.finished:
+        final sid = e.finished.sessionId;
+        return AiTurnFinished(sid.isNotEmpty ? sid : sessionId);
+      case pb.WatchAssistantTurnResponse_Event.error:
+        final m = e.error.localizedMessage;
+        return AiTurnFailed(m.isNotEmpty ? m : _defaults(Code.internal));
+      case pb.WatchAssistantTurnResponse_Event.notSet:
+        return null;
+    }
+  }
+
+  /// 載入最近一段對話歷史；沒有對話時 sessionId 是空字串。
   Future<({String sessionId, List<AiMessage> messages})>
   loadLatestSession() async {
     try {
-      final resp = await _dio.get<Map<String, dynamic>>(
-        '/app/buyers/me/assistant/sessions/latest',
-        options: Options(validateStatus: (_) => true),
+      final r = await _client.getLatestAssistantSession(
+        pb.GetLatestAssistantSessionRequest(),
       );
-      final body = resp.data ?? const {};
-      if (body['code'] != 0) return (sessionId: '', messages: <AiMessage>[]);
-      final data = body['data'] as Map<String, dynamic>? ?? const {};
-      final sid = (data['sessionId'] ?? '').toString();
-      final raw = (data['messages'] as List?) ?? const [];
-      final msgs = raw.whereType<Map>().map((m) {
-        final role = (m['role'] ?? '').toString();
-        final uiRole = role == 'model' ? 'assistant' : role;
-        DateTime ts;
-        try {
-          ts = DateTime.parse((m['timestamp'] ?? '').toString());
-        } catch (_) {
-          ts = DateTime.now();
-        }
-        return AiMessage(
-          role: uiRole,
-          content: (m['text'] ?? '').toString(),
-          timestamp: ts,
-        );
-      }).toList();
-      return (sessionId: sid, messages: msgs);
-    } catch (_) {
+      return (
+        sessionId: r.sessionId,
+        messages: [
+          for (final m in r.messages)
+            AiMessage(
+              role: m.role == AssistantMessageRole.ASSISTANT_MESSAGE_ROLE_USER
+                  ? 'user'
+                  : 'assistant',
+              content: m.text,
+              timestamp: m.hasCreateTime()
+                  ? m.createTime.toDateTime().toLocal()
+                  : DateTime.now(),
+            ),
+        ],
+      );
+    } on ConnectException {
       return (sessionId: '', messages: <AiMessage>[]);
     }
   }
-}
 
-List<AiOrderItem> parseOrderListResult(String jsonStr) {
-  try {
-    final map = jsonDecode(jsonStr) as Map<String, dynamic>;
-    final orders = map['orders'] as List<dynamic>? ?? [];
-    return orders.map((o) {
-      final j = o as Map<String, dynamic>;
-      return AiOrderItem(
-        orderId: j['order_no'] as String? ?? '',
-        status: j['status'] as String? ?? '',
-        // B-109：後端金額/時間戳一律字串，用 AmountUtils 做容錯
-        amountTwd: AmountUtils.parseToInt(j['amount_twd']),
-        createTimeMs: AmountUtils.parseToInt(j['create_time_ms']),
-      );
-    }).toList();
-  } catch (_) {
-    return [];
-  }
+  /// 失敗時給使用者看的文字：伺服器的 LocalizedMessage，沒有時是該 code 的預設文字。
+  String failureText(Object error) => errorText(error, defaults: _defaults);
 }
 
 @riverpod
 AiAssistantRepository aiAssistantRepository(Ref ref) => AiAssistantRepository(
-  ref.watch(dioProvider),
-  onSuspended: () => ref.read(accountRestrictionProvider.notifier).rejected(),
+  ref.watch(assistantAppClientProvider),
+  defaults: ref.watch(defaultErrorTextProvider),
 );
