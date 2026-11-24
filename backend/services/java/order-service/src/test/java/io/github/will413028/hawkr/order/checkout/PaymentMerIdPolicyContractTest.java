@@ -7,7 +7,6 @@ import io.github.will413028.hawkr.common.utils.code.GrpcResponseCode;
 import io.github.will413028.hawkr.common.utils.code.InvoiceModel;
 import io.github.will413028.hawkr.common.utils.code.ShippingMethod;
 import io.github.will413028.hawkr.order.exception.OrderBusinessException;
-import io.github.will413028.hawkr.seller.grpc.SellerMeta;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -37,7 +36,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("收款主體的政策契約")
 class PaymentMerIdPolicyContractTest {
 
-    private static final String SELLER_MER_ID = "HAWK26001234";
     private static final String AGENT_MER_ID = "HAWKAGENT";
 
     /**
@@ -56,17 +54,16 @@ class PaymentMerIdPolicyContractTest {
         Method m;
         try {
             m = CheckoutService.class.getDeclaredMethod(
-                    "resolvePaymentMerId", OrderPolicySnapshot.class, SellerMeta.class);
+                    "resolvePaymentMerId", OrderPolicySnapshot.class);
         } catch (NoSuchMethodException e) {
             throw new AssertionError(
-                    "找不到 resolvePaymentMerId(OrderPolicySnapshot, SellerMeta)——"
+                    "找不到 resolvePaymentMerId(OrderPolicySnapshot)——"
                             + "它被改名、改簽章或搬走了？本測試對『目標不存在』一律 FAIL，"
                             + "因為 skip 會讓收款主體的守護在目標消失的那一刻靜默失效", e);
         }
         m.setAccessible(true);
-        SellerMeta meta = SellerMeta.newBuilder().setPayuniMerId(SELLER_MER_ID).build();
         try {
-            return (String) m.invoke(service, policy, meta);
+            return (String) m.invoke(service, policy);
         } catch (InvocationTargetException e) {
             if (e.getCause() instanceof RuntimeException re) {
                 throw re;
@@ -95,10 +92,10 @@ class PaymentMerIdPolicyContractTest {
     class MerIdResolution {
 
         @Test
-        @DisplayName("賣家子商店收款 → 賣家自己的 MerID")
-        void sellerMerchantUsesSellerMerId() throws Exception {
+        @DisplayName("賣家收款 → 不帶商店代號（收款走 payment 模組，可否接單由 can_accept_orders 擋）")
+        void sellerMerchantCarriesNoMerId() throws Exception {
             assertThat(invokeResolve(AGENT_MER_ID, policyWith(CollectionModel.SELLER_MERCHANT.value())))
-                    .isEqualTo(SELLER_MER_ID);
+                    .isEmpty();
         }
 
         @Test

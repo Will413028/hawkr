@@ -762,7 +762,7 @@ public class CheckoutService {
         //    要走擴張—收縮（後端先不讀 → 前端停送 → 再移欄）。**本波只做「不讀」這一半**，
         //    留著不讀比留著讀更安全，但它是一個尚未收縮的欄位，登記在此以免被當成 target design。
         OrderPolicySnapshot policySnapshot = orderPolicyResolver.resolve(method.value());
-        String paymentMerId = resolvePaymentMerId(policySnapshot, sellerMeta);
+        String paymentMerId = resolvePaymentMerId(policySnapshot);
 
         // 寫入 Redis 金額快照（含 paymentMerId 給 confirm 讀回）
         String snapshotJson = buildPriceSnapshot(orderSubtotal, finalShippingFee, discountAmount,
@@ -793,7 +793,7 @@ public class CheckoutService {
     }
 
     /**
-     * 決策本次交易的付款 PayUni MerID。
+     * 決策本次訂單寫入的收款商店代號：賣家收款不帶代號（空字串），平台代收取代理商代號。
      *
      * <p>🔴 <b>由 {@code collection_model} 驅動，不再讀 buyer request 透傳的 {@code consolidated}。</b>
      * 需求書把「移除 consolidated 由 buyer request 透傳、改由後端推導」列為不可妥協的工程邊界之一
@@ -805,7 +805,7 @@ public class CheckoutService {
      * 快照欄與現金流向不一致，沒有任何東西會發現：訂單成功、付款成功、帳本平衡，
      * 對帳查詢也查得到（只是查到的是賣家子商店的交易）。
      */
-    private String resolvePaymentMerId(OrderPolicySnapshot policy, SellerMeta sellerMeta) {
+    private String resolvePaymentMerId(OrderPolicySnapshot policy) {
         String model = policy.collectionModel();
         // 🔴 窮舉式判定，**沒有 fall-through**。改成 switch 之前，這裡是
         //    「等於 PLATFORM_AGENT_MERCHANT 才特殊，其餘一律賣家 MerID」——
@@ -816,7 +816,9 @@ public class CheckoutService {
             throw new OrderBusinessException(GrpcResponseCode.FULFILLMENT_COMMERCE_MODEL_UNKNOWN);
         }
         if (CollectionModel.SELLER_MERCHANT.value().equals(model)) {
-            return sellerMeta.getPayuniMerId();
+            // 收款走 payment 模組（賣家的收款帳戶），訂單不再持有商店代號；
+            // 賣家能不能接單由 requireSellerAcceptingOrders（can_accept_orders）在 validate()、preview()、confirm() 擋下。
+            return "";
         }
         if (CollectionModel.PLATFORM_AGENT_MERCHANT.value().equals(model)) {
             if (agentMerId == null || agentMerId.isBlank()) {
@@ -1016,14 +1018,14 @@ public class CheckoutService {
                 .toList();
 
         // OrderEntity.mer_id 寫入來源 = preview 階段決策並存入 snapshot 的 paymentMerId
-        // （取代原本「直接用 sellerMeta.getPayuniMerId()」邏輯，20 設計書 §4.13.4）
+        // （20 設計書 §4.13.4）
         // 🔴 fallback 改為「用同一份政策重新解析」，不再無條件退回 sellerMeta。
         //    舊寫法在 collection_model = PLATFORM_AGENT_MERCHANT 而快照缺 paymentMerId 時，
         //    會把款項導到賣家子商店，**同時**把 collection_model 寫成平台代收——
         //    快照欄與現金流向不一致，而兩邊各自看起來都正常。
         String orderMerId = (paymentMerIdFromSnapshot != null && !paymentMerIdFromSnapshot.isBlank())
                 ? paymentMerIdFromSnapshot
-                : resolvePaymentMerId(policySnapshot, sellerMeta);
+                : resolvePaymentMerId(policySnapshot);
 
         // 58 號 §7.1.2 步驟 1：採集買家發票選擇。**選填**——未帶時走 USE_BUYER_DEFAULT，
         // 由 invoice-service 在建立文件時解析（見 InvoiceIntakeResolver 的類別註解）。

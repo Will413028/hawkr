@@ -360,19 +360,16 @@ public class OrderService {
                 InvoiceModel.SELLER_TO_BUYER.value(),
                 OrderPolicyResolver.POLICY_VERSION);
 
-        // 收款主體是賣家子商店 ⇒ mer_id 取該 store 的 PayUni MerID，與結帳路徑同一個來源。
-        // EXTERNAL lane 的「賣方」是結算 store，所以同一行對兩條 lane 都成立。
-        String merId = sellerGrpcClient.getSellerMeta(storeId).getPayuniMerId();
-
-        // 🔴 fail-closed 在**建單當下**。CheckoutService.resolvePaymentMerId 對同一件事的
-        //    註解逐字寫著「不是建單後才發現」——RFQ 沒有結帳，最早的等價位置就是這裡。
-        //    這一格接手的是 EXTERNAL lane 原本那道 PLATFORM_COLLECTION_NOT_CONFIGURED：
-        //    收款主體換人之後，「沒設定代理商 MerID」不再是風險，「這個 store 沒有 PayUni
-        //    子商店」才是。⚠️ 少了它，訂單會帶著空 mer_id 建成功，然後在付款時才炸——
-        //    而那時買家已經看到一張訂單了。
-        if (merId == null || merId.isBlank()) {
+        // 收款走 payment 模組（賣家的收款帳戶），訂單不再持有商店代號，orders.mer_id 寫空字串。
+        // 兩條 lane 的賣方都是結算 store，所以同一道閘對兩條 lane 都成立。
+        //
+        // 🔴 fail-closed 在**建單當下**：RFQ 沒有結帳，最早的等價位置就是這裡，和結帳路徑的
+        //    requireSellerAcceptingOrders 同一個依據（SellerMeta.can_accept_orders）。
+        //    ⚠️ 少了它，不可接單的店（停權、KYC 或收款帳戶未核准）也會建出訂單，買家到付款時才被擋。
+        if (!sellerGrpcClient.getSellerMeta(storeId).getCanAcceptOrders()) {
             throw new OrderBusinessException(GrpcResponseCode.SELLER_NOT_ONBOARDED);
         }
+        String merId = "";
 
         // order_items 恆為一列且 quantity = 1：order_items.quantity 是 INT，而賣家報價的
         // 數量是 NUMERIC(14,3)（12.5 公斤是合法報價），小數表達不出來；放寬型別會動到

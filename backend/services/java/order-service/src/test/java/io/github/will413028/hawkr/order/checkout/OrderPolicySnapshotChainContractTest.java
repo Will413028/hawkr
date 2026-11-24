@@ -164,7 +164,6 @@ class OrderPolicySnapshotChainContractTest {
                         .build());
         when(sellerGrpcClient.getSellerMeta(anyLong())).thenReturn(SellerMeta.newBuilder()
                 .setSellerName("測試賣家")
-                .setPayuniMerId("HAWK" + STORE_ID)
                 .setCanAcceptOrders(true)
                 .build());
         when(checkoutValidator.validate(anyList(), any()))
