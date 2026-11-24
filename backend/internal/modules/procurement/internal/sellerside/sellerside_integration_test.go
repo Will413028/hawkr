@@ -585,7 +585,9 @@ func TestDeclineIsIdempotentAndKeepsTheFirstClosure(t *testing.T) {
 	f.now = f.now.Add(time.Hour)
 	again, err := svc.Decline(ctx, invitedStore, f.publication, "OTHER")
 	must(t, err)
-	if !reflect.DeepEqual(again, c) {
+	if again.ResponseID != c.ResponseID || again.PublicationID != c.PublicationID || again.LatestVersion != c.LatestVersion ||
+		again.WithdrawnVersion != c.WithdrawnVersion || again.WriteClosedReason != c.WriteClosedReason ||
+		again.WriteClosedAt == nil || !again.WriteClosedAt.Equal(*c.WriteClosedAt) {
 		t.Fatalf("重複婉拒要回第一次的結果：%+v 與 %+v", again, c)
 	}
 	var code string
