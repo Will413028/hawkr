@@ -49,10 +49,7 @@ test("candidate workspace renders a semantic fact table from only current DTO fi
 		browser,
 		/<table[\s\S]*?aria-label=\{t\("candidateTableLabel"\)\}/,
 	);
-	assert.equal(
-		zhMessages.procurementAssistant.candidateTableLabel,
-		"候選資料",
-	);
+	assert.equal(zhMessages.procurementAssistant.candidateTableLabel, "候選資料");
 	for (const heading of ["候選", "符合條件", "待確認", "資料時間", "狀態"]) {
 		assert.match(browser, new RegExp(`<th scope="col">${heading}</th>`));
 	}
