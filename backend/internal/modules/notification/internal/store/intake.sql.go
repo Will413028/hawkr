@@ -108,6 +108,22 @@ func (q *Queries) IntentByID(ctx context.Context, id uuid.UUID) (NotificationInt
 	return i, err
 }
 
+const intentHasRecipientRows = `-- name: IntentHasRecipientRows :one
+SELECT (EXISTS (
+    SELECT 1 FROM notification.inbox_item_intents l WHERE l.intent_id = $1
+) OR EXISTS (
+    SELECT 1 FROM notification.deliveries d WHERE d.intent_id = $1
+)) ::boolean AS has_rows
+`
+
+// 這個意圖已經有收件匣連結或投遞紀錄（先前的嘗試寫過）：它的參數還有人要讀（收件匣列、渠道 job），重試時因為略過條件才成立而清參數會讓它們組不出字。
+func (q *Queries) IntentHasRecipientRows(ctx context.Context, intentID uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, intentHasRecipientRows, intentID)
+	var has_rows bool
+	err := row.Scan(&has_rows)
+	return has_rows, err
+}
+
 const linkInboxItemIntent = `-- name: LinkInboxItemIntent :exec
 INSERT INTO notification.inbox_item_intents (intent_id, inbox_item_id)
 VALUES ($1, $2)

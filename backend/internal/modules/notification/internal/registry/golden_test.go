@@ -134,11 +134,16 @@ func TestEveryRenderableValueHasEnglishText(t *testing.T) {
 			t.Errorf("categoryLabel(en, %s) = %+v（%v）", c, l, err)
 		}
 	}
-	for _, e := range All() {
-		raw, _, _ := e.ExampleParams()
-		got, err := e.RenderLoaded(uitext.EN, raw, e.ExampleLoaded())
-		if err != nil || got.Locale != uitext.EN || han.MatchString(got.Title+got.Body) {
-			t.Errorf("%s 的 en 範例：%+v（%v）", e.Spec().Name, got, err)
+	for label, entries := range wholeRegistries() {
+		for _, e := range entries {
+			if e.Spec().Broadcast {
+				continue
+			}
+			raw, _, _ := e.ExampleParams()
+			got, err := e.RenderLoaded(uitext.EN, raw, e.ExampleLoaded())
+			if err != nil || got.Locale != uitext.EN || han.MatchString(got.Title+got.Body) {
+				t.Errorf("%s：%s 的 en 範例：%+v（%v）", label, e.Spec().Name, got, err)
+			}
 		}
 	}
 }

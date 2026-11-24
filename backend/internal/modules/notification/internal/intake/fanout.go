@@ -14,12 +14,13 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
-// DefaultFanoutChunk 是 fan-out 一頁的預設收件人數（不超過 buyer 的 MaxLiveAccountsPage）。
+// DefaultFanoutChunk 是 fan-out 一頁的預設收件人數（不超過 registry.MaxFollowerPage）。
 const DefaultFanoutChunk = 200
 
+// fanoutChunk 是一頁的收件人數：沒設用預設，設太大夾到 registry.MaxFollowerPage（依賴模組的分頁上限，超過會回 InvalidInput）。
 func (s *Service) fanoutChunk() int {
 	if s.d.FanoutChunk > 0 {
-		return s.d.FanoutChunk
+		return min(s.d.FanoutChunk, registry.MaxFollowerPage)
 	}
 	return DefaultFanoutChunk
 }
@@ -68,8 +69,7 @@ func (s *Service) Fanout(ctx context.Context, a FanoutArgs) error {
 		s.log().WarnContext(ctx, "fan-out 的子型別沒有註冊或不是 Spawned，取消 job", "intent_id", parent.ID, "type", parent.Type, "child", child)
 		return river.JobCancel(fmt.Errorf("通知型別 %q 的子型別 %q 沒有註冊或不是 Spawned", parent.Type, child))
 	}
-	chunk := s.fanoutChunk()
-	targets, err := e.Spawn(ctx, s.d.Resolver, parent.Params, a.AfterID, chunk)
+	page, err := e.Spawn(ctx, s.d.Resolver, parent.Params, registry.PageRequest{After: a.AfterID, Limit: s.fanoutChunk(), OccurredAt: parent.OccurredAt})
 	if errors.Is(err, registry.ErrBadParams) {
 		s.log().WarnContext(ctx, "fan-out 母意圖的參數無法展開，取消 job", "intent_id", parent.ID, "type", parent.Type, "error", err)
 		return river.JobCancel(err)
@@ -79,7 +79,7 @@ func (s *Service) Fanout(ctx context.Context, a FanoutArgs) error {
 	}
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := store.New(s.d.DB.Conn(ctx))
-		for _, t := range targets {
+		for _, t := range page.Items {
 			id := s.d.NewID()
 			_, err := q.InsertIntent(ctx, store.InsertIntentParams{
 				ID: id, Type: child, IdempotencyKey: registry.SpawnedKey(child, parent.IdempotencyKey, t.ID),
@@ -95,10 +95,10 @@ func (s *Service) Fanout(ctx context.Context, a FanoutArgs) error {
 				return fmt.Errorf("排入子意圖 job：%w", err)
 			}
 		}
-		if len(targets) < chunk {
+		if page.Done {
 			return nil
 		}
-		return s.d.Jobs.Enqueue(ctx, FanoutArgs{IntentID: parent.ID, AfterID: targets[len(targets)-1].ID}, fanoutOpts())
+		return s.d.Jobs.Enqueue(ctx, FanoutArgs{IntentID: parent.ID, AfterID: page.Next}, fanoutOpts())
 	})
 }
 

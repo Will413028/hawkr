@@ -193,10 +193,19 @@ func (s *Service) Process(ctx context.Context, intentID uuid.UUID) error {
 	})
 }
 
-// scrubSkipped 在 Process 因收件人已刪除、已關閉、已退場或就是 actor 而略過時，把這個意圖的參數換成 '{}'（D16）：意圖還沒有收件匣連結或投遞紀錄，
-// 收件人的清除 job 找不到它；與略過同一個 transaction。
+// scrubSkipped 在 Process 因收件人已刪除、已關閉、已退場、就是 actor 或有封鎖而略過時，把這個意圖的參數換成 '{}'（D16）：意圖還沒有收件匣連結或投遞紀錄，
+// 收件人的清除 job 找不到它；與略過同一個 transaction。重試時意圖已經有連結或投遞紀錄（先前的嘗試寫過）就不清：那些列與渠道 job 還要讀這份參數，
+// 收件人的清除 job 也找得到它。
 func (s *Service) scrubSkipped(ctx context.Context, intentID uuid.UUID) error {
-	if err := store.New(s.d.DB.Conn(ctx)).ScrubIntentParams(ctx, intentID); err != nil {
+	q := store.New(s.d.DB.Conn(ctx))
+	written, err := q.IntentHasRecipientRows(ctx, intentID)
+	if err != nil {
+		return fmt.Errorf("檢查意圖是否已寫過收件人：%w", err)
+	}
+	if written {
+		return nil
+	}
+	if err := q.ScrubIntentParams(ctx, intentID); err != nil {
 		return fmt.Errorf("清除略過的通知意圖參數：%w", err)
 	}
 	return nil

@@ -2,10 +2,13 @@ package notification
 
 import (
 	"context"
+	"slices"
+	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
 // Resolver 是 worker 端解析收件人、封鎖檢查與追蹤者展開要問的地方。
@@ -23,8 +26,23 @@ func (r resolver) BuyerAccounts(ctx context.Context, buyerIDs []int64) (map[int6
 	return r.buyers.ResolvePrincipals(ctx, buyerIDs)
 }
 
+// StoreAccounts 逐店讀 seller 的 Store（含已關閉的 stint）：不存在與已關閉的店不在結果裡；其餘錯誤原樣回傳（讓 job 重試）。
 func (r resolver) StoreAccounts(ctx context.Context, storeIDs []int64) (map[int64]int64, error) {
-	return r.stores.ResolvePrincipals(ctx, storeIDs)
+	out := make(map[int64]int64, len(storeIDs))
+	for _, id := range slices.Compact(slices.Sorted(slices.Values(storeIDs))) {
+		st, err := r.stores.Store(ctx, id)
+		if apperr.KindOf(err) == apperr.KindNotFound {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		if st.Status == seller.Closed {
+			continue
+		}
+		out[id] = st.AccountID
+	}
+	return out, nil
 }
 
 func (r resolver) BuyersBlockedBetween(ctx context.Context, buyerA, buyerB int64) (bool, error) {
@@ -39,8 +57,8 @@ func (r resolver) StoreBlocksBuyer(ctx context.Context, storeID, buyerID int64) 
 	return r.stores.StoreBlocksBuyer(ctx, storeID, buyerID)
 }
 
-func (r resolver) StoreFollowers(ctx context.Context, storeID, afterBuyerID int64, limit int) ([]registry.FollowerRef, error) {
-	rows, err := r.buyers.ListLiveFollowerAccounts(ctx, storeID, afterBuyerID, limit)
+func (r resolver) StoreFollowers(ctx context.Context, storeID, afterBuyerID int64, limit int, followedBy time.Time) ([]registry.FollowerRef, error) {
+	rows, err := r.buyers.ListLiveFollowerAccounts(ctx, storeID, afterBuyerID, limit, followedBy)
 	if err != nil {
 		return nil, err
 	}

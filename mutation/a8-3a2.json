@@ -44,6 +44,78 @@
    "new": "_ = a",
    "test": "internal/modules/notification/internal/registry ^TestExpandResolvesRecipientSelfAndActorAccounts$",
    "why": "Worker-resolved actors no longer contribute their accounts, so the self-skip and the inbox actor list lose them."
+  },
+  {
+   "id": "expand-invalid-input-stays-retryable",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/registry/registry.go",
+   "old": "\t\treturn Expanded{}, false, permanent(err)\n",
+   "new": "\t\treturn Expanded{}, false, err\n",
+   "test": "internal/modules/notification/internal/registry ^TestNonPositiveIDsAndInvalidInputAreBadParams$",
+   "why": "An InvalidInput from the resolver is no longer mapped to ErrBadParams, so the job is retried instead of cancelled."
+  },
+  {
+   "id": "buyer-recipient-accepts-non-positive-id",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/registry/resolve.go",
+   "old": "\tif buyerID <= 0 {\n",
+   "new": "\tif false && buyerID <= 0 {\n",
+   "test": "internal/modules/notification/internal/registry ^TestNonPositiveIDsAndInvalidInputAreBadParams$",
+   "why": "A buyer id of 0 or less reaches the resolver instead of being rejected as permanently invalid."
+  },
+  {
+   "id": "process-retries-invalid-buyer-id",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/registry/resolve.go",
+   "old": "\tif buyerID <= 0 {\n",
+   "new": "\tif false && buyerID <= 0 {\n",
+   "test": "internal/modules/notification ^TestProcessCancelsAnIntentWithAnInvalidBuyerID$",
+   "why": "Process no longer cancels an intent whose recipient buyer id is invalid, so River retries it."
+  },
+  {
+   "id": "scrub-guard-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/intake/intake.go",
+   "old": "\tif written {\n\t\treturn nil\n\t}\n",
+   "new": "\tif false && written {\n\t\treturn nil\n\t}\n",
+   "test": "internal/modules/notification ^TestRetryAfterABlockDoesNotScrubAnAlreadyDeliveredIntent$",
+   "why": "A retry that finds a block now scrubs the params of an intent whose inbox row and delivery jobs already exist."
+  },
+  {
+   "id": "fanout-done-from-target-count",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/notification/internal/intake/fanout.go",
+   "old": "\t\tif page.Done {\n",
+   "new": "\t\tif page.Done || len(page.Items) < s.fanoutChunk() {\n",
+   "test": "internal/modules/notification ^TestFanoutContinuesPastAPageThatTheTypeFilteredEmpty$",
+   "why": "Fan-out stops at a short page again, so followers after a page the type filtered empty are never notified."
+  },
+  {
+   "id": "spawn-done-from-target-count",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/registry/registry.go",
+   "old": "Next: page.Next, Done: page.Done}",
+   "new": "Next: page.Next, Done: len(page.Targets) < req.Limit}",
+   "test": "internal/modules/notification/internal/registry ^TestSpawnCursorAndDoneComeFromTheUnderlyingPageNotTheTargets$",
+   "why": "Spawn derives the end of the list from the number of targets instead of the underlying page."
+  },
+  {
+   "id": "fanout-chunk-not-clamped",
+   "stack": "go",
+   "file": "backend/internal/modules/notification/internal/intake/fanout.go",
+   "old": "return min(s.d.FanoutChunk, registry.MaxFollowerPage)",
+   "new": "return s.d.FanoutChunk",
+   "test": "internal/modules/notification/internal/intake ^TestFanoutChunkDefaultsAndClampsToThePageLimit$",
+   "why": "An oversized FanoutChunk is passed through unclamped, so buyer answers InvalidInput for every page."
+  },
+  {
+   "id": "followers-after-the-event-listed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/buyer/internal/store/seller_subscriptions.sql.go",
+   "old": "s.created_at <= $3",
+   "new": "($3::timestamptz IS NOT NULL)",
+   "test": "internal/modules/buyer ^TestListLiveFollowerAccountsExcludesFollowersAfterTheEvent$",
+   "why": "The follower list no longer filters on the follow time, so buyers who followed after the event are notified."
   }
  ]
 }

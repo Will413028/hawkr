@@ -13,8 +13,8 @@ import (
 	"github.com/riverqueue/river/rivertype"
 )
 
-// fan-out 的排頁 job：同一頁尚未結束的合併；River 要求 ByState 含 available、pending、running、scheduled，Completed 排除
-// （完成的頁不擋之後的重跑）。wiki/tech/river-unique-job-dedup.md R1。
+// fan-out 的排頁 job：同一頁尚未結束的合併；River 的唯一性選項要求 ByState 含 available、pending、running、scheduled（缺任何一個，Insert 就回
+// 選項錯誤），Completed 排除（完成的頁不擋之後的重跑）。
 func TestFanoutPageJobStatesFollowRiverRulesAndExcludeCompleted(t *testing.T) {
 	t.Parallel()
 	o := fanoutOpts().UniqueOpts

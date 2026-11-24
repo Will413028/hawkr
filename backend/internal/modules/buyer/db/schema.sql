@@ -70,14 +70,14 @@ CREATE TABLE buyer.visit_history (
     PRIMARY KEY (buyer_id, product_id)
 );
 
--- 追蹤店家：關聯由 buyer 擁有，store_id 索引供店家粉絲查詢。
+-- 追蹤店家：關聯由 buyer 擁有，(store_id, buyer_id) 索引供店家粉絲查詢與依 buyer_id 的 keyset 分頁（追蹤者 fan-out）。
 CREATE TABLE buyer.seller_subscriptions (
     buyer_id   BIGINT NOT NULL REFERENCES buyer.buyers (buyer_id),
     store_id   BIGINT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,
     PRIMARY KEY (buyer_id, store_id)
 );
-CREATE INDEX subscriptions_store ON buyer.seller_subscriptions (store_id);
+CREATE INDEX subscriptions_store ON buyer.seller_subscriptions (store_id, buyer_id);
 
 -- 個人封鎖分兩張表，因為對象是兩種不同的東西：買家封鎖買家（對象在本模組，建外鍵）與買家封鎖店（店在 seller，不建跨模組外鍵）。
 -- 買家 ID 與店家 ID 是兩個號碼空間，分表後不可能把買家 7 當成店 7。發起者買家刪帳時由刪帳流程刪掉他發起的兩種列，

@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
@@ -46,7 +48,7 @@ func (fakeResolver) BuyerBlocksStore(context.Context, int64, int64) (bool, error
 
 func (fakeResolver) StoreBlocksBuyer(context.Context, int64, int64) (bool, error) { return false, nil }
 
-func (f fakeResolver) StoreFollowers(_ context.Context, _, after int64, limit int) ([]FollowerRef, error) {
+func (f fakeResolver) StoreFollowers(_ context.Context, _, after int64, limit int, _ time.Time) ([]FollowerRef, error) {
 	var out []FollowerRef
 	for _, r := range f.followers {
 		if r.BuyerID > after && len(out) < limit {
@@ -57,9 +59,9 @@ func (f fakeResolver) StoreFollowers(_ context.Context, _, after int64, limit in
 }
 
 type expandParams struct {
-	BuyerID int64 `json:"buyer_id"`
-	StoreID int64 `json:"store_id"`
-	EventID string
+	BuyerID int64  `json:"buyer_id"`
+	StoreID int64  `json:"store_id"`
+	EventID string `json:"EventID"`
 }
 
 func expandText(l uitext.Locale, _ expandParams) (Content, error) {
@@ -103,16 +105,17 @@ func broadcastDef() Definition[expandParams] {
 		OccurredAt:        func(expandParams) time.Time { return fixedAt },
 		Broadcast: &Broadcast[expandParams]{
 			Child: "expand_child",
-			Targets: func(ctx context.Context, r Resolver, p expandParams, after int64, limit int) ([]Target, error) {
-				page, err := r.StoreFollowers(ctx, p.StoreID, after, limit)
+			Targets: func(ctx context.Context, r Resolver, p expandParams, req PageRequest) (TargetPage, error) {
+				page, err := r.StoreFollowers(ctx, p.StoreID, req.After, req.Limit, req.OccurredAt)
 				if err != nil {
-					return nil, err
+					return TargetPage{}, err
 				}
 				out := make([]Target, len(page))
 				for i, f := range page {
 					out[i] = Target{ID: f.BuyerID, Params: expandParams{BuyerID: f.BuyerID, StoreID: p.StoreID}}
 				}
-				return out, nil
+				next, done := FollowersCursor(page, req.After, req.Limit)
+				return TargetPage{Targets: out, Next: next, Done: done}, nil
 			},
 		},
 		Example: expandParams{StoreID: 2, EventID: "e"},
@@ -243,26 +246,135 @@ func TestSpawnPagesTargetsAndMarshalsChildParams(t *testing.T) {
 	e := Define(broadcastDef())
 	r := fakeResolver{followers: []FollowerRef{{BuyerID: 3, AccountID: 103}, {BuyerID: 4, AccountID: 104}, {BuyerID: 9, AccountID: 109}}}
 	raw := json.RawMessage(`{"store_id":2,"EventID":"e"}`)
-	page, err := e.Spawn(context.Background(), r, raw, 3, 5)
-	if err != nil || len(page) != 2 || page[0].ID != 4 || page[1].ID != 9 {
+	page, err := e.Spawn(context.Background(), r, raw, PageRequest{After: 3, Limit: 5, OccurredAt: fixedAt})
+	if err != nil || len(page.Items) != 2 || page.Items[0].ID != 4 || page.Items[1].ID != 9 || !page.Done {
 		t.Fatalf("Spawn = %+v %v", page, err)
 	}
 	var child expandParams
-	if err := json.Unmarshal(page[0].Params, &child); err != nil || child.BuyerID != 4 || child.StoreID != 2 {
-		t.Fatalf("子參數 %s：%v", page[0].Params, err)
+	if err := json.Unmarshal(page.Items[0].Params, &child); err != nil || child.BuyerID != 4 || child.StoreID != 2 {
+		t.Fatalf("子參數 %s：%v", page.Items[0].Params, err)
+	}
+	full, err := e.Spawn(context.Background(), r, raw, PageRequest{After: 0, Limit: 2, OccurredAt: fixedAt})
+	if err != nil || full.Done || full.Next != 4 || len(full.Items) != 2 {
+		t.Fatalf("滿頁 = %+v %v，預期游標 4 且未結束", full, err)
+	}
+}
+
+func filteringBroadcast(drop func(int64) bool) Definition[expandParams] {
+	d := broadcastDef()
+	d.Broadcast.Targets = func(ctx context.Context, r Resolver, p expandParams, req PageRequest) (TargetPage, error) {
+		page, err := r.StoreFollowers(ctx, p.StoreID, req.After, req.Limit, req.OccurredAt)
+		if err != nil {
+			return TargetPage{}, err
+		}
+		var out []Target
+		for _, f := range page {
+			if !drop(f.BuyerID) {
+				out = append(out, Target{ID: f.BuyerID, Params: expandParams{BuyerID: f.BuyerID, StoreID: p.StoreID}})
+			}
+		}
+		next, done := FollowersCursor(page, req.After, req.Limit)
+		return TargetPage{Targets: out, Next: next, Done: done}, nil
+	}
+	return d
+}
+
+// 型別濾掉一整頁的列時，游標仍沿底層前進、結束只由底層決定。
+func TestSpawnCursorAndDoneComeFromTheUnderlyingPageNotTheTargets(t *testing.T) {
+	t.Parallel()
+	e := Define(filteringBroadcast(func(id int64) bool { return id < 5 }))
+	r := fakeResolver{followers: []FollowerRef{{BuyerID: 1, AccountID: 101}, {BuyerID: 2, AccountID: 102}, {BuyerID: 7, AccountID: 107}}}
+	page, err := e.Spawn(context.Background(), r, json.RawMessage(`{"store_id":2,"EventID":"e"}`), PageRequest{Limit: 2, OccurredAt: fixedAt})
+	if err != nil || len(page.Items) != 0 || page.Done || page.Next != 2 {
+		t.Fatalf("Spawn = %+v %v，預期沒有收件人、未結束、游標 2", page, err)
+	}
+}
+
+func TestSpawnRejectsAnInvalidCursorOrPageRequest(t *testing.T) {
+	t.Parallel()
+	page := func(tp TargetPage) Definition[expandParams] {
+		d := broadcastDef()
+		d.Broadcast.Targets = func(context.Context, Resolver, expandParams, PageRequest) (TargetPage, error) { return tp, nil }
+		return d
+	}
+	cases := map[string]struct {
+		d   Definition[expandParams]
+		req PageRequest
+	}{
+		"游標沒有前進":     {page(TargetPage{Next: 3}), PageRequest{After: 3, Limit: 5}},
+		"游標落在最後一個之前": {page(TargetPage{Targets: []Target{{ID: 9, Params: 1}}, Next: 4}), PageRequest{After: 3, Limit: 5}},
+		"ID 重複":      {page(TargetPage{Targets: []Target{{ID: 5, Params: 1}, {ID: 5, Params: 2}}, Next: 5}), PageRequest{Limit: 10}},
+		"一頁超過要求":     {page(TargetPage{Targets: []Target{{ID: 1, Params: 1}, {ID: 2, Params: 2}}, Done: true}), PageRequest{Limit: 1}},
+		"limit 超過上限": {broadcastDef(), PageRequest{Limit: MaxFollowerPage + 1}},
+		"limit 0":    {broadcastDef(), PageRequest{}},
+		"游標為負":       {broadcastDef(), PageRequest{After: -1, Limit: 1}},
+		"非母意圖":       {buyerExpandDef(), PageRequest{Limit: 10}},
+		"Targets 回 InvalidInput": {func() Definition[expandParams] {
+			d := broadcastDef()
+			d.Broadcast.Targets = func(context.Context, Resolver, expandParams, PageRequest) (TargetPage, error) {
+				return TargetPage{}, apperr.InvalidInput("分頁參數不合法")
+			}
+			return d
+		}(), PageRequest{Limit: 10}},
+	}
+	for name, c := range cases {
+		if _, err := Define(c.d).Spawn(context.Background(), fakeResolver{}, json.RawMessage(`{}`), c.req); !errors.Is(err, ErrBadParams) {
+			t.Errorf("%s：%v，預期 ErrBadParams", name, err)
+		}
+	}
+}
+
+func TestSpawnPassesTransientTargetErrorsThrough(t *testing.T) {
+	t.Parallel()
+	boom := errors.New("db down")
+	d := broadcastDef()
+	d.Broadcast.Targets = func(context.Context, Resolver, expandParams, PageRequest) (TargetPage, error) {
+		return TargetPage{}, boom
+	}
+	_, err := Define(d).Spawn(context.Background(), fakeResolver{}, json.RawMessage(`{}`), PageRequest{Limit: 10})
+	if !errors.Is(err, boom) || errors.Is(err, ErrBadParams) {
+		t.Fatalf("%v，預期原錯誤且不是 ErrBadParams（會被重試）", err)
+	}
+}
+
+// ID 小於等於 0 在呼叫 Resolver 之前就是永久錯誤；依賴模組回的 InvalidInput 也是永久錯誤（不是重試 25 次的暫時性錯誤）。
+func TestNonPositiveIDsAndInvalidInputAreBadParams(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	for _, id := range []int64{0, -3} {
+		if _, err := BuyerRecipient(ctx, fakeResolver{}, id); !errors.Is(err, ErrBadParams) {
+			t.Errorf("BuyerRecipient(%d)：%v，預期 ErrBadParams", id, err)
+		}
+		if _, err := StoreRecipient(ctx, fakeResolver{}, id); !errors.Is(err, ErrBadParams) {
+			t.Errorf("StoreRecipient(%d)：%v，預期 ErrBadParams", id, err)
+		}
+		if _, err := ResolveActors(ctx, fakeResolver{}, Principal{Side: model.AudienceStore, ID: id}); !errors.Is(err, ErrBadParams) {
+			t.Errorf("ResolveActors(%d)：%v，預期 ErrBadParams", id, err)
+		}
+	}
+	d := buyerExpandDef()
+	d.Expand = func(context.Context, Resolver, expandParams) (*Expansion, error) {
+		return nil, fmt.Errorf("解析收件人：%w", apperr.InvalidInput("id 不合法"))
+	}
+	if _, _, err := Define(d).Expand(ctx, fakeResolver{}, json.RawMessage(`{}`)); !errors.Is(err, ErrBadParams) {
+		t.Errorf("Expand 回 InvalidInput：%v，預期 ErrBadParams", err)
+	}
+	d.Expand = func(context.Context, Resolver, expandParams) (*Expansion, error) { return nil, apperr.NotFound("x") }
+	if _, _, err := Define(d).Expand(ctx, fakeResolver{}, json.RawMessage(`{}`)); errors.Is(err, ErrBadParams) {
+		t.Errorf("Expand 回 NotFound 不是永久不合法：%v", err)
 	}
 }
 
 func TestSpawnRejectsNonIncreasingIDs(t *testing.T) {
 	t.Parallel()
 	d := broadcastDef()
-	d.Broadcast.Targets = func(context.Context, Resolver, expandParams, int64, int) ([]Target, error) {
-		return []Target{{ID: 5, Params: 1}, {ID: 5, Params: 2}}, nil
+	d.Broadcast.Targets = func(context.Context, Resolver, expandParams, PageRequest) (TargetPage, error) {
+		return TargetPage{Targets: []Target{{ID: 5, Params: 1}, {ID: 5, Params: 2}}, Next: 5}, nil
 	}
-	if _, err := Define(d).Spawn(context.Background(), fakeResolver{}, json.RawMessage(`{}`), 0, 10); !errors.Is(err, ErrBadParams) {
+	if _, err := Define(d).Spawn(context.Background(), fakeResolver{}, json.RawMessage(`{}`), PageRequest{Limit: 10}); !errors.Is(err, ErrBadParams) {
 		t.Fatalf("%v，預期 ErrBadParams（重複的 ID 會讓游標原地踏步）", err)
 	}
-	if _, err := Define(buyerExpandDef()).Spawn(context.Background(), fakeResolver{}, json.RawMessage(`{}`), 0, 10); !errors.Is(err, ErrBadParams) {
+	if _, err := Define(buyerExpandDef()).Spawn(context.Background(), fakeResolver{}, json.RawMessage(`{}`), PageRequest{Limit: 10}); !errors.Is(err, ErrBadParams) {
 		t.Fatalf("非母意圖：%v，預期 ErrBadParams", err)
 	}
 }
@@ -311,7 +423,30 @@ func TestSelfCheckRejectsBrokenResolutionDefinitions(t *testing.T) {
 		},
 		"母意圖帶文案":        func() Definition[expandParams] { d := broadcastDef(); d.Text = expandText; return d },
 		"母意圖沒有 Targets": func() Definition[expandParams] { d := broadcastDef(); d.Broadcast.Targets = nil; return d },
-		"母意圖子型別是自己":     func() Definition[expandParams] { d := broadcastDef(); d.Broadcast.Child = d.Name; return d },
+		"母意圖帶偏好分類":      func() Definition[expandParams] { d := broadcastDef(); d.Category = model.CategoryLike; return d },
+		"母意圖帶呈現分類": func() Definition[expandParams] {
+			d := broadcastDef()
+			d.Presentation = model.PresentationSocial
+			return d
+		},
+		"母意圖帶狀態提示": func() Definition[expandParams] {
+			d := broadcastDef()
+			d.StateHint = model.StateHints()[0]
+			return d
+		},
+		"母意圖帶深連結": func() Definition[expandParams] {
+			d := broadcastDef()
+			d.DeepLink = func(expandParams) string { return "x" }
+			return d
+		},
+		"Spawned 的範例展開不出收件人": func() Definition[expandParams] {
+			d := spawnedDef()
+			d.Expand = func(context.Context, Resolver, expandParams) (*Expansion, error) { return nil, nil }
+			return d
+		},
+		"Spawned 的範例 ID 不合法": func() Definition[expandParams] { d := spawnedDef(); d.Example = expandParams{}; return d },
+		"Expand 的範例 ID 不合法":  func() Definition[expandParams] { d := buyerExpandDef(); d.Example = expandParams{}; return d },
+		"母意圖子型別是自己":          func() Definition[expandParams] { d := broadcastDef(); d.Broadcast.Child = d.Name; return d },
 		"母意圖沒有冪等鍵": func() Definition[expandParams] {
 			d := broadcastDef()
 			d.IdempotencyKey = nil

@@ -286,7 +286,9 @@ type fixture struct {
 	push     *fcm.Fake
 	mail     *resend.Fake
 	contacts *fakeContacts
-	resolver *fakeResolver
+	resolver Resolver
+	// sellerMod 只有 setupResolution 建（真的 seller 模組）；其餘測試用 stores 替身。
+	sellerMod *seller.Module
 }
 
 type syncBuffer struct {
@@ -321,11 +323,10 @@ func setupIntake(t *testing.T) *fixture {
 	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Media: media.NewFake(), Now: time.Now, Logger: log})
 	events.Subscribe[identity.AccountCreated](bus, buyers.OnAccountCreated)
 	stores := &fakeStores{retired: map[int64]bool{}}
-	resolver := &fakeResolver{buyers: buyers, storeAccounts: map[int64]int64{}, storeBlocks: map[[2]int64]bool{}}
 	rec := &recorder{}
 	push, mail, contacts := fcm.NewFake(nil), resend.NewFake(nil), &fakeContacts{m: map[int64]identity.ContactEmail{}}
 	m := newModule(Deps{
-		DB: d, Identity: id, Buyer: buyers, Seller: stores, Resolver: resolver, Jobs: rec, Now: time.Now, NewID: uuid.NewV7, Logger: log,
+		DB: d, Identity: id, Buyer: buyers, Seller: stores, Jobs: rec, Now: time.Now, NewID: uuid.NewV7, Logger: log,
 		Contacts: contacts, Locales: id, Push: push, Mail: mail, ImageURL: testImageURL, SuppressionKeys: testSuppressionKeys,
 	}, testRegistry{})
 	events.Subscribe[accountsuspension.Suspended](bus, m.OnSuspended)
@@ -335,7 +336,7 @@ func setupIntake(t *testing.T) *fixture {
 	events.Subscribe[identity.AccountDeleted](bus, m.PurgeTokensOnAccountDeleted)
 	events.Subscribe[buyer.BuyerDeleted](bus, m.OnBuyerDeleted)
 	events.Subscribe[seller.StoreRetired](bus, m.OnStoreRetired)
-	return &fixture{db: d, identity: id, buyer: buyers, stores: stores, bus: bus, jobs: rec, module: m, logs: logs, push: push, mail: mail, contacts: contacts, resolver: resolver}
+	return &fixture{db: d, identity: id, buyer: buyers, stores: stores, bus: bus, jobs: rec, module: m, logs: logs, push: push, mail: mail, contacts: contacts}
 }
 
 func (f *fixture) newAccount(t *testing.T) int64 {

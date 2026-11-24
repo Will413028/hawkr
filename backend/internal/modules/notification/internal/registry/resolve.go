@@ -6,12 +6,25 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"time"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
 // ErrBadParams 表示參數快照或型別的解析結果永遠不合法（解不開、收件人形狀錯）：重試也不會好，worker 取消 job。其餘錯誤（資料庫、逾時）是暫時性，由 River 重試。
 var ErrBadParams = errors.New("通知參數永久不合法")
+
+// MaxFollowerPage 是 StoreFollowers 與 fan-out 一頁的上限，等於 buyer.MaxLiveAccountsPage（根套件的測試守住兩者相等）。
+const MaxFollowerPage = 1000
+
+// permanent 把依賴模組回的 InvalidInput（呼叫方給的值不合法，重試也不會好）轉成 ErrBadParams，讓 worker 取消 job 而不是重試；其餘錯誤原樣回傳。
+func permanent(err error) error {
+	if err != nil && !errors.Is(err, ErrBadParams) && apperr.KindOf(err) == apperr.KindInvalidInput {
+		return fmt.Errorf("%w：%w", ErrBadParams, err)
+	}
+	return err
+}
 
 // FollowerRef 是追蹤者的買家與所屬帳號，只有鍵。
 type FollowerRef struct{ BuyerID, AccountID int64 }
@@ -29,8 +42,9 @@ type Resolver interface {
 	BuyerBlocksStore(ctx context.Context, buyerID, storeID int64) (bool, error)
 	// StoreBlocksBuyer 回報店是否封鎖了買家。
 	StoreBlocksBuyer(ctx context.Context, storeID, buyerID int64) (bool, error)
-	// StoreFollowers 列出追蹤店家、未關閉的買家：afterBuyerID 之後（不含）依 buyer_id 由小到大最多 limit 筆，不足 limit 筆表示沒有更多。不加鎖。
-	StoreFollowers(ctx context.Context, storeID, afterBuyerID int64, limit int) ([]FollowerRef, error)
+	// StoreFollowers 列出追蹤店家、未關閉、追蹤時間不晚於 followedBy 的買家：afterBuyerID 之後（不含）依 buyer_id 由小到大最多 limit 筆（1 到 MaxFollowerPage），
+	// 不足 limit 筆表示沒有更多。不加鎖。
+	StoreFollowers(ctx context.Context, storeID, afterBuyerID int64, limit int, followedBy time.Time) ([]FollowerRef, error)
 }
 
 // Principal 是事件裡的一方：Side 是 BUYER 或 STORE，ID 是該身分面的號碼（buyer_id 或 store_id，兩個號碼空間不可混用）。
@@ -88,6 +102,9 @@ func (x *Expansion) validate(aud model.Audience) error {
 func ResolveActors(ctx context.Context, r Resolver, ps ...Principal) ([]Actor, error) {
 	var buyers, stores []int64
 	for _, p := range ps {
+		if p.ID <= 0 {
+			return nil, fmt.Errorf("%w：actor %v 的號碼不合法", ErrBadParams, p)
+		}
 		switch p.Side {
 		case model.AudienceBuyer:
 			buyers = append(buyers, p.ID)
@@ -123,6 +140,9 @@ func ResolveActors(ctx context.Context, r Resolver, ps ...Principal) ([]Actor, e
 
 // BuyerRecipient 是 Expand 的共用寫法：收件人是買家 buyerID，查帳號；買家已關閉或不存在時回 nil（沒有收件人，Process 略過）。
 func BuyerRecipient(ctx context.Context, r Resolver, buyerID int64, actors ...Principal) (*Expansion, error) {
+	if buyerID <= 0 {
+		return nil, fmt.Errorf("%w：收件買家號碼 %d 不合法", ErrBadParams, buyerID)
+	}
 	accounts, err := r.BuyerAccounts(ctx, []int64{buyerID})
 	if err != nil {
 		return nil, fmt.Errorf("解析收件買家帳號：%w", err)
@@ -140,6 +160,9 @@ func BuyerRecipient(ctx context.Context, r Resolver, buyerID int64, actors ...Pr
 
 // StoreRecipient 是 Expand 的共用寫法：收件人是店家 storeID 的所屬帳號；店家已關閉或不存在時回 nil。
 func StoreRecipient(ctx context.Context, r Resolver, storeID int64, actors ...Principal) (*Expansion, error) {
+	if storeID <= 0 {
+		return nil, fmt.Errorf("%w：收件店家號碼 %d 不合法", ErrBadParams, storeID)
+	}
 	accounts, err := r.StoreAccounts(ctx, []int64{storeID})
 	if err != nil {
 		return nil, fmt.Errorf("解析收件店家帳號：%w", err)
@@ -155,6 +178,14 @@ func StoreRecipient(ctx context.Context, r Resolver, storeID int64, actors ...Pr
 	return &Expansion{Recipient: Recipient{AccountID: account, StoreID: storeID}, Actors: resolved}, nil
 }
 
+// PageRequest 是 fan-out 一頁的要求：After 是上一頁的游標（0 是從頭），Limit 是這頁最多幾個（1 到 MaxFollowerPage），
+// OccurredAt 是母意圖的事件時間（只有事件發生時就在名單上的收件人才收得到，例如事件之後才追蹤的買家不通知）。
+type PageRequest struct {
+	After      int64
+	Limit      int
+	OccurredAt time.Time
+}
+
 // Target 是 fan-out 的一位收件人：ID 是它在這次派送裡的唯一號碼（依 ID 由小到大分頁，也是子意圖冪等鍵的收件人部分，例如追蹤者的 buyer_id），
 // Params 是子型別的參數（內含該收件人，之後由子型別的 Expand 解析）。
 type Target struct {
@@ -162,12 +193,29 @@ type Target struct {
 	Params any
 }
 
+// TargetPage 是 fan-out 的一頁：Targets 是這頁要通知的收件人（可以比底層讀到的少，例如濾掉不該通知的人）；Next 是下一頁的游標，
+// 是底層已讀到的最後位置，不是 Targets 的最後一個 ID（Targets 為空時照樣往前）；Done 為 true 表示底層已經沒有更多。游標與結束由底層的分頁決定，
+// 不能從 Targets 的數量推得：被濾掉的列會讓一頁看起來不滿。
+type TargetPage struct {
+	Targets []Target
+	Next    int64
+	Done    bool
+}
+
+// FollowersCursor 由 StoreFollowers 這一頁的原始結果得出 TargetPage 的游標與結束：沒有讀滿 limit 筆就是結束，否則游標是最後一位追蹤者的 buyer_id。
+func FollowersCursor(page []FollowerRef, after int64, limit int) (next int64, done bool) {
+	if len(page) == 0 {
+		return after, true
+	}
+	return page[len(page)-1].BuyerID, len(page) < limit
+}
+
 // Broadcast 宣告型別是 fan-out 的母意圖：它自己不產生收件匣列，worker 分頁呼叫 Targets，為每位收件人建一個 Child 型別的子意圖。
 type Broadcast[P any] struct {
 	// Child 是子型別名稱；子型別要宣告 Spawned。
 	Child string
-	// Targets 回傳 afterID 之後（不含）依 ID 由小到大最多 limit 個收件人；不足 limit 個表示沒有更多。
-	Targets func(ctx context.Context, r Resolver, p P, afterID int64, limit int) ([]Target, error)
+	// Targets 回傳 req.After 之後的一頁收件人（依 ID 由小到大、最多 req.Limit 個）與下一頁的游標，見 TargetPage。
+	Targets func(ctx context.Context, r Resolver, p P, req PageRequest) (TargetPage, error)
 }
 
 // SpawnedKey 是 fan-out 子意圖的冪等鍵：母意圖的冪等鍵加收件人 ID，再加子型別名稱前綴。同一個母意圖對同一位收件人只會有一個子意圖，

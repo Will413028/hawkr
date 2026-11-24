@@ -17,9 +17,18 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// pipelineTypes 是走意圖管線的型別（排除 Fanout 型別：它們沒有冪等鍵與收件人）。
-func pipelineTypes() []Entry {
-	return slices.DeleteFunc(All(), func(e Entry) bool { return e.Spec().Fanout })
+// wholeRegistries 是整份註冊表檢查要跑的兩份清單：正式清單，以及加上一組 Broadcast 母意圖與它的 Spawned 子型別的清單
+// （正式清單還沒有 fan-out 型別，第一個真的 fan-out 型別加進來時要與後者走同一條規則，不能讓整份註冊表的測試先紅）。
+func wholeRegistries() map[string][]Entry {
+	return map[string][]Entry{
+		"正式清單":                  All(),
+		"含 Broadcast 與 Spawned": append(All(), Define(broadcastDef()), Define(spawnedDef())),
+	}
+}
+
+// pipelineTypes 是走意圖管線、自己有冪等鍵的型別：排除 Fanout 型別（沒有冪等鍵與收件人）與 Spawned 型別（冪等鍵由派送決定）。
+func pipelineTypes(entries []Entry) []Entry {
+	return slices.DeleteFunc(slices.Clone(entries), func(e Entry) bool { return e.Spec().Fanout || e.Spec().Spawned })
 }
 
 func zhOnly() Content {
@@ -42,25 +51,29 @@ func TestRegistryHoldsTheTypesOfThisStep(t *testing.T) {
 
 // 註冊表自檢：每個型別有冪等鍵來源、分類在 D4 清單、呈現分類在 D6 清單、聚合鍵只在宣告可聚合的型別。
 func TestEveryRegisteredTypePassesTheSelfCheck(t *testing.T) {
-	seen := map[string]bool{}
-	for _, e := range All() {
-		name := e.Spec().Name
-		if seen[name] {
-			t.Errorf("型別名稱 %s 重複", name)
-		}
-		seen[name] = true
-		for _, err := range Validate(e) {
-			t.Error(err)
-		}
-		s := e.Spec()
-		if s.IdempotencySource == "" && !s.Fanout {
-			t.Errorf("%s 沒有冪等鍵來源", name)
-		}
-		if !model.ValidCategory(s.Category) || !slices.Contains(model.Presentations(), s.Presentation) {
-			t.Errorf("%s 的分類不在清單", name)
-		}
-		if _, ok := Lookup(name); !ok {
-			t.Errorf("Lookup(%s) 找不到", name)
+	for label, entries := range wholeRegistries() {
+		seen := map[string]bool{}
+		for _, e := range entries {
+			name := e.Spec().Name
+			if seen[name] {
+				t.Errorf("%s：型別名稱 %s 重複", label, name)
+			}
+			seen[name] = true
+			for _, err := range Validate(e) {
+				t.Errorf("%s：%v", label, err)
+			}
+			s := e.Spec()
+			if s.IdempotencySource == "" && !s.Fanout && !s.Spawned {
+				t.Errorf("%s：%s 沒有冪等鍵來源", label, name)
+			}
+			if !s.Broadcast && (!model.ValidCategory(s.Category) || !slices.Contains(model.Presentations(), s.Presentation)) {
+				t.Errorf("%s：%s 的分類不在清單", label, name)
+			}
+			if label == "正式清單" {
+				if _, ok := Lookup(name); !ok {
+					t.Errorf("Lookup(%s) 找不到", name)
+				}
+			}
 		}
 	}
 }
@@ -201,13 +214,15 @@ func walkParams(t reflect.Type, path string, seen map[reflect.Type]bool, out *[]
 }
 
 func TestParamsDeclareNoThirdPartyNameFields(t *testing.T) {
-	for _, e := range All() {
-		_, example, err := e.ExampleParams()
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, p := range paramsProblems(reflect.TypeOf(example)) {
-			t.Errorf("%s：%s", e.Spec().Name, p)
+	for label, entries := range wholeRegistries() {
+		for _, e := range entries {
+			_, example, err := e.ExampleParams()
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, p := range paramsProblems(reflect.TypeOf(example)) {
+				t.Errorf("%s：%s：%s", label, e.Spec().Name, p)
+			}
 		}
 	}
 }
@@ -304,10 +319,12 @@ func TestLongKeysAreHashedToFit(t *testing.T) {
 	if err != nil || r.AggregationKey != want {
 		t.Errorf("250 字元的聚合鍵 = %q、%v，應該是 %q", r.AggregationKey, err, want)
 	}
-	for _, e := range pipelineTypes() {
-		raw, _, _ := e.ExampleParams()
-		if k, err := e.IdempotencyKey(raw); err != nil || len(k) > MaxIdempotencyKeyLen {
-			t.Errorf("%s 的範例冪等鍵長度 %d（%v）", e.Spec().Name, len(k), err)
+	for label, entries := range wholeRegistries() {
+		for _, e := range pipelineTypes(entries) {
+			raw, _, _ := e.ExampleParams()
+			if k, err := e.IdempotencyKey(raw); err != nil || len(k) > MaxIdempotencyKeyLen {
+				t.Errorf("%s：%s 的範例冪等鍵長度 %d（%v）", label, e.Spec().Name, len(k), err)
+			}
 		}
 	}
 }
@@ -344,23 +361,25 @@ func TestAggregationKeysAreNamespacedByType(t *testing.T) {
 
 // 冪等鍵是型別名稱加事件來源身分；同一個事件來源身分在不同型別下不撞。
 func TestIdempotencyKeysAreNamespacedByType(t *testing.T) {
-	keys := map[string]string{}
-	for _, e := range pipelineTypes() {
-		raw, _, err := e.ExampleParams()
-		if err != nil {
-			t.Fatal(err)
+	for label, entries := range wholeRegistries() {
+		keys := map[string]string{}
+		for _, e := range pipelineTypes(entries) {
+			raw, _, err := e.ExampleParams()
+			if err != nil {
+				t.Fatal(err)
+			}
+			k, err := e.IdempotencyKey(raw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.HasPrefix(k, e.Spec().Name+":") {
+				t.Errorf("%s：%s 的冪等鍵 %q 沒有型別前綴", label, e.Spec().Name, k)
+			}
+			if other, dup := keys[k]; dup {
+				t.Errorf("%s：%s 與 %s 的冪等鍵相同：%s", label, e.Spec().Name, other, k)
+			}
+			keys[k] = e.Spec().Name
 		}
-		k, err := e.IdempotencyKey(raw)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !strings.HasPrefix(k, e.Spec().Name+":") {
-			t.Errorf("%s 的冪等鍵 %q 沒有型別前綴", e.Spec().Name, k)
-		}
-		if other, dup := keys[k]; dup {
-			t.Errorf("%s 與 %s 的冪等鍵相同：%s", e.Spec().Name, other, k)
-		}
-		keys[k] = e.Spec().Name
 	}
 }
 
