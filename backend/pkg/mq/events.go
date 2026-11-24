@@ -30,9 +30,7 @@ const (
 	EventTypeReviewCreated EventType = "REVIEW_CREATED"
 	EventTypeReviewHidden  EventType = "REVIEW_HIDDEN"
 
-	EventTypeNotificationInboxNew      EventType = "NOTIFICATION_INBOX_NEW"
-	EventTypeNotificationUnreadChanged EventType = "NOTIFICATION_UNREAD_CHANGED"
-	EventTypeCouponIssued              EventType = "COUPON_ISSUED"
+	EventTypeCouponIssued EventType = "COUPON_ISSUED"
 
 	EventTypeAccountDeleted EventType = "ACCOUNT_DELETED"
 
@@ -151,40 +149,6 @@ func NewReviewHiddenEvent(reviewID, storeID, productID int64, avgRating float64,
 		TotalCount:         totalCount,
 		ProductAvgRating:   productAvgRating,
 		ProductReviewCount: productReviewCount,
-	}
-}
-
-type NotificationInboxNewEvent struct {
-	BaseEvent
-	UserID      int64                  `json:"userId"`
-	UserType    string                 `json:"userType"`
-	Item        map[string]interface{} `json:"item"`
-	UnreadCount int64                  `json:"unreadCount"`
-}
-
-func NewNotificationInboxNewEvent(userID int64, userType string, item map[string]interface{}, unreadCount int64) *NotificationInboxNewEvent {
-	return &NotificationInboxNewEvent{
-		BaseEvent:   NewBaseEvent(EventTypeNotificationInboxNew, "notification-service"),
-		UserID:      userID,
-		UserType:    userType,
-		Item:        item,
-		UnreadCount: unreadCount,
-	}
-}
-
-type NotificationUnreadChangedEvent struct {
-	BaseEvent
-	UserID      int64  `json:"userId"`
-	UserType    string `json:"userType"`
-	UnreadCount int64  `json:"unreadCount"`
-}
-
-func NewNotificationUnreadChangedEvent(userID int64, userType string, unreadCount int64) *NotificationUnreadChangedEvent {
-	return &NotificationUnreadChangedEvent{
-		BaseEvent:   NewBaseEvent(EventTypeNotificationUnreadChanged, "notification-service"),
-		UserID:      userID,
-		UserType:    userType,
-		UnreadCount: unreadCount,
 	}
 }
 

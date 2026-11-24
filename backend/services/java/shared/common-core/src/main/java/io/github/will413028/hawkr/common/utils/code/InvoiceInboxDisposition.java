@@ -4,7 +4,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 一則入向事件「不處理」時的機器可讀理由（**5 值**）。它是 `SKIPPED` 這個狀態的必填配對——沒有它，「這則事件為什麼沒有下文」在事後只能靠猜。🔴 **本 enum 的存在理由是 runbook 指名要它**：`docs/runbooks/invoice-inbox-stranded-runbook.md` §4 逐字寫「`disposition` 值要先在 CodeMeta 登記再用，不要直接寫字面值進 DB」，而在本次登記之前那個區塊**並不存在** ⇒ 照 runbook 施工的人會找不到要登記的地方，然後直接寫字面值。
+ * 一則入向事件「不處理」時的機器可讀理由（**5 值**）。它是 `SKIPPED` 這個狀態的必填配對——沒有它，「這則事件為什麼沒有下文」在事後只能靠猜。🔴 **本 enum 的存在理由是 runbook 指名要它**：`backend/docs/runbooks/invoice-inbox-stranded-runbook.md` §4 逐字寫「`disposition` 值要先在 CodeMeta 登記再用，不要直接寫字面值進 DB」，而在本次登記之前那個區塊**並不存在** ⇒ 照 runbook 施工的人會找不到要登記的地方，然後直接寫字面值。
  *
  * ⚠ 此檔案由 generate.sh 自動生成，請勿手動修改。
  * 業務輔助邏輯請在使用該 enum 的服務或模組內建立 helper class

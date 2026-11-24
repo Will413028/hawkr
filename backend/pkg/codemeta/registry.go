@@ -1511,11 +1511,11 @@ type ReportTargetType struct {
 }
 
 var (
-	ReportTargetTypeReview      = ReportTargetType{Code: "REVIEW", Value: "REVIEW", Label: "商品評論", Description: "商品評論（review-service 擁有，social 只持 target_id）"}
+	ReportTargetTypeReview      = ReportTargetType{Code: "REVIEW", Value: "REVIEW", Label: "商品評論", Description: "商品評論（內容由 review 模組擁有，檢舉案件只持 target_id）"}
 	ReportTargetTypePost        = ReportTargetType{Code: "POST", Value: "POST", Label: "貼文", Description: "賣家貼文 `cms_post`"}
 	ReportTargetTypePostComment = ReportTargetType{Code: "POST_COMMENT", Value: "POST_COMMENT", Label: "貼文留言", Description: "貼文底下的留言 `cms_comment`"}
 	ReportTargetTypeSellerForum = ReportTargetType{Code: "SELLER_FORUM", Value: "SELLER_FORUM", Label: "討論區", Description: "賣家討論區內容"}
-	ReportTargetTypeChatMessage = ReportTargetType{Code: "CHAT_MESSAGE", Value: "CHAT_MESSAGE", Label: "聊天訊息", Description: "IM 訊息（im-service 擁有）"}
+	ReportTargetTypeChatMessage = ReportTargetType{Code: "CHAT_MESSAGE", Value: "CHAT_MESSAGE", Label: "聊天訊息", Description: "IM 訊息（內容由 im 模組擁有，檢舉案件只持 target_id）"}
 	ReportTargetTypeUser        = ReportTargetType{Code: "USER", Value: "USER", Label: "使用者", Description: "檢舉對象是人而非單一則內容；此類不下架內容，只走警告／停權"}
 )
 
@@ -3133,7 +3133,7 @@ func InvoiceCancelReasonFromValue(value string) (InvoiceCancelReason, bool) {
 }
 
 // ===== InvoiceInboxDisposition =====
-// 一則入向事件「不處理」時的機器可讀理由（**5 值**）。它是 `SKIPPED` 這個狀態的必填配對——沒有它，「這則事件為什麼沒有下文」在事後只能靠猜。🔴 **本 enum 的存在理由是 runbook 指名要它**：`docs/runbooks/invoice-inbox-stranded-runbook.md` §4 逐字寫「`disposition` 值要先在 CodeMeta 登記再用，不要直接寫字面值進 DB」，而在本次登記之前那個區塊**並不存在** ⇒ 照 runbook 施工的人會找不到要登記的地方，然後直接寫字面值。
+// 一則入向事件「不處理」時的機器可讀理由（**5 值**）。它是 `SKIPPED` 這個狀態的必填配對——沒有它，「這則事件為什麼沒有下文」在事後只能靠猜。🔴 **本 enum 的存在理由是 runbook 指名要它**：`backend/docs/runbooks/invoice-inbox-stranded-runbook.md` §4 逐字寫「`disposition` 值要先在 CodeMeta 登記再用，不要直接寫字面值進 DB」，而在本次登記之前那個區塊**並不存在** ⇒ 照 runbook 施工的人會找不到要登記的地方，然後直接寫字面值。
 
 type InvoiceInboxDisposition struct {
 	Code        string
