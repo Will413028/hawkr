@@ -195,7 +195,7 @@
       "file": "backend/internal/modules/procurement/internal/store/seller.sql.go",
       "old": "ON CONFLICT (seller_response_id) DO NOTHING",
       "new": "ON CONFLICT (seller_response_id) DO UPDATE SET payload = EXCLUDED.payload",
-      "test": "internal/modules/procurement/internal/sellerside ^TestDraftCreateUpdateAndVersionConflicts$",
+      "test": "internal/modules/procurement/internal/sellerside ^TestInsertSellerDraftKeepsTheFirstPayloadOnConflict$",
       "why": "Creating a draft over an existing one overwrites it instead of reporting a draft version conflict."
     },
     {

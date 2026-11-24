@@ -5,6 +5,7 @@ package sellerside_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"reflect"
 	"strings"
 	"sync"
@@ -12,6 +13,8 @@ import (
 	"time"
 
 	"uuid"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/quote"
@@ -192,6 +195,32 @@ func TestDraftCreateUpdateAndVersionConflicts(t *testing.T) {
 	}
 	if got.Latest != nil {
 		t.Fatal("草稿不是正式回價")
+	}
+}
+
+// 草稿建立在已有草稿時由 ON CONFLICT 擋下（併發建立只有一個贏）：第二次插入沒有列回來，也不改原內容。
+func TestInsertSellerDraftKeepsTheFirstPayloadOnConflict(t *testing.T) {
+	f := newFixture(t)
+	ctx := t.Context()
+	in := model.QuoteInput{SpecNote: "第一份", GoodsAmount: 10}
+	if _, err := f.service().UpsertDraft(ctx, invitedStore, f.publication, "", in); err != nil {
+		t.Fatal(err)
+	}
+	var responseID uuid.UUID
+	if err := f.d.Pool().QueryRow(ctx, `SELECT seller_response_id FROM procurement.seller_response_drafts`).Scan(&responseID); err != nil {
+		t.Fatal(err)
+	}
+	q := store.New(f.d.Pool())
+	_, err := q.InsertSellerDraft(ctx, store.InsertSellerDraftParams{SellerResponseID: responseID, Payload: []byte(`{"SpecNote":"第二份"}`), Now: start})
+	if !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("已有草稿時要沒有列回來，得到 %v", err)
+	}
+	got, err := q.GetSellerDraft(ctx, responseID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Version != 1 || strings.Contains(string(got.Payload), "第二份") || !strings.Contains(string(got.Payload), "第一份") {
+		t.Fatalf("草稿被覆蓋：version=%d payload=%s", got.Version, got.Payload)
 	}
 }
 
