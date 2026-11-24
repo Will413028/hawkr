@@ -8,17 +8,19 @@ import 'package:hawkr_buyer/shared/widgets/hk_button_label.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:hawkr_api/errors.dart' show errorText;
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:hawkr_buyer/core/codemeta/code_meta.dart';
 import 'package:hawkr_buyer/core/codemeta/shipping_presentation.dart';
 
 import '../../../../core/exceptions/seller_suspension_codes.dart';
+import '../../../../core/l10n/ui_locale.dart';
+import '../../../../l10n/l10n.dart';
+import '../../../order/data/payment_flow.dart';
+import '../../../order/presentation/payment_outcome_text.dart';
 import '../../../../core/networking/dio_provider.dart';
-import '../../../../core/payment/pay_token_service.dart';
 import '../../../../shared/widgets/common_dialog.dart';
 import '../../../../shared/widgets/common_snackbar.dart';
 import '../../../../shared/widgets/hk_icon.dart';
-import '../../../../shared/widgets/floating_toast.dart';
 import '../../../../shared/widgets/swipe_to_pay.dart';
 import '../../../../shared/widgets/truck_loading_overlay.dart';
 import '../../../address/data/address_model.dart';
@@ -28,10 +30,9 @@ import '../../data/cart_model.dart';
 // 結帳付款底部彈窗。
 //
 // 呈現結帳預覽資訊（商品總額、運費、折扣、總付款金額）、
-// 付款方式選擇（Apple Pay / ATM / 信用卡），
 // 以及滑動確認付款。
 //
-// 內部管理 preview API 呼叫、confirm + payment 流程。
+// 內部管理 preview API 呼叫、confirm + payment 流程；付款由 PaymentSheet 完成。
 // ---------------------------------------------------------------------------
 
 /// 結帳付款彈窗的配置參數。
@@ -68,9 +69,7 @@ class CheckoutCallbacks {
     required this.onClearCoupons,
     required this.onNavigateToOrders,
     required this.onNavigateHome,
-    required this.onNavigateToPaymentWebview,
     required this.onInvalidateCartCount,
-    this.onPayMethodChanged,
     this.onPaymentSucceeded,
   });
 
@@ -85,24 +84,10 @@ class CheckoutCallbacks {
   /// 導向首頁。
   final VoidCallback onNavigateHome;
 
-  /// 導向信用卡 WebView 付款。
-  final void Function({
-    required String redirectUrl,
-    required String tradeNo,
-    required String orderNo,
-    required String amount,
-  })
-  onNavigateToPaymentWebview;
-
   /// 讓主頁面 invalidate cartCount。
   final VoidCallback onInvalidateCartCount;
 
-  /// 付款方式切換時回調（傳入 payType 字串）。
-  final void Function(String payType)? onPayMethodChanged;
-
-  /// Apple Pay 付款成功後回調（傳入已確認付款的 orderNo）。
-  /// 用於觸發 GA4 purchase 事件；credit card 走 WebView 回調，ATM 未付款，
-  /// 故此 callback 只在即時付款成功路徑呼叫。
+  /// 付款經 GetPayment 確認成功後回調（傳入已確認付款的 orderNo），用於觸發 GA4 purchase 事件。
   /// 多賣家拆單時每筆 orderNo 各呼叫一次。
   final void Function(String orderNo)? onPaymentSucceeded;
 }
@@ -131,30 +116,6 @@ class CheckoutPaymentSheet extends StatefulWidget {
 }
 
 class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
-  // 付款方式列表（App 只發 iOS，錢包是 Apple Pay）
-  List<({String label, String payType})> get _payMethods => [
-    (label: 'Apple Pay', payType: PaymentMethod.applePay.value),
-    (label: 'ATM 虛擬轉帳', payType: PaymentMethod.atm.value),
-    (label: '信用卡', payType: PaymentMethod.creditCard.value),
-  ];
-
-  // 後端 §3.4.1 付款方式可用性：依金額判定哪些方式可用 + 不可用理由。
-  // 空清單（未載入 / 舊後端 / 零元）graceful 視為不限制；零元另由 _isZeroAmount 走無需付款分支。
-  ({bool eligible, String reason}) _availabilityFor(String payType) {
-    final list = _previewData?['availablePaymentMethods'];
-    if (list is! List || list.isEmpty) return (eligible: true, reason: '');
-    for (final m in list) {
-      if (m is Map && m['paymentType']?.toString() == payType) {
-        return (
-          eligible: m['eligible'] == true,
-          reason: m['ineligibleReason']?.toString() ?? '',
-        );
-      }
-    }
-    return (eligible: true, reason: '');
-  }
-
-  int _payMethodIdx = 0;
   Map<String, dynamic>? _previewData;
   bool _previewLoading = true;
   String? _previewError;
@@ -321,20 +282,6 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
       return;
     }
 
-    // 後端 §3.4.1 金額 gating 守門：非零元時選中方式必須 eligible（前端已禁點，此為保險）
-    final guardZero = _isZeroAmount(
-      _previewData?['totalActualAmount']?.toString() ?? '',
-    );
-    if (!guardZero &&
-        !_availabilityFor(_payMethods[_payMethodIdx].payType).eligible) {
-      await showCommonDialog(
-        context: context,
-        title: '提示',
-        content: '所選付款方式不適用本訂單金額，請改選其他付款方式',
-      );
-      return;
-    }
-
     final p = widget.params;
     final cb = widget.callbacks;
     // confirm payload 依配送方式**明確分派**（與 _loadPreview 同一套判定）。
@@ -384,7 +331,7 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
     _isConfirming = true;
     final zipCode = postalCodeByTownCode(addr?.townCode ?? '');
 
-    TruckLoadingOverlay.show(context, message: '處理中...');
+    TruckLoadingOverlay.show(context, message: context.l10n.paymentProcessing);
     try {
       // Step 1: 確認訂單
       final confirmResp = await widget.dio.post<Map<String, dynamic>>(
@@ -453,9 +400,7 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
         return;
       }
 
-      final payType = _payMethods[_payMethodIdx].payType;
       await _processPayment(
-        payType: payType,
         orderNo: orderNo,
         orderText: orderText,
         totalPayAmount: actualPayAmount,
@@ -546,226 +491,70 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
   }
 
   Future<void> _processPayment({
-    required String payType,
     required String orderNo,
     required String orderText,
     required String totalPayAmount,
     List<String> orderNos = const [],
   }) async {
     final cb = widget.callbacks;
-    final isZeroAmount = _isZeroAmount(totalPayAmount);
+    final container = ProviderScope.containerOf(context);
+    final l10n = context.l10n;
 
-    try {
-      // Apple Pay：先取得 token
-      String? nativePayToken;
-      if (!isZeroAmount && payType == PaymentMethod.applePay.value) {
-        if (mounted) TruckLoadingOverlay.hide(context);
-
-        try {
-          final payTokenService = PayTokenService();
-          await payTokenService.init();
-          if (!payTokenService.isAvailable) {
-            if (mounted) {
-              await showCommonDialog(
-                context: context,
-                title: '不支援',
-                content:
-                    '此裝置不支援 Apple Pay，'
-                    '請選擇其他付款方式或至「我的訂單」重新付款',
-              );
-              cb.onNavigateToOrders();
-            }
-            return;
-          }
-          nativePayToken = await payTokenService.requestToken(
-            amount: totalPayAmount,
-            label: 'Hawkr 訂單',
-          );
-        } on PaymentCancelledException {
-          if (mounted) {
-            await showCommonDialog(
-              context: context,
-              title: '付款取消',
-              content: '訂單已建立（$orderText），您可以到「我的訂單」重新付款',
-            );
-            cb.onNavigateToOrders();
-          }
-          return;
-        } on PaymentTokenUnavailableException catch (e) {
-          if (mounted) {
-            await showCommonDialog(
-              context: context,
-              title: '付款憑證取得失敗',
-              content: '訂單已建立（$orderText），$e',
-            );
-            cb.onNavigateToOrders();
-          }
-          return;
-        } catch (e, stackTrace) {
-          debugPrint('[CheckoutPaymentSheet] native pay token failed: $e');
-          debugPrintStack(stackTrace: stackTrace);
-          if (mounted) {
-            await showCommonDialog(
-              context: context,
-              title: '付款授權失敗',
-              content: '訂單已建立（$orderText），請到「我的訂單」重新付款或改用其他付款方式',
-            );
-            cb.onNavigateToOrders();
-          }
-          return;
-        }
-
-        if (!mounted) return;
-        TruckLoadingOverlay.show(context, message: '處理中...');
-      }
-
-      final payResp = await widget.dio.post<Map<String, dynamic>>(
-        '/app/payments',
-        data: {
-          'orderNo': orderNo,
-          'paymentType': payType,
-          if (payType == PaymentMethod.applePay.value &&
-              (nativePayToken?.trim().isNotEmpty ?? false))
-            'applePayToken': nativePayToken!.trim(),
-        },
-      );
-      if (!mounted) return;
-      TruckLoadingOverlay.hide(context);
-
-      final payCode = payResp.data?['code'] as int? ?? -1;
-      if (payCode != 0) {
-        final message = payCode == 8021
-            // 8021 付款方式金額不符（前端 gating 已擋，此為 fallback）
-            ? '所選付款方式不適用本訂單金額，請改選其他付款方式'
-            : payResp.data?['message']?.toString() ?? '付款請求失敗';
-        debugPrint('[Payment] API error: $message');
-        await showCommonDialog(
-          context: context,
-          title: '付款處理失敗',
-          content: '訂單已建立（$orderText），$message\n請到「我的訂單」重新付款',
-        );
-        cb.onNavigateToOrders();
-        return;
-      }
-
-      final payData = payResp.data?['data'] as Map<String, dynamic>? ?? {};
-      final tradeNo = payData['tradeNo']?.toString() ?? '';
-      final responsePaymentType =
-          payData['paymentType']?.toString() ??
-          payData['paymentMethod']?.toString() ??
-          '';
-      final paidWithoutRedirect =
-          _isPaidPaymentStatus(payData['status']) &&
-          (isZeroAmount ||
-              responsePaymentType == PaymentMethod.zeroAmount.value ||
-              _isZeroAmount(payData['amount']?.toString() ?? ''));
-
-      if (paidWithoutRedirect) {
-        await showCommonDialog(
-          context: context,
-          title: '付款完成',
-          content: '$orderText\n折抵後無需付款，訂單已完成付款。',
-        );
-        cb.onReloadCart();
-        cb.onInvalidateCartCount();
-        cb.onNavigateToOrders();
-        return;
-      }
-
-      if (payType == PaymentMethod.creditCard.value) {
-        // 信用卡 UPP
-        final redirectUrl = payData['redirectUrl']?.toString() ?? '';
-        if (redirectUrl.isNotEmpty) {
-          cb.onReloadCart();
-          cb.onInvalidateCartCount();
-          cb.onNavigateToPaymentWebview(
-            redirectUrl: redirectUrl,
-            tradeNo: tradeNo,
-            orderNo: orderNo,
-            amount: totalPayAmount,
-          );
-        } else {
-          await showCommonDialog(
-            context: context,
-            title: '付款處理失敗',
-            content: '訂單已建立（$orderText），付款頁面無法開啟，請到「我的訂單」重新付款',
-          );
-          cb.onNavigateToOrders();
-        }
-      } else if (payType == PaymentMethod.atm.value) {
-        // ATM 虛擬轉帳
-        final bankCode = payData['atmBankCode']?.toString() ?? '';
-        final virtualAccount = payData['atmVirtualAccount']?.toString() ?? '';
-        FloatingToast.show(
-          title: 'ATM 轉帳資訊',
-          message: '銀行代碼：$bankCode\n虛擬帳號：$virtualAccount',
-          icon: AppIcons.accountBalance,
-          duration: const Duration(seconds: 8),
-        );
-        cb.onNavigateToOrders();
-      } else if (payType == PaymentMethod.applePay.value) {
-        await showCommonDialog(
-          context: context,
-          title: '付款成功',
-          content: '$orderText\n付款金額：NT\$ $totalPayAmount',
-        );
-        cb.onReloadCart();
-        cb.onInvalidateCartCount();
-        // GA4 purchase：對每筆已付款 orderNo 觸發一次（多賣家拆單各呼叫一次）。
-        final trackedNos = orderNos.isNotEmpty
-            ? orderNos
-            : (orderNo.isNotEmpty ? [orderNo] : <String>[]);
-        for (final no in trackedNos) {
-          cb.onPaymentSucceeded?.call(no);
-        }
-        cb.onNavigateHome();
-      } else {
-        await showCommonDialog(
-          context: context,
-          title: '付款處理失敗',
-          content: '訂單已建立（$orderText），不支援的付款方式，請到「我的訂單」重新付款',
-        );
-        cb.onNavigateToOrders();
-      }
-    } on DioException catch (e) {
-      if (!mounted) return;
-      TruckLoadingOverlay.hide(context);
-      final data = e.response?.data;
-      final message = data is Map ? data['message']?.toString() : null;
-      await showCommonDialog(
-        context: context,
-        title: '付款處理失敗',
-        content:
-            '訂單已建立（$orderText），${message?.trim().isNotEmpty == true ? message : '請到「我的訂單」重新付款'}',
-      );
-      cb.onNavigateToOrders();
-    } catch (_) {
+    if (_isZeroAmount(totalPayAmount)) {
       if (!mounted) return;
       TruckLoadingOverlay.hide(context);
       await showCommonDialog(
         context: context,
-        title: '付款處理失敗',
-        content: '訂單已建立（$orderText），請到「我的訂單」重新付款',
+        title: '付款完成',
+        content: '$orderText\n折抵後無需付款，訂單已完成付款。',
       );
+      cb.onReloadCart();
+      cb.onInvalidateCartCount();
       cb.onNavigateToOrders();
+      return;
     }
+
+    PaymentOutcome? outcome;
+    String? errorMessage;
+    try {
+      outcome = await container.read(paymentFlowProvider).pay(orderNo);
+    } catch (e) {
+      errorMessage = errorText(
+        e,
+        defaults: container.read(defaultErrorTextProvider),
+      );
+    }
+    if (!mounted) return;
+    TruckLoadingOverlay.hide(context);
+
+    if (outcome == PaymentOutcome.succeeded) {
+      await showCommonDialog(
+        context: context,
+        title: l10n.paymentSucceededTitle,
+        content: '$orderText\n付款金額：NT\$ $totalPayAmount',
+      );
+      cb.onReloadCart();
+      cb.onInvalidateCartCount();
+      // GA4 purchase：對每筆 orderNo 觸發一次（多賣家拆單各呼叫一次）。
+      for (final no in orderNos.isNotEmpty ? orderNos : [orderNo]) {
+        cb.onPaymentSucceeded?.call(no);
+      }
+      cb.onNavigateHome();
+      return;
+    }
+
+    final message = errorMessage ?? paymentOutcomeMessage(l10n, outcome!);
+    await showCommonDialog(
+      context: context,
+      title: l10n.paymentNotCompletedTitle,
+      content: '$orderText\n$message',
+    );
+    cb.onReloadCart();
+    cb.onInvalidateCartCount();
+    cb.onNavigateToOrders();
   }
 
   // ── UI ──
-
-  Widget _payMethodIcon(String payType) {
-    if (payType == PaymentMethod.atm.value) {
-      return Text(
-        'ATM',
-        style: TextStyle(
-          color: AppColors.primary,
-          fontWeight: FontWeight.bold,
-          fontSize: 20,
-        ),
-      );
-    }
-    return const SizedBox.shrink();
-  }
 
   /// 付款明細行：icon + label + amount。
   Widget _paymentRow(HkIconName icon, String label, String amount) {
@@ -902,9 +691,10 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
                   ),
                   SizedBox(height: 22.h),
 
-                  // 付款方式卡片
-                  _buildPaymentMethodCard(),
-                  SizedBox(height: 16.h),
+                  if (_isZeroAmount(totalActual)) ...[
+                    _buildZeroAmountCard(),
+                    SizedBox(height: 16.h),
+                  ],
                 ],
               ],
             ),
@@ -984,10 +774,7 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
     );
   }
 
-  Widget _buildPaymentMethodCard() {
-    final zeroAmount = _isZeroAmount(
-      _previewData?['totalActualAmount']?.toString() ?? '',
-    );
+  Widget _buildZeroAmountCard() {
     return Container(
       padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
@@ -1002,159 +789,17 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              HkIcon(
-                HkIconName.payment,
-                size: 24.sp,
-                color: AppIconColors.strong,
-              ),
-              SizedBox(width: 6.w),
-              Text('付款方式', style: CartTypography.section),
-            ],
+          Icon(
+            AppIcons.checkCircleRounded,
+            size: 20.sp,
+            color: AppIconColors.active,
           ),
-          SizedBox(height: 12.h),
-          if (zeroAmount)
-            Row(
-              children: [
-                Icon(
-                  AppIcons.checkCircleRounded,
-                  size: 20.sp,
-                  color: AppIconColors.active,
-                ),
-                SizedBox(width: 8.w),
-                Expanded(
-                  child: Text(
-                    '折抵後無需付款，送出後系統會自動完成付款。',
-                    style: CartTypography.body,
-                  ),
-                ),
-              ],
-            )
-          else
-            // Block UI 對齊再次付款彈窗：label Expanded 而非固定寬，ATM 下方加虛擬帳號標語。
-            ..._payMethods.asMap().entries.expand((e) {
-              final idx = e.key;
-              final method = e.value;
-              final isSelected = idx == _payMethodIdx;
-              // 後端 §3.4.1 金額 gating：不符金額 → 灰化 + 禁點 + 顯示理由
-              final avail = _availabilityFor(method.payType);
-              final eligible = avail.eligible;
-              final isActiveSelection = isSelected && eligible;
-              final onSelect = eligible
-                  ? () {
-                      setState(() => _payMethodIdx = idx);
-                      widget.callbacks.onPayMethodChanged?.call(method.payType);
-                    }
-                  : null;
-              return [
-                Semantics(
-                  container: true,
-                  button: true,
-                  enabled: eligible,
-                  selected: isActiveSelection,
-                  inMutuallyExclusiveGroup: true,
-                  label: method.label,
-                  hint: eligible
-                      ? '點兩下選擇付款方式'
-                      : (_kIneligibleReasonLabel[avail.reason] ??
-                            '此付款方式不適用本訂單金額'),
-                  onTap: onSelect,
-                  child: ExcludeSemantics(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: onSelect,
-                      child: Opacity(
-                        opacity: eligible ? 1.0 : 0.45,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(
-                            minHeight: HkControl.minTap,
-                          ),
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 8.h),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 16.w,
-                                  height: 16.w,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: AppColors.bgCard,
-                                    border: Border.all(
-                                      color: AppColors.textEmphasis.withValues(
-                                        alpha: 0.2,
-                                      ),
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: AppColors.cardShadow,
-                                        blurRadius: 2,
-                                        offset: const Offset(0, 1),
-                                      ),
-                                    ],
-                                  ),
-                                  child: (isSelected && eligible)
-                                      ? Center(
-                                          child: Container(
-                                            width: 8.w,
-                                            height: 8.w,
-                                            decoration: const BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              color: AppColors.primary,
-                                            ),
-                                          ),
-                                        )
-                                      : null,
-                                ),
-                                SizedBox(width: 11.w),
-                                Expanded(
-                                  child: Text(
-                                    method.label,
-                                    maxLines: 1,
-                                    softWrap: false,
-                                    style: CartTypography.body.copyWith(
-                                      color: AppColors.textEmphasis,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                _payMethodIcon(method.payType),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                if (!eligible && avail.reason.isNotEmpty)
-                  Padding(
-                    padding: EdgeInsets.only(left: 24.w, bottom: 4.h),
-                    child: Text(
-                      _kIneligibleReasonLabel[avail.reason] ?? '此付款方式不適用本訂單金額',
-                      style: CartTypography.support.copyWith(
-                        color: AppColors.warningText,
-                      ),
-                    ),
-                  )
-                else if (method.payType == PaymentMethod.atm.value)
-                  Padding(
-                    padding: EdgeInsets.only(left: 24.w, bottom: 4.h),
-                    child: Text(
-                      '虛擬帳號只能用網路銀行跟ATM轉帳，不能臨櫃匯款',
-                      style: CartTypography.supportMuted,
-                    ),
-                  ),
-                if (idx < _payMethods.length - 1)
-                  Divider(
-                    height: 1,
-                    color: AppColors.textPrimary.withValues(alpha: 0.1),
-                  ),
-              ];
-            }),
+          SizedBox(width: 8.w),
+          Expanded(
+            child: Text('折抵後無需付款，送出後系統會自動完成付款。', style: CartTypography.body),
+          ),
         ],
       ),
     );
@@ -1327,24 +972,10 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
   }
 }
 
-// 付款方式不可用理由碼 → 通用文案（對齊後端 PaymentMethodIneligibleReason；§3.4.1）
-const Map<String, String> _kIneligibleReasonLabel = {
-  '2101': '金額未達此付款方式下限',
-  '2102': '金額超過此付款方式上限',
-};
-
 bool _isZeroAmount(String value) {
   final cleaned = value.replaceAll(RegExp(r'[^0-9.-]'), '');
   if (cleaned.isEmpty) return false;
   return (num.tryParse(cleaned) ?? -1) == 0;
-}
-
-bool _isPaidPaymentStatus(dynamic value) {
-  final status = value?.toString().trim().toUpperCase() ?? '';
-  return status == '1' ||
-      status == 'PAID' ||
-      status == 'SUCCESS' ||
-      status == '1102';
 }
 
 /// 開啟結帳付款底部彈窗。

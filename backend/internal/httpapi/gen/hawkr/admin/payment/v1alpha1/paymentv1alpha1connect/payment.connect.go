@@ -2,7 +2,7 @@
 //
 // Source: hawkr/admin/payment/v1alpha1/payment.proto
 
-// payment 模組給後台的 API（收款開通 ADR D28、D30）：收款帳戶的讀取、重新整理、重試建立，以及清理無法完成時的重試關閉與刪除對應。收款帳戶由 payment 模組擁有，擁有者現階段是店家
+// payment 模組給後台的 API（收款開通 ADR D28、D30）：收款帳戶的讀取、重新整理、重試建立，以及清理無法完成時的重試關閉與刪除對應；付款、轉帳與退款的查詢，以及 ANOMALY 的人工結案。收款帳戶由 payment 模組擁有，擁有者現階段是店家
 // （store_id）；賣家自己的收款帳戶讀取與開通 session 留在 SellerAppService（seller 確認店家擁有者之後呼叫 payment）。狀態與收件方式的列舉沿用
 // hawkr.payment.v1alpha1 的定義（賣家與後台看到同一組值）。
 package paymentv1alpha1connect
@@ -51,6 +51,18 @@ const (
 	// PaymentAdminServiceDeletePaymentAccountMappingProcedure is the fully-qualified name of the
 	// PaymentAdminService's DeletePaymentAccountMapping RPC.
 	PaymentAdminServiceDeletePaymentAccountMappingProcedure = "/hawkr.admin.payment.v1alpha1.PaymentAdminService/DeletePaymentAccountMapping"
+	// PaymentAdminServiceListPaymentsProcedure is the fully-qualified name of the PaymentAdminService's
+	// ListPayments RPC.
+	PaymentAdminServiceListPaymentsProcedure = "/hawkr.admin.payment.v1alpha1.PaymentAdminService/ListPayments"
+	// PaymentAdminServiceListPaymentTransfersProcedure is the fully-qualified name of the
+	// PaymentAdminService's ListPaymentTransfers RPC.
+	PaymentAdminServiceListPaymentTransfersProcedure = "/hawkr.admin.payment.v1alpha1.PaymentAdminService/ListPaymentTransfers"
+	// PaymentAdminServiceListPaymentRefundsProcedure is the fully-qualified name of the
+	// PaymentAdminService's ListPaymentRefunds RPC.
+	PaymentAdminServiceListPaymentRefundsProcedure = "/hawkr.admin.payment.v1alpha1.PaymentAdminService/ListPaymentRefunds"
+	// PaymentAdminServiceResolvePaymentAnomalyProcedure is the fully-qualified name of the
+	// PaymentAdminService's ResolvePaymentAnomaly RPC.
+	PaymentAdminServiceResolvePaymentAnomalyProcedure = "/hawkr.admin.payment.v1alpha1.PaymentAdminService/ResolvePaymentAnomaly"
 )
 
 // PaymentAdminServiceClient is a client for the hawkr.admin.payment.v1alpha1.PaymentAdminService
@@ -77,6 +89,15 @@ type PaymentAdminServiceClient interface {
 	// 不呼叫金流商；同一個交易寫一筆只增不改的紀錄（店家、金流商、外部帳戶 ID、操作的管理員與時間）並刪除帳戶列。帳戶不是終局的狀態回 failed_precondition，
 	// 店家沒有收款帳戶回 not_found。帳戶的 purge_replay_pending 為真（重送取回外部 ID 進行中）時回 failed_precondition。需要權限 payment.accounts.delete_mapping。
 	DeletePaymentAccountMapping(context.Context, *connect.Request[v1alpha1.DeletePaymentAccountMappingRequest]) (*connect.Response[v1alpha1.DeletePaymentAccountMappingResponse], error)
+	// ListPayments 列付款，建立時間新的在前（營運查詢；取代舊後台的付款交易列表）。篩選條件都可省略；page_token 只能用在同一組篩選。需要權限 payment.payments.list。
+	ListPayments(context.Context, *connect.Request[v1alpha1.ListPaymentsRequest]) (*connect.Response[v1alpha1.ListPaymentsResponse], error)
+	// ListPaymentTransfers 列付款轉給賣家的轉帳，建立時間新的在前（取代舊後台的撥款列表）。篩選條件都可省略；page_token 只能用在同一組篩選。需要權限 payment.transfers.list。
+	ListPaymentTransfers(context.Context, *connect.Request[v1alpha1.ListPaymentTransfersRequest]) (*connect.Response[v1alpha1.ListPaymentTransfersResponse], error)
+	// ListPaymentRefunds 列退款，建立時間新的在前，每筆附撤回列（人工結案撤回要用撤回列 ID）。篩選條件都可省略；page_token 只能用在同一組篩選。需要權限 payment.refunds.list。
+	ListPaymentRefunds(context.Context, *connect.Request[v1alpha1.ListPaymentRefundsRequest]) (*connect.Response[v1alpha1.ListPaymentRefundsResponse], error)
+	// ResolvePaymentAnomaly 是對 ANOMALY 的付款、轉帳、退款、撤回或補差額轉帳的人工結案：管理員核對金流商之後結案成成功（附金流商物件 ID 為證據）或失敗。
+	// 領域變更與一筆後台紀錄在同一個交易。物件不存在回 not_found；物件不在 ANOMALY 或證據不合回 failed_precondition 或 invalid_argument（依模組）。需要權限 payment.anomalies.resolve。
+	ResolvePaymentAnomaly(context.Context, *connect.Request[v1alpha1.ResolvePaymentAnomalyRequest]) (*connect.Response[v1alpha1.ResolvePaymentAnomalyResponse], error)
 }
 
 // NewPaymentAdminServiceClient constructs a client for the
@@ -122,6 +143,33 @@ func NewPaymentAdminServiceClient(httpClient connect.HTTPClient, baseURL string,
 			connect.WithSchema(paymentAdminServiceMethods.ByName("DeletePaymentAccountMapping")),
 			connect.WithClientOptions(opts...),
 		),
+		listPayments: connect.NewClient[v1alpha1.ListPaymentsRequest, v1alpha1.ListPaymentsResponse](
+			httpClient,
+			baseURL+PaymentAdminServiceListPaymentsProcedure,
+			connect.WithSchema(paymentAdminServiceMethods.ByName("ListPayments")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		listPaymentTransfers: connect.NewClient[v1alpha1.ListPaymentTransfersRequest, v1alpha1.ListPaymentTransfersResponse](
+			httpClient,
+			baseURL+PaymentAdminServiceListPaymentTransfersProcedure,
+			connect.WithSchema(paymentAdminServiceMethods.ByName("ListPaymentTransfers")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		listPaymentRefunds: connect.NewClient[v1alpha1.ListPaymentRefundsRequest, v1alpha1.ListPaymentRefundsResponse](
+			httpClient,
+			baseURL+PaymentAdminServiceListPaymentRefundsProcedure,
+			connect.WithSchema(paymentAdminServiceMethods.ByName("ListPaymentRefunds")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+			connect.WithClientOptions(opts...),
+		),
+		resolvePaymentAnomaly: connect.NewClient[v1alpha1.ResolvePaymentAnomalyRequest, v1alpha1.ResolvePaymentAnomalyResponse](
+			httpClient,
+			baseURL+PaymentAdminServiceResolvePaymentAnomalyProcedure,
+			connect.WithSchema(paymentAdminServiceMethods.ByName("ResolvePaymentAnomaly")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -132,6 +180,10 @@ type paymentAdminServiceClient struct {
 	retryPaymentAccountCreate   *connect.Client[v1alpha1.RetryPaymentAccountCreateRequest, v1alpha1.RetryPaymentAccountCreateResponse]
 	retryPaymentAccountPurge    *connect.Client[v1alpha1.RetryPaymentAccountPurgeRequest, v1alpha1.RetryPaymentAccountPurgeResponse]
 	deletePaymentAccountMapping *connect.Client[v1alpha1.DeletePaymentAccountMappingRequest, v1alpha1.DeletePaymentAccountMappingResponse]
+	listPayments                *connect.Client[v1alpha1.ListPaymentsRequest, v1alpha1.ListPaymentsResponse]
+	listPaymentTransfers        *connect.Client[v1alpha1.ListPaymentTransfersRequest, v1alpha1.ListPaymentTransfersResponse]
+	listPaymentRefunds          *connect.Client[v1alpha1.ListPaymentRefundsRequest, v1alpha1.ListPaymentRefundsResponse]
+	resolvePaymentAnomaly       *connect.Client[v1alpha1.ResolvePaymentAnomalyRequest, v1alpha1.ResolvePaymentAnomalyResponse]
 }
 
 // GetPaymentAccount calls hawkr.admin.payment.v1alpha1.PaymentAdminService.GetPaymentAccount.
@@ -163,6 +215,27 @@ func (c *paymentAdminServiceClient) DeletePaymentAccountMapping(ctx context.Cont
 	return c.deletePaymentAccountMapping.CallUnary(ctx, req)
 }
 
+// ListPayments calls hawkr.admin.payment.v1alpha1.PaymentAdminService.ListPayments.
+func (c *paymentAdminServiceClient) ListPayments(ctx context.Context, req *connect.Request[v1alpha1.ListPaymentsRequest]) (*connect.Response[v1alpha1.ListPaymentsResponse], error) {
+	return c.listPayments.CallUnary(ctx, req)
+}
+
+// ListPaymentTransfers calls hawkr.admin.payment.v1alpha1.PaymentAdminService.ListPaymentTransfers.
+func (c *paymentAdminServiceClient) ListPaymentTransfers(ctx context.Context, req *connect.Request[v1alpha1.ListPaymentTransfersRequest]) (*connect.Response[v1alpha1.ListPaymentTransfersResponse], error) {
+	return c.listPaymentTransfers.CallUnary(ctx, req)
+}
+
+// ListPaymentRefunds calls hawkr.admin.payment.v1alpha1.PaymentAdminService.ListPaymentRefunds.
+func (c *paymentAdminServiceClient) ListPaymentRefunds(ctx context.Context, req *connect.Request[v1alpha1.ListPaymentRefundsRequest]) (*connect.Response[v1alpha1.ListPaymentRefundsResponse], error) {
+	return c.listPaymentRefunds.CallUnary(ctx, req)
+}
+
+// ResolvePaymentAnomaly calls
+// hawkr.admin.payment.v1alpha1.PaymentAdminService.ResolvePaymentAnomaly.
+func (c *paymentAdminServiceClient) ResolvePaymentAnomaly(ctx context.Context, req *connect.Request[v1alpha1.ResolvePaymentAnomalyRequest]) (*connect.Response[v1alpha1.ResolvePaymentAnomalyResponse], error) {
+	return c.resolvePaymentAnomaly.CallUnary(ctx, req)
+}
+
 // PaymentAdminServiceHandler is an implementation of the
 // hawkr.admin.payment.v1alpha1.PaymentAdminService service.
 type PaymentAdminServiceHandler interface {
@@ -187,6 +260,15 @@ type PaymentAdminServiceHandler interface {
 	// 不呼叫金流商；同一個交易寫一筆只增不改的紀錄（店家、金流商、外部帳戶 ID、操作的管理員與時間）並刪除帳戶列。帳戶不是終局的狀態回 failed_precondition，
 	// 店家沒有收款帳戶回 not_found。帳戶的 purge_replay_pending 為真（重送取回外部 ID 進行中）時回 failed_precondition。需要權限 payment.accounts.delete_mapping。
 	DeletePaymentAccountMapping(context.Context, *connect.Request[v1alpha1.DeletePaymentAccountMappingRequest]) (*connect.Response[v1alpha1.DeletePaymentAccountMappingResponse], error)
+	// ListPayments 列付款，建立時間新的在前（營運查詢；取代舊後台的付款交易列表）。篩選條件都可省略；page_token 只能用在同一組篩選。需要權限 payment.payments.list。
+	ListPayments(context.Context, *connect.Request[v1alpha1.ListPaymentsRequest]) (*connect.Response[v1alpha1.ListPaymentsResponse], error)
+	// ListPaymentTransfers 列付款轉給賣家的轉帳，建立時間新的在前（取代舊後台的撥款列表）。篩選條件都可省略；page_token 只能用在同一組篩選。需要權限 payment.transfers.list。
+	ListPaymentTransfers(context.Context, *connect.Request[v1alpha1.ListPaymentTransfersRequest]) (*connect.Response[v1alpha1.ListPaymentTransfersResponse], error)
+	// ListPaymentRefunds 列退款，建立時間新的在前，每筆附撤回列（人工結案撤回要用撤回列 ID）。篩選條件都可省略；page_token 只能用在同一組篩選。需要權限 payment.refunds.list。
+	ListPaymentRefunds(context.Context, *connect.Request[v1alpha1.ListPaymentRefundsRequest]) (*connect.Response[v1alpha1.ListPaymentRefundsResponse], error)
+	// ResolvePaymentAnomaly 是對 ANOMALY 的付款、轉帳、退款、撤回或補差額轉帳的人工結案：管理員核對金流商之後結案成成功（附金流商物件 ID 為證據）或失敗。
+	// 領域變更與一筆後台紀錄在同一個交易。物件不存在回 not_found；物件不在 ANOMALY 或證據不合回 failed_precondition 或 invalid_argument（依模組）。需要權限 payment.anomalies.resolve。
+	ResolvePaymentAnomaly(context.Context, *connect.Request[v1alpha1.ResolvePaymentAnomalyRequest]) (*connect.Response[v1alpha1.ResolvePaymentAnomalyResponse], error)
 }
 
 // NewPaymentAdminServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -227,6 +309,33 @@ func NewPaymentAdminServiceHandler(svc PaymentAdminServiceHandler, opts ...conne
 		connect.WithSchema(paymentAdminServiceMethods.ByName("DeletePaymentAccountMapping")),
 		connect.WithHandlerOptions(opts...),
 	)
+	paymentAdminServiceListPaymentsHandler := connect.NewUnaryHandler(
+		PaymentAdminServiceListPaymentsProcedure,
+		svc.ListPayments,
+		connect.WithSchema(paymentAdminServiceMethods.ByName("ListPayments")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	paymentAdminServiceListPaymentTransfersHandler := connect.NewUnaryHandler(
+		PaymentAdminServiceListPaymentTransfersProcedure,
+		svc.ListPaymentTransfers,
+		connect.WithSchema(paymentAdminServiceMethods.ByName("ListPaymentTransfers")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	paymentAdminServiceListPaymentRefundsHandler := connect.NewUnaryHandler(
+		PaymentAdminServiceListPaymentRefundsProcedure,
+		svc.ListPaymentRefunds,
+		connect.WithSchema(paymentAdminServiceMethods.ByName("ListPaymentRefunds")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
+		connect.WithHandlerOptions(opts...),
+	)
+	paymentAdminServiceResolvePaymentAnomalyHandler := connect.NewUnaryHandler(
+		PaymentAdminServiceResolvePaymentAnomalyProcedure,
+		svc.ResolvePaymentAnomaly,
+		connect.WithSchema(paymentAdminServiceMethods.ByName("ResolvePaymentAnomaly")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/hawkr.admin.payment.v1alpha1.PaymentAdminService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case PaymentAdminServiceGetPaymentAccountProcedure:
@@ -239,6 +348,14 @@ func NewPaymentAdminServiceHandler(svc PaymentAdminServiceHandler, opts ...conne
 			paymentAdminServiceRetryPaymentAccountPurgeHandler.ServeHTTP(w, r)
 		case PaymentAdminServiceDeletePaymentAccountMappingProcedure:
 			paymentAdminServiceDeletePaymentAccountMappingHandler.ServeHTTP(w, r)
+		case PaymentAdminServiceListPaymentsProcedure:
+			paymentAdminServiceListPaymentsHandler.ServeHTTP(w, r)
+		case PaymentAdminServiceListPaymentTransfersProcedure:
+			paymentAdminServiceListPaymentTransfersHandler.ServeHTTP(w, r)
+		case PaymentAdminServiceListPaymentRefundsProcedure:
+			paymentAdminServiceListPaymentRefundsHandler.ServeHTTP(w, r)
+		case PaymentAdminServiceResolvePaymentAnomalyProcedure:
+			paymentAdminServiceResolvePaymentAnomalyHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -266,4 +383,20 @@ func (UnimplementedPaymentAdminServiceHandler) RetryPaymentAccountPurge(context.
 
 func (UnimplementedPaymentAdminServiceHandler) DeletePaymentAccountMapping(context.Context, *connect.Request[v1alpha1.DeletePaymentAccountMappingRequest]) (*connect.Response[v1alpha1.DeletePaymentAccountMappingResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.payment.v1alpha1.PaymentAdminService.DeletePaymentAccountMapping is not implemented"))
+}
+
+func (UnimplementedPaymentAdminServiceHandler) ListPayments(context.Context, *connect.Request[v1alpha1.ListPaymentsRequest]) (*connect.Response[v1alpha1.ListPaymentsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.payment.v1alpha1.PaymentAdminService.ListPayments is not implemented"))
+}
+
+func (UnimplementedPaymentAdminServiceHandler) ListPaymentTransfers(context.Context, *connect.Request[v1alpha1.ListPaymentTransfersRequest]) (*connect.Response[v1alpha1.ListPaymentTransfersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.payment.v1alpha1.PaymentAdminService.ListPaymentTransfers is not implemented"))
+}
+
+func (UnimplementedPaymentAdminServiceHandler) ListPaymentRefunds(context.Context, *connect.Request[v1alpha1.ListPaymentRefundsRequest]) (*connect.Response[v1alpha1.ListPaymentRefundsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.payment.v1alpha1.PaymentAdminService.ListPaymentRefunds is not implemented"))
+}
+
+func (UnimplementedPaymentAdminServiceHandler) ResolvePaymentAnomaly(context.Context, *connect.Request[v1alpha1.ResolvePaymentAnomalyRequest]) (*connect.Response[v1alpha1.ResolvePaymentAnomalyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.admin.payment.v1alpha1.PaymentAdminService.ResolvePaymentAnomaly is not implemented"))
 }

@@ -2,16 +2,257 @@
 // @generated from file hawkr/payment/v1alpha1/payment.proto (package hawkr.payment.v1alpha1, syntax proto3)
 /* eslint-disable */
 
-// payment 模組擁有的收款帳戶列舉：賣家端（hawkr.seller.v1alpha1）與後台（hawkr.admin.payment.v1alpha1）看到同一組值。
+// payment 模組的買家付款 API，以及模組擁有的列舉（收款帳戶、付款、轉帳、退款）：賣家端（hawkr.seller.v1alpha1）、買家與後台（hawkr.admin.payment.v1alpha1）看到同一組值。
+// 付款只對應一張訂單（order_no）：金額、店家與可付與否由訂單一方決定（payment 不收 client 傳來的金額）；web 以 Stripe Payment Element、App 以 PaymentSheet
+// 用 client_secret 完成付款（計畫 B2 D3、ADR D64），付款結果以 webhook 為準，client 以 GetPayment 重讀，不信任 client 回報的結果。
 
-import type { GenEnum, GenFile } from "@bufbuild/protobuf/codegenv2";
-import { enumDesc, fileDesc } from "@bufbuild/protobuf/codegenv2";
+import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import { file_google_api_field_behavior } from "../../../google/api/field_behavior_pb";
+import type { Timestamp } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file hawkr/payment/v1alpha1/payment.proto.
  */
 export const file_hawkr_payment_v1alpha1_payment: GenFile = /*@__PURE__*/
-  fileDesc("CiRoYXdrci9wYXltZW50L3YxYWxwaGExL3BheW1lbnQucHJvdG8SFmhhd2tyLnBheW1lbnQudjFhbHBoYTEqhAIKFFBheW1lbnRBY2NvdW50U3RhdHVzEiYKIlBBWU1FTlRfQUNDT1VOVF9TVEFUVVNfVU5TUEVDSUZJRUQQABImCiJQQVlNRU5UX0FDQ09VTlRfU1RBVFVTX05PVF9DUkVBVEVEEAESJwojUEFZTUVOVF9BQ0NPVU5UX1NUQVRVU19VTkRFUl9SRVZJRVcQAhIqCiZQQVlNRU5UX0FDQ09VTlRfU1RBVFVTX0FDVElPTl9SRVFVSVJFRBADEiIKHlBBWU1FTlRfQUNDT1VOVF9TVEFUVVNfRU5BQkxFRBAEEiMKH1BBWU1FTlRfQUNDT1VOVF9TVEFUVVNfRElTQUJMRUQQBSqJAQoVUmVxdWlyZW1lbnRDb2xsZWN0aW9uEiYKIlJFUVVJUkVNRU5UX0NPTExFQ1RJT05fVU5TUEVDSUZJRUQQABIjCh9SRVFVSVJFTUVOVF9DT0xMRUNUSU9OX1BST1ZJREVSEAESIwofUkVRVUlSRU1FTlRfQ09MTEVDVElPTl9QTEFURk9STRACKnsKGUVtYmVkZGVkT25ib2FyZGluZ1J1bnRpbWUSKwonRU1CRURERURfT05CT0FSRElOR19SVU5USU1FX1VOU1BFQ0lGSUVEEAASMQotRU1CRURERURfT05CT0FSRElOR19SVU5USU1FX1NUUklQRV9DT05ORUNUX0pTEAFiBnByb3RvMw");
+  fileDesc("CiRoYXdrci9wYXltZW50L3YxYWxwaGExL3BheW1lbnQucHJvdG8SFmhhd2tyLnBheW1lbnQudjFhbHBoYTEizwEKB1BheW1lbnQSEAoIb3JkZXJfbm8YASABKAkSNQoGc3RhdHVzGAIgASgOMiUuaGF3a3IucGF5bWVudC52MWFscGhhMS5QYXltZW50U3RhdHVzEg4KBmFtb3VudBgDIAEoAxItCglwYWlkX3RpbWUYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjwKB3Nlc3Npb24YBSABKAsyJi5oYXdrci5wYXltZW50LnYxYWxwaGExLlBheW1lbnRTZXNzaW9uQgPgQQMiXAoOUGF5bWVudFNlc3Npb24SPgoGc3RyaXBlGAEgASgLMiwuaGF3a3IucGF5bWVudC52MWFscGhhMS5TdHJpcGVQYXltZW50U2Vzc2lvbkgAQgoKCHByb3ZpZGVyIkYKFFN0cmlwZVBheW1lbnRTZXNzaW9uEhUKDWNsaWVudF9zZWNyZXQYASABKAkSFwoPcHVibGlzaGFibGVfa2V5GAIgASgJIi0KFENyZWF0ZVBheW1lbnRSZXF1ZXN0EhUKCG9yZGVyX25vGAEgASgJQgPgQQIiSQoVQ3JlYXRlUGF5bWVudFJlc3BvbnNlEjAKB3BheW1lbnQYASABKAsyHy5oYXdrci5wYXltZW50LnYxYWxwaGExLlBheW1lbnQiKgoRR2V0UGF5bWVudFJlcXVlc3QSFQoIb3JkZXJfbm8YASABKAlCA+BBAiJGChJHZXRQYXltZW50UmVzcG9uc2USMAoHcGF5bWVudBgBIAEoCzIfLmhhd2tyLnBheW1lbnQudjFhbHBoYTEuUGF5bWVudCqJAgoNUGF5bWVudFN0YXR1cxIeChpQQVlNRU5UX1NUQVRVU19VTlNQRUNJRklFRBAAEhsKF1BBWU1FTlRfU1RBVFVTX0NSRUFUSU5HEAESIwofUEFZTUVOVF9TVEFUVVNfQVdBSVRJTkdfUEFZTUVOVBACEh0KGVBBWU1FTlRfU1RBVFVTX1BST0NFU1NJTkcQAxIcChhQQVlNRU5UX1NUQVRVU19TVUNDRUVERUQQBBIbChdQQVlNRU5UX1NUQVRVU19DQU5DRUxFRBAFEiAKHFBBWU1FTlRfU1RBVFVTX0NSRUFURV9GQUlMRUQQBhIaChZQQVlNRU5UX1NUQVRVU19BTk9NQUxZEAcqhAIKFFBheW1lbnRBY2NvdW50U3RhdHVzEiYKIlBBWU1FTlRfQUNDT1VOVF9TVEFUVVNfVU5TUEVDSUZJRUQQABImCiJQQVlNRU5UX0FDQ09VTlRfU1RBVFVTX05PVF9DUkVBVEVEEAESJwojUEFZTUVOVF9BQ0NPVU5UX1NUQVRVU19VTkRFUl9SRVZJRVcQAhIqCiZQQVlNRU5UX0FDQ09VTlRfU1RBVFVTX0FDVElPTl9SRVFVSVJFRBADEiIKHlBBWU1FTlRfQUNDT1VOVF9TVEFUVVNfRU5BQkxFRBAEEiMKH1BBWU1FTlRfQUNDT1VOVF9TVEFUVVNfRElTQUJMRUQQBSqJAQoVUmVxdWlyZW1lbnRDb2xsZWN0aW9uEiYKIlJFUVVJUkVNRU5UX0NPTExFQ1RJT05fVU5TUEVDSUZJRUQQABIjCh9SRVFVSVJFTUVOVF9DT0xMRUNUSU9OX1BST1ZJREVSEAESIwofUkVRVUlSRU1FTlRfQ09MTEVDVElPTl9QTEFURk9STRACKnsKGUVtYmVkZGVkT25ib2FyZGluZ1J1bnRpbWUSKwonRU1CRURERURfT05CT0FSRElOR19SVU5USU1FX1VOU1BFQ0lGSUVEEAASMQotRU1CRURERURfT05CT0FSRElOR19SVU5USU1FX1NUUklQRV9DT05ORUNUX0pTEAEq7gEKE1BheW1lbnRSZWZ1bmRTdGF0dXMSJQohUEFZTUVOVF9SRUZVTkRfU1RBVFVTX1VOU1BFQ0lGSUVEEAASIQodUEFZTUVOVF9SRUZVTkRfU1RBVFVTX1BFTkRJTkcQARIjCh9QQVlNRU5UX1JFRlVORF9TVEFUVVNfUkVGVU5ESU5HEAISIwofUEFZTUVOVF9SRUZVTkRfU1RBVFVTX1NVQ0NFRURFRBADEiAKHFBBWU1FTlRfUkVGVU5EX1NUQVRVU19GQUlMRUQQBBIhCh1QQVlNRU5UX1JFRlVORF9TVEFUVVNfQU5PTUFMWRAFKtUBChVQYXltZW50VHJhbnNmZXJTdGF0dXMSJwojUEFZTUVOVF9UUkFOU0ZFUl9TVEFUVVNfVU5TUEVDSUZJRUQQABIjCh9QQVlNRU5UX1RSQU5TRkVSX1NUQVRVU19QRU5ESU5HEAESJQohUEFZTUVOVF9UUkFOU0ZFUl9TVEFUVVNfU1VDQ0VFREVEEAISIgoeUEFZTUVOVF9UUkFOU0ZFUl9TVEFUVVNfRkFJTEVEEAMSIwofUEFZTUVOVF9UUkFOU0ZFUl9TVEFUVVNfQU5PTUFMWRAEKp8CChVQYXltZW50UmV2ZXJzYWxTdGF0dXMSJwojUEFZTUVOVF9SRVZFUlNBTF9TVEFUVVNfVU5TUEVDSUZJRUQQABIgChxQQVlNRU5UX1JFVkVSU0FMX1NUQVRVU19OT05FEAESIwofUEFZTUVOVF9SRVZFUlNBTF9TVEFUVVNfV0FJVElORxACEiUKIVBBWU1FTlRfUkVWRVJTQUxfU1RBVFVTX1JFVkVSU0lORxADEiQKIFBBWU1FTlRfUkVWRVJTQUxfU1RBVFVTX1JFVkVSU0VEEAQSJAogUEFZTUVOVF9SRVZFUlNBTF9TVEFUVVNfUkVMRUFTRUQQBRIjCh9QQVlNRU5UX1JFVkVSU0FMX1NUQVRVU19BTk9NQUxZEAYqgQIKElBheW1lbnRUb3B1cFN0YXR1cxIkCiBQQVlNRU5UX1RPUFVQX1NUQVRVU19VTlNQRUNJRklFRBAAEh0KGVBBWU1FTlRfVE9QVVBfU1RBVFVTX05PTkUQARIgChxQQVlNRU5UX1RPUFVQX1NUQVRVU19XQUlUSU5HEAISIAocUEFZTUVOVF9UT1BVUF9TVEFUVVNfU0VORElORxADEh0KGVBBWU1FTlRfVE9QVVBfU1RBVFVTX0RPTkUQBBIhCh1QQVlNRU5UX1RPUFVQX1NUQVRVU19SRUxFQVNFRBAFEiAKHFBBWU1FTlRfVE9QVVBfU1RBVFVTX0FOT01BTFkQBirjAQoSUGF5bWVudEFub21hbHlLaW5kEiQKIFBBWU1FTlRfQU5PTUFMWV9LSU5EX1VOU1BFQ0lGSUVEEAASIAocUEFZTUVOVF9BTk9NQUxZX0tJTkRfUEFZTUVOVBABEiEKHVBBWU1FTlRfQU5PTUFMWV9LSU5EX1RSQU5TRkVSEAISHwobUEFZTUVOVF9BTk9NQUxZX0tJTkRfUkVGVU5EEAMSIQodUEFZTUVOVF9BTk9NQUxZX0tJTkRfUkVWRVJTQUwQBBIeChpQQVlNRU5UX0FOT01BTFlfS0lORF9UT1BVUBAFKosBChVQYXltZW50QW5vbWFseU91dGNvbWUSJwojUEFZTUVOVF9BTk9NQUxZX09VVENPTUVfVU5TUEVDSUZJRUQQABIlCiFQQVlNRU5UX0FOT01BTFlfT1VUQ09NRV9TVUNDRUVERUQQARIiCh5QQVlNRU5UX0FOT01BTFlfT1VUQ09NRV9GQUlMRUQQAjLwAQoRUGF5bWVudEFwcFNlcnZpY2UScQoNQ3JlYXRlUGF5bWVudBIsLmhhd2tyLnBheW1lbnQudjFhbHBoYTEuQ3JlYXRlUGF5bWVudFJlcXVlc3QaLS5oYXdrci5wYXltZW50LnYxYWxwaGExLkNyZWF0ZVBheW1lbnRSZXNwb25zZSIDkAICEmgKCkdldFBheW1lbnQSKS5oYXdrci5wYXltZW50LnYxYWxwaGExLkdldFBheW1lbnRSZXF1ZXN0GiouaGF3a3IucGF5bWVudC52MWFscGhhMS5HZXRQYXltZW50UmVzcG9uc2UiA5ACAmIGcHJvdG8z", [file_google_api_field_behavior, file_google_protobuf_timestamp]);
+
+/**
+ * Payment 是買家對一張訂單的付款。
+ *
+ * @generated from message hawkr.payment.v1alpha1.Payment
+ */
+export type Payment = Message<"hawkr.payment.v1alpha1.Payment"> & {
+  /**
+   * @generated from field: string order_no = 1;
+   */
+  orderNo: string;
+
+  /**
+   * @generated from field: hawkr.payment.v1alpha1.PaymentStatus status = 2;
+   */
+  status: PaymentStatus;
+
+  /**
+   * 付款金額（訂單的整數金額，不帶幣別）。
+   *
+   * @generated from field: int64 amount = 3;
+   */
+  amount: bigint;
+
+  /**
+   * 入帳時間；沒有入帳時不設。
+   *
+   * @generated from field: google.protobuf.Timestamp paid_time = 4;
+   */
+  paidTime?: Timestamp | undefined;
+
+  /**
+   * 完成付款所需的初始化資料；只有狀態 AWAITING_PAYMENT 且金流商還在等待付款時才有。
+   *
+   * @generated from field: hawkr.payment.v1alpha1.PaymentSession session = 5;
+   */
+  session?: PaymentSession | undefined;
+};
+
+/**
+ * Describes the message hawkr.payment.v1alpha1.Payment.
+ * Use `create(PaymentSchema)` to create a new message.
+ */
+export const PaymentSchema: GenMessage<Payment> = /*@__PURE__*/
+  messageDesc(file_hawkr_payment_v1alpha1_payment, 0);
+
+/**
+ * PaymentSession 是完成付款的初始化資料，依金流商分支。
+ *
+ * @generated from message hawkr.payment.v1alpha1.PaymentSession
+ */
+export type PaymentSession = Message<"hawkr.payment.v1alpha1.PaymentSession"> & {
+  /**
+   * @generated from oneof hawkr.payment.v1alpha1.PaymentSession.provider
+   */
+  provider: {
+    /**
+     * @generated from field: hawkr.payment.v1alpha1.StripePaymentSession stripe = 1;
+     */
+    value: StripePaymentSession;
+    case: "stripe";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message hawkr.payment.v1alpha1.PaymentSession.
+ * Use `create(PaymentSessionSchema)` to create a new message.
+ */
+export const PaymentSessionSchema: GenMessage<PaymentSession> = /*@__PURE__*/
+  messageDesc(file_hawkr_payment_v1alpha1_payment, 1);
+
+/**
+ * StripePaymentSession 是 Stripe Payment Element（web）與 PaymentSheet（App）的初始化資料。
+ *
+ * @generated from message hawkr.payment.v1alpha1.StripePaymentSession
+ */
+export type StripePaymentSession = Message<"hawkr.payment.v1alpha1.StripePaymentSession"> & {
+  /**
+   * PaymentIntent 的 client secret；只給這個買家的 client，不記錄、不快取。
+   *
+   * @generated from field: string client_secret = 1;
+   */
+  clientSecret: string;
+
+  /**
+   * 初始化 Stripe.js 與 PaymentSheet 用的公開金鑰（不是 secret）。
+   *
+   * @generated from field: string publishable_key = 2;
+   */
+  publishableKey: string;
+};
+
+/**
+ * Describes the message hawkr.payment.v1alpha1.StripePaymentSession.
+ * Use `create(StripePaymentSessionSchema)` to create a new message.
+ */
+export const StripePaymentSessionSchema: GenMessage<StripePaymentSession> = /*@__PURE__*/
+  messageDesc(file_hawkr_payment_v1alpha1_payment, 2);
+
+/**
+ * @generated from message hawkr.payment.v1alpha1.CreatePaymentRequest
+ */
+export type CreatePaymentRequest = Message<"hawkr.payment.v1alpha1.CreatePaymentRequest"> & {
+  /**
+   * 要付款的訂單編號。
+   *
+   * @generated from field: string order_no = 1;
+   */
+  orderNo: string;
+};
+
+/**
+ * Describes the message hawkr.payment.v1alpha1.CreatePaymentRequest.
+ * Use `create(CreatePaymentRequestSchema)` to create a new message.
+ */
+export const CreatePaymentRequestSchema: GenMessage<CreatePaymentRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_payment_v1alpha1_payment, 3);
+
+/**
+ * @generated from message hawkr.payment.v1alpha1.CreatePaymentResponse
+ */
+export type CreatePaymentResponse = Message<"hawkr.payment.v1alpha1.CreatePaymentResponse"> & {
+  /**
+   * @generated from field: hawkr.payment.v1alpha1.Payment payment = 1;
+   */
+  payment?: Payment | undefined;
+};
+
+/**
+ * Describes the message hawkr.payment.v1alpha1.CreatePaymentResponse.
+ * Use `create(CreatePaymentResponseSchema)` to create a new message.
+ */
+export const CreatePaymentResponseSchema: GenMessage<CreatePaymentResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_payment_v1alpha1_payment, 4);
+
+/**
+ * @generated from message hawkr.payment.v1alpha1.GetPaymentRequest
+ */
+export type GetPaymentRequest = Message<"hawkr.payment.v1alpha1.GetPaymentRequest"> & {
+  /**
+   * @generated from field: string order_no = 1;
+   */
+  orderNo: string;
+};
+
+/**
+ * Describes the message hawkr.payment.v1alpha1.GetPaymentRequest.
+ * Use `create(GetPaymentRequestSchema)` to create a new message.
+ */
+export const GetPaymentRequestSchema: GenMessage<GetPaymentRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_payment_v1alpha1_payment, 5);
+
+/**
+ * @generated from message hawkr.payment.v1alpha1.GetPaymentResponse
+ */
+export type GetPaymentResponse = Message<"hawkr.payment.v1alpha1.GetPaymentResponse"> & {
+  /**
+   * @generated from field: hawkr.payment.v1alpha1.Payment payment = 1;
+   */
+  payment?: Payment | undefined;
+};
+
+/**
+ * Describes the message hawkr.payment.v1alpha1.GetPaymentResponse.
+ * Use `create(GetPaymentResponseSchema)` to create a new message.
+ */
+export const GetPaymentResponseSchema: GenMessage<GetPaymentResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_payment_v1alpha1_payment, 6);
+
+/**
+ * PaymentStatus 是付款的狀態，只由金流商回報的 PaymentIntent 狀態推導。
+ *
+ * @generated from enum hawkr.payment.v1alpha1.PaymentStatus
+ */
+export enum PaymentStatus {
+  /**
+   * @generated from enum value: PAYMENT_STATUS_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * 付款已記錄，金流商那邊的付款物件還沒確認建立（含呼叫過、結果不明）；背景補做，client 稍後重讀。
+   *
+   * @generated from enum value: PAYMENT_STATUS_CREATING = 1;
+   */
+  CREATING = 1,
+
+  /**
+   * 已建立，等買家付款（含需要 3DS 的額外驗證）。
+   *
+   * @generated from enum value: PAYMENT_STATUS_AWAITING_PAYMENT = 2;
+   */
+  AWAITING_PAYMENT = 2,
+
+  /**
+   * 買家已送出付款，金流商處理中。
+   *
+   * @generated from enum value: PAYMENT_STATUS_PROCESSING = 3;
+   */
+  PROCESSING = 3,
+
+  /**
+   * 已入帳（終局）。
+   *
+   * @generated from enum value: PAYMENT_STATUS_SUCCEEDED = 4;
+   */
+  SUCCEEDED = 4,
+
+  /**
+   * 已取消（之後的入帳仍勝出）；訂單仍可付時 CreatePayment 會換新的嘗試。
+   *
+   * @generated from enum value: PAYMENT_STATUS_CANCELED = 5;
+   */
+  CANCELED = 5,
+
+  /**
+   * 建立被金流商永久拒絕，或查回證明金流商沒有這筆。
+   *
+   * @generated from enum value: PAYMENT_STATUS_CREATE_FAILED = 6;
+   */
+  CREATE_FAILED = 6,
+
+  /**
+   * 建立的結果與金流商對不起來：待營運人工處理，買家不能重試。
+   *
+   * @generated from enum value: PAYMENT_STATUS_ANOMALY = 7;
+   */
+  ANOMALY = 7,
+}
+
+/**
+ * Describes the enum hawkr.payment.v1alpha1.PaymentStatus.
+ */
+export const PaymentStatusSchema: GenEnum<PaymentStatus> = /*@__PURE__*/
+  enumDesc(file_hawkr_payment_v1alpha1_payment, 0);
 
 /**
  * PaymentAccountStatus 是收款帳戶的中立狀態，由金流商的轉帳能力推導（不是金流商自己的狀態名）。
@@ -64,7 +305,7 @@ export enum PaymentAccountStatus {
  * Describes the enum hawkr.payment.v1alpha1.PaymentAccountStatus.
  */
 export const PaymentAccountStatusSchema: GenEnum<PaymentAccountStatus> = /*@__PURE__*/
-  enumDesc(file_hawkr_payment_v1alpha1_payment, 0);
+  enumDesc(file_hawkr_payment_v1alpha1_payment, 1);
 
 /**
  * RequirementCollection 是誰向賣家收身分與銀行資料。
@@ -96,7 +337,7 @@ export enum RequirementCollection {
  * Describes the enum hawkr.payment.v1alpha1.RequirementCollection.
  */
 export const RequirementCollectionSchema: GenEnum<RequirementCollection> = /*@__PURE__*/
-  enumDesc(file_hawkr_payment_v1alpha1_payment, 1);
+  enumDesc(file_hawkr_payment_v1alpha1_payment, 2);
 
 /**
  * EmbeddedOnboardingRuntime 是呼叫端能承載的內嵌開通執行環境。
@@ -121,5 +362,342 @@ export enum EmbeddedOnboardingRuntime {
  * Describes the enum hawkr.payment.v1alpha1.EmbeddedOnboardingRuntime.
  */
 export const EmbeddedOnboardingRuntimeSchema: GenEnum<EmbeddedOnboardingRuntime> = /*@__PURE__*/
-  enumDesc(file_hawkr_payment_v1alpha1_payment, 2);
+  enumDesc(file_hawkr_payment_v1alpha1_payment, 3);
+
+/**
+ * PaymentRefundStatus 是退款的狀態（只給後台）。
+ *
+ * @generated from enum hawkr.payment.v1alpha1.PaymentRefundStatus
+ */
+export enum PaymentRefundStatus {
+  /**
+   * @generated from enum value: PAYMENT_REFUND_STATUS_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * 已記錄，還沒呼叫金流商。
+   *
+   * @generated from enum value: PAYMENT_REFUND_STATUS_PENDING = 1;
+   */
+  PENDING = 1,
+
+  /**
+   * 已呼叫金流商，等結果。
+   *
+   * @generated from enum value: PAYMENT_REFUND_STATUS_REFUNDING = 2;
+   */
+  REFUNDING = 2,
+
+  /**
+   * 退款成功。
+   *
+   * @generated from enum value: PAYMENT_REFUND_STATUS_SUCCEEDED = 3;
+   */
+  SUCCEEDED = 3,
+
+  /**
+   * 退款失敗，不佔累計額度。
+   *
+   * @generated from enum value: PAYMENT_REFUND_STATUS_FAILED = 4;
+   */
+  FAILED = 4,
+
+  /**
+   * 與金流商對不起來：仍佔額度，待營運人工結案。
+   *
+   * @generated from enum value: PAYMENT_REFUND_STATUS_ANOMALY = 5;
+   */
+  ANOMALY = 5,
+}
+
+/**
+ * Describes the enum hawkr.payment.v1alpha1.PaymentRefundStatus.
+ */
+export const PaymentRefundStatusSchema: GenEnum<PaymentRefundStatus> = /*@__PURE__*/
+  enumDesc(file_hawkr_payment_v1alpha1_payment, 4);
+
+/**
+ * PaymentTransferStatus 是付款轉給賣家的轉帳的狀態（只給後台）。
+ *
+ * @generated from enum hawkr.payment.v1alpha1.PaymentTransferStatus
+ */
+export enum PaymentTransferStatus {
+  /**
+   * @generated from enum value: PAYMENT_TRANSFER_STATUS_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * 已記錄，等送出或等結果。
+   *
+   * @generated from enum value: PAYMENT_TRANSFER_STATUS_PENDING = 1;
+   */
+  PENDING = 1,
+
+  /**
+   * 轉帳成功。
+   *
+   * @generated from enum value: PAYMENT_TRANSFER_STATUS_SUCCEEDED = 2;
+   */
+  SUCCEEDED = 2,
+
+  /**
+   * 轉帳失敗（終局）。
+   *
+   * @generated from enum value: PAYMENT_TRANSFER_STATUS_FAILED = 3;
+   */
+  FAILED = 3,
+
+  /**
+   * 與金流商對不起來：佔住這筆付款的轉帳，待營運人工結案。
+   *
+   * @generated from enum value: PAYMENT_TRANSFER_STATUS_ANOMALY = 4;
+   */
+  ANOMALY = 4,
+}
+
+/**
+ * Describes the enum hawkr.payment.v1alpha1.PaymentTransferStatus.
+ */
+export const PaymentTransferStatusSchema: GenEnum<PaymentTransferStatus> = /*@__PURE__*/
+  enumDesc(file_hawkr_payment_v1alpha1_payment, 5);
+
+/**
+ * PaymentReversalStatus 是退款向賣家收回款項（撤回轉帳）的狀態，與退款狀態並行（只給後台）。
+ *
+ * @generated from enum hawkr.payment.v1alpha1.PaymentReversalStatus
+ */
+export enum PaymentReversalStatus {
+  /**
+   * @generated from enum value: PAYMENT_REVERSAL_STATUS_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * 沒有要向賣家收回的款項。
+   *
+   * @generated from enum value: PAYMENT_REVERSAL_STATUS_NONE = 1;
+   */
+  NONE = 1,
+
+  /**
+   * 等退款被金流商接受之後才開始收回。
+   *
+   * @generated from enum value: PAYMENT_REVERSAL_STATUS_WAITING = 2;
+   */
+  WAITING = 2,
+
+  /**
+   * 收回進行中。
+   *
+   * @generated from enum value: PAYMENT_REVERSAL_STATUS_REVERSING = 3;
+   */
+  REVERSING = 3,
+
+  /**
+   * 已向賣家收回。
+   *
+   * @generated from enum value: PAYMENT_REVERSAL_STATUS_REVERSED = 4;
+   */
+  REVERSED = 4,
+
+  /**
+   * 不再收回（退款失敗或轉帳沒有可收回的額度）。
+   *
+   * @generated from enum value: PAYMENT_REVERSAL_STATUS_RELEASED = 5;
+   */
+  RELEASED = 5,
+
+  /**
+   * 與金流商對不起來：待營運人工結案。
+   *
+   * @generated from enum value: PAYMENT_REVERSAL_STATUS_ANOMALY = 6;
+   */
+  ANOMALY = 6,
+}
+
+/**
+ * Describes the enum hawkr.payment.v1alpha1.PaymentReversalStatus.
+ */
+export const PaymentReversalStatusSchema: GenEnum<PaymentReversalStatus> = /*@__PURE__*/
+  enumDesc(file_hawkr_payment_v1alpha1_payment, 6);
+
+/**
+ * PaymentTopupStatus 是已從轉帳金額扣掉的退款之後失敗，補差額轉帳給賣家的狀態（只給後台）。
+ *
+ * @generated from enum hawkr.payment.v1alpha1.PaymentTopupStatus
+ */
+export enum PaymentTopupStatus {
+  /**
+   * @generated from enum value: PAYMENT_TOPUP_STATUS_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * 沒有要補的差額。
+   *
+   * @generated from enum value: PAYMENT_TOPUP_STATUS_NONE = 1;
+   */
+  NONE = 1,
+
+  /**
+   * 等補差額轉帳。
+   *
+   * @generated from enum value: PAYMENT_TOPUP_STATUS_WAITING = 2;
+   */
+  WAITING = 2,
+
+  /**
+   * 補差額轉帳送出中。
+   *
+   * @generated from enum value: PAYMENT_TOPUP_STATUS_SENDING = 3;
+   */
+  SENDING = 3,
+
+  /**
+   * 已補給賣家。
+   *
+   * @generated from enum value: PAYMENT_TOPUP_STATUS_DONE = 4;
+   */
+  DONE = 4,
+
+  /**
+   * 不再補（差額已無需補）。
+   *
+   * @generated from enum value: PAYMENT_TOPUP_STATUS_RELEASED = 5;
+   */
+  RELEASED = 5,
+
+  /**
+   * 與金流商對不起來：待營運人工結案。
+   *
+   * @generated from enum value: PAYMENT_TOPUP_STATUS_ANOMALY = 6;
+   */
+  ANOMALY = 6,
+}
+
+/**
+ * Describes the enum hawkr.payment.v1alpha1.PaymentTopupStatus.
+ */
+export const PaymentTopupStatusSchema: GenEnum<PaymentTopupStatus> = /*@__PURE__*/
+  enumDesc(file_hawkr_payment_v1alpha1_payment, 7);
+
+/**
+ * PaymentAnomalyKind 是進入 ANOMALY 的物件種類（只給後台）。
+ *
+ * @generated from enum hawkr.payment.v1alpha1.PaymentAnomalyKind
+ */
+export enum PaymentAnomalyKind {
+  /**
+   * @generated from enum value: PAYMENT_ANOMALY_KIND_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * 付款：建立結果與金流商對不起來。
+   *
+   * @generated from enum value: PAYMENT_ANOMALY_KIND_PAYMENT = 1;
+   */
+  PAYMENT = 1,
+
+  /**
+   * 轉帳。
+   *
+   * @generated from enum value: PAYMENT_ANOMALY_KIND_TRANSFER = 2;
+   */
+  TRANSFER = 2,
+
+  /**
+   * 退款。
+   *
+   * @generated from enum value: PAYMENT_ANOMALY_KIND_REFUND = 3;
+   */
+  REFUND = 3,
+
+  /**
+   * 退款的收回（撤回轉帳）：id 是撤回列 ID。
+   *
+   * @generated from enum value: PAYMENT_ANOMALY_KIND_REVERSAL = 4;
+   */
+  REVERSAL = 4,
+
+  /**
+   * 退款的補差額轉帳：id 是退款 ID。
+   *
+   * @generated from enum value: PAYMENT_ANOMALY_KIND_TOPUP = 5;
+   */
+  TOPUP = 5,
+}
+
+/**
+ * Describes the enum hawkr.payment.v1alpha1.PaymentAnomalyKind.
+ */
+export const PaymentAnomalyKindSchema: GenEnum<PaymentAnomalyKind> = /*@__PURE__*/
+  enumDesc(file_hawkr_payment_v1alpha1_payment, 8);
+
+/**
+ * PaymentAnomalyOutcome 是人工結案的結果（只給後台）。
+ *
+ * @generated from enum hawkr.payment.v1alpha1.PaymentAnomalyOutcome
+ */
+export enum PaymentAnomalyOutcome {
+  /**
+   * @generated from enum value: PAYMENT_ANOMALY_OUTCOME_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * 核對金流商之後確認它確實執行了（要附金流商物件 ID 為證據）。
+   *
+   * @generated from enum value: PAYMENT_ANOMALY_OUTCOME_SUCCEEDED = 1;
+   */
+  SUCCEEDED = 1,
+
+  /**
+   * 核對金流商之後確認它沒有執行。
+   *
+   * @generated from enum value: PAYMENT_ANOMALY_OUTCOME_FAILED = 2;
+   */
+  FAILED = 2,
+}
+
+/**
+ * Describes the enum hawkr.payment.v1alpha1.PaymentAnomalyOutcome.
+ */
+export const PaymentAnomalyOutcomeSchema: GenEnum<PaymentAnomalyOutcome> = /*@__PURE__*/
+  enumDesc(file_hawkr_payment_v1alpha1_payment, 9);
+
+/**
+ * PaymentAppService 只有登入的顧客帳號（買家）能呼叫；只讀寫呼叫者自己的付款（他人的訂單回 not_found）。
+ *
+ * @generated from service hawkr.payment.v1alpha1.PaymentAppService
+ */
+export const PaymentAppService: GenService<{
+  /**
+   * CreatePayment 對買家自己的一張待付款訂單建立付款（冪等：同一張訂單只有一筆付款、同時只有一個有效的 PaymentIntent，重複呼叫回目前的付款）。
+   * 訂單不是呼叫者的回 not_found；訂單不可付（已取消、已付款以外的狀態）、零元訂單、金額或店家與既有付款不同回 failed_precondition；沒有設定付款 provider 回 failed_precondition。
+   * provider 暫時失敗或逾時時回狀態 CREATING 的付款（沒有 session），背景補做之後以 GetPayment 重讀；provider 永久拒絕時回狀態 CREATE_FAILED（不是錯誤），訂單仍可付時再呼叫一次會換新的嘗試。
+   * 狀態 AWAITING_PAYMENT 時帶 session。
+   *
+   * @generated from rpc hawkr.payment.v1alpha1.PaymentAppService.CreatePayment
+   */
+  createPayment: {
+    methodKind: "unary";
+    input: typeof CreatePaymentRequestSchema;
+    output: typeof CreatePaymentResponseSchema;
+  },
+  /**
+   * GetPayment 讀買家自己的付款（沒有付款或不是呼叫者的回 not_found）。狀態 AWAITING_PAYMENT 時帶 session（client secret 是每次向 provider 讀的，不存）；
+   * provider 那邊已往前（買家剛付款）時不帶 session、狀態仍是 AWAITING_PAYMENT，背景同步後再讀會是 PROCESSING 或 SUCCEEDED。回應含 client secret，一律 POST，不可被快取。
+   *
+   * @generated from rpc hawkr.payment.v1alpha1.PaymentAppService.GetPayment
+   */
+  getPayment: {
+    methodKind: "unary";
+    input: typeof GetPaymentRequestSchema;
+    output: typeof GetPaymentResponseSchema;
+  },
+}> = /*@__PURE__*/
+  serviceDesc(file_hawkr_payment_v1alpha1_payment, 0);
 

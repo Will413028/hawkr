@@ -78,6 +78,20 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.ModerationReportTargetKind(goldenEnum(c.Value, "REPORT_TARGET_KIND_"))
 	case "payment.PaymentAccountStatus":
 		return t.PaymentPaymentAccountStatus(goldenEnum(c.Value, "PAYMENT_ACCOUNT_STATUS_"))
+	case "payment.PaymentAnomalyKind":
+		return t.PaymentPaymentAnomalyKind(goldenEnum(c.Value, "PAYMENT_ANOMALY_KIND_"))
+	case "payment.PaymentAnomalyOutcome":
+		return t.PaymentPaymentAnomalyOutcome(goldenEnum(c.Value, "PAYMENT_ANOMALY_OUTCOME_"))
+	case "payment.PaymentRefundStatus":
+		return t.PaymentPaymentRefundStatus(goldenEnum(c.Value, "PAYMENT_REFUND_STATUS_"))
+	case "payment.PaymentReversalStatus":
+		return t.PaymentPaymentReversalStatus(goldenEnum(c.Value, "PAYMENT_REVERSAL_STATUS_"))
+	case "payment.PaymentStatus":
+		return t.PaymentPaymentStatus(goldenEnum(c.Value, "PAYMENT_STATUS_"))
+	case "payment.PaymentTopupStatus":
+		return t.PaymentPaymentTopupStatus(goldenEnum(c.Value, "PAYMENT_TOPUP_STATUS_"))
+	case "payment.PaymentTransferStatus":
+		return t.PaymentPaymentTransferStatus(goldenEnum(c.Value, "PAYMENT_TRANSFER_STATUS_"))
 	case "payment.RequirementCollection":
 		return t.PaymentRequirementCollection(goldenEnum(c.Value, "REQUIREMENT_COLLECTION_"))
 	case "procurement.RejectionReason":

@@ -15,9 +15,6 @@
  *   GA4 (@next/third-parties)        googletagmanager.com, *.google-analytics.com
  *   Google Sign-In (GSI, vendor      accounts.google.com, gstatic.com,
  *   portal step-up)                  apis.google.com, *.googleapis.com
- *   Google Pay                       pay.google.com
- *   Apple Pay                        applepay.cdn-apple.com,
- *                                    smp-paymentservices.apple.com
  *   Stripe Connect embedded          connect-js.stripe.com, js.stripe.com
  *   components (script-src,          (script-src, frame-src). The same page lists
  *   frame-src)                       img-src https://*.stripe.com (covered by
@@ -25,6 +22,8 @@
  *                                    empty style element (covered by 'unsafe-inline');
  *                                    it lists no connect-src host.
  *                                    https://docs.stripe.com/connect/get-started-connect-embedded-components
+ *   Stripe Payment Element           js.stripe.com (script-src, frame-src), api.stripe.com
+ *   (checkout payment step)          (connect-src), hooks.stripe.com (frame-src, 3DS)
  *   Backend gateway (Connect, incl.   API base env (https)
  *   the chat server stream)
  *   Media (image-gateway)            NEXT_PUBLIC_MEDIA_BASE_URL
@@ -104,15 +103,9 @@ function sources(...parts: ReadonlyArray<string | readonly string[]>): string {
  * 少了 media origin，enforce 之下該 fetch 被擋，使用者看到的是「無法下載既有圖片」
  * 而非 CSP 錯誤。env 沒設的來源不會出現在清單裡。
  *
- * google.com（裸域）：Google Pay JS 的 PaymentsClient 會直連 https://google.com/pay，
- * 只列 www/pay 子域擋不住。
- * smp-paymentservices.apple.com：Apple Pay JS SDK 的 applePayCapabilities 會打
- * /paymentservices/v3/checkStatus/merchant/*；少了它 enforce 會擋掉這支能力偵測，
- * 結帳頁的 Apple Pay 判定靜默失真。
  * stats.g.doubleclick.net：GA4 的 Google Signals cookie 同步；只列這一個精確 host，
  * 不放行整個 *.doubleclick.net。
- * applepay.cdn-apple.com（frame-src）：Apple Pay JS SDK 第三方瀏覽器掃碼流程用它渲染
- * 付款 sheet 的 iframe；少了它 enforce 下該 iframe 被擋成空白。
+ * Stripe Payment Element（付款步驟）：wallet（Apple Pay、Google Pay）在 Stripe 自己的 iframe 內執行，頁面不需要它們的來源。
  */
 export function buildContentSecurityPolicy(
 	input: ContentSecurityPolicyInput,
@@ -125,19 +118,19 @@ export function buildContentSecurityPolicy(
 		"form-action 'self' https:",
 		sources(
 			"script-src 'self' 'unsafe-inline' 'report-sample'",
-			"https://www.googletagmanager.com https://www.gstatic.com https://www.google.com https://apis.google.com https://accounts.google.com https://pay.google.com https://applepay.cdn-apple.com https://connect-js.stripe.com https://js.stripe.com",
+			"https://www.googletagmanager.com https://www.gstatic.com https://www.google.com https://apis.google.com https://accounts.google.com https://connect-js.stripe.com https://js.stripe.com",
 		),
 		"style-src 'self' 'unsafe-inline' https://accounts.google.com",
 		"style-src-elem 'self' 'unsafe-inline' https://accounts.google.com",
 		"img-src 'self' data: blob: https:",
-		"font-src 'self' data: https://applepay.cdn-apple.com",
+		"font-src 'self' data:",
 		sources(
 			"connect-src 'self'",
 			input.appConnectOrigins,
 			input.uploadOrigins,
-			"https://www.googletagmanager.com https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://stats.g.doubleclick.net https://*.googleapis.com https://google.com https://www.google.com https://*.gstatic.com https://accounts.google.com https://pay.google.com https://smp-paymentservices.apple.com",
+			"https://www.googletagmanager.com https://*.google-analytics.com https://analytics.google.com https://*.analytics.google.com https://stats.g.doubleclick.net https://*.googleapis.com https://www.google.com https://*.gstatic.com https://accounts.google.com https://api.stripe.com",
 		),
-		"frame-src 'self' https://accounts.google.com https://apis.google.com https://pay.google.com https://applepay.cdn-apple.com https://connect-js.stripe.com https://js.stripe.com",
+		"frame-src 'self' https://accounts.google.com https://apis.google.com https://connect-js.stripe.com https://js.stripe.com https://hooks.stripe.com",
 		"worker-src 'self' blob:",
 		"manifest-src 'self'",
 		// Collects violations at app/api/csp-report/route.ts → Sentry.

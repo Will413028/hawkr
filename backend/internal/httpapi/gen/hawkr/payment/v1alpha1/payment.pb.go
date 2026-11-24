@@ -4,13 +4,17 @@
 // 	protoc        (unknown)
 // source: hawkr/payment/v1alpha1/payment.proto
 
-// payment 模組擁有的收款帳戶列舉：賣家端（hawkr.seller.v1alpha1）與後台（hawkr.admin.payment.v1alpha1）看到同一組值。
+// payment 模組的買家付款 API，以及模組擁有的列舉（收款帳戶、付款、轉帳、退款）：賣家端（hawkr.seller.v1alpha1）、買家與後台（hawkr.admin.payment.v1alpha1）看到同一組值。
+// 付款只對應一張訂單（order_no）：金額、店家與可付與否由訂單一方決定（payment 不收 client 傳來的金額）；web 以 Stripe Payment Element、App 以 PaymentSheet
+// 用 client_secret 完成付款（計畫 B2 D3、ADR D64），付款結果以 webhook 為準，client 以 GetPayment 重讀，不信任 client 回報的結果。
 
 package paymentv1alpha1
 
 import (
+	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -22,6 +26,78 @@ const (
 	// Verify that runtime/protoimpl is sufficiently up-to-date.
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
+
+// PaymentStatus 是付款的狀態，只由金流商回報的 PaymentIntent 狀態推導。
+type PaymentStatus int32
+
+const (
+	PaymentStatus_PAYMENT_STATUS_UNSPECIFIED PaymentStatus = 0
+	// 付款已記錄，金流商那邊的付款物件還沒確認建立（含呼叫過、結果不明）；背景補做，client 稍後重讀。
+	PaymentStatus_PAYMENT_STATUS_CREATING PaymentStatus = 1
+	// 已建立，等買家付款（含需要 3DS 的額外驗證）。
+	PaymentStatus_PAYMENT_STATUS_AWAITING_PAYMENT PaymentStatus = 2
+	// 買家已送出付款，金流商處理中。
+	PaymentStatus_PAYMENT_STATUS_PROCESSING PaymentStatus = 3
+	// 已入帳（終局）。
+	PaymentStatus_PAYMENT_STATUS_SUCCEEDED PaymentStatus = 4
+	// 已取消（之後的入帳仍勝出）；訂單仍可付時 CreatePayment 會換新的嘗試。
+	PaymentStatus_PAYMENT_STATUS_CANCELED PaymentStatus = 5
+	// 建立被金流商永久拒絕，或查回證明金流商沒有這筆。
+	PaymentStatus_PAYMENT_STATUS_CREATE_FAILED PaymentStatus = 6
+	// 建立的結果與金流商對不起來：待營運人工處理，買家不能重試。
+	PaymentStatus_PAYMENT_STATUS_ANOMALY PaymentStatus = 7
+)
+
+// Enum value maps for PaymentStatus.
+var (
+	PaymentStatus_name = map[int32]string{
+		0: "PAYMENT_STATUS_UNSPECIFIED",
+		1: "PAYMENT_STATUS_CREATING",
+		2: "PAYMENT_STATUS_AWAITING_PAYMENT",
+		3: "PAYMENT_STATUS_PROCESSING",
+		4: "PAYMENT_STATUS_SUCCEEDED",
+		5: "PAYMENT_STATUS_CANCELED",
+		6: "PAYMENT_STATUS_CREATE_FAILED",
+		7: "PAYMENT_STATUS_ANOMALY",
+	}
+	PaymentStatus_value = map[string]int32{
+		"PAYMENT_STATUS_UNSPECIFIED":      0,
+		"PAYMENT_STATUS_CREATING":         1,
+		"PAYMENT_STATUS_AWAITING_PAYMENT": 2,
+		"PAYMENT_STATUS_PROCESSING":       3,
+		"PAYMENT_STATUS_SUCCEEDED":        4,
+		"PAYMENT_STATUS_CANCELED":         5,
+		"PAYMENT_STATUS_CREATE_FAILED":    6,
+		"PAYMENT_STATUS_ANOMALY":          7,
+	}
+)
+
+func (x PaymentStatus) Enum() *PaymentStatus {
+	p := new(PaymentStatus)
+	*p = x
+	return p
+}
+
+func (x PaymentStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PaymentStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_hawkr_payment_v1alpha1_payment_proto_enumTypes[0].Descriptor()
+}
+
+func (PaymentStatus) Type() protoreflect.EnumType {
+	return &file_hawkr_payment_v1alpha1_payment_proto_enumTypes[0]
+}
+
+func (x PaymentStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PaymentStatus.Descriptor instead.
+func (PaymentStatus) EnumDescriptor() ([]byte, []int) {
+	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{0}
+}
 
 // PaymentAccountStatus 是收款帳戶的中立狀態，由金流商的轉帳能力推導（不是金流商自己的狀態名）。
 type PaymentAccountStatus int32
@@ -71,11 +147,11 @@ func (x PaymentAccountStatus) String() string {
 }
 
 func (PaymentAccountStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_hawkr_payment_v1alpha1_payment_proto_enumTypes[0].Descriptor()
+	return file_hawkr_payment_v1alpha1_payment_proto_enumTypes[1].Descriptor()
 }
 
 func (PaymentAccountStatus) Type() protoreflect.EnumType {
-	return &file_hawkr_payment_v1alpha1_payment_proto_enumTypes[0]
+	return &file_hawkr_payment_v1alpha1_payment_proto_enumTypes[1]
 }
 
 func (x PaymentAccountStatus) Number() protoreflect.EnumNumber {
@@ -84,7 +160,7 @@ func (x PaymentAccountStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use PaymentAccountStatus.Descriptor instead.
 func (PaymentAccountStatus) EnumDescriptor() ([]byte, []int) {
-	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{0}
+	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{1}
 }
 
 // RequirementCollection 是誰向賣家收身分與銀行資料。
@@ -123,11 +199,11 @@ func (x RequirementCollection) String() string {
 }
 
 func (RequirementCollection) Descriptor() protoreflect.EnumDescriptor {
-	return file_hawkr_payment_v1alpha1_payment_proto_enumTypes[1].Descriptor()
+	return file_hawkr_payment_v1alpha1_payment_proto_enumTypes[2].Descriptor()
 }
 
 func (RequirementCollection) Type() protoreflect.EnumType {
-	return &file_hawkr_payment_v1alpha1_payment_proto_enumTypes[1]
+	return &file_hawkr_payment_v1alpha1_payment_proto_enumTypes[2]
 }
 
 func (x RequirementCollection) Number() protoreflect.EnumNumber {
@@ -136,7 +212,7 @@ func (x RequirementCollection) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use RequirementCollection.Descriptor instead.
 func (RequirementCollection) EnumDescriptor() ([]byte, []int) {
-	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{1}
+	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{2}
 }
 
 // EmbeddedOnboardingRuntime 是呼叫端能承載的內嵌開通執行環境。
@@ -171,11 +247,11 @@ func (x EmbeddedOnboardingRuntime) String() string {
 }
 
 func (EmbeddedOnboardingRuntime) Descriptor() protoreflect.EnumDescriptor {
-	return file_hawkr_payment_v1alpha1_payment_proto_enumTypes[2].Descriptor()
+	return file_hawkr_payment_v1alpha1_payment_proto_enumTypes[3].Descriptor()
 }
 
 func (EmbeddedOnboardingRuntime) Type() protoreflect.EnumType {
-	return &file_hawkr_payment_v1alpha1_payment_proto_enumTypes[2]
+	return &file_hawkr_payment_v1alpha1_payment_proto_enumTypes[3]
 }
 
 func (x EmbeddedOnboardingRuntime) Number() protoreflect.EnumNumber {
@@ -184,14 +260,799 @@ func (x EmbeddedOnboardingRuntime) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use EmbeddedOnboardingRuntime.Descriptor instead.
 func (EmbeddedOnboardingRuntime) EnumDescriptor() ([]byte, []int) {
+	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{3}
+}
+
+// PaymentRefundStatus 是退款的狀態（只給後台）。
+type PaymentRefundStatus int32
+
+const (
+	PaymentRefundStatus_PAYMENT_REFUND_STATUS_UNSPECIFIED PaymentRefundStatus = 0
+	// 已記錄，還沒呼叫金流商。
+	PaymentRefundStatus_PAYMENT_REFUND_STATUS_PENDING PaymentRefundStatus = 1
+	// 已呼叫金流商，等結果。
+	PaymentRefundStatus_PAYMENT_REFUND_STATUS_REFUNDING PaymentRefundStatus = 2
+	// 退款成功。
+	PaymentRefundStatus_PAYMENT_REFUND_STATUS_SUCCEEDED PaymentRefundStatus = 3
+	// 退款失敗，不佔累計額度。
+	PaymentRefundStatus_PAYMENT_REFUND_STATUS_FAILED PaymentRefundStatus = 4
+	// 與金流商對不起來：仍佔額度，待營運人工結案。
+	PaymentRefundStatus_PAYMENT_REFUND_STATUS_ANOMALY PaymentRefundStatus = 5
+)
+
+// Enum value maps for PaymentRefundStatus.
+var (
+	PaymentRefundStatus_name = map[int32]string{
+		0: "PAYMENT_REFUND_STATUS_UNSPECIFIED",
+		1: "PAYMENT_REFUND_STATUS_PENDING",
+		2: "PAYMENT_REFUND_STATUS_REFUNDING",
+		3: "PAYMENT_REFUND_STATUS_SUCCEEDED",
+		4: "PAYMENT_REFUND_STATUS_FAILED",
+		5: "PAYMENT_REFUND_STATUS_ANOMALY",
+	}
+	PaymentRefundStatus_value = map[string]int32{
+		"PAYMENT_REFUND_STATUS_UNSPECIFIED": 0,
+		"PAYMENT_REFUND_STATUS_PENDING":     1,
+		"PAYMENT_REFUND_STATUS_REFUNDING":   2,
+		"PAYMENT_REFUND_STATUS_SUCCEEDED":   3,
+		"PAYMENT_REFUND_STATUS_FAILED":      4,
+		"PAYMENT_REFUND_STATUS_ANOMALY":     5,
+	}
+)
+
+func (x PaymentRefundStatus) Enum() *PaymentRefundStatus {
+	p := new(PaymentRefundStatus)
+	*p = x
+	return p
+}
+
+func (x PaymentRefundStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PaymentRefundStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_hawkr_payment_v1alpha1_payment_proto_enumTypes[4].Descriptor()
+}
+
+func (PaymentRefundStatus) Type() protoreflect.EnumType {
+	return &file_hawkr_payment_v1alpha1_payment_proto_enumTypes[4]
+}
+
+func (x PaymentRefundStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PaymentRefundStatus.Descriptor instead.
+func (PaymentRefundStatus) EnumDescriptor() ([]byte, []int) {
+	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{4}
+}
+
+// PaymentTransferStatus 是付款轉給賣家的轉帳的狀態（只給後台）。
+type PaymentTransferStatus int32
+
+const (
+	PaymentTransferStatus_PAYMENT_TRANSFER_STATUS_UNSPECIFIED PaymentTransferStatus = 0
+	// 已記錄，等送出或等結果。
+	PaymentTransferStatus_PAYMENT_TRANSFER_STATUS_PENDING PaymentTransferStatus = 1
+	// 轉帳成功。
+	PaymentTransferStatus_PAYMENT_TRANSFER_STATUS_SUCCEEDED PaymentTransferStatus = 2
+	// 轉帳失敗（終局）。
+	PaymentTransferStatus_PAYMENT_TRANSFER_STATUS_FAILED PaymentTransferStatus = 3
+	// 與金流商對不起來：佔住這筆付款的轉帳，待營運人工結案。
+	PaymentTransferStatus_PAYMENT_TRANSFER_STATUS_ANOMALY PaymentTransferStatus = 4
+)
+
+// Enum value maps for PaymentTransferStatus.
+var (
+	PaymentTransferStatus_name = map[int32]string{
+		0: "PAYMENT_TRANSFER_STATUS_UNSPECIFIED",
+		1: "PAYMENT_TRANSFER_STATUS_PENDING",
+		2: "PAYMENT_TRANSFER_STATUS_SUCCEEDED",
+		3: "PAYMENT_TRANSFER_STATUS_FAILED",
+		4: "PAYMENT_TRANSFER_STATUS_ANOMALY",
+	}
+	PaymentTransferStatus_value = map[string]int32{
+		"PAYMENT_TRANSFER_STATUS_UNSPECIFIED": 0,
+		"PAYMENT_TRANSFER_STATUS_PENDING":     1,
+		"PAYMENT_TRANSFER_STATUS_SUCCEEDED":   2,
+		"PAYMENT_TRANSFER_STATUS_FAILED":      3,
+		"PAYMENT_TRANSFER_STATUS_ANOMALY":     4,
+	}
+)
+
+func (x PaymentTransferStatus) Enum() *PaymentTransferStatus {
+	p := new(PaymentTransferStatus)
+	*p = x
+	return p
+}
+
+func (x PaymentTransferStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PaymentTransferStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_hawkr_payment_v1alpha1_payment_proto_enumTypes[5].Descriptor()
+}
+
+func (PaymentTransferStatus) Type() protoreflect.EnumType {
+	return &file_hawkr_payment_v1alpha1_payment_proto_enumTypes[5]
+}
+
+func (x PaymentTransferStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PaymentTransferStatus.Descriptor instead.
+func (PaymentTransferStatus) EnumDescriptor() ([]byte, []int) {
+	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{5}
+}
+
+// PaymentReversalStatus 是退款向賣家收回款項（撤回轉帳）的狀態，與退款狀態並行（只給後台）。
+type PaymentReversalStatus int32
+
+const (
+	PaymentReversalStatus_PAYMENT_REVERSAL_STATUS_UNSPECIFIED PaymentReversalStatus = 0
+	// 沒有要向賣家收回的款項。
+	PaymentReversalStatus_PAYMENT_REVERSAL_STATUS_NONE PaymentReversalStatus = 1
+	// 等退款被金流商接受之後才開始收回。
+	PaymentReversalStatus_PAYMENT_REVERSAL_STATUS_WAITING PaymentReversalStatus = 2
+	// 收回進行中。
+	PaymentReversalStatus_PAYMENT_REVERSAL_STATUS_REVERSING PaymentReversalStatus = 3
+	// 已向賣家收回。
+	PaymentReversalStatus_PAYMENT_REVERSAL_STATUS_REVERSED PaymentReversalStatus = 4
+	// 不再收回（退款失敗或轉帳沒有可收回的額度）。
+	PaymentReversalStatus_PAYMENT_REVERSAL_STATUS_RELEASED PaymentReversalStatus = 5
+	// 與金流商對不起來：待營運人工結案。
+	PaymentReversalStatus_PAYMENT_REVERSAL_STATUS_ANOMALY PaymentReversalStatus = 6
+)
+
+// Enum value maps for PaymentReversalStatus.
+var (
+	PaymentReversalStatus_name = map[int32]string{
+		0: "PAYMENT_REVERSAL_STATUS_UNSPECIFIED",
+		1: "PAYMENT_REVERSAL_STATUS_NONE",
+		2: "PAYMENT_REVERSAL_STATUS_WAITING",
+		3: "PAYMENT_REVERSAL_STATUS_REVERSING",
+		4: "PAYMENT_REVERSAL_STATUS_REVERSED",
+		5: "PAYMENT_REVERSAL_STATUS_RELEASED",
+		6: "PAYMENT_REVERSAL_STATUS_ANOMALY",
+	}
+	PaymentReversalStatus_value = map[string]int32{
+		"PAYMENT_REVERSAL_STATUS_UNSPECIFIED": 0,
+		"PAYMENT_REVERSAL_STATUS_NONE":        1,
+		"PAYMENT_REVERSAL_STATUS_WAITING":     2,
+		"PAYMENT_REVERSAL_STATUS_REVERSING":   3,
+		"PAYMENT_REVERSAL_STATUS_REVERSED":    4,
+		"PAYMENT_REVERSAL_STATUS_RELEASED":    5,
+		"PAYMENT_REVERSAL_STATUS_ANOMALY":     6,
+	}
+)
+
+func (x PaymentReversalStatus) Enum() *PaymentReversalStatus {
+	p := new(PaymentReversalStatus)
+	*p = x
+	return p
+}
+
+func (x PaymentReversalStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PaymentReversalStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_hawkr_payment_v1alpha1_payment_proto_enumTypes[6].Descriptor()
+}
+
+func (PaymentReversalStatus) Type() protoreflect.EnumType {
+	return &file_hawkr_payment_v1alpha1_payment_proto_enumTypes[6]
+}
+
+func (x PaymentReversalStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PaymentReversalStatus.Descriptor instead.
+func (PaymentReversalStatus) EnumDescriptor() ([]byte, []int) {
+	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{6}
+}
+
+// PaymentTopupStatus 是已從轉帳金額扣掉的退款之後失敗，補差額轉帳給賣家的狀態（只給後台）。
+type PaymentTopupStatus int32
+
+const (
+	PaymentTopupStatus_PAYMENT_TOPUP_STATUS_UNSPECIFIED PaymentTopupStatus = 0
+	// 沒有要補的差額。
+	PaymentTopupStatus_PAYMENT_TOPUP_STATUS_NONE PaymentTopupStatus = 1
+	// 等補差額轉帳。
+	PaymentTopupStatus_PAYMENT_TOPUP_STATUS_WAITING PaymentTopupStatus = 2
+	// 補差額轉帳送出中。
+	PaymentTopupStatus_PAYMENT_TOPUP_STATUS_SENDING PaymentTopupStatus = 3
+	// 已補給賣家。
+	PaymentTopupStatus_PAYMENT_TOPUP_STATUS_DONE PaymentTopupStatus = 4
+	// 不再補（差額已無需補）。
+	PaymentTopupStatus_PAYMENT_TOPUP_STATUS_RELEASED PaymentTopupStatus = 5
+	// 與金流商對不起來：待營運人工結案。
+	PaymentTopupStatus_PAYMENT_TOPUP_STATUS_ANOMALY PaymentTopupStatus = 6
+)
+
+// Enum value maps for PaymentTopupStatus.
+var (
+	PaymentTopupStatus_name = map[int32]string{
+		0: "PAYMENT_TOPUP_STATUS_UNSPECIFIED",
+		1: "PAYMENT_TOPUP_STATUS_NONE",
+		2: "PAYMENT_TOPUP_STATUS_WAITING",
+		3: "PAYMENT_TOPUP_STATUS_SENDING",
+		4: "PAYMENT_TOPUP_STATUS_DONE",
+		5: "PAYMENT_TOPUP_STATUS_RELEASED",
+		6: "PAYMENT_TOPUP_STATUS_ANOMALY",
+	}
+	PaymentTopupStatus_value = map[string]int32{
+		"PAYMENT_TOPUP_STATUS_UNSPECIFIED": 0,
+		"PAYMENT_TOPUP_STATUS_NONE":        1,
+		"PAYMENT_TOPUP_STATUS_WAITING":     2,
+		"PAYMENT_TOPUP_STATUS_SENDING":     3,
+		"PAYMENT_TOPUP_STATUS_DONE":        4,
+		"PAYMENT_TOPUP_STATUS_RELEASED":    5,
+		"PAYMENT_TOPUP_STATUS_ANOMALY":     6,
+	}
+)
+
+func (x PaymentTopupStatus) Enum() *PaymentTopupStatus {
+	p := new(PaymentTopupStatus)
+	*p = x
+	return p
+}
+
+func (x PaymentTopupStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PaymentTopupStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_hawkr_payment_v1alpha1_payment_proto_enumTypes[7].Descriptor()
+}
+
+func (PaymentTopupStatus) Type() protoreflect.EnumType {
+	return &file_hawkr_payment_v1alpha1_payment_proto_enumTypes[7]
+}
+
+func (x PaymentTopupStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PaymentTopupStatus.Descriptor instead.
+func (PaymentTopupStatus) EnumDescriptor() ([]byte, []int) {
+	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{7}
+}
+
+// PaymentAnomalyKind 是進入 ANOMALY 的物件種類（只給後台）。
+type PaymentAnomalyKind int32
+
+const (
+	PaymentAnomalyKind_PAYMENT_ANOMALY_KIND_UNSPECIFIED PaymentAnomalyKind = 0
+	// 付款：建立結果與金流商對不起來。
+	PaymentAnomalyKind_PAYMENT_ANOMALY_KIND_PAYMENT PaymentAnomalyKind = 1
+	// 轉帳。
+	PaymentAnomalyKind_PAYMENT_ANOMALY_KIND_TRANSFER PaymentAnomalyKind = 2
+	// 退款。
+	PaymentAnomalyKind_PAYMENT_ANOMALY_KIND_REFUND PaymentAnomalyKind = 3
+	// 退款的收回（撤回轉帳）：id 是撤回列 ID。
+	PaymentAnomalyKind_PAYMENT_ANOMALY_KIND_REVERSAL PaymentAnomalyKind = 4
+	// 退款的補差額轉帳：id 是退款 ID。
+	PaymentAnomalyKind_PAYMENT_ANOMALY_KIND_TOPUP PaymentAnomalyKind = 5
+)
+
+// Enum value maps for PaymentAnomalyKind.
+var (
+	PaymentAnomalyKind_name = map[int32]string{
+		0: "PAYMENT_ANOMALY_KIND_UNSPECIFIED",
+		1: "PAYMENT_ANOMALY_KIND_PAYMENT",
+		2: "PAYMENT_ANOMALY_KIND_TRANSFER",
+		3: "PAYMENT_ANOMALY_KIND_REFUND",
+		4: "PAYMENT_ANOMALY_KIND_REVERSAL",
+		5: "PAYMENT_ANOMALY_KIND_TOPUP",
+	}
+	PaymentAnomalyKind_value = map[string]int32{
+		"PAYMENT_ANOMALY_KIND_UNSPECIFIED": 0,
+		"PAYMENT_ANOMALY_KIND_PAYMENT":     1,
+		"PAYMENT_ANOMALY_KIND_TRANSFER":    2,
+		"PAYMENT_ANOMALY_KIND_REFUND":      3,
+		"PAYMENT_ANOMALY_KIND_REVERSAL":    4,
+		"PAYMENT_ANOMALY_KIND_TOPUP":       5,
+	}
+)
+
+func (x PaymentAnomalyKind) Enum() *PaymentAnomalyKind {
+	p := new(PaymentAnomalyKind)
+	*p = x
+	return p
+}
+
+func (x PaymentAnomalyKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PaymentAnomalyKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_hawkr_payment_v1alpha1_payment_proto_enumTypes[8].Descriptor()
+}
+
+func (PaymentAnomalyKind) Type() protoreflect.EnumType {
+	return &file_hawkr_payment_v1alpha1_payment_proto_enumTypes[8]
+}
+
+func (x PaymentAnomalyKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PaymentAnomalyKind.Descriptor instead.
+func (PaymentAnomalyKind) EnumDescriptor() ([]byte, []int) {
+	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{8}
+}
+
+// PaymentAnomalyOutcome 是人工結案的結果（只給後台）。
+type PaymentAnomalyOutcome int32
+
+const (
+	PaymentAnomalyOutcome_PAYMENT_ANOMALY_OUTCOME_UNSPECIFIED PaymentAnomalyOutcome = 0
+	// 核對金流商之後確認它確實執行了（要附金流商物件 ID 為證據）。
+	PaymentAnomalyOutcome_PAYMENT_ANOMALY_OUTCOME_SUCCEEDED PaymentAnomalyOutcome = 1
+	// 核對金流商之後確認它沒有執行。
+	PaymentAnomalyOutcome_PAYMENT_ANOMALY_OUTCOME_FAILED PaymentAnomalyOutcome = 2
+)
+
+// Enum value maps for PaymentAnomalyOutcome.
+var (
+	PaymentAnomalyOutcome_name = map[int32]string{
+		0: "PAYMENT_ANOMALY_OUTCOME_UNSPECIFIED",
+		1: "PAYMENT_ANOMALY_OUTCOME_SUCCEEDED",
+		2: "PAYMENT_ANOMALY_OUTCOME_FAILED",
+	}
+	PaymentAnomalyOutcome_value = map[string]int32{
+		"PAYMENT_ANOMALY_OUTCOME_UNSPECIFIED": 0,
+		"PAYMENT_ANOMALY_OUTCOME_SUCCEEDED":   1,
+		"PAYMENT_ANOMALY_OUTCOME_FAILED":      2,
+	}
+)
+
+func (x PaymentAnomalyOutcome) Enum() *PaymentAnomalyOutcome {
+	p := new(PaymentAnomalyOutcome)
+	*p = x
+	return p
+}
+
+func (x PaymentAnomalyOutcome) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PaymentAnomalyOutcome) Descriptor() protoreflect.EnumDescriptor {
+	return file_hawkr_payment_v1alpha1_payment_proto_enumTypes[9].Descriptor()
+}
+
+func (PaymentAnomalyOutcome) Type() protoreflect.EnumType {
+	return &file_hawkr_payment_v1alpha1_payment_proto_enumTypes[9]
+}
+
+func (x PaymentAnomalyOutcome) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PaymentAnomalyOutcome.Descriptor instead.
+func (PaymentAnomalyOutcome) EnumDescriptor() ([]byte, []int) {
+	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{9}
+}
+
+// Payment 是買家對一張訂單的付款。
+type Payment struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	OrderNo string                 `protobuf:"bytes,1,opt,name=order_no,json=orderNo,proto3" json:"order_no,omitempty"`
+	Status  PaymentStatus          `protobuf:"varint,2,opt,name=status,proto3,enum=hawkr.payment.v1alpha1.PaymentStatus" json:"status,omitempty"`
+	// 付款金額（訂單的整數金額，不帶幣別）。
+	Amount int64 `protobuf:"varint,3,opt,name=amount,proto3" json:"amount,omitempty"`
+	// 入帳時間；沒有入帳時不設。
+	PaidTime *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=paid_time,json=paidTime,proto3" json:"paid_time,omitempty"`
+	// 完成付款所需的初始化資料；只有狀態 AWAITING_PAYMENT 且金流商還在等待付款時才有。
+	Session       *PaymentSession `protobuf:"bytes,5,opt,name=session,proto3" json:"session,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Payment) Reset() {
+	*x = Payment{}
+	mi := &file_hawkr_payment_v1alpha1_payment_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Payment) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Payment) ProtoMessage() {}
+
+func (x *Payment) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_payment_v1alpha1_payment_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Payment.ProtoReflect.Descriptor instead.
+func (*Payment) Descriptor() ([]byte, []int) {
+	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *Payment) GetOrderNo() string {
+	if x != nil {
+		return x.OrderNo
+	}
+	return ""
+}
+
+func (x *Payment) GetStatus() PaymentStatus {
+	if x != nil {
+		return x.Status
+	}
+	return PaymentStatus_PAYMENT_STATUS_UNSPECIFIED
+}
+
+func (x *Payment) GetAmount() int64 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
+func (x *Payment) GetPaidTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.PaidTime
+	}
+	return nil
+}
+
+func (x *Payment) GetSession() *PaymentSession {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
+// PaymentSession 是完成付款的初始化資料，依金流商分支。
+type PaymentSession struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Provider:
+	//
+	//	*PaymentSession_Stripe
+	Provider      isPaymentSession_Provider `protobuf_oneof:"provider"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PaymentSession) Reset() {
+	*x = PaymentSession{}
+	mi := &file_hawkr_payment_v1alpha1_payment_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PaymentSession) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PaymentSession) ProtoMessage() {}
+
+func (x *PaymentSession) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_payment_v1alpha1_payment_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PaymentSession.ProtoReflect.Descriptor instead.
+func (*PaymentSession) Descriptor() ([]byte, []int) {
+	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *PaymentSession) GetProvider() isPaymentSession_Provider {
+	if x != nil {
+		return x.Provider
+	}
+	return nil
+}
+
+func (x *PaymentSession) GetStripe() *StripePaymentSession {
+	if x != nil {
+		if x, ok := x.Provider.(*PaymentSession_Stripe); ok {
+			return x.Stripe
+		}
+	}
+	return nil
+}
+
+type isPaymentSession_Provider interface {
+	isPaymentSession_Provider()
+}
+
+type PaymentSession_Stripe struct {
+	Stripe *StripePaymentSession `protobuf:"bytes,1,opt,name=stripe,proto3,oneof"`
+}
+
+func (*PaymentSession_Stripe) isPaymentSession_Provider() {}
+
+// StripePaymentSession 是 Stripe Payment Element（web）與 PaymentSheet（App）的初始化資料。
+type StripePaymentSession struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// PaymentIntent 的 client secret；只給這個買家的 client，不記錄、不快取。
+	ClientSecret string `protobuf:"bytes,1,opt,name=client_secret,json=clientSecret,proto3" json:"client_secret,omitempty"`
+	// 初始化 Stripe.js 與 PaymentSheet 用的公開金鑰（不是 secret）。
+	PublishableKey string `protobuf:"bytes,2,opt,name=publishable_key,json=publishableKey,proto3" json:"publishable_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *StripePaymentSession) Reset() {
+	*x = StripePaymentSession{}
+	mi := &file_hawkr_payment_v1alpha1_payment_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StripePaymentSession) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StripePaymentSession) ProtoMessage() {}
+
+func (x *StripePaymentSession) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_payment_v1alpha1_payment_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StripePaymentSession.ProtoReflect.Descriptor instead.
+func (*StripePaymentSession) Descriptor() ([]byte, []int) {
 	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *StripePaymentSession) GetClientSecret() string {
+	if x != nil {
+		return x.ClientSecret
+	}
+	return ""
+}
+
+func (x *StripePaymentSession) GetPublishableKey() string {
+	if x != nil {
+		return x.PublishableKey
+	}
+	return ""
+}
+
+type CreatePaymentRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 要付款的訂單編號。
+	OrderNo       string `protobuf:"bytes,1,opt,name=order_no,json=orderNo,proto3" json:"order_no,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreatePaymentRequest) Reset() {
+	*x = CreatePaymentRequest{}
+	mi := &file_hawkr_payment_v1alpha1_payment_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreatePaymentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreatePaymentRequest) ProtoMessage() {}
+
+func (x *CreatePaymentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_payment_v1alpha1_payment_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreatePaymentRequest.ProtoReflect.Descriptor instead.
+func (*CreatePaymentRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *CreatePaymentRequest) GetOrderNo() string {
+	if x != nil {
+		return x.OrderNo
+	}
+	return ""
+}
+
+type CreatePaymentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Payment       *Payment               `protobuf:"bytes,1,opt,name=payment,proto3" json:"payment,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreatePaymentResponse) Reset() {
+	*x = CreatePaymentResponse{}
+	mi := &file_hawkr_payment_v1alpha1_payment_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreatePaymentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreatePaymentResponse) ProtoMessage() {}
+
+func (x *CreatePaymentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_payment_v1alpha1_payment_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreatePaymentResponse.ProtoReflect.Descriptor instead.
+func (*CreatePaymentResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *CreatePaymentResponse) GetPayment() *Payment {
+	if x != nil {
+		return x.Payment
+	}
+	return nil
+}
+
+type GetPaymentRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OrderNo       string                 `protobuf:"bytes,1,opt,name=order_no,json=orderNo,proto3" json:"order_no,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPaymentRequest) Reset() {
+	*x = GetPaymentRequest{}
+	mi := &file_hawkr_payment_v1alpha1_payment_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPaymentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPaymentRequest) ProtoMessage() {}
+
+func (x *GetPaymentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_payment_v1alpha1_payment_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPaymentRequest.ProtoReflect.Descriptor instead.
+func (*GetPaymentRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *GetPaymentRequest) GetOrderNo() string {
+	if x != nil {
+		return x.OrderNo
+	}
+	return ""
+}
+
+type GetPaymentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Payment       *Payment               `protobuf:"bytes,1,opt,name=payment,proto3" json:"payment,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPaymentResponse) Reset() {
+	*x = GetPaymentResponse{}
+	mi := &file_hawkr_payment_v1alpha1_payment_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPaymentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPaymentResponse) ProtoMessage() {}
+
+func (x *GetPaymentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_payment_v1alpha1_payment_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPaymentResponse.ProtoReflect.Descriptor instead.
+func (*GetPaymentResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *GetPaymentResponse) GetPayment() *Payment {
+	if x != nil {
+		return x.Payment
+	}
+	return nil
 }
 
 var File_hawkr_payment_v1alpha1_payment_proto protoreflect.FileDescriptor
 
 const file_hawkr_payment_v1alpha1_payment_proto_rawDesc = "" +
 	"\n" +
-	"$hawkr/payment/v1alpha1/payment.proto\x12\x16hawkr.payment.v1alpha1*\x84\x02\n" +
+	"$hawkr/payment/v1alpha1/payment.proto\x12\x16hawkr.payment.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xfb\x01\n" +
+	"\aPayment\x12\x19\n" +
+	"\border_no\x18\x01 \x01(\tR\aorderNo\x12=\n" +
+	"\x06status\x18\x02 \x01(\x0e2%.hawkr.payment.v1alpha1.PaymentStatusR\x06status\x12\x16\n" +
+	"\x06amount\x18\x03 \x01(\x03R\x06amount\x127\n" +
+	"\tpaid_time\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\bpaidTime\x12E\n" +
+	"\asession\x18\x05 \x01(\v2&.hawkr.payment.v1alpha1.PaymentSessionB\x03\xe0A\x03R\asession\"d\n" +
+	"\x0ePaymentSession\x12F\n" +
+	"\x06stripe\x18\x01 \x01(\v2,.hawkr.payment.v1alpha1.StripePaymentSessionH\x00R\x06stripeB\n" +
+	"\n" +
+	"\bprovider\"d\n" +
+	"\x14StripePaymentSession\x12#\n" +
+	"\rclient_secret\x18\x01 \x01(\tR\fclientSecret\x12'\n" +
+	"\x0fpublishable_key\x18\x02 \x01(\tR\x0epublishableKey\"6\n" +
+	"\x14CreatePaymentRequest\x12\x1e\n" +
+	"\border_no\x18\x01 \x01(\tB\x03\xe0A\x02R\aorderNo\"R\n" +
+	"\x15CreatePaymentResponse\x129\n" +
+	"\apayment\x18\x01 \x01(\v2\x1f.hawkr.payment.v1alpha1.PaymentR\apayment\"3\n" +
+	"\x11GetPaymentRequest\x12\x1e\n" +
+	"\border_no\x18\x01 \x01(\tB\x03\xe0A\x02R\aorderNo\"O\n" +
+	"\x12GetPaymentResponse\x129\n" +
+	"\apayment\x18\x01 \x01(\v2\x1f.hawkr.payment.v1alpha1.PaymentR\apayment*\x89\x02\n" +
+	"\rPaymentStatus\x12\x1e\n" +
+	"\x1aPAYMENT_STATUS_UNSPECIFIED\x10\x00\x12\x1b\n" +
+	"\x17PAYMENT_STATUS_CREATING\x10\x01\x12#\n" +
+	"\x1fPAYMENT_STATUS_AWAITING_PAYMENT\x10\x02\x12\x1d\n" +
+	"\x19PAYMENT_STATUS_PROCESSING\x10\x03\x12\x1c\n" +
+	"\x18PAYMENT_STATUS_SUCCEEDED\x10\x04\x12\x1b\n" +
+	"\x17PAYMENT_STATUS_CANCELED\x10\x05\x12 \n" +
+	"\x1cPAYMENT_STATUS_CREATE_FAILED\x10\x06\x12\x1a\n" +
+	"\x16PAYMENT_STATUS_ANOMALY\x10\a*\x84\x02\n" +
 	"\x14PaymentAccountStatus\x12&\n" +
 	"\"PAYMENT_ACCOUNT_STATUS_UNSPECIFIED\x10\x00\x12&\n" +
 	"\"PAYMENT_ACCOUNT_STATUS_NOT_CREATED\x10\x01\x12'\n" +
@@ -205,7 +1066,51 @@ const file_hawkr_payment_v1alpha1_payment_proto_rawDesc = "" +
 	"\x1fREQUIREMENT_COLLECTION_PLATFORM\x10\x02*{\n" +
 	"\x19EmbeddedOnboardingRuntime\x12+\n" +
 	"'EMBEDDED_ONBOARDING_RUNTIME_UNSPECIFIED\x10\x00\x121\n" +
-	"-EMBEDDED_ONBOARDING_RUNTIME_STRIPE_CONNECT_JS\x10\x01B\x85\x02\n" +
+	"-EMBEDDED_ONBOARDING_RUNTIME_STRIPE_CONNECT_JS\x10\x01*\xee\x01\n" +
+	"\x13PaymentRefundStatus\x12%\n" +
+	"!PAYMENT_REFUND_STATUS_UNSPECIFIED\x10\x00\x12!\n" +
+	"\x1dPAYMENT_REFUND_STATUS_PENDING\x10\x01\x12#\n" +
+	"\x1fPAYMENT_REFUND_STATUS_REFUNDING\x10\x02\x12#\n" +
+	"\x1fPAYMENT_REFUND_STATUS_SUCCEEDED\x10\x03\x12 \n" +
+	"\x1cPAYMENT_REFUND_STATUS_FAILED\x10\x04\x12!\n" +
+	"\x1dPAYMENT_REFUND_STATUS_ANOMALY\x10\x05*\xd5\x01\n" +
+	"\x15PaymentTransferStatus\x12'\n" +
+	"#PAYMENT_TRANSFER_STATUS_UNSPECIFIED\x10\x00\x12#\n" +
+	"\x1fPAYMENT_TRANSFER_STATUS_PENDING\x10\x01\x12%\n" +
+	"!PAYMENT_TRANSFER_STATUS_SUCCEEDED\x10\x02\x12\"\n" +
+	"\x1ePAYMENT_TRANSFER_STATUS_FAILED\x10\x03\x12#\n" +
+	"\x1fPAYMENT_TRANSFER_STATUS_ANOMALY\x10\x04*\x9f\x02\n" +
+	"\x15PaymentReversalStatus\x12'\n" +
+	"#PAYMENT_REVERSAL_STATUS_UNSPECIFIED\x10\x00\x12 \n" +
+	"\x1cPAYMENT_REVERSAL_STATUS_NONE\x10\x01\x12#\n" +
+	"\x1fPAYMENT_REVERSAL_STATUS_WAITING\x10\x02\x12%\n" +
+	"!PAYMENT_REVERSAL_STATUS_REVERSING\x10\x03\x12$\n" +
+	" PAYMENT_REVERSAL_STATUS_REVERSED\x10\x04\x12$\n" +
+	" PAYMENT_REVERSAL_STATUS_RELEASED\x10\x05\x12#\n" +
+	"\x1fPAYMENT_REVERSAL_STATUS_ANOMALY\x10\x06*\x81\x02\n" +
+	"\x12PaymentTopupStatus\x12$\n" +
+	" PAYMENT_TOPUP_STATUS_UNSPECIFIED\x10\x00\x12\x1d\n" +
+	"\x19PAYMENT_TOPUP_STATUS_NONE\x10\x01\x12 \n" +
+	"\x1cPAYMENT_TOPUP_STATUS_WAITING\x10\x02\x12 \n" +
+	"\x1cPAYMENT_TOPUP_STATUS_SENDING\x10\x03\x12\x1d\n" +
+	"\x19PAYMENT_TOPUP_STATUS_DONE\x10\x04\x12!\n" +
+	"\x1dPAYMENT_TOPUP_STATUS_RELEASED\x10\x05\x12 \n" +
+	"\x1cPAYMENT_TOPUP_STATUS_ANOMALY\x10\x06*\xe3\x01\n" +
+	"\x12PaymentAnomalyKind\x12$\n" +
+	" PAYMENT_ANOMALY_KIND_UNSPECIFIED\x10\x00\x12 \n" +
+	"\x1cPAYMENT_ANOMALY_KIND_PAYMENT\x10\x01\x12!\n" +
+	"\x1dPAYMENT_ANOMALY_KIND_TRANSFER\x10\x02\x12\x1f\n" +
+	"\x1bPAYMENT_ANOMALY_KIND_REFUND\x10\x03\x12!\n" +
+	"\x1dPAYMENT_ANOMALY_KIND_REVERSAL\x10\x04\x12\x1e\n" +
+	"\x1aPAYMENT_ANOMALY_KIND_TOPUP\x10\x05*\x8b\x01\n" +
+	"\x15PaymentAnomalyOutcome\x12'\n" +
+	"#PAYMENT_ANOMALY_OUTCOME_UNSPECIFIED\x10\x00\x12%\n" +
+	"!PAYMENT_ANOMALY_OUTCOME_SUCCEEDED\x10\x01\x12\"\n" +
+	"\x1ePAYMENT_ANOMALY_OUTCOME_FAILED\x10\x022\xf0\x01\n" +
+	"\x11PaymentAppService\x12q\n" +
+	"\rCreatePayment\x12,.hawkr.payment.v1alpha1.CreatePaymentRequest\x1a-.hawkr.payment.v1alpha1.CreatePaymentResponse\"\x03\x90\x02\x02\x12h\n" +
+	"\n" +
+	"GetPayment\x12).hawkr.payment.v1alpha1.GetPaymentRequest\x1a*.hawkr.payment.v1alpha1.GetPaymentResponse\"\x03\x90\x02\x02B\x85\x02\n" +
 	"\x1acom.hawkr.payment.v1alpha1B\fPaymentProtoP\x01Z_github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/payment/v1alpha1;paymentv1alpha1\xa2\x02\x03HPX\xaa\x02\x16Hawkr.Payment.V1alpha1\xca\x02\x16Hawkr\\Payment\\V1alpha1\xe2\x02\"Hawkr\\Payment\\V1alpha1\\GPBMetadata\xea\x02\x18Hawkr::Payment::V1alpha1b\x06proto3"
 
 var (
@@ -220,18 +1125,44 @@ func file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP() []byte {
 	return file_hawkr_payment_v1alpha1_payment_proto_rawDescData
 }
 
-var file_hawkr_payment_v1alpha1_payment_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_hawkr_payment_v1alpha1_payment_proto_enumTypes = make([]protoimpl.EnumInfo, 10)
+var file_hawkr_payment_v1alpha1_payment_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_hawkr_payment_v1alpha1_payment_proto_goTypes = []any{
-	(PaymentAccountStatus)(0),      // 0: hawkr.payment.v1alpha1.PaymentAccountStatus
-	(RequirementCollection)(0),     // 1: hawkr.payment.v1alpha1.RequirementCollection
-	(EmbeddedOnboardingRuntime)(0), // 2: hawkr.payment.v1alpha1.EmbeddedOnboardingRuntime
+	(PaymentStatus)(0),             // 0: hawkr.payment.v1alpha1.PaymentStatus
+	(PaymentAccountStatus)(0),      // 1: hawkr.payment.v1alpha1.PaymentAccountStatus
+	(RequirementCollection)(0),     // 2: hawkr.payment.v1alpha1.RequirementCollection
+	(EmbeddedOnboardingRuntime)(0), // 3: hawkr.payment.v1alpha1.EmbeddedOnboardingRuntime
+	(PaymentRefundStatus)(0),       // 4: hawkr.payment.v1alpha1.PaymentRefundStatus
+	(PaymentTransferStatus)(0),     // 5: hawkr.payment.v1alpha1.PaymentTransferStatus
+	(PaymentReversalStatus)(0),     // 6: hawkr.payment.v1alpha1.PaymentReversalStatus
+	(PaymentTopupStatus)(0),        // 7: hawkr.payment.v1alpha1.PaymentTopupStatus
+	(PaymentAnomalyKind)(0),        // 8: hawkr.payment.v1alpha1.PaymentAnomalyKind
+	(PaymentAnomalyOutcome)(0),     // 9: hawkr.payment.v1alpha1.PaymentAnomalyOutcome
+	(*Payment)(nil),                // 10: hawkr.payment.v1alpha1.Payment
+	(*PaymentSession)(nil),         // 11: hawkr.payment.v1alpha1.PaymentSession
+	(*StripePaymentSession)(nil),   // 12: hawkr.payment.v1alpha1.StripePaymentSession
+	(*CreatePaymentRequest)(nil),   // 13: hawkr.payment.v1alpha1.CreatePaymentRequest
+	(*CreatePaymentResponse)(nil),  // 14: hawkr.payment.v1alpha1.CreatePaymentResponse
+	(*GetPaymentRequest)(nil),      // 15: hawkr.payment.v1alpha1.GetPaymentRequest
+	(*GetPaymentResponse)(nil),     // 16: hawkr.payment.v1alpha1.GetPaymentResponse
+	(*timestamppb.Timestamp)(nil),  // 17: google.protobuf.Timestamp
 }
 var file_hawkr_payment_v1alpha1_payment_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	0,  // 0: hawkr.payment.v1alpha1.Payment.status:type_name -> hawkr.payment.v1alpha1.PaymentStatus
+	17, // 1: hawkr.payment.v1alpha1.Payment.paid_time:type_name -> google.protobuf.Timestamp
+	11, // 2: hawkr.payment.v1alpha1.Payment.session:type_name -> hawkr.payment.v1alpha1.PaymentSession
+	12, // 3: hawkr.payment.v1alpha1.PaymentSession.stripe:type_name -> hawkr.payment.v1alpha1.StripePaymentSession
+	10, // 4: hawkr.payment.v1alpha1.CreatePaymentResponse.payment:type_name -> hawkr.payment.v1alpha1.Payment
+	10, // 5: hawkr.payment.v1alpha1.GetPaymentResponse.payment:type_name -> hawkr.payment.v1alpha1.Payment
+	13, // 6: hawkr.payment.v1alpha1.PaymentAppService.CreatePayment:input_type -> hawkr.payment.v1alpha1.CreatePaymentRequest
+	15, // 7: hawkr.payment.v1alpha1.PaymentAppService.GetPayment:input_type -> hawkr.payment.v1alpha1.GetPaymentRequest
+	14, // 8: hawkr.payment.v1alpha1.PaymentAppService.CreatePayment:output_type -> hawkr.payment.v1alpha1.CreatePaymentResponse
+	16, // 9: hawkr.payment.v1alpha1.PaymentAppService.GetPayment:output_type -> hawkr.payment.v1alpha1.GetPaymentResponse
+	8,  // [8:10] is the sub-list for method output_type
+	6,  // [6:8] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_payment_v1alpha1_payment_proto_init() }
@@ -239,19 +1170,23 @@ func file_hawkr_payment_v1alpha1_payment_proto_init() {
 	if File_hawkr_payment_v1alpha1_payment_proto != nil {
 		return
 	}
+	file_hawkr_payment_v1alpha1_payment_proto_msgTypes[1].OneofWrappers = []any{
+		(*PaymentSession_Stripe)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_payment_v1alpha1_payment_proto_rawDesc), len(file_hawkr_payment_v1alpha1_payment_proto_rawDesc)),
-			NumEnums:      3,
-			NumMessages:   0,
+			NumEnums:      10,
+			NumMessages:   7,
 			NumExtensions: 0,
-			NumServices:   0,
+			NumServices:   1,
 		},
 		GoTypes:           file_hawkr_payment_v1alpha1_payment_proto_goTypes,
 		DependencyIndexes: file_hawkr_payment_v1alpha1_payment_proto_depIdxs,
 		EnumInfos:         file_hawkr_payment_v1alpha1_payment_proto_enumTypes,
+		MessageInfos:      file_hawkr_payment_v1alpha1_payment_proto_msgTypes,
 	}.Build()
 	File_hawkr_payment_v1alpha1_payment_proto = out.File
 	file_hawkr_payment_v1alpha1_payment_proto_goTypes = nil

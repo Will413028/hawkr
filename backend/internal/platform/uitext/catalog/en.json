@@ -162,6 +162,111 @@
     "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_UNDER_REVIEW": {
       "message": "Under review"
     },
+    "payment.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_PAYMENT": {
+      "message": "Payment"
+    },
+    "payment.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_REFUND": {
+      "message": "Refund"
+    },
+    "payment.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_REVERSAL": {
+      "message": "Recovery"
+    },
+    "payment.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_TOPUP": {
+      "message": "Top-up transfer"
+    },
+    "payment.PaymentAnomalyKind.PAYMENT_ANOMALY_KIND_TRANSFER": {
+      "message": "Transfer"
+    },
+    "payment.PaymentAnomalyOutcome.PAYMENT_ANOMALY_OUTCOME_FAILED": {
+      "message": "Provider did not execute it"
+    },
+    "payment.PaymentAnomalyOutcome.PAYMENT_ANOMALY_OUTCOME_SUCCEEDED": {
+      "message": "Provider executed it"
+    },
+    "payment.PaymentRefundStatus.PAYMENT_REFUND_STATUS_ANOMALY": {
+      "message": "Needs review"
+    },
+    "payment.PaymentRefundStatus.PAYMENT_REFUND_STATUS_FAILED": {
+      "message": "Refund failed"
+    },
+    "payment.PaymentRefundStatus.PAYMENT_REFUND_STATUS_PENDING": {
+      "message": "Pending"
+    },
+    "payment.PaymentRefundStatus.PAYMENT_REFUND_STATUS_REFUNDING": {
+      "message": "Refunding"
+    },
+    "payment.PaymentRefundStatus.PAYMENT_REFUND_STATUS_SUCCEEDED": {
+      "message": "Refunded"
+    },
+    "payment.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_ANOMALY": {
+      "message": "Needs review"
+    },
+    "payment.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_NONE": {
+      "message": "Nothing to recover"
+    },
+    "payment.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_RELEASED": {
+      "message": "Not recovered"
+    },
+    "payment.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_REVERSED": {
+      "message": "Recovered"
+    },
+    "payment.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_REVERSING": {
+      "message": "Recovering"
+    },
+    "payment.PaymentReversalStatus.PAYMENT_REVERSAL_STATUS_WAITING": {
+      "message": "Waiting"
+    },
+    "payment.PaymentStatus.PAYMENT_STATUS_ANOMALY": {
+      "message": "Needs review"
+    },
+    "payment.PaymentStatus.PAYMENT_STATUS_AWAITING_PAYMENT": {
+      "message": "Awaiting payment"
+    },
+    "payment.PaymentStatus.PAYMENT_STATUS_CANCELED": {
+      "message": "Canceled"
+    },
+    "payment.PaymentStatus.PAYMENT_STATUS_CREATE_FAILED": {
+      "message": "Could not start"
+    },
+    "payment.PaymentStatus.PAYMENT_STATUS_CREATING": {
+      "message": "Setting up"
+    },
+    "payment.PaymentStatus.PAYMENT_STATUS_PROCESSING": {
+      "message": "Processing"
+    },
+    "payment.PaymentStatus.PAYMENT_STATUS_SUCCEEDED": {
+      "message": "Paid"
+    },
+    "payment.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_ANOMALY": {
+      "message": "Needs review"
+    },
+    "payment.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_DONE": {
+      "message": "Topped up"
+    },
+    "payment.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_NONE": {
+      "message": "No top-up"
+    },
+    "payment.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_RELEASED": {
+      "message": "Not topped up"
+    },
+    "payment.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_SENDING": {
+      "message": "Sending"
+    },
+    "payment.PaymentTopupStatus.PAYMENT_TOPUP_STATUS_WAITING": {
+      "message": "Waiting"
+    },
+    "payment.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_ANOMALY": {
+      "message": "Needs review"
+    },
+    "payment.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_FAILED": {
+      "message": "Transfer failed"
+    },
+    "payment.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_PENDING": {
+      "message": "Pending"
+    },
+    "payment.PaymentTransferStatus.PAYMENT_TRANSFER_STATUS_SUCCEEDED": {
+      "message": "Transferred"
+    },
     "payment.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM": {
       "message": "Embedded on platform"
     },

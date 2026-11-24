@@ -653,3 +653,49 @@ func (m *Module) CloseOrderPayment(ctx context.Context, orderNo string) (bool, e
 func (m *Module) CloseOrderPaymentAttempt(ctx context.Context, paymentID uuid.UUID, finalAttempt bool) error {
 	return m.charges.Close(ctx, paymentID, finalAttempt)
 }
+
+// 後台的付款、轉帳與退款清單（新的在前、keyset）：記錄型別是對外視圖加上 provider 的外部 ID 與訂單編號，不含 client secret。
+type (
+	RecordCursor       = model.RecordCursor
+	PaymentRecord      = model.PaymentRecord
+	PaymentFilter      = model.PaymentFilter
+	PaymentRecordPage  = model.PaymentRecordPage
+	TransferRecord     = model.TransferRecord
+	TransferFilter     = model.TransferFilter
+	TransferRecordPage = model.TransferRecordPage
+	ReversalRecord     = model.ReversalRecord
+	RefundRecord       = model.RefundRecord
+	RefundFilter       = model.RefundFilter
+	RefundRecordPage   = model.RefundRecordPage
+)
+
+// ListPayments 列付款（後台查詢），新的在前；Status 不是付款狀態回 InvalidInput，空值不篩；OrderNo 空字串不篩。
+func (m *Module) ListPayments(ctx context.Context, f PaymentFilter, after *RecordCursor, size int32) (PaymentRecordPage, error) {
+	return m.charges.ListPayments(ctx, f, after, size)
+}
+
+// ListPaymentTransfers 列轉帳（後台查詢），新的在前；Status 不是轉帳狀態回 InvalidInput，空值不篩；OrderNo 是所屬付款的訂單編號，空字串不篩。
+func (m *Module) ListPaymentTransfers(ctx context.Context, f TransferFilter, after *RecordCursor, size int32) (TransferRecordPage, error) {
+	return m.charges.ListTransfers(ctx, f, after, size)
+}
+
+// ListPaymentRefunds 列退款（後台查詢），新的在前，每筆附撤回列（人工結案撤回要用撤回列 ID）；Status 不是退款狀態回 InvalidInput，空值不篩；
+// OrderNo 是所屬付款的訂單編號，空字串不篩；AnomalyOnly 只列退款、收回或補差額任一個在 ANOMALY 的退款。
+func (m *Module) ListPaymentRefunds(ctx context.Context, f RefundFilter, after *RecordCursor, size int32) (RefundRecordPage, error) {
+	return m.charges.ListRefunds(ctx, f, after, size)
+}
+
+// PaymentStatusValues 回傳全部付款狀態（與 payments_status_check 相同）。
+func PaymentStatusValues() []PaymentStatus { return model.PaymentStatusValues() }
+
+// PaymentRefundStatusValues 回傳全部退款狀態（與 refunds_status_check 相同）。
+func PaymentRefundStatusValues() []PaymentRefundStatus { return model.RefundStatusValues() }
+
+// PaymentTransferStatusValues 回傳全部轉帳狀態（與 transfers_status_check 相同）。
+func PaymentTransferStatusValues() []PaymentTransferStatus { return model.TransferStatusValues() }
+
+// PaymentReversalStatusValues 回傳全部收回狀態（與 refunds_reversal_status_check 相同）。
+func PaymentReversalStatusValues() []PaymentReversalStatus { return model.ReversalStatusValues() }
+
+// PaymentTopupStatusValues 回傳全部補差額狀態（與 refunds_topup_status_check 相同）。
+func PaymentTopupStatusValues() []PaymentTopupStatus { return model.TopupStatusValues() }

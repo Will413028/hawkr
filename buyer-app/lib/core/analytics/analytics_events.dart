@@ -102,18 +102,6 @@ class AnalyticsEvents {
     ),
   );
 
-  Future<void> trackAddPaymentInfo(
-    List<GA4Item> items, {
-    required String paymentType,
-  }) => _svc.logEcommerce(
-    (fa) => fa.logAddPaymentInfo(
-      currency: kAnalyticsCurrency,
-      value: sumValue(items).toDouble(),
-      paymentType: paymentType,
-      items: _items(items),
-    ),
-  );
-
   Future<void> trackPurchase(Order order) {
     final items = order.items.map(orderItemToGA4Item).toList();
     return _svc.logEcommerce(

@@ -619,6 +619,58 @@ final class ModerationAppClientProvider
 String _$moderationAppClientHash() =>
     r'8b3fcf02b8505f77423f433df99664ee1a4bf171';
 
+/// 買家的付款（`PaymentAppService`）：建立付款與重讀付款（含 PaymentSheet 的 client secret，不可快取）。
+
+@ProviderFor(paymentAppClient)
+final paymentAppClientProvider = PaymentAppClientProvider._();
+
+/// 買家的付款（`PaymentAppService`）：建立付款與重讀付款（含 PaymentSheet 的 client secret，不可快取）。
+
+final class PaymentAppClientProvider
+    extends
+        $FunctionalProvider<
+          PaymentAppServiceClient,
+          PaymentAppServiceClient,
+          PaymentAppServiceClient
+        >
+    with $Provider<PaymentAppServiceClient> {
+  /// 買家的付款（`PaymentAppService`）：建立付款與重讀付款（含 PaymentSheet 的 client secret，不可快取）。
+  PaymentAppClientProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'paymentAppClientProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$paymentAppClientHash();
+
+  @$internal
+  @override
+  $ProviderElement<PaymentAppServiceClient> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  PaymentAppServiceClient create(Ref ref) {
+    return paymentAppClient(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(PaymentAppServiceClient value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<PaymentAppServiceClient>(value),
+    );
+  }
+}
+
+String _$paymentAppClientHash() => r'90a502f1c4e9ff9713f2b4357997d17ed03598e9';
+
 /// 買家的聊天（`ChatAppService`）：對話、訊息、已讀與即時事件串流（`StreamEvents`，長連線不設逾時）。
 
 @ProviderFor(chatAppClient)
