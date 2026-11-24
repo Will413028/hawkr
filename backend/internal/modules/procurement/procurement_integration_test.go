@@ -630,7 +630,7 @@ func TestMarkApprovalSucceededSurvivesBuyerDeletion(t *testing.T) {
 	c := seed(ctx, t, q, 71, false)
 	approval := id()
 	if n, err := q.InsertApproval(ctx, store.InsertApprovalParams{
-		ID: approval, BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 1, RangeUpperAmount: 2,
+		ID: approval, BuyerID: &c.buyer, RequestID: c.request, RequestRevisionID: c.revision, RangeLowerAmount: 1, RangeUpperAmount: 2, CandidateSetID: c.candidateSet,
 		SchemaVersion: "v1", ClientRequestID: id(), Now: epoch, ExpiresAt: epoch.Add(time.Hour),
 	}); err != nil || n != 1 {
 		t.Fatalf("InsertApproval n=%d err=%v", n, err)
@@ -647,6 +647,25 @@ func TestMarkApprovalSucceededSurvivesBuyerDeletion(t *testing.T) {
 	}
 	if n, _ := q.MarkApprovalSucceeded(ctx, store.MarkApprovalSucceededParams{ID: approval, Version: claimed.Version, Now: epoch}); n != 0 {
 		t.Fatal("已 SUCCEEDED 的核准不能再被標一次（CAS）")
+	}
+}
+
+// 被核准引用的候選集不能被刪：FK 是 RESTRICT，核准、發布與賣家紀錄都保留。
+func TestDeletingACandidateSetReferencedByAnApprovalIsRestricted(t *testing.T) {
+	ctx := context.Background()
+	d := newDB(t)
+	q := store.New(d.Pool())
+	c := seed(ctx, t, q, 81, true)
+	_, err := d.Pool().Exec(ctx, `DELETE FROM procurement.candidate_sets WHERE id = $1`, c.candidateSet)
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != "23503" || pgErr.ConstraintName != "rfq_publication_approvals_candidate_set_id_fkey" {
+		t.Fatalf("要被 rfq_publication_approvals_candidate_set_id_fkey 以 23503 擋下：%v", err)
+	}
+	if n := count(ctx, t, d, "rfq_publication_approvals", "id = $1", c.approval); n != 1 {
+		t.Fatalf("核准要保留，實際 %d 列", n)
+	}
+	if n := count(ctx, t, d, "rfq_publications", "id = $1", c.publication); n != 1 {
+		t.Fatalf("發布要保留，實際 %d 列", n)
 	}
 }
 

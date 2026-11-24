@@ -33,7 +33,7 @@
    "file": "backend/internal/modules/procurement/db/migrations/20261124030023_procurement_wish_pool_spec_note.sql",
    "old": "REFERENCES \"procurement\".\"candidate_sets\" (\"id\") ON UPDATE NO ACTION ON DELETE RESTRICT",
    "new": "REFERENCES \"procurement\".\"candidate_sets\" (\"id\") ON UPDATE NO ACTION ON DELETE CASCADE",
-   "test": "internal/modules/procurement ^TestBuyerDeletedRemovesBuyerDataAndAnonymizesPublishedRecords$",
+   "test": "internal/modules/procurement ^TestDeletingACandidateSetReferencedByAnApprovalIsRestricted$",
    "why": "With a cascading foreign key a candidate set delete removes the approval and the seller-visible publication, invite, response and acceptance behind it, so BuyerDeleted loses records S10 requires to keep."
   }
  ]
