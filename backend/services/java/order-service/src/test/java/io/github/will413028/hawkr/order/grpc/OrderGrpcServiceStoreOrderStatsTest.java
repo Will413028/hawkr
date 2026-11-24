@@ -45,7 +45,7 @@ class OrderGrpcServiceStoreOrderStatsTest {
                 mock(BuyerGrpcClient.class), mock(MediaGrpcClient.class),
                 mock(MediaUrlProperties.class), mock(GrantPaymentTaskRepository.class),
                 mock(io.github.will413028.hawkr.order.repository.OrderInvoiceSnapshotRepository.class),
-                mock(OrderEventPublisher.class), "");
+                mock(OrderEventPublisher.class));
     }
 
     @SuppressWarnings("unchecked")

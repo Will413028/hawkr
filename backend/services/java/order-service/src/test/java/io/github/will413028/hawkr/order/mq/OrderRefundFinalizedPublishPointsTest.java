@@ -314,16 +314,6 @@ class OrderRefundFinalizedPublishPointsTest {
         }
 
         @Test
-        @DisplayName("need_refund_page 的清除收進同一事務（原本在 consumer 內、非交易性）")
-        void clearsNeedRefundPageInSameTx() {
-            when(financialLogRepository.sumAmountByType(anyString(), anyString())).thenReturn(TOTAL_ACTUAL);
-
-            handler.handleCancelCompleted(ORDER_NO, "CXL_556");
-
-            verify(orderRepository).updateNeedRefundPage(ORDER_NO, false);
-        }
-
-        @Test
         @DisplayName("cancel_id 為空 → fail-loud（它是 refund_ref 的唯一組成，共用鍵會讓多筆退款被當成同一筆）")
         void blankCancelId_failsLoud() {
             assertThatThrownBy(() -> handler.handleCancelCompleted(ORDER_NO, ""))

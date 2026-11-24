@@ -47,7 +47,7 @@ class OrderGrpcServiceStorePeriodOrderStatsTest {
                 mock(BuyerGrpcClient.class), mock(MediaGrpcClient.class),
                 mock(MediaUrlProperties.class), mock(GrantPaymentTaskRepository.class),
                 mock(io.github.will413028.hawkr.order.repository.OrderInvoiceSnapshotRepository.class),
-                mock(OrderEventPublisher.class), "");
+                mock(OrderEventPublisher.class));
     }
 
     private static StatsWindow window(String start, String end) {

@@ -23,7 +23,6 @@ import java.util.Map;
  *   <li>APPLE_PAY / GOOGLE_PAY：PayUni 官方文件未明列上下限；實際走 PayUni 幕後專屬 API
  *       （`/api/apple` / `/api/google`，AuthType=4 / 5），與信用卡同為卡片授權通道，
  *       保守沿用信用卡 1~199,999 元範圍。</li>
- *   <li>ATM：PayUni 業務確認 15~49,999 元（dev 實測 14 元被拒 ATM02007）。</li>
  *   <li>ZERO_AMOUNT：不適用，呼叫端以 amount==0 路徑跳過範圍檢核。</li>
  * </ul>
  */
@@ -44,7 +43,6 @@ public final class PaymentMethodLimitRules {
         map.put(PaymentMethod.CREDIT_CARD, new AmountRange(1L, 199_999L));
         map.put(PaymentMethod.APPLE_PAY, new AmountRange(1L, 199_999L));
         map.put(PaymentMethod.GOOGLE_PAY, new AmountRange(1L, 199_999L));
-        map.put(PaymentMethod.ATM, new AmountRange(15L, 49_999L));
         LIMITS = Map.copyOf(map);
     }
 
@@ -89,7 +87,7 @@ public final class PaymentMethodLimitRules {
     /**
      * 前端付款方式 gating 用：依訂單金額算出各 PayUni 付款方式的可用性。
      * <p>
-     * 規格見 20-結帳模組設計書 §3.4.1。回傳順序固定（信用卡 → Apple Pay → Google Pay → ATM）。
+     * 規格見 20-結帳模組設計書 §3.4.1。回傳順序固定（信用卡 → Apple Pay → Google Pay）。
      * <ul>
      *   <li>amount == 0（零元訂單）→ 回空清單（前端顯示「無需付款」，不走 PayUni）。</li>
      *   <li>amount &lt; min → eligible=false, reason=AMOUNT_BELOW_MIN。</li>
@@ -118,7 +116,7 @@ public final class PaymentMethodLimitRules {
 
     /** 候選付款方式（固定順序，與前端付款方式呈現順序對齊）。ZERO_AMOUNT 不在此列（零元由空清單表達）。 */
     private static final List<PaymentMethod> CANDIDATE_METHODS = List.of(
-            PaymentMethod.CREDIT_CARD, PaymentMethod.APPLE_PAY, PaymentMethod.GOOGLE_PAY, PaymentMethod.ATM);
+            PaymentMethod.CREDIT_CARD, PaymentMethod.APPLE_PAY, PaymentMethod.GOOGLE_PAY);
 
     /**
      * 單一付款方式對某金額的可用性結果（純資料，不依賴 proto）。

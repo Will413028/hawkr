@@ -1,7 +1,6 @@
 package io.github.will413028.hawkr.aftersales.mq;
 
 import io.github.will413028.hawkr.aftersales.mq.payload.AppealSubmittedPayload;
-import io.github.will413028.hawkr.aftersales.mq.payload.AwaitingBuyerRefundPagePayload;
 import io.github.will413028.hawkr.aftersales.mq.payload.CancelCompletedPayload;
 import io.github.will413028.hawkr.aftersales.mq.payload.CaseAutoEscalatedPayload;
 import io.github.will413028.hawkr.aftersales.mq.payload.CaseAutoRejectedPayload;
@@ -49,51 +48,6 @@ public class AfterSalesEventPublisherImpl implements AfterSalesEventPublisher {
         this.obsRabbitPublisher = obsRabbitPublisher;
         this.sellerGrpcClient = sellerGrpcClient;
         this.buyerGrpcClient = buyerGrpcClient;
-    }
-
-    @Override
-    public void publishAwaitingBuyerRefundPage(String orderNo, String caseNo, Long refundTaskId, Long buyerId) {
-        publish(MqConstants.EXCHANGE_AFTERSALES,
-                AfterSalesEventType.AWAITING_BUYER_PAGE.value(),
-                buildAwaitingBuyerRefundPagePayload(orderNo, caseNo, refundTaskId, buyerId),
-                MqConstants.EVENT_TYPE_AFTERSALES_AWAITING_BUYER_REFUND_PAGE,
-                orderNo);
-    }
-
-    @Override
-    public boolean tryPublishAwaitingBuyerRefundPage(String orderNo, String caseNo,
-                                                      Long refundTaskId, Long buyerId,
-                                                      EventPrincipals principals) {
-        try {
-            return tryPublish(MqConstants.EXCHANGE_AFTERSALES,
-                    AfterSalesEventType.AWAITING_BUYER_PAGE.value(),
-                    buildAwaitingBuyerRefundPagePayload(orderNo, caseNo, refundTaskId, buyerId,
-                            principals.notifyBuyerAccountId()),
-                    MqConstants.EVENT_TYPE_AFTERSALES_AWAITING_BUYER_REFUND_PAGE,
-                    orderNo);
-        } catch (Exception e) {
-            log.error("AfterSalesEventPublisherImpl.tryPublishAwaitingBuyerRefundPage.error",
-                    "payload 組裝失敗, orderNo=" + orderNo + ", caseNo=" + caseNo, e);
-            return false;
-        }
-    }
-
-    private AwaitingBuyerRefundPagePayload buildAwaitingBuyerRefundPagePayload(
-            String orderNo, String caseNo, Long refundTaskId, Long buyerId) {
-        return buildAwaitingBuyerRefundPagePayload(orderNo, caseNo, refundTaskId, buyerId,
-                resolveNotifyBuyerAccountId(buyerId));
-    }
-
-    private AwaitingBuyerRefundPagePayload buildAwaitingBuyerRefundPagePayload(
-            String orderNo, String caseNo, Long refundTaskId, Long buyerId,
-            Long notifyBuyerAccountId) {
-        return new AwaitingBuyerRefundPagePayload(
-                orderNo,
-                caseNo,
-                refundTaskId != null ? String.valueOf(refundTaskId) : null,
-                nowIso8601(),
-                buyerId != null ? String.valueOf(buyerId) : null,
-                String.valueOf(notifyBuyerAccountId));
     }
 
     @Override

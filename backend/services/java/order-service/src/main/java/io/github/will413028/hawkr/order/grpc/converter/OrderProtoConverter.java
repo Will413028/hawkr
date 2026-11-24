@@ -103,11 +103,6 @@ public final class OrderProtoConverter {
                     .setBuyerAvatarKey(buyerDisplay.getAvatarKey()); // 49 §6.6 S2+S9：只填 key，Gateway 組 buyerAvatarUrl
         }
 
-        // need_refund_page 標記（ATM 退款等待買家前往 PayUni 頁面）
-        if (order.getNeedRefundPage() != null && order.getNeedRefundPage()) {
-            builder.setNeedRefundPage(true);
-        }
-
         // is_reviewed 標記（任一商品已評論即 true）
         if (order.getIsReviewed() != null && order.getIsReviewed()) {
             builder.setIsReviewed(true);
@@ -243,17 +238,6 @@ public final class OrderProtoConverter {
             builder.addAllReceiptPhotoKeys(order.getReceiptPhotoKeys());
         }
 
-        // ATM 付款資訊快照（建單時寫入 Order DB，僅 ATM 付款時有值）
-        if (order.getAtmBankCode() != null) {
-            builder.setAtmBankCode(order.getAtmBankCode());
-        }
-        if (order.getAtmVirtualAccount() != null) {
-            builder.setAtmVirtualAccount(order.getAtmVirtualAccount());
-        }
-        if (order.getAtmExpireDate() != null) {
-            builder.setAtmExpireDate(order.getAtmExpireDate());
-        }
-
         // 賣家資訊聚合（即時從 Seller Service 取得）
         if (sellerMeta != null) {
             builder.setSellerName(sellerMeta.getSellerName())
@@ -289,11 +273,6 @@ public final class OrderProtoConverter {
                 itemBuilder.setProductName(item.getProductName());
             }
             builder.addItems(itemBuilder.build());
-        }
-
-        // need_refund_page 標記（ATM 退款等待買家前往 PayUni 頁面）
-        if (order.getNeedRefundPage() != null && order.getNeedRefundPage()) {
-            builder.setNeedRefundPage(true);
         }
 
         // is_reviewed 標記（任一商品已評論即 true）
@@ -393,8 +372,7 @@ public final class OrderProtoConverter {
                 // 買家收件資訊（映射自 orders 表的 recipient 欄位）
                 .setBuyerName(order.getRecipientName() != null ? order.getRecipientName() : "")
                 .setBuyerPhone(order.getRecipientPhone() != null ? order.getRecipientPhone() : "")
-                .setBuyerAddressDetail(order.getShippingAddress() != null ? order.getShippingAddress() : "")
-                .setNeedRefundPage(order.getNeedRefundPage() != null && order.getNeedRefundPage());
+                .setBuyerAddressDetail(order.getShippingAddress() != null ? order.getShippingAddress() : "");
 
         // 出貨照片快照（值為 objectKey；aftersales 透傳、Gateway 組顯示 URL）
         if (order.getShipmentPhotoKeys() != null && !order.getShipmentPhotoKeys().isEmpty()) {

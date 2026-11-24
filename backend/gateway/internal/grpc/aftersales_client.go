@@ -81,13 +81,6 @@ func (c *AftersalesClient) CancelAfterSaleCase(ctx context.Context, req *pb.Canc
 	return c.client.CancelAfterSaleCase(ctx, req)
 }
 
-// GetRefundPageUrl ATM 退款頁面 URL
-func (c *AftersalesClient) GetRefundPageUrl(ctx context.Context, req *pb.GetRefundPageUrlRequest) (*pb.GetRefundPageUrlResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	return c.client.GetRefundPageUrl(ctx, req)
-}
-
 // ==================== 賣家端 ====================
 
 // GetSellerAfterSaleCases 賣家售後列表
@@ -123,15 +116,6 @@ func (c *AftersalesClient) CancelShipment(ctx context.Context, req *pb.CancelShi
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	return c.client.CancelShipment(ctx, req)
-}
-
-// ==================== 回調處理 ====================
-
-// HandleRefundPageReturn ATM 退款頁面完成回調（解密 + 更新退款任務 + 回傳 Deep Link）
-func (c *AftersalesClient) HandleRefundPageReturn(ctx context.Context, req *pb.HandleRefundPageReturnRequest) (*pb.HandleRefundPageReturnResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-	return c.client.HandleRefundPageReturn(ctx, req)
 }
 
 // RetryPrintReturnLabel 7-11 退貨出貨便代碼人工重試列印（§5.3.7）

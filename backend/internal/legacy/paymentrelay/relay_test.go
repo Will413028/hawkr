@@ -177,7 +177,7 @@ func TestRefundSucceededWire(t *testing.T) {
 	check(t, a, got, "refund.succeeded", map[string]any{
 		"event_type": "refund.succeeded", "aggregate_type": "refund", "aggregate_id": "C77-0", "occurred_at": wireTime,
 		"refundNo": "C77-0", "tradeNo": "O20261124001", "orderId": "O20261124001", "amount": float64(120),
-		"providerRefundNo": "", "payuniStatus": "", "payuniMessage": "", "estimatedRefundDate": "", "bankDate": "",
+		"providerRefundNo": "", "payuniStatus": "", "payuniMessage": "",
 		"completedAt": wireTime, "occurredAt": wireTime,
 	})
 }

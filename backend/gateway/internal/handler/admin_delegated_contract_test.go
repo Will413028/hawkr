@@ -31,10 +31,10 @@ var delegatedForbiddenFields = []string{
 	"odno", "validationno", "partnerid", "pickupstorename",
 	"shipmentphotokeys", "receiptphotokeys", "cvsstoreid",
 	// 金流
-	"transactionid", "paymentmerid", "atmbankcode", "atmvirtualaccount",
-	"atmexpiredate", "providerstatus", "providermessage", "availablepaymentmethods",
+	"transactionid", "paymentmerid", "providerstatus", "providermessage",
+	"availablepaymentmethods",
 	// 退款與撥款
-	"refundhistory", "needrefundpage",
+	"refundhistory",
 	// 買家側行為與社群互動計數
 	"review", "isreviewed", "canreview", "reviewdeadline",
 	"likecount", "commentcount", "viewcount", "sharecount", "isliked",

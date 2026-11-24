@@ -12,17 +12,6 @@ public final class AfterSalesConstants {
 
     private AfterSalesConstants() {}
 
-    // ==================== PayUni 退款頁面回傳狀態（第三方協定，非 CodeMeta） ====================
-
-    public static final String PAYUNI_REFUND_PAGE_SUCCESS = "SUCCESS";
-    public static final String PAYUNI_REFUND_PAGE_FAIL = "FAIL";
-
-    /**
-     * PayUni 退款錯誤碼「無足夠金額可退款」（可退餘額不足，強烈代表該筆已退過）。
-     * 出現此碼不得 revert 讓買家重填，改對帳 payment 端實際狀態（issue #1288 / 09 §5.4.3.1）。
-     */
-    public static final String PAYUNI_REFUND_NO_BALANCE = "REF02037";
-
     // ==================== 逆向 leg 分類器（已遷出）====================
     // 🔴 5 個 PAYUNI_RETURN_* 常數於 2026-09-12 依 65 附錄 ADR-013 **整組刪除**。
     //

@@ -11,7 +11,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
@@ -36,8 +35,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("收款主體的政策契約")
 class PaymentMerIdPolicyContractTest {
 
-    private static final String AGENT_MER_ID = "HAWKAGENT";
-
     /**
      * 直接呼叫 private 的決策方法。
      *
@@ -45,11 +42,8 @@ class PaymentMerIdPolicyContractTest {
      * 不該為了測試而放寬。而找不到方法時<b>丟 AssertionError 不是 skip</b>——
      * 方法被改名的那天，skip 會讓這道守護靜默消失。
      */
-    private static String invokeResolve(String agentMerId, OrderPolicySnapshot policy) throws Exception {
+    private static String invokeResolve(OrderPolicySnapshot policy) throws Exception {
         CheckoutService service = newServiceWithoutDependencies();
-        Field agentField = CheckoutService.class.getDeclaredField("agentMerId");
-        agentField.setAccessible(true);
-        agentField.set(service, agentMerId);
 
         Method m;
         try {
@@ -94,32 +88,14 @@ class PaymentMerIdPolicyContractTest {
         @Test
         @DisplayName("賣家收款 → 不帶商店代號（收款走 payment 模組，可否接單由 can_accept_orders 擋）")
         void sellerMerchantCarriesNoMerId() throws Exception {
-            assertThat(invokeResolve(AGENT_MER_ID, policyWith(CollectionModel.SELLER_MERCHANT.value())))
+            assertThat(invokeResolve(policyWith(CollectionModel.SELLER_MERCHANT.value())))
                     .isEmpty();
         }
 
         @Test
-        @DisplayName("平台代理商戶收款 → 代理商 MerID")
-        void platformAgentUsesAgentMerId() throws Exception {
-            assertThat(invokeResolve(AGENT_MER_ID, policyWith(CollectionModel.PLATFORM_AGENT_MERCHANT.value())))
-                    .isEqualTo(AGENT_MER_ID);
-        }
-
-        /**
-         * 🔴 <b>兩個候選值必須不同</b>，否則「填錯也會通過」——
-         * 用同一個字串當賣家與平台的 MerID，這支測試會在決策邏輯完全反了的情況下照樣全綠。
-         */
-        @Test
-        @DisplayName("兩種收款模式必須解析出不同的 MerID（測試自身的鑑別力）")
-        void twoModelsResolveDifferently() throws Exception {
-            assertThat(invokeResolve(AGENT_MER_ID, policyWith(CollectionModel.SELLER_MERCHANT.value())))
-                    .isNotEqualTo(invokeResolve(AGENT_MER_ID, policyWith(CollectionModel.PLATFORM_AGENT_MERCHANT.value())));
-        }
-
-        @Test
-        @DisplayName("平台代收但代理商 MerID 未設定 → 結帳當下 fail-closed")
-        void platformCollectionWithoutAgentMerIdFailsClosed() {
-            assertThatThrownBy(() -> invokeResolve("", policyWith(CollectionModel.PLATFORM_AGENT_MERCHANT.value())))
+        @DisplayName("平台代收沒有收款路徑 → 結帳當下 fail-closed")
+        void platformCollectionFailsClosed() {
+            assertThatThrownBy(() -> invokeResolve(policyWith(CollectionModel.PLATFORM_AGENT_MERCHANT.value())))
                     .isInstanceOf(OrderBusinessException.class)
                     .satisfies(e -> assertThat(((OrderBusinessException) e).code())
                             .as("必須回 PLATFORM_COLLECTION_NOT_CONFIGURED，而不是通用參數錯誤——"
@@ -146,13 +122,13 @@ class PaymentMerIdPolicyContractTest {
                     "SOMETHING_NEW",
             };
             for (String model : denied) {
-                assertThatThrownBy(() -> invokeResolve(AGENT_MER_ID, policyWith(model)))
+                assertThatThrownBy(() -> invokeResolve(policyWith(model)))
                         .as("collection_model='" + model + "' 必須被擋下")
                         .isInstanceOf(OrderBusinessException.class)
                         .satisfies(e -> assertThat(((OrderBusinessException) e).code())
                                 .isEqualTo(GrpcResponseCode.FULFILLMENT_COMMERCE_MODEL_UNKNOWN.code()));
             }
-            assertThatThrownBy(() -> invokeResolve(AGENT_MER_ID, policyWith(null)))
+            assertThatThrownBy(() -> invokeResolve(policyWith(null)))
                     .as("collection_model=null 必須被擋下")
                     .isInstanceOf(OrderBusinessException.class);
         }

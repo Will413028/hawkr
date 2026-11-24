@@ -12890,53 +12890,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/orders/{order_no}/refund_page:
-    post:
-      operationId: getRefundPageUrl
-      summary: 取得 ATM 退款頁面 URL
-      description: 取得 PayUni ATM 退款頁面 URL，前端用 WebView 開啟讓買家填寫銀行資訊（售後退款 + 賣家取消出貨通用）
-      tags:
-      - AfterSales
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: order_no
-        in: path
-        description: 訂單編號
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/RefundPageUrlDataResponse'
-                  message:
-                    type: string
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/app/orders/{order_no}/seller_cancellations:
     post:
       operationId: cancelShipment
@@ -19626,45 +19579,6 @@ paths:
                     type: string
                   traceId:
                     type: string
-  /atm-refund/return:
-    post:
-      operationId: atmRefundReturn
-      summary: ATM 退款頁面回調
-      description: PayUni ATM 退款頁面完成後的 Form POST 回調，解密退款結果、更新退款任務、302 redirect 到 Deep Link 導回 App
-      tags:
-      - AfterSales
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              type: object
-              required:
-              - EncryptInfo
-              - HashInfo
-              properties:
-                EncryptInfo:
-                  type: string
-                  description: PayUni 加密資料
-                  x-formData-name: EncryptInfo
-                HashInfo:
-                  type: string
-                  description: PayUni 簽章
-                  x-formData-name: HashInfo
-      responses:
-        '302':
-          description: Redirect to Deep Link
-        '400':
-          description: 參數錯誤
-          content:
-            text/plain:
-              schema:
-                type: string
-        '503':
-          description: 服務不可用
-          content:
-            text/plain:
-              schema:
-                type: string
   /store_map/redirect:
     get:
       operationId: storeMapRedirect
@@ -20179,8 +20093,6 @@ components:
         logoUrl:
           type: string
           description: 商家 logo 顯示 URL（Gateway 組）
-        needRefundPage:
-          type: boolean
         odno:
           type: string
         orderNo:
@@ -20713,9 +20625,6 @@ components:
         autoEscalated:
           type: boolean
           description: §5.10 是否系統自動升級至平台仲裁
-        bankDate:
-          type: string
-          description: 實際到帳日 YYYY-MM-DD（僅 ATM 成功匯款後）
         buyerId:
           type: string
         canAppeal:
@@ -20728,9 +20637,6 @@ components:
           type: string
         description:
           type: string
-        estimatedRefundDate:
-          type: string
-          description: 預計扣款日 YYYY-MM-DD（僅 ATM 受理後）
         evidence:
           type: array
           items:
@@ -20739,8 +20645,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AfterSaleCaseItemResponse'
-        needRefundPage:
-          type: boolean
         odno:
           type: string
         orderNo:
@@ -20853,20 +20757,12 @@ components:
         avatarUrl:
           type: string
           description: 買家頭像顯示 URL（Gateway 組）
-        bankDate:
-          type: string
-          description: 實際到帳日 ISO 8601 YYYY-MM-DD（僅 ATM webhook 匯款成功後有值，信用卡恆空）
         buyerName:
           type: string
         caseNo:
           type: string
         createdAt:
           type: string
-        estimatedRefundDate:
-          type: string
-          description: 預計扣款日 ISO 8601 YYYY-MM-DD（僅 ATM 同步受理後有值，信用卡恆空）
-        needRefundPage:
-          type: boolean
         orderNo:
           type: string
         providerMessage:
@@ -20882,7 +20778,7 @@ components:
           description: 退款失敗訊息（PayUni 原話，直接透傳），成功時為空字串
         refundTaskStatus:
           type: string
-          description: WorkerTaskStatus value。合法值：0=PENDING, 5=AWAITING_BUYER_REFUND_PAGE, 10=PROCESSING, 15=AWAITING_WEBHOOK, 20=DONE, 30=FAILED, 40=MANUAL_INTERVENTION；無 refund_task 時為空字串
+          description: WorkerTaskStatus value。合法值：0=PENDING, 10=PROCESSING, 20=DONE, 30=FAILED, 40=MANUAL_INTERVENTION；無 refund_task 時為空字串
         refundableAmount:
           type: string
         returnShippingMethod:
@@ -21383,9 +21279,6 @@ components:
     CancelShipmentResultResponse:
       type: object
       properties:
-        needRefundPage:
-          type: boolean
-          description: 是否需前往 ATM 退款頁面
         orderNo:
           type: string
         refundAmount:
@@ -23978,12 +23871,6 @@ components:
     OrderDetailResponse:
       type: object
       properties:
-        atmBankCode:
-          type: string
-        atmExpireDate:
-          type: string
-        atmVirtualAccount:
-          type: string
         autoCompleteAt:
           type: string
         availablePaymentMethods:
@@ -24037,8 +23924,6 @@ components:
         logoUrl:
           type: string
           description: 商家 logo 顯示 URL（Gateway 組）
-        needRefundPage:
-          type: boolean
         odno:
           type: string
         orderNo:
@@ -24455,8 +24340,6 @@ components:
         logoUrl:
           type: string
           description: 商家 logo 顯示 URL（Gateway 組）
-        needRefundPage:
-          type: boolean
         odno:
           type: string
         orderNo:
@@ -26175,12 +26058,6 @@ components:
       properties:
         handoffCode:
           type: string
-    RefundPageUrlDataResponse:
-      type: object
-      properties:
-        redirectUrl:
-          type: string
-          description: PayUni 退款頁面 URL
     RefundRequestResponse:
       type: object
       properties:
@@ -26366,9 +26243,6 @@ components:
       properties:
         caseNo:
           type: string
-        needRefundPage:
-          type: boolean
-          description: 是否需前往 ATM 退款頁面
         returnShipmentNo:
           type: string
           description: 退貨物流單號（退貨退款時有值）

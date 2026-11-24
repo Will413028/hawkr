@@ -2,7 +2,6 @@ package io.github.will413028.hawkr.payuni.webhook;
 
 import io.github.will413028.hawkr.payuni.crypto.PayUniCryptoService;
 import io.github.will413028.hawkr.payuni.webhook.event.AgentNotifyEvent;
-import io.github.will413028.hawkr.payuni.webhook.event.PaymentUopEvent;
 import io.github.will413028.hawkr.payuni.webhook.event.ShippingStatusEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -23,64 +22,6 @@ class PayUniWebhookParserTest {
 
     private final PayUniCryptoService cryptoService = new PayUniCryptoService(TEST_KEY, TEST_IV);
     private final PayUniWebhookParser parser = new PayUniWebhookParser(cryptoService);
-
-    @Nested
-    @DisplayName("付款結果通知 (PAYMENT_UOP)")
-    class PaymentUopTest {
-
-        @Test
-        @DisplayName("正常付款成功 → PaymentUopEvent")
-        void paymentSuccess() {
-            Map<String, String> params = new LinkedHashMap<>();
-            params.put("MerID", "HAWK9");
-            params.put("MerTradeNo", "TRD001");
-            params.put("TradeNo", "P20260216001");
-            params.put("TradeStatus", "1");
-            params.put("TradeAmt", "1000");
-            params.put("PayType", "Credit");
-            params.put("Message", "付款成功");
-
-            String encrypted = cryptoService.encrypt(params);
-            String hash = cryptoService.calculateHash(encrypted);
-
-            WebhookParseResult result = parser.parse(encrypted, hash);
-
-            assertEquals(WebhookType.PAYMENT_UOP, result.type());
-            assertInstanceOf(PaymentUopEvent.class, result.event());
-
-            PaymentUopEvent event = (PaymentUopEvent) result.event();
-            assertEquals("HAWK9", event.merId());
-            assertEquals("TRD001", event.merTradeNo());
-            assertEquals("P20260216001", event.tradeNo());
-            assertEquals("1", event.tradeStatus());
-            assertEquals("1000", event.tradeAmt());
-            assertEquals("Credit", event.payType());
-
-            assertNotNull(result.rawMap());
-            assertEquals(encrypted, result.encryptInfo());
-            assertEquals(hash, result.hashInfo());
-        }
-
-        @Test
-        @DisplayName("付款失敗 → TradeStatus=2")
-        void paymentFailed() {
-            Map<String, String> params = new LinkedHashMap<>();
-            params.put("MerTradeNo", "TRD002");
-            params.put("TradeNo", "P20260216002");
-            params.put("TradeStatus", "2");
-            params.put("TradeAmt", "500");
-            params.put("Message", "餘額不足");
-
-            String encrypted = cryptoService.encrypt(params);
-            String hash = cryptoService.calculateHash(encrypted);
-
-            WebhookParseResult result = parser.parse(encrypted, hash);
-            assertEquals(WebhookType.PAYMENT_UOP, result.type());
-
-            PaymentUopEvent event = (PaymentUopEvent) result.event();
-            assertEquals("2", event.tradeStatus());
-        }
-    }
 
     @Nested
     @DisplayName("物流貨態通知 (SHIPPING_STATUS)")
@@ -143,11 +84,11 @@ class PayUniWebhookParserTest {
     }
 
     @Nested
-    @DisplayName("週期扣款通知（不處理）")
+    @DisplayName("金流通知（不處理）")
     class PeriodNotificationTest {
 
         @Test
-        @DisplayName("含 PeriodTradeNo 的通知即使帶 TradeAmt／TradeStatus 也判為 UNKNOWN，不誤判成 PAYMENT_UOP")
+        @DisplayName("付款或週期扣款通知判為 UNKNOWN：金流不經 PayUni")
         void periodNotificationIsUnknown() {
             Map<String, String> params = new LinkedHashMap<>();
             params.put("MerID", "HAWK9");

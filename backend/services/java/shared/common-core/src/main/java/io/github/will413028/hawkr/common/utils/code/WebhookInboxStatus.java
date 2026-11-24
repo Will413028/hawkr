@@ -4,7 +4,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * payuni-webhook-service 的 inbox 收件箱狀態。表達「收件流程的階段」，與 WebhookProcessStatus（payment-service 處理結果）為**不同層級**：前者紀錄 webhook-service 自身的收件→去重→入隊流程，後者紀錄下游 payment-service 的處理結果。
+ * payuni-webhook-service 的 inbox 收件箱狀態。表達「收件流程的階段」，紀錄 webhook-service 自身的收件→去重→入隊流程。
  *
  * ⚠ 此檔案由 generate.sh 自動生成，請勿手動修改。
  * 業務輔助邏輯請在使用該 enum 的服務或模組內建立 helper class

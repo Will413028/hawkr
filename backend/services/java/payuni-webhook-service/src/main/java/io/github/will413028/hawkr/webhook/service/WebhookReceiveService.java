@@ -110,25 +110,13 @@ public class WebhookReceiveService {
         }
         // 注意：T1 其他例外（非 DupKey）不被 catch，向上拋 → controller 回 500 → PayUni 重送
 
-        // Step 3: UNKNOWN 處理（§2.2 業務 pivot 2026-05-14：保守失敗處理）
-        // - payload 無 MerID → 無法綁定任何業務 task，維持既有 IGNORED 終態（不投遞 MQ）
-        // - payload 含 MerID → 投遞 payuni.unknown.fallback 由 aftersales / payment 兩個 fallback consumer 接手
+        // Step 3: UNKNOWN（含已不經 PayUni 的金流通知）→ 寫入 inbox 稽核並標 IGNORED，不投遞 MQ
         if (actualType == PayUniEventType.UNKNOWN) {
-            String rawMerId = payload.get("MerID");
-            boolean hasMerId = rawMerId != null && !rawMerId.isBlank();
-            if (!hasMerId) {
-                inboxTxOps.markIgnored(inbox.getId());
-                log.warn("WebhookReceiveService.unknown.noMerId.markedIgnored",
-                        "UNKNOWN webhook 無 MerID 無法綁定，已寫入 inbox 並標 IGNORED eventKey=" + eventKey,
-                        "eventKey", eventKey);
-                return;
-            }
-            // 含 MerID：log.error 觸發 alert（§F.5 universal alert），然後繼續走 Step 4 T2 投遞 fallback queue
-            log.error("WebhookReceiveService.unknown.fallback",
-                    "UNKNOWN webhook 含 MerID，投遞 fallback queue 由下游 consumer 接手 merId=" + rawMerId
-                            + " eventKey=" + eventKey,
+            inboxTxOps.markIgnored(inbox.getId());
+            log.warn("WebhookReceiveService.unknown.markedIgnored",
+                    "UNKNOWN webhook 已寫入 inbox 並標 IGNORED eventKey=" + eventKey,
                     "eventKey", eventKey);
-            // 不 return，繼續 Step 4
+            return;
         }
 
         // Step 4: T2 — outbox INSERT(s) + inbox status=ENQUEUED（REQUIRES_NEW）
@@ -224,12 +212,9 @@ public class WebhookReceiveService {
 
     private PayUniEventType resolveType(WebhookParseResult parseResult) {
         return switch (parseResult.type()) {
-            case PAYMENT_UOP -> PayUniEventType.PAYMENT_UOP;
             case SHIPPING_STATUS -> PayUniEventType.SHIPPING_STATUS;
             case SHIPPING_PRINT -> PayUniEventType.SHIPPING_PRINT;
             case AGENT_NOTIFY -> PayUniEventType.AGENT_NOTIFY;
-            case REFUND_NOTIFY -> PayUniEventType.REFUND_NOTIFY;
-            case REFUND_ACCEPTED -> PayUniEventType.REFUND_ACCEPTED;
             case UNKNOWN -> PayUniEventType.UNKNOWN;
         };
     }

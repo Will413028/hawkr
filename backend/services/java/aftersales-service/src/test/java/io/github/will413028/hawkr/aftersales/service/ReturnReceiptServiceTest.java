@@ -5,7 +5,6 @@ import io.github.will413028.hawkr.aftersales.entity.AfterSaleCaseEntity;
 import io.github.will413028.hawkr.aftersales.entity.AfterSaleResolutionEntity;
 import io.github.will413028.hawkr.aftersales.entity.RefundTaskEntity;
 import io.github.will413028.hawkr.aftersales.exception.AfterSalesBusinessException;
-import io.github.will413028.hawkr.aftersales.grpc.client.PaymentGrpcClient;
 import io.github.will413028.hawkr.aftersales.mapper.AfterSaleCaseMapper;
 import io.github.will413028.hawkr.aftersales.mapper.AfterSaleResolutionMapper;
 import io.github.will413028.hawkr.aftersales.mapper.RefundTaskMapper;
@@ -14,8 +13,6 @@ import io.github.will413028.hawkr.common.utils.TsidUtil;
 import io.github.will413028.hawkr.common.utils.code.AfterSaleCaseStatus;
 import io.github.will413028.hawkr.common.utils.code.GrpcResponseCode;
 import io.github.will413028.hawkr.common.utils.code.PaymentMethod;
-import io.github.will413028.hawkr.payment.grpc.CreateRefundResponse;
-import io.github.will413028.hawkr.payment.grpc.RefundDetail;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -66,7 +63,6 @@ class ReturnReceiptServiceTest {
     @Mock private AfterSalesEventPublisher eventPublisher;
     @Mock private EvidenceService evidenceService;
     @Mock private AfterSaleCaseService caseService;
-    @Mock private PaymentGrpcClient paymentGrpcClient;
 
     private AfterSalesProperties properties;
     private ReturnReceiptService service;
@@ -92,16 +88,13 @@ class ReturnReceiptServiceTest {
         properties.getRefund().setMaxRetryCount(10);
         service = new ReturnReceiptService(
                 caseMapper, resolutionMapper, refundTaskMapper, auditService,
-                properties, eventPublisher, evidenceService, caseService, paymentGrpcClient);
+                properties, eventPublisher, evidenceService, caseService);
         // issue #2294 B5/B6/B7：publish 改用會傳遞失敗的變體，Mockito 對 boolean 預設回 false
         // ⇒ 不 stub 的話每個 happy path 都會被判為「publish 失敗」而拋例外。預設補成成功。
         // （帶 EventPrincipals 的零 gRPC 多載；不帶的那些留給 never() 斷言，刻意不 stub）
         when(eventPublisher.tryPublishCaseTransitionWithContext(
                 anyString(), anyString(), anyString(), anyString(), any(), any(), anyString(),
                 any(), any(EventPrincipals.class)))
-                .thenReturn(true);
-        when(eventPublisher.tryPublishAwaitingBuyerRefundPage(
-                any(), any(), any(), any(), any(EventPrincipals.class)))
                 .thenReturn(true);
     }
 
@@ -118,7 +111,6 @@ class ReturnReceiptServiceTest {
         verify(eventPublisher, never()).tryPublishCaseTransitionWithContext(
                 anyString(), anyString(), anyString(), anyString(), any(), any(), anyString(),
                 any());
-        verify(eventPublisher, never()).publishAwaitingBuyerRefundPage(any(), any(), any(), any());
     }
 
     // ==================== autoConfirmReceipt（27→30，CONFIRM_RECEIPT_TIMEOUT）====================
@@ -150,11 +142,6 @@ class ReturnReceiptServiceTest {
         Map<String, Object> extra = extraCap.getValue();
         assertEquals("3001", extra.get("shipping_method"));
         assertNotNull(extra.get("deadline_at"));
-
-        // 非 ATM 不應該呼叫 publishAwaitingBuyerRefundPage（含 try 變體）
-        verify(eventPublisher, never()).publishAwaitingBuyerRefundPage(any(), any(), any(), any());
-        verify(eventPublisher, never()).tryPublishAwaitingBuyerRefundPage(
-                any(), any(), any(), any(), any());
         // B5：tx 內零身分反解 gRPC —— 退回不帶 principals 的多載即轉紅
         // （範圍限定見 EventPrincipalPreResolutionTest 的同名註解）
         assertNoGrpcDoingPublishOverloadUsed();
@@ -298,48 +285,6 @@ class ReturnReceiptServiceTest {
         assertThrows(EventPublishFailedException.class, () -> service.autoCompleteFromAtStore("A011", PRINCIPALS));
     }
 
-    @Test
-    void atmRefundPagePublishFails_throwsSoTxRollsBack() {
-        // B7：ATM 路徑的 awaiting_buyer_refund_page 遺失＝買家永遠拿不到退款頁連結、退款卡死。
-        // ⚠️ 這個 helper 被兩條排程 ＋ 兩條 API 共用 ⇒ 本斷言同時鎖住「API 側接受 fail-closed」的裁決（09 §5.3.7）。
-        AfterSaleCaseEntity entity = caseWith("A012", "O1200", "27", "3001",
-                PaymentMethod.ATM.value());
-        entity.setAutoConfirmAt(LocalDateTime.of(2026, 5, 22, 1, 0));
-        stubLoadCase(entity);
-        stubResolutionAmount("A012", 900L);
-        when(caseMapper.markAutoCompletedFromDelivered(eq("A012"), any())).thenReturn(1);
-        when(caseMapper.markRefundProcessingFromReceived("A012")).thenReturn(1);
-        when(paymentGrpcClient.createRefund(anyString(), anyString(), anyString(), anyString()))
-                .thenReturn(atmCreateRefundOk());
-        when(eventPublisher.tryPublishAwaitingBuyerRefundPage(
-                any(), any(), any(), any(), any(EventPrincipals.class)))
-                .thenReturn(false);
-
-        assertThrows(EventPublishFailedException.class, () -> service.autoConfirmReceipt("A012", PRINCIPALS));
-    }
-
-    @Test
-    void atmRefundPagePublishSucceeds_usesFailurePropagatingVariant() {
-        // 正面對照：ATM happy path 走的必須是 try 變體（不是舊的吞噬版），否則上面那支測試永遠不會紅
-        AfterSaleCaseEntity entity = caseWith("A013", "O1300", "27", "3001",
-                PaymentMethod.ATM.value());
-        entity.setAutoConfirmAt(LocalDateTime.of(2026, 5, 22, 1, 0));
-        stubLoadCase(entity);
-        stubResolutionAmount("A013", 900L);
-        when(caseMapper.markAutoCompletedFromDelivered(eq("A013"), any())).thenReturn(1);
-        when(caseMapper.markRefundProcessingFromReceived("A013")).thenReturn(1);
-        when(paymentGrpcClient.createRefund(anyString(), anyString(), anyString(), anyString()))
-                .thenReturn(atmCreateRefundOk());
-
-        assertTrue(service.autoConfirmReceipt("A013", PRINCIPALS));
-
-        // B7：帶 principals 的零 gRPC 多載 ＋ 預解值真的被帶下去（55 ≠ buyerId 2001）
-        verify(eventPublisher).tryPublishAwaitingBuyerRefundPage(
-                eq("O1300"), eq("A013"), any(), eq(2001L), eq(PRINCIPALS));
-        verify(eventPublisher, never()).publishAwaitingBuyerRefundPage(any(), any(), any(), any());
-        assertNoGrpcDoingPublishOverloadUsed();
-    }
-
     // ==================== confirmReceipt（賣家手動，前置必須 status=27）====================
 
     @Test
@@ -409,8 +354,7 @@ class ReturnReceiptServiceTest {
     @Test
     void forceConfirmReceiptByAdmin_transitionPublishFails_stillSucceeds() {
         // API 路徑的 CASE_RETURN_RECEIVED 維持 best-effort：MQ 故障只是少一則通知，
-        // 不該讓 Admin 的強制確認整筆失敗（與同 tx 內 ATM 退款頁事件的 fail-closed 是兩種等級，
-        // 差別在「遺失的後果是少一則通知」vs「錢退不出去且沒人知道」）。
+        // 不該讓 Admin 的強制確認整筆失敗。
         AfterSaleCaseEntity entity = caseWith("A014", "O1400", "27", "3001",
                 PaymentMethod.CREDIT_CARD.value());
         stubLoadCase(entity);
@@ -508,13 +452,6 @@ class ReturnReceiptServiceTest {
         return e;
     }
 
-
-    private CreateRefundResponse atmCreateRefundOk() {
-        return CreateRefundResponse.newBuilder()
-                .setCode(0)
-                .setData(RefundDetail.newBuilder().setRefundNo("RF-TEST").build())
-                .build();
-    }
 
     private void stubLoadCase(AfterSaleCaseEntity entity) {
         when(caseMapper.selectOne(any())).thenReturn(entity);

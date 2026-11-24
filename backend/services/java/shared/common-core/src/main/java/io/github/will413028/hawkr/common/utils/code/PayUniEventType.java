@@ -12,12 +12,9 @@ import java.util.stream.Collectors;
  */
 public enum PayUniEventType implements CodeMeta {
 
-    PAYMENT_UOP("PAYMENT_UOP", "8251", "付款結果", "PayUni 付款結果通知（UOP）→ payuni.payment.uop"),
     SHIPPING_STATUS("SHIPPING_STATUS", "8252", "物流狀態", "PayUni 物流狀態通知 → payuni.shipping.status"),
     SHIPPING_PRINT("SHIPPING_PRINT", "8253", "超商列印", "超商列印結果（與 SHIPPING_STATUS 共用 routing key）"),
     AGENT_NOTIFY("AGENT_NOTIFY", "8254", "代理通知", "PayUni 代理通知（賣家 onboarding 等）→ seller.review.result"),
-    REFUND_NOTIFY("REFUND_NOTIFY", "8255", "退款結果", "PayUni ATM 退款結果通知（含 RefundStatus / BankDate，匯款完成 / 失敗）→ payuni.refund.notify"),
-    REFUND_ACCEPTED("REFUND_ACCEPTED", "8256", "退款受理", "PayUni ATM 退款受理通知（含 EstimatedRefundDate 無 RefundStatus；sync return URL 的 async 副本）→ payuni.refund.accepted"),
     UNKNOWN("UNKNOWN", "8259", "未知事件", "無法由 payload 辨識的 PayUni webhook，仍寫入 inbox 稽核並打印 warning，由人工或重送處理");
 
     private final String code;

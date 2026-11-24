@@ -56,15 +56,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
     private final io.github.will413028.hawkr.aftersales.grpc.client.SellerGrpcClient sellerGrpcClient;
     private final io.github.will413028.hawkr.aftersales.grpc.client.ShippingGrpcClient shippingGrpcClient;
     private final io.github.will413028.hawkr.aftersales.grpc.client.OrderGrpcClient orderGrpcClient;
-    private final io.github.will413028.hawkr.aftersales.service.AtmRefundReconciler atmRefundReconciler;
-    // handleRefundPageReturn 的 REF02037 / 缺陷 B 對帳分支含多筆寫入（task transition + close case
-    // + audit + publish），須以 TransactionTemplate 程式式包覆確保原子（gRPC handler 無 @Transactional）；
-    // 且 payment 端狀態查詢的同步 gRPC 必須在 tx 外先做（P1-1 / P1-2，issue #1288）。
-    private final org.springframework.transaction.support.TransactionTemplate refundReconcileTxTemplate;
-
-    @Value("${hawkr.web.frontend-url}")
-    private String webFrontendUrl;
-
     public AfterSalesGrpcService(AfterSaleCaseService caseService,
                                   AfterSaleResolutionService resolutionService,
                                   ReturnReceiptService returnReceiptService,
@@ -84,9 +75,7 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                                   io.github.will413028.hawkr.aftersales.grpc.client.BuyerGrpcClient buyerGrpcClient,
                                   io.github.will413028.hawkr.aftersales.grpc.client.SellerGrpcClient sellerGrpcClient,
                                   io.github.will413028.hawkr.aftersales.grpc.client.ShippingGrpcClient shippingGrpcClient,
-                                  io.github.will413028.hawkr.aftersales.grpc.client.OrderGrpcClient orderGrpcClient,
-                                  io.github.will413028.hawkr.aftersales.service.AtmRefundReconciler atmRefundReconciler,
-                                  org.springframework.transaction.PlatformTransactionManager txManager) {
+                                  io.github.will413028.hawkr.aftersales.grpc.client.OrderGrpcClient orderGrpcClient) {
         this.caseService = caseService;
         this.resolutionService = resolutionService;
         this.returnReceiptService = returnReceiptService;
@@ -107,9 +96,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
         this.sellerGrpcClient = sellerGrpcClient;
         this.shippingGrpcClient = shippingGrpcClient;
         this.orderGrpcClient = orderGrpcClient;
-        this.atmRefundReconciler = atmRefundReconciler;
-        this.refundReconcileTxTemplate =
-                new org.springframework.transaction.support.TransactionTemplate(txManager);
     }
 
     // ==================== 買家端 ====================
@@ -139,7 +125,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                     .setReason(caseEntity.getReason())
                     .setRefundableAmount(ProtoConversionUtils.formatLong(caseEntity.getRefundableAmount()))
                     .setCreatedAt(ProtoConversionUtils.formatIso8601(caseEntity.getCreatedAt()))
-                    .setNeedRefundPage(false)
                     .build();
 
             observer.onNext(CreateAfterSaleCaseResponse.newBuilder()
@@ -377,7 +362,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
 
             // 重新查詢最新狀態
             AfterSaleCaseEntity updatedCase = caseService.getCase(request.getCaseNo());
-            boolean needRefundPage = isNeedRefundPage(updatedCase);
 
             observer.onNext(ResolveAfterSaleCaseResponse.newBuilder()
                     .setCode(GrpcResponseCode.SUCCESS.code())
@@ -386,7 +370,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                             .setCaseNo(updatedCase.getCaseNo())
                             .setStatus(updatedCase.getStatus())
                             .setReturnShipmentNo(nullToEmpty(updatedCase.getReturnShipmentNo()))
-                            .setNeedRefundPage(needRefundPage)
                             .build())
                     .build());
             observer.onCompleted();
@@ -484,15 +467,7 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                             .last("LIMIT 1")
             );
 
-            boolean needRefundPage = false;
-            Long refundAmount = 0L;
-            if (cancelEntity != null) {
-                refundAmount = cancelEntity.getRefundAmount();
-                if (PaymentMethod.ATM.value().equals(cancelEntity.getPaymentMethod())
-                        && SellerCancelStatus.REFUND_PROCESSING.value().equals(cancelEntity.getStatus())) {
-                    needRefundPage = true;
-                }
-            }
+            Long refundAmount = cancelEntity != null ? cancelEntity.getRefundAmount() : 0L;
 
             observer.onNext(CancelShipmentResponse.newBuilder()
                     .setCode(GrpcResponseCode.SUCCESS.code())
@@ -500,7 +475,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                     .setData(CancelShipmentResultData.newBuilder()
                             .setOrderNo(request.getOrderNo())
                             .setRefundAmount(ProtoConversionUtils.formatLong(refundAmount))
-                            .setNeedRefundPage(needRefundPage)
                             .build())
                     .build());
             observer.onCompleted();
@@ -510,65 +484,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
         } finally {
             MDC.remove("order_no");
         }
-    }
-
-    // ==================== 內部 RPC ====================
-
-    // ==================== Deep Link 建構 ====================
-
-    /**
-     * ATM 退款成功 Deep Link。
-     */
-    /**
-     * 依 client_type × app_type 矩陣組裝失敗 redirect_url。
-     */
-    private String buildRefundErrorRedirectUrl(String clientType, String appType,
-                                                String orderNo, String tradeNo,
-                                                String code, String errorMessage) {
-        String safeOrderNo = orderNo != null ? orderNo : "";
-        String safeError = errorMessage != null ? errorMessage : "退款失敗";
-        String safeTradeNo = tradeNo != null ? tradeNo : "";
-        String safeCode = code != null ? code : "";
-        String resolvedClient = resolveClientType(clientType);
-        String resolvedApp = resolveAppType(appType);
-
-        if (ClientType.WEB_BROWSER.value().equals(resolvedClient)) {
-            resolveWebAppFallback(resolvedApp, safeOrderNo);
-            String base = stripTrailingSlash(webFrontendUrl) + "/orders/" + urlEncode(safeOrderNo) + "/refund";
-            return base + "?status=failed"
-                    + "&trade_no=" + urlEncode(safeTradeNo)
-                    + "&code=" + urlEncode(safeCode);
-        }
-
-        String scheme = AppType.SELLER.value().equals(resolvedApp) ? "hawkrseller" : "hawkrbuyer";
-        return scheme + "://refund/result?orderNo=" + urlEncode(safeOrderNo)
-                + "&status=failed"
-                + "&error=" + urlEncode(safeError);
-    }
-
-    private String resolveClientType(String value) {
-        return ClientType.isValidValue(value) ? value : ClientType.MOBILE_APP.value();
-    }
-
-    private String resolveAppType(String value) {
-        return AppType.isValidValue(value) ? value : AppType.BUYER.value();
-    }
-
-    // Phase 1: WEB_BROWSER + SELLER 不支援 → 退回 BUYER 路徑並留下軌跡
-    private void resolveWebAppFallback(String appType, String orderNo) {
-        if (AppType.SELLER.value().equals(appType)) {
-            log.warn("AfterSalesGrpcService.handleRefundPageReturn.webSellerFallback",
-                    "WEB_BROWSER+SELLER 尚未支援，fallback 為 BUYER", "order_no", orderNo);
-        }
-    }
-
-    private static String stripTrailingSlash(String url) {
-        if (url == null || url.isEmpty()) return "";
-        return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
-    }
-
-    private static String urlEncode(String value) {
-        return java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8);
     }
 
     // ==================== 私有方法 ====================
@@ -586,17 +501,14 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                 .setReason(nullToEmpty(entity.getReason()))
                 .setRefundableAmount(ProtoConversionUtils.formatLong(entity.getRefundableAmount()))
                 .setCreatedAt(ProtoConversionUtils.formatIso8601(entity.getCreatedAt()))
-                .setNeedRefundPage(isNeedRefundPage(entity))
                 .setBuyerName(nullToEmpty(entity.getBuyerName()))
                 .setBuyerAvatarKey(nullToEmpty(buyerAvatarKey)) // 49 §6.6 S2+S9：只填 key，Gateway 組
                 .setShippingAddress(composeShippingAddress(entity))
                 .setReturnShippingMethod(nullToEmpty(entity.getReturnShippingMethod()))
                 .setTemperatureCode(nullToEmpty(entity.getDeliveryTemp()))
                 .setAppealState(nullToEmpty(entity.getAppealState()))
-                .setRefundTaskStatus(snapshot.status)
-                .setRefundFailureMessage(snapshot.failureMessage)
-                .setEstimatedRefundDate(snapshot.estimatedRefundDate)
-                .setBankDate(snapshot.bankDate)
+                .setRefundTaskStatus(snapshot.status())
+                .setRefundFailureMessage(snapshot.failureMessage())
                 .setProviderStatus(providerPair.status)
                 .setProviderMessage(providerPair.message)
                 .setAutoConfirmAt(entity.getAutoConfirmAt() != null
@@ -635,7 +547,7 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
             }
         }
 
-        // Bucket 1: REFUND_PROCESSING — 批次讀 refund_tasks.payuni_*（本地 snapshot）
+        // Bucket 1: REFUND_PROCESSING — 批次讀 refund_tasks.provider_*（本地 snapshot）
         if (!refundCaseNos.isEmpty()) {
             List<RefundTaskEntity> tasks = refundTaskMapper.selectList(
                     new LambdaQueryWrapper<RefundTaskEntity>()
@@ -656,8 +568,8 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
             }
             for (Map.Entry<String, RefundTaskEntity> e : latestByCase.entrySet()) {
                 out.put(e.getKey(), new ProviderStatusPair(
-                        nullToEmpty(e.getValue().getPayuniStatus()),
-                        nullToEmpty(e.getValue().getPayuniMessage())));
+                        nullToEmpty(e.getValue().getProviderStatus()),
+                        nullToEmpty(e.getValue().getProviderMessage())));
             }
         }
 
@@ -727,7 +639,6 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                 .setPartnerId(nullToEmpty(caseEntity.getPartnerId()))
                 .setOdno(nullToEmpty(caseEntity.getOdno()))
                 .setValidationNo(nullToEmpty(caseEntity.getValidationNo()))
-                .setNeedRefundPage(isNeedRefundPage(caseEntity))
                 .setCreatedAt(ProtoConversionUtils.formatIso8601(caseEntity.getCreatedAt()));
 
         if (caseEntity.getClosedAt() != null) {
@@ -806,10 +717,8 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
 
         // §2.2 退款任務欄位（snapshot from refund_tasks）
         RefundTaskSnapshot snapshot = loadRefundTaskSnapshot(caseEntity.getCaseNo());
-        detailBuilder.setRefundTaskStatus(snapshot.status);
-        detailBuilder.setRefundFailureMessage(snapshot.failureMessage);
-        detailBuilder.setEstimatedRefundDate(snapshot.estimatedRefundDate);
-        detailBuilder.setBankDate(snapshot.bankDate);
+        detailBuilder.setRefundTaskStatus(snapshot.status());
+        detailBuilder.setRefundFailureMessage(snapshot.failureMessage());
 
         // 收斂規範 §6.2：依 case 當下 status 決定 provider 取源
         ProviderStatusPair providerPair = resolveCaseProviderStatus(caseEntity, snapshot);
@@ -875,7 +784,7 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
 
     /**
      * 依 case 當下 status 決定 providerStatus / providerMessage 取源：
-     * - 退款相關（REFUND_PROCESSING）→ refund_tasks.payuni_*（本地 snapshot）
+     * - 退款相關（REFUND_PROCESSING）→ refund_tasks.provider_*（本地 snapshot）
      * - 退貨物流相關（RETURN_SHIPPING）→ 呼 Shipping.BatchGetProviderStatusByOrderIds(isReturn=true)（單筆）
      * - 其他狀態 → 空字串
      */
@@ -883,15 +792,15 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
                                                           RefundTaskSnapshot snapshot) {
         String status = caseEntity.getStatus();
         if (AfterSaleCaseStatus.REFUND_PROCESSING.value().equals(status)) {
-            // 從 refund_tasks 讀 payuni_status / payuni_message 的 raw 值（不挑失敗才透傳）
+            // 從 refund_tasks 讀 provider_status / provider_message 的 raw 值（不挑失敗才透傳）
             RefundTaskEntity task = refundTaskMapper.selectOne(
                     new LambdaQueryWrapper<RefundTaskEntity>()
                             .eq(RefundTaskEntity::getCaseNo, caseEntity.getCaseNo())
                             .orderByDesc(RefundTaskEntity::getCreatedAt)
                             .last("LIMIT 1"));
             if (task == null) return ProviderStatusPair.EMPTY;
-            return new ProviderStatusPair(nullToEmpty(task.getPayuniStatus()),
-                    nullToEmpty(task.getPayuniMessage()));
+            return new ProviderStatusPair(nullToEmpty(task.getProviderStatus()),
+                    nullToEmpty(task.getProviderMessage()));
         }
         if (AfterSaleCaseStatus.RETURN_SHIPPING.value().equals(status)) {
             return resolveReturnShippingProviderStatus(List.of(caseEntity)).getOrDefault(
@@ -935,20 +844,8 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
      * 退款任務 snapshot（供 Summary / Detail 組裝使用）。
      * 無對應 refund_task 時所有欄位為空字串。
      */
-    private static final class RefundTaskSnapshot {
-        static final RefundTaskSnapshot EMPTY = new RefundTaskSnapshot("", "", "", "");
-        final String status;
-        final String failureMessage;
-        final String estimatedRefundDate;
-        final String bankDate;
-
-        RefundTaskSnapshot(String status, String failureMessage,
-                           String estimatedRefundDate, String bankDate) {
-            this.status = status;
-            this.failureMessage = failureMessage;
-            this.estimatedRefundDate = estimatedRefundDate;
-            this.bankDate = bankDate;
-        }
+    private record RefundTaskSnapshot(String status, String failureMessage) {
+        static final RefundTaskSnapshot EMPTY = new RefundTaskSnapshot("", "");
     }
 
     private RefundTaskSnapshot loadRefundTaskSnapshot(String caseNo) {
@@ -963,40 +860,11 @@ public class AfterSalesGrpcService extends AfterSalesServiceGrpc.AfterSalesServi
         if (task == null) {
             return RefundTaskSnapshot.EMPTY;
         }
-        // refund_failure_message 透傳規則見 §2.2.1：
-        //  - state=5 (AWAITING_BUYER_REFUND_PAGE)：若 payuni_message 有值，代表買家上次填寫失敗，需讓前端看到錯誤原因並「重新填寫」
-        //  - state=30 (FAILED)：終態失敗，客服介入
-        //  - 其他狀態：payuni_message 可能是成功訊息（如 "退款轉匯處理成功"），不透傳以免污染 refund_failure_message 語意
-        String failureMessage = "";
-        String taskStatus = task.getStatus();
-        if (WorkerTaskStatus.FAILED.value().equals(taskStatus)
-                || WorkerTaskStatus.AWAITING_BUYER_REFUND_PAGE.value().equals(taskStatus)) {
-            failureMessage = nullToEmpty(task.getPayuniMessage());
-        }
-        return new RefundTaskSnapshot(
-                nullToEmpty(task.getStatus()),
-                failureMessage,
-                task.getEstimatedRefundDate() != null ? task.getEstimatedRefundDate().toString() : "",
-                task.getBankDate() != null ? task.getBankDate().toString() : ""
-        );
-    }
-
-    /**
-     * 判斷案件是否需要買家操作 ATM 退款頁面。
-     */
-    private boolean isNeedRefundPage(AfterSaleCaseEntity entity) {
-        if (!PaymentMethod.ATM.value().equals(entity.getPaymentMethod())) {
-            return false;
-        }
-        if (!AfterSaleCaseStatus.REFUND_PROCESSING.value().equals(entity.getStatus())) {
-            return false;
-        }
-        Long count = refundTaskMapper.selectCount(
-                new LambdaQueryWrapper<RefundTaskEntity>()
-                        .eq(RefundTaskEntity::getCaseNo, entity.getCaseNo())
-                        .eq(RefundTaskEntity::getStatus, WorkerTaskStatus.AWAITING_BUYER_REFUND_PAGE.value())
-        );
-        return count != null && count > 0;
+        // refund_failure_message 只在終態失敗（FAILED）透傳 provider 訊息；其他狀態的訊息不是失敗原因。
+        String failureMessage = WorkerTaskStatus.FAILED.value().equals(task.getStatus())
+                ? nullToEmpty(task.getProviderMessage())
+                : "";
+        return new RefundTaskSnapshot(nullToEmpty(task.getStatus()), failureMessage);
     }
 
     private static String nullToEmpty(String value) {

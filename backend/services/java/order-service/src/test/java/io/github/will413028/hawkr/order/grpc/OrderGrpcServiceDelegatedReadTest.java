@@ -67,7 +67,7 @@ class OrderGrpcServiceDelegatedReadTest {
                 sellerGrpcClient, buyerGrpcClient, mediaGrpcClient, mediaUrlProperties,
                 grantPaymentTaskRepository,
                 org.mockito.Mockito.mock(io.github.will413028.hawkr.order.repository.OrderInvoiceSnapshotRepository.class),
-                eventPublisher, "");
+                eventPublisher);
     }
 
     private static DelegationContext.Builder delegation() {
@@ -88,7 +88,6 @@ class OrderGrpcServiceDelegatedReadTest {
         order.setRecipientPhone("0912341234");
         order.setShippingAddress("台北市大安區信義路四段 123 號 5 樓之 3");
         order.setTransactionId("TXN-0001");
-        order.setAtmVirtualAccount("9988776655");
         order.setLabelUrl("labels/ORD1.pdf");
         order.setOdno("12345678");
         when(orderService.getOrderByNo("ORD1")).thenReturn(order);
@@ -132,7 +131,6 @@ class OrderGrpcServiceDelegatedReadTest {
                 .build());
 
         assertTrue(detail.getTransactionId().isEmpty(), "金流交易明細不得外流");
-        assertTrue(detail.getAtmVirtualAccount().isEmpty(), "ATM 虛擬帳號不得外流");
         assertTrue(detail.getLabelKey().isEmpty(), "託運單不得外流");
         assertTrue(detail.getOdno().isEmpty(), "出貨單編號不得外流");
     }

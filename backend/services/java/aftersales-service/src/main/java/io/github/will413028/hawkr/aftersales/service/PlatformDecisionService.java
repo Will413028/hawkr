@@ -23,7 +23,6 @@ import io.github.will413028.hawkr.common.utils.code.AfterSaleResolutionSource;
 import io.github.will413028.hawkr.common.utils.code.AfterSaleResolutionType;
 import io.github.will413028.hawkr.common.utils.code.CodeMetaValidator;
 import io.github.will413028.hawkr.common.utils.code.GrpcResponseCode;
-import io.github.will413028.hawkr.common.utils.code.PaymentMethod;
 import io.github.will413028.hawkr.common.utils.code.WorkerTaskStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -33,8 +32,8 @@ import org.springframework.transaction.annotation.Transactional;
  * §10 平台裁決服務。
  * 處理 Admin 對申訴案件做出的三種 outcome：FULL_REFUND / PARTIAL_REFUND / REJECT_APPEAL。
  *
- * 退款觸發：FULL/PARTIAL_REFUND 時自行建立 refund_tasks + 對 ATM 額外 publish awaiting_buyer_page
- * 事件，退款後續沿用既有 §8.3 管線。REJECT_APPEAL 不觸發退款，case 終態。
+ * 退款觸發：FULL/PARTIAL_REFUND 時自行建立 refund_tasks，
+ * 退款後續沿用既有 §8.3 管線。REJECT_APPEAL 不觸發退款，case 終態。
  */
 @Service
 @RequiredArgsConstructor
@@ -129,21 +128,14 @@ public class PlatformDecisionService {
         appealEventMapper.insert(event);
 
         // FULL/PARTIAL_REFUND: 建 refund_tasks
-        RefundTaskEntity refundTask = null;
         if (outcomeEnum != AfterSalePlatformDecisionOutcome.REJECT_APPEAL) {
-            refundTask = createRefundTask(caseEntity, finalAmount, outcomeEnum);
+            createRefundTask(caseEntity, finalAmount, outcomeEnum);
         }
 
-        // publish MQ（順序：decision.made → awaiting_buyer_page if ATM）
+        // publish MQ
         eventPublisher.publishPlatformDecisionMade(caseNo, caseEntity.getOrderNo(),
                 caseEntity.getBuyerId(), caseEntity.getStoreId(),
                 outcome, finalAmount);
-
-        if (refundTask != null
-                && PaymentMethod.ATM.value().equals(caseEntity.getPaymentMethod())) {
-            eventPublisher.publishAwaitingBuyerRefundPage(
-                    caseEntity.getOrderNo(), caseNo, refundTask.getId(), caseEntity.getBuyerId());
-        }
 
         log.info("PlatformDecisionService.decide.success",
                 "平台裁決完成, outcome=" + outcome + ", amount=" + finalAmount, "caseNo", caseNo);
@@ -198,13 +190,12 @@ public class PlatformDecisionService {
     }
 
     /**
-     * 建立退款任務（與 AfterSaleResolutionService 同樣邏輯，依 payment_method 決定初始 status）。
+     * 建立退款任務（與 AfterSaleResolutionService 同樣邏輯）。
      * outcome 由 caller 從 AfterSalePlatformDecisionOutcome（FULL_REFUND / PARTIAL_REFUND）直接傳入；
      * REJECT_APPEAL 不會走到此 method。
      */
-    private RefundTaskEntity createRefundTask(AfterSaleCaseEntity caseEntity, Long refundAmount,
+    private void createRefundTask(AfterSaleCaseEntity caseEntity, Long refundAmount,
                                                 AfterSalePlatformDecisionOutcome outcome) {
-        boolean isAtm = PaymentMethod.ATM.value().equals(caseEntity.getPaymentMethod());
         RefundTaskEntity task = new RefundTaskEntity();
         task.setId(TsidUtil.generate());
         task.setCaseNo(caseEntity.getCaseNo());
@@ -212,14 +203,10 @@ public class PlatformDecisionService {
         task.setTransactionId(caseEntity.getTransactionId());
         task.setRefundAmount(refundAmount);
         task.setPaymentMethod(caseEntity.getPaymentMethod());
-        task.setMerId(caseEntity.getMerId());
         task.setRefundOutcome(outcome.value());
-        task.setStatus(isAtm
-                ? WorkerTaskStatus.AWAITING_BUYER_REFUND_PAGE.value()
-                : WorkerTaskStatus.PENDING.value());
+        task.setStatus(WorkerTaskStatus.PENDING.value());
         task.setRetryCount(0);
         task.setMaxRetryCount(properties.getRefund().getMaxRetryCount());
         refundTaskMapper.insert(task);
-        return task;
     }
 }

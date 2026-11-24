@@ -316,14 +316,6 @@ public class RabbitMqConfig {
     }
 
     @Bean
-    public Queue orderAftersalesAwaitingBuyerPageQueue() {
-        return QueueBuilder.durable(MqConstants.QUEUE_ORDER_AFTERSALES_AWAITING_BUYER_PAGE)
-                .withArgument("x-dead-letter-exchange", MqConstants.EXCHANGE_ORDER_DLX)
-                .withArgument("x-dead-letter-routing-key", MqConstants.QUEUE_ORDER_AFTERSALES_AWAITING_BUYER_PAGE_DLQ)
-                .build();
-    }
-
-    @Bean
     public Binding bindAftersalesRefundCompleted(Queue orderAftersalesRefundCompletedQueue, TopicExchange aftersalesExchange) {
         return BindingBuilder.bind(orderAftersalesRefundCompletedQueue)
                 .to(aftersalesExchange)
@@ -335,13 +327,6 @@ public class RabbitMqConfig {
         return BindingBuilder.bind(orderAftersalesCancelCompletedQueue)
                 .to(aftersalesExchange)
                 .with(AfterSalesEventType.CANCEL_COMPLETED.value());
-    }
-
-    @Bean
-    public Binding bindAftersalesAwaitingBuyerPage(Queue orderAftersalesAwaitingBuyerPageQueue, TopicExchange aftersalesExchange) {
-        return BindingBuilder.bind(orderAftersalesAwaitingBuyerPageQueue)
-                .to(aftersalesExchange)
-                .with(AfterSalesEventType.AWAITING_BUYER_PAGE.value());
     }
 
     // 60h 自動完成倒數的暫停/恢復事件（03 §5.8）
@@ -419,11 +404,6 @@ public class RabbitMqConfig {
     }
 
     @Bean
-    public Queue orderAftersalesAwaitingBuyerPageDlq() {
-        return QueueBuilder.durable(MqConstants.QUEUE_ORDER_AFTERSALES_AWAITING_BUYER_PAGE_DLQ).build();
-    }
-
-    @Bean
     public Queue orderAftersalesCountdownDlq() {
         return QueueBuilder.durable(MqConstants.QUEUE_ORDER_AFTERSALES_COUNTDOWN_DLQ).build();
     }
@@ -436,11 +416,6 @@ public class RabbitMqConfig {
     @Bean
     public Binding bindOrderAftersalesCancelCompletedDlq(Queue orderAftersalesCancelCompletedDlq, TopicExchange orderDlxExchange) {
         return BindingBuilder.bind(orderAftersalesCancelCompletedDlq).to(orderDlxExchange).with(MqConstants.QUEUE_ORDER_AFTERSALES_CANCEL_COMPLETED_DLQ);
-    }
-
-    @Bean
-    public Binding bindOrderAftersalesAwaitingBuyerPageDlq(Queue orderAftersalesAwaitingBuyerPageDlq, TopicExchange orderDlxExchange) {
-        return BindingBuilder.bind(orderAftersalesAwaitingBuyerPageDlq).to(orderDlxExchange).with(MqConstants.QUEUE_ORDER_AFTERSALES_AWAITING_BUYER_PAGE_DLQ);
     }
 
     @Bean

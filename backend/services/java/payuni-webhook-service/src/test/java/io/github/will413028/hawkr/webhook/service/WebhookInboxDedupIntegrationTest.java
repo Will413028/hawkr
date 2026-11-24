@@ -236,7 +236,7 @@ class WebhookInboxDedupIntegrationTest {
     void insertIfAbsent_replaySafeViaOnConflict() {
         String eventKey = "HAWK9:OREPLAY001:UNI001:1";
         String exchange = "payuni.events";
-        String topic = "payuni.payment.uop";
+        String topic = "payuni.shipping.status";
         var now = DateTimeUtils.nowUtc();
 
         // 第一次：應寫入
@@ -311,14 +311,14 @@ class WebhookInboxDedupIntegrationTest {
 
         WebhookInbox found = inboxMapper.findByEventKey(
                 WebhookProvider.PAYUNI.value(),
-                PayUniEventType.PAYMENT_UOP.value(),
+                PayUniEventType.SHIPPING_STATUS.value(),
                 "HAWK9:OFIND001:UNI001:1");
         assertNotNull(found, "findByEventKey 應能查到 existing row");
         assertEquals(inbox.getId(), found.getId());
 
         WebhookInbox notFound = inboxMapper.findByEventKey(
                 WebhookProvider.PAYUNI.value(),
-                PayUniEventType.PAYMENT_UOP.value(),
+                PayUniEventType.SHIPPING_STATUS.value(),
                 "HAWK9:NOTEXIST:UNI001:1");
         assertEquals(null, notFound, "查不到應回 null（用於 dedup.lookupMissing 防呆判斷）");
     }
@@ -333,7 +333,7 @@ class WebhookInboxDedupIntegrationTest {
                 java.util.List.of(new WebhookOutboxTxOps.OutboxRoute(
                         "HAWK9:OENQ001:UNI001:1",
                         "payuni.events",
-                        "payuni.payment.uop",
+                        "payuni.shipping.status",
                         "{\"e\":\"1\"}")));
 
         WebhookInbox after = inboxMapper.selectById(inbox.getId());
@@ -375,7 +375,7 @@ class WebhookInboxDedupIntegrationTest {
         WebhookOutboxTxOps.OutboxRoute route = new WebhookOutboxTxOps.OutboxRoute(
                 "HAWK9:OREP001:UNI001:1",
                 "payuni.events",
-                "payuni.payment.uop",
+                "payuni.shipping.status",
                 "{\"e\":\"1\"}");
 
         // 第一次（模擬前次 T2 commit 後在某處中斷）
@@ -396,7 +396,7 @@ class WebhookInboxDedupIntegrationTest {
         WebhookInbox inbox = new WebhookInbox();
         inbox.setProvider(WebhookProvider.PAYUNI.value());
         inbox.setMerId("HAWK9");
-        inbox.setWebhookType(PayUniEventType.PAYMENT_UOP.value());
+        inbox.setWebhookType(PayUniEventType.SHIPPING_STATUS.value());
         inbox.setEventKey(eventKey);
         inbox.setStatus(WebhookInboxStatus.RECEIVED.value());
         inbox.setVerifyStatus(WebhookVerifyStatus.PASSED.value());

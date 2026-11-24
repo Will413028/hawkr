@@ -70,7 +70,6 @@ class AfterSalesGrpcServiceFieldMappingTest {
     @Mock private SellerGrpcClient sellerGrpcClient;
     @Mock private ShippingGrpcClient shippingGrpcClient;
     @Mock private OrderGrpcClient orderGrpcClient;
-    @Mock private io.github.will413028.hawkr.aftersales.service.AtmRefundReconciler atmRefundReconciler;
 
     private AfterSalesProperties properties;
     private AfterSalesGrpcService service;
@@ -98,9 +97,7 @@ class AfterSalesGrpcServiceFieldMappingTest {
                 org.mockito.Mockito.mock(io.github.will413028.hawkr.aftersales.service.AfterSalePayoutHoldService.class),
                 caseMapper, caseItemMapper, evidenceMapper, resolutionMapper, refundTaskMapper,
                 cancelMapper, properties,
-                paymentGrpcClient, buyerGrpcClient, sellerGrpcClient, shippingGrpcClient, orderGrpcClient,
-                atmRefundReconciler,
-                org.mockito.Mockito.mock(org.springframework.transaction.PlatformTransactionManager.class));
+                paymentGrpcClient, buyerGrpcClient, sellerGrpcClient, shippingGrpcClient, orderGrpcClient);
 
         buildDetailView = AfterSalesGrpcService.class
                 .getDeclaredMethod("buildDetailView", AfterSaleCaseEntity.class);

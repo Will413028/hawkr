@@ -204,7 +204,7 @@ var allowedKeys = map[string]struct{}{
 	"deliverytempintersection": {}, "onboardingstatus": {}, "errorcode": {},
 	"valid": {}, "eligible": {}, "enabled": {}, "available": {},
 	"canappeal": {}, "autoescalated": {}, "isdefault": {}, "iscontact": {},
-	"istrolley": {}, "needrefundpage": {}, "onboardingrequired": {},
+	"istrolley": {}, "onboardingrequired": {},
 	"freeshippingeligible": {}, "tentativefreeshippingeligible": {},
 	"webhookreceived": {}, "success": {}, "tags": {},
 
@@ -226,10 +226,10 @@ var allowedKeys = map[string]struct{}{
 
 	// 時間戳／期限
 	"appealsubmittedat": {}, "appealdeadline": {}, "autocompleteatstamp": {},
-	"autoconfirmat": {}, "bankdate": {}, "businessdays": {}, "calltime": {},
+	"autoconfirmat": {}, "businessdays": {}, "calltime": {},
 	"closedat": {}, "coveragedays": {}, "createdat": {}, "date": {},
 	"dayofweek": {}, "decidedat": {}, "deliverydate": {},
-	"estimatedrefunddate": {}, "lastrejectedat": {}, "maxholidaydate": {},
+	"lastrejectedat": {}, "maxholidaydate": {},
 	"processdeadline": {}, "processdeadlinehours": {}, "sellerpickedupat": {},
 	"shipbackdeadlineat": {}, "shipdate": {}, "statustime": {},
 	"storearrivedat": {}, "storepickupdeadlineat": {}, "timeline": {},

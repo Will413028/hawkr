@@ -122,34 +122,6 @@ class AfterSalesEventPublisherImplNotifyFieldTest {
     }
 
     @Test
-    @DisplayName("publishAwaitingBuyerRefundPage resolves buyerId to notify_buyer_account_id (discriminating)")
-    void publishAwaitingBuyerRefundPage_resolvesNotifyBuyerAccountId() throws Exception {
-        long buyerId = 9001L;
-        long resolvedAccountId = 55L;
-
-        ObsRabbitPublisher obsRabbitPublisher = mock(ObsRabbitPublisher.class);
-        SellerGrpcClient sellerGrpcClient = mock(SellerGrpcClient.class);
-        BuyerGrpcClient buyerGrpcClient = mock(BuyerGrpcClient.class);
-
-        when(buyerGrpcClient.resolvePrincipals(java.util.List.of(buyerId)))
-                .thenReturn(new PrincipalResolution(Map.of(buyerId, resolvedAccountId), Set.of()));
-
-        AfterSalesEventPublisherImpl publisher =
-                new AfterSalesEventPublisherImpl(obsRabbitPublisher, sellerGrpcClient, buyerGrpcClient);
-
-        publisher.publishAwaitingBuyerRefundPage("ORD1", "CASE1", 9999L, buyerId);
-
-        ArgumentCaptor<byte[]> bodyCaptor = ArgumentCaptor.forClass(byte[].class);
-        verify(obsRabbitPublisher).publish(any(), eq("aftersales.refund.awaiting_buyer_page"), bodyCaptor.capture(), any());
-
-        Map<?, ?> payload = new ObjectMapper().readValue(bodyCaptor.getValue(), Map.class);
-        assertEquals(String.valueOf(buyerId), payload.get("buyer_id"),
-                "buyer_id must stay the raw stint-scoped business value (9001), not the resolved account_id");
-        assertEquals(String.valueOf(resolvedAccountId), payload.get("notify_buyer_account_id"),
-                "notify_buyer_account_id 必須是反解後的 account_id(55)，不是 buyer_id(9001)");
-    }
-
-    @Test
     @DisplayName("buyer_id 查無存活買家（unresolved_ids）：notify_buyer_account_id 帶 0，不回吐 buyer_id")
     void publishCaseAutoRejected_unresolvedBuyerIsNotEchoedAsAnAccount() throws Exception {
         long buyerId = 9001L;

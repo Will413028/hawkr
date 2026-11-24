@@ -10,9 +10,7 @@ import (
 // registerAfterSalesRoutes 配置售後服務相關路由
 // /api/v1/app/after_sales — 買家售後
 // /api/v1/app/seller/after_sales — 賣家售後
-// /api/v1/app/orders/:order_no/refund_page — ATM 退款頁面（通用）
 // /api/v1/app/orders/:order_no/seller_cancellations — 取消出貨（遷移自 Order）
-// /atm-refund/return — ATM 退款頁面完成回調（頂層路由）
 func registerAfterSalesRoutes(app *gin.RouterGroup, r *gin.Engine, h *handler.Holder) {
 	// ------------------------------------------
 	// 買家售後（/app/after_sales）
@@ -51,14 +49,7 @@ func registerAfterSalesRoutes(app *gin.RouterGroup, r *gin.Engine, h *handler.Ho
 	orders := app.Group(OrdersPath)
 	orders.Use(middleware.JWTAuth())
 	{
-		// ATM 退款頁面（買家/賣家通用）
-		orders.POST(OrderRefundPage, h.GetRefundPageUrl)
 		// 取消出貨（賣家，遷移自 Order Service）— 收縮型操作 CAP_ORDER_CONTRACT（白名單）
 		sellerHandle(orders, "POST", OrderSellerCancellations, authz.CapOrderContract, h.CancelShipment)
 	}
-
-	// ------------------------------------------
-	// ATM 退款頁面完成回調（頂層路由，PayUni Form POST 導回，無需 JWT）
-	// ------------------------------------------
-	r.POST(AtmRefundReturnPath, h.AtmRefundReturn)
 }

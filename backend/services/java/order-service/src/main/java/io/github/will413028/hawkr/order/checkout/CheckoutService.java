@@ -89,14 +89,6 @@ public class CheckoutService {
     private final OrderPolicyResolver orderPolicyResolver;
     private final StringRedisTemplate redisTemplate;
 
-    /**
-     * 代理商 PayUni MerID（多賣家和單代收）。consolidated=true 時取此值。
-     * 空字串時不允許 consolidated=true（preview 階段拒絕）。
-     * 詳見 20 設計書 §4.13 和單與 paymentMerId 決策。
-     */
-    @Value("${payuni.agent.mer-id:}")
-    private String agentMerId;
-
     public CheckoutService(ProductGrpcClient productGrpcClient,
                            SellerGrpcClient sellerGrpcClient,
                            BuyerGrpcClient buyerGrpcClient,
@@ -825,12 +817,8 @@ public class CheckoutService {
             return "";
         }
         if (CollectionModel.PLATFORM_AGENT_MERCHANT.value().equals(model)) {
-            if (agentMerId == null || agentMerId.isBlank()) {
-                // fail-closed 在**結帳當下**，不是建單後才發現。
-                // ⚠️ 這條在受託代銷啟用前一定會觸發——那是正確行為，不是要繞過的障礙。
-                throw new OrderBusinessException(GrpcResponseCode.PLATFORM_COLLECTION_NOT_CONFIGURED);
-            }
-            return agentMerId;
+            // 平台代收（受託代銷）沒有收款路徑：fail-closed 在結帳當下。
+            throw new OrderBusinessException(GrpcResponseCode.PLATFORM_COLLECTION_NOT_CONFIGURED);
         }
         // PROVIDER_COLLECTED／EXTERNAL_PREPAID／未來新增值／未知字串一律擋下。
         // 判準與撥款資格 PayoutEligibility 的 default⇒BLOCKED 同源：

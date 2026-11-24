@@ -69,15 +69,6 @@ public class OrderEntity {
     /** 超商門市名稱（店到店） */
     private String cvsStoreName;
 
-    /** ATM 銀行代碼（建單時快照，僅 ATM 付款） */
-    private String atmBankCode;
-
-    /** ATM 虛擬帳號（建單時快照，僅 ATM 付款） */
-    private String atmVirtualAccount;
-
-    /** ATM 繳費期限（建單時快照，僅 ATM 付款，ISO 8601） */
-    private String atmExpireDate;
-
     /** 材積總和（cm³，用於宅配 Spec 計算） */
     private Integer dimensionSum;
 
@@ -280,9 +271,6 @@ public class OrderEntity {
 
     /** 送達時間（訂單轉 DELIVERED 時記錄，供 AfterSales 時效驗證） */
     private LocalDateTime deliveredAt;
-
-    /** ATM 退款等待買家前往 PayUni 頁面（MQ 事件驅動 TRUE/FALSE） */
-    private Boolean needRefundPage;
 
     /** 任一商品項目已評論即為 TRUE（由 review.created MQ 事件更新） */
     private Boolean isReviewed;

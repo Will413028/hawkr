@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"github.com/Will413028/hawkr/gateway/internal/codemeta"
@@ -69,16 +68,13 @@ type AfterSaleCaseSummaryResponse struct {
 	RefundableAmount      string `json:"refundableAmount"`
 	CreatedAt             string `json:"createdAt"`
 	AppealState           string `json:"appealState"`                     // 申訴狀態（AfterSaleAppealState value：0=無申訴 / 10=已申訴 / 20=平台調查中 / 30=已裁決）
-	RefundTaskStatus      string `json:"refundTaskStatus"`                // WorkerTaskStatus value。合法值：0=PENDING, 5=AWAITING_BUYER_REFUND_PAGE, 10=PROCESSING, 15=AWAITING_WEBHOOK, 20=DONE, 30=FAILED, 40=MANUAL_INTERVENTION；無 refund_task 時為空字串
+	RefundTaskStatus      string `json:"refundTaskStatus"`                // WorkerTaskStatus value。合法值：0=PENDING, 10=PROCESSING, 20=DONE, 30=FAILED, 40=MANUAL_INTERVENTION；無 refund_task 時為空字串
 	RefundFailureMessage  string `json:"refundFailureMessage"`            // 退款失敗訊息（PayUni 原話，直接透傳），成功時為空字串
-	EstimatedRefundDate   string `json:"estimatedRefundDate"`             // 預計扣款日 ISO 8601 YYYY-MM-DD（僅 ATM 同步受理後有值，信用卡恆空）
-	BankDate              string `json:"bankDate"`                        // 實際到帳日 ISO 8601 YYYY-MM-DD（僅 ATM webhook 匯款成功後有值，信用卡恆空）
 	ProviderStatus        string `json:"providerStatus,omitempty"`        // 聚合 PayUni 原始狀態碼（收斂規範 §6.2；退款看 refund_tasks，退貨物流看 shipments）
 	ProviderMessage       string `json:"providerMessage,omitempty"`       // 聚合 PayUni 原始訊息
 	AutoConfirmAt         string `json:"autoConfirmAt,omitempty"`         // §5.3.10 自動確認收貨截止時間（僅 status=27 RETURN_DELIVERED 有值，前端列表也可秀「N 小時後自動確認」）
 	StorePickupDeadlineAt string `json:"storePickupDeadlineAt,omitempty"` // 2026-05-22 超商待取逾時截止（僅 status=26 RETURN_AT_STORE 有值，前端依此倒數 72h）
 	ShipBackDeadlineAt    string `json:"shipBackDeadlineAt,omitempty"`    // 2026-06-15 買家寄回退貨逾時截止（僅 status=20 RETURN_PENDING 有值，前端依此倒數 7 天）
-	NeedRefundPage        bool   `json:"needRefundPage"`
 }
 
 // AfterSaleCaseDetailResponse 售後案件詳情
@@ -103,8 +99,6 @@ type AfterSaleCaseDetailResponse struct {
 	Odno                  string `json:"odno"`
 	RefundTaskStatus      string `json:"refundTaskStatus"`                // WorkerTaskStatus value，無 refund_task 時空字串
 	RefundFailureMessage  string `json:"refundFailureMessage"`            // 退款失敗訊息（PayUni 原話）
-	EstimatedRefundDate   string `json:"estimatedRefundDate"`             // 預計扣款日 YYYY-MM-DD（僅 ATM 受理後）
-	BankDate              string `json:"bankDate"`                        // 實際到帳日 YYYY-MM-DD（僅 ATM 成功匯款後）
 	ProviderStatus        string `json:"providerStatus,omitempty"`        // 聚合 PayUni 原始狀態碼（收斂規範 §6.2）
 	ProviderMessage       string `json:"providerMessage,omitempty"`       // 聚合 PayUni 原始訊息
 	ProcessDeadline       string `json:"processDeadline,omitempty"`       // §5.10 賣家處理截止時間 ISO 8601 UTC；僅 status=PENDING 才有值；前端依此倒數
@@ -126,7 +120,6 @@ type AfterSaleCaseDetailResponse struct {
 	ShipmentPhotoUrls  []string                    `json:"shipmentPhotoUrls"` // 出貨照片顯示 URL（Gateway 組）
 	Evidence           []EvidenceResponse          `json:"evidence"`
 	Items              []AfterSaleCaseItemResponse `json:"items"`
-	NeedRefundPage     bool                        `json:"needRefundPage"`
 	CanAppeal          bool                        `json:"canAppeal"`
 }
 
@@ -174,24 +167,12 @@ type ResolveResultResponse struct {
 	CaseNo           string `json:"caseNo"`
 	Status           string `json:"status"`           // 案件狀態（AfterSaleCaseStatus value；合法值以 CodeMeta 業務狀態碼.md 為準）
 	ReturnShipmentNo string `json:"returnShipmentNo"` // 退貨物流單號（退貨退款時有值）
-	NeedRefundPage   bool   `json:"needRefundPage"`   // 是否需前往 ATM 退款頁面
-}
-
-// RefundPageUrlDataResponse ATM 退款頁面 URL 回應
-type RefundPageUrlDataResponse struct {
-	RedirectUrl string `json:"redirectUrl"` // PayUni 退款頁面 URL
-}
-
-// GetRefundPageUrlRequest ATM 退款頁面 URL 請求
-type GetRefundPageUrlRequest struct {
-	ClientType string `json:"clientType"` // CodeMeta ClientType value（MOBILE_APP / WEB_BROWSER），空字串由 Service 套用 MOBILE_APP 預設
 }
 
 // CancelShipmentResultResponse 取消出貨結果回應
 type CancelShipmentResultResponse struct {
-	OrderNo        string `json:"orderNo"`
-	RefundAmount   string `json:"refundAmount"`
-	NeedRefundPage bool   `json:"needRefundPage"` // 是否需前往 ATM 退款頁面
+	OrderNo      string `json:"orderNo"`
+	RefundAmount string `json:"refundAmount"`
 }
 
 // ==================== 轉換函式 ====================
@@ -213,12 +194,9 @@ func convertAfterSaleSummary(s *pb.AfterSaleCaseSummary, mediaBase string) After
 		Reason:                s.Reason,
 		RefundableAmount:      s.RefundableAmount,
 		CreatedAt:             s.CreatedAt,
-		NeedRefundPage:        s.NeedRefundPage,
 		AppealState:           s.AppealState,
 		RefundTaskStatus:      s.RefundTaskStatus,
 		RefundFailureMessage:  s.RefundFailureMessage,
-		EstimatedRefundDate:   s.EstimatedRefundDate,
-		BankDate:              s.BankDate,
 		ProviderStatus:        s.GetProviderStatus(),
 		ProviderMessage:       s.GetProviderMessage(),
 		AutoConfirmAt:         s.GetAutoConfirmAt(),
@@ -298,7 +276,6 @@ func convertAfterSaleDetail(d *pb.AfterSaleCaseDetailView, mediaBase string) Aft
 		ValidationNo:          d.ValidationNo,
 		ShipmentPhotoKeys:     d.ShipmentPhotoKeys,
 		ShipmentPhotoUrls:     buildURLs(mediaBase, d.ShipmentPhotoKeys),
-		NeedRefundPage:        d.NeedRefundPage,
 		CreatedAt:             d.CreatedAt,
 		ClosedAt:              d.ClosedAt,
 		AppealState:           d.AppealState,
@@ -306,8 +283,6 @@ func convertAfterSaleDetail(d *pb.AfterSaleCaseDetailView, mediaBase string) Aft
 		CanAppeal:             d.CanAppeal,
 		RefundTaskStatus:      d.RefundTaskStatus,
 		RefundFailureMessage:  d.RefundFailureMessage,
-		EstimatedRefundDate:   d.EstimatedRefundDate,
-		BankDate:              d.BankDate,
 		ProviderStatus:        d.GetProviderStatus(),
 		ProviderMessage:       d.GetProviderMessage(),
 		ProcessDeadline:       d.GetProcessDeadline(),
@@ -557,55 +532,6 @@ func (h *Holder) CancelAfterSaleCase(c *gin.Context) {
 	response.GrpcResult(c, resp.Code, resp.Message, nil)
 }
 
-// GetRefundPageUrl ATM 退款頁面
-// @Summary      取得 ATM 退款頁面 URL
-// @Description  取得 PayUni ATM 退款頁面 URL，前端用 WebView 開啟讓買家填寫銀行資訊（售後退款 + 賣家取消出貨通用）
-// @Tags         售後 (AfterSales)
-// @Accept       json
-// @Produce      json
-// @Security     BearerAuth
-// @Param        order_no  path  string  true  "訂單編號"
-// @Success      200  {object}  object{code=int,message=string,data=RefundPageUrlDataResponse}
-// @Failure      401  {object}  object{code=int,message=string}
-// @Failure      404  {object}  object{code=int,message=string}
-// @Router       /app/orders/{order_no}/refund_page [post]
-func (h *Holder) GetRefundPageUrl(c *gin.Context) {
-	accountID, ok := getAccountID(c)
-	if !ok || accountID == 0 {
-		response.Unauthorized(c)
-		return
-	}
-	buyerID, ok := h.resolveBuyerIDFor(c, accountID)
-	if !ok {
-		return
-	}
-
-	orderNo := c.Param("order_no")
-	if orderNo == "" {
-		response.BadRequest(c, "order_no is required")
-		return
-	}
-
-	// 容許空 body（既有呼叫端可能未帶 body），僅綁定可解析的欄位
-	var req GetRefundPageUrlRequest
-	_ = c.ShouldBindJSON(&req)
-
-	resp, err := h.Aftersales.GetRefundPageUrl(c.Request.Context(), &pb.GetRefundPageUrlRequest{
-		BuyerId:    int64(buyerID),
-		OrderNo:    orderNo,
-		ClientType: req.ClientType,
-		AppType:    codemeta.AppTypeFromAccountType(getAccountType(c)),
-	})
-	if err != nil {
-		response.GrpcErr(c, "aftersales", err)
-		return
-	}
-
-	response.GrpcResult(c, resp.Code, resp.Message, RefundPageUrlDataResponse{
-		RedirectUrl: resp.GetData().GetRedirectUrl(),
-	})
-}
-
 // ==================== 賣家端 Handler ====================
 
 // GetSellerAfterSaleCases 賣家售後列表
@@ -741,7 +667,6 @@ func (h *Holder) ResolveAfterSaleCase(c *gin.Context) {
 		CaseNo:           d.GetCaseNo(),
 		Status:           d.GetStatus(),
 		ReturnShipmentNo: d.GetReturnShipmentNo(),
-		NeedRefundPage:   d.GetNeedRefundPage(),
 	})
 }
 
@@ -883,52 +808,9 @@ func (h *Holder) CancelShipment(c *gin.Context) {
 
 	d := resp.GetData()
 	response.GrpcResult(c, resp.Code, resp.Message, CancelShipmentResultResponse{
-		OrderNo:        d.GetOrderNo(),
-		RefundAmount:   d.GetRefundAmount(),
-		NeedRefundPage: d.GetNeedRefundPage(),
+		OrderNo:      d.GetOrderNo(),
+		RefundAmount: d.GetRefundAmount(),
 	})
-}
-
-// ==================== ATM 退款回調 ====================
-
-// AtmRefundReturn ATM 退款頁面完成回調（PayUni Form POST）
-// PayUni ATM 退款頁面完成後以 Form POST 將 EncryptInfo + HashInfo 導回此端點
-// Gateway 提取加密參數 → AfterSales gRPC 解密 + 更新退款任務 → 302 redirect Deep Link
-// @Summary      ATM 退款頁面回調
-// @Description  PayUni ATM 退款頁面完成後的 Form POST 回調，解密退款結果、更新退款任務、302 redirect 到 Deep Link 導回 App
-// @Tags         售後 (AfterSales)
-// @Accept       x-www-form-urlencoded
-// @Param        EncryptInfo  formData  string  true  "PayUni 加密資料"
-// @Param        HashInfo     formData  string  true  "PayUni 簽章"
-// @Success      302  "Redirect to Deep Link"
-// @Failure      400  {string}  string  "參數錯誤"
-// @Failure      503  {string}  string  "服務不可用"
-// @Router       /atm-refund/return [post]
-func (h *Holder) AtmRefundReturn(c *gin.Context) {
-	encryptInfo := c.PostForm("EncryptInfo")
-	hashInfo := c.PostForm("HashInfo")
-
-	if encryptInfo == "" || hashInfo == "" {
-		c.String(http.StatusBadRequest, "缺少加密參數")
-		return
-	}
-
-	// return_url 帶了 ?order_no=xxx 作 fallback：PayUni 失敗時 MerTradeNo 可能為空，
-	// AfterSales 需靠 order_no lookup refund_task 才能寫 payuni_status/message snapshot
-	orderNo := c.Query("order_no")
-
-	resp, err := h.Aftersales.HandleRefundPageReturn(c.Request.Context(), &pb.HandleRefundPageReturnRequest{
-		EncryptInfo: encryptInfo,
-		HashInfo:    hashInfo,
-		OrderNo:     orderNo,
-	})
-	if err != nil {
-		c.String(http.StatusServiceUnavailable, "處理退款結果失敗")
-		return
-	}
-
-	// 302 redirect 到 AfterSales Service 組裝的 Deep Link
-	c.Redirect(http.StatusFound, resp.GetRedirectUrl())
 }
 
 // 避免 import 未使用警告

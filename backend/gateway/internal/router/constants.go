@@ -268,8 +268,6 @@ const (
 	AdminAfterSalesDetail                = "/:case_no"                          // §10.6.6 Admin 單案詳情
 	AdminAfterSalesRetryPrintReturnLabel = "/:case_no/retry_print_return_label" // §5.3.6 admin/ops 人工重試 7-11 退貨列印
 	AdminAfterSalesForceConfirmReceipt   = "/:case_no/force_confirm_receipt"    // §5.3.12 Admin 強制確認收貨
-	OrderRefundPage                      = "/:order_no/refund_page"
-	AtmRefundReturnPath                  = "/atm-refund/return"
 )
 
 // ==================== 電子發票 Invoice（58 號設計書 §6.1）====================

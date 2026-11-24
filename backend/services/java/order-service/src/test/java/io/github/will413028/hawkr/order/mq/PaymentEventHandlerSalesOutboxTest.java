@@ -9,7 +9,6 @@ import io.github.will413028.hawkr.common.utils.code.PaymentMethod;
 import io.github.will413028.hawkr.order.entity.OrderEntity;
 import io.github.will413028.hawkr.order.entity.OrderItemEntity;
 import io.github.will413028.hawkr.order.entity.OrderOutboxEntity;
-import io.github.will413028.hawkr.order.grpc.client.PaymentGrpcClient;
 import io.github.will413028.hawkr.order.mq.dto.OrderSalesAccumulatedPayload;
 import io.github.will413028.hawkr.order.repository.AutoRefundTaskRepository;
 import io.github.will413028.hawkr.order.repository.CouponConsumptionTaskRepository;
@@ -82,7 +81,6 @@ class PaymentEventHandlerSalesOutboxTest {
                 mock(AutoRefundTaskRepository.class),
                 mock(CouponConsumptionTaskRepository.class),
                 mock(OrderEventPublisher.class),
-                mock(PaymentGrpcClient.class),
                 outboxMapper,
                 mock(io.github.will413028.hawkr.order.repository.OrderInvoiceSnapshotRepository.class),
                 mock(OrderService.class),
