@@ -494,7 +494,7 @@ func checkNoShadow(pkg string, fn *ast.FuncDecl, names ...string) {
 	})
 }
 
-// topicMatch 是 AMQP topic exchange 的比對：* 一個字，# 零個以上的字（notification-service 的 relay_routes_test.go 因為是另一個 module 有同一份，改這裡要一併改那裡）。
+// topicMatch 是 AMQP topic exchange 的比對：* 一個字，# 零個以上的字。
 func topicMatch(pattern, key string) bool {
 	var match func(p, k []string) bool
 	match = func(p, k []string) bool {
