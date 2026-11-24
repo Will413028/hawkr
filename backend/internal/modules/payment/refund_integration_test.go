@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -109,6 +110,12 @@ func TestCreateRefundRefusesWhatCannotBeRefunded(t *testing.T) {
 	f.create(t, 11, "RF-2")
 	_, err = f.module.CreatePaymentRefund(ctx, RefundRequest{OrderNo: "RF-2", Amount: 10, RequestKey: "k"})
 	wantKind(t, err, apperr.KindFailedPrecondition, "付款未入帳")
+	if !strings.Contains(err.Error(), "付款尚未入帳") {
+		t.Fatalf("未入帳的付款要由入帳檢查拒絕（不是額度或可退款檢查）：%v", err)
+	}
+	if f.refundCount(t, "RF-2") != 0 {
+		t.Fatal("未入帳的付款被寫了退款列")
+	}
 	f.paidPayment(t, "RF-3", 100)
 	for name, in := range map[string]RefundRequest{
 		"零元":   {OrderNo: "RF-3", Amount: 0, RequestKey: "k"},
