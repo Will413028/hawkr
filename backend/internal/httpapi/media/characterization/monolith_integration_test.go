@@ -27,6 +27,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/imageai"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/moderation"
+	"github.com/Will413028/hawkr/backend/internal/modules/notification"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
@@ -77,7 +78,7 @@ func monolith(t *testing.T) *connectDriver {
 		Procurement: &procurement.Module{}, ImageAI: &imageai.Module{}, Assistant: &assistant.Module{}, Review: &review.Module{}, CRM: &crm.Module{}, IM: &im.Module{}, BizCalendar: &bizcalendar.Store{},
 		// NewHandler 要求的其他模組：特性測試只打 media 的端點，這些以零值或替身佔位，不會被呼叫。
 		Buyer: &buyer.Module{}, Deletion: &accountdeletion.Module{}, Seller: &seller.Module{}, Discovery: &discovery.Module{},
-		ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{}, Moderation: &moderation.Module{}, Social: &social.Module{}, Stats: ch.Stats(t), WebOrigin: ch.WebOrigin(t), Images: ch.Images(t), DashboardOrders: noDashboardOrders{},
+		ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{}, Moderation: &moderation.Module{}, Notification: &notification.Module{}, Social: &social.Module{}, Stats: ch.Stats(t), WebOrigin: ch.WebOrigin(t), Images: ch.Images(t), DashboardOrders: noDashboardOrders{},
 	})
 	if err != nil {
 		t.Fatal(err)

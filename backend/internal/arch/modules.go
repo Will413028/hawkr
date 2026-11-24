@@ -102,7 +102,6 @@ var InternalDependencies = map[string]InternalGraph{
 	"imageai": {Packages: map[string][]string{
 		"admin":     {"model", "store", "text"}, // 後台的風格與額度維護（7 支）；縮圖與 seller 經介面，由根套件組裝
 		"limit":     {},
-		"mediaref":  {"store"},
 		"model":     {},
 		"quota":     {"model", "store"},
 		"store":     {},

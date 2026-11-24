@@ -49,14 +49,6 @@ type Audit interface {
 	Record(ctx context.Context, e adminaudit.Entry) error
 }
 
-// Thumbnails 是風格縮圖在 media 的轉正與引用登記（internal/mediaref 的實作）。Finalize 在 transaction 外；Reject 與 Changed 在寫風格列的 transaction 內。
-type Thumbnails interface {
-	// Finalize 把新上傳的縮圖轉正；token 不可用回 InvalidInput（欄位 ThumbnailToken，message 是給使用者的文字）。
-	Finalize(ctx context.Context, adminID int64, token, message string) (key, assetID string, err error)
-	Reject(ctx context.Context, styleID uuid.UUID, assetID string) error
-	Changed(ctx context.Context, now time.Time, styleID uuid.UUID, retired ...string) error
-}
-
 // Stores 是對 seller 的需求：Exists 確認店家存在（含已退場、已關閉的），LockNotRetired 在 transaction 內鎖住店家列並確認未退場；不存在都回 NotFound。
 type Stores interface {
 	Exists(ctx context.Context, storeID int64) error
@@ -70,7 +62,7 @@ type Deps struct {
 	// Q 回傳 ctx 所在連線（transaction 內是該 transaction）上的查詢。
 	Q      func(ctx context.Context) Queries
 	Audit  Audit
-	Thumbs Thumbnails
+	Media  model.Media
 	Stores Stores
 	// Used 是店家本週已用的修圖次數。
 	Used  func(ctx context.Context, storeID int64) (int32, error)
