@@ -2,7 +2,6 @@
  * Adapters between the seller-product API shape and the form draft.
  *
  *   - emptyDraft()           initial draft for `mode === "create"`
- *   - applyAiPatch()         merge an AI assistant draft_patch into a draft
  *   - draftToCreateBody()    strip empty trailing description blocks before
  *                            POST /app/products
  *
@@ -31,7 +30,6 @@ import {
 	type SellerProductDetail,
 	type SkuWriteInput,
 } from "@/lib/products/seller-repo";
-import type { AiDraftPatch } from "@/lib/seller/ai-listing-chat";
 
 const toNum = (v: unknown): number | undefined => {
 	if (v === null || v === undefined || v === "") return undefined;
@@ -137,42 +135,6 @@ export function applyImagesUpdate(
 		// `??` 會讓它通過並把主圖清成 ""。同檔 normaliseDraftFromApi 的主圖 fallback 同此。
 		main_image: images[0]?.url || prev.main_image,
 	};
-}
-
-/**
- * Apply an AI draft_patch event onto an existing draft.
- *   - scalar fields (name / origin / categoryId / description) overwrite
- *   - array fields (tags / skus) replace entirely
- * Mirrors mobile's `mergePatch()` semantics.
- */
-export function applyAiPatch(
-	prev: SellerProductDetail,
-	patch: AiDraftPatch,
-): SellerProductDetail {
-	const next: SellerProductDetail = { ...prev };
-	if (patch.name) next.name = patch.name;
-	if (patch.origin) next.origin = patch.origin;
-	if (patch.categoryId != null) {
-		const num = Number(patch.categoryId);
-		if (Number.isFinite(num)) next.category_id = num;
-	}
-	if (patch.description) {
-		next.description = parseDescription(patch.description);
-	}
-	if (Array.isArray(patch.tags)) next.tags = [...patch.tags];
-	if (Array.isArray(patch.skus)) {
-		next.skus = patch.skus.map((s, i) => ({
-			id: "",
-			sku_name: s.skuName ?? `規格 ${i + 1}`,
-			price: s.price != null ? String(s.price) : "0",
-			original_price: "",
-			sale_price: "",
-			stock: s.stockQty != null ? Number(s.stockQty) : 0,
-			unit: s.unit ?? WeightUnit.KG,
-			weight: s.weight != null ? String(s.weight) : undefined,
-		}));
-	}
-	return next;
 }
 
 /**

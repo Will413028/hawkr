@@ -21,7 +21,6 @@ const failures: string[] = [];
 const ALLOWLIST = new Set([
 	"lib/api/client.ts",
 	"lib/sse/client.ts",
-	"lib/seller/ai-listing-chat.ts",
 	"lib/ai-chat/stream-client.ts",
 	// 代行 BFF 的唯一上游轉送點（56 號 §4.5）。與 lib/api/client.ts 同性質：逾時／
 	// header allow-list／envelope policy 集中在這一支，而且它是本 repo 唯一會轉送
