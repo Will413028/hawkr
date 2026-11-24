@@ -28,7 +28,7 @@ const (
 // errUnknownRefundState 標示快照的退款狀態不認得：不是有效值，不寫入；暫時性，由 job 重試。
 var errUnknownRefundState = errors.New("charge: provider 回了不認得的退款狀態")
 
-// reversalFor 是一筆退款在 provider 接受之後要向賣家收回的額度：退款額與轉帳剩餘可撤額度（已扣掉其他預留）取小，沒有可撤額度時是 0。
+// reversalFor 是一筆退款在 provider 接受之後要向賣家收回的額度：退款額與可撤額度（原轉帳剩餘可撤額加成功的補差額轉帳剩餘可撤額，已扣掉其他預留）取小，沒有可撤額度時是 0。
 // 賣家已收到的款項向賣家收回，收不到的部分由平台手上的款項（轉帳前已退掉的、或之前撤回後退款失敗留在平台的）支付。
 func reversalFor(amount, available int64) int64 {
 	if available <= 0 {
@@ -82,7 +82,7 @@ func providerFailureReason(code string) string {
 // 以 (付款, request_key) 找既有的退款（同一把鍵回同一筆，內容不同回 FailedPrecondition）、確認付款已入帳、加總非失敗的退款（進行中與 ANOMALY 都算）守累計上限，
 // 寫 PENDING 的退款列並排退款 job；provider 在 transaction 外由 job 呼叫（規則 5）。退款先退買家，轉帳的任何狀態都可以退款（D11、ADR D69），向賣家收回依付款的轉帳決定：
 //   - 沒有有效轉帳（或轉帳都已 FAILED），或轉帳還沒承諾金額（PENDING 且 called_at 為空）：不必收回（reversal_status NONE），轉帳第一次送出時的金額已扣掉這筆退款。
-//   - 轉帳金額已承諾（PENDING 已呼叫、SUCCEEDED 或 ANOMALY）：預留 reversal_amount = min(退款額, 轉帳金額 − 已撤回 − 其他預留)；大於 0 寫 WAITING，等 provider 接受退款且轉帳 SUCCEEDED 才排撤回；
+//   - 轉帳金額已承諾（PENDING 已呼叫、SUCCEEDED 或 ANOMALY）：預留 reversal_amount = min(退款額, 轉帳金額 − 已撤回 + 成功的補差額轉帳的（退款額 − 已撤回） − 其他預留)；大於 0 寫 WAITING，等 provider 接受退款且轉帳 SUCCEEDED 才開始收回（依目標分成一或多次 provider 撤回，見 startReversals）；
 //     是 0（剩餘額度已被預留或撤光，款項在平台手上）寫 NONE。
 //
 // 付款不存在回 NotFound；付款未入帳、超過累計上限回 FailedPrecondition；金額不是正數或鍵不合回 InvalidInput。呼叫方不能在 transaction 內呼叫。
@@ -193,7 +193,11 @@ func (s *Service) reservableReversal(ctx context.Context, q *store.Queries, pay 
 	if err != nil {
 		return 0, err
 	}
-	return reversalFor(amount, tr.Amount-tr.ReversedAmount-reserved), nil
+	topups, err := q.DoneTopupCapacity(ctx, pay.ID)
+	if err != nil {
+		return 0, err
+	}
+	return reversalFor(amount, tr.Amount-tr.ReversedAmount+topups-reserved), nil
 }
 
 func toRefund(r store.PaymentRefund) model.Refund {
@@ -393,10 +397,11 @@ func (s *Service) lockActiveTransfer(ctx context.Context, q *store.Queries, paym
 }
 
 // afterRefundFailed 處理退款進入 FAILED 時列上的收回狀態（同一個 transaction，呼叫方已鎖付款列、轉帳列與退款列）。WAITING 的預留已由寫 FAILED 的同一個 statement 釋出（不撤回）；
-// 已算進轉帳金額的退款失敗，補差額的 WAITING 同一個 statement 寫入、轉帳已 SUCCEEDED 時由呼叫方接著開始補差額（startTopups）；REVERSED 發 MoneyAnomaly（撤回已落地，買家沒拿到錢、賣家已被收回，錢留在平台、reversed_amount 不減）；REVERSING 由撤回落地的 transaction 發；
-// ANOMALY 的預留持續佔住直到人工結案，結案成成功時撤回落地的 transaction 發。
+// 已算進轉帳金額的退款失敗，補差額的 WAITING 同一個 statement 寫入、轉帳已 SUCCEEDED 時由呼叫方接著開始補差額（startTopups）；已有撤回成立（reversal_recovered 大於 0）發 MoneyAnomaly
+// （撤回已落地，買家沒拿到錢、賣家已被收回，錢留在平台、累計撤回額不減）；還在進行中的撤回列由各自落地的 transaction 發；
+// ANOMALY 的撤回列持續佔住額度直到人工結案，結案成成功時落地的 transaction 發。
 func (s *Service) afterRefundFailed(ctx context.Context, r store.PaymentRefund) error {
-	if model.ReversalStatus(r.ReversalStatus) == model.ReversalReversed {
+	if r.ReversalRecovered > 0 {
 		return s.publishAnomaly(ctx, model.AnomalyRefund, r.ID, r.PaymentID, "refund_failed_after_reversal")
 	}
 	return nil

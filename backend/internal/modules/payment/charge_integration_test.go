@@ -742,20 +742,21 @@ VALUES ($1, $2, 7, 100, 'acct_1', $3::text, CASE WHEN $3::text = 'FAILED' THEN '
 	}
 	must(t, exec("UPDATE payment.transfers SET status = 'SUCCEEDED', external_transfer_id = 'tr_1', called_at = now(), reversed_amount = 60 WHERE status = 'PENDING'"))
 	ptr := func(s string) *string { return &s }
-	// insertRefund 寫一筆退款列：status 與撤回狀態 reversalStatus 各自獨立；ext 是 provider 的退款 ID（有就同時寫呼叫時刻），reason 與 revExt 是撤回的原因與撤回 ID。
-	insertRefund := func(key, status, reversalStatus string, reversalAmount int64, ext, reason, revExt *string) error {
-		return exec(`INSERT INTO payment.refunds (id, payment_id, request_key, amount, status, reversal_status, reversal_amount, reversal_reason, reversal_external_id, reversal_called_at,
+	// insertRefund 寫一筆退款列：status 與撤回彙總狀態 reversalStatus 各自獨立；ext 是 provider 的退款 ID（有就同時寫呼叫時刻），reason 是撤回的原因，
+	// recovered 非 nil 表示撤回額已全部成立（reversal_recovered 等於預留額），nil 是 0。
+	insertRefund := func(key, status, reversalStatus string, reversalAmount int64, ext, reason, recovered *string) error {
+		return exec(`INSERT INTO payment.refunds (id, payment_id, request_key, amount, status, reversal_status, reversal_amount, reversal_reason, reversal_recovered,
 	external_refund_id, refund_called_at, failure_reason, created_at, updated_at)
-VALUES ($1, $2, $3, 50, $4::text, $5::text, $6, $7::text, $8::text, CASE WHEN $8::text IS NOT NULL THEN now() END,
+VALUES ($1, $2, $3, 50, $4::text, $5::text, $6, $7::text, CASE WHEN $8::text IS NOT NULL THEN $6::bigint ELSE 0 END,
 	$9::text, CASE WHEN $9::text IS NOT NULL OR $4::text IN ('REFUNDING', 'SUCCEEDED') THEN now() END, CASE WHEN $4::text IN ('FAILED', 'ANOMALY') THEN 'x' END, now(), now())`,
-			uuid.NewV7(), p.ID, key, status, reversalStatus, reversalAmount, reason, revExt, ext)
+			uuid.NewV7(), p.ID, key, status, reversalStatus, reversalAmount, reason, recovered, ext)
 	}
 	must(t, insertRefund("k1", "PENDING", "NONE", 0, nil, nil, nil))
 	if err := insertRefund("k1", "PENDING", "NONE", 0, nil, nil, nil); err == nil {
 		t.Fatal("同一把退款冪等鍵寫了兩列")
 	}
 	if err := insertRefund("k2", "REFUNDING", "REVERSED", 30, ptr("re_k2"), nil, nil); err == nil {
-		t.Fatal("撤回完成卻沒有撤回的外部 ID")
+		t.Fatal("撤回完成卻沒有成立的撤回額")
 	}
 	if err := insertRefund("k3", "PENDING", "WAITING", 0, nil, nil, nil); err == nil {
 		t.Fatal("有預留的撤回狀態卻沒有要撤的額度")
@@ -777,6 +778,38 @@ VALUES ($1, $2, $3, 50, $4::text, $5::text, $6, $7::text, $8::text, CASE WHEN $8
 	must(t, insertRefund("k7b", "FAILED", "RELEASED", 30, nil, ptr("refund_failed"), nil))
 	if err := insertRefund("k8", "REVERSING", "NONE", 0, nil, nil, nil); err == nil {
 		t.Fatal("退款狀態不再有 REVERSING")
+	}
+	if err := exec("UPDATE payment.refunds SET reversal_recovered = 31 WHERE request_key = 'k4'"); err == nil {
+		t.Fatal("成立的撤回額超過預留額")
+	}
+	if err := exec("UPDATE payment.refunds SET reversal_recovered = 10 WHERE request_key = 'k4'"); err == nil {
+		t.Fatal("還沒開始收回就有成立的撤回額")
+	}
+	if err := exec("UPDATE payment.refunds SET topup_reversed_amount = 10 WHERE request_key = 'k4'"); err == nil {
+		t.Fatal("補差額轉帳不是成功的卻有撤回額")
+	}
+	var k5b uuid.UUID
+	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT id FROM payment.refunds WHERE request_key = 'k5b'").Scan(&k5b))
+	insertSeg := func(seq int, target *uuid.UUID, amount int64, status string) error {
+		return exec(`INSERT INTO payment.refund_reversals (id, refund_id, payment_id, seq, target_refund_id, target_external_id, amount, status, reason, called_at, external_id, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, 'tr_1', $6, $7::text, CASE WHEN $7::text IN ('RELEASED', 'ANOMALY') THEN 'x' END, CASE WHEN $7::text = 'REVERSED' THEN now() END, CASE WHEN $7::text = 'REVERSED' THEN 'trr_' || $1::text END, now(), now())`,
+			uuid.NewV7(), k5b, p.ID, seq, target, amount, status)
+	}
+	must(t, insertSeg(0, nil, 20, "REVERSING"))
+	if err := insertSeg(0, nil, 10, "REVERSING"); err == nil {
+		t.Fatal("同一筆退款的同一個序號寫了兩列撤回列")
+	}
+	if err := insertSeg(1, nil, 10, "REVERSING"); err == nil {
+		t.Fatal("原轉帳以外的目標沒有指定補差額轉帳的退款")
+	}
+	if err := insertSeg(2, &k5b, 0, "REVERSING"); err == nil {
+		t.Fatal("撤回列的額度不是正數")
+	}
+	if err := insertSeg(3, &k5b, 10, "RELEASED"); err != nil {
+		t.Fatalf("釋出的撤回列：%v", err)
+	}
+	if err := insertSeg(4, &k5b, 10, "ANOMALY"); err != nil {
+		t.Fatalf("ANOMALY 的撤回列：%v", err)
 	}
 	if err := exec("UPDATE payment.payments SET status = 'SUCCEEDED' WHERE id = $1", p.ID); err == nil {
 		t.Fatal("入帳的付款沒有 charge 與入帳時間")

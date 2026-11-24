@@ -112,8 +112,8 @@
    "id": "transfer-resolution-ignores-the-verified-amount",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/anomaly.go",
-   "old": "remaining := proof.amount - proof.reversed - (reserved - waitingTotal)",
-   "new": "remaining := proof.amount - (reserved - waitingTotal)",
+   "old": "remaining := proof.amount - proof.reversed + topups - (reserved - waitingTotal)",
+   "new": "remaining := proof.amount + topups - (reserved - waitingTotal)",
    "test": "internal/modules/payment ^(TestResolvingATransferAnomalyAsSucceededCapsTheWaitingReversalsByTheVerifiedTransfer)$",
    "why": "重新分配預留時不扣 provider 上已撤回的額度。"
   },
@@ -157,17 +157,17 @@
    "id": "refund-failure-after-the-reversal-landed-is-silent",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/refund.go",
-   "old": "model.ReversalStatus(r.ReversalStatus) == model.ReversalReversed",
-   "new": "false",
+   "old": "if r.ReversalRecovered > 0 {",
+   "new": "if false {",
    "test": "internal/modules/payment ^(TestARefundThatFailsAfterTheReversalStartedKeepsTheReversalAndAlertsTheMoneyAnomaly)$",
-   "why": "撤回已落地後退款才失敗不發 MoneyAnomaly：賣家已被收回、買家沒拿到錢卻沒有告警。"
+   "why": "已有撤回成立後退款才失敗不發 MoneyAnomaly：賣家已被收回、買家沒拿到錢卻沒有告警。"
   },
   {
    "id": "reversal-landing-on-a-failed-refund-is-silent",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/reversal.go",
-   "old": "\t\tif applied.Status == string(model.RefundFailed) {\n\t\t\treturn s.publishAnomaly(ctx, model.AnomalyRefund, ref.ID, ref.PaymentID, withDetail(\"refund_failed_after_reversal\", snap.ExternalID))\n\t\t}\n",
-   "new": "",
+   "old": "\tif cur.Status == string(model.RefundFailed) {\n\t\treturn s.publishAnomaly(ctx, model.AnomalyRefund, seg.RefundID, seg.PaymentID, withDetail(\"refund_failed_after_reversal\", detail))\n\t}\n",
+   "new": "\t_ = cur\n",
    "test": "internal/modules/payment ^(TestARefundThatFailsAfterTheReversalStartedKeepsTheReversalAndAlertsTheMoneyAnomaly)$",
    "why": "撤回進行中退款失敗、撤回落地時不發 MoneyAnomaly。"
   },
@@ -305,6 +305,78 @@
    "new": "WHERE payment_id = $1\nORDER BY id\nFOR UPDATE",
    "test": "internal/modules/payment ^(TestConcurrentRefundFailuresAndTransferSuccessNeverTopUpTwice|TestADeductedRefundThatFailsGetsExactlyOneTopUpTransferToTheSeller)$",
    "why": "開始補差額時不只挑 WAITING 的退款：沒有失敗的退款也被排補差額（StartRefundTopup 的條件擋下並回錯誤，交易整個失敗）。"
+  },
+  {
+   "id": "reversal-cap-excludes-topups",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/refund.go",
+   "old": "return reversalFor(amount, tr.Amount-tr.ReversedAmount+topups-reserved), nil",
+   "new": "_ = topups\n\treturn reversalFor(amount, tr.Amount-tr.ReversedAmount-reserved), nil",
+   "test": "internal/modules/payment ^TestAFullRefundAfterATopUpRecoversTheOriginalTransferAndTheTopUpExactly$",
+   "why": "預留上限只算原轉帳、不含成功的補差額轉帳：全額退款只預留 70，賣家留 30。"
+  },
+  {
+   "id": "reversal-cap-counts-non-done-topups",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/store/reversals.sql.go",
+   "old": "FROM payment.refunds\nWHERE payment_id = $1 AND topup_status = 'DONE'",
+   "new": "FROM payment.refunds\nWHERE payment_id = $1 AND topup_status IN ('DONE', 'SENDING', 'WAITING')",
+   "test": "internal/modules/payment ^TestATopUpThatIsNotDoneIsNotCountedInTheReversalCap$",
+   "why": "預留上限把還沒成功的補差額轉帳也算進去：補差額 SENDING 時全額退款預留 100，超過 provider 上可撤的額度。"
+  },
+  {
+   "id": "reversal-split-skipped-single-target",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/reversal.go",
+   "old": "\t\t\tlegs = append(legs, leg{seq: int32(i), target: targets[i], amount: take})\n",
+   "new": "\t\t\tlegs = append(legs, leg{seq: int32(i), target: targets[i], amount: take})\n\t\t\tbreak\n",
+   "test": "internal/modules/payment ^TestAFullRefundAfterATopUpRecoversTheOriginalTransferAndTheTopUpExactly$",
+   "why": "一次收回只分給第一個有額度的目標：補差額轉帳沒有撤回列，賣家淨收 30。"
+  },
+  {
+   "id": "reversal-per-target-open-reservations-ignored",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/reversal.go",
+   "old": "free: tr.Amount - tr.ReversedAmount - open}}",
+   "new": "free: tr.Amount - tr.ReversedAmount + 0*open}}",
+   "test": "internal/modules/payment ^TestConcurrentRefundsNeverReverseMoreThanEachTransferOrTheTotal$",
+   "why": "分配撤回額時不扣原轉帳上進行中的撤回列：兩筆退款都從原轉帳分，累計超過原轉帳的額度。"
+  },
+  {
+   "id": "reversal-topup-remaining-ignores-reversed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/reversal.go",
+   "old": "return segmentTarget{remaining: t.Amount - t.TopupReversedAmount}, \"\", nil",
+   "new": "return segmentTarget{remaining: t.Amount}, \"\", nil",
+   "test": "internal/modules/payment ^TestASegmentBeyondTheTopUpRemainingGoesToAnomalyWithoutCallingTheProvider$",
+   "why": "補差額轉帳的剩餘可撤額度不扣已撤回的額度：超額的撤回列照樣呼叫 provider。"
+  },
+  {
+   "id": "reversal-topup-reversed-check-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/db/migrations/20261124035328_payment_refunds.sql",
+   "old": "ADD CONSTRAINT \"refunds_topup_reversed_check\" CHECK ((topup_reversed_amount >= 0) AND (topup_reversed_amount <= amount)), ",
+   "new": "",
+   "test": "internal/modules/payment ^TestConcurrentRefundsNeverReverseMoreThanEachTransferOrTheTotal$",
+   "why": "拿掉補差額轉帳累計撤回額的 CHECK：超過額度的寫入沒被資料庫擋下。"
+  },
+  {
+   "id": "reversal-aggregate-ignores-anomaly-segments",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/store/reversals.sql.go",
+   "old": "CASE WHEN agg.anomalies > 0 THEN 'ANOMALY' WHEN agg.reversing > 0 THEN 'REVERSING'",
+   "new": "CASE WHEN agg.reversing > 0 THEN 'REVERSING' WHEN agg.anomalies > 0 THEN 'ANOMALY'",
+   "test": "internal/modules/payment ^TestTheRefundAggregateIsAnomalyWhileAnotherSegmentIsStillReversing$",
+   "why": "彙總在還有進行中的撤回列時不顯示 ANOMALY：異常的那一列沒有被後台看到（此測試第一段在另一列成立後檢查彙總）。"
+  },
+  {
+   "id": "resolve-reversal-skips-topup-accrual",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/payment/internal/charge/anomaly.go",
+   "old": "\tif err := addTargetReversal(ctx, q, locked, transferID, now); err != nil {\n\t\treturn \"\", err\n\t}\n",
+   "new": "",
+   "test": "internal/modules/payment ^TestASegmentAnomalyHoldsTheReservationAndIsResolvedPerSegment$",
+   "why": "人工結案成功不累加目標的累計撤回額：補差額轉帳的撤回額仍是 0，之後可重複撤回。"
   }
  ]
 }

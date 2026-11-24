@@ -59,6 +59,9 @@ func TestStatusTypesMatchTheSchemaChecks(t *testing.T) {
 	if got, want := checkColumnValues(t, "refunds_reversal_status_check", "reversal_status"), names(model.ReversalStatusValues()); !slices.Equal(got, want) {
 		t.Errorf("refunds_reversal_status_check：schema=%v，Go 型別=%v", got, want)
 	}
+	if got, want := checkColumnValues(t, "refund_reversals_status_check", "status"), names(model.ReversalStatusValues()[2:]); !slices.Equal(got, want) {
+		t.Errorf("refund_reversals_status_check：schema=%v，Go 型別（REVERSING 起）=%v", got, want)
+	}
 	if got, want := checkColumnValues(t, "refunds_topup_status_check", "topup_status"), names(model.TopupStatusValues()); !slices.Equal(got, want) {
 		t.Errorf("refunds_topup_status_check：schema=%v，Go 型別=%v", got, want)
 	}

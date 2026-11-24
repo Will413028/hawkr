@@ -46,7 +46,7 @@ func TestARetryableRefusalOnAResendOfAnUnknownReversalKeepsTheKey(t *testing.T) 
 	ctx := context.Background()
 	p, tr := f.transferred(t, "R1-R")
 	refund := f.insertReversal(t, p.ID, "REFUNDING", "REVERSING", 10, 10)
-	key := f.refundText(t, "reversal_idempotency_key", refund)
+	key := f.segText(t, "idempotency_key", refund)
 	f.fake.FailReversalAfterCreate(errLost)
 	if err := f.module.ReversePaymentTransfer(ctx, refund, false); err == nil {
 		t.Fatal("回應遺失沒有回錯誤")
@@ -55,7 +55,7 @@ func TestARetryableRefusalOnAResendOfAnUnknownReversalKeepsTheKey(t *testing.T) 
 	if err := f.module.ReversePaymentTransfer(ctx, refund, false); !errors.Is(err, ErrChargeRetryableRefusal) {
 		t.Fatalf("重送被拒絕：%v", err)
 	}
-	if f.refundText(t, "reversal_idempotency_key", refund) != key || f.refundText(t, "reversal_called_at", refund) == "" {
+	if f.segText(t, "idempotency_key", refund) != key || f.segText(t, "called_at", refund) == "" {
 		t.Fatal("重送被可重試拒絕之後換了撤回鍵或清掉了呼叫時刻")
 	}
 	f.pastResendWindow()
@@ -223,20 +223,20 @@ func TestResolvingAReversalAnomalyAsSucceededRequiresTheProviderToConfirmTheEvid
 	ctx := context.Background()
 	p, tr := f.transferred(t, "R3-R")
 	refund := f.insertReversal(t, p.ID, "REFUNDING", "ANOMALY", 30, 30)
-	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, refund, AnomalySucceeded, "trr_typo"); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, f.reversalID(t, refund), AnomalySucceeded, "trr_typo"); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("亂貼的 ID：%v", err)
 	}
-	rev, err := f.fake.ReverseTransfer(ctx, ChargeReversalInput{ExternalTransferID: f.transferText(t, "external_transfer_id", tr.ID), Amount: 30, IdempotencyKey: f.refundText(t, "reversal_idempotency_key", refund)})
+	rev, err := f.fake.ReverseTransfer(ctx, ChargeReversalInput{ExternalTransferID: f.transferText(t, "external_transfer_id", tr.ID), Amount: 30, IdempotencyKey: f.segText(t, "idempotency_key", refund)})
 	must(t, err)
 	must(t, f.fake.SetReversalAmount(rev.ExternalID, 5))
-	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, refund, AnomalySucceeded, rev.ExternalID); apperr.KindOf(err) != apperr.KindFailedPrecondition {
+	if err := f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, f.reversalID(t, refund), AnomalySucceeded, rev.ExternalID); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("金額不符：%v", err)
 	}
 	if f.refundText(t, "reversal_status", refund) != "ANOMALY" || f.reversedOf(t, tr.ID) != 0 || f.auditCount(t) != 0 {
 		t.Fatalf("被擋下的結案改動了列：%s reversed %d", f.refundText(t, "reversal_status", refund), f.reversedOf(t, tr.ID))
 	}
 	must(t, f.fake.SetReversalAmount(rev.ExternalID, 30))
-	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, refund, AnomalySucceeded, rev.ExternalID))
+	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, f.reversalID(t, refund), AnomalySucceeded, rev.ExternalID))
 	if f.refundText(t, "reversal_status", refund) != "REVERSED" || f.reversedOf(t, tr.ID) != 30 {
 		t.Fatalf("相符之後：%s", f.refundText(t, "reversal_status", refund))
 	}

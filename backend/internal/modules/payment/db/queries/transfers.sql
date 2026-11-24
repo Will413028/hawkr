@@ -146,82 +146,14 @@ FROM payment.refunds
 WHERE id = $1
 FOR UPDATE;
 
--- name: MarkRefundReversalCalled :one
--- 撤回 provider 之前先記「已呼叫」的時刻（這把鍵已記過的保留最早的）。只有 REVERSING 的列寫。
-UPDATE payment.refunds
-SET reversal_called_at = COALESCE(reversal_called_at, sqlc.arg(now)::timestamptz),
-    updated_at = sqlc.arg(now)
-WHERE id = sqlc.arg(id) AND reversal_status = 'REVERSING'
-RETURNING *;
-
--- name: ApplyRefundReversal :one
--- 撤回成功：REVERSING → REVERSED 並記 provider 的撤回 ID（與 transfers.reversed_amount 的累加在同一個 transaction）。
-UPDATE payment.refunds
-SET reversal_status = 'REVERSED',
-    reversal_external_id = sqlc.arg(reversal_external_id),
-    updated_at = sqlc.arg(now)
-WHERE id = sqlc.arg(id) AND reversal_status = 'REVERSING'
-RETURNING *;
-
 -- name: ReleaseRefundReversal :one
--- 釋出預留、不撤回：WAITING（退款在撤回開始前失敗、轉帳少付或失敗）或 REVERSING（撤回永久失敗，或查回證明上一次不存在又過了最短等待）進 RELEASED，原因記在 reversal_reason，退款狀態不動。
+-- 釋出還沒開始的預留、不撤回：WAITING（退款在撤回開始前失敗、轉帳少付或失敗、人工結案後沒有額度）進 RELEASED，原因記在 reversal_reason，退款狀態不動。
+-- 已開始的撤回（有撤回列）由撤回列各自收斂，彙總狀態由 SettleRefundReversal 重算。
 UPDATE payment.refunds
 SET reversal_status = 'RELEASED',
     reversal_reason = sqlc.arg(reason),
     updated_at = sqlc.arg(now)
-WHERE id = sqlc.arg(id) AND reversal_status = ANY(sqlc.arg(from_statuses)::text[])
-RETURNING *;
-
--- name: RotateRefundReversalKey :one
--- 撤回被 provider 已知拒絕（可重試、沒有執行）：換新的撤回冪等鍵（也是新的嘗試 ID），清掉呼叫時刻與查回失敗次數，不計任何期限。
-UPDATE payment.refunds
-SET reversal_idempotency_key = gen_random_uuid(),
-    reversal_called_at = NULL,
-    reversal_lookup_failures = 0,
-    updated_at = sqlc.arg(now)
-WHERE id = sqlc.arg(id) AND reversal_status = 'REVERSING' AND reversal_idempotency_key = sqlc.arg(old_key)
-RETURNING *;
-
--- name: BumpRefundReversalLookupFailures :one
-UPDATE payment.refunds
-SET reversal_lookup_failures = reversal_lookup_failures + 1,
-    updated_at = sqlc.arg(now)
-WHERE id = sqlc.arg(id) AND reversal_status = 'REVERSING'
-RETURNING reversal_lookup_failures;
-
--- name: ClearRefundReversalLookupFailures :exec
-UPDATE payment.refunds
-SET reversal_lookup_failures = 0
-WHERE id = sqlc.arg(id) AND reversal_status = 'REVERSING' AND reversal_lookup_failures > 0;
-
--- name: AnomalyRefundReversal :one
--- 撤回與 provider 不符、前置條件不成立或查回連續失敗：REVERSING 進 ANOMALY（預留持續佔住，補掃不再重試），原因記在 reversal_reason。
-UPDATE payment.refunds
-SET reversal_status = 'ANOMALY',
-    reversal_reason = sqlc.arg(reason),
-    updated_at = sqlc.arg(now)
-WHERE id = sqlc.arg(id) AND reversal_status = 'REVERSING'
-RETURNING *;
-
--- name: ResolveRefundReversed :one
--- 後台人工結案（撤回的 ANOMALY）：provider 確實撤回了（reversal_external_id 是證據），進 REVERSED。
-UPDATE payment.refunds
-SET reversal_status = 'REVERSED',
-    reversal_external_id = sqlc.arg(reversal_external_id),
-    reversal_called_at = COALESCE(reversal_called_at, sqlc.arg(now)::timestamptz),
-    reversal_reason = NULL,
-    reversal_lookup_failures = 0,
-    updated_at = sqlc.arg(now)
-WHERE id = sqlc.arg(id) AND reversal_status = 'ANOMALY'
-RETURNING *;
-
--- name: ResolveRefundReversalReleased :one
--- 後台人工結案（撤回的 ANOMALY）：確認 provider 沒有撤回，預留釋出。
-UPDATE payment.refunds
-SET reversal_status = 'RELEASED',
-    reversal_reason = sqlc.arg(reason),
-    updated_at = sqlc.arg(now)
-WHERE id = sqlc.arg(id) AND reversal_status = 'ANOMALY'
+WHERE id = sqlc.arg(id) AND reversal_status = 'WAITING'
 RETURNING *;
 
 -- name: StartableReversals :many
@@ -256,22 +188,14 @@ SET reversal_amount = sqlc.arg(reversal_amount),
 WHERE id = sqlc.arg(id) AND reversal_status = 'WAITING'
 RETURNING *;
 
--- name: ReversingRefundIDs :many
--- 週期掃描：撤回 REVERSING、閒置超過門檻的退款（ANOMALY 不在內，partial index refunds_reversing）。
-SELECT id
-FROM payment.refunds
-WHERE reversal_status = 'REVERSING' AND updated_at <= sqlc.arg(idle_before) AND id > sqlc.arg(after_id)
-ORDER BY id
-LIMIT sqlc.arg(batch);
-
 -- name: RefundByRequestKey :one
 SELECT *
 FROM payment.refunds
 WHERE payment_id = sqlc.arg(payment_id) AND request_key = sqlc.arg(request_key);
 
 -- name: PendingReversalTotal :one
--- 已預留、還沒累加到 transfers.reversed_amount 的撤回額度：WAITING、REVERSING 與 ANOMALY 的預留。
-SELECT COALESCE(SUM(reversal_amount), 0)::bigint AS total
+-- 已預留、還沒成立的撤回額度（預留額減已成立的）：WAITING、REVERSING 與 ANOMALY 的預留。
+SELECT COALESCE(SUM(reversal_amount - reversal_recovered), 0)::bigint AS total
 FROM payment.refunds
 WHERE payment_id = $1 AND reversal_status IN ('WAITING', 'REVERSING', 'ANOMALY');
 

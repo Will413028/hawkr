@@ -398,7 +398,7 @@ func TestAnAnomalousReversalKeepsHoldingItsReservationAndAPermanentFailureReleas
 	if f.reversalOf(t, big.ID) != "RELEASED" || f.refundText(t, "status", big.ID) != "SUCCEEDED" {
 		t.Fatalf("撤回永久失敗：%s，退款 %s", f.reversalOf(t, big.ID), f.refundText(t, "status", big.ID))
 	}
-	if len(f.anomalies) != 1 || f.anomalies[0].Kind != AnomalyReversal || f.anomalies[0].ObjectID != big.ID || !f.anomalyInTx[0] {
+	if len(f.anomalies) != 1 || f.anomalies[0].Kind != AnomalyReversal || f.anomalies[0].ObjectID != f.reversalID(t, big.ID) || !f.anomalyInTx[0] {
 		t.Fatalf("事件=%+v", f.anomalies)
 	}
 	f.noViolations(t)

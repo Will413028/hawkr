@@ -87,7 +87,7 @@ func RefundStatusValues() []RefundStatus {
 	return []RefundStatus{RefundPending, RefundRefunding, RefundSucceeded, RefundFailed, RefundAnomaly}
 }
 
-// ReversalStatus 是退款列上向賣家收回（撤回轉帳）的狀態（refunds_reversal_status_check），與退款狀態並行、各自收斂（D11、ADR D69）。
+// ReversalStatus 是退款列上向賣家收回（撤回轉帳）的彙總狀態（refunds_reversal_status_check），與退款狀態並行、各自收斂（D11、ADR D69）；REVERSING 起的四個值也是每一次 provider 撤回呼叫（refund_reversals.status，refund_reversals_status_check）的狀態，彙總由撤回列推導。
 type ReversalStatus string
 
 // 向賣家收回的狀態。
@@ -96,13 +96,13 @@ const (
 	ReversalNone ReversalStatus = "NONE"
 	// ReversalWaiting 已預留額度、尚未開始：等 provider 接受退款且轉帳成立。
 	ReversalWaiting ReversalStatus = "WAITING"
-	// ReversalReversing 撤回轉帳進行中（結果不明時依 D68 收斂）。
+	// ReversalReversing 撤回進行中（至少一次 provider 撤回呼叫還沒終局，結果不明時依 D68 收斂）。
 	ReversalReversing ReversalStatus = "REVERSING"
-	// ReversalReversed 撤回成立。
+	// ReversalReversed 撤回成立（撤回列：這一次成立；彙總：全部撤回列成立）。
 	ReversalReversed ReversalStatus = "REVERSED"
-	// ReversalReleased 預留已釋出、沒有撤回（退款在撤回前失敗、轉帳少付或失敗、撤回永久失敗、人工結案）。
+	// ReversalReleased 預留已釋出、沒有撤回（退款在撤回前失敗、轉帳少付或失敗、撤回永久失敗、人工結案）；彙總只在撤回列終局而不是全部成立時才是它，已成立的部分留在 reversal_recovered。
 	ReversalReleased ReversalStatus = "RELEASED"
-	// ReversalAnomaly 撤回與 provider 對不起來：預留持續佔住，由後台人工結案。
+	// ReversalAnomaly 撤回與 provider 對不起來：額度持續佔住，由後台人工結案（撤回列逐列結案）。
 	ReversalAnomaly ReversalStatus = "ANOMALY"
 )
 
@@ -185,7 +185,7 @@ const (
 	AnomalyPayment  AnomalyKind = "payment"
 	AnomalyTransfer AnomalyKind = "transfer"
 	AnomalyRefund   AnomalyKind = "refund"
-	// AnomalyReversal 是退款列上的撤回（ObjectID 是退款 ID）。
+	// AnomalyReversal 是一次 provider 撤回呼叫（refund_reversals 的列，ObjectID 是撤回列 ID）。
 	AnomalyReversal AnomalyKind = "reversal"
 	// AnomalyTopup 是退款列上的補差額轉帳（ObjectID 是退款 ID）。
 	AnomalyTopup AnomalyKind = "topup"

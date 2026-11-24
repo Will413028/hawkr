@@ -83,7 +83,7 @@ SET status = 'ANOMALY',
     failure_reason = $1,
     updated_at = $2
 WHERE id = $3 AND status IN ('PENDING', 'REFUNDING')
-RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_reason, reversal_idempotency_key, reversal_called_at, reversal_external_id, reversal_lookup_failures, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 `
 
 type AnomalyRefundParams struct {
@@ -105,11 +105,8 @@ func (q *Queries) AnomalyRefund(ctx context.Context, arg AnomalyRefundParams) (P
 		&i.Status,
 		&i.ReversalStatus,
 		&i.ReversalAmount,
+		&i.ReversalRecovered,
 		&i.ReversalReason,
-		&i.ReversalIdempotencyKey,
-		&i.ReversalCalledAt,
-		&i.ReversalExternalID,
-		&i.ReversalLookupFailures,
 		&i.TransferDeducted,
 		&i.TopupStatus,
 		&i.TopupReason,
@@ -117,57 +114,7 @@ func (q *Queries) AnomalyRefund(ctx context.Context, arg AnomalyRefundParams) (P
 		&i.TopupCalledAt,
 		&i.TopupExternalID,
 		&i.TopupLookupFailures,
-		&i.IdempotencyKey,
-		&i.RefundCalledAt,
-		&i.RefundLookupFailures,
-		&i.ExternalRefundID,
-		&i.FailureReason,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const anomalyRefundReversal = `-- name: AnomalyRefundReversal :one
-UPDATE payment.refunds
-SET reversal_status = 'ANOMALY',
-    reversal_reason = $1,
-    updated_at = $2
-WHERE id = $3 AND reversal_status = 'REVERSING'
-RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_reason, reversal_idempotency_key, reversal_called_at, reversal_external_id, reversal_lookup_failures, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
-`
-
-type AnomalyRefundReversalParams struct {
-	Reason *string
-	Now    time.Time
-	ID     uuid.UUID
-}
-
-// 撤回與 provider 不符、前置條件不成立或查回連續失敗：REVERSING 進 ANOMALY（預留持續佔住，補掃不再重試），原因記在 reversal_reason。
-func (q *Queries) AnomalyRefundReversal(ctx context.Context, arg AnomalyRefundReversalParams) (PaymentRefund, error) {
-	row := q.db.QueryRow(ctx, anomalyRefundReversal, arg.Reason, arg.Now, arg.ID)
-	var i PaymentRefund
-	err := row.Scan(
-		&i.ID,
-		&i.PaymentID,
-		&i.RequestKey,
-		&i.Amount,
-		&i.Auto,
-		&i.Status,
-		&i.ReversalStatus,
-		&i.ReversalAmount,
-		&i.ReversalReason,
-		&i.ReversalIdempotencyKey,
-		&i.ReversalCalledAt,
-		&i.ReversalExternalID,
-		&i.ReversalLookupFailures,
-		&i.TransferDeducted,
-		&i.TopupStatus,
-		&i.TopupReason,
-		&i.TopupIdempotencyKey,
-		&i.TopupCalledAt,
-		&i.TopupExternalID,
-		&i.TopupLookupFailures,
+		&i.TopupReversedAmount,
 		&i.IdempotencyKey,
 		&i.RefundCalledAt,
 		&i.RefundLookupFailures,
@@ -217,57 +164,6 @@ func (q *Queries) AnomalyTransfer(ctx context.Context, arg AnomalyTransferParams
 	return i, err
 }
 
-const applyRefundReversal = `-- name: ApplyRefundReversal :one
-UPDATE payment.refunds
-SET reversal_status = 'REVERSED',
-    reversal_external_id = $1,
-    updated_at = $2
-WHERE id = $3 AND reversal_status = 'REVERSING'
-RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_reason, reversal_idempotency_key, reversal_called_at, reversal_external_id, reversal_lookup_failures, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
-`
-
-type ApplyRefundReversalParams struct {
-	ReversalExternalID *string
-	Now                time.Time
-	ID                 uuid.UUID
-}
-
-// 撤回成功：REVERSING → REVERSED 並記 provider 的撤回 ID（與 transfers.reversed_amount 的累加在同一個 transaction）。
-func (q *Queries) ApplyRefundReversal(ctx context.Context, arg ApplyRefundReversalParams) (PaymentRefund, error) {
-	row := q.db.QueryRow(ctx, applyRefundReversal, arg.ReversalExternalID, arg.Now, arg.ID)
-	var i PaymentRefund
-	err := row.Scan(
-		&i.ID,
-		&i.PaymentID,
-		&i.RequestKey,
-		&i.Amount,
-		&i.Auto,
-		&i.Status,
-		&i.ReversalStatus,
-		&i.ReversalAmount,
-		&i.ReversalReason,
-		&i.ReversalIdempotencyKey,
-		&i.ReversalCalledAt,
-		&i.ReversalExternalID,
-		&i.ReversalLookupFailures,
-		&i.TransferDeducted,
-		&i.TopupStatus,
-		&i.TopupReason,
-		&i.TopupIdempotencyKey,
-		&i.TopupCalledAt,
-		&i.TopupExternalID,
-		&i.TopupLookupFailures,
-		&i.IdempotencyKey,
-		&i.RefundCalledAt,
-		&i.RefundLookupFailures,
-		&i.ExternalRefundID,
-		&i.FailureReason,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
 const applyRefundSnapshot = `-- name: ApplyRefundSnapshot :one
 UPDATE payment.refunds
 SET status = $1,
@@ -281,7 +177,7 @@ SET status = $1,
     updated_at = $3
 WHERE id = $5 AND status IN ('PENDING', 'REFUNDING')
   AND (external_refund_id IS NULL OR external_refund_id = $2)
-RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_reason, reversal_idempotency_key, reversal_called_at, reversal_external_id, reversal_lookup_failures, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 `
 
 type ApplyRefundSnapshotParams struct {
@@ -312,11 +208,8 @@ func (q *Queries) ApplyRefundSnapshot(ctx context.Context, arg ApplyRefundSnapsh
 		&i.Status,
 		&i.ReversalStatus,
 		&i.ReversalAmount,
+		&i.ReversalRecovered,
 		&i.ReversalReason,
-		&i.ReversalIdempotencyKey,
-		&i.ReversalCalledAt,
-		&i.ReversalExternalID,
-		&i.ReversalLookupFailures,
 		&i.TransferDeducted,
 		&i.TopupStatus,
 		&i.TopupReason,
@@ -324,6 +217,7 @@ func (q *Queries) ApplyRefundSnapshot(ctx context.Context, arg ApplyRefundSnapsh
 		&i.TopupCalledAt,
 		&i.TopupExternalID,
 		&i.TopupLookupFailures,
+		&i.TopupReversedAmount,
 		&i.IdempotencyKey,
 		&i.RefundCalledAt,
 		&i.RefundLookupFailures,
@@ -353,26 +247,6 @@ func (q *Queries) BumpRefundLookupFailures(ctx context.Context, arg BumpRefundLo
 	var refund_lookup_failures int32
 	err := row.Scan(&refund_lookup_failures)
 	return refund_lookup_failures, err
-}
-
-const bumpRefundReversalLookupFailures = `-- name: BumpRefundReversalLookupFailures :one
-UPDATE payment.refunds
-SET reversal_lookup_failures = reversal_lookup_failures + 1,
-    updated_at = $1
-WHERE id = $2 AND reversal_status = 'REVERSING'
-RETURNING reversal_lookup_failures
-`
-
-type BumpRefundReversalLookupFailuresParams struct {
-	Now time.Time
-	ID  uuid.UUID
-}
-
-func (q *Queries) BumpRefundReversalLookupFailures(ctx context.Context, arg BumpRefundReversalLookupFailuresParams) (int32, error) {
-	row := q.db.QueryRow(ctx, bumpRefundReversalLookupFailures, arg.Now, arg.ID)
-	var reversal_lookup_failures int32
-	err := row.Scan(&reversal_lookup_failures)
-	return reversal_lookup_failures, err
 }
 
 const bumpTransferLookupFailures = `-- name: BumpTransferLookupFailures :one
@@ -481,17 +355,6 @@ func (q *Queries) ClearRefundLookupFailures(ctx context.Context, id uuid.UUID) e
 	return err
 }
 
-const clearRefundReversalLookupFailures = `-- name: ClearRefundReversalLookupFailures :exec
-UPDATE payment.refunds
-SET reversal_lookup_failures = 0
-WHERE id = $1 AND reversal_status = 'REVERSING' AND reversal_lookup_failures > 0
-`
-
-func (q *Queries) ClearRefundReversalLookupFailures(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.Exec(ctx, clearRefundReversalLookupFailures, id)
-	return err
-}
-
 const clearTransferLookupFailures = `-- name: ClearTransferLookupFailures :exec
 UPDATE payment.transfers
 SET lookup_failures = 0
@@ -512,7 +375,7 @@ SET status = 'FAILED',
     failure_reason = $1,
     updated_at = $2
 WHERE id = $3 AND status = 'PENDING'
-RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_reason, reversal_idempotency_key, reversal_called_at, reversal_external_id, reversal_lookup_failures, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 `
 
 type FailRefundCallParams struct {
@@ -534,11 +397,8 @@ func (q *Queries) FailRefundCall(ctx context.Context, arg FailRefundCallParams) 
 		&i.Status,
 		&i.ReversalStatus,
 		&i.ReversalAmount,
+		&i.ReversalRecovered,
 		&i.ReversalReason,
-		&i.ReversalIdempotencyKey,
-		&i.ReversalCalledAt,
-		&i.ReversalExternalID,
-		&i.ReversalLookupFailures,
 		&i.TransferDeducted,
 		&i.TopupStatus,
 		&i.TopupReason,
@@ -546,6 +406,7 @@ func (q *Queries) FailRefundCall(ctx context.Context, arg FailRefundCallParams) 
 		&i.TopupCalledAt,
 		&i.TopupExternalID,
 		&i.TopupLookupFailures,
+		&i.TopupReversedAmount,
 		&i.IdempotencyKey,
 		&i.RefundCalledAt,
 		&i.RefundLookupFailures,
@@ -597,7 +458,7 @@ func (q *Queries) FailTransfer(ctx context.Context, arg FailTransferParams) (Pay
 const insertRefund = `-- name: InsertRefund :one
 INSERT INTO payment.refunds (id, payment_id, request_key, amount, auto, reversal_status, reversal_amount, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
-RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_reason, reversal_idempotency_key, reversal_called_at, reversal_external_id, reversal_lookup_failures, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 `
 
 type InsertRefundParams struct {
@@ -632,11 +493,8 @@ func (q *Queries) InsertRefund(ctx context.Context, arg InsertRefundParams) (Pay
 		&i.Status,
 		&i.ReversalStatus,
 		&i.ReversalAmount,
+		&i.ReversalRecovered,
 		&i.ReversalReason,
-		&i.ReversalIdempotencyKey,
-		&i.ReversalCalledAt,
-		&i.ReversalExternalID,
-		&i.ReversalLookupFailures,
 		&i.TransferDeducted,
 		&i.TopupStatus,
 		&i.TopupReason,
@@ -644,6 +502,7 @@ func (q *Queries) InsertRefund(ctx context.Context, arg InsertRefundParams) (Pay
 		&i.TopupCalledAt,
 		&i.TopupExternalID,
 		&i.TopupLookupFailures,
+		&i.TopupReversedAmount,
 		&i.IdempotencyKey,
 		&i.RefundCalledAt,
 		&i.RefundLookupFailures,
@@ -722,7 +581,7 @@ func (q *Queries) LockPaymentByOrderNo(ctx context.Context, orderNo string) (Pay
 }
 
 const lockRefund = `-- name: LockRefund :one
-SELECT id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_reason, reversal_idempotency_key, reversal_called_at, reversal_external_id, reversal_lookup_failures, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+SELECT id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 FROM payment.refunds
 WHERE id = $1
 FOR UPDATE
@@ -740,11 +599,8 @@ func (q *Queries) LockRefund(ctx context.Context, id uuid.UUID) (PaymentRefund, 
 		&i.Status,
 		&i.ReversalStatus,
 		&i.ReversalAmount,
+		&i.ReversalRecovered,
 		&i.ReversalReason,
-		&i.ReversalIdempotencyKey,
-		&i.ReversalCalledAt,
-		&i.ReversalExternalID,
-		&i.ReversalLookupFailures,
 		&i.TransferDeducted,
 		&i.TopupStatus,
 		&i.TopupReason,
@@ -752,6 +608,7 @@ func (q *Queries) LockRefund(ctx context.Context, id uuid.UUID) (PaymentRefund, 
 		&i.TopupCalledAt,
 		&i.TopupExternalID,
 		&i.TopupLookupFailures,
+		&i.TopupReversedAmount,
 		&i.IdempotencyKey,
 		&i.RefundCalledAt,
 		&i.RefundLookupFailures,
@@ -798,7 +655,7 @@ UPDATE payment.refunds
 SET refund_called_at = COALESCE(refund_called_at, $1::timestamptz),
     updated_at = $1
 WHERE id = $2 AND status = 'PENDING'
-RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_reason, reversal_idempotency_key, reversal_called_at, reversal_external_id, reversal_lookup_failures, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 `
 
 type MarkRefundCalledParams struct {
@@ -819,11 +676,8 @@ func (q *Queries) MarkRefundCalled(ctx context.Context, arg MarkRefundCalledPara
 		&i.Status,
 		&i.ReversalStatus,
 		&i.ReversalAmount,
+		&i.ReversalRecovered,
 		&i.ReversalReason,
-		&i.ReversalIdempotencyKey,
-		&i.ReversalCalledAt,
-		&i.ReversalExternalID,
-		&i.ReversalLookupFailures,
 		&i.TransferDeducted,
 		&i.TopupStatus,
 		&i.TopupReason,
@@ -831,55 +685,7 @@ func (q *Queries) MarkRefundCalled(ctx context.Context, arg MarkRefundCalledPara
 		&i.TopupCalledAt,
 		&i.TopupExternalID,
 		&i.TopupLookupFailures,
-		&i.IdempotencyKey,
-		&i.RefundCalledAt,
-		&i.RefundLookupFailures,
-		&i.ExternalRefundID,
-		&i.FailureReason,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const markRefundReversalCalled = `-- name: MarkRefundReversalCalled :one
-UPDATE payment.refunds
-SET reversal_called_at = COALESCE(reversal_called_at, $1::timestamptz),
-    updated_at = $1
-WHERE id = $2 AND reversal_status = 'REVERSING'
-RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_reason, reversal_idempotency_key, reversal_called_at, reversal_external_id, reversal_lookup_failures, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
-`
-
-type MarkRefundReversalCalledParams struct {
-	Now time.Time
-	ID  uuid.UUID
-}
-
-// 撤回 provider 之前先記「已呼叫」的時刻（這把鍵已記過的保留最早的）。只有 REVERSING 的列寫。
-func (q *Queries) MarkRefundReversalCalled(ctx context.Context, arg MarkRefundReversalCalledParams) (PaymentRefund, error) {
-	row := q.db.QueryRow(ctx, markRefundReversalCalled, arg.Now, arg.ID)
-	var i PaymentRefund
-	err := row.Scan(
-		&i.ID,
-		&i.PaymentID,
-		&i.RequestKey,
-		&i.Amount,
-		&i.Auto,
-		&i.Status,
-		&i.ReversalStatus,
-		&i.ReversalAmount,
-		&i.ReversalReason,
-		&i.ReversalIdempotencyKey,
-		&i.ReversalCalledAt,
-		&i.ReversalExternalID,
-		&i.ReversalLookupFailures,
-		&i.TransferDeducted,
-		&i.TopupStatus,
-		&i.TopupReason,
-		&i.TopupIdempotencyKey,
-		&i.TopupCalledAt,
-		&i.TopupExternalID,
-		&i.TopupLookupFailures,
+		&i.TopupReversedAmount,
 		&i.IdempotencyKey,
 		&i.RefundCalledAt,
 		&i.RefundLookupFailures,
@@ -906,12 +712,12 @@ func (q *Queries) NonFailedRefundTotal(ctx context.Context, paymentID uuid.UUID)
 }
 
 const pendingReversalTotal = `-- name: PendingReversalTotal :one
-SELECT COALESCE(SUM(reversal_amount), 0)::bigint AS total
+SELECT COALESCE(SUM(reversal_amount - reversal_recovered), 0)::bigint AS total
 FROM payment.refunds
 WHERE payment_id = $1 AND reversal_status IN ('WAITING', 'REVERSING', 'ANOMALY')
 `
 
-// 已預留、還沒累加到 transfers.reversed_amount 的撤回額度：WAITING、REVERSING 與 ANOMALY 的預留。
+// 已預留、還沒成立的撤回額度（預留額減已成立的）：WAITING、REVERSING 與 ANOMALY 的預留。
 func (q *Queries) PendingReversalTotal(ctx context.Context, paymentID uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, pendingReversalTotal, paymentID)
 	var total int64
@@ -955,7 +761,7 @@ func (q *Queries) PendingTransferIDs(ctx context.Context, arg PendingTransferIDs
 }
 
 const refundByExternal = `-- name: RefundByExternal :one
-SELECT r.id, r.payment_id, r.request_key, r.amount, r.auto, r.status, r.reversal_status, r.reversal_amount, r.reversal_reason, r.reversal_idempotency_key, r.reversal_called_at, r.reversal_external_id, r.reversal_lookup_failures, r.transfer_deducted, r.topup_status, r.topup_reason, r.topup_idempotency_key, r.topup_called_at, r.topup_external_id, r.topup_lookup_failures, r.idempotency_key, r.refund_called_at, r.refund_lookup_failures, r.external_refund_id, r.failure_reason, r.created_at, r.updated_at
+SELECT r.id, r.payment_id, r.request_key, r.amount, r.auto, r.status, r.reversal_status, r.reversal_amount, r.reversal_recovered, r.reversal_reason, r.transfer_deducted, r.topup_status, r.topup_reason, r.topup_idempotency_key, r.topup_called_at, r.topup_external_id, r.topup_lookup_failures, r.topup_reversed_amount, r.idempotency_key, r.refund_called_at, r.refund_lookup_failures, r.external_refund_id, r.failure_reason, r.created_at, r.updated_at
 FROM payment.refunds r
 JOIN payment.payments p ON p.id = r.payment_id
 WHERE p.provider = $1 AND r.external_refund_id = $2
@@ -979,11 +785,8 @@ func (q *Queries) RefundByExternal(ctx context.Context, arg RefundByExternalPara
 		&i.Status,
 		&i.ReversalStatus,
 		&i.ReversalAmount,
+		&i.ReversalRecovered,
 		&i.ReversalReason,
-		&i.ReversalIdempotencyKey,
-		&i.ReversalCalledAt,
-		&i.ReversalExternalID,
-		&i.ReversalLookupFailures,
 		&i.TransferDeducted,
 		&i.TopupStatus,
 		&i.TopupReason,
@@ -991,6 +794,7 @@ func (q *Queries) RefundByExternal(ctx context.Context, arg RefundByExternalPara
 		&i.TopupCalledAt,
 		&i.TopupExternalID,
 		&i.TopupLookupFailures,
+		&i.TopupReversedAmount,
 		&i.IdempotencyKey,
 		&i.RefundCalledAt,
 		&i.RefundLookupFailures,
@@ -1003,7 +807,7 @@ func (q *Queries) RefundByExternal(ctx context.Context, arg RefundByExternalPara
 }
 
 const refundByID = `-- name: RefundByID :one
-SELECT id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_reason, reversal_idempotency_key, reversal_called_at, reversal_external_id, reversal_lookup_failures, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+SELECT id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 FROM payment.refunds
 WHERE id = $1
 `
@@ -1020,11 +824,8 @@ func (q *Queries) RefundByID(ctx context.Context, id uuid.UUID) (PaymentRefund, 
 		&i.Status,
 		&i.ReversalStatus,
 		&i.ReversalAmount,
+		&i.ReversalRecovered,
 		&i.ReversalReason,
-		&i.ReversalIdempotencyKey,
-		&i.ReversalCalledAt,
-		&i.ReversalExternalID,
-		&i.ReversalLookupFailures,
 		&i.TransferDeducted,
 		&i.TopupStatus,
 		&i.TopupReason,
@@ -1032,6 +833,7 @@ func (q *Queries) RefundByID(ctx context.Context, id uuid.UUID) (PaymentRefund, 
 		&i.TopupCalledAt,
 		&i.TopupExternalID,
 		&i.TopupLookupFailures,
+		&i.TopupReversedAmount,
 		&i.IdempotencyKey,
 		&i.RefundCalledAt,
 		&i.RefundLookupFailures,
@@ -1044,7 +846,7 @@ func (q *Queries) RefundByID(ctx context.Context, id uuid.UUID) (PaymentRefund, 
 }
 
 const refundByRequestKey = `-- name: RefundByRequestKey :one
-SELECT id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_reason, reversal_idempotency_key, reversal_called_at, reversal_external_id, reversal_lookup_failures, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+SELECT id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 FROM payment.refunds
 WHERE payment_id = $1 AND request_key = $2
 `
@@ -1066,11 +868,8 @@ func (q *Queries) RefundByRequestKey(ctx context.Context, arg RefundByRequestKey
 		&i.Status,
 		&i.ReversalStatus,
 		&i.ReversalAmount,
+		&i.ReversalRecovered,
 		&i.ReversalReason,
-		&i.ReversalIdempotencyKey,
-		&i.ReversalCalledAt,
-		&i.ReversalExternalID,
-		&i.ReversalLookupFailures,
 		&i.TransferDeducted,
 		&i.TopupStatus,
 		&i.TopupReason,
@@ -1078,6 +877,7 @@ func (q *Queries) RefundByRequestKey(ctx context.Context, arg RefundByRequestKey
 		&i.TopupCalledAt,
 		&i.TopupExternalID,
 		&i.TopupLookupFailures,
+		&i.TopupReversedAmount,
 		&i.IdempotencyKey,
 		&i.RefundCalledAt,
 		&i.RefundLookupFailures,
@@ -1162,25 +962,20 @@ UPDATE payment.refunds
 SET reversal_status = 'RELEASED',
     reversal_reason = $1,
     updated_at = $2
-WHERE id = $3 AND reversal_status = ANY($4::text[])
-RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_reason, reversal_idempotency_key, reversal_called_at, reversal_external_id, reversal_lookup_failures, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+WHERE id = $3 AND reversal_status = 'WAITING'
+RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 `
 
 type ReleaseRefundReversalParams struct {
-	Reason       *string
-	Now          time.Time
-	ID           uuid.UUID
-	FromStatuses []string
+	Reason *string
+	Now    time.Time
+	ID     uuid.UUID
 }
 
-// 釋出預留、不撤回：WAITING（退款在撤回開始前失敗、轉帳少付或失敗）或 REVERSING（撤回永久失敗，或查回證明上一次不存在又過了最短等待）進 RELEASED，原因記在 reversal_reason，退款狀態不動。
+// 釋出還沒開始的預留、不撤回：WAITING（退款在撤回開始前失敗、轉帳少付或失敗、人工結案後沒有額度）進 RELEASED，原因記在 reversal_reason，退款狀態不動。
+// 已開始的撤回（有撤回列）由撤回列各自收斂，彙總狀態由 SettleRefundReversal 重算。
 func (q *Queries) ReleaseRefundReversal(ctx context.Context, arg ReleaseRefundReversalParams) (PaymentRefund, error) {
-	row := q.db.QueryRow(ctx, releaseRefundReversal,
-		arg.Reason,
-		arg.Now,
-		arg.ID,
-		arg.FromStatuses,
-	)
+	row := q.db.QueryRow(ctx, releaseRefundReversal, arg.Reason, arg.Now, arg.ID)
 	var i PaymentRefund
 	err := row.Scan(
 		&i.ID,
@@ -1191,11 +986,8 @@ func (q *Queries) ReleaseRefundReversal(ctx context.Context, arg ReleaseRefundRe
 		&i.Status,
 		&i.ReversalStatus,
 		&i.ReversalAmount,
+		&i.ReversalRecovered,
 		&i.ReversalReason,
-		&i.ReversalIdempotencyKey,
-		&i.ReversalCalledAt,
-		&i.ReversalExternalID,
-		&i.ReversalLookupFailures,
 		&i.TransferDeducted,
 		&i.TopupStatus,
 		&i.TopupReason,
@@ -1203,6 +995,7 @@ func (q *Queries) ReleaseRefundReversal(ctx context.Context, arg ReleaseRefundRe
 		&i.TopupCalledAt,
 		&i.TopupExternalID,
 		&i.TopupLookupFailures,
+		&i.TopupReversedAmount,
 		&i.IdempotencyKey,
 		&i.RefundCalledAt,
 		&i.RefundLookupFailures,
@@ -1223,7 +1016,7 @@ SET status = 'FAILED',
     failure_reason = $1,
     updated_at = $2
 WHERE id = $3 AND status = 'ANOMALY'
-RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_reason, reversal_idempotency_key, reversal_called_at, reversal_external_id, reversal_lookup_failures, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 `
 
 type ResolveRefundCallFailedParams struct {
@@ -1245,11 +1038,8 @@ func (q *Queries) ResolveRefundCallFailed(ctx context.Context, arg ResolveRefund
 		&i.Status,
 		&i.ReversalStatus,
 		&i.ReversalAmount,
+		&i.ReversalRecovered,
 		&i.ReversalReason,
-		&i.ReversalIdempotencyKey,
-		&i.ReversalCalledAt,
-		&i.ReversalExternalID,
-		&i.ReversalLookupFailures,
 		&i.TransferDeducted,
 		&i.TopupStatus,
 		&i.TopupReason,
@@ -1257,6 +1047,7 @@ func (q *Queries) ResolveRefundCallFailed(ctx context.Context, arg ResolveRefund
 		&i.TopupCalledAt,
 		&i.TopupExternalID,
 		&i.TopupLookupFailures,
+		&i.TopupReversedAmount,
 		&i.IdempotencyKey,
 		&i.RefundCalledAt,
 		&i.RefundLookupFailures,
@@ -1277,7 +1068,7 @@ SET status = 'REFUNDING',
     failure_reason = NULL,
     updated_at = $2
 WHERE id = $3 AND status = 'ANOMALY'
-RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_reason, reversal_idempotency_key, reversal_called_at, reversal_external_id, reversal_lookup_failures, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 `
 
 type ResolveRefundRefundingParams struct {
@@ -1299,11 +1090,8 @@ func (q *Queries) ResolveRefundRefunding(ctx context.Context, arg ResolveRefundR
 		&i.Status,
 		&i.ReversalStatus,
 		&i.ReversalAmount,
+		&i.ReversalRecovered,
 		&i.ReversalReason,
-		&i.ReversalIdempotencyKey,
-		&i.ReversalCalledAt,
-		&i.ReversalExternalID,
-		&i.ReversalLookupFailures,
 		&i.TransferDeducted,
 		&i.TopupStatus,
 		&i.TopupReason,
@@ -1311,111 +1099,7 @@ func (q *Queries) ResolveRefundRefunding(ctx context.Context, arg ResolveRefundR
 		&i.TopupCalledAt,
 		&i.TopupExternalID,
 		&i.TopupLookupFailures,
-		&i.IdempotencyKey,
-		&i.RefundCalledAt,
-		&i.RefundLookupFailures,
-		&i.ExternalRefundID,
-		&i.FailureReason,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const resolveRefundReversalReleased = `-- name: ResolveRefundReversalReleased :one
-UPDATE payment.refunds
-SET reversal_status = 'RELEASED',
-    reversal_reason = $1,
-    updated_at = $2
-WHERE id = $3 AND reversal_status = 'ANOMALY'
-RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_reason, reversal_idempotency_key, reversal_called_at, reversal_external_id, reversal_lookup_failures, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
-`
-
-type ResolveRefundReversalReleasedParams struct {
-	Reason *string
-	Now    time.Time
-	ID     uuid.UUID
-}
-
-// 後台人工結案（撤回的 ANOMALY）：確認 provider 沒有撤回，預留釋出。
-func (q *Queries) ResolveRefundReversalReleased(ctx context.Context, arg ResolveRefundReversalReleasedParams) (PaymentRefund, error) {
-	row := q.db.QueryRow(ctx, resolveRefundReversalReleased, arg.Reason, arg.Now, arg.ID)
-	var i PaymentRefund
-	err := row.Scan(
-		&i.ID,
-		&i.PaymentID,
-		&i.RequestKey,
-		&i.Amount,
-		&i.Auto,
-		&i.Status,
-		&i.ReversalStatus,
-		&i.ReversalAmount,
-		&i.ReversalReason,
-		&i.ReversalIdempotencyKey,
-		&i.ReversalCalledAt,
-		&i.ReversalExternalID,
-		&i.ReversalLookupFailures,
-		&i.TransferDeducted,
-		&i.TopupStatus,
-		&i.TopupReason,
-		&i.TopupIdempotencyKey,
-		&i.TopupCalledAt,
-		&i.TopupExternalID,
-		&i.TopupLookupFailures,
-		&i.IdempotencyKey,
-		&i.RefundCalledAt,
-		&i.RefundLookupFailures,
-		&i.ExternalRefundID,
-		&i.FailureReason,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const resolveRefundReversed = `-- name: ResolveRefundReversed :one
-UPDATE payment.refunds
-SET reversal_status = 'REVERSED',
-    reversal_external_id = $1,
-    reversal_called_at = COALESCE(reversal_called_at, $2::timestamptz),
-    reversal_reason = NULL,
-    reversal_lookup_failures = 0,
-    updated_at = $2
-WHERE id = $3 AND reversal_status = 'ANOMALY'
-RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_reason, reversal_idempotency_key, reversal_called_at, reversal_external_id, reversal_lookup_failures, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
-`
-
-type ResolveRefundReversedParams struct {
-	ReversalExternalID *string
-	Now                time.Time
-	ID                 uuid.UUID
-}
-
-// 後台人工結案（撤回的 ANOMALY）：provider 確實撤回了（reversal_external_id 是證據），進 REVERSED。
-func (q *Queries) ResolveRefundReversed(ctx context.Context, arg ResolveRefundReversedParams) (PaymentRefund, error) {
-	row := q.db.QueryRow(ctx, resolveRefundReversed, arg.ReversalExternalID, arg.Now, arg.ID)
-	var i PaymentRefund
-	err := row.Scan(
-		&i.ID,
-		&i.PaymentID,
-		&i.RequestKey,
-		&i.Amount,
-		&i.Auto,
-		&i.Status,
-		&i.ReversalStatus,
-		&i.ReversalAmount,
-		&i.ReversalReason,
-		&i.ReversalIdempotencyKey,
-		&i.ReversalCalledAt,
-		&i.ReversalExternalID,
-		&i.ReversalLookupFailures,
-		&i.TransferDeducted,
-		&i.TopupStatus,
-		&i.TopupReason,
-		&i.TopupIdempotencyKey,
-		&i.TopupCalledAt,
-		&i.TopupExternalID,
-		&i.TopupLookupFailures,
+		&i.TopupReversedAmount,
 		&i.IdempotencyKey,
 		&i.RefundCalledAt,
 		&i.RefundLookupFailures,
@@ -1513,41 +1197,6 @@ func (q *Queries) ResolveTransferSucceeded(ctx context.Context, arg ResolveTrans
 	return i, err
 }
 
-const reversingRefundIDs = `-- name: ReversingRefundIDs :many
-SELECT id
-FROM payment.refunds
-WHERE reversal_status = 'REVERSING' AND updated_at <= $1 AND id > $2
-ORDER BY id
-LIMIT $3
-`
-
-type ReversingRefundIDsParams struct {
-	IdleBefore time.Time
-	AfterID    uuid.UUID
-	Batch      int32
-}
-
-// 週期掃描：撤回 REVERSING、閒置超過門檻的退款（ANOMALY 不在內，partial index refunds_reversing）。
-func (q *Queries) ReversingRefundIDs(ctx context.Context, arg ReversingRefundIDsParams) ([]uuid.UUID, error) {
-	rows, err := q.db.Query(ctx, reversingRefundIDs, arg.IdleBefore, arg.AfterID, arg.Batch)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []uuid.UUID{}
-	for rows.Next() {
-		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const rotateRefundKey = `-- name: RotateRefundKey :one
 UPDATE payment.refunds
 SET idempotency_key = gen_random_uuid(),
@@ -1555,7 +1204,7 @@ SET idempotency_key = gen_random_uuid(),
     refund_lookup_failures = 0,
     updated_at = $1
 WHERE id = $2 AND status = 'PENDING' AND idempotency_key = $3
-RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_reason, reversal_idempotency_key, reversal_called_at, reversal_external_id, reversal_lookup_failures, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 `
 
 type RotateRefundKeyParams struct {
@@ -1577,11 +1226,8 @@ func (q *Queries) RotateRefundKey(ctx context.Context, arg RotateRefundKeyParams
 		&i.Status,
 		&i.ReversalStatus,
 		&i.ReversalAmount,
+		&i.ReversalRecovered,
 		&i.ReversalReason,
-		&i.ReversalIdempotencyKey,
-		&i.ReversalCalledAt,
-		&i.ReversalExternalID,
-		&i.ReversalLookupFailures,
 		&i.TransferDeducted,
 		&i.TopupStatus,
 		&i.TopupReason,
@@ -1589,58 +1235,7 @@ func (q *Queries) RotateRefundKey(ctx context.Context, arg RotateRefundKeyParams
 		&i.TopupCalledAt,
 		&i.TopupExternalID,
 		&i.TopupLookupFailures,
-		&i.IdempotencyKey,
-		&i.RefundCalledAt,
-		&i.RefundLookupFailures,
-		&i.ExternalRefundID,
-		&i.FailureReason,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const rotateRefundReversalKey = `-- name: RotateRefundReversalKey :one
-UPDATE payment.refunds
-SET reversal_idempotency_key = gen_random_uuid(),
-    reversal_called_at = NULL,
-    reversal_lookup_failures = 0,
-    updated_at = $1
-WHERE id = $2 AND reversal_status = 'REVERSING' AND reversal_idempotency_key = $3
-RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_reason, reversal_idempotency_key, reversal_called_at, reversal_external_id, reversal_lookup_failures, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
-`
-
-type RotateRefundReversalKeyParams struct {
-	Now    time.Time
-	ID     uuid.UUID
-	OldKey uuid.UUID
-}
-
-// 撤回被 provider 已知拒絕（可重試、沒有執行）：換新的撤回冪等鍵（也是新的嘗試 ID），清掉呼叫時刻與查回失敗次數，不計任何期限。
-func (q *Queries) RotateRefundReversalKey(ctx context.Context, arg RotateRefundReversalKeyParams) (PaymentRefund, error) {
-	row := q.db.QueryRow(ctx, rotateRefundReversalKey, arg.Now, arg.ID, arg.OldKey)
-	var i PaymentRefund
-	err := row.Scan(
-		&i.ID,
-		&i.PaymentID,
-		&i.RequestKey,
-		&i.Amount,
-		&i.Auto,
-		&i.Status,
-		&i.ReversalStatus,
-		&i.ReversalAmount,
-		&i.ReversalReason,
-		&i.ReversalIdempotencyKey,
-		&i.ReversalCalledAt,
-		&i.ReversalExternalID,
-		&i.ReversalLookupFailures,
-		&i.TransferDeducted,
-		&i.TopupStatus,
-		&i.TopupReason,
-		&i.TopupIdempotencyKey,
-		&i.TopupCalledAt,
-		&i.TopupExternalID,
-		&i.TopupLookupFailures,
+		&i.TopupReversedAmount,
 		&i.IdempotencyKey,
 		&i.RefundCalledAt,
 		&i.RefundLookupFailures,
@@ -1696,7 +1291,7 @@ UPDATE payment.refunds
 SET reversal_amount = $1,
     updated_at = $2
 WHERE id = $3 AND reversal_status = 'WAITING'
-RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_reason, reversal_idempotency_key, reversal_called_at, reversal_external_id, reversal_lookup_failures, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 `
 
 type SetRefundReversalAmountParams struct {
@@ -1718,11 +1313,8 @@ func (q *Queries) SetRefundReversalAmount(ctx context.Context, arg SetRefundReve
 		&i.Status,
 		&i.ReversalStatus,
 		&i.ReversalAmount,
+		&i.ReversalRecovered,
 		&i.ReversalReason,
-		&i.ReversalIdempotencyKey,
-		&i.ReversalCalledAt,
-		&i.ReversalExternalID,
-		&i.ReversalLookupFailures,
 		&i.TransferDeducted,
 		&i.TopupStatus,
 		&i.TopupReason,
@@ -1730,6 +1322,7 @@ func (q *Queries) SetRefundReversalAmount(ctx context.Context, arg SetRefundReve
 		&i.TopupCalledAt,
 		&i.TopupExternalID,
 		&i.TopupLookupFailures,
+		&i.TopupReversedAmount,
 		&i.IdempotencyKey,
 		&i.RefundCalledAt,
 		&i.RefundLookupFailures,
@@ -1746,7 +1339,7 @@ UPDATE payment.refunds
 SET reversal_status = 'REVERSING',
     updated_at = $1
 WHERE id = $2 AND reversal_status = 'WAITING' AND status IN ('REFUNDING', 'SUCCEEDED')
-RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_reason, reversal_idempotency_key, reversal_called_at, reversal_external_id, reversal_lookup_failures, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+RETURNING id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 `
 
 type StartRefundReversalParams struct {
@@ -1767,11 +1360,8 @@ func (q *Queries) StartRefundReversal(ctx context.Context, arg StartRefundRevers
 		&i.Status,
 		&i.ReversalStatus,
 		&i.ReversalAmount,
+		&i.ReversalRecovered,
 		&i.ReversalReason,
-		&i.ReversalIdempotencyKey,
-		&i.ReversalCalledAt,
-		&i.ReversalExternalID,
-		&i.ReversalLookupFailures,
 		&i.TransferDeducted,
 		&i.TopupStatus,
 		&i.TopupReason,
@@ -1779,6 +1369,7 @@ func (q *Queries) StartRefundReversal(ctx context.Context, arg StartRefundRevers
 		&i.TopupCalledAt,
 		&i.TopupExternalID,
 		&i.TopupLookupFailures,
+		&i.TopupReversedAmount,
 		&i.IdempotencyKey,
 		&i.RefundCalledAt,
 		&i.RefundLookupFailures,
@@ -1791,7 +1382,7 @@ func (q *Queries) StartRefundReversal(ctx context.Context, arg StartRefundRevers
 }
 
 const startableReversals = `-- name: StartableReversals :many
-SELECT id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_reason, reversal_idempotency_key, reversal_called_at, reversal_external_id, reversal_lookup_failures, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+SELECT id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 FROM payment.refunds
 WHERE payment_id = $1 AND reversal_status = 'WAITING' AND status IN ('REFUNDING', 'SUCCEEDED')
 ORDER BY id
@@ -1817,11 +1408,8 @@ func (q *Queries) StartableReversals(ctx context.Context, paymentID uuid.UUID) (
 			&i.Status,
 			&i.ReversalStatus,
 			&i.ReversalAmount,
+			&i.ReversalRecovered,
 			&i.ReversalReason,
-			&i.ReversalIdempotencyKey,
-			&i.ReversalCalledAt,
-			&i.ReversalExternalID,
-			&i.ReversalLookupFailures,
 			&i.TransferDeducted,
 			&i.TopupStatus,
 			&i.TopupReason,
@@ -1829,6 +1417,7 @@ func (q *Queries) StartableReversals(ctx context.Context, paymentID uuid.UUID) (
 			&i.TopupCalledAt,
 			&i.TopupExternalID,
 			&i.TopupLookupFailures,
+			&i.TopupReversedAmount,
 			&i.IdempotencyKey,
 			&i.RefundCalledAt,
 			&i.RefundLookupFailures,
@@ -1941,7 +1530,7 @@ func (q *Queries) TransferByID(ctx context.Context, id uuid.UUID) (PaymentTransf
 }
 
 const waitingReversals = `-- name: WaitingReversals :many
-SELECT id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_reason, reversal_idempotency_key, reversal_called_at, reversal_external_id, reversal_lookup_failures, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
+SELECT id, payment_id, request_key, amount, auto, status, reversal_status, reversal_amount, reversal_recovered, reversal_reason, transfer_deducted, topup_status, topup_reason, topup_idempotency_key, topup_called_at, topup_external_id, topup_lookup_failures, topup_reversed_amount, idempotency_key, refund_called_at, refund_lookup_failures, external_refund_id, failure_reason, created_at, updated_at
 FROM payment.refunds
 WHERE payment_id = $1 AND reversal_status = 'WAITING'
 ORDER BY created_at, id
@@ -1967,11 +1556,8 @@ func (q *Queries) WaitingReversals(ctx context.Context, paymentID uuid.UUID) ([]
 			&i.Status,
 			&i.ReversalStatus,
 			&i.ReversalAmount,
+			&i.ReversalRecovered,
 			&i.ReversalReason,
-			&i.ReversalIdempotencyKey,
-			&i.ReversalCalledAt,
-			&i.ReversalExternalID,
-			&i.ReversalLookupFailures,
 			&i.TransferDeducted,
 			&i.TopupStatus,
 			&i.TopupReason,
@@ -1979,6 +1565,7 @@ func (q *Queries) WaitingReversals(ctx context.Context, paymentID uuid.UUID) ([]
 			&i.TopupCalledAt,
 			&i.TopupExternalID,
 			&i.TopupLookupFailures,
+			&i.TopupReversedAmount,
 			&i.IdempotencyKey,
 			&i.RefundCalledAt,
 			&i.RefundLookupFailures,

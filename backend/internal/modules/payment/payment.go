@@ -427,7 +427,7 @@ const (
 	AnomalyFailed    = model.AnomalyFailed
 )
 
-// ResolveAnomaly 是後台對 ANOMALY 的付款、轉帳、退款、撤回（AnomalyReversal）或補差額轉帳（AnomalyTopup）的人工結案；後兩者的 id 是退款 ID：核對 provider 之後結案成成功（evidence 是 provider 物件 ID，必填）或失敗，
+// ResolveAnomaly 是後台對 ANOMALY 的付款、轉帳、退款、撤回（AnomalyReversal）或補差額轉帳（AnomalyTopup）的人工結案；撤回的 id 是撤回列 ID，補差額轉帳的 id 是退款 ID：核對 provider 之後結案成成功（evidence 是 provider 物件 ID，必填）或失敗，
 // 領域變更與一筆 adminaudit 在同一個 transaction。語意與鎖順序見 charge.Service.ResolveAnomaly。
 func (m *Module) ResolveAnomaly(ctx context.Context, actor AdminActor, kind AnomalyKind, id uuid.UUID, outcome AnomalyOutcome, evidence string) error {
 	return m.charges.ResolveAnomaly(ctx, actor, kind, id, outcome, evidence)
@@ -513,8 +513,8 @@ func (m *Module) CreatePaymentTransfer(ctx context.Context, transferID uuid.UUID
 	return m.charges.Transfer(ctx, transferID, finalAttempt)
 }
 
-// ReversePaymentTransfer 是撤回轉帳 job（payment.transfer_reversal）的內容，給 worker 與測試呼叫：撤回狀態是 REVERSING 的退款列的 reversal_amount，
-// 成功後同一個 transaction 累加轉帳的 reversed_amount 並把撤回推進到 REVERSED。
+// ReversePaymentTransfer 是撤回轉帳 job（payment.transfer_reversal）的內容，給 worker 與測試呼叫：逐列收斂退款進行中的撤回列，
+// 每一列成功後同一個 transaction 累加目標（原轉帳或補差額轉帳）的累計撤回額並把該列推進到 REVERSED、重算退款的彙總。
 func (m *Module) ReversePaymentTransfer(ctx context.Context, refundID uuid.UUID, finalAttempt bool) error {
 	return m.charges.Reverse(ctx, refundID, finalAttempt)
 }

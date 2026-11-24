@@ -318,12 +318,12 @@ func TestAReversalConvergesByLookupAndAnAnomalousRefundStillHoldsItsQuota(t *tes
 	}
 
 	refusal := f.insertReversal(t, p.ID, "REFUNDING", "REVERSING", 10, 10)
-	oldKey := f.refundText(t, "reversal_idempotency_key", refusal)
+	oldKey := f.segText(t, "idempotency_key", refusal)
 	f.fake.FailReversal(fmt.Errorf("%w：429", ErrChargeRetryableRefusal))
 	if err := f.module.ReversePaymentTransfer(ctx, refusal, false); !errors.Is(err, ErrChargeRetryableRefusal) {
 		t.Fatalf("可重試拒絕：%v", err)
 	}
-	if f.refundText(t, "reversal_idempotency_key", refusal) == oldKey || f.refundText(t, "reversal_called_at", refusal) != "" || f.refundText(t, "reversal_status", refusal) != "REVERSING" {
+	if f.segText(t, "idempotency_key", refusal) == oldKey || f.segText(t, "called_at", refusal) != "" || f.refundText(t, "reversal_status", refusal) != "REVERSING" {
 		t.Fatal("可重試拒絕沒有換新的撤回鍵")
 	}
 	f.now = f.now.Add(40 * time.Hour)
@@ -364,14 +364,14 @@ func TestAReversalThatIsNoLongerReversingIsReportedNotSilent(t *testing.T) {
 	f = setupChargeWith(t, func(fake *ChargeFake) ChargeProvider {
 		return &afterReverse{ChargeProvider: fake, after: func() {
 			ctx := context.Background()
-			_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.refunds SET reversal_status = 'RELEASED', reversal_reason = 'manual' WHERE id = $1", refundID)
+			_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.refund_reversals SET status = 'RELEASED', reason = 'manual' WHERE refund_id = $1", refundID)
 			must(t, err)
 		}}
 	})
 	p, tr := f.transferred(t, "C-8")
 	refundID = f.insertReversal(t, p.ID, "REFUNDING", "REVERSING", 40, 40)
 	must(t, f.module.ReversePaymentTransfer(context.Background(), refundID, false))
-	if f.reversedOf(t, tr.ID) != 0 || len(f.anomalies) != 1 || f.anomalies[0].Kind != AnomalyReversal || f.anomalies[0].ObjectID != refundID {
+	if f.reversedOf(t, tr.ID) != 0 || len(f.anomalies) != 1 || f.anomalies[0].Kind != AnomalyReversal || f.anomalies[0].ObjectID != f.reversalID(t, refundID) {
 		t.Fatalf("reversed %d，事件 %+v", f.reversedOf(t, tr.ID), f.anomalies)
 	}
 	if !strings.Contains(f.logs.String(), refundID.String()) || !strings.Contains(f.logs.String(), f.fake.ReversalIDs()[0]) {
@@ -387,14 +387,14 @@ func TestResolvingARefundReversalAnomalyAccruesTheReversalOnSuccess(t *testing.T
 	p, tr := f.transferred(t, "C-9")
 	ok := f.insertReversal(t, p.ID, "REFUNDING", "ANOMALY", 30, 30)
 	bad := f.insertReversal(t, p.ID, "REFUNDING", "ANOMALY", 20, 20)
-	f.exec(t, "UPDATE payment.refunds SET reversal_reason = 'lookup_failed' WHERE reversal_status = 'ANOMALY'")
-	rev, err := f.fake.ReverseTransfer(ctx, ChargeReversalInput{ExternalTransferID: f.transferText(t, "external_transfer_id", tr.ID), Amount: 30, IdempotencyKey: f.refundText(t, "reversal_idempotency_key", ok)})
+	f.exec(t, "UPDATE payment.refund_reversals SET reason = 'lookup_failed' WHERE status = 'ANOMALY'")
+	rev, err := f.fake.ReverseTransfer(ctx, ChargeReversalInput{ExternalTransferID: f.transferText(t, "external_transfer_id", tr.ID), Amount: 30, IdempotencyKey: f.segText(t, "idempotency_key", ok)})
 	must(t, err)
-	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, ok, AnomalySucceeded, rev.ExternalID))
-	if f.refundText(t, "reversal_status", ok) != "REVERSED" || f.refundText(t, "reversal_external_id", ok) != rev.ExternalID || f.reversedOf(t, tr.ID) != 30 || f.auditCount(t) != 1 {
+	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, f.reversalID(t, ok), AnomalySucceeded, rev.ExternalID))
+	if f.refundText(t, "reversal_status", ok) != "REVERSED" || f.segText(t, "external_id", ok) != rev.ExternalID || f.reversedOf(t, tr.ID) != 30 || f.auditCount(t) != 1 {
 		t.Fatalf("成功結案：%s，reversed %d", f.refundText(t, "reversal_status", ok), f.reversedOf(t, tr.ID))
 	}
-	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, bad, AnomalyFailed, ""))
+	must(t, f.module.ResolveAnomaly(ctx, f.admin(), AnomalyReversal, f.reversalID(t, bad), AnomalyFailed, ""))
 	if f.refundText(t, "reversal_status", bad) != "RELEASED" || f.refundText(t, "status", bad) != "REFUNDING" || f.reversedOf(t, tr.ID) != 30 || f.auditCount(t) != 2 {
 		t.Fatalf("失敗結案：%s", f.refundText(t, "reversal_status", bad))
 	}
