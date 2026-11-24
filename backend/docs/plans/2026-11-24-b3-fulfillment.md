@@ -55,10 +55,10 @@
 - [ ] **1. 文件前置**（被擋於：R4）
   - 範圍：主計畫 B1、B3、B6、B8、B9 條目依 ADR 2026-11-24 修訂改寫（B8 加出貨、B6 報價來源、B9 退貨物流、B1 的託運單觸發作廢）；對設計書 69 的引用改指 ADR 修訂；假日段修正。
   - 驗收：`rg -n '設計書 ?69' backend/docs docs` 只剩歷史紀錄；`python3 scripts/check-doc-paths.py` 綠。
-- [ ] **2. seller 運費設定與報價**（被擋於：R2）
+- [ ] **2. seller 運費設定與報價**（被擋於：R2、R6）
   - 範圍：seller 模組加運費設定表（atlas migration；以賣家業務鍵為主鍵、固定運費 TWD 非負、免運門檻可空、處理天數 1–7 預設 3，CHECK 約束）；純函式報價（輸入賣家設定與商品小計，回運費與距免運差額）；Connect：`api/hawkr/seller/v1alpha1/seller.proto` 的 `SellerAppService` 加讀寫運費設定；報價以 seller 根套件的函式提供給 B6／B8（in-process，不開對外 RPC；B6 的購物車 RPC 自己帶報價結果）；生成 Go／TS／Dart；文字走模組 `internal/text`；`backend/docs/modules/seller.md` 補運費設定。
   - 消費端：`rg -n 'SellerAppService' website admin buyer-app seller-app packages -g '!**/gen/**' -g '!node_modules'`；B6、B8 計畫（尚未開工）。
-  - 不能動：seller 既有 RPC 與表。
+  - 不能動：seller 既有 RPC 與表（R6 的能力改名除外）。
   - 驗收：`gofmt -l`、`make lint-monolith`、`GOWORK=off go vet -tags integration ./...`、`buf lint`、三端生成無 drift；單元測試覆蓋報價邊界（小計等於門檻、門檻空、運費 0）；integration 測試覆蓋設定讀寫與 CHECK 拒絕（`backend-integration-tests.yml`，待 CI）；mutation 清單寫進 `mutation/`（門檻比較 `>=` 改 `>`、門檻空時當 0、處理天數 CHECK 拿掉、更新不檢查擁有者），`python3 scripts/mutation/run.py --validate`，結果待 CI。
 - [ ] **3. 運費設定畫面**（被擋於：步驟 2、R1 第 4 組）
   - 範圍：website 賣家設定與 seller-app 設定加「運費設定」（固定運費、免運門檻、處理天數）；先交線框取得 Will 同意；在上手清單取代「物流設定」步驟。
@@ -71,11 +71,14 @@
     - Java aftersales 刪 shipping client 與退貨物流呼叫；product-service 刪 shipping client 的 3 支呼叫。
     - Go invoice-service 刪 `internal/client/shipping`、`internal/grpc/shipment_status.go` 與依賴它們的流程。
     - notification 依 R3 處理賣家新訂單推播。
-    - MQ topology 刪 `hawkr.shipping` 與 `shipping.*` queue；CodeMeta 物流值域（溫層除外）與 bizcode 9024；`sellerserver` 的 `MerId` 與 `GetSellerShippingProfile`；compose、`.env.template`、CI 路徑；`modules.go` 刪 `fulfillment` 與指向它的邊。
+    - MQ topology 刪 `hawkr.shipping` 與 `shipping.*` queue；CodeMeta 物流值域（溫層除外）與 bizcode 9024；`sellerserver` 的 `MerId` 與 `GetSellerShippingProfile`；compose、`.env.template`、CI 路徑；`modules.go` 刪 `fulfillment` 與指向它的全部邊（含 catalog→fulfillment，與 B4 協調見 R5），同步刪 `internal/platform/lockorder/lockorder.go` 的 `fulfillment`（`internal/arch` 的 lockorder 測試要求兩者一致）。
+    - Java `common-core` 的物流碼值 enum 與 helper、`java-proto` 的 `shipping.proto`、`backend/pkg/proto/shipping` 與 `backend/api/proto/shipping`、`pkg/proto/order` 裡只服務 shipping 的欄位；contract golden 隨之更新。
+    - 舊種子 `06-shipping.sql`；seller `CARRYOVER.md` 裡「固定 `store_code` 是為了 shipping 的 `mer_id`」那條理由改寫（理由不存在後，重新回答 `store_code` 是否還要固定，寫進 `CARRYOVER.md`）。
+    - notification：單體的 `CategoryShipment`、`CategoryShipmentAnomaly` 與舊服務的偏好、`shipment.delivered`／`shipment.anomaly.*` 模板刪除（配送異常不再存在；出貨通知在 B8 隨出貨重建），與步驟 6 刪 client 開關同一批合進 dev。
     - 搬遷清單裡 shipping 與 payuni-webhook 的 RPC、事件、副本填 `disposition`（單體規則 8）。
   - 消費端：`rg -n 'ShippingServiceGrpc|shippingGrpcClient|client/shipping|hawkr\.shipping|shipment\.' backend --glob '!**/target/**' --glob '!**/gen/**' --glob '!backend/docs/**'`
   - 不能動：`shipping_ambient.go`；溫層值域；Java order 的其他狀態轉換與 payment 呼叫（B2 的轉接依賴它們）。
-  - 驗收：`backend-java-tests.yml`、`backend-go-checks.yml`、`backend-monolith.yml`、`backend-migration-inventory.yml` 等價檢查綠（`python3 scripts/check-migration-inventory.py`）；上列 `rg` 為 0；Java order 的單元測試斷言結帳運費為 0 且不呼叫 shipping；mutation：結帳運費改回讀舊值要變紅。
+  - 驗收：`backend-java-tests.yml`、`backend-go-checks.yml`、`backend-monolith.yml`、`backend-migration-inventory.yml` 等價檢查綠（`python3 scripts/check-migration-inventory.py`）；上列消費端 `rg` 的命中只剩「步驟 4 開工時列出的允許清單」：已套用的 migration（只能往前，不改）、步驟 5 才刪的 gateway 檔與測試、步驟 7 的文件；允許清單寫進進度表，每項附理由；Java order 的單元測試斷言結帳運費為 0 且不呼叫任何 shipping client；mutation：結帳運費改成非 0 常數要變紅。
   - 完成後的狀態：Java 訂單不會離開已付款（P3）。
 - [ ] **5. gateway 與 openapi**（被擋於：步驟 4、R5）
   - 範圍：刪 gateway shipping 路由與 handler、`routes_webhook_simulator.go`、`routes_payment.go` 的 PayUni 物流代理（與 B2 協調：先到者刪）、`reverse_proxy.go` 的 `payuni-webhook` 項、openapi 對應 path；對 `shipping_ambient.go` 的引用隨 handler 刪除，檔案本身留給 B4（R5）。
@@ -88,7 +91,8 @@
   - 驗收：同步驟 3 的 client 檢查；`rg -n 'store_map|storePickup|store-pickups|shipment_anomaly|shipping_quotes|shipping_onboarding' website admin buyer-app seller-app -g '!node_modules' -g '!.next' -g '!**/gen/**'` 為 0；e2e 交 CI。
 - [ ] **7. 文件**（被擋於：R4）
   - 範圍：設計書 65、06、20–23 改寫（自寄、出貨歸訂單、運費設定歸 seller）；03、09、29、36、58 刪物流商與 Uber 段落；`backend/docs/runbooks/uber-quote-retention*` 刪；R4 列出的 ADR 標 superseded。
-  - 驗收：`python3 scripts/check-doc-paths.py`、`python3 scripts/check-payuni-residue.py` 綠；`rg -n -i 'Uber|黑貓|7-ELEVEN|超商取貨' backend/docs docs` 只剩 superseded ADR 與歷史紀錄。
+  - 範圍補充：`backend/docs/開發規範/` 裡描述物流商的段落刪除；`backend/docs/第三方整合/` 的 7-ELEVEN、黑貓、PayUni 物流總覽整份刪除（整合不存在）；R4 名單外仍提到物流商的 ADR 只在文末加一行「物流商已依 ADR 2026-11-15 退場」，不改正文。
+  - 驗收：`python3 scripts/check-doc-paths.py`、`python3 scripts/check-payuni-residue.py` 綠；`rg -l -i 'Uber|黑貓|7-ELEVEN|超商取貨' backend/docs docs` 的命中只在 `docs/adr/`（superseded 或加了退場註記的 ADR）與 `backend/docs/plans/`（計畫與盤點的歷史紀錄）。
 - [ ] **8. 收尾**：主計畫「模組完成的定義」逐項核對（seller 運費設定部分）；design-review skill 跑在累積 diff；延後項附觸發條件搬回主計畫 B1、B8、B9；需要 Will 做的事列出。驗收：各 workflow 每個 job 綠、`mutation` CI job 綠、主計畫勾選。
 
 ## 決定
@@ -103,11 +107,14 @@ v1 題目的去向：D1–D6、D9、D15 被 P1–P6 取代；D7（承運商清�
 | R2 | 配送方式從契約拿掉（v1 D10） | 拿掉；3005 交給 procurement 自己表達；B6、B8 的契約不帶配送方式 | 未決 | 2、6 |
 | R3 | 賣家新訂單推播（v1 D11） | 改綁 `order.paid`（過渡期由 Java order 發），不再依賴 `shipment.created` | 未決 | 4 |
 | R4 | 文件與 ADR superseded（v1 D13） | 設計書依步驟 7 改寫；4 份 Uber ADR、`free-shipping-subsidy-attribution`、`logistics-finance-domain-ownership`、`shipping-fee-cache-no-warmup-no-scheduler`、`checkout-free-shipping-and-degradation` 標 superseded | 未決 | 1、7 |
+| R6 | seller 既有 `SELLER_CAPABILITY_SHIPPING_SETUP`（`CapShippingSetup`，上手清單的「物流設定」能力） | 改成「運費設定已填」：賣家建好運費設定才算完成這個能力，名稱改為 `SHIPPING_FEE_SETUP`；運費設定的寫入以既有賣家身分檢查（只寫自己的 `store`）；或刪掉這個能力、不擋上手流程 | 未決 | 2、3 |
 | R5 | 與 B4 的刪除次序（v1 D14） | B3 刪 gateway handler 時帶走對 `shipping_ambient.go` 的引用，檔案本身由 B4 刪；誰先合進 dev，後者 rebase | 未決 | 4、5 |
 
 既有缺陷（`interface-inventory.md` §12，24 條）：全部隨 Java 刪除消失；出貨相關的 D1、D2、D4、D7、D10 在 B8 設計出貨時當反例參考。拍板 R1–R5 時一併確認。
 
-拍板順序：R1–R5 彼此獨立，可一次拍。
+拍板順序：R1–R6 彼此獨立，可一次拍。
+
+計畫審查（v2，2026-11-24）：findings 7（blocking 1）；修 6、升為決定題 1（F3→R6）、駁回 0。
 
 ## 進度
 
@@ -115,5 +122,5 @@ v1 題目的去向：D1–D6、D9、D15 被 P1–P6 取代；D7（承運商清�
 
 | 步驟 | 狀態 | 已跑的驗收 | 未跑的驗收與原因 | commit |
 |---|---|---|---|---|
-| 盤點與前提重審 | 完成 | 三份盤點（快照 `496b048e2`）；v1 計畫審查 2 輪；前提重審批判 1 輪 | v2 計畫（本版）未審查 | `3d8ef0bc0`、`b1bb27a92` |
+| 盤點與前提重審 | 完成 | 三份盤點（快照 `496b048e2`）；v1 計畫審查 2 輪；前提重審批判 1 輪 | v2 計畫審查 1 輪，修正後未再審（只改驗收文字與補範圍） | `3d8ef0bc0`、`b1bb27a92` |
 | 0 基線 | 未開始 | | | |
