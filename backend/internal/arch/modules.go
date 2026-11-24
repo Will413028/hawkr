@@ -54,6 +54,7 @@ var InternalDependencies = map[string]InternalGraph{
 	"coupon": {Packages: map[string][]string{
 		"admin":      {"campaign", "model", "voucher"},
 		"campaign":   {"model", "rows", "store"},
+		"expiry":     {"model", "store"},
 		"membership": {"model", "store"},
 		"model":      {"text"},
 		"purge":      {"model", "store"},

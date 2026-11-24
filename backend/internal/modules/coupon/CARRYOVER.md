@@ -40,6 +40,7 @@ coupon-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 | 賣家 DESIGNATED 的自發自用防護（解析 principal 比對） | 賣家不能發券給自己 | 成立 | 身分比對在入口，核心不重複 | B7-3a 完成：在 `httpapi/coupon.CreateCampaign` 比對名單與呼叫者的買家身分（名單的 ID 是買家 ID，與 CRM 客戶的 `buyer_id` 同一種，不再是帳號 ID，不需要 principal 解析），相同回 invalid_argument 並指出 `campaign.designated_buyer_ids`（`TestCreateCampaignRejectsSelfDesignation`） |
 | `CouponTargetTypeRules`（賣家只能 ALL、MEMBER、DESIGNATED） | 限制賣家可建立的資格 | 成立 | 權限在入口與核心都檢查 | `CreateCampaign` 接受 ALL、MEMBER、DESIGNATED（賣家與 admin 入口都不再擋 MEMBER，資格由消費紀錄投影判定）；COMPENSATION 只經 `IssueCompensation`；賣家的 DESIGNATED 名單不得為空，而且只能是這家店的 CRM 客戶（Will 2026-11-24，入口以 `crm.GetCustomer` 檢查，不是客戶回 invalid_argument 指向 `campaign.designated_buyer_ids[n]`）；賣家的活動一律是自己的店；店家不能結束補償活動（NotFound） |
 | 無 FK（所有關聯靠應用層） | 避免跨服務耦合 | 同 schema 內不成立：沒有理由不用 FK | 同 schema 用 FK，跨 schema 不建（單體規則 2） | 券與資格名單 FK 到活動（同 schema）；沒有跨 schema FK（`buyer_id`、`store_id` 是業務鍵）；稽核紀錄不設 FK（只追加，不擋刪除） |
+| `CouponExpiringWarningJob`：每日 01:00（JVM 時區）、`days=1`、`instance_id > cursor` 游標、逐筆發 MQ、publish 失敗被吞（at-most-once） | 到期前提醒買家一次 | 成立；但時區混用（cron 用 JVM 預設、窗用 UTC）、吞錯、游標不成立（游標以後才符合的券永遠漏：進窗時被 LOCKED 後釋放、晚領的券） | 以每張券為單位冪等，與事件同 transaction | 每張券一筆提醒紀錄 `voucher_expiry_reminders`（`voucher_id` 主鍵，Will 2026-11-24），與 `PublishRequired` 同 transaction；River periodic job 每小時以 `FOR UPDATE SKIP LOCKED`＋`LIMIT` 分批；提前量 24h 常數（同 Java）、UTC、注入時鐘；條件：AVAILABLE、未提醒、`end_at` 在 (now, now+24h]、`created_at <= end_at - 24h`（領到時已進窗的不補提醒）；整批失敗逐張重試、單張失敗記錄後跳過，下一輪重試；索引 `campaigns_by_end_at`：掃描先以 `end_at` 短窗找活動、再經 `vouchers_by_campaign` 找券，沒有它得掃全部活動；紀錄不含 `end_at`（`end_at` 沒有修改路徑）；不呼叫 Buyer.ResolvePrincipals（帳號解析歸 notification） |
 
 ## 傳輸層的沿用盤點
 
@@ -64,7 +65,7 @@ coupon-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 | `CouponInstanceStatus`（UNUSED、RESERVED、USED、REVOKED、EXPIRED…） | proto enum `VoucherStatus`（AVAILABLE、LOCKED、REDEEMED、VOIDED）；EXPIRED→`Voucher.expired`（推導）；來源另有 `VoucherOrigin`（CLAIM、GRANT、COMPENSATION） |
 | `IssuerType` | 不對外：模組的 `Issuer`（`issuer_type` CHECK）；client 從方法知道身分，店家看到的都是自己的活動 |
 | `CouponRedemptionAction` | 不對外：`coupon_redemption_logs.action` 的 CHECK（CLAIM、ISSUE、LOCK、REDEEM、RELEASE、VOID、END_CAMPAIGN） |
-| `CouponEventType`（`coupon.issued`、`coupon.expiring`） | `coupon.issued` 不搬（D7、BD27）；`coupon.expiring` 是 in-process 事件 `VoucherExpiring`（B7-4） |
+| `CouponEventType`（`coupon.issued`、`coupon.expiring`） | `coupon.issued` 不搬（D7、BD27）；`coupon.expiring` 是 in-process 事件 `VoucherExpiring`（B7-4c，`internal/expiry`） |
 
 | 舊錯誤碼 | 去向 |
 |---|---|

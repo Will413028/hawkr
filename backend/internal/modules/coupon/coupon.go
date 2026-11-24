@@ -10,9 +10,12 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/riverqueue/river"
+
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/admin"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/campaign"
+	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/expiry"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/membership"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/purge"
@@ -21,6 +24,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon/internal/voucher"
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
 //go:embed db/migrations/*.sql db/migrations/atlas.sum
@@ -42,6 +46,10 @@ type Deps struct {
 	// Buyers 與 StoreDirectory 是後台寫入前的存在檢查（admin 建立限店活動與指定發放）。
 	Buyers         Buyers
 	StoreDirectory StoreDirectory
+	// Events 是 VoucherExpiring 的發布點；只有到期提醒需要，沒給時 AddWorkers 與 PeriodicJobs 會 panic。
+	Events *events.Bus
+	// ExpiryBatchSize 是到期提醒每批的券數；0 用預設值。
+	ExpiryBatchSize int32
 	// NewID 產生活動與券的主鍵，組裝點給 uuid.NewV7（ADR 2026-09-25-row-identity-by-data-kind）。
 	NewID func() uuid.UUID
 	// Now 是目前時間；測試注入固定值。
@@ -155,8 +163,11 @@ type Module struct {
 	campaign *campaign.Service
 	voucher  *voucher.Service
 	read     *read.Service
-	member   *membership.Service
-	purge    *purge.Service
+	expiry   *expiry.Service
+	// expiryReady 表示 Deps.Events 有給。
+	expiryReady bool
+	member      *membership.Service
+	purge       *purge.Service
 }
 
 // New 建立模組。
@@ -168,12 +179,14 @@ func New(d Deps) *Module {
 	camp := campaign.New(campaign.Deps{DB: d.DB, NewID: d.NewID, Now: d.Now})
 	vouch := voucher.New(voucher.Deps{DB: d.DB, Qualify: q, Buyers: d.Buyers, NewID: d.NewID, Now: d.Now})
 	return &Module{
-		admin:    admin.New(admin.Deps{DB: d.DB, Audit: adminaudit.New(d.DB, d.Now), Campaign: camp, Voucher: vouch, Buyers: d.Buyers, Directory: d.StoreDirectory}),
-		campaign: camp,
-		voucher:  vouch,
-		read:     read.New(read.Deps{DB: d.DB, Qualify: q, Now: d.Now}),
-		member:   membership.New(membership.Deps{DB: d.DB, Buyers: d.Buyers, Now: d.Now}),
-		purge:    purge.New(purge.Deps{DB: d.DB, Now: d.Now}),
+		admin:       admin.New(admin.Deps{DB: d.DB, Audit: adminaudit.New(d.DB, d.Now), Campaign: camp, Voucher: vouch, Buyers: d.Buyers, Directory: d.StoreDirectory}),
+		campaign:    camp,
+		voucher:     vouch,
+		read:        read.New(read.Deps{DB: d.DB, Qualify: q, Now: d.Now}),
+		expiry:      expiry.New(expiry.Deps{DB: d.DB, Events: d.Events, NewID: d.NewID, Now: d.Now, BatchSize: d.ExpiryBatchSize}),
+		expiryReady: d.Events != nil,
+		member:      membership.New(membership.Deps{DB: d.DB, Buyers: d.Buyers, Now: d.Now}),
+		purge:       purge.New(purge.Deps{DB: d.DB, Now: d.Now}),
 	}
 }
 
@@ -269,6 +282,25 @@ func (m *Module) GetSellerCampaign(ctx context.Context, storeID int64, id uuid.U
 func (m *Module) GetVoucher(ctx context.Context, buyerID int64, id uuid.UUID) (VoucherView, error) {
 	return m.read.GetVoucher(ctx, buyerID, id)
 }
+
+// AddWorkers 登記到期提醒的 River worker；沒給 Deps.Events 時 panic。
+func (m *Module) AddWorkers(workers *river.Workers) {
+	if !m.expiryReady {
+		panic("coupon：到期提醒需要 Deps.Events")
+	}
+	expiry.AddWorkers(workers, m.expiry)
+}
+
+// PeriodicJobs 回傳到期提醒的排程（啟動即跑、每小時）；沒給 Deps.Events 時 panic。
+func (m *Module) PeriodicJobs() []*river.PeriodicJob {
+	if !m.expiryReady {
+		panic("coupon：到期提醒需要 Deps.Events")
+	}
+	return expiry.PeriodicJobs()
+}
+
+// RunExpiryReminder 立即處理一次到期提醒並回傳發布的事件數；沒給 Deps.Events 時回錯誤。job 呼叫的是同一個方法。
+func (m *Module) RunExpiryReminder(ctx context.Context) (int, error) { return m.expiry.Run(ctx) }
 
 // RecordOrderCompleted 記下買家在該店有完成的訂單（MEMBER 資格的消費紀錄投影，只給 legacy/couponconsumer）。recorded 為 false 表示重放。
 func (m *Module) RecordOrderCompleted(ctx context.Context, storeID, buyerID int64) (recorded bool, err error) {
