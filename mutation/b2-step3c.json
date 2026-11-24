@@ -186,7 +186,7 @@
    "file": "backend/internal/modules/payment/internal/charge/fake.go",
    "old": "if in.Amount > pi.snap.Amount-taken {",
    "new": "if taken+in.Amount > pi.snap.Amount {",
-   "test": "internal/modules/payment ^(TestTheFakeRefusesAHugeRefundAfterAnExistingOneInsteadOfOverflowing)$",
+   "test": "internal/modules/payment/internal/charge ^(TestTheFakeRefusesAHugeRefundAfterAnExistingOneInsteadOfOverflowing)$",
    "why": "fake 的累計上限改回加法：巨額退款回繞後被接受。"
   },
   {
