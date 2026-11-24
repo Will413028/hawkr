@@ -86,8 +86,14 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.PaymentPaymentAccountStatus(goldenEnum(c.Value, "PAYMENT_ACCOUNT_STATUS_"))
 	case "payment.RequirementCollection":
 		return t.PaymentRequirementCollection(goldenEnum(c.Value, "REQUIREMENT_COLLECTION_"))
+	case "procurement.CancelDisposition":
+		return t.ProcurementCancelDisposition(goldenEnum(c.Value, "CANCEL_DISPOSITION_"))
+	case "procurement.QuoteAcceptability":
+		return t.ProcurementQuoteAcceptability(goldenEnum(c.Value, "QUOTE_ACCEPTABILITY_"))
 	case "procurement.RejectionReason":
 		return t.ProcurementRejectionReason(goldenEnum(c.Value, "REJECTION_REASON_"))
+	case "procurement.RunFailureReason":
+		return t.ProcurementRunFailureReason(goldenEnum(c.Value, "RUN_FAILURE_REASON_"))
 	case "review.Review.rating_label_1":
 		return t.ReviewReviewRatingLabel1(), true
 	case "review.Review.rating_label_2":

@@ -157,6 +157,19 @@
     }
   },
   "procurement": {
+    "CancelDisposition": {
+      "CANCEL_DISPOSITION_ALREADY_CANCELLED": "This round was already stopped, so nothing was sent again.",
+      "CANCEL_DISPOSITION_ALREADY_TERMINAL": "This round had already finished. Its completed result is still valid and was not voided by this stop.",
+      "CANCEL_DISPOSITION_REQUESTED": "Stop requested. Wrapping up this round.",
+      "CANCEL_DISPOSITION_TOO_LATE": "This round already finished and was sent, so it was too late to stop. Its completed result is still valid."
+    },
+    "QuoteAcceptability": {
+      "QUOTE_ACCEPTABILITY_ACCEPTABLE": "Can be accepted",
+      "QUOTE_ACCEPTABILITY_EXPIRED": "Past its validity period",
+      "QUOTE_ACCEPTABILITY_INELIGIBLE": "Not eligible to be accepted",
+      "QUOTE_ACCEPTABILITY_SUPERSEDED": "Replaced by a newer version",
+      "QUOTE_ACCEPTABILITY_WITHDRAWN": "Withdrawn by the seller"
+    },
     "RejectionReason": {
       "REJECTION_REASON_BUDGET_RANGE": "The budget per unit is out of range",
       "REJECTION_REASON_CITY_UNRECOGNIZED": "The city could not be recognized",
@@ -171,6 +184,14 @@
       "REJECTION_REASON_RESOLUTION_UNKNOWN_KIND": "The way the item category was decided is unknown",
       "REJECTION_REASON_TRUNCATED": "Over the length limit, shortened",
       "REJECTION_REASON_UNIT_NOT_ALLOWED": "This unit is not supported"
+    },
+    "RunFailureReason": {
+      "RUN_FAILURE_REASON_ANSWER_REJECTED": "This answer could not be used. Please answer again.",
+      "RUN_FAILURE_REASON_ITEM_CATEGORY_UNAVAILABLE": "The item category has changed. Please choose the item again.",
+      "RUN_FAILURE_REASON_MODEL_UNAVAILABLE": "Hawkr Agent can't reply right now. Please send it again later.",
+      "RUN_FAILURE_REASON_SEARCH_FAILED": "The candidate search failed. Please search again.",
+      "RUN_FAILURE_REASON_TURN_PIPELINE_ERROR": "Something went wrong while processing this round. Please send it again.",
+      "RUN_FAILURE_REASON_WORKER_LOST": "This round was interrupted. Please send it again."
     }
   },
   "review": {

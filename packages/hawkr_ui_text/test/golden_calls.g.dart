@@ -103,6 +103,17 @@ const _enumNumber = <String, int>{
 	'hawkr.payment.v1alpha1.RequirementCollection.REQUIREMENT_COLLECTION_PLATFORM': 2,
 	'hawkr.payment.v1alpha1.RequirementCollection.REQUIREMENT_COLLECTION_PROVIDER': 1,
 	'hawkr.payment.v1alpha1.RequirementCollection.REQUIREMENT_COLLECTION_UNSPECIFIED': 0,
+	'hawkr.procurement.v1alpha1.CancelDisposition.CANCEL_DISPOSITION_ALREADY_CANCELLED': 2,
+	'hawkr.procurement.v1alpha1.CancelDisposition.CANCEL_DISPOSITION_ALREADY_TERMINAL': 3,
+	'hawkr.procurement.v1alpha1.CancelDisposition.CANCEL_DISPOSITION_REQUESTED': 1,
+	'hawkr.procurement.v1alpha1.CancelDisposition.CANCEL_DISPOSITION_TOO_LATE': 4,
+	'hawkr.procurement.v1alpha1.CancelDisposition.CANCEL_DISPOSITION_UNSPECIFIED': 0,
+	'hawkr.procurement.v1alpha1.QuoteAcceptability.QUOTE_ACCEPTABILITY_ACCEPTABLE': 1,
+	'hawkr.procurement.v1alpha1.QuoteAcceptability.QUOTE_ACCEPTABILITY_EXPIRED': 2,
+	'hawkr.procurement.v1alpha1.QuoteAcceptability.QUOTE_ACCEPTABILITY_INELIGIBLE': 5,
+	'hawkr.procurement.v1alpha1.QuoteAcceptability.QUOTE_ACCEPTABILITY_SUPERSEDED': 4,
+	'hawkr.procurement.v1alpha1.QuoteAcceptability.QUOTE_ACCEPTABILITY_UNSPECIFIED': 0,
+	'hawkr.procurement.v1alpha1.QuoteAcceptability.QUOTE_ACCEPTABILITY_WITHDRAWN': 3,
 	'hawkr.procurement.v1alpha1.RejectionReason.REJECTION_REASON_BUDGET_RANGE': 4,
 	'hawkr.procurement.v1alpha1.RejectionReason.REJECTION_REASON_CITY_UNRECOGNIZED': 6,
 	'hawkr.procurement.v1alpha1.RejectionReason.REJECTION_REASON_DATE_FORMAT': 7,
@@ -117,6 +128,13 @@ const _enumNumber = <String, int>{
 	'hawkr.procurement.v1alpha1.RejectionReason.REJECTION_REASON_TRUNCATED': 2,
 	'hawkr.procurement.v1alpha1.RejectionReason.REJECTION_REASON_UNIT_NOT_ALLOWED': 5,
 	'hawkr.procurement.v1alpha1.RejectionReason.REJECTION_REASON_UNSPECIFIED': 0,
+	'hawkr.procurement.v1alpha1.RunFailureReason.RUN_FAILURE_REASON_ANSWER_REJECTED': 7,
+	'hawkr.procurement.v1alpha1.RunFailureReason.RUN_FAILURE_REASON_ITEM_CATEGORY_UNAVAILABLE': 6,
+	'hawkr.procurement.v1alpha1.RunFailureReason.RUN_FAILURE_REASON_MODEL_UNAVAILABLE': 5,
+	'hawkr.procurement.v1alpha1.RunFailureReason.RUN_FAILURE_REASON_SEARCH_FAILED': 2,
+	'hawkr.procurement.v1alpha1.RunFailureReason.RUN_FAILURE_REASON_TURN_PIPELINE_ERROR': 3,
+	'hawkr.procurement.v1alpha1.RunFailureReason.RUN_FAILURE_REASON_UNSPECIFIED': 0,
+	'hawkr.procurement.v1alpha1.RunFailureReason.RUN_FAILURE_REASON_WORKER_LOST': 1,
 	'hawkr.seller.v1alpha1.ContentKind.CONTENT_KIND_CHAT_MESSAGE': 4,
 	'hawkr.seller.v1alpha1.ContentKind.CONTENT_KIND_COMMENT': 2,
 	'hawkr.seller.v1alpha1.ContentKind.CONTENT_KIND_FORUM_ENTRY': 3,
@@ -314,8 +332,14 @@ String? goldenText(String fn, String value, Map<String, Object?> params, UiLocal
       return hawkr_payment_v1alpha1_payment.PaymentAccountStatus.valueOf(_n('hawkr.payment.v1alpha1.PaymentAccountStatus', value))!.uiText(l);
     case 'payment.RequirementCollection':
       return hawkr_payment_v1alpha1_payment.RequirementCollection.valueOf(_n('hawkr.payment.v1alpha1.RequirementCollection', value))!.uiText(l);
+    case 'procurement.CancelDisposition':
+      return hawkr_procurement_v1alpha1_procurement.CancelDisposition.valueOf(_n('hawkr.procurement.v1alpha1.CancelDisposition', value))!.uiText(l);
+    case 'procurement.QuoteAcceptability':
+      return hawkr_procurement_v1alpha1_procurement.QuoteAcceptability.valueOf(_n('hawkr.procurement.v1alpha1.QuoteAcceptability', value))!.uiText(l);
     case 'procurement.RejectionReason':
       return hawkr_procurement_v1alpha1_procurement.RejectionReason.valueOf(_n('hawkr.procurement.v1alpha1.RejectionReason', value))!.uiText(l);
+    case 'procurement.RunFailureReason':
+      return hawkr_procurement_v1alpha1_procurement.RunFailureReason.valueOf(_n('hawkr.procurement.v1alpha1.RunFailureReason', value))!.uiText(l);
     case 'review.Review.rating_label_1':
       return reviewReviewRatingLabel1(l);
     case 'review.Review.rating_label_2':
