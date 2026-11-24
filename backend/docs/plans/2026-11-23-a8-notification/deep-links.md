@@ -8,6 +8,7 @@
 - 語系前綴：收件人語系是 en 時前綴 `/en`，zh-TW 不加前綴。下表的路徑不含前綴。
 - 路徑必須是下表中已存在的 website 路由；伺服器不產生沒有路由的路徑。沒有目的地的型別，`deep_link` 為空字串。
 - App 把路徑對應到自己的畫面（universal link／App Links 接受 `/en/…`）；遇到不認得的路徑開收件匣。
+- `/sellers/{storeCode}` 的路徑段是店家的 store_code，不是 store id；伺服器必須用店家的 store_code 組這些路徑。
 - App 的聊天 banner 抑制從路徑判斷聊天室（D6）：路徑符合下表聊天列時，取最後一段 `{targetId}`。
 
 ## 路徑表
@@ -18,11 +19,11 @@
 | 買家售後詳情 | `/account/after-sales/{caseNo}` | BUYER | |
 | 聊天（買家） | `/account/messages/{targetId}` | BUYER | |
 | 聊天（賣家） | `/seller-center/messages/{targetId}` | STORE | |
-| 店家論壇串（留言、讚） | `/sellers/{storeId}/messages/{threadId}` | BUYER、STORE | 公開頁 |
-| 貼文 | 無獨立路由 | - | 只有店家貼文列表 `/sellers/{storeId}/posts`；追蹤的店發文用此列表 |
-| 店家頁 | `/sellers/{storeId}` | BUYER | |
+| 店家論壇串（留言、讚） | `/sellers/{storeCode}/messages/{threadId}` | BUYER、STORE | 公開頁 |
+| 貼文 | 無獨立路由 | - | 只有店家貼文列表 `/sellers/{storeCode}/posts`；追蹤的店發文用此列表 |
+| 店家頁 | `/sellers/{storeCode}` | BUYER | |
 | 商品頁 | `/products/{id}` | BUYER | 補貨通知 |
-| 評價 | 買家端：`/sellers/{storeId}/reviews`；賣家端：無獨立路由 | BUYER、STORE | 賣家中心只有 `preview/reviews`（預覽），不用 |
+| 評價 | 買家端：`/sellers/{storeCode}/reviews`；賣家端：無獨立路由 | BUYER、STORE | 賣家中心只有 `preview/reviews`（預覽），不用 |
 | 賣家訂單詳情 | `/seller-center/orders/{orderNo}` | STORE | |
 | 賣家售後詳情 | 無獨立路由 | - | 賣家中心沒有售後頁 |
 | 賣家撥款、錢包 | `/seller-center/wallet` | STORE | 收款帳戶啟用 |
