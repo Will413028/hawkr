@@ -143,13 +143,15 @@ type ReversalSnapshot struct {
 	Amount     int64
 }
 
-// EventKind 是付款事件指的物件種類。目前只處理付款（PaymentIntent）；退款與轉帳的事件 ParseEvent 回 ErrIgnoredEvent。
+// EventKind 是付款事件指的物件種類：付款（PaymentIntent）與退款；轉帳的事件 ParseEvent 回 ErrIgnoredEvent。
 type EventKind string
 
 // 事件指的物件種類。
 const (
 	// EventPayment 指向一個 PaymentIntent。
 	EventPayment EventKind = "payment"
+	// EventRefund 指向一筆退款（ObjectID 是 provider 的退款 ID）。
+	EventRefund EventKind = "refund"
 )
 
 // Event 是驗過簽章的 provider 事件：事件 ID（inbox 的唯一鍵）與它指的物件。事件內容不攜帶狀態：處理者一律重讀物件。

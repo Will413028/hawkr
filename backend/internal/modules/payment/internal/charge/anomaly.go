@@ -27,9 +27,10 @@ const evidenceMax = 255
 // 或 AnomalyFailed（確認 provider 沒有執行，evidence 選填）。領域變更與一筆 adminaudit 在同一個 transaction，沒有紀錄的結案不成立（Connect 端點在後台入口接上）。
 //   - 付款：成功是把有效嘗試連上 evidence 這個 PaymentIntent、暫記 AWAITING_PAYMENT 並排同步 job（真正的狀態由重讀推導）；失敗進 CREATE_FAILED（買家可以再付，換新鍵）。
 //   - 轉帳：成功記 evidence 為外部轉帳 ID 並進 SUCCEEDED；失敗進 FAILED（讓出一筆付款一筆有效轉帳的位置）。
-//   - 退款（撤回階段的 ANOMALY）：成功表示撤回確實成立，evidence 是撤回 ID，同一個 transaction 累加轉帳的 reversed_amount 並進 REVERSED；失敗進 FAILED（不佔額度）。
+//   - 退款（撤回階段的 ANOMALY：reversal_amount > 0 且還沒有 reversal_external_id）：成功表示撤回確實成立，evidence 是撤回 ID，同一個 transaction 累加轉帳的 reversed_amount、進 REVERSED 並排退款 job；失敗進 FAILED（不佔額度）。
+//   - 退款（退款階段的 ANOMALY，其餘）：成功表示 provider 確實建立了退款，evidence 是退款 ID，暫記 REFUNDING 並排退款同步 job（真正的狀態由重讀推導）；失敗進 FAILED（不佔額度）。
 //
-// 結案成成功之前，先在 transaction 外向 provider 查回證據（依列上的冪等鍵／嘗試 ID 查，不信管理員貼的 ID）：查到的物件 ID、金額必須與證據和列相符，不符回 FailedPrecondition、
+// 結案成成功之前，先在 transaction 外向 provider 查回證據（依列上的冪等鍵／嘗試 ID 查，不信管理員貼的 ID；退款依階段用 FindReversal 或 FindRefund）：查到的物件 ID、金額必須與證據和列相符，不符回 FailedPrecondition、
 // 列不動；transaction 內鎖列之後再確認列上的鍵沒變。付款的證據在目前設定的 provider 查得到才行（列屬於已無法查回的 provider 時不能結案成成功）。
 // 不在 ANOMALY 的物件回 FailedPrecondition，找不到回 NotFound。鎖順序：付款列、轉帳列、退款列。呼叫方不能在 transaction 內呼叫。
 func (s *Service) ResolveAnomaly(ctx context.Context, actor adminaudit.Actor, kind model.AnomalyKind, id uuid.UUID, outcome model.AnomalyOutcome, evidence string) error {
@@ -88,10 +89,16 @@ var (
 	errEvidenceChanged  = apperr.FailedPrecondition("核對 provider 之後這筆紀錄又變動了，請重新核對")
 )
 
-// evidenceProof 是核對過證據時用的列上識別：key 是查回用的冪等鍵（嘗試 ID），parent 是退款核對時轉帳的外部 ID；transaction 內鎖列後要確認沒變。
+// evidenceProof 是核對過證據時用的列上識別：key 是查回用的冪等鍵（嘗試 ID），parent 是退款核對時轉帳（撤回階段）或付款（退款階段）的外部 ID；transaction 內鎖列後要確認沒變。
 type evidenceProof struct {
 	key    uuid.UUID
 	parent string
+}
+
+// inReversalStage 回傳 ANOMALY 的退款是不是撤回階段：要撤回（reversal_amount > 0）而撤回還沒成立（沒有 reversal_external_id）；其餘是退款階段
+// （schema 保證 REVERSED 與之後的狀態在 reversal_amount > 0 時一定有 reversal_external_id，不需要撤回的退款 reversal_amount 是 0）。
+func inReversalStage(r store.PaymentRefund) bool {
+	return r.ReversalAmount > 0 && r.ReversalExternalID == nil
 }
 
 // verifyEvidence 在 transaction 外向 provider 查回管理員給的證據：以列上的嘗試 ID 查，找到的物件 ID 與金額都要和證據、列相符。
@@ -155,6 +162,23 @@ func (s *Service) verifyEvidence(ctx context.Context, kind model.AnomalyKind, id
 		}
 		if r.Status != string(model.RefundAnomaly) {
 			return evidenceProof{}, errNotAnomaly
+		}
+		if !inReversalStage(r) {
+			pay, err := q.PaymentByID(ctx, r.PaymentID)
+			if err != nil {
+				return evidenceProof{}, err
+			}
+			if pay.ExternalPaymentID == nil || pay.Provider != s.d.Provider.Name() {
+				return evidenceProof{}, apperr.FailedPrecondition("付款沒有可查回的 provider 付款，不能結案成成功")
+			}
+			snap, found, err := s.d.Provider.FindRefund(callCtx, *pay.ExternalPaymentID, r.IdempotencyKey.String())
+			if err != nil {
+				return evidenceProof{}, fmt.Errorf("charge: 核對退款 %s 的證據失敗：%w", id, err)
+			}
+			if !found || snap.ExternalID != evidence || snap.Amount != r.Amount {
+				return evidenceProof{}, errEvidenceMismatch
+			}
+			return evidenceProof{key: r.IdempotencyKey, parent: *pay.ExternalPaymentID}, nil
 		}
 		tr, err := q.SucceededTransferByPayment(ctx, r.PaymentID)
 		if errors.Is(err, pgx.ErrNoRows) || (err == nil && tr.ExternalTransferID == nil) {
@@ -252,6 +276,7 @@ func (s *Service) resolveTransfer(ctx context.Context, q *store.Queries, id uuid
 	return reason, conflictOrErr(err)
 }
 
+// resolveRefund 依階段結案（見 ResolveAnomaly）：鎖順序付款列、轉帳列（只有撤回階段成功要鎖）、退款列。
 func (s *Service) resolveRefund(ctx context.Context, q *store.Queries, id uuid.UUID, outcome model.AnomalyOutcome, evidence string, proof evidenceProof) (string, error) {
 	r, err := q.RefundByID(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -264,7 +289,7 @@ func (s *Service) resolveRefund(ctx context.Context, q *store.Queries, id uuid.U
 		return "", err
 	}
 	var tr store.PaymentTransfer
-	if outcome == model.AnomalySucceeded {
+	if outcome == model.AnomalySucceeded && inReversalStage(r) {
 		found, err := q.SucceededTransferByPayment(ctx, r.PaymentID)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", apperr.FailedPrecondition("付款沒有已成立的轉帳，不能記撤回")
@@ -280,15 +305,29 @@ func (s *Service) resolveRefund(ctx context.Context, q *store.Queries, id uuid.U
 	if err != nil {
 		return "", err
 	}
-	if locked.Status != string(model.RefundAnomaly) || locked.RefundCalledAt != nil || locked.ExternalRefundID != nil {
+	if locked.Status != string(model.RefundAnomaly) {
 		return "", errNotAnomaly
 	}
+	reversalStage := inReversalStage(locked)
 	reason := derefString(locked.FailureReason)
 	now := s.d.Now().UTC()
 	if outcome == model.AnomalyFailed {
 		failed := failedResolved
-		_, err = q.ResolveRefundFailed(ctx, store.ResolveRefundFailedParams{ID: id, FailureReason: &failed, Now: now})
+		if reversalStage {
+			_, err = q.ResolveRefundReversalFailed(ctx, store.ResolveRefundReversalFailedParams{ID: id, FailureReason: &failed, Now: now})
+			return reason, err
+		}
+		_, err = q.ResolveRefundCallFailed(ctx, store.ResolveRefundCallFailedParams{ID: id, FailureReason: &failed, Now: now})
 		return reason, err
+	}
+	if !reversalStage {
+		if locked.IdempotencyKey != proof.key || proof.parent == "" {
+			return "", errEvidenceChanged
+		}
+		if _, err := q.ResolveRefundRefunding(ctx, store.ResolveRefundRefundingParams{ID: id, ExternalRefundID: &evidence, Now: now}); err != nil {
+			return "", conflictOrErr(err)
+		}
+		return reason, enqueueRefundSync(ctx, s.d.Jobs, id)
 	}
 	if locked.ReversalIdempotencyKey != proof.key || tr.ExternalTransferID == nil || *tr.ExternalTransferID != proof.parent {
 		return "", errEvidenceChanged
@@ -299,6 +338,8 @@ func (s *Service) resolveRefund(ctx context.Context, q *store.Queries, id uuid.U
 	if _, err := q.ResolveRefundReversed(ctx, store.ResolveRefundReversedParams{ID: id, ReversalExternalID: &evidence, Now: now}); err != nil {
 		return "", conflictOrErr(err)
 	}
-	_, err = q.AddTransferReversal(ctx, store.AddTransferReversalParams{ID: tr.ID, Amount: locked.ReversalAmount, Now: now})
-	return reason, err
+	if _, err = q.AddTransferReversal(ctx, store.AddTransferReversalParams{ID: tr.ID, Amount: locked.ReversalAmount, Now: now}); err != nil {
+		return "", err
+	}
+	return reason, enqueueRefund(ctx, s.d.Jobs, id)
 }

@@ -158,8 +158,11 @@ func (s *Service) acceptReversal(ctx context.Context, ref store.PaymentRefund, t
 		if err != nil {
 			return err
 		}
-		_, err = q.AddTransferReversal(ctx, store.AddTransferReversalParams{ID: tr.ID, Amount: applied.ReversalAmount, Now: s.d.Now().UTC()})
-		return err
+		if _, err = q.AddTransferReversal(ctx, store.AddTransferReversalParams{ID: tr.ID, Amount: applied.ReversalAmount, Now: s.d.Now().UTC()}); err != nil {
+			return err
+		}
+		// 先撤回再退款：撤回成立的同一個 transaction 排退款 job。
+		return enqueueRefund(ctx, s.d.Jobs, ref.ID)
 	})
 	if err == nil && orphan {
 		s.d.Logger.ErrorContext(ctx, "payment：provider 已撤回轉帳，退款卻已不在 REVERSING，待人工核對",
@@ -249,15 +252,19 @@ func (s *Service) anomalyReversal(ctx context.Context, ref store.PaymentRefund, 
 	})
 }
 
-// failReversal 讓 REVERSING 的退款進終局 FAILED；退款已不是 REVERSING 時什麼都不做。
+// failReversal 讓 REVERSING 的退款進終局 FAILED 並發 RefundChanged；退款已不是 REVERSING 時什麼都不做。
 func (s *Service) failReversal(ctx context.Context, refundID uuid.UUID, reason string) error {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
 	return s.d.DB.InTx(wctx, func(ctx context.Context) error {
-		_, err := store.New(s.d.DB.Conn(ctx)).FailRefundReversal(ctx, store.FailRefundReversalParams{ID: refundID, FailureReason: &reason, Now: s.d.Now().UTC()})
+		q := store.New(s.d.DB.Conn(ctx))
+		r, err := q.FailRefundReversal(ctx, store.FailRefundReversalParams{ID: refundID, FailureReason: &reason, Now: s.d.Now().UTC()})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
-		return err
+		if err != nil {
+			return err
+		}
+		return s.publishRefundResult(ctx, q, r, model.RefundReversing)
 	})
 }

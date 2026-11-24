@@ -120,7 +120,7 @@ func (s *Service) ReceiveEvent(ctx context.Context, header http.Header, body []b
 	if err != nil {
 		return err
 	}
-	if ev.Kind != EventPayment {
+	if ev.Kind != EventPayment && ev.Kind != EventRefund {
 		return nil
 	}
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {

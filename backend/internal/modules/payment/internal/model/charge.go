@@ -161,3 +161,54 @@ const (
 	AnomalySucceeded AnomalyOutcome = "SUCCEEDED"
 	AnomalyFailed    AnomalyOutcome = "FAILED"
 )
+
+// RefundRequest 是建立退款的輸入：OrderNo 指向付款；RequestKey 是呼叫端給的冪等鍵（同一筆付款內唯一，同一把鍵重送得到同一筆退款）；
+// Auto 標示自動退款（D5 修訂：由訂單一方判斷與發起，payment 只標記）。
+type RefundRequest struct {
+	OrderNo    string
+	Amount     int64
+	RequestKey string
+	Auto       bool
+}
+
+// Refund 是退款的對外視圖。ReversalAmount 是這筆退款要先從賣家轉帳撤回的額度（沒有轉帳或沒有可撤額度時是 0）。
+type Refund struct {
+	ID             uuid.UUID
+	PaymentID      uuid.UUID
+	RequestKey     string
+	Amount         int64
+	Auto           bool
+	Status         RefundStatus
+	ReversalAmount int64
+	// FailureReason 只在 RefundFailed 與 RefundAnomaly 有值。
+	FailureReason string
+	CreatedAt     time.Time
+}
+
+// RefundChanged 在退款進入終局（SUCCEEDED、FAILED）的 transaction 內發布：訂單與售後一方據此得知退款結果（舊事件 refund.succeeded、refund.failed 的來源）。
+// RequestKey 是呼叫端建立退款時給的冪等鍵（售後以案件 ID 對回）。
+type RefundChanged struct {
+	OccurredAt    time.Time
+	RefundID      uuid.UUID
+	PaymentID     uuid.UUID
+	OrderNo       string
+	StoreID       int64
+	BuyerID       int64
+	Amount        int64
+	Auto          bool
+	RequestKey    string
+	Status        RefundStatus
+	Previous      RefundStatus
+	FailureReason string
+}
+
+// AutoRefundCompleted 在自動退款（Auto 為真）成功的 transaction 內發布（D5）：通知買家與後台可見；失敗的自動退款只發 RefundChanged。
+type AutoRefundCompleted struct {
+	OccurredAt time.Time
+	RefundID   uuid.UUID
+	PaymentID  uuid.UUID
+	OrderNo    string
+	StoreID    int64
+	BuyerID    int64
+	Amount     int64
+}

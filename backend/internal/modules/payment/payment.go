@@ -521,3 +521,55 @@ func (m *Module) ReversePaymentTransfer(ctx context.Context, refundID uuid.UUID,
 func (m *Module) EnqueueRefundReversal(ctx context.Context, refundID uuid.UUID) error {
 	return m.charges.EnqueueReversal(ctx, refundID)
 }
+
+// RefundRequest 是建立退款的輸入（OrderNo、Amount、呼叫端的冪等鍵 RequestKey、是否自動退款 Auto）；Refund 是退款的對外視圖。
+type (
+	RefundRequest = model.RefundRequest
+	PaymentRefund = model.Refund
+)
+
+// PaymentRefundStatus 是退款的狀態。
+type PaymentRefundStatus = model.RefundStatus
+
+// 退款的狀態。
+const (
+	RefundPending   = model.RefundPending
+	RefundReversing = model.RefundReversing
+	RefundReversed  = model.RefundReversed
+	RefundRefunding = model.RefundRefunding
+	RefundSucceeded = model.RefundSucceeded
+	RefundFailed    = model.RefundFailed
+	RefundAnomaly   = model.RefundAnomaly
+)
+
+// ChargeRefundInput、ChargeRefundSnapshot 與 ChargeRefundState 是退款的 port 型別（測試包裝 provider 用）。
+type (
+	ChargeRefundInput    = charge.RefundInput
+	ChargeRefundSnapshot = charge.RefundSnapshot
+	ChargeRefundState    = charge.RefundState
+)
+
+// 退款的中立狀態。
+const (
+	ChargeRefundPending   = charge.RefundPending
+	ChargeRefundSucceeded = charge.RefundSucceeded
+	ChargeRefundFailed    = charge.RefundFailed
+	ChargeRefundUnknown   = charge.RefundUnknown
+)
+
+// CreatePaymentRefund 是建立退款的入口（計畫 D4、D5 修訂；步驟 4 的 legacy CreateRefund 與 Java order 的 AutoRefundWorker 呼叫）：一個 transaction 內鎖付款列、
+// 以 (付款, RequestKey) 冪等、加總非失敗退款守累計上限，已轉帳的付款先寫 REVERSING（先撤回再退款），否則寫 PENDING，並排 job；provider 在 transaction 外由 job 呼叫。
+// 語意與錯誤見 charge.Service.CreateRefund。呼叫方不能在 transaction 內呼叫。
+func (m *Module) CreatePaymentRefund(ctx context.Context, in RefundRequest) (PaymentRefund, error) {
+	return m.charges.CreateRefund(ctx, in)
+}
+
+// RefundPayment 是退款 job（payment.refund_create）的內容，給 worker 與測試呼叫；finalAttempt 為 true 時暫時性失敗只記警示 log，留給週期掃描。
+func (m *Module) RefundPayment(ctx context.Context, refundID uuid.UUID, finalAttempt bool) error {
+	return m.charges.Refund(ctx, refundID, finalAttempt)
+}
+
+// SyncPaymentRefund 是退款同步 job（payment.refund_sync）的內容，給 worker 與測試呼叫：REFUNDING 的退款重讀 provider 後進 SUCCEEDED 或 FAILED。外部呼叫在 transaction 外。
+func (m *Module) SyncPaymentRefund(ctx context.Context, refundID uuid.UUID) error {
+	return m.charges.SyncRefund(ctx, refundID)
+}

@@ -1,6 +1,6 @@
 # payment 模組行為規格
 
-payment 是收款與付款的模組（ADR `docs/adr/2026-09-24-go-modular-monolith.md` 的依賴表葉節點）。擁有收款帳戶（收款開通 ADR D28）與付款（§9）；轉帳與撤回（§10）、結果不明的收斂（§11）；退款 use case 是 3c，撥款對帳與手續費是 B10，進來時擴充這份規格。
+payment 是收款與付款的模組（ADR `docs/adr/2026-09-24-go-modular-monolith.md` 的依賴表葉節點）。擁有收款帳戶（收款開通 ADR D28）與付款（§9）；轉帳與撤回（§10）、結果不明的收斂（§11）、退款（§12）；撥款對帳與手續費是 B10，進來時擴充這份規格。
 
 ## 1. 範圍與公開面
 
@@ -12,7 +12,8 @@ payment 是收款與付款的模組（ADR `docs/adr/2026-09-24-go-modular-monoli
   - 對外契約的收款帳戶列舉（`PaymentAccountStatus`、`RequirementCollection`）與呼叫端宣告用的內嵌開通執行環境列舉（`EmbeddedOnboardingRuntime`）由 payment 擁有，在 `hawkr.payment.v1alpha1`（`api/hawkr/payment/v1alpha1/payment.proto`）；seller 與 admin payment 的 proto 都 import 它，共用文案目錄的 key 是 `payment.PaymentAccountStatus.*`、`payment.RequirementCollection.*`。
   - webhook：`ReceiveEvent`（HTTP 入口 `POST /webhooks/stripe`，`internal/httpapi/payment`）；付款事件 `ReceivePaymentEvent`（`POST /webhooks/stripe-payments`，獨立的 destination 與簽章密鑰）。
   - 付款：`CreatePayment`、`GetPayment`（買家，§9）、`ChargeConfigured`；job 的內容 `CreatePaymentIntent`、`SyncPayment`、`SweepPayments` 給 worker 與測試。
-  - 事件：`PayoutAccountChanged`、`PaymentChanged`（§5）。
+  - 退款：`CreatePaymentRefund`（§12）；job 的內容 `RefundPayment`、`SyncPaymentRefund`、`ReversePaymentTransfer` 給 worker 與測試。
+  - 事件：`PayoutAccountChanged`、`PaymentChanged`、`RefundChanged`、`AutoRefundCompleted`（§5）。
 - 擁有者鍵是 `store_id`（seller 的店家；不建跨 schema FK）。出現第二種擁有者時再通用化（D28）。payment 是葉節點，不讀 seller：擁有者是否營運中經組裝點注入的 `Owners`（cmd/hawkr 以 `seller.Module.Store` 實作）。
 - 不在本模組：開通閘門（seller 的 `store_requirement_flags`，讀 seller 自存的副本）、防詐 hash（seller 的 `account_identity_hashes`）、可曝光公告（seller）、webhook inbox 的表與派送（platform 的 `internal/platform/inbox`，D29）。
 
@@ -47,6 +48,9 @@ payment 是收款與付款的模組（ADR `docs/adr/2026-09-24-go-modular-monoli
 - `PayoutAccountChanged{OccurredAt, StoreID, Provider, TransfersActive, BankFingerprints}`：同步 job 寫快照的 transaction 內每次都發布（fingerprint 可能在轉帳能力不變時改變）。seller 的同 transaction 訂閱者把 `TransfersActive` 複製到開通閘門的副本、把 fingerprint 寫成防詐 hash（D12），轉帳能力有變時重新公告。訂閱者失敗時整筆同步 rollback，River 重試。
 - `PaymentChanged{OccurredAt, PaymentID, OrderNo, StoreID, BuyerID, Amount, Provider, Status, Previous, PaidAt, LastError}`：付款的快照寫入、狀態與寫入前不同的 transaction 內發布（重複讀取與重複事件不重發）。訂單一方據此得知付款成功或取消，並在訂單已不可付時發起自動退款（D5 修訂）；payment 不讀訂單狀態。訂閱者同 transaction，只做原子的狀態變更或排 job。
 
+- `RefundChanged{OccurredAt, RefundID, PaymentID, OrderNo, StoreID, BuyerID, Amount, Auto, RequestKey, Status, Previous, FailureReason}`：退款進入終局（`SUCCEEDED`、`FAILED`）的 transaction 內發布（呼叫成功、查回找到、重讀 `REFUNDING`、撤回或退款的永久失敗與查無；人工結案不發，由後台入口負責回報）。訂單與售後一方據此得知結果（舊事件 `refund.succeeded`、`refund.failed` 的來源，步驟 4 的 relay 轉送）；`RequestKey` 是呼叫端建立退款時給的冪等鍵。
+- `AutoRefundCompleted{OccurredAt, RefundID, PaymentID, OrderNo, StoreID, BuyerID, Amount}`：自動退款（`Auto`）成功的 transaction 內發布（計畫 D5），由 notification 模組（A8）訂閱以通知買家；失敗的自動退款只發 `RefundChanged`。同 transaction 的訂閱者只做原子的狀態變更或排 job。
+
 ## 6. 發布的讀取介面
 
 - `payment.pub_review_items(at)`：後台待辦的 payment 部分（reviewqueue 讀，形狀在 `db/pub.sql`），兩種：`PAYMENT_ACCOUNT_CREATE_FAILED`（`create_failed_at` 有值的帳戶，開始是失敗的時刻）與 `PAYMENT_ACCOUNT_PURGE_STUCK`（`purge_blocked_at` 有值的帳戶，開始是進終局的時刻）。兩種的 item_id 都是店家 ID 的文字，期限 24 小時。只有店家 ID，店名由後台入口（`internal/httpapi/reviewqueue`）經 seller 的店家卡片補上。
@@ -54,7 +58,7 @@ payment 是收款與付款的模組（ADR `docs/adr/2026-09-24-go-modular-monoli
 ## 7. 鎖順序
 
 - 全域順序見單體規則 4 與 `platform/lockorder` 的 `Modules`（payment 在 seller 之前）。payment 自己的寫入只鎖帳戶列（`LockPaymentAccount`）；同步在帳戶列之後發事件，seller 的訂閱者再鎖 seller 的列。擁有者（seller）的 transaction 只對 payment 做 INSERT ON CONFLICT DO NOTHING 與排 job，不等 payment 的既有列；`inbox` schema 是 platform 的，不在模組順序內。
-- 付款：鎖付款列（`LockPayment`）只在寫入快照時，寫完同 transaction 發 `PaymentChanged`。轉帳（3b）：`RequestTransfer` 只鎖付款列；撤回與轉帳成功的寫結果依序鎖付款列、轉帳列、退款列（`LockPayment` → `LockTransfer` → `LockRefund`）。3c 補退款的鎖順序（同一筆付款的多筆退款依 ID 升序），不得違反「付款列先於轉帳列先於退款列」。
+- 付款：鎖付款列（`LockPayment`）只在寫入快照時，寫完同 transaction 發 `PaymentChanged`。轉帳（3b）：`RequestTransfer` 只鎖付款列；撤回與轉帳成功的寫結果依序鎖付款列、轉帳列、退款列（`LockPayment` → `LockTransfer` → `LockRefund`）。退款（3c）：`CreateRefund` 鎖付款列（`LockPaymentByOrderNo`，FOR UPDATE）→ 轉帳列（`LockTransfer`，只在付款有有效轉帳時）→ 新寫的退款列（INSERT）；退款呼叫與重讀的寫結果鎖付款列（`LockPayment`）→ 退款列（`LockRefund`）；撤回的寫結果與撤回階段的人工結案鎖付款列 → 轉帳列 → 退款列。全部遵守「付款列先於轉帳列先於退款列」。目前沒有 transaction 同時鎖兩筆退款列；若將來有，同一筆付款的多筆退款依 ID 升序鎖。併發的退款以付款列的鎖序列化，累計上限因此不會被並行突破（§12）。
 
 ## 8. 已知限制
 
@@ -62,7 +66,9 @@ payment 是收款與付款的模組（ADR `docs/adr/2026-09-24-go-modular-monoli
 - 本機種子（`dev-seed`）以 fake provider 走正式的建立與同步；店家已有別的 provider 的帳戶時種子不改它，只印出提醒。
 - 付款的冪等鍵保存期取 24 小時（`PaymentIdempotencyRetention`，Stripe 的下限，3d 以文件核對）：結果不明的呼叫 23 小時內同鍵重送、之後只查回，見 §11。觸發：3d 核對文件後調整。
 - 零元訂單不經 provider（`CreatePayment` 回 FailedPrecondition），怎麼完成由訂單一方決定。觸發：步驟 4。
-- 付款事件的 handler 只涵蓋付款（PaymentIntent）；退款與轉帳的事件在 3b、3c 加入前，`ParseEvent` 回 ErrIgnoredEvent。
+- 付款事件的 handler 涵蓋付款（PaymentIntent）與退款（`refund.*`，路由鍵是 provider 的退款 ID）；轉帳的事件 `ParseEvent` 回 ErrIgnoredEvent。
+- 付款的轉帳還在進行（`PENDING`）或待人工核對（`ANOMALY`）時，`CreateRefund` 回 FailedPrecondition，呼叫端（售後、自動退款）稍後重試：轉帳金額在寫列時就定了，這時放行退款會讓平台多付。觸發：售後或自動退款常撞到轉帳進行中時，改成讓退款等轉帳結果再決定撤回額度。
+- 撤回成立之後退款被 provider 拒絕或查無（`FAILED`）時，已撤回的額度不退回賣家（款項留在平台，轉帳的 `reversed_amount` 不減）；後續退款只撤回轉帳剩餘額度，不足的部分由平台手上的款項支付。觸發：B10 對帳或賣家反映時。
 
 ## 9. 付款
 
@@ -76,7 +82,7 @@ payment 是收款與付款的模組（ADR `docs/adr/2026-09-24-go-modular-monoli
 - **舊 PaymentIntent 晚到成功**（D8 補充）：付款列還沒入帳 → 付款列記成功（成功優先於取消）並發 `PaymentChanged`，這個舊嘗試成為有效的、原有效的嘗試若還沒結案就排 `payment.charge_cancel`（嘗試 ID 唯一鍵，transaction 外呼叫 provider 取消）；付款列已經以另一個 PaymentIntent 入帳而這個也入帳 → 記 `excess_paid_at`（重複入帳，error log，後台以 `ExcessPaidPayments` 查），不自動退款（D5 修訂：退款由訂單一方發起）；付款列已入帳而這個舊 PaymentIntent 還沒結案 → 排取消。取消與入帳競態時取消的結果是 provider 的入帳快照，同樣記成重複入帳。
 - **補掃**（`payment.charge_sweep`，15 分鐘）：閒置超過 10 分鐘的 `CREATING` 補排補做；超過 30 分鐘沒讀過的 `AWAITING_PAYMENT`／`PROCESSING` 補排同步；被取代、未結案又超過 30 分鐘沒讀過的舊嘗試所屬的付款補排同步；inbox 有超過 1 分鐘未處理事件的付款（含舊 PaymentIntent 的事件）補排同步。
 - **外部 ID 的 schema**：退款與轉帳的外部 ID 在 provider 已回應的狀態都存得下來（退款 `REFUNDING`、`SUCCEEDED`、`FAILED`；轉帳 `SUCCEEDED`、`FAILED`），入帳一定要有 ID，還沒呼叫 provider 的狀態不能有，有 ID 一定要有呼叫時刻（`refunds_external_state_check`、`refunds_external_called_check`、`transfers_external_state_check`）。撤回的外部 ID 不綁狀態。
-- **port**（`internal/charge.Provider`）：建立與讀取 PaymentIntent、取消 PaymentIntent、建立與讀取退款、建立轉帳、撤回轉帳（可部分）、`ParseEvent`；fake 全部實作並記 `Violations`（transaction 內或沒有 deadline 的呼叫）。Stripe adapter 是 3d。
+- **port**（`internal/charge.Provider`）：建立與讀取 PaymentIntent、取消 PaymentIntent、建立與讀取退款、建立轉帳、撤回轉帳（可部分）、`ParseEvent`（付款與退款事件）；fake 全部實作並記 `Violations`（transaction 內或沒有 deadline 的呼叫）。Stripe adapter 是 3d。
 
 ## 10. 轉帳與撤回
 
@@ -87,15 +93,25 @@ payment 是收款與付款的模組（ADR `docs/adr/2026-09-24-go-modular-monoli
 - **轉帳 job**：呼叫前在獨立 transaction 記 `called_at`（保留最早的）→ transaction 外帶列上的冪等鍵與付款的 `external_charge_id`（`source_transaction`）呼叫 `CreateTransfer` → 成功在新的 transaction 寫外部 ID 與 `SUCCEEDED`。`ErrPermanent` → `FAILED`（job 完成）；`ErrRetryableRefusal`（平台餘額不足）→ 換新冪等鍵、清 `called_at`、回錯誤由 River 重試、列保持 `PENDING`，不計任何期限；其他錯誤是結果不明，同鍵重送到 23 小時、之後只查回（§11）；最後一次嘗試只記警示、留給掃描。付款沒有 charge、provider 回的金額或外部 ID 與列不符 → `ANOMALY`（不寫成功、job 完成）。
 - **撤回 job**（`payment.transfer_reversal`，退款 ID 唯一鍵；`EnqueueReversal` 由 3c 在寫 `REVERSING` 退款列的同一個 transaction 呼叫）：退款是 `REVERSING` 時，找付款的 `SUCCEEDED` 轉帳（沒有、或 `reversal_amount` 超過 `amount − reversed_amount` 是 `ANOMALY`，不呼叫 provider）→ 呼叫前記 `reversal_called_at` → transaction 外帶 `reversal_idempotency_key` 呼叫 `ReverseTransfer` → 一個 transaction 內依序鎖付款列、轉帳列、退款列，退款 `REVERSING` → `REVERSED`（記 `reversal_external_id`）並把 `reversal_amount` 累加到轉帳的 `reversed_amount`。provider 已撤回、退款卻已不在 `REVERSING`（同一個撤回 ID 的重複寫入除外）：記 error log（退款、付款、轉帳與撤回 ID）並發 `MoneyAnomaly`，不累加。已不是 `REVERSING` 的退款什麼都不做，所以同一把鍵重送不會重複累加。賣家餘額不足不是錯誤（#9），沒有對應分支。
 - **撤回的終局**：`ErrPermanent` → 退款 `FAILED`（`provider_refused`）；`ErrRetryableRefusal` 換新的撤回鍵；結果不明與異常見 §11（查無滿等待 → `FAILED`，`provider_not_found`）。`FAILED` 的退款不佔累計額度，`ANOMALY` 佔。
-- **補掃**：`payment.charge_sweep` 另外補排閒置超過 10 分鐘（`updated_at`，每次呼叫都更新）的 `PENDING` 轉帳與 `REVERSING` 退款（算在回傳的 created）；查詢走 partial index（`transfers_pending`、`refunds_reversing`），`ANOMALY` 一律不補排。
+- **補掃**：`payment.charge_sweep` 另外補排閒置超過 10 分鐘（`updated_at`，每次呼叫都更新）的 `PENDING` 轉帳與 `REVERSING` 退款（算在回傳的 created）；查詢走 partial index（`transfers_pending`、`refunds_reversing`），`ANOMALY` 一律不補排。退款的補掃見 §12。
+- 撤回成立（`REVERSED`）的同一個 transaction 排退款 job（`payment.refund_create`），撤回階段的人工結案成功同理。
 
 ## 11. 結果不明的收斂（ADR D68、計畫 D10）
 
-付款、轉帳、撤回（退款的 port 方法與查回已備，use case 在 3c）的 provider 呼叫結果只分三種：成功；確定失敗，再分終局（`ErrPermanent`）與可重試拒絕（`ErrRetryableRefusal`，例如平台餘額不足、429）；不明（其餘錯誤）。不變量：**換新冪等鍵之前，必須以強一致的查回證明上一次嘗試在 provider 不存在**，時間不能把「不明」推斷成「失敗」。
+付款、轉帳、撤回、退款的 provider 呼叫結果只分三種：成功；確定失敗，再分終局（`ErrPermanent`）與可重試拒絕（`ErrRetryableRefusal`，例如平台餘額不足、429）；不明（其餘錯誤）。不變量：**換新冪等鍵之前，必須以強一致的查回證明上一次嘗試在 provider 不存在**，時間不能把「不明」推斷成「失敗」。
 
 - **可重試拒絕**：換新冪等鍵（付款：付款列換鍵、有效嘗試記被取代、新嘗試另寫一列；轉帳與撤回：列上的鍵換掉、`called_at` 清空、查回失敗次數歸零）、回錯誤由 River 重試，不計任何期限。**只有這把鍵的第一次呼叫（呼叫前 `called_at` 是空的）被拒絕才換鍵**；重送被可重試拒絕時，前一次呼叫的結果仍不明（可能已執行），保持同一把鍵、回錯誤，過了 `ResendWindow` 再查回。
 - **不明**：這把鍵的第一次呼叫（`called_at`）起 `ResendWindow`（23 小時，小於保存期 `IdempotencyRetention`）內以同一把鍵重送（River 重試與週期掃描）；之後不再呼叫 provider，只以 `Find*`（`FindPayment`、`FindTransfer`、`FindReversal`、`FindRefund`）依嘗試 ID 查回。嘗試 ID 就是這把冪等鍵，adapter 在建立時寫進 provider 物件的 metadata。
-- **查回的結果**：找到 → 與列核對後收下（等同呼叫成功）；查無 → 從第一次呼叫起滿 `NotFoundAfter`（`ResendWindow` + `NotFoundWait` 1 小時，等於 24 小時；最後一次重送在視窗內，列表可能晚一點才看得到）才算確定不存在，進終局 `FAILED`（付款是 `CREATE_FAILED`，原因 `provider_not_found`），之後才可以換新鍵建新的（轉帳靠 `RequestTransfer`、付款靠買家再次建立）；未滿就回錯誤稍後再查，列不動。查回本身失敗累計連續次數（`create_lookup_failures`、`lookup_failures`、`reversal_lookup_failures`），成功的查回歸零，連續 `LookupFailureLimit`（5）次進 `ANOMALY`。
+- **查回的結果**：找到 → 與列核對後收下（等同呼叫成功）；查無 → 從第一次呼叫起滿 `NotFoundAfter`（`ResendWindow` + `NotFoundWait` 1 小時，等於 24 小時；最後一次重送在視窗內，列表可能晚一點才看得到）才算確定不存在，進終局 `FAILED`（付款是 `CREATE_FAILED`，原因 `provider_not_found`），之後才可以換新鍵建新的（轉帳靠 `RequestTransfer`、付款靠買家再次建立）；未滿就回錯誤稍後再查，列不動。查回本身失敗累計連續次數（`create_lookup_failures`、`lookup_failures`、`reversal_lookup_failures`、`refund_lookup_failures`），成功的查回歸零，連續 `LookupFailureLimit`（5）次進 `ANOMALY`。
 - **ANOMALY**：provider 與本地紀錄不符（金額或外部 ID）、前置條件不成立（轉帳的付款沒有 charge、撤回對不到已成立的轉帳或額度超過剩餘可撤）、或查回連續失敗。列的 `status` 進 `ANOMALY`、`failure_reason` 只記原因碼（上限 200 字，provider 的外部 ID 只進 log 與事件）；原因碼另有 `provider_changed_after_call`（建立中的付款列屬於別的 provider 而且呼叫過：同時只設定一個 provider，舊的已無法查回，所以不依時間改綁，從沒呼叫過才改綁）與 `transfer_without_external_id`。它佔住 `transfers_active_payment`（一筆付款最多一筆有效轉帳）與退款額度加總（`NonFailedRefundTotal`），付款列仍佔那張訂單，補掃與 job 不再碰它；進入的同一個 transaction 發 `MoneyAnomaly`（`Kind`、`ObjectID`、`PaymentID`、`Reason`）給告警。付款的 `Next` 對 `ANOMALY` 一律保留，快照不會把它改寫；但 `ANOMALY` 的付款收到帶外部 ID 的快照時，同 transaction 仍發 `MoneyAnomaly`（`snapshot_on_anomaly_*`）。provider 已建立轉帳而轉帳列已不在 `PENDING` 時記 error log 並發 `MoneyAnomaly`（`transferred_but_transfer_*`），與撤回同。
-- **人工結案**（`ResolveAnomaly(actor, kind, id, outcome, evidence)`，後台 Connect 端點在步驟 5）：管理員核對 provider 後結案成 `SUCCEEDED`（provider 確實執行了，`evidence` 是 provider 物件 ID，必填）或 `FAILED`（確認沒有執行）；領域變更與一筆 `adminaudit`（對象種類 `payment_payment`／`payment_transfer`／`payment_refund`，detail 含結果、原因碼與證據）在同一個 transaction，結案成成功之前，先在 transaction 外向 provider 以列上的嘗試 ID 查回證據（付款 `FindPayment`、轉帳 `FindTransfer`、撤回 `FindReversal`）：物件 ID 與金額必須同時符合證據與列，不符或查不到回 `FAILED_PRECONDITION`、列不動（付款屬於已無法查回的 provider 時一律不能結案成成功），核對本身失敗回一般錯誤；transaction 內鎖列後再確認列上的鍵沒變。競態下證據與別的列的外部 ID 衝突回 `ALREADY_EXISTS`，不在 `ANOMALY` 回 `FAILED_PRECONDITION`。付款：成功是把有效嘗試連上證據的 PaymentIntent、暫記 `AWAITING_PAYMENT` 並排同步 job，真正的狀態由重讀推導；失敗進 `CREATE_FAILED`。轉帳：成功記外部轉帳 ID 進 `SUCCEEDED`；失敗進 `FAILED`（讓出名額）。退款（撤回階段的 `ANOMALY`）：成功表示撤回成立，記撤回 ID、累加轉帳的 `reversed_amount`、進 `REVERSED`；失敗進 `FAILED`。鎖順序同 §7（付款列、轉帳列、退款列）。
-- **已知限制**：退款階段（`REFUNDING`）的 `ANOMALY` 與它的人工結案、退款的建立與查回由 3c 補；Stripe 的錯誤分類與 `Find*` 的 Stripe 實作在 3d（`transfer_group` 列出轉帳為文件事實、sandbox 未實測）。
+- **人工結案**（`ResolveAnomaly(actor, kind, id, outcome, evidence)`，後台 Connect 端點在步驟 5）：管理員核對 provider 後結案成 `SUCCEEDED`（provider 確實執行了，`evidence` 是 provider 物件 ID，必填）或 `FAILED`（確認沒有執行）；領域變更與一筆 `adminaudit`（對象種類 `payment_payment`／`payment_transfer`／`payment_refund`，detail 含結果、原因碼與證據）在同一個 transaction，結案成成功之前，先在 transaction 外向 provider 以列上的嘗試 ID 查回證據（付款 `FindPayment`、轉帳 `FindTransfer`、撤回 `FindReversal`）：物件 ID 與金額必須同時符合證據與列，不符或查不到回 `FAILED_PRECONDITION`、列不動（付款屬於已無法查回的 provider 時一律不能結案成成功），核對本身失敗回一般錯誤；transaction 內鎖列後再確認列上的鍵沒變。競態下證據與別的列的外部 ID 衝突回 `ALREADY_EXISTS`，不在 `ANOMALY` 回 `FAILED_PRECONDITION`。付款：成功是把有效嘗試連上證據的 PaymentIntent、暫記 `AWAITING_PAYMENT` 並排同步 job，真正的狀態由重讀推導；失敗進 `CREATE_FAILED`。轉帳：成功記外部轉帳 ID 進 `SUCCEEDED`；失敗進 `FAILED`（讓出名額）。退款分兩個階段（`reversal_amount > 0` 且還沒有 `reversal_external_id` 是撤回階段，其餘是退款階段）：撤回階段成功表示撤回成立，記撤回 ID、累加轉帳的 `reversed_amount`、進 `REVERSED` 並排退款 job，證據用 `FindReversal`；退款階段成功表示 provider 確實建立了退款，證據用 `FindRefund`（依列上的退款鍵、付款的外部 ID，物件 ID 與金額都要符合），記退款 ID、暫記 `REFUNDING` 並排 `payment.refund_sync`，真正的狀態由重讀推導；兩個階段的失敗都進 `FAILED`（不佔額度）。鎖順序同 §7（付款列、轉帳列、退款列）。
+- **已知限制**：Stripe 的錯誤分類與 `Find*` 的 Stripe 實作在 3d（`transfer_group` 列出轉帳為文件事實、sandbox 未實測）。
+
+## 12. 退款（計畫 3c；D4、D5 修訂、D10）
+
+- **建立**（`CreatePaymentRefund(RefundRequest{OrderNo, Amount, RequestKey, Auto})`，步驟 4 的 legacy `CreateRefund` 與 Java order 的 `AutoRefundWorker` 呼叫；payment 不讀訂單狀態，是否自動退款由呼叫方判斷，D5 修訂）：一個 transaction 內依序：鎖付款列（FOR UPDATE）→ 以 `(付款, request_key)` 找既有退款（同鍵同內容回同一筆、不排 job，金額或 `Auto` 不同回 FailedPrecondition）→ 付款必須 `SUCCEEDED` → 加總非失敗退款（`NonFailedRefundTotal`：進行中與 `ANOMALY` 都算）守累計上限（超過回 FailedPrecondition）→ 依轉帳決定寫哪種列並排 job。provider 在 transaction 外由 job 呼叫。付款不存在回 NotFound，金額不是正數或鍵長度不合回 InvalidInput。D4：可以並行，只守累計上限；Java 的 `REFUND_ALREADY_PROCESSING` 不保留。
+- **先撤回再退款**（spikes #6、#7：退款不會自動撤回 SCT 轉帳）：付款沒有有效轉帳（或轉帳都 `FAILED`）寫 `PENDING` 並排 `payment.refund_create`；轉帳 `SUCCEEDED` 時 `reversal_amount = min(退款額, 轉帳金額 − reversed_amount − 進行中的預留)`（預留是 `REVERSING` 與撤回階段 `ANOMALY` 的退款的 `reversal_amount`），大於 0 寫 `REVERSING` 並在同一個 transaction 排撤回 job（§10），撤回成立後才排退款 job；等於 0（剩餘額度已被預留或撤光，款項在平台手上）寫 `PENDING`。轉帳 `PENDING` 或 `ANOMALY` 時回 FailedPrecondition（§8）。
+- **退款 job**（`payment.refund_create`，退款 ID 唯一鍵）：退款是 `PENDING` 或 `REVERSED` 時，付款必須已入帳、有外部 ID、屬於目前的 provider（否則 `ANOMALY`，原因 `payment_not_refundable`）→ 呼叫前記 `refund_called_at` → transaction 外帶列上的 `idempotency_key` 與付款的外部 ID 呼叫 `CreateRefund` → 依結果三分（§11）：成功依快照進 `REFUNDING`（provider 處理中）、`SUCCEEDED` 或 `FAILED`（記 provider 的外部 ID）；`ErrPermanent` → `FAILED`（`provider_refused`）；`ErrRetryableRefusal`（只在這把鍵的第一次呼叫）→ 換新鍵、清 `refund_called_at` 與 `refund_lookup_failures`、回錯誤由 River 重試；不明同鍵重送到 `ResendWindow`，之後只 `FindRefund` 查回，查無滿 `NotFoundAfter` 才 `FAILED`（`provider_not_found`），查回連續失敗進 `ANOMALY`（`lookup_failed`）。provider 回的金額或外部 ID 與列不符進 `ANOMALY`（`reply_mismatch`）。不認得的快照狀態是暫時性錯誤（重試），不寫入。
+- **結果**：`refund.*` 事件經 inbox handler（路由鍵是 provider 的退款 ID）只排以退款 ID 為唯一鍵的 `payment.refund_sync`、不標記已處理、不讀事件內容；同步在 transaction 外重讀（`GetRefund`），在一個 transaction 內（鎖付款列、退款列）把 `REFUNDING` 推到 `SUCCEEDED` 或 `FAILED`，並把讀取開始前收到的事件標為已處理；重讀不到（永久失敗）或與列不符進 `ANOMALY`（保留已知的外部 ID，`refunds_external_state_check` 因此允許 `ANOMALY`）。終局的列不被過期的「處理中」讀取倒退；終局之間衝突、列在 `ANOMALY` 或已被人工結案成失敗而 provider 又回成功時，記 error log 並發 `MoneyAnomaly`（`refunded_but_refund_*`）。終局同 transaction 發 `RefundChanged`，自動退款成功再發 `AutoRefundCompleted`（§5）。
+- **補掃**：`PENDING`、`REVERSED` 閒置超過 10 分鐘補排 `payment.refund_create`（算在 created）；`REFUNDING` 閒置超過 30 分鐘補排 `payment.refund_sync`，inbox 有超過 1 分鐘還沒處理的退款事件的退款也補排同步（算在 synced）；`ANOMALY` 與終局不補排（partial index `refunds_open`）。
+- **ANOMALY 與額度**：`ANOMALY` 佔累計額度；`FAILED` 釋出。人工結案見 §11。

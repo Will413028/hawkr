@@ -309,12 +309,19 @@ func toModel(r store.PaymentPayment, clientSecret string) model.Payment {
 	return p
 }
 
-// handleEvent 是付款事件的 inbox handler（派送 job 的 transaction 內，不能呼叫 provider）：PaymentIntent 對得到本地付款時排入該付款的同步 job（以付款 ID 為唯一鍵），
+// handleEvent 是付款事件的 inbox handler（派送 job 的 transaction 內，不能呼叫 provider）：PaymentIntent 對得到本地付款時排入該付款的同步 job（以付款 ID 為唯一鍵），退款 ID 對得到本地退款時排入該退款的同步 job（以退款 ID 為唯一鍵），
 // 不標記已處理，也不讀事件內容：狀態一律由同步重讀得到。對不到本地付款的事件只留紀錄、直接標記已處理（付款列的外部 ID 還沒寫進來時，建立的結果本身就是最新的快照）。
 func (s *Service) handleEvent(ctx context.Context, e inbox.Event) error {
 	row, err := store.New(s.d.DB.Conn(ctx)).PaymentByExternal(ctx, store.PaymentByExternalParams{Provider: e.Provider, ExternalPaymentID: &e.RouteKey})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return s.d.Inbox.MarkProcessed(ctx, e.Provider, e.EventID, eventProcessor)
+		refund, rerr := store.New(s.d.DB.Conn(ctx)).RefundByExternal(ctx, &e.RouteKey)
+		if errors.Is(rerr, pgx.ErrNoRows) {
+			return s.d.Inbox.MarkProcessed(ctx, e.Provider, e.EventID, eventProcessor)
+		}
+		if rerr != nil {
+			return rerr
+		}
+		return enqueueRefundSync(ctx, s.d.Jobs, refund.ID)
 	}
 	if err != nil {
 		return err

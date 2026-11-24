@@ -22,8 +22,8 @@
    "id": "reversal-skips-reversed-amount",
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/reversal.go",
-   "old": "\t\t_, err = q.AddTransferReversal(ctx, store.AddTransferReversalParams{ID: tr.ID, Amount: applied.ReversalAmount, Now: s.d.Now().UTC()})\n\t\treturn err",
-   "new": "\t\t_ = applied\n\t\treturn nil",
+   "old": "\t\tif _, err = q.AddTransferReversal(ctx, store.AddTransferReversalParams{ID: tr.ID, Amount: applied.ReversalAmount, Now: s.d.Now().UTC()}); err != nil {\n\t\t\treturn err\n\t\t}",
+   "new": "\t\t_ = applied",
    "test": "internal/modules/payment ^TestAReversalUpdatesTheReversedAmountAndTheRefundStatusTogether$",
    "why": "撤回成功只推進退款狀態、不累加轉帳的 reversed_amount：reversed_amount 仍是 0。"
   },

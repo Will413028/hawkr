@@ -221,6 +221,9 @@ CREATE INDEX transfers_pending ON payment.transfers (updated_at, id) WHERE statu
 -- 重啟時從這裡接著呼叫退款，不再撤回）；不需要撤回的退款直接 PENDING → REFUNDING。REFUNDING 已呼叫退款（refund_called_at，冪等鍵 idempotency_key），
 -- provider 的結果 SUCCEEDED（external_refund_id）或 FAILED（failure_reason，不佔額度）；ANOMALY 待人工結案（failure_reason 記原因，佔額度，補掃不再重試）。
 -- reversal_lookup_failures 是撤回連續查回失敗的次數；reversal_idempotency_key 同時是撤回的嘗試 ID。reversal_amount 在 REVERSED 與之後的狀態必須有對應的 reversal_external_id（當 reversal_amount > 0）。
+-- 退款呼叫的收斂同轉帳（D68）：PENDING（不需撤回）與 REVERSED 是「可以呼叫退款」的狀態，refund_called_at 是這把退款鍵（idempotency_key，同時是嘗試 ID）第一次呼叫 provider 之前寫入的時刻，
+-- 可重試拒絕時換新鍵並清掉它與 refund_lookup_failures（連續查回失敗的次數）；provider 回了物件才有 external_refund_id（REFUNDING 等 provider 的結果、SUCCEEDED、FAILED）。
+-- ANOMALY 有兩個階段：撤回階段（reversal_amount > 0 且還沒有 reversal_external_id）與退款階段（其餘）；退款階段從 REFUNDING 進 ANOMALY 時保留已知的 external_refund_id。
 CREATE TABLE payment.refunds (
     id                       UUID        PRIMARY KEY,
     payment_id               UUID        NOT NULL REFERENCES payment.payments (id),
@@ -235,6 +238,7 @@ CREATE TABLE payment.refunds (
     reversal_lookup_failures INTEGER     NOT NULL DEFAULT 0,
     idempotency_key          UUID        NOT NULL DEFAULT gen_random_uuid(),
     refund_called_at         TIMESTAMPTZ,
+    refund_lookup_failures   INTEGER     NOT NULL DEFAULT 0,
     external_refund_id       TEXT,
     failure_reason           TEXT,
     created_at               TIMESTAMPTZ NOT NULL,
@@ -244,13 +248,14 @@ CREATE TABLE payment.refunds (
     CONSTRAINT refunds_reversal_amount_check CHECK (reversal_amount BETWEEN 0 AND amount),
     CONSTRAINT refunds_status_check CHECK (status IN ('PENDING', 'REVERSING', 'REVERSED', 'REFUNDING', 'SUCCEEDED', 'FAILED', 'ANOMALY')),
     CONSTRAINT refunds_lookup_failures_check CHECK (reversal_lookup_failures >= 0),
+    CONSTRAINT refunds_refund_lookup_failures_check CHECK (refund_lookup_failures >= 0),
     CONSTRAINT refunds_reversing_check CHECK (status <> 'REVERSING' OR reversal_amount > 0),
     CONSTRAINT refunds_reversed_check CHECK (status NOT IN ('REVERSED', 'REFUNDING', 'SUCCEEDED') OR reversal_amount = 0 OR reversal_external_id IS NOT NULL),
     CONSTRAINT refunds_reversal_called_check CHECK (reversal_external_id IS NULL OR reversal_called_at IS NOT NULL),
     CONSTRAINT refunds_reversal_external_id_check CHECK (reversal_external_id IS NULL OR char_length(reversal_external_id) BETWEEN 1 AND 255),
     CONSTRAINT refunds_refund_called_check CHECK (status NOT IN ('REFUNDING', 'SUCCEEDED') OR refund_called_at IS NOT NULL),
     CONSTRAINT refunds_succeeded_check CHECK (status <> 'SUCCEEDED' OR external_refund_id IS NOT NULL),
-    CONSTRAINT refunds_external_state_check CHECK (external_refund_id IS NULL OR status IN ('REFUNDING', 'SUCCEEDED', 'FAILED')),
+    CONSTRAINT refunds_external_state_check CHECK (external_refund_id IS NULL OR status IN ('REFUNDING', 'SUCCEEDED', 'FAILED', 'ANOMALY')),
     CONSTRAINT refunds_external_called_check CHECK (external_refund_id IS NULL OR refund_called_at IS NOT NULL),
     CONSTRAINT refunds_external_id_check CHECK (external_refund_id IS NULL OR char_length(external_refund_id) BETWEEN 1 AND 255),
     CONSTRAINT refunds_failure_check CHECK ((status IN ('FAILED', 'ANOMALY')) = (failure_reason IS NOT NULL)),
@@ -260,3 +265,4 @@ CREATE UNIQUE INDEX refunds_request ON payment.refunds (payment_id, request_key)
 CREATE UNIQUE INDEX refunds_external ON payment.refunds (external_refund_id) WHERE external_refund_id IS NOT NULL;
 CREATE INDEX refunds_payment ON payment.refunds (payment_id);
 CREATE INDEX refunds_reversing ON payment.refunds (updated_at, id) WHERE status = 'REVERSING';
+CREATE INDEX refunds_open ON payment.refunds (updated_at, id) WHERE status IN ('PENDING', 'REVERSED', 'REFUNDING');

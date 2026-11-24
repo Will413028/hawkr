@@ -80,7 +80,7 @@ func constraintBody(t *testing.T, constraint string) string {
 func TestExternalIDsAreAllowedInEveryStateTheProviderHasAlreadyAnswered(t *testing.T) {
 	t.Parallel()
 	for constraint, want := range map[string][]string{
-		"refunds_external_state_check":   {"REFUNDING", "SUCCEEDED", "FAILED"},
+		"refunds_external_state_check":   {"REFUNDING", "SUCCEEDED", "FAILED", "ANOMALY"},
 		"transfers_external_state_check": {"SUCCEEDED", "FAILED"},
 	} {
 		if got := checkValuesIn(t, constraint); !slices.Equal(got, want) {

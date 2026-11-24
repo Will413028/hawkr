@@ -108,6 +108,40 @@ func enqueueReversal(ctx context.Context, jc jobs.Enqueuer, id uuid.UUID) error 
 	return jc.Enqueue(ctx, args, &opts)
 }
 
+// RefundArgs 是呼叫 provider 建立退款的 job，以退款 ID 為唯一鍵：CreateRefund 在寫 PENDING 退款列的同一個 transaction 排入；需要先撤回的退款由撤回成立的 transaction 排入。
+type RefundArgs struct {
+	RefundID uuid.UUID `json:"refund_id" river:"unique"`
+}
+
+// Kind 是 River 的 job 種類。
+func (RefundArgs) Kind() string { return "payment.refund_create" }
+
+// InsertOpts 是退款 job 的排入選項。
+func (RefundArgs) InsertOpts() river.InsertOpts { return jobs.UniqueByArgs(maxAttempts) }
+
+func enqueueRefund(ctx context.Context, jc jobs.Enqueuer, id uuid.UUID) error {
+	args := RefundArgs{RefundID: id}
+	opts := args.InsertOpts()
+	return jc.Enqueue(ctx, args, &opts)
+}
+
+// RefundSyncArgs 是重讀 provider 的退款並寫入狀態的 job，以退款 ID 為唯一鍵：退款事件的 handler 與掃描只排這個 job。
+type RefundSyncArgs struct {
+	RefundID uuid.UUID `json:"refund_id" river:"unique"`
+}
+
+// Kind 是 River 的 job 種類。
+func (RefundSyncArgs) Kind() string { return "payment.refund_sync" }
+
+// InsertOpts 是退款同步 job 的排入選項。
+func (RefundSyncArgs) InsertOpts() river.InsertOpts { return jobs.UniqueByArgs(maxAttempts) }
+
+func enqueueRefundSync(ctx context.Context, jc jobs.Enqueuer, id uuid.UUID) error {
+	args := RefundSyncArgs{RefundID: id}
+	opts := args.InsertOpts()
+	return jc.Enqueue(ctx, args, &opts)
+}
+
 // SweepArgs 是定期的掃描：補排閒置的建立與未結案付款的同步，以及有舊的未處理事件的付款的同步。
 type SweepArgs struct{}
 
@@ -202,6 +236,32 @@ func (w *reversalWorker) Work(ctx context.Context, job *river.Job[ReversalArgs])
 // Timeout 是一次撤回的時間上限。
 func (w *reversalWorker) Timeout(*river.Job[ReversalArgs]) time.Duration { return jobTimeout }
 
+type refundWorker struct {
+	river.WorkerDefaults[RefundArgs]
+	service *Service
+}
+
+// Work 執行一次退款呼叫：provider 的永久拒絕進終局、不重試；暫時性失敗回錯誤由 River 重試。
+func (w *refundWorker) Work(ctx context.Context, job *river.Job[RefundArgs]) error {
+	return jobError(w.service.Refund(ctx, job.Args.RefundID, job.Attempt >= job.MaxAttempts))
+}
+
+// Timeout 是一次退款呼叫的時間上限。
+func (w *refundWorker) Timeout(*river.Job[RefundArgs]) time.Duration { return jobTimeout }
+
+type refundSyncWorker struct {
+	river.WorkerDefaults[RefundSyncArgs]
+	service *Service
+}
+
+// Work 執行一次退款同步。
+func (w *refundSyncWorker) Work(ctx context.Context, job *river.Job[RefundSyncArgs]) error {
+	return jobError(w.service.SyncRefund(ctx, job.Args.RefundID))
+}
+
+// Timeout 是一次退款同步的時間上限。
+func (w *refundSyncWorker) Timeout(*river.Job[RefundSyncArgs]) time.Duration { return jobTimeout }
+
 type sweepWorker struct {
 	river.WorkerDefaults[SweepArgs]
 	service *Service
@@ -223,6 +283,8 @@ func (s *Service) AddWorkers(workers *river.Workers) {
 	river.AddWorker(workers, &cancelWorker{service: s})
 	river.AddWorker(workers, &transferWorker{service: s})
 	river.AddWorker(workers, &reversalWorker{service: s})
+	river.AddWorker(workers, &refundWorker{service: s})
+	river.AddWorker(workers, &refundSyncWorker{service: s})
 	river.AddWorker(workers, &sweepWorker{service: s})
 }
 
@@ -240,9 +302,10 @@ func (s *Service) PeriodicJobs() []*river.PeriodicJob {
 //   - 狀態：已建立、未結案、超過 readIdle 沒讀過的列補排同步（掉了 webhook 的保底）；
 //   - 舊嘗試：被取代、還沒結案又超過 readIdle 沒讀過的舊 PaymentIntent 所屬的付款補排同步；
 //   - 事件：inbox 有超過 eventGrace 還沒處理的事件的付款補排同步（任何狀態）；
-//   - 轉帳與撤回：PENDING 的轉帳、REVERSING 的退款閒置超過 createIdle 就補排各自的 job（結果不明的由 job 依 ResendWindow 同鍵重送或查回）；ANOMALY 的列一律不補排。
+//   - 轉帳、撤回與退款：PENDING 的轉帳、REVERSING 的退款閒置超過 createIdle 就補排各自的 job，PENDING 或 REVERSED 的退款補排退款 job（結果不明的由 job 依 ResendWindow 同鍵重送或查回）；
+//     REFUNDING 的退款閒置超過 readIdle 補排退款同步；inbox 有超過 eventGrace 還沒處理的退款事件的退款補排退款同步；ANOMALY 的列一律不補排。
 //
-// 回傳排入補做與同步的付款數（唯一鍵合併掉的也算；同一筆付款符合兩種同步時算兩次；補排的轉帳與撤回算在 created）。沒有設定 provider 時什麼都不做。
+// 回傳排入補做與同步的付款數（唯一鍵合併掉的也算；同一筆付款符合兩種同步時算兩次；補排的轉帳、撤回與退款呼叫算在 created，退款同步算在 synced）。沒有設定 provider 時什麼都不做。
 func (s *Service) Sweep(ctx context.Context) (created, synced int, err error) {
 	p := s.d.Provider
 	if p == nil {
@@ -309,6 +372,40 @@ func (s *Service) Sweep(ctx context.Context) (created, synced int, err error) {
 	}
 	after = uuid.Nil()
 	for {
+		ids, err := store.New(s.d.DB.Conn(ctx)).CallableRefundIDs(ctx, store.CallableRefundIDsParams{IdleBefore: createBefore, AfterID: after, Batch: sweepBatch})
+		if err != nil {
+			return created, synced, err
+		}
+		for _, id := range ids {
+			if err := queue(enqueueRefund, id); err != nil {
+				return created, synced, err
+			}
+			created++
+			after = id
+		}
+		if len(ids) < sweepBatch {
+			break
+		}
+	}
+	after = uuid.Nil()
+	for {
+		ids, err := store.New(s.d.DB.Conn(ctx)).RefundingRefundIDs(ctx, store.RefundingRefundIDsParams{IdleBefore: readBefore, AfterID: after, Batch: sweepBatch})
+		if err != nil {
+			return created, synced, err
+		}
+		for _, id := range ids {
+			if err := queue(enqueueRefundSync, id); err != nil {
+				return created, synced, err
+			}
+			synced++
+			after = id
+		}
+		if len(ids) < sweepBatch {
+			break
+		}
+	}
+	after = uuid.Nil()
+	for {
 		ids, err := store.New(s.d.DB.Conn(ctx)).PollablePaymentIDs(ctx, store.PollablePaymentIDsParams{ReadBefore: &readBefore, AfterID: after, Batch: sweepBatch})
 		if err != nil {
 			return created, synced, err
@@ -353,6 +450,16 @@ func (s *Service) Sweep(ctx context.Context) (created, synced int, err error) {
 		}
 		for _, id := range ids {
 			if err := queue(enqueueSync, id); err != nil {
+				return created, synced, err
+			}
+			synced++
+		}
+		refunds, err := store.New(s.d.DB.Conn(ctx)).RefundIDsByExternal(ctx, store.RefundIDsByExternalParams{Provider: p.Name(), ExternalRefundIds: routes})
+		if err != nil {
+			return created, synced, err
+		}
+		for _, id := range refunds {
+			if err := queue(enqueueRefundSync, id); err != nil {
 				return created, synced, err
 			}
 			synced++

@@ -85,6 +85,7 @@ type PaymentRefund struct {
 	ReversalLookupFailures int32
 	IdempotencyKey         uuid.UUID
 	RefundCalledAt         *time.Time
+	RefundLookupFailures   int32
 	ExternalRefundID       *string
 	FailureReason          *string
 	CreatedAt              time.Time

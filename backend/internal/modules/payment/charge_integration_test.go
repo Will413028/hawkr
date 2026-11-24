@@ -67,8 +67,12 @@ type chargeFixture struct {
 	// anomalies 是同 transaction 內收到的 MoneyAnomaly（告警事件），anomalyInTx 記下是否真的在 transaction 內。
 	anomalies   []MoneyAnomaly
 	anomalyInTx []bool
-	inTx        []bool
-	logs        bytes.Buffer
+	// refundChanges 與 autoDone 是同 transaction 內收到的 RefundChanged 與 AutoRefundCompleted，refundEventInTx 記下兩者是否真的在 transaction 內。
+	refundChanges   []RefundChanged
+	autoDone        []AutoRefundCompleted
+	refundEventInTx []bool
+	inTx            []bool
+	logs            bytes.Buffer
 }
 
 func setupCharge(t *testing.T) *chargeFixture {
@@ -92,6 +96,18 @@ func setupChargeWith(t *testing.T, wrap func(*ChargeFake) ChargeProvider) *charg
 		_, ok := db.TxFrom(ctx)
 		f.anomalies = append(f.anomalies, e)
 		f.anomalyInTx = append(f.anomalyInTx, ok)
+		return nil
+	})
+	events.Subscribe(bus, func(ctx context.Context, e RefundChanged) error {
+		_, ok := db.TxFrom(ctx)
+		f.refundChanges = append(f.refundChanges, e)
+		f.refundEventInTx = append(f.refundEventInTx, ok)
+		return nil
+	})
+	events.Subscribe(bus, func(ctx context.Context, e AutoRefundCompleted) error {
+		_, ok := db.TxFrom(ctx)
+		f.autoDone = append(f.autoDone, e)
+		f.refundEventInTx = append(f.refundEventInTx, ok)
 		return nil
 	})
 	log := slog.New(slog.NewTextHandler(&f.logs, nil))
