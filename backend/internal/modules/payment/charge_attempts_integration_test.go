@@ -53,7 +53,7 @@ func (f *chargeFixture) attemptOf(t *testing.T, external string) string {
 
 func (f *chargeFixture) effectiveExternal(t *testing.T, orderNo string) string {
 	t.Helper()
-	return f.text(t, "SELECT a.external_payment_id FROM payment.payment_attempts a JOIN payment.payments p ON p.id = a.payment_id WHERE p.order_no = $1 AND a.superseded_at IS NULL", orderNo)
+	return f.text(t, "SELECT a.external_payment_id FROM payment.payment_attempts a JOIN payment.payment_orders o ON o.payment_id = a.payment_id WHERE o.order_no = $1 AND a.superseded_at IS NULL", orderNo)
 }
 
 // repay 把付款建立、讓舊的 PaymentIntent 在 provider 那邊取消並同步到本地、再讓買家重付：回傳付款、舊與新的外部 ID。

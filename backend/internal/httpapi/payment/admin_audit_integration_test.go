@@ -4,12 +4,14 @@ package payment
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+	"uuid"
 
 	"connectrpc.com/connect"
 	"github.com/riverqueue/river"
@@ -17,6 +19,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/adminauth"
 	adminpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/payment/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/payment/v1alpha1/paymentv1alpha1connect"
+	paymentpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/payment/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/payment"
@@ -42,8 +45,14 @@ func (activeOwners) OwnerContactEmail(context.Context, int64) (string, bool, err
 	return "seller@example.com", true, nil
 }
 
+type noOrders struct{}
+
+func (noOrders) OrderForPayment(context.Context, string) (payment.PaymentOrder, error) {
+	return payment.PaymentOrder{}, errors.New("not used")
+}
+
 // adminauth 宣告為 audited 的每一支 payment 後台 RPC，經真的 Connect handler 與真的資料庫呼叫一次，都恰好寫一筆後台紀錄（動作是它的 procedure 名稱、
-// 管理員是呼叫者、對象是店家）；宣告了 audited 卻沒有這裡的情境、或情境沒有寫紀錄，都失敗。
+// 管理員是呼叫者、對象是情境操作的那一列：收款帳戶是店家，異常結案是那筆付款）；宣告了 audited 卻沒有這裡的情境、或情境沒有寫紀錄，都失敗。
 // mutation：把任一個 use case 的 s.audit 呼叫拿掉 → 該 procedure 的紀錄是 0 筆，失敗；宣告表新增一支 audited 的 payment RPC 而沒有補情境 → 「沒有情境」失敗。
 func TestEveryAuditedPaymentProcedureWritesOneRecordForTheCaller(t *testing.T) {
 	t.Parallel()
@@ -59,6 +68,7 @@ func TestEveryAuditedPaymentProcedureWritesOneRecordForTheCaller(t *testing.T) {
 	m := payment.New(payment.Deps{
 		DB: d, Events: events.NewBus(), Jobs: discardQueue{}, Inbox: inbox.New(inbox.Deps{DB: d, Jobs: discardQueue{}, Now: clock, Logger: log}),
 		Audit: audit, Provider: payment.NewFake(), Owners: activeOwners{}, Now: clock, Logger: log,
+		Charge: payment.NewChargeFake(), PaymentOrders: noOrders{},
 	})
 	path, handler := paymentv1alpha1connect.NewPaymentAdminServiceHandler(NewAdmin(m))
 	mux := http.NewServeMux()
@@ -84,21 +94,35 @@ func TestEveryAuditedPaymentProcedureWritesOneRecordForTheCaller(t *testing.T) {
 		exec(`INSERT INTO payment.accounts (store_id, provider, requirement_collection, created_at, updated_at, purge_pending_at, purge_blocked_at, purge_blocked_reason)
 VALUES ($1, 'fake', 'PROVIDER', $2, $2, $2, $2, 'provider_refused：no')`, store, now)
 	}
-	scenarios := map[string]func(store int64) error{
-		paymentv1alpha1connect.PaymentAdminServiceRetryPaymentAccountCreateProcedure: func(store int64) error {
+	account := func(store int64, err error) (string, string, error) {
+		return "payment_account", rpc.FormatID(store), err
+	}
+	scenarios := map[string]func(store int64) (targetType, targetID string, err error){
+		paymentv1alpha1connect.PaymentAdminServiceRetryPaymentAccountCreateProcedure: func(store int64) (string, string, error) {
 			failedRow(store)
 			_, err := client.RetryPaymentAccountCreate(ctx, connect.NewRequest(&adminpb.RetryPaymentAccountCreateRequest{StoreId: rpc.FormatID(store)}))
-			return err
+			return account(store, err)
 		},
-		paymentv1alpha1connect.PaymentAdminServiceRetryPaymentAccountPurgeProcedure: func(store int64) error {
+		paymentv1alpha1connect.PaymentAdminServiceRetryPaymentAccountPurgeProcedure: func(store int64) (string, string, error) {
 			blockedRow(store)
 			_, err := client.RetryPaymentAccountPurge(ctx, connect.NewRequest(&adminpb.RetryPaymentAccountPurgeRequest{StoreId: rpc.FormatID(store)}))
-			return err
+			return account(store, err)
 		},
-		paymentv1alpha1connect.PaymentAdminServiceDeletePaymentAccountMappingProcedure: func(store int64) error {
+		paymentv1alpha1connect.PaymentAdminServiceDeletePaymentAccountMappingProcedure: func(store int64) (string, string, error) {
 			blockedRow(store)
 			_, err := client.DeletePaymentAccountMapping(ctx, connect.NewRequest(&adminpb.DeletePaymentAccountMappingRequest{StoreId: rpc.FormatID(store)}))
-			return err
+			return account(store, err)
+		},
+		paymentv1alpha1connect.PaymentAdminServiceResolvePaymentAnomalyProcedure: func(store int64) (string, string, error) {
+			id := uuid.NewV7()
+			exec(`INSERT INTO payment.payments (id, buyer_id, amount, provider, description, status, failure_reason, created_at, updated_at)
+VALUES ($1, $2, 100, $3, '藍色 T 恤', 'ANOMALY', 'lookup_failed', $4, $4)`, id, store, payment.ChargeFakeName, now)
+			_, err := client.ResolvePaymentAnomaly(ctx, connect.NewRequest(&adminpb.ResolvePaymentAnomalyRequest{
+				Kind: paymentpb.PaymentAnomalyKind_PAYMENT_ANOMALY_KIND_PAYMENT, Id: id.String(),
+				Outcome: paymentpb.PaymentAnomalyOutcome_PAYMENT_ANOMALY_OUTCOME_FAILED,
+				Reason:  paymentpb.PaymentAnomalyResolutionReason_PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_NOT_EXECUTED, Note: "在 provider 查無這筆",
+			}))
+			return "payment_payment", id.String(), err
 		},
 	}
 	store := int64(500)
@@ -112,13 +136,14 @@ VALUES ($1, 'fake', 'PROVIDER', $2, $2, $2, $2, 'provider_refused：no')`, store
 			continue
 		}
 		store++
-		if err := run(store); err != nil {
+		targetType, targetID, err := run(store)
+		if err != nil {
 			t.Errorf("%s：%v", procedure, err)
 			continue
 		}
 		recs, err := audit.List(ctx, adminaudit.Filter{Action: procedure})
-		if err != nil || len(recs) != 1 || recs[0].AdminID != 77 || recs[0].TargetType != "payment_account" || recs[0].TargetID != rpc.FormatID(store) {
-			t.Errorf("%s：紀錄=%+v err=%v，預期恰好一筆（管理員 77、對象 payment_account/%d）", procedure, recs, err, store)
+		if err != nil || len(recs) != 1 || recs[0].AdminID != 77 || recs[0].TargetType != targetType || recs[0].TargetID != targetID {
+			t.Errorf("%s：紀錄=%+v err=%v，預期恰好一筆（管理員 77、對象 %s/%s）", procedure, recs, err, targetType, targetID)
 		}
 	}
 	for procedure := range scenarios {
