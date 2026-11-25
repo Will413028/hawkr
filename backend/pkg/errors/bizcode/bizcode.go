@@ -7,71 +7,18 @@ package bizcode
 
 const (
 	// Order 業務碼（4001~4099）
-	InsufficientStock              int32 = 4001
-	InvalidStatus                  int32 = 4002
-	CheckoutExpired                int32 = 4006
-	CheckoutValidationFailed       int32 = 4007
-	ShippingMethodUnavailable      int32 = 4008
-	SellerNotOnboarded             int32 = 4009
-	SellerShippingIncomplete       int32 = 4010
-	CouponLockFailed               int32 = 4011
-	SkuNotFound                    int32 = 4012
-	CouponNotAvailable             int32 = 4013
-	OrderMissingTransaction        int32 = 4014
-	SelfPurchaseNotAllowed         int32 = 4015
-	ShippingAllMethodsExceedLimits int32 = 4016
-	CheckoutPriceChanged           int32 = 4091
-	OrderAlreadyCreated            int32 = 4092
-
-	// Shipping 業務碼（5001~5099）
-	ShipmentNotFound                    int32 = 5001
-	ShipmentNoTradeNo                   int32 = 5002
-	ShipmentAlreadyLabeled              int32 = 5003
-	ShipmentSellerNotOnboarded          int32 = 5004
-	ShipmentPermissionDenied            int32 = 5005
-	ShipmentDataIncomplete              int32 = 5006
-	ShipmentDateMustFuture              int32 = 5007
-	ShipmentDateHoliday                 int32 = 5008
-	ShipmentDateOutOfRange              int32 = 5009
-	ShipmentDeliveryBeforeShip          int32 = 5010
-	ShipmentLabelRequired               int32 = 5011
-	ShipmentTcatAlreadyCalled           int32 = 5012
-	ShipmentConcurrentConflict          int32 = 5013
-	ShipmentUnsupportedMethod           int32 = 5014
-	ShipmentOrderQueryFailed            int32 = 5015
-	BuyerStorePickupNotFound            int32 = 5016
-	ShippingOnboardingNotFound          int32 = 5017
-	ShipmentProviderCreateFailed        int32 = 5018
-	ReturnShipmentCreateFailed          int32 = 5019
-	ShippingOnboardingFailed            int32 = 5020
-	ShippingOnboardingViewDenied        int32 = 5021
-	ShippingOnboardingUpdateDenied      int32 = 5022
-	ShippingSellerMetaNotFound          int32 = 5023
-	ShippingSellerPayuniNotRegistered   int32 = 5024
-	ShippingOnboardingPendingReview     int32 = 5025
-	ShippingOnboardingPermanentlyClosed int32 = 5026
-	ShippingOnboardingClosed            int32 = 5027
-	ShippingSellerMetaQueryFailed       int32 = 5028
-	ShippingGoodsTypeInvalid            int32 = 5029
-	ShippingReturnStoreCodeInvalid      int32 = 5030
-	ShippingProductCategoryInvalid      int32 = 5031
-	BuyerStorePickupLimitExceeded       int32 = 5032
-	ShipmentLabelScheduleEmpty          int32 = 5033
-	HolidayCsvEmpty                     int32 = 5034
-	ShipmentLabelScheduleFailed         int32 = 5035
-	ShipmentLabelFormActionMissing      int32 = 5036
-	ShipmentLabelFormParamsMissing      int32 = 5037
-	ShipmentLabelPdfDownloadFailed      int32 = 5038
-	ShipmentLabelPdfResponseInvalid     int32 = 5039
-	ShipmentLabelFileDownloadFailed     int32 = 5040
-	HolidayCsvDownloadFailed            int32 = 5041
-	HolidayCsvParseFailed               int32 = 5042
-	ShipmentTcatCallFailed              int32 = 5044
-	ShipmentNotAReturn                  int32 = 5045
-	ShipmentProviderCallInProgress      int32 = 5047
-	ShipmentProviderCallFailed          int32 = 5048
-	ShipmentDateInvalidFormat           int32 = 5049
-	HolidayCsvYearMismatch              int32 = 5050
+	InsufficientStock        int32 = 4001
+	InvalidStatus            int32 = 4002
+	CheckoutExpired          int32 = 4006
+	CheckoutValidationFailed int32 = 4007
+	SellerNotOnboarded       int32 = 4009
+	CouponLockFailed         int32 = 4011
+	SkuNotFound              int32 = 4012
+	CouponNotAvailable       int32 = 4013
+	OrderMissingTransaction  int32 = 4014
+	SelfPurchaseNotAllowed   int32 = 4015
+	CheckoutPriceChanged     int32 = 4091
+	OrderAlreadyCreated      int32 = 4092
 
 	// Cart 業務碼（6001~6099）
 	CartItemNotFound            int32 = 6001
@@ -305,10 +252,7 @@ const (
 	CancelNotAllowed                           int32 = 9008
 	CancelDuplicate                            int32 = 9009
 	AftersaleNotOwner                          int32 = 9010
-	ReturnShipmentFailed                       int32 = 9011
 	RefundPageNotAvailable                     int32 = 9012
-	AftersaleLabelAlreadyGenerated             int32 = 9013
-	AftersaleLabelRetryNotApplicable           int32 = 9014
 	AftersaleAppealNotAppealable               int32 = 9015
 	AftersaleAppealAlreadySubmitted            int32 = 9016
 	AftersaleAppealDeadlineExceeded            int32 = 9017
@@ -317,8 +261,6 @@ const (
 	AftersalePlatformDecisionInvalidAmount     int32 = 9020
 	AftersaleCaseNotUnderAppeal                int32 = 9021
 	AftersaleResolutionNotAllowedForZeroAmount int32 = 9022
-	AftersaleReturnMethodMismatch              int32 = 9023
-	AftersaleReturnNotSupportedForUber         int32 = 9024
 	AftersaleCouponCompensationFailed          int32 = 9025
 	AftersaleConfirmReceiptBlocked             int32 = 9026
 
@@ -328,20 +270,6 @@ const (
 	FulfillmentProviderNotEnabled               int32 = 9503
 	FulfillmentCommerceModelUnknown             int32 = 9504
 	PlatformCollectionNotConfigured             int32 = 9505
-	ShippingOptionConfigMissing                 int32 = 9510
-	ShippingOptionNoFeeTier                     int32 = 9511
-	ShippingOptionExceedsLimit                  int32 = 9512
-	ShippingOptionNoneAvailableConfig           int32 = 9513
-	ShippingOptionNoneAvailableLimit            int32 = 9514
-	ShipmentStateTransitionRejected             int32 = 9520
-	ShipmentCancelAlreadyPending                int32 = 9521
-	ShipmentCancelNotCancellable                int32 = 9522
-	ShipmentClaimAlreadyOpen                    int32 = 9523
-	ShipmentClaimNotEligible                    int32 = 9524
-	ShipmentRecreateNotAllowed                  int32 = 9525
-	ShipmentProviderStatusUnknown               int32 = 9526
-	ShipmentHandoverNotAllowed                  int32 = 9527
-	ShipmentProviderMismatch                    int32 = 9528
 	ReceiptConfirmationAlreadyDone              int32 = 9530
 	ReceiptConfirmationNotReady                 int32 = 9531
 	ReceiptConfirmationDisputed                 int32 = 9532
@@ -377,10 +305,9 @@ const (
 	ExceptionCaseImpactPreviewStale             int32 = 9575
 
 	// 平台功能開通業務碼（9700~9709）
-	FeatureAddressLookupDisabled    int32 = 9700
-	FeatureAiAssistantDisabled      int32 = 9703
-	FeaturePayuniMerchantDisabled   int32 = 9704
-	FeatureShippingProviderDisabled int32 = 9705
+	FeatureAddressLookupDisabled  int32 = 9700
+	FeatureAiAssistantDisabled    int32 = 9703
+	FeaturePayuniMerchantDisabled int32 = 9704
 )
 
 // bizCodeMessages 是錯誤碼.md 的 Message 欄逐字對照，與 Java 的
@@ -391,65 +318,14 @@ var bizCodeMessages = map[int32]string{
 	4002: "狀態不允許此操作",
 	4006: "結帳已過期",
 	4007: "結帳驗證失敗：%s",
-	4008: "所選配送方式不可用",
 	4009: "賣家尚未開通此配送方式",
-	4010: "賣家物流設定不完整，請聯繫賣家",
 	4011: "優惠券鎖定失敗：%s",
 	4012: "商品不存在",
 	4013: "優惠券不可用：%s",
 	4014: "訂單缺少交易編號，無法退款",
 	4015: "不可購買自己上架的商品",
-	4016: "商品尺寸或重量超過所有已開通配送方式的限制",
 	4091: "訂單金額已變動",
 	4092: "您已有未付款訂單：%s，請先完成付款或取消後再下單",
-	5001: "物流單不存在",
-	5002: "物流單尚未取得序號，無法操作",
-	5003: "已取號，不可重複產生",
-	5004: "賣家尚未開通「%s」物流服務，請先完成建店申請",
-	5005: "賣家帳號不符，無權操作此物流單",
-	5006: "訂單資料不完整：%s",
-	5007: "出貨日期必須大於今日",
-	5008: "%s %s 為假日（%s），請選擇工作天",
-	5009: "出貨日期超出可選範圍（最遠至 %s）",
-	5010: "配達日期必須大於出貨日期",
-	5011: "尚未取號，請先產生 PDF 後再呼叫黑貓",
-	5012: "已呼叫過黑貓，不可重複呼叫",
-	5013: "操作失敗（併發衝突），請重試",
-	5014: "不支援的配送方式：%s",
-	5015: "訂單查詢失敗：%s",
-	5016: "常用門市不存在或無權限操作",
-	5017: "建店設定不存在",
-	5018: "物流商建單失敗：%s",
-	5019: "退貨物流建單失敗：%s",
-	5020: "物流建店失敗：%s",
-	5021: "無權查詢此建店設定",
-	5022: "無權操作此建店設定",
-	5023: "找不到賣家資訊",
-	5024: "賣家尚未註冊 PayUni 商家",
-	5025: "已有待審核的建店申請，請等待審核結果",
-	5026: "此物流類型已被永久關閉，無法重新申請",
-	5027: "此物流類型已關閉，請聯繫客服",
-	5028: "賣家資訊查詢失敗：%s",
-	5029: "無效的貨物類型：%s，僅支援 常溫 / 冷凍",
-	5030: "退貨門市代碼格式錯誤，需為 6 位數字",
-	5031: "商品類別代碼格式錯誤，需為 4 位數字（0001~0015）",
-	5032: "常用門市數量已達上限（%s）",
-	5033: "PayUni 預約取號回傳為空",
-	5034: "CSV 無有效假日資料",
-	5035: "PayUni 預約取號失敗：%s",
-	5036: "無法從 PayUni HTML 回應中解析 form action URL",
-	5037: "無法從 PayUni HTML 回應中解析 form 參數",
-	5038: "PDF 下載失敗",
-	5039: "PDF 下載回應異常",
-	5040: "檔案下載失敗",
-	5041: "CSV 下載失敗",
-	5042: "CSV 解析失敗",
-	5044: "呼叫黑貓失敗：%s",
-	5045: "此物流單非退貨單，不可執行退貨列印重試",
-	5047: "物流商呼叫進行中，請稍候再試",
-	5048: "物流商呼叫失敗：%s",
-	5049: "%s 格式錯誤，需為 yyyy-MM-dd 或 yyyyMMdd：%s",
-	5050: "上傳的 CSV 不含指定年份 %s 的假日資料，請確認檔案與年份是否相符",
 	6001: "找不到購物車項目",
 	6002: "商品不存在或已下架",
 	6003: "商品處於結帳鎖定狀態",
@@ -651,10 +527,7 @@ var bizCodeMessages = map[int32]string{
 	9008: "訂單狀態不允許取消出貨",
 	9009: "該訂單已有取消出貨申請",
 	9010: "無權操作此售後單",
-	9011: "建立退貨物流失敗：%s",
 	9012: "非 ATM 付款或退款任務狀態不允許",
-	9013: "出貨便代碼已產生，無需重試",
-	9014: "售後案件狀態不允許重試列印（需為 7-11 退貨且處於待退貨 / 退貨運送中狀態）",
 	9015: "目前狀態無法申訴",
 	9016: "此案件已提交過申訴",
 	9017: "申訴期限已過",
@@ -663,8 +536,6 @@ var bizCodeMessages = map[int32]string{
 	9020: "裁決金額不合法",
 	9021: "案件未申訴，無仲裁資料",
 	9022: "零元訂單不允許此退款決議：%s（沒收錢無退款概念，僅允許退貨退款 / 拒絕 / 券補償）",
-	9023: "退貨方式須與原出貨方式相同",
-	9024: "Uber 即時配送訂單暫不支援退貨退款，請選擇其他售後決議",
 	9025: "補償券發放失敗：%s",
 	9026: "訂單有進行中的退貨 / 退款 / 申訴售後案件，無法確認收貨",
 	9501: "訂單的履約模式已鎖定，無法變更",
@@ -672,20 +543,6 @@ var bizCodeMessages = map[int32]string{
 	9503: "此配送服務尚未開放",
 	9504: "無法判定履約模式，請稍後再試",
 	9505: "平台代收設定尚未完成，暫時無法以此方式結帳",
-	9510: "此配送方式暫不可用",
-	9511: "此配送方式暫不可用",
-	9512: "商品超過此配送方式的材積或重量限制",
-	9513: "目前沒有可用的配送方式，我們正在處理",
-	9514: "商品超過所有配送方式的限制，請調整包裝或分批下單",
-	9520: "目前的配送狀態不允許此操作",
-	9521: "已有處理中的取消申請",
-	9522: "此配送單目前無法申請取消",
-	9523: "本配送單已有處理中的理賠案件",
-	9524: "目前的配送狀態不可受理理賠",
-	9525: "只有建單失敗的配送單可以重新建單",
-	9526: "物流商回報了目前無法辨識的狀態",
-	9527: "目前狀態不可回報交運",
-	9528: "此操作不適用於這張配送單的配送方式",
 	9530: "本訂單已完成收貨確認",
 	9531: "商品尚未送達，暫時無法確認收貨",
 	9532: "本訂單有處理中的爭議，暫時無法確認收貨",
@@ -722,7 +579,6 @@ var bizCodeMessages = map[int32]string{
 	9700: "地址查詢服務尚未開通，請手動輸入完整地址",
 	9703: "AI 助理尚未開通，請稍後再試",
 	9704: "金流商家建檔服務尚未開通，請稍後再試",
-	9705: "物流服務尚未開通，請稍後再試",
 }
 
 // Message 回傳 code 對應的錯誤訊息；未登錄的碼回空字串，由呼叫端決定

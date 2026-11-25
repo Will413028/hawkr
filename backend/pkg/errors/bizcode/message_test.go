@@ -9,7 +9,7 @@ import "testing"
 func TestMessage_CoversRepresentativeCodes(t *testing.T) {
 	for _, code := range []int32{
 		InsufficientStock,                        // Order，最小的碼段
-		ShipmentNotFound,                         // Shipping
+		CartItemNotFound,                         // Cart
 		DelegationResourceVersionConflict,        // 代行營運，稽核面板實際會顯示的那一組
 		DelegationUpstreamUnavailable,            // 同上
 		DelegationCapabilityDependencyIncomplete, // 代行營運碼段的尾端

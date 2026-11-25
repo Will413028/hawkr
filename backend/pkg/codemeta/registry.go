@@ -1511,11 +1511,11 @@ type ReportTargetType struct {
 }
 
 var (
-	ReportTargetTypeReview      = ReportTargetType{Code: "REVIEW", Value: "REVIEW", Label: "商品評論", Description: "商品評論（review-service 擁有，social 只持 target_id）"}
+	ReportTargetTypeReview      = ReportTargetType{Code: "REVIEW", Value: "REVIEW", Label: "商品評論", Description: "商品評論（內容由 review 模組擁有，檢舉案件只持 target_id）"}
 	ReportTargetTypePost        = ReportTargetType{Code: "POST", Value: "POST", Label: "貼文", Description: "賣家貼文 `cms_post`"}
 	ReportTargetTypePostComment = ReportTargetType{Code: "POST_COMMENT", Value: "POST_COMMENT", Label: "貼文留言", Description: "貼文底下的留言 `cms_comment`"}
 	ReportTargetTypeSellerForum = ReportTargetType{Code: "SELLER_FORUM", Value: "SELLER_FORUM", Label: "討論區", Description: "賣家討論區內容"}
-	ReportTargetTypeChatMessage = ReportTargetType{Code: "CHAT_MESSAGE", Value: "CHAT_MESSAGE", Label: "聊天訊息", Description: "IM 訊息（im-service 擁有）"}
+	ReportTargetTypeChatMessage = ReportTargetType{Code: "CHAT_MESSAGE", Value: "CHAT_MESSAGE", Label: "聊天訊息", Description: "IM 訊息（內容由 im 模組擁有，檢舉案件只持 target_id）"}
 	ReportTargetTypeUser        = ReportTargetType{Code: "USER", Value: "USER", Label: "使用者", Description: "檢舉對象是人而非單一則內容；此類不下架內容，只走警告／停權"}
 )
 
@@ -2504,78 +2504,6 @@ func InvoiceModelFromValue(value string) (InvoiceModel, bool) {
 	return InvoiceModel{}, false
 }
 
-// ===== FulfillmentAction =====
-// **配送／履約軸**的領域動作值域，19 值。🔴 **fail-closed**：表上沒列的 action 一律不可用，前端只准 fallback 到 `view_only`，**不得自行猜測或退化成其他動作**。🔴 **與 provider capability 是兩層**：capability 回答「這個 provider 的 API 有沒有這個能力」，本 enum 的動作回答「這顆按鈕現在能不能按」；銜接兩層的是每個 action 自己宣告的 `requiresProviderCall`（且逐 provider 可覆寫）——`requiresProviderCall=false` 的動作（如 handover，以及 3002／3005 的 cancel）**不因 capability 為 empty 而消失**。URL 一律走 `allowedActions[].href`，前端不得自行組路徑。
-
-type FulfillmentAction struct {
-	Code        string
-	Value       string
-	Label       string
-	Description string
-}
-
-var (
-	FulfillmentActionDispatch       = FulfillmentAction{Code: "DISPATCH", Value: "dispatch", Label: "派車／叫件", Description: "配送推進群。3001 黑貓叫件、3003 Uber 建單即派車"}
-	FulfillmentActionHandover       = FulfillmentAction{Code: "HANDOVER", Value: "handover", Label: "回報交運", Description: "配送推進群。賣家確認出貨，`requiresProviderCall=false`"}
-	FulfillmentActionCancel         = FulfillmentAction{Code: "CANCEL", Value: "cancel", Label: "取消配送單", Description: "配送推進群。🔴 四個 provider 中只有 3003 的 `requiresProviderCall=true`；其餘寫 992 或本地終態。"}
-	FulfillmentActionResubmit       = FulfillmentAction{Code: "RESUBMIT", Value: "resubmit", Label: "重新建單", Description: "配送推進群。只有 990 建單失敗的配送單可重建"}
-	FulfillmentActionUpdate         = FulfillmentAction{Code: "UPDATE", Value: "update", Label: "修改配送資料", Description: "配送推進群。⚠️ 在 provider 的 update 契約到位前**恆 disabled**"}
-	FulfillmentActionPrintLabel     = FulfillmentAction{Code: "PRINT_LABEL", Value: "print_label", Label: "列印標籤", Description: "標籤群"}
-	FulfillmentActionReprintLabel   = FulfillmentAction{Code: "REPRINT_LABEL", Value: "reprint_label", Label: "重印標籤", Description: "標籤群。🔴 不得整批重印"}
-	FulfillmentActionTrack          = FulfillmentAction{Code: "TRACK", Value: "track", Label: "查詢物流狀態", Description: "追蹤與證明群"}
-	FulfillmentActionViewPod        = FulfillmentAction{Code: "VIEW_POD", Value: "view_pod", Label: "檢視送達證明", Description: "追蹤與證明群。⚠️ 全值域統一 snake_case，不使用 camelCase"}
-	FulfillmentActionRequery        = FulfillmentAction{Code: "REQUERY", Value: "requery", Label: "重新查詢", Description: "追蹤與證明群。主動向 provider 回查"}
-	FulfillmentActionArrangeReturn  = FulfillmentAction{Code: "ARRANGE_RETURN", Value: "arrange_return", Label: "安排退貨物流", Description: "逆向與門市群"}
-	FulfillmentActionAcceptReturn   = FulfillmentAction{Code: "ACCEPT_RETURN", Value: "accept_return", Label: "接受退貨", Description: "逆向與門市群。🔴 冷凍逆向（3203）一律移除本動作"}
-	FulfillmentActionSellerPickup   = FulfillmentAction{Code: "SELLER_PICKUP", Value: "seller_pickup", Label: "賣家領回", Description: "逆向與門市群"}
-	FulfillmentActionReselectStore  = FulfillmentAction{Code: "RESELECT_STORE", Value: "reselect_store", Label: "重選門市", Description: "逆向與門市群。門市關轉（81）時使用"}
-	FulfillmentActionOpenCase       = FulfillmentAction{Code: "OPEN_CASE", Value: "open_case", Label: "建立異常案件", Description: "ADM 群"}
-	FulfillmentActionClaim          = FulfillmentAction{Code: "CLAIM", Value: "claim", Label: "受理理賠", Description: "ADM 群。🔴 是**理賠**（993 CLAIM_PENDING），**不是案件認領**——ADM 文案必須寫「受理理賠」，寫「認領」會與不存在的認領動作混淆"}
-	FulfillmentActionAdminResolve   = FulfillmentAction{Code: "ADMIN_RESOLVE", Value: "admin_resolve", Label: "處置提案", Description: "ADM 群"}
-	FulfillmentActionAdminCloseCase = FulfillmentAction{Code: "ADMIN_CLOSE_CASE", Value: "admin_close_case", Label: "關閉案件", Description: "ADM 群"}
-	FulfillmentActionViewOnly       = FulfillmentAction{Code: "VIEW_ONLY", Value: "view_only", Label: "僅檢視", Description: "兜底群。🔴 **唯一允許的 fallback 值**"}
-)
-
-var AllFulfillmentActions = []FulfillmentAction{
-	FulfillmentActionDispatch,
-	FulfillmentActionHandover,
-	FulfillmentActionCancel,
-	FulfillmentActionResubmit,
-	FulfillmentActionUpdate,
-	FulfillmentActionPrintLabel,
-	FulfillmentActionReprintLabel,
-	FulfillmentActionTrack,
-	FulfillmentActionViewPod,
-	FulfillmentActionRequery,
-	FulfillmentActionArrangeReturn,
-	FulfillmentActionAcceptReturn,
-	FulfillmentActionSellerPickup,
-	FulfillmentActionReselectStore,
-	FulfillmentActionOpenCase,
-	FulfillmentActionClaim,
-	FulfillmentActionAdminResolve,
-	FulfillmentActionAdminCloseCase,
-	FulfillmentActionViewOnly,
-}
-
-func FulfillmentActionFromCode(code string) (FulfillmentAction, bool) {
-	for _, v := range AllFulfillmentActions {
-		if v.Code == code {
-			return v, true
-		}
-	}
-	return FulfillmentAction{}, false
-}
-
-func FulfillmentActionFromValue(value string) (FulfillmentAction, bool) {
-	for _, v := range AllFulfillmentActions {
-		if v.Value == value {
-			return v, true
-		}
-	}
-	return FulfillmentAction{}, false
-}
-
 // ===== LedgerOwnerType =====
 // 雙分錄帳本的科目歸屬主體。🔴 **落地順序**：CodeMeta → `generate.sh --all` → DDL 的 CHECK → 程式碼；反過來做的話 `ledger_entries` 的 INSERT 會在 CHECK 上失敗，而症狀是「撥款流程 500」，不會有人聯想到是碼表沒生成。
 
@@ -2840,50 +2768,6 @@ func ProviderFeeTypeFromValue(value string) (ProviderFeeType, bool) {
 	return ProviderFeeType{}, false
 }
 
-// ===== UberDeliveryOutcome =====
-// 即時配送未完成的結果原因，5 值。🔴 **值域由 65 定案**——原本 envelope 只寫欄位型別 `String` 而沒有值域，導致 payload 契約測試無值可對。⚠️ 本 enum 是 envelope 欄位的值域，**與 webhook inbox 的 `WebhookProvider` 分類無關**，兩者不得混用。
-
-type UberDeliveryOutcome struct {
-	Code        string
-	Value       string
-	Label       string
-	Description string
-}
-
-var (
-	UberDeliveryOutcomeProviderUndeliverable = UberDeliveryOutcome{Code: "PROVIDER_UNDELIVERABLE", Value: "PROVIDER_UNDELIVERABLE", Label: "物流商無法送達", Description: "provider 回報無法完成配送"}
-	UberDeliveryOutcomeProviderCanceled      = UberDeliveryOutcome{Code: "PROVIDER_CANCELED", Value: "PROVIDER_CANCELED", Label: "物流商取消", Description: "provider 側取消"}
-	UberDeliveryOutcomeSellerCanceled        = UberDeliveryOutcome{Code: "SELLER_CANCELED", Value: "SELLER_CANCELED", Label: "賣家取消", Description: "賣家主動取消"}
-	UberDeliveryOutcomeAdminCanceled         = UberDeliveryOutcome{Code: "ADMIN_CANCELED", Value: "ADMIN_CANCELED", Label: "平台取消", Description: "ADM 判定取消"}
-	UberDeliveryOutcomeCreateFailed          = UberDeliveryOutcome{Code: "CREATE_FAILED", Value: "CREATE_FAILED", Label: "建單失敗", Description: "建單重試耗盡後確定失敗"}
-)
-
-var AllUberDeliveryOutcomes = []UberDeliveryOutcome{
-	UberDeliveryOutcomeProviderUndeliverable,
-	UberDeliveryOutcomeProviderCanceled,
-	UberDeliveryOutcomeSellerCanceled,
-	UberDeliveryOutcomeAdminCanceled,
-	UberDeliveryOutcomeCreateFailed,
-}
-
-func UberDeliveryOutcomeFromCode(code string) (UberDeliveryOutcome, bool) {
-	for _, v := range AllUberDeliveryOutcomes {
-		if v.Code == code {
-			return v, true
-		}
-	}
-	return UberDeliveryOutcome{}, false
-}
-
-func UberDeliveryOutcomeFromValue(value string) (UberDeliveryOutcome, bool) {
-	for _, v := range AllUberDeliveryOutcomes {
-		if v.Value == value {
-			return v, true
-		}
-	}
-	return UberDeliveryOutcome{}, false
-}
-
 // ===== ModerationActionType =====
 // 內容審核稽核 log（`moderation_actions`，append-only）的動作類型。本表記錄「發生過什麼」，含沒有檢舉單的系統自動處置與把單子打回申訴的動作，因此值域是 `ReportResolveAction`（業務類型碼，四個終態裁決）的**嚴格超集**。兩者刻意分開：`reports.resolved_action` 只能是終態裁決，若共用同一個 enum，`AUTO_REJECT`／`REOPEN` 就有機會被寫進那一欄，而它們不對應任何 `ReportStatus` 終態。
 
@@ -3133,7 +3017,7 @@ func InvoiceCancelReasonFromValue(value string) (InvoiceCancelReason, bool) {
 }
 
 // ===== InvoiceInboxDisposition =====
-// 一則入向事件「不處理」時的機器可讀理由（**5 值**）。它是 `SKIPPED` 這個狀態的必填配對——沒有它，「這則事件為什麼沒有下文」在事後只能靠猜。🔴 **本 enum 的存在理由是 runbook 指名要它**：`docs/runbooks/invoice-inbox-stranded-runbook.md` §4 逐字寫「`disposition` 值要先在 CodeMeta 登記再用，不要直接寫字面值進 DB」，而在本次登記之前那個區塊**並不存在** ⇒ 照 runbook 施工的人會找不到要登記的地方，然後直接寫字面值。
+// 一則入向事件「不處理」時的機器可讀理由（**5 值**）。它是 `SKIPPED` 這個狀態的必填配對——沒有它，「這則事件為什麼沒有下文」在事後只能靠猜。🔴 **本 enum 的存在理由是 runbook 指名要它**：`backend/docs/runbooks/invoice-inbox-stranded-runbook.md` §4 逐字寫「`disposition` 值要先在 CodeMeta 登記再用，不要直接寫字面值進 DB」，而在本次登記之前那個區塊**並不存在** ⇒ 照 runbook 施工的人會找不到要登記的地方，然後直接寫字面值。
 
 type InvoiceInboxDisposition struct {
 	Code        string

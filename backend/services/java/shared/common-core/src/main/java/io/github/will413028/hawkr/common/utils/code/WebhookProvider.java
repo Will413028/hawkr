@@ -4,7 +4,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Webhook 收件來源（**服務商分類，不限金流商**）。表級分類，回答「這筆 webhook 來自哪個服務商」。獨立於 PayUniEventType（後者表達 PayUni 內部事件子類別），抽象層級不同。
+ * Webhook 收件來源（**服務商分類，不限金流商**）。表級分類，回答「這筆 webhook 來自哪個服務商」。
  *
  * ⚠ 此檔案由 generate.sh 自動生成，請勿手動修改。
  * 業務輔助邏輯請在使用該 enum 的服務或模組內建立 helper class

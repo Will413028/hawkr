@@ -1724,53 +1724,6 @@ export const INVOICE_MODEL_LABEL: Record<string, string> = {
 	"PLATFORM_TO_BUYER": "平台對買家開立",
 };
 
-/** **配送／履約軸**的領域動作值域，19 值。🔴 **fail-closed**：表上沒列的 action 一律不可用，前端只准 fallback 到 `view_only`，**不得自行猜測或退化成其他動作**。🔴 **與 provider capability 是兩層**：capability 回答「這個 provider 的 API 有沒有這個能力」，本 enum 的動作回答「這顆按鈕現在能不能按」；銜接兩層的是每個 action 自己宣告的 `requiresProviderCall`（且逐 provider 可覆寫）——`requiresProviderCall=false` 的動作（如 handover，以及 3002／3005 的 cancel）**不因 capability 為 empty 而消失**。URL 一律走 `allowedActions[].href`，前端不得自行組路徑。 */
-export const FulfillmentAction = {
-	DISPATCH: "dispatch",
-	HANDOVER: "handover",
-	CANCEL: "cancel",
-	RESUBMIT: "resubmit",
-	UPDATE: "update",
-	PRINT_LABEL: "print_label",
-	REPRINT_LABEL: "reprint_label",
-	TRACK: "track",
-	VIEW_POD: "view_pod",
-	REQUERY: "requery",
-	ARRANGE_RETURN: "arrange_return",
-	ACCEPT_RETURN: "accept_return",
-	SELLER_PICKUP: "seller_pickup",
-	RESELECT_STORE: "reselect_store",
-	OPEN_CASE: "open_case",
-	CLAIM: "claim",
-	ADMIN_RESOLVE: "admin_resolve",
-	ADMIN_CLOSE_CASE: "admin_close_case",
-	VIEW_ONLY: "view_only",
-} as const;
-export type FulfillmentActionCode = keyof typeof FulfillmentAction;
-export type FulfillmentActionValue = (typeof FulfillmentAction)[FulfillmentActionCode];
-
-export const FULFILLMENT_ACTION_LABEL: Record<string, string> = {
-	"dispatch": "派車／叫件",
-	"handover": "回報交運",
-	"cancel": "取消配送單",
-	"resubmit": "重新建單",
-	"update": "修改配送資料",
-	"print_label": "列印標籤",
-	"reprint_label": "重印標籤",
-	"track": "查詢物流狀態",
-	"view_pod": "檢視送達證明",
-	"requery": "重新查詢",
-	"arrange_return": "安排退貨物流",
-	"accept_return": "接受退貨",
-	"seller_pickup": "賣家領回",
-	"reselect_store": "重選門市",
-	"open_case": "建立異常案件",
-	"claim": "受理理賠",
-	"admin_resolve": "處置提案",
-	"admin_close_case": "關閉案件",
-	"view_only": "僅檢視",
-};
-
 /** 雙分錄帳本的科目歸屬主體。🔴 **落地順序**：CodeMeta → `generate.sh --all` → DDL 的 CHECK → 程式碼；反過來做的話 `ledger_entries` 的 INSERT 會在 CHECK 上失敗，而症狀是「撥款流程 500」，不會有人聯想到是碼表沒生成。 */
 export const LedgerOwnerType = {
 	PLATFORM: "PLATFORM",
@@ -1908,25 +1861,6 @@ export const PROVIDER_FEE_TYPE_LABEL: Record<string, string> = {
 	"WAITING": "等候費",
 	"RETURN": "退回費",
 	"ADJUSTMENT": "調整",
-};
-
-/** 即時配送未完成的結果原因，5 值。🔴 **值域由 65 定案**——原本 envelope 只寫欄位型別 `String` 而沒有值域，導致 payload 契約測試無值可對。⚠️ 本 enum 是 envelope 欄位的值域，**與 webhook inbox 的 `WebhookProvider` 分類無關**，兩者不得混用。 */
-export const UberDeliveryOutcome = {
-	PROVIDER_UNDELIVERABLE: "PROVIDER_UNDELIVERABLE",
-	PROVIDER_CANCELED: "PROVIDER_CANCELED",
-	SELLER_CANCELED: "SELLER_CANCELED",
-	ADMIN_CANCELED: "ADMIN_CANCELED",
-	CREATE_FAILED: "CREATE_FAILED",
-} as const;
-export type UberDeliveryOutcomeCode = keyof typeof UberDeliveryOutcome;
-export type UberDeliveryOutcomeValue = (typeof UberDeliveryOutcome)[UberDeliveryOutcomeCode];
-
-export const UBER_DELIVERY_OUTCOME_LABEL: Record<string, string> = {
-	"PROVIDER_UNDELIVERABLE": "物流商無法送達",
-	"PROVIDER_CANCELED": "物流商取消",
-	"SELLER_CANCELED": "賣家取消",
-	"ADMIN_CANCELED": "平台取消",
-	"CREATE_FAILED": "建單失敗",
 };
 
 /** ADM 代行營運的稽核動作類型。Code 與 Value 一致（UPPER_SNAKE_CASE，直接存讀可辨識文字），對齊 EventType 系列字串式 value 設計。`riskLevel` 不是本 enum 的欄位，由 delegation 模組的 `RiskLevel()`（`internal/modules/delegation/internal/model`）純函式決定（未登錄的 action 一律回 high，忘記登記的後果必須是多記一次高風險而非靜默降級）；CodeMeta enum 內禁止放業務輔助邏輯。四個 READ 動作只在讀取被拒絕時寫入，result 恆為 FAILED、biz_code 僅 9262 / 9263 / 9275 三者，讀取成功一律不落稽核（可觀測性由 access log 承擔）。 */

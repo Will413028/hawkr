@@ -4,7 +4,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Outbox pattern 投遞狀態，跨服務共用（payuni-webhook 與 payment-service 的 outbox_events、order-service 的 order_outbox 皆使用同一組值）。獨立於 WebhookInboxStatus（後者表達收件階段）。
+ * Outbox pattern 投遞狀態，跨服務共用（payuni-webhook 與 payment-service 的 outbox_events、order-service 的 order_outbox 皆使用同一組值）。
  *
  * ⚠ 此檔案由 generate.sh 自動生成，請勿手動修改。
  * 業務輔助邏輯請在使用該 enum 的服務或模組內建立 helper class

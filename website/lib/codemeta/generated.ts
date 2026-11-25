@@ -457,40 +457,6 @@ export const CART_ITEM_STATUS_LABEL: Record<string, string> = {
 	"1": "鎖定中",
 };
 
-/** 超商出貨單列印 / 宅配託運單取號的外部呼叫四態狀態機。賣家觸發後寫入 `REQUESTED`，PayUni 同步 API 失敗轉 `FAILED`，PayUni Print Webhook（`ApiType=Print`，超商）或同步 PDF 下載成功（宅配）轉 `SUCCEEDED`。共用同一狀態機處理超商與宅配兩條列印路徑。前端依此判斷「重列印」「重試」按鈕可用性，後端排程依 `REQUESTED 過久 / FAILED` 觸發補拉與重試。詳見 06-Shipping 設計書 §2.4。 */
-export const LabelPrintStatus = {
-	NONE: "4101",
-	REQUESTED: "4102",
-	SUCCEEDED: "4103",
-	FAILED: "4104",
-} as const;
-export type LabelPrintStatusCode = keyof typeof LabelPrintStatus;
-export type LabelPrintStatusValue = (typeof LabelPrintStatus)[LabelPrintStatusCode];
-
-export const LABEL_PRINT_STATUS_LABEL: Record<string, string> = {
-	"4101": "未列印",
-	"4102": "列印中",
-	"4103": "已列印",
-	"4104": "列印失敗",
-};
-
-/** 黑貓宅配叫車（PayUni `call_tcat` API）的外部呼叫四態狀態機。賣家點「呼叫黑貓」寫入 `REQUESTED`，PayUni 同步 API 成功 → `SUCCEEDED`、retry 後仍失敗 → `FAILED`（同時 `provider_message` 落地 PayUni 原始錯誤）。前端依此控制「再次預約」按鈕；reconciliation 不重打（PayUni 黑貓叫車為一次性同步 API，無 webhook，失敗只能由賣家重試）。詳見 06-Shipping 設計書 §2.4 / §5.4。 */
-export const TcatCallStatus = {
-	NONE: "4201",
-	REQUESTED: "4202",
-	SUCCEEDED: "4203",
-	FAILED: "4204",
-} as const;
-export type TcatCallStatusCode = keyof typeof TcatCallStatus;
-export type TcatCallStatusValue = (typeof TcatCallStatus)[TcatCallStatusCode];
-
-export const TCAT_CALL_STATUS_LABEL: Record<string, string> = {
-	"4201": "未叫件",
-	"4202": "叫件中",
-	"4203": "已叫件",
-	"4204": "叫件失敗",
-};
-
 /** 賣家建店送 PayUni 設定 API（`/api/logistics/setting` / `/api/home_delivery/setting`）的外部呼叫四態狀態機。取代原 `payuni_submitted BOOLEAN`，並接管「宅配地址不可更新」「30 秒 cooldown 防 PayUni race」等業務規則的判定。前端依此判斷宅配地址欄位 readonly；後端建單時依此選用 DB 既有地址而非 request 地址。詳見 06-Shipping 設計書 §2.4 / §5.9 / §5.10。 */
 export const PayUniSubmitStatus = {
 	NONE: "4301",
@@ -1323,23 +1289,6 @@ export const SHIPPING_AREA_LABEL: Record<string, string> = {
 	"3402": "離島",
 };
 
-/** 運費計算路線（依寄送/收件區域組合） */
-export const ShippingRoute = {
-	DOMESTIC: "3501",
-	TO_OFFSHORE: "3502",
-	FROM_OFFSHORE: "3503",
-	OFFSHORE_TO_OFFSHORE: "3504",
-} as const;
-export type ShippingRouteCode = keyof typeof ShippingRoute;
-export type ShippingRouteValue = (typeof ShippingRoute)[ShippingRouteCode];
-
-export const SHIPPING_ROUTE_LABEL: Record<string, string> = {
-	"3501": "本島互寄",
-	"3502": "寄離島",
-	"3503": "離島寄出",
-	"3504": "離島互寄",
-};
-
 /** 商品重量單位 */
 export const WeightUnit = {
 	KG: "3301",
@@ -2160,53 +2109,6 @@ export const INVOICE_MODEL_LABEL: Record<string, string> = {
 	"PLATFORM_TO_BUYER": "平台對買家開立",
 };
 
-/** **配送／履約軸**的領域動作值域，19 值。🔴 **fail-closed**：表上沒列的 action 一律不可用，前端只准 fallback 到 `view_only`，**不得自行猜測或退化成其他動作**。🔴 **與 provider capability 是兩層**：capability 回答「這個 provider 的 API 有沒有這個能力」，本 enum 的動作回答「這顆按鈕現在能不能按」；銜接兩層的是每個 action 自己宣告的 `requiresProviderCall`（且逐 provider 可覆寫）——`requiresProviderCall=false` 的動作（如 handover，以及 3002／3005 的 cancel）**不因 capability 為 empty 而消失**。URL 一律走 `allowedActions[].href`，前端不得自行組路徑。 */
-export const FulfillmentAction = {
-	DISPATCH: "dispatch",
-	HANDOVER: "handover",
-	CANCEL: "cancel",
-	RESUBMIT: "resubmit",
-	UPDATE: "update",
-	PRINT_LABEL: "print_label",
-	REPRINT_LABEL: "reprint_label",
-	TRACK: "track",
-	VIEW_POD: "view_pod",
-	REQUERY: "requery",
-	ARRANGE_RETURN: "arrange_return",
-	ACCEPT_RETURN: "accept_return",
-	SELLER_PICKUP: "seller_pickup",
-	RESELECT_STORE: "reselect_store",
-	OPEN_CASE: "open_case",
-	CLAIM: "claim",
-	ADMIN_RESOLVE: "admin_resolve",
-	ADMIN_CLOSE_CASE: "admin_close_case",
-	VIEW_ONLY: "view_only",
-} as const;
-export type FulfillmentActionCode = keyof typeof FulfillmentAction;
-export type FulfillmentActionValue = (typeof FulfillmentAction)[FulfillmentActionCode];
-
-export const FULFILLMENT_ACTION_LABEL: Record<string, string> = {
-	"dispatch": "派車／叫件",
-	"handover": "回報交運",
-	"cancel": "取消配送單",
-	"resubmit": "重新建單",
-	"update": "修改配送資料",
-	"print_label": "列印標籤",
-	"reprint_label": "重印標籤",
-	"track": "查詢物流狀態",
-	"view_pod": "檢視送達證明",
-	"requery": "重新查詢",
-	"arrange_return": "安排退貨物流",
-	"accept_return": "接受退貨",
-	"seller_pickup": "賣家領回",
-	"reselect_store": "重選門市",
-	"open_case": "建立異常案件",
-	"claim": "受理理賠",
-	"admin_resolve": "處置提案",
-	"admin_close_case": "關閉案件",
-	"view_only": "僅檢視",
-};
-
 /** 物流額外成本的**責任成因**（承 `ADR-004`）。🔴 **依成因判定，不依費用名稱**——同一個「取消費」在賣家改地址與外送員失聯兩種情況下歸屬完全不同。 */
 export const ResponsibilityCause = {
 	SELLER_CAUSED: "SELLER_CAUSED",
@@ -2222,25 +2124,6 @@ export const RESPONSIBILITY_CAUSE_LABEL: Record<string, string> = {
 	"BUYER_CAUSED": "買家原因",
 	"PLATFORM_CAUSED": "平台或系統原因",
 	"PROVIDER_CAUSED": "物流商原因",
-};
-
-/** 即時配送未完成的結果原因，5 值。🔴 **值域由 65 定案**——原本 envelope 只寫欄位型別 `String` 而沒有值域，導致 payload 契約測試無值可對。⚠️ 本 enum 是 envelope 欄位的值域，**與 webhook inbox 的 `WebhookProvider` 分類無關**，兩者不得混用。 */
-export const UberDeliveryOutcome = {
-	PROVIDER_UNDELIVERABLE: "PROVIDER_UNDELIVERABLE",
-	PROVIDER_CANCELED: "PROVIDER_CANCELED",
-	SELLER_CANCELED: "SELLER_CANCELED",
-	ADMIN_CANCELED: "ADMIN_CANCELED",
-	CREATE_FAILED: "CREATE_FAILED",
-} as const;
-export type UberDeliveryOutcomeCode = keyof typeof UberDeliveryOutcome;
-export type UberDeliveryOutcomeValue = (typeof UberDeliveryOutcome)[UberDeliveryOutcomeCode];
-
-export const UBER_DELIVERY_OUTCOME_LABEL: Record<string, string> = {
-	"PROVIDER_UNDELIVERABLE": "物流商無法送達",
-	"PROVIDER_CANCELED": "物流商取消",
-	"SELLER_CANCELED": "賣家取消",
-	"ADMIN_CANCELED": "平台取消",
-	"CREATE_FAILED": "建單失敗",
 };
 
 /** 售後證據類型。 */

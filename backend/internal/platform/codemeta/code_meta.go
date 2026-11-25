@@ -960,90 +960,6 @@ func CartItemStatusFromValue(value string) (CartItemStatus, bool) {
 	return CartItemStatus{}, false
 }
 
-// ===== LabelPrintStatus =====
-// 超商出貨單列印 / 宅配託運單取號的外部呼叫四態狀態機。賣家觸發後寫入 `REQUESTED`，PayUni 同步 API 失敗轉 `FAILED`，PayUni Print Webhook（`ApiType=Print`，超商）或同步 PDF 下載成功（宅配）轉 `SUCCEEDED`。共用同一狀態機處理超商與宅配兩條列印路徑。前端依此判斷「重列印」「重試」按鈕可用性，後端排程依 `REQUESTED 過久 / FAILED` 觸發補拉與重試。詳見 06-Shipping 設計書 §2.4。
-
-type LabelPrintStatus struct {
-	Code        string
-	Value       string
-	Label       string
-	Description string
-}
-
-var (
-	LabelPrintStatusNone      = LabelPrintStatus{Code: "NONE", Value: "4101", Label: "未列印", Description: "物流單建立後預設值；尚未觸發任何列印呼叫"}
-	LabelPrintStatusRequested = LabelPrintStatus{Code: "REQUESTED", Value: "4102", Label: "列印中", Description: "已呼叫 PayUni 列印 API，等待 Print Webhook 回填代碼（超商）或 PDF 下載（宅配）"}
-	LabelPrintStatusSucceeded = LabelPrintStatus{Code: "SUCCEEDED", Value: "4103", Label: "已列印", Description: "PayUni Print Webhook 回填三段碼（超商）或 PDF 下載成功並上傳 OSS（宅配）"}
-	LabelPrintStatusFailed    = LabelPrintStatus{Code: "FAILED", Value: "4104", Label: "列印失敗", Description: "PayUni 同步 API 拋例外，或 reconciliation 確認 PayUni 端無此 ShipTradeNo"}
-)
-
-var AllLabelPrintStatuss = []LabelPrintStatus{
-	LabelPrintStatusNone,
-	LabelPrintStatusRequested,
-	LabelPrintStatusSucceeded,
-	LabelPrintStatusFailed,
-}
-
-func LabelPrintStatusFromCode(code string) (LabelPrintStatus, bool) {
-	for _, v := range AllLabelPrintStatuss {
-		if v.Code == code {
-			return v, true
-		}
-	}
-	return LabelPrintStatus{}, false
-}
-
-func LabelPrintStatusFromValue(value string) (LabelPrintStatus, bool) {
-	for _, v := range AllLabelPrintStatuss {
-		if v.Value == value {
-			return v, true
-		}
-	}
-	return LabelPrintStatus{}, false
-}
-
-// ===== TcatCallStatus =====
-// 黑貓宅配叫車（PayUni `call_tcat` API）的外部呼叫四態狀態機。賣家點「呼叫黑貓」寫入 `REQUESTED`，PayUni 同步 API 成功 → `SUCCEEDED`、retry 後仍失敗 → `FAILED`（同時 `provider_message` 落地 PayUni 原始錯誤）。前端依此控制「再次預約」按鈕；reconciliation 不重打（PayUni 黑貓叫車為一次性同步 API，無 webhook，失敗只能由賣家重試）。詳見 06-Shipping 設計書 §2.4 / §5.4。
-
-type TcatCallStatus struct {
-	Code        string
-	Value       string
-	Label       string
-	Description string
-}
-
-var (
-	TcatCallStatusNone      = TcatCallStatus{Code: "NONE", Value: "4201", Label: "未叫件", Description: "宅配物流單建立後預設值；尚未呼叫黑貓"}
-	TcatCallStatusRequested = TcatCallStatus{Code: "REQUESTED", Value: "4202", Label: "叫件中", Description: "已呼叫 PayUni call_tcat，等待同步回應（短暫過渡狀態）"}
-	TcatCallStatusSucceeded = TcatCallStatus{Code: "SUCCEEDED", Value: "4203", Label: "已叫件", Description: "PayUni 回傳成功，黑貓司機已接單，`tcat_call_time` 同步寫入"}
-	TcatCallStatusFailed    = TcatCallStatus{Code: "FAILED", Value: "4204", Label: "叫件失敗", Description: "PayUni 同步 API retry 後仍失敗（地址錯誤、假日、配額等），需賣家修正後重試"}
-)
-
-var AllTcatCallStatuss = []TcatCallStatus{
-	TcatCallStatusNone,
-	TcatCallStatusRequested,
-	TcatCallStatusSucceeded,
-	TcatCallStatusFailed,
-}
-
-func TcatCallStatusFromCode(code string) (TcatCallStatus, bool) {
-	for _, v := range AllTcatCallStatuss {
-		if v.Code == code {
-			return v, true
-		}
-	}
-	return TcatCallStatus{}, false
-}
-
-func TcatCallStatusFromValue(value string) (TcatCallStatus, bool) {
-	for _, v := range AllTcatCallStatuss {
-		if v.Value == value {
-			return v, true
-		}
-	}
-	return TcatCallStatus{}, false
-}
-
 // ===== PayUniSubmitStatus =====
 // 賣家建店送 PayUni 設定 API（`/api/logistics/setting` / `/api/home_delivery/setting`）的外部呼叫四態狀態機。取代原 `payuni_submitted BOOLEAN`，並接管「宅配地址不可更新」「30 秒 cooldown 防 PayUni race」等業務規則的判定。前端依此判斷宅配地址欄位 readonly；後端建單時依此選用 DB 既有地址而非 request 地址。詳見 06-Shipping 設計書 §2.4 / §5.9 / §5.10。
 
@@ -2774,48 +2690,6 @@ func ShippingAreaFromValue(value string) (ShippingArea, bool) {
 		}
 	}
 	return ShippingArea{}, false
-}
-
-// ===== ShippingRoute =====
-// 運費計算路線（依寄送/收件區域組合）
-
-type ShippingRoute struct {
-	Code        string
-	Value       string
-	Label       string
-	Description string
-}
-
-var (
-	ShippingRouteDomestic           = ShippingRoute{Code: "DOMESTIC", Value: "3501", Label: "本島互寄", Description: "本島 → 本島（標準費率）"}
-	ShippingRouteToOffshore         = ShippingRoute{Code: "TO_OFFSHORE", Value: "3502", Label: "寄離島", Description: "本島 → 離島（加價）"}
-	ShippingRouteFromOffshore       = ShippingRoute{Code: "FROM_OFFSHORE", Value: "3503", Label: "離島寄出", Description: "離島 → 本島（加價）"}
-	ShippingRouteOffshoreToOffshore = ShippingRoute{Code: "OFFSHORE_TO_OFFSHORE", Value: "3504", Label: "離島互寄", Description: "離島 → 離島（加價）"}
-)
-
-var AllShippingRoutes = []ShippingRoute{
-	ShippingRouteDomestic,
-	ShippingRouteToOffshore,
-	ShippingRouteFromOffshore,
-	ShippingRouteOffshoreToOffshore,
-}
-
-func ShippingRouteFromCode(code string) (ShippingRoute, bool) {
-	for _, v := range AllShippingRoutes {
-		if v.Code == code {
-			return v, true
-		}
-	}
-	return ShippingRoute{}, false
-}
-
-func ShippingRouteFromValue(value string) (ShippingRoute, bool) {
-	for _, v := range AllShippingRoutes {
-		if v.Value == value {
-			return v, true
-		}
-	}
-	return ShippingRoute{}, false
 }
 
 // ===== WeightUnit =====
@@ -4838,78 +4712,6 @@ func InvoiceModelFromValue(value string) (InvoiceModel, bool) {
 	return InvoiceModel{}, false
 }
 
-// ===== FulfillmentAction =====
-// **配送／履約軸**的領域動作值域，19 值。🔴 **fail-closed**：表上沒列的 action 一律不可用，前端只准 fallback 到 `view_only`，**不得自行猜測或退化成其他動作**。🔴 **與 provider capability 是兩層**：capability 回答「這個 provider 的 API 有沒有這個能力」，本 enum 的動作回答「這顆按鈕現在能不能按」；銜接兩層的是每個 action 自己宣告的 `requiresProviderCall`（且逐 provider 可覆寫）——`requiresProviderCall=false` 的動作（如 handover，以及 3002／3005 的 cancel）**不因 capability 為 empty 而消失**。URL 一律走 `allowedActions[].href`，前端不得自行組路徑。
-
-type FulfillmentAction struct {
-	Code        string
-	Value       string
-	Label       string
-	Description string
-}
-
-var (
-	FulfillmentActionDispatch       = FulfillmentAction{Code: "DISPATCH", Value: "dispatch", Label: "派車／叫件", Description: "配送推進群。3001 黑貓叫件、3003 Uber 建單即派車"}
-	FulfillmentActionHandover       = FulfillmentAction{Code: "HANDOVER", Value: "handover", Label: "回報交運", Description: "配送推進群。賣家確認出貨，`requiresProviderCall=false`"}
-	FulfillmentActionCancel         = FulfillmentAction{Code: "CANCEL", Value: "cancel", Label: "取消配送單", Description: "配送推進群。🔴 四個 provider 中只有 3003 的 `requiresProviderCall=true`；其餘寫 992 或本地終態。"}
-	FulfillmentActionResubmit       = FulfillmentAction{Code: "RESUBMIT", Value: "resubmit", Label: "重新建單", Description: "配送推進群。只有 990 建單失敗的配送單可重建"}
-	FulfillmentActionUpdate         = FulfillmentAction{Code: "UPDATE", Value: "update", Label: "修改配送資料", Description: "配送推進群。⚠️ 在 provider 的 update 契約到位前**恆 disabled**"}
-	FulfillmentActionPrintLabel     = FulfillmentAction{Code: "PRINT_LABEL", Value: "print_label", Label: "列印標籤", Description: "標籤群"}
-	FulfillmentActionReprintLabel   = FulfillmentAction{Code: "REPRINT_LABEL", Value: "reprint_label", Label: "重印標籤", Description: "標籤群。🔴 不得整批重印"}
-	FulfillmentActionTrack          = FulfillmentAction{Code: "TRACK", Value: "track", Label: "查詢物流狀態", Description: "追蹤與證明群"}
-	FulfillmentActionViewPod        = FulfillmentAction{Code: "VIEW_POD", Value: "view_pod", Label: "檢視送達證明", Description: "追蹤與證明群。⚠️ 全值域統一 snake_case，不使用 camelCase"}
-	FulfillmentActionRequery        = FulfillmentAction{Code: "REQUERY", Value: "requery", Label: "重新查詢", Description: "追蹤與證明群。主動向 provider 回查"}
-	FulfillmentActionArrangeReturn  = FulfillmentAction{Code: "ARRANGE_RETURN", Value: "arrange_return", Label: "安排退貨物流", Description: "逆向與門市群"}
-	FulfillmentActionAcceptReturn   = FulfillmentAction{Code: "ACCEPT_RETURN", Value: "accept_return", Label: "接受退貨", Description: "逆向與門市群。🔴 冷凍逆向（3203）一律移除本動作"}
-	FulfillmentActionSellerPickup   = FulfillmentAction{Code: "SELLER_PICKUP", Value: "seller_pickup", Label: "賣家領回", Description: "逆向與門市群"}
-	FulfillmentActionReselectStore  = FulfillmentAction{Code: "RESELECT_STORE", Value: "reselect_store", Label: "重選門市", Description: "逆向與門市群。門市關轉（81）時使用"}
-	FulfillmentActionOpenCase       = FulfillmentAction{Code: "OPEN_CASE", Value: "open_case", Label: "建立異常案件", Description: "ADM 群"}
-	FulfillmentActionClaim          = FulfillmentAction{Code: "CLAIM", Value: "claim", Label: "受理理賠", Description: "ADM 群。🔴 是**理賠**（993 CLAIM_PENDING），**不是案件認領**——ADM 文案必須寫「受理理賠」，寫「認領」會與不存在的認領動作混淆"}
-	FulfillmentActionAdminResolve   = FulfillmentAction{Code: "ADMIN_RESOLVE", Value: "admin_resolve", Label: "處置提案", Description: "ADM 群"}
-	FulfillmentActionAdminCloseCase = FulfillmentAction{Code: "ADMIN_CLOSE_CASE", Value: "admin_close_case", Label: "關閉案件", Description: "ADM 群"}
-	FulfillmentActionViewOnly       = FulfillmentAction{Code: "VIEW_ONLY", Value: "view_only", Label: "僅檢視", Description: "兜底群。🔴 **唯一允許的 fallback 值**"}
-)
-
-var AllFulfillmentActions = []FulfillmentAction{
-	FulfillmentActionDispatch,
-	FulfillmentActionHandover,
-	FulfillmentActionCancel,
-	FulfillmentActionResubmit,
-	FulfillmentActionUpdate,
-	FulfillmentActionPrintLabel,
-	FulfillmentActionReprintLabel,
-	FulfillmentActionTrack,
-	FulfillmentActionViewPod,
-	FulfillmentActionRequery,
-	FulfillmentActionArrangeReturn,
-	FulfillmentActionAcceptReturn,
-	FulfillmentActionSellerPickup,
-	FulfillmentActionReselectStore,
-	FulfillmentActionOpenCase,
-	FulfillmentActionClaim,
-	FulfillmentActionAdminResolve,
-	FulfillmentActionAdminCloseCase,
-	FulfillmentActionViewOnly,
-}
-
-func FulfillmentActionFromCode(code string) (FulfillmentAction, bool) {
-	for _, v := range AllFulfillmentActions {
-		if v.Code == code {
-			return v, true
-		}
-	}
-	return FulfillmentAction{}, false
-}
-
-func FulfillmentActionFromValue(value string) (FulfillmentAction, bool) {
-	for _, v := range AllFulfillmentActions {
-		if v.Value == value {
-			return v, true
-		}
-	}
-	return FulfillmentAction{}, false
-}
-
 // ===== ResponsibilityCause =====
 // 物流額外成本的**責任成因**（承 `ADR-004`）。🔴 **依成因判定，不依費用名稱**——同一個「取消費」在賣家改地址與外送員失聯兩種情況下歸屬完全不同。
 
@@ -4950,50 +4752,6 @@ func ResponsibilityCauseFromValue(value string) (ResponsibilityCause, bool) {
 		}
 	}
 	return ResponsibilityCause{}, false
-}
-
-// ===== UberDeliveryOutcome =====
-// 即時配送未完成的結果原因，5 值。🔴 **值域由 65 定案**——原本 envelope 只寫欄位型別 `String` 而沒有值域，導致 payload 契約測試無值可對。⚠️ 本 enum 是 envelope 欄位的值域，**與 webhook inbox 的 `WebhookProvider` 分類無關**，兩者不得混用。
-
-type UberDeliveryOutcome struct {
-	Code        string
-	Value       string
-	Label       string
-	Description string
-}
-
-var (
-	UberDeliveryOutcomeProviderUndeliverable = UberDeliveryOutcome{Code: "PROVIDER_UNDELIVERABLE", Value: "PROVIDER_UNDELIVERABLE", Label: "物流商無法送達", Description: "provider 回報無法完成配送"}
-	UberDeliveryOutcomeProviderCanceled      = UberDeliveryOutcome{Code: "PROVIDER_CANCELED", Value: "PROVIDER_CANCELED", Label: "物流商取消", Description: "provider 側取消"}
-	UberDeliveryOutcomeSellerCanceled        = UberDeliveryOutcome{Code: "SELLER_CANCELED", Value: "SELLER_CANCELED", Label: "賣家取消", Description: "賣家主動取消"}
-	UberDeliveryOutcomeAdminCanceled         = UberDeliveryOutcome{Code: "ADMIN_CANCELED", Value: "ADMIN_CANCELED", Label: "平台取消", Description: "ADM 判定取消"}
-	UberDeliveryOutcomeCreateFailed          = UberDeliveryOutcome{Code: "CREATE_FAILED", Value: "CREATE_FAILED", Label: "建單失敗", Description: "建單重試耗盡後確定失敗"}
-)
-
-var AllUberDeliveryOutcomes = []UberDeliveryOutcome{
-	UberDeliveryOutcomeProviderUndeliverable,
-	UberDeliveryOutcomeProviderCanceled,
-	UberDeliveryOutcomeSellerCanceled,
-	UberDeliveryOutcomeAdminCanceled,
-	UberDeliveryOutcomeCreateFailed,
-}
-
-func UberDeliveryOutcomeFromCode(code string) (UberDeliveryOutcome, bool) {
-	for _, v := range AllUberDeliveryOutcomes {
-		if v.Code == code {
-			return v, true
-		}
-	}
-	return UberDeliveryOutcome{}, false
-}
-
-func UberDeliveryOutcomeFromValue(value string) (UberDeliveryOutcome, bool) {
-	for _, v := range AllUberDeliveryOutcomes {
-		if v.Value == value {
-			return v, true
-		}
-	}
-	return UberDeliveryOutcome{}, false
 }
 
 // ===== AfterSaleEvidenceType =====

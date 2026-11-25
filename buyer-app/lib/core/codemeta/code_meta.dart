@@ -880,82 +880,6 @@ enum CartItemStatus {
   }
 }
 
-/// 超商出貨單列印 / 宅配託運單取號的外部呼叫四態狀態機。賣家觸發後寫入 `REQUESTED`，PayUni 同步 API 失敗轉 `FAILED`，PayUni Print Webhook（`ApiType=Print`，超商）或同步 PDF 下載成功（宅配）轉 `SUCCEEDED`。共用同一狀態機處理超商與宅配兩條列印路徑。前端依此判斷「重列印」「重試」按鈕可用性，後端排程依 `REQUESTED 過久 / FAILED` 觸發補拉與重試。詳見 06-Shipping 設計書 §2.4。
-enum LabelPrintStatus {
-  /// 未列印 — 物流單建立後預設值；尚未觸發任何列印呼叫
-  none(code: 'NONE', value: '4101', label: '未列印'),
-  /// 列印中 — 已呼叫 PayUni 列印 API，等待 Print Webhook 回填代碼（超商）或 PDF 下載（宅配）
-  requested(code: 'REQUESTED', value: '4102', label: '列印中'),
-  /// 已列印 — PayUni Print Webhook 回填三段碼（超商）或 PDF 下載成功並上傳 OSS（宅配）
-  succeeded(code: 'SUCCEEDED', value: '4103', label: '已列印'),
-  /// 列印失敗 — PayUni 同步 API 拋例外，或 reconciliation 確認 PayUni 端無此 ShipTradeNo
-  failed(code: 'FAILED', value: '4104', label: '列印失敗');
-
-  const LabelPrintStatus({
-    required this.code,
-    required this.value,
-    required this.label,
-  });
-
-  final String code;
-  final String value;
-  final String label;
-
-  /// 依 code 查找，找不到回傳 null
-  static LabelPrintStatus? fromCode(String code) {
-    for (final v in values) {
-      if (v.code == code) return v;
-    }
-    return null;
-  }
-
-  /// 依 value 查找，找不到回傳 null
-  static LabelPrintStatus? fromValue(String value) {
-    for (final v in values) {
-      if (v.value == value) return v;
-    }
-    return null;
-  }
-}
-
-/// 黑貓宅配叫車（PayUni `call_tcat` API）的外部呼叫四態狀態機。賣家點「呼叫黑貓」寫入 `REQUESTED`，PayUni 同步 API 成功 → `SUCCEEDED`、retry 後仍失敗 → `FAILED`（同時 `provider_message` 落地 PayUni 原始錯誤）。前端依此控制「再次預約」按鈕；reconciliation 不重打（PayUni 黑貓叫車為一次性同步 API，無 webhook，失敗只能由賣家重試）。詳見 06-Shipping 設計書 §2.4 / §5.4。
-enum TcatCallStatus {
-  /// 未叫件 — 宅配物流單建立後預設值；尚未呼叫黑貓
-  none(code: 'NONE', value: '4201', label: '未叫件'),
-  /// 叫件中 — 已呼叫 PayUni call_tcat，等待同步回應（短暫過渡狀態）
-  requested(code: 'REQUESTED', value: '4202', label: '叫件中'),
-  /// 已叫件 — PayUni 回傳成功，黑貓司機已接單，`tcat_call_time` 同步寫入
-  succeeded(code: 'SUCCEEDED', value: '4203', label: '已叫件'),
-  /// 叫件失敗 — PayUni 同步 API retry 後仍失敗（地址錯誤、假日、配額等），需賣家修正後重試
-  failed(code: 'FAILED', value: '4204', label: '叫件失敗');
-
-  const TcatCallStatus({
-    required this.code,
-    required this.value,
-    required this.label,
-  });
-
-  final String code;
-  final String value;
-  final String label;
-
-  /// 依 code 查找，找不到回傳 null
-  static TcatCallStatus? fromCode(String code) {
-    for (final v in values) {
-      if (v.code == code) return v;
-    }
-    return null;
-  }
-
-  /// 依 value 查找，找不到回傳 null
-  static TcatCallStatus? fromValue(String value) {
-    for (final v in values) {
-      if (v.value == value) return v;
-    }
-    return null;
-  }
-}
-
 /// 賣家建店送 PayUni 設定 API（`/api/logistics/setting` / `/api/home_delivery/setting`）的外部呼叫四態狀態機。取代原 `payuni_submitted BOOLEAN`，並接管「宅配地址不可更新」「30 秒 cooldown 防 PayUni race」等業務規則的判定。前端依此判斷宅配地址欄位 readonly；後端建單時依此選用 DB 既有地址而非 request 地址。詳見 06-Shipping 設計書 §2.4 / §5.9 / §5.10。
 enum PayUniSubmitStatus {
   /// 未送 PayUni — 設定記錄初始值；尚未首次送 PayUni（無此記錄時等同此值）
@@ -2537,44 +2461,6 @@ enum ShippingArea {
 
   /// 依 value 查找，找不到回傳 null
   static ShippingArea? fromValue(String value) {
-    for (final v in values) {
-      if (v.value == value) return v;
-    }
-    return null;
-  }
-}
-
-/// 運費計算路線（依寄送/收件區域組合）
-enum ShippingRoute {
-  /// 本島互寄 — 本島 → 本島（標準費率）
-  domestic(code: 'DOMESTIC', value: '3501', label: '本島互寄'),
-  /// 寄離島 — 本島 → 離島（加價）
-  toOffshore(code: 'TO_OFFSHORE', value: '3502', label: '寄離島'),
-  /// 離島寄出 — 離島 → 本島（加價）
-  fromOffshore(code: 'FROM_OFFSHORE', value: '3503', label: '離島寄出'),
-  /// 離島互寄 — 離島 → 離島（加價）
-  offshoreToOffshore(code: 'OFFSHORE_TO_OFFSHORE', value: '3504', label: '離島互寄');
-
-  const ShippingRoute({
-    required this.code,
-    required this.value,
-    required this.label,
-  });
-
-  final String code;
-  final String value;
-  final String label;
-
-  /// 依 code 查找，找不到回傳 null
-  static ShippingRoute? fromCode(String code) {
-    for (final v in values) {
-      if (v.code == code) return v;
-    }
-    return null;
-  }
-
-  /// 依 value 查找，找不到回傳 null
-  static ShippingRoute? fromValue(String value) {
     for (final v in values) {
       if (v.value == value) return v;
     }
@@ -4410,74 +4296,6 @@ enum InvoiceModel {
   }
 }
 
-/// **配送／履約軸**的領域動作值域，19 值。🔴 **fail-closed**：表上沒列的 action 一律不可用，前端只准 fallback 到 `view_only`，**不得自行猜測或退化成其他動作**。🔴 **與 provider capability 是兩層**：capability 回答「這個 provider 的 API 有沒有這個能力」，本 enum 的動作回答「這顆按鈕現在能不能按」；銜接兩層的是每個 action 自己宣告的 `requiresProviderCall`（且逐 provider 可覆寫）——`requiresProviderCall=false` 的動作（如 handover，以及 3002／3005 的 cancel）**不因 capability 為 empty 而消失**。URL 一律走 `allowedActions[].href`，前端不得自行組路徑。
-enum FulfillmentAction {
-  /// 派車／叫件 — 配送推進群。3001 黑貓叫件、3003 Uber 建單即派車
-  dispatch(code: 'DISPATCH', value: 'dispatch', label: '派車／叫件'),
-  /// 回報交運 — 配送推進群。賣家確認出貨，`requiresProviderCall=false`
-  handover(code: 'HANDOVER', value: 'handover', label: '回報交運'),
-  /// 取消配送單 — 配送推進群。🔴 四個 provider 中只有 3003 的 `requiresProviderCall=true`；其餘寫 992 或本地終態。
-  cancel(code: 'CANCEL', value: 'cancel', label: '取消配送單'),
-  /// 重新建單 — 配送推進群。只有 990 建單失敗的配送單可重建
-  resubmit(code: 'RESUBMIT', value: 'resubmit', label: '重新建單'),
-  /// 修改配送資料 — 配送推進群。⚠️ 在 provider 的 update 契約到位前**恆 disabled**
-  update(code: 'UPDATE', value: 'update', label: '修改配送資料'),
-  /// 列印標籤 — 標籤群
-  printLabel(code: 'PRINT_LABEL', value: 'print_label', label: '列印標籤'),
-  /// 重印標籤 — 標籤群。🔴 不得整批重印
-  reprintLabel(code: 'REPRINT_LABEL', value: 'reprint_label', label: '重印標籤'),
-  /// 查詢物流狀態 — 追蹤與證明群
-  track(code: 'TRACK', value: 'track', label: '查詢物流狀態'),
-  /// 檢視送達證明 — 追蹤與證明群。⚠️ 全值域統一 snake_case，不使用 camelCase
-  viewPod(code: 'VIEW_POD', value: 'view_pod', label: '檢視送達證明'),
-  /// 重新查詢 — 追蹤與證明群。主動向 provider 回查
-  requery(code: 'REQUERY', value: 'requery', label: '重新查詢'),
-  /// 安排退貨物流 — 逆向與門市群
-  arrangeReturn(code: 'ARRANGE_RETURN', value: 'arrange_return', label: '安排退貨物流'),
-  /// 接受退貨 — 逆向與門市群。🔴 冷凍逆向（3203）一律移除本動作
-  acceptReturn(code: 'ACCEPT_RETURN', value: 'accept_return', label: '接受退貨'),
-  /// 賣家領回 — 逆向與門市群
-  sellerPickup(code: 'SELLER_PICKUP', value: 'seller_pickup', label: '賣家領回'),
-  /// 重選門市 — 逆向與門市群。門市關轉（81）時使用
-  reselectStore(code: 'RESELECT_STORE', value: 'reselect_store', label: '重選門市'),
-  /// 建立異常案件 — ADM 群
-  openCase(code: 'OPEN_CASE', value: 'open_case', label: '建立異常案件'),
-  /// 受理理賠 — ADM 群。🔴 是**理賠**（993 CLAIM_PENDING），**不是案件認領**——ADM 文案必須寫「受理理賠」，寫「認領」會與不存在的認領動作混淆
-  claim(code: 'CLAIM', value: 'claim', label: '受理理賠'),
-  /// 處置提案 — ADM 群
-  adminResolve(code: 'ADMIN_RESOLVE', value: 'admin_resolve', label: '處置提案'),
-  /// 關閉案件 — ADM 群
-  adminCloseCase(code: 'ADMIN_CLOSE_CASE', value: 'admin_close_case', label: '關閉案件'),
-  /// 僅檢視 — 兜底群。🔴 **唯一允許的 fallback 值**
-  viewOnly(code: 'VIEW_ONLY', value: 'view_only', label: '僅檢視');
-
-  const FulfillmentAction({
-    required this.code,
-    required this.value,
-    required this.label,
-  });
-
-  final String code;
-  final String value;
-  final String label;
-
-  /// 依 code 查找，找不到回傳 null
-  static FulfillmentAction? fromCode(String code) {
-    for (final v in values) {
-      if (v.code == code) return v;
-    }
-    return null;
-  }
-
-  /// 依 value 查找，找不到回傳 null
-  static FulfillmentAction? fromValue(String value) {
-    for (final v in values) {
-      if (v.value == value) return v;
-    }
-    return null;
-  }
-}
-
 /// 物流額外成本的**責任成因**（承 `ADR-004`）。🔴 **依成因判定，不依費用名稱**——同一個「取消費」在賣家改地址與外送員失聯兩種情況下歸屬完全不同。
 enum ResponsibilityCause {
   /// 賣家原因 — 由賣家負擔（備貨逾時、地址填錯、商品不符等）
@@ -4509,46 +4327,6 @@ enum ResponsibilityCause {
 
   /// 依 value 查找，找不到回傳 null
   static ResponsibilityCause? fromValue(String value) {
-    for (final v in values) {
-      if (v.value == value) return v;
-    }
-    return null;
-  }
-}
-
-/// 即時配送未完成的結果原因，5 值。🔴 **值域由 65 定案**——原本 envelope 只寫欄位型別 `String` 而沒有值域，導致 payload 契約測試無值可對。⚠️ 本 enum 是 envelope 欄位的值域，**與 webhook inbox 的 `WebhookProvider` 分類無關**，兩者不得混用。
-enum UberDeliveryOutcome {
-  /// 物流商無法送達 — provider 回報無法完成配送
-  providerUndeliverable(code: 'PROVIDER_UNDELIVERABLE', value: 'PROVIDER_UNDELIVERABLE', label: '物流商無法送達'),
-  /// 物流商取消 — provider 側取消
-  providerCanceled(code: 'PROVIDER_CANCELED', value: 'PROVIDER_CANCELED', label: '物流商取消'),
-  /// 賣家取消 — 賣家主動取消
-  sellerCanceled(code: 'SELLER_CANCELED', value: 'SELLER_CANCELED', label: '賣家取消'),
-  /// 平台取消 — ADM 判定取消
-  adminCanceled(code: 'ADMIN_CANCELED', value: 'ADMIN_CANCELED', label: '平台取消'),
-  /// 建單失敗 — 建單重試耗盡後確定失敗
-  createFailed(code: 'CREATE_FAILED', value: 'CREATE_FAILED', label: '建單失敗');
-
-  const UberDeliveryOutcome({
-    required this.code,
-    required this.value,
-    required this.label,
-  });
-
-  final String code;
-  final String value;
-  final String label;
-
-  /// 依 code 查找，找不到回傳 null
-  static UberDeliveryOutcome? fromCode(String code) {
-    for (final v in values) {
-      if (v.code == code) return v;
-    }
-    return null;
-  }
-
-  /// 依 value 查找，找不到回傳 null
-  static UberDeliveryOutcome? fromValue(String value) {
     for (final v in values) {
       if (v.value == value) return v;
     }

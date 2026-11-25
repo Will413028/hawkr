@@ -12,11 +12,11 @@ import java.util.stream.Collectors;
  */
 public enum ReportTargetType implements CodeMeta {
 
-    REVIEW("REVIEW", "REVIEW", "商品評論", "商品評論（review-service 擁有，social 只持 target_id）"),
+    REVIEW("REVIEW", "REVIEW", "商品評論", "商品評論（內容由 review 模組擁有，檢舉案件只持 target_id）"),
     POST("POST", "POST", "貼文", "賣家貼文 `cms_post`"),
     POST_COMMENT("POST_COMMENT", "POST_COMMENT", "貼文留言", "貼文底下的留言 `cms_comment`"),
     SELLER_FORUM("SELLER_FORUM", "SELLER_FORUM", "討論區", "賣家討論區內容"),
-    CHAT_MESSAGE("CHAT_MESSAGE", "CHAT_MESSAGE", "聊天訊息", "IM 訊息（im-service 擁有）"),
+    CHAT_MESSAGE("CHAT_MESSAGE", "CHAT_MESSAGE", "聊天訊息", "IM 訊息（內容由 im 模組擁有，檢舉案件只持 target_id）"),
     USER("USER", "USER", "使用者", "檢舉對象是人而非單一則內容；此類不下架內容，只走警告／停權");
 
     private final String code;
