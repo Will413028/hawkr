@@ -31,5 +31,5 @@
   "backend/internal/modules/seller/db/migrations/atlas.sum": 3,
   "backend/internal/modules/seller/internal/model/agreement_test.go": 1,
   "backend/internal/modules/seller/migration_integration_test.go": 5,
-  "backend/internal/platform/codemeta/code_meta.go": 71
+  "backend/internal/platform/codemeta/code_meta.go": 63
 }

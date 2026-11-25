@@ -1,0 +1,67 @@
+{
+ "mutants": [
+  {
+   "id": "group-response-regrows-shipping-method",
+   "stack": "go:backend/gateway",
+   "file": "backend/gateway/internal/handler/checkout.go",
+   "old": "\tShippingFee            string                        `json:\"shippingFee\"`\n",
+   "new": "\tShippingFee            string                        `json:\"shippingFee\"`\n\tShippingMethod string `json:\"shippingMethod\"`\n",
+   "test": "internal/handler ^TestCheckoutResponseDTOsDeclareNoRemovedKeys$",
+   "why": "結帳預覽的 orderGroups 又長出 shippingMethod key：賣家自行出貨後結帳契約不再選配送方式，測試要紅。"
+  },
+  {
+   "id": "group-response-regrows-shipping-method-2",
+   "stack": "go:backend/gateway",
+   "file": "backend/gateway/internal/handler/checkout.go",
+   "old": "\tShippingFee            string                        `json:\"shippingFee\"`\n",
+   "new": "\tShippingFee            string                        `json:\"shippingFee\"`\n\tShippingMethod string `json:\"shippingMethod\"`\n",
+   "test": "internal/handler ^TestCheckoutPreview_ResponseHasNoShippingSelectionKeys$",
+   "why": "結帳預覽的 orderGroups 又長出 shippingMethod key：賣家自行出貨後結帳契約不再選配送方式，測試要紅。"
+  },
+  {
+   "id": "validate-response-regrows-shipping-options",
+   "stack": "go:backend/gateway",
+   "file": "backend/gateway/internal/handler/checkout.go",
+   "old": "\tValid                    bool                              `json:\"valid\"`\n",
+   "new": "\tValid                    bool                              `json:\"valid\"`\n\tAvailableShippingOptions []string `json:\"availableShippingOptions\"`\n",
+   "test": "internal/handler ^TestCheckoutResponseDTOsDeclareNoRemovedKeys$",
+   "why": "結帳驗證回應又長出 availableShippingOptions：配送方式選項已離開結帳契約，測試要紅。"
+  },
+  {
+   "id": "validate-response-regrows-shipping-options-2",
+   "stack": "go:backend/gateway",
+   "file": "backend/gateway/internal/handler/checkout.go",
+   "old": "\tValid                    bool                              `json:\"valid\"`\n",
+   "new": "\tValid                    bool                              `json:\"valid\"`\n\tAvailableShippingOptions []string `json:\"availableShippingOptions\"`\n",
+   "test": "internal/handler ^TestCheckoutValidate_ResponseHasNoShippingOptions$",
+   "why": "結帳驗證回應又長出 availableShippingOptions：配送方式選項已離開結帳契約，測試要紅。"
+  },
+  {
+   "id": "preview-response-regrows-free-shipping-flag",
+   "stack": "go:backend/gateway",
+   "file": "backend/gateway/internal/handler/checkout.go",
+   "old": "\tTotalShippingFee    string                      `json:\"totalShippingFee\"`\n",
+   "new": "\tTotalShippingFee    string                      `json:\"totalShippingFee\"`\n\tFreeShippingEligible bool `json:\"freeShippingEligible\"`\n",
+   "test": "internal/handler ^TestCheckoutResponseDTOsDeclareNoRemovedKeys$",
+   "why": "結帳預覽回應又長出 freeShippingEligible：免運判定已離開結帳契約，測試要紅。"
+  },
+  {
+   "id": "preview-response-regrows-free-shipping-flag-2",
+   "stack": "go:backend/gateway",
+   "file": "backend/gateway/internal/handler/checkout.go",
+   "old": "\tTotalShippingFee    string                      `json:\"totalShippingFee\"`\n",
+   "new": "\tTotalShippingFee    string                      `json:\"totalShippingFee\"`\n\tFreeShippingEligible bool `json:\"freeShippingEligible\"`\n",
+   "test": "internal/handler ^TestCheckoutPreview_ResponseHasNoShippingSelectionKeys$",
+   "why": "結帳預覽回應又長出 freeShippingEligible：免運判定已離開結帳契約，測試要紅。"
+  },
+  {
+   "id": "confirm-response-regrows-uber-quote",
+   "stack": "go:backend/gateway",
+   "file": "backend/gateway/internal/handler/checkout.go",
+   "old": "\tTotalPayAmount   string                    `json:\"totalPayAmount\"`\n",
+   "new": "\tTotalPayAmount   string                    `json:\"totalPayAmount\"`\n\tUberQuoteID string `json:\"uberQuoteId\"`\n",
+   "test": "internal/handler ^TestCheckoutResponseDTOsDeclareNoRemovedKeys$",
+   "why": "結帳確認回應又長出 uberQuoteId：Uber 報價已離開結帳契約，測試要紅。"
+  }
+ ]
+}
