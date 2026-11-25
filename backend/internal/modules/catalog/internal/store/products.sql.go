@@ -49,8 +49,18 @@ func (q *Queries) DeleteProductImages(ctx context.Context, productID uuid.UUID) 
 }
 
 const getOwnProduct = `-- name: GetOwnProduct :one
-SELECT id, store_id, category_id, title, description, status, first_published_at, min_price, max_price, sales_count, favorite_count, rating_average, review_count, created_at, updated_at
-FROM catalog.products WHERE id = $1 AND store_id = $2 AND deleted_at IS NULL
+SELECT p.id, p.store_id, p.category_id, p.title, p.description, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.created_at, p.updated_at,
+       COALESCE((SELECT jsonb_agg(jsonb_build_object('kind', i.kind, 'asset_id', i.asset_id, 'object_key', i.object_key, 'alt', i.alt) ORDER BY i.kind, i.position)
+                 FROM catalog.product_images i WHERE i.product_id = p.id), '[]'::jsonb)::jsonb AS images,
+       COALESCE((SELECT jsonb_agg(jsonb_build_object('name', x.name, 'values', COALESCE((SELECT jsonb_agg(v.value ORDER BY v.position)
+                                                                                         FROM catalog.product_option_values v
+                                                                                         WHERE v.product_id = x.product_id AND v.axis_position = x.position), '[]'::jsonb)) ORDER BY x.position)
+                 FROM catalog.product_option_axes x WHERE x.product_id = p.id), '[]'::jsonb)::jsonb AS axes,
+       COALESCE((SELECT jsonb_agg(jsonb_build_object('id', k.id, 'option1', k.option1_value, 'option2', k.option2_value, 'price', k.price, 'compare_at_price', k.compare_at_price, 'stock_qty', k.stock_qty) ORDER BY k.created_at, k.id)
+                 FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), '[]'::jsonb)::jsonb AS skus,
+       COALESCE((SELECT jsonb_agg(jsonb_build_object('name', t.name, 'display_name', t.display_name) ORDER BY t.position)
+                 FROM catalog.product_hashtags t WHERE t.product_id = p.id), '[]'::jsonb)::jsonb AS hashtags
+FROM catalog.products p WHERE p.id = $1 AND p.store_id = $2 AND p.deleted_at IS NULL
 `
 
 type GetOwnProductParams struct {
@@ -74,9 +84,13 @@ type GetOwnProductRow struct {
 	ReviewCount      int32
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
+	Images           []byte
+	Axes             []byte
+	Skus             []byte
+	Hashtags         []byte
 }
 
-// 店家自己的商品（任何狀態，沒刪除）。
+// 店家自己的商品（任何狀態，沒刪除）。圖片、選項、SKU 與 hashtag 以 JSON 欄位在同一句 SQL 內讀出：一句就是一份快照，不會讀到並行寫入的一半。
 func (q *Queries) GetOwnProduct(ctx context.Context, arg GetOwnProductParams) (GetOwnProductRow, error) {
 	row := q.db.QueryRow(ctx, getOwnProduct, arg.ID, arg.StoreID)
 	var i GetOwnProductRow
@@ -96,12 +110,27 @@ func (q *Queries) GetOwnProduct(ctx context.Context, arg GetOwnProductParams) (G
 		&i.ReviewCount,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Images,
+		&i.Axes,
+		&i.Skus,
+		&i.Hashtags,
 	)
 	return i, err
 }
 
 const getPublicProduct = `-- name: GetPublicProduct :one
-SELECT p.id, p.store_id, p.category_id, p.title, p.description, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.created_at, p.updated_at
+SELECT p.id, p.store_id, p.category_id, p.title, p.description, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.created_at, p.updated_at,
+       COALESCE((SELECT jsonb_agg(jsonb_build_object('kind', i.kind, 'asset_id', i.asset_id, 'object_key', i.object_key, 'alt', i.alt) ORDER BY i.kind, i.position)
+                 FROM catalog.product_images i WHERE i.product_id = p.id), '[]'::jsonb)::jsonb AS images,
+       COALESCE((SELECT jsonb_agg(jsonb_build_object('name', x.name, 'values', COALESCE((SELECT jsonb_agg(v.value ORDER BY v.position)
+                                                                                         FROM catalog.product_option_values v
+                                                                                         WHERE v.product_id = x.product_id AND v.axis_position = x.position), '[]'::jsonb)) ORDER BY x.position)
+                 FROM catalog.product_option_axes x WHERE x.product_id = p.id), '[]'::jsonb)::jsonb AS axes,
+       COALESCE((SELECT jsonb_agg(jsonb_build_object('id', k.id, 'option1', k.option1_value, 'option2', k.option2_value, 'price', k.price, 'compare_at_price', k.compare_at_price, 'stock_qty', k.stock_qty) ORDER BY k.created_at, k.id)
+                 FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), '[]'::jsonb)::jsonb AS skus,
+       COALESCE((SELECT jsonb_agg(jsonb_build_object('name', t.name, 'display_name', t.display_name) ORDER BY t.position)
+                 FROM catalog.product_hashtags t WHERE t.product_id = p.id), '[]'::jsonb)::jsonb AS hashtags
+
 FROM catalog.products p
 WHERE p.id = $1 AND p.status = 'ACTIVE' AND p.deleted_at IS NULL
   AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($2::timestamptz) e)
@@ -128,9 +157,13 @@ type GetPublicProductRow struct {
 	ReviewCount      int32
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
+	Images           []byte
+	Axes             []byte
+	Skus             []byte
+	Hashtags         []byte
 }
 
-// 公開可讀：ACTIVE、沒刪除、店家在 at 這一刻可曝光。
+// 公開可讀：ACTIVE、沒刪除、店家在 at 這一刻可曝光。子表的 JSON 欄位同 GetOwnProduct：公開讀取會被別的模組呼叫，不開快照 transaction（backend/AGENTS.md 規則 3），靠單一語句取得一致的讀取。
 func (q *Queries) GetPublicProduct(ctx context.Context, arg GetPublicProductParams) (GetPublicProductRow, error) {
 	row := q.db.QueryRow(ctx, getPublicProduct, arg.ID, arg.At)
 	var i GetPublicProductRow
@@ -150,6 +183,10 @@ func (q *Queries) GetPublicProduct(ctx context.Context, arg GetPublicProductPara
 		&i.ReviewCount,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Images,
+		&i.Axes,
+		&i.Skus,
+		&i.Hashtags,
 	)
 	return i, err
 }
@@ -304,132 +341,6 @@ func (q *Queries) InsertSku(ctx context.Context, arg InsertSkuParams) error {
 		arg.Now,
 	)
 	return err
-}
-
-const listLiveSkus = `-- name: ListLiveSkus :many
-SELECT id, product_id, option1_value, option2_value, price, compare_at_price, stock_qty
-FROM catalog.product_skus WHERE product_id = $1 AND deleted_at IS NULL
-ORDER BY created_at, id
-`
-
-type ListLiveSkusRow struct {
-	ID             uuid.UUID
-	ProductID      uuid.UUID
-	Option1Value   *string
-	Option2Value   *string
-	Price          int64
-	CompareAtPrice *int64
-	StockQty       int32
-}
-
-func (q *Queries) ListLiveSkus(ctx context.Context, productID uuid.UUID) ([]ListLiveSkusRow, error) {
-	rows, err := q.db.Query(ctx, listLiveSkus, productID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListLiveSkusRow{}
-	for rows.Next() {
-		var i ListLiveSkusRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.ProductID,
-			&i.Option1Value,
-			&i.Option2Value,
-			&i.Price,
-			&i.CompareAtPrice,
-			&i.StockQty,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listOptionAxes = `-- name: ListOptionAxes :many
-SELECT product_id, position, name FROM catalog.product_option_axes WHERE product_id = $1 ORDER BY position
-`
-
-func (q *Queries) ListOptionAxes(ctx context.Context, productID uuid.UUID) ([]CatalogProductOptionAx, error) {
-	rows, err := q.db.Query(ctx, listOptionAxes, productID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []CatalogProductOptionAx{}
-	for rows.Next() {
-		var i CatalogProductOptionAx
-		if err := rows.Scan(&i.ProductID, &i.Position, &i.Name); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listOptionValues = `-- name: ListOptionValues :many
-SELECT product_id, axis_position, position, value FROM catalog.product_option_values WHERE product_id = $1 ORDER BY axis_position, position
-`
-
-func (q *Queries) ListOptionValues(ctx context.Context, productID uuid.UUID) ([]CatalogProductOptionValue, error) {
-	rows, err := q.db.Query(ctx, listOptionValues, productID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []CatalogProductOptionValue{}
-	for rows.Next() {
-		var i CatalogProductOptionValue
-		if err := rows.Scan(
-			&i.ProductID,
-			&i.AxisPosition,
-			&i.Position,
-			&i.Value,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listProductHashtags = `-- name: ListProductHashtags :many
-SELECT product_id, name, display_name, position FROM catalog.product_hashtags WHERE product_id = $1 ORDER BY position
-`
-
-func (q *Queries) ListProductHashtags(ctx context.Context, productID uuid.UUID) ([]CatalogProductHashtag, error) {
-	rows, err := q.db.Query(ctx, listProductHashtags, productID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []CatalogProductHashtag{}
-	for rows.Next() {
-		var i CatalogProductHashtag
-		if err := rows.Scan(
-			&i.ProductID,
-			&i.Name,
-			&i.DisplayName,
-			&i.Position,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const listProductImages = `-- name: ListProductImages :many
@@ -617,6 +528,52 @@ func (q *Queries) ListSellerProducts(ctx context.Context, arg ListSellerProducts
 	return items, nil
 }
 
+const lockLiveSkus = `-- name: LockLiveSkus :many
+SELECT id, product_id, option1_value, option2_value, price, compare_at_price, stock_qty
+FROM catalog.product_skus WHERE product_id = $1 AND deleted_at IS NULL
+ORDER BY id
+FOR UPDATE
+`
+
+type LockLiveSkusRow struct {
+	ID             uuid.UUID
+	ProductID      uuid.UUID
+	Option1Value   *string
+	Option2Value   *string
+	Price          int64
+	CompareAtPrice *int64
+	StockQty       int32
+}
+
+// 商品的未刪除 SKU，依 ID 升序鎖列（FOR UPDATE 在排序之後逐列取鎖）：與 DeductStock 的 SKU 鎖順序一致，商品寫入之後再改這些列不會再等別人。
+func (q *Queries) LockLiveSkus(ctx context.Context, productID uuid.UUID) ([]LockLiveSkusRow, error) {
+	rows, err := q.db.Query(ctx, lockLiveSkus, productID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []LockLiveSkusRow{}
+	for rows.Next() {
+		var i LockLiveSkusRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProductID,
+			&i.Option1Value,
+			&i.Option2Value,
+			&i.Price,
+			&i.CompareAtPrice,
+			&i.StockQty,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockOwnProduct = `-- name: LockOwnProduct :one
 SELECT id, status, first_published_at FROM catalog.products
 WHERE id = $1 AND store_id = $2 AND deleted_at IS NULL
@@ -680,6 +637,21 @@ type SetProductStatusParams struct {
 // 設成 ACTIVE 時 first_published_at 只在還是空的時候填（之後的下架再上架不改它）。
 func (q *Queries) SetProductStatus(ctx context.Context, arg SetProductStatusParams) error {
 	_, err := q.db.Exec(ctx, setProductStatus, arg.Status, arg.Now, arg.ID)
+	return err
+}
+
+const softDeleteLiveSkus = `-- name: SoftDeleteLiveSkus :exec
+UPDATE catalog.product_skus SET deleted_at = $1, updated_at = $1 WHERE product_id = $2 AND deleted_at IS NULL
+`
+
+type SoftDeleteLiveSkusParams struct {
+	Now       *time.Time
+	ProductID uuid.UUID
+}
+
+// 商品刪除時，它還在的 SKU 一併標刪除，讓所有庫存路徑對「已刪除的商品」一致（扣減與調整都找不到）；呼叫前先 LockLiveSkus。
+func (q *Queries) SoftDeleteLiveSkus(ctx context.Context, arg SoftDeleteLiveSkusParams) error {
+	_, err := q.db.Exec(ctx, softDeleteLiveSkus, arg.Now, arg.ProductID)
 	return err
 }
 

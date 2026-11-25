@@ -2,7 +2,9 @@ package product
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 	"uuid"
 
@@ -13,7 +15,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/store"
 )
 
-// head 是商品列的共同欄位（賣家與公開的讀取各有自己的 sqlc 型別）。
+// head 是商品列與它的子表（同一句 SQL 讀出，賣家與公開的讀取各有自己的 sqlc 型別）。
 type head struct {
 	id               uuid.UUID
 	storeID          int64
@@ -30,6 +32,36 @@ type head struct {
 	reviewCount      int32
 	createdAt        time.Time
 	updatedAt        time.Time
+	images           []byte
+	axes             []byte
+	skus             []byte
+	hashtags         []byte
+}
+
+type imageJSON struct {
+	Kind      string    `json:"kind"`
+	AssetID   uuid.UUID `json:"asset_id"`
+	ObjectKey string    `json:"object_key"`
+	Alt       string    `json:"alt"`
+}
+
+type axisJSON struct {
+	Name   string   `json:"name"`
+	Values []string `json:"values"`
+}
+
+type skuJSON struct {
+	ID             uuid.UUID `json:"id"`
+	Option1        *string   `json:"option1"`
+	Option2        *string   `json:"option2"`
+	Price          int64     `json:"price"`
+	CompareAtPrice *int64    `json:"compare_at_price"`
+	StockQty       int32     `json:"stock_qty"`
+}
+
+type hashtagJSON struct {
+	Name        string `json:"name"`
+	DisplayName string `json:"display_name"`
 }
 
 // Get 讀店家自己的商品（任何狀態，沒刪除）。
@@ -43,6 +75,8 @@ func (s *Service) GetPublic(ctx context.Context, productID uuid.UUID, at time.Ti
 }
 
 // load 讀商品與它的選項、SKU、圖片與 hashtag。public 非 nil 時走公開的條件（storeID 不用），否則限定店家。
+// 商品列與全部子表在同一句 SQL 讀出，所以是一份快照：並行的修改不會讓描述指到讀不到的圖片，也不會混到兩個版本。
+// 公開讀取會被別的模組呼叫，規則 3（backend/AGENTS.md）不讓它開 InReadSnapshot，單一語句是合規的做法。
 func (s *Service) load(ctx context.Context, q *store.Queries, id uuid.UUID, storeID int64, public *time.Time) (model.Product, error) {
 	var h head
 	if public != nil {
@@ -53,7 +87,7 @@ func (s *Service) load(ctx context.Context, q *store.Queries, id uuid.UUID, stor
 		if err != nil {
 			return model.Product{}, err
 		}
-		h = head{r.ID, r.StoreID, r.CategoryID, r.Title, r.Description, r.Status, r.FirstPublishedAt, r.MinPrice, r.MaxPrice, r.SalesCount, r.FavoriteCount, r.RatingAverage, r.ReviewCount, r.CreatedAt, r.UpdatedAt}
+		h = head{r.ID, r.StoreID, r.CategoryID, r.Title, r.Description, r.Status, r.FirstPublishedAt, r.MinPrice, r.MaxPrice, r.SalesCount, r.FavoriteCount, r.RatingAverage, r.ReviewCount, r.CreatedAt, r.UpdatedAt, r.Images, r.Axes, r.Skus, r.Hashtags}
 	} else {
 		r, err := q.GetOwnProduct(ctx, store.GetOwnProductParams{ID: id, StoreID: storeID})
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -62,7 +96,7 @@ func (s *Service) load(ctx context.Context, q *store.Queries, id uuid.UUID, stor
 		if err != nil {
 			return model.Product{}, err
 		}
-		h = head{r.ID, r.StoreID, r.CategoryID, r.Title, r.Description, r.Status, r.FirstPublishedAt, r.MinPrice, r.MaxPrice, r.SalesCount, r.FavoriteCount, r.RatingAverage, r.ReviewCount, r.CreatedAt, r.UpdatedAt}
+		h = head{r.ID, r.StoreID, r.CategoryID, r.Title, r.Description, r.Status, r.FirstPublishedAt, r.MinPrice, r.MaxPrice, r.SalesCount, r.FavoriteCount, r.RatingAverage, r.ReviewCount, r.CreatedAt, r.UpdatedAt, r.Images, r.Axes, r.Skus, r.Hashtags}
 	}
 	p := model.Product{
 		ID: h.id, StoreID: h.storeID, CategoryID: h.categoryID, Title: h.title, Status: model.ProductStatus(h.status),
@@ -72,9 +106,9 @@ func (s *Service) load(ctx context.Context, q *store.Queries, id uuid.UUID, stor
 	if !p.Status.Valid() {
 		return model.Product{}, errors.New("catalog: stored product status is not valid: " + h.status)
 	}
-	images, err := q.ListProductImages(ctx, id)
-	if err != nil {
-		return model.Product{}, err
+	var images []imageJSON
+	if err := json.Unmarshal(h.images, &images); err != nil {
+		return model.Product{}, fmt.Errorf("catalog: decode product images: %w", err)
 	}
 	byAsset := make(map[uuid.UUID]model.Image, len(images))
 	p.Gallery = []model.Image{}
@@ -85,38 +119,29 @@ func (s *Service) load(ctx context.Context, q *store.Queries, id uuid.UUID, stor
 			p.Gallery = append(p.Gallery, img)
 		}
 	}
+	var err error
 	if p.Description, err = description.Decode(h.description, byAsset); err != nil {
 		return model.Product{}, err
 	}
-	axes, err := q.ListOptionAxes(ctx, id)
-	if err != nil {
-		return model.Product{}, err
+	var axes []axisJSON
+	if err := json.Unmarshal(h.axes, &axes); err != nil {
+		return model.Product{}, fmt.Errorf("catalog: decode product axes: %w", err)
 	}
-	values, err := q.ListOptionValues(ctx, id)
-	if err != nil {
-		return model.Product{}, err
-	}
-	p.Axes = []model.Axis{}
+	p.Axes = make([]model.Axis, 0, len(axes))
 	for _, a := range axes {
-		ax := model.Axis{Name: a.Name, Values: []string{}}
-		for _, v := range values {
-			if v.AxisPosition == a.Position {
-				ax.Values = append(ax.Values, v.Value)
-			}
-		}
-		p.Axes = append(p.Axes, ax)
+		p.Axes = append(p.Axes, model.Axis{Name: a.Name, Values: append([]string{}, a.Values...)})
 	}
-	skus, err := q.ListLiveSkus(ctx, id)
-	if err != nil {
-		return model.Product{}, err
+	var skus []skuJSON
+	if err := json.Unmarshal(h.skus, &skus); err != nil {
+		return model.Product{}, fmt.Errorf("catalog: decode product skus: %w", err)
 	}
 	p.Skus = make([]model.Sku, 0, len(skus))
 	for _, k := range skus {
-		p.Skus = append(p.Skus, model.Sku{ID: k.ID, Option1: deref(k.Option1Value), Option2: deref(k.Option2Value), Price: k.Price, CompareAtPrice: k.CompareAtPrice, StockQty: k.StockQty})
+		p.Skus = append(p.Skus, model.Sku{ID: k.ID, Option1: deref(k.Option1), Option2: deref(k.Option2), Price: k.Price, CompareAtPrice: k.CompareAtPrice, StockQty: k.StockQty})
 	}
-	tags, err := q.ListProductHashtags(ctx, id)
-	if err != nil {
-		return model.Product{}, err
+	var tags []hashtagJSON
+	if err := json.Unmarshal(h.hashtags, &tags); err != nil {
+		return model.Product{}, fmt.Errorf("catalog: decode product hashtags: %w", err)
 	}
 	p.Hashtags = make([]model.Hashtag, 0, len(tags))
 	for _, t := range tags {

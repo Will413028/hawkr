@@ -9,22 +9,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/model"
 )
 
-func TestCanTransitionAllowsAnyDistinctValidPair(t *testing.T) {
-	all := []model.ProductStatus{model.StatusDraft, model.StatusActive, model.StatusArchived}
-	for _, from := range all {
-		for _, to := range all {
-			if got, want := from.CanTransition(to), from != to; got != want {
-				t.Errorf("%s -> %s: CanTransition = %v, want %v", from, to, got, want)
-			}
-		}
-		for _, bad := range []model.ProductStatus{"", "PENDING", "active"} {
-			if from.CanTransition(bad) {
-				t.Errorf("%s -> %q must not be allowed", from, bad)
-			}
-		}
-	}
-}
-
 // 儲存端 CHECK 的字面上限要等於生成的常數（上限的唯一來源是 api/ 的 limits option）。
 func TestSchemaCheckLimitsMatchGeneratedConstants(t *testing.T) {
 	raw, err := os.ReadFile("../../db/schema.sql")

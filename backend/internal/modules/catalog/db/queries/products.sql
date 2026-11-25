@@ -39,10 +39,16 @@ WHERE p.id = sqlc.arg(id) AND r.lo IS NOT NULL;
 INSERT INTO catalog.product_skus (id, product_id, option1_value, option2_value, price, compare_at_price, stock_qty, created_at, updated_at)
 VALUES (sqlc.arg(id), sqlc.arg(product_id), sqlc.narg(option1_value), sqlc.narg(option2_value), sqlc.arg(price), sqlc.narg(compare_at_price), sqlc.arg(stock_qty), sqlc.arg(now), sqlc.arg(now));
 
--- name: ListLiveSkus :many
+-- name: LockLiveSkus :many
+-- 商品的未刪除 SKU，依 ID 升序鎖列（FOR UPDATE 在排序之後逐列取鎖）：與 DeductStock 的 SKU 鎖順序一致，商品寫入之後再改這些列不會再等別人。
 SELECT id, product_id, option1_value, option2_value, price, compare_at_price, stock_qty
 FROM catalog.product_skus WHERE product_id = sqlc.arg(product_id) AND deleted_at IS NULL
-ORDER BY created_at, id;
+ORDER BY id
+FOR UPDATE;
+
+-- name: SoftDeleteLiveSkus :exec
+-- 商品刪除時，它還在的 SKU 一併標刪除，讓所有庫存路徑對「已刪除的商品」一致（扣減與調整都找不到）；呼叫前先 LockLiveSkus。
+UPDATE catalog.product_skus SET deleted_at = sqlc.arg(now), updated_at = sqlc.arg(now) WHERE product_id = sqlc.arg(product_id) AND deleted_at IS NULL;
 
 -- name: UpdateSkuPrices :exec
 -- 庫存不在這裡改（只由 stock 改）。
@@ -63,12 +69,6 @@ INSERT INTO catalog.product_option_axes (product_id, position, name) VALUES (sql
 -- name: InsertOptionValue :exec
 INSERT INTO catalog.product_option_values (product_id, axis_position, position, value) VALUES (sqlc.arg(product_id), sqlc.arg(axis_position), sqlc.arg(position), sqlc.arg(value));
 
--- name: ListOptionAxes :many
-SELECT product_id, position, name FROM catalog.product_option_axes WHERE product_id = sqlc.arg(product_id) ORDER BY position;
-
--- name: ListOptionValues :many
-SELECT product_id, axis_position, position, value FROM catalog.product_option_values WHERE product_id = sqlc.arg(product_id) ORDER BY axis_position, position;
-
 -- name: ListProductImages :many
 SELECT product_id, kind, position, asset_id, object_key, alt FROM catalog.product_images WHERE product_id = sqlc.arg(product_id) ORDER BY kind, position;
 
@@ -85,17 +85,35 @@ DELETE FROM catalog.product_hashtags WHERE product_id = sqlc.arg(product_id);
 -- name: InsertProductHashtag :exec
 INSERT INTO catalog.product_hashtags (product_id, name, display_name, position) VALUES (sqlc.arg(product_id), sqlc.arg(name), sqlc.arg(display_name), sqlc.arg(position));
 
--- name: ListProductHashtags :many
-SELECT product_id, name, display_name, position FROM catalog.product_hashtags WHERE product_id = sqlc.arg(product_id) ORDER BY position;
-
 -- name: GetOwnProduct :one
--- 店家自己的商品（任何狀態，沒刪除）。
-SELECT id, store_id, category_id, title, description, status, first_published_at, min_price, max_price, sales_count, favorite_count, rating_average, review_count, created_at, updated_at
-FROM catalog.products WHERE id = sqlc.arg(id) AND store_id = sqlc.arg(store_id) AND deleted_at IS NULL;
+-- 店家自己的商品（任何狀態，沒刪除）。圖片、選項、SKU 與 hashtag 以 JSON 欄位在同一句 SQL 內讀出：一句就是一份快照，不會讀到並行寫入的一半。
+SELECT p.id, p.store_id, p.category_id, p.title, p.description, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.created_at, p.updated_at,
+       COALESCE((SELECT jsonb_agg(jsonb_build_object('kind', i.kind, 'asset_id', i.asset_id, 'object_key', i.object_key, 'alt', i.alt) ORDER BY i.kind, i.position)
+                 FROM catalog.product_images i WHERE i.product_id = p.id), '[]'::jsonb)::jsonb AS images,
+       COALESCE((SELECT jsonb_agg(jsonb_build_object('name', x.name, 'values', COALESCE((SELECT jsonb_agg(v.value ORDER BY v.position)
+                                                                                         FROM catalog.product_option_values v
+                                                                                         WHERE v.product_id = x.product_id AND v.axis_position = x.position), '[]'::jsonb)) ORDER BY x.position)
+                 FROM catalog.product_option_axes x WHERE x.product_id = p.id), '[]'::jsonb)::jsonb AS axes,
+       COALESCE((SELECT jsonb_agg(jsonb_build_object('id', k.id, 'option1', k.option1_value, 'option2', k.option2_value, 'price', k.price, 'compare_at_price', k.compare_at_price, 'stock_qty', k.stock_qty) ORDER BY k.created_at, k.id)
+                 FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), '[]'::jsonb)::jsonb AS skus,
+       COALESCE((SELECT jsonb_agg(jsonb_build_object('name', t.name, 'display_name', t.display_name) ORDER BY t.position)
+                 FROM catalog.product_hashtags t WHERE t.product_id = p.id), '[]'::jsonb)::jsonb AS hashtags
+FROM catalog.products p WHERE p.id = sqlc.arg(id) AND p.store_id = sqlc.arg(store_id) AND p.deleted_at IS NULL;
 
 -- name: GetPublicProduct :one
--- 公開可讀：ACTIVE、沒刪除、店家在 at 這一刻可曝光。
-SELECT p.id, p.store_id, p.category_id, p.title, p.description, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.created_at, p.updated_at
+-- 公開可讀：ACTIVE、沒刪除、店家在 at 這一刻可曝光。子表的 JSON 欄位同 GetOwnProduct：公開讀取會被別的模組呼叫，不開快照 transaction（backend/AGENTS.md 規則 3），靠單一語句取得一致的讀取。
+SELECT p.id, p.store_id, p.category_id, p.title, p.description, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.created_at, p.updated_at,
+       COALESCE((SELECT jsonb_agg(jsonb_build_object('kind', i.kind, 'asset_id', i.asset_id, 'object_key', i.object_key, 'alt', i.alt) ORDER BY i.kind, i.position)
+                 FROM catalog.product_images i WHERE i.product_id = p.id), '[]'::jsonb)::jsonb AS images,
+       COALESCE((SELECT jsonb_agg(jsonb_build_object('name', x.name, 'values', COALESCE((SELECT jsonb_agg(v.value ORDER BY v.position)
+                                                                                         FROM catalog.product_option_values v
+                                                                                         WHERE v.product_id = x.product_id AND v.axis_position = x.position), '[]'::jsonb)) ORDER BY x.position)
+                 FROM catalog.product_option_axes x WHERE x.product_id = p.id), '[]'::jsonb)::jsonb AS axes,
+       COALESCE((SELECT jsonb_agg(jsonb_build_object('id', k.id, 'option1', k.option1_value, 'option2', k.option2_value, 'price', k.price, 'compare_at_price', k.compare_at_price, 'stock_qty', k.stock_qty) ORDER BY k.created_at, k.id)
+                 FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), '[]'::jsonb)::jsonb AS skus,
+       COALESCE((SELECT jsonb_agg(jsonb_build_object('name', t.name, 'display_name', t.display_name) ORDER BY t.position)
+                 FROM catalog.product_hashtags t WHERE t.product_id = p.id), '[]'::jsonb)::jsonb AS hashtags
+
 FROM catalog.products p
 WHERE p.id = sqlc.arg(id) AND p.status = 'ACTIVE' AND p.deleted_at IS NULL
   AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores(sqlc.arg(at)::timestamptz) e);

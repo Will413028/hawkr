@@ -12,6 +12,8 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/jackc/pgx/v5/pgconn"
+
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
@@ -651,5 +653,235 @@ func TestOnlyLeafCategoriesAcceptedOnWrite(t *testing.T) {
 	in.CategoryID = top
 	if _, err := f.m.CreateProduct(f.ct, storeID, media.Uploader{ID: acct}, in); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("a top-level group takes no products: %v", err)
+	}
+}
+
+// waitBlocked 等到有別的連線卡在鎖上（條件成立才往下，不假設時間）；query 要含 fragment。
+func (f *productFixture) waitBlocked(fragment string) {
+	f.t.Helper()
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		if f.count(`SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid()
+			AND wait_event_type = 'Lock' AND query LIKE '%' || $1 || '%'`, fragment) > 0 {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	f.t.Fatalf("no session blocked on a lock touching %s", fragment)
+}
+
+// lockedNow 回報這一刻 query（必須是 FOR UPDATE NOWAIT 的 SELECT）要鎖的列是不是已經被別的 transaction 持有。
+func (f *productFixture) lockedNow(query string, args ...any) bool {
+	f.t.Helper()
+	tx, err := f.d.Pool().Begin(f.ct)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(f.ct) }()
+	_, err = tx.Exec(f.ct, query, args...)
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "55P03" {
+		return true
+	}
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	return false
+}
+
+// Update 以反過來的 SKU 順序送：它對既有 SKU 列的鎖仍依 ID 升序（與 DeductStock 同序），所以卡在最小 ID 的列時，還沒鎖較大的列。
+// 以固定的交錯斷言順序：外部先持有最小 ID 的列，Update 卡住後較大的列必須還沒被它鎖住。
+func TestUpdateLocksExistingSkusInAscendingIdOrderWhateverTheInputOrder(t *testing.T) {
+	t.Parallel()
+	f := newProductFixture(t)
+	storeID, acct := f.store()
+	in := f.input("鎖順序")
+	in.Axes = colorSize()
+	in.Skus = []SkuInput{{Option1: "紅", Option2: "S", Price: 100}, {Option1: "藍", Option2: "M", Price: 200}}
+	p := f.create(storeID, acct, in)
+	lo, hi := p.Skus[0], p.Skus[1]
+	if lo.ID.String() > hi.ID.String() {
+		lo, hi = hi, lo
+	}
+	holder, err := f.d.Pool().Begin(f.ct)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = holder.Rollback(f.ct) }()
+	if _, err := holder.Exec(f.ct, `SELECT id FROM catalog.product_skus WHERE id = $1 FOR UPDATE`, lo.ID); err != nil {
+		t.Fatal(err)
+	}
+	reversed := f.input("鎖順序")
+	reversed.Axes = colorSize()
+	byID := map[uuid.UUID]Sku{lo.ID: lo, hi.ID: hi}
+	for _, id := range []uuid.UUID{hi.ID, lo.ID} {
+		k := byID[id]
+		reversed.Skus = append(reversed.Skus, SkuInput{Option1: k.Option1, Option2: k.Option2, Price: k.Price + 1})
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := f.m.UpdateProduct(f.ct, storeID, media.Uploader{ID: acct}, p.ID, reversed)
+		done <- err
+	}()
+	f.waitBlocked("product_skus")
+	if f.lockedNow(`SELECT id FROM catalog.product_skus WHERE id = $1 FOR UPDATE NOWAIT`, hi.ID) {
+		t.Error("Update locked the larger sku id before the smaller one")
+	}
+	if err := holder.Rollback(f.ct); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	got, err := f.m.Product(f.ct, storeID, p.ID)
+	if err != nil || len(got.Skus) != 2 {
+		t.Fatalf("%v %+v", err, got.Skus)
+	}
+}
+
+// 並行的 Update（反向輸入）與多品項 DeductStock（升序鎖）不死結，兩邊都成功。
+func TestUpdateAndMultiSkuDeductDoNotDeadlock(t *testing.T) {
+	t.Parallel()
+	f := newProductFixture(t)
+	storeID, acct := f.store()
+	in := f.input("並行")
+	in.Axes = colorSize()
+	in.Skus = []SkuInput{{Option1: "紅", Option2: "S", Price: 100, StockQty: 1000}, {Option1: "藍", Option2: "M", Price: 200, StockQty: 1000}}
+	p := f.create(storeID, acct, in)
+	a, b := p.Skus[0], p.Skus[1]
+	var wg sync.WaitGroup
+	for i := range 20 {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			up := f.input("並行")
+			up.Axes = colorSize()
+			up.Skus = []SkuInput{{Option1: b.Option1, Option2: b.Option2, Price: int64(300 + i)}, {Option1: a.Option1, Option2: a.Option2, Price: int64(100 + i)}}
+			if i%2 == 1 {
+				up.Skus[0], up.Skus[1] = up.Skus[1], up.Skus[0]
+			}
+			if _, err := f.m.UpdateProduct(f.ct, storeID, media.Uploader{ID: acct}, p.ID, up); err != nil {
+				t.Errorf("update: %v", err)
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			if err := f.m.DeductStock(f.ct, fmt.Sprintf("d%d", i), items(b.ID, 1, a.ID, 1)); err != nil {
+				t.Errorf("deduct: %v", err)
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+// 描述的圖片區塊指向 product_images：商品列與圖片在同一份快照讀出。圖片被並行的修改在兩個語句之間清掉時，讀取不能得到
+// 「描述還有圖片、圖片表已經沒有」的錯誤，只能是修改前或修改後的完整內容。
+func TestReadIsOneSnapshotWhileAWriteCommitsBetweenItsParts(t *testing.T) {
+	t.Parallel()
+	f := newProductFixture(t)
+	storeID, acct := f.store()
+	in := f.input("快照")
+	in.Description = []Block{{Kind: BlockParagraph, Text: "說明"}, {Kind: BlockImage, Image: &Image{Token: "snap-d1"}}}
+	p := f.create(storeID, acct, in)
+	tx, err := f.d.Pool().Begin(f.ct)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(f.ct) }()
+	if _, err := tx.Exec(f.ct, `LOCK TABLE catalog.product_images IN ACCESS EXCLUSIVE MODE`); err != nil {
+		t.Fatal(err)
+	}
+	type result struct {
+		p   Product
+		err error
+	}
+	done := make(chan result, 1)
+	go func() {
+		got, err := f.m.Product(f.ct, storeID, p.ID)
+		done <- result{got, err}
+	}()
+	f.waitBlocked("product_images")
+	if _, err := tx.Exec(f.ct, `DELETE FROM catalog.product_images WHERE product_id = $1`, p.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(f.ct, `UPDATE catalog.products SET description = '[]'::jsonb WHERE id = $1`, p.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(f.ct); err != nil {
+		t.Fatal(err)
+	}
+	r := <-done
+	if r.err != nil {
+		t.Fatalf("a read overlapping a write must see one version: %v", r.err)
+	}
+	before := len(r.p.Description) == 2 && len(r.p.Gallery) == 1
+	after := len(r.p.Description) == 0 && len(r.p.Gallery) == 0
+	if !before && !after {
+		t.Fatalf("mixed versions: description=%d gallery=%d", len(r.p.Description), len(r.p.Gallery))
+	}
+}
+
+// 刪除商品時它的 SKU 一併刪除：扣減找不到；刪除之前的扣減仍能歸還（歸還不看刪除）。
+func TestDeleteProductMakesItsSkusUndeductibleButRestorable(t *testing.T) {
+	t.Parallel()
+	f := newProductFixture(t)
+	storeID, acct := f.store()
+	in := f.input("刪除庫存")
+	in.Skus = []SkuInput{{Price: 100, StockQty: 10}}
+	p := f.create(storeID, acct, in)
+	sku := p.Skus[0].ID
+	if err := f.m.DeductStock(f.ct, "before-delete", items(sku, 3)); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.m.DeleteProduct(f.ct, storeID, p.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.m.DeductStock(f.ct, "after-delete", items(sku, 1)); !errors.Is(err, ErrSkuNotFound) {
+		t.Fatalf("deduct after the product was deleted: %v", err)
+	}
+	if err := f.m.AdjustStock(f.ct, storeID, "adj-after-delete", sku, 1); !errors.Is(err, ErrSkuNotFound) {
+		t.Fatalf("adjust after the product was deleted: %v", err)
+	}
+	if err := f.m.RestoreStock(f.ct, "restore", "before-delete", nil); err != nil {
+		t.Fatalf("restoring an earlier deduction still works: %v", err)
+	}
+	var qty int
+	if err := f.d.Pool().QueryRow(f.ct, `SELECT stock_qty FROM catalog.product_skus WHERE id = $1`, sku).Scan(&qty); err != nil || qty != 10 {
+		t.Fatalf("qty=%d err=%v", qty, err)
+	}
+}
+
+// confirmProbe 在 Confirm 被呼叫的那一刻檢查商品列是否已被這個寫入鎖住。
+type confirmProbe struct {
+	*media.Fake
+	f         *productFixture
+	productID uuid.UUID
+	calls     int
+	lockedAt  int
+}
+
+func (c *confirmProbe) Confirm(ctx context.Context, u media.Uploader, token string, want media.Visibility) (media.ConfirmedAsset, error) {
+	c.calls++
+	if c.f.lockedNow(`SELECT id FROM catalog.products WHERE id = $1 FOR UPDATE NOWAIT`, c.productID) {
+		c.lockedAt++
+	}
+	return c.Fake.Confirm(ctx, u, token, want)
+}
+
+// 上層先呼叫下層的 API 再鎖自己的列（platform/lockorder）：Update 在鎖商品列之前就 Confirm 新圖。
+func TestUpdateConfirmsNewImagesBeforeLockingTheProductRow(t *testing.T) {
+	t.Parallel()
+	f := newProductFixture(t)
+	storeID, acct := f.store()
+	p := f.create(storeID, acct, f.input("確認順序"))
+	probe := &confirmProbe{Fake: f.media, f: f, productID: p.ID}
+	m := New(Deps{DB: f.d, NewID: uuid.NewV7, Now: f.clock, Media: probe})
+	in := f.input("確認順序")
+	in.Gallery = []Image{{Token: "probe-new"}}
+	if _, err := m.UpdateProduct(f.ct, storeID, media.Uploader{ID: acct}, p.ID, in); err != nil {
+		t.Fatal(err)
+	}
+	if probe.calls != 1 || probe.lockedAt != 0 {
+		t.Fatalf("confirm calls=%d, of which with the product row already locked=%d", probe.calls, probe.lockedAt)
 	}
 }

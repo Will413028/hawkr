@@ -242,6 +242,42 @@
    "new": "MaxProductInputTitleRunes = 101",
    "test": "internal/modules/catalog/internal/model ^TestSchemaCheckLimitsMatchGeneratedConstants$",
    "why": "生成的上限與 schema.sql 的 CHECK 字面值不同：drift 測試要紅。"
+  },
+  {
+   "id": "update-locks-skus-in-descending-id-order",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
+   "old": "ORDER BY id\nFOR UPDATE\n`\n\ntype LockLiveSkusRow",
+   "new": "ORDER BY id DESC\nFOR UPDATE\n`\n\ntype LockLiveSkusRow",
+   "test": "internal/modules/catalog ^TestUpdateLocksExistingSkusInAscendingIdOrderWhateverTheInputOrder$",
+   "why": "Update 改成由大到小鎖既有 SKU 列：卡在最小 ID 的列時較大的列已被鎖住，與 DeductStock 的升序相反（死結），測試要紅。"
+  },
+  {
+   "id": "read-images-in-a-separate-statement",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/read.go",
+   "old": "if err := json.Unmarshal(h.images, &images); err != nil {",
+   "new": "if err := func() error { rows, e := q.ListProductImages(ctx, id); for _, r := range rows { images = append(images, imageJSON{Kind: r.Kind, AssetID: r.AssetID, ObjectKey: r.ObjectKey, Alt: r.Alt}) }; return e }(); err != nil {",
+   "test": "internal/modules/catalog ^TestReadIsOneSnapshotWhileAWriteCommitsBetweenItsParts$",
+   "why": "圖片改在商品列之後另一句 SQL 讀：並行的修改提交在兩句之間時讀到描述有圖、圖片表已空，Decode 失敗，測試要紅。"
+  },
+  {
+   "id": "delete-product-keeps-its-skus-live",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "if err := q.SoftDeleteLiveSkus(ctx, store.SoftDeleteLiveSkusParams{ProductID: productID, Now: &now}); err != nil {",
+   "new": "if err := error(nil); err != nil {",
+   "test": "internal/modules/catalog ^TestDeleteProductMakesItsSkusUndeductibleButRestorable$",
+   "why": "刪除商品不標刪除它的 SKU：已刪除商品的 SKU 仍能被扣減，測試要紅。"
+  },
+  {
+   "id": "update-confirms-images-after-locking-the-product",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "\t\tif err := s.confirmImages(ctx, uploader, &p); err != nil {\n\t\t\treturn err\n\t\t}\n\t\tcur, err := s.lock(ctx, q, storeID, productID)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n",
+   "new": "\t\tcur, err := s.lock(ctx, q, storeID, productID)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif err := s.confirmImages(ctx, uploader, &p); err != nil {\n\t\t\treturn err\n\t\t}\n",
+   "test": "internal/modules/catalog ^TestUpdateConfirmsNewImagesBeforeLockingTheProductRow$",
+   "why": "Update 先鎖商品列才 Confirm 新圖，與上層先呼叫下層再鎖自己列的順序相反，測試要紅。"
   }
  ]
 }

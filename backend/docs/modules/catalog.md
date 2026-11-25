@@ -40,12 +40,12 @@
 
 呼叫端（B4-3 的 handler）從登入身分推導 `storeID` 與 `media.Uploader`（店家所屬帳號），不信任 client 送的店家；這一層每個寫入與賣家讀取都以 `storeID` 限定，商品不是這家店的或已刪除回 `ErrProductNotFound`。輸入不合法回 `*InvalidInputError{Field, Reason}`（`errors.Is(err, ErrInvalidInput)`），使用者面文字由呼叫端依欄位與原因產生。
 
-- `CreateProduct` 建立草稿；`UpdateProduct` 整體取代內容（狀態不變）；`SetProductStatus` 切換狀態；`DeleteProduct` 設 `deleted_at`（不可還原，列與圖片引用保留）。全部在一個 transaction，並以 `LockOwnProduct` 鎖商品列。
-- 狀態（D16）：`DRAFT`→`ACTIVE`、`ACTIVE`→`ARCHIVED`、`ARCHIVED`→`ACTIVE`；其他切換回 `ErrInvalidTransition`，切成目前狀態是 no-op。`first_published_at` 在第一次設成 `ACTIVE` 時填，之後不變。分類必須是葉節點。
+- `CreateProduct` 建立草稿；`UpdateProduct` 整體取代內容（狀態不變）；`SetProductStatus` 切換狀態；`DeleteProduct` 設 `deleted_at` 並把它還在的 SKU 一併標刪除（不可還原，列與圖片引用保留；刪除後扣減與賣家調整找不到這些 SKU，歸還原扣減仍可，D2）。全部在一個 transaction，並以 `LockOwnProduct` 鎖商品列。鎖順序：新圖的 `Confirm` 在鎖商品列之前，既有 SKU 列在商品列之後一次依 ID 升序鎖住（與 `DeductStock` 同序）；`MarkDeleted` 要比對寫入前後的圖，在商品列鎖住之後（media 只 INSERT 不鎖既有列，見 media.md）。讀取（`Product`、`PublicProduct`）以一句 SQL 讀出商品列與全部子表，是一份快照（會被別的模組呼叫，不開 `InReadSnapshot`，backend/AGENTS.md 規則 3）。
+- 狀態（D22）：`DRAFT`、`ACTIVE`、`ARCHIVED` 任兩個都能互切，目標不是有效狀態回 `*InvalidInputError`，切成目前狀態是 no-op。切成 `ACTIVE` 時商品必須至少有 1 張主圖，ACTIVE 的商品每次 `UpdateProduct` 也一樣，否則 `ErrActiveRequiresGalleryImage`。`first_published_at` 只在第一次設成 `ACTIVE` 時填，之後不變、切回其他狀態也不清除。分類必須是葉節點。
 - 選項與 SKU（D18）：0–2 個軸，軸名稱不重複，每軸 1–50 個值且不重複；SKU 以組合辨識，每個位置的值必須在該軸的值內、沒有軸的位置為空、組合不重複；沒有軸的商品剛好一個預設 SKU；SKU 最多 100 個。價格為正整數新台幣元，`compare_at_price` 必須大於售價。更新時組合還在就更新價格（庫存不動）、新組合新增（庫存給初始值）、不在輸入的組合以 `deleted_at` 刪除。
 - 價格區間（D19）：每次 SKU 寫入的同 transaction 以沒刪除 SKU 的最小與最大價重算 `min_price`／`max_price`。
-- 描述（D17 A）：`paragraph`（純文字）、`image`（新 token 或現有 `AssetID`，alt）、`list`（項目）、`table`（列的儲存格）。上限：區塊 100、描述圖片 20、段落 5000 字、清單 50 項、表格 50 列 × 10 欄、清單項與儲存格 200 字（表格與清單照 seller-app 編輯器的常數，其餘待確認）。JSON 存在 `products.description`，圖片區塊只含 `asset_id`。
-- 圖片：圖庫最多 9 張（待確認）與描述圖片都在 `product_images`（`GALLERY`／`DESCRIPTION`，各自從 0 起排序）。新 token 在同 transaction 內 `media.ConfirmFields`（公開圖片），既有的圖以 `AssetID` 引用且必須屬於這個商品；沒有被引用的現有資產同 transaction `MarkDeleted`。Confirm 或 MarkDeleted 失敗整筆回滾。同一個 token 或資產不得出現兩次。
+- 描述（D17 A）：`paragraph`（純文字）、`image`（新 token 或現有 `AssetID`，alt）、`list`（項目）、`table`（列的儲存格）。上限（D21）：區塊 100、描述圖片 20、整份描述的總字數 3000（段落、清單、表格文字合計）、清單 50 項、表格 50 列 × 10 欄、清單項與儲存格 200 字；上限寫在 `api/` 商品寫入訊息欄位的自訂 option，`uitext-gen` 生成 Go／TS／Dart 常數，DB CHECK 保留並由 drift 測試對齊。JSON 存在 `products.description`，圖片區塊只含 `asset_id`。
+- 圖片：圖庫最多 9 張（待確認）與描述圖片都在 `product_images`（`GALLERY`／`DESCRIPTION`，各自從 0 起排序）。新 token 在同 transaction 內、鎖商品列之前 `media.ConfirmFields`（公開圖片），既有的圖以 `AssetID` 引用且必須屬於這個商品；沒有被引用的現有資產同 transaction `MarkDeleted`。Confirm 或 MarkDeleted 失敗整筆回滾。同一個 token 或資產不得出現兩次。
 - hashtag（D14）：明確輸入，正規化與驗證是 `platform/hashtag`（與 social 同一份：去頭尾空白與 `#`、NFC、ASCII 小寫；字元集 a-z、0-9、漢字；1–40 字；最多 10 個）；寫入 `product_hashtags(name, display_name, position)`。
 - `searchable_text`：標題、描述文字（段落、清單項、儲存格）、hashtag 名稱、分類名稱（en，缺時 zh-TW），以單一空格相接。
 

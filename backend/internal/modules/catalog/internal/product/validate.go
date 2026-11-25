@@ -22,6 +22,8 @@ type prepared struct {
 	axes       []model.Axis
 	skus       []model.SkuInput
 	tags       []hashtag.Tag
+	// confirmed 是 confirmImages 這一次確認的新資產（writeImages 不必在商品現有的圖裡找到它們）。
+	confirmed map[uuid.UUID]bool
 }
 
 // prepare 驗證商品輸入的所有純規則（不碰資料庫與 media）。

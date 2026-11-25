@@ -92,8 +92,7 @@ var (
 
 // 商品讀寫的錯誤；用 errors.Is 判斷。
 var (
-	ErrProductNotFound   = model.ErrProductNotFound
-	ErrInvalidTransition = model.ErrInvalidTransition
+	ErrProductNotFound = model.ErrProductNotFound
 	// ErrActiveRequiresGalleryImage 見 model.ErrActiveRequiresGalleryImage。
 	ErrActiveRequiresGalleryImage = model.ErrActiveRequiresGalleryImage
 	ErrInvalidInput               = model.ErrInvalidInput

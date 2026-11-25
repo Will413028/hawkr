@@ -25,11 +25,6 @@ func (s ProductStatus) Valid() bool {
 	return s == StatusDraft || s == StatusActive || s == StatusArchived
 }
 
-// CanTransition 回報賣家能否把狀態從 s 切到 to：三個狀態任兩個都能互切，同狀態不是切換。
-func (s ProductStatus) CanTransition(to ProductStatus) bool {
-	return to.Valid() && to != s
-}
-
 // MaxListPageSize 是列表單頁筆數的上限。
 const MaxListPageSize int32 = 100
 
@@ -37,8 +32,6 @@ const MaxListPageSize int32 = 100
 var (
 	// ErrProductNotFound 表示商品不存在、已刪除，或不屬於這家店。
 	ErrProductNotFound = errors.New("catalog: product not found")
-	// ErrInvalidTransition 表示商品狀態不能這樣切換（目標不是有效狀態，或與目前相同）。
-	ErrInvalidTransition = errors.New("catalog: invalid status transition")
 	// ErrActiveRequiresGalleryImage 表示 ACTIVE 的商品必須至少有一張主圖：切成 ACTIVE 或寫入 ACTIVE 商品的內容時主圖是空的。
 	ErrActiveRequiresGalleryImage = errors.New("catalog: an active product needs at least one gallery image")
 	// ErrInvalidInput 表示輸入不合法；具體的欄位與原因在 *InvalidInputError。

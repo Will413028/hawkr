@@ -1,7 +1,7 @@
 // Package product 是商品的寫入與讀取：建立、整體修改、狀態切換、刪除，選項軸與 SKU 組合，價格區間，描述區塊與圖片引用，
 // hashtag，searchable_text，以及賣家清單與公開列表。
 //   - 同一個商品的寫入從 LockOwnProduct 的列鎖開始，SKU、選項、圖片與價格區間的重算在同一個 transaction，所以並行的寫入不會交錯。
-//   - 新圖在寫入的 transaction 內 Confirm（ctx 帶 transaction，失敗整筆回滾）；退場的資產在同一個 transaction 內 MarkDeleted。
+//   - 新圖在寫入的 transaction 內、鎖或插入商品列之前 Confirm（ctx 帶 transaction，失敗整筆回滾）；退場的資產在商品列鎖住之後、同一個 transaction 內 MarkDeleted。
 //   - 店家身分由呼叫端推導後傳入：這裡的每個寫入與賣家讀取都以 storeID 限定，不接受 client 送的店家。
 package product
 
@@ -57,6 +57,9 @@ func (s *Service) Create(ctx context.Context, storeID int64, uploader media.Uplo
 	var out model.Product
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
+		if err := s.confirmImages(ctx, uploader, &p); err != nil {
+			return err
+		}
 		id, now := s.d.NewID(), s.d.Now()
 		catName, err := s.leafCategoryText(ctx, q, p.categoryID)
 		if err != nil {
@@ -69,7 +72,7 @@ func (s *Service) Create(ctx context.Context, storeID int64, uploader media.Uplo
 		}); err != nil {
 			return err
 		}
-		if err := s.writeImages(ctx, q, id, uploader, nil, &p); err != nil {
+		if err := s.writeImages(ctx, q, id, nil, &p); err != nil {
 			return err
 		}
 		descJSON, err := description.Encode(p.desc)
@@ -106,6 +109,9 @@ func (s *Service) Update(ctx context.Context, storeID int64, uploader media.Uplo
 	var out model.Product
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
+		if err := s.confirmImages(ctx, uploader, &p); err != nil {
+			return err
+		}
 		cur, err := s.lock(ctx, q, storeID, productID)
 		if err != nil {
 			return err
@@ -122,7 +128,7 @@ func (s *Service) Update(ctx context.Context, storeID int64, uploader media.Uplo
 		if err != nil {
 			return err
 		}
-		if err := s.writeImages(ctx, q, productID, uploader, existing, &p); err != nil {
+		if err := s.writeImages(ctx, q, productID, existing, &p); err != nil {
 			return err
 		}
 		descJSON, err := description.Encode(p.desc)
@@ -143,7 +149,7 @@ func (s *Service) Update(ctx context.Context, storeID int64, uploader media.Uplo
 		if err := s.writeOptions(ctx, q, productID, p.axes); err != nil {
 			return err
 		}
-		live, err := q.ListLiveSkus(ctx, productID)
+		live, err := q.LockLiveSkus(ctx, productID)
 		if err != nil {
 			return err
 		}
@@ -162,7 +168,7 @@ func (s *Service) Update(ctx context.Context, storeID int64, uploader media.Uplo
 	return out, err
 }
 
-// SetStatus 切換狀態：三個狀態任兩個都能互切。設成 ACTIVE 時 first_published_at 只在還是空的時候填，切回其他狀態不清除。
+// SetStatus 切換狀態：三個狀態任兩個都能互切（目標不是有效狀態回 model.Invalid）。設成 ACTIVE 時 first_published_at 只在還是空的時候填，切回其他狀態不清除。
 // 切成目前的狀態是 no-op；切成 ACTIVE 而商品沒有主圖回 model.ErrActiveRequiresGalleryImage。
 func (s *Service) SetStatus(ctx context.Context, storeID int64, productID uuid.UUID, to model.ProductStatus) error {
 	if !to.Valid() {
@@ -178,9 +184,6 @@ func (s *Service) SetStatus(ctx context.Context, storeID int64, productID uuid.U
 		if from == to {
 			return nil
 		}
-		if !from.CanTransition(to) {
-			return model.ErrInvalidTransition
-		}
 		if to == model.StatusActive {
 			imgs, err := q.ListProductImages(ctx, productID)
 			if err != nil {
@@ -194,7 +197,7 @@ func (s *Service) SetStatus(ctx context.Context, storeID int64, productID uuid.U
 	})
 }
 
-// Delete 刪除商品：設 deleted_at，不可還原，列與圖片引用保留（訂單與評價仍引用）。
+// Delete 刪除商品：設 deleted_at，它還在的 SKU 同 transaction 一併標刪除，不可還原，列與圖片引用保留（訂單與評價仍引用）。
 func (s *Service) Delete(ctx context.Context, storeID int64, productID uuid.UUID) error {
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
@@ -202,6 +205,13 @@ func (s *Service) Delete(ctx context.Context, storeID int64, productID uuid.UUID
 			return err
 		}
 		now := s.d.Now()
+		// SKU 一併標刪除，扣減、調整與商品一致地找不到它們；先依 ID 升序鎖列（與 DeductStock 同序）。歸還不看刪除，原扣減的庫存仍記得回去。
+		if _, err := q.LockLiveSkus(ctx, productID); err != nil {
+			return err
+		}
+		if err := q.SoftDeleteLiveSkus(ctx, store.SoftDeleteLiveSkusParams{ProductID: productID, Now: &now}); err != nil {
+			return err
+		}
 		return q.SoftDeleteProduct(ctx, store.SoftDeleteProductParams{ID: productID, Now: &now})
 	})
 }
@@ -277,9 +287,10 @@ func deref(s *string) string {
 }
 
 // writeSkus 把輸入的 SKU 對上現有的（以組合辨識）：還在的更新價格，新的新增，不在輸入裡的標刪除，最後重算價格區間。
-func (s *Service) writeSkus(ctx context.Context, q *store.Queries, id uuid.UUID, live []store.ListLiveSkusRow, in []model.SkuInput) error {
+// live 是 LockLiveSkus 依 ID 升序鎖住的列，這裡不再取新的 SKU 鎖，所以輸入順序不影響鎖順序。
+func (s *Service) writeSkus(ctx context.Context, q *store.Queries, id uuid.UUID, live []store.LockLiveSkusRow, in []model.SkuInput) error {
 	now := s.d.Now()
-	byCombo := make(map[[2]string]store.ListLiveSkusRow, len(live))
+	byCombo := make(map[[2]string]store.LockLiveSkusRow, len(live))
 	for _, l := range live {
 		byCombo[[2]string{deref(l.Option1Value), deref(l.Option2Value)}] = l
 	}
@@ -299,8 +310,11 @@ func (s *Service) writeSkus(ctx context.Context, q *store.Queries, id uuid.UUID,
 			return err
 		}
 	}
-	for _, gone := range byCombo {
-		if err := q.SoftDeleteSku(ctx, store.SoftDeleteSkuParams{ID: gone.ID, Now: &now}); err != nil {
+	for _, l := range live {
+		if _, ok := byCombo[[2]string{deref(l.Option1Value), deref(l.Option2Value)}]; !ok {
+			continue
+		}
+		if err := q.SoftDeleteSku(ctx, store.SoftDeleteSkuParams{ID: l.ID, Now: &now}); err != nil {
 			return err
 		}
 	}
@@ -330,10 +344,7 @@ type imageSlot struct {
 	ref   *model.Image
 }
 
-// writeImages 解決圖庫與描述裡的圖片引用並寫進 product_images：新的 token 在這個 transaction 內 Confirm；既有的 asset 必須是這個商品現有的圖；
-// 沒有被引用的現有資產在同一個 transaction 內 MarkDeleted（媒體 ADR 2026-10-03）。Confirm 或 MarkDeleted 失敗整筆回滾。
-// 成功後 p.gallery 與描述區塊裡的圖片都帶 AssetID 與 ObjectKey。
-func (s *Service) writeImages(ctx context.Context, q *store.Queries, id uuid.UUID, uploader media.Uploader, existing []store.CatalogProductImage, p *prepared) error {
+func imageSlots(p *prepared) []imageSlot {
 	var slots []imageSlot
 	for i := range p.gallery {
 		slots = append(slots, imageSlot{field: fmt.Sprintf("Gallery[%d]", i), kind: kindGallery, ref: &p.gallery[i]})
@@ -341,19 +352,52 @@ func (s *Service) writeImages(ctx context.Context, q *store.Queries, id uuid.UUI
 	for i, ref := range description.ImageRefs(p.desc) {
 		slots = append(slots, imageSlot{field: fmt.Sprintf("Description.Image[%d]", i), kind: kindDescription, ref: ref})
 	}
+	return slots
+}
+
+// confirmImages 在這個 transaction 內 Confirm 輸入裡的新 token，成功後那些圖片帶 AssetID 與 ObjectKey。
+// token 的解析不依賴商品列，所以在鎖或插入 catalog 的商品列之前呼叫（platform/lockorder：上層先呼叫下層的 API 再鎖自己的列）；
+// Confirm 失敗整筆回滾。
+func (s *Service) confirmImages(ctx context.Context, uploader media.Uploader, p *prepared) error {
+	var items []media.ConfirmItem
+	var confirming []*imageSlot
+	slots := imageSlots(p)
+	for i := range slots {
+		if sl := &slots[i]; sl.ref.Token != "" {
+			items = append(items, media.ConfirmItem{Field: sl.field + ".Token", Token: sl.ref.Token})
+			confirming = append(confirming, sl)
+		}
+	}
+	if len(items) == 0 {
+		return nil
+	}
+	assets, err := media.ConfirmFields(ctx, s.d.Media, uploader, items, media.VisibilityPublic)
+	if err != nil {
+		return err
+	}
+	p.confirmed = make(map[uuid.UUID]bool, len(assets))
+	for i, sl := range confirming {
+		sl.ref.AssetID, sl.ref.ObjectKey, sl.ref.Token = assets[i].ID, assets[i].ObjectKey, ""
+		p.confirmed[assets[i].ID] = true
+	}
+	return nil
+}
+
+// writeImages 把圖庫與描述裡的圖片寫進 product_images（新圖已由 confirmImages 確認；既有的 asset 必須是這個商品現有的圖）；
+// 沒有被引用的現有資產在同一個 transaction 內 MarkDeleted（媒體 ADR 2026-10-03）。MarkDeleted 要比對寫入前後的圖，所以在商品列鎖住之後：
+// media 的 Confirm 與 MarkDeleted 只 INSERT，不鎖 media 的既有列（backend/docs/modules/media.md，B1-D25），社群改貼文圖也是鎖貼文列後才 MarkDeleted。
+// 失敗整筆回滾。成功後 p.gallery 與描述區塊裡的圖片都帶 AssetID 與 ObjectKey。
+func (s *Service) writeImages(ctx context.Context, q *store.Queries, id uuid.UUID, existing []store.CatalogProductImage, p *prepared) error {
+	slots := imageSlots(p)
 	byAsset := make(map[uuid.UUID]store.CatalogProductImage, len(existing))
 	var before []uuid.UUID
 	for _, e := range existing {
 		byAsset[e.AssetID] = e
 		before = append(before, e.AssetID)
 	}
-	var items []media.ConfirmItem
-	var confirming []*imageSlot
 	for i := range slots {
 		sl := &slots[i]
-		if sl.ref.Token != "" {
-			items = append(items, media.ConfirmItem{Field: sl.field + ".Token", Token: sl.ref.Token})
-			confirming = append(confirming, sl)
+		if p.confirmed[sl.ref.AssetID] {
 			continue
 		}
 		cur, ok := byAsset[sl.ref.AssetID]
@@ -361,15 +405,6 @@ func (s *Service) writeImages(ctx context.Context, q *store.Queries, id uuid.UUI
 			return model.Invalid(sl.field+".AssetID", model.ReasonUnknown)
 		}
 		sl.ref.ObjectKey = cur.ObjectKey
-	}
-	if len(items) > 0 {
-		assets, err := media.ConfirmFields(ctx, s.d.Media, uploader, items, media.VisibilityPublic)
-		if err != nil {
-			return err
-		}
-		for i, sl := range confirming {
-			sl.ref.AssetID, sl.ref.ObjectKey, sl.ref.Token = assets[i].ID, assets[i].ObjectKey, ""
-		}
 	}
 	if err := q.DeleteProductImages(ctx, id); err != nil {
 		return err
