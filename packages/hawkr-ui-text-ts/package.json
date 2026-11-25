@@ -7,6 +7,7 @@
 	"exports": {
 		"./keys": "./src/keys.gen.ts",
 		"./accepted": "./src/accepted.gen.ts",
+		"./limits": "./src/limits.gen.ts",
 		"./format": "./src/format.ts",
 		"./messages/zh-TW": "./src/messages/zh-TW.gen.json",
 		"./messages/en": "./src/messages/en.gen.json",

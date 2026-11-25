@@ -12,6 +12,36 @@ import (
 	"uuid"
 )
 
+const adjustOwnSkuStock = `-- name: AdjustOwnSkuStock :execrows
+UPDATE catalog.product_skus s
+SET stock_qty = s.stock_qty + $1::integer, updated_at = $2
+FROM catalog.products p
+WHERE s.id = $3 AND s.deleted_at IS NULL
+  AND p.id = s.product_id AND p.store_id = $4 AND p.deleted_at IS NULL
+  AND s.stock_qty::bigint + $1::integer BETWEEN 0 AND 2147483647
+`
+
+type AdjustOwnSkuStockParams struct {
+	Delta   int32
+	Now     time.Time
+	ID      uuid.UUID
+	StoreID int64
+}
+
+// 賣家調整：只動自己店家、未刪除商品的未刪除 SKU；結果必須落在 0 到 INTEGER 上限之間（以 bigint 算，不溢位），否則回 0 列，庫存不變。
+func (q *Queries) AdjustOwnSkuStock(ctx context.Context, arg AdjustOwnSkuStockParams) (int64, error) {
+	result, err := q.db.Exec(ctx, adjustOwnSkuStock,
+		arg.Delta,
+		arg.Now,
+		arg.ID,
+		arg.StoreID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deductSkuStock = `-- name: DeductSkuStock :execrows
 UPDATE catalog.product_skus
 SET stock_qty = stock_qty - $1::integer, updated_at = $2
@@ -50,10 +80,34 @@ func (q *Queries) GetLiveSkuStock(ctx context.Context, id uuid.UUID) (GetLiveSku
 	return i, err
 }
 
-const getStockOperationByKey = `-- name: GetStockOperationByKey :one
-SELECT id, idempotency_key, kind, deduct_operation_id, created_at FROM catalog.stock_operations WHERE idempotency_key = $1
+const getOwnLiveSku = `-- name: GetOwnLiveSku :one
+SELECT s.id, s.stock_qty FROM catalog.product_skus s JOIN catalog.products p ON p.id = s.product_id
+WHERE s.id = $1 AND s.deleted_at IS NULL AND p.store_id = $2 AND p.deleted_at IS NULL
 `
 
+type GetOwnLiveSkuParams struct {
+	ID      uuid.UUID
+	StoreID int64
+}
+
+type GetOwnLiveSkuRow struct {
+	ID       uuid.UUID
+	StockQty int32
+}
+
+// 店家自己的未刪除 SKU；調整失敗時用來區分「不存在、不是自己的或已刪除」與「結果超出範圍」。
+func (q *Queries) GetOwnLiveSku(ctx context.Context, arg GetOwnLiveSkuParams) (GetOwnLiveSkuRow, error) {
+	row := q.db.QueryRow(ctx, getOwnLiveSku, arg.ID, arg.StoreID)
+	var i GetOwnLiveSkuRow
+	err := row.Scan(&i.ID, &i.StockQty)
+	return i, err
+}
+
+const getStockOperationByKey = `-- name: GetStockOperationByKey :one
+SELECT id, idempotency_key, kind, store_id, deduct_operation_id, created_at FROM catalog.stock_operations WHERE idempotency_key = $1 AND store_id IS NULL
+`
+
+// 結帳扣減與歸還的操作（沒有店家）。
 func (q *Queries) GetStockOperationByKey(ctx context.Context, idempotencyKey string) (CatalogStockOperation, error) {
 	row := q.db.QueryRow(ctx, getStockOperationByKey, idempotencyKey)
 	var i CatalogStockOperation
@@ -61,6 +115,31 @@ func (q *Queries) GetStockOperationByKey(ctx context.Context, idempotencyKey str
 		&i.ID,
 		&i.IdempotencyKey,
 		&i.Kind,
+		&i.StoreID,
+		&i.DeductOperationID,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getStoreStockOperationByKey = `-- name: GetStoreStockOperationByKey :one
+SELECT id, idempotency_key, kind, store_id, deduct_operation_id, created_at FROM catalog.stock_operations WHERE store_id = $1::bigint AND idempotency_key = $2
+`
+
+type GetStoreStockOperationByKeyParams struct {
+	StoreID        int64
+	IdempotencyKey string
+}
+
+// 某家店的賣家調整操作；別家店的同名鍵不可見。
+func (q *Queries) GetStoreStockOperationByKey(ctx context.Context, arg GetStoreStockOperationByKeyParams) (CatalogStockOperation, error) {
+	row := q.db.QueryRow(ctx, getStoreStockOperationByKey, arg.StoreID, arg.IdempotencyKey)
+	var i CatalogStockOperation
+	err := row.Scan(
+		&i.ID,
+		&i.IdempotencyKey,
+		&i.Kind,
+		&i.StoreID,
 		&i.DeductOperationID,
 		&i.CreatedAt,
 	)
@@ -84,27 +163,30 @@ func (q *Queries) InsertStockMovement(ctx context.Context, arg InsertStockMoveme
 
 const insertStockOperation = `-- name: InsertStockOperation :execrows
 
-INSERT INTO catalog.stock_operations (id, idempotency_key, kind, deduct_operation_id, created_at)
-VALUES ($1, $2, $3, $4, $5)
-ON CONFLICT (idempotency_key) DO NOTHING
+INSERT INTO catalog.stock_operations (id, idempotency_key, kind, store_id, deduct_operation_id, created_at)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT DO NOTHING
 `
 
 type InsertStockOperationParams struct {
 	ID                uuid.UUID
 	IdempotencyKey    string
 	Kind              string
+	StoreID           *int64
 	DeductOperationID *uuid.UUID
 	Now               time.Time
 }
 
-// 庫存：冪等的扣減與歸還（D2）。
+// 庫存：冪等的扣減與歸還。
 // 冪等鍵 UNIQUE 是唯一的判重點：同一個鍵的併發或重送，後到的交易在這裡等到先到的提交，然後回 0 列（呼叫端改走重送路徑）；
 // 先到的回滾時，後到的插入成功。沒有「先查再扣」。
+// 鍵的範圍：賣家調整帶 store_id，鍵只在該店家內唯一；結帳的扣減與歸還 store_id 為空，鍵全域唯一（兩個部分唯一索引，ON CONFLICT 不指定目標）。
 func (q *Queries) InsertStockOperation(ctx context.Context, arg InsertStockOperationParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertStockOperation,
 		arg.ID,
 		arg.IdempotencyKey,
 		arg.Kind,
+		arg.StoreID,
 		arg.DeductOperationID,
 		arg.Now,
 	)
@@ -144,7 +226,7 @@ func (q *Queries) ListStockMovements(ctx context.Context, operationID uuid.UUID)
 }
 
 const lockStockOperation = `-- name: LockStockOperation :one
-SELECT id, idempotency_key, kind, deduct_operation_id, created_at FROM catalog.stock_operations WHERE id = $1 AND kind = 'DEDUCT' FOR UPDATE
+SELECT id, idempotency_key, kind, store_id, deduct_operation_id, created_at FROM catalog.stock_operations WHERE id = $1 AND kind = 'DEDUCT' FOR UPDATE
 `
 
 // 歸還前鎖住原扣減：同一次扣減的多筆歸還（不同鍵）排隊，累計檢查看到前一筆已提交的結果。
@@ -155,6 +237,7 @@ func (q *Queries) LockStockOperation(ctx context.Context, id uuid.UUID) (Catalog
 		&i.ID,
 		&i.IdempotencyKey,
 		&i.Kind,
+		&i.StoreID,
 		&i.DeductOperationID,
 		&i.CreatedAt,
 	)
@@ -180,6 +263,26 @@ func (q *Queries) RestoreSkuStock(ctx context.Context, arg RestoreSkuStockParams
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const skuInStore = `-- name: SkuInStore :one
+SELECT EXISTS (
+    SELECT 1 FROM catalog.product_skus s JOIN catalog.products p ON p.id = s.product_id
+    WHERE s.id = $1 AND p.store_id = $2
+)
+`
+
+type SkuInStoreParams struct {
+	ID      uuid.UUID
+	StoreID int64
+}
+
+// SKU 是否屬於這家店（不看 SKU 或商品是否已刪除）；調整的冪等重送用它確認重送的人就是原本的店家。
+func (q *Queries) SkuInStore(ctx context.Context, arg SkuInStoreParams) (bool, error) {
+	row := q.db.QueryRow(ctx, skuInStore, arg.ID, arg.StoreID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const sumRestoredBySku = `-- name: SumRestoredBySku :many

@@ -70,6 +70,19 @@ func (m *Model) Outputs() (map[string][]byte, error) {
 	}
 	out[tsDir+"/src/accepted.gen.ts"] = EmitTSAccepted(accepted)
 	out[dartDir+"/lib/src/accepted.g.dart"] = EmitDartAccepted(accepted)
+	limits, err := m.Schema.LimitFields()
+	if err != nil {
+		return nil, err
+	}
+	goLimits, err := EmitGoLimits(limits)
+	if err != nil {
+		return nil, fmt.Errorf("limits_gen.go：%w", err)
+	}
+	for path, b := range goLimits {
+		out[path] = b
+	}
+	out[tsDir+"/src/limits.gen.ts"] = EmitTSLimits(limits)
+	out[dartDir+"/lib/src/limits.g.dart"] = EmitDartLimits(limits)
 	for _, mm := range m.Modules {
 		b, err := m.EmitModule(mm)
 		if err != nil {

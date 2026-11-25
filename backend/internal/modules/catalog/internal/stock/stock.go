@@ -1,7 +1,7 @@
-// Package stock 是庫存的冪等扣減與歸還（B4 D2）：
-//   - 每次操作是 stock_operations 的一列，冪等鍵 UNIQUE；先插入操作列、再條件式扣減（WHERE stock_qty >= n），不做「先查再扣」，
-//     所以同一個鍵的併發重送只生效一次（CD1）。
-//   - 歸還依原扣減：只帶原扣減的冪等鍵，累計不超過原扣減量（CD2）；items 省略表示歸還剩下的全部。
+// Package stock 是庫存的冪等扣減與歸還：
+//   - 每次操作是 stock_operations 的一列，冪等鍵在各自範圍內唯一（結帳的操作全域唯一，賣家調整依店家）；先插入操作列、再條件式扣減（WHERE stock_qty >= n），不做「先查再扣」，
+//     所以同一個鍵的併發重送只生效一次。
+//   - 歸還依原扣減：只帶原扣減的冪等鍵，累計不超過原扣減量；items 省略表示歸還剩下的全部。
 //   - 全部寫入在呼叫方的 transaction 內（ctx 沒有時自己開一個）；失敗整筆回滾，包括操作列。
 //   - SKU 列依 ID 升序鎖定，兩個多品項扣減不會互相死結。
 package stock
@@ -26,6 +26,7 @@ import (
 const (
 	kindDeduct  = "DEDUCT"
 	kindRestore = "RESTORE"
+	kindAdjust  = "ADJUST"
 	maxKeyRunes = 200
 )
 
@@ -76,6 +77,75 @@ func (s *Service) Deduct(ctx context.Context, key string, items []model.StockIte
 		}
 		return nil
 	})
+}
+
+// Adjust 是賣家調整自己店家某個 SKU 的庫存，delta 是有號的變動量（不為 0）；帳本記一列 ADJUST 操作與一筆 movement。
+// 用變動量而不是設成絕對值：movements 存的是有號 delta（只增不改的稽核帳本），變動量重送時內容固定、可比對，
+// 絕對值的結果取決於當時庫存，重送無法判斷是否相同。店家身分由呼叫端推導後傳入，SKU 不屬於該店家（或已刪除）回 ErrSkuNotFound。
+// 調整後的庫存必須在 0 到 int32 上限之間，否則整次不生效（減少超過現有量回 *InsufficientStockError，增加溢位回 ErrInvalidStockInput）。
+// 同一個 key 重送且內容相同不再調整、回 nil；內容不同回 ErrIdempotencyKeyReused。
+func (s *Service) Adjust(ctx context.Context, storeID int64, key string, skuID uuid.UUID, delta int32) error {
+	if err := checkKey(key); err != nil {
+		return err
+	}
+	if storeID <= 0 || delta == 0 || skuID == uuid.Nil() {
+		return model.ErrInvalidStockInput
+	}
+	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		q := s.q(ctx)
+		now := s.d.Now()
+		opID := s.d.NewID()
+		n, err := q.InsertStockOperation(ctx, store.InsertStockOperationParams{ID: opID, IdempotencyKey: key, Kind: kindAdjust, StoreID: &storeID, Now: now})
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return s.replayAdjust(ctx, q, storeID, key, skuID, delta)
+		}
+		affected, err := q.AdjustOwnSkuStock(ctx, store.AdjustOwnSkuStockParams{ID: skuID, StoreID: storeID, Delta: delta, Now: now})
+		if err != nil {
+			return err
+		}
+		if affected == 0 {
+			if _, err := q.GetOwnLiveSku(ctx, store.GetOwnLiveSkuParams{ID: skuID, StoreID: storeID}); errors.Is(err, pgx.ErrNoRows) {
+				return model.ErrSkuNotFound
+			} else if err != nil {
+				return err
+			}
+			if delta < 0 {
+				return &model.InsufficientStockError{SkuID: skuID}
+			}
+			return model.ErrInvalidStockInput
+		}
+		return q.InsertStockMovement(ctx, store.InsertStockMovementParams{OperationID: opID, SkuID: skuID, Delta: delta})
+	})
+}
+
+// replayAdjust 處理同一家店同一個 key 的重送（鍵只在店家內唯一）：先確認 SKU 屬於呼叫的店家（重送時 SKU 已不屬於這家店回 ErrSkuNotFound），
+// 再比對原操作的內容。
+func (s *Service) replayAdjust(ctx context.Context, q *store.Queries, storeID int64, key string, skuID uuid.UUID, delta int32) error {
+	own, err := q.SkuInStore(ctx, store.SkuInStoreParams{ID: skuID, StoreID: storeID})
+	if err != nil {
+		return err
+	}
+	if !own {
+		return model.ErrSkuNotFound
+	}
+	op, err := q.GetStoreStockOperationByKey(ctx, store.GetStoreStockOperationByKeyParams{StoreID: storeID, IdempotencyKey: key})
+	if err != nil {
+		return err
+	}
+	if op.Kind != kindAdjust {
+		return model.ErrIdempotencyKeyReused
+	}
+	moves, err := q.ListStockMovements(ctx, op.ID)
+	if err != nil {
+		return err
+	}
+	if len(moves) != 1 || moves[0].SkuID != skuID || moves[0].Delta != delta {
+		return model.ErrIdempotencyKeyReused
+	}
+	return nil
 }
 
 // Restore 依 deductKey 指的原扣減歸還庫存。items 為空表示歸還剩下的全部；有給時每個 SKU 必須在原扣減內，累計歸還量不得超過原扣減量。

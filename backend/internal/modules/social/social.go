@@ -23,7 +23,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/comment"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/engage"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/forum"
-	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/hashtag"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/post"
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/purge"
@@ -415,12 +414,6 @@ func (m *Module) ListStorePosts(ctx context.Context, c Caller, storeID int64, af
 // ListHashtagPosts 列出某個標籤的觀看者可讀的貼文。
 func (m *Module) ListHashtagPosts(ctx context.Context, c Caller, tag string, after *PostCursor, size int32) (PostPage, error) {
 	return m.post.ListByHashtag(ctx, c, tag, after, size)
-}
-
-// NormalizeHashtag 回傳標籤輸入正規化後的名稱（去頭尾空白與開頭的 #、ASCII 小寫）；輸入是空的或只剩 # 時 ok 為假。
-func NormalizeHashtag(raw string) (name string, ok bool) {
-	name, _, ok = hashtag.Normalize(raw)
-	return name, ok
 }
 
 // ListOwnPosts 是店主自己的貼文（含草稿與下架）；status 為空字串不篩選。

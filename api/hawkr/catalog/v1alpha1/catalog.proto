@@ -1,0 +1,122 @@
+syntax = "proto3";
+
+// catalog 模組的商品寫入內容：賣家建立與修改商品時送的訊息。服務與 RPC 隨後的步驟加入，這裡只定義寫入的資料形狀與內容上限。
+//
+// 內容上限掛在實際受限制的欄位上（hawkr.common.v1alpha1.limits），uitext-gen 讀它並生成 Go、TS、Dart 的常數；
+// 伺服器照樣驗證，違反回 INVALID_ARGUMENT。ID 是不透明的字串（ADR 2026-09-25-row-identity-by-data-kind）。
+// 新圖只收 staged token，不收 URL 或 key（ADR 2026-09-25-api-image-uri-template）。
+package hawkr.catalog.v1alpha1;
+
+import "google/api/field_behavior.proto";
+import "hawkr/common/v1alpha1/limits.proto";
+
+// ProductInput 是商品的完整可寫內容。修改是整體取代：沒有帶的圖片、選項軸與 SKU 組合會被移除。
+// 狀態不在這裡，用切換狀態的操作改。
+message ProductInput {
+  // 商品標題，去頭尾空白後不得為空。
+  string title = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (hawkr.common.v1alpha1.limits).max_runes = 100
+  ];
+  // 分類 ID，必須是葉節點。
+  string category_id = 2 [(google.api.field_behavior) = REQUIRED];
+  // 標籤的輸入（使用者輸入的樣子，可帶開頭的 #）；整批取代，空清單是沒有標籤。個數與格式的規則同 social 的標籤（platform/hashtag）。
+  repeated string hashtag_inputs = 3;
+  // 主圖，依顯示順序；狀態為 ACTIVE 的商品至少要有一張。
+  repeated ImageInput gallery = 4 [(hawkr.common.v1alpha1.limits).max_items = 9];
+  // 描述的區塊，依顯示順序。上限跨整份描述計算：區塊個數，帶圖片的區塊個數，以及段落、清單項目與表格儲存格的文字總量。
+  repeated DescriptionBlock description = 5 [(hawkr.common.v1alpha1.limits) = {
+    max_items: 100
+    max_total_runes: 3000
+    max_image_items: 20
+  }];
+  // 選項軸，依順序；沒有軸的商品只有一個預設 SKU。
+  repeated OptionAxisInput axes = 6 [(hawkr.common.v1alpha1.limits).max_items = 2];
+  // SKU，以選項值的組合辨識；至少一個。
+  repeated SkuInput skus = 7 [
+    (google.api.field_behavior) = REQUIRED,
+    (hawkr.common.v1alpha1.limits).max_items = 100
+  ];
+}
+
+// ImageInput 是寫入時的一張圖：新上傳的圖帶 staged token，商品現有的圖帶它的 asset_id，兩者剛好給一個。
+message ImageInput {
+  oneof source {
+    // media 上傳完成後拿到的 staged token；伺服器在寫入的 transaction 內確認它。
+    string staged_token = 1;
+    // 商品現有的圖（讀取商品時回傳的資產 ID），沿用不重新上傳。
+    string asset_id = 2;
+  }
+  // 圖片的替代文字，可空。
+  string alt = 3 [(hawkr.common.v1alpha1.limits).max_runes = 200];
+}
+
+// DescriptionBlock 是描述的一個區塊，剛好設一種。
+message DescriptionBlock {
+  oneof block {
+    // 段落，純文字。
+    string paragraph = 1;
+    // 圖片。
+    ImageInput image = 2;
+    // 項目清單。
+    BulletList bullet_list = 3;
+    // 表格。
+    Table table = 4;
+  }
+}
+
+// BulletList 是項目清單。
+message BulletList {
+  // 清單項目，至少一項；每項的文字上限是 max_runes。
+  repeated string items = 1 [(hawkr.common.v1alpha1.limits) = {
+    max_items: 50
+    max_runes: 200
+  }];
+}
+
+// Table 是表格，每列的儲存格數相同。
+message Table {
+  // 表格的列，至少一列。
+  repeated TableRow rows = 1 [(hawkr.common.v1alpha1.limits).max_items = 50];
+}
+
+// TableRow 是表格的一列。
+message TableRow {
+  // 這一列的儲存格，至少一格；每格的文字上限是 max_runes。
+  repeated string cells = 1 [(hawkr.common.v1alpha1.limits) = {
+    max_items: 10
+    max_runes: 200
+  }];
+}
+
+// OptionAxisInput 是一個選項軸：名稱與有序的選項值。名稱與值都是賣家的字，不翻譯。
+message OptionAxisInput {
+  // 軸名稱，例如「顏色」。
+  string name = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (hawkr.common.v1alpha1.limits).max_runes = 20
+  ];
+  // 選項值，依顯示順序，至少一個；每個值的長度上限是 max_runes。
+  repeated string values = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (hawkr.common.v1alpha1.limits) = {
+      max_items: 50
+      max_runes: 40
+    }
+  ];
+}
+
+// SkuInput 是一個 SKU，以選項值的組合辨識：沒有軸的商品兩個選項都空；有一個軸只給 option1。
+// 組合已存在時更新價格；庫存只在新組合時作為初始值，既有 SKU 的庫存只由庫存調整改。
+message SkuInput {
+  // 第一個軸的選項值，必須是 axes[0].values 之一。
+  string option1 = 1;
+  // 第二個軸的選項值，必須是 axes[1].values 之一。
+  string option2 = 2;
+  // 售價，新台幣元的整數，大於 0。
+  int64 price = 3 [(google.api.field_behavior) = REQUIRED];
+  // 原價（劃線價），新台幣元的整數；沒有設是沒有原價。
+  optional int64 compare_at_price = 4;
+  // 新組合的初始庫存，不得為負。
+  int32 initial_stock = 5;
+}

@@ -1,4 +1,4 @@
-// Package taxonomy 讀平台分類樹（B4 D8）：兩層、由 migration 的種子定義，沒有執行期寫入。
+// Package taxonomy 讀平台分類樹：兩層、由 migration 的種子定義，沒有執行期寫入。
 package taxonomy
 
 import (

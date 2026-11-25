@@ -4,10 +4,19 @@
    "id": "insert-conflicts-on-the-wrong-key",
    "stack": "go-integration",
    "file": "backend/internal/modules/catalog/internal/store/stock.sql.go",
-   "old": "ON CONFLICT (idempotency_key) DO NOTHING",
+   "old": "ON CONFLICT DO NOTHING",
    "new": "ON CONFLICT (id) DO NOTHING",
    "test": "internal/modules/catalog ^TestConcurrentSameKeyDeductsOnce$",
    "why": "冪等鍵不再是判重點（CD1 回歸）：同一個鍵的併發重送各自插入操作列，不是只扣一次，測試要紅。"
+  },
+  {
+   "id": "adjust-key-not-scoped-to-store",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/stock/stock.go",
+   "old": "op, err := q.GetStoreStockOperationByKey(ctx, store.GetStoreStockOperationByKeyParams{StoreID: storeID, IdempotencyKey: key})",
+   "new": "op, err := q.GetStoreStockOperationByKey(ctx, store.GetStoreStockOperationByKeyParams{StoreID: 501, IdempotencyKey: key})",
+   "test": "internal/modules/catalog ^TestAdjustKeyIsScopedPerStore$",
+   "why": "調整重送讀的是固定店家的操作而不是呼叫店家的：店家 502 重送同一個鍵時讀不到自己的操作列，測試要紅。"
   },
   {
    "id": "restore-quantity-not-capped",
@@ -62,6 +71,195 @@
    "new": "WHERE c.id = $1)",
    "test": "internal/modules/catalog ^TestOnlyLeafCategoriesTakeProducts$",
    "why": "葉節點檢查拿掉：頂層分組也能掛商品，測試要紅。"
+  },
+  {
+   "id": "public-list-without-exposure-join",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
+   "old": "p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e)",
+   "new": "$1::timestamptz IS NOT NULL",
+   "test": "internal/modules/catalog ^TestPublicListOnlyActiveProductsOfExposableStores$",
+   "why": "公開列表拿掉 seller.pub_exposable_stores 的 join：停權店的 ACTIVE 商品出現在公開列表，測試要紅。"
+  },
+  {
+   "id": "public-get-without-exposure-join",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
+   "old": "p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($2::timestamptz) e)",
+   "new": "$2::timestamptz IS NOT NULL",
+   "test": "internal/modules/catalog ^TestPublicListOnlyActiveProductsOfExposableStores$",
+   "why": "公開單筆讀取拿掉曝光條件：停權店的商品仍可公開讀取，測試要紅。"
+  },
+  {
+   "id": "sku-write-without-price-range-recompute",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "n, err := q.RecomputePriceRange(ctx, store.RecomputePriceRangeParams{ID: id, Now: now})",
+   "new": "n, err := int64(1), error(nil)",
+   "test": "internal/modules/catalog ^TestPriceRangeFollowsSkuChanges$",
+   "why": "SKU 寫入不重算價格區間（D19）：商品的 min_price／max_price 停在 0 或舊值，區間測試要紅。"
+  },
+  {
+   "id": "image-removal-without-mark-deleted",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "return s.d.Media.MarkDeleted(ctx, retired)",
+   "new": "_ = retired\n\t\treturn nil",
+   "test": "internal/modules/catalog ^TestImagesConfirmedInTheWriteAndMarkedDeletedWhenRemoved$",
+   "why": "移除圖片時不呼叫 MarkDeleted：退場的資產沒有被標為刪除，測試要紅。"
+  },
+  {
+   "id": "sku-combination-not-checked-against-option-values",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/validate.go",
+   "old": "case !slices.Contains(axes[k].Values, *opt):",
+   "new": "case false:",
+   "test": "internal/modules/catalog ^TestSkuCombinationsMustBeUniqueAndWithinOptionValues$",
+   "why": "SKU 的選項值不必落在軸的值內（D18）：商品帶著不存在的規格值，測試要紅。"
+  },
+  {
+   "id": "sku-duplicate-combination-not-rejected",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/validate.go",
+   "old": "if seen[key] {",
+   "new": "if false {",
+   "test": "internal/modules/catalog ^TestSkuCombinationsMustBeUniqueAndWithinOptionValues$",
+   "why": "重複的 SKU 組合不在寫入端擋下：變成資料庫唯一索引錯誤而不是 InvalidInput，測試要紅。"
+  },
+  {
+   "id": "reactivation-resets-first-published-at",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
+   "old": "THEN COALESCE(first_published_at, $2::timestamptz) ELSE",
+   "new": "THEN $2::timestamptz ELSE",
+   "test": "internal/modules/catalog ^TestProductLifecycleAndFirstPublishedAt$",
+   "why": "再次上架覆寫 first_published_at：它不再是第一次上架的時間，測試要紅。"
+  },
+  {
+   "id": "hashtag-name-keeps-ascii-case",
+   "stack": "go-integration",
+   "file": "backend/internal/platform/hashtag/hashtag.go",
+   "old": "r += 'a' - 'A'",
+   "new": "r += 0",
+   "test": "internal/modules/catalog ^TestHashtagsUseThePlatformNormalization$",
+   "why": "共用的正規化不再把 ASCII 大寫轉小寫：商品的標籤名稱與去重都變了，測試要紅（social 的測試也用同一份）。"
+  },
+  {
+   "id": "seller-list-filters-by-exposure",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
+   "old": "WHERE p.store_id = $1 AND p.deleted_at IS NULL",
+   "new": "WHERE p.store_id = $1 AND p.deleted_at IS NULL\n  AND p.status = 'ACTIVE'",
+   "test": "internal/modules/catalog ^TestSellerListIsUnfilteredByStatusAndExposure$",
+   "why": "賣家清單只列 ACTIVE：賣家看不到自己的草稿與下架商品，測試要紅。"
+  },
+  {
+   "id": "adjust-without-store-ownership",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/stock.sql.go",
+   "old": "p.store_id = $4",
+   "new": "$4 > 0",
+   "test": "internal/modules/catalog ^TestAdjustOnAnotherStoresSkuOrDeletedSkuIsNotFound$",
+   "why": "賣家調整不再限定 SKU 屬於自己的店家：跨店調整生效而不是回 ErrSkuNotFound，測試要紅。"
+  },
+  {
+   "id": "activate-without-gallery-image-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "if !slices.ContainsFunc(imgs, func(i store.CatalogProductImage) bool { return i.Kind == kindGallery }) {",
+   "new": "if _ = imgs; false {",
+   "test": "internal/modules/catalog ^TestActiveProductNeedsAGalleryImageOnEveryWrite$",
+   "why": "切成 ACTIVE 不再檢查主圖：沒有主圖的商品被上架，測試要紅。"
+  },
+  {
+   "id": "description-image-counts-as-gallery",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "return i.Kind == kindGallery }",
+   "new": "return true }",
+   "test": "internal/modules/catalog ^TestActiveProductNeedsAGalleryImageOnEveryWrite$",
+   "why": "上架檢查把描述圖當主圖：只有描述圖的商品被上架，測試要紅。"
+  },
+  {
+   "id": "update-active-without-gallery-image-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "if model.ProductStatus(cur.Status) == model.StatusActive && len(p.gallery) == 0 {",
+   "new": "if _ = cur; false {",
+   "test": "internal/modules/catalog ^TestActiveProductNeedsAGalleryImageOnEveryWrite$",
+   "why": "ACTIVE 商品的整體取代不再檢查主圖：上架中的商品被改成沒有主圖，測試要紅。"
+  },
+  {
+   "id": "back-to-draft-clears-first-published-at",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
+   "old": "ELSE first_published_at END",
+   "new": "ELSE NULL END",
+   "test": "internal/modules/catalog ^TestProductLifecycleAndFirstPublishedAt$",
+   "why": "切回非 ACTIVE 時清掉 first_published_at：曾上架的紀錄消失，測試要紅。"
+  },
+  {
+   "id": "description-total-not-enforced",
+   "stack": "go",
+   "file": "backend/internal/modules/catalog/internal/description/description.go",
+   "old": "if b.used > model.MaxProductInputDescriptionTotalRunes {",
+   "new": "if false {",
+   "test": "internal/modules/catalog/internal/description ^TestNormalizeRejects$",
+   "why": "整份描述的文字總量不再受限：段落、清單與表格合計超過 3000 字被放行，測試要紅。"
+  },
+  {
+   "id": "adjust-replay-skips-store-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/stock/stock.go",
+   "old": "if !own {",
+   "new": "if false && !own {",
+   "test": "internal/modules/catalog ^TestAdjustReplayIsNoOpAndDifferentContentIsRejected$",
+   "why": "調整的冪等重送不確認 SKU 屬於呼叫的店家：別家店用同一個 key 與內容重送回成功，測試要紅。"
+  },
+  {
+   "id": "limit-constant-drifts-from-schema-check",
+   "stack": "go",
+   "file": "backend/internal/modules/catalog/internal/model/limits_gen.go",
+   "old": "MaxProductInputTitleRunes = 100",
+   "new": "MaxProductInputTitleRunes = 101",
+   "test": "internal/modules/catalog/internal/model ^TestSchemaCheckLimitsMatchGeneratedConstants$",
+   "why": "生成的上限與 schema.sql 的 CHECK 字面值不同：drift 測試要紅。"
+  },
+  {
+   "id": "update-locks-skus-in-descending-id-order",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
+   "old": "ORDER BY id\nFOR UPDATE\n`\n\ntype LockLiveSkusRow",
+   "new": "ORDER BY id DESC\nFOR UPDATE\n`\n\ntype LockLiveSkusRow",
+   "test": "internal/modules/catalog ^TestUpdateLocksExistingSkusInAscendingIdOrderWhateverTheInputOrder$",
+   "why": "Update 改成由大到小鎖既有 SKU 列：卡在最小 ID 的列時較大的列已被鎖住，與 DeductStock 的升序相反（死結），測試要紅。"
+  },
+  {
+   "id": "read-images-in-a-separate-statement",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/read.go",
+   "old": "if err := json.Unmarshal(h.images, &images); err != nil {",
+   "new": "if err := func() error { rows, e := q.ListProductImages(ctx, id); for _, r := range rows { images = append(images, imageJSON{Kind: r.Kind, AssetID: r.AssetID, ObjectKey: r.ObjectKey, Alt: r.Alt}) }; return e }(); err != nil {",
+   "test": "internal/modules/catalog ^TestReadIsOneSnapshotWhileAWriteCommitsBetweenItsParts$",
+   "why": "圖片改在商品列之後另一句 SQL 讀：並行的修改提交在兩句之間時讀到描述有圖、圖片表已空，Decode 失敗，測試要紅。"
+  },
+  {
+   "id": "delete-product-keeps-its-skus-live",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "if err := q.SoftDeleteLiveSkus(ctx, store.SoftDeleteLiveSkusParams{ProductID: productID, Now: &now}); err != nil {",
+   "new": "if err := error(nil); err != nil {",
+   "test": "internal/modules/catalog ^TestDeleteProductMakesItsSkusUndeductibleButRestorable$",
+   "why": "刪除商品不標刪除它的 SKU：已刪除商品的 SKU 仍能被扣減，測試要紅。"
+  },
+  {
+   "id": "update-confirms-images-after-locking-the-product",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "\t\tif err := s.confirmImages(ctx, uploader, &p); err != nil {\n\t\t\treturn err\n\t\t}\n\t\tcur, err := s.lock(ctx, q, storeID, productID)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n",
+   "new": "\t\tcur, err := s.lock(ctx, q, storeID, productID)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif err := s.confirmImages(ctx, uploader, &p); err != nil {\n\t\t\treturn err\n\t\t}\n",
+   "test": "internal/modules/catalog ^TestUpdateConfirmsNewImagesBeforeLockingTheProductRow$",
+   "why": "Update 先鎖商品列才 Confirm 新圖，與上層先呼叫下層再鎖自己列的順序相反，測試要紅。"
   }
  ]
 }
