@@ -240,11 +240,6 @@ func goldenPreviewOK() *orderpb.CheckoutPreviewResponse {
 		TotalShippingFee:    "55",
 		TotalDiscount:       "0",
 		TotalActualAmount:   "1055",
-		PaymentMerId:        "HAWK2685914682",
-		AvailablePaymentMethods: []*orderpb.AvailablePaymentMethod{
-			{PaymentType: "2004", Eligible: true},
-			{PaymentType: "2001", Eligible: false, IneligibleReason: "2102"},
-		},
 	}}
 }
 

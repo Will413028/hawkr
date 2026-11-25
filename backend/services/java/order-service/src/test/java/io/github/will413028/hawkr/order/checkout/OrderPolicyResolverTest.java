@@ -15,9 +15,9 @@ import static org.assertj.core.api.Assertions.catchThrowableOfType;
  *
  * <h2>為什麼需要這一支——既有覆蓋長什麼樣</h2>
  * 在本檔之前，{@code OrderPolicyResolver} 沒有任何專屬測試，只被四支契約／持久化測試
- * <b>順帶</b>經過（{@code OrderPolicySnapshotChainContractTest}／{@code PaymentMerIdPolicyContractTest}／
+ * <b>順帶</b>經過（{@code OrderPolicySnapshotChainContractTest}／{@code CollectionModelGuardContractTest}／
  * {@code OrderPolicyPersistenceOnCreationPathsTest}／{@code OrderPolicySnapshotPersistenceIT}），
- * 而那四支都是<b>拿 resolver 當工具</b>去驗別的東西（鏈路、merId、entity 寫入、DB 落地）。
+ * 而那四支都是<b>拿 resolver 當工具</b>去驗別的東西（鏈路、收款模式守門、entity 寫入、DB 落地）。
  * 結果是：resolver 自己的<b>值域完整性</b>（每個 {@code shipping_method} 各算出什麼）從來沒有被斷言過，
  * 而那正是 {@code fulfillment_mode} 這個<b>會寫進訂單快照、成為撥款與開票法源</b>的欄位的唯一決定點。
  *

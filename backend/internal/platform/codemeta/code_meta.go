@@ -2404,44 +2404,6 @@ func PaymentMethodFromValue(value string) (PaymentMethod, bool) {
 	return PaymentMethod{}, false
 }
 
-// ===== PaymentMethodIneligibleReason =====
-// 付款方式因「訂單金額不符該方式合法區間」而不可用的理由碼。由 order-service 在結帳預覽 / 訂單詳情計算 `availablePaymentMethods` 時填入（`eligible=false` 才有值）。前端依此碼的 label 顯示禁用理由（**通用文案、不帶具體數字**；限制值的 SSOT 留後端 [PaymentMethodLimitRules](../詳細設計書/20-結帳模組（Checkout%20Module）詳細設計書.md)，前端零複製）。
-
-type PaymentMethodIneligibleReason struct {
-	Code        string
-	Value       string
-	Label       string
-	Description string
-}
-
-var (
-	PaymentMethodIneligibleReasonAmountBelowMin = PaymentMethodIneligibleReason{Code: "AMOUNT_BELOW_MIN", Value: "2101", Label: "金額未達此付款方式下限", Description: "訂單金額低於該付款方式允許的最小金額（具體限制值見 PaymentMethodLimitRules）"}
-	PaymentMethodIneligibleReasonAmountAboveMax = PaymentMethodIneligibleReason{Code: "AMOUNT_ABOVE_MAX", Value: "2102", Label: "金額超過此付款方式上限", Description: "訂單金額高於該付款方式允許的最大金額（具體限制值見 PaymentMethodLimitRules）"}
-)
-
-var AllPaymentMethodIneligibleReasons = []PaymentMethodIneligibleReason{
-	PaymentMethodIneligibleReasonAmountBelowMin,
-	PaymentMethodIneligibleReasonAmountAboveMax,
-}
-
-func PaymentMethodIneligibleReasonFromCode(code string) (PaymentMethodIneligibleReason, bool) {
-	for _, v := range AllPaymentMethodIneligibleReasons {
-		if v.Code == code {
-			return v, true
-		}
-	}
-	return PaymentMethodIneligibleReason{}, false
-}
-
-func PaymentMethodIneligibleReasonFromValue(value string) (PaymentMethodIneligibleReason, bool) {
-	for _, v := range AllPaymentMethodIneligibleReasons {
-		if v.Value == value {
-			return v, true
-		}
-	}
-	return PaymentMethodIneligibleReason{}, false
-}
-
 // ===== ShippingMethod =====
 // 運送方式
 

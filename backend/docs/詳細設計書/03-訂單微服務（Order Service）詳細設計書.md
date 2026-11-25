@@ -937,7 +937,7 @@ WHERE 條件均要求 task 處於 `PROCESSING(10)`，避免：
 
 | DTO | 新增欄位 | 適用層 | 說明 |
 |---|---|---|---|
-| `OrderDetailResp` | `providerStatus` / `providerMessage` / `paymentMerId` | App（買家/賣家）+ Admin | provider 欄位依 order 狀態聚合（§4.3.1 聚合規則）；`paymentMerId` 為訂單對應 PayUni MerID，供 Web/Mobile Google Pay 重試時動態取得 tokenization 用的 gatewayMerchantId |
+| `OrderDetailResp` | `providerStatus` / `providerMessage` | App（買家/賣家）+ Admin | provider 欄位依 order 狀態聚合（§4.3.1 聚合規則） |
 | `OrderSummaryResp`（列表）| `providerStatus` / `providerMessage` | App + Admin | 同上，批次聚合 |
 | `AdminOrderDetailResp` | **完整** `providerStatus` / `providerMessage` + **撥款欄位** `grantStatus` / `grantMessage` / `grantedAt` | **僅 Admin** | 撥款欄位封閉規則；App DTO 嚴禁 |
 
@@ -1103,8 +1103,6 @@ message OrderDetailView {
   string countdown_paused_at = 58;          // 倒數暫停時刻（ISO 8601 UTC；空字串=倒數中，非空=已暫停，§5.8；新增）
   string payment_deadline = 59;             // 付款期限（ISO 8601 UTC，僅 status=0 時有值；建單時 = createdAt + payment-deadline-seconds，§8.5；買家詳情頁顯示「待付款倒數」用）
   OrderReviewView review = 60;              // 訂單評論快照（訂單層級單一，取最近一筆商品評論；未評論時不設定 / null）
-  string payment_mer_id = 61;              // 訂單對應 PayUni MerID（= orders.mer_id 直接暴露），供 Web/Mobile Google Pay 重試動態取得 tokenization gatewayMerchantId（§3.4.1 paymentMerId 決策邏輯）
-  repeated AvailablePaymentMethod available_payment_methods = 62;  // 再次付款可用付款方式（依 total_actual_amount 算）。**僅 buyer 視角 + status=PENDING_PAYMENT 時填**，其他 caller（賣家/管理員/物流）與非 pending 狀態一律空清單。型別與規則同結帳預覽，見 §4.x 與 [20-結帳模組設計書 §3.4.1](../詳細設計書/20-結帳模組（Checkout%20Module）詳細設計書.md)
 }
 
 message OrderItemDetail {
@@ -1296,30 +1294,9 @@ message GetSellerOrderStatusCountsResponse {
 
 > count 欄位維持 `int64`（既有 wire 契約，與本服務其他 dashboard 數值欄位一致）。
 
-### 4.2.1 GetOrder 付款方式可用性（再次付款 surface）
+### 4.2.1 GetOrder 付款方式
 
-**背景**：付款方式選擇有兩個 surface — 結帳（[20-結帳模組 §3.4.1](../詳細設計書/20-結帳模組（Checkout%20Module）詳細設計書.md)）與**再次付款**（pending 訂單重付）。再次付款不走 CheckoutPreview，前端直接用 `GetOrder` 的訂單金額 + 重選付款方式 + 直接 `CreatePayment`。因此 `OrderDetailView.available_payment_methods`（field 62）必須在 `GetOrder` 回傳時填好，讓再次付款也能 gating（規則與結帳完全相同）。
-
-**填充規則（per-caller enrich，禁止塞共用 converter）**：
-
-| 條件 | `available_payment_methods` |
-|---|---|
-| `GetOrder`（買家視角）且 `status == PENDING_PAYMENT` | `PaymentMethodLimitRules.resolveAvailability(total_actual_amount)` |
-| 其他狀態（已付 / 已取消 / …） | 空清單（非 pending 不能再 `CreatePayment`，回付款方式為噪音） |
-| `GetSellerOrderDetail` / `GetAdminOrderDetail` 等非買家 caller | 空清單（賣家 / 管理員 / 物流不付款；避免污染共用 `OrderDetailView`） |
-
-> **實作約束**：`OrderProtoConverter.toDetailView(...)` 為 5 個 caller 共用的 static 組裝方法，**禁止**把 availability 塞進去（會洩漏到賣家 / 管理員 / 物流回應）。比照既有 `OrderGrpcService.enrichProvider(...)` 的 per-caller `toBuilder().build()` pattern，新增 `enrichAvailablePaymentMethods(base, order)`，**僅在 `OrderGrpcService.getOrder`（買家路徑）呼叫**，內部再以 `status == PENDING_PAYMENT` 守門。
-
-> **零元無需特例**：零元訂單建立即 PAID（05 §2A.1（已刪除）），永不停在 PENDING_PAYMENT，故再次付款 surface 天然碰不到零元空清單情境。
-
-**影響檔案清單**：
-
-| 檔案 | 變更 |
-|------|------|
-| `api/proto/order/order.proto` | `OrderDetailView` 加 `available_payment_methods = 62`（message `AvailablePaymentMethod` 由結帳模組共用，定義於同檔） |
-| `services/java/order-service/.../grpc/OrderGrpcService.java` | 新增私有 `enrichAvailablePaymentMethods(OrderDetailView base, OrderEntity order)`（比照既有 `enrichProvider` pattern）；**僅在 `getOrder`（買家）路徑呼叫**，內部 `status == PENDING_PAYMENT` 守門，非 pending 回原 base |
-| `services/java/order-service/.../grpc/converter/OrderProtoConverter.java` | **不改** `toDetailView`（5 caller 共用，禁止塞 availability） |
-| `gateway/internal/handler/order.go` | `OrderDetailView` DTO 加 `availablePaymentMethods`（買家詳情；其他 caller 後端已保證空）+ Swagger |
+付款方式的選擇由 Stripe Payment Element 決定，`GetOrder` 不回傳付款方式清單。
 
 ### 4.3 依賴的外部 gRPC 服務
 

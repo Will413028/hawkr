@@ -9,7 +9,6 @@ import io.github.will413028.hawkr.common.utils.code.ShippingRoute;
 import io.github.will413028.hawkr.common.utils.code.ShippingTemperature;
 import io.github.will413028.hawkr.common.utils.code.WeightUnit;
 import io.github.will413028.hawkr.common.utils.code.CartItemUnavailableReason;
-import io.github.will413028.hawkr.common.utils.code.helper.PaymentMethodLimitRules;
 import io.github.will413028.hawkr.common.utils.code.helper.ProductPurchasabilityRules;
 import io.github.will413028.hawkr.common.utils.shipping.SellerShippingFilter;
 import io.github.will413028.hawkr.common.utils.shipping.ShippingAreaResolver;
@@ -25,7 +24,6 @@ import io.github.will413028.hawkr.common.grpc.PrincipalResolution;
 import io.github.will413028.hawkr.common.grpc.UnresolvedPrincipalException;
 import io.github.will413028.hawkr.order.checkout.client.SellerGrpcClient;
 import io.github.will413028.hawkr.order.grpc.*;
-import io.github.will413028.hawkr.order.grpc.converter.PaymentMethodAvailabilityConverter;
 import io.github.will413028.hawkr.order.grpc.client.BuyerGrpcClient;
 import io.github.will413028.hawkr.common.utils.code.InvoiceCarrierType;
 import io.github.will413028.hawkr.invoice.grpc.InvoiceAmountBreakdown;
@@ -758,11 +756,11 @@ public class CheckoutService {
         //    要走擴張—收縮（後端先不讀 → 前端停送 → 再移欄）。**本波只做「不讀」這一半**，
         //    留著不讀比留著讀更安全，但它是一個尚未收縮的欄位，登記在此以免被當成 target design。
         OrderPolicySnapshot policySnapshot = orderPolicyResolver.resolve(method.value());
-        String paymentMerId = resolvePaymentMerId(policySnapshot);
+        requireSupportedCollectionModel(policySnapshot);
 
-        // 寫入 Redis 金額快照（含 paymentMerId 給 confirm 讀回）
+        // 寫入 Redis 金額快照
         String snapshotJson = buildPriceSnapshot(orderSubtotal, finalShippingFee, discountAmount,
-                totalActualAmount, finalFsr.eligible(), option.freeShippingEligible(), paymentMerId,
+                totalActualAmount, finalFsr.eligible(), option.freeShippingEligible(),
                 policySnapshot);
         redisTemplate.opsForValue().set(CHECKOUT_KEY_PREFIX + checkoutId, snapshotJson, CHECKOUT_TTL);
 
@@ -774,10 +772,7 @@ public class CheckoutService {
                 .setTotalOriginalAmount(String.valueOf(orderSubtotal))
                 .setTotalShippingFee(String.valueOf(finalShippingFee))
                 .setTotalDiscount(String.valueOf(discountAmount))
-                .setTotalActualAmount(String.valueOf(totalActualAmount))
-                .setPaymentMerId(paymentMerId)
-                // §3.4.1 付款方式可用性（依 total_actual_amount 算；零元 → 空清單）
-                .addAllAvailablePaymentMethods(PaymentMethodAvailabilityConverter.resolve(totalActualAmount));
+                .setTotalActualAmount(String.valueOf(totalActualAmount));
 
         // §6.2.4 order ②：發票區（58A §B01）。拿不到就不設這一欄，前端不渲染發票區。
         CheckoutInvoicePreview invoicePreview = resolveInvoicePreview(
@@ -789,41 +784,27 @@ public class CheckoutService {
     }
 
     /**
-     * 決策本次訂單寫入的收款商店代號：賣家收款不帶代號（空字串），平台代收取代理商代號。
+     * 收款模式（{@code collection_model}）fail-closed 守門：只有賣家收款（SELLER_MERCHANT）放行。
      *
-     * <p>🔴 <b>由 {@code collection_model} 驅動，不再讀 buyer request 透傳的 {@code consolidated}。</b>
-     * 需求書把「移除 consolidated 由 buyer request 透傳、改由後端推導」列為不可妥協的工程邊界之一
-     * ——收款主體不能由呼叫端指定。推導在 {@link OrderPolicyResolver}。
-     *
-     * <p>🔴 <b>不補這一段的話，會是本波最安靜的一個失效</b>：
-     * {@code orders.collection_model} 被正確寫成平台代收（快照欄、有 DB CHECK 守著），
-     * 帳本也據此記「平台代理商戶收到買家款」——<b>而錢實際上還在賣家的 MerID</b>。
-     * 快照欄與現金流向不一致，沒有任何東西會發現：訂單成功、付款成功、帳本平衡，
-     * 對帳查詢也查得到（只是查到的是賣家子商店的交易）。
+     * <p>🔴 由政策快照的 {@code collection_model} 驅動，不讀 buyer request 的 {@code consolidated}
+     * ——收款主體不能由呼叫端指定，推導在 {@link OrderPolicyResolver}。
+     * 窮舉式判定、沒有 fall-through：null／空白／PROVIDER_COLLECTED／EXTERNAL_PREPAID／未知字串
+     * 一律拒絕，因為對看不懂的收款模式做出「照賣家收」的結論是猜測，不是推導
+     * （與撥款資格 PayoutEligibility 的 default⇒BLOCKED 同源）。
+     * 賣家能不能接單由 requireSellerAcceptingOrders（can_accept_orders）擋下。
      */
-    private String resolvePaymentMerId(OrderPolicySnapshot policy) {
+    private void requireSupportedCollectionModel(OrderPolicySnapshot policy) {
         String model = policy.collectionModel();
-        // 🔴 窮舉式判定，**沒有 fall-through**。改成 switch 之前，這裡是
-        //    「等於 PLATFORM_AGENT_MERCHANT 才特殊，其餘一律賣家 MerID」——
-        //    於是 null／`PROVIDER_COLLECTED`／`EXTERNAL_PREPAID`／任何打錯的字串
-        //    都被靜默解析成賣家收款。那兩個值是 DB CHECK 的合法值，
-        //    只是今天還沒有寫入路徑；它們一旦出現，錢會進錯人的口袋而快照欄說得很正確。
         if (model == null || model.isBlank()) {
             throw new OrderBusinessException(GrpcResponseCode.FULFILLMENT_COMMERCE_MODEL_UNKNOWN);
         }
         if (CollectionModel.SELLER_MERCHANT.value().equals(model)) {
-            // 收款走 payment 模組（賣家的收款帳戶），訂單不再持有商店代號；
-            // 賣家能不能接單由 requireSellerAcceptingOrders（can_accept_orders）在 validate()、preview()、confirm() 擋下。
-            return "";
+            return;
         }
         if (CollectionModel.PLATFORM_AGENT_MERCHANT.value().equals(model)) {
             // 平台代收（受託代銷）沒有收款路徑：fail-closed 在結帳當下。
             throw new OrderBusinessException(GrpcResponseCode.PLATFORM_COLLECTION_NOT_CONFIGURED);
         }
-        // PROVIDER_COLLECTED／EXTERNAL_PREPAID／未來新增值／未知字串一律擋下。
-        // 判準與撥款資格 PayoutEligibility 的 default⇒BLOCKED 同源：
-        // ⚠️ 2026-09-12 架構合併：該判準原本在獨立的 settlement 服務，現落 payment-service。
-        // 對一個我們看不懂的收款模式做出「照賣家收」的結論，是猜測不是推導。
         throw new OrderBusinessException(GrpcResponseCode.FULFILLMENT_COMMERCE_MODEL_UNKNOWN);
     }
 
@@ -842,10 +823,6 @@ public class CheckoutService {
         if (snapshotJson == null || snapshotJson.isEmpty()) {
             throw new CheckoutExpiredException();
         }
-
-        // 從 snapshot 讀回 preview 決策的 paymentMerId（20 設計書 §4.13.4）
-        // confirm 不重新決策，避免 preview/confirm drift
-        String paymentMerIdFromSnapshot = extractPaymentMerIdFromSnapshot(snapshotJson);
 
         // 🔴 政策快照同樣只從 preview 讀回，**不在 confirm 重算**（65）。
         //    重算會讓「preview 顯示的運費／收款主體」與「訂單實際寫入的政策」來自兩次求值；
@@ -962,18 +939,16 @@ public class CheckoutService {
 
         long totalActualAmount = Math.max(0, orderSubtotal + finalShippingFee - discountAmount);
 
-        // §2A.2 L1 上限攔截：訂單建立時尚未選 paymentMethod，使用最寬鬆上限提早攔截不可能成立的訂單。
-        // 下限不在 L1 檢查（信用卡 1 元、ATM 15 元），留給 payment-service L2 按 paymentMethod 精準檢核。
-        // 0 元由 §2A.1 零元路徑處理，不進入本檢查。
-        if (totalActualAmount > PaymentMethodLimitRules.ORDER_MAX_AMOUNT) {
+        // 訂單金額上限（業務規則，invoice-service A20 依賴它）。0 元由 §2A.1 零元路徑處理，不進入本檢查。
+        if (totalActualAmount > OrderAmountLimit.ORDER_MAX_AMOUNT) {
             log.warn("CheckoutService.confirm.amountExceedsLimit",
                     "訂單金額超出上限 amount=" + totalActualAmount
-                            + " limit=" + PaymentMethodLimitRules.ORDER_MAX_AMOUNT
+                            + " limit=" + OrderAmountLimit.ORDER_MAX_AMOUNT
                             + " buyer=" + buyerId);
             throw new OrderBusinessException(
                     GrpcResponseCode.ORDER_AMOUNT_EXCEEDS_LIMIT,
                     totalActualAmount,
-                    PaymentMethodLimitRules.ORDER_MAX_AMOUNT);
+                    OrderAmountLimit.ORDER_MAX_AMOUNT);
         }
 
         // 金額比對（Preview → Confirm 防護，含最終免運狀態比對）
@@ -1009,15 +984,10 @@ public class CheckoutService {
                         Long.parseLong(r.productId()), r.productName()))
                 .toList();
 
-        // OrderEntity.mer_id 寫入來源 = preview 階段決策並存入 snapshot 的 paymentMerId
-        // （20 設計書 §4.13.4）
-        // 🔴 fallback 改為「用同一份政策重新解析」，不再無條件退回 sellerMeta。
-        //    舊寫法在 collection_model = PLATFORM_AGENT_MERCHANT 而快照缺 paymentMerId 時，
-        //    會把款項導到賣家子商店，**同時**把 collection_model 寫成平台代收——
-        //    快照欄與現金流向不一致，而兩邊各自看起來都正常。
-        String orderMerId = (paymentMerIdFromSnapshot != null && !paymentMerIdFromSnapshot.isBlank())
-                ? paymentMerIdFromSnapshot
-                : resolvePaymentMerId(policySnapshot);
+        // 收款模式 fail-closed：與 preview 同一份政策快照，不在 confirm 重新決策。
+        requireSupportedCollectionModel(policySnapshot);
+        // orders.mer_id 欄位仍由出貨與售後讀取，收款改走 payment 模組後恆為空字串。
+        String orderMerId = "";
 
         // 58 號 §7.1.2 步驟 1：採集買家發票選擇。**選填**——未帶時走 USE_BUYER_DEFAULT，
         // 由 invoice-service 在建立文件時解析（見 InvoiceIntakeResolver 的類別註解）。
@@ -1381,25 +1351,6 @@ public class CheckoutService {
     }
 
     /**
-     * 從 Redis snapshot JSON 取出 paymentMerId。
-     * preview 階段已決策並寫入，confirm 階段直接讀回，避免 drift。
-     */
-    private String extractPaymentMerIdFromSnapshot(String snapshotJson) {
-        if (snapshotJson == null || snapshotJson.isEmpty() || "1".equals(snapshotJson)) {
-            return null;
-        }
-        try {
-            JsonNode node = objectMapper.readTree(snapshotJson);
-            String v = node.path("paymentMerId").asText("");
-            return v.isBlank() ? null : v;
-        } catch (Exception e) {
-            log.warn("CheckoutService.extractPaymentMerIdFromSnapshot.failed",
-                    "snapshot 解析失敗，退回 sellerMeta 取 merId", "error", e.getMessage());
-            return null;
-        }
-    }
-
-    /**
      * 從 Redis snapshot JSON 取回 preview 階段凍結的政策五欄——<b>fail-closed</b>。
      *
      * <p>🔴 <b>為什麼缺欄位要拋而不是退回預設值</b>：這五欄是撥款資格與開票法源的輸入
@@ -1454,13 +1405,12 @@ public class CheckoutService {
 
     /**
      * 組裝金額快照 JSON（Preview 存入 Redis）。20 設計書 §4.11 + §4.13.4。
-     * paymentMerId 為 preview 階段決策結果，confirm 直接讀回避免 drift。
      */
     // package-private（非 private）：讓同 package 的測試用**產線這一支**組快照，
     // 而不是各自手寫一份 JSON——手寫 fixture 等於自己跟自己對，欄名改了不會有人發現。
     String buildPriceSnapshot(long subtotal, long shippingFee, long discount, long totalAmount,
                                        boolean freeShippingEligible, boolean tentativeFreeShippingEligible,
-                                       String paymentMerId, OrderPolicySnapshot policy) {
+                                       OrderPolicySnapshot policy) {
         try {
             Map<String, Object> snapshot = new LinkedHashMap<>();
             snapshot.put("subtotal", subtotal);
@@ -1469,10 +1419,7 @@ public class CheckoutService {
             snapshot.put("totalAmount", totalAmount);
             snapshot.put("freeShippingEligible", freeShippingEligible);
             snapshot.put("tentativeFreeShippingEligible", tentativeFreeShippingEligible);
-            snapshot.put("paymentMerId", paymentMerId);
-            // 🔴 政策五欄與 paymentMerId 是**同一次求值的兩個投影**，必須一起進快照。
-            //    分開求值（preview 算收款主體、confirm 重算政策）會讓兩者在
-            //    「快照說平台代收、錢進賣家子商店」這種組合上不一致，而那是靜默的。
+            // 政策五欄來自 preview 的同一次求值，confirm 只讀回、不重算。
             Map<String, Object> policyMap = new LinkedHashMap<>();
             policyMap.put("commerceModel", policy.commerceModel());
             policyMap.put("collectionModel", policy.collectionModel());

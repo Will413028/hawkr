@@ -31,8 +31,7 @@ var delegatedForbiddenFields = []string{
 	"odno", "validationno", "partnerid", "pickupstorename",
 	"shipmentphotokeys", "receiptphotokeys", "cvsstoreid",
 	// 金流
-	"transactionid", "paymentmerid", "providerstatus", "providermessage",
-	"availablepaymentmethods",
+	"transactionid", "providerstatus", "providermessage",
 	// 退款與撥款
 	"refundhistory",
 	// 買家側行為與社群互動計數

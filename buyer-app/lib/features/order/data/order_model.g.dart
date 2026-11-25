@@ -118,11 +118,6 @@ _Order _$OrderFromJson(Map<String, dynamic> json) => _Order(
           ?.map((e) => e as String)
           .toList() ??
       const <String>[],
-  availablePaymentMethods:
-      (json['availablePaymentMethods'] as List<dynamic>?)
-          ?.map((e) => e as Map<String, dynamic>)
-          .toList() ??
-      const <Map<String, dynamic>>[],
   items:
       (json['items'] as List<dynamic>?)
           ?.map((e) => OrderItem.fromJson(e as Map<String, dynamic>))
@@ -186,7 +181,6 @@ Map<String, dynamic> _$OrderToJson(_Order instance) => <String, dynamic>{
   'cancelByRole': instance.cancelByRole,
   'shipmentPhotoUrls': instance.shipmentPhotoUrls,
   'receiptPhotoUrls': instance.receiptPhotoUrls,
-  'availablePaymentMethods': instance.availablePaymentMethods,
   'items': instance.items,
   'refundHistory': instance.refundHistory,
 };

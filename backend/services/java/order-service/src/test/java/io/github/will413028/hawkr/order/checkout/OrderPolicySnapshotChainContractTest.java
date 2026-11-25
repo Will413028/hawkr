@@ -254,7 +254,7 @@ class OrderPolicySnapshotChainContractTest {
     @DisplayName("快照缺政策區塊 ⇒ confirm 中止，不得用預設值建單")
     void missingPolicyInSnapshotAbortsInsteadOfDefaulting() {
         when(valueOperations.getAndDelete(anyString()))
-                .thenReturn("{\"subtotal\":1000,\"shippingFee\":60,\"totalAmount\":1060,\"paymentMerId\":\"HAWK123\"}");
+                .thenReturn("{\"subtotal\":1000,\"shippingFee\":60,\"totalAmount\":1060}");
 
         try {
             service.confirm(baseRequest(METHOD).build());
@@ -289,7 +289,7 @@ class OrderPolicySnapshotChainContractTest {
         OrderPolicySnapshot policy = new OrderPolicyResolver().resolve(shippingMethod);
         // ②：產線的快照組裝，不手寫 JSON——欄名改了要在這裡就爆
         String snapshot = service.buildPriceSnapshot(
-                1000L, 60L, 0L, 1060L, false, false, "HAWK" + STORE_ID, policy);
+                1000L, 60L, 0L, 1060L, false, false, policy);
         // Redis 的往返就是字串往返
         when(valueOperations.getAndDelete(anyString())).thenReturn(snapshot);
 

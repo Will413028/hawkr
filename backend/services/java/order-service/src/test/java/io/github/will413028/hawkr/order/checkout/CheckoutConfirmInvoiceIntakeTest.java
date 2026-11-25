@@ -141,7 +141,7 @@ class CheckoutConfirmInvoiceIntakeTest {
         OrderPolicySnapshot policy =
                 new OrderPolicyResolver().resolve(ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value());
         when(valueOperations.getAndDelete(anyString())).thenReturn(
-                service.buildPriceSnapshot(1000L, 60L, 0L, 1060L, false, false, "HAWK123", policy));
+                service.buildPriceSnapshot(1000L, 60L, 0L, 1060L, false, false, policy));
     }
 
     private static CheckoutConfirmRequest.Builder baseRequest() {

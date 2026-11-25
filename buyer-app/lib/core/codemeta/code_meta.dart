@@ -2208,40 +2208,6 @@ enum PaymentMethod {
   }
 }
 
-/// 付款方式因「訂單金額不符該方式合法區間」而不可用的理由碼。由 order-service 在結帳預覽 / 訂單詳情計算 `availablePaymentMethods` 時填入（`eligible=false` 才有值）。前端依此碼的 label 顯示禁用理由（**通用文案、不帶具體數字**；限制值的 SSOT 留後端 [PaymentMethodLimitRules](../詳細設計書/20-結帳模組（Checkout%20Module）詳細設計書.md)，前端零複製）。
-enum PaymentMethodIneligibleReason {
-  /// 金額未達此付款方式下限 — 訂單金額低於該付款方式允許的最小金額（具體限制值見 PaymentMethodLimitRules）
-  amountBelowMin(code: 'AMOUNT_BELOW_MIN', value: '2101', label: '金額未達此付款方式下限'),
-  /// 金額超過此付款方式上限 — 訂單金額高於該付款方式允許的最大金額（具體限制值見 PaymentMethodLimitRules）
-  amountAboveMax(code: 'AMOUNT_ABOVE_MAX', value: '2102', label: '金額超過此付款方式上限');
-
-  const PaymentMethodIneligibleReason({
-    required this.code,
-    required this.value,
-    required this.label,
-  });
-
-  final String code;
-  final String value;
-  final String label;
-
-  /// 依 code 查找，找不到回傳 null
-  static PaymentMethodIneligibleReason? fromCode(String code) {
-    for (final v in values) {
-      if (v.code == code) return v;
-    }
-    return null;
-  }
-
-  /// 依 value 查找，找不到回傳 null
-  static PaymentMethodIneligibleReason? fromValue(String value) {
-    for (final v in values) {
-      if (v.value == value) return v;
-    }
-    return null;
-  }
-}
-
 /// 運送方式
 enum ShippingMethod {
   /// 黑貓宅急便 — 宅配到府

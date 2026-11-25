@@ -32,7 +32,6 @@ import io.github.will413028.hawkr.buyer.grpc.BuyerDisplay;
 import io.github.will413028.hawkr.seller.grpc.SellerMeta;
 import io.github.will413028.hawkr.common.config.MediaUrlProperties;
 import io.github.will413028.hawkr.order.grpc.converter.OrderProtoConverter;
-import io.github.will413028.hawkr.order.grpc.converter.PaymentMethodAvailabilityConverter;
 import io.github.will413028.hawkr.order.mq.OrderEventPublisher;
 import io.github.will413028.hawkr.order.repository.OrderItemRepository;
 import io.github.will413028.hawkr.order.repository.OrderRepository;
@@ -295,24 +294,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
         return base.toBuilder()
                 .setProviderStatus(pair.status())
                 .setProviderMessage(pair.message())
-                .build();
-    }
-
-    /**
-     * 再次付款 surface：依訂單金額填 availablePaymentMethods（§3.4.1 / 03 §4.2.1）。
-     * <p>
-     * **僅買家 getOrder 路徑呼叫**，內部以 status==PENDING_PAYMENT 守門：
-     * 非 pending（已付/已取消）不能再 CreatePayment，回付款方式為噪音，故回原 base。
-     * 賣家/管理員/物流 caller 不呼叫本方法，OrderDetailView.available_payment_methods 保持空，
-     * 避免污染共用 {@link OrderProtoConverter#toDetailView}。
-     */
-    private static OrderDetailView enrichAvailablePaymentMethods(OrderDetailView base, OrderEntity order) {
-        if (!io.github.will413028.hawkr.common.utils.code.OrderStatus.PENDING_PAYMENT.value().equals(order.getStatus())) {
-            return base;
-        }
-        long amount = order.getTotalActualAmount() == null ? 0L : order.getTotalActualAmount();
-        return base.toBuilder()
-                .addAllAvailablePaymentMethods(PaymentMethodAvailabilityConverter.resolve(amount))
                 .build();
     }
 
@@ -637,9 +618,7 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
 
             OrderDetailView baseDetail = OrderProtoConverter.toDetailView(
                     order, items, refunds, shipment, sellerMeta, null, cdnBaseUrl, false);
-            // 買家路徑：先 enrichProvider，再 enrichAvailablePaymentMethods（僅 pending 填，再次付款 surface §4.2.1）
-            OrderDetailView detail = enrichAvailablePaymentMethods(
-                    enrichProvider(baseDetail, resolveProviderStatusFor(order)), order);
+            OrderDetailView detail = enrichProvider(baseDetail, resolveProviderStatusFor(order));
 
             responseObserver.onNext(GetOrderResponse.newBuilder()
                     .setCode(GrpcResponseCode.SUCCESS.code())
@@ -992,10 +971,8 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                 .clearCvsStoreId()
                 // 金流
                 .clearTransactionId()
-                .clearPaymentMerId()
                 .clearProviderStatus()
                 .clearProviderMessage()
-                .clearAvailablePaymentMethods()
                 // 退款與撥款
                 .clearRefundHistory();
         if (!reveal) {

@@ -325,10 +325,6 @@ services:
       # §2A.2 訂單最低金額（CheckoutService L1 檢查）
       PAYMENT_MIN_AMOUNT: ${PAYMENT_MIN_AMOUNT:-15}
 
-      # 代理商 PayUni MerID（多賣家和單代收，20 設計書 §4.13）
-      # 空字串時 CheckoutPreview 接到 consolidated=true 會拒絕（INVALID_PARAM）
-      PAYUNI_AGENT_MER_ID: ${PAYUNI_AGENT_MER_ID:-}
-
       # Database
       DB_HOST: postgres
       DB_PORT: 5432

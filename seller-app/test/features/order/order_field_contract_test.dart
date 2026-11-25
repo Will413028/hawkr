@@ -77,7 +77,6 @@ Map<String, dynamic> _liveDetailOrder() => <String, dynamic>{
   'recipientPhone': '0912345678',
   'shippingAddress': '台北市內湖區瑞光路1號',
   'paymentMethod': '2004',
-  'paymentMerId': 'HAWK2685914682',
   'cancelByRole': 'BUYER',
   'items': <Map<String, dynamic>>[
     {
@@ -298,12 +297,11 @@ void main() {
       }
     });
 
-    test('啟發式嗅探已移除：付款方式清單不會被當成商品明細', () {
-      // 舊的 looksLikeItemMap 只要鍵名含 name/title 就算命中，而同一份回應裡
-      // 的 availablePaymentMethods 正好有 name。只要 items 因 omitempty 消失，
-      // 付款方式就會變成商品被算進金額。
+    test('啟發式嗅探已移除：其他帶 name 的清單不會被當成商品明細', () {
+      // 舊的 looksLikeItemMap 只要鍵名含 name/title 就算命中。
+      // 只要 items 因 omitempty 消失，這類清單就會變成商品被算進金額。
       final payload = _liveDetailOrder()..remove('items');
-      payload['availablePaymentMethods'] = [
+      payload['paymentOptions'] = [
         {'method': '2001', 'name': '信用卡', 'enabled': true},
       ];
       expect(OrderSummary.fromJson(payload).items, isEmpty);

@@ -325,10 +325,8 @@ message OrderDetailView {
     string payment_deadline = 59;             // ISO 8601 UTC，僅 status=0 時有值；建單時 = createdAt + payment-deadline-seconds
     // 評論快照（訂單層級單一，取該訂單最近一筆商品評論；未評論時不設定 / null）
     OrderReviewView review = 60;
-    // 付款 PayUni MerID（= orders.mer_id）— 給 Web/Mobile Google Pay 重試時動態取得 tokenization gatewayMerchantId（20 設計書 §4.13）
-    string payment_mer_id = 61;
-    // 再次付款可用付款方式（依 total_actual_amount 算）。**僅買家 getOrder + status=PENDING_PAYMENT 時填**；賣家/管理員/物流 caller 與非 pending 一律空（per-caller enrich，03 §4.2.1）。型別與規則同結帳預覽（20 §3.4.1）
-    repeated AvailablePaymentMethod available_payment_methods = 62;
+    reserved 61, 62;
+    reserved "payment_mer_id", "available_payment_methods";
     // 結案節點時間（皆 ISO 8601 UTC，空字串=尚未發生）。訂單時間軸的最後一格靠它們——
     // 沒有這三欄時只能送空字串，或拿 updated_at 冒充（dev 實測 95 筆取消單有 11 筆漂掉、
     // 最大漂 22.7 天，故不採用）。
@@ -790,7 +788,7 @@ message CheckoutPreviewRequest {
     string receiver_zip_code = 5;              // 收件人郵遞區號（宅配必填，如 "880"；店到店可空）
     string cvs_store_id = 6;                   // 超商門市代號（店到店時填）
     string coupon_template_id = 7;             // 使用者選擇的優惠券**模板** ID（空字串表示不使用）
-    bool consolidated = 8;                     // 是否為和單（多賣家走代理商代收）。default false=單賣家走 seller.payuni_mer_id；true=取 env PAYUNI_AGENT_MER_ID。詳見 20 設計書 §4.13
+    bool consolidated = 8;                     // 是否為和單（多賣家合併結帳）。default false=單賣家；多店結帳的設計在 B8 重做
 
     // ─── Uber Direct（shipping_method = 3003）專用，其餘配送方式一律空字串 ───
     //
@@ -820,9 +818,7 @@ message CheckoutPreviewData {
     string total_shipping_fee = 4;                 // 運費總計（數字字串）
     string total_discount = 5;                     // 折扣總計（數字字串）
     string total_actual_amount = 6;                // 實付總計（含運費、扣折扣，數字字串）
-    string payment_mer_id = 7;                     // 本次交易付款對應的 PayUni MerID（top-level，一次交易=一個 merId）。consolidated=false 取 sellerMeta.payuni_mer_id；consolidated=true 取 env PAYUNI_AGENT_MER_ID。前端 Web/Mobile 用此值帶入 Google Pay SDK tokenizationSpec.parameters.gatewayMerchantId
     repeated UnavailableItem unavailable_items = 8; // row 級不可購買清單。非空 → envelope code=4001 + 前端跳「請先返回購物車移除以下商品」dialog
-    repeated AvailablePaymentMethod available_payment_methods = 9; // 依 total_actual_amount 算出的各付款方式可用性（20 設計書 §3.4.1）。前端據此 render（禁用 + 理由），不自行用金額判斷。total_actual_amount==0（零元）→ 空清單，前端顯示「無需付款」
 
     // 58 號 §6.2.4 order ②：結帳頁的發票區（B01）所需的一切。
     //
@@ -834,13 +830,9 @@ message CheckoutPreviewData {
     // 而 invoice 那支 RPC 回空字串（它沒有可回聲的值）⇒ **order 必須用自己的值覆蓋**，
     // 否則前端拿到空字串。設計書 §5821 第 1 項逐字記載這件事。
     CheckoutInvoicePreview invoice = 10;
-}
 
-// 付款方式可用性（依訂單金額對 PayUni 各方式合法區間判定）。20 設計書 §3.4.1；OrderDetailView 再次付款 surface 共用
-message AvailablePaymentMethod {
-    string payment_type = 1;       // PaymentMethod value（2001 信用卡 / 2002 Apple Pay / 2003 Google Pay / 2004 ATM）
-    bool eligible = 2;             // 金額是否落在該方式合法區間
-    string ineligible_reason = 3;  // PaymentMethodIneligibleReason value（2101 未達下限 / 2102 超過上限）；eligible=true 時為空字串
+    reserved 7, 9;
+    reserved "payment_mer_id", "available_payment_methods";
 }
 
 // 單筆訂單分組預覽

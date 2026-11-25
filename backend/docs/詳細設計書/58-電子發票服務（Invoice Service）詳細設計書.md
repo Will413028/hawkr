@@ -4038,7 +4038,7 @@ FUNCTION AllocateLargestRemainder(weights[0..n-1], total) -> out[0..n-1]
 
 | 識別字 | 值／簽章 | 語意 |
 |---|---|---|
-| `MaxAmount` | `int64 = 199_999` | **業務上限**，與結帳側 `PaymentMethodLimitRules.ORDER_MAX_AMOUNT` 對齊（`services/java/shared/common-core/.../helper/PaymentMethodLimitRules.java:36`）。由 A20 檢查，**不是本函式的護欄** |
+| `MaxAmount` | `int64 = 199_999` | **業務上限**，與結帳側 `OrderAmountLimit.ORDER_MAX_AMOUNT` 對齊（`services/java/order-service/.../order/checkout/OrderAmountLimit.java`）。由 A20 檢查，**不是本函式的護欄** |
 | `maxSafeOperand` | `int64 = 1 << 31`（unexported） | **溢位護欄**，與業務上限無關。`total < 2³¹` ∧ `Σweights < 2³¹` ⇒ `total × weights[i] < 2⁶²`，永不溢位 |
 | `ErrAllocateNegative` | `errors.New("invoice: allocate: negative input")` | 權重或總額為負 |
 | `ErrAllocateOperandTooLarge` | `errors.New("invoice: allocate: operand exceeds overflow guard")` | 總額或權重合計 `>= 2³¹`。**全章沒有 `ErrAllocateOverflow` 這個識別字** |
