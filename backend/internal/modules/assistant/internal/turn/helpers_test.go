@@ -25,6 +25,8 @@ type chunk struct {
 	Thought      bool       `json:"thought"`
 	FunctionCall *chunkCall `json:"function_call"`
 	Error        string     `json:"error"`
+	// ErrorCode 非空時送出沒有內容的最終回應，形狀同 Gemini 擋下的回應（ErrorCode 與 FinishReason 都帶安全原因）。
+	ErrorCode string `json:"error_code"`
 }
 
 type chunkCall struct {
@@ -36,6 +38,8 @@ type chunkCall struct {
 type scriptedCall struct {
 	Agent  string  `json:"agent"`
 	Chunks []chunk `json:"chunks"`
+	// FinishReason 是非 Partial 回應的結束原因；nil 表示 STOP，指向空字串表示串流被提早關閉。
+	FinishReason *genai.FinishReason `json:"finish_reason"`
 }
 
 // llmRequest 是替身 LLM 收到的一次請求的摘要。
@@ -126,11 +130,21 @@ func (l *scriptedLLM) GenerateContent(_ context.Context, req *adkmodel.LLMReques
 				yield(nil, errors.New(c.Error))
 				return
 			}
+			if c.ErrorCode != "" {
+				yield(&adkmodel.LLMResponse{ErrorCode: c.ErrorCode, FinishReason: genai.FinishReasonSafety}, nil)
+				return
+			}
 			part := &genai.Part{Text: c.Text, Thought: c.Thought}
 			if c.FunctionCall != nil {
 				part = &genai.Part{FunctionCall: &genai.FunctionCall{Name: c.FunctionCall.Name, Args: c.FunctionCall.Args}}
 			}
 			resp := &adkmodel.LLMResponse{Content: &genai.Content{Role: genai.RoleModel, Parts: []*genai.Part{part}}, Partial: c.Partial}
+			if !c.Partial {
+				resp.FinishReason = genai.FinishReasonStop
+				if call.FinishReason != nil {
+					resp.FinishReason = *call.FinishReason
+				}
+			}
 			if !yield(resp, nil) {
 				return
 			}

@@ -36,7 +36,7 @@ ai-service 的每個機制，搬進來時都重新判斷過（遷移計畫「模
 
 **A9-2c 交接（已完成）**：`buyeragent.Orders` 的 adapter 在 `cmd/hawkr/assistant.go`，把 `orderservice.ErrOrderNotFound` 轉成 `assistant.ErrOrderNotFound`（= `buyeragent.ErrOrderNotFound`，`%w` 保留原錯誤），測試 `cmd/hawkr/assistant_test.go`；不轉的話查無訂單會變成 `upstream_unavailable`。
 
-**待決**（1–4 已由 A9-D17 決定，A9-2c 完成：1. 預設訊息刪除；2. 緩衝上限 4096、保留 10 分鐘定案；3. 輪次逾時 2 分鐘定案；4. `error` 事件的 reason 是新增的 `ASSISTANT_TURN_FAILED`，`FailureKind` 細分只進 log）：5. 疑似缺陷照搬未修，程式註解標「疑似缺陷」：整句空白的訊息被當成有內容（狀態標籤表與 prompt 的狀態碼不一致、`track_my_package` 以狀態 20 當配送中已由 A9-D15 修正、單筆物流詳情失敗靜默略過已由 A9-D16 修正（全失敗回 `upstream_unavailable`，部分失敗回 `note=some_packages_unavailable`））。；6. ADK v2.7.1／v2.8.0 的 data race（串流以 partial 事件結尾時，`runner.fromPlugin` 與 `IsFinalResponse()` 同時存取同一事件；正常結尾不觸發，有 `-race` 測試守）：已回報 google/adk-go#2447、修正 PR #2448；partial 結尾的測試暫時 `t.Skip`。觸發：ADK 發佈含修正的版本且滿兩週，升級並刪除 Skip（A9-D16）。
+**待決**（1–4 已由 A9-D17 決定，A9-2c 完成：1. 預設訊息刪除；2. 緩衝上限 4096、保留 10 分鐘定案；3. 輪次逾時 2 分鐘定案；4. `error` 事件的 reason 是新增的 `ASSISTANT_TURN_FAILED`，`FailureKind` 細分只進 log）：5. 疑似缺陷照搬未修，程式註解標「疑似缺陷」：整句空白的訊息被當成有內容（狀態標籤表與 prompt 的狀態碼不一致、`track_my_package` 以狀態 20 當配送中已由 A9-D15 修正、單筆物流詳情失敗靜默略過已由 A9-D16 修正（全失敗回 `upstream_unavailable`，部分失敗回 `note=some_packages_unavailable`））。；6. （已結案）ADK v2.7.1 對以 partial 結尾的串流有競態，ADK 裡仍存在，但這裡走不到：現行的轉接器（Gemini、openaimodel）成功的串流一律以非 Partial 的聚合回應結尾（上游 google/adk-go#2447 與修正 PR #2448 於 2026-11-24 未合併就關閉）。重開條件：assistant 開始使用會讓串流停在 partial 片段的自訂 `model.LLM` 或 proxy。截斷（伺服器乾淨地提早關閉、結束原因為空）由「最終回應的 FinishReason 必須是 STOP 才算 finished」處理。
 
 ## 傳輸層的沿用盤點
 

@@ -3,6 +3,7 @@ package turn
 import (
 	"context"
 	"errors"
+	"fmt"
 	"iter"
 	"sync"
 	"sync/atomic"
@@ -344,17 +345,77 @@ func TestStreamEndingNormallyAfterPartialChunksFinishesWithoutARace(t *testing.T
 	}
 }
 
-func TestStreamEndingWithPartialChunksOnlyDoesNotRace(t *testing.T) {
-	t.Skip("ADK data race on partial-ending streams: https://github.com/google/adk-go/issues/2447；移除條件：google/adk-go 修正 runner.fromPlugin 對 Actions.Compaction 的寫入與 IsFinalResponse 的讀取後，升級 ADK 並刪除這個 Skip")
-	llm := &scriptedLLM{script: []scriptedCall{{Chunks: []chunk{{Partial: true, Text: "半句"}, {Partial: true, Text: "話"}}}}}
+// 最終回應的結束原因不是 STOP 就不算完成：串流被提早關閉（空值、UNSPECIFIED）與 MAX_TOKENS、SAFETY 都走 fail()。
+func TestFinalResponseWithoutStopFinishReasonIsNotFinished(t *testing.T) {
+	reasons := map[string]genai.FinishReason{
+		"empty":       "",
+		"unspecified": genai.FinishReasonUnspecified,
+		"max_tokens":  genai.FinishReasonMaxTokens,
+		"safety":      genai.FinishReasonSafety,
+	}
+	for name, reason := range reasons {
+		for _, streamed := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/streamed=%t", name, streamed), func(t *testing.T) {
+				chunks := []chunk{{Text: "半句話"}}
+				want := model.FailureNoOutput
+				if streamed {
+					chunks = []chunk{{Partial: true, Text: "半句"}, {Text: "半句話"}}
+					want = model.FailureInterrupted
+				}
+				llm := &scriptedLLM{script: []scriptedCall{{Chunks: chunks, FinishReason: &reason}}}
+				e := newExecutor(t, llm, &fakeOrders{}, nil)
+				ref, err := submitChat(t, e, "", "你好")
+				if err != nil {
+					t.Fatal(err)
+				}
+				evs := collect(t, e, buyer, ref.TurnID, "")
+				last := evs[len(evs)-1]
+				if last.Kind != model.EventError || last.Failure != want {
+					t.Fatalf("結束原因 %q 要以 %v 的 error 結束，得到 %+v", reason, want, last)
+				}
+				for _, ev := range evs {
+					if ev.Kind == model.EventFinished {
+						t.Fatalf("不得出現 finished：%+v", evs)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestFinalResponseWithStopFinishReasonIsFinished(t *testing.T) {
+	llm := &scriptedLLM{script: []scriptedCall{{Chunks: []chunk{{Text: "您好"}}}}}
 	e := newExecutor(t, llm, &fakeOrders{}, nil)
 	ref, err := submitChat(t, e, "", "你好")
 	if err != nil {
 		t.Fatal(err)
 	}
 	evs := collect(t, e, buyer, ref.TurnID, "")
-	if last := evs[len(evs)-1]; last.Kind != model.EventError {
-		t.Fatalf("沒有最終回應不得 finished：%+v", evs)
+	last := evs[len(evs)-1]
+	if last.Kind != model.EventFinished {
+		t.Fatalf("STOP 的最終回應要 finished：%+v", evs)
+	}
+	got := ""
+	for _, ev := range evs {
+		got += ev.Text
+	}
+	if got != "您好" {
+		t.Fatalf("文字 = %q", got)
+	}
+}
+
+// 被 Gemini 擋下的回應沒有內容，帶 ErrorCode 與 SAFETY 的結束原因，要以沒有輸出的失敗結束。
+func TestBlockedFinalResponseWithErrorCodeFails(t *testing.T) {
+	llm := &scriptedLLM{script: []scriptedCall{{Chunks: []chunk{{ErrorCode: "SAFETY"}}}}}
+	e := newExecutor(t, llm, &fakeOrders{}, nil)
+	ref, err := submitChat(t, e, "", "你好")
+	if err != nil {
+		t.Fatal(err)
+	}
+	evs := collect(t, e, buyer, ref.TurnID, "")
+	last := evs[len(evs)-1]
+	if last.Kind != model.EventError || last.Failure != model.FailureNoOutput {
+		t.Fatalf("被擋下的回應要以 FailureNoOutput 的 error 結束，得到 %+v", last)
 	}
 }
 

@@ -35,7 +35,7 @@ func (replyLLM) Name() string { return "reply" }
 
 func (l replyLLM) GenerateContent(context.Context, *adkmodel.LLMRequest, bool) iter.Seq2[*adkmodel.LLMResponse, error] {
 	return func(yield func(*adkmodel.LLMResponse, error) bool) {
-		yield(&adkmodel.LLMResponse{Content: genai.NewContentFromText(l.reply, genai.RoleModel)}, nil)
+		yield(&adkmodel.LLMResponse{Content: genai.NewContentFromText(l.reply, genai.RoleModel), FinishReason: genai.FinishReasonStop}, nil)
 	}
 }
 
