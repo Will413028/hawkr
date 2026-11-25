@@ -27,4 +27,4 @@
 - 3d adapter 分類：`internal/modules/payment/internal/charge/stripe_test.go` 的 `TestStripeMoneyErrorsAreClassifiedIntoThreeWays` 等 19 個測試，本機 `go test ./internal/modules/payment/...` ok。
 - mutation（workflow_dispatch run 45572988704，dev `ad526d5db`，`b2-step3d/4/5.json`）：go 38/40、go-integration 9/10、admin 10/10 KILLED。未殺的 3 條：
   - `currency-not-usd` 存活：測試拿常數 `StripeCurrency` 比對自己。步驟 7 改成比對字面值 `"usd"`；本機在副本換成 `"twd"`，`TestStripeCreatePaymentSendsCentsUSDGroupMetadataAndKey` 失敗（killed）。
-  - `resolve-wrong-actor`、`close-job-gives-up-while-creating` 是清單本身編譯失敗（變數或 import 沒用到），步驟 7 修清單；CI 重跑結果見進度表。
+  - `resolve-wrong-actor`、`close-job-gives-up-while-creating` 是清單本身編譯失敗（變數或 import 沒用到），步驟 7 修清單。修正後 run 45577634782：go 40/40、go-integration 10/10、admin 10/10 全殺。
