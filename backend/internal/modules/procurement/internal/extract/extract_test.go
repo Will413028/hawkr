@@ -10,7 +10,6 @@ import (
 	"time"
 
 	adkmodel "google.golang.org/adk/v2/model"
-	"google.golang.org/adk/v2/model/openaimodel"
 	"google.golang.org/genai"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/slots"
@@ -309,7 +308,7 @@ func TestNonStopFinishReasonOnToolCall(t *testing.T) {
 func TestFinishReasonErrorCarriesProviderDetail(t *testing.T) {
 	cut := text(`{"item":"蘋果"}`)
 	cut.resp.FinishReason = genai.FinishReasonMaxTokens
-	cut.resp.CustomMetadata = map[string]any{openaimodel.FinishMessageKey: "length"}
+	cut.resp.CustomMetadata = map[string]any{"openai_finish_message": "length"}
 	f := &fakeLLM{steps: []step{cut}}
 	_, err := newTest(f, ShapeSchema).Extract(context.Background(), "蘋果", slots.Set{})
 	if err == nil || !strings.Contains(err.Error(), "length") {

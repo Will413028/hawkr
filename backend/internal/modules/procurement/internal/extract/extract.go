@@ -14,7 +14,6 @@ import (
 	"time"
 
 	adkmodel "google.golang.org/adk/v2/model"
-	"google.golang.org/adk/v2/model/openaimodel"
 	"google.golang.org/genai"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/slots"
@@ -171,7 +170,7 @@ func (e *Extractor) attempt(parent, budget context.Context, req *adkmodel.LLMReq
 	}
 	if resp != nil && resp.FinishReason != genai.FinishReasonStop {
 		err := fmt.Errorf("模型結束原因 %q", resp.FinishReason)
-		if detail, ok := resp.CustomMetadata[openaimodel.FinishMessageKey].(string); ok && detail != "" {
+		if detail := llm.FinishDetail(resp); detail != "" {
 			err = fmt.Errorf("模型結束原因 %q：%s", resp.FinishReason, detail)
 		}
 		return slots.Patch{}, &attemptErr{
