@@ -7,11 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 	"uuid"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
@@ -656,18 +658,23 @@ func TestOnlyLeafCategoriesAcceptedOnWrite(t *testing.T) {
 	}
 }
 
-// waitBlocked 等到有別的連線卡在鎖上（條件成立才往下，不假設時間）；query 要含 fragment。
-func (f *productFixture) waitBlocked(fragment string) {
+// waitBlockedBy 等到有別的連線被 pid 這個 backend 持有的鎖擋住（pg_blocking_pids，不看 SQL 文字）；條件成立才往下，不假設時間。
+// done 先有結果代表那個呼叫沒有等鎖就結束了，直接讓測試失敗並帶出它的錯誤。
+func (f *productFixture) waitBlockedBy(pid int, done <-chan error) {
 	f.t.Helper()
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
-		if f.count(`SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid()
-			AND wait_event_type = 'Lock' AND query LIKE '%' || $1 || '%'`, fragment) > 0 {
+		select {
+		case err := <-done:
+			f.t.Fatalf("the call finished (err=%v) without waiting for the lock held by backend %d", err, pid)
+		default:
+		}
+		if f.count(`SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND $1::int = ANY(pg_blocking_pids(pid))`, pid) > 0 {
 			return
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	f.t.Fatalf("no session blocked on a lock touching %s", fragment)
+	f.t.Fatalf("no session blocked on a lock held by backend %d", pid)
 }
 
 // lockedNow 回報這一刻 query（必須是 FOR UPDATE NOWAIT 的 SELECT）要鎖的列是不是已經被別的 transaction 持有。
@@ -711,6 +718,10 @@ func TestUpdateLocksExistingSkusInAscendingIdOrderWhateverTheInputOrder(t *testi
 	if _, err := holder.Exec(f.ct, `SELECT id FROM catalog.product_skus WHERE id = $1 FOR UPDATE`, lo.ID); err != nil {
 		t.Fatal(err)
 	}
+	var holderPID int
+	if err := holder.QueryRow(f.ct, `SELECT pg_backend_pid()`).Scan(&holderPID); err != nil {
+		t.Fatal(err)
+	}
 	reversed := f.input("鎖順序")
 	reversed.Axes = colorSize()
 	byID := map[uuid.UUID]Sku{lo.ID: lo, hi.ID: hi}
@@ -723,7 +734,7 @@ func TestUpdateLocksExistingSkusInAscendingIdOrderWhateverTheInputOrder(t *testi
 		_, err := f.m.UpdateProduct(f.ct, storeID, media.Uploader{ID: acct}, p.ID, reversed)
 		done <- err
 	}()
-	f.waitBlocked("product_skus")
+	f.waitBlockedBy(holderPID, done)
 	if f.lockedNow(`SELECT id FROM catalog.product_skus WHERE id = $1 FOR UPDATE NOWAIT`, hi.ID) {
 		t.Error("Update locked the larger sku id before the smaller one")
 	}
@@ -783,43 +794,82 @@ func TestReadIsOneSnapshotWhileAWriteCommitsBetweenItsParts(t *testing.T) {
 	in := f.input("快照")
 	in.Description = []Block{{Kind: BlockParagraph, Text: "說明"}, {Kind: BlockImage, Image: &Image{Token: "snap-d1"}}}
 	p := f.create(storeID, acct, in)
-	tx, err := f.d.Pool().Begin(f.ct)
+	// 第二個連線池的 tracer 在 GetOwnProduct 這句讀完之後把讀取停住：單句實作到此已經讀完全部內容，
+	// 拆成兩句的實作還沒讀圖片。停住的期間提交修改，再放行。
+	gate := &readGate{reached: make(chan struct{}), release: make(chan struct{})}
+	defer gate.open()
+	d2, err := db.Open(f.ct, db.Config{URL: f.d.Pool().Config().ConnConfig.ConnString(), MaxConns: 2, ConnectRetryBudget: 10 * time.Second, Tracer: gate})
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = tx.Rollback(f.ct) }()
-	if _, err := tx.Exec(f.ct, `LOCK TABLE catalog.product_images IN ACCESS EXCLUSIVE MODE`); err != nil {
-		t.Fatal(err)
-	}
+	defer d2.Close()
+	reader := New(Deps{DB: d2, NewID: uuid.NewV7, Now: f.clock, Media: f.media})
 	type result struct {
 		p   Product
 		err error
 	}
 	done := make(chan result, 1)
 	go func() {
-		got, err := f.m.Product(f.ct, storeID, p.ID)
+		got, err := reader.Product(f.ct, storeID, p.ID)
 		done <- result{got, err}
 	}()
-	f.waitBlocked("product_images")
-	if _, err := tx.Exec(f.ct, `DELETE FROM catalog.product_images WHERE product_id = $1`, p.ID); err != nil {
+	select {
+	case <-gate.reached:
+	case r := <-done:
+		t.Fatalf("the read finished without passing the gate: %v", r.err)
+	case <-time.After(30 * time.Second):
+		t.Fatal("the read never reached the gate")
+	}
+	w, err := f.d.Pool().Begin(f.ct)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tx.Exec(f.ct, `UPDATE catalog.products SET description = '[]'::jsonb WHERE id = $1`, p.ID); err != nil {
+	defer func() { _ = w.Rollback(f.ct) }()
+	if _, err := w.Exec(f.ct, `DELETE FROM catalog.product_images WHERE product_id = $1`, p.ID); err != nil {
 		t.Fatal(err)
 	}
-	if err := tx.Commit(f.ct); err != nil {
+	if _, err := w.Exec(f.ct, `UPDATE catalog.products SET description = '[]'::jsonb WHERE id = $1`, p.ID); err != nil {
 		t.Fatal(err)
 	}
+	if err := w.Commit(f.ct); err != nil {
+		t.Fatal(err)
+	}
+	gate.open()
 	r := <-done
 	if r.err != nil {
 		t.Fatalf("a read overlapping a write must see one version: %v", r.err)
 	}
-	before := len(r.p.Description) == 2 && len(r.p.Gallery) == 1
-	after := len(r.p.Description) == 0 && len(r.p.Gallery) == 0
-	if !before && !after {
-		t.Fatalf("mixed versions: description=%d gallery=%d", len(r.p.Description), len(r.p.Gallery))
+	if len(r.p.Description) != 2 || len(r.p.Gallery) != 1 {
+		t.Fatalf("the read began before the write committed, want the whole old version: description=%d gallery=%d", len(r.p.Description), len(r.p.Gallery))
 	}
 }
+
+// readGate 在 GetOwnProduct 讀完時停住該連線，直到 open。
+type readGate struct {
+	reached chan struct{}
+	release chan struct{}
+	once    sync.Once
+	opened  sync.Once
+}
+
+type gateKey struct{}
+
+func (g *readGate) TraceQueryStart(ctx context.Context, _ *pgx.Conn, data pgx.TraceQueryStartData) context.Context {
+	if strings.Contains(data.SQL, "name: GetOwnProduct") {
+		return context.WithValue(ctx, gateKey{}, true)
+	}
+	return ctx
+}
+
+func (g *readGate) TraceQueryEnd(ctx context.Context, _ *pgx.Conn, _ pgx.TraceQueryEndData) {
+	if ctx.Value(gateKey{}) == nil {
+		return
+	}
+	g.once.Do(func() { close(g.reached) })
+	<-g.release
+}
+
+func (g *readGate) open() { g.opened.Do(func() { close(g.release) }) }
 
 // 刪除商品時它的 SKU 一併刪除：扣減找不到；刪除之前的扣減仍能歸還（歸還不看刪除）。
 func TestDeleteProductMakesItsSkusUndeductibleButRestorable(t *testing.T) {

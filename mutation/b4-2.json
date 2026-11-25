@@ -42,8 +42,8 @@
    "file": "backend/internal/modules/catalog/internal/stock/stock.go",
    "old": "if _, err := q.LockStockOperation(ctx, deduct.ID); err != nil {\n\t\t\treturn err\n\t\t}",
    "new": "_ = deduct.ID",
-   "test": "internal/modules/catalog ^TestConcurrentRestoresNeverExceedTheDeduction$",
-   "why": "歸還不鎖原扣減：併發歸還各自讀到同一個剩餘量，總歸還量超過原扣減，測試要紅。"
+   "test": "internal/modules/catalog ^TestRestoreWaitsForTheLockOnTheDeduction$",
+   "why": "歸還不鎖原扣減：別的 transaction 持有原扣減列的 FOR NO KEY UPDATE 時，歸還不等它就做完，測試要紅（併發歸還各自讀到同一個剩餘量的後果由 TestConcurrentRestoresNeverExceedTheDeduction 守，但它依賴時序）。"
   },
   {
    "id": "items-not-sorted-before-locking",
@@ -214,7 +214,7 @@
    "old": "if !own {",
    "new": "if false && !own {",
    "test": "internal/modules/catalog ^TestAdjustReplayIsNoOpAndDifferentContentIsRejected$",
-   "why": "調整的冪等重送不確認 SKU 屬於呼叫的店家：別家店用同一個 key 與內容重送回成功，測試要紅。"
+   "why": "調整的冪等重送不確認 SKU 屬於呼叫的店家：同店同一個 key 重送別家店的 SKU 回 ErrIdempotencyKeyReused 而不是 ErrSkuNotFound，測試要紅。"
   },
   {
    "id": "limit-constant-drifts-from-schema-check",
