@@ -43,8 +43,8 @@
 
 | 編號 | 設計書 | 對應程式碼 |
 |------|--------|-----------|
-| 12 | [通知微服務（Notification Service）](詳細設計書/12-通知微服務%EF%BC%88Notification%20Service%EF%BC%89詳細設計書.md) | `services/notification-service/` |
-| 13 | [通知模板引擎與收件箱（Notification Template）](詳細設計書/13-通知模板引擎與收件箱%EF%BC%88Notification%20Template%EF%BC%89詳細設計書.md) | `services/notification-service/` |
+| 12 | [通知微服務（Notification Service）](詳細設計書/12-通知微服務%EF%BC%88Notification%20Service%EF%BC%89詳細設計書.md) | 已退場，規格見 `backend/docs/modules/notification.md`（`internal/modules/notification/`） |
+| 13 | [通知模板引擎與收件箱（Notification Template）](詳細設計書/13-通知模板引擎與收件箱%EF%BC%88Notification%20Template%EF%BC%89詳細設計書.md) | 已退場，規格見 `backend/docs/modules/notification.md`（`internal/modules/notification/`） |
 | 14 | [即時通訊微服務（IM Service）](詳細設計書/14-即時通訊微服務%EF%BC%88IM%20Service%EF%BC%89詳細設計書.md) | `services/im-service/` |
 | 15 | [AI 微服務（AI Service）](詳細設計書/15-AI%20微服務%EF%BC%88AI%20Service%EF%BC%89詳細設計書.md) | `services/ai-service/` |
 | 16 | [顧客管理微服務（CRM Service）](詳細設計書/16-顧客管理微服務%EF%BC%88CRM%20Service%EF%BC%89詳細設計書.md) | `services/crm-service/` |

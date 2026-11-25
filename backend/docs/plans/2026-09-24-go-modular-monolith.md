@@ -295,14 +295,16 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - `pkg/mq` 剩餘的 social routing key／event type 常數與 `socialrelay`。觸發：A8 notification 搬進單體時刪。
   - lockorder 檢查器看不到 SQL 函式內的鎖（`pub_lock_content_takedowns`）。觸發：再新增一個在 pub 函式內鎖列的機制時，改成檢查器可見的形式。
   - supply chain（dev 既有失敗）：`next@16.4.1` GHSA-mfr8-8qww-v76h、GHSA-vc7v-qv4w-wrv8（修正版 16.4.5，需 Will 同意升級）與 `osv-scanner.toml` 3 筆 unused ignore（GHSA-xxph-c9ww-hj94、GHSA-w573-9ffj-6ff9、GHSA-crwc-vw2r-qr6m）。觸發：立即（medium 90 天期限自 2026-11-19 起）。
-- [ ] **A8 notification**：依 ADR `2026-10-05-notification-module.md`：通知型別定義在程式碼、逐一明確訂閱，不照搬 wildcard。階段計畫：`2026-11-23-a8-notification.md`（盤點、步驟、決定 D0–D13 與進度寫在那裡；本段以下是計畫建立前的原文，Clerk webhook 一條已由計畫前提取代）。
-  - 發票寄送的買家 email 來源：單體 buyer 沒有 email，email 只在 identity（`accounts.email`）；A8 定 identity 的 email 同步時，一併決定發票（invoice-service）寄送地址取自 identity 的哪個欄位與介面（設計書 58 U5，Will 2026-10-28）。
-  - 通知的維運重送：舊的 outbox 手動補列已隨 outbox 刪除，設計書 56 的 runbook 已無重送步驟；A8 設計投遞紀錄時一併定義重送手段（例如重排永久失敗的投遞紀錄）與 runbook（Will 2026-10-28）。
-  - （已被 A8 計畫取代：寄件地址改用 identity 登入同步）~~identity 接 Clerk 的 `user.updated` webhook（驗證簽章）同步已驗證的主要 email，作為 email 渠道的寄件地址；不在寄信時呼叫 Clerk Backend API（ADR `2026-09-27-identity-clerk.md` 文末〈修訂：email 作為通知的寄件地址〉）。完成時 `backend/docs/modules/identity.md` 的 email 從「建帳時的快照」改成同步後的規格。~~
-  - （已被 A8 計畫 D11 取代：串流只傳失效訊號、不做續傳）~~`notifications/stream` 的 SSE 依 D7 改成 server streaming，續傳用游標欄位取代 `Last-Event-ID`，保留每個帳號的串流上限。~~
-  - 治理的通知（A3b `step10e-reports-brief.md` R4、R7、R9，Will 2026-10-18）：訂閱 seller 的 `ReportReceived`、`ReportResolved`（通報人一定是登入的買家，用站內通知；匿名入口在 A3b 10f-2a 刪除），以及在 seller 加上詢問的事件並訂閱（賣家；3c-b 預先發出的 `CaseInquiryCreated` 因沒有消費者已刪除，A8 依「消費者出現時再加事件」在這一刀加）；食安事件通知某個商品過去 6 個月的購買者，前提是查得到購買者（B8）。
-  - **確認信地址不得留在 job 參數裡**（A3b 3c-a 設計審查 #10，Will 2026-10-18）：`ReportReceived.ConfirmationEmail`（匿名送出留的 email）只在事件與 A8 同一個 transaction 排入的 job 參數裡，seller 不落表（`seller/events.go` 的註解寫同一條）。River v0.47.0（`backend/go.mod`）預設保留完成的 job 24 小時、丟棄（寄送失敗用盡重試）的 job 7 天（`rivershared/riversharedmaintenance/river_shared_maintenance.go:35-37`；專案沒有覆寫 `*JobRetentionPeriod`），參數裡的地址會跟著留那麼久。所以寄送 job 必須在完成或丟棄時清掉參數裡的地址，或參數只放 report／supplement 的參照、執行時再讀（地址就落在 seller，回到 365 天的聯絡方式保留規則管得到的範圍）。觸發：A8 訂閱 `ReportReceived` 的那一刀；驗收要有測試證明 job 完成與丟棄之後參數不含地址。
-  - 賣家收款開通結果與平台審核結果的通知（ADR `2026-11-13-payment-onboarding-provider-port-stripe.md`、`2026-11-13-seller-platform-review-and-identity-matching.md`，Will 2026-11-02、2026-11-12）：舊的 `merchant.verification.*`（含管理員退回）與 `sellerconsumer` 的 PayUni 審核通知已停發，賣家現在不會收到核准、退回或收款帳戶啟用、需補件、停用的通知。A8 訂閱 seller 的 KYC 審核事件與 payment 的 `PayoutAccountChanged`；email 只寄 identity 已驗證的信箱，自填聯絡信箱要先有驗證碼驗證。收款帳戶的首次啟用時間與補件期限（Stripe `requirements.summary.minimum_deadline`）欄位與期限前提醒在這一刀一起加。
+- [x] **A8 notification**（完成，2026-11-26，Will 決定跳過 A8-6 的真機推播驗收；程式完成，真機驗收延後）：依 ADR `2026-10-05-notification-module.md`：通知型別定義在程式碼、逐一明確訂閱，不照搬 wildcard。階段計畫：`2026-11-23-a8-notification.md`（盤點、步驟、決定 D0–D31、完成定義核對與進度寫在那裡）；行為規格 `backend/docs/modules/notification.md`。notification-service、gateway 通知路由與 SSE 平台、payload golden 契約、`pkg/mail` 已刪。
+  - A8 延後項（階段計畫「延後項」搬回，2026-11-26）：
+    - 接上 order、aftersales 的賣家工作區發布者（`notification.PublishSellerWorkspace`，D19）；到那時賣家中心沒有即時同步。觸發：order、aftersales 搬進單體（B8、B9）。
+    - 還沒搬的服務的通知型別（訂單、出貨、退款、發票、商品認證、庫存與訂單逾期預警、`order.delivered`、ATM 退款通知參數）：逐一裁決（做型別並訂閱，或不做附理由），不經 `internal/legacy`。觸發：各發送端搬進單體（B2–B10、A5），由「模組完成的定義」的通知型別條目承接。
+    - 食安事件通知近 6 個月購買者。觸發：B8。
+    - 真實寄信驗收（Resend 帳號與交易信子網域）、真機推播驗收（Firebase、APNs、Notification Service Extension 的 App ID）。觸發：Will 買網域與完成 Apple、Firebase 設定（清單見階段計畫「需要人做的事」）。
+    - SMS、LINE、Web Push 重新評估。觸發：未觸達率連續 4 週超過 10%。
+    - 買家處分的申訴流程（階段計畫 D25）。觸發：上線前產品決定。
+    - 特性測試豁免（階段計畫 D31，Will 2026-11-26，比照 A6-D27）；FCM 憑證錯誤告警延後（D32，Will 2026-11-26；觸發：單體告警管道建立時或上線前，同時承接未觸達率 metric）。
+    - 設計審查的接受項（推播不收斂、`actor_account_ids` 無讀取端、停寄名單 HMAC 輪替、重送 `RequeuedAt`、串流無心跳、公告與 fan-out 兩套）：結論與重新評估條件在 `internal/modules/notification/CARRYOVER.md`「A8-8 設計審查的處置」。
 - [x] **A9 agent**（完成，2026-11-25，Will 決定；細節與 pending P1–P5 見階段計畫的 A9-7）
   - 階段計畫：`2026-11-19-a9-agent.md`（盤點、步驟、決定 A9-D1–D11 與進度寫在那裡；本段以下是計畫建立前的原文）。
   - AI 助理與 procurement 的串流（AG-UI，12 支 SSE）：依 ADR `2026-09-26-external-contract-protobuf-connect.md` D7 在這一步決定改成 proto 的 server streaming，或保留 AG-UI 的 SSE 並明列為第二套契約（AG-UI 是外部的開放格式）。
@@ -312,8 +314,8 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - A9 收尾後的 pending（階段計畫 A9-7「收尾後的 pending」P1–P5，Will 2026-11-25 決定之後再改）：D5 對 assistant 與 imageai 的例外、6 份 ai-service 時期 ADR 標 superseded、三份 `CARRYOVER.md` 補公司時期未完成項、獨立 design-review、API key／en 文案審閱／150 秒重連測試／Vercel 實量。
   - A9 延後項（階段計畫 `2026-11-19-a9-agent.md` 的「延後」搬回，2026-11-25）：
     - `cmd/new-module` 模板的 integration test 產生無呼叫者的 `setup`，新模組在第一個真實測試前會被 `lint-monolith` 擋。觸發：下次跑 `make new-module`。
-    - notification-service 的 `MailConfig` 已無呼叫者。觸發：A8。
-    - notification 直接訂閱單體採購事件、刪 `procurement` 的 relay。觸發：A8。
+    - ~~notification-service 的 `MailConfig` 已無呼叫者。觸發：A8。~~（A8-7a 隨服務刪除，`pkg/mail` 於 A8-8 刪除）
+    - ~~notification 直接訂閱單體採購事件、刪 `procurement` 的 relay。觸發：A8。~~（A8-3c 訂閱 `RfqPublished`，A8-3f 刪 relay 與 `delivery_state`）
     - 採購建單與商品讀取改 in-process（目前經 `internal/legacy` 的 ordering、catalog client）。觸發：B8 ordering、B4 catalog 搬進單體。
     - 召回 eval 與別名層。觸發：上線前需要召回率基準（A9-D7）。
     - LLM 指標接告警，並補回 AI 告警規則（供應商停用、設定不完整、token 預算逼近與用盡、抽取降級）。觸發：單體開始匯出指標（主計畫「單體告警管道」）。
@@ -461,7 +463,7 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
 | 階段 | 狀態 | 備註 |
 |---|---|---|
 | 0 地基 | 進行中 | 已完成：0.1；0.2 的核心機制；0.3 的依賴方向、migration 與 query 隔離檢查；0.4 的 migration 套用器與 Atlas 開發設定；0.6 的 OpenAPI 規格與生成工具（2026-09-26 由 Connect 取代，規格改為現有 API 清單）；0.7 的 D9 gate；0.8 的盤點 gate；0.9 的本機環境；0.10 的指令檔；0.11 的 `backend-monolith` workflow（含 integration 測試）；0.5 的模組模板與 scaffold（2026-09-27，從 content 抽出）。單體統一使用 Postgres 18。前置修正：CodeMeta 的 Go 輸出從 `docs/` 移到 `internal/platform/codemeta`，因為中文目錄名不是合法的 import path，會讓根 module 無法建置 |
-| A Go 併入 | 進行中 | A0、A1、A2 完成；A4 取消（pricebook 刪除）。A3 完成（2026-11-23，`2026-09-29-a3-buyer-seller.md`；延後項見 A 段「A3 延後項」）；收款開通換 Stripe 已完成，決定在 `adr/2026-11-13-payment-onboarding-provider-port-stripe.md`。A7：1a、1b、1c、1d、1d′、1d″、1e、1f 完成，下一步 A7-2 對外 API（`2026-10-18-a7-social.md`）。A6 完成（2026-11-23：review、im、crm 進單體、三個舊服務與 33 條 REST 刪除，四端改 Connect；兩支 App 真機登入驗證延後，延後項見 A6 段，`2026-11-19-a6-review-im-crm.md`）。其餘 A5、A8–A11 未開始 |
+| A Go 併入 | 進行中 | A0、A1、A2 完成；A4 取消（pricebook 刪除）。A3 完成（2026-11-23，`2026-09-29-a3-buyer-seller.md`；延後項見 A 段「A3 延後項」）；收款開通換 Stripe 已完成，決定在 `adr/2026-11-13-payment-onboarding-provider-port-stripe.md`。A7：1a、1b、1c、1d、1d′、1d″、1e、1f 完成，下一步 A7-2 對外 API（`2026-10-18-a7-social.md`）。A6 完成（2026-11-23：review、im、crm 進單體、三個舊服務與 33 條 REST 刪除，四端改 Connect；兩支 App 真機登入驗證延後，延後項見 A6 段，`2026-11-19-a6-review-im-crm.md`）。A8 完成（2026-11-26：notification 進單體、舊服務與通知路由刪除，四端改 Connect；兩支 App 真機推播驗收延後，延後項見 A8 段，`2026-11-23-a8-notification.md`）。其餘 A5、A10 未開始（A9、A11 見各段）|
 | B Java 改寫 | 未開始 | |
 | C 收尾 | 未開始 | |
 | D 前端 client | 取消（2026-09-26） | 併進模組完成的定義，收尾在階段 C |
