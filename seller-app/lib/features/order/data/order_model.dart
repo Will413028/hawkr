@@ -192,8 +192,8 @@ abstract class OrderSummary with _$OrderSummary {
     // `order`/`orderInfo` 找、最後還有一段「掃過每個 List 欄位，用鍵名長得
     // 像不像商品來猜」的啟發式嗅探——那段是真的會咬人的：`looksLikeItemMap`
     // 只要鍵名含 name/title 就算命中，而同一份回應裡的
-    // `availablePaymentMethods`（付款方式，有 name）正好符合。只要哪天
-    // `items` 因為 omitempty 消失，付款方式清單就會被當成商品明細算進金額。
+    // 回應裡其他帶 name 的清單（例如付款選項）也符合。只要哪天
+    // `items` 因為 omitempty 消失，那份清單就會被當成商品明細算進金額。
     final rawItems = j['items'];
     final List<dynamic>? foundList = rawItems is List && rawItems.isNotEmpty
         ? rawItems

@@ -210,9 +210,7 @@ public final class OrderProtoConverter {
                 .setShippingStatusDesc(order.getShippingStatusDesc() != null ? order.getShippingStatusDesc() : "")
                 .setLabelKey(order.getLabelUrl() != null ? order.getLabelUrl() : "") // 49 §6.6：labelUrl 欄快照值為 key，Gateway 組
                 // 付款方式 code（field 32，來自 Order DB payment_method，如 CREDIT_CARD / ATM）
-                .setPaymentMethod(order.getPaymentMethod() != null ? order.getPaymentMethod() : "")
-                // 付款 PayUni MerID（field 61，給 Web/Mobile Google Pay 重試動態取得 gatewayMerchantId，20 §4.13）
-                .setPaymentMerId(order.getMerId() != null ? order.getMerId() : "");
+                .setPaymentMethod(order.getPaymentMethod() != null ? order.getPaymentMethod() : "");
 
         // 物流資訊聚合（以 Shipping Service 即時資料為準，覆蓋 Order 快照）
         // shippingStatusDesc 不從 shipment 覆蓋，統一用 orders 快照值（MQ 事件已即時更新）

@@ -61,16 +61,16 @@
 | `fulfillment_mode` | 平台履約白名單（`3001`、`3002`、`3003`）與 `PLATFORM_LOGISTICS` 的推導隨 B3 刪除；每筆訂單都是賣家自寄（`SELLER_MANAGED`），對外契約不帶配送方式（B3 R2）。政策快照本身是否保留，B8 重新設計 ordering 時決定 |
 
 - `PLATFORM_CONSIGNMENT`、`PLATFORM_AGENT_MERCHANT`、`PLATFORM_TO_BUYER`、`PROVIDER_COLLECTED`、`EXTERNAL_PREPAID` 是值域內的值，結帳與 RFQ 建單都不會寫入。啟用任一值的改動點是 `OrderPolicyResolver`，不是呼叫端。
-- 快照在結帳 preview 階段決定，confirm 時隨訂單凍結；付款用的 MerID 與快照欄必須來自同一次推導。
+- 快照在結帳 preview 階段決定，confirm 時隨訂單凍結；收款模式守門與快照欄必須來自同一次推導。
 
-### 1.3 付款 MerID：`CheckoutService.resolvePaymentMerId`
+### 1.3 收款模式守門：`CheckoutService.requireSupportedCollectionModel`
 
-付款 MerID 由快照的 `collection_model` 決定，不讀 buyer request 的任何布林：
+結帳是否放行由快照的 `collection_model` 決定，不讀 buyer request 的任何布林；結帳不再決策或回傳商店代號：
 
-| `collection_model` | MerID |
+| `collection_model` | 結果 |
 |---|---|
-| `SELLER_MERCHANT` | 該賣家的 `payuni_mer_id` |
-| `PLATFORM_AGENT_MERCHANT` | 平台代理商戶 MerID；未設定 → `PLATFORM_COLLECTION_NOT_CONFIGURED`（9505） |
+| `SELLER_MERCHANT` | 放行 |
+| `PLATFORM_AGENT_MERCHANT` | `PLATFORM_COLLECTION_NOT_CONFIGURED`（9505） |
 | null、空白、`PROVIDER_COLLECTED`、`EXTERNAL_PREPAID`、其他字串 | `FULFILLMENT_COMMERCE_MODEL_UNKNOWN`（9504） |
 
 判定窮舉，沒有 fall-through；失敗發生在結帳當下，不是建單之後。

@@ -322,7 +322,7 @@ message CheckoutPreviewRequest {
   string receiver_zip_code = 5;
   string cvs_store_id = 6;
   string coupon_template_id = 7;             // 使用者選擇的優惠券**模板** ID（非 instance）
-  bool consolidated = 8;                     // **新增**：是否為和單（多賣家走代理商代收）。default false = 單賣家走 seller mer_id；true = 取 env PAYUNI_AGENT_MER_ID（§4.x 和單與 paymentMerId 決策）
+  bool consolidated = 8;                     // 是否為和單（多賣家合併結帳）。default false = 單賣家；多店結帳在 B8 重新設計
 }
 
 message CheckoutItem {
@@ -344,16 +344,7 @@ message CheckoutPreviewData {
   string total_shipping_fee = 4;
   string total_discount = 5;
   string total_actual_amount = 6;
-  string payment_mer_id = 7;                 // **新增**：本次交易付款對應的 PayUni MerID（top-level，因為「一次交易 = 一個 merId」）。consolidated=false 取 seller.payuni_mer_id；consolidated=true 取 env PAYUNI_AGENT_MER_ID。前端 Web/Mobile 用此值帶入 Google Pay SDK `tokenizationSpecification.parameters.gatewayMerchantId`
   repeated UnavailableItem unavailable_items = 8;  // **新增**：row 級不可購買清單。非空 → code 非 0（4006 結帳已過期除外）+ 前端跳「請先返回購物車移除以下商品」dialog
-  repeated AvailablePaymentMethod available_payment_methods = 9;  // **新增**：依 total_actual_amount 算出的各付款方式可用性（§3.4.1）。前端據此 render 付款方式（禁用 + 理由），不自行用金額判斷。total_actual_amount==0（零元）時為空清單 → 前端顯示「無需付款」
-}
-
-// **新增**：付款方式可用性（依訂單金額對 PayUni 各方式合法區間判定）。§3.4.1
-message AvailablePaymentMethod {
-  string payment_type = 1;        // PaymentMethod value（2001/2002/2003/2004）
-  bool   eligible = 2;            // 金額是否落在該方式合法區間
-  string ineligible_reason = 3;   // PaymentMethodIneligibleReason value（2101 未達下限 / 2102 超過上限）；eligible=true 時為空字串
 }
 
 message OrderGroupPreview {
@@ -398,62 +389,9 @@ message CheckoutItemPreview {
 }
 ```
 
-#### 3.4.1 付款方式可用性政策（availablePaymentMethods）
+#### 3.4.1 付款方式
 
-**前提**：PayUni 對各付款方式有硬性金額合法區間（見 05-支付服務設計書 §2A.2（已刪除））。🔴 **前端不得自行寫死付款方式清單**——那樣使用者會選到不符金額的方式，直到下單／付款才被 L1（8026）／L2（8021）拒絕，而且只看得到泛用錯誤。
-
-**決策**：可用性由**後端依 `total_actual_amount` 算好**回傳 `available_payment_methods`，前端只負責 render（**禁用 + 顯示理由**，非隱藏），**前端不得自行用金額判斷、不得硬編碼限制值**。限制值唯一真實來源 = `common-core` `PaymentMethodLimitRules`（§2A.2）。
-
-**`available_payment_methods` 放 top-level 而非 per-group**：付款是「一次 `CreatePayment` 打整車 `total_actual_amount`」、L2 驗的也是該訂單金額 ⇒ 依 `total_actual_amount` 算於 top-level 即正確，**不需 per-group 交集**。
-
-**判定規則**（`PaymentMethodLimitRules.resolveAvailability(amount)` 純函式，跨 order/payment 共用）：
-
-> 區間採**閉區間**（與 `PaymentMethodLimitRules.isWithinRange` 的 `amount >= min && amount <= max` 一致）；下表各列互斥不重疊，端點歸屬明確。
-
-| `total_actual_amount` | 信用卡 / Apple Pay / Google Pay (2001/2002/2003) | ATM (2004) | 前端呈現 |
-|---|---|---|---|
-| `amount == 0` | —（空清單） | —（空清單） | 隱藏付款方式，顯示「無需付款」狀態（零元路徑，不走 PayUni） |
-| `1 ≤ amount ≤ 14` | eligible | `AMOUNT_BELOW_MIN`(2101) | ATM 禁用 + 理由 label（ATM 下限 = 15） |
-| `15 ≤ amount ≤ 49,999` | eligible | eligible | 全部可選（49,999 含端點 eligible） |
-| `50,000 ≤ amount ≤ 199,999` | eligible | `AMOUNT_ABOVE_MAX`(2102) | ATM 禁用 + 理由 label（ATM 上限 = 49,999） |
-| `amount ≥ 200,000` | `AMOUNT_ABOVE_MAX`(2102) | `AMOUNT_ABOVE_MAX`(2102) | 全部禁用 + 禁用「確認下單」鈕 + 引導減量/分批（信用卡上限 = 單筆訂單上限 = 199,999，含端點 eligible） |
-
-> 註：信用卡/Apple/Google Pay 的上限（199,999，含端點）= 訂單建立上限 `ORDER_MAX_AMOUNT`，故 `amount ≤ 199,999` 時三者恆 eligible；`amount ≥ 200,000` 時整單在 L1（confirm 8026）會被擋，前端禁用確認鈕僅為提早回饋的 UX 層。
-
-```mermaid
-flowchart TD
-    A[total_actual_amount] --> B{== 0?}
-    B -->|是| Z[空清單 → 前端「無需付款」]
-    B -->|否| C[對每個 PaymentMethod 取 PaymentMethodLimitRules.limits]
-    C --> D{amount < min?}
-    D -->|是| E[eligible=false, reason=AMOUNT_BELOW_MIN]
-    D -->|否| F{amount > max?}
-    F -->|是| G[eligible=false, reason=AMOUNT_ABOVE_MAX]
-    F -->|否| H[eligible=true, reason=空]
-    E --> I[available_payment_methods 收集]
-    G --> I
-    H --> I
-```
-
-**前端 render 契約**（web + buyer 一致，§1.4 前後端責任分工延伸）：
-1. **金額 gating（禁用與否）以 `available_payment_methods` 為準**；前端不得自行用金額判斷、不得寫死 15/49,999/199,999。
-2. **device 能力（顯示與否）為前端職責**：Apple Pay / Google Pay 在不支援的裝置上**隱藏**（既有行為，符合 wallet guideline）。最終可選 = `後端 eligible` AND `device 支援`。**兩層分離**：device 決定「顯示與否」、eligible 決定「禁用與否」；ineligible_reason 只承載金額理由，不混 device 理由。
-3. **理由文案 SSOT = `PaymentMethodIneligibleReason` 的 label**（通用、不帶具體數字）；前端用 CodeMeta 生成的 enum label render，不自行拼接金額字串。
-4. **gating 綁同一份 preview response**：每次金額 / 優惠券 / 配送變動導致重新 `CheckoutPreview` 時，`available_payment_methods` 隨 `total_actual_amount` 一起更新；前端不得用舊 preview 的 gating 配新一輪金額。
-5. **L1（8026）/ L2（8021）仍為最終權威**：前端 gating 僅 UX 層，**不得**因有 gating 而移除 8021/8026 錯誤處理（preview→confirm 之間理論上仍可能 drift）。
-
-> 再次付款（pending 訂單重付）為第二個付款方式選擇 surface，不走 CheckoutPreview，改由 `GetOrder` 的 `OrderDetailView.available_payment_methods` 提供，規則相同。詳見 [03-訂單微服務設計書 §4.2.1](../詳細設計書/03-訂單微服務（Order%20Service）詳細設計書.md)。
-
-**影響檔案清單**：
-
-| 檔案 | 變更 |
-|------|------|
-| `api/proto/order/order.proto` | 新增 `message AvailablePaymentMethod`；`CheckoutPreviewData` 加 `available_payment_methods = 9`；`OrderDetailView` 加 `available_payment_methods = 62` |
-| `services/java/shared/common-core/.../code/helper/PaymentMethodLimitRules.java` | 新增純函式 `resolveAvailability(long amount)`（回 `List<AvailabilityResult>`，含 eligible + ineligibleReason）；不動既有限制資料 |
-| `services/java/shared/common-core/.../code/PaymentMethodIneligibleReason.java` | `generate.sh` 由 `業務類型碼.md` 產出（勿手改） |
-| `services/java/order-service/.../checkout/CheckoutService.java` | `preview` step 10.6 呼叫 `resolveAvailability` 並 set 進 `CheckoutPreviewData`（零元 → 空清單） |
-| `services/java/order-service/.../grpc/converter/OrderProtoConverter.java` | **不改**（避免污染共用 caller，見 [03 §4.2.1](../詳細設計書/03-訂單微服務（Order%20Service）詳細設計書.md)） |
-| `gateway/internal/handler/checkout.go` | `CheckoutPreviewDataResponse` DTO 加 `availablePaymentMethods` + Swagger |
+付款方式的選擇與可用性由 Stripe Payment Element 決定，結帳預覽不回傳付款方式清單。訂單金額上限 `ORDER_MAX_AMOUNT`（199,999 元）是訂單的業務規則，放在 order-service 的 `OrderAmountLimit`，confirm 對超過者回 8026。
 
 ### 3.5 CheckoutConfirm（確認結帳 → 建單）
 
@@ -607,14 +545,9 @@ message CheckoutPriceChangedDetail {
 8. **最終免運判定**（§4.7.2）：無條件免運（freeThreshold<=0）直接達標；門檻免運以 item.unit_price × quantity − item.share_discount 對門檻（§4.7.1 兩分支）
 9. 計算精確運費（依 final_free_shipping_eligible 決定 0 或級距費率）
 10. total_actual_amount = total_subtotal − discount + shipping_fee
-10.5 **paymentMerId 決策**（§4.13 和單與 paymentMerId 決策）：
-   → 若 request.consolidated=true：取 env `PAYUNI_AGENT_MER_ID`；env 為空 → 拋 INVALID_ARGUMENT
-   → 若 request.consolidated=false：取 sellerMeta.payuni_mer_id（既有 SellerGrpcClient 呼叫已取得）
-10.6 **付款方式可用性**（§3.4.1）：`available_payment_methods = PaymentMethodLimitRules.resolveAvailability(total_actual_amount)`
-   → total_actual_amount==0 → 空清單（前端「無需付款」）；否則對每個 PaymentMethod 依上下限填 eligible + ineligible_reason
 11. 生成 checkout_id（UUID）
-12. 存入 Redis checkout:{checkoutId} = JSON 金額快照（含 tentative + final 免運狀態 + **paymentMerId**），TTL=30 分鐘
-13. 回傳（含 tentative_free_shipping_eligible、free_shipping_eligible 兩欄供前端比對 + **payment_mer_id top-level**）
+12. 存入 Redis checkout:{checkoutId} = JSON 金額快照（含 tentative + final 免運狀態與政策五欄），TTL=30 分鐘
+13. 回傳（含 tentative_free_shipping_eligible、free_shipping_eligible 兩欄供前端比對）
 ```
 
 ### 4.4 CheckoutConfirm 流程
@@ -637,12 +570,10 @@ message CheckoutPriceChangedDetail {
 6.5 金額比對（Preview → Confirm 防護）
    → 與 Redis 快照逐項比對：subtotal/shippingFee/discount/totalAmount
    → 不一致 → code=4091 + 變動原因
-6.6 **paymentMerId 來源**（§4.13）：
-   → 直接從 Redis 快照取 `paymentMerId`（preview 階段已決策並寫入）
-   → confirm **不重新決策**、不接受新的 consolidated 參數 → 避免 preview/confirm 結果 drift
+6.6 **收款模式守門**：從 Redis 快照讀回政策五欄，`collection_model` 不是 SELLER_MERCHANT 一律 fail-closed（`requireSupportedCollectionModel`）；confirm 不重新決策。
 7. 呼叫 `OrderService.createOrder()`
-   → 傳入 items, 金額, 配送資訊, 收件人, checkout_id, **mer_id=snapshot.paymentMerId**, **discount_amount**, sender_city, sender_district, dimensionSum, order_remark
-   → OrderEntity.mer_id 寫入即為 paymentMerId（單賣家 = seller.payuni_mer_id；和單 = 代理商 mer）
+   → 傳入 items, 金額, 配送資訊, 收件人, checkout_id, **discount_amount**, sender_city, sender_district, dimensionSum, order_remark
+   → `orders.mer_id` 恆寫入空字串（欄位仍由出貨與售後讀取）
    → **不傳 coupon 任何 ID**：`orders.coupon_instance_id` 起始為 NULL（見 03 設計書 §3.1 不變式）
 8. 建單成功後**由 CheckoutService**（非 OrderService）鎖定優惠券：
    - `couponInstanceId = CheckoutCouponGrpcClient.reserveCoupon(couponTemplateId, buyerId, orderNo)`
@@ -889,8 +820,7 @@ Value: JSON {
   "discount": 50,
   "totalAmount": 1050,
   "freeShippingEligible": false,          // 最終免運判定（折扣後）
-  "tentativeFreeShippingEligible": true,  // 暫定免運判定（折扣前；供前端比對）
-  "paymentMerId": "HAWK2685914682"        // Preview 階段決策的付款 MerID；Confirm 直接讀回不重新決策（§4.13.4）
+  "tentativeFreeShippingEligible": true   // 暫定免運判定（折扣前；供前端比對）
 }
 TTL:   30 分鐘
 ```
@@ -923,55 +853,9 @@ TTL:   30 分鐘
 - CB 開路期間：若本機 cache 非空 → 回傳 stale + log warn；cache 為空 → 拋 `SHIPPING_SERVICE_UNAVAILABLE`
 - ⚠️ fail-open ＋ stale **只適用於運費查詢**；決定「能不能買」的判定（商品可購買狀態、賣家接單能力、庫存）一律 fail-closed，兩者不可互相類比。理由見 [ADR：結帳免運判定與降級策略](/docs/adr/2026-09-18-checkout-free-shipping-and-degradation.md)
 
-### 4.13 和單與 paymentMerId 決策（Web/Mobile Google Pay 動態 gatewayMerchantId 支援）
+### 4.13 收款主體
 
-#### 4.13.1 背景
-
-Web Google Pay SDK 在 `loadPaymentData()` 開 sheet 時必須塞入 `tokenizationSpecification.parameters.gatewayMerchantId`（PayUni 商店代號），否則 token 加密 metadata 不正確、後端送 PayUni `/api/google` 可能被拒。Apple Pay / 信用卡 / ATM 流程因 token 由後端取得或走 redirect，前端不需要 merId。
-
-mobile Android Google Pay 同樣需要此值（pay 套件 `PaymentConfiguration` 內含 `gatewayMerchantId`）。
-
-為支援未來多賣家「代理商代收」（單一交易 = 單一 merId，平台代理商統一收款後再分帳，PayUni 官方代理商 API 支援），preview API 需告訴前端「這筆交易付款對應的 PayUni MerID」。
-
-#### 4.13.2 決策邏輯
-
-| `request.consolidated` | `paymentMerId` 來源 | 適用場景 |
-|---|---|---|
-| `false`（預設） | `sellerMeta.payuni_mer_id`（既有 `SellerGrpcClient.getSellerMeta()`）| 單賣家 cart（目前 Phase 1） |
-| `true` | env `PAYUNI_AGENT_MER_ID` | 多賣家代理商代收 |
-
-決策只在 **preview** 階段執行；結果連同金額快照寫入 Redis `checkout:{checkoutId}`。**confirm 直接從 Redis 讀回，不重新決策、不接受新的 consolidated 參數**（避免 preview/confirm drift）。
-
-#### 4.13.3 驗證
-
-| 情境 | 行為 |
-|---|---|
-| `consolidated=true` 且 env `PAYUNI_AGENT_MER_ID` 為空 | 拋 `OrderBusinessException(INVALID_ARGUMENT)`，訊息「consolidated=true 但代理商 MerID 未設定」 |
-| `consolidated=false`（或未傳）且 sellerMeta.payuni_mer_id 為空 | 既有的 seller 開通驗證會先擋下，這層不重複驗 |
-
-#### 4.13.4 OrderEntity.mer_id 寫入
-
-`OrderService.createOrder(... merId ...)` 寫入 `orders.mer_id` 欄位的值 = `snapshot.paymentMerId`，**取代既有「直接用 sellerMeta.getPayuniMerId()」邏輯**。
-
-對後端付款流程影響：
-- `PaymentApplicationService.handleGooglePayPayment / handleCreditCardPayment / handleApplePayPayment / handleAtmPayment` 等既有路徑全部從 `orders.mer_id` 取 merId 呼叫 PayUni，不需任何修改
-- 後端**不**信任前端 createPayment request 的 merId 欄位（既有契約：`CreatePaymentRequest.java` 註解明寫 mer_id 由 OrderService 查詢）
-
-#### 4.13.5 安全性：merId 暴露至前端的風險分析
-
-**結論**：可接受，無需額外防護。
-
-| 風險路徑 | 結果 |
-|---|---|
-| 攻擊者篡改前端收到的 `paymentMerId` → 加密成不同 merchant 的 Google Pay token | backend createPayment 仍從 DB `order.mer_id` 讀，呼叫 PayUni 用 DB 那個值。PayUni 端 token-merchant 與 API call-merchant 不一致時的行為**待 sandbox 實證**（樂觀：reject = 攻擊者 DoS 自己；悲觀：PayUni 信 token = 攻擊者用自己的卡付給別人，無經濟誘因）|
-| 重複用別人的 paymentMerId 自己付款 | 自己刷自己卡、錢進別人帳戶 — 攻擊者自殘 |
-
-**防線（既有）**：
-1. preview API 走 JWT（`/app/checkout/preview` 需登入）→ 一般攻擊者無法任意取得 merId mapping
-2. PayUni MerID 等同 Stripe publishable key — 公開可枚舉、本身非機密
-3. backend `CreatePaymentRequest` 設計明確不信前端 merId
-
-**後續驗證任務**：dev TEST env 跑通 Google Pay 後，順手做 sandbox 實驗 — 故意送錯 merchant 的 token，觀察 PayUni `/api/google` 是 reject 還是 silent honor，更新本章節結論。
+收款走 payment 模組（賣家的收款帳戶），結帳不決策也不回傳商店代號。`collection_model` 由伺服端政策推導並凍結在預覽快照，只有 SELLER_MERCHANT 放行；平台代收（PLATFORM_AGENT_MERCHANT）回 PLATFORM_COLLECTION_NOT_CONFIGURED，未知值回 FULFILLMENT_COMMERCE_MODEL_UNKNOWN。多店結帳在 B8 重新設計。
 
 ### 4.14 不可購買狀態優先級與判定（強制統一）
 
@@ -1089,9 +973,8 @@ sequenceDiagram
     C->>S: GetSellerMeta(sellerId) → sellerName
     S-->>C: SellerMeta
     C->>C: 完整驗證 + 精算 + 優惠券驗證（不消耗）
-    C->>C: resolveAvailability(total_actual_amount) → available_payment_methods（§3.4.1，step 10.6）
-    C-->>G: CheckoutPreviewData（checkout_id + 真實總額 + available_payment_methods）
-    G-->>U: 預覽頁面（依 available_payment_methods render 付款方式）
+    C-->>G: CheckoutPreviewData（checkout_id + 真實總額）
+    G-->>U: 預覽頁面
 
     Note over U: Step 6: 點「確認下單」
     U->>G: POST /checkout/confirm

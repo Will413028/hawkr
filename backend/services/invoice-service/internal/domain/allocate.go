@@ -5,7 +5,7 @@ import (
 	"sort"
 )
 
-// MaxAmount 是業務上限，與結帳側 PaymentMethodLimitRules.ORDER_MAX_AMOUNT 對齊。
+// MaxAmount 是業務上限，與結帳側 OrderAmountLimit.ORDER_MAX_AMOUNT（order-service）對齊。
 // 由 A20 檢查，不是 AllocateLargestRemainder 的護欄。
 const MaxAmount int64 = 199_999
 

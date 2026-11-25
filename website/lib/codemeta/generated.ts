@@ -1176,19 +1176,6 @@ export const PAYMENT_METHOD_LABEL: Record<string, string> = {
 	"2900": "零元訂單",
 };
 
-/** 付款方式因「訂單金額不符該方式合法區間」而不可用的理由碼。由 order-service 在結帳預覽 / 訂單詳情計算 `availablePaymentMethods` 時填入（`eligible=false` 才有值）。前端依此碼的 label 顯示禁用理由（**通用文案、不帶具體數字**；限制值的 SSOT 留後端 [PaymentMethodLimitRules](../詳細設計書/20-結帳模組（Checkout%20Module）詳細設計書.md)，前端零複製）。 */
-export const PaymentMethodIneligibleReason = {
-	AMOUNT_BELOW_MIN: "2101",
-	AMOUNT_ABOVE_MAX: "2102",
-} as const;
-export type PaymentMethodIneligibleReasonCode = keyof typeof PaymentMethodIneligibleReason;
-export type PaymentMethodIneligibleReasonValue = (typeof PaymentMethodIneligibleReason)[PaymentMethodIneligibleReasonCode];
-
-export const PAYMENT_METHOD_INELIGIBLE_REASON_LABEL: Record<string, string> = {
-	"2101": "金額未達此付款方式下限",
-	"2102": "金額超過此付款方式上限",
-};
-
 /** 運送方式 */
 export const ShippingMethod = {
 	TAQBIN: "3001",

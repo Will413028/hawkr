@@ -32,8 +32,8 @@ export interface CheckoutPreviewRequest {
 	storeName?: string;
 	couponTemplateId?: string;
 	/**
-	 * 是否為和單（多賣家代理商代收）。default false=單賣家走 seller mer；
-	 * true=後端取 env PAYUNI_AGENT_MER_ID。目前 Phase 1 單賣家 cart 一律 false。
+	 * 是否為和單（多賣家合併結帳）。default false=單賣家；
+	 * 多店結帳的設計在 B8 重做。目前單賣家 cart 一律 false。
 	 */
 	consolidated?: boolean;
 }

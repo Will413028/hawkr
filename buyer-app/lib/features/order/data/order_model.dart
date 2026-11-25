@@ -188,10 +188,6 @@ abstract class Order with _$Order {
     /// 買家確認收貨上傳的照片（status>=40 後才會有值）
     @Default(<String>[]) List<String> receiptPhotoUrls,
 
-    /// 再次付款可用付款方式（依 totalActualAmount 算；僅 pending 時非空）。§3.4.1
-    /// 每筆 = {paymentType, eligible, ineligibleReason}。
-    @Default(<Map<String, dynamic>>[])
-    List<Map<String, dynamic>> availablePaymentMethods,
     @Default([]) List<OrderItem> items,
     @Default([]) List<RefundRecord> refundHistory,
   }) = _Order;

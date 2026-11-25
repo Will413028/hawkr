@@ -99,7 +99,7 @@ public class OrderEntity {
      * 收款模式快照：{@code SELLER_MERCHANT} / {@code PLATFORM_AGENT_MERCHANT} /
      * {@code PROVIDER_COLLECTED} / {@code EXTERNAL_PREPAID}
      * （DB CHECK {@code chk_orders_collection_model}）。
-     * <p>🔴 {@code resolvePaymentMerId} 必須由本欄驅動，不得再讀 buyer request 透傳的 consolidated。
+     * <p>🔴 結帳的收款模式守門（{@code requireSupportedCollectionModel}）必須由本欄驅動，不得讀 buyer request 透傳的 consolidated。
      * <p>DB CHECK {@code chk_orders_policy_matrix} 綁死本欄與 {@link #commerceModel} 的對應：
      * {@code PLATFORM_CONSIGNMENT} ⇔ {@code PLATFORM_AGENT_MERCHANT}。
      */

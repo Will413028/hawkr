@@ -173,7 +173,7 @@ class UberCheckoutProbeWiringTest {
 
         OrderPolicySnapshot policy = new OrderPolicyResolver().resolve(UBER);
         when(valueOperations.getAndDelete(anyString())).thenReturn(
-                service.buildPriceSnapshot(1000L, 250L, 0L, 1250L, false, false, "HAWK123", policy));
+                service.buildPriceSnapshot(1000L, 250L, 0L, 1250L, false, false, policy));
     }
 
     private static UberOrderEligibilityGuard.Decision allowedDecision() {
@@ -322,7 +322,7 @@ class UberCheckoutProbeWiringTest {
                         .build());
         OrderPolicySnapshot policy = new OrderPolicyResolver().resolve("3001");
         when(valueOperations.getAndDelete(anyString())).thenReturn(
-                service.buildPriceSnapshot(1000L, 250L, 0L, 1250L, false, false, "HAWK123", policy));
+                service.buildPriceSnapshot(1000L, 250L, 0L, 1250L, false, false, policy));
 
         service.confirm(confirmRequest().setShippingMethod("3001").build());
 

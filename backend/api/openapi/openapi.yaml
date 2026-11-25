@@ -16219,18 +16219,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AppealEventResponse'
-    AvailablePaymentMethodResponse:
-      type: object
-      properties:
-        eligible:
-          type: boolean
-          description: 金額是否落在該方式合法區間
-        ineligibleReason:
-          type: string
-          description: PaymentMethodIneligibleReason value（2101 未達下限 / 2102 超過上限）；eligible=true 時空字串
-        paymentType:
-          type: string
-          description: PaymentMethod value（2001 信用卡 / 2002 Apple Pay / 2003 Google Pay / 2004 ATM）
     AvailableShippingOptionResponse:
       type: object
       properties:
@@ -16836,11 +16824,6 @@ components:
     CheckoutPreviewDataResponse:
       type: object
       properties:
-        availablePaymentMethods:
-          type: array
-          description: 依 totalActualAmount 算出的各付款方式可用性（20 設計書 §3.4.1）。前端據此 render（禁用 + 理由），不自行用金額判斷。totalActualAmount==0（零元）→ 空清單，前端顯示「無需付款」
-          items:
-            $ref: '#/components/schemas/AvailablePaymentMethodResponse'
         checkoutId:
           type: string
         invoice:
@@ -16854,9 +16837,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OrderGroupPreviewResponse'
-        paymentMerId:
-          type: string
-          description: 本次交易付款對應 PayUni MerID（單賣家=seller.mer / 和單=代理商 mer）。前端 Google Pay 用此值
         totalActualAmount:
           type: string
         totalDiscount:
@@ -16879,7 +16859,7 @@ components:
       properties:
         consolidated:
           type: boolean
-          description: 是否為和單（多賣家代理商代收）。default false=單賣家走 seller mer，true=取 env PAYUNI_AGENT_MER_ID。20 §4.13
+          description: 是否為和單（多賣家合併結帳）。default false=單賣家；多店結帳的設計在 B8 重做
         couponTemplateId:
           type: string
           description: 使用者選擇的優惠券模板 ID
@@ -18994,11 +18974,6 @@ components:
       properties:
         autoCompleteAt:
           type: string
-        availablePaymentMethods:
-          type: array
-          description: 再次付款可用付款方式（依 totalActualAmount 算）。僅買家 + status=pending_payment 時非空（03 §4.2.1）；前端據此 render（禁用 + 理由）
-          items:
-            $ref: '#/components/schemas/AvailablePaymentMethodResponse'
         avatarKey:
           type: string
           description: 買家頭像 objectKey（SSOT；49 §6.1）
@@ -19058,9 +19033,6 @@ components:
         paymentDeadline:
           type: string
           description: 付款期限（ISO 8601 UTC，僅 status=0 時有值）
-        paymentMerId:
-          type: string
-          description: 訂單對應 PayUni MerID（給 Google Pay 重試 tokenization）
         paymentMethod:
           type: string
         pickupStoreName:

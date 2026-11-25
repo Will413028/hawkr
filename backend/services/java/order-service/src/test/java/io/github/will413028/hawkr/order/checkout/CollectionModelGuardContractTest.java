@@ -15,49 +15,42 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * 收款主體的契約守護：**快照欄 vs 現金流向**。
+ * 收款模式守門的契約守護：只有賣家收款（SELLER_MERCHANT）放行，其餘 fail-closed。
  *
- * <h2>🔴 這支測試是那個不一致唯一的偵測</h2>
- * 沒有它，下面這個失效在資料上完全看不出來：
- * {@code orders.collection_model} 被正確寫成「平台代理商戶收款」（快照欄、有 DB CHECK 守著），
- * 帳本也據此記「平台收到買家款」——<b>而錢實際上還在賣家的 MerID</b>。
- * 訂單成功、付款成功、帳本平衡、對帳查詢也查得到（只是查到的是賣家子商店的交易）。
- * 兩邊各自都「對」，只有把它們並排比對才看得出來。
- *
- * <p>⚠️ 本測試守的是<b>決策點</b>（{@code CheckoutService.resolvePaymentMerId}）。
- * 下游 {@code payment_transactions.mer_id} 是從 {@code orders.mer_id} 單路徑複製而來，
- * 那一段由 payment-service 自己的測試守；本測試不重複斷言它，但那條複製鏈斷掉的話，
- * 本測試不會發現——這一點寫出來，免得把它當成端到端的保證。
+ * <p>沒有它，下面這個失效在資料上完全看不出來：{@code orders.collection_model} 被寫成
+ * 一個沒有收款路徑的值，訂單、付款、帳本三邊卻都正常。本測試守的是決策點
+ * （{@code CheckoutService.requireSupportedCollectionModel}）。
  */
-@DisplayName("收款主體的政策契約")
-class PaymentMerIdPolicyContractTest {
+@DisplayName("收款模式守門的政策契約")
+class CollectionModelGuardContractTest {
 
     /**
-     * 直接呼叫 private 的決策方法。
+     * 直接呼叫 private 的守門方法。
      *
      * <p>用反射而不是把方法改成 package-private：可見性是 production 的設計決定，
-     * 不該為了測試而放寬。而找不到方法時<b>丟 AssertionError 不是 skip</b>——
+     * 不該為了測試而放寬。找不到方法時<b>丟 AssertionError 不是 skip</b>——
      * 方法被改名的那天，skip 會讓這道守護靜默消失。
      */
-    private static String invokeResolve(OrderPolicySnapshot policy) throws Exception {
+    private static void invokeGuard(OrderPolicySnapshot policy) throws Exception {
         CheckoutService service = newServiceWithoutDependencies();
 
         Method m;
         try {
             m = CheckoutService.class.getDeclaredMethod(
-                    "resolvePaymentMerId", OrderPolicySnapshot.class);
+                    "requireSupportedCollectionModel", OrderPolicySnapshot.class);
         } catch (NoSuchMethodException e) {
             throw new AssertionError(
-                    "找不到 resolvePaymentMerId(OrderPolicySnapshot)——"
+                    "找不到 requireSupportedCollectionModel(OrderPolicySnapshot)——"
                             + "它被改名、改簽章或搬走了？本測試對『目標不存在』一律 FAIL，"
-                            + "因為 skip 會讓收款主體的守護在目標消失的那一刻靜默失效", e);
+                            + "因為 skip 會讓收款模式的守護在目標消失的那一刻靜默失效", e);
         }
         m.setAccessible(true);
         try {
-            return (String) m.invoke(service, policy);
+            m.invoke(service, policy);
         } catch (InvocationTargetException e) {
             if (e.getCause() instanceof RuntimeException re) {
                 throw re;
@@ -82,20 +75,20 @@ class PaymentMerIdPolicyContractTest {
     }
 
     @Nested
-    @DisplayName("collection_model → 實際收款的 MerID")
-    class MerIdResolution {
+    @DisplayName("collection_model → 是否放行")
+    class CollectionModelGuard {
 
         @Test
-        @DisplayName("賣家收款 → 不帶商店代號（收款走 payment 模組，可否接單由 can_accept_orders 擋）")
-        void sellerMerchantCarriesNoMerId() throws Exception {
-            assertThat(invokeResolve(policyWith(CollectionModel.SELLER_MERCHANT.value())))
-                    .isEmpty();
+        @DisplayName("賣家收款 → 放行（可否接單由 can_accept_orders 擋）")
+        void sellerMerchantPasses() {
+            assertThatCode(() -> invokeGuard(policyWith(CollectionModel.SELLER_MERCHANT.value())))
+                    .doesNotThrowAnyException();
         }
 
         @Test
         @DisplayName("平台代收沒有收款路徑 → 結帳當下 fail-closed")
         void platformCollectionFailsClosed() {
-            assertThatThrownBy(() -> invokeResolve(policyWith(CollectionModel.PLATFORM_AGENT_MERCHANT.value())))
+            assertThatThrownBy(() -> invokeGuard(policyWith(CollectionModel.PLATFORM_AGENT_MERCHANT.value())))
                     .isInstanceOf(OrderBusinessException.class)
                     .satisfies(e -> assertThat(((OrderBusinessException) e).code())
                             .as("必須回 PLATFORM_COLLECTION_NOT_CONFIGURED，而不是通用參數錯誤——"
@@ -104,53 +97,52 @@ class PaymentMerIdPolicyContractTest {
         }
 
         /**
-         * 🔴 <b>BLOCKER 6 的核心</b>：這四個輸入以前全部靜默解析成賣家 MerID。
-         *
-         * <p>{@code PROVIDER_COLLECTED} 與 {@code EXTERNAL_PREPAID} 是
-         * {@code chk_orders_collection_model} 的<b>合法值</b>（碼表逐字：值域內但尚無寫入路徑）。
-         * 「今天 resolver 不會產出它們」是<b>呼叫端保證</b>，不是決策點保證——
-         * 68／69 落地時 resolver 會開始產出，而那一天這裡若還是 fall-through，
-         * 症狀是<b>錢進賣家子商店而快照欄說是 provider 代收</b>，且訂單、付款、帳本三邊都正常。
+         * {@code PROVIDER_COLLECTED} 與 {@code EXTERNAL_PREPAID} 是
+         * {@code chk_orders_collection_model} 的合法值，但尚無寫入路徑；
+         * 它們出現時守門不得 fall-through 成放行。
          */
         @Test
-        @DisplayName("未知／未啟用／空白的 collection_model 一律 fail-closed，不得落到賣家 MerID")
+        @DisplayName("未知／未啟用／空白的 collection_model 一律 fail-closed")
         void unknownCollectionModelFailsClosed() {
             String[] denied = {
                     CollectionModel.PROVIDER_COLLECTED.value(),
                     CollectionModel.EXTERNAL_PREPAID.value(),
                     "",
+                    "  ",
                     "SOMETHING_NEW",
             };
             for (String model : denied) {
-                assertThatThrownBy(() -> invokeResolve(policyWith(model)))
+                assertThatThrownBy(() -> invokeGuard(policyWith(model)))
                         .as("collection_model='" + model + "' 必須被擋下")
                         .isInstanceOf(OrderBusinessException.class)
                         .satisfies(e -> assertThat(((OrderBusinessException) e).code())
                                 .isEqualTo(GrpcResponseCode.FULFILLMENT_COMMERCE_MODEL_UNKNOWN.code()));
             }
-            assertThatThrownBy(() -> invokeResolve(policyWith(null)))
+            assertThatThrownBy(() -> invokeGuard(policyWith(null)))
                     .as("collection_model=null 必須被擋下")
-                    .isInstanceOf(OrderBusinessException.class);
+                    .isInstanceOf(OrderBusinessException.class)
+                    .satisfies(e -> assertThat(((OrderBusinessException) e).code())
+                            .isEqualTo(GrpcResponseCode.FULFILLMENT_COMMERCE_MODEL_UNKNOWN.code()));
         }
 
-        /**
-         * 🔴 這一條守的是需求書列為「不可妥協」的那件事：<b>收款主體不能由呼叫端指定</b>。
-         * 改造前，這個決策讀的是 {@code CheckoutPreviewRequest.consolidated}——一個買家 request 的布林。
-         */
+        /** 收款主體不能由呼叫端指定：守門方法不得吃 boolean（consolidated 透傳的形狀）。 */
         @Test
-        @DisplayName("決策方法的簽章不得再吃 boolean（那是 consolidated 透傳的形狀）")
-        void resolveDoesNotTakeBooleanFromRequest() {
+        @DisplayName("守門方法的簽章不得吃 boolean")
+        void guardDoesNotTakeBooleanFromRequest() {
+            boolean found = false;
             for (Method m : CheckoutService.class.getDeclaredMethods()) {
-                if (!m.getName().equals("resolvePaymentMerId")) {
+                if (!m.getName().equals("requireSupportedCollectionModel")) {
                     continue;
                 }
+                found = true;
                 for (Class<?> p : m.getParameterTypes()) {
                     assertThat(p)
-                            .as("resolvePaymentMerId 出現 boolean 參數——收款主體又變成由呼叫端傳入的旗標了")
+                            .as("requireSupportedCollectionModel 出現 boolean 參數——收款主體又變成由呼叫端傳入的旗標了")
                             .isNotEqualTo(boolean.class)
                             .isNotEqualTo(Boolean.class);
                 }
             }
+            assertThat(found).as("找不到 requireSupportedCollectionModel").isTrue();
         }
     }
 

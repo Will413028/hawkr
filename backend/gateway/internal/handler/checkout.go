@@ -116,11 +116,8 @@ type CheckoutPreviewDataResponse struct {
 	TotalShippingFee    string                      `json:"totalShippingFee"`
 	TotalDiscount       string                      `json:"totalDiscount"`
 	TotalActualAmount   string                      `json:"totalActualAmount"`
-	PaymentMerID        string                      `json:"paymentMerId"` // 本次交易付款對應 PayUni MerID（單賣家=seller.mer / 和單=代理商 mer）。前端 Google Pay 用此值
 	OrderGroups         []OrderGroupPreviewResponse `json:"orderGroups"`
 	UnavailableItems    []UnavailableItemResponse   `json:"unavailableItems,omitempty"` // row 級不可購買清單。非空 → envelope code=4001
-	// 依 totalActualAmount 算出的各付款方式可用性（20 設計書 §3.4.1）。前端據此 render（禁用 + 理由），不自行用金額判斷。totalActualAmount==0（零元）→ 空清單，前端顯示「無需付款」
-	AvailablePaymentMethods []AvailablePaymentMethodResponse `json:"availablePaymentMethods,omitempty"`
 	// 結帳頁的發票區（58 §6.2.4 order ②、58A §B01）。
 	// 🔴 omitempty ＋ 指標：invoice-service 拿不到時 order 不設這一欄，前端據此**不渲染**發票區，
 	// 而不是渲染一個空的。回 `{}` 與「沒有這個 key」對前端是兩件事。
@@ -236,29 +233,6 @@ func convertCheckoutInvoicePreview(in *pb.CheckoutInvoicePreview) *CheckoutInvoi
 	return out
 }
 
-// AvailablePaymentMethodResponse 付款方式可用性（結帳預覽 + 訂單詳情再次付款共用）。20 設計書 §3.4.1
-type AvailablePaymentMethodResponse struct {
-	PaymentType      string `json:"paymentType"`                // PaymentMethod value（2001 信用卡 / 2002 Apple Pay / 2003 Google Pay / 2004 ATM）
-	Eligible         bool   `json:"eligible"`                   // 金額是否落在該方式合法區間
-	IneligibleReason string `json:"ineligibleReason,omitempty"` // PaymentMethodIneligibleReason value（2101 未達下限 / 2102 超過上限）；eligible=true 時空字串
-}
-
-// convertAvailablePaymentMethods 將 proto AvailablePaymentMethod 列表轉 Gateway DTO（結帳預覽 + 訂單詳情共用）
-func convertAvailablePaymentMethods(items []*pb.AvailablePaymentMethod) []AvailablePaymentMethodResponse {
-	if len(items) == 0 {
-		return nil
-	}
-	out := make([]AvailablePaymentMethodResponse, 0, len(items))
-	for _, m := range items {
-		out = append(out, AvailablePaymentMethodResponse{
-			PaymentType:      m.GetPaymentType(),
-			Eligible:         m.GetEligible(),
-			IneligibleReason: m.GetIneligibleReason(),
-		})
-	}
-	return out
-}
-
 // OrderGroupPreviewResponse 訂單分組預覽
 type OrderGroupPreviewResponse struct {
 	GroupIndex                    string                        `json:"groupIndex"`
@@ -344,7 +318,7 @@ type CheckoutPreviewRequest struct {
 	StoreID          string                `json:"storeId"`          // Deprecated：cvsStoreCode 的舊名，語意完全相同（**不是**賣家 store_id）
 	CouponTemplateID string                `json:"couponTemplateId"` // 使用者選擇的優惠券模板 ID
 	Items            []CheckoutItemRequest `json:"items" binding:"required"`
-	Consolidated     bool                  `json:"consolidated,omitempty"` // 是否為和單（多賣家代理商代收）。default false=單賣家走 seller mer，true=取 env PAYUNI_AGENT_MER_ID。20 §4.13
+	Consolidated     bool                  `json:"consolidated,omitempty"` // 是否為和單（多賣家合併結帳）。default false=單賣家；多店結帳的設計在 B8 重做
 }
 
 // CheckoutConfirmRequest 確認結帳請求
@@ -484,7 +458,6 @@ func convertCheckoutPreviewData(d *pb.CheckoutPreviewData) *CheckoutPreviewDataR
 		TotalShippingFee:    d.TotalShippingFee,
 		TotalDiscount:       d.TotalDiscount,
 		TotalActualAmount:   d.TotalActualAmount,
-		PaymentMerID:        d.PaymentMerId,
 		// 58 §6.2.4 order ②：發票區。order 拿不到時不設這一欄 ⇒ 這裡也是 nil ⇒
 		// JSON 沒有 `invoice` key，前端據此不渲染（而不是渲染一個空的）。
 		Invoice: convertCheckoutInvoicePreview(d.GetInvoice()),
@@ -526,7 +499,6 @@ func convertCheckoutPreviewData(d *pb.CheckoutPreviewData) *CheckoutPreviewDataR
 		r.OrderGroups = append(r.OrderGroups, group)
 	}
 	r.UnavailableItems = convertUnavailableItems(d.UnavailableItems)
-	r.AvailablePaymentMethods = convertAvailablePaymentMethods(d.AvailablePaymentMethods)
 	return r
 }
 

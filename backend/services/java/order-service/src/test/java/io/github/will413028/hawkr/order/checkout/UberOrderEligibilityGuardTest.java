@@ -409,7 +409,7 @@ class UberOrderEligibilityGuardTest {
     void unwiredChecksAreDeniedNotPassed() throws Exception {
         // 用反射直接打 decide()——這是這條分支唯一測得到的方式：
         // evaluate() 的每一條路徑都把六項接滿了，走不到 null 分支。
-        // 反射在本專案有既有慣例（PaymentMerIdPolicyContractTest.invokeResolve）。
+        // 反射在本專案有既有慣例（CollectionModelGuardContractTest.invokeResolve）。
         Method decide = UberOrderEligibilityGuard.class
                 .getDeclaredMethod("decide", EnumMap.class, Assessment.class);
         decide.setAccessible(true);
