@@ -74,6 +74,7 @@ func TestSuggestedSafetyStock(t *testing.T) {
 		{"無條件進位：8 週共 22 件 → 兩週 5.5 → 6", []int32{3, 3, 3, 3, 3, 3, 2, 2}, 6},
 		{"無條件進位：8 週共 25 件 → 兩週 6.25 → 7", []int32{4, 3, 3, 3, 3, 3, 3, 3}, 7},
 		{"週數不足的缺的週算 0", []int32{40}, 10},
+		{"超過 8 週只取最後 8 週：前 4 週各 100、後 8 週各 10 → 20", []int32{100, 100, 100, 100, 10, 10, 10, 10, 10, 10, 10, 10}, 20},
 	}
 	for _, c := range cases {
 		if got := model.SuggestedSafetyStock(c.weekly); got != c.want {

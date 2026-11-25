@@ -95,6 +95,32 @@ func TestStaleEtagIsRejectedAndStockChangesDoNotMoveIt(t *testing.T) {
 	if got := f.mustProduct(storeID, p.ID); got.Version != active.Version {
 		t.Fatalf("a no-op status change must not bump the version: %d -> %d", active.Version, got.Version)
 	}
+	// 重送：用切換前的舊 etag 再送同一個目標狀態仍成功（冪等），etag 不變。
+	f.must(f.m.SetProductStatus(f.ct, storeID, p.ID, updated.Version, StatusActive))
+	if got := f.mustProduct(storeID, p.ID); got.Version != active.Version {
+		t.Fatalf("a retried status change must leave the etag alone: %d -> %d", active.Version, got.Version)
+	}
+	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, updated.Version, StatusArchived); !errors.Is(err, ErrVersionConflict) {
+		t.Fatalf("a stale etag with a different target is still a conflict: %v", err)
+	}
+}
+
+func TestDeleteIsIdempotentForTheOwnerAndHidesOtherStores(t *testing.T) {
+	t.Parallel()
+	f := newProductFixture(t)
+	storeID, acct := f.store()
+	other, _ := f.store()
+	p := f.create(storeID, acct, f.input("x"))
+	f.must(f.m.DeleteProduct(f.ct, storeID, p.ID, 0))
+	if err := f.m.DeleteProduct(f.ct, storeID, p.ID, 0); err != nil {
+		t.Fatalf("deleting an already deleted own product succeeds: %v", err)
+	}
+	if err := f.m.DeleteProduct(f.ct, other, p.ID, 0); !errors.Is(err, ErrProductNotFound) {
+		t.Fatalf("another store must not learn that it exists: %v", err)
+	}
+	if err := f.m.DeleteProduct(f.ct, storeID, uuid.NewV7(), 0); !errors.Is(err, ErrProductNotFound) {
+		t.Fatalf("an unknown product is not found: %v", err)
+	}
 }
 
 func TestCreateIsIdempotentByRequestID(t *testing.T) {
@@ -154,6 +180,7 @@ func TestConcurrentCreatesWithOneRequestIDMakeOneProduct(t *testing.T) {
 	f := newProductFixture(t)
 	storeID, acct := f.store()
 	in := ProductInput{Title: "併發", CategoryID: f.leaf(), Skus: []SkuInput{{Price: 100}}}
+	in.Gallery = []Image{{Token: "conc1"}}
 	key := uuid.NewV7()
 	const n = 10
 	ids := make([]uuid.UUID, n)
@@ -184,6 +211,9 @@ func TestConcurrentCreatesWithOneRequestIDMakeOneProduct(t *testing.T) {
 	}
 	if got := f.count(`SELECT count(*) FROM catalog.product_skus s JOIN catalog.products p ON p.id = s.product_id WHERE p.store_id = $1`, storeID); got != 1 {
 		t.Fatalf("one SKU row set, got %d", got)
+	}
+	if got := f.count(`SELECT count(*) FROM catalog.product_images i JOIN catalog.products p ON p.id = i.product_id WHERE p.store_id = $1`, storeID); got != 1 {
+		t.Fatalf("one image row, got %d", got)
 	}
 }
 
@@ -567,6 +597,7 @@ func TestPublicFiltersAndStoreScopedList(t *testing.T) {
 	same("a top-level category covers its leaves", list(PublicFilter{CategoryIDs: []uuid.UUID{parent}}), pa, pb, pc)
 	same("hashtag any", list(PublicFilter{Hashtags: []string{"x", "y"}}), pa, pb)
 	same("hashtag all", list(PublicFilter{Hashtags: []string{"x", "y"}, HashtagAll: true}), pa)
+	same("hashtag all ignores duplicate and differently written names", list(PublicFilter{Hashtags: []string{"#x", "x", "X", "y"}, HashtagAll: true}), pa)
 	lo, hi := int64(400), int64(600)
 	same("price range", list(PublicFilter{PriceMin: &lo, PriceMax: &hi}), pb)
 	same("stores", list(PublicFilter{StoreIDs: []int64{a, c}}), pa, pc)

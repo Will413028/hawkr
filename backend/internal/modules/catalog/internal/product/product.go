@@ -132,6 +132,16 @@ func (s *Service) Create(ctx context.Context, storeID int64, uploader media.Uplo
 	if errors.As(err, &rep) {
 		return s.Get(ctx, storeID, rep.id)
 	}
+	if errors.Is(err, media.ErrUploadAlreadyConfirmed) {
+		// 並行的重送輸家：同一個圖片 token 已被贏家的 transaction 確認並提交，這時贏家的商品讀得到；回滾後在 transaction 外讀回並比對雜湊。
+		id, found, rerr := s.replayedCreate(ctx, s.q(ctx), storeID, requestID, hash)
+		if rerr != nil {
+			return model.Product{}, rerr
+		}
+		if found {
+			return s.Get(ctx, storeID, id)
+		}
+	}
 	return out, err
 }
 
@@ -231,7 +241,7 @@ func (s *Service) Update(ctx context.Context, storeID int64, uploader media.Uplo
 
 // SetStatus 切換狀態：三個狀態任兩個都能互切（目標不是有效狀態回 model.Invalid）。設成 ACTIVE 時 first_published_at 只在還是空的時候填，切回其他狀態不清除。
 // 切成目前的狀態是 no-op；切成 ACTIVE 而商品沒有主圖回 model.ErrActiveRequiresGalleryImage。
-// version 是讀取時拿到的版本（etag），必填：不符回 model.ErrVersionConflict（先於「同狀態 no-op」檢查）。狀態改變時版本加一，no-op 不加。
+// version 是讀取時拿到的版本（etag），必填：狀態要改變而版本不符回 model.ErrVersionConflict；同狀態是 no-op，不比對版本（重送冪等，etag 不變）。狀態改變時版本加一，no-op 不加。
 func (s *Service) SetStatus(ctx context.Context, storeID int64, productID uuid.UUID, version int64, to model.ProductStatus) error {
 	if !to.Valid() {
 		return model.Invalid("Status", model.ReasonUnknown)
@@ -245,12 +255,12 @@ func (s *Service) SetStatus(ctx context.Context, storeID int64, productID uuid.U
 		if err != nil {
 			return err
 		}
-		if cur.ContentVersion != version {
-			return model.ErrVersionConflict
-		}
 		from := model.ProductStatus(cur.Status)
 		if from == to {
 			return nil
+		}
+		if cur.ContentVersion != version {
+			return model.ErrVersionConflict
 		}
 		if to == model.StatusActive {
 			imgs, err := q.ListProductImages(ctx, productID)
@@ -267,10 +277,20 @@ func (s *Service) SetStatus(ctx context.Context, storeID int64, productID uuid.U
 
 // Delete 刪除商品：設 deleted_at，它還在的 SKU 同 transaction 一併標刪除，不可還原，列與圖片引用保留（訂單與評價仍引用）。
 // version 選填：0 不比對，非 0 要與目前版本相符，否則回 model.ErrVersionConflict。
+// 自己的商品已經刪除時回 nil（重送冪等，不比對版本）；別家的或不存在的回 model.ErrProductNotFound。
 func (s *Service) Delete(ctx context.Context, storeID int64, productID uuid.UUID, version int64) error {
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
 		cur, err := s.lock(ctx, q, storeID, productID)
+		if errors.Is(err, model.ErrProductNotFound) {
+			deleted, derr := q.OwnProductDeleted(ctx, store.OwnProductDeletedParams{ID: productID, StoreID: storeID})
+			if derr != nil {
+				return derr
+			}
+			if deleted {
+				return nil
+			}
+		}
 		if err != nil {
 			return err
 		}

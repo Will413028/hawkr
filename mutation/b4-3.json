@@ -13,8 +13,8 @@
    "id": "status-etag-not-compared",
    "stack": "go-integration",
    "file": "backend/internal/modules/catalog/internal/product/product.go",
-   "old": "\t\tif cur.ContentVersion != version {\n\t\t\treturn model.ErrVersionConflict\n\t\t}\n\t\tfrom := model.ProductStatus(cur.Status)",
-   "new": "\t\tfrom := model.ProductStatus(cur.Status)",
+   "old": "\t\tif cur.ContentVersion != version {\n\t\t\treturn model.ErrVersionConflict\n\t\t}\n\t\tif to == model.StatusActive {",
+   "new": "\t\tif to == model.StatusActive {",
    "test": "internal/modules/catalog ^TestStaleEtagIsRejectedAndStockChangesDoNotMoveIt$",
    "why": "上下架不再比對 etag：用過期畫面上架別人剛改的內容也成功，測試要紅。"
   },
@@ -98,6 +98,42 @@
    "new": "int32(min(n, int64(math.MaxInt32)))",
    "test": "internal/modules/catalog/internal/model ^TestSuggestedSafetyStock$",
    "why": "建議安全庫存拿掉下限 5：銷量很低的商品建議值低於 5，測試要紅。"
+  },
+  {
+   "id": "status-same-target-checks-etag-first",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "\t\tif from == to {\n\t\t\treturn nil\n\t\t}\n\t\tif cur.ContentVersion != version {",
+   "new": "\t\tif cur.ContentVersion != version {",
+   "test": "internal/modules/catalog ^TestStaleEtagIsRejectedAndStockChangesDoNotMoveIt$",
+   "why": "同狀態 no-op 不再先於 etag 比對：用切換前的舊 etag 重送同一個目標狀態回 VERSION_CONFLICT，不是成功，測試要紅。"
+  },
+  {
+   "id": "delete-already-deleted-is-not-found",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "\t\t\tif deleted {\n\t\t\t\treturn nil\n\t\t\t}",
+   "new": "\t\t\tif deleted && false {\n\t\t\t\treturn nil\n\t\t\t}",
+   "test": "internal/modules/catalog ^TestDeleteIsIdempotentForTheOwnerAndHidesOtherStores$",
+   "why": "重送刪除已刪除的自己的商品回找不到而不是成功，測試要紅。"
+  },
+  {
+   "id": "public-hashtag-filter-not-normalized",
+   "stack": "go",
+   "file": "backend/internal/modules/catalog/internal/product/read.go",
+   "old": "\ttags, err := hashtag.RequireSet(raw)\n\tif err != nil {\n\t\treturn nil, model.Invalid(\"Hashtags\", model.ReasonInvalid)\n\t}\n\tnames := make([]string, len(tags))\n\tfor i, t := range tags {\n\t\tnames[i] = t.Name\n\t}\n\treturn names, nil",
+   "new": "\tfor _, n := range raw {\n\t\tif hashtag.ValidName(n) != nil {\n\t\t\treturn nil, model.Invalid(\"Hashtags\", model.ReasonInvalid)\n\t\t}\n\t}\n\treturn raw, nil",
+   "test": "internal/modules/catalog/internal/product ^TestFilterHashtagsNormalizesAndDeduplicates$",
+   "why": "篩選標籤不正規化也不去重：#tea、tea 重複算兩個，HashtagAll 的基數被灌大，測試要紅。"
+  },
+  {
+   "id": "safety-stock-sums-beyond-window",
+   "stack": "go",
+   "file": "backend/internal/modules/catalog/internal/model/product.go",
+   "old": "\tweeklySales = weeklySales[max(0, len(weeklySales)-SalesWindowWeeks):]\n",
+   "new": "",
+   "test": "internal/modules/catalog/internal/model ^TestSuggestedSafetyStock$",
+   "why": "超過 8 週的輸入全部加總卻仍除以 8：建議值被灌大，測試要紅。"
   }
  ]
 }

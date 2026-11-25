@@ -2,6 +2,8 @@ package product
 
 import (
 	"bytes"
+	"errors"
+	"slices"
 	"testing"
 	"uuid"
 
@@ -74,5 +76,22 @@ func TestLowStockThresholdRange(t *testing.T) {
 		if (err == nil) != c.ok {
 			t.Errorf("threshold %d: err = %v, want ok=%v", c.v, err, c.ok)
 		}
+	}
+}
+
+func TestFilterHashtagsNormalizesAndDeduplicates(t *testing.T) {
+	t.Parallel()
+	got, err := filterHashtags([]string{"#tea", "tea", "Tea", "coffee"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"tea", "coffee"}; !slices.Equal(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	if got, err := filterHashtags(nil); err != nil || len(got) != 0 {
+		t.Fatalf("no filter: %v, %v", got, err)
+	}
+	if _, err := filterHashtags([]string{"bad tag!"}); !errors.Is(err, model.ErrInvalidInput) {
+		t.Fatalf("an invalid name is a client error: %v", err)
 	}
 }

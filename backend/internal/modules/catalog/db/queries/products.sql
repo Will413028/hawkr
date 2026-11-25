@@ -18,6 +18,10 @@ SELECT id, status, first_published_at, content_version FROM catalog.products
 WHERE id = sqlc.arg(id) AND store_id = sqlc.arg(store_id) AND deleted_at IS NULL
 FOR UPDATE;
 
+-- name: OwnProductDeleted :one
+-- 店家自己的商品是否已刪除（Delete 重送冪等：已刪除回成功；別家的或不存在的查不到，仍是找不到）。
+SELECT EXISTS (SELECT 1 FROM catalog.products WHERE id = sqlc.arg(id) AND store_id = sqlc.arg(store_id) AND deleted_at IS NOT NULL);
+
 -- name: UpdateProductContent :exec
 -- 賣家可編輯的內容；content_version 加 version_bump（etag 的來源；修改是 1，建立時補寫內容是 0，建立的版本是 1）。呼叫前已用 LockOwnProduct 鎖列並比對過版本（同一把列鎖之下，版本不會在比對與寫入之間改變）。
 UPDATE catalog.products

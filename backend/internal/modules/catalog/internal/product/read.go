@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 	"time"
 	"uuid"
@@ -319,8 +318,9 @@ func (s *Service) ListPublic(ctx context.Context, at time.Time, f model.PublicFi
 	default:
 		return model.ProductPage{}, model.Invalid("Sort", model.ReasonUnknown)
 	}
-	if len(f.Hashtags) > 0 && slices.ContainsFunc(f.Hashtags, func(n string) bool { return hashtag.ValidName(n) != nil }) {
-		return model.ProductPage{}, model.Invalid("Hashtags", model.ReasonInvalid)
+	names, err := filterHashtags(f.Hashtags)
+	if err != nil {
+		return model.ProductPage{}, err
 	}
 	size = pageSize(size)
 	var akey *int64
@@ -330,7 +330,7 @@ func (s *Service) ListPublic(ctx context.Context, at time.Time, f model.PublicFi
 	}
 	rows, err := s.q(ctx).ListPublicProducts(ctx, store.ListPublicProductsParams{
 		Sort: string(sort), Query: trimtext.Trim(f.Query), At: at, CategoryIds: nonNil(f.CategoryIDs), PriceMin: f.PriceMin, PriceMax: f.PriceMax,
-		Hashtags: nonNil(f.Hashtags), HashtagAll: f.HashtagAll, StoreIds: nonNil(f.StoreIDs), QueryPattern: likePattern(f.Query),
+		Hashtags: nonNil(names), HashtagAll: f.HashtagAll, StoreIds: nonNil(f.StoreIDs), QueryPattern: likePattern(f.Query),
 		AfterKey: akey, AfterID: aid, RowLimit: size + 1,
 	})
 	if err != nil {
@@ -358,6 +358,19 @@ func (s *Service) SuggestNames(ctx context.Context, at time.Time, query string, 
 	}
 	out, err := s.q(ctx).SuggestProductNames(ctx, store.SuggestProductNamesParams{Query: trimtext.Trim(query), At: at, QueryPattern: pat, RowLimit: clamp(limit, 10, 20)})
 	return nonNil(out), err
+}
+
+// filterHashtags 把篩選的標籤以寫入同一套規則正規化並去重（#tea、Tea、tea 是同一個），否則 HashtagAll 的「全部命中」基數會被重複的輸入灌大而查無結果。
+func filterHashtags(raw []string) ([]string, error) {
+	tags, err := hashtag.RequireSet(raw)
+	if err != nil {
+		return nil, model.Invalid("Hashtags", model.ReasonInvalid)
+	}
+	names := make([]string, len(tags))
+	for i, t := range tags {
+		names[i] = t.Name
+	}
+	return names, nil
 }
 
 // SuggestHashtags 是標籤建議：query 可帶開頭的 #；contains 為假是以 query 開頭。回可見商品數多的在前，最多 limit 筆（預設 10，上限 20）。

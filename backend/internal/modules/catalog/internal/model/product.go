@@ -119,8 +119,9 @@ func (e *StockMismatchError) Error() string {
 }
 
 // SuggestedSafetyStock 是依最近銷售建議的安全庫存：weeklySales 是最近 SalesWindowWeeks 週每週的銷量（舊到新，可以較短，缺的週算 0）；
-// 備貨兩週的平均需求，下限 5；沒有銷量時是 10。規則沿用賣家中心庫存頁（website/features/seller-center/inventory/InventoryPage.tsx）。
+// 較長的輸入只取最後 SalesWindowWeeks 週（尾端窗口，與除數一致）。備貨兩週的平均需求，下限 5；沒有銷量時是 10。規則沿用賣家中心庫存頁（website/features/seller-center/inventory/InventoryPage.tsx）。
 func SuggestedSafetyStock(weeklySales []int32) int32 {
+	weeklySales = weeklySales[max(0, len(weeklySales)-SalesWindowWeeks):]
 	var sum int64
 	for _, w := range weeklySales {
 		sum += int64(w)

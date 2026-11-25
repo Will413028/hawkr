@@ -947,6 +947,23 @@ func (q *Queries) LockOwnProduct(ctx context.Context, arg LockOwnProductParams) 
 	return i, err
 }
 
+const ownProductDeleted = `-- name: OwnProductDeleted :one
+SELECT EXISTS (SELECT 1 FROM catalog.products WHERE id = $1 AND store_id = $2 AND deleted_at IS NOT NULL)
+`
+
+type OwnProductDeletedParams struct {
+	ID      uuid.UUID
+	StoreID int64
+}
+
+// 店家自己的商品是否已刪除（Delete 重送冪等：已刪除回成功；別家的或不存在的查不到，仍是找不到）。
+func (q *Queries) OwnProductDeleted(ctx context.Context, arg OwnProductDeletedParams) (bool, error) {
+	row := q.db.QueryRow(ctx, ownProductDeleted, arg.ID, arg.StoreID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const recomputePriceRange = `-- name: RecomputePriceRange :execrows
 UPDATE catalog.products p
 SET min_price = r.lo, max_price = r.hi, updated_at = $1
