@@ -1,0 +1,75 @@
+package model_test
+
+import (
+	"os"
+	"regexp"
+	"strconv"
+	"testing"
+
+	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/model"
+)
+
+func TestCanTransitionAllowsAnyDistinctValidPair(t *testing.T) {
+	all := []model.ProductStatus{model.StatusDraft, model.StatusActive, model.StatusArchived}
+	for _, from := range all {
+		for _, to := range all {
+			if got, want := from.CanTransition(to), from != to; got != want {
+				t.Errorf("%s -> %s: CanTransition = %v, want %v", from, to, got, want)
+			}
+		}
+		for _, bad := range []model.ProductStatus{"", "PENDING", "active"} {
+			if from.CanTransition(bad) {
+				t.Errorf("%s -> %q must not be allowed", from, bad)
+			}
+		}
+	}
+}
+
+// 儲存端 CHECK 的字面上限要等於生成的常數（上限的唯一來源是 api/ 的 limits option）。
+func TestSchemaCheckLimitsMatchGeneratedConstants(t *testing.T) {
+	raw, err := os.ReadFile("../../db/schema.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	schema := string(raw)
+	atoi := func(s string) int {
+		n, err := strconv.Atoi(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	// 名為 constraint 的 CHECK 裡 char_length(column) <= N 的 N。
+	maxLen := func(constraint, column string) int {
+		re := regexp.MustCompile(`CONSTRAINT ` + constraint + ` CHECK \([^\n]*char_length\(` + column + `\) <= (\d+)`)
+		m := re.FindStringSubmatch(schema)
+		if m == nil {
+			t.Fatalf("schema.sql 沒有 %s 的 char_length(%s) <= N", constraint, column)
+		}
+		return atoi(m[1])
+	}
+	for _, c := range []struct {
+		constraint, column string
+		want               int
+	}{
+		{"products_title_check", "title", model.MaxTitleRunes},
+		{"option_axes_name_check", "name", model.MaxAxisNameRunes},
+		{"option_values_value_check", "value", model.MaxOptionValueRunes},
+		{"product_images_alt_check", "alt", model.MaxAltRunes},
+	} {
+		if got := maxLen(c.constraint, c.column); got != c.want {
+			t.Errorf("%s: schema.sql 的上限 %d，生成的常數 %d", c.constraint, got, c.want)
+		}
+	}
+	m := regexp.MustCompile(`CONSTRAINT option_axes_position_check CHECK \(position IN \(([\d, ]+)\)\)`).FindStringSubmatch(schema)
+	if m == nil {
+		t.Fatal("schema.sql 沒有 option_axes_position_check 的 IN 清單")
+	}
+	var last int
+	for _, n := range regexp.MustCompile(`\d+`).FindAllString(m[1], -1) {
+		last = atoi(n)
+	}
+	if last != model.MaxAxes {
+		t.Errorf("option_axes_position_check 的最大位置 %d，MaxAxes %d", last, model.MaxAxes)
+	}
+}

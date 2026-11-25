@@ -25,47 +25,22 @@ func (s ProductStatus) Valid() bool {
 	return s == StatusDraft || s == StatusActive || s == StatusArchived
 }
 
-// CanTransition 回報賣家能否把狀態從 s 切到 to：草稿上架、上架後下架、下架可再上架。同狀態不是切換。
+// CanTransition 回報賣家能否把狀態從 s 切到 to：三個狀態任兩個都能互切，同狀態不是切換。
 func (s ProductStatus) CanTransition(to ProductStatus) bool {
-	switch s {
-	case StatusDraft:
-		return to == StatusActive
-	case StatusActive:
-		return to == StatusArchived
-	case StatusArchived:
-		return to == StatusActive
-	}
-	return false
+	return to.Valid() && to != s
 }
 
-// 輸入與結構上限。圖片與區塊的上限沒有明定數字：表格與清單照 seller-app 編輯器的常數（50 列、10 欄、每格 200 字），其餘為待確認的值，
-// 集中在這裡以便調整。
-const (
-	MaxTitleRunes              = 100
-	MaxAxes                    = 2
-	MaxAxisNameRunes           = 20
-	MaxOptionValueRunes        = 40
-	MaxValuesPerAxis           = 50
-	MaxSkus                    = 100
-	MaxGalleryImages           = 9
-	MaxDescriptionImages       = 20
-	MaxDescriptionBlocks       = 100
-	MaxParagraphRunes          = 5000
-	MaxListItems               = 50
-	MaxListItemRunes           = 200
-	MaxTableRows               = 50
-	MaxTableCols               = 10
-	MaxTableCellRunes          = 200
-	MaxAltRunes                = 200
-	MaxListPageSize      int32 = 100
-)
+// MaxListPageSize 是列表單頁筆數的上限。
+const MaxListPageSize int32 = 100
 
 // 寫入與讀取商品的錯誤；用 errors.Is 判斷。
 var (
 	// ErrProductNotFound 表示商品不存在、已刪除，或不屬於這家店。
 	ErrProductNotFound = errors.New("catalog: product not found")
-	// ErrInvalidTransition 表示商品狀態不能這樣切換。
+	// ErrInvalidTransition 表示商品狀態不能這樣切換（目標不是有效狀態，或與目前相同）。
 	ErrInvalidTransition = errors.New("catalog: invalid status transition")
+	// ErrActiveRequiresGalleryImage 表示 ACTIVE 的商品必須至少有一張主圖：切成 ACTIVE 或寫入 ACTIVE 商品的內容時主圖是空的。
+	ErrActiveRequiresGalleryImage = errors.New("catalog: an active product needs at least one gallery image")
 	// ErrInvalidInput 表示輸入不合法；具體的欄位與原因在 *InvalidInputError。
 	ErrInvalidInput = errors.New("catalog: invalid input")
 )

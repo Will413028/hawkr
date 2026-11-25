@@ -106,8 +106,12 @@ func (s *Service) Update(ctx context.Context, storeID int64, uploader media.Uplo
 	var out model.Product
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
-		if _, err := s.lock(ctx, q, storeID, productID); err != nil {
+		cur, err := s.lock(ctx, q, storeID, productID)
+		if err != nil {
 			return err
+		}
+		if model.ProductStatus(cur.Status) == model.StatusActive && len(p.gallery) == 0 {
+			return model.ErrActiveRequiresGalleryImage
 		}
 		now := s.d.Now()
 		catName, err := s.leafCategoryText(ctx, q, p.categoryID)
@@ -158,8 +162,8 @@ func (s *Service) Update(ctx context.Context, storeID int64, uploader media.Uplo
 	return out, err
 }
 
-// SetStatus 切換狀態：DRAFT→ACTIVE、ACTIVE→ARCHIVED、ARCHIVED→ACTIVE。設成 ACTIVE 時 first_published_at 只在還是空的時候填。
-// 切成目前的狀態是 no-op；其他切換回 model.ErrInvalidTransition。
+// SetStatus 切換狀態：三個狀態任兩個都能互切。設成 ACTIVE 時 first_published_at 只在還是空的時候填，切回其他狀態不清除。
+// 切成目前的狀態是 no-op；切成 ACTIVE 而商品沒有主圖回 model.ErrActiveRequiresGalleryImage。
 func (s *Service) SetStatus(ctx context.Context, storeID int64, productID uuid.UUID, to model.ProductStatus) error {
 	if !to.Valid() {
 		return model.Invalid("Status", model.ReasonUnknown)
@@ -176,6 +180,15 @@ func (s *Service) SetStatus(ctx context.Context, storeID int64, productID uuid.U
 		}
 		if !from.CanTransition(to) {
 			return model.ErrInvalidTransition
+		}
+		if to == model.StatusActive {
+			imgs, err := q.ListProductImages(ctx, productID)
+			if err != nil {
+				return err
+			}
+			if !slices.ContainsFunc(imgs, func(i store.CatalogProductImage) bool { return i.Kind == kindGallery }) {
+				return model.ErrActiveRequiresGalleryImage
+			}
 		}
 		return q.SetProductStatus(ctx, store.SetProductStatusParams{ID: productID, Status: string(to), Now: s.d.Now()})
 	})

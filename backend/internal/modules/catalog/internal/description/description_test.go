@@ -39,7 +39,12 @@ func TestNormalizeAcceptsFourBlockKinds(t *testing.T) {
 }
 
 func TestNormalizeRejects(t *testing.T) {
-	long := strings.Repeat("字", model.MaxParagraphRunes+1)
+	long := strings.Repeat("字", model.MaxDescriptionRunes+1)
+	cell := strings.Repeat("a", model.MaxTableCellRunes)
+	list := make([]string, model.MaxListItems)
+	for i := range list {
+		list[i] = cell
+	}
 	cases := []struct {
 		name   string
 		blocks []model.Block
@@ -48,7 +53,13 @@ func TestNormalizeRejects(t *testing.T) {
 	}{
 		{"unknown kind", []model.Block{{Kind: "html"}}, "Description[0].Kind", model.ReasonUnknown},
 		{"empty paragraph", []model.Block{{Kind: model.BlockParagraph, Text: " "}}, "Description[0].Text", model.ReasonRequired},
-		{"long paragraph", []model.Block{{Kind: model.BlockParagraph, Text: long}}, "Description[0].Text", model.ReasonTooLong},
+		{"long paragraph", []model.Block{{Kind: model.BlockParagraph, Text: long}}, "Description", model.ReasonTooLong},
+		{"total across paragraph, list and table", []model.Block{
+			{Kind: model.BlockParagraph, Text: strings.Repeat("字", model.MaxDescriptionRunes-model.MaxListItemRunes*2)},
+			{Kind: model.BlockList, Items: []string{cell, cell}},
+			{Kind: model.BlockTable, Rows: [][]string{{"x"}}},
+		}, "Description", model.ReasonTooLong},
+		{"total across list items", []model.Block{{Kind: model.BlockList, Items: list}, {Kind: model.BlockList, Items: list}}, "Description", model.ReasonTooLong},
 		{"image without ref", []model.Block{{Kind: model.BlockImage, Image: &model.Image{}}}, "Description[0].Image", model.ReasonInvalid},
 		{"image with both", []model.Block{{Kind: model.BlockImage, Image: &model.Image{Token: "t", AssetID: uuid.NewV7()}}}, "Description[0].Image", model.ReasonInvalid},
 		{"empty list", []model.Block{{Kind: model.BlockList}}, "Description[0].Items", model.ReasonRequired},
@@ -68,11 +79,20 @@ func TestNormalizeRejects(t *testing.T) {
 	}
 	// 邊界值可以。
 	edge := []model.Block{
-		{Kind: model.BlockParagraph, Text: strings.Repeat("字", model.MaxParagraphRunes)},
+		{Kind: model.BlockParagraph, Text: strings.Repeat("字", model.MaxDescriptionRunes)},
 		{Kind: model.BlockTable, Rows: [][]string{make([]string, model.MaxTableCols)}},
+		{Kind: model.BlockImage, Image: &model.Image{Token: "t", Alt: strings.Repeat("字", model.MaxAltRunes)}},
 	}
 	if _, err := Normalize("Description", edge); err != nil {
-		t.Fatalf("edge: %v", err)
+		t.Fatalf("edge (exact total, empty cells and alt do not count): %v", err)
+	}
+	// 只差一個字就超過：同一個總數，段落先佔 MaxDescriptionRunes-1 再一個格子兩字。
+	over := []model.Block{
+		{Kind: model.BlockParagraph, Text: strings.Repeat("字", model.MaxDescriptionRunes-1)},
+		{Kind: model.BlockTable, Rows: [][]string{{"ab"}}},
+	}
+	if _, err := Normalize("Description", over); err == nil {
+		t.Fatal("one rune over the total must fail")
 	}
 }
 

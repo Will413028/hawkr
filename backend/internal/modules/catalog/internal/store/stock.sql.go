@@ -235,6 +235,26 @@ func (q *Queries) RestoreSkuStock(ctx context.Context, arg RestoreSkuStockParams
 	return result.RowsAffected(), nil
 }
 
+const skuInStore = `-- name: SkuInStore :one
+SELECT EXISTS (
+    SELECT 1 FROM catalog.product_skus s JOIN catalog.products p ON p.id = s.product_id
+    WHERE s.id = $1 AND p.store_id = $2
+)
+`
+
+type SkuInStoreParams struct {
+	ID      uuid.UUID
+	StoreID int64
+}
+
+// SKU 是否屬於這家店（不看 SKU 或商品是否已刪除）；調整的冪等重送用它確認重送的人就是原本的店家。
+func (q *Queries) SkuInStore(ctx context.Context, arg SkuInStoreParams) (bool, error) {
+	row := q.db.QueryRow(ctx, skuInStore, arg.ID, arg.StoreID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const sumRestoredBySku = `-- name: SumRestoredBySku :many
 SELECT m.sku_id, SUM(m.delta)::integer AS restored
 FROM catalog.stock_operations o

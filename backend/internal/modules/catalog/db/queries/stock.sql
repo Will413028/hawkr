@@ -58,3 +58,10 @@ WHERE s.id = sqlc.arg(id) AND s.deleted_at IS NULL
 -- 店家自己的未刪除 SKU；調整失敗時用來區分「不存在、不是自己的或已刪除」與「結果超出範圍」。
 SELECT s.id, s.stock_qty FROM catalog.product_skus s JOIN catalog.products p ON p.id = s.product_id
 WHERE s.id = sqlc.arg(id) AND s.deleted_at IS NULL AND p.store_id = sqlc.arg(store_id) AND p.deleted_at IS NULL;
+
+-- name: SkuInStore :one
+-- SKU 是否屬於這家店（不看 SKU 或商品是否已刪除）；調整的冪等重送用它確認重送的人就是原本的店家。
+SELECT EXISTS (
+    SELECT 1 FROM catalog.product_skus s JOIN catalog.products p ON p.id = s.product_id
+    WHERE s.id = sqlc.arg(id) AND p.store_id = sqlc.arg(store_id)
+);

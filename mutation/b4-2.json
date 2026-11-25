@@ -152,6 +152,87 @@
    "new": "$4 > 0",
    "test": "internal/modules/catalog ^TestAdjustOnAnotherStoresSkuOrDeletedSkuIsNotFound$",
    "why": "賣家調整不再限定 SKU 屬於自己的店家：跨店調整生效而不是回 ErrSkuNotFound，測試要紅。"
+  },
+  {
+   "id": "activate-without-gallery-image-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "if !slices.ContainsFunc(imgs, func(i store.CatalogProductImage) bool { return i.Kind == kindGallery }) {",
+   "new": "if _ = imgs; false {",
+   "test": "internal/modules/catalog ^TestActiveProductNeedsAGalleryImageOnEveryWrite$",
+   "why": "切成 ACTIVE 不再檢查主圖：沒有主圖的商品被上架，測試要紅。"
+  },
+  {
+   "id": "description-image-counts-as-gallery",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "return i.Kind == kindGallery }",
+   "new": "return true }",
+   "test": "internal/modules/catalog ^TestActiveProductNeedsAGalleryImageOnEveryWrite$",
+   "why": "上架檢查把描述圖當主圖：只有描述圖的商品被上架，測試要紅。"
+  },
+  {
+   "id": "update-active-without-gallery-image-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "if model.ProductStatus(cur.Status) == model.StatusActive && len(p.gallery) == 0 {",
+   "new": "if _ = cur; false {",
+   "test": "internal/modules/catalog ^TestActiveProductNeedsAGalleryImageOnEveryWrite$",
+   "why": "ACTIVE 商品的整體取代不再檢查主圖：上架中的商品被改成沒有主圖，測試要紅。"
+  },
+  {
+   "id": "back-to-draft-clears-first-published-at",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
+   "old": "ELSE first_published_at END",
+   "new": "ELSE NULL END",
+   "test": "internal/modules/catalog ^TestProductLifecycleAndFirstPublishedAt$",
+   "why": "切回非 ACTIVE 時清掉 first_published_at：曾上架的紀錄消失，測試要紅。"
+  },
+  {
+   "id": "can-transition-allows-same-status",
+   "stack": "go",
+   "file": "backend/internal/modules/catalog/internal/model/product.go",
+   "old": "return to.Valid() && to != s",
+   "new": "return to.Valid()",
+   "test": "internal/modules/catalog/internal/model ^TestCanTransitionAllowsAnyDistinctValidPair$",
+   "why": "同狀態被當成切換：測試要紅。"
+  },
+  {
+   "id": "can-transition-allows-invalid-status",
+   "stack": "go",
+   "file": "backend/internal/modules/catalog/internal/model/product.go",
+   "old": "return to.Valid() && to != s",
+   "new": "return to != s",
+   "test": "internal/modules/catalog/internal/model ^TestCanTransitionAllowsAnyDistinctValidPair$",
+   "why": "無效狀態被當成可切換的目標：測試要紅。"
+  },
+  {
+   "id": "description-total-not-enforced",
+   "stack": "go",
+   "file": "backend/internal/modules/catalog/internal/description/description.go",
+   "old": "if b.used > model.MaxDescriptionRunes {",
+   "new": "if false {",
+   "test": "internal/modules/catalog/internal/description ^TestNormalizeRejects$",
+   "why": "整份描述的文字總量不再受限：段落、清單與表格合計超過 3000 字被放行，測試要紅。"
+  },
+  {
+   "id": "adjust-replay-skips-store-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/stock/stock.go",
+   "old": "if !own {",
+   "new": "if false && !own {",
+   "test": "internal/modules/catalog ^TestAdjustReplayIsNoOpAndDifferentContentIsRejected$",
+   "why": "調整的冪等重送不確認 SKU 屬於呼叫的店家：別家店用同一個 key 與內容重送回成功，測試要紅。"
+  },
+  {
+   "id": "limit-constant-drifts-from-schema-check",
+   "stack": "go",
+   "file": "backend/internal/modules/catalog/internal/model/limits_gen.go",
+   "old": "MaxTitleRunes = 100",
+   "new": "MaxTitleRunes = 101",
+   "test": "internal/modules/catalog/internal/model ^TestSchemaCheckLimitsMatchGeneratedConstants$",
+   "why": "生成的上限與 schema.sql 的 CHECK 字面值不同：drift 測試要紅。"
   }
  ]
 }

@@ -94,7 +94,9 @@ var (
 var (
 	ErrProductNotFound   = model.ErrProductNotFound
 	ErrInvalidTransition = model.ErrInvalidTransition
-	ErrInvalidInput      = model.ErrInvalidInput
+	// ErrActiveRequiresGalleryImage 見 model.ErrActiveRequiresGalleryImage。
+	ErrActiveRequiresGalleryImage = model.ErrActiveRequiresGalleryImage
+	ErrInvalidInput               = model.ErrInvalidInput
 )
 
 // Deps 是模組需要的外部依賴，全部在組裝點提供。
@@ -158,12 +160,13 @@ func (m *Module) CreateProduct(ctx context.Context, storeID int64, uploader medi
 	return m.product.Create(ctx, storeID, uploader, in)
 }
 
-// UpdateProduct 整體取代商品的內容，狀態不變；SKU 以選項值的組合辨識（組合還在就更新價格，庫存不動）。商品不是這家店的或已刪除回 ErrProductNotFound。
+// UpdateProduct 整體取代商品的內容，狀態不變（ACTIVE 的商品輸入沒有主圖回 ErrActiveRequiresGalleryImage）；SKU 以選項值的組合辨識（組合還在就更新價格，庫存不動）。商品不是這家店的或已刪除回 ErrProductNotFound。
 func (m *Module) UpdateProduct(ctx context.Context, storeID int64, uploader media.Uploader, productID uuid.UUID, in ProductInput) (Product, error) {
 	return m.product.Update(ctx, storeID, uploader, productID, in)
 }
 
-// SetProductStatus 切換商品狀態：DRAFT→ACTIVE、ACTIVE→ARCHIVED、ARCHIVED→ACTIVE（首次 ACTIVE 設 first_published_at）；其他切換回 ErrInvalidTransition，切成目前狀態是 no-op。
+// SetProductStatus 切換商品狀態：DRAFT、ACTIVE、ARCHIVED 任兩個都能互切，切成目前狀態是 no-op。切成 ACTIVE 時商品沒有主圖回 ErrActiveRequiresGalleryImage；
+// first_published_at 只在第一次 ACTIVE 時填，之後不清除。
 func (m *Module) SetProductStatus(ctx context.Context, storeID int64, productID uuid.UUID, to ProductStatus) error {
 	return m.product.SetStatus(ctx, storeID, productID, to)
 }

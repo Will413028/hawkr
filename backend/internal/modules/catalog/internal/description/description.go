@@ -14,18 +14,23 @@ import (
 
 // Normalize 驗證區塊並回傳整理過的副本（文字去頭尾空白）。欄位路徑以 field 為前綴（例如 "Description"）。
 // 圖片區塊必須剛好給 Token 或 AssetID 其中一個，alt 不超過上限；上限見 model 的常數。
+// 文字沒有單段上限，段落、清單項目與表格儲存格的文字合計不得超過 model.MaxDescriptionRunes（不含 alt）；清單項目與儲存格另有各自的上限。
 func Normalize(field string, blocks []model.Block) ([]model.Block, error) {
 	if len(blocks) > model.MaxDescriptionBlocks {
 		return nil, model.Invalid(field, model.ReasonTooMany)
 	}
 	out := make([]model.Block, 0, len(blocks))
 	images := 0
+	budget := textBudget{field: field}
 	for i, b := range blocks {
 		f := fmt.Sprintf("%s[%d]", field, i)
 		switch b.Kind {
 		case model.BlockParagraph:
 			text := trimtext.Trim(b.Text)
-			if err := checkText(f+".Text", text, model.MaxParagraphRunes, false); err != nil {
+			if err := checkText(f+".Text", text, 0, false); err != nil {
+				return nil, err
+			}
+			if err := budget.add(text); err != nil {
 				return nil, err
 			}
 			out = append(out, model.Block{Kind: b.Kind, Text: text})
@@ -55,10 +60,13 @@ func Normalize(field string, blocks []model.Block) ([]model.Block, error) {
 				if err := checkText(fmt.Sprintf("%s.Items[%d]", f, j), items[j], model.MaxListItemRunes, false); err != nil {
 					return nil, err
 				}
+				if err := budget.add(items[j]); err != nil {
+					return nil, err
+				}
 			}
 			out = append(out, model.Block{Kind: b.Kind, Items: items})
 		case model.BlockTable:
-			rows, err := normalizeTable(f+".Rows", b.Rows)
+			rows, err := normalizeTable(f+".Rows", b.Rows, &budget)
 			if err != nil {
 				return nil, err
 			}
@@ -83,7 +91,7 @@ func NormalizeImage(field string, img model.Image) (model.Image, error) {
 	return model.Image{Token: img.Token, AssetID: img.AssetID, Alt: alt}, nil
 }
 
-func normalizeTable(field string, rows [][]string) ([][]string, error) {
+func normalizeTable(field string, rows [][]string, budget *textBudget) ([][]string, error) {
 	if len(rows) == 0 {
 		return nil, model.Invalid(field, model.ReasonRequired)
 	}
@@ -108,16 +116,34 @@ func normalizeTable(field string, rows [][]string) ([][]string, error) {
 			if err := checkText(fmt.Sprintf("%s[%d][%d]", field, r, c), out[r][c], model.MaxTableCellRunes, true); err != nil {
 				return nil, err
 			}
+			if err := budget.add(out[r][c]); err != nil {
+				return nil, err
+			}
 		}
 	}
 	return out, nil
 }
 
+// textBudget 累計整份描述的文字量（rune），超過 model.MaxDescriptionRunes 回 TooLong，欄位是整份描述的欄位路徑。
+type textBudget struct {
+	field string
+	used  int
+}
+
+func (b *textBudget) add(s string) error {
+	b.used += utf8.RuneCountInString(s)
+	if b.used > model.MaxDescriptionRunes {
+		return model.Invalid(b.field, model.ReasonTooLong)
+	}
+	return nil
+}
+
+// checkText 檢查單一文字：max 大於 0 時是這段文字自己的上限，0 表示沒有單段上限。
 func checkText(field, s string, max int, allowEmpty bool) error {
 	if s == "" && !allowEmpty {
 		return model.Invalid(field, model.ReasonRequired)
 	}
-	if utf8.RuneCountInString(s) > max {
+	if max > 0 && utf8.RuneCountInString(s) > max {
 		return model.Invalid(field, model.ReasonTooLong)
 	}
 	return nil

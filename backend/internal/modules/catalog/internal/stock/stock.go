@@ -100,7 +100,7 @@ func (s *Service) Adjust(ctx context.Context, storeID int64, key string, skuID u
 			return err
 		}
 		if n == 0 {
-			return s.replayAdjust(ctx, q, key, skuID, delta)
+			return s.replayAdjust(ctx, q, storeID, key, skuID, delta)
 		}
 		affected, err := q.AdjustOwnSkuStock(ctx, store.AdjustOwnSkuStockParams{ID: skuID, StoreID: storeID, Delta: delta, Now: now})
 		if err != nil {
@@ -121,7 +121,16 @@ func (s *Service) Adjust(ctx context.Context, storeID int64, key string, skuID u
 	})
 }
 
-func (s *Service) replayAdjust(ctx context.Context, q *store.Queries, key string, skuID uuid.UUID, delta int32) error {
+// replayAdjust 處理同一個 key 重送：先確認 SKU 屬於呼叫的店家（別家店重送同一個 key 與內容，回 ErrSkuNotFound，與第一次送別家 SKU 相同），
+// 再比對原操作的內容。
+func (s *Service) replayAdjust(ctx context.Context, q *store.Queries, storeID int64, key string, skuID uuid.UUID, delta int32) error {
+	own, err := q.SkuInStore(ctx, store.SkuInStoreParams{ID: skuID, StoreID: storeID})
+	if err != nil {
+		return err
+	}
+	if !own {
+		return model.ErrSkuNotFound
+	}
 	op, err := q.GetStockOperationByKey(ctx, key)
 	if err != nil {
 		return err

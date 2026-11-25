@@ -5,6 +5,7 @@ package catalog
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"sync"
 	"testing"
@@ -112,8 +113,13 @@ func (f *productFixture) setExposable(storeID int64, ok bool) {
 	f.exec("UPDATE seller.kyc_applications SET status = $2 WHERE store_id = $1", storeID, status)
 }
 
+// input 是一份可以上架的輸入：帶一張主圖（token 每次不同）。
 func (f *productFixture) input(title string) ProductInput {
-	return ProductInput{Title: title, CategoryID: f.leaf(), Skus: []SkuInput{{Price: 100}}}
+	f.mu.Lock()
+	f.seq++
+	token := fmt.Sprintf("input-image-%d", f.seq)
+	f.mu.Unlock()
+	return ProductInput{Title: title, CategoryID: f.leaf(), Skus: []SkuInput{{Price: 100}}, Gallery: []Image{{Token: token}}}
 }
 
 func (f *productFixture) create(storeID, accountID int64, in ProductInput) Product {
@@ -152,11 +158,14 @@ func TestProductLifecycleAndFirstPublishedAt(t *testing.T) {
 	if p.Status != StatusDraft || p.FirstPublishedAt != nil {
 		t.Fatalf("a new product is a draft without first_published_at: %+v", p)
 	}
-	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, StatusArchived); !errors.Is(err, ErrInvalidTransition) {
-		t.Fatalf("DRAFT to ARCHIVED: %v", err)
+	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, StatusArchived); err != nil {
+		t.Fatalf("DRAFT to ARCHIVED is allowed: %v", err)
 	}
 	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, ProductStatus("")); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("empty status must not be valid: %v", err)
+	}
+	if got, _ := f.m.Product(f.ct, storeID, p.ID); got.FirstPublishedAt != nil {
+		t.Fatalf("archiving a draft does not set first_published_at: %+v", got)
 	}
 	f.activate(storeID, p.ID)
 	first := f.clock()
@@ -164,20 +173,75 @@ func TestProductLifecycleAndFirstPublishedAt(t *testing.T) {
 	if got.Status != StatusActive || got.FirstPublishedAt == nil || !got.FirstPublishedAt.Equal(first) {
 		t.Fatalf("ACTIVE sets first_published_at: %+v", got)
 	}
-	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, StatusDraft); !errors.Is(err, ErrInvalidTransition) {
-		t.Fatalf("ACTIVE to DRAFT: %v", err)
+	f.advance(time.Hour)
+	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, StatusDraft); err != nil {
+		t.Fatalf("ACTIVE to DRAFT is allowed: %v", err)
+	}
+	got, _ = f.m.Product(f.ct, storeID, p.ID)
+	if got.Status != StatusDraft || got.FirstPublishedAt == nil || !got.FirstPublishedAt.Equal(first) {
+		t.Fatalf("going back to DRAFT keeps first_published_at: %+v (want %v)", got, first)
 	}
 	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, StatusArchived); err != nil {
-		t.Fatal(err)
+		t.Fatalf("DRAFT to ARCHIVED: %v", err)
 	}
 	f.advance(time.Hour)
-	f.activate(storeID, p.ID) // ARCHIVED to ACTIVE is allowed
+	f.activate(storeID, p.ID)
 	got, _ = f.m.Product(f.ct, storeID, p.ID)
 	if got.Status != StatusActive || !got.FirstPublishedAt.Equal(first) {
 		t.Fatalf("re-activating keeps the first publish time: %+v (want %v)", got.FirstPublishedAt, first)
 	}
 	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, StatusActive); err != nil {
 		t.Fatalf("same status is a no-op: %v", err)
+	}
+}
+
+func TestActiveProductNeedsAGalleryImageOnEveryWrite(t *testing.T) {
+	t.Parallel()
+	f := newProductFixture(t)
+	storeID, acct := f.store()
+	up := media.Uploader{ID: acct}
+	bare := f.input("沒圖")
+	bare.Gallery = nil
+	p := f.create(storeID, acct, bare)
+	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, StatusActive); !errors.Is(err, ErrActiveRequiresGalleryImage) {
+		t.Fatalf("activating without a gallery image: %v", err)
+	}
+	if got, _ := f.m.Product(f.ct, storeID, p.ID); got.Status != StatusDraft || got.FirstPublishedAt != nil {
+		t.Fatalf("a rejected activation changes nothing: %+v", got)
+	}
+	// 描述圖不算主圖。
+	withDescImage := bare
+	withDescImage.Description = []Block{{Kind: BlockImage, Image: &Image{Token: "only-description"}}}
+	if _, err := f.m.UpdateProduct(f.ct, storeID, up, p.ID, withDescImage); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, StatusActive); !errors.Is(err, ErrActiveRequiresGalleryImage) {
+		t.Fatalf("a description image is not a gallery image: %v", err)
+	}
+	// 草稿與下架的商品可以存沒有主圖的內容；有主圖才能上架。
+	withImage := f.input("有圖")
+	if _, err := f.m.UpdateProduct(f.ct, storeID, up, p.ID, withImage); err != nil {
+		t.Fatal(err)
+	}
+	f.activate(storeID, p.ID)
+	// ACTIVE 的商品整體取代時不給主圖：拒絕，內容不變，也不自動降回草稿。
+	bare.Title = "改名"
+	if _, err := f.m.UpdateProduct(f.ct, storeID, up, p.ID, bare); !errors.Is(err, ErrActiveRequiresGalleryImage) {
+		t.Fatalf("updating an ACTIVE product without a gallery image: %v", err)
+	}
+	got, _ := f.m.Product(f.ct, storeID, p.ID)
+	if got.Status != StatusActive || got.Title != "有圖" || len(got.Gallery) != 1 {
+		t.Fatalf("a rejected update changes nothing and does not demote: %+v", got)
+	}
+	// 下架後可以把主圖清掉，再上架時被擋。
+	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, StatusArchived); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.UpdateProduct(f.ct, storeID, up, p.ID, bare); err != nil {
+		t.Fatalf("an ARCHIVED product may be saved without a gallery image: %v", err)
+	}
+	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, StatusActive); !errors.Is(err, ErrActiveRequiresGalleryImage) {
+		t.Fatalf("re-activating without a gallery image: %v", err)
 	}
 }
 

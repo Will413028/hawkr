@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package hawkr.catalog.v1alpha1;
+
+import "hawkr/common/v1alpha1/limits.proto";
+
+// ProductContentLimits 是商品內容的上限：每個欄位只用來掛 hawkr.common.v1alpha1.limits，不出現在任何 RPC。
+// 欄位名決定生成的常數名：string 欄位的 max_runes 生成 Max<欄位>Runes，repeated 欄位的 max_items 生成 Max<欄位>。
+// 商品的請求訊息定義之後，上限改掛在實際的請求欄位上，這個訊息即可刪除。
+message ProductContentLimits {
+  // 商品標題。
+  string title = 1 [(hawkr.common.v1alpha1.limits).max_runes = 100];
+  // 選項軸個數。
+  repeated string axes = 2 [(hawkr.common.v1alpha1.limits).max_items = 2];
+  // 選項軸名稱。
+  string axis_name = 3 [(hawkr.common.v1alpha1.limits).max_runes = 20];
+  // 選項值。
+  string option_value = 4 [(hawkr.common.v1alpha1.limits).max_runes = 40];
+  // 每個選項軸的值個數。
+  repeated string values_per_axis = 5 [(hawkr.common.v1alpha1.limits).max_items = 50];
+  // SKU 個數。
+  repeated string skus = 6 [(hawkr.common.v1alpha1.limits).max_items = 100];
+  // 主圖張數。
+  repeated string gallery_images = 7 [(hawkr.common.v1alpha1.limits).max_items = 9];
+  // 圖片的替代文字。
+  string alt = 8 [(hawkr.common.v1alpha1.limits).max_runes = 200];
+  // 描述的區塊個數。
+  repeated string description_blocks = 9 [(hawkr.common.v1alpha1.limits).max_items = 100];
+  // 描述內的圖片張數。
+  repeated string description_images = 10 [(hawkr.common.v1alpha1.limits).max_items = 20];
+  // 整份描述的文字總量：段落、清單項目與表格儲存格的文字合計（不含圖片的替代文字）。
+  string description = 11 [(hawkr.common.v1alpha1.limits).max_runes = 3000];
+  // 清單的項目個數。
+  repeated string list_items = 12 [(hawkr.common.v1alpha1.limits).max_items = 50];
+  // 清單的單一項目文字。
+  string list_item = 13 [(hawkr.common.v1alpha1.limits).max_runes = 200];
+  // 表格的列數。
+  repeated string table_rows = 14 [(hawkr.common.v1alpha1.limits).max_items = 50];
+  // 表格的欄數。
+  repeated string table_cols = 15 [(hawkr.common.v1alpha1.limits).max_items = 10];
+  // 表格的單一儲存格文字。
+  string table_cell = 16 [(hawkr.common.v1alpha1.limits).max_runes = 200];
+}

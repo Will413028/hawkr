@@ -393,6 +393,12 @@ func TestAdjustReplayIsNoOpAndDifferentContentIsRejected(t *testing.T) {
 	if err := f.m.AdjustStock(f.ct, 501, "adj:r", other, 3); !errors.Is(err, ErrIdempotencyKeyReused) {
 		t.Fatalf("不同 SKU 重送 err = %v，want ErrIdempotencyKeyReused", err)
 	}
+	if err := f.m.AdjustStock(f.ct, 502, "adj:r", sku, 3); !errors.Is(err, ErrSkuNotFound) {
+		t.Fatalf("別家店重送同一個 key 與內容 err = %v，want ErrSkuNotFound", err)
+	}
+	if got := f.stockOf(sku); got != 8 {
+		t.Fatalf("跨店重送後庫存 = %d，want 8", got)
+	}
 	f.must(f.m.DeductStock(f.ct, "adj:d", items(sku, 1)))
 	if err := f.m.AdjustStock(f.ct, 501, "adj:d", sku, -1); !errors.Is(err, ErrIdempotencyKeyReused) {
 		t.Fatalf("與扣減共用鍵 err = %v，want ErrIdempotencyKeyReused", err)

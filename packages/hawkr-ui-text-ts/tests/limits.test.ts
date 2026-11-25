@@ -1,0 +1,19 @@
+import { describe, expect, it } from "vitest";
+import {
+	CATALOG_PRODUCT_CONTENT_LIMITS_DESCRIPTION_MAX_RUNES,
+	CATALOG_PRODUCT_CONTENT_LIMITS_SKUS_MAX_ITEMS,
+	CATALOG_PRODUCT_CONTENT_LIMITS_TABLE_CELL_MAX_RUNES,
+	CATALOG_PRODUCT_CONTENT_LIMITS_TITLE_MAX_RUNES,
+} from "../src/limits.gen";
+
+describe("商品內容上限", () => {
+	it("整份描述的總量是 3000，單一儲存格另有 200", () => {
+		expect(CATALOG_PRODUCT_CONTENT_LIMITS_DESCRIPTION_MAX_RUNES).toBe(3000);
+		expect(CATALOG_PRODUCT_CONTENT_LIMITS_TABLE_CELL_MAX_RUNES).toBe(200);
+	});
+
+	it("標題與 SKU 數的上限來自 proto 的 limits option", () => {
+		expect(CATALOG_PRODUCT_CONTENT_LIMITS_TITLE_MAX_RUNES).toBe(100);
+		expect(CATALOG_PRODUCT_CONTENT_LIMITS_SKUS_MAX_ITEMS).toBe(100);
+	});
+});

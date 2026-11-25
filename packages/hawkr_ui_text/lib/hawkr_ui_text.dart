@@ -5,6 +5,7 @@
 library;
 
 export 'src/accepted.g.dart';
+export 'src/limits.g.dart';
 export 'src/ui_text.g.dart';
 
 /// UI 語系。成員與 `catalog/config.json` 的 `locales` 一一對應；生成碼的 switch 不留萬用分支，

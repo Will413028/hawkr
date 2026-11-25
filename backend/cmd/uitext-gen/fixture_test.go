@@ -99,7 +99,7 @@ func fixtureImage(opts ...func(*descriptorpb.FileDescriptorSet)) *descriptorpb.F
 	// ErrorReason 的零值名稱是 UNSPECIFIED（沒有前綴），enumProto 已處理。
 	policy, ext := acceptedDefinitionFiles()
 	fds := &descriptorpb.FileDescriptorSet{File: []*descriptorpb.FileDescriptorProto{
-		fx, protodesc.ToFileDescriptorProto(descriptorpb.File_google_protobuf_descriptor_proto), adminRoot, adminFx, common, policy, ext,
+		fx, protodesc.ToFileDescriptorProto(descriptorpb.File_google_protobuf_descriptor_proto), adminRoot, adminFx, common, policy, ext, limitsDefinitionFile(),
 	}}
 	for _, o := range opts {
 		o(fds)
