@@ -1,0 +1,58 @@
+{
+ "mutants": [
+  {
+   "id": "bury-includes-processed",
+   "stack": "go-integration",
+   "file": "backend/internal/platform/inbox/inbox.go",
+   "old": "SELECT ctid FROM inbox.events WHERE processed_at IS NULL AND dead_at IS NULL AND received_at < $1 LIMIT $3",
+   "new": "SELECT ctid FROM inbox.events WHERE dead_at IS NULL AND received_at < $1 LIMIT $3",
+   "test": "internal/platform/inbox ^TestAnEventUnprocessedPastTheDeadlineBecomesADeadLetterAndLeavesEverySweep$",
+   "why": "已處理的事件也被標成死信"
+  },
+  {
+   "id": "sweep-redispatches-dead",
+   "stack": "go-integration",
+   "file": "backend/internal/platform/inbox/inbox.go",
+   "old": "WHERE processed_at IS NULL AND dead_at IS NULL AND dispatched_at IS NULL AND received_at < $1",
+   "new": "WHERE processed_at IS NULL AND dispatched_at IS NULL AND received_at < $1",
+   "test": "internal/platform/inbox ^TestAnEventUnprocessedPastTheDeadlineBecomesADeadLetterAndLeavesEverySweep$",
+   "why": "死信被補掃重派，終局失效"
+  },
+  {
+   "id": "mark-processed-ignores-dead",
+   "stack": "go-integration",
+   "file": "backend/internal/platform/inbox/inbox.go",
+   "old": "WHERE provider = $1 AND event_id = $2 AND processed_at IS NULL AND dead_at IS NULL`",
+   "new": "WHERE provider = $1 AND event_id = $2 AND processed_at IS NULL`",
+   "test": "internal/platform/inbox ^TestAnEventUnprocessedPastTheDeadlineBecomesADeadLetterAndLeavesEverySweep$",
+   "why": "死信可以再標成已處理"
+  },
+  {
+   "id": "purge-skips-dead",
+   "stack": "go-integration",
+   "file": "backend/internal/platform/inbox/inbox.go",
+   "old": "WHERE (processed_at IS NOT NULL OR dead_at IS NOT NULL) AND purge_after <= $1",
+   "new": "WHERE processed_at IS NOT NULL AND purge_after <= $1",
+   "test": "internal/platform/inbox ^TestAnEventUnprocessedPastTheDeadlineBecomesADeadLetterAndLeavesEverySweep$",
+   "why": "死信的 payload 永不清理"
+  },
+  {
+   "id": "dead-reason-always-unprocessed",
+   "stack": "go-integration",
+   "file": "backend/internal/platform/inbox/inbox.go",
+   "old": "CASE WHEN dispatched_at IS NULL THEN 'undispatched' ELSE 'unprocessed' END",
+   "new": "'unprocessed'",
+   "test": "internal/platform/inbox ^TestAnEventUnprocessedPastTheDeadlineBecomesADeadLetterAndLeavesEverySweep$",
+   "why": "死信原因分不出沒派送與沒標記"
+  },
+  {
+   "id": "bury-deadline-ignored",
+   "stack": "go-integration",
+   "file": "backend/internal/platform/inbox/inbox.go",
+   "old": "now.Add(-deadAfter)",
+   "new": "now",
+   "test": "internal/platform/inbox ^TestAnEventUnprocessedPastTheDeadlineBecomesADeadLetterAndLeavesEverySweep$",
+   "why": "期限內的事件也被標成死信"
+  }
+ ]
+}

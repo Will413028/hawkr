@@ -12,7 +12,9 @@ CREATE SCHEMA inbox;
 --   - route_key 是 provider 內的路由鍵（收款是外部帳戶 ID），模組依它整批標記已處理、找出有舊的未處理事件的對象；
 --   - payload 是驗過簽章的原始內容（位元組原樣），保存到 purge_after，之後由清理 job 刪除；寫 log 時不得輸出；
 --   - dispatched_at 是派送 job 成功呼叫 handler 的時刻：補掃只重派還沒派送成功、也還沒處理的列（job 被丟棄或用完重試）；
---   - processed_at、processed_by 是模組標記已處理的時刻與處理者（模組的 handler 或同步 job 的名稱）。
+--   - processed_at、processed_by 是模組標記已處理的時刻與處理者（模組的 handler 或同步 job 的名稱）；
+--   - dead_at、dead_reason 是死信：收到超過期限仍沒有處理的事件由補掃標成死信（undispatched＝一直沒有派送成功、unprocessed＝派送了
+--     但模組沒有標記已處理），之後不再補掃、不再派送，也不能再標記已處理；payload 仍保存到 purge_after，供人工查看。
 CREATE TABLE inbox.events (
     provider      TEXT        NOT NULL,
     event_id      TEXT        NOT NULL,
@@ -23,14 +25,19 @@ CREATE TABLE inbox.events (
     dispatched_at TIMESTAMPTZ,
     processed_at  TIMESTAMPTZ,
     processed_by  TEXT,
+    dead_at       TIMESTAMPTZ,
+    dead_reason   TEXT,
     PRIMARY KEY (provider, event_id),
     CONSTRAINT events_provider_check CHECK (provider ~ '^[a-z][a-z0-9_]{0,39}$'),
     CONSTRAINT events_event_id_check CHECK (char_length(event_id) BETWEEN 1 AND 255),
     CONSTRAINT events_route_key_check CHECK (char_length(route_key) BETWEEN 1 AND 255),
     CONSTRAINT events_purge_after_check CHECK (purge_after > received_at),
     CONSTRAINT events_processed_check CHECK ((processed_at IS NULL) = (processed_by IS NULL)),
+    CONSTRAINT events_dead_check CHECK ((dead_at IS NULL) = (dead_reason IS NULL) AND (dead_at IS NULL OR processed_at IS NULL)),
+    CONSTRAINT events_dead_reason_check CHECK (dead_reason IS NULL OR dead_reason IN ('undispatched', 'unprocessed')),
     CONSTRAINT events_processed_by_check CHECK (processed_by IS NULL OR char_length(processed_by) BETWEEN 1 AND 100)
 );
-CREATE INDEX events_pending ON inbox.events (provider, route_key, received_at) WHERE processed_at IS NULL;
-CREATE INDEX events_undispatched ON inbox.events (received_at) WHERE processed_at IS NULL AND dispatched_at IS NULL;
-CREATE INDEX events_purge ON inbox.events (purge_after) WHERE processed_at IS NOT NULL;
+CREATE INDEX events_pending ON inbox.events (provider, route_key, received_at) WHERE processed_at IS NULL AND dead_at IS NULL;
+CREATE INDEX events_undispatched ON inbox.events (received_at) WHERE processed_at IS NULL AND dead_at IS NULL AND dispatched_at IS NULL;
+CREATE INDEX events_purge ON inbox.events (purge_after) WHERE processed_at IS NOT NULL OR dead_at IS NOT NULL;
+CREATE INDEX events_dead ON inbox.events (dead_at) WHERE dead_at IS NOT NULL;
