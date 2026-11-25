@@ -171,6 +171,7 @@ func TestIsolationChecksCatchModulesThatLeaveTheirSchema(t *testing.T) {
 		{name: "只碰自己的 schema", sql: v1},
 		{name: "把表建在 public", sql: "CREATE SCHEMA shop;\nCREATE TABLE public.leak (id int);", foreign: []string{"relation public.leak"}},
 		{name: "把 type 建在 public", sql: "CREATE SCHEMA shop;\nCREATE TYPE public.mood AS ENUM ('ok');", foreign: []string{"type public.mood"}},
+		{name: "擴充套件的物件不算模組建的", sql: "CREATE SCHEMA shop;\nCREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;"},
 		{name: "建立別的模組的 schema", sql: "CREATE SCHEMA shop;\nCREATE SCHEMA other;", foreign: []string{"schema other"}},
 		{name: "跨 schema 的 FK", sql: "CREATE SCHEMA shop;\nCREATE TABLE shop.orders (seller_id bigint REFERENCES seller.stores (id));", wantErr: true},
 		{name: "沒有建立自己的 schema", sql: "SELECT 1;", noOwn: true},

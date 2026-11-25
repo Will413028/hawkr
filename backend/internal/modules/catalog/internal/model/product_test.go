@@ -1,6 +1,7 @@
 package model_test
 
 import (
+	"errors"
 	"os"
 	"regexp"
 	"strconv"
@@ -55,5 +56,43 @@ func TestSchemaCheckLimitsMatchGeneratedConstants(t *testing.T) {
 	}
 	if last != model.MaxProductInputAxes {
 		t.Errorf("option_axes_position_check 的最大位置 %d，MaxProductInputAxes %d", last, model.MaxProductInputAxes)
+	}
+}
+
+func TestSuggestedSafetyStock(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name   string
+		weekly []int32
+		want   int32
+	}{
+		{"沒有銷量是 10", nil, 10},
+		{"全部為 0 是 10", []int32{0, 0, 0, 0, 0, 0, 0, 0}, 10},
+		{"銷量很低時取下限 5", []int32{1, 0, 0, 0, 0, 0, 0, 0}, 5},
+		{"剛好在下限：8 週共 20 件，平均 2.5，兩週 5", []int32{3, 2, 3, 2, 3, 2, 3, 2}, 5},
+		{"超過下限：8 週共 80 件，平均 10，兩週 20", []int32{10, 10, 10, 10, 10, 10, 10, 10}, 20},
+		{"無條件進位：8 週共 22 件 → 兩週 5.5 → 6", []int32{3, 3, 3, 3, 3, 3, 2, 2}, 6},
+		{"無條件進位：8 週共 25 件 → 兩週 6.25 → 7", []int32{4, 3, 3, 3, 3, 3, 3, 3}, 7},
+		{"週數不足的缺的週算 0", []int32{40}, 10},
+	}
+	for _, c := range cases {
+		if got := model.SuggestedSafetyStock(c.weekly); got != c.want {
+			t.Errorf("%s：got %d, want %d", c.name, got, c.want)
+		}
+	}
+}
+
+func TestEtagRoundTripsAndRejectsGarbage(t *testing.T) {
+	t.Parallel()
+	for _, v := range []int64{1, 2, 99} {
+		got, err := model.ParseEtag(model.Etag(v))
+		if err != nil || got != v {
+			t.Errorf("ParseEtag(Etag(%d)) = %d, %v", v, got, err)
+		}
+	}
+	for _, bad := range []string{"", "0", "-1", "abc", "01", "1.5", " 1"} {
+		if _, err := model.ParseEtag(bad); !errors.Is(err, model.ErrInvalidInput) {
+			t.Errorf("ParseEtag(%q) 應回 ErrInvalidInput：%v", bad, err)
+		}
 	}
 }

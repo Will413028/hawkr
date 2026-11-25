@@ -11,6 +11,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strconv"
 	"time"
 	"unicode/utf8"
 	"uuid"
@@ -20,6 +21,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/idempotency"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 )
 
@@ -27,6 +29,7 @@ const (
 	kindDeduct  = "DEDUCT"
 	kindRestore = "RESTORE"
 	kindAdjust  = "ADJUST"
+	kindSet     = "SET"
 	maxKeyRunes = 200
 )
 
@@ -95,12 +98,13 @@ func (s *Service) Adjust(ctx context.Context, storeID int64, key string, skuID u
 		q := s.q(ctx)
 		now := s.d.Now()
 		opID := s.d.NewID()
-		n, err := q.InsertStockOperation(ctx, store.InsertStockOperationParams{ID: opID, IdempotencyKey: key, Kind: kindAdjust, StoreID: &storeID, Now: now})
+		hash := idempotency.Hash(kindAdjust, skuID.String(), strconv.Itoa(int(delta)))
+		n, err := q.InsertStockOperation(ctx, store.InsertStockOperationParams{ID: opID, IdempotencyKey: key, Kind: kindAdjust, StoreID: &storeID, RequestHash: hash, Now: now})
 		if err != nil {
 			return err
 		}
 		if n == 0 {
-			return s.replayAdjust(ctx, q, storeID, key, skuID, delta)
+			return s.replayOwn(ctx, q, storeID, key, skuID, kindAdjust, hash)
 		}
 		affected, err := q.AdjustOwnSkuStock(ctx, store.AdjustOwnSkuStockParams{ID: skuID, StoreID: storeID, Delta: delta, Now: now})
 		if err != nil {
@@ -121,9 +125,53 @@ func (s *Service) Adjust(ctx context.Context, storeID int64, key string, skuID u
 	})
 }
 
-// replayAdjust 處理同一家店同一個 key 的重送（鍵只在店家內唯一）：先確認 SKU 屬於呼叫的店家（重送時 SKU 已不屬於這家店回 ErrSkuNotFound），
-// 再比對原操作的內容。
-func (s *Service) replayAdjust(ctx context.Context, q *store.Queries, storeID int64, key string, skuID uuid.UUID, delta int32) error {
+// SetQuantity 是賣家把自己店家某個 SKU 的庫存設成絕對值 quantity（0 到 int32 上限），以 expected 比對現值：現值不等於 expected 整次不生效，
+// 回 *model.StockMismatchError（帶現值）；帳本記一列 SET 操作與一筆 movement（差額 quantity − expected，差額為 0 時只有操作列）。
+// 比對與寫入是同一句條件式 UPDATE，沒有「先查再設」；expected 與 quantity 都在範圍內才可能成立。同一個 key 重送且內容（SKU、quantity、expected）相同不再設定、回 nil，
+// 不再比對現值（第一次已生效）；內容不同回 ErrIdempotencyKeyReused。SKU 不屬於該店家或已刪除回 ErrSkuNotFound。
+func (s *Service) SetQuantity(ctx context.Context, storeID int64, key string, skuID uuid.UUID, quantity, expected int32) error {
+	if err := checkKey(key); err != nil {
+		return err
+	}
+	if storeID <= 0 || skuID == uuid.Nil() || quantity < 0 || expected < 0 {
+		return model.ErrInvalidStockInput
+	}
+	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		q := s.q(ctx)
+		now := s.d.Now()
+		opID := s.d.NewID()
+		hash := idempotency.Hash(kindSet, skuID.String(), strconv.Itoa(int(quantity)), strconv.Itoa(int(expected)))
+		n, err := q.InsertStockOperation(ctx, store.InsertStockOperationParams{ID: opID, IdempotencyKey: key, Kind: kindSet, StoreID: &storeID, RequestHash: hash, Now: now})
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return s.replayOwn(ctx, q, storeID, key, skuID, kindSet, hash)
+		}
+		affected, err := q.SetOwnSkuStock(ctx, store.SetOwnSkuStockParams{ID: skuID, StoreID: storeID, Quantity: quantity, Expected: expected, Now: now})
+		if err != nil {
+			return err
+		}
+		if affected == 0 {
+			cur, err := q.GetOwnLiveSku(ctx, store.GetOwnLiveSkuParams{ID: skuID, StoreID: storeID})
+			if errors.Is(err, pgx.ErrNoRows) {
+				return model.ErrSkuNotFound
+			}
+			if err != nil {
+				return err
+			}
+			return &model.StockMismatchError{SkuID: skuID, Current: cur.StockQty}
+		}
+		if delta := quantity - expected; delta != 0 {
+			return q.InsertStockMovement(ctx, store.InsertStockMovementParams{OperationID: opID, SkuID: skuID, Delta: delta})
+		}
+		return nil
+	})
+}
+
+// replayOwn 處理同一家店同一個 key 的重送（鍵只在店家內唯一）：先確認 SKU 屬於呼叫的店家（重送時 SKU 已不屬於這家店回 ErrSkuNotFound），
+// 再比對原操作的種類與請求雜湊。
+func (s *Service) replayOwn(ctx context.Context, q *store.Queries, storeID int64, key string, skuID uuid.UUID, kind string, hash []byte) error {
 	own, err := q.SkuInStore(ctx, store.SkuInStoreParams{ID: skuID, StoreID: storeID})
 	if err != nil {
 		return err
@@ -135,14 +183,7 @@ func (s *Service) replayAdjust(ctx context.Context, q *store.Queries, storeID in
 	if err != nil {
 		return err
 	}
-	if op.Kind != kindAdjust {
-		return model.ErrIdempotencyKeyReused
-	}
-	moves, err := q.ListStockMovements(ctx, op.ID)
-	if err != nil {
-		return err
-	}
-	if len(moves) != 1 || moves[0].SkuID != skuID || moves[0].Delta != delta {
+	if op.Kind != kind || !bytes.Equal(op.RequestHash, hash) {
 		return model.ErrIdempotencyKeyReused
 	}
 	return nil

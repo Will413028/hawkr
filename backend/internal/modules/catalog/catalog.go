@@ -65,6 +65,20 @@ type (
 	Sku = model.Sku
 	// Hashtag 是商品的一個標籤。
 	Hashtag = model.Hashtag
+	// HashtagCount 是一個商品標籤與它的可見商品數。
+	HashtagCount = model.HashtagCount
+	// ProductSort 是商品列表與搜尋的排序。
+	ProductSort = model.ProductSort
+	// StockStatus 是賣家清單與計數依庫存的篩選。
+	StockStatus = model.StockStatus
+	// PublicFilter 是公開列表與搜尋的篩選。
+	PublicFilter = model.PublicFilter
+	// SellerFilter 是賣家清單與計數的篩選。
+	SellerFilter = model.SellerFilter
+	// AdminFilter 是後台列表的篩選。
+	AdminFilter = model.AdminFilter
+	// StockMismatchError 表示設定庫存時的預期值與現值不符。
+	StockMismatchError = model.StockMismatchError
 	// Media 是 catalog 對 media 的依賴（*media.Module 與 *media.Fake 都滿足）。
 	Media = model.Media
 )
@@ -74,6 +88,20 @@ const (
 	StatusDraft    = model.StatusDraft
 	StatusActive   = model.StatusActive
 	StatusArchived = model.StatusArchived
+
+	SortLatest    = model.SortLatest
+	SortPriceAsc  = model.SortPriceAsc
+	SortPriceDesc = model.SortPriceDesc
+	SortSales     = model.SortSales
+	SortRating    = model.SortRating
+	SortRelevance = model.SortRelevance
+
+	StockLow        = model.StockLow
+	StockOutOfStock = model.StockOutOfStock
+
+	// DefaultLowStockThreshold 是商品沒有自己的低庫存門檻時的平台預設值；MaxLowStockThreshold 是商品門檻的上限。
+	DefaultLowStockThreshold = model.DefaultLowStockThreshold
+	MaxLowStockThreshold     = model.MaxLowStockThreshold
 
 	BlockParagraph = model.BlockParagraph
 	BlockImage     = model.BlockImage
@@ -96,7 +124,18 @@ var (
 	// ErrActiveRequiresGalleryImage 見 model.ErrActiveRequiresGalleryImage。
 	ErrActiveRequiresGalleryImage = model.ErrActiveRequiresGalleryImage
 	ErrInvalidInput               = model.ErrInvalidInput
+	// ErrVersionConflict 表示依據的版本（etag）已過時，沒有寫入。
+	ErrVersionConflict = model.ErrVersionConflict
 )
+
+// Etag 是商品版本對外的 etag；ParseEtag 還原它（不合法回 ErrInvalidInput）。etag 只涵蓋賣家可編輯的內容與狀態：庫存、銷量、收藏數、評分不改它。
+func Etag(version int64) string { return model.Etag(version) }
+
+// ParseEtag 見 Etag。
+func ParseEtag(etag string) (int64, error) { return model.ParseEtag(etag) }
+
+// SuggestedSafetyStock 是依最近 8 週每週銷量（舊到新）建議的安全庫存：備貨兩週的平均需求、下限 5，沒有銷量是 10。
+func SuggestedSafetyStock(weeklySales []int32) int32 { return model.SuggestedSafetyStock(weeklySales) }
 
 // Deps 是模組需要的外部依賴，全部在組裝點提供。
 type Deps struct {
@@ -139,10 +178,16 @@ func (m *Module) RestoreStock(ctx context.Context, key, deductKey string, items 
 }
 
 // AdjustStock 是賣家以變動量 delta（有號、不為 0）調整自己店家某個 SKU 的庫存，記為 ADJUST 操作；storeID 由呼叫端推導。
-// SKU 不屬於該店家或已刪除回 ErrSkuNotFound；調整後不得小於 0（回 *InsufficientStockError）。同一個 key 重送且內容相同不再調整。
-// transaction 規則同 DeductStock。
+// SKU 不屬於該店家或已刪除回 ErrSkuNotFound；調整後不得小於 0（回 *InsufficientStockError）。同一個 key（賣家的 request_id）重送且內容相同不再調整，同時在途也只生效一次，內容不同回 ErrIdempotencyKeyReused。
+// 不改商品的 etag。transaction 規則同 DeductStock。
 func (m *Module) AdjustStock(ctx context.Context, storeID int64, key string, skuID uuid.UUID, delta int32) error {
 	return m.stock.Adjust(ctx, storeID, key, skuID, delta)
+}
+
+// SetStock 是賣家把自己店家某個 SKU 的庫存設成絕對值 quantity，expected 是呼叫者看到的現值：現值不等於 expected 回 *StockMismatchError（帶現值），不寫入。
+// 成功時帳本記一列 SET 操作與差額 movement；重送與錯誤語意同 AdjustStock。不改商品的 etag。
+func (m *Module) SetStock(ctx context.Context, storeID int64, key string, skuID uuid.UUID, quantity, expected int32) error {
+	return m.stock.SetQuantity(ctx, storeID, key, skuID, quantity, expected)
 }
 
 // Categories 回傳整棵平台分類樹，頂層在前，同層依 position。
@@ -153,26 +198,28 @@ func (m *Module) IsLeafCategory(ctx context.Context, id uuid.UUID) (bool, error)
 	return m.taxonomy.RequireLeaf(ctx, id)
 }
 
-// CreateProduct 建立一個草稿商品。storeID 是呼叫端從登入身分推導的店家（不信任 client 送的店家）；uploader 是新圖 staged token 的上傳者。
+// CreateProduct 建立一個草稿商品。storeID 是呼叫端從登入身分推導的店家（不信任 client 送的店家）；uploader 是新圖 staged token 的上傳者；
+// requestID 是冪等鍵（範圍是店家，永久保存）：同一家店以同一個鍵重送回第一次建立的商品目前的樣子，不重複建立（同時在途也只建立一個），內容不同回 ErrIdempotencyKeyReused。
 // 圖片的 Confirm 在建立的 transaction 內，失敗整筆回滾。輸入不合法回 *InvalidInputError。
-func (m *Module) CreateProduct(ctx context.Context, storeID int64, uploader media.Uploader, in ProductInput) (Product, error) {
-	return m.product.Create(ctx, storeID, uploader, in)
+func (m *Module) CreateProduct(ctx context.Context, storeID int64, uploader media.Uploader, requestID uuid.UUID, in ProductInput) (Product, error) {
+	return m.product.Create(ctx, storeID, uploader, requestID, in)
 }
 
-// UpdateProduct 整體取代商品的內容，狀態不變（ACTIVE 的商品輸入沒有主圖回 ErrActiveRequiresGalleryImage）；SKU 以選項值的組合辨識（組合還在就更新價格，庫存不動）。商品不是這家店的或已刪除回 ErrProductNotFound。
-func (m *Module) UpdateProduct(ctx context.Context, storeID int64, uploader media.Uploader, productID uuid.UUID, in ProductInput) (Product, error) {
-	return m.product.Update(ctx, storeID, uploader, productID, in)
+// UpdateProduct 整體取代商品的內容，狀態不變（ACTIVE 的商品輸入沒有主圖回 ErrActiveRequiresGalleryImage）；SKU 以選項值的組合辨識（組合還在就更新價格，庫存不動）。
+// version 是讀取時拿到的版本（Product.Version，對外是 Etag），必填；與目前的不符回 ErrVersionConflict、不寫入。商品不是這家店的或已刪除回 ErrProductNotFound。
+func (m *Module) UpdateProduct(ctx context.Context, storeID int64, uploader media.Uploader, productID uuid.UUID, version int64, in ProductInput) (Product, error) {
+	return m.product.Update(ctx, storeID, uploader, productID, version, in)
 }
 
-// SetProductStatus 切換商品狀態：DRAFT、ACTIVE、ARCHIVED 任兩個都能互切，切成目前狀態是 no-op。切成 ACTIVE 時商品沒有主圖回 ErrActiveRequiresGalleryImage；
-// first_published_at 只在第一次 ACTIVE 時填，之後不清除。
-func (m *Module) SetProductStatus(ctx context.Context, storeID int64, productID uuid.UUID, to ProductStatus) error {
-	return m.product.SetStatus(ctx, storeID, productID, to)
+// SetProductStatus 切換商品狀態：DRAFT、ACTIVE、ARCHIVED 任兩個都能互切，切成目前狀態是 no-op（不改版本）。切成 ACTIVE 時商品沒有主圖回 ErrActiveRequiresGalleryImage；
+// first_published_at 只在第一次 ACTIVE 時填，之後不清除。version 必填，不符回 ErrVersionConflict。
+func (m *Module) SetProductStatus(ctx context.Context, storeID int64, productID uuid.UUID, version int64, to ProductStatus) error {
+	return m.product.SetStatus(ctx, storeID, productID, version, to)
 }
 
-// DeleteProduct 刪除商品（設 deleted_at，不可還原，列保留）。
-func (m *Module) DeleteProduct(ctx context.Context, storeID int64, productID uuid.UUID) error {
-	return m.product.Delete(ctx, storeID, productID)
+// DeleteProduct 刪除商品（設 deleted_at，不可還原，列保留）。version 選填：0 不比對，非 0 要與目前版本相符，否則回 ErrVersionConflict。
+func (m *Module) DeleteProduct(ctx context.Context, storeID int64, productID uuid.UUID, version int64) error {
+	return m.product.Delete(ctx, storeID, productID, version)
 }
 
 // Product 讀店家自己的商品（任何狀態，沒刪除）。
@@ -180,17 +227,57 @@ func (m *Module) Product(ctx context.Context, storeID int64, productID uuid.UUID
 	return m.product.Get(ctx, storeID, productID)
 }
 
-// PublicProduct 讀公開可見的商品：ACTIVE、沒刪除、店家在 at 可曝光；否則 ErrProductNotFound。at 是請求的 clock。
+// PublicProduct 讀公開可見的商品：ACTIVE 或 ARCHIVED（下架的商品頁保留，Status 讓呼叫端決定可不可以買）、沒刪除、店家在 at 可曝光；草稿與其他情況 ErrProductNotFound。at 是請求的 clock。
 func (m *Module) PublicProduct(ctx context.Context, productID uuid.UUID, at time.Time) (Product, error) {
 	return m.product.GetPublic(ctx, productID, at)
 }
 
-// ListSellerProducts 是賣家清單：店家自己的所有沒刪除的商品，不看狀態也不看曝光，最新建立的在前。
-func (m *Module) ListSellerProducts(ctx context.Context, storeID int64, after *ListCursor, size int32) (ProductPage, error) {
-	return m.product.ListSeller(ctx, storeID, after, size)
+// AdminProduct 讀任何店家的商品（任何狀態，沒刪除），後台唯讀用；不存在回 ErrProductNotFound。
+func (m *Module) AdminProduct(ctx context.Context, productID uuid.UUID) (Product, error) {
+	return m.product.GetAdmin(ctx, productID)
 }
 
-// ListPublicProducts 是公開列表：只含 ACTIVE、沒刪除、店家在 at 可曝光（seller.pub_exposable_stores）的商品，最新上架的在前；categoryID 非 nil 時只列該分類。
-func (m *Module) ListPublicProducts(ctx context.Context, at time.Time, categoryID *uuid.UUID, after *ListCursor, size int32) (ProductPage, error) {
-	return m.product.ListPublic(ctx, at, categoryID, after, size)
+// ListSellerProducts 是賣家清單：店家自己的所有沒刪除的商品，不看曝光，最新建立的在前；可依狀態、庫存（只比對 ACTIVE）與關鍵字（比對 searchable_text）篩選。
+func (m *Module) ListSellerProducts(ctx context.Context, storeID int64, f SellerFilter, after *ListCursor, size int32) (ProductPage, error) {
+	return m.product.ListSeller(ctx, storeID, f, after, size)
+}
+
+// CountSellerProducts 回店家自己符合篩選的商品數（低庫存徽章用 Status ACTIVE、StockStatus StockLow）。低庫存以 SKU 判斷：沒刪除的 SKU 庫存大於 0 且小於或等於商品的門檻
+// （沒設用 DefaultLowStockThreshold）；售完（有 SKU 庫存為 0）是另一個篩選。
+func (m *Module) CountSellerProducts(ctx context.Context, storeID int64, f SellerFilter) (int32, error) {
+	return m.product.CountSeller(ctx, storeID, f)
+}
+
+// ListAdminProducts 是後台列表：全站沒刪除的商品（任何狀態），最新建立的在前，回符合篩選的總數。
+func (m *Module) ListAdminProducts(ctx context.Context, f AdminFilter, after *ListCursor, size int32) (ProductPage, int32, error) {
+	return m.product.ListAdmin(ctx, f, after, size)
+}
+
+// ListPublicProducts 是公開列表與搜尋：只含 ACTIVE、沒刪除、店家在 at 可曝光（seller.pub_exposable_stores）的商品。sort 空字串是 SortLatest；SortRelevance 要有 f.Query。
+// 游標是 (排序鍵, ID)，翻頁不重不漏。
+func (m *Module) ListPublicProducts(ctx context.Context, at time.Time, f PublicFilter, sort ProductSort, after *ListCursor, size int32) (ProductPage, error) {
+	return m.product.ListPublic(ctx, at, f, sort, after, size)
+}
+
+// ListPublicProductsOfStores 是指定店家的公開商品，最新上架在前（buyer 的「追蹤中」動態用）。storeIDs 為空回空頁（不是不篩選）。
+func (m *Module) ListPublicProductsOfStores(ctx context.Context, at time.Time, storeIDs []int64, after *ListCursor, size int32) (ProductPage, error) {
+	if len(storeIDs) == 0 {
+		return ProductPage{Items: []ProductSummary{}}, nil
+	}
+	return m.product.ListPublic(ctx, at, PublicFilter{StoreIDs: storeIDs}, SortLatest, after, size)
+}
+
+// SuggestProductNames 是搜尋框的商品名稱建議（可見商品，相關度高的在前，最多 limit 筆：預設 10、上限 20）。
+func (m *Module) SuggestProductNames(ctx context.Context, at time.Time, query string, limit int32) ([]string, error) {
+	return m.product.SuggestNames(ctx, at, query, limit)
+}
+
+// SuggestHashtags 是標籤建議（可見商品數多的在前，預設 10、上限 20）。
+func (m *Module) SuggestHashtags(ctx context.Context, at time.Time, query string, contains bool, limit int32) ([]HashtagCount, error) {
+	return m.product.SuggestHashtags(ctx, at, query, contains, limit)
+}
+
+// TrendingHashtags 是熱門標籤（預設 20、上限 50）。
+func (m *Module) TrendingHashtags(ctx context.Context, at time.Time, limit int32) ([]HashtagCount, error) {
+	return m.product.TrendingHashtags(ctx, at, limit)
 }

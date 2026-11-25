@@ -9,6 +9,11 @@
 
 CREATE SCHEMA IF NOT EXISTS public;
 
+-- pg_trgm 給商品搜尋（D15）：searchable_text 的 GIN trigram 索引支援 ILIKE，相關度排序用 word_similarity。擴充裝在 public，不屬於本模組。
+-- Atlas 社群版讀到 CREATE EXTENSION 就報錯：改這個檔之後跑 `atlas migrate diff` 時，先暫時拿掉下一行與 products_search_idx，產生 migration 後把這兩者
+-- 以手寫補回 migration（product_api_support 是範例），再還原這個檔、`atlas migrate hash`。
+CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
+
 CREATE SCHEMA catalog;
 
 -- 平台分類樹：兩層（頂層分組與葉節點），由 migration 的版本化種子定義，沒有執行期寫入。商品只能掛葉節點（寫入端以
@@ -39,7 +44,12 @@ CREATE INDEX categories_parent_idx ON catalog.categories (parent_id, position);
 -- min_price／max_price 是 SKU 價格區間的反正規化，在 SKU 寫入的同 transaction 重算。
 -- 銷量、收藏數、評分與則數是反正規化的計數：由事實擁有者在同 transaction 更新或傳絕對值，不用 ±1。
 -- description 是結構化區塊的 JSON 陣列，結構與長度由寫入端驗證。searchable_text 由寫入端組（名稱、描述文字、hashtag、
--- 分類英文名），給 pg_trgm 搜尋。
+-- 分類英文名、選項軸與值），給 pg_trgm 搜尋（公開搜尋、賣家清單與後台的關鍵字共用）。
+-- content_version 是樂觀鎖的版本，對外是 etag（ADR 2026-09-25-optimistic-concurrency-etag D4）：只在賣家可編輯的內容與狀態改變時加一
+-- （整體修改、狀態切換）；庫存、銷量、收藏數、評分與價格區間的重算不改它，所以調整庫存或下單不會讓編輯中的表單衝突。
+-- low_stock_threshold 是賣家設的低庫存提醒門檻（每個 SKU 庫存大於 0 且小於或等於它就偏低），空表示用平台預設值（程式常數 5）。
+-- request_id 與 request_hash 是建立的冪等：同一家店以同一個 request_id 重送只建立一次，request_hash 是請求內容的雜湊，不同內容回錯；
+-- 兩者永久保存（跟著商品列），一起有值或一起為空。
 CREATE TABLE catalog.products (
     id                 UUID             PRIMARY KEY,
     store_id           BIGINT           NOT NULL,
@@ -56,9 +66,16 @@ CREATE TABLE catalog.products (
     rating_average     DOUBLE PRECISION NOT NULL DEFAULT 0,
     review_count       INTEGER          NOT NULL DEFAULT 0,
     searchable_text    TEXT             NOT NULL DEFAULT '',
+    content_version    BIGINT           NOT NULL DEFAULT 1,
+    low_stock_threshold INTEGER,
+    request_id         UUID,
+    request_hash       BYTEA,
     created_at         TIMESTAMPTZ      NOT NULL,
     updated_at         TIMESTAMPTZ      NOT NULL,
     CONSTRAINT products_store_check CHECK (store_id > 0),
+    CONSTRAINT products_version_check CHECK (content_version >= 1),
+    CONSTRAINT products_low_stock_check CHECK (low_stock_threshold IS NULL OR (low_stock_threshold >= 0 AND low_stock_threshold <= 9999)),
+    CONSTRAINT products_request_check CHECK ((request_id IS NULL) = (request_hash IS NULL)),
     CONSTRAINT products_title_check CHECK (char_length(title) >= 1 AND char_length(title) <= 100 AND title !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
     CONSTRAINT products_description_check CHECK (jsonb_typeof(description) = 'array'),
     CONSTRAINT products_status_check CHECK (status IN ('DRAFT', 'ACTIVE', 'ARCHIVED')),
@@ -71,6 +88,8 @@ CREATE TABLE catalog.products (
 CREATE INDEX products_store_idx ON catalog.products (store_id, created_at DESC, id DESC) WHERE deleted_at IS NULL;
 CREATE INDEX products_category_idx ON catalog.products (category_id, id) WHERE deleted_at IS NULL AND status = 'ACTIVE';
 CREATE INDEX products_public_new_idx ON catalog.products (first_published_at DESC, id DESC) WHERE deleted_at IS NULL AND status = 'ACTIVE';
+CREATE UNIQUE INDEX products_request_key ON catalog.products (store_id, request_id) WHERE request_id IS NOT NULL;
+CREATE INDEX products_search_idx ON catalog.products USING gin (searchable_text public.gin_trgm_ops) WHERE deleted_at IS NULL;
 CREATE INDEX products_public_sales_idx ON catalog.products (sales_count DESC, id DESC) WHERE deleted_at IS NULL AND status = 'ACTIVE';
 
 -- 選項軸：每個商品 0–2 個，position 是軸的順序。軸的名稱與值都是賣家的字，不翻譯。
@@ -120,8 +139,9 @@ CREATE TABLE catalog.product_skus (
 CREATE UNIQUE INDEX skus_combination_key ON catalog.product_skus (product_id, COALESCE(option1_value, ''), COALESCE(option2_value, '')) WHERE deleted_at IS NULL;
 CREATE INDEX skus_product_idx ON catalog.product_skus (product_id) WHERE deleted_at IS NULL;
 
--- 庫存操作：一次扣減、歸還或賣家調整是一列。冪等鍵在各自的範圍內唯一：結帳的扣減與歸還沒有店家（store_id 為空），鍵全域唯一；
+-- 庫存操作：一次扣減、歸還、賣家調整或賣家設定是一列。冪等鍵在各自的範圍內唯一：結帳的扣減與歸還沒有店家（store_id 為空），鍵全域唯一；
 -- 賣家調整記下店家，鍵只在該店家內唯一，兩家店可以用同一個鍵，也探不到彼此的鍵。同一個範圍內併發或重送同一個鍵只生效一次。
+-- 賣家的調整與設定（ADJUST、SET）記下請求內容的雜湊（request_hash），同一個鍵以不同內容重送時比對它；SET 的 movement 是設定當下的差額。
 -- 歸還指向它歸還的那次扣減（deduct_operation_id），每個 SKU 的累計歸還量不得超過原扣減量（寫入端在鎖住原扣減列後檢查）。
 CREATE TABLE catalog.stock_operations (
     id                  UUID        PRIMARY KEY,
@@ -129,11 +149,13 @@ CREATE TABLE catalog.stock_operations (
     kind                TEXT        NOT NULL,
     store_id            BIGINT,
     deduct_operation_id UUID        REFERENCES catalog.stock_operations (id),
+    request_hash        BYTEA,
     created_at          TIMESTAMPTZ NOT NULL,
     CONSTRAINT stock_operations_key_check CHECK (char_length(idempotency_key) >= 1 AND char_length(idempotency_key) <= 200),
-    CONSTRAINT stock_operations_kind_check CHECK (kind IN ('DEDUCT', 'RESTORE', 'ADJUST')),
+    CONSTRAINT stock_operations_kind_check CHECK (kind IN ('DEDUCT', 'RESTORE', 'ADJUST', 'SET')),
     CONSTRAINT stock_operations_restore_ref_check CHECK ((kind = 'RESTORE') = (deduct_operation_id IS NOT NULL)),
-    CONSTRAINT stock_operations_store_check CHECK ((kind = 'ADJUST') = (store_id IS NOT NULL))
+    CONSTRAINT stock_operations_store_check CHECK ((kind IN ('ADJUST', 'SET')) = (store_id IS NOT NULL)),
+    CONSTRAINT stock_operations_hash_check CHECK ((kind IN ('ADJUST', 'SET')) = (request_hash IS NOT NULL))
 );
 
 CREATE UNIQUE INDEX stock_operations_global_key ON catalog.stock_operations (idempotency_key) WHERE store_id IS NULL;

@@ -241,7 +241,7 @@ func sumFile(files []file) string {
 //
 // 在只套用過這個模組 migration 的空 database 上呼叫：migration 若參照別的模組
 // （例如跨 schema FK），套用時就會失敗；若把物件建在別的 schema（包括 public），
-// 這裡會列出來。兩者合起來保證模組只碰自己的 schema（ADR D3）。
+// 這裡會列出來（擴充套件自己的物件不算：它們屬於擴充，不是模組建的，例如 pg_trgm 的函式）。兩者合起來保證模組只碰自己的 schema（ADR D3）。
 func ForeignObjects(ctx context.Context, d *db.DB, module string) ([]string, error) {
 	const q = `
 		SELECT 'schema ' || nspname
@@ -252,16 +252,19 @@ func ForeignObjects(ctx context.Context, d *db.DB, module string) ([]string, err
 		SELECT 'relation ' || n.nspname || '.' || c.relname
 		  FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
 		 WHERE n.nspname = 'public'
+		   AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_class'::regclass AND d.objid = c.oid AND d.deptype = 'e')
 		UNION ALL
 		SELECT 'function ' || n.nspname || '.' || p.proname
 		  FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
 		 WHERE n.nspname = 'public'
+		   AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_proc'::regclass AND d.objid = p.oid AND d.deptype = 'e')
 		UNION ALL
 		SELECT 'type ' || n.nspname || '.' || t.typname
 		  FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
 		 WHERE n.nspname = 'public'
 		   -- 表的 row type 與 array type 由 Postgres 自動建立，表本身已列在 relation 裡。
 		   AND t.typrelid = 0 AND t.typcategory <> 'A'
+		   AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_type'::regclass AND d.objid = t.oid AND d.deptype = 'e')
 		ORDER BY 1`
 	rows, err := d.Conn(ctx).Query(ctx, q, module)
 	if err != nil {

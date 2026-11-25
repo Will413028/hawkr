@@ -1,0 +1,103 @@
+{
+ "mutants": [
+  {
+   "id": "update-etag-not-compared",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "\t\tif cur.ContentVersion != version {\n\t\t\treturn model.ErrVersionConflict\n\t\t}\n\t\tif model.ProductStatus(cur.Status) == model.StatusActive && len(p.gallery) == 0 {",
+   "new": "\t\tif model.ProductStatus(cur.Status) == model.StatusActive && len(p.gallery) == 0 {",
+   "test": "internal/modules/catalog ^TestStaleEtagIsRejectedAndStockChangesDoNotMoveIt$",
+   "why": "整體修改不再比對 etag：過期的 etag 也寫入，沒有 VERSION_CONFLICT，測試要紅。"
+  },
+  {
+   "id": "status-etag-not-compared",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "\t\tif cur.ContentVersion != version {\n\t\t\treturn model.ErrVersionConflict\n\t\t}\n\t\tfrom := model.ProductStatus(cur.Status)",
+   "new": "\t\tfrom := model.ProductStatus(cur.Status)",
+   "test": "internal/modules/catalog ^TestStaleEtagIsRejectedAndStockChangesDoNotMoveIt$",
+   "why": "上下架不再比對 etag：用過期畫面上架別人剛改的內容也成功，測試要紅。"
+  },
+  {
+   "id": "status-change-does-not-bump-version",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
+   "old": "SET status = $1::text, content_version = content_version + 1,",
+   "new": "SET status = $1::text, content_version = content_version,",
+   "test": "internal/modules/catalog ^TestStaleEtagIsRejectedAndStockChangesDoNotMoveIt$",
+   "why": "狀態切換不加版本：etag 涵蓋的範圍少了狀態，切換前後 etag 相同，測試要紅。"
+  },
+  {
+   "id": "create-does-not-dedupe-by-request-id",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "\treturn row.ID, true, nil\n}",
+   "new": "\treturn uuid.Nil(), false, nil\n}",
+   "test": "internal/modules/catalog ^TestCreateIsIdempotentByRequestID$",
+   "why": "CreateProduct 不以 request_id 去重：同鍵重送找不到第一次的商品，不是回同一個商品，測試要紅。"
+  },
+  {
+   "id": "create-request-hash-not-compared",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "if !bytes.Equal(row.RequestHash, hash) {",
+   "new": "if false && !bytes.Equal(row.RequestHash, hash) {",
+   "test": "internal/modules/catalog ^TestCreateIsIdempotentByRequestID$",
+   "why": "拿掉請求雜湊比對：同鍵不同內容的建立被當成重送，測試要紅。"
+  },
+  {
+   "id": "adjust-does-not-dedupe-by-request-id",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/stock/stock.go",
+   "old": "\t\tif n == 0 {\n\t\t\treturn s.replayOwn(ctx, q, storeID, key, skuID, kindAdjust, hash)\n\t\t}",
+   "new": "\t\tif n == 0 && false {\n\t\t\treturn s.replayOwn(ctx, q, storeID, key, skuID, kindAdjust, hash)\n\t\t}",
+   "test": "internal/modules/catalog ^TestAdjustReplayIsNoOpAndDifferentContentIsRejected$",
+   "why": "AdjustStock 不以 request_id 去重：同鍵重送又調整一次，庫存重複加減，測試要紅。"
+  },
+  {
+   "id": "set-does-not-dedupe-by-request-id",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/stock/stock.go",
+   "old": "\t\tif n == 0 {\n\t\t\treturn s.replayOwn(ctx, q, storeID, key, skuID, kindSet, hash)\n\t\t}",
+   "new": "\t\tif n == 0 && false {\n\t\t\treturn s.replayOwn(ctx, q, storeID, key, skuID, kindSet, hash)\n\t\t}",
+   "test": "internal/modules/catalog ^TestSetStockReplaysOnceAndRejectsADifferentRequest$",
+   "why": "SetStock 不以 request_id 去重：同鍵重送時現值已不是預期值，回預期值不符而不是成功，測試要紅。"
+  },
+  {
+   "id": "replay-request-hash-not-compared",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/stock/stock.go",
+   "old": "if op.Kind != kind || !bytes.Equal(op.RequestHash, hash) {",
+   "new": "if op.Kind != kind {",
+   "test": "internal/modules/catalog ^TestSetStockReplaysOnceAndRejectsADifferentRequest$",
+   "why": "拿掉請求雜湊比對：同鍵不同內容的 SetStock 與 AdjustStock 被當成重送，測試要紅。"
+  },
+  {
+   "id": "set-stock-does-not-compare-expected",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/stock.sql.go",
+   "old": "  AND s.stock_qty = $5::integer",
+   "new": "  AND $5::integer >= 0",
+   "test": "internal/modules/catalog ^TestConcurrentSetStockWithTheSameExpectedValueLetsOneWin$",
+   "why": "SetStock 不比對預期值：併發的設定都成功，後到的覆寫先到的，測試要紅。"
+  },
+  {
+   "id": "low-stock-count-includes-every-status",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
+   "old": "\nWHERE p.store_id = $1 AND p.deleted_at IS NULL\n  AND ($2::text = '' OR p.status = $2::text)\n  AND ($3::text = ''\n       OR (p.status = 'ACTIVE' AND EXISTS (",
+   "new": "\nWHERE p.store_id = $1 AND p.deleted_at IS NULL\n  AND ($2::text = '' OR p.status = $2::text)\n  AND ($3::text = ''\n       OR (p.status <> '' AND EXISTS (",
+   "test": "internal/modules/catalog ^TestLowStockCountIsPerSkuActiveOnlyWithPerProductThreshold$",
+   "why": "低庫存計數不過濾 ACTIVE：草稿與下架的商品也算偏低，計數多於 ACTIVE 的商品，測試要紅。"
+  },
+  {
+   "id": "safety-stock-without-floor",
+   "stack": "go",
+   "file": "backend/internal/modules/catalog/internal/model/product.go",
+   "old": "int32(min(max(n, int64(SafetyStockFloor)), int64(math.MaxInt32)))",
+   "new": "int32(min(n, int64(math.MaxInt32)))",
+   "test": "internal/modules/catalog/internal/model ^TestSuggestedSafetyStock$",
+   "why": "建議安全庫存拿掉下限 5：銷量很低的商品建議值低於 5，測試要紅。"
+  }
+ ]
+}

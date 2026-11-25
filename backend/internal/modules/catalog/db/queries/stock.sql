@@ -4,8 +4,8 @@
 -- 冪等鍵 UNIQUE 是唯一的判重點：同一個鍵的併發或重送，後到的交易在這裡等到先到的提交，然後回 0 列（呼叫端改走重送路徑）；
 -- 先到的回滾時，後到的插入成功。沒有「先查再扣」。
 -- 鍵的範圍：賣家調整帶 store_id，鍵只在該店家內唯一；結帳的扣減與歸還 store_id 為空，鍵全域唯一（兩個部分唯一索引，ON CONFLICT 不指定目標）。
-INSERT INTO catalog.stock_operations (id, idempotency_key, kind, store_id, deduct_operation_id, created_at)
-VALUES (sqlc.arg(id), sqlc.arg(idempotency_key), sqlc.arg(kind), sqlc.narg(store_id), sqlc.narg(deduct_operation_id), sqlc.arg(now))
+INSERT INTO catalog.stock_operations (id, idempotency_key, kind, store_id, deduct_operation_id, request_hash, created_at)
+VALUES (sqlc.arg(id), sqlc.arg(idempotency_key), sqlc.arg(kind), sqlc.narg(store_id), sqlc.narg(deduct_operation_id), sqlc.narg(request_hash), sqlc.arg(now))
 ON CONFLICT DO NOTHING;
 
 -- name: GetStockOperationByKey :one
@@ -59,6 +59,15 @@ FROM catalog.products p
 WHERE s.id = sqlc.arg(id) AND s.deleted_at IS NULL
   AND p.id = s.product_id AND p.store_id = sqlc.arg(store_id) AND p.deleted_at IS NULL
   AND s.stock_qty::bigint + sqlc.arg(delta)::integer BETWEEN 0 AND 2147483647;
+
+-- name: SetOwnSkuStock :execrows
+-- 賣家設定：只動自己店家、未刪除商品的未刪除 SKU，而且現值要等於 expected（比對與寫入是同一句 UPDATE，沒有「先查再設」）；不符回 0 列，庫存不變。
+UPDATE catalog.product_skus s
+SET stock_qty = sqlc.arg(quantity)::integer, updated_at = sqlc.arg(now)
+FROM catalog.products p
+WHERE s.id = sqlc.arg(id) AND s.deleted_at IS NULL
+  AND p.id = s.product_id AND p.store_id = sqlc.arg(store_id) AND p.deleted_at IS NULL
+  AND s.stock_qty = sqlc.arg(expected)::integer;
 
 -- name: GetOwnLiveSku :one
 -- 店家自己的未刪除 SKU；調整失敗時用來區分「不存在、不是自己的或已刪除」與「結果超出範圍」。

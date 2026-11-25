@@ -19,23 +19,27 @@ type CatalogCategory struct {
 }
 
 type CatalogProduct struct {
-	ID               uuid.UUID
-	StoreID          int64
-	CategoryID       uuid.UUID
-	Title            string
-	Description      []byte
-	Status           string
-	FirstPublishedAt *time.Time
-	DeletedAt        *time.Time
-	MinPrice         int64
-	MaxPrice         int64
-	SalesCount       int32
-	FavoriteCount    int32
-	RatingAverage    float64
-	ReviewCount      int32
-	SearchableText   string
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	ID                uuid.UUID
+	StoreID           int64
+	CategoryID        uuid.UUID
+	Title             string
+	Description       []byte
+	Status            string
+	FirstPublishedAt  *time.Time
+	DeletedAt         *time.Time
+	MinPrice          int64
+	MaxPrice          int64
+	SalesCount        int32
+	FavoriteCount     int32
+	RatingAverage     float64
+	ReviewCount       int32
+	SearchableText    string
+	ContentVersion    int64
+	LowStockThreshold *int32
+	RequestID         *uuid.UUID
+	RequestHash       []byte
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 type CatalogProductHashtag struct {
@@ -92,6 +96,7 @@ type CatalogStockOperation struct {
 	Kind              string
 	StoreID           *int64
 	DeductOperationID *uuid.UUID
+	RequestHash       []byte
 	CreatedAt         time.Time
 }
 

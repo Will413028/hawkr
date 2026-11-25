@@ -5,7 +5,7 @@
 ## 1. 範圍與公開介面
 
 - 實作在 `internal/modules/catalog`，自己的 `catalog` schema 與 migration，登記在 `cmd/hawkr/modules.go` 的 `modules()`。不依賴 fulfillment（D10：運費與配送方式歸 seller 的運費設定，B3）。
-- 根套件的方法：`DeductStock`、`RestoreStock`、`AdjustStock`、`Categories`、`IsLeafCategory`、`CreateProduct`、`UpdateProduct`、`SetProductStatus`、`DeleteProduct`、`Product`、`PublicProduct`、`ListSellerProducts`、`ListPublicProducts`；對外 Connect API 隨 B4-3，`legacy/catalogserver` 與單體內改接隨 B4-4。
+- 根套件的方法：`DeductStock`、`RestoreStock`、`AdjustStock`、`SetStock`、`Categories`、`IsLeafCategory`、`CreateProduct`、`UpdateProduct`、`SetProductStatus`、`DeleteProduct`、`Product`、`PublicProduct`、`AdminProduct`、`ListSellerProducts`、`CountSellerProducts`、`ListPublicProducts`、`ListPublicProductsOfStores`、`ListAdminProducts`、`SuggestProductNames`、`SuggestHashtags`、`TrendingHashtags`、`Etag`／`ParseEtag`、`SuggestedSafetyStock`。
 - 模組內依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`。
 
 ## 2. 資料
@@ -13,10 +13,10 @@
 | 表 | 內容 |
 |---|---|
 | `categories` | 兩層分類樹；名稱 `LocalizedText`（JSONB，必有 zh-TW）；葉節點有 `shopify_taxonomy_id` |
-| `products` | 商品：`DRAFT`／`ACTIVE`／`ARCHIVED`、`deleted_at`、價格區間、反正規化計數、描述區塊 JSON、`searchable_text` |
+| `products` | 商品：`DRAFT`／`ACTIVE`／`ARCHIVED`、`deleted_at`、價格區間、反正規化計數、描述區塊 JSON、`searchable_text`（含選項軸名稱與值，pg_trgm GIN 索引）、`content_version`（etag）、`low_stock_threshold`（選填，預設 5）、`request_id`＋`request_hash`（建立的冪等） |
 | `product_option_axes`、`product_option_values` | 0–2 個選項軸與有序的值 |
 | `product_skus` | 選項值的組合；`price`、`compare_at_price`、`stock_qty`、`deleted_at` |
-| `stock_operations`、`stock_movements` | 庫存帳本：一次操作一列（冪等鍵：結帳的操作全域唯一、賣家調整依 `store_id` 在店家內唯一，各一個部分唯一索引），明細是有號 delta |
+| `stock_operations`、`stock_movements` | 庫存帳本：一次操作一列（冪等鍵：結帳的操作全域唯一、賣家調整依 `store_id` 在店家內唯一，各一個部分唯一索引），明細是有號 delta；賣家的 `ADJUST`／`SET` 操作記 `request_hash` |
 | `product_images` | 圖庫與描述圖片的資產引用 |
 | `product_hashtags` | 商品的 hashtag 值集合 |
 
@@ -29,6 +29,9 @@
 - 輸入：key 1–200 字元、頭尾無空白；品項 1–100 個、數量為正、同一個 SKU 不重複；違反回 `ErrInvalidStockInput`。
 - transaction：全部寫入在呼叫方的 transaction 內，沒有時自己開一個；呼叫方 transaction 內失敗時必須整個回滾。
 - 扣減時點是「下單即扣、逾時未付歸還」（D2）；歸還的觸發在 B8。
+
+- 賣家設定（`SetStock(ctx, storeID, key, skuID, quantity, expected)`）：把自己店家某個 SKU 的庫存設成絕對值，比對與寫入是同一句條件式 `UPDATE … WHERE stock_qty = expected`；現值不等於 `expected` 回 `*StockMismatchError`（帶現值），整次不生效、不留操作列。成功記一列 `SET` 操作與差額 movement（差額為 0 時只有操作列）。`quantity`、`expected` 在 0 到 int32 上限。重送：同鍵且（SKU、quantity、expected）相同回成功、不再比對現值（第一次已生效）。
+- 冪等（`ADJUST`、`SET`）：鍵是賣家的 `request_id`，範圍是店家；`stock_operations.request_hash` 存請求內容（種類、SKU、delta 或 quantity／expected）的雜湊，同鍵內容或種類不同回 `ErrIdempotencyKeyReused`；併發同鍵靠插入操作列的 `ON CONFLICT DO NOTHING`，後到的讀回比對。庫存調整與設定不改商品的 etag。
 
 ## 4. 分類
 
@@ -51,8 +54,13 @@
 
 ## 6. 讀取與列表
 
-- `Product`（賣家，任何狀態、沒刪除）與 `PublicProduct`（ACTIVE、沒刪除、店家在 `at` 可曝光）回完整內容：描述區塊、圖庫、選項軸、SKU、hashtag。
-- `ListSellerProducts(storeID)`：店家自己所有沒刪除的商品，不看狀態與曝光，最新建立的在前。
-- `ListPublicProducts(at, categoryID?)`：只含 ACTIVE、沒刪除、`store_id IN (seller.pub_exposable_stores(at))` 的商品，最新上架的在前；`at` 是請求的 clock。
-- 分頁是 keyset（`ListCursor{At, ID}`，賣家用建立時間、公開用首次上架時間，同時間依 ID 遞減）；頁大小預設與上限 100。列帶主圖庫第一張的 object key。
-- 還沒有：有效限制措施（D7）的排除（B4-5）、搜尋與 hashtag 彙總（B4-3）。
+- `Product`（賣家，任何狀態、沒刪除）、`PublicProduct`（ACTIVE 或 ARCHIVED、沒刪除、店家在 `at` 可曝光；草稿回 `ErrProductNotFound`，下架的商品頁保留，呼叫端以 `Status` 決定 `availability`，D24 Q10）與 `AdminProduct`（任何店家、任何狀態、沒刪除）回完整內容：描述區塊、圖庫、選項軸、SKU、hashtag、`LowStockThreshold`、`Version`。
+- 版本與 etag（D24 Q5）：`Product.Version` 起始為 1，只在賣家可編輯的內容（`UpdateProduct`）與狀態（`SetProductStatus` 實際改變狀態）改變時加一；庫存調整與設定、扣減與歸還、銷量、收藏數、評分、價格區間重算都不加。`UpdateProduct` 與 `SetProductStatus` 的 `version` 必填（`< 1` 回 `*InvalidInputError`），在鎖住商品列之後比對，不符回 `ErrVersionConflict`；`DeleteProduct` 的 `version` 選填（0 不比對）。對外 etag 是 `Etag(version)`，`ParseEtag` 還原。
+- 建立的冪等（D24 Q4）：`CreateProduct(…, requestID, in)`；`(store_id, request_id)` 唯一，`request_hash` 是原始輸入（含新圖 token）的雜湊。同鍵同內容回第一次建立的商品目前的樣子（不再 Confirm 新圖），不同內容回 `ErrIdempotencyKeyReused`，已刪除的回 `ErrProductNotFound`。同鍵併發：`INSERT … ON CONFLICT DO NOTHING` 回 0 列的請求整筆回滾（新圖的 Confirm 也不留），在 transaction 外讀回先到的那筆、比對雜湊。帶新圖 token 的併發重送，後到者可能先在 `Confirm` 失敗（token 已被先到者用掉）而不是走重送路徑。
+- 賣家清單與計數（Q6a、Q11）：`ListSellerProducts(storeID, SellerFilter{Status, StockStatus, Query}, after, size)` 與 `CountSellerProducts` 共用篩選。`Query` 以 `searchable_text ILIKE %query%` 比對（`%`、`_`、`\` 跳脫）；`StockStatus` 的 `LOW`、`OUT_OF_STOCK` 只比對 ACTIVE 的商品：`LOW` 是至少一個沒刪除的 SKU 庫存大於 0 且小於或等於商品的門檻（`low_stock_threshold`，沒設用 `DefaultLowStockThreshold` = 5），`OUT_OF_STOCK` 是至少一個 SKU 庫存為 0，兩者各自獨立。門檻範圍 0–9999（0 表示只有售完才提醒）。
+- 建議安全庫存（Q6b）：`SuggestedSafetyStock(weeklySales)`：最近 8 週每週銷量（舊到新，缺的週算 0）；沒有銷量是 10，否則 `max(5, ceil(平均週銷量 × 2))`。銷量的來源是訂單，不在 catalog；這個函式只做規則，由呼叫端提供銷量（B4-3b）。
+- `ListPublicProducts(at, PublicFilter, sort, after, size)`：只含 ACTIVE、沒刪除、`store_id IN (seller.pub_exposable_stores(at))` 的商品；`at` 是請求的 clock。篩選：分類（頂層展開成它底下的葉節點）、價格區間（與 [min_price, max_price] 有交集）、hashtag（ANY／ALL）、店家、關鍵字（`searchable_text ILIKE`，GIN trigram 索引）。排序 `LATEST`（預設）、`PRICE_ASC`、`PRICE_DESC`、`SALES`、`RATING`、`RELEVANCE`（`word_similarity`，要有關鍵字）。`ListPublicProductsOfStores(at, storeIDs, …)` 是指定店家的最新上架，`storeIDs` 為空回空頁（供 buyer 的追蹤中動態）。`SuggestProductNames`、`SuggestHashtags`、`TrendingHashtags` 只算可見商品。
+- `ListAdminProducts(AdminFilter{StoreID, Query}, after, size)`：全站沒刪除的商品，最新建立在前，回傳符合篩選的總數（每頁相同）。
+- 分頁是 keyset（`ListCursor{Key, ID}`）：賣家與後台的 `Key` 是建立時間的微秒數，公開列表依排序決定（`LATEST` 是首次上架的微秒數，價格低到高取負值，評分乘 1000 取整，相關度乘 10^6 取整），同鍵依 ID 遞減；頁大小預設與上限 100。游標的編碼與跟請求參數的綁定在對外層（B4-3b）。列帶主圖庫第一張的 object key、沒刪除 SKU 的庫存總和（上限 int32）。
+- 公開排序用 `CASE` 算出排序鍵，沒有對應的索引：量測前不加（D15）；只有 `searchable_text` 的 ILIKE 有 GIN 索引。
+- 還沒有：有效限制措施（D7）的排除（B4-5）。
