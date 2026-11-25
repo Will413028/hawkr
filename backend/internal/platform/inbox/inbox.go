@@ -5,7 +5,8 @@
 // 模組登記的 Handler 並記下派送成功的時刻；模組在自己寫業務列的 transaction 內以 MarkProcessed 或 MarkRouteProcessed 標記已處理。
 // 「已處理」由模組決定：handler 可以只排入自己的 job，由那個 job 涵蓋事件之後再標記（收款的同步 job 就是這樣）。
 //
-// 週期 job：補掃重派還沒派送成功、也還沒處理的列（派送 job 被丟棄或用完重試）；清理刪除已處理、過了保存期的列。
+// 週期 job：補掃重派還沒派送成功、也還沒處理的列（派送 job 被丟棄或用完重試）；收到超過 deadAfter 仍沒有處理的列標成死信（終局：不再補掃、
+// 不再派送、不能再標記已處理，記 Error log，Dead 列出）；清理刪除已處理或死信、過了保存期的列。
 // payload 是原始內容，可能含個資：本套件與呼叫方都不得把它寫進 log。
 package inbox
 
@@ -51,6 +52,8 @@ const (
 	sweepGrace = 5 * time.Minute
 	// sweepInterval 是補掃與清理的週期。
 	sweepInterval = 15 * time.Minute
+	// deadAfter 是事件收到多久之後仍沒有處理就標成死信。比補掃與各模組的重試都長：到這個時間還沒處理，代表重試沒有用，要人看。
+	deadAfter = 7 * 24 * time.Hour
 	// batch 是補掃與清理一次處理的上限。
 	batch = 500
 )
@@ -154,7 +157,7 @@ func (i *Inbox) Record(ctx context.Context, e Event) (inserted bool, err error) 
 }
 
 const markProcessedSQL = `UPDATE inbox.events SET processed_at = $3, processed_by = $4
-WHERE provider = $1 AND event_id = $2 AND processed_at IS NULL`
+WHERE provider = $1 AND event_id = $2 AND processed_at IS NULL AND dead_at IS NULL`
 
 // MarkProcessed 在呼叫方的 transaction 內把一個事件標記為已處理（已處理的不變）。by 是處理者的名稱。
 func (i *Inbox) MarkProcessed(ctx context.Context, provider, eventID, by string) error {
@@ -163,7 +166,7 @@ func (i *Inbox) MarkProcessed(ctx context.Context, provider, eventID, by string)
 }
 
 const markRouteProcessedSQL = `UPDATE inbox.events SET processed_at = $4, processed_by = $5
-WHERE provider = $1 AND route_key = $2 AND processed_at IS NULL AND received_at <= $3`
+WHERE provider = $1 AND route_key = $2 AND processed_at IS NULL AND dead_at IS NULL AND received_at <= $3`
 
 // MarkRouteProcessed 在呼叫方的 transaction 內把一個路由鍵在 receivedBefore（含）之前收到的未處理事件整批標記為已處理，回傳標記的列數。
 // 用在「重讀即最新」的處理：讀取開始前收到的事件都被這次讀取涵蓋，讀取期間到的留給下一輪。
@@ -175,7 +178,7 @@ func (i *Inbox) MarkRouteProcessed(ctx context.Context, provider, routeKey strin
 	return tag.RowsAffected(), nil
 }
 
-const routePendingSQL = `SELECT EXISTS (SELECT 1 FROM inbox.events WHERE provider = $1 AND route_key = $2 AND processed_at IS NULL)`
+const routePendingSQL = `SELECT EXISTS (SELECT 1 FROM inbox.events WHERE provider = $1 AND route_key = $2 AND processed_at IS NULL AND dead_at IS NULL)`
 
 // RoutePending 回傳路由鍵還有沒有未處理的事件。
 func (i *Inbox) RoutePending(ctx context.Context, provider, routeKey string) (bool, error) {
@@ -185,7 +188,7 @@ func (i *Inbox) RoutePending(ctx context.Context, provider, routeKey string) (bo
 }
 
 const staleRoutesSQL = `SELECT DISTINCT route_key FROM inbox.events
-WHERE provider = $1 AND processed_at IS NULL AND received_at < $2 AND route_key > $3
+WHERE provider = $1 AND processed_at IS NULL AND dead_at IS NULL AND received_at < $2 AND route_key > $3
 ORDER BY route_key
 LIMIT $4`
 
@@ -198,11 +201,11 @@ func (i *Inbox) StaleRoutes(ctx context.Context, provider string, receivedBefore
 	return pgx.CollectRows(rows, pgx.RowTo[string])
 }
 
-const loadEventSQL = `SELECT route_key, payload, received_at, processed_at IS NOT NULL FROM inbox.events WHERE provider = $1 AND event_id = $2`
+const loadEventSQL = `SELECT route_key, payload, received_at, processed_at IS NOT NULL OR dead_at IS NOT NULL FROM inbox.events WHERE provider = $1 AND event_id = $2`
 
 const markDispatchedSQL = `UPDATE inbox.events SET dispatched_at = $3 WHERE provider = $1 AND event_id = $2`
 
-// Dispatch 是派送 job 的內容：在一個 transaction 內呼叫 provider 的 Handler 並記下派送成功的時刻。列不存在（已清理）或已處理時什麼都不做；
+// Dispatch 是派送 job 的內容：在一個 transaction 內呼叫 provider 的 Handler 並記下派送成功的時刻。列不存在（已清理）、已處理或已是死信時什麼都不做；
 // handler 回傳錯誤時 rollback 並回傳錯誤（由 River 重試）。給 worker 與測試呼叫。
 func (i *Inbox) Dispatch(ctx context.Context, provider, eventID string) error {
 	src, ok := i.source(provider)
@@ -232,7 +235,7 @@ func (i *Inbox) Dispatch(ctx context.Context, provider, eventID string) error {
 }
 
 const undispatchedSQL = `SELECT provider, event_id FROM inbox.events
-WHERE processed_at IS NULL AND dispatched_at IS NULL AND received_at < $1 AND (provider, event_id) > ($2, $3)
+WHERE processed_at IS NULL AND dead_at IS NULL AND dispatched_at IS NULL AND received_at < $1 AND (provider, event_id) > ($2, $3)
 ORDER BY provider, event_id
 LIMIT $4`
 
@@ -276,10 +279,10 @@ func (i *Inbox) Sweep(ctx context.Context) (int, error) {
 }
 
 const purgeSQL = `DELETE FROM inbox.events WHERE ctid IN (
-    SELECT ctid FROM inbox.events WHERE processed_at IS NOT NULL AND purge_after <= $1 LIMIT $2
+    SELECT ctid FROM inbox.events WHERE (processed_at IS NOT NULL OR dead_at IS NOT NULL) AND purge_after <= $1 LIMIT $2
 )`
 
-// Purge 是清理：刪除已處理而且過了保存期的事件（含原始 payload），分批。未處理的列不刪：它們由補掃或模組的掃描處理。回傳刪除的列數。
+// Purge 是清理：刪除已處理或死信、而且過了保存期的事件（含原始 payload），分批。還在補掃的未處理列不刪：它們由補掃或模組的掃描處理。回傳刪除的列數。
 func (i *Inbox) Purge(ctx context.Context) (int64, error) {
 	now := i.d.Now().UTC()
 	var total int64
@@ -293,6 +296,62 @@ func (i *Inbox) Purge(ctx context.Context) (int64, error) {
 			return total, nil
 		}
 	}
+}
+
+const buryDeadSQL = `UPDATE inbox.events SET dead_at = $2,
+    dead_reason = CASE WHEN dispatched_at IS NULL THEN 'undispatched' ELSE 'unprocessed' END
+WHERE ctid IN (
+    SELECT ctid FROM inbox.events WHERE processed_at IS NULL AND dead_at IS NULL AND received_at < $1 LIMIT $3
+)
+RETURNING provider`
+
+// Bury 把收到超過 deadAfter 仍沒有處理的事件標成死信，回傳各 provider 標記的列數（分批做完）。標記之後事件不再被補掃或派送，也不能再標記已處理：
+// 要處理它的人讀 Dead，修好原因後以 provider 的方式重建（例如重新向 provider 取得物件），不在這裡重派。
+func (i *Inbox) Bury(ctx context.Context) (map[string]int, error) {
+	now := i.d.Now().UTC()
+	out := map[string]int{}
+	for {
+		rows, err := i.d.DB.Conn(ctx).Query(ctx, buryDeadSQL, now.Add(-deadAfter), now, batch)
+		if err != nil {
+			return out, err
+		}
+		providers, err := pgx.CollectRows(rows, pgx.RowTo[string])
+		if err != nil {
+			return out, err
+		}
+		for _, p := range providers {
+			out[p]++
+		}
+		if len(providers) < batch {
+			return out, nil
+		}
+	}
+}
+
+// DeadEvent 是一個死信的 metadata（不含 payload）。
+type DeadEvent struct {
+	Provider   string
+	EventID    string
+	RouteKey   string
+	Reason     string
+	ReceivedAt time.Time
+	DeadAt     time.Time
+}
+
+const deadSQL = `SELECT provider, event_id, route_key, dead_reason, received_at, dead_at FROM inbox.events
+WHERE provider = $1 AND dead_at IS NOT NULL ORDER BY dead_at DESC, event_id LIMIT $2`
+
+// Dead 回傳一個 provider 最近的死信（新的在前，最多 limit 筆）。
+func (i *Inbox) Dead(ctx context.Context, provider string, limit int) ([]DeadEvent, error) {
+	rows, err := i.d.DB.Conn(ctx).Query(ctx, deadSQL, provider, limit)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (DeadEvent, error) {
+		var d DeadEvent
+		err := r.Scan(&d.Provider, &d.EventID, &d.RouteKey, &d.Reason, &d.ReceivedAt, &d.DeadAt)
+		return d, err
+	})
 }
 
 // DispatchArgs 是派送一個事件的 job，以 (provider, event_id) 為唯一鍵。
@@ -347,6 +406,13 @@ type sweepWorker struct {
 }
 
 func (w *sweepWorker) Work(ctx context.Context, _ *river.Job[SweepArgs]) error {
+	dead, err := w.inbox.Bury(ctx)
+	for p, n := range dead {
+		w.inbox.d.Logger.ErrorContext(ctx, "inbox：事件超過期限仍沒有處理，標成死信", "provider", p, "events", n)
+	}
+	if err != nil {
+		return err
+	}
 	n, err := w.inbox.Sweep(ctx)
 	if err != nil {
 		return err

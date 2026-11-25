@@ -180,3 +180,59 @@ func TestRouteMarkingAndPurgeRespectTheirBounds(t *testing.T) {
 		t.Fatalf("清理=%d", n)
 	}
 }
+
+// 收到超過 7 天仍沒有處理的事件標成死信：記原因（沒派送成功＝undispatched、派送了但沒標記＝unprocessed），之後不再補掃、不再派送、不能再標記已處理，
+// 清理在過了保存期之後刪除；已處理的與期限內的不受影響。mutation 見 mutation/inbox-dead-letter.json。
+func TestAnEventUnprocessedPastTheDeadlineBecomesADeadLetterAndLeavesEverySweep(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := setup(t)
+	t0 := f.now
+	f.record(t, "evt_lost", "acct_1")
+	f.record(t, "evt_stuck", "acct_2")
+	f.record(t, "evt_done", "acct_3")
+	must(t, f.inbox.Dispatch(ctx, "fake", "evt_stuck"))
+	must(t, f.inbox.Dispatch(ctx, "fake", "evt_done"))
+	must(t, f.db.InTx(ctx, func(ctx context.Context) error { return f.inbox.MarkProcessed(ctx, "fake", "evt_done", "test") }))
+	f.now = t0.Add(7*24*time.Hour - time.Minute)
+	if dead, err := f.inbox.Bury(ctx); err != nil || len(dead) != 0 {
+		t.Fatalf("期限內 dead=%v %v", dead, err)
+	}
+	f.record(t, "evt_late", "acct_4")
+	f.now = t0.Add(7*24*time.Hour + time.Minute)
+	dead, err := f.inbox.Bury(ctx)
+	must(t, err)
+	if dead["fake"] != 2 {
+		t.Fatalf("死信=%v，應該是 evt_lost 與 evt_stuck", dead)
+	}
+	got, err := f.inbox.Dead(ctx, "fake", 10)
+	must(t, err)
+	reasons := map[string]string{}
+	for _, d := range got {
+		reasons[d.EventID] = d.Reason
+	}
+	if len(got) != 2 || reasons["evt_lost"] != "undispatched" || reasons["evt_stuck"] != "unprocessed" {
+		t.Fatalf("Dead=%+v", got)
+	}
+	f.jobs.args = nil
+	if n, err := f.inbox.Sweep(ctx); err != nil || n != 1 || f.jobs.args[0].EventID != "evt_late" {
+		t.Fatalf("補掃=%d %v %v：死信不再補掃，只剩期限內的 evt_late", n, err, f.jobs.args)
+	}
+	calls := len(f.calls)
+	must(t, f.inbox.Dispatch(ctx, "fake", "evt_lost"))
+	if len(f.calls) != calls {
+		t.Fatal("死信不再派送")
+	}
+	must(t, f.db.InTx(ctx, func(ctx context.Context) error { return f.inbox.MarkProcessed(ctx, "fake", "evt_lost", "late") }))
+	if f.count(t, "SELECT count(*) FROM inbox.events WHERE processed_at IS NOT NULL") != 1 {
+		t.Fatal("死信不能再標記已處理")
+	}
+	if pending, err := f.inbox.RoutePending(ctx, "fake", "acct_1"); err != nil || pending {
+		t.Fatalf("死信不算未處理：%v %v", pending, err)
+	}
+	n, err := f.inbox.Purge(ctx)
+	must(t, err)
+	if n != 3 || f.count(t, "SELECT count(*) FROM inbox.events") != 1 {
+		t.Fatalf("清理=%d：已處理與死信過了保存期都刪，只剩 evt_late", n)
+	}
+}
