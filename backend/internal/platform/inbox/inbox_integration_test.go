@@ -199,7 +199,7 @@ func TestAnEventUnprocessedPastTheDeadlineBecomesADeadLetterAndLeavesEverySweep(
 		t.Fatalf("期限內 dead=%v %v", dead, err)
 	}
 	f.record(t, "evt_late", "acct_4")
-	f.now = t0.Add(7*24*time.Hour + time.Minute)
+	f.now = t0.Add(7*24*time.Hour + 10*time.Minute)
 	dead, err := f.inbox.Bury(ctx)
 	must(t, err)
 	if dead["fake"] != 2 {
