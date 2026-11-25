@@ -27,11 +27,6 @@ on:
       - '!backend/internal/**'
       - '!backend/go.mod'
       - '!backend/go.sum'
-      # 排除之後再收回（路徑規則後者勝）：notification-service 的 relay_routes_test 讀單體的發送點 manifest
-      # 與 topology.yaml；它們變動時 notification-service 要重測。原始碼掃描只在單體（backend-monolith），
-      # 這裡不需要 internal/legacy 的 .go。
-      - 'backend/internal/legacy/rabbitmq/testdata/routes.json'
-      - 'backend/infra/mq/topology/topology.yaml'
   push:
     branches: [main, dev]
     paths: *go_paths
@@ -95,7 +90,7 @@ jobs:
           all_mods() {
             for d in gateway pkg services/*/; do
               d=${d%/}
-              [ -f "$d/go.mod" ] && echo "$d"
+              if [ -f "$d/go.mod" ]; then echo "$d"; fi
             done
           }
 
@@ -118,16 +113,9 @@ jobs:
             # AG-UI golden fixture 不是 .go 檔，但 gateway 的 golden test 逐位元組比對它們。
             changed=$(git diff --relative --name-only "$base"...HEAD -- \
               '*.go' 'go.mod' 'go.sum' '**/go.mod' '**/go.sum' go.work .go-version \
-              'gateway/internal/proxy/testdata/agui-frames/*' \
-              'internal/legacy/rabbitmq/testdata/routes.json' 'infra/mq/topology/topology.yaml' || true)
+              'gateway/internal/proxy/testdata/agui-frames/*' || true)
             mods=""
             for f in $changed; do
-              # 發送點 manifest 與 topology.yaml 不屬於任何舊模組，但 notification-service 的測試讀它們。
-              case "$f" in
-                internal/legacy/rabbitmq/testdata/routes.json|infra/mq/topology/topology.yaml)
-                  mods="$mods services/notification-service"
-                  continue ;;
-              esac
               d=$(dirname "$f")
               while [ "$d" != "." ] && [ ! -f "$d/go.mod" ]; do d=$(dirname "$d"); done
               [ -f "$d/go.mod" ] && mods="$mods $d"
@@ -198,8 +186,7 @@ jobs:
           set -e
           for module in \
               gateway pkg \
-              services/invoice-service \
-              services/notification-service; do
+              services/invoice-service; do
             echo "=== $module ==="
             (cd "$module" && go mod tidy)
           done

@@ -24,7 +24,7 @@ import (
 const specPath = "../../../api/openapi/openapi.yaml"
 
 // maxRESTOperations 是清單的端點數上限，只准變少：模組搬遷刪掉 REST 路由後，把它改成新的端點數鎖住新低點。
-const maxRESTOperations = 247
+const maxRESTOperations = 228
 
 // 分類理由；路由隨模組搬遷刪除時從清單移除，不再補進規格。
 const (
@@ -58,7 +58,6 @@ var routesNotInSpec = map[string]string{
 	"GET /api/v1/admin/invoices/tax_reviews/{}/documents/{}/content":        binaryProxy,
 	"GET /api/v1/app/orders/{}/invoice_documents/{}/file/content":           binaryProxy,
 	"GET /api/v1/app/seller/invoices/documents/{}/file/content":             binaryProxy,
-	"GET /api/v1/admin/notification-templates":                              notAnnotated,
 	"GET /api/v1/app/hashtags":                                              notAnnotated,
 	"GET /docs/{}":                                                          localDevTool,
 	"POST /docs/login":                                                      localDevTool,

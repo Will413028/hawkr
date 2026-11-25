@@ -43,7 +43,7 @@ const (
 	CapChatSend Capability = "CAP_CHAT_SEND"
 	// CapChatRead — IM 讀取（history/conversations/unread/已讀）。白名單。
 	CapChatRead Capability = "CAP_CHAT_READ"
-	// CapNotification — 通知收件箱/偏好/device-token。白名單。
+	// CapNotification — 單體的賣家能力 token（停權白名單）；單體以 header 帶來，gateway 要認得（TestCapabilityTokensMatchGateway）。
 	CapNotification Capability = "CAP_NOTIFICATION"
 	// CapAccountClose — 收縮型：關閉店家（刪帳號是 identity 的事，不需要這個能力）。白名單。
 	CapAccountClose Capability = "CAP_ACCOUNT_CLOSE"

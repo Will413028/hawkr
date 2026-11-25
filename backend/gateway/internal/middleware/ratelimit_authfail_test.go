@@ -122,12 +122,12 @@ func TestRateLimiter_AuthFailureIgnoresExemptRoutes(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(middleware.TieredRateLimiter(limiter, authPolicy(3)))
-	r.GET("/api/v1/app/notifications/stream", func(c *gin.Context) {
+	r.GET("/api/v1/health", func(c *gin.Context) {
 		c.String(http.StatusUnauthorized, "")
 	})
 
 	for i := 1; i <= 20; i++ {
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/app/notifications/stream", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/health", nil)
 		req.RemoteAddr = "203.0.113.9:5555"
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)

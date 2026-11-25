@@ -12,7 +12,6 @@ public final class MqConstants {
     public static final String EXCHANGE_ORDER = "hawkr.order";
     public static final String EXCHANGE_PAYMENT = "payment.events";
     public static final String EXCHANGE_MARKETING = "hawkr.marketing";
-    public static final String EXCHANGE_NOTIFICATION = "hawkr.notification";
     public static final String EXCHANGE_DELAYED = "hawkr.delayed";
     public static final String EXCHANGE_SELLER_BIZ = "hawkr.seller";
     public static final String EXCHANGE_USER = "hawkr.user";
@@ -37,7 +36,6 @@ public final class MqConstants {
     public static final String EXCHANGE_ORDER_DLX = "hawkr.order.dlx";
     public static final String EXCHANGE_PAYMENT_DLX = "hawkr.payment.dlx";
     public static final String EXCHANGE_MARKETING_DLX = "hawkr.marketing.dlx";
-    public static final String EXCHANGE_NOTIFICATION_DLX = "hawkr.notification.dlx";
     public static final String EXCHANGE_SELLER_BIZ_DLX = "hawkr.seller.dlx";
     public static final String EXCHANGE_USER_DLX = "hawkr.user.dlx";
     /** Cart Service 私有 DLX（#1426：cart 首個 consumer seller.profile.changed 的死信出口） */

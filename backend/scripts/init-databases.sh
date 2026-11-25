@@ -93,7 +93,6 @@ DATABASES=(
   "hawkr_product"
   "hawkr_cart"
   "hawkr_webhook"
-  "hawkr_notification"
   "hawkr_coupon"
   "hawkr_invoice"
 )

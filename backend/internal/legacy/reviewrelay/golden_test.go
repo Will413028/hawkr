@@ -55,7 +55,7 @@ func TestGoldenEmittedKeysAreSubsetOfRelayedPayloadWithValues(t *testing.T) {
 	if entry.RoutingKey != "review.created" || len(entry.EmittedKeys) == 0 {
 		t.Fatalf("golden review.created = %+v", entry)
 	}
-	w, _, _, _ := newFixture()
+	w, _ := newFixture()
 	got := run(t, w, OnReviewCreated, created())
 	if len(got) != 1 {
 		t.Fatalf("messages=%d", len(got))
@@ -102,12 +102,12 @@ func TestProductStatsConsumerContract(t *testing.T) {
 		}
 	}
 	t.Run("with reviews", func(t *testing.T) {
-		w, _, _, _ := newFixture()
+		w, _ := newFixture()
 		check(t, body(t, run(t, w, OnReviewCreated, created())[0]), 4.9, 30)
 		check(t, body(t, run(t, w, OnReviewAggregateChanged, review.ReviewAggregateChanged{EventID: eventID, OccurredAt: occurredAt, StoreID: 91, ProductID: 700})[0]), 4.9, 30)
 	})
 	t.Run("no visible reviews", func(t *testing.T) {
-		w, r, _, _ := newFixture()
+		w, r := newFixture()
 		r.product = map[int64]review.ProductStats{}
 		check(t, body(t, run(t, w, OnReviewAggregateChanged, review.ReviewAggregateChanged{EventID: eventID, OccurredAt: occurredAt, StoreID: 91, ProductID: 700})[0]), 0, 0)
 	})

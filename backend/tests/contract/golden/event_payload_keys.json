@@ -1421,16 +1421,12 @@
     "lang": "go",
     "routing_key": "review.created",
     "emitted_keys": [
-      "buyer_avatar_key",
-      "buyer_nickname",
-      "notify_seller_account_id",
       "order_no",
       "rating",
       "review_id",
       "store_id"
     ],
     "identity_spaces": {
-      "notify_seller_account_id": "account_id",
       "store_id": "store_id"
     }
   },

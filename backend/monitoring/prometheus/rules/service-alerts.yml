@@ -23,13 +23,10 @@ groups:
       # 🔴 2026-09-07 修正：**這條規則之前對 7 個服務永遠 firing**，因為它們沒有、也不可能有 up series。
       # 原清單 14 個裡：
       #   - account / buyer / seller / im / ai / content 已改 gRPC-only，指標走 OTLP，**沒有 scrape target**
-      #     ⇒ up{job=…} 這個 series 在 prod 從不存在 ⇒ absent() 恆為真。改由下方 ProdOtlpServiceAbsent 承接。
+      #     ⇒ up{job=…} 這個 series 在 prod 從不存在 ⇒ absent() 恆為真，所以不列在這條。
       #   - invoice-service 曾因 prod replicas=0（刻意未部署）移出清單；#3230 已把 replicas 改回 1，
       #     **加回本條**。它不是 gRPC-only：invoice-service 有 HTTP port（10040），
       #     chart 因此打 prometheus.io/scrape ⇒ 有 up series，與 order／product 同類。
-      #     ⚠️ 一度誤加進下方 ProdOtlpServiceAbsent —— 那條要的是 server_start_total，而它來自
-      #     pkgotel.InitMeterProvider，invoice-service 沒有呼叫（全 repo 只有那 11 個服務有）⇒
-      #     absent() 恆為真 ⇒ 會讓整條 or 鏈永久 firing，把那 11 個服務的偵測一起毀掉。
       #     判準：**看該服務的部署設定有沒有 `transportMode: grpc-only`** —— 那才是 chart
       #     決定要不要打 prometheus.io/scrape 的條件（deployment.yaml 的 $grpcOnly）。
       #     ⚠️ 不要用「有沒有 ports.http」當判準：chart 對 ports.http.containerPort 有預設值 8080，
@@ -59,29 +56,15 @@ groups:
           summary: "Prod service {{ $labels.job }} 完全消失（無任何 up series）"
           description: "{{ $labels.job }}(env=prod) 已 5 分鐘沒有任何 metrics（所有 pod 消失或 agent 停抓）。"
 
-      # Prod OTLP Service Absent — 同上，但針對 **gRPC-only／OTLP 傳輸**的服務。
-      # 它們沒有 /metrics 可刮，因此沒有 up series；等價的存活訊號是 server_start_total
-      # （pkg/server 的 OTel instrument，每個 PeriodicReader 週期重送一次累積值）。
-      # 所有 pod 消失 ⇒ 推送停止 ⇒ series 在 staleness 窗後消失 ⇒ absent() 成立，語意與上面一致。
-      - alert: ProdOtlpServiceAbsent
-        expr: |
-          absent(server_start_total{job="notification-service", env="prod"})
-        for: 5m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Prod OTLP service {{ $labels.job }} 完全消失（無任何 OTLP 指標）"
-          description: "{{ $labels.job }}(env=prod) 已 5 分鐘沒有推送任何 OTLP 指標（所有 pod 消失，或 otel-collector 斷線）。"
-
       # Prod Workload Not Running — **不依賴任何手寫服務清單**的兜底。
-      # 上面兩條的正確性建立在「清單與實際傳輸方式一致」，而 2026-09-07 的事故正是清單沒跟上傳輸變更。
+      # 上面那條的正確性建立在「清單與實際傳輸方式一致」，而 2026-09-07 的事故正是清單沒跟上傳輸變更。
       # 這條改由 kube-state-metrics 直接讀宣告面，語意是「宣告要跑但一個可用副本都沒有」：
       #   - 新增服務、改名、換傳輸 ⇒ 自動涵蓋，不需要改這裡。
       #   - 刻意 scale 到 0 的 ⇒ spec_replicas > 0 這個守衛會排除，不誤報。
       #     ⚠️ 這裡曾舉 prod 的 invoice-service 為例，#3230 之後不再成立：`replicas: 0` 已被
       #     §12.3.0 G8 明文列為非法值（它把「一個功能未開通」放大成「整個服務不存在」且完全靜默）。
-      # 與上面兩條互補而非取代：這條答「工作負載在不在」，上面兩條答「指標有沒有送到」——
-      # pod 活著但 agent／collector 斷線時只有上面兩條會響。
+      # 與上面那條互補而非取代：這條答「工作負載在不在」，上面那條答「指標有沒有送到」——
+      # pod 活著但 agent 斷線時只有上面那條會響。
       - alert: ProdWorkloadNotRunning
         expr: |
           kube_deployment_status_replicas_available{env="prod"} == 0

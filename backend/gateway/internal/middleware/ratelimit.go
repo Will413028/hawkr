@@ -99,10 +99,9 @@ const publicNamespace = "/api/v1/public"
 // low-JWT store-map callbacks would be wrongly throttled — reconnect storms or
 // same-source-IP callback bursts — under a per-IP request limit.
 var exemptExact = map[string]struct{}{
-	"/api/v1/health":                   {}, // liveness probe
-	"/api/v1/app/notifications/stream": {}, // notification SSE
-	"/store_map/return":                {}, // PayUni CVS map return
-	"/store_map/redirect":              {}, // WebView CVS-map opener
+	"/api/v1/health":      {}, // liveness probe
+	"/store_map/return":   {}, // PayUni CVS map return
+	"/store_map/redirect": {}, // WebView CVS-map opener
 	"/.well-known/apple-developer-merchantid-domain-association.txt": {},
 }
 

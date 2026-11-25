@@ -1,7 +1,6 @@
 package router
 
 import (
-	"github.com/Will413028/hawkr/gateway/internal/authz"
 	"github.com/Will413028/hawkr/gateway/internal/handler"
 	"github.com/Will413028/hawkr/gateway/internal/middleware"
 	"github.com/gin-gonic/gin"
@@ -19,18 +18,5 @@ func registerSellerRoutes(public, app *gin.RouterGroup, h *handler.Holder) {
 	pubSellers.Use(middleware.OptionalJWTAuth())
 	{
 		pubSellers.GET("/:id/products", h.GetSellerProducts)
-	}
-
-	// ------------------------------------------
-	// 商家管理（需要 JWT + 賣家角色 + 能力層）
-	// capability 粒度決定掛載粒度：本群組混 CAP_MARKETING（dashboard/報表/評論回覆）
-	// 與 CAP_NOTIFICATION（通知偏好，白名單），故 per-route 掛 requireSeller(cap)。
-	// ------------------------------------------
-	sellerMgmt := app.Group(SellersPath)
-	sellerMgmt.Use(middleware.JWTAuth())
-	{
-		// 通知偏好設定（設定自己收不收通知，非經營行為 → 白名單）
-		sellerHandle(sellerMgmt, "GET", "/me/notification-preferences", authz.CapNotification, h.GetNotificationPreferences)
-		sellerHandle(sellerMgmt, "PUT", "/me/notification-preferences", authz.CapNotification, h.UpdateNotificationPreference)
 	}
 }

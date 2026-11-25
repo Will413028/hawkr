@@ -59,8 +59,6 @@ func SetupRoutes(r *gin.Engine, h *handler.Holder) {
 	registerAfterSalesRoutes(app, r, h)
 	registerAdminNonManagedRoutes(app, admin, h)
 	registerShareRoutes(app, h)
-	registerNotificationRoutes(app, h)
-	registerAdminNotificationTemplateRoutes(admin, h)
 	registerDevRoutes(public, h)
 
 	// ADM 代行營運（56 號）：14 支走 ADM session、18 支走 operation credential。

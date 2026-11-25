@@ -25,7 +25,7 @@ func TestRelayRetryEnqueuesOnePublishJobPerEvent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w, reviews, _, _ := newFixture()
+	w, reviews := newFixture()
 	w.Jobs = queue
 
 	createdArgs := ReviewCreatedArgs{eventFields: eventFields{EventID: "event-created", Occurred: occurredAt}, ReviewID: reviewID.String()}

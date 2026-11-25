@@ -372,22 +372,22 @@ MembershipBillingService,CreateMembershipSubscription,payment-service,removed: �
 MembershipBillingService,SuspendMembershipSubscription,payment-service,removed: 會員計費流程從未上線（provider adapter 一律 UNSUPPORTED），proto 沒有這個 service，V17 已 drop 表，程式已刪（B2 盤點 §2a #30-33）
 MembershipBillingService,RestartMembershipSubscription,payment-service,removed: 會員計費流程從未上線（provider adapter 一律 UNSUPPORTED），proto 沒有這個 service，V17 已 drop 表，程式已刪（B2 盤點 §2a #30-33）
 MembershipBillingService,EndMembershipSubscription,payment-service,removed: 會員計費流程從未上線（provider adapter 一律 UNSUPPORTED），proto 沒有這個 service，V17 已 drop 表，程式已刪（B2 盤點 §2a #30-33）
-NotificationService,GetNotificationPreferences,notification-service,
-NotificationService,UpdateNotificationPreference,notification-service,
-NotificationService,RegisterDeviceToken,notification-service,
-NotificationService,RemoveDeviceToken,notification-service,
-NotificationService,ReloadTemplates,notification-service,
-NotificationService,ListTemplates,notification-service,
-NotificationService,GetTemplate,notification-service,
-NotificationService,UpdateTemplateEnabled,notification-service,
-NotificationService,PreviewTemplate,notification-service,
-NotificationService,TestSendTemplate,notification-service,
-NotificationService,BroadcastAnnouncement,notification-service,
-NotificationService,ListNotifications,notification-service,
-NotificationService,GetUnreadCount,notification-service,
-NotificationService,MarkAsRead,notification-service,
-NotificationService,MarkAllAsRead,notification-service,
-NotificationService,DeleteNotifications,notification-service,
+NotificationService,GetNotificationPreferences,notification-service,api: notification 模組的 NotificationAppService.GetNotificationPreferences（A8-2b）
+NotificationService,UpdateNotificationPreference,notification-service,api: notification 模組的 NotificationAppService.UpdateNotificationPreference（A8-2b）
+NotificationService,RegisterDeviceToken,notification-service,api: notification 模組的 NotificationAppService.RegisterDeviceToken（A8-2b）
+NotificationService,RemoveDeviceToken,notification-service,api: notification 模組的 NotificationAppService.RemoveDeviceToken（A8-2b）
+NotificationService,ReloadTemplates,notification-service,removed: 模板退場，型別定義在程式碼（通知 ADR 2026-11-23 修訂、A8 D1）
+NotificationService,ListTemplates,notification-service,removed: 模板退場，後台不做模板編輯、預覽、試發（A8 範圍）
+NotificationService,GetTemplate,notification-service,removed: 模板退場，後台不做模板編輯、預覽、試發（A8 範圍）
+NotificationService,UpdateTemplateEnabled,notification-service,removed: 模板退場，缺陷 #8 隨之消失（A8 範圍）
+NotificationService,PreviewTemplate,notification-service,removed: 模板退場，後台不做模板編輯、預覽、試發（A8 範圍）
+NotificationService,TestSendTemplate,notification-service,removed: 試發路徑，缺陷 #21（A8 範圍）
+NotificationService,BroadcastAnnouncement,notification-service,api: NotificationAdminService 的後台公告（A8-2c）
+NotificationService,ListNotifications,notification-service,api: notification 模組的 NotificationAppService.ListNotifications（A8-2b）
+NotificationService,GetUnreadCount,notification-service,api: notification 模組的 NotificationAppService.GetUnreadCount（A8-2b）
+NotificationService,MarkAsRead,notification-service,api: notification 模組的 NotificationAppService.MarkAsRead（A8-2b）
+NotificationService,MarkAllAsRead,notification-service,api: notification 模組的 NotificationAppService.MarkAllAsRead（A8-2b）
+NotificationService,DeleteNotifications,notification-service,api: notification 模組的 NotificationAppService.DeleteNotifications（A8-2b）
 OrderService,CreateOrder,order-service,
 OrderService,CreateRfqOrder,order-service,
 OrderService,CancelOrder,order-service,

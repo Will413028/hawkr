@@ -23,7 +23,6 @@ func rlEngine(limiter *ratelimit.Limiter, policy middleware.RateLimitPolicy) *gi
 
 	// exempt — SSE / WS / beacon / health / store-map callbacks.
 	r.GET("/api/v1/health", ok)
-	r.GET("/api/v1/app/notifications/stream", ok)
 	r.POST("/store_map/return", ok)
 
 	// tiered
@@ -63,7 +62,6 @@ func TestRateLimiter_ExemptPathsNeverLimited(t *testing.T) {
 
 	exempt := []struct{ method, path string }{
 		{"GET", "/api/v1/health"},
-		{"GET", "/api/v1/app/notifications/stream"},
 		{"POST", "/store_map/return"},
 	}
 	for _, e := range exempt {
