@@ -24,6 +24,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
+	"github.com/Will413028/hawkr/backend/internal/platform/hashtag"
 )
 
 // DefaultTrending 是 SuggestTrendingPosts 沒有指定 max_results 時回傳的篇數。
@@ -210,7 +211,7 @@ func (h *Public) ListPosts(ctx context.Context, req *connect.Request[pb.ListPost
 	}
 	scopeTag := ""
 	if msg.Hashtag != nil {
-		scopeTag, _ = social.NormalizeHashtag(msg.GetHashtag())
+		scopeTag, _, _ = hashtag.Normalize(msg.GetHashtag())
 	}
 	scope := rpc.FilterScope(socialv1alpha1connect.SocialPublicServiceListPostsProcedure, scopeStore, scopeTag)
 	after, err := rpc.ValidCursor[postCursor](scope, msg.GetPageToken())

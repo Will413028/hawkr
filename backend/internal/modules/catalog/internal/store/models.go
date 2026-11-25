@@ -93,3 +93,35 @@ type CatalogStockOperation struct {
 	DeductOperationID *uuid.UUID
 	CreatedAt         time.Time
 }
+
+type SellerPubContentTakedown struct {
+	MeasureID   uuid.UUID
+	ContentKind string
+	ContentID   uuid.UUID
+}
+
+type SellerPubExposableStore struct {
+	StoreID int64
+}
+
+type SellerPubRetiredStore struct {
+	StoreID int64
+}
+
+type SellerPubReviewItem struct {
+	Kind             string
+	ItemID           string
+	ReportID         *uuid.UUID
+	CaseID           *uuid.UUID
+	InquiryID        *uuid.UUID
+	AuthorityOrderID *uuid.UUID
+	TargetPosition   *int16
+	AccountID        *int64
+	MeasureID        *uuid.UUID
+	RequestID        *uuid.UUID
+	KycApplicationID *uuid.UUID
+	StoreID          *int64
+	StoreName        *string
+	StartAt          time.Time
+	DueAt            time.Time
+}

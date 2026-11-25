@@ -62,6 +62,87 @@
    "new": "WHERE c.id = $1)",
    "test": "internal/modules/catalog ^TestOnlyLeafCategoriesTakeProducts$",
    "why": "葉節點檢查拿掉：頂層分組也能掛商品，測試要紅。"
+  },
+  {
+   "id": "public-list-without-exposure-join",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
+   "old": "p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e)",
+   "new": "$1::timestamptz IS NOT NULL",
+   "test": "internal/modules/catalog ^TestPublicListOnlyActiveProductsOfExposableStores$",
+   "why": "公開列表拿掉 seller.pub_exposable_stores 的 join：停權店的 ACTIVE 商品出現在公開列表，測試要紅。"
+  },
+  {
+   "id": "public-get-without-exposure-join",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
+   "old": "p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($2::timestamptz) e)",
+   "new": "$2::timestamptz IS NOT NULL",
+   "test": "internal/modules/catalog ^TestPublicListOnlyActiveProductsOfExposableStores$",
+   "why": "公開單筆讀取拿掉曝光條件：停權店的商品仍可公開讀取，測試要紅。"
+  },
+  {
+   "id": "sku-write-without-price-range-recompute",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "n, err := q.RecomputePriceRange(ctx, store.RecomputePriceRangeParams{ID: id, Now: now})",
+   "new": "n, err := int64(1), error(nil)",
+   "test": "internal/modules/catalog ^TestPriceRangeFollowsSkuChanges$",
+   "why": "SKU 寫入不重算價格區間（D19）：商品的 min_price／max_price 停在 0 或舊值，區間測試要紅。"
+  },
+  {
+   "id": "image-removal-without-mark-deleted",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "return s.d.Media.MarkDeleted(ctx, retired)",
+   "new": "_ = retired\n\t\treturn nil",
+   "test": "internal/modules/catalog ^TestImagesConfirmedInTheWriteAndMarkedDeletedWhenRemoved$",
+   "why": "移除圖片時不呼叫 MarkDeleted：退場的資產沒有被標為刪除，測試要紅。"
+  },
+  {
+   "id": "sku-combination-not-checked-against-option-values",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/validate.go",
+   "old": "case !slices.Contains(axes[k].Values, *opt):",
+   "new": "case false:",
+   "test": "internal/modules/catalog ^TestSkuCombinationsMustBeUniqueAndWithinOptionValues$",
+   "why": "SKU 的選項值不必落在軸的值內（D18）：商品帶著不存在的規格值，測試要紅。"
+  },
+  {
+   "id": "sku-duplicate-combination-not-rejected",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/validate.go",
+   "old": "if seen[key] {",
+   "new": "if false {",
+   "test": "internal/modules/catalog ^TestSkuCombinationsMustBeUniqueAndWithinOptionValues$",
+   "why": "重複的 SKU 組合不在寫入端擋下：變成資料庫唯一索引錯誤而不是 InvalidInput，測試要紅。"
+  },
+  {
+   "id": "reactivation-resets-first-published-at",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
+   "old": "THEN COALESCE(first_published_at, $2::timestamptz) ELSE",
+   "new": "THEN $2::timestamptz ELSE",
+   "test": "internal/modules/catalog ^TestProductLifecycleAndFirstPublishedAt$",
+   "why": "再次上架覆寫 first_published_at：它不再是第一次上架的時間，測試要紅。"
+  },
+  {
+   "id": "hashtag-name-keeps-ascii-case",
+   "stack": "go-integration",
+   "file": "backend/internal/platform/hashtag/hashtag.go",
+   "old": "r += 'a' - 'A'",
+   "new": "r += 0",
+   "test": "internal/modules/catalog ^TestHashtagsUseThePlatformNormalization$",
+   "why": "共用的正規化不再把 ASCII 大寫轉小寫：商品的標籤名稱與去重都變了，測試要紅（social 的測試也用同一份）。"
+  },
+  {
+   "id": "seller-list-filters-by-exposure",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
+   "old": "WHERE p.store_id = $1 AND p.deleted_at IS NULL",
+   "new": "WHERE p.store_id = $1 AND p.deleted_at IS NULL\n  AND p.status = 'ACTIVE'",
+   "test": "internal/modules/catalog ^TestSellerListIsUnfilteredByStatusAndExposure$",
+   "why": "賣家清單只列 ACTIVE：賣家看不到自己的草稿與下架商品，測試要紅。"
   }
  ]
 }

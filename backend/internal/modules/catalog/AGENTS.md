@@ -17,7 +17,8 @@ schema `catalog`（`db/schema.sql`）：`categories`、`products`、`product_opt
 ## 模組內部結構
 
 - 根套件只保留 `Module`、`New`、轉呼叫方法、對外型別別名與錯誤。
-- `internal/model` 放對外型別與錯誤；`internal/stock` 是庫存的冪等扣減與歸還；`internal/taxonomy` 讀分類樹；`internal/store` 是 sqlc 的查詢套件。
+- `internal/model` 放對外型別與錯誤；`internal/stock` 是庫存的冪等扣減與歸還；`internal/taxonomy` 讀分類樹；`internal/product` 是商品的寫入、讀取與兩種列表；`internal/description` 是描述區塊的純驗證與編碼；`internal/store` 是 sqlc 的查詢套件。
+- 依賴 media（圖片 `Confirm`／`MarkDeleted`）與 seller 的 `pub_exposable_stores`（公開列表的 join，`db/sqlc.yaml` 讀 seller 的 `pub.sql`）；hashtag 規則在 `platform/hashtag`，與 social 共用。
 - 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`；增加 use case 或子領域時同步修改圖。各子領域在自己套件宣告最小的 `Deps`，由根套件逐欄組裝。
 
 ## 不變量
@@ -27,6 +28,9 @@ schema `catalog`（`db/schema.sql`）：`categories`、`products`、`product_opt
 - 同一個冪等鍵以不同內容重送回 `ErrIdempotencyKeyReused`，內容相同回成功且不改庫存。`DeductStock`／`RestoreStock` 在呼叫方的 transaction 內失敗時，呼叫方必須整個回滾。
 - 分類只在 migration 變動，兩層；商品只能掛葉節點（`IsLeafCategory`）；名稱是 `LocalizedText`（必有 zh-TW）。守門：`TestSeedTaxonomyShape`、`TestOnlyLeafCategoriesTakeProducts`、`categories_name_check`。
 - 商品狀態是 `DRAFT`／`ACTIVE`／`ARCHIVED`，`ACTIVE` 必有 `first_published_at`；刪除是 `deleted_at`，列保留。可見性是狀態 ∧ 店家可曝光（join `seller.pub_exposable_stores`）∧ 沒有有效限制措施，不寫進狀態欄。
+- 商品寫入都從 `LockOwnProduct`（以呼叫端推導的 `storeID` 限定）的列鎖開始；SKU 以選項值的組合辨識，每次 SKU 寫入同 transaction 重算 `min_price`／`max_price`（D19）。組合必須落在選項值內、不重複，沒有軸的商品剛好一個預設 SKU。庫存不在商品寫入裡改（既有組合不動，新組合才給初始值）。守門：`TestSkuCombinationsMustBeUniqueAndWithinOptionValues`、`TestPriceRangeFollowsSkuChanges`。
+- 圖片：新 token 在寫入的 transaction 內 `Confirm`，退場的資產同 transaction `MarkDeleted`，兩者失敗整筆回滾；描述的圖片區塊只存 `asset_id`，alt 與 key 在 `product_images`。守門：`TestImagesConfirmedInTheWriteAndMarkedDeletedWhenRemoved`、`TestMediaFailuresRollBackTheProductWrite`。
+- 狀態切換只有 DRAFT→ACTIVE、ACTIVE→ARCHIVED、ARCHIVED→ACTIVE；`first_published_at` 只在第一次 ACTIVE 填。刪除不碰圖片引用。公開列表與公開單筆只含 ACTIVE、沒刪除、店家可曝光的商品；賣家清單不過濾狀態與曝光。守門：`TestProductLifecycleAndFirstPublishedAt`、`TestPublicListOnlyActiveProductsOfExposableStores`、`TestSellerListIsUnfilteredByStatusAndExposure`。
 - 運費與配送方式不在 catalog（D10）；不依賴 fulfillment。
 
 ## 不負責

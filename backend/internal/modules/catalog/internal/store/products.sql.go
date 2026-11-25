@@ -12,6 +12,184 @@ import (
 	"uuid"
 )
 
+const deleteOptionAxes = `-- name: DeleteOptionAxes :exec
+DELETE FROM catalog.product_option_axes WHERE product_id = $1
+`
+
+func (q *Queries) DeleteOptionAxes(ctx context.Context, productID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteOptionAxes, productID)
+	return err
+}
+
+const deleteOptionValues = `-- name: DeleteOptionValues :exec
+DELETE FROM catalog.product_option_values WHERE product_id = $1
+`
+
+func (q *Queries) DeleteOptionValues(ctx context.Context, productID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteOptionValues, productID)
+	return err
+}
+
+const deleteProductHashtags = `-- name: DeleteProductHashtags :exec
+DELETE FROM catalog.product_hashtags WHERE product_id = $1
+`
+
+func (q *Queries) DeleteProductHashtags(ctx context.Context, productID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteProductHashtags, productID)
+	return err
+}
+
+const deleteProductImages = `-- name: DeleteProductImages :exec
+DELETE FROM catalog.product_images WHERE product_id = $1
+`
+
+func (q *Queries) DeleteProductImages(ctx context.Context, productID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteProductImages, productID)
+	return err
+}
+
+const getOwnProduct = `-- name: GetOwnProduct :one
+SELECT id, store_id, category_id, title, description, status, first_published_at, min_price, max_price, sales_count, favorite_count, rating_average, review_count, created_at, updated_at
+FROM catalog.products WHERE id = $1 AND store_id = $2 AND deleted_at IS NULL
+`
+
+type GetOwnProductParams struct {
+	ID      uuid.UUID
+	StoreID int64
+}
+
+type GetOwnProductRow struct {
+	ID               uuid.UUID
+	StoreID          int64
+	CategoryID       uuid.UUID
+	Title            string
+	Description      []byte
+	Status           string
+	FirstPublishedAt *time.Time
+	MinPrice         int64
+	MaxPrice         int64
+	SalesCount       int32
+	FavoriteCount    int32
+	RatingAverage    float64
+	ReviewCount      int32
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+}
+
+// 店家自己的商品（任何狀態，沒刪除）。
+func (q *Queries) GetOwnProduct(ctx context.Context, arg GetOwnProductParams) (GetOwnProductRow, error) {
+	row := q.db.QueryRow(ctx, getOwnProduct, arg.ID, arg.StoreID)
+	var i GetOwnProductRow
+	err := row.Scan(
+		&i.ID,
+		&i.StoreID,
+		&i.CategoryID,
+		&i.Title,
+		&i.Description,
+		&i.Status,
+		&i.FirstPublishedAt,
+		&i.MinPrice,
+		&i.MaxPrice,
+		&i.SalesCount,
+		&i.FavoriteCount,
+		&i.RatingAverage,
+		&i.ReviewCount,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getPublicProduct = `-- name: GetPublicProduct :one
+SELECT p.id, p.store_id, p.category_id, p.title, p.description, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.created_at, p.updated_at
+FROM catalog.products p
+WHERE p.id = $1 AND p.status = 'ACTIVE' AND p.deleted_at IS NULL
+  AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($2::timestamptz) e)
+`
+
+type GetPublicProductParams struct {
+	ID uuid.UUID
+	At time.Time
+}
+
+type GetPublicProductRow struct {
+	ID               uuid.UUID
+	StoreID          int64
+	CategoryID       uuid.UUID
+	Title            string
+	Description      []byte
+	Status           string
+	FirstPublishedAt *time.Time
+	MinPrice         int64
+	MaxPrice         int64
+	SalesCount       int32
+	FavoriteCount    int32
+	RatingAverage    float64
+	ReviewCount      int32
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+}
+
+// 公開可讀：ACTIVE、沒刪除、店家在 at 這一刻可曝光。
+func (q *Queries) GetPublicProduct(ctx context.Context, arg GetPublicProductParams) (GetPublicProductRow, error) {
+	row := q.db.QueryRow(ctx, getPublicProduct, arg.ID, arg.At)
+	var i GetPublicProductRow
+	err := row.Scan(
+		&i.ID,
+		&i.StoreID,
+		&i.CategoryID,
+		&i.Title,
+		&i.Description,
+		&i.Status,
+		&i.FirstPublishedAt,
+		&i.MinPrice,
+		&i.MaxPrice,
+		&i.SalesCount,
+		&i.FavoriteCount,
+		&i.RatingAverage,
+		&i.ReviewCount,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const insertOptionAxis = `-- name: InsertOptionAxis :exec
+INSERT INTO catalog.product_option_axes (product_id, position, name) VALUES ($1, $2, $3)
+`
+
+type InsertOptionAxisParams struct {
+	ProductID uuid.UUID
+	Position  int32
+	Name      string
+}
+
+func (q *Queries) InsertOptionAxis(ctx context.Context, arg InsertOptionAxisParams) error {
+	_, err := q.db.Exec(ctx, insertOptionAxis, arg.ProductID, arg.Position, arg.Name)
+	return err
+}
+
+const insertOptionValue = `-- name: InsertOptionValue :exec
+INSERT INTO catalog.product_option_values (product_id, axis_position, position, value) VALUES ($1, $2, $3, $4)
+`
+
+type InsertOptionValueParams struct {
+	ProductID    uuid.UUID
+	AxisPosition int32
+	Position     int32
+	Value        string
+}
+
+func (q *Queries) InsertOptionValue(ctx context.Context, arg InsertOptionValueParams) error {
+	_, err := q.db.Exec(ctx, insertOptionValue,
+		arg.ProductID,
+		arg.AxisPosition,
+		arg.Position,
+		arg.Value,
+	)
+	return err
+}
+
 const insertProduct = `-- name: InsertProduct :exec
 
 INSERT INTO catalog.products (id, store_id, category_id, title, description, status, first_published_at, min_price, max_price, searchable_text, created_at, updated_at)
@@ -33,7 +211,7 @@ type InsertProductParams struct {
 	Now              time.Time
 }
 
-// 商品、選項與 SKU 的寫入與讀取（B4-2b 擴充；這裡先放庫存與分類的測試與讀取需要的最小集合）。
+// 商品、選項、SKU、圖片引用與 hashtag 的寫入與讀取。
 func (q *Queries) InsertProduct(ctx context.Context, arg InsertProductParams) error {
 	_, err := q.db.Exec(ctx, insertProduct,
 		arg.ID,
@@ -47,6 +225,53 @@ func (q *Queries) InsertProduct(ctx context.Context, arg InsertProductParams) er
 		arg.MaxPrice,
 		arg.SearchableText,
 		arg.Now,
+	)
+	return err
+}
+
+const insertProductHashtag = `-- name: InsertProductHashtag :exec
+INSERT INTO catalog.product_hashtags (product_id, name, display_name, position) VALUES ($1, $2, $3, $4)
+`
+
+type InsertProductHashtagParams struct {
+	ProductID   uuid.UUID
+	Name        string
+	DisplayName string
+	Position    int32
+}
+
+func (q *Queries) InsertProductHashtag(ctx context.Context, arg InsertProductHashtagParams) error {
+	_, err := q.db.Exec(ctx, insertProductHashtag,
+		arg.ProductID,
+		arg.Name,
+		arg.DisplayName,
+		arg.Position,
+	)
+	return err
+}
+
+const insertProductImage = `-- name: InsertProductImage :exec
+INSERT INTO catalog.product_images (product_id, kind, position, asset_id, object_key, alt)
+VALUES ($1, $2, $3, $4, $5, $6)
+`
+
+type InsertProductImageParams struct {
+	ProductID uuid.UUID
+	Kind      string
+	Position  int32
+	AssetID   uuid.UUID
+	ObjectKey string
+	Alt       string
+}
+
+func (q *Queries) InsertProductImage(ctx context.Context, arg InsertProductImageParams) error {
+	_, err := q.db.Exec(ctx, insertProductImage,
+		arg.ProductID,
+		arg.Kind,
+		arg.Position,
+		arg.AssetID,
+		arg.ObjectKey,
+		arg.Alt,
 	)
 	return err
 }
@@ -77,6 +302,461 @@ func (q *Queries) InsertSku(ctx context.Context, arg InsertSkuParams) error {
 		arg.CompareAtPrice,
 		arg.StockQty,
 		arg.Now,
+	)
+	return err
+}
+
+const listLiveSkus = `-- name: ListLiveSkus :many
+SELECT id, product_id, option1_value, option2_value, price, compare_at_price, stock_qty
+FROM catalog.product_skus WHERE product_id = $1 AND deleted_at IS NULL
+ORDER BY created_at, id
+`
+
+type ListLiveSkusRow struct {
+	ID             uuid.UUID
+	ProductID      uuid.UUID
+	Option1Value   *string
+	Option2Value   *string
+	Price          int64
+	CompareAtPrice *int64
+	StockQty       int32
+}
+
+func (q *Queries) ListLiveSkus(ctx context.Context, productID uuid.UUID) ([]ListLiveSkusRow, error) {
+	rows, err := q.db.Query(ctx, listLiveSkus, productID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLiveSkusRow{}
+	for rows.Next() {
+		var i ListLiveSkusRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProductID,
+			&i.Option1Value,
+			&i.Option2Value,
+			&i.Price,
+			&i.CompareAtPrice,
+			&i.StockQty,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOptionAxes = `-- name: ListOptionAxes :many
+SELECT product_id, position, name FROM catalog.product_option_axes WHERE product_id = $1 ORDER BY position
+`
+
+func (q *Queries) ListOptionAxes(ctx context.Context, productID uuid.UUID) ([]CatalogProductOptionAx, error) {
+	rows, err := q.db.Query(ctx, listOptionAxes, productID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CatalogProductOptionAx{}
+	for rows.Next() {
+		var i CatalogProductOptionAx
+		if err := rows.Scan(&i.ProductID, &i.Position, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOptionValues = `-- name: ListOptionValues :many
+SELECT product_id, axis_position, position, value FROM catalog.product_option_values WHERE product_id = $1 ORDER BY axis_position, position
+`
+
+func (q *Queries) ListOptionValues(ctx context.Context, productID uuid.UUID) ([]CatalogProductOptionValue, error) {
+	rows, err := q.db.Query(ctx, listOptionValues, productID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CatalogProductOptionValue{}
+	for rows.Next() {
+		var i CatalogProductOptionValue
+		if err := rows.Scan(
+			&i.ProductID,
+			&i.AxisPosition,
+			&i.Position,
+			&i.Value,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listProductHashtags = `-- name: ListProductHashtags :many
+SELECT product_id, name, display_name, position FROM catalog.product_hashtags WHERE product_id = $1 ORDER BY position
+`
+
+func (q *Queries) ListProductHashtags(ctx context.Context, productID uuid.UUID) ([]CatalogProductHashtag, error) {
+	rows, err := q.db.Query(ctx, listProductHashtags, productID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CatalogProductHashtag{}
+	for rows.Next() {
+		var i CatalogProductHashtag
+		if err := rows.Scan(
+			&i.ProductID,
+			&i.Name,
+			&i.DisplayName,
+			&i.Position,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listProductImages = `-- name: ListProductImages :many
+SELECT product_id, kind, position, asset_id, object_key, alt FROM catalog.product_images WHERE product_id = $1 ORDER BY kind, position
+`
+
+func (q *Queries) ListProductImages(ctx context.Context, productID uuid.UUID) ([]CatalogProductImage, error) {
+	rows, err := q.db.Query(ctx, listProductImages, productID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CatalogProductImage{}
+	for rows.Next() {
+		var i CatalogProductImage
+		if err := rows.Scan(
+			&i.ProductID,
+			&i.Kind,
+			&i.Position,
+			&i.AssetID,
+			&i.ObjectKey,
+			&i.Alt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPublicProducts = `-- name: ListPublicProducts :many
+SELECT p.id, p.store_id, p.category_id, p.title, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.created_at,
+       COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key
+FROM catalog.products p
+WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL
+  AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e)
+  AND ($2::uuid IS NULL OR p.category_id = $2::uuid)
+  AND ($3::timestamptz IS NULL OR (p.first_published_at, p.id) < ($3::timestamptz, $4::uuid))
+ORDER BY p.first_published_at DESC, p.id DESC
+LIMIT $5
+`
+
+type ListPublicProductsParams struct {
+	At         time.Time
+	CategoryID *uuid.UUID
+	AfterAt    *time.Time
+	AfterID    *uuid.UUID
+	RowLimit   int32
+}
+
+type ListPublicProductsRow struct {
+	ID               uuid.UUID
+	StoreID          int64
+	CategoryID       uuid.UUID
+	Title            string
+	Status           string
+	FirstPublishedAt *time.Time
+	MinPrice         int64
+	MaxPrice         int64
+	SalesCount       int32
+	FavoriteCount    int32
+	RatingAverage    float64
+	ReviewCount      int32
+	CreatedAt        time.Time
+	CoverKey         string
+}
+
+// 公開列表：只含 ACTIVE、沒刪除、店家在 at 這一刻可曝光的商品；最新上架的在前。
+func (q *Queries) ListPublicProducts(ctx context.Context, arg ListPublicProductsParams) ([]ListPublicProductsRow, error) {
+	rows, err := q.db.Query(ctx, listPublicProducts,
+		arg.At,
+		arg.CategoryID,
+		arg.AfterAt,
+		arg.AfterID,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPublicProductsRow{}
+	for rows.Next() {
+		var i ListPublicProductsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StoreID,
+			&i.CategoryID,
+			&i.Title,
+			&i.Status,
+			&i.FirstPublishedAt,
+			&i.MinPrice,
+			&i.MaxPrice,
+			&i.SalesCount,
+			&i.FavoriteCount,
+			&i.RatingAverage,
+			&i.ReviewCount,
+			&i.CreatedAt,
+			&i.CoverKey,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSellerProducts = `-- name: ListSellerProducts :many
+SELECT p.id, p.store_id, p.category_id, p.title, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.created_at,
+       COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key
+FROM catalog.products p
+WHERE p.store_id = $1 AND p.deleted_at IS NULL
+  AND ($2::timestamptz IS NULL OR (p.created_at, p.id) < ($2::timestamptz, $3::uuid))
+ORDER BY p.created_at DESC, p.id DESC
+LIMIT $4
+`
+
+type ListSellerProductsParams struct {
+	StoreID  int64
+	AfterAt  *time.Time
+	AfterID  *uuid.UUID
+	RowLimit int32
+}
+
+type ListSellerProductsRow struct {
+	ID               uuid.UUID
+	StoreID          int64
+	CategoryID       uuid.UUID
+	Title            string
+	Status           string
+	FirstPublishedAt *time.Time
+	MinPrice         int64
+	MaxPrice         int64
+	SalesCount       int32
+	FavoriteCount    int32
+	RatingAverage    float64
+	ReviewCount      int32
+	CreatedAt        time.Time
+	CoverKey         string
+}
+
+// 賣家清單：店家自己的所有沒刪除的商品，不看狀態也不看曝光；最新建立的在前。
+func (q *Queries) ListSellerProducts(ctx context.Context, arg ListSellerProductsParams) ([]ListSellerProductsRow, error) {
+	rows, err := q.db.Query(ctx, listSellerProducts,
+		arg.StoreID,
+		arg.AfterAt,
+		arg.AfterID,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSellerProductsRow{}
+	for rows.Next() {
+		var i ListSellerProductsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StoreID,
+			&i.CategoryID,
+			&i.Title,
+			&i.Status,
+			&i.FirstPublishedAt,
+			&i.MinPrice,
+			&i.MaxPrice,
+			&i.SalesCount,
+			&i.FavoriteCount,
+			&i.RatingAverage,
+			&i.ReviewCount,
+			&i.CreatedAt,
+			&i.CoverKey,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockOwnProduct = `-- name: LockOwnProduct :one
+SELECT id, status, first_published_at FROM catalog.products
+WHERE id = $1 AND store_id = $2 AND deleted_at IS NULL
+FOR UPDATE
+`
+
+type LockOwnProductParams struct {
+	ID      uuid.UUID
+	StoreID int64
+}
+
+type LockOwnProductRow struct {
+	ID               uuid.UUID
+	Status           string
+	FirstPublishedAt *time.Time
+}
+
+// 店家自己的、沒刪除的商品，鎖列；同一個商品的寫入都從這裡開始，所以 SKU、選項與價格區間的重算不會並行交錯。
+func (q *Queries) LockOwnProduct(ctx context.Context, arg LockOwnProductParams) (LockOwnProductRow, error) {
+	row := q.db.QueryRow(ctx, lockOwnProduct, arg.ID, arg.StoreID)
+	var i LockOwnProductRow
+	err := row.Scan(&i.ID, &i.Status, &i.FirstPublishedAt)
+	return i, err
+}
+
+const recomputePriceRange = `-- name: RecomputePriceRange :execrows
+UPDATE catalog.products p
+SET min_price = r.lo, max_price = r.hi, updated_at = $1
+FROM (SELECT min(price)::bigint AS lo, max(price)::bigint AS hi FROM catalog.product_skus WHERE product_id = $2 AND deleted_at IS NULL) r
+WHERE p.id = $2 AND r.lo IS NOT NULL
+`
+
+type RecomputePriceRangeParams struct {
+	Now time.Time
+	ID  uuid.UUID
+}
+
+// 商品的價格區間是沒刪除 SKU 價格的最小與最大（D19）；每次 SKU 寫入的同 transaction 呼叫。沒有 SKU 時不改（影響 0 列）。
+func (q *Queries) RecomputePriceRange(ctx context.Context, arg RecomputePriceRangeParams) (int64, error) {
+	result, err := q.db.Exec(ctx, recomputePriceRange, arg.Now, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const setProductStatus = `-- name: SetProductStatus :exec
+UPDATE catalog.products
+SET status = $1::text,
+    first_published_at = CASE WHEN $1::text = 'ACTIVE' THEN COALESCE(first_published_at, $2::timestamptz) ELSE first_published_at END,
+    updated_at = $2
+WHERE id = $3
+`
+
+type SetProductStatusParams struct {
+	Status string
+	Now    time.Time
+	ID     uuid.UUID
+}
+
+// 設成 ACTIVE 時 first_published_at 只在還是空的時候填（之後的下架再上架不改它）。
+func (q *Queries) SetProductStatus(ctx context.Context, arg SetProductStatusParams) error {
+	_, err := q.db.Exec(ctx, setProductStatus, arg.Status, arg.Now, arg.ID)
+	return err
+}
+
+const softDeleteProduct = `-- name: SoftDeleteProduct :exec
+UPDATE catalog.products SET deleted_at = $1, updated_at = $1 WHERE id = $2
+`
+
+type SoftDeleteProductParams struct {
+	Now *time.Time
+	ID  uuid.UUID
+}
+
+func (q *Queries) SoftDeleteProduct(ctx context.Context, arg SoftDeleteProductParams) error {
+	_, err := q.db.Exec(ctx, softDeleteProduct, arg.Now, arg.ID)
+	return err
+}
+
+const softDeleteSku = `-- name: SoftDeleteSku :exec
+UPDATE catalog.product_skus SET deleted_at = $1, updated_at = $1 WHERE id = $2
+`
+
+type SoftDeleteSkuParams struct {
+	Now *time.Time
+	ID  uuid.UUID
+}
+
+func (q *Queries) SoftDeleteSku(ctx context.Context, arg SoftDeleteSkuParams) error {
+	_, err := q.db.Exec(ctx, softDeleteSku, arg.Now, arg.ID)
+	return err
+}
+
+const updateProductContent = `-- name: UpdateProductContent :exec
+UPDATE catalog.products
+SET category_id = $1, title = $2, description = $3,
+    searchable_text = $4, updated_at = $5
+WHERE id = $6
+`
+
+type UpdateProductContentParams struct {
+	CategoryID     uuid.UUID
+	Title          string
+	Description    []byte
+	SearchableText string
+	Now            time.Time
+	ID             uuid.UUID
+}
+
+func (q *Queries) UpdateProductContent(ctx context.Context, arg UpdateProductContentParams) error {
+	_, err := q.db.Exec(ctx, updateProductContent,
+		arg.CategoryID,
+		arg.Title,
+		arg.Description,
+		arg.SearchableText,
+		arg.Now,
+		arg.ID,
+	)
+	return err
+}
+
+const updateSkuPrices = `-- name: UpdateSkuPrices :exec
+UPDATE catalog.product_skus SET price = $1, compare_at_price = $2, updated_at = $3 WHERE id = $4
+`
+
+type UpdateSkuPricesParams struct {
+	Price          int64
+	CompareAtPrice *int64
+	Now            time.Time
+	ID             uuid.UUID
+}
+
+// 庫存不在這裡改（只由 stock 改）。
+func (q *Queries) UpdateSkuPrices(ctx context.Context, arg UpdateSkuPricesParams) error {
+	_, err := q.db.Exec(ctx, updateSkuPrices,
+		arg.Price,
+		arg.CompareAtPrice,
+		arg.Now,
+		arg.ID,
 	)
 	return err
 }

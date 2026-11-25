@@ -45,3 +45,7 @@ product-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 - 分類：兩層、版本化種子、`LocalizedText` 名稱、Shopify 對照（Java 三層可編輯、種子只有兩筆）。
 - 規格：0–2 個選項軸，SKU 是組合；價格 `price`＋`compare_at_price`（Java 自由文字規格、`price`＋`sale_price`）。
 - 沒有：`certifications`、溫層、`shipping_methods`、`seller_deleted_at`、`version`、分類名稱快照、`idempotency_request`。
+- 商品寫入（B4-2b）：整體取代；SKU 以選項值的組合辨識（Java 以 ID），組合在就更新價格、庫存不動；選項軸與值整組重寫。
+- 描述：四種結構化區塊（段落、圖片、清單、表格），圖片區塊只存 `asset_id`（Java 的 `table_json`／`list_json` 是不解析的字串）；上限見 `internal/model/product.go`。
+- hashtag：明確欄位輸入，正規化在 `platform/hashtag`，與 social 同一份（Java 從描述抽取）。
+- 刪除商品不 `MarkDeleted` 圖片：列保留給訂單與評價引用，圖片的去留待訂單快照（D20、B4-4）決定。
