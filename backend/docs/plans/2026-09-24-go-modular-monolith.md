@@ -303,12 +303,13 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - 治理的通知（A3b `step10e-reports-brief.md` R4、R7、R9，Will 2026-10-18）：訂閱 seller 的 `ReportReceived`、`ReportResolved`（通報人一定是登入的買家，用站內通知；匿名入口在 A3b 10f-2a 刪除），以及在 seller 加上詢問的事件並訂閱（賣家；3c-b 預先發出的 `CaseInquiryCreated` 因沒有消費者已刪除，A8 依「消費者出現時再加事件」在這一刀加）；食安事件通知某個商品過去 6 個月的購買者，前提是查得到購買者（B8）。
   - **確認信地址不得留在 job 參數裡**（A3b 3c-a 設計審查 #10，Will 2026-10-18）：`ReportReceived.ConfirmationEmail`（匿名送出留的 email）只在事件與 A8 同一個 transaction 排入的 job 參數裡，seller 不落表（`seller/events.go` 的註解寫同一條）。River v0.47.0（`backend/go.mod`）預設保留完成的 job 24 小時、丟棄（寄送失敗用盡重試）的 job 7 天（`rivershared/riversharedmaintenance/river_shared_maintenance.go:35-37`；專案沒有覆寫 `*JobRetentionPeriod`），參數裡的地址會跟著留那麼久。所以寄送 job 必須在完成或丟棄時清掉參數裡的地址，或參數只放 report／supplement 的參照、執行時再讀（地址就落在 seller，回到 365 天的聯絡方式保留規則管得到的範圍）。觸發：A8 訂閱 `ReportReceived` 的那一刀；驗收要有測試證明 job 完成與丟棄之後參數不含地址。
   - 賣家收款開通結果與平台審核結果的通知（ADR `2026-11-13-payment-onboarding-provider-port-stripe.md`、`2026-11-13-seller-platform-review-and-identity-matching.md`，Will 2026-11-02、2026-11-12）：舊的 `merchant.verification.*`（含管理員退回）與 `sellerconsumer` 的 PayUni 審核通知已停發，賣家現在不會收到核准、退回或收款帳戶啟用、需補件、停用的通知。A8 訂閱 seller 的 KYC 審核事件與 payment 的 `PayoutAccountChanged`；email 只寄 identity 已驗證的信箱，自填聯絡信箱要先有驗證碼驗證。收款帳戶的首次啟用時間與補件期限（Stripe `requirements.summary.minimum_deadline`）欄位與期限前提醒在這一刀一起加。
-- [ ] **A9 agent**
+- [x] **A9 agent**（完成，2026-11-25，Will 決定；細節與 pending P1–P5 見階段計畫的 A9-7）
   - 階段計畫：`2026-11-19-a9-agent.md`（盤點、步驟、決定 A9-D1–D11 與進度寫在那裡；本段以下是計畫建立前的原文）。
   - AI 助理與 procurement 的串流（AG-UI，12 支 SSE）：依 ADR `2026-09-26-external-contract-protobuf-connect.md` D7 在這一步決定改成 proto 的 server streaming，或保留 AG-UI 的 SSE 並明列為第二套契約（AG-UI 是外部的開放格式）。
   - 採購不再依賴 pricebook（執行計畫 `2026-10-27-ecommerce-scope-cut` 已刪除，ADR `2026-10-27-general-ecommerce-scope-cut.md` D2）：品項只解析到平台分類樹與 LLM 召回，報價只看供應商報的價，沒有行情依據與價格冷熱判斷；`procurement_price_previews` 已刪行情欄位。A9 搬採購時不接 pricebook，也不恢復農產行情。
   - 延後項（原執行計畫 `2026-10-27-ecommerce-scope-cut`「延後」，計畫已刪除，見 ADR `2026-10-27-general-ecommerce-scope-cut` 文末修訂，2026-10-29）：
     - ai-service `cmd/resolver-eval` 的觀察邏輯（`observe` 仍照拿掉行情前的回應形狀解析），以及 `Unavailable` 與 `categoryDescribeStage` 的命名在拿掉 pricebook 後是否仍名實相符、`cropidentity.GateOption` 以 variadic 保留舊簽章的寫法。觸發：A9 搬採購、或下一次要跑線上 `resolver-eval` 時先審查。
+  - A9 收尾後的 pending（階段計畫 A9-7「收尾後的 pending」P1–P5，Will 2026-11-25 決定之後再改）：D5 對 assistant 與 imageai 的例外、6 份 ai-service 時期 ADR 標 superseded、三份 `CARRYOVER.md` 補公司時期未完成項、獨立 design-review、API key／en 文案審閱／150 秒重連測試／Vercel 實量。
   - A9 延後項（階段計畫 `2026-11-19-a9-agent.md` 的「延後」搬回，2026-11-25）：
     - `cmd/new-module` 模板的 integration test 產生無呼叫者的 `setup`，新模組在第一個真實測試前會被 `lint-monolith` 擋。觸發：下次跑 `make new-module`。
     - notification-service 的 `MailConfig` 已無呼叫者。觸發：A8。
