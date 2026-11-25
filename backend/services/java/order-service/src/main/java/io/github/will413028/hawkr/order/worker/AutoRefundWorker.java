@@ -40,8 +40,8 @@ public class AutoRefundWorker {
      * ⇒ 任何租約長度都合格；tick 30 秒遠小於窗口，第 4 步的極端情況不成立。
      *
      * <p><b>下界</b>（同規範第 5 步）：claim 之後唯一的長工作是
-     * {@link PaymentGrpcClient#createRefund}（payment 端同步打 PayUni），其最壞耗時由
-     * {@link PaymentGrpcClient#PAYUNI_BACKED_DEADLINE_SEC}（100 秒）硬性封頂
+     * {@link PaymentGrpcClient#createRefund}（payment 端寫列並排 job），其最壞耗時由
+     * {@link PaymentGrpcClient#MONEY_MOVEMENT_DEADLINE_SEC}（100 秒）硬性封頂
      * （在此之前該呼叫<b>沒有任何 deadline</b>，下界無從建立）。
      * 取 <b>120 秒</b> = 100 秒 deadline ＋ 20 秒餘裕（claim→呼叫之間與失敗路徑的 DB 寫入）。
      *

@@ -2754,50 +2754,6 @@ func ResponsibilityCauseFromValue(value string) (ResponsibilityCause, bool) {
 	return ResponsibilityCause{}, false
 }
 
-// ===== ProviderFeeType =====
-// 物流商帳單明細的費用類型，5 值。⚠️ 唯一寫入者是 ADM **人工匯入**——本 repo 明令不做自動比對排程，本表不是自動對帳的一部分。未登記本 enum 則 `CodeMetaValidator` 會擋下寫入。
-
-type ProviderFeeType struct {
-	Code        string
-	Value       string
-	Label       string
-	Description string
-}
-
-var (
-	ProviderFeeTypeDelivery     = ProviderFeeType{Code: "DELIVERY", Value: "DELIVERY", Label: "配送費", Description: "正常配送的費用"}
-	ProviderFeeTypeCancellation = ProviderFeeType{Code: "CANCELLATION", Value: "CANCELLATION", Label: "取消費", Description: "取消產生的費用"}
-	ProviderFeeTypeWaiting      = ProviderFeeType{Code: "WAITING", Value: "WAITING", Label: "等候費", Description: "外送員等候費"}
-	ProviderFeeTypeReturn       = ProviderFeeType{Code: "RETURN", Value: "RETURN", Label: "退回費", Description: "逆向配送費用"}
-	ProviderFeeTypeAdjustment   = ProviderFeeType{Code: "ADJUSTMENT", Value: "ADJUSTMENT", Label: "調整", Description: "provider 帳單的調整列"}
-)
-
-var AllProviderFeeTypes = []ProviderFeeType{
-	ProviderFeeTypeDelivery,
-	ProviderFeeTypeCancellation,
-	ProviderFeeTypeWaiting,
-	ProviderFeeTypeReturn,
-	ProviderFeeTypeAdjustment,
-}
-
-func ProviderFeeTypeFromCode(code string) (ProviderFeeType, bool) {
-	for _, v := range AllProviderFeeTypes {
-		if v.Code == code {
-			return v, true
-		}
-	}
-	return ProviderFeeType{}, false
-}
-
-func ProviderFeeTypeFromValue(value string) (ProviderFeeType, bool) {
-	for _, v := range AllProviderFeeTypes {
-		if v.Value == value {
-			return v, true
-		}
-	}
-	return ProviderFeeType{}, false
-}
-
 // ===== UberDeliveryOutcome =====
 // 即時配送未完成的結果原因，5 值。🔴 **值域由 65 定案**——原本 envelope 只寫欄位型別 `String` 而沒有值域，導致 payload 契約測試無值可對。⚠️ 本 enum 是 envelope 欄位的值域，**與 webhook inbox 的 `WebhookProvider` 分類無關**，兩者不得混用。
 

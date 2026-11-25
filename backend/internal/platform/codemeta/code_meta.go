@@ -167,7 +167,7 @@ var (
 	PaymentTransactionStatusExpired        = PaymentTransactionStatus{Code: "EXPIRED", Value: "3", Label: "已逾期", Description: "逾期未付款"}
 	PaymentTransactionStatusConflict       = PaymentTransactionStatus{Code: "CONFLICT", Value: "4", Label: "狀態衝突", Description: "同步與 Webhook 結果不一致，需人工介入"}
 	PaymentTransactionStatusClosed         = PaymentTransactionStatus{Code: "CLOSED", Value: "5", Label: "已關閉", Description: "交易主動關閉"}
-	PaymentTransactionStatusClosedBySwitch = PaymentTransactionStatus{Code: "CLOSED_BY_SWITCH", Value: "6", Label: "因切換付款方式而關閉", Description: "使用者主動切換付款方式造成的關閉，保留審計軌跡（見 [05-支付服務設計書 §2A.3](../詳細設計書/05-支付服務（Payment%20Service）詳細設計書.md)）"}
+	PaymentTransactionStatusClosedBySwitch = PaymentTransactionStatus{Code: "CLOSED_BY_SWITCH", Value: "6", Label: "因切換付款方式而關閉", Description: "使用者主動切換付款方式造成的關閉，保留審計軌跡（見 05-支付服務設計書 §2A.3（已刪除））"}
 )
 
 var AllPaymentTransactionStatuss = []PaymentTransactionStatus{
@@ -542,54 +542,6 @@ func RefundStatusFromValue(value string) (RefundStatus, bool) {
 	return RefundStatus{}, false
 }
 
-// ===== PayuniMerchantVerificationStatus =====
-// PayUni 商店（merchant）審核狀態。終止狀態（`2`、`8`、`92`、`99`）由 seller 模組的 `TerminalMerStatus`（`internal/modules/seller/internal/model/payuni.go`）判定。未命中 `codeLabel()` 的 fail-safe：一律回傳
-
-type PayuniMerchantVerificationStatus struct {
-	Code        string
-	Value       string
-	Label       string
-	Description string
-}
-
-var (
-	PayuniMerchantVerificationStatusActive      = PayuniMerchantVerificationStatus{Code: "ACTIVE", Value: "1", Label: "啟用", Description: "PayUni 商店已啟用，可收款"}
-	PayuniMerchantVerificationStatusClosed      = PayuniMerchantVerificationStatus{Code: "CLOSED", Value: "2", Label: "關閉", Description: "PayUni 商店已關閉"}
-	PayuniMerchantVerificationStatusDenied      = PayuniMerchantVerificationStatus{Code: "DENIED", Value: "8", Label: "拒絕", Description: "PayUni 拒絕商店申請（與 92 同樣為終結退件）"}
-	PayuniMerchantVerificationStatusUnderReview = PayuniMerchantVerificationStatus{Code: "UNDER_REVIEW", Value: "9", Label: "審核中", Description: "PayUni 審核中"}
-	PayuniMerchantVerificationStatusPendingInfo = PayuniMerchantVerificationStatus{Code: "PENDING_INFO", Value: "91", Label: "待補資料", Description: "PayUni 要求補充資料"}
-	PayuniMerchantVerificationStatusRejected    = PayuniMerchantVerificationStatus{Code: "REJECTED", Value: "92", Label: "審核失敗", Description: "PayUni 審核未通過"}
-	PayuniMerchantVerificationStatusOtherClosed = PayuniMerchantVerificationStatus{Code: "OTHER_CLOSED", Value: "99", Label: "其它關閉", Description: "PayUni 商店關閉（其他原因）"}
-)
-
-var AllPayuniMerchantVerificationStatuss = []PayuniMerchantVerificationStatus{
-	PayuniMerchantVerificationStatusActive,
-	PayuniMerchantVerificationStatusClosed,
-	PayuniMerchantVerificationStatusDenied,
-	PayuniMerchantVerificationStatusUnderReview,
-	PayuniMerchantVerificationStatusPendingInfo,
-	PayuniMerchantVerificationStatusRejected,
-	PayuniMerchantVerificationStatusOtherClosed,
-}
-
-func PayuniMerchantVerificationStatusFromCode(code string) (PayuniMerchantVerificationStatus, bool) {
-	for _, v := range AllPayuniMerchantVerificationStatuss {
-		if v.Code == code {
-			return v, true
-		}
-	}
-	return PayuniMerchantVerificationStatus{}, false
-}
-
-func PayuniMerchantVerificationStatusFromValue(value string) (PayuniMerchantVerificationStatus, bool) {
-	for _, v := range AllPayuniMerchantVerificationStatuss {
-		if v.Value == value {
-			return v, true
-		}
-	}
-	return PayuniMerchantVerificationStatus{}, false
-}
-
 // ===== ShippingStatus =====
 // 正規化配送域（normalized delivery）狀態碼，30 值。**號碼慣例：兩位數＝PayUni 原生值，三位數＝平台自訂值**——新增值一律取三位，佔用兩位號碼會在 PayUni 日後新增狀態碼時被 `fromValue()` 解析成語意完全不同但合法的值。每個 provider 都必須走顯式映射表（PayUni 那張是恆等映射但必須存在），provider 原生值另存 `shipments.provider_status`
 
@@ -802,7 +754,6 @@ var (
 	WorkerTaskStatusDone               = WorkerTaskStatus{Code: "DONE", Value: "20", Label: "已完成", Description: "任務成功完成"}
 	WorkerTaskStatusFailed             = WorkerTaskStatus{Code: "FAILED", Value: "30", Label: "失敗", Description: "任務失敗（Worker retry 後仍失敗）"}
 	WorkerTaskStatusManualIntervention = WorkerTaskStatus{Code: "MANUAL_INTERVENTION", Value: "40", Label: "人工介入", Description: "業務策略明確轉人工（Phase 1 退款任務目前不寫此值，既有歷史資料保留）"}
-	WorkerTaskStatusProviderAuto       = WorkerTaskStatus{Code: "PROVIDER_AUTO", Value: "50", Label: "提供方主動撥款", Description: "PayUni 已對退款交易接管撥款；唯一進入 = GrantPayment 回應 `grant_outcome=PROVIDER_TOOK_OVER` 後由 Worker 收斂，不再重試，任務僅作對帳記錄（終態，僅撥款任務使用；03 §3.11.2 / 05 §5.6.1）"}
 )
 
 var AllWorkerTaskStatuss = []WorkerTaskStatus{
@@ -811,7 +762,6 @@ var AllWorkerTaskStatuss = []WorkerTaskStatus{
 	WorkerTaskStatusDone,
 	WorkerTaskStatusFailed,
 	WorkerTaskStatusManualIntervention,
-	WorkerTaskStatusProviderAuto,
 }
 
 func WorkerTaskStatusFromCode(code string) (WorkerTaskStatus, bool) {
@@ -2374,44 +2324,6 @@ func AccountTypeFromValue(value string) (AccountType, bool) {
 	return AccountType{}, false
 }
 
-// ===== ClientType =====
-// 請求端類型。前端發起付款 / ATM 退款頁時必須帶入，後端據以決定 PayUni 回調完成後的「最終出口」（行動 App 走 deep link / 網頁走 WEB_FRONTEND_URL）。詳見 [05-支付服務設計書 §5.9](../詳細設計書/05-支付服務（Payment%20Service）詳細設計書.md#59-付款頁面導回流程)。
-
-type ClientType struct {
-	Code        string
-	Value       string
-	Label       string
-	Description string
-}
-
-var (
-	ClientTypeMobileApp  = ClientType{Code: "MOBILE_APP", Value: "MOBILE_APP", Label: "行動 App", Description: "iOS 原生 App（含內嵌 WebView 走 deep link 攔截）"}
-	ClientTypeWebBrowser = ClientType{Code: "WEB_BROWSER", Value: "WEB_BROWSER", Label: "網頁瀏覽器", Description: "PC / 行動瀏覽器（直接走 https，不可解析 deep link scheme）"}
-)
-
-var AllClientTypes = []ClientType{
-	ClientTypeMobileApp,
-	ClientTypeWebBrowser,
-}
-
-func ClientTypeFromCode(code string) (ClientType, bool) {
-	for _, v := range AllClientTypes {
-		if v.Code == code {
-			return v, true
-		}
-	}
-	return ClientType{}, false
-}
-
-func ClientTypeFromValue(value string) (ClientType, bool) {
-	for _, v := range AllClientTypes {
-		if v.Value == value {
-			return v, true
-		}
-	}
-	return ClientType{}, false
-}
-
 // ===== AppType =====
 // 請求所屬的 App 身份，決定 PayUni 回調完成後 deep link / web URL 該指向買家版或賣家版。與 `AccountType` 為不同維度：`AccountType` 是 JWT 帳號權限類別（含 `SELLER_AND_BUYER`、`ADMIN`），`AppType` 是運行時這個請求是從哪個 App / 網頁發起的二元選擇。
 
@@ -2464,7 +2376,7 @@ var (
 	PaymentMethodCreditCard = PaymentMethod{Code: "CREDIT_CARD", Value: "2001", Label: "信用卡", Description: "信用卡一次付清"}
 	PaymentMethodApplePay   = PaymentMethod{Code: "APPLE_PAY", Value: "2002", Label: "Apple Pay", Description: "Apple 行動支付"}
 	PaymentMethodGooglePay  = PaymentMethod{Code: "GOOGLE_PAY", Value: "2003", Label: "Google Pay", Description: "Google 行動支付"}
-	PaymentMethodZeroAmount = PaymentMethod{Code: "ZERO_AMOUNT", Value: "2900", Label: "零元訂單", Description: "全額折抵後無需付款，不呼叫 PayUni 直接標 PAID（見 [05-支付服務設計書 §2A.1](../詳細設計書/05-支付服務（Payment%20Service）詳細設計書.md)）"}
+	PaymentMethodZeroAmount = PaymentMethod{Code: "ZERO_AMOUNT", Value: "2900", Label: "零元訂單", Description: "全額折抵後無需付款，不呼叫 PayUni 直接標 PAID（見 05-支付服務設計書 §2A.1（已刪除））"}
 )
 
 var AllPaymentMethods = []PaymentMethod{
@@ -2972,44 +2884,6 @@ func RefundReasonFromValue(value string) (RefundReason, bool) {
 	return RefundReason{}, false
 }
 
-// ===== RefundMethod =====
-// 退款執行方式
-
-type RefundMethod struct {
-	Code        string
-	Value       string
-	Label       string
-	Description string
-}
-
-var (
-	RefundMethodCash   = RefundMethod{Code: "CASH", Value: "1", Label: "原路退款", Description: "退回原支付管道"}
-	RefundMethodCoupon = RefundMethod{Code: "COUPON", Value: "2", Label: "優惠券退款", Description: "發放等值優惠券"}
-)
-
-var AllRefundMethods = []RefundMethod{
-	RefundMethodCash,
-	RefundMethodCoupon,
-}
-
-func RefundMethodFromCode(code string) (RefundMethod, bool) {
-	for _, v := range AllRefundMethods {
-		if v.Code == code {
-			return v, true
-		}
-	}
-	return RefundMethod{}, false
-}
-
-func RefundMethodFromValue(value string) (RefundMethod, bool) {
-	for _, v := range AllRefundMethods {
-		if v.Value == value {
-			return v, true
-		}
-	}
-	return RefundMethod{}, false
-}
-
 // ===== FinancialLogType =====
 // 財務流水紀錄類型
 
@@ -3399,7 +3273,7 @@ func OrderCancelByRoleFromValue(value string) (OrderCancelByRole, bool) {
 }
 
 // ===== ProductSort =====
-// 商品列表排序方式。對應 `/api/v1/public/products` 的 `sort` 參數。Value 採字串（同 ClientType / AppType / OrderCancelByRole 慣例），便於前端 `switch` 與 URL round-trip。空字串視為 LATEST。詳見 [35 商品列表排序與銷量反正規化設計書](../詳細設計書/35-商品列表排序與銷量反正規化%EF%BC%88Product%20Sort%20&%20Sales%20Count%EF%BC%89詳細設計書.md)。
+// 商品列表排序方式。對應 `/api/v1/public/products` 的 `sort` 參數。Value 採字串（同 AppType / OrderCancelByRole 慣例），便於前端 `switch` 與 URL round-trip。空字串視為 LATEST。詳見 [35 商品列表排序與銷量反正規化設計書](../詳細設計書/35-商品列表排序與銷量反正規化%EF%BC%88Product%20Sort%20&%20Sales%20Count%EF%BC%89詳細設計書.md)。
 
 type ProductSort struct {
 	Code        string

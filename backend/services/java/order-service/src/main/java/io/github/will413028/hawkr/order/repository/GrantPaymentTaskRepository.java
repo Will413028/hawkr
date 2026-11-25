@@ -280,50 +280,21 @@ public interface GrantPaymentTaskRepository extends BaseMapper<GrantPaymentTaskE
                                             @Param("processing") String processing);
 
     /**
-     * 03 §3.11.2 / §2.1 INV-3：PayUni 主動撥款收斂（PROCESSING 10 → PROVIDER_AUTO 50）。
-     * <p>
-     * Worker 收到 GRANT 類拒絕（30023/30018/30019 等線索碼）且主判準 orders.refund_total_amount > 0
-     * 成立時呼叫：PayUni 已對退款交易接管撥款，不再重試、不進 MANUAL_INTERVENTION，
-     * task 收斂為純對帳記錄（終態）。
-     */
-    default int markGrantTaskProviderAuto(long taskId, String lastError) {
-        return markGrantTaskProviderAutoByStatus(taskId, lastError,
-                WorkerTaskStatus.PROVIDER_AUTO.value(), WorkerTaskStatus.PROCESSING.value());
-    }
-
-    @Update("""
-        UPDATE grant_payment_tasks
-        SET status = #{providerAuto},
-            last_error = #{lastError},
-            updated_at = NOW()
-        WHERE task_id = #{taskId}
-          AND status = #{processing}
-        """)
-    int markGrantTaskProviderAutoByStatus(@Param("taskId") long taskId,
-                                          @Param("lastError") String lastError,
-                                          @Param("providerAuto") String providerAuto,
-                                          @Param("processing") String processing);
-
-    /**
-     * 03 §8.4 TaskCleanupJob：刪除指定時間前的已了結任務（DONE / PROVIDER_AUTO）。
-     * PROVIDER_AUTO 與 DONE 同等對待：grant_payment_tasks 是 worker 佇列非帳本，
-     * 帳務權威在 payment_transactions / financial_logs 與 PayUni 端。
+     * 03 §8.4 TaskCleanupJob：刪除指定時間前的已了結任務（DONE）。
+     * grant_payment_tasks 是 worker 佇列非帳本，帳務權威在單體 payment 模組的轉帳列。
      * <b>刻意排除 MANUAL_INTERVENTION</b>：撥款無 webhook 自動閉環，人工介入單是 Admin 異常清單
      * 與重發撥款（resetForRetry）的依據，未處理完就被清會讓失敗撥款永久失聯。
      */
     default int deleteCompletedBefore(LocalDateTime before) {
-        return deleteCompletedBeforeByStatus(before,
-                WorkerTaskStatus.DONE.value(),
-                WorkerTaskStatus.PROVIDER_AUTO.value());
+        return deleteCompletedBeforeByStatus(before, WorkerTaskStatus.DONE.value());
     }
 
     @Delete("""
         DELETE FROM grant_payment_tasks
-        WHERE status IN (#{done}, #{providerAuto})
+        WHERE status = #{done}
           AND updated_at < #{before}
         """)
     int deleteCompletedBeforeByStatus(
             @Param("before") LocalDateTime before,
-            @Param("done") String done,
-            @Param("providerAuto") String providerAuto);
+            @Param("done") String done);
 }

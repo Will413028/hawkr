@@ -141,4 +141,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get paymentAnomalyMessage => '這筆付款需要客服協助處理，暫時無法重新付款，請聯絡客服。';
+
+  @override
+  String get afterSaleReturnPendingSummary => '請寄回退貨商品';
 }

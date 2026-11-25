@@ -152,7 +152,7 @@ enum PaymentTransactionStatus {
   conflict(code: 'CONFLICT', value: '4', label: '狀態衝突'),
   /// 已關閉 — 交易主動關閉
   closed(code: 'CLOSED', value: '5', label: '已關閉'),
-  /// 因切換付款方式而關閉 — 使用者主動切換付款方式造成的關閉，保留審計軌跡（見 [05-支付服務設計書 §2A.3](../詳細設計書/05-支付服務（Payment%20Service）詳細設計書.md)）
+  /// 因切換付款方式而關閉 — 使用者主動切換付款方式造成的關閉，保留審計軌跡（見 05-支付服務設計書 §2A.3（已刪除））
   closedBySwitch(code: 'CLOSED_BY_SWITCH', value: '6', label: '因切換付款方式而關閉');
 
   const PaymentTransactionStatus({
@@ -494,50 +494,6 @@ enum RefundStatus {
   }
 }
 
-/// PayUni 商店（merchant）審核狀態。終止狀態（`2`、`8`、`92`、`99`）由 seller 模組的 `TerminalMerStatus`（`internal/modules/seller/internal/model/payuni.go`）判定。未命中 `codeLabel()` 的 fail-safe：一律回傳
-enum PayuniMerchantVerificationStatus {
-  /// 啟用 — PayUni 商店已啟用，可收款
-  active(code: 'ACTIVE', value: '1', label: '啟用'),
-  /// 關閉 — PayUni 商店已關閉
-  closed(code: 'CLOSED', value: '2', label: '關閉'),
-  /// 拒絕 — PayUni 拒絕商店申請（與 92 同樣為終結退件）
-  denied(code: 'DENIED', value: '8', label: '拒絕'),
-  /// 審核中 — PayUni 審核中
-  underReview(code: 'UNDER_REVIEW', value: '9', label: '審核中'),
-  /// 待補資料 — PayUni 要求補充資料
-  pendingInfo(code: 'PENDING_INFO', value: '91', label: '待補資料'),
-  /// 審核失敗 — PayUni 審核未通過
-  rejected(code: 'REJECTED', value: '92', label: '審核失敗'),
-  /// 其它關閉 — PayUni 商店關閉（其他原因）
-  otherClosed(code: 'OTHER_CLOSED', value: '99', label: '其它關閉');
-
-  const PayuniMerchantVerificationStatus({
-    required this.code,
-    required this.value,
-    required this.label,
-  });
-
-  final String code;
-  final String value;
-  final String label;
-
-  /// 依 code 查找，找不到回傳 null
-  static PayuniMerchantVerificationStatus? fromCode(String code) {
-    for (final v in values) {
-      if (v.code == code) return v;
-    }
-    return null;
-  }
-
-  /// 依 value 查找，找不到回傳 null
-  static PayuniMerchantVerificationStatus? fromValue(String value) {
-    for (final v in values) {
-      if (v.value == value) return v;
-    }
-    return null;
-  }
-}
-
 /// 正規化配送域（normalized delivery）狀態碼，30 值。**號碼慣例：兩位數＝PayUni 原生值，三位數＝平台自訂值**——新增值一律取三位，佔用兩位號碼會在 PayUni 日後新增狀態碼時被 `fromValue()` 解析成語意完全不同但合法的值。每個 provider 都必須走顯式映射表（PayUni 那張是恆等映射但必須存在），provider 原生值另存 `shipments.provider_status`
 enum ShippingStatus {
   /// 未處理 — 尚未取得出貨單編號
@@ -733,9 +689,7 @@ enum WorkerTaskStatus {
   /// 失敗 — 任務失敗（Worker retry 後仍失敗）
   failed(code: 'FAILED', value: '30', label: '失敗'),
   /// 人工介入 — 業務策略明確轉人工（Phase 1 退款任務目前不寫此值，既有歷史資料保留）
-  manualIntervention(code: 'MANUAL_INTERVENTION', value: '40', label: '人工介入'),
-  /// 提供方主動撥款 — PayUni 已對退款交易接管撥款；唯一進入 = GrantPayment 回應 `grant_outcome=PROVIDER_TOOK_OVER` 後由 Worker 收斂，不再重試，任務僅作對帳記錄（終態，僅撥款任務使用；03 §3.11.2 / 05 §5.6.1）
-  providerAuto(code: 'PROVIDER_AUTO', value: '50', label: '提供方主動撥款');
+  manualIntervention(code: 'MANUAL_INTERVENTION', value: '40', label: '人工介入');
 
   const WorkerTaskStatus({
     required this.code,
@@ -2182,40 +2136,6 @@ enum AccountType {
   }
 }
 
-/// 請求端類型。前端發起付款 / ATM 退款頁時必須帶入，後端據以決定 PayUni 回調完成後的「最終出口」（行動 App 走 deep link / 網頁走 WEB_FRONTEND_URL）。詳見 [05-支付服務設計書 §5.9](../詳細設計書/05-支付服務（Payment%20Service）詳細設計書.md#59-付款頁面導回流程)。
-enum ClientType {
-  /// 行動 App — iOS 原生 App（含內嵌 WebView 走 deep link 攔截）
-  mobileApp(code: 'MOBILE_APP', value: 'MOBILE_APP', label: '行動 App'),
-  /// 網頁瀏覽器 — PC / 行動瀏覽器（直接走 https，不可解析 deep link scheme）
-  webBrowser(code: 'WEB_BROWSER', value: 'WEB_BROWSER', label: '網頁瀏覽器');
-
-  const ClientType({
-    required this.code,
-    required this.value,
-    required this.label,
-  });
-
-  final String code;
-  final String value;
-  final String label;
-
-  /// 依 code 查找，找不到回傳 null
-  static ClientType? fromCode(String code) {
-    for (final v in values) {
-      if (v.code == code) return v;
-    }
-    return null;
-  }
-
-  /// 依 value 查找，找不到回傳 null
-  static ClientType? fromValue(String value) {
-    for (final v in values) {
-      if (v.value == value) return v;
-    }
-    return null;
-  }
-}
-
 /// 請求所屬的 App 身份，決定 PayUni 回調完成後 deep link / web URL 該指向買家版或賣家版。與 `AccountType` 為不同維度：`AccountType` 是 JWT 帳號權限類別（含 `SELLER_AND_BUYER`、`ADMIN`），`AppType` 是運行時這個請求是從哪個 App / 網頁發起的二元選擇。
 enum AppType {
   /// 買家 — 買家版 App / 買家版網頁
@@ -2258,7 +2178,7 @@ enum PaymentMethod {
   applePay(code: 'APPLE_PAY', value: '2002', label: 'Apple Pay'),
   /// Google Pay — Google 行動支付
   googlePay(code: 'GOOGLE_PAY', value: '2003', label: 'Google Pay'),
-  /// 零元訂單 — 全額折抵後無需付款，不呼叫 PayUni 直接標 PAID（見 [05-支付服務設計書 §2A.1](../詳細設計書/05-支付服務（Payment%20Service）詳細設計書.md)）
+  /// 零元訂單 — 全額折抵後無需付款，不呼叫 PayUni 直接標 PAID（見 05-支付服務設計書 §2A.1（已刪除））
   zeroAmount(code: 'ZERO_AMOUNT', value: '2900', label: '零元訂單');
 
   const PaymentMethod({
@@ -2720,40 +2640,6 @@ enum RefundReason {
   }
 }
 
-/// 退款執行方式
-enum RefundMethod {
-  /// 原路退款 — 退回原支付管道
-  cash(code: 'CASH', value: '1', label: '原路退款'),
-  /// 優惠券退款 — 發放等值優惠券
-  coupon(code: 'COUPON', value: '2', label: '優惠券退款');
-
-  const RefundMethod({
-    required this.code,
-    required this.value,
-    required this.label,
-  });
-
-  final String code;
-  final String value;
-  final String label;
-
-  /// 依 code 查找，找不到回傳 null
-  static RefundMethod? fromCode(String code) {
-    for (final v in values) {
-      if (v.code == code) return v;
-    }
-    return null;
-  }
-
-  /// 依 value 查找，找不到回傳 null
-  static RefundMethod? fromValue(String value) {
-    for (final v in values) {
-      if (v.value == value) return v;
-    }
-    return null;
-  }
-}
-
 /// 財務流水紀錄類型
 enum FinancialLogType {
   /// 收款 — 訂單付款收入
@@ -3106,7 +2992,7 @@ enum OrderCancelByRole {
   }
 }
 
-/// 商品列表排序方式。對應 `/api/v1/public/products` 的 `sort` 參數。Value 採字串（同 ClientType / AppType / OrderCancelByRole 慣例），便於前端 `switch` 與 URL round-trip。空字串視為 LATEST。詳見 [35 商品列表排序與銷量反正規化設計書](../詳細設計書/35-商品列表排序與銷量反正規化%EF%BC%88Product%20Sort%20&%20Sales%20Count%EF%BC%89詳細設計書.md)。
+/// 商品列表排序方式。對應 `/api/v1/public/products` 的 `sort` 參數。Value 採字串（同 AppType / OrderCancelByRole 慣例），便於前端 `switch` 與 URL round-trip。空字串視為 LATEST。詳見 [35 商品列表排序與銷量反正規化設計書](../詳細設計書/35-商品列表排序與銷量反正規化%EF%BC%88Product%20Sort%20&%20Sales%20Count%EF%BC%89詳細設計書.md)。
 enum ProductSort {
   /// 最新上架 — 依 `created_at DESC`（不送 sort 也視為此值）
   latest(code: 'LATEST', value: 'LATEST', label: '最新上架'),

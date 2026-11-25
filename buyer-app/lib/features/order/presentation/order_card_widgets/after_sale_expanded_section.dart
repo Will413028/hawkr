@@ -22,6 +22,7 @@ import '../../data/after_sale_repository.dart';
 import '../../data/order_model.dart';
 import '../widgets/return_logistics_timeline.dart';
 import '../../../../shared/time/taipei_display.dart';
+import '../../../../l10n/l10n.dart';
 
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 
@@ -106,7 +107,7 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
               SizedBox(height: AppSpacing.md),
               _buildStepIndicator(),
               SizedBox(height: AppSpacing.md),
-              _buildSummaryCard(detail: detail.value),
+              _buildSummaryCard(context, detail: detail.value),
               if (loading.value) ...[
                 SizedBox(height: AppSpacing.md),
                 const Center(
@@ -164,7 +165,7 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
   /// 1. detail.refundTaskStatus 非空 → 用 [RefundTaskStatus.buyerProgressLabel]
   ///    回傳的動態文案（排隊、處理中、完成、失敗）
   /// 2. fallback 到 status 對應的靜態文案
-  Widget _buildSummaryCard({AfterSaleCase? detail}) {
+  Widget _buildSummaryCard(BuildContext context, {AfterSaleCase? detail}) {
     if (detail != null && BlackcatAfterSaleStatusCard.shouldShowFor(detail)) {
       return BlackcatAfterSaleStatusCard(caseData: detail);
     }
@@ -187,7 +188,7 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
         switch (snapshot.status) {
           // 後端 #1241：REOPENED(65) 已淘汰（被拒後改走平台申訴），僅剩 0=待回覆
           '0' => '等待賣家回覆中，預計 1-3 個工作天',
-          '20' => '請填寫退款銀行資訊',
+          '20' => context.l10n.afterSaleReturnPendingSummary,
           '25' => '退貨商品運送中',
           '30' => '賣家已收到退貨，退款處理中',
           // PR #983：待寄回逾時自動關案（status=33）

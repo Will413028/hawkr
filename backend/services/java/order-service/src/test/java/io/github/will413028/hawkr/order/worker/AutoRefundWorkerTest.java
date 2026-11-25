@@ -109,7 +109,7 @@ class AutoRefundWorkerTest {
     @Test
     void claimUsesFutureLease_longerThanCreateRefundDeadline() {
         org.junit.jupiter.api.Assertions.assertTrue(
-                AutoRefundWorker.CLAIM_LEASE_SEC > PaymentGrpcClient.PAYUNI_BACKED_DEADLINE_SEC,
+                AutoRefundWorker.CLAIM_LEASE_SEC > PaymentGrpcClient.MONEY_MOVEMENT_DEADLINE_SEC,
                 "租約長度必須大於 createRefund 的 deadline，否則原持有者還在跑租約就到期，搶佔等於沒有");
 
         AutoRefundTaskEntity task = nonAtmPendingTask();

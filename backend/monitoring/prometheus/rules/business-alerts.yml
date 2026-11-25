@@ -12,25 +12,6 @@
 # hawkr_checkout_completed_total / hawkr_inventory_lock_total / hawkr_inventory_lock_failed_total。
 
 groups:
-  # ── ATM 退款終態卡單（issue #1353）─────────────────────────────
-  # 撥款前 ATM 退款走完第一階段後，終態收斂 100% 依賴 PayUni §6.7 退款轉匯結果 webhook；
-  # PayUni 對 ATM 退款無任何查詢 API（見設計書 05 §5.5.4.2），webhook 若遺失則 refund_task
-  # 永久停在 AWAITING_WEBHOOK(15)。§22：偵測歸 observability（metric 由 sql_exporter 產出），
-  # 回復歸維運（runbook：查 PayUni 後台 → 請 PayUni 重送 §6.7）。
-  # 門檻 5 天 > prod §6.7 正常 2-3 工作天，避免正常延遲誤報。channel=business → dev-警報/prod-警報。
-  - name: atm-refund-alerts
-    interval: 300s
-    rules:
-      - alert: AtmRefundStuckAwaitingWebhook
-        expr: hawkr_atm_refund_stuck_total > 0
-        for: 1h
-        labels:
-          severity: warning
-          channel: business
-        annotations:
-          summary: "有 {{ $value }} 筆 ATM 退款卡在 AWAITING_WEBHOOK 超過 5 天（§6.7 疑遺失）"
-          description: "env={{ $labels.env }}：refund_task 停在 AWAITING_WEBHOOK(15) 逾門檻，PayUni 退款轉匯結果 webhook(§6.7) 疑未送達。處置見 runbook：backend/docs/基礎建設/ATM 退款結果 Webhook 遺失維運處置.md"
-
   # ── 假日資料覆蓋度（issue #898）─────────────────────────────────
   # shipping-service HolidayService 依賴 holidays 表（admin 人工從政府 CSV 匯入）。下年度資料未上傳時
   # generate_home_label 的 shipDate/deliveryDate 驗證會 fail、宅配出貨卡死。metric 由 sql_exporter 查

@@ -21,31 +21,22 @@ public class PaymentGrpcClient {
     private static final ObsLogger log = ObsLogger.forClass(PaymentGrpcClient.class);
 
     /**
-     * issue #2294 C2／C4：夾著 PayUni 的 RPC 的 gRPC deadline（秒）。
+     * 搬錢 RPC（{@code CreateRefund}、{@code GrantPayment}）的 gRPC deadline（秒）。
      *
      * <p><b>為什麼非有不可</b>：{@code GrpcStubFactory} / {@code GrpcChannelRegistry}
-     * （observability-common）全域<b>零</b> deadline，而 {@code CreateRefund} / {@code GrantPayment}
-     * 在 payment-service 端都是<b>同步打 PayUni</b> ⇒ 沒有 deadline 就是「單筆最壞耗時無上界」。
-     * {@code AutoRefundWorker}（C2）與 {@code GrantPaymentWorker}（C4）的租約下界
-     * （《多副本排程搶佔規範》§三第 5 步）因此無從建立；且 Spring Boot 排程執行緒池預設 1，
-     * 一次掛住即讓 order-service 全部排程停擺。
+     * 全域<b>零</b> deadline ⇒ 沒有 deadline 就是「單筆最壞耗時無上界」；
+     * {@code AutoRefundWorker} 與 {@code GrantPaymentWorker} 的租約下界依賴它，
+     * 且 Spring Boot 排程執行緒池預設 1，一次掛住即讓 order-service 全部排程停擺。
      *
-     * <p><b>100 秒怎麼推出來的</b>：PayUni 往返上界由共用 HTTP client 決定——
-     * {@code PayUniHttpClient} 的 OkHttp 設定為 connect 30s ＋ write 30s ＋ read 30s
-     * （三段各自獨立計時 ⇒ 單次交換上界 <b>90 秒</b>），再加 payment 端本地 DB 寫入與
-     * gRPC 傳輸的餘裕 10 秒 ⇒ <b>100 秒</b>。與 aftersales 側
-     * {@code PaymentGrpcClient.CREATE_REFUND_DEADLINE_SEC} 同一推導、同一值。
-     *
-     * <p>⚠️ <b>刻意取大，不可「保守地」調小</b>：deadline 若小於 PayUni 的最壞往返，
-     * 一筆<b>其實已在 PayUni 端成功</b>的退款/撥款會在我方變成 {@code DEADLINE_EXCEEDED}
-     * ⇒ 走失敗重試路徑 ⇒ {@code retry_count++}，而 order 側 {@code AutoRefundWorker}
-     * 呼叫 {@code createRefund} <b>不帶冪等鍵</b>（見下方多載）⇒ 重試就是另一筆退款請求。
+     * <p><b>為什麼取大</b>：單體的 payment 在請求內只寫退款／轉帳列並排 job，外部呼叫在 job 裡，
+     * 正常耗時遠小於此值；但 order 側 {@code AutoRefundWorker} 呼叫 {@code createRefund}
+     * <b>不帶冪等鍵</b>（見下方多載），逾時後重試就是另一筆退款請求，所以寧可等久也不誤判逾時。
+     * 調小前要先讓呼叫帶冪等鍵，並重算兩個 worker 的租約不等式（測試守住）。
      *
      * <p>deadline 加在<b>呼叫點</b>而非 {@code GrpcStubFactory}（共用元件）；
-     * ⚠️ {@code withDeadlineAfter} 換算<b>絕對</b>時間，必須每次呼叫時套用，
-     * 挪進建構子＝啟動 100 秒後全部逾時。
+     * ⚠️ {@code withDeadlineAfter} 換算<b>絕對</b>時間，必須每次呼叫時套用。
      */
-    public static final long PAYUNI_BACKED_DEADLINE_SEC = 100L;
+    public static final long MONEY_MOVEMENT_DEADLINE_SEC = 100L;
 
     /**
      * backend#3332：payment 端<b>不</b>夾 PayUni 的內部 RPC 的 gRPC deadline（秒）。
@@ -57,18 +48,14 @@ public class PaymentGrpcClient {
      * （經 {@code OrderExpiryCancellationService}）逐筆呼叫，Spring Boot 排程執行緒池預設 1，
      * 一次掛住即讓 order-service 全部排程停擺。
      *
-     * <p><b>為什麼不是 {@link #PAYUNI_BACKED_DEADLINE_SEC} 的 100 秒</b>：這四支在 payment 端
-     * <b>全部不打 PayUni</b>——
-     * {@code getActivePaymentStatusByOrderNo} 是 {@code order_no} 上的付款歷程查詢、
-     * 兩支 {@code batchGet*ProviderStatus*} 是既存 {@code provider_status} 欄位的批次讀取、
-     * {@code closePaymentByOrderNo} 是 {@code PaymentCloseService.closePayment} 的
-     * 本地 CAS UPDATE ＋ {@code payment.closed} 事件發布。100 秒是為 PayUni 往返上界
-     * （connect 30s ＋ write 30s ＋ read 30s ＋ 餘裕）推導的，套在純本地操作上只會讓
-     * 「掛住」多撐 90 秒才被發現。
+     * <p><b>為什麼不是 {@link #MONEY_MOVEMENT_DEADLINE_SEC} 的 100 秒</b>：這四支都是讀取或本地狀態變更——
+     * {@code getActivePaymentStatusByOrderNo} 與兩支 {@code batchGet*ProviderStatus*} 讀付款列，
+     * {@code closePaymentByOrderNo} 寫付款列並排取消 job。100 秒是為不帶冪等鍵的搬錢呼叫取大的，
+     * 套在這些操作上只會讓「掛住」多撐 90 秒才被發現。
      *
      * <p><b>短 deadline 在這四支上為何安全</b>：它們都<b>不是</b>那條「逾時＝重打一次外部交易」
      * 的路徑（那是 {@link #createRefund} / {@link #grantPayment}，見
-     * {@link #PAYUNI_BACKED_DEADLINE_SEC} 的刻意取大說明）。這四支要嘛唯讀、要嘛冪等：
+     * {@link #MONEY_MOVEMENT_DEADLINE_SEC} 的刻意取大說明）。這四支要嘛唯讀、要嘛冪等：
      * {@code closePaymentByOrderNo} 對「無活躍交易」與「已非 INIT」都回 true，
      * 且呼叫端是 best-effort；{@code getActivePaymentStatusByOrderNo} 逾時走
      * {@code OrderExpiryCancellationService} 的 fail-safe（付款真相未知 ⇒ 保守<b>不</b>取消，
@@ -120,7 +107,7 @@ public class PaymentGrpcClient {
                 .setOrderNo(orderNo)
                 .build();
         GrantPaymentResponse response = paymentStub
-                .withDeadlineAfter(PAYUNI_BACKED_DEADLINE_SEC, TimeUnit.SECONDS)
+                .withDeadlineAfter(MONEY_MOVEMENT_DEADLINE_SEC, TimeUnit.SECONDS)
                 .grantPayment(request);
         log.info("PaymentGrpcClient.grantPayment.done", "撥款指示回應 code=" + response.getCode(), "orderNo", orderNo);
         return response;
@@ -162,7 +149,7 @@ public class PaymentGrpcClient {
         // PaymentEventHandler ATM 預建 → log + 不中斷主流程（#1150 同類：原本不檢查 code 直接取
         // getData().getRefundNo()，FAILED 退款被當成功標 task DONE，買家錢未退）。
         CreateRefundResponse response = paymentStub
-                .withDeadlineAfter(PAYUNI_BACKED_DEADLINE_SEC, TimeUnit.SECONDS)
+                .withDeadlineAfter(MONEY_MOVEMENT_DEADLINE_SEC, TimeUnit.SECONDS)
                 .createRefund(builder.build());
         if (response.getCode() != GrpcResponseCode.SUCCESS.code()) {
             throw new IllegalStateException("createRefund 失敗: code=" + response.getCode()

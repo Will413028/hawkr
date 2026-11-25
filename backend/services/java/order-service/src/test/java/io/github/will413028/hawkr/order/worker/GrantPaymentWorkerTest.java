@@ -2,7 +2,6 @@ package io.github.will413028.hawkr.order.worker;
 
 import io.github.will413028.hawkr.common.grpc.PrincipalResolution;
 import io.github.will413028.hawkr.order.checkout.client.SellerGrpcClient;
-import io.github.will413028.hawkr.order.constant.OrderConstants;
 import io.github.will413028.hawkr.order.entity.GrantPaymentTaskEntity;
 import io.github.will413028.hawkr.order.grpc.client.PaymentGrpcClient;
 import io.github.will413028.hawkr.order.mq.OrderEventPublisher;
@@ -28,7 +27,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -38,9 +36,7 @@ import static org.mockito.Mockito.when;
 /**
  * GrantPaymentWorker 任務終態分流（03 §3.11.2 / §8.8）。
  *
- * <p>收斂唯一依據 = gRPC 回應的結構化 {@code grant_outcome}：
- * PROVIDER_TOOK_OVER → PROVIDER_AUTO（不發 payout 通知）；GRANTED → DONE；
- * 業務錯誤 / 例外 → 既有 MANUAL_INTERVENTION / retry 路徑。
+ * <p>GRANTED → DONE；業務錯誤 / 例外 → 既有 MANUAL_INTERVENTION / retry 路徑。
  */
 @ExtendWith(MockitoExtension.class)
 class GrantPaymentWorkerTest {
@@ -83,25 +79,6 @@ class GrantPaymentWorkerTest {
     }
 
     @Test
-    @DisplayName("grant_outcome=PROVIDER_TOOK_OVER → task 收斂 PROVIDER_AUTO：不 DONE、不發 payout、不進人工介入")
-    void providerTookOver_convergesToProviderAuto() {
-        stubOneClaimedTask();
-        when(paymentGrpcClient.grantPayment("O123")).thenReturn(GrantPaymentResponse.newBuilder()
-                .setCode(0)
-                .setMessage("success")
-                .setGrantOutcome(OrderConstants.GRANT_OUTCOME_PROVIDER_TOOK_OVER)
-                .build());
-        when(grantPaymentTaskRepository.markGrantTaskProviderAuto(eq(1L), anyString())).thenReturn(1);
-
-        worker.execute();
-
-        verify(grantPaymentTaskRepository).markGrantTaskProviderAuto(eq(1L), contains("PROVIDER_TOOK_OVER"));
-        verify(grantPaymentTaskRepository, never()).markGrantTaskDone(anyLong());
-        verify(grantPaymentTaskRepository, never()).markGrantTaskManualIntervention(anyLong(), anyString());
-        verify(orderEventPublisher, never()).publishPayoutCompleted(any());
-    }
-
-    @Test
     @DisplayName("grant_outcome=GRANTED → task DONE + 發 payout.completed 通知")
     void granted_marksDoneAndPublishesPayout() {
         stubOneClaimedTask();
@@ -118,7 +95,6 @@ class GrantPaymentWorkerTest {
         worker.execute();
 
         verify(grantPaymentTaskRepository).markGrantTaskDone(1L);
-        verify(grantPaymentTaskRepository, never()).markGrantTaskProviderAuto(anyLong(), anyString());
         verify(orderEventPublisher).publishPayoutCompleted(any());
     }
 
@@ -235,7 +211,7 @@ class GrantPaymentWorkerTest {
     }
 
     @Test
-    @DisplayName("code!=0（業務錯誤）→ 既有路徑 MANUAL_INTERVENTION（不收斂 PROVIDER_AUTO）")
+    @DisplayName("code!=0（業務錯誤）→ 既有路徑 MANUAL_INTERVENTION")
     void bizError_manualIntervention_unchanged() {
         stubOneClaimedTask();
         when(paymentGrpcClient.grantPayment("O123")).thenReturn(GrantPaymentResponse.newBuilder()
@@ -247,7 +223,6 @@ class GrantPaymentWorkerTest {
         worker.execute();
 
         verify(grantPaymentTaskRepository).markGrantTaskManualIntervention(eq(1L), anyString());
-        verify(grantPaymentTaskRepository, never()).markGrantTaskProviderAuto(anyLong(), anyString());
         verify(grantPaymentTaskRepository, never()).markGrantTaskDone(anyLong());
     }
 
@@ -262,7 +237,6 @@ class GrantPaymentWorkerTest {
         worker.execute();
 
         verify(grantPaymentTaskRepository).markGrantTaskRetryScheduled(eq(1L), eq(1), any(), anyString());
-        verify(grantPaymentTaskRepository, never()).markGrantTaskProviderAuto(anyLong(), anyString());
     }
 
     /**
@@ -283,7 +257,6 @@ class GrantPaymentWorkerTest {
 
         verifyNoInteractions(paymentGrpcClient);
         verify(grantPaymentTaskRepository, never()).markGrantTaskDone(anyLong());
-        verify(grantPaymentTaskRepository, never()).markGrantTaskProviderAuto(anyLong(), anyString());
         verify(grantPaymentTaskRepository, never()).markGrantTaskManualIntervention(anyLong(), anyString());
         verify(grantPaymentTaskRepository, never()).markGrantTaskRetryScheduled(anyLong(), anyInt(), any(), anyString());
         verify(orderEventPublisher, never()).publishPayoutCompleted(any());
@@ -300,7 +273,7 @@ class GrantPaymentWorkerTest {
     void claimUsesFutureLease_longerThanGrantDeadline() {
         org.junit.jupiter.api.Assertions.assertTrue(
                 GrantPaymentWorker.CLAIM_LEASE_SEC
-                        > io.github.will413028.hawkr.order.grpc.client.PaymentGrpcClient.PAYUNI_BACKED_DEADLINE_SEC,
+                        > io.github.will413028.hawkr.order.grpc.client.PaymentGrpcClient.MONEY_MOVEMENT_DEADLINE_SEC,
                 "租約長度必須大於 grantPayment 的 deadline，否則原持有者還在跑租約就到期，搶佔等於沒有");
 
         when(grantPaymentTaskRepository.findPendingTasks(anyInt())).thenReturn(List.of(task()));

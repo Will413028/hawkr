@@ -90,7 +90,7 @@ public class AfterSalesGrpcClient {
      * <p><b>為什麼是 5 秒</b>：server 端只做一次 {@code order_no} 上的索引查詢
      * ＋ 記憶體分類（{@code AfterSalePayoutHoldService}），無外部呼叫、無交易。
      * 5 秒對這個工作量有數量級餘裕，而它進入租約下界的算式：
-     * {@code 5（本呼叫）＋ 100（PaymentGrpcClient.PAYUNI_BACKED_DEADLINE_SEC）= 105 < 120（CLAIM_LEASE_SEC）}。
+     * {@code 5（本呼叫）＋ 100（PaymentGrpcClient.MONEY_MOVEMENT_DEADLINE_SEC）= 105 < 120（CLAIM_LEASE_SEC）}。
      * 這條不等式由 {@code GrantPaymentWorkerPayoutHoldTest.leaseCoversBothExternalCallDeadlines} 機械斷言。
      *
      * <p>逾時走 fail-closed（視為 hold），不是失敗——見 {@link #getPayoutHold}。

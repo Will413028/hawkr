@@ -56,12 +56,6 @@ public final class OrderConstants {
     public static final String TASK_STATUS_DONE = WorkerTaskStatus.DONE.value();
     public static final String TASK_STATUS_FAILED = WorkerTaskStatus.FAILED.value();
     public static final String TASK_STATUS_MANUAL_INTERVENTION = WorkerTaskStatus.MANUAL_INTERVENTION.value();
-    public static final String TASK_STATUS_PROVIDER_AUTO = WorkerTaskStatus.PROVIDER_AUTO.value();
-
-    // ==================== 撥款 gRPC 結構化結果（proto GrantPaymentResponse.grant_outcome） ====================
-
-    /** PayUni 已對退款交易接管撥款（payment-service §5.6.1）→ task 收斂 PROVIDER_AUTO（03 §3.11.2） */
-    public static final String GRANT_OUTCOME_PROVIDER_TOOK_OVER = "PROVIDER_TOOK_OVER";
 
     // ==================== 庫存交易協調 ====================
 

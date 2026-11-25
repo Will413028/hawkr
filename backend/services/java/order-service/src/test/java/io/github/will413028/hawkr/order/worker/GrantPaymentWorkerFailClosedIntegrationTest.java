@@ -110,7 +110,6 @@ class GrantPaymentWorkerFailClosedIntegrationTest {
 
         // (2) task 不得變成成功／終態
         verify(repo, never()).markGrantTaskDone(anyLong());
-        verify(repo, never()).markGrantTaskProviderAuto(anyLong(), anyString());
         verify(repo, never()).markGrantTaskManualIntervention(anyLong(), anyString());
 
         // (3) 不得消耗業務重試額度（依賴故障不是撥款失敗；否則 aftersales 抖幾次就把

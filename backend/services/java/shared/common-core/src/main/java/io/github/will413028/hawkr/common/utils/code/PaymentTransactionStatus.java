@@ -18,7 +18,7 @@ public enum PaymentTransactionStatus implements CodeMeta {
     EXPIRED("EXPIRED", "3", "已逾期", "逾期未付款"),
     CONFLICT("CONFLICT", "4", "狀態衝突", "同步與 Webhook 結果不一致，需人工介入"),
     CLOSED("CLOSED", "5", "已關閉", "交易主動關閉"),
-    CLOSED_BY_SWITCH("CLOSED_BY_SWITCH", "6", "因切換付款方式而關閉", "使用者主動切換付款方式造成的關閉，保留審計軌跡（見 [05-支付服務設計書 §2A.3](../詳細設計書/05-支付服務（Payment%20Service）詳細設計書.md)）");
+    CLOSED_BY_SWITCH("CLOSED_BY_SWITCH", "6", "因切換付款方式而關閉", "使用者主動切換付款方式造成的關閉，保留審計軌跡（見 05-支付服務設計書 §2A.3（已刪除））");
 
     private final String code;
     private final String value;

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { AnimateHeight } from "@/components/shared/AnimateHeight";
 import AppImage from "@/components/shared/AppImage";
@@ -143,8 +144,6 @@ function actionStateLead(status: string): string {
 	switch (status) {
 		case AFTER_SALE_STATUS.RETURN_FAILED:
 			return "退貨尚未完成，先確認物流原因，再由客服協助安排同原物流退貨。";
-		case AFTER_SALE_STATUS.REFUNDING:
-			return "退款已送出，等待金流完成；若需買家填寫退款帳戶，流程會先暫停。";
 		case AFTER_SALE_STATUS.CLOSED:
 			return "此案件已完成，處理結果與退款資訊可於紀錄中查核。";
 		case AFTER_SALE_STATUS.REJECTED:
@@ -735,6 +734,7 @@ function AfterSaleActionStateCard({
 	detail: AfterSaleDetail | null;
 	resolution: AfterSaleResolution | null;
 }) {
+	const t = useTranslations("sellerCenter.afterSales");
 	const refundTaskStatus = detail?.refundProgress?.refundTaskStatus;
 	const refundStatusLabel = refundTaskStatus
 		? (REFUND_TASK_STATUS_LABEL[refundTaskStatus] ?? refundTaskStatus)
@@ -757,7 +757,10 @@ function AfterSaleActionStateCard({
 		status === AFTER_SALE_STATUS.RETURN_FAILED ||
 		status === AFTER_SALE_STATUS.RETURN_RECEIVED;
 	const resolutionValue = resolution ? resolutionLabel(resolution) : "";
-	const lead = actionStateLead(status);
+	const lead =
+		status === AFTER_SALE_STATUS.REFUNDING
+			? t("refundingLead")
+			: actionStateLead(status);
 	const failureGuidance =
 		status === AFTER_SALE_STATUS.RETURN_FAILED
 			? returnFailureGuidance({

@@ -114,73 +114,6 @@ export const REFUND_STATUS_LABEL: Record<string, string> = {
 	"5": "人工審核中",
 };
 
-/** PayUni 商店（merchant）審核狀態。終止狀態（`2`、`8`、`92`、`99`）由 seller 模組的 `TerminalMerStatus`（`internal/modules/seller/internal/model/payuni.go`）判定。未命中 `codeLabel()` 的 fail-safe：一律回傳 */
-export const PayuniMerchantVerificationStatus = {
-	ACTIVE: "1",
-	CLOSED: "2",
-	DENIED: "8",
-	UNDER_REVIEW: "9",
-	PENDING_INFO: "91",
-	REJECTED: "92",
-	OTHER_CLOSED: "99",
-} as const;
-export type PayuniMerchantVerificationStatusCode = keyof typeof PayuniMerchantVerificationStatus;
-export type PayuniMerchantVerificationStatusValue = (typeof PayuniMerchantVerificationStatus)[PayuniMerchantVerificationStatusCode];
-
-export const PAYUNI_MERCHANT_VERIFICATION_STATUS_LABEL: Record<string, string> = {
-	"1": "啟用",
-	"2": "關閉",
-	"8": "拒絕",
-	"9": "審核中",
-	"91": "待補資料",
-	"92": "審核失敗",
-	"99": "其它關閉",
-};
-
-/** PayUni 會員資料審核狀態，獨立於商店與支付通道狀態。 */
-export const PayuniMemberVerificationStatus = {
-	ACTIVE: "1",
-	PENDING_INFO: "5",
-	DENIED: "8",
-	UNDER_REVIEW: "9",
-	REJECTED: "92",
-	CLOSED: "99",
-} as const;
-export type PayuniMemberVerificationStatusCode = keyof typeof PayuniMemberVerificationStatus;
-export type PayuniMemberVerificationStatusValue = (typeof PayuniMemberVerificationStatus)[PayuniMemberVerificationStatusCode];
-
-export const PAYUNI_MEMBER_VERIFICATION_STATUS_LABEL: Record<string, string> = {
-	"1": "啟用",
-	"5": "待補資料",
-	"8": "拒絕",
-	"9": "待審核",
-	"92": "審核失敗",
-	"99": "關閉／停權",
-};
-
-/** PayUni 信用卡、Apple Pay、Google Pay 與 ATM 支付通道開通狀態。 */
-export const PayuniPaymentChannelStatus = {
-	ACTIVE: "1",
-	DISABLED: "2",
-	NOT_APPLIED: "3",
-	FORCED_CLOSED: "4",
-	UNDER_REVIEW: "9",
-	REJECTED: "92",
-	OTHER_CLOSED: "99",
-} as const;
-export type PayuniPaymentChannelStatusCode = keyof typeof PayuniPaymentChannelStatus;
-export type PayuniPaymentChannelStatusValue = (typeof PayuniPaymentChannelStatus)[PayuniPaymentChannelStatusCode];
-
-export const PAYUNI_PAYMENT_CHANNEL_STATUS_LABEL: Record<string, string> = {
-	"1": "啟用",
-	"2": "不啟用",
-	"3": "未申請",
-	"4": "強制關閉",
-	"9": "審核中",
-	"92": "審核失敗",
-	"99": "其他關閉",
-};
-
 /** 正規化配送域（normalized delivery）狀態碼，30 值。**號碼慣例：兩位數＝PayUni 原生值，三位數＝平台自訂值**——新增值一律取三位，佔用兩位號碼會在 PayUni 日後新增狀態碼時被 `fromValue()` 解析成語意完全不同但合法的值。每個 provider 都必須走顯式映射表（PayUni 那張是恆等映射但必須存在），provider 原生值另存 `shipments.provider_status` */
 export const ShippingStatus = {
 	UNPROCESSED: "91",
@@ -1870,25 +1803,6 @@ export const RESPONSIBILITY_CAUSE_LABEL: Record<string, string> = {
 	"BUYER_CAUSED": "買家原因",
 	"PLATFORM_CAUSED": "平台或系統原因",
 	"PROVIDER_CAUSED": "物流商原因",
-};
-
-/** 物流商帳單明細的費用類型，5 值。⚠️ 唯一寫入者是 ADM **人工匯入**——本 repo 明令不做自動比對排程，本表不是自動對帳的一部分。未登記本 enum 則 `CodeMetaValidator` 會擋下寫入。 */
-export const ProviderFeeType = {
-	DELIVERY: "DELIVERY",
-	CANCELLATION: "CANCELLATION",
-	WAITING: "WAITING",
-	RETURN: "RETURN",
-	ADJUSTMENT: "ADJUSTMENT",
-} as const;
-export type ProviderFeeTypeCode = keyof typeof ProviderFeeType;
-export type ProviderFeeTypeValue = (typeof ProviderFeeType)[ProviderFeeTypeCode];
-
-export const PROVIDER_FEE_TYPE_LABEL: Record<string, string> = {
-	"DELIVERY": "配送費",
-	"CANCELLATION": "取消費",
-	"WAITING": "等候費",
-	"RETURN": "退回費",
-	"ADJUSTMENT": "調整",
 };
 
 /** 即時配送未完成的結果原因，5 值。🔴 **值域由 65 定案**——原本 envelope 只寫欄位型別 `String` 而沒有值域，導致 payload 契約測試無值可對。⚠️ 本 enum 是 envelope 欄位的值域，**與 webhook inbox 的 `WebhookProvider` 分類無關**，兩者不得混用。 */

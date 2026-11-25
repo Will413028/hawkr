@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
  * 任務表清理排程（03 §8.4）
  *
  * 定期清理已完成的 stock_tx_records、auto_refund_tasks、coupon_consumption_tasks、
- * cart_cleanup_retry_tasks、grant_payment_tasks（DONE / MANUAL_INTERVENTION / PROVIDER_AUTO），
+ * cart_cleanup_retry_tasks、grant_payment_tasks（DONE），
  * 避免任務表無限膨脹。
  */
 @Component

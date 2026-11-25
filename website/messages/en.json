@@ -240,6 +240,9 @@
 			"selectSegment": "Select this segment",
 			"updatingCategory": "Updating category…",
 			"loaded": "{count} customers loaded, more available"
+		},
+		"afterSales": {
+			"refundingLead": "The refund has been submitted and is waiting for the payment provider."
 		}
 	},
 	"content": {

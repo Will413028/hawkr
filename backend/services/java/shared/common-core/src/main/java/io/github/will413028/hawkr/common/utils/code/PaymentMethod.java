@@ -15,7 +15,7 @@ public enum PaymentMethod implements CodeMeta {
     CREDIT_CARD("CREDIT_CARD", "2001", "信用卡", "信用卡一次付清"),
     APPLE_PAY("APPLE_PAY", "2002", "Apple Pay", "Apple 行動支付"),
     GOOGLE_PAY("GOOGLE_PAY", "2003", "Google Pay", "Google 行動支付"),
-    ZERO_AMOUNT("ZERO_AMOUNT", "2900", "零元訂單", "全額折抵後無需付款，不呼叫 PayUni 直接標 PAID（見 [05-支付服務設計書 §2A.1](../詳細設計書/05-支付服務（Payment%20Service）詳細設計書.md)）");
+    ZERO_AMOUNT("ZERO_AMOUNT", "2900", "零元訂單", "全額折抵後無需付款，不呼叫 PayUni 直接標 PAID（見 05-支付服務設計書 §2A.1（已刪除））");
 
     private final String code;
     private final String value;

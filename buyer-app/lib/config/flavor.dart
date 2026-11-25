@@ -120,9 +120,8 @@ extension FlavorExtension on Flavor {
 
   /// Apple Pay merchant identifier
   ///
-  /// 金流走 PAYUni，測試環境與正式環境各自綁不同的 Payment Processing
-  /// Certificate，因此 dev/stage 必須用 `.sandbox` merchant id，付款 token 才會
-  /// 用 PAYUni 測試環境的憑證加密、被導去測試環境（不碰真錢）。
+  /// Stripe PaymentSheet 的 Apple Pay 用它（`Stripe.merchantIdentifier`）；測試與正式環境
+  /// 各自綁不同的 Payment Processing Certificate，dev/stage 用 `.sandbox` merchant id。
   ///
   /// 注意：此 id 必須同時出現在對應 flavor 的已簽章 entitlements
   /// （dev → `RunnerDev.entitlements`）並掛在該 App ID 上，否則 Apple Pay

@@ -254,5 +254,5 @@ cd docs/代碼管理（CodeMeta）/scripts
 | 9001~9099 | CommonStatus |
 | 9601~9699 | SellerSuspensionReason |
 
-若新增 enum 需要新的值段，應先在本 README 補登記再使用。Value 為 UPPER_SNAKE 字串本身的 enum（例如 `ClientType`）不佔用值段，
+若新增 enum 需要新的值段，應先在本 README 補登記再使用。Value 為 UPPER_SNAKE 字串本身的 enum（例如 `AppType`）不佔用值段，
 不是數字碼。

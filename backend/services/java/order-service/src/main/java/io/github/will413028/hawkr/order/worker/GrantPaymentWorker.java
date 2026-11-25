@@ -24,9 +24,8 @@ import java.util.List;
 /**
  * 撥款指示 Worker（03 §8.8）
  *
- * 定期掃描 grant_payment_tasks 表（僅 PENDING / FAILED 重試排程；PROVIDER_AUTO 為終態純對帳
- * 記錄不撈取），呼叫 Payment Service GrantPayment RPC，指數退避重試，超過上限轉人工介入。
- * PayUni 接管收斂見 processTask 內註解（03 §3.11.2）。
+ * 定期掃描 grant_payment_tasks 表（僅 PENDING / FAILED 重試排程），呼叫 Payment Service
+ * GrantPayment RPC，指數退避重試，超過上限轉人工介入。
  *
  * <p><b>搶佔語意（issue #2294 C4）</b>：claim 是 <b>lease on {@code next_retry_time}</b>
  * （{@link #CLAIM_LEASE_SEC} 秒），不是 {@code SET status=PROCESSING} 的永久旗標——
@@ -71,8 +70,8 @@ public class GrantPaymentWorker {
      * <ul>
      *   <li>{@link AfterSalesGrpcClient#getPayoutHold}（backend#3262 撥款資格閘門）：
      *       {@link AfterSalesGrpcClient#PAYOUT_HOLD_DEADLINE_SEC} = <b>5 秒</b></li>
-     *   <li>{@link PaymentGrpcClient#grantPayment}（payment 端同步打 PayUni）：
-     *       {@link PaymentGrpcClient#PAYUNI_BACKED_DEADLINE_SEC} = <b>100 秒</b></li>
+     *   <li>{@link PaymentGrpcClient#grantPayment}（payment 端寫列並排 job）：
+     *       {@link PaymentGrpcClient#MONEY_MOVEMENT_DEADLINE_SEC} = <b>100 秒</b></li>
      * </ul>
      * ⇒ 單筆最壞耗時 <b>105 秒</b> < <b>120 秒</b>租約，餘裕 15 秒。
      * ⚠️ 加閘門時<b>必須</b>連帶檢查這條不等式：新增一個沒有 deadline 的呼叫進租約窗口，
@@ -152,23 +151,6 @@ public class GrantPaymentWorker {
             GrantPaymentResponse response = paymentGrpcClient.grantPayment(orderNo);
 
             if (response.getCode() == 0) {
-                // PayUni 接管收斂（03 §3.11.2）：payment-service 以正常回應帶
-                // grant_outcome=PROVIDER_TOOK_OVER（該交易存在已完成退款，PayUni 主動撥款、拒絕補發）
-                // → task 收斂 PROVIDER_AUTO（終態純對帳記錄），不重試、不進 MANUAL_INTERVENTION、不發 payout 通知
-                if (OrderConstants.GRANT_OUTCOME_PROVIDER_TOOK_OVER.equals(response.getGrantOutcome())) {
-                    String lastError = "grant_outcome=PROVIDER_TOOK_OVER, message=" + response.getMessage();
-                    int converged = grantPaymentTaskRepository.markGrantTaskProviderAuto(taskId, lastError);
-                    if (converged == 0) {
-                        log.info("GrantPaymentWorker.processTask.providerAutoSkip",
-                                "收斂 PROVIDER_AUTO 時 task 已被他路徑變更，冪等 skip, orderNo=" + orderNo);
-                        return;
-                    }
-                    log.info("GrantPaymentWorker.processTask.providerAuto",
-                            "PayUni 已接管撥款（退款交易），task 收斂 PROVIDER_AUTO，" + lastError,
-                            "orderNo", orderNo);
-                    return;
-                }
-
                 // 撥款成功（PROCESSING → DONE）
                 int updated = grantPaymentTaskRepository.markGrantTaskDone(taskId);
                 if (updated == 0) {

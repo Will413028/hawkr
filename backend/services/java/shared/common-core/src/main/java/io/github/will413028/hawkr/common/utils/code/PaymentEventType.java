@@ -18,9 +18,7 @@ public enum PaymentEventType implements CodeMeta {
     PAYMENT_CLOSED("PAYMENT_CLOSED", "payment.closed", "交易關閉", "交易主動關閉"),
     PAYMENT_CONFLICT("PAYMENT_CONFLICT", "payment.conflict", "狀態衝突", "同步與 Webhook 結果不一致"),
     REFUND_SUCCEEDED("REFUND_SUCCEEDED", "refund.succeeded", "退款成功", "退款處理成功"),
-    REFUND_FAILED("REFUND_FAILED", "refund.failed", "退款失敗", "退款處理失敗"),
-    PAYMENT_RESCUE_REFUND_INITIATED("PAYMENT_RESCUE_REFUND_INITIATED", "payment.rescue.refund_initiated", "rescue 退款已發起", "reconcile 在 grace 視窗內偵測到 EXPIRED 但 PayUni 已成功，自動觸發退款"),
-    PAYMENT_RESCUE_REFUND_COMPLETED("PAYMENT_RESCUE_REFUND_COMPLETED", "payment.rescue.refund_completed", "rescue 退款完成", "rescue 退款已成功完成（PayUni close API 回成功 + 本地 row CLOSED），需通知使用者");
+    REFUND_FAILED("REFUND_FAILED", "refund.failed", "退款失敗", "退款處理失敗");
 
     private final String code;
     private final String value;

@@ -240,6 +240,9 @@
 			"selectSegment": "全選此分群",
 			"updatingCategory": "更新分類中…",
 			"loaded": "已載入 {count} 位客戶，還有更多"
+		},
+		"afterSales": {
+			"refundingLead": "退款已送出，等待金流完成。"
 		}
 	},
 	"content": {

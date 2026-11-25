@@ -102,10 +102,10 @@ class GrantPaymentWorkerPayoutHoldTest {
     @DisplayName("租約必須涵蓋『兩個』外部呼叫的 deadline 總和——閘門加進租約窗口後這條才是完整的")
     void leaseCoversBothExternalCallDeadlines() {
         long worstCase = AfterSalesGrpcClient.PAYOUT_HOLD_DEADLINE_SEC
-                + PaymentGrpcClient.PAYUNI_BACKED_DEADLINE_SEC;
+                + PaymentGrpcClient.MONEY_MOVEMENT_DEADLINE_SEC;
         assertTrue(GrantPaymentWorker.CLAIM_LEASE_SEC > worstCase,
                 "CLAIM_LEASE_SEC(" + GrantPaymentWorker.CLAIM_LEASE_SEC + ") 必須 > "
-                        + "PAYOUT_HOLD_DEADLINE_SEC + PAYUNI_BACKED_DEADLINE_SEC(" + worstCase + ")。"
+                        + "PAYOUT_HOLD_DEADLINE_SEC + MONEY_MOVEMENT_DEADLINE_SEC(" + worstCase + ")。"
                         + "租約短於單筆最壞耗時 ⇒ 持有者還在打第三方時租約就被別的 pod 合法搶走 ⇒ 重複撥款。");
     }
 
@@ -115,7 +115,7 @@ class GrantPaymentWorkerPayoutHoldTest {
         assertTrue(AfterSalesGrpcClient.PAYOUT_HOLD_DEADLINE_SEC > 0,
                 "PAYOUT_HOLD_DEADLINE_SEC 必須為正數（0 或負數 = 無界）");
         assertTrue(AfterSalesGrpcClient.PAYOUT_HOLD_DEADLINE_SEC
-                        < PaymentGrpcClient.PAYUNI_BACKED_DEADLINE_SEC,
+                        < PaymentGrpcClient.MONEY_MOVEMENT_DEADLINE_SEC,
                 "反查只做一次索引查詢 ＋ 記憶體分類，deadline 不該與同步打第三方的撥款同量級；"
                         + "調大它之前先重算租約下界");
     }

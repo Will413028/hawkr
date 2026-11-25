@@ -146,12 +146,6 @@ public final class MqConstants {
     public static final String ROUTING_KEY_PAYMENT_CLOSED = "payment.closed";
     public static final String ROUTING_KEY_PAYMENT_CONFLICT = "payment.conflict";
 
-    // Seller routing keys (PAYUNi integration)
-    public static final String ROUTING_KEY_SELLER_PAYUNI_REGISTER = "seller.payuni.register";
-    public static final String ROUTING_KEY_SELLER_PAYUNI_RESULT = "seller.payuni.result";
-    public static final String ROUTING_KEY_SELLER_PAYUNI_STATUS_CHECK = "seller.payuni.status.check";
-    public static final String ROUTING_KEY_SELLER_PAYUNI_STATUS_UPDATED = "seller.payuni.status.updated";
-
     // Seller routing keys（賣家審核結果，由 Payment Webhook 觸發）
     public static final String EXCHANGE_SELLER = "seller.events";
     public static final String ROUTING_KEY_SELLER_REVIEW_RESULT = "seller.review.result";
@@ -379,13 +373,6 @@ public final class MqConstants {
 
     // Order 相關 event type 已遷移至 OrderEventType enum（內部技術碼，使用 routing key 點分式 value），不再宣告為 String 常數
     // Payment 相關 event type 已遷移至 PaymentEventType enum（內部技術碼），不再宣告為 String 常數
-
-    // Seller event types (PAYUNi integration)
-    public static final String EVENT_TYPE_SELLER_PAYUNI_REGISTER = "SELLER_PAYUNI_REGISTER";
-    public static final String EVENT_TYPE_SELLER_PAYUNI_REGISTERED = "SELLER_PAYUNI_REGISTERED";
-    public static final String EVENT_TYPE_SELLER_PAYUNI_FAILED = "SELLER_PAYUNI_FAILED";
-    public static final String EVENT_TYPE_SELLER_PAYUNI_STATUS_CHECK = "SELLER_PAYUNI_STATUS_CHECK";
-    public static final String EVENT_TYPE_SELLER_PAYUNI_STATUS_UPDATED = "SELLER_PAYUNI_STATUS_UPDATED";
 
     // Seller event types（賣家審核結果）
     public static final String EVENT_TYPE_SELLER_REVIEW_RESULT_RECEIVED = "SELLER_REVIEW_RESULT_RECEIVED";

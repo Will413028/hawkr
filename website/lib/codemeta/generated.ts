@@ -239,29 +239,6 @@ export const REFUND_STATUS_LABEL: Record<string, string> = {
 	"5": "人工審核中",
 };
 
-/** PayUni 商店（merchant）審核狀態。終止狀態（`2`、`8`、`92`、`99`）由 seller 模組的 `TerminalMerStatus`（`internal/modules/seller/internal/model/payuni.go`）判定。未命中 `codeLabel()` 的 fail-safe：一律回傳 */
-export const PayuniMerchantVerificationStatus = {
-	ACTIVE: "1",
-	CLOSED: "2",
-	DENIED: "8",
-	UNDER_REVIEW: "9",
-	PENDING_INFO: "91",
-	REJECTED: "92",
-	OTHER_CLOSED: "99",
-} as const;
-export type PayuniMerchantVerificationStatusCode = keyof typeof PayuniMerchantVerificationStatus;
-export type PayuniMerchantVerificationStatusValue = (typeof PayuniMerchantVerificationStatus)[PayuniMerchantVerificationStatusCode];
-
-export const PAYUNI_MERCHANT_VERIFICATION_STATUS_LABEL: Record<string, string> = {
-	"1": "啟用",
-	"2": "關閉",
-	"8": "拒絕",
-	"9": "審核中",
-	"91": "待補資料",
-	"92": "審核失敗",
-	"99": "其它關閉",
-};
-
 /** 正規化配送域（normalized delivery）狀態碼，30 值。**號碼慣例：兩位數＝PayUni 原生值，三位數＝平台自訂值**——新增值一律取三位，佔用兩位號碼會在 PayUni 日後新增狀態碼時被 `fromValue()` 解析成語意完全不同但合法的值。每個 provider 都必須走顯式映射表（PayUni 那張是恆等映射但必須存在），provider 原生值另存 `shipments.provider_status` */
 export const ShippingStatus = {
 	UNPROCESSED: "91",
@@ -390,7 +367,6 @@ export const WorkerTaskStatus = {
 	DONE: "20",
 	FAILED: "30",
 	MANUAL_INTERVENTION: "40",
-	PROVIDER_AUTO: "50",
 } as const;
 export type WorkerTaskStatusCode = keyof typeof WorkerTaskStatus;
 export type WorkerTaskStatusValue = (typeof WorkerTaskStatus)[WorkerTaskStatusCode];
@@ -401,7 +377,6 @@ export const WORKER_TASK_STATUS_LABEL: Record<string, string> = {
 	"20": "已完成",
 	"30": "失敗",
 	"40": "人工介入",
-	"50": "提供方主動撥款",
 };
 
 /** 賣家取消出貨狀態 */
@@ -1171,19 +1146,6 @@ export const ACCOUNT_TYPE_LABEL: Record<string, string> = {
 	"4": "管理員",
 };
 
-/** 請求端類型。前端發起付款 / ATM 退款頁時必須帶入，後端據以決定 PayUni 回調完成後的「最終出口」（行動 App 走 deep link / 網頁走 WEB_FRONTEND_URL）。詳見 [05-支付服務設計書 §5.9](../詳細設計書/05-支付服務（Payment%20Service）詳細設計書.md#59-付款頁面導回流程)。 */
-export const ClientType = {
-	MOBILE_APP: "MOBILE_APP",
-	WEB_BROWSER: "WEB_BROWSER",
-} as const;
-export type ClientTypeCode = keyof typeof ClientType;
-export type ClientTypeValue = (typeof ClientType)[ClientTypeCode];
-
-export const CLIENT_TYPE_LABEL: Record<string, string> = {
-	"MOBILE_APP": "行動 App",
-	"WEB_BROWSER": "網頁瀏覽器",
-};
-
 /** 請求所屬的 App 身份，決定 PayUni 回調完成後 deep link / web URL 該指向買家版或賣家版。與 `AccountType` 為不同維度：`AccountType` 是 JWT 帳號權限類別（含 `SELLER_AND_BUYER`、`ADMIN`），`AppType` 是運行時這個請求是從哪個 App / 網頁發起的二元選擇。 */
 export const AppType = {
 	BUYER: "BUYER",
@@ -1394,19 +1356,6 @@ export const REFUND_REASON_LABEL: Record<string, string> = {
 	"5005": "其他原因",
 };
 
-/** 退款執行方式 */
-export const RefundMethod = {
-	CASH: "1",
-	COUPON: "2",
-} as const;
-export type RefundMethodCode = keyof typeof RefundMethod;
-export type RefundMethodValue = (typeof RefundMethod)[RefundMethodCode];
-
-export const REFUND_METHOD_LABEL: Record<string, string> = {
-	"1": "原路退款",
-	"2": "優惠券退款",
-};
-
 /** 財務流水紀錄類型 */
 export const FinancialLogType = {
 	RECEIPT: "1",
@@ -1570,7 +1519,7 @@ export const ORDER_CANCEL_BY_ROLE_LABEL: Record<string, string> = {
 	"BUYER": "買家",
 };
 
-/** 商品列表排序方式。對應 `/api/v1/public/products` 的 `sort` 參數。Value 採字串（同 ClientType / AppType / OrderCancelByRole 慣例），便於前端 `switch` 與 URL round-trip。空字串視為 LATEST。詳見 [35 商品列表排序與銷量反正規化設計書](../詳細設計書/35-商品列表排序與銷量反正規化%EF%BC%88Product%20Sort%20&%20Sales%20Count%EF%BC%89詳細設計書.md)。 */
+/** 商品列表排序方式。對應 `/api/v1/public/products` 的 `sort` 參數。Value 採字串（同 AppType / OrderCancelByRole 慣例），便於前端 `switch` 與 URL round-trip。空字串視為 LATEST。詳見 [35 商品列表排序與銷量反正規化設計書](../詳細設計書/35-商品列表排序與銷量反正規化%EF%BC%88Product%20Sort%20&%20Sales%20Count%EF%BC%89詳細設計書.md)。 */
 export const ProductSort = {
 	LATEST: "LATEST",
 	PRICE_ASC: "PRICE_ASC",

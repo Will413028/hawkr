@@ -152,4 +152,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get paymentAnomalyMessage =>
       'This payment needs help from support and cannot be retried right now. Please contact support.';
+
+  @override
+  String get afterSaleReturnPendingSummary => 'Please send the item back.';
 }

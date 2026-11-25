@@ -265,6 +265,12 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'這筆付款需要客服協助處理，暫時無法重新付款，請聯絡客服。'**
   String get paymentAnomalyMessage;
+
+  /// After-sale summary while the seller has accepted the return and waits for the buyer to send the item back (status RETURN_PENDING).
+  ///
+  /// In zh, this message translates to:
+  /// **'請寄回退貨商品'**
+  String get afterSaleReturnPendingSummary;
 }
 
 class _AppLocalizationsDelegate

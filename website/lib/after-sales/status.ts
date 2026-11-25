@@ -39,7 +39,7 @@ export const AFTER_SALE_STATUS_LABEL: Record<string, string> = {
 	"70": "已取消",
 };
 
-/** PayUni WorkerTaskStatus (`refundTaskStatus`) display labels. */
+/** WorkerTaskStatus (`refundTaskStatus`) display labels. */
 export const REFUND_TASK_STATUS_LABEL: Record<string, string> = {
 	"0": "待處理",
 	"10": "退款處理中",

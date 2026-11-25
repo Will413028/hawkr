@@ -30,8 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 不經 proxy，@Transactional 實際失效——「CAS + 建撥款任務」曾非原子）。
  *
  * 同一事務內：DELIVERED(40) → COMPLETED(50) CAS + INSERT grant_payment_tasks（PENDING），
- * 兩者原子；PayUni 接管分流不在建立時判斷（一律 PENDING），由 Worker 依 payment-service 回應的
- * grant_outcome=PROVIDER_TOOK_OVER 收斂（03 §3.11.2 單一收斂點）。
+ * 兩者原子。
  *
  * <p><b>搶佔語意（issue #2294 B8 — 例外 A：同 tx outbox）</b>
  *
@@ -100,9 +99,7 @@ public class OrderCompletionTxHandler {
             return false;
         }
 
-        // 建立撥款指示任務：一律 PENDING（03 §5.4 階段 1）。曾發生退款的交易由 Worker 發動撥款後
-        // 依 payment-service 回應 grant_outcome=PROVIDER_TOOK_OVER 收斂為 PROVIDER_AUTO，
-        // 建立時不做啟發式分流（避免與退款事件的競態產生兩套判準）。
+        // 建立撥款指示任務：一律 PENDING（03 §5.4 階段 1）；轉帳金額扣掉已退款的部分由 payment 在送出時計算。
         GrantPaymentTaskEntity task = new GrantPaymentTaskEntity();
         task.setTaskId(TsidUtil.generate());
         task.setOrderNo(orderNo);

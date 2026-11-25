@@ -1,10 +1,9 @@
-# SQL Exporter — 業務正確性 metrics（issue #1353 ATM 退款卡單 / #898 假日資料覆蓋）
+# SQL Exporter — 業務正確性 metrics（#898 假日資料覆蓋等）
 #
 # 依 §22：偵測歸 observability（本 exporter），非 application @Scheduled/reconciler。
 # 部署：co-located 於各 infra 主機（dev-infra / prod-infra），連「本地」的業務 DB
 #       （dev = 本地 Postgres、prod = Aliyun RDS）。env 標籤由 Prometheus scrape target 提供。
 # DSN：不寫死於此檔；由環境變數注入（含密碼，走各主機 infra/.env），本檔以 ${VAR} 引用：
-#   AFTERSALES_DSN 例：postgresql://dbadmin:<pwd>@postgres:5432/hawkr_aftersales?sslmode=disable（dev）
 #   SHIPPING_DSN   例：postgresql://dbadmin:<pwd>@postgres:5432/hawkr_shipping?sslmode=disable（dev）
 #   ACCOUNT_DSN    例：postgresql://dbadmin:<pwd>@postgres:5432/hawkr_account?sslmode=disable（dev）
 #   INVOICE_DSN    例：postgresql://dbadmin:<pwd>@postgres:5432/hawkr_invoice?sslmode=disable（dev）
@@ -21,13 +20,6 @@ global:
   max_idle_connections: 3
 
 jobs:
-  - job_name: aftersales
-    collectors:
-      - atm_refund
-    static_configs:
-      - targets:
-          aftersales: '${AFTERSALES_DSN}'
-
   - job_name: shipping
     collectors:
       - holiday
@@ -52,21 +44,6 @@ jobs:
           invoice: '${INVOICE_DSN}'
 
 collectors:
-  # #1353：ATM 退款卡在 AWAITING_WEBHOOK(15) 超過 5 天的筆數（hawkr_aftersales.refund_tasks）
-  - collector_name: atm_refund
-    metrics:
-      - metric_name: hawkr_atm_refund_stuck_total
-        type: gauge
-        help: 'Count of ATM(2004) refunds stuck in refund_tasks.AWAITING_WEBHOOK(15) beyond 5 days (issue #1353)'
-        values:
-          - stuck
-        query: |
-          SELECT count(*)::float8 AS stuck
-          FROM refund_tasks
-          WHERE status = '15'
-            AND payment_method = '2004'
-            AND updated_at < now() - interval '5 days'
-
   # #898：假日資料尚有幾天覆蓋 = MAX(holiday_date) - CURRENT_DATE（hawkr_shipping.holidays）
   # 空表 / 資料耗盡 → 回 -1（觸發 critical），提醒下年度資料未匯入。
   - collector_name: holiday

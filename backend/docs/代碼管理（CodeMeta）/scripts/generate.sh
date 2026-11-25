@@ -57,7 +57,7 @@ ERROR_MD_FILE="$MD_DIR/錯誤碼.md"
 
 # --go-labels 的涵蓋清單（見 generate_go_labels 的說明）。日後 Go 側再需要別的
 # enum 的中文 Label，一律加進這個陣列，不得另開手寫表。
-GO_LABEL_ENUMS=(ProductStatus PostPublishStatus OrderStatus DelegationReasonCode DelegationAuditAction DelegationAuthorizationAction CertificationType PayuniSellerFacingError PayuniErrorRemedy)
+GO_LABEL_ENUMS=(ProductStatus PostPublishStatus OrderStatus DelegationReasonCode DelegationAuditAction DelegationAuthorizationAction CertificationType)
 
 # --go-registry 的涵蓋清單：需要在 Go 端有 typed 常數 + AllXxx + FromCode/FromValue
 # 的 enum。與 GO_LABEL_ENUMS 必須互斥——兩者同寫 package codemeta，對同一個 enum
@@ -86,7 +86,7 @@ GO_REGISTRY_ENUMS=(
     #    **刻意保留**：碼表屬於物流財務結算 domain，domain 還在、只是換了 runtime owner；
     #    刪掉會讓 ADMIN_ENUMS 那半也要重判，而 ADM 的帳本畫面確實會用到值域。
     CommerceModel CollectionModel FulfillmentMode InvoiceModel
-    LedgerOwnerType LedgerAccountCode LedgerTxnType ProviderFeeType
+    LedgerOwnerType LedgerAccountCode LedgerTxnType
     FulfillmentAction UberDeliveryOutcome
     # 70 物流財務結算（線 B）：應收狀態機與責任成因判定（runtime owner 已改為 payment-service）
     # 都在 Go 側，需要 typed 常數與 FromValue（狀態值用字串比對會讓 typo 在 runtime 才現形）。
@@ -121,7 +121,7 @@ ADMIN_ENUMS=(
     # 少任何一個，ADM 的帳本／撥款畫面就會拿不到值域而只能硬編碼字串。
     CommerceModel CollectionModel FulfillmentMode InvoiceModel
     FulfillmentAction UberDeliveryOutcome ShippingType ReceiptStatus
-    LedgerOwnerType LedgerAccountCode LedgerTxnType ProviderFeeType
+    LedgerOwnerType LedgerAccountCode LedgerTxnType
     # 70 物流財務結算：ADM 的收款異常佇列依 LogisticsReceivableStatus 篩 UNCONFIRMED／FAILED，
     # 對帳與爭議畫面依 ResponsibilityCause 分流歸屬。
     LogisticsReceivableStatus ResponsibilityCause
@@ -136,7 +136,6 @@ ADMIN_ENUMS=(
     ProductCertificationGovVerifyState ProductCertificationValidity
     ProductCertificationReviewAction ProductCertificationActorRole
     ProductCertificationRejectReason
-    PayuniMerchantVerificationStatus PayuniMemberVerificationStatus PayuniPaymentChannelStatus
     InvoiceDocumentStatus InvoiceOperationStatus InvoiceAdjustmentStatus InvoiceCorrectionStatus
     InvoiceComplaintStatus SellerTaxReviewStatus InvoiceProviderAccountStatus
     InvoiceIssuerType InvoiceRecipientType InvoiceDocumentKind InvoiceFulfillmentMode

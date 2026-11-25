@@ -7,7 +7,6 @@
  *   POST /app/orders                            create
  *   POST /app/orders/{order_no}/cancellations
  *   POST /app/orders/{order_no}/refund          { orderItemId, reason }
- *   POST /app/orders/{order_no}/refund/method   { method, requestNo }
  */
 
 import { authedFetch } from "../api/client";

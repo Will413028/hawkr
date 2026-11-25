@@ -173,5 +173,9 @@
   "paymentAnomalyMessage": "這筆付款需要客服協助處理，暫時無法重新付款，請聯絡客服。",
   "@paymentAnomalyMessage": {
     "description": "Message when the payment is in ANOMALY; the buyer cannot retry."
+  },
+  "afterSaleReturnPendingSummary": "請寄回退貨商品",
+  "@afterSaleReturnPendingSummary": {
+    "description": "After-sale summary while the seller has accepted the return and waits for the buyer to send the item back (status RETURN_PENDING)."
   }
 }

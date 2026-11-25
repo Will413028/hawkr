@@ -16,8 +16,7 @@ public enum WorkerTaskStatus implements CodeMeta {
     PROCESSING("PROCESSING", "10", "執行中", "Worker 已 Claim，執行任務中"),
     DONE("DONE", "20", "已完成", "任務成功完成"),
     FAILED("FAILED", "30", "失敗", "任務失敗（Worker retry 後仍失敗）"),
-    MANUAL_INTERVENTION("MANUAL_INTERVENTION", "40", "人工介入", "業務策略明確轉人工（Phase 1 退款任務目前不寫此值，既有歷史資料保留）"),
-    PROVIDER_AUTO("PROVIDER_AUTO", "50", "提供方主動撥款", "PayUni 已對退款交易接管撥款；唯一進入 = GrantPayment 回應 `grant_outcome=PROVIDER_TOOK_OVER` 後由 Worker 收斂，不再重試，任務僅作對帳記錄（終態，僅撥款任務使用；03 §3.11.2 / 05 §5.6.1）");
+    MANUAL_INTERVENTION("MANUAL_INTERVENTION", "40", "人工介入", "業務策略明確轉人工（Phase 1 退款任務目前不寫此值，既有歷史資料保留）");
 
     private final String code;
     private final String value;
