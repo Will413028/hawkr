@@ -25,6 +25,8 @@ type chunk struct {
 	Thought      bool       `json:"thought"`
 	FunctionCall *chunkCall `json:"function_call"`
 	Error        string     `json:"error"`
+	// ErrorCode 非空時送出沒有內容的最終回應，形狀同 Gemini 擋下的回應（ErrorCode 與 FinishReason 都帶安全原因）。
+	ErrorCode string `json:"error_code"`
 }
 
 type chunkCall struct {
@@ -126,6 +128,10 @@ func (l *scriptedLLM) GenerateContent(_ context.Context, req *adkmodel.LLMReques
 		for _, c := range call.Chunks {
 			if c.Error != "" {
 				yield(nil, errors.New(c.Error))
+				return
+			}
+			if c.ErrorCode != "" {
+				yield(&adkmodel.LLMResponse{ErrorCode: c.ErrorCode, FinishReason: genai.FinishReasonSafety}, nil)
 				return
 			}
 			part := &genai.Part{Text: c.Text, Thought: c.Thought}

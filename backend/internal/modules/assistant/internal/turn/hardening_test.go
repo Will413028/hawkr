@@ -384,15 +384,38 @@ func TestFinalResponseWithoutStopFinishReasonIsNotFinished(t *testing.T) {
 }
 
 func TestFinalResponseWithStopFinishReasonIsFinished(t *testing.T) {
-	llm := &scriptedLLM{script: []scriptedCall{{Chunks: []chunk{{Partial: true, Text: "半句"}, {Text: "半句話"}}}}}
+	llm := &scriptedLLM{script: []scriptedCall{{Chunks: []chunk{{Text: "您好"}}}}}
 	e := newExecutor(t, llm, &fakeOrders{}, nil)
 	ref, err := submitChat(t, e, "", "你好")
 	if err != nil {
 		t.Fatal(err)
 	}
 	evs := collect(t, e, buyer, ref.TurnID, "")
-	if last := evs[len(evs)-1]; last.Kind != model.EventFinished {
+	last := evs[len(evs)-1]
+	if last.Kind != model.EventFinished {
 		t.Fatalf("STOP 的最終回應要 finished：%+v", evs)
+	}
+	got := ""
+	for _, ev := range evs {
+		got += ev.Text
+	}
+	if got != "您好" {
+		t.Fatalf("文字 = %q", got)
+	}
+}
+
+// 被 Gemini 擋下的回應沒有內容，帶 ErrorCode 與 SAFETY 的結束原因，要以沒有輸出的失敗結束。
+func TestBlockedFinalResponseWithErrorCodeFails(t *testing.T) {
+	llm := &scriptedLLM{script: []scriptedCall{{Chunks: []chunk{{ErrorCode: "SAFETY"}}}}}
+	e := newExecutor(t, llm, &fakeOrders{}, nil)
+	ref, err := submitChat(t, e, "", "你好")
+	if err != nil {
+		t.Fatal(err)
+	}
+	evs := collect(t, e, buyer, ref.TurnID, "")
+	last := evs[len(evs)-1]
+	if last.Kind != model.EventError || last.Failure != model.FailureNoOutput {
+		t.Fatalf("被擋下的回應要以 FailureNoOutput 的 error 結束，得到 %+v", last)
 	}
 }
 
