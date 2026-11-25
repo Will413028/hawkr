@@ -66,8 +66,8 @@ func deliveryWith(ack *fakeAck, rk string, retryCount int32) amqp.Delivery {
 func TestHandleHandlerError_RepublishToPerQueueRetryExchange(t *testing.T) {
 	pub := &fakePublisher{}
 	ack := &fakeAck{}
-	sub := Subscription{Exchange: "hawkr.shipping", Queue: "notification.buyer.delivered", MaxRetries: 3}
-	msg := deliveryWith(ack, "shipment.delivered", 1)
+	sub := Subscription{Exchange: "hawkr.review", Queue: "notification.buyer.review", MaxRetries: 3}
+	msg := deliveryWith(ack, "review.created", 1)
 	before := mqConsumeCount(sub.Queue, "retry")
 
 	handleHandlerError(pub, sub, msg, errors.New("handler failed"))
@@ -76,10 +76,10 @@ func TestHandleHandlerError_RepublishToPerQueueRetryExchange(t *testing.T) {
 		t.Fatalf("expected exactly 1 publish, got %d", len(pub.calls))
 	}
 	c := pub.calls[0]
-	if c.exchange != "notification.buyer.delivered.retry" {
+	if c.exchange != "notification.buyer.review.retry" {
 		t.Errorf("retry must target per-queue fanout exchange {Queue}.retry, got %q", c.exchange)
 	}
-	if c.key != "shipment.delivered" {
+	if c.key != "review.created" {
 		t.Errorf("original routing key must be preserved on republish, got %q", c.key)
 	}
 	if got := c.pub.Headers[retryHeaderKey]; got != int32(2) {
@@ -101,8 +101,8 @@ func TestHandleHandlerError_RepublishToPerQueueRetryExchange(t *testing.T) {
 func TestHandleHandlerError_DeadLetterDirectToOwnDLQ(t *testing.T) {
 	pub := &fakePublisher{}
 	ack := &fakeAck{}
-	sub := Subscription{Exchange: "hawkr.shipping", Queue: "notification.buyer.delivered", MaxRetries: 3}
-	msg := deliveryWith(ack, "shipment.delivered", 3)
+	sub := Subscription{Exchange: "hawkr.review", Queue: "notification.buyer.review", MaxRetries: 3}
+	msg := deliveryWith(ack, "review.created", 3)
 	before := mqConsumeCount(sub.Queue, "dlq")
 
 	handleHandlerError(pub, sub, msg, errors.New("still failing"))
@@ -114,10 +114,10 @@ func TestHandleHandlerError_DeadLetterDirectToOwnDLQ(t *testing.T) {
 	if c.exchange != "" {
 		t.Errorf("direct DLQ publish must use the default exchange, got %q", c.exchange)
 	}
-	if c.key != "notification.buyer.delivered.dlq" {
+	if c.key != "notification.buyer.review.dlq" {
 		t.Errorf("direct DLQ publish routing key must equal the DLQ name, got %q", c.key)
 	}
-	if got := c.pub.Headers[originalRoutingKeyHeaderKey]; got != "shipment.delivered" {
+	if got := c.pub.Headers[originalRoutingKeyHeaderKey]; got != "review.created" {
 		t.Errorf("original routing key must be preserved in header, got %v", got)
 	}
 	if !ack.acked {
@@ -136,8 +136,8 @@ func TestHandleHandlerError_DeadLetterDirectToOwnDLQ(t *testing.T) {
 func TestHandleHandlerError_DeadLetterFallbackToBrokerDLXOnPublishFailure(t *testing.T) {
 	pub := &fakePublisher{err: errors.New("channel closed")}
 	ack := &fakeAck{}
-	sub := Subscription{Exchange: "hawkr.shipping", Queue: "notification.buyer.delivered", MaxRetries: 3}
-	msg := deliveryWith(ack, "shipment.delivered", 3)
+	sub := Subscription{Exchange: "hawkr.review", Queue: "notification.buyer.review", MaxRetries: 3}
+	msg := deliveryWith(ack, "review.created", 3)
 	before := mqConsumeCount(sub.Queue, "dlq")
 
 	handleHandlerError(pub, sub, msg, errors.New("still failing"))

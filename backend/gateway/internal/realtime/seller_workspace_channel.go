@@ -90,7 +90,6 @@ func (s *SellerWorkspaceChannel) BuildSSEEvent(routingKey string, payload []byte
 			Source:         ev.Source,
 			PreviousStatus: ev.PreviousStatus,
 			Status:         ev.Status,
-			ShipmentStatus: ev.ShipmentStatus,
 			ChangedAt:      ev.ChangedAt,
 		}
 		data, err := json.Marshal(out)
@@ -126,7 +125,6 @@ type sellerOrderUpdatedSSE struct {
 	Source         string `json:"source"`
 	PreviousStatus string `json:"previousStatus,omitempty"`
 	Status         string `json:"status,omitempty"`
-	ShipmentStatus string `json:"shipmentStatus,omitempty"`
 	ChangedAt      string `json:"changedAt"`
 }
 

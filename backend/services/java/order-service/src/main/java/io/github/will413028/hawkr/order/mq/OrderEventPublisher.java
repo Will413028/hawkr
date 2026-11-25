@@ -111,7 +111,6 @@ public class OrderEventPublisher {
      * @param source          事件來源（SRC_* 常數）
      * @param previousStatus  前一個 order status code（可為 null）
      * @param status          最新 order status code（可為 null）
-     * @param shipmentStatus  最新 shipment status code（可為 null；物流來源時帶）
      */
     /**
      * by-orderNo 便利 overload：內部反查 store_id 後 emit（供新增碼避免各處手抄
@@ -120,7 +119,7 @@ public class OrderEventPublisher {
     public void emitSellerOrderUpdated(String orderNo, String source,
                                        String previousStatus, String status) {
         Long storeId = orderRepository.findStoreIdByOrderNo(orderNo);
-        emitSellerOrderUpdated(storeId, orderNo, source, previousStatus, status, null);
+        emitSellerOrderUpdated(storeId, orderNo, source, previousStatus, status);
     }
 
     /**
@@ -135,7 +134,7 @@ public class OrderEventPublisher {
      *                事件 100% 送不到且無任何 log。反解析已移除，兩端同為 store_id 空間。
      */
     public void emitSellerOrderUpdated(Long storeId, String orderNo, String source,
-                                       String previousStatus, String status, String shipmentStatus) {
+                                       String previousStatus, String status) {
         if (storeId == null || storeId <= 0 || orderNo == null || orderNo.isEmpty()) {
             log.warn("OrderEventPublisher.emitSellerOrderUpdated.skip",
                     "缺 storeId 或 orderNo，跳過 seller.order.updated"
@@ -146,7 +145,7 @@ public class OrderEventPublisher {
         // 這裡曾經反解析成 login account_id，並為此付一次 seller-service gRPC —— 那次呼叫
         // 連同它的 fail-closed 降級一併移除，因為它現在是「把值轉換到一個沒有人訂閱的空間」。
         SellerOrderUpdatedPayload payload = new SellerOrderUpdatedPayload(
-                storeId, orderNo, source, previousStatus, status, shipmentStatus,
+                storeId, orderNo, source, previousStatus, status,
                 DateTimeUtils.formatIso8601(DateTimeUtils.nowUtc()));
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {

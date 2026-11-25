@@ -7,7 +7,6 @@ const (
 	ExchangeMarketing    = "hawkr.marketing"
 	ExchangeNotification = "hawkr.notification"
 	ExchangeDelayed      = "hawkr.delayed"
-	ExchangeShipping     = "hawkr.shipping"
 	ExchangeReview       = "hawkr.review"
 	ExchangeContent      = "hawkr.content"
 	ExchangeAccount      = "hawkr.account"
@@ -47,9 +46,6 @@ const (
 	RoutingKeyPaymentSuccess = "payment.success"
 	RoutingKeyPaymentFailed  = "payment.failed"
 	RoutingKeyPaymentExpired = "payment.expired"
-
-	RoutingKeyShipmentCreated   = "shipment.created"
-	RoutingKeyShipmentDelivered = "shipment.delivered"
 
 	RoutingKeyReviewCreated = "review.created"
 	RoutingKeyReviewHidden  = "review.hidden"

@@ -50,7 +50,7 @@ class OrderEventPublisherSellerOrderUpdatedTest {
             return null;
         }).when(rabbitPublisher).publish(anyString(), anyString(), any(byte[].class), anyString());
 
-        publisher.emitSellerOrderUpdated(storeId, "ORD1", OrderEventPublisher.SRC_SYSTEM, "10", "80", null);
+        publisher.emitSellerOrderUpdated(storeId, "ORD1", OrderEventPublisher.SRC_SYSTEM, "10", "80");
 
         verify(rabbitPublisher).publish(anyString(), anyString(), any(byte[].class), anyString());
         JsonNode published = new ObjectMapper().readTree(capturedBody[0]);
@@ -67,8 +67,8 @@ class OrderEventPublisherSellerOrderUpdatedTest {
         OrderRepository orderRepository = mock(OrderRepository.class);
         OrderEventPublisher publisher = new OrderEventPublisher(rabbitPublisher, orderRepository);
 
-        publisher.emitSellerOrderUpdated(null, "ORD1", OrderEventPublisher.SRC_SYSTEM, "10", "80", null);
-        publisher.emitSellerOrderUpdated(0L, "ORD1", OrderEventPublisher.SRC_SYSTEM, "10", "80", null);
+        publisher.emitSellerOrderUpdated(null, "ORD1", OrderEventPublisher.SRC_SYSTEM, "10", "80");
+        publisher.emitSellerOrderUpdated(0L, "ORD1", OrderEventPublisher.SRC_SYSTEM, "10", "80");
 
         verify(rabbitPublisher, never()).publish(anyString(), anyString(), any(byte[].class), anyString());
     }

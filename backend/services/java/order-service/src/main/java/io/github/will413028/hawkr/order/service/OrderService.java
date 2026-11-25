@@ -418,7 +418,7 @@ public class OrderService {
         // [B-207] #1181：賣家工作區 realtime — 買家取消待付款訂單（afterCommit）
         eventPublisher.emitSellerOrderUpdated(
                 order.getStoreId(), orderNo, OrderEventPublisher.SRC_SYSTEM,
-                OrderStatus.PENDING_PAYMENT.value(), OrderStatus.CANCELLED.value(), null);
+                OrderStatus.PENDING_PAYMENT.value(), OrderStatus.CANCELLED.value());
     }
 
     /**

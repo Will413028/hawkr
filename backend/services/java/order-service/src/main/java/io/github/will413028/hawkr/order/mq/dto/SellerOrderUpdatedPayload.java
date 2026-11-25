@@ -20,7 +20,7 @@ import java.util.UUID;
  * 見 CLAUDE.md §6）。
  *
  * <p>{@code eventId} 由 publisher 端自動產生 UUID v4，供前端去重；{@code changedAt} 為 ISO 8601 UTC。
- * 狀態欄位（previous/status/shipment）為 order/shipment status code 字串（OrderStatus.value()），可為 null。
+ * 狀態欄位（previous/status）為 order status code 字串（OrderStatus.value()），可為 null。
  */
 public record SellerOrderUpdatedPayload(
         String eventId,
@@ -29,7 +29,6 @@ public record SellerOrderUpdatedPayload(
         String source,
         String previousStatus,
         String status,
-        String shipmentStatus,
         String changedAt
 ) {
     public SellerOrderUpdatedPayload(
@@ -38,10 +37,9 @@ public record SellerOrderUpdatedPayload(
             String source,
             String previousStatus,
             String status,
-            String shipmentStatus,
             String changedAt
     ) {
         this(UUID.randomUUID().toString(), sellerId, orderNo, source,
-                previousStatus, status, shipmentStatus, changedAt);
+                previousStatus, status, changedAt);
     }
 }

@@ -217,7 +217,7 @@ public class PaymentEventHandler {
         // [B-207] #1181：賣家工作區 realtime（afterCommit）— 待付款 → 已付款
         orderEventPublisher.emitSellerOrderUpdated(
                 order.getStoreId(), orderId, OrderEventPublisher.SRC_PAYUNI_WEBHOOK,
-                OrderStatus.PENDING_PAYMENT.value(), OrderStatus.PAID.value(), null);
+                OrderStatus.PENDING_PAYMENT.value(), OrderStatus.PAID.value());
 
         // order.paid 改走 Outbox 可靠投遞（03 §3.12/§8.10）：事務內寫入，杜絕原 afterCommit best-effort 遺失。
         // seller/buyer meta 由 OrderOutboxPublisher 於派送時 best-effort 補（payload 形狀與原本一致，下游不受影響）。
@@ -401,7 +401,7 @@ public class PaymentEventHandler {
         // [B-207] #1181：賣家工作區 realtime — 逾時取消
         orderEventPublisher.emitSellerOrderUpdated(
                 order.getStoreId(), orderNo, OrderEventPublisher.SRC_SYSTEM,
-                OrderStatus.PENDING_PAYMENT.value(), OrderStatus.CANCELLED.value(), null);
+                OrderStatus.PENDING_PAYMENT.value(), OrderStatus.CANCELLED.value());
         return new CancelInfo(orderNo, order.getCheckoutId(),
                 order.getBuyerId(), order.getCouponInstanceId());
     }
@@ -437,7 +437,7 @@ public class PaymentEventHandler {
             // [B-207] #1181：賣家工作區 realtime — 異常取消
             orderEventPublisher.emitSellerOrderUpdated(
                     order.getStoreId(), orderNo, OrderEventPublisher.SRC_SYSTEM,
-                    OrderStatus.PENDING_PAYMENT.value(), OrderStatus.CANCELLED.value(), null);
+                    OrderStatus.PENDING_PAYMENT.value(), OrderStatus.CANCELLED.value());
             return true;
         }
 

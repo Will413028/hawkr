@@ -1843,7 +1843,7 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
             Long storeId = orderRepository.findStoreIdByOrderNo(orderNo);
             eventPublisher.emitSellerOrderUpdated(
                     storeId, orderNo, OrderEventPublisher.SRC_SYSTEM,
-                    null, io.github.will413028.hawkr.common.utils.code.OrderStatus.CANCELLED.value(), null);
+                    null, io.github.will413028.hawkr.common.utils.code.OrderStatus.CANCELLED.value());
 
             responseObserver.onNext(CancelOrderInternalResponse.newBuilder()
                     .setCode(GrpcResponseCode.SUCCESS.code())

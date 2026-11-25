@@ -24,9 +24,6 @@ const (
 	EventTypePaymentFailed  EventType = "PAYMENT_FAILED"
 	EventTypePaymentExpired EventType = "PAYMENT_EXPIRED"
 
-	EventTypeShipmentCreated   EventType = "SHIPMENT_CREATED"
-	EventTypeShipmentDelivered EventType = "SHIPMENT_DELIVERED"
-
 	EventTypeReviewCreated EventType = "REVIEW_CREATED"
 	EventTypeReviewHidden  EventType = "REVIEW_HIDDEN"
 
@@ -275,7 +272,6 @@ type SellerOrderUpdatedEvent struct {
 	Source         string `json:"source"`
 	PreviousStatus string `json:"previousStatus,omitempty"`
 	Status         string `json:"status,omitempty"`
-	ShipmentStatus string `json:"shipmentStatus,omitempty"`
 	ChangedAt      string `json:"changedAt"`
 }
 
