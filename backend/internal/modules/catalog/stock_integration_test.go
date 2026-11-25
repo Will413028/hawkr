@@ -91,7 +91,7 @@ func wantConstraint(t *testing.T, err error, name string) {
 	}
 }
 
-// CD1：同一個冪等鍵併發重送只扣一次。
+// 同一個冪等鍵併發重送只扣一次。
 func TestConcurrentSameKeyDeductsOnce(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t)
@@ -288,7 +288,7 @@ func TestDeletedSkuCannotBeDeductedButCanBeRestored(t *testing.T) {
 	}
 }
 
-// CD2：歸還依原扣減，累計不超過原扣減量。
+// 歸還依原扣減，累計不超過原扣減量。
 func TestRestoreFollowsTheOriginalDeduction(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t)
@@ -400,8 +400,36 @@ func TestAdjustReplayIsNoOpAndDifferentContentIsRejected(t *testing.T) {
 		t.Fatalf("跨店重送後庫存 = %d，want 8", got)
 	}
 	f.must(f.m.DeductStock(f.ct, "adj:d", items(sku, 1)))
-	if err := f.m.AdjustStock(f.ct, 501, "adj:d", sku, -1); !errors.Is(err, ErrIdempotencyKeyReused) {
-		t.Fatalf("與扣減共用鍵 err = %v，want ErrIdempotencyKeyReused", err)
+	f.must(f.m.AdjustStock(f.ct, 501, "adj:d", sku, -1))
+	f.must(f.m.DeductStock(f.ct, "adj:d", items(sku, 1)))
+	if got := f.stockOf(sku); got != 6 {
+		t.Fatalf("結帳鍵與賣家調整鍵各自獨立：庫存 = %d，want 6（扣 1、調整 -1、重送不再扣）", got)
+	}
+}
+
+// 賣家調整的冪等鍵只在店家內唯一：別家店用同一個鍵各自生效，也不會因此讀到或擋到對方的操作。
+func TestAdjustKeyIsScopedPerStore(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t)
+	a, b := f.sku(5), f.sku(5)
+	f.must(f.exec(`UPDATE catalog.products SET store_id = 502 WHERE id = (SELECT product_id FROM catalog.product_skus WHERE id = $1)`, b))
+	f.must(f.m.AdjustStock(f.ct, 501, "adj:shared", a, 3))
+	f.must(f.m.AdjustStock(f.ct, 502, "adj:shared", b, 7))
+	if got := f.stockOf(a); got != 8 {
+		t.Fatalf("店家 501 的 SKU 庫存 = %d，want 8", got)
+	}
+	if got := f.stockOf(b); got != 12 {
+		t.Fatalf("店家 502 的 SKU 庫存 = %d，want 12（同一個鍵在別家店獨立生效）", got)
+	}
+	f.must(f.m.AdjustStock(f.ct, 502, "adj:shared", b, 7))
+	if err := f.m.AdjustStock(f.ct, 502, "adj:shared", b, 1); !errors.Is(err, ErrIdempotencyKeyReused) {
+		t.Fatalf("同店不同內容重送 err = %v，want ErrIdempotencyKeyReused", err)
+	}
+	if got := f.stockOf(b); got != 12 {
+		t.Fatalf("重送後庫存 = %d，want 12", got)
+	}
+	if got := f.count(`SELECT count(*) FROM catalog.stock_operations WHERE idempotency_key = 'adj:shared'`); got != 2 {
+		t.Fatalf("操作列 %d 筆，want 2（每家店一列）", got)
 	}
 }
 

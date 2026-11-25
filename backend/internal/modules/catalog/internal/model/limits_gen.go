@@ -4,36 +4,36 @@
 package model
 
 const (
-	// MaxTitleRunes 是 catalog.ProductContentLimits.title 的上限（hawkr.common.v1alpha1.limits，runes）。
-	MaxTitleRunes = 100
-	// MaxAxes 是 catalog.ProductContentLimits.axes 的上限（hawkr.common.v1alpha1.limits，items）。
-	MaxAxes = 2
-	// MaxAxisNameRunes 是 catalog.ProductContentLimits.axis_name 的上限（hawkr.common.v1alpha1.limits，runes）。
-	MaxAxisNameRunes = 20
-	// MaxOptionValueRunes 是 catalog.ProductContentLimits.option_value 的上限（hawkr.common.v1alpha1.limits，runes）。
-	MaxOptionValueRunes = 40
-	// MaxValuesPerAxis 是 catalog.ProductContentLimits.values_per_axis 的上限（hawkr.common.v1alpha1.limits，items）。
-	MaxValuesPerAxis = 50
-	// MaxSkus 是 catalog.ProductContentLimits.skus 的上限（hawkr.common.v1alpha1.limits，items）。
-	MaxSkus = 100
-	// MaxGalleryImages 是 catalog.ProductContentLimits.gallery_images 的上限（hawkr.common.v1alpha1.limits，items）。
-	MaxGalleryImages = 9
-	// MaxAltRunes 是 catalog.ProductContentLimits.alt 的上限（hawkr.common.v1alpha1.limits，runes）。
-	MaxAltRunes = 200
-	// MaxDescriptionBlocks 是 catalog.ProductContentLimits.description_blocks 的上限（hawkr.common.v1alpha1.limits，items）。
-	MaxDescriptionBlocks = 100
-	// MaxDescriptionImages 是 catalog.ProductContentLimits.description_images 的上限（hawkr.common.v1alpha1.limits，items）。
-	MaxDescriptionImages = 20
-	// MaxDescriptionRunes 是 catalog.ProductContentLimits.description 的上限（hawkr.common.v1alpha1.limits，runes）。
-	MaxDescriptionRunes = 3000
-	// MaxListItems 是 catalog.ProductContentLimits.list_items 的上限（hawkr.common.v1alpha1.limits，items）。
-	MaxListItems = 50
-	// MaxListItemRunes 是 catalog.ProductContentLimits.list_item 的上限（hawkr.common.v1alpha1.limits，runes）。
-	MaxListItemRunes = 200
-	// MaxTableRows 是 catalog.ProductContentLimits.table_rows 的上限（hawkr.common.v1alpha1.limits，items）。
+	// MaxBulletListItems 是 catalog.BulletList.items 的上限（hawkr.common.v1alpha1.limits，items）。
+	MaxBulletListItems = 50
+	// MaxBulletListItemsRunes 是 catalog.BulletList.items 的上限（hawkr.common.v1alpha1.limits，runes）。
+	MaxBulletListItemsRunes = 200
+	// MaxImageInputAltRunes 是 catalog.ImageInput.alt 的上限（hawkr.common.v1alpha1.limits，runes）。
+	MaxImageInputAltRunes = 200
+	// MaxOptionAxisInputNameRunes 是 catalog.OptionAxisInput.name 的上限（hawkr.common.v1alpha1.limits，runes）。
+	MaxOptionAxisInputNameRunes = 20
+	// MaxOptionAxisInputValues 是 catalog.OptionAxisInput.values 的上限（hawkr.common.v1alpha1.limits，items）。
+	MaxOptionAxisInputValues = 50
+	// MaxOptionAxisInputValuesRunes 是 catalog.OptionAxisInput.values 的上限（hawkr.common.v1alpha1.limits，runes）。
+	MaxOptionAxisInputValuesRunes = 40
+	// MaxProductInputTitleRunes 是 catalog.ProductInput.title 的上限（hawkr.common.v1alpha1.limits，runes）。
+	MaxProductInputTitleRunes = 100
+	// MaxProductInputGallery 是 catalog.ProductInput.gallery 的上限（hawkr.common.v1alpha1.limits，items）。
+	MaxProductInputGallery = 9
+	// MaxProductInputDescription 是 catalog.ProductInput.description 的上限（hawkr.common.v1alpha1.limits，items）。
+	MaxProductInputDescription = 100
+	// MaxProductInputDescriptionTotalRunes 是 catalog.ProductInput.description 的上限（hawkr.common.v1alpha1.limits，total_runes）。
+	MaxProductInputDescriptionTotalRunes = 3000
+	// MaxProductInputDescriptionImageItems 是 catalog.ProductInput.description 的上限（hawkr.common.v1alpha1.limits，image_items）。
+	MaxProductInputDescriptionImageItems = 20
+	// MaxProductInputAxes 是 catalog.ProductInput.axes 的上限（hawkr.common.v1alpha1.limits，items）。
+	MaxProductInputAxes = 2
+	// MaxProductInputSkus 是 catalog.ProductInput.skus 的上限（hawkr.common.v1alpha1.limits，items）。
+	MaxProductInputSkus = 100
+	// MaxTableRows 是 catalog.Table.rows 的上限（hawkr.common.v1alpha1.limits，items）。
 	MaxTableRows = 50
-	// MaxTableCols 是 catalog.ProductContentLimits.table_cols 的上限（hawkr.common.v1alpha1.limits，items）。
-	MaxTableCols = 10
-	// MaxTableCellRunes 是 catalog.ProductContentLimits.table_cell 的上限（hawkr.common.v1alpha1.limits，runes）。
-	MaxTableCellRunes = 200
+	// MaxTableRowCells 是 catalog.TableRow.cells 的上限（hawkr.common.v1alpha1.limits，items）。
+	MaxTableRowCells = 10
+	// MaxTableRowCellsRunes 是 catalog.TableRow.cells 的上限（hawkr.common.v1alpha1.limits，runes）。
+	MaxTableRowCellsRunes = 200
 )

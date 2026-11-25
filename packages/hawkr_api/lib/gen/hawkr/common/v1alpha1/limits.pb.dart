@@ -16,16 +16,21 @@ import 'package:protobuf/protobuf.dart' as $pb;
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
-/// Limits 是一個欄位的內容上限。max_items 用在 repeated 欄位（元素個數），max_runes 用在 string 欄位（Unicode code point 數，
-/// 不是位元組也不是 UTF-16 單位）。兩者擇一，必須大於 0。
+/// Limits 是一個欄位的內容上限，至少設一種，每種必須大於 0。
+/// max_items 用在 repeated 欄位（元素個數）；max_runes 用在 string 欄位（Unicode code point 數，不是位元組也不是 UTF-16 單位），
+/// 用在 repeated string 時是每個元素的上限；max_total_runes 與 max_image_items 用在 repeated 訊息欄位，上限跨整個欄位的所有元素計算。
 class Limits extends $pb.GeneratedMessage {
   factory Limits({
     $core.int? maxItems,
     $core.int? maxRunes,
+    $core.int? maxTotalRunes,
+    $core.int? maxImageItems,
   }) {
     final result = Limits._();
     if (maxItems != null) result.maxItems = maxItems;
     if (maxRunes != null) result.maxRunes = maxRunes;
+    if (maxTotalRunes != null) result.maxTotalRunes = maxTotalRunes;
+    if (maxImageItems != null) result.maxImageItems = maxImageItems;
     return result;
   }
 
@@ -45,6 +50,8 @@ class Limits extends $pb.GeneratedMessage {
       createEmptyInstance: Limits.$_createMessage)
     ..aI(1, _omitFieldNames ? '' : 'maxItems')
     ..aI(2, _omitFieldNames ? '' : 'maxRunes')
+    ..aI(3, _omitFieldNames ? '' : 'maxTotalRunes')
+    ..aI(4, _omitFieldNames ? '' : 'maxImageItems')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -86,6 +93,26 @@ class Limits extends $pb.GeneratedMessage {
   $core.bool hasMaxRunes() => $_has(1);
   @$pb.TagNumber(2)
   void clearMaxRunes() => $_clearField(2);
+
+  /// 所有元素內文字的 code point 總數上限：只算內容文字（段落、清單項目、表格儲存格），不含圖片的替代文字。
+  @$pb.TagNumber(3)
+  $core.int get maxTotalRunes => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set maxTotalRunes($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasMaxTotalRunes() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearMaxTotalRunes() => $_clearField(3);
+
+  /// 所有元素裡帶圖片的元素個數上限。
+  @$pb.TagNumber(4)
+  $core.int get maxImageItems => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set maxImageItems($core.int value) => $_setSignedInt32(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasMaxImageItems() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearMaxImageItems() => $_clearField(4);
 }
 
 class LimitsExt {

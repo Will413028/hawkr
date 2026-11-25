@@ -22,14 +22,19 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Limits 是一個欄位的內容上限。max_items 用在 repeated 欄位（元素個數），max_runes 用在 string 欄位（Unicode code point 數，
-// 不是位元組也不是 UTF-16 單位）。兩者擇一，必須大於 0。
+// Limits 是一個欄位的內容上限，至少設一種，每種必須大於 0。
+// max_items 用在 repeated 欄位（元素個數）；max_runes 用在 string 欄位（Unicode code point 數，不是位元組也不是 UTF-16 單位），
+// 用在 repeated string 時是每個元素的上限；max_total_runes 與 max_image_items 用在 repeated 訊息欄位，上限跨整個欄位的所有元素計算。
 type Limits struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// 元素個數上限。
 	MaxItems int32 `protobuf:"varint,1,opt,name=max_items,json=maxItems,proto3" json:"max_items,omitempty"`
 	// code point 數上限。
-	MaxRunes      int32 `protobuf:"varint,2,opt,name=max_runes,json=maxRunes,proto3" json:"max_runes,omitempty"`
+	MaxRunes int32 `protobuf:"varint,2,opt,name=max_runes,json=maxRunes,proto3" json:"max_runes,omitempty"`
+	// 所有元素內文字的 code point 總數上限：只算內容文字（段落、清單項目、表格儲存格），不含圖片的替代文字。
+	MaxTotalRunes int32 `protobuf:"varint,3,opt,name=max_total_runes,json=maxTotalRunes,proto3" json:"max_total_runes,omitempty"`
+	// 所有元素裡帶圖片的元素個數上限。
+	MaxImageItems int32 `protobuf:"varint,4,opt,name=max_image_items,json=maxImageItems,proto3" json:"max_image_items,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -78,6 +83,20 @@ func (x *Limits) GetMaxRunes() int32 {
 	return 0
 }
 
+func (x *Limits) GetMaxTotalRunes() int32 {
+	if x != nil {
+		return x.MaxTotalRunes
+	}
+	return 0
+}
+
+func (x *Limits) GetMaxImageItems() int32 {
+	if x != nil {
+		return x.MaxImageItems
+	}
+	return 0
+}
+
 var file_hawkr_common_v1alpha1_limits_proto_extTypes = []protoimpl.ExtensionInfo{
 	{
 		ExtendedType:  (*descriptorpb.FieldOptions)(nil),
@@ -102,10 +121,12 @@ var File_hawkr_common_v1alpha1_limits_proto protoreflect.FileDescriptor
 
 const file_hawkr_common_v1alpha1_limits_proto_rawDesc = "" +
 	"\n" +
-	"\"hawkr/common/v1alpha1/limits.proto\x12\x15hawkr.common.v1alpha1\x1a google/protobuf/descriptor.proto\"B\n" +
+	"\"hawkr/common/v1alpha1/limits.proto\x12\x15hawkr.common.v1alpha1\x1a google/protobuf/descriptor.proto\"\x92\x01\n" +
 	"\x06Limits\x12\x1b\n" +
 	"\tmax_items\x18\x01 \x01(\x05R\bmaxItems\x12\x1b\n" +
-	"\tmax_runes\x18\x02 \x01(\x05R\bmaxRunes:V\n" +
+	"\tmax_runes\x18\x02 \x01(\x05R\bmaxRunes\x12&\n" +
+	"\x0fmax_total_runes\x18\x03 \x01(\x05R\rmaxTotalRunes\x12&\n" +
+	"\x0fmax_image_items\x18\x04 \x01(\x05R\rmaxImageItems:V\n" +
 	"\x06limits\x12\x1d.google.protobuf.FieldOptions\x18҆\x03 \x01(\v2\x1d.hawkr.common.v1alpha1.LimitsR\x06limitsB\xfd\x01\n" +
 	"\x19com.hawkr.common.v1alpha1B\vLimitsProtoP\x01Z]github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1;commonv1alpha1\xa2\x02\x03HCX\xaa\x02\x15Hawkr.Common.V1alpha1\xca\x02\x15Hawkr\\Common\\V1alpha1\xe2\x02!Hawkr\\Common\\V1alpha1\\GPBMetadata\xea\x02\x17Hawkr::Common::V1alpha1b\x06proto3"
 

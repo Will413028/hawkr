@@ -90,6 +90,7 @@ type CatalogStockOperation struct {
 	ID                uuid.UUID
 	IdempotencyKey    string
 	Kind              string
+	StoreID           *int64
 	DeductOperationID *uuid.UUID
 	CreatedAt         time.Time
 }

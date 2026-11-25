@@ -2,8 +2,15 @@
 // @generated from file hawkr/catalog/v1alpha1/catalog.proto (package hawkr.catalog.v1alpha1, syntax proto3)
 /* eslint-disable */
 
+// catalog 模組的商品寫入內容：賣家建立與修改商品時送的訊息。服務與 RPC 隨後的步驟加入，這裡只定義寫入的資料形狀與內容上限。
+//
+// 內容上限掛在實際受限制的欄位上（hawkr.common.v1alpha1.limits），uitext-gen 讀它並生成 Go、TS、Dart 的常數；
+// 伺服器照樣驗證，違反回 INVALID_ARGUMENT。ID 是不透明的字串（ADR 2026-09-25-row-identity-by-data-kind）。
+// 新圖只收 staged token，不收 URL 或 key（ADR 2026-09-25-api-image-uri-template）。
+
 import type { GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
+import { file_google_api_field_behavior } from "../../../google/api/field_behavior_pb";
 import { file_hawkr_common_v1alpha1_limits } from "../../common/v1alpha1/limits_pb";
 import type { Message } from "@bufbuild/protobuf";
 
@@ -11,133 +18,303 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file hawkr/catalog/v1alpha1/catalog.proto.
  */
 export const file_hawkr_catalog_v1alpha1_catalog: GenFile = /*@__PURE__*/
-  fileDesc("CiRoYXdrci9jYXRhbG9nL3YxYWxwaGExL2NhdGFsb2cucHJvdG8SFmhhd2tyLmNhdGFsb2cudjFhbHBoYTEi3AMKFFByb2R1Y3RDb250ZW50TGltaXRzEhUKBXRpdGxlGAEgASgJQgaStRgCEGQSFAoEYXhlcxgCIAMoCUIGkrUYAggCEhkKCWF4aXNfbmFtZRgDIAEoCUIGkrUYAhAUEhwKDG9wdGlvbl92YWx1ZRgEIAEoCUIGkrUYAhAoEh8KD3ZhbHVlc19wZXJfYXhpcxgFIAMoCUIGkrUYAggyEhQKBHNrdXMYBiADKAlCBpK1GAIIZBIeCg5nYWxsZXJ5X2ltYWdlcxgHIAMoCUIGkrUYAggJEhQKA2FsdBgIIAEoCUIHkrUYAxDIARIiChJkZXNjcmlwdGlvbl9ibG9ja3MYCSADKAlCBpK1GAIIZBIiChJkZXNjcmlwdGlvbl9pbWFnZXMYCiADKAlCBpK1GAIIFBIcCgtkZXNjcmlwdGlvbhgLIAEoCUIHkrUYAxC4FxIaCgpsaXN0X2l0ZW1zGAwgAygJQgaStRgCCDISGgoJbGlzdF9pdGVtGA0gASgJQgeStRgDEMgBEhoKCnRhYmxlX3Jvd3MYDiADKAlCBpK1GAIIMhIaCgp0YWJsZV9jb2xzGA8gAygJQgaStRgCCAoSGwoKdGFibGVfY2VsbBgQIAEoCUIHkrUYAxDIAWIGcHJvdG8z", [file_hawkr_common_v1alpha1_limits]);
+  fileDesc("CiRoYXdrci9jYXRhbG9nL3YxYWxwaGExL2NhdGFsb2cucHJvdG8SFmhhd2tyLmNhdGFsb2cudjFhbHBoYTEi3QIKDFByb2R1Y3RJbnB1dBIYCgV0aXRsZRgBIAEoCUIJ4EECkrUYAhBkEhgKC2NhdGVnb3J5X2lkGAIgASgJQgPgQQISFgoOaGFzaHRhZ19pbnB1dHMYAyADKAkSOwoHZ2FsbGVyeRgEIAMoCzIiLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuSW1hZ2VJbnB1dEIGkrUYAggJEkoKC2Rlc2NyaXB0aW9uGAUgAygLMiguaGF3a3IuY2F0YWxvZy52MWFscGhhMS5EZXNjcmlwdGlvbkJsb2NrQguStRgHCGQYuBcgFBI9CgRheGVzGAYgAygLMicuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5PcHRpb25BeGlzSW5wdXRCBpK1GAIIAhI5CgRza3VzGAcgAygLMiAuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5Ta3VJbnB1dEIJ4EECkrUYAghkIlgKCkltYWdlSW5wdXQSFgoMc3RhZ2VkX3Rva2VuGAEgASgJSAASEgoIYXNzZXRfaWQYAiABKAlIABIUCgNhbHQYAyABKAlCB5K1GAMQyAFCCAoGc291cmNlItABChBEZXNjcmlwdGlvbkJsb2NrEhMKCXBhcmFncmFwaBgBIAEoCUgAEjMKBWltYWdlGAIgASgLMiIuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5JbWFnZUlucHV0SAASOQoLYnVsbGV0X2xpc3QYAyABKAsyIi5oYXdrci5jYXRhbG9nLnYxYWxwaGExLkJ1bGxldExpc3RIABIuCgV0YWJsZRgEIAEoCzIdLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuVGFibGVIAEIHCgVibG9jayImCgpCdWxsZXRMaXN0EhgKBWl0ZW1zGAEgAygJQgmStRgFCDIQyAEiPwoFVGFibGUSNgoEcm93cxgBIAMoCzIgLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuVGFibGVSb3dCBpK1GAIIMiIkCghUYWJsZVJvdxIYCgVjZWxscxgBIAMoCUIJkrUYBQgKEMgBIkcKD09wdGlvbkF4aXNJbnB1dBIXCgRuYW1lGAEgASgJQgngQQKStRgCEBQSGwoGdmFsdWVzGAIgAygJQgvgQQKStRgECDIQKCKLAQoIU2t1SW5wdXQSDwoHb3B0aW9uMRgBIAEoCRIPCgdvcHRpb24yGAIgASgJEhIKBXByaWNlGAMgASgDQgPgQQISHQoQY29tcGFyZV9hdF9wcmljZRgEIAEoA0gAiAEBEhUKDWluaXRpYWxfc3RvY2sYBSABKAVCEwoRX2NvbXBhcmVfYXRfcHJpY2ViBnByb3RvMw", [file_google_api_field_behavior, file_hawkr_common_v1alpha1_limits]);
 
 /**
- * ProductContentLimits 是商品內容的上限：每個欄位只用來掛 hawkr.common.v1alpha1.limits，不出現在任何 RPC。
- * 欄位名決定生成的常數名：string 欄位的 max_runes 生成 Max<欄位>Runes，repeated 欄位的 max_items 生成 Max<欄位>。
- * 商品的請求訊息定義之後，上限改掛在實際的請求欄位上，這個訊息即可刪除。
+ * ProductInput 是商品的完整可寫內容。修改是整體取代：沒有帶的圖片、選項軸與 SKU 組合會被移除。
+ * 狀態不在這裡，用切換狀態的操作改。
  *
- * @generated from message hawkr.catalog.v1alpha1.ProductContentLimits
+ * @generated from message hawkr.catalog.v1alpha1.ProductInput
  */
-export type ProductContentLimits = Message<"hawkr.catalog.v1alpha1.ProductContentLimits"> & {
+export type ProductInput = Message<"hawkr.catalog.v1alpha1.ProductInput"> & {
   /**
-   * 商品標題。
+   * 商品標題，去頭尾空白後不得為空。
    *
    * @generated from field: string title = 1;
    */
   title: string;
 
   /**
-   * 選項軸個數。
+   * 分類 ID，必須是葉節點。
    *
-   * @generated from field: repeated string axes = 2;
+   * @generated from field: string category_id = 2;
    */
-  axes: string[];
+  categoryId: string;
 
   /**
-   * 選項軸名稱。
+   * 標籤的輸入（使用者輸入的樣子，可帶開頭的 #）；整批取代，空清單是沒有標籤。個數與格式的規則同 social 的標籤（platform/hashtag）。
    *
-   * @generated from field: string axis_name = 3;
+   * @generated from field: repeated string hashtag_inputs = 3;
    */
-  axisName: string;
+  hashtagInputs: string[];
 
   /**
-   * 選項值。
+   * 主圖，依顯示順序；狀態為 ACTIVE 的商品至少要有一張。
    *
-   * @generated from field: string option_value = 4;
+   * @generated from field: repeated hawkr.catalog.v1alpha1.ImageInput gallery = 4;
    */
-  optionValue: string;
+  gallery: ImageInput[];
 
   /**
-   * 每個選項軸的值個數。
+   * 描述的區塊，依顯示順序。上限跨整份描述計算：區塊個數，帶圖片的區塊個數，以及段落、清單項目與表格儲存格的文字總量。
    *
-   * @generated from field: repeated string values_per_axis = 5;
+   * @generated from field: repeated hawkr.catalog.v1alpha1.DescriptionBlock description = 5;
    */
-  valuesPerAxis: string[];
+  description: DescriptionBlock[];
 
   /**
-   * SKU 個數。
+   * 選項軸，依順序；沒有軸的商品只有一個預設 SKU。
    *
-   * @generated from field: repeated string skus = 6;
+   * @generated from field: repeated hawkr.catalog.v1alpha1.OptionAxisInput axes = 6;
    */
-  skus: string[];
+  axes: OptionAxisInput[];
 
   /**
-   * 主圖張數。
+   * SKU，以選項值的組合辨識；至少一個。
    *
-   * @generated from field: repeated string gallery_images = 7;
+   * @generated from field: repeated hawkr.catalog.v1alpha1.SkuInput skus = 7;
    */
-  galleryImages: string[];
-
-  /**
-   * 圖片的替代文字。
-   *
-   * @generated from field: string alt = 8;
-   */
-  alt: string;
-
-  /**
-   * 描述的區塊個數。
-   *
-   * @generated from field: repeated string description_blocks = 9;
-   */
-  descriptionBlocks: string[];
-
-  /**
-   * 描述內的圖片張數。
-   *
-   * @generated from field: repeated string description_images = 10;
-   */
-  descriptionImages: string[];
-
-  /**
-   * 整份描述的文字總量：段落、清單項目與表格儲存格的文字合計（不含圖片的替代文字）。
-   *
-   * @generated from field: string description = 11;
-   */
-  description: string;
-
-  /**
-   * 清單的項目個數。
-   *
-   * @generated from field: repeated string list_items = 12;
-   */
-  listItems: string[];
-
-  /**
-   * 清單的單一項目文字。
-   *
-   * @generated from field: string list_item = 13;
-   */
-  listItem: string;
-
-  /**
-   * 表格的列數。
-   *
-   * @generated from field: repeated string table_rows = 14;
-   */
-  tableRows: string[];
-
-  /**
-   * 表格的欄數。
-   *
-   * @generated from field: repeated string table_cols = 15;
-   */
-  tableCols: string[];
-
-  /**
-   * 表格的單一儲存格文字。
-   *
-   * @generated from field: string table_cell = 16;
-   */
-  tableCell: string;
+  skus: SkuInput[];
 };
 
 /**
- * Describes the message hawkr.catalog.v1alpha1.ProductContentLimits.
- * Use `create(ProductContentLimitsSchema)` to create a new message.
+ * Describes the message hawkr.catalog.v1alpha1.ProductInput.
+ * Use `create(ProductInputSchema)` to create a new message.
  */
-export const ProductContentLimitsSchema: GenMessage<ProductContentLimits> = /*@__PURE__*/
+export const ProductInputSchema: GenMessage<ProductInput> = /*@__PURE__*/
   messageDesc(file_hawkr_catalog_v1alpha1_catalog, 0);
+
+/**
+ * ImageInput 是寫入時的一張圖：新上傳的圖帶 staged token，商品現有的圖帶它的 asset_id，兩者剛好給一個。
+ *
+ * @generated from message hawkr.catalog.v1alpha1.ImageInput
+ */
+export type ImageInput = Message<"hawkr.catalog.v1alpha1.ImageInput"> & {
+  /**
+   * @generated from oneof hawkr.catalog.v1alpha1.ImageInput.source
+   */
+  source: {
+    /**
+     * media 上傳完成後拿到的 staged token；伺服器在寫入的 transaction 內確認它。
+     *
+     * @generated from field: string staged_token = 1;
+     */
+    value: string;
+    case: "stagedToken";
+  } | {
+    /**
+     * 商品現有的圖（讀取商品時回傳的資產 ID），沿用不重新上傳。
+     *
+     * @generated from field: string asset_id = 2;
+     */
+    value: string;
+    case: "assetId";
+  } | { case: undefined; value?: undefined };
+
+  /**
+   * 圖片的替代文字，可空。
+   *
+   * @generated from field: string alt = 3;
+   */
+  alt: string;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.ImageInput.
+ * Use `create(ImageInputSchema)` to create a new message.
+ */
+export const ImageInputSchema: GenMessage<ImageInput> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 1);
+
+/**
+ * DescriptionBlock 是描述的一個區塊，剛好設一種。
+ *
+ * @generated from message hawkr.catalog.v1alpha1.DescriptionBlock
+ */
+export type DescriptionBlock = Message<"hawkr.catalog.v1alpha1.DescriptionBlock"> & {
+  /**
+   * @generated from oneof hawkr.catalog.v1alpha1.DescriptionBlock.block
+   */
+  block: {
+    /**
+     * 段落，純文字。
+     *
+     * @generated from field: string paragraph = 1;
+     */
+    value: string;
+    case: "paragraph";
+  } | {
+    /**
+     * 圖片。
+     *
+     * @generated from field: hawkr.catalog.v1alpha1.ImageInput image = 2;
+     */
+    value: ImageInput;
+    case: "image";
+  } | {
+    /**
+     * 項目清單。
+     *
+     * @generated from field: hawkr.catalog.v1alpha1.BulletList bullet_list = 3;
+     */
+    value: BulletList;
+    case: "bulletList";
+  } | {
+    /**
+     * 表格。
+     *
+     * @generated from field: hawkr.catalog.v1alpha1.Table table = 4;
+     */
+    value: Table;
+    case: "table";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.DescriptionBlock.
+ * Use `create(DescriptionBlockSchema)` to create a new message.
+ */
+export const DescriptionBlockSchema: GenMessage<DescriptionBlock> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 2);
+
+/**
+ * BulletList 是項目清單。
+ *
+ * @generated from message hawkr.catalog.v1alpha1.BulletList
+ */
+export type BulletList = Message<"hawkr.catalog.v1alpha1.BulletList"> & {
+  /**
+   * 清單項目，至少一項；每項的文字上限是 max_runes。
+   *
+   * @generated from field: repeated string items = 1;
+   */
+  items: string[];
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.BulletList.
+ * Use `create(BulletListSchema)` to create a new message.
+ */
+export const BulletListSchema: GenMessage<BulletList> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 3);
+
+/**
+ * Table 是表格，每列的儲存格數相同。
+ *
+ * @generated from message hawkr.catalog.v1alpha1.Table
+ */
+export type Table = Message<"hawkr.catalog.v1alpha1.Table"> & {
+  /**
+   * 表格的列，至少一列。
+   *
+   * @generated from field: repeated hawkr.catalog.v1alpha1.TableRow rows = 1;
+   */
+  rows: TableRow[];
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.Table.
+ * Use `create(TableSchema)` to create a new message.
+ */
+export const TableSchema: GenMessage<Table> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 4);
+
+/**
+ * TableRow 是表格的一列。
+ *
+ * @generated from message hawkr.catalog.v1alpha1.TableRow
+ */
+export type TableRow = Message<"hawkr.catalog.v1alpha1.TableRow"> & {
+  /**
+   * 這一列的儲存格，至少一格；每格的文字上限是 max_runes。
+   *
+   * @generated from field: repeated string cells = 1;
+   */
+  cells: string[];
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.TableRow.
+ * Use `create(TableRowSchema)` to create a new message.
+ */
+export const TableRowSchema: GenMessage<TableRow> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 5);
+
+/**
+ * OptionAxisInput 是一個選項軸：名稱與有序的選項值。名稱與值都是賣家的字，不翻譯。
+ *
+ * @generated from message hawkr.catalog.v1alpha1.OptionAxisInput
+ */
+export type OptionAxisInput = Message<"hawkr.catalog.v1alpha1.OptionAxisInput"> & {
+  /**
+   * 軸名稱，例如「顏色」。
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * 選項值，依顯示順序，至少一個；每個值的長度上限是 max_runes。
+   *
+   * @generated from field: repeated string values = 2;
+   */
+  values: string[];
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.OptionAxisInput.
+ * Use `create(OptionAxisInputSchema)` to create a new message.
+ */
+export const OptionAxisInputSchema: GenMessage<OptionAxisInput> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 6);
+
+/**
+ * SkuInput 是一個 SKU，以選項值的組合辨識：沒有軸的商品兩個選項都空；有一個軸只給 option1。
+ * 組合已存在時更新價格；庫存只在新組合時作為初始值，既有 SKU 的庫存只由庫存調整改。
+ *
+ * @generated from message hawkr.catalog.v1alpha1.SkuInput
+ */
+export type SkuInput = Message<"hawkr.catalog.v1alpha1.SkuInput"> & {
+  /**
+   * 第一個軸的選項值，必須是 axes[0].values 之一。
+   *
+   * @generated from field: string option1 = 1;
+   */
+  option1: string;
+
+  /**
+   * 第二個軸的選項值，必須是 axes[1].values 之一。
+   *
+   * @generated from field: string option2 = 2;
+   */
+  option2: string;
+
+  /**
+   * 售價，新台幣元的整數，大於 0。
+   *
+   * @generated from field: int64 price = 3;
+   */
+  price: bigint;
+
+  /**
+   * 原價（劃線價），新台幣元的整數；沒有設是沒有原價。
+   *
+   * @generated from field: optional int64 compare_at_price = 4;
+   */
+  compareAtPrice?: bigint | undefined;
+
+  /**
+   * 新組合的初始庫存，不得為負。
+   *
+   * @generated from field: int32 initial_stock = 5;
+   */
+  initialStock: number;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.SkuInput.
+ * Use `create(SkuInputSchema)` to create a new message.
+ */
+export const SkuInputSchema: GenMessage<SkuInput> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 7);
 

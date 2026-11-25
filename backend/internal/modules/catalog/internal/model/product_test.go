@@ -52,10 +52,10 @@ func TestSchemaCheckLimitsMatchGeneratedConstants(t *testing.T) {
 		constraint, column string
 		want               int
 	}{
-		{"products_title_check", "title", model.MaxTitleRunes},
-		{"option_axes_name_check", "name", model.MaxAxisNameRunes},
-		{"option_values_value_check", "value", model.MaxOptionValueRunes},
-		{"product_images_alt_check", "alt", model.MaxAltRunes},
+		{"products_title_check", "title", model.MaxProductInputTitleRunes},
+		{"option_axes_name_check", "name", model.MaxOptionAxisInputNameRunes},
+		{"option_values_value_check", "value", model.MaxOptionAxisInputValuesRunes},
+		{"product_images_alt_check", "alt", model.MaxImageInputAltRunes},
 	} {
 		if got := maxLen(c.constraint, c.column); got != c.want {
 			t.Errorf("%s: schema.sql 的上限 %d，生成的常數 %d", c.constraint, got, c.want)
@@ -69,7 +69,7 @@ func TestSchemaCheckLimitsMatchGeneratedConstants(t *testing.T) {
 	for _, n := range regexp.MustCompile(`\d+`).FindAllString(m[1], -1) {
 		last = atoi(n)
 	}
-	if last != model.MaxAxes {
-		t.Errorf("option_axes_position_check 的最大位置 %d，MaxAxes %d", last, model.MaxAxes)
+	if last != model.MaxProductInputAxes {
+		t.Errorf("option_axes_position_check 的最大位置 %d，MaxProductInputAxes %d", last, model.MaxProductInputAxes)
 	}
 }

@@ -12,11 +12,12 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file hawkr/common/v1alpha1/limits.proto.
  */
 export const file_hawkr_common_v1alpha1_limits: GenFile = /*@__PURE__*/
-  fileDesc("CiJoYXdrci9jb21tb24vdjFhbHBoYTEvbGltaXRzLnByb3RvEhVoYXdrci5jb21tb24udjFhbHBoYTEiLgoGTGltaXRzEhEKCW1heF9pdGVtcxgBIAEoBRIRCgltYXhfcnVuZXMYAiABKAU6VgoGbGltaXRzEh0uZ29vZ2xlLnByb3RvYnVmLkZpZWxkT3B0aW9ucxjShgMgASgLMh0uaGF3a3IuY29tbW9uLnYxYWxwaGExLkxpbWl0c1IGbGltaXRzYgZwcm90bzM", [file_google_protobuf_descriptor]);
+  fileDesc("CiJoYXdrci9jb21tb24vdjFhbHBoYTEvbGltaXRzLnByb3RvEhVoYXdrci5jb21tb24udjFhbHBoYTEiYAoGTGltaXRzEhEKCW1heF9pdGVtcxgBIAEoBRIRCgltYXhfcnVuZXMYAiABKAUSFwoPbWF4X3RvdGFsX3J1bmVzGAMgASgFEhcKD21heF9pbWFnZV9pdGVtcxgEIAEoBTpWCgZsaW1pdHMSHS5nb29nbGUucHJvdG9idWYuRmllbGRPcHRpb25zGNKGAyABKAsyHS5oYXdrci5jb21tb24udjFhbHBoYTEuTGltaXRzUgZsaW1pdHNiBnByb3RvMw", [file_google_protobuf_descriptor]);
 
 /**
- * Limits 是一個欄位的內容上限。max_items 用在 repeated 欄位（元素個數），max_runes 用在 string 欄位（Unicode code point 數，
- * 不是位元組也不是 UTF-16 單位）。兩者擇一，必須大於 0。
+ * Limits 是一個欄位的內容上限，至少設一種，每種必須大於 0。
+ * max_items 用在 repeated 欄位（元素個數）；max_runes 用在 string 欄位（Unicode code point 數，不是位元組也不是 UTF-16 單位），
+ * 用在 repeated string 時是每個元素的上限；max_total_runes 與 max_image_items 用在 repeated 訊息欄位，上限跨整個欄位的所有元素計算。
  *
  * @generated from message hawkr.common.v1alpha1.Limits
  */
@@ -34,6 +35,20 @@ export type Limits = Message<"hawkr.common.v1alpha1.Limits"> & {
    * @generated from field: int32 max_runes = 2;
    */
   maxRunes: number;
+
+  /**
+   * 所有元素內文字的 code point 總數上限：只算內容文字（段落、清單項目、表格儲存格），不含圖片的替代文字。
+   *
+   * @generated from field: int32 max_total_runes = 3;
+   */
+  maxTotalRunes: number;
+
+  /**
+   * 所有元素裡帶圖片的元素個數上限。
+   *
+   * @generated from field: int32 max_image_items = 4;
+   */
+  maxImageItems: number;
 };
 
 /**

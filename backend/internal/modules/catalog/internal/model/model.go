@@ -16,7 +16,7 @@ type StockItem struct {
 // MaxStockItems 是一次扣減或歸還的 SKU 數上限。
 const MaxStockItems = 100
 
-// 庫存操作的錯誤。呼叫端（B4-3 的 API、B8 的結帳）用 errors.Is／errors.As 判斷並對應成對外的錯誤原因。
+// 庫存操作的錯誤。呼叫端（對外的 API、結帳）用 errors.Is／errors.As 判斷並對應成對外的錯誤原因。
 var (
 	// ErrInvalidStockInput 表示輸入不合法：冪等鍵空白或過長、沒有品項、數量不是正數、同一個 SKU 出現兩次、品項過多。
 	ErrInvalidStockInput = errors.New("catalog: invalid stock input")

@@ -14,9 +14,9 @@ import (
 
 // Normalize 驗證區塊並回傳整理過的副本（文字去頭尾空白）。欄位路徑以 field 為前綴（例如 "Description"）。
 // 圖片區塊必須剛好給 Token 或 AssetID 其中一個，alt 不超過上限；上限見 model 的常數。
-// 文字沒有單段上限，段落、清單項目與表格儲存格的文字合計不得超過 model.MaxDescriptionRunes（不含 alt）；清單項目與儲存格另有各自的上限。
+// 文字沒有單段上限，段落、清單項目與表格儲存格的文字合計不得超過 model.MaxProductInputDescriptionTotalRunes（不含 alt）；清單項目與儲存格另有各自的上限。
 func Normalize(field string, blocks []model.Block) ([]model.Block, error) {
-	if len(blocks) > model.MaxDescriptionBlocks {
+	if len(blocks) > model.MaxProductInputDescription {
 		return nil, model.Invalid(field, model.ReasonTooMany)
 	}
 	out := make([]model.Block, 0, len(blocks))
@@ -39,7 +39,7 @@ func Normalize(field string, blocks []model.Block) ([]model.Block, error) {
 				return nil, model.Invalid(f+".Image", model.ReasonRequired)
 			}
 			images++
-			if images > model.MaxDescriptionImages {
+			if images > model.MaxProductInputDescriptionImageItems {
 				return nil, model.Invalid(field, model.ReasonTooMany)
 			}
 			img, err := NormalizeImage(f+".Image", *b.Image)
@@ -51,13 +51,13 @@ func Normalize(field string, blocks []model.Block) ([]model.Block, error) {
 			if len(b.Items) == 0 {
 				return nil, model.Invalid(f+".Items", model.ReasonRequired)
 			}
-			if len(b.Items) > model.MaxListItems {
+			if len(b.Items) > model.MaxBulletListItems {
 				return nil, model.Invalid(f+".Items", model.ReasonTooMany)
 			}
 			items := make([]string, len(b.Items))
 			for j, it := range b.Items {
 				items[j] = trimtext.Trim(it)
-				if err := checkText(fmt.Sprintf("%s.Items[%d]", f, j), items[j], model.MaxListItemRunes, false); err != nil {
+				if err := checkText(fmt.Sprintf("%s.Items[%d]", f, j), items[j], model.MaxBulletListItemsRunes, false); err != nil {
 					return nil, err
 				}
 				if err := budget.add(items[j]); err != nil {
@@ -85,7 +85,7 @@ func NormalizeImage(field string, img model.Image) (model.Image, error) {
 		return model.Image{}, model.Invalid(field, model.ReasonInvalid)
 	}
 	alt := trimtext.Trim(img.Alt)
-	if utf8.RuneCountInString(alt) > model.MaxAltRunes {
+	if utf8.RuneCountInString(alt) > model.MaxImageInputAltRunes {
 		return model.Image{}, model.Invalid(field+".Alt", model.ReasonTooLong)
 	}
 	return model.Image{Token: img.Token, AssetID: img.AssetID, Alt: alt}, nil
@@ -102,7 +102,7 @@ func normalizeTable(field string, rows [][]string, budget *textBudget) ([][]stri
 	if width == 0 {
 		return nil, model.Invalid(field, model.ReasonRequired)
 	}
-	if width > model.MaxTableCols {
+	if width > model.MaxTableRowCells {
 		return nil, model.Invalid(field, model.ReasonTooMany)
 	}
 	out := make([][]string, len(rows))
@@ -113,7 +113,7 @@ func normalizeTable(field string, rows [][]string, budget *textBudget) ([][]stri
 		out[r] = make([]string, width)
 		for c, cell := range row {
 			out[r][c] = trimtext.Trim(cell)
-			if err := checkText(fmt.Sprintf("%s[%d][%d]", field, r, c), out[r][c], model.MaxTableCellRunes, true); err != nil {
+			if err := checkText(fmt.Sprintf("%s[%d][%d]", field, r, c), out[r][c], model.MaxTableRowCellsRunes, true); err != nil {
 				return nil, err
 			}
 			if err := budget.add(out[r][c]); err != nil {
@@ -124,7 +124,7 @@ func normalizeTable(field string, rows [][]string, budget *textBudget) ([][]stri
 	return out, nil
 }
 
-// textBudget 累計整份描述的文字量（rune），超過 model.MaxDescriptionRunes 回 TooLong，欄位是整份描述的欄位路徑。
+// textBudget 累計整份描述的文字量（rune），超過 model.MaxProductInputDescriptionTotalRunes 回 TooLong，欄位是整份描述的欄位路徑。
 type textBudget struct {
 	field string
 	used  int
@@ -132,7 +132,7 @@ type textBudget struct {
 
 func (b *textBudget) add(s string) error {
 	b.used += utf8.RuneCountInString(s)
-	if b.used > model.MaxDescriptionRunes {
+	if b.used > model.MaxProductInputDescriptionTotalRunes {
 		return model.Invalid(b.field, model.ReasonTooLong)
 	}
 	return nil

@@ -23,7 +23,7 @@ schema `catalog`（`db/schema.sql`）：`categories`、`products`、`product_opt
 
 ## 不變量
 
-- 庫存只由 `stock` 改：扣減是 `UPDATE … WHERE stock_qty >= n`，先插入 `stock_operations`（冪等鍵 UNIQUE，`ON CONFLICT DO NOTHING`）再扣，不「先查再扣」；SKU 列依 ID 升序鎖定；庫存不為負（`skus_stock_check`）。守門：`TestConcurrentSameKeyDeductsOnce`、`TestConcurrentDifferentKeysNeverOversell`、`TestMultiItemDeductsInOppositeOrderDoNotDeadlock`。規格 §庫存。
+- 庫存只由 `stock` 改：扣減是 `UPDATE … WHERE stock_qty >= n`，先插入 `stock_operations`（冪等鍵唯一，`ON CONFLICT DO NOTHING`；結帳的操作全域唯一，賣家調整的鍵依 `store_id` 只在店家內唯一）再扣，不「先查再扣」；SKU 列依 ID 升序鎖定；庫存不為負（`skus_stock_check`）。守門：`TestConcurrentSameKeyDeductsOnce`、`TestConcurrentDifferentKeysNeverOversell`、`TestMultiItemDeductsInOppositeOrderDoNotDeadlock`、`TestAdjustKeyIsScopedPerStore`。規格 §庫存。
 - 歸還依原扣減，只認原扣減的冪等鍵；先 `LockStockOperation` 鎖原扣減列，累計不超過原扣減量，原扣減沒有的 SKU 被拒。守門：`TestRestoreFollowsTheOriginalDeduction`、`TestConcurrentRestoresNeverExceedTheDeduction`。
 - 同一個冪等鍵以不同內容重送回 `ErrIdempotencyKeyReused`，內容相同回成功且不改庫存。`DeductStock`／`RestoreStock` 在呼叫方的 transaction 內失敗時，呼叫方必須整個回滾。
 - 分類只在 migration 變動，兩層；商品只能掛葉節點（`IsLeafCategory`）；名稱是 `LocalizedText`（必有 zh-TW）。守門：`TestSeedTaxonomyShape`、`TestOnlyLeafCategoriesTakeProducts`、`categories_name_check`。

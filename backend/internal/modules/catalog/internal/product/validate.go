@@ -31,7 +31,7 @@ func prepare(in model.ProductInput) (prepared, error) {
 	if p.title == "" {
 		return p, model.Invalid("Title", model.ReasonRequired)
 	}
-	if utf8.RuneCountInString(p.title) > model.MaxTitleRunes {
+	if utf8.RuneCountInString(p.title) > model.MaxProductInputTitleRunes {
 		return p, model.Invalid("Title", model.ReasonTooLong)
 	}
 	if in.CategoryID == uuid.Nil() {
@@ -74,7 +74,7 @@ func hashtagInvalid(err error) error {
 }
 
 func normalizeGallery(in []model.Image) ([]model.Image, error) {
-	if len(in) > model.MaxGalleryImages {
+	if len(in) > model.MaxProductInputGallery {
 		return nil, model.Invalid("Gallery", model.ReasonTooMany)
 	}
 	out := make([]model.Image, len(in))
@@ -119,7 +119,7 @@ func checkImageRefsUnique(gallery []model.Image, desc []model.Block) error {
 }
 
 func normalizeAxes(in []model.Axis) ([]model.Axis, error) {
-	if len(in) > model.MaxAxes {
+	if len(in) > model.MaxProductInputAxes {
 		return nil, model.Invalid("Axes", model.ReasonTooMany)
 	}
 	out := make([]model.Axis, len(in))
@@ -130,7 +130,7 @@ func normalizeAxes(in []model.Axis) ([]model.Axis, error) {
 		if name == "" {
 			return nil, model.Invalid(f+".Name", model.ReasonRequired)
 		}
-		if utf8.RuneCountInString(name) > model.MaxAxisNameRunes {
+		if utf8.RuneCountInString(name) > model.MaxOptionAxisInputNameRunes {
 			return nil, model.Invalid(f+".Name", model.ReasonTooLong)
 		}
 		if names[name] {
@@ -140,7 +140,7 @@ func normalizeAxes(in []model.Axis) ([]model.Axis, error) {
 		if len(a.Values) == 0 {
 			return nil, model.Invalid(f+".Values", model.ReasonRequired)
 		}
-		if len(a.Values) > model.MaxValuesPerAxis {
+		if len(a.Values) > model.MaxOptionAxisInputValues {
 			return nil, model.Invalid(f+".Values", model.ReasonTooMany)
 		}
 		values := make([]string, len(a.Values))
@@ -150,7 +150,7 @@ func normalizeAxes(in []model.Axis) ([]model.Axis, error) {
 			if v == "" {
 				return nil, model.Invalid(vf, model.ReasonRequired)
 			}
-			if utf8.RuneCountInString(v) > model.MaxOptionValueRunes {
+			if utf8.RuneCountInString(v) > model.MaxOptionAxisInputValuesRunes {
 				return nil, model.Invalid(vf, model.ReasonTooLong)
 			}
 			if slices.Contains(values[:j], v) {
@@ -169,7 +169,7 @@ func normalizeSkus(axes []model.Axis, in []model.SkuInput) ([]model.SkuInput, er
 	if len(in) == 0 {
 		return nil, model.Invalid("Skus", model.ReasonRequired)
 	}
-	if len(in) > model.MaxSkus {
+	if len(in) > model.MaxProductInputSkus {
 		return nil, model.Invalid("Skus", model.ReasonTooMany)
 	}
 	if len(axes) == 0 && len(in) != 1 {

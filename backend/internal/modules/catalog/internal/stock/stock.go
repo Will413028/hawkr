@@ -1,7 +1,7 @@
-// Package stock 是庫存的冪等扣減與歸還（B4 D2）：
-//   - 每次操作是 stock_operations 的一列，冪等鍵 UNIQUE；先插入操作列、再條件式扣減（WHERE stock_qty >= n），不做「先查再扣」，
-//     所以同一個鍵的併發重送只生效一次（CD1）。
-//   - 歸還依原扣減：只帶原扣減的冪等鍵，累計不超過原扣減量（CD2）；items 省略表示歸還剩下的全部。
+// Package stock 是庫存的冪等扣減與歸還：
+//   - 每次操作是 stock_operations 的一列，冪等鍵在各自範圍內唯一（結帳的操作全域唯一，賣家調整依店家）；先插入操作列、再條件式扣減（WHERE stock_qty >= n），不做「先查再扣」，
+//     所以同一個鍵的併發重送只生效一次。
+//   - 歸還依原扣減：只帶原扣減的冪等鍵，累計不超過原扣減量；items 省略表示歸還剩下的全部。
 //   - 全部寫入在呼叫方的 transaction 內（ctx 沒有時自己開一個）；失敗整筆回滾，包括操作列。
 //   - SKU 列依 ID 升序鎖定，兩個多品項扣減不會互相死結。
 package stock
@@ -95,7 +95,7 @@ func (s *Service) Adjust(ctx context.Context, storeID int64, key string, skuID u
 		q := s.q(ctx)
 		now := s.d.Now()
 		opID := s.d.NewID()
-		n, err := q.InsertStockOperation(ctx, store.InsertStockOperationParams{ID: opID, IdempotencyKey: key, Kind: kindAdjust, Now: now})
+		n, err := q.InsertStockOperation(ctx, store.InsertStockOperationParams{ID: opID, IdempotencyKey: key, Kind: kindAdjust, StoreID: &storeID, Now: now})
 		if err != nil {
 			return err
 		}
@@ -121,7 +121,7 @@ func (s *Service) Adjust(ctx context.Context, storeID int64, key string, skuID u
 	})
 }
 
-// replayAdjust 處理同一個 key 重送：先確認 SKU 屬於呼叫的店家（別家店重送同一個 key 與內容，回 ErrSkuNotFound，與第一次送別家 SKU 相同），
+// replayAdjust 處理同一家店同一個 key 的重送（鍵只在店家內唯一）：先確認 SKU 屬於呼叫的店家（重送時 SKU 已不屬於這家店回 ErrSkuNotFound），
 // 再比對原操作的內容。
 func (s *Service) replayAdjust(ctx context.Context, q *store.Queries, storeID int64, key string, skuID uuid.UUID, delta int32) error {
 	own, err := q.SkuInStore(ctx, store.SkuInStoreParams{ID: skuID, StoreID: storeID})
@@ -131,7 +131,7 @@ func (s *Service) replayAdjust(ctx context.Context, q *store.Queries, storeID in
 	if !own {
 		return model.ErrSkuNotFound
 	}
-	op, err := q.GetStockOperationByKey(ctx, key)
+	op, err := q.GetStoreStockOperationByKey(ctx, store.GetStoreStockOperationByKeyParams{StoreID: storeID, IdempotencyKey: key})
 	if err != nil {
 		return err
 	}

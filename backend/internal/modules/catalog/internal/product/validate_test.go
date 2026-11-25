@@ -97,7 +97,7 @@ func TestPrepareTitleAndHashtags(t *testing.T) {
 	in.Title = " "
 	_, err := prepare(in)
 	wantInvalid(t, err, "Title", model.ReasonRequired)
-	in.Title = strings.Repeat("a", model.MaxTitleRunes+1)
+	in.Title = strings.Repeat("a", model.MaxProductInputTitleRunes+1)
 	_, err = prepare(in)
 	wantInvalid(t, err, "Title", model.ReasonTooLong)
 
@@ -121,7 +121,7 @@ func TestPrepareRejectsDuplicateImageRefs(t *testing.T) {
 	in.Description = []model.Block{{Kind: model.BlockImage, Image: &model.Image{Token: "t"}}}
 	_, err := prepare(in)
 	wantInvalid(t, err, "Description.Image[0]", model.ReasonDuplicate)
-	in.Gallery = make([]model.Image, model.MaxGalleryImages+1)
+	in.Gallery = make([]model.Image, model.MaxProductInputGallery+1)
 	_, err = prepare(in)
 	wantInvalid(t, err, "Gallery", model.ReasonTooMany)
 }

@@ -4,10 +4,19 @@
    "id": "insert-conflicts-on-the-wrong-key",
    "stack": "go-integration",
    "file": "backend/internal/modules/catalog/internal/store/stock.sql.go",
-   "old": "ON CONFLICT (idempotency_key) DO NOTHING",
+   "old": "ON CONFLICT DO NOTHING",
    "new": "ON CONFLICT (id) DO NOTHING",
    "test": "internal/modules/catalog ^TestConcurrentSameKeyDeductsOnce$",
    "why": "冪等鍵不再是判重點（CD1 回歸）：同一個鍵的併發重送各自插入操作列，不是只扣一次，測試要紅。"
+  },
+  {
+   "id": "adjust-key-not-scoped-to-store",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/stock/stock.go",
+   "old": "op, err := q.GetStoreStockOperationByKey(ctx, store.GetStoreStockOperationByKeyParams{StoreID: storeID, IdempotencyKey: key})",
+   "new": "op, err := q.GetStoreStockOperationByKey(ctx, store.GetStoreStockOperationByKeyParams{StoreID: 501, IdempotencyKey: key})",
+   "test": "internal/modules/catalog ^TestAdjustKeyIsScopedPerStore$",
+   "why": "調整重送讀的是固定店家的操作而不是呼叫店家的：店家 502 重送同一個鍵時讀不到自己的操作列，測試要紅。"
   },
   {
    "id": "restore-quantity-not-capped",
@@ -211,7 +220,7 @@
    "id": "description-total-not-enforced",
    "stack": "go",
    "file": "backend/internal/modules/catalog/internal/description/description.go",
-   "old": "if b.used > model.MaxDescriptionRunes {",
+   "old": "if b.used > model.MaxProductInputDescriptionTotalRunes {",
    "new": "if false {",
    "test": "internal/modules/catalog/internal/description ^TestNormalizeRejects$",
    "why": "整份描述的文字總量不再受限：段落、清單與表格合計超過 3000 字被放行，測試要紅。"
@@ -229,8 +238,8 @@
    "id": "limit-constant-drifts-from-schema-check",
    "stack": "go",
    "file": "backend/internal/modules/catalog/internal/model/limits_gen.go",
-   "old": "MaxTitleRunes = 100",
-   "new": "MaxTitleRunes = 101",
+   "old": "MaxProductInputTitleRunes = 100",
+   "new": "MaxProductInputTitleRunes = 101",
    "test": "internal/modules/catalog/internal/model ^TestSchemaCheckLimitsMatchGeneratedConstants$",
    "why": "生成的上限與 schema.sql 的 CHECK 字面值不同：drift 測試要紅。"
   }

@@ -4,10 +4,17 @@
 // 	protoc        (unknown)
 // source: hawkr/catalog/v1alpha1/catalog.proto
 
+// catalog 模組的商品寫入內容：賣家建立與修改商品時送的訊息。服務與 RPC 隨後的步驟加入，這裡只定義寫入的資料形狀與內容上限。
+//
+// 內容上限掛在實際受限制的欄位上（hawkr.common.v1alpha1.limits），uitext-gen 讀它並生成 Go、TS、Dart 的常數；
+// 伺服器照樣驗證，違反回 INVALID_ARGUMENT。ID 是不透明的字串（ADR 2026-09-25-row-identity-by-data-kind）。
+// 新圖只收 staged token，不收 URL 或 key（ADR 2026-09-25-api-image-uri-template）。
+
 package catalogv1alpha1
 
 import (
 	_ "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
+	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -22,61 +29,42 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// ProductContentLimits 是商品內容的上限：每個欄位只用來掛 hawkr.common.v1alpha1.limits，不出現在任何 RPC。
-// 欄位名決定生成的常數名：string 欄位的 max_runes 生成 Max<欄位>Runes，repeated 欄位的 max_items 生成 Max<欄位>。
-// 商品的請求訊息定義之後，上限改掛在實際的請求欄位上，這個訊息即可刪除。
-type ProductContentLimits struct {
+// ProductInput 是商品的完整可寫內容。修改是整體取代：沒有帶的圖片、選項軸與 SKU 組合會被移除。
+// 狀態不在這裡，用切換狀態的操作改。
+type ProductInput struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 商品標題。
+	// 商品標題，去頭尾空白後不得為空。
 	Title string `protobuf:"bytes,1,opt,name=title,proto3" json:"title,omitempty"`
-	// 選項軸個數。
-	Axes []string `protobuf:"bytes,2,rep,name=axes,proto3" json:"axes,omitempty"`
-	// 選項軸名稱。
-	AxisName string `protobuf:"bytes,3,opt,name=axis_name,json=axisName,proto3" json:"axis_name,omitempty"`
-	// 選項值。
-	OptionValue string `protobuf:"bytes,4,opt,name=option_value,json=optionValue,proto3" json:"option_value,omitempty"`
-	// 每個選項軸的值個數。
-	ValuesPerAxis []string `protobuf:"bytes,5,rep,name=values_per_axis,json=valuesPerAxis,proto3" json:"values_per_axis,omitempty"`
-	// SKU 個數。
-	Skus []string `protobuf:"bytes,6,rep,name=skus,proto3" json:"skus,omitempty"`
-	// 主圖張數。
-	GalleryImages []string `protobuf:"bytes,7,rep,name=gallery_images,json=galleryImages,proto3" json:"gallery_images,omitempty"`
-	// 圖片的替代文字。
-	Alt string `protobuf:"bytes,8,opt,name=alt,proto3" json:"alt,omitempty"`
-	// 描述的區塊個數。
-	DescriptionBlocks []string `protobuf:"bytes,9,rep,name=description_blocks,json=descriptionBlocks,proto3" json:"description_blocks,omitempty"`
-	// 描述內的圖片張數。
-	DescriptionImages []string `protobuf:"bytes,10,rep,name=description_images,json=descriptionImages,proto3" json:"description_images,omitempty"`
-	// 整份描述的文字總量：段落、清單項目與表格儲存格的文字合計（不含圖片的替代文字）。
-	Description string `protobuf:"bytes,11,opt,name=description,proto3" json:"description,omitempty"`
-	// 清單的項目個數。
-	ListItems []string `protobuf:"bytes,12,rep,name=list_items,json=listItems,proto3" json:"list_items,omitempty"`
-	// 清單的單一項目文字。
-	ListItem string `protobuf:"bytes,13,opt,name=list_item,json=listItem,proto3" json:"list_item,omitempty"`
-	// 表格的列數。
-	TableRows []string `protobuf:"bytes,14,rep,name=table_rows,json=tableRows,proto3" json:"table_rows,omitempty"`
-	// 表格的欄數。
-	TableCols []string `protobuf:"bytes,15,rep,name=table_cols,json=tableCols,proto3" json:"table_cols,omitempty"`
-	// 表格的單一儲存格文字。
-	TableCell     string `protobuf:"bytes,16,opt,name=table_cell,json=tableCell,proto3" json:"table_cell,omitempty"`
+	// 分類 ID，必須是葉節點。
+	CategoryId string `protobuf:"bytes,2,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`
+	// 標籤的輸入（使用者輸入的樣子，可帶開頭的 #）；整批取代，空清單是沒有標籤。個數與格式的規則同 social 的標籤（platform/hashtag）。
+	HashtagInputs []string `protobuf:"bytes,3,rep,name=hashtag_inputs,json=hashtagInputs,proto3" json:"hashtag_inputs,omitempty"`
+	// 主圖，依顯示順序；狀態為 ACTIVE 的商品至少要有一張。
+	Gallery []*ImageInput `protobuf:"bytes,4,rep,name=gallery,proto3" json:"gallery,omitempty"`
+	// 描述的區塊，依顯示順序。上限跨整份描述計算：區塊個數，帶圖片的區塊個數，以及段落、清單項目與表格儲存格的文字總量。
+	Description []*DescriptionBlock `protobuf:"bytes,5,rep,name=description,proto3" json:"description,omitempty"`
+	// 選項軸，依順序；沒有軸的商品只有一個預設 SKU。
+	Axes []*OptionAxisInput `protobuf:"bytes,6,rep,name=axes,proto3" json:"axes,omitempty"`
+	// SKU，以選項值的組合辨識；至少一個。
+	Skus          []*SkuInput `protobuf:"bytes,7,rep,name=skus,proto3" json:"skus,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ProductContentLimits) Reset() {
-	*x = ProductContentLimits{}
+func (x *ProductInput) Reset() {
+	*x = ProductInput{}
 	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ProductContentLimits) String() string {
+func (x *ProductInput) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ProductContentLimits) ProtoMessage() {}
+func (*ProductInput) ProtoMessage() {}
 
-func (x *ProductContentLimits) ProtoReflect() protoreflect.Message {
+func (x *ProductInput) ProtoReflect() protoreflect.Message {
 	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -88,151 +76,594 @@ func (x *ProductContentLimits) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ProductContentLimits.ProtoReflect.Descriptor instead.
-func (*ProductContentLimits) Descriptor() ([]byte, []int) {
+// Deprecated: Use ProductInput.ProtoReflect.Descriptor instead.
+func (*ProductInput) Descriptor() ([]byte, []int) {
 	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *ProductContentLimits) GetTitle() string {
+func (x *ProductInput) GetTitle() string {
 	if x != nil {
 		return x.Title
 	}
 	return ""
 }
 
-func (x *ProductContentLimits) GetAxes() []string {
+func (x *ProductInput) GetCategoryId() string {
+	if x != nil {
+		return x.CategoryId
+	}
+	return ""
+}
+
+func (x *ProductInput) GetHashtagInputs() []string {
+	if x != nil {
+		return x.HashtagInputs
+	}
+	return nil
+}
+
+func (x *ProductInput) GetGallery() []*ImageInput {
+	if x != nil {
+		return x.Gallery
+	}
+	return nil
+}
+
+func (x *ProductInput) GetDescription() []*DescriptionBlock {
+	if x != nil {
+		return x.Description
+	}
+	return nil
+}
+
+func (x *ProductInput) GetAxes() []*OptionAxisInput {
 	if x != nil {
 		return x.Axes
 	}
 	return nil
 }
 
-func (x *ProductContentLimits) GetAxisName() string {
-	if x != nil {
-		return x.AxisName
-	}
-	return ""
-}
-
-func (x *ProductContentLimits) GetOptionValue() string {
-	if x != nil {
-		return x.OptionValue
-	}
-	return ""
-}
-
-func (x *ProductContentLimits) GetValuesPerAxis() []string {
-	if x != nil {
-		return x.ValuesPerAxis
-	}
-	return nil
-}
-
-func (x *ProductContentLimits) GetSkus() []string {
+func (x *ProductInput) GetSkus() []*SkuInput {
 	if x != nil {
 		return x.Skus
 	}
 	return nil
 }
 
-func (x *ProductContentLimits) GetGalleryImages() []string {
+// ImageInput 是寫入時的一張圖：新上傳的圖帶 staged token，商品現有的圖帶它的 asset_id，兩者剛好給一個。
+type ImageInput struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Source:
+	//
+	//	*ImageInput_StagedToken
+	//	*ImageInput_AssetId
+	Source isImageInput_Source `protobuf_oneof:"source"`
+	// 圖片的替代文字，可空。
+	Alt           string `protobuf:"bytes,3,opt,name=alt,proto3" json:"alt,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ImageInput) Reset() {
+	*x = ImageInput{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImageInput) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImageInput) ProtoMessage() {}
+
+func (x *ImageInput) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[1]
 	if x != nil {
-		return x.GalleryImages
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImageInput.ProtoReflect.Descriptor instead.
+func (*ImageInput) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ImageInput) GetSource() isImageInput_Source {
+	if x != nil {
+		return x.Source
 	}
 	return nil
 }
 
-func (x *ProductContentLimits) GetAlt() string {
+func (x *ImageInput) GetStagedToken() string {
+	if x != nil {
+		if x, ok := x.Source.(*ImageInput_StagedToken); ok {
+			return x.StagedToken
+		}
+	}
+	return ""
+}
+
+func (x *ImageInput) GetAssetId() string {
+	if x != nil {
+		if x, ok := x.Source.(*ImageInput_AssetId); ok {
+			return x.AssetId
+		}
+	}
+	return ""
+}
+
+func (x *ImageInput) GetAlt() string {
 	if x != nil {
 		return x.Alt
 	}
 	return ""
 }
 
-func (x *ProductContentLimits) GetDescriptionBlocks() []string {
+type isImageInput_Source interface {
+	isImageInput_Source()
+}
+
+type ImageInput_StagedToken struct {
+	// media 上傳完成後拿到的 staged token；伺服器在寫入的 transaction 內確認它。
+	StagedToken string `protobuf:"bytes,1,opt,name=staged_token,json=stagedToken,proto3,oneof"`
+}
+
+type ImageInput_AssetId struct {
+	// 商品現有的圖（讀取商品時回傳的資產 ID），沿用不重新上傳。
+	AssetId string `protobuf:"bytes,2,opt,name=asset_id,json=assetId,proto3,oneof"`
+}
+
+func (*ImageInput_StagedToken) isImageInput_Source() {}
+
+func (*ImageInput_AssetId) isImageInput_Source() {}
+
+// DescriptionBlock 是描述的一個區塊，剛好設一種。
+type DescriptionBlock struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Block:
+	//
+	//	*DescriptionBlock_Paragraph
+	//	*DescriptionBlock_Image
+	//	*DescriptionBlock_BulletList
+	//	*DescriptionBlock_Table
+	Block         isDescriptionBlock_Block `protobuf_oneof:"block"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DescriptionBlock) Reset() {
+	*x = DescriptionBlock{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DescriptionBlock) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DescriptionBlock) ProtoMessage() {}
+
+func (x *DescriptionBlock) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[2]
 	if x != nil {
-		return x.DescriptionBlocks
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DescriptionBlock.ProtoReflect.Descriptor instead.
+func (*DescriptionBlock) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *DescriptionBlock) GetBlock() isDescriptionBlock_Block {
+	if x != nil {
+		return x.Block
 	}
 	return nil
 }
 
-func (x *ProductContentLimits) GetDescriptionImages() []string {
+func (x *DescriptionBlock) GetParagraph() string {
 	if x != nil {
-		return x.DescriptionImages
-	}
-	return nil
-}
-
-func (x *ProductContentLimits) GetDescription() string {
-	if x != nil {
-		return x.Description
+		if x, ok := x.Block.(*DescriptionBlock_Paragraph); ok {
+			return x.Paragraph
+		}
 	}
 	return ""
 }
 
-func (x *ProductContentLimits) GetListItems() []string {
+func (x *DescriptionBlock) GetImage() *ImageInput {
 	if x != nil {
-		return x.ListItems
+		if x, ok := x.Block.(*DescriptionBlock_Image); ok {
+			return x.Image
+		}
 	}
 	return nil
 }
 
-func (x *ProductContentLimits) GetListItem() string {
+func (x *DescriptionBlock) GetBulletList() *BulletList {
 	if x != nil {
-		return x.ListItem
+		if x, ok := x.Block.(*DescriptionBlock_BulletList); ok {
+			return x.BulletList
+		}
+	}
+	return nil
+}
+
+func (x *DescriptionBlock) GetTable() *Table {
+	if x != nil {
+		if x, ok := x.Block.(*DescriptionBlock_Table); ok {
+			return x.Table
+		}
+	}
+	return nil
+}
+
+type isDescriptionBlock_Block interface {
+	isDescriptionBlock_Block()
+}
+
+type DescriptionBlock_Paragraph struct {
+	// 段落，純文字。
+	Paragraph string `protobuf:"bytes,1,opt,name=paragraph,proto3,oneof"`
+}
+
+type DescriptionBlock_Image struct {
+	// 圖片。
+	Image *ImageInput `protobuf:"bytes,2,opt,name=image,proto3,oneof"`
+}
+
+type DescriptionBlock_BulletList struct {
+	// 項目清單。
+	BulletList *BulletList `protobuf:"bytes,3,opt,name=bullet_list,json=bulletList,proto3,oneof"`
+}
+
+type DescriptionBlock_Table struct {
+	// 表格。
+	Table *Table `protobuf:"bytes,4,opt,name=table,proto3,oneof"`
+}
+
+func (*DescriptionBlock_Paragraph) isDescriptionBlock_Block() {}
+
+func (*DescriptionBlock_Image) isDescriptionBlock_Block() {}
+
+func (*DescriptionBlock_BulletList) isDescriptionBlock_Block() {}
+
+func (*DescriptionBlock_Table) isDescriptionBlock_Block() {}
+
+// BulletList 是項目清單。
+type BulletList struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 清單項目，至少一項；每項的文字上限是 max_runes。
+	Items         []string `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BulletList) Reset() {
+	*x = BulletList{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BulletList) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BulletList) ProtoMessage() {}
+
+func (x *BulletList) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BulletList.ProtoReflect.Descriptor instead.
+func (*BulletList) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *BulletList) GetItems() []string {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+// Table 是表格，每列的儲存格數相同。
+type Table struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 表格的列，至少一列。
+	Rows          []*TableRow `protobuf:"bytes,1,rep,name=rows,proto3" json:"rows,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Table) Reset() {
+	*x = Table{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Table) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Table) ProtoMessage() {}
+
+func (x *Table) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Table.ProtoReflect.Descriptor instead.
+func (*Table) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *Table) GetRows() []*TableRow {
+	if x != nil {
+		return x.Rows
+	}
+	return nil
+}
+
+// TableRow 是表格的一列。
+type TableRow struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 這一列的儲存格，至少一格；每格的文字上限是 max_runes。
+	Cells         []string `protobuf:"bytes,1,rep,name=cells,proto3" json:"cells,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TableRow) Reset() {
+	*x = TableRow{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TableRow) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TableRow) ProtoMessage() {}
+
+func (x *TableRow) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TableRow.ProtoReflect.Descriptor instead.
+func (*TableRow) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *TableRow) GetCells() []string {
+	if x != nil {
+		return x.Cells
+	}
+	return nil
+}
+
+// OptionAxisInput 是一個選項軸：名稱與有序的選項值。名稱與值都是賣家的字，不翻譯。
+type OptionAxisInput struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 軸名稱，例如「顏色」。
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// 選項值，依顯示順序，至少一個；每個值的長度上限是 max_runes。
+	Values        []string `protobuf:"bytes,2,rep,name=values,proto3" json:"values,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OptionAxisInput) Reset() {
+	*x = OptionAxisInput{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OptionAxisInput) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OptionAxisInput) ProtoMessage() {}
+
+func (x *OptionAxisInput) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OptionAxisInput.ProtoReflect.Descriptor instead.
+func (*OptionAxisInput) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *OptionAxisInput) GetName() string {
+	if x != nil {
+		return x.Name
 	}
 	return ""
 }
 
-func (x *ProductContentLimits) GetTableRows() []string {
+func (x *OptionAxisInput) GetValues() []string {
 	if x != nil {
-		return x.TableRows
+		return x.Values
 	}
 	return nil
 }
 
-func (x *ProductContentLimits) GetTableCols() []string {
-	if x != nil {
-		return x.TableCols
-	}
-	return nil
+// SkuInput 是一個 SKU，以選項值的組合辨識：沒有軸的商品兩個選項都空；有一個軸只給 option1。
+// 組合已存在時更新價格；庫存只在新組合時作為初始值，既有 SKU 的庫存只由庫存調整改。
+type SkuInput struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 第一個軸的選項值，必須是 axes[0].values 之一。
+	Option1 string `protobuf:"bytes,1,opt,name=option1,proto3" json:"option1,omitempty"`
+	// 第二個軸的選項值，必須是 axes[1].values 之一。
+	Option2 string `protobuf:"bytes,2,opt,name=option2,proto3" json:"option2,omitempty"`
+	// 售價，新台幣元的整數，大於 0。
+	Price int64 `protobuf:"varint,3,opt,name=price,proto3" json:"price,omitempty"`
+	// 原價（劃線價），新台幣元的整數；沒有設是沒有原價。
+	CompareAtPrice *int64 `protobuf:"varint,4,opt,name=compare_at_price,json=compareAtPrice,proto3,oneof" json:"compare_at_price,omitempty"`
+	// 新組合的初始庫存，不得為負。
+	InitialStock  int32 `protobuf:"varint,5,opt,name=initial_stock,json=initialStock,proto3" json:"initial_stock,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ProductContentLimits) GetTableCell() string {
+func (x *SkuInput) Reset() {
+	*x = SkuInput{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SkuInput) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SkuInput) ProtoMessage() {}
+
+func (x *SkuInput) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[7]
 	if x != nil {
-		return x.TableCell
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SkuInput.ProtoReflect.Descriptor instead.
+func (*SkuInput) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *SkuInput) GetOption1() string {
+	if x != nil {
+		return x.Option1
 	}
 	return ""
+}
+
+func (x *SkuInput) GetOption2() string {
+	if x != nil {
+		return x.Option2
+	}
+	return ""
+}
+
+func (x *SkuInput) GetPrice() int64 {
+	if x != nil {
+		return x.Price
+	}
+	return 0
+}
+
+func (x *SkuInput) GetCompareAtPrice() int64 {
+	if x != nil && x.CompareAtPrice != nil {
+		return *x.CompareAtPrice
+	}
+	return 0
+}
+
+func (x *SkuInput) GetInitialStock() int32 {
+	if x != nil {
+		return x.InitialStock
+	}
+	return 0
 }
 
 var File_hawkr_catalog_v1alpha1_catalog_proto protoreflect.FileDescriptor
 
 const file_hawkr_catalog_v1alpha1_catalog_proto_rawDesc = "" +
 	"\n" +
-	"$hawkr/catalog/v1alpha1/catalog.proto\x12\x16hawkr.catalog.v1alpha1\x1a\"hawkr/common/v1alpha1/limits.proto\"\x92\x05\n" +
-	"\x14ProductContentLimits\x12\x1c\n" +
-	"\x05title\x18\x01 \x01(\tB\x06\x92\xb5\x18\x02\x10dR\x05title\x12\x1a\n" +
-	"\x04axes\x18\x02 \x03(\tB\x06\x92\xb5\x18\x02\b\x02R\x04axes\x12#\n" +
-	"\taxis_name\x18\x03 \x01(\tB\x06\x92\xb5\x18\x02\x10\x14R\baxisName\x12)\n" +
-	"\foption_value\x18\x04 \x01(\tB\x06\x92\xb5\x18\x02\x10(R\voptionValue\x12.\n" +
-	"\x0fvalues_per_axis\x18\x05 \x03(\tB\x06\x92\xb5\x18\x02\b2R\rvaluesPerAxis\x12\x1a\n" +
-	"\x04skus\x18\x06 \x03(\tB\x06\x92\xb5\x18\x02\bdR\x04skus\x12-\n" +
-	"\x0egallery_images\x18\a \x03(\tB\x06\x92\xb5\x18\x02\b\tR\rgalleryImages\x12\x19\n" +
-	"\x03alt\x18\b \x01(\tB\a\x92\xb5\x18\x03\x10\xc8\x01R\x03alt\x125\n" +
-	"\x12description_blocks\x18\t \x03(\tB\x06\x92\xb5\x18\x02\bdR\x11descriptionBlocks\x125\n" +
-	"\x12description_images\x18\n" +
-	" \x03(\tB\x06\x92\xb5\x18\x02\b\x14R\x11descriptionImages\x12)\n" +
-	"\vdescription\x18\v \x01(\tB\a\x92\xb5\x18\x03\x10\xb8\x17R\vdescription\x12%\n" +
+	"$hawkr/catalog/v1alpha1/catalog.proto\x12\x16hawkr.catalog.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\"hawkr/common/v1alpha1/limits.proto\"\xa1\x03\n" +
+	"\fProductInput\x12\x1f\n" +
+	"\x05title\x18\x01 \x01(\tB\t\xe0A\x02\x92\xb5\x18\x02\x10dR\x05title\x12$\n" +
+	"\vcategory_id\x18\x02 \x01(\tB\x03\xe0A\x02R\n" +
+	"categoryId\x12%\n" +
+	"\x0ehashtag_inputs\x18\x03 \x03(\tR\rhashtagInputs\x12D\n" +
+	"\agallery\x18\x04 \x03(\v2\".hawkr.catalog.v1alpha1.ImageInputB\x06\x92\xb5\x18\x02\b\tR\agallery\x12W\n" +
+	"\vdescription\x18\x05 \x03(\v2(.hawkr.catalog.v1alpha1.DescriptionBlockB\v\x92\xb5\x18\a\bd\x18\xb8\x17 \x14R\vdescription\x12C\n" +
+	"\x04axes\x18\x06 \x03(\v2'.hawkr.catalog.v1alpha1.OptionAxisInputB\x06\x92\xb5\x18\x02\b\x02R\x04axes\x12?\n" +
+	"\x04skus\x18\a \x03(\v2 .hawkr.catalog.v1alpha1.SkuInputB\t\xe0A\x02\x92\xb5\x18\x02\bdR\x04skus\"s\n" +
 	"\n" +
-	"list_items\x18\f \x03(\tB\x06\x92\xb5\x18\x02\b2R\tlistItems\x12$\n" +
-	"\tlist_item\x18\r \x01(\tB\a\x92\xb5\x18\x03\x10\xc8\x01R\blistItem\x12%\n" +
+	"ImageInput\x12#\n" +
+	"\fstaged_token\x18\x01 \x01(\tH\x00R\vstagedToken\x12\x1b\n" +
+	"\basset_id\x18\x02 \x01(\tH\x00R\aassetId\x12\x19\n" +
+	"\x03alt\x18\x03 \x01(\tB\a\x92\xb5\x18\x03\x10\xc8\x01R\x03altB\b\n" +
+	"\x06source\"\xf5\x01\n" +
+	"\x10DescriptionBlock\x12\x1e\n" +
+	"\tparagraph\x18\x01 \x01(\tH\x00R\tparagraph\x12:\n" +
+	"\x05image\x18\x02 \x01(\v2\".hawkr.catalog.v1alpha1.ImageInputH\x00R\x05image\x12E\n" +
+	"\vbullet_list\x18\x03 \x01(\v2\".hawkr.catalog.v1alpha1.BulletListH\x00R\n" +
+	"bulletList\x125\n" +
+	"\x05table\x18\x04 \x01(\v2\x1d.hawkr.catalog.v1alpha1.TableH\x00R\x05tableB\a\n" +
+	"\x05block\"-\n" +
 	"\n" +
-	"table_rows\x18\x0e \x03(\tB\x06\x92\xb5\x18\x02\b2R\ttableRows\x12%\n" +
-	"\n" +
-	"table_cols\x18\x0f \x03(\tB\x06\x92\xb5\x18\x02\b\n" +
-	"R\ttableCols\x12&\n" +
-	"\n" +
-	"table_cell\x18\x10 \x01(\tB\a\x92\xb5\x18\x03\x10\xc8\x01R\ttableCellB\x85\x02\n" +
+	"BulletList\x12\x1f\n" +
+	"\x05items\x18\x01 \x03(\tB\t\x92\xb5\x18\x05\b2\x10\xc8\x01R\x05items\"E\n" +
+	"\x05Table\x12<\n" +
+	"\x04rows\x18\x01 \x03(\v2 .hawkr.catalog.v1alpha1.TableRowB\x06\x92\xb5\x18\x02\b2R\x04rows\"+\n" +
+	"\bTableRow\x12\x1f\n" +
+	"\x05cells\x18\x01 \x03(\tB\t\x92\xb5\x18\x05\b\n" +
+	"\x10\xc8\x01R\x05cells\"U\n" +
+	"\x0fOptionAxisInput\x12\x1d\n" +
+	"\x04name\x18\x01 \x01(\tB\t\xe0A\x02\x92\xb5\x18\x02\x10\x14R\x04name\x12#\n" +
+	"\x06values\x18\x02 \x03(\tB\v\xe0A\x02\x92\xb5\x18\x04\b2\x10(R\x06values\"\xc2\x01\n" +
+	"\bSkuInput\x12\x18\n" +
+	"\aoption1\x18\x01 \x01(\tR\aoption1\x12\x18\n" +
+	"\aoption2\x18\x02 \x01(\tR\aoption2\x12\x19\n" +
+	"\x05price\x18\x03 \x01(\x03B\x03\xe0A\x02R\x05price\x12-\n" +
+	"\x10compare_at_price\x18\x04 \x01(\x03H\x00R\x0ecompareAtPrice\x88\x01\x01\x12#\n" +
+	"\rinitial_stock\x18\x05 \x01(\x05R\finitialStockB\x13\n" +
+	"\x11_compare_at_priceB\x85\x02\n" +
 	"\x1acom.hawkr.catalog.v1alpha1B\fCatalogProtoP\x01Z_github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/catalog/v1alpha1;catalogv1alpha1\xa2\x02\x03HCX\xaa\x02\x16Hawkr.Catalog.V1alpha1\xca\x02\x16Hawkr\\Catalog\\V1alpha1\xe2\x02\"Hawkr\\Catalog\\V1alpha1\\GPBMetadata\xea\x02\x18Hawkr::Catalog::V1alpha1b\x06proto3"
 
 var (
@@ -247,16 +678,31 @@ func file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP() []byte {
 	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescData
 }
 
-var file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
+var file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_hawkr_catalog_v1alpha1_catalog_proto_goTypes = []any{
-	(*ProductContentLimits)(nil), // 0: hawkr.catalog.v1alpha1.ProductContentLimits
+	(*ProductInput)(nil),     // 0: hawkr.catalog.v1alpha1.ProductInput
+	(*ImageInput)(nil),       // 1: hawkr.catalog.v1alpha1.ImageInput
+	(*DescriptionBlock)(nil), // 2: hawkr.catalog.v1alpha1.DescriptionBlock
+	(*BulletList)(nil),       // 3: hawkr.catalog.v1alpha1.BulletList
+	(*Table)(nil),            // 4: hawkr.catalog.v1alpha1.Table
+	(*TableRow)(nil),         // 5: hawkr.catalog.v1alpha1.TableRow
+	(*OptionAxisInput)(nil),  // 6: hawkr.catalog.v1alpha1.OptionAxisInput
+	(*SkuInput)(nil),         // 7: hawkr.catalog.v1alpha1.SkuInput
 }
 var file_hawkr_catalog_v1alpha1_catalog_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	1, // 0: hawkr.catalog.v1alpha1.ProductInput.gallery:type_name -> hawkr.catalog.v1alpha1.ImageInput
+	2, // 1: hawkr.catalog.v1alpha1.ProductInput.description:type_name -> hawkr.catalog.v1alpha1.DescriptionBlock
+	6, // 2: hawkr.catalog.v1alpha1.ProductInput.axes:type_name -> hawkr.catalog.v1alpha1.OptionAxisInput
+	7, // 3: hawkr.catalog.v1alpha1.ProductInput.skus:type_name -> hawkr.catalog.v1alpha1.SkuInput
+	1, // 4: hawkr.catalog.v1alpha1.DescriptionBlock.image:type_name -> hawkr.catalog.v1alpha1.ImageInput
+	3, // 5: hawkr.catalog.v1alpha1.DescriptionBlock.bullet_list:type_name -> hawkr.catalog.v1alpha1.BulletList
+	4, // 6: hawkr.catalog.v1alpha1.DescriptionBlock.table:type_name -> hawkr.catalog.v1alpha1.Table
+	5, // 7: hawkr.catalog.v1alpha1.Table.rows:type_name -> hawkr.catalog.v1alpha1.TableRow
+	8, // [8:8] is the sub-list for method output_type
+	8, // [8:8] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_catalog_v1alpha1_catalog_proto_init() }
@@ -264,13 +710,24 @@ func file_hawkr_catalog_v1alpha1_catalog_proto_init() {
 	if File_hawkr_catalog_v1alpha1_catalog_proto != nil {
 		return
 	}
+	file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[1].OneofWrappers = []any{
+		(*ImageInput_StagedToken)(nil),
+		(*ImageInput_AssetId)(nil),
+	}
+	file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[2].OneofWrappers = []any{
+		(*DescriptionBlock_Paragraph)(nil),
+		(*DescriptionBlock_Image)(nil),
+		(*DescriptionBlock_BulletList)(nil),
+		(*DescriptionBlock_Table)(nil),
+	}
+	file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[7].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_catalog_v1alpha1_catalog_proto_rawDesc), len(file_hawkr_catalog_v1alpha1_catalog_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   1,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

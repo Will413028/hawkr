@@ -21,10 +21,13 @@ const Limits$json = {
   '2': [
     {'1': 'max_items', '3': 1, '4': 1, '5': 5, '10': 'maxItems'},
     {'1': 'max_runes', '3': 2, '4': 1, '5': 5, '10': 'maxRunes'},
+    {'1': 'max_total_runes', '3': 3, '4': 1, '5': 5, '10': 'maxTotalRunes'},
+    {'1': 'max_image_items', '3': 4, '4': 1, '5': 5, '10': 'maxImageItems'},
   ],
 };
 
 /// Descriptor for `Limits`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List limitsDescriptor = $convert.base64Decode(
     'CgZMaW1pdHMSGwoJbWF4X2l0ZW1zGAEgASgFUghtYXhJdGVtcxIbCgltYXhfcnVuZXMYAiABKA'
-    'VSCG1heFJ1bmVz');
+    'VSCG1heFJ1bmVzEiYKD21heF90b3RhbF9ydW5lcxgDIAEoBVINbWF4VG90YWxSdW5lcxImCg9t'
+    'YXhfaW1hZ2VfaXRlbXMYBCABKAVSDW1heEltYWdlSXRlbXM=');

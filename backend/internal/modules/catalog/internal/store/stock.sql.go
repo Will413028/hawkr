@@ -104,9 +104,10 @@ func (q *Queries) GetOwnLiveSku(ctx context.Context, arg GetOwnLiveSkuParams) (G
 }
 
 const getStockOperationByKey = `-- name: GetStockOperationByKey :one
-SELECT id, idempotency_key, kind, deduct_operation_id, created_at FROM catalog.stock_operations WHERE idempotency_key = $1
+SELECT id, idempotency_key, kind, store_id, deduct_operation_id, created_at FROM catalog.stock_operations WHERE idempotency_key = $1 AND store_id IS NULL
 `
 
+// 結帳扣減與歸還的操作（沒有店家）。
 func (q *Queries) GetStockOperationByKey(ctx context.Context, idempotencyKey string) (CatalogStockOperation, error) {
 	row := q.db.QueryRow(ctx, getStockOperationByKey, idempotencyKey)
 	var i CatalogStockOperation
@@ -114,6 +115,31 @@ func (q *Queries) GetStockOperationByKey(ctx context.Context, idempotencyKey str
 		&i.ID,
 		&i.IdempotencyKey,
 		&i.Kind,
+		&i.StoreID,
+		&i.DeductOperationID,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getStoreStockOperationByKey = `-- name: GetStoreStockOperationByKey :one
+SELECT id, idempotency_key, kind, store_id, deduct_operation_id, created_at FROM catalog.stock_operations WHERE store_id = $1::bigint AND idempotency_key = $2
+`
+
+type GetStoreStockOperationByKeyParams struct {
+	StoreID        int64
+	IdempotencyKey string
+}
+
+// 某家店的賣家調整操作；別家店的同名鍵不可見。
+func (q *Queries) GetStoreStockOperationByKey(ctx context.Context, arg GetStoreStockOperationByKeyParams) (CatalogStockOperation, error) {
+	row := q.db.QueryRow(ctx, getStoreStockOperationByKey, arg.StoreID, arg.IdempotencyKey)
+	var i CatalogStockOperation
+	err := row.Scan(
+		&i.ID,
+		&i.IdempotencyKey,
+		&i.Kind,
+		&i.StoreID,
 		&i.DeductOperationID,
 		&i.CreatedAt,
 	)
@@ -137,27 +163,30 @@ func (q *Queries) InsertStockMovement(ctx context.Context, arg InsertStockMoveme
 
 const insertStockOperation = `-- name: InsertStockOperation :execrows
 
-INSERT INTO catalog.stock_operations (id, idempotency_key, kind, deduct_operation_id, created_at)
-VALUES ($1, $2, $3, $4, $5)
-ON CONFLICT (idempotency_key) DO NOTHING
+INSERT INTO catalog.stock_operations (id, idempotency_key, kind, store_id, deduct_operation_id, created_at)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT DO NOTHING
 `
 
 type InsertStockOperationParams struct {
 	ID                uuid.UUID
 	IdempotencyKey    string
 	Kind              string
+	StoreID           *int64
 	DeductOperationID *uuid.UUID
 	Now               time.Time
 }
 
-// 庫存：冪等的扣減與歸還（D2）。
+// 庫存：冪等的扣減與歸還。
 // 冪等鍵 UNIQUE 是唯一的判重點：同一個鍵的併發或重送，後到的交易在這裡等到先到的提交，然後回 0 列（呼叫端改走重送路徑）；
 // 先到的回滾時，後到的插入成功。沒有「先查再扣」。
+// 鍵的範圍：賣家調整帶 store_id，鍵只在該店家內唯一；結帳的扣減與歸還 store_id 為空，鍵全域唯一（兩個部分唯一索引，ON CONFLICT 不指定目標）。
 func (q *Queries) InsertStockOperation(ctx context.Context, arg InsertStockOperationParams) (int64, error) {
 	result, err := q.db.Exec(ctx, insertStockOperation,
 		arg.ID,
 		arg.IdempotencyKey,
 		arg.Kind,
+		arg.StoreID,
 		arg.DeductOperationID,
 		arg.Now,
 	)
@@ -197,7 +226,7 @@ func (q *Queries) ListStockMovements(ctx context.Context, operationID uuid.UUID)
 }
 
 const lockStockOperation = `-- name: LockStockOperation :one
-SELECT id, idempotency_key, kind, deduct_operation_id, created_at FROM catalog.stock_operations WHERE id = $1 AND kind = 'DEDUCT' FOR UPDATE
+SELECT id, idempotency_key, kind, store_id, deduct_operation_id, created_at FROM catalog.stock_operations WHERE id = $1 AND kind = 'DEDUCT' FOR UPDATE
 `
 
 // 歸還前鎖住原扣減：同一次扣減的多筆歸還（不同鍵）排隊，累計檢查看到前一筆已提交的結果。
@@ -208,6 +237,7 @@ func (q *Queries) LockStockOperation(ctx context.Context, id uuid.UUID) (Catalog
 		&i.ID,
 		&i.IdempotencyKey,
 		&i.Kind,
+		&i.StoreID,
 		&i.DeductOperationID,
 		&i.CreatedAt,
 	)

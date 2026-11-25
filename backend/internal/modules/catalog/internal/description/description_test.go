@@ -39,9 +39,9 @@ func TestNormalizeAcceptsFourBlockKinds(t *testing.T) {
 }
 
 func TestNormalizeRejects(t *testing.T) {
-	long := strings.Repeat("字", model.MaxDescriptionRunes+1)
-	cell := strings.Repeat("a", model.MaxTableCellRunes)
-	list := make([]string, model.MaxListItems)
+	long := strings.Repeat("字", model.MaxProductInputDescriptionTotalRunes+1)
+	cell := strings.Repeat("a", model.MaxTableRowCellsRunes)
+	list := make([]string, model.MaxBulletListItems)
 	for i := range list {
 		list[i] = cell
 	}
@@ -55,7 +55,7 @@ func TestNormalizeRejects(t *testing.T) {
 		{"empty paragraph", []model.Block{{Kind: model.BlockParagraph, Text: " "}}, "Description[0].Text", model.ReasonRequired},
 		{"long paragraph", []model.Block{{Kind: model.BlockParagraph, Text: long}}, "Description", model.ReasonTooLong},
 		{"total across paragraph, list and table", []model.Block{
-			{Kind: model.BlockParagraph, Text: strings.Repeat("字", model.MaxDescriptionRunes-model.MaxListItemRunes*2)},
+			{Kind: model.BlockParagraph, Text: strings.Repeat("字", model.MaxProductInputDescriptionTotalRunes-model.MaxBulletListItemsRunes*2)},
 			{Kind: model.BlockList, Items: []string{cell, cell}},
 			{Kind: model.BlockTable, Rows: [][]string{{"x"}}},
 		}, "Description", model.ReasonTooLong},
@@ -63,12 +63,12 @@ func TestNormalizeRejects(t *testing.T) {
 		{"image without ref", []model.Block{{Kind: model.BlockImage, Image: &model.Image{}}}, "Description[0].Image", model.ReasonInvalid},
 		{"image with both", []model.Block{{Kind: model.BlockImage, Image: &model.Image{Token: "t", AssetID: uuid.NewV7()}}}, "Description[0].Image", model.ReasonInvalid},
 		{"empty list", []model.Block{{Kind: model.BlockList}}, "Description[0].Items", model.ReasonRequired},
-		{"too many items", []model.Block{{Kind: model.BlockList, Items: make([]string, model.MaxListItems+1)}}, "Description[0].Items", model.ReasonTooMany},
+		{"too many items", []model.Block{{Kind: model.BlockList, Items: make([]string, model.MaxBulletListItems+1)}}, "Description[0].Items", model.ReasonTooMany},
 		{"ragged table", []model.Block{{Kind: model.BlockTable, Rows: [][]string{{"a", "b"}, {"c"}}}}, "Description[0].Rows[1]", model.ReasonInvalid},
-		{"too many cols", []model.Block{{Kind: model.BlockTable, Rows: [][]string{make([]string, model.MaxTableCols+1)}}}, "Description[0].Rows", model.ReasonTooMany},
+		{"too many cols", []model.Block{{Kind: model.BlockTable, Rows: [][]string{make([]string, model.MaxTableRowCells+1)}}}, "Description[0].Rows", model.ReasonTooMany},
 		{"too many rows", []model.Block{{Kind: model.BlockTable, Rows: make([][]string, model.MaxTableRows+1)}}, "Description[0].Rows", model.ReasonTooMany},
-		{"long cell", []model.Block{{Kind: model.BlockTable, Rows: [][]string{{strings.Repeat("a", model.MaxTableCellRunes+1)}}}}, "Description[0].Rows[0][0]", model.ReasonTooLong},
-		{"too many blocks", make([]model.Block, model.MaxDescriptionBlocks+1), "Description", model.ReasonTooMany},
+		{"long cell", []model.Block{{Kind: model.BlockTable, Rows: [][]string{{strings.Repeat("a", model.MaxTableRowCellsRunes+1)}}}}, "Description[0].Rows[0][0]", model.ReasonTooLong},
+		{"too many blocks", make([]model.Block, model.MaxProductInputDescription+1), "Description", model.ReasonTooMany},
 	}
 	for _, c := range cases {
 		_, err := Normalize("Description", c.blocks)
@@ -79,16 +79,16 @@ func TestNormalizeRejects(t *testing.T) {
 	}
 	// 邊界值可以。
 	edge := []model.Block{
-		{Kind: model.BlockParagraph, Text: strings.Repeat("字", model.MaxDescriptionRunes)},
-		{Kind: model.BlockTable, Rows: [][]string{make([]string, model.MaxTableCols)}},
-		{Kind: model.BlockImage, Image: &model.Image{Token: "t", Alt: strings.Repeat("字", model.MaxAltRunes)}},
+		{Kind: model.BlockParagraph, Text: strings.Repeat("字", model.MaxProductInputDescriptionTotalRunes)},
+		{Kind: model.BlockTable, Rows: [][]string{make([]string, model.MaxTableRowCells)}},
+		{Kind: model.BlockImage, Image: &model.Image{Token: "t", Alt: strings.Repeat("字", model.MaxImageInputAltRunes)}},
 	}
 	if _, err := Normalize("Description", edge); err != nil {
 		t.Fatalf("edge (exact total, empty cells and alt do not count): %v", err)
 	}
-	// 只差一個字就超過：同一個總數，段落先佔 MaxDescriptionRunes-1 再一個格子兩字。
+	// 只差一個字就超過：同一個總數，段落先佔 MaxProductInputDescriptionTotalRunes-1 再一個格子兩字。
 	over := []model.Block{
-		{Kind: model.BlockParagraph, Text: strings.Repeat("字", model.MaxDescriptionRunes-1)},
+		{Kind: model.BlockParagraph, Text: strings.Repeat("字", model.MaxProductInputDescriptionTotalRunes-1)},
 		{Kind: model.BlockTable, Rows: [][]string{{"ab"}}},
 	}
 	if _, err := Normalize("Description", over); err == nil {

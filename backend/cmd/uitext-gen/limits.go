@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"go/format"
 	"sort"
@@ -17,47 +16,76 @@ import (
 // limitsOption 是欄位選項 hawkr.common.v1alpha1.limits 的全名（api/hawkr/common/v1alpha1/limits.proto）。
 const limitsOption protoreflect.FullName = "hawkr.common.v1alpha1.limits"
 
-// limitsGoTargets 是掛了 limits 的訊息（短 package.訊息名）到 Go 常數檔所在目錄（相對於 repo 根目錄）與 package 名。
-// 掛了 limits 的訊息不在這張表裡就報錯：常數要放進擁有它的模組。
+// limitsGoTargets 是 package 短名到 Go 常數檔所在目錄（相對於 repo 根目錄）與 Go package 名：package 內任何訊息的欄位掛了 limits，
+// 常數都生成進擁有它的模組。掛了 limits 的 package 不在這張表裡就報錯。
 var limitsGoTargets = map[string]struct{ Dir, Package string }{
-	"catalog.ProductContentLimits": {"backend/internal/modules/catalog/internal/model", "model"},
+	"catalog": {"backend/internal/modules/catalog/internal/model", "model"},
 }
 
-// LimitField 是一個掛了 limits 的欄位。
+// 上限的種類，對應 Limits 訊息的欄位。
+const (
+	// limitItems 是 max_items：repeated 欄位的元素個數。
+	limitItems = "items"
+	// limitRunes 是 max_runes：string 欄位的 code point 數；用在 repeated string 時是每個元素的上限。
+	limitRunes = "runes"
+	// limitTotalRunes 是 max_total_runes：repeated 訊息欄位的所有元素裡文字內容的 code point 總數（排除圖片的替代文字）。
+	limitTotalRunes = "total_runes"
+	// limitImageItems 是 max_image_items：repeated 訊息欄位的元素裡帶圖片的個數。
+	limitImageItems = "image_items"
+)
+
+// limitKinds 依輸出順序列出每種上限：Limits 的欄位名、Go 常數的字尾、Dart 常數的字尾。
+var limitKinds = []struct{ Kind, Field, GoSuffix, DartSuffix string }{
+	{limitItems, "max_items", "", "MaxItems"},
+	{limitRunes, "max_runes", "Runes", "MaxRunes"},
+	{limitTotalRunes, "max_total_runes", "TotalRunes", "MaxTotalRunes"},
+	{limitImageItems, "max_image_items", "ImageItems", "MaxImageItems"},
+}
+
+// LimitField 是一個欄位上的一個上限。一個欄位可以同時掛幾種上限（例如 repeated string 的個數與每個元素的長度），各自是一個 LimitField。
 type LimitField struct {
-	// Message 是 key 風格的訊息路徑，例如 catalog.ProductContentLimits。
+	// Message 是 key 風格的訊息路徑，例如 catalog.ProductInput；第一段是 package 短名。
 	Message string
 	// Name 是欄位名（lower_snake）。
 	Name string
-	// Items 是 max_items（repeated 欄位），Runes 是 max_runes（string 欄位）；恰好一個大於 0。
-	Items, Runes int64
+	// Kind 是上限的種類：limitItems、limitRunes、limitTotalRunes 或 limitImageItems。
+	Kind string
+	// Count 是上限值，大於 0。
+	Count int64
 }
 
 // Value 是欄位的上限值。
-func (l *LimitField) Value() int64 {
-	if l.Items > 0 {
-		return l.Items
-	}
-	return l.Runes
-}
+func (l *LimitField) Value() int64 { return l.Count }
 
 // Path 是欄位的 key 風格路徑。
 func (l *LimitField) Path() string { return l.Message + "." + l.Name }
 
-// unit 是上限的單位：items 或 runes。
-func (l *LimitField) unit() string {
-	if l.Items > 0 {
-		return "items"
+// unit 是上限的單位名稱（種類名）。
+func (l *LimitField) unit() string { return l.Kind }
+
+func (l *LimitField) pkg() string { return strings.SplitN(l.Message, ".", 2)[0] }
+
+func (l *LimitField) kindInfo() (goSuffix, dartSuffix string) {
+	for _, k := range limitKinds {
+		if k.Kind == l.Kind {
+			return k.GoSuffix, k.DartSuffix
+		}
 	}
-	return "runes"
+	return "", ""
 }
 
-// goName 是 Go 常數名：max_runes 生成 Max<欄位>Runes，max_items 生成 Max<欄位>。
+// goName 是 Go 常數名：Max<訊息><欄位><字尾>，字尾依種類為空、Runes、TotalRunes、ImageItems。
+// 訊息路徑不含 package：catalog.ProductInput 的 title 的 max_runes 是 MaxProductInputTitleRunes。
 func (l *LimitField) goName() string {
-	if l.Items > 0 {
-		return "Max" + pascal(l.Name)
-	}
-	return "Max" + pascal(l.Name) + "Runes"
+	suffix, _ := l.kindInfo()
+	_, msg, _ := strings.Cut(l.Message, ".")
+	return "Max" + pascal(msg) + pascal(l.Name) + suffix
+}
+
+// dartName 是 Dart 常數名：<package><訊息><欄位>Max<Items|Runes|TotalRunes|ImageItems>。
+func (l *LimitField) dartName() string {
+	_, suffix := l.kindInfo()
+	return lowerFirst(pascal(l.Path())) + suffix
 }
 
 // LimitFields 讀出 image 裡所有掛了 limits 的欄位，依訊息與欄位宣告順序排列。
@@ -71,10 +99,13 @@ func (s *Schema) LimitFields() ([]*LimitField, error) {
 	if !ok || xd.IsList() || xd.Message() == nil || xd.Message().FullName() != "hawkr.common.v1alpha1.Limits" {
 		return nil, fmt.Errorf("%s 必須是單值 Limits 的 FieldOptions 擴充欄位", limitsOption)
 	}
-	maxItems := xd.Message().Fields().ByName("max_items")
-	maxRunes := xd.Message().Fields().ByName("max_runes")
-	if maxItems == nil || maxRunes == nil {
-		return nil, errors.New("limits 的訊息 Limits 必須有 max_items 與 max_runes")
+	kindFields := map[string]protoreflect.FieldDescriptor{}
+	for _, k := range limitKinds {
+		fd := xd.Message().Fields().ByName(protoreflect.Name(k.Field))
+		if fd == nil {
+			return nil, fmt.Errorf("limits 的訊息 Limits 必須有 %s", k.Field)
+		}
+		kindFields[k.Kind] = fd
 	}
 	xt := dynamicpb.NewExtensionType(xd)
 	resolver := &protoregistry.Types{}
@@ -112,10 +143,7 @@ func (s *Schema) LimitFields() ([]*LimitField, error) {
 					continue
 				}
 				v := opts.ProtoReflect().Get(xt.TypeDescriptor()).Message()
-				lf := s.limitField(f, v.Get(maxItems).Int(), v.Get(maxRunes).Int(), &errs)
-				if lf != nil {
-					out = append(out, lf)
-				}
+				out = append(out, s.limitFields(f, v, kindFields, &errs)...)
 			}
 			walk(fd, m.Messages(), known)
 		}
@@ -130,13 +158,13 @@ func (s *Schema) LimitFields() ([]*LimitField, error) {
 	}
 	seen := map[string]bool{}
 	for _, l := range out {
-		if _, ok := limitsGoTargets[l.Message]; !ok {
-			errs.addf("%s：訊息 %s 沒有登記 Go 常數的輸出位置（limitsGoTargets）", l.Path(), l.Message)
+		if _, ok := limitsGoTargets[l.pkg()]; !ok {
+			errs.addf("%s：package %s 沒有登記 Go 常數的輸出位置（limitsGoTargets）", l.Path(), l.pkg())
 		}
-		if seen[l.Message+"/"+l.goName()] {
+		if seen[l.pkg()+"/"+l.goName()] {
 			errs.addf("%s：生成的常數名 %s 重複", l.Path(), l.goName())
 		}
-		seen[l.Message+"/"+l.goName()] = true
+		seen[l.pkg()+"/"+l.goName()] = true
 	}
 	if err := errs.err(); err != nil {
 		return nil, err
@@ -146,35 +174,58 @@ func (s *Schema) LimitFields() ([]*LimitField, error) {
 	return out, nil
 }
 
-func (s *Schema) limitField(f protoreflect.FieldDescriptor, items, runes int64, errs *errList) *LimitField {
+// limitFields 把欄位上的 Limits 訊息拆成每種上限一個 LimitField，並檢查每種上限掛得合不合欄位：
+// max_items 只能掛 repeated 欄位；max_runes 掛單值 string 或 repeated string（每個元素）；
+// max_total_runes 與 max_image_items 只能掛 repeated 訊息欄位；每個值不得為負，至少設一種。
+func (s *Schema) limitFields(f protoreflect.FieldDescriptor, v protoreflect.Message, kindFields map[string]protoreflect.FieldDescriptor, errs *errList) []*LimitField {
 	pkg := string(f.ParentFile().Package())
 	msg := s.pkgShort[pkg] + "." + strings.TrimPrefix(string(f.Parent().FullName()), pkg+".")
-	lf := &LimitField{Message: msg, Name: string(f.Name()), Items: items, Runes: runes}
-	switch {
-	case items < 0 || runes < 0:
-		errs.addf("%s：%s 的上限不得為負", f.FullName(), limitsOption)
-	case (items > 0) == (runes > 0):
-		errs.addf("%s：%s 必須恰好設 max_items 或 max_runes 其中一個（大於 0）", f.FullName(), limitsOption)
-	case items > 0 && !f.IsList():
-		errs.addf("%s：max_items 只能掛在 repeated 欄位", f.FullName())
-	case runes > 0 && (f.IsList() || f.Kind() != protoreflect.StringKind):
-		errs.addf("%s：max_runes 只能掛在單值的 string 欄位", f.FullName())
-	default:
-		return lf
+	var out []*LimitField
+	ok := true
+	for _, k := range limitKinds {
+		n := v.Get(kindFields[k.Kind]).Int()
+		if n == 0 {
+			continue
+		}
+		var fits bool
+		switch k.Kind {
+		case limitItems:
+			fits = f.IsList()
+		case limitRunes:
+			fits = f.Kind() == protoreflect.StringKind
+		default:
+			fits = f.IsList() && f.Kind() == protoreflect.MessageKind
+		}
+		switch {
+		case n < 0:
+			errs.addf("%s：%s 的 %s 不得為負", f.FullName(), limitsOption, k.Field)
+			ok = false
+		case !fits:
+			errs.addf("%s：%s 不能掛在這種欄位（max_items 要 repeated；max_runes 要 string 或 repeated string；max_total_runes、max_image_items 要 repeated 訊息）", f.FullName(), k.Field)
+			ok = false
+		default:
+			out = append(out, &LimitField{Message: msg, Name: string(f.Name()), Kind: k.Kind, Count: n})
+		}
 	}
-	return nil
+	if len(out) == 0 && ok {
+		errs.addf("%s：%s 必須至少設一種上限（大於 0）", f.FullName(), limitsOption)
+	}
+	if !ok {
+		return nil
+	}
+	return out
 }
 
 // EmitGoLimits 生成每個目標目錄的常數檔：路徑 → 內容。
 func EmitGoLimits(fields []*LimitField) (map[string][]byte, error) {
 	byDir := map[string][]*LimitField{}
 	for _, l := range fields {
-		byDir[limitsGoTargets[l.Message].Dir] = append(byDir[limitsGoTargets[l.Message].Dir], l)
+		byDir[limitsGoTargets[l.pkg()].Dir] = append(byDir[limitsGoTargets[l.pkg()].Dir], l)
 	}
 	out := map[string][]byte{}
 	for dir, fs := range byDir {
 		var b strings.Builder
-		fmt.Fprintf(&b, "// Code generated by backend/cmd/uitext-gen; DO NOT EDIT.\n// %s\n\npackage %s\n\nconst (\n", generatedHeader, limitsGoTargets[fs[0].Message].Package)
+		fmt.Fprintf(&b, "// Code generated by backend/cmd/uitext-gen; DO NOT EDIT.\n// %s\n\npackage %s\n\nconst (\n", generatedHeader, limitsGoTargets[fs[0].pkg()].Package)
 		for _, l := range fs {
 			fmt.Fprintf(&b, "\t// %s 是 %s 的上限（%s，%s）。\n\t%s = %d\n", l.goName(), l.Path(), limitsOption, l.unit(), l.goName(), l.Value())
 		}
@@ -188,7 +239,7 @@ func EmitGoLimits(fields []*LimitField) (map[string][]byte, error) {
 	return out, nil
 }
 
-// EmitTSLimits 生成 @hawkr/ui-text 的 limits.gen.ts：每個上限一個 number 常數，名稱 <訊息路徑>_<欄位>_MAX_<ITEMS|RUNES>。
+// EmitTSLimits 生成 @hawkr/ui-text 的 limits.gen.ts：每個上限一個 number 常數，名稱 <訊息路徑>_<欄位>_MAX_<ITEMS|RUNES|TOTAL_RUNES|IMAGE_ITEMS>。
 func EmitTSLimits(fields []*LimitField) []byte {
 	var b strings.Builder
 	b.WriteString(tsHeader)
@@ -202,12 +253,12 @@ func limitConstName(l *LimitField) string {
 	return constName(l.Path()) + "_MAX_" + strings.ToUpper(l.unit())
 }
 
-// EmitDartLimits 生成 hawkr_ui_text 的 limits.g.dart：每個上限一個 int 常數，名稱 <訊息路徑><欄位>Max<Items|Runes>。
+// EmitDartLimits 生成 hawkr_ui_text 的 limits.g.dart：每個上限一個 int 常數，名稱 <package><訊息><欄位>Max<Items|Runes|TotalRunes|ImageItems>。
 func EmitDartLimits(fields []*LimitField) []byte {
 	var b strings.Builder
 	b.WriteString("// dart format off\n// 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。\n")
 	for _, l := range fields {
-		fmt.Fprintf(&b, "\n/// %s 的上限（%s，%s）。\nconst int %s = %d;\n", l.Path(), limitsOption, l.unit(), lowerFirst(pascal(l.Path()))+"Max"+upperFirst(l.unit()), l.Value())
+		fmt.Fprintf(&b, "\n/// %s 的上限（%s，%s）。\nconst int %s = %d;\n", l.Path(), limitsOption, l.unit(), l.dartName(), l.Value())
 	}
 	return []byte(b.String())
 }
