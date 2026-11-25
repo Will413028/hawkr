@@ -115,7 +115,7 @@ legacy-backlog 的 A3 段裡屬於 buyer 的項目（A3a 步驟 6 對照現行�
 | 項目 | 結論 | 依據 |
 |---|---|---|
 | buyer #91：個人資料的「行政區」「個人簡介」顯示儲存成功，但後端沒有欄位 | 仍成立，未修：後端照設計沒有這兩欄（`Profile` 只有暱稱、電話、性別、生日、城市、職業），buyer-app 的編輯頁仍顯示兩欄、儲存時丟棄並提示「已儲存」。已修：Will 2026-10-01 決定拿掉 buyer-app 的兩欄（profile 契約不擴充）；同類的信箱欄（profile 沒有 email，必填卻被丟棄）改成唯讀顯示登入信箱（2026-10-01 當時由 Clerk 提供） | `api/hawkr/buyer/v1alpha1/buyer.proto` 的 `Profile`；`buyer-app/lib/features/settings/presentation/profile_edit_screen.dart`（district 恆為空、sign 不送）；website 的個人資料頁沒有這兩欄 |
-| #2345：仍用 `account_id` 的位置（buyer 範圍） | 已解決：業務表一律以 `buyer_id` 為鍵，`account_id` 只在 `buyers` 的對應欄（UNIQUE）與「由登入者找自己的買家」的查詢；legacy 事件裡的 `account_id`、`seller_id`、`merchant_id`、`follower_id` 是舊契約定義在帳號空間的欄位，照舊送 | `db/schema.sql`；`db/queries/buyers.sql`；golden `tests/contract/golden/event_payload_keys.json` 的 `identity_spaces`；`internal/httpapi/buyer/buyer_integration_test.go`（讓 buyer_id 與 account_id 不同值）、`internal/legacy/buyerserver/server_integration_test.go` 的 `ResolvePrincipals` |
+| #2345：仍用 `account_id` 的位置（buyer 範圍） | 已解決：業務表一律以 `buyer_id` 為鍵，`account_id` 只在 `buyers` 的對應欄（UNIQUE）與「由登入者找自己的買家」的查詢；legacy 事件裡的 `account_id`、`seller_id`、`merchant_id`、`follower_id` 是舊契約定義在帳號空間的欄位，照舊送 | `db/schema.sql`；`db/queries/buyers.sql`；`internal/httpapi/buyer/buyer_integration_test.go`（讓 buyer_id 與 account_id 不同值）、`internal/legacy/buyerserver/server_integration_test.go` 的 `ResolvePrincipals` |
 | buyer-app L52：封鎖名單頁永遠無法顯示姓名與頭像 | 仍成立，不屬於 buyer：封鎖名單是 social 的資料，`ListBlocks` 只回 `blocked_id`，而它的命名空間是混合的（現任 buyer_id 或 store_id，查無時退回 account_id），補顯示要先在 social 定下被封鎖者的身分，才能用 `buyer.BatchDisplay` 或 seller 補。隨 A7 social（seller-app L54 同一件事） | `services/social-service/db/schema/schema.sql` 的 `user_blocks`；`buyer-app/lib/features/moderation/data/block_model.dart` |
 
 ## 特性測試
