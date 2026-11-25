@@ -32,7 +32,6 @@
 | 02 | [產品微服務（Product Service）](詳細設計書/02-產品微服務%EF%BC%88Product%20Service%EF%BC%89詳細設計書.md) | `services/java/product-service/` |
 | 03 | [訂單微服務（Order Service）](詳細設計書/03-訂單微服務%EF%BC%88Order%20Service%EF%BC%89詳細設計書.md) | `services/java/order-service/` |
 | 04 | [購物車微服務（Cart Service）](詳細設計書/04-購物車微服務%EF%BC%88Cart%20Service%EF%BC%89詳細設計書.md) | `services/java/cart-service/` |
-| 05 | [支付服務（Payment Service）](詳細設計書/05-支付服務%EF%BC%88Payment%20Service%EF%BC%89詳細設計書.md) | `services/java/payment-service/` |
 | 06 | [物流微服務（Shipping Service）](詳細設計書/06-物流微服務%EF%BC%88Shipping%20Service%EF%BC%89詳細設計書.md) | `services/java/shipping-service/` |
 | 07 | [優惠券微服務（Coupon Service）](詳細設計書/07-優惠券微服務%EF%BC%88Coupon%20Service%EF%BC%89詳細設計書.md) | `services/java/coupon-service/` |
 | 08 | [多媒體微服務（Media Service）](詳細設計書/08-多媒體微服務%EF%BC%88Media%20Service%EF%BC%89詳細設計書.md) | `services/java/media-service/` |
@@ -111,7 +110,6 @@
 | [Web 前端契約同步規範](開發規範/Web%20前端契約同步規範.md) | 後端契約變更時與 web 前端的同步責任 |
 | [固定 IP 出口與第三方轉發規範（Egress Proxy）](開發規範/固定%20IP%20出口與第三方轉發規範（Egress%20Proxy）.md) | 第三方要求來源 IP 白名單時一律收斂到 egress-proxy |
 | [Cloudflare Worker 與 Serverless 部署治理規範](開發規範/Cloudflare%20Worker%20與%20Serverless%20部署治理規範.md) | Worker/Cloud Run 源碼入版控、CI 部署、zone 配置快照稽核 |
-| [PayUni 錯誤回應收斂規範](開發規範/PayUni%20錯誤回應收斂規範.md) | PayUni 錯誤碼三層語意分離（平台 / Provider SoT / Snapshot） |
 | [Gateway Swagger 註解規範](開發規範/Gateway%20Swagger%20註解規範.md) | Gateway handler Swagger 必要欄位、DTO 規範、test mock 同步 |
 | [硬上限依賴接入治理規範（配額與容量）](開發規範/硬上限依賴接入治理規範（配額與容量）.md) | 有硬上限的依賴（配額 / maxmemory / 連線數 / rate limit）接入前必備：指標＋告警＋預算數字 |
 | [多副本排程搶佔規範](開發規範/多副本排程搶佔規範.md) | `replicas ≥ 2` 下排程不重複執行：**prod 副本數現況與查證方式（§〇，判定輸入）**、搶佔必在副作用前、一律 lease 不用永久旗標、永久旗標六步判準、租約長度 < 候選窗口、例外 A/B |
@@ -154,7 +152,6 @@
 | [Discord 監控 Bot 設計書](基礎建設/Discord%20監控%20Bot%20設計書.md) | 監控告警轉 Discord 的 bot 設計 |
 | [Cloudflare CDN 與 DDoS 防護配置指南](基礎建設/Cloudflare%20CDN%20與%20DDoS%20防護配置指南.md) | CDN 與安全配置 |
 | [Discord 告警通知設定指南](基礎建設/Discord%20告警通知設定指南.md) | 從零建立 Discord Server 到告警通知 |
-| [ATM 退款結果 Webhook 遺失維運處置](基礎建設/ATM%20退款結果%20Webhook%20遺失維運處置.md) | ATM 退款 §6.7 webhook 遺失卡單的診斷與回復 runbook |
 | [業務告警分流與 dev-警報 路由設定](基礎建設/業務告警分流與%20dev-警報%20路由設定.md) | 業務告警→dev-警報/prod-警報 頻道分流路由基建（#898/#1353） |
 | [MQ Topology 管理（Terraform）](基礎建設/MQ%20Topology%20管理%EF%BC%88Terraform%EF%BC%89.md) | RabbitMQ exchange/queue/binding 的新增、修改、刪除流程與環境現況 |
 | [Prod RabbitMQ 3-Node Cluster](基礎建設/Prod%20RabbitMQ%203-Node%20Cluster.md) | Prod MQ 三節點 cluster 的節點配置、bootstrap 與 cutover |
@@ -170,7 +167,6 @@
 | [資料庫管理命令速查表](速查參考/資料庫管理命令速查表.md) | DB 管理指令 |
 | [Redis 快取管理](速查參考/Redis%20快取管理.md) | Redis key 清冊（含 session / 限流）、清除方式、**§5 512MB 容量契約與失效模型** |
 | [前端屏幕與 API 映射表](速查參考/前端屏幕與%20API%20映射表.md) | 前端頁面對應的 API 端點 |
-| [Apple Pay Merchant Cert 輪替 SOP](速查參考/Apple%20Pay%20Merchant%20Cert%20輪替%20SOP.md) | Apple Pay 商家憑證到期前的輪替步驟 |
 
 ---
 

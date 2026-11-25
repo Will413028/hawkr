@@ -726,7 +726,7 @@ WHERE 條件均要求 task 處於 `PROCESSING(10)`，避免：
 
 🔴 **`refund_requests` 是 V1 遺留表，已停用**：表仍物理存在（V1 建立、未被後續 migration drop），但**禁止任何新程式碼讀寫它**。退款申請的 SSOT 在 [09 售後微服務](09-售後微服務（AfterSales%20Service）詳細設計書.md)的 `aftersale_cases` ＋ `refund_tasks`。
 
-🔴 **`refund_execute_tasks` 已物理刪除**，不得重建。它曾帶有 `bank_code` / `bank_sub_code` / `bank_account_no` / `uid` 欄位但從未被接上任何寫入端或 Worker ⇒ **平台端的退款路徑不持有銀行帳號**，這是安全邊界的一部分（見 [05 §9.3](05-支付服務（Payment%20Service）詳細設計書.md)），重建它等於把那個邊界打開。
+🔴 **`refund_execute_tasks` 已物理刪除**，不得重建。它曾帶有 `bank_code` / `bank_sub_code` / `bank_account_no` / `uid` 欄位但從未被接上任何寫入端或 Worker ⇒ **平台端的退款路徑不持有銀行帳號**，這是安全邊界的一部分（見 05 §9.3（已刪除）），重建它等於把那個邊界打開。
 
 ### 3.4 資金流水表 financial_logs（強制冪等）
 
@@ -842,7 +842,7 @@ WHERE 條件均要求 task 處於 `PROCESSING(10)`，避免：
 
 > **撥款閉環斷點的處理**：`grant_payment_tasks` 是 Worker 任務表，屬 task 層允許有 `retry_count` / `next_retry_time`。撥款實際執行後 `granted_at` / `grant_status` / `grant_message` 落在 `payment_transactions`（由 Payment Service 寫）。若 PayUni 撥款失敗：
 >
-> 1. Payment Service 側寫入 `payment_transactions.grant_status / grant_message`（[收斂規範 §8.4](../開發規範/PayUni%20錯誤回應收斂規範.md)）
+> 1. Payment Service 側寫入 `payment_transactions.grant_status / grant_message`（收斂規範 §8.4（已刪除））
 > 2. GrantPaymentWorker 既有 retry 機制自動重試幾次後 task → FAILED
 > 3. 運營透過 Admin 異常清單（29-Admin 異常訂單管理 API）查到失敗 → 登入 PayUni 後台修正（儲值 / 調整設定）
 > 4. **Admin 重發撥款 API**：`POST /api/v1/admin/orders/:order_no/retry_grant` — Order Service 重置 `grant_payment_tasks` 對應 row（status=PENDING, retry_count=0, next_retry_time=NOW()）讓既有 worker 重跑
@@ -853,13 +853,13 @@ WHERE 條件均要求 task 處於 `PROCESSING(10)`，避免：
 
 撥款任務有**兩個合法建立點**：`completeOrderInTx`（`40→50` CAS 成功後）與**配送失敗未退款終態的事務處理器**（`35→54` CAS 成功後，見 §5.4「配送失敗未退款（54）的撥款觸發」）。兩者建立撥款任務時**一律建 `PENDING(0)`、照現行流程發撥款指示**——不讀 `refund_total_amount`、不預判 `PROVIDER_AUTO`。
 
-🔴 **不得在完成時依 `orders.refund_total_amount` 預分流**（例如「有退款就直接標 `PROVIDER_AUTO`、不發指示」）。PayUni 對曾發生退款（含部分退款）的交易會主動撥款、補發指示會被拒絕（`GRANT30023`；領域事實全文與成對分錄 / D+7 入帳規則見 [05 §5.6.1](./05-支付服務（Payment%20Service）詳細設計書.md#561-退款交易的-payuni-主動撥款領域事實撥款語意主場)，該節為撥款語意主場）。但「該交易是否已被 PayUni 接管」的**唯一權威是 PayUni 對撥款指示的實際回應**；以本地 `orders.refund_total_amount` 預判會**放棄這次權威確認機會**——本地累計與 PayUni 端狀態可能不一致（事件遲到、極端 race），預判錯 = 該撥的不撥、商家收不到款且系統無任何失敗訊號。故一律發送，由回應的結構化 outcome 決定收斂（§3.11.2）。
+🔴 **不得在完成時依 `orders.refund_total_amount` 預分流**（例如「有退款就直接標 `PROVIDER_AUTO`、不發指示」）。PayUni 對曾發生退款（含部分退款）的交易會主動撥款、補發指示會被拒絕（`GRANT30023`；領域事實全文與成對分錄 / D+7 入帳規則見 05 §5.6.1（已刪除），該節為撥款語意主場）。但「該交易是否已被 PayUni 接管」的**唯一權威是 PayUni 對撥款指示的實際回應**；以本地 `orders.refund_total_amount` 預判會**放棄這次權威確認機會**——本地累計與 PayUni 端狀態可能不一致（事件遲到、極端 race），預判錯 = 該撥的不撥、商家收不到款且系統無任何失敗訊號。故一律發送，由回應的結構化 outcome 決定收斂（§3.11.2）。
 
 `orders.refund_total_amount` 欄位保留，用途 = **前端顯示 + `seller.order.updated` emit 判斷 + 50→60 CASE 轉移**（§5.7.1）；**不作為撥款判準**。
 
 #### 3.11.2 撥款已由 PayUni 接管的收斂（Worker 韌性）
 
-**`PROVIDER_AUTO(50)` 的唯一進入路徑**：GrantPayment gRPC **回應的結構化欄位 `grant_outcome = PROVIDER_TOOK_OVER`**（proto 欄位定義與判準見 [§4.3 撥款指示](#payment-service--撥款指示) / [05 §5.6.1](./05-支付服務（Payment%20Service）詳細設計書.md#561-退款交易的-payuni-主動撥款領域事實撥款語意主場)；payment-service 端判準 = 確定拒絕 + 存在已完成退款）。GrantPaymentWorker 收到此 outcome → `markGrantTaskProviderAuto`（PROCESSING→PROVIDER_AUTO，見 §2.1 mapper 矩陣）：PayUni 已接管撥款，**不再重試、不進 `MANUAL_INTERVENTION`**；帳務權威 = PayUni 端明細 + `payment_refunds` / `financial_logs`（`payment_transactions.granted_at` 刻意保持 NULL、**不建立對帳/巡檢機制**（見[後端服務責任邊界規範](../開發規範/後端服務責任邊界規範.md)），維運需要時以 `grant_query` 腳本人工核對）。
+**`PROVIDER_AUTO(50)` 的唯一進入路徑**：GrantPayment gRPC **回應的結構化欄位 `grant_outcome = PROVIDER_TOOK_OVER`**（proto 欄位定義與判準見 [§4.3 撥款指示](#payment-service--撥款指示) / 05 §5.6.1（已刪除）；payment-service 端判準 = 確定拒絕 + 存在已完成退款）。GrantPaymentWorker 收到此 outcome → `markGrantTaskProviderAuto`（PROCESSING→PROVIDER_AUTO，見 §2.1 mapper 矩陣）：PayUni 已接管撥款，**不再重試、不進 `MANUAL_INTERVENTION`**；帳務權威 = PayUni 端明細 + `payment_refunds` / `financial_logs`（`payment_transactions.granted_at` 刻意保持 NULL、**不建立對帳/巡檢機制**（見[後端服務責任邊界規範](../開發規範/後端服務責任邊界規範.md)），維運需要時以 `grant_query` 腳本人工核對）。
 
 **禁止本地啟發式（強制）**：Worker **不得**以「gRPC error + `orders.refund_total_amount > 0`」自行推斷收斂——該啟發式會吞掉 `PENDING_CONFIRM` 對帳迴圈（模稜兩可失敗必須留給 payment 端下輪 `grant_query` 對帳把關）與無關業務拒絕（餘額/設定類錯誤誤收斂 = 該撥的不撥）。**凡 gRPC error / 其他失敗，一律維持既有路徑**：FAILED/retry → 上限轉 `MANUAL_INTERVENTION`；`PENDING_CONFIRM` 由 payment 端對帳迴圈收斂。
 
@@ -933,7 +933,7 @@ WHERE 條件均要求 task 處於 `PROCESSING(10)`，避免：
 
 #### Gateway Handler DTO 透傳 provider_* 欄位
 
-遵循[收斂規範 §7 Gateway 透傳規範](../開發規範/PayUni%20錯誤回應收斂規範.md)：
+遵循收斂規範 §7 Gateway 透傳規範（已刪除）：
 
 | DTO | 新增欄位 | 適用層 | 說明 |
 |---|---|---|---|
@@ -1095,7 +1095,7 @@ message OrderDetailView {
   repeated string receipt_photo_keys = 50; // 買家收貨照片 objectKey 陣列（原 receipt_photo_urls，49 號設計書 §5.3；雙方可見，於 ConfirmReceipt 寫入）
   string review_deadline = 51;              // 評論截止時間（confirmed_at + 30 天，ISO 8601 UTC，僅 status=50 時有值）
   bool can_review = 52;                     // 是否可評論（status=50 且未超過評論截止時間；🔴 刻意不含 `DELIVERY_FAILED_NO_REFUND(54)`，見 §2.1）
-  string provider_status = 54;              // 聚合 PayUni 原始狀態碼（[收斂規範 §6.2](../開發規範/PayUni%20錯誤回應收斂規範.md)；依當下 order status 取源，見 §4.3 聚合邏輯）
+  string provider_status = 54;              // 聚合 PayUni 原始狀態碼（收斂規範 §6.2（已刪除）；依當下 order status 取源，見 §4.3 聚合邏輯）
   string provider_message = 55;             // 聚合 PayUni 原始訊息；空字串代表無異常或尚未涉及 PayUni
   string auto_complete_at = 53;             // 自動完成時間（ISO 8601 UTC，僅 status=40 時有值，§5.8）
   string processing_deadline = 56;          // 賣家處理期限（ISO 8601 UTC，§5.9）；空字串表示無期限／已處理／已取消
@@ -1310,7 +1310,7 @@ message GetSellerOrderStatusCountsResponse {
 
 > **實作約束**：`OrderProtoConverter.toDetailView(...)` 為 5 個 caller 共用的 static 組裝方法，**禁止**把 availability 塞進去（會洩漏到賣家 / 管理員 / 物流回應）。比照既有 `OrderGrpcService.enrichProvider(...)` 的 per-caller `toBuilder().build()` pattern，新增 `enrichAvailablePaymentMethods(base, order)`，**僅在 `OrderGrpcService.getOrder`（買家路徑）呼叫**，內部再以 `status == PENDING_PAYMENT` 守門。
 
-> **零元無需特例**：零元訂單建立即 PAID（[05 §2A.1](../詳細設計書/05-支付服務（Payment%20Service）詳細設計書.md)），永不停在 PENDING_PAYMENT，故再次付款 surface 天然碰不到零元空清單情境。
+> **零元無需特例**：零元訂單建立即 PAID（05 §2A.1（已刪除）），永不停在 PENDING_PAYMENT，故再次付款 surface 天然碰不到零元空清單情境。
 
 **影響檔案清單**：
 
@@ -1374,7 +1374,7 @@ message GrantPaymentResponse {
 
 #### Payment Service — 聚合 PayUni provider 狀態
 
-遵循[收斂規範 §6.3](../開發規範/PayUni%20錯誤回應收斂規範.md)，Order 組裝 `OrderDetailView / OrderSummaryView` 的 `provider_status` / `provider_message` 欄位時使用：
+遵循收斂規範 §6.3（已刪除），Order 組裝 `OrderDetailView / OrderSummaryView` 的 `provider_status` / `provider_message` 欄位時使用：
 
 ```protobuf
 rpc BatchGetProviderStatusByOrderIds(BatchGetProviderStatusByOrderIdsRequest) returns (BatchGetProviderStatusByOrderIdsResponse);
@@ -1421,7 +1421,7 @@ rpc GetSellerShippingConfig(GetSellerShippingConfigRequest) returns (GetSellerSh
 
 #### 4.3.1 聚合規則（依當下 order status 決定 provider 取源）
 
-遵循[收斂規範 §6.2](../開發規範/PayUni%20錯誤回應收斂規範.md)：
+遵循收斂規範 §6.2（已刪除）：
 
 | 當下 order 狀態類型 | providerStatus 取源 | 呼叫 |
 |---|---|---|
@@ -2061,7 +2061,7 @@ fulfillment.responsibility.finalized
 
 🔴 **第五面是 producer 端的前置，前四面沒有任何一項會因為它不成立而轉紅。** 本事件的 producer 是 payment-service 的 `outbox_events`：其 publisher **必須讀該列持久化的 `exchange` 欄**決定投遞目標（不 hardcode、不從 `routing_key` 或 `event_type` 推導），空白時 **fail-closed 標 FAILED、不得 fallback 回 `payment.events`**。
 
-⚠️ **若投到了錯的 exchange**：該 exchange 存在、routing key 無 binding ⇒ **unroutable，沒有任何 consumer 收到、也不會有錯誤訊息**。consumer 註冊完成、queue 建好、常數與 catalog 都登記了，本 consumer 仍然一則訊息都收不到。contract（模型／值／fail-closed）見 **36 §3.3.1「Outbox persisted exchange」**；payment-service 端的 schema 與 rollout 順序見 [05 §3.5](05-支付服務（Payment%20Service）詳細設計書.md)。
+⚠️ **若投到了錯的 exchange**：該 exchange 存在、routing key 無 binding ⇒ **unroutable，沒有任何 consumer 收到、也不會有錯誤訊息**。consumer 註冊完成、queue 建好、常數與 catalog 都登記了，本 consumer 仍然一則訊息都收不到。contract（模型／值／fail-closed）見 **36 §3.3.1「Outbox persisted exchange」**；payment-service 端的 schema 與 rollout 順序見 05 §3.5（已刪除）。
 
 **本 consumer 是 `54` 的唯一執行者**（admin 不提供改 status 的端點、本書不引入補推排程）⇒ 五面任一面漏了，`54` 就是一個沒有人推得進去的死狀態。
 
@@ -2619,7 +2619,7 @@ flowchart TD
 | 批次 | 100 筆 |
 | 對外暴露 | `OrderDetailView.payment_deadline`（詳情，§8.5）+ `OrderSummaryView.payment_deadline`（列表，免逐筆打詳情 API）（皆 ISO 8601 UTC，僅 status=0 時有值），買家詳情頁與列表「待付款倒數」卡片據此顯示倒數 |
 
-**取消前反查付款 SoT（縱深防護）**：對每筆逾期訂單，在 `cancelExpiredOrderInTx` 取消**之前**（事務外）同步呼叫 payment `GetActivePaymentStatusByOrderNo(orderNo)`（[05 §5.12](../詳細設計書/05-支付服務（Payment%20Service）詳細設計書.md#512-getactivepaymentstatusbyorderno逾期取消前反查internal-only)）反查付款狀態，依結果分支：
+**取消前反查付款 SoT（縱深防護）**：對每筆逾期訂單，在 `cancelExpiredOrderInTx` 取消**之前**（事務外）同步呼叫 payment `GetActivePaymentStatusByOrderNo(orderNo)`（05 §5.12（已刪除））反查付款狀態，依結果分支：
 
 ```mermaid
 flowchart TD

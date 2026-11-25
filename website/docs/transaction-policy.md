@@ -240,7 +240,7 @@
 
 **設計書**
 - `backend/docs/詳細設計書/03-訂單微服務（Order Service）詳細設計書.md`——訂單狀態機、付款期限、自動完成、撥款觸發
-- `backend/docs/詳細設計書/05-支付服務（Payment Service）詳細設計書.md`——撥款、退款、發票（未實作）
+- `05-支付服務（Payment Service）詳細設計書`（已刪除）——撥款、退款、發票（未實作）
 - `backend/docs/詳細設計書/09-售後微服務（AfterSales Service）詳細設計書.md`——出貨期限、售後全時效、退款金流
 - `backend/docs/詳細設計書/20-結帳模組（Checkout Module）詳細設計書.md`——運費收款主體、fee_payer、免運
 - `backend/docs/詳細設計書/21-運費計算模組（Shipping Fee Module）詳細設計書.md`——三維運費費率、代收手續費

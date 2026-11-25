@@ -384,7 +384,7 @@ AWAITING_BUYER_REFUND_PAGE(5)
 2. **同步失敗的即時 + 持久 UX**：
    - **即時**：透過 URL scheme 導回 App，前端顯示錯誤 + 重新填寫按鈕
    - **持久**：Payment 發 event，consumer 更新 `refund_tasks.payuni_status / payuni_message`（task state 保持 `AWAITING_BUYER_REFUND_PAGE`，不推 state）；買家下次查詢仍看得到錯誤原因與重填按鈕
-   - 這是遵循[收斂規範 §5.3 訂閱者不必推 state](../開發規範/PayUni%20錯誤回應收斂規範.md)：發 event 不代表要改狀態機
+   - 這是遵循收斂規範 §5.3 訂閱者不必推 state（已刪除）：發 event 不代表要改狀態機
 3. **非同步失敗的處置**：webhook 回 `RefundStatus=2` 後，先對帳 payment 端該退款狀態——已成功則推進完成、`REF02037`（已退過）不重填改對帳、其餘一般失敗才退回 `AWAITING_BUYER_REFUND_PAGE(5)` 讓買家重填；對帳無法判定則 `MANUAL_INTERVENTION(40)`。完整規則見 §5.4.3.1
 4. **買家遲未操作**：`AWAITING_BUYER_REFUND_PAGE` 維持，**本狀態無逾時**，task 可無限期停留
 
@@ -899,7 +899,7 @@ CREATE INDEX idx_aftersale_resolutions_case_no ON aftersale_resolutions (case_no
 | retry_count | INTEGER | NOT NULL | 重試次數（DEFAULT 0） |
 | max_retry_count | INTEGER | NOT NULL | 最大重試次數（DEFAULT 10，僅信用卡路徑使用） |
 | next_retry_time | TIMESTAMPTZ | | 下次重試時間 |
-| payuni_status | VARCHAR(20) | | PayUni 回傳的 Status 值（遵循[收斂規範](../開發規範/PayUni%20錯誤回應收斂規範.md) §2.2 欄位寬度 + §4.4 單一欄位雙階段寫入規則；信用卡 sync 與 ATM sync：`response.Status`；ATM async webhook：**inner RefundStatus**，值為 `1` 或 `2`）|
+| payuni_status | VARCHAR(20) | | PayUni 回傳的 Status 值（遵循收斂規範（已刪除） §2.2 欄位寬度 + §4.4 單一欄位雙階段寫入規則；信用卡 sync 與 ATM sync：`response.Status`；ATM async webhook：**inner RefundStatus**，值為 `1` 或 `2`）|
 | payuni_message | TEXT | | PayUni 原始訊息（遵循規範 §2.2；失敗時供 admin / 客服查看；API 透傳到前端 `refundFailureMessage` 的規則見 §2.2.1）|
 | estimated_refund_date | DATE | | UNi 帳戶預計扣款日（ATM 同步受理成功時寫入；信用卡恆 NULL） |
 | bank_date | DATE | | 買家實際到帳日（ATM webhook RefundStatus=1 時寫入；信用卡恆 NULL） |
@@ -1100,7 +1100,7 @@ Gateway middleware：`JWTAuth()` + `requireAdmin()` → gRPC Service 驗證 `req
 
 #### 4.1.2b Gateway DTO 透傳 provider_* 欄位
 
-遵循[收斂規範 §7 Gateway 透傳規範](../開發規範/PayUni%20錯誤回應收斂規範.md)：
+遵循收斂規範 §7 Gateway 透傳規範（已刪除）：
 
 | DTO | 新增欄位 | 適用層 |
 |---|---|---|
@@ -1553,7 +1553,7 @@ message AfterSaleCaseSummary {
     string refund_failure_message = 15;      // PayUni 原始訊息；透傳規則見 §2.2.1（僅 state=5 上次填寫失敗 / state=30 終態失敗 時有值）
     string estimated_refund_date = 16;       // 預計扣款日 ISO 8601 YYYY-MM-DD（僅 ATM 受理後有值，其餘為空字串）
     string bank_date = 17;                   // 實際到帳日 ISO 8601 YYYY-MM-DD（僅 ATM 成功匯款後有值，其餘為空字串）
-    string provider_status = 18;             // 聚合 provider 狀態碼（[收斂規範 §9.4](../開發規範/PayUni%20錯誤回應收斂規範.md)；依當下 case status 取自 refund_tasks.payuni_status / aftersale_cases.return_provider_status / shipments.provider_status，見 §4.3 聚合邏輯）
+    string provider_status = 18;             // 聚合 provider 狀態碼（收斂規範 §9.4（已刪除）；依當下 case status 取自 refund_tasks.payuni_status / aftersale_cases.return_provider_status / shipments.provider_status，見 §4.3 聚合邏輯）
     string provider_message = 19;            // 聚合 provider 訊息（同上；空字串代表無異常或尚未涉及 PayUni）
     string auto_confirm_at = 20;             // 自動確認收貨截止時間 ISO 8601 UTC（僅 status=27 RETURN_DELIVERED 時有值，scheduler 到期自動 confirm）
     // 逆物流退貨政策欄位
@@ -1605,7 +1605,7 @@ message AfterSaleCaseDetailView {
     string refund_failure_message = 27;          // PayUni 原始訊息；透傳規則見 §2.2.1（僅 state=5 上次填寫失敗 / state=30 終態失敗 時有值）
     string estimated_refund_date = 28;           // 預計扣款日 ISO 8601 YYYY-MM-DD（僅 ATM 受理後有值，其餘為空字串）
     string bank_date = 29;                       // 實際到帳日 ISO 8601 YYYY-MM-DD（僅 ATM 成功匯款後有值，其餘為空字串）
-    string provider_status = 30;                 // 聚合 provider 狀態碼（[收斂規範 §9.4](../開發規範/PayUni%20錯誤回應收斂規範.md)；依當下 case status 取自 refund_tasks.payuni_status / aftersale_cases.return_provider_status / shipments.provider_status，見 §4.3 聚合邏輯）
+    string provider_status = 30;                 // 聚合 provider 狀態碼（收斂規範 §9.4（已刪除）；依當下 case status 取自 refund_tasks.payuni_status / aftersale_cases.return_provider_status / shipments.provider_status，見 §4.3 聚合邏輯）
     string provider_message = 31;                // 聚合 provider 訊息（同上）
     string auto_confirm_at = 32;                 // 自動確認收貨截止時間 ISO 8601 UTC（僅 status=27 RETURN_DELIVERED 時有值，scheduler 到期自動 confirm）
     string return_delivered_at = 33;             // 退貨送達賣家時間 ISO 8601 UTC（status>=27 時有值，PayUni webhook 觸發 25→27 流轉時 stamp）
@@ -1858,7 +1858,7 @@ message CreateRefundRequest {
 
 > `refund_no` 為向後相容欄位：**空值時走原有邏輯**（舊版 caller 仍可能不帶此欄，payment 端必須容忍）。
 
-> **權限收斂**：`CreateRefund` 已改為僅接受內部服務 internal call（見 [05 §5.5.3](./05-支付服務（Payment%20Service）詳細設計書.md#55-退款流程refund)）；AfterSales `RefundTaskWorker` 經 `x-internal-service` metadata 呼叫，買家 App 不再有直呼退款入口。
+> **權限收斂**：`CreateRefund` 已改為僅接受內部服務 internal call（見 05 §5.5.3（已刪除））；AfterSales `RefundTaskWorker` 經 `x-internal-service` metadata 呼叫，買家 App 不再有直呼退款入口。
 
 **信用卡退款分流（Payment Service 內部邏輯，AfterSales 不感知）**：
 
@@ -1875,7 +1875,7 @@ message CreateRefundRequest {
 
 #### 4.3.4b Payment / Shipping — 批次 provider 狀態聚合 RPC
 
-聚合 `AfterSaleCaseDetailView / Summary` 的 `provider_status` / `provider_message` 欄位時使用（遵循[收斂規範 §6.3](../開發規範/PayUni%20錯誤回應收斂規範.md)）：
+聚合 `AfterSaleCaseDetailView / Summary` 的 `provider_status` / `provider_message` 欄位時使用（遵循收斂規範 §6.3（已刪除））：
 
 | Service | RPC | 用途 |
 |---|---|---|
@@ -1886,7 +1886,7 @@ message CreateRefundRequest {
 
 #### 4.3.6 聚合規則（依 case 當下 status 決定 provider 取源）
 
-遵循[收斂規範 §6.2](../開發規範/PayUni%20錯誤回應收斂規範.md)：
+遵循收斂規範 §6.2（已刪除）：
 
 | case 當下平台狀態類型 | providerStatus 取源 |
 |---|---|
@@ -2618,7 +2618,7 @@ flowchart TD
 **實作位置**：`services/java/aftersales-service/.../scheduler/AutoConfirmReceiptScheduler.java`
 
 > **⚠️ 搶佔語意**：`markAutoCompletedFromDelivered` 的 CAS（`WHERE status='27'`）擋得住跨 pod 重複，但 `status='32'` 是**永久轉換** —— row 永久離開候選集合。CAS 與後續 publish **同在 `autoConfirmReceipt` 的 `@Transactional` 內**，因此 🔴 **publish 必須呼叫會傳遞失敗的變體**（[§5.3.10.5 (2)](#53105-24h-預警的搶佔語意例外-b)）：publish 拋例外 ⇒ 連 CAS 一起 rollback ⇒ 下一個 tick 重來。呼叫吞噬版 ⇒ 事件永久遺失且零告警。
-> ⚠️ **這裡的 `@Transactional` 確實有保護作用**，與 [05 號 §5.7](./05-支付服務（Payment%20Service）詳細設計書.md) B4 那個「`@Transactional` 完全沒有保護作用」的情形**相反**。兩者的差別在於例外有沒有穿過 Spring proxy —— 不要從其中一則推出通則。
+> ⚠️ **這裡的 `@Transactional` 確實有保護作用**，與 05 號 §5.7（已刪除） B4 那個「`@Transactional` 完全沒有保護作用」的情形**相反**。兩者的差別在於例外有沒有穿過 Spring proxy —— 不要從其中一則推出通則。
 
 ##### 5.3.10.2 超商待取逾時自動完成（已退場）
 
@@ -2836,7 +2836,7 @@ notification-service 透過 `payload_filter` + template_render 即可從 payload
 
 由 §5.2.2（部分退款）、§5.2.3（全額退款）、§5.3.3（確認收貨後）、§5.7（取消出貨）觸發。
 
-> **一致性（退款發起方唯一）**：Payment Service 已將 `CreateRefund` 收斂為 **internal-only**（見 [05 §1.6 / §4.1 / §5.5.3](./05-支付服務（Payment%20Service）詳細設計書.md#55-退款流程refund)），買家不再能直呼付款服務退款。**售後審核核准後的 `RefundTaskWorker` 是退款的唯一發起方**。金額防線兩側對應、不重複實作：aftersales 側以 R5 退款上限（`refund_amount ≤ refundable_amount`，見 §1.5 R5）把關**申請額度**；payment 側以 [05 §5.5.5](./05-支付服務（Payment%20Service）詳細設計書.md#55-退款流程refund) L2 在途餘額計算 + L3 DB 兜底把關**落地額度**，**以 payment 為金額落地權威**。
+> **一致性（退款發起方唯一）**：Payment Service 已將 `CreateRefund` 收斂為 **internal-only**（見 05 §1.6 / §4.1 / §5.5.3（已刪除）），買家不再能直呼付款服務退款。**售後審核核准後的 `RefundTaskWorker` 是退款的唯一發起方**。金額防線兩側對應、不重複實作：aftersales 側以 R5 退款上限（`refund_amount ≤ refundable_amount`，見 §1.5 R5）把關**申請額度**；payment 側以 05 §5.5.5（已刪除） L2 在途餘額計算 + L3 DB 兜底把關**落地額度**，**以 payment 為金額落地權威**。
 
 **refund_amount 來源**（重要）：
 
@@ -3038,7 +3038,7 @@ POST /api/v1/app/orders/:order_no/refund_page
    → 依 client_type × app_type 組 redirect_url（最終出口分支矩陣，見下表）
    → Gateway 302 redirect 到 redirect_url
 
-**最終出口分支矩陣**（與 [05-支付服務 §5.9](../詳細設計書/05-支付服務（Payment%20Service）詳細設計書.md#59-付款頁面導回流程) 一致）：
+**最終出口分支矩陣**（與 05-支付服務 §5.9（已刪除） 一致）：
 
 | client_type | app_type | redirect_url 模板（成功） | redirect_url 模板（失敗） |
 |---|---|---|---|
@@ -3289,7 +3289,7 @@ ATM 退款存在三條「失敗 → 讓買家重填」的 revert 路徑，均呼
 
 > **常數與碼**：`REF02037` 為 PayUni 外部碼，於常數集中定義（`AfterSalesConstants` / PayUni 錯誤碼常數，無則新增，禁硬編碼字面值）。`MANUAL_INTERVENTION(40)`、`DONE(20)`、`AWAITING_WEBHOOK(15)` 均為既有 [`WorkerTaskStatus`](../代碼管理%EF%BC%88CodeMeta%EF%BC%89/業務狀態碼.md) 值，本修正**不新增碼**、無 CodeMeta / Flyway / MQ event 變更。
 >
-> **一致性總則**：PayUni 已成功退款為單一真實來源；任何 aftersales revert 路徑不得把已成功退款打回買家重填或標失敗。對帳於此單一事件 / 回傳處理路徑內即時完成——查 payment 端狀態後在同一 tx 決定推進或打斷，**不引入補償 / 對帳 scheduler job**（遵 [§22 後端服務責任邊界](../開發規範/後端服務責任邊界規範.md)）。payment 端對稱處置（webhook finalize lossless）見 [05 §5.5.4.1](./05-支付服務（Payment%20Service）詳細設計書.md#5541-atm-退款最終結果-webhook-的-finalize-語意權威結果-lossless)。存量卡在重填迴圈的舊資料以一次性維運 SQL 對帳，不寫進 application code。
+> **一致性總則**：PayUni 已成功退款為單一真實來源；任何 aftersales revert 路徑不得把已成功退款打回買家重填或標失敗。對帳於此單一事件 / 回傳處理路徑內即時完成——查 payment 端狀態後在同一 tx 決定推進或打斷，**不引入補償 / 對帳 scheduler job**（遵 [§22 後端服務責任邊界](../開發規範/後端服務責任邊界規範.md)）。payment 端對稱處置（webhook finalize lossless）見 05 §5.5.4.1（已刪除）。存量卡在重填迴圈的舊資料以一次性維運 SQL 對帳，不寫進 application code。
 
 #### 5.4.4 訂單狀態同步（MQ 事件）
 
@@ -3439,7 +3439,7 @@ AfterSales 發布 `aftersales.refund.completed` 事件，Order Service 消費後
 |---------|---------|
 | 逾時申請（超過 60hr） | 系統拒絕 |
 | 信用卡退款 PayUni 同步失敗 | Worker 固定 30s 後 retry 1 次；retry 後仍失敗 → refund_task `FAILED` 終態，進 admin 異常清單 |
-| ATM 退款同步 API 失敗 | payment 發 event（含 PayUni 錯誤碼與訊息），consumer **僅更新 `refund_tasks.payuni_status` / `payuni_message` snapshot，task state 保持 `AWAITING_BUYER_REFUND_PAGE`**（遵循[收斂規範 §5.3](../開發規範/PayUni%20錯誤回應收斂規範.md) 訂閱者不必推 state）。前端透過 URL scheme 即時顯示錯誤；買家下次查詢也能從 snapshot 讀到錯誤原因與重新填寫按鈕。買家自由決定是否再次嘗試；**本狀態無逾時** |
+| ATM 退款同步 API 失敗 | payment 發 event（含 PayUni 錯誤碼與訊息），consumer **僅更新 `refund_tasks.payuni_status` / `payuni_message` snapshot，task state 保持 `AWAITING_BUYER_REFUND_PAGE`**（遵循收斂規範 §5.3（已刪除） 訂閱者不必推 state）。前端透過 URL scheme 即時顯示錯誤；買家下次查詢也能從 snapshot 讀到錯誤原因與重新填寫按鈕。買家自由決定是否再次嘗試；**本狀態無逾時** |
 | ATM 退款 webhook 匯款失敗（RefundStatus=2）| 依 §5.4.3.1 先對帳 payment 端狀態：已成功→推進完成；`REF02037`（已退過）→不重填改對帳；一般失敗（帳號錯 / 戶名不符 / 帳戶凍結）→退回 `AWAITING_BUYER_REFUND_PAGE(5)`+`current_attempt++`+`payuni_message`，讓買家重填；對帳無法判定→`MANUAL_INTERVENTION(40)` 由運營 / 客服介入 |
 | Shipping 建立逆物流失敗 | 回傳明確錯誤訊息，售後單狀態不變，賣家重試 |
 | Shipping 逆物流建立成功但 TX 失敗 | 產生孤立物流單，由 Shipping Service 定期清理無關聯物流單 |
@@ -3458,7 +3458,7 @@ AfterSales 發布 `aftersales.refund.completed` 事件，Order Service 消費後
 
 #### 5.8.1 PayUni 相關異常 — 人工介入閉環
 
-遵循[收斂規範 §8.4 人工介入閉環](../開發規範/PayUni%20錯誤回應收斂規範.md)。
+遵循收斂規範 §8.4 人工介入閉環（已刪除）。
 
 **觸發條件**：
 

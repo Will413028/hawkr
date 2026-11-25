@@ -14,7 +14,6 @@
   - [02 產品微服務（Product Service）](詳細設計書/02-產品微服務%EF%BC%88Product%20Service%EF%BC%89詳細設計書.md)
   - [03 訂單微服務（Order Service）](詳細設計書/03-訂單微服務%EF%BC%88Order%20Service%EF%BC%89詳細設計書.md)
   - [04 購物車微服務（Cart Service）](詳細設計書/04-購物車微服務%EF%BC%88Cart%20Service%EF%BC%89詳細設計書.md)
-  - [05 支付服務（Payment Service）](詳細設計書/05-支付服務%EF%BC%88Payment%20Service%EF%BC%89詳細設計書.md)
   - [06 物流微服務（Shipping Service）](詳細設計書/06-物流微服務%EF%BC%88Shipping%20Service%EF%BC%89詳細設計書.md)
   - [07 優惠券微服務（Coupon Service）](詳細設計書/07-優惠券微服務%EF%BC%88Coupon%20Service%EF%BC%89詳細設計書.md)
   - [08 多媒體微服務（Media Service）](詳細設計書/08-多媒體微服務%EF%BC%88Media%20Service%EF%BC%89詳細設計書.md)
@@ -70,7 +69,6 @@
   - [Go gRPC 錯誤處理規範](開發規範/Go%20gRPC%20錯誤處理規範.md)
   - [PostgreSQL 設計規範與最佳實踐](開發規範/PostgreSQL%20設計規範與最佳實踐.md)
   - [DB Migration 相容性規範（expand-contract）](開發規範/DB%20Migration%20相容性規範（expand-contract）.md)
-  - [PayUni 錯誤回應收斂規範](開發規範/PayUni%20錯誤回應收斂規範.md)
   - [Gateway Swagger 註解規範](開發規範/Gateway%20Swagger%20註解規範.md)
   - [MQ 與事件管理規範](開發規範/MQ%20與事件管理規範.md)
   - [新增微服務指南](開發規範/新增微服務指南.md)
@@ -108,7 +106,6 @@
   - [Cloudflare CDN 與 DDoS 防護配置指南](基礎建設/Cloudflare%20CDN%20與%20DDoS%20防護配置指南.md)
   - [Discord 告警通知設定指南](基礎建設/Discord%20告警通知設定指南.md)
   - [Discord 監控 Bot 設計書](基礎建設/Discord%20監控%20Bot%20設計書.md)
-  - [ATM 退款結果 Webhook 遺失維運處置](基礎建設/ATM%20退款結果%20Webhook%20遺失維運處置.md)
   - [業務告警分流與 dev-警報 路由設定](基礎建設/業務告警分流與%20dev-警報%20路由設定.md)
   - [MQ Topology 管理（Terraform）](基礎建設/MQ%20Topology%20管理%EF%BC%88Terraform%EF%BC%89.md)
   - [Prod RabbitMQ 3-Node Cluster](基礎建設/Prod%20RabbitMQ%203-Node%20Cluster.md)
@@ -119,7 +116,6 @@
   - [資料庫管理命令速查表](速查參考/資料庫管理命令速查表.md)
   - [Redis 快取管理](速查參考/Redis%20快取管理.md)
   - [前端屏幕與 API 映射表](速查參考/前端屏幕與%20API%20映射表.md)
-  - [Apple Pay Merchant Cert 輪替 SOP](速查參考/Apple%20Pay%20Merchant%20Cert%20輪替%20SOP.md)
 
 - Runbook
   - [食安事件處理 Runbook](runbooks/food-safety-incident-runbook.md)

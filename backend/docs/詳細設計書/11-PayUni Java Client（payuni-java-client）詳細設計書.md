@@ -356,7 +356,7 @@ public record PayUniApiResponse(
 
 **類別**：`io.github.will413028.hawkr.payuni.http.PayUniRequestLogger`
 
-金流爭議稽核需要「我方送了什麼、PayUni 回了什麼、耗時多久、驗簽/解密是否通過」的完整落庫（落庫設計見 [05 §11](./05-支付服務（Payment%20Service）詳細設計書.md#11-payuni-互動-audit-loggingpayuni_audit_logs)）。本 client 只負責在**每次 exchange 結束時觸發一次 hook**，不負責 DB。
+金流爭議稽核需要「我方送了什麼、PayUni 回了什麼、耗時多久、驗簽/解密是否通過」的完整落庫（落庫設計見 05 §11（已刪除））。本 client 只負責在**每次 exchange 結束時觸發一次 hook**，不負責 DB。
 
 **介面（單一聚合 hook）**：
 

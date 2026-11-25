@@ -5,7 +5,7 @@
 > **定位**：純查詢聚合層，不新增 DB 表、不新增業務動作。運營人員透過 Admin API 找到異常紀錄後，登入 PayUni 後台手動處理；PayUni webhook 回流時系統自動更新，異常紀錄從清單中消失 = 閉環完成。
 >
 > **強制依據**（優先順序）：
-> 1. [PayUni 錯誤回應收斂規範](../開發規範/PayUni%20錯誤回應收斂規範.md)（三層語意 / 欄位命名 / 批次聚合）
+> 1. PayUni 錯誤回應收斂規範（已刪除）（三層語意 / 欄位命名 / 批次聚合）
 > 2. [API 設計規範](../開發規範/API%20設計規範.md)（Namespace / DTO / Envelope）
 > 3. [Gateway Swagger 註解規範](../開發規範/Gateway%20Swagger%20註解規範.md)（Gateway Swagger 規範）
 
@@ -1612,9 +1612,9 @@ cd services/java/shared/java-proto && mvn clean install
 
 | 本設計書章節 | 引用自 |
 |---|---|
-| §1 / §3 / §4 / §10 | `docs/開發規範/PayUni 錯誤回應收斂規範.md` |
+| §1 / §3 / §4 / §10 | `PayUni 錯誤回應收斂規範`（已刪除） |
 | §5 / §13 | `docs/開發規範/API 設計規範.md` / `docs/開發規範/Gateway Swagger 註解規範.md` |
-| §6 | `docs/詳細設計書/05-支付服務（Payment Service）詳細設計書.md` |
+| §6 | `05-支付服務（Payment Service）詳細設計書`（已刪除） |
 | §7 | `docs/詳細設計書/06-物流微服務（Shipping Service）詳細設計書.md` |
 | §8 | `docs/詳細設計書/09-售後微服務（AfterSales Service）詳細設計書.md` |
 | §9 | `docs/詳細設計書/03-訂單微服務（Order Service）詳細設計書.md` |
