@@ -150,8 +150,8 @@ func (f *fixture) open(t *testing.T) {
 func (f *fixture) enableSeller(t *testing.T) {
 	t.Helper()
 	ctx := context.Background()
-	_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO payment.accounts (store_id, provider, external_account_id, requirement_collection, status, transfers_active, create_called_at, create_completed_at, created_at, updated_at)
-VALUES (7, $1, 'acct_7', 'PLATFORM', 'ENABLED', true, now(), now(), now(), now())`, payment.ChargeFakeName)
+	_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO payment.accounts (store_id, provider, external_account_id, requirement_collection, status, transfers_active, first_activated_at, create_called_at, create_completed_at, created_at, updated_at)
+VALUES (7, $1, 'acct_7', 'PLATFORM', 'ENABLED', true, now(), now(), now(), now(), now())`, payment.ChargeFakeName)
 	must(t, err)
 }
 

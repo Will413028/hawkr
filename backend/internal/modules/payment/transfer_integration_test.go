@@ -35,7 +35,7 @@ func (f *chargeFixture) paidPayment(t *testing.T, orderNo string, amount int64) 
 	return p
 }
 
-// enableAccount 寫入賣家已開通轉帳的收款帳戶列（store 的外部帳戶 ID 是 external）。
+// enableAccount 寫入賣家的收款帳戶列（外部帳戶 ID 是 external，active 決定能否轉帳）；同一個測試多次呼叫時更新同一列。
 func (f *chargeFixture) enableAccount(t *testing.T, storeID int64, external string, active bool) {
 	t.Helper()
 	ctx := context.Background()
@@ -44,7 +44,9 @@ func (f *chargeFixture) enableAccount(t *testing.T, storeID int64, external stri
 		status = "DISABLED"
 	}
 	_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO payment.accounts (store_id, provider, external_account_id, requirement_collection, status, transfers_active, first_activated_at, create_called_at, create_completed_at, created_at, updated_at)
-VALUES ($1, 'fake', $2, 'PLATFORM', $3, $4::boolean, CASE WHEN $4::boolean THEN now() END, now(), now(), now(), now())`, storeID, external, status, active)
+VALUES ($1, 'fake', $2, 'PLATFORM', $3, $4::boolean, CASE WHEN $4::boolean THEN now() END, now(), now(), now(), now())
+ON CONFLICT (store_id) DO UPDATE SET external_account_id = EXCLUDED.external_account_id, status = EXCLUDED.status, transfers_active = EXCLUDED.transfers_active,
+  first_activated_at = COALESCE(payment.accounts.first_activated_at, EXCLUDED.first_activated_at), updated_at = now()`, storeID, external, status, active)
 	must(t, err)
 }
 

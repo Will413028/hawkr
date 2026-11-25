@@ -209,7 +209,7 @@ func TestAGrantRequestRepeatedAfterTheTransferExistsSucceedsIdempotently(t *test
 	f.enableAccount(t, 7, "acct_seller_7", true)
 	first := f.requestTransfer(t, "G-1")
 	must(t, f.runTransfer(first.ID, false))
-	f.exec(t, "UPDATE payment.accounts SET transfers_active = false WHERE store_id = 7")
+	f.exec(t, "UPDATE payment.accounts SET status = 'DISABLED', transfers_active = false WHERE store_id = 7")
 	again, err := f.module.RequestPaymentTransfer(context.Background(), "G-1")
 	if err != nil || again.ID != first.ID || again.Status != TransferSucceeded {
 		t.Fatalf("重複請求：%+v err=%v，預期同一筆已成功的轉帳", again, err)
