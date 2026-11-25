@@ -25,7 +25,13 @@ export async function installStripeStub(page: Page): Promise<void> {
     return {
       mount: function (node) {
         var host = typeof node === "string" ? document.querySelector(node) : node;
-        if (host) host.setAttribute("data-testid", "stub-payment-element");
+        if (host) {
+          // 真的 Payment Element 在容器裡插入 iframe；空的容器沒有高度，Playwright 視為不可見。
+          var frame = document.createElement("div");
+          frame.style.height = "40px";
+          host.appendChild(frame);
+          host.setAttribute("data-testid", "stub-payment-element");
+        }
         (handlers.ready || []).forEach(function (h) { h(); });
       },
       on: function (name, h) { (handlers[name] = handlers[name] || []).push(h); },
