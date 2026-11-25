@@ -359,10 +359,16 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
     - 舊 Go 服務的 3 條上傳流程恢復（同附件第四節，B1-D11；評價圖、聊天傳圖已隨 A6-6 改走單體的 `Confirm`，B1-9）。觸發：稅籍證明與發票解鎖佐證是 B10；AI 風格縮圖已在 B1-9 改成 `imageai` 在自己的 transaction 內 `Confirm` 與 `MarkDeleted`。
     - 服務內部直傳的接線：託運單 PDF 走 `PutSecure`（B1-D14）。作廢：託運單隨物流商退場不存在（ADR `2026-11-15-fulfillment-seller-managed-shipping.md` 2026-11-24 修訂），B3 不接；`PutPublic` 只收圖片的限制不變，`PutSecure` 留給之後有機敏檔案直傳的模組。
     - 公開圖片 CDN 快取拉長：目前 `Cache-Control: public, max-age=3600`（Will 2026-11-23）。觸發：有了「刪除資產時清 CDN 快取」的機制。
-- [ ] **B2 payment**：計畫與進度見 `2026-11-23-b2-payment.md`。物流財務與責任判定已刪（commit `5883f499e`）。收款模式改為 separate charges and transfers，轉帳機制在 B2 做（收款開通 ADR D20 修訂，Will 2026-11-23）。
+- [x] **B2 payment**：完成（2026-11-25）；計畫與進度見 `2026-11-23-b2-payment.md`。物流財務與責任判定已刪（commit `5883f499e`）。收款模式改為 separate charges and transfers，轉帳機制在 B2 做（收款開通 ADR D20 修訂，Will 2026-11-23）。
   - 不改寫、直接刪（Will 2026-11-23）：PayUni 特有的流程 `AtmReactivationService`、`PendingPaymentReconcile*`、`PaymentReturnController`、`PaymentPageService`、`UnknownPaymentFallbackConsumer`、`PayUniRefund*Consumer`、`RescueRefundConsumer`，由 Stripe 的 webhook（inbox、event id 去重）與冪等鍵取代。
   - `createRefund` 依 D5 修正。
   - 換金流（收款開通 ADR D1、D5）：付款不再走 PayUni，改經 payment port，作品集的 adapter 是 Stripe Connect 測試模式；付款建立、webhook（先寫 inbox、event id 去重）都走 port。`internal/legacy/sellerserver` 回給 Java 的 `payuni_mer_id` 改由 port 的外部帳戶 ID 取代；Java 與 Go 舊服務的 PayUni 程式隨本步刪除。
+  - B2 延後項（步驟 8 收尾搬回，細節見子計畫「範圍」與附件 `adr-review.md`）：
+    - 訂單的 `consolidated`／`is_consolidated_order` 與 invoice-service 依它判斷開立方的分支：多賣家合併付款不做（B2 範圍），欄位沒有新的寫入來源。觸發：B8 ordering 搬遷時刪欄位與分支，或 A5 invoice 接手發票快照時一起處理。
+    - `orders.mer_id` 欄位（物流與售後仍讀，B2 起寫空字串）。觸發：B3 刪 Java shipping、B8 ordering 搬遷後沒有讀者時刪。
+    - Stripe 對平台持有資金的時間上限：以 Stripe 官方文件查證並附連結；短於「完成期限加售後期限」時收款模式改 destination charges 加手動撥款。觸發：決定上線前。代理收付的法規前提同此觸發。
+    - 非 B2 造成的 ADR 殘句與漏標狀態列（`adr-review.md`）：`membership-billing-payuni-period` 改 superseded by scope cut；`logistics-amount-semantics-separation`、`logistics-cost-true-up`、`responsibility-based-cost-attribution` 補 superseded by 11-15；`seller-governance-consolidated` 的保留期引用改指 `2026-11-13-seller-platform-review-and-identity-matching`；`public-store-identity-and-visibility` 的 PayUni 曝光條件與 MerID 句、`optimistic-concurrency-etag` :60 的 `RebindPayUni` 例子改寫。觸發：下一次動到該 ADR，最晚 B3 收尾。
+    - `2026-09-18-webhook-two-phase-transaction` 標 superseded。觸發：B3 刪 `payuni-webhook-service`（Uber 切片仍用兩段交易）。
 - [ ] **B3 fulfillment**（不建 `fulfillment` 模組）
   - 子計畫與進度：`2026-11-24-b3-fulfillment.md`（前提重審 P1–P6 已決 2026-11-24：出貨歸 B8 ordering、運費設定歸 seller、物流 port 延後；R1–R6 已決；本段以下的條目若與子計畫衝突，以子計畫為準）。
   - 範圍（ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md` 與其 2026-11-24 修訂）：出貨只做賣家自寄；`internal/modules/seller` 擁有賣家的運費設定（固定運費、免運門檻可空、處理天數 1–7、預設 3 個工作日）與純函式報價，經 Connect 對外，賣家設定畫面在本步做；出貨記錄與含出貨的訂單狀態機歸 B8 ordering，不在本步。`internal/arch/modules.go` 刪除 `fulfillment` 模組與指向它的邊。

@@ -3,7 +3,7 @@
 | 項目 | 值 |
 |---|---|
 | 狀態 | accepted；D7 superseded by `2026-09-26-external-contract-protobuf-connect.md` |
-| 修訂 | 2026-09-29：A3 盤點更正 seller 往上呼叫的描述；vendor portal 改屬 agent（Will 決定，計畫 `2026-09-29-a3-buyer-seller.md`）；2026-11-23：D9 的 CI denylist gate 不建，改寫現行做法（Will） |
+| 修訂 | 2026-09-29：A3 盤點更正 seller 往上呼叫的描述；vendor portal 改屬 agent（Will 決定，計畫 `2026-09-29-a3-buyer-seller.md`）；2026-11-23：D9 的 CI denylist gate 不建，改寫現行做法（Will）；2026-11-25：B2 完成，payment 來源描述與外部呼叫清單由 PayUni 改為 Stripe（計畫 `backend/docs/plans/2026-11-23-b2-payment.md`） |
 | 日期 | 2026-09-24 |
 | 影響範圍 | 整個 `backend/`（22 個 deployable ＋ gateway）、`api/proto`、`infra/mq`、`k8s`、前端的 API client |
 | 計畫 | `docs/plans/2026-09-24-go-modular-monolith.md` |
@@ -58,7 +58,7 @@
 |---|---|---|
 | identity | account-service：登入、session、角色、ADM 帳號（代行的 session 與稽核資料 2026-09-27 改屬 delegation，見 `2026-09-27-delegation-module.md`） | — |
 | media | media-service | — |
-| payment | payment-service：PayUni 收款、退款、撥款 API，會員訂閱計費 | — |
+| payment | payment-service：收款、退款、撥款 API（B2 改為 Stripe separate charges and transfers，經 provider port；會員訂閱計費已隨 scope cut 刪除） | — |
 | buyer | buyer-service | identity, media |
 | seller | seller-service（推薦賣家排行、vendor portal 除外） | identity, media |
 | content | content-service | media, social（banner 的貼文目標：建立時確認公開可讀，讀取時隱藏失效的；social 不得依賴 content，A7-D28、A7-D23 O5） |
@@ -185,7 +185,7 @@
 
 **決策**：
 
-- 呼叫 PayUni、AMEGO、Uber、Apple、R2、FCM、LLM 時，先 commit 一筆帶冪等鍵的 intent 列，再由 River job 在 transaction 外呼叫，最後在新的 transaction 裡寫入結果。
+- 呼叫 Stripe、AMEGO、Uber、Apple、R2、FCM、LLM 時，先 commit 一筆帶冪等鍵的 intent 列，再由 River job 在 transaction 外呼叫，最後在新的 transaction 裡寫入結果。
 - 外部進來的 webhook 一律先寫 `webhook_inbox`、先 commit，再交給負責的模組處理。
 - 這是 `platform` 提供的單一機制，模組不得自己實作。
 

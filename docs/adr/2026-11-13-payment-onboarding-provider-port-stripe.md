@@ -57,7 +57,7 @@
 
 賣家收款開通只經 provider 中立的 payment port。作品集的 adapter 是 Stripe Connect 測試模式，預設由 Stripe 收件加託管頁面，平台收件的帳戶在能承載內嵌元件的 client（website）用內嵌元件、其餘用託管頁面；平台不收身分證號、銀行帳號與證件；PayUni adapter 刪除。店家公開曝光要平台審核核准且轉帳能力 active，狀態、任務清單、下一步與閘門由伺服器從同一組來源欄位推導，client 只呈現。
 
-**收款 adapter**（Will 2026-10-29、2026-11-02）：Stripe Connect 測試模式，單體的 PayUni adapter 刪除，PayUni 的付款、退款、撥款與物流留在 Java 舊服務，由單體計畫的 B2、B3、B8–B10 搬。
+**收款 adapter**（Will 2026-10-29、2026-11-02）：Stripe Connect 測試模式，單體的 PayUni adapter 刪除。付款、退款與轉帳已由單體計畫 B2 搬進 payment 模組，經 provider port 呼叫 Stripe，Java payment-service 與 PayUni 程式已刪（計畫 `backend/docs/plans/2026-11-23-b2-payment.md`）；物流改賣家自寄（`docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md`），由 B3 搬。
 - 未採：PayUni adapter 留在 port 後面當第二個 adapter：沒有測試帳號無法驗證，會隨 port 演進失真；git 找得回。
 - 未採：簽 PayUni：測試帳號要簽約，作品集要展示國際標準。
 
@@ -208,7 +208,7 @@
 
 ## 後果
 
-- 本機的付款與物流端到端在付款、物流模組搬進單體前不通：`internal/legacy/sellerserver` 回給 Java 的 `payuni_mer_id` 與物流的 `MerId` 是空值（Stripe 的 `acct_` 不是 PayUni 商店代號）。付款改走 port 時以外部帳戶 ID 取代這個接縫；物流改綠界後恢復建店與出貨（Will 2026-10-29、2026-11-12 接受）。修訂（Will 2026-11-15）：物流不改綠界，B3 改成賣家自寄主線加模擬 adapter（ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md`），物流 `MerId` 隨 Java shipping 退場刪除。
+- 本機的物流端到端在物流模組搬進單體前不通：`internal/legacy/sellerserver` 回給 Java 的物流 `MerId` 是空值（Stripe 的 `acct_` 不是商店代號）。付款已在 B2 改走 payment port，以外部帳戶 ID 取代 `payuni_mer_id` 這個接縫（舊契約欄位仍回空字串）；物流改綠界後恢復建店與出貨（Will 2026-10-29、2026-11-12 接受）。修訂（Will 2026-11-15）：物流不改綠界，B3 改成賣家自寄主線加模擬 adapter（ADR `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md`），物流 `MerId` 隨 Java shipping 退場刪除。
 - Stripe adapter 不示範台灣情境（沒有 TWD、台灣 KYC、超商與 ATM）。決定在台灣上線時，先確認法規（代理收付）與合約，再寫台灣金流商 adapter，並重新評估兩軸 port 的設計（平台收件是否要重建自建 KYC）與收款模式。
 - live mode 的銀行帳號 fingerprint 是否跨 connected account 一致，只在測試模式驗過；上線前核對範圍，防詐比對靠它。
 - 撥款模型與手續費（代理商費反推）未決定：付款與撥款搬進 payment 時重審（B2、B10 開工）。

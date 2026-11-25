@@ -129,7 +129,7 @@ Java 側 AES-GCM 共用元件（抽進 `common-core`）、TSID `node-id-base` �
 | proto `package` | `hawkr.invoice` | 照抄 `payment.proto` 的 `io.github.will413028.hawkr.payment.grpc` | 違反 Proto 管理規範的 package 命名 |
 | 發票 PDF 取得 | objectKey ＋ 授權下載 | 公開 CDN URL | 發票是稅務憑證，公開 URL 等於無授權外流 |
 | Tier A 越權回應 | 404，與「不存在」不可區分 | 403 | 403 等於確認訂單存在，可枚舉他人訂單號 |
-| 發票日期取值 | `COALESCE(provider_paid_at, pay_time)`，期別以 UTC+8 雙月制換算 | 只取 `pay_time`；在 UTC 算期別 | `provider_paid_at` 是 PayUni 認為的真實付款時間；在 UTC 算期別會在跨期邊界把單據算進錯誤期別。改取其他時間需重新論證跨期邊界行為，並補邊界日測試 |
+| 發票日期取值 | `COALESCE(provider_paid_at, pay_time)`，期別以 UTC+8 雙月制換算 | 只取 `pay_time`；在 UTC 算期別 | `provider_paid_at` 是金流供應商回報的付款成功時間（B2 起是 Stripe）；在 UTC 算期別會在跨期邊界把單據算進錯誤期別。改取其他時間需重新論證跨期邊界行為，並補邊界日測試 |
 | 表頭稅別 | 一律 `DetailVat=1`（含 B2B），明細帶含稅價 | B2B 走未稅明細 | 兩套明細語意會讓尾差出現在兩個不同的地方 |
 | 折扣分攤 | 最大餘數法、全整數、先分攤再算稅 | 浮點分攤；先算稅再分攤 | 浮點違反金額規範；先算稅再分攤會讓尾差散在每一行，而先分攤再算稅的尾差只有一處、且由 AMEGO 用同一條式子復現 |
 
