@@ -108,6 +108,21 @@ notification-service 的每個機制，搬進來時都重新判斷過（遷移�
 |---|---|---|---|---|
 | gateway 對 notification-service 的 16 支 gRPC 與一條 SSE（`inventory.md` §1，含錯誤吞掉的呼叫與跨身分的串流） | 四個 client 要讀寫收件匣、偏好、token 與公告 | 不成立：舊 REST、手寫 client 與 gRPC 呼叫隨 A8-7 刪除；缺陷 #8、#11、#17、#18、#19 在舊傳輸層 | Connect service 加生成的 client，錯誤用 `ErrorReason`，分頁 cursor，串流只傳失效訊號 | 全部在 A8-2 重新設計，本步驟不新增對外方法；`inventory.md` §1 的去向欄為準 |
 
+傳輸層逐機制（A8-8 補，對應 `internal/httpapi/notification`（顧客與後台兩個 service）與模組 `internal/app`；結論取自 A8-2a 到 A8-2d 的契約與實作）：
+
+| 沿用的機制 | 必要條件 | 今天是否成立 | 業界在同樣條件下的做法 | 決定 |
+|---|---|---|---|---|
+| 認證與身分：gateway 把 account 解析成 `buyer_id` 或 `store_id` 放進 `user_id` | 通知要對到收件人 | 不成立：身分空間混用是缺陷 #12 的根源 | 以帳號為收件人鍵，受眾與店家另列 | 改：`(account_id, 受眾, store_id)`；賣家受眾經 seller 的現任店家解析並檢查 `CAP_NOTIFICATION`；代行者不能呼叫（D9） |
+| 錯誤：舊 service 以 `Code != 0` 回業務錯誤、gateway 丟掉 Code（缺陷 #8、#9、#11、#18） | client 要知道失敗原因 | 不成立 | Connect 標準 code | 改：標準 Connect code（NotFound、InvalidArgument、ResourceExhausted…），沒有新增 `ErrorReason`（A8-2a）；已讀不存在或非本人回 NotFound |
+| 分頁：`cursorId`＋`pageSize`，`total` 不受篩選 | 收件匣要翻頁 | 部分成立：cursor 成立，`total` 不成立（缺陷 #17） | AIP-158 風格的 page token | 改：cursor 分頁、`total` 跟著分類篩選；聚合列翻頁的限制見下方第一條 |
+| 快取、請求大小 | — | 不適用：收件匣是私人資料，不快取；請求大小由模組內的上限檢查（`MaxBatchDelete`、`MaxTokenLen`、公告 `MaxTitleRunes`／`MaxBodyRunes`，與 schema CHECK 一致） | — | 不沿用舊 handler 的任何快取 |
+| 限流：`/notifications/stream` 豁免、其餘一般限流 | 長連線不能被一般限流切斷 | 部分成立 | 串流另設連線上限而不是請求限流 | 改：`tierWatch` 限流層級加每帳號每 serve 行程 8 條串流上限（`stream.MaxPerAccount`），超過回 resource_exhausted；停權帳號只放行 `DeleteDeviceToken`（`httpapi/effects.go` 的 `EffectSelfService`，A8-2b） |
+| trace、下游逾時與重試：gateway 對 gRPC 各設 5–30 秒逾時 | 跨服務呼叫要有期限 | 不成立：單體內 in-process | 模組呼叫沿用請求 ctx | 刪除：沒有下游 gRPC；渠道 provider 呼叫的逾時在 adapter、重試在 River |
+| 串流傳輸：gateway SSE（心跳、`Last-Event-ID`） | web 看到即時變化 | 部分成立 | 見下方「串流沒有心跳」 | 改：Connect server streaming，只傳失效訊號，壽命 15 分鐘（`streamLifetime`），無續傳（D11） |
+
+- 串流沒有心跳與每 frame 寫入期限（A8-8 設計審查 R1-2）：`httpapi/chat` 的串流有 15 秒心跳、10 秒寫入期限與 session 重驗，notification 串流沒有。這是 A8-2d 的設計（協定沒有心跳訊號，訊號可遺漏、client 以列表為準，重連後先拉列表），不是遺漏；但閒置連線被反代或 Cloudflare 切斷時 client 要等到下次寫入或壽命到期才知道。結論：現在不改，因為沒有量測到切斷，而且錯過訊號的代價是未讀數延遲到下次重連。重新評估條件：web host 反代或 Cloudflare 實測閒置切斷短於 15 分鐘，或 client 回報半開連線；屆時改用 `httpapi/chat` 的 `streamSpec` 共用骨架（提成共用元件）並在 proto 加心跳 frame。
+- 公告有自己的派送鏈（A8-8 設計審查 R1-1）：公告走 `internal/announce` 的逐受眾逐頁 job 鏈，與 `internal/intake/fanout.go` 的追蹤者 fan-out 並存兩套；為此多了假意圖列、`inbox_items.announcement_id` 與註冊表的 `Fanout` 旗標，也是「派送重試重建使用者剛刪的公告」那條已知窗口的來源。保留的理由：公告收件人是全體帳號、沒有事件來源身分可當母意圖的冪等鍵、且公告的收件匣與推播必須分開 job（ADR 決策 6）；A8-2b 發現的「公告列被收件匣隱藏」就是在這個結構下以註冊 `Fanout` 型別解決的。從零設計可以把公告也建成 Broadcast 母意圖加 Spawned 子型別。重新評估條件：出現第三種 fan-out、公告的重建窗口造成實際投訴，或收件人量級讓兩套 job 鏈的維護成本明顯高於合併。
+
 - 收件匣列表依 `updated_at` 排序分頁：聚合列合併新事件會更新 `updated_at`（依最後活動排，是有意的），所以翻頁途中被合併的列可能跳過或重複；client 收到串流失效訊號時從第一頁重新整理，不接著用舊的 page token。
 
 ## 意圖管線（A8-1b）
@@ -124,7 +139,7 @@ notification-service 的每個機制，搬進來時都重新判斷過（遷移�
 
 | 新機制 | 必要條件 | 今天是否成立 | 決定 |
 |---|---|---|---|
-| FCM HTTP v1 adapter（`platform/fcm`，net/http 加 oauth2，只停用 UNREGISTERED、SENDER_ID_MISMATCH 的 token；單次呼叫不超過 500 個 token） | 要推播到 iOS，舊服務的 FCM SDK 與 Android 都不沿用 | 成立 | 不重試，結果分已送出、token 失效、暫時、永久、憑證錯誤，重試與停用由渠道 job 決定 |
+| FCM HTTP v1 adapter（`platform/fcm`，net/http 加 oauth2，只停用 UNREGISTERED、SENDER_ID_MISMATCH 的 token） | 要推播到 iOS；Android 不沿用 | 成立 | 不用舊服務的 Firebase Admin SDK（`firebase.google.com/go/v4`，只在舊 notification-service 的 go.mod）：單體的 `backend/go.mod` 沒有它，依賴規則要求新增依賴逐版同意，而 HTTP v1 的送出與 oauth2 取 token（`golang.org/x/oauth2` 已在依賴內）只有一個端點。HTTP v1 一個請求只送一個 token（以 16 個並行送出），舊 SDK multicast 的 500 上限在這裡不是 API 限制，`MaxBatch = 500` 只是單次呼叫的批次大小與並行的邊界，不是「FCM 官方限制」（原盤點 §4#4 與缺陷 #26 的措辭更正）。重新評估條件：Admin SDK 因其他需求進入依賴時改用 SDK。不重試，結果分已送出、token 失效、暫時、永久、憑證錯誤，重試與停用由渠道 job 決定 |
 | Resend adapter（`platform/resend`）與 Svix 簽章驗證 | 交易 email 與退信、投訴回報 | 成立 | 只回暫時性或永久性；冪等鍵用投遞紀錄 ID，job 當在送出後、寫回前時重試不重寄 |
 | 渠道 job 三階段（鎖收件人準備、transaction 外呼叫 provider、再鎖一次記結果） | 單體規則 5（provider 不在 transaction 內）與 R1-4（清除後才執行的待送 job 不得寫回文字） | 成立 | 送出前收件人已不在：永久失敗不寫文字；送出後才不在：記已送出、不留文字 |
 | `email_suppressions` | 寄給永久退信與投訴的位址會傷寄件網域信譽 | 成立（真實寄信延後到買網域，表與 webhook 先建） | D22：只存正規化位址的 HMAC-SHA256（`EMAIL_SUPPRESSION_HMAC_KEY`，輪替期間加 `_PREVIOUS` 一起查）、原因（`HARD_BOUNCE`、`COMPLAINT`）與時間，無明文位址、無限期保留；暫時與未定的退信不進名單；管理員只能經內部方法 `RemoveEmailSuppression` 移除 `HARD_BOUNCE`，投訴不可移除，投訴會把退信列升級成 `COMPLAINT`；webhook 驗簽後把事件縮成「原因加位址雜湊」才寫 `platform/inbox`（payload 從不含位址），inbox 依 `purge_after` 清除已處理的列；沒有密鑰時 dev 用固定 dev 密鑰、其他環境啟動失敗，email job 沒有密鑰不寄（守門：`TestSuppressionKeepsNoPlainAddressAnywhere`、`TestHardBounceIsRemovableButComplaintIsNot`、`TestSuppressedAddressIsNotEmailed`、`TestSuppressionKeysConfig`） |
@@ -154,6 +169,43 @@ notification-service 的每個機制，搬進來時都重新判斷過（遷移�
 - 補件期限提醒由 payment 的每小時掃描發布 `PayoutDeadlineApproaching`、notification 以「店家＋期限＋檔位」去重，取代計畫 D23 的「每日 job 排 `payout_account_deadline`」：期限在 payment 的表裡，notification 不讀別的模組的表。
 - 結案的檢舉人 fan-out 的游標是檢舉人號碼（buyer_id 或 store_id，`Resolver.CaseReporters`）：買家與店家的母意圖各讀 moderation 自己那一邊（`ReporterSide`），一案一位檢舉人一筆（UNIQUE (case_id, reporter_*_id)）讓號碼可當 keyset，每頁從游標接著讀，不從頭走。
 - `rfq_invited` 的偏好分類是 `PROCUREMENT`（D29：店家、預設開、可關）；`delegation_operation_completed` 的參數按計畫保留 `Capability`，文案只用動作（`Action`）。
+
+## A8-8 設計審查的處置
+
+完成前由沒參與實作的獨立審查者（fresh `pi` 行程，只讀）看整個模組，找到 10 項（blocking 1、should 8、nit 1）；第 1 輪，依 Review protocol 不派第 2 輪。下列每項的結論與重新評估條件；前兩項見上方「傳輸層的沿用盤點」。
+
+補進盤點的缺漏（審查指出沒有記錄，實際決定本來就成立）：
+
+| 沿用的機制 | 必要條件 | 今天是否成立 | 業界在同樣條件下的做法 | 決定 |
+|---|---|---|---|---|
+| ID 方案：舊服務的應用層 TSID bigint 主鍵 | 多副本寫入不撞號、可排序 | 不成立：`pkg/tsid` 沒有 node 位元（主計畫 ID 策略） | 依資料性質：實體 UUIDv7，值的集合與關聯用複合鍵 | 改：實體主鍵是應用層產生的 UUIDv7、schema 不設 DEFAULT（ADR `2026-09-25-row-identity-by-data-kind.md`）；`device_tokens` 以 token 為鍵、偏好以複合鍵 |
+| schema 慣例：舊表的 `DEFAULT CURRENT_TIMESTAMP`、varchar 與字串狀態 | 欄位要有型別與約束 | 部分成立 | 狀態用 TEXT 加 CHECK，時間由應用層傳入 | 改：TEXT 加 CHECK、時間由呼叫端給（sqlc 查詢參數），計數器與陣列欄位才有 DEFAULT；`TestSchemaFileMatchesMigrations` 守 migration 與 schema 一致 |
+| CodeMeta 值域與錯誤碼 | 舊服務與 gateway 用 `NotificationEventType` 與通知相關錯誤碼 | 不成立 | 值域由擁有資料的模組定義（ADR `2026-09-25-codemeta-retirement.md`） | 刪：`NotificationEventType` 值域與生成物已刪（A8-7a）；偏好分類與呈現分類是 proto enum 加 `internal/model`；錯誤用標準 Connect code，沒有新增 `ErrorReason`；CodeMeta 其他值域的「使用服務：notification」是別的服務擁有的凍結值域，隨各自搬遷退場 |
+
+接受並記下結論的項目：
+
+| 項目 | 結論 | 重新評估條件 |
+|---|---|---|
+| FCM 憑證被拒（`OutcomeAuth`）只記 log error 並重試，沒有告警（通知 ADR 決策 7 要求「補上告警」；嚴重度 blocking） | 接受延後：單體還沒有告警管道，repo 的 Loki 規則只覆蓋舊服務的 log key，與主計畫已記的同類項（單體 revalidate 失敗、moderation SLA 告警）同一個前提；程式已把憑證錯誤與暫時錯誤分開、不記永久失敗、不停用 token，修好設定後重試會成功。**這是違反已接受 ADR 的延後，待 Will 確認（A8 計畫 D32）** | 單體告警管道建立時或上線前（與主計畫「單體告警管道」同一個觸發）：對憑證錯誤的 log key 或 counter 加規則 |
+| 未觸達率「連續 4 週超過 10%」的重評觸發沒有 metric，只能人工查後台 RPC | 同上，隨告警管道：先靠後台「未觸達通知」頁與 `ListUnreachedNotifications` 人工查 | 單體告警管道建立時，以 SQL exporter 輸出比率並加規則 |
+| 互動類推播不收斂：聚合鍵只合併收件匣，每次讚仍各推一則（沒有 APNs `apns-collapse-id`／FCM `collapse_key`） | 接受：D12 只決定收件匣聚合；洗版的實際量未量測（系統未上線） | 上線後讚、追蹤推播被投訴洗版，或未觸達查詢顯示互動推播量異常時，在 `platform/fcm` 帶聚合鍵當 collapse key |
+| `inbox_items.actor_account_ids` 只寫不讀（每次合併重寫整個陣列，沒有上限） | 接受：欄位為「某某等 N 人」顯示預留，沒有讀取端；目前文案是通用稱呼（"Someone liked your post."）。這是沒有必要條件證據的機制 | 收件匣要顯示 actor 名稱時接讀取端並加上限（例如保留最近 20 位）；若上線前沒有這個顯示需求就刪欄（改 `schema.sql` 與 migration） |
+| 停寄名單 HMAC 輪替：`_PREVIOUS` 一起查，拿掉後舊密鑰寫入的列（含 `COMPLAINT`）失效 | 接受：目前沒有輪替計畫；規則是 `_PREVIOUS` 在還有舊密鑰寫入的列時不得移除 | 第一次需要輪替金鑰時，先加 key id 欄位與命中舊密鑰時改寫成新密鑰（lazy rehash），再拿掉 `_PREVIOUS` |
+| 重送以 `DeliverArgs.RequeuedAt` 繞過 River 唯一鍵（連已完成的 job 也算），`UniqueByArgs` 選項寫了 4 次；`platform/jobs.UniqueByArgs` 只看未結束的 job，可以取代 | 接受：正確性靠投遞列狀態（`PENDING` 加 `DeliveryForUpdate`），不靠 job 唯一鍵，現行寫法有測試；改共用元件會動到 4 個排程點與重送測試 | 下次改動渠道 job 的排程選項時，統一改用 `jobs.UniqueByArgs` 並刪 `RequeuedAt` |
+| `RegisterDeviceToken` 順帶更新 identity 的 `preferred_locale`（nit） | 接受：App 每次啟動都會呼叫它，是帳號語系最可靠的來源（ADR 多語系 D1）；網頁登入不更新語系 | identity 提供自己的語系更新 RPC 時改走它 |
+
+## 公司時期未完成項
+
+A8-8 對照現行程式碼的結果（來源：維護者的個人清單 `wiki/projects/hawkr/legacy-backlog.md` 的 A8 段與跨 repo 的 A8 條目；舊公司 repo 的 issue 內文取不到，只有標題）。
+
+| 項目 | 結論 | 依據 |
+|---|---|---|
+| #2552 買家留言被按讚沒有通知 | 已修：`social.CommentLiked` 有同步訂閱者，留言作者是買家或店家各有型別，讚用聚合鍵、以帳號比對自我略過 | `notification.go` 的 `OnCommentLikedBuyerAuthor`；`internal/registry` 的 `comment_liked` 型別；`subscriptions_test.go` 的訂閱與型別對照 |
+| #3511 商品庫存不足、訂單即將逾期未付款兩項預警沒實作 | 隨發送端搬遷：事件的來源是還沒搬進單體的 Java product、order；A8 只接單體事件（D13），這兩項沒有發送端可訂閱。觸發：B4 catalog、B8 ordering 搬進單體時定義型別 | A8 計畫「範圍」與 D3、D13 |
+| #3486 `order.delivered` 有 producer 沒有消費端，要在事件去向表決定 | 隨發送端搬遷：order 在 Java，單體沒有這個事件；去向表（`events.csv`）已把 notification 的消費端標成隨發送端搬遷。觸發：B8 ordering 搬進單體 | A8 計畫 D13；`a8-7-removal.md` §3 |
+| #2465 代行通知點進去只到列表，要精確到那一筆需要新增 App 路由 | 因設計改變不再成立：深連結是 website 路徑（D20），代行區 `/adm/{storeId}/…` 無語系前綴且只給代行者，`delegation_operation_completed` 沒有深連結（`deep_link` 空，沒有路由的目的地不產生連結）。重新評估的條件：賣家 App 出現代行紀錄的畫面 | `2026-11-23-a8-notification/deep-links.md` 的「代行完成」列 |
+| #2513 ATM 退款通知沒有綁 MerID、金額與退款身分 | 隨發送端搬遷：退款通知的發送端是還沒搬進單體的 Java payment、aftersales（A8 只接單體事件，D13）。觸發：aftersales 與 B8 ordering 搬進單體，定義退款型別時參數只放參照、金額與身分在讀取時解析（不變量：參數快照不含第三方個資） | A8 計畫 D13 與「本階段依賴的不變量」 |
+| 賣家 App L56：FCM 通知 template 的 `data_type` 共用通用值是否還有同構案例；跨 repo L164：V6 的 template 用 `storeId`（camelCase） | 不再成立：模板與 `data_type` 欄位已退場（沒有資料驅動的模板，型別參數是 typed 結構，冪等鍵來源與受眾由註冊表自檢強制） | 本檔「沿用盤點」§2#5、§5.1#2、§5.1#7 |
 
 ## 與 舊服務的差異
 

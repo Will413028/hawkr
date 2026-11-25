@@ -99,4 +99,14 @@ notification-service（設計書 12、13）的現況：
 - 決策 8：寄件地址改為 identity 在每次登入同步的已驗證 email（`identity.ContactEmail`，Clerk 已移除）；Apple 私密轉寄網域登記刪除（沒有 Apple 登入）；寄信服務為 Resend 新帳號（免費額度足夠；真實寄信等網域） 與交易信子網域。follower、post 歸互動分類，行銷只剩 coupon、restock。
 - 決策 9：取貨簡訊候選失效（B3 改賣家自寄，平台不建超商取貨單）。
 
+## 修訂：A8 完成時的實作結論（2026-11-26）
+
+原決策段與前兩個修訂保留歷史；以下是實作過程中定案、與前文不同或前文沒寫的結論（出處是 A8 計畫決定表 D17–D30，行為規格移到 `backend/docs/modules/notification.md`）。
+
+- 決策 4 的即時串流：單體是同一份程式、不是單一行程（`serve` 與 `worker` 分開），串流訊號走 Postgres LISTEN/NOTIFY：寫入端在自己的 transaction 內 `pg_notify`，每個 serve 行程一條專用 LISTEN 連線扇出，內容由 serve 端讀取；不用行程內記憶體 hub。訊號帶新建收件匣項目的 ID（最多 20 個，D21），賣家工作區事件共用同一條串流（D19）。
+- 決策 5 加：後台公告單一英文 `title`／`body`（D17），偏好分類 `ANNOUNCEMENT`（收件匣不可關、推播可關、不寄 email，D18）；行銷類推播在台北 22:00–09:00 延後（D26）；停寄名單只存位址 HMAC，hard bounce 可由後台解除、complaint 永不解除（D22）。
+- 決策 9 的未觸達率來源：投遞紀錄是唯一帳本，後台有重送與未觸達查詢 RPC（`RUNBOOK.md`）；重新評估 SMS、LINE、Web Push 的觸發條件（連續 4 週未觸達率超過 10%）不變。
+- 採購邀請的 `delivery_state` 刪除（D30）：投遞事實只在 notification 的投遞紀錄，領域物件不複製通知狀態。
+- 待辦現況：新 Firebase 專案與 APNs key、Notification Service Extension 的 App ID、Resend 帳號與交易信子網域仍由 Will 完成；真機推播與真實寄信驗收擋在這些項目。
+
 物流商已依 `2026-11-15-fulfillment-seller-managed-shipping.md` 退場（Java shipping、`payuni-webhook-service` 與 Uber 程式於 B3 刪除）；本檔提到的物流商只作歷史脈絡。
