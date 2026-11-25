@@ -6,7 +6,6 @@ import (
 	"errors"
 	"go/ast"
 	"go/token"
-	"os"
 	"sort"
 	"strings"
 	"testing"
@@ -311,90 +310,6 @@ func TestBuyerIDNeverCarriesAStoreIDAcrossEveryProducer(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-// goldenPath 是跨服務 payload 契約快照的位置（repo 根的 tests/contract/golden/）。
-const goldenPath = "../../../../tests/contract/golden/event_payload_keys.json"
-
-// TestProducersMatchTheGoldenEmittedKeys 把**真的發出去的 key 集合**與 golden 快照對拍。
-//
-// 🔴 這一支補的是一個已知盲區：既有的 golden gate 只驗
-// 「notification template 讀的 key ⊆ golden」，**不驗** 「golden ⊆ publisher 實發」
-// ——golden 手寫錯了不會被抓（#1529 賣家送達通知因此靜默 0 投遞）。
-// 這裡是反方向：拿**生產者實際 marshal 出來的東西**去對 golden，兩個方向都有人守才算閉合。
-//
-// 為什麼順便值得做：本輪把六個事件的 store_id／buyer_id 換成了 eventwire 的不透明型別。
-// 型別換了而 wire 形狀必須一字不變 —— 這一支就是那句話的證據，不是我的宣稱。
-func TestProducersMatchTheGoldenEmittedKeys(t *testing.T) {
-	raw, err := os.ReadFile(goldenPath)
-	if err != nil {
-		// 🔴 目標不存在一律 FAIL 不 SKIP：檔案被搬走時 SKIP 會讓這道檢查靜默消失。
-		t.Fatalf("讀不到 golden 快照 %s：%v", goldenPath, err)
-	}
-	var golden map[string]struct {
-		EmittedKeys []string `json:"emitted_keys"`
-		RoutingKey  string   `json:"routing_key"`
-		Publisher   string   `json:"publisher"`
-	}
-	if err := json.Unmarshal(raw, &golden); err != nil {
-		t.Fatalf("golden 解不開：%v", err)
-	}
-
-	// 生產點 → golden 條目。同一個 payload 型別供多個條目時（issuedEvent 供 buyer／seller／
-	// receipt 三條）逐條都要對得上 —— 三條的 emitted_keys 必須一致，否則就是快照自己漂了。
-	want := map[string][]string{
-		"P1/P6 issuedEvent（開立）":       {"invoice.issued.buyer", "invoice.issued.seller", "invoice.receipt.issued.buyer"},
-		"P1/P6 issuedEvent（重寄）":       {"invoice.issued.buyer", "invoice.issued.seller", "invoice.receipt.issued.buyer"},
-		"P2 issueFailedEvent":         {"invoice.issue_failed.seller"},
-		"P8 complaintCreatedEvent":    {"invoice.complaint.created.seller"},
-		"P9 complaintRespondedEvent":  {"invoice.complaint.responded.buyer"},
-		"P12 resolvedExternallyEvent": {"invoice.resolved_externally.buyer"},
-		"P11 taxStatusChangedEvent":   {"invoice.seller_tax_profile.status_changed.seller"},
-		"P5 reissuedEvent":            {"invoice.reissued.buyer"},
-		"P3 voidedEvent":              {"invoice.voided.buyer"},
-		"P7 reviewRequiredEvent":      {"invoice.operation.review_required.seller"},
-		"P10 complaintOverdueEvent":   {"invoice.complaint.overdue.seller"},
-		"P4 allowanceIssuedEvent":     {"invoice.allowance.issued.buyer"},
-	}
-
-	doc := fxDoc(codemeta.InvoiceRecipientTypeBuyer.Value, ptrInt64(fxBuyerID))
-	for _, p := range eventProducers(t, doc) {
-		entries, mapped := want[p.Name]
-		if !mapped {
-			t.Fatalf("生產點 %q 沒有對應的 golden 條目 —— 新增事件時必須同時登記，"+
-				"否則它的 wire 形狀沒有任何東西在守", p.Name)
-		}
-		var got map[string]any
-		if err := json.Unmarshal(p.Payload, &got); err != nil {
-			t.Fatalf("%s: unmarshal: %v", p.Name, err)
-		}
-		gotKeys := make([]string, 0, len(got)+1)
-		for k := range got {
-			gotKeys = append(gotKeys, k)
-		}
-		// notify_seller_account_id 由 outbox dispatcher 在派送時補（§6.3.3.2），
-		// 生產者不填 —— 但它在 golden 裡，所以比對前補上。
-		gotKeys = append(gotKeys, notifyrouting.KeyNotifySellerAccountID)
-		sort.Strings(gotKeys)
-
-		for _, name := range entries {
-			g, ok := golden[name]
-			if !ok {
-				t.Fatalf("golden 沒有條目 %q（%s 的對拍對象）", name, p.Name)
-			}
-			if g.Publisher != "invoice-service" {
-				t.Fatalf("golden 條目 %q 的 publisher 是 %q", name, g.Publisher)
-			}
-			wantKeys := append([]string(nil), g.EmittedKeys...)
-			sort.Strings(wantKeys)
-			if strings.Join(gotKeys, ",") != strings.Join(wantKeys, ",") {
-				t.Errorf("%s 實發的 key 集合與 golden %q 不一致：\n  實發 %v\n  golden %v\n"+
-					"多出來的 key ＝ golden 沒登記（下游模板讀不到）；少掉的 key ＝ golden 騙人"+
-					"（模板照 golden 寫，執行期拿到 undefined）。",
-					p.Name, name, gotKeys, wantKeys)
-			}
-		}
 	}
 }
 

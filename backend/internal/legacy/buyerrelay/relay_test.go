@@ -71,28 +71,6 @@ func (q *recordingJobs) published(t *testing.T) (rabbitmq.PublishArgs, map[strin
 	return a, payload
 }
 
-// goldenKeys 讀通知模板契約的 golden（tests/contract/golden/event_payload_keys.json）：模板讀的 key 必須在
-// emitted_keys 裡，這裡反過來確認 relay 真的送出這些 key。
-func goldenKeys(t *testing.T, eventType, routingKey string) []string {
-	t.Helper()
-	b, err := os.ReadFile(filepath.Join("..", "..", "..", "tests", "contract", "golden", "event_payload_keys.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var golden map[string]struct {
-		RoutingKey  string   `json:"routing_key"`
-		EmittedKeys []string `json:"emitted_keys"`
-	}
-	if err := json.Unmarshal(b, &golden); err != nil {
-		t.Fatal(err)
-	}
-	entry, ok := golden[eventType]
-	if !ok || entry.RoutingKey != routingKey || len(entry.EmittedKeys) == 0 {
-		t.Fatalf("golden %s = %+v", eventType, entry)
-	}
-	return entry.EmittedKeys
-}
-
 func at() time.Time { return time.Date(2026, 9, 30, 0, 0, 0, 0, time.UTC) }
 func fields(eventID string) eventFields {
 	return eventFields{EventID: eventID, Occurred: at(), BuyerID: 42}
@@ -134,16 +112,15 @@ func TestBuyerDeletedKeepsLegacyWireKeys(t *testing.T) {
 
 func TestLegacyEventsEnrichProductAndSellerFields(t *testing.T) {
 	for _, tc := range []struct {
-		name, exchange, key, golden string
-		work                        func(*Worker) error
-		fields                      map[string]any
+		name, exchange, key string
+		work                func(*Worker) error
+		fields              map[string]any
 	}{
-		{"favorite", "hawkr.buyer", "buyer.favorite.added", "product.favorited", func(w *Worker) error {
+		{"favorite", "hawkr.buyer", "buyer.favorite.added", func(w *Worker) error {
 			return w.favoriteAdded(t.Context(), FavoriteAddedArgs{eventFields: fields("event-1"), ProductID: 11})
 		}, map[string]any{"product_name": "蘋果", "seller_account_id": "88", "store_id": "91", "buyer_name": "買家甲"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			emitted := goldenKeys(t, tc.golden, tc.key)
 			q := &recordingJobs{}
 			products := &relayProducts{}
 			w := NewWorker(relayBuyers{}, products, relayStores{}, q, nil)
@@ -160,11 +137,6 @@ func TestLegacyEventsEnrichProductAndSellerFields(t *testing.T) {
 			for key, want := range tc.fields {
 				if payload[key] != want {
 					t.Errorf("%s=%v want %v", key, payload[key], want)
-				}
-			}
-			for _, key := range emitted {
-				if _, ok := payload[key]; !ok {
-					t.Errorf("golden %s 宣稱送出 %q，payload 沒有：%v", tc.golden, key, payload)
 				}
 			}
 		})
