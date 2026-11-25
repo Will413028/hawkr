@@ -55,7 +55,7 @@ func (l *stubLLM) GenerateContent(ctx context.Context, _ *adkmodel.LLMRequest, _
 			yield(nil, ctx.Err())
 			return
 		}
-		yield(&adkmodel.LLMResponse{Content: genai.NewContentFromText(l.reply(n), genai.RoleModel)}, nil)
+		yield(&adkmodel.LLMResponse{Content: genai.NewContentFromText(l.reply(n), genai.RoleModel), FinishReason: genai.FinishReasonStop}, nil)
 	}
 }
 

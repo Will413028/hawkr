@@ -1,0 +1,7 @@
+{"mutants": [
+  {"id": "extract-finish-reason-stop-check-dropped", "stack": "go", "file": "backend/internal/modules/procurement/internal/extract/extract.go",
+   "old": "if resp != nil && resp.FinishReason != genai.FinishReasonStop {",
+   "new": "if false && resp != nil && resp.FinishReason != genai.FinishReasonStop {",
+   "test": "internal/modules/procurement/internal/extract ^TestNonStopFinishReasonIsNotAnAnswer$",
+   "why": "拿掉結束原因必須是 STOP 的檢查：有內容但被截斷或過濾的回應會被當成答案"}
+]}

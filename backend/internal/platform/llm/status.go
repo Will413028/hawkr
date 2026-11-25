@@ -4,6 +4,8 @@ import (
 	"errors"
 
 	"github.com/openai/openai-go/v3"
+	"google.golang.org/adk/v2/model"
+	"google.golang.org/adk/v2/model/openaimodel"
 	"google.golang.org/genai"
 )
 
@@ -23,4 +25,14 @@ func HTTPStatus(err error) (code int, ok bool) {
 		return gp.Code, true
 	}
 	return 0, false
+}
+
+// FinishDetail 取出 provider 對結束原因的補充說明（例如 openai 相容 API 的 finish_message）；沒有、不是字串或 resp 為 nil 時回空字串。
+// 呼叫端（模組）不能 import provider SDK，回報結束原因時靠它。
+func FinishDetail(resp *model.LLMResponse) string {
+	if resp == nil {
+		return ""
+	}
+	detail, _ := resp.CustomMetadata[openaimodel.FinishMessageKey].(string)
+	return detail
 }

@@ -101,7 +101,7 @@ func (s *scripted) GenerateContent(ctx context.Context, _ *adkmodel.LLMRequest, 
 
 func say(json string) func(context.Context) (*adkmodel.LLMResponse, error) {
 	return func(context.Context) (*adkmodel.LLMResponse, error) {
-		return &adkmodel.LLMResponse{Content: genai.NewContentFromText(json, genai.RoleModel)}, nil
+		return &adkmodel.LLMResponse{Content: genai.NewContentFromText(json, genai.RoleModel), FinishReason: genai.FinishReasonStop}, nil
 	}
 }
 
