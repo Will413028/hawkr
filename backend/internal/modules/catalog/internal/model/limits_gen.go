@@ -10,12 +10,20 @@ const (
 	MaxBulletListItemsRunes = 200
 	// MaxImageInputAltRunes 是 catalog.ImageInput.alt 的上限（hawkr.common.v1alpha1.limits，runes）。
 	MaxImageInputAltRunes = 200
+	// MaxMyProductFilterQueryRunes 是 catalog.MyProductFilter.query 的上限（hawkr.common.v1alpha1.limits，runes）。
+	MaxMyProductFilterQueryRunes = 100
 	// MaxOptionAxisInputNameRunes 是 catalog.OptionAxisInput.name 的上限（hawkr.common.v1alpha1.limits，runes）。
 	MaxOptionAxisInputNameRunes = 20
 	// MaxOptionAxisInputValues 是 catalog.OptionAxisInput.values 的上限（hawkr.common.v1alpha1.limits，items）。
 	MaxOptionAxisInputValues = 50
 	// MaxOptionAxisInputValuesRunes 是 catalog.OptionAxisInput.values 的上限（hawkr.common.v1alpha1.limits，runes）。
 	MaxOptionAxisInputValuesRunes = 40
+	// MaxProductFilterCategoryIds 是 catalog.ProductFilter.category_ids 的上限（hawkr.common.v1alpha1.limits，items）。
+	MaxProductFilterCategoryIds = 20
+	// MaxProductFilterHashtags 是 catalog.ProductFilter.hashtags 的上限（hawkr.common.v1alpha1.limits，items）。
+	MaxProductFilterHashtags = 10
+	// MaxProductFilterStoreIds 是 catalog.ProductFilter.store_ids 的上限（hawkr.common.v1alpha1.limits，items）。
+	MaxProductFilterStoreIds = 50
 	// MaxProductInputTitleRunes 是 catalog.ProductInput.title 的上限（hawkr.common.v1alpha1.limits，runes）。
 	MaxProductInputTitleRunes = 100
 	// MaxProductInputGallery 是 catalog.ProductInput.gallery 的上限（hawkr.common.v1alpha1.limits，items）。
@@ -30,6 +38,10 @@ const (
 	MaxProductInputAxes = 2
 	// MaxProductInputSkus 是 catalog.ProductInput.skus 的上限（hawkr.common.v1alpha1.limits，items）。
 	MaxProductInputSkus = 100
+	// MaxSearchProductsRequestQueryRunes 是 catalog.SearchProductsRequest.query 的上限（hawkr.common.v1alpha1.limits，runes）。
+	MaxSearchProductsRequestQueryRunes = 100
+	// MaxSuggestProductNamesRequestQueryRunes 是 catalog.SuggestProductNamesRequest.query 的上限（hawkr.common.v1alpha1.limits，runes）。
+	MaxSuggestProductNamesRequestQueryRunes = 100
 	// MaxTableRows 是 catalog.Table.rows 的上限（hawkr.common.v1alpha1.limits，items）。
 	MaxTableRows = 50
 	// MaxTableRowCells 是 catalog.TableRow.cells 的上限（hawkr.common.v1alpha1.limits，items）。

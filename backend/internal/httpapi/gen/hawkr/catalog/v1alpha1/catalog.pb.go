@@ -4,19 +4,24 @@
 // 	protoc        (unknown)
 // source: hawkr/catalog/v1alpha1/catalog.proto
 
-// catalog 模組的商品寫入內容：賣家建立與修改商品時送的訊息。服務與 RPC 隨後的步驟加入，這裡只定義寫入的資料形狀與內容上限。
+// catalog 模組給前台的 API：公開的商品瀏覽、搜尋與分類（CatalogPublicService），以及賣家管理自己店家的商品（SellerCatalogAppService）；
+// 後台的唯讀 API 在 hawkr.admin.catalog.v1alpha1。收藏與追蹤屬於 buyer 模組（BuyerAppService），這裡不依觀看者回應。
 //
-// 內容上限掛在實際受限制的欄位上（hawkr.common.v1alpha1.limits），uitext-gen 讀它並生成 Go、TS、Dart 的常數；
+// 公開讀取與賣家讀取是兩組訊息（Product、ProductSummary 與 SellerProduct、SellerProductSummary）：公開的不帶賣家的狀態 enum、etag 與內部 ID，
+// 只帶 availability（可不可以買）。值型別（ProductImage、Sku、OptionAxis 等）兩邊共用。
+//
+// 寫入內容（ProductInput）的內容上限掛在實際受限制的欄位上（hawkr.common.v1alpha1.limits），uitext-gen 讀它並生成 Go、TS、Dart 的常數；
 // 伺服器照樣驗證，違反回 INVALID_ARGUMENT。ID 是不透明的字串（ADR 2026-09-25-row-identity-by-data-kind）。
 // 新圖只收 staged token，不收 URL 或 key（ADR 2026-09-25-api-image-uri-template）。
 
 package catalogv1alpha1
 
 import (
-	_ "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
+	v1alpha1 "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -28,6 +33,3283 @@ const (
 	// Verify that runtime/protoimpl is sufficiently up-to-date.
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
+
+// ProductStatus 是商品的狀態（賣家與後台看得到，公開訊息不帶）。
+type ProductStatus int32
+
+const (
+	ProductStatus_PRODUCT_STATUS_UNSPECIFIED ProductStatus = 0
+	// 草稿：隱藏，只有賣家看得到。
+	ProductStatus_PRODUCT_STATUS_DRAFT ProductStatus = 1
+	// 上架：公開可見（店家可曝光時），可購買（有庫存時）。
+	ProductStatus_PRODUCT_STATUS_ACTIVE ProductStatus = 2
+	// 下架：賣家自己停售，可還原；商品頁保留（收藏與分享連結仍可讀），但不可購買，不出現在列表與搜尋。要完全隱藏請改回草稿。
+	ProductStatus_PRODUCT_STATUS_ARCHIVED ProductStatus = 3
+)
+
+// Enum value maps for ProductStatus.
+var (
+	ProductStatus_name = map[int32]string{
+		0: "PRODUCT_STATUS_UNSPECIFIED",
+		1: "PRODUCT_STATUS_DRAFT",
+		2: "PRODUCT_STATUS_ACTIVE",
+		3: "PRODUCT_STATUS_ARCHIVED",
+	}
+	ProductStatus_value = map[string]int32{
+		"PRODUCT_STATUS_UNSPECIFIED": 0,
+		"PRODUCT_STATUS_DRAFT":       1,
+		"PRODUCT_STATUS_ACTIVE":      2,
+		"PRODUCT_STATUS_ARCHIVED":    3,
+	}
+)
+
+func (x ProductStatus) Enum() *ProductStatus {
+	p := new(ProductStatus)
+	*p = x
+	return p
+}
+
+func (x ProductStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ProductStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_enumTypes[0].Descriptor()
+}
+
+func (ProductStatus) Type() protoreflect.EnumType {
+	return &file_hawkr_catalog_v1alpha1_catalog_proto_enumTypes[0]
+}
+
+func (x ProductStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ProductStatus.Descriptor instead.
+func (ProductStatus) EnumDescriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{0}
+}
+
+// ProductAvailability 是公開訊息裡商品或 SKU 現在能不能買。公開訊息只帶它，不帶賣家的狀態。
+type ProductAvailability int32
+
+const (
+	ProductAvailability_PRODUCT_AVAILABILITY_UNSPECIFIED ProductAvailability = 0
+	// 可購買：上架中（ACTIVE）而且有庫存。
+	ProductAvailability_PRODUCT_AVAILABILITY_AVAILABLE ProductAvailability = 1
+	// 不可購買：已下架（ARCHIVED）或沒有庫存。client 以它決定能不能加入購物車，不自己由庫存推導。
+	ProductAvailability_PRODUCT_AVAILABILITY_UNAVAILABLE ProductAvailability = 2
+)
+
+// Enum value maps for ProductAvailability.
+var (
+	ProductAvailability_name = map[int32]string{
+		0: "PRODUCT_AVAILABILITY_UNSPECIFIED",
+		1: "PRODUCT_AVAILABILITY_AVAILABLE",
+		2: "PRODUCT_AVAILABILITY_UNAVAILABLE",
+	}
+	ProductAvailability_value = map[string]int32{
+		"PRODUCT_AVAILABILITY_UNSPECIFIED": 0,
+		"PRODUCT_AVAILABILITY_AVAILABLE":   1,
+		"PRODUCT_AVAILABILITY_UNAVAILABLE": 2,
+	}
+)
+
+func (x ProductAvailability) Enum() *ProductAvailability {
+	p := new(ProductAvailability)
+	*p = x
+	return p
+}
+
+func (x ProductAvailability) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ProductAvailability) Descriptor() protoreflect.EnumDescriptor {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_enumTypes[1].Descriptor()
+}
+
+func (ProductAvailability) Type() protoreflect.EnumType {
+	return &file_hawkr_catalog_v1alpha1_catalog_proto_enumTypes[1]
+}
+
+func (x ProductAvailability) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ProductAvailability.Descriptor instead.
+func (ProductAvailability) EnumDescriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{1}
+}
+
+// StockStatus 是賣家清單與計數依庫存的篩選。兩個值都只比對 ACTIVE 的商品（草稿與下架不在賣，提醒是噪音）。
+type StockStatus int32
+
+const (
+	StockStatus_STOCK_STATUS_UNSPECIFIED StockStatus = 0
+	// 庫存偏低：至少有一個沒刪除的 SKU 庫存大於 0 且小於或等於商品的低庫存門檻（沒設用平台預設值）。
+	StockStatus_STOCK_STATUS_LOW StockStatus = 1
+	// 售完：至少有一個沒刪除的 SKU 庫存是 0。與 LOW 各自獨立計算。
+	StockStatus_STOCK_STATUS_OUT_OF_STOCK StockStatus = 2
+)
+
+// Enum value maps for StockStatus.
+var (
+	StockStatus_name = map[int32]string{
+		0: "STOCK_STATUS_UNSPECIFIED",
+		1: "STOCK_STATUS_LOW",
+		2: "STOCK_STATUS_OUT_OF_STOCK",
+	}
+	StockStatus_value = map[string]int32{
+		"STOCK_STATUS_UNSPECIFIED":  0,
+		"STOCK_STATUS_LOW":          1,
+		"STOCK_STATUS_OUT_OF_STOCK": 2,
+	}
+)
+
+func (x StockStatus) Enum() *StockStatus {
+	p := new(StockStatus)
+	*p = x
+	return p
+}
+
+func (x StockStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (StockStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_enumTypes[2].Descriptor()
+}
+
+func (StockStatus) Type() protoreflect.EnumType {
+	return &file_hawkr_catalog_v1alpha1_catalog_proto_enumTypes[2]
+}
+
+func (x StockStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use StockStatus.Descriptor instead.
+func (StockStatus) EnumDescriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{2}
+}
+
+// ProductSort 是商品列表與搜尋的排序。
+type ProductSort int32
+
+const (
+	// 不指定：ListProducts 是 LATEST，SearchProducts 是 RELEVANCE。
+	ProductSort_PRODUCT_SORT_UNSPECIFIED ProductSort = 0
+	// 最新上架（first_publish_time 遞減）。
+	ProductSort_PRODUCT_SORT_LATEST ProductSort = 1
+	// 價格低到高（依 min_price）。
+	ProductSort_PRODUCT_SORT_PRICE_ASC ProductSort = 2
+	// 價格高到低（依 max_price）。
+	ProductSort_PRODUCT_SORT_PRICE_DESC ProductSort = 3
+	// 銷量多到少。
+	ProductSort_PRODUCT_SORT_SALES ProductSort = 4
+	// 評分高到低。
+	ProductSort_PRODUCT_SORT_RATING ProductSort = 5
+	// 相關度（只有 SearchProducts 接受；ListProducts 收到回 invalid_argument）。
+	ProductSort_PRODUCT_SORT_RELEVANCE ProductSort = 6
+)
+
+// Enum value maps for ProductSort.
+var (
+	ProductSort_name = map[int32]string{
+		0: "PRODUCT_SORT_UNSPECIFIED",
+		1: "PRODUCT_SORT_LATEST",
+		2: "PRODUCT_SORT_PRICE_ASC",
+		3: "PRODUCT_SORT_PRICE_DESC",
+		4: "PRODUCT_SORT_SALES",
+		5: "PRODUCT_SORT_RATING",
+		6: "PRODUCT_SORT_RELEVANCE",
+	}
+	ProductSort_value = map[string]int32{
+		"PRODUCT_SORT_UNSPECIFIED": 0,
+		"PRODUCT_SORT_LATEST":      1,
+		"PRODUCT_SORT_PRICE_ASC":   2,
+		"PRODUCT_SORT_PRICE_DESC":  3,
+		"PRODUCT_SORT_SALES":       4,
+		"PRODUCT_SORT_RATING":      5,
+		"PRODUCT_SORT_RELEVANCE":   6,
+	}
+)
+
+func (x ProductSort) Enum() *ProductSort {
+	p := new(ProductSort)
+	*p = x
+	return p
+}
+
+func (x ProductSort) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ProductSort) Descriptor() protoreflect.EnumDescriptor {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_enumTypes[3].Descriptor()
+}
+
+func (ProductSort) Type() protoreflect.EnumType {
+	return &file_hawkr_catalog_v1alpha1_catalog_proto_enumTypes[3]
+}
+
+func (x ProductSort) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ProductSort.Descriptor instead.
+func (ProductSort) EnumDescriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{3}
+}
+
+// HashtagMatch 是多個 hashtag 的比對方式。
+type HashtagMatch int32
+
+const (
+	// 不指定：ANY。
+	HashtagMatch_HASHTAG_MATCH_UNSPECIFIED HashtagMatch = 0
+	// 商品帶有其中任何一個。
+	HashtagMatch_HASHTAG_MATCH_ANY HashtagMatch = 1
+	// 商品帶有全部。
+	HashtagMatch_HASHTAG_MATCH_ALL HashtagMatch = 2
+)
+
+// Enum value maps for HashtagMatch.
+var (
+	HashtagMatch_name = map[int32]string{
+		0: "HASHTAG_MATCH_UNSPECIFIED",
+		1: "HASHTAG_MATCH_ANY",
+		2: "HASHTAG_MATCH_ALL",
+	}
+	HashtagMatch_value = map[string]int32{
+		"HASHTAG_MATCH_UNSPECIFIED": 0,
+		"HASHTAG_MATCH_ANY":         1,
+		"HASHTAG_MATCH_ALL":         2,
+	}
+)
+
+func (x HashtagMatch) Enum() *HashtagMatch {
+	p := new(HashtagMatch)
+	*p = x
+	return p
+}
+
+func (x HashtagMatch) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (HashtagMatch) Descriptor() protoreflect.EnumDescriptor {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_enumTypes[4].Descriptor()
+}
+
+func (HashtagMatch) Type() protoreflect.EnumType {
+	return &file_hawkr_catalog_v1alpha1_catalog_proto_enumTypes[4]
+}
+
+func (x HashtagMatch) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use HashtagMatch.Descriptor instead.
+func (HashtagMatch) EnumDescriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{4}
+}
+
+// ProductFilter 是公開列表與搜尋共用的篩選，全部選填，之間是 AND。不含觀看者相關的篩選（收藏、追蹤）。
+type ProductFilter struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 分類 ID，可以給頂層分類（包含它底下所有葉節點）或葉節點；多個之間是 OR。
+	CategoryIds []string `protobuf:"bytes,1,rep,name=category_ids,json=categoryIds,proto3" json:"category_ids,omitempty"`
+	// 價格區間，新台幣元的整數，含邊界；比對商品的 [min_price, max_price] 與區間有交集。
+	PriceMin *int64 `protobuf:"varint,2,opt,name=price_min,json=priceMin,proto3,oneof" json:"price_min,omitempty"`
+	PriceMax *int64 `protobuf:"varint,3,opt,name=price_max,json=priceMax,proto3,oneof" json:"price_max,omitempty"`
+	// 標籤（正規化後的名稱，或使用者輸入的樣子，規則同 ProductInput.hashtag_inputs）。
+	Hashtags     []string     `protobuf:"bytes,4,rep,name=hashtags,proto3" json:"hashtags,omitempty"`
+	HashtagMatch HashtagMatch `protobuf:"varint,5,opt,name=hashtag_match,json=hashtagMatch,proto3,enum=hawkr.catalog.v1alpha1.HashtagMatch" json:"hashtag_match,omitempty"`
+	// 只看這些店家的商品；店家不可曝光的照樣排除。
+	StoreIds      []string `protobuf:"bytes,6,rep,name=store_ids,json=storeIds,proto3" json:"store_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ProductFilter) Reset() {
+	*x = ProductFilter{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProductFilter) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProductFilter) ProtoMessage() {}
+
+func (x *ProductFilter) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProductFilter.ProtoReflect.Descriptor instead.
+func (*ProductFilter) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *ProductFilter) GetCategoryIds() []string {
+	if x != nil {
+		return x.CategoryIds
+	}
+	return nil
+}
+
+func (x *ProductFilter) GetPriceMin() int64 {
+	if x != nil && x.PriceMin != nil {
+		return *x.PriceMin
+	}
+	return 0
+}
+
+func (x *ProductFilter) GetPriceMax() int64 {
+	if x != nil && x.PriceMax != nil {
+		return *x.PriceMax
+	}
+	return 0
+}
+
+func (x *ProductFilter) GetHashtags() []string {
+	if x != nil {
+		return x.Hashtags
+	}
+	return nil
+}
+
+func (x *ProductFilter) GetHashtagMatch() HashtagMatch {
+	if x != nil {
+		return x.HashtagMatch
+	}
+	return HashtagMatch_HASHTAG_MATCH_UNSPECIFIED
+}
+
+func (x *ProductFilter) GetStoreIds() []string {
+	if x != nil {
+		return x.StoreIds
+	}
+	return nil
+}
+
+type ListProductsRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Filter *ProductFilter         `protobuf:"bytes,1,opt,name=filter,proto3" json:"filter,omitempty"`
+	// 不指定是 LATEST；不接受 RELEVANCE。
+	Sort ProductSort `protobuf:"varint,2,opt,name=sort,proto3,enum=hawkr.catalog.v1alpha1.ProductSort" json:"sort,omitempty"`
+	// 預設 20，上限 100；負數回 invalid_argument。
+	PageSize int32 `protobuf:"varint,3,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	// page_token 與 filter、sort 綁定，其中任何一個與取得 token 時不同回 invalid_argument。
+	PageToken     string `protobuf:"bytes,4,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListProductsRequest) Reset() {
+	*x = ListProductsRequest{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListProductsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListProductsRequest) ProtoMessage() {}
+
+func (x *ListProductsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListProductsRequest.ProtoReflect.Descriptor instead.
+func (*ListProductsRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ListProductsRequest) GetFilter() *ProductFilter {
+	if x != nil {
+		return x.Filter
+	}
+	return nil
+}
+
+func (x *ListProductsRequest) GetSort() ProductSort {
+	if x != nil {
+		return x.Sort
+	}
+	return ProductSort_PRODUCT_SORT_UNSPECIFIED
+}
+
+func (x *ListProductsRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListProductsRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+type ListProductsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Products      []*ProductSummary      `protobuf:"bytes,1,rep,name=products,proto3" json:"products,omitempty"`
+	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListProductsResponse) Reset() {
+	*x = ListProductsResponse{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListProductsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListProductsResponse) ProtoMessage() {}
+
+func (x *ListProductsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListProductsResponse.ProtoReflect.Descriptor instead.
+func (*ListProductsResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ListProductsResponse) GetProducts() []*ProductSummary {
+	if x != nil {
+		return x.Products
+	}
+	return nil
+}
+
+func (x *ListProductsResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
+type SearchProductsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 關鍵字；去頭尾空白後不得為空。
+	Query  string         `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
+	Filter *ProductFilter `protobuf:"bytes,2,opt,name=filter,proto3" json:"filter,omitempty"`
+	// 不指定是 RELEVANCE。
+	Sort ProductSort `protobuf:"varint,3,opt,name=sort,proto3,enum=hawkr.catalog.v1alpha1.ProductSort" json:"sort,omitempty"`
+	// 預設 20，上限 100。
+	PageSize int32 `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	// page_token 與 query、filter、sort 綁定。
+	PageToken     string `protobuf:"bytes,5,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchProductsRequest) Reset() {
+	*x = SearchProductsRequest{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchProductsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchProductsRequest) ProtoMessage() {}
+
+func (x *SearchProductsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchProductsRequest.ProtoReflect.Descriptor instead.
+func (*SearchProductsRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *SearchProductsRequest) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *SearchProductsRequest) GetFilter() *ProductFilter {
+	if x != nil {
+		return x.Filter
+	}
+	return nil
+}
+
+func (x *SearchProductsRequest) GetSort() ProductSort {
+	if x != nil {
+		return x.Sort
+	}
+	return ProductSort_PRODUCT_SORT_UNSPECIFIED
+}
+
+func (x *SearchProductsRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *SearchProductsRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+type SearchProductsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Products      []*ProductSummary      `protobuf:"bytes,1,rep,name=products,proto3" json:"products,omitempty"`
+	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchProductsResponse) Reset() {
+	*x = SearchProductsResponse{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchProductsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchProductsResponse) ProtoMessage() {}
+
+func (x *SearchProductsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchProductsResponse.ProtoReflect.Descriptor instead.
+func (*SearchProductsResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *SearchProductsResponse) GetProducts() []*ProductSummary {
+	if x != nil {
+		return x.Products
+	}
+	return nil
+}
+
+func (x *SearchProductsResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
+type SuggestProductNamesRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 輸入的前綴或片段；正規化後是空的回空清單。
+	Query string `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
+	// 最多回傳幾筆，1 到 20；0 表示預設值 10，超過 20 以 20 計，負數回 invalid_argument。
+	MaxResults    int32 `protobuf:"varint,2,opt,name=max_results,json=maxResults,proto3" json:"max_results,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SuggestProductNamesRequest) Reset() {
+	*x = SuggestProductNamesRequest{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SuggestProductNamesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SuggestProductNamesRequest) ProtoMessage() {}
+
+func (x *SuggestProductNamesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SuggestProductNamesRequest.ProtoReflect.Descriptor instead.
+func (*SuggestProductNamesRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *SuggestProductNamesRequest) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *SuggestProductNamesRequest) GetMaxResults() int32 {
+	if x != nil {
+		return x.MaxResults
+	}
+	return 0
+}
+
+type SuggestProductNamesResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 商品名稱，相關度高的在前，已去重。
+	Names         []string `protobuf:"bytes,1,rep,name=names,proto3" json:"names,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SuggestProductNamesResponse) Reset() {
+	*x = SuggestProductNamesResponse{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SuggestProductNamesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SuggestProductNamesResponse) ProtoMessage() {}
+
+func (x *SuggestProductNamesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SuggestProductNamesResponse.ProtoReflect.Descriptor instead.
+func (*SuggestProductNamesResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *SuggestProductNamesResponse) GetNames() []string {
+	if x != nil {
+		return x.Names
+	}
+	return nil
+}
+
+type GetProductRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProductId     string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetProductRequest) Reset() {
+	*x = GetProductRequest{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetProductRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetProductRequest) ProtoMessage() {}
+
+func (x *GetProductRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetProductRequest.ProtoReflect.Descriptor instead.
+func (*GetProductRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *GetProductRequest) GetProductId() string {
+	if x != nil {
+		return x.ProductId
+	}
+	return ""
+}
+
+type GetProductResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Product       *Product               `protobuf:"bytes,1,opt,name=product,proto3" json:"product,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetProductResponse) Reset() {
+	*x = GetProductResponse{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetProductResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetProductResponse) ProtoMessage() {}
+
+func (x *GetProductResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetProductResponse.ProtoReflect.Descriptor instead.
+func (*GetProductResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *GetProductResponse) GetProduct() *Product {
+	if x != nil {
+		return x.Product
+	}
+	return nil
+}
+
+type ListCategoriesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListCategoriesRequest) Reset() {
+	*x = ListCategoriesRequest{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListCategoriesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListCategoriesRequest) ProtoMessage() {}
+
+func (x *ListCategoriesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListCategoriesRequest.ProtoReflect.Descriptor instead.
+func (*ListCategoriesRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{9}
+}
+
+type ListCategoriesResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 頂層分類，每個帶底下的葉節點。
+	Categories    []*Category `protobuf:"bytes,1,rep,name=categories,proto3" json:"categories,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListCategoriesResponse) Reset() {
+	*x = ListCategoriesResponse{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListCategoriesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListCategoriesResponse) ProtoMessage() {}
+
+func (x *ListCategoriesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListCategoriesResponse.ProtoReflect.Descriptor instead.
+func (*ListCategoriesResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ListCategoriesResponse) GetCategories() []*Category {
+	if x != nil {
+		return x.Categories
+	}
+	return nil
+}
+
+// Category 是平台分類樹的一個節點。商品只能掛在葉節點（沒有 children 的節點）。
+// 路徑（頂層 → 葉節點）由這棵樹推得，沒有另外的方法。Shopify 對照 ID 是內部資料，不對外。
+type Category struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// 依請求語系的名稱。
+	Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	// 底下的葉節點；葉節點本身沒有。
+	Children      []*Category `protobuf:"bytes,3,rep,name=children,proto3" json:"children,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Category) Reset() {
+	*x = Category{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Category) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Category) ProtoMessage() {}
+
+func (x *Category) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Category.ProtoReflect.Descriptor instead.
+func (*Category) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *Category) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Category) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Category) GetChildren() []*Category {
+	if x != nil {
+		return x.Children
+	}
+	return nil
+}
+
+type SuggestHashtagsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 搜尋字串，可以帶開頭的 #；正規化後是空的回空清單。
+	Query string `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
+	// true 是名稱包含 query，false 是以 query 開頭。
+	Contains bool `protobuf:"varint,2,opt,name=contains,proto3" json:"contains,omitempty"`
+	// 最多回傳幾筆，1 到 20；0 表示預設值 10，超過 20 以 20 計，負數回 invalid_argument。
+	MaxResults    int32 `protobuf:"varint,3,opt,name=max_results,json=maxResults,proto3" json:"max_results,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SuggestHashtagsRequest) Reset() {
+	*x = SuggestHashtagsRequest{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SuggestHashtagsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SuggestHashtagsRequest) ProtoMessage() {}
+
+func (x *SuggestHashtagsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SuggestHashtagsRequest.ProtoReflect.Descriptor instead.
+func (*SuggestHashtagsRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *SuggestHashtagsRequest) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *SuggestHashtagsRequest) GetContains() bool {
+	if x != nil {
+		return x.Contains
+	}
+	return false
+}
+
+func (x *SuggestHashtagsRequest) GetMaxResults() int32 {
+	if x != nil {
+		return x.MaxResults
+	}
+	return 0
+}
+
+type SuggestHashtagsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Hashtags      []*HashtagCount        `protobuf:"bytes,1,rep,name=hashtags,proto3" json:"hashtags,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SuggestHashtagsResponse) Reset() {
+	*x = SuggestHashtagsResponse{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SuggestHashtagsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SuggestHashtagsResponse) ProtoMessage() {}
+
+func (x *SuggestHashtagsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SuggestHashtagsResponse.ProtoReflect.Descriptor instead.
+func (*SuggestHashtagsResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *SuggestHashtagsResponse) GetHashtags() []*HashtagCount {
+	if x != nil {
+		return x.Hashtags
+	}
+	return nil
+}
+
+type SuggestTrendingHashtagsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 最多回傳幾名，1 到 50；0 表示預設值 20，超過 50 以 50 計，負數回 invalid_argument。
+	MaxResults    int32 `protobuf:"varint,1,opt,name=max_results,json=maxResults,proto3" json:"max_results,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SuggestTrendingHashtagsRequest) Reset() {
+	*x = SuggestTrendingHashtagsRequest{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SuggestTrendingHashtagsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SuggestTrendingHashtagsRequest) ProtoMessage() {}
+
+func (x *SuggestTrendingHashtagsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SuggestTrendingHashtagsRequest.ProtoReflect.Descriptor instead.
+func (*SuggestTrendingHashtagsRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *SuggestTrendingHashtagsRequest) GetMaxResults() int32 {
+	if x != nil {
+		return x.MaxResults
+	}
+	return 0
+}
+
+type SuggestTrendingHashtagsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Hashtags      []*HashtagCount        `protobuf:"bytes,1,rep,name=hashtags,proto3" json:"hashtags,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SuggestTrendingHashtagsResponse) Reset() {
+	*x = SuggestTrendingHashtagsResponse{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SuggestTrendingHashtagsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SuggestTrendingHashtagsResponse) ProtoMessage() {}
+
+func (x *SuggestTrendingHashtagsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SuggestTrendingHashtagsResponse.ProtoReflect.Descriptor instead.
+func (*SuggestTrendingHashtagsResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *SuggestTrendingHashtagsResponse) GetHashtags() []*HashtagCount {
+	if x != nil {
+		return x.Hashtags
+	}
+	return nil
+}
+
+// HashtagCount 是一個商品標籤與它在範圍內的商品數。
+type HashtagCount struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 正規化後的名稱，用來比對與連結。
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// 最多商品使用的輸入樣子，用來顯示。
+	Display       string `protobuf:"bytes,2,opt,name=display,proto3" json:"display,omitempty"`
+	ProductCount  int64  `protobuf:"varint,3,opt,name=product_count,json=productCount,proto3" json:"product_count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HashtagCount) Reset() {
+	*x = HashtagCount{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HashtagCount) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HashtagCount) ProtoMessage() {}
+
+func (x *HashtagCount) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HashtagCount.ProtoReflect.Descriptor instead.
+func (*HashtagCount) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *HashtagCount) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *HashtagCount) GetDisplay() string {
+	if x != nil {
+		return x.Display
+	}
+	return ""
+}
+
+func (x *HashtagCount) GetProductCount() int64 {
+	if x != nil {
+		return x.ProductCount
+	}
+	return 0
+}
+
+// MyProductFilter 是賣家清單與計數共用的篩選，全部選填，之間是 AND。
+type MyProductFilter struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 只列這個狀態的商品；UNSPECIFIED 是全部。
+	Status ProductStatus `protobuf:"varint,1,opt,name=status,proto3,enum=hawkr.catalog.v1alpha1.ProductStatus" json:"status,omitempty"`
+	// 依庫存篩選；LOW 與 OUT_OF_STOCK 只比對 ACTIVE 的商品（與 status 同時給了非 ACTIVE 的狀態就沒有結果）。
+	StockStatus StockStatus `protobuf:"varint,2,opt,name=stock_status,json=stockStatus,proto3,enum=hawkr.catalog.v1alpha1.StockStatus" json:"stock_status,omitempty"`
+	// 關鍵字，比對標題、描述、標籤、分類與選項（同公開搜尋的 searchable_text）；去頭尾空白後空的是不篩選。
+	Query         string `protobuf:"bytes,3,opt,name=query,proto3" json:"query,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MyProductFilter) Reset() {
+	*x = MyProductFilter{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MyProductFilter) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MyProductFilter) ProtoMessage() {}
+
+func (x *MyProductFilter) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MyProductFilter.ProtoReflect.Descriptor instead.
+func (*MyProductFilter) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *MyProductFilter) GetStatus() ProductStatus {
+	if x != nil {
+		return x.Status
+	}
+	return ProductStatus_PRODUCT_STATUS_UNSPECIFIED
+}
+
+func (x *MyProductFilter) GetStockStatus() StockStatus {
+	if x != nil {
+		return x.StockStatus
+	}
+	return StockStatus_STOCK_STATUS_UNSPECIFIED
+}
+
+func (x *MyProductFilter) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+type ListMyProductsRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Filter *MyProductFilter       `protobuf:"bytes,1,opt,name=filter,proto3" json:"filter,omitempty"`
+	// 預設 20，上限 100。
+	PageSize int32 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	// page_token 與 filter 綁定。
+	PageToken     string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMyProductsRequest) Reset() {
+	*x = ListMyProductsRequest{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMyProductsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMyProductsRequest) ProtoMessage() {}
+
+func (x *ListMyProductsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMyProductsRequest.ProtoReflect.Descriptor instead.
+func (*ListMyProductsRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *ListMyProductsRequest) GetFilter() *MyProductFilter {
+	if x != nil {
+		return x.Filter
+	}
+	return nil
+}
+
+func (x *ListMyProductsRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListMyProductsRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+type ListMyProductsResponse struct {
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	Products      []*SellerProductSummary `protobuf:"bytes,1,rep,name=products,proto3" json:"products,omitempty"`
+	NextPageToken string                  `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMyProductsResponse) Reset() {
+	*x = ListMyProductsResponse{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMyProductsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMyProductsResponse) ProtoMessage() {}
+
+func (x *ListMyProductsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMyProductsResponse.ProtoReflect.Descriptor instead.
+func (*ListMyProductsResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *ListMyProductsResponse) GetProducts() []*SellerProductSummary {
+	if x != nil {
+		return x.Products
+	}
+	return nil
+}
+
+func (x *ListMyProductsResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
+type GetMyProductRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProductId     string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMyProductRequest) Reset() {
+	*x = GetMyProductRequest{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMyProductRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMyProductRequest) ProtoMessage() {}
+
+func (x *GetMyProductRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMyProductRequest.ProtoReflect.Descriptor instead.
+func (*GetMyProductRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *GetMyProductRequest) GetProductId() string {
+	if x != nil {
+		return x.ProductId
+	}
+	return ""
+}
+
+type GetMyProductResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Product       *SellerProduct         `protobuf:"bytes,1,opt,name=product,proto3" json:"product,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMyProductResponse) Reset() {
+	*x = GetMyProductResponse{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMyProductResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMyProductResponse) ProtoMessage() {}
+
+func (x *GetMyProductResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMyProductResponse.ProtoReflect.Descriptor instead.
+func (*GetMyProductResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *GetMyProductResponse) GetProduct() *SellerProduct {
+	if x != nil {
+		return x.Product
+	}
+	return nil
+}
+
+type CountMyProductsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Filter        *MyProductFilter       `protobuf:"bytes,1,opt,name=filter,proto3" json:"filter,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CountMyProductsRequest) Reset() {
+	*x = CountMyProductsRequest{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CountMyProductsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CountMyProductsRequest) ProtoMessage() {}
+
+func (x *CountMyProductsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CountMyProductsRequest.ProtoReflect.Descriptor instead.
+func (*CountMyProductsRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *CountMyProductsRequest) GetFilter() *MyProductFilter {
+	if x != nil {
+		return x.Filter
+	}
+	return nil
+}
+
+type CountMyProductsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 符合篩選的商品數。
+	Count int32 `protobuf:"varint,1,opt,name=count,proto3" json:"count,omitempty"`
+	// 商品沒有自己的低庫存門檻時用的平台預設值，client 顯示用，不自己寫死數字。
+	DefaultLowStockThreshold int32 `protobuf:"varint,2,opt,name=default_low_stock_threshold,json=defaultLowStockThreshold,proto3" json:"default_low_stock_threshold,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
+}
+
+func (x *CountMyProductsResponse) Reset() {
+	*x = CountMyProductsResponse{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CountMyProductsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CountMyProductsResponse) ProtoMessage() {}
+
+func (x *CountMyProductsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CountMyProductsResponse.ProtoReflect.Descriptor instead.
+func (*CountMyProductsResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *CountMyProductsResponse) GetCount() int32 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+func (x *CountMyProductsResponse) GetDefaultLowStockThreshold() int32 {
+	if x != nil {
+		return x.DefaultLowStockThreshold
+	}
+	return 0
+}
+
+type CreateProductRequest struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Product *ProductInput          `protobuf:"bytes,1,opt,name=product,proto3" json:"product,omitempty"`
+	// UUIDv4（AIP-155）：範圍是（店家、方法），永久保存；同一家店以同一個 request_id 重送回第一次建立的商品目前的樣子，
+	// 兩個請求同時在途也只建立一個；內容不同回 invalid_argument。必填。
+	RequestId     string `protobuf:"bytes,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateProductRequest) Reset() {
+	*x = CreateProductRequest{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateProductRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateProductRequest) ProtoMessage() {}
+
+func (x *CreateProductRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateProductRequest.ProtoReflect.Descriptor instead.
+func (*CreateProductRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *CreateProductRequest) GetProduct() *ProductInput {
+	if x != nil {
+		return x.Product
+	}
+	return nil
+}
+
+func (x *CreateProductRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+type CreateProductResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Product       *SellerProduct         `protobuf:"bytes,1,opt,name=product,proto3" json:"product,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateProductResponse) Reset() {
+	*x = CreateProductResponse{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateProductResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateProductResponse) ProtoMessage() {}
+
+func (x *CreateProductResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateProductResponse.ProtoReflect.Descriptor instead.
+func (*CreateProductResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *CreateProductResponse) GetProduct() *SellerProduct {
+	if x != nil {
+		return x.Product
+	}
+	return nil
+}
+
+type UpdateProductRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	ProductId string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	// 讀取時拿到的 etag，必填。
+	Etag string `protobuf:"bytes,2,opt,name=etag,proto3" json:"etag,omitempty"`
+	// 完整內容，整體取代；沒有 update_mask。
+	Product       *ProductInput `protobuf:"bytes,3,opt,name=product,proto3" json:"product,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateProductRequest) Reset() {
+	*x = UpdateProductRequest{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateProductRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateProductRequest) ProtoMessage() {}
+
+func (x *UpdateProductRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateProductRequest.ProtoReflect.Descriptor instead.
+func (*UpdateProductRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *UpdateProductRequest) GetProductId() string {
+	if x != nil {
+		return x.ProductId
+	}
+	return ""
+}
+
+func (x *UpdateProductRequest) GetEtag() string {
+	if x != nil {
+		return x.Etag
+	}
+	return ""
+}
+
+func (x *UpdateProductRequest) GetProduct() *ProductInput {
+	if x != nil {
+		return x.Product
+	}
+	return nil
+}
+
+// UpdateProductResponse 的商品是修改後的完整資源（含新的 etag）。
+type UpdateProductResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Product       *SellerProduct         `protobuf:"bytes,1,opt,name=product,proto3" json:"product,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateProductResponse) Reset() {
+	*x = UpdateProductResponse{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateProductResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateProductResponse) ProtoMessage() {}
+
+func (x *UpdateProductResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateProductResponse.ProtoReflect.Descriptor instead.
+func (*UpdateProductResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *UpdateProductResponse) GetProduct() *SellerProduct {
+	if x != nil {
+		return x.Product
+	}
+	return nil
+}
+
+type SetProductStatusRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	ProductId string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	// 目標狀態，不得是 UNSPECIFIED。
+	Status ProductStatus `protobuf:"varint,2,opt,name=status,proto3,enum=hawkr.catalog.v1alpha1.ProductStatus" json:"status,omitempty"`
+	// 讀取時拿到的 etag，必填。
+	Etag          string `protobuf:"bytes,3,opt,name=etag,proto3" json:"etag,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetProductStatusRequest) Reset() {
+	*x = SetProductStatusRequest{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetProductStatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetProductStatusRequest) ProtoMessage() {}
+
+func (x *SetProductStatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetProductStatusRequest.ProtoReflect.Descriptor instead.
+func (*SetProductStatusRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *SetProductStatusRequest) GetProductId() string {
+	if x != nil {
+		return x.ProductId
+	}
+	return ""
+}
+
+func (x *SetProductStatusRequest) GetStatus() ProductStatus {
+	if x != nil {
+		return x.Status
+	}
+	return ProductStatus_PRODUCT_STATUS_UNSPECIFIED
+}
+
+func (x *SetProductStatusRequest) GetEtag() string {
+	if x != nil {
+		return x.Etag
+	}
+	return ""
+}
+
+type SetProductStatusResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Product       *SellerProduct         `protobuf:"bytes,1,opt,name=product,proto3" json:"product,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetProductStatusResponse) Reset() {
+	*x = SetProductStatusResponse{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetProductStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetProductStatusResponse) ProtoMessage() {}
+
+func (x *SetProductStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetProductStatusResponse.ProtoReflect.Descriptor instead.
+func (*SetProductStatusResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *SetProductStatusResponse) GetProduct() *SellerProduct {
+	if x != nil {
+		return x.Product
+	}
+	return nil
+}
+
+type DeleteProductRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	ProductId string                 `protobuf:"bytes,1,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	// 選填；帶了就與目前版本比對。
+	Etag          string `protobuf:"bytes,2,opt,name=etag,proto3" json:"etag,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteProductRequest) Reset() {
+	*x = DeleteProductRequest{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteProductRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteProductRequest) ProtoMessage() {}
+
+func (x *DeleteProductRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteProductRequest.ProtoReflect.Descriptor instead.
+func (*DeleteProductRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *DeleteProductRequest) GetProductId() string {
+	if x != nil {
+		return x.ProductId
+	}
+	return ""
+}
+
+func (x *DeleteProductRequest) GetEtag() string {
+	if x != nil {
+		return x.Etag
+	}
+	return ""
+}
+
+type DeleteProductResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteProductResponse) Reset() {
+	*x = DeleteProductResponse{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteProductResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteProductResponse) ProtoMessage() {}
+
+func (x *DeleteProductResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteProductResponse.ProtoReflect.Descriptor instead.
+func (*DeleteProductResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{31}
+}
+
+type AdjustStockRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 要調整的 SKU；不屬於自己店家或已刪除回 not_found。
+	SkuId string `protobuf:"bytes,1,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"`
+	// 有號變動量，不得為 0；調整後的庫存必須在 0 到 2147483647 之間。
+	Delta int32 `protobuf:"varint,2,opt,name=delta,proto3" json:"delta,omitempty"`
+	// UUIDv4（AIP-155）：範圍是（店家、方法），永久保存；同一家店以同一個 request_id 重送且內容相同只生效一次，同時在途也只生效一次；內容不同回 invalid_argument。必填：變動量重送會重複計算。
+	RequestId     string `protobuf:"bytes,3,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AdjustStockRequest) Reset() {
+	*x = AdjustStockRequest{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AdjustStockRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AdjustStockRequest) ProtoMessage() {}
+
+func (x *AdjustStockRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AdjustStockRequest.ProtoReflect.Descriptor instead.
+func (*AdjustStockRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *AdjustStockRequest) GetSkuId() string {
+	if x != nil {
+		return x.SkuId
+	}
+	return ""
+}
+
+func (x *AdjustStockRequest) GetDelta() int32 {
+	if x != nil {
+		return x.Delta
+	}
+	return 0
+}
+
+func (x *AdjustStockRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+type AdjustStockResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 調整後的 SKU（含新的庫存）。
+	Sku           *Sku `protobuf:"bytes,1,opt,name=sku,proto3" json:"sku,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AdjustStockResponse) Reset() {
+	*x = AdjustStockResponse{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AdjustStockResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AdjustStockResponse) ProtoMessage() {}
+
+func (x *AdjustStockResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AdjustStockResponse.ProtoReflect.Descriptor instead.
+func (*AdjustStockResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *AdjustStockResponse) GetSku() *Sku {
+	if x != nil {
+		return x.Sku
+	}
+	return nil
+}
+
+type SetStockRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 要設定的 SKU；不屬於自己店家或已刪除回 not_found。
+	SkuId string `protobuf:"bytes,1,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"`
+	// 新的庫存，0 到 2147483647。
+	Quantity int32 `protobuf:"varint,2,opt,name=quantity,proto3" json:"quantity,omitempty"`
+	// 呼叫者看到的現值；與目前的庫存不等回 failed_precondition。
+	ExpectedQuantity int32 `protobuf:"varint,3,opt,name=expected_quantity,json=expectedQuantity,proto3" json:"expected_quantity,omitempty"`
+	// UUIDv4（AIP-155）：範圍與冪等語意同 AdjustStock。必填。
+	RequestId     string `protobuf:"bytes,4,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetStockRequest) Reset() {
+	*x = SetStockRequest{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetStockRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetStockRequest) ProtoMessage() {}
+
+func (x *SetStockRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetStockRequest.ProtoReflect.Descriptor instead.
+func (*SetStockRequest) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *SetStockRequest) GetSkuId() string {
+	if x != nil {
+		return x.SkuId
+	}
+	return ""
+}
+
+func (x *SetStockRequest) GetQuantity() int32 {
+	if x != nil {
+		return x.Quantity
+	}
+	return 0
+}
+
+func (x *SetStockRequest) GetExpectedQuantity() int32 {
+	if x != nil {
+		return x.ExpectedQuantity
+	}
+	return 0
+}
+
+func (x *SetStockRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+type SetStockResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 設定後的 SKU。
+	Sku           *Sku `protobuf:"bytes,1,opt,name=sku,proto3" json:"sku,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetStockResponse) Reset() {
+	*x = SetStockResponse{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetStockResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetStockResponse) ProtoMessage() {}
+
+func (x *SetStockResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetStockResponse.ProtoReflect.Descriptor instead.
+func (*SetStockResponse) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *SetStockResponse) GetSku() *Sku {
+	if x != nil {
+		return x.Sku
+	}
+	return nil
+}
+
+// ProductImage 是商品的一張圖（圖庫或描述圖片）。
+type ProductImage struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 圖片資產 ID；只有賣家讀自己的商品才設（寫入沿用這張圖時放進 ImageInput.asset_id），公開讀取不設。
+	AssetId string          `protobuf:"bytes,1,opt,name=asset_id,json=assetId,proto3" json:"asset_id,omitempty"`
+	Image   *v1alpha1.Image `protobuf:"bytes,2,opt,name=image,proto3" json:"image,omitempty"`
+	// 替代文字，可空。
+	Alt           string `protobuf:"bytes,3,opt,name=alt,proto3" json:"alt,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ProductImage) Reset() {
+	*x = ProductImage{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProductImage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProductImage) ProtoMessage() {}
+
+func (x *ProductImage) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProductImage.ProtoReflect.Descriptor instead.
+func (*ProductImage) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *ProductImage) GetAssetId() string {
+	if x != nil {
+		return x.AssetId
+	}
+	return ""
+}
+
+func (x *ProductImage) GetImage() *v1alpha1.Image {
+	if x != nil {
+		return x.Image
+	}
+	return nil
+}
+
+func (x *ProductImage) GetAlt() string {
+	if x != nil {
+		return x.Alt
+	}
+	return ""
+}
+
+// ProductDescriptionBlock 是描述的一個區塊（輸出），剛好設一種；形狀對應寫入的 DescriptionBlock。
+type ProductDescriptionBlock struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Block:
+	//
+	//	*ProductDescriptionBlock_Paragraph
+	//	*ProductDescriptionBlock_Image
+	//	*ProductDescriptionBlock_BulletList
+	//	*ProductDescriptionBlock_Table
+	Block         isProductDescriptionBlock_Block `protobuf_oneof:"block"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ProductDescriptionBlock) Reset() {
+	*x = ProductDescriptionBlock{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProductDescriptionBlock) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProductDescriptionBlock) ProtoMessage() {}
+
+func (x *ProductDescriptionBlock) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProductDescriptionBlock.ProtoReflect.Descriptor instead.
+func (*ProductDescriptionBlock) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *ProductDescriptionBlock) GetBlock() isProductDescriptionBlock_Block {
+	if x != nil {
+		return x.Block
+	}
+	return nil
+}
+
+func (x *ProductDescriptionBlock) GetParagraph() string {
+	if x != nil {
+		if x, ok := x.Block.(*ProductDescriptionBlock_Paragraph); ok {
+			return x.Paragraph
+		}
+	}
+	return ""
+}
+
+func (x *ProductDescriptionBlock) GetImage() *ProductImage {
+	if x != nil {
+		if x, ok := x.Block.(*ProductDescriptionBlock_Image); ok {
+			return x.Image
+		}
+	}
+	return nil
+}
+
+func (x *ProductDescriptionBlock) GetBulletList() *BulletList {
+	if x != nil {
+		if x, ok := x.Block.(*ProductDescriptionBlock_BulletList); ok {
+			return x.BulletList
+		}
+	}
+	return nil
+}
+
+func (x *ProductDescriptionBlock) GetTable() *Table {
+	if x != nil {
+		if x, ok := x.Block.(*ProductDescriptionBlock_Table); ok {
+			return x.Table
+		}
+	}
+	return nil
+}
+
+type isProductDescriptionBlock_Block interface {
+	isProductDescriptionBlock_Block()
+}
+
+type ProductDescriptionBlock_Paragraph struct {
+	Paragraph string `protobuf:"bytes,1,opt,name=paragraph,proto3,oneof"`
+}
+
+type ProductDescriptionBlock_Image struct {
+	Image *ProductImage `protobuf:"bytes,2,opt,name=image,proto3,oneof"`
+}
+
+type ProductDescriptionBlock_BulletList struct {
+	BulletList *BulletList `protobuf:"bytes,3,opt,name=bullet_list,json=bulletList,proto3,oneof"`
+}
+
+type ProductDescriptionBlock_Table struct {
+	Table *Table `protobuf:"bytes,4,opt,name=table,proto3,oneof"`
+}
+
+func (*ProductDescriptionBlock_Paragraph) isProductDescriptionBlock_Block() {}
+
+func (*ProductDescriptionBlock_Image) isProductDescriptionBlock_Block() {}
+
+func (*ProductDescriptionBlock_BulletList) isProductDescriptionBlock_Block() {}
+
+func (*ProductDescriptionBlock_Table) isProductDescriptionBlock_Block() {}
+
+// OptionAxis 是一個選項軸（輸出）。
+type OptionAxis struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Values        []string               `protobuf:"bytes,2,rep,name=values,proto3" json:"values,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OptionAxis) Reset() {
+	*x = OptionAxis{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OptionAxis) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OptionAxis) ProtoMessage() {}
+
+func (x *OptionAxis) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OptionAxis.ProtoReflect.Descriptor instead.
+func (*OptionAxis) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *OptionAxis) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *OptionAxis) GetValues() []string {
+	if x != nil {
+		return x.Values
+	}
+	return nil
+}
+
+// Sku 是商品的一個 SKU。沒有該軸的位置，option 是空字串。
+type Sku struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Id      string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Option1 string                 `protobuf:"bytes,2,opt,name=option1,proto3" json:"option1,omitempty"`
+	Option2 string                 `protobuf:"bytes,3,opt,name=option2,proto3" json:"option2,omitempty"`
+	// 售價，新台幣元的整數。
+	Price int64 `protobuf:"varint,4,opt,name=price,proto3" json:"price,omitempty"`
+	// 原價（劃線價）；沒有設不設。
+	CompareAtPrice *int64 `protobuf:"varint,5,opt,name=compare_at_price,json=compareAtPrice,proto3,oneof" json:"compare_at_price,omitempty"`
+	// 現在的庫存，不為負。
+	StockQty int32 `protobuf:"varint,6,opt,name=stock_qty,json=stockQty,proto3" json:"stock_qty,omitempty"`
+	// 這個 SKU 現在能不能買：商品上架中（ACTIVE）而且庫存大於 0。
+	Availability  ProductAvailability `protobuf:"varint,7,opt,name=availability,proto3,enum=hawkr.catalog.v1alpha1.ProductAvailability" json:"availability,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Sku) Reset() {
+	*x = Sku{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Sku) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Sku) ProtoMessage() {}
+
+func (x *Sku) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Sku.ProtoReflect.Descriptor instead.
+func (*Sku) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *Sku) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Sku) GetOption1() string {
+	if x != nil {
+		return x.Option1
+	}
+	return ""
+}
+
+func (x *Sku) GetOption2() string {
+	if x != nil {
+		return x.Option2
+	}
+	return ""
+}
+
+func (x *Sku) GetPrice() int64 {
+	if x != nil {
+		return x.Price
+	}
+	return 0
+}
+
+func (x *Sku) GetCompareAtPrice() int64 {
+	if x != nil && x.CompareAtPrice != nil {
+		return *x.CompareAtPrice
+	}
+	return 0
+}
+
+func (x *Sku) GetStockQty() int32 {
+	if x != nil {
+		return x.StockQty
+	}
+	return 0
+}
+
+func (x *Sku) GetAvailability() ProductAvailability {
+	if x != nil {
+		return x.Availability
+	}
+	return ProductAvailability_PRODUCT_AVAILABILITY_UNSPECIFIED
+}
+
+// ProductHashtag 是商品的一個標籤。
+type ProductHashtag struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 正規化後的名稱，用來比對與連結。
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// 使用者輸入的樣子，用來顯示。
+	Display       string `protobuf:"bytes,2,opt,name=display,proto3" json:"display,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ProductHashtag) Reset() {
+	*x = ProductHashtag{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProductHashtag) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProductHashtag) ProtoMessage() {}
+
+func (x *ProductHashtag) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProductHashtag.ProtoReflect.Descriptor instead.
+func (*ProductHashtag) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *ProductHashtag) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ProductHashtag) GetDisplay() string {
+	if x != nil {
+		return x.Display
+	}
+	return ""
+}
+
+// Product 是公開讀取的商品完整內容。沒有賣家的狀態 enum、etag、建立與修改時間：公開的只有 availability。
+type Product struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// 賣這個商品的店家；店家卡片讀不到時不設。
+	Store      *v1alpha1.StoreCard `protobuf:"bytes,2,opt,name=store,proto3" json:"store,omitempty"`
+	CategoryId string              `protobuf:"bytes,3,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`
+	Title      string              `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
+	// 商品現在能不能買：上架中而且至少一個 SKU 有庫存。已下架（ARCHIVED）的商品是不可購買。
+	Availability ProductAvailability `protobuf:"varint,5,opt,name=availability,proto3,enum=hawkr.catalog.v1alpha1.ProductAvailability" json:"availability,omitempty"`
+	// 第一次上架的時間。
+	FirstPublishTime *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=first_publish_time,json=firstPublishTime,proto3" json:"first_publish_time,omitempty"`
+	// 沒刪除 SKU 的最低與最高售價，新台幣元的整數。
+	MinPrice      int64 `protobuf:"varint,7,opt,name=min_price,json=minPrice,proto3" json:"min_price,omitempty"`
+	MaxPrice      int64 `protobuf:"varint,8,opt,name=max_price,json=maxPrice,proto3" json:"max_price,omitempty"`
+	SalesCount    int32 `protobuf:"varint,9,opt,name=sales_count,json=salesCount,proto3" json:"sales_count,omitempty"`
+	FavoriteCount int32 `protobuf:"varint,10,opt,name=favorite_count,json=favoriteCount,proto3" json:"favorite_count,omitempty"`
+	// 平均評分，1 到 5；沒有評價不設。
+	RatingAverage *float32                   `protobuf:"fixed32,11,opt,name=rating_average,json=ratingAverage,proto3,oneof" json:"rating_average,omitempty"`
+	ReviewCount   int32                      `protobuf:"varint,12,opt,name=review_count,json=reviewCount,proto3" json:"review_count,omitempty"`
+	Gallery       []*ProductImage            `protobuf:"bytes,13,rep,name=gallery,proto3" json:"gallery,omitempty"`
+	Description   []*ProductDescriptionBlock `protobuf:"bytes,14,rep,name=description,proto3" json:"description,omitempty"`
+	Axes          []*OptionAxis              `protobuf:"bytes,15,rep,name=axes,proto3" json:"axes,omitempty"`
+	Skus          []*Sku                     `protobuf:"bytes,16,rep,name=skus,proto3" json:"skus,omitempty"`
+	Hashtags      []*ProductHashtag          `protobuf:"bytes,17,rep,name=hashtags,proto3" json:"hashtags,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Product) Reset() {
+	*x = Product{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Product) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Product) ProtoMessage() {}
+
+func (x *Product) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Product.ProtoReflect.Descriptor instead.
+func (*Product) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *Product) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Product) GetStore() *v1alpha1.StoreCard {
+	if x != nil {
+		return x.Store
+	}
+	return nil
+}
+
+func (x *Product) GetCategoryId() string {
+	if x != nil {
+		return x.CategoryId
+	}
+	return ""
+}
+
+func (x *Product) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *Product) GetAvailability() ProductAvailability {
+	if x != nil {
+		return x.Availability
+	}
+	return ProductAvailability_PRODUCT_AVAILABILITY_UNSPECIFIED
+}
+
+func (x *Product) GetFirstPublishTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.FirstPublishTime
+	}
+	return nil
+}
+
+func (x *Product) GetMinPrice() int64 {
+	if x != nil {
+		return x.MinPrice
+	}
+	return 0
+}
+
+func (x *Product) GetMaxPrice() int64 {
+	if x != nil {
+		return x.MaxPrice
+	}
+	return 0
+}
+
+func (x *Product) GetSalesCount() int32 {
+	if x != nil {
+		return x.SalesCount
+	}
+	return 0
+}
+
+func (x *Product) GetFavoriteCount() int32 {
+	if x != nil {
+		return x.FavoriteCount
+	}
+	return 0
+}
+
+func (x *Product) GetRatingAverage() float32 {
+	if x != nil && x.RatingAverage != nil {
+		return *x.RatingAverage
+	}
+	return 0
+}
+
+func (x *Product) GetReviewCount() int32 {
+	if x != nil {
+		return x.ReviewCount
+	}
+	return 0
+}
+
+func (x *Product) GetGallery() []*ProductImage {
+	if x != nil {
+		return x.Gallery
+	}
+	return nil
+}
+
+func (x *Product) GetDescription() []*ProductDescriptionBlock {
+	if x != nil {
+		return x.Description
+	}
+	return nil
+}
+
+func (x *Product) GetAxes() []*OptionAxis {
+	if x != nil {
+		return x.Axes
+	}
+	return nil
+}
+
+func (x *Product) GetSkus() []*Sku {
+	if x != nil {
+		return x.Skus
+	}
+	return nil
+}
+
+func (x *Product) GetHashtags() []*ProductHashtag {
+	if x != nil {
+		return x.Hashtags
+	}
+	return nil
+}
+
+// ProductSummary 是公開列表的一列（商品卡片）。
+type ProductSummary struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// 店家卡片讀不到時不設。
+	Store      *v1alpha1.StoreCard `protobuf:"bytes,2,opt,name=store,proto3" json:"store,omitempty"`
+	CategoryId string              `protobuf:"bytes,3,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`
+	Title      string              `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
+	// 主圖庫的第一張；沒有圖不設。
+	CoverImage       *v1alpha1.Image        `protobuf:"bytes,5,opt,name=cover_image,json=coverImage,proto3" json:"cover_image,omitempty"`
+	Availability     ProductAvailability    `protobuf:"varint,6,opt,name=availability,proto3,enum=hawkr.catalog.v1alpha1.ProductAvailability" json:"availability,omitempty"`
+	FirstPublishTime *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=first_publish_time,json=firstPublishTime,proto3" json:"first_publish_time,omitempty"`
+	MinPrice         int64                  `protobuf:"varint,8,opt,name=min_price,json=minPrice,proto3" json:"min_price,omitempty"`
+	MaxPrice         int64                  `protobuf:"varint,9,opt,name=max_price,json=maxPrice,proto3" json:"max_price,omitempty"`
+	SalesCount       int32                  `protobuf:"varint,10,opt,name=sales_count,json=salesCount,proto3" json:"sales_count,omitempty"`
+	FavoriteCount    int32                  `protobuf:"varint,11,opt,name=favorite_count,json=favoriteCount,proto3" json:"favorite_count,omitempty"`
+	RatingAverage    *float32               `protobuf:"fixed32,12,opt,name=rating_average,json=ratingAverage,proto3,oneof" json:"rating_average,omitempty"`
+	ReviewCount      int32                  `protobuf:"varint,13,opt,name=review_count,json=reviewCount,proto3" json:"review_count,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *ProductSummary) Reset() {
+	*x = ProductSummary{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProductSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProductSummary) ProtoMessage() {}
+
+func (x *ProductSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProductSummary.ProtoReflect.Descriptor instead.
+func (*ProductSummary) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *ProductSummary) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *ProductSummary) GetStore() *v1alpha1.StoreCard {
+	if x != nil {
+		return x.Store
+	}
+	return nil
+}
+
+func (x *ProductSummary) GetCategoryId() string {
+	if x != nil {
+		return x.CategoryId
+	}
+	return ""
+}
+
+func (x *ProductSummary) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *ProductSummary) GetCoverImage() *v1alpha1.Image {
+	if x != nil {
+		return x.CoverImage
+	}
+	return nil
+}
+
+func (x *ProductSummary) GetAvailability() ProductAvailability {
+	if x != nil {
+		return x.Availability
+	}
+	return ProductAvailability_PRODUCT_AVAILABILITY_UNSPECIFIED
+}
+
+func (x *ProductSummary) GetFirstPublishTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.FirstPublishTime
+	}
+	return nil
+}
+
+func (x *ProductSummary) GetMinPrice() int64 {
+	if x != nil {
+		return x.MinPrice
+	}
+	return 0
+}
+
+func (x *ProductSummary) GetMaxPrice() int64 {
+	if x != nil {
+		return x.MaxPrice
+	}
+	return 0
+}
+
+func (x *ProductSummary) GetSalesCount() int32 {
+	if x != nil {
+		return x.SalesCount
+	}
+	return 0
+}
+
+func (x *ProductSummary) GetFavoriteCount() int32 {
+	if x != nil {
+		return x.FavoriteCount
+	}
+	return 0
+}
+
+func (x *ProductSummary) GetRatingAverage() float32 {
+	if x != nil && x.RatingAverage != nil {
+		return *x.RatingAverage
+	}
+	return 0
+}
+
+func (x *ProductSummary) GetReviewCount() int32 {
+	if x != nil {
+		return x.ReviewCount
+	}
+	return 0
+}
+
+// SellerProduct 是賣家讀自己的商品完整內容。
+type SellerProduct struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Id         string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	CategoryId string                 `protobuf:"bytes,2,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`
+	Title      string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	Status     ProductStatus          `protobuf:"varint,4,opt,name=status,proto3,enum=hawkr.catalog.v1alpha1.ProductStatus" json:"status,omitempty"`
+	// 第一次上架的時間；從沒上架過不設。
+	FirstPublishTime *timestamppb.Timestamp     `protobuf:"bytes,5,opt,name=first_publish_time,json=firstPublishTime,proto3" json:"first_publish_time,omitempty"`
+	MinPrice         int64                      `protobuf:"varint,6,opt,name=min_price,json=minPrice,proto3" json:"min_price,omitempty"`
+	MaxPrice         int64                      `protobuf:"varint,7,opt,name=max_price,json=maxPrice,proto3" json:"max_price,omitempty"`
+	SalesCount       int32                      `protobuf:"varint,8,opt,name=sales_count,json=salesCount,proto3" json:"sales_count,omitempty"`
+	FavoriteCount    int32                      `protobuf:"varint,9,opt,name=favorite_count,json=favoriteCount,proto3" json:"favorite_count,omitempty"`
+	RatingAverage    *float32                   `protobuf:"fixed32,10,opt,name=rating_average,json=ratingAverage,proto3,oneof" json:"rating_average,omitempty"`
+	ReviewCount      int32                      `protobuf:"varint,11,opt,name=review_count,json=reviewCount,proto3" json:"review_count,omitempty"`
+	Gallery          []*ProductImage            `protobuf:"bytes,12,rep,name=gallery,proto3" json:"gallery,omitempty"`
+	Description      []*ProductDescriptionBlock `protobuf:"bytes,13,rep,name=description,proto3" json:"description,omitempty"`
+	Axes             []*OptionAxis              `protobuf:"bytes,14,rep,name=axes,proto3" json:"axes,omitempty"`
+	Skus             []*Sku                     `protobuf:"bytes,15,rep,name=skus,proto3" json:"skus,omitempty"`
+	Hashtags         []*ProductHashtag          `protobuf:"bytes,16,rep,name=hashtags,proto3" json:"hashtags,omitempty"`
+	// 賣家設的低庫存門檻；沒設不設（用平台預設值）。
+	LowStockThreshold *int32 `protobuf:"varint,17,opt,name=low_stock_threshold,json=lowStockThreshold,proto3,oneof" json:"low_stock_threshold,omitempty"`
+	// 修改、上下架與刪除時帶回，client 視為不透明字串。範圍是賣家可編輯的內容與狀態；庫存、銷量、收藏數、評分、首次上架時間不影響它。
+	Etag          string                 `protobuf:"bytes,18,opt,name=etag,proto3" json:"etag,omitempty"`
+	CreateTime    *timestamppb.Timestamp `protobuf:"bytes,19,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	UpdateTime    *timestamppb.Timestamp `protobuf:"bytes,20,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SellerProduct) Reset() {
+	*x = SellerProduct{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SellerProduct) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SellerProduct) ProtoMessage() {}
+
+func (x *SellerProduct) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SellerProduct.ProtoReflect.Descriptor instead.
+func (*SellerProduct) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *SellerProduct) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *SellerProduct) GetCategoryId() string {
+	if x != nil {
+		return x.CategoryId
+	}
+	return ""
+}
+
+func (x *SellerProduct) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *SellerProduct) GetStatus() ProductStatus {
+	if x != nil {
+		return x.Status
+	}
+	return ProductStatus_PRODUCT_STATUS_UNSPECIFIED
+}
+
+func (x *SellerProduct) GetFirstPublishTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.FirstPublishTime
+	}
+	return nil
+}
+
+func (x *SellerProduct) GetMinPrice() int64 {
+	if x != nil {
+		return x.MinPrice
+	}
+	return 0
+}
+
+func (x *SellerProduct) GetMaxPrice() int64 {
+	if x != nil {
+		return x.MaxPrice
+	}
+	return 0
+}
+
+func (x *SellerProduct) GetSalesCount() int32 {
+	if x != nil {
+		return x.SalesCount
+	}
+	return 0
+}
+
+func (x *SellerProduct) GetFavoriteCount() int32 {
+	if x != nil {
+		return x.FavoriteCount
+	}
+	return 0
+}
+
+func (x *SellerProduct) GetRatingAverage() float32 {
+	if x != nil && x.RatingAverage != nil {
+		return *x.RatingAverage
+	}
+	return 0
+}
+
+func (x *SellerProduct) GetReviewCount() int32 {
+	if x != nil {
+		return x.ReviewCount
+	}
+	return 0
+}
+
+func (x *SellerProduct) GetGallery() []*ProductImage {
+	if x != nil {
+		return x.Gallery
+	}
+	return nil
+}
+
+func (x *SellerProduct) GetDescription() []*ProductDescriptionBlock {
+	if x != nil {
+		return x.Description
+	}
+	return nil
+}
+
+func (x *SellerProduct) GetAxes() []*OptionAxis {
+	if x != nil {
+		return x.Axes
+	}
+	return nil
+}
+
+func (x *SellerProduct) GetSkus() []*Sku {
+	if x != nil {
+		return x.Skus
+	}
+	return nil
+}
+
+func (x *SellerProduct) GetHashtags() []*ProductHashtag {
+	if x != nil {
+		return x.Hashtags
+	}
+	return nil
+}
+
+func (x *SellerProduct) GetLowStockThreshold() int32 {
+	if x != nil && x.LowStockThreshold != nil {
+		return *x.LowStockThreshold
+	}
+	return 0
+}
+
+func (x *SellerProduct) GetEtag() string {
+	if x != nil {
+		return x.Etag
+	}
+	return ""
+}
+
+func (x *SellerProduct) GetCreateTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreateTime
+	}
+	return nil
+}
+
+func (x *SellerProduct) GetUpdateTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdateTime
+	}
+	return nil
+}
+
+// SellerProductSummary 是賣家清單的一列。
+type SellerProductSummary struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	CategoryId       string                 `protobuf:"bytes,2,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`
+	Title            string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	CoverImage       *v1alpha1.Image        `protobuf:"bytes,4,opt,name=cover_image,json=coverImage,proto3" json:"cover_image,omitempty"`
+	Status           ProductStatus          `protobuf:"varint,5,opt,name=status,proto3,enum=hawkr.catalog.v1alpha1.ProductStatus" json:"status,omitempty"`
+	FirstPublishTime *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=first_publish_time,json=firstPublishTime,proto3" json:"first_publish_time,omitempty"`
+	MinPrice         int64                  `protobuf:"varint,7,opt,name=min_price,json=minPrice,proto3" json:"min_price,omitempty"`
+	MaxPrice         int64                  `protobuf:"varint,8,opt,name=max_price,json=maxPrice,proto3" json:"max_price,omitempty"`
+	SalesCount       int32                  `protobuf:"varint,9,opt,name=sales_count,json=salesCount,proto3" json:"sales_count,omitempty"`
+	FavoriteCount    int32                  `protobuf:"varint,10,opt,name=favorite_count,json=favoriteCount,proto3" json:"favorite_count,omitempty"`
+	RatingAverage    *float32               `protobuf:"fixed32,11,opt,name=rating_average,json=ratingAverage,proto3,oneof" json:"rating_average,omitempty"`
+	ReviewCount      int32                  `protobuf:"varint,12,opt,name=review_count,json=reviewCount,proto3" json:"review_count,omitempty"`
+	// 沒刪除 SKU 的庫存總和（庫存頁用，免得逐商品再讀 SKU）。
+	TotalStock        int32  `protobuf:"varint,13,opt,name=total_stock,json=totalStock,proto3" json:"total_stock,omitempty"`
+	LowStockThreshold *int32 `protobuf:"varint,14,opt,name=low_stock_threshold,json=lowStockThreshold,proto3,oneof" json:"low_stock_threshold,omitempty"`
+	// 列表上的上下架動作用它當版本。
+	Etag          string                 `protobuf:"bytes,15,opt,name=etag,proto3" json:"etag,omitempty"`
+	CreateTime    *timestamppb.Timestamp `protobuf:"bytes,16,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SellerProductSummary) Reset() {
+	*x = SellerProductSummary{}
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SellerProductSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SellerProductSummary) ProtoMessage() {}
+
+func (x *SellerProductSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SellerProductSummary.ProtoReflect.Descriptor instead.
+func (*SellerProductSummary) Descriptor() ([]byte, []int) {
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *SellerProductSummary) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *SellerProductSummary) GetCategoryId() string {
+	if x != nil {
+		return x.CategoryId
+	}
+	return ""
+}
+
+func (x *SellerProductSummary) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *SellerProductSummary) GetCoverImage() *v1alpha1.Image {
+	if x != nil {
+		return x.CoverImage
+	}
+	return nil
+}
+
+func (x *SellerProductSummary) GetStatus() ProductStatus {
+	if x != nil {
+		return x.Status
+	}
+	return ProductStatus_PRODUCT_STATUS_UNSPECIFIED
+}
+
+func (x *SellerProductSummary) GetFirstPublishTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.FirstPublishTime
+	}
+	return nil
+}
+
+func (x *SellerProductSummary) GetMinPrice() int64 {
+	if x != nil {
+		return x.MinPrice
+	}
+	return 0
+}
+
+func (x *SellerProductSummary) GetMaxPrice() int64 {
+	if x != nil {
+		return x.MaxPrice
+	}
+	return 0
+}
+
+func (x *SellerProductSummary) GetSalesCount() int32 {
+	if x != nil {
+		return x.SalesCount
+	}
+	return 0
+}
+
+func (x *SellerProductSummary) GetFavoriteCount() int32 {
+	if x != nil {
+		return x.FavoriteCount
+	}
+	return 0
+}
+
+func (x *SellerProductSummary) GetRatingAverage() float32 {
+	if x != nil && x.RatingAverage != nil {
+		return *x.RatingAverage
+	}
+	return 0
+}
+
+func (x *SellerProductSummary) GetReviewCount() int32 {
+	if x != nil {
+		return x.ReviewCount
+	}
+	return 0
+}
+
+func (x *SellerProductSummary) GetTotalStock() int32 {
+	if x != nil {
+		return x.TotalStock
+	}
+	return 0
+}
+
+func (x *SellerProductSummary) GetLowStockThreshold() int32 {
+	if x != nil && x.LowStockThreshold != nil {
+		return *x.LowStockThreshold
+	}
+	return 0
+}
+
+func (x *SellerProductSummary) GetEtag() string {
+	if x != nil {
+		return x.Etag
+	}
+	return ""
+}
+
+func (x *SellerProductSummary) GetCreateTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreateTime
+	}
+	return nil
+}
 
 // ProductInput 是商品的完整可寫內容。修改是整體取代：沒有帶的圖片、選項軸與 SKU 組合會被移除。
 // 狀態不在這裡，用切換狀態的操作改。
@@ -46,14 +3328,17 @@ type ProductInput struct {
 	// 選項軸，依順序；沒有軸的商品只有一個預設 SKU。
 	Axes []*OptionAxisInput `protobuf:"bytes,6,rep,name=axes,proto3" json:"axes,omitempty"`
 	// SKU，以選項值的組合辨識；至少一個。
-	Skus          []*SkuInput `protobuf:"bytes,7,rep,name=skus,proto3" json:"skus,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Skus []*SkuInput `protobuf:"bytes,7,rep,name=skus,proto3" json:"skus,omitempty"`
+	// 低庫存提醒門檻（每個 SKU 的庫存小於或等於它且大於 0 就算偏低）；不設是用平台預設值（CountMyProductsResponse.default_low_stock_threshold）。
+	// 0 到 9999；整體取代時不帶就是清掉，改回預設值。
+	LowStockThreshold *int32 `protobuf:"varint,8,opt,name=low_stock_threshold,json=lowStockThreshold,proto3,oneof" json:"low_stock_threshold,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *ProductInput) Reset() {
 	*x = ProductInput{}
-	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[0]
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -65,7 +3350,7 @@ func (x *ProductInput) String() string {
 func (*ProductInput) ProtoMessage() {}
 
 func (x *ProductInput) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[0]
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -78,7 +3363,7 @@ func (x *ProductInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProductInput.ProtoReflect.Descriptor instead.
 func (*ProductInput) Descriptor() ([]byte, []int) {
-	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{0}
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *ProductInput) GetTitle() string {
@@ -130,6 +3415,13 @@ func (x *ProductInput) GetSkus() []*SkuInput {
 	return nil
 }
 
+func (x *ProductInput) GetLowStockThreshold() int32 {
+	if x != nil && x.LowStockThreshold != nil {
+		return *x.LowStockThreshold
+	}
+	return 0
+}
+
 // ImageInput 是寫入時的一張圖：新上傳的圖帶 staged token，商品現有的圖帶它的 asset_id，兩者剛好給一個。
 type ImageInput struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -146,7 +3438,7 @@ type ImageInput struct {
 
 func (x *ImageInput) Reset() {
 	*x = ImageInput{}
-	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[1]
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -158,7 +3450,7 @@ func (x *ImageInput) String() string {
 func (*ImageInput) ProtoMessage() {}
 
 func (x *ImageInput) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[1]
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -171,7 +3463,7 @@ func (x *ImageInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ImageInput.ProtoReflect.Descriptor instead.
 func (*ImageInput) Descriptor() ([]byte, []int) {
-	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{1}
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *ImageInput) GetSource() isImageInput_Source {
@@ -240,7 +3532,7 @@ type DescriptionBlock struct {
 
 func (x *DescriptionBlock) Reset() {
 	*x = DescriptionBlock{}
-	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[2]
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -252,7 +3544,7 @@ func (x *DescriptionBlock) String() string {
 func (*DescriptionBlock) ProtoMessage() {}
 
 func (x *DescriptionBlock) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[2]
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -265,7 +3557,7 @@ func (x *DescriptionBlock) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DescriptionBlock.ProtoReflect.Descriptor instead.
 func (*DescriptionBlock) Descriptor() ([]byte, []int) {
-	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{2}
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *DescriptionBlock) GetBlock() isDescriptionBlock_Block {
@@ -354,7 +3646,7 @@ type BulletList struct {
 
 func (x *BulletList) Reset() {
 	*x = BulletList{}
-	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[3]
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -366,7 +3658,7 @@ func (x *BulletList) String() string {
 func (*BulletList) ProtoMessage() {}
 
 func (x *BulletList) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[3]
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -379,7 +3671,7 @@ func (x *BulletList) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BulletList.ProtoReflect.Descriptor instead.
 func (*BulletList) Descriptor() ([]byte, []int) {
-	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{3}
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *BulletList) GetItems() []string {
@@ -400,7 +3692,7 @@ type Table struct {
 
 func (x *Table) Reset() {
 	*x = Table{}
-	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[4]
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -412,7 +3704,7 @@ func (x *Table) String() string {
 func (*Table) ProtoMessage() {}
 
 func (x *Table) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[4]
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -425,7 +3717,7 @@ func (x *Table) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Table.ProtoReflect.Descriptor instead.
 func (*Table) Descriptor() ([]byte, []int) {
-	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{4}
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *Table) GetRows() []*TableRow {
@@ -446,7 +3738,7 @@ type TableRow struct {
 
 func (x *TableRow) Reset() {
 	*x = TableRow{}
-	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[5]
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -458,7 +3750,7 @@ func (x *TableRow) String() string {
 func (*TableRow) ProtoMessage() {}
 
 func (x *TableRow) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[5]
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -471,7 +3763,7 @@ func (x *TableRow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TableRow.ProtoReflect.Descriptor instead.
 func (*TableRow) Descriptor() ([]byte, []int) {
-	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{5}
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *TableRow) GetCells() []string {
@@ -494,7 +3786,7 @@ type OptionAxisInput struct {
 
 func (x *OptionAxisInput) Reset() {
 	*x = OptionAxisInput{}
-	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[6]
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -506,7 +3798,7 @@ func (x *OptionAxisInput) String() string {
 func (*OptionAxisInput) ProtoMessage() {}
 
 func (x *OptionAxisInput) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[6]
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -519,7 +3811,7 @@ func (x *OptionAxisInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OptionAxisInput.ProtoReflect.Descriptor instead.
 func (*OptionAxisInput) Descriptor() ([]byte, []int) {
-	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{6}
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *OptionAxisInput) GetName() string {
@@ -556,7 +3848,7 @@ type SkuInput struct {
 
 func (x *SkuInput) Reset() {
 	*x = SkuInput{}
-	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[7]
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -568,7 +3860,7 @@ func (x *SkuInput) String() string {
 func (*SkuInput) ProtoMessage() {}
 
 func (x *SkuInput) ProtoReflect() protoreflect.Message {
-	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[7]
+	mi := &file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -581,7 +3873,7 @@ func (x *SkuInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SkuInput.ProtoReflect.Descriptor instead.
 func (*SkuInput) Descriptor() ([]byte, []int) {
-	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{7}
+	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *SkuInput) GetOption1() string {
@@ -623,7 +3915,257 @@ var File_hawkr_catalog_v1alpha1_catalog_proto protoreflect.FileDescriptor
 
 const file_hawkr_catalog_v1alpha1_catalog_proto_rawDesc = "" +
 	"\n" +
-	"$hawkr/catalog/v1alpha1/catalog.proto\x12\x16hawkr.catalog.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\"hawkr/common/v1alpha1/limits.proto\"\xa1\x03\n" +
+	"$hawkr/catalog/v1alpha1/catalog.proto\x12\x16hawkr.catalog.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bgoogle/api/field_info.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a!hawkr/common/v1alpha1/image.proto\x1a\"hawkr/common/v1alpha1/limits.proto\x1a&hawkr/common/v1alpha1/store_card.proto\"\xae\x02\n" +
+	"\rProductFilter\x12)\n" +
+	"\fcategory_ids\x18\x01 \x03(\tB\x06\x92\xb5\x18\x02\b\x14R\vcategoryIds\x12 \n" +
+	"\tprice_min\x18\x02 \x01(\x03H\x00R\bpriceMin\x88\x01\x01\x12 \n" +
+	"\tprice_max\x18\x03 \x01(\x03H\x01R\bpriceMax\x88\x01\x01\x12\"\n" +
+	"\bhashtags\x18\x04 \x03(\tB\x06\x92\xb5\x18\x02\b\n" +
+	"R\bhashtags\x12I\n" +
+	"\rhashtag_match\x18\x05 \x01(\x0e2$.hawkr.catalog.v1alpha1.HashtagMatchR\fhashtagMatch\x12#\n" +
+	"\tstore_ids\x18\x06 \x03(\tB\x06\x92\xb5\x18\x02\b2R\bstoreIdsB\f\n" +
+	"\n" +
+	"_price_minB\f\n" +
+	"\n" +
+	"_price_max\"\xc9\x01\n" +
+	"\x13ListProductsRequest\x12=\n" +
+	"\x06filter\x18\x01 \x01(\v2%.hawkr.catalog.v1alpha1.ProductFilterR\x06filter\x127\n" +
+	"\x04sort\x18\x02 \x01(\x0e2#.hawkr.catalog.v1alpha1.ProductSortR\x04sort\x12\x1b\n" +
+	"\tpage_size\x18\x03 \x01(\x05R\bpageSize\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x04 \x01(\tR\tpageToken\"\x82\x01\n" +
+	"\x14ListProductsResponse\x12B\n" +
+	"\bproducts\x18\x01 \x03(\v2&.hawkr.catalog.v1alpha1.ProductSummaryR\bproducts\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xec\x01\n" +
+	"\x15SearchProductsRequest\x12\x1f\n" +
+	"\x05query\x18\x01 \x01(\tB\t\xe0A\x02\x92\xb5\x18\x02\x10dR\x05query\x12=\n" +
+	"\x06filter\x18\x02 \x01(\v2%.hawkr.catalog.v1alpha1.ProductFilterR\x06filter\x127\n" +
+	"\x04sort\x18\x03 \x01(\x0e2#.hawkr.catalog.v1alpha1.ProductSortR\x04sort\x12\x1b\n" +
+	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x05 \x01(\tR\tpageToken\"\x84\x01\n" +
+	"\x16SearchProductsResponse\x12B\n" +
+	"\bproducts\x18\x01 \x03(\v2&.hawkr.catalog.v1alpha1.ProductSummaryR\bproducts\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"^\n" +
+	"\x1aSuggestProductNamesRequest\x12\x1f\n" +
+	"\x05query\x18\x01 \x01(\tB\t\xe0A\x02\x92\xb5\x18\x02\x10dR\x05query\x12\x1f\n" +
+	"\vmax_results\x18\x02 \x01(\x05R\n" +
+	"maxResults\"3\n" +
+	"\x1bSuggestProductNamesResponse\x12\x14\n" +
+	"\x05names\x18\x01 \x03(\tR\x05names\"7\n" +
+	"\x11GetProductRequest\x12\"\n" +
+	"\n" +
+	"product_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tproductId\"O\n" +
+	"\x12GetProductResponse\x129\n" +
+	"\aproduct\x18\x01 \x01(\v2\x1f.hawkr.catalog.v1alpha1.ProductR\aproduct\"\x17\n" +
+	"\x15ListCategoriesRequest\"Z\n" +
+	"\x16ListCategoriesResponse\x12@\n" +
+	"\n" +
+	"categories\x18\x01 \x03(\v2 .hawkr.catalog.v1alpha1.CategoryR\n" +
+	"categories\"{\n" +
+	"\bCategory\x12\x13\n" +
+	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x17\n" +
+	"\x04name\x18\x02 \x01(\tB\x03\xe0A\x03R\x04name\x12A\n" +
+	"\bchildren\x18\x03 \x03(\v2 .hawkr.catalog.v1alpha1.CategoryB\x03\xe0A\x03R\bchildren\"p\n" +
+	"\x16SuggestHashtagsRequest\x12\x19\n" +
+	"\x05query\x18\x01 \x01(\tB\x03\xe0A\x02R\x05query\x12\x1a\n" +
+	"\bcontains\x18\x02 \x01(\bR\bcontains\x12\x1f\n" +
+	"\vmax_results\x18\x03 \x01(\x05R\n" +
+	"maxResults\"[\n" +
+	"\x17SuggestHashtagsResponse\x12@\n" +
+	"\bhashtags\x18\x01 \x03(\v2$.hawkr.catalog.v1alpha1.HashtagCountR\bhashtags\"A\n" +
+	"\x1eSuggestTrendingHashtagsRequest\x12\x1f\n" +
+	"\vmax_results\x18\x01 \x01(\x05R\n" +
+	"maxResults\"c\n" +
+	"\x1fSuggestTrendingHashtagsResponse\x12@\n" +
+	"\bhashtags\x18\x01 \x03(\v2$.hawkr.catalog.v1alpha1.HashtagCountR\bhashtags\"p\n" +
+	"\fHashtagCount\x12\x17\n" +
+	"\x04name\x18\x01 \x01(\tB\x03\xe0A\x03R\x04name\x12\x1d\n" +
+	"\adisplay\x18\x02 \x01(\tB\x03\xe0A\x03R\adisplay\x12(\n" +
+	"\rproduct_count\x18\x03 \x01(\x03B\x03\xe0A\x03R\fproductCount\"\xb6\x01\n" +
+	"\x0fMyProductFilter\x12=\n" +
+	"\x06status\x18\x01 \x01(\x0e2%.hawkr.catalog.v1alpha1.ProductStatusR\x06status\x12F\n" +
+	"\fstock_status\x18\x02 \x01(\x0e2#.hawkr.catalog.v1alpha1.StockStatusR\vstockStatus\x12\x1c\n" +
+	"\x05query\x18\x03 \x01(\tB\x06\x92\xb5\x18\x02\x10dR\x05query\"\x94\x01\n" +
+	"\x15ListMyProductsRequest\x12?\n" +
+	"\x06filter\x18\x01 \x01(\v2'.hawkr.catalog.v1alpha1.MyProductFilterR\x06filter\x12\x1b\n" +
+	"\tpage_size\x18\x02 \x01(\x05R\bpageSize\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x03 \x01(\tR\tpageToken\"\x8a\x01\n" +
+	"\x16ListMyProductsResponse\x12H\n" +
+	"\bproducts\x18\x01 \x03(\v2,.hawkr.catalog.v1alpha1.SellerProductSummaryR\bproducts\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"9\n" +
+	"\x13GetMyProductRequest\x12\"\n" +
+	"\n" +
+	"product_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tproductId\"W\n" +
+	"\x14GetMyProductResponse\x12?\n" +
+	"\aproduct\x18\x01 \x01(\v2%.hawkr.catalog.v1alpha1.SellerProductR\aproduct\"Y\n" +
+	"\x16CountMyProductsRequest\x12?\n" +
+	"\x06filter\x18\x01 \x01(\v2'.hawkr.catalog.v1alpha1.MyProductFilterR\x06filter\"x\n" +
+	"\x17CountMyProductsResponse\x12\x19\n" +
+	"\x05count\x18\x01 \x01(\x05B\x03\xe0A\x03R\x05count\x12B\n" +
+	"\x1bdefault_low_stock_threshold\x18\x02 \x01(\x05B\x03\xe0A\x03R\x18defaultLowStockThreshold\"\x87\x01\n" +
+	"\x14CreateProductRequest\x12C\n" +
+	"\aproduct\x18\x01 \x01(\v2$.hawkr.catalog.v1alpha1.ProductInputB\x03\xe0A\x02R\aproduct\x12*\n" +
+	"\n" +
+	"request_id\x18\x02 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\trequestId\"X\n" +
+	"\x15CreateProductResponse\x12?\n" +
+	"\aproduct\x18\x01 \x01(\v2%.hawkr.catalog.v1alpha1.SellerProductR\aproduct\"\x98\x01\n" +
+	"\x14UpdateProductRequest\x12\"\n" +
+	"\n" +
+	"product_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tproductId\x12\x17\n" +
+	"\x04etag\x18\x02 \x01(\tB\x03\xe0A\x02R\x04etag\x12C\n" +
+	"\aproduct\x18\x03 \x01(\v2$.hawkr.catalog.v1alpha1.ProductInputB\x03\xe0A\x02R\aproduct\"X\n" +
+	"\x15UpdateProductResponse\x12?\n" +
+	"\aproduct\x18\x01 \x01(\v2%.hawkr.catalog.v1alpha1.SellerProductR\aproduct\"\x9a\x01\n" +
+	"\x17SetProductStatusRequest\x12\"\n" +
+	"\n" +
+	"product_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tproductId\x12B\n" +
+	"\x06status\x18\x02 \x01(\x0e2%.hawkr.catalog.v1alpha1.ProductStatusB\x03\xe0A\x02R\x06status\x12\x17\n" +
+	"\x04etag\x18\x03 \x01(\tB\x03\xe0A\x02R\x04etag\"[\n" +
+	"\x18SetProductStatusResponse\x12?\n" +
+	"\aproduct\x18\x01 \x01(\v2%.hawkr.catalog.v1alpha1.SellerProductR\aproduct\"N\n" +
+	"\x14DeleteProductRequest\x12\"\n" +
+	"\n" +
+	"product_id\x18\x01 \x01(\tB\x03\xe0A\x02R\tproductId\x12\x12\n" +
+	"\x04etag\x18\x02 \x01(\tR\x04etag\"\x17\n" +
+	"\x15DeleteProductResponse\"w\n" +
+	"\x12AdjustStockRequest\x12\x1a\n" +
+	"\x06sku_id\x18\x01 \x01(\tB\x03\xe0A\x02R\x05skuId\x12\x19\n" +
+	"\x05delta\x18\x02 \x01(\x05B\x03\xe0A\x02R\x05delta\x12*\n" +
+	"\n" +
+	"request_id\x18\x03 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\trequestId\"D\n" +
+	"\x13AdjustStockResponse\x12-\n" +
+	"\x03sku\x18\x01 \x01(\v2\x1b.hawkr.catalog.v1alpha1.SkuR\x03sku\"\xa2\x01\n" +
+	"\x0fSetStockRequest\x12\x1a\n" +
+	"\x06sku_id\x18\x01 \x01(\tB\x03\xe0A\x02R\x05skuId\x12\x1a\n" +
+	"\bquantity\x18\x02 \x01(\x05R\bquantity\x12+\n" +
+	"\x11expected_quantity\x18\x03 \x01(\x05R\x10expectedQuantity\x12*\n" +
+	"\n" +
+	"request_id\x18\x04 \x01(\tB\v\xe0A\x02\xe2\x8c\xcf\xd7\b\x02\b\x01R\trequestId\"A\n" +
+	"\x10SetStockResponse\x12-\n" +
+	"\x03sku\x18\x01 \x01(\v2\x1b.hawkr.catalog.v1alpha1.SkuR\x03sku\"~\n" +
+	"\fProductImage\x12\x1e\n" +
+	"\basset_id\x18\x01 \x01(\tB\x03\xe0A\x03R\aassetId\x127\n" +
+	"\x05image\x18\x02 \x01(\v2\x1c.hawkr.common.v1alpha1.ImageB\x03\xe0A\x03R\x05image\x12\x15\n" +
+	"\x03alt\x18\x03 \x01(\tB\x03\xe0A\x03R\x03alt\"\xfe\x01\n" +
+	"\x17ProductDescriptionBlock\x12\x1e\n" +
+	"\tparagraph\x18\x01 \x01(\tH\x00R\tparagraph\x12<\n" +
+	"\x05image\x18\x02 \x01(\v2$.hawkr.catalog.v1alpha1.ProductImageH\x00R\x05image\x12E\n" +
+	"\vbullet_list\x18\x03 \x01(\v2\".hawkr.catalog.v1alpha1.BulletListH\x00R\n" +
+	"bulletList\x125\n" +
+	"\x05table\x18\x04 \x01(\v2\x1d.hawkr.catalog.v1alpha1.TableH\x00R\x05tableB\a\n" +
+	"\x05block\"B\n" +
+	"\n" +
+	"OptionAxis\x12\x17\n" +
+	"\x04name\x18\x01 \x01(\tB\x03\xe0A\x03R\x04name\x12\x1b\n" +
+	"\x06values\x18\x02 \x03(\tB\x03\xe0A\x03R\x06values\"\xb4\x02\n" +
+	"\x03Sku\x12\x13\n" +
+	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12\x1d\n" +
+	"\aoption1\x18\x02 \x01(\tB\x03\xe0A\x03R\aoption1\x12\x1d\n" +
+	"\aoption2\x18\x03 \x01(\tB\x03\xe0A\x03R\aoption2\x12\x19\n" +
+	"\x05price\x18\x04 \x01(\x03B\x03\xe0A\x03R\x05price\x122\n" +
+	"\x10compare_at_price\x18\x05 \x01(\x03B\x03\xe0A\x03H\x00R\x0ecompareAtPrice\x88\x01\x01\x12 \n" +
+	"\tstock_qty\x18\x06 \x01(\x05B\x03\xe0A\x03R\bstockQty\x12T\n" +
+	"\favailability\x18\a \x01(\x0e2+.hawkr.catalog.v1alpha1.ProductAvailabilityB\x03\xe0A\x03R\favailabilityB\x13\n" +
+	"\x11_compare_at_price\"H\n" +
+	"\x0eProductHashtag\x12\x17\n" +
+	"\x04name\x18\x01 \x01(\tB\x03\xe0A\x03R\x04name\x12\x1d\n" +
+	"\adisplay\x18\x02 \x01(\tB\x03\xe0A\x03R\adisplay\"\x9c\a\n" +
+	"\aProduct\x12\x13\n" +
+	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12;\n" +
+	"\x05store\x18\x02 \x01(\v2 .hawkr.common.v1alpha1.StoreCardB\x03\xe0A\x03R\x05store\x12$\n" +
+	"\vcategory_id\x18\x03 \x01(\tB\x03\xe0A\x03R\n" +
+	"categoryId\x12\x19\n" +
+	"\x05title\x18\x04 \x01(\tB\x03\xe0A\x03R\x05title\x12T\n" +
+	"\favailability\x18\x05 \x01(\x0e2+.hawkr.catalog.v1alpha1.ProductAvailabilityB\x03\xe0A\x03R\favailability\x12M\n" +
+	"\x12first_publish_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\x10firstPublishTime\x12 \n" +
+	"\tmin_price\x18\a \x01(\x03B\x03\xe0A\x03R\bminPrice\x12 \n" +
+	"\tmax_price\x18\b \x01(\x03B\x03\xe0A\x03R\bmaxPrice\x12$\n" +
+	"\vsales_count\x18\t \x01(\x05B\x03\xe0A\x03R\n" +
+	"salesCount\x12*\n" +
+	"\x0efavorite_count\x18\n" +
+	" \x01(\x05B\x03\xe0A\x03R\rfavoriteCount\x12/\n" +
+	"\x0erating_average\x18\v \x01(\x02B\x03\xe0A\x03H\x00R\rratingAverage\x88\x01\x01\x12&\n" +
+	"\freview_count\x18\f \x01(\x05B\x03\xe0A\x03R\vreviewCount\x12C\n" +
+	"\agallery\x18\r \x03(\v2$.hawkr.catalog.v1alpha1.ProductImageB\x03\xe0A\x03R\agallery\x12V\n" +
+	"\vdescription\x18\x0e \x03(\v2/.hawkr.catalog.v1alpha1.ProductDescriptionBlockB\x03\xe0A\x03R\vdescription\x12;\n" +
+	"\x04axes\x18\x0f \x03(\v2\".hawkr.catalog.v1alpha1.OptionAxisB\x03\xe0A\x03R\x04axes\x124\n" +
+	"\x04skus\x18\x10 \x03(\v2\x1b.hawkr.catalog.v1alpha1.SkuB\x03\xe0A\x03R\x04skus\x12G\n" +
+	"\bhashtags\x18\x11 \x03(\v2&.hawkr.catalog.v1alpha1.ProductHashtagB\x03\xe0A\x03R\bhashtagsB\x11\n" +
+	"\x0f_rating_average\"\x8e\x05\n" +
+	"\x0eProductSummary\x12\x13\n" +
+	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12;\n" +
+	"\x05store\x18\x02 \x01(\v2 .hawkr.common.v1alpha1.StoreCardB\x03\xe0A\x03R\x05store\x12$\n" +
+	"\vcategory_id\x18\x03 \x01(\tB\x03\xe0A\x03R\n" +
+	"categoryId\x12\x19\n" +
+	"\x05title\x18\x04 \x01(\tB\x03\xe0A\x03R\x05title\x12B\n" +
+	"\vcover_image\x18\x05 \x01(\v2\x1c.hawkr.common.v1alpha1.ImageB\x03\xe0A\x03R\n" +
+	"coverImage\x12T\n" +
+	"\favailability\x18\x06 \x01(\x0e2+.hawkr.catalog.v1alpha1.ProductAvailabilityB\x03\xe0A\x03R\favailability\x12M\n" +
+	"\x12first_publish_time\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\x10firstPublishTime\x12 \n" +
+	"\tmin_price\x18\b \x01(\x03B\x03\xe0A\x03R\bminPrice\x12 \n" +
+	"\tmax_price\x18\t \x01(\x03B\x03\xe0A\x03R\bmaxPrice\x12$\n" +
+	"\vsales_count\x18\n" +
+	" \x01(\x05B\x03\xe0A\x03R\n" +
+	"salesCount\x12*\n" +
+	"\x0efavorite_count\x18\v \x01(\x05B\x03\xe0A\x03R\rfavoriteCount\x12/\n" +
+	"\x0erating_average\x18\f \x01(\x02B\x03\xe0A\x03H\x00R\rratingAverage\x88\x01\x01\x12&\n" +
+	"\freview_count\x18\r \x01(\x05B\x03\xe0A\x03R\vreviewCountB\x11\n" +
+	"\x0f_rating_average\"\xc2\b\n" +
+	"\rSellerProduct\x12\x13\n" +
+	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12$\n" +
+	"\vcategory_id\x18\x02 \x01(\tB\x03\xe0A\x03R\n" +
+	"categoryId\x12\x19\n" +
+	"\x05title\x18\x03 \x01(\tB\x03\xe0A\x03R\x05title\x12B\n" +
+	"\x06status\x18\x04 \x01(\x0e2%.hawkr.catalog.v1alpha1.ProductStatusB\x03\xe0A\x03R\x06status\x12M\n" +
+	"\x12first_publish_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\x10firstPublishTime\x12 \n" +
+	"\tmin_price\x18\x06 \x01(\x03B\x03\xe0A\x03R\bminPrice\x12 \n" +
+	"\tmax_price\x18\a \x01(\x03B\x03\xe0A\x03R\bmaxPrice\x12$\n" +
+	"\vsales_count\x18\b \x01(\x05B\x03\xe0A\x03R\n" +
+	"salesCount\x12*\n" +
+	"\x0efavorite_count\x18\t \x01(\x05B\x03\xe0A\x03R\rfavoriteCount\x12/\n" +
+	"\x0erating_average\x18\n" +
+	" \x01(\x02B\x03\xe0A\x03H\x00R\rratingAverage\x88\x01\x01\x12&\n" +
+	"\freview_count\x18\v \x01(\x05B\x03\xe0A\x03R\vreviewCount\x12C\n" +
+	"\agallery\x18\f \x03(\v2$.hawkr.catalog.v1alpha1.ProductImageB\x03\xe0A\x03R\agallery\x12V\n" +
+	"\vdescription\x18\r \x03(\v2/.hawkr.catalog.v1alpha1.ProductDescriptionBlockB\x03\xe0A\x03R\vdescription\x12;\n" +
+	"\x04axes\x18\x0e \x03(\v2\".hawkr.catalog.v1alpha1.OptionAxisB\x03\xe0A\x03R\x04axes\x124\n" +
+	"\x04skus\x18\x0f \x03(\v2\x1b.hawkr.catalog.v1alpha1.SkuB\x03\xe0A\x03R\x04skus\x12G\n" +
+	"\bhashtags\x18\x10 \x03(\v2&.hawkr.catalog.v1alpha1.ProductHashtagB\x03\xe0A\x03R\bhashtags\x128\n" +
+	"\x13low_stock_threshold\x18\x11 \x01(\x05B\x03\xe0A\x03H\x01R\x11lowStockThreshold\x88\x01\x01\x12\x17\n" +
+	"\x04etag\x18\x12 \x01(\tB\x03\xe0A\x03R\x04etag\x12@\n" +
+	"\vcreate_time\x18\x13 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"createTime\x12@\n" +
+	"\vupdate_time\x18\x14 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"updateTimeB\x11\n" +
+	"\x0f_rating_averageB\x16\n" +
+	"\x14_low_stock_threshold\"\x98\x06\n" +
+	"\x14SellerProductSummary\x12\x13\n" +
+	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12$\n" +
+	"\vcategory_id\x18\x02 \x01(\tB\x03\xe0A\x03R\n" +
+	"categoryId\x12\x19\n" +
+	"\x05title\x18\x03 \x01(\tB\x03\xe0A\x03R\x05title\x12B\n" +
+	"\vcover_image\x18\x04 \x01(\v2\x1c.hawkr.common.v1alpha1.ImageB\x03\xe0A\x03R\n" +
+	"coverImage\x12B\n" +
+	"\x06status\x18\x05 \x01(\x0e2%.hawkr.catalog.v1alpha1.ProductStatusB\x03\xe0A\x03R\x06status\x12M\n" +
+	"\x12first_publish_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\x10firstPublishTime\x12 \n" +
+	"\tmin_price\x18\a \x01(\x03B\x03\xe0A\x03R\bminPrice\x12 \n" +
+	"\tmax_price\x18\b \x01(\x03B\x03\xe0A\x03R\bmaxPrice\x12$\n" +
+	"\vsales_count\x18\t \x01(\x05B\x03\xe0A\x03R\n" +
+	"salesCount\x12*\n" +
+	"\x0efavorite_count\x18\n" +
+	" \x01(\x05B\x03\xe0A\x03R\rfavoriteCount\x12/\n" +
+	"\x0erating_average\x18\v \x01(\x02B\x03\xe0A\x03H\x00R\rratingAverage\x88\x01\x01\x12&\n" +
+	"\freview_count\x18\f \x01(\x05B\x03\xe0A\x03R\vreviewCount\x12$\n" +
+	"\vtotal_stock\x18\r \x01(\x05B\x03\xe0A\x03R\n" +
+	"totalStock\x128\n" +
+	"\x13low_stock_threshold\x18\x0e \x01(\x05B\x03\xe0A\x03H\x01R\x11lowStockThreshold\x88\x01\x01\x12\x17\n" +
+	"\x04etag\x18\x0f \x01(\tB\x03\xe0A\x03R\x04etag\x12@\n" +
+	"\vcreate_time\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"createTimeB\x11\n" +
+	"\x0f_rating_averageB\x16\n" +
+	"\x14_low_stock_threshold\"\xee\x03\n" +
 	"\fProductInput\x12\x1f\n" +
 	"\x05title\x18\x01 \x01(\tB\t\xe0A\x02\x92\xb5\x18\x02\x10dR\x05title\x12$\n" +
 	"\vcategory_id\x18\x02 \x01(\tB\x03\xe0A\x02R\n" +
@@ -632,7 +4174,9 @@ const file_hawkr_catalog_v1alpha1_catalog_proto_rawDesc = "" +
 	"\agallery\x18\x04 \x03(\v2\".hawkr.catalog.v1alpha1.ImageInputB\x06\x92\xb5\x18\x02\b\tR\agallery\x12W\n" +
 	"\vdescription\x18\x05 \x03(\v2(.hawkr.catalog.v1alpha1.DescriptionBlockB\v\x92\xb5\x18\a\bd\x18\xb8\x17 \x14R\vdescription\x12C\n" +
 	"\x04axes\x18\x06 \x03(\v2'.hawkr.catalog.v1alpha1.OptionAxisInputB\x06\x92\xb5\x18\x02\b\x02R\x04axes\x12?\n" +
-	"\x04skus\x18\a \x03(\v2 .hawkr.catalog.v1alpha1.SkuInputB\t\xe0A\x02\x92\xb5\x18\x02\bdR\x04skus\"s\n" +
+	"\x04skus\x18\a \x03(\v2 .hawkr.catalog.v1alpha1.SkuInputB\t\xe0A\x02\x92\xb5\x18\x02\bdR\x04skus\x123\n" +
+	"\x13low_stock_threshold\x18\b \x01(\x05H\x00R\x11lowStockThreshold\x88\x01\x01B\x16\n" +
+	"\x14_low_stock_threshold\"s\n" +
 	"\n" +
 	"ImageInput\x12#\n" +
 	"\fstaged_token\x18\x01 \x01(\tH\x00R\vstagedToken\x12\x1b\n" +
@@ -663,7 +4207,51 @@ const file_hawkr_catalog_v1alpha1_catalog_proto_rawDesc = "" +
 	"\x05price\x18\x03 \x01(\x03B\x03\xe0A\x02R\x05price\x12-\n" +
 	"\x10compare_at_price\x18\x04 \x01(\x03H\x00R\x0ecompareAtPrice\x88\x01\x01\x12#\n" +
 	"\rinitial_stock\x18\x05 \x01(\x05R\finitialStockB\x13\n" +
-	"\x11_compare_at_priceB\x85\x02\n" +
+	"\x11_compare_at_price*\x81\x01\n" +
+	"\rProductStatus\x12\x1e\n" +
+	"\x1aPRODUCT_STATUS_UNSPECIFIED\x10\x00\x12\x18\n" +
+	"\x14PRODUCT_STATUS_DRAFT\x10\x01\x12\x19\n" +
+	"\x15PRODUCT_STATUS_ACTIVE\x10\x02\x12\x1b\n" +
+	"\x17PRODUCT_STATUS_ARCHIVED\x10\x03*\x85\x01\n" +
+	"\x13ProductAvailability\x12$\n" +
+	" PRODUCT_AVAILABILITY_UNSPECIFIED\x10\x00\x12\"\n" +
+	"\x1ePRODUCT_AVAILABILITY_AVAILABLE\x10\x01\x12$\n" +
+	" PRODUCT_AVAILABILITY_UNAVAILABLE\x10\x02*`\n" +
+	"\vStockStatus\x12\x1c\n" +
+	"\x18STOCK_STATUS_UNSPECIFIED\x10\x00\x12\x14\n" +
+	"\x10STOCK_STATUS_LOW\x10\x01\x12\x1d\n" +
+	"\x19STOCK_STATUS_OUT_OF_STOCK\x10\x02*\xca\x01\n" +
+	"\vProductSort\x12\x1c\n" +
+	"\x18PRODUCT_SORT_UNSPECIFIED\x10\x00\x12\x17\n" +
+	"\x13PRODUCT_SORT_LATEST\x10\x01\x12\x1a\n" +
+	"\x16PRODUCT_SORT_PRICE_ASC\x10\x02\x12\x1b\n" +
+	"\x17PRODUCT_SORT_PRICE_DESC\x10\x03\x12\x16\n" +
+	"\x12PRODUCT_SORT_SALES\x10\x04\x12\x17\n" +
+	"\x13PRODUCT_SORT_RATING\x10\x05\x12\x1a\n" +
+	"\x16PRODUCT_SORT_RELEVANCE\x10\x06*[\n" +
+	"\fHashtagMatch\x12\x1d\n" +
+	"\x19HASHTAG_MATCH_UNSPECIFIED\x10\x00\x12\x15\n" +
+	"\x11HASHTAG_MATCH_ANY\x10\x01\x12\x15\n" +
+	"\x11HASHTAG_MATCH_ALL\x10\x022\xed\x06\n" +
+	"\x14CatalogPublicService\x12n\n" +
+	"\fListProducts\x12+.hawkr.catalog.v1alpha1.ListProductsRequest\x1a,.hawkr.catalog.v1alpha1.ListProductsResponse\"\x03\x90\x02\x01\x12t\n" +
+	"\x0eSearchProducts\x12-.hawkr.catalog.v1alpha1.SearchProductsRequest\x1a..hawkr.catalog.v1alpha1.SearchProductsResponse\"\x03\x90\x02\x01\x12\x83\x01\n" +
+	"\x13SuggestProductNames\x122.hawkr.catalog.v1alpha1.SuggestProductNamesRequest\x1a3.hawkr.catalog.v1alpha1.SuggestProductNamesResponse\"\x03\x90\x02\x01\x12h\n" +
+	"\n" +
+	"GetProduct\x12).hawkr.catalog.v1alpha1.GetProductRequest\x1a*.hawkr.catalog.v1alpha1.GetProductResponse\"\x03\x90\x02\x01\x12t\n" +
+	"\x0eListCategories\x12-.hawkr.catalog.v1alpha1.ListCategoriesRequest\x1a..hawkr.catalog.v1alpha1.ListCategoriesResponse\"\x03\x90\x02\x01\x12w\n" +
+	"\x0fSuggestHashtags\x12..hawkr.catalog.v1alpha1.SuggestHashtagsRequest\x1a/.hawkr.catalog.v1alpha1.SuggestHashtagsResponse\"\x03\x90\x02\x01\x12\x8f\x01\n" +
+	"\x17SuggestTrendingHashtags\x126.hawkr.catalog.v1alpha1.SuggestTrendingHashtagsRequest\x1a7.hawkr.catalog.v1alpha1.SuggestTrendingHashtagsResponse\"\x03\x90\x02\x012\x8f\b\n" +
+	"\x17SellerCatalogAppService\x12t\n" +
+	"\x0eListMyProducts\x12-.hawkr.catalog.v1alpha1.ListMyProductsRequest\x1a..hawkr.catalog.v1alpha1.ListMyProductsResponse\"\x03\x90\x02\x01\x12n\n" +
+	"\fGetMyProduct\x12+.hawkr.catalog.v1alpha1.GetMyProductRequest\x1a,.hawkr.catalog.v1alpha1.GetMyProductResponse\"\x03\x90\x02\x01\x12w\n" +
+	"\x0fCountMyProducts\x12..hawkr.catalog.v1alpha1.CountMyProductsRequest\x1a/.hawkr.catalog.v1alpha1.CountMyProductsResponse\"\x03\x90\x02\x01\x12l\n" +
+	"\rCreateProduct\x12,.hawkr.catalog.v1alpha1.CreateProductRequest\x1a-.hawkr.catalog.v1alpha1.CreateProductResponse\x12q\n" +
+	"\rUpdateProduct\x12,.hawkr.catalog.v1alpha1.UpdateProductRequest\x1a-.hawkr.catalog.v1alpha1.UpdateProductResponse\"\x03\x90\x02\x02\x12z\n" +
+	"\x10SetProductStatus\x12/.hawkr.catalog.v1alpha1.SetProductStatusRequest\x1a0.hawkr.catalog.v1alpha1.SetProductStatusResponse\"\x03\x90\x02\x02\x12q\n" +
+	"\rDeleteProduct\x12,.hawkr.catalog.v1alpha1.DeleteProductRequest\x1a-.hawkr.catalog.v1alpha1.DeleteProductResponse\"\x03\x90\x02\x02\x12f\n" +
+	"\vAdjustStock\x12*.hawkr.catalog.v1alpha1.AdjustStockRequest\x1a+.hawkr.catalog.v1alpha1.AdjustStockResponse\x12]\n" +
+	"\bSetStock\x12'.hawkr.catalog.v1alpha1.SetStockRequest\x1a(.hawkr.catalog.v1alpha1.SetStockResponseB\x85\x02\n" +
 	"\x1acom.hawkr.catalog.v1alpha1B\fCatalogProtoP\x01Z_github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/catalog/v1alpha1;catalogv1alpha1\xa2\x02\x03HCX\xaa\x02\x16Hawkr.Catalog.V1alpha1\xca\x02\x16Hawkr\\Catalog\\V1alpha1\xe2\x02\"Hawkr\\Catalog\\V1alpha1\\GPBMetadata\xea\x02\x18Hawkr::Catalog::V1alpha1b\x06proto3"
 
 var (
@@ -678,31 +4266,173 @@ func file_hawkr_catalog_v1alpha1_catalog_proto_rawDescGZIP() []byte {
 	return file_hawkr_catalog_v1alpha1_catalog_proto_rawDescData
 }
 
-var file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_hawkr_catalog_v1alpha1_catalog_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
+var file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes = make([]protoimpl.MessageInfo, 53)
 var file_hawkr_catalog_v1alpha1_catalog_proto_goTypes = []any{
-	(*ProductInput)(nil),     // 0: hawkr.catalog.v1alpha1.ProductInput
-	(*ImageInput)(nil),       // 1: hawkr.catalog.v1alpha1.ImageInput
-	(*DescriptionBlock)(nil), // 2: hawkr.catalog.v1alpha1.DescriptionBlock
-	(*BulletList)(nil),       // 3: hawkr.catalog.v1alpha1.BulletList
-	(*Table)(nil),            // 4: hawkr.catalog.v1alpha1.Table
-	(*TableRow)(nil),         // 5: hawkr.catalog.v1alpha1.TableRow
-	(*OptionAxisInput)(nil),  // 6: hawkr.catalog.v1alpha1.OptionAxisInput
-	(*SkuInput)(nil),         // 7: hawkr.catalog.v1alpha1.SkuInput
+	(ProductStatus)(0),                      // 0: hawkr.catalog.v1alpha1.ProductStatus
+	(ProductAvailability)(0),                // 1: hawkr.catalog.v1alpha1.ProductAvailability
+	(StockStatus)(0),                        // 2: hawkr.catalog.v1alpha1.StockStatus
+	(ProductSort)(0),                        // 3: hawkr.catalog.v1alpha1.ProductSort
+	(HashtagMatch)(0),                       // 4: hawkr.catalog.v1alpha1.HashtagMatch
+	(*ProductFilter)(nil),                   // 5: hawkr.catalog.v1alpha1.ProductFilter
+	(*ListProductsRequest)(nil),             // 6: hawkr.catalog.v1alpha1.ListProductsRequest
+	(*ListProductsResponse)(nil),            // 7: hawkr.catalog.v1alpha1.ListProductsResponse
+	(*SearchProductsRequest)(nil),           // 8: hawkr.catalog.v1alpha1.SearchProductsRequest
+	(*SearchProductsResponse)(nil),          // 9: hawkr.catalog.v1alpha1.SearchProductsResponse
+	(*SuggestProductNamesRequest)(nil),      // 10: hawkr.catalog.v1alpha1.SuggestProductNamesRequest
+	(*SuggestProductNamesResponse)(nil),     // 11: hawkr.catalog.v1alpha1.SuggestProductNamesResponse
+	(*GetProductRequest)(nil),               // 12: hawkr.catalog.v1alpha1.GetProductRequest
+	(*GetProductResponse)(nil),              // 13: hawkr.catalog.v1alpha1.GetProductResponse
+	(*ListCategoriesRequest)(nil),           // 14: hawkr.catalog.v1alpha1.ListCategoriesRequest
+	(*ListCategoriesResponse)(nil),          // 15: hawkr.catalog.v1alpha1.ListCategoriesResponse
+	(*Category)(nil),                        // 16: hawkr.catalog.v1alpha1.Category
+	(*SuggestHashtagsRequest)(nil),          // 17: hawkr.catalog.v1alpha1.SuggestHashtagsRequest
+	(*SuggestHashtagsResponse)(nil),         // 18: hawkr.catalog.v1alpha1.SuggestHashtagsResponse
+	(*SuggestTrendingHashtagsRequest)(nil),  // 19: hawkr.catalog.v1alpha1.SuggestTrendingHashtagsRequest
+	(*SuggestTrendingHashtagsResponse)(nil), // 20: hawkr.catalog.v1alpha1.SuggestTrendingHashtagsResponse
+	(*HashtagCount)(nil),                    // 21: hawkr.catalog.v1alpha1.HashtagCount
+	(*MyProductFilter)(nil),                 // 22: hawkr.catalog.v1alpha1.MyProductFilter
+	(*ListMyProductsRequest)(nil),           // 23: hawkr.catalog.v1alpha1.ListMyProductsRequest
+	(*ListMyProductsResponse)(nil),          // 24: hawkr.catalog.v1alpha1.ListMyProductsResponse
+	(*GetMyProductRequest)(nil),             // 25: hawkr.catalog.v1alpha1.GetMyProductRequest
+	(*GetMyProductResponse)(nil),            // 26: hawkr.catalog.v1alpha1.GetMyProductResponse
+	(*CountMyProductsRequest)(nil),          // 27: hawkr.catalog.v1alpha1.CountMyProductsRequest
+	(*CountMyProductsResponse)(nil),         // 28: hawkr.catalog.v1alpha1.CountMyProductsResponse
+	(*CreateProductRequest)(nil),            // 29: hawkr.catalog.v1alpha1.CreateProductRequest
+	(*CreateProductResponse)(nil),           // 30: hawkr.catalog.v1alpha1.CreateProductResponse
+	(*UpdateProductRequest)(nil),            // 31: hawkr.catalog.v1alpha1.UpdateProductRequest
+	(*UpdateProductResponse)(nil),           // 32: hawkr.catalog.v1alpha1.UpdateProductResponse
+	(*SetProductStatusRequest)(nil),         // 33: hawkr.catalog.v1alpha1.SetProductStatusRequest
+	(*SetProductStatusResponse)(nil),        // 34: hawkr.catalog.v1alpha1.SetProductStatusResponse
+	(*DeleteProductRequest)(nil),            // 35: hawkr.catalog.v1alpha1.DeleteProductRequest
+	(*DeleteProductResponse)(nil),           // 36: hawkr.catalog.v1alpha1.DeleteProductResponse
+	(*AdjustStockRequest)(nil),              // 37: hawkr.catalog.v1alpha1.AdjustStockRequest
+	(*AdjustStockResponse)(nil),             // 38: hawkr.catalog.v1alpha1.AdjustStockResponse
+	(*SetStockRequest)(nil),                 // 39: hawkr.catalog.v1alpha1.SetStockRequest
+	(*SetStockResponse)(nil),                // 40: hawkr.catalog.v1alpha1.SetStockResponse
+	(*ProductImage)(nil),                    // 41: hawkr.catalog.v1alpha1.ProductImage
+	(*ProductDescriptionBlock)(nil),         // 42: hawkr.catalog.v1alpha1.ProductDescriptionBlock
+	(*OptionAxis)(nil),                      // 43: hawkr.catalog.v1alpha1.OptionAxis
+	(*Sku)(nil),                             // 44: hawkr.catalog.v1alpha1.Sku
+	(*ProductHashtag)(nil),                  // 45: hawkr.catalog.v1alpha1.ProductHashtag
+	(*Product)(nil),                         // 46: hawkr.catalog.v1alpha1.Product
+	(*ProductSummary)(nil),                  // 47: hawkr.catalog.v1alpha1.ProductSummary
+	(*SellerProduct)(nil),                   // 48: hawkr.catalog.v1alpha1.SellerProduct
+	(*SellerProductSummary)(nil),            // 49: hawkr.catalog.v1alpha1.SellerProductSummary
+	(*ProductInput)(nil),                    // 50: hawkr.catalog.v1alpha1.ProductInput
+	(*ImageInput)(nil),                      // 51: hawkr.catalog.v1alpha1.ImageInput
+	(*DescriptionBlock)(nil),                // 52: hawkr.catalog.v1alpha1.DescriptionBlock
+	(*BulletList)(nil),                      // 53: hawkr.catalog.v1alpha1.BulletList
+	(*Table)(nil),                           // 54: hawkr.catalog.v1alpha1.Table
+	(*TableRow)(nil),                        // 55: hawkr.catalog.v1alpha1.TableRow
+	(*OptionAxisInput)(nil),                 // 56: hawkr.catalog.v1alpha1.OptionAxisInput
+	(*SkuInput)(nil),                        // 57: hawkr.catalog.v1alpha1.SkuInput
+	(*v1alpha1.Image)(nil),                  // 58: hawkr.common.v1alpha1.Image
+	(*v1alpha1.StoreCard)(nil),              // 59: hawkr.common.v1alpha1.StoreCard
+	(*timestamppb.Timestamp)(nil),           // 60: google.protobuf.Timestamp
 }
 var file_hawkr_catalog_v1alpha1_catalog_proto_depIdxs = []int32{
-	1, // 0: hawkr.catalog.v1alpha1.ProductInput.gallery:type_name -> hawkr.catalog.v1alpha1.ImageInput
-	2, // 1: hawkr.catalog.v1alpha1.ProductInput.description:type_name -> hawkr.catalog.v1alpha1.DescriptionBlock
-	6, // 2: hawkr.catalog.v1alpha1.ProductInput.axes:type_name -> hawkr.catalog.v1alpha1.OptionAxisInput
-	7, // 3: hawkr.catalog.v1alpha1.ProductInput.skus:type_name -> hawkr.catalog.v1alpha1.SkuInput
-	1, // 4: hawkr.catalog.v1alpha1.DescriptionBlock.image:type_name -> hawkr.catalog.v1alpha1.ImageInput
-	3, // 5: hawkr.catalog.v1alpha1.DescriptionBlock.bullet_list:type_name -> hawkr.catalog.v1alpha1.BulletList
-	4, // 6: hawkr.catalog.v1alpha1.DescriptionBlock.table:type_name -> hawkr.catalog.v1alpha1.Table
-	5, // 7: hawkr.catalog.v1alpha1.Table.rows:type_name -> hawkr.catalog.v1alpha1.TableRow
-	8, // [8:8] is the sub-list for method output_type
-	8, // [8:8] is the sub-list for method input_type
-	8, // [8:8] is the sub-list for extension type_name
-	8, // [8:8] is the sub-list for extension extendee
-	0, // [0:8] is the sub-list for field type_name
+	4,  // 0: hawkr.catalog.v1alpha1.ProductFilter.hashtag_match:type_name -> hawkr.catalog.v1alpha1.HashtagMatch
+	5,  // 1: hawkr.catalog.v1alpha1.ListProductsRequest.filter:type_name -> hawkr.catalog.v1alpha1.ProductFilter
+	3,  // 2: hawkr.catalog.v1alpha1.ListProductsRequest.sort:type_name -> hawkr.catalog.v1alpha1.ProductSort
+	47, // 3: hawkr.catalog.v1alpha1.ListProductsResponse.products:type_name -> hawkr.catalog.v1alpha1.ProductSummary
+	5,  // 4: hawkr.catalog.v1alpha1.SearchProductsRequest.filter:type_name -> hawkr.catalog.v1alpha1.ProductFilter
+	3,  // 5: hawkr.catalog.v1alpha1.SearchProductsRequest.sort:type_name -> hawkr.catalog.v1alpha1.ProductSort
+	47, // 6: hawkr.catalog.v1alpha1.SearchProductsResponse.products:type_name -> hawkr.catalog.v1alpha1.ProductSummary
+	46, // 7: hawkr.catalog.v1alpha1.GetProductResponse.product:type_name -> hawkr.catalog.v1alpha1.Product
+	16, // 8: hawkr.catalog.v1alpha1.ListCategoriesResponse.categories:type_name -> hawkr.catalog.v1alpha1.Category
+	16, // 9: hawkr.catalog.v1alpha1.Category.children:type_name -> hawkr.catalog.v1alpha1.Category
+	21, // 10: hawkr.catalog.v1alpha1.SuggestHashtagsResponse.hashtags:type_name -> hawkr.catalog.v1alpha1.HashtagCount
+	21, // 11: hawkr.catalog.v1alpha1.SuggestTrendingHashtagsResponse.hashtags:type_name -> hawkr.catalog.v1alpha1.HashtagCount
+	0,  // 12: hawkr.catalog.v1alpha1.MyProductFilter.status:type_name -> hawkr.catalog.v1alpha1.ProductStatus
+	2,  // 13: hawkr.catalog.v1alpha1.MyProductFilter.stock_status:type_name -> hawkr.catalog.v1alpha1.StockStatus
+	22, // 14: hawkr.catalog.v1alpha1.ListMyProductsRequest.filter:type_name -> hawkr.catalog.v1alpha1.MyProductFilter
+	49, // 15: hawkr.catalog.v1alpha1.ListMyProductsResponse.products:type_name -> hawkr.catalog.v1alpha1.SellerProductSummary
+	48, // 16: hawkr.catalog.v1alpha1.GetMyProductResponse.product:type_name -> hawkr.catalog.v1alpha1.SellerProduct
+	22, // 17: hawkr.catalog.v1alpha1.CountMyProductsRequest.filter:type_name -> hawkr.catalog.v1alpha1.MyProductFilter
+	50, // 18: hawkr.catalog.v1alpha1.CreateProductRequest.product:type_name -> hawkr.catalog.v1alpha1.ProductInput
+	48, // 19: hawkr.catalog.v1alpha1.CreateProductResponse.product:type_name -> hawkr.catalog.v1alpha1.SellerProduct
+	50, // 20: hawkr.catalog.v1alpha1.UpdateProductRequest.product:type_name -> hawkr.catalog.v1alpha1.ProductInput
+	48, // 21: hawkr.catalog.v1alpha1.UpdateProductResponse.product:type_name -> hawkr.catalog.v1alpha1.SellerProduct
+	0,  // 22: hawkr.catalog.v1alpha1.SetProductStatusRequest.status:type_name -> hawkr.catalog.v1alpha1.ProductStatus
+	48, // 23: hawkr.catalog.v1alpha1.SetProductStatusResponse.product:type_name -> hawkr.catalog.v1alpha1.SellerProduct
+	44, // 24: hawkr.catalog.v1alpha1.AdjustStockResponse.sku:type_name -> hawkr.catalog.v1alpha1.Sku
+	44, // 25: hawkr.catalog.v1alpha1.SetStockResponse.sku:type_name -> hawkr.catalog.v1alpha1.Sku
+	58, // 26: hawkr.catalog.v1alpha1.ProductImage.image:type_name -> hawkr.common.v1alpha1.Image
+	41, // 27: hawkr.catalog.v1alpha1.ProductDescriptionBlock.image:type_name -> hawkr.catalog.v1alpha1.ProductImage
+	53, // 28: hawkr.catalog.v1alpha1.ProductDescriptionBlock.bullet_list:type_name -> hawkr.catalog.v1alpha1.BulletList
+	54, // 29: hawkr.catalog.v1alpha1.ProductDescriptionBlock.table:type_name -> hawkr.catalog.v1alpha1.Table
+	1,  // 30: hawkr.catalog.v1alpha1.Sku.availability:type_name -> hawkr.catalog.v1alpha1.ProductAvailability
+	59, // 31: hawkr.catalog.v1alpha1.Product.store:type_name -> hawkr.common.v1alpha1.StoreCard
+	1,  // 32: hawkr.catalog.v1alpha1.Product.availability:type_name -> hawkr.catalog.v1alpha1.ProductAvailability
+	60, // 33: hawkr.catalog.v1alpha1.Product.first_publish_time:type_name -> google.protobuf.Timestamp
+	41, // 34: hawkr.catalog.v1alpha1.Product.gallery:type_name -> hawkr.catalog.v1alpha1.ProductImage
+	42, // 35: hawkr.catalog.v1alpha1.Product.description:type_name -> hawkr.catalog.v1alpha1.ProductDescriptionBlock
+	43, // 36: hawkr.catalog.v1alpha1.Product.axes:type_name -> hawkr.catalog.v1alpha1.OptionAxis
+	44, // 37: hawkr.catalog.v1alpha1.Product.skus:type_name -> hawkr.catalog.v1alpha1.Sku
+	45, // 38: hawkr.catalog.v1alpha1.Product.hashtags:type_name -> hawkr.catalog.v1alpha1.ProductHashtag
+	59, // 39: hawkr.catalog.v1alpha1.ProductSummary.store:type_name -> hawkr.common.v1alpha1.StoreCard
+	58, // 40: hawkr.catalog.v1alpha1.ProductSummary.cover_image:type_name -> hawkr.common.v1alpha1.Image
+	1,  // 41: hawkr.catalog.v1alpha1.ProductSummary.availability:type_name -> hawkr.catalog.v1alpha1.ProductAvailability
+	60, // 42: hawkr.catalog.v1alpha1.ProductSummary.first_publish_time:type_name -> google.protobuf.Timestamp
+	0,  // 43: hawkr.catalog.v1alpha1.SellerProduct.status:type_name -> hawkr.catalog.v1alpha1.ProductStatus
+	60, // 44: hawkr.catalog.v1alpha1.SellerProduct.first_publish_time:type_name -> google.protobuf.Timestamp
+	41, // 45: hawkr.catalog.v1alpha1.SellerProduct.gallery:type_name -> hawkr.catalog.v1alpha1.ProductImage
+	42, // 46: hawkr.catalog.v1alpha1.SellerProduct.description:type_name -> hawkr.catalog.v1alpha1.ProductDescriptionBlock
+	43, // 47: hawkr.catalog.v1alpha1.SellerProduct.axes:type_name -> hawkr.catalog.v1alpha1.OptionAxis
+	44, // 48: hawkr.catalog.v1alpha1.SellerProduct.skus:type_name -> hawkr.catalog.v1alpha1.Sku
+	45, // 49: hawkr.catalog.v1alpha1.SellerProduct.hashtags:type_name -> hawkr.catalog.v1alpha1.ProductHashtag
+	60, // 50: hawkr.catalog.v1alpha1.SellerProduct.create_time:type_name -> google.protobuf.Timestamp
+	60, // 51: hawkr.catalog.v1alpha1.SellerProduct.update_time:type_name -> google.protobuf.Timestamp
+	58, // 52: hawkr.catalog.v1alpha1.SellerProductSummary.cover_image:type_name -> hawkr.common.v1alpha1.Image
+	0,  // 53: hawkr.catalog.v1alpha1.SellerProductSummary.status:type_name -> hawkr.catalog.v1alpha1.ProductStatus
+	60, // 54: hawkr.catalog.v1alpha1.SellerProductSummary.first_publish_time:type_name -> google.protobuf.Timestamp
+	60, // 55: hawkr.catalog.v1alpha1.SellerProductSummary.create_time:type_name -> google.protobuf.Timestamp
+	51, // 56: hawkr.catalog.v1alpha1.ProductInput.gallery:type_name -> hawkr.catalog.v1alpha1.ImageInput
+	52, // 57: hawkr.catalog.v1alpha1.ProductInput.description:type_name -> hawkr.catalog.v1alpha1.DescriptionBlock
+	56, // 58: hawkr.catalog.v1alpha1.ProductInput.axes:type_name -> hawkr.catalog.v1alpha1.OptionAxisInput
+	57, // 59: hawkr.catalog.v1alpha1.ProductInput.skus:type_name -> hawkr.catalog.v1alpha1.SkuInput
+	51, // 60: hawkr.catalog.v1alpha1.DescriptionBlock.image:type_name -> hawkr.catalog.v1alpha1.ImageInput
+	53, // 61: hawkr.catalog.v1alpha1.DescriptionBlock.bullet_list:type_name -> hawkr.catalog.v1alpha1.BulletList
+	54, // 62: hawkr.catalog.v1alpha1.DescriptionBlock.table:type_name -> hawkr.catalog.v1alpha1.Table
+	55, // 63: hawkr.catalog.v1alpha1.Table.rows:type_name -> hawkr.catalog.v1alpha1.TableRow
+	6,  // 64: hawkr.catalog.v1alpha1.CatalogPublicService.ListProducts:input_type -> hawkr.catalog.v1alpha1.ListProductsRequest
+	8,  // 65: hawkr.catalog.v1alpha1.CatalogPublicService.SearchProducts:input_type -> hawkr.catalog.v1alpha1.SearchProductsRequest
+	10, // 66: hawkr.catalog.v1alpha1.CatalogPublicService.SuggestProductNames:input_type -> hawkr.catalog.v1alpha1.SuggestProductNamesRequest
+	12, // 67: hawkr.catalog.v1alpha1.CatalogPublicService.GetProduct:input_type -> hawkr.catalog.v1alpha1.GetProductRequest
+	14, // 68: hawkr.catalog.v1alpha1.CatalogPublicService.ListCategories:input_type -> hawkr.catalog.v1alpha1.ListCategoriesRequest
+	17, // 69: hawkr.catalog.v1alpha1.CatalogPublicService.SuggestHashtags:input_type -> hawkr.catalog.v1alpha1.SuggestHashtagsRequest
+	19, // 70: hawkr.catalog.v1alpha1.CatalogPublicService.SuggestTrendingHashtags:input_type -> hawkr.catalog.v1alpha1.SuggestTrendingHashtagsRequest
+	23, // 71: hawkr.catalog.v1alpha1.SellerCatalogAppService.ListMyProducts:input_type -> hawkr.catalog.v1alpha1.ListMyProductsRequest
+	25, // 72: hawkr.catalog.v1alpha1.SellerCatalogAppService.GetMyProduct:input_type -> hawkr.catalog.v1alpha1.GetMyProductRequest
+	27, // 73: hawkr.catalog.v1alpha1.SellerCatalogAppService.CountMyProducts:input_type -> hawkr.catalog.v1alpha1.CountMyProductsRequest
+	29, // 74: hawkr.catalog.v1alpha1.SellerCatalogAppService.CreateProduct:input_type -> hawkr.catalog.v1alpha1.CreateProductRequest
+	31, // 75: hawkr.catalog.v1alpha1.SellerCatalogAppService.UpdateProduct:input_type -> hawkr.catalog.v1alpha1.UpdateProductRequest
+	33, // 76: hawkr.catalog.v1alpha1.SellerCatalogAppService.SetProductStatus:input_type -> hawkr.catalog.v1alpha1.SetProductStatusRequest
+	35, // 77: hawkr.catalog.v1alpha1.SellerCatalogAppService.DeleteProduct:input_type -> hawkr.catalog.v1alpha1.DeleteProductRequest
+	37, // 78: hawkr.catalog.v1alpha1.SellerCatalogAppService.AdjustStock:input_type -> hawkr.catalog.v1alpha1.AdjustStockRequest
+	39, // 79: hawkr.catalog.v1alpha1.SellerCatalogAppService.SetStock:input_type -> hawkr.catalog.v1alpha1.SetStockRequest
+	7,  // 80: hawkr.catalog.v1alpha1.CatalogPublicService.ListProducts:output_type -> hawkr.catalog.v1alpha1.ListProductsResponse
+	9,  // 81: hawkr.catalog.v1alpha1.CatalogPublicService.SearchProducts:output_type -> hawkr.catalog.v1alpha1.SearchProductsResponse
+	11, // 82: hawkr.catalog.v1alpha1.CatalogPublicService.SuggestProductNames:output_type -> hawkr.catalog.v1alpha1.SuggestProductNamesResponse
+	13, // 83: hawkr.catalog.v1alpha1.CatalogPublicService.GetProduct:output_type -> hawkr.catalog.v1alpha1.GetProductResponse
+	15, // 84: hawkr.catalog.v1alpha1.CatalogPublicService.ListCategories:output_type -> hawkr.catalog.v1alpha1.ListCategoriesResponse
+	18, // 85: hawkr.catalog.v1alpha1.CatalogPublicService.SuggestHashtags:output_type -> hawkr.catalog.v1alpha1.SuggestHashtagsResponse
+	20, // 86: hawkr.catalog.v1alpha1.CatalogPublicService.SuggestTrendingHashtags:output_type -> hawkr.catalog.v1alpha1.SuggestTrendingHashtagsResponse
+	24, // 87: hawkr.catalog.v1alpha1.SellerCatalogAppService.ListMyProducts:output_type -> hawkr.catalog.v1alpha1.ListMyProductsResponse
+	26, // 88: hawkr.catalog.v1alpha1.SellerCatalogAppService.GetMyProduct:output_type -> hawkr.catalog.v1alpha1.GetMyProductResponse
+	28, // 89: hawkr.catalog.v1alpha1.SellerCatalogAppService.CountMyProducts:output_type -> hawkr.catalog.v1alpha1.CountMyProductsResponse
+	30, // 90: hawkr.catalog.v1alpha1.SellerCatalogAppService.CreateProduct:output_type -> hawkr.catalog.v1alpha1.CreateProductResponse
+	32, // 91: hawkr.catalog.v1alpha1.SellerCatalogAppService.UpdateProduct:output_type -> hawkr.catalog.v1alpha1.UpdateProductResponse
+	34, // 92: hawkr.catalog.v1alpha1.SellerCatalogAppService.SetProductStatus:output_type -> hawkr.catalog.v1alpha1.SetProductStatusResponse
+	36, // 93: hawkr.catalog.v1alpha1.SellerCatalogAppService.DeleteProduct:output_type -> hawkr.catalog.v1alpha1.DeleteProductResponse
+	38, // 94: hawkr.catalog.v1alpha1.SellerCatalogAppService.AdjustStock:output_type -> hawkr.catalog.v1alpha1.AdjustStockResponse
+	40, // 95: hawkr.catalog.v1alpha1.SellerCatalogAppService.SetStock:output_type -> hawkr.catalog.v1alpha1.SetStockResponse
+	80, // [80:96] is the sub-list for method output_type
+	64, // [64:80] is the sub-list for method input_type
+	64, // [64:64] is the sub-list for extension type_name
+	64, // [64:64] is the sub-list for extension extendee
+	0,  // [0:64] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_catalog_v1alpha1_catalog_proto_init() }
@@ -710,29 +4440,43 @@ func file_hawkr_catalog_v1alpha1_catalog_proto_init() {
 	if File_hawkr_catalog_v1alpha1_catalog_proto != nil {
 		return
 	}
-	file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[1].OneofWrappers = []any{
+	file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[0].OneofWrappers = []any{}
+	file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[37].OneofWrappers = []any{
+		(*ProductDescriptionBlock_Paragraph)(nil),
+		(*ProductDescriptionBlock_Image)(nil),
+		(*ProductDescriptionBlock_BulletList)(nil),
+		(*ProductDescriptionBlock_Table)(nil),
+	}
+	file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[39].OneofWrappers = []any{}
+	file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[41].OneofWrappers = []any{}
+	file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[42].OneofWrappers = []any{}
+	file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[43].OneofWrappers = []any{}
+	file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[44].OneofWrappers = []any{}
+	file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[45].OneofWrappers = []any{}
+	file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[46].OneofWrappers = []any{
 		(*ImageInput_StagedToken)(nil),
 		(*ImageInput_AssetId)(nil),
 	}
-	file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[2].OneofWrappers = []any{
+	file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[47].OneofWrappers = []any{
 		(*DescriptionBlock_Paragraph)(nil),
 		(*DescriptionBlock_Image)(nil),
 		(*DescriptionBlock_BulletList)(nil),
 		(*DescriptionBlock_Table)(nil),
 	}
-	file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[7].OneofWrappers = []any{}
+	file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes[52].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_catalog_v1alpha1_catalog_proto_rawDesc), len(file_hawkr_catalog_v1alpha1_catalog_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   8,
+			NumEnums:      5,
+			NumMessages:   53,
 			NumExtensions: 0,
-			NumServices:   0,
+			NumServices:   2,
 		},
 		GoTypes:           file_hawkr_catalog_v1alpha1_catalog_proto_goTypes,
 		DependencyIndexes: file_hawkr_catalog_v1alpha1_catalog_proto_depIdxs,
+		EnumInfos:         file_hawkr_catalog_v1alpha1_catalog_proto_enumTypes,
 		MessageInfos:      file_hawkr_catalog_v1alpha1_catalog_proto_msgTypes,
 	}.Build()
 	File_hawkr_catalog_v1alpha1_catalog_proto = out.File

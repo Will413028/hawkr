@@ -288,6 +288,41 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.catalog.v1alpha1.HashtagMatch",
+      "tsName": "HashtagMatch",
+      "tsModule": "@hawkr/api/gen/hawkr/catalog/v1alpha1/catalog_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.catalog.v1alpha1.ProductAvailability",
+      "tsName": "ProductAvailability",
+      "tsModule": "@hawkr/api/gen/hawkr/catalog/v1alpha1/catalog_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.catalog.v1alpha1.ProductSort",
+      "tsName": "ProductSort",
+      "tsModule": "@hawkr/api/gen/hawkr/catalog/v1alpha1/catalog_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.catalog.v1alpha1.ProductStatus",
+      "tsName": "ProductStatus",
+      "tsModule": "@hawkr/api/gen/hawkr/catalog/v1alpha1/catalog_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.catalog.v1alpha1.StockStatus",
+      "tsName": "StockStatus",
+      "tsModule": "@hawkr/api/gen/hawkr/catalog/v1alpha1/catalog_pb",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.chat.v1alpha1.ChatParty",
       "tsName": "ChatParty",
       "tsModule": "@hawkr/api/gen/hawkr/chat/v1alpha1/chat_pb",

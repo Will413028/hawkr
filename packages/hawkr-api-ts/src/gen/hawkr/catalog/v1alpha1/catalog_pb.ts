@@ -2,23 +2,1525 @@
 // @generated from file hawkr/catalog/v1alpha1/catalog.proto (package hawkr.catalog.v1alpha1, syntax proto3)
 /* eslint-disable */
 
-// catalog 模組的商品寫入內容：賣家建立與修改商品時送的訊息。服務與 RPC 隨後的步驟加入，這裡只定義寫入的資料形狀與內容上限。
+// catalog 模組給前台的 API：公開的商品瀏覽、搜尋與分類（CatalogPublicService），以及賣家管理自己店家的商品（SellerCatalogAppService）；
+// 後台的唯讀 API 在 hawkr.admin.catalog.v1alpha1。收藏與追蹤屬於 buyer 模組（BuyerAppService），這裡不依觀看者回應。
 //
-// 內容上限掛在實際受限制的欄位上（hawkr.common.v1alpha1.limits），uitext-gen 讀它並生成 Go、TS、Dart 的常數；
+// 公開讀取與賣家讀取是兩組訊息（Product、ProductSummary 與 SellerProduct、SellerProductSummary）：公開的不帶賣家的狀態 enum、etag 與內部 ID，
+// 只帶 availability（可不可以買）。值型別（ProductImage、Sku、OptionAxis 等）兩邊共用。
+//
+// 寫入內容（ProductInput）的內容上限掛在實際受限制的欄位上（hawkr.common.v1alpha1.limits），uitext-gen 讀它並生成 Go、TS、Dart 的常數；
 // 伺服器照樣驗證，違反回 INVALID_ARGUMENT。ID 是不透明的字串（ADR 2026-09-25-row-identity-by-data-kind）。
 // 新圖只收 staged token，不收 URL 或 key（ADR 2026-09-25-api-image-uri-template）。
 
-import type { GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
-import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
+import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_google_api_field_behavior } from "../../../google/api/field_behavior_pb";
+import { file_google_api_field_info } from "../../../google/api/field_info_pb";
+import type { Timestamp } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
+import type { Image } from "../../common/v1alpha1/image_pb";
+import { file_hawkr_common_v1alpha1_image } from "../../common/v1alpha1/image_pb";
 import { file_hawkr_common_v1alpha1_limits } from "../../common/v1alpha1/limits_pb";
+import type { StoreCard } from "../../common/v1alpha1/store_card_pb";
+import { file_hawkr_common_v1alpha1_store_card } from "../../common/v1alpha1/store_card_pb";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file hawkr/catalog/v1alpha1/catalog.proto.
  */
 export const file_hawkr_catalog_v1alpha1_catalog: GenFile = /*@__PURE__*/
-  fileDesc("CiRoYXdrci9jYXRhbG9nL3YxYWxwaGExL2NhdGFsb2cucHJvdG8SFmhhd2tyLmNhdGFsb2cudjFhbHBoYTEi3QIKDFByb2R1Y3RJbnB1dBIYCgV0aXRsZRgBIAEoCUIJ4EECkrUYAhBkEhgKC2NhdGVnb3J5X2lkGAIgASgJQgPgQQISFgoOaGFzaHRhZ19pbnB1dHMYAyADKAkSOwoHZ2FsbGVyeRgEIAMoCzIiLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuSW1hZ2VJbnB1dEIGkrUYAggJEkoKC2Rlc2NyaXB0aW9uGAUgAygLMiguaGF3a3IuY2F0YWxvZy52MWFscGhhMS5EZXNjcmlwdGlvbkJsb2NrQguStRgHCGQYuBcgFBI9CgRheGVzGAYgAygLMicuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5PcHRpb25BeGlzSW5wdXRCBpK1GAIIAhI5CgRza3VzGAcgAygLMiAuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5Ta3VJbnB1dEIJ4EECkrUYAghkIlgKCkltYWdlSW5wdXQSFgoMc3RhZ2VkX3Rva2VuGAEgASgJSAASEgoIYXNzZXRfaWQYAiABKAlIABIUCgNhbHQYAyABKAlCB5K1GAMQyAFCCAoGc291cmNlItABChBEZXNjcmlwdGlvbkJsb2NrEhMKCXBhcmFncmFwaBgBIAEoCUgAEjMKBWltYWdlGAIgASgLMiIuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5JbWFnZUlucHV0SAASOQoLYnVsbGV0X2xpc3QYAyABKAsyIi5oYXdrci5jYXRhbG9nLnYxYWxwaGExLkJ1bGxldExpc3RIABIuCgV0YWJsZRgEIAEoCzIdLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuVGFibGVIAEIHCgVibG9jayImCgpCdWxsZXRMaXN0EhgKBWl0ZW1zGAEgAygJQgmStRgFCDIQyAEiPwoFVGFibGUSNgoEcm93cxgBIAMoCzIgLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuVGFibGVSb3dCBpK1GAIIMiIkCghUYWJsZVJvdxIYCgVjZWxscxgBIAMoCUIJkrUYBQgKEMgBIkcKD09wdGlvbkF4aXNJbnB1dBIXCgRuYW1lGAEgASgJQgngQQKStRgCEBQSGwoGdmFsdWVzGAIgAygJQgvgQQKStRgECDIQKCKLAQoIU2t1SW5wdXQSDwoHb3B0aW9uMRgBIAEoCRIPCgdvcHRpb24yGAIgASgJEhIKBXByaWNlGAMgASgDQgPgQQISHQoQY29tcGFyZV9hdF9wcmljZRgEIAEoA0gAiAEBEhUKDWluaXRpYWxfc3RvY2sYBSABKAVCEwoRX2NvbXBhcmVfYXRfcHJpY2ViBnByb3RvMw", [file_google_api_field_behavior, file_hawkr_common_v1alpha1_limits]);
+  fileDesc("CiRoYXdrci9jYXRhbG9nL3YxYWxwaGExL2NhdGFsb2cucHJvdG8SFmhhd2tyLmNhdGFsb2cudjFhbHBoYTEi6wEKDVByb2R1Y3RGaWx0ZXISHAoMY2F0ZWdvcnlfaWRzGAEgAygJQgaStRgCCBQSFgoJcHJpY2VfbWluGAIgASgDSACIAQESFgoJcHJpY2VfbWF4GAMgASgDSAGIAQESGAoIaGFzaHRhZ3MYBCADKAlCBpK1GAIIChI7Cg1oYXNodGFnX21hdGNoGAUgASgOMiQuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5IYXNodGFnTWF0Y2gSGQoJc3RvcmVfaWRzGAYgAygJQgaStRgCCDJCDAoKX3ByaWNlX21pbkIMCgpfcHJpY2VfbWF4IqYBChNMaXN0UHJvZHVjdHNSZXF1ZXN0EjUKBmZpbHRlchgBIAEoCzIlLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuUHJvZHVjdEZpbHRlchIxCgRzb3J0GAIgASgOMiMuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5Qcm9kdWN0U29ydBIRCglwYWdlX3NpemUYAyABKAUSEgoKcGFnZV90b2tlbhgEIAEoCSJpChRMaXN0UHJvZHVjdHNSZXNwb25zZRI4Cghwcm9kdWN0cxgBIAMoCzImLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuUHJvZHVjdFN1bW1hcnkSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIsIBChVTZWFyY2hQcm9kdWN0c1JlcXVlc3QSGAoFcXVlcnkYASABKAlCCeBBApK1GAIQZBI1CgZmaWx0ZXIYAiABKAsyJS5oYXdrci5jYXRhbG9nLnYxYWxwaGExLlByb2R1Y3RGaWx0ZXISMQoEc29ydBgDIAEoDjIjLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuUHJvZHVjdFNvcnQSEQoJcGFnZV9zaXplGAQgASgFEhIKCnBhZ2VfdG9rZW4YBSABKAkiawoWU2VhcmNoUHJvZHVjdHNSZXNwb25zZRI4Cghwcm9kdWN0cxgBIAMoCzImLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuUHJvZHVjdFN1bW1hcnkSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIksKGlN1Z2dlc3RQcm9kdWN0TmFtZXNSZXF1ZXN0EhgKBXF1ZXJ5GAEgASgJQgngQQKStRgCEGQSEwoLbWF4X3Jlc3VsdHMYAiABKAUiLAobU3VnZ2VzdFByb2R1Y3ROYW1lc1Jlc3BvbnNlEg0KBW5hbWVzGAEgAygJIiwKEUdldFByb2R1Y3RSZXF1ZXN0EhcKCnByb2R1Y3RfaWQYASABKAlCA+BBAiJGChJHZXRQcm9kdWN0UmVzcG9uc2USMAoHcHJvZHVjdBgBIAEoCzIfLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuUHJvZHVjdCIXChVMaXN0Q2F0ZWdvcmllc1JlcXVlc3QiTgoWTGlzdENhdGVnb3JpZXNSZXNwb25zZRI0CgpjYXRlZ29yaWVzGAEgAygLMiAuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5DYXRlZ29yeSJnCghDYXRlZ29yeRIPCgJpZBgBIAEoCUID4EEIEhEKBG5hbWUYAiABKAlCA+BBAxI3CghjaGlsZHJlbhgDIAMoCzIgLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuQ2F0ZWdvcnlCA+BBAyJTChZTdWdnZXN0SGFzaHRhZ3NSZXF1ZXN0EhIKBXF1ZXJ5GAEgASgJQgPgQQISEAoIY29udGFpbnMYAiABKAgSEwoLbWF4X3Jlc3VsdHMYAyABKAUiUQoXU3VnZ2VzdEhhc2h0YWdzUmVzcG9uc2USNgoIaGFzaHRhZ3MYASADKAsyJC5oYXdrci5jYXRhbG9nLnYxYWxwaGExLkhhc2h0YWdDb3VudCI1Ch5TdWdnZXN0VHJlbmRpbmdIYXNodGFnc1JlcXVlc3QSEwoLbWF4X3Jlc3VsdHMYASABKAUiWQofU3VnZ2VzdFRyZW5kaW5nSGFzaHRhZ3NSZXNwb25zZRI2CghoYXNodGFncxgBIAMoCzIkLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuSGFzaHRhZ0NvdW50IlMKDEhhc2h0YWdDb3VudBIRCgRuYW1lGAEgASgJQgPgQQMSFAoHZGlzcGxheRgCIAEoCUID4EEDEhoKDXByb2R1Y3RfY291bnQYAyABKANCA+BBAyKaAQoPTXlQcm9kdWN0RmlsdGVyEjUKBnN0YXR1cxgBIAEoDjIlLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuUHJvZHVjdFN0YXR1cxI5CgxzdG9ja19zdGF0dXMYAiABKA4yIy5oYXdrci5jYXRhbG9nLnYxYWxwaGExLlN0b2NrU3RhdHVzEhUKBXF1ZXJ5GAMgASgJQgaStRgCEGQidwoVTGlzdE15UHJvZHVjdHNSZXF1ZXN0EjcKBmZpbHRlchgBIAEoCzInLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuTXlQcm9kdWN0RmlsdGVyEhEKCXBhZ2Vfc2l6ZRgCIAEoBRISCgpwYWdlX3Rva2VuGAMgASgJInEKFkxpc3RNeVByb2R1Y3RzUmVzcG9uc2USPgoIcHJvZHVjdHMYASADKAsyLC5oYXdrci5jYXRhbG9nLnYxYWxwaGExLlNlbGxlclByb2R1Y3RTdW1tYXJ5EhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSIuChNHZXRNeVByb2R1Y3RSZXF1ZXN0EhcKCnByb2R1Y3RfaWQYASABKAlCA+BBAiJOChRHZXRNeVByb2R1Y3RSZXNwb25zZRI2Cgdwcm9kdWN0GAEgASgLMiUuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5TZWxsZXJQcm9kdWN0IlEKFkNvdW50TXlQcm9kdWN0c1JlcXVlc3QSNwoGZmlsdGVyGAEgASgLMicuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5NeVByb2R1Y3RGaWx0ZXIiVwoXQ291bnRNeVByb2R1Y3RzUmVzcG9uc2USEgoFY291bnQYASABKAVCA+BBAxIoChtkZWZhdWx0X2xvd19zdG9ja190aHJlc2hvbGQYAiABKAVCA+BBAyJzChRDcmVhdGVQcm9kdWN0UmVxdWVzdBI6Cgdwcm9kdWN0GAEgASgLMiQuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5Qcm9kdWN0SW5wdXRCA+BBAhIfCgpyZXF1ZXN0X2lkGAIgASgJQgvgQQLijM/XCAIIASJPChVDcmVhdGVQcm9kdWN0UmVzcG9uc2USNgoHcHJvZHVjdBgBIAEoCzIlLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuU2VsbGVyUHJvZHVjdCJ+ChRVcGRhdGVQcm9kdWN0UmVxdWVzdBIXCgpwcm9kdWN0X2lkGAEgASgJQgPgQQISEQoEZXRhZxgCIAEoCUID4EECEjoKB3Byb2R1Y3QYAyABKAsyJC5oYXdrci5jYXRhbG9nLnYxYWxwaGExLlByb2R1Y3RJbnB1dEID4EECIk8KFVVwZGF0ZVByb2R1Y3RSZXNwb25zZRI2Cgdwcm9kdWN0GAEgASgLMiUuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5TZWxsZXJQcm9kdWN0IoEBChdTZXRQcm9kdWN0U3RhdHVzUmVxdWVzdBIXCgpwcm9kdWN0X2lkGAEgASgJQgPgQQISOgoGc3RhdHVzGAIgASgOMiUuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5Qcm9kdWN0U3RhdHVzQgPgQQISEQoEZXRhZxgDIAEoCUID4EECIlIKGFNldFByb2R1Y3RTdGF0dXNSZXNwb25zZRI2Cgdwcm9kdWN0GAEgASgLMiUuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5TZWxsZXJQcm9kdWN0Ij0KFERlbGV0ZVByb2R1Y3RSZXF1ZXN0EhcKCnByb2R1Y3RfaWQYASABKAlCA+BBAhIMCgRldGFnGAIgASgJIhcKFURlbGV0ZVByb2R1Y3RSZXNwb25zZSJeChJBZGp1c3RTdG9ja1JlcXVlc3QSEwoGc2t1X2lkGAEgASgJQgPgQQISEgoFZGVsdGEYAiABKAVCA+BBAhIfCgpyZXF1ZXN0X2lkGAMgASgJQgvgQQLijM/XCAIIASI/ChNBZGp1c3RTdG9ja1Jlc3BvbnNlEigKA3NrdRgBIAEoCzIbLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuU2t1InQKD1NldFN0b2NrUmVxdWVzdBITCgZza3VfaWQYASABKAlCA+BBAhIQCghxdWFudGl0eRgCIAEoBRIZChFleHBlY3RlZF9xdWFudGl0eRgDIAEoBRIfCgpyZXF1ZXN0X2lkGAQgASgJQgvgQQLijM/XCAIIASI8ChBTZXRTdG9ja1Jlc3BvbnNlEigKA3NrdRgBIAEoCzIbLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuU2t1ImkKDFByb2R1Y3RJbWFnZRIVCghhc3NldF9pZBgBIAEoCUID4EEDEjAKBWltYWdlGAIgASgLMhwuaGF3a3IuY29tbW9uLnYxYWxwaGExLkltYWdlQgPgQQMSEAoDYWx0GAMgASgJQgPgQQMi2QEKF1Byb2R1Y3REZXNjcmlwdGlvbkJsb2NrEhMKCXBhcmFncmFwaBgBIAEoCUgAEjUKBWltYWdlGAIgASgLMiQuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5Qcm9kdWN0SW1hZ2VIABI5CgtidWxsZXRfbGlzdBgDIAEoCzIiLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuQnVsbGV0TGlzdEgAEi4KBXRhYmxlGAQgASgLMh0uaGF3a3IuY2F0YWxvZy52MWFscGhhMS5UYWJsZUgAQgcKBWJsb2NrIjQKCk9wdGlvbkF4aXMSEQoEbmFtZRgBIAEoCUID4EEDEhMKBnZhbHVlcxgCIAMoCUID4EEDIu8BCgNTa3USDwoCaWQYASABKAlCA+BBCBIUCgdvcHRpb24xGAIgASgJQgPgQQMSFAoHb3B0aW9uMhgDIAEoCUID4EEDEhIKBXByaWNlGAQgASgDQgPgQQMSIgoQY29tcGFyZV9hdF9wcmljZRgFIAEoA0ID4EEDSACIAQESFgoJc3RvY2tfcXR5GAYgASgFQgPgQQMSRgoMYXZhaWxhYmlsaXR5GAcgASgOMisuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5Qcm9kdWN0QXZhaWxhYmlsaXR5QgPgQQNCEwoRX2NvbXBhcmVfYXRfcHJpY2UiOQoOUHJvZHVjdEhhc2h0YWcSEQoEbmFtZRgBIAEoCUID4EEDEhQKB2Rpc3BsYXkYAiABKAlCA+BBAyLnBQoHUHJvZHVjdBIPCgJpZBgBIAEoCUID4EEIEjQKBXN0b3JlGAIgASgLMiAuaGF3a3IuY29tbW9uLnYxYWxwaGExLlN0b3JlQ2FyZEID4EEDEhgKC2NhdGVnb3J5X2lkGAMgASgJQgPgQQMSEgoFdGl0bGUYBCABKAlCA+BBAxJGCgxhdmFpbGFiaWxpdHkYBSABKA4yKy5oYXdrci5jYXRhbG9nLnYxYWxwaGExLlByb2R1Y3RBdmFpbGFiaWxpdHlCA+BBAxI7ChJmaXJzdF9wdWJsaXNoX3RpbWUYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMSFgoJbWluX3ByaWNlGAcgASgDQgPgQQMSFgoJbWF4X3ByaWNlGAggASgDQgPgQQMSGAoLc2FsZXNfY291bnQYCSABKAVCA+BBAxIbCg5mYXZvcml0ZV9jb3VudBgKIAEoBUID4EEDEiAKDnJhdGluZ19hdmVyYWdlGAsgASgCQgPgQQNIAIgBARIZCgxyZXZpZXdfY291bnQYDCABKAVCA+BBAxI6CgdnYWxsZXJ5GA0gAygLMiQuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5Qcm9kdWN0SW1hZ2VCA+BBAxJJCgtkZXNjcmlwdGlvbhgOIAMoCzIvLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuUHJvZHVjdERlc2NyaXB0aW9uQmxvY2tCA+BBAxI1CgRheGVzGA8gAygLMiIuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5PcHRpb25BeGlzQgPgQQMSLgoEc2t1cxgQIAMoCzIbLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuU2t1QgPgQQMSPQoIaGFzaHRhZ3MYESADKAsyJi5oYXdrci5jYXRhbG9nLnYxYWxwaGExLlByb2R1Y3RIYXNodGFnQgPgQQNCEQoPX3JhdGluZ19hdmVyYWdlIvkDCg5Qcm9kdWN0U3VtbWFyeRIPCgJpZBgBIAEoCUID4EEIEjQKBXN0b3JlGAIgASgLMiAuaGF3a3IuY29tbW9uLnYxYWxwaGExLlN0b3JlQ2FyZEID4EEDEhgKC2NhdGVnb3J5X2lkGAMgASgJQgPgQQMSEgoFdGl0bGUYBCABKAlCA+BBAxI2Cgtjb3Zlcl9pbWFnZRgFIAEoCzIcLmhhd2tyLmNvbW1vbi52MWFscGhhMS5JbWFnZUID4EEDEkYKDGF2YWlsYWJpbGl0eRgGIAEoDjIrLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuUHJvZHVjdEF2YWlsYWJpbGl0eUID4EEDEjsKEmZpcnN0X3B1Ymxpc2hfdGltZRgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBAxIWCgltaW5fcHJpY2UYCCABKANCA+BBAxIWCgltYXhfcHJpY2UYCSABKANCA+BBAxIYCgtzYWxlc19jb3VudBgKIAEoBUID4EEDEhsKDmZhdm9yaXRlX2NvdW50GAsgASgFQgPgQQMSIAoOcmF0aW5nX2F2ZXJhZ2UYDCABKAJCA+BBA0gAiAEBEhkKDHJldmlld19jb3VudBgNIAEoBUID4EEDQhEKD19yYXRpbmdfYXZlcmFnZSLpBgoNU2VsbGVyUHJvZHVjdBIPCgJpZBgBIAEoCUID4EEIEhgKC2NhdGVnb3J5X2lkGAIgASgJQgPgQQMSEgoFdGl0bGUYAyABKAlCA+BBAxI6CgZzdGF0dXMYBCABKA4yJS5oYXdrci5jYXRhbG9nLnYxYWxwaGExLlByb2R1Y3RTdGF0dXNCA+BBAxI7ChJmaXJzdF9wdWJsaXNoX3RpbWUYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMSFgoJbWluX3ByaWNlGAYgASgDQgPgQQMSFgoJbWF4X3ByaWNlGAcgASgDQgPgQQMSGAoLc2FsZXNfY291bnQYCCABKAVCA+BBAxIbCg5mYXZvcml0ZV9jb3VudBgJIAEoBUID4EEDEiAKDnJhdGluZ19hdmVyYWdlGAogASgCQgPgQQNIAIgBARIZCgxyZXZpZXdfY291bnQYCyABKAVCA+BBAxI6CgdnYWxsZXJ5GAwgAygLMiQuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5Qcm9kdWN0SW1hZ2VCA+BBAxJJCgtkZXNjcmlwdGlvbhgNIAMoCzIvLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuUHJvZHVjdERlc2NyaXB0aW9uQmxvY2tCA+BBAxI1CgRheGVzGA4gAygLMiIuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5PcHRpb25BeGlzQgPgQQMSLgoEc2t1cxgPIAMoCzIbLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuU2t1QgPgQQMSPQoIaGFzaHRhZ3MYECADKAsyJi5oYXdrci5jYXRhbG9nLnYxYWxwaGExLlByb2R1Y3RIYXNodGFnQgPgQQMSJQoTbG93X3N0b2NrX3RocmVzaG9sZBgRIAEoBUID4EEDSAGIAQESEQoEZXRhZxgSIAEoCUID4EEDEjQKC2NyZWF0ZV90aW1lGBMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEjQKC3VwZGF0ZV90aW1lGBQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDQhEKD19yYXRpbmdfYXZlcmFnZUIWChRfbG93X3N0b2NrX3RocmVzaG9sZCLfBAoUU2VsbGVyUHJvZHVjdFN1bW1hcnkSDwoCaWQYASABKAlCA+BBCBIYCgtjYXRlZ29yeV9pZBgCIAEoCUID4EEDEhIKBXRpdGxlGAMgASgJQgPgQQMSNgoLY292ZXJfaW1hZ2UYBCABKAsyHC5oYXdrci5jb21tb24udjFhbHBoYTEuSW1hZ2VCA+BBAxI6CgZzdGF0dXMYBSABKA4yJS5oYXdrci5jYXRhbG9nLnYxYWxwaGExLlByb2R1Y3RTdGF0dXNCA+BBAxI7ChJmaXJzdF9wdWJsaXNoX3RpbWUYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQgPgQQMSFgoJbWluX3ByaWNlGAcgASgDQgPgQQMSFgoJbWF4X3ByaWNlGAggASgDQgPgQQMSGAoLc2FsZXNfY291bnQYCSABKAVCA+BBAxIbCg5mYXZvcml0ZV9jb3VudBgKIAEoBUID4EEDEiAKDnJhdGluZ19hdmVyYWdlGAsgASgCQgPgQQNIAIgBARIZCgxyZXZpZXdfY291bnQYDCABKAVCA+BBAxIYCgt0b3RhbF9zdG9jaxgNIAEoBUID4EEDEiUKE2xvd19zdG9ja190aHJlc2hvbGQYDiABKAVCA+BBA0gBiAEBEhEKBGV0YWcYDyABKAlCA+BBAxI0CgtjcmVhdGVfdGltZRgQIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCA+BBA0IRCg9fcmF0aW5nX2F2ZXJhZ2VCFgoUX2xvd19zdG9ja190aHJlc2hvbGQilwMKDFByb2R1Y3RJbnB1dBIYCgV0aXRsZRgBIAEoCUIJ4EECkrUYAhBkEhgKC2NhdGVnb3J5X2lkGAIgASgJQgPgQQISFgoOaGFzaHRhZ19pbnB1dHMYAyADKAkSOwoHZ2FsbGVyeRgEIAMoCzIiLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuSW1hZ2VJbnB1dEIGkrUYAggJEkoKC2Rlc2NyaXB0aW9uGAUgAygLMiguaGF3a3IuY2F0YWxvZy52MWFscGhhMS5EZXNjcmlwdGlvbkJsb2NrQguStRgHCGQYuBcgFBI9CgRheGVzGAYgAygLMicuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5PcHRpb25BeGlzSW5wdXRCBpK1GAIIAhI5CgRza3VzGAcgAygLMiAuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5Ta3VJbnB1dEIJ4EECkrUYAghkEiAKE2xvd19zdG9ja190aHJlc2hvbGQYCCABKAVIAIgBAUIWChRfbG93X3N0b2NrX3RocmVzaG9sZCJYCgpJbWFnZUlucHV0EhYKDHN0YWdlZF90b2tlbhgBIAEoCUgAEhIKCGFzc2V0X2lkGAIgASgJSAASFAoDYWx0GAMgASgJQgeStRgDEMgBQggKBnNvdXJjZSLQAQoQRGVzY3JpcHRpb25CbG9jaxITCglwYXJhZ3JhcGgYASABKAlIABIzCgVpbWFnZRgCIAEoCzIiLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuSW1hZ2VJbnB1dEgAEjkKC2J1bGxldF9saXN0GAMgASgLMiIuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5CdWxsZXRMaXN0SAASLgoFdGFibGUYBCABKAsyHS5oYXdrci5jYXRhbG9nLnYxYWxwaGExLlRhYmxlSABCBwoFYmxvY2siJgoKQnVsbGV0TGlzdBIYCgVpdGVtcxgBIAMoCUIJkrUYBQgyEMgBIj8KBVRhYmxlEjYKBHJvd3MYASADKAsyIC5oYXdrci5jYXRhbG9nLnYxYWxwaGExLlRhYmxlUm93QgaStRgCCDIiJAoIVGFibGVSb3cSGAoFY2VsbHMYASADKAlCCZK1GAUIChDIASJHCg9PcHRpb25BeGlzSW5wdXQSFwoEbmFtZRgBIAEoCUIJ4EECkrUYAhAUEhsKBnZhbHVlcxgCIAMoCUIL4EECkrUYBAgyECgiiwEKCFNrdUlucHV0Eg8KB29wdGlvbjEYASABKAkSDwoHb3B0aW9uMhgCIAEoCRISCgVwcmljZRgDIAEoA0ID4EECEh0KEGNvbXBhcmVfYXRfcHJpY2UYBCABKANIAIgBARIVCg1pbml0aWFsX3N0b2NrGAUgASgFQhMKEV9jb21wYXJlX2F0X3ByaWNlKoEBCg1Qcm9kdWN0U3RhdHVzEh4KGlBST0RVQ1RfU1RBVFVTX1VOU1BFQ0lGSUVEEAASGAoUUFJPRFVDVF9TVEFUVVNfRFJBRlQQARIZChVQUk9EVUNUX1NUQVRVU19BQ1RJVkUQAhIbChdQUk9EVUNUX1NUQVRVU19BUkNISVZFRBADKoUBChNQcm9kdWN0QXZhaWxhYmlsaXR5EiQKIFBST0RVQ1RfQVZBSUxBQklMSVRZX1VOU1BFQ0lGSUVEEAASIgoeUFJPRFVDVF9BVkFJTEFCSUxJVFlfQVZBSUxBQkxFEAESJAogUFJPRFVDVF9BVkFJTEFCSUxJVFlfVU5BVkFJTEFCTEUQAipgCgtTdG9ja1N0YXR1cxIcChhTVE9DS19TVEFUVVNfVU5TUEVDSUZJRUQQABIUChBTVE9DS19TVEFUVVNfTE9XEAESHQoZU1RPQ0tfU1RBVFVTX09VVF9PRl9TVE9DSxACKsoBCgtQcm9kdWN0U29ydBIcChhQUk9EVUNUX1NPUlRfVU5TUEVDSUZJRUQQABIXChNQUk9EVUNUX1NPUlRfTEFURVNUEAESGgoWUFJPRFVDVF9TT1JUX1BSSUNFX0FTQxACEhsKF1BST0RVQ1RfU09SVF9QUklDRV9ERVNDEAMSFgoSUFJPRFVDVF9TT1JUX1NBTEVTEAQSFwoTUFJPRFVDVF9TT1JUX1JBVElORxAFEhoKFlBST0RVQ1RfU09SVF9SRUxFVkFOQ0UQBipbCgxIYXNodGFnTWF0Y2gSHQoZSEFTSFRBR19NQVRDSF9VTlNQRUNJRklFRBAAEhUKEUhBU0hUQUdfTUFUQ0hfQU5ZEAESFQoRSEFTSFRBR19NQVRDSF9BTEwQAjLtBgoUQ2F0YWxvZ1B1YmxpY1NlcnZpY2USbgoMTGlzdFByb2R1Y3RzEisuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5MaXN0UHJvZHVjdHNSZXF1ZXN0GiwuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5MaXN0UHJvZHVjdHNSZXNwb25zZSIDkAIBEnQKDlNlYXJjaFByb2R1Y3RzEi0uaGF3a3IuY2F0YWxvZy52MWFscGhhMS5TZWFyY2hQcm9kdWN0c1JlcXVlc3QaLi5oYXdrci5jYXRhbG9nLnYxYWxwaGExLlNlYXJjaFByb2R1Y3RzUmVzcG9uc2UiA5ACARKDAQoTU3VnZ2VzdFByb2R1Y3ROYW1lcxIyLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuU3VnZ2VzdFByb2R1Y3ROYW1lc1JlcXVlc3QaMy5oYXdrci5jYXRhbG9nLnYxYWxwaGExLlN1Z2dlc3RQcm9kdWN0TmFtZXNSZXNwb25zZSIDkAIBEmgKCkdldFByb2R1Y3QSKS5oYXdrci5jYXRhbG9nLnYxYWxwaGExLkdldFByb2R1Y3RSZXF1ZXN0GiouaGF3a3IuY2F0YWxvZy52MWFscGhhMS5HZXRQcm9kdWN0UmVzcG9uc2UiA5ACARJ0Cg5MaXN0Q2F0ZWdvcmllcxItLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuTGlzdENhdGVnb3JpZXNSZXF1ZXN0Gi4uaGF3a3IuY2F0YWxvZy52MWFscGhhMS5MaXN0Q2F0ZWdvcmllc1Jlc3BvbnNlIgOQAgESdwoPU3VnZ2VzdEhhc2h0YWdzEi4uaGF3a3IuY2F0YWxvZy52MWFscGhhMS5TdWdnZXN0SGFzaHRhZ3NSZXF1ZXN0Gi8uaGF3a3IuY2F0YWxvZy52MWFscGhhMS5TdWdnZXN0SGFzaHRhZ3NSZXNwb25zZSIDkAIBEo8BChdTdWdnZXN0VHJlbmRpbmdIYXNodGFncxI2Lmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuU3VnZ2VzdFRyZW5kaW5nSGFzaHRhZ3NSZXF1ZXN0GjcuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5TdWdnZXN0VHJlbmRpbmdIYXNodGFnc1Jlc3BvbnNlIgOQAgEyjwgKF1NlbGxlckNhdGFsb2dBcHBTZXJ2aWNlEnQKDkxpc3RNeVByb2R1Y3RzEi0uaGF3a3IuY2F0YWxvZy52MWFscGhhMS5MaXN0TXlQcm9kdWN0c1JlcXVlc3QaLi5oYXdrci5jYXRhbG9nLnYxYWxwaGExLkxpc3RNeVByb2R1Y3RzUmVzcG9uc2UiA5ACARJuCgxHZXRNeVByb2R1Y3QSKy5oYXdrci5jYXRhbG9nLnYxYWxwaGExLkdldE15UHJvZHVjdFJlcXVlc3QaLC5oYXdrci5jYXRhbG9nLnYxYWxwaGExLkdldE15UHJvZHVjdFJlc3BvbnNlIgOQAgESdwoPQ291bnRNeVByb2R1Y3RzEi4uaGF3a3IuY2F0YWxvZy52MWFscGhhMS5Db3VudE15UHJvZHVjdHNSZXF1ZXN0Gi8uaGF3a3IuY2F0YWxvZy52MWFscGhhMS5Db3VudE15UHJvZHVjdHNSZXNwb25zZSIDkAIBEmwKDUNyZWF0ZVByb2R1Y3QSLC5oYXdrci5jYXRhbG9nLnYxYWxwaGExLkNyZWF0ZVByb2R1Y3RSZXF1ZXN0Gi0uaGF3a3IuY2F0YWxvZy52MWFscGhhMS5DcmVhdGVQcm9kdWN0UmVzcG9uc2UScQoNVXBkYXRlUHJvZHVjdBIsLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuVXBkYXRlUHJvZHVjdFJlcXVlc3QaLS5oYXdrci5jYXRhbG9nLnYxYWxwaGExLlVwZGF0ZVByb2R1Y3RSZXNwb25zZSIDkAICEnoKEFNldFByb2R1Y3RTdGF0dXMSLy5oYXdrci5jYXRhbG9nLnYxYWxwaGExLlNldFByb2R1Y3RTdGF0dXNSZXF1ZXN0GjAuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5TZXRQcm9kdWN0U3RhdHVzUmVzcG9uc2UiA5ACAhJxCg1EZWxldGVQcm9kdWN0EiwuaGF3a3IuY2F0YWxvZy52MWFscGhhMS5EZWxldGVQcm9kdWN0UmVxdWVzdBotLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuRGVsZXRlUHJvZHVjdFJlc3BvbnNlIgOQAgISZgoLQWRqdXN0U3RvY2sSKi5oYXdrci5jYXRhbG9nLnYxYWxwaGExLkFkanVzdFN0b2NrUmVxdWVzdBorLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuQWRqdXN0U3RvY2tSZXNwb25zZRJdCghTZXRTdG9jaxInLmhhd2tyLmNhdGFsb2cudjFhbHBoYTEuU2V0U3RvY2tSZXF1ZXN0GiguaGF3a3IuY2F0YWxvZy52MWFscGhhMS5TZXRTdG9ja1Jlc3BvbnNlYgZwcm90bzM", [file_google_api_field_behavior, file_google_api_field_info, file_google_protobuf_timestamp, file_hawkr_common_v1alpha1_image, file_hawkr_common_v1alpha1_limits, file_hawkr_common_v1alpha1_store_card]);
+
+/**
+ * ProductFilter 是公開列表與搜尋共用的篩選，全部選填，之間是 AND。不含觀看者相關的篩選（收藏、追蹤）。
+ *
+ * @generated from message hawkr.catalog.v1alpha1.ProductFilter
+ */
+export type ProductFilter = Message<"hawkr.catalog.v1alpha1.ProductFilter"> & {
+  /**
+   * 分類 ID，可以給頂層分類（包含它底下所有葉節點）或葉節點；多個之間是 OR。
+   *
+   * @generated from field: repeated string category_ids = 1;
+   */
+  categoryIds: string[];
+
+  /**
+   * 價格區間，新台幣元的整數，含邊界；比對商品的 [min_price, max_price] 與區間有交集。
+   *
+   * @generated from field: optional int64 price_min = 2;
+   */
+  priceMin?: bigint | undefined;
+
+  /**
+   * @generated from field: optional int64 price_max = 3;
+   */
+  priceMax?: bigint | undefined;
+
+  /**
+   * 標籤（正規化後的名稱，或使用者輸入的樣子，規則同 ProductInput.hashtag_inputs）。
+   *
+   * @generated from field: repeated string hashtags = 4;
+   */
+  hashtags: string[];
+
+  /**
+   * @generated from field: hawkr.catalog.v1alpha1.HashtagMatch hashtag_match = 5;
+   */
+  hashtagMatch: HashtagMatch;
+
+  /**
+   * 只看這些店家的商品；店家不可曝光的照樣排除。
+   *
+   * @generated from field: repeated string store_ids = 6;
+   */
+  storeIds: string[];
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.ProductFilter.
+ * Use `create(ProductFilterSchema)` to create a new message.
+ */
+export const ProductFilterSchema: GenMessage<ProductFilter> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 0);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.ListProductsRequest
+ */
+export type ListProductsRequest = Message<"hawkr.catalog.v1alpha1.ListProductsRequest"> & {
+  /**
+   * @generated from field: hawkr.catalog.v1alpha1.ProductFilter filter = 1;
+   */
+  filter?: ProductFilter | undefined;
+
+  /**
+   * 不指定是 LATEST；不接受 RELEVANCE。
+   *
+   * @generated from field: hawkr.catalog.v1alpha1.ProductSort sort = 2;
+   */
+  sort: ProductSort;
+
+  /**
+   * 預設 20，上限 100；負數回 invalid_argument。
+   *
+   * @generated from field: int32 page_size = 3;
+   */
+  pageSize: number;
+
+  /**
+   * page_token 與 filter、sort 綁定，其中任何一個與取得 token 時不同回 invalid_argument。
+   *
+   * @generated from field: string page_token = 4;
+   */
+  pageToken: string;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.ListProductsRequest.
+ * Use `create(ListProductsRequestSchema)` to create a new message.
+ */
+export const ListProductsRequestSchema: GenMessage<ListProductsRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 1);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.ListProductsResponse
+ */
+export type ListProductsResponse = Message<"hawkr.catalog.v1alpha1.ListProductsResponse"> & {
+  /**
+   * @generated from field: repeated hawkr.catalog.v1alpha1.ProductSummary products = 1;
+   */
+  products: ProductSummary[];
+
+  /**
+   * @generated from field: string next_page_token = 2;
+   */
+  nextPageToken: string;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.ListProductsResponse.
+ * Use `create(ListProductsResponseSchema)` to create a new message.
+ */
+export const ListProductsResponseSchema: GenMessage<ListProductsResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 2);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.SearchProductsRequest
+ */
+export type SearchProductsRequest = Message<"hawkr.catalog.v1alpha1.SearchProductsRequest"> & {
+  /**
+   * 關鍵字；去頭尾空白後不得為空。
+   *
+   * @generated from field: string query = 1;
+   */
+  query: string;
+
+  /**
+   * @generated from field: hawkr.catalog.v1alpha1.ProductFilter filter = 2;
+   */
+  filter?: ProductFilter | undefined;
+
+  /**
+   * 不指定是 RELEVANCE。
+   *
+   * @generated from field: hawkr.catalog.v1alpha1.ProductSort sort = 3;
+   */
+  sort: ProductSort;
+
+  /**
+   * 預設 20，上限 100。
+   *
+   * @generated from field: int32 page_size = 4;
+   */
+  pageSize: number;
+
+  /**
+   * page_token 與 query、filter、sort 綁定。
+   *
+   * @generated from field: string page_token = 5;
+   */
+  pageToken: string;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.SearchProductsRequest.
+ * Use `create(SearchProductsRequestSchema)` to create a new message.
+ */
+export const SearchProductsRequestSchema: GenMessage<SearchProductsRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 3);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.SearchProductsResponse
+ */
+export type SearchProductsResponse = Message<"hawkr.catalog.v1alpha1.SearchProductsResponse"> & {
+  /**
+   * @generated from field: repeated hawkr.catalog.v1alpha1.ProductSummary products = 1;
+   */
+  products: ProductSummary[];
+
+  /**
+   * @generated from field: string next_page_token = 2;
+   */
+  nextPageToken: string;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.SearchProductsResponse.
+ * Use `create(SearchProductsResponseSchema)` to create a new message.
+ */
+export const SearchProductsResponseSchema: GenMessage<SearchProductsResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 4);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.SuggestProductNamesRequest
+ */
+export type SuggestProductNamesRequest = Message<"hawkr.catalog.v1alpha1.SuggestProductNamesRequest"> & {
+  /**
+   * 輸入的前綴或片段；正規化後是空的回空清單。
+   *
+   * @generated from field: string query = 1;
+   */
+  query: string;
+
+  /**
+   * 最多回傳幾筆，1 到 20；0 表示預設值 10，超過 20 以 20 計，負數回 invalid_argument。
+   *
+   * @generated from field: int32 max_results = 2;
+   */
+  maxResults: number;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.SuggestProductNamesRequest.
+ * Use `create(SuggestProductNamesRequestSchema)` to create a new message.
+ */
+export const SuggestProductNamesRequestSchema: GenMessage<SuggestProductNamesRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 5);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.SuggestProductNamesResponse
+ */
+export type SuggestProductNamesResponse = Message<"hawkr.catalog.v1alpha1.SuggestProductNamesResponse"> & {
+  /**
+   * 商品名稱，相關度高的在前，已去重。
+   *
+   * @generated from field: repeated string names = 1;
+   */
+  names: string[];
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.SuggestProductNamesResponse.
+ * Use `create(SuggestProductNamesResponseSchema)` to create a new message.
+ */
+export const SuggestProductNamesResponseSchema: GenMessage<SuggestProductNamesResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 6);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.GetProductRequest
+ */
+export type GetProductRequest = Message<"hawkr.catalog.v1alpha1.GetProductRequest"> & {
+  /**
+   * @generated from field: string product_id = 1;
+   */
+  productId: string;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.GetProductRequest.
+ * Use `create(GetProductRequestSchema)` to create a new message.
+ */
+export const GetProductRequestSchema: GenMessage<GetProductRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 7);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.GetProductResponse
+ */
+export type GetProductResponse = Message<"hawkr.catalog.v1alpha1.GetProductResponse"> & {
+  /**
+   * @generated from field: hawkr.catalog.v1alpha1.Product product = 1;
+   */
+  product?: Product | undefined;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.GetProductResponse.
+ * Use `create(GetProductResponseSchema)` to create a new message.
+ */
+export const GetProductResponseSchema: GenMessage<GetProductResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 8);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.ListCategoriesRequest
+ */
+export type ListCategoriesRequest = Message<"hawkr.catalog.v1alpha1.ListCategoriesRequest"> & {
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.ListCategoriesRequest.
+ * Use `create(ListCategoriesRequestSchema)` to create a new message.
+ */
+export const ListCategoriesRequestSchema: GenMessage<ListCategoriesRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 9);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.ListCategoriesResponse
+ */
+export type ListCategoriesResponse = Message<"hawkr.catalog.v1alpha1.ListCategoriesResponse"> & {
+  /**
+   * 頂層分類，每個帶底下的葉節點。
+   *
+   * @generated from field: repeated hawkr.catalog.v1alpha1.Category categories = 1;
+   */
+  categories: Category[];
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.ListCategoriesResponse.
+ * Use `create(ListCategoriesResponseSchema)` to create a new message.
+ */
+export const ListCategoriesResponseSchema: GenMessage<ListCategoriesResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 10);
+
+/**
+ * Category 是平台分類樹的一個節點。商品只能掛在葉節點（沒有 children 的節點）。
+ * 路徑（頂層 → 葉節點）由這棵樹推得，沒有另外的方法。Shopify 對照 ID 是內部資料，不對外。
+ *
+ * @generated from message hawkr.catalog.v1alpha1.Category
+ */
+export type Category = Message<"hawkr.catalog.v1alpha1.Category"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * 依請求語系的名稱。
+   *
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * 底下的葉節點；葉節點本身沒有。
+   *
+   * @generated from field: repeated hawkr.catalog.v1alpha1.Category children = 3;
+   */
+  children: Category[];
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.Category.
+ * Use `create(CategorySchema)` to create a new message.
+ */
+export const CategorySchema: GenMessage<Category> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 11);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.SuggestHashtagsRequest
+ */
+export type SuggestHashtagsRequest = Message<"hawkr.catalog.v1alpha1.SuggestHashtagsRequest"> & {
+  /**
+   * 搜尋字串，可以帶開頭的 #；正規化後是空的回空清單。
+   *
+   * @generated from field: string query = 1;
+   */
+  query: string;
+
+  /**
+   * true 是名稱包含 query，false 是以 query 開頭。
+   *
+   * @generated from field: bool contains = 2;
+   */
+  contains: boolean;
+
+  /**
+   * 最多回傳幾筆，1 到 20；0 表示預設值 10，超過 20 以 20 計，負數回 invalid_argument。
+   *
+   * @generated from field: int32 max_results = 3;
+   */
+  maxResults: number;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.SuggestHashtagsRequest.
+ * Use `create(SuggestHashtagsRequestSchema)` to create a new message.
+ */
+export const SuggestHashtagsRequestSchema: GenMessage<SuggestHashtagsRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 12);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.SuggestHashtagsResponse
+ */
+export type SuggestHashtagsResponse = Message<"hawkr.catalog.v1alpha1.SuggestHashtagsResponse"> & {
+  /**
+   * @generated from field: repeated hawkr.catalog.v1alpha1.HashtagCount hashtags = 1;
+   */
+  hashtags: HashtagCount[];
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.SuggestHashtagsResponse.
+ * Use `create(SuggestHashtagsResponseSchema)` to create a new message.
+ */
+export const SuggestHashtagsResponseSchema: GenMessage<SuggestHashtagsResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 13);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.SuggestTrendingHashtagsRequest
+ */
+export type SuggestTrendingHashtagsRequest = Message<"hawkr.catalog.v1alpha1.SuggestTrendingHashtagsRequest"> & {
+  /**
+   * 最多回傳幾名，1 到 50；0 表示預設值 20，超過 50 以 50 計，負數回 invalid_argument。
+   *
+   * @generated from field: int32 max_results = 1;
+   */
+  maxResults: number;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.SuggestTrendingHashtagsRequest.
+ * Use `create(SuggestTrendingHashtagsRequestSchema)` to create a new message.
+ */
+export const SuggestTrendingHashtagsRequestSchema: GenMessage<SuggestTrendingHashtagsRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 14);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.SuggestTrendingHashtagsResponse
+ */
+export type SuggestTrendingHashtagsResponse = Message<"hawkr.catalog.v1alpha1.SuggestTrendingHashtagsResponse"> & {
+  /**
+   * @generated from field: repeated hawkr.catalog.v1alpha1.HashtagCount hashtags = 1;
+   */
+  hashtags: HashtagCount[];
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.SuggestTrendingHashtagsResponse.
+ * Use `create(SuggestTrendingHashtagsResponseSchema)` to create a new message.
+ */
+export const SuggestTrendingHashtagsResponseSchema: GenMessage<SuggestTrendingHashtagsResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 15);
+
+/**
+ * HashtagCount 是一個商品標籤與它在範圍內的商品數。
+ *
+ * @generated from message hawkr.catalog.v1alpha1.HashtagCount
+ */
+export type HashtagCount = Message<"hawkr.catalog.v1alpha1.HashtagCount"> & {
+  /**
+   * 正規化後的名稱，用來比對與連結。
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * 最多商品使用的輸入樣子，用來顯示。
+   *
+   * @generated from field: string display = 2;
+   */
+  display: string;
+
+  /**
+   * @generated from field: int64 product_count = 3;
+   */
+  productCount: bigint;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.HashtagCount.
+ * Use `create(HashtagCountSchema)` to create a new message.
+ */
+export const HashtagCountSchema: GenMessage<HashtagCount> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 16);
+
+/**
+ * MyProductFilter 是賣家清單與計數共用的篩選，全部選填，之間是 AND。
+ *
+ * @generated from message hawkr.catalog.v1alpha1.MyProductFilter
+ */
+export type MyProductFilter = Message<"hawkr.catalog.v1alpha1.MyProductFilter"> & {
+  /**
+   * 只列這個狀態的商品；UNSPECIFIED 是全部。
+   *
+   * @generated from field: hawkr.catalog.v1alpha1.ProductStatus status = 1;
+   */
+  status: ProductStatus;
+
+  /**
+   * 依庫存篩選；LOW 與 OUT_OF_STOCK 只比對 ACTIVE 的商品（與 status 同時給了非 ACTIVE 的狀態就沒有結果）。
+   *
+   * @generated from field: hawkr.catalog.v1alpha1.StockStatus stock_status = 2;
+   */
+  stockStatus: StockStatus;
+
+  /**
+   * 關鍵字，比對標題、描述、標籤、分類與選項（同公開搜尋的 searchable_text）；去頭尾空白後空的是不篩選。
+   *
+   * @generated from field: string query = 3;
+   */
+  query: string;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.MyProductFilter.
+ * Use `create(MyProductFilterSchema)` to create a new message.
+ */
+export const MyProductFilterSchema: GenMessage<MyProductFilter> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 17);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.ListMyProductsRequest
+ */
+export type ListMyProductsRequest = Message<"hawkr.catalog.v1alpha1.ListMyProductsRequest"> & {
+  /**
+   * @generated from field: hawkr.catalog.v1alpha1.MyProductFilter filter = 1;
+   */
+  filter?: MyProductFilter | undefined;
+
+  /**
+   * 預設 20，上限 100。
+   *
+   * @generated from field: int32 page_size = 2;
+   */
+  pageSize: number;
+
+  /**
+   * page_token 與 filter 綁定。
+   *
+   * @generated from field: string page_token = 3;
+   */
+  pageToken: string;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.ListMyProductsRequest.
+ * Use `create(ListMyProductsRequestSchema)` to create a new message.
+ */
+export const ListMyProductsRequestSchema: GenMessage<ListMyProductsRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 18);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.ListMyProductsResponse
+ */
+export type ListMyProductsResponse = Message<"hawkr.catalog.v1alpha1.ListMyProductsResponse"> & {
+  /**
+   * @generated from field: repeated hawkr.catalog.v1alpha1.SellerProductSummary products = 1;
+   */
+  products: SellerProductSummary[];
+
+  /**
+   * @generated from field: string next_page_token = 2;
+   */
+  nextPageToken: string;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.ListMyProductsResponse.
+ * Use `create(ListMyProductsResponseSchema)` to create a new message.
+ */
+export const ListMyProductsResponseSchema: GenMessage<ListMyProductsResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 19);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.GetMyProductRequest
+ */
+export type GetMyProductRequest = Message<"hawkr.catalog.v1alpha1.GetMyProductRequest"> & {
+  /**
+   * @generated from field: string product_id = 1;
+   */
+  productId: string;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.GetMyProductRequest.
+ * Use `create(GetMyProductRequestSchema)` to create a new message.
+ */
+export const GetMyProductRequestSchema: GenMessage<GetMyProductRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 20);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.GetMyProductResponse
+ */
+export type GetMyProductResponse = Message<"hawkr.catalog.v1alpha1.GetMyProductResponse"> & {
+  /**
+   * @generated from field: hawkr.catalog.v1alpha1.SellerProduct product = 1;
+   */
+  product?: SellerProduct | undefined;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.GetMyProductResponse.
+ * Use `create(GetMyProductResponseSchema)` to create a new message.
+ */
+export const GetMyProductResponseSchema: GenMessage<GetMyProductResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 21);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.CountMyProductsRequest
+ */
+export type CountMyProductsRequest = Message<"hawkr.catalog.v1alpha1.CountMyProductsRequest"> & {
+  /**
+   * @generated from field: hawkr.catalog.v1alpha1.MyProductFilter filter = 1;
+   */
+  filter?: MyProductFilter | undefined;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.CountMyProductsRequest.
+ * Use `create(CountMyProductsRequestSchema)` to create a new message.
+ */
+export const CountMyProductsRequestSchema: GenMessage<CountMyProductsRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 22);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.CountMyProductsResponse
+ */
+export type CountMyProductsResponse = Message<"hawkr.catalog.v1alpha1.CountMyProductsResponse"> & {
+  /**
+   * 符合篩選的商品數。
+   *
+   * @generated from field: int32 count = 1;
+   */
+  count: number;
+
+  /**
+   * 商品沒有自己的低庫存門檻時用的平台預設值，client 顯示用，不自己寫死數字。
+   *
+   * @generated from field: int32 default_low_stock_threshold = 2;
+   */
+  defaultLowStockThreshold: number;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.CountMyProductsResponse.
+ * Use `create(CountMyProductsResponseSchema)` to create a new message.
+ */
+export const CountMyProductsResponseSchema: GenMessage<CountMyProductsResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 23);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.CreateProductRequest
+ */
+export type CreateProductRequest = Message<"hawkr.catalog.v1alpha1.CreateProductRequest"> & {
+  /**
+   * @generated from field: hawkr.catalog.v1alpha1.ProductInput product = 1;
+   */
+  product?: ProductInput | undefined;
+
+  /**
+   * UUIDv4（AIP-155）：範圍是（店家、方法），永久保存；同一家店以同一個 request_id 重送回第一次建立的商品目前的樣子，
+   * 兩個請求同時在途也只建立一個；內容不同回 invalid_argument。必填。
+   *
+   * @generated from field: string request_id = 2;
+   */
+  requestId: string;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.CreateProductRequest.
+ * Use `create(CreateProductRequestSchema)` to create a new message.
+ */
+export const CreateProductRequestSchema: GenMessage<CreateProductRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 24);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.CreateProductResponse
+ */
+export type CreateProductResponse = Message<"hawkr.catalog.v1alpha1.CreateProductResponse"> & {
+  /**
+   * @generated from field: hawkr.catalog.v1alpha1.SellerProduct product = 1;
+   */
+  product?: SellerProduct | undefined;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.CreateProductResponse.
+ * Use `create(CreateProductResponseSchema)` to create a new message.
+ */
+export const CreateProductResponseSchema: GenMessage<CreateProductResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 25);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.UpdateProductRequest
+ */
+export type UpdateProductRequest = Message<"hawkr.catalog.v1alpha1.UpdateProductRequest"> & {
+  /**
+   * @generated from field: string product_id = 1;
+   */
+  productId: string;
+
+  /**
+   * 讀取時拿到的 etag，必填。
+   *
+   * @generated from field: string etag = 2;
+   */
+  etag: string;
+
+  /**
+   * 完整內容，整體取代；沒有 update_mask。
+   *
+   * @generated from field: hawkr.catalog.v1alpha1.ProductInput product = 3;
+   */
+  product?: ProductInput | undefined;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.UpdateProductRequest.
+ * Use `create(UpdateProductRequestSchema)` to create a new message.
+ */
+export const UpdateProductRequestSchema: GenMessage<UpdateProductRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 26);
+
+/**
+ * UpdateProductResponse 的商品是修改後的完整資源（含新的 etag）。
+ *
+ * @generated from message hawkr.catalog.v1alpha1.UpdateProductResponse
+ */
+export type UpdateProductResponse = Message<"hawkr.catalog.v1alpha1.UpdateProductResponse"> & {
+  /**
+   * @generated from field: hawkr.catalog.v1alpha1.SellerProduct product = 1;
+   */
+  product?: SellerProduct | undefined;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.UpdateProductResponse.
+ * Use `create(UpdateProductResponseSchema)` to create a new message.
+ */
+export const UpdateProductResponseSchema: GenMessage<UpdateProductResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 27);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.SetProductStatusRequest
+ */
+export type SetProductStatusRequest = Message<"hawkr.catalog.v1alpha1.SetProductStatusRequest"> & {
+  /**
+   * @generated from field: string product_id = 1;
+   */
+  productId: string;
+
+  /**
+   * 目標狀態，不得是 UNSPECIFIED。
+   *
+   * @generated from field: hawkr.catalog.v1alpha1.ProductStatus status = 2;
+   */
+  status: ProductStatus;
+
+  /**
+   * 讀取時拿到的 etag，必填。
+   *
+   * @generated from field: string etag = 3;
+   */
+  etag: string;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.SetProductStatusRequest.
+ * Use `create(SetProductStatusRequestSchema)` to create a new message.
+ */
+export const SetProductStatusRequestSchema: GenMessage<SetProductStatusRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 28);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.SetProductStatusResponse
+ */
+export type SetProductStatusResponse = Message<"hawkr.catalog.v1alpha1.SetProductStatusResponse"> & {
+  /**
+   * @generated from field: hawkr.catalog.v1alpha1.SellerProduct product = 1;
+   */
+  product?: SellerProduct | undefined;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.SetProductStatusResponse.
+ * Use `create(SetProductStatusResponseSchema)` to create a new message.
+ */
+export const SetProductStatusResponseSchema: GenMessage<SetProductStatusResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 29);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.DeleteProductRequest
+ */
+export type DeleteProductRequest = Message<"hawkr.catalog.v1alpha1.DeleteProductRequest"> & {
+  /**
+   * @generated from field: string product_id = 1;
+   */
+  productId: string;
+
+  /**
+   * 選填；帶了就與目前版本比對。
+   *
+   * @generated from field: string etag = 2;
+   */
+  etag: string;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.DeleteProductRequest.
+ * Use `create(DeleteProductRequestSchema)` to create a new message.
+ */
+export const DeleteProductRequestSchema: GenMessage<DeleteProductRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 30);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.DeleteProductResponse
+ */
+export type DeleteProductResponse = Message<"hawkr.catalog.v1alpha1.DeleteProductResponse"> & {
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.DeleteProductResponse.
+ * Use `create(DeleteProductResponseSchema)` to create a new message.
+ */
+export const DeleteProductResponseSchema: GenMessage<DeleteProductResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 31);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.AdjustStockRequest
+ */
+export type AdjustStockRequest = Message<"hawkr.catalog.v1alpha1.AdjustStockRequest"> & {
+  /**
+   * 要調整的 SKU；不屬於自己店家或已刪除回 not_found。
+   *
+   * @generated from field: string sku_id = 1;
+   */
+  skuId: string;
+
+  /**
+   * 有號變動量，不得為 0；調整後的庫存必須在 0 到 2147483647 之間。
+   *
+   * @generated from field: int32 delta = 2;
+   */
+  delta: number;
+
+  /**
+   * UUIDv4（AIP-155）：範圍是（店家、方法），永久保存；同一家店以同一個 request_id 重送且內容相同只生效一次，同時在途也只生效一次；內容不同回 invalid_argument。必填：變動量重送會重複計算。
+   *
+   * @generated from field: string request_id = 3;
+   */
+  requestId: string;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.AdjustStockRequest.
+ * Use `create(AdjustStockRequestSchema)` to create a new message.
+ */
+export const AdjustStockRequestSchema: GenMessage<AdjustStockRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 32);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.AdjustStockResponse
+ */
+export type AdjustStockResponse = Message<"hawkr.catalog.v1alpha1.AdjustStockResponse"> & {
+  /**
+   * 調整後的 SKU（含新的庫存）。
+   *
+   * @generated from field: hawkr.catalog.v1alpha1.Sku sku = 1;
+   */
+  sku?: Sku | undefined;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.AdjustStockResponse.
+ * Use `create(AdjustStockResponseSchema)` to create a new message.
+ */
+export const AdjustStockResponseSchema: GenMessage<AdjustStockResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 33);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.SetStockRequest
+ */
+export type SetStockRequest = Message<"hawkr.catalog.v1alpha1.SetStockRequest"> & {
+  /**
+   * 要設定的 SKU；不屬於自己店家或已刪除回 not_found。
+   *
+   * @generated from field: string sku_id = 1;
+   */
+  skuId: string;
+
+  /**
+   * 新的庫存，0 到 2147483647。
+   *
+   * @generated from field: int32 quantity = 2;
+   */
+  quantity: number;
+
+  /**
+   * 呼叫者看到的現值；與目前的庫存不等回 failed_precondition。
+   *
+   * @generated from field: int32 expected_quantity = 3;
+   */
+  expectedQuantity: number;
+
+  /**
+   * UUIDv4（AIP-155）：範圍與冪等語意同 AdjustStock。必填。
+   *
+   * @generated from field: string request_id = 4;
+   */
+  requestId: string;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.SetStockRequest.
+ * Use `create(SetStockRequestSchema)` to create a new message.
+ */
+export const SetStockRequestSchema: GenMessage<SetStockRequest> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 34);
+
+/**
+ * @generated from message hawkr.catalog.v1alpha1.SetStockResponse
+ */
+export type SetStockResponse = Message<"hawkr.catalog.v1alpha1.SetStockResponse"> & {
+  /**
+   * 設定後的 SKU。
+   *
+   * @generated from field: hawkr.catalog.v1alpha1.Sku sku = 1;
+   */
+  sku?: Sku | undefined;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.SetStockResponse.
+ * Use `create(SetStockResponseSchema)` to create a new message.
+ */
+export const SetStockResponseSchema: GenMessage<SetStockResponse> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 35);
+
+/**
+ * ProductImage 是商品的一張圖（圖庫或描述圖片）。
+ *
+ * @generated from message hawkr.catalog.v1alpha1.ProductImage
+ */
+export type ProductImage = Message<"hawkr.catalog.v1alpha1.ProductImage"> & {
+  /**
+   * 圖片資產 ID；只有賣家讀自己的商品才設（寫入沿用這張圖時放進 ImageInput.asset_id），公開讀取不設。
+   *
+   * @generated from field: string asset_id = 1;
+   */
+  assetId: string;
+
+  /**
+   * @generated from field: hawkr.common.v1alpha1.Image image = 2;
+   */
+  image?: Image | undefined;
+
+  /**
+   * 替代文字，可空。
+   *
+   * @generated from field: string alt = 3;
+   */
+  alt: string;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.ProductImage.
+ * Use `create(ProductImageSchema)` to create a new message.
+ */
+export const ProductImageSchema: GenMessage<ProductImage> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 36);
+
+/**
+ * ProductDescriptionBlock 是描述的一個區塊（輸出），剛好設一種；形狀對應寫入的 DescriptionBlock。
+ *
+ * @generated from message hawkr.catalog.v1alpha1.ProductDescriptionBlock
+ */
+export type ProductDescriptionBlock = Message<"hawkr.catalog.v1alpha1.ProductDescriptionBlock"> & {
+  /**
+   * @generated from oneof hawkr.catalog.v1alpha1.ProductDescriptionBlock.block
+   */
+  block: {
+    /**
+     * @generated from field: string paragraph = 1;
+     */
+    value: string;
+    case: "paragraph";
+  } | {
+    /**
+     * @generated from field: hawkr.catalog.v1alpha1.ProductImage image = 2;
+     */
+    value: ProductImage;
+    case: "image";
+  } | {
+    /**
+     * @generated from field: hawkr.catalog.v1alpha1.BulletList bullet_list = 3;
+     */
+    value: BulletList;
+    case: "bulletList";
+  } | {
+    /**
+     * @generated from field: hawkr.catalog.v1alpha1.Table table = 4;
+     */
+    value: Table;
+    case: "table";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.ProductDescriptionBlock.
+ * Use `create(ProductDescriptionBlockSchema)` to create a new message.
+ */
+export const ProductDescriptionBlockSchema: GenMessage<ProductDescriptionBlock> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 37);
+
+/**
+ * OptionAxis 是一個選項軸（輸出）。
+ *
+ * @generated from message hawkr.catalog.v1alpha1.OptionAxis
+ */
+export type OptionAxis = Message<"hawkr.catalog.v1alpha1.OptionAxis"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: repeated string values = 2;
+   */
+  values: string[];
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.OptionAxis.
+ * Use `create(OptionAxisSchema)` to create a new message.
+ */
+export const OptionAxisSchema: GenMessage<OptionAxis> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 38);
+
+/**
+ * Sku 是商品的一個 SKU。沒有該軸的位置，option 是空字串。
+ *
+ * @generated from message hawkr.catalog.v1alpha1.Sku
+ */
+export type Sku = Message<"hawkr.catalog.v1alpha1.Sku"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string option1 = 2;
+   */
+  option1: string;
+
+  /**
+   * @generated from field: string option2 = 3;
+   */
+  option2: string;
+
+  /**
+   * 售價，新台幣元的整數。
+   *
+   * @generated from field: int64 price = 4;
+   */
+  price: bigint;
+
+  /**
+   * 原價（劃線價）；沒有設不設。
+   *
+   * @generated from field: optional int64 compare_at_price = 5;
+   */
+  compareAtPrice?: bigint | undefined;
+
+  /**
+   * 現在的庫存，不為負。
+   *
+   * @generated from field: int32 stock_qty = 6;
+   */
+  stockQty: number;
+
+  /**
+   * 這個 SKU 現在能不能買：商品上架中（ACTIVE）而且庫存大於 0。
+   *
+   * @generated from field: hawkr.catalog.v1alpha1.ProductAvailability availability = 7;
+   */
+  availability: ProductAvailability;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.Sku.
+ * Use `create(SkuSchema)` to create a new message.
+ */
+export const SkuSchema: GenMessage<Sku> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 39);
+
+/**
+ * ProductHashtag 是商品的一個標籤。
+ *
+ * @generated from message hawkr.catalog.v1alpha1.ProductHashtag
+ */
+export type ProductHashtag = Message<"hawkr.catalog.v1alpha1.ProductHashtag"> & {
+  /**
+   * 正規化後的名稱，用來比對與連結。
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * 使用者輸入的樣子，用來顯示。
+   *
+   * @generated from field: string display = 2;
+   */
+  display: string;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.ProductHashtag.
+ * Use `create(ProductHashtagSchema)` to create a new message.
+ */
+export const ProductHashtagSchema: GenMessage<ProductHashtag> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 40);
+
+/**
+ * Product 是公開讀取的商品完整內容。沒有賣家的狀態 enum、etag、建立與修改時間：公開的只有 availability。
+ *
+ * @generated from message hawkr.catalog.v1alpha1.Product
+ */
+export type Product = Message<"hawkr.catalog.v1alpha1.Product"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * 賣這個商品的店家；店家卡片讀不到時不設。
+   *
+   * @generated from field: hawkr.common.v1alpha1.StoreCard store = 2;
+   */
+  store?: StoreCard | undefined;
+
+  /**
+   * @generated from field: string category_id = 3;
+   */
+  categoryId: string;
+
+  /**
+   * @generated from field: string title = 4;
+   */
+  title: string;
+
+  /**
+   * 商品現在能不能買：上架中而且至少一個 SKU 有庫存。已下架（ARCHIVED）的商品是不可購買。
+   *
+   * @generated from field: hawkr.catalog.v1alpha1.ProductAvailability availability = 5;
+   */
+  availability: ProductAvailability;
+
+  /**
+   * 第一次上架的時間。
+   *
+   * @generated from field: google.protobuf.Timestamp first_publish_time = 6;
+   */
+  firstPublishTime?: Timestamp | undefined;
+
+  /**
+   * 沒刪除 SKU 的最低與最高售價，新台幣元的整數。
+   *
+   * @generated from field: int64 min_price = 7;
+   */
+  minPrice: bigint;
+
+  /**
+   * @generated from field: int64 max_price = 8;
+   */
+  maxPrice: bigint;
+
+  /**
+   * @generated from field: int32 sales_count = 9;
+   */
+  salesCount: number;
+
+  /**
+   * @generated from field: int32 favorite_count = 10;
+   */
+  favoriteCount: number;
+
+  /**
+   * 平均評分，1 到 5；沒有評價不設。
+   *
+   * @generated from field: optional float rating_average = 11;
+   */
+  ratingAverage?: number | undefined;
+
+  /**
+   * @generated from field: int32 review_count = 12;
+   */
+  reviewCount: number;
+
+  /**
+   * @generated from field: repeated hawkr.catalog.v1alpha1.ProductImage gallery = 13;
+   */
+  gallery: ProductImage[];
+
+  /**
+   * @generated from field: repeated hawkr.catalog.v1alpha1.ProductDescriptionBlock description = 14;
+   */
+  description: ProductDescriptionBlock[];
+
+  /**
+   * @generated from field: repeated hawkr.catalog.v1alpha1.OptionAxis axes = 15;
+   */
+  axes: OptionAxis[];
+
+  /**
+   * @generated from field: repeated hawkr.catalog.v1alpha1.Sku skus = 16;
+   */
+  skus: Sku[];
+
+  /**
+   * @generated from field: repeated hawkr.catalog.v1alpha1.ProductHashtag hashtags = 17;
+   */
+  hashtags: ProductHashtag[];
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.Product.
+ * Use `create(ProductSchema)` to create a new message.
+ */
+export const ProductSchema: GenMessage<Product> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 41);
+
+/**
+ * ProductSummary 是公開列表的一列（商品卡片）。
+ *
+ * @generated from message hawkr.catalog.v1alpha1.ProductSummary
+ */
+export type ProductSummary = Message<"hawkr.catalog.v1alpha1.ProductSummary"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * 店家卡片讀不到時不設。
+   *
+   * @generated from field: hawkr.common.v1alpha1.StoreCard store = 2;
+   */
+  store?: StoreCard | undefined;
+
+  /**
+   * @generated from field: string category_id = 3;
+   */
+  categoryId: string;
+
+  /**
+   * @generated from field: string title = 4;
+   */
+  title: string;
+
+  /**
+   * 主圖庫的第一張；沒有圖不設。
+   *
+   * @generated from field: hawkr.common.v1alpha1.Image cover_image = 5;
+   */
+  coverImage?: Image | undefined;
+
+  /**
+   * @generated from field: hawkr.catalog.v1alpha1.ProductAvailability availability = 6;
+   */
+  availability: ProductAvailability;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp first_publish_time = 7;
+   */
+  firstPublishTime?: Timestamp | undefined;
+
+  /**
+   * @generated from field: int64 min_price = 8;
+   */
+  minPrice: bigint;
+
+  /**
+   * @generated from field: int64 max_price = 9;
+   */
+  maxPrice: bigint;
+
+  /**
+   * @generated from field: int32 sales_count = 10;
+   */
+  salesCount: number;
+
+  /**
+   * @generated from field: int32 favorite_count = 11;
+   */
+  favoriteCount: number;
+
+  /**
+   * @generated from field: optional float rating_average = 12;
+   */
+  ratingAverage?: number | undefined;
+
+  /**
+   * @generated from field: int32 review_count = 13;
+   */
+  reviewCount: number;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.ProductSummary.
+ * Use `create(ProductSummarySchema)` to create a new message.
+ */
+export const ProductSummarySchema: GenMessage<ProductSummary> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 42);
+
+/**
+ * SellerProduct 是賣家讀自己的商品完整內容。
+ *
+ * @generated from message hawkr.catalog.v1alpha1.SellerProduct
+ */
+export type SellerProduct = Message<"hawkr.catalog.v1alpha1.SellerProduct"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string category_id = 2;
+   */
+  categoryId: string;
+
+  /**
+   * @generated from field: string title = 3;
+   */
+  title: string;
+
+  /**
+   * @generated from field: hawkr.catalog.v1alpha1.ProductStatus status = 4;
+   */
+  status: ProductStatus;
+
+  /**
+   * 第一次上架的時間；從沒上架過不設。
+   *
+   * @generated from field: google.protobuf.Timestamp first_publish_time = 5;
+   */
+  firstPublishTime?: Timestamp | undefined;
+
+  /**
+   * @generated from field: int64 min_price = 6;
+   */
+  minPrice: bigint;
+
+  /**
+   * @generated from field: int64 max_price = 7;
+   */
+  maxPrice: bigint;
+
+  /**
+   * @generated from field: int32 sales_count = 8;
+   */
+  salesCount: number;
+
+  /**
+   * @generated from field: int32 favorite_count = 9;
+   */
+  favoriteCount: number;
+
+  /**
+   * @generated from field: optional float rating_average = 10;
+   */
+  ratingAverage?: number | undefined;
+
+  /**
+   * @generated from field: int32 review_count = 11;
+   */
+  reviewCount: number;
+
+  /**
+   * @generated from field: repeated hawkr.catalog.v1alpha1.ProductImage gallery = 12;
+   */
+  gallery: ProductImage[];
+
+  /**
+   * @generated from field: repeated hawkr.catalog.v1alpha1.ProductDescriptionBlock description = 13;
+   */
+  description: ProductDescriptionBlock[];
+
+  /**
+   * @generated from field: repeated hawkr.catalog.v1alpha1.OptionAxis axes = 14;
+   */
+  axes: OptionAxis[];
+
+  /**
+   * @generated from field: repeated hawkr.catalog.v1alpha1.Sku skus = 15;
+   */
+  skus: Sku[];
+
+  /**
+   * @generated from field: repeated hawkr.catalog.v1alpha1.ProductHashtag hashtags = 16;
+   */
+  hashtags: ProductHashtag[];
+
+  /**
+   * 賣家設的低庫存門檻；沒設不設（用平台預設值）。
+   *
+   * @generated from field: optional int32 low_stock_threshold = 17;
+   */
+  lowStockThreshold?: number | undefined;
+
+  /**
+   * 修改、上下架與刪除時帶回，client 視為不透明字串。範圍是賣家可編輯的內容與狀態；庫存、銷量、收藏數、評分、首次上架時間不影響它。
+   *
+   * @generated from field: string etag = 18;
+   */
+  etag: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp create_time = 19;
+   */
+  createTime?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp update_time = 20;
+   */
+  updateTime?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.SellerProduct.
+ * Use `create(SellerProductSchema)` to create a new message.
+ */
+export const SellerProductSchema: GenMessage<SellerProduct> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 43);
+
+/**
+ * SellerProductSummary 是賣家清單的一列。
+ *
+ * @generated from message hawkr.catalog.v1alpha1.SellerProductSummary
+ */
+export type SellerProductSummary = Message<"hawkr.catalog.v1alpha1.SellerProductSummary"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string category_id = 2;
+   */
+  categoryId: string;
+
+  /**
+   * @generated from field: string title = 3;
+   */
+  title: string;
+
+  /**
+   * @generated from field: hawkr.common.v1alpha1.Image cover_image = 4;
+   */
+  coverImage?: Image | undefined;
+
+  /**
+   * @generated from field: hawkr.catalog.v1alpha1.ProductStatus status = 5;
+   */
+  status: ProductStatus;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp first_publish_time = 6;
+   */
+  firstPublishTime?: Timestamp | undefined;
+
+  /**
+   * @generated from field: int64 min_price = 7;
+   */
+  minPrice: bigint;
+
+  /**
+   * @generated from field: int64 max_price = 8;
+   */
+  maxPrice: bigint;
+
+  /**
+   * @generated from field: int32 sales_count = 9;
+   */
+  salesCount: number;
+
+  /**
+   * @generated from field: int32 favorite_count = 10;
+   */
+  favoriteCount: number;
+
+  /**
+   * @generated from field: optional float rating_average = 11;
+   */
+  ratingAverage?: number | undefined;
+
+  /**
+   * @generated from field: int32 review_count = 12;
+   */
+  reviewCount: number;
+
+  /**
+   * 沒刪除 SKU 的庫存總和（庫存頁用，免得逐商品再讀 SKU）。
+   *
+   * @generated from field: int32 total_stock = 13;
+   */
+  totalStock: number;
+
+  /**
+   * @generated from field: optional int32 low_stock_threshold = 14;
+   */
+  lowStockThreshold?: number | undefined;
+
+  /**
+   * 列表上的上下架動作用它當版本。
+   *
+   * @generated from field: string etag = 15;
+   */
+  etag: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp create_time = 16;
+   */
+  createTime?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message hawkr.catalog.v1alpha1.SellerProductSummary.
+ * Use `create(SellerProductSummarySchema)` to create a new message.
+ */
+export const SellerProductSummarySchema: GenMessage<SellerProductSummary> = /*@__PURE__*/
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 44);
 
 /**
  * ProductInput 是商品的完整可寫內容。修改是整體取代：沒有帶的圖片、選項軸與 SKU 組合會被移除。
@@ -75,6 +1577,14 @@ export type ProductInput = Message<"hawkr.catalog.v1alpha1.ProductInput"> & {
    * @generated from field: repeated hawkr.catalog.v1alpha1.SkuInput skus = 7;
    */
   skus: SkuInput[];
+
+  /**
+   * 低庫存提醒門檻（每個 SKU 的庫存小於或等於它且大於 0 就算偏低）；不設是用平台預設值（CountMyProductsResponse.default_low_stock_threshold）。
+   * 0 到 9999；整體取代時不帶就是清掉，改回預設值。
+   *
+   * @generated from field: optional int32 low_stock_threshold = 8;
+   */
+  lowStockThreshold?: number | undefined;
 };
 
 /**
@@ -82,7 +1592,7 @@ export type ProductInput = Message<"hawkr.catalog.v1alpha1.ProductInput"> & {
  * Use `create(ProductInputSchema)` to create a new message.
  */
 export const ProductInputSchema: GenMessage<ProductInput> = /*@__PURE__*/
-  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 0);
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 45);
 
 /**
  * ImageInput 是寫入時的一張圖：新上傳的圖帶 staged token，商品現有的圖帶它的 asset_id，兩者剛好給一個。
@@ -124,7 +1634,7 @@ export type ImageInput = Message<"hawkr.catalog.v1alpha1.ImageInput"> & {
  * Use `create(ImageInputSchema)` to create a new message.
  */
 export const ImageInputSchema: GenMessage<ImageInput> = /*@__PURE__*/
-  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 1);
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 46);
 
 /**
  * DescriptionBlock 是描述的一個區塊，剛好設一種。
@@ -175,7 +1685,7 @@ export type DescriptionBlock = Message<"hawkr.catalog.v1alpha1.DescriptionBlock"
  * Use `create(DescriptionBlockSchema)` to create a new message.
  */
 export const DescriptionBlockSchema: GenMessage<DescriptionBlock> = /*@__PURE__*/
-  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 2);
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 47);
 
 /**
  * BulletList 是項目清單。
@@ -196,7 +1706,7 @@ export type BulletList = Message<"hawkr.catalog.v1alpha1.BulletList"> & {
  * Use `create(BulletListSchema)` to create a new message.
  */
 export const BulletListSchema: GenMessage<BulletList> = /*@__PURE__*/
-  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 3);
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 48);
 
 /**
  * Table 是表格，每列的儲存格數相同。
@@ -217,7 +1727,7 @@ export type Table = Message<"hawkr.catalog.v1alpha1.Table"> & {
  * Use `create(TableSchema)` to create a new message.
  */
 export const TableSchema: GenMessage<Table> = /*@__PURE__*/
-  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 4);
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 49);
 
 /**
  * TableRow 是表格的一列。
@@ -238,7 +1748,7 @@ export type TableRow = Message<"hawkr.catalog.v1alpha1.TableRow"> & {
  * Use `create(TableRowSchema)` to create a new message.
  */
 export const TableRowSchema: GenMessage<TableRow> = /*@__PURE__*/
-  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 5);
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 50);
 
 /**
  * OptionAxisInput 是一個選項軸：名稱與有序的選項值。名稱與值都是賣家的字，不翻譯。
@@ -266,7 +1776,7 @@ export type OptionAxisInput = Message<"hawkr.catalog.v1alpha1.OptionAxisInput"> 
  * Use `create(OptionAxisInputSchema)` to create a new message.
  */
 export const OptionAxisInputSchema: GenMessage<OptionAxisInput> = /*@__PURE__*/
-  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 6);
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 51);
 
 /**
  * SkuInput 是一個 SKU，以選項值的組合辨識：沒有軸的商品兩個選項都空；有一個軸只給 option1。
@@ -316,5 +1826,398 @@ export type SkuInput = Message<"hawkr.catalog.v1alpha1.SkuInput"> & {
  * Use `create(SkuInputSchema)` to create a new message.
  */
 export const SkuInputSchema: GenMessage<SkuInput> = /*@__PURE__*/
-  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 7);
+  messageDesc(file_hawkr_catalog_v1alpha1_catalog, 52);
+
+/**
+ * ProductStatus 是商品的狀態（賣家與後台看得到，公開訊息不帶）。
+ *
+ * @generated from enum hawkr.catalog.v1alpha1.ProductStatus
+ */
+export enum ProductStatus {
+  /**
+   * @generated from enum value: PRODUCT_STATUS_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * 草稿：隱藏，只有賣家看得到。
+   *
+   * @generated from enum value: PRODUCT_STATUS_DRAFT = 1;
+   */
+  DRAFT = 1,
+
+  /**
+   * 上架：公開可見（店家可曝光時），可購買（有庫存時）。
+   *
+   * @generated from enum value: PRODUCT_STATUS_ACTIVE = 2;
+   */
+  ACTIVE = 2,
+
+  /**
+   * 下架：賣家自己停售，可還原；商品頁保留（收藏與分享連結仍可讀），但不可購買，不出現在列表與搜尋。要完全隱藏請改回草稿。
+   *
+   * @generated from enum value: PRODUCT_STATUS_ARCHIVED = 3;
+   */
+  ARCHIVED = 3,
+}
+
+/**
+ * Describes the enum hawkr.catalog.v1alpha1.ProductStatus.
+ */
+export const ProductStatusSchema: GenEnum<ProductStatus> = /*@__PURE__*/
+  enumDesc(file_hawkr_catalog_v1alpha1_catalog, 0);
+
+/**
+ * ProductAvailability 是公開訊息裡商品或 SKU 現在能不能買。公開訊息只帶它，不帶賣家的狀態。
+ *
+ * @generated from enum hawkr.catalog.v1alpha1.ProductAvailability
+ */
+export enum ProductAvailability {
+  /**
+   * @generated from enum value: PRODUCT_AVAILABILITY_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * 可購買：上架中（ACTIVE）而且有庫存。
+   *
+   * @generated from enum value: PRODUCT_AVAILABILITY_AVAILABLE = 1;
+   */
+  AVAILABLE = 1,
+
+  /**
+   * 不可購買：已下架（ARCHIVED）或沒有庫存。client 以它決定能不能加入購物車，不自己由庫存推導。
+   *
+   * @generated from enum value: PRODUCT_AVAILABILITY_UNAVAILABLE = 2;
+   */
+  UNAVAILABLE = 2,
+}
+
+/**
+ * Describes the enum hawkr.catalog.v1alpha1.ProductAvailability.
+ */
+export const ProductAvailabilitySchema: GenEnum<ProductAvailability> = /*@__PURE__*/
+  enumDesc(file_hawkr_catalog_v1alpha1_catalog, 1);
+
+/**
+ * StockStatus 是賣家清單與計數依庫存的篩選。兩個值都只比對 ACTIVE 的商品（草稿與下架不在賣，提醒是噪音）。
+ *
+ * @generated from enum hawkr.catalog.v1alpha1.StockStatus
+ */
+export enum StockStatus {
+  /**
+   * @generated from enum value: STOCK_STATUS_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * 庫存偏低：至少有一個沒刪除的 SKU 庫存大於 0 且小於或等於商品的低庫存門檻（沒設用平台預設值）。
+   *
+   * @generated from enum value: STOCK_STATUS_LOW = 1;
+   */
+  LOW = 1,
+
+  /**
+   * 售完：至少有一個沒刪除的 SKU 庫存是 0。與 LOW 各自獨立計算。
+   *
+   * @generated from enum value: STOCK_STATUS_OUT_OF_STOCK = 2;
+   */
+  OUT_OF_STOCK = 2,
+}
+
+/**
+ * Describes the enum hawkr.catalog.v1alpha1.StockStatus.
+ */
+export const StockStatusSchema: GenEnum<StockStatus> = /*@__PURE__*/
+  enumDesc(file_hawkr_catalog_v1alpha1_catalog, 2);
+
+/**
+ * ProductSort 是商品列表與搜尋的排序。
+ *
+ * @generated from enum hawkr.catalog.v1alpha1.ProductSort
+ */
+export enum ProductSort {
+  /**
+   * 不指定：ListProducts 是 LATEST，SearchProducts 是 RELEVANCE。
+   *
+   * @generated from enum value: PRODUCT_SORT_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * 最新上架（first_publish_time 遞減）。
+   *
+   * @generated from enum value: PRODUCT_SORT_LATEST = 1;
+   */
+  LATEST = 1,
+
+  /**
+   * 價格低到高（依 min_price）。
+   *
+   * @generated from enum value: PRODUCT_SORT_PRICE_ASC = 2;
+   */
+  PRICE_ASC = 2,
+
+  /**
+   * 價格高到低（依 max_price）。
+   *
+   * @generated from enum value: PRODUCT_SORT_PRICE_DESC = 3;
+   */
+  PRICE_DESC = 3,
+
+  /**
+   * 銷量多到少。
+   *
+   * @generated from enum value: PRODUCT_SORT_SALES = 4;
+   */
+  SALES = 4,
+
+  /**
+   * 評分高到低。
+   *
+   * @generated from enum value: PRODUCT_SORT_RATING = 5;
+   */
+  RATING = 5,
+
+  /**
+   * 相關度（只有 SearchProducts 接受；ListProducts 收到回 invalid_argument）。
+   *
+   * @generated from enum value: PRODUCT_SORT_RELEVANCE = 6;
+   */
+  RELEVANCE = 6,
+}
+
+/**
+ * Describes the enum hawkr.catalog.v1alpha1.ProductSort.
+ */
+export const ProductSortSchema: GenEnum<ProductSort> = /*@__PURE__*/
+  enumDesc(file_hawkr_catalog_v1alpha1_catalog, 3);
+
+/**
+ * HashtagMatch 是多個 hashtag 的比對方式。
+ *
+ * @generated from enum hawkr.catalog.v1alpha1.HashtagMatch
+ */
+export enum HashtagMatch {
+  /**
+   * 不指定：ANY。
+   *
+   * @generated from enum value: HASHTAG_MATCH_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * 商品帶有其中任何一個。
+   *
+   * @generated from enum value: HASHTAG_MATCH_ANY = 1;
+   */
+  ANY = 1,
+
+  /**
+   * 商品帶有全部。
+   *
+   * @generated from enum value: HASHTAG_MATCH_ALL = 2;
+   */
+  ALL = 2,
+}
+
+/**
+ * Describes the enum hawkr.catalog.v1alpha1.HashtagMatch.
+ */
+export const HashtagMatchSchema: GenEnum<HashtagMatch> = /*@__PURE__*/
+  enumDesc(file_hawkr_catalog_v1alpha1_catalog, 4);
+
+/**
+ * CatalogPublicService 是任何人都能讀的商品、搜尋與分類，不需要登入，回應不依觀看者（可共享快取）。
+ * 公開可讀的商品：沒刪除、店家此刻可曝光（seller.pub_exposable_stores，時間用請求的 clock）、狀態是 ACTIVE 或 ARCHIVED；
+ * 只有 ACTIVE 的出現在列表與搜尋，ARCHIVED 的商品頁讀得到但 availability 是不可購買。其他一律與不存在相同（not_found）。
+ * 公開訊息不帶賣家的狀態 enum，只帶 availability。
+ *
+ * @generated from service hawkr.catalog.v1alpha1.CatalogPublicService
+ */
+export const CatalogPublicService: GenService<{
+  /**
+   * ListProducts 是買家瀏覽的商品列表（分類頁、市集、店家的商品頁）；不帶關鍵字，關鍵字搜尋用 SearchProducts。filter 的欄位全部選填，之間是 AND。
+   * 要看收藏的商品用 BuyerAppService.ListFavorites，追蹤的店家的商品用 BuyerAppService.ListFollowedStoreProducts。
+   *
+   * @generated from rpc hawkr.catalog.v1alpha1.CatalogPublicService.ListProducts
+   */
+  listProducts: {
+    methodKind: "unary";
+    input: typeof ListProductsRequestSchema;
+    output: typeof ListProductsResponseSchema;
+  },
+  /**
+   * SearchProducts 依關鍵字找商品（標題、描述文字、標籤、分類名稱與選項的 searchable_text，pg_trgm），預設依相關度排序。
+   *
+   * @generated from rpc hawkr.catalog.v1alpha1.CatalogPublicService.SearchProducts
+   */
+  searchProducts: {
+    methodKind: "unary";
+    input: typeof SearchProductsRequestSchema;
+    output: typeof SearchProductsResponseSchema;
+  },
+  /**
+   * SuggestProductNames 是搜尋框輸入時的建議：商品名稱符合的前幾筆，不分頁，最多 20 筆。
+   *
+   * @generated from rpc hawkr.catalog.v1alpha1.CatalogPublicService.SuggestProductNames
+   */
+  suggestProductNames: {
+    methodKind: "unary";
+    input: typeof SuggestProductNamesRequestSchema;
+    output: typeof SuggestProductNamesResponseSchema;
+  },
+  /**
+   * GetProduct 讀一個公開可見的商品的完整內容（含 SKU 與庫存）。ACTIVE 與 ARCHIVED 讀得到（ARCHIVED 的 availability 是不可購買）；
+   * 不存在、草稿、已刪除、店家不可曝光回 not_found。不帶觀看者狀態（是否已收藏、是否訂閱補貨）：那些由 BuyerAppService 提供。
+   *
+   * @generated from rpc hawkr.catalog.v1alpha1.CatalogPublicService.GetProduct
+   */
+  getProduct: {
+    methodKind: "unary";
+    input: typeof GetProductRequestSchema;
+    output: typeof GetProductResponseSchema;
+  },
+  /**
+   * ListCategories 回整棵平台分類樹（兩層，頂層在前，同層依平台排序）。分類只在 migration 變動，不分頁。
+   * 名稱依 Accept-Language 協商；沒有該語言時是 zh-TW。
+   *
+   * @generated from rpc hawkr.catalog.v1alpha1.CatalogPublicService.ListCategories
+   */
+  listCategories: {
+    methodKind: "unary";
+    input: typeof ListCategoriesRequestSchema;
+    output: typeof ListCategoriesResponseSchema;
+  },
+  /**
+   * SuggestHashtags 是商品標籤輸入與搜尋的建議：名稱符合的標籤與其商品數（只算可曝光店家的 ACTIVE 商品），商品數多的在前。沒有分頁，最多 20 筆。
+   *
+   * @generated from rpc hawkr.catalog.v1alpha1.CatalogPublicService.SuggestHashtags
+   */
+  suggestHashtags: {
+    methodKind: "unary";
+    input: typeof SuggestHashtagsRequestSchema;
+    output: typeof SuggestHashtagsResponseSchema;
+  },
+  /**
+   * SuggestTrendingHashtags 是熱門商品標籤：各標籤的 ACTIVE 商品數（只算可曝光店家），多的在前。只取前 max_results 名，不分頁。
+   *
+   * @generated from rpc hawkr.catalog.v1alpha1.CatalogPublicService.SuggestTrendingHashtags
+   */
+  suggestTrendingHashtags: {
+    methodKind: "unary";
+    input: typeof SuggestTrendingHashtagsRequestSchema;
+    output: typeof SuggestTrendingHashtagsResponseSchema;
+  },
+}> = /*@__PURE__*/
+  serviceDesc(file_hawkr_catalog_v1alpha1_catalog, 0);
+
+/**
+ * SellerCatalogAppService 是賣家管理自己店家的商品。店家由登入身分推導，請求不帶 store_id；
+ * 商品不是這家店的、或已刪除，與不存在一樣回 not_found（規範 §二 防枚舉）。每個方法需要賣家能力 CAP_PRODUCT_MANAGE。
+ *
+ * etag 只涵蓋賣家可編輯的內容與狀態：庫存、銷量、收藏數、評分、首次上架時間不改它，所以調整庫存或有人下單不會讓編輯中的表單衝突。
+ *
+ * @generated from service hawkr.catalog.v1alpha1.SellerCatalogAppService
+ */
+export const SellerCatalogAppService: GenService<{
+  /**
+   * ListMyProducts 列出自己店家沒刪除的商品，任何狀態，不看店家曝光；最新建立的在前。
+   *
+   * @generated from rpc hawkr.catalog.v1alpha1.SellerCatalogAppService.ListMyProducts
+   */
+  listMyProducts: {
+    methodKind: "unary";
+    input: typeof ListMyProductsRequestSchema;
+    output: typeof ListMyProductsResponseSchema;
+  },
+  /**
+   * GetMyProduct 讀自己店家的商品完整內容（任何狀態，含 etag 與每個 SKU 的庫存）。
+   *
+   * @generated from rpc hawkr.catalog.v1alpha1.SellerCatalogAppService.GetMyProduct
+   */
+  getMyProduct: {
+    methodKind: "unary";
+    input: typeof GetMyProductRequestSchema;
+    output: typeof GetMyProductResponseSchema;
+  },
+  /**
+   * CountMyProducts 回自己店家符合篩選的商品數（導覽列的低庫存徽章用 status = ACTIVE、stock_status = LOW）。
+   *
+   * @generated from rpc hawkr.catalog.v1alpha1.SellerCatalogAppService.CountMyProducts
+   */
+  countMyProducts: {
+    methodKind: "unary";
+    input: typeof CountMyProductsRequestSchema;
+    output: typeof CountMyProductsResponseSchema;
+  },
+  /**
+   * CreateProduct 建立一個草稿商品（建立一律是草稿；要上架呼叫 SetProductStatus）。
+   * 同一家店以同一個 request_id 重送回第一次建立的商品目前的樣子，不重複建立；內容不同回 invalid_argument。
+   *
+   * @generated from rpc hawkr.catalog.v1alpha1.SellerCatalogAppService.CreateProduct
+   */
+  createProduct: {
+    methodKind: "unary";
+    input: typeof CreateProductRequestSchema;
+    output: typeof CreateProductResponseSchema;
+  },
+  /**
+   * UpdateProduct 整體取代商品的內容（狀態不變；等同 AIP-134 的 update_mask = "*"，沒有 update_mask）：沒有帶的圖片、選項軸與 SKU 組合會被移除；既有 SKU 的庫存不在這裡改（用 AdjustStock、SetStock）。
+   * etag 必填（在請求上，因為寫入的 ProductInput 與讀取的 SellerProduct 是不同的型別），與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。商品目前是 ACTIVE 時，輸入至少要有一張主圖，否則回 failed_precondition。
+   *
+   * @generated from rpc hawkr.catalog.v1alpha1.SellerCatalogAppService.UpdateProduct
+   */
+  updateProduct: {
+    methodKind: "unary";
+    input: typeof UpdateProductRequestSchema;
+    output: typeof UpdateProductResponseSchema;
+  },
+  /**
+   * SetProductStatus 切換商品狀態：草稿、上架、下架任兩個都能互切，切成目前的狀態也回成功（不改 etag）。
+   * 切成 ACTIVE 時商品至少要有一張主圖，否則回 failed_precondition。首次上架寫入 first_publish_time，之後不清除。
+   * etag 必填（上架是把看到的內容公開，內容在狀態不變時仍可能被別人改動，規範 §七）。
+   *
+   * @generated from rpc hawkr.catalog.v1alpha1.SellerCatalogAppService.SetProductStatus
+   */
+  setProductStatus: {
+    methodKind: "unary";
+    input: typeof SetProductStatusRequestSchema;
+    output: typeof SetProductStatusResponseSchema;
+  },
+  /**
+   * DeleteProduct 刪除商品：從賣家清單消失、不可還原，列保留（訂單與評價仍引用）。已經刪除的也回成功。etag 選填，帶了就檢查。
+   *
+   * @generated from rpc hawkr.catalog.v1alpha1.SellerCatalogAppService.DeleteProduct
+   */
+  deleteProduct: {
+    methodKind: "unary";
+    input: typeof DeleteProductRequestSchema;
+    output: typeof DeleteProductResponseSchema;
+  },
+  /**
+   * AdjustStock 以有號變動量調整自己店家某個 SKU 的庫存（進貨加、出貨減）。
+   * 同一家店以同一個 request_id 重送且內容相同只生效一次；內容不同回 invalid_argument。調整後不得小於 0，否則回 failed_precondition。不改商品的 etag。
+   *
+   * @generated from rpc hawkr.catalog.v1alpha1.SellerCatalogAppService.AdjustStock
+   */
+  adjustStock: {
+    methodKind: "unary";
+    input: typeof AdjustStockRequestSchema;
+    output: typeof AdjustStockResponseSchema;
+  },
+  /**
+   * SetStock 把自己店家某個 SKU 的庫存設成絕對值（盤點、商品表單輸入庫存），以 expected_quantity 比對現值：
+   * 現值不等於預期（期間有訂單扣減或別處調整）回 failed_precondition，不寫入，client 重讀後再決定。
+   * 同一家店以同一個 request_id 重送且內容相同只生效一次；內容不同回 invalid_argument。不改商品的 etag。
+   *
+   * @generated from rpc hawkr.catalog.v1alpha1.SellerCatalogAppService.SetStock
+   */
+  setStock: {
+    methodKind: "unary";
+    input: typeof SetStockRequestSchema;
+    output: typeof SetStockResponseSchema;
+  },
+}> = /*@__PURE__*/
+  serviceDesc(file_hawkr_catalog_v1alpha1_catalog, 1);
 

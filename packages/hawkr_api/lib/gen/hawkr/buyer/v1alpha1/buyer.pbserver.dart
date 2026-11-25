@@ -15,139 +15,143 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'buyer.pb.dart' as $6;
+import 'buyer.pb.dart' as $7;
 import 'buyer.pbjson.dart';
 
 export 'buyer.pb.dart';
 
 abstract class BuyerAppServiceBase extends $pb.GeneratedService {
-  $async.Future<$6.GetProfileResponse> getProfile(
-      $pb.ServerContext ctx, $6.GetProfileRequest request);
-  $async.Future<$6.UpdateProfileResponse> updateProfile(
-      $pb.ServerContext ctx, $6.UpdateProfileRequest request);
-  $async.Future<$6.ListAddressesResponse> listAddresses(
-      $pb.ServerContext ctx, $6.ListAddressesRequest request);
-  $async.Future<$6.GetAddressResponse> getAddress(
-      $pb.ServerContext ctx, $6.GetAddressRequest request);
-  $async.Future<$6.CreateAddressResponse> createAddress(
-      $pb.ServerContext ctx, $6.CreateAddressRequest request);
-  $async.Future<$6.UpdateAddressResponse> updateAddress(
-      $pb.ServerContext ctx, $6.UpdateAddressRequest request);
-  $async.Future<$6.DeleteAddressResponse> deleteAddress(
-      $pb.ServerContext ctx, $6.DeleteAddressRequest request);
-  $async.Future<$6.ListFavoritesResponse> listFavorites(
-      $pb.ServerContext ctx, $6.ListFavoritesRequest request);
-  $async.Future<$6.CheckFavoriteResponse> checkFavorite(
-      $pb.ServerContext ctx, $6.CheckFavoriteRequest request);
-  $async.Future<$6.BatchCheckFavoritesResponse> batchCheckFavorites(
-      $pb.ServerContext ctx, $6.BatchCheckFavoritesRequest request);
-  $async.Future<$6.AddFavoriteResponse> addFavorite(
-      $pb.ServerContext ctx, $6.AddFavoriteRequest request);
-  $async.Future<$6.RemoveFavoriteResponse> removeFavorite(
-      $pb.ServerContext ctx, $6.RemoveFavoriteRequest request);
-  $async.Future<$6.ListFollowsResponse> listFollows(
-      $pb.ServerContext ctx, $6.ListFollowsRequest request);
-  $async.Future<$6.CheckFollowResponse> checkFollow(
-      $pb.ServerContext ctx, $6.CheckFollowRequest request);
-  $async.Future<$6.BatchCheckFollowsResponse> batchCheckFollows(
-      $pb.ServerContext ctx, $6.BatchCheckFollowsRequest request);
-  $async.Future<$6.FollowStoreResponse> followStore(
-      $pb.ServerContext ctx, $6.FollowStoreRequest request);
-  $async.Future<$6.UnfollowStoreResponse> unfollowStore(
-      $pb.ServerContext ctx, $6.UnfollowStoreRequest request);
-  $async.Future<$6.ListMemberCardsResponse> listMemberCards(
-      $pb.ServerContext ctx, $6.ListMemberCardsRequest request);
-  $async.Future<$6.ListSpendingRecordsResponse> listSpendingRecords(
-      $pb.ServerContext ctx, $6.ListSpendingRecordsRequest request);
-  $async.Future<$6.ListVisitsResponse> listVisits(
-      $pb.ServerContext ctx, $6.ListVisitsRequest request);
-  $async.Future<$6.RecordVisitResponse> recordVisit(
-      $pb.ServerContext ctx, $6.RecordVisitRequest request);
-  $async.Future<$6.ClearVisitsResponse> clearVisits(
-      $pb.ServerContext ctx, $6.ClearVisitsRequest request);
-  $async.Future<$6.ListRestockSubscriptionsResponse> listRestockSubscriptions(
-      $pb.ServerContext ctx, $6.ListRestockSubscriptionsRequest request);
-  $async.Future<$6.SubscribeRestockResponse> subscribeRestock(
-      $pb.ServerContext ctx, $6.SubscribeRestockRequest request);
-  $async.Future<$6.UnsubscribeRestockResponse> unsubscribeRestock(
-      $pb.ServerContext ctx, $6.UnsubscribeRestockRequest request);
-  $async.Future<$6.BlockAuthorResponse> blockAuthor(
-      $pb.ServerContext ctx, $6.BlockAuthorRequest request);
-  $async.Future<$6.BlockStoreResponse> blockStore(
-      $pb.ServerContext ctx, $6.BlockStoreRequest request);
-  $async.Future<$6.UnblockBuyerResponse> unblockBuyer(
-      $pb.ServerContext ctx, $6.UnblockBuyerRequest request);
-  $async.Future<$6.UnblockStoreResponse> unblockStore(
-      $pb.ServerContext ctx, $6.UnblockStoreRequest request);
-  $async.Future<$6.ListBlockedBuyersResponse> listBlockedBuyers(
-      $pb.ServerContext ctx, $6.ListBlockedBuyersRequest request);
-  $async.Future<$6.ListBlockedStoresResponse> listBlockedStores(
-      $pb.ServerContext ctx, $6.ListBlockedStoresRequest request);
+  $async.Future<$7.GetProfileResponse> getProfile(
+      $pb.ServerContext ctx, $7.GetProfileRequest request);
+  $async.Future<$7.UpdateProfileResponse> updateProfile(
+      $pb.ServerContext ctx, $7.UpdateProfileRequest request);
+  $async.Future<$7.ListAddressesResponse> listAddresses(
+      $pb.ServerContext ctx, $7.ListAddressesRequest request);
+  $async.Future<$7.GetAddressResponse> getAddress(
+      $pb.ServerContext ctx, $7.GetAddressRequest request);
+  $async.Future<$7.CreateAddressResponse> createAddress(
+      $pb.ServerContext ctx, $7.CreateAddressRequest request);
+  $async.Future<$7.UpdateAddressResponse> updateAddress(
+      $pb.ServerContext ctx, $7.UpdateAddressRequest request);
+  $async.Future<$7.DeleteAddressResponse> deleteAddress(
+      $pb.ServerContext ctx, $7.DeleteAddressRequest request);
+  $async.Future<$7.ListFavoritesResponse> listFavorites(
+      $pb.ServerContext ctx, $7.ListFavoritesRequest request);
+  $async.Future<$7.CheckFavoriteResponse> checkFavorite(
+      $pb.ServerContext ctx, $7.CheckFavoriteRequest request);
+  $async.Future<$7.BatchCheckFavoritesResponse> batchCheckFavorites(
+      $pb.ServerContext ctx, $7.BatchCheckFavoritesRequest request);
+  $async.Future<$7.AddFavoriteResponse> addFavorite(
+      $pb.ServerContext ctx, $7.AddFavoriteRequest request);
+  $async.Future<$7.RemoveFavoriteResponse> removeFavorite(
+      $pb.ServerContext ctx, $7.RemoveFavoriteRequest request);
+  $async.Future<$7.ListFollowedStoreProductsResponse> listFollowedStoreProducts(
+      $pb.ServerContext ctx, $7.ListFollowedStoreProductsRequest request);
+  $async.Future<$7.ListFollowsResponse> listFollows(
+      $pb.ServerContext ctx, $7.ListFollowsRequest request);
+  $async.Future<$7.CheckFollowResponse> checkFollow(
+      $pb.ServerContext ctx, $7.CheckFollowRequest request);
+  $async.Future<$7.BatchCheckFollowsResponse> batchCheckFollows(
+      $pb.ServerContext ctx, $7.BatchCheckFollowsRequest request);
+  $async.Future<$7.FollowStoreResponse> followStore(
+      $pb.ServerContext ctx, $7.FollowStoreRequest request);
+  $async.Future<$7.UnfollowStoreResponse> unfollowStore(
+      $pb.ServerContext ctx, $7.UnfollowStoreRequest request);
+  $async.Future<$7.ListMemberCardsResponse> listMemberCards(
+      $pb.ServerContext ctx, $7.ListMemberCardsRequest request);
+  $async.Future<$7.ListSpendingRecordsResponse> listSpendingRecords(
+      $pb.ServerContext ctx, $7.ListSpendingRecordsRequest request);
+  $async.Future<$7.ListVisitsResponse> listVisits(
+      $pb.ServerContext ctx, $7.ListVisitsRequest request);
+  $async.Future<$7.RecordVisitResponse> recordVisit(
+      $pb.ServerContext ctx, $7.RecordVisitRequest request);
+  $async.Future<$7.ClearVisitsResponse> clearVisits(
+      $pb.ServerContext ctx, $7.ClearVisitsRequest request);
+  $async.Future<$7.ListRestockSubscriptionsResponse> listRestockSubscriptions(
+      $pb.ServerContext ctx, $7.ListRestockSubscriptionsRequest request);
+  $async.Future<$7.SubscribeRestockResponse> subscribeRestock(
+      $pb.ServerContext ctx, $7.SubscribeRestockRequest request);
+  $async.Future<$7.UnsubscribeRestockResponse> unsubscribeRestock(
+      $pb.ServerContext ctx, $7.UnsubscribeRestockRequest request);
+  $async.Future<$7.BlockAuthorResponse> blockAuthor(
+      $pb.ServerContext ctx, $7.BlockAuthorRequest request);
+  $async.Future<$7.BlockStoreResponse> blockStore(
+      $pb.ServerContext ctx, $7.BlockStoreRequest request);
+  $async.Future<$7.UnblockBuyerResponse> unblockBuyer(
+      $pb.ServerContext ctx, $7.UnblockBuyerRequest request);
+  $async.Future<$7.UnblockStoreResponse> unblockStore(
+      $pb.ServerContext ctx, $7.UnblockStoreRequest request);
+  $async.Future<$7.ListBlockedBuyersResponse> listBlockedBuyers(
+      $pb.ServerContext ctx, $7.ListBlockedBuyersRequest request);
+  $async.Future<$7.ListBlockedStoresResponse> listBlockedStores(
+      $pb.ServerContext ctx, $7.ListBlockedStoresRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
       case 'GetProfile':
-        return $6.GetProfileRequest();
+        return $7.GetProfileRequest();
       case 'UpdateProfile':
-        return $6.UpdateProfileRequest();
+        return $7.UpdateProfileRequest();
       case 'ListAddresses':
-        return $6.ListAddressesRequest();
+        return $7.ListAddressesRequest();
       case 'GetAddress':
-        return $6.GetAddressRequest();
+        return $7.GetAddressRequest();
       case 'CreateAddress':
-        return $6.CreateAddressRequest();
+        return $7.CreateAddressRequest();
       case 'UpdateAddress':
-        return $6.UpdateAddressRequest();
+        return $7.UpdateAddressRequest();
       case 'DeleteAddress':
-        return $6.DeleteAddressRequest();
+        return $7.DeleteAddressRequest();
       case 'ListFavorites':
-        return $6.ListFavoritesRequest();
+        return $7.ListFavoritesRequest();
       case 'CheckFavorite':
-        return $6.CheckFavoriteRequest();
+        return $7.CheckFavoriteRequest();
       case 'BatchCheckFavorites':
-        return $6.BatchCheckFavoritesRequest();
+        return $7.BatchCheckFavoritesRequest();
       case 'AddFavorite':
-        return $6.AddFavoriteRequest();
+        return $7.AddFavoriteRequest();
       case 'RemoveFavorite':
-        return $6.RemoveFavoriteRequest();
+        return $7.RemoveFavoriteRequest();
+      case 'ListFollowedStoreProducts':
+        return $7.ListFollowedStoreProductsRequest();
       case 'ListFollows':
-        return $6.ListFollowsRequest();
+        return $7.ListFollowsRequest();
       case 'CheckFollow':
-        return $6.CheckFollowRequest();
+        return $7.CheckFollowRequest();
       case 'BatchCheckFollows':
-        return $6.BatchCheckFollowsRequest();
+        return $7.BatchCheckFollowsRequest();
       case 'FollowStore':
-        return $6.FollowStoreRequest();
+        return $7.FollowStoreRequest();
       case 'UnfollowStore':
-        return $6.UnfollowStoreRequest();
+        return $7.UnfollowStoreRequest();
       case 'ListMemberCards':
-        return $6.ListMemberCardsRequest();
+        return $7.ListMemberCardsRequest();
       case 'ListSpendingRecords':
-        return $6.ListSpendingRecordsRequest();
+        return $7.ListSpendingRecordsRequest();
       case 'ListVisits':
-        return $6.ListVisitsRequest();
+        return $7.ListVisitsRequest();
       case 'RecordVisit':
-        return $6.RecordVisitRequest();
+        return $7.RecordVisitRequest();
       case 'ClearVisits':
-        return $6.ClearVisitsRequest();
+        return $7.ClearVisitsRequest();
       case 'ListRestockSubscriptions':
-        return $6.ListRestockSubscriptionsRequest();
+        return $7.ListRestockSubscriptionsRequest();
       case 'SubscribeRestock':
-        return $6.SubscribeRestockRequest();
+        return $7.SubscribeRestockRequest();
       case 'UnsubscribeRestock':
-        return $6.UnsubscribeRestockRequest();
+        return $7.UnsubscribeRestockRequest();
       case 'BlockAuthor':
-        return $6.BlockAuthorRequest();
+        return $7.BlockAuthorRequest();
       case 'BlockStore':
-        return $6.BlockStoreRequest();
+        return $7.BlockStoreRequest();
       case 'UnblockBuyer':
-        return $6.UnblockBuyerRequest();
+        return $7.UnblockBuyerRequest();
       case 'UnblockStore':
-        return $6.UnblockStoreRequest();
+        return $7.UnblockStoreRequest();
       case 'ListBlockedBuyers':
-        return $6.ListBlockedBuyersRequest();
+        return $7.ListBlockedBuyersRequest();
       case 'ListBlockedStores':
-        return $6.ListBlockedStoresRequest();
+        return $7.ListBlockedStoresRequest();
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }
@@ -157,70 +161,73 @@ abstract class BuyerAppServiceBase extends $pb.GeneratedService {
       $core.String methodName, $pb.GeneratedMessage request) {
     switch (methodName) {
       case 'GetProfile':
-        return getProfile(ctx, request as $6.GetProfileRequest);
+        return getProfile(ctx, request as $7.GetProfileRequest);
       case 'UpdateProfile':
-        return updateProfile(ctx, request as $6.UpdateProfileRequest);
+        return updateProfile(ctx, request as $7.UpdateProfileRequest);
       case 'ListAddresses':
-        return listAddresses(ctx, request as $6.ListAddressesRequest);
+        return listAddresses(ctx, request as $7.ListAddressesRequest);
       case 'GetAddress':
-        return getAddress(ctx, request as $6.GetAddressRequest);
+        return getAddress(ctx, request as $7.GetAddressRequest);
       case 'CreateAddress':
-        return createAddress(ctx, request as $6.CreateAddressRequest);
+        return createAddress(ctx, request as $7.CreateAddressRequest);
       case 'UpdateAddress':
-        return updateAddress(ctx, request as $6.UpdateAddressRequest);
+        return updateAddress(ctx, request as $7.UpdateAddressRequest);
       case 'DeleteAddress':
-        return deleteAddress(ctx, request as $6.DeleteAddressRequest);
+        return deleteAddress(ctx, request as $7.DeleteAddressRequest);
       case 'ListFavorites':
-        return listFavorites(ctx, request as $6.ListFavoritesRequest);
+        return listFavorites(ctx, request as $7.ListFavoritesRequest);
       case 'CheckFavorite':
-        return checkFavorite(ctx, request as $6.CheckFavoriteRequest);
+        return checkFavorite(ctx, request as $7.CheckFavoriteRequest);
       case 'BatchCheckFavorites':
         return batchCheckFavorites(
-            ctx, request as $6.BatchCheckFavoritesRequest);
+            ctx, request as $7.BatchCheckFavoritesRequest);
       case 'AddFavorite':
-        return addFavorite(ctx, request as $6.AddFavoriteRequest);
+        return addFavorite(ctx, request as $7.AddFavoriteRequest);
       case 'RemoveFavorite':
-        return removeFavorite(ctx, request as $6.RemoveFavoriteRequest);
+        return removeFavorite(ctx, request as $7.RemoveFavoriteRequest);
+      case 'ListFollowedStoreProducts':
+        return listFollowedStoreProducts(
+            ctx, request as $7.ListFollowedStoreProductsRequest);
       case 'ListFollows':
-        return listFollows(ctx, request as $6.ListFollowsRequest);
+        return listFollows(ctx, request as $7.ListFollowsRequest);
       case 'CheckFollow':
-        return checkFollow(ctx, request as $6.CheckFollowRequest);
+        return checkFollow(ctx, request as $7.CheckFollowRequest);
       case 'BatchCheckFollows':
-        return batchCheckFollows(ctx, request as $6.BatchCheckFollowsRequest);
+        return batchCheckFollows(ctx, request as $7.BatchCheckFollowsRequest);
       case 'FollowStore':
-        return followStore(ctx, request as $6.FollowStoreRequest);
+        return followStore(ctx, request as $7.FollowStoreRequest);
       case 'UnfollowStore':
-        return unfollowStore(ctx, request as $6.UnfollowStoreRequest);
+        return unfollowStore(ctx, request as $7.UnfollowStoreRequest);
       case 'ListMemberCards':
-        return listMemberCards(ctx, request as $6.ListMemberCardsRequest);
+        return listMemberCards(ctx, request as $7.ListMemberCardsRequest);
       case 'ListSpendingRecords':
         return listSpendingRecords(
-            ctx, request as $6.ListSpendingRecordsRequest);
+            ctx, request as $7.ListSpendingRecordsRequest);
       case 'ListVisits':
-        return listVisits(ctx, request as $6.ListVisitsRequest);
+        return listVisits(ctx, request as $7.ListVisitsRequest);
       case 'RecordVisit':
-        return recordVisit(ctx, request as $6.RecordVisitRequest);
+        return recordVisit(ctx, request as $7.RecordVisitRequest);
       case 'ClearVisits':
-        return clearVisits(ctx, request as $6.ClearVisitsRequest);
+        return clearVisits(ctx, request as $7.ClearVisitsRequest);
       case 'ListRestockSubscriptions':
         return listRestockSubscriptions(
-            ctx, request as $6.ListRestockSubscriptionsRequest);
+            ctx, request as $7.ListRestockSubscriptionsRequest);
       case 'SubscribeRestock':
-        return subscribeRestock(ctx, request as $6.SubscribeRestockRequest);
+        return subscribeRestock(ctx, request as $7.SubscribeRestockRequest);
       case 'UnsubscribeRestock':
-        return unsubscribeRestock(ctx, request as $6.UnsubscribeRestockRequest);
+        return unsubscribeRestock(ctx, request as $7.UnsubscribeRestockRequest);
       case 'BlockAuthor':
-        return blockAuthor(ctx, request as $6.BlockAuthorRequest);
+        return blockAuthor(ctx, request as $7.BlockAuthorRequest);
       case 'BlockStore':
-        return blockStore(ctx, request as $6.BlockStoreRequest);
+        return blockStore(ctx, request as $7.BlockStoreRequest);
       case 'UnblockBuyer':
-        return unblockBuyer(ctx, request as $6.UnblockBuyerRequest);
+        return unblockBuyer(ctx, request as $7.UnblockBuyerRequest);
       case 'UnblockStore':
-        return unblockStore(ctx, request as $6.UnblockStoreRequest);
+        return unblockStore(ctx, request as $7.UnblockStoreRequest);
       case 'ListBlockedBuyers':
-        return listBlockedBuyers(ctx, request as $6.ListBlockedBuyersRequest);
+        return listBlockedBuyers(ctx, request as $7.ListBlockedBuyersRequest);
       case 'ListBlockedStores':
-        return listBlockedStores(ctx, request as $6.ListBlockedStoresRequest);
+        return listBlockedStores(ctx, request as $7.ListBlockedStoresRequest);
       default:
         throw $core.ArgumentError('Unknown method: $methodName');
     }

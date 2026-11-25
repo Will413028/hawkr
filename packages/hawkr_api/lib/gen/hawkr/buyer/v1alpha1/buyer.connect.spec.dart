@@ -119,6 +119,16 @@ abstract final class BuyerAppService {
     idempotency: connect.Idempotency.idempotent,
   );
 
+  /// ListFollowedStoreProducts 列出呼叫者追蹤的店家的公開商品（「追蹤中」動態），最新上架在前；只含公開可見的商品
+  /// （ACTIVE、沒刪除、店家此刻可曝光）。沒有追蹤任何店家回空清單。商品卡片與公開列表相同（hawkr.catalog.v1alpha1.ProductSummary）。
+  static const listFollowedStoreProducts = connect.Spec(
+    '/$name/ListFollowedStoreProducts',
+    connect.StreamType.unary,
+    hawkrbuyerv1alpha1buyer.ListFollowedStoreProductsRequest.new,
+    hawkrbuyerv1alpha1buyer.ListFollowedStoreProductsResponse.new,
+    idempotency: connect.Idempotency.noSideEffects,
+  );
+
   /// ListFollows 列出追蹤的店家，新到舊。
   static const listFollows = connect.Spec(
     '/$name/ListFollows',

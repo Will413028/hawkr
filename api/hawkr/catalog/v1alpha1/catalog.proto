@@ -1,14 +1,566 @@
 syntax = "proto3";
 
-// catalog 模組的商品寫入內容：賣家建立與修改商品時送的訊息。服務與 RPC 隨後的步驟加入，這裡只定義寫入的資料形狀與內容上限。
+// catalog 模組給前台的 API：公開的商品瀏覽、搜尋與分類（CatalogPublicService），以及賣家管理自己店家的商品（SellerCatalogAppService）；
+// 後台的唯讀 API 在 hawkr.admin.catalog.v1alpha1。收藏與追蹤屬於 buyer 模組（BuyerAppService），這裡不依觀看者回應。
 //
-// 內容上限掛在實際受限制的欄位上（hawkr.common.v1alpha1.limits），uitext-gen 讀它並生成 Go、TS、Dart 的常數；
+// 公開讀取與賣家讀取是兩組訊息（Product、ProductSummary 與 SellerProduct、SellerProductSummary）：公開的不帶賣家的狀態 enum、etag 與內部 ID，
+// 只帶 availability（可不可以買）。值型別（ProductImage、Sku、OptionAxis 等）兩邊共用。
+//
+// 寫入內容（ProductInput）的內容上限掛在實際受限制的欄位上（hawkr.common.v1alpha1.limits），uitext-gen 讀它並生成 Go、TS、Dart 的常數；
 // 伺服器照樣驗證，違反回 INVALID_ARGUMENT。ID 是不透明的字串（ADR 2026-09-25-row-identity-by-data-kind）。
 // 新圖只收 staged token，不收 URL 或 key（ADR 2026-09-25-api-image-uri-template）。
 package hawkr.catalog.v1alpha1;
 
 import "google/api/field_behavior.proto";
+import "google/api/field_info.proto";
+import "google/protobuf/timestamp.proto";
+import "hawkr/common/v1alpha1/image.proto";
 import "hawkr/common/v1alpha1/limits.proto";
+import "hawkr/common/v1alpha1/store_card.proto";
+
+// CatalogPublicService 是任何人都能讀的商品、搜尋與分類，不需要登入，回應不依觀看者（可共享快取）。
+// 公開可讀的商品：沒刪除、店家此刻可曝光（seller.pub_exposable_stores，時間用請求的 clock）、狀態是 ACTIVE 或 ARCHIVED；
+// 只有 ACTIVE 的出現在列表與搜尋，ARCHIVED 的商品頁讀得到但 availability 是不可購買。其他一律與不存在相同（not_found）。
+// 公開訊息不帶賣家的狀態 enum，只帶 availability。
+service CatalogPublicService {
+  // ListProducts 是買家瀏覽的商品列表（分類頁、市集、店家的商品頁）；不帶關鍵字，關鍵字搜尋用 SearchProducts。filter 的欄位全部選填，之間是 AND。
+  // 要看收藏的商品用 BuyerAppService.ListFavorites，追蹤的店家的商品用 BuyerAppService.ListFollowedStoreProducts。
+  rpc ListProducts(ListProductsRequest) returns (ListProductsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // SearchProducts 依關鍵字找商品（標題、描述文字、標籤、分類名稱與選項的 searchable_text，pg_trgm），預設依相關度排序。
+  rpc SearchProducts(SearchProductsRequest) returns (SearchProductsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // SuggestProductNames 是搜尋框輸入時的建議：商品名稱符合的前幾筆，不分頁，最多 20 筆。
+  rpc SuggestProductNames(SuggestProductNamesRequest) returns (SuggestProductNamesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetProduct 讀一個公開可見的商品的完整內容（含 SKU 與庫存）。ACTIVE 與 ARCHIVED 讀得到（ARCHIVED 的 availability 是不可購買）；
+  // 不存在、草稿、已刪除、店家不可曝光回 not_found。不帶觀看者狀態（是否已收藏、是否訂閱補貨）：那些由 BuyerAppService 提供。
+  rpc GetProduct(GetProductRequest) returns (GetProductResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // ListCategories 回整棵平台分類樹（兩層，頂層在前，同層依平台排序）。分類只在 migration 變動，不分頁。
+  // 名稱依 Accept-Language 協商；沒有該語言時是 zh-TW。
+  rpc ListCategories(ListCategoriesRequest) returns (ListCategoriesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // SuggestHashtags 是商品標籤輸入與搜尋的建議：名稱符合的標籤與其商品數（只算可曝光店家的 ACTIVE 商品），商品數多的在前。沒有分頁，最多 20 筆。
+  rpc SuggestHashtags(SuggestHashtagsRequest) returns (SuggestHashtagsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // SuggestTrendingHashtags 是熱門商品標籤：各標籤的 ACTIVE 商品數（只算可曝光店家），多的在前。只取前 max_results 名，不分頁。
+  rpc SuggestTrendingHashtags(SuggestTrendingHashtagsRequest) returns (SuggestTrendingHashtagsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+// SellerCatalogAppService 是賣家管理自己店家的商品。店家由登入身分推導，請求不帶 store_id；
+// 商品不是這家店的、或已刪除，與不存在一樣回 not_found（規範 §二 防枚舉）。每個方法需要賣家能力 CAP_PRODUCT_MANAGE。
+//
+// etag 只涵蓋賣家可編輯的內容與狀態：庫存、銷量、收藏數、評分、首次上架時間不改它，所以調整庫存或有人下單不會讓編輯中的表單衝突。
+service SellerCatalogAppService {
+  // ListMyProducts 列出自己店家沒刪除的商品，任何狀態，不看店家曝光；最新建立的在前。
+  rpc ListMyProducts(ListMyProductsRequest) returns (ListMyProductsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetMyProduct 讀自己店家的商品完整內容（任何狀態，含 etag 與每個 SKU 的庫存）。
+  rpc GetMyProduct(GetMyProductRequest) returns (GetMyProductResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // CountMyProducts 回自己店家符合篩選的商品數（導覽列的低庫存徽章用 status = ACTIVE、stock_status = LOW）。
+  rpc CountMyProducts(CountMyProductsRequest) returns (CountMyProductsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // CreateProduct 建立一個草稿商品（建立一律是草稿；要上架呼叫 SetProductStatus）。
+  // 同一家店以同一個 request_id 重送回第一次建立的商品目前的樣子，不重複建立；內容不同回 invalid_argument。
+  rpc CreateProduct(CreateProductRequest) returns (CreateProductResponse);
+
+  // UpdateProduct 整體取代商品的內容（狀態不變；等同 AIP-134 的 update_mask = "*"，沒有 update_mask）：沒有帶的圖片、選項軸與 SKU 組合會被移除；既有 SKU 的庫存不在這裡改（用 AdjustStock、SetStock）。
+  // etag 必填（在請求上，因為寫入的 ProductInput 與讀取的 SellerProduct 是不同的型別），與目前版本不符回 aborted 與 VERSION_CONFLICT，不寫入。商品目前是 ACTIVE 時，輸入至少要有一張主圖，否則回 failed_precondition。
+  rpc UpdateProduct(UpdateProductRequest) returns (UpdateProductResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // SetProductStatus 切換商品狀態：草稿、上架、下架任兩個都能互切，切成目前的狀態也回成功（不改 etag）。
+  // 切成 ACTIVE 時商品至少要有一張主圖，否則回 failed_precondition。首次上架寫入 first_publish_time，之後不清除。
+  // etag 必填（上架是把看到的內容公開，內容在狀態不變時仍可能被別人改動，規範 §七）。
+  rpc SetProductStatus(SetProductStatusRequest) returns (SetProductStatusResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // DeleteProduct 刪除商品：從賣家清單消失、不可還原，列保留（訂單與評價仍引用）。已經刪除的也回成功。etag 選填，帶了就檢查。
+  rpc DeleteProduct(DeleteProductRequest) returns (DeleteProductResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+
+  // AdjustStock 以有號變動量調整自己店家某個 SKU 的庫存（進貨加、出貨減）。
+  // 同一家店以同一個 request_id 重送且內容相同只生效一次；內容不同回 invalid_argument。調整後不得小於 0，否則回 failed_precondition。不改商品的 etag。
+  rpc AdjustStock(AdjustStockRequest) returns (AdjustStockResponse);
+
+  // SetStock 把自己店家某個 SKU 的庫存設成絕對值（盤點、商品表單輸入庫存），以 expected_quantity 比對現值：
+  // 現值不等於預期（期間有訂單扣減或別處調整）回 failed_precondition，不寫入，client 重讀後再決定。
+  // 同一家店以同一個 request_id 重送且內容相同只生效一次；內容不同回 invalid_argument。不改商品的 etag。
+  rpc SetStock(SetStockRequest) returns (SetStockResponse);
+}
+
+// ProductStatus 是商品的狀態（賣家與後台看得到，公開訊息不帶）。
+enum ProductStatus {
+  PRODUCT_STATUS_UNSPECIFIED = 0;
+  // 草稿：隱藏，只有賣家看得到。
+  PRODUCT_STATUS_DRAFT = 1;
+  // 上架：公開可見（店家可曝光時），可購買（有庫存時）。
+  PRODUCT_STATUS_ACTIVE = 2;
+  // 下架：賣家自己停售，可還原；商品頁保留（收藏與分享連結仍可讀），但不可購買，不出現在列表與搜尋。要完全隱藏請改回草稿。
+  PRODUCT_STATUS_ARCHIVED = 3;
+}
+
+// ProductAvailability 是公開訊息裡商品或 SKU 現在能不能買。公開訊息只帶它，不帶賣家的狀態。
+enum ProductAvailability {
+  PRODUCT_AVAILABILITY_UNSPECIFIED = 0;
+  // 可購買：上架中（ACTIVE）而且有庫存。
+  PRODUCT_AVAILABILITY_AVAILABLE = 1;
+  // 不可購買：已下架（ARCHIVED）或沒有庫存。client 以它決定能不能加入購物車，不自己由庫存推導。
+  PRODUCT_AVAILABILITY_UNAVAILABLE = 2;
+}
+
+// StockStatus 是賣家清單與計數依庫存的篩選。兩個值都只比對 ACTIVE 的商品（草稿與下架不在賣，提醒是噪音）。
+enum StockStatus {
+  STOCK_STATUS_UNSPECIFIED = 0;
+  // 庫存偏低：至少有一個沒刪除的 SKU 庫存大於 0 且小於或等於商品的低庫存門檻（沒設用平台預設值）。
+  STOCK_STATUS_LOW = 1;
+  // 售完：至少有一個沒刪除的 SKU 庫存是 0。與 LOW 各自獨立計算。
+  STOCK_STATUS_OUT_OF_STOCK = 2;
+}
+
+// ProductSort 是商品列表與搜尋的排序。
+enum ProductSort {
+  // 不指定：ListProducts 是 LATEST，SearchProducts 是 RELEVANCE。
+  PRODUCT_SORT_UNSPECIFIED = 0;
+  // 最新上架（first_publish_time 遞減）。
+  PRODUCT_SORT_LATEST = 1;
+  // 價格低到高（依 min_price）。
+  PRODUCT_SORT_PRICE_ASC = 2;
+  // 價格高到低（依 max_price）。
+  PRODUCT_SORT_PRICE_DESC = 3;
+  // 銷量多到少。
+  PRODUCT_SORT_SALES = 4;
+  // 評分高到低。
+  PRODUCT_SORT_RATING = 5;
+  // 相關度（只有 SearchProducts 接受；ListProducts 收到回 invalid_argument）。
+  PRODUCT_SORT_RELEVANCE = 6;
+}
+
+// HashtagMatch 是多個 hashtag 的比對方式。
+enum HashtagMatch {
+  // 不指定：ANY。
+  HASHTAG_MATCH_UNSPECIFIED = 0;
+  // 商品帶有其中任何一個。
+  HASHTAG_MATCH_ANY = 1;
+  // 商品帶有全部。
+  HASHTAG_MATCH_ALL = 2;
+}
+
+// ProductFilter 是公開列表與搜尋共用的篩選，全部選填，之間是 AND。不含觀看者相關的篩選（收藏、追蹤）。
+message ProductFilter {
+  // 分類 ID，可以給頂層分類（包含它底下所有葉節點）或葉節點；多個之間是 OR。
+  repeated string category_ids = 1 [(hawkr.common.v1alpha1.limits).max_items = 20];
+  // 價格區間，新台幣元的整數，含邊界；比對商品的 [min_price, max_price] 與區間有交集。
+  optional int64 price_min = 2;
+  optional int64 price_max = 3;
+  // 標籤（正規化後的名稱，或使用者輸入的樣子，規則同 ProductInput.hashtag_inputs）。
+  repeated string hashtags = 4 [(hawkr.common.v1alpha1.limits).max_items = 10];
+  HashtagMatch hashtag_match = 5;
+  // 只看這些店家的商品；店家不可曝光的照樣排除。
+  repeated string store_ids = 6 [(hawkr.common.v1alpha1.limits).max_items = 50];
+}
+
+message ListProductsRequest {
+  ProductFilter filter = 1;
+  // 不指定是 LATEST；不接受 RELEVANCE。
+  ProductSort sort = 2;
+  // 預設 20，上限 100；負數回 invalid_argument。
+  int32 page_size = 3;
+  // page_token 與 filter、sort 綁定，其中任何一個與取得 token 時不同回 invalid_argument。
+  string page_token = 4;
+}
+
+message ListProductsResponse {
+  repeated ProductSummary products = 1;
+  string next_page_token = 2;
+}
+
+message SearchProductsRequest {
+  // 關鍵字；去頭尾空白後不得為空。
+  string query = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (hawkr.common.v1alpha1.limits).max_runes = 100
+  ];
+  ProductFilter filter = 2;
+  // 不指定是 RELEVANCE。
+  ProductSort sort = 3;
+  // 預設 20，上限 100。
+  int32 page_size = 4;
+  // page_token 與 query、filter、sort 綁定。
+  string page_token = 5;
+}
+
+message SearchProductsResponse {
+  repeated ProductSummary products = 1;
+  string next_page_token = 2;
+}
+
+message SuggestProductNamesRequest {
+  // 輸入的前綴或片段；正規化後是空的回空清單。
+  string query = 1 [
+    (google.api.field_behavior) = REQUIRED,
+    (hawkr.common.v1alpha1.limits).max_runes = 100
+  ];
+  // 最多回傳幾筆，1 到 20；0 表示預設值 10，超過 20 以 20 計，負數回 invalid_argument。
+  int32 max_results = 2;
+}
+
+message SuggestProductNamesResponse {
+  // 商品名稱，相關度高的在前，已去重。
+  repeated string names = 1;
+}
+
+message GetProductRequest {
+  string product_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetProductResponse {
+  Product product = 1;
+}
+
+message ListCategoriesRequest {}
+
+message ListCategoriesResponse {
+  // 頂層分類，每個帶底下的葉節點。
+  repeated Category categories = 1;
+}
+
+// Category 是平台分類樹的一個節點。商品只能掛在葉節點（沒有 children 的節點）。
+// 路徑（頂層 → 葉節點）由這棵樹推得，沒有另外的方法。Shopify 對照 ID 是內部資料，不對外。
+message Category {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // 依請求語系的名稱。
+  string name = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 底下的葉節點；葉節點本身沒有。
+  repeated Category children = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message SuggestHashtagsRequest {
+  // 搜尋字串，可以帶開頭的 #；正規化後是空的回空清單。
+  string query = 1 [(google.api.field_behavior) = REQUIRED];
+  // true 是名稱包含 query，false 是以 query 開頭。
+  bool contains = 2;
+  // 最多回傳幾筆，1 到 20；0 表示預設值 10，超過 20 以 20 計，負數回 invalid_argument。
+  int32 max_results = 3;
+}
+
+message SuggestHashtagsResponse {
+  repeated HashtagCount hashtags = 1;
+}
+
+message SuggestTrendingHashtagsRequest {
+  // 最多回傳幾名，1 到 50；0 表示預設值 20，超過 50 以 50 計，負數回 invalid_argument。
+  int32 max_results = 1;
+}
+
+message SuggestTrendingHashtagsResponse {
+  repeated HashtagCount hashtags = 1;
+}
+
+// HashtagCount 是一個商品標籤與它在範圍內的商品數。
+message HashtagCount {
+  // 正規化後的名稱，用來比對與連結。
+  string name = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 最多商品使用的輸入樣子，用來顯示。
+  string display = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 product_count = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// ===== 賣家 =====
+
+// MyProductFilter 是賣家清單與計數共用的篩選，全部選填，之間是 AND。
+message MyProductFilter {
+  // 只列這個狀態的商品；UNSPECIFIED 是全部。
+  ProductStatus status = 1;
+  // 依庫存篩選；LOW 與 OUT_OF_STOCK 只比對 ACTIVE 的商品（與 status 同時給了非 ACTIVE 的狀態就沒有結果）。
+  StockStatus stock_status = 2;
+  // 關鍵字，比對標題、描述、標籤、分類與選項（同公開搜尋的 searchable_text）；去頭尾空白後空的是不篩選。
+  string query = 3 [(hawkr.common.v1alpha1.limits).max_runes = 100];
+}
+
+message ListMyProductsRequest {
+  MyProductFilter filter = 1;
+  // 預設 20，上限 100。
+  int32 page_size = 2;
+  // page_token 與 filter 綁定。
+  string page_token = 3;
+}
+
+message ListMyProductsResponse {
+  repeated SellerProductSummary products = 1;
+  string next_page_token = 2;
+}
+
+message GetMyProductRequest {
+  string product_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetMyProductResponse {
+  SellerProduct product = 1;
+}
+
+message CountMyProductsRequest {
+  MyProductFilter filter = 1;
+}
+
+message CountMyProductsResponse {
+  // 符合篩選的商品數。
+  int32 count = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 商品沒有自己的低庫存門檻時用的平台預設值，client 顯示用，不自己寫死數字。
+  int32 default_low_stock_threshold = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message CreateProductRequest {
+  ProductInput product = 1 [(google.api.field_behavior) = REQUIRED];
+  // UUIDv4（AIP-155）：範圍是（店家、方法），永久保存；同一家店以同一個 request_id 重送回第一次建立的商品目前的樣子，
+  // 兩個請求同時在途也只建立一個；內容不同回 invalid_argument。必填。
+  string request_id = 2 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
+}
+
+message CreateProductResponse {
+  SellerProduct product = 1;
+}
+
+message UpdateProductRequest {
+  string product_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 讀取時拿到的 etag，必填。
+  string etag = 2 [(google.api.field_behavior) = REQUIRED];
+  // 完整內容，整體取代；沒有 update_mask。
+  ProductInput product = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+// UpdateProductResponse 的商品是修改後的完整資源（含新的 etag）。
+message UpdateProductResponse {
+  SellerProduct product = 1;
+}
+
+message SetProductStatusRequest {
+  string product_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 目標狀態，不得是 UNSPECIFIED。
+  ProductStatus status = 2 [(google.api.field_behavior) = REQUIRED];
+  // 讀取時拿到的 etag，必填。
+  string etag = 3 [(google.api.field_behavior) = REQUIRED];
+}
+
+message SetProductStatusResponse {
+  SellerProduct product = 1;
+}
+
+message DeleteProductRequest {
+  string product_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 選填；帶了就與目前版本比對。
+  string etag = 2;
+}
+
+message DeleteProductResponse {}
+
+message AdjustStockRequest {
+  // 要調整的 SKU；不屬於自己店家或已刪除回 not_found。
+  string sku_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 有號變動量，不得為 0；調整後的庫存必須在 0 到 2147483647 之間。
+  int32 delta = 2 [(google.api.field_behavior) = REQUIRED];
+  // UUIDv4（AIP-155）：範圍是（店家、方法），永久保存；同一家店以同一個 request_id 重送且內容相同只生效一次，同時在途也只生效一次；內容不同回 invalid_argument。必填：變動量重送會重複計算。
+  string request_id = 3 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
+}
+
+message AdjustStockResponse {
+  // 調整後的 SKU（含新的庫存）。
+  Sku sku = 1;
+}
+
+message SetStockRequest {
+  // 要設定的 SKU；不屬於自己店家或已刪除回 not_found。
+  string sku_id = 1 [(google.api.field_behavior) = REQUIRED];
+  // 新的庫存，0 到 2147483647。
+  int32 quantity = 2;
+  // 呼叫者看到的現值；與目前的庫存不等回 failed_precondition。
+  int32 expected_quantity = 3;
+  // UUIDv4（AIP-155）：範圍與冪等語意同 AdjustStock。必填。
+  string request_id = 4 [
+    (google.api.field_behavior) = REQUIRED,
+    (google.api.field_info).format = UUID4
+  ];
+}
+
+message SetStockResponse {
+  // 設定後的 SKU。
+  Sku sku = 1;
+}
+
+// ===== 輸出資源 =====
+
+// ProductImage 是商品的一張圖（圖庫或描述圖片）。
+message ProductImage {
+  // 圖片資產 ID；只有賣家讀自己的商品才設（寫入沿用這張圖時放進 ImageInput.asset_id），公開讀取不設。
+  string asset_id = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.common.v1alpha1.Image image = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 替代文字，可空。
+  string alt = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// ProductDescriptionBlock 是描述的一個區塊（輸出），剛好設一種；形狀對應寫入的 DescriptionBlock。
+message ProductDescriptionBlock {
+  oneof block {
+    string paragraph = 1;
+    ProductImage image = 2;
+    BulletList bullet_list = 3;
+    Table table = 4;
+  }
+}
+
+// OptionAxis 是一個選項軸（輸出）。
+message OptionAxis {
+  string name = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated string values = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Sku 是商品的一個 SKU。沒有該軸的位置，option 是空字串。
+message Sku {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  string option1 = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string option2 = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 售價，新台幣元的整數。
+  int64 price = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 原價（劃線價）；沒有設不設。
+  optional int64 compare_at_price = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 現在的庫存，不為負。
+  int32 stock_qty = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 這個 SKU 現在能不能買：商品上架中（ACTIVE）而且庫存大於 0。
+  ProductAvailability availability = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// ProductHashtag 是商品的一個標籤。
+message ProductHashtag {
+  // 正規化後的名稱，用來比對與連結。
+  string name = 1 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 使用者輸入的樣子，用來顯示。
+  string display = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Product 是公開讀取的商品完整內容。沒有賣家的狀態 enum、etag、建立與修改時間：公開的只有 availability。
+message Product {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // 賣這個商品的店家；店家卡片讀不到時不設。
+  hawkr.common.v1alpha1.StoreCard store = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string category_id = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string title = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 商品現在能不能買：上架中而且至少一個 SKU 有庫存。已下架（ARCHIVED）的商品是不可購買。
+  ProductAvailability availability = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 第一次上架的時間。
+  google.protobuf.Timestamp first_publish_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 沒刪除 SKU 的最低與最高售價，新台幣元的整數。
+  int64 min_price = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 max_price = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 sales_count = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 favorite_count = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 平均評分，1 到 5；沒有評價不設。
+  optional float rating_average = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 review_count = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated ProductImage gallery = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated ProductDescriptionBlock description = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated OptionAxis axes = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated Sku skus = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated ProductHashtag hashtags = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// ProductSummary 是公開列表的一列（商品卡片）。
+message ProductSummary {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  // 店家卡片讀不到時不設。
+  hawkr.common.v1alpha1.StoreCard store = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string category_id = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string title = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 主圖庫的第一張；沒有圖不設。
+  hawkr.common.v1alpha1.Image cover_image = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  ProductAvailability availability = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp first_publish_time = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 min_price = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 max_price = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 sales_count = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 favorite_count = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+  optional float rating_average = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 review_count = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// SellerProduct 是賣家讀自己的商品完整內容。
+message SellerProduct {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  string category_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string title = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  ProductStatus status = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 第一次上架的時間；從沒上架過不設。
+  google.protobuf.Timestamp first_publish_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 min_price = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 max_price = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 sales_count = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 favorite_count = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  optional float rating_average = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 review_count = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated ProductImage gallery = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated ProductDescriptionBlock description = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated OptionAxis axes = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated Sku skus = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated ProductHashtag hashtags = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 賣家設的低庫存門檻；沒設不設（用平台預設值）。
+  optional int32 low_stock_threshold = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 修改、上下架與刪除時帶回，client 視為不透明字串。範圍是賣家可編輯的內容與狀態；庫存、銷量、收藏數、評分、首次上架時間不影響它。
+  string etag = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 19 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 20 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// SellerProductSummary 是賣家清單的一列。
+message SellerProductSummary {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  string category_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string title = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.common.v1alpha1.Image cover_image = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  ProductStatus status = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp first_publish_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 min_price = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 max_price = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 sales_count = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 favorite_count = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  optional float rating_average = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 review_count = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 沒刪除 SKU 的庫存總和（庫存頁用，免得逐商品再讀 SKU）。
+  int32 total_stock = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+  optional int32 low_stock_threshold = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // 列表上的上下架動作用它當版本。
+  string etag = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
 
 // ProductInput 是商品的完整可寫內容。修改是整體取代：沒有帶的圖片、選項軸與 SKU 組合會被移除。
 // 狀態不在這裡，用切換狀態的操作改。
@@ -37,6 +589,9 @@ message ProductInput {
     (google.api.field_behavior) = REQUIRED,
     (hawkr.common.v1alpha1.limits).max_items = 100
   ];
+  // 低庫存提醒門檻（每個 SKU 的庫存小於或等於它且大於 0 就算偏低）；不設是用平台預設值（CountMyProductsResponse.default_low_stock_threshold）。
+  // 0 到 9999；整體取代時不帶就是清掉，改回預設值。
+  optional int32 low_stock_threshold = 8;
 }
 
 // ImageInput 是寫入時的一張圖：新上傳的圖帶 staged token，商品現有的圖帶它的 asset_id，兩者剛好給一個。

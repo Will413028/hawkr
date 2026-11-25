@@ -75,6 +75,9 @@ const (
 	// BuyerAppServiceRemoveFavoriteProcedure is the fully-qualified name of the BuyerAppService's
 	// RemoveFavorite RPC.
 	BuyerAppServiceRemoveFavoriteProcedure = "/hawkr.buyer.v1alpha1.BuyerAppService/RemoveFavorite"
+	// BuyerAppServiceListFollowedStoreProductsProcedure is the fully-qualified name of the
+	// BuyerAppService's ListFollowedStoreProducts RPC.
+	BuyerAppServiceListFollowedStoreProductsProcedure = "/hawkr.buyer.v1alpha1.BuyerAppService/ListFollowedStoreProducts"
 	// BuyerAppServiceListFollowsProcedure is the fully-qualified name of the BuyerAppService's
 	// ListFollows RPC.
 	BuyerAppServiceListFollowsProcedure = "/hawkr.buyer.v1alpha1.BuyerAppService/ListFollows"
@@ -164,6 +167,9 @@ type BuyerAppServiceClient interface {
 	AddFavorite(context.Context, *connect.Request[v1alpha1.AddFavoriteRequest]) (*connect.Response[v1alpha1.AddFavoriteResponse], error)
 	// RemoveFavorite 取消收藏；沒有收藏時也成功。
 	RemoveFavorite(context.Context, *connect.Request[v1alpha1.RemoveFavoriteRequest]) (*connect.Response[v1alpha1.RemoveFavoriteResponse], error)
+	// ListFollowedStoreProducts 列出呼叫者追蹤的店家的公開商品（「追蹤中」動態），最新上架在前；只含公開可見的商品
+	// （ACTIVE、沒刪除、店家此刻可曝光）。沒有追蹤任何店家回空清單。商品卡片與公開列表相同（hawkr.catalog.v1alpha1.ProductSummary）。
+	ListFollowedStoreProducts(context.Context, *connect.Request[v1alpha1.ListFollowedStoreProductsRequest]) (*connect.Response[v1alpha1.ListFollowedStoreProductsResponse], error)
 	// ListFollows 列出追蹤的店家，新到舊。
 	ListFollows(context.Context, *connect.Request[v1alpha1.ListFollowsRequest]) (*connect.Response[v1alpha1.ListFollowsResponse], error)
 	// CheckFollow 回傳是否已追蹤店家。
@@ -296,6 +302,13 @@ func NewBuyerAppServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			baseURL+BuyerAppServiceRemoveFavoriteProcedure,
 			connect.WithSchema(buyerAppServiceMethods.ByName("RemoveFavorite")),
 			connect.WithIdempotency(connect.IdempotencyIdempotent),
+			connect.WithClientOptions(opts...),
+		),
+		listFollowedStoreProducts: connect.NewClient[v1alpha1.ListFollowedStoreProductsRequest, v1alpha1.ListFollowedStoreProductsResponse](
+			httpClient,
+			baseURL+BuyerAppServiceListFollowedStoreProductsProcedure,
+			connect.WithSchema(buyerAppServiceMethods.ByName("ListFollowedStoreProducts")),
+			connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 			connect.WithClientOptions(opts...),
 		),
 		listFollows: connect.NewClient[v1alpha1.ListFollowsRequest, v1alpha1.ListFollowsResponse](
@@ -435,37 +448,38 @@ func NewBuyerAppServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 
 // buyerAppServiceClient implements BuyerAppServiceClient.
 type buyerAppServiceClient struct {
-	getProfile               *connect.Client[v1alpha1.GetProfileRequest, v1alpha1.GetProfileResponse]
-	updateProfile            *connect.Client[v1alpha1.UpdateProfileRequest, v1alpha1.UpdateProfileResponse]
-	listAddresses            *connect.Client[v1alpha1.ListAddressesRequest, v1alpha1.ListAddressesResponse]
-	getAddress               *connect.Client[v1alpha1.GetAddressRequest, v1alpha1.GetAddressResponse]
-	createAddress            *connect.Client[v1alpha1.CreateAddressRequest, v1alpha1.CreateAddressResponse]
-	updateAddress            *connect.Client[v1alpha1.UpdateAddressRequest, v1alpha1.UpdateAddressResponse]
-	deleteAddress            *connect.Client[v1alpha1.DeleteAddressRequest, v1alpha1.DeleteAddressResponse]
-	listFavorites            *connect.Client[v1alpha1.ListFavoritesRequest, v1alpha1.ListFavoritesResponse]
-	checkFavorite            *connect.Client[v1alpha1.CheckFavoriteRequest, v1alpha1.CheckFavoriteResponse]
-	batchCheckFavorites      *connect.Client[v1alpha1.BatchCheckFavoritesRequest, v1alpha1.BatchCheckFavoritesResponse]
-	addFavorite              *connect.Client[v1alpha1.AddFavoriteRequest, v1alpha1.AddFavoriteResponse]
-	removeFavorite           *connect.Client[v1alpha1.RemoveFavoriteRequest, v1alpha1.RemoveFavoriteResponse]
-	listFollows              *connect.Client[v1alpha1.ListFollowsRequest, v1alpha1.ListFollowsResponse]
-	checkFollow              *connect.Client[v1alpha1.CheckFollowRequest, v1alpha1.CheckFollowResponse]
-	batchCheckFollows        *connect.Client[v1alpha1.BatchCheckFollowsRequest, v1alpha1.BatchCheckFollowsResponse]
-	followStore              *connect.Client[v1alpha1.FollowStoreRequest, v1alpha1.FollowStoreResponse]
-	unfollowStore            *connect.Client[v1alpha1.UnfollowStoreRequest, v1alpha1.UnfollowStoreResponse]
-	listMemberCards          *connect.Client[v1alpha1.ListMemberCardsRequest, v1alpha1.ListMemberCardsResponse]
-	listSpendingRecords      *connect.Client[v1alpha1.ListSpendingRecordsRequest, v1alpha1.ListSpendingRecordsResponse]
-	listVisits               *connect.Client[v1alpha1.ListVisitsRequest, v1alpha1.ListVisitsResponse]
-	recordVisit              *connect.Client[v1alpha1.RecordVisitRequest, v1alpha1.RecordVisitResponse]
-	clearVisits              *connect.Client[v1alpha1.ClearVisitsRequest, v1alpha1.ClearVisitsResponse]
-	listRestockSubscriptions *connect.Client[v1alpha1.ListRestockSubscriptionsRequest, v1alpha1.ListRestockSubscriptionsResponse]
-	subscribeRestock         *connect.Client[v1alpha1.SubscribeRestockRequest, v1alpha1.SubscribeRestockResponse]
-	unsubscribeRestock       *connect.Client[v1alpha1.UnsubscribeRestockRequest, v1alpha1.UnsubscribeRestockResponse]
-	blockAuthor              *connect.Client[v1alpha1.BlockAuthorRequest, v1alpha1.BlockAuthorResponse]
-	blockStore               *connect.Client[v1alpha1.BlockStoreRequest, v1alpha1.BlockStoreResponse]
-	unblockBuyer             *connect.Client[v1alpha1.UnblockBuyerRequest, v1alpha1.UnblockBuyerResponse]
-	unblockStore             *connect.Client[v1alpha1.UnblockStoreRequest, v1alpha1.UnblockStoreResponse]
-	listBlockedBuyers        *connect.Client[v1alpha1.ListBlockedBuyersRequest, v1alpha1.ListBlockedBuyersResponse]
-	listBlockedStores        *connect.Client[v1alpha1.ListBlockedStoresRequest, v1alpha1.ListBlockedStoresResponse]
+	getProfile                *connect.Client[v1alpha1.GetProfileRequest, v1alpha1.GetProfileResponse]
+	updateProfile             *connect.Client[v1alpha1.UpdateProfileRequest, v1alpha1.UpdateProfileResponse]
+	listAddresses             *connect.Client[v1alpha1.ListAddressesRequest, v1alpha1.ListAddressesResponse]
+	getAddress                *connect.Client[v1alpha1.GetAddressRequest, v1alpha1.GetAddressResponse]
+	createAddress             *connect.Client[v1alpha1.CreateAddressRequest, v1alpha1.CreateAddressResponse]
+	updateAddress             *connect.Client[v1alpha1.UpdateAddressRequest, v1alpha1.UpdateAddressResponse]
+	deleteAddress             *connect.Client[v1alpha1.DeleteAddressRequest, v1alpha1.DeleteAddressResponse]
+	listFavorites             *connect.Client[v1alpha1.ListFavoritesRequest, v1alpha1.ListFavoritesResponse]
+	checkFavorite             *connect.Client[v1alpha1.CheckFavoriteRequest, v1alpha1.CheckFavoriteResponse]
+	batchCheckFavorites       *connect.Client[v1alpha1.BatchCheckFavoritesRequest, v1alpha1.BatchCheckFavoritesResponse]
+	addFavorite               *connect.Client[v1alpha1.AddFavoriteRequest, v1alpha1.AddFavoriteResponse]
+	removeFavorite            *connect.Client[v1alpha1.RemoveFavoriteRequest, v1alpha1.RemoveFavoriteResponse]
+	listFollowedStoreProducts *connect.Client[v1alpha1.ListFollowedStoreProductsRequest, v1alpha1.ListFollowedStoreProductsResponse]
+	listFollows               *connect.Client[v1alpha1.ListFollowsRequest, v1alpha1.ListFollowsResponse]
+	checkFollow               *connect.Client[v1alpha1.CheckFollowRequest, v1alpha1.CheckFollowResponse]
+	batchCheckFollows         *connect.Client[v1alpha1.BatchCheckFollowsRequest, v1alpha1.BatchCheckFollowsResponse]
+	followStore               *connect.Client[v1alpha1.FollowStoreRequest, v1alpha1.FollowStoreResponse]
+	unfollowStore             *connect.Client[v1alpha1.UnfollowStoreRequest, v1alpha1.UnfollowStoreResponse]
+	listMemberCards           *connect.Client[v1alpha1.ListMemberCardsRequest, v1alpha1.ListMemberCardsResponse]
+	listSpendingRecords       *connect.Client[v1alpha1.ListSpendingRecordsRequest, v1alpha1.ListSpendingRecordsResponse]
+	listVisits                *connect.Client[v1alpha1.ListVisitsRequest, v1alpha1.ListVisitsResponse]
+	recordVisit               *connect.Client[v1alpha1.RecordVisitRequest, v1alpha1.RecordVisitResponse]
+	clearVisits               *connect.Client[v1alpha1.ClearVisitsRequest, v1alpha1.ClearVisitsResponse]
+	listRestockSubscriptions  *connect.Client[v1alpha1.ListRestockSubscriptionsRequest, v1alpha1.ListRestockSubscriptionsResponse]
+	subscribeRestock          *connect.Client[v1alpha1.SubscribeRestockRequest, v1alpha1.SubscribeRestockResponse]
+	unsubscribeRestock        *connect.Client[v1alpha1.UnsubscribeRestockRequest, v1alpha1.UnsubscribeRestockResponse]
+	blockAuthor               *connect.Client[v1alpha1.BlockAuthorRequest, v1alpha1.BlockAuthorResponse]
+	blockStore                *connect.Client[v1alpha1.BlockStoreRequest, v1alpha1.BlockStoreResponse]
+	unblockBuyer              *connect.Client[v1alpha1.UnblockBuyerRequest, v1alpha1.UnblockBuyerResponse]
+	unblockStore              *connect.Client[v1alpha1.UnblockStoreRequest, v1alpha1.UnblockStoreResponse]
+	listBlockedBuyers         *connect.Client[v1alpha1.ListBlockedBuyersRequest, v1alpha1.ListBlockedBuyersResponse]
+	listBlockedStores         *connect.Client[v1alpha1.ListBlockedStoresRequest, v1alpha1.ListBlockedStoresResponse]
 }
 
 // GetProfile calls hawkr.buyer.v1alpha1.BuyerAppService.GetProfile.
@@ -526,6 +540,11 @@ func (c *buyerAppServiceClient) AddFavorite(ctx context.Context, req *connect.Re
 // RemoveFavorite calls hawkr.buyer.v1alpha1.BuyerAppService.RemoveFavorite.
 func (c *buyerAppServiceClient) RemoveFavorite(ctx context.Context, req *connect.Request[v1alpha1.RemoveFavoriteRequest]) (*connect.Response[v1alpha1.RemoveFavoriteResponse], error) {
 	return c.removeFavorite.CallUnary(ctx, req)
+}
+
+// ListFollowedStoreProducts calls hawkr.buyer.v1alpha1.BuyerAppService.ListFollowedStoreProducts.
+func (c *buyerAppServiceClient) ListFollowedStoreProducts(ctx context.Context, req *connect.Request[v1alpha1.ListFollowedStoreProductsRequest]) (*connect.Response[v1alpha1.ListFollowedStoreProductsResponse], error) {
+	return c.listFollowedStoreProducts.CallUnary(ctx, req)
 }
 
 // ListFollows calls hawkr.buyer.v1alpha1.BuyerAppService.ListFollows.
@@ -653,6 +672,9 @@ type BuyerAppServiceHandler interface {
 	AddFavorite(context.Context, *connect.Request[v1alpha1.AddFavoriteRequest]) (*connect.Response[v1alpha1.AddFavoriteResponse], error)
 	// RemoveFavorite 取消收藏；沒有收藏時也成功。
 	RemoveFavorite(context.Context, *connect.Request[v1alpha1.RemoveFavoriteRequest]) (*connect.Response[v1alpha1.RemoveFavoriteResponse], error)
+	// ListFollowedStoreProducts 列出呼叫者追蹤的店家的公開商品（「追蹤中」動態），最新上架在前；只含公開可見的商品
+	// （ACTIVE、沒刪除、店家此刻可曝光）。沒有追蹤任何店家回空清單。商品卡片與公開列表相同（hawkr.catalog.v1alpha1.ProductSummary）。
+	ListFollowedStoreProducts(context.Context, *connect.Request[v1alpha1.ListFollowedStoreProductsRequest]) (*connect.Response[v1alpha1.ListFollowedStoreProductsResponse], error)
 	// ListFollows 列出追蹤的店家，新到舊。
 	ListFollows(context.Context, *connect.Request[v1alpha1.ListFollowsRequest]) (*connect.Response[v1alpha1.ListFollowsResponse], error)
 	// CheckFollow 回傳是否已追蹤店家。
@@ -781,6 +803,13 @@ func NewBuyerAppServiceHandler(svc BuyerAppServiceHandler, opts ...connect.Handl
 		svc.RemoveFavorite,
 		connect.WithSchema(buyerAppServiceMethods.ByName("RemoveFavorite")),
 		connect.WithIdempotency(connect.IdempotencyIdempotent),
+		connect.WithHandlerOptions(opts...),
+	)
+	buyerAppServiceListFollowedStoreProductsHandler := connect.NewUnaryHandler(
+		BuyerAppServiceListFollowedStoreProductsProcedure,
+		svc.ListFollowedStoreProducts,
+		connect.WithSchema(buyerAppServiceMethods.ByName("ListFollowedStoreProducts")),
+		connect.WithIdempotency(connect.IdempotencyNoSideEffects),
 		connect.WithHandlerOptions(opts...),
 	)
 	buyerAppServiceListFollowsHandler := connect.NewUnaryHandler(
@@ -941,6 +970,8 @@ func NewBuyerAppServiceHandler(svc BuyerAppServiceHandler, opts ...connect.Handl
 			buyerAppServiceAddFavoriteHandler.ServeHTTP(w, r)
 		case BuyerAppServiceRemoveFavoriteProcedure:
 			buyerAppServiceRemoveFavoriteHandler.ServeHTTP(w, r)
+		case BuyerAppServiceListFollowedStoreProductsProcedure:
+			buyerAppServiceListFollowedStoreProductsHandler.ServeHTTP(w, r)
 		case BuyerAppServiceListFollowsProcedure:
 			buyerAppServiceListFollowsHandler.ServeHTTP(w, r)
 		case BuyerAppServiceCheckFollowProcedure:
@@ -1034,6 +1065,10 @@ func (UnimplementedBuyerAppServiceHandler) AddFavorite(context.Context, *connect
 
 func (UnimplementedBuyerAppServiceHandler) RemoveFavorite(context.Context, *connect.Request[v1alpha1.RemoveFavoriteRequest]) (*connect.Response[v1alpha1.RemoveFavoriteResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.buyer.v1alpha1.BuyerAppService.RemoveFavorite is not implemented"))
+}
+
+func (UnimplementedBuyerAppServiceHandler) ListFollowedStoreProducts(context.Context, *connect.Request[v1alpha1.ListFollowedStoreProductsRequest]) (*connect.Response[v1alpha1.ListFollowedStoreProductsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.buyer.v1alpha1.BuyerAppService.ListFollowedStoreProducts is not implemented"))
 }
 
 func (UnimplementedBuyerAppServiceHandler) ListFollows(context.Context, *connect.Request[v1alpha1.ListFollowsRequest]) (*connect.Response[v1alpha1.ListFollowsResponse], error) {

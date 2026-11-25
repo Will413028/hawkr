@@ -128,6 +128,7 @@
   - 可修改的資源帶 `string etag`，client 當成不透明的字串。
   - `Update`：資源裡的 `etag` 必填，沒帶回 `INVALID_ARGUMENT`；與目前版本不符回 `ABORTED`，`ErrorInfo.reason` 是 `VERSION_CONFLICT`，不寫入。
   - `Delete`：請求的 `etag` 選填，帶了就同樣檢查。
+  - 整體取代的 `Update` 若寫入型別與讀取型別不同（寫入的 `ProductInput` 帶 staged token，讀取的資源帶 asset），資源不是請求本體，`etag` 放在請求上（偏離 AIP-134 的「資源帶 etag」，理由是讀寫型別不同；檢查與錯誤同上）。範例：catalog 的 `UpdateProductRequest.etag`。
   - 改變狀態的自訂方法（核准、合併、封存等）：決定依據的內容在狀態不變時仍可能被改的，請求的 `etag` 必填，檢查同 `Update`；決定只依據狀態機已經檢查的狀態、或依據不可變的內容的，不帶 etag（ADR `2026-09-25-optimistic-concurrency-etag.md` 修訂）。
   - 同一組裡只能有一筆的標記（預設、主要）不做成資源上可寫的布林：該欄位 `OUTPUT_ONLY`，改由自訂方法（`SetDefault<資源>`）設定，在同一個 transaction 鎖住整組的列、取消舊的再設定新的，稽核一筆。可寫布林會讓「設成 false」語意不明，並發設定時撞唯一索引。
   - 以 key 識別的資源（ADR 的 D3）：`Create` 與 `Update` 分開。`Create` 不帶 etag、只建立，已經存在回 `ALREADY_EXISTS`（AIP-133），`ErrorInfo.reason` 同樣是 `VERSION_CONFLICT`；`Update` 必須帶 etag。
