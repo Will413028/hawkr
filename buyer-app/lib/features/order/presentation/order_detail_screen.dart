@@ -907,12 +907,8 @@ class _RefundTaskSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final afterSale = afterSaleAsync.value;
-    final needsRefundPage =
-        order.needRefundPage || afterSale?.needRefundPage == true;
-    final refundFailed =
-        afterSale != null &&
-        RefundTaskStatus.isFailed(afterSale.refundTaskStatus);
-    if (!needsRefundPage && !refundFailed) {
+    if (afterSale == null ||
+        !RefundTaskStatus.isFailed(afterSale.refundTaskStatus)) {
       return const SizedBox.shrink();
     }
 
@@ -921,9 +917,7 @@ class _RefundTaskSummaryCard extends StatelessWidget {
       child: _SimpleInfoCard(
         icon: HkIconName.warning,
         title: '需要你的處理',
-        message: needsRefundPage
-            ? '請補填退款帳戶資料，完成後才能安排退款。'
-            : afterSale!.refundFailureMessage.ifEmpty('退款處理失敗，請聯繫客服協助。'),
+        message: afterSale.refundFailureMessage.ifEmpty('退款處理失敗，請聯繫客服協助。'),
         color: OrderColorTokens.attention,
       ),
     );
@@ -998,8 +992,6 @@ class _AfterSaleCaseSection extends StatelessWidget {
         final refundLabel = RefundTaskStatus.buyerProgressLabel(
           taskStatus: afterSale.refundTaskStatus,
           failureMessage: afterSale.refundFailureMessage,
-          estimatedRefundDate: afterSale.estimatedRefundDate,
-          bankDate: afterSale.bankDate,
         );
         final rows = <Widget>[
           if (afterSale.caseNo.isNotEmpty)
@@ -1028,11 +1020,7 @@ class _AfterSaleCaseSection extends StatelessWidget {
             _InfoLine(
               label: '退款進度',
               value: refundLabel,
-              valueColor:
-                  RefundTaskStatus.isFailed(afterSale.refundTaskStatus) ||
-                      RefundTaskStatus.needsBuyerForm(
-                        afterSale.refundTaskStatus,
-                      )
+              valueColor: RefundTaskStatus.isFailed(afterSale.refundTaskStatus)
                   ? OrderColorTokens.attention
                   : null,
             ),
@@ -1660,11 +1648,6 @@ class _PaymentDetailsCard extends StatelessWidget {
         _amountIsNonZero(shippingFee) ||
         _amountIsNonZero(discount) ||
         originalAmount != totalAmount;
-    final showAtmAccount =
-        order.paymentMethod == PaymentMethod.atm.value &&
-        order.atmVirtualAccount.isNotEmpty &&
-        order.status != '80' &&
-        order.status != '70';
 
     return Container(
       decoration: _cardDecoration(),
@@ -1708,14 +1691,6 @@ class _PaymentDetailsCard extends StatelessWidget {
             if (_amountIsNonZero(discount))
               _PaymentRow(label: '優惠', amount: '− NT\$ $discount'),
           ],
-          if (showAtmAccount) ...[
-            const SizedBox(height: HkSpace.md),
-            Divider(color: AppColors.textPrimary.withValues(alpha: 0.12)),
-            const SizedBox(height: HkSpace.sm),
-            if (order.atmBankCode.isNotEmpty)
-              _InfoLine(label: '銀行代碼', value: order.atmBankCode),
-            _CopyableInfoRow(label: '匯款帳號', value: order.atmVirtualAccount),
-          ],
           if (order.status == '60' ||
               order.status == '70' ||
               order.status == '80') ...[
@@ -1724,12 +1699,7 @@ class _PaymentDetailsCard extends StatelessWidget {
             const SizedBox(height: HkSpace.sm),
             Row(
               children: [
-                Text(
-                  order.status == '80' && order.needRefundPage
-                      ? '退款待處理'
-                      : '退款金額',
-                  style: AppTypography.metaMuted,
-                ),
+                Text('退款金額', style: AppTypography.metaMuted),
                 const Spacer(),
                 Text(
                   refundAmountText,
@@ -1882,9 +1852,7 @@ bool _amountIsNonZero(String value) {
     case '0':
       return (label: '尚未付款', color: OrderColorTokens.attentionFill);
     case '80':
-      return order.needRefundPage
-          ? (label: '退款待處理', color: OrderColorTokens.attentionFill)
-          : (label: '付款已關閉', color: OrderColorTokens.neutral);
+      return (label: '付款已關閉', color: OrderColorTokens.neutral);
     case '60':
       return (label: '退款調整', color: OrderColorTokens.attentionFill);
     case '70':

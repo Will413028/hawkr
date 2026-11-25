@@ -137,7 +137,6 @@ class UberCheckoutProbeWiringTest {
                         .build());
         when(sellerGrpcClient.getSellerMeta(anyLong())).thenReturn(SellerMeta.newBuilder()
                 .setSellerName("測試賣家")
-                .setPayuniMerId("HAWK" + STORE_ID)
                 .setCanAcceptOrders(true)
                 .build());
         // 🔴 買家地址簿是 dropoff 三欄的唯一來源。值刻意與「一整串 shipping_address」不同，
@@ -170,7 +169,7 @@ class UberCheckoutProbeWiringTest {
 
         service = new CheckoutService(productGrpcClient, sellerGrpcClient, buyerGrpcClient,
                 shippingGrpcClient, null, invoiceGrpcClient, checkoutValidator, orderService,
-                new OrderPolicyResolver(), redisTemplate, null);
+                new OrderPolicyResolver(), redisTemplate, null, null);
 
         OrderPolicySnapshot policy = new OrderPolicyResolver().resolve(UBER);
         when(valueOperations.getAndDelete(anyString())).thenReturn(

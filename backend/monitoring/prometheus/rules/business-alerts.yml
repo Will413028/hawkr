@@ -5,13 +5,6 @@
 # | Metric                                        | 來源                                   | 告警 |
 # |-----------------------------------------------|----------------------------------------|------|
 # | hawkr_orders_created_total               | order-service（Micrometer Counter）    | ZeroOrders |
-# | hawkr_payment_failed_total               | payment-service（Micrometer Counter）  | PaymentFailureSpike |
-# | hawkr_payment_total                      | payment-service（Micrometer Counter）  | PaymentFailureSpike |
-# | hawkr_payment_reconcile_outcome_total    | payment-service（reconcile 排程）      | PaymentReconcileConflict |
-# | hawkr_payment_rescue_manual_pending      | sql_exporter（payment DB）             | PaymentRescueManualPending |
-# | payment_outbox_backlog_rows                   | sql_exporter（payment DB）             | （趨勢用，門檻走 age 那支） |
-# | payment_outbox_oldest_backlog_age_seconds     | sql_exporter（payment DB）             | PaymentOutboxBacklogStuck |
-# | payment_outbox_dead_rows                      | sql_exporter（payment DB）             | PaymentOutboxDeadRows |
 # | hawkr_shipping_provider_status_unknown_total | shipping-service（Micrometer Counter） | ShippingProviderStatusUnknown |
 # | hawkr_shipping_provider_not_status_event_total | shipping-service（正常流量，趨勢用） | （刻意無告警） |
 #
@@ -85,62 +78,6 @@ groups:
           summary: "env={{ $labels.env }}：過去 30 分鐘無任何訂單建立"
           description: "env={{ $labels.env }}：hawkr_orders_created_total 30 分鐘增量為 0，結帳/庫存/建單鏈路疑異常，請查 order-service 與上游。"
 
-  # ── 付款失敗率飆高（issue #1369）───────────────────────────────
-  # payment-service 於 outbox 收斂點 export hawkr_payment_failed_total /
-  # hawkr_payment_total（僅計 payment.success + payment.failed 終態）。失敗佔比 >10% 持續
-  # 5 分鐘即告警。channel=business → dev-警報/prod-警報。
-  - name: payment-alerts
-    interval: 60s
-    rules:
-      - alert: PaymentFailureSpike
-        expr: |
-          (
-            sum(rate(hawkr_payment_failed_total[10m]))
-            /
-            sum(rate(hawkr_payment_total[10m]))
-          ) > 0.1
-        for: 5m
-        labels:
-          severity: critical
-          channel: business
-        annotations:
-          summary: "env={{ $labels.env }}：付款失敗率過高（>10%）"
-          description: "env={{ $labels.env }}：近 10 分鐘 payment.failed / (success+failed) > 0.1，金流疑異常（PayUni 通道/卡別/服務），請查 payment-service。"
-
-  # ── 金流成功但本地未收斂（issue #1369）─────────────────────────
-  # payment-service reconcile 排程 export hawkr_payment_reconcile_outcome_total{outcome=...}。
-  # RESCUE_MANUAL_REQUIRED（ATM rescue 需人工）/ RESCUE_FAILED（rescue 退款失敗）表「PayUni 已扣款
-  # 但本地 EXPIRED，自動補救未完成」，需人工救援。時間窗內出現任一即告警。channel=business。
-  - name: payment-reconcile-alerts
-    interval: 300s
-    rules:
-      - alert: PaymentReconcileConflict
-        expr: sum(increase(hawkr_payment_reconcile_outcome_total{outcome=~"RESCUE_MANUAL_REQUIRED|RESCUE_FAILED"}[15m])) > 0
-        for: 5m
-        labels:
-          severity: critical
-          channel: business
-        annotations:
-          summary: "env={{ $labels.env }}：偵測到金流成功但本地未收斂的 reconcile 衝突"
-          description: "env={{ $labels.env }}：近 15 分鐘 reconcile 出現 RESCUE_MANUAL_REQUIRED / RESCUE_FAILED，PayUni 已成功但本地曾 EXPIRED、自動退款需人工或失敗，請查 payment_transactions.rescue_action 與 rescue 退款狀態。"
-
-  # ── ATM rescue 待人工退款積壓（issue #1369，取代原孤兒事件 payment.rescue.requires_manual）─
-  # sql_exporter 查 payment_transactions.rescue_action='8902'（REFUND_PENDING_MANUAL）且尚無成功退款
-  # 的筆數 → hawkr_payment_rescue_manual_pending。>0 表有 ATM rescue 待人工頁面版完成退款。
-  # channel=business → dev-警報/prod-警報。
-  - name: payment-rescue-alerts
-    interval: 300s
-    rules:
-      - alert: PaymentRescueManualPending
-        expr: hawkr_payment_rescue_manual_pending > 0
-        for: 1h
-        labels:
-          severity: warning
-          channel: business
-        annotations:
-          summary: "env={{ $labels.env }}：有 {{ $value }} 筆 ATM rescue 退款待人工完成"
-          description: "env={{ $labels.env }}：payment_transactions.rescue_action='8902'（REFUND_PENDING_MANUAL）且無成功退款者 {{ $value }} 筆。ATM rescue 退款需人工於 PayUni 頁面版填銀行資訊完成，請儘速處理。"
-
   # ── 撥款資格閘門（backend#3262）─────────────────────────────────────
   # order-service GrantPaymentWorker 在撥款前反查 aftersales「這張訂單還會不會再生出退款」，
   # 被擋住時發 hawkr_grant_payout_held_total{reason=...}（每次推遲 +1）。
@@ -198,49 +135,6 @@ groups:
         annotations:
           summary: "env={{ $labels.env }}：撥款被『在途申訴』持續擋住，可能有交易抓著 case row lock 不放"
           description: "env={{ $labels.env }}：近 1 小時有 {{ $value }} 次撥款因偵測到在途申訴（case row 被持鎖或持鎖重讀發現快照過期）而 fail-closed 推遲。偶發表示 backend#3262 的競態防護正常運作；持續出現代表有交易長時間持有 aftersale_cases 的 row lock。請查 aftersales-service 的 pg_stat_activity（state='idle in transaction' 或長時間 active 的 UPDATE/SELECT FOR UPDATE on aftersale_cases），以及 media-service 是否可達（submitAppeal 的 finalizeImages/linkImages 走在該鎖之內）。"
-
-  # ── payment outbox_events 積壓／DEAD 偵測（36 §3.3.1 Outbox persisted exchange，WP1）──
-  # sql_exporter（payment job / payment_outbox collector）export
-  # payment_outbox_backlog_rows{status} / payment_outbox_oldest_backlog_age_seconds /
-  # payment_outbox_dead_rows{exchange}。在此之前這張表**零指標零告警**，而它的 DEAD
-  # 是無人推走的終態（markDeadGuarded 把 next_retry_at 設 NULL、候選述詞不含 8224）。
-  #
-  # 🔴 門檻推導（不是抄來的數字）：afterCommit 即時投遞是秒級；排程兜底 fixedDelay=5s；
-  #    退避序列 5*3^(n-1) 秒 = 5/15/45/135/405，max-retries=5 ⇒ **最長正常重試鏈 605 秒
-  #    （約 10.1 分鐘）**，之後該列轉 DEAD 而離開 backlog 述詞。
-  #    ⇒ backlog 仍在且最舊超過 900 秒 = 已超過最長正常重試鏈 + 緩衝，必定異常。
-  #    （對照：buyer_deleted 用 3600 秒，因為它們的重試 backoff worst-case 是 30-55 分鐘。
-  #      直接照抄 3600 會讓本表的告警比實際失效晚一個數量級。）
-  #
-  # ⚠️ 與 *OutboxTerminalFailure 那兩組的**語意差異**，不要照抄它們的 expr：
-  #    那兩組的 outbox_failed_total 是應用層 Counter（累計達終態次數）⇒ 用
-  #    increase(...[1h]) > 0，一小時後自然 resolve。
-  #    本組的 payment_outbox_dead_rows 是 sql_exporter 查 DB 得到的 **gauge**（目前有幾列
-  #    卡在 DEAD）⇒ 必須用 > 0。它在有人處理掉那幾列之前會持續 firing，那是**刻意的**：
-  #    DEAD 列代表事件永久遺失且沒有任何程式路徑會再碰它，處置（補發或註記後清除）
-  #    完成前它就該一直叫。
-  - name: payment-outbox-alerts
-    interval: 60s
-    rules:
-      - alert: PaymentOutboxBacklogStuck
-        expr: payment_outbox_oldest_backlog_age_seconds > 900
-        for: 5m
-        labels:
-          severity: warning
-          channel: business
-        annotations:
-          summary: "env={{ $labels.env }}：payment outbox_events 最舊待派送已卡住超過 15 分鐘"
-          description: "env={{ $labels.env }}：payment_outbox_oldest_backlog_age_seconds 超過 900 秒，已超過最長正常重試鏈（5+15+45+135+405＝605 秒）加緩衝，該筆 outbox_events row 疑似卡住。請查 payment-service（可能原因包含 OutboxEventPublisherScheduler 未運行、DB 不可用、RabbitMQ 不可用、或該列的 exchange 無效而反覆 fail-closed）。查法：SELECT id, exchange, routing_key, status, retry_count, last_error FROM outbox_events WHERE status IN ('8221','8223') ORDER BY created_at LIMIT 20;"
-
-      - alert: PaymentOutboxDeadRows
-        expr: payment_outbox_dead_rows > 0
-        for: 0m
-        labels:
-          severity: warning
-          channel: business
-        annotations:
-          summary: "env={{ $labels.env }}：payment outbox_events 出現 DEAD 列（exchange={{ $labels.exchange }}）"
-          description: "env={{ $labels.env }}：payment_outbox_dead_rows{exchange=\"{{ $labels.exchange }}\"} 大於 0，代表某筆事件已耗盡重試次數進入 DEAD（8224）。DEAD 是無人推走的終態——候選述詞 status IN ('8221','8223') 不含它，不會有任何程式路徑再碰它，**該事件等於永久遺失**。請查 last_error 判斷原因（常見：exchange 無效被 fail-closed 擋下、routing key 無 binding 而 unroutable）。處置完成（補發或註記後清除該列）前本告警會持續 firing，這是刻意的。查法：SELECT id, exchange, routing_key, retry_count, last_error, created_at FROM outbox_events WHERE status = '8224' ORDER BY created_at;"
 
   # ── 電子發票（58 號設計書 §8.2.4 ①–⑯ ＋ ⑳㉑㉒、§9.3.3 ⑰⑱⑲）──────────────
   # 本 group 共 34 條（2026-09-05 實數；本行原本寫 24，那是條目長大之後沒有回灌的舊值）。

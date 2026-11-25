@@ -374,11 +374,7 @@ class OrderBottomRow extends ConsumerWidget {
               } else {
                 FloatingToast.show(context, '已建立退貨物流單');
               }
-            } else if (result.needRefundPage) {
-              // ATM 訂單：退款需買家填寫銀行資訊，後端已推播通知買家
-              FloatingToast.show(context, '退款需買家填寫銀行資訊，已通知買家');
             } else {
-              // 信用卡訂單：原路直接退款
               FloatingToast.show(context, '已提交處理決策，款項將原路退還');
             }
           }

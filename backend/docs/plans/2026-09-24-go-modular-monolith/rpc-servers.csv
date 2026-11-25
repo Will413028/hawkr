@@ -409,7 +409,7 @@ OrderService,CheckoutShippingFee,order-service,
 OrderService,CheckoutPreview,order-service,
 OrderService,CheckoutConfirm,order-service,
 OrderService,GetOrderForPayment,order-service,
-OrderService,SnapshotPaymentInfo,order-service,
+OrderService,SnapshotPaymentInfo,order-service,removed: 唯一呼叫者 Java payment-service 已刪（B2 步驟 6），order 需要的付款方式由 payment.success 事件帶，RPC 與訊息一併從 proto 刪除
 OrderService,SearchOrders,order-service,
 OrderService,GetAdminOrderDetail,order-service,
 OrderService,GetSellerOrderStatusCounts,order-service,

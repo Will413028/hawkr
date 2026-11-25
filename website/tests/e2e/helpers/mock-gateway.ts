@@ -1281,6 +1281,20 @@ function fulfillConnectStreamError(
 }
 
 /**
+ * BuyerProcurementAppService 的預設回應：Hawkr Agent 分頁的對話列表是空的。訊息外殼每次載入都會讀它，
+ * 沒有預設時請求打到沒有後端的 dev server，回 502，頁面的 runtime／network 失敗檢查會擋下。
+ * 需要內容的 spec 在 `setupGatewayMocks` 之後以 `mockProcurementUnary` 覆寫（後註冊的 route 優先）。
+ */
+async function mockProcurementDefaults(page: Page): Promise<void> {
+	await page.route(
+		/\/api\/connect\/hawkr\.procurement\.v1alpha1\.BuyerProcurementAppService\/ListConversations(?:\?|$)/,
+		(route) => {
+			void fulfillConnect(route, { conversations: [], nextPageToken: "" });
+		},
+	);
+}
+
+/**
  * chat 的預設回應：沒有對話、沒有訊息、未讀 0、對方離線；即時串流以 end-stream 訊框回 not_found
  * （終止、不重連、不發登入失效），所以 e2e 不會留著一條開著的長連線，頁面照常載入。
  */
@@ -1438,6 +1452,7 @@ export async function setupGatewayMocks(
 	await mockSocialDefaults(page);
 	await mockReviewDefaults(page);
 	await mockChatDefaults(page);
+	await mockProcurementDefaults(page);
 	await mockNotificationDefaults(page);
 	await mockCrmDefaults(page);
 

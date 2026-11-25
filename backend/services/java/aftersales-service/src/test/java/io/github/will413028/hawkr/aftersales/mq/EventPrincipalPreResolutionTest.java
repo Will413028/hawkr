@@ -59,10 +59,7 @@ class EventPrincipalPreResolutionTest {
     }
 
     // ==================== tx 內零身分反解 gRPC ====================
-    // ⚠️ 範圍限定（issue #2294 P1-B）：本組只 verifyNoInteractions seller／buyer 兩個 client，
-    //    量不到 payment。ATM 路徑的 createRefund 仍在 tx 內（ReturnReceiptService
-    //    .createRefundTaskAndAdvanceStatus 的 javadoc 有完整說明），不要把本組的綠燈
-    //    讀成「tx 內已經沒有任何 gRPC」。
+    // 本組只 verifyNoInteractions seller／buyer 兩個 client。
 
     @Test
     @DisplayName("B2 tryPublishCaseAutoRejected(principals)：tx 內零身分反解 gRPC，payload 用預解值")
@@ -98,18 +95,6 @@ class EventPrincipalPreResolutionTest {
         Map<?, ?> payload = capturePayload("aftersales.case.auto_completed_return_pending_timeout");
         assertEquals("42", payload.get("seller_account_id"));
         assertEquals("55", payload.get("notify_buyer_account_id"));
-    }
-
-    @Test
-    @DisplayName("B7 tryPublishAwaitingBuyerRefundPage(principals)：tx 內零身分反解 gRPC，payload 用預解值")
-    void tryPublishAwaitingBuyerRefundPage_doesNotCallGrpcInsideTx() throws Exception {
-        publisher.tryPublishAwaitingBuyerRefundPage("O100", "A001", 9999L, BUYER_ID, PRINCIPALS);
-
-        verifyNoInteractions(sellerGrpcClient, buyerGrpcClient);
-        Map<?, ?> payload = capturePayload("aftersales.refund.awaiting_buyer_page");
-        // 55 ＝ 預解值；9001 ＝ 未反解的 raw buyer_id。兩者不同才測得出「有沒有真的用預解值」
-        assertEquals("55", payload.get("notify_buyer_account_id"));
-        assertEquals(String.valueOf(BUYER_ID), payload.get("buyer_id"));
     }
 
     // ==================== strict 解析語意 ====================

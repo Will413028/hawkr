@@ -56,7 +56,6 @@ public final class OrderConstants {
     public static final String TASK_STATUS_DONE = WorkerTaskStatus.DONE.value();
     public static final String TASK_STATUS_FAILED = WorkerTaskStatus.FAILED.value();
     public static final String TASK_STATUS_MANUAL_INTERVENTION = WorkerTaskStatus.MANUAL_INTERVENTION.value();
-    public static final String TASK_STATUS_AWAITING_BUYER_REFUND_PAGE = WorkerTaskStatus.AWAITING_BUYER_REFUND_PAGE.value();
     public static final String TASK_STATUS_PROVIDER_AUTO = WorkerTaskStatus.PROVIDER_AUTO.value();
 
     // ==================== 撥款 gRPC 結構化結果（proto GrantPaymentResponse.grant_outcome） ====================

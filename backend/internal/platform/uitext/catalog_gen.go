@@ -539,6 +539,54 @@ func (t Text) NotificationNotificationChannel(v string) (string, bool) {
 	return "", false
 }
 
+// PaymentEarningsEntryStatus 是 payment.EarningsEntryStatus 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) PaymentEarningsEntryStatus(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "PENDING":
+			return "Processing", true
+		case "COMPLETED":
+			return "Completed", true
+		case "FAILED":
+			return "Failed", true
+		}
+	}
+	switch v {
+	case "PENDING":
+		return "處理中", true
+	case "COMPLETED":
+		return "已完成", true
+	case "FAILED":
+		return "失敗", true
+	}
+	return "", false
+}
+
+// PaymentEarningsEntryType 是 payment.EarningsEntryType 的文案。
+// 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
+func (t Text) PaymentEarningsEntryType(v string) (string, bool) {
+	if t.Locale() == EN {
+		switch v {
+		case "TRANSFER":
+			return "Payout", true
+		case "REVERSAL":
+			return "Clawback", true
+		case "TOP_UP":
+			return "Top-up", true
+		}
+	}
+	switch v {
+	case "TRANSFER":
+		return "入帳", true
+	case "REVERSAL":
+		return "扣回", true
+	case "TOP_UP":
+		return "補差額", true
+	}
+	return "", false
+}
+
 // PaymentPaymentAccountStatus 是 payment.PaymentAccountStatus 的文案。
 // 不認得的值、UNSPECIFIED、沒有文字的值回 ("", false)；伺服器不顯示「未知」。
 func (t Text) PaymentPaymentAccountStatus(v string) (string, bool) {

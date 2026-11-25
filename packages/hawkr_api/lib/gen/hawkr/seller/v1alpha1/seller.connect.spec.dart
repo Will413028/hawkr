@@ -178,6 +178,29 @@ abstract final class SellerAppService {
     idempotency: connect.Idempotency.noSideEffects,
   );
 
+  /// ListMyEarnings 列出呼叫者店家的入帳帳本，新到舊：平台轉給店家的款項（TRANSFER）、退款時收回的款項（REVERSAL，負數）與補差額（TOP_UP）。
+  /// 一列對應一張訂單的一次轉入、收回或補差額，不含付款、退款本身與撥款到銀行（撥款由金流商處理，不在帳本內）。order_no 篩單一訂單
+  /// （別家店的訂單編號沒有列，回空清單）；from_time（含）與 to_time（不含）篩列的記錄時間，任何一個不設就是不限。from_time 不早於 to_time 回 invalid_argument。
+  /// 需要賣家能力 CAP_ACCOUNT_SELF_READ：停權的店家照樣可以讀。
+  static const listMyEarnings = connect.Spec(
+    '/$name/ListMyEarnings',
+    connect.StreamType.unary,
+    hawkrsellerv1alpha1seller.ListMyEarningsRequest.new,
+    hawkrsellerv1alpha1seller.ListMyEarningsResponse.new,
+    idempotency: connect.Idempotency.noSideEffects,
+  );
+
+  /// GetMyOrderEarnings 回傳呼叫者店家一張訂單的入帳列（新到舊，一張訂單的列數很少，不分頁）與已完成列的淨額，給訂單詳情頁。
+  /// 訂單不是呼叫者店家的、或沒有付款，一律回 not_found（不洩漏存在與否）；訂單有付款但還沒有任何列時回空清單與淨額 0。
+  /// 需要賣家能力 CAP_ACCOUNT_SELF_READ：停權的店家照樣可以讀。
+  static const getMyOrderEarnings = connect.Spec(
+    '/$name/GetMyOrderEarnings',
+    connect.StreamType.unary,
+    hawkrsellerv1alpha1seller.GetMyOrderEarningsRequest.new,
+    hawkrsellerv1alpha1seller.GetMyOrderEarningsResponse.new,
+    idempotency: connect.Idempotency.noSideEffects,
+  );
+
   /// CreatePaymentOnboardingSession 為呼叫者店家的收款帳戶產生開通 session。回應是兩種互斥的 session 之一：託管連結（hosted，金流商的一次性、
   /// 短效連結，賣家開瀏覽器完成後回到 destination 與請求語系（Accept-Language）決定的頁面；連結過期時回到同一目的地的重新取得入口），或內嵌元件
   /// （embedded，初始化元件用的憑證）。只有帳戶的收款方式是平台收件、金流商支援、而且 embedded_runtimes 含對應的執行環境時才回內嵌，其餘一律回託管連結。

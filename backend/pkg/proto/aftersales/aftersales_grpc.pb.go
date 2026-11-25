@@ -24,7 +24,6 @@ const (
 	AfterSalesService_GetAfterSaleCaseDetail_FullMethodName           = "/hawkr.aftersales.AfterSalesService/GetAfterSaleCaseDetail"
 	AfterSalesService_SupplementEvidence_FullMethodName               = "/hawkr.aftersales.AfterSalesService/SupplementEvidence"
 	AfterSalesService_CancelAfterSaleCase_FullMethodName              = "/hawkr.aftersales.AfterSalesService/CancelAfterSaleCase"
-	AfterSalesService_GetRefundPageUrl_FullMethodName                 = "/hawkr.aftersales.AfterSalesService/GetRefundPageUrl"
 	AfterSalesService_GetSellerAfterSaleCases_FullMethodName          = "/hawkr.aftersales.AfterSalesService/GetSellerAfterSaleCases"
 	AfterSalesService_GetSellerAfterSaleCaseDetail_FullMethodName     = "/hawkr.aftersales.AfterSalesService/GetSellerAfterSaleCaseDetail"
 	AfterSalesService_ResolveAfterSaleCase_FullMethodName             = "/hawkr.aftersales.AfterSalesService/ResolveAfterSaleCase"
@@ -37,7 +36,6 @@ const (
 	AfterSalesService_ListAppealsForAdmin_FullMethodName              = "/hawkr.aftersales.AfterSalesService/ListAppealsForAdmin"
 	AfterSalesService_DecideAppealForAdmin_FullMethodName             = "/hawkr.aftersales.AfterSalesService/DecideAppealForAdmin"
 	AfterSalesService_GetAppealDetailForAdmin_FullMethodName          = "/hawkr.aftersales.AfterSalesService/GetAppealDetailForAdmin"
-	AfterSalesService_HandleRefundPageReturn_FullMethodName           = "/hawkr.aftersales.AfterSalesService/HandleRefundPageReturn"
 	AfterSalesService_HasActiveCase_FullMethodName                    = "/hawkr.aftersales.AfterSalesService/HasActiveCase"
 	AfterSalesService_CancelActiveCaseOnConfirmReceipt_FullMethodName = "/hawkr.aftersales.AfterSalesService/CancelActiveCaseOnConfirmReceipt"
 	AfterSalesService_GetOrderPayoutHold_FullMethodName               = "/hawkr.aftersales.AfterSalesService/GetOrderPayoutHold"
@@ -62,8 +60,6 @@ type AfterSalesServiceClient interface {
 	SupplementEvidence(ctx context.Context, in *SupplementEvidenceRequest, opts ...grpc.CallOption) (*SupplementEvidenceResponse, error)
 	// 取消售後
 	CancelAfterSaleCase(ctx context.Context, in *CancelAfterSaleCaseRequest, opts ...grpc.CallOption) (*CancelAfterSaleCaseResponse, error)
-	// ATM 退款：取得 PayUni 退款頁面 URL（通用：售後退款 + 賣家取消出貨）
-	GetRefundPageUrl(ctx context.Context, in *GetRefundPageUrlRequest, opts ...grpc.CallOption) (*GetRefundPageUrlResponse, error)
 	// 賣家售後列表
 	GetSellerAfterSaleCases(ctx context.Context, in *GetSellerAfterSaleCasesRequest, opts ...grpc.CallOption) (*GetSellerAfterSaleCasesResponse, error)
 	// 售後詳情（賣家視角）
@@ -88,9 +84,6 @@ type AfterSalesServiceClient interface {
 	DecideAppealForAdmin(ctx context.Context, in *DecideAppealForAdminRequest, opts ...grpc.CallOption) (*DecideAppealForAdminResponse, error)
 	// Admin 單案詳情（§10.6.6）：含買家申訴理由 / 證據照片 / 賣家原始拒絕理由
 	GetAppealDetailForAdmin(ctx context.Context, in *GetAppealDetailForAdminRequest, opts ...grpc.CallOption) (*GetAppealDetailForAdminResponse, error)
-	// PayUni ATM 退款頁面完成回調（Gateway 接收 Form POST 後呼叫）
-	// 解密（委派 Payment Service）→ 更新退款任務 → 組裝 Deep Link
-	HandleRefundPageReturn(ctx context.Context, in *HandleRefundPageReturnRequest, opts ...grpc.CallOption) (*HandleRefundPageReturnResponse, error)
 	// 訂單是否有活躍 case（Order Service 訂單自動完成倒數恢復前反查，03 §5.8 / 09 §4.4.1）
 	HasActiveCase(ctx context.Context, in *HasActiveCaseRequest, opts ...grpc.CallOption) (*HasActiveCaseResponse, error)
 	// 確認收貨時同步處置進行中售後 case（Order Service confirmReceipt 於完成訂單前同步呼叫，09 §2.1.1 / §8.2.1，#1225）
@@ -165,16 +158,6 @@ func (c *afterSalesServiceClient) CancelAfterSaleCase(ctx context.Context, in *C
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CancelAfterSaleCaseResponse)
 	err := c.cc.Invoke(ctx, AfterSalesService_CancelAfterSaleCase_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *afterSalesServiceClient) GetRefundPageUrl(ctx context.Context, in *GetRefundPageUrlRequest, opts ...grpc.CallOption) (*GetRefundPageUrlResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetRefundPageUrlResponse)
-	err := c.cc.Invoke(ctx, AfterSalesService_GetRefundPageUrl_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -301,16 +284,6 @@ func (c *afterSalesServiceClient) GetAppealDetailForAdmin(ctx context.Context, i
 	return out, nil
 }
 
-func (c *afterSalesServiceClient) HandleRefundPageReturn(ctx context.Context, in *HandleRefundPageReturnRequest, opts ...grpc.CallOption) (*HandleRefundPageReturnResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(HandleRefundPageReturnResponse)
-	err := c.cc.Invoke(ctx, AfterSalesService_HandleRefundPageReturn_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *afterSalesServiceClient) HasActiveCase(ctx context.Context, in *HasActiveCaseRequest, opts ...grpc.CallOption) (*HasActiveCaseResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(HasActiveCaseResponse)
@@ -387,8 +360,6 @@ type AfterSalesServiceServer interface {
 	SupplementEvidence(context.Context, *SupplementEvidenceRequest) (*SupplementEvidenceResponse, error)
 	// 取消售後
 	CancelAfterSaleCase(context.Context, *CancelAfterSaleCaseRequest) (*CancelAfterSaleCaseResponse, error)
-	// ATM 退款：取得 PayUni 退款頁面 URL（通用：售後退款 + 賣家取消出貨）
-	GetRefundPageUrl(context.Context, *GetRefundPageUrlRequest) (*GetRefundPageUrlResponse, error)
 	// 賣家售後列表
 	GetSellerAfterSaleCases(context.Context, *GetSellerAfterSaleCasesRequest) (*GetSellerAfterSaleCasesResponse, error)
 	// 售後詳情（賣家視角）
@@ -413,9 +384,6 @@ type AfterSalesServiceServer interface {
 	DecideAppealForAdmin(context.Context, *DecideAppealForAdminRequest) (*DecideAppealForAdminResponse, error)
 	// Admin 單案詳情（§10.6.6）：含買家申訴理由 / 證據照片 / 賣家原始拒絕理由
 	GetAppealDetailForAdmin(context.Context, *GetAppealDetailForAdminRequest) (*GetAppealDetailForAdminResponse, error)
-	// PayUni ATM 退款頁面完成回調（Gateway 接收 Form POST 後呼叫）
-	// 解密（委派 Payment Service）→ 更新退款任務 → 組裝 Deep Link
-	HandleRefundPageReturn(context.Context, *HandleRefundPageReturnRequest) (*HandleRefundPageReturnResponse, error)
 	// 訂單是否有活躍 case（Order Service 訂單自動完成倒數恢復前反查，03 §5.8 / 09 §4.4.1）
 	HasActiveCase(context.Context, *HasActiveCaseRequest) (*HasActiveCaseResponse, error)
 	// 確認收貨時同步處置進行中售後 case（Order Service confirmReceipt 於完成訂單前同步呼叫，09 §2.1.1 / §8.2.1，#1225）
@@ -461,9 +429,6 @@ func (UnimplementedAfterSalesServiceServer) SupplementEvidence(context.Context, 
 func (UnimplementedAfterSalesServiceServer) CancelAfterSaleCase(context.Context, *CancelAfterSaleCaseRequest) (*CancelAfterSaleCaseResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CancelAfterSaleCase not implemented")
 }
-func (UnimplementedAfterSalesServiceServer) GetRefundPageUrl(context.Context, *GetRefundPageUrlRequest) (*GetRefundPageUrlResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetRefundPageUrl not implemented")
-}
 func (UnimplementedAfterSalesServiceServer) GetSellerAfterSaleCases(context.Context, *GetSellerAfterSaleCasesRequest) (*GetSellerAfterSaleCasesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetSellerAfterSaleCases not implemented")
 }
@@ -499,9 +464,6 @@ func (UnimplementedAfterSalesServiceServer) DecideAppealForAdmin(context.Context
 }
 func (UnimplementedAfterSalesServiceServer) GetAppealDetailForAdmin(context.Context, *GetAppealDetailForAdminRequest) (*GetAppealDetailForAdminResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAppealDetailForAdmin not implemented")
-}
-func (UnimplementedAfterSalesServiceServer) HandleRefundPageReturn(context.Context, *HandleRefundPageReturnRequest) (*HandleRefundPageReturnResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method HandleRefundPageReturn not implemented")
 }
 func (UnimplementedAfterSalesServiceServer) HasActiveCase(context.Context, *HasActiveCaseRequest) (*HasActiveCaseResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method HasActiveCase not implemented")
@@ -628,24 +590,6 @@ func _AfterSalesService_CancelAfterSaleCase_Handler(srv interface{}, ctx context
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AfterSalesServiceServer).CancelAfterSaleCase(ctx, req.(*CancelAfterSaleCaseRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _AfterSalesService_GetRefundPageUrl_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetRefundPageUrlRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AfterSalesServiceServer).GetRefundPageUrl(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AfterSalesService_GetRefundPageUrl_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AfterSalesServiceServer).GetRefundPageUrl(ctx, req.(*GetRefundPageUrlRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -866,24 +810,6 @@ func _AfterSalesService_GetAppealDetailForAdmin_Handler(srv interface{}, ctx con
 	return interceptor(ctx, in, info, handler)
 }
 
-func _AfterSalesService_HandleRefundPageReturn_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(HandleRefundPageReturnRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AfterSalesServiceServer).HandleRefundPageReturn(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AfterSalesService_HandleRefundPageReturn_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AfterSalesServiceServer).HandleRefundPageReturn(ctx, req.(*HandleRefundPageReturnRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _AfterSalesService_HasActiveCase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(HasActiveCaseRequest)
 	if err := dec(in); err != nil {
@@ -1020,10 +946,6 @@ var AfterSalesService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _AfterSalesService_CancelAfterSaleCase_Handler,
 		},
 		{
-			MethodName: "GetRefundPageUrl",
-			Handler:    _AfterSalesService_GetRefundPageUrl_Handler,
-		},
-		{
 			MethodName: "GetSellerAfterSaleCases",
 			Handler:    _AfterSalesService_GetSellerAfterSaleCases_Handler,
 		},
@@ -1070,10 +992,6 @@ var AfterSalesService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAppealDetailForAdmin",
 			Handler:    _AfterSalesService_GetAppealDetailForAdmin_Handler,
-		},
-		{
-			MethodName: "HandleRefundPageReturn",
-			Handler:    _AfterSalesService_HandleRefundPageReturn_Handler,
 		},
 		{
 			MethodName: "HasActiveCase",

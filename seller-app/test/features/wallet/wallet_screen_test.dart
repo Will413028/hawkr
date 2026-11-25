@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.client.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.connect.spec.dart';
-import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart';
+import 'package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pb.dart';
 import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart';
 import 'package:hawkr_api/testing.dart';
 import 'package:hawkr_api/transport.dart';
@@ -18,6 +18,7 @@ import 'package:hawkr_seller/features/coupon/presentation/coupon_controller.dart
 import 'package:hawkr_seller/features/seller/data/my_store_repository.dart';
 import 'package:hawkr_seller/features/seller/data/payment_onboarding.dart';
 import 'package:hawkr_seller/features/wallet/presentation/wallet_screen.dart';
+import 'package:hawkr_seller/l10n/gen/app_localizations.dart';
 import 'package:hawkr_seller/shared/widgets/truck_loading_overlay.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
@@ -117,6 +118,10 @@ class _Server {
   int paymentCalls = 0;
   final launched = <Uri>[];
 
+  /// `ListMyEarnings` 依 page token 回的頁；沒有的 token 回空頁。
+  final earningsPages = <String, ListMyEarningsResponse>{};
+  final earningsTokens = <String>[];
+
   GetMyStoreResponse _storeResponse() => myStoreResponse(
     capabilities: marketing
         ? null
@@ -157,6 +162,10 @@ class _Server {
           if (answer is ConnectException) throw answer;
           if (answer == null) throw ConnectException(Code.notFound, 'none');
           return GetMyPaymentAccountResponse(account: answer as PaymentAccount);
+        })
+        .unary(SellerAppService.listMyEarnings, (request, _) {
+          earningsTokens.add(request.pageToken);
+          return earningsPages[request.pageToken] ?? ListMyEarningsResponse();
         })
         .unary(
           SellerAppService.createPaymentOnboardingSession,
@@ -241,6 +250,9 @@ Future<GoRouter> _pump(
     enableScaleWH: () => false,
     enableScaleText: () => false,
     builder: (_, _) => MaterialApp.router(
+      locale: const Locale('zh'),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       theme: AppTheme.light,
       routerConfig: router,
       builder: (context, child) => MediaQuery(
@@ -846,6 +858,57 @@ void main() {
       await _pump(tester, server);
       expect(find.text('無法載入認證狀態'), findsOneWidget);
       expect(find.text('優惠券'), findsOneWidget);
+    });
+  });
+
+  group('入帳紀錄', () {
+    testWidgets('商家認證通過：列出入帳紀錄，載入更多讀下一頁', (tester) async {
+      final server = _Server()
+        ..earningsPages[''] = ListMyEarningsResponse(
+          entries: [
+            EarningsEntry(
+              id: 'e1',
+              orderNo: 'O-100',
+              type: EarningsEntryType.EARNINGS_ENTRY_TYPE_TRANSFER,
+              status: EarningsEntryStatus.EARNINGS_ENTRY_STATUS_COMPLETED,
+            )..mergeFromProto3Json({'amount': '980'}),
+          ],
+          nextPageToken: 'p2',
+        )
+        ..earningsPages['p2'] = ListMyEarningsResponse(
+          entries: [
+            EarningsEntry(
+              id: 'e2',
+              orderNo: 'O-101',
+              type: EarningsEntryType.EARNINGS_ENTRY_TYPE_REVERSAL,
+              status: EarningsEntryStatus.EARNINGS_ENTRY_STATUS_PENDING,
+            )..mergeFromProto3Json({'amount': '-120'}),
+          ],
+        );
+      await _pump(tester, server);
+
+      expect(find.text('入帳紀錄'), findsOneWidget);
+      expect(find.text('入帳'), findsOneWidget);
+      expect(find.text('NT\$ 980'), findsOneWidget);
+      expect(find.textContaining('O-100'), findsOneWidget);
+
+      await _tap(tester, find.text('載入更多'));
+      expect(server.earningsTokens, ['', 'p2']);
+      expect(find.text('扣回'), findsOneWidget);
+      expect(find.text('NT\$ -120'), findsOneWidget);
+      expect(find.text('載入更多'), findsNothing);
+    });
+
+    testWidgets('還沒有入帳：顯示空狀態', (tester) async {
+      await _pump(tester, _Server());
+      expect(find.text('還沒有入帳紀錄'), findsOneWidget);
+    });
+
+    testWidgets('商家認證還沒通過：不讀入帳紀錄', (tester) async {
+      final server = _Server(certified: false);
+      await _pump(tester, server);
+      expect(find.text('入帳紀錄'), findsNothing);
+      expect(server.earningsTokens, isEmpty);
     });
   });
 }

@@ -319,7 +319,6 @@ type mockOrderServiceClient struct {
 	CheckoutValidateFn           func(ctx context.Context, in *orderpb.CheckoutValidateRequest, opts ...grpc.CallOption) (*orderpb.CheckoutValidateResponse, error)
 	CheckoutPreviewFn            func(ctx context.Context, in *orderpb.CheckoutPreviewRequest, opts ...grpc.CallOption) (*orderpb.CheckoutPreviewResponse, error)
 	CheckoutConfirmFn            func(ctx context.Context, in *orderpb.CheckoutConfirmRequest, opts ...grpc.CallOption) (*orderpb.CheckoutConfirmResponse, error)
-	SnapshotPaymentInfoFn        func(ctx context.Context, in *orderpb.SnapshotPaymentInfoRequest, opts ...grpc.CallOption) (*orderpb.SnapshotPaymentInfoResponse, error)
 	CreateOrderFn                func(ctx context.Context, in *orderpb.CreateOrderRequest, opts ...grpc.CallOption) (*orderpb.CreateOrderResponse, error)
 	SearchOrdersFn               func(ctx context.Context, in *orderpb.SearchOrdersRequest, opts ...grpc.CallOption) (*orderpb.SearchOrdersResponse, error)
 	ListAbnormalOrdersForAdminFn func(ctx context.Context, in *orderpb.ListAbnormalOrdersForAdminRequest, opts ...grpc.CallOption) (*orderpb.ListAbnormalOrdersForAdminResponse, error)
@@ -401,13 +400,6 @@ func (m *mockOrderServiceClient) CheckoutConfirm(ctx context.Context, in *orderp
 		return m.CheckoutConfirmFn(ctx, in, opts...)
 	}
 	return &orderpb.CheckoutConfirmResponse{}, nil
-}
-
-func (m *mockOrderServiceClient) SnapshotPaymentInfo(ctx context.Context, in *orderpb.SnapshotPaymentInfoRequest, opts ...grpc.CallOption) (*orderpb.SnapshotPaymentInfoResponse, error) {
-	if m.SnapshotPaymentInfoFn != nil {
-		return m.SnapshotPaymentInfoFn(ctx, in, opts...)
-	}
-	return &orderpb.SnapshotPaymentInfoResponse{}, nil
 }
 
 func (m *mockOrderServiceClient) CreateOrder(ctx context.Context, in *orderpb.CreateOrderRequest, opts ...grpc.CallOption) (*orderpb.CreateOrderResponse, error) {

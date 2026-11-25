@@ -797,21 +797,17 @@ type WorkerTaskStatus struct {
 }
 
 var (
-	WorkerTaskStatusPending                 = WorkerTaskStatus{Code: "PENDING", Value: "0", Label: "待執行", Description: "任務已建立，等待 Worker 處理"}
-	WorkerTaskStatusAwaitingBuyerRefundPage = WorkerTaskStatus{Code: "AWAITING_BUYER_REFUND_PAGE", Value: "5", Label: "等待買家操作退款頁面", Description: "ATM 退款，等待買家填寫銀行帳號（僅退款任務使用）"}
-	WorkerTaskStatusProcessing              = WorkerTaskStatus{Code: "PROCESSING", Value: "10", Label: "執行中", Description: "Worker 已 Claim，執行任務中"}
-	WorkerTaskStatusAwaitingWebhook         = WorkerTaskStatus{Code: "AWAITING_WEBHOOK", Value: "15", Label: "等待回調", Description: "ATM 退款已受理，等待 PayUni Webhook 匯款結果（僅退款任務使用）"}
-	WorkerTaskStatusDone                    = WorkerTaskStatus{Code: "DONE", Value: "20", Label: "已完成", Description: "任務成功完成"}
-	WorkerTaskStatusFailed                  = WorkerTaskStatus{Code: "FAILED", Value: "30", Label: "失敗", Description: "任務失敗（信用卡路徑經 Worker retry 1 次後仍失敗 / ATM 路徑 webhook 回報匯款失敗）"}
-	WorkerTaskStatusManualIntervention      = WorkerTaskStatus{Code: "MANUAL_INTERVENTION", Value: "40", Label: "人工介入", Description: "業務策略明確轉人工（Phase 1 退款任務目前不寫此值，既有歷史資料保留）"}
-	WorkerTaskStatusProviderAuto            = WorkerTaskStatus{Code: "PROVIDER_AUTO", Value: "50", Label: "提供方主動撥款", Description: "PayUni 已對退款交易接管撥款；唯一進入 = GrantPayment 回應 `grant_outcome=PROVIDER_TOOK_OVER` 後由 Worker 收斂，不再重試，任務僅作對帳記錄（終態，僅撥款任務使用；03 §3.11.2 / 05 §5.6.1）"}
+	WorkerTaskStatusPending            = WorkerTaskStatus{Code: "PENDING", Value: "0", Label: "待執行", Description: "任務已建立，等待 Worker 處理"}
+	WorkerTaskStatusProcessing         = WorkerTaskStatus{Code: "PROCESSING", Value: "10", Label: "執行中", Description: "Worker 已 Claim，執行任務中"}
+	WorkerTaskStatusDone               = WorkerTaskStatus{Code: "DONE", Value: "20", Label: "已完成", Description: "任務成功完成"}
+	WorkerTaskStatusFailed             = WorkerTaskStatus{Code: "FAILED", Value: "30", Label: "失敗", Description: "任務失敗（Worker retry 後仍失敗）"}
+	WorkerTaskStatusManualIntervention = WorkerTaskStatus{Code: "MANUAL_INTERVENTION", Value: "40", Label: "人工介入", Description: "業務策略明確轉人工（Phase 1 退款任務目前不寫此值，既有歷史資料保留）"}
+	WorkerTaskStatusProviderAuto       = WorkerTaskStatus{Code: "PROVIDER_AUTO", Value: "50", Label: "提供方主動撥款", Description: "PayUni 已對退款交易接管撥款；唯一進入 = GrantPayment 回應 `grant_outcome=PROVIDER_TOOK_OVER` 後由 Worker 收斂，不再重試，任務僅作對帳記錄（終態，僅撥款任務使用；03 §3.11.2 / 05 §5.6.1）"}
 )
 
 var AllWorkerTaskStatuss = []WorkerTaskStatus{
 	WorkerTaskStatusPending,
-	WorkerTaskStatusAwaitingBuyerRefundPage,
 	WorkerTaskStatusProcessing,
-	WorkerTaskStatusAwaitingWebhook,
 	WorkerTaskStatusDone,
 	WorkerTaskStatusFailed,
 	WorkerTaskStatusManualIntervention,
@@ -2468,7 +2464,6 @@ var (
 	PaymentMethodCreditCard = PaymentMethod{Code: "CREDIT_CARD", Value: "2001", Label: "信用卡", Description: "信用卡一次付清"}
 	PaymentMethodApplePay   = PaymentMethod{Code: "APPLE_PAY", Value: "2002", Label: "Apple Pay", Description: "Apple 行動支付"}
 	PaymentMethodGooglePay  = PaymentMethod{Code: "GOOGLE_PAY", Value: "2003", Label: "Google Pay", Description: "Google 行動支付"}
-	PaymentMethodAtm        = PaymentMethod{Code: "ATM", Value: "2004", Label: "ATM 轉帳", Description: "銀行虛擬帳戶轉帳"}
 	PaymentMethodZeroAmount = PaymentMethod{Code: "ZERO_AMOUNT", Value: "2900", Label: "零元訂單", Description: "全額折抵後無需付款，不呼叫 PayUni 直接標 PAID（見 [05-支付服務設計書 §2A.1](../詳細設計書/05-支付服務（Payment%20Service）詳細設計書.md)）"}
 )
 
@@ -2476,7 +2471,6 @@ var AllPaymentMethods = []PaymentMethod{
 	PaymentMethodCreditCard,
 	PaymentMethodApplePay,
 	PaymentMethodGooglePay,
-	PaymentMethodAtm,
 	PaymentMethodZeroAmount,
 }
 

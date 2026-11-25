@@ -109,35 +109,21 @@ const (
 	CouponLockedByOtherOrder         int32 = 7023
 
 	// Payment 業務碼（8001~8099）
-	PaymentAlreadyExists               int32 = 8001
-	InvalidPaymentType                 int32 = 8002
-	PaymentStatusInvalid               int32 = 8003
-	RefundAlreadyProcessing            int32 = 8004
-	RefundBankInfoRequired             int32 = 8005
-	QueryTransactionFailed             int32 = 8006
-	GrantFailed                        int32 = 8007
-	AtmCreationFailed                  int32 = 8008
-	CloseStatusNotRefundable           int32 = 8009
-	CloseStatusUnavailable             int32 = 8010
-	InvalidMerchantId                  int32 = 8011
-	OrderQueryFailed                   int32 = 8012
-	NoPermissionForPayment             int32 = 8013
-	OrderStatusNotPayable              int32 = 8014
-	TransactionNotFoundForOrder        int32 = 8015
-	TransactionNotPaid                 int32 = 8016
-	CloseStatusCanceled                int32 = 8017
-	CloseStatusNotApplied              int32 = 8018
-	CloseStatusUnknown                 int32 = 8019
-	PaymentTypeRequired                int32 = 8020
-	PaymentMethodAmountOutOfRange      int32 = 8021
-	PaymentDuplicateDetected           int32 = 8023
-	PaymentAmountMismatch              int32 = 8024
-	UnsupportedPaymentTypeForDuplicate int32 = 8025
-	OrderAmountExceedsLimit            int32 = 8026
-	PaymentZeroAmountNotRefundable     int32 = 8027
-	ApplePayValidationUrlRejected      int32 = 8028
-	ApplePayCertLoadFailed             int32 = 8029
-	ApplePayMerchantValidationFailed   int32 = 8030
+	PaymentAlreadyExists           int32 = 8001
+	InvalidPaymentType             int32 = 8002
+	PaymentStatusInvalid           int32 = 8003
+	RefundAlreadyProcessing        int32 = 8004
+	RefundBankInfoRequired         int32 = 8005
+	CloseStatusNotRefundable       int32 = 8009
+	InvalidMerchantId              int32 = 8011
+	OrderQueryFailed               int32 = 8012
+	NoPermissionForPayment         int32 = 8013
+	OrderStatusNotPayable          int32 = 8014
+	TransactionNotFoundForOrder    int32 = 8015
+	PaymentTypeRequired            int32 = 8020
+	PaymentMethodAmountOutOfRange  int32 = 8021
+	OrderAmountExceedsLimit        int32 = 8026
+	PaymentZeroAmountNotRefundable int32 = 8027
 
 	// Product 業務碼（3001~3099）
 	CertNoRequired                  int32 = 3001
@@ -486,30 +472,16 @@ var bizCodeMessages = map[int32]string{
 	8003: "交易狀態不允許此操作：%s",
 	8004: "該交易已有進行中的退款申請",
 	8005: "ATM 退款必須提供銀行帳戶資訊",
-	8006: "查詢交易狀態失敗：%s",
-	8007: "撥款指示失敗：%s",
-	8008: "ATM 建立失敗：%s",
 	8009: "交易請款狀態不允許退款：%s",
-	8010: "無法取得請款狀態，交易可能非信用卡",
 	8011: "代理商模式下必須提供子商家 MerID",
 	8012: "查詢訂單失敗：%s",
 	8013: "無權為此訂單付款",
 	8014: "訂單狀態不允許付款：%s",
 	8015: "找不到訂單的付款交易",
-	8016: "交易尚未付款，無法撥款：%s",
-	8017: "交易請款已取消，不可退款",
-	8018: "交易尚未請款，不可退款",
-	8019: "未知的請款狀態：%s",
 	8020: "payment_type 不可為空",
 	8021: "所選付款方式不支援此訂單金額：付款方式=%s、訂單金額=%d 元、允許範圍=%d~%d 元",
-	8023: "偵測到重複付款，已自動觸發退款流程",
-	8024: "重複付款金額不一致：existingPaid=%d, new=%d",
-	8025: "未支援的付款方式無法進入重複付款處理流程：%s",
 	8026: "訂單金額過高（%d 元），超出系統支援上限（%d 元），請分批下單或聯繫客服",
 	8027: "零元訂單無退款流程，請改由訂單退貨/取消流程處理",
-	8028: "Apple Pay 驗證網址不符合白名單",
-	8029: "Apple Pay 憑證載入失敗",
-	8030: "Apple Pay merchant 驗證失敗",
 	3001: "認證編號不可為空",
 	3002: "不合法的認證類型",
 	3003: "此認證類型暫不支援線上驗證",

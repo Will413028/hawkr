@@ -1,0 +1,49 @@
+{
+  "mutants": [
+    {
+      "id": "earnings-reversal-wrong-sign",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/payment/internal/store/earnings.sql.go",
+      "old": "(-v.amount)::bigint, v.status::text",
+      "new": "v.amount::bigint, v.status::text",
+      "test": "internal/modules/payment ^TestTheEarningsLedgerSignsTransfersReversalsAndTopUps$",
+      "why": "收回列的金額不取負：帳本把收回記成入帳，淨額變多"
+    },
+    {
+      "id": "earnings-other-store-transfers",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/payment/internal/store/earnings.sql.go",
+      "old": "    WHERE o.store_id = $1::bigint\n    UNION ALL\n    SELECT v.id",
+      "new": "    WHERE true OR o.store_id = $1::bigint\n    UNION ALL\n    SELECT v.id",
+      "test": "internal/modules/payment ^TestTheEarningsLedgerIsScopedToTheCallingStore$",
+      "why": "轉帳那一支不篩店家：店家看得到別家店的入帳"
+    },
+    {
+      "id": "earnings-topup-omitted",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/payment/internal/store/earnings.sql.go",
+      "old": "r.topup_status IN ('WAITING', 'SENDING', 'DONE', 'ANOMALY')",
+      "new": "r.topup_status IN ('NONE')",
+      "test": "internal/modules/payment ^TestTheEarningsLedgerSignsTransfersReversalsAndTopUps$",
+      "why": "補差額列從帳本拿掉：賣家少看到補回的款項，淨額少算"
+    },
+    {
+      "id": "earnings-order-lookup-ignores-store",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/payment/internal/store/earnings.sql.go",
+      "old": "WHERE store_id = $1::bigint AND order_no = $2::text",
+      "new": "WHERE order_no = $2::text AND $1::bigint > 0",
+      "test": "internal/modules/payment ^TestTheEarningsLedgerIsScopedToTheCallingStore$",
+      "why": "訂單存在檢查不看店家：別家店讀訂單的入帳不是 not_found"
+    },
+    {
+      "id": "earnings-net-counts-pending",
+      "stack": "go-integration",
+      "file": "backend/internal/modules/payment/internal/charge/earnings.go",
+      "old": "if e.Status == model.EarningsCompleted {",
+      "new": "if e.Status != model.EarningsFailed {",
+      "test": "internal/modules/payment ^TestTheEarningsNetCountsOnlyCompletedEntries$",
+      "why": "淨額把處理中的列也加總：進行中的收回被當成已扣"
+    }
+  ]
+}

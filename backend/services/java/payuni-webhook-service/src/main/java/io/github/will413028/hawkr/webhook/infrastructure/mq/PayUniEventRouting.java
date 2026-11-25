@@ -20,7 +20,6 @@ public final class PayUniEventRouting {
 
     public static String topic(PayUniEventType type) {
         return switch (type) {
-            case PAYMENT_UOP     -> MqConstants.ROUTING_KEY_PAYUNI_PAYMENT_UOP;
             case SHIPPING_STATUS -> MqConstants.ROUTING_KEY_PAYUNI_SHIPPING_STATUS;
             // 超商列印與貨態共用 routing key，由下游按 ApiType 分流
             case SHIPPING_PRINT  -> MqConstants.ROUTING_KEY_PAYUNI_SHIPPING_STATUS;
@@ -28,11 +27,8 @@ public final class PayUniEventRouting {
             // seller.review.result。case 保留以維持窮舉，但不應被呼叫到。
             case AGENT_NOTIFY    -> throw new IllegalStateException(
                     "AGENT_NOTIFY 走 seller.review.result，不經 payuni.events");
-            case REFUND_NOTIFY   -> MqConstants.ROUTING_KEY_PAYUNI_REFUND_NOTIFY;
-            case REFUND_ACCEPTED -> MqConstants.ROUTING_KEY_PAYUNI_REFUND_ACCEPTED;
-            // §2.2 業務 pivot (2026-05-14)：UNKNOWN 若 payload 含 MerID 投遞 fallback 由 aftersales/payment consumer 接手；
-            // 若 payload 無 MerID 由 WebhookReceiveService 在 T2 前 markIgnored 終態，不會走到此 routing。
-            case UNKNOWN -> MqConstants.ROUTING_KEY_PAYUNI_UNKNOWN_FALLBACK;
+            case UNKNOWN         -> throw new IllegalStateException(
+                    "UNKNOWN 由 WebhookReceiveService 標 IGNORED，不投遞 MQ");
         };
     }
 }

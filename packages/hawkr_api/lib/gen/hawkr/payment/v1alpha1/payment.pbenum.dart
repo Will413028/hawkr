@@ -510,5 +510,77 @@ class PaymentAnomalyResolutionReason extends $pb.ProtobufEnum {
   const PaymentAnomalyResolutionReason._(super.value, super.name);
 }
 
+/// EarningsEntryType 是賣家入帳帳本（hawkr.seller.v1alpha1.SellerAppService.ListMyEarnings）一列的種類；金額的正負由種類決定，與金流商無關。
+class EarningsEntryType extends $pb.ProtobufEnum {
+  static const EarningsEntryType EARNINGS_ENTRY_TYPE_UNSPECIFIED =
+      EarningsEntryType._(
+          0, _omitEnumNames ? '' : 'EARNINGS_ENTRY_TYPE_UNSPECIFIED');
+
+  /// 平台把一張訂單的款項轉給賣家（金額為正）。
+  static const EarningsEntryType EARNINGS_ENTRY_TYPE_TRANSFER =
+      EarningsEntryType._(
+          1, _omitEnumNames ? '' : 'EARNINGS_ENTRY_TYPE_TRANSFER');
+
+  /// 退款時向賣家收回已轉出的款項（金額為負）。
+  static const EarningsEntryType EARNINGS_ENTRY_TYPE_REVERSAL =
+      EarningsEntryType._(
+          2, _omitEnumNames ? '' : 'EARNINGS_ENTRY_TYPE_REVERSAL');
+
+  /// 補差額：已從轉帳金額扣掉的退款之後失敗，把少收的款項補給賣家（金額為正）。
+  static const EarningsEntryType EARNINGS_ENTRY_TYPE_TOP_UP =
+      EarningsEntryType._(
+          3, _omitEnumNames ? '' : 'EARNINGS_ENTRY_TYPE_TOP_UP');
+
+  static const $core.List<EarningsEntryType> values = <EarningsEntryType>[
+    EARNINGS_ENTRY_TYPE_UNSPECIFIED,
+    EARNINGS_ENTRY_TYPE_TRANSFER,
+    EARNINGS_ENTRY_TYPE_REVERSAL,
+    EARNINGS_ENTRY_TYPE_TOP_UP,
+  ];
+
+  static final $core.List<EarningsEntryType?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static EarningsEntryType? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const EarningsEntryType._(super.value, super.name);
+}
+
+/// EarningsEntryStatus 是賣家入帳帳本一列的狀態。只有 COMPLETED 的列計入賣家實際入帳的金額。
+class EarningsEntryStatus extends $pb.ProtobufEnum {
+  static const EarningsEntryStatus EARNINGS_ENTRY_STATUS_UNSPECIFIED =
+      EarningsEntryStatus._(
+          0, _omitEnumNames ? '' : 'EARNINGS_ENTRY_STATUS_UNSPECIFIED');
+
+  /// 處理中：已記錄，還沒有結果（含待營運人工處理的列，賣家沒有要做的事）。
+  static const EarningsEntryStatus EARNINGS_ENTRY_STATUS_PENDING =
+      EarningsEntryStatus._(
+          1, _omitEnumNames ? '' : 'EARNINGS_ENTRY_STATUS_PENDING');
+
+  /// 已完成。
+  static const EarningsEntryStatus EARNINGS_ENTRY_STATUS_COMPLETED =
+      EarningsEntryStatus._(
+          2, _omitEnumNames ? '' : 'EARNINGS_ENTRY_STATUS_COMPLETED');
+
+  /// 失敗（終局）：款項沒有轉出。
+  static const EarningsEntryStatus EARNINGS_ENTRY_STATUS_FAILED =
+      EarningsEntryStatus._(
+          3, _omitEnumNames ? '' : 'EARNINGS_ENTRY_STATUS_FAILED');
+
+  static const $core.List<EarningsEntryStatus> values = <EarningsEntryStatus>[
+    EARNINGS_ENTRY_STATUS_UNSPECIFIED,
+    EARNINGS_ENTRY_STATUS_PENDING,
+    EARNINGS_ENTRY_STATUS_COMPLETED,
+    EARNINGS_ENTRY_STATUS_FAILED,
+  ];
+
+  static final $core.List<EarningsEntryStatus?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static EarningsEntryStatus? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const EarningsEntryStatus._(super.value, super.name);
+}
+
 const $core.bool _omitEnumNames =
     $core.bool.fromEnvironment('protobuf.omit_enum_names');

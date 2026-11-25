@@ -109,7 +109,7 @@ class CheckoutUberQuoteWiringTest {
                 mock(OrderService.class),
                 new OrderPolicyResolver(),
                 mock(StringRedisTemplate.class),
-                null);
+                null, null);
     }
 
     private static List<CheckoutItem> items() {

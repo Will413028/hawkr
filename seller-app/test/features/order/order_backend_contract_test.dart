@@ -68,16 +68,12 @@ void main() {
         'orderNo': 'HK202605070001',
         'refund_task_status': 'DONE',
         'refund_failure_message': '',
-        'estimated_refund_date': '2026-05-12',
-        'bank_date': '2026-05-13',
         'provider_status': 'S000',
         'provider_message': 'success',
       });
 
       expect(afterSale.refundTaskStatus, 'DONE');
       expect(afterSale.refundFailureMessage, '');
-      expect(afterSale.estimatedRefundDate, '2026-05-12');
-      expect(afterSale.bankDate, '2026-05-13');
       expect(afterSale.providerStatus, 'S000');
       expect(afterSale.providerMessage, 'success');
     });

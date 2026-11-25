@@ -37,5 +37,9 @@
   "quoteStatusSuperseded": "Superseded",
   "quoteStatusWithdrawn": "Withdrawn",
   "quoteStatusExpired": "Expired",
-  "quoteAmountNotWholeNumber": "{label} must be a non-negative whole number of TWD, for example 1200"
+  "quoteAmountNotWholeNumber": "{label} must be a non-negative whole number of TWD, for example 1200",
+  "earningsTitle": "Earnings",
+  "earningsNetAmount": "Net earnings {amount}",
+  "earningsEmpty": "No earnings yet",
+  "earningsLoadFailed": "Could not load earnings"
 }

@@ -91,7 +91,7 @@ class OrderInvoiceSnapshotReviseTest {
                 mock(PaymentGrpcClient.class), mock(SellerGrpcClient.class), mock(BuyerGrpcClient.class),
                 mock(MediaGrpcClient.class), mock(MediaUrlProperties.class),
                 mock(GrantPaymentTaskRepository.class), invoiceSnapshotRepository,
-                mock(OrderEventPublisher.class), "");
+                mock(OrderEventPublisher.class));
     }
 
     private static OrderInvoiceSnapshotEntity v1() {

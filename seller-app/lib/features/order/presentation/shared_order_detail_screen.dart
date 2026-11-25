@@ -8,6 +8,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:hawkr_api/money.dart';
 
 import '../../../config/image_config.dart';
 import '../../../core/codemeta/code_meta_display.dart';
@@ -25,7 +26,10 @@ import '../../../shared/widgets/step_indicator.dart';
 import 'order_status_presentation.dart';
 import 'package:hawkr_api/errors.dart' show errorText;
 import '../../../core/l10n/ui_locale.dart';
+import '../../../l10n/l10n.dart';
 import '../../review/data/review_repository.dart';
+import '../../wallet/data/earnings.dart';
+import '../../wallet/presentation/earnings_entry_row.dart';
 
 class SharedOrderDetailScreen extends HookConsumerWidget {
   const SharedOrderDetailScreen({
@@ -402,7 +406,7 @@ class SharedOrderDetailScreen extends HookConsumerWidget {
                     ],
                   ),
                 ],
-                _PaymentHistoryCard(orderId: orderId),
+                _OrderEarningsCard(orderNo: orderId),
               ],
             ),
     );
@@ -1031,263 +1035,73 @@ class _DetailCard extends StatelessWidget {
   }
 }
 
-class _PaymentHistoryCard extends ConsumerStatefulWidget {
-  const _PaymentHistoryCard({required this.orderId});
-  final String orderId;
+/// 這張訂單的入帳紀錄（`GetMyOrderEarnings`）：平台轉入、退款收回與補差額，加上已完成列的淨入帳。
+/// 訂單沒有付款（或不是自己店家的）、還沒有任何列、或讀取失敗時不顯示。
+class _OrderEarningsCard extends ConsumerWidget {
+  const _OrderEarningsCard({required this.orderNo});
+  final String orderNo;
 
   @override
-  ConsumerState<_PaymentHistoryCard> createState() =>
-      _PaymentHistoryCardState();
-}
-
-class _PaymentHistoryCardState extends ConsumerState<_PaymentHistoryCard> {
-  late final Future<List<Map<String, dynamic>>> _future;
-
-  @override
-  void initState() {
-    super.initState();
-    _future = widget.orderId.isEmpty
-        ? Future.value(const <Map<String, dynamic>>[])
-        : ref.read(orderRepositoryProvider).fetchPaymentHistory(widget.orderId);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: _future,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const SizedBox.shrink();
-        }
-        final records = snapshot.data ?? const <Map<String, dynamic>>[];
-        if (records.isEmpty) return const SizedBox.shrink();
-
-        return Padding(
-          padding: EdgeInsets.only(top: 16.h),
-          child: _DetailCard(
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (orderNo.isEmpty) return const SizedBox.shrink();
+    final earnings = ref.watch(myOrderEarningsProvider(orderNo)).value;
+    if (earnings == null || earnings.entries.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final entries = earnings.entries;
+    return Padding(
+      padding: EdgeInsets.only(top: 16.h),
+      child: _DetailCard(
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  HkIcon(
-                    HkIconName.history,
-                    size: 24.w,
-                    color: AppIconColors.defaultColor,
-                  ),
-                  SizedBox(width: 6.w),
-                  Text(
-                    '付款歷程',
-                    style: TextStyle(
-                      fontSize: 18.sp,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                      height: 1.23,
-                    ),
-                  ),
-                ],
+              HkIcon(
+                HkIconName.history,
+                size: 24.w,
+                color: AppIconColors.defaultColor,
               ),
-              SizedBox(height: 12.h),
-              ...records.asMap().entries.map((entry) {
-                final isLast = entry.key == records.length - 1;
-                return Column(
-                  children: [
-                    _PaymentHistoryRow(record: entry.value),
-                    if (!isLast) ...[
-                      SizedBox(height: 10.h),
-                      Divider(
-                        height: 1,
-                        color: AppColors.textPrimary.withValues(alpha: 0.1),
-                      ),
-                      SizedBox(height: 10.h),
-                    ],
-                  ],
-                );
-              }),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _PaymentHistoryRow extends StatelessWidget {
-  const _PaymentHistoryRow({required this.record});
-  final Map<String, dynamic> record;
-
-  @override
-  Widget build(BuildContext context) {
-    final paymentType = _historyValue(record, 'paymentType', 'payment_type');
-    final status = _historyValue(
-      record,
-      'status',
-      'paymentStatus',
-      'payment_status',
-    );
-    final displayTradeNo = _historyValue(
-      record,
-      'displayTradeNo',
-      'display_trade_no',
-    );
-    final tradeNo = displayTradeNo.isNotEmpty
-        ? displayTradeNo
-        : _historyValue(record, 'tradeNo', 'trade_no');
-    final amount = _historyValue(record, 'amount');
-    final createdAt = _historyValue(record, 'createdAt', 'created_at');
-    final payTime = _historyValue(record, 'payTime', 'pay_time');
-    final isDuplicate =
-        record['isDuplicate'] == true ||
-        record['is_duplicate'] == true ||
-        _historyValue(
-          record,
-          'duplicateSequence',
-          'duplicate_sequence',
-        ).isNotEmpty;
-    final badge = _paymentHistoryBadge(status, isDuplicate: isDuplicate);
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 8.w,
-          height: 8.w,
-          margin: EdgeInsets.only(top: 8.h),
-          decoration: BoxDecoration(color: badge.color, shape: BoxShape.circle),
-        ),
-        SizedBox(width: 10.w),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      CodeMetaDisplay.paymentMethod(
-                        paymentType,
-                        fallback: paymentType.isEmpty ? '付款方式未指定' : paymentType,
-                      ),
-                      style: TextStyle(
-                        fontSize: 16.sp,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                        height: 1.5,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 8.w,
-                      vertical: 4.h,
-                    ),
-                    decoration: BoxDecoration(
-                      color: badge.color,
-                      borderRadius: BorderRadius.circular(16.r),
-                    ),
-                    child: Text(
-                      badge.label,
-                      style: TextStyle(
-                        fontSize: 12.sp,
-                        fontWeight: FontWeight.w700,
-                        color: badge.color.computeLuminance() > 0.45
-                            ? AppColors.textEmphasis
-                            : AppColors.bgCard,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 4.h),
-              if (tradeNo.isNotEmpty)
-                Text(
-                  '交易編號 $tradeNo',
-                  style: TextStyle(
-                    fontSize: 14.sp,
-                    color: AppColors.textPrimary,
-                    height: 1.5,
-                  ),
-                ),
+              SizedBox(width: 6.w),
               Text(
-                [
-                  if (amount.isNotEmpty) '金額 NT\$ $amount',
-                  if (payTime.isNotEmpty)
-                    '付款 ${_formatDateTime(payTime, context.taipeiDisplay)}',
-                  if (payTime.isEmpty && createdAt.isNotEmpty)
-                    '建立 ${_formatDateTime(createdAt, context.taipeiDisplay)}',
-                ].join('｜'),
+                context.l10n.earningsTitle,
                 style: TextStyle(
-                  fontSize: 14.sp,
+                  fontSize: 18.sp,
+                  fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
-                  height: 1.5,
+                  height: 1.23,
                 ),
               ),
-              if (isDuplicate) ...[
-                SizedBox(height: 4.h),
-                Text(
-                  '此筆為重複付款紀錄，請以退款進度為準。',
-                  style: TextStyle(
-                    fontSize: 14.sp,
-                    color: AppColors.warningText,
-                    height: 1.5,
-                  ),
-                ),
-              ],
             ],
           ),
-        ),
-      ],
+          SizedBox(height: 12.h),
+          for (final (i, entry) in entries.indexed) ...[
+            if (i > 0) ...[
+              SizedBox(height: 10.h),
+              Divider(
+                height: 1,
+                color: AppColors.textPrimary.withValues(alpha: 0.1),
+              ),
+              SizedBox(height: 10.h),
+            ],
+            EarningsEntryRow(entry: entry),
+          ],
+          SizedBox(height: 12.h),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              context.l10n.earningsNetAmount(
+                formatMoney(earnings.netAmount.toInt()),
+              ),
+              key: const ValueKey('order-earnings-net'),
+              style: TextStyle(
+                fontSize: 16.sp,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
-  }
-}
-
-String _historyValue(
-  Map<String, dynamic> map,
-  String key, [
-  String? alt1,
-  String? alt2,
-]) {
-  final value =
-      map[key] ??
-      (alt1 == null ? null : map[alt1]) ??
-      (alt2 == null ? null : map[alt2]);
-  final text = value?.toString().trim() ?? '';
-  return text == 'null' ? '' : text;
-}
-
-({String label, Color color}) _paymentHistoryBadge(
-  String status, {
-  required bool isDuplicate,
-}) {
-  if (isDuplicate) {
-    return (label: '重複付款', color: AppColors.warning);
-  }
-  switch (status.toUpperCase()) {
-    case '0':
-    case 'INIT':
-      return (label: '待付款', color: AppColors.warning);
-    case '1':
-    case 'PAID':
-    case 'SUCCESS':
-      return (label: '付款完成', color: AppColors.brandPrimaryStrong);
-    case '2':
-    case 'FAILED':
-      return (label: '付款失敗', color: AppColors.error);
-    case '3':
-    case 'EXPIRED':
-      return (label: '已逾期', color: AppColors.textSecondary);
-    case '4':
-    case 'CONFLICT':
-      return (label: '狀態衝突', color: AppColors.error);
-    case '5':
-    case 'CLOSED':
-      return (label: '已關閉', color: AppColors.textSecondary);
-    case '6':
-    case 'CLOSED_BY_SWITCH':
-      return (label: '已切換', color: AppColors.textSecondary);
-    default:
-      return (
-        label: status.isEmpty ? '未知' : status,
-        color: AppColors.textSecondary,
-      );
   }
 }
 

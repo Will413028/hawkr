@@ -531,6 +531,133 @@ class GetPaymentResponse extends $pb.GeneratedMessage {
   Payment ensurePayment() => $_ensure(0);
 }
 
+/// EarningsEntry 是賣家入帳帳本的一列：一張訂單的一次轉入、收回或補差額。不帶金流商的物件 ID 與失敗原因。
+class EarningsEntry extends $pb.GeneratedMessage {
+  factory EarningsEntry({
+    $core.String? id,
+    EarningsEntryType? type,
+    $core.String? orderNo,
+    $fixnum.Int64? amount,
+    EarningsEntryStatus? status,
+    $0.Timestamp? createTime,
+  }) {
+    final result = EarningsEntry._();
+    if (id != null) result.id = id;
+    if (type != null) result.type = type;
+    if (orderNo != null) result.orderNo = orderNo;
+    if (amount != null) result.amount = amount;
+    if (status != null) result.status = status;
+    if (createTime != null) result.createTime = createTime;
+    return result;
+  }
+
+  EarningsEntry._();
+
+  factory EarningsEntry.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      EarningsEntry()..mergeFromBuffer(data, registry);
+  factory EarningsEntry.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      EarningsEntry()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'EarningsEntry',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.payment.v1alpha1'),
+      createEmptyInstance: EarningsEntry.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aE<EarningsEntryType>(2, _omitFieldNames ? '' : 'type',
+        enumValues: EarningsEntryType.values)
+    ..aOS(3, _omitFieldNames ? '' : 'orderNo')
+    ..aInt64(4, _omitFieldNames ? '' : 'amount')
+    ..aE<EarningsEntryStatus>(5, _omitFieldNames ? '' : 'status',
+        enumValues: EarningsEntryStatus.values)
+    ..aOM<$0.Timestamp>(6, _omitFieldNames ? '' : 'createTime',
+        subBuilder: $0.Timestamp.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EarningsEntry clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  EarningsEntry copyWith(void Function(EarningsEntry) updates) =>
+      super.copyWith((message) => updates(message as EarningsEntry))
+          as EarningsEntry;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated('Use EarningsEntry() / EarningsEntry.new instead')
+  static EarningsEntry create() => EarningsEntry._();
+  static $pb.GeneratedMessage $_createMessage() => EarningsEntry._();
+  @$core.override
+  EarningsEntry createEmptyInstance() => EarningsEntry._();
+  @$core.pragma('dart2js:noInline')
+  static EarningsEntry getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<EarningsEntry>(
+          EarningsEntry.$_createMessage);
+  static EarningsEntry? _defaultInstance;
+
+  /// 列的識別（轉帳、收回或補差額各自的紀錄 ID），不是訂單編號；補差額的 ID 是所屬退款的 ID。
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  EarningsEntryType get type => $_getN(1);
+  @$pb.TagNumber(2)
+  set type(EarningsEntryType value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasType() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearType() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get orderNo => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set orderNo($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasOrderNo() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearOrderNo() => $_clearField(3);
+
+  /// 新台幣元，帶正負：TRANSFER 與 TOP_UP 為正，REVERSAL 為負。
+  @$pb.TagNumber(4)
+  $fixnum.Int64 get amount => $_getI64(3);
+  @$pb.TagNumber(4)
+  set amount($fixnum.Int64 value) => $_setInt64(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasAmount() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearAmount() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  EarningsEntryStatus get status => $_getN(4);
+  @$pb.TagNumber(5)
+  set status(EarningsEntryStatus value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasStatus() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearStatus() => $_clearField(5);
+
+  /// 這一列記錄的時間（補差額是所屬退款的記錄時間）。
+  @$pb.TagNumber(6)
+  $0.Timestamp get createTime => $_getN(5);
+  @$pb.TagNumber(6)
+  set createTime($0.Timestamp value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasCreateTime() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearCreateTime() => $_clearField(6);
+  @$pb.TagNumber(6)
+  $0.Timestamp ensureCreateTime() => $_ensure(5);
+}
+
 /// PaymentAppService 只有登入的顧客帳號（買家）能呼叫；只讀寫呼叫者自己的付款（他人的訂單回 not_found）。
 class PaymentAppServiceApi {
   final $pb.RpcClient _client;

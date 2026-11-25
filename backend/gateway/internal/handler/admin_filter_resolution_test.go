@@ -8,7 +8,6 @@ import (
 
 	grpcclient "github.com/Will413028/hawkr/gateway/internal/grpc"
 	aftersalespb "github.com/Will413028/hawkr/go-pkg/proto/aftersales"
-	paymentpb "github.com/Will413028/hawkr/go-pkg/proto/payment"
 	shippingpb "github.com/Will413028/hawkr/go-pkg/proto/shipping"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc"
@@ -33,15 +32,6 @@ type mockAftersalesAdminServiceClient struct {
 
 func (m *mockAftersalesAdminServiceClient) ListAfterSaleCasesForAdmin(ctx context.Context, in *aftersalespb.ListAfterSaleCasesForAdminRequest, opts ...grpc.CallOption) (*aftersalespb.ListAfterSaleCasesForAdminResponse, error) {
 	return m.ListAfterSaleCasesForAdminFn(ctx, in, opts...)
-}
-
-type mockPaymentAdminServiceClient struct {
-	paymentpb.PaymentServiceClient
-	ListPaymentTransactionsForAdminFn func(ctx context.Context, in *paymentpb.ListPaymentTransactionsForAdminRequest, opts ...grpc.CallOption) (*paymentpb.ListPaymentTransactionsForAdminResponse, error)
-}
-
-func (m *mockPaymentAdminServiceClient) ListPaymentTransactionsForAdmin(ctx context.Context, in *paymentpb.ListPaymentTransactionsForAdminRequest, opts ...grpc.CallOption) (*paymentpb.ListPaymentTransactionsForAdminResponse, error) {
-	return m.ListPaymentTransactionsForAdminFn(ctx, in, opts...)
 }
 
 type mockShippingAdminServiceClient struct {
@@ -140,68 +130,6 @@ func TestListAfterSaleCasesForAdmin_InvalidBuyerFilter_BadRequest(t *testing.T) 
 
 	req, _ := http.NewRequest("GET", "/api/v1/admin/after_sales?buyer_id=not-a-number", nil)
 	req.Header.Set("X-Account-Id", "99")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	assertHTTPStatus(t, w, http.StatusBadRequest)
-}
-
-// ==================== 2) admin_payment.go: ListPaymentTransactionsForAdmin ====================
-
-func setupAdminPaymentTransactionsRouter(h *Holder) *gin.Engine {
-	r := gin.New()
-	r.GET("/api/v1/admin/payment_transactions", h.ListPaymentTransactionsForAdmin)
-	return r
-}
-
-func TestListPaymentTransactionsForAdmin_BuyerFilter_ResolvesTarget(t *testing.T) {
-	var captured *paymentpb.ListPaymentTransactionsForAdminRequest
-	mock := &mockPaymentAdminServiceClient{
-		ListPaymentTransactionsForAdminFn: func(ctx context.Context, in *paymentpb.ListPaymentTransactionsForAdminRequest, opts ...grpc.CallOption) (*paymentpb.ListPaymentTransactionsForAdminResponse, error) {
-			captured = in
-			return &paymentpb.ListPaymentTransactionsForAdminResponse{Code: 0, Data: &paymentpb.ListPaymentTransactionsForAdminData{Total: "0", Page: "1", PageSize: "20"}}, nil
-		},
-	}
-	h := &Holder{Payment: grpcclient.NewPaymentClientForTest(mock), BuyerID: buyerResolverForTest(8001)}
-	r := setupAdminPaymentTransactionsRouter(h)
-
-	req, _ := http.NewRequest("GET", "/api/v1/admin/payment_transactions?buyer_id=42", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	assertHTTPStatus(t, w, http.StatusOK)
-	if captured == nil || captured.BuyerId != "8001" {
-		t.Errorf("BuyerId = %+v, want \"8001\" (resolved surrogate, not raw 42)", captured)
-	}
-}
-
-func TestListPaymentTransactionsForAdmin_NoBuyerFilter_PassesThroughEmpty(t *testing.T) {
-	var captured *paymentpb.ListPaymentTransactionsForAdminRequest
-	mock := &mockPaymentAdminServiceClient{
-		ListPaymentTransactionsForAdminFn: func(ctx context.Context, in *paymentpb.ListPaymentTransactionsForAdminRequest, opts ...grpc.CallOption) (*paymentpb.ListPaymentTransactionsForAdminResponse, error) {
-			captured = in
-			return &paymentpb.ListPaymentTransactionsForAdminResponse{Code: 0, Data: &paymentpb.ListPaymentTransactionsForAdminData{Total: "0", Page: "1", PageSize: "20"}}, nil
-		},
-	}
-	h := &Holder{Payment: grpcclient.NewPaymentClientForTest(mock), BuyerID: buyerResolverForTest(8001)}
-	r := setupAdminPaymentTransactionsRouter(h)
-
-	req, _ := http.NewRequest("GET", "/api/v1/admin/payment_transactions", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	assertHTTPStatus(t, w, http.StatusOK)
-	if captured == nil || captured.BuyerId != "" {
-		t.Errorf("BuyerId = %+v, want empty (no filter supplied)", captured)
-	}
-}
-
-func TestListPaymentTransactionsForAdmin_InvalidBuyerFilter_BadRequest(t *testing.T) {
-	mock := &mockPaymentAdminServiceClient{}
-	h := &Holder{Payment: grpcclient.NewPaymentClientForTest(mock), BuyerID: buyerResolverForTest(8001)}
-	r := setupAdminPaymentTransactionsRouter(h)
-
-	req, _ := http.NewRequest("GET", "/api/v1/admin/payment_transactions?buyer_id=not-a-number", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 

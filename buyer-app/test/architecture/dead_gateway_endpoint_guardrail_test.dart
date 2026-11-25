@@ -26,7 +26,6 @@ const _deadEndpointFragments = <String, String>{
       '/public/posts/comments/{id}/likes',
   // 正解：POST /app/coupons/{template_id}/claim
   '/receive\'': 'POST /app/coupons/{template_id}/receive',
-  // ATM 退款走 POST /app/orders/{order_no}/refund_page（PayUni 退款頁）
   '/refunds/method': 'PUT /app/orders/{order_no}/refunds/method',
   '/refund_bank_info': 'POST /app/orders/{order_no}/refund_bank_info',
 };
@@ -78,6 +77,12 @@ final _retiredEndpointPatterns = <RegExp, _Retired>{
   // 檢舉、封鎖、封鎖名單與貼文分享已改走 ModerationAppService、BuyerAppService 與 `Post.url`；聊天改走
   // ChatAppService（A6-6c2），不再有允許的舊 REST 呼叫。
   RegExp(r'/app/blocks'): _Retired('POST|GET|DELETE /app/blocks…（封鎖與封鎖名單）'),
+  // ATM 退款頁與 PayUni 付款路由已隨 Java payment 刪除（B2 步驟 6）；退款一律原路退回，付款走 PaymentService。
+  RegExp(r'/refund_page\b'): _Retired(
+    'POST /app/orders/{order_no}/refund_page（ATM 退款頁）',
+  ),
+  RegExp(r'/atm-refund\b'): _Retired('POST /atm-refund/return（ATM 退款頁回跳）'),
+  RegExp(r'/app/payments\b'): _Retired('/app/payments…（舊付款 REST）'),
   RegExp(r'/app/reports/me'): _Retired('GET /app/reports/me（我的檢舉）'),
   RegExp(r'/app/reports(?!/)'): _Retired('POST /app/reports（檢舉）'),
   RegExp(r'/app/chat/'): _Retired('/app/chat/*（聊天的 REST 與 WebSocket 連線票）'),

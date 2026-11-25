@@ -79,9 +79,6 @@ const (
 	// PaymentServiceGrantPaymentProcedure is the fully-qualified name of the PaymentService's
 	// GrantPayment RPC.
 	PaymentServiceGrantPaymentProcedure = "/io.github.will413028.hawkr.payment.grpc.PaymentService/GrantPayment"
-	// PaymentServiceGetRefundPageUrlProcedure is the fully-qualified name of the PaymentService's
-	// GetRefundPageUrl RPC.
-	PaymentServiceGetRefundPageUrlProcedure = "/io.github.will413028.hawkr.payment.grpc.PaymentService/GetRefundPageUrl"
 	// PaymentServiceBatchGetProviderStatusByOrderIdsProcedure is the fully-qualified name of the
 	// PaymentService's BatchGetProviderStatusByOrderIds RPC.
 	PaymentServiceBatchGetProviderStatusByOrderIdsProcedure = "/io.github.will413028.hawkr.payment.grpc.PaymentService/BatchGetProviderStatusByOrderIds"
@@ -94,15 +91,9 @@ const (
 	// PaymentServiceHandlePaymentPageReturnProcedure is the fully-qualified name of the
 	// PaymentService's HandlePaymentPageReturn RPC.
 	PaymentServiceHandlePaymentPageReturnProcedure = "/io.github.will413028.hawkr.payment.grpc.PaymentService/HandlePaymentPageReturn"
-	// PaymentServiceDecryptPayUniResultProcedure is the fully-qualified name of the PaymentService's
-	// DecryptPayUniResult RPC.
-	PaymentServiceDecryptPayUniResultProcedure = "/io.github.will413028.hawkr.payment.grpc.PaymentService/DecryptPayUniResult"
 	// PaymentServiceValidateApplePayMerchantProcedure is the fully-qualified name of the
 	// PaymentService's ValidateApplePayMerchant RPC.
 	PaymentServiceValidateApplePayMerchantProcedure = "/io.github.will413028.hawkr.payment.grpc.PaymentService/ValidateApplePayMerchant"
-	// PaymentServiceAckAtmRefundAcceptedProcedure is the fully-qualified name of the PaymentService's
-	// AckAtmRefundAccepted RPC.
-	PaymentServiceAckAtmRefundAcceptedProcedure = "/io.github.will413028.hawkr.payment.grpc.PaymentService/AckAtmRefundAccepted"
 	// PaymentServiceListPaymentTransactionsForAdminProcedure is the fully-qualified name of the
 	// PaymentService's ListPaymentTransactionsForAdmin RPC.
 	PaymentServiceListPaymentTransactionsForAdminProcedure = "/io.github.will413028.hawkr.payment.grpc.PaymentService/ListPaymentTransactionsForAdmin"
@@ -157,8 +148,6 @@ type PaymentServiceClient interface {
 	GetPaymentRedirectForm(context.Context, *connect.Request[payment.GetPaymentRedirectFormRequest]) (*connect.Response[payment.GetPaymentRedirectFormResponse], error)
 	// 發動撥款指示（代理商模式：買家確認收貨後，由 Order Service 呼叫）
 	GrantPayment(context.Context, *connect.Request[payment.GrantPaymentRequest]) (*connect.Response[payment.GrantPaymentResponse], error)
-	// ATM 退款頁面版 URL 組裝（AfterSales Service 呼叫）
-	GetRefundPageUrl(context.Context, *connect.Request[payment.GetRefundPageUrlRequest]) (*connect.Response[payment.GetRefundPageUrlResponse], error)
 	// 批次查詢付款 provider 狀態（Order 聚合用，收斂規範 §6.3）
 	BatchGetProviderStatusByOrderIds(context.Context, *connect.Request[payment.BatchGetProviderStatusByOrderIdsRequest]) (*connect.Response[payment.BatchGetProviderStatusByOrderIdsResponse], error)
 	// 批次查詢退款 provider 狀態 by case_ids（AfterSales 聚合用）
@@ -168,15 +157,10 @@ type PaymentServiceClient interface {
 	// 信用卡付款 Return 處理（Gateway 接收 PayUni Form POST 後呼叫）
 	// 解密 + 驗簽 + 更新交易狀態 + 組裝 Deep Link
 	HandlePaymentPageReturn(context.Context, *connect.Request[payment.HandlePaymentPageReturnRequest]) (*connect.Response[payment.HandlePaymentPageReturnResponse], error)
-	// PayUni 加密資料通用解密（供其他微服務呼叫，如 AfterSales ATM 退款回調）
-	DecryptPayUniResult(context.Context, *connect.Request[payment.DecryptPayUniResultRequest]) (*connect.Response[payment.DecryptPayUniResultResponse], error)
 	// Apple Pay on Web Merchant Validation：對 Apple validationURL 取 merchantSession
 	// 使用 Apple Pay Merchant Identity Certificate (PEM + Key) 進行 mTLS POST，原樣透傳 Apple 回應
 	// 詳見 05 號設計書 §5.11
 	ValidateApplePayMerchant(context.Context, *connect.Request[payment.ValidateApplePayMerchantRequest]) (*connect.Response[payment.ValidateApplePayMerchantResponse], error)
-	// ATM 退款頁面版受理成功確認（收斂規範 §4.4 雙階段 sync 階段 → PROCESSING + estimated_refund_date）
-	// AfterSales 解密 PayUni 回頁面 payload 後呼叫
-	AckAtmRefundAccepted(context.Context, *connect.Request[payment.AckAtmRefundAcceptedRequest]) (*connect.Response[payment.AckAtmRefundAcceptedResponse], error)
 	// 列付款異常（FAILED / EXPIRED / CONFLICT 或 rescue_action 有值）
 	ListPaymentTransactionsForAdmin(context.Context, *connect.Request[payment.ListPaymentTransactionsForAdminRequest]) (*connect.Response[payment.ListPaymentTransactionsForAdminResponse], error)
 	// 取付款詳情（Admin 對帳用，含 grant_* 撥款欄位、rescue、重複付款等）
@@ -297,12 +281,6 @@ func NewPaymentServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(paymentServiceMethods.ByName("GrantPayment")),
 			connect.WithClientOptions(opts...),
 		),
-		getRefundPageUrl: connect.NewClient[payment.GetRefundPageUrlRequest, payment.GetRefundPageUrlResponse](
-			httpClient,
-			baseURL+PaymentServiceGetRefundPageUrlProcedure,
-			connect.WithSchema(paymentServiceMethods.ByName("GetRefundPageUrl")),
-			connect.WithClientOptions(opts...),
-		),
 		batchGetProviderStatusByOrderIds: connect.NewClient[payment.BatchGetProviderStatusByOrderIdsRequest, payment.BatchGetProviderStatusByOrderIdsResponse](
 			httpClient,
 			baseURL+PaymentServiceBatchGetProviderStatusByOrderIdsProcedure,
@@ -327,22 +305,10 @@ func NewPaymentServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(paymentServiceMethods.ByName("HandlePaymentPageReturn")),
 			connect.WithClientOptions(opts...),
 		),
-		decryptPayUniResult: connect.NewClient[payment.DecryptPayUniResultRequest, payment.DecryptPayUniResultResponse](
-			httpClient,
-			baseURL+PaymentServiceDecryptPayUniResultProcedure,
-			connect.WithSchema(paymentServiceMethods.ByName("DecryptPayUniResult")),
-			connect.WithClientOptions(opts...),
-		),
 		validateApplePayMerchant: connect.NewClient[payment.ValidateApplePayMerchantRequest, payment.ValidateApplePayMerchantResponse](
 			httpClient,
 			baseURL+PaymentServiceValidateApplePayMerchantProcedure,
 			connect.WithSchema(paymentServiceMethods.ByName("ValidateApplePayMerchant")),
-			connect.WithClientOptions(opts...),
-		),
-		ackAtmRefundAccepted: connect.NewClient[payment.AckAtmRefundAcceptedRequest, payment.AckAtmRefundAcceptedResponse](
-			httpClient,
-			baseURL+PaymentServiceAckAtmRefundAcceptedProcedure,
-			connect.WithSchema(paymentServiceMethods.ByName("AckAtmRefundAccepted")),
 			connect.WithClientOptions(opts...),
 		),
 		listPaymentTransactionsForAdmin: connect.NewClient[payment.ListPaymentTransactionsForAdminRequest, payment.ListPaymentTransactionsForAdminResponse](
@@ -401,14 +367,11 @@ type paymentServiceClient struct {
 	getPaymentReturnPage                   *connect.Client[payment.GetPaymentReturnPageRequest, payment.GetPaymentReturnPageResponse]
 	getPaymentRedirectForm                 *connect.Client[payment.GetPaymentRedirectFormRequest, payment.GetPaymentRedirectFormResponse]
 	grantPayment                           *connect.Client[payment.GrantPaymentRequest, payment.GrantPaymentResponse]
-	getRefundPageUrl                       *connect.Client[payment.GetRefundPageUrlRequest, payment.GetRefundPageUrlResponse]
 	batchGetProviderStatusByOrderIds       *connect.Client[payment.BatchGetProviderStatusByOrderIdsRequest, payment.BatchGetProviderStatusByOrderIdsResponse]
 	batchGetRefundProviderStatusByCaseIds  *connect.Client[payment.BatchGetRefundProviderStatusByCaseIdsRequest, payment.BatchGetRefundProviderStatusResponse]
 	batchGetRefundProviderStatusByOrderIds *connect.Client[payment.BatchGetRefundProviderStatusByOrderIdsRequest, payment.BatchGetRefundProviderStatusResponse]
 	handlePaymentPageReturn                *connect.Client[payment.HandlePaymentPageReturnRequest, payment.HandlePaymentPageReturnResponse]
-	decryptPayUniResult                    *connect.Client[payment.DecryptPayUniResultRequest, payment.DecryptPayUniResultResponse]
 	validateApplePayMerchant               *connect.Client[payment.ValidateApplePayMerchantRequest, payment.ValidateApplePayMerchantResponse]
-	ackAtmRefundAccepted                   *connect.Client[payment.AckAtmRefundAcceptedRequest, payment.AckAtmRefundAcceptedResponse]
 	listPaymentTransactionsForAdmin        *connect.Client[payment.ListPaymentTransactionsForAdminRequest, payment.ListPaymentTransactionsForAdminResponse]
 	getPaymentTransactionForAdmin          *connect.Client[payment.GetPaymentTransactionForAdminRequest, payment.GetPaymentTransactionForAdminResponse]
 	listRefundsForAdmin                    *connect.Client[payment.ListRefundsForAdminRequest, payment.ListRefundsForAdminResponse]
@@ -499,11 +462,6 @@ func (c *paymentServiceClient) GrantPayment(ctx context.Context, req *connect.Re
 	return c.grantPayment.CallUnary(ctx, req)
 }
 
-// GetRefundPageUrl calls io.github.will413028.hawkr.payment.grpc.PaymentService.GetRefundPageUrl.
-func (c *paymentServiceClient) GetRefundPageUrl(ctx context.Context, req *connect.Request[payment.GetRefundPageUrlRequest]) (*connect.Response[payment.GetRefundPageUrlResponse], error) {
-	return c.getRefundPageUrl.CallUnary(ctx, req)
-}
-
 // BatchGetProviderStatusByOrderIds calls
 // io.github.will413028.hawkr.payment.grpc.PaymentService.BatchGetProviderStatusByOrderIds.
 func (c *paymentServiceClient) BatchGetProviderStatusByOrderIds(ctx context.Context, req *connect.Request[payment.BatchGetProviderStatusByOrderIdsRequest]) (*connect.Response[payment.BatchGetProviderStatusByOrderIdsResponse], error) {
@@ -528,22 +486,10 @@ func (c *paymentServiceClient) HandlePaymentPageReturn(ctx context.Context, req 
 	return c.handlePaymentPageReturn.CallUnary(ctx, req)
 }
 
-// DecryptPayUniResult calls
-// io.github.will413028.hawkr.payment.grpc.PaymentService.DecryptPayUniResult.
-func (c *paymentServiceClient) DecryptPayUniResult(ctx context.Context, req *connect.Request[payment.DecryptPayUniResultRequest]) (*connect.Response[payment.DecryptPayUniResultResponse], error) {
-	return c.decryptPayUniResult.CallUnary(ctx, req)
-}
-
 // ValidateApplePayMerchant calls
 // io.github.will413028.hawkr.payment.grpc.PaymentService.ValidateApplePayMerchant.
 func (c *paymentServiceClient) ValidateApplePayMerchant(ctx context.Context, req *connect.Request[payment.ValidateApplePayMerchantRequest]) (*connect.Response[payment.ValidateApplePayMerchantResponse], error) {
 	return c.validateApplePayMerchant.CallUnary(ctx, req)
-}
-
-// AckAtmRefundAccepted calls
-// io.github.will413028.hawkr.payment.grpc.PaymentService.AckAtmRefundAccepted.
-func (c *paymentServiceClient) AckAtmRefundAccepted(ctx context.Context, req *connect.Request[payment.AckAtmRefundAcceptedRequest]) (*connect.Response[payment.AckAtmRefundAcceptedResponse], error) {
-	return c.ackAtmRefundAccepted.CallUnary(ctx, req)
 }
 
 // ListPaymentTransactionsForAdmin calls
@@ -615,8 +561,6 @@ type PaymentServiceHandler interface {
 	GetPaymentRedirectForm(context.Context, *connect.Request[payment.GetPaymentRedirectFormRequest]) (*connect.Response[payment.GetPaymentRedirectFormResponse], error)
 	// 發動撥款指示（代理商模式：買家確認收貨後，由 Order Service 呼叫）
 	GrantPayment(context.Context, *connect.Request[payment.GrantPaymentRequest]) (*connect.Response[payment.GrantPaymentResponse], error)
-	// ATM 退款頁面版 URL 組裝（AfterSales Service 呼叫）
-	GetRefundPageUrl(context.Context, *connect.Request[payment.GetRefundPageUrlRequest]) (*connect.Response[payment.GetRefundPageUrlResponse], error)
 	// 批次查詢付款 provider 狀態（Order 聚合用，收斂規範 §6.3）
 	BatchGetProviderStatusByOrderIds(context.Context, *connect.Request[payment.BatchGetProviderStatusByOrderIdsRequest]) (*connect.Response[payment.BatchGetProviderStatusByOrderIdsResponse], error)
 	// 批次查詢退款 provider 狀態 by case_ids（AfterSales 聚合用）
@@ -626,15 +570,10 @@ type PaymentServiceHandler interface {
 	// 信用卡付款 Return 處理（Gateway 接收 PayUni Form POST 後呼叫）
 	// 解密 + 驗簽 + 更新交易狀態 + 組裝 Deep Link
 	HandlePaymentPageReturn(context.Context, *connect.Request[payment.HandlePaymentPageReturnRequest]) (*connect.Response[payment.HandlePaymentPageReturnResponse], error)
-	// PayUni 加密資料通用解密（供其他微服務呼叫，如 AfterSales ATM 退款回調）
-	DecryptPayUniResult(context.Context, *connect.Request[payment.DecryptPayUniResultRequest]) (*connect.Response[payment.DecryptPayUniResultResponse], error)
 	// Apple Pay on Web Merchant Validation：對 Apple validationURL 取 merchantSession
 	// 使用 Apple Pay Merchant Identity Certificate (PEM + Key) 進行 mTLS POST，原樣透傳 Apple 回應
 	// 詳見 05 號設計書 §5.11
 	ValidateApplePayMerchant(context.Context, *connect.Request[payment.ValidateApplePayMerchantRequest]) (*connect.Response[payment.ValidateApplePayMerchantResponse], error)
-	// ATM 退款頁面版受理成功確認（收斂規範 §4.4 雙階段 sync 階段 → PROCESSING + estimated_refund_date）
-	// AfterSales 解密 PayUni 回頁面 payload 後呼叫
-	AckAtmRefundAccepted(context.Context, *connect.Request[payment.AckAtmRefundAcceptedRequest]) (*connect.Response[payment.AckAtmRefundAcceptedResponse], error)
 	// 列付款異常（FAILED / EXPIRED / CONFLICT 或 rescue_action 有值）
 	ListPaymentTransactionsForAdmin(context.Context, *connect.Request[payment.ListPaymentTransactionsForAdminRequest]) (*connect.Response[payment.ListPaymentTransactionsForAdminResponse], error)
 	// 取付款詳情（Admin 對帳用，含 grant_* 撥款欄位、rescue、重複付款等）
@@ -750,12 +689,6 @@ func NewPaymentServiceHandler(svc PaymentServiceHandler, opts ...connect.Handler
 		connect.WithSchema(paymentServiceMethods.ByName("GrantPayment")),
 		connect.WithHandlerOptions(opts...),
 	)
-	paymentServiceGetRefundPageUrlHandler := connect.NewUnaryHandler(
-		PaymentServiceGetRefundPageUrlProcedure,
-		svc.GetRefundPageUrl,
-		connect.WithSchema(paymentServiceMethods.ByName("GetRefundPageUrl")),
-		connect.WithHandlerOptions(opts...),
-	)
 	paymentServiceBatchGetProviderStatusByOrderIdsHandler := connect.NewUnaryHandler(
 		PaymentServiceBatchGetProviderStatusByOrderIdsProcedure,
 		svc.BatchGetProviderStatusByOrderIds,
@@ -780,22 +713,10 @@ func NewPaymentServiceHandler(svc PaymentServiceHandler, opts ...connect.Handler
 		connect.WithSchema(paymentServiceMethods.ByName("HandlePaymentPageReturn")),
 		connect.WithHandlerOptions(opts...),
 	)
-	paymentServiceDecryptPayUniResultHandler := connect.NewUnaryHandler(
-		PaymentServiceDecryptPayUniResultProcedure,
-		svc.DecryptPayUniResult,
-		connect.WithSchema(paymentServiceMethods.ByName("DecryptPayUniResult")),
-		connect.WithHandlerOptions(opts...),
-	)
 	paymentServiceValidateApplePayMerchantHandler := connect.NewUnaryHandler(
 		PaymentServiceValidateApplePayMerchantProcedure,
 		svc.ValidateApplePayMerchant,
 		connect.WithSchema(paymentServiceMethods.ByName("ValidateApplePayMerchant")),
-		connect.WithHandlerOptions(opts...),
-	)
-	paymentServiceAckAtmRefundAcceptedHandler := connect.NewUnaryHandler(
-		PaymentServiceAckAtmRefundAcceptedProcedure,
-		svc.AckAtmRefundAccepted,
-		connect.WithSchema(paymentServiceMethods.ByName("AckAtmRefundAccepted")),
 		connect.WithHandlerOptions(opts...),
 	)
 	paymentServiceListPaymentTransactionsForAdminHandler := connect.NewUnaryHandler(
@@ -866,8 +787,6 @@ func NewPaymentServiceHandler(svc PaymentServiceHandler, opts ...connect.Handler
 			paymentServiceGetPaymentRedirectFormHandler.ServeHTTP(w, r)
 		case PaymentServiceGrantPaymentProcedure:
 			paymentServiceGrantPaymentHandler.ServeHTTP(w, r)
-		case PaymentServiceGetRefundPageUrlProcedure:
-			paymentServiceGetRefundPageUrlHandler.ServeHTTP(w, r)
 		case PaymentServiceBatchGetProviderStatusByOrderIdsProcedure:
 			paymentServiceBatchGetProviderStatusByOrderIdsHandler.ServeHTTP(w, r)
 		case PaymentServiceBatchGetRefundProviderStatusByCaseIdsProcedure:
@@ -876,12 +795,8 @@ func NewPaymentServiceHandler(svc PaymentServiceHandler, opts ...connect.Handler
 			paymentServiceBatchGetRefundProviderStatusByOrderIdsHandler.ServeHTTP(w, r)
 		case PaymentServiceHandlePaymentPageReturnProcedure:
 			paymentServiceHandlePaymentPageReturnHandler.ServeHTTP(w, r)
-		case PaymentServiceDecryptPayUniResultProcedure:
-			paymentServiceDecryptPayUniResultHandler.ServeHTTP(w, r)
 		case PaymentServiceValidateApplePayMerchantProcedure:
 			paymentServiceValidateApplePayMerchantHandler.ServeHTTP(w, r)
-		case PaymentServiceAckAtmRefundAcceptedProcedure:
-			paymentServiceAckAtmRefundAcceptedHandler.ServeHTTP(w, r)
 		case PaymentServiceListPaymentTransactionsForAdminProcedure:
 			paymentServiceListPaymentTransactionsForAdminHandler.ServeHTTP(w, r)
 		case PaymentServiceGetPaymentTransactionForAdminProcedure:
@@ -963,10 +878,6 @@ func (UnimplementedPaymentServiceHandler) GrantPayment(context.Context, *connect
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.github.will413028.hawkr.payment.grpc.PaymentService.GrantPayment is not implemented"))
 }
 
-func (UnimplementedPaymentServiceHandler) GetRefundPageUrl(context.Context, *connect.Request[payment.GetRefundPageUrlRequest]) (*connect.Response[payment.GetRefundPageUrlResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.github.will413028.hawkr.payment.grpc.PaymentService.GetRefundPageUrl is not implemented"))
-}
-
 func (UnimplementedPaymentServiceHandler) BatchGetProviderStatusByOrderIds(context.Context, *connect.Request[payment.BatchGetProviderStatusByOrderIdsRequest]) (*connect.Response[payment.BatchGetProviderStatusByOrderIdsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.github.will413028.hawkr.payment.grpc.PaymentService.BatchGetProviderStatusByOrderIds is not implemented"))
 }
@@ -983,16 +894,8 @@ func (UnimplementedPaymentServiceHandler) HandlePaymentPageReturn(context.Contex
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.github.will413028.hawkr.payment.grpc.PaymentService.HandlePaymentPageReturn is not implemented"))
 }
 
-func (UnimplementedPaymentServiceHandler) DecryptPayUniResult(context.Context, *connect.Request[payment.DecryptPayUniResultRequest]) (*connect.Response[payment.DecryptPayUniResultResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.github.will413028.hawkr.payment.grpc.PaymentService.DecryptPayUniResult is not implemented"))
-}
-
 func (UnimplementedPaymentServiceHandler) ValidateApplePayMerchant(context.Context, *connect.Request[payment.ValidateApplePayMerchantRequest]) (*connect.Response[payment.ValidateApplePayMerchantResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.github.will413028.hawkr.payment.grpc.PaymentService.ValidateApplePayMerchant is not implemented"))
-}
-
-func (UnimplementedPaymentServiceHandler) AckAtmRefundAccepted(context.Context, *connect.Request[payment.AckAtmRefundAcceptedRequest]) (*connect.Response[payment.AckAtmRefundAcceptedResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("io.github.will413028.hawkr.payment.grpc.PaymentService.AckAtmRefundAccepted is not implemented"))
 }
 
 func (UnimplementedPaymentServiceHandler) ListPaymentTransactionsForAdmin(context.Context, *connect.Request[payment.ListPaymentTransactionsForAdminRequest]) (*connect.Response[payment.ListPaymentTransactionsForAdminResponse], error) {

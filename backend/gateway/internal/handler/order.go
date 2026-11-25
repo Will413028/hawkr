@@ -48,9 +48,6 @@ type OrderDetailResponse struct {
 	Odno                string `json:"odno,omitempty"`
 	ValidationNo        string `json:"validationNo,omitempty"`
 	PaymentMethod       string `json:"paymentMethod,omitempty"`
-	AtmBankCode         string `json:"atmBankCode,omitempty"`
-	AtmVirtualAccount   string `json:"atmVirtualAccount,omitempty"`
-	AtmExpireDate       string `json:"atmExpireDate,omitempty"`
 	SellerName          string `json:"sellerName,omitempty"`
 	// 賣家 canonical 短碼（sellers.store_code）；storeId 是內部代理鍵，賣家頁
 	// canonical 網址走 storeCode。與 sellerName 同源自 order-service 的
@@ -82,7 +79,6 @@ type OrderDetailResponse struct {
 	RefundHistory      []RefundRequestResponse   `json:"refundHistory,omitempty"`
 	IsReviewed         bool                      `json:"isReviewed"`
 	CanReview          bool                      `json:"canReview"`
-	NeedRefundPage     bool                      `json:"needRefundPage"`
 	// 再次付款可用付款方式（依 totalActualAmount 算）。僅買家 + status=pending_payment 時非空（03 §4.2.1）；前端據此 render（禁用 + 理由）
 	AvailablePaymentMethods []AvailablePaymentMethodResponse `json:"availablePaymentMethods,omitempty"`
 }
@@ -183,7 +179,6 @@ type OrderSummaryResponse struct {
 	ShipmentPhotoUrls  []string                `json:"shipmentPhotoUrls,omitempty"` // 出貨照片顯示 URL（Gateway 組）
 	IsReviewed         bool                    `json:"isReviewed"`
 	CanReview          bool                    `json:"canReview"`
-	NeedRefundPage     bool                    `json:"needRefundPage"`
 }
 
 // AdminOrderSummaryResponse Admin 訂單列表單筆（/admin/orders）。
@@ -304,9 +299,6 @@ func convertOrderDetail(d *pb.OrderDetailView, mediaBase string) *OrderDetailRes
 		Odno:                    d.Odno,
 		ValidationNo:            d.ValidationNo,
 		PaymentMethod:           d.PaymentMethod,
-		AtmBankCode:             d.AtmBankCode,
-		AtmVirtualAccount:       d.AtmVirtualAccount,
-		AtmExpireDate:           d.AtmExpireDate,
 		SellerName:              d.SellerName,
 		StoreCode:               d.StoreCode,
 		SellerLogoKey:           d.SellerAvatarKey,
@@ -329,7 +321,6 @@ func convertOrderDetail(d *pb.OrderDetailView, mediaBase string) *OrderDetailRes
 		ProcessingDeadline:      d.GetProcessingDeadline(),
 		PaymentDeadline:         d.GetPaymentDeadline(),
 		CanReview:               d.CanReview,
-		NeedRefundPage:          d.GetNeedRefundPage(),
 		ProviderStatus:          d.GetProviderStatus(),
 		ProviderMessage:         d.GetProviderMessage(),
 		PaymentMerID:            d.GetPaymentMerId(),
@@ -421,7 +412,6 @@ func convertOrderSummaries(orders []*pb.OrderSummaryView, mediaBase string) []Or
 			CancelRemark:       o.GetCancelRemark(),
 			CancelByRole:       o.GetCancelByRole(),
 			CanReview:          o.CanReview,
-			NeedRefundPage:     o.GetNeedRefundPage(),
 			ProviderStatus:     o.GetProviderStatus(),
 			ProviderMessage:    o.GetProviderMessage(),
 		}

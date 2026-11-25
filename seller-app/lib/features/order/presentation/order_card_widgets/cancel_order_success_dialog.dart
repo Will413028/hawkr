@@ -88,17 +88,6 @@ class CancelOrderSuccessDialog extends StatelessWidget {
                   ],
                 ),
               ),
-              if (result.needRefundPage) ...[
-                SizedBox(height: 10.h),
-                Text(
-                  'ATM 付款需買家填寫銀行資訊，已通知買家完成退款',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 12.sp,
-                    color: AppColors.warningText,
-                  ),
-                ),
-              ],
             ],
             SizedBox(height: 22.h),
             SizedBox(

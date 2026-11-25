@@ -115,7 +115,6 @@ class CheckoutConfirmInvoiceIntakeTest {
                         .build());
         when(sellerGrpcClient.getSellerMeta(anyLong())).thenReturn(SellerMeta.newBuilder()
                 .setSellerName("測試賣家")
-                .setPayuniMerId("HAWK" + STORE_ID)
                 .setCanAcceptOrders(true)
                 .build());
         when(checkoutValidator.validate(anyList(), any()))
@@ -134,7 +133,7 @@ class CheckoutConfirmInvoiceIntakeTest {
                 .thenReturn(ValidateOrderInvoiceInputInternalResponse.newBuilder().setCode(0).build());
 
         service = new CheckoutService(productGrpcClient, sellerGrpcClient, buyerGrpcClient,
-                shippingGrpcClient, null, invoiceGrpcClient, checkoutValidator, orderService, new OrderPolicyResolver(), redisTemplate, null);
+                shippingGrpcClient, null, invoiceGrpcClient, checkoutValidator, orderService, new OrderPolicyResolver(), redisTemplate, null, null);
 
         // 🔴 快照用**產線那一支** buildPriceSnapshot 組，不手寫 JSON。
         //    舊版這裡餵的是 "1"（舊格式哨兵），而 confirm 現在對「快照沒有政策五欄」一律 fail-closed

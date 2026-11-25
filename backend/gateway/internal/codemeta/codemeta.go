@@ -1,27 +1,12 @@
 // Package codemeta mirrors the subset of CodeMeta enum string values that the
 // gateway needs to inject into downstream gRPC requests.
 //
-// Source of truth: docs/代碼管理（CodeMeta）/業務類型碼.md (ClientType, AppType).
-// Account type ints come from gateway/internal/middleware/account_type.go.
+// Source of truth: backend/docs/代碼管理（CodeMeta）/.
 //
 // We do not import the generated internal/platform/codemeta/code_meta.go: it
 // belongs to the monolith module, which gateway cannot import; keeping a thin local mirror
 // avoids cross-module coupling. Keep these values in sync with the markdown.
 package codemeta
-
-import "github.com/Will413028/hawkr/gateway/internal/middleware"
-
-// ClientType values (CodeMeta TechnicalCode "ClientType").
-const (
-	ClientTypeMobileApp  = "MOBILE_APP"
-	ClientTypeWebBrowser = "WEB_BROWSER"
-)
-
-// AppType values (CodeMeta TechnicalCode "AppType").
-const (
-	AppTypeBuyer  = "BUYER"
-	AppTypeSeller = "SELLER"
-)
 
 // AfterSaleAppealState values (CodeMeta BusinessStatusCode "AfterSaleAppealState",
 // docs/代碼管理（CodeMeta）/業務狀態碼.md). These are the enum *Value* column —
@@ -33,18 +18,6 @@ const (
 	AfterSaleAppealStateInvestigating = "20"
 	AfterSaleAppealStateResolved      = "30"
 )
-
-// AppTypeFromAccountType derives the AppType string from gateway's int-valued
-// JWT account_type. SELLER_AND_BUYER and ADMIN both fall back to BUYER because
-// the only callers (payment / refund) are buyer-flow endpoints.
-func AppTypeFromAccountType(accountType int) string {
-	switch accountType {
-	case middleware.AccountTypeSeller:
-		return AppTypeSeller
-	default:
-		return AppTypeBuyer
-	}
-}
 
 // WeightUnit values (CodeMeta BusinessTypeCode "WeightUnit",
 // docs/代碼管理（CodeMeta）/業務類型碼.md). product_sku.unit stores the *Value*,

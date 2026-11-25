@@ -8,7 +8,7 @@ import type { CustomerSort, CustomerType } from "@hawkr/api/gen/hawkr/crm/v1alph
 import type { RejectReason } from "@hawkr/api/gen/hawkr/media/v1alpha1/media_pb";
 import type { ReportOutcome, ReportTargetKind } from "@hawkr/api/gen/hawkr/moderation/v1alpha1/moderation_pb";
 import type { NotificationCategory, NotificationChannel } from "@hawkr/api/gen/hawkr/notification/v1alpha1/notification_pb";
-import type { PaymentAccountStatus, PaymentAnomalyKind, PaymentAnomalyOutcome, PaymentAnomalyResolutionReason, PaymentRefundStatus, PaymentReversalStatus, PaymentStatus, PaymentTopupStatus, PaymentTransferStatus, RequirementCollection } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
+import type { EarningsEntryStatus, EarningsEntryType, PaymentAccountStatus, PaymentAnomalyKind, PaymentAnomalyOutcome, PaymentAnomalyResolutionReason, PaymentRefundStatus, PaymentReversalStatus, PaymentStatus, PaymentTopupStatus, PaymentTransferStatus, RequirementCollection } from "@hawkr/api/gen/hawkr/payment/v1alpha1/payment_pb";
 import type { CancelDisposition, QuoteAcceptability, RejectionReason, RunFailureReason } from "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb";
 import type { ReportOutcome as SellerReportOutcome } from "@hawkr/api/gen/hawkr/seller/v1alpha1/report_pb";
 import type { ContentKind, InquiryKind, InquiryReplyChannel, InquiryState, KYCField, KYCStatus, MeasureBasis, MeasureKind, MeasureRequestKind, MeasureRequestState, MeasureState, OnboardingAction, OnboardingTaskId, RevokeReason, RiskGround, SellerRequirement, StoreField, TerminationGround, ViolationSeverity } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
@@ -107,6 +107,12 @@ export type UiTextKey =
 	| "notification.NotificationChannel.NOTIFICATION_CHANNEL_EMAIL"
 	| "notification.NotificationChannel.NOTIFICATION_CHANNEL_INBOX"
 	| "notification.NotificationChannel.NOTIFICATION_CHANNEL_PUSH"
+	| "payment.EarningsEntryStatus.EARNINGS_ENTRY_STATUS_COMPLETED"
+	| "payment.EarningsEntryStatus.EARNINGS_ENTRY_STATUS_FAILED"
+	| "payment.EarningsEntryStatus.EARNINGS_ENTRY_STATUS_PENDING"
+	| "payment.EarningsEntryType.EARNINGS_ENTRY_TYPE_REVERSAL"
+	| "payment.EarningsEntryType.EARNINGS_ENTRY_TYPE_TOP_UP"
+	| "payment.EarningsEntryType.EARNINGS_ENTRY_TYPE_TRANSFER"
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ACTION_REQUIRED"
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_DISABLED"
 	| "payment.PaymentAccountStatus.PAYMENT_ACCOUNT_STATUS_ENABLED"
@@ -582,6 +588,32 @@ const NOTIFICATION_NOTIFICATION_CHANNEL: Readonly<Partial<Record<number, UiTextK
 /** notification.NotificationChannel 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
 export function notificationNotificationChannel(v: NotificationChannel): UiMessage | undefined {
 	const key = NOTIFICATION_NOTIFICATION_CHANNEL[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const PAYMENT_EARNINGS_ENTRY_STATUS: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "payment.EarningsEntryStatus.EARNINGS_ENTRY_STATUS_PENDING",
+	2: "payment.EarningsEntryStatus.EARNINGS_ENTRY_STATUS_COMPLETED",
+	3: "payment.EarningsEntryStatus.EARNINGS_ENTRY_STATUS_FAILED",
+};
+
+/** payment.EarningsEntryStatus 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function paymentEarningsEntryStatus(v: EarningsEntryStatus): UiMessage | undefined {
+	const key = PAYMENT_EARNINGS_ENTRY_STATUS[v];
+	if (key === undefined) return undefined;
+	return { key };
+}
+
+const PAYMENT_EARNINGS_ENTRY_TYPE: Readonly<Partial<Record<number, UiTextKey>>> = {
+	1: "payment.EarningsEntryType.EARNINGS_ENTRY_TYPE_TRANSFER",
+	2: "payment.EarningsEntryType.EARNINGS_ENTRY_TYPE_REVERSAL",
+	3: "payment.EarningsEntryType.EARNINGS_ENTRY_TYPE_TOP_UP",
+};
+
+/** payment.EarningsEntryType 的名詞；UNSPECIFIED 與不認得的值回 undefined，要顯示「未知」的呼叫端自己用 commonUnknown()。 */
+export function paymentEarningsEntryType(v: EarningsEntryType): UiMessage | undefined {
+	const key = PAYMENT_EARNINGS_ENTRY_TYPE[v];
 	if (key === undefined) return undefined;
 	return { key };
 }

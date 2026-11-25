@@ -70,7 +70,10 @@ var declarations = map[string]declaration{
 	sellerv1alpha1connect.SellerAppServiceGetMyKYCProcedure:     requires(model.CapAccountSelfRead),
 	sellerv1alpha1connect.SellerAppServiceCancelKYCProcedure:    requires(model.CapStorefrontWrite),
 	// 收款帳戶：讀取自己的帳戶停權時仍可以；取得開通 session 與重讀帳戶（RefreshMyPaymentAccount）會呼叫金流商，是店面設定的一部分，停權與等待刪除時不能做；開通任務（GetMyOnboarding）只讀，停權時仍可以。
-	sellerv1alpha1connect.SellerAppServiceGetMyPaymentAccountProcedure:            requires(model.CapAccountSelfRead),
+	sellerv1alpha1connect.SellerAppServiceGetMyPaymentAccountProcedure: requires(model.CapAccountSelfRead),
+	// 入帳帳本（D15）只讀本地的紀錄、不呼叫金流商：停權的店家照樣要看得到自己的款項，與讀取收款帳戶同一類。
+	sellerv1alpha1connect.SellerAppServiceListMyEarningsProcedure:                 requires(model.CapAccountSelfRead),
+	sellerv1alpha1connect.SellerAppServiceGetMyOrderEarningsProcedure:             requires(model.CapAccountSelfRead),
 	sellerv1alpha1connect.SellerAppServiceCreatePaymentOnboardingSessionProcedure: requires(model.CapStorefrontWrite),
 	sellerv1alpha1connect.SellerAppServiceRefreshMyPaymentAccountProcedure:        requires(model.CapStorefrontWrite),
 	// 身分比對是統編存在與否的探測面（ADR 2026-11-13-seller-platform-review-and-identity-matching「身分比對與比對 hash」）：每個帳號每小時最多 5 次。

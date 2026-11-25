@@ -63,30 +63,6 @@ public class PayUniWebhookParser {
             return WebhookType.SHIPPING_STATUS;
         }
 
-        // 退款結果通知（§6.7：含 RefundStatus，匯款完成 / 失敗）；必須先於 PAYMENT_UOP 判斷
-        // 因退款 webhook 亦含 TradeStatus 外層欄位，用內層 RefundStatus 唯一鍵區分
-        if (data.containsKey("RefundStatus")) {
-            return WebhookType.REFUND_NOTIFY;
-        }
-
-        // 退款受理通知（§6.6：含 EstimatedRefundDate 無 RefundStatus；sync return URL 的 async 副本）
-        // 必須先於 PAYMENT_UOP 判斷，避免被後面 TradeAmt 條件誤歸類
-        if (data.containsKey("EstimatedRefundDate")) {
-            return WebhookType.REFUND_ACCEPTED;
-        }
-
-        // 週期扣款通知（含 PeriodTradeNo）：系統沒有任何定期定額流程，不處理。
-        // 必須先於 PAYMENT_UOP，否則帶 TradeAmt／TradeStatus 的週期 payload 會被誤判成一次性付款；
-        // 判成 UNKNOWN 後走既有的未知類型處理（寫 inbox 稽核）。
-        if (data.containsKey("PeriodTradeNo")) {
-            return WebhookType.UNKNOWN;
-        }
-
-        // 含 TradeAmt + TradeStatus → 付款結果
-        if (data.containsKey("TradeAmt") && data.containsKey("TradeStatus")) {
-            return WebhookType.PAYMENT_UOP;
-        }
-
         // 含 NotifyType → 代理商通知
         if (data.containsKey("NotifyType")) {
             return WebhookType.AGENT_NOTIFY;
@@ -100,16 +76,6 @@ public class PayUniWebhookParser {
      */
     private PayUniWebhookEvent buildEvent(WebhookType type, Map<String, String> data) {
         return switch (type) {
-            case PAYMENT_UOP -> new PaymentUopEvent(
-                    data.get("MerID"),
-                    data.get("MerTradeNo"),
-                    data.get("TradeNo"),
-                    data.get("TradeStatus"),
-                    data.get("TradeAmt"),
-                    data.get("PayType"),
-                    data.get("Message"),
-                    data.get("TradeDate")
-            );
             case SHIPPING_STATUS -> new ShippingStatusEvent(
                     data.get("MerID"),
                     data.get("ShipTradeNo"),
@@ -134,25 +100,6 @@ public class PayUniWebhookParser {
                     data.get("MerStatus"),
                     data.get("MerStatusNote"),
                     data.get("ExecuteTime")
-            );
-            case REFUND_NOTIFY -> new RefundNotifyEvent(
-                    data.get("MerID"),
-                    data.get("MerTradeNo"),
-                    data.get("TradeNo"),
-                    data.get("RefundStatus"),
-                    data.get("RefundAmt"),
-                    data.get("BankDate"),
-                    data.get("Message")
-            );
-            case REFUND_ACCEPTED -> new RefundAcceptedEvent(
-                    data.get("MerID"),
-                    data.get("MerTradeNo"),
-                    data.get("TradeNo"),
-                    data.get("Status"),
-                    data.get("Message"),
-                    data.get("RefundAmt"),
-                    data.get("PaymentType"),
-                    data.get("EstimatedRefundDate")
             );
             case UNKNOWN -> null;
         };

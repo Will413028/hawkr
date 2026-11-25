@@ -246,6 +246,20 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.payment.v1alpha1.EarningsEntryStatus",
+      "dartClass": "EarningsEntryStatus",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.payment.v1alpha1.EarningsEntryType",
+      "dartClass": "EarningsEntryType",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart",
+      "inCatalog": true,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.payment.v1alpha1.EmbeddedOnboardingRuntime",
       "dartClass": "EmbeddedOnboardingRuntime",
       "dartLibrary": "package:hawkr_api/gen/hawkr/payment/v1alpha1/payment.pbenum.dart",

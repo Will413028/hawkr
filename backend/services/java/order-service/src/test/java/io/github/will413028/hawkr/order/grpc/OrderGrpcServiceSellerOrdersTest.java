@@ -74,7 +74,7 @@ class OrderGrpcServiceSellerOrdersTest {
                 sellerGrpcClient, buyerGrpcClient, mediaGrpcClient, mediaUrlProperties,
                 grantPaymentTaskRepository,
                 org.mockito.Mockito.mock(io.github.will413028.hawkr.order.repository.OrderInvoiceSnapshotRepository.class),
-                eventPublisher, "");
+                eventPublisher);
     }
 
     @Test

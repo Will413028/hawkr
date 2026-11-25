@@ -82,6 +82,10 @@ func goldenCall(t Text, c goldenCase) (string, bool) {
 		return t.NotificationNotificationCategory(goldenEnum(c.Value, "NOTIFICATION_CATEGORY_"))
 	case "notification.NotificationChannel":
 		return t.NotificationNotificationChannel(goldenEnum(c.Value, "NOTIFICATION_CHANNEL_"))
+	case "payment.EarningsEntryStatus":
+		return t.PaymentEarningsEntryStatus(goldenEnum(c.Value, "EARNINGS_ENTRY_STATUS_"))
+	case "payment.EarningsEntryType":
+		return t.PaymentEarningsEntryType(goldenEnum(c.Value, "EARNINGS_ENTRY_TYPE_"))
 	case "payment.PaymentAccountStatus":
 		return t.PaymentPaymentAccountStatus(goldenEnum(c.Value, "PAYMENT_ACCOUNT_STATUS_"))
 	case "payment.PaymentAnomalyKind":

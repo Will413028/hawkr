@@ -247,8 +247,8 @@
    "id": "b1-4-l6-openapi-op-cap",
    "stack": "go:backend/gateway",
    "file": "backend/gateway/internal/router/openapi_coverage_test.go",
-   "old": "maxRESTOperations = 246",
-   "new": "maxRESTOperations = 248",
+   "old": "maxRESTOperations = 228",
+   "new": "maxRESTOperations = 230",
    "test": "internal/router ^TestEveryRouteIsInOpenAPISpec$",
    "why": "端點數上限放寬，鎖低點的斷言要紅"
   },

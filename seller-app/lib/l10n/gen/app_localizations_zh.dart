@@ -150,4 +150,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String quoteAmountNotWholeNumber(String label) {
     return '$label只能是非負整數（新台幣元），例如 1200';
   }
+
+  @override
+  String get earningsTitle => '入帳紀錄';
+
+  @override
+  String earningsNetAmount(String amount) {
+    return '淨入帳 $amount';
+  }
+
+  @override
+  String get earningsEmpty => '還沒有入帳紀錄';
+
+  @override
+  String get earningsLoadFailed => '無法載入入帳紀錄';
 }

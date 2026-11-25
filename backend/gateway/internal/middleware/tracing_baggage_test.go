@@ -78,7 +78,7 @@ func TestTracingMiddleware_DropsBrowserBaggage_KeepsRemoteParent(t *testing.T) {
 }
 
 // ctx 層 scrub 只擋 otelgrpc Inject 這條 gRPC 面；CreateProxy 系列 HTTP
-// reverse proxy（media/seller/payuni-webhook）是把 c.Request 的 header 原樣
+// reverse proxy（media/seller/invoice）是把 c.Request 的 header 原樣
 // 轉發到內部 upstream 的，所以 header 本身也要在同一個 trust boundary 清掉
 // ——兩層互補，缺一面就有一條透傳路徑。
 func TestTracingMiddleware_StripsBaggageHeaderForDownstreamProxies(t *testing.T) {

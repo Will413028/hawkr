@@ -628,15 +628,11 @@ class RefundProgressTimeline extends StatelessWidget {
           ? '退款 NT\$ $refundAmount 已入帳'
           : '退款已入帳';
       summarySub = '退款已完成';
-      summaryTime = caseData.bankDate.isNotEmpty
-          ? caseData.bankDate
-          : caseData.closedAt;
+      summaryTime = caseData.closedAt;
     } else if (processing) {
       currentStep = 2;
       summaryTitle = '退款處理中';
-      summarySub = caseData.estimatedRefundDate.isNotEmpty
-          ? '預計 ${caseData.estimatedRefundDate} 入帳'
-          : '系統處理中，預計 1-3 個工作天入帳';
+      summarySub = '系統處理中，預計 1-3 個工作天入帳';
       summaryTime = '';
     } else if (inspecting) {
       currentStep = 1;

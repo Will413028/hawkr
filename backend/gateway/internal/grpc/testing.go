@@ -7,7 +7,6 @@ import (
 	cartpb "github.com/Will413028/hawkr/go-pkg/proto/cart"
 	couponpb "github.com/Will413028/hawkr/go-pkg/proto/coupon"
 	orderpb "github.com/Will413028/hawkr/go-pkg/proto/order"
-	paymentpb "github.com/Will413028/hawkr/go-pkg/proto/payment"
 	productpb "github.com/Will413028/hawkr/go-pkg/proto/product"
 	sellerpb "github.com/Will413028/hawkr/go-pkg/proto/seller"
 	shippingpb "github.com/Will413028/hawkr/go-pkg/proto/shipping"
@@ -70,13 +69,6 @@ func NewCouponClientForTest(c couponpb.CouponServiceClient) *CouponClient {
 // NewOrderClientForTest creates an OrderClient with the given mock proto client.
 func NewOrderClientForTest(c orderpb.OrderServiceClient) *OrderClient {
 	return &OrderClient{orderClient: c}
-}
-
-// ==================== Payment ====================
-
-// NewPaymentClientForTest creates a PaymentClient with the given mock proto client.
-func NewPaymentClientForTest(c paymentpb.PaymentServiceClient) *PaymentClient {
-	return &PaymentClient{client: c}
 }
 
 // ==================== Buyer ====================

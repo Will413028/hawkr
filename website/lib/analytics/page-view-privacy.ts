@@ -97,8 +97,6 @@ const STATIC_ANALYTICS_ROUTES = new Set([
 	"/adm/unavailable",
 	"/cart",
 	"/checkout",
-	"/checkout/fail",
-	"/checkout/submitted",
 	"/checkout/success",
 	"/contact",
 	"/faq",

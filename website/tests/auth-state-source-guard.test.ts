@@ -40,14 +40,12 @@ const AUTH_IN_ENABLED_CONST = new RegExp(
 );
 
 /**
- * Not account queries: a live stream that must not open before sign-in, and a lookup that only waits for
- * hydration and runs for guests too. Anything else gates through `accountQueryFn`.
+ * Not account queries: a live stream that must not open before sign-in. Anything else gates through
+ * `accountQueryFn`.
  */
 const ENABLED_EXEMPT: Record<string, string> = {
 	"lib/chat/unread-context.tsx":
 		"unread-count stream (WebSocket), not a query; opens only when signedIn",
-	"features/after-sales/screens/RefundResultClient.tsx":
-		"order lookup by public order number; runs for guests too and only waits for hydration",
 };
 
 function collapsed(file: string): string {

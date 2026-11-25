@@ -248,10 +248,7 @@ export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
 					</section>
 
 					{/* 2 · Next action banners */}
-					<AfterSaleRefundBanner
-						orderNo={detail.orderNo}
-						progress={detail.refundProgress}
-					/>
+					<AfterSaleRefundBanner progress={detail.refundProgress} />
 
 					{shipBackDeadlineMs !== null && !shipBackShowD1Banner ? (
 						<section
@@ -463,38 +460,15 @@ export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
 					) : null}
 
 					{/* 5 · Refund progress detail */}
-					{detail.refundProgress &&
-					(detail.refundProgress.refundTaskStatus ||
-						detail.refundProgress.estimatedRefundDate ||
-						detail.refundProgress.bankDate) ? (
+					{detail.refundProgress?.refundTaskStatus ? (
 						<Card title="退款進度">
 							<dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-sm">
-								{detail.refundProgress.refundTaskStatus ? (
-									<>
-										<dt className="text-hk-muted">退款狀態</dt>
-										<dd className="m-0 text-hk-body">
-											{REFUND_TASK_STATUS_LABEL[
-												detail.refundProgress.refundTaskStatus
-											] ?? detail.refundProgress.refundTaskStatus}
-										</dd>
-									</>
-								) : null}
-								{detail.refundProgress.estimatedRefundDate ? (
-									<>
-										<dt className="text-hk-muted">預計退款日</dt>
-										<dd className="m-0 text-hk-body">
-											{detail.refundProgress.estimatedRefundDate}
-										</dd>
-									</>
-								) : null}
-								{detail.refundProgress.bankDate ? (
-									<>
-										<dt className="text-hk-muted">撥款日期</dt>
-										<dd className="m-0 text-hk-body">
-											{detail.refundProgress.bankDate}
-										</dd>
-									</>
-								) : null}
+								<dt className="text-hk-muted">退款狀態</dt>
+								<dd className="m-0 text-hk-body">
+									{REFUND_TASK_STATUS_LABEL[
+										detail.refundProgress.refundTaskStatus
+									] ?? detail.refundProgress.refundTaskStatus}
+								</dd>
 							</dl>
 						</Card>
 					) : null}

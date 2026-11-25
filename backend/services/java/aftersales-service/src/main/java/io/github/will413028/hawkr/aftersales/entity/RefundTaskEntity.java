@@ -25,8 +25,6 @@ public class RefundTaskEntity {
 
     private String paymentMethod;
 
-    private String merId;
-
     /**
      * 退款 outcome：FULL_REFUND / PARTIAL_REFUND（{@link io.github.will413028.hawkr.common.utils.code.AfterSalePlatformDecisionOutcome} value）。
      * case_no path 必填（由 V3 CHECK constraint 保證）；cancel_id path 可 NULL（cancel.completed event 下游不需 outcome）。
@@ -46,24 +44,9 @@ public class RefundTaskEntity {
 
     private LocalDateTime nextRetryTime;
 
-    private String payuniStatus;
+    private String providerStatus;
 
-    private String payuniMessage;
-
-    private LocalDate estimatedRefundDate;
-
-    private LocalDate bankDate;
-
-    private String clientType;
-
-    private String appType;
-
-    /**
-     * 當前對 PayUni 發 RFD 的 attempt 序號。
-     * §2.2 業務 pivot (2026-05-14)：每次 ATM 退款失敗退回 AWAITING_BUYER_REFUND_PAGE(5) 時 +1，
-     * 供 idempotency_key 構成 {@code :{attempt}} 後綴，避免 buyer 重填時命中既有 payment_refunds row 而不發新 RFD。
-     */
-    private Short currentAttempt;
+    private String providerMessage;
 
     /**
      * issue #2294 L5：{@code RefundSyncWorker}（補發遺漏 MQ 通知）的<b>租約欄</b>，

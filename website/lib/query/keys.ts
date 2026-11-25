@@ -67,10 +67,6 @@ export const queryKeys = {
 		// uses an object slot); invalidate just this key after a buyer action.
 		afterSale: (id: QueryIdentity, caseNo: string) =>
 			["buyer", ...idPrefix(id), "after-sales", String(caseNo)] as const,
-		// Resolve an order's refund landing page (PayUni ATM 302) → its after-sale
-		// case + refund progress. Keyed by orderNo; one-shot read, no mutation.
-		refundResolve: (id: QueryIdentity, orderNo: string) =>
-			["buyer", ...idPrefix(id), "refund-resolve", String(orderNo)] as const,
 		favorites: (id: QueryIdentity, params?: Record<string, unknown>) =>
 			["buyer", ...idPrefix(id), "favorites", params ?? {}] as const,
 		following: (id: QueryIdentity, params?: Record<string, unknown>) =>

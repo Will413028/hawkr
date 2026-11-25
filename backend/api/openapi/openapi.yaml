@@ -59,8 +59,6 @@ tags:
   description: 通知 - Realtime
 - name: Order
   description: 訂單：訂單建立、查詢、支付等
-- name: Payment
-  description: 支付：支付相關功能
 - name: Product
   description: 商品：商品瀏覽、搜尋、評價等
 - name: ProductCertification
@@ -2135,79 +2133,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/admin/grants:
-    get:
-      operationId: listGrantsForAdmin
-      summary: 列撥款異常
-      description: Admin 查詢 PayUni 撥款失敗或異常狀態的交易紀錄
-      tags:
-      - AdminAbnormal
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: page
-        in: query
-        description: 頁碼
-        schema:
-          type: string
-          default: '1'
-      - name: page_size
-        in: query
-        description: 每頁筆數
-        schema:
-          type: string
-          default: '20'
-      - name: abnormal_only
-        in: query
-        description: 合法值：true / false
-        schema:
-          type: string
-          default: 'true'
-      - name: grant_status
-        in: query
-        description: PayUni 撥款狀態 exact match
-        schema:
-          type: string
-      - name: order_no
-        in: query
-        description: 訂單號過濾
-        schema:
-          type: string
-      - name: granted_from
-        in: query
-        description: ISO 8601 UTC
-        schema:
-          type: string
-      - name: granted_to
-        in: query
-        description: ISO 8601 UTC
-        schema:
-          type: string
-      - name: sort
-        in: query
-        description: 合法值：updated_at_desc 等
-        schema:
-          type: string
-          default: updated_at_desc
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/AdminGrantListResp'
-                  message:
-                    type: string
   /api/v1/admin/invoices/audit_logs:
     get:
       operationId: listInvoiceAuditLogsForAdmin
@@ -4922,271 +4847,6 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '409':
           description: Conflict
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/admin/payment_refunds:
-    get:
-      operationId: listRefundsForAdmin
-      summary: 列退款異常
-      description: Admin 查詢退款失敗 / 處理超時 24h 的退款紀錄
-      tags:
-      - AdminAbnormal
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: page
-        in: query
-        description: 頁碼
-        schema:
-          type: string
-          default: '1'
-      - name: page_size
-        in: query
-        description: 每頁筆數
-        schema:
-          type: string
-          default: '20'
-      - name: abnormal_only
-        in: query
-        description: 合法值：true / false
-        schema:
-          type: string
-          default: 'true'
-      - name: provider_status
-        in: query
-        description: PayUni 原始狀態碼
-        schema:
-          type: string
-      - name: status
-        in: query
-        description: RefundStatus value，可多值逗號分隔
-        schema:
-          type: string
-      - name: trade_no
-        in: query
-        description: 原交易號過濾
-        schema:
-          type: string
-      - name: order_no
-        in: query
-        description: 訂單號過濾
-        schema:
-          type: string
-      - name: created_from
-        in: query
-        description: ISO 8601 UTC
-        schema:
-          type: string
-      - name: created_to
-        in: query
-        description: ISO 8601 UTC
-        schema:
-          type: string
-      - name: sort
-        in: query
-        description: 合法值：updated_at_desc 等
-        schema:
-          type: string
-          default: updated_at_desc
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/AdminPaymentRefundListResp'
-                  message:
-                    type: string
-  /api/v1/admin/payment_refunds/{refund_no}:
-    get:
-      operationId: getRefundForAdmin
-      summary: 取退款詳情
-      description: Admin 查詢單筆退款紀錄詳情
-      tags:
-      - AdminAbnormal
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: refund_no
-        in: path
-        description: 退款編號（Payment refund_no）
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/AdminPaymentRefundSummaryResp'
-                  message:
-                    type: string
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/admin/payment_transactions:
-    get:
-      operationId: listPaymentTransactionsForAdmin
-      summary: 列付款異常
-      description: Admin 查詢付款失敗 / 逾期 / 狀態衝突 / rescue 觸發的交易。
-      tags:
-      - AdminAbnormal
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: page
-        in: query
-        description: 頁碼（整數字串）
-        schema:
-          type: string
-          default: '1'
-      - name: page_size
-        in: query
-        description: 每頁筆數，最大 100
-        schema:
-          type: string
-          default: '20'
-      - name: abnormal_only
-        in: query
-        description: 僅異常；合法值：true / false
-        schema:
-          type: string
-          default: 'true'
-      - name: provider_status
-        in: query
-        description: PayUni 原始狀態碼 exact match
-        schema:
-          type: string
-      - name: status
-        in: query
-        description: PaymentTransactionStatus value，多值逗號分隔
-        schema:
-          type: string
-      - name: order_no
-        in: query
-        description: 訂單號過濾
-        schema:
-          type: string
-      - name: buyer_id
-        in: query
-        description: 依買家過濾
-        schema:
-          type: string
-      - name: payment_type
-        in: query
-        description: 付款方式過濾（PaymentMethod value；合法值以 CodeMeta 業務類型碼.md 為準，2001-2004）
-        schema:
-          type: string
-      - name: created_from
-        in: query
-        description: ISO 8601 UTC
-        schema:
-          type: string
-      - name: created_to
-        in: query
-        description: ISO 8601 UTC
-        schema:
-          type: string
-      - name: sort
-        in: query
-        description: 排序；合法值：updated_at_desc / updated_at_asc / created_at_desc / created_at_asc
-        schema:
-          type: string
-          default: updated_at_desc
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/AdminPaymentTransactionListResp'
-                  message:
-                    type: string
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/admin/payment_transactions/{trade_no}:
-    get:
-      operationId: getPaymentTransactionForAdmin
-      summary: 取付款詳情
-      description: Admin 查詢單筆付款交易詳情，含撥款 (grant_*)、重複付款、rescue 等欄位
-      tags:
-      - AdminAbnormal
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: trade_no
-        in: path
-        description: 交易編號（Payment trade_no）
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/AdminPaymentTransactionDetailResp'
-                  message:
-                    type: string
-        '404':
-          description: Not Found
           content:
             application/json:
               schema:
@@ -9743,53 +9403,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/orders/{order_no}/refund_page:
-    post:
-      operationId: getRefundPageUrl
-      summary: 取得 ATM 退款頁面 URL
-      description: 取得 PayUni ATM 退款頁面 URL，前端用 WebView 開啟讓買家填寫銀行資訊（售後退款 + 賣家取消出貨通用）
-      tags:
-      - AfterSales
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: order_no
-        in: path
-        description: 訂單編號
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/RefundPageUrlDataResponse'
-                  message:
-                    type: string
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/app/orders/{order_no}/seller_cancellations:
     post:
       operationId: cancelShipment
@@ -9841,493 +9454,6 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '401':
           description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/payments:
-    post:
-      operationId: createPayment
-      summary: 建立支付交易
-      description: |-
-        建立新的支付交易，支援信用卡、ATM、Apple Pay、Google Pay 等付款方式。
-
-        **付款方式金額範圍（PayUni 硬性限制）**：
-        - 信用卡 / Apple Pay / Google Pay：1 ~ 199,999 元
-        - ATM 轉帳：15 ~ 49,999 元
-        - 零元訂單（amount=0）：不走 PayUni，直接由 payment-service 標記為 PAID（不需呼叫本 API）
-
-        超範圍會回 `8021 PAYMENT_METHOD_AMOUNT_OUT_OF_RANGE`；訂單建立時若超過 199,999 已於 order-service 早期攔截，回 `8026 ORDER_AMOUNT_EXCEEDS_LIMIT`。
-      tags:
-      - Payment
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      requestBody:
-        description: 建立支付請求
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreatePaymentRequest'
-        x-originalParamName: request
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/PaymentResultResponse'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '409':
-          description: 8021 PAYMENT_METHOD_AMOUNT_OUT_OF_RANGE 付款方式金額超出範圍
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '503':
-          description: Service Unavailable
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/payments/apple_pay/validate_merchant:
-    post:
-      operationId: validateApplePayMerchant
-      summary: Apple Pay on Web merchant 驗證
-      description: |-
-        Apple Pay 付款 sheet 啟動時，前端 onvalidatemerchant / onmerchantvalidation callback 會拿到 Apple 提供的一次性 validationURL；前端把這個 URL 送來後端後，由後端使用 Apple Pay Merchant Identity Certificate 進行 mTLS POST，原樣回傳 merchantSession JSON 給前端調用 completeMerchantValidation。
-
-        **安全規則**：
-        - `validationURL` 必須 scheme=https、host 以 `.apple.com` 結尾、path 以 `/paymentservices/` 開頭、port=443（或省略）、不含 userInfo、長度 ≤ 2048；URL 經 `normalize()` 後再檢查 path 防 traversal
-        - `domainName` 必須在後端 `APPLE_PAY_DOMAIN_ALLOWLIST` 內、長度 ≤ 253
-        - 違反任一規則一律回業務碼 8028 `APPLE_PAY_VALIDATION_URL_REJECTED`
-
-        **業務錯誤碼**（PaymentBusinessException 既有架構：HTTP 409 + envelope `message` 內帶業務碼 `[8028]` / `[8029]` / `[8030]`）：
-        - `[8028] APPLE_PAY_VALIDATION_URL_REJECTED` 驗證網址不符合白名單 / 網域不被允許 / 含 userInfo / 非 https / port 非 443 / 長度超限
-        - `[8029] APPLE_PAY_CERT_LOAD_FAILED` Apple Pay 憑證載入失敗（檔不存在、PKCS#1 不支援、cert/key 不配對）
-        - `[8030] APPLE_PAY_MERCHANT_VALIDATION_FAILED` Apple 端 mTLS 驗證失敗（非 2xx 或網路 / TLS 錯）
-        - 詳見 [05 號設計書 §5.11.7](../docs/詳細設計書/05-支付服務設計書.md)
-
-        **前端建議**：依 envelope `message` 開頭的 `[<code>]` 業務碼做分流；不要單看 HTTP status，因為 409 同時涵蓋三種業務情境。文案策略見設計書 §5.11.7。
-      tags:
-      - Payment
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      requestBody:
-        description: Apple Pay merchant validation 請求
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ValidateApplePayMerchantRequest'
-        x-originalParamName: request
-      responses:
-        '200':
-          description: 成功取得 merchantSession
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/ValidateApplePayMerchantResponse'
-                  message:
-                    type: string
-        '400':
-          description: request body 格式錯誤
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: JWT 缺失 / 失效
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '409':
-          description: '[8028] 驗證網址 / 網域不符 ; [8029] 憑證載入失敗 ; [8030] Apple mTLS 失敗'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '503':
-          description: payment-service 不可用 / gRPC 連線失敗
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/payments/orders/{order_id}/history:
-    get:
-      operationId: getPaymentHistory
-      summary: 查詢訂單付款歷程
-      description: 根據訂單編號查詢所有付款嘗試記錄，含切換而關閉的舊 row（CLOSED_BY_SWITCH）與重複付款的副 row（is_duplicate=true）。依 created_at DESC 排序。預設為買家視角（僅本人訂單）；view=seller 切換為賣家視角，以現任 store_id 驗店家歸屬並遮蔽買家 PII（buyerId/atmVirtualAccount/providerTradeNo）
-      tags:
-      - Payment
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: order_id
-        in: path
-        description: 訂單編號（如 O382716459）
-        required: true
-        schema:
-          type: string
-      - name: view
-        in: query
-        description: 視角：空值=買家（僅本人訂單）；seller=賣家（僅自己店家的訂單，遮蔽買家 PII）
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    type: object
-                    properties:
-                      records:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/PaymentDetailResponse'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/payments/refunds/{refund_no}:
-    get:
-      operationId: getRefund
-      summary: 查詢退款詳情
-      description: 根據退款編號查詢退款的詳細資訊
-      tags:
-      - Payment
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: refund_no
-        in: path
-        description: 退款編號
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/RefundDetailResponse'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/payments/{trade_no}:
-    get:
-      operationId: getPayment
-      summary: 查詢支付詳情
-      description: 根據交易編號查詢支付交易的詳細資訊
-      tags:
-      - Payment
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: trade_no
-        in: path
-        description: 交易編號
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/PaymentDetailResponse'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-    patch:
-      operationId: closePayment
-      summary: 關閉交易
-      description: 關閉指定的支付交易，交易關閉後無法再進行付款
-      tags:
-      - Payment
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: trade_no
-        in: path
-        description: 交易編號
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '409':
-          description: Conflict
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/payments/{trade_no}/refunds:
-    get:
-      operationId: getRefundsByTradeNo
-      summary: 查詢交易的所有退款
-      description: 根據交易編號查詢該筆交易下的所有退款紀錄
-      tags:
-      - Payment
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: trade_no
-        in: path
-        description: 交易編號
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/RefundDetailResponse'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/v1/app/payments/{trade_no}/status_syncs:
-    post:
-      operationId: syncPaymentStatus
-      summary: 同步支付狀態
-      description: 手動同步指定交易的支付狀態，從 PAYUNi 取得最新狀態
-      tags:
-      - Payment
-      security:
-      - BearerAuth: []
-      - CookieAuth: []
-      parameters:
-      - name: trade_no
-        in: path
-        description: 交易編號
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: integer
-                    format: int32
-                  data:
-                    $ref: '#/components/schemas/PaymentDetailResponse'
-                  message:
-                    type: string
-        '400':
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Not Found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '503':
-          description: Service Unavailable
           content:
             application/json:
               schema:
@@ -15768,155 +14894,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
-  /atm-refund/return:
-    post:
-      operationId: atmRefundReturn
-      summary: ATM 退款頁面回調
-      description: PayUni ATM 退款頁面完成後的 Form POST 回調，解密退款結果、更新退款任務、302 redirect 到 Deep Link 導回 App
-      tags:
-      - AfterSales
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              type: object
-              required:
-              - EncryptInfo
-              - HashInfo
-              properties:
-                EncryptInfo:
-                  type: string
-                  description: PayUni 加密資料
-                  x-formData-name: EncryptInfo
-                HashInfo:
-                  type: string
-                  description: PayUni 簽章
-                  x-formData-name: HashInfo
-      responses:
-        '302':
-          description: Redirect to Deep Link
-        '400':
-          description: 參數錯誤
-          content:
-            text/plain:
-              schema:
-                type: string
-        '503':
-          description: 服務不可用
-          content:
-            text/plain:
-              schema:
-                type: string
-  /payment/redirect:
-    get:
-      operationId: redirectToPayUni
-      summary: 重導向到 PAYUNi 付款頁
-      description: 以後端產生的一次性 opaque id 取回 canonical 表單資料並自動 Form POST 到 PAYUNi，供 APP WebView 直接開啟使用
-      tags:
-      - Payment
-      parameters:
-      - name: id
-        in: query
-        description: 後端產生的一次性 redirect id
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: 自動提交到 PAYUNi 的 HTML 頁面
-          content:
-            text/html:
-              schema:
-                type: string
-        '400':
-          description: 缺少參數
-          content:
-            text/html:
-              schema:
-                type: string
-        '404':
-          description: 連結已失效或不存在
-          content:
-            text/html:
-              schema:
-                type: string
-        '503':
-          description: 服務不可用
-          content:
-            text/html:
-              schema:
-                type: string
-  /payment/return:
-    get:
-      operationId: paymentReturn
-      summary: 付款結果回調頁面
-      description: PayUni 付款完成後的回調頁面，顯示付款結果（成功/失敗/處理中），自動透過 deep link 導回 App
-      tags:
-      - Payment
-      parameters:
-      - name: tradeNo
-        in: query
-        description: 交易編號
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: 付款結果 HTML 頁面
-          content:
-            text/html:
-              schema:
-                type: string
-        '400':
-          description: 參數錯誤
-          content:
-            text/html:
-              schema:
-                type: string
-        '503':
-          description: 服務不可用
-          content:
-            text/html:
-              schema:
-                type: string
-    post:
-      operationId: paymentReturnPost
-      summary: 信用卡付款完成回調
-      description: PayUni UPP 付款完成後的 Form POST 回調，解密交易結果、更新 DB、302 redirect 到 Deep Link 導回 App
-      tags:
-      - Payment
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              type: object
-              required:
-              - EncryptInfo
-              - HashInfo
-              properties:
-                EncryptInfo:
-                  type: string
-                  description: PayUni 加密資料
-                  x-formData-name: EncryptInfo
-                HashInfo:
-                  type: string
-                  description: PayUni 簽章
-                  x-formData-name: HashInfo
-      responses:
-        '302':
-          description: Redirect to Deep Link
-        '400':
-          description: 參數錯誤
-          content:
-            text/plain:
-              schema:
-                type: string
-        '503':
-          description: 服務不可用
-          content:
-            text/plain:
-              schema:
-                type: string
   /store_map/redirect:
     get:
       operationId: storeMapRedirect
@@ -16281,40 +15258,6 @@ components:
           type: string
         refOrderNo:
           type: string
-    AdminGrantListResp:
-      type: object
-      properties:
-        page:
-          type: string
-        pageSize:
-          type: string
-        records:
-          type: array
-          items:
-            $ref: '#/components/schemas/AdminGrantSummaryResp'
-        total:
-          type: string
-    AdminGrantSummaryResp:
-      type: object
-      properties:
-        amount:
-          type: string
-        createdAt:
-          type: string
-        grantMessage:
-          type: string
-        grantStatus:
-          type: string
-        grantedAt:
-          type: string
-        orderNo:
-          type: string
-        providerTradeNo:
-          type: string
-        tradeNo:
-          type: string
-        updatedAt:
-          type: string
     AdminInvoiceDocumentDetail:
       type: object
       properties:
@@ -16465,8 +15408,6 @@ components:
         logoUrl:
           type: string
           description: 商家 logo 顯示 URL（Gateway 組）
-        needRefundPage:
-          type: boolean
         odno:
           type: string
         orderNo:
@@ -16529,151 +15470,6 @@ components:
         totalActualAmount:
           type: string
         validationNo:
-          type: string
-    AdminPaymentRefundListResp:
-      type: object
-      properties:
-        page:
-          type: string
-        pageSize:
-          type: string
-        records:
-          type: array
-          items:
-            $ref: '#/components/schemas/AdminPaymentRefundSummaryResp'
-        total:
-          type: string
-    AdminPaymentRefundSummaryResp:
-      type: object
-      properties:
-        amount:
-          type: string
-        completedAt:
-          type: string
-        createdAt:
-          type: string
-        orderNo:
-          type: string
-        providerMessage:
-          type: string
-        providerRefundNo:
-          type: string
-        providerStatus:
-          type: string
-        reason:
-          type: string
-        refundNo:
-          type: string
-        status:
-          type: string
-          description: RefundStatus value；合法值：0=REQUESTED,1=PROCESSING,2=SUCCEEDED,3=FAILED
-        tradeNo:
-          type: string
-        updatedAt:
-          type: string
-    AdminPaymentTransactionDetailResp:
-      type: object
-      properties:
-        amount:
-          type: string
-        atmBankCode:
-          type: string
-        atmExpireDate:
-          type: string
-        atmVirtualAccount:
-          type: string
-        buyerId:
-          type: string
-        closedAt:
-          type: string
-        createdAt:
-          type: string
-        duplicateOfPaymentId:
-          type: string
-        duplicateSequence:
-          type: string
-        expireAt:
-          type: string
-        grantMessage:
-          type: string
-        grantStatus:
-          type: string
-        grantedAt:
-          type: string
-        isDuplicate:
-          type: string
-        merId:
-          type: string
-        orderNo:
-          type: string
-        payTime:
-          type: string
-        paymentType:
-          type: string
-        productName:
-          type: string
-        providerCreateAt:
-          type: string
-        providerMessage:
-          type: string
-        providerPaidAt:
-          type: string
-        providerStatus:
-          type: string
-        providerTradeNo:
-          type: string
-        rescueAction:
-          type: string
-        rescuedAt:
-          type: string
-        status:
-          type: string
-        tradeNo:
-          type: string
-        updatedAt:
-          type: string
-    AdminPaymentTransactionListResp:
-      type: object
-      properties:
-        page:
-          type: string
-        pageSize:
-          type: string
-        records:
-          type: array
-          items:
-            $ref: '#/components/schemas/AdminPaymentTransactionSummaryResp'
-        total:
-          type: string
-    AdminPaymentTransactionSummaryResp:
-      type: object
-      properties:
-        amount:
-          type: string
-          description: 新台幣元，整數字串
-        buyerId:
-          type: string
-        createdAt:
-          type: string
-        merId:
-          type: string
-        orderNo:
-          type: string
-        paymentType:
-          type: string
-          description: 付款方式（PaymentMethod value；合法值以 CodeMeta 業務類型碼.md 為準，2001-2004）
-        providerMessage:
-          type: string
-        providerStatus:
-          type: string
-        providerTradeNo:
-          type: string
-        status:
-          type: string
-          description: PaymentTransactionStatus value；合法值：0=INIT,1=PAID,2=FAILED,3=EXPIRED,4=CONFLICT,5=CLOSED,6=CLOSED_BY_SWITCH
-        tradeNo:
-          type: string
-        updatedAt:
           type: string
     AdminProductCertificationApplicationItem:
       type: object
@@ -17144,9 +15940,6 @@ components:
         autoEscalated:
           type: boolean
           description: §5.10 是否系統自動升級至平台仲裁
-        bankDate:
-          type: string
-          description: 實際到帳日 YYYY-MM-DD（僅 ATM 成功匯款後）
         buyerId:
           type: string
         canAppeal:
@@ -17159,9 +15952,6 @@ components:
           type: string
         description:
           type: string
-        estimatedRefundDate:
-          type: string
-          description: 預計扣款日 YYYY-MM-DD（僅 ATM 受理後）
         evidence:
           type: array
           items:
@@ -17170,8 +15960,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AfterSaleCaseItemResponse'
-        needRefundPage:
-          type: boolean
         odno:
           type: string
         orderNo:
@@ -17284,20 +16072,12 @@ components:
         avatarUrl:
           type: string
           description: 買家頭像顯示 URL（Gateway 組）
-        bankDate:
-          type: string
-          description: 實際到帳日 ISO 8601 YYYY-MM-DD（僅 ATM webhook 匯款成功後有值，信用卡恆空）
         buyerName:
           type: string
         caseNo:
           type: string
         createdAt:
           type: string
-        estimatedRefundDate:
-          type: string
-          description: 預計扣款日 ISO 8601 YYYY-MM-DD（僅 ATM 同步受理後有值，信用卡恆空）
-        needRefundPage:
-          type: boolean
         orderNo:
           type: string
         providerMessage:
@@ -17313,7 +16093,7 @@ components:
           description: 退款失敗訊息（PayUni 原話，直接透傳），成功時為空字串
         refundTaskStatus:
           type: string
-          description: WorkerTaskStatus value。合法值：0=PENDING, 5=AWAITING_BUYER_REFUND_PAGE, 10=PROCESSING, 15=AWAITING_WEBHOOK, 20=DONE, 30=FAILED, 40=MANUAL_INTERVENTION；無 refund_task 時為空字串
+          description: WorkerTaskStatus value。合法值：0=PENDING, 10=PROCESSING, 20=DONE, 30=FAILED, 40=MANUAL_INTERVENTION；無 refund_task 時為空字串
         refundableAmount:
           type: string
         returnShippingMethod:
@@ -17713,9 +16493,6 @@ components:
     CancelShipmentResultResponse:
       type: object
       properties:
-        needRefundPage:
-          type: boolean
-          description: 是否需前往 ATM 退款頁面
         orderNo:
           type: string
         refundAmount:
@@ -18604,28 +17381,6 @@ components:
       type: object
       properties:
         orderNo:
-          type: string
-    CreatePaymentRequest:
-      type: object
-      required:
-      - orderNo
-      - paymentType
-      properties:
-        applePayToken:
-          type: string
-        bankType:
-          type: string
-        clientType:
-          type: string
-        expireDays:
-          type: string
-        googlePayToken:
-          type: string
-        orderNo:
-          type: string
-        paymentType:
-          type: string
-        userEmail:
           type: string
     CreateProductImageInput:
       type: object
@@ -20237,12 +18992,6 @@ components:
     OrderDetailResponse:
       type: object
       properties:
-        atmBankCode:
-          type: string
-        atmExpireDate:
-          type: string
-        atmVirtualAccount:
-          type: string
         autoCompleteAt:
           type: string
         availablePaymentMethods:
@@ -20296,8 +19045,6 @@ components:
         logoUrl:
           type: string
           description: 商家 logo 顯示 URL（Gateway 組）
-        needRefundPage:
-          type: boolean
         odno:
           type: string
         orderNo:
@@ -20714,8 +19461,6 @@ components:
         logoUrl:
           type: string
           description: 商家 logo 顯示 URL（Gateway 組）
-        needRefundPage:
-          type: boolean
         odno:
           type: string
         orderNo:
@@ -20792,86 +19537,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/OriginSummaryItem'
-    PaymentDetailResponse:
-      type: object
-      properties:
-        amount:
-          type: string
-        atmBankCode:
-          type: string
-        atmExpireDate:
-          type: string
-        atmVirtualAccount:
-          type: string
-        buyerId:
-          type: string
-        closedAt:
-          type: string
-        createdAt:
-          type: string
-        displayTradeNo:
-          type: string
-          description: 前端顯示用：副 row 為 "{tradeNo}-DUP{seq}"，主 row 為原 tradeNo
-        duplicateSequence:
-          type: string
-          description: §2A.6 重複付款顯示
-        expireAt:
-          type: string
-        isDuplicate:
-          type: boolean
-          description: 是否為重複付款的副 row（true=已被退款）
-        merId:
-          type: string
-        orderId:
-          type: string
-        payTime:
-          type: string
-        paymentType:
-          type: string
-          description: 支付方式 dbValue（2001=信用卡, 2002=ApplePay, 2003=GooglePay, 2004=ATM, 2900=零元）
-        productName:
-          type: string
-        providerMessage:
-          type: string
-        providerStatus:
-          type: string
-        providerTradeNo:
-          type: string
-        status:
-          type: string
-          description: 交易狀態 dbValue（0=待付款, 1=已付款, 2=付款失敗, 3=已逾期, 4=狀態衝突, 5=已關閉, 6=因切換付款方式而關閉）
-        tradeNo:
-          type: string
-        updatedAt:
-          type: string
-    PaymentResultResponse:
-      type: object
-      properties:
-        amount:
-          type: string
-        atmBankCode:
-          type: string
-        atmExpireDate:
-          type: string
-        atmVirtualAccount:
-          type: string
-        expireAt:
-          type: string
-        orderId:
-          type: string
-        paymentType:
-          type: string
-          description: 付款方式（PaymentMethod value；合法值以 CodeMeta 業務類型碼.md 為準，2001-2004）
-        redirectUrl:
-          type: string
-          description: 完整的 WebView 開啟 URL（由 Payment Service 組裝）
-        status:
-          type: string
-          description: 交易狀態 dbValue（0=待付款, 1=已付款, 2=付款失敗, 3=已逾期, 4=狀態衝突, 5=已關閉）
-        tradeNo:
-          type: string
-        uppFormData:
-          $ref: '#/components/schemas/UppFormDataResponse'
     PlatformDecisionResponse:
       type: object
       properties:
@@ -21602,44 +20267,6 @@ components:
       properties:
         handoffCode:
           type: string
-    RefundDetailResponse:
-      type: object
-      properties:
-        amount:
-          type: string
-        bankDate:
-          type: string
-          description: ATM 實際到帳日 YYYY-MM-DD（僅 ATM async RefundStatus=1 有值）
-        completedAt:
-          type: string
-        createdAt:
-          type: string
-        estimatedRefundDate:
-          type: string
-          description: ATM 預計扣款日 YYYY-MM-DD（僅 ATM sync success 有值）
-        orderId:
-          type: string
-        providerMessage:
-          type: string
-        providerRefundNo:
-          type: string
-        providerStatus:
-          type: string
-        reason:
-          type: string
-        refundNo:
-          type: string
-        status:
-          type: string
-          description: 退款狀態 dbValue
-        tradeNo:
-          type: string
-    RefundPageUrlDataResponse:
-      type: object
-      properties:
-        redirectUrl:
-          type: string
-          description: PayUni 退款頁面 URL
     RefundRequestResponse:
       type: object
       properties:
@@ -21818,9 +20445,6 @@ components:
       properties:
         caseNo:
           type: string
-        needRefundPage:
-          type: boolean
-          description: 是否需前往 ATM 退款頁面
         returnShipmentNo:
           type: string
           description: 退貨物流單號（退貨退款時有值）
@@ -23359,46 +21983,6 @@ components:
           type: string
         storeName:
           type: string
-    UppFormDataResponse:
-      type: object
-      properties:
-        actionUrl:
-          type: string
-        encryptInfo:
-          type: string
-        hashInfo:
-          type: string
-        isPlatform:
-          type: string
-        merId:
-          type: string
-        version:
-          type: string
-    ValidateApplePayMerchantRequest:
-      type: object
-      required:
-      - displayName
-      - domainName
-      - validationURL
-      properties:
-        displayName:
-          type: string
-          description: Apple Pay sheet 顯示的商家名稱（一般為商品名稱或品牌名）
-          example: Hawkr
-        domainName:
-          type: string
-          description: 前端發起付款的網域（後端依 APPLE_PAY_DOMAIN_ALLOWLIST 校驗、長度 ≤ 253）
-          example: web.example.com
-        validationURL:
-          type: string
-          description: Apple 提供的一次性 validationURL（後端校驗 host 必須以 .apple.com 結尾、path 必須以 /paymentservices/ 開頭、scheme=https、port=443、不含 userInfo、長度 ≤ 2048）
-          example: https://apple-pay-gateway-cert.apple.com/paymentservices/startSession
-    ValidateApplePayMerchantResponse:
-      type: object
-      properties:
-        merchantSessionJson:
-          type: string
-          description: Apple 回應原文 JSON，前端原樣傳入 ApplePaySession.completeMerchantValidation() / event.complete()
     VerifyCertificationResponse:
       type: object
       properties:
