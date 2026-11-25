@@ -439,23 +439,6 @@ export const PROCUREMENT_RFQ_PUBLICATION_APPROVAL_STATE_LABEL: Record<string, st
 	"FAILED": "執行失敗",
 };
 
-/** 單一 recipient（invite）的投遞狀態（issue #2450 Slice 2b）。這是「有沒有交出去」的投遞軸，與 `ProcurementRfqPublicationApprovalState`（核准／發布軸）是不同實體、不同生命週期，不得合併或互相轉譯。**`SENT` 也不是收件人有沒有看到／回應**——delivered／seen 屬 #2539，是另一條尚未存在的回饋軸。 */
-export const ProcurementRfqInviteDeliveryState = {
-	NOT_SENT: "NOT_SENT",
-	QUEUED: "QUEUED",
-	SENT: "SENT",
-	FAILED: "FAILED",
-} as const;
-export type ProcurementRfqInviteDeliveryStateCode = keyof typeof ProcurementRfqInviteDeliveryState;
-export type ProcurementRfqInviteDeliveryStateValue = (typeof ProcurementRfqInviteDeliveryState)[ProcurementRfqInviteDeliveryStateCode];
-
-export const PROCUREMENT_RFQ_INVITE_DELIVERY_STATE_LABEL: Record<string, string> = {
-	"NOT_SENT": "尚未送出",
-	"QUEUED": "待送出",
-	"SENT": "已送出",
-	"FAILED": "送出失敗",
-};
-
 /** run 進入 `FAILED`／`EXPIRED` 時的機器可讀原因。**只在這兩個狀態下非空**。 */
 export const ProcurementRunFailureReason = {
 	WORKER_LOST: "WORKER_LOST",

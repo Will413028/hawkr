@@ -247,7 +247,6 @@ func runServe(ctx context.Context) error {
 	suspension := accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: id, Seller: sellerModule, Logger: log})
 	moderationModule := newModeration(d, bus, socialModule, reviewModule, imModule, sellerModule, buyerModule, suspension, med, log)
 	subscribeProcurement(bus, d, log)
-	subscribeProcurementRelay(bus, jc)
 	imageAIModule := newImageAI(d, imageAIConfig, sellerModule, llm.NewImage(llmConfig, log).Generator(), med, log)
 	subscribeImageAI(bus, imageAIModule)
 	procurementModule := newProcurement(d, jc, buyerModule, sellerModule, bus, log)
@@ -484,7 +483,6 @@ func runWorker(ctx context.Context) error {
 	}
 	moderationModule := newModerationRetention(d, buyerModule, med, log)
 	subscribeProcurement(bus, d, log)
-	subscribeProcurementRelay(bus, jc)
 	imageAIModule := newImageAI(d, imageAIConfig, sellerModule, llm.DisabledImage().Generator(), med, log)
 	subscribeImageAI(bus, imageAIModule)
 	subscribeModeration(bus, moderationModule)
@@ -512,7 +510,6 @@ func runWorker(ctx context.Context) error {
 	crmConsumer.AddWorkers(workers)
 	publisher := rabbitmq.NewWorker(pub)
 	river.AddWorker(workers, publisher)
-	procurementSweep := addProcurementRelay(workers, procurementModule, publisher, jc)
 	buyerrelay.NewWorker(buyerModule, products, sellerModule, jc, log).AddWorkers(workers)
 	sellerrelay.NewWorker(sellerModule, jc, log).AddWorkers(workers)
 	reviewrelay.NewWorker(reviewModule, jc, log).AddWorkers(workers)
@@ -532,7 +529,6 @@ func runWorker(ctx context.Context) error {
 	periodic = append(periodic, med.PeriodicJobs()...)
 	periodic = append(periodic, procurementModule.PeriodicJobs()...)
 	periodic = append(periodic, procurementModule.OrderPeriodicJobs()...)
-	periodic = append(periodic, procurementSweep...)
 	periodic = append(periodic, bizcalendarrelay.PeriodicJobs()...)
 	queues, err := workerQueues(workerConcurrency, media.Queues())
 	if err != nil {

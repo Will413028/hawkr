@@ -90,7 +90,7 @@ func TestGetReturnsTheSellerFacingContentAndSummary(t *testing.T) {
 	f := newFixture(t)
 	d, err := f.service().Get(t.Context(), invitedStore, f.publication)
 	must(t, err)
-	if d.Summary.PublicationID != f.publication || d.Summary.Version != 1 || d.Summary.SellerFacingHash != f.hash || d.Summary.DeliveryState != "QUEUED" {
+	if d.Summary.PublicationID != f.publication || d.Summary.Version != 1 || d.Summary.SellerFacingHash != f.hash {
 		t.Fatalf("摘要 = %+v", d.Summary)
 	}
 	p := d.Payload

@@ -590,8 +590,8 @@ func (q *Queries) InsertApprovalRecipient(ctx context.Context, arg InsertApprova
 }
 
 const insertInvite = `-- name: InsertInvite :exec
-INSERT INTO procurement.rfq_publication_invites (id, publication_id, position, store_id, delivery_state, delivery_state_at, created_at, updated_at)
-VALUES ($1, $2, $3, $4, 'QUEUED', $5, $5, $5)
+INSERT INTO procurement.rfq_publication_invites (id, publication_id, position, store_id, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $5)
 `
 
 type InsertInviteParams struct {
@@ -738,7 +738,7 @@ func (q *Queries) ListCreatingOrderIDsAfter(ctx context.Context, arg ListCreatin
 }
 
 const listInvites = `-- name: ListInvites :many
-SELECT i.id, i.publication_id, i.position, i.store_id, i.delivery_state, i.delivery_state_at, i.created_at, i.updated_at FROM procurement.rfq_publication_invites i
+SELECT i.id, i.publication_id, i.position, i.store_id, i.created_at, i.updated_at FROM procurement.rfq_publication_invites i
 JOIN procurement.rfq_publications p ON p.id = i.publication_id
 WHERE i.publication_id = $1 AND p.buyer_id = $2
 ORDER BY i.position
@@ -763,55 +763,9 @@ func (q *Queries) ListInvites(ctx context.Context, arg ListInvitesParams) ([]Pro
 			&i.PublicationID,
 			&i.Position,
 			&i.StoreID,
-			&i.DeliveryState,
-			&i.DeliveryStateAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listStaleQueuedInvites = `-- name: ListStaleQueuedInvites :many
-SELECT id, created_at FROM procurement.rfq_publication_invites
-WHERE delivery_state = 'QUEUED' AND created_at < $1 AND (created_at, id) > ($2::timestamptz, $3::uuid)
-ORDER BY created_at, id
-LIMIT $4
-`
-
-type ListStaleQueuedInvitesParams struct {
-	Before         time.Time
-	AfterCreatedAt time.Time
-	AfterID        uuid.UUID
-	MaxRows        int32
-}
-
-type ListStaleQueuedInvitesRow struct {
-	ID        uuid.UUID
-	CreatedAt time.Time
-}
-
-func (q *Queries) ListStaleQueuedInvites(ctx context.Context, arg ListStaleQueuedInvitesParams) ([]ListStaleQueuedInvitesRow, error) {
-	rows, err := q.db.Query(ctx, listStaleQueuedInvites,
-		arg.Before,
-		arg.AfterCreatedAt,
-		arg.AfterID,
-		arg.MaxRows,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListStaleQueuedInvitesRow{}
-	for rows.Next() {
-		var i ListStaleQueuedInvitesRow
-		if err := rows.Scan(&i.ID, &i.CreatedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -854,42 +808,6 @@ type MarkApprovalSucceededParams struct {
 // 不帶 buyer_id：(id, version, state) 已是 CAS，擁有者在 ClaimApprovalForExecute 驗過；BuyerDeleted 把 buyer_id 設 NULL 後仍要能收尾。
 func (q *Queries) MarkApprovalSucceeded(ctx context.Context, arg MarkApprovalSucceededParams) (int64, error) {
 	result, err := q.db.Exec(ctx, markApprovalSucceeded, arg.Now, arg.ID, arg.Version)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const markInviteFailed = `-- name: MarkInviteFailed :execrows
-UPDATE procurement.rfq_publication_invites SET delivery_state = 'FAILED', delivery_state_at = $1, updated_at = $1
-WHERE id = $2 AND delivery_state = 'QUEUED'
-`
-
-type MarkInviteFailedParams struct {
-	Now time.Time
-	ID  uuid.UUID
-}
-
-func (q *Queries) MarkInviteFailed(ctx context.Context, arg MarkInviteFailedParams) (int64, error) {
-	result, err := q.db.Exec(ctx, markInviteFailed, arg.Now, arg.ID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const markInviteSent = `-- name: MarkInviteSent :execrows
-UPDATE procurement.rfq_publication_invites SET delivery_state = 'SENT', delivery_state_at = $1, updated_at = $1
-WHERE id = $2 AND delivery_state = 'QUEUED'
-`
-
-type MarkInviteSentParams struct {
-	Now time.Time
-	ID  uuid.UUID
-}
-
-func (q *Queries) MarkInviteSent(ctx context.Context, arg MarkInviteSentParams) (int64, error) {
-	result, err := q.db.Exec(ctx, markInviteSent, arg.Now, arg.ID)
 	if err != nil {
 		return 0, err
 	}

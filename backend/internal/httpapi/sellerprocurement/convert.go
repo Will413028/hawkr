@@ -93,24 +93,16 @@ func quoteInputToProto(q procurement.SellerQuoteInput) (*pb.SellerQuote, error) 
 	return out, nil
 }
 
-func summaryToProto(s procurement.SellerPublicationSummary) (*pb.SellerPublicationSummary, error) {
-	state, err := procurementwire.Enum[pb.InviteDeliveryState](pb.InviteDeliveryState_value, "INVITE_DELIVERY_STATE_", "投遞狀態", s.DeliveryState)
-	if err != nil {
-		return nil, err
-	}
+func summaryToProto(s procurement.SellerPublicationSummary) *pb.SellerPublicationSummary {
 	return &pb.SellerPublicationSummary{
 		PublicationId: s.PublicationID.String(), PublicationVersion: versionString(s.Version), SellerFacingPayloadHash: s.SellerFacingHash,
-		DeliveryState: state, PublishTime: timestamppb.New(s.PublishedAt),
-	}, nil
+		PublishTime: timestamppb.New(s.PublishedAt),
+	}
 }
 
 func itemToProto(it procurement.SellerPublicationItem) (*pb.SellerPublicationListItem, error) {
-	summary, err := summaryToProto(it.Summary)
-	if err != nil {
-		return nil, err
-	}
 	out := &pb.SellerPublicationListItem{
-		Publication: summary, SellerFacingPayload: procurementwire.SellerFacing(it.Payload, versionString(it.Summary.Version)), HasDraft: it.HasDraft,
+		Publication: summaryToProto(it.Summary), SellerFacingPayload: procurementwire.SellerFacing(it.Payload, versionString(it.Summary.Version)), HasDraft: it.HasDraft,
 	}
 	if it.LatestResponseStatus != nil {
 		status, err := procurementwire.Enum[pb.SellerResponseStatus](pb.SellerResponseStatus_value, "SELLER_RESPONSE_STATUS_", "回價狀態", *it.LatestResponseStatus)
@@ -150,11 +142,8 @@ func versionToProto(v procurement.SellerResponseVersion) (*pb.SellerResponseVers
 }
 
 func detailToProto(d procurement.SellerPublicationDetail) (*pb.GetSellerPublicationResponse, error) {
-	summary, err := summaryToProto(d.Summary)
-	if err != nil {
-		return nil, err
-	}
-	out := &pb.GetSellerPublicationResponse{Publication: summary, SellerFacingPayload: procurementwire.SellerFacing(d.Payload, versionString(d.Summary.Version))}
+	var err error
+	out := &pb.GetSellerPublicationResponse{Publication: summaryToProto(d.Summary), SellerFacingPayload: procurementwire.SellerFacing(d.Payload, versionString(d.Summary.Version))}
 	if d.Draft != nil {
 		if out.Draft, err = draftToProto(d.Draft); err != nil {
 			return nil, err

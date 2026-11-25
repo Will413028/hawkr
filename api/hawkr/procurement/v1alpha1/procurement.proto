@@ -332,17 +332,6 @@ enum PublicationState {
   // 沒有重發與撤回發布的方法，所以目前只有這一個值；新值隨它的寫入方法一起加。
 }
 
-// InviteDeliveryState 是詢價通知投遞給賣家的狀態。
-enum InviteDeliveryState {
-  INVITE_DELIVERY_STATE_UNSPECIFIED = 0;
-  // 已排入投遞，還沒交給投遞管道。
-  INVITE_DELIVERY_STATE_QUEUED = 1;
-  // 已交給投遞管道；不代表賣家已收到或看到。
-  INVITE_DELIVERY_STATE_SENT = 2;
-  // 重試耗盡，投遞失敗。
-  INVITE_DELIVERY_STATE_FAILED = 3;
-}
-
 // SellerResponseType 是賣家回價的方式。
 enum SellerResponseType {
   SELLER_RESPONSE_TYPE_UNSPECIFIED = 0;
@@ -1155,7 +1144,8 @@ message SellerPublicationSummary {
   string publication_id = 1;
   string publication_version = 2;
   string seller_facing_payload_hash = 3;
-  InviteDeliveryState delivery_state = 4;
+  reserved 4;
+  reserved "delivery_state";
   google.protobuf.Timestamp publish_time = 5;
 }
 

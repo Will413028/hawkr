@@ -39,8 +39,6 @@ exchanges:
   type: topic
 - name: payment.webhook.dlx
   type: direct
-- name: procurement.events
-  type: topic
 - name: payuni.events
   type: topic
 - name: seller.events
@@ -158,12 +156,6 @@ queues:
   bindings:
   - exchange: hawkr.order
     key: order.cancelled
-- name: notification.procurement
-  retry:
-    max_attempts: 3
-  bindings:
-  - exchange: procurement.events
-    key: '#'
 - name: order.aftersales.awaiting.buyer.page
   dlq:
     via: hawkr.order.dlx

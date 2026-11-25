@@ -1374,44 +1374,6 @@ enum ProcurementRfqPublicationApprovalState {
   }
 }
 
-/// 單一 recipient（invite）的投遞狀態（issue #2450 Slice 2b）。這是「有沒有交出去」的投遞軸，與 `ProcurementRfqPublicationApprovalState`（核准／發布軸）是不同實體、不同生命週期，不得合併或互相轉譯。**`SENT` 也不是收件人有沒有看到／回應**——delivered／seen 屬 #2539，是另一條尚未存在的回饋軸。
-enum ProcurementRfqInviteDeliveryState {
-  /// 尚未送出 — 這條 lane 目前沒有真實投遞管道（EXTERNAL，T17 之前），系統尚未嘗試送出
-  notSent(code: 'NOT_SENT', value: 'NOT_SENT', label: '尚未送出'),
-  /// 待送出 — 投遞任務已排入 outbox，尚未交給投遞管道
-  queued(code: 'QUEUED', value: 'QUEUED', label: '待送出'),
-  /// 已送出 — 已交給投遞管道。**不代表賣家已收到，更不代表已看到**——delivered／seen 屬 #2539
-  sent(code: 'SENT', value: 'SENT', label: '已送出'),
-  /// 送出失敗 — 投遞重試耗盡轉終態
-  failed(code: 'FAILED', value: 'FAILED', label: '送出失敗');
-
-  const ProcurementRfqInviteDeliveryState({
-    required this.code,
-    required this.value,
-    required this.label,
-  });
-
-  final String code;
-  final String value;
-  final String label;
-
-  /// 依 code 查找，找不到回傳 null
-  static ProcurementRfqInviteDeliveryState? fromCode(String code) {
-    for (final v in values) {
-      if (v.code == code) return v;
-    }
-    return null;
-  }
-
-  /// 依 value 查找，找不到回傳 null
-  static ProcurementRfqInviteDeliveryState? fromValue(String value) {
-    for (final v in values) {
-      if (v.value == value) return v;
-    }
-    return null;
-  }
-}
-
 /// run 進入 `FAILED`／`EXPIRED` 時的機器可讀原因。**只在這兩個狀態下非空**。
 enum ProcurementRunFailureReason {
   /// 執行程序中斷 — 執行 run 的程序消失（lease 過期／pod 重啟），由讀取路徑終態化

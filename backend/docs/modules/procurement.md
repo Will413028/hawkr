@@ -112,4 +112,4 @@
 - 撤回與婉拒是目標狀態的方法，沒有 `client_request_id` 與收據：撤回指定版本已撤回即冪等回原結果，婉拒已婉拒即冪等。`withdrawn_version` 是單值：撤回版本 1 後送出版本 2 再撤回，版本 1 顯示 `SUPERSEDED`。`reason_code` 去頭尾空白、最多 64 字、空字串存 NULL。
 - 草稿的大小由 DB CHECK 限制（整份 jsonb 文字 ≤ 16 KiB，違規對成 INVALID_ARGUMENT／`Draft`），Go 端不重算；`lead_time_days` 是 `optional`，0 是當天出貨。
 - 送出以 `quote.PayloadHash`（`rfqhash.SellerResponse`）比對冪等重送；賣家可見內容的 hash 用 `rfq.SellerFacingOf`，與買家端同一份。`publication_version` 目前沒有重發、恆為 1，只有 `expected_seller_facing_payload_hash` 實際有效。
-- 邀請投遞狀態 `delivery_state` 由 relay job 寫（`QUEUED`→`SENT` 或 `FAILED`），補掃把沒有進行中 job 的過期 `QUEUED` 轉 `FAILED`；賣家端 summary 顯示它。細節與 A8-3 的交接點見 `CARRYOVER.md`。
+- 邀請沒有投遞狀態：通知有沒有送到只記在 notification 的投遞紀錄（A8 D30）；賣家端 summary 不帶它。

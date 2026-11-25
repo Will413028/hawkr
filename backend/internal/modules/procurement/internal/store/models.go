@@ -201,14 +201,12 @@ type ProcurementRfqPublicationApprovalRecipient struct {
 }
 
 type ProcurementRfqPublicationInvite struct {
-	ID              uuid.UUID
-	PublicationID   uuid.UUID
-	Position        int32
-	StoreID         int64
-	DeliveryState   string
-	DeliveryStateAt time.Time
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	ID            uuid.UUID
+	PublicationID uuid.UUID
+	Position      int32
+	StoreID       int64
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 type ProcurementSellerResponse struct {

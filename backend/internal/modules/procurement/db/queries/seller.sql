@@ -3,7 +3,7 @@
 
 -- name: GetSellerPublicationView :one
 -- 一筆發給這家店的詢價，連同組出賣家可見內容要用的核准與需求版本（組法在 rfq.SellerFacingOf）。沒有列就是不存在或不是發給這家店。
-SELECT sqlc.embed(p), sqlc.embed(a), sqlc.embed(rev), i.delivery_state
+SELECT sqlc.embed(p), sqlc.embed(a), sqlc.embed(rev)
 FROM procurement.rfq_publication_invites i
 JOIN procurement.rfq_publications p ON p.id = i.publication_id
 JOIN procurement.rfq_publication_approvals a ON a.id = p.approval_id
@@ -12,8 +12,8 @@ WHERE i.publication_id = @publication_id AND i.store_id = @store_id;
 
 -- name: ListSellerPublicationViews :many
 -- 發給這家店的詢價，依 (published_at DESC, id DESC) keyset；游標是上一頁最後一列的 (published_at, id)，沒有游標時 after_id 為 NULL。
--- 一次 join 取核准與需求版本，不逐列再查。不過濾投遞狀態、不過濾已成交或買家已刪的詢價（賣家讀得到自己收過的詢價）。
-SELECT sqlc.embed(p), sqlc.embed(a), sqlc.embed(rev), i.delivery_state
+-- 一次 join 取核准與需求版本，不逐列再查。不過濾已成交或買家已刪的詢價（賣家讀得到自己收過的詢價）。
+SELECT sqlc.embed(p), sqlc.embed(a), sqlc.embed(rev)
 FROM procurement.rfq_publication_invites i
 JOIN procurement.rfq_publications p ON p.id = i.publication_id
 JOIN procurement.rfq_publication_approvals a ON a.id = p.approval_id

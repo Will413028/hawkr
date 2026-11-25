@@ -346,7 +346,7 @@ func TestExecuteDirectWritesOneQueuedInvitePerRecipientInOrderAndTheEventCarries
 		t.Fatalf("邀請 %d 列", len(invites))
 	}
 	for i, want := range []int64{30, 10, 20} {
-		if invites[i].StoreID != want || invites[i].Position != int32(i) || invites[i].DeliveryState != "QUEUED" {
+		if invites[i].StoreID != want || invites[i].Position != int32(i) {
 			t.Fatalf("邀請 %d = %+v", i, invites[i])
 		}
 	}

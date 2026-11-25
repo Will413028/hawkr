@@ -1,6 +1,0 @@
-{
-  "source": "Built verbatim from inviteCreatedPayload in backend/services/ai-service/internal/procurement/commerce/publication_execute.go:434-438 (commit a849cc9c2) by marshalling the struct with fixed inputs (ids via strconv.FormatInt, TSID-sized). Inferred, not captured from the running old service. Key names and string types are the contract; id values are TSID decimals in the old service and UUID strings in the monolith (A9-D45(6)).",
-  "exchange": "procurement.events",
-  "routing_key": "procurement.rfq_publication_invite.created",
-  "payload": {"inviteId":"7501000000000000001","publicationId":"7502000000000000002","storeId":"7496483081637855232"}
-}

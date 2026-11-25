@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"go/ast"
-	"slices"
 	"testing"
 	"time"
 
@@ -92,38 +91,5 @@ func TestWorkerRoleRegistersProcurementOrderProvisioning(t *testing.T) {
 	})
 	if !found {
 		t.Error("runWorker 組採購模組時沒有帶 procurementOrders{orders}（建單 port）")
-	}
-}
-
-// 邀請事件的 relay：單體是 procurement.rfq_publication_invite.created 唯一的 producer。
-// 訂閱在 serve 與 worker 都要有（RfqPublished 在哪個程序發布，訂閱者就在哪個程序），job worker 與補掃排程只在 worker。
-func TestProcurementInviteRelayIsWired(t *testing.T) {
-	requireRefs(t, "procurement.go", "subscribeProcurementRelay", "procurementrelay.OnRfqPublished")
-	for _, role := range []string{"runServe", "runWorker"} {
-		requireCalls(t, "main.go", role, "subscribeProcurementRelay")
-	}
-	requireCalls(t, "procurement.go", "addProcurementRelay", "procurementrelay.NewWorker", "w.AddWorkers", "w.PeriodicJobs")
-	requireCalls(t, "main.go", "runWorker", "addProcurementRelay")
-	if slices.Contains(callsIn(t, "main.go", "runServe"), "addProcurementRelay") {
-		t.Error("runServe 不該呼叫 addProcurementRelay：relay job 只在 worker 角色執行")
-	}
-	scheduled := false
-	ast.Inspect(funcBody(t, "runWorker"), func(n ast.Node) bool {
-		call, ok := n.(*ast.CallExpr)
-		if !ok {
-			return true
-		}
-		if id, ok := call.Fun.(*ast.Ident); !ok || id.Name != "append" {
-			return true
-		}
-		for _, arg := range call.Args {
-			if id, ok := arg.(*ast.Ident); ok && id.Name == "procurementSweep" {
-				scheduled = true
-			}
-		}
-		return true
-	})
-	if !scheduled {
-		t.Error("runWorker 沒有把 relay 補掃的排程（procurementSweep）接進 periodic")
 	}
 }

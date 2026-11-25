@@ -53,28 +53,14 @@ SELECT * FROM procurement.rfq_publications WHERE id = @id AND buyer_id = @buyer_
 SELECT * FROM procurement.rfq_publications WHERE buyer_id = @buyer_id AND client_request_id = @client_request_id;
 
 -- name: InsertInvite :exec
-INSERT INTO procurement.rfq_publication_invites (id, publication_id, position, store_id, delivery_state, delivery_state_at, created_at, updated_at)
-VALUES (@id, @publication_id, @position, @store_id, 'QUEUED', @now, @now, @now);
+INSERT INTO procurement.rfq_publication_invites (id, publication_id, position, store_id, created_at, updated_at)
+VALUES (@id, @publication_id, @position, @store_id, @now, @now);
 
 -- name: ListInvites :many
 SELECT i.* FROM procurement.rfq_publication_invites i
 JOIN procurement.rfq_publications p ON p.id = i.publication_id
 WHERE i.publication_id = @publication_id AND p.buyer_id = @buyer_id
 ORDER BY i.position;
-
--- name: MarkInviteSent :execrows
-UPDATE procurement.rfq_publication_invites SET delivery_state = 'SENT', delivery_state_at = @now, updated_at = @now
-WHERE id = @id AND delivery_state = 'QUEUED';
-
--- name: MarkInviteFailed :execrows
-UPDATE procurement.rfq_publication_invites SET delivery_state = 'FAILED', delivery_state_at = @now, updated_at = @now
-WHERE id = @id AND delivery_state = 'QUEUED';
-
--- name: ListStaleQueuedInvites :many
-SELECT id, created_at FROM procurement.rfq_publication_invites
-WHERE delivery_state = 'QUEUED' AND created_at < @before AND (created_at, id) > (@after_created_at::timestamptz, @after_id::uuid)
-ORDER BY created_at, id
-LIMIT @max_rows;
 
 -- name: InsertSellerResponse :exec
 INSERT INTO procurement.seller_responses (id, publication_id, request_id, store_id, created_at, updated_at)

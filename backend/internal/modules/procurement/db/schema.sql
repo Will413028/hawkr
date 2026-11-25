@@ -225,24 +225,19 @@ CREATE UNIQUE INDEX rfq_publications_approval ON procurement.rfq_publications (a
 CREATE UNIQUE INDEX rfq_publications_idempotency ON procurement.rfq_publications (buyer_id, client_request_id);
 CREATE INDEX rfq_publications_request ON procurement.rfq_publications (request_id, created_at DESC);
 
--- 發給一家店的邀請。與 River job 同 transaction 建立，一出生就是 QUEUED（沒有 NOT_SENT）。
+-- 發給一家店的邀請，是賣家可見性的唯一依據。通知有沒有送到只記在 notification 的投遞紀錄（A8 D30），這裡不複製。
 CREATE TABLE procurement.rfq_publication_invites (
     id UUID PRIMARY KEY,
     publication_id UUID NOT NULL REFERENCES procurement.rfq_publications (id) ON DELETE CASCADE,
     position INT NOT NULL,
     store_id BIGINT NOT NULL,
-    delivery_state TEXT NOT NULL DEFAULT 'QUEUED',
-    delivery_state_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT rfq_publication_invites_position_check CHECK (position >= 0),
-    CONSTRAINT rfq_publication_invites_store_check CHECK (store_id > 0),
-    CONSTRAINT rfq_publication_invites_state_check CHECK (delivery_state IN ('QUEUED', 'SENT', 'FAILED'))
+    CONSTRAINT rfq_publication_invites_store_check CHECK (store_id > 0)
 );
 CREATE UNIQUE INDEX rfq_publication_invites_store ON procurement.rfq_publication_invites (publication_id, store_id);
 CREATE UNIQUE INDEX rfq_publication_invites_position ON procurement.rfq_publication_invites (publication_id, position);
--- 補掃只掃還沒有結果的邀請，終態的列不進索引。
-CREATE INDEX rfq_publication_invites_queued ON procurement.rfq_publication_invites (created_at, id) WHERE delivery_state = 'QUEUED';
 
 -- 一家店對一次發布的回價（身分列）。只有被邀請的店能有回價列：(publication_id, store_id) 參照邀請列，邀請列是賣家可見性的唯一依據（A9-D44）。沒有 buyer_id（由 request 推出）、沒有列版本（回價版次是 latest_version）。
 -- write_closed_reason 只收有寫入者的 DECLINED（S6）。withdrawn_reason_code、write_closed_reason_code 是賣家填的原因代碼，伺服器記錄、不解析（A9-D45(2)；撤回與婉拒是目標狀態的方法，不建收據）。

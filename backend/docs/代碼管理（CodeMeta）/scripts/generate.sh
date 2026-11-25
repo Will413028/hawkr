@@ -67,7 +67,7 @@ GO_REGISTRY_ENUMS=(
     ProcurementRunStatus ProcurementStepStatus ProcurementLaneStatus ProcurementArtifactStatus
     ProcurementConfirmationStatus ProcurementRunFailureReason ProcurementErrorReason
     ProcurementLedgerEventType ProcurementArtifactType
-    ProcurementRfqPublicationApprovalState ProcurementRfqInviteDeliveryState ProcurementPublicationAudienceMode ProcurementWishPoolPolicy ProcurementPublicationState
+    ProcurementRfqPublicationApprovalState ProcurementPublicationAudienceMode ProcurementWishPoolPolicy ProcurementPublicationState
     ProcurementSellerResponseType ProcurementTaxInclusionBasis ProcurementSellerPartyType
     ProcurementSellerResponseStatus ProcurementQuoteAcceptability ProcurementOrderProvisioningState
     ReportStatus ReportTargetType ReportReasonCode ReportResolveAction ModerationActionType
@@ -106,7 +106,7 @@ ADMIN_ENUMS=(
     # **ADM 要拿到完整值域只能靠本 allowlist**——少了就只能在後台硬編字串。
     ProcurementRunStatus ProcurementStepStatus ProcurementLaneStatus
     ProcurementArtifactStatus ProcurementConfirmationStatus
-    ProcurementRfqPublicationApprovalState ProcurementRfqInviteDeliveryState
+    ProcurementRfqPublicationApprovalState
     ProcurementRunFailureReason ProcurementErrorReason ProcurementLedgerEventType
     ProcurementArtifactType
     ProcurementPublicationAudienceMode ProcurementPublicationState

@@ -55,7 +55,6 @@ type SellerPublicationSummary struct {
 	PublicationID    uuid.UUID
 	Version          int32
 	SellerFacingHash string
-	DeliveryState    string
 	PublishedAt      time.Time
 }
 

@@ -380,48 +380,6 @@ func ProcurementRfqPublicationApprovalStateFromValue(value string) (ProcurementR
 	return ProcurementRfqPublicationApprovalState{}, false
 }
 
-// ===== ProcurementRfqInviteDeliveryState =====
-// 單一 recipient（invite）的投遞狀態（issue #2450 Slice 2b）。這是「有沒有交出去」的投遞軸，與 `ProcurementRfqPublicationApprovalState`（核准／發布軸）是不同實體、不同生命週期，不得合併或互相轉譯。**`SENT` 也不是收件人有沒有看到／回應**——delivered／seen 屬 #2539，是另一條尚未存在的回饋軸。
-
-type ProcurementRfqInviteDeliveryState struct {
-	Code        string
-	Value       string
-	Label       string
-	Description string
-}
-
-var (
-	ProcurementRfqInviteDeliveryStateNotSent = ProcurementRfqInviteDeliveryState{Code: "NOT_SENT", Value: "NOT_SENT", Label: "尚未送出", Description: "這條 lane 目前沒有真實投遞管道（EXTERNAL，T17 之前），系統尚未嘗試送出"}
-	ProcurementRfqInviteDeliveryStateQueued  = ProcurementRfqInviteDeliveryState{Code: "QUEUED", Value: "QUEUED", Label: "待送出", Description: "投遞任務已排入 outbox，尚未交給投遞管道"}
-	ProcurementRfqInviteDeliveryStateSent    = ProcurementRfqInviteDeliveryState{Code: "SENT", Value: "SENT", Label: "已送出", Description: "已交給投遞管道。**不代表賣家已收到，更不代表已看到**——delivered／seen 屬 #2539"}
-	ProcurementRfqInviteDeliveryStateFailed  = ProcurementRfqInviteDeliveryState{Code: "FAILED", Value: "FAILED", Label: "送出失敗", Description: "投遞重試耗盡轉終態"}
-)
-
-var AllProcurementRfqInviteDeliveryStates = []ProcurementRfqInviteDeliveryState{
-	ProcurementRfqInviteDeliveryStateNotSent,
-	ProcurementRfqInviteDeliveryStateQueued,
-	ProcurementRfqInviteDeliveryStateSent,
-	ProcurementRfqInviteDeliveryStateFailed,
-}
-
-func ProcurementRfqInviteDeliveryStateFromCode(code string) (ProcurementRfqInviteDeliveryState, bool) {
-	for _, v := range AllProcurementRfqInviteDeliveryStates {
-		if v.Code == code {
-			return v, true
-		}
-	}
-	return ProcurementRfqInviteDeliveryState{}, false
-}
-
-func ProcurementRfqInviteDeliveryStateFromValue(value string) (ProcurementRfqInviteDeliveryState, bool) {
-	for _, v := range AllProcurementRfqInviteDeliveryStates {
-		if v.Value == value {
-			return v, true
-		}
-	}
-	return ProcurementRfqInviteDeliveryState{}, false
-}
-
 // ===== ProcurementRunFailureReason =====
 // run 進入 `FAILED`／`EXPIRED` 時的機器可讀原因。**只在這兩個狀態下非空**。
 
