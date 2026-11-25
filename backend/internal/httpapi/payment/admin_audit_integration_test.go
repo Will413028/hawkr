@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"uuid"
 
 	"connectrpc.com/connect"
-	"github.com/google/uuid"
 	"github.com/riverqueue/river"
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi/adminauth"
@@ -114,7 +114,7 @@ VALUES ($1, 'fake', 'PROVIDER', $2, $2, $2, $2, 'provider_refused：no')`, store
 			return account(store, err)
 		},
 		paymentv1alpha1connect.PaymentAdminServiceResolvePaymentAnomalyProcedure: func(store int64) (string, string, error) {
-			id := uuid.New()
+			id := uuid.NewV7()
 			exec(`INSERT INTO payment.payments (id, buyer_id, amount, provider, description, status, failure_reason, created_at, updated_at)
 VALUES ($1, $2, 100, $3, '藍色 T 恤', 'ANOMALY', 'lookup_failed', $4, $4)`, id, store, payment.ChargeFakeName, now)
 			_, err := client.ResolvePaymentAnomaly(ctx, connect.NewRequest(&adminpb.ResolvePaymentAnomalyRequest{
