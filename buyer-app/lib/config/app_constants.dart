@@ -1,15 +1,8 @@
 /// 跨環境不變的全域常數
 ///
-/// 只放真正的 const——Payment 設定、OSS CDN base 等。
+/// 只放真正的 const——分享連結、OSS CDN base 等。
 /// Flavor-dependent 的設定（URL、timeout 等）請用 [F.appFlavor.<getter>]。
 abstract final class AppConstants {
-  // ============================================================
-  // Payment
-  // ============================================================
-
-  /// Deep link scheme for payment callback
-  static const String paymentDeepLinkScheme = 'hawkrbuyer';
-
   // ============================================================
   // 分享連結
   // ============================================================

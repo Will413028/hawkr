@@ -74,14 +74,6 @@ export interface OrderPayment {
 	status?: string;
 	paidAt?: number | null;
 	amount?: string;
-	/** Backend's `atmBankCode` — populated when paymentMethod = "2004" (ATM)
-	 * and the gateway has minted a virtual account. */
-	atmBankCode?: string;
-	/** Backend's `atmVirtualAccount` — the 銀行虛擬帳號 buyer transfers to.
-	 * App displays this as 繳費代碼. */
-	atmVirtualAccount?: string;
-	/** Backend's `atmExpireDate` — ISO/date string for 繳費截止日期. */
-	atmExpireDate?: string;
 }
 
 export interface OrderReview {

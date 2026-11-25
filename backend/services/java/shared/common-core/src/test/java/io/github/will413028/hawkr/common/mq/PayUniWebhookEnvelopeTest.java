@@ -82,7 +82,7 @@ class PayUniWebhookEnvelopeTest {
                 {
                   "event_id": "def-456",
                   "provider": "PAYUNI",
-                  "webhook_type": "PAYMENT_UOP"
+                  "webhook_type": "SHIPPING_STATUS"
                 }
                 """;
         PayUniWebhookEnvelope env = PayUniWebhookEnvelope.parse(json.getBytes(StandardCharsets.UTF_8));
@@ -98,7 +98,7 @@ class PayUniWebhookEnvelopeTest {
                 {
                   "event_id": "ghi-789",
                   "provider": "PAYUNI",
-                  "webhook_type": "PAYMENT_UOP",
+                  "webhook_type": "SHIPPING_STATUS",
                   "payload": null,
                   "meta": null
                 }
@@ -141,13 +141,13 @@ class PayUniWebhookEnvelopeTest {
     }
 
     @Test
-    void parsePaymentUopEnvelope() {
+    void parseShippingStatusEnvelope() {
         // 模擬實際的付款結果 envelope
         String json = """
                 {
                   "event_id": "pay-001",
                   "provider": "PAYUNI",
-                  "webhook_type": "PAYMENT_UOP",
+                  "webhook_type": "SHIPPING_STATUS",
                   "mer_id": "HAWK9",
                   "event_key": "HAWK9:TRD123:1:1000",
                   "occurred_at": "2026-03-18T10:00:00",
@@ -162,7 +162,7 @@ class PayUniWebhookEnvelopeTest {
                 """;
         PayUniWebhookEnvelope env = PayUniWebhookEnvelope.parse(json.getBytes(StandardCharsets.UTF_8));
 
-        assertEquals("PAYMENT_UOP", env.webhookType());
+        assertEquals("SHIPPING_STATUS", env.webhookType());
         assertEquals("TRD123", env.payloadField("MerTradeNo"));
         assertEquals("UNI456", env.payloadField("TradeNo"));
         assertEquals("1", env.payloadField("TradeStatus"));

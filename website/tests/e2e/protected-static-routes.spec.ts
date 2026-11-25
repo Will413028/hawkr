@@ -40,8 +40,6 @@ const ACCOUNT_ROUTES = routesOf("account");
 /** Callback/result screens need representative query state to exercise their
  * real rendered branch instead of an intentionally sparse no-order shell. */
 const ROUTE_QUERY: Partial<Record<string, string>> = {
-	"/checkout/fail": "?order=HK-ROUTE-SMOKE&reason=route-smoke",
-	"/checkout/submitted": "?order=HK-ROUTE-SMOKE",
 	"/checkout/success": "?order=HK-ROUTE-SMOKE",
 };
 

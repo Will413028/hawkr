@@ -16,20 +16,20 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 import 'package:protobuf/well_known_types/google/protobuf/duration.pb.dart'
-    as $6;
+    as $7;
 import 'package:protobuf/well_known_types/google/protobuf/field_mask.pb.dart'
     as $4;
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart'
     as $2;
 
 import '../../../google/rpc/error_details.pb.dart' as $3;
-import '../../../google/type/date.pb.dart' as $5;
-import '../../common/v1alpha1/deadline.pb.dart' as $7;
+import '../../../google/type/date.pb.dart' as $6;
+import '../../common/v1alpha1/deadline.pb.dart' as $8;
 import '../../common/v1alpha1/image.pb.dart' as $1;
 import '../../common/v1alpha1/policy_category.pbenum.dart' as $10;
 import '../../common/v1alpha1/postal_address.pb.dart' as $0;
-import '../../common/v1alpha1/store_card.pb.dart' as $8;
-import '../../payment/v1alpha1/payment.pbenum.dart' as $9;
+import '../../common/v1alpha1/store_card.pb.dart' as $9;
+import '../../payment/v1alpha1/payment.pb.dart' as $5;
 import 'seller.pbenum.dart';
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
@@ -1509,6 +1509,324 @@ class UpdateMyStoreResponse extends $pb.GeneratedMessage {
   Store ensureStore() => $_ensure(0);
 }
 
+class ListMyEarningsRequest extends $pb.GeneratedMessage {
+  factory ListMyEarningsRequest({
+    $core.int? pageSize,
+    $core.String? pageToken,
+    $core.String? orderNo,
+    $2.Timestamp? fromTime,
+    $2.Timestamp? toTime,
+  }) {
+    final result = ListMyEarningsRequest._();
+    if (pageSize != null) result.pageSize = pageSize;
+    if (pageToken != null) result.pageToken = pageToken;
+    if (orderNo != null) result.orderNo = orderNo;
+    if (fromTime != null) result.fromTime = fromTime;
+    if (toTime != null) result.toTime = toTime;
+    return result;
+  }
+
+  ListMyEarningsRequest._();
+
+  factory ListMyEarningsRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListMyEarningsRequest()..mergeFromBuffer(data, registry);
+  factory ListMyEarningsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListMyEarningsRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListMyEarningsRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance: ListMyEarningsRequest.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'pageSize')
+    ..aOS(2, _omitFieldNames ? '' : 'pageToken')
+    ..aOS(3, _omitFieldNames ? '' : 'orderNo')
+    ..aOM<$2.Timestamp>(4, _omitFieldNames ? '' : 'fromTime',
+        subBuilder: $2.Timestamp.$_createMessage)
+    ..aOM<$2.Timestamp>(5, _omitFieldNames ? '' : 'toTime',
+        subBuilder: $2.Timestamp.$_createMessage)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListMyEarningsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListMyEarningsRequest copyWith(
+          void Function(ListMyEarningsRequest) updates) =>
+      super.copyWith((message) => updates(message as ListMyEarningsRequest))
+          as ListMyEarningsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListMyEarningsRequest() / ListMyEarningsRequest.new instead')
+  static ListMyEarningsRequest create() => ListMyEarningsRequest._();
+  static $pb.GeneratedMessage $_createMessage() => ListMyEarningsRequest._();
+  @$core.override
+  ListMyEarningsRequest createEmptyInstance() => ListMyEarningsRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ListMyEarningsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListMyEarningsRequest>(
+          ListMyEarningsRequest.$_createMessage);
+  static ListMyEarningsRequest? _defaultInstance;
+
+  /// 預設 20，上限 100。
+  @$pb.TagNumber(1)
+  $core.int get pageSize => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set pageSize($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPageSize() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPageSize() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get pageToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set pageToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPageToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPageToken() => $_clearField(2);
+
+  /// 只列這張訂單的列；空字串不篩。
+  @$pb.TagNumber(3)
+  $core.String get orderNo => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set orderNo($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasOrderNo() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearOrderNo() => $_clearField(3);
+
+  /// 記錄時間不早於它（含）；不設就不限。
+  @$pb.TagNumber(4)
+  $2.Timestamp get fromTime => $_getN(3);
+  @$pb.TagNumber(4)
+  set fromTime($2.Timestamp value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasFromTime() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearFromTime() => $_clearField(4);
+  @$pb.TagNumber(4)
+  $2.Timestamp ensureFromTime() => $_ensure(3);
+
+  /// 記錄時間早於它（不含）；不設就不限。
+  @$pb.TagNumber(5)
+  $2.Timestamp get toTime => $_getN(4);
+  @$pb.TagNumber(5)
+  set toTime($2.Timestamp value) => $_setField(5, value);
+  @$pb.TagNumber(5)
+  $core.bool hasToTime() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearToTime() => $_clearField(5);
+  @$pb.TagNumber(5)
+  $2.Timestamp ensureToTime() => $_ensure(4);
+}
+
+class ListMyEarningsResponse extends $pb.GeneratedMessage {
+  factory ListMyEarningsResponse({
+    $core.Iterable<$5.EarningsEntry>? entries,
+    $core.String? nextPageToken,
+  }) {
+    final result = ListMyEarningsResponse._();
+    if (entries != null) result.entries.addAll(entries);
+    if (nextPageToken != null) result.nextPageToken = nextPageToken;
+    return result;
+  }
+
+  ListMyEarningsResponse._();
+
+  factory ListMyEarningsResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListMyEarningsResponse()..mergeFromBuffer(data, registry);
+  factory ListMyEarningsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListMyEarningsResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListMyEarningsResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance: ListMyEarningsResponse.$_createMessage)
+    ..pPM<$5.EarningsEntry>(1, _omitFieldNames ? '' : 'entries',
+        subBuilder: $5.EarningsEntry.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'nextPageToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListMyEarningsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListMyEarningsResponse copyWith(
+          void Function(ListMyEarningsResponse) updates) =>
+      super.copyWith((message) => updates(message as ListMyEarningsResponse))
+          as ListMyEarningsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListMyEarningsResponse() / ListMyEarningsResponse.new instead')
+  static ListMyEarningsResponse create() => ListMyEarningsResponse._();
+  static $pb.GeneratedMessage $_createMessage() => ListMyEarningsResponse._();
+  @$core.override
+  ListMyEarningsResponse createEmptyInstance() => ListMyEarningsResponse._();
+  @$core.pragma('dart2js:noInline')
+  static ListMyEarningsResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListMyEarningsResponse>(
+          ListMyEarningsResponse.$_createMessage);
+  static ListMyEarningsResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<$5.EarningsEntry> get entries => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $core.String get nextPageToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set nextPageToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasNextPageToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearNextPageToken() => $_clearField(2);
+}
+
+class GetMyOrderEarningsRequest extends $pb.GeneratedMessage {
+  factory GetMyOrderEarningsRequest({
+    $core.String? orderNo,
+  }) {
+    final result = GetMyOrderEarningsRequest._();
+    if (orderNo != null) result.orderNo = orderNo;
+    return result;
+  }
+
+  GetMyOrderEarningsRequest._();
+
+  factory GetMyOrderEarningsRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetMyOrderEarningsRequest()..mergeFromBuffer(data, registry);
+  factory GetMyOrderEarningsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetMyOrderEarningsRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetMyOrderEarningsRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance: GetMyOrderEarningsRequest.$_createMessage)
+    ..aOS(1, _omitFieldNames ? '' : 'orderNo')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMyOrderEarningsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMyOrderEarningsRequest copyWith(
+          void Function(GetMyOrderEarningsRequest) updates) =>
+      super.copyWith((message) => updates(message as GetMyOrderEarningsRequest))
+          as GetMyOrderEarningsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use GetMyOrderEarningsRequest() / GetMyOrderEarningsRequest.new instead')
+  static GetMyOrderEarningsRequest create() => GetMyOrderEarningsRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      GetMyOrderEarningsRequest._();
+  @$core.override
+  GetMyOrderEarningsRequest createEmptyInstance() =>
+      GetMyOrderEarningsRequest._();
+  @$core.pragma('dart2js:noInline')
+  static GetMyOrderEarningsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetMyOrderEarningsRequest>(
+          GetMyOrderEarningsRequest.$_createMessage);
+  static GetMyOrderEarningsRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get orderNo => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set orderNo($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasOrderNo() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearOrderNo() => $_clearField(1);
+}
+
+class GetMyOrderEarningsResponse extends $pb.GeneratedMessage {
+  factory GetMyOrderEarningsResponse({
+    $core.Iterable<$5.EarningsEntry>? entries,
+    $fixnum.Int64? netAmount,
+  }) {
+    final result = GetMyOrderEarningsResponse._();
+    if (entries != null) result.entries.addAll(entries);
+    if (netAmount != null) result.netAmount = netAmount;
+    return result;
+  }
+
+  GetMyOrderEarningsResponse._();
+
+  factory GetMyOrderEarningsResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetMyOrderEarningsResponse()..mergeFromBuffer(data, registry);
+  factory GetMyOrderEarningsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      GetMyOrderEarningsResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'GetMyOrderEarningsResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
+      createEmptyInstance: GetMyOrderEarningsResponse.$_createMessage)
+    ..pPM<$5.EarningsEntry>(1, _omitFieldNames ? '' : 'entries',
+        subBuilder: $5.EarningsEntry.$_createMessage)
+    ..aInt64(2, _omitFieldNames ? '' : 'netAmount')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMyOrderEarningsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  GetMyOrderEarningsResponse copyWith(
+          void Function(GetMyOrderEarningsResponse) updates) =>
+      super.copyWith(
+              (message) => updates(message as GetMyOrderEarningsResponse))
+          as GetMyOrderEarningsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use GetMyOrderEarningsResponse() / GetMyOrderEarningsResponse.new instead')
+  static GetMyOrderEarningsResponse create() => GetMyOrderEarningsResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      GetMyOrderEarningsResponse._();
+  @$core.override
+  GetMyOrderEarningsResponse createEmptyInstance() =>
+      GetMyOrderEarningsResponse._();
+  @$core.pragma('dart2js:noInline')
+  static GetMyOrderEarningsResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<GetMyOrderEarningsResponse>(
+          GetMyOrderEarningsResponse.$_createMessage);
+  static GetMyOrderEarningsResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<$5.EarningsEntry> get entries => $_getList(0);
+
+  /// 狀態是 COMPLETED 的列的金額加總（新台幣元，帶正負）：這張訂單店家實際淨入帳的金額。處理中與失敗的列不計。
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get netAmount => $_getI64(1);
+  @$pb.TagNumber(2)
+  set netAmount($fixnum.Int64 value) => $_setInt64(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasNetAmount() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearNetAmount() => $_clearField(2);
+}
+
 class RefreshMyPaymentAccountRequest extends $pb.GeneratedMessage {
   factory RefreshMyPaymentAccountRequest() =>
       RefreshMyPaymentAccountRequest._();
@@ -2305,8 +2623,8 @@ class Dashboard extends $pb.GeneratedMessage {
 /// DashboardPeriod 是一個期間，以台北日曆日表示，含頭含尾（共 7 日）。
 class DashboardPeriod extends $pb.GeneratedMessage {
   factory DashboardPeriod({
-    $5.Date? firstDate,
-    $5.Date? lastDate,
+    $6.Date? firstDate,
+    $6.Date? lastDate,
   }) {
     final result = DashboardPeriod._();
     if (firstDate != null) result.firstDate = firstDate;
@@ -2328,10 +2646,10 @@ class DashboardPeriod extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
       createEmptyInstance: DashboardPeriod.$_createMessage)
-    ..aOM<$5.Date>(1, _omitFieldNames ? '' : 'firstDate',
-        subBuilder: $5.Date.$_createMessage)
-    ..aOM<$5.Date>(2, _omitFieldNames ? '' : 'lastDate',
-        subBuilder: $5.Date.$_createMessage)
+    ..aOM<$6.Date>(1, _omitFieldNames ? '' : 'firstDate',
+        subBuilder: $6.Date.$_createMessage)
+    ..aOM<$6.Date>(2, _omitFieldNames ? '' : 'lastDate',
+        subBuilder: $6.Date.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2357,26 +2675,26 @@ class DashboardPeriod extends $pb.GeneratedMessage {
   static DashboardPeriod? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $5.Date get firstDate => $_getN(0);
+  $6.Date get firstDate => $_getN(0);
   @$pb.TagNumber(1)
-  set firstDate($5.Date value) => $_setField(1, value);
+  set firstDate($6.Date value) => $_setField(1, value);
   @$pb.TagNumber(1)
   $core.bool hasFirstDate() => $_has(0);
   @$pb.TagNumber(1)
   void clearFirstDate() => $_clearField(1);
   @$pb.TagNumber(1)
-  $5.Date ensureFirstDate() => $_ensure(0);
+  $6.Date ensureFirstDate() => $_ensure(0);
 
   @$pb.TagNumber(2)
-  $5.Date get lastDate => $_getN(1);
+  $6.Date get lastDate => $_getN(1);
   @$pb.TagNumber(2)
-  set lastDate($5.Date value) => $_setField(2, value);
+  set lastDate($6.Date value) => $_setField(2, value);
   @$pb.TagNumber(2)
   $core.bool hasLastDate() => $_has(1);
   @$pb.TagNumber(2)
   void clearLastDate() => $_clearField(2);
   @$pb.TagNumber(2)
-  $5.Date ensureLastDate() => $_ensure(1);
+  $6.Date ensureLastDate() => $_ensure(1);
 }
 
 /// PeriodAmount 是兩個期間的金額，新台幣元。
@@ -3221,7 +3539,7 @@ class BusinessKYC extends $pb.GeneratedMessage {
   factory BusinessKYC({
     $core.String? companyName,
     $core.String? taxId,
-    $5.Date? companyRegisterDate,
+    $6.Date? companyRegisterDate,
     $core.String? companyPhone,
     $core.Iterable<KYCDocument>? companyDocuments,
     $0.PostalAddress? companyAddress,
@@ -3254,8 +3572,8 @@ class BusinessKYC extends $pb.GeneratedMessage {
       createEmptyInstance: BusinessKYC.$_createMessage)
     ..aOS(1, _omitFieldNames ? '' : 'companyName')
     ..aOS(2, _omitFieldNames ? '' : 'taxId')
-    ..aOM<$5.Date>(3, _omitFieldNames ? '' : 'companyRegisterDate',
-        subBuilder: $5.Date.$_createMessage)
+    ..aOM<$6.Date>(3, _omitFieldNames ? '' : 'companyRegisterDate',
+        subBuilder: $6.Date.$_createMessage)
     ..aOS(4, _omitFieldNames ? '' : 'companyPhone')
     ..pPM<KYCDocument>(5, _omitFieldNames ? '' : 'companyDocuments',
         subBuilder: KYCDocument.$_createMessage)
@@ -3305,15 +3623,15 @@ class BusinessKYC extends $pb.GeneratedMessage {
   void clearTaxId() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $5.Date get companyRegisterDate => $_getN(2);
+  $6.Date get companyRegisterDate => $_getN(2);
   @$pb.TagNumber(3)
-  set companyRegisterDate($5.Date value) => $_setField(3, value);
+  set companyRegisterDate($6.Date value) => $_setField(3, value);
   @$pb.TagNumber(3)
   $core.bool hasCompanyRegisterDate() => $_has(2);
   @$pb.TagNumber(3)
   void clearCompanyRegisterDate() => $_clearField(3);
   @$pb.TagNumber(3)
-  $5.Date ensureCompanyRegisterDate() => $_ensure(2);
+  $6.Date ensureCompanyRegisterDate() => $_ensure(2);
 
   @$pb.TagNumber(4)
   $core.String get companyPhone => $_getSZ(3);
@@ -3760,7 +4078,7 @@ class SaveKYCDraftResponse extends $pb.GeneratedMessage {
 /// PaymentAccount 是賣家看到的收款帳戶。
 class PaymentAccount extends $pb.GeneratedMessage {
   factory PaymentAccount({
-    $9.PaymentAccountStatus? status,
+    $5.PaymentAccountStatus? status,
     $core.bool? payoutsActive,
     $2.Timestamp? fetchTime,
   }) {
@@ -3785,8 +4103,8 @@ class PaymentAccount extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
       createEmptyInstance: PaymentAccount.$_createMessage)
-    ..aE<$9.PaymentAccountStatus>(1, _omitFieldNames ? '' : 'status',
-        enumValues: $9.PaymentAccountStatus.values)
+    ..aE<$5.PaymentAccountStatus>(1, _omitFieldNames ? '' : 'status',
+        enumValues: $5.PaymentAccountStatus.values)
     ..aOB(2, _omitFieldNames ? '' : 'payoutsActive')
     ..aOM<$2.Timestamp>(3, _omitFieldNames ? '' : 'fetchTime',
         subBuilder: $2.Timestamp.$_createMessage)
@@ -3815,9 +4133,9 @@ class PaymentAccount extends $pb.GeneratedMessage {
   static PaymentAccount? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $9.PaymentAccountStatus get status => $_getN(0);
+  $5.PaymentAccountStatus get status => $_getN(0);
   @$pb.TagNumber(1)
-  set status($9.PaymentAccountStatus value) => $_setField(1, value);
+  set status($5.PaymentAccountStatus value) => $_setField(1, value);
   @$pb.TagNumber(1)
   $core.bool hasStatus() => $_has(0);
   @$pb.TagNumber(1)
@@ -3963,7 +4281,7 @@ class GetMyPaymentAccountResponse extends $pb.GeneratedMessage {
 class CreatePaymentOnboardingSessionRequest extends $pb.GeneratedMessage {
   factory CreatePaymentOnboardingSessionRequest({
     OnboardingReturnDestination? destination,
-    $core.Iterable<$9.EmbeddedOnboardingRuntime>? embeddedRuntimes,
+    $core.Iterable<$5.EmbeddedOnboardingRuntime>? embeddedRuntimes,
   }) {
     final result = CreatePaymentOnboardingSessionRequest._();
     if (destination != null) result.destination = destination;
@@ -3990,11 +4308,11 @@ class CreatePaymentOnboardingSessionRequest extends $pb.GeneratedMessage {
           CreatePaymentOnboardingSessionRequest.$_createMessage)
     ..aE<OnboardingReturnDestination>(1, _omitFieldNames ? '' : 'destination',
         enumValues: OnboardingReturnDestination.values)
-    ..pc<$9.EmbeddedOnboardingRuntime>(
+    ..pc<$5.EmbeddedOnboardingRuntime>(
         2, _omitFieldNames ? '' : 'embeddedRuntimes', $pb.PbFieldType.KE,
-        valueOf: $9.EmbeddedOnboardingRuntime.valueOf,
-        enumValues: $9.EmbeddedOnboardingRuntime.values,
-        defaultEnumValue: $9
+        valueOf: $5.EmbeddedOnboardingRuntime.valueOf,
+        enumValues: $5.EmbeddedOnboardingRuntime.values,
+        defaultEnumValue: $5
             .EmbeddedOnboardingRuntime.EMBEDDED_ONBOARDING_RUNTIME_UNSPECIFIED)
     ..hasRequiredFields = false;
 
@@ -4040,7 +4358,7 @@ class CreatePaymentOnboardingSessionRequest extends $pb.GeneratedMessage {
 
   /// 呼叫端能承載的內嵌執行環境；空表示不能內嵌（一律拿託管連結）。不認得的值與 UNSPECIFIED 忽略。
   @$pb.TagNumber(2)
-  $pb.PbList<$9.EmbeddedOnboardingRuntime> get embeddedRuntimes => $_getList(1);
+  $pb.PbList<$5.EmbeddedOnboardingRuntime> get embeddedRuntimes => $_getList(1);
 }
 
 enum CreatePaymentOnboardingSessionResponse_Session { hosted, embedded, notSet }
@@ -4734,7 +5052,7 @@ class BusinessRegistration extends $pb.GeneratedMessage {
     $core.String? taxId,
     $core.String? name,
     $core.String? address,
-    $5.Date? setupDate,
+    $6.Date? setupDate,
     $core.String? organizationType,
     $0.PostalAddress? postalAddress,
   }) {
@@ -4765,8 +5083,8 @@ class BusinessRegistration extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'taxId')
     ..aOS(2, _omitFieldNames ? '' : 'name')
     ..aOS(3, _omitFieldNames ? '' : 'address')
-    ..aOM<$5.Date>(4, _omitFieldNames ? '' : 'setupDate',
-        subBuilder: $5.Date.$_createMessage)
+    ..aOM<$6.Date>(4, _omitFieldNames ? '' : 'setupDate',
+        subBuilder: $6.Date.$_createMessage)
     ..aOS(5, _omitFieldNames ? '' : 'organizationType')
     ..aOM<$0.PostalAddress>(6, _omitFieldNames ? '' : 'postalAddress',
         subBuilder: $0.PostalAddress.$_createMessage)
@@ -4825,15 +5143,15 @@ class BusinessRegistration extends $pb.GeneratedMessage {
 
   /// 設立日期；來源缺漏時不設。
   @$pb.TagNumber(4)
-  $5.Date get setupDate => $_getN(3);
+  $6.Date get setupDate => $_getN(3);
   @$pb.TagNumber(4)
-  set setupDate($5.Date value) => $_setField(4, value);
+  set setupDate($6.Date value) => $_setField(4, value);
   @$pb.TagNumber(4)
   $core.bool hasSetupDate() => $_has(3);
   @$pb.TagNumber(4)
   void clearSetupDate() => $_clearField(4);
   @$pb.TagNumber(4)
-  $5.Date ensureSetupDate() => $_ensure(3);
+  $6.Date ensureSetupDate() => $_ensure(3);
 
   /// 組織型態（股份有限公司、有限公司、獨資、合夥……）；判斷不出時是空字串。
   @$pb.TagNumber(5)
@@ -5748,7 +6066,7 @@ class Measure extends $pb.GeneratedMessage {
     RevokeReason? revokeReason,
     $core.bool? canRequestRemediation,
     $2.Timestamp? nextRemediationTime,
-    $6.Duration? rejectionCooldown,
+    $7.Duration? rejectionCooldown,
     $core.Iterable<MeasureRequest>? requests,
     $core.Iterable<RemediationUnavailability>? remediationUnavailabilities,
     TerminationGround? terminationGround,
@@ -5823,8 +6141,8 @@ class Measure extends $pb.GeneratedMessage {
     ..aOB(13, _omitFieldNames ? '' : 'canRequestRemediation')
     ..aOM<$2.Timestamp>(14, _omitFieldNames ? '' : 'nextRemediationTime',
         subBuilder: $2.Timestamp.$_createMessage)
-    ..aOM<$6.Duration>(15, _omitFieldNames ? '' : 'rejectionCooldown',
-        subBuilder: $6.Duration.$_createMessage)
+    ..aOM<$7.Duration>(15, _omitFieldNames ? '' : 'rejectionCooldown',
+        subBuilder: $7.Duration.$_createMessage)
     ..pPM<MeasureRequest>(16, _omitFieldNames ? '' : 'requests',
         subBuilder: MeasureRequest.$_createMessage)
     ..pPM<RemediationUnavailability>(
@@ -6004,15 +6322,15 @@ class Measure extends $pb.GeneratedMessage {
   /// 這筆措施的下一個請求若被駁回，會開始的冷卻期長度；只在 RISK 依據、措施生效中時才可能設，不設表示不會有冷卻。給送出前的警告用（「若本次經駁回，將於這段期間內不得
   /// 再提出」），client 不用自己從駁回次數推導。冷卻規則由伺服器決定（條款第 17.4 條）。
   @$pb.TagNumber(15)
-  $6.Duration get rejectionCooldown => $_getN(14);
+  $7.Duration get rejectionCooldown => $_getN(14);
   @$pb.TagNumber(15)
-  set rejectionCooldown($6.Duration value) => $_setField(15, value);
+  set rejectionCooldown($7.Duration value) => $_setField(15, value);
   @$pb.TagNumber(15)
   $core.bool hasRejectionCooldown() => $_has(14);
   @$pb.TagNumber(15)
   void clearRejectionCooldown() => $_clearField(15);
   @$pb.TagNumber(15)
-  $6.Duration ensureRejectionCooldown() => $_ensure(14);
+  $7.Duration ensureRejectionCooldown() => $_ensure(14);
 
   /// 措施上賣家的請求（申覆與解除請求，看 MeasureRequest.kind），新到舊；沒有請求過時是空的。每一筆的 state 由伺服器推導（見
   /// MeasureRequest）；同時至多一筆 PENDING，所以「目前的請求」是第一筆不是 CLOSED 的。
@@ -6658,7 +6976,7 @@ class Inquiry extends $pb.GeneratedMessage {
     $core.String? message,
     $2.Timestamp? createTime,
     InquiryState? state,
-    $7.Deadline? replyDeadline,
+    $8.Deadline? replyDeadline,
     InquiryReply? reply,
     $2.Timestamp? withdrawTime,
     $core.bool? canReply,
@@ -6701,8 +7019,8 @@ class Inquiry extends $pb.GeneratedMessage {
         subBuilder: $2.Timestamp.$_createMessage)
     ..aE<InquiryState>(5, _omitFieldNames ? '' : 'state',
         enumValues: InquiryState.values)
-    ..aOM<$7.Deadline>(6, _omitFieldNames ? '' : 'replyDeadline',
-        subBuilder: $7.Deadline.$_createMessage)
+    ..aOM<$8.Deadline>(6, _omitFieldNames ? '' : 'replyDeadline',
+        subBuilder: $8.Deadline.$_createMessage)
     ..aOM<InquiryReply>(7, _omitFieldNames ? '' : 'reply',
         subBuilder: InquiryReply.$_createMessage)
     ..aOM<$2.Timestamp>(8, _omitFieldNames ? '' : 'withdrawTime',
@@ -6781,15 +7099,15 @@ class Inquiry extends $pb.GeneratedMessage {
 
   /// 回覆期限，只在 OPEN 時設（義務還在時才輸出）：開始時間是 create_time，期限是建立時存下的。逾期後仍可回覆。
   @$pb.TagNumber(6)
-  $7.Deadline get replyDeadline => $_getN(5);
+  $8.Deadline get replyDeadline => $_getN(5);
   @$pb.TagNumber(6)
-  set replyDeadline($7.Deadline value) => $_setField(6, value);
+  set replyDeadline($8.Deadline value) => $_setField(6, value);
   @$pb.TagNumber(6)
   $core.bool hasReplyDeadline() => $_has(5);
   @$pb.TagNumber(6)
   void clearReplyDeadline() => $_clearField(6);
   @$pb.TagNumber(6)
-  $7.Deadline ensureReplyDeadline() => $_ensure(5);
+  $8.Deadline ensureReplyDeadline() => $_ensure(5);
 
   /// 只在 REPLIED 時設。
   @$pb.TagNumber(7)
@@ -7969,7 +8287,7 @@ class BatchGetStoresRequest extends $pb.GeneratedMessage {
 
 class BatchGetStoresResponse extends $pb.GeneratedMessage {
   factory BatchGetStoresResponse({
-    $core.Iterable<$8.StoreCard>? stores,
+    $core.Iterable<$9.StoreCard>? stores,
   }) {
     final result = BatchGetStoresResponse._();
     if (stores != null) result.stores.addAll(stores);
@@ -7990,8 +8308,8 @@ class BatchGetStoresResponse extends $pb.GeneratedMessage {
       package: const $pb.PackageName(
           _omitMessageNames ? '' : 'hawkr.seller.v1alpha1'),
       createEmptyInstance: BatchGetStoresResponse.$_createMessage)
-    ..pPM<$8.StoreCard>(1, _omitFieldNames ? '' : 'stores',
-        subBuilder: $8.StoreCard.$_createMessage)
+    ..pPM<$9.StoreCard>(1, _omitFieldNames ? '' : 'stores',
+        subBuilder: $9.StoreCard.$_createMessage)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -8019,7 +8337,7 @@ class BatchGetStoresResponse extends $pb.GeneratedMessage {
   static BatchGetStoresResponse? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $pb.PbList<$8.StoreCard> get stores => $_getList(0);
+  $pb.PbList<$9.StoreCard> get stores => $_getList(0);
 }
 
 class GetSellerAgreementsRequest extends $pb.GeneratedMessage {
@@ -8903,6 +9221,23 @@ class SellerAppServiceApi {
           $pb.ClientContext? ctx, GetMyPaymentAccountRequest request) =>
       _client.invoke<GetMyPaymentAccountResponse>(ctx, 'SellerAppService',
           'GetMyPaymentAccount', request, GetMyPaymentAccountResponse());
+
+  /// ListMyEarnings 列出呼叫者店家的入帳帳本，新到舊：平台轉給店家的款項（TRANSFER）、退款時收回的款項（REVERSAL，負數）與補差額（TOP_UP）。
+  /// 一列對應一張訂單的一次轉入、收回或補差額，不含付款、退款本身與撥款到銀行（撥款由金流商處理，不在帳本內）。order_no 篩單一訂單
+  /// （別家店的訂單編號沒有列，回空清單）；from_time（含）與 to_time（不含）篩列的記錄時間，任何一個不設就是不限。from_time 不早於 to_time 回 invalid_argument。
+  /// 需要賣家能力 CAP_ACCOUNT_SELF_READ：停權的店家照樣可以讀。
+  $async.Future<ListMyEarningsResponse> listMyEarnings(
+          $pb.ClientContext? ctx, ListMyEarningsRequest request) =>
+      _client.invoke<ListMyEarningsResponse>(ctx, 'SellerAppService',
+          'ListMyEarnings', request, ListMyEarningsResponse());
+
+  /// GetMyOrderEarnings 回傳呼叫者店家一張訂單的入帳列（新到舊，一張訂單的列數很少，不分頁）與已完成列的淨額，給訂單詳情頁。
+  /// 訂單不是呼叫者店家的、或沒有付款，一律回 not_found（不洩漏存在與否）；訂單有付款但還沒有任何列時回空清單與淨額 0。
+  /// 需要賣家能力 CAP_ACCOUNT_SELF_READ：停權的店家照樣可以讀。
+  $async.Future<GetMyOrderEarningsResponse> getMyOrderEarnings(
+          $pb.ClientContext? ctx, GetMyOrderEarningsRequest request) =>
+      _client.invoke<GetMyOrderEarningsResponse>(ctx, 'SellerAppService',
+          'GetMyOrderEarnings', request, GetMyOrderEarningsResponse());
 
   /// CreatePaymentOnboardingSession 為呼叫者店家的收款帳戶產生開通 session。回應是兩種互斥的 session 之一：託管連結（hosted，金流商的一次性、
   /// 短效連結，賣家開瀏覽器完成後回到 destination 與請求語系（Accept-Language）決定的頁面；連結過期時回到同一目的地的重新取得入口），或內嵌元件

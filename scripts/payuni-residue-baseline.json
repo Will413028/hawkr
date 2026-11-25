@@ -1,7 +1,7 @@
 {
-  "backend/internal/legacy/gen/order/order.pb.go": 18,
-  "backend/internal/legacy/gen/payment/payment.pb.go": 70,
-  "backend/internal/legacy/gen/payment/paymentconnect/payment.connect.go": 29,
+  "backend/internal/legacy/gen/order/order.pb.go": 16,
+  "backend/internal/legacy/gen/payment/payment.pb.go": 13,
+  "backend/internal/legacy/gen/payment/paymentconnect/payment.connect.go": 4,
   "backend/internal/legacy/gen/seller/seller.pb.go": 7,
   "backend/internal/legacy/paymentrelay/relay.go": 4,
   "backend/internal/legacy/paymentrelay/relay_test.go": 2,
@@ -31,5 +31,5 @@
   "backend/internal/modules/seller/db/migrations/atlas.sum": 3,
   "backend/internal/modules/seller/internal/model/agreement_test.go": 1,
   "backend/internal/modules/seller/migration_integration_test.go": 5,
-  "backend/internal/platform/codemeta/code_meta.go": 71
+  "backend/internal/platform/codemeta/code_meta.go": 70
 }

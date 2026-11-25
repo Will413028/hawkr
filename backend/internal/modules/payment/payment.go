@@ -720,6 +720,43 @@ func (m *Module) ListPaymentRefunds(ctx context.Context, f RefundFilter, after *
 	return m.charges.ListRefunds(ctx, f, after, size)
 }
 
+// 賣家入帳帳本（D15）：轉帳、收回與補差額的列，只讀本地的紀錄。
+type (
+	EarningsEntry  = model.EarningsEntry
+	EarningsType   = model.EarningsType
+	EarningsStatus = model.EarningsStatus
+	EarningsFilter = model.EarningsFilter
+	EarningsPage   = model.EarningsPage
+	OrderEarnings  = model.OrderEarnings
+)
+
+// 入帳帳本的種類與狀態。
+const (
+	EarningsTransfer  = model.EarningsTransfer
+	EarningsReversal  = model.EarningsReversal
+	EarningsTopUp     = model.EarningsTopUp
+	EarningsPending   = model.EarningsPending
+	EarningsCompleted = model.EarningsCompleted
+	EarningsFailed    = model.EarningsFailed
+)
+
+// EarningsTypeValues 回傳全部入帳帳本的種類。
+func EarningsTypeValues() []EarningsType { return model.EarningsTypeValues() }
+
+// EarningsStatusValues 回傳全部入帳帳本的狀態。
+func EarningsStatusValues() []EarningsStatus { return model.EarningsStatusValues() }
+
+// ListEarnings 列 storeID 這家店的入帳帳本（新的在前、keyset）：呼叫者必須先由賣家能力檢查取得店家，這裡只回這家店訂單應收的列。
+// OrderNo 長度不合與 From 不早於 To 回 InvalidInput；別家店的訂單編號沒有列，回空頁。
+func (m *Module) ListEarnings(ctx context.Context, storeID int64, f EarningsFilter, after *RecordCursor, size int32) (EarningsPage, error) {
+	return m.charges.ListEarnings(ctx, storeID, f, after, size)
+}
+
+// OrderEarnings 回傳 storeID 這家店一張訂單的全部入帳列與已完成列的淨額；訂單不是這家店的或沒有付款回 NotFound（兩者不分）。
+func (m *Module) OrderEarnings(ctx context.Context, storeID int64, orderNo string) (OrderEarnings, error) {
+	return m.charges.OrderEarnings(ctx, storeID, orderNo)
+}
+
 // PaymentStatusValues 回傳全部付款狀態（與 payments_status_check 相同）。
 func PaymentStatusValues() []PaymentStatus { return model.PaymentStatusValues() }
 

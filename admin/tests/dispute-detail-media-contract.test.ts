@@ -74,8 +74,6 @@ const APPEAL_CASE = {
 		odno: "",
 		refundTaskStatus: "",
 		refundFailureMessage: "",
-		estimatedRefundDate: "",
-		bankDate: "",
 		autoEscalated: false,
 		processDeadlineHours: 72,
 		resolutions: [
@@ -125,7 +123,6 @@ const APPEAL_CASE = {
 				imageUrl: "",
 			},
 		],
-		needRefundPage: false,
 		canAppeal: false,
 	},
 } as unknown as DisputeDetail;
@@ -171,8 +168,6 @@ const INSPECTION_CASE = {
 		odno: "",
 		refundTaskStatus: "30",
 		refundFailureMessage: "",
-		estimatedRefundDate: "",
-		bankDate: "",
 		processDeadline: "2026-08-06T03:01:45.563309Z",
 		autoEscalated: false,
 		processDeadlineHours: 72,
@@ -247,7 +242,6 @@ const INSPECTION_CASE = {
 				imageUrl: "",
 			},
 		],
-		needRefundPage: false,
 		canAppeal: false,
 	},
 } as unknown as DisputeDetail;

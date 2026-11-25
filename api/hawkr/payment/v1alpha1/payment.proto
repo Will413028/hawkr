@@ -215,3 +215,38 @@ enum PaymentAnomalyResolutionReason {
   // 其他原因，細節寫在備註（搭配任一結果）。
   PAYMENT_ANOMALY_RESOLUTION_REASON_OTHER = 4;
 }
+
+// EarningsEntryType 是賣家入帳帳本（hawkr.seller.v1alpha1.SellerAppService.ListMyEarnings）一列的種類；金額的正負由種類決定，與金流商無關。
+enum EarningsEntryType {
+  EARNINGS_ENTRY_TYPE_UNSPECIFIED = 0;
+  // 平台把一張訂單的款項轉給賣家（金額為正）。
+  EARNINGS_ENTRY_TYPE_TRANSFER = 1;
+  // 退款時向賣家收回已轉出的款項（金額為負）。
+  EARNINGS_ENTRY_TYPE_REVERSAL = 2;
+  // 補差額：已從轉帳金額扣掉的退款之後失敗，把少收的款項補給賣家（金額為正）。
+  EARNINGS_ENTRY_TYPE_TOP_UP = 3;
+}
+
+// EarningsEntryStatus 是賣家入帳帳本一列的狀態。只有 COMPLETED 的列計入賣家實際入帳的金額。
+enum EarningsEntryStatus {
+  EARNINGS_ENTRY_STATUS_UNSPECIFIED = 0;
+  // 處理中：已記錄，還沒有結果（含待營運人工處理的列，賣家沒有要做的事）。
+  EARNINGS_ENTRY_STATUS_PENDING = 1;
+  // 已完成。
+  EARNINGS_ENTRY_STATUS_COMPLETED = 2;
+  // 失敗（終局）：款項沒有轉出。
+  EARNINGS_ENTRY_STATUS_FAILED = 3;
+}
+
+// EarningsEntry 是賣家入帳帳本的一列：一張訂單的一次轉入、收回或補差額。不帶金流商的物件 ID 與失敗原因。
+message EarningsEntry {
+  // 列的識別（轉帳、收回或補差額各自的紀錄 ID），不是訂單編號；補差額的 ID 是所屬退款的 ID。
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  EarningsEntryType type = 2;
+  string order_no = 3;
+  // 新台幣元，帶正負：TRANSFER 與 TOP_UP 為正，REVERSAL 為負。
+  int64 amount = 4;
+  EarningsEntryStatus status = 5;
+  // 這一列記錄的時間（補差額是所屬退款的記錄時間）。
+  google.protobuf.Timestamp create_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+}

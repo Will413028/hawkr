@@ -4,7 +4,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * PayUni Webhook 簽章驗證結果。獨立於 WebhookProcessStatus.VERIFY_FAILED（後者是處理整體結果，本枚舉只表達簽章驗證階段的二元結果）。
+ * PayUni Webhook 簽章驗證結果。本枚舉只表達簽章驗證階段的二元結果。
  *
  * ⚠ 此檔案由 generate.sh 自動生成，請勿手動修改。
  * 業務輔助邏輯請在使用該 enum 的服務或模組內建立 helper class

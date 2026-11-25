@@ -699,6 +699,118 @@ func (PaymentAnomalyResolutionReason) EnumDescriptor() ([]byte, []int) {
 	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{10}
 }
 
+// EarningsEntryType 是賣家入帳帳本（hawkr.seller.v1alpha1.SellerAppService.ListMyEarnings）一列的種類；金額的正負由種類決定，與金流商無關。
+type EarningsEntryType int32
+
+const (
+	EarningsEntryType_EARNINGS_ENTRY_TYPE_UNSPECIFIED EarningsEntryType = 0
+	// 平台把一張訂單的款項轉給賣家（金額為正）。
+	EarningsEntryType_EARNINGS_ENTRY_TYPE_TRANSFER EarningsEntryType = 1
+	// 退款時向賣家收回已轉出的款項（金額為負）。
+	EarningsEntryType_EARNINGS_ENTRY_TYPE_REVERSAL EarningsEntryType = 2
+	// 補差額：已從轉帳金額扣掉的退款之後失敗，把少收的款項補給賣家（金額為正）。
+	EarningsEntryType_EARNINGS_ENTRY_TYPE_TOP_UP EarningsEntryType = 3
+)
+
+// Enum value maps for EarningsEntryType.
+var (
+	EarningsEntryType_name = map[int32]string{
+		0: "EARNINGS_ENTRY_TYPE_UNSPECIFIED",
+		1: "EARNINGS_ENTRY_TYPE_TRANSFER",
+		2: "EARNINGS_ENTRY_TYPE_REVERSAL",
+		3: "EARNINGS_ENTRY_TYPE_TOP_UP",
+	}
+	EarningsEntryType_value = map[string]int32{
+		"EARNINGS_ENTRY_TYPE_UNSPECIFIED": 0,
+		"EARNINGS_ENTRY_TYPE_TRANSFER":    1,
+		"EARNINGS_ENTRY_TYPE_REVERSAL":    2,
+		"EARNINGS_ENTRY_TYPE_TOP_UP":      3,
+	}
+)
+
+func (x EarningsEntryType) Enum() *EarningsEntryType {
+	p := new(EarningsEntryType)
+	*p = x
+	return p
+}
+
+func (x EarningsEntryType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (EarningsEntryType) Descriptor() protoreflect.EnumDescriptor {
+	return file_hawkr_payment_v1alpha1_payment_proto_enumTypes[11].Descriptor()
+}
+
+func (EarningsEntryType) Type() protoreflect.EnumType {
+	return &file_hawkr_payment_v1alpha1_payment_proto_enumTypes[11]
+}
+
+func (x EarningsEntryType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use EarningsEntryType.Descriptor instead.
+func (EarningsEntryType) EnumDescriptor() ([]byte, []int) {
+	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{11}
+}
+
+// EarningsEntryStatus 是賣家入帳帳本一列的狀態。只有 COMPLETED 的列計入賣家實際入帳的金額。
+type EarningsEntryStatus int32
+
+const (
+	EarningsEntryStatus_EARNINGS_ENTRY_STATUS_UNSPECIFIED EarningsEntryStatus = 0
+	// 處理中：已記錄，還沒有結果（含待營運人工處理的列，賣家沒有要做的事）。
+	EarningsEntryStatus_EARNINGS_ENTRY_STATUS_PENDING EarningsEntryStatus = 1
+	// 已完成。
+	EarningsEntryStatus_EARNINGS_ENTRY_STATUS_COMPLETED EarningsEntryStatus = 2
+	// 失敗（終局）：款項沒有轉出。
+	EarningsEntryStatus_EARNINGS_ENTRY_STATUS_FAILED EarningsEntryStatus = 3
+)
+
+// Enum value maps for EarningsEntryStatus.
+var (
+	EarningsEntryStatus_name = map[int32]string{
+		0: "EARNINGS_ENTRY_STATUS_UNSPECIFIED",
+		1: "EARNINGS_ENTRY_STATUS_PENDING",
+		2: "EARNINGS_ENTRY_STATUS_COMPLETED",
+		3: "EARNINGS_ENTRY_STATUS_FAILED",
+	}
+	EarningsEntryStatus_value = map[string]int32{
+		"EARNINGS_ENTRY_STATUS_UNSPECIFIED": 0,
+		"EARNINGS_ENTRY_STATUS_PENDING":     1,
+		"EARNINGS_ENTRY_STATUS_COMPLETED":   2,
+		"EARNINGS_ENTRY_STATUS_FAILED":      3,
+	}
+)
+
+func (x EarningsEntryStatus) Enum() *EarningsEntryStatus {
+	p := new(EarningsEntryStatus)
+	*p = x
+	return p
+}
+
+func (x EarningsEntryStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (EarningsEntryStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_hawkr_payment_v1alpha1_payment_proto_enumTypes[12].Descriptor()
+}
+
+func (EarningsEntryStatus) Type() protoreflect.EnumType {
+	return &file_hawkr_payment_v1alpha1_payment_proto_enumTypes[12]
+}
+
+func (x EarningsEntryStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use EarningsEntryStatus.Descriptor instead.
+func (EarningsEntryStatus) EnumDescriptor() ([]byte, []int) {
+	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{12}
+}
+
 // Payment 是買家對一張訂單的付款（order_no 是請求的那張訂單）。
 type Payment struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
@@ -1078,6 +1190,94 @@ func (x *GetPaymentResponse) GetPayment() *Payment {
 	return nil
 }
 
+// EarningsEntry 是賣家入帳帳本的一列：一張訂單的一次轉入、收回或補差額。不帶金流商的物件 ID 與失敗原因。
+type EarningsEntry struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 列的識別（轉帳、收回或補差額各自的紀錄 ID），不是訂單編號；補差額的 ID 是所屬退款的 ID。
+	Id      string            `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Type    EarningsEntryType `protobuf:"varint,2,opt,name=type,proto3,enum=hawkr.payment.v1alpha1.EarningsEntryType" json:"type,omitempty"`
+	OrderNo string            `protobuf:"bytes,3,opt,name=order_no,json=orderNo,proto3" json:"order_no,omitempty"`
+	// 新台幣元，帶正負：TRANSFER 與 TOP_UP 為正，REVERSAL 為負。
+	Amount int64               `protobuf:"varint,4,opt,name=amount,proto3" json:"amount,omitempty"`
+	Status EarningsEntryStatus `protobuf:"varint,5,opt,name=status,proto3,enum=hawkr.payment.v1alpha1.EarningsEntryStatus" json:"status,omitempty"`
+	// 這一列記錄的時間（補差額是所屬退款的記錄時間）。
+	CreateTime    *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EarningsEntry) Reset() {
+	*x = EarningsEntry{}
+	mi := &file_hawkr_payment_v1alpha1_payment_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EarningsEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EarningsEntry) ProtoMessage() {}
+
+func (x *EarningsEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_hawkr_payment_v1alpha1_payment_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EarningsEntry.ProtoReflect.Descriptor instead.
+func (*EarningsEntry) Descriptor() ([]byte, []int) {
+	return file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *EarningsEntry) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *EarningsEntry) GetType() EarningsEntryType {
+	if x != nil {
+		return x.Type
+	}
+	return EarningsEntryType_EARNINGS_ENTRY_TYPE_UNSPECIFIED
+}
+
+func (x *EarningsEntry) GetOrderNo() string {
+	if x != nil {
+		return x.OrderNo
+	}
+	return ""
+}
+
+func (x *EarningsEntry) GetAmount() int64 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
+func (x *EarningsEntry) GetStatus() EarningsEntryStatus {
+	if x != nil {
+		return x.Status
+	}
+	return EarningsEntryStatus_EARNINGS_ENTRY_STATUS_UNSPECIFIED
+}
+
+func (x *EarningsEntry) GetCreateTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreateTime
+	}
+	return nil
+}
+
 var File_hawkr_payment_v1alpha1_payment_proto protoreflect.FileDescriptor
 
 const file_hawkr_payment_v1alpha1_payment_proto_rawDesc = "" +
@@ -1103,7 +1303,15 @@ const file_hawkr_payment_v1alpha1_payment_proto_rawDesc = "" +
 	"\x11GetPaymentRequest\x12\x1e\n" +
 	"\border_no\x18\x01 \x01(\tB\x03\xe0A\x02R\aorderNo\"O\n" +
 	"\x12GetPaymentResponse\x129\n" +
-	"\apayment\x18\x01 \x01(\v2\x1f.hawkr.payment.v1alpha1.PaymentR\apayment*\x89\x02\n" +
+	"\apayment\x18\x01 \x01(\v2\x1f.hawkr.payment.v1alpha1.PaymentR\apayment\"\x9d\x02\n" +
+	"\rEarningsEntry\x12\x13\n" +
+	"\x02id\x18\x01 \x01(\tB\x03\xe0A\bR\x02id\x12=\n" +
+	"\x04type\x18\x02 \x01(\x0e2).hawkr.payment.v1alpha1.EarningsEntryTypeR\x04type\x12\x19\n" +
+	"\border_no\x18\x03 \x01(\tR\aorderNo\x12\x16\n" +
+	"\x06amount\x18\x04 \x01(\x03R\x06amount\x12C\n" +
+	"\x06status\x18\x05 \x01(\x0e2+.hawkr.payment.v1alpha1.EarningsEntryStatusR\x06status\x12@\n" +
+	"\vcreate_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
+	"createTime*\x89\x02\n" +
 	"\rPaymentStatus\x12\x1e\n" +
 	"\x1aPAYMENT_STATUS_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17PAYMENT_STATUS_CREATING\x10\x01\x12#\n" +
@@ -1172,7 +1380,17 @@ const file_hawkr_payment_v1alpha1_payment_proto_rawDesc = "" +
 	"@PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_EXECUTED_NOT_RECORDED\x10\x01\x12;\n" +
 	"7PAYMENT_ANOMALY_RESOLUTION_REASON_PROVIDER_NOT_EXECUTED\x10\x02\x12/\n" +
 	"+PAYMENT_ANOMALY_RESOLUTION_REASON_DUPLICATE\x10\x03\x12+\n" +
-	"'PAYMENT_ANOMALY_RESOLUTION_REASON_OTHER\x10\x042\xeb\x01\n" +
+	"'PAYMENT_ANOMALY_RESOLUTION_REASON_OTHER\x10\x04*\x9c\x01\n" +
+	"\x11EarningsEntryType\x12#\n" +
+	"\x1fEARNINGS_ENTRY_TYPE_UNSPECIFIED\x10\x00\x12 \n" +
+	"\x1cEARNINGS_ENTRY_TYPE_TRANSFER\x10\x01\x12 \n" +
+	"\x1cEARNINGS_ENTRY_TYPE_REVERSAL\x10\x02\x12\x1e\n" +
+	"\x1aEARNINGS_ENTRY_TYPE_TOP_UP\x10\x03*\xa6\x01\n" +
+	"\x13EarningsEntryStatus\x12%\n" +
+	"!EARNINGS_ENTRY_STATUS_UNSPECIFIED\x10\x00\x12!\n" +
+	"\x1dEARNINGS_ENTRY_STATUS_PENDING\x10\x01\x12#\n" +
+	"\x1fEARNINGS_ENTRY_STATUS_COMPLETED\x10\x02\x12 \n" +
+	"\x1cEARNINGS_ENTRY_STATUS_FAILED\x10\x032\xeb\x01\n" +
 	"\x11PaymentAppService\x12q\n" +
 	"\rCreatePayment\x12,.hawkr.payment.v1alpha1.CreatePaymentRequest\x1a-.hawkr.payment.v1alpha1.CreatePaymentResponse\"\x03\x90\x02\x02\x12c\n" +
 	"\n" +
@@ -1191,8 +1409,8 @@ func file_hawkr_payment_v1alpha1_payment_proto_rawDescGZIP() []byte {
 	return file_hawkr_payment_v1alpha1_payment_proto_rawDescData
 }
 
-var file_hawkr_payment_v1alpha1_payment_proto_enumTypes = make([]protoimpl.EnumInfo, 11)
-var file_hawkr_payment_v1alpha1_payment_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_hawkr_payment_v1alpha1_payment_proto_enumTypes = make([]protoimpl.EnumInfo, 13)
+var file_hawkr_payment_v1alpha1_payment_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_hawkr_payment_v1alpha1_payment_proto_goTypes = []any{
 	(PaymentStatus)(0),                  // 0: hawkr.payment.v1alpha1.PaymentStatus
 	(PaymentAccountStatus)(0),           // 1: hawkr.payment.v1alpha1.PaymentAccountStatus
@@ -1205,31 +1423,37 @@ var file_hawkr_payment_v1alpha1_payment_proto_goTypes = []any{
 	(PaymentAnomalyKind)(0),             // 8: hawkr.payment.v1alpha1.PaymentAnomalyKind
 	(PaymentAnomalyOutcome)(0),          // 9: hawkr.payment.v1alpha1.PaymentAnomalyOutcome
 	(PaymentAnomalyResolutionReason)(0), // 10: hawkr.payment.v1alpha1.PaymentAnomalyResolutionReason
-	(*Payment)(nil),                     // 11: hawkr.payment.v1alpha1.Payment
-	(*PaymentSession)(nil),              // 12: hawkr.payment.v1alpha1.PaymentSession
-	(*StripePaymentSession)(nil),        // 13: hawkr.payment.v1alpha1.StripePaymentSession
-	(*CreatePaymentRequest)(nil),        // 14: hawkr.payment.v1alpha1.CreatePaymentRequest
-	(*CreatePaymentResponse)(nil),       // 15: hawkr.payment.v1alpha1.CreatePaymentResponse
-	(*GetPaymentRequest)(nil),           // 16: hawkr.payment.v1alpha1.GetPaymentRequest
-	(*GetPaymentResponse)(nil),          // 17: hawkr.payment.v1alpha1.GetPaymentResponse
-	(*timestamppb.Timestamp)(nil),       // 18: google.protobuf.Timestamp
+	(EarningsEntryType)(0),              // 11: hawkr.payment.v1alpha1.EarningsEntryType
+	(EarningsEntryStatus)(0),            // 12: hawkr.payment.v1alpha1.EarningsEntryStatus
+	(*Payment)(nil),                     // 13: hawkr.payment.v1alpha1.Payment
+	(*PaymentSession)(nil),              // 14: hawkr.payment.v1alpha1.PaymentSession
+	(*StripePaymentSession)(nil),        // 15: hawkr.payment.v1alpha1.StripePaymentSession
+	(*CreatePaymentRequest)(nil),        // 16: hawkr.payment.v1alpha1.CreatePaymentRequest
+	(*CreatePaymentResponse)(nil),       // 17: hawkr.payment.v1alpha1.CreatePaymentResponse
+	(*GetPaymentRequest)(nil),           // 18: hawkr.payment.v1alpha1.GetPaymentRequest
+	(*GetPaymentResponse)(nil),          // 19: hawkr.payment.v1alpha1.GetPaymentResponse
+	(*EarningsEntry)(nil),               // 20: hawkr.payment.v1alpha1.EarningsEntry
+	(*timestamppb.Timestamp)(nil),       // 21: google.protobuf.Timestamp
 }
 var file_hawkr_payment_v1alpha1_payment_proto_depIdxs = []int32{
 	0,  // 0: hawkr.payment.v1alpha1.Payment.status:type_name -> hawkr.payment.v1alpha1.PaymentStatus
-	18, // 1: hawkr.payment.v1alpha1.Payment.paid_time:type_name -> google.protobuf.Timestamp
-	12, // 2: hawkr.payment.v1alpha1.Payment.session:type_name -> hawkr.payment.v1alpha1.PaymentSession
-	13, // 3: hawkr.payment.v1alpha1.PaymentSession.stripe:type_name -> hawkr.payment.v1alpha1.StripePaymentSession
-	11, // 4: hawkr.payment.v1alpha1.CreatePaymentResponse.payment:type_name -> hawkr.payment.v1alpha1.Payment
-	11, // 5: hawkr.payment.v1alpha1.GetPaymentResponse.payment:type_name -> hawkr.payment.v1alpha1.Payment
-	14, // 6: hawkr.payment.v1alpha1.PaymentAppService.CreatePayment:input_type -> hawkr.payment.v1alpha1.CreatePaymentRequest
-	16, // 7: hawkr.payment.v1alpha1.PaymentAppService.GetPayment:input_type -> hawkr.payment.v1alpha1.GetPaymentRequest
-	15, // 8: hawkr.payment.v1alpha1.PaymentAppService.CreatePayment:output_type -> hawkr.payment.v1alpha1.CreatePaymentResponse
-	17, // 9: hawkr.payment.v1alpha1.PaymentAppService.GetPayment:output_type -> hawkr.payment.v1alpha1.GetPaymentResponse
-	8,  // [8:10] is the sub-list for method output_type
-	6,  // [6:8] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	21, // 1: hawkr.payment.v1alpha1.Payment.paid_time:type_name -> google.protobuf.Timestamp
+	14, // 2: hawkr.payment.v1alpha1.Payment.session:type_name -> hawkr.payment.v1alpha1.PaymentSession
+	15, // 3: hawkr.payment.v1alpha1.PaymentSession.stripe:type_name -> hawkr.payment.v1alpha1.StripePaymentSession
+	13, // 4: hawkr.payment.v1alpha1.CreatePaymentResponse.payment:type_name -> hawkr.payment.v1alpha1.Payment
+	13, // 5: hawkr.payment.v1alpha1.GetPaymentResponse.payment:type_name -> hawkr.payment.v1alpha1.Payment
+	11, // 6: hawkr.payment.v1alpha1.EarningsEntry.type:type_name -> hawkr.payment.v1alpha1.EarningsEntryType
+	12, // 7: hawkr.payment.v1alpha1.EarningsEntry.status:type_name -> hawkr.payment.v1alpha1.EarningsEntryStatus
+	21, // 8: hawkr.payment.v1alpha1.EarningsEntry.create_time:type_name -> google.protobuf.Timestamp
+	16, // 9: hawkr.payment.v1alpha1.PaymentAppService.CreatePayment:input_type -> hawkr.payment.v1alpha1.CreatePaymentRequest
+	18, // 10: hawkr.payment.v1alpha1.PaymentAppService.GetPayment:input_type -> hawkr.payment.v1alpha1.GetPaymentRequest
+	17, // 11: hawkr.payment.v1alpha1.PaymentAppService.CreatePayment:output_type -> hawkr.payment.v1alpha1.CreatePaymentResponse
+	19, // 12: hawkr.payment.v1alpha1.PaymentAppService.GetPayment:output_type -> hawkr.payment.v1alpha1.GetPaymentResponse
+	11, // [11:13] is the sub-list for method output_type
+	9,  // [9:11] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_hawkr_payment_v1alpha1_payment_proto_init() }
@@ -1245,8 +1469,8 @@ func file_hawkr_payment_v1alpha1_payment_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_hawkr_payment_v1alpha1_payment_proto_rawDesc), len(file_hawkr_payment_v1alpha1_payment_proto_rawDesc)),
-			NumEnums:      11,
-			NumMessages:   7,
+			NumEnums:      13,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

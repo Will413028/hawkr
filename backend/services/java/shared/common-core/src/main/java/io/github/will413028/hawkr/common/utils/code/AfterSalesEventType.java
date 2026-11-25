@@ -12,8 +12,7 @@ import java.util.stream.Collectors;
  */
 public enum AfterSalesEventType implements CodeMeta {
 
-    AWAITING_BUYER_PAGE("AWAITING_BUYER_PAGE", "aftersales.refund.awaiting_buyer_page", "等待買家退款頁面", "ATM 退款等待買家前往 PayUni 頁面填寫銀行資訊"),
-    REFUND_COMPLETED("REFUND_COMPLETED", "aftersales.refund.completed", "退款完成", "售後退款任務完成（CC 或 ATM webhook 成功）"),
+    REFUND_COMPLETED("REFUND_COMPLETED", "aftersales.refund.completed", "退款完成", "售後退款任務完成"),
     CANCEL_COMPLETED("CANCEL_COMPLETED", "aftersales.cancel.completed", "取消出貨完成", "賣家取消出貨流程完成"),
     APPEAL_SUBMITTED("APPEAL_SUBMITTED", "aftersales.appeal.submitted", "申訴提交", "買家提交平台申訴"),
     PLATFORM_DECISION_MADE("PLATFORM_DECISION_MADE", "aftersales.platform_decision.made", "平台仲裁決策", "平台仲裁決策做出"),

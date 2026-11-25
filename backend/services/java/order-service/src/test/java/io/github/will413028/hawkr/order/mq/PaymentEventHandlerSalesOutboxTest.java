@@ -9,7 +9,6 @@ import io.github.will413028.hawkr.common.utils.code.PaymentMethod;
 import io.github.will413028.hawkr.order.entity.OrderEntity;
 import io.github.will413028.hawkr.order.entity.OrderItemEntity;
 import io.github.will413028.hawkr.order.entity.OrderOutboxEntity;
-import io.github.will413028.hawkr.order.grpc.client.PaymentGrpcClient;
 import io.github.will413028.hawkr.order.mq.dto.OrderSalesAccumulatedPayload;
 import io.github.will413028.hawkr.order.repository.AutoRefundTaskRepository;
 import io.github.will413028.hawkr.order.repository.CouponConsumptionTaskRepository;
@@ -82,7 +81,6 @@ class PaymentEventHandlerSalesOutboxTest {
                 mock(AutoRefundTaskRepository.class),
                 mock(CouponConsumptionTaskRepository.class),
                 mock(OrderEventPublisher.class),
-                mock(PaymentGrpcClient.class),
                 outboxMapper,
                 mock(io.github.will413028.hawkr.order.repository.OrderInvoiceSnapshotRepository.class),
                 mock(OrderService.class),
@@ -115,6 +113,32 @@ class PaymentEventHandlerSalesOutboxTest {
         it.setProductId(productId);
         it.setQuantity(qty);
         return it;
+    }
+
+    @Test
+    @DisplayName("零元訂單由訂單方直接完成：不經 payment，以 ZERO_AMOUNT 轉為已付款並落 order.paid")
+    void zeroAmountOrderIsCompletedByOrderWithoutPayment() {
+        when(dedupRepository.insertIdempotent(eq("ZERO-O1"), eq("O1"), anyString(), anyString())).thenReturn(1);
+        OrderEntity order = new OrderEntity();
+        order.setOrderNo("O1");
+        order.setStatus(OrderStatus.PENDING_PAYMENT.value());
+        order.setBuyerId(3001L);
+        order.setStoreId(7001L);
+        order.setTotalActualAmount(0L);
+        order.setShippingMethod("3001");
+        when(orderRepository.findByOrderNoForUpdate("O1")).thenReturn(order);
+        when(orderRepository.updatePaymentConfirmed(
+                eq("O1"), anyString(), anyString(), anyString(), any(), anyString())).thenReturn(1);
+
+        handler.completeZeroAmountOrder("O1");
+
+        verify(orderRepository).updatePaymentConfirmed(
+                eq("O1"), eq(OrderStatus.PENDING_PAYMENT.value()), eq(OrderStatus.PAID.value()),
+                eq("ZERO-O1"), any(), eq(PaymentMethod.ZERO_AMOUNT.value()));
+        ArgumentCaptor<OrderOutboxEntity> captor = ArgumentCaptor.forClass(OrderOutboxEntity.class);
+        verify(outboxMapper, org.mockito.Mockito.atLeastOnce()).insert(captor.capture());
+        assertThat(captor.getAllValues()).extracting(OrderOutboxEntity::getEventType)
+                .contains(OrderEventType.ORDER_PAID.value());
     }
 
     @Test

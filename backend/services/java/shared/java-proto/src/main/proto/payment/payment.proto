@@ -55,9 +55,6 @@ service PaymentService {
   // 發動撥款指示（代理商模式：買家確認收貨後，由 Order Service 呼叫）
   rpc GrantPayment(GrantPaymentRequest) returns (GrantPaymentResponse);
 
-  // ATM 退款頁面版 URL 組裝（AfterSales Service 呼叫）
-  rpc GetRefundPageUrl(GetRefundPageUrlRequest) returns (GetRefundPageUrlResponse);
-
   // 批次查詢付款 provider 狀態（Order 聚合用，收斂規範 §6.3）
   rpc BatchGetProviderStatusByOrderIds(BatchGetProviderStatusByOrderIdsRequest) returns (BatchGetProviderStatusByOrderIdsResponse);
 
@@ -71,17 +68,10 @@ service PaymentService {
   // 解密 + 驗簽 + 更新交易狀態 + 組裝 Deep Link
   rpc HandlePaymentPageReturn(HandlePaymentPageReturnRequest) returns (HandlePaymentPageReturnResponse);
 
-  // PayUni 加密資料通用解密（供其他微服務呼叫，如 AfterSales ATM 退款回調）
-  rpc DecryptPayUniResult(DecryptPayUniResultRequest) returns (DecryptPayUniResultResponse);
-
   // Apple Pay on Web Merchant Validation：對 Apple validationURL 取 merchantSession
   // 使用 Apple Pay Merchant Identity Certificate (PEM + Key) 進行 mTLS POST，原樣透傳 Apple 回應
   // 詳見 05 號設計書 §5.11
   rpc ValidateApplePayMerchant(ValidateApplePayMerchantRequest) returns (ValidateApplePayMerchantResponse);
-
-  // ATM 退款頁面版受理成功確認（收斂規範 §4.4 雙階段 sync 階段 → PROCESSING + estimated_refund_date）
-  // AfterSales 解密 PayUni 回頁面 payload 後呼叫
-  rpc AckAtmRefundAccepted(AckAtmRefundAcceptedRequest) returns (AckAtmRefundAcceptedResponse);
 
   // ==================== Admin 異常查詢 API（§29 Admin 異常訂單管理）====================
 
@@ -146,9 +136,9 @@ message PaymentResult {
   UppFormData upp_form_data = 6;
 
   // ATM 專用
-  string atm_bank_code = 7;
-  string atm_virtual_account = 8;
-  string atm_expire_date = 9;
+  reserved 7;
+  reserved 8;
+  reserved 9;
 
   // 保留欄位編號 10, 11（已移除 CVS 相關欄位）
   reserved 10, 11;
@@ -194,9 +184,9 @@ message PaymentDetail {
   string provider_trade_no = 9;
   string provider_status = 10;
   string provider_message = 11;
-  string atm_bank_code = 12;
-  string atm_virtual_account = 13;
-  string atm_expire_date = 14;
+  reserved 12;
+  reserved 13;
+  reserved 14;
   string pay_time = 15;       // Unix timestamp 毫秒（數字字串）
   string closed_at = 16;      // Unix timestamp 毫秒（數字字串）
   string expire_at = 17;      // Unix timestamp 毫秒（數字字串）
@@ -360,8 +350,8 @@ message RefundDetail {
   string provider_message = 9;
   string completed_at = 10;   // Unix timestamp 毫秒（數字字串）
   string created_at = 11;     // Unix timestamp 毫秒（數字字串）
-  string estimated_refund_date = 12; // ATM sync success：PayUni EstimatedRefundDate（YYYY-MM-DD，空字串代表無值）
-  string bank_date = 13;      // ATM async RefundStatus=1：webhook BankDate（YYYY-MM-DD，空字串代表無值）
+  reserved 12;
+  reserved 13;
 }
 
 // ==================== 批次 provider 狀態聚合（收斂規範 §6.3）====================
@@ -437,24 +427,6 @@ message GrantPaymentResult {
   string granted_at = 5;        // 撥款指示時間（ISO 8601）
 }
 
-// ==================== ATM 退款頁面版 ====================
-
-message GetRefundPageUrlRequest {
-  string trade_no = 1;          // Payment trade_no
-  string amount = 2;            // 退款金額
-  string return_url = 3;        // PayUni 完成後導回 URL
-}
-
-message GetRefundPageUrlResponse {
-  int32 code = 1;
-  string message = 2;
-  RefundPageData data = 3;
-}
-
-message RefundPageData {
-  string redirect_url = 1;      // 組裝好的 redirect URL（含加密參數）
-}
-
 // ==================== 信用卡付款 Return 處理 ====================
 
 message HandlePaymentPageReturnRequest {
@@ -467,43 +439,6 @@ message HandlePaymentPageReturnResponse {
   int32 code = 1;
   string message = 2;
   string redirect_url = 3;      // 完整 Deep Link URL（Gateway 302 redirect 用）
-}
-
-// ==================== PayUni 加密資料通用解密 ====================
-
-message DecryptPayUniResultRequest {
-  string encrypt_info = 1;      // PayUni 加密資料
-  string hash_info = 2;         // PayUni 簽章
-}
-
-message DecryptPayUniResultResponse {
-  int32 code = 1;
-  string message = 2;
-  DecryptedPayUniData data = 3;
-}
-
-message DecryptedPayUniData {
-  string status = 1;                    // PayUni Status（SUCCESS / 錯誤代碼）
-  string mer_trade_no = 2;              // 商店訂單編號
-  string trade_no = 3;                  // PayUni UNi 序號
-  string refund_amt = 4;               // 退款金額
-  string payment_type = 5;             // 支付工具（2=ATM, 3=超商代碼）
-  string estimated_refund_date = 6;    // 預計扣款日期（YYYY-MM-DD）
-  string error_message = 7;            // 失敗時的錯誤訊息
-}
-
-// ==================== ATM 退款頁面受理確認（收斂規範 §4.4） ====================
-
-message AckAtmRefundAcceptedRequest {
-  string refund_no = 1;                // payment_refunds.refund_no（AfterSales 從 refund_tasks.external_ref_id 取得）
-  string provider_status = 2;          // PayUni 同步 Status（通常 "SUCCESS"）
-  string provider_message = 3;         // PayUni 同步 Message（空字串允許）
-  string estimated_refund_date = 4;    // PayUni 回頁面 EstimatedRefundDate（YYYY-MM-DD，允許空字串）
-}
-
-message AckAtmRefundAcceptedResponse {
-  int32 code = 1;
-  string message = 2;
 }
 
 // ==================== Admin 異常查詢 Messages（§29 Admin 異常訂單管理）====================
@@ -584,9 +519,9 @@ message AdminPaymentTransactionDetail {
   string provider_status = 9;
   string provider_message = 10;
   string provider_trade_no = 11;
-  string atm_bank_code = 12;
-  string atm_virtual_account = 13;
-  string atm_expire_date = 14;
+  reserved 12;
+  reserved 13;
+  reserved 14;
   string pay_time = 15;
   string provider_create_at = 16;
   string provider_paid_at = 17;

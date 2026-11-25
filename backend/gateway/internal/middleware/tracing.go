@@ -42,7 +42,7 @@ func TracingMiddleware() gin.HandlerFunc {
 		// 在邊界丟棄，內部要用 baggage 必須由 gateway 在這行之後自己寫入。
 		ctx = baggage.ContextWithoutBaggage(ctx)
 		// 兩層互補：ctx 層擋 otelgrpc 的 gRPC 面，header 層擋 CreateProxy 系
-		// 列 HTTP reverse proxy（media/seller/payuni-webhook）的原樣轉發面。
+		// 列 HTTP reverse proxy（media/seller/invoice）的原樣轉發面。
 		// 只清 ctx 擋不住 header 透傳，只刪 header 也擋不住已 extract 的值。
 		c.Request.Header.Del("baggage")
 

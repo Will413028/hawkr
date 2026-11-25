@@ -10,7 +10,6 @@ import io.github.will413028.hawkr.common.utils.code.PaymentMethod;
 import io.github.will413028.hawkr.order.entity.OrderEntity;
 import io.github.will413028.hawkr.order.entity.OrderInvoiceSnapshotEntity;
 import io.github.will413028.hawkr.order.entity.OrderOutboxEntity;
-import io.github.will413028.hawkr.order.grpc.client.PaymentGrpcClient;
 import io.github.will413028.hawkr.order.repository.AutoRefundTaskRepository;
 import io.github.will413028.hawkr.order.repository.CouponConsumptionTaskRepository;
 import io.github.will413028.hawkr.order.repository.FinancialLogRepository;
@@ -92,7 +91,7 @@ class OrderPaidInvoiceFieldsTest {
                 orderRepository, orderItemRepository, dedupRepository,
                 mock(FinancialLogRepository.class), mock(AutoRefundTaskRepository.class),
                 mock(CouponConsumptionTaskRepository.class), mock(OrderEventPublisher.class),
-                mock(PaymentGrpcClient.class), outboxMapper, invoiceSnapshotRepository,
+                outboxMapper, invoiceSnapshotRepository,
                 mock(OrderService.class), obsContext);
 
         when(dedupRepository.insertIdempotent(eq("T1"), eq("O1"), anyString(), anyString())).thenReturn(1);

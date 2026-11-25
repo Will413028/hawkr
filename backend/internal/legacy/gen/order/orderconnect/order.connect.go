@@ -95,9 +95,6 @@ const (
 	// OrderServiceGetOrderForPaymentProcedure is the fully-qualified name of the OrderService's
 	// GetOrderForPayment RPC.
 	OrderServiceGetOrderForPaymentProcedure = "/hawkr.order.OrderService/GetOrderForPayment"
-	// OrderServiceSnapshotPaymentInfoProcedure is the fully-qualified name of the OrderService's
-	// SnapshotPaymentInfo RPC.
-	OrderServiceSnapshotPaymentInfoProcedure = "/hawkr.order.OrderService/SnapshotPaymentInfo"
 	// OrderServiceSearchOrdersProcedure is the fully-qualified name of the OrderService's SearchOrders
 	// RPC.
 	OrderServiceSearchOrdersProcedure = "/hawkr.order.OrderService/SearchOrders"
@@ -189,8 +186,6 @@ type OrderServiceClient interface {
 	CheckoutConfirm(context.Context, *connect.Request[order.CheckoutConfirmRequest]) (*connect.Response[order.CheckoutConfirmResponse], error)
 	// 取得訂單付款資訊（Payment Service 內部呼叫）
 	GetOrderForPayment(context.Context, *connect.Request[order.GetOrderForPaymentRequest]) (*connect.Response[order.GetOrderForPaymentResponse], error)
-	// 快照付款資訊到訂單（CreatePayment 成功後由 Gateway 呼叫）
-	SnapshotPaymentInfo(context.Context, *connect.Request[order.SnapshotPaymentInfoRequest]) (*connect.Response[order.SnapshotPaymentInfoResponse], error)
 	// 搜尋訂單（後台）
 	SearchOrders(context.Context, *connect.Request[order.SearchOrdersRequest]) (*connect.Response[order.SearchOrdersResponse], error)
 	// 查詢訂單詳情（後台，含資金流水）
@@ -371,12 +366,6 @@ func NewOrderServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(orderServiceMethods.ByName("GetOrderForPayment")),
 			connect.WithClientOptions(opts...),
 		),
-		snapshotPaymentInfo: connect.NewClient[order.SnapshotPaymentInfoRequest, order.SnapshotPaymentInfoResponse](
-			httpClient,
-			baseURL+OrderServiceSnapshotPaymentInfoProcedure,
-			connect.WithSchema(orderServiceMethods.ByName("SnapshotPaymentInfo")),
-			connect.WithClientOptions(opts...),
-		),
 		searchOrders: connect.NewClient[order.SearchOrdersRequest, order.SearchOrdersResponse](
 			httpClient,
 			baseURL+OrderServiceSearchOrdersProcedure,
@@ -469,7 +458,6 @@ type orderServiceClient struct {
 	checkoutPreview                    *connect.Client[order.CheckoutPreviewRequest, order.CheckoutPreviewResponse]
 	checkoutConfirm                    *connect.Client[order.CheckoutConfirmRequest, order.CheckoutConfirmResponse]
 	getOrderForPayment                 *connect.Client[order.GetOrderForPaymentRequest, order.GetOrderForPaymentResponse]
-	snapshotPaymentInfo                *connect.Client[order.SnapshotPaymentInfoRequest, order.SnapshotPaymentInfoResponse]
 	searchOrders                       *connect.Client[order.SearchOrdersRequest, order.SearchOrdersResponse]
 	getAdminOrderDetail                *connect.Client[order.GetAdminOrderDetailRequest, order.GetAdminOrderDetailResponse]
 	getSellerOrderStatusCounts         *connect.Client[order.GetSellerOrderStatusCountsRequest, order.GetSellerOrderStatusCountsResponse]
@@ -588,11 +576,6 @@ func (c *orderServiceClient) GetOrderForPayment(ctx context.Context, req *connec
 	return c.getOrderForPayment.CallUnary(ctx, req)
 }
 
-// SnapshotPaymentInfo calls hawkr.order.OrderService.SnapshotPaymentInfo.
-func (c *orderServiceClient) SnapshotPaymentInfo(ctx context.Context, req *connect.Request[order.SnapshotPaymentInfoRequest]) (*connect.Response[order.SnapshotPaymentInfoResponse], error) {
-	return c.snapshotPaymentInfo.CallUnary(ctx, req)
-}
-
 // SearchOrders calls hawkr.order.OrderService.SearchOrders.
 func (c *orderServiceClient) SearchOrders(ctx context.Context, req *connect.Request[order.SearchOrdersRequest]) (*connect.Response[order.SearchOrdersResponse], error) {
 	return c.searchOrders.CallUnary(ctx, req)
@@ -706,8 +689,6 @@ type OrderServiceHandler interface {
 	CheckoutConfirm(context.Context, *connect.Request[order.CheckoutConfirmRequest]) (*connect.Response[order.CheckoutConfirmResponse], error)
 	// 取得訂單付款資訊（Payment Service 內部呼叫）
 	GetOrderForPayment(context.Context, *connect.Request[order.GetOrderForPaymentRequest]) (*connect.Response[order.GetOrderForPaymentResponse], error)
-	// 快照付款資訊到訂單（CreatePayment 成功後由 Gateway 呼叫）
-	SnapshotPaymentInfo(context.Context, *connect.Request[order.SnapshotPaymentInfoRequest]) (*connect.Response[order.SnapshotPaymentInfoResponse], error)
 	// 搜尋訂單（後台）
 	SearchOrders(context.Context, *connect.Request[order.SearchOrdersRequest]) (*connect.Response[order.SearchOrdersResponse], error)
 	// 查詢訂單詳情（後台，含資金流水）
@@ -884,12 +865,6 @@ func NewOrderServiceHandler(svc OrderServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(orderServiceMethods.ByName("GetOrderForPayment")),
 		connect.WithHandlerOptions(opts...),
 	)
-	orderServiceSnapshotPaymentInfoHandler := connect.NewUnaryHandler(
-		OrderServiceSnapshotPaymentInfoProcedure,
-		svc.SnapshotPaymentInfo,
-		connect.WithSchema(orderServiceMethods.ByName("SnapshotPaymentInfo")),
-		connect.WithHandlerOptions(opts...),
-	)
 	orderServiceSearchOrdersHandler := connect.NewUnaryHandler(
 		OrderServiceSearchOrdersProcedure,
 		svc.SearchOrders,
@@ -1000,8 +975,6 @@ func NewOrderServiceHandler(svc OrderServiceHandler, opts ...connect.HandlerOpti
 			orderServiceCheckoutConfirmHandler.ServeHTTP(w, r)
 		case OrderServiceGetOrderForPaymentProcedure:
 			orderServiceGetOrderForPaymentHandler.ServeHTTP(w, r)
-		case OrderServiceSnapshotPaymentInfoProcedure:
-			orderServiceSnapshotPaymentInfoHandler.ServeHTTP(w, r)
 		case OrderServiceSearchOrdersProcedure:
 			orderServiceSearchOrdersHandler.ServeHTTP(w, r)
 		case OrderServiceGetAdminOrderDetailProcedure:
@@ -1115,10 +1088,6 @@ func (UnimplementedOrderServiceHandler) CheckoutConfirm(context.Context, *connec
 
 func (UnimplementedOrderServiceHandler) GetOrderForPayment(context.Context, *connect.Request[order.GetOrderForPaymentRequest]) (*connect.Response[order.GetOrderForPaymentResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.order.OrderService.GetOrderForPayment is not implemented"))
-}
-
-func (UnimplementedOrderServiceHandler) SnapshotPaymentInfo(context.Context, *connect.Request[order.SnapshotPaymentInfoRequest]) (*connect.Response[order.SnapshotPaymentInfoResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("hawkr.order.OrderService.SnapshotPaymentInfo is not implemented"))
 }
 
 func (UnimplementedOrderServiceHandler) SearchOrders(context.Context, *connect.Request[order.SearchOrdersRequest]) (*connect.Response[order.SearchOrdersResponse], error) {

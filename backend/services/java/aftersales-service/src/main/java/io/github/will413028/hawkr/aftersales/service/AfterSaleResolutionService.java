@@ -20,7 +20,6 @@ import io.github.will413028.hawkr.common.utils.code.*;
 import io.github.will413028.hawkr.common.utils.proto.ProtoConversionUtils;
 import io.github.will413028.hawkr.common.utils.TsidUtil;
 import io.github.will413028.hawkr.coupon.grpc.GrantSellerCompensationCouponResponse;
-import io.github.will413028.hawkr.payment.grpc.CreateRefundResponse;
 import io.github.will413028.hawkr.shipping.grpc.CreateReturnShipmentResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -49,10 +48,6 @@ public class AfterSaleResolutionService {
     private final AfterSalesProperties properties;
     private final AfterSalesEventPublisher afterSalesEventPublisher;
     private final AfterSaleCaseService caseService;
-    private final io.github.will413028.hawkr.aftersales.grpc.client.PaymentGrpcClient paymentGrpcClient;
-
-    /** ATM 付款方式（Order DB 存 value） */
-    private static final String ATM_PAYMENT_METHOD = PaymentMethod.ATM.value();
 
     /** 允許決議的案件狀態：僅待處理(0)（reopen 已於 #1228 淘汰，65 不再可達） */
     private static final Set<String> RESOLVABLE_STATUSES = Set.of(
@@ -251,8 +246,7 @@ public class AfterSaleResolutionService {
         resolutionMapper.insert(resolution);
 
         // 建立退款任務（部分退款 outcome）
-        boolean isAtm = ATM_PAYMENT_METHOD.equals(caseEntity.getPaymentMethod());
-        RefundTaskEntity refundTask = createRefundTask(caseEntity, refundAmount, isAtm, resolution.getId(),
+        createRefundTask(caseEntity, refundAmount,
                 AfterSalePlatformDecisionOutcome.PARTIAL_REFUND);
 
         // §2.1 INV-3：mapper 自訂 SQL transition（PENDING → REFUND_PROCESSING）
@@ -261,14 +255,8 @@ public class AfterSaleResolutionService {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_INVALID_STATUS);
         }
 
-        // ATM 需等待買家操作退款頁面（§2.3.1 INV-5：createRefund 預建失敗時 task=FAILED，不發等待頁事件）
-        if (isAtm && WorkerTaskStatus.AWAITING_BUYER_REFUND_PAGE.value().equals(refundTask.getStatus())) {
-            afterSalesEventPublisher.publishAwaitingBuyerRefundPage(
-                    caseEntity.getOrderNo(), caseNo, refundTask.getId(), caseEntity.getBuyerId());
-        }
-
         auditService.log(caseNo, null, storeId, AfterSaleAuditActor.SELLER.value(), AfterSaleAuditAction.RESOLVE_PARTIAL_REFUND.value(),
-                Map.of("refundAmount", refundAmount, "isAtm", isAtm));
+                Map.of("refundAmount", refundAmount));
 
         log.info("AfterSaleResolutionService.partialRefund.success",
                 "部分退款決議完成, refundAmount=" + refundAmount, "caseNo", caseNo);
@@ -298,8 +286,7 @@ public class AfterSaleResolutionService {
         resolutionMapper.insert(resolution);
 
         // 建立退款任務（全額退款 outcome）
-        boolean isAtm = ATM_PAYMENT_METHOD.equals(caseEntity.getPaymentMethod());
-        RefundTaskEntity refundTask = createRefundTask(caseEntity, refundAmount, isAtm, resolution.getId(),
+        createRefundTask(caseEntity, refundAmount,
                 AfterSalePlatformDecisionOutcome.FULL_REFUND);
 
         // §2.1 INV-3：mapper 自訂 SQL transition（PENDING → REFUND_PROCESSING）
@@ -308,14 +295,8 @@ public class AfterSaleResolutionService {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_INVALID_STATUS);
         }
 
-        // ATM 需等待買家操作退款頁面（§2.3.1 INV-5：createRefund 預建失敗時 task=FAILED，不發等待頁事件）
-        if (isAtm && WorkerTaskStatus.AWAITING_BUYER_REFUND_PAGE.value().equals(refundTask.getStatus())) {
-            afterSalesEventPublisher.publishAwaitingBuyerRefundPage(
-                    caseEntity.getOrderNo(), caseNo, refundTask.getId(), caseEntity.getBuyerId());
-        }
-
         auditService.log(caseNo, null, storeId, AfterSaleAuditActor.SELLER.value(), AfterSaleAuditAction.RESOLVE_FULL_REFUND_NO_RETURN.value(),
-                Map.of("refundAmount", refundAmount, "isAtm", isAtm));
+                Map.of("refundAmount", refundAmount));
 
         log.info("AfterSaleResolutionService.fullRefundNoReturn.success",
                 "全額退款（免退貨）決議完成, refundAmount=" + refundAmount, "caseNo", caseNo);
@@ -441,58 +422,9 @@ public class AfterSaleResolutionService {
 
     // ==================== 共用方法 ====================
 
-    /**
-     * 建立退款任務。ATM 付款方式初始狀態為「等待買家操作退款頁面」，其他為「待執行」。
-     *
-     * <p>ATM 路徑預建 {@code payment_refunds} row（status=REQUESTED），以供：
-     * <ul>
-     *   <li>{@code AfterSales.handleRefundPageReturn} 成功後呼叫 {@code ackAtmRefundAccepted} 有 row 可更新</li>
-     *   <li>{@code PayUniRefundAcceptedConsumer} / {@code handleAtmRefundWebhook} 用 tradeNo 能找到 active refund</li>
-     * </ul>
-     * 冪等：idempotency key 用 {@code CASE:{caseNo}:{resolutionId}:{attempt}}，同 key 重複呼叫 Payment 回既有 row。
-     * §2.2 業務 pivot (2026-05-14)：key 加 {@code :{attempt}} 後綴避免 buyer 重填時命中既有 row。
-     * 首次建立 attempt=1。</p>
-     */
-    private RefundTaskEntity createRefundTask(AfterSaleCaseEntity caseEntity, Long refundAmount,
-                                                boolean isAtm, Long resolutionId,
-                                                AfterSalePlatformDecisionOutcome outcome) {
-        short initialAttempt = 1;
-        String externalRefId = null;
-        // §2.3.1 INV-5：ATM createRefund 預建失敗時不 throw，建終態 FAILED refund_task 持久化 PayUni 原話
-        boolean refundPrebuildFailed = false;
-        String payuniStatus = null;
-        String payuniMessage = null;
-        String lastError = null;
-        if (isAtm) {
-            String idempotencyKey = "CASE:" + caseEntity.getCaseNo() + ":" + resolutionId
-                    + ":" + initialAttempt;
-            CreateRefundResponse resp = null;
-            try {
-                resp = paymentGrpcClient.createRefund(
-                        caseEntity.getTransactionId(),
-                        ProtoConversionUtils.formatLong(refundAmount),
-                        "售後退款",
-                        idempotencyKey);
-            } catch (io.grpc.StatusRuntimeException e) {
-                refundPrebuildFailed = true;
-                lastError = "createRefund StatusRuntimeException: " + e.getMessage();
-                log.warn("AfterSaleResolutionService.createRefundTask.createRefundUnavailable",
-                        "ATM 預建退款 payment 不可用, caseNo=" + caseEntity.getCaseNo() + ", " + e.getMessage(),
-                        "caseNo", caseEntity.getCaseNo());
-            }
-            if (!refundPrebuildFailed && resp.getCode() != 0) {
-                refundPrebuildFailed = true;
-                payuniStatus = resp.getData().getProviderStatus();
-                payuniMessage = resp.getData().getProviderMessage();
-                lastError = resp.getMessage();
-                log.warn("AfterSaleResolutionService.createRefundTask.createRefundFailed",
-                        "ATM 預建退款失敗, caseNo=" + caseEntity.getCaseNo() + ", code=" + resp.getCode()
-                                + ", msg=" + resp.getMessage(), "caseNo", caseEntity.getCaseNo());
-            } else if (!refundPrebuildFailed) {
-                externalRefId = resp.getData().getRefundNo();
-            }
-        }
-
+    /** 建立退款任務（PENDING，由 {@code RefundTaskWorker} 呼叫 payment 的 CreateRefund）。 */
+    private void createRefundTask(AfterSaleCaseEntity caseEntity, Long refundAmount,
+                                  AfterSalePlatformDecisionOutcome outcome) {
         RefundTaskEntity task = new RefundTaskEntity();
         task.setId(TsidUtil.generate());
         task.setCaseNo(caseEntity.getCaseNo());
@@ -500,25 +432,10 @@ public class AfterSaleResolutionService {
         task.setTransactionId(caseEntity.getTransactionId());
         task.setRefundAmount(refundAmount);
         task.setPaymentMethod(caseEntity.getPaymentMethod());
-        task.setMerId(caseEntity.getMerId());
         task.setRefundOutcome(outcome.value());
-        task.setExternalRefId(externalRefId);
-        if (refundPrebuildFailed) {
-            // 終態 FAILED：Worker 不再撈，持久化 PayUni 原話進 admin 異常清單
-            task.setStatus(WorkerTaskStatus.FAILED.value());
-            task.setNextRetryTime(null);
-            task.setPayuniStatus(payuniStatus);
-            task.setPayuniMessage(payuniMessage);
-            task.setLastError(lastError);
-        } else {
-            task.setStatus(isAtm
-                    ? WorkerTaskStatus.AWAITING_BUYER_REFUND_PAGE.value()
-                    : WorkerTaskStatus.PENDING.value());
-        }
+        task.setStatus(WorkerTaskStatus.PENDING.value());
         task.setRetryCount(0);
         task.setMaxRetryCount(properties.getRefund().getMaxRetryCount());
-        task.setCurrentAttempt(initialAttempt);
         refundTaskMapper.insert(task);
-        return task;
     }
 }

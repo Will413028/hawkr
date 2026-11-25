@@ -54,7 +54,7 @@ import static org.mockito.Mockito.when;
  * <h2>M1 變異</h2>
  * 把政策五欄改成 {@code orderPolicyResolver.resolve(...)} ⇒ <b>不會</b>轉紅（現在同值），
  * 所以第一支改守「不得退回平台側四值」；拿掉冪等回查 ⇒ 冪等那支轉紅；
- * 拿掉空 MerID 的 fail-closed ⇒ {@code failsClosedWhenStoreHasNoPayuniMerId} 轉紅。
+ * 拿掉 can_accept_orders 的 fail-closed ⇒ {@code failsClosedWhenStoreCannotAcceptOrders} 轉紅。
  */
 class OrderServiceCreateRfqOrderTest {
 
@@ -87,7 +87,7 @@ class OrderServiceCreateRfqOrderTest {
         stockTxRecordRepository = mock(StockTxRecordRepository.class);
         sellerGrpcClient = mock(io.github.will413028.hawkr.order.checkout.client.SellerGrpcClient.class);
         when(sellerGrpcClient.getSellerMeta(anyLong())).thenReturn(
-                io.github.will413028.hawkr.seller.grpc.SellerMeta.newBuilder().setPayuniMerId("HAWK2001").build());
+                io.github.will413028.hawkr.seller.grpc.SellerMeta.newBuilder().setCanAcceptOrders(true).build());
 
         orderService = new OrderService(
                 orderRepository, mock(io.github.will413028.hawkr.order.repository.OrderItemRepository.class),
@@ -136,15 +136,15 @@ class OrderServiceCreateRfqOrderTest {
     }
 
     @Test
-    @DisplayName("EXTERNAL lane 的 mer_id 取結算 store 自己的 PayUni 子商店，不是平台代理商戶")
-    void externalLaneUsesSettlementStoreMerId() {
+    @DisplayName("EXTERNAL lane 查結算 store 的可接單狀態，mer_id 留空（收款走 payment 模組）")
+    void externalLaneChecksSettlementStoreAndWritesNoMerId() {
         orderService.createRfqOrder(100L, SETTLEMENT_STORE_ID, ACCEPTANCE_ID,
                 30800L, 800L, null, "文旦柚 200 公斤", 30000L, "3201", "EXTERNAL");
 
         verify(sellerGrpcClient).getSellerMeta(SETTLEMENT_STORE_ID);
         verify(txHandler).createRfqOrderInTx(anyLong(), anyLong(), anyLong(), any(),
                 anyLong(), anyLong(), any(), anyString(), anyString(),
-                org.mockito.ArgumentMatchers.eq("HAWK2001"), any());
+                org.mockito.ArgumentMatchers.eq(""), any());
     }
 
     @Test
@@ -215,7 +215,7 @@ class OrderServiceCreateRfqOrderTest {
                 org.mockito.ArgumentMatchers.eq("3201"),
                 org.mockito.ArgumentMatchers.eq("3005"),
                 org.mockito.ArgumentMatchers.eq("3101"),
-                org.mockito.ArgumentMatchers.eq("HAWK2001"),
+                org.mockito.ArgumentMatchers.eq(""),
                 any());
     }
 
@@ -238,12 +238,10 @@ class OrderServiceCreateRfqOrderTest {
     }
 
     @Test
-    @DisplayName("fail-closed：賣方 store 沒有 PayUni 子商店時不得建單（空 mer_id 會等到付款才炸）")
-    void failsClosedWhenStoreHasNoPayuniMerId() {
-        // 這一格接手 EXTERNAL lane 原本那道 PLATFORM_COLLECTION_NOT_CONFIGURED：
-        // 收款主體換人之後，風險從「沒設代理商 MerID」變成「這個 store 沒有 PayUni 子商店」。
+    @DisplayName("fail-closed：賣方 store 不可接單時不得建單（否則買家到付款時才被擋）")
+    void failsClosedWhenStoreCannotAcceptOrders() {
         when(sellerGrpcClient.getSellerMeta(anyLong())).thenReturn(
-                io.github.will413028.hawkr.seller.grpc.SellerMeta.newBuilder().setPayuniMerId("").build());
+                io.github.will413028.hawkr.seller.grpc.SellerMeta.newBuilder().setCanAcceptOrders(false).build());
 
         assertThatThrownBy(() -> orderService.createRfqOrder(100L, SETTLEMENT_STORE_ID, ACCEPTANCE_ID,
                 30800L, 800L, null, "文旦柚 200 公斤", 30000L, "3201", "EXTERNAL"))
@@ -254,10 +252,10 @@ class OrderServiceCreateRfqOrderTest {
     }
 
     @Test
-    @DisplayName("同一道 fail-closed 也蓋 PLATFORM lane：兩條 lane 的 mer_id 現在同源")
-    void platformLaneAlsoFailsClosedWhenStoreHasNoPayuniMerId() {
+    @DisplayName("同一道 fail-closed 也蓋 PLATFORM lane：兩條 lane 同一個依據")
+    void platformLaneAlsoFailsClosedWhenStoreCannotAcceptOrders() {
         when(sellerGrpcClient.getSellerMeta(anyLong())).thenReturn(
-                io.github.will413028.hawkr.seller.grpc.SellerMeta.newBuilder().setPayuniMerId("").build());
+                io.github.will413028.hawkr.seller.grpc.SellerMeta.newBuilder().setCanAcceptOrders(false).build());
 
         assertThatThrownBy(() -> orderService.createRfqOrder(100L, 7489859548420286732L, ACCEPTANCE_ID,
                 30800L, 800L, null, "文旦柚 200 公斤", 30000L, "3201", "PLATFORM"))
@@ -291,14 +289,14 @@ class OrderServiceCreateRfqOrderTest {
     }
 
     @Test
-    @DisplayName("PLATFORM lane 的 mer_id 取賣家子商店，不是平台代理商戶")
-    void platformLaneUsesSellerMerId() {
+    @DisplayName("PLATFORM lane 一樣 mer_id 留空")
+    void platformLaneWritesNoMerId() {
         orderService.createRfqOrder(100L, 7489859548420286732L, ACCEPTANCE_ID,
                 30800L, 800L, null, "文旦柚 200 公斤", 30000L, "3201", "PLATFORM");
 
         verify(txHandler).createRfqOrderInTx(anyLong(), anyLong(), anyLong(), any(),
                 anyLong(), anyLong(), any(), anyString(), anyString(),
-                org.mockito.ArgumentMatchers.eq("HAWK2001"), any());
+                org.mockito.ArgumentMatchers.eq(""), any());
     }
 
     @Test

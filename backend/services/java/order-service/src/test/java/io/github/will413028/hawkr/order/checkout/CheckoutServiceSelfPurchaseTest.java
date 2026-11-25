@@ -190,6 +190,6 @@ class CheckoutServiceSelfPurchaseTest {
     }
 
     private CheckoutService newService(SellerGrpcClient sellerGrpcClient, BuyerGrpcClient buyerGrpcClient) {
-        return new CheckoutService(null, sellerGrpcClient, buyerGrpcClient, null, null, null, null, null, new OrderPolicyResolver(), null, null);
+        return new CheckoutService(null, sellerGrpcClient, buyerGrpcClient, null, null, null, null, null, new OrderPolicyResolver(), null, null, null);
     }
 }

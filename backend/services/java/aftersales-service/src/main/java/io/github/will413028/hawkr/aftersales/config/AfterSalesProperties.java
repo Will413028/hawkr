@@ -13,8 +13,6 @@ public class AfterSalesProperties {
 
     private RefundConfig refund = new RefundConfig();
 
-    private AtmRefundConfig atmRefund = new AtmRefundConfig();
-
     private AppealConfig appeal = new AppealConfig();
 
     @Data
@@ -61,12 +59,6 @@ public class AfterSalesProperties {
         private long workerIntervalMs = 10000;
         /** 最大重試次數 */
         private int maxRetryCount = 10;
-    }
-
-    @Data
-    public static class AtmRefundConfig {
-        /** ATM 退款完成導回 URL（完整路徑，如 https://test-api.example.com/atm-refund/return） */
-        private String returnUrl;
     }
 
     /** §10 申訴與平台裁決參數 */

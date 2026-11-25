@@ -2,12 +2,10 @@ package io.github.will413028.hawkr.order.worker;
 
 import io.github.will413028.hawkr.common.obs.log.ObsLogger;
 import io.github.will413028.hawkr.common.utils.DateTimeUtils;
-import io.github.will413028.hawkr.common.utils.code.PaymentMethod;
 import io.github.will413028.hawkr.order.constant.OrderConstants;
 import io.github.will413028.hawkr.order.entity.AutoRefundTaskEntity;
 import io.github.will413028.hawkr.order.grpc.client.PaymentGrpcClient;
 import io.github.will413028.hawkr.order.repository.AutoRefundTaskRepository;
-import io.github.will413028.hawkr.order.repository.OrderRepository;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -19,8 +17,7 @@ import java.util.List;
  * 處理場景：訂單已取消但收到付款事件 → 自動向 Payment Service 發起退款
  *
  * 依付款方式分流：
- * - 非 ATM（信用卡/Apple Pay/Google Pay）：呼叫 CreateRefund gRPC 自動退款
- * - ATM：設為 AWAITING_BUYER_REFUND_PAGE，等待買家前往 PayUni 退款頁面
+ * 呼叫 CreateRefund gRPC 自動退款。
  *
  * <p><b>搶佔語意（issue #2294 C2）</b>：claim 是 <b>lease on {@code next_retry_time}</b>
  * （{@link #CLAIM_LEASE_SEC} 秒），不是 {@code SET status=PROCESSING} 的永久旗標；
@@ -55,21 +52,18 @@ public class AutoRefundWorker {
 
     private final AutoRefundTaskRepository autoRefundTaskRepository;
     private final PaymentGrpcClient paymentGrpcClient;
-    private final OrderRepository orderRepository;
     private final AutoRefundTxHandler autoRefundTxHandler;
 
     public AutoRefundWorker(AutoRefundTaskRepository autoRefundTaskRepository,
                             PaymentGrpcClient paymentGrpcClient,
-                            OrderRepository orderRepository,
                             AutoRefundTxHandler autoRefundTxHandler) {
         this.autoRefundTaskRepository = autoRefundTaskRepository;
         this.paymentGrpcClient = paymentGrpcClient;
-        this.orderRepository = orderRepository;
         this.autoRefundTxHandler = autoRefundTxHandler;
     }
 
     /**
-     * 每 30 秒掃描一次（掃描 PENDING / FAILED，不含 AWAITING_BUYER_REFUND_PAGE）
+     * 每 30 秒掃描一次（掃描 PENDING / FAILED）
      */
     @Scheduled(fixedDelay = 30000, initialDelay = 15000)
     public void process() {
@@ -88,14 +82,7 @@ public class AutoRefundWorker {
             return;
         }
 
-        // ATM 付款：設為等待買家操作 PayUni 退款頁面，不由 Worker 自動退款
-        boolean isAtm = PaymentMethod.ATM.value().equals(task.getPaymentMethod());
-        if (isAtm) {
-            handleAtmRefund(task);
-            return;
-        }
-
-        // 非 ATM：Claim（lease）後自動退款。claim 回 0 ⇒ 另一個 pod 持有租約 ⇒ 一個副作用都不做。
+        // Claim（lease）後自動退款。claim 回 0 ⇒ 另一個 pod 持有租約 ⇒ 一個副作用都不做。
         int claimed = autoRefundTaskRepository.claimTask(
                 task.getTaskId(), DateTimeUtils.nowUtc().plusSeconds(CLAIM_LEASE_SEC));
         if (claimed == 0) {
@@ -103,7 +90,7 @@ public class AutoRefundWorker {
         }
 
         log.info("AutoRefundWorker.process.start",
-                "處理自動退款（非 ATM）: taskId=" + task.getTaskId() + ", orderNo=" + task.getOrderNo());
+                "處理自動退款: taskId=" + task.getTaskId() + ", orderNo=" + task.getOrderNo());
 
         try {
             String reason = "訂單取消自動退款: " + task.getOrderNo();
@@ -125,20 +112,6 @@ public class AutoRefundWorker {
                     retryDelay
             );
         }
-    }
-
-    /**
-     * ATM 退款：設為 AWAITING_BUYER_REFUND_PAGE + 標記 orders.need_refund_page = TRUE
-     * 買家需前往 PayUni 頁面填寫銀行資訊（平台不接觸銀行機敏資訊）
-     */
-    private void handleAtmRefund(AutoRefundTaskEntity task) {
-        autoRefundTaskRepository.markDoneByStatus(task.getTaskId(), OrderConstants.TASK_STATUS_AWAITING_BUYER_REFUND_PAGE);
-        orderRepository.updateNeedRefundPage(task.getOrderNo(), true);
-
-        // TODO: 發布通知 MQ 事件，通知買家前往退款頁面
-
-        log.info("AutoRefundWorker.handleAtm.awaitingBuyer",
-                "ATM 退款等待買家操作 PayUni 頁面: taskId=" + task.getTaskId() + ", orderNo=" + task.getOrderNo());
     }
 
 

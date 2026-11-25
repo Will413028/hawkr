@@ -44,7 +44,7 @@ import java.util.Map;
  * {@link #processTask} 組裝處），<b>不是</b>單純的 {@code case_no}。這一點是理解整條防線的關鍵：
  * <ul>
  *   <li><b>租約到期被另一個 pod 重搶</b> ⇒ {@code retry_count} <b>未變</b> ⇒ <b>同一把鍵</b>
- *       ⇒ payment 側 {@code idx_payment_refunds_idempotency_key} 命中，回傳既有退款、不重打 PayUni。
+ *       ⇒ payment 側 {@code idx_payment_refunds_idempotency_key} 命中，回傳既有退款、不重打 provider。
  *       claim 是第一道防線（少打一次），冪等鍵是最終防線（真打了兩次也不會退兩次）。</li>
  *   <li><b>走失敗路徑重試</b>（{@link #handleRefundFailure}）⇒ {@code retry_count++}
  *       ⇒ <b>換一把鍵</b> ⇒ 冪等鍵這道防線<b>刻意不生效</b>（那正是「重試」的定義）。
@@ -110,7 +110,6 @@ public class RefundTaskWorker {
     @Scheduled(fixedDelayString = "${aftersales.refund.worker-interval-ms:10000}")
     public void processRefundTasks() {
         LocalDateTime now = DateTimeUtils.nowUtc();
-        // 僅處理非 ATM 路徑；ATM 退款由 RefundResultConsumer 依 webhook 推進
         // 掃描條件（issue #2294 C1：claim 從「換狀態」改成「推時間」後的候選述詞）：
         //   PENDING   且 租約未生效或已到期 → 撈
         //   FAILED    且 next_retry_time 已到 → 撈（retry 中）
@@ -121,7 +120,6 @@ public class RefundTaskWorker {
         // ⚠️ FAILED 的 isNotNull 是**終態守門**，不可為了「三個分支寫成一個共同述詞」而拿掉。
         List<RefundTaskEntity> tasks = refundTaskMapper.selectList(
                 new LambdaQueryWrapper<RefundTaskEntity>()
-                        .ne(RefundTaskEntity::getPaymentMethod, PaymentMethod.ATM.value())
                         .and(outer -> outer
                                 .nested(pending -> pending
                                         .eq(RefundTaskEntity::getStatus, WorkerTaskStatus.PENDING.value())
@@ -219,7 +217,7 @@ public class RefundTaskWorker {
                 // 退款成功（或已受理）
                 markTaskDoneAndAdvance(task, refundNo);
             } else {
-                // 退款失敗：持久化 PayUni 原始 status/message（last_error 帶 payment 回報原話，非僅 code）
+                // 退款失敗：持久化 provider 原始 status/message（last_error 帶 payment 回報原話，非僅 code）
                 handleRefundFailure(task, refundNo,
                         "Payment 回報錯誤: code=" + resp.getCode() + ", msg=" + resp.getMessage(),
                         resp.getData().getProviderStatus(), resp.getData().getProviderMessage());
@@ -261,7 +259,7 @@ public class RefundTaskWorker {
      * retry_count >= CC_RETRY_LIMIT    → 終止為 FAILED（next_retry_time=null，不再重試），進 admin 異常清單
      */
     private void handleRefundFailure(RefundTaskEntity task, String refundNo, String errorMsg,
-                                     String payuniStatus, String payuniMessage) {
+                                     String providerStatus, String providerMessage) {
         int currentRetry = task.getRetryCount();
         Long taskId = task.getId();
         LocalDateTime now = DateTimeUtils.nowUtc();
@@ -275,9 +273,9 @@ public class RefundTaskWorker {
                             .set(RefundTaskEntity::getStatus, WorkerTaskStatus.FAILED.value())
                             .set(RefundTaskEntity::getExternalRefId, refundNo)
                             .set(RefundTaskEntity::getLastError, errorMsg)
-                            // 持久化 PayUni 原始循線（payment 回非 0 時帶；例外路徑為 null 不覆蓋既有值）
-                            .set(payuniStatus != null, RefundTaskEntity::getPayuniStatus, payuniStatus)
-                            .set(payuniMessage != null, RefundTaskEntity::getPayuniMessage, payuniMessage)
+                            // 持久化 provider 原始狀態（payment 回非 0 時帶；例外路徑為 null 不覆蓋既有值）
+                            .set(providerStatus != null, RefundTaskEntity::getProviderStatus, providerStatus)
+                            .set(providerMessage != null, RefundTaskEntity::getProviderMessage, providerMessage)
                             .set(RefundTaskEntity::getRetryCount, newRetryCount)
                             .set(RefundTaskEntity::getNextRetryTime, nextRetry)
                             .set(RefundTaskEntity::getUpdatedAt, now));
@@ -299,9 +297,9 @@ public class RefundTaskWorker {
                             .set(RefundTaskEntity::getStatus, WorkerTaskStatus.FAILED.value())
                             .set(RefundTaskEntity::getExternalRefId, refundNo)
                             .set(RefundTaskEntity::getLastError, errorMsg)
-                            // 持久化 PayUni 原始循線（payment 回非 0 時帶；例外路徑為 null 不覆蓋既有值）
-                            .set(payuniStatus != null, RefundTaskEntity::getPayuniStatus, payuniStatus)
-                            .set(payuniMessage != null, RefundTaskEntity::getPayuniMessage, payuniMessage)
+                            // 持久化 provider 原始狀態（payment 回非 0 時帶；例外路徑為 null 不覆蓋既有值）
+                            .set(providerStatus != null, RefundTaskEntity::getProviderStatus, providerStatus)
+                            .set(providerMessage != null, RefundTaskEntity::getProviderMessage, providerMessage)
                             .set(RefundTaskEntity::getNextRetryTime, null)
                             .set(RefundTaskEntity::getUpdatedAt, now));
 

@@ -21,10 +21,8 @@ func rlEngine(limiter *ratelimit.Limiter, policy middleware.RateLimitPolicy) *gi
 	r.Use(middleware.TieredRateLimiter(limiter, policy))
 	ok := func(c *gin.Context) { c.String(http.StatusOK, "ok") }
 
-	// exempt — SSE / WS / beacon / health / PayUni callbacks.
+	// exempt — SSE / WS / beacon / health / store-map callbacks.
 	r.GET("/api/v1/health", ok)
-	r.POST("/webhook/payuni/notify", ok)
-	r.GET("/payment/return", ok)
 	r.POST("/store_map/return", ok)
 
 	// tiered
@@ -64,8 +62,6 @@ func TestRateLimiter_ExemptPathsNeverLimited(t *testing.T) {
 
 	exempt := []struct{ method, path string }{
 		{"GET", "/api/v1/health"},
-		{"POST", "/webhook/payuni/notify"},
-		{"GET", "/payment/return"},
 		{"POST", "/store_map/return"},
 	}
 	for _, e := range exempt {

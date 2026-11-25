@@ -30,7 +30,6 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 class AfterSalesEventConsumerRefundCompletedTest {
 
-    @Mock private OrderRepository orderRepository;
     @Mock private AfterSalesRefundEventHandler refundEventHandler;
     @Mock private SellerCancelRefundTxHandler sellerCancelRefundTxHandler;
     @Mock private OrderCountdownService countdownService;
@@ -40,7 +39,7 @@ class AfterSalesEventConsumerRefundCompletedTest {
 
     @BeforeEach
     void setUp() {
-        consumer = new AfterSalesEventConsumer(orderRepository, refundEventHandler,
+        consumer = new AfterSalesEventConsumer(refundEventHandler,
                 sellerCancelRefundTxHandler, countdownService);
     }
 

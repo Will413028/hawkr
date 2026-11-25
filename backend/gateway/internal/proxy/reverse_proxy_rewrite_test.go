@@ -135,37 +135,3 @@ func TestCreateProxy_StripsAPIPrefixAndSetsHost(t *testing.T) {
 		t.Errorf("X-Forwarded-Proto = %q, want http", got.Header.Get("X-Forwarded-Proto"))
 	}
 }
-
-// CreateProxyWithPathRewrite：fromPath → toPath。
-// 唯一消費者是 PayUni webhook（/webhook/payuni/notify → /webhooks/payuni/notify），
-// 改錯 ＝ 第三方通知全部打不到 payuni-webhook-service。
-func TestCreateProxyWithPathRewrite_RewritesPathAndSetsHost(t *testing.T) {
-	lastRequest := startFakeUpstream(t, "payuni-webhook")
-	upstreamHost := services["payuni-webhook"].Host + ":" + services["payuni-webhook"].Port
-
-	gw := startGateway(t, http.MethodPost, "/webhook/payuni/notify",
-		CreateProxyWithPathRewrite("payuni-webhook",
-			"/webhook/payuni/notify", "/webhooks/payuni/notify", FailThirdPartyWebhook))
-
-	resp, err := http.Post(gw.URL+"/webhook/payuni/notify",
-		"application/x-www-form-urlencoded", strings.NewReader("MerID=HAWK1&EncryptInfo=xx"))
-	if err != nil {
-		t.Fatalf("打 gateway 失敗：%v", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-	_, _ = io.ReadAll(resp.Body)
-
-	got := lastRequest()
-	if got == nil {
-		t.Fatal("上游沒收到任何請求")
-	}
-	if want := "/webhooks/payuni/notify"; got.URL.Path != want {
-		t.Errorf("上游收到的 path = %q, want %q（路徑改寫未生效）", got.URL.Path, want)
-	}
-	if got.Host != upstreamHost {
-		t.Errorf("上游收到的 Host = %q, want %q", got.Host, upstreamHost)
-	}
-	if got.Header.Get("X-Forwarded-For") == "" {
-		t.Error("X-Forwarded-For 為空 —— 漏了 SetXForwarded()")
-	}
-}

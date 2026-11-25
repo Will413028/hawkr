@@ -81,8 +81,6 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen>
   }
 
   bool _needsBuyerAction(Order order, AfterSaleCaseSnapshot? afterSale) {
-    if (afterSale?.needRefundPage == true) return true;
-    if (order.needRefundPage) return true;
     if (order.status == OrderStatus.pendingPayment.value) return true;
     if (order.status == OrderStatus.delivered.value && afterSale == null) {
       return true;

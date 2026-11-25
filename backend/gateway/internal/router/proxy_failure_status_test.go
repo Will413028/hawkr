@@ -16,14 +16,8 @@ import (
 //
 //   - 我們自己的前端 → proxy.FailClientFacing（424）。Cloudflare 會把 origin 的 5xx
 //     body 整個換成 text/plain 錯誤頁，前端 response.json() 直接拋錯、拿不到 envelope。
-//   - 第三方 webhook 送信端 → proxy.FailThirdPartyWebhook（502）。5xx 對 PayUni 是
-//     「等一下重送」、4xx 是「別再送了」，而 10 號設計書 §4.5.3／§4.5.5.D 的整套失敗
-//     回收（T2 失敗 → PayUni 重送 → dedup 命中 FAILED → replay 接手）就是靠重送觸發。
 //
-// 「必填參數」只保證有人回答了這個問題，不保證答對。這支測試補的是後者：它把答案
-// 逐條釘死在下面兩張表裡。**沒有這兩張表，把 webhook 那條一起改成 424 的回歸不會有
-// 任何徵兆**——編譯過、單元測試綠、CI 綠，要等到某次 payuni-webhook-service 短暫
-// 不可用、PayUni 不再重送、付款狀態永久不同步才會被發現。
+// 「必填參數」只保證有人回答了這個問題，不保證答對。這支測試把答案逐條釘死在下面兩張表裡。
 //
 // ⚠️ **兩個套件都要掃**。只掃 router 會漏掉 proxy 套件內直接呼叫
 // `writeUpstreamFailureEnvelope` 的路徑（值寫死正確，但不受表約束）。
@@ -37,15 +31,10 @@ func TestProxyRoutesDeclareFailureStatusByConsumer(t *testing.T) {
 			// routes_seller.go:CreateProxy:ServiceSeller 已於 #2813 移除——那是條死路由
 			// （seller 模組未實作 /app/sellers/{id}、四個前端 repo 零呼叫端），
 			// 且它每個請求都 panic 回 500 空 body。不要因為看到這裡少一條就補回去。
-			// 開發用 webhook 模擬器：我們自己用瀏覽器開的工具，不是第三方送信端。
-			"routes_webhook_simulator.go:proxyToPath:ServicePayuniWebhook": "proxy.FailClientFacing",
-			// ⚠️ 唯一一條第三方 webhook。改成 4xx ＝ PayUni 停止重送 ＝ 10 號的 replay
-			// 路徑永遠等不到觸發。要動它之前先讀 proxy.UpstreamFailureStatus 的說明。
-			"routes_payment.go:CreateProxyWithPathRewrite:ServicePayuniWebhook": "proxy.FailThirdPartyWebhook",
 		}
 		got := scan(t, ".", func(fn string, call *ast.CallExpr, file, enclosing string) (string, string, bool) {
 			switch fn {
-			case "proxy.CreateProxy", "proxy.CreateProxyWithPathRewrite", "proxyToPath":
+			case "proxy.CreateProxy":
 			default:
 				return "", "", false
 			}
@@ -56,12 +45,7 @@ func TestProxyRoutesDeclareFailureStatusByConsumer(t *testing.T) {
 			short := strings.TrimPrefix(fn, "proxy.")
 			return file + ":" + short + ":" + exprString(call.Args[0]),
 				exprString(call.Args[len(call.Args)-1]), true
-		}, map[string]bool{
-			// proxyToPath 是把模式原樣往下傳的泛用 wrapper，本身不是一條路由——
-			// 要檢查的是它的呼叫端。其他 wrapper 若出現，其內部呼叫會以參數名被
-			// 記成「未登記」而轉紅，那是刻意的：新 wrapper 必須被看見。
-			"proxyToPath": true,
-		})
+		}, nil)
 		compare(t, "router 路由", got, expected)
 	})
 
@@ -70,8 +54,7 @@ func TestProxyRoutesDeclareFailureStatusByConsumer(t *testing.T) {
 		expected := map[string]string{
 			// 泛用建構函式：模式由呼叫端傳入，答案在上面那張表。這裡把值釘成參數名，
 			// 是為了在有人把它寫死成某個常數時轉紅（那會讓上面那張表失去效力）。
-			"reverse_proxy.go:CreateProxy":                "onUpstreamFailure",
-			"reverse_proxy.go:CreateProxyWithPathRewrite": "onUpstreamFailure",
+			"reverse_proxy.go:CreateProxy": "onUpstreamFailure",
 		}
 		got := scan(t, filepath.Join("..", "proxy"), func(fn string, call *ast.CallExpr, file, enclosing string) (string, string, bool) {
 			if fn != "writeUpstreamFailureEnvelope" {

@@ -32,7 +32,7 @@ func TestProxiedServiceNamesExistInServicesMap(t *testing.T) {
 	mapKeys := parseProxyServicesMapKeys(t)
 
 	if len(called) == 0 {
-		t.Fatal("掃不到任何 CreateProxy／proxyToPath 呼叫端——掃描器壞了，不是「沒有反代路由」")
+		t.Fatal("掃不到任何 CreateProxy 呼叫端——掃描器壞了，不是「沒有反代路由」")
 	}
 	if len(mapKeys) == 0 {
 		t.Fatal("解析不到任何 services map key——解析器壞了")
@@ -79,7 +79,7 @@ func scanProxiedServiceNames(t *testing.T) []string {
 				return true
 			}
 			switch calleeName(call.Fun) {
-			case "proxy.CreateProxy", "proxy.CreateProxyWithPathRewrite", "proxyToPath":
+			case "proxy.CreateProxy":
 			default:
 				return true
 			}

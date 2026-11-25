@@ -7,10 +7,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	"connectrpc.com/connect"
+	"uuid"
 
 	paymentpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/payment/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/seller/v1alpha1"
@@ -36,6 +38,23 @@ type paymentModule struct {
 	// syncedFor 記下 SyncAccountUnlessFresh 被呼叫的店家；syncErr 非 nil 時同步失敗。
 	syncedFor []int64
 	syncErr   error
+	// 入帳帳本：記下收到的店家、篩選、游標與筆數；page 與 order 是回應。
+	earningsStore  int64
+	earningsFilter payment.EarningsFilter
+	earningsAfter  *payment.RecordCursor
+	earningsSize   int32
+	page           payment.EarningsPage
+	order          payment.OrderEarnings
+}
+
+func (m *paymentModule) ListEarnings(_ context.Context, storeID int64, f payment.EarningsFilter, after *payment.RecordCursor, size int32) (payment.EarningsPage, error) {
+	m.earningsStore, m.earningsFilter, m.earningsAfter, m.earningsSize = storeID, f, after, size
+	return m.page, m.err
+}
+
+func (m *paymentModule) OrderEarnings(_ context.Context, storeID int64, _ string) (payment.OrderEarnings, error) {
+	m.earningsStore = storeID
+	return m.order, m.err
 }
 
 func (m *paymentModule) Account(_ context.Context, storeID int64) (payment.Account, error) {
@@ -66,6 +85,8 @@ func TestPaymentEnumsMatchTheModule(t *testing.T) {
 		"PaymentAccountStatus":      rpc.EnumMismatches[paymentpb.PaymentAccountStatus](payment.AccountStatusValues()),
 		"RequirementCollection":     rpc.EnumMismatches[paymentpb.RequirementCollection](payment.RequirementCollectionValues()),
 		"EmbeddedOnboardingRuntime": rpc.EnumMismatches[paymentpb.EmbeddedOnboardingRuntime](payment.EmbeddedRuntimeValues()),
+		"EarningsEntryType":         rpc.EnumMismatches[paymentpb.EarningsEntryType](payment.EarningsTypeValues()),
+		"EarningsEntryStatus":       rpc.EnumMismatches[paymentpb.EarningsEntryStatus](payment.EarningsStatusValues()),
 	} {
 		if len(got) != 0 {
 			t.Errorf("%s：%v", name, got)
@@ -247,3 +268,101 @@ func TestCreatePaymentOnboardingSessionAnswersWithExactlyOneSessionShape(t *test
 // unknownSession 模擬 payment 新增了 handler 還沒處理的 session 形狀。payment.OnboardingSession 是封閉的 interface，
 // 這裡以巢狀的內嵌型別取得它的未匯出方法。
 type unknownSession struct{ payment.HostedSession }
+
+func earningsFixture() []payment.EarningsEntry {
+	at := time.Date(2026, 11, 20, 3, 0, 0, 0, time.UTC)
+	return []payment.EarningsEntry{
+		{ID: uuid.MustParse("01930000-0000-7000-8000-000000000003"), Type: payment.EarningsReversal, OrderNo: "A1", Amount: -300, Status: payment.EarningsCompleted, CreatedAt: at},
+		{ID: uuid.MustParse("01930000-0000-7000-8000-000000000002"), Type: payment.EarningsTopUp, OrderNo: "A1", Amount: 100, Status: payment.EarningsPending, CreatedAt: at},
+		{ID: uuid.MustParse("01930000-0000-7000-8000-000000000001"), Type: payment.EarningsTransfer, OrderNo: "A1", Amount: 1000, Status: payment.EarningsFailed, CreatedAt: at},
+	}
+}
+
+// 店家只從能力檢查的 ctx 取得：請求不帶店家，模組收到的就是呼叫者的店家；收回是負數，種類與狀態轉成 proto 的列舉。
+func TestListMyEarningsUsesTheCallersStoreAndMapsEntries(t *testing.T) {
+	m := &paymentModule{page: payment.EarningsPage{Entries: earningsFixture()}}
+	app := &App{payments: m}
+	got, err := app.ListMyEarnings(ctxWithStore(currentStore()), connect.NewRequest(&pb.ListMyEarningsRequest{OrderNo: "A1", PageSize: 5}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.earningsStore != currentStore().StoreID || m.earningsFilter.OrderNo != "A1" || m.earningsSize != 5 {
+		t.Fatalf("模組收到 store=%d filter=%+v size=%d", m.earningsStore, m.earningsFilter, m.earningsSize)
+	}
+	es := got.Msg.GetEntries()
+	if len(es) != 3 || got.Msg.GetNextPageToken() != "" {
+		t.Fatalf("entries=%d token=%q", len(es), got.Msg.GetNextPageToken())
+	}
+	if es[0].GetType() != paymentpb.EarningsEntryType_EARNINGS_ENTRY_TYPE_REVERSAL || es[0].GetAmount() != -300 || es[0].GetStatus() != paymentpb.EarningsEntryStatus_EARNINGS_ENTRY_STATUS_COMPLETED {
+		t.Errorf("收回：%v", es[0])
+	}
+	if es[1].GetType() != paymentpb.EarningsEntryType_EARNINGS_ENTRY_TYPE_TOP_UP || es[1].GetStatus() != paymentpb.EarningsEntryStatus_EARNINGS_ENTRY_STATUS_PENDING {
+		t.Errorf("補差額：%v", es[1])
+	}
+	if es[2].GetType() != paymentpb.EarningsEntryType_EARNINGS_ENTRY_TYPE_TRANSFER || es[2].GetStatus() != paymentpb.EarningsEntryStatus_EARNINGS_ENTRY_STATUS_FAILED || es[2].GetId() == "" || es[2].GetCreateTime() == nil {
+		t.Errorf("轉入：%v", es[2])
+	}
+}
+
+// 下一頁的 token 帶回模組的游標；token 只能用在同一個店家與同一組篩選，換了篩選回 invalid_argument。
+func TestListMyEarningsPageTokenIsBoundToTheFilter(t *testing.T) {
+	last := earningsFixture()[2].ID
+	m := &paymentModule{page: payment.EarningsPage{Entries: earningsFixture(), Next: &payment.RecordCursor{ID: last}}}
+	app := &App{payments: m}
+	ctx := ctxWithStore(currentStore())
+	first, err := app.ListMyEarnings(ctx, connect.NewRequest(&pb.ListMyEarningsRequest{OrderNo: "A1"}))
+	if err != nil || first.Msg.GetNextPageToken() == "" {
+		t.Fatalf("err=%v token=%q", err, first.Msg.GetNextPageToken())
+	}
+	if _, err := app.ListMyEarnings(ctx, connect.NewRequest(&pb.ListMyEarningsRequest{OrderNo: "A1", PageToken: first.Msg.GetNextPageToken()})); err != nil {
+		t.Fatal(err)
+	}
+	if m.earningsAfter == nil || m.earningsAfter.ID != last {
+		t.Fatalf("游標沒有帶給模組：%v", m.earningsAfter)
+	}
+	_, err = app.ListMyEarnings(ctx, connect.NewRequest(&pb.ListMyEarningsRequest{OrderNo: "B2", PageToken: first.Msg.GetNextPageToken()}))
+	if !isTransportInvalidArgument(err) {
+		t.Fatalf("換了篩選的 token 沒有被擋：%v", err)
+	}
+	other := currentStore()
+	other.StoreID = 12
+	_, err = app.ListMyEarnings(ctxWithStore(other), connect.NewRequest(&pb.ListMyEarningsRequest{OrderNo: "A1", PageToken: first.Msg.GetNextPageToken()}))
+	if !isTransportInvalidArgument(err) {
+		t.Fatalf("別家店的 token 沒有被擋：%v", err)
+	}
+}
+
+func TestListMyEarningsRequiresAStoreInTheContext(t *testing.T) {
+	app := &App{payments: &paymentModule{}}
+	if _, err := app.ListMyEarnings(context.Background(), connect.NewRequest(&pb.ListMyEarningsRequest{})); err == nil {
+		t.Fatal("沒有店家仍然讀了帳本")
+	}
+	if _, err := app.GetMyOrderEarnings(context.Background(), connect.NewRequest(&pb.GetMyOrderEarningsRequest{OrderNo: "A1"})); err == nil {
+		t.Fatal("沒有店家仍然讀了訂單的帳本")
+	}
+}
+
+func TestGetMyOrderEarningsReturnsEntriesAndNet(t *testing.T) {
+	m := &paymentModule{order: payment.OrderEarnings{Entries: earningsFixture(), NetAmount: -300}}
+	app := &App{payments: m}
+	got, err := app.GetMyOrderEarnings(ctxWithStore(currentStore()), connect.NewRequest(&pb.GetMyOrderEarningsRequest{OrderNo: "A1"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.earningsStore != currentStore().StoreID || len(got.Msg.GetEntries()) != 3 || got.Msg.GetNetAmount() != -300 {
+		t.Fatalf("store=%d got=%v", m.earningsStore, got.Msg)
+	}
+}
+
+func TestGetMyOrderEarningsPassesNotFoundThrough(t *testing.T) {
+	app := &App{payments: &paymentModule{err: apperr.NotFound("找不到這張訂單的入帳")}}
+	_, err := app.GetMyOrderEarnings(ctxWithStore(currentStore()), connect.NewRequest(&pb.GetMyOrderEarningsRequest{OrderNo: "X"}))
+	if apperr.KindOf(err) != apperr.KindNotFound {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+// handler 直接回傳的是 interceptor 轉換之前的傳輸層錯誤，錯誤文字以代碼開頭。
+func isTransportInvalidArgument(err error) bool {
+	return err != nil && strings.HasPrefix(err.Error(), "invalid_argument")
+}

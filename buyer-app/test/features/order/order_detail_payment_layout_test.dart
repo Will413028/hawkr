@@ -65,7 +65,7 @@ void main() {
           expect(tester.widget<Text>(amount).data, _longAmount);
           final paragraph = tester.renderObject<RenderParagraph>(amount);
           expect(paragraph.didExceedMaxLines, isFalse);
-          final method = find.text('ATM 轉帳');
+          final method = find.text('信用卡');
           expect(
             tester.renderObject<RenderParagraph>(method).didExceedMaxLines,
             isFalse,
@@ -113,7 +113,7 @@ class _PaymentOrderAdapter implements HttpClientAdapter {
           'totalActualAmount': _longAmount,
           'shippingFee': '0',
           'discountAmount': '0',
-          'paymentMethod': '2004',
+          'paymentMethod': '2001',
           'createTime': '2026-09-09T00:00:00+08:00',
           'items': <Object>[],
         },

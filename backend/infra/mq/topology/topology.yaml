@@ -37,8 +37,6 @@ exchanges:
   type: topic
 - name: payment.events
   type: topic
-- name: payment.webhook.dlx
-  type: direct
 - name: procurement.events
   type: topic
 - name: payuni.events
@@ -216,8 +214,6 @@ queues:
   - exchange: payment.events
     key: payment.closed
   - exchange: payment.events
-    key: payment.conflict
-  - exchange: payment.events
     key: payment.expired
   - exchange: payment.events
     key: payment.failed
@@ -288,46 +284,6 @@ queues:
   bindings:
   - exchange: hawkr.shipping
     key: shipment.status.changed
-- name: payment.payuni.refund.accepted
-  dlq:
-    via: payment.webhook.dlx
-    routing_key: payment.payuni.refund.accepted.dlq
-  bindings:
-  - exchange: payuni.events
-    key: payuni.refund.accepted
-- name: payment.payuni.refund.notify
-  dlq:
-    via: payment.webhook.dlx
-    routing_key: payment.payuni.refund.notify.dlq
-  bindings:
-  - exchange: payuni.events
-    key: payuni.refund.notify
-- name: payment.payuni.unknown.fallback
-  dlq:
-    via: payment.webhook.dlx
-    routing_key: payment.payuni.unknown.fallback.dlq
-  bindings:
-  - exchange: payuni.events
-    key: payuni.unknown.fallback
-- name: payment.payuni.webhook
-  dlq:
-    via: payment.webhook.dlx
-    routing_key: payment.payuni.webhook.dlq
-  bindings:
-  - exchange: payuni.events
-    key: payuni.payment.uop
-- name: payment.rescue.refund.dlq
-  bindings:
-  - exchange: hawkr.payment.dlx
-    key: payment.rescue.refund.dlq
-- name: payment.rescue.refund.queue
-  dlq:
-    via: hawkr.payment.dlx
-    queue: payment.rescue.refund.dlq
-    routing_key: payment.rescue.refund.dlq
-  bindings:
-  - exchange: payment.events
-    key: payment.rescue.refund_initiated
 - name: product.buyer.favorite.added
   dlq:
     via: hawkr.product.dlx

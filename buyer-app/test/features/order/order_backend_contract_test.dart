@@ -36,7 +36,6 @@ void main() {
         'orderNo': 'HK202605070002',
         'status': '50',
         'is_reviewed': true,
-        'need_refund_page': true,
         'review_deadline': '2026-05-31T15:59:59Z',
         'processing_deadline': '2026-05-10T15:59:59Z',
         'auto_complete_at': '2026-05-11T15:59:59Z',
@@ -45,10 +44,9 @@ void main() {
         'recipient_name': '王小明',
       });
 
-      // isReviewed / needRefundPage 的 @Default 都是 false ——
-      // 舊 snake 欄位若被讀回來就會變 true，這兩條才有鑑別力。
+      // isReviewed 的 @Default 是 false ——
+      // 舊 snake 欄位若被讀回來就會變 true，這條才有鑑別力。
       expect(order.isReviewed, isFalse);
-      expect(order.needRefundPage, isFalse);
       expect(order.reviewDeadline, '');
       expect(order.processingDeadline, '');
       expect(order.autoCompleteAt, '');
@@ -122,18 +120,14 @@ void main() {
       final afterSale = AfterSaleCase.fromJson({
         'caseNo': 'AS202605070001',
         'orderNo': 'HK202605070001',
-        'refundTaskStatus': 'AWAITING_BUYER_REFUND_PAGE',
+        'refundTaskStatus': 'FAILED',
         'refundFailureMessage': '銀行帳號格式錯誤',
-        'estimatedRefundDate': '2026-05-12',
-        'bankDate': '2026-05-13',
         'providerStatus': 'S000',
         'providerMessage': 'success',
       });
 
-      expect(afterSale.refundTaskStatus, 'AWAITING_BUYER_REFUND_PAGE');
+      expect(afterSale.refundTaskStatus, 'FAILED');
       expect(afterSale.refundFailureMessage, '銀行帳號格式錯誤');
-      expect(afterSale.estimatedRefundDate, '2026-05-12');
-      expect(afterSale.bankDate, '2026-05-13');
       expect(afterSale.providerStatus, 'S000');
       expect(afterSale.providerMessage, 'success');
     });
@@ -142,18 +136,14 @@ void main() {
       final afterSale = AfterSaleCase.fromJson({
         'caseNo': 'AS202605070003',
         'orderNo': 'HK202605070003',
-        'refund_task_status': 'AWAITING_BUYER_REFUND_PAGE',
+        'refund_task_status': 'FAILED',
         'refund_failure_message': '銀行帳號格式錯誤',
-        'estimated_refund_date': '2026-05-12',
-        'bank_date': '2026-05-13',
         'provider_status': 'S000',
         'provider_message': 'success',
       });
 
       expect(afterSale.refundTaskStatus, '');
       expect(afterSale.refundFailureMessage, '');
-      expect(afterSale.estimatedRefundDate, '');
-      expect(afterSale.bankDate, '');
       expect(afterSale.providerStatus, '');
       expect(afterSale.providerMessage, '');
     });

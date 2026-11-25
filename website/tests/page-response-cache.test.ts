@@ -120,7 +120,6 @@ const PRIVATE_PATHS = [
 	"/login",
 	"/search",
 	"/orders/HK123",
-	"/orders/HK123/refund",
 	"/adm",
 	"/adm/123/dashboard",
 	"/adm/enter",
@@ -265,7 +264,6 @@ const LOCALIZED_PRIVATE_PATHS = [
 	"/payment/return",
 	"/login",
 	"/search",
-	"/orders/HK123/refund",
 	"/seller/onboarding",
 ];
 

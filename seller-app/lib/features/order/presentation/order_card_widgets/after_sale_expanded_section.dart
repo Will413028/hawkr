@@ -673,31 +673,21 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     final refundTaskStatus = _text(c.refundTaskStatus);
     final refundStatus = refundTaskStatus.toUpperCase();
     final refundFailureMessage = _text(c.refundFailureMessage);
-    final estimatedRefundDate = _formatRefundDate(
-      c.estimatedRefundDate,
-      context.taipeiDisplay,
-    );
-    final bankDate = _formatRefundDate(c.bankDate, context.taipeiDisplay);
     if (c.status == AfterSaleStatus.closed) {
-      final msg = bankDate.isNotEmpty
-          ? '退款已於 $bankDate 退回買家帳戶'
-          : '退款已完成，售後案件結案';
-      return _ReturnLogisticsStatus(step: 3, title: '驗貨完成', message: msg);
+      return const _ReturnLogisticsStatus(
+        step: 3,
+        title: '驗貨完成',
+        message: '退款已完成，售後案件結案',
+      );
     }
     if (c.status == AfterSaleStatus.refundProcessing ||
         refundTaskStatus.isNotEmpty) {
       final msg = switch (refundStatus) {
-        'AWAITING_BUYER_REFUND_PAGE' when refundFailureMessage.isNotEmpty =>
-          '買家需重新填寫退款資料：$refundFailureMessage',
         'FAILED' when refundFailureMessage.isNotEmpty =>
           '退款失敗：$refundFailureMessage',
         'FAILED' => '退款失敗，請聯繫客服處理',
         'MANUAL_INTERVENTION' => '退款需人工處理，請聯繫客服',
         'PENDING' => '退款排隊中',
-        'DONE' when bankDate.isNotEmpty => '退款已於 $bankDate 退回買家帳戶',
-        '20' when bankDate.isNotEmpty => '退款已於 $bankDate 退回買家帳戶',
-        _ when estimatedRefundDate.isNotEmpty =>
-          '退款將於 $estimatedRefundDate 退回買家帳戶中',
         _ => '已完成驗貨，系統將依確認金額執行退款',
       };
       return _ReturnLogisticsStatus(step: 3, title: '驗貨完成', message: msg);
@@ -855,11 +845,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
 
   String _formatTime(String raw, TaipeiDisplay t) {
     return t.formatIso(raw);
-  }
-
-  /// 退款預計日 / 入帳日：只取年月日，給「退款將於 X 退回買家帳戶」這類訊息用。
-  String _formatRefundDate(String? raw, TaipeiDisplay t) {
-    return t.formatIso(raw ?? '', TaipeiFormat.date);
   }
 }
 

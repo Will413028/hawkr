@@ -85,13 +85,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
     private final io.github.will413028.hawkr.order.repository.OrderInvoiceSnapshotRepository orderInvoiceSnapshotRepository;
     private final OrderEventPublisher eventPublisher;
 
-    /**
-     * 代理商 PayUni MerID（和單代收，20 號 §4.13）。空字串 ＝ 本環境未設定 ⇒ 沒有任何訂單是和單。
-     * {@code orders.mer_id} 等於它就是和單——那是 order-service 在讀取端唯一拿得到的訊號，
-     * 快照表刻意不存這個布林（它是「付款收款方是誰」的衍生值，不是買家的發票選擇）。
-     */
-    private final String agentMerId;
-
     public OrderGrpcService(OrderService orderService, CheckoutService checkoutService,
                             CouponReleaseService couponReleaseService,
                             OrderRepository orderRepository, OrderItemRepository orderItemRepository,
@@ -101,8 +94,7 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                             MediaUrlProperties mediaUrlProperties,
                             io.github.will413028.hawkr.order.repository.GrantPaymentTaskRepository grantPaymentTaskRepository,
                             io.github.will413028.hawkr.order.repository.OrderInvoiceSnapshotRepository orderInvoiceSnapshotRepository,
-                            OrderEventPublisher eventPublisher,
-                            @org.springframework.beans.factory.annotation.Value("${payuni.agent.mer-id:}") String agentMerId) {
+                            OrderEventPublisher eventPublisher) {
         this.orderService = orderService;
         this.checkoutService = checkoutService;
         this.couponReleaseService = couponReleaseService;
@@ -117,7 +109,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
         this.grantPaymentTaskRepository = grantPaymentTaskRepository;
         this.orderInvoiceSnapshotRepository = orderInvoiceSnapshotRepository;
         this.eventPublisher = eventPublisher;
-        this.agentMerId = agentMerId;
     }
 
     /**
@@ -976,7 +967,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                 // 金流與退款
                 .clearProviderStatus()
                 .clearProviderMessage()
-                .clearNeedRefundPage()
                 .build();
     }
 
@@ -1003,15 +993,11 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                 // 金流
                 .clearTransactionId()
                 .clearPaymentMerId()
-                .clearAtmBankCode()
-                .clearAtmVirtualAccount()
-                .clearAtmExpireDate()
                 .clearProviderStatus()
                 .clearProviderMessage()
                 .clearAvailablePaymentMethods()
                 // 退款與撥款
-                .clearRefundHistory()
-                .clearNeedRefundPage();
+                .clearRefundHistory();
         if (!reveal) {
             builder.setRecipientPhone(nullToEmpty(MaskUtils.maskPhone(detail.getRecipientPhone())))
                     .setShippingAddress(nullToEmpty(MaskUtils.maskAddressToDistrict(detail.getShippingAddress())));
@@ -1953,51 +1939,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
         }
     }
 
-    // ==================== 快照付款資訊 ====================
-
-    /**
-     * 快照付款資訊到訂單（CreatePayment 成功後由 Gateway 呼叫）
-     *
-     * 將 trade_no、payment_method、ATM 虛擬帳號等資訊寫入 orders 表，
-     * 讓訂單明細 API 可直接從 DB 讀取，無需聚合 Payment Service。
-     */
-    @Override
-    public void snapshotPaymentInfo(SnapshotPaymentInfoRequest request,
-                                     StreamObserver<SnapshotPaymentInfoResponse> responseObserver) {
-        try {
-            String orderNo = request.getOrderNo();
-            if (orderNo.isEmpty()) {
-                responseObserver.onNext(SnapshotPaymentInfoResponse.newBuilder()
-                        .setCode(GrpcResponseCode.INVALID_PARAM.code())
-                        .setMessage(GrpcResponseCode.INVALID_PARAM.message())
-                        .build());
-                responseObserver.onCompleted();
-                return;
-            }
-
-            // 使用自訂 SQL 只更新快照欄位，避免 updateById 全欄位覆蓋導致 race condition
-            // （與 PaymentEventHandler 的 @Transactional updateById 併發時，會把 status 覆蓋回舊值）
-            orderRepository.snapshotPaymentInfo(
-                    orderNo,
-                    request.getTradeNo(),
-                    request.getPaymentMethod(),
-                    request.getAtmBankCode(),
-                    request.getAtmVirtualAccount(),
-                    request.getAtmExpireDate()
-            );
-            log.info("OrderGrpcService.snapshotPaymentInfo.success",
-                    "付款資訊已快照: orderNo=" + orderNo + ", tradeNo=" + request.getTradeNo());
-
-            responseObserver.onNext(SnapshotPaymentInfoResponse.newBuilder()
-                    .setCode(GrpcResponseCode.SUCCESS.code())
-                    .setMessage(GrpcResponseCode.SUCCESS.message())
-                    .build());
-            responseObserver.onCompleted();
-        } catch (Exception e) {
-            GrpcErrorHandler.handleException(responseObserver, SnapshotPaymentInfoResponse.newBuilder(), e, "OrderGrpcService", "snapshotPaymentInfo", GrpcResponseCode.INTERNAL_ERROR);
-        }
-    }
-
     // ==================== 服務間呼叫（aftersales-service）====================
 
     /**
@@ -2209,8 +2150,7 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                     .setDiscountAmount(amountStr(order.getDiscountAmount()))
                     .setTotalActualAmount(amountStr(order.getTotalActualAmount()))
                     // 見 javadoc：判不出來就送空字串，讓呼叫端 fail-closed
-                    .setDiscountFunding("")
-                    .setIsConsolidatedOrder(isConsolidatedOrder(order.getMerId()));
+                    .setDiscountFunding("");
 
             for (OrderItemEntity item : items) {
                 data.addItems(OrderInvoiceSnapshotItem.newBuilder()
@@ -2381,18 +2321,6 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                     ReviseOrderInvoiceSnapshotInternalResponse.newBuilder(), e,
                     "OrderGrpcService", "reviseOrderInvoiceSnapshotInternal", GrpcResponseCode.INTERNAL_ERROR);
         }
-    }
-
-    /**
-     * 和單判定（58 號 §7.1.3 fail-closed 三格之一）。
-     *
-     * <p>和單會把收款方換成代理商 MerID ⇒ 開票法源前提不成立。order-service 沒有專門的
-     * 「是否和單」欄位，{@code orders.mer_id == PAYUNI_AGENT_MER_ID} 是唯一可用的訊號。
-     * {@code agentMerId} 為空（本環境未設定和單）⇒ 一律 false，而不是「每張訂單都是和單」
-     * ——空字串比對到空 merId 會讓後者成真。
-     */
-    private boolean isConsolidatedOrder(String orderMerId) {
-        return agentMerId != null && !agentMerId.isBlank() && agentMerId.equals(orderMerId);
     }
 
     /** 金額／數量：null 一律送 "0"（DB 上這些欄位都有值，null 只可能來自極舊的殘列）。 */

@@ -37,10 +37,11 @@ import '../../seller/presentation/seller_certification_gate.dart'
         certificationGateTitle;
 import 'wallet_account_section.dart';
 import 'wallet_coupon_section.dart';
+import 'wallet_earnings_section.dart';
 
 /// 錢包頁：依伺服器的開通摘要（`GetMyOnboarding`）顯示認證閘門或收款帳戶狀態面板（和 website 的 `WalletClient` 同一個判斷）：
 /// 摘要的平台審核任務還沒完成、或還沒有收款帳戶，顯示認證閘門；收款帳戶任務還沒完成顯示狀態面板（內容讀 `GetMyPaymentAccount`）；
-/// 店家通過開通閘門後加上帳戶與認證。
+/// 店家通過開通閘門後加上帳戶與認證，以及入帳紀錄（`ListMyEarnings`）。
 /// 優惠券由 `MARKETING` 能力決定，與認證狀態無關。
 ///
 /// 錢包常駐在主導航的 IndexedStack 裡；它是否看得到由 widget 樹決定：被隱藏的分頁，或被不透明頁面（認證流程）蓋住時，
@@ -136,6 +137,7 @@ class WalletScreen extends HookConsumerWidget {
             task: paymentAccountTask(summary),
           ),
         if (certified) const WalletAccountSection(),
+        if (certified) const WalletEarningsSection(),
       ],
     );
   }

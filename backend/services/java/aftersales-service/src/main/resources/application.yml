@@ -53,8 +53,6 @@ mybatis-plus:
     map-underscore-to-camel-case: true
 
 hawkr:
-  web:
-    frontend-url: ${WEB_FRONTEND_URL:http://localhost:3000}
   obs:
     service: aftersales
     grpc:
@@ -154,5 +152,3 @@ aftersales:
   refund:
     worker-interval-ms: ${REFUND_WORKER_INTERVAL_MS:10000}
     max-retry-count: ${REFUND_MAX_RETRY_COUNT:10}
-  atm-refund:
-    return-url: ${ATM_REFUND_RETURN_URL:http://localhost:8080/atm-refund/return}

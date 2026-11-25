@@ -16,7 +16,6 @@ import io.github.will413028.hawkr.common.utils.TsidUtil;
 import io.github.will413028.hawkr.order.grpc.CancelOrderInternalResponse;
 import io.github.will413028.hawkr.order.grpc.GetOrderForAfterSalesResponse;
 import io.github.will413028.hawkr.order.grpc.OrderAfterSalesView;
-import io.github.will413028.hawkr.payment.grpc.CreateRefundResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,13 +36,9 @@ public class SellerCancelService {
     private final SellerCancelRequestMapper cancelMapper;
     private final RefundTaskMapper refundTaskMapper;
     private final OrderGrpcClient orderGrpcClient;
-    private final io.github.will413028.hawkr.aftersales.grpc.client.PaymentGrpcClient paymentGrpcClient;
     private final AfterSaleAuditService auditService;
     private final AfterSalesProperties properties;
     private final AfterSalesEventPublisher afterSalesEventPublisher;
-
-    /** ATM 付款方式（Order DB 存 value） */
-    private static final String ATM_PAYMENT_METHOD = PaymentMethod.ATM.value();
 
     /** 待付款訂單狀態 value */
     private static final String ORDER_STATUS_PENDING_PAYMENT = OrderStatus.PENDING_PAYMENT.value();
@@ -138,41 +133,6 @@ public class SellerCancelService {
             afterSalesEventPublisher.publishCancelCompleted(orderNo, cancelId);
         } else {
             // 已付款：建立退款任務
-            // §2.2 業務 pivot (2026-05-14)：idempotency_key 加 :{attempt} 後綴；首次建立 attempt=1
-            boolean isAtm = ATM_PAYMENT_METHOD.equals(order.getPaymentMethod());
-            short initialAttempt = 1;
-            // ATM 路徑：預建 payment_refunds row（idempotency key = CANCEL:{cancelId}:{attempt}）
-            String externalRefId = null;
-            if (isAtm) {
-                String idempotencyKey = "CANCEL:" + cancelId + ":" + initialAttempt;
-                CreateRefundResponse resp;
-                try {
-                    resp = paymentGrpcClient.createRefund(
-                            order.getTransactionId(),
-                            String.valueOf(refundAmount),
-                            "賣家取消退款",
-                            idempotencyKey);
-                } catch (io.grpc.StatusRuntimeException e) {
-                    // §2.3.1 INV-5：payment 不可用 → 訂單已跨服務取消（不可逆），持久化 PayUni 循線 + 標 FAILED，不 throw/rollback
-                    log.warn("SellerCancelService.cancelShipment.createRefundUnavailable",
-                            "ATM 預建退款 payment 不可用, orderNo=" + orderNo + ", " + e.getMessage(), "orderNo", orderNo);
-                    persistFailedRefundTaskAndMarkCancelFailed(cancelEntity, initialAttempt,
-                            null, e.getStatus().getDescription(),
-                            "createRefund StatusRuntimeException: " + e.getMessage());
-                    return;
-                }
-                if (resp.getCode() != 0) {
-                    // §2.3.1 INV-5：createRefund 失敗 → 持久化 PayUni 原始循線 + 標 FAILED，不 throw/rollback
-                    log.warn("SellerCancelService.cancelShipment.createRefundFailed",
-                            "ATM 預建退款失敗, orderNo=" + orderNo + ", code=" + resp.getCode()
-                                    + ", msg=" + resp.getMessage(), "orderNo", orderNo);
-                    persistFailedRefundTaskAndMarkCancelFailed(cancelEntity, initialAttempt,
-                            resp.getData().getProviderStatus(), resp.getData().getProviderMessage(),
-                            resp.getMessage());
-                    return;
-                }
-                externalRefId = resp.getData().getRefundNo();
-            }
             RefundTaskEntity refundTask = new RefundTaskEntity();
             refundTask.setId(TsidUtil.generate());
             refundTask.setCancelId(cancelId);
@@ -180,24 +140,13 @@ public class SellerCancelService {
             refundTask.setTransactionId(order.getTransactionId());
             refundTask.setRefundAmount(refundAmount);
             refundTask.setPaymentMethod(order.getPaymentMethod());
-            refundTask.setMerId(order.getMerId());
-            refundTask.setExternalRefId(externalRefId);
-            refundTask.setStatus(isAtm
-                    ? WorkerTaskStatus.AWAITING_BUYER_REFUND_PAGE.value()
-                    : WorkerTaskStatus.PENDING.value());
+            refundTask.setStatus(WorkerTaskStatus.PENDING.value());
             refundTask.setRetryCount(0);
             refundTask.setMaxRetryCount(properties.getRefund().getMaxRetryCount());
-            refundTask.setCurrentAttempt(initialAttempt);
             refundTaskMapper.insert(refundTask);
 
             // §2.3 INV-3：PENDING → REFUND_PROCESSING
             cancelMapper.markRefundProcessing(cancelId);
-
-            // ATM 需等待買家操作退款頁面
-            if (isAtm) {
-                afterSalesEventPublisher.publishAwaitingBuyerRefundPage(
-                        orderNo, null, refundTask.getId(), cancelEntity.getBuyerId());
-            }
         }
 
         // 10. 稽核日誌
@@ -286,40 +235,6 @@ public class SellerCancelService {
             cancelMapper.markCompletedFromPending(cancelId);
             afterSalesEventPublisher.publishCancelCompleted(orderNo, cancelId);
         } else {
-            // §2.2 業務 pivot (2026-05-14)：idempotency_key 加 :{attempt} 後綴；首次建立 attempt=1
-            boolean isAtm = ATM_PAYMENT_METHOD.equals(order.getPaymentMethod());
-            short initialAttempt = 1;
-            // ATM 路徑：預建 payment_refunds row（idempotency key = CANCEL:{cancelId}:{attempt}）
-            String externalRefId = null;
-            if (isAtm) {
-                String idempotencyKey = "CANCEL:" + cancelId + ":" + initialAttempt;
-                CreateRefundResponse resp;
-                try {
-                    resp = paymentGrpcClient.createRefund(
-                            order.getTransactionId(),
-                            String.valueOf(refundAmount),
-                            "系統取消退款",
-                            idempotencyKey);
-                } catch (io.grpc.StatusRuntimeException e) {
-                    // §2.3.1 INV-5：payment 不可用 → 訂單已跨服務取消（不可逆），持久化 PayUni 循線 + 標 FAILED
-                    log.error("SellerCancelService.cancelShipmentBySystem.createRefundUnavailable",
-                            "ATM 預建退款 payment 不可用 orderNo=" + orderNo + " msg=" + e.getMessage());
-                    persistFailedRefundTaskAndMarkCancelFailed(cancelEntity, initialAttempt,
-                            null, e.getStatus().getDescription(),
-                            "createRefund StatusRuntimeException: " + e.getMessage());
-                    return;  // 系統取消靜默失敗
-                }
-                if (resp.getCode() != 0) {
-                    // §2.3.1 INV-5：createRefund 失敗 → 持久化 PayUni 原始循線 + 標 FAILED
-                    log.error("SellerCancelService.cancelShipmentBySystem.createRefundFailed",
-                            "預建 payment_refunds 失敗 orderNo=" + orderNo + " msg=" + resp.getMessage());
-                    persistFailedRefundTaskAndMarkCancelFailed(cancelEntity, initialAttempt,
-                            resp.getData().getProviderStatus(), resp.getData().getProviderMessage(),
-                            resp.getMessage());
-                    return;  // 系統取消靜默失敗
-                }
-                externalRefId = resp.getData().getRefundNo();
-            }
             RefundTaskEntity refundTask = new RefundTaskEntity();
             refundTask.setId(TsidUtil.generate());
             refundTask.setCancelId(cancelId);
@@ -327,23 +242,13 @@ public class SellerCancelService {
             refundTask.setTransactionId(order.getTransactionId());
             refundTask.setRefundAmount(refundAmount);
             refundTask.setPaymentMethod(order.getPaymentMethod());
-            refundTask.setMerId(order.getMerId());
-            refundTask.setExternalRefId(externalRefId);
-            refundTask.setStatus(isAtm
-                    ? WorkerTaskStatus.AWAITING_BUYER_REFUND_PAGE.value()
-                    : WorkerTaskStatus.PENDING.value());
+            refundTask.setStatus(WorkerTaskStatus.PENDING.value());
             refundTask.setRetryCount(0);
             refundTask.setMaxRetryCount(properties.getRefund().getMaxRetryCount());
-            refundTask.setCurrentAttempt(initialAttempt);
             refundTaskMapper.insert(refundTask);
 
             // §2.3 INV-3：PENDING → REFUND_PROCESSING
             cancelMapper.markRefundProcessing(cancelId);
-
-            if (isAtm) {
-                afterSalesEventPublisher.publishAwaitingBuyerRefundPage(
-                        orderNo, null, refundTask.getId(), cancelEntity.getBuyerId());
-            }
         }
 
         // 8. 稽核日誌（actor = SYSTEM）
@@ -353,58 +258,5 @@ public class SellerCancelService {
 
         log.info("SellerCancelService.cancelShipmentBySystem.success",
                 "系統自動取消出貨完成, cancelId=" + cancelId + ", refundAmount=" + refundAmount, "orderNo", orderNo);
-    }
-
-    /**
-     * §2.3.1 INV-5：ATM createRefund 預建失敗時的處置（seller / system 兩路徑共用）。
-     *
-     * <p>此時 {@code cancelOrderInternal} 已成功，訂單由 order-service 跨服務取消（不可逆），
-     * 故本地事務**不可** throw/rollback。改為：建立終態 {@code FAILED} 的 refund_task，
-     * 持久化 PayUni 原始循線（{@code payuni_status} / {@code payuni_message} / {@code last_error}）供追查，
-     * 並將 seller_cancel_requests 標 {@code FAILED(30)}。買家退款進 admin 異常清單 / 客服救援。</p>
-     *
-     * @param cancelEntity  已建立的取消請求（提供 orderNo / transactionId / refundAmount / paymentMethod / merId / cancelId）
-     * @param attempt       退款嘗試序號（與 idempotency key 對齊）
-     * @param payuniStatus  PayUni 原始狀態（payment 不可用時為 null）
-     * @param payuniMessage PayUni 原始訊息（payment 不可用時為 null）
-     * @param lastError     技術錯誤訊息（一律有值）
-     */
-    private void persistFailedRefundTaskAndMarkCancelFailed(SellerCancelRequestEntity cancelEntity, short attempt,
-                                                            String payuniStatus, String payuniMessage, String lastError) {
-        Long cancelId = cancelEntity.getId();
-
-        RefundTaskEntity failedTask = new RefundTaskEntity();
-        failedTask.setId(TsidUtil.generate());
-        failedTask.setCancelId(cancelId);
-        failedTask.setOrderNo(cancelEntity.getOrderNo());
-        failedTask.setTransactionId(cancelEntity.getTransactionId());
-        failedTask.setRefundAmount(cancelEntity.getRefundAmount());
-        failedTask.setPaymentMethod(cancelEntity.getPaymentMethod());
-        failedTask.setMerId(cancelEntity.getMerId());
-        failedTask.setExternalRefId(null);
-        failedTask.setStatus(WorkerTaskStatus.FAILED.value());   // 終態
-        failedTask.setRetryCount(0);
-        failedTask.setMaxRetryCount(properties.getRefund().getMaxRetryCount());
-        failedTask.setCurrentAttempt(attempt);
-        failedTask.setNextRetryTime(null);                       // 終態：Worker 不再撈
-        failedTask.setPayuniStatus(payuniStatus);
-        failedTask.setPayuniMessage(payuniMessage);
-        failedTask.setLastError(lastError);
-        refundTaskMapper.insert(failedTask);
-
-        // §2.3 INV-3：PENDING → FAILED（不 rollback，本地事務正常 commit）
-        cancelMapper.markFailedFromPending(cancelId);
-
-        auditService.log(null, cancelId, null, AfterSaleAuditActor.SYSTEM.value(),
-                AfterSaleAuditAction.REFUND_FAILED.value(),
-                Map.of("orderNo", cancelEntity.getOrderNo(),
-                        "reason", "ATM createRefund 預建失敗（§2.3.1 INV-5）",
-                        "payuniStatus", payuniStatus == null ? "" : payuniStatus,
-                        "payuniMessage", payuniMessage == null ? "" : payuniMessage,
-                        "lastError", lastError == null ? "" : lastError));
-
-        log.warn("SellerCancelService.persistFailedRefundTaskAndMarkCancelFailed",
-                "ATM createRefund 預建失敗，建立終態 FAILED refund_task 並標 cancel=FAILED, cancelId=" + cancelId,
-                "orderNo", cancelEntity.getOrderNo());
     }
 }

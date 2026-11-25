@@ -55,20 +55,18 @@ import static org.mockito.Mockito.when;
 class OrderInvoiceSnapshotInternalTest {
 
     private static final String ORDER_NO = "O20260830001";
-    private static final String AGENT_MER_ID = "HAWKAGENT01";
-
     private OrderRepository orderRepository;
     private OrderItemRepository orderItemRepository;
     private OrderInvoiceSnapshotRepository invoiceSnapshotRepository;
 
-    private OrderGrpcService buildService(String agentMerId) {
+    private OrderGrpcService buildService() {
         return new OrderGrpcService(
                 mock(OrderService.class), mock(CheckoutService.class), mock(CouponReleaseService.class),
                 orderRepository, orderItemRepository, mock(ShippingGrpcClient.class),
                 mock(PaymentGrpcClient.class), mock(SellerGrpcClient.class), mock(BuyerGrpcClient.class),
                 mock(MediaGrpcClient.class), mock(MediaUrlProperties.class),
                 mock(GrantPaymentTaskRepository.class), invoiceSnapshotRepository,
-                mock(OrderEventPublisher.class), agentMerId);
+                mock(OrderEventPublisher.class));
     }
 
     @BeforeEach
@@ -161,7 +159,7 @@ class OrderInvoiceSnapshotInternalTest {
         when(orderRepository.findByOrderNo(ORDER_NO)).thenReturn(order(null));
         when(invoiceSnapshotRepository.findLatestByOrderNo(ORDER_NO)).thenReturn(snapshot());
 
-        Result r = call(buildService(""), false);
+        Result r = call(buildService(), false);
 
         assertThat(r.response()).as("被拒絕時不得吐出任何 data").isNull();
         assertThat(r.error()).isInstanceOf(StatusRuntimeException.class);
@@ -173,7 +171,7 @@ class OrderInvoiceSnapshotInternalTest {
     void missingOrderReturnsNonZeroCode() {
         when(orderRepository.findByOrderNo(ORDER_NO)).thenReturn(null);
 
-        Result r = call(buildService(""), true);
+        Result r = call(buildService(), true);
 
         assertThat(r.response().getCode()).isNotZero().isEqualTo(GrpcResponseCode.NOT_FOUND.code());
         assertThat(r.response().hasData()).isFalse();
@@ -185,7 +183,7 @@ class OrderInvoiceSnapshotInternalTest {
         when(orderRepository.findByOrderNo(ORDER_NO)).thenReturn(order(null));
         when(invoiceSnapshotRepository.findLatestByOrderNo(ORDER_NO)).thenReturn(null);
 
-        Result r = call(buildService(""), true);
+        Result r = call(buildService(), true);
 
         assertThat(r.response().getCode()).isNotZero().isEqualTo(GrpcResponseCode.NOT_FOUND.code());
         assertThat(r.response().hasData()).isFalse();
@@ -200,7 +198,7 @@ class OrderInvoiceSnapshotInternalTest {
                 item(7001L, 5001L, "蘋果禮盒", "大", 2, 400L),
                 item(7002L, 5002L, "梨子", "", 1, 200L)));
 
-        Result r = call(buildService(AGENT_MER_ID), true);
+        Result r = call(buildService(), true);
 
         assertThat(r.response().getCode()).isZero();
         OrderInvoiceSnapshotData d = r.response().getData();
@@ -227,9 +225,6 @@ class OrderInvoiceSnapshotInternalTest {
                 .as("CouponValidateResult 不帶 issuer_type（58 U-7）⇒ 判不出來就送空字串，"
                         + "呼叫端必須 fail-closed 轉 AWAITING_MANUAL，不得當成 SELLER")
                 .isEmpty();
-        assertThat(d.getIsConsolidatedOrder())
-                .as("orders.mer_id 是賣家自己的 merId ⇒ 非和單")
-                .isFalse();
 
         // --- 品項 6 欄 × 2 ---
         assertThat(d.getItemsCount()).isEqualTo(2);
@@ -253,31 +248,9 @@ class OrderInvoiceSnapshotInternalTest {
                 item(7002L, 5002L, "B", "", 1, 100L),
                 item(7003L, 5003L, "C", "", 1, 100L)));
 
-        OrderInvoiceSnapshotData d = call(buildService(""), true).response().getData();
+        OrderInvoiceSnapshotData d = call(buildService(), true).response().getData();
 
         assertThat(d.getItemsList()).extracting(OrderInvoiceSnapshotItem::getOrderItemId)
                 .containsExactly("7001", "7002", "7003");
-    }
-
-    @Test
-    @DisplayName("和單（orders.mer_id ＝ 代理商 MerID）→ is_consolidated_order = true，讓 invoice 端 fail-closed")
-    void consolidatedOrderIsFlagged() {
-        when(orderRepository.findByOrderNo(ORDER_NO)).thenReturn(order(AGENT_MER_ID));
-        when(invoiceSnapshotRepository.findLatestByOrderNo(ORDER_NO)).thenReturn(snapshot());
-        when(orderItemRepository.findByOrderNo(ORDER_NO)).thenReturn(List.of());
-
-        assertThat(call(buildService(AGENT_MER_ID), true).response().getData().getIsConsolidatedOrder())
-                .isTrue();
-    }
-
-    @Test
-    @DisplayName("未設定 PAYUNI_AGENT_MER_ID 時，merId 為空的訂單不得被判成和單（空字串比對到空 merId 會全部成真）")
-    void blankAgentMerIdNeverMarksConsolidated() {
-        when(orderRepository.findByOrderNo(ORDER_NO)).thenReturn(order(""));
-        when(invoiceSnapshotRepository.findLatestByOrderNo(ORDER_NO)).thenReturn(snapshot());
-        when(orderItemRepository.findByOrderNo(ORDER_NO)).thenReturn(List.of());
-
-        assertThat(call(buildService(""), true).response().getData().getIsConsolidatedOrder())
-                .isFalse();
     }
 }

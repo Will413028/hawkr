@@ -27,7 +27,6 @@ import org.springframework.transaction.annotation.Transactional;
  * <ol>
  *   <li>冪等寫入 financial_log（{@code REFUND_ORIGINAL}，{@code external_txn_id = "AS_CANCEL_" + cancelId}）</li>
  *   <li>落 {@code order.refund.finalized} outbox</li>
- *   <li>清除 need_refund_page</li>
  * </ol>
  *
  * <p><b>金額來源是 {@code orders.total_actual_amount}</b>，不改 aftersales 的 payload：
@@ -93,8 +92,5 @@ public class SellerCancelRefundTxHandler {
         // 不是唯一防線）。
         refundFinalizedOutboxWriter.write(orderNo, RefundSource.SELLER_CANCEL, refundRef,
                 refundAmount, null, null, cancelId);
-
-        // 清除 need_refund_page 標記（原本在 consumer 內、非交易性；一併收進本事務）
-        orderRepository.updateNeedRefundPage(orderNo, false);
     }
 }

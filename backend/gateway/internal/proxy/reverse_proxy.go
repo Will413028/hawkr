@@ -35,27 +35,6 @@ const (
 	// 而且 4xx 說的是「這一次請求出了事」，不是「這個服務不存在」（後者才是
 	// 56 §0.3 禁 404／503 的顧慮，對 424 不成立）。同理見 response/bizhttp.go。
 	FailClientFacing UpstreamFailureStatus = http.StatusFailedDependency // 424
-
-	// FailThirdPartyWebhook：消費者是**第三方的 webhook 送信端**（目前唯一一條是
-	// PayUni 的 /webhook/payuni/notify）。
-	//
-	// ⚠️ 這一條**刻意維持 502，不要跟著 424 改**。第三方對 HTTP status 家族的解讀
-	// 與瀏覽器相反：5xx ＝「你那邊壞了，我等一下重送」；4xx ＝「你說我這個請求有
-	// 問題，那我不重送了」。而本 repo 的 webhook 失敗回收設計**整個建立在重送上**：
-	// 10 號設計書 §4.5.3／§4.5.5.D 明載「T2 失敗一律 rethrow → controller 回 500 →
-	// PayUni 重送 → 下次 T1 dedup 命中 FAILED → replay 路徑接手」，且方案 F 被選中的
-	// 理由就是「復用既有重送機制」。把這條改成 4xx ＝ 讓 PayUni 停止重送 ＝ 那條
-	// replay 路徑永遠等不到觸發，付款狀態永久不同步，而且**沒有任何錯誤訊號**。
-	// CF 會把 body 換掉在這裡不是問題：PayUni 不讀我們的 envelope，它只看 status。
-	//
-	// ⚠️ 另一個不對稱：這裡的錯誤是「payuni-webhook-service 連不上」——正是最需要
-	// 對方重送的時刻（服務回來之後那筆通知還在）。回 4xx 會把一個**可恢復**的
-	// 中斷變成**永久遺失**。
-	//
-	// 誠實標註：PayUni 對 5xx 的實際重送次數與窗口**未經實測坐實**，10 號 §4.5.5.D
-	// 自己就標了「實測 PayUni 的重送策略需確認」。但那影響的是「重送夠不夠」，
-	// 不影響本判斷的方向——改成 4xx 是把重送機率從「未知但非零」直接歸零。
-	FailThirdPartyWebhook UpstreamFailureStatus = http.StatusBadGateway // 502
 )
 
 // upstreamFailureMessage 是**唯一**會出現在使用者畫面上的那句話。
@@ -66,9 +45,6 @@ const (
 // （`lib/core/exceptions/app_exception.dart:26-44`）直接把 `responseData['message']`
 // 當文案顯示 ⇒ 使用者會在畫面上看到 `dial tcp 10.x.x.x:9936: connect: connection refused`，
 // 內部 host:port 就這樣從「被 CF 藏著」變成「印在使用者手機上」。
-//
-// **PayUni 那條（維持 502）也吃同一份文案**：它現在被 CF 擋著是巧合不是設計，
-// 而且 PayUni 只看 status 不讀 body，換成固定文案零成本。
 //
 // 真正的錯誤只進 log；排障靠 envelope 裡的 traceId 對回那筆 log。
 const upstreamFailureMessage = "服務暫時無法使用，請稍後再試"
@@ -166,18 +142,6 @@ var services = map[string]ServiceConfig{
 		Port:   getEnvOrDefault("SHIPPING_SERVICE_PORT", "9930"),
 		Prefix: "",
 	},
-	"payment": {
-		Name:   "payment-service",
-		Host:   getEnvOrDefault("PAYMENT_SERVICE_HOST", "127.0.0.1"),
-		Port:   getEnvOrDefault("PAYMENT_SERVICE_PORT", "9924"),
-		Prefix: "",
-	},
-	"payuni-webhook": {
-		Name:   "payuni-webhook-service",
-		Host:   getEnvOrDefault("PAYUNI_WEBHOOK_SERVICE_HOST", "127.0.0.1"),
-		Port:   getEnvOrDefault("PAYUNI_WEBHOOK_SERVICE_PORT", "9946"),
-		Prefix: "",
-	},
 	// invoice-service 的**檔案串流面**（10042），不是 gRPC 面（10041）。發票 PDF 的
 	// bytes 不該經 gRPC，而擁有者述詞（order_no × buyer_id × document_id）不在 media
 	// ⇒ 這是「微服務不暴露 HTTP」的第二個明列例外（58 號 §6.1.4）。
@@ -241,9 +205,8 @@ func mustParseTarget(serviceName string, config ServiceConfig) *url.URL {
 
 // CreateProxy creates a reverse proxy handler for a service.
 //
-// onUpstreamFailure 是必填的：呼叫端必須宣告這條路由的消費者是我們自己的前端
-// （FailClientFacing）還是第三方 webhook 送信端（FailThirdPartyWebhook），因為
-// 上游不可達時兩者要的答覆剛好相反。判準與理由見 UpstreamFailureStatus。
+// onUpstreamFailure 是必填的：呼叫端必須宣告這條路由上游不可達時的失敗模式。
+// 判準與理由見 UpstreamFailureStatus。
 func CreateProxy(serviceName string, onUpstreamFailure UpstreamFailureStatus) gin.HandlerFunc {
 	config, ok := services[serviceName]
 	if !ok {
@@ -314,37 +277,4 @@ func GetServiceConfig(name string) (ServiceConfig, bool) {
 type PathOverride struct {
 	Handler    gin.HandlerFunc
 	PathPrefix string
-}
-
-// CreateProxyWithPathRewrite creates a proxy that rewrites the request path before
-// forwarding. onUpstreamFailure 同 CreateProxy——必填，依消費者類別宣告。
-func CreateProxyWithPathRewrite(serviceName, fromPath, toPath string, onUpstreamFailure UpstreamFailureStatus) gin.HandlerFunc {
-	config, ok := services[serviceName]
-	if !ok {
-		return func(c *gin.Context) {
-			response.NotFound(c, "service not found")
-		}
-	}
-
-	targetURL := mustParseTarget(serviceName, config)
-	// Rewrite 取代 deprecated 的 Director，X-Forwarded-* 的語意見 CreateProxy 的註解。
-	proxy := &httputil.ReverseProxy{
-		Rewrite: func(r *httputil.ProxyRequest) {
-			r.SetURL(targetURL)
-			r.SetXForwarded()
-			// 路徑改寫
-			if r.Out.URL.Path == fromPath {
-				r.Out.URL.Path = toPath
-			}
-			r.Out.Host = targetURL.Host
-		},
-	}
-
-	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-		writeUpstreamFailureEnvelope(w, r, onUpstreamFailure, err)
-	}
-
-	return func(c *gin.Context) {
-		proxy.ServeHTTP(c.Writer, c.Request)
-	}
 }

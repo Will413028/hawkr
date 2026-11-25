@@ -114,21 +114,6 @@ test("confirmReceipt always sends inspectionPhotoTokens as an array", async () =
 	});
 });
 
-test("fetchRefundPage posts WEB_BROWSER and reads redirect aliases", async () => {
-	responseBody = {
-		code: 0,
-		data: { redirect_url: "https://payuni.test/refund" },
-	};
-
-	const { fetchRefundPage } = await import("../lib/after-sales/buyer-repo");
-	const result = await fetchRefundPage("ORD/001");
-
-	assert.deepEqual(result, { redirectUrl: "https://payuni.test/refund" });
-	assert.match(fetchCalls[0].url, /\/app\/orders\/ORD%2F001\/refund_page$/);
-	assert.equal(fetchCalls[0].init.method, "POST");
-	assert.deepEqual(bodyJson(fetchCalls[0]), { clientType: "WEB_BROWSER" });
-});
-
 test("buyer after-sale creation and follow-up actions keep their API bodies stable", async () => {
 	responseBody = { code: 0, data: { case_no: "AS900" } };
 	const {

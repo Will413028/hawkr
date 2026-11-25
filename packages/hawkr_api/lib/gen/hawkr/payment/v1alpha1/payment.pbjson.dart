@@ -239,6 +239,41 @@ final $typed_data.Uint8List paymentAnomalyResolutionReasonDescriptor = $convert.
     'RU5UX0FOT01BTFlfUkVTT0xVVElPTl9SRUFTT05fRFVQTElDQVRFEAMSKwonUEFZTUVOVF9BTk'
     '9NQUxZX1JFU09MVVRJT05fUkVBU09OX09USEVSEAQ=');
 
+@$core.Deprecated('Use earningsEntryTypeDescriptor instead')
+const EarningsEntryType$json = {
+  '1': 'EarningsEntryType',
+  '2': [
+    {'1': 'EARNINGS_ENTRY_TYPE_UNSPECIFIED', '2': 0},
+    {'1': 'EARNINGS_ENTRY_TYPE_TRANSFER', '2': 1},
+    {'1': 'EARNINGS_ENTRY_TYPE_REVERSAL', '2': 2},
+    {'1': 'EARNINGS_ENTRY_TYPE_TOP_UP', '2': 3},
+  ],
+};
+
+/// Descriptor for `EarningsEntryType`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List earningsEntryTypeDescriptor = $convert.base64Decode(
+    'ChFFYXJuaW5nc0VudHJ5VHlwZRIjCh9FQVJOSU5HU19FTlRSWV9UWVBFX1VOU1BFQ0lGSUVEEA'
+    'ASIAocRUFSTklOR1NfRU5UUllfVFlQRV9UUkFOU0ZFUhABEiAKHEVBUk5JTkdTX0VOVFJZX1RZ'
+    'UEVfUkVWRVJTQUwQAhIeChpFQVJOSU5HU19FTlRSWV9UWVBFX1RPUF9VUBAD');
+
+@$core.Deprecated('Use earningsEntryStatusDescriptor instead')
+const EarningsEntryStatus$json = {
+  '1': 'EarningsEntryStatus',
+  '2': [
+    {'1': 'EARNINGS_ENTRY_STATUS_UNSPECIFIED', '2': 0},
+    {'1': 'EARNINGS_ENTRY_STATUS_PENDING', '2': 1},
+    {'1': 'EARNINGS_ENTRY_STATUS_COMPLETED', '2': 2},
+    {'1': 'EARNINGS_ENTRY_STATUS_FAILED', '2': 3},
+  ],
+};
+
+/// Descriptor for `EarningsEntryStatus`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List earningsEntryStatusDescriptor = $convert.base64Decode(
+    'ChNFYXJuaW5nc0VudHJ5U3RhdHVzEiUKIUVBUk5JTkdTX0VOVFJZX1NUQVRVU19VTlNQRUNJRk'
+    'lFRBAAEiEKHUVBUk5JTkdTX0VOVFJZX1NUQVRVU19QRU5ESU5HEAESIwofRUFSTklOR1NfRU5U'
+    'UllfU1RBVFVTX0NPTVBMRVRFRBACEiAKHEVBUk5JTkdTX0VOVFJZX1NUQVRVU19GQUlMRUQQAw'
+    '==');
+
 @$core.Deprecated('Use paymentDescriptor instead')
 const Payment$json = {
   '1': 'Payment',
@@ -382,6 +417,50 @@ const GetPaymentResponse$json = {
 final $typed_data.Uint8List getPaymentResponseDescriptor = $convert.base64Decode(
     'ChJHZXRQYXltZW50UmVzcG9uc2USOQoHcGF5bWVudBgBIAEoCzIfLmhhd2tyLnBheW1lbnQudj'
     'FhbHBoYTEuUGF5bWVudFIHcGF5bWVudA==');
+
+@$core.Deprecated('Use earningsEntryDescriptor instead')
+const EarningsEntry$json = {
+  '1': 'EarningsEntry',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'id'},
+    {
+      '1': 'type',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.payment.v1alpha1.EarningsEntryType',
+      '10': 'type'
+    },
+    {'1': 'order_no', '3': 3, '4': 1, '5': 9, '10': 'orderNo'},
+    {'1': 'amount', '3': 4, '4': 1, '5': 3, '10': 'amount'},
+    {
+      '1': 'status',
+      '3': 5,
+      '4': 1,
+      '5': 14,
+      '6': '.hawkr.payment.v1alpha1.EarningsEntryStatus',
+      '10': 'status'
+    },
+    {
+      '1': 'create_time',
+      '3': 6,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '8': {},
+      '10': 'createTime'
+    },
+  ],
+};
+
+/// Descriptor for `EarningsEntry`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List earningsEntryDescriptor = $convert.base64Decode(
+    'Cg1FYXJuaW5nc0VudHJ5EhMKAmlkGAEgASgJQgPgQQhSAmlkEj0KBHR5cGUYAiABKA4yKS5oYX'
+    'drci5wYXltZW50LnYxYWxwaGExLkVhcm5pbmdzRW50cnlUeXBlUgR0eXBlEhkKCG9yZGVyX25v'
+    'GAMgASgJUgdvcmRlck5vEhYKBmFtb3VudBgEIAEoA1IGYW1vdW50EkMKBnN0YXR1cxgFIAEoDj'
+    'IrLmhhd2tyLnBheW1lbnQudjFhbHBoYTEuRWFybmluZ3NFbnRyeVN0YXR1c1IGc3RhdHVzEkAK'
+    'C2NyZWF0ZV90aW1lGAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDUgpjcm'
+    'VhdGVUaW1l');
 
 const $core.Map<$core.String, $core.dynamic> PaymentAppServiceBase$json = {
   '1': 'PaymentAppService',

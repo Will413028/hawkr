@@ -173,11 +173,6 @@ export const DYNAMIC_ROUTE_CATALOG: readonly DynamicRouteCatalogEntry[] = [
 		fixture: "order-callback",
 	},
 	{
-		pattern: "/orders/[orderNo]/refund",
-		access: "public",
-		fixture: "order-callback",
-	},
-	{
 		pattern: "/products/[id]",
 		access: "public",
 		fixture: "product",

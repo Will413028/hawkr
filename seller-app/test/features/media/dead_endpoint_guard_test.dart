@@ -33,6 +33,8 @@ void main() {
         'stagedToken 轉正（實際由 UpdateMyStore 的 staged token 欄位內含）',
     '/like_status': '查「我按過這則貼文沒」（實際欄位是列表 payload 的 is_liked）',
     '/like_count': '查貼文讚數（實際欄位是列表 payload 的 like_count）',
+    '/api/v1/app/payments':
+        '訂單付款歷程（舊付款 REST 已隨 Java payment 刪除；改讀 GetMyOrderEarnings）',
   };
 
   /// 還沒處置的死端點：**只准留在這一個檔案**，不准擴散。

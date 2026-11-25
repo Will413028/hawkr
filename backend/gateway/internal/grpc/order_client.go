@@ -167,13 +167,6 @@ func (c *OrderClient) GetTopSellersByRevenue(ctx context.Context, days, limit in
 	})
 }
 
-// SnapshotPaymentInfo 快照付款資訊到訂單
-func (c *OrderClient) SnapshotPaymentInfo(ctx context.Context, req *pb.SnapshotPaymentInfoRequest) (*pb.SnapshotPaymentInfoResponse, error) {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	return c.orderClient.SnapshotPaymentInfo(ctx, req)
-}
-
 // RetryGrant Admin 重發撥款任務（收斂規範 §8.4 人工介入閉環）
 func (c *OrderClient) RetryGrant(ctx context.Context, req *pb.RetryGrantRequest) (*pb.RetryGrantResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)

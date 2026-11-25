@@ -24,7 +24,6 @@ import java.util.List;
  * 2. 依 refundOutcome 分流：FULL → CAS 轉 FULLY_REFUNDED(70)；
  *    PARTIAL → 單一原子 UPDATE 累加 refund_total_amount（僅 COMPLETED(50) 轉 60，
  *    進行中訂單 10~40 不改狀態，物流/完成路徑照走）
- * 3. 清除 need_refund_page
  *
  * 倒數恢復（tryResume）刻意<b>不在</b>本事務內：其內含 AfterSales gRPC 反查（不應被 DB 事務
  * 包住），由 consumer 於本方法返回（= 事務 commit）後呼叫，見 AfterSalesEventConsumer。
@@ -101,9 +100,6 @@ public class AfterSalesRefundEventHandler {
                         refundAmount, outcome.value(), caseNo, null);
             }
         }
-
-        // 共用尾段（首次與重複投遞皆執行）：清除 need_refund_page 標記
-        orderRepository.updateNeedRefundPage(orderNo, false);
     }
 
     /** FULL outcome：多前置 CAS → FULLY_REFUNDED(70)（沿用既有 updateStatusIfMatchAny）。 */

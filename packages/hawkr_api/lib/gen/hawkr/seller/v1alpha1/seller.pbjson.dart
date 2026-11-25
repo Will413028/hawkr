@@ -16,18 +16,19 @@ import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
 import 'package:protobuf/well_known_types/google/protobuf/duration.pbjson.dart'
-    as $6;
+    as $7;
 import 'package:protobuf/well_known_types/google/protobuf/field_mask.pbjson.dart'
     as $4;
 import 'package:protobuf/well_known_types/google/protobuf/timestamp.pbjson.dart'
     as $2;
 
 import '../../../google/rpc/error_details.pbjson.dart' as $3;
-import '../../../google/type/date.pbjson.dart' as $5;
-import '../../common/v1alpha1/deadline.pbjson.dart' as $7;
+import '../../../google/type/date.pbjson.dart' as $6;
+import '../../common/v1alpha1/deadline.pbjson.dart' as $8;
 import '../../common/v1alpha1/image.pbjson.dart' as $1;
 import '../../common/v1alpha1/postal_address.pbjson.dart' as $0;
-import '../../common/v1alpha1/store_card.pbjson.dart' as $8;
+import '../../common/v1alpha1/store_card.pbjson.dart' as $9;
+import '../../payment/v1alpha1/payment.pbjson.dart' as $5;
 
 @$core.Deprecated('Use agreementKindDescriptor instead')
 const AgreementKind$json = {
@@ -1169,6 +1170,98 @@ const UpdateMyStoreResponse$json = {
 final $typed_data.Uint8List updateMyStoreResponseDescriptor = $convert.base64Decode(
     'ChVVcGRhdGVNeVN0b3JlUmVzcG9uc2USMgoFc3RvcmUYASABKAsyHC5oYXdrci5zZWxsZXIudj'
     'FhbHBoYTEuU3RvcmVSBXN0b3Jl');
+
+@$core.Deprecated('Use listMyEarningsRequestDescriptor instead')
+const ListMyEarningsRequest$json = {
+  '1': 'ListMyEarningsRequest',
+  '2': [
+    {'1': 'page_size', '3': 1, '4': 1, '5': 5, '10': 'pageSize'},
+    {'1': 'page_token', '3': 2, '4': 1, '5': 9, '10': 'pageToken'},
+    {'1': 'order_no', '3': 3, '4': 1, '5': 9, '10': 'orderNo'},
+    {
+      '1': 'from_time',
+      '3': 4,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '10': 'fromTime'
+    },
+    {
+      '1': 'to_time',
+      '3': 5,
+      '4': 1,
+      '5': 11,
+      '6': '.google.protobuf.Timestamp',
+      '10': 'toTime'
+    },
+  ],
+};
+
+/// Descriptor for `ListMyEarningsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listMyEarningsRequestDescriptor = $convert.base64Decode(
+    'ChVMaXN0TXlFYXJuaW5nc1JlcXVlc3QSGwoJcGFnZV9zaXplGAEgASgFUghwYWdlU2l6ZRIdCg'
+    'pwYWdlX3Rva2VuGAIgASgJUglwYWdlVG9rZW4SGQoIb3JkZXJfbm8YAyABKAlSB29yZGVyTm8S'
+    'NwoJZnJvbV90aW1lGAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcFIIZnJvbVRpbW'
+    'USMwoHdG9fdGltZRgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBSBnRvVGltZQ==');
+
+@$core.Deprecated('Use listMyEarningsResponseDescriptor instead')
+const ListMyEarningsResponse$json = {
+  '1': 'ListMyEarningsResponse',
+  '2': [
+    {
+      '1': 'entries',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.payment.v1alpha1.EarningsEntry',
+      '10': 'entries'
+    },
+    {'1': 'next_page_token', '3': 2, '4': 1, '5': 9, '10': 'nextPageToken'},
+  ],
+};
+
+/// Descriptor for `ListMyEarningsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List listMyEarningsResponseDescriptor = $convert.base64Decode(
+    'ChZMaXN0TXlFYXJuaW5nc1Jlc3BvbnNlEj8KB2VudHJpZXMYASADKAsyJS5oYXdrci5wYXltZW'
+    '50LnYxYWxwaGExLkVhcm5pbmdzRW50cnlSB2VudHJpZXMSJgoPbmV4dF9wYWdlX3Rva2VuGAIg'
+    'ASgJUg1uZXh0UGFnZVRva2Vu');
+
+@$core.Deprecated('Use getMyOrderEarningsRequestDescriptor instead')
+const GetMyOrderEarningsRequest$json = {
+  '1': 'GetMyOrderEarningsRequest',
+  '2': [
+    {'1': 'order_no', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'orderNo'},
+  ],
+};
+
+/// Descriptor for `GetMyOrderEarningsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getMyOrderEarningsRequestDescriptor =
+    $convert.base64Decode(
+        'ChlHZXRNeU9yZGVyRWFybmluZ3NSZXF1ZXN0Eh4KCG9yZGVyX25vGAEgASgJQgPgQQJSB29yZG'
+        'VyTm8=');
+
+@$core.Deprecated('Use getMyOrderEarningsResponseDescriptor instead')
+const GetMyOrderEarningsResponse$json = {
+  '1': 'GetMyOrderEarningsResponse',
+  '2': [
+    {
+      '1': 'entries',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.hawkr.payment.v1alpha1.EarningsEntry',
+      '10': 'entries'
+    },
+    {'1': 'net_amount', '3': 2, '4': 1, '5': 3, '10': 'netAmount'},
+  ],
+};
+
+/// Descriptor for `GetMyOrderEarningsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List getMyOrderEarningsResponseDescriptor =
+    $convert.base64Decode(
+        'ChpHZXRNeU9yZGVyRWFybmluZ3NSZXNwb25zZRI/CgdlbnRyaWVzGAEgAygLMiUuaGF3a3IucG'
+        'F5bWVudC52MWFscGhhMS5FYXJuaW5nc0VudHJ5UgdlbnRyaWVzEh0KCm5ldF9hbW91bnQYAiAB'
+        'KANSCW5ldEFtb3VudA==');
 
 @$core.Deprecated('Use refreshMyPaymentAccountRequestDescriptor instead')
 const RefreshMyPaymentAccountRequest$json = {
@@ -3645,6 +3738,18 @@ const $core.Map<$core.String, $core.dynamic> SellerAppServiceBase$json = {
       '4': {'34': 1},
     },
     {
+      '1': 'ListMyEarnings',
+      '2': '.hawkr.seller.v1alpha1.ListMyEarningsRequest',
+      '3': '.hawkr.seller.v1alpha1.ListMyEarningsResponse',
+      '4': {'34': 1},
+    },
+    {
+      '1': 'GetMyOrderEarnings',
+      '2': '.hawkr.seller.v1alpha1.GetMyOrderEarningsRequest',
+      '3': '.hawkr.seller.v1alpha1.GetMyOrderEarningsResponse',
+      '4': {'34': 1},
+    },
+    {
       '1': 'CreatePaymentOnboardingSession',
       '2': '.hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionRequest',
       '3': '.hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionResponse'
@@ -3759,7 +3864,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.seller.v1alpha1.GetMyDashboardResponse': GetMyDashboardResponse$json,
   '.hawkr.seller.v1alpha1.Dashboard': Dashboard$json,
   '.hawkr.seller.v1alpha1.DashboardPeriod': DashboardPeriod$json,
-  '.google.type.Date': $5.Date$json,
+  '.google.type.Date': $6.Date$json,
   '.hawkr.seller.v1alpha1.DashboardSales': DashboardSales$json,
   '.hawkr.seller.v1alpha1.PeriodAmount': PeriodAmount$json,
   '.hawkr.seller.v1alpha1.PeriodCount': PeriodCount$json,
@@ -3786,6 +3891,13 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.seller.v1alpha1.GetMyPaymentAccountResponse':
       GetMyPaymentAccountResponse$json,
   '.hawkr.seller.v1alpha1.PaymentAccount': PaymentAccount$json,
+  '.hawkr.seller.v1alpha1.ListMyEarningsRequest': ListMyEarningsRequest$json,
+  '.hawkr.seller.v1alpha1.ListMyEarningsResponse': ListMyEarningsResponse$json,
+  '.hawkr.payment.v1alpha1.EarningsEntry': $5.EarningsEntry$json,
+  '.hawkr.seller.v1alpha1.GetMyOrderEarningsRequest':
+      GetMyOrderEarningsRequest$json,
+  '.hawkr.seller.v1alpha1.GetMyOrderEarningsResponse':
+      GetMyOrderEarningsResponse$json,
   '.hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionRequest':
       CreatePaymentOnboardingSessionRequest$json,
   '.hawkr.seller.v1alpha1.CreatePaymentOnboardingSessionResponse':
@@ -3804,7 +3916,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.seller.v1alpha1.Measure': Measure$json,
   '.hawkr.seller.v1alpha1.MeasureFinding': MeasureFinding$json,
   '.hawkr.seller.v1alpha1.MeasurePeriod': MeasurePeriod$json,
-  '.google.protobuf.Duration': $6.Duration$json,
+  '.google.protobuf.Duration': $7.Duration$json,
   '.hawkr.seller.v1alpha1.MeasureRequest': MeasureRequest$json,
   '.hawkr.seller.v1alpha1.RemediationUnavailability':
       RemediationUnavailability$json,
@@ -3823,7 +3935,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.seller.v1alpha1.ListMyInquiriesResponse':
       ListMyInquiriesResponse$json,
   '.hawkr.seller.v1alpha1.Inquiry': Inquiry$json,
-  '.hawkr.common.v1alpha1.Deadline': $7.Deadline$json,
+  '.hawkr.common.v1alpha1.Deadline': $8.Deadline$json,
   '.hawkr.seller.v1alpha1.InquiryReply': InquiryReply$json,
   '.hawkr.seller.v1alpha1.GetMyInquiryRequest': GetMyInquiryRequest$json,
   '.hawkr.seller.v1alpha1.GetMyInquiryResponse': GetMyInquiryResponse$json,
@@ -3873,33 +3985,37 @@ final $typed_data.Uint8List sellerAppServiceDescriptor = $convert.base64Decode(
     'ZXF1ZXN0GiguaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkNhbmNlbEtZQ1Jlc3BvbnNlEoEBChNHZX'
     'RNeVBheW1lbnRBY2NvdW50EjEuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkdldE15UGF5bWVudEFj'
     'Y291bnRSZXF1ZXN0GjIuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkdldE15UGF5bWVudEFjY291bn'
-    'RSZXNwb25zZSIDkAIBEp0BCh5DcmVhdGVQYXltZW50T25ib2FyZGluZ1Nlc3Npb24SPC5oYXdr'
-    'ci5zZWxsZXIudjFhbHBoYTEuQ3JlYXRlUGF5bWVudE9uYm9hcmRpbmdTZXNzaW9uUmVxdWVzdB'
-    'o9Lmhhd2tyLnNlbGxlci52MWFscGhhMS5DcmVhdGVQYXltZW50T25ib2FyZGluZ1Nlc3Npb25S'
-    'ZXNwb25zZRKRAQoaTG9va3VwQnVzaW5lc3NSZWdpc3RyYXRpb24SOC5oYXdrci5zZWxsZXIudj'
-    'FhbHBoYTEuTG9va3VwQnVzaW5lc3NSZWdpc3RyYXRpb25SZXF1ZXN0GjkuaGF3a3Iuc2VsbGVy'
-    'LnYxYWxwaGExLkxvb2t1cEJ1c2luZXNzUmVnaXN0cmF0aW9uUmVzcG9uc2UScgoOTGlzdE15TW'
-    'Vhc3VyZXMSLC5oYXdrci5zZWxsZXIudjFhbHBoYTEuTGlzdE15TWVhc3VyZXNSZXF1ZXN0Gi0u'
-    'aGF3a3Iuc2VsbGVyLnYxYWxwaGExLkxpc3RNeU1lYXN1cmVzUmVzcG9uc2UiA5ACARJsCgxHZX'
-    'RNeU1lYXN1cmUSKi5oYXdrci5zZWxsZXIudjFhbHBoYTEuR2V0TXlNZWFzdXJlUmVxdWVzdBor'
-    'Lmhhd2tyLnNlbGxlci52MWFscGhhMS5HZXRNeU1lYXN1cmVSZXNwb25zZSIDkAIBEmcKDFN1Ym'
-    '1pdEFwcGVhbBIqLmhhd2tyLnNlbGxlci52MWFscGhhMS5TdWJtaXRBcHBlYWxSZXF1ZXN0Gisu'
-    'aGF3a3Iuc2VsbGVyLnYxYWxwaGExLlN1Ym1pdEFwcGVhbFJlc3BvbnNlEnkKElJlcXVlc3RSZW'
-    '1lZGlhdGlvbhIwLmhhd2tyLnNlbGxlci52MWFscGhhMS5SZXF1ZXN0UmVtZWRpYXRpb25SZXF1'
-    'ZXN0GjEuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlJlcXVlc3RSZW1lZGlhdGlvblJlc3BvbnNlEn'
-    'UKD0xpc3RNeUlucXVpcmllcxItLmhhd2tyLnNlbGxlci52MWFscGhhMS5MaXN0TXlJbnF1aXJp'
-    'ZXNSZXF1ZXN0Gi4uaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkxpc3RNeUlucXVpcmllc1Jlc3Bvbn'
-    'NlIgOQAgESbAoMR2V0TXlJbnF1aXJ5EiouaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkdldE15SW5x'
-    'dWlyeVJlcXVlc3QaKy5oYXdrci5zZWxsZXIudjFhbHBoYTEuR2V0TXlJbnF1aXJ5UmVzcG9uc2'
-    'UiA5ACARJtCg5SZXBseVRvSW5xdWlyeRIsLmhhd2tyLnNlbGxlci52MWFscGhhMS5SZXBseVRv'
-    'SW5xdWlyeVJlcXVlc3QaLS5oYXdrci5zZWxsZXIudjFhbHBoYTEuUmVwbHlUb0lucXVpcnlSZX'
-    'Nwb25zZRJmCgpCbG9ja0J1eWVyEiguaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkJsb2NrQnV5ZXJS'
-    'ZXF1ZXN0GikuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkJsb2NrQnV5ZXJSZXNwb25zZSIDkAICEm'
-    'wKDFVuYmxvY2tCdXllchIqLmhhd2tyLnNlbGxlci52MWFscGhhMS5VbmJsb2NrQnV5ZXJSZXF1'
-    'ZXN0GisuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLlVuYmxvY2tCdXllclJlc3BvbnNlIgOQAgISew'
-    'oRTGlzdEJsb2NrZWRCdXllcnMSLy5oYXdrci5zZWxsZXIudjFhbHBoYTEuTGlzdEJsb2NrZWRC'
-    'dXllcnNSZXF1ZXN0GjAuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkxpc3RCbG9ja2VkQnV5ZXJzUm'
-    'VzcG9uc2UiA5ACAQ==');
+    'RSZXNwb25zZSIDkAIBEnIKDkxpc3RNeUVhcm5pbmdzEiwuaGF3a3Iuc2VsbGVyLnYxYWxwaGEx'
+    'Lkxpc3RNeUVhcm5pbmdzUmVxdWVzdBotLmhhd2tyLnNlbGxlci52MWFscGhhMS5MaXN0TXlFYX'
+    'JuaW5nc1Jlc3BvbnNlIgOQAgESfgoSR2V0TXlPcmRlckVhcm5pbmdzEjAuaGF3a3Iuc2VsbGVy'
+    'LnYxYWxwaGExLkdldE15T3JkZXJFYXJuaW5nc1JlcXVlc3QaMS5oYXdrci5zZWxsZXIudjFhbH'
+    'BoYTEuR2V0TXlPcmRlckVhcm5pbmdzUmVzcG9uc2UiA5ACARKdAQoeQ3JlYXRlUGF5bWVudE9u'
+    'Ym9hcmRpbmdTZXNzaW9uEjwuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkNyZWF0ZVBheW1lbnRPbm'
+    'JvYXJkaW5nU2Vzc2lvblJlcXVlc3QaPS5oYXdrci5zZWxsZXIudjFhbHBoYTEuQ3JlYXRlUGF5'
+    'bWVudE9uYm9hcmRpbmdTZXNzaW9uUmVzcG9uc2USkQEKGkxvb2t1cEJ1c2luZXNzUmVnaXN0cm'
+    'F0aW9uEjguaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkxvb2t1cEJ1c2luZXNzUmVnaXN0cmF0aW9u'
+    'UmVxdWVzdBo5Lmhhd2tyLnNlbGxlci52MWFscGhhMS5Mb29rdXBCdXNpbmVzc1JlZ2lzdHJhdG'
+    'lvblJlc3BvbnNlEnIKDkxpc3RNeU1lYXN1cmVzEiwuaGF3a3Iuc2VsbGVyLnYxYWxwaGExLkxp'
+    'c3RNeU1lYXN1cmVzUmVxdWVzdBotLmhhd2tyLnNlbGxlci52MWFscGhhMS5MaXN0TXlNZWFzdX'
+    'Jlc1Jlc3BvbnNlIgOQAgESbAoMR2V0TXlNZWFzdXJlEiouaGF3a3Iuc2VsbGVyLnYxYWxwaGEx'
+    'LkdldE15TWVhc3VyZVJlcXVlc3QaKy5oYXdrci5zZWxsZXIudjFhbHBoYTEuR2V0TXlNZWFzdX'
+    'JlUmVzcG9uc2UiA5ACARJnCgxTdWJtaXRBcHBlYWwSKi5oYXdrci5zZWxsZXIudjFhbHBoYTEu'
+    'U3VibWl0QXBwZWFsUmVxdWVzdBorLmhhd2tyLnNlbGxlci52MWFscGhhMS5TdWJtaXRBcHBlYW'
+    'xSZXNwb25zZRJ5ChJSZXF1ZXN0UmVtZWRpYXRpb24SMC5oYXdrci5zZWxsZXIudjFhbHBoYTEu'
+    'UmVxdWVzdFJlbWVkaWF0aW9uUmVxdWVzdBoxLmhhd2tyLnNlbGxlci52MWFscGhhMS5SZXF1ZX'
+    'N0UmVtZWRpYXRpb25SZXNwb25zZRJ1Cg9MaXN0TXlJbnF1aXJpZXMSLS5oYXdrci5zZWxsZXIu'
+    'djFhbHBoYTEuTGlzdE15SW5xdWlyaWVzUmVxdWVzdBouLmhhd2tyLnNlbGxlci52MWFscGhhMS'
+    '5MaXN0TXlJbnF1aXJpZXNSZXNwb25zZSIDkAIBEmwKDEdldE15SW5xdWlyeRIqLmhhd2tyLnNl'
+    'bGxlci52MWFscGhhMS5HZXRNeUlucXVpcnlSZXF1ZXN0GisuaGF3a3Iuc2VsbGVyLnYxYWxwaG'
+    'ExLkdldE15SW5xdWlyeVJlc3BvbnNlIgOQAgESbQoOUmVwbHlUb0lucXVpcnkSLC5oYXdrci5z'
+    'ZWxsZXIudjFhbHBoYTEuUmVwbHlUb0lucXVpcnlSZXF1ZXN0Gi0uaGF3a3Iuc2VsbGVyLnYxYW'
+    'xwaGExLlJlcGx5VG9JbnF1aXJ5UmVzcG9uc2USZgoKQmxvY2tCdXllchIoLmhhd2tyLnNlbGxl'
+    'ci52MWFscGhhMS5CbG9ja0J1eWVyUmVxdWVzdBopLmhhd2tyLnNlbGxlci52MWFscGhhMS5CbG'
+    '9ja0J1eWVyUmVzcG9uc2UiA5ACAhJsCgxVbmJsb2NrQnV5ZXISKi5oYXdrci5zZWxsZXIudjFh'
+    'bHBoYTEuVW5ibG9ja0J1eWVyUmVxdWVzdBorLmhhd2tyLnNlbGxlci52MWFscGhhMS5VbmJsb2'
+    'NrQnV5ZXJSZXNwb25zZSIDkAICEnsKEUxpc3RCbG9ja2VkQnV5ZXJzEi8uaGF3a3Iuc2VsbGVy'
+    'LnYxYWxwaGExLkxpc3RCbG9ja2VkQnV5ZXJzUmVxdWVzdBowLmhhd2tyLnNlbGxlci52MWFscG'
+    'hhMS5MaXN0QmxvY2tlZEJ1eWVyc1Jlc3BvbnNlIgOQAgE=');
 
 const $core.Map<$core.String, $core.dynamic> SellerPublicServiceBase$json = {
   '1': 'SellerPublicService',
@@ -3949,7 +4065,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>>
   '.hawkr.seller.v1alpha1.ListStoresResponse': ListStoresResponse$json,
   '.hawkr.seller.v1alpha1.BatchGetStoresRequest': BatchGetStoresRequest$json,
   '.hawkr.seller.v1alpha1.BatchGetStoresResponse': BatchGetStoresResponse$json,
-  '.hawkr.common.v1alpha1.StoreCard': $8.StoreCard$json,
+  '.hawkr.common.v1alpha1.StoreCard': $9.StoreCard$json,
   '.hawkr.seller.v1alpha1.GetSellerAgreementsRequest':
       GetSellerAgreementsRequest$json,
   '.hawkr.seller.v1alpha1.GetSellerAgreementsResponse':

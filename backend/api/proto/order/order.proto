@@ -95,9 +95,6 @@ service OrderService {
     // 取得訂單付款資訊（Payment Service 內部呼叫）
     rpc GetOrderForPayment(GetOrderForPaymentRequest) returns (GetOrderForPaymentResponse);
 
-    // 快照付款資訊到訂單（CreatePayment 成功後由 Gateway 呼叫）
-    rpc SnapshotPaymentInfo(SnapshotPaymentInfoRequest) returns (SnapshotPaymentInfoResponse);
-
     // ==================== 管理端 ====================
 
     // 搜尋訂單（後台）
@@ -211,7 +208,7 @@ message OrderSummaryView {
     string odno = 25;               // 超商出貨單編號（8 碼，shipment.label.updated 事件快照）
     string validation_no = 26;      // 超商 C2C 驗證碼（4 碼，shipment.label.updated 事件快照，B2C 時為空）
     repeated string shipment_photo_keys = 27; // 出貨照片 objectKey 陣列（49 §6.6：Gateway 組 shipmentPhotoUrls；僅賣家視角，選填）
-    bool need_refund_page = 30;               // ATM 退款等待買家前往 PayUni 頁面
+    reserved 30;
     bool is_reviewed = 31;                    // 該訂單是否已有評論（任一商品已評即 true）
     string review_deadline = 32;              // 評論截止時間（confirmed_at + 30 天，ISO 8601 UTC，僅 status=50 時有值）
     bool can_review = 33;                     // 是否可評論（status=50 且未超過評論截止時間）
@@ -284,9 +281,9 @@ message OrderDetailView {
     string validation_no = 31;      // C2C 驗證碼（4 碼，B2C 時為空）
     // 付款資訊（Order DB 快照 + Payment Service 聚合）
     string payment_method = 32;     // 付款方式 value（2001=信用卡 / 2002=ApplePay / 2003=GooglePay / 2004=ATM）
-    string atm_bank_code = 33;      // ATM 銀行代碼（僅 ATM 付款時有值，如 "822"）
-    string atm_virtual_account = 34; // ATM 虛擬帳號（僅 ATM 付款時有值）
-    string atm_expire_date = 35;    // ATM 繳費期限（僅 ATM 付款時有值，格式 "yyyy-MM-dd"）
+    reserved 33;
+    reserved 34;
+    reserved 35;
     // 賣家資訊（即時聚合自 Seller Service）
     string seller_name = 36;        // 賣家店名
     string seller_avatar_key = 37;  // 賣家頭像 objectKey（49 §6.6 S2+S9：Gateway 組 sellerAvatarUrl；http 值 passthrough）
@@ -303,7 +300,7 @@ message OrderDetailView {
     string cancel_remark = 43;      // 取消備註（空字串表示無備註）
     // 出貨照片（賣家上傳，雙方詳情頁可見，統一從 orders.shipment_photo_urls 快照取）
     repeated string shipment_photo_keys = 44; // 賣家出貨照片 objectKey 陣列（49 §6.6：Gateway 組 shipmentPhotoUrls；選填）
-    bool need_refund_page = 47;               // ATM 退款等待買家前往 PayUni 頁面
+    reserved 47;
     // 訂單備註
     string order_remark = 48;                 // 訂單備註（買家下單時留言給賣家，選填）
     // 評論狀態
@@ -1198,22 +1195,6 @@ message StorePeriodOrderStats {
     string revenue = 3;              // 營收（新台幣元，數字字串）：成立訂單的實付金額（total_actual_amount）減去已完成的退款金額（refund_total_amount）加總；之後才發生的退款會使過去的窗變小
 }
 
-// ==================== 快照付款資訊 ====================
-
-message SnapshotPaymentInfoRequest {
-    string order_no = 1;             // 訂單編號
-    string trade_no = 2;             // 交易編號（Payment Service trade_no）
-    string payment_method = 3;       // 付款方式 value（2001=信用卡 / 2002=ApplePay / 2003=GooglePay / 2004=ATM）
-    string atm_bank_code = 4;        // ATM 銀行代碼（僅 ATM 有值）
-    string atm_virtual_account = 5;  // ATM 虛擬帳號（僅 ATM 有值）
-    string atm_expire_date = 6;      // ATM 繳費期限（僅 ATM 有值，ISO 8601）
-}
-
-message SnapshotPaymentInfoResponse {
-    int32 code = 1;
-    string message = 2;
-}
-
 // ==================== 售後用：查詢訂單 ====================
 
 message GetOrderForAfterSalesRequest {
@@ -1249,7 +1230,7 @@ message OrderAfterSalesView {
     string buyer_district = 19;
     string buyer_address_detail = 20;
     string buyer_postal_code = 21;
-    bool need_refund_page = 22;
+    reserved 22;
 }
 
 message OrderItemForAfterSales {

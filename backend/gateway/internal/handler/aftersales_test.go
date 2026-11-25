@@ -24,7 +24,6 @@ type mockAftersalesBuyerServiceClient struct {
 	GetAfterSaleCaseDetailFn func(ctx context.Context, in *aftersalespb.GetAfterSaleCaseDetailRequest, opts ...grpc.CallOption) (*aftersalespb.GetAfterSaleCaseDetailResponse, error)
 	SupplementEvidenceFn     func(ctx context.Context, in *aftersalespb.SupplementEvidenceRequest, opts ...grpc.CallOption) (*aftersalespb.SupplementEvidenceResponse, error)
 	CancelAfterSaleCaseFn    func(ctx context.Context, in *aftersalespb.CancelAfterSaleCaseRequest, opts ...grpc.CallOption) (*aftersalespb.CancelAfterSaleCaseResponse, error)
-	GetRefundPageUrlFn       func(ctx context.Context, in *aftersalespb.GetRefundPageUrlRequest, opts ...grpc.CallOption) (*aftersalespb.GetRefundPageUrlResponse, error)
 	SubmitAppealFn           func(ctx context.Context, in *aftersalespb.SubmitAppealRequest, opts ...grpc.CallOption) (*aftersalespb.SubmitAppealResponse, error)
 	GetArbitrationFn         func(ctx context.Context, in *aftersalespb.GetArbitrationRequest, opts ...grpc.CallOption) (*aftersalespb.GetArbitrationResponse, error)
 }
@@ -43,9 +42,6 @@ func (m *mockAftersalesBuyerServiceClient) SupplementEvidence(ctx context.Contex
 }
 func (m *mockAftersalesBuyerServiceClient) CancelAfterSaleCase(ctx context.Context, in *aftersalespb.CancelAfterSaleCaseRequest, opts ...grpc.CallOption) (*aftersalespb.CancelAfterSaleCaseResponse, error) {
 	return m.CancelAfterSaleCaseFn(ctx, in, opts...)
-}
-func (m *mockAftersalesBuyerServiceClient) GetRefundPageUrl(ctx context.Context, in *aftersalespb.GetRefundPageUrlRequest, opts ...grpc.CallOption) (*aftersalespb.GetRefundPageUrlResponse, error) {
-	return m.GetRefundPageUrlFn(ctx, in, opts...)
 }
 func (m *mockAftersalesBuyerServiceClient) SubmitAppeal(ctx context.Context, in *aftersalespb.SubmitAppealRequest, opts ...grpc.CallOption) (*aftersalespb.SubmitAppealResponse, error) {
 	return m.SubmitAppealFn(ctx, in, opts...)
@@ -77,9 +73,6 @@ func successStubMock() *mockAftersalesBuyerServiceClient {
 		CancelAfterSaleCaseFn: func(context.Context, *aftersalespb.CancelAfterSaleCaseRequest, ...grpc.CallOption) (*aftersalespb.CancelAfterSaleCaseResponse, error) {
 			return &aftersalespb.CancelAfterSaleCaseResponse{Code: 0}, nil
 		},
-		GetRefundPageUrlFn: func(context.Context, *aftersalespb.GetRefundPageUrlRequest, ...grpc.CallOption) (*aftersalespb.GetRefundPageUrlResponse, error) {
-			return &aftersalespb.GetRefundPageUrlResponse{Code: 0, Data: &aftersalespb.RefundPageUrlData{RedirectUrl: "https://pay.example/refund"}}, nil
-		},
 		SubmitAppealFn: func(context.Context, *aftersalespb.SubmitAppealRequest, ...grpc.CallOption) (*aftersalespb.SubmitAppealResponse, error) {
 			return &aftersalespb.SubmitAppealResponse{Code: 0, Data: &aftersalespb.SubmitAppealData{AppealId: "AP0001", AppealState: "APPEALED"}}, nil
 		},
@@ -100,7 +93,6 @@ func setupAftersalesBuyerRouter(h *Holder) *gin.Engine {
 		app.GET("/after_sales/:case_no", h.GetAfterSaleCaseDetail)
 		app.POST("/after_sales/:case_no/supplement", h.SupplementEvidence)
 		app.POST("/after_sales/:case_no/cancel", h.CancelAfterSaleCase)
-		app.POST("/orders/:order_no/refund_page", h.GetRefundPageUrl)
 		app.POST("/after_sales/:case_no/appeal", h.SubmitAppeal)
 		app.GET("/after_sales/:case_no/arbitration", h.GetArbitration)
 	}
@@ -215,23 +207,6 @@ func TestCancelAfterSaleCase_UsesResolvedBuyerID(t *testing.T) {
 	}
 }
 
-func TestGetRefundPageUrl_UsesResolvedBuyerID(t *testing.T) {
-	var gotBuyerID int64
-	mock := &mockAftersalesBuyerServiceClient{
-		GetRefundPageUrlFn: func(_ context.Context, in *aftersalespb.GetRefundPageUrlRequest, _ ...grpc.CallOption) (*aftersalespb.GetRefundPageUrlResponse, error) {
-			gotBuyerID = in.BuyerId
-			return &aftersalespb.GetRefundPageUrlResponse{Code: 0, Data: &aftersalespb.RefundPageUrlData{RedirectUrl: "https://pay.example/refund"}}, nil
-		},
-	}
-	h := &Holder{Aftersales: grpcclient.NewAftersalesClientForTest(mock), BuyerID: buyerResolverForTest(aftersalesTestBuyerID)}
-	w := doAftersalesBuyerReq(t, setupAftersalesBuyerRouter(h), "POST", "/api/v1/app/orders/HK20260716000001/refund_page", "")
-
-	assertHTTPStatus(t, w, 200)
-	if gotBuyerID != aftersalesTestBuyerID {
-		t.Errorf("GetRefundPageUrlRequest.BuyerId = %d, want resolved buyer_id %d (not raw account_id %d)", gotBuyerID, aftersalesTestBuyerID, aftersalesTestAccountID)
-	}
-}
-
 func TestSubmitAppeal_UsesResolvedBuyerID(t *testing.T) {
 	var gotBuyerID int64
 	mock := &mockAftersalesBuyerServiceClient{
@@ -279,7 +254,6 @@ func TestAftersalesBuyerHandlers_NoCurrentBuyer_Forbidden(t *testing.T) {
 		{"GetAfterSaleCaseDetail", "GET", "/api/v1/app/after_sales/AS0001"},
 		{"SupplementEvidence", "POST", "/api/v1/app/after_sales/AS0001/supplement"},
 		{"CancelAfterSaleCase", "POST", "/api/v1/app/after_sales/AS0001/cancel"},
-		{"GetRefundPageUrl", "POST", "/api/v1/app/orders/HK20260716000001/refund_page"},
 		{"SubmitAppeal", "POST", "/api/v1/app/after_sales/AS0001/appeal"},
 		{"GetArbitration", "GET", "/api/v1/app/after_sales/AS0001/arbitration"},
 	}

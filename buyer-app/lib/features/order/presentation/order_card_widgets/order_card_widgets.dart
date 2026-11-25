@@ -2,7 +2,6 @@
 library;
 
 export 'after_sale_expanded_section.dart';
-export 'atm_info_sheet.dart';
 export 'order_action_buttons.dart';
 export 'order_expanded_section.dart';
 export 'order_flag_banner.dart';

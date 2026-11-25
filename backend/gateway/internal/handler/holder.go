@@ -15,7 +15,6 @@ type Holder struct {
 	Buyer        *grpcclient.BuyerClient
 	Product      *grpcclient.ProductClient
 	Order        *grpcclient.OrderClient
-	Payment      *grpcclient.PaymentClient
 	Cart         *grpcclient.CartClient
 	Shipping     *grpcclient.ShippingClient
 	Coupon       *grpcclient.CouponClient

@@ -158,4 +158,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String quoteAmountNotWholeNumber(String label) {
     return '$label must be a non-negative whole number of TWD, for example 1200';
   }
+
+  @override
+  String get earningsTitle => 'Earnings';
+
+  @override
+  String earningsNetAmount(String amount) {
+    return 'Net earnings $amount';
+  }
+
+  @override
+  String get earningsEmpty => 'No earnings yet';
+
+  @override
+  String get earningsLoadFailed => 'Could not load earnings';
 }

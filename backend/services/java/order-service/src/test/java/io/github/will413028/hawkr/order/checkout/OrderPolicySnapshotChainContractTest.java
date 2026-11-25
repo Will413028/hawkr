@@ -164,7 +164,6 @@ class OrderPolicySnapshotChainContractTest {
                         .build());
         when(sellerGrpcClient.getSellerMeta(anyLong())).thenReturn(SellerMeta.newBuilder()
                 .setSellerName("測試賣家")
-                .setPayuniMerId("HAWK" + STORE_ID)
                 .setCanAcceptOrders(true)
                 .build());
         when(checkoutValidator.validate(anyList(), any()))
@@ -202,7 +201,7 @@ class OrderPolicySnapshotChainContractTest {
                 new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
 
         service = new CheckoutService(productGrpcClient, sellerGrpcClient, buyerGrpcClient,
-                shippingGrpcClient, null, invoiceGrpcClient, checkoutValidator, orderService, new OrderPolicyResolver(), redisTemplate, null);
+                shippingGrpcClient, null, invoiceGrpcClient, checkoutValidator, orderService, new OrderPolicyResolver(), redisTemplate, null, null);
     }
 
 

@@ -52,11 +52,8 @@ abstract class AfterSaleCase with _$AfterSaleCase {
     @JsonKey(readValue: _readCaseValue)
     @Default('')
     String refundFailureMessage,
-    @JsonKey(readValue: _readCaseValue) @Default('') String estimatedRefundDate,
-    @JsonKey(readValue: _readCaseValue) @Default('') String bankDate,
     String? odno,
     String? validationNo,
-    @Default(false) bool needRefundPage,
     @Default('') String createdAt,
     @Default('') String closedAt,
     @Default([]) List<AfterSaleItem> items,
