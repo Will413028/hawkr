@@ -134,18 +134,6 @@ func (c *Client) CancelJob(ctx context.Context, jobID int64) (state rivertype.Jo
 	return row.State, true, nil
 }
 
-// HasUnfinishedJob 回答是否有一個 kinds 之一、args 含 {argKey: argValue}（字串值）、而且還沒結束（UnfinishedStates）的 job。
-// 經 River 的 JobList 查，job 表的欄位與狀態名由 River 負責；args 條件用 jsonb 包含（可走 GIN 索引）。
-func (c *Client) HasUnfinishedJob(ctx context.Context, kinds []string, argKey, argValue string) (bool, error) {
-	params := river.NewJobListParams().Kinds(kinds...).States(UnfinishedStates()...).First(1).
-		Where("args @> jsonb_build_object(@arg_key::text, @arg_value::text)", river.NamedArgs{"arg_key": argKey, "arg_value": argValue})
-	res, err := c.river.JobList(ctx, params)
-	if err != nil {
-		return false, fmt.Errorf("jobs：查詢進行中的 job：%w", err)
-	}
-	return len(res.Jobs) > 0, nil
-}
-
 // Run 執行 job 直到 ctx 結束，之後停止取新工作並等進行中的 job 收尾。
 func (c *Client) Run(ctx context.Context) error {
 	if err := c.river.Start(context.WithoutCancel(ctx)); err != nil {

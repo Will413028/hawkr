@@ -480,42 +480,6 @@ class PublicationState extends $pb.ProtobufEnum {
   const PublicationState._(super.value, super.name);
 }
 
-/// InviteDeliveryState 是詢價通知投遞給賣家的狀態。
-class InviteDeliveryState extends $pb.ProtobufEnum {
-  static const InviteDeliveryState INVITE_DELIVERY_STATE_UNSPECIFIED =
-      InviteDeliveryState._(
-          0, _omitEnumNames ? '' : 'INVITE_DELIVERY_STATE_UNSPECIFIED');
-
-  /// 已排入投遞，還沒交給投遞管道。
-  static const InviteDeliveryState INVITE_DELIVERY_STATE_QUEUED =
-      InviteDeliveryState._(
-          1, _omitEnumNames ? '' : 'INVITE_DELIVERY_STATE_QUEUED');
-
-  /// 已交給投遞管道；不代表賣家已收到或看到。
-  static const InviteDeliveryState INVITE_DELIVERY_STATE_SENT =
-      InviteDeliveryState._(
-          2, _omitEnumNames ? '' : 'INVITE_DELIVERY_STATE_SENT');
-
-  /// 重試耗盡，投遞失敗。
-  static const InviteDeliveryState INVITE_DELIVERY_STATE_FAILED =
-      InviteDeliveryState._(
-          3, _omitEnumNames ? '' : 'INVITE_DELIVERY_STATE_FAILED');
-
-  static const $core.List<InviteDeliveryState> values = <InviteDeliveryState>[
-    INVITE_DELIVERY_STATE_UNSPECIFIED,
-    INVITE_DELIVERY_STATE_QUEUED,
-    INVITE_DELIVERY_STATE_SENT,
-    INVITE_DELIVERY_STATE_FAILED,
-  ];
-
-  static final $core.List<InviteDeliveryState?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 3);
-  static InviteDeliveryState? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const InviteDeliveryState._(super.value, super.name);
-}
-
 /// SellerResponseType 是賣家回價的方式。
 class SellerResponseType extends $pb.ProtobufEnum {
   static const SellerResponseType SELLER_RESPONSE_TYPE_UNSPECIFIED =

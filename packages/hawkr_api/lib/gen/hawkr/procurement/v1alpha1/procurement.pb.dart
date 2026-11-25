@@ -8029,7 +8029,6 @@ class SellerPublicationSummary extends $pb.GeneratedMessage {
     $core.String? publicationId,
     $core.String? publicationVersion,
     $core.String? sellerFacingPayloadHash,
-    InviteDeliveryState? deliveryState,
     $1.Timestamp? publishTime,
   }) {
     final result = SellerPublicationSummary._();
@@ -8038,7 +8037,6 @@ class SellerPublicationSummary extends $pb.GeneratedMessage {
       result.publicationVersion = publicationVersion;
     if (sellerFacingPayloadHash != null)
       result.sellerFacingPayloadHash = sellerFacingPayloadHash;
-    if (deliveryState != null) result.deliveryState = deliveryState;
     if (publishTime != null) result.publishTime = publishTime;
     return result;
   }
@@ -8060,8 +8058,6 @@ class SellerPublicationSummary extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'publicationId')
     ..aOS(2, _omitFieldNames ? '' : 'publicationVersion')
     ..aOS(3, _omitFieldNames ? '' : 'sellerFacingPayloadHash')
-    ..aE<InviteDeliveryState>(4, _omitFieldNames ? '' : 'deliveryState',
-        enumValues: InviteDeliveryState.values)
     ..aOM<$1.Timestamp>(5, _omitFieldNames ? '' : 'publishTime',
         subBuilder: $1.Timestamp.$_createMessage)
     ..hasRequiredFields = false;
@@ -8118,25 +8114,16 @@ class SellerPublicationSummary extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearSellerFacingPayloadHash() => $_clearField(3);
 
-  @$pb.TagNumber(4)
-  InviteDeliveryState get deliveryState => $_getN(3);
-  @$pb.TagNumber(4)
-  set deliveryState(InviteDeliveryState value) => $_setField(4, value);
-  @$pb.TagNumber(4)
-  $core.bool hasDeliveryState() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearDeliveryState() => $_clearField(4);
-
   @$pb.TagNumber(5)
-  $1.Timestamp get publishTime => $_getN(4);
+  $1.Timestamp get publishTime => $_getN(3);
   @$pb.TagNumber(5)
   set publishTime($1.Timestamp value) => $_setField(5, value);
   @$pb.TagNumber(5)
-  $core.bool hasPublishTime() => $_has(4);
+  $core.bool hasPublishTime() => $_has(3);
   @$pb.TagNumber(5)
   void clearPublishTime() => $_clearField(5);
   @$pb.TagNumber(5)
-  $1.Timestamp ensurePublishTime() => $_ensure(4);
+  $1.Timestamp ensurePublishTime() => $_ensure(3);
 }
 
 /// SellerResponseDraft 是賣家自己的回價草稿。

@@ -617,13 +617,6 @@
       "serverOwned": false
     },
     {
-      "name": "hawkr.procurement.v1alpha1.InviteDeliveryState",
-      "tsName": "InviteDeliveryState",
-      "tsModule": "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb",
-      "inCatalog": false,
-      "serverOwned": false
-    },
-    {
       "name": "hawkr.procurement.v1alpha1.ItemResolutionKind",
       "tsName": "ItemResolutionKind",
       "tsModule": "@hawkr/api/gen/hawkr/procurement/v1alpha1/procurement_pb",

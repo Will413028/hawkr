@@ -80,23 +80,22 @@ func recipientClosed(msg string) error {
 
 // view 是一筆發給這家店的詢價：賣家看得到的內容與它的 hash 都由核准與需求版本重算（S5、A9-D35）。
 type view struct {
-	pub      store.ProcurementRfqPublication
-	payload  model.SellerFacing
-	hash     string
-	delivery string
+	pub     store.ProcurementRfqPublication
+	payload model.SellerFacing
+	hash    string
 }
 
-func newView(pub store.ProcurementRfqPublication, a store.ProcurementRfqPublicationApproval, rev store.ProcurementRequestRevision, delivery string) (view, error) {
+func newView(pub store.ProcurementRfqPublication, a store.ProcurementRfqPublicationApproval, rev store.ProcurementRequestRevision) (view, error) {
 	payload, hash, err := rfq.SellerFacingOf(a, rev)
 	if err != nil {
 		return view{}, err
 	}
-	return view{pub: pub, payload: payload, hash: hash, delivery: delivery}, nil
+	return view{pub: pub, payload: payload, hash: hash}, nil
 }
 
 func (v view) summary() model.SellerPublicationSummary {
 	return model.SellerPublicationSummary{
-		PublicationID: v.pub.ID, Version: v.pub.Version, SellerFacingHash: v.hash, DeliveryState: v.delivery, PublishedAt: v.pub.PublishedAt,
+		PublicationID: v.pub.ID, Version: v.pub.Version, SellerFacingHash: v.hash, PublishedAt: v.pub.PublishedAt,
 	}
 }
 
@@ -109,7 +108,7 @@ func loadView(ctx context.Context, q *store.Queries, storeID int64, publicationI
 	if err != nil {
 		return view{}, fmt.Errorf("sellerside：讀取詢價 %s：%w", publicationID, err)
 	}
-	return newView(row.ProcurementRfqPublication, row.ProcurementRfqPublicationApproval, row.ProcurementRequestRevision, row.DeliveryState)
+	return newView(row.ProcurementRfqPublication, row.ProcurementRfqPublicationApproval, row.ProcurementRequestRevision)
 }
 
 // versionOf 把一個回價版本的列轉成回應：狀態、hash 與是否超出區間都由列推導（區間在發布核准，已隨賣家可見內容帶來）。

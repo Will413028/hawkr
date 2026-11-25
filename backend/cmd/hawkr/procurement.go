@@ -9,12 +9,10 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/Will413028/hawkr/backend/internal/legacy/categoryservice"
-	"github.com/Will413028/hawkr/backend/internal/legacy/procurementrelay"
 	"github.com/Will413028/hawkr/backend/internal/legacy/productservice"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/llm"
 )
 
@@ -22,12 +20,6 @@ import (
 // serve 與 worker 都要訂：BuyerDeleted 在哪個程序的 transaction 內發布，訂閱者就要在那個程序裡。
 func subscribeProcurement(bus *events.Bus, d *db.DB, log *slog.Logger) {
 	events.Subscribe(bus, newProcurement(d, nil, nil, nil, bus, log).OnBuyerDeleted)
-}
-
-// subscribeProcurementRelay 讓發布詢價在同一個 transaction 為每個邀請排入 relay job，由 worker 送出 procurement.rfq_publication_invite.created 給 notification-service。
-// 單體是這個事件唯一的 producer（舊 AI 服務 已刪）；serve 與 worker 都要訂：RfqPublished 在哪個程序的 transaction 內發布，訂閱者就要在那個程序裡。
-func subscribeProcurementRelay(bus *events.Bus, queue jobs.Enqueuer) {
-	events.Subscribe(bus, procurementrelay.OnRfqPublished(queue))
 }
 
 // newProcurement 組出採購模組；jobs 是送出與取消 run 的 River client、entitlements 是 SubmitTurn 讀額度的買家模組（只訂閱事件的呼叫端兩者都給 nil）、
@@ -90,13 +82,6 @@ func flattenTaxonomy(out []procurement.TaxonomyNode, nodes []categoryservice.Nod
 func addProcurementWorkers(workers *river.Workers, m *procurement.Module) {
 	m.AddWorkers(workers)
 	m.AddOrderWorkers(workers)
-}
-
-// addProcurementRelay 登記邀請事件 relay 的 River worker（送出、狀態寫入、補掃），回傳補掃的排程。
-func addProcurementRelay(workers *river.Workers, m *procurement.Module, out procurementrelay.Sender, jc *jobs.Client) []*river.PeriodicJob {
-	w := procurementrelay.NewWorker(m, out, procurementrelay.ClientJobs{Client: jc}, jc)
-	w.AddWorkers(workers)
-	return w.PeriodicJobs()
 }
 
 // startProcurementHub 啟動 WatchRun 共用的 LISTEN 連線，回傳的函式停止它並等它結束。只有 serve 角色需要（串流在那裡）。

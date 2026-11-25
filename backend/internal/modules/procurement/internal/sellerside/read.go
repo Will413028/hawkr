@@ -64,7 +64,7 @@ func (s Service) List(ctx context.Context, storeID int64, pageSize int32, pageTo
 		}
 		now := s.Now()
 		for _, r := range rows {
-			v, err := newView(r.ProcurementRfqPublication, r.ProcurementRfqPublicationApproval, r.ProcurementRequestRevision, r.DeliveryState)
+			v, err := newView(r.ProcurementRfqPublication, r.ProcurementRfqPublicationApproval, r.ProcurementRequestRevision)
 			if err != nil {
 				return err
 			}

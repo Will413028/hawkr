@@ -106,7 +106,7 @@ func (q *Queries) GetSellerDraft(ctx context.Context, sellerResponseID uuid.UUID
 
 const getSellerPublicationView = `-- name: GetSellerPublicationView :one
 
-SELECT p.id, p.version, p.buyer_id, p.request_id, p.request_revision_id, p.approval_id, p.approval_version, p.state, p.schema_version, p.client_request_id, p.published_at, p.created_at, p.updated_at, a.id, a.version, a.buyer_id, a.request_id, a.request_revision_id, a.range_lower_amount, a.range_upper_amount, a.buyer_note, a.candidate_set_id, a.response_deadline, a.state, a.schema_version, a.client_request_id, a.generated_at, a.expires_at, a.created_at, a.updated_at, rev.id, rev.request_id, rev.revision_no, rev.parent_revision_id, rev.status, rev.item, rev.item_resolution_kind, rev.item_resolution_label, rev.item_resolution_category_id, rev.quantity, rev.unit, rev.packaging, rev.budget_per_unit, rev.delivery_city, rev.delivery_date, rev.exact_match_required, rev.created_at, i.delivery_state
+SELECT p.id, p.version, p.buyer_id, p.request_id, p.request_revision_id, p.approval_id, p.approval_version, p.state, p.schema_version, p.client_request_id, p.published_at, p.created_at, p.updated_at, a.id, a.version, a.buyer_id, a.request_id, a.request_revision_id, a.range_lower_amount, a.range_upper_amount, a.buyer_note, a.candidate_set_id, a.response_deadline, a.state, a.schema_version, a.client_request_id, a.generated_at, a.expires_at, a.created_at, a.updated_at, rev.id, rev.request_id, rev.revision_no, rev.parent_revision_id, rev.status, rev.item, rev.item_resolution_kind, rev.item_resolution_label, rev.item_resolution_category_id, rev.quantity, rev.unit, rev.packaging, rev.budget_per_unit, rev.delivery_city, rev.delivery_date, rev.exact_match_required, rev.created_at
 FROM procurement.rfq_publication_invites i
 JOIN procurement.rfq_publications p ON p.id = i.publication_id
 JOIN procurement.rfq_publication_approvals a ON a.id = p.approval_id
@@ -123,7 +123,6 @@ type GetSellerPublicationViewRow struct {
 	ProcurementRfqPublication         ProcurementRfqPublication
 	ProcurementRfqPublicationApproval ProcurementRfqPublicationApproval
 	ProcurementRequestRevision        ProcurementRequestRevision
-	DeliveryState                     string
 }
 
 // 賣家端的讀寫。賣家可見性的唯一依據是邀請列的 (publication_id, store_id)（A9-D44(2)）：下面的讀取都從邀請列出發，
@@ -180,7 +179,6 @@ func (q *Queries) GetSellerPublicationView(ctx context.Context, arg GetSellerPub
 		&i.ProcurementRequestRevision.DeliveryDate,
 		&i.ProcurementRequestRevision.ExactMatchRequired,
 		&i.ProcurementRequestRevision.CreatedAt,
-		&i.DeliveryState,
 	)
 	return i, err
 }
@@ -364,7 +362,7 @@ func (q *Queries) InsertSellerResponseVersion(ctx context.Context, arg InsertSel
 }
 
 const listSellerPublicationViews = `-- name: ListSellerPublicationViews :many
-SELECT p.id, p.version, p.buyer_id, p.request_id, p.request_revision_id, p.approval_id, p.approval_version, p.state, p.schema_version, p.client_request_id, p.published_at, p.created_at, p.updated_at, a.id, a.version, a.buyer_id, a.request_id, a.request_revision_id, a.range_lower_amount, a.range_upper_amount, a.buyer_note, a.candidate_set_id, a.response_deadline, a.state, a.schema_version, a.client_request_id, a.generated_at, a.expires_at, a.created_at, a.updated_at, rev.id, rev.request_id, rev.revision_no, rev.parent_revision_id, rev.status, rev.item, rev.item_resolution_kind, rev.item_resolution_label, rev.item_resolution_category_id, rev.quantity, rev.unit, rev.packaging, rev.budget_per_unit, rev.delivery_city, rev.delivery_date, rev.exact_match_required, rev.created_at, i.delivery_state
+SELECT p.id, p.version, p.buyer_id, p.request_id, p.request_revision_id, p.approval_id, p.approval_version, p.state, p.schema_version, p.client_request_id, p.published_at, p.created_at, p.updated_at, a.id, a.version, a.buyer_id, a.request_id, a.request_revision_id, a.range_lower_amount, a.range_upper_amount, a.buyer_note, a.candidate_set_id, a.response_deadline, a.state, a.schema_version, a.client_request_id, a.generated_at, a.expires_at, a.created_at, a.updated_at, rev.id, rev.request_id, rev.revision_no, rev.parent_revision_id, rev.status, rev.item, rev.item_resolution_kind, rev.item_resolution_label, rev.item_resolution_category_id, rev.quantity, rev.unit, rev.packaging, rev.budget_per_unit, rev.delivery_city, rev.delivery_date, rev.exact_match_required, rev.created_at
 FROM procurement.rfq_publication_invites i
 JOIN procurement.rfq_publications p ON p.id = i.publication_id
 JOIN procurement.rfq_publication_approvals a ON a.id = p.approval_id
@@ -388,11 +386,10 @@ type ListSellerPublicationViewsRow struct {
 	ProcurementRfqPublication         ProcurementRfqPublication
 	ProcurementRfqPublicationApproval ProcurementRfqPublicationApproval
 	ProcurementRequestRevision        ProcurementRequestRevision
-	DeliveryState                     string
 }
 
 // 發給這家店的詢價，依 (published_at DESC, id DESC) keyset；游標是上一頁最後一列的 (published_at, id)，沒有游標時 after_id 為 NULL。
-// 一次 join 取核准與需求版本，不逐列再查。不過濾投遞狀態、不過濾已成交或買家已刪的詢價（賣家讀得到自己收過的詢價）。
+// 一次 join 取核准與需求版本，不逐列再查。不過濾已成交或買家已刪的詢價（賣家讀得到自己收過的詢價）。
 func (q *Queries) ListSellerPublicationViews(ctx context.Context, arg ListSellerPublicationViewsParams) ([]ListSellerPublicationViewsRow, error) {
 	rows, err := q.db.Query(ctx, listSellerPublicationViews,
 		arg.StoreID,
@@ -455,7 +452,6 @@ func (q *Queries) ListSellerPublicationViews(ctx context.Context, arg ListSeller
 			&i.ProcurementRequestRevision.DeliveryDate,
 			&i.ProcurementRequestRevision.ExactMatchRequired,
 			&i.ProcurementRequestRevision.CreatedAt,
-			&i.DeliveryState,
 		); err != nil {
 			return nil, err
 		}

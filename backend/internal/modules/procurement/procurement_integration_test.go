@@ -340,14 +340,8 @@ func TestStoreQueriesRoundTrip(t *testing.T) {
 		t.Fatalf("過期的核准不能 claim：%v", err)
 	}
 	invites, err := q.ListInvites(ctx, store.ListInvitesParams{PublicationID: c.publication, BuyerID: &c.buyer})
-	if err != nil || len(invites) != 1 || invites[0].DeliveryState != "QUEUED" {
+	if err != nil || len(invites) != 1 {
 		t.Fatalf("ListInvites = %+v, %v", invites, err)
-	}
-	if n, err := q.MarkInviteSent(ctx, store.MarkInviteSentParams{ID: c.invite, Now: epoch}); err != nil || n != 1 {
-		t.Fatalf("MarkInviteSent n=%d err=%v", n, err)
-	}
-	if n, _ := q.MarkInviteFailed(ctx, store.MarkInviteFailedParams{ID: c.invite, Now: epoch}); n != 0 {
-		t.Fatal("已 SENT 的邀請不能再標 FAILED")
 	}
 	if got, err := q.GetSellerResponse(ctx, store.GetSellerResponseParams{PublicationID: c.publication, StoreID: storeID}); err != nil || got.ID != c.sellerResponse || got.LatestVersion != 0 {
 		t.Fatalf("GetSellerResponse = %+v, %v", got, err)

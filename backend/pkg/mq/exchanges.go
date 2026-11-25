@@ -13,7 +13,6 @@ const (
 	ExchangeSeller       = "hawkr.seller"
 	ExchangeSellerEvents = "seller.events"
 	ExchangeAftersales   = "aftersales.events"
-	ExchangeProcurement  = "procurement.events"
 )
 
 const (

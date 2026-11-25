@@ -278,23 +278,6 @@ final $typed_data.Uint8List publicationStateDescriptor = $convert.base64Decode(
     'ChBQdWJsaWNhdGlvblN0YXRlEiEKHVBVQkxJQ0FUSU9OX1NUQVRFX1VOU1BFQ0lGSUVEEAASHw'
     'obUFVCTElDQVRJT05fU1RBVEVfUFVCTElTSEVEEAE=');
 
-@$core.Deprecated('Use inviteDeliveryStateDescriptor instead')
-const InviteDeliveryState$json = {
-  '1': 'InviteDeliveryState',
-  '2': [
-    {'1': 'INVITE_DELIVERY_STATE_UNSPECIFIED', '2': 0},
-    {'1': 'INVITE_DELIVERY_STATE_QUEUED', '2': 1},
-    {'1': 'INVITE_DELIVERY_STATE_SENT', '2': 2},
-    {'1': 'INVITE_DELIVERY_STATE_FAILED', '2': 3},
-  ],
-};
-
-/// Descriptor for `InviteDeliveryState`. Decode as a `google.protobuf.EnumDescriptorProto`.
-final $typed_data.Uint8List inviteDeliveryStateDescriptor = $convert.base64Decode(
-    'ChNJbnZpdGVEZWxpdmVyeVN0YXRlEiUKIUlOVklURV9ERUxJVkVSWV9TVEFURV9VTlNQRUNJRk'
-    'lFRBAAEiAKHElOVklURV9ERUxJVkVSWV9TVEFURV9RVUVVRUQQARIeChpJTlZJVEVfREVMSVZF'
-    'UllfU1RBVEVfU0VOVBACEiAKHElOVklURV9ERUxJVkVSWV9TVEFURV9GQUlMRUQQAw==');
-
 @$core.Deprecated('Use sellerResponseTypeDescriptor instead')
 const SellerResponseType$json = {
   '1': 'SellerResponseType',
@@ -3260,14 +3243,6 @@ const SellerPublicationSummary$json = {
       '10': 'sellerFacingPayloadHash'
     },
     {
-      '1': 'delivery_state',
-      '3': 4,
-      '4': 1,
-      '5': 14,
-      '6': '.hawkr.procurement.v1alpha1.InviteDeliveryState',
-      '10': 'deliveryState'
-    },
-    {
       '1': 'publish_time',
       '3': 5,
       '4': 1,
@@ -3276,6 +3251,10 @@ const SellerPublicationSummary$json = {
       '10': 'publishTime'
     },
   ],
+  '9': [
+    {'1': 4, '2': 5},
+  ],
+  '10': ['delivery_state'],
 };
 
 /// Descriptor for `SellerPublicationSummary`. Decode as a `google.protobuf.DescriptorProto`.
@@ -3283,9 +3262,8 @@ final $typed_data.Uint8List sellerPublicationSummaryDescriptor = $convert.base64
     'ChhTZWxsZXJQdWJsaWNhdGlvblN1bW1hcnkSJQoOcHVibGljYXRpb25faWQYASABKAlSDXB1Ym'
     'xpY2F0aW9uSWQSLwoTcHVibGljYXRpb25fdmVyc2lvbhgCIAEoCVIScHVibGljYXRpb25WZXJz'
     'aW9uEjsKGnNlbGxlcl9mYWNpbmdfcGF5bG9hZF9oYXNoGAMgASgJUhdzZWxsZXJGYWNpbmdQYX'
-    'lsb2FkSGFzaBJWCg5kZWxpdmVyeV9zdGF0ZRgEIAEoDjIvLmhhd2tyLnByb2N1cmVtZW50LnYx'
-    'YWxwaGExLkludml0ZURlbGl2ZXJ5U3RhdGVSDWRlbGl2ZXJ5U3RhdGUSPQoMcHVibGlzaF90aW'
-    '1lGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcFILcHVibGlzaFRpbWU=');
+    'lsb2FkSGFzaBI9CgxwdWJsaXNoX3RpbWUYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0'
+    'YW1wUgtwdWJsaXNoVGltZUoECAQQBVIOZGVsaXZlcnlfc3RhdGU=');
 
 @$core.Deprecated('Use sellerResponseDraftDescriptor instead')
 const SellerResponseDraft$json = {

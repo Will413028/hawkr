@@ -1,4 +1,4 @@
-h1:16w6xTjD9t18eEZ/FK+GFaJtc5dRJwsZUdz5rhTMk1U=
+h1:JeSfwhMQ2BcGmOaUhQfte3BRqQS7WvX3XsCX27nVgkQ=
 20261121020526_procurement_schema.sql h1:4b7iMy5vWcgTh3b/6mcHgpMKKYiu4IlZRsz0bTxOgiA=
 20261121050422_procurement_run_lifecycle.sql h1:I4ieRXRo48BLbf15Mayok7JxbgdDDg5wjAmsmACUlms=
 20261121121937_procurement_turn_optional_progress.sql h1:I8kh61q0KdMqUkXaPgFzO6AEAyPiqxd51Nq4p7/lBYQ=
@@ -17,3 +17,4 @@ h1:16w6xTjD9t18eEZ/FK+GFaJtc5dRJwsZUdz5rhTMk1U=
 20261124080430_procurement_seller_side.sql h1:0N2W1G1W21VOLTtjog80AbjGDZBELOw5efjBNKDM62k=
 20261124102308_procurement_invite_queued_index.sql h1:O+G2NnHdVkcex3RkzICg0+0fLO7EfoIuBVBqgpIkxiQ=
 20261124120000_procurement_order_provisioning.sql h1:LG+poWEj9bw9o6sUkTpUMLI0pMqTNIKLkRAjjOHwzwU=
+20261125120000_procurement_drop_invite_delivery_state.sql h1:FhzThlsfeCwO4X6BTwIngavmBl/H/2wybUHH681bTRo=

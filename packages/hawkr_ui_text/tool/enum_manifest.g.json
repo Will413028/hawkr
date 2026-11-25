@@ -365,13 +365,6 @@
       "serverOwned": false
     },
     {
-      "name": "hawkr.procurement.v1alpha1.InviteDeliveryState",
-      "dartClass": "InviteDeliveryState",
-      "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",
-      "inCatalog": false,
-      "serverOwned": false
-    },
-    {
       "name": "hawkr.procurement.v1alpha1.ItemResolutionKind",
       "dartClass": "ItemResolutionKind",
       "dartLibrary": "package:hawkr_api/gen/hawkr/procurement/v1alpha1/procurement.pbenum.dart",

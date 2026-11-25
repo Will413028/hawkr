@@ -1,51 +1,6 @@
 {
  "mutants": [
   {
-   "id": "relay-subscribe-removed-serve",
-   "stack": "go",
-   "file": "backend/cmd/hawkr/main.go",
-   "old": "\tsubscribeProcurementRelay(bus, jc)\n\timageAIModule := newImageAI(d, imageAIConfig, sellerModule, llm.NewImage(",
-   "new": "\timageAIModule := newImageAI(d, imageAIConfig, sellerModule, llm.NewImage(",
-   "test": "cmd/hawkr ^TestProcurementInviteRelayIsWired$",
-   "why": "serve 角色不訂 RfqPublished 的 relay：發布詢價不再為邀請排 job，事件永遠不送出"
-  },
-  {
-   "id": "relay-subscribe-removed-worker",
-   "stack": "go",
-   "file": "backend/cmd/hawkr/main.go",
-   "old": "\tsubscribeProcurementRelay(bus, jc)\n\timageAIModule := newImageAI(d, imageAIConfig, sellerModule, llm.DisabledImage(",
-   "new": "\timageAIModule := newImageAI(d, imageAIConfig, sellerModule, llm.DisabledImage(",
-   "test": "cmd/hawkr ^TestProcurementInviteRelayIsWired$",
-   "why": "worker 角色不訂 relay：在 worker 程序發布的 RfqPublished 沒有訂閱者"
-  },
-  {
-   "id": "relay-subscribe-body-dropped",
-   "stack": "go",
-   "file": "backend/cmd/hawkr/procurement.go",
-   "old": "\tevents.Subscribe(bus, procurementrelay.OnRfqPublished(queue))\n",
-   "new": "\t_ = queue\n",
-   "test": "cmd/hawkr ^TestProcurementInviteRelayIsWired$",
-   "why": "subscribeProcurementRelay 變成空函式：呼叫點都在，但沒有任何訂閱"
-  },
-  {
-   "id": "relay-worker-not-registered",
-   "stack": "go",
-   "file": "backend/cmd/hawkr/main.go",
-   "old": "\tprocurementSweep := addProcurementRelay(workers, procurementModule, publisher, jc)\n",
-   "new": "\tvar procurementSweep []*river.PeriodicJob\n",
-   "test": "cmd/hawkr ^TestProcurementInviteRelayIsWired$",
-   "why": "worker 沒登記 relay 的 River worker（送出、狀態寫入、補掃）：排進去的 job 沒有人執行"
-  },
-  {
-   "id": "relay-sweep-not-scheduled",
-   "stack": "go",
-   "file": "backend/cmd/hawkr/main.go",
-   "old": "\tperiodic = append(periodic, procurementSweep...)\n",
-   "new": "\t_ = procurementSweep\n",
-   "test": "cmd/hawkr ^TestProcurementInviteRelayIsWired$",
-   "why": "補掃排程沒交給 River：job 不見的邀請永遠停在 QUEUED"
-  },
-  {
    "id": "order-reconciler-periodic-dropped",
    "stack": "go",
    "file": "backend/cmd/hawkr/main.go",

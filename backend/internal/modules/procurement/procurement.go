@@ -584,24 +584,6 @@ func (m *Module) ExecuteRfqPublication(ctx context.Context, in ExecuteRfqPublica
 	return m.rfq.ExecutePublication(ctx, in)
 }
 
-// MarkInviteSent 與 MarkInviteFailed 由邀請事件的投遞者（`legacy/procurementrelay`）寫入邀請的投遞狀態：QUEUED 轉 SENT 或 FAILED，已是終態或不存在時不做事。
-func (m *Module) MarkInviteSent(ctx context.Context, inviteID uuid.UUID) error {
-	return m.rfq.MarkInviteSent(ctx, inviteID)
-}
-
-func (m *Module) MarkInviteFailed(ctx context.Context, inviteID uuid.UUID) error {
-	return m.rfq.MarkInviteFailed(ctx, inviteID)
-}
-
-// StaleInvite 是補掃游標的一格。
-type StaleInvite = rfq.StaleInvite
-
-// StaleQueuedInvites 回傳建立時間早於 before、仍是 QUEUED、排序鍵 (created_at, id) 在 after 之後的邀請（最舊的先，至多 limit 個），
-// 給投遞者的補掃找出沒人在處理的邀請；after 為零值時從頭開始。
-func (m *Module) StaleQueuedInvites(ctx context.Context, before time.Time, after StaleInvite, limit int32) ([]StaleInvite, error) {
-	return m.rfq.StaleQueuedInvites(ctx, before, after, limit)
-}
-
 // 買家對賣家回價的使用的型別。
 type (
 	// SellerResponse 是買家看到的一份賣家回價（目前版本），SellerQuote 是它的報價內容，SellerResponsePage 是 ListSellerResponses 的一頁。
