@@ -724,6 +724,7 @@ func TestUpdateLocksExistingSkusInAscendingIdOrderWhateverTheInputOrder(t *testi
 	}
 	reversed := f.input("鎖順序")
 	reversed.Axes = colorSize()
+	reversed.Skus = nil
 	byID := map[uuid.UUID]Sku{lo.ID: lo, hi.ID: hi}
 	for _, id := range []uuid.UUID{hi.ID, lo.ID} {
 		k := byID[id]
