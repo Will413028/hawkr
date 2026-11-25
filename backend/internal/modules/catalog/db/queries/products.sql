@@ -29,7 +29,7 @@ WHERE id = sqlc.arg(id);
 UPDATE catalog.products SET deleted_at = sqlc.arg(now), updated_at = sqlc.arg(now) WHERE id = sqlc.arg(id);
 
 -- name: RecomputePriceRange :execrows
--- 商品的價格區間是沒刪除 SKU 價格的最小與最大（D19）；每次 SKU 寫入的同 transaction 呼叫。沒有 SKU 時不改（影響 0 列）。
+-- 商品的價格區間是沒刪除 SKU 價格的最小與最大；每次 SKU 寫入的同 transaction 呼叫。沒有 SKU 時不改（影響 0 列）。
 UPDATE catalog.products p
 SET min_price = r.lo, max_price = r.hi, updated_at = sqlc.arg(now)
 FROM (SELECT min(price)::bigint AS lo, max(price)::bigint AS hi FROM catalog.product_skus WHERE product_id = sqlc.arg(id) AND deleted_at IS NULL) r

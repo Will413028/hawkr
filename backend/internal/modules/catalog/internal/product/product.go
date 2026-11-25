@@ -1,8 +1,8 @@
-// Package product 是商品的寫入與讀取（B4 D14、D16–D19）：建立、整體修改、狀態切換、刪除，選項軸與 SKU 組合，價格區間，描述區塊與圖片引用，
+// Package product 是商品的寫入與讀取：建立、整體修改、狀態切換、刪除，選項軸與 SKU 組合，價格區間，描述區塊與圖片引用，
 // hashtag，searchable_text，以及賣家清單與公開列表。
 //   - 同一個商品的寫入從 LockOwnProduct 的列鎖開始，SKU、選項、圖片與價格區間的重算在同一個 transaction，所以並行的寫入不會交錯。
 //   - 新圖在寫入的 transaction 內 Confirm（ctx 帶 transaction，失敗整筆回滾）；退場的資產在同一個 transaction 內 MarkDeleted。
-//   - 店家身分由呼叫端推導後傳入（D4）：這裡的每個寫入與賣家讀取都以 storeID 限定，不接受 client 送的店家。
+//   - 店家身分由呼叫端推導後傳入：這裡的每個寫入與賣家讀取都以 storeID 限定，不接受 client 送的店家。
 package product
 
 import (
@@ -45,7 +45,7 @@ func New(d Deps) *Service { return &Service{d: d} }
 
 func (s *Service) q(ctx context.Context) *store.Queries { return store.New(s.d.DB.Conn(ctx)) }
 
-// Create 建立一個草稿商品（D16）。uploader 是新圖 staged token 的上傳者（店家所屬的帳號，由呼叫端推導）。
+// Create 建立一個草稿商品。uploader 是新圖 staged token 的上傳者（店家所屬的帳號，由呼叫端推導）。
 func (s *Service) Create(ctx context.Context, storeID int64, uploader media.Uploader, in model.ProductInput) (model.Product, error) {
 	if storeID <= 0 {
 		return model.Product{}, model.Invalid("StoreID", model.ReasonRequired)
@@ -62,6 +62,13 @@ func (s *Service) Create(ctx context.Context, storeID int64, uploader media.Uplo
 		if err != nil {
 			return err
 		}
+		// product_images.product_id 的外鍵不可延後：先插入商品列（描述先放空陣列），圖片寫入取得資產 id 後再以 UpdateProductContent 補上
+		// 描述 JSON 與 searchable_text。價格區間先放 0，下面的 SKU 寫入之後由 RecomputePriceRange 算；建立一律是草稿，不需要 first_published_at。
+		if err := q.InsertProduct(ctx, store.InsertProductParams{
+			ID: id, StoreID: storeID, CategoryID: p.categoryID, Title: p.title, Description: []byte("[]"), Status: string(model.StatusDraft), Now: now,
+		}); err != nil {
+			return err
+		}
 		if err := s.writeImages(ctx, q, id, uploader, nil, &p); err != nil {
 			return err
 		}
@@ -69,10 +76,8 @@ func (s *Service) Create(ctx context.Context, storeID int64, uploader media.Uplo
 		if err != nil {
 			return err
 		}
-		// 價格區間先放 0，下面的 SKU 寫入之後由 RecomputePriceRange 算（D19）；ACTIVE 才需要 first_published_at，建立一律是草稿。
-		if err := q.InsertProduct(ctx, store.InsertProductParams{
-			ID: id, StoreID: storeID, CategoryID: p.categoryID, Title: p.title, Description: descJSON, Status: string(model.StatusDraft),
-			SearchableText: searchableText(p, catName), Now: now,
+		if err := q.UpdateProductContent(ctx, store.UpdateProductContentParams{
+			ID: id, CategoryID: p.categoryID, Title: p.title, Description: descJSON, SearchableText: searchableText(p, catName), Now: now,
 		}); err != nil {
 			return err
 		}
@@ -153,7 +158,7 @@ func (s *Service) Update(ctx context.Context, storeID int64, uploader media.Uplo
 	return out, err
 }
 
-// SetStatus 切換狀態（D16）：DRAFT→ACTIVE、ACTIVE→ARCHIVED、ARCHIVED→ACTIVE。設成 ACTIVE 時 first_published_at 只在還是空的時候填。
+// SetStatus 切換狀態：DRAFT→ACTIVE、ACTIVE→ARCHIVED、ARCHIVED→ACTIVE。設成 ACTIVE 時 first_published_at 只在還是空的時候填。
 // 切成目前的狀態是 no-op；其他切換回 model.ErrInvalidTransition。
 func (s *Service) SetStatus(ctx context.Context, storeID int64, productID uuid.UUID, to model.ProductStatus) error {
 	if !to.Valid() {
@@ -219,7 +224,7 @@ func (s *Service) leafCategoryText(ctx context.Context, q *store.Queries, id uui
 	return name["zh-TW"], nil
 }
 
-// searchableText 組 searchable_text：名稱、描述文字、hashtag 名稱、分類名稱，以單一空格相接（schema.sql 的註解、D15）。
+// searchableText 組 searchable_text：名稱、描述文字、hashtag 名稱、分類名稱，以單一空格相接（schema.sql 的註解）。
 func searchableText(p prepared, categoryName string) string {
 	parts := []string{p.title, description.Text(p.desc)}
 	for _, t := range p.tags {
@@ -258,7 +263,7 @@ func deref(s *string) string {
 	return *s
 }
 
-// writeSkus 把輸入的 SKU 對上現有的（以組合辨識）：還在的更新價格，新的新增，不在輸入裡的標刪除，最後重算價格區間（D19）。
+// writeSkus 把輸入的 SKU 對上現有的（以組合辨識）：還在的更新價格，新的新增，不在輸入裡的標刪除，最後重算價格區間。
 func (s *Service) writeSkus(ctx context.Context, q *store.Queries, id uuid.UUID, live []store.ListLiveSkusRow, in []model.SkuInput) error {
 	now := s.d.Now()
 	byCombo := make(map[[2]string]store.ListLiveSkusRow, len(live))

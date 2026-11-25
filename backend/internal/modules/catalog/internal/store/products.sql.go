@@ -654,7 +654,7 @@ type RecomputePriceRangeParams struct {
 	ID  uuid.UUID
 }
 
-// 商品的價格區間是沒刪除 SKU 價格的最小與最大（D19）；每次 SKU 寫入的同 transaction 呼叫。沒有 SKU 時不改（影響 0 列）。
+// 商品的價格區間是沒刪除 SKU 價格的最小與最大；每次 SKU 寫入的同 transaction 呼叫。沒有 SKU 時不改（影響 0 列）。
 func (q *Queries) RecomputePriceRange(ctx context.Context, arg RecomputePriceRangeParams) (int64, error) {
 	result, err := q.db.Exec(ctx, recomputePriceRange, arg.Now, arg.ID)
 	if err != nil {

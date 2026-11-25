@@ -163,8 +163,8 @@ func normalizeAxes(in []model.Axis) ([]model.Axis, error) {
 	return out, nil
 }
 
-// normalizeSkus 驗證 SKU 是選項值的組合（D18）：沒有軸的商品剛好一個預設 SKU；有軸時每個 SKU 的每個軸都落在該軸的值內、
-// 沒有軸的位置是空的、組合不重複；價格與原價（D19）。
+// normalizeSkus 驗證 SKU 是選項值的組合：沒有軸的商品剛好一個預設 SKU；有軸時每個 SKU 的每個軸都落在該軸的值內、
+// 沒有軸的位置是空的、組合不重複；價格與原價。
 func normalizeSkus(axes []model.Axis, in []model.SkuInput) ([]model.SkuInput, error) {
 	if len(in) == 0 {
 		return nil, model.Invalid("Skus", model.ReasonRequired)

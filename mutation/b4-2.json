@@ -143,6 +143,15 @@
    "new": "WHERE p.store_id = $1 AND p.deleted_at IS NULL\n  AND p.status = 'ACTIVE'",
    "test": "internal/modules/catalog ^TestSellerListIsUnfilteredByStatusAndExposure$",
    "why": "賣家清單只列 ACTIVE：賣家看不到自己的草稿與下架商品，測試要紅。"
+  },
+  {
+   "id": "adjust-without-store-ownership",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/stock.sql.go",
+   "old": "p.store_id = $4",
+   "new": "$4 > 0",
+   "test": "internal/modules/catalog ^TestAdjustOnAnotherStoresSkuOrDeletedSkuIsNotFound$",
+   "why": "賣家調整不再限定 SKU 屬於自己的店家：跨店調整生效而不是回 ErrSkuNotFound，測試要紅。"
   }
  ]
 }

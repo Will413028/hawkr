@@ -10,7 +10,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 )
 
-// ProductStatus 是商品的狀態（D16）。空字串與未知值都不是有效狀態。
+// ProductStatus 是商品的狀態。空字串與未知值都不是有效狀態。
 type ProductStatus string
 
 // 商品狀態。
@@ -25,7 +25,7 @@ func (s ProductStatus) Valid() bool {
 	return s == StatusDraft || s == StatusActive || s == StatusArchived
 }
 
-// CanTransition 回報賣家能否把狀態從 s 切到 to：草稿上架、上架後下架、下架可再上架（D16）。同狀態不是切換。
+// CanTransition 回報賣家能否把狀態從 s 切到 to：草稿上架、上架後下架、下架可再上架。同狀態不是切換。
 func (s ProductStatus) CanTransition(to ProductStatus) bool {
 	switch s {
 	case StatusDraft:
@@ -38,7 +38,7 @@ func (s ProductStatus) CanTransition(to ProductStatus) bool {
 	return false
 }
 
-// 輸入與結構上限。圖片與區塊的上限在 D17 沒有寫數字：表格與清單照 seller-app 編輯器的常數（50 列、10 欄、每格 200 字），其餘為待確認的值，
+// 輸入與結構上限。圖片與區塊的上限沒有明定數字：表格與清單照 seller-app 編輯器的常數（50 列、10 欄、每格 200 字），其餘為待確認的值，
 // 集中在這裡以便調整。
 const (
 	MaxTitleRunes              = 100
@@ -82,7 +82,7 @@ const (
 )
 
 // InvalidInputError 指出哪個欄位為什麼不合法。Field 是輸入欄位的路徑，例如 "Skus[2].Price"；Reason 是 Reason* 常數之一；
-// 若是 hashtag 違規，Cause 是 platform/hashtag 的 sentinel 錯誤。使用者面文字由呼叫端（B4-3 的 handler）決定。
+// 若是 hashtag 違規，Cause 是 platform/hashtag 的 sentinel 錯誤。使用者面文字由呼叫端（對外層的 handler）決定。
 type InvalidInputError struct {
 	Field  string
 	Reason string
@@ -118,7 +118,7 @@ type Image struct {
 	Alt       string
 }
 
-// BlockKind 是描述區塊的種類（D17 A）。
+// BlockKind 是描述區塊的種類。
 type BlockKind string
 
 // 描述區塊的種類。

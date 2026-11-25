@@ -5,7 +5,7 @@
 ## 1. 範圍與公開介面
 
 - 實作在 `internal/modules/catalog`，自己的 `catalog` schema 與 migration，登記在 `cmd/hawkr/modules.go` 的 `modules()`。不依賴 fulfillment（D10：運費與配送方式歸 seller 的運費設定，B3）。
-- 根套件的方法：`DeductStock`、`RestoreStock`、`Categories`、`IsLeafCategory`、`CreateProduct`、`UpdateProduct`、`SetProductStatus`、`DeleteProduct`、`Product`、`PublicProduct`、`ListSellerProducts`、`ListPublicProducts`；對外 Connect API 隨 B4-3，`legacy/catalogserver` 與單體內改接隨 B4-4。
+- 根套件的方法：`DeductStock`、`RestoreStock`、`AdjustStock`、`Categories`、`IsLeafCategory`、`CreateProduct`、`UpdateProduct`、`SetProductStatus`、`DeleteProduct`、`Product`、`PublicProduct`、`ListSellerProducts`、`ListPublicProducts`；對外 Connect API 隨 B4-3，`legacy/catalogserver` 與單體內改接隨 B4-4。
 - 模組內依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`。
 
 ## 2. 資料
@@ -25,6 +25,7 @@
 - 扣減（`DeductStock(ctx, key, items)`）：先插入 `stock_operations`（`ON CONFLICT (idempotency_key) DO NOTHING`），再依 SKU ID 升序逐一 `UPDATE … WHERE stock_qty >= n AND deleted_at IS NULL`，每個寫一筆 `stock_movements`（delta 為負）。任何一個 SKU 不足整次回滾，回 `*InsufficientStockError`（第一個不足的 SKU）；SKU 不存在或已刪除回 `ErrSkuNotFound`。
 - 重送：同一個 key 內容相同（品項與數量，不論順序）回成功且不改庫存；內容或種類不同回 `ErrIdempotencyKeyReused`。併發的同一個 key 在 UNIQUE 上排隊，後到的看到 0 列後走重送路徑。
 - 歸還（`RestoreStock(ctx, key, deductKey, items)`）：依 `deductKey` 找原扣減（不存在回 `ErrDeductionNotFound`），先鎖原扣減列，再檢查每個 SKU 的累計歸還量不超過原扣減量（`ErrRestoreExceedsDeduction`）；`items` 為空表示歸還剩下的全部（沒有剩下的也回 `ErrRestoreExceedsDeduction`）。歸還不檢查 SKU 是否已刪除。
+- 賣家調整（`AdjustStock(ctx, storeID, key, skuID, delta)`）：賣家改自己店家某個既有 SKU 的庫存，`storeID` 由呼叫端推導。用有號變動量而不是絕對值，因為 `stock_movements` 存的是有號 delta（`delta <> 0` 的只增不改帳本），變動量重送時內容固定可比對。先插入 `kind = 'ADJUST'` 的 `stock_operations`，再 `UPDATE … FROM products WHERE store_id = n AND 結果 BETWEEN 0 AND 2147483647`，寫一筆 movement。SKU 不存在、不屬於該店家或已刪除（含商品已刪除）回 `ErrSkuNotFound`；結果小於 0 回 `*InsufficientStockError`；結果超過 int32 上限回 `ErrInvalidStockInput`；失敗整筆回滾（含操作列）。重送規則同扣減，與扣減或歸還共用 key 回 `ErrIdempotencyKeyReused`。
 - 輸入：key 1–200 字元、頭尾無空白；品項 1–100 個、數量為正、同一個 SKU 不重複；違反回 `ErrInvalidStockInput`。
 - transaction：全部寫入在呼叫方的 transaction 內，沒有時自己開一個；呼叫方 transaction 內失敗時必須整個回滾。
 - 扣減時點是「下單即扣、逾時未付歸還」（D2）；歸還的觸發在 B8。

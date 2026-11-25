@@ -44,3 +44,17 @@ WHERE id = sqlc.arg(id);
 -- name: GetLiveSkuStock :one
 -- 未刪除的 SKU 的庫存；扣減失敗時用來區分「不存在或已刪除」與「庫存不足」。
 SELECT id, stock_qty FROM catalog.product_skus WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
+
+-- name: AdjustOwnSkuStock :execrows
+-- 賣家調整：只動自己店家、未刪除商品的未刪除 SKU；結果必須落在 0 到 INTEGER 上限之間（以 bigint 算，不溢位），否則回 0 列，庫存不變。
+UPDATE catalog.product_skus s
+SET stock_qty = s.stock_qty + sqlc.arg(delta)::integer, updated_at = sqlc.arg(now)
+FROM catalog.products p
+WHERE s.id = sqlc.arg(id) AND s.deleted_at IS NULL
+  AND p.id = s.product_id AND p.store_id = sqlc.arg(store_id) AND p.deleted_at IS NULL
+  AND s.stock_qty::bigint + sqlc.arg(delta)::integer BETWEEN 0 AND 2147483647;
+
+-- name: GetOwnLiveSku :one
+-- 店家自己的未刪除 SKU；調整失敗時用來區分「不存在、不是自己的或已刪除」與「結果超出範圍」。
+SELECT s.id, s.stock_qty FROM catalog.product_skus s JOIN catalog.products p ON p.id = s.product_id
+WHERE s.id = sqlc.arg(id) AND s.deleted_at IS NULL AND p.store_id = sqlc.arg(store_id) AND p.deleted_at IS NULL;

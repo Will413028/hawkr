@@ -1,4 +1,4 @@
-// Package description 驗證與編碼商品描述的結構化區塊（B4 D17 A）：段落（純文字）、圖片（引用 product_images 的資產）、項目清單、表格。
+// Package description 驗證與編碼商品描述的結構化區塊：段落（純文字）、圖片（引用 product_images 的資產）、項目清單、表格。
 // 這裡是純函式：不碰資料庫與 media；圖片的 Confirm 與引用表在 product。
 package description
 

@@ -362,3 +362,118 @@ func TestStockCannotGoNegativeAtTheSchemaLevel(t *testing.T) {
 	sku := f.sku(1)
 	wantConstraint(t, f.exec(`UPDATE catalog.product_skus SET stock_qty = -1 WHERE id = $1`, sku), "skus_stock_check")
 }
+
+func TestSellerAdjustMovesStockAndWritesTheLedger(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t)
+	sku := f.sku(5)
+	f.must(f.m.AdjustStock(f.ct, 501, "adj:1", sku, 7))
+	f.must(f.m.AdjustStock(f.ct, 501, "adj:2", sku, -4))
+	if got := f.stockOf(sku); got != 8 {
+		t.Fatalf("庫存 = %d，want 8", got)
+	}
+	if got := f.count(`SELECT count(*) FROM catalog.stock_operations o JOIN catalog.stock_movements m ON m.operation_id = o.id
+		WHERE o.kind = 'ADJUST' AND m.sku_id = $1`, sku); got != 2 {
+		t.Fatalf("ADJUST 帳本 %d 筆，want 2", got)
+	}
+}
+
+func TestAdjustReplayIsNoOpAndDifferentContentIsRejected(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t)
+	sku, other := f.sku(5), f.sku(5)
+	f.must(f.m.AdjustStock(f.ct, 501, "adj:r", sku, 3))
+	f.must(f.m.AdjustStock(f.ct, 501, "adj:r", sku, 3))
+	if got := f.stockOf(sku); got != 8 {
+		t.Fatalf("重送後庫存 = %d，want 8（只生效一次）", got)
+	}
+	if err := f.m.AdjustStock(f.ct, 501, "adj:r", sku, 4); !errors.Is(err, ErrIdempotencyKeyReused) {
+		t.Fatalf("不同變動量重送 err = %v，want ErrIdempotencyKeyReused", err)
+	}
+	if err := f.m.AdjustStock(f.ct, 501, "adj:r", other, 3); !errors.Is(err, ErrIdempotencyKeyReused) {
+		t.Fatalf("不同 SKU 重送 err = %v，want ErrIdempotencyKeyReused", err)
+	}
+	f.must(f.m.DeductStock(f.ct, "adj:d", items(sku, 1)))
+	if err := f.m.AdjustStock(f.ct, 501, "adj:d", sku, -1); !errors.Is(err, ErrIdempotencyKeyReused) {
+		t.Fatalf("與扣減共用鍵 err = %v，want ErrIdempotencyKeyReused", err)
+	}
+}
+
+func TestConcurrentSameKeyAdjustsOnce(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t)
+	sku := f.sku(1)
+	const n = 12
+	errs := make([]error, n)
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+	for i := range n {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			errs[i] = f.m.AdjustStock(f.ct, 501, "adj:c", sku, 5)
+		}()
+	}
+	close(start)
+	wg.Wait()
+	for i, err := range errs {
+		if err != nil {
+			t.Errorf("重送 %d 要回成功：%v", i, err)
+		}
+	}
+	if got := f.stockOf(sku); got != 6 {
+		t.Fatalf("庫存 = %d，want 6（只調整一次）", got)
+	}
+}
+
+func TestAdjustNeverGoesNegativeAndRollsBackTheOperation(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t)
+	sku := f.sku(3)
+	var short *InsufficientStockError
+	if err := f.m.AdjustStock(f.ct, 501, "adj:neg", sku, -4); !errors.As(err, &short) || short.SkuID != sku {
+		t.Fatalf("err = %v，want *InsufficientStockError", err)
+	}
+	if got := f.stockOf(sku); got != 3 {
+		t.Fatalf("庫存 = %d，want 3（沒有生效）", got)
+	}
+	if got := f.count(`SELECT count(*) FROM catalog.stock_operations WHERE idempotency_key = 'adj:neg'`); got != 0 {
+		t.Fatalf("失敗的調整留下 %d 列操作，want 0", got)
+	}
+	f.must(f.m.AdjustStock(f.ct, 501, "adj:neg", sku, -3))
+	if got := f.stockOf(sku); got != 0 {
+		t.Fatalf("庫存 = %d，want 0", got)
+	}
+}
+
+func TestAdjustOverflowIsRejected(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t)
+	sku := f.sku(2147483647)
+	if err := f.m.AdjustStock(f.ct, 501, "adj:big", sku, 1); !errors.Is(err, ErrInvalidStockInput) {
+		t.Fatalf("err = %v，want ErrInvalidStockInput", err)
+	}
+	if got := f.stockOf(sku); got != 2147483647 {
+		t.Fatalf("庫存 = %d，want 不變", got)
+	}
+}
+
+func TestAdjustOnAnotherStoresSkuOrDeletedSkuIsNotFound(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t)
+	sku := f.sku(5)
+	if err := f.m.AdjustStock(f.ct, 502, "adj:x", sku, 10); !errors.Is(err, ErrSkuNotFound) {
+		t.Fatalf("跨店調整 err = %v，want ErrSkuNotFound", err)
+	}
+	if got := f.stockOf(sku); got != 5 {
+		t.Fatalf("庫存 = %d，want 5（跨店調整不得生效）", got)
+	}
+	f.must(f.exec(`UPDATE catalog.product_skus SET deleted_at = $2 WHERE id = $1`, sku, epoch))
+	if err := f.m.AdjustStock(f.ct, 501, "adj:del", sku, 1); !errors.Is(err, ErrSkuNotFound) {
+		t.Fatalf("已刪除 SKU err = %v，want ErrSkuNotFound", err)
+	}
+	if err := f.m.AdjustStock(f.ct, 501, "adj:none", uuid.NewV7(), 1); !errors.Is(err, ErrSkuNotFound) {
+		t.Fatalf("不存在的 SKU err = %v，want ErrSkuNotFound", err)
+	}
+}

@@ -12,6 +12,36 @@ import (
 	"uuid"
 )
 
+const adjustOwnSkuStock = `-- name: AdjustOwnSkuStock :execrows
+UPDATE catalog.product_skus s
+SET stock_qty = s.stock_qty + $1::integer, updated_at = $2
+FROM catalog.products p
+WHERE s.id = $3 AND s.deleted_at IS NULL
+  AND p.id = s.product_id AND p.store_id = $4 AND p.deleted_at IS NULL
+  AND s.stock_qty::bigint + $1::integer BETWEEN 0 AND 2147483647
+`
+
+type AdjustOwnSkuStockParams struct {
+	Delta   int32
+	Now     time.Time
+	ID      uuid.UUID
+	StoreID int64
+}
+
+// 賣家調整：只動自己店家、未刪除商品的未刪除 SKU；結果必須落在 0 到 INTEGER 上限之間（以 bigint 算，不溢位），否則回 0 列，庫存不變。
+func (q *Queries) AdjustOwnSkuStock(ctx context.Context, arg AdjustOwnSkuStockParams) (int64, error) {
+	result, err := q.db.Exec(ctx, adjustOwnSkuStock,
+		arg.Delta,
+		arg.Now,
+		arg.ID,
+		arg.StoreID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deductSkuStock = `-- name: DeductSkuStock :execrows
 UPDATE catalog.product_skus
 SET stock_qty = stock_qty - $1::integer, updated_at = $2
@@ -46,6 +76,29 @@ type GetLiveSkuStockRow struct {
 func (q *Queries) GetLiveSkuStock(ctx context.Context, id uuid.UUID) (GetLiveSkuStockRow, error) {
 	row := q.db.QueryRow(ctx, getLiveSkuStock, id)
 	var i GetLiveSkuStockRow
+	err := row.Scan(&i.ID, &i.StockQty)
+	return i, err
+}
+
+const getOwnLiveSku = `-- name: GetOwnLiveSku :one
+SELECT s.id, s.stock_qty FROM catalog.product_skus s JOIN catalog.products p ON p.id = s.product_id
+WHERE s.id = $1 AND s.deleted_at IS NULL AND p.store_id = $2 AND p.deleted_at IS NULL
+`
+
+type GetOwnLiveSkuParams struct {
+	ID      uuid.UUID
+	StoreID int64
+}
+
+type GetOwnLiveSkuRow struct {
+	ID       uuid.UUID
+	StockQty int32
+}
+
+// 店家自己的未刪除 SKU；調整失敗時用來區分「不存在、不是自己的或已刪除」與「結果超出範圍」。
+func (q *Queries) GetOwnLiveSku(ctx context.Context, arg GetOwnLiveSkuParams) (GetOwnLiveSkuRow, error) {
+	row := q.db.QueryRow(ctx, getOwnLiveSku, arg.ID, arg.StoreID)
+	var i GetOwnLiveSkuRow
 	err := row.Scan(&i.ID, &i.StockQty)
 	return i, err
 }

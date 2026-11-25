@@ -171,7 +171,7 @@ func TestProductLifecycleAndFirstPublishedAt(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.advance(time.Hour)
-	f.activate(storeID, p.ID) // ARCHIVED to ACTIVE is allowed (D16)
+	f.activate(storeID, p.ID) // ARCHIVED to ACTIVE is allowed
 	got, _ = f.m.Product(f.ct, storeID, p.ID)
 	if got.Status != StatusActive || !got.FirstPublishedAt.Equal(first) {
 		t.Fatalf("re-activating keeps the first publish time: %+v (want %v)", got.FirstPublishedAt, first)

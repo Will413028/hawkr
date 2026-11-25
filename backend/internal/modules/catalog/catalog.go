@@ -137,6 +137,13 @@ func (m *Module) RestoreStock(ctx context.Context, key, deductKey string, items 
 	return m.stock.Restore(ctx, key, deductKey, items)
 }
 
+// AdjustStock 是賣家以變動量 delta（有號、不為 0）調整自己店家某個 SKU 的庫存，記為 ADJUST 操作；storeID 由呼叫端推導。
+// SKU 不屬於該店家或已刪除回 ErrSkuNotFound；調整後不得小於 0（回 *InsufficientStockError）。同一個 key 重送且內容相同不再調整。
+// transaction 規則同 DeductStock。
+func (m *Module) AdjustStock(ctx context.Context, storeID int64, key string, skuID uuid.UUID, delta int32) error {
+	return m.stock.Adjust(ctx, storeID, key, skuID, delta)
+}
+
 // Categories 回傳整棵平台分類樹，頂層在前，同層依 position。
 func (m *Module) Categories(ctx context.Context) ([]Category, error) { return m.taxonomy.List(ctx) }
 
