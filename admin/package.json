@@ -23,13 +23,13 @@
 		"@hawkr/icons": "workspace:*",
 		"@hawkr/twaddr": "workspace:*",
 		"@hawkr/ui-text": "workspace:*",
-		"@sentry/nextjs": "11.11.0",
+		"@sentry/nextjs": "11.12.0",
 		"@tanstack/react-query": "^5.107.1",
 		"@tanstack/react-query-devtools": "^5.107.1",
 		"chart.js": "^4.6.1",
 		"clsx": "^2.1.1",
 		"fabric": "^7.4.0",
-		"framer-motion": "^14.11.1",
+		"framer-motion": "^14.12.0",
 		"konva": "^10.9.1",
 		"next": "catalog:",
 		"react": "catalog:",
@@ -52,6 +52,6 @@
 		"tsx": "^4.23.15",
 		"typescript": "catalog:",
 		"typescript-compiler-api": "catalog:",
-		"wrangler": "^4.159.0"
+		"wrangler": "^4.160.0"
 	}
 }
