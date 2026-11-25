@@ -303,7 +303,7 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
     - 真實寄信驗收（Resend 帳號與交易信子網域）、真機推播驗收（Firebase、APNs、Notification Service Extension 的 App ID）。觸發：Will 買網域與完成 Apple、Firebase 設定（清單見階段計畫「需要人做的事」）。
     - SMS、LINE、Web Push 重新評估。觸發：未觸達率連續 4 週超過 10%。
     - 買家處分的申訴流程（階段計畫 D25）。觸發：上線前產品決定。
-    - 特性測試豁免（階段計畫 D31）與 FCM 憑證錯誤告警延後（D32；觸發：單體告警管道建立時或上線前，同時承接未觸達率 metric）待 Will 確認。
+    - 特性測試豁免（階段計畫 D31，Will 2026-11-26，比照 A6-D27）；FCM 憑證錯誤告警延後（D32，Will 2026-11-26；觸發：單體告警管道建立時或上線前，同時承接未觸達率 metric）。
     - 設計審查的接受項（推播不收斂、`actor_account_ids` 無讀取端、停寄名單 HMAC 輪替、重送 `RequeuedAt`、串流無心跳、公告與 fan-out 兩套）：結論與重新評估條件在 `internal/modules/notification/CARRYOVER.md`「A8-8 設計審查的處置」。
 - [x] **A9 agent**（完成，2026-11-25，Will 決定；細節與 pending P1–P5 見階段計畫的 A9-7）
   - 階段計畫：`2026-11-19-a9-agent.md`（盤點、步驟、決定 A9-D1–D11 與進度寫在那裡；本段以下是計畫建立前的原文）。

@@ -186,7 +186,7 @@ notification-service 的每個機制，搬進來時都重新判斷過（遷移�
 
 | 項目 | 結論 | 重新評估條件 |
 |---|---|---|
-| FCM 憑證被拒（`OutcomeAuth`）只記 log error 並重試，沒有告警（通知 ADR 決策 7 要求「補上告警」；嚴重度 blocking） | 接受延後：單體還沒有告警管道，repo 的 Loki 規則只覆蓋舊服務的 log key，與主計畫已記的同類項（單體 revalidate 失敗、moderation SLA 告警）同一個前提；程式已把憑證錯誤與暫時錯誤分開、不記永久失敗、不停用 token，修好設定後重試會成功。**這是違反已接受 ADR 的延後，待 Will 確認（A8 計畫 D32）** | 單體告警管道建立時或上線前（與主計畫「單體告警管道」同一個觸發）：對憑證錯誤的 log key 或 counter 加規則 |
+| FCM 憑證被拒（`OutcomeAuth`）只記 log error 並重試，沒有告警（通知 ADR 決策 7 要求「補上告警」；嚴重度 blocking） | 接受延後：單體還沒有告警管道，repo 的 Loki 規則只覆蓋舊服務的 log key，與主計畫已記的同類項（單體 revalidate 失敗、moderation SLA 告警）同一個前提；程式已把憑證錯誤與暫時錯誤分開、不記永久失敗、不停用 token，修好設定後重試會成功。違反已接受的 ADR 決策 7，已由 Will 接受（A8 計畫 D32，2026-11-26） | 單體告警管道建立時或上線前（與主計畫「單體告警管道」同一個觸發）：對憑證錯誤的 log key 或 counter 加規則 |
 | 未觸達率「連續 4 週超過 10%」的重評觸發沒有 metric，只能人工查後台 RPC | 同上，隨告警管道：先靠後台「未觸達通知」頁與 `ListUnreachedNotifications` 人工查 | 單體告警管道建立時，以 SQL exporter 輸出比率並加規則 |
 | 互動類推播不收斂：聚合鍵只合併收件匣，每次讚仍各推一則（沒有 APNs `apns-collapse-id`／FCM `collapse_key`） | 接受：D12 只決定收件匣聚合；洗版的實際量未量測（系統未上線） | 上線後讚、追蹤推播被投訴洗版，或未觸達查詢顯示互動推播量異常時，在 `platform/fcm` 帶聚合鍵當 collapse key |
 | `inbox_items.actor_account_ids` 只寫不讀（每次合併重寫整個陣列，沒有上限） | 接受：欄位為「某某等 N 人」顯示預留，沒有讀取端；目前文案是通用稱呼（"Someone liked your post."）。這是沒有必要條件證據的機制 | 收件匣要顯示 actor 名稱時接讀取端並加上限（例如保留最近 20 位）；若上線前沒有這個顯示需求就刪欄（改 `schema.sql` 與 migration） |
