@@ -41,7 +41,7 @@
    "stack": "go",
    "file": "backend/internal/httpapi/payment/admin.go",
    "old": "h.m.ResolveAnomaly(ctx, actor, kind, id, outcome, reason, note, req.Msg.GetEvidence())",
-   "new": "h.m.ResolveAnomaly(ctx, payment.AdminActor{}, kind, id, outcome, reason, note, req.Msg.GetEvidence())",
+   "new": "h.m.ResolveAnomaly(ctx, func() payment.AdminActor { _ = actor; return payment.AdminActor{} }(), kind, id, outcome, reason, note, req.Msg.GetEvidence())",
    "test": "internal/httpapi/payment ^TestResolvePaymentAnomalyPassesKindIDOutcomeReasonNoteAndTheCallingAdmin$",
    "why": "人工結案不記操作的管理員：後台紀錄失去操作者"
   },

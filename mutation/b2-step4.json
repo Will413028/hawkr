@@ -203,7 +203,7 @@
    "stack": "go-integration",
    "file": "backend/internal/modules/payment/internal/charge/legacy_reads.go",
    "old": "\t\t\treturn fmt.Errorf(\"%w：%w\", errStillCreating, cerr)",
-   "new": "\t\t\t_ = cerr\n\t\t\treturn nil",
+   "new": "\t\t\t_ = fmt.Errorf(\"%w：%w\", errStillCreating, cerr)\n\t\t\treturn nil",
    "test": "internal/modules/payment ^TestCloseJobWaitsForACreatingPaymentToConvergeThenCancelsItWithoutAnOrphanIntent$",
    "why": "建立中的付款遇到建立暫時失敗就結束關閉 job：之後建好的 PaymentIntent 沒被取消（孤兒）；現在必須等建立收斂再取消。"
   },
