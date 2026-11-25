@@ -405,7 +405,7 @@ func TestStripeCreatePaymentSendsCentsUSDGroupMetadataAndKey(t *testing.T) {
 	}
 	req := rig.last(t)
 	want := map[string]string{
-		"amount": "10000", "currency": StripeCurrency, "transfer_group": "group_A", "description": "desc",
+		"amount": "10000", "currency": "usd", "transfer_group": "group_A", "description": "desc",
 		"metadata[attempt_id]": stripeTestAttemptID, "metadata[payment_id]": pid.String(), "metadata[order_count]": "2", "metadata[order_nos]": "order_A,order_B",
 		"automatic_payment_methods[enabled]": "true",
 	}

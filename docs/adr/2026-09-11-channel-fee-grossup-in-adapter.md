@@ -2,7 +2,7 @@
 
 | 項目 | 值 |
 |---|---|
-| 狀態 | accepted |
+| 狀態 | superseded by `docs/adr/2026-11-13-payment-onboarding-provider-port-stripe.md`（D1、D20 修訂：收款改為 Stripe separate charges and transfers，PayUni `agent_fee` 與 `BalType` 加成隨 PayUni 金流刪除；Stripe 手續費由平台帳戶負擔（Stripe 文件 [Separate charges and transfers](https://docs.stripe.com/connect/separate-charges-and-transfers)；未在 sandbox 量測），物流費代收已隨 `docs/adr/2026-11-15-fulfillment-seller-managed-shipping.md` 刪除）；原為 accepted |
 | 日期 | 2026-09-12 |
 | 影響範圍 | payment-service 收款 adapter |
 
