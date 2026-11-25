@@ -43,7 +43,7 @@ func (g *gatedLLM) GenerateContent(ctx context.Context, _ *adkmodel.LLMRequest, 
 			yield(nil, ctx.Err())
 			return
 		}
-		yield(&adkmodel.LLMResponse{Content: genai.NewContentFromText("好的", genai.RoleModel)}, nil)
+		yield(&adkmodel.LLMResponse{Content: genai.NewContentFromText("好的", genai.RoleModel), FinishReason: genai.FinishReasonStop}, nil)
 	}
 }
 

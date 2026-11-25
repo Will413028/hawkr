@@ -36,6 +36,8 @@ type chunkCall struct {
 type scriptedCall struct {
 	Agent  string  `json:"agent"`
 	Chunks []chunk `json:"chunks"`
+	// FinishReason 是非 Partial 回應的結束原因；nil 表示 STOP，指向空字串表示串流被提早關閉。
+	FinishReason *genai.FinishReason `json:"finish_reason"`
 }
 
 // llmRequest 是替身 LLM 收到的一次請求的摘要。
@@ -131,6 +133,12 @@ func (l *scriptedLLM) GenerateContent(_ context.Context, req *adkmodel.LLMReques
 				part = &genai.Part{FunctionCall: &genai.FunctionCall{Name: c.FunctionCall.Name, Args: c.FunctionCall.Args}}
 			}
 			resp := &adkmodel.LLMResponse{Content: &genai.Content{Role: genai.RoleModel, Parts: []*genai.Part{part}}, Partial: c.Partial}
+			if !c.Partial {
+				resp.FinishReason = genai.FinishReasonStop
+				if call.FinishReason != nil {
+					resp.FinishReason = *call.FinishReason
+				}
+			}
 			if !yield(resp, nil) {
 				return
 			}

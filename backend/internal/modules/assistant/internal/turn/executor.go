@@ -479,7 +479,8 @@ func writeReturnPolicy(buf *buffer, sessionID string, loc uitext.Locale, now tim
 
 // execute 跑 agent 並回這一輪的終止事件；panic 也以失敗事件回傳。
 //
-// finished 的條件：事件迭代正常結束，而且看過根 agent 的最終回應（IsFinalResponse）。
+// finished 的條件：事件迭代正常結束，而且看過根 agent 的最終回應（IsFinalResponse），該回應的 FinishReason 是 STOP。
+// 串流被提早關閉時聚合器仍會送出非 Partial 的最終回應，但結束原因是空值或 UNSPECIFIED；MAX_TOKENS、SAFETY 等也不算完成，一律走 fail()。
 // 取消、逾時、模型安靜停下、事件數超過上限，只要最終回應沒有出現，一律是 error；迴圈之後不再看 ctx.Err()。
 func (e *Executor) execute(ctx context.Context, t *turnState, in SubmitInput, userID, sessionID string, content *genai.Content, loc uitext.Locale) (terminal model.Event) {
 	var sent strings.Builder
@@ -559,6 +560,10 @@ func (e *Executor) execute(ctx context.Context, t *turnState, in SubmitInput, us
 			continue
 		}
 		if ev.Author == ag.Name() && ev.IsFinalResponse() && ev.ErrorCode == "" {
+			if ev.FinishReason != genai.FinishReasonStop {
+				slog.WarnContext(ctx, "assistant：最終回應的結束原因不是 STOP", "finish_reason", string(ev.FinishReason))
+				return fail()
+			}
 			finalSeen = true
 		}
 		if ev.Content == nil {

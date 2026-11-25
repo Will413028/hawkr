@@ -1,0 +1,7 @@
+{"mutants": [
+  {"id": "finish-reason-stop-check-dropped", "stack": "go", "file": "backend/internal/modules/assistant/internal/turn/executor.go",
+   "old": "if ev.FinishReason != genai.FinishReasonStop {",
+   "new": "if false && ev.FinishReason != genai.FinishReasonStop {",
+   "test": "internal/modules/assistant/internal/turn ^TestFinalResponseWithoutStopFinishReasonIsNotFinished$",
+   "why": "拿掉最終回應必須是 STOP 的檢查：提早關閉的串流與 MAX_TOKENS 會被當成 finished"}
+]}
