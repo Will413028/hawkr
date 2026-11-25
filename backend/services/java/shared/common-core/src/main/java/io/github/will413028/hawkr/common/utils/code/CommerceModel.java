@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
  */
 public enum CommerceModel implements CodeMeta {
 
-    SELLER_DIRECT("SELLER_DIRECT", "SELLER_DIRECT", "賣家直營", "賣家為收款主體與開票人。**既有全部訂單皆為本值**（merId = 'HAWK' ‖ store_id）。撥款資格述詞對本值回 NOT_APPLICABLE——不是「不合格」，是不在撥款軸上"),
+    SELLER_DIRECT("SELLER_DIRECT", "SELLER_DIRECT", "賣家直營", "賣家為收款主體與開票人。**既有全部訂單皆為本值**，收款走 payment 模組（賣家的收款帳戶）。撥款資格述詞對本值回 NOT_APPLICABLE——不是「不合格」，是不在撥款軸上"),
     PLATFORM_CONSIGNMENT("PLATFORM_CONSIGNMENT", "PLATFORM_CONSIGNMENT", "平台受託代銷", "平台以代理商戶收款、對買家開票，再結算撥付賣家。**必須帶 `consignment_agreement_version`**（`chk_orders_consignment_agreement`），且 `collection_model` 必須是 PLATFORM_AGENT_MERCHANT");
 
     private final String code;

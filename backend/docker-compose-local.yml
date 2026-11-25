@@ -322,9 +322,6 @@ services:
       AFTERSALES_SERVICE_HOST: aftersales-service
       AFTERSALES_SERVICE_GRPC_PORT: 9923
 
-      # §2A.2 訂單最低金額（CheckoutService L1 檢查）
-      PAYMENT_MIN_AMOUNT: ${PAYMENT_MIN_AMOUNT:-15}
-
       # Database
       DB_HOST: postgres
       DB_PORT: 5432

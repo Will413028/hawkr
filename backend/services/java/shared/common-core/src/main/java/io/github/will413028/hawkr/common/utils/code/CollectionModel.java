@@ -12,8 +12,8 @@ import java.util.stream.Collectors;
  */
 public enum CollectionModel implements CodeMeta {
 
-    SELLER_MERCHANT("SELLER_MERCHANT", "SELLER_MERCHANT", "賣家子商店收款", "款項直接進賣家的 PayUni 子商店（merId = 'HAWK' ‖ store_id）。**現況全部訂單皆為本值**"),
-    PLATFORM_AGENT_MERCHANT("PLATFORM_AGENT_MERCHANT", "PLATFORM_AGENT_MERCHANT", "平台代理商戶收款", "款項進平台代理商戶（`PAYUNI_AGENT_MER_ID`）。🔴 `resolvePaymentMerId` 必須由本值驅動；env 未設定時**結帳當下 fail-closed**（9503 群），不得建單後才發現"),
+    SELLER_MERCHANT("SELLER_MERCHANT", "SELLER_MERCHANT", "賣家子商店收款", "款項直接進賣家的收款帳戶，收款走 payment 模組。**現況全部訂單皆為本值**"),
+    PLATFORM_AGENT_MERCHANT("PLATFORM_AGENT_MERCHANT", "PLATFORM_AGENT_MERCHANT", "平台代理商戶收款", "平台代收目前沒有收款路徑。🔴 結帳由 `requireSupportedCollectionModel` 在**結帳當下 fail-closed**（PLATFORM_COLLECTION_NOT_CONFIGURED，9503 群），不得建單後才發現"),
     PROVIDER_COLLECTED("PROVIDER_COLLECTED", "PROVIDER_COLLECTED", "物流商代收", "由物流商在交付時代收貨款（如超商取貨付款）。⚠️ 值域內但**尚無寫入路徑**——書面契約到位前由 flag 擋住，這是刻意的"),
     EXTERNAL_PREPAID("EXTERNAL_PREPAID", "EXTERNAL_PREPAID", "外部預付", "款項在平台之外已完成收取。⚠️ 同上，值域內但尚無寫入路徑");
 

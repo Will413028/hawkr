@@ -4481,7 +4481,7 @@ type CommerceModel struct {
 }
 
 var (
-	CommerceModelSellerDirect        = CommerceModel{Code: "SELLER_DIRECT", Value: "SELLER_DIRECT", Label: "賣家直營", Description: "賣家為收款主體與開票人。**既有全部訂單皆為本值**（merId = 'HAWK' ‖ store_id）。撥款資格述詞對本值回 NOT_APPLICABLE——不是「不合格」，是不在撥款軸上"}
+	CommerceModelSellerDirect        = CommerceModel{Code: "SELLER_DIRECT", Value: "SELLER_DIRECT", Label: "賣家直營", Description: "賣家為收款主體與開票人。**既有全部訂單皆為本值**，收款走 payment 模組（賣家的收款帳戶）。撥款資格述詞對本值回 NOT_APPLICABLE——不是「不合格」，是不在撥款軸上"}
 	CommerceModelPlatformConsignment = CommerceModel{Code: "PLATFORM_CONSIGNMENT", Value: "PLATFORM_CONSIGNMENT", Label: "平台受託代銷", Description: "平台以代理商戶收款、對買家開票，再結算撥付賣家。**必須帶 `consignment_agreement_version`**（`chk_orders_consignment_agreement`），且 `collection_model` 必須是 PLATFORM_AGENT_MERCHANT"}
 )
 
@@ -4519,8 +4519,8 @@ type CollectionModel struct {
 }
 
 var (
-	CollectionModelSellerMerchant        = CollectionModel{Code: "SELLER_MERCHANT", Value: "SELLER_MERCHANT", Label: "賣家子商店收款", Description: "款項直接進賣家的 PayUni 子商店（merId = 'HAWK' ‖ store_id）。**現況全部訂單皆為本值**"}
-	CollectionModelPlatformAgentMerchant = CollectionModel{Code: "PLATFORM_AGENT_MERCHANT", Value: "PLATFORM_AGENT_MERCHANT", Label: "平台代理商戶收款", Description: "款項進平台代理商戶（`PAYUNI_AGENT_MER_ID`）。🔴 `resolvePaymentMerId` 必須由本值驅動；env 未設定時**結帳當下 fail-closed**（9503 群），不得建單後才發現"}
+	CollectionModelSellerMerchant        = CollectionModel{Code: "SELLER_MERCHANT", Value: "SELLER_MERCHANT", Label: "賣家子商店收款", Description: "款項直接進賣家的收款帳戶，收款走 payment 模組。**現況全部訂單皆為本值**"}
+	CollectionModelPlatformAgentMerchant = CollectionModel{Code: "PLATFORM_AGENT_MERCHANT", Value: "PLATFORM_AGENT_MERCHANT", Label: "平台代理商戶收款", Description: "平台代收目前沒有收款路徑。🔴 結帳由 `requireSupportedCollectionModel` 在**結帳當下 fail-closed**（PLATFORM_COLLECTION_NOT_CONFIGURED，9503 群），不得建單後才發現"}
 	CollectionModelProviderCollected     = CollectionModel{Code: "PROVIDER_COLLECTED", Value: "PROVIDER_COLLECTED", Label: "物流商代收", Description: "由物流商在交付時代收貨款（如超商取貨付款）。⚠️ 值域內但**尚無寫入路徑**——書面契約到位前由 flag 擋住，這是刻意的"}
 	CollectionModelExternalPrepaid       = CollectionModel{Code: "EXTERNAL_PREPAID", Value: "EXTERNAL_PREPAID", Label: "外部預付", Description: "款項在平台之外已完成收取。⚠️ 同上，值域內但尚無寫入路徑"}
 )

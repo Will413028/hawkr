@@ -387,11 +387,11 @@ EXTERNAL lane 的語意因此是「**平台結算 store 這個賣家自己賣**�
 
 #### 6.4.8 佈署前置只剩一項：平台結算 store
 
-**唯一前置是平台結算 store 本身**（`PROCUREMENT_SETTLEMENT_STORE_ID`）。⚠️ `PAYUNI_AGENT_MER_ID` 不是本線的前置——EXTERNAL lane 不走代理商戶收款（6.4.5）；受託代銷附約版本已隨 order-service Flyway `V16` 整條退場。
+**唯一前置是平台結算 store 本身**（`PROCUREMENT_SETTLEMENT_STORE_ID`）。⚠️ 平台代收不是本線的前置——EXTERNAL lane 不走代理商戶收款（6.4.5）；受託代銷附約版本已隨 order-service Flyway `V16` 整條退場。
 
 🔴 **結算 store 必須真實存在於單體 seller 模組**，不只是一個設定值：gateway 的 `batchGetSellerMeta` 對查不到的 store 是 fail-soft（不 crash），後果是**買家在訂單上看到沒有賣方**。⇒ 佈署清單是「seed 一筆 store → 確認單體 seller 模組查得到 → 才把它的 id 填進設定」，三步不可只做第一步。
 
-🔴 **該 store 必須有可用的 PayUni 子商店**：`orders.mer_id` 取自 `sellerMeta.payuni_mer_id`，空值時 `CreateRfqOrder` 在**建單當下** fail-closed（`SELLER_NOT_ONBOARDED`）。這一格接手的是原本 `PAYUNI_AGENT_MER_ID` 那道 fail-closed——收款主體換人之後，風險從「沒設代理商 MerID」變成「這個 store 沒有 PayUni 子商店」。沿用 `CheckoutService.resolvePaymentMerId` 的同一條紀律：擋在建單當下，**不是建單後才發現**。
+🔴 **該 store 必須有可用的 PayUni 子商店**：`orders.mer_id` 取自 `sellerMeta.payuni_mer_id`，空值時 `CreateRfqOrder` 在**建單當下** fail-closed（`SELLER_NOT_ONBOARDED`）。收款主體是平台結算 store，風險是「這個 store 沒有 PayUni 子商店」。沿用 `CheckoutService.requireSupportedCollectionModel` 的同一條紀律：擋在建單當下，**不是建單後才發現**。
 
 ⚠️ **結算 store 的顯示名稱不需要另外約束**：發票開立人就是該 store 這個賣家本身，訂單賣方與發票開立人**結構上同一個**。
 
@@ -448,7 +448,7 @@ EXTERNAL lane 的語意因此是「**平台結算 store 這個賣家自己賣**�
 
 | 上游要表達的 | 我方既有欄位與值 | 守門 |
 |---|---|---|
-| 平台收款（代理商戶 MerID） | `collection_model = PLATFORM_AGENT_MERCHANT` | `chk_orders_policy_matrix`；`resolvePaymentMerId` **必須由本值驅動**，env 未設定時結帳當下 fail-closed |
+| 平台收款（代理商戶 MerID） | `collection_model = PLATFORM_AGENT_MERCHANT` | `chk_orders_policy_matrix`；平台代收不支援，`requireSupportedCollectionModel` 於結帳當下 fail-closed |
 | 平台對買家開票 | `invoice_model = PLATFORM_TO_BUYER` | `chk_orders_invoice_collection` 與上一列**雙向等值** |
 | 受託代銷、再結算撥付賣家 | `commerce_model = PLATFORM_CONSIGNMENT` | `chk_orders_policy_matrix` |
 
@@ -554,7 +554,7 @@ stateDiagram-v2
 
 | 值 | 何時 | 可否靠重跑自癒 |
 |---|---|---|
-| `CONFIGURATION_MISSING` | 結算 store id 未設定（`PROCUREMENT_SETTLEMENT_STORE_ID`）。⚠️ 只有這一項：EXTERNAL lane 不讀 `PAYUNI_AGENT_MER_ID`（6.4.5） | 否——補設定後需人工重放 |
+| `CONFIGURATION_MISSING` | 結算 store id 未設定（`PROCUREMENT_SETTLEMENT_STORE_ID`）。⚠️ 只有這一項：EXTERNAL lane 不走平台代收（6.4.5） | 否——補設定後需人工重放 |
 | `UNKNOWN_LANE` | `lane` 不是 `PLATFORM` 也不是 `EXTERNAL`（fail-closed，6.4 適用範圍） | 否 |
 | `RECIPIENT_VALIDATION_FAILED` | order-service 的 PayUni 收件人姓名／地址驗證未過（6.4.1 的縱深防禦） | 否——需買家改收件資料 |
 | `ORDER_SERVICE_REJECTED` | order-service 回終態拒絕的其餘情形 | 視情形 |

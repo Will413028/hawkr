@@ -4080,7 +4080,7 @@ enum ProductCertificationRejectReason {
 
 /// 商流模式——**這筆錢誰收、誰開票**，決定整條帳務軸。訂單快照六欄之一：付款後鎖定，改政策不得回溯既有訂單。取**短名**（不把 provider 綁進商流維度），與 `provider` 維度正交。🔴 **本值域是三條商流帳務軸互斥的分界線**，65 定版、66 只引用。
 enum CommerceModel {
-  /// 賣家直營 — 賣家為收款主體與開票人。**既有全部訂單皆為本值**（merId = 'HAWK' ‖ store_id）。撥款資格述詞對本值回 NOT_APPLICABLE——不是「不合格」，是不在撥款軸上
+  /// 賣家直營 — 賣家為收款主體與開票人。**既有全部訂單皆為本值**，收款走 payment 模組（賣家的收款帳戶）。撥款資格述詞對本值回 NOT_APPLICABLE——不是「不合格」，是不在撥款軸上
   sellerDirect(code: 'SELLER_DIRECT', value: 'SELLER_DIRECT', label: '賣家直營'),
   /// 平台受託代銷 — 平台以代理商戶收款、對買家開票，再結算撥付賣家。**必須帶 `consignment_agreement_version`**（`chk_orders_consignment_agreement`），且 `collection_model` 必須是 PLATFORM_AGENT_MERCHANT
   platformConsignment(code: 'PLATFORM_CONSIGNMENT', value: 'PLATFORM_CONSIGNMENT', label: '平台受託代銷');
@@ -4114,9 +4114,9 @@ enum CommerceModel {
 
 /// 收款模式——**款項實際經過誰的手**。訂單快照六欄之一。🔴 與 `commerce_model` 由 `chk_orders_policy_matrix` 綁成雙條件式（兩者必須同時是平台側或同時是賣家側），與 `invoice_model` 由 `chk_orders_invoice_collection` 綁死（收款主體與開票 issuer 必須一致）。**這是通用維度，不得把 provider 名稱寫進值域**——下一個 provider 代收會需要第四個值，而 provider 已由 `ShippingMethod` 承載。
 enum CollectionModel {
-  /// 賣家子商店收款 — 款項直接進賣家的 PayUni 子商店（merId = 'HAWK' ‖ store_id）。**現況全部訂單皆為本值**
+  /// 賣家子商店收款 — 款項直接進賣家的收款帳戶，收款走 payment 模組。**現況全部訂單皆為本值**
   sellerMerchant(code: 'SELLER_MERCHANT', value: 'SELLER_MERCHANT', label: '賣家子商店收款'),
-  /// 平台代理商戶收款 — 款項進平台代理商戶（`PAYUNI_AGENT_MER_ID`）。🔴 `resolvePaymentMerId` 必須由本值驅動；env 未設定時**結帳當下 fail-closed**（9503 群），不得建單後才發現
+  /// 平台代理商戶收款 — 平台代收目前沒有收款路徑。🔴 結帳由 `requireSupportedCollectionModel` 在**結帳當下 fail-closed**（PLATFORM_COLLECTION_NOT_CONFIGURED，9503 群），不得建單後才發現
   platformAgentMerchant(code: 'PLATFORM_AGENT_MERCHANT', value: 'PLATFORM_AGENT_MERCHANT', label: '平台代理商戶收款'),
   /// 物流商代收 — 由物流商在交付時代收貨款（如超商取貨付款）。⚠️ 值域內但**尚無寫入路徑**——書面契約到位前由 flag 擋住，這是刻意的
   providerCollected(code: 'PROVIDER_COLLECTED', value: 'PROVIDER_COLLECTED', label: '物流商代收'),
