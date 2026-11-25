@@ -356,6 +356,53 @@ func TestConcurrentRestoresNeverExceedTheDeduction(t *testing.T) {
 	}
 }
 
+// 歸還先鎖原扣減那一列再算剩餘量：別的 transaction 持有該列的 FOR NO KEY UPDATE 時（與 FOR UPDATE 衝突、與插入歸還列的外鍵檢查所取的
+// FOR KEY SHARE 不衝突），歸還必須等它；沒鎖原扣減的實作會直接做完。以 pg_blocking_pids 等到它被擋住，不靠併發的時序。
+func TestRestoreWaitsForTheLockOnTheDeduction(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t)
+	sku := f.sku(10)
+	f.must(f.m.DeductStock(f.ct, "d", items(sku, 6)))
+	holder, err := f.d.Pool().Begin(f.ct)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = holder.Rollback(f.ct) }()
+	if _, err := holder.Exec(f.ct, `SELECT id FROM catalog.stock_operations WHERE kind = 'DEDUCT' AND idempotency_key = 'd' FOR NO KEY UPDATE`); err != nil {
+		t.Fatal(err)
+	}
+	var pid int
+	if err := holder.QueryRow(f.ct, `SELECT pg_backend_pid()`).Scan(&pid); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- f.m.RestoreStock(f.ct, "r", "d", items(sku, 2)) }()
+	deadline := time.Now().Add(30 * time.Second)
+	for blocked := false; !blocked; {
+		select {
+		case err := <-done:
+			t.Fatalf("restore finished (err=%v) without waiting for the lock on the deduction", err)
+		default:
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("restore never blocked on the deduction row")
+		}
+		blocked = f.count(`SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND $1::int = ANY(pg_blocking_pids(pid))`, pid) > 0
+		if !blocked {
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+	if err := holder.Rollback(f.ct); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if got := f.stockOf(sku); got != 6 {
+		t.Fatalf("庫存 = %d，want 6（扣 6、還 2）", got)
+	}
+}
+
 func TestStockCannotGoNegativeAtTheSchemaLevel(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t)
@@ -394,7 +441,12 @@ func TestAdjustReplayIsNoOpAndDifferentContentIsRejected(t *testing.T) {
 		t.Fatalf("不同 SKU 重送 err = %v，want ErrIdempotencyKeyReused", err)
 	}
 	if err := f.m.AdjustStock(f.ct, 502, "adj:r", sku, 3); !errors.Is(err, ErrSkuNotFound) {
-		t.Fatalf("別家店重送同一個 key 與內容 err = %v，want ErrSkuNotFound", err)
+		t.Fatalf("別家店用同一個 key 調整這個 SKU err = %v，want ErrSkuNotFound", err)
+	}
+	foreign := f.sku(5)
+	f.must(f.exec(`UPDATE catalog.products SET store_id = 502 WHERE id = (SELECT product_id FROM catalog.product_skus WHERE id = $1)`, foreign))
+	if err := f.m.AdjustStock(f.ct, 501, "adj:r", foreign, 3); !errors.Is(err, ErrSkuNotFound) {
+		t.Fatalf("同店同一個 key 重送別家店的 SKU err = %v，want ErrSkuNotFound（不是 ErrIdempotencyKeyReused）", err)
 	}
 	if got := f.stockOf(sku); got != 8 {
 		t.Fatalf("跨店重送後庫存 = %d，want 8", got)
