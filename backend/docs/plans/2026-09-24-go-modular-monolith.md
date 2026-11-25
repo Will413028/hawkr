@@ -295,7 +295,7 @@ A2、A3 的帳號、買家、賣家 ID 仍被 Java 服務存成 `BIGINT`，主�
   - `pkg/mq` 剩餘的 social routing key／event type 常數與 `socialrelay`。觸發：A8 notification 搬進單體時刪。
   - lockorder 檢查器看不到 SQL 函式內的鎖（`pub_lock_content_takedowns`）。觸發：再新增一個在 pub 函式內鎖列的機制時，改成檢查器可見的形式。
   - supply chain（dev 既有失敗）：`next@16.4.1` GHSA-mfr8-8qww-v76h、GHSA-vc7v-qv4w-wrv8（修正版 16.4.5，需 Will 同意升級）與 `osv-scanner.toml` 3 筆 unused ignore（GHSA-xxph-c9ww-hj94、GHSA-w573-9ffj-6ff9、GHSA-crwc-vw2r-qr6m）。觸發：立即（medium 90 天期限自 2026-11-19 起）。
-- [x] **A8 notification**（完成，2026-11-26，Will 決定跳過 A8-6 的真機推播驗收；程式完成，真機驗收延後）：依 ADR `2026-10-05-notification-module.md`：通知型別定義在程式碼、逐一明確訂閱，不照搬 wildcard。階段計畫：`2026-11-23-a8-notification.md`（盤點、步驟、決定 D0–D31、完成定義核對與進度寫在那裡）；行為規格 `backend/docs/modules/notification.md`。notification-service、gateway 通知路由與 SSE 平台、payload golden 契約、`pkg/mail` 已刪。
+- [x] **A8 notification**（完成，2026-11-26，Will 決定跳過 A8-6 的真機推播驗收；程式完成，真機驗收延後）：依 ADR `2026-10-05-notification-module.md`：通知型別定義在程式碼、逐一明確訂閱，不照搬 wildcard。階段計畫：`2026-11-23-a8-notification.md`（盤點、步驟、決定 D0–D32、完成定義核對與進度寫在那裡）；行為規格 `backend/docs/modules/notification.md`。notification-service、gateway 通知路由與 SSE 平台、payload golden 契約、`pkg/mail` 已刪。
   - A8 延後項（階段計畫「延後項」搬回，2026-11-26）：
     - 接上 order、aftersales 的賣家工作區發布者（`notification.PublishSellerWorkspace`，D19）；到那時賣家中心沒有即時同步。觸發：order、aftersales 搬進單體（B8、B9）。
     - 還沒搬的服務的通知型別（訂單、出貨、退款、發票、商品認證、庫存與訂單逾期預警、`order.delivered`、ATM 退款通知參數）：逐一裁決（做型別並訂閱，或不做附理由），不經 `internal/legacy`。觸發：各發送端搬進單體（B2–B10、A5），由「模組完成的定義」的通知型別條目承接。
