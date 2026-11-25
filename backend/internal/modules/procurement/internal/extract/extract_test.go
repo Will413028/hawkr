@@ -46,11 +46,11 @@ func (f *fakeLLM) GenerateContent(ctx context.Context, req *adkmodel.LLMRequest,
 }
 
 func text(s string) step {
-	return step{resp: &adkmodel.LLMResponse{Content: genai.NewContentFromText(s, genai.RoleModel)}}
+	return step{resp: &adkmodel.LLMResponse{Content: genai.NewContentFromText(s, genai.RoleModel), FinishReason: genai.FinishReasonStop}}
 }
 
 func toolCall(args map[string]any) step {
-	return step{resp: &adkmodel.LLMResponse{Content: &genai.Content{Role: genai.RoleModel, Parts: []*genai.Part{{FunctionCall: &genai.FunctionCall{Name: toolName, Args: args}}}}}}
+	return step{resp: &adkmodel.LLMResponse{Content: &genai.Content{Role: genai.RoleModel, Parts: []*genai.Part{{FunctionCall: &genai.FunctionCall{Name: toolName, Args: args}}}}, FinishReason: genai.FinishReasonStop}}
 }
 
 func newTest(f *fakeLLM, shape Shape) *Extractor {
@@ -255,5 +255,32 @@ func TestUnclearOutputErrorCodesRetryOnceAndAreNotUnavailable(t *testing.T) {
 		if !errors.As(err, &ee) || ee.Unavailable || bad.calls.Load() != 2 {
 			t.Errorf("%s：err = %v, calls = %d，用盡後要失敗且不算服務不可用", code, err, bad.calls.Load())
 		}
+	}
+}
+
+func TestNonStopFinishReasonIsNotAnAnswer(t *testing.T) {
+	withReason := func(r genai.FinishReason) step {
+		return step{resp: &adkmodel.LLMResponse{Content: genai.NewContentFromText(`{"item":"蘋果"}`, genai.RoleModel), FinishReason: r}}
+	}
+	for name, tc := range map[string]struct {
+		reason genai.FinishReason
+		calls  int32
+	}{
+		"MAX_TOKENS":  {genai.FinishReasonMaxTokens, 1},
+		"SAFETY":      {genai.FinishReasonSafety, 1},
+		"UNSPECIFIED": {genai.FinishReasonUnspecified, 2},
+		"空值":          {"", 2},
+		"OTHER":       {genai.FinishReasonOther, 2},
+	} {
+		f := &fakeLLM{steps: []step{withReason(tc.reason)}}
+		_, err := newTest(f, ShapeSchema).Extract(context.Background(), "蘋果", slots.Set{})
+		var ee *Error
+		if !errors.As(err, &ee) || ee.Unavailable || f.calls.Load() != tc.calls {
+			t.Errorf("%s：err = %v, calls = %d，要呼叫 %d 次後失敗且不算服務不可用", name, err, f.calls.Load(), tc.calls)
+		}
+	}
+	f := &fakeLLM{steps: []step{withReason(genai.FinishReasonStop)}}
+	if p, err := newTest(f, ShapeSchema).Extract(context.Background(), "蘋果", slots.Set{}); err != nil || p.Item == nil || *p.Item != "蘋果" || f.calls.Load() != 1 {
+		t.Errorf("STOP：patch = %+v, err = %v, calls = %d", p, err, f.calls.Load())
 	}
 }
