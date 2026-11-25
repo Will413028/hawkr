@@ -199,24 +199,6 @@
    "why": "切回非 ACTIVE 時清掉 first_published_at：曾上架的紀錄消失，測試要紅。"
   },
   {
-   "id": "can-transition-allows-same-status",
-   "stack": "go",
-   "file": "backend/internal/modules/catalog/internal/model/product.go",
-   "old": "return to.Valid() && to != s",
-   "new": "return to.Valid()",
-   "test": "internal/modules/catalog/internal/model ^TestCanTransitionAllowsAnyDistinctValidPair$",
-   "why": "同狀態被當成切換：測試要紅。"
-  },
-  {
-   "id": "can-transition-allows-invalid-status",
-   "stack": "go",
-   "file": "backend/internal/modules/catalog/internal/model/product.go",
-   "old": "return to.Valid() && to != s",
-   "new": "return to != s",
-   "test": "internal/modules/catalog/internal/model ^TestCanTransitionAllowsAnyDistinctValidPair$",
-   "why": "無效狀態被當成可切換的目標：測試要紅。"
-  },
-  {
    "id": "description-total-not-enforced",
    "stack": "go",
    "file": "backend/internal/modules/catalog/internal/description/description.go",
