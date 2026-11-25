@@ -1,5 +1,7 @@
 # B4-3 Connect proto 草稿（交 Will 審，尚未實作）
 
+> **已被 D24 部分取代（2026-11-26）**：本稿是修訂前的底稿；與 `api-baseline-brief.md` 開頭的拍板段不一致處（例如 `ListProducts` 的 `followed_*` 篩選、公開與賣家共用 `Product`、低庫存定義、沒有 `SetStock`）以 D24 為準。
+
 快照：dev `cb273c7d9`。本檔只是草稿：沒有改 `api/`、沒有跑 `buf`，proto 文字是否能通過 `buf lint` 尚未驗證（見第 6 節）。
 
 證據標記：【量】＝讀過該檔案或跑過指令；【推】＝推論；【未查證】＝沒有可靠來源。
