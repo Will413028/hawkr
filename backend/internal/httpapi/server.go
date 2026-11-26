@@ -140,6 +140,8 @@ type Deps struct {
 	// Coupon 是優惠券：買家的券與可領的活動、店家發的活動（CouponAppService）。
 	Coupon *coupon.Module
 	// Catalog 是商品模組：CatalogPublicService、SellerCatalogAppService、CatalogAdminService，與買家「追蹤中」動態的商品來源。
+	// 選填：舊服務處理商品流量到 B4-6，cmd/hawkr 不給（三支 service 不掛、ListFollowedStoreProducts 回 unimplemented），切換的同一變更才給；測試給。
+	// 和 Media、Legacy 一樣是 nil 就不掛的選填依賴。
 	Catalog *modcatalog.Module
 	// CRM 是店家的客戶與標籤（CrmAppService）。
 	CRM *crm.Module
@@ -502,34 +504,36 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	}
 	add(adminsocialconnect.NewSocialAdminServiceHandler(socialAdmin, opts...))
 	blocking := blocks.Sources{Authors: deps.Social, Reviews: deps.Review, Messages: deps.IM, Identities: blocks.Identities{Buyers: deps.Buyer, Stores: deps.Seller}}
-	// 商品卡片（公開 service 與買家的「追蹤中」動態共用）的店家卡片與評分組裝。
-	catalogPresenter, err := httpcatalog.NewPresenter(deps.Seller, stats, deps.Images)
-	if err != nil {
-		return nil, err
-	}
 	buyerPorts := deps.BuyerPorts
-	buyerPorts.Followed = httpbuyer.FollowedProducts{Follows: deps.Buyer, Catalog: deps.Catalog, Cards: catalogPresenter, Now: now}
+	if deps.Catalog != nil {
+		// 商品卡片（公開 service 與買家的「追蹤中」動態共用）的店家卡片與評分組裝。
+		catalogPresenter, err := httpcatalog.NewPresenter(deps.Seller, stats, deps.Images)
+		if err != nil {
+			return nil, err
+		}
+		buyerPorts.Followed = httpbuyer.FollowedProducts{Follows: deps.Buyer, Catalog: deps.Catalog, Cards: catalogPresenter, Now: now}
+		catalogPublic, err := httpcatalog.NewPublic(deps.Catalog, catalogPresenter, now)
+		if err != nil {
+			return nil, err
+		}
+		add(catalogv1alpha1connect.NewCatalogPublicServiceHandler(catalogPublic, opts...))
+		catalogApp, err := httpcatalog.NewApp(deps.Catalog, deps.Seller, deps.Images, deps.Logger)
+		if err != nil {
+			return nil, err
+		}
+		add(catalogv1alpha1connect.NewSellerCatalogAppServiceHandler(catalogApp, opts...))
+		catalogAdmin, err := httpcatalog.NewAdmin(deps.Catalog, deps.Images)
+		if err != nil {
+			return nil, err
+		}
+		add(admincatalogconnect.NewCatalogAdminServiceHandler(catalogAdmin, opts...))
+	}
 	buyerApp, err := httpbuyer.NewApp(deps.Buyer, deps.Images, buyerPorts, stats, blocking)
 	if err != nil {
 		return nil, err
 	}
 	add(buyerconnect.NewBuyerAppServiceHandler(buyerApp, opts...))
 	add(adminbuyerconnect.NewBuyerAdminServiceHandler(httpbuyer.NewAdmin(deps.Buyer), opts...))
-	catalogPublic, err := httpcatalog.NewPublic(deps.Catalog, catalogPresenter, now)
-	if err != nil {
-		return nil, err
-	}
-	add(catalogv1alpha1connect.NewCatalogPublicServiceHandler(catalogPublic, opts...))
-	catalogApp, err := httpcatalog.NewApp(deps.Catalog, deps.Seller, deps.Images, deps.Logger)
-	if err != nil {
-		return nil, err
-	}
-	add(catalogv1alpha1connect.NewSellerCatalogAppServiceHandler(catalogApp, opts...))
-	catalogAdmin, err := httpcatalog.NewAdmin(deps.Catalog, deps.Images)
-	if err != nil {
-		return nil, err
-	}
-	add(admincatalogconnect.NewCatalogAdminServiceHandler(catalogAdmin, opts...))
 	appLogin := deps.AppLogin
 	if appLogin == nil {
 		if appLogin, err = httpidentity.NewAppLogin(deps.Identity); err != nil {

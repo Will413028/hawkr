@@ -15,12 +15,22 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
 
 // FirstStoreID 是第一家店的 store_id：與帳號 ID（從 1001 起）刻意拉開，誤把帳號 ID 當店家 ID 的實作會讀到別人的資料或找不到店。
 const FirstStoreID = 7000
+
+// Notifier 是測試用的補貨通知替身：job 不在這些測試執行（只有排入），兩個呼叫都是 no-op。
+type Notifier struct{}
+
+// NotifyRestocked 什麼都不做。
+func (Notifier) NotifyRestocked(context.Context, catalog.RestockedSKU) error { return nil }
+
+// PurgeSKUSubscriptions 什麼都不做。
+func (Notifier) PurgeSKUSubscriptions(context.Context, []uuid.UUID) error { return nil }
 
 // World 是一個測試的資料庫與 catalog 模組；時間固定，由 Advance 推進。
 type World struct {
@@ -43,7 +53,11 @@ func New(t *testing.T, pg *testdb.Server) *World {
 		migrate.Module{Name: "catalog", Dir: catalog.Migrations()},
 	))
 	w := &World{T: t, DB: d, Media: media.NewFake(), now: time.Date(2026, 12, 1, 9, 0, 0, 0, time.UTC)}
-	w.Module = catalog.New(catalog.Deps{DB: d, NewID: uuid.NewV7, Now: w.Now, Media: w.Media})
+	queue, err := jobs.NewInsertOnly(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.Module = catalog.New(catalog.Deps{DB: d, NewID: uuid.NewV7, Now: w.Now, Media: w.Media, Jobs: queue, Restock: Notifier{}})
 	// 只關心 catalog 讀 seller 的 pub_exposable_stores：KYC 的表放寬成可以直接寫最小的列（它自己的規則在 seller 的測試）。
 	w.Exec(`DO $$ DECLARE r record; BEGIN
 		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint

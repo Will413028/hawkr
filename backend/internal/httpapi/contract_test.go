@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
 	"io/fs"
 	"log/slog"
 	"os"
@@ -10,6 +9,9 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 )
 
 var (
@@ -47,7 +49,7 @@ func contractServices(t *testing.T) []string {
 }
 
 // declaredNotYetMounted 是契約已宣告、handler 在後續步驟才接線的 service（值是接線的步驟）。接線之後必須從這裡刪除：下面的測試在它已經掛上時失敗。
-var declaredNotYetMounted = map[string]string{}
+var declaredNotYetMounted = rpc.DeferredServices
 
 func TestEveryServiceInTheContractIsMounted(t *testing.T) {
 	var mounted []string

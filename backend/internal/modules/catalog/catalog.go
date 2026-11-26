@@ -184,8 +184,11 @@ type Module struct {
 	restock  *restock.Service
 }
 
-// New 建立模組。
+// New 建立模組；Jobs 與 Restock 是必要的（缺了，上架、刪除、庫存由零變正的寫入會在執行時 nil 解參考），沒給就 panic，和 coupon.New 一樣在組裝時失敗。
 func New(d Deps) *Module {
+	if d.Jobs == nil || d.Restock == nil {
+		panic("catalog：Jobs 與 Restock 是必要的")
+	}
 	rs := restock.New(restock.Deps{DB: d.DB, Jobs: d.Jobs, Now: d.Now, Notifier: d.Restock})
 	return &Module{
 		stock:    stock.New(stock.Deps{DB: d.DB, NewID: d.NewID, Now: d.Now, Restock: rs}),

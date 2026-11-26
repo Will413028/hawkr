@@ -2,7 +2,7 @@ package buyer
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"time"
 
 	"connectrpc.com/connect"
@@ -34,14 +34,14 @@ func (f FollowedProducts) Complete() bool {
 	return f.Follows != nil && f.Catalog != nil && f.Cards != nil && f.Now != nil
 }
 
-// ErrFollowedProductsRequired 是 ListFollowedStoreProducts 在沒有組裝來源時的錯誤：組裝錯誤，不是使用者的錯。
-var ErrFollowedProductsRequired = fmt.Errorf("httpapi/buyer：ListFollowedStoreProducts 需要 Ports.Followed")
+// errFollowedNotWired 是 ListFollowedStoreProducts 在沒有組裝來源時的錯誤：商品資料在 B4-6 切換前仍在舊服務，cmd/hawkr 不接 catalog，這支 RPC 回 unimplemented。
+var errFollowedNotWired = connect.NewError(connect.CodeUnimplemented, errors.New("buyer: ListFollowedStoreProducts is not wired yet"))
 
 // ListFollowedStoreProducts 列出呼叫者追蹤的店家的公開商品，最新上架在前。沒有追蹤任何店家回空清單。
 func (a *App) ListFollowedStoreProducts(ctx context.Context, req *connect.Request[pb.ListFollowedStoreProductsRequest]) (*connect.Response[pb.ListFollowedStoreProductsResponse], error) {
 	f := a.ports.Followed
 	if !f.Complete() {
-		return nil, ErrFollowedProductsRequired
+		return nil, errFollowedNotWired
 	}
 	buyerID, err := a.caller(ctx)
 	if err != nil {

@@ -340,7 +340,7 @@ func checkCustomerEffects(services []service) error {
 	if err != nil {
 		return err
 	}
-	return checkCustomerEffectTable("httpapi/effects", customerEffects, descriptors)
+	return checkCustomerEffectTable("httpapi/effects", rpc.WithoutUnmountedDeferred(customerEffects, descriptors), descriptors)
 }
 
 func checkCustomerEffectTable(scope string, table map[string]Effect, descriptors []protoreflect.ServiceDescriptor) error {

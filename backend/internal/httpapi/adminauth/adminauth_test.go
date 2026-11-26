@@ -540,3 +540,23 @@ func TestSocialAdminMethodsDeclareTheirOwnPermission(t *testing.T) {
 		t.Errorf("ListPosts 的宣告 = %+v，預期權限 %s、紀錄模式 %s", d, adminperm.SocialPostsList, auditReadOnly)
 	}
 }
+
+// rpc.DeferredServices 只放寬「宣告了但還沒掛」：沒掛時不要求對得上；掛了就和其他 service 一樣；其他 service 沒掛仍然不能啟動。
+func TestCheckRelaxesOnlyTheDeferredServicesAndOnlyWhileTheyAreNotMounted(t *testing.T) {
+	const deferred = "hawkr.admin.catalog.v1alpha1.CatalogAdminService"
+	all := declaredServices(t)
+	without := func(name string) []protoreflect.ServiceDescriptor {
+		return slices.DeleteFunc(slices.Clone(all), func(sd protoreflect.ServiceDescriptor) bool { return string(sd.FullName()) == name })
+	}
+	if err := Check(without(deferred)); err != nil {
+		t.Errorf("延後的 service 沒掛應該通過：%v", err)
+	}
+	if err := Check(without("hawkr.admin.coupon.v1alpha1.CouponAdminService")); err == nil || !strings.Contains(err.Error(), "有宣告，但 service 沒有這個方法") {
+		t.Errorf("其他 service 沒掛仍要失敗：err=%v", err)
+	}
+	table := maps.Clone(declarations)
+	delete(table, "/"+deferred+"/ListProducts")
+	if err := checkDeclarations(rpc.WithoutUnmountedDeferred(table, all), all); err == nil || !strings.Contains(err.Error(), "ListProducts 沒有授權宣告") {
+		t.Errorf("延後的 service 掛上後缺宣告要失敗：err=%v", err)
+	}
+}

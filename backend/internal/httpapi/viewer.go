@@ -57,7 +57,7 @@ func checkPublicViewerDependence(services []service) error {
 	if err != nil {
 		return err
 	}
-	return checkViewerDependenceTable("httpapi/viewer", publicViewerDependent, descriptors)
+	return checkViewerDependenceTable("httpapi/viewer", rpc.WithoutUnmountedDeferred(publicViewerDependent, descriptors), descriptors)
 }
 
 func checkViewerDependenceTable(scope string, table map[string]bool, descriptors []protoreflect.ServiceDescriptor) error {

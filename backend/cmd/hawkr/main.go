@@ -55,7 +55,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
-	"github.com/Will413028/hawkr/backend/internal/modules/catalog"
 	"github.com/Will413028/hawkr/backend/internal/modules/content"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/imageai"
@@ -283,17 +282,15 @@ func runServe(ctx context.Context) error {
 	defer stopAssistant()
 
 	h, err := httpapi.NewHandler(httpapi.Deps{
-		Assistant:   assistantModule,
-		Procurement: procurementModule,
-		ImageAI:     imageAIModule,
-		Ready:       d.Ping,
-		Social:      socialModule,
-		Review:      reviewModule,
-		IM:          imModule,
-		CRM:         crmModule,
-		Coupon:      couponModule,
-		// catalog 的 Connect handler 在 B4-3b 掛上；它的事件訂閱、job 與舊 gateway 轉接在 B4-6 切換時才接（商品的資料仍在舊 product-service）。
-		Catalog:      catalog.New(catalog.Deps{DB: d, NewID: uuid.NewV7, Now: time.Now, Media: med}),
+		Assistant:    assistantModule,
+		Procurement:  procurementModule,
+		ImageAI:      imageAIModule,
+		Ready:        d.Ping,
+		Social:       socialModule,
+		Review:       reviewModule,
+		IM:           imModule,
+		CRM:          crmModule,
+		Coupon:       couponModule,
 		Moderation:   moderationModule,
 		Notification: notificationModule,
 		Content: content.New(content.Deps{

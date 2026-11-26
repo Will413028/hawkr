@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -37,4 +38,29 @@ func CheckDeclarations[D any](scope string, table map[string]D, services []proto
 	}
 	slices.Sort(problems)
 	return fmt.Errorf("%s：%s", scope, strings.Join(problems, "；"))
+}
+
+// DeferredServices 是契約與宣告表已有、但 handler 在後續步驟才掛上的 service（值是掛上的步驟）：舊服務處理商品流量到 B4-6，
+// cmd/hawkr 在那之前不給 httpapi.Deps.Catalog，三支 catalog service 不掛（和 declaredNotYetMounted 同一份）。接線的步驟完成後從這裡刪除。
+var DeferredServices = map[string]string{
+	"hawkr.admin.catalog.v1alpha1.CatalogAdminService": "B4-6",
+	"hawkr.catalog.v1alpha1.CatalogPublicService":      "B4-6",
+	"hawkr.catalog.v1alpha1.SellerCatalogAppService":   "B4-6",
+}
+
+// WithoutUnmountedDeferred 回傳 table 去掉 DeferredServices 裡還沒掛的 service 的宣告，給 CheckDeclarations 用：
+// 延後的 service 沒掛時不要求宣告對得上；掛上後和其他 service 一樣「宣告＝掛載」，其他 service 沒掛仍然不能啟動。
+func WithoutUnmountedDeferred[D any](table map[string]D, mounted []protoreflect.ServiceDescriptor) map[string]D {
+	out := maps.Clone(table)
+	for name := range DeferredServices {
+		if slices.ContainsFunc(mounted, func(sd protoreflect.ServiceDescriptor) bool { return string(sd.FullName()) == name }) {
+			continue
+		}
+		for procedure := range out {
+			if strings.HasPrefix(procedure, "/"+name+"/") {
+				delete(out, procedure)
+			}
+		}
+	}
+	return out
 }

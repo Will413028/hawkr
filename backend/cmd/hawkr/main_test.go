@@ -16,7 +16,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
-	catalogmod "github.com/Will413028/hawkr/backend/internal/modules/catalog"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon"
 	"github.com/Will413028/hawkr/backend/internal/modules/crm"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
@@ -66,7 +65,7 @@ func TestServeAnswersUntilContextEnds(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	ready := func(context.Context) error { return nil }
-	h, err := httpapi.NewHandler(httpapi.Deps{Procurement: &procurement.Module{}, Catalog: &catalogmod.Module{}, ImageAI: &imageai.Module{}, Assistant: &assistant.Module{}, CRM: &crm.Module{}, Coupon: &coupon.Module{}, Buyer: &buyer.Module{}, Social: &social.Module{}, Moderation: &moderation.Module{}, Notification: &notification.Module{}, Ready: ready, Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}, Social: &social.Module{}}), Deletion: &accountdeletion.Module{}, Seller: &seller.Module{}, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Review: &review.Module{}, IM: &im.Module{}, Identity: &identity.Module{}, BizCalendar: &bizcalendar.Store{}, Payment: &payment.Module{}})
+	h, err := httpapi.NewHandler(httpapi.Deps{Procurement: &procurement.Module{}, ImageAI: &imageai.Module{}, Assistant: &assistant.Module{}, CRM: &crm.Module{}, Coupon: &coupon.Module{}, Buyer: &buyer.Module{}, Social: &social.Module{}, Moderation: &moderation.Module{}, Notification: &notification.Module{}, Ready: ready, Delegation: delegation.New(delegation.Deps{Seller: &seller.Module{}, Social: &social.Module{}}), Deletion: &accountdeletion.Module{}, Seller: &seller.Module{}, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), DashboardOrders: noDashboardOrders{}, Discovery: &discovery.Module{}, ReviewQueue: &reviewqueue.Module{}, Review: &review.Module{}, IM: &im.Module{}, Identity: &identity.Module{}, BizCalendar: &bizcalendar.Store{}, Payment: &payment.Module{}})
 	if err != nil {
 		t.Fatal(err)
 	}
