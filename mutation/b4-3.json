@@ -154,7 +154,6 @@
    "why": "回填的雜湊編碼和應用層 idempotency.Hash 不同：舊 ADJUST 操作的同鍵同內容重送被當成鍵重用，測試要紅。"
   },
   {
-<<<<<<< HEAD
    "id": "public-list-exposure-join-dropped",
    "stack": "go-integration",
    "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
@@ -288,7 +287,8 @@
    "new": "if false && c.NameEn != \"\" {",
    "test": "internal/httpapi/catalog ^TestPublicGetsVaryOnAcceptLanguage$",
    "why": "分類名稱不看請求語系（一律 zh-TW）：Accept-Language: en 拿到中文名稱，測試要紅。"
-=======
+  },
+  {
    "id": "rating-accumulates",
    "stack": "go-integration",
    "file": "backend/internal/modules/catalog/internal/store/counters.sql.go",
@@ -413,7 +413,6 @@
    "new": "\t\treturn nil\n",
    "test": "internal/modules/catalog ^TestDeletingAProductOrSkuEnqueuesAPurgeOfItsSubscriptions$",
    "why": "刪除商品不排清補貨訂閱的 job，測試要紅。"
->>>>>>> b4-3b-counters
   }
  ]
 }
