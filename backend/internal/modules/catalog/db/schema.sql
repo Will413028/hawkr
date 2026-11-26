@@ -197,3 +197,11 @@ CREATE TABLE catalog.product_hashtags (
     CONSTRAINT product_hashtags_position_check CHECK (position >= 0)
 );
 
+
+-- 銷量累計的去重：訂單編號是 order.sales.accumulated 事件的自然鍵，同一筆訂單只累計一次。
+-- 必要條件：Java order 以 MQ 送出事件，會重送，直到 ordering 搬進單體（B8）改成同 transaction 呼叫；那時這張表退場。
+CREATE TABLE catalog.sales_orders (
+    order_no    TEXT        PRIMARY KEY,
+    recorded_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT sales_orders_no_check CHECK (char_length(order_no) >= 1 AND char_length(order_no) <= 200)
+);

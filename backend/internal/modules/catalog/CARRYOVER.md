@@ -51,3 +51,4 @@ product-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 - 描述：四種結構化區塊（段落、圖片、清單、表格），圖片區塊只存 `asset_id`（Java 的 `table_json`／`list_json` 是不解析的字串）；上限見 `internal/model/product.go`。
 - hashtag：明確欄位輸入，正規化在 `platform/hashtag`，與 social 同一份（Java 從描述抽取）。
 - 刪除商品不 `MarkDeleted` 圖片：列保留給訂單與評價引用，圖片的去留待訂單快照（D20、B4-4）決定。
+- 計數與補貨（B4-3b）：`SetRating` 傳絕對值、由 review 在自己的 transaction 內呼叫，沒有版本欄；Java 的 `ReviewStatsService` 以事件累計。銷量以 `sales_orders`（`order_no` 去重）冪等，必要條件是 Java order 的 MQ 會重送，B8 之後退場。補貨通知（D26）是新增：Java 只有賣家以外的路徑會通知、賣家補庫存不通知（視為缺陷）；job 是 River、延後 5 分鐘、唯一鍵合併未結束的同 SKU job（River 不允許排除 running，執行中的 job 會擋下同 SKU 的新排入，窗口是毫秒）。

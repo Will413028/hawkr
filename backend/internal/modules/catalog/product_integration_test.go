@@ -29,6 +29,7 @@ type productFixture struct {
 	t     *testing.T
 	d     *db.DB
 	m     *Module
+	rn    *recordingNotifier
 	media *media.Fake
 	ct    context.Context
 	mu    sync.Mutex
@@ -45,13 +46,19 @@ func newProductFixture(t *testing.T) *productFixture {
 		migrate.Module{Name: "catalog", Dir: Migrations()},
 	))
 	f := &productFixture{t: t, d: d, ct: context.Background(), media: media.NewFake(), now: time.Date(2026, 12, 1, 9, 0, 0, 0, time.UTC)}
-	f.m = New(Deps{DB: d, NewID: uuid.NewV7, Now: f.clock, Media: f.media})
+	f.rn = &recordingNotifier{}
+	f.m = New(f.deps(d, f.media))
 	// 測試只關心 catalog 讀 seller 的 pub_exposable_stores：把 KYC 的表放寬成可以直接寫最小的列（它自己的規則在 seller 的測試）。
 	f.exec(`DO $$ DECLARE r record; BEGIN
 		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
 		         WHERE conrelid = 'seller.kyc_applications'::regclass AND contype = 'c'
 		LOOP EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.t, r.conname); END LOOP; END $$`)
 	return f
+}
+
+// deps 是這個 fixture 的模組依賴；換 database 連線或 media 的測試用它組出另一個 Module。
+func (f *productFixture) deps(d *db.DB, m Media) Deps {
+	return Deps{DB: d, NewID: uuid.NewV7, Now: f.clock, Media: m, Jobs: newJobs(f.t, d), Restock: f.rn}
 }
 
 func (f *productFixture) clock() time.Time {
@@ -841,7 +848,7 @@ func TestReadIsOneSnapshotWhileAWriteCommitsBetweenItsParts(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer d2.Close()
-	reader := New(Deps{DB: d2, NewID: uuid.NewV7, Now: f.clock, Media: f.media})
+	reader := New(f.deps(d2, f.media))
 	type result struct {
 		p   Product
 		err error
@@ -963,7 +970,7 @@ func TestUpdateConfirmsNewImagesBeforeLockingTheProductRow(t *testing.T) {
 	storeID, acct := f.store()
 	p := f.create(storeID, acct, f.input("確認順序"))
 	probe := &confirmProbe{Fake: f.media, f: f, productID: p.ID}
-	m := New(Deps{DB: f.d, NewID: uuid.NewV7, Now: f.clock, Media: probe})
+	m := New(f.deps(f.d, probe))
 	in := f.input("確認順序")
 	in.Gallery = []Image{{Token: "probe-new"}}
 	if _, err := updateP(m, f.ct, storeID, media.Uploader{ID: acct}, p.ID, in); err != nil {

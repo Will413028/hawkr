@@ -1,5 +1,6 @@
-h1:fJOYZavAGhACE6nSJbOUCOsI/0gEe3Ayji4nPa7N8tw=
+h1:wSgJdxtd2DbQWvDGNA79vpRWLwREQ/4rvzUi0rxHb3c=
 20261124173042_catalog_baseline.sql h1:C0iQVTNeJxH+zEEcZ4Op+Hza49HiaXMtGiRihOFP8ZM=
 20261124173043_catalog_taxonomy_seed.sql h1:gTSugqq9K0kYRDsQckHdQ4nrooQNBzsH50bT62xw32Q=
 20261125144118_stock_operation_store_scope.sql h1:PeKSWwKCsc0d7/e071kkgW1FT/5H5bsyZbV8kqzJkqo=
 20261125175058_product_api_support.sql h1:Fx12qJ7zUL5sUxmaA/ztQnLNzmpWdOOt55rH3GNUWLU=
+20261126095946_sales_order_dedup.sql h1:/aVYC57zDoRI74Wlgpz2oZ/RLZvJvwgzBNM+VjscgaM=

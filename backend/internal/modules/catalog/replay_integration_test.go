@@ -51,7 +51,7 @@ func TestCreateLoserReadsBackTheWinnerWhenItsImageTokenWasConfirmedElsewhere(t *
 		}
 		winner = w
 	}
-	loser := New(Deps{DB: f.d, NewID: uuid.NewV7, Now: f.clock, Media: rm})
+	loser := New(f.deps(f.d, rm))
 	// 輸家的第一次查詢（transaction 內）還沒有商品；贏家在輸家確認圖片時才提交。
 	got, err := loser.CreateProduct(f.ct, storeID, up, key, in)
 	if err != nil {

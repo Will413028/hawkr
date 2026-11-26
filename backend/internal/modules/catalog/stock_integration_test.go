@@ -23,12 +23,14 @@ type fixture struct {
 	d  *db.DB
 	m  *Module
 	ct context.Context
+	rn *recordingNotifier
 }
 
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
 	d := setup(t)
-	return &fixture{t: t, d: d, ct: context.Background(), m: New(Deps{DB: d, NewID: uuid.NewV7, Now: func() time.Time { return epoch }})}
+	rn := &recordingNotifier{}
+	return &fixture{t: t, d: d, ct: context.Background(), rn: rn, m: New(Deps{DB: d, NewID: uuid.NewV7, Now: func() time.Time { return epoch }, Jobs: newJobs(t, d), Restock: rn})}
 }
 
 func (f *fixture) exec(sql string, args ...any) error {
