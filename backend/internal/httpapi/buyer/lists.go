@@ -21,6 +21,8 @@ type Ports struct {
 	Stores   Stores
 	Orders   Orders
 	CRM      CRM
+	// Followed 是「追蹤中」動態的來源；httpapi.NewHandler 組裝，呼叫端不填。
+	Followed FollowedProducts
 }
 
 type listModule interface {

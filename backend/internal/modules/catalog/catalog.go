@@ -10,8 +10,12 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/riverqueue/river"
+
+	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/counter"
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/product"
+	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/restock"
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/stock"
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/taxonomy"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
@@ -81,6 +85,14 @@ type (
 	StockMismatchError = model.StockMismatchError
 	// Media 是 catalog 對 media 的依賴（*media.Module 與 *media.Fake 都滿足）。
 	Media = model.Media
+	// SkuState 是店家自己的一個 SKU 此刻的內容與可購買性（含已刪除的）。
+	SkuState = model.SkuState
+	// SalesItem 是一筆訂單裡一個商品的銷量。
+	SalesItem = model.SalesItem
+	// RestockedSKU 是 SKU 由不可買變可買時，通知用的最新快照。
+	RestockedSKU = model.RestockedSKU
+	// RestockNotifier 是 catalog 宣告、補貨通知下游（buyer，B4-4 接線）實作的 port。
+	RestockNotifier = model.RestockNotifier
 )
 
 // 商品狀態與描述區塊的種類。
@@ -128,6 +140,17 @@ var (
 	ErrVersionConflict = model.ErrVersionConflict
 )
 
+// InvalidInputError.Reason 的值：欄位為什麼不合法。
+const (
+	ReasonRequired   = model.ReasonRequired
+	ReasonTooLong    = model.ReasonTooLong
+	ReasonTooMany    = model.ReasonTooMany
+	ReasonDuplicate  = model.ReasonDuplicate
+	ReasonUnknown    = model.ReasonUnknown
+	ReasonOutOfRange = model.ReasonOutOfRange
+	ReasonInvalid    = model.ReasonInvalid
+)
+
 // Etag 是商品版本對外的 etag；ParseEtag 還原它（不合法回 ErrInvalidInput）。etag 只涵蓋賣家可編輯的內容與狀態：庫存、銷量、收藏數、評分不改它。
 func Etag(version int64) string { return model.Etag(version) }
 
@@ -146,6 +169,8 @@ type Deps struct {
 	Now func() time.Time
 	// Media 是 media 模組；新圖的 Confirm 與退場資產的 MarkDeleted 在商品寫入的 transaction 內呼叫。
 	Media Media
+	// Restock 是補貨通知的下游：catalog 的週期 worker 在 transaction 外呼叫它（B4-4 接 buyer，之前由組裝點給替身）。
+	Restock RestockNotifier
 }
 
 // Module 是 catalog 模組。
@@ -153,15 +178,42 @@ type Module struct {
 	stock    *stock.Service
 	taxonomy *taxonomy.Service
 	product  *product.Service
+	counter  *counter.Service
+	restock  *restock.Service
 }
 
-// New 建立模組。
+// New 建立模組；Restock 是必要的（缺了，補貨與清訂閱的 worker 會在執行時 nil 解參考），沒給就 panic，和 coupon.New 一樣在組裝時失敗。
 func New(d Deps) *Module {
-	return &Module{
-		stock:    stock.New(stock.Deps{DB: d.DB, NewID: d.NewID, Now: d.Now}),
-		taxonomy: taxonomy.New(taxonomy.Deps{DB: d.DB}),
-		product:  product.New(product.Deps{DB: d.DB, NewID: d.NewID, Now: d.Now, Media: d.Media}),
+	if d.Restock == nil {
+		panic("catalog：Restock 是必要的")
 	}
+	rs := restock.New(restock.Deps{DB: d.DB, Now: d.Now, Notifier: d.Restock})
+	return &Module{
+		stock:    stock.New(stock.Deps{DB: d.DB, NewID: d.NewID, Now: d.Now, Restock: rs}),
+		taxonomy: taxonomy.New(taxonomy.Deps{DB: d.DB}),
+		product:  product.New(product.Deps{DB: d.DB, NewID: d.NewID, Now: d.Now, Media: d.Media, Restock: rs}),
+		counter:  counter.New(counter.Deps{DB: d.DB, Now: d.Now}),
+		restock:  rs,
+	}
+}
+
+// AddWorkers 登記補貨佇列週期 job 的 River worker。
+func (m *Module) AddWorkers(workers *river.Workers) { restock.AddWorkers(workers, m.restock) }
+
+// PeriodicJobs 回傳補貨佇列的排程（每 restock.Interval 處理一輪到期的補貨與清訂閱列）；組裝點在 B4-6 接線。
+func (m *Module) PeriodicJobs() []*river.PeriodicJob { return restock.PeriodicJobs() }
+
+// SetRating 把商品的評分平均（0 到 5）與評價則數設成絕對值，由 review 在自己的 transaction 內呼叫（D3、D26）：沒有版本欄，並行的呼叫靠商品列的行鎖序列化，後提交的絕對值勝出；
+// 不改 etag。count 為 0 時 average 必為 0；不合法回 *InvalidInputError，商品不存在回 ErrProductNotFound（已刪除的商品仍更新）。
+func (m *Module) SetRating(ctx context.Context, productID uuid.UUID, average float64, count int32) error {
+	return m.counter.SetRating(ctx, productID, average, count)
+}
+
+// RecordSales 把一筆訂單的銷量累計到各商品（同一個商品多筆先加總），同一個 orderNo 只累計一次，重送回 nil 且不再累計。
+// 必要條件：Java order 以 MQ 送出事件，會重送，直到 ordering 搬進單體（B8）；到時 sales_orders 去重表退場。與呼叫方的 transaction 同進退（ctx 沒有時自己開一個），任何商品不存在整筆回滾、回 ErrProductNotFound。
+// 在呼叫方的 transaction 內回 error（含 ErrProductNotFound）時，呼叫方必須回滾那個 transaction：這裡不開 savepoint，已寫入的訂單登記仍在 transaction 裡，繼續 commit 會留下登記了但沒累計的訂單，之後的重送被去重擋下。未知商品是否當毒訊息丟棄由 B4-4 的消費端決定。
+func (m *Module) RecordSales(ctx context.Context, orderNo string, items []SalesItem) error {
+	return m.counter.RecordSales(ctx, orderNo, items)
 }
 
 // DeductStock 以冪等鍵 key 扣減庫存，與呼叫方的 transaction 同進退（ctx 沒有 transaction 時自己開一個）。
@@ -225,6 +277,11 @@ func (m *Module) DeleteProduct(ctx context.Context, storeID int64, productID uui
 // Product 讀店家自己的商品（任何狀態，沒刪除）。
 func (m *Module) Product(ctx context.Context, storeID int64, productID uuid.UUID) (Product, error) {
 	return m.product.Get(ctx, storeID, productID)
+}
+
+// OwnSku 讀店家自己的 SKU 此刻的內容與可購買性，含已刪除的 SKU 與商品；SKU 不存在或不是這家店的回 ErrSkuNotFound。庫存調整成功後 Connect 層用它回該 SKU 調整後的內容：已生效的調整不會因為並行刪除或重送而回失敗。
+func (m *Module) OwnSku(ctx context.Context, storeID int64, skuID uuid.UUID) (SkuState, error) {
+	return m.product.OwnSku(ctx, storeID, skuID)
 }
 
 // PublicProduct 讀公開可見的商品：ACTIVE 或 ARCHIVED（下架的商品頁保留，Status 讓呼叫端決定可不可以買）、沒刪除、店家在 at 可曝光；草稿與其他情況 ErrProductNotFound。at 是請求的 clock。

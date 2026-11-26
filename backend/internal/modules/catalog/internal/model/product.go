@@ -233,6 +233,13 @@ type Sku struct {
 	StockQty         int32
 }
 
+// SkuState 是店家自己的一個 SKU 此刻的內容與可購買性（ACTIVE、SKU 與商品都沒刪除、庫存大於 0），已刪除的 SKU 也讀得到：
+// 庫存調整已經 commit 之後並行刪除，或重送時 SKU 已被刪除，回應仍要照實回報已生效的結果。
+type SkuState struct {
+	Sku      Sku
+	Sellable bool
+}
+
 // Hashtag 是商品的一個標籤。
 type Hashtag struct{ Name, Display string }
 

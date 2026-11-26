@@ -11,6 +11,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
+	modcatalog "github.com/Will413028/hawkr/backend/internal/modules/catalog"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 )
 
@@ -98,7 +99,7 @@ func TestCachePolicyCredential(t *testing.T) {
 
 // 掛載的 Public service 每個 procedure 都要宣告是否依觀看者：全部掛載時通過，缺宣告或多宣告都不能啟動。
 func TestPublicViewerDependenceIsDeclaredForEveryProcedure(t *testing.T) {
-	services, err := connectServices(Deps{Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), Logger: slog.New(slog.DiscardHandler)})
+	services, err := connectServices(Deps{Catalog: &modcatalog.Module{}, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), Logger: slog.New(slog.DiscardHandler)})
 	if err != nil {
 		t.Fatalf("connectServices：%v", err)
 	}

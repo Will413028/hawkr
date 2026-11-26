@@ -1,15 +1,18 @@
-//go:build gateway
-
 // Package characterization 是 catalog 對外 API 的特性測試（ADR 2026-09-24-go-modular-monolith D8 的第一層
 // 安全網、ADR 2026-09-26-external-contract-protobuf-connect D4），共用的部分在 internal/httpapi/characterize。
 //
-// 情境只寫一次（scenarios_test.go），透過 Driver 操作：REST driver 經 gateway 打舊的 Java product-service；
-// Connect driver 在 B4-3 加入，打單體的 catalog（加入時拿掉這三個檔的 gateway build tag）。
+// 情境只寫一次（scenarios_test.go），透過 Driver 操作：REST driver（rest_test.go、gateway_test.go，build tag gateway）經 gateway
+// 打舊的 Java product-service；Connect driver（connect_test.go、monolith_integration_test.go，build tag integration）在行程內起
+// 單體的 Connect 入口，打 CatalogPublicService、SellerCatalogAppService 與 CatalogAdminService。
 //
 // 情境鎖定的是 Java product-service 當時的行為，沒有驗證那行為是否正確；疑似缺陷以 CD 編號標明
 // （backend/docs/plans/2026-11-24-b4-catalog/defects.md）。計畫決定要改的行為（D 編號）寫成修正後的斷言，在
 // REST driver 上以 skipOnLegacy 略過並附編號。product-service 刪除時，REST driver、legacy.sh 與 TestLegacy
-// 一起刪除。
+// 一起刪除，情境檔的 build tag 改成 integration。
+//
+// 單體的契約依 D24 修訂（api-baseline-brief.md）：ACTIVE 的寫入至少要有一張主圖（D22，ProductInput.MainImage）、庫存只由
+// SetStock／AdjustStock 改（D23、D24 Q13，SellerSetStock）、ARCHIVED 的公開商品頁仍讀得到但不可購買（D24 Q10）、賣家列表的
+// 關鍵字由伺服器端比對（D24 Q11）。Connect 的情境另外鎖定 D22 的拒絕與 SetStock 的預期值比對。
 //
 // 情境只看業務上的結果：ID 當成不透明的字串，商品只有一個 SKU（D18 沒有選項軸的商品），價格是買家付的
 // Price 與劃線的 ListPrice（D19），錯誤只比 characterize 的分類與下面的 catalog 錯誤。
@@ -36,6 +39,9 @@ const (
 // ErrWrongStatus 是商品狀態不允許這個操作：characterize 的分類放不下的失敗。
 var ErrWrongStatus = errors.New("商品狀態不允許此操作")
 
+// ErrStockMismatch 是 SetStock 的預期庫存與目前的庫存不符（D24 Q13）。
+var ErrStockMismatch = errors.New("庫存已經變動")
+
 // Status 是賣家看到的商品生命週期（D16）。
 type Status string
 
@@ -53,6 +59,8 @@ type ProductInput struct {
 	ListPrice  int64
 	Stock      int64
 	Hashtags   []string
+	// MainImage 為真時商品帶一張主圖（D22：ACTIVE 的寫入至少一張）；舊的 product-service 沒有這個規則，REST driver 不送。
+	MainImage bool
 }
 
 // Product 是讀回的商品。Hashtags 是正規化後的名稱；Purchasable 只有公開商品頁會帶。
@@ -107,7 +115,11 @@ type Driver interface {
 	SellerGet(ctx context.Context, c ch.Caller, id string) (Product, error)
 	// SellerList 以關鍵字列出呼叫者自己店的商品（含未上架）。
 	SellerList(ctx context.Context, c ch.Caller, keyword string) ([]Product, error)
+	// SellerUpdate 整體取代商品內容；庫存不在內容裡（D24 Q13，in.Stock 只有舊的 REST 會送）。
 	SellerUpdate(ctx context.Context, c ch.Caller, id string, in ProductInput) (Product, error)
+	// SellerSetStock 把商品唯一的 SKU 的庫存設成 quantity，expected 是呼叫者看到的現值（D24 Q13：不符是 ErrStockMismatch；
+	// 舊的 REST 沒有這個比對，不檢查）。
+	SellerSetStock(ctx context.Context, c ch.Caller, id string, quantity, expected int64) error
 	// SellerSetListed 上架（true）或下架（false）。
 	SellerSetListed(ctx context.Context, c ch.Caller, id string, listed bool) error
 	SellerDelete(ctx context.Context, c ch.Caller, id string) error

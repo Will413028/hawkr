@@ -103,6 +103,44 @@ func (q *Queries) GetOwnLiveSku(ctx context.Context, arg GetOwnLiveSkuParams) (G
 	return i, err
 }
 
+const getOwnSkuState = `-- name: GetOwnSkuState :one
+SELECT s.id, s.option1_value, s.option2_value, s.price, s.compare_at_price, s.stock_qty,
+       (s.deleted_at IS NULL AND p.deleted_at IS NULL AND p.status = 'ACTIVE' AND s.stock_qty > 0)::boolean AS sellable
+FROM catalog.product_skus s JOIN catalog.products p ON p.id = s.product_id
+WHERE s.id = $1 AND p.store_id = $2
+`
+
+type GetOwnSkuStateParams struct {
+	ID      uuid.UUID
+	StoreID int64
+}
+
+type GetOwnSkuStateRow struct {
+	ID             uuid.UUID
+	Option1Value   *string
+	Option2Value   *string
+	Price          int64
+	CompareAtPrice *int64
+	StockQty       int32
+	Sellable       bool
+}
+
+// 店家自己的 SKU 此刻的內容與可購買性；已刪除的 SKU 與商品也回列（庫存調整 commit 之後並行刪除、或重送時已刪除，回應仍要照實回報）。不是這家店的回無列。
+func (q *Queries) GetOwnSkuState(ctx context.Context, arg GetOwnSkuStateParams) (GetOwnSkuStateRow, error) {
+	row := q.db.QueryRow(ctx, getOwnSkuState, arg.ID, arg.StoreID)
+	var i GetOwnSkuStateRow
+	err := row.Scan(
+		&i.ID,
+		&i.Option1Value,
+		&i.Option2Value,
+		&i.Price,
+		&i.CompareAtPrice,
+		&i.StockQty,
+		&i.Sellable,
+	)
+	return i, err
+}
+
 const getStockOperationByKey = `-- name: GetStockOperationByKey :one
 SELECT id, idempotency_key, kind, store_id, deduct_operation_id, request_hash, created_at FROM catalog.stock_operations WHERE idempotency_key = $1 AND store_id IS NULL
 `

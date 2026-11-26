@@ -4,6 +4,7 @@
 //   - 歸還依原扣減：只帶原扣減的冪等鍵，累計不超過原扣減量；items 省略表示歸還剩下的全部。
 //   - 全部寫入在呼叫方的 transaction 內（ctx 沒有時自己開一個）；失敗整筆回滾，包括操作列。
 //   - SKU 列依 ID 升序鎖定，兩個多品項扣減不會互相死結。
+//   - 庫存增加（賣家調整與設定、歸還）讓 SKU 由 0 變可買時，同 transaction 排補貨通知的 job（restock 套件，D26）。
 package stock
 
 import (
@@ -19,6 +20,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/restock"
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 	"github.com/Will413028/hawkr/backend/internal/platform/idempotency"
@@ -38,6 +40,8 @@ type Deps struct {
 	DB    *db.DB
 	NewID func() uuid.UUID
 	Now   func() time.Time
+	// Restock 偵測庫存由 0 變可買並排補貨通知的 job（在寫入的 transaction 內）。
+	Restock *restock.Service
 }
 
 // Service 是庫存的 use case。
@@ -121,7 +125,10 @@ func (s *Service) Adjust(ctx context.Context, storeID int64, key string, skuID u
 			}
 			return model.ErrInvalidStockInput
 		}
-		return q.InsertStockMovement(ctx, store.InsertStockMovementParams{OperationID: opID, SkuID: skuID, Delta: delta})
+		if err := q.InsertStockMovement(ctx, store.InsertStockMovementParams{OperationID: opID, SkuID: skuID, Delta: delta}); err != nil {
+			return err
+		}
+		return s.d.Restock.StockIncreased(ctx, skuID, delta)
 	})
 }
 
@@ -163,7 +170,13 @@ func (s *Service) SetQuantity(ctx context.Context, storeID int64, key string, sk
 			return &model.StockMismatchError{SkuID: skuID, Current: cur.StockQty}
 		}
 		if delta := quantity - expected; delta != 0 {
-			return q.InsertStockMovement(ctx, store.InsertStockMovementParams{OperationID: opID, SkuID: skuID, Delta: delta})
+			if err := q.InsertStockMovement(ctx, store.InsertStockMovementParams{OperationID: opID, SkuID: skuID, Delta: delta}); err != nil {
+				return err
+			}
+		}
+		// 現值等於 expected 已由上面的條件式 UPDATE 確認，所以 expected 為 0 才是由 0 增加。
+		if expected == 0 {
+			return s.d.Restock.StockIncreased(ctx, skuID, quantity)
 		}
 		return nil
 	})
@@ -248,6 +261,9 @@ func (s *Service) Restore(ctx context.Context, key, deductKey string, items []mo
 				return err
 			}
 			if err := q.InsertStockMovement(ctx, store.InsertStockMovementParams{OperationID: opID, SkuID: it.SkuID, Delta: it.Quantity}); err != nil {
+				return err
+			}
+			if err := s.d.Restock.StockIncreased(ctx, it.SkuID, it.Quantity); err != nil {
 				return err
 			}
 		}

@@ -16,6 +16,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/bizcalendar/v1alpha1/bizcalendarv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/buyer/v1alpha1/buyerv1alpha1connect"
+	catalogv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/catalog/v1alpha1/catalogv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/content/v1alpha1/contentv1alpha1connect"
 	couponv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/coupon/v1alpha1/couponv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/identity/v1alpha1/identityv1alpha1connect"
@@ -71,6 +72,9 @@ var declarations = map[string]declaration{
 	bizcalendarv1alpha1connect.BizCalendarAdminServiceGetHolidayCalendarCoverageProcedure: requires(adminperm.BizcalendarHolidayCalendarCoveragesGet, auditReadOnly),
 
 	buyerv1alpha1connect.BuyerAdminServiceGetBuyerStatsProcedure: requires(adminperm.BuyerBuyerStatsGet, auditReadOnly),
+
+	catalogv1alpha1connect.CatalogAdminServiceListProductsProcedure: requires(adminperm.CatalogProductsList, auditReadOnly),
+	catalogv1alpha1connect.CatalogAdminServiceGetProductProcedure:   requires(adminperm.CatalogProductsGet, auditReadOnly),
 
 	contentv1alpha1connect.ContentAdminServiceListBannersProcedure:          requires(adminperm.ContentBannersList, auditReadOnly),
 	contentv1alpha1connect.ContentAdminServiceGetBannerProcedure:            requires(adminperm.ContentBannersGet, auditReadOnly),
@@ -210,8 +214,9 @@ func checkDeclarations(table map[string]declaration, svcs []protoreflect.Service
 
 // Check 對照宣告表與實際掛載的 admin service（ADR 2026-10-04-admin-roles：「宣告＝掛載」）：每個掛載的方法都有宣告、
 // 沒有指向未掛載方法的宣告、每個宣告合法。掛載的 service 由呼叫方從實際掛上的 handler 取得，不由這個套件列舉。
+// rpc.DeferredServices 裡還沒掛的 service 不在比對之內。
 func Check(mounted []protoreflect.ServiceDescriptor) error {
-	return checkDeclarations(declarations, mounted)
+	return checkDeclarations(rpc.WithoutUnmountedDeferred(declarations, mounted), mounted)
 }
 
 // Procedures 是宣告表裡的全部 procedure，已排序。啟動時 Check 保證它與掛載的 admin 方法一致，測試以它逐一探測。

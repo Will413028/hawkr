@@ -22,6 +22,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
 	socialv1alpha1 "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
+	modcatalog "github.com/Will413028/hawkr/backend/internal/modules/catalog"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
@@ -256,7 +257,7 @@ func TestRESTPermissionDeniedWithoutReasonOmitsTheField(t *testing.T) {
 
 // 宣告表與掛載的顧客 service 一一對應：connectServices 啟動時比對，數量等於掛載的方法數。
 func TestMountedCustomerServicesMatchTheEffectDeclarations(t *testing.T) {
-	services, err := connectServices(Deps{Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), Logger: slog.New(slog.DiscardHandler)})
+	services, err := connectServices(Deps{Catalog: &modcatalog.Module{}, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), Logger: slog.New(slog.DiscardHandler)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -268,14 +269,14 @@ func TestMountedCustomerServicesMatchTheEffectDeclarations(t *testing.T) {
 	for _, d := range descriptors {
 		methods += d.Methods().Len()
 	}
-	if methods != len(customerEffects) || len(descriptors) != 25 {
+	if methods != len(customerEffects) || len(descriptors) != 27 {
 		t.Fatalf("掛載 %d 個顧客 service、%d 支方法；宣告 %d 支", len(descriptors), methods, len(customerEffects))
 	}
 }
 
 // 少一個、多一個、值不合法的宣告都不能啟動。
 func TestCustomerEffectTableMustMatchTheServicesExactly(t *testing.T) {
-	services, err := connectServices(Deps{Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), Logger: slog.New(slog.DiscardHandler)})
+	services, err := connectServices(Deps{Catalog: &modcatalog.Module{}, Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), Logger: slog.New(slog.DiscardHandler)})
 	if err != nil {
 		t.Fatal(err)
 	}

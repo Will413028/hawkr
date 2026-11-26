@@ -197,3 +197,44 @@ CREATE TABLE catalog.product_hashtags (
     CONSTRAINT product_hashtags_position_check CHECK (position >= 0)
 );
 
+
+-- 銷量累計的去重：訂單編號是 order.sales.accumulated 事件的自然鍵，同一筆訂單只累計一次。
+-- 必要條件：Java order 以 MQ 送出事件，會重送，直到 ordering 搬進單體（B8）改成同 transaction 呼叫；那時這張表退場。
+CREATE TABLE catalog.sales_orders (
+    order_no    TEXT        PRIMARY KEY,
+    recorded_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT sales_orders_no_check CHECK (char_length(order_no) >= 1 AND char_length(order_no) <= 200)
+);
+
+-- 補貨通知佇列（D26，transactional outbox 的 polling publisher）：一個 SKU 同時最多一列待通知的請求。
+-- 必要條件：通知 port（buyer FanOut）不能在寫庫存的 transaction 內呼叫（單體規則 5），又不能因 crash 或下游失敗而漏掉；
+-- 所以同 transaction 寫佇列列，由週期 worker 認領後在 transaction 外通知。due_at 是最早可處理的時間（合併短時間內反覆的轉換，也讓賣家來得及改正）；
+-- requested_at 是最近一次請求的時間：列被認領處理中又來新轉換時只改 requested_at，worker 完成時比對它，變了就重新排而不是刪（轉換不會遺失）；
+-- claimed_until 是認領的租約（crash 後租約到期即重新處理）；attempts、last_error 記失敗；failed_at 非空表示超過重試上限而停手（列保留供查，下一次新請求會重置）。
+CREATE TABLE catalog.restock_queue (
+    sku_id        UUID        PRIMARY KEY,
+    due_at        TIMESTAMPTZ NOT NULL,
+    requested_at  TIMESTAMPTZ NOT NULL,
+    claimed_until TIMESTAMPTZ,
+    attempts      INTEGER     NOT NULL DEFAULT 0,
+    last_error    TEXT,
+    failed_at     TIMESTAMPTZ,
+    CONSTRAINT restock_queue_attempts_check CHECK (attempts >= 0)
+);
+
+CREATE INDEX restock_queue_due_idx ON catalog.restock_queue (due_at) WHERE failed_at IS NULL;
+
+-- 商品或 SKU 刪除後清補貨訂閱的佇列：形狀與語意同 restock_queue，worker 呼叫 PurgeSKUSubscriptions。
+-- 必要條件：訂閱在 buyer，刪除的 transaction 內不能呼叫它（單體規則 4、5），也不能因 crash 而漏清。
+CREATE TABLE catalog.restock_purge_queue (
+    sku_id        UUID        PRIMARY KEY,
+    due_at        TIMESTAMPTZ NOT NULL,
+    requested_at  TIMESTAMPTZ NOT NULL,
+    claimed_until TIMESTAMPTZ,
+    attempts      INTEGER     NOT NULL DEFAULT 0,
+    last_error    TEXT,
+    failed_at     TIMESTAMPTZ,
+    CONSTRAINT restock_purge_queue_attempts_check CHECK (attempts >= 0)
+);
+
+CREATE INDEX restock_purge_queue_due_idx ON catalog.restock_purge_queue (due_at) WHERE failed_at IS NULL;

@@ -116,6 +116,23 @@ func (c *Client) EnqueueJob(ctx context.Context, args river.JobArgs, opts *river
 	return res.Job.ID, nil
 }
 
+// JobState 回傳 job 目前的狀態；job 列不存在（被清掉）回 found 為 false。ctx 裡有 transaction 時在該 transaction 內讀（看得到它自己排入、還沒 commit 的 job）。
+func (c *Client) JobState(ctx context.Context, jobID int64) (state rivertype.JobState, found bool, err error) {
+	var row *rivertype.JobRow
+	if tx, ok := db.TxFrom(ctx); ok {
+		row, err = c.river.JobGetTx(ctx, tx, jobID)
+	} else {
+		row, err = c.river.JobGet(ctx, jobID)
+	}
+	if gone := errors.Is(err, river.ErrNotFound); gone {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("jobs：讀 job %d：%w", jobID, err)
+	}
+	return row.State, true, nil
+}
+
 // CancelJob 取消一個 job 並回傳取消之後 job 的狀態：還沒執行的直接成為 cancelled；執行中的取消它的 ctx，狀態仍是 running，由 worker 結束後收尾；
 // 已完成的 job 不受影響、回傳原狀態；job 列已不存在（被清掉）回 found 為 false，呼叫端自行收斂。ctx 裡有 transaction 時在該 transaction 內執行。
 func (c *Client) CancelJob(ctx context.Context, jobID int64) (state rivertype.JobState, found bool, err error) {

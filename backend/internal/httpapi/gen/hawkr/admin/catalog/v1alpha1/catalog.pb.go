@@ -32,7 +32,7 @@ const (
 
 type ListProductsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// 關鍵字，比對標題、描述、標籤、分類與選項；空是不篩選。
+	// 關鍵字，比對標題、描述、標籤、分類與選項；去頭尾空白後空的是不篩選。
 	Query string `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
 	// 只列這家店的商品；空是不篩選。
 	StoreId string `protobuf:"bytes,2,opt,name=store_id,json=storeId,proto3" json:"store_id,omitempty"`
@@ -553,9 +553,9 @@ var File_hawkr_admin_catalog_v1alpha1_catalog_proto protoreflect.FileDescriptor
 
 const file_hawkr_admin_catalog_v1alpha1_catalog_proto_rawDesc = "" +
 	"\n" +
-	"*hawkr/admin/catalog/v1alpha1/catalog.proto\x12\x1chawkr.admin.catalog.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$hawkr/catalog/v1alpha1/catalog.proto\x1a!hawkr/common/v1alpha1/image.proto\"\x82\x01\n" +
-	"\x13ListProductsRequest\x12\x14\n" +
-	"\x05query\x18\x01 \x01(\tR\x05query\x12\x19\n" +
+	"*hawkr/admin/catalog/v1alpha1/catalog.proto\x12\x1chawkr.admin.catalog.v1alpha1\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$hawkr/catalog/v1alpha1/catalog.proto\x1a!hawkr/common/v1alpha1/image.proto\x1a\"hawkr/common/v1alpha1/limits.proto\"\x8a\x01\n" +
+	"\x13ListProductsRequest\x12\x1c\n" +
+	"\x05query\x18\x01 \x01(\tB\x06\x92\xb5\x18\x02\x10dR\x05query\x12\x19\n" +
 	"\bstore_id\x18\x02 \x01(\tR\astoreId\x12\x1b\n" +
 	"\tpage_size\x18\x03 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +
