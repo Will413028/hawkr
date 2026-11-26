@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
+	"strconv"
 	"time"
 	"uuid"
 
@@ -36,6 +38,108 @@ var (
 	ErrActiveRequiresGalleryImage = errors.New("catalog: an active product needs at least one gallery image")
 	// ErrInvalidInput 表示輸入不合法；具體的欄位與原因在 *InvalidInputError。
 	ErrInvalidInput = errors.New("catalog: invalid input")
+	// ErrVersionConflict 表示呼叫端依據的版本（etag）已經過時：與目前的不符，沒有寫入。
+	ErrVersionConflict = errors.New("catalog: product version conflict")
+)
+
+// DefaultLowStockThreshold 是商品沒有自己的低庫存門檻時用的平台預設值；MaxLowStockThreshold 是商品門檻的上限（products_low_stock_check）。
+const (
+	DefaultLowStockThreshold int32 = 5
+	MaxLowStockThreshold     int32 = 9999
+)
+
+// Etag 是商品版本對外的 etag（client 視為不透明字串）；版本只在賣家可編輯的內容與狀態改變時加一。
+func Etag(version int64) string { return strconv.FormatInt(version, 10) }
+
+// ParseEtag 把 etag 還原成版本；空字串、不是正整數都回 ErrInvalidInput。
+func ParseEtag(etag string) (int64, error) {
+	v, err := strconv.ParseInt(etag, 10, 64)
+	if err != nil || v < 1 || Etag(v) != etag {
+		return 0, Invalid("Etag", ReasonInvalid)
+	}
+	return v, nil
+}
+
+// ProductSort 是商品列表與搜尋的排序。
+type ProductSort string
+
+// 排序：LATEST 是首次上架時間遞減，PRICE_ASC 依最低價，PRICE_DESC 依最高價，SALES 銷量，RATING 評分，RELEVANCE 相關度（要有關鍵字）。
+const (
+	SortLatest    ProductSort = "LATEST"
+	SortPriceAsc  ProductSort = "PRICE_ASC"
+	SortPriceDesc ProductSort = "PRICE_DESC"
+	SortSales     ProductSort = "SALES"
+	SortRating    ProductSort = "RATING"
+	SortRelevance ProductSort = "RELEVANCE"
+)
+
+// StockStatus 是賣家清單與計數依庫存的篩選；空字串是不篩選。兩個值都只比對 ACTIVE 的商品。
+type StockStatus string
+
+// 庫存篩選：LOW 是至少一個 SKU 庫存大於 0 且小於或等於商品的門檻；OUT_OF_STOCK 是至少一個 SKU 庫存是 0。
+const (
+	StockLow        StockStatus = "LOW"
+	StockOutOfStock StockStatus = "OUT_OF_STOCK"
+)
+
+// PublicFilter 是公開列表與搜尋的篩選，全部選填、之間是 AND；空的欄位不篩選。
+// CategoryIDs 可給頂層（含底下的葉節點）或葉節點；Hashtags 是已正規化的名稱，HashtagAll 為真時要全部都有。
+type PublicFilter struct {
+	CategoryIDs []uuid.UUID
+	PriceMin    *int64
+	PriceMax    *int64
+	Hashtags    []string
+	HashtagAll  bool
+	StoreIDs    []int64
+	// Query 是關鍵字（去頭尾空白後空的是不篩選）。
+	Query string
+}
+
+// SellerFilter 是賣家清單與計數的篩選；空值不篩選。
+type SellerFilter struct {
+	Status      ProductStatus
+	StockStatus StockStatus
+	Query       string
+}
+
+// AdminFilter 是後台列表的篩選；空值不篩選。
+type AdminFilter struct {
+	StoreID *int64
+	Query   string
+}
+
+// StockMismatchError 表示設定庫存時的預期值與現值不符，沒有寫入；Current 是呼叫當下看到的現值。
+type StockMismatchError struct {
+	SkuID   uuid.UUID
+	Current int32
+}
+
+func (e *StockMismatchError) Error() string {
+	return fmt.Sprintf("catalog: stock of sku %s is %d, not the expected quantity", e.SkuID, e.Current)
+}
+
+// SuggestedSafetyStock 是依最近銷售建議的安全庫存：weeklySales 是最近 SalesWindowWeeks 週每週的銷量（舊到新，可以較短，缺的週算 0）；
+// 較長的輸入只取最後 SalesWindowWeeks 週（尾端窗口，與除數一致）。備貨兩週的平均需求，下限 5；沒有銷量時是 10。規則沿用賣家中心庫存頁（website/features/seller-center/inventory/InventoryPage.tsx）。
+func SuggestedSafetyStock(weeklySales []int32) int32 {
+	weeklySales = weeklySales[max(0, len(weeklySales)-SalesWindowWeeks):]
+	var sum int64
+	for _, w := range weeklySales {
+		sum += int64(w)
+	}
+	if sum <= 0 {
+		return SafetyStockNoSales
+	}
+	// ceil(avg × 2) = ceil(sum × 2 / weeks)
+	n := (sum*SafeCoverWeeks + SalesWindowWeeks - 1) / SalesWindowWeeks
+	return int32(min(max(n, int64(SafetyStockFloor)), int64(math.MaxInt32)))
+}
+
+// 建議安全庫存的參數。
+const (
+	SalesWindowWeeks         = 8
+	SafeCoverWeeks           = 2
+	SafetyStockFloor   int32 = 5
+	SafetyStockNoSales int32 = 10
 )
 
 // 輸入不合法的原因。
@@ -141,6 +245,8 @@ type ProductInput struct {
 	Axes        []Axis
 	Skus        []SkuInput
 	Hashtags    []string
+	// LowStockThreshold 是低庫存提醒門檻（0 到 MaxLowStockThreshold）；nil 是用平台預設值。
+	LowStockThreshold *int32
 }
 
 // Product 是商品的完整內容。
@@ -164,6 +270,10 @@ type Product struct {
 	Hashtags         []Hashtag
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
+	// LowStockThreshold 是賣家設的門檻，nil 是用平台預設值。
+	LowStockThreshold *int32
+	// Version 是樂觀鎖的版本（對外是 Etag(Version)）：只在賣家可編輯的內容與狀態改變時加一，庫存與計數不改它。
+	Version int64
 }
 
 // ProductSummary 是列表的一列。CoverKey 是主圖庫第一張的 object key，沒有圖是空字串。
@@ -182,16 +292,28 @@ type ProductSummary struct {
 	ReviewCount      int32
 	CoverKey         string
 	CreatedAt        time.Time
+	// TotalStock 是沒刪除 SKU 的庫存總和（上限 int32）。
+	TotalStock        int32
+	LowStockThreshold *int32
+	Version           int64
 }
 
-// ListCursor 是 keyset 分頁的游標：賣家清單的 At 是建立時間，公開列表的 At 是首次上架時間；同時間依 ID 遞減。
+// ListCursor 是 keyset 分頁的游標：Key 是排序鍵（賣家清單與後台是建立時間的微秒數，公開列表依 ProductSort 決定），同鍵依 ID 遞減。
+// 游標的編碼與跟請求參數的綁定在對外層。
 type ListCursor struct {
-	At time.Time
-	ID uuid.UUID
+	Key int64
+	ID  uuid.UUID
 }
 
 // ProductPage 是列表的一頁；Next 為 nil 表示沒有下一頁。
 type ProductPage struct {
 	Items []ProductSummary
 	Next  *ListCursor
+}
+
+// HashtagCount 是一個商品標籤與它在範圍內的可見商品數；Name 是正規化名稱，Display 是最常用的輸入樣子。
+type HashtagCount struct {
+	Name         string
+	Display      string
+	ProductCount int64
 }

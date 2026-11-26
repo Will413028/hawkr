@@ -104,7 +104,7 @@ func (q *Queries) GetOwnLiveSku(ctx context.Context, arg GetOwnLiveSkuParams) (G
 }
 
 const getStockOperationByKey = `-- name: GetStockOperationByKey :one
-SELECT id, idempotency_key, kind, store_id, deduct_operation_id, created_at FROM catalog.stock_operations WHERE idempotency_key = $1 AND store_id IS NULL
+SELECT id, idempotency_key, kind, store_id, deduct_operation_id, request_hash, created_at FROM catalog.stock_operations WHERE idempotency_key = $1 AND store_id IS NULL
 `
 
 // 結帳扣減與歸還的操作（沒有店家）。
@@ -117,13 +117,14 @@ func (q *Queries) GetStockOperationByKey(ctx context.Context, idempotencyKey str
 		&i.Kind,
 		&i.StoreID,
 		&i.DeductOperationID,
+		&i.RequestHash,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
 const getStoreStockOperationByKey = `-- name: GetStoreStockOperationByKey :one
-SELECT id, idempotency_key, kind, store_id, deduct_operation_id, created_at FROM catalog.stock_operations WHERE store_id = $1::bigint AND idempotency_key = $2
+SELECT id, idempotency_key, kind, store_id, deduct_operation_id, request_hash, created_at FROM catalog.stock_operations WHERE store_id = $1::bigint AND idempotency_key = $2
 `
 
 type GetStoreStockOperationByKeyParams struct {
@@ -141,6 +142,7 @@ func (q *Queries) GetStoreStockOperationByKey(ctx context.Context, arg GetStoreS
 		&i.Kind,
 		&i.StoreID,
 		&i.DeductOperationID,
+		&i.RequestHash,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -163,8 +165,8 @@ func (q *Queries) InsertStockMovement(ctx context.Context, arg InsertStockMoveme
 
 const insertStockOperation = `-- name: InsertStockOperation :execrows
 
-INSERT INTO catalog.stock_operations (id, idempotency_key, kind, store_id, deduct_operation_id, created_at)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO catalog.stock_operations (id, idempotency_key, kind, store_id, deduct_operation_id, request_hash, created_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT DO NOTHING
 `
 
@@ -174,6 +176,7 @@ type InsertStockOperationParams struct {
 	Kind              string
 	StoreID           *int64
 	DeductOperationID *uuid.UUID
+	RequestHash       []byte
 	Now               time.Time
 }
 
@@ -188,6 +191,7 @@ func (q *Queries) InsertStockOperation(ctx context.Context, arg InsertStockOpera
 		arg.Kind,
 		arg.StoreID,
 		arg.DeductOperationID,
+		arg.RequestHash,
 		arg.Now,
 	)
 	if err != nil {
@@ -226,7 +230,7 @@ func (q *Queries) ListStockMovements(ctx context.Context, operationID uuid.UUID)
 }
 
 const lockStockOperation = `-- name: LockStockOperation :one
-SELECT id, idempotency_key, kind, store_id, deduct_operation_id, created_at FROM catalog.stock_operations WHERE id = $1 AND kind = 'DEDUCT' FOR UPDATE
+SELECT id, idempotency_key, kind, store_id, deduct_operation_id, request_hash, created_at FROM catalog.stock_operations WHERE id = $1 AND kind = 'DEDUCT' FOR UPDATE
 `
 
 // 歸還前鎖住原扣減：同一次扣減的多筆歸還（不同鍵）排隊，累計檢查看到前一筆已提交的結果。
@@ -239,6 +243,7 @@ func (q *Queries) LockStockOperation(ctx context.Context, id uuid.UUID) (Catalog
 		&i.Kind,
 		&i.StoreID,
 		&i.DeductOperationID,
+		&i.RequestHash,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -259,6 +264,38 @@ type RestoreSkuStockParams struct {
 // 歸還不檢查 SKU 是否已刪除：訂單取消時商品可能已被賣家移除，庫存仍要記回（量由原扣減決定）。
 func (q *Queries) RestoreSkuStock(ctx context.Context, arg RestoreSkuStockParams) (int64, error) {
 	result, err := q.db.Exec(ctx, restoreSkuStock, arg.Quantity, arg.Now, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const setOwnSkuStock = `-- name: SetOwnSkuStock :execrows
+UPDATE catalog.product_skus s
+SET stock_qty = $1::integer, updated_at = $2
+FROM catalog.products p
+WHERE s.id = $3 AND s.deleted_at IS NULL
+  AND p.id = s.product_id AND p.store_id = $4 AND p.deleted_at IS NULL
+  AND s.stock_qty = $5::integer
+`
+
+type SetOwnSkuStockParams struct {
+	Quantity int32
+	Now      time.Time
+	ID       uuid.UUID
+	StoreID  int64
+	Expected int32
+}
+
+// 賣家設定：只動自己店家、未刪除商品的未刪除 SKU，而且現值要等於 expected（比對與寫入是同一句 UPDATE，沒有「先查再設」）；不符回 0 列，庫存不變。
+func (q *Queries) SetOwnSkuStock(ctx context.Context, arg SetOwnSkuStockParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setOwnSkuStock,
+		arg.Quantity,
+		arg.Now,
+		arg.ID,
+		arg.StoreID,
+		arg.Expected,
+	)
 	if err != nil {
 		return 0, err
 	}

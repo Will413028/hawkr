@@ -21,6 +21,7 @@ import 'package:protobuf/well_known_types/google/protobuf/timestamp.pb.dart'
     as $2;
 
 import '../../../google/type/date.pb.dart' as $0;
+import '../../catalog/v1alpha1/catalog.pb.dart' as $6;
 import '../../common/v1alpha1/image.pb.dart' as $1;
 import '../../common/v1alpha1/postal_address.pb.dart' as $3;
 import '../../common/v1alpha1/store_card.pb.dart' as $4;
@@ -2002,6 +2003,156 @@ class DeleteAddressResponse extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<DeleteAddressResponse>(
           DeleteAddressResponse.$_createMessage);
   static DeleteAddressResponse? _defaultInstance;
+}
+
+class ListFollowedStoreProductsRequest extends $pb.GeneratedMessage {
+  factory ListFollowedStoreProductsRequest({
+    $core.int? pageSize,
+    $core.String? pageToken,
+  }) {
+    final result = ListFollowedStoreProductsRequest._();
+    if (pageSize != null) result.pageSize = pageSize;
+    if (pageToken != null) result.pageToken = pageToken;
+    return result;
+  }
+
+  ListFollowedStoreProductsRequest._();
+
+  factory ListFollowedStoreProductsRequest.fromBuffer(
+          $core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListFollowedStoreProductsRequest()..mergeFromBuffer(data, registry);
+  factory ListFollowedStoreProductsRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListFollowedStoreProductsRequest()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListFollowedStoreProductsRequest',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.buyer.v1alpha1'),
+      createEmptyInstance: ListFollowedStoreProductsRequest.$_createMessage)
+    ..aI(1, _omitFieldNames ? '' : 'pageSize')
+    ..aOS(2, _omitFieldNames ? '' : 'pageToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListFollowedStoreProductsRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListFollowedStoreProductsRequest copyWith(
+          void Function(ListFollowedStoreProductsRequest) updates) =>
+      super.copyWith(
+              (message) => updates(message as ListFollowedStoreProductsRequest))
+          as ListFollowedStoreProductsRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListFollowedStoreProductsRequest() / ListFollowedStoreProductsRequest.new instead')
+  static ListFollowedStoreProductsRequest create() =>
+      ListFollowedStoreProductsRequest._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      ListFollowedStoreProductsRequest._();
+  @$core.override
+  ListFollowedStoreProductsRequest createEmptyInstance() =>
+      ListFollowedStoreProductsRequest._();
+  @$core.pragma('dart2js:noInline')
+  static ListFollowedStoreProductsRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListFollowedStoreProductsRequest>(
+          ListFollowedStoreProductsRequest.$_createMessage);
+  static ListFollowedStoreProductsRequest? _defaultInstance;
+
+  /// 預設 20，上限 100；負數回 invalid_argument。
+  @$pb.TagNumber(1)
+  $core.int get pageSize => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set pageSize($core.int value) => $_setSignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPageSize() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPageSize() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get pageToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set pageToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasPageToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPageToken() => $_clearField(2);
+}
+
+class ListFollowedStoreProductsResponse extends $pb.GeneratedMessage {
+  factory ListFollowedStoreProductsResponse({
+    $core.Iterable<$6.ProductSummary>? products,
+    $core.String? nextPageToken,
+  }) {
+    final result = ListFollowedStoreProductsResponse._();
+    if (products != null) result.products.addAll(products);
+    if (nextPageToken != null) result.nextPageToken = nextPageToken;
+    return result;
+  }
+
+  ListFollowedStoreProductsResponse._();
+
+  factory ListFollowedStoreProductsResponse.fromBuffer(
+          $core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListFollowedStoreProductsResponse()..mergeFromBuffer(data, registry);
+  factory ListFollowedStoreProductsResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      ListFollowedStoreProductsResponse()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ListFollowedStoreProductsResponse',
+      package: const $pb.PackageName(
+          _omitMessageNames ? '' : 'hawkr.buyer.v1alpha1'),
+      createEmptyInstance: ListFollowedStoreProductsResponse.$_createMessage)
+    ..pPM<$6.ProductSummary>(1, _omitFieldNames ? '' : 'products',
+        subBuilder: $6.ProductSummary.$_createMessage)
+    ..aOS(2, _omitFieldNames ? '' : 'nextPageToken')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListFollowedStoreProductsResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ListFollowedStoreProductsResponse copyWith(
+          void Function(ListFollowedStoreProductsResponse) updates) =>
+      super.copyWith((message) =>
+              updates(message as ListFollowedStoreProductsResponse))
+          as ListFollowedStoreProductsResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  @$core.Deprecated(
+      'Use ListFollowedStoreProductsResponse() / ListFollowedStoreProductsResponse.new instead')
+  static ListFollowedStoreProductsResponse create() =>
+      ListFollowedStoreProductsResponse._();
+  static $pb.GeneratedMessage $_createMessage() =>
+      ListFollowedStoreProductsResponse._();
+  @$core.override
+  ListFollowedStoreProductsResponse createEmptyInstance() =>
+      ListFollowedStoreProductsResponse._();
+  @$core.pragma('dart2js:noInline')
+  static ListFollowedStoreProductsResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ListFollowedStoreProductsResponse>(
+          ListFollowedStoreProductsResponse.$_createMessage);
+  static ListFollowedStoreProductsResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $pb.PbList<$6.ProductSummary> get products => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $core.String get nextPageToken => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set nextPageToken($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasNextPageToken() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearNextPageToken() => $_clearField(2);
 }
 
 class ListFavoritesRequest extends $pb.GeneratedMessage {
@@ -5304,6 +5455,17 @@ class BuyerAppServiceApi {
           $pb.ClientContext? ctx, RemoveFavoriteRequest request) =>
       _client.invoke<RemoveFavoriteResponse>(ctx, 'BuyerAppService',
           'RemoveFavorite', request, RemoveFavoriteResponse());
+
+  /// ListFollowedStoreProducts 列出呼叫者追蹤的店家的公開商品（「追蹤中」動態），最新上架在前；只含公開可見的商品
+  /// （ACTIVE、沒刪除、店家此刻可曝光）。沒有追蹤任何店家回空清單。商品卡片與公開列表相同（hawkr.catalog.v1alpha1.ProductSummary）。
+  $async.Future<ListFollowedStoreProductsResponse> listFollowedStoreProducts(
+          $pb.ClientContext? ctx, ListFollowedStoreProductsRequest request) =>
+      _client.invoke<ListFollowedStoreProductsResponse>(
+          ctx,
+          'BuyerAppService',
+          'ListFollowedStoreProducts',
+          request,
+          ListFollowedStoreProductsResponse());
 
   /// ListFollows 列出追蹤的店家，新到舊。
   $async.Future<ListFollowsResponse> listFollows(

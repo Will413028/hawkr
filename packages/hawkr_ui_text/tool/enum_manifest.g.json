@@ -36,6 +36,41 @@
       "serverOwned": false
     },
     {
+      "name": "hawkr.catalog.v1alpha1.HashtagMatch",
+      "dartClass": "HashtagMatch",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/catalog/v1alpha1/catalog.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.catalog.v1alpha1.ProductAvailability",
+      "dartClass": "ProductAvailability",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/catalog/v1alpha1/catalog.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.catalog.v1alpha1.ProductSort",
+      "dartClass": "ProductSort",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/catalog/v1alpha1/catalog.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.catalog.v1alpha1.ProductStatus",
+      "dartClass": "ProductStatus",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/catalog/v1alpha1/catalog.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
+      "name": "hawkr.catalog.v1alpha1.StockStatus",
+      "dartClass": "StockStatus",
+      "dartLibrary": "package:hawkr_api/gen/hawkr/catalog/v1alpha1/catalog.pbenum.dart",
+      "inCatalog": false,
+      "serverOwned": false
+    },
+    {
       "name": "hawkr.chat.v1alpha1.ChatParty",
       "dartClass": "ChatParty",
       "dartLibrary": "package:hawkr_api/gen/hawkr/chat/v1alpha1/chat.pbenum.dart",

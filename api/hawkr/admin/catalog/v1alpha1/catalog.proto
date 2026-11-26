@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+// catalog 模組給後台的 API：商品的唯讀查詢。前台的 API 在 hawkr.catalog.v1alpha1。
+//
+// 後台沒有商品的寫入：管理員強制下架是商品限制措施（由 seller 模組擁有），不直接改商品狀態；分類只在 migration 變動，沒有分類管理。
+// 圖片、描述區塊、SKU 等值型別沿用前台的定義（API 設計規範（Connect）第五節）。
+package hawkr.admin.catalog.v1alpha1;
+
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+import "hawkr/catalog/v1alpha1/catalog.proto";
+import "hawkr/common/v1alpha1/image.proto";
+
+// CatalogAdminService 只有管理員能呼叫；權限 catalog.products.list、catalog.products.get（adminauth，唯讀不留稽核）。
+service CatalogAdminService {
+  // ListProducts 列出全站沒刪除的商品（任何狀態），最新建立的在前；游標分頁，回應帶符合條件的總數。
+  rpc ListProducts(ListProductsRequest) returns (ListProductsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  // GetProduct 讀一個商品的完整內容（任何狀態，沒刪除）。不存在回 not_found。
+  rpc GetProduct(GetProductRequest) returns (GetProductResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+message ListProductsRequest {
+  // 關鍵字，比對標題、描述、標籤、分類與選項；空是不篩選。
+  string query = 1;
+  // 只列這家店的商品；空是不篩選。
+  string store_id = 2;
+  // 預設 20，上限 100。
+  int32 page_size = 3;
+  // page_token 與 query、store_id 綁定。
+  string page_token = 4;
+}
+
+message ListProductsResponse {
+  repeated ProductSummary products = 1;
+  string next_page_token = 2;
+  // 符合條件的商品總數；每一頁都回（不隨游標變），不是上限也不是估計。
+  int32 total_size = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message GetProductRequest {
+  string product_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetProductResponse {
+  Product product = 1;
+}
+
+// ProductSummary 是後台列表的一列。
+message ProductSummary {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  string store_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string title = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.catalog.v1alpha1.ProductStatus status = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.common.v1alpha1.Image cover_image = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 min_price = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 max_price = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp first_publish_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Product 是後台看到的商品完整內容。沒有 etag：後台不寫入。
+message Product {
+  string id = 1 [(google.api.field_behavior) = IDENTIFIER];
+  string store_id = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string category_id = 3 [(google.api.field_behavior) = OUTPUT_ONLY];
+  string title = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  hawkr.catalog.v1alpha1.ProductStatus status = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp first_publish_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 min_price = 7 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int64 max_price = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 sales_count = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 favorite_count = 10 [(google.api.field_behavior) = OUTPUT_ONLY];
+  optional float rating_average = 11 [(google.api.field_behavior) = OUTPUT_ONLY];
+  int32 review_count = 12 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated hawkr.catalog.v1alpha1.ProductImage gallery = 13 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated hawkr.catalog.v1alpha1.ProductDescriptionBlock description = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated hawkr.catalog.v1alpha1.OptionAxis axes = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated hawkr.catalog.v1alpha1.Sku skus = 16 [(google.api.field_behavior) = OUTPUT_ONLY];
+  repeated hawkr.catalog.v1alpha1.ProductHashtag hashtags = 17 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp create_time = 18 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 19 [(google.api.field_behavior) = OUTPUT_ONLY];
+}

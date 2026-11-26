@@ -229,6 +229,25 @@ extension type BuyerAppServiceClient (connect.Transport _transport) {
     );
   }
 
+  /// ListFollowedStoreProducts 列出呼叫者追蹤的店家的公開商品（「追蹤中」動態），最新上架在前；只含公開可見的商品
+  /// （ACTIVE、沒刪除、店家此刻可曝光）。沒有追蹤任何店家回空清單。商品卡片與公開列表相同（hawkr.catalog.v1alpha1.ProductSummary）。
+  Future<hawkrbuyerv1alpha1buyer.ListFollowedStoreProductsResponse> listFollowedStoreProducts(
+    hawkrbuyerv1alpha1buyer.ListFollowedStoreProductsRequest input, {
+    connect.Headers? headers,
+    connect.AbortSignal? signal,
+    Function(connect.Headers)? onHeader,
+    Function(connect.Headers)? onTrailer,
+  }) {
+    return connect.Client(_transport).unary(
+      specs.BuyerAppService.listFollowedStoreProducts,
+      input,
+      signal: signal,
+      headers: headers,
+      onHeader: onHeader,
+      onTrailer: onTrailer,
+    );
+  }
+
   /// ListFollows 列出追蹤的店家，新到舊。
   Future<hawkrbuyerv1alpha1buyer.ListFollowsResponse> listFollows(
     hawkrbuyerv1alpha1buyer.ListFollowsRequest input, {

@@ -128,16 +128,51 @@ func (f *productFixture) input(title string) ProductInput {
 
 func (f *productFixture) create(storeID, accountID int64, in ProductInput) Product {
 	f.t.Helper()
-	p, err := f.m.CreateProduct(f.ct, storeID, media.Uploader{ID: accountID}, in)
+	p, err := createP(f.m, f.ct, storeID, media.Uploader{ID: accountID}, in)
 	if err != nil {
 		f.t.Fatal(err)
 	}
 	return p
 }
 
+// createP 以新的 request_id 建立商品。
+func createP(m *Module, ct context.Context, storeID int64, up media.Uploader, in ProductInput) (Product, error) {
+	return m.CreateProduct(ct, storeID, up, uuid.NewV7(), in)
+}
+
+// updateP 讀目前的版本再整體取代；並行的修改造成版本衝突時重讀重試（測試關心的是寫入本身，不是版本競爭）。
+func updateP(m *Module, ct context.Context, storeID int64, up media.Uploader, id uuid.UUID, in ProductInput) (Product, error) {
+	for range 50 {
+		cur, err := m.Product(ct, storeID, id)
+		if err != nil {
+			return Product{}, err
+		}
+		p, err := m.UpdateProduct(ct, storeID, up, id, cur.Version, in)
+		if !errors.Is(err, ErrVersionConflict) {
+			return p, err
+		}
+	}
+	return Product{}, ErrVersionConflict
+}
+
+// setStatusP 讀目前的版本再切換狀態。
+func setStatusP(m *Module, ct context.Context, storeID int64, id uuid.UUID, to ProductStatus) error {
+	for range 50 {
+		cur, err := m.Product(ct, storeID, id)
+		if err != nil {
+			return err
+		}
+		err = m.SetProductStatus(ct, storeID, id, cur.Version, to)
+		if !errors.Is(err, ErrVersionConflict) {
+			return err
+		}
+	}
+	return ErrVersionConflict
+}
+
 func (f *productFixture) activate(storeID int64, id uuid.UUID) {
 	f.t.Helper()
-	if err := f.m.SetProductStatus(f.ct, storeID, id, StatusActive); err != nil {
+	if err := setStatusP(f.m, f.ct, storeID, id, StatusActive); err != nil {
 		f.t.Fatal(err)
 	}
 }
@@ -162,10 +197,10 @@ func TestProductLifecycleAndFirstPublishedAt(t *testing.T) {
 	if p.Status != StatusDraft || p.FirstPublishedAt != nil {
 		t.Fatalf("a new product is a draft without first_published_at: %+v", p)
 	}
-	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, StatusArchived); err != nil {
+	if err := setStatusP(f.m, f.ct, storeID, p.ID, StatusArchived); err != nil {
 		t.Fatalf("DRAFT to ARCHIVED is allowed: %v", err)
 	}
-	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, ProductStatus("")); !errors.Is(err, ErrInvalidInput) {
+	if err := setStatusP(f.m, f.ct, storeID, p.ID, ProductStatus("")); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("empty status must not be valid: %v", err)
 	}
 	if got, _ := f.m.Product(f.ct, storeID, p.ID); got.FirstPublishedAt != nil {
@@ -178,14 +213,14 @@ func TestProductLifecycleAndFirstPublishedAt(t *testing.T) {
 		t.Fatalf("ACTIVE sets first_published_at: %+v", got)
 	}
 	f.advance(time.Hour)
-	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, StatusDraft); err != nil {
+	if err := setStatusP(f.m, f.ct, storeID, p.ID, StatusDraft); err != nil {
 		t.Fatalf("ACTIVE to DRAFT is allowed: %v", err)
 	}
 	got, _ = f.m.Product(f.ct, storeID, p.ID)
 	if got.Status != StatusDraft || got.FirstPublishedAt == nil || !got.FirstPublishedAt.Equal(first) {
 		t.Fatalf("going back to DRAFT keeps first_published_at: %+v (want %v)", got, first)
 	}
-	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, StatusArchived); err != nil {
+	if err := setStatusP(f.m, f.ct, storeID, p.ID, StatusArchived); err != nil {
 		t.Fatalf("DRAFT to ARCHIVED: %v", err)
 	}
 	f.advance(time.Hour)
@@ -194,7 +229,7 @@ func TestProductLifecycleAndFirstPublishedAt(t *testing.T) {
 	if got.Status != StatusActive || !got.FirstPublishedAt.Equal(first) {
 		t.Fatalf("re-activating keeps the first publish time: %+v (want %v)", got.FirstPublishedAt, first)
 	}
-	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, StatusActive); err != nil {
+	if err := setStatusP(f.m, f.ct, storeID, p.ID, StatusActive); err != nil {
 		t.Fatalf("same status is a no-op: %v", err)
 	}
 }
@@ -207,7 +242,7 @@ func TestActiveProductNeedsAGalleryImageOnEveryWrite(t *testing.T) {
 	bare := f.input("沒圖")
 	bare.Gallery = nil
 	p := f.create(storeID, acct, bare)
-	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, StatusActive); !errors.Is(err, ErrActiveRequiresGalleryImage) {
+	if err := setStatusP(f.m, f.ct, storeID, p.ID, StatusActive); !errors.Is(err, ErrActiveRequiresGalleryImage) {
 		t.Fatalf("activating without a gallery image: %v", err)
 	}
 	if got, _ := f.m.Product(f.ct, storeID, p.ID); got.Status != StatusDraft || got.FirstPublishedAt != nil {
@@ -216,21 +251,21 @@ func TestActiveProductNeedsAGalleryImageOnEveryWrite(t *testing.T) {
 	// 描述圖不算主圖。
 	withDescImage := bare
 	withDescImage.Description = []Block{{Kind: BlockImage, Image: &Image{Token: "only-description"}}}
-	if _, err := f.m.UpdateProduct(f.ct, storeID, up, p.ID, withDescImage); err != nil {
+	if _, err := updateP(f.m, f.ct, storeID, up, p.ID, withDescImage); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, StatusActive); !errors.Is(err, ErrActiveRequiresGalleryImage) {
+	if err := setStatusP(f.m, f.ct, storeID, p.ID, StatusActive); !errors.Is(err, ErrActiveRequiresGalleryImage) {
 		t.Fatalf("a description image is not a gallery image: %v", err)
 	}
 	// 草稿與下架的商品可以存沒有主圖的內容；有主圖才能上架。
 	withImage := f.input("有圖")
-	if _, err := f.m.UpdateProduct(f.ct, storeID, up, p.ID, withImage); err != nil {
+	if _, err := updateP(f.m, f.ct, storeID, up, p.ID, withImage); err != nil {
 		t.Fatal(err)
 	}
 	f.activate(storeID, p.ID)
 	// ACTIVE 的商品整體取代時不給主圖：拒絕，內容不變，也不自動降回草稿。
 	bare.Title = "改名"
-	if _, err := f.m.UpdateProduct(f.ct, storeID, up, p.ID, bare); !errors.Is(err, ErrActiveRequiresGalleryImage) {
+	if _, err := updateP(f.m, f.ct, storeID, up, p.ID, bare); !errors.Is(err, ErrActiveRequiresGalleryImage) {
 		t.Fatalf("updating an ACTIVE product without a gallery image: %v", err)
 	}
 	got, _ := f.m.Product(f.ct, storeID, p.ID)
@@ -238,13 +273,13 @@ func TestActiveProductNeedsAGalleryImageOnEveryWrite(t *testing.T) {
 		t.Fatalf("a rejected update changes nothing and does not demote: %+v", got)
 	}
 	// 下架後可以把主圖清掉，再上架時被擋。
-	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, StatusArchived); err != nil {
+	if err := setStatusP(f.m, f.ct, storeID, p.ID, StatusArchived); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.m.UpdateProduct(f.ct, storeID, up, p.ID, bare); err != nil {
+	if _, err := updateP(f.m, f.ct, storeID, up, p.ID, bare); err != nil {
 		t.Fatalf("an ARCHIVED product may be saved without a gallery image: %v", err)
 	}
-	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, StatusActive); !errors.Is(err, ErrActiveRequiresGalleryImage) {
+	if err := setStatusP(f.m, f.ct, storeID, p.ID, StatusActive); !errors.Is(err, ErrActiveRequiresGalleryImage) {
 		t.Fatalf("re-activating without a gallery image: %v", err)
 	}
 }
@@ -255,10 +290,10 @@ func TestDeleteKeepsTheRowAndIsIrreversible(t *testing.T) {
 	storeID, acct := f.store()
 	other, _ := f.store()
 	p := f.create(storeID, acct, f.input("x"))
-	if err := f.m.DeleteProduct(f.ct, other, p.ID); !errors.Is(err, ErrProductNotFound) {
+	if err := f.m.DeleteProduct(f.ct, other, p.ID, 0); !errors.Is(err, ErrProductNotFound) {
 		t.Fatalf("another store must not delete it: %v", err)
 	}
-	if err := f.m.DeleteProduct(f.ct, storeID, p.ID); err != nil {
+	if err := f.m.DeleteProduct(f.ct, storeID, p.ID, 0); err != nil {
 		t.Fatal(err)
 	}
 	if n := f.count(`SELECT count(*) FROM catalog.products WHERE id = $1 AND deleted_at IS NOT NULL`, p.ID); n != 1 {
@@ -267,13 +302,13 @@ func TestDeleteKeepsTheRowAndIsIrreversible(t *testing.T) {
 	if _, err := f.m.Product(f.ct, storeID, p.ID); !errors.Is(err, ErrProductNotFound) {
 		t.Fatalf("read after delete: %v", err)
 	}
-	if err := f.m.SetProductStatus(f.ct, storeID, p.ID, StatusActive); !errors.Is(err, ErrProductNotFound) {
+	if err := setStatusP(f.m, f.ct, storeID, p.ID, StatusActive); !errors.Is(err, ErrProductNotFound) {
 		t.Fatalf("a deleted product cannot come back: %v", err)
 	}
-	if _, err := f.m.UpdateProduct(f.ct, storeID, media.Uploader{ID: acct}, p.ID, f.input("y")); !errors.Is(err, ErrProductNotFound) {
+	if _, err := updateP(f.m, f.ct, storeID, media.Uploader{ID: acct}, p.ID, f.input("y")); !errors.Is(err, ErrProductNotFound) {
 		t.Fatalf("update after delete: %v", err)
 	}
-	if page, _ := f.m.ListSellerProducts(f.ct, storeID, nil, 10); len(page.Items) != 0 {
+	if page, _ := f.m.ListSellerProducts(f.ct, storeID, SellerFilter{}, nil, 10); len(page.Items) != 0 {
 		t.Fatalf("deleted products leave the seller list: %+v", page.Items)
 	}
 }
@@ -292,18 +327,18 @@ func TestSkuCombinationsMustBeUniqueAndWithinOptionValues(t *testing.T) {
 
 	bad := in
 	bad.Skus = []SkuInput{{Option1: "綠", Option2: "S", Price: 1}}
-	if _, err := f.m.CreateProduct(f.ct, storeID, media.Uploader{ID: acct}, bad); !errors.Is(err, ErrInvalidInput) {
+	if _, err := createP(f.m, f.ct, storeID, media.Uploader{ID: acct}, bad); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("a combination outside the option values: %v", err)
 	}
 	dup := in
 	dup.Skus = []SkuInput{{Option1: "紅", Option2: "S", Price: 1}, {Option1: "紅", Option2: "S", Price: 2}}
-	if _, err := f.m.UpdateProduct(f.ct, storeID, media.Uploader{ID: acct}, p.ID, dup); !errors.Is(err, ErrInvalidInput) {
+	if _, err := updateP(f.m, f.ct, storeID, media.Uploader{ID: acct}, p.ID, dup); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("a duplicate combination: %v", err)
 	}
 	// 沒有軸的商品只有一個預設 SKU。
 	flat := f.input("單一規格")
 	flat.Skus = []SkuInput{{Price: 1}, {Option1: "紅", Price: 1}}
-	if _, err := f.m.CreateProduct(f.ct, storeID, media.Uploader{ID: acct}, flat); !errors.Is(err, ErrInvalidInput) {
+	if _, err := createP(f.m, f.ct, storeID, media.Uploader{ID: acct}, flat); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("a product without axes has exactly one default sku: %v", err)
 	}
 	if n := f.count(`SELECT count(*) FROM catalog.products WHERE title IN ('單一規格')`); n != 0 {
@@ -330,7 +365,7 @@ func TestPriceRangeFollowsSkuChanges(t *testing.T) {
 
 	f.exec(`UPDATE catalog.product_skus SET stock_qty = 7 WHERE product_id = $1 AND option1_value = '紅'`, p.ID)
 	in.Skus = []SkuInput{{Option1: "紅", Option2: "S", Price: 50, StockQty: 99}, {Option1: "藍", Option2: "M", Price: 300}}
-	p, err := f.m.UpdateProduct(f.ct, storeID, up, p.ID, in)
+	p, err := updateP(f.m, f.ct, storeID, up, p.ID, in)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -344,7 +379,7 @@ func TestPriceRangeFollowsSkuChanges(t *testing.T) {
 	}
 
 	in.Skus = []SkuInput{{Option1: "藍", Option2: "M", Price: 300}, {Option1: "藍", Option2: "S", Price: 120, StockQty: 4}}
-	p, err = f.m.UpdateProduct(f.ct, storeID, up, p.ID, in)
+	p, err = updateP(f.m, f.ct, storeID, up, p.ID, in)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -386,7 +421,7 @@ func TestImagesConfirmedInTheWriteAndMarkedDeletedWhenRemoved(t *testing.T) {
 	// 保留 g1 與描述圖（以資產 ID），移除 g2。
 	in.Gallery = []Image{{AssetID: g1, Alt: "正面"}}
 	in.Description = []Block{{Kind: BlockImage, Image: &Image{AssetID: d1, Alt: "細節"}}}
-	p, err := f.m.UpdateProduct(f.ct, storeID, up, p.ID, in)
+	p, err := updateP(f.m, f.ct, storeID, up, p.ID, in)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -402,12 +437,12 @@ func TestImagesConfirmedInTheWriteAndMarkedDeletedWhenRemoved(t *testing.T) {
 
 	// 不是這個商品的資產不能引用。
 	in.Gallery = []Image{{AssetID: uuid.NewV7()}}
-	if _, err := f.m.UpdateProduct(f.ct, storeID, up, p.ID, in); !errors.Is(err, ErrInvalidInput) {
+	if _, err := updateP(f.m, f.ct, storeID, up, p.ID, in); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("a foreign asset: %v", err)
 	}
 	// 移除全部圖片。
 	in.Gallery, in.Description = nil, nil
-	if _, err := f.m.UpdateProduct(f.ct, storeID, up, p.ID, in); err != nil {
+	if _, err := updateP(f.m, f.ct, storeID, up, p.ID, in); err != nil {
 		t.Fatal(err)
 	}
 	if !f.media.IsDeleted(g1) || !f.media.IsDeleted(d1) {
@@ -424,7 +459,7 @@ func TestMediaFailuresRollBackTheProductWrite(t *testing.T) {
 	in.Gallery = []Image{{Token: "g1"}}
 
 	f.media.FailConfirm = errors.New("confirm down")
-	if _, err := f.m.CreateProduct(f.ct, storeID, up, in); err == nil {
+	if _, err := createP(f.m, f.ct, storeID, up, in); err == nil {
 		t.Fatal("a Confirm error fails the create")
 	}
 	if n := f.count(`SELECT count(*) FROM catalog.products WHERE title = '回滾'`); n != 0 {
@@ -436,7 +471,7 @@ func TestMediaFailuresRollBackTheProductWrite(t *testing.T) {
 	in.Title = "新名稱"
 	in.Gallery = nil
 	f.media.FailMarkDeleted = errors.New("mark down")
-	if _, err := f.m.UpdateProduct(f.ct, storeID, up, p.ID, in); err == nil {
+	if _, err := updateP(f.m, f.ct, storeID, up, p.ID, in); err == nil {
 		t.Fatal("a MarkDeleted error fails the update")
 	}
 	got, _ := f.m.Product(f.ct, storeID, p.ID)
@@ -480,7 +515,7 @@ func TestHashtagsUseThePlatformNormalization(t *testing.T) {
 		t.Fatalf("%v", names)
 	}
 	in.Hashtags = []string{"a b"}
-	if _, err := f.m.UpdateProduct(f.ct, storeID, media.Uploader{ID: acct}, p.ID, in); !errors.Is(err, ErrInvalidInput) || !errors.Is(err, hashtag.ErrInvalidChars) {
+	if _, err := updateP(f.m, f.ct, storeID, media.Uploader{ID: acct}, p.ID, in); !errors.Is(err, ErrInvalidInput) || !errors.Is(err, hashtag.ErrInvalidChars) {
 		t.Fatalf("an invalid tag: %v", err)
 	}
 }
@@ -518,19 +553,19 @@ func TestPublicListOnlyActiveProductsOfExposableStores(t *testing.T) {
 	draft := f.create(okStore, okAcct, f.input("草稿"))
 	archived := f.create(okStore, okAcct, f.input("下架"))
 	f.activate(okStore, archived.ID)
-	if err := f.m.SetProductStatus(f.ct, okStore, archived.ID, StatusArchived); err != nil {
+	if err := setStatusP(f.m, f.ct, okStore, archived.ID, StatusArchived); err != nil {
 		t.Fatal(err)
 	}
 	deleted := f.create(okStore, okAcct, f.input("已刪除"))
 	f.activate(okStore, deleted.ID)
-	if err := f.m.DeleteProduct(f.ct, okStore, deleted.ID); err != nil {
+	if err := f.m.DeleteProduct(f.ct, okStore, deleted.ID, 0); err != nil {
 		t.Fatal(err)
 	}
 	suspended := f.create(badStore, badAcct, f.input("停權店商品"))
 	f.activate(badStore, suspended.ID)
 	f.setExposable(badStore, false)
 
-	page, err := f.m.ListPublicProducts(f.ct, f.clock(), nil, nil, 50)
+	page, err := f.m.ListPublicProducts(f.ct, f.clock(), PublicFilter{}, "", nil, 50)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -548,17 +583,17 @@ func TestPublicListOnlyActiveProductsOfExposableStores(t *testing.T) {
 	}
 
 	f.setExposable(badStore, true)
-	page, _ = f.m.ListPublicProducts(f.ct, f.clock(), nil, nil, 50)
+	page, _ = f.m.ListPublicProducts(f.ct, f.clock(), PublicFilter{}, "", nil, 50)
 	if len(page.Items) != 2 {
 		t.Fatalf("an exposable store's active product appears again: %v", f.ids(page))
 	}
 	cat := f.leaf()
-	page, _ = f.m.ListPublicProducts(f.ct, f.clock(), &cat, nil, 50)
+	page, _ = f.m.ListPublicProducts(f.ct, f.clock(), PublicFilter{CategoryIDs: []uuid.UUID{cat}}, "", nil, 50)
 	if len(page.Items) != 2 {
 		t.Fatalf("category filter: %v", f.ids(page))
 	}
 	other := uuid.NewV7()
-	if page, _ = f.m.ListPublicProducts(f.ct, f.clock(), &other, nil, 50); len(page.Items) != 0 {
+	if page, _ = f.m.ListPublicProducts(f.ct, f.clock(), PublicFilter{CategoryIDs: []uuid.UUID{other}}, "", nil, 50); len(page.Items) != 0 {
 		t.Fatalf("another category: %v", f.ids(page))
 	}
 }
@@ -573,17 +608,17 @@ func TestSellerListIsUnfilteredByStatusAndExposure(t *testing.T) {
 	f.activate(storeID, b.ID)
 	c := f.create(storeID, acct, f.input("下架"))
 	f.activate(storeID, c.ID)
-	if err := f.m.SetProductStatus(f.ct, storeID, c.ID, StatusArchived); err != nil {
+	if err := setStatusP(f.m, f.ct, storeID, c.ID, StatusArchived); err != nil {
 		t.Fatal(err)
 	}
 	gone := f.create(storeID, acct, f.input("刪除"))
-	if err := f.m.DeleteProduct(f.ct, storeID, gone.ID); err != nil {
+	if err := f.m.DeleteProduct(f.ct, storeID, gone.ID, 0); err != nil {
 		t.Fatal(err)
 	}
 	foreign := f.create(other, otherAcct, f.input("別家"))
 	f.setExposable(storeID, false)
 
-	page, err := f.m.ListSellerProducts(f.ct, storeID, nil, 50)
+	page, err := f.m.ListSellerProducts(f.ct, storeID, SellerFilter{}, nil, 50)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -625,9 +660,11 @@ func TestListPaginationWalksEveryProductOnce(t *testing.T) {
 		return nil
 	}
 	pub := walk(func(after *ListCursor) (ProductPage, error) {
-		return f.m.ListPublicProducts(f.ct, f.clock(), nil, after, 2)
+		return f.m.ListPublicProducts(f.ct, f.clock(), PublicFilter{}, "", after, 2)
 	})
-	own := walk(func(after *ListCursor) (ProductPage, error) { return f.m.ListSellerProducts(f.ct, storeID, after, 2) })
+	own := walk(func(after *ListCursor) (ProductPage, error) {
+		return f.m.ListSellerProducts(f.ct, storeID, SellerFilter{}, after, 2)
+	})
 	for name, seen := range map[string][]uuid.UUID{"public": pub, "seller": own} {
 		if len(seen) != len(all) {
 			t.Fatalf("%s: %d of %d", name, len(seen), len(all))
@@ -653,7 +690,7 @@ func TestOnlyLeafCategoriesAcceptedOnWrite(t *testing.T) {
 	}
 	in := f.input("分類")
 	in.CategoryID = top
-	if _, err := f.m.CreateProduct(f.ct, storeID, media.Uploader{ID: acct}, in); !errors.Is(err, ErrInvalidInput) {
+	if _, err := createP(f.m, f.ct, storeID, media.Uploader{ID: acct}, in); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("a top-level group takes no products: %v", err)
 	}
 }
@@ -732,7 +769,7 @@ func TestUpdateLocksExistingSkusInAscendingIdOrderWhateverTheInputOrder(t *testi
 	}
 	done := make(chan error, 1)
 	go func() {
-		_, err := f.m.UpdateProduct(f.ct, storeID, media.Uploader{ID: acct}, p.ID, reversed)
+		_, err := updateP(f.m, f.ct, storeID, media.Uploader{ID: acct}, p.ID, reversed)
 		done <- err
 	}()
 	f.waitBlockedBy(holderPID, done)
@@ -772,7 +809,7 @@ func TestUpdateAndMultiSkuDeductDoNotDeadlock(t *testing.T) {
 			if i%2 == 1 {
 				up.Skus[0], up.Skus[1] = up.Skus[1], up.Skus[0]
 			}
-			if _, err := f.m.UpdateProduct(f.ct, storeID, media.Uploader{ID: acct}, p.ID, up); err != nil {
+			if _, err := updateP(f.m, f.ct, storeID, media.Uploader{ID: acct}, p.ID, up); err != nil {
 				t.Errorf("update: %v", err)
 			}
 		}()
@@ -884,7 +921,7 @@ func TestDeleteProductMakesItsSkusUndeductibleButRestorable(t *testing.T) {
 	if err := f.m.DeductStock(f.ct, "before-delete", items(sku, 3)); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.m.DeleteProduct(f.ct, storeID, p.ID); err != nil {
+	if err := f.m.DeleteProduct(f.ct, storeID, p.ID, 0); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.m.DeductStock(f.ct, "after-delete", items(sku, 1)); !errors.Is(err, ErrSkuNotFound) {
@@ -929,7 +966,7 @@ func TestUpdateConfirmsNewImagesBeforeLockingTheProductRow(t *testing.T) {
 	m := New(Deps{DB: f.d, NewID: uuid.NewV7, Now: f.clock, Media: probe})
 	in := f.input("確認順序")
 	in.Gallery = []Image{{Token: "probe-new"}}
-	if _, err := m.UpdateProduct(f.ct, storeID, media.Uploader{ID: acct}, p.ID, in); err != nil {
+	if _, err := updateP(m, f.ct, storeID, media.Uploader{ID: acct}, p.ID, in); err != nil {
 		t.Fatal(err)
 	}
 	if probe.calls != 1 || probe.lockedAt != 0 {

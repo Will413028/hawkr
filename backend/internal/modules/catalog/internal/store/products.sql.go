@@ -12,6 +12,64 @@ import (
 	"uuid"
 )
 
+const countAdminProducts = `-- name: CountAdminProducts :one
+SELECT count(*)::integer
+FROM catalog.products p
+WHERE p.deleted_at IS NULL
+  AND ($1::bigint IS NULL OR p.store_id = $1::bigint)
+  AND ($2::text = '' OR p.searchable_text ILIKE $2::text)
+`
+
+type CountAdminProductsParams struct {
+	StoreID      *int64
+	QueryPattern string
+}
+
+func (q *Queries) CountAdminProducts(ctx context.Context, arg CountAdminProductsParams) (int32, error) {
+	row := q.db.QueryRow(ctx, countAdminProducts, arg.StoreID, arg.QueryPattern)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const countSellerProducts = `-- name: CountSellerProducts :one
+SELECT count(*)::integer
+FROM catalog.products p
+WHERE p.store_id = $1 AND p.deleted_at IS NULL
+  AND ($2::text = '' OR p.status = $2::text)
+  AND ($3::text = ''
+       OR (p.status = 'ACTIVE' AND EXISTS (
+            SELECT 1 FROM catalog.product_skus k
+            WHERE k.product_id = p.id AND k.deleted_at IS NULL
+              AND CASE $3::text
+                    WHEN 'LOW' THEN k.stock_qty > 0 AND k.stock_qty <= COALESCE(p.low_stock_threshold, $4::integer)
+                    ELSE k.stock_qty = 0
+                  END)))
+  AND ($5::text = '' OR p.searchable_text ILIKE $5::text)
+`
+
+type CountSellerProductsParams struct {
+	StoreID          int64
+	Status           string
+	StockStatus      string
+	DefaultThreshold int32
+	QueryPattern     string
+}
+
+// 條件同 ListSellerProducts（沒有游標）。
+func (q *Queries) CountSellerProducts(ctx context.Context, arg CountSellerProductsParams) (int32, error) {
+	row := q.db.QueryRow(ctx, countSellerProducts,
+		arg.StoreID,
+		arg.Status,
+		arg.StockStatus,
+		arg.DefaultThreshold,
+		arg.QueryPattern,
+	)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const deleteOptionAxes = `-- name: DeleteOptionAxes :exec
 DELETE FROM catalog.product_option_axes WHERE product_id = $1
 `
@@ -48,8 +106,77 @@ func (q *Queries) DeleteProductImages(ctx context.Context, productID uuid.UUID) 
 	return err
 }
 
+const getAdminProduct = `-- name: GetAdminProduct :one
+SELECT p.id, p.store_id, p.category_id, p.title, p.description, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.low_stock_threshold, p.content_version, p.created_at, p.updated_at,
+       COALESCE((SELECT jsonb_agg(jsonb_build_object('kind', i.kind, 'asset_id', i.asset_id, 'object_key', i.object_key, 'alt', i.alt) ORDER BY i.kind, i.position)
+                 FROM catalog.product_images i WHERE i.product_id = p.id), '[]'::jsonb)::jsonb AS images,
+       COALESCE((SELECT jsonb_agg(jsonb_build_object('name', x.name, 'values', COALESCE((SELECT jsonb_agg(v.value ORDER BY v.position)
+                                                                                         FROM catalog.product_option_values v
+                                                                                         WHERE v.product_id = x.product_id AND v.axis_position = x.position), '[]'::jsonb)) ORDER BY x.position)
+                 FROM catalog.product_option_axes x WHERE x.product_id = p.id), '[]'::jsonb)::jsonb AS axes,
+       COALESCE((SELECT jsonb_agg(jsonb_build_object('id', k.id, 'option1', k.option1_value, 'option2', k.option2_value, 'price', k.price, 'compare_at_price', k.compare_at_price, 'stock_qty', k.stock_qty) ORDER BY k.created_at, k.id)
+                 FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), '[]'::jsonb)::jsonb AS skus,
+       COALESCE((SELECT jsonb_agg(jsonb_build_object('name', t.name, 'display_name', t.display_name) ORDER BY t.position)
+                 FROM catalog.product_hashtags t WHERE t.product_id = p.id), '[]'::jsonb)::jsonb AS hashtags
+FROM catalog.products p WHERE p.id = $1 AND p.deleted_at IS NULL
+`
+
+type GetAdminProductRow struct {
+	ID                uuid.UUID
+	StoreID           int64
+	CategoryID        uuid.UUID
+	Title             string
+	Description       []byte
+	Status            string
+	FirstPublishedAt  *time.Time
+	MinPrice          int64
+	MaxPrice          int64
+	SalesCount        int32
+	FavoriteCount     int32
+	RatingAverage     float64
+	ReviewCount       int32
+	LowStockThreshold *int32
+	ContentVersion    int64
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	Images            []byte
+	Axes              []byte
+	Skus              []byte
+	Hashtags          []byte
+}
+
+// 後台讀任何店家的商品（任何狀態，沒刪除）；唯讀。圖片、選項、SKU 與 hashtag 以 JSON 欄位在同一句 SQL 內讀出：一句就是一份快照，不會讀到並行寫入的一半。
+func (q *Queries) GetAdminProduct(ctx context.Context, id uuid.UUID) (GetAdminProductRow, error) {
+	row := q.db.QueryRow(ctx, getAdminProduct, id)
+	var i GetAdminProductRow
+	err := row.Scan(
+		&i.ID,
+		&i.StoreID,
+		&i.CategoryID,
+		&i.Title,
+		&i.Description,
+		&i.Status,
+		&i.FirstPublishedAt,
+		&i.MinPrice,
+		&i.MaxPrice,
+		&i.SalesCount,
+		&i.FavoriteCount,
+		&i.RatingAverage,
+		&i.ReviewCount,
+		&i.LowStockThreshold,
+		&i.ContentVersion,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Images,
+		&i.Axes,
+		&i.Skus,
+		&i.Hashtags,
+	)
+	return i, err
+}
+
 const getOwnProduct = `-- name: GetOwnProduct :one
-SELECT p.id, p.store_id, p.category_id, p.title, p.description, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.created_at, p.updated_at,
+SELECT p.id, p.store_id, p.category_id, p.title, p.description, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.low_stock_threshold, p.content_version, p.created_at, p.updated_at,
        COALESCE((SELECT jsonb_agg(jsonb_build_object('kind', i.kind, 'asset_id', i.asset_id, 'object_key', i.object_key, 'alt', i.alt) ORDER BY i.kind, i.position)
                  FROM catalog.product_images i WHERE i.product_id = p.id), '[]'::jsonb)::jsonb AS images,
        COALESCE((SELECT jsonb_agg(jsonb_build_object('name', x.name, 'values', COALESCE((SELECT jsonb_agg(v.value ORDER BY v.position)
@@ -69,25 +196,27 @@ type GetOwnProductParams struct {
 }
 
 type GetOwnProductRow struct {
-	ID               uuid.UUID
-	StoreID          int64
-	CategoryID       uuid.UUID
-	Title            string
-	Description      []byte
-	Status           string
-	FirstPublishedAt *time.Time
-	MinPrice         int64
-	MaxPrice         int64
-	SalesCount       int32
-	FavoriteCount    int32
-	RatingAverage    float64
-	ReviewCount      int32
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	Images           []byte
-	Axes             []byte
-	Skus             []byte
-	Hashtags         []byte
+	ID                uuid.UUID
+	StoreID           int64
+	CategoryID        uuid.UUID
+	Title             string
+	Description       []byte
+	Status            string
+	FirstPublishedAt  *time.Time
+	MinPrice          int64
+	MaxPrice          int64
+	SalesCount        int32
+	FavoriteCount     int32
+	RatingAverage     float64
+	ReviewCount       int32
+	LowStockThreshold *int32
+	ContentVersion    int64
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	Images            []byte
+	Axes              []byte
+	Skus              []byte
+	Hashtags          []byte
 }
 
 // 店家自己的商品（任何狀態，沒刪除）。圖片、選項、SKU 與 hashtag 以 JSON 欄位在同一句 SQL 內讀出：一句就是一份快照，不會讀到並行寫入的一半。
@@ -108,6 +237,8 @@ func (q *Queries) GetOwnProduct(ctx context.Context, arg GetOwnProductParams) (G
 		&i.FavoriteCount,
 		&i.RatingAverage,
 		&i.ReviewCount,
+		&i.LowStockThreshold,
+		&i.ContentVersion,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Images,
@@ -118,8 +249,31 @@ func (q *Queries) GetOwnProduct(ctx context.Context, arg GetOwnProductParams) (G
 	return i, err
 }
 
+const getProductByRequest = `-- name: GetProductByRequest :one
+SELECT id, request_hash, deleted_at FROM catalog.products WHERE store_id = $1 AND request_id = $2
+`
+
+type GetProductByRequestParams struct {
+	StoreID   int64
+	RequestID *uuid.UUID
+}
+
+type GetProductByRequestRow struct {
+	ID          uuid.UUID
+	RequestHash []byte
+	DeletedAt   *time.Time
+}
+
+// 同一家店以同一個 request_id 建立過的商品（含已刪除）；重送時用它讀回並比對 request_hash。
+func (q *Queries) GetProductByRequest(ctx context.Context, arg GetProductByRequestParams) (GetProductByRequestRow, error) {
+	row := q.db.QueryRow(ctx, getProductByRequest, arg.StoreID, arg.RequestID)
+	var i GetProductByRequestRow
+	err := row.Scan(&i.ID, &i.RequestHash, &i.DeletedAt)
+	return i, err
+}
+
 const getPublicProduct = `-- name: GetPublicProduct :one
-SELECT p.id, p.store_id, p.category_id, p.title, p.description, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.created_at, p.updated_at,
+SELECT p.id, p.store_id, p.category_id, p.title, p.description, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.low_stock_threshold, p.content_version, p.created_at, p.updated_at,
        COALESCE((SELECT jsonb_agg(jsonb_build_object('kind', i.kind, 'asset_id', i.asset_id, 'object_key', i.object_key, 'alt', i.alt) ORDER BY i.kind, i.position)
                  FROM catalog.product_images i WHERE i.product_id = p.id), '[]'::jsonb)::jsonb AS images,
        COALESCE((SELECT jsonb_agg(jsonb_build_object('name', x.name, 'values', COALESCE((SELECT jsonb_agg(v.value ORDER BY v.position)
@@ -132,7 +286,7 @@ SELECT p.id, p.store_id, p.category_id, p.title, p.description, p.status, p.firs
                  FROM catalog.product_hashtags t WHERE t.product_id = p.id), '[]'::jsonb)::jsonb AS hashtags
 
 FROM catalog.products p
-WHERE p.id = $1 AND p.status = 'ACTIVE' AND p.deleted_at IS NULL
+WHERE p.id = $1 AND p.status IN ('ACTIVE', 'ARCHIVED') AND p.deleted_at IS NULL
   AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($2::timestamptz) e)
 `
 
@@ -142,28 +296,30 @@ type GetPublicProductParams struct {
 }
 
 type GetPublicProductRow struct {
-	ID               uuid.UUID
-	StoreID          int64
-	CategoryID       uuid.UUID
-	Title            string
-	Description      []byte
-	Status           string
-	FirstPublishedAt *time.Time
-	MinPrice         int64
-	MaxPrice         int64
-	SalesCount       int32
-	FavoriteCount    int32
-	RatingAverage    float64
-	ReviewCount      int32
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	Images           []byte
-	Axes             []byte
-	Skus             []byte
-	Hashtags         []byte
+	ID                uuid.UUID
+	StoreID           int64
+	CategoryID        uuid.UUID
+	Title             string
+	Description       []byte
+	Status            string
+	FirstPublishedAt  *time.Time
+	MinPrice          int64
+	MaxPrice          int64
+	SalesCount        int32
+	FavoriteCount     int32
+	RatingAverage     float64
+	ReviewCount       int32
+	LowStockThreshold *int32
+	ContentVersion    int64
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	Images            []byte
+	Axes              []byte
+	Skus              []byte
+	Hashtags          []byte
 }
 
-// 公開可讀：ACTIVE、沒刪除、店家在 at 這一刻可曝光。子表的 JSON 欄位同 GetOwnProduct：公開讀取會被別的模組呼叫，不開快照 transaction（backend/AGENTS.md 規則 3），靠單一語句取得一致的讀取。
+// 公開可讀：ACTIVE 或 ARCHIVED（下架的商品頁保留、不可購買）、沒刪除、店家在 at 這一刻可曝光；草稿不可讀。子表的 JSON 欄位同 GetOwnProduct：公開讀取會被別的模組呼叫，不開快照 transaction（backend/AGENTS.md 規則 3），靠單一語句取得一致的讀取。
 func (q *Queries) GetPublicProduct(ctx context.Context, arg GetPublicProductParams) (GetPublicProductRow, error) {
 	row := q.db.QueryRow(ctx, getPublicProduct, arg.ID, arg.At)
 	var i GetPublicProductRow
@@ -181,6 +337,8 @@ func (q *Queries) GetPublicProduct(ctx context.Context, arg GetPublicProductPara
 		&i.FavoriteCount,
 		&i.RatingAverage,
 		&i.ReviewCount,
+		&i.LowStockThreshold,
+		&i.ContentVersion,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Images,
@@ -227,30 +385,36 @@ func (q *Queries) InsertOptionValue(ctx context.Context, arg InsertOptionValuePa
 	return err
 }
 
-const insertProduct = `-- name: InsertProduct :exec
+const insertProduct = `-- name: InsertProduct :execrows
 
-INSERT INTO catalog.products (id, store_id, category_id, title, description, status, first_published_at, min_price, max_price, searchable_text, created_at, updated_at)
+INSERT INTO catalog.products (id, store_id, category_id, title, description, status, first_published_at, min_price, max_price, searchable_text, low_stock_threshold, request_id, request_hash, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7,
-        $8, $9, $10, $11, $11)
+        $8, $9, $10, $11, $12, $13, $14, $14)
+ON CONFLICT DO NOTHING
 `
 
 type InsertProductParams struct {
-	ID               uuid.UUID
-	StoreID          int64
-	CategoryID       uuid.UUID
-	Title            string
-	Description      []byte
-	Status           string
-	FirstPublishedAt *time.Time
-	MinPrice         int64
-	MaxPrice         int64
-	SearchableText   string
-	Now              time.Time
+	ID                uuid.UUID
+	StoreID           int64
+	CategoryID        uuid.UUID
+	Title             string
+	Description       []byte
+	Status            string
+	FirstPublishedAt  *time.Time
+	MinPrice          int64
+	MaxPrice          int64
+	SearchableText    string
+	LowStockThreshold *int32
+	RequestID         *uuid.UUID
+	RequestHash       []byte
+	Now               time.Time
 }
 
 // 商品、選項、SKU、圖片引用與 hashtag 的寫入與讀取。
-func (q *Queries) InsertProduct(ctx context.Context, arg InsertProductParams) error {
-	_, err := q.db.Exec(ctx, insertProduct,
+// 建立的冪等：(store_id, request_id) 唯一索引是判重點。同鍵併發時後到的交易在這裡等到先到的提交，然後 ON CONFLICT DO NOTHING 回 0 列
+// （呼叫端改讀回先到的那筆、比對 request_hash）；先到的回滾時後到的插入成功。
+func (q *Queries) InsertProduct(ctx context.Context, arg InsertProductParams) (int64, error) {
+	result, err := q.db.Exec(ctx, insertProduct,
 		arg.ID,
 		arg.StoreID,
 		arg.CategoryID,
@@ -261,9 +425,15 @@ func (q *Queries) InsertProduct(ctx context.Context, arg InsertProductParams) er
 		arg.MinPrice,
 		arg.MaxPrice,
 		arg.SearchableText,
+		arg.LowStockThreshold,
+		arg.RequestID,
+		arg.RequestHash,
 		arg.Now,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const insertProductHashtag = `-- name: InsertProductHashtag :exec
@@ -343,6 +513,98 @@ func (q *Queries) InsertSku(ctx context.Context, arg InsertSkuParams) error {
 	return err
 }
 
+const listAdminProducts = `-- name: ListAdminProducts :many
+SELECT t.id, t.store_id, t.category_id, t.title, t.status, t.first_published_at, t.min_price, t.max_price, t.sales_count, t.favorite_count, t.rating_average, t.review_count, t.low_stock_threshold, t.content_version, t.created_at, t.cover_key, t.total_stock, t.sort_key
+FROM (
+    SELECT p.id, p.store_id, p.category_id, p.title, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.low_stock_threshold, p.content_version, p.created_at,
+       COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key,
+       COALESCE((SELECT LEAST(sum(k.stock_qty), 2147483647) FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), 0)::integer AS total_stock,
+           (extract(epoch FROM p.created_at) * 1000000)::bigint AS sort_key
+    FROM catalog.products p
+    WHERE p.deleted_at IS NULL
+      AND ($1::bigint IS NULL OR p.store_id = $1::bigint)
+      AND ($2::text = '' OR p.searchable_text ILIKE $2::text)
+      AND ($3::timestamptz IS NULL OR (p.created_at, p.id) < ($3::timestamptz, $4::uuid))
+) t
+ORDER BY t.created_at DESC, t.id DESC
+LIMIT $5
+`
+
+type ListAdminProductsParams struct {
+	StoreID      *int64
+	QueryPattern string
+	AfterAt      *time.Time
+	AfterID      *uuid.UUID
+	RowLimit     int32
+}
+
+type ListAdminProductsRow struct {
+	ID                uuid.UUID
+	StoreID           int64
+	CategoryID        uuid.UUID
+	Title             string
+	Status            string
+	FirstPublishedAt  *time.Time
+	MinPrice          int64
+	MaxPrice          int64
+	SalesCount        int32
+	FavoriteCount     int32
+	RatingAverage     float64
+	ReviewCount       int32
+	LowStockThreshold *int32
+	ContentVersion    int64
+	CreatedAt         time.Time
+	CoverKey          string
+	TotalStock        int32
+	SortKey           int64
+}
+
+// 後台列表：全站沒刪除的商品（任何狀態），最新建立的在前；store_id 與 query_pattern 選填。
+func (q *Queries) ListAdminProducts(ctx context.Context, arg ListAdminProductsParams) ([]ListAdminProductsRow, error) {
+	rows, err := q.db.Query(ctx, listAdminProducts,
+		arg.StoreID,
+		arg.QueryPattern,
+		arg.AfterAt,
+		arg.AfterID,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAdminProductsRow{}
+	for rows.Next() {
+		var i ListAdminProductsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StoreID,
+			&i.CategoryID,
+			&i.Title,
+			&i.Status,
+			&i.FirstPublishedAt,
+			&i.MinPrice,
+			&i.MaxPrice,
+			&i.SalesCount,
+			&i.FavoriteCount,
+			&i.RatingAverage,
+			&i.ReviewCount,
+			&i.LowStockThreshold,
+			&i.ContentVersion,
+			&i.CreatedAt,
+			&i.CoverKey,
+			&i.TotalStock,
+			&i.SortKey,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listProductImages = `-- name: ListProductImages :many
 SELECT product_id, kind, position, asset_id, object_key, alt FROM catalog.product_images WHERE product_id = $1 ORDER BY kind, position
 `
@@ -375,48 +637,91 @@ func (q *Queries) ListProductImages(ctx context.Context, productID uuid.UUID) ([
 }
 
 const listPublicProducts = `-- name: ListPublicProducts :many
-SELECT p.id, p.store_id, p.category_id, p.title, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.created_at,
-       COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key
-FROM catalog.products p
-WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL
-  AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e)
-  AND ($2::uuid IS NULL OR p.category_id = $2::uuid)
-  AND ($3::timestamptz IS NULL OR (p.first_published_at, p.id) < ($3::timestamptz, $4::uuid))
-ORDER BY p.first_published_at DESC, p.id DESC
-LIMIT $5
+SELECT t.id, t.store_id, t.category_id, t.title, t.status, t.first_published_at, t.min_price, t.max_price, t.sales_count, t.favorite_count, t.rating_average, t.review_count, t.low_stock_threshold, t.content_version, t.created_at, t.cover_key, t.total_stock, t.sort_key
+FROM (
+    SELECT p.id, p.store_id, p.category_id, p.title, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.low_stock_threshold, p.content_version, p.created_at,
+       COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key,
+       COALESCE((SELECT LEAST(sum(k.stock_qty), 2147483647) FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), 0)::integer AS total_stock,
+           CASE $1::text
+              WHEN 'LATEST' THEN (extract(epoch FROM p.first_published_at) * 1000000)::bigint
+              WHEN 'PRICE_ASC' THEN -p.min_price
+              WHEN 'PRICE_DESC' THEN p.max_price
+              WHEN 'SALES' THEN p.sales_count::bigint
+              WHEN 'RATING' THEN round(p.rating_average * 1000)::bigint
+              ELSE round(word_similarity($2::text, p.searchable_text) * 1000000)::bigint
+          END AS sort_key
+    FROM catalog.products p
+    WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL
+      AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($3::timestamptz) e)
+      AND (cardinality($4::uuid[]) = 0
+           OR p.category_id IN (SELECT c.id FROM catalog.categories c WHERE c.id = ANY($4::uuid[]) OR c.parent_id = ANY($4::uuid[])))
+      AND ($5::bigint IS NULL OR p.max_price >= $5::bigint)
+      AND ($6::bigint IS NULL OR p.min_price <= $6::bigint)
+      AND (cardinality($7::text[]) = 0
+           OR (SELECT count(*) FROM catalog.product_hashtags h WHERE h.product_id = p.id AND h.name = ANY($7::text[]))
+              >= CASE WHEN $8::boolean THEN cardinality($7::text[]) ELSE 1 END)
+      AND (cardinality($9::bigint[]) = 0 OR p.store_id = ANY($9::bigint[]))
+      AND ($10::text = '' OR p.searchable_text ILIKE $10::text)
+) t
+WHERE $11::bigint IS NULL OR (t.sort_key, t.id) < ($11::bigint, $12::uuid)
+ORDER BY t.sort_key DESC, t.id DESC
+LIMIT $13
 `
 
 type ListPublicProductsParams struct {
-	At         time.Time
-	CategoryID *uuid.UUID
-	AfterAt    *time.Time
-	AfterID    *uuid.UUID
-	RowLimit   int32
+	Sort         string
+	Query        string
+	At           time.Time
+	CategoryIds  []uuid.UUID
+	PriceMin     *int64
+	PriceMax     *int64
+	Hashtags     []string
+	HashtagAll   bool
+	StoreIds     []int64
+	QueryPattern string
+	AfterKey     *int64
+	AfterID      *uuid.UUID
+	RowLimit     int32
 }
 
 type ListPublicProductsRow struct {
-	ID               uuid.UUID
-	StoreID          int64
-	CategoryID       uuid.UUID
-	Title            string
-	Status           string
-	FirstPublishedAt *time.Time
-	MinPrice         int64
-	MaxPrice         int64
-	SalesCount       int32
-	FavoriteCount    int32
-	RatingAverage    float64
-	ReviewCount      int32
-	CreatedAt        time.Time
-	CoverKey         string
+	ID                uuid.UUID
+	StoreID           int64
+	CategoryID        uuid.UUID
+	Title             string
+	Status            string
+	FirstPublishedAt  *time.Time
+	MinPrice          int64
+	MaxPrice          int64
+	SalesCount        int32
+	FavoriteCount     int32
+	RatingAverage     float64
+	ReviewCount       int32
+	LowStockThreshold *int32
+	ContentVersion    int64
+	CreatedAt         time.Time
+	CoverKey          string
+	TotalStock        int32
+	SortKey           int64
 }
 
-// 公開列表：只含 ACTIVE、沒刪除、店家在 at 這一刻可曝光的商品；最新上架的在前。
+// 公開列表與搜尋：只含 ACTIVE、沒刪除、店家在 at 這一刻可曝光（seller.pub_exposable_stores）的商品。排序鍵 sort_key 依 sort 決定、一律由大到小
+// （價格低到高取負值），同鍵依 id 遞減；游標是 (sort_key, id)。sort 是 LATEST、PRICE_ASC、PRICE_DESC、SALES、RATING 或 RELEVANCE（RELEVANCE 要有 query）。
+// query_pattern 是已跳脫的 ILIKE 樣式（空字串不篩選），query 是原字串（相關度用 word_similarity）。category_ids 可給頂層（含底下的葉節點）或葉節點。
+// 空的陣列是不篩選；hashtags 是正規化名稱，hashtag_all 為真時要全部都有。
 func (q *Queries) ListPublicProducts(ctx context.Context, arg ListPublicProductsParams) ([]ListPublicProductsRow, error) {
 	rows, err := q.db.Query(ctx, listPublicProducts,
+		arg.Sort,
+		arg.Query,
 		arg.At,
-		arg.CategoryID,
-		arg.AfterAt,
+		arg.CategoryIds,
+		arg.PriceMin,
+		arg.PriceMax,
+		arg.Hashtags,
+		arg.HashtagAll,
+		arg.StoreIds,
+		arg.QueryPattern,
+		arg.AfterKey,
 		arg.AfterID,
 		arg.RowLimit,
 	)
@@ -440,8 +745,12 @@ func (q *Queries) ListPublicProducts(ctx context.Context, arg ListPublicProducts
 			&i.FavoriteCount,
 			&i.RatingAverage,
 			&i.ReviewCount,
+			&i.LowStockThreshold,
+			&i.ContentVersion,
 			&i.CreatedAt,
 			&i.CoverKey,
+			&i.TotalStock,
+			&i.SortKey,
 		); err != nil {
 			return nil, err
 		}
@@ -454,43 +763,72 @@ func (q *Queries) ListPublicProducts(ctx context.Context, arg ListPublicProducts
 }
 
 const listSellerProducts = `-- name: ListSellerProducts :many
-SELECT p.id, p.store_id, p.category_id, p.title, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.created_at,
-       COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key
-FROM catalog.products p
-WHERE p.store_id = $1 AND p.deleted_at IS NULL
-  AND ($2::timestamptz IS NULL OR (p.created_at, p.id) < ($2::timestamptz, $3::uuid))
-ORDER BY p.created_at DESC, p.id DESC
-LIMIT $4
+SELECT t.id, t.store_id, t.category_id, t.title, t.status, t.first_published_at, t.min_price, t.max_price, t.sales_count, t.favorite_count, t.rating_average, t.review_count, t.low_stock_threshold, t.content_version, t.created_at, t.cover_key, t.total_stock, t.sort_key
+FROM (
+    SELECT p.id, p.store_id, p.category_id, p.title, p.status, p.first_published_at, p.min_price, p.max_price, p.sales_count, p.favorite_count, p.rating_average, p.review_count, p.low_stock_threshold, p.content_version, p.created_at,
+       COALESCE((SELECT i.object_key FROM catalog.product_images i WHERE i.product_id = p.id AND i.kind = 'GALLERY' ORDER BY i.position LIMIT 1), '')::text AS cover_key,
+       COALESCE((SELECT LEAST(sum(k.stock_qty), 2147483647) FROM catalog.product_skus k WHERE k.product_id = p.id AND k.deleted_at IS NULL), 0)::integer AS total_stock,
+           (extract(epoch FROM p.created_at) * 1000000)::bigint AS sort_key
+    FROM catalog.products p
+    WHERE p.store_id = $1 AND p.deleted_at IS NULL
+      AND ($2::text = '' OR p.status = $2::text)
+  AND ($3::text = ''
+       OR (p.status = 'ACTIVE' AND EXISTS (
+            SELECT 1 FROM catalog.product_skus k
+            WHERE k.product_id = p.id AND k.deleted_at IS NULL
+              AND CASE $3::text
+                    WHEN 'LOW' THEN k.stock_qty > 0 AND k.stock_qty <= COALESCE(p.low_stock_threshold, $4::integer)
+                    ELSE k.stock_qty = 0
+                  END)))
+      AND ($5::text = '' OR p.searchable_text ILIKE $5::text)
+      AND ($6::timestamptz IS NULL OR (p.created_at, p.id) < ($6::timestamptz, $7::uuid))
+) t
+ORDER BY t.created_at DESC, t.id DESC
+LIMIT $8
 `
 
 type ListSellerProductsParams struct {
-	StoreID  int64
-	AfterAt  *time.Time
-	AfterID  *uuid.UUID
-	RowLimit int32
+	StoreID          int64
+	Status           string
+	StockStatus      string
+	DefaultThreshold int32
+	QueryPattern     string
+	AfterAt          *time.Time
+	AfterID          *uuid.UUID
+	RowLimit         int32
 }
 
 type ListSellerProductsRow struct {
-	ID               uuid.UUID
-	StoreID          int64
-	CategoryID       uuid.UUID
-	Title            string
-	Status           string
-	FirstPublishedAt *time.Time
-	MinPrice         int64
-	MaxPrice         int64
-	SalesCount       int32
-	FavoriteCount    int32
-	RatingAverage    float64
-	ReviewCount      int32
-	CreatedAt        time.Time
-	CoverKey         string
+	ID                uuid.UUID
+	StoreID           int64
+	CategoryID        uuid.UUID
+	Title             string
+	Status            string
+	FirstPublishedAt  *time.Time
+	MinPrice          int64
+	MaxPrice          int64
+	SalesCount        int32
+	FavoriteCount     int32
+	RatingAverage     float64
+	ReviewCount       int32
+	LowStockThreshold *int32
+	ContentVersion    int64
+	CreatedAt         time.Time
+	CoverKey          string
+	TotalStock        int32
+	SortKey           int64
 }
 
-// 賣家清單：店家自己的所有沒刪除的商品，不看狀態也不看曝光；最新建立的在前。
+// 賣家清單：店家自己的所有沒刪除的商品，不看狀態也不看曝光；最新建立的在前。status 空字串是全部；stock_status 空字串是不篩選，LOW 與 OUT_OF_STOCK
+// 只比對 ACTIVE 的商品（LOW：有 SKU 庫存大於 0 且小於或等於商品的門檻，沒設用 default_threshold；OUT_OF_STOCK：有 SKU 庫存是 0）。
+// query_pattern 是已跳脫的 ILIKE 樣式（空字串不篩選），比對 searchable_text。游標是 (created_at, id)；sort_key 是 created_at 的微秒數，給呼叫端組游標。
 func (q *Queries) ListSellerProducts(ctx context.Context, arg ListSellerProductsParams) ([]ListSellerProductsRow, error) {
 	rows, err := q.db.Query(ctx, listSellerProducts,
 		arg.StoreID,
+		arg.Status,
+		arg.StockStatus,
+		arg.DefaultThreshold,
+		arg.QueryPattern,
 		arg.AfterAt,
 		arg.AfterID,
 		arg.RowLimit,
@@ -515,8 +853,12 @@ func (q *Queries) ListSellerProducts(ctx context.Context, arg ListSellerProducts
 			&i.FavoriteCount,
 			&i.RatingAverage,
 			&i.ReviewCount,
+			&i.LowStockThreshold,
+			&i.ContentVersion,
 			&i.CreatedAt,
 			&i.CoverKey,
+			&i.TotalStock,
+			&i.SortKey,
 		); err != nil {
 			return nil, err
 		}
@@ -575,7 +917,7 @@ func (q *Queries) LockLiveSkus(ctx context.Context, productID uuid.UUID) ([]Lock
 }
 
 const lockOwnProduct = `-- name: LockOwnProduct :one
-SELECT id, status, first_published_at FROM catalog.products
+SELECT id, status, first_published_at, content_version FROM catalog.products
 WHERE id = $1 AND store_id = $2 AND deleted_at IS NULL
 FOR UPDATE
 `
@@ -589,14 +931,37 @@ type LockOwnProductRow struct {
 	ID               uuid.UUID
 	Status           string
 	FirstPublishedAt *time.Time
+	ContentVersion   int64
 }
 
 // 店家自己的、沒刪除的商品，鎖列；同一個商品的寫入都從這裡開始，所以 SKU、選項與價格區間的重算不會並行交錯。
 func (q *Queries) LockOwnProduct(ctx context.Context, arg LockOwnProductParams) (LockOwnProductRow, error) {
 	row := q.db.QueryRow(ctx, lockOwnProduct, arg.ID, arg.StoreID)
 	var i LockOwnProductRow
-	err := row.Scan(&i.ID, &i.Status, &i.FirstPublishedAt)
+	err := row.Scan(
+		&i.ID,
+		&i.Status,
+		&i.FirstPublishedAt,
+		&i.ContentVersion,
+	)
 	return i, err
+}
+
+const ownProductDeleted = `-- name: OwnProductDeleted :one
+SELECT EXISTS (SELECT 1 FROM catalog.products WHERE id = $1 AND store_id = $2 AND deleted_at IS NOT NULL)
+`
+
+type OwnProductDeletedParams struct {
+	ID      uuid.UUID
+	StoreID int64
+}
+
+// 店家自己的商品是否已刪除（Delete 重送冪等：已刪除回成功；別家的或不存在的查不到，仍是找不到）。
+func (q *Queries) OwnProductDeleted(ctx context.Context, arg OwnProductDeletedParams) (bool, error) {
+	row := q.db.QueryRow(ctx, ownProductDeleted, arg.ID, arg.StoreID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }
 
 const recomputePriceRange = `-- name: RecomputePriceRange :execrows
@@ -622,7 +987,7 @@ func (q *Queries) RecomputePriceRange(ctx context.Context, arg RecomputePriceRan
 
 const setProductStatus = `-- name: SetProductStatus :exec
 UPDATE catalog.products
-SET status = $1::text,
+SET status = $1::text, content_version = content_version + 1,
     first_published_at = CASE WHEN $1::text = 'ACTIVE' THEN COALESCE(first_published_at, $2::timestamptz) ELSE first_published_at END,
     updated_at = $2
 WHERE id = $3
@@ -634,7 +999,7 @@ type SetProductStatusParams struct {
 	ID     uuid.UUID
 }
 
-// 設成 ACTIVE 時 first_published_at 只在還是空的時候填（之後的下架再上架不改它）。
+// 設成 ACTIVE 時 first_published_at 只在還是空的時候填（之後的下架再上架不改它）。狀態是 etag 涵蓋的範圍，content_version 加一。
 func (q *Queries) SetProductStatus(ctx context.Context, arg SetProductStatusParams) error {
 	_, err := q.db.Exec(ctx, setProductStatus, arg.Status, arg.Now, arg.ID)
 	return err
@@ -683,28 +1048,169 @@ func (q *Queries) SoftDeleteSku(ctx context.Context, arg SoftDeleteSkuParams) er
 	return err
 }
 
+const suggestHashtags = `-- name: SuggestHashtags :many
+SELECT h.name::text AS name, mode() WITHIN GROUP (ORDER BY h.display_name)::text AS display, count(*)::bigint AS product_count
+FROM catalog.product_hashtags h
+JOIN catalog.products p ON p.id = h.product_id
+WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL
+  AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e)
+  AND h.name ILIKE $2::text
+GROUP BY h.name
+ORDER BY count(*) DESC, h.name
+LIMIT $3
+`
+
+type SuggestHashtagsParams struct {
+	At          time.Time
+	NamePattern string
+	RowLimit    int32
+}
+
+type SuggestHashtagsRow struct {
+	Name         string
+	Display      string
+	ProductCount int64
+}
+
+// 標籤建議：名稱符合 name_pattern（已跳脫的 ILIKE 樣式）的標籤與它的可見商品數（ACTIVE、店家可曝光），商品數多的在前。display 是最常用的輸入樣子。
+func (q *Queries) SuggestHashtags(ctx context.Context, arg SuggestHashtagsParams) ([]SuggestHashtagsRow, error) {
+	rows, err := q.db.Query(ctx, suggestHashtags, arg.At, arg.NamePattern, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SuggestHashtagsRow{}
+	for rows.Next() {
+		var i SuggestHashtagsRow
+		if err := rows.Scan(&i.Name, &i.Display, &i.ProductCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const suggestProductNames = `-- name: SuggestProductNames :many
+SELECT t.title::text AS title
+FROM (
+    SELECT p.title, max(word_similarity($1::text, p.title)) AS score
+    FROM catalog.products p
+    WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL
+      AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($2::timestamptz) e)
+      AND p.title ILIKE $3::text
+    GROUP BY p.title
+) t
+ORDER BY t.score DESC, t.title
+LIMIT $4
+`
+
+type SuggestProductNamesParams struct {
+	Query        string
+	At           time.Time
+	QueryPattern string
+	RowLimit     int32
+}
+
+// 搜尋框的建議：可見商品（ACTIVE、店家可曝光）的標題含 query_pattern，相關度高的在前，已去重。
+func (q *Queries) SuggestProductNames(ctx context.Context, arg SuggestProductNamesParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, suggestProductNames,
+		arg.Query,
+		arg.At,
+		arg.QueryPattern,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var title string
+		if err := rows.Scan(&title); err != nil {
+			return nil, err
+		}
+		items = append(items, title)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const trendingHashtags = `-- name: TrendingHashtags :many
+SELECT h.name::text AS name, mode() WITHIN GROUP (ORDER BY h.display_name)::text AS display, count(*)::bigint AS product_count
+FROM catalog.product_hashtags h
+JOIN catalog.products p ON p.id = h.product_id
+WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL
+  AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e)
+GROUP BY h.name
+ORDER BY count(*) DESC, h.name
+LIMIT $2
+`
+
+type TrendingHashtagsParams struct {
+	At       time.Time
+	RowLimit int32
+}
+
+type TrendingHashtagsRow struct {
+	Name         string
+	Display      string
+	ProductCount int64
+}
+
+// 熱門標籤：各標籤的可見商品數，多的在前。
+func (q *Queries) TrendingHashtags(ctx context.Context, arg TrendingHashtagsParams) ([]TrendingHashtagsRow, error) {
+	rows, err := q.db.Query(ctx, trendingHashtags, arg.At, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []TrendingHashtagsRow{}
+	for rows.Next() {
+		var i TrendingHashtagsRow
+		if err := rows.Scan(&i.Name, &i.Display, &i.ProductCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateProductContent = `-- name: UpdateProductContent :exec
 UPDATE catalog.products
 SET category_id = $1, title = $2, description = $3,
-    searchable_text = $4, updated_at = $5
-WHERE id = $6
+    searchable_text = $4, low_stock_threshold = $5,
+    content_version = content_version + $6::bigint, updated_at = $7
+WHERE id = $8
 `
 
 type UpdateProductContentParams struct {
-	CategoryID     uuid.UUID
-	Title          string
-	Description    []byte
-	SearchableText string
-	Now            time.Time
-	ID             uuid.UUID
+	CategoryID        uuid.UUID
+	Title             string
+	Description       []byte
+	SearchableText    string
+	LowStockThreshold *int32
+	VersionBump       int64
+	Now               time.Time
+	ID                uuid.UUID
 }
 
+// 賣家可編輯的內容；content_version 加 version_bump（etag 的來源；修改是 1，建立時補寫內容是 0，建立的版本是 1）。呼叫前已用 LockOwnProduct 鎖列並比對過版本（同一把列鎖之下，版本不會在比對與寫入之間改變）。
 func (q *Queries) UpdateProductContent(ctx context.Context, arg UpdateProductContentParams) error {
 	_, err := q.db.Exec(ctx, updateProductContent,
 		arg.CategoryID,
 		arg.Title,
 		arg.Description,
 		arg.SearchableText,
+		arg.LowStockThreshold,
+		arg.VersionBump,
 		arg.Now,
 		arg.ID,
 	)

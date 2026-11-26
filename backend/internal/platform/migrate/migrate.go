@@ -40,6 +40,35 @@ func (f file) checksum() string {
 	return hex.EncodeToString(s[:])
 }
 
+// extensions 是平台擁有的 Postgres extension（database 層級，裝在 public，不屬於任何模組）。
+//
+// 必要條件：有模組依賴某個 database extension 時才列在這裡（catalog 的商品搜尋用 pg_trgm，D15）。
+// 模組的 schema.sql 與 migration 不寫 CREATE EXTENSION（TestModulesDoNotCreateExtensions）：Atlas 社群版
+// 讀到它就報錯，而且 extension 是 database 的資源，不是模組的 schema 物件。
+var extensions = []string{"pg_trgm"}
+
+// Extensions 回傳平台擁有的 extension 名稱。
+func Extensions() []string { return append([]string(nil), extensions...) }
+
+// ExtensionsSQL 回傳安裝 Extensions 的 SQL，每個 extension 一行：套用 migration 前的 Apply、
+// 以及產生 migration 時 Atlas 的 dev database（scripts/atlas-diff.sh）用的是同一份。
+func ExtensionsSQL() string {
+	var b strings.Builder
+	for _, e := range extensions {
+		fmt.Fprintf(&b, "CREATE EXTENSION IF NOT EXISTS %s WITH SCHEMA public;\n", e)
+	}
+	return b.String()
+}
+
+// InstallExtensions 在 database 上安裝 Extensions。Apply 在套用任何模組之前呼叫它；
+// 不經 Apply 直接套用模組 desired state（schema.sql）的測試要自己先呼叫。
+func InstallExtensions(ctx context.Context, d *db.DB) error {
+	if _, err := d.Pool().Exec(ctx, ExtensionsSQL()); err != nil {
+		return fmt.Errorf("migrate：安裝 extension：%w", err)
+	}
+	return nil
+}
+
 // lockKey 是 migrate 的 advisory lock：同一時間只有一個 migrate 在跑（例如兩個 pod 同時啟動）。
 const lockKey = 7_236_915_402
 
@@ -75,6 +104,10 @@ func Apply(ctx context.Context, d *db.DB, mods []Module) error {
 			PRIMARY KEY (module, version)
 		)`); err != nil {
 		return fmt.Errorf("migrate：建立紀錄表：%w", err)
+	}
+
+	if _, err := conn.Exec(ctx, ExtensionsSQL()); err != nil {
+		return fmt.Errorf("migrate：安裝 extension：%w", err)
 	}
 
 	for i, m := range mods {
@@ -241,7 +274,7 @@ func sumFile(files []file) string {
 //
 // 在只套用過這個模組 migration 的空 database 上呼叫：migration 若參照別的模組
 // （例如跨 schema FK），套用時就會失敗；若把物件建在別的 schema（包括 public），
-// 這裡會列出來。兩者合起來保證模組只碰自己的 schema（ADR D3）。
+// 這裡會列出來（擴充套件自己的物件不算：它們屬於擴充，不是模組建的，例如 pg_trgm 的函式）。兩者合起來保證模組只碰自己的 schema（ADR D3）。
 func ForeignObjects(ctx context.Context, d *db.DB, module string) ([]string, error) {
 	const q = `
 		SELECT 'schema ' || nspname
@@ -252,16 +285,19 @@ func ForeignObjects(ctx context.Context, d *db.DB, module string) ([]string, err
 		SELECT 'relation ' || n.nspname || '.' || c.relname
 		  FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
 		 WHERE n.nspname = 'public'
+		   AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_class'::regclass AND d.objid = c.oid AND d.deptype = 'e')
 		UNION ALL
 		SELECT 'function ' || n.nspname || '.' || p.proname
 		  FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
 		 WHERE n.nspname = 'public'
+		   AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_proc'::regclass AND d.objid = p.oid AND d.deptype = 'e')
 		UNION ALL
 		SELECT 'type ' || n.nspname || '.' || t.typname
 		  FROM pg_type t JOIN pg_namespace n ON n.oid = t.typnamespace
 		 WHERE n.nspname = 'public'
 		   -- 表的 row type 與 array type 由 Postgres 自動建立，表本身已列在 relation 裡。
 		   AND t.typrelid = 0 AND t.typcategory <> 'A'
+		   AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_type'::regclass AND d.objid = t.oid AND d.deptype = 'e')
 		ORDER BY 1`
 	rows, err := d.Conn(ctx).Query(ctx, q, module)
 	if err != nil {

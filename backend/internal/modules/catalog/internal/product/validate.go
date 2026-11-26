@@ -22,6 +22,7 @@ type prepared struct {
 	axes       []model.Axis
 	skus       []model.SkuInput
 	tags       []hashtag.Tag
+	lowStock   *int32
 	// confirmed 是 confirmImages 這一次確認的新資產（writeImages 不必在商品現有的圖裡找到它們）。
 	confirmed map[uuid.UUID]bool
 }
@@ -40,6 +41,12 @@ func prepare(in model.ProductInput) (prepared, error) {
 		return p, model.Invalid("CategoryID", model.ReasonRequired)
 	}
 	p.categoryID = in.CategoryID
+	if t := in.LowStockThreshold; t != nil {
+		if *t < 0 || *t > model.MaxLowStockThreshold {
+			return p, model.Invalid("LowStockThreshold", model.ReasonOutOfRange)
+		}
+		p.lowStock = t
+	}
 
 	var err error
 	if p.desc, err = description.Normalize("Description", in.Description); err != nil {

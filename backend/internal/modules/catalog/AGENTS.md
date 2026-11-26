@@ -8,7 +8,7 @@
 
 ## 擁有的資料
 
-schema `catalog`（`db/schema.sql`）：`categories`、`products`、`product_option_axes`、`product_option_values`、`product_skus`、`stock_operations`、`stock_movements`、`product_images`、`product_hashtags`。讀取模型：無。
+schema `catalog`（`db/schema.sql`）：`categories`、`products`、`product_option_axes`、`product_option_values`、`product_skus`、`stock_operations`、`stock_movements`、`product_images`、`product_hashtags`。讀取模型：無。依賴 Postgres 擴充 `pg_trgm`（`public`，由平台安裝，見單體規則 6）。
 
 ## 發布的讀取介面
 
@@ -29,11 +29,11 @@ schema `catalog`（`db/schema.sql`）：`categories`、`products`、`product_opt
 - 分類只在 migration 變動，兩層；商品只能掛葉節點（`IsLeafCategory`）；名稱是 `LocalizedText`（必有 zh-TW）。守門：`TestSeedTaxonomyShape`、`TestOnlyLeafCategoriesTakeProducts`、`categories_name_check`。
 - 商品狀態是 `DRAFT`／`ACTIVE`／`ARCHIVED`，`ACTIVE` 必有 `first_published_at`；刪除是 `deleted_at`，列保留。可見性是狀態 ∧ 店家可曝光（join `seller.pub_exposable_stores`）∧ 沒有有效限制措施，不寫進狀態欄。
 - 商品寫入在新圖 `Confirm` 之後從 `LockOwnProduct`（以 `storeID` 限定）的列鎖開始，既有 SKU 列接著依 ID 升序一次鎖住（`LockLiveSkus`，與 `DeductStock` 同序）。守門：`TestUpdateLocksExistingSkusInAscendingIdOrderWhateverTheInputOrder`、`TestUpdateConfirmsNewImagesBeforeLockingTheProductRow`。
-- SKU 以選項值的組合辨識，每次 SKU 寫入同 transaction 重算 `min_price`／`max_price`（D19）；組合落在選項值內、不重複，沒有軸的商品剛好一個預設 SKU。庫存不在商品寫入裡改（既有組合不動，新組合給初始值）；改既有 SKU 的庫存走 `AdjustStock`（冪等、限定自己店家、不為負）。守門：`TestAdjustOnAnotherStoresSkuOrDeletedSkuIsNotFound`、`TestPriceRangeFollowsSkuChanges`。
 - 讀取：商品列與子表一句 SQL 讀出（一份快照；會被別的模組呼叫，規則 3 不讓開 `InReadSnapshot`）。守門：`TestReadIsOneSnapshotWhileAWriteCommitsBetweenItsParts`。
 - 圖片：新 token 在鎖商品列之前 `Confirm`，退場的資產在鎖住之後 `MarkDeleted`（media 只 INSERT），都在寫入的 transaction 內，失敗整筆回滾；描述的圖片區塊只存 `asset_id`。守門：`TestImagesConfirmedInTheWriteAndMarkedDeletedWhenRemoved`、`TestMediaFailuresRollBackTheProductWrite`。
 - 狀態（D22）任兩個都能互切（無效目標回 `InvalidInputError`）；ACTIVE 的商品在切成 ACTIVE 與每次寫入時至少 1 張主圖；`first_published_at` 只在第一次 ACTIVE 填，不清除。刪除把還在的 SKU 一併標刪除（扣減與調整找不到，歸還仍可），不碰圖片引用。守門：`TestDeleteProductMakesItsSkusUndeductibleButRestorable`、`TestProductLifecycleAndFirstPublishedAt`。
-- 公開列表與公開單筆只含 ACTIVE、沒刪除、店家可曝光的商品；賣家清單不過濾狀態與曝光。守門：`TestPublicListOnlyActiveProductsOfExposableStores`。
+- 公開列表只含 ACTIVE、沒刪除、店家可曝光的商品；公開單筆另含 ARCHIVED（頁面保留），草稿不可讀；賣家清單不過濾狀態與曝光。守門：`TestPublicListOnlyActiveProductsOfExposableStores`、`TestArchivedProductPageIsPublicButDraftIsNot`。
+- SKU 組合、價格區間、etag（`content_version`）、請求冪等、`SetStock`、低庫存、搜尋與列表篩選的不變量在 `internal/product/AGENTS.md`。
 - 運費與配送方式不在 catalog（D10）；不依賴 fulfillment。
 
 ## 不負責

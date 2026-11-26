@@ -6,11 +6,13 @@
 package product
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"uuid"
@@ -22,6 +24,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/idempotency"
 )
 
 const (
@@ -45,18 +48,34 @@ func New(d Deps) *Service { return &Service{d: d} }
 
 func (s *Service) q(ctx context.Context) *store.Queries { return store.New(s.d.DB.Conn(ctx)) }
 
+// errReplayed 讓重送的建立整筆回滾（新圖的 Confirm 也不留下），由呼叫端在 transaction 外讀回第一次建立的商品。
+type errReplayed struct{ id uuid.UUID }
+
+func (e errReplayed) Error() string { return "catalog: create replayed" }
+
 // Create 建立一個草稿商品。uploader 是新圖 staged token 的上傳者（店家所屬的帳號，由呼叫端推導）。
-func (s *Service) Create(ctx context.Context, storeID int64, uploader media.Uploader, in model.ProductInput) (model.Product, error) {
+// requestID 是建立的冪等鍵（範圍是店家，永久保存）：同一家店以同一個鍵重送回第一次建立的商品目前的樣子，不重複建立；內容不同回 model.ErrIdempotencyKeyReused；
+// 兩個同鍵請求同時在途也只建立一個（INSERT … ON CONFLICT DO NOTHING 回 0 列的那個讀回先到的、比對請求雜湊）。重送時不再 Confirm 新圖（token 已用過）。
+func (s *Service) Create(ctx context.Context, storeID int64, uploader media.Uploader, requestID uuid.UUID, in model.ProductInput) (model.Product, error) {
 	if storeID <= 0 {
 		return model.Product{}, model.Invalid("StoreID", model.ReasonRequired)
+	}
+	if requestID == uuid.Nil() {
+		return model.Product{}, model.Invalid("RequestID", model.ReasonRequired)
 	}
 	p, err := prepare(in)
 	if err != nil {
 		return model.Product{}, err
 	}
+	hash := inputHash(in)
 	var out model.Product
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
+		if id, found, err := s.replayedCreate(ctx, q, storeID, requestID, hash); err != nil {
+			return err
+		} else if found {
+			return errReplayed{id}
+		}
 		if err := s.confirmImages(ctx, uploader, &p); err != nil {
 			return err
 		}
@@ -67,10 +86,23 @@ func (s *Service) Create(ctx context.Context, storeID int64, uploader media.Uplo
 		}
 		// product_images.product_id 的外鍵不可延後：先插入商品列（描述先放空陣列），圖片寫入取得資產 id 後再以 UpdateProductContent 補上
 		// 描述 JSON 與 searchable_text。價格區間先放 0，下面的 SKU 寫入之後由 RecomputePriceRange 算；建立一律是草稿，不需要 first_published_at。
-		if err := q.InsertProduct(ctx, store.InsertProductParams{
-			ID: id, StoreID: storeID, CategoryID: p.categoryID, Title: p.title, Description: []byte("[]"), Status: string(model.StatusDraft), Now: now,
-		}); err != nil {
+		n, err := q.InsertProduct(ctx, store.InsertProductParams{
+			ID: id, StoreID: storeID, CategoryID: p.categoryID, Title: p.title, Description: []byte("[]"), Status: string(model.StatusDraft),
+			LowStockThreshold: p.lowStock, RequestID: &requestID, RequestHash: hash, Now: now,
+		})
+		if err != nil {
 			return err
+		}
+		if n == 0 {
+			// 同鍵的另一個請求先提交了：讀回它、比對雜湊。
+			existing, found, err := s.replayedCreate(ctx, q, storeID, requestID, hash)
+			if err != nil {
+				return err
+			}
+			if !found {
+				return fmt.Errorf("catalog: product insert conflicted but request %s not found", requestID)
+			}
+			return errReplayed{existing}
 		}
 		if err := s.writeImages(ctx, q, id, nil, &p); err != nil {
 			return err
@@ -80,7 +112,7 @@ func (s *Service) Create(ctx context.Context, storeID int64, uploader media.Uplo
 			return err
 		}
 		if err := q.UpdateProductContent(ctx, store.UpdateProductContentParams{
-			ID: id, CategoryID: p.categoryID, Title: p.title, Description: descJSON, SearchableText: searchableText(p, catName), Now: now,
+			ID: id, CategoryID: p.categoryID, Title: p.title, Description: descJSON, SearchableText: searchableText(p, catName), LowStockThreshold: p.lowStock, VersionBump: 0, Now: now,
 		}); err != nil {
 			return err
 		}
@@ -96,12 +128,48 @@ func (s *Service) Create(ctx context.Context, storeID int64, uploader media.Uplo
 		out, err = s.load(ctx, q, id, storeID, nil)
 		return err
 	})
+	var rep errReplayed
+	if errors.As(err, &rep) {
+		return s.Get(ctx, storeID, rep.id)
+	}
+	if errors.Is(err, media.ErrUploadAlreadyConfirmed) {
+		// 並行的重送輸家：同一個圖片 token 已被贏家的 transaction 確認並提交，這時贏家的商品讀得到；回滾後在 transaction 外讀回並比對雜湊。
+		id, found, rerr := s.replayedCreate(ctx, s.q(ctx), storeID, requestID, hash)
+		if rerr != nil {
+			return model.Product{}, rerr
+		}
+		if found {
+			return s.Get(ctx, storeID, id)
+		}
+	}
 	return out, err
+}
+
+// replayedCreate 查同一家店同一個 request_id 的商品：有就比對雜湊（不同回 ErrIdempotencyKeyReused，已刪除回 ErrProductNotFound）。
+func (s *Service) replayedCreate(ctx context.Context, q *store.Queries, storeID int64, requestID uuid.UUID, hash []byte) (uuid.UUID, bool, error) {
+	row, err := q.GetProductByRequest(ctx, store.GetProductByRequestParams{StoreID: storeID, RequestID: &requestID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil(), false, nil
+	}
+	if err != nil {
+		return uuid.Nil(), false, err
+	}
+	if !bytes.Equal(row.RequestHash, hash) {
+		return uuid.Nil(), false, model.ErrIdempotencyKeyReused
+	}
+	if row.DeletedAt != nil {
+		return uuid.Nil(), false, model.ErrProductNotFound
+	}
+	return row.ID, true, nil
 }
 
 // Update 整體取代商品的內容（狀態不變）。選項軸、hashtag 與圖片整組取代；SKU 以選項值的組合辨識：組合還在就更新價格（庫存不動），
 // 新組合新增，不在輸入裡的組合刪除（deleted_at）。
-func (s *Service) Update(ctx context.Context, storeID int64, uploader media.Uploader, productID uuid.UUID, in model.ProductInput) (model.Product, error) {
+// version 是讀取時拿到的版本（etag），與鎖住商品列之後的目前版本不符回 model.ErrVersionConflict、不寫入。
+func (s *Service) Update(ctx context.Context, storeID int64, uploader media.Uploader, productID uuid.UUID, version int64, in model.ProductInput) (model.Product, error) {
+	if version < 1 {
+		return model.Product{}, model.Invalid("Etag", model.ReasonRequired)
+	}
 	p, err := prepare(in)
 	if err != nil {
 		return model.Product{}, err
@@ -115,6 +183,9 @@ func (s *Service) Update(ctx context.Context, storeID int64, uploader media.Uplo
 		cur, err := s.lock(ctx, q, storeID, productID)
 		if err != nil {
 			return err
+		}
+		if cur.ContentVersion != version {
+			return model.ErrVersionConflict
 		}
 		if model.ProductStatus(cur.Status) == model.StatusActive && len(p.gallery) == 0 {
 			return model.ErrActiveRequiresGalleryImage
@@ -136,7 +207,7 @@ func (s *Service) Update(ctx context.Context, storeID int64, uploader media.Uplo
 			return err
 		}
 		if err := q.UpdateProductContent(ctx, store.UpdateProductContentParams{
-			ID: productID, CategoryID: p.categoryID, Title: p.title, Description: descJSON, SearchableText: searchableText(p, catName), Now: now,
+			ID: productID, CategoryID: p.categoryID, Title: p.title, Description: descJSON, SearchableText: searchableText(p, catName), LowStockThreshold: p.lowStock, VersionBump: 1, Now: now,
 		}); err != nil {
 			return err
 		}
@@ -170,9 +241,13 @@ func (s *Service) Update(ctx context.Context, storeID int64, uploader media.Uplo
 
 // SetStatus 切換狀態：三個狀態任兩個都能互切（目標不是有效狀態回 model.Invalid）。設成 ACTIVE 時 first_published_at 只在還是空的時候填，切回其他狀態不清除。
 // 切成目前的狀態是 no-op；切成 ACTIVE 而商品沒有主圖回 model.ErrActiveRequiresGalleryImage。
-func (s *Service) SetStatus(ctx context.Context, storeID int64, productID uuid.UUID, to model.ProductStatus) error {
+// version 是讀取時拿到的版本（etag），必填：狀態要改變而版本不符回 model.ErrVersionConflict；同狀態是 no-op，不比對版本（重送冪等，etag 不變）。狀態改變時版本加一，no-op 不加。
+func (s *Service) SetStatus(ctx context.Context, storeID int64, productID uuid.UUID, version int64, to model.ProductStatus) error {
 	if !to.Valid() {
 		return model.Invalid("Status", model.ReasonUnknown)
+	}
+	if version < 1 {
+		return model.Invalid("Etag", model.ReasonRequired)
 	}
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
@@ -183,6 +258,9 @@ func (s *Service) SetStatus(ctx context.Context, storeID int64, productID uuid.U
 		from := model.ProductStatus(cur.Status)
 		if from == to {
 			return nil
+		}
+		if cur.ContentVersion != version {
+			return model.ErrVersionConflict
 		}
 		if to == model.StatusActive {
 			imgs, err := q.ListProductImages(ctx, productID)
@@ -198,11 +276,26 @@ func (s *Service) SetStatus(ctx context.Context, storeID int64, productID uuid.U
 }
 
 // Delete 刪除商品：設 deleted_at，它還在的 SKU 同 transaction 一併標刪除，不可還原，列與圖片引用保留（訂單與評價仍引用）。
-func (s *Service) Delete(ctx context.Context, storeID int64, productID uuid.UUID) error {
+// version 選填：0 不比對，非 0 要與目前版本相符，否則回 model.ErrVersionConflict。
+// 自己的商品已經刪除時回 nil（重送冪等，不比對版本）；別家的或不存在的回 model.ErrProductNotFound。
+func (s *Service) Delete(ctx context.Context, storeID int64, productID uuid.UUID, version int64) error {
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
-		if _, err := s.lock(ctx, q, storeID, productID); err != nil {
+		cur, err := s.lock(ctx, q, storeID, productID)
+		if errors.Is(err, model.ErrProductNotFound) {
+			deleted, derr := q.OwnProductDeleted(ctx, store.OwnProductDeletedParams{ID: productID, StoreID: storeID})
+			if derr != nil {
+				return derr
+			}
+			if deleted {
+				return nil
+			}
+		}
+		if err != nil {
 			return err
+		}
+		if version != 0 && cur.ContentVersion != version {
+			return model.ErrVersionConflict
 		}
 		now := s.d.Now()
 		// SKU 一併標刪除，扣減、調整與商品一致地找不到它們；先依 ID 升序鎖列（與 DeductStock 同序）。歸還不看刪除，原扣減的庫存仍記得回去。
@@ -247,11 +340,15 @@ func (s *Service) leafCategoryText(ctx context.Context, q *store.Queries, id uui
 	return name["zh-TW"], nil
 }
 
-// searchableText 組 searchable_text：名稱、描述文字、hashtag 名稱、分類名稱，以單一空格相接（schema.sql 的註解）。
+// searchableText 組 searchable_text：名稱、描述文字、hashtag 名稱、選項軸的名稱與值、分類名稱，以單一空格相接（schema.sql 的註解）。
 func searchableText(p prepared, categoryName string) string {
 	parts := []string{p.title, description.Text(p.desc)}
 	for _, t := range p.tags {
 		parts = append(parts, t.Name)
+	}
+	for _, a := range p.axes {
+		parts = append(parts, a.Name)
+		parts = append(parts, a.Values...)
 	}
 	parts = append(parts, categoryName)
 	return strings.Join(slices.DeleteFunc(parts, func(s string) bool { return s == "" }), " ")
@@ -427,4 +524,50 @@ func (s *Service) writeImages(ctx context.Context, q *store.Queries, id uuid.UUI
 		return s.d.Media.MarkDeleted(ctx, retired)
 	}
 	return nil
+}
+
+// inputHash 是建立請求內容的雜湊（冪等重送比對用）：用原始輸入，所以新圖 token 也是內容的一部分；欄位依固定順序以長度前綴編碼。
+func inputHash(in model.ProductInput) []byte {
+	h := idempotency.New()
+	h.Put("create-product", in.Title, in.CategoryID.String(), strconv.Itoa(len(in.Hashtags)))
+	h.Put(in.Hashtags...)
+	if in.LowStockThreshold == nil {
+		h.Put("-")
+	} else {
+		h.Put(strconv.Itoa(int(*in.LowStockThreshold)))
+	}
+	putImage := func(img model.Image) { h.Put(img.Token, img.AssetID.String(), img.Alt) }
+	h.Put("gallery", strconv.Itoa(len(in.Gallery)))
+	for _, img := range in.Gallery {
+		putImage(img)
+	}
+	h.Put("description", strconv.Itoa(len(in.Description)))
+	for _, b := range in.Description {
+		h.Put(string(b.Kind), b.Text, strconv.Itoa(len(b.Items)))
+		h.Put(b.Items...)
+		if b.Image != nil {
+			putImage(*b.Image)
+		} else {
+			h.Put("-")
+		}
+		h.Put(strconv.Itoa(len(b.Rows)))
+		for _, r := range b.Rows {
+			h.Put(strconv.Itoa(len(r)))
+			h.Put(r...)
+		}
+	}
+	h.Put("axes", strconv.Itoa(len(in.Axes)))
+	for _, a := range in.Axes {
+		h.Put(a.Name, strconv.Itoa(len(a.Values)))
+		h.Put(a.Values...)
+	}
+	h.Put("skus", strconv.Itoa(len(in.Skus)))
+	for _, k := range in.Skus {
+		cmp := "-"
+		if k.CompareAtPrice != nil {
+			cmp = strconv.FormatInt(*k.CompareAtPrice, 10)
+		}
+		h.Put(k.Option1, k.Option2, strconv.FormatInt(k.Price, 10), cmp, strconv.Itoa(int(k.StockQty)))
+	}
+	return h.Sum()
 }

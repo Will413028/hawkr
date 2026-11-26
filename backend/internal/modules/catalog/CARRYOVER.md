@@ -21,9 +21,9 @@ product-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 | 規格：SKU 只有自由文字 `sku_name`＋`unit` | 一個商品多個規格 | 不成立：買家無法依規格篩選、賣家可建重複規格、client 畫不出選擇器 | 0–2 個選項軸，SKU 是值的組合，組合唯一（Shopify variants、蝦皮規格） | D18：`product_option_axes`／`product_option_values`；`product_skus` 的 `option1_value`、`option2_value`，`skus_combination_key` 對未刪除的 SKU 唯一；沒有選項的商品有一個預設 SKU（兩個選項值都是 NULL） |
 | SKU 的 `shipping_method` JSONB（溫層、免運門檻、運費負擔者）、`restricted_category_codes`、商品的 `certifications`、`shipping_methods` | 運費與配送方式；範圍裁切前的食品與認證 | 不成立：運費規則歸 seller 的運費設定（B3，D10）；溫層與認證已裁切（ADR general-ecommerce-scope-cut） | 運費規則屬物流設定，商品只記實體屬性 | 不帶：catalog 不存配送方式、重量尺寸，不依賴運費設定（D10，Will 2026-11-24） |
 | 圖片：`product.gallery` JSONB；描述 `description` JSONB blocks 內含圖片 | 商品圖庫與描述的圖文 | 圖片需求成立；JSONB 內嵌圖片不成立：引用只存在擁有者的表（ADR media-references-owner-side） | 有序資產引用清單；描述是結構化區塊（Shopify product media、Portable Text） | D17：`product_images(product_id, kind, position, asset_id, object_key, alt)`，`kind` 是 `GALLERY`／`DESCRIPTION`；描述是四種區塊（段落、圖片、清單、表格）的 JSON，圖片區塊以 `asset_id` 指向 `product_images`；儲存時 `Confirm`、移除時同 transaction `MarkDeleted`（B4-2b） |
-| `searchable_text` ILIKE `%t%`（無索引的掃描） | 商品搜尋 | 成立；ILIKE 不成立：量大時全表掃描 | 百萬列以下用 `pg_trgm`；量測觸發才換搜尋引擎（GitLab、Discourse） | D15：`searchable_text` 欄由寫入端組；GIN trigram 索引隨 B4-3 的查詢一起建（現在沒有查詢，不預建，necessity condition） |
-| `version` 欄（V16、V17）與 `expectedVersion` 409 | 並發修改偵測 | 成立；欄位不成立：ADR optimistic-concurrency-etag 規定用 etag | etag（If-Match 語意） | D4：不帶 `version`；etag 在 B4-3 的 API 層由列內容推導 |
-| `idempotency_request` 表＋`IdempotencyCleanupJob`；`FavoriteEventDedupCleanupJob` | 寫入重送冪等 | 不成立：D4 規定寫入帶 `request_id`；去重表隨 D3 消失 | 請求冪等鍵（Stripe） | 不帶：B4-3 的寫入以 `request_id` 冪等（`platform/idempotency`）；庫存的冪等鍵是 `stock_operations` 自己的 |
+| `searchable_text` ILIKE `%t%`（無索引的掃描） | 商品搜尋 | 成立；ILIKE 不成立：量大時全表掃描 | 百萬列以下用 `pg_trgm`；量測觸發才換搜尋引擎（GitLab、Discourse） | D15：`searchable_text` 欄由寫入端組（標題、描述文字、hashtag、選項軸名稱與值、分類名稱；B4-3a 加入選項）；B4-3a 的搜尋與賣家關鍵字查詢一起建 `pg_trgm` 擴充與 GIN trigram 索引（`ILIKE` 命中、`word_similarity` 排相關度）。`pg_trgm` 由平台擁有（`internal/platform/migrate` 的 `extensions`，`Apply` 先裝；Atlas 的 dev database 由 `make atlas-diff` 先裝），索引由 Atlas 從 schema.sql 產生進 migration `product_api_support`，模組不寫 `CREATE EXTENSION`；排序用 `CASE` 算鍵、沒有索引，量測觸發才換 |
+| `version` 欄（V16、V17）與 `expectedVersion` 409 | 並發修改偵測 | 成立；欄位不成立：ADR optimistic-concurrency-etag 規定用 etag | etag（If-Match 語意） | D4、B4-3a：欄位叫 `content_version`（起始 1），對外是 etag（`Etag`／`ParseEtag`）；只在賣家可編輯的內容與狀態改變時加一，庫存、銷量、收藏數、評分、價格區間重算都不加（Shopify 商品與庫存是不同資源）；`UpdateProduct`、`SetProductStatus` 必帶版本，`DeleteProduct` 選填 |
+| `idempotency_request` 表＋`IdempotencyCleanupJob`；`FavoriteEventDedupCleanupJob` | 寫入重送冪等 | 不成立：D4 規定寫入帶 `request_id`；去重表隨 D3 消失 | 請求冪等鍵（Stripe） | 不帶表與清理 job：B4-3a 的 `CreateProduct` 以 `(store_id, request_id)` 唯一索引加 `request_hash`（`platform/idempotency` 的雜湊）冪等、永久保存；賣家的 `AdjustStock`、`SetStock` 以 `stock_operations` 的 `(store_id, key)` 加 `request_hash` 冪等；同鍵併發 `ON CONFLICT DO NOTHING` 後讀回比對 |
 
 ## 傳輸層的沿用盤點
 
@@ -44,7 +44,8 @@ product-service 的每個機制，搬進來時都重新判斷過（遷移計畫�
 - 庫存：`stock_operations`＋`stock_movements` 帳本（Java 的 `stock_transaction`），冪等鍵 UNIQUE；歸還依原扣減。
 - 分類：兩層、版本化種子、`LocalizedText` 名稱、Shopify 對照（Java 三層可編輯、種子只有兩筆）。
 - 規格：0–2 個選項軸，SKU 是組合；價格 `price`＋`compare_at_price`（Java 自由文字規格、`price`＋`sale_price`）。
-- 沒有：`certifications`、溫層、`shipping_methods`、`seller_deleted_at`、`version`、分類名稱快照、`idempotency_request`。
+- 沒有：`certifications`、溫層、`shipping_methods`、`seller_deleted_at`、`version`（改叫 `content_version`）、分類名稱快照、`idempotency_request`（改成 `request_id`）。
+- 賣家設定庫存（B4-3a）：`SetStock(quantity, expected)` 比對預期值的條件式 `UPDATE`，Java 沒有；低庫存門檻（每商品選填，預設 5）、關鍵字搜尋與賣家清單 `query`、後台游標列表與總數、公開單筆含 ARCHIVED 也是 B4-3a 新增，Java 的列表是 offset 與 ILIKE。
 - 賣家調整庫存（B4-2b）：`AdjustStock` 以冪等鍵與有號 delta 記 `ADJUST` 操作，條件式更新、限定自己店家，既有 SKU 的庫存只由 stock 改（Java 沒有對應的專用方法）。
 - 商品寫入（B4-2b）：整體取代；SKU 以選項值的組合辨識（Java 以 ID），組合在就更新價格、庫存不動；選項軸與值整組重寫。
 - 描述：四種結構化區塊（段落、圖片、清單、表格），圖片區塊只存 `asset_id`（Java 的 `table_json`／`list_json` 是不解析的字串）；上限見 `internal/model/product.go`。

@@ -8,6 +8,7 @@ syntax = "proto3";
 // （ADR 2026-09-25-api-image-uri-template）。
 package hawkr.buyer.v1alpha1;
 
+import "hawkr/catalog/v1alpha1/catalog.proto";
 import "hawkr/common/v1alpha1/image.proto";
 import "hawkr/common/v1alpha1/postal_address.proto";
 import "hawkr/common/v1alpha1/store_card.proto";
@@ -72,6 +73,12 @@ service BuyerAppService {
   // RemoveFavorite 取消收藏；沒有收藏時也成功。
   rpc RemoveFavorite(RemoveFavoriteRequest) returns (RemoveFavoriteResponse) {
     option idempotency_level = IDEMPOTENT;
+  }
+
+  // ListFollowedStoreProducts 列出呼叫者追蹤的店家的公開商品（「追蹤中」動態），最新上架在前；只含公開可見的商品
+  // （ACTIVE、沒刪除、店家此刻可曝光）。沒有追蹤任何店家回空清單。商品卡片與公開列表相同（hawkr.catalog.v1alpha1.ProductSummary）。
+  rpc ListFollowedStoreProducts(ListFollowedStoreProductsRequest) returns (ListFollowedStoreProductsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
   }
 
   // ListFollows 列出追蹤的店家，新到舊。
@@ -354,6 +361,17 @@ message DeleteAddressRequest {
 }
 
 message DeleteAddressResponse {}
+
+message ListFollowedStoreProductsRequest {
+  // 預設 20，上限 100；負數回 invalid_argument。
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListFollowedStoreProductsResponse {
+  repeated hawkr.catalog.v1alpha1.ProductSummary products = 1;
+  string next_page_token = 2;
+}
 
 message ListFavoritesRequest {
   // 預設 20，上限 100。

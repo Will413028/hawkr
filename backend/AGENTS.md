@@ -34,6 +34,7 @@
 7. 不得出現舊公司的端點或帳號識別碼。
 8. 刪除舊服務之前，它在搬遷清單裡的 RPC、事件、副本都要填好 `disposition`（`scripts/check-migration-inventory.py`）。
 9. 頭尾空白只有 `internal/platform/trimtext` 一個定義：寫入端用 `trimtext.Trim` 或 `strings.TrimSpace`，DB 的 CHECK 用 `trimtext.Check` 並登記在 `cmd/hawkr` 的 `trimmedColumns`；SQL 不用 `btrim`／`trim`，也不自己定義空白（`TestTrimmedTextChecksUseTheCanonicalPattern`、`TestModuleSQLDoesNotTrim`）。
+10. extension 只在 `platform/migrate` 宣告，模組 SQL 不寫 `CREATE EXTENSION`。
 
 ## 指令
 
@@ -49,12 +50,12 @@ make sqlc  # 改 db/schema.sql、objects.sql、queries/ 後
 make jet  # 改 social 的 migration 或擁有者的 pub.sql 後
 make connect  # 改 api/ 的 proto 後
 make uitext  # 改文案目錄、模組的 text/*.json 或 proto 註解後
-(cd internal/modules/<名稱>/db && atlas migrate diff <名稱> --env dev)  # 改 schema.sql 後；objects.sql 用 atlas migrate new 手寫再 atlas migrate hash
+make atlas-diff module=<名稱> name=<名>  # 改 schema.sql 後；objects.sql 手寫（atlas migrate new＋hash）
 ```
 
 營運子命令：`go run ./cmd/hawkr` 不帶參數列出全部（營運用的要 `DATABASE_URL`）。搬模組時的工具（`make new-module`、`make new-characterization`、`scripts/characterize.sh`）見遷移計畫。
 
-`GOWORK=off` 確保單體不依賴 `go.work` 裡的舊服務 module。本機設定集中在 `Makefile`；`DEV_AUTH_KEY_FILE`（本機 dev 金鑰）與 `CF_ACCESS_*` 互斥。舊服務的整套本機環境是 `./dev.sh`，沒搬的路徑由單體轉給 gateway（:9900）；細節見單體開發規範 §3。
+`GOWORK=off` 確保單體不依賴 `go.work` 裡的舊服務 module。`DEV_AUTH_KEY_FILE`（本機 dev 金鑰）與 `CF_ACCESS_*` 互斥。舊服務的整套本機環境是 `./dev.sh`，沒搬的路徑由單體轉給 gateway（:9900）；細節見單體開發規範 §3。
 
 ## 契約規則（單體與舊服務都適用）
 

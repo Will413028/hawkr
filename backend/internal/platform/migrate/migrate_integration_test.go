@@ -171,6 +171,7 @@ func TestIsolationChecksCatchModulesThatLeaveTheirSchema(t *testing.T) {
 		{name: "只碰自己的 schema", sql: v1},
 		{name: "把表建在 public", sql: "CREATE SCHEMA shop;\nCREATE TABLE public.leak (id int);", foreign: []string{"relation public.leak"}},
 		{name: "把 type 建在 public", sql: "CREATE SCHEMA shop;\nCREATE TYPE public.mood AS ENUM ('ok');", foreign: []string{"type public.mood"}},
+		{name: "平台安裝的擴充套件物件不算模組建的", sql: "CREATE SCHEMA shop;"},
 		{name: "建立別的模組的 schema", sql: "CREATE SCHEMA shop;\nCREATE SCHEMA other;", foreign: []string{"schema other"}},
 		{name: "跨 schema 的 FK", sql: "CREATE SCHEMA shop;\nCREATE TABLE shop.orders (seller_id bigint REFERENCES seller.stores (id));", wantErr: true},
 		{name: "沒有建立自己的 schema", sql: "SELECT 1;", noOwn: true},
@@ -288,5 +289,21 @@ func TestFunctionsBreakingRule6ListsLooseBodiesAndWholeRowReturns(t *testing.T) 
 	want := []string{"loose_plpgsql：不是 BEGIN ATOMIC", "loose_sql：不是 BEGIN ATOMIC", "whole_row：回傳 shop.item_names 的整列", "whole_rows：回傳 shop.items 的整列"}
 	if !slices.Equal(got, want) {
 		t.Errorf("FunctionsBreakingRule6 = %q，要 %q", got, want)
+	}
+}
+
+// 平台的 extension 在任何模組的 migration 之前安裝：模組的第一支 migration 就能參照 extension 的 operator class。
+func TestExtensionsAreInstalledBeforeModuleMigrations(t *testing.T) {
+	d := pg.NewDB(t)
+	sql := "CREATE SCHEMA shop;\nCREATE TABLE shop.items (name text NOT NULL);\n" +
+		"CREATE INDEX items_name_trgm ON shop.items USING gin (name public.gin_trgm_ops);"
+	if err := migrate.Apply(context.Background(), d, []migrate.Module{migrate.TestModule("shop", map[string]string{"001_init.sql": sql})}); err != nil {
+		t.Fatalf("migration 參照平台 extension 的 operator class 失敗：%v", err)
+	}
+	for _, e := range migrate.Extensions() {
+		var n int
+		if err := d.Pool().QueryRow(context.Background(), "SELECT count(*) FROM pg_extension WHERE extname = $1", e).Scan(&n); err != nil || n != 1 {
+			t.Errorf("extension %s 沒有安裝（n=%d, err=%v）", e, n, err)
+		}
 	}
 }

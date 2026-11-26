@@ -81,6 +81,9 @@ func TestSchemaFileMatchesMigrations(t *testing.T) {
 				t.Fatal(err)
 			}
 			fromSchema := pg.NewDB(t)
+			if err := migrate.InstallExtensions(ctx, fromSchema); err != nil {
+				t.Fatal(err)
+			}
 			for _, name := range []string{"schema.sql", "objects.sql"} {
 				sql, err := os.ReadFile(filepath.Join("..", "..", sourceDir(m.Name), "db", name))
 				if name == "objects.sql" && os.IsNotExist(err) {

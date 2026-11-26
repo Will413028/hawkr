@@ -46,6 +46,13 @@ func contractServices(t *testing.T) []string {
 	return out
 }
 
+// declaredNotYetMounted 是契約已宣告、handler 在後續步驟才接線的 service（值是接線的步驟）。接線之後必須從這裡刪除：下面的測試在它已經掛上時失敗。
+var declaredNotYetMounted = map[string]string{
+	"hawkr.admin.catalog.v1alpha1.CatalogAdminService": "B4-3b",
+	"hawkr.catalog.v1alpha1.CatalogPublicService":      "B4-3b",
+	"hawkr.catalog.v1alpha1.SellerCatalogAppService":   "B4-3b",
+}
+
 func TestEveryServiceInTheContractIsMounted(t *testing.T) {
 	var mounted []string
 	services, err := connectServices(Deps{Stats: characterize.Stats(t), WebOrigin: characterize.WebOrigin(t), Images: characterize.Images(t), Logger: slog.New(slog.DiscardHandler)})
@@ -56,7 +63,14 @@ func TestEveryServiceInTheContractIsMounted(t *testing.T) {
 		mounted = append(mounted, strings.Trim(s.path, "/"))
 	}
 	slices.Sort(mounted)
-	if want := contractServices(t); !slices.Equal(mounted, want) {
+	want := contractServices(t)
+	for name, step := range declaredNotYetMounted {
+		if slices.Contains(mounted, name) {
+			t.Errorf("%s 已經掛上，從 declaredNotYetMounted（%s）刪除它", name, step)
+		}
+		want = slices.DeleteFunc(want, func(s string) bool { return s == name })
+	}
+	if !slices.Equal(mounted, want) {
 		t.Fatalf("單體掛的 service = %v，api/ 宣告的 = %v", mounted, want)
 	}
 }

@@ -76,8 +76,8 @@
    "id": "public-list-without-exposure-join",
    "stack": "go-integration",
    "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
-   "old": "p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e)",
-   "new": "$1::timestamptz IS NOT NULL",
+   "old": "p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($3::timestamptz) e)",
+   "new": "$3::timestamptz IS NOT NULL",
    "test": "internal/modules/catalog ^TestPublicListOnlyActiveProductsOfExposableStores$",
    "why": "公開列表拿掉 seller.pub_exposable_stores 的 join：停權店的 ACTIVE 商品出現在公開列表，測試要紅。"
   },
@@ -85,8 +85,8 @@
    "id": "public-get-without-exposure-join",
    "stack": "go-integration",
    "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
-   "old": "p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($2::timestamptz) e)",
-   "new": "$2::timestamptz IS NOT NULL",
+   "old": "p.status IN ('ACTIVE', 'ARCHIVED') AND p.deleted_at IS NULL\n  AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($2::timestamptz) e)",
+   "new": "p.status IN ('ACTIVE', 'ARCHIVED') AND p.deleted_at IS NULL\n  AND $2::timestamptz IS NOT NULL",
    "test": "internal/modules/catalog ^TestPublicListOnlyActiveProductsOfExposableStores$",
    "why": "公開單筆讀取拿掉曝光條件：停權店的商品仍可公開讀取，測試要紅。"
   },
@@ -148,8 +148,8 @@
    "id": "seller-list-filters-by-exposure",
    "stack": "go-integration",
    "file": "backend/internal/modules/catalog/internal/store/products.sql.go",
-   "old": "WHERE p.store_id = $1 AND p.deleted_at IS NULL",
-   "new": "WHERE p.store_id = $1 AND p.deleted_at IS NULL\n  AND p.status = 'ACTIVE'",
+   "old": "    WHERE p.store_id = $1 AND p.deleted_at IS NULL\n      AND ($2::text = '' OR p.status = $2::text)",
+   "new": "    WHERE p.store_id = $1 AND p.deleted_at IS NULL\n      AND p.status = 'ACTIVE'\n      AND ($2::text = '' OR p.status = $2::text)",
    "test": "internal/modules/catalog ^TestSellerListIsUnfilteredByStatusAndExposure$",
    "why": "賣家清單只列 ACTIVE：賣家看不到自己的草稿與下架商品，測試要紅。"
   },
@@ -157,8 +157,8 @@
    "id": "adjust-without-store-ownership",
    "stack": "go-integration",
    "file": "backend/internal/modules/catalog/internal/store/stock.sql.go",
-   "old": "p.store_id = $4",
-   "new": "$4 > 0",
+   "old": "p.id = s.product_id AND p.store_id = $4 AND p.deleted_at IS NULL\n  AND s.stock_qty::bigint",
+   "new": "p.id = s.product_id AND $4 > 0 AND p.deleted_at IS NULL\n  AND s.stock_qty::bigint",
    "test": "internal/modules/catalog ^TestAdjustOnAnotherStoresSkuOrDeletedSkuIsNotFound$",
    "why": "賣家調整不再限定 SKU 屬於自己的店家：跨店調整生效而不是回 ErrSkuNotFound，測試要紅。"
   },
@@ -238,7 +238,7 @@
    "id": "read-images-in-a-separate-statement",
    "stack": "go-integration",
    "file": "backend/internal/modules/catalog/internal/product/read.go",
-   "old": "if err := json.Unmarshal(h.images, &images); err != nil {",
+   "old": "if err := json.Unmarshal(h.Images, &images); err != nil {",
    "new": "if err := func() error { rows, e := q.ListProductImages(ctx, id); for _, r := range rows { images = append(images, imageJSON{Kind: r.Kind, AssetID: r.AssetID, ObjectKey: r.ObjectKey, Alt: r.Alt}) }; return e }(); err != nil {",
    "test": "internal/modules/catalog ^TestReadIsOneSnapshotWhileAWriteCommitsBetweenItsParts$",
    "why": "圖片改在商品列之後另一句 SQL 讀：並行的修改提交在兩句之間時讀到描述有圖、圖片表已空，Decode 失敗，測試要紅。"
