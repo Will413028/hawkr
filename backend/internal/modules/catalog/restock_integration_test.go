@@ -224,6 +224,7 @@ func TestRestockIsNotEnqueuedWithoutAZeroToPurchasableTransition(t *testing.T) {
 			if err := setStatusP(f.m, f.ct, storeID, p.ID, StatusArchived); err != nil {
 				t.Fatal(err)
 			}
+			f.clearQueues() // 啟用會排每個沒刪除的 SKU（D26）；這裡只驗庫存寫入的路徑
 		}
 		f.setStock(storeID, s, 5, 0)
 		if got := f.queued(s); got != 0 {
