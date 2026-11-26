@@ -81,7 +81,9 @@ SELECT EXISTS (
     WHERE s.id = sqlc.arg(id) AND p.store_id = sqlc.arg(store_id)
 );
 
--- name: GetOwnLiveSkuProduct :one
--- 店家自己的未刪除 SKU 所屬的商品；庫存調整成功後要回該 SKU 的完整內容（價格、選項與可購買性在商品上），用它找商品。
-SELECT s.product_id FROM catalog.product_skus s JOIN catalog.products p ON p.id = s.product_id
-WHERE s.id = sqlc.arg(id) AND s.deleted_at IS NULL AND p.store_id = sqlc.arg(store_id) AND p.deleted_at IS NULL;
+-- name: GetOwnSkuState :one
+-- 店家自己的 SKU 此刻的內容與可購買性；已刪除的 SKU 與商品也回列（庫存調整 commit 之後並行刪除、或重送時已刪除，回應仍要照實回報）。不是這家店的回無列。
+SELECT s.id, s.option1_value, s.option2_value, s.price, s.compare_at_price, s.stock_qty,
+       (s.deleted_at IS NULL AND p.deleted_at IS NULL AND p.status = 'ACTIVE' AND s.stock_qty > 0)::boolean AS sellable
+FROM catalog.product_skus s JOIN catalog.products p ON p.id = s.product_id
+WHERE s.id = sqlc.arg(id) AND p.store_id = sqlc.arg(store_id);

@@ -5,27 +5,17 @@ package catalog
 import (
 	"context"
 	"errors"
-	"fmt"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 	"uuid"
 
-	"github.com/riverqueue/river"
-
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/restock"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
-const (
-	kindSku   = "catalog.restock_sku"
-	kindStore = "catalog.restock_store"
-	kindPurge = "catalog.restock_purge"
-)
-
-// stocked 建一個商品（一個 SKU，庫存 stock），active 為真就切成 ACTIVE，回傳商品與它的 SKU。建立與上架可能排出的 job 都清掉，測試從乾淨的 job 表開始。
+// stocked 建一個商品（一個 SKU，庫存 stock），active 為真就切成 ACTIVE，回傳商品與它的 SKU。建立與上架可能排出的佇列列都清掉，測試從乾淨的佇列開始。
 func (f *productFixture) stocked(storeID, acct int64, title string, stock int32, active bool) (Product, uuid.UUID) {
 	f.t.Helper()
 	in := f.input(title)
@@ -34,26 +24,54 @@ func (f *productFixture) stocked(storeID, acct int64, title string, stock int32,
 	if active {
 		f.activate(storeID, p.ID)
 	}
-	f.clearJobs()
+	f.clearQueues()
 	return p, p.Skus[0].ID
 }
 
-func (f *productFixture) clearJobs() {
+func (f *productFixture) clearQueues() {
 	f.t.Helper()
-	f.exec(`DELETE FROM river.river_job`)
-	f.exec(`DELETE FROM catalog.restock_pending`)
+	f.exec(`DELETE FROM catalog.restock_queue`)
+	f.exec(`DELETE FROM catalog.restock_purge_queue`)
 }
 
-// jobsOf 回傳這個種類的 job 數，idKey 與 id 非空時只算參數裡 idKey 等於 id 的。
-func (f *productFixture) jobsOf(kind string, idKey string, id any) int {
+// queued 回傳 SKU 在補貨佇列的列數（0 或 1）。
+func (f *productFixture) queued(sku uuid.UUID) int {
 	f.t.Helper()
-	if idKey == "" {
-		return f.count(`SELECT count(*) FROM river.river_job WHERE kind = $1`, kind)
+	return f.count(`SELECT count(*) FROM catalog.restock_queue WHERE sku_id = $1`, sku)
+}
+
+type queueRow struct {
+	DueAt, RequestedAt time.Time
+	ClaimedUntil       *time.Time
+	Attempts           int32
+	LastError          *string
+	FailedAt           *time.Time
+}
+
+func (f *productFixture) row(table string, sku uuid.UUID) queueRow {
+	f.t.Helper()
+	var r queueRow
+	err := f.d.Pool().QueryRow(f.ct, `SELECT due_at, requested_at, claimed_until, attempts, last_error, failed_at FROM catalog.`+table+` WHERE sku_id = $1`, sku).
+		Scan(&r.DueAt, &r.RequestedAt, &r.ClaimedUntil, &r.Attempts, &r.LastError, &r.FailedAt)
+	if err != nil {
+		f.t.Fatalf("%s row of %v: %v", table, sku, err)
 	}
-	return f.count(`SELECT count(*) FROM river.river_job WHERE kind = $1 AND args ->> $2 = $3::text`, kind, idKey, fmt.Sprint(id))
+	return r
 }
 
-func (f *productFixture) skuJobs(sku uuid.UUID) int { return f.jobsOf(kindSku, "sku_id", sku) }
+// arm 讓 SKU 在補貨佇列有一列此刻就到期、沒被認領的請求（不經偵測，隔離 worker 的行為）。
+func (f *productFixture) arm(sku uuid.UUID) {
+	f.t.Helper()
+	f.exec(`INSERT INTO catalog.restock_queue (sku_id, due_at, requested_at) VALUES ($1, $2, $2)
+		ON CONFLICT (sku_id) DO UPDATE SET due_at = $2, requested_at = $2, claimed_until = NULL, attempts = 0, last_error = NULL, failed_at = NULL`, sku, f.clock())
+}
+
+func (f *productFixture) run() {
+	f.t.Helper()
+	if err := f.m.restock.Run(f.ct); err != nil {
+		f.t.Fatal(err)
+	}
+}
 
 func (f *productFixture) setStock(storeID int64, sku uuid.UUID, quantity, expected int32) {
 	f.t.Helper()
@@ -62,7 +80,7 @@ func (f *productFixture) setStock(storeID int64, sku uuid.UUID, quantity, expect
 	}
 }
 
-func TestRestockJobIsEnqueuedOnEveryZeroToPurchasablePath(t *testing.T) {
+func TestRestockIsEnqueuedOnEveryZeroToPurchasablePath(t *testing.T) {
 	t.Parallel()
 	type env struct {
 		f       *productFixture
@@ -71,7 +89,7 @@ func TestRestockJobIsEnqueuedOnEveryZeroToPurchasablePath(t *testing.T) {
 	}
 	paths := []struct {
 		name  string
-		setup func(e *env) // 讓 SKU 在 ACTIVE、可曝光的店家處於庫存 0（或要上架的草稿）
+		setup func(e *env) // 讓 SKU 在 ACTIVE、可曝光的店家處於庫存 0
 		act   func(e *env) error
 	}{
 		{"SetStock", func(e *env) {}, func(e *env) error {
@@ -86,7 +104,7 @@ func TestRestockJobIsEnqueuedOnEveryZeroToPurchasablePath(t *testing.T) {
 			if err := e.f.m.DeductStock(e.f.ct, "order-1", []StockItem{{SkuID: e.sku, Quantity: 3}}); err != nil {
 				e.f.t.Fatal(err)
 			}
-			e.f.clearJobs()
+			e.f.clearQueues()
 		}, func(e *env) error {
 			return e.f.m.RestoreStock(e.f.ct, "restore-1", "order-1", nil)
 		}},
@@ -99,27 +117,24 @@ func TestRestockJobIsEnqueuedOnEveryZeroToPurchasablePath(t *testing.T) {
 			_, sku := f.stocked(storeID, acct, "補貨", 0, true)
 			e := &env{f: f, storeID: storeID, sku: sku}
 			p.setup(e)
-			if got := f.skuJobs(sku); got != 0 {
-				t.Fatalf("no job before the transition: %d", got)
+			if got := f.queued(sku); got != 0 {
+				t.Fatalf("no row before the transition: %d", got)
 			}
 			if err := p.act(e); err != nil {
 				t.Fatal(err)
 			}
-			if got := f.skuJobs(sku); got != 1 {
-				t.Fatalf("0 -> purchasable must enqueue exactly one job for the SKU, got %d", got)
+			if got := f.queued(sku); got != 1 {
+				t.Fatalf("0 -> purchasable must enqueue exactly one row for the SKU, got %d", got)
 			}
-			var at time.Time
-			if err := f.d.Pool().QueryRow(f.ct, `SELECT scheduled_at FROM river.river_job WHERE kind = $1`, kindSku).Scan(&at); err != nil {
-				t.Fatal(err)
-			}
-			if want := f.clock().Add(restock.Delay); !at.Equal(want) {
-				t.Fatalf("the job is delayed by %v from the request clock: scheduled_at = %v, want %v", restock.Delay, at, want)
+			r := f.row("restock_queue", sku)
+			if want := f.clock().Add(restock.Delay); !r.DueAt.Equal(want) || r.ClaimedUntil != nil || r.Attempts != 0 || r.FailedAt != nil {
+				t.Fatalf("the row is due %v after the request clock, unclaimed, no failures: %+v, want due %v", restock.Delay, r, want)
 			}
 		})
 	}
 }
 
-func TestRestockJobIsEnqueuedWhenAProductBecomesActiveWithStock(t *testing.T) {
+func TestRestockIsEnqueuedWhenAProductBecomesActiveWithStock(t *testing.T) {
 	t.Parallel()
 	for _, from := range []ProductStatus{StatusDraft, StatusArchived} {
 		t.Run(string(from), func(t *testing.T) {
@@ -131,17 +146,50 @@ func TestRestockJobIsEnqueuedWhenAProductBecomesActiveWithStock(t *testing.T) {
 				if err := setStatusP(f.m, f.ct, storeID, p.ID, StatusArchived); err != nil {
 					t.Fatal(err)
 				}
-				f.clearJobs()
+				f.clearQueues()
 			}
 			f.activate(storeID, p.ID)
-			if got := f.skuJobs(sku); got != 1 {
-				t.Fatalf("%s -> ACTIVE with stock must enqueue a job, got %d", from, got)
+			if got := f.queued(sku); got != 1 {
+				t.Fatalf("%s -> ACTIVE with stock must enqueue a row, got %d", from, got)
+			}
+			f.advance(restock.Delay)
+			f.run()
+			if got := f.rn.skus(); !slices.Equal(got, []uuid.UUID{sku}) {
+				t.Fatalf("the activated stocked SKU is notified, got %v", got)
 			}
 		})
 	}
 }
 
-func TestRestockJobIsNotEnqueuedWithoutAZeroToPurchasableTransition(t *testing.T) {
+// 商品切成 ACTIVE 與另一個 SKU 的 0 到正庫存並行時，兩邊的 transaction 互相看不到對方：啟用不讀庫存，每個沒刪除的 SKU 都排，執行時再確認。
+func TestActivationEnqueuesEveryLiveSkuRegardlessOfStock(t *testing.T) {
+	t.Parallel()
+	f := newProductFixture(t)
+	storeID, acct := f.store()
+	in := f.input("並行啟用")
+	in.Axes = []Axis{{Name: "尺寸", Values: []string{"S", "M", "L"}}}
+	in.Skus = []SkuInput{{Option1: "S", Price: 100}, {Option1: "M", Price: 100}, {Option1: "L", Price: 100}}
+	p := f.create(storeID, acct, in)
+	f.clearQueues()
+	f.activate(storeID, p.ID)
+	for _, sk := range p.Skus {
+		if got := f.queued(sk.ID); got != 1 {
+			t.Fatalf("SKU %v has no stock but the activation must still enqueue it, got %d rows", sk.ID, got)
+		}
+	}
+	// 沒有庫存的 SKU 在執行時不可買，不通知；這時其中一個 SKU 已經補貨（模擬與啟用並行的庫存變更）才會通知。
+	f.setStock(storeID, p.Skus[1].ID, 6, 0)
+	f.advance(restock.Delay)
+	f.run()
+	if got := f.rn.skus(); !slices.Equal(got, []uuid.UUID{p.Skus[1].ID}) {
+		t.Fatalf("only the SKU that has stock when the worker runs is notified, got %v", got)
+	}
+	if got := f.count(`SELECT count(*) FROM catalog.restock_queue`); got != 0 {
+		t.Fatalf("every processed row is deleted, %d left", got)
+	}
+}
+
+func TestRestockIsNotEnqueuedWithoutAZeroToPurchasableTransition(t *testing.T) {
 	t.Parallel()
 	f := newProductFixture(t)
 	storeID, acct := f.store()
@@ -158,14 +206,14 @@ func TestRestockJobIsNotEnqueuedWithoutAZeroToPurchasableTransition(t *testing.T
 	if err := f.m.RestoreStock(f.ct, "restore-pos", "order-pos", nil); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.skuJobs(sku); got != 0 {
-		t.Fatalf("stock > 0 to > 0 must not enqueue, got %d", got)
+	if got := f.queued(sku); got != 0 {
+		t.Fatalf("stock > 0 to > 0 must not enqueue a row, got %d", got)
 	}
 
 	// 庫存減少（到 0）不排。
 	f.setStock(storeID, sku, 0, 10)
-	if got := f.skuJobs(sku); got != 0 {
-		t.Fatalf("a decrease to 0 must not enqueue, got %d", got)
+	if got := f.queued(sku); got != 0 {
+		t.Fatalf("a decrease to 0 must not enqueue a row, got %d", got)
 	}
 
 	// 草稿與已下架的商品庫存 0 -> >0：不可買，不排。
@@ -178,8 +226,8 @@ func TestRestockJobIsNotEnqueuedWithoutAZeroToPurchasableTransition(t *testing.T
 			}
 		}
 		f.setStock(storeID, s, 5, 0)
-		if got := f.skuJobs(s); got != 0 {
-			t.Fatalf("a %s product is not purchasable, got %d jobs", st, got)
+		if got := f.queued(s); got != 0 {
+			t.Fatalf("a %s product is not purchasable, got %d rows", st, got)
 		}
 	}
 
@@ -188,8 +236,8 @@ func TestRestockJobIsNotEnqueuedWithoutAZeroToPurchasableTransition(t *testing.T
 	_, s2 := f.stocked(other, otherAcct, "不曝光", 0, true)
 	f.setExposable(other, false)
 	f.setStock(other, s2, 5, 0)
-	if got := f.skuJobs(s2); got != 0 {
-		t.Fatalf("a store that is not exposable makes the SKU not purchasable, got %d jobs", got)
+	if got := f.queued(s2); got != 0 {
+		t.Fatalf("a store that is not exposable makes the SKU not purchasable, got %d rows", got)
 	}
 
 	// 已刪除的商品：SKU 還能歸還庫存（原扣減仍可歸還），但不可買，不排。
@@ -200,16 +248,16 @@ func TestRestockJobIsNotEnqueuedWithoutAZeroToPurchasableTransition(t *testing.T
 	if err := f.m.DeleteProduct(f.ct, storeID, p3.ID, 0); err != nil {
 		t.Fatal(err)
 	}
-	f.clearJobs()
+	f.clearQueues()
 	if err := f.m.RestoreStock(f.ct, "restore-deleted", "order-deleted", nil); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.skuJobs(s3); got != 0 {
-		t.Fatalf("a deleted SKU is not purchasable, got %d jobs", got)
+	if got := f.queued(s3); got != 0 {
+		t.Fatalf("a deleted SKU is not purchasable, got %d rows", got)
 	}
 }
 
-func TestRestockJobIsEnqueuedInTheCallersTransaction(t *testing.T) {
+func TestRestockIsEnqueuedInTheCallersTransaction(t *testing.T) {
 	t.Parallel()
 	f := newProductFixture(t)
 	storeID, acct := f.store()
@@ -220,14 +268,13 @@ func TestRestockJobIsEnqueuedInTheCallersTransaction(t *testing.T) {
 		if err := f.m.SetStock(ctx, storeID, "tx-1", sku, 5, 0); err != nil {
 			return err
 		}
-		// 同一個 transaction 內已經看得到排入的 job（和庫存一起在途），回滾後兩者都沒有。
 		return errRollback
 	})
 	if !errors.Is(err, errRollback) {
 		t.Fatalf("transaction error = %v", err)
 	}
-	if got := f.skuJobs(sku); got != 0 {
-		t.Fatalf("a rolled-back transaction must leave no job, got %d", got)
+	if got := f.queued(sku); got != 0 {
+		t.Fatalf("a rolled-back transaction must leave no row, got %d", got)
 	}
 	var stock int32
 	if err := f.d.Pool().QueryRow(f.ct, `SELECT stock_qty FROM catalog.product_skus WHERE id = $1`, sku).Scan(&stock); err != nil || stock != 0 {
@@ -237,132 +284,169 @@ func TestRestockJobIsEnqueuedInTheCallersTransaction(t *testing.T) {
 	if err := f.d.InTx(f.ct, func(ctx context.Context) error { return f.m.SetStock(ctx, storeID, "tx-2", sku, 5, 0) }); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.skuJobs(sku); got != 1 {
-		t.Fatalf("a committed transaction leaves the job, got %d", got)
+	if got := f.queued(sku); got != 1 {
+		t.Fatalf("a committed transaction leaves the row, got %d", got)
 	}
 }
 
-func TestRestockJobsOfTheSameSkuMergeWhileNotStarted(t *testing.T) {
+func TestRestockTransitionsWithinTheWindowCoalesceIntoOneNotification(t *testing.T) {
 	t.Parallel()
 	f := newProductFixture(t)
 	storeID, acct := f.store()
 	_, sku := f.stocked(storeID, acct, "合併", 0, true)
 	f.setStock(storeID, sku, 5, 0)
+	first := f.row("restock_queue", sku)
+	f.advance(time.Minute)
 	f.setStock(storeID, sku, 0, 5)
 	f.setStock(storeID, sku, 3, 0)
-	if got := f.skuJobs(sku); got != 1 {
-		t.Fatalf("two transitions before the job starts merge into one job, got %d", got)
+	if got := f.count(`SELECT count(*) FROM catalog.restock_queue`); got != 1 {
+		t.Fatalf("transitions of the same SKU share one row, got %d", got)
 	}
-	if got := f.count(`SELECT count(*) FROM catalog.restock_pending WHERE job_key = $1`, "sku:"+sku.String()); got != 1 {
-		t.Fatalf("one pending marker stands for the not-yet-started job, got %d", got)
+	if r := f.row("restock_queue", sku); !r.DueAt.Equal(first.DueAt) || !r.RequestedAt.Equal(first.RequestedAt) {
+		t.Fatalf("an unclaimed row is left as it is (earliest due, original request): %+v, first %+v", r, first)
+	}
+
+	f.run() // 還沒到期
+	if len(f.rn.skus()) != 0 {
+		t.Fatalf("not due yet: %v", f.rn.skus())
+	}
+	f.advance(restock.Delay)
+	f.run()
+	f.run()
+	if got := f.rn.skus(); !slices.Equal(got, []uuid.UUID{sku}) {
+		t.Fatalf("two transitions in the window notify once, got %v", got)
+	}
+	if got := f.queued(sku); got != 0 {
+		t.Fatalf("a notified row is deleted, got %d", got)
 	}
 }
 
-// 一個 SKU 的 job 正在執行（River 的 running）時又發生 0 到大於 0 的轉換：它不能被執行中的 job 吞掉（D26：只合併還沒開始的 job）。
-// 做法：第一個 job 標成 running，通知呼叫（發生在 job 開始之後）內做第二次轉換；第二次轉換必須排出自己的 job。
-func TestRestockTransitionWhileTheSkuJobIsRunningIsNotLost(t *testing.T) {
+// 處理中（已被認領）的列又來新轉換：完成時不能刪掉它，要重新排，第二次轉換才不會遺失。
+func TestRestockTransitionWhileTheRowIsClaimedIsNotLost(t *testing.T) {
 	t.Parallel()
 	f := newProductFixture(t)
 	storeID, acct := f.store()
-	_, sku := f.stocked(storeID, acct, "執行中", 0, true)
+	_, sku := f.stocked(storeID, acct, "處理中", 0, true)
 	f.setStock(storeID, sku, 5, 0)
-	f.exec(`UPDATE river.river_job SET state = 'running', attempt = 1, attempted_at = now(), attempted_by = ARRAY['test'] WHERE kind = $1`, kindSku)
+	f.advance(restock.Delay)
 	f.rn.onNotify = func() {
+		// 時鐘不動：兩次請求的時間相同，requested_at 仍要不同。
 		f.setStock(storeID, sku, 0, 5)
 		f.setStock(storeID, sku, 3, 0)
 	}
-	if err := f.m.restock.RunSku(f.ct, sku); err != nil {
-		t.Fatal(err)
-	}
-	if got := f.skuJobs(sku); got != 2 {
-		t.Fatalf("the transition during the running job enqueues its own job: running one + new one = 2, got %d", got)
-	}
-	if got := f.count(`SELECT count(*) FROM river.river_job WHERE kind = $1 AND state <> 'running'`, kindSku); got != 1 {
-		t.Fatalf("exactly one not-started job carries the second transition, got %d", got)
-	}
+	f.run()
 	f.rn.onNotify = nil
-	if err := f.m.restock.RunSku(f.ct, sku); err != nil {
-		t.Fatal(err)
+	if got := len(f.rn.skus()); got != 1 {
+		t.Fatalf("first run notifies once, got %d", got)
 	}
-	if got := f.rn.skus(); len(got) != 2 {
-		t.Fatalf("the second job notifies again for the second transition, got %d notifications", len(got))
+	if got := f.queued(sku); got != 1 {
+		t.Fatalf("the transition during processing keeps the row, got %d rows", got)
 	}
-}
-
-// 店家層的 job 同樣只合併還沒開始的：開始（消耗標記）之後的再次曝光排自己的 job。
-func TestStoreExposureAfterTheStoreJobStartedEnqueuesANewJob(t *testing.T) {
-	t.Parallel()
-	f := newProductFixture(t)
-	storeID, _ := f.store()
-	for range 2 {
-		if err := f.m.restock.StoreExposed(f.ct, storeID); err != nil {
-			t.Fatal(err)
-		}
+	r := f.row("restock_queue", sku)
+	if want := f.clock().Add(restock.Delay); r.ClaimedUntil != nil || !r.DueAt.Equal(want) || r.Attempts != 0 {
+		t.Fatalf("the row is re-armed (unclaimed, due %v): %+v", want, r)
 	}
-	if got := f.jobsOf(kindStore, "store_id", storeID); got != 1 {
-		t.Fatalf("exposures before the store job starts merge, got %d", got)
+	f.run() // 重新排的延後還沒過
+	if got := len(f.rn.skus()); got != 1 {
+		t.Fatalf("the re-armed row waits out the delay, got %d notifications", got)
 	}
-	if err := f.m.restock.RunStore(f.ct, storeID); err != nil {
-		t.Fatal(err)
+	f.advance(restock.Delay)
+	f.run()
+	if got := f.rn.skus(); !slices.Equal(got, []uuid.UUID{sku, sku}) {
+		t.Fatalf("the second transition is notified later, got %v", got)
 	}
-	if err := f.m.restock.StoreExposed(f.ct, storeID); err != nil {
-		t.Fatal(err)
-	}
-	if got := f.jobsOf(kindStore, "store_id", storeID); got != 2 {
-		t.Fatalf("an exposure after the job started enqueues a new job, got %d", got)
+	if got := f.queued(sku); got != 0 {
+		t.Fatalf("done, got %d rows", got)
 	}
 }
 
-func TestRestockJobNotifiesWithTheLatestSnapshotOfTheSkuThatChanged(t *testing.T) {
+// worker 認領後 crash：租約沒過不重複處理，租約過了重新處理。
+func TestRestockClaimedRowIsReprocessedOnlyAfterTheLeaseExpires(t *testing.T) {
 	t.Parallel()
 	f := newProductFixture(t)
 	storeID, acct := f.store()
-	in := f.input("舊名")
-	in.Axes = []Axis{{Name: "尺寸", Values: []string{"S", "M"}}}
-	in.Skus = []SkuInput{{Option1: "S", Price: 100}, {Option1: "M", Price: 100}}
-	p := f.create(storeID, acct, in)
-	f.activate(storeID, p.ID)
-	restocked, sibling := p.Skus[0].ID, p.Skus[1].ID
-	f.clearJobs()
-
-	f.setStock(storeID, restocked, 5, 0)
-	if f.skuJobs(sibling) != 0 || f.skuJobs(restocked) != 1 {
-		t.Fatalf("only the restocked SKU gets a job: sibling %d, restocked %d", f.skuJobs(sibling), f.skuJobs(restocked))
-	}
-
-	// job 執行前商品改名換主圖：通知帶的是執行當下的最新快照。
-	in2 := in
-	in2.Title = "新名"
-	in2.Gallery = []Image{{Token: "restock-new-cover"}}
-	if _, err := updateP(f.m, f.ct, storeID, media.Uploader{ID: acct}, p.ID, in2); err != nil {
-		t.Fatal(err)
-	}
+	_, sku := f.stocked(storeID, acct, "crash", 0, true)
+	f.setStock(storeID, sku, 5, 0)
 	f.advance(restock.Delay)
-	if err := f.m.restock.RunSku(f.ct, restocked); err != nil {
-		t.Fatal(err)
-	}
-	if len(f.rn.notified) != 1 {
-		t.Fatalf("one notification, got %+v", f.rn.notified)
-	}
-	got := f.rn.notified[0]
-	var coverKey string
-	if err := f.d.Pool().QueryRow(f.ct, `SELECT object_key FROM catalog.product_images WHERE product_id = $1 AND kind = 'GALLERY' ORDER BY position LIMIT 1`, p.ID).Scan(&coverKey); err != nil {
-		t.Fatal(err)
-	}
-	if got.SKUID != restocked || got.ProductID != p.ID || got.StoreID != storeID || got.Name != "新名" || got.ImageKey != coverKey || coverKey == "" || !got.OccurredAt.Equal(f.clock()) {
-		t.Fatalf("notification = %+v, want sku %v product %v store %d name 新名 image %q at %v", got, restocked, p.ID, storeID, coverKey, f.clock())
-	}
+	f.exec(`UPDATE catalog.restock_queue SET claimed_until = $2 WHERE sku_id = $1`, sku, f.clock().Add(restock.Lease))
 
-	// 同商品的另一個 SKU 還是 0：它的 job（就算被誤排）也不通知。
-	if err := f.m.restock.RunSku(f.ct, sibling); err != nil {
-		t.Fatal(err)
+	f.run()
+	if got := len(f.rn.skus()); got != 0 {
+		t.Fatalf("a row under a live lease belongs to its worker, got %d notifications", got)
 	}
-	if !slices.Equal(f.rn.skus(), []uuid.UUID{restocked}) {
-		t.Fatalf("only the restocked SKU is notified, got %v", f.rn.skus())
+	f.advance(restock.Lease - time.Second)
+	f.run()
+	if got := len(f.rn.skus()); got != 0 {
+		t.Fatalf("the lease has not expired yet, got %d notifications", got)
+	}
+	f.advance(2 * time.Second)
+	f.run()
+	if got := f.rn.skus(); !slices.Equal(got, []uuid.UUID{sku}) {
+		t.Fatalf("an expired lease is reclaimed and processed, got %v", got)
+	}
+	if got := f.queued(sku); got != 0 {
+		t.Fatalf("processed, got %d rows", got)
 	}
 }
 
-func TestRestockJobRechecksPurchasabilityWhenItRuns(t *testing.T) {
+func TestRestockNotifierFailureBacksOffAndStopsAtMaxAttempts(t *testing.T) {
+	t.Parallel()
+	f := newProductFixture(t)
+	storeID, acct := f.store()
+	_, sku := f.stocked(storeID, acct, "失敗", 0, true)
+	f.setStock(storeID, sku, 5, 0)
+	f.advance(restock.Delay)
+	f.rn.failNotify = errors.New("fanout down")
+
+	for attempt := int32(1); attempt <= restock.MaxAttempts; attempt++ {
+		f.run()
+		r := f.row("restock_queue", sku)
+		if r.Attempts != attempt || r.ClaimedUntil != nil || r.LastError == nil || !strings.Contains(*r.LastError, "fanout down") {
+			t.Fatalf("attempt %d: the failure is recorded on the same row: %+v", attempt, r)
+		}
+		if want := f.clock().Add(restock.Backoff(attempt)); !r.DueAt.Equal(want) {
+			t.Fatalf("attempt %d: due %v, want %v (exponential backoff)", attempt, r.DueAt, want)
+		}
+		if got := len(f.rn.notified); got != int(attempt) {
+			t.Fatalf("attempt %d: %d calls", attempt, got)
+		}
+		if attempt < restock.MaxAttempts {
+			f.run() // 退避中不重試
+			if got := len(f.rn.notified); got != int(attempt) {
+				t.Fatalf("attempt %d: retried before the backoff passed, %d calls", attempt, got)
+			}
+			if r.FailedAt != nil {
+				t.Fatalf("attempt %d: not stopped yet: %+v", attempt, r)
+			}
+		}
+		f.advance(restock.Backoff(attempt))
+	}
+	r := f.row("restock_queue", sku)
+	if r.FailedAt == nil || r.Attempts != restock.MaxAttempts {
+		t.Fatalf("after %d failures the row stops: %+v", restock.MaxAttempts, r)
+	}
+	f.advance(24 * time.Hour)
+	f.run()
+	if got := len(f.rn.notified); got != restock.MaxAttempts {
+		t.Fatalf("a stopped row is not retried, %d calls", got)
+	}
+
+	// 恢復之後的新轉換重置停手的列，並且通知得出去。
+	f.rn.failNotify = nil
+	f.setStock(storeID, sku, 0, 5)
+	f.setStock(storeID, sku, 2, 0)
+	r = f.row("restock_queue", sku)
+	if r.FailedAt != nil || r.Attempts != 0 || r.LastError != nil {
+		t.Fatalf("a new request resets a stopped row: %+v", r)
+	}
+	f.advance(restock.Delay)
+	f.run()
+	if got := len(f.rn.notified); got != restock.MaxAttempts+1 || f.queued(sku) != 0 {
+		t.Fatalf("the reset row notifies and is deleted: %d calls, %d rows", got, f.queued(sku))
+	}
+}
+
+func TestRestockRechecksPurchasabilityWhenItRuns(t *testing.T) {
 	t.Parallel()
 	f := newProductFixture(t)
 	storeID, acct := f.store()
@@ -381,89 +465,70 @@ func TestRestockJobRechecksPurchasabilityWhenItRuns(t *testing.T) {
 			}
 		}, func() { f.activate(storeID, p.ID) }},
 		{"store not exposable", func() { f.setExposable(storeID, false) }, func() { f.setExposable(storeID, true) }},
+		{"product deleted", func() {
+			if err := f.m.DeleteProduct(f.ct, storeID, p.ID, 0); err != nil {
+				t.Fatal(err)
+			}
+		}, func() {}},
 	}
 	for _, c := range cases {
+		f.clearQueues()
+		f.arm(sku)
 		c.change()
-		if err := f.m.restock.RunSku(f.ct, sku); err != nil {
-			t.Fatal(err)
-		}
+		f.run()
 		if got := f.rn.skus(); len(got) != 0 {
-			t.Fatalf("%s: a job that finds the SKU not purchasable must not notify, got %v", c.name, got)
+			t.Fatalf("%s: a row whose SKU is not purchasable must not notify, got %v", c.name, got)
+		}
+		if got := f.queued(sku); got != 0 {
+			t.Fatalf("%s: the row is deleted, got %d", c.name, got)
 		}
 		c.undo()
 	}
-
-	if err := f.m.DeleteProduct(f.ct, storeID, p.ID, 0); err != nil {
-		t.Fatal(err)
-	}
-	if err := f.m.restock.RunSku(f.ct, sku); err != nil {
-		t.Fatal(err)
-	}
-	if got := f.rn.skus(); len(got) != 0 {
-		t.Fatalf("a deleted product must not notify, got %v", got)
-	}
 }
 
-func TestStoreExposureEnqueuesOneStoreJobThatNotifiesOnlyPurchasableSkus(t *testing.T) {
+func TestRestockNotifiesWithTheLatestSnapshotOfTheSkuThatChanged(t *testing.T) {
 	t.Parallel()
 	f := newProductFixture(t)
 	storeID, acct := f.store()
-	_, buyable := f.stocked(storeID, acct, "可買", 5, true)
-	_, soldOut := f.stocked(storeID, acct, "售完", 0, true)
-	_, draft := f.stocked(storeID, acct, "草稿", 5, false)
-	other, otherAcct := f.store()
-	_, elsewhere := f.stocked(other, otherAcct, "別家店", 5, true)
+	in := f.input("舊名")
+	in.Axes = []Axis{{Name: "尺寸", Values: []string{"S", "M"}}}
+	in.Skus = []SkuInput{{Option1: "S", Price: 100}, {Option1: "M", Price: 100}}
+	p := f.create(storeID, acct, in)
+	f.activate(storeID, p.ID)
+	restocked, sibling := p.Skus[0].ID, p.Skus[1].ID
+	f.clearQueues()
 
-	f.setExposable(storeID, false)
-	f.clearJobs()
-	f.setExposable(storeID, true)
-
-	event := func(exposable bool) seller.StoreExposureChanged {
-		return seller.StoreExposureChanged{OccurredAt: f.clock(), EventID: uuid.NewV7(), StoreID: storeID, Exposable: exposable, Version: 2}
-	}
-	if err := f.m.OnStoreExposureChanged(f.ct, event(false)); err != nil {
-		t.Fatal(err)
-	}
-	if got := f.jobsOf(kindStore, "", nil); got != 0 {
-		t.Fatalf("a store that stops being exposable enqueues nothing, got %d", got)
-	}
-	if err := f.m.OnStoreExposureChanged(f.ct, event(true)); err != nil {
-		t.Fatal(err)
-	}
-	if err := f.m.OnStoreExposureChanged(f.ct, event(true)); err != nil {
-		t.Fatal(err)
-	}
-	if got := f.jobsOf(kindStore, "store_id", storeID); got != 1 {
-		t.Fatalf("one store-level job (merged), got %d", got)
-	}
-	if got := f.jobsOf(kindSku, "", nil); got != 0 {
-		t.Fatalf("the SKUs are not expanded inside the event's transaction, got %d SKU jobs", got)
+	f.setStock(storeID, restocked, 5, 0)
+	if f.queued(sibling) != 0 || f.queued(restocked) != 1 {
+		t.Fatalf("only the restocked SKU gets a row: sibling %d, restocked %d", f.queued(sibling), f.queued(restocked))
 	}
 
-	if err := f.m.restock.RunStore(f.ct, storeID); err != nil {
+	// worker 執行前商品改名換主圖：通知帶的是執行當下的最新快照。
+	in2 := in
+	in2.Title = "新名"
+	in2.Gallery = []Image{{Token: "restock-new-cover"}}
+	if _, err := updateP(f.m, f.ct, storeID, media.Uploader{ID: acct}, p.ID, in2); err != nil {
 		t.Fatal(err)
 	}
-	if f.skuJobs(buyable) != 1 || f.skuJobs(soldOut) != 0 || f.skuJobs(draft) != 0 || f.skuJobs(elsewhere) != 0 {
-		t.Fatalf("the store job expands to the store's purchasable SKUs only: buyable %d, sold out %d, draft %d, other store %d",
-			f.skuJobs(buyable), f.skuJobs(soldOut), f.skuJobs(draft), f.skuJobs(elsewhere))
+	f.advance(restock.Delay)
+	f.run()
+	if len(f.rn.notified) != 1 {
+		t.Fatalf("one notification, got %+v", f.rn.notified)
 	}
-	for _, sku := range []uuid.UUID{buyable, soldOut, draft} {
-		if err := f.m.restock.RunSku(f.ct, sku); err != nil {
-			t.Fatal(err)
-		}
+	got := f.rn.notified[0]
+	var coverKey string
+	if err := f.d.Pool().QueryRow(f.ct, `SELECT object_key FROM catalog.product_images WHERE product_id = $1 AND kind = 'GALLERY' ORDER BY position LIMIT 1`, p.ID).Scan(&coverKey); err != nil {
+		t.Fatal(err)
 	}
-	if !slices.Equal(f.rn.skus(), []uuid.UUID{buyable}) {
-		t.Fatalf("only the purchasable SKU is notified, got %v", f.rn.skus())
+	if got.SKUID != restocked || got.ProductID != p.ID || got.StoreID != storeID || got.Name != "新名" || got.ImageKey != coverKey || coverKey == "" || !got.OccurredAt.Equal(f.clock()) {
+		t.Fatalf("notification = %+v, want sku %v product %v store %d name 新名 image %q at %v", got, restocked, p.ID, storeID, coverKey, f.clock())
 	}
 
-	// 店家此刻不可曝光時展開不出任何 SKU。
-	f.clearJobs()
-	f.setExposable(storeID, false)
-	if err := f.m.restock.RunStore(f.ct, storeID); err != nil {
-		t.Fatal(err)
-	}
-	if got := f.jobsOf(kindSku, "", nil); got != 0 {
-		t.Fatalf("a store that is not exposable expands to nothing, got %d", got)
+	// 同商品的另一個 SKU 還是 0：它的列（就算被誤排）也不通知。
+	f.arm(sibling)
+	f.run()
+	if !slices.Equal(f.rn.skus(), []uuid.UUID{restocked}) {
+		t.Fatalf("only the restocked SKU is notified, got %v", f.rn.skus())
 	}
 }
 
@@ -475,29 +540,20 @@ func TestDeletingAProductOrSkuEnqueuesAPurgeOfItsSubscriptions(t *testing.T) {
 	in.Axes = []Axis{{Name: "尺寸", Values: []string{"S", "M"}}}
 	in.Skus = []SkuInput{{Option1: "S", Price: 100}, {Option1: "M", Price: 100}}
 	p := f.create(storeID, acct, in)
-	f.clearJobs()
+	f.clearQueues()
 
-	purged := func() [][]uuid.UUID {
+	// purged 處理佇列並回傳這一輪 port 收到的 SKU（排序後）。
+	purged := func() []uuid.UUID {
 		f.t.Helper()
 		f.rn.purged = nil
-		rows, err := f.d.Pool().Query(f.ct, `SELECT args FROM river.river_job WHERE kind = $1 ORDER BY id`, kindPurge)
-		if err != nil {
-			f.t.Fatal(err)
-		}
-		defer rows.Close()
-		var out [][]uuid.UUID
-		for rows.Next() {
-			var a restock.PurgeArgs
-			if err := rows.Scan(&a); err != nil {
-				f.t.Fatal(err)
-			}
-			out = append(out, a.SkuIDs)
-			if err := f.m.restock.RunPurge(f.ct, a.SkuIDs); err != nil {
-				f.t.Fatal(err)
-			}
+		f.run()
+		var out []uuid.UUID
+		for _, ids := range f.rn.purged {
+			out = append(out, ids...)
 		}
 		return out
 	}
+	queuedPurges := func() int { return f.count(`SELECT count(*) FROM catalog.restock_purge_queue`) }
 
 	// 修改商品拿掉一個 SKU：只清被拿掉的那個。
 	keep := in
@@ -506,136 +562,47 @@ func TestDeletingAProductOrSkuEnqueuesAPurgeOfItsSubscriptions(t *testing.T) {
 	if _, err := updateP(f.m, f.ct, storeID, media.Uploader{ID: acct}, p.ID, keep); err != nil {
 		t.Fatal(err)
 	}
-	var removed uuid.UUID
+	var removed, kept uuid.UUID
 	for _, sk := range p.Skus {
 		if sk.Option1 == "M" {
 			removed = sk.ID
+		} else {
+			kept = sk.ID
 		}
 	}
-	if got := purged(); len(got) != 1 || !slices.Equal(got[0], []uuid.UUID{removed}) || !slices.Equal(f.rn.purged[0], []uuid.UUID{removed}) {
-		t.Fatalf("removing a SKU purges exactly that SKU's subscriptions, got %v", got)
+	if got := f.count(`SELECT count(*) FROM catalog.restock_purge_queue WHERE sku_id = $1`, removed); got != 1 || queuedPurges() != 1 {
+		t.Fatalf("removing a SKU enqueues exactly that SKU's purge, got %d (total %d)", got, queuedPurges())
+	}
+	if got := purged(); !slices.Equal(got, []uuid.UUID{removed}) {
+		t.Fatalf("the worker purges exactly the removed SKU, got %v", got)
+	}
+	if got := queuedPurges(); got != 0 {
+		t.Fatalf("a purged row is deleted, got %d", got)
 	}
 
 	// 沒有拿掉 SKU 的修改不排。
-	f.clearJobs()
 	if _, err := updateP(f.m, f.ct, storeID, media.Uploader{ID: acct}, p.ID, keep); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.jobsOf(kindPurge, "", nil); got != 0 {
+	if got := queuedPurges(); got != 0 {
 		t.Fatalf("an update that keeps every SKU purges nothing, got %d", got)
 	}
 
-	// 刪除商品：清它還在的 SKU。
-	kept := p.Skus[0].ID
-	if p.Skus[0].Option1 != "S" {
-		kept = p.Skus[1].ID
-	}
+	// 刪除商品：清它還在的 SKU；清除失敗在同一列記錄並退避。
 	if err := f.m.DeleteProduct(f.ct, storeID, p.ID, 0); err != nil {
 		t.Fatal(err)
 	}
-	if got := purged(); len(got) != 1 || !slices.Equal(got[0], []uuid.UUID{kept}) {
+	f.rn.failPurge = errors.New("purge down")
+	if got := purged(); !slices.Equal(got, []uuid.UUID{kept}) {
 		t.Fatalf("deleting the product purges its remaining SKU, got %v", got)
 	}
-}
-
-// failingJobs 讓排入失敗，其餘轉給真的 River client。
-type failingJobs struct{ jobs.Tracker }
-
-var errEnqueue = errors.New("enqueue failed on purpose")
-
-func (failingJobs) EnqueueJob(context.Context, river.JobArgs, *river.InsertOpts) (int64, error) {
-	return 0, errEnqueue
-}
-
-// 排入失敗時標記不能留下：標記與 job 在同一個 transaction 內，沒有 transaction 的呼叫方也一樣（request 自己開）。
-// 留下的標記會讓之後每次轉換都以為有 job 而合併，通知永遠漏掉。
-func TestRestockEnqueueFailureLeavesNoMarker(t *testing.T) {
-	t.Parallel()
-	f := newProductFixture(t)
-	storeID, acct := f.store()
-	_, sku := f.stocked(storeID, acct, "排入失敗", 5, true)
-	failing := restock.New(restock.Deps{DB: f.d, Jobs: failingJobs{newJobs(t, f.d)}, Now: f.clock, Notifier: f.rn})
-
-	if err := failing.StockIncreased(f.ct, sku, 5); !errors.Is(err, errEnqueue) {
-		t.Fatalf("StockIncreased error = %v，預期排入的錯誤", err)
+	r := f.row("restock_purge_queue", kept)
+	if r.Attempts != 1 || r.ClaimedUntil != nil || r.LastError == nil || !r.DueAt.Equal(f.clock().Add(restock.Backoff(1))) {
+		t.Fatalf("a failed purge stays on its row with a backoff: %+v", r)
 	}
-	if err := failing.StoreExposed(f.ct, storeID); !errors.Is(err, errEnqueue) {
-		t.Fatalf("StoreExposed error = %v，預期排入的錯誤", err)
-	}
-	if got := f.count(`SELECT count(*) FROM catalog.restock_pending`); got != 0 {
-		t.Fatalf("a failed enqueue must leave no marker, got %d", got)
-	}
-	// 修好之後同一個轉換能排出 job。
-	if err := f.m.restock.StockIncreased(f.ct, sku, 5); err != nil {
-		t.Fatal(err)
-	}
-	if got := f.skuJobs(sku); got != 1 {
-		t.Fatalf("after the failure the next transition enqueues, got %d jobs", got)
-	}
-}
-
-// 標記綁著它的 job：job 已結束、取消或被刪就不會再消耗標記，下一次轉換要接手排新 job；
-// 還沒開始、執行中、等重試的 job 還會消耗標記，下一次轉換合併（不排新 job、標記仍綁原 job）。
-func TestRestockMarkerFollowsItsJob(t *testing.T) {
-	t.Parallel()
-	cases := []struct {
-		name     string
-		set      string // 對 river_job 的處理
-		takeover bool
-	}{
-		{"deleted", `DELETE FROM river.river_job WHERE kind = $1`, true},
-		{"cancelled", `UPDATE river.river_job SET state = 'cancelled', finalized_at = now() WHERE kind = $1`, true},
-		{"discarded", `UPDATE river.river_job SET state = 'discarded', finalized_at = now(), attempt = 1, attempted_at = now(), attempted_by = ARRAY['t'] WHERE kind = $1`, true},
-		{"completed", `UPDATE river.river_job SET state = 'completed', finalized_at = now(), attempt = 1, attempted_at = now(), attempted_by = ARRAY['t'] WHERE kind = $1`, true},
-		{"available", `UPDATE river.river_job SET state = 'available', scheduled_at = now() WHERE kind = $1`, false},
-		{"running", `UPDATE river.river_job SET state = 'running', attempt = 1, attempted_at = now(), attempted_by = ARRAY['t'] WHERE kind = $1`, false},
-		{"retryable", `UPDATE river.river_job SET state = 'retryable', attempt = 1, attempted_at = now(), attempted_by = ARRAY['t'], scheduled_at = now() + interval '1 minute' WHERE kind = $1`, false},
-	}
-	for _, kind := range []string{kindSku, kindStore} {
-		for _, c := range cases {
-			t.Run(kind+"/"+c.name, func(t *testing.T) {
-				t.Parallel()
-				f := newProductFixture(t)
-				storeID, acct := f.store()
-				_, sku := f.stocked(storeID, acct, "標記", 5, true)
-				key, transition := "sku:"+sku.String(), func() {
-					if err := f.m.restock.StockIncreased(f.ct, sku, 5); err != nil {
-						t.Fatal(err)
-					}
-				}
-				if kind == kindStore {
-					key, transition = fmt.Sprintf("store:%d", storeID), func() {
-						if err := f.m.restock.StoreExposed(f.ct, storeID); err != nil {
-							t.Fatal(err)
-						}
-					}
-				}
-				marker := func() int64 {
-					var id int64
-					if err := f.d.Pool().QueryRow(f.ct, `SELECT job_id FROM catalog.restock_pending WHERE job_key = $1`, key).Scan(&id); err != nil {
-						t.Fatal(err)
-					}
-					return id
-				}
-				transition()
-				first := marker()
-				f.exec(c.set, kind)
-				transition()
-				second := marker()
-				if c.takeover && second == first {
-					t.Fatalf("job is %s: the marker must be taken over by a new job, still bound to %d", c.name, first)
-				}
-				if !c.takeover && second != first {
-					t.Fatalf("job is %s and will still consume the marker: merge, but the marker moved %d -> %d", c.name, first, second)
-				}
-				// 標記綁的 job 一定存在且還會執行，且這個 kind 沒有第二個還會執行的 job。
-				if got := f.count(`SELECT count(*) FROM river.river_job WHERE id = $1 AND state IN ('pending','scheduled','available','running','retryable')`, second); got != 1 {
-					t.Fatalf("the marker's job %d must be live, got %d", second, got)
-				}
-				if got := f.count(`SELECT count(*) FROM river.river_job WHERE kind = $1 AND state IN ('pending','scheduled','available','running','retryable')`, kind); got != 1 {
-					t.Fatalf("exactly one live job per key, got %d", got)
-				}
-			})
-		}
+	f.rn.failPurge = nil
+	f.advance(restock.Backoff(1))
+	if got := purged(); !slices.Equal(got, []uuid.UUID{kept}) || queuedPurges() != 0 {
+		t.Fatalf("the retry purges and deletes the row, got %v (%d rows left)", got, queuedPurges())
 	}
 }

@@ -39,7 +39,7 @@ type productFixture struct {
 
 func newProductFixture(t *testing.T) *productFixture {
 	t.Helper()
-	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(
+	d := pg.NewDB(t, testdb.Migrations(
 		migrate.Module{Name: "media", Dir: media.Migrations()},
 		migrate.Module{Name: "buyer", Dir: buyer.Migrations()},
 		migrate.Module{Name: "seller", Dir: seller.Migrations()},
@@ -58,7 +58,7 @@ func newProductFixture(t *testing.T) *productFixture {
 
 // deps 是這個 fixture 的模組依賴；換 database 連線或 media 的測試用它組出另一個 Module。
 func (f *productFixture) deps(d *db.DB, m Media) Deps {
-	return Deps{DB: d, NewID: uuid.NewV7, Now: f.clock, Media: m, Jobs: newJobs(f.t, d), Restock: f.rn}
+	return Deps{DB: d, NewID: uuid.NewV7, Now: f.clock, Media: m, Restock: f.rn}
 }
 
 func (f *productFixture) clock() time.Time {

@@ -108,10 +108,11 @@ func (h *Public) SuggestProductNames(ctx context.Context, req *connect.Request[p
 	if err := checkMaxResults(msg.GetMaxResults()); err != nil {
 		return nil, err
 	}
-	if err := tooLong("query", msg.GetQuery(), maxSuggestRunes); err != nil {
+	query := normalizeQuery(msg.GetQuery())
+	if err := tooLong("query", query, maxSuggestRunes); err != nil {
 		return nil, err
 	}
-	names, err := h.m.SuggestProductNames(ctx, h.now(), msg.GetQuery(), msg.GetMaxResults())
+	names, err := h.m.SuggestProductNames(ctx, h.now(), query, msg.GetMaxResults())
 	if err != nil {
 		return nil, failure(err, noPaths)
 	}

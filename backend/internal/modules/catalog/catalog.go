@@ -19,9 +19,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/stock"
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/taxonomy"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
-	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
 //go:embed db/migrations/*.sql db/migrations/atlas.sum
@@ -87,6 +85,8 @@ type (
 	StockMismatchError = model.StockMismatchError
 	// Media 是 catalog 對 media 的依賴（*media.Module 與 *media.Fake 都滿足）。
 	Media = model.Media
+	// SkuState 是店家自己的一個 SKU 此刻的內容與可購買性（含已刪除的）。
+	SkuState = model.SkuState
 	// SalesItem 是一筆訂單裡一個商品的銷量。
 	SalesItem = model.SalesItem
 	// RestockedSKU 是 SKU 由不可買變可買時，通知用的最新快照。
@@ -169,9 +169,7 @@ type Deps struct {
 	Now func() time.Time
 	// Media 是 media 模組；新圖的 Confirm 與退場資產的 MarkDeleted 在商品寫入的 transaction 內呼叫。
 	Media Media
-	// Jobs 排入補貨通知的 job；在呼叫方的 transaction 內排入時與資料一起 commit 或回滾（單體規則 4）。
-	Jobs jobs.Tracker
-	// Restock 是補貨通知的下游：catalog 的 job 在 transaction 外呼叫它（B4-4 接 buyer，之前由組裝點給替身）。
+	// Restock 是補貨通知的下游：catalog 的週期 worker 在 transaction 外呼叫它（B4-4 接 buyer，之前由組裝點給替身）。
 	Restock RestockNotifier
 }
 
@@ -184,12 +182,12 @@ type Module struct {
 	restock  *restock.Service
 }
 
-// New 建立模組；Jobs 與 Restock 是必要的（缺了，上架、刪除、庫存由零變正的寫入會在執行時 nil 解參考），沒給就 panic，和 coupon.New 一樣在組裝時失敗。
+// New 建立模組；Restock 是必要的（缺了，補貨與清訂閱的 worker 會在執行時 nil 解參考），沒給就 panic，和 coupon.New 一樣在組裝時失敗。
 func New(d Deps) *Module {
-	if d.Jobs == nil || d.Restock == nil {
-		panic("catalog：Jobs 與 Restock 是必要的")
+	if d.Restock == nil {
+		panic("catalog：Restock 是必要的")
 	}
-	rs := restock.New(restock.Deps{DB: d.DB, Jobs: d.Jobs, Now: d.Now, Notifier: d.Restock})
+	rs := restock.New(restock.Deps{DB: d.DB, Now: d.Now, Notifier: d.Restock})
 	return &Module{
 		stock:    stock.New(stock.Deps{DB: d.DB, NewID: d.NewID, Now: d.Now, Restock: rs}),
 		taxonomy: taxonomy.New(taxonomy.Deps{DB: d.DB}),
@@ -199,8 +197,11 @@ func New(d Deps) *Module {
 	}
 }
 
-// AddWorkers 登記補貨通知的 River worker（SKU、店家層與清訂閱三種 job）。
+// AddWorkers 登記補貨佇列週期 job 的 River worker。
 func (m *Module) AddWorkers(workers *river.Workers) { restock.AddWorkers(workers, m.restock) }
+
+// PeriodicJobs 回傳補貨佇列的排程（每 restock.Interval 處理一輪到期的補貨與清訂閱列）；組裝點在 B4-6 接線。
+func (m *Module) PeriodicJobs() []*river.PeriodicJob { return restock.PeriodicJobs() }
 
 // SetRating 把商品的評分平均（0 到 5）與評價則數設成絕對值，由 review 在自己的 transaction 內呼叫（D3、D26）：沒有版本欄，並行的呼叫靠商品列的行鎖序列化，後提交的絕對值勝出；
 // 不改 etag。count 為 0 時 average 必為 0；不合法回 *InvalidInputError，商品不存在回 ErrProductNotFound（已刪除的商品仍更新）。
@@ -213,15 +214,6 @@ func (m *Module) SetRating(ctx context.Context, productID uuid.UUID, average flo
 // 在呼叫方的 transaction 內回 error（含 ErrProductNotFound）時，呼叫方必須回滾那個 transaction：這裡不開 savepoint，已寫入的訂單登記仍在 transaction 裡，繼續 commit 會留下登記了但沒累計的訂單，之後的重送被去重擋下。未知商品是否當毒訊息丟棄由 B4-4 的消費端決定。
 func (m *Module) RecordSales(ctx context.Context, orderNo string, items []SalesItem) error {
 	return m.counter.RecordSales(ctx, orderNo, items)
-}
-
-// OnStoreExposureChanged 訂閱 seller 的 StoreExposureChanged（同 transaction 的訂閱者，只排 job）：店家變成可曝光時排一個店家層的補貨 job，
-// 它在 transaction 外展開成該店家目前可買的 SKU 再各自確認；變成不可曝光不需要動作（不可買的 SKU 不通知）。
-func (m *Module) OnStoreExposureChanged(ctx context.Context, e seller.StoreExposureChanged) error {
-	if !e.Exposable {
-		return nil
-	}
-	return m.restock.StoreExposed(ctx, e.StoreID)
 }
 
 // DeductStock 以冪等鍵 key 扣減庫存，與呼叫方的 transaction 同進退（ctx 沒有 transaction 時自己開一個）。
@@ -287,9 +279,9 @@ func (m *Module) Product(ctx context.Context, storeID int64, productID uuid.UUID
 	return m.product.Get(ctx, storeID, productID)
 }
 
-// ProductOfSku 讀店家自己的未刪除 SKU 所屬的商品（任何狀態）；SKU 不存在、不是這家店的或已刪除回 ErrSkuNotFound。庫存調整成功後 Connect 層用它回該 SKU 調整後的內容。
-func (m *Module) ProductOfSku(ctx context.Context, storeID int64, skuID uuid.UUID) (Product, error) {
-	return m.product.GetOfSku(ctx, storeID, skuID)
+// OwnSku 讀店家自己的 SKU 此刻的內容與可購買性，含已刪除的 SKU 與商品；SKU 不存在或不是這家店的回 ErrSkuNotFound。庫存調整成功後 Connect 層用它回該 SKU 調整後的內容：已生效的調整不會因為並行刪除或重送而回失敗。
+func (m *Module) OwnSku(ctx context.Context, storeID int64, skuID uuid.UUID) (SkuState, error) {
+	return m.product.OwnSku(ctx, storeID, skuID)
 }
 
 // PublicProduct 讀公開可見的商品：ACTIVE 或 ARCHIVED（下架的商品頁保留，Status 讓呼叫端決定可不可以買）、沒刪除、店家在 at 可曝光；草稿與其他情況 ErrProductNotFound。at 是請求的 clock。

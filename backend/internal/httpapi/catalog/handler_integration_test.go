@@ -481,3 +481,31 @@ func TestPublicGetsVaryOnAcceptLanguage(t *testing.T) {
 		t.Fatalf("not_found：%d Vary = %q", resp.StatusCode, resp.Header.Values("Vary"))
 	}
 }
+
+// 庫存調整 commit 之後 SKU 被刪除（並行刪除，或同一個 request_id 重送時已刪除）：已生效的操作仍回成功與已生效的庫存，不回 not_found。
+func TestAppliedStockWriteStillSucceedsAfterTheSkuIsDeleted(t *testing.T) {
+	t.Parallel()
+	e := setup(t)
+	ctx := context.Background()
+	storeID, acct := e.w.Store()
+	p := e.w.Active(storeID, acct, e.w.Input("將被刪除", 5))
+	sku := p.Skus[0].ID.String()
+	s := e.seller(acct)
+
+	rid := uuid.NewV4().String()
+	first, err := s.AdjustStock(ctx, connect.NewRequest(&pb.AdjustStockRequest{SkuId: sku, Delta: 2, RequestId: rid}))
+	if err != nil || first.Msg.GetSku().GetStockQty() != 7 {
+		t.Fatalf("第一次調整 = %v, %v", first, err)
+	}
+	if _, err := s.DeleteProduct(ctx, connect.NewRequest(&pb.DeleteProductRequest{ProductId: p.ID.String()})); err != nil {
+		t.Fatal(err)
+	}
+	again, err := s.AdjustStock(ctx, connect.NewRequest(&pb.AdjustStockRequest{SkuId: sku, Delta: 2, RequestId: rid}))
+	if err != nil || again.Msg.GetSku().GetStockQty() != 7 || again.Msg.GetSku().GetAvailability() != pb.ProductAvailability_PRODUCT_AVAILABILITY_UNAVAILABLE {
+		t.Fatalf("商品刪除後重送同一個 request_id 要回已生效的結果：%v, %v", again, err)
+	}
+	// 另一家店讀不到這個 SKU，仍是 not_found。
+	_, otherAcct := e.w.Store()
+	_, err = e.seller(otherAcct).AdjustStock(ctx, connect.NewRequest(&pb.AdjustStockRequest{SkuId: sku, Delta: 1, RequestId: uuid.NewV4().String()}))
+	wantCode(t, err, connect.CodeNotFound)
+}

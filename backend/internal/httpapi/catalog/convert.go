@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"time"
-	"uuid"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -241,17 +240,12 @@ func sellerSummaries(images rpc.Images, items []catalog.ProductSummary) ([]*pb.S
 }
 
 // sellerSku 是庫存調整後回給賣家的 SKU：沒有商品狀態可依，availability 由商品狀態與庫存決定，所以要帶商品現在是不是 ACTIVE。
-func sellerSku(p catalog.Product, skuID uuid.UUID) (*pb.Sku, error) {
-	for _, s := range p.Skus {
-		if s.ID == skuID {
-			sellable := p.Status == catalog.StatusActive && s.StockQty > 0
-			return &pb.Sku{
-				Id: s.ID.String(), Option1: s.Option1, Option2: s.Option2, Price: s.Price, CompareAtPrice: s.CompareAtPrice,
-				StockQty: s.StockQty, Availability: availability(sellable),
-			}, nil
-		}
+func sellerSku(st catalog.SkuState) *pb.Sku {
+	s := st.Sku
+	return &pb.Sku{
+		Id: s.ID.String(), Option1: s.Option1, Option2: s.Option2, Price: s.Price, CompareAtPrice: s.CompareAtPrice,
+		StockQty: s.StockQty, Availability: availability(st.Sellable),
 	}
-	return nil, fmt.Errorf("httpapi/catalog：商品 %s 讀不到剛調整的規格 %s", p.ID, skuID)
 }
 
 func availability(ok bool) pb.ProductAvailability {

@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 	"uuid"
@@ -45,8 +46,10 @@ type fakeModule struct {
 	keys     []string
 	deltas   []int32
 	calls    []string
+	queries  []string
 
 	product catalog.Product
+	sku     catalog.SkuState
 	page    catalog.ProductPage
 	err     error
 }
@@ -65,8 +68,9 @@ func (f *fakeModule) ListPublicProducts(_ context.Context, at time.Time, fl cata
 	return f.page, f.err
 }
 
-func (f *fakeModule) SuggestProductNames(_ context.Context, at time.Time, _ string, _ int32) ([]string, error) {
+func (f *fakeModule) SuggestProductNames(_ context.Context, at time.Time, query string, _ int32) ([]string, error) {
 	f.rec("SuggestProductNames")
+	f.queries = append(f.queries, query)
 	f.at = append(f.at, at)
 	return nil, f.err
 }
@@ -103,10 +107,10 @@ func (f *fakeModule) Product(_ context.Context, storeID int64, _ uuid.UUID) (cat
 	return f.product, f.err
 }
 
-func (f *fakeModule) ProductOfSku(_ context.Context, storeID int64, _ uuid.UUID) (catalog.Product, error) {
-	f.rec("ProductOfSku")
+func (f *fakeModule) OwnSku(_ context.Context, storeID int64, _ uuid.UUID) (catalog.SkuState, error) {
+	f.rec("OwnSku")
 	f.stores = append(f.stores, storeID)
-	return f.product, f.err
+	return f.sku, f.err
 }
 
 func (f *fakeModule) CreateProduct(_ context.Context, storeID int64, up media.Uploader, _ uuid.UUID, _ catalog.ProductInput) (catalog.Product, error) {
@@ -735,5 +739,57 @@ func TestEtagAndRequestIDReachTheModule(t *testing.T) {
 	}
 	if !slices.Equal(r.m.keys, []string{rid}) || !slices.Equal(r.m.deltas, []int32{-2}) {
 		t.Fatalf("冪等鍵 %v、變動量 %v", r.m.keys, r.m.deltas)
+	}
+}
+
+// 庫存調整已生效之後的讀回只依模組回報的 SKU 狀態：SKU 或商品已被並行刪除（不可購買）也回成功與已生效的庫存，不回 not_found。
+func TestStockWritesRespondWithTheAppliedStateEvenWhenTheSkuIsGone(t *testing.T) {
+	t.Parallel()
+	r := newRig(t)
+	r.m.sku = catalog.SkuState{Sku: catalog.Sku{ID: uuid.UUID{3}, Price: 100, StockQty: 7}, Sellable: false}
+	ctx := signedIn()
+	sku := uuid.UUID{3}.String()
+	adj, err := r.app.AdjustStock(ctx, connect.NewRequest(&pb.AdjustStockRequest{SkuId: sku, Delta: 2, RequestId: validRequestID()}))
+	if err != nil || adj.Msg.GetSku().GetStockQty() != 7 || adj.Msg.GetSku().GetAvailability() != pb.ProductAvailability_PRODUCT_AVAILABILITY_UNAVAILABLE {
+		t.Fatalf("AdjustStock = %v, %v", adj, err)
+	}
+	set, err := r.app.SetStock(ctx, connect.NewRequest(&pb.SetStockRequest{SkuId: sku, Quantity: 7, ExpectedQuantity: 5, RequestId: validRequestID()}))
+	if err != nil || set.Msg.GetSku().GetStockQty() != 7 {
+		t.Fatalf("SetStock = %v, %v", set, err)
+	}
+}
+
+// 名稱建議與搜尋一樣先去頭尾空白再比長度、再交給模組：頭尾空白不佔長度上限，模組收到的是去空白後的關鍵字。
+func TestSuggestProductNamesNormalizesTheQueryBeforeCheckingAndPassingIt(t *testing.T) {
+	t.Parallel()
+	r := newRig(t)
+	ctx := context.Background()
+	exact := strings.Repeat("山", int(maxSuggestRunes))
+	for _, q := range []string{"  " + exact + "  ", "\u3000" + exact + "\u3000"} {
+		if _, err := r.pub.SuggestProductNames(ctx, connect.NewRequest(&pb.SuggestProductNamesRequest{Query: q})); err != nil {
+			t.Fatalf("去掉頭尾空白剛好是上限的關鍵字要接受：%v", err)
+		}
+	}
+	if len(r.m.queries) != 2 || r.m.queries[0] != exact || r.m.queries[1] != exact {
+		t.Fatalf("模組收到 %q，預期去空白後的關鍵字", r.m.queries)
+	}
+	_, err := r.pub.SuggestProductNames(ctx, connect.NewRequest(&pb.SuggestProductNamesRequest{Query: exact + "山"}))
+	if codeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("超過上限要回 invalid_argument：%v", err)
+	}
+}
+
+// 後台列表的關鍵字上限取自後台請求自己的欄位宣告，同樣先去頭尾空白。
+func TestAdminListProductsChecksTheQueryAgainstItsOwnLimit(t *testing.T) {
+	t.Parallel()
+	r := newRig(t)
+	ctx := adminCtx()
+	exact := strings.Repeat("山", int(maxAdminQueryRunes))
+	if _, err := r.adm.ListProducts(ctx, connect.NewRequest(&adminpb.ListProductsRequest{Query: " " + exact + " "})); err != nil {
+		t.Fatalf("去掉頭尾空白剛好是上限的關鍵字要接受：%v", err)
+	}
+	_, err := r.adm.ListProducts(ctx, connect.NewRequest(&adminpb.ListProductsRequest{Query: exact + "山"}))
+	if codeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("超過上限要回 invalid_argument：%v", err)
 	}
 }

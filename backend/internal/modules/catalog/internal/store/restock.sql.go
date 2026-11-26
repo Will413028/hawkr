@@ -12,29 +12,265 @@ import (
 	"uuid"
 )
 
-const bindRestockPending = `-- name: BindRestockPending :exec
-UPDATE catalog.restock_pending SET job_id = $1 WHERE job_key = $2
+const claimPurge = `-- name: ClaimPurge :many
+WITH picked AS (
+    SELECT sku_id FROM catalog.restock_purge_queue
+    WHERE failed_at IS NULL AND due_at <= $2::timestamptz AND (claimed_until IS NULL OR claimed_until < $2::timestamptz)
+    ORDER BY due_at, sku_id
+    LIMIT $3
+    FOR UPDATE SKIP LOCKED)
+UPDATE catalog.restock_purge_queue AS q SET claimed_until = $1::timestamptz
+FROM picked AS p WHERE q.sku_id = p.sku_id
+RETURNING q.sku_id, q.requested_at, q.attempts
 `
 
-type BindRestockPendingParams struct {
-	JobID  int64
-	JobKey string
+type ClaimPurgeParams struct {
+	LeaseUntil time.Time
+	Now        time.Time
+	MaxRows    int32
 }
 
-// 把標記綁到新排的 job（新占到，或接手孤兒標記）。
-func (q *Queries) BindRestockPending(ctx context.Context, arg BindRestockPendingParams) error {
-	_, err := q.db.Exec(ctx, bindRestockPending, arg.JobID, arg.JobKey)
+type ClaimPurgeRow struct {
+	SkuID       uuid.UUID
+	RequestedAt time.Time
+	Attempts    int32
+}
+
+// worker 認領到期、沒被認領（或租約已過）的列：SKIP LOCKED 讓多個 worker 分開，寫租約 lease_until，回認領當下的 requested_at 與 attempts。
+func (q *Queries) ClaimPurge(ctx context.Context, arg ClaimPurgeParams) ([]ClaimPurgeRow, error) {
+	rows, err := q.db.Query(ctx, claimPurge, arg.LeaseUntil, arg.Now, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ClaimPurgeRow{}
+	for rows.Next() {
+		var i ClaimPurgeRow
+		if err := rows.Scan(&i.SkuID, &i.RequestedAt, &i.Attempts); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const claimRestock = `-- name: ClaimRestock :many
+WITH picked AS (
+    SELECT sku_id FROM catalog.restock_queue
+    WHERE failed_at IS NULL AND due_at <= $2::timestamptz AND (claimed_until IS NULL OR claimed_until < $2::timestamptz)
+    ORDER BY due_at, sku_id
+    LIMIT $3
+    FOR UPDATE SKIP LOCKED)
+UPDATE catalog.restock_queue AS q SET claimed_until = $1::timestamptz
+FROM picked AS p WHERE q.sku_id = p.sku_id
+RETURNING q.sku_id, q.requested_at, q.attempts
+`
+
+type ClaimRestockParams struct {
+	LeaseUntil time.Time
+	Now        time.Time
+	MaxRows    int32
+}
+
+type ClaimRestockRow struct {
+	SkuID       uuid.UUID
+	RequestedAt time.Time
+	Attempts    int32
+}
+
+// worker 認領到期、沒被認領（或租約已過）的列：SKIP LOCKED 讓多個 worker 分開，寫租約 lease_until，回認領當下的 requested_at 與 attempts。
+func (q *Queries) ClaimRestock(ctx context.Context, arg ClaimRestockParams) ([]ClaimRestockRow, error) {
+	rows, err := q.db.Query(ctx, claimRestock, arg.LeaseUntil, arg.Now, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ClaimRestockRow{}
+	for rows.Next() {
+		var i ClaimRestockRow
+		if err := rows.Scan(&i.SkuID, &i.RequestedAt, &i.Attempts); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const enqueuePurge = `-- name: EnqueuePurge :exec
+INSERT INTO catalog.restock_purge_queue AS q (sku_id, due_at, requested_at)
+VALUES ($1, $2, $3)
+ON CONFLICT (sku_id) DO UPDATE SET
+    requested_at = GREATEST(EXCLUDED.requested_at, q.requested_at + interval '1 microsecond'),
+    due_at = CASE WHEN q.failed_at IS NOT NULL THEN EXCLUDED.due_at ELSE q.due_at END,
+    attempts = CASE WHEN q.failed_at IS NOT NULL THEN 0 ELSE q.attempts END,
+    last_error = CASE WHEN q.failed_at IS NOT NULL THEN NULL ELSE q.last_error END,
+    failed_at = NULL
+WHERE q.claimed_until IS NOT NULL OR q.failed_at IS NOT NULL
+`
+
+type EnqueuePurgeParams struct {
+	SkuID uuid.UUID
+	DueAt time.Time
+	Now   time.Time
+}
+
+// 排一個 SKU 的請求（呼叫方的 transaction 內）。沒有列就新增；有列且沒被認領就不動（合併，保留較早的 due_at）；
+// 被認領處理中（claimed_until 非空）只把 requested_at 往前推（至少加 1 微秒，時鐘不動也一定不同），worker 完成時比對它而不是刪列，所以處理中的新轉換不會遺失；
+// 已停手的列（failed_at 非空）被新請求重置成全新的一列。
+func (q *Queries) EnqueuePurge(ctx context.Context, arg EnqueuePurgeParams) error {
+	_, err := q.db.Exec(ctx, enqueuePurge, arg.SkuID, arg.DueAt, arg.Now)
 	return err
 }
 
-const consumeRestockPending = `-- name: ConsumeRestockPending :exec
-DELETE FROM catalog.restock_pending WHERE job_key = $1
+const enqueueRestock = `-- name: EnqueueRestock :exec
+INSERT INTO catalog.restock_queue AS q (sku_id, due_at, requested_at)
+VALUES ($1, $2, $3)
+ON CONFLICT (sku_id) DO UPDATE SET
+    requested_at = GREATEST(EXCLUDED.requested_at, q.requested_at + interval '1 microsecond'),
+    due_at = CASE WHEN q.failed_at IS NOT NULL THEN EXCLUDED.due_at ELSE q.due_at END,
+    attempts = CASE WHEN q.failed_at IS NOT NULL THEN 0 ELSE q.attempts END,
+    last_error = CASE WHEN q.failed_at IS NOT NULL THEN NULL ELSE q.last_error END,
+    failed_at = NULL
+WHERE q.claimed_until IS NOT NULL OR q.failed_at IS NOT NULL
 `
 
-// job 開始時消耗標記：之後的轉換看不到標記，會排自己的 job。
-func (q *Queries) ConsumeRestockPending(ctx context.Context, jobKey string) error {
-	_, err := q.db.Exec(ctx, consumeRestockPending, jobKey)
+type EnqueueRestockParams struct {
+	SkuID uuid.UUID
+	DueAt time.Time
+	Now   time.Time
+}
+
+// 排一個 SKU 的請求（呼叫方的 transaction 內）。沒有列就新增；有列且沒被認領就不動（合併，保留較早的 due_at）；
+// 被認領處理中（claimed_until 非空）只把 requested_at 往前推（至少加 1 微秒，時鐘不動也一定不同），worker 完成時比對它而不是刪列，所以處理中的新轉換不會遺失；
+// 已停手的列（failed_at 非空）被新請求重置成全新的一列。
+func (q *Queries) EnqueueRestock(ctx context.Context, arg EnqueueRestockParams) error {
+	_, err := q.db.Exec(ctx, enqueueRestock, arg.SkuID, arg.DueAt, arg.Now)
 	return err
+}
+
+const enqueueRestockOfProduct = `-- name: EnqueueRestockOfProduct :exec
+INSERT INTO catalog.restock_queue AS q (sku_id, due_at, requested_at)
+SELECT s.id, $1, $2 FROM catalog.product_skus s
+WHERE s.product_id = $3 AND s.deleted_at IS NULL
+ORDER BY s.id
+ON CONFLICT (sku_id) DO UPDATE SET
+    requested_at = GREATEST(EXCLUDED.requested_at, q.requested_at + interval '1 microsecond'),
+    due_at = CASE WHEN q.failed_at IS NOT NULL THEN EXCLUDED.due_at ELSE q.due_at END,
+    attempts = CASE WHEN q.failed_at IS NOT NULL THEN 0 ELSE q.attempts END,
+    last_error = CASE WHEN q.failed_at IS NOT NULL THEN NULL ELSE q.last_error END,
+    failed_at = NULL
+WHERE q.claimed_until IS NOT NULL OR q.failed_at IS NOT NULL
+`
+
+type EnqueueRestockOfProductParams struct {
+	DueAt     time.Time
+	Now       time.Time
+	ProductID uuid.UUID
+}
+
+// 商品切成 ACTIVE：它每一個沒刪除的 SKU 都排一列，不看庫存（庫存與可買由 worker 執行時重新確認），所以不需要在這個 transaction 讀別的 SKU 的庫存，
+// 也就不會漏掉與另一個 SKU 的 0 到正庫存變更並行時雙方都看不到對方的情況。語意同 EnqueueRestock。
+func (q *Queries) EnqueueRestockOfProduct(ctx context.Context, arg EnqueueRestockOfProductParams) error {
+	_, err := q.db.Exec(ctx, enqueueRestockOfProduct, arg.DueAt, arg.Now, arg.ProductID)
+	return err
+}
+
+const failPurge = `-- name: FailPurge :execrows
+UPDATE catalog.restock_purge_queue SET attempts = attempts + 1, due_at = $1, claimed_until = NULL, last_error = $2, failed_at = $3
+WHERE sku_id = $4 AND requested_at = $5
+`
+
+type FailPurgeParams struct {
+	DueAt       time.Time
+	LastError   *string
+	FailedAt    *time.Time
+	SkuID       uuid.UUID
+	RequestedAt time.Time
+}
+
+// 處理失敗：同一列次數加一、退避到 due_at、放掉租約並記錯誤；failed_at 有給就停手（超過上限）。只在 requested_at 沒變時；回 0 表示處理中有新請求，呼叫方改用 Rearm。
+func (q *Queries) FailPurge(ctx context.Context, arg FailPurgeParams) (int64, error) {
+	result, err := q.db.Exec(ctx, failPurge,
+		arg.DueAt,
+		arg.LastError,
+		arg.FailedAt,
+		arg.SkuID,
+		arg.RequestedAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const failRestock = `-- name: FailRestock :execrows
+UPDATE catalog.restock_queue SET attempts = attempts + 1, due_at = $1, claimed_until = NULL, last_error = $2, failed_at = $3
+WHERE sku_id = $4 AND requested_at = $5
+`
+
+type FailRestockParams struct {
+	DueAt       time.Time
+	LastError   *string
+	FailedAt    *time.Time
+	SkuID       uuid.UUID
+	RequestedAt time.Time
+}
+
+// 處理失敗：同一列次數加一、退避到 due_at、放掉租約並記錯誤；failed_at 有給就停手（超過上限）。只在 requested_at 沒變時；回 0 表示處理中有新請求，呼叫方改用 Rearm。
+func (q *Queries) FailRestock(ctx context.Context, arg FailRestockParams) (int64, error) {
+	result, err := q.db.Exec(ctx, failRestock,
+		arg.DueAt,
+		arg.LastError,
+		arg.FailedAt,
+		arg.SkuID,
+		arg.RequestedAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const finishPurge = `-- name: FinishPurge :execrows
+DELETE FROM catalog.restock_purge_queue WHERE sku_id = $1 AND requested_at = $2
+`
+
+type FinishPurgeParams struct {
+	SkuID       uuid.UUID
+	RequestedAt time.Time
+}
+
+// 處理完（成功或不需要通知）：只在 requested_at 還是認領時讀到的值才刪；回 0 表示處理中又有新請求（或列已被別人處理掉）。
+func (q *Queries) FinishPurge(ctx context.Context, arg FinishPurgeParams) (int64, error) {
+	result, err := q.db.Exec(ctx, finishPurge, arg.SkuID, arg.RequestedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const finishRestock = `-- name: FinishRestock :execrows
+DELETE FROM catalog.restock_queue WHERE sku_id = $1 AND requested_at = $2
+`
+
+type FinishRestockParams struct {
+	SkuID       uuid.UUID
+	RequestedAt time.Time
+}
+
+// 處理完（成功或不需要通知）：只在 requested_at 還是認領時讀到的值才刪；回 0 表示處理中又有新請求（或列已被別人處理掉）。
+func (q *Queries) FinishRestock(ctx context.Context, arg FinishRestockParams) (int64, error) {
+	result, err := q.db.Exec(ctx, finishRestock, arg.SkuID, arg.RequestedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const getSkuRestockState = `-- name: GetSkuRestockState :one
@@ -61,7 +297,7 @@ type GetSkuRestockStateRow struct {
 	Purchasable bool
 }
 
-// 補貨：SKU 由不可買變可買（有庫存、商品 ACTIVE 且未刪、SKU 未刪、店家在 at 可曝光）的偵測與 job 執行時重新確認用的讀取。
+// 補貨：SKU 由不可買變可買（有庫存、商品 ACTIVE 且未刪、SKU 未刪、店家在 at 可曝光）的偵測、執行時重新確認，與補貨、清訂閱兩張佇列表（D26）。
 // 一個 SKU 此刻的庫存與可買與否，加上通知用的最新快照（商品名稱、主圖 key）。SKU 已刪除也回列（歸還不看刪除），purchasable 為 false。
 func (q *Queries) GetSkuRestockState(ctx context.Context, arg GetSkuRestockStateParams) (GetSkuRestockStateRow, error) {
 	row := q.db.QueryRow(ctx, getSkuRestockState, arg.At, arg.ID)
@@ -77,103 +313,34 @@ func (q *Queries) GetSkuRestockState(ctx context.Context, arg GetSkuRestockState
 	return i, err
 }
 
-const insertRestockPending = `-- name: InsertRestockPending :execrows
-INSERT INTO catalog.restock_pending (job_key, job_id) VALUES ($1, 0)
-ON CONFLICT (job_key) DO NOTHING
+const rearmPurge = `-- name: RearmPurge :exec
+UPDATE catalog.restock_purge_queue SET claimed_until = NULL, due_at = $1, attempts = 0, last_error = NULL
+WHERE sku_id = $2 AND claimed_until IS NOT NULL
 `
 
-// 占標記：新增回 1（呼叫方同一個 transaction 內排 job 並綁定，job_id 的 0 只在 transaction 內存在），已有同一個 key 回 0。
-func (q *Queries) InsertRestockPending(ctx context.Context, jobKey string) (int64, error) {
-	result, err := q.db.Exec(ctx, insertRestockPending, jobKey)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+type RearmPurgeParams struct {
+	DueAt time.Time
+	SkuID uuid.UUID
 }
 
-const listPurchasableSkusOfProduct = `-- name: ListPurchasableSkusOfProduct :many
-SELECT s.id FROM catalog.product_skus s JOIN catalog.products p ON p.id = s.product_id
-WHERE p.id = $1 AND s.deleted_at IS NULL AND s.stock_qty > 0 AND p.deleted_at IS NULL AND p.status = 'ACTIVE'
-  AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($2::timestamptz) e)
-ORDER BY s.id
+// 處理中來了新請求：放掉租約、重新計 Delay 與失敗次數，下一輪再處理（只動還被認領的列）。
+func (q *Queries) RearmPurge(ctx context.Context, arg RearmPurgeParams) error {
+	_, err := q.db.Exec(ctx, rearmPurge, arg.DueAt, arg.SkuID)
+	return err
+}
+
+const rearmRestock = `-- name: RearmRestock :exec
+UPDATE catalog.restock_queue SET claimed_until = NULL, due_at = $1, attempts = 0, last_error = NULL
+WHERE sku_id = $2 AND claimed_until IS NOT NULL
 `
 
-type ListPurchasableSkusOfProductParams struct {
-	ProductID uuid.UUID
-	At        time.Time
+type RearmRestockParams struct {
+	DueAt time.Time
+	SkuID uuid.UUID
 }
 
-// 商品切成 ACTIVE 之後可買的 SKU。
-func (q *Queries) ListPurchasableSkusOfProduct(ctx context.Context, arg ListPurchasableSkusOfProductParams) ([]uuid.UUID, error) {
-	rows, err := q.db.Query(ctx, listPurchasableSkusOfProduct, arg.ProductID, arg.At)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []uuid.UUID{}
-	for rows.Next() {
-		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listPurchasableSkusOfStore = `-- name: ListPurchasableSkusOfStore :many
-SELECT s.id FROM catalog.product_skus s JOIN catalog.products p ON p.id = s.product_id
-WHERE p.store_id = $1 AND s.id > $2::uuid
-  AND s.deleted_at IS NULL AND s.stock_qty > 0 AND p.deleted_at IS NULL AND p.status = 'ACTIVE'
-  AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($3::timestamptz) e)
-ORDER BY s.id
-LIMIT $4
-`
-
-type ListPurchasableSkusOfStoreParams struct {
-	StoreID  int64
-	After    uuid.UUID
-	At       time.Time
-	PageSize int32
-}
-
-// 店家目前可買的 SKU（店家要在 at 可曝光），依 ID 升序的 keyset 分頁；after 是上一頁最後一個 ID（第一頁用 nil UUID）。
-func (q *Queries) ListPurchasableSkusOfStore(ctx context.Context, arg ListPurchasableSkusOfStoreParams) ([]uuid.UUID, error) {
-	rows, err := q.db.Query(ctx, listPurchasableSkusOfStore,
-		arg.StoreID,
-		arg.After,
-		arg.At,
-		arg.PageSize,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []uuid.UUID{}
-	for rows.Next() {
-		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const lockRestockPending = `-- name: LockRestockPending :one
-SELECT job_id FROM catalog.restock_pending WHERE job_key = $1 FOR UPDATE
-`
-
-// 鎖住現有的標記列並回它綁的 job id：job 開始時消耗標記（DELETE）要等這個 transaction 結束，所以它之後讀到的狀態一定含這次的變動。標記已被消耗回無列，呼叫方重新占。
-func (q *Queries) LockRestockPending(ctx context.Context, jobKey string) (int64, error) {
-	row := q.db.QueryRow(ctx, lockRestockPending, jobKey)
-	var job_id int64
-	err := row.Scan(&job_id)
-	return job_id, err
+// 處理中來了新請求：放掉租約、重新計 Delay 與失敗次數，下一輪再處理（只動還被認領的列）。
+func (q *Queries) RearmRestock(ctx context.Context, arg RearmRestockParams) error {
+	_, err := q.db.Exec(ctx, rearmRestock, arg.DueAt, arg.SkuID)
+	return err
 }

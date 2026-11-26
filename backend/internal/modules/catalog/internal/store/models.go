@@ -84,9 +84,24 @@ type CatalogProductSku struct {
 	UpdatedAt      time.Time
 }
 
-type CatalogRestockPending struct {
-	JobKey string
-	JobID  int64
+type CatalogRestockPurgeQueue struct {
+	SkuID        uuid.UUID
+	DueAt        time.Time
+	RequestedAt  time.Time
+	ClaimedUntil *time.Time
+	Attempts     int32
+	LastError    *string
+	FailedAt     *time.Time
+}
+
+type CatalogRestockQueue struct {
+	SkuID        uuid.UUID
+	DueAt        time.Time
+	RequestedAt  time.Time
+	ClaimedUntil *time.Time
+	Attempts     int32
+	LastError    *string
+	FailedAt     *time.Time
 }
 
 type CatalogSalesOrder struct {

@@ -312,7 +312,7 @@
    "file": "backend/internal/modules/catalog/internal/stock/stock.go",
    "old": "\t\t\treturn s.d.Restock.StockIncreased(ctx, skuID, quantity)\n",
    "new": "\t\t\treturn nil\n",
-   "test": "internal/modules/catalog ^TestRestockJobIsEnqueuedOnEveryZeroToPurchasablePath$/^SetStock$",
+   "test": "internal/modules/catalog ^TestRestockIsEnqueuedOnEveryZeroToPurchasablePath$/^SetStock$",
    "why": "SetStock 由 0 設成正數不排補貨 job，賣家補庫存沒有通知，測試要紅。"
   },
   {
@@ -321,7 +321,7 @@
    "file": "backend/internal/modules/catalog/internal/stock/stock.go",
    "old": "\t\treturn s.d.Restock.StockIncreased(ctx, skuID, delta)\n",
    "new": "\t\treturn nil\n",
-   "test": "internal/modules/catalog ^TestRestockJobIsEnqueuedOnEveryZeroToPurchasablePath$/^AdjustStock$",
+   "test": "internal/modules/catalog ^TestRestockIsEnqueuedOnEveryZeroToPurchasablePath$/^AdjustStock$",
    "why": "AdjustStock 由 0 增加不排補貨 job，測試要紅。"
   },
   {
@@ -330,7 +330,7 @@
    "file": "backend/internal/modules/catalog/internal/stock/stock.go",
    "old": "\t\t\tif err := s.d.Restock.StockIncreased(ctx, it.SkuID, it.Quantity); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n",
    "new": "",
-   "test": "internal/modules/catalog ^TestRestockJobIsEnqueuedOnEveryZeroToPurchasablePath$/^RestoreStock$",
+   "test": "internal/modules/catalog ^TestRestockIsEnqueuedOnEveryZeroToPurchasablePath$/^RestoreStock$",
    "why": "RestoreStock（訂單取消歸還）讓庫存由 0 變可買卻不排補貨 job，測試要紅。"
   },
   {
@@ -339,7 +339,7 @@
    "file": "backend/internal/modules/catalog/internal/product/product.go",
    "old": "\t\t\treturn s.d.Restock.ProductActivated(ctx, productID)\n",
    "new": "\t\t\treturn nil\n",
-   "test": "internal/modules/catalog ^TestRestockJobIsEnqueuedWhenAProductBecomesActiveWithStock$",
+   "test": "internal/modules/catalog ^TestRestockIsEnqueuedWhenAProductBecomesActiveWithStock$",
    "why": "DRAFT 或 ARCHIVED 改回 ACTIVE 時有庫存的 SKU 不排補貨 job，測試要紅。"
   },
   {
@@ -348,7 +348,7 @@
    "file": "backend/internal/modules/catalog/internal/restock/restock.go",
    "old": "\tif st.StockQty != added || !st.Purchasable {",
    "new": "\tif !st.Purchasable {",
-   "test": "internal/modules/catalog ^TestRestockJobIsNotEnqueuedWithoutAZeroToPurchasableTransition$",
+   "test": "internal/modules/catalog ^TestRestockIsNotEnqueuedWithoutAZeroToPurchasableTransition$",
    "why": "只要增加後可買就排 job，不要求增加前是 0：庫存 >0 到 >0 也排，測試要紅。"
   },
   {
@@ -357,7 +357,7 @@
    "file": "backend/internal/modules/catalog/internal/store/restock.sql.go",
    "old": "s.stock_qty > 0 AND p.deleted_at IS NULL AND p.status = 'ACTIVE'\n        AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e))::boolean AS purchasable",
    "new": "s.stock_qty > 0 AND p.deleted_at IS NULL\n        AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e))::boolean AS purchasable",
-   "test": "internal/modules/catalog ^TestRestockJobIsNotEnqueuedWithoutAZeroToPurchasableTransition$",
+   "test": "internal/modules/catalog ^TestRestockIsNotEnqueuedWithoutAZeroToPurchasableTransition$",
    "why": "可買不看商品是否 ACTIVE：草稿與已下架的商品補庫存也排 job，測試要紅。"
   },
   {
@@ -366,7 +366,7 @@
    "file": "backend/internal/modules/catalog/internal/store/restock.sql.go",
    "old": "s.stock_qty > 0 AND p.deleted_at IS NULL AND p.status = 'ACTIVE'\n        AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores($1::timestamptz) e))::boolean AS purchasable",
    "new": "s.stock_qty > 0 AND p.deleted_at IS NULL AND p.status = 'ACTIVE')::boolean AS purchasable",
-   "test": "internal/modules/catalog ^TestRestockJobIsNotEnqueuedWithoutAZeroToPurchasableTransition$",
+   "test": "internal/modules/catalog ^TestRestockIsNotEnqueuedWithoutAZeroToPurchasableTransition$",
    "why": "可買不看店家是否可曝光：不可曝光的店家補庫存也排 job，測試要紅。"
   },
   {
@@ -375,53 +375,8 @@
    "file": "backend/internal/modules/catalog/internal/restock/restock.go",
    "old": "\tif !st.Purchasable {\n\t\treturn nil\n\t}\n\treturn s.d.Notifier.NotifyRestocked(",
    "new": "\treturn s.d.Notifier.NotifyRestocked(",
-   "test": "internal/modules/catalog ^TestRestockJobRechecksPurchasabilityWhenItRuns$",
+   "test": "internal/modules/catalog ^TestRestockRechecksPurchasabilityWhenItRuns$",
    "why": "job 執行時不重新確認可買：庫存又歸零、商品下架或刪除、店家不可曝光時仍通知，測試要紅。"
-  },
-  {
-   "id": "restock-store-job-ignores-stock",
-   "stack": "go-integration",
-   "file": "backend/internal/modules/catalog/internal/store/restock.sql.go",
-   "old": "WHERE p.store_id = $1 AND s.id > $2::uuid\n  AND s.deleted_at IS NULL AND s.stock_qty > 0 AND",
-   "new": "WHERE p.store_id = $1 AND s.id > $2::uuid\n  AND s.deleted_at IS NULL AND",
-   "test": "internal/modules/catalog ^TestStoreExposureEnqueuesOneStoreJobThatNotifiesOnlyPurchasableSkus$",
-   "why": "店家層 job 展開時不看庫存：售完的 SKU 也排 job，測試要紅。"
-  },
-  {
-   "id": "restock-sku-job-does-not-consume-marker",
-   "stack": "go-integration",
-   "file": "backend/internal/modules/catalog/internal/restock/restock.go",
-   "old": "\tif err := s.q(ctx).ConsumeRestockPending(ctx, skuKey(skuID)); err != nil {\n\t\treturn err\n\t}\n",
-   "new": "",
-   "test": "internal/modules/catalog ^TestRestockTransitionWhileTheSkuJobIsRunningIsNotLost$",
-   "why": "SKU job 開始時不消耗待處理標記：job 執行中發生的 0 到大於 0 轉換被合併進已經開始的 job，漏掉通知，測試要紅（D26：只合併還沒開始的 job）。"
-  },
-  {
-   "id": "restock-store-job-does-not-consume-marker",
-   "stack": "go-integration",
-   "file": "backend/internal/modules/catalog/internal/restock/restock.go",
-   "old": "\tif err := s.q(ctx).ConsumeRestockPending(ctx, storeKey(storeID)); err != nil {\n\t\treturn err\n\t}\n",
-   "new": "",
-   "test": "internal/modules/catalog ^TestStoreExposureAfterTheStoreJobStartedEnqueuesANewJob$",
-   "why": "店家層 job 開始時不消耗標記：開始之後的再次曝光被合併而不排 job，測試要紅。"
-  },
-  {
-   "id": "restock-jobs-not-merged",
-   "stack": "go-integration",
-   "file": "backend/internal/modules/catalog/internal/restock/restock.go",
-   "old": "\t\t\tif inserted == 1 {\n",
-   "new": "\t\t\tif inserted >= 0 {\n",
-   "test": "internal/modules/catalog ^TestRestockJobsOfTheSameSkuMergeWhileNotStarted$",
-   "why": "已有待處理標記時仍排 job：同一個 SKU 還沒開始的 job 不合併，短時間內反覆補貨排出多個，測試要紅。"
-  },
-  {
-   "id": "restock-enqueue-outside-transaction",
-   "stack": "go-integration",
-   "file": "backend/internal/modules/catalog/internal/restock/restock.go",
-   "old": "\tid, err := s.d.Jobs.EnqueueJob(ctx, args, s.opts(delay))",
-   "new": "\tid, err := s.d.Jobs.EnqueueJob(context.Background(), args, s.opts(delay))",
-   "test": "internal/modules/catalog ^TestRestockJobIsEnqueuedInTheCallersTransaction$",
-   "why": "job 不用呼叫方的 transaction 排入：交易回滾後 job 仍在，測試要紅。"
   },
   {
    "id": "delete-does-not-purge-subscriptions",
@@ -433,31 +388,94 @@
    "why": "刪除商品不排清補貨訂閱的 job，測試要紅。"
   },
   {
-   "id": "restock-marker-not-in-transaction",
+   "id": "restock-enqueue-outside-transaction",
    "stack": "go-integration",
    "file": "backend/internal/modules/catalog/internal/restock/restock.go",
-   "old": "\treturn s.d.DB.InTx(ctx, func(ctx context.Context) error {",
-   "new": "\treturn func(fn func(context.Context) error) error { return fn(ctx) }(func(ctx context.Context) error {",
-   "test": "internal/modules/catalog ^TestRestockEnqueueFailureLeavesNoMarker$",
-   "why": "占標記與排 job 不包 transaction：沒有 transaction 的呼叫方排入失敗時標記已 autocommit 留下，之後的轉換都被它合併而漏通知，測試要紅。"
+   "old": "return s.q(ctx).EnqueueRestock(ctx,",
+   "new": "return store.New(s.d.DB.Pool()).EnqueueRestock(ctx,",
+   "test": "internal/modules/catalog ^TestRestockIsEnqueuedInTheCallersTransaction$",
+   "why": "排入補貨列走自己的連線而不加入呼叫方的 transaction：庫存寫入回滾後佇列列仍在，回滾測試要紅。"
   },
   {
-   "id": "restock-merge-skips-job-state-check",
+   "id": "restock-claimed-row-not-updated",
    "stack": "go-integration",
-   "file": "backend/internal/modules/catalog/internal/restock/restock.go",
-   "old": "\t\t\tif found && mergeable(state) {",
-   "new": "\t\t\tif mergeable(rivertype.JobStateAvailable) {",
-   "test": "internal/modules/catalog ^TestRestockMarkerFollowsItsJob$",
-   "why": "合併前不確認標記綁的 job 還會執行：job 被取消、刪除、丟棄或已完成後標記成孤兒，下一次轉換被合併而漏通知，接手測試要紅。"
+   "file": "backend/internal/modules/catalog/internal/store/restock.sql.go",
+   "old": "INSERT INTO catalog.restock_queue AS q (sku_id, due_at, requested_at)\nVALUES ($1, $2, $3)\nON CONFLICT (sku_id) DO UPDATE SET\n    requested_at = GREATEST(EXCLUDED.requested_at, q.requested_at + interval '1 microsecond'),\n    due_at = CASE WHEN q.failed_at IS NOT NULL THEN EXCLUDED.due_at ELSE q.due_at END,\n    attempts = CASE WHEN q.failed_at IS NOT NULL THEN 0 ELSE q.attempts END,\n    last_error = CASE WHEN q.failed_at IS NOT NULL THEN NULL ELSE q.last_error END,\n    failed_at = NULL\nWHERE q.claimed_until IS NOT NULL OR q.failed_at IS NOT NULL\n",
+   "new": "INSERT INTO catalog.restock_queue AS q (sku_id, due_at, requested_at)\nVALUES ($1, $2, $3)\nON CONFLICT (sku_id) DO UPDATE SET\n    requested_at = GREATEST(EXCLUDED.requested_at, q.requested_at + interval '1 microsecond'),\n    due_at = CASE WHEN q.failed_at IS NOT NULL THEN EXCLUDED.due_at ELSE q.due_at END,\n    attempts = CASE WHEN q.failed_at IS NOT NULL THEN 0 ELSE q.attempts END,\n    last_error = CASE WHEN q.failed_at IS NOT NULL THEN NULL ELSE q.last_error END,\n    failed_at = NULL\nWHERE q.failed_at IS NOT NULL\n",
+   "test": "internal/modules/catalog ^TestRestockTransitionWhileTheRowIsClaimedIsNotLost$",
+   "why": "處理中（已認領）的列來新轉換時不記下新的請求時間：worker 完成時刪掉列，第二次轉換遺失，被認領轉換測試要紅。"
   },
   {
-   "id": "restock-running-job-not-mergeable",
+   "id": "restock-claimed-request-time-not-advanced",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/restock.sql.go",
+   "old": "INSERT INTO catalog.restock_queue AS q (sku_id, due_at, requested_at)\nVALUES ($1, $2, $3)\nON CONFLICT (sku_id) DO UPDATE SET\n    requested_at = GREATEST(EXCLUDED.requested_at, q.requested_at + interval '1 microsecond'),\n    due_at = CASE WHEN q.failed_at IS NOT NULL THEN EXCLUDED.due_at ELSE q.due_at END,\n    attempts = CASE WHEN q.failed_at IS NOT NULL THEN 0 ELSE q.attempts END,\n    last_error = CASE WHEN q.failed_at IS NOT NULL THEN NULL ELSE q.last_error END,\n    failed_at = NULL\nWHERE q.claimed_until IS NOT NULL OR q.failed_at IS NOT NULL\n",
+   "new": "INSERT INTO catalog.restock_queue AS q (sku_id, due_at, requested_at)\nVALUES ($1, $2, $3)\nON CONFLICT (sku_id) DO UPDATE SET\n    requested_at = q.requested_at,\n    due_at = CASE WHEN q.failed_at IS NOT NULL THEN EXCLUDED.due_at ELSE q.due_at END,\n    attempts = CASE WHEN q.failed_at IS NOT NULL THEN 0 ELSE q.attempts END,\n    last_error = CASE WHEN q.failed_at IS NOT NULL THEN NULL ELSE q.last_error END,\n    failed_at = NULL\nWHERE q.claimed_until IS NOT NULL OR q.failed_at IS NOT NULL\n",
+   "test": "internal/modules/catalog ^TestRestockTransitionWhileTheRowIsClaimedIsNotLost$",
+   "why": "處理中的新轉換沒有讓 requested_at 改變：worker 的條件式刪除仍成立，轉換遺失，被認領轉換測試要紅。"
+  },
+  {
+   "id": "restock-unclaimed-row-not-coalesced",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/restock.sql.go",
+   "old": "INSERT INTO catalog.restock_queue AS q (sku_id, due_at, requested_at)\nVALUES ($1, $2, $3)\nON CONFLICT (sku_id) DO UPDATE SET\n    requested_at = GREATEST(EXCLUDED.requested_at, q.requested_at + interval '1 microsecond'),\n    due_at = CASE WHEN q.failed_at IS NOT NULL THEN EXCLUDED.due_at ELSE q.due_at END,\n    attempts = CASE WHEN q.failed_at IS NOT NULL THEN 0 ELSE q.attempts END,\n    last_error = CASE WHEN q.failed_at IS NOT NULL THEN NULL ELSE q.last_error END,\n    failed_at = NULL\nWHERE q.claimed_until IS NOT NULL OR q.failed_at IS NOT NULL\n",
+   "new": "INSERT INTO catalog.restock_queue AS q (sku_id, due_at, requested_at)\nVALUES ($1, $2, $3)\nON CONFLICT (sku_id) DO UPDATE SET\n    requested_at = GREATEST(EXCLUDED.requested_at, q.requested_at + interval '1 microsecond'),\n    due_at = CASE WHEN q.failed_at IS NOT NULL THEN EXCLUDED.due_at ELSE q.due_at END,\n    attempts = CASE WHEN q.failed_at IS NOT NULL THEN 0 ELSE q.attempts END,\n    last_error = CASE WHEN q.failed_at IS NOT NULL THEN NULL ELSE q.last_error END,\n    failed_at = NULL\nWHERE true\n",
+   "test": "internal/modules/catalog ^TestRestockTransitionsWithinTheWindowCoalesceIntoOneNotification$",
+   "why": "沒被認領的列也被新請求改寫 requested_at：不再是合併，合併測試比對原本的請求時間要紅。"
+  },
+  {
+   "id": "restock-finish-ignores-requested-at",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/restock.sql.go",
+   "old": "DELETE FROM catalog.restock_queue WHERE sku_id = $1 AND requested_at = $2",
+   "new": "DELETE FROM catalog.restock_queue WHERE sku_id = $1 AND $2::timestamptz IS NOT NULL",
+   "test": "internal/modules/catalog ^TestRestockTransitionWhileTheRowIsClaimedIsNotLost$",
+   "why": "完成時不比對 requested_at 就刪列：處理中的新轉換被一起刪掉，被認領轉換測試要紅。"
+  },
+  {
+   "id": "restock-claim-ignores-lease",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/restock.sql.go",
+   "old": "SELECT sku_id FROM catalog.restock_queue\n    WHERE failed_at IS NULL AND due_at <= $2::timestamptz AND (claimed_until IS NULL OR claimed_until < $2::timestamptz)",
+   "new": "SELECT sku_id FROM catalog.restock_queue\n    WHERE failed_at IS NULL AND due_at <= $2::timestamptz",
+   "test": "internal/modules/catalog ^TestRestockClaimedRowIsReprocessedOnlyAfterTheLeaseExpires$",
+   "why": "認領不看租約：別的 worker 還握著租約的列被重複處理，租約未過期的斷言（沒有通知）要紅。"
+  },
+  {
+   "id": "restock-activation-only-stocked-skus",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/restock.sql.go",
+   "old": "WHERE s.product_id = $3 AND s.deleted_at IS NULL\nORDER BY s.id",
+   "new": "WHERE s.product_id = $3 AND s.deleted_at IS NULL AND s.stock_qty > 0\nORDER BY s.id",
+   "test": "internal/modules/catalog ^TestActivationEnqueuesEveryLiveSkuRegardlessOfStock$",
+   "why": "啟用只排有庫存的 SKU：與另一個 SKU 的 0 到正庫存並行時雙方都看不到對方而漏通知，沒庫存 SKU 沒有列的斷言要紅。"
+  },
+  {
+   "id": "restock-failure-deletes-row",
    "stack": "go-integration",
    "file": "backend/internal/modules/catalog/internal/restock/restock.go",
-   "old": "rivertype.JobStateAvailable, rivertype.JobStateRunning, rivertype.JobStateRetryable:",
-   "new": "rivertype.JobStateAvailable, rivertype.JobStateRetryable:",
-   "test": "internal/modules/catalog ^TestRestockMarkerFollowsItsJob$",
-   "why": "執行中的 job 被當成不會消耗標記而接手：多排一個 job、標記改綁，合併測試要紅。"
+   "old": "\tif procErr == nil {\n\t\tn, err := finish(ctx, c)",
+   "new": "\tif procErr == nil || true {\n\t\tn, err := finish(ctx, c)",
+   "test": "internal/modules/catalog ^TestRestockNotifierFailureBacksOffAndStopsAtMaxAttempts$",
+   "why": "通知失敗也當成完成而刪列：不累計次數、不退避、不重試，失敗測試讀不到那一列而紅。"
+  },
+  {
+   "id": "suggest-query-not-normalized",
+   "stack": "go",
+   "file": "backend/internal/httpapi/catalog/public.go",
+   "old": "\tquery := normalizeQuery(msg.GetQuery())\n\tif err := tooLong(\"query\", query, maxSuggestRunes); err != nil {",
+   "new": "\tquery := msg.GetQuery()\n\tif err := tooLong(\"query\", query, maxSuggestRunes); err != nil {",
+   "test": "internal/httpapi/catalog ^TestSuggestProductNamesNormalizesTheQueryBeforeCheckingAndPassingIt$",
+   "why": "名稱建議不先去頭尾空白：頭尾空白佔長度上限、模組收到帶空白的關鍵字，去空白後剛好是上限的關鍵字會被拒，測試要紅。"
+  },
+  {
+   "id": "stock-readback-excludes-deleted-sku",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/store/stock.sql.go",
+   "old": "AS sellable\nFROM catalog.product_skus s JOIN catalog.products p ON p.id = s.product_id\nWHERE s.id = $1 AND p.store_id = $2\n",
+   "new": "AS sellable\nFROM catalog.product_skus s JOIN catalog.products p ON p.id = s.product_id\nWHERE s.id = $1 AND p.store_id = $2 AND s.deleted_at IS NULL AND p.deleted_at IS NULL\n",
+   "test": "internal/httpapi/catalog ^TestAppliedStockWriteStillSucceedsAfterTheSkuIsDeleted$",
+   "why": "庫存調整後的讀回排除已刪除的 SKU 與商品：已生效的操作在並行刪除或重送時回 not_found，測試要紅。"
   }
  ]
 }

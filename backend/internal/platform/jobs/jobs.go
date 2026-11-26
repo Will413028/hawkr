@@ -31,15 +31,6 @@ type Enqueuer interface {
 	Enqueue(ctx context.Context, args river.JobArgs, opts *river.InsertOpts) error
 }
 
-// Tracker 是排入之後還要追蹤 job 的使用方需要的介面：EnqueueJob 回 job id，JobState 查 job 目前的狀態。
-type Tracker interface {
-	Enqueuer
-	EnqueueJob(ctx context.Context, args river.JobArgs, opts *river.InsertOpts) (int64, error)
-	JobState(ctx context.Context, jobID int64) (state rivertype.JobState, found bool, err error)
-}
-
-var _ Tracker = (*Client)(nil)
-
 // ReportingEnqueuer 另外回報是否真的排入：job 被唯一鍵略過（同一個 job 還在排隊、執行或等重試）時 inserted 為 false。
 type ReportingEnqueuer interface {
 	Enqueuer

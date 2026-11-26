@@ -15,7 +15,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
@@ -46,18 +45,14 @@ type World struct {
 // New 建立世界：套用 media、buyer、seller、catalog 的 migration（catalog 讀 seller 的 pub_exposable_stores）。
 func New(t *testing.T, pg *testdb.Server) *World {
 	t.Helper()
-	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(
+	d := pg.NewDB(t, testdb.Migrations(
 		migrate.Module{Name: "media", Dir: media.Migrations()},
 		migrate.Module{Name: "buyer", Dir: buyer.Migrations()},
 		migrate.Module{Name: "seller", Dir: seller.Migrations()},
 		migrate.Module{Name: "catalog", Dir: catalog.Migrations()},
 	))
 	w := &World{T: t, DB: d, Media: media.NewFake(), now: time.Date(2026, 12, 1, 9, 0, 0, 0, time.UTC)}
-	queue, err := jobs.NewInsertOnly(d)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.Module = catalog.New(catalog.Deps{DB: d, NewID: uuid.NewV7, Now: w.Now, Media: w.Media, Jobs: queue, Restock: Notifier{}})
+	w.Module = catalog.New(catalog.Deps{DB: d, NewID: uuid.NewV7, Now: w.Now, Media: w.Media, Restock: Notifier{}})
 	// 只關心 catalog 讀 seller 的 pub_exposable_stores：KYC 的表放寬成可以直接寫最小的列（它自己的規則在 seller 的測試）。
 	w.Exec(`DO $$ DECLARE r record; BEGIN
 		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint

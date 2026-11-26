@@ -1,46 +1,59 @@
-// Package restock 是補貨通知在 catalog 這一端的部分（D26）：偵測 SKU 由不可買變可買、排 job、job 執行時重新確認並呼叫通知 port。
-//   - 可買是庫存大於 0 ∧ SKU 未刪 ∧ 商品 ACTIVE 且未刪 ∧ 店家在請求的 clock 可曝光（seller.pub_exposable_stores）；來源不限：賣家 SetStock 與 AdjustStock、歸還、
-//     改回上架、店家重新曝光。
-//   - 偵測與排入在寫入的 transaction 內（ctx 帶 transaction 時 job 與庫存一起 commit 或回滾）；呼叫通知 port 一律在 transaction 外，由 job 執行（單體規則 5）。
-//   - SKU 的 job 延後 Delay 才執行，只合併還沒開始的 job（D26）：合併靠 catalog.restock_pending 的標記，不靠 River 的唯一鍵（River 不允許把 running 排除在唯一鍵之外，
-//     執行中的 job 會吞掉之後的排入）。排入時占標記並在同一個 transaction 內排 job、把 job id 記在標記上；已有標記就鎖住它，它的 job 還會執行才合併，否則（完成、取消、被刪）接手排新 job；job 開始時第一件事消耗標記，之後的轉換重新占標記、排自己的 job，所以沒有窗口。
-//     店家曝光只排一個店家層的 job（同樣的標記，key 是店家），由它在 transaction 外展開成該店家可買 SKU 的 job。
-//   - job 執行時重新確認可買並讀最新的名稱與主圖，不可買就結束、不呼叫通知；通知是一次性訂閱，重複呼叫是 no-op，所以 job 重試安全。
+// Package restock 是補貨通知在 catalog 這一端的部分（D26）：偵測 SKU 由不可買變可買、寫進佇列表、由週期 worker 重新確認後呼叫通知 port。
+//   - 可買是庫存大於 0 ∧ SKU 未刪 ∧ 商品 ACTIVE 且未刪 ∧ 店家在請求的 clock 可曝光（seller.pub_exposable_stores）；來源不限：賣家 SetStock 與 AdjustStock、歸還、改回上架。
+//     店家重新曝光不觸發（Will 2026-11-27）。
+//   - 偵測與排入在寫入的 transaction 內（ctx 帶 transaction 時佇列列與庫存一起 commit 或回滾）；呼叫通知 port 一律在 transaction 外，由 worker 執行（單體規則 5）。
+//     這是 transactional outbox 的 polling publisher，前例是 media 的刪除請求表。
+//   - 佇列表 restock_queue 一個 SKU 最多一列：沒被認領就合併（保留較早的 due_at），被認領處理中就只更新 requested_at；worker 完成時只在 requested_at 沒變才刪列，
+//     變了就重新排（Rearm），所以處理中的轉換不會遺失，也不需要 River 唯一鍵或標記。
+//   - worker 認領時寫租約（claimed_until），crash 後租約到期即重新處理；通知是一次性訂閱，重複呼叫是 no-op，所以重處理安全。失敗在同一列累計次數並指數退避，
+//     超過 MaxAttempts 設 failed_at 停手、列保留（含 last_error），之後的新請求會重置它。
+//   - 商品或 SKU 刪除經另一張同形的 restock_purge_queue 非同步清訂閱，同一套認領、完成與失敗。
 package restock
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 	"uuid"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/rivertype"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
-	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
 const (
-	// Delay 是 SKU 與店家層 job 排入後延後執行的時間：合併短時間內反覆的庫存變動，也讓賣家來得及改正誤操作。
+	// Delay 是請求排入後到可處理的延後時間：合併短時間內反覆的庫存變動，也讓賣家來得及改正誤操作。
 	Delay = 5 * time.Minute
+	// Interval 是 worker 的輪詢週期。
+	Interval = 30 * time.Second
+	// Lease 是認領的租約：必須長於一輪處理的時間（job 的 Timeout 較短），crash 的 worker 留下的列在它過後被重新認領。
+	Lease = 5 * time.Minute
+	// MaxAttempts 是失敗累計到幾次就停手。
+	MaxAttempts = 5
+	// BatchSize 是一輪最多認領幾列（補貨與清訂閱各自）。
+	BatchSize = 100
 
-	maxAttempts = 5
-	storePage   = 500
-
-	// requestAttempts 是占標記時遇到標記被並行消耗的重試上限。
-	requestAttempts = 5
+	backoffBase = time.Minute
+	backoffMax  = time.Hour
+	runTimeout  = 4 * time.Minute
 )
+
+// Backoff 是第 attempts 次失敗（從 1 起）之後到下一次嘗試的等待：一分鐘起倍增，上限一小時。
+func Backoff(attempts int32) time.Duration {
+	d := backoffBase
+	for i := int32(1); i < attempts && d < backoffMax; i++ {
+		d *= 2
+	}
+	return min(d, backoffMax)
+}
 
 // Deps 是補貨的依賴。
 type Deps struct {
 	DB       *db.DB
-	Jobs     jobs.Tracker
 	Now      func() time.Time
 	Notifier model.RestockNotifier
 }
@@ -53,108 +66,15 @@ func New(d Deps) *Service { return &Service{d: d} }
 
 func (s *Service) q(ctx context.Context) *store.Queries { return store.New(s.d.DB.Conn(ctx)) }
 
-// SkuArgs 是單一 SKU 的補貨確認 job（種類 catalog.restock_sku）。
-type SkuArgs struct {
-	SkuID uuid.UUID `json:"sku_id"`
-}
-
-// Kind 是 River 的 job 種類。
-func (SkuArgs) Kind() string { return "catalog.restock_sku" }
-
-// StoreArgs 是店家重新曝光後展開成各 SKU 的 job（種類 catalog.restock_store）。
-type StoreArgs struct {
-	StoreID int64 `json:"store_id"`
-}
-
-// Kind 是 River 的 job 種類。
-func (StoreArgs) Kind() string { return "catalog.restock_store" }
-
-// PurgeArgs 是商品或 SKU 刪除後清補貨訂閱的 job（種類 catalog.restock_purge）。清除是冪等的，不設唯一鍵。
-type PurgeArgs struct {
-	SkuIDs []uuid.UUID `json:"sku_ids"`
-}
-
-// Kind 是 River 的 job 種類。
-func (PurgeArgs) Kind() string { return "catalog.restock_purge" }
-
-func (s *Service) opts(delay time.Duration) *river.InsertOpts {
-	o := river.InsertOpts{MaxAttempts: maxAttempts}
-	if delay > 0 {
-		o.ScheduledAt = s.d.Now().Add(delay)
-	}
-	return &o
-}
-
-func skuKey(id uuid.UUID) string { return "sku:" + id.String() }
-
-func storeKey(id int64) string { return "store:" + strconv.FormatInt(id, 10) }
-
-// mergeable 是還會讀到之後狀態的 job 狀態：還沒開始的，以及開始了但還沒消耗標記（執行中、等重試，重跑時一樣先消耗標記）的。
-// completed、cancelled、discarded 的 job 不會再消耗標記，留在標記上就是孤兒。
-func mergeable(state rivertype.JobState) bool {
-	switch state {
-	case rivertype.JobStatePending, rivertype.JobStateScheduled, rivertype.JobStateAvailable, rivertype.JobStateRunning, rivertype.JobStateRetryable:
-		return true
-	case rivertype.JobStateCompleted, rivertype.JobStateCancelled, rivertype.JobStateDiscarded:
-		return false
-	}
-	return false
-}
-
-// request 讓 key 有一個還沒開始的 job 會讀到之後的狀態。標記與 job 在同一個 transaction 內建立與綁定（ctx 已帶 transaction 就加入它），
-// 所以不會有「標記在、job 沒排」；標記記著它的 job id，合併前先確認那個 job 還會執行，已結束或被取消、刪除就接手：排新 job、改綁。
-// 標記已存在時用 FOR UPDATE 鎖住它（job 開始時消耗標記要等這個 transaction 結束）；鎖時標記剛好被消耗就重新占。
-func (s *Service) request(ctx context.Context, key string, args river.JobArgs, delay time.Duration) error {
-	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
-		q := s.q(ctx)
-		for range requestAttempts {
-			inserted, err := q.InsertRestockPending(ctx, key)
-			if err != nil {
-				return err
-			}
-			if inserted == 1 {
-				return s.bind(ctx, key, args, delay)
-			}
-			jobID, err := q.LockRestockPending(ctx, key)
-			if errors.Is(err, pgx.ErrNoRows) {
-				continue
-			}
-			if err != nil {
-				return err
-			}
-			state, found, err := s.d.Jobs.JobState(ctx, jobID)
-			if err != nil {
-				return err
-			}
-			if found && mergeable(state) {
-				return nil
-			}
-			return s.bind(ctx, key, args, delay)
-		}
-		return fmt.Errorf("restock：%s 的待處理標記一直被並行消耗", key)
-	})
-}
-
-// bind 排 job 並把標記綁到它；呼叫方已持有標記列的鎖（剛新增或 FOR UPDATE）。
-func (s *Service) bind(ctx context.Context, key string, args river.JobArgs, delay time.Duration) error {
-	id, err := s.d.Jobs.EnqueueJob(ctx, args, s.opts(delay))
-	if err != nil {
-		return err
-	}
-	return s.q(ctx).BindRestockPending(ctx, store.BindRestockPendingParams{JobKey: key, JobID: id})
-}
-
-func (s *Service) enqueueSku(ctx context.Context, skuID uuid.UUID, delay time.Duration) error {
-	return s.request(ctx, skuKey(skuID), SkuArgs{SkuID: skuID}, delay)
-}
-
 // StockIncreased 在庫存增加的寫入之後、同一個 transaction 內呼叫：added 是這次增加的量，呼叫方保證 SKU 列已被它的 UPDATE 鎖住，
-// 所以此刻庫存等於 added 就表示增加前是 0；而且此刻可買才排 job（>0 到 >0、店家不可曝光、商品不是 ACTIVE 都不排）。
+// 所以此刻庫存等於 added 就表示增加前是 0；而且此刻可買才排（>0 到 >0、店家不可曝光、商品不是 ACTIVE 都不排）。
+// 商品狀態與這次庫存變更並行時，兩邊 transaction 互相看不到對方；漏的那一邊由 ProductActivated 對每個 SKU 都排補上。
 func (s *Service) StockIncreased(ctx context.Context, skuID uuid.UUID, added int32) error {
 	if added <= 0 {
 		return nil
 	}
-	st, err := s.q(ctx).GetSkuRestockState(ctx, store.GetSkuRestockStateParams{ID: skuID, At: s.d.Now()})
+	now := s.d.Now()
+	st, err := s.q(ctx).GetSkuRestockState(ctx, store.GetSkuRestockStateParams{ID: skuID, At: now})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
@@ -164,42 +84,66 @@ func (s *Service) StockIncreased(ctx context.Context, skuID uuid.UUID, added int
 	if st.StockQty != added || !st.Purchasable {
 		return nil
 	}
-	return s.enqueueSku(ctx, skuID, Delay)
+	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		return s.q(ctx).EnqueueRestock(ctx, store.EnqueueRestockParams{SkuID: skuID, DueAt: now.Add(Delay), Now: now})
+	})
 }
 
-// ProductActivated 在商品由 DRAFT 或 ARCHIVED 切成 ACTIVE 的 transaction 內呼叫：切換前它的 SKU 都不可買，所以現在可買的每個 SKU 都是新的轉換。
+// ProductActivated 在商品由 DRAFT 或 ARCHIVED 切成 ACTIVE 的 transaction 內呼叫：商品每個沒刪除的 SKU 都排，不看庫存。
+// 不讀庫存就不會與並行的 0 到正庫存變更互相看不到而漏通知；庫存是 0 的 SKU 由 worker 執行時重新確認而不通知。
 func (s *Service) ProductActivated(ctx context.Context, productID uuid.UUID) error {
-	ids, err := s.q(ctx).ListPurchasableSkusOfProduct(ctx, store.ListPurchasableSkusOfProductParams{ProductID: productID, At: s.d.Now()})
-	if err != nil {
-		return err
-	}
-	for _, id := range ids {
-		if err := s.enqueueSku(ctx, id, Delay); err != nil {
-			return err
-		}
-	}
-	return nil
+	now := s.d.Now()
+	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		return s.q(ctx).EnqueueRestockOfProduct(ctx, store.EnqueueRestockOfProductParams{ProductID: productID, DueAt: now.Add(Delay), Now: now})
+	})
 }
 
-// StoreExposed 在店家變成可曝光（seller.StoreExposureChanged）的 transaction 內呼叫：只排一個店家層的 job，不在 transaction 內展開（店家的 SKU 可能很多）。
-func (s *Service) StoreExposed(ctx context.Context, storeID int64) error {
-	return s.request(ctx, storeKey(storeID), StoreArgs{StoreID: storeID}, Delay)
-}
-
-// SkusDeleted 在商品或 SKU 刪除的 transaction 內呼叫：排一個 job 非同步清這些 SKU 的訂閱。
+// SkusDeleted 在商品或 SKU 刪除的 transaction 內呼叫：排這些 SKU 的訂閱清除，由 worker 非同步呼叫 port。
 func (s *Service) SkusDeleted(ctx context.Context, skuIDs []uuid.UUID) error {
 	if len(skuIDs) == 0 {
 		return nil
 	}
-	return s.d.Jobs.Enqueue(ctx, PurgeArgs{SkuIDs: skuIDs}, &river.InsertOpts{MaxAttempts: maxAttempts})
+	now := s.d.Now()
+	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		q := s.q(ctx)
+		for _, id := range skuIDs {
+			if err := q.EnqueuePurge(ctx, store.EnqueuePurgeParams{SkuID: id, DueAt: now, Now: now}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
-// RunSku 是 SKU job 的內容：重新確認可買，可買才以最新的名稱與主圖呼叫通知 port；不可買（庫存又歸零、商品下架或刪除、店家不可曝光）直接結束。
-func (s *Service) RunSku(ctx context.Context, skuID uuid.UUID) error {
-	// 先消耗標記再讀狀態：此後 commit 的轉換排自己的 job；標記上有尚未 commit 的合併時，這裡等它 commit，下面讀到的狀態就含它。
-	if err := s.q(ctx).ConsumeRestockPending(ctx, skuKey(skuID)); err != nil {
-		return err
+// Run 是 worker 一輪的內容：處理到期的補貨列，再處理清訂閱列。通知 port 的失敗記在列上、不回傳；只有佇列表本身的資料庫錯誤才回 error。
+func (s *Service) Run(ctx context.Context) error {
+	return errors.Join(s.runRestock(ctx), s.runPurge(ctx))
+}
+
+type claimed struct {
+	skuID       uuid.UUID
+	requestedAt time.Time
+	attempts    int32
+}
+
+func (s *Service) runRestock(ctx context.Context) error {
+	now := s.d.Now()
+	rows, err := s.q(ctx).ClaimRestock(ctx, store.ClaimRestockParams{Now: now, LeaseUntil: now.Add(Lease), MaxRows: BatchSize})
+	if err != nil {
+		return fmt.Errorf("restock：認領：%w", err)
 	}
+	var errs []error
+	for _, r := range rows {
+		c := claimed{skuID: r.SkuID, requestedAt: r.RequestedAt, attempts: r.Attempts}
+		if err := s.settle(ctx, c, s.notify(ctx, c.skuID), s.finishRestock, s.failRestock, s.rearmRestock); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// notify 重新確認可買、讀最新的名稱與主圖，可買才呼叫通知 port；不可買（庫存又歸零、商品下架或刪除、店家不可曝光）不通知，視為處理完。
+func (s *Service) notify(ctx context.Context, skuID uuid.UUID) error {
 	now := s.d.Now()
 	st, err := s.q(ctx).GetSkuRestockState(ctx, store.GetSkuRestockStateParams{ID: skuID, At: now})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -216,70 +160,110 @@ func (s *Service) RunSku(ctx context.Context, skuID uuid.UUID) error {
 	})
 }
 
-// RunStore 是店家層 job 的內容：把店家目前可買的每個 SKU 展開成立即執行的 SKU job（和延後中的同 SKU job 合併）。
-func (s *Service) RunStore(ctx context.Context, storeID int64) error {
-	if err := s.q(ctx).ConsumeRestockPending(ctx, storeKey(storeID)); err != nil {
-		return err
+func (s *Service) runPurge(ctx context.Context) error {
+	now := s.d.Now()
+	rows, err := s.q(ctx).ClaimPurge(ctx, store.ClaimPurgeParams{Now: now, LeaseUntil: now.Add(Lease), MaxRows: BatchSize})
+	if err != nil {
+		return fmt.Errorf("restock：認領清訂閱：%w", err)
 	}
-	after := uuid.Nil()
-	for {
-		ids, err := s.q(ctx).ListPurchasableSkusOfStore(ctx, store.ListPurchasableSkusOfStoreParams{StoreID: storeID, After: after, At: s.d.Now(), PageSize: storePage})
+	if len(rows) == 0 {
+		return nil
+	}
+	ids := make([]uuid.UUID, len(rows))
+	for i, r := range rows {
+		ids[i] = r.SkuID
+	}
+	callErr := s.d.Notifier.PurgeSKUSubscriptions(ctx, ids)
+	var errs []error
+	for _, r := range rows {
+		c := claimed{skuID: r.SkuID, requestedAt: r.RequestedAt, attempts: r.Attempts}
+		if err := s.settle(ctx, c, callErr, s.finishPurge, s.failPurge, s.rearmPurge); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// settle 收尾一個認領的列：成功就刪（requested_at 沒變）；處理中有新請求（刪不到）就重新排；失敗就同列退避或停手。
+func (s *Service) settle(ctx context.Context, c claimed, procErr error,
+	finish func(context.Context, claimed) (int64, error),
+	fail func(context.Context, claimed, time.Time, string, *time.Time) (int64, error),
+	rearm func(context.Context, claimed, time.Time) error,
+) error {
+	now := s.d.Now()
+	if procErr == nil {
+		n, err := finish(ctx, c)
 		if err != nil {
 			return err
 		}
-		for _, id := range ids {
-			if err := s.enqueueSku(ctx, id, 0); err != nil {
-				return err
-			}
+		if n == 0 {
+			return rearm(ctx, c, now.Add(Delay))
 		}
-		if len(ids) < storePage {
-			return nil
-		}
-		after = ids[len(ids)-1]
+		return nil
 	}
+	var failedAt *time.Time
+	if c.attempts+1 >= MaxAttempts {
+		failedAt = &now
+	}
+	n, err := fail(ctx, c, now.Add(Backoff(c.attempts+1)), procErr.Error(), failedAt)
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return rearm(ctx, c, now.Add(Delay))
+	}
+	return nil
 }
 
-// RunPurge 是清訂閱 job 的內容。
-func (s *Service) RunPurge(ctx context.Context, skuIDs []uuid.UUID) error {
-	return s.d.Notifier.PurgeSKUSubscriptions(ctx, skuIDs)
+func (s *Service) finishRestock(ctx context.Context, c claimed) (int64, error) {
+	return s.q(ctx).FinishRestock(ctx, store.FinishRestockParams{SkuID: c.skuID, RequestedAt: c.requestedAt})
 }
 
-type skuWorker struct {
-	river.WorkerDefaults[SkuArgs]
+func (s *Service) failRestock(ctx context.Context, c claimed, due time.Time, msg string, failedAt *time.Time) (int64, error) {
+	return s.q(ctx).FailRestock(ctx, store.FailRestockParams{SkuID: c.skuID, RequestedAt: c.requestedAt, DueAt: due, LastError: &msg, FailedAt: failedAt})
+}
+
+func (s *Service) rearmRestock(ctx context.Context, c claimed, due time.Time) error {
+	return s.q(ctx).RearmRestock(ctx, store.RearmRestockParams{SkuID: c.skuID, DueAt: due})
+}
+
+func (s *Service) finishPurge(ctx context.Context, c claimed) (int64, error) {
+	return s.q(ctx).FinishPurge(ctx, store.FinishPurgeParams{SkuID: c.skuID, RequestedAt: c.requestedAt})
+}
+
+func (s *Service) failPurge(ctx context.Context, c claimed, due time.Time, msg string, failedAt *time.Time) (int64, error) {
+	return s.q(ctx).FailPurge(ctx, store.FailPurgeParams{SkuID: c.skuID, RequestedAt: c.requestedAt, DueAt: due, LastError: &msg, FailedAt: failedAt})
+}
+
+func (s *Service) rearmPurge(ctx context.Context, c claimed, due time.Time) error {
+	return s.q(ctx).RearmPurge(ctx, store.RearmPurgeParams{SkuID: c.skuID, DueAt: due})
+}
+
+// RunArgs 是週期 job 的參數（種類 catalog.restock_run）。
+type RunArgs struct{}
+
+// Kind 是 River 的 job 種類。
+func (RunArgs) Kind() string { return "catalog.restock_run" }
+
+type runWorker struct {
+	river.WorkerDefaults[RunArgs]
 	svc *Service
 }
 
-func (w *skuWorker) Work(ctx context.Context, j *river.Job[SkuArgs]) error {
-	return w.svc.RunSku(ctx, j.Args.SkuID)
-}
+func (w *runWorker) Work(ctx context.Context, _ *river.Job[RunArgs]) error { return w.svc.Run(ctx) }
 
-func (w *skuWorker) Timeout(*river.Job[SkuArgs]) time.Duration { return time.Minute }
+func (w *runWorker) Timeout(*river.Job[RunArgs]) time.Duration { return runTimeout }
 
-type storeWorker struct {
-	river.WorkerDefaults[StoreArgs]
-	svc *Service
-}
+// AddWorkers 登記週期 job 的 River worker。
+func AddWorkers(workers *river.Workers, s *Service) { river.AddWorker(workers, &runWorker{svc: s}) }
 
-func (w *storeWorker) Work(ctx context.Context, j *river.Job[StoreArgs]) error {
-	return w.svc.RunStore(ctx, j.Args.StoreID)
-}
-
-func (w *storeWorker) Timeout(*river.Job[StoreArgs]) time.Duration { return 5 * time.Minute }
-
-type purgeWorker struct {
-	river.WorkerDefaults[PurgeArgs]
-	svc *Service
-}
-
-func (w *purgeWorker) Work(ctx context.Context, j *river.Job[PurgeArgs]) error {
-	return w.svc.RunPurge(ctx, j.Args.SkuIDs)
-}
-
-func (w *purgeWorker) Timeout(*river.Job[PurgeArgs]) time.Duration { return time.Minute }
-
-// AddWorkers 登記三種 job 的 River worker。
-func AddWorkers(workers *river.Workers, s *Service) {
-	river.AddWorker(workers, &skuWorker{svc: s})
-	river.AddWorker(workers, &storeWorker{svc: s})
-	river.AddWorker(workers, &purgeWorker{svc: s})
+// PeriodicJobs 回傳每 Interval 執行一輪的排程。只試一次：下一個週期就是重試，失敗的列在表上。
+func PeriodicJobs() []*river.PeriodicJob {
+	return []*river.PeriodicJob{
+		river.NewPeriodicJob(
+			river.PeriodicInterval(Interval),
+			func() (river.JobArgs, *river.InsertOpts) { return RunArgs{}, &river.InsertOpts{MaxAttempts: 1} },
+			&river.PeriodicJobOpts{ID: "catalog.restock_run", RunOnStart: true},
+		),
+	}
 }

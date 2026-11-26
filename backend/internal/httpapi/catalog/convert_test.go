@@ -228,20 +228,16 @@ func TestSellerProductMapsEveryField(t *testing.T) {
 	}
 }
 
-// 庫存調整後回的 SKU：availability 依商品狀態與調整後的庫存；找不到 SKU 是內部錯誤（調整已成功）。
+// 庫存調整後回的 SKU：availability 依模組算好的可購買性（已刪除的 SKU 也照實回報已生效的庫存）。
 func TestSellerSkuAfterStockChange(t *testing.T) {
 	t.Parallel()
-	pr := fullProduct(catalog.StatusActive)
-	got, err := sellerSku(pr, uuid.UUID{3})
-	if err != nil || got.GetStockQty() != 4 || got.GetAvailability() != pb.ProductAvailability_PRODUCT_AVAILABILITY_AVAILABLE {
-		t.Fatalf("sku = %v, %v", got, err)
+	sku := catalog.Sku{ID: uuid.UUID{3}, Option1: "S", Price: 120, StockQty: 4}
+	got := sellerSku(catalog.SkuState{Sku: sku, Sellable: true})
+	if got.GetId() != sku.ID.String() || got.GetOption1() != "S" || got.GetPrice() != 120 || got.GetStockQty() != 4 || got.GetAvailability() != pb.ProductAvailability_PRODUCT_AVAILABILITY_AVAILABLE {
+		t.Fatalf("sku = %v", got)
 	}
-	pr.Status = catalog.StatusDraft
-	if got, _ := sellerSku(pr, uuid.UUID{3}); got.GetAvailability() != pb.ProductAvailability_PRODUCT_AVAILABILITY_UNAVAILABLE {
-		t.Fatalf("草稿的 SKU = %v", got)
-	}
-	if _, err := sellerSku(pr, uuid.UUID{77}); err == nil {
-		t.Fatal("找不到 SKU 要回錯誤")
+	if got := sellerSku(catalog.SkuState{Sku: sku}); got.GetStockQty() != 4 || got.GetAvailability() != pb.ProductAvailability_PRODUCT_AVAILABILITY_UNAVAILABLE {
+		t.Fatalf("不可購買的 SKU = %v", got)
 	}
 }
 

@@ -5,7 +5,7 @@
 ## 1. 範圍與公開介面
 
 - 實作在 `internal/modules/catalog`，自己的 `catalog` schema 與 migration，登記在 `cmd/hawkr/modules.go` 的 `modules()`。不依賴 fulfillment（D10：運費與配送方式歸 seller 的運費設定，B3）。
-- 根套件的方法：`DeductStock`、`RestoreStock`、`AdjustStock`、`SetStock`、`Categories`、`IsLeafCategory`、`CreateProduct`、`UpdateProduct`、`SetProductStatus`、`DeleteProduct`、`Product`、`PublicProduct`、`AdminProduct`、`ListSellerProducts`、`CountSellerProducts`、`ListPublicProducts`、`ListPublicProductsOfStores`、`ListAdminProducts`、`SuggestProductNames`、`SuggestHashtags`、`TrendingHashtags`、`Etag`／`ParseEtag`、`SuggestedSafetyStock`。
+- 根套件的方法：`DeductStock`、`RestoreStock`、`AdjustStock`、`SetStock`、`SetRating`、`RecordSales`、`Categories`、`IsLeafCategory`、`CreateProduct`、`UpdateProduct`、`SetProductStatus`、`DeleteProduct`、`Product`、`PublicProduct`、`AdminProduct`、`ListSellerProducts`、`CountSellerProducts`、`ListPublicProducts`、`ListPublicProductsOfStores`、`ListAdminProducts`、`SuggestProductNames`、`SuggestHashtags`、`TrendingHashtags`、`Etag`／`ParseEtag`、`SuggestedSafetyStock`。
 - 模組內依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`。
 
 ## 2. 資料
@@ -19,6 +19,8 @@
 | `stock_operations`、`stock_movements` | 庫存帳本：一次操作一列（冪等鍵：結帳的操作全域唯一、賣家調整依 `store_id` 在店家內唯一，各一個部分唯一索引），明細是有號 delta；賣家的 `ADJUST`／`SET` 操作記 `request_hash` |
 | `product_images` | 圖庫與描述圖片的資產引用 |
 | `product_hashtags` | 商品的 hashtag 值集合 |
+| `sales_orders` | 銷量累計的去重：`order_no` 主鍵，同一筆訂單只累計一次（B8 之前 Java order 的 MQ 會重送，之後退場） |
+| `restock_queue`、`restock_purge_queue` | 補貨通知與清訂閱的佇列（D26）：`sku_id` 主鍵，`due_at`、`requested_at`、`claimed_until`（租約）、`attempts`、`last_error`、`failed_at` |
 
 ## 3. 庫存
 
@@ -64,3 +66,14 @@
 - 分頁是 keyset（`ListCursor{Key, ID}`）：賣家與後台的 `Key` 是建立時間的微秒數，公開列表依排序決定（`LATEST` 是首次上架的微秒數，價格低到高取負值，評分乘 1000 取整，相關度乘 10^6 取整），同鍵依 ID 遞減；頁大小預設與上限 100。游標的編碼與跟請求參數的綁定在對外層（B4-3b）。列帶主圖庫第一張的 object key、沒刪除 SKU 的庫存總和（上限 int32）。
 - 公開排序用 `CASE` 算出排序鍵，沒有對應的索引：量測前不加（D15）；只有 `searchable_text` 的 ILIKE 有 GIN 索引。
 - 還沒有：有效限制措施（D7）的排除（B4-5）。
+
+## 7. 評分、銷量與補貨通知（B4-3b）
+
+- `SetRating(ctx, productID, average, count)`：review 在自己的 transaction 內把商品的評分平均（0 到 5）與評價則數設成絕對值；沒有版本欄，並行呼叫靠商品列的行鎖序列化，後提交的勝出；不改 etag。`count` 為 0 時 `average` 必為 0，不合法回 `*InvalidInputError`，商品不存在回 `ErrProductNotFound`（已刪除的商品仍更新）。
+- `RecordSales(ctx, orderNo, items)`：把一筆訂單的銷量累計到各商品（同商品先加總），同一個 `orderNo` 只累計一次（`sales_orders` 去重），重送回 nil 不再累計。與呼叫方的 transaction 同進退；任何商品不存在整筆回滾並回 `ErrProductNotFound`。在呼叫方的 transaction 內回 error 時，呼叫方必須回滾那個 transaction（這裡不開 savepoint，否則登記了訂單卻沒累計，之後的重送被去重擋下）。
+- 補貨通知（D26）：SKU 由不可買變可買（庫存大於 0、SKU 未刪、商品 ACTIVE 且未刪、店家可曝光），來源不限（`SetStock`、`AdjustStock`、`RestoreStock`、商品切成 ACTIVE）。偵測與排入在寫入的 transaction 內：庫存增加後該 SKU 庫存等於增加量（即原本是 0）且此刻可買，就寫一列 `restock_queue`，`due_at` 是請求時間加 5 分鐘；商品切成 ACTIVE 對它每個沒刪除的 SKU 都寫一列，不讀庫存。
+- 合併與處理中的請求：沒被認領的列不動（保留較早的 `due_at`）；被認領處理中的列只把 `requested_at` 往後推至少 1 微秒。worker 完成時只在 `requested_at` 沒變才刪，變了就放掉租約、`due_at` 重設成現在加 5 分鐘，所以處理中的轉換不會遺失。
+- worker（River 週期 job，每 30 秒，`PeriodicJobs()` 與 `AddWorkers` 匯出，B4-6 接線）：以 `FOR UPDATE SKIP LOCKED` 認領到期且沒被認領（或租約已過）的列並寫 5 分鐘租約，在 transaction 外重新確認可買、讀最新的名稱與主圖，呼叫 `RestockNotifier.NotifyRestocked`；不可買就不通知、刪列。通知是一次性訂閱，重處理安全。
+- 失敗：同一列 `attempts` 加一、`due_at` 退避（1 分鐘起倍增，上限 1 小時）、記 `last_error`；累計 5 次設 `failed_at` 停手，列保留，新請求會重置。
+- 清訂閱：商品或 SKU 刪除的 transaction 內寫 `restock_purge_queue`（立即到期），worker 把一輪認領的 SKU 合併成一次 `PurgeSKUSubscriptions`，語意同上。
+- 不以店家恢復曝光觸發通知（Will 2026-11-27）。

@@ -28,7 +28,7 @@ type SellerModule interface {
 	ListSellerProducts(ctx context.Context, storeID int64, f catalog.SellerFilter, after *catalog.ListCursor, size int32) (catalog.ProductPage, error)
 	CountSellerProducts(ctx context.Context, storeID int64, f catalog.SellerFilter) (int32, error)
 	Product(ctx context.Context, storeID int64, productID uuid.UUID) (catalog.Product, error)
-	ProductOfSku(ctx context.Context, storeID int64, skuID uuid.UUID) (catalog.Product, error)
+	OwnSku(ctx context.Context, storeID int64, skuID uuid.UUID) (catalog.SkuState, error)
 	CreateProduct(ctx context.Context, storeID int64, uploader media.Uploader, requestID uuid.UUID, in catalog.ProductInput) (catalog.Product, error)
 	UpdateProduct(ctx context.Context, storeID int64, uploader media.Uploader, productID uuid.UUID, version int64, in catalog.ProductInput) (catalog.Product, error)
 	SetProductStatus(ctx context.Context, storeID int64, productID uuid.UUID, version int64, to catalog.ProductStatus) error

@@ -316,11 +316,11 @@ func (h *App) SetStock(ctx context.Context, req *connect.Request[pb.SetStockRequ
 	return connect.NewResponse(&pb.SetStockResponse{Sku: out}), nil
 }
 
-// stockResult 讀回調整後的 SKU：SKU 沒有單獨的讀取，經它所屬的商品（限定這家店）讀。
+// stockResult 讀回調整後的 SKU（含已刪除的）：調整已經 commit 或重送時，並行刪除不能讓已生效的操作回失敗。
 func (h *App) stockResult(ctx context.Context, c caller, sku uuid.UUID) (*pb.Sku, error) {
-	p, err := h.m.ProductOfSku(ctx, c.storeID, sku)
+	st, err := h.m.OwnSku(ctx, c.storeID, sku)
 	if err != nil {
 		return nil, failure(err, noPaths)
 	}
-	return sellerSku(p, sku)
+	return sellerSku(st), nil
 }

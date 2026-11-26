@@ -152,7 +152,7 @@ func startMonolith(t *testing.T) *monolith {
 		Payment: payment.New(payment.Deps{DB: d, Audit: adminaudit.New(d, time.Now), Events: bus, Jobs: queue, Now: time.Now, Logger: log}),
 	})
 	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Identity: id, Buyer: buyers, Seller: sellers, Orders: noAccountOrders{}, Now: time.Now, Logger: log})
-	catalogModule := catalogmod.New(catalogmod.Deps{DB: d, NewID: uuid.NewV7, Now: time.Now, Media: media.NewFake(), Jobs: queue, Restock: catalogtest.Notifier{}})
+	catalogModule := catalogmod.New(catalogmod.Deps{DB: d, NewID: uuid.NewV7, Now: time.Now, Media: media.NewFake(), Restock: catalogtest.Notifier{}})
 	images, err := rpc.NewImages("https://media.example.test")
 	if err != nil {
 		t.Fatal(err)
