@@ -91,12 +91,17 @@ type (
 	SalesItem = model.SalesItem
 	// RestockedSKU 是 SKU 由不可買變可買時，通知用的最新快照。
 	RestockedSKU = model.RestockedSKU
+	// SkuSnapshot 是一個 SKU 與它的商品此刻的內容（結帳快照與購物車資訊共用）。
+	SkuSnapshot = model.SkuSnapshot
 	// RestockNotifier 是 catalog 宣告、補貨通知下游（buyer，B4-4 接線）實作的 port。
 	RestockNotifier = model.RestockNotifier
 )
 
 // 商品狀態與描述區塊的種類。
 const (
+	// MaxBatchIDs 是批次讀取一次的 ID 數上限。
+	MaxBatchIDs = model.MaxBatchIDs
+
 	StatusDraft    = model.StatusDraft
 	StatusActive   = model.StatusActive
 	StatusArchived = model.StatusArchived
@@ -240,6 +245,43 @@ func (m *Module) AdjustStock(ctx context.Context, storeID int64, key string, sku
 // 成功時帳本記一列 SET 操作與差額 movement；重送與錯誤語意同 AdjustStock。不改商品的 etag。
 func (m *Module) SetStock(ctx context.Context, storeID int64, key string, skuID uuid.UUID, quantity, expected int32) error {
 	return m.stock.SetQuantity(ctx, storeID, key, skuID, quantity, expected)
+}
+
+// ProductCards 批次讀商品卡片（沒刪除的商品，缺席的 ID 表示不存在或已刪除）：includeInactive 為假時只回 ACTIVE 且店家在 at 可曝光的（公開可見），為真時任何狀態都回（直接連結仍可瀏覽）。
+// ids 最多 MaxBatchIDs 個，超過或含零值回 *InvalidInputError。
+func (m *Module) ProductCards(ctx context.Context, at time.Time, ids []uuid.UUID, includeInactive bool) (map[uuid.UUID]ProductSummary, error) {
+	return m.product.Cards(ctx, at, ids, includeInactive)
+}
+
+// ProductStoreIDs 批次讀商品所屬店家：沒刪除的商品，任何狀態（含草稿與下架）、不看店家曝光；缺席的 ID 表示不存在或已刪除。輸入限制同 ProductCards。
+func (m *Module) ProductStoreIDs(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]int64, error) {
+	return m.product.StoreIDs(ctx, ids)
+}
+
+// StoresWithPublicProducts 回至少有一件公開商品（ACTIVE、沒刪除）且店家在 at 可曝光的店家 ID，升序。
+func (m *Module) StoresWithPublicProducts(ctx context.Context, at time.Time) ([]int64, error) {
+	return m.product.StoresWithPublicProducts(ctx, at)
+}
+
+// CheckoutSnapshot 是結帳用的 SKU 快照（D20，不版本化：訂單自己保存當時讀到的內容）：不過濾狀態與刪除，已下架與已刪除的 SKU 也回，
+// 由 Active 判斷可不可以買、StockQty 看庫存；缺席的 SKU 表示不存在。配送方式、重量與尺寸不在 catalog（D10）。輸入限制同 ProductCards。
+func (m *Module) CheckoutSnapshot(ctx context.Context, skuIDs []uuid.UUID) (map[uuid.UUID]SkuSnapshot, error) {
+	return m.product.SkuSnapshots(ctx, skuIDs)
+}
+
+// SkuCartInfo 是購物車列表與加入購物車用的 SKU 即時資訊，內容與判斷同 CheckoutSnapshot（兩個呼叫端各自的入口，同一句查詢）。
+func (m *Module) SkuCartInfo(ctx context.Context, skuIDs []uuid.UUID) (map[uuid.UUID]SkuSnapshot, error) {
+	return m.product.SkuSnapshots(ctx, skuIDs)
+}
+
+// AddFavorite 把商品的收藏數加一，由 buyer 在收藏列同一個 transaction 內呼叫（D3）：與呼叫方的 transaction 同進退（ctx 沒有時單句寫入）。商品不存在或已刪除回 ErrProductNotFound。
+func (m *Module) AddFavorite(ctx context.Context, productID uuid.UUID) error {
+	return m.product.AddFavorite(ctx, productID)
+}
+
+// RemoveFavorite 把商品的收藏數減一，下限 0，transaction 規則同 AddFavorite；已刪除的商品照減，商品不存在回 ErrProductNotFound。
+func (m *Module) RemoveFavorite(ctx context.Context, productID uuid.UUID) error {
+	return m.product.RemoveFavorite(ctx, productID)
 }
 
 // Categories 回傳整棵平台分類樹，頂層在前，同層依 position。
