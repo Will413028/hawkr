@@ -103,8 +103,8 @@
    "id": "status-same-target-checks-etag-first",
    "stack": "go-integration",
    "file": "backend/internal/modules/catalog/internal/product/product.go",
-   "old": "\t\tif from == to {\n\t\t\treturn nil\n\t\t}\n\t\tif cur.ContentVersion != version {",
-   "new": "\t\tif cur.ContentVersion != version {",
+   "old": "\t\tif from == to {\n\t\t\treturn nil\n\t\t}\n\t\tif cur.ContentVersion != version {\n\t\t\treturn model.ErrVersionConflict\n\t\t}",
+   "new": "\t\tif cur.ContentVersion != version {\n\t\t\treturn model.ErrVersionConflict\n\t\t}\n\t\tif from == to {\n\t\t\treturn nil\n\t\t}",
    "test": "internal/modules/catalog ^TestStaleEtagIsRejectedAndStockChangesDoNotMoveIt$",
    "why": "同狀態 no-op 不再先於 etag 比對：用切換前的舊 etag 重送同一個目標狀態回 VERSION_CONFLICT，不是成功，測試要紅。"
   },
