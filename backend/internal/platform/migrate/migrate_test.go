@@ -1,7 +1,10 @@
 package migrate
 
 import (
+	"io/fs"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -82,5 +85,46 @@ func TestDirectiveOnlyReadsTheFileHeader(t *testing.T) {
 		if got := directive([]byte(body)); got != want {
 			t.Errorf("directive(%q) = %q，預期 %q", body, got, want)
 		}
+	}
+}
+
+func TestExtensionsSQLInstallsEveryPlatformExtension(t *testing.T) {
+	want := ""
+	for _, e := range Extensions() {
+		want += "CREATE EXTENSION IF NOT EXISTS " + e + " WITH SCHEMA public;\n"
+	}
+	if got := ExtensionsSQL(); got != want || !strings.Contains(got, "pg_trgm") {
+		t.Fatalf("ExtensionsSQL = %q，預期 %q（含 pg_trgm，catalog 商品搜尋 D15）", got, want)
+	}
+}
+
+var createExtension = regexp.MustCompile(`(?im)^\s*CREATE\s+EXTENSION\b`)
+
+// extension 是 database 層級、由平台擁有（extensions）：模組的 desired state 與 migration 不得自己建立，
+// 否則 Atlas 產生 migration 時要靠手動步驟，也繞過平台清單。
+func TestModulesDoNotCreateExtensions(t *testing.T) {
+	roots := []string{"../../modules", "../../platform"}
+	checked := 0
+	for _, root := range roots {
+		err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() || !strings.HasSuffix(p, ".sql") || !strings.Contains(filepath.ToSlash(p), "/db/") {
+				return err
+			}
+			body, err := os.ReadFile(p)
+			if err != nil {
+				return err
+			}
+			checked++
+			if createExtension.Match(body) {
+				t.Errorf("%s 含 CREATE EXTENSION：extension 只在 internal/platform/migrate 的 extensions 宣告", p)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if checked == 0 {
+		t.Fatal("沒有找到任何模組的 SQL，守門沒有意義")
 	}
 }

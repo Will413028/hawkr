@@ -13,7 +13,5 @@ FROM "catalog"."stock_movements" m
 WHERE m.operation_id = o.id AND o.kind = 'ADJUST' AND o.request_hash IS NULL;
 UPDATE "catalog"."stock_operations" SET request_hash = sha256(convert_to(id::text, 'UTF8')) WHERE kind = 'ADJUST' AND request_hash IS NULL;
 ALTER TABLE "catalog"."stock_operations" ADD CONSTRAINT "stock_operations_hash_check" CHECK ((kind = ANY (ARRAY['ADJUST'::text, 'SET'::text])) = (request_hash IS NOT NULL));
--- 手寫：Atlas 社群版不處理 CREATE EXTENSION（desired state 的 schema.sql 裡遇到就報錯），pg_trgm 與它的 GIN 索引由這裡建立。
-CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
 -- Create index "products_search_idx" to table: "products"
-CREATE INDEX "products_search_idx" ON "catalog"."products" USING gin ("searchable_text" public.gin_trgm_ops) WHERE (deleted_at IS NULL);
+CREATE INDEX "products_search_idx" ON "catalog"."products" USING GIN ("searchable_text" public.gin_trgm_ops) WHERE (deleted_at IS NULL);

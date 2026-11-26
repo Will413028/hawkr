@@ -1,6 +1,6 @@
 .PHONY: build-all test-all vet-all lint-all lint-monolith lint-staged vet-tags-staged lint-fix-all deadcode proto-gen proto-lint proto-lint-numeric \
 	db-init db-init-local atlas-validate-all \
-	infra-up infra-down migrate serve worker dev-key dev-token dev-seed dev-seed-check dev-seed-stores reannounce-exposures sqlc jet connect uitext new-module new-characterization
+	infra-up infra-down migrate atlas-diff serve worker dev-key dev-token dev-seed dev-seed-check dev-seed-stores reannounce-exposures sqlc jet connect uitext new-module new-characterization
 
 GO_SERVICES := \
 	gateway \
@@ -329,12 +329,17 @@ jet:
 	GOWORK=off go run ./cmd/jetgen tables -module social -out internal/modules/social/internal/jet
 	GOWORK=off go run ./cmd/jetgen pub -module social -out internal/modules/social/internal/pubsql -use seller:pub_exposable_stores -use buyer:pub_blocked_buyers -use buyer:pub_blocked_stores
 
+# 為既有模組產生 migration（改完 db/schema.sql 之後）：dev database 先裝平台擁有的 extension，見 scripts/atlas-diff.sh。
+atlas-diff:
+	@test -n "$(module)" && test -n "$(name)" || { echo "用法：make atlas-diff module=<模組> name=<migration 名稱>" >&2; exit 2; }
+	bash scripts/atlas-diff.sh $(module) $(name)
+
 # 產生模組的骨架（遷移計畫 0.5）：internal/modules/<name>，登記到 cmd/hawkr/modules.go，並以 Atlas
 # 產生第一個 migration（建立 schema；需要 Atlas CLI 與 docker）。from 是舊服務的名稱，寫進 AGENTS.md。
 new-module:
 	@test -n "$(name)" || { echo "用法：make new-module name=<模組> [from=<舊服務>]" >&2; exit 2; }
 	GOWORK=off go run ./cmd/new-module module $(name) $(if $(from),-from $(from))
-	cd internal/modules/$(name)/db && atlas migrate diff $(name)_schema --env dev
+	bash scripts/atlas-diff.sh $(name) $(name)_schema
 
 # 產生模組特性測試的骨架（internal/httpapi/<name>/characterization）；legacy 是舊服務的名稱，有的話另外產生
 # REST driver 與起舊服務的 legacy.sh（scripts/characterize.sh 用）。

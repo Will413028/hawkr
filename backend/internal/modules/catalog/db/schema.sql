@@ -9,11 +9,6 @@
 
 CREATE SCHEMA IF NOT EXISTS public;
 
--- pg_trgm 給商品搜尋（D15）：searchable_text 的 GIN trigram 索引支援 ILIKE，相關度排序用 word_similarity。擴充裝在 public，不屬於本模組。
--- Atlas 社群版讀到 CREATE EXTENSION 就報錯：改這個檔之後跑 `atlas migrate diff` 時，先暫時拿掉下一行與 products_search_idx，產生 migration 後把這兩者
--- 以手寫補回 migration（product_api_support 是範例），再還原這個檔、`atlas migrate hash`。
-CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
-
 CREATE SCHEMA catalog;
 
 -- 平台分類樹：兩層（頂層分組與葉節點），由 migration 的版本化種子定義，沒有執行期寫入。商品只能掛葉節點（寫入端以

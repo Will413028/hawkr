@@ -8,7 +8,7 @@
 
 ## 擁有的資料
 
-schema `catalog`（`db/schema.sql`）：`categories`、`products`、`product_option_axes`、`product_option_values`、`product_skus`、`stock_operations`、`stock_movements`、`product_images`、`product_hashtags`。讀取模型：無。依賴 Postgres 擴充 `pg_trgm`（`public`）。
+schema `catalog`（`db/schema.sql`）：`categories`、`products`、`product_option_axes`、`product_option_values`、`product_skus`、`stock_operations`、`stock_movements`、`product_images`、`product_hashtags`。讀取模型：無。依賴 Postgres 擴充 `pg_trgm`（`public`，由平台安裝，見單體規則 6）。
 
 ## 發布的讀取介面
 
