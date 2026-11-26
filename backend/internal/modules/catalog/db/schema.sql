@@ -205,3 +205,11 @@ CREATE TABLE catalog.sales_orders (
     recorded_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT sales_orders_no_check CHECK (char_length(order_no) >= 1 AND char_length(order_no) <= 200)
 );
+
+-- 補貨 job 的待處理標記（D26）：一個 job_key（sku:<id> 或 store:<id>）同時最多一個還沒開始的 job，標記存在就代表有一個排好、還沒開始的 job 會讀到之後的狀態。
+-- 必要條件：River 的唯一鍵不能把 running 排除在外，執行中的 job 會吞掉之後的排入而漏通知；標記由 job 開始時消耗，之後的轉換重新排自己的 job。
+CREATE TABLE catalog.restock_pending (
+    job_key      TEXT        PRIMARY KEY,
+    requested_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT restock_pending_key_check CHECK (char_length(job_key) >= 1 AND char_length(job_key) <= 100)
+);

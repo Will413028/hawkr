@@ -388,20 +388,38 @@
    "why": "店家層 job 展開時不看庫存：售完的 SKU 也排 job，測試要紅。"
   },
   {
-   "id": "restock-jobs-not-unique",
+   "id": "restock-sku-job-does-not-consume-marker",
    "stack": "go-integration",
    "file": "backend/internal/modules/catalog/internal/restock/restock.go",
-   "old": "\to := jobs.UniqueByArgs(maxAttempts)\n",
-   "new": "\to := river.InsertOpts{MaxAttempts: maxAttempts}\n",
+   "old": "\tif err := s.q(ctx).ConsumeRestockPending(ctx, skuKey(skuID)); err != nil {\n\t\treturn err\n\t}\n",
+   "new": "",
+   "test": "internal/modules/catalog ^TestRestockTransitionWhileTheSkuJobIsRunningIsNotLost$",
+   "why": "SKU job 開始時不消耗待處理標記：job 執行中發生的 0 到大於 0 轉換被合併進已經開始的 job，漏掉通知，測試要紅（D26：只合併還沒開始的 job）。"
+  },
+  {
+   "id": "restock-store-job-does-not-consume-marker",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/restock/restock.go",
+   "old": "\tif err := s.q(ctx).ConsumeRestockPending(ctx, storeKey(storeID)); err != nil {\n\t\treturn err\n\t}\n",
+   "new": "",
+   "test": "internal/modules/catalog ^TestStoreExposureAfterTheStoreJobStartedEnqueuesANewJob$",
+   "why": "店家層 job 開始時不消耗標記：開始之後的再次曝光被合併而不排 job，測試要紅。"
+  },
+  {
+   "id": "restock-jobs-not-merged",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/restock/restock.go",
+   "old": "\t\tif inserted == 1 {\n",
+   "new": "\t\tif inserted >= 0 {\n",
    "test": "internal/modules/catalog ^TestRestockJobsOfTheSameSkuMergeWhileNotStarted$",
-   "why": "補貨 job 沒有唯一鍵：同一個 SKU 還沒開始的 job 不合併，短時間內反覆補貨排出多個，測試要紅。（River 不允許把 running 排除在唯一鍵之外，所以不能只排除 running 來做 mutant。）"
+   "why": "已有待處理標記時仍排 job：同一個 SKU 還沒開始的 job 不合併，短時間內反覆補貨排出多個，測試要紅。"
   },
   {
    "id": "restock-enqueue-outside-transaction",
    "stack": "go-integration",
    "file": "backend/internal/modules/catalog/internal/restock/restock.go",
-   "old": "\treturn s.d.Jobs.Enqueue(ctx, SkuArgs{SkuID: skuID}, s.opts(delay))",
-   "new": "\treturn s.d.Jobs.Enqueue(context.Background(), SkuArgs{SkuID: skuID}, s.opts(delay))",
+   "old": "\t\t\treturn s.d.Jobs.Enqueue(ctx, args, s.opts(delay))",
+   "new": "\t\t\treturn s.d.Jobs.Enqueue(context.Background(), args, s.opts(delay))",
    "test": "internal/modules/catalog ^TestRestockJobIsEnqueuedInTheCallersTransaction$",
    "why": "job 不用呼叫方的 transaction 排入：交易回滾後 job 仍在，測試要紅。"
   },

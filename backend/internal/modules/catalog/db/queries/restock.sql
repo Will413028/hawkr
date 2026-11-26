@@ -24,3 +24,16 @@ WHERE p.store_id = sqlc.arg(store_id) AND s.id > sqlc.arg(after)::uuid
   AND p.store_id IN (SELECT e.store_id FROM seller.pub_exposable_stores(sqlc.arg(at)::timestamptz) e)
 ORDER BY s.id
 LIMIT sqlc.arg(page_size);
+
+-- name: InsertRestockPending :execrows
+-- 排入前先占標記：新增回 1（呼叫方要排 job），已有同一個 key 回 0（合併進還沒開始的 job）。
+INSERT INTO catalog.restock_pending (job_key, requested_at) VALUES (sqlc.arg(job_key), sqlc.arg(requested_at))
+ON CONFLICT (job_key) DO NOTHING;
+
+-- name: TouchRestockPending :execrows
+-- 合併時鎖住現有的標記列：job 開始時消耗標記（DELETE）要等這個 transaction 結束，所以它之後讀到的狀態一定含這次的變動。標記已被消耗回 0，呼叫方重新占。
+UPDATE catalog.restock_pending SET requested_at = sqlc.arg(requested_at) WHERE job_key = sqlc.arg(job_key);
+
+-- name: ConsumeRestockPending :exec
+-- job 開始時消耗標記：之後的轉換看不到標記，會排自己的 job。
+DELETE FROM catalog.restock_pending WHERE job_key = sqlc.arg(job_key);

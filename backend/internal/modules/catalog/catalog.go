@@ -210,6 +210,7 @@ func (m *Module) SetRating(ctx context.Context, productID uuid.UUID, average flo
 
 // RecordSales 把一筆訂單的銷量累計到各商品（同一個商品多筆先加總），同一個 orderNo 只累計一次，重送回 nil 且不再累計。
 // 必要條件：Java order 以 MQ 送出事件，會重送，直到 ordering 搬進單體（B8）；到時 sales_orders 去重表退場。與呼叫方的 transaction 同進退（ctx 沒有時自己開一個），任何商品不存在整筆回滾、回 ErrProductNotFound。
+// 在呼叫方的 transaction 內回 error（含 ErrProductNotFound）時，呼叫方必須回滾那個 transaction：這裡不開 savepoint，已寫入的訂單登記仍在 transaction 裡，繼續 commit 會留下登記了但沒累計的訂單，之後的重送被去重擋下。未知商品是否當毒訊息丟棄由 B4-4 的消費端決定。
 func (m *Module) RecordSales(ctx context.Context, orderNo string, items []SalesItem) error {
 	return m.counter.RecordSales(ctx, orderNo, items)
 }

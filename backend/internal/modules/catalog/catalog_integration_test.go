@@ -38,12 +38,18 @@ type recordingNotifier struct {
 	mu       sync.Mutex
 	notified []RestockedSKU
 	purged   [][]uuid.UUID
+	// onNotify 在通知呼叫內執行（在 mu 之外），模擬 job 執行中發生的並行寫入。
+	onNotify func()
 }
 
 func (n *recordingNotifier) NotifyRestocked(_ context.Context, sku RestockedSKU) error {
 	n.mu.Lock()
-	defer n.mu.Unlock()
 	n.notified = append(n.notified, sku)
+	hook := n.onNotify
+	n.mu.Unlock()
+	if hook != nil {
+		hook()
+	}
 	return nil
 }
 

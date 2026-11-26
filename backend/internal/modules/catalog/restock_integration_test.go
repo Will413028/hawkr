@@ -38,6 +38,7 @@ func (f *productFixture) stocked(storeID, acct int64, title string, stock int32,
 func (f *productFixture) clearJobs() {
 	f.t.Helper()
 	f.exec(`DELETE FROM river.river_job`)
+	f.exec(`DELETE FROM catalog.restock_pending`)
 }
 
 // jobsOf 回傳這個種類的 job 數，idKey 與 id 非空時只算參數裡 idKey 等於 id 的。
@@ -248,6 +249,64 @@ func TestRestockJobsOfTheSameSkuMergeWhileNotStarted(t *testing.T) {
 	f.setStock(storeID, sku, 3, 0)
 	if got := f.skuJobs(sku); got != 1 {
 		t.Fatalf("two transitions before the job starts merge into one job, got %d", got)
+	}
+	if got := f.count(`SELECT count(*) FROM catalog.restock_pending WHERE job_key = $1`, "sku:"+sku.String()); got != 1 {
+		t.Fatalf("one pending marker stands for the not-yet-started job, got %d", got)
+	}
+}
+
+// 一個 SKU 的 job 正在執行（River 的 running）時又發生 0 到大於 0 的轉換：它不能被執行中的 job 吞掉（D26：只合併還沒開始的 job）。
+// 做法：第一個 job 標成 running，通知呼叫（發生在 job 開始之後）內做第二次轉換；第二次轉換必須排出自己的 job。
+func TestRestockTransitionWhileTheSkuJobIsRunningIsNotLost(t *testing.T) {
+	t.Parallel()
+	f := newProductFixture(t)
+	storeID, acct := f.store()
+	_, sku := f.stocked(storeID, acct, "執行中", 0, true)
+	f.setStock(storeID, sku, 5, 0)
+	f.exec(`UPDATE river.river_job SET state = 'running', attempt = 1, attempted_at = now(), attempted_by = ARRAY['test'] WHERE kind = $1`, kindSku)
+	f.rn.onNotify = func() {
+		f.setStock(storeID, sku, 0, 5)
+		f.setStock(storeID, sku, 3, 0)
+	}
+	if err := f.m.restock.RunSku(f.ct, sku); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.skuJobs(sku); got != 2 {
+		t.Fatalf("the transition during the running job enqueues its own job: running one + new one = 2, got %d", got)
+	}
+	if got := f.count(`SELECT count(*) FROM river.river_job WHERE kind = $1 AND state <> 'running'`, kindSku); got != 1 {
+		t.Fatalf("exactly one not-started job carries the second transition, got %d", got)
+	}
+	f.rn.onNotify = nil
+	if err := f.m.restock.RunSku(f.ct, sku); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.rn.skus(); len(got) != 2 {
+		t.Fatalf("the second job notifies again for the second transition, got %d notifications", len(got))
+	}
+}
+
+// 店家層的 job 同樣只合併還沒開始的：開始（消耗標記）之後的再次曝光排自己的 job。
+func TestStoreExposureAfterTheStoreJobStartedEnqueuesANewJob(t *testing.T) {
+	t.Parallel()
+	f := newProductFixture(t)
+	storeID, _ := f.store()
+	for range 2 {
+		if err := f.m.restock.StoreExposed(f.ct, storeID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := f.jobsOf(kindStore, "store_id", storeID); got != 1 {
+		t.Fatalf("exposures before the store job starts merge, got %d", got)
+	}
+	if err := f.m.restock.RunStore(f.ct, storeID); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.m.restock.StoreExposed(f.ct, storeID); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.jobsOf(kindStore, "store_id", storeID); got != 2 {
+		t.Fatalf("an exposure after the job started enqueues a new job, got %d", got)
 	}
 }
 

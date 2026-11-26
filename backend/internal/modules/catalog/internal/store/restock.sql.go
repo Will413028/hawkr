@@ -12,6 +12,16 @@ import (
 	"uuid"
 )
 
+const consumeRestockPending = `-- name: ConsumeRestockPending :exec
+DELETE FROM catalog.restock_pending WHERE job_key = $1
+`
+
+// job 開始時消耗標記：之後的轉換看不到標記，會排自己的 job。
+func (q *Queries) ConsumeRestockPending(ctx context.Context, jobKey string) error {
+	_, err := q.db.Exec(ctx, consumeRestockPending, jobKey)
+	return err
+}
+
 const getSkuRestockState = `-- name: GetSkuRestockState :one
 
 SELECT s.product_id, p.store_id, p.title, s.stock_qty,
@@ -50,6 +60,25 @@ func (q *Queries) GetSkuRestockState(ctx context.Context, arg GetSkuRestockState
 		&i.Purchasable,
 	)
 	return i, err
+}
+
+const insertRestockPending = `-- name: InsertRestockPending :execrows
+INSERT INTO catalog.restock_pending (job_key, requested_at) VALUES ($1, $2)
+ON CONFLICT (job_key) DO NOTHING
+`
+
+type InsertRestockPendingParams struct {
+	JobKey      string
+	RequestedAt time.Time
+}
+
+// 排入前先占標記：新增回 1（呼叫方要排 job），已有同一個 key 回 0（合併進還沒開始的 job）。
+func (q *Queries) InsertRestockPending(ctx context.Context, arg InsertRestockPendingParams) (int64, error) {
+	result, err := q.db.Exec(ctx, insertRestockPending, arg.JobKey, arg.RequestedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const listPurchasableSkusOfProduct = `-- name: ListPurchasableSkusOfProduct :many
@@ -125,4 +154,22 @@ func (q *Queries) ListPurchasableSkusOfStore(ctx context.Context, arg ListPurcha
 		return nil, err
 	}
 	return items, nil
+}
+
+const touchRestockPending = `-- name: TouchRestockPending :execrows
+UPDATE catalog.restock_pending SET requested_at = $1 WHERE job_key = $2
+`
+
+type TouchRestockPendingParams struct {
+	RequestedAt time.Time
+	JobKey      string
+}
+
+// 合併時鎖住現有的標記列：job 開始時消耗標記（DELETE）要等這個 transaction 結束，所以它之後讀到的狀態一定含這次的變動。標記已被消耗回 0，呼叫方重新占。
+func (q *Queries) TouchRestockPending(ctx context.Context, arg TouchRestockPendingParams) (int64, error) {
+	result, err := q.db.Exec(ctx, touchRestockPending, arg.RequestedAt, arg.JobKey)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

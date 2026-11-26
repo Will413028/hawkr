@@ -84,6 +84,11 @@ type CatalogProductSku struct {
 	UpdatedAt      time.Time
 }
 
+type CatalogRestockPending struct {
+	JobKey      string
+	RequestedAt time.Time
+}
+
 type CatalogSalesOrder struct {
 	OrderNo    string
 	RecordedAt time.Time

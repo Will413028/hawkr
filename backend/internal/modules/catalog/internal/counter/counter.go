@@ -63,6 +63,7 @@ func (s *Service) SetRating(ctx context.Context, productID uuid.UUID, average fl
 //
 // 必要條件：Java order 以 MQ 送出銷量事件，MQ 會重送，直到 ordering 搬進單體（B8）改成同 transaction 呼叫為止；到那時去重表 catalog.sales_orders 退場。
 // 同一個商品出現多次（不同 SKU）先加總；商品依 ID 升序更新，兩筆同時處理的訂單不會互相死結。
+// 在呼叫方的 transaction 內回 error（含 ErrProductNotFound）時，呼叫方必須回滾那個 transaction：這裡不開 savepoint，已寫入的訂單登記仍在 transaction 裡，繼續 commit 會留下登記了但沒累計的訂單，之後的重送被去重擋下。未知商品是否當毒訊息丟棄由 B4-4 的消費端決定。
 func (s *Service) RecordSales(ctx context.Context, orderNo string, items []model.SalesItem) error {
 	if n := utf8.RuneCountInString(orderNo); n < 1 || n > maxOrderNoRunes || trimtext.Trim(orderNo) != orderNo {
 		return model.Invalid("OrderNo", model.ReasonInvalid)
