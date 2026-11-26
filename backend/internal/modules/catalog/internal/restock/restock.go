@@ -3,7 +3,7 @@
 //     改回上架、店家重新曝光。
 //   - 偵測與排入在寫入的 transaction 內（ctx 帶 transaction 時 job 與庫存一起 commit 或回滾）；呼叫通知 port 一律在 transaction 外，由 job 執行（單體規則 5）。
 //   - SKU 的 job 延後 Delay 才執行，只合併還沒開始的 job（D26）：合併靠 catalog.restock_pending 的標記，不靠 River 的唯一鍵（River 不允許把 running 排除在唯一鍵之外，
-//     執行中的 job 會吞掉之後的排入）。排入時占標記，新占到才排 job，已有標記就鎖住它並合併；job 開始時第一件事消耗標記，之後的轉換重新占標記、排自己的 job，所以沒有窗口。
+//     執行中的 job 會吞掉之後的排入）。排入時占標記並在同一個 transaction 內排 job、把 job id 記在標記上；已有標記就鎖住它，它的 job 還會執行才合併，否則（完成、取消、被刪）接手排新 job；job 開始時第一件事消耗標記，之後的轉換重新占標記、排自己的 job，所以沒有窗口。
 //     店家曝光只排一個店家層的 job（同樣的標記，key 是店家），由它在 transaction 外展開成該店家可買 SKU 的 job。
 //   - job 執行時重新確認可買並讀最新的名稱與主圖，不可買就結束、不呼叫通知；通知是一次性訂閱，重複呼叫是 no-op，所以 job 重試安全。
 package restock
@@ -18,6 +18,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/rivertype"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/store"
@@ -39,7 +40,7 @@ const (
 // Deps 是補貨的依賴。
 type Deps struct {
 	DB       *db.DB
-	Jobs     jobs.Enqueuer
+	Jobs     jobs.Tracker
 	Now      func() time.Time
 	Notifier model.RestockNotifier
 }
@@ -88,28 +89,59 @@ func skuKey(id uuid.UUID) string { return "sku:" + id.String() }
 
 func storeKey(id int64) string { return "store:" + strconv.FormatInt(id, 10) }
 
-// request 占 key 的待處理標記並在新占到時排 job。標記已存在就更新它（鎖住該列，見 TouchRestockPending）並合併進還沒開始的 job；
-// 更新時標記剛好被消耗（job 開始了）就重新占。
-func (s *Service) request(ctx context.Context, key string, args river.JobArgs, delay time.Duration) error {
-	q := s.q(ctx)
-	for range requestAttempts {
-		at := s.d.Now()
-		inserted, err := q.InsertRestockPending(ctx, store.InsertRestockPendingParams{JobKey: key, RequestedAt: at})
-		if err != nil {
-			return err
-		}
-		if inserted == 1 {
-			return s.d.Jobs.Enqueue(ctx, args, s.opts(delay))
-		}
-		touched, err := q.TouchRestockPending(ctx, store.TouchRestockPendingParams{JobKey: key, RequestedAt: at})
-		if err != nil {
-			return err
-		}
-		if touched == 1 {
-			return nil
-		}
+// mergeable 是還會讀到之後狀態的 job 狀態：還沒開始的，以及開始了但還沒消耗標記（執行中、等重試，重跑時一樣先消耗標記）的。
+// completed、cancelled、discarded 的 job 不會再消耗標記，留在標記上就是孤兒。
+func mergeable(state rivertype.JobState) bool {
+	switch state {
+	case rivertype.JobStatePending, rivertype.JobStateScheduled, rivertype.JobStateAvailable, rivertype.JobStateRunning, rivertype.JobStateRetryable:
+		return true
+	case rivertype.JobStateCompleted, rivertype.JobStateCancelled, rivertype.JobStateDiscarded:
+		return false
 	}
-	return fmt.Errorf("restock：%s 的待處理標記一直被並行消耗", key)
+	return false
+}
+
+// request 讓 key 有一個還沒開始的 job 會讀到之後的狀態。標記與 job 在同一個 transaction 內建立與綁定（ctx 已帶 transaction 就加入它），
+// 所以不會有「標記在、job 沒排」；標記記著它的 job id，合併前先確認那個 job 還會執行，已結束或被取消、刪除就接手：排新 job、改綁。
+// 標記已存在時用 FOR UPDATE 鎖住它（job 開始時消耗標記要等這個 transaction 結束）；鎖時標記剛好被消耗就重新占。
+func (s *Service) request(ctx context.Context, key string, args river.JobArgs, delay time.Duration) error {
+	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
+		q := s.q(ctx)
+		for range requestAttempts {
+			inserted, err := q.InsertRestockPending(ctx, key)
+			if err != nil {
+				return err
+			}
+			if inserted == 1 {
+				return s.bind(ctx, key, args, delay)
+			}
+			jobID, err := q.LockRestockPending(ctx, key)
+			if errors.Is(err, pgx.ErrNoRows) {
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			state, found, err := s.d.Jobs.JobState(ctx, jobID)
+			if err != nil {
+				return err
+			}
+			if found && mergeable(state) {
+				return nil
+			}
+			return s.bind(ctx, key, args, delay)
+		}
+		return fmt.Errorf("restock：%s 的待處理標記一直被並行消耗", key)
+	})
+}
+
+// bind 排 job 並把標記綁到它；呼叫方已持有標記列的鎖（剛新增或 FOR UPDATE）。
+func (s *Service) bind(ctx context.Context, key string, args river.JobArgs, delay time.Duration) error {
+	id, err := s.d.Jobs.EnqueueJob(ctx, args, s.opts(delay))
+	if err != nil {
+		return err
+	}
+	return s.q(ctx).BindRestockPending(ctx, store.BindRestockPendingParams{JobKey: key, JobID: id})
 }
 
 func (s *Service) enqueueSku(ctx context.Context, skuID uuid.UUID, delay time.Duration) error {

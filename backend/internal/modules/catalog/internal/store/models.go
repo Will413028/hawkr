@@ -85,8 +85,8 @@ type CatalogProductSku struct {
 }
 
 type CatalogRestockPending struct {
-	JobKey      string
-	RequestedAt time.Time
+	JobKey string
+	JobID  int64
 }
 
 type CatalogSalesOrder struct {

@@ -170,7 +170,7 @@ type Deps struct {
 	// Media 是 media 模組；新圖的 Confirm 與退場資產的 MarkDeleted 在商品寫入的 transaction 內呼叫。
 	Media Media
 	// Jobs 排入補貨通知的 job；在呼叫方的 transaction 內排入時與資料一起 commit 或回滾（單體規則 4）。
-	Jobs jobs.Enqueuer
+	Jobs jobs.Tracker
 	// Restock 是補貨通知的下游：catalog 的 job 在 transaction 外呼叫它（B4-4 接 buyer，之前由組裝點給替身）。
 	Restock RestockNotifier
 }

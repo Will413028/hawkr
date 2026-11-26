@@ -207,9 +207,9 @@ CREATE TABLE catalog.sales_orders (
 );
 
 -- 補貨 job 的待處理標記（D26）：一個 job_key（sku:<id> 或 store:<id>）同時最多一個還沒開始的 job，標記存在就代表有一個排好、還沒開始的 job 會讀到之後的狀態。
--- 必要條件：River 的唯一鍵不能把 running 排除在外，執行中的 job 會吞掉之後的排入而漏通知；標記由 job 開始時消耗，之後的轉換重新排自己的 job。
+-- 必要條件：River 的唯一鍵不能把 running 排除在外，執行中的 job 會吞掉之後的排入而漏通知；標記由 job 開始時消耗，之後的轉換重新排自己的 job。job_id 是標記綁的 River job：合併前確認它還會執行，已完成、取消或被刪就接手（標記不會孤立）；標記與 job 在同一個 transaction 內建立，0 只在 transaction 內存在。
 CREATE TABLE catalog.restock_pending (
     job_key      TEXT        PRIMARY KEY,
-    requested_at TIMESTAMPTZ NOT NULL,
+    job_id       BIGINT      NOT NULL,
     CONSTRAINT restock_pending_key_check CHECK (char_length(job_key) >= 1 AND char_length(job_key) <= 100)
 );

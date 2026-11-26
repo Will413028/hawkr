@@ -11,9 +11,12 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/riverqueue/river"
+
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/restock"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
+	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
 const (
@@ -532,5 +535,107 @@ func TestDeletingAProductOrSkuEnqueuesAPurgeOfItsSubscriptions(t *testing.T) {
 	}
 	if got := purged(); len(got) != 1 || !slices.Equal(got[0], []uuid.UUID{kept}) {
 		t.Fatalf("deleting the product purges its remaining SKU, got %v", got)
+	}
+}
+
+// failingJobs 讓排入失敗，其餘轉給真的 River client。
+type failingJobs struct{ jobs.Tracker }
+
+var errEnqueue = errors.New("enqueue failed on purpose")
+
+func (failingJobs) EnqueueJob(context.Context, river.JobArgs, *river.InsertOpts) (int64, error) {
+	return 0, errEnqueue
+}
+
+// 排入失敗時標記不能留下：標記與 job 在同一個 transaction 內，沒有 transaction 的呼叫方也一樣（request 自己開）。
+// 留下的標記會讓之後每次轉換都以為有 job 而合併，通知永遠漏掉。
+func TestRestockEnqueueFailureLeavesNoMarker(t *testing.T) {
+	t.Parallel()
+	f := newProductFixture(t)
+	storeID, acct := f.store()
+	_, sku := f.stocked(storeID, acct, "排入失敗", 5, true)
+	failing := restock.New(restock.Deps{DB: f.d, Jobs: failingJobs{newJobs(t, f.d)}, Now: f.clock, Notifier: f.rn})
+
+	if err := failing.StockIncreased(f.ct, sku, 5); !errors.Is(err, errEnqueue) {
+		t.Fatalf("StockIncreased error = %v，預期排入的錯誤", err)
+	}
+	if err := failing.StoreExposed(f.ct, storeID); !errors.Is(err, errEnqueue) {
+		t.Fatalf("StoreExposed error = %v，預期排入的錯誤", err)
+	}
+	if got := f.count(`SELECT count(*) FROM catalog.restock_pending`); got != 0 {
+		t.Fatalf("a failed enqueue must leave no marker, got %d", got)
+	}
+	// 修好之後同一個轉換能排出 job。
+	if err := f.m.restock.StockIncreased(f.ct, sku, 5); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.skuJobs(sku); got != 1 {
+		t.Fatalf("after the failure the next transition enqueues, got %d jobs", got)
+	}
+}
+
+// 標記綁著它的 job：job 已結束、取消或被刪就不會再消耗標記，下一次轉換要接手排新 job；
+// 還沒開始、執行中、等重試的 job 還會消耗標記，下一次轉換合併（不排新 job、標記仍綁原 job）。
+func TestRestockMarkerFollowsItsJob(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name     string
+		set      string // 對 river_job 的處理
+		takeover bool
+	}{
+		{"deleted", `DELETE FROM river.river_job WHERE kind = $1`, true},
+		{"cancelled", `UPDATE river.river_job SET state = 'cancelled', finalized_at = now() WHERE kind = $1`, true},
+		{"discarded", `UPDATE river.river_job SET state = 'discarded', finalized_at = now(), attempt = 1, attempted_at = now(), attempted_by = ARRAY['t'] WHERE kind = $1`, true},
+		{"completed", `UPDATE river.river_job SET state = 'completed', finalized_at = now(), attempt = 1, attempted_at = now(), attempted_by = ARRAY['t'] WHERE kind = $1`, true},
+		{"available", `UPDATE river.river_job SET state = 'available', scheduled_at = now() WHERE kind = $1`, false},
+		{"running", `UPDATE river.river_job SET state = 'running', attempt = 1, attempted_at = now(), attempted_by = ARRAY['t'] WHERE kind = $1`, false},
+		{"retryable", `UPDATE river.river_job SET state = 'retryable', attempt = 1, attempted_at = now(), attempted_by = ARRAY['t'], scheduled_at = now() + interval '1 minute' WHERE kind = $1`, false},
+	}
+	for _, kind := range []string{kindSku, kindStore} {
+		for _, c := range cases {
+			t.Run(kind+"/"+c.name, func(t *testing.T) {
+				t.Parallel()
+				f := newProductFixture(t)
+				storeID, acct := f.store()
+				_, sku := f.stocked(storeID, acct, "標記", 5, true)
+				key, transition := "sku:"+sku.String(), func() {
+					if err := f.m.restock.StockIncreased(f.ct, sku, 5); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if kind == kindStore {
+					key, transition = fmt.Sprintf("store:%d", storeID), func() {
+						if err := f.m.restock.StoreExposed(f.ct, storeID); err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
+				marker := func() int64 {
+					var id int64
+					if err := f.d.Pool().QueryRow(f.ct, `SELECT job_id FROM catalog.restock_pending WHERE job_key = $1`, key).Scan(&id); err != nil {
+						t.Fatal(err)
+					}
+					return id
+				}
+				transition()
+				first := marker()
+				f.exec(c.set, kind)
+				transition()
+				second := marker()
+				if c.takeover && second == first {
+					t.Fatalf("job is %s: the marker must be taken over by a new job, still bound to %d", c.name, first)
+				}
+				if !c.takeover && second != first {
+					t.Fatalf("job is %s and will still consume the marker: merge, but the marker moved %d -> %d", c.name, first, second)
+				}
+				// 標記綁的 job 一定存在且還會執行，且這個 kind 沒有第二個還會執行的 job。
+				if got := f.count(`SELECT count(*) FROM river.river_job WHERE id = $1 AND state IN ('pending','scheduled','available','running','retryable')`, second); got != 1 {
+					t.Fatalf("the marker's job %d must be live, got %d", second, got)
+				}
+				if got := f.count(`SELECT count(*) FROM river.river_job WHERE kind = $1 AND state IN ('pending','scheduled','available','running','retryable')`, kind); got != 1 {
+					t.Fatalf("exactly one live job per key, got %d", got)
+				}
+			})
+		}
 	}
 }

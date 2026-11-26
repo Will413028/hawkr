@@ -409,8 +409,8 @@
    "id": "restock-jobs-not-merged",
    "stack": "go-integration",
    "file": "backend/internal/modules/catalog/internal/restock/restock.go",
-   "old": "\t\tif inserted == 1 {\n",
-   "new": "\t\tif inserted >= 0 {\n",
+   "old": "\t\t\tif inserted == 1 {\n",
+   "new": "\t\t\tif inserted >= 0 {\n",
    "test": "internal/modules/catalog ^TestRestockJobsOfTheSameSkuMergeWhileNotStarted$",
    "why": "已有待處理標記時仍排 job：同一個 SKU 還沒開始的 job 不合併，短時間內反覆補貨排出多個，測試要紅。"
   },
@@ -418,8 +418,8 @@
    "id": "restock-enqueue-outside-transaction",
    "stack": "go-integration",
    "file": "backend/internal/modules/catalog/internal/restock/restock.go",
-   "old": "\t\t\treturn s.d.Jobs.Enqueue(ctx, args, s.opts(delay))",
-   "new": "\t\t\treturn s.d.Jobs.Enqueue(context.Background(), args, s.opts(delay))",
+   "old": "\tid, err := s.d.Jobs.EnqueueJob(ctx, args, s.opts(delay))",
+   "new": "\tid, err := s.d.Jobs.EnqueueJob(context.Background(), args, s.opts(delay))",
    "test": "internal/modules/catalog ^TestRestockJobIsEnqueuedInTheCallersTransaction$",
    "why": "job 不用呼叫方的 transaction 排入：交易回滾後 job 仍在，測試要紅。"
   },
@@ -431,6 +431,33 @@
    "new": "\t\treturn nil\n",
    "test": "internal/modules/catalog ^TestDeletingAProductOrSkuEnqueuesAPurgeOfItsSubscriptions$",
    "why": "刪除商品不排清補貨訂閱的 job，測試要紅。"
+  },
+  {
+   "id": "restock-marker-not-in-transaction",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/restock/restock.go",
+   "old": "\treturn s.d.DB.InTx(ctx, func(ctx context.Context) error {",
+   "new": "\treturn func(fn func(context.Context) error) error { return fn(ctx) }(func(ctx context.Context) error {",
+   "test": "internal/modules/catalog ^TestRestockEnqueueFailureLeavesNoMarker$",
+   "why": "占標記與排 job 不包 transaction：沒有 transaction 的呼叫方排入失敗時標記已 autocommit 留下，之後的轉換都被它合併而漏通知，測試要紅。"
+  },
+  {
+   "id": "restock-merge-skips-job-state-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/restock/restock.go",
+   "old": "\t\t\tif found && mergeable(state) {",
+   "new": "\t\t\tif mergeable(rivertype.JobStateAvailable) {",
+   "test": "internal/modules/catalog ^TestRestockMarkerFollowsItsJob$",
+   "why": "合併前不確認標記綁的 job 還會執行：job 被取消、刪除、丟棄或已完成後標記成孤兒，下一次轉換被合併而漏通知，接手測試要紅。"
+  },
+  {
+   "id": "restock-running-job-not-mergeable",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/restock/restock.go",
+   "old": "rivertype.JobStateAvailable, rivertype.JobStateRunning, rivertype.JobStateRetryable:",
+   "new": "rivertype.JobStateAvailable, rivertype.JobStateRetryable:",
+   "test": "internal/modules/catalog ^TestRestockMarkerFollowsItsJob$",
+   "why": "執行中的 job 被當成不會消耗標記而接手：多排一個 job、標記改綁，合併測試要紅。"
   }
  ]
 }

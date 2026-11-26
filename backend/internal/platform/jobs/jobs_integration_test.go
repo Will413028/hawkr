@@ -207,3 +207,24 @@ func TestCancelJobReportsAMissingJobRowAsNotFound(t *testing.T) {
 		t.Fatal("job 列不存在 found 應為 false")
 	}
 }
+
+func TestJobStateReportsTheStateAndAMissingRow(t *testing.T) {
+	t.Parallel()
+	d := migrated(t)
+	c, err := jobs.NewInsertOnly(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	id, err := c.EnqueueJob(ctx, pingArgs{N: 1}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, found, err := c.JobState(ctx, id)
+	if err != nil || !found || state != rivertype.JobStateAvailable {
+		t.Fatalf("JobState = %s, %v, %v，預期 available、found", state, found, err)
+	}
+	if _, found, err = c.JobState(ctx, id+1_000_000); err != nil || found {
+		t.Fatalf("a missing job row: found = %v, err = %v，預期 found 為 false", found, err)
+	}
+}

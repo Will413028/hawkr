@@ -26,13 +26,17 @@ ORDER BY s.id
 LIMIT sqlc.arg(page_size);
 
 -- name: InsertRestockPending :execrows
--- 排入前先占標記：新增回 1（呼叫方要排 job），已有同一個 key 回 0（合併進還沒開始的 job）。
-INSERT INTO catalog.restock_pending (job_key, requested_at) VALUES (sqlc.arg(job_key), sqlc.arg(requested_at))
+-- 占標記：新增回 1（呼叫方同一個 transaction 內排 job 並綁定，job_id 的 0 只在 transaction 內存在），已有同一個 key 回 0。
+INSERT INTO catalog.restock_pending (job_key, job_id) VALUES (sqlc.arg(job_key), 0)
 ON CONFLICT (job_key) DO NOTHING;
 
--- name: TouchRestockPending :execrows
--- 合併時鎖住現有的標記列：job 開始時消耗標記（DELETE）要等這個 transaction 結束，所以它之後讀到的狀態一定含這次的變動。標記已被消耗回 0，呼叫方重新占。
-UPDATE catalog.restock_pending SET requested_at = sqlc.arg(requested_at) WHERE job_key = sqlc.arg(job_key);
+-- name: LockRestockPending :one
+-- 鎖住現有的標記列並回它綁的 job id：job 開始時消耗標記（DELETE）要等這個 transaction 結束，所以它之後讀到的狀態一定含這次的變動。標記已被消耗回無列，呼叫方重新占。
+SELECT job_id FROM catalog.restock_pending WHERE job_key = sqlc.arg(job_key) FOR UPDATE;
+
+-- name: BindRestockPending :exec
+-- 把標記綁到新排的 job（新占到，或接手孤兒標記）。
+UPDATE catalog.restock_pending SET job_id = sqlc.arg(job_id) WHERE job_key = sqlc.arg(job_key);
 
 -- name: ConsumeRestockPending :exec
 -- job 開始時消耗標記：之後的轉換看不到標記，會排自己的 job。

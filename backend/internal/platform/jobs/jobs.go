@@ -31,6 +31,15 @@ type Enqueuer interface {
 	Enqueue(ctx context.Context, args river.JobArgs, opts *river.InsertOpts) error
 }
 
+// Tracker 是排入之後還要追蹤 job 的使用方需要的介面：EnqueueJob 回 job id，JobState 查 job 目前的狀態。
+type Tracker interface {
+	Enqueuer
+	EnqueueJob(ctx context.Context, args river.JobArgs, opts *river.InsertOpts) (int64, error)
+	JobState(ctx context.Context, jobID int64) (state rivertype.JobState, found bool, err error)
+}
+
+var _ Tracker = (*Client)(nil)
+
 // ReportingEnqueuer 另外回報是否真的排入：job 被唯一鍵略過（同一個 job 還在排隊、執行或等重試）時 inserted 為 false。
 type ReportingEnqueuer interface {
 	Enqueuer
@@ -114,6 +123,23 @@ func (c *Client) EnqueueJob(ctx context.Context, args river.JobArgs, opts *river
 		return 0, fmt.Errorf("jobs：排入 %s：%w", args.Kind(), err)
 	}
 	return res.Job.ID, nil
+}
+
+// JobState 回傳 job 目前的狀態；job 列不存在（被清掉）回 found 為 false。ctx 裡有 transaction 時在該 transaction 內讀（看得到它自己排入、還沒 commit 的 job）。
+func (c *Client) JobState(ctx context.Context, jobID int64) (state rivertype.JobState, found bool, err error) {
+	var row *rivertype.JobRow
+	if tx, ok := db.TxFrom(ctx); ok {
+		row, err = c.river.JobGetTx(ctx, tx, jobID)
+	} else {
+		row, err = c.river.JobGet(ctx, jobID)
+	}
+	if gone := errors.Is(err, river.ErrNotFound); gone {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("jobs：讀 job %d：%w", jobID, err)
+	}
+	return row.State, true, nil
 }
 
 // CancelJob 取消一個 job 並回傳取消之後 job 的狀態：還沒執行的直接成為 cancelled；執行中的取消它的 ctx，狀態仍是 running，由 worker 結束後收尾；

@@ -6,6 +6,7 @@ import (
 	"uuid"
 
 	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/rivertype"
 
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
@@ -14,7 +15,15 @@ type noJobs struct{}
 
 func (noJobs) Enqueue(context.Context, river.JobArgs, *river.InsertOpts) error { return nil }
 
-var _ jobs.Enqueuer = noJobs{}
+func (noJobs) EnqueueJob(context.Context, river.JobArgs, *river.InsertOpts) (int64, error) {
+	return 0, nil
+}
+
+func (noJobs) JobState(context.Context, int64) (rivertype.JobState, bool, error) {
+	return "", false, nil
+}
+
+var _ jobs.Tracker = noJobs{}
 
 // Jobs 與 Restock 缺任何一個，組裝時就 panic，不留到上架或庫存寫入時才 nil 解參考。
 func TestNewRequiresJobsAndRestock(t *testing.T) {

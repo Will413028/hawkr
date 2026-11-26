@@ -12,6 +12,21 @@ import (
 	"uuid"
 )
 
+const bindRestockPending = `-- name: BindRestockPending :exec
+UPDATE catalog.restock_pending SET job_id = $1 WHERE job_key = $2
+`
+
+type BindRestockPendingParams struct {
+	JobID  int64
+	JobKey string
+}
+
+// 把標記綁到新排的 job（新占到，或接手孤兒標記）。
+func (q *Queries) BindRestockPending(ctx context.Context, arg BindRestockPendingParams) error {
+	_, err := q.db.Exec(ctx, bindRestockPending, arg.JobID, arg.JobKey)
+	return err
+}
+
 const consumeRestockPending = `-- name: ConsumeRestockPending :exec
 DELETE FROM catalog.restock_pending WHERE job_key = $1
 `
@@ -63,18 +78,13 @@ func (q *Queries) GetSkuRestockState(ctx context.Context, arg GetSkuRestockState
 }
 
 const insertRestockPending = `-- name: InsertRestockPending :execrows
-INSERT INTO catalog.restock_pending (job_key, requested_at) VALUES ($1, $2)
+INSERT INTO catalog.restock_pending (job_key, job_id) VALUES ($1, 0)
 ON CONFLICT (job_key) DO NOTHING
 `
 
-type InsertRestockPendingParams struct {
-	JobKey      string
-	RequestedAt time.Time
-}
-
-// 排入前先占標記：新增回 1（呼叫方要排 job），已有同一個 key 回 0（合併進還沒開始的 job）。
-func (q *Queries) InsertRestockPending(ctx context.Context, arg InsertRestockPendingParams) (int64, error) {
-	result, err := q.db.Exec(ctx, insertRestockPending, arg.JobKey, arg.RequestedAt)
+// 占標記：新增回 1（呼叫方同一個 transaction 內排 job 並綁定，job_id 的 0 只在 transaction 內存在），已有同一個 key 回 0。
+func (q *Queries) InsertRestockPending(ctx context.Context, jobKey string) (int64, error) {
+	result, err := q.db.Exec(ctx, insertRestockPending, jobKey)
 	if err != nil {
 		return 0, err
 	}
@@ -156,20 +166,14 @@ func (q *Queries) ListPurchasableSkusOfStore(ctx context.Context, arg ListPurcha
 	return items, nil
 }
 
-const touchRestockPending = `-- name: TouchRestockPending :execrows
-UPDATE catalog.restock_pending SET requested_at = $1 WHERE job_key = $2
+const lockRestockPending = `-- name: LockRestockPending :one
+SELECT job_id FROM catalog.restock_pending WHERE job_key = $1 FOR UPDATE
 `
 
-type TouchRestockPendingParams struct {
-	RequestedAt time.Time
-	JobKey      string
-}
-
-// 合併時鎖住現有的標記列：job 開始時消耗標記（DELETE）要等這個 transaction 結束，所以它之後讀到的狀態一定含這次的變動。標記已被消耗回 0，呼叫方重新占。
-func (q *Queries) TouchRestockPending(ctx context.Context, arg TouchRestockPendingParams) (int64, error) {
-	result, err := q.db.Exec(ctx, touchRestockPending, arg.RequestedAt, arg.JobKey)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+// 鎖住現有的標記列並回它綁的 job id：job 開始時消耗標記（DELETE）要等這個 transaction 結束，所以它之後讀到的狀態一定含這次的變動。標記已被消耗回無列，呼叫方重新占。
+func (q *Queries) LockRestockPending(ctx context.Context, jobKey string) (int64, error) {
+	row := q.db.QueryRow(ctx, lockRestockPending, jobKey)
+	var job_id int64
+	err := row.Scan(&job_id)
+	return job_id, err
 }
