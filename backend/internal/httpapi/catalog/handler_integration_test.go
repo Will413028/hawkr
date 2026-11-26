@@ -208,9 +208,15 @@ func TestSellerCannotReadOrWriteAnotherStoresProduct(t *testing.T) {
 	if err != nil || own.Msg.GetProduct().GetTitle() != "A 店的山藥" {
 		t.Fatalf("A 讀自己的商品 = %v, %v", own, err)
 	}
-	set, err := e.seller(acctA).SetStock(ctx, connect.NewRequest(&pb.SetStockRequest{SkuId: sku, Quantity: 8, ExpectedQuantity: 5, RequestId: uuid.NewV4().String()}))
+	setReq := &pb.SetStockRequest{SkuId: sku, Quantity: 8, ExpectedQuantity: 5, RequestId: uuid.NewV4().String()}
+	set, err := e.seller(acctA).SetStock(ctx, connect.NewRequest(setReq))
 	if err != nil || set.Msg.GetSku().GetStockQty() != 8 || set.Msg.GetSku().GetAvailability() != pb.ProductAvailability_PRODUCT_AVAILABILITY_AVAILABLE {
 		t.Fatalf("A 設定庫存 = %v, %v", set, err)
+	}
+	// 同一個 request_id 重送：現值已是 8，預期值 5 不符，只有冪等重放才回成功。
+	again, err := e.seller(acctA).SetStock(ctx, connect.NewRequest(setReq))
+	if err != nil || again.Msg.GetSku().GetStockQty() != 8 {
+		t.Fatalf("同一個 request_id 重送設定庫存 = %v, %v", again, err)
 	}
 }
 
@@ -242,8 +248,13 @@ func TestSellerWritesCarryEtagAndRequestID(t *testing.T) {
 	stale := strconv.FormatInt(mustVersion(t, p.GetEtag())+1, 10)
 	_, err = s.SetProductStatus(ctx, connect.NewRequest(&pb.SetProductStatusRequest{ProductId: p.GetId(), Etag: stale, Status: pb.ProductStatus_PRODUCT_STATUS_ACTIVE}))
 	wantCode(t, err, connect.CodeAborted)
-	if _, err := s.AdjustStock(ctx, connect.NewRequest(&pb.AdjustStockRequest{SkuId: p.GetSkus()[0].GetId(), Delta: 2, RequestId: uuid.NewV4().String()})); err != nil {
-		t.Fatal(err)
+	adjust := &pb.AdjustStockRequest{SkuId: p.GetSkus()[0].GetId(), Delta: 2, RequestId: uuid.NewV4().String()}
+	for range 2 {
+		// 同一個 request_id 重送只生效一次：庫存 3 + 2 = 5，不是 7。
+		adjusted, err := s.AdjustStock(ctx, connect.NewRequest(adjust))
+		if err != nil || adjusted.Msg.GetSku().GetStockQty() != 5 {
+			t.Fatalf("調整庫存 = %v, %v", adjusted, err)
+		}
 	}
 	active, err := s.SetProductStatus(ctx, connect.NewRequest(&pb.SetProductStatusRequest{ProductId: p.GetId(), Etag: p.GetEtag(), Status: pb.ProductStatus_PRODUCT_STATUS_ACTIVE}))
 	if err != nil {
