@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.order.checkout;
 
 import io.github.will413028.hawkr.order.checkout.UberOrderEligibilityGuard.Assessment;
+import io.github.will413028.hawkr.order.TestIds;
 import io.github.will413028.hawkr.order.checkout.UberOrderEligibilityGuard.Check;
 import io.github.will413028.hawkr.order.checkout.UberOrderEligibilityGuard.CheckOutcome;
 import io.github.will413028.hawkr.order.checkout.UberOrderEligibilityGuard.Context;
@@ -60,7 +61,7 @@ class UberOrderEligibilityGuardTest {
                 2623900520L, 2685914682L, "3201",
                 "王小明", "0912345678",
                 "台北市", "中正區", "測試路1號",
-                List.of(new Item(5001L, "蘋果", 2, 10, 12, 8, 1500L, 500L)));
+                List.of(new Item(TestIds.id(5001L), "蘋果", 2, 10, 12, 8, 1500L, 500L)));
     }
 
     /**

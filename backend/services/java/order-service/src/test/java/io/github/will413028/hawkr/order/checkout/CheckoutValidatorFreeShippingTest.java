@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.order.checkout;
 
 import io.github.will413028.hawkr.common.utils.code.ShippingFeePayer;
+import io.github.will413028.hawkr.order.TestIds;
 import io.github.will413028.hawkr.order.checkout.CheckoutValidator.FreeShippingResult;
 import io.github.will413028.hawkr.order.checkout.CheckoutValidator.ResolvedItem;
 import io.github.will413028.hawkr.order.checkout.CheckoutValidator.SkuShippingOption;
@@ -28,8 +29,8 @@ class CheckoutValidatorFreeShippingTest {
 
     private ResolvedItem item(long skuId, long unitPrice, int qty, long freeThreshold, String feePayer) {
         return new ResolvedItem(
-                skuId, "sku-" + skuId, qty, unitPrice, unitPrice, 999L,
-                10, 10, 10, 1000L, 2683382637L, "p-" + skuId, "product-" + skuId,
+                TestIds.id(skuId), "sku-" + skuId, qty, unitPrice, unitPrice, 999L,
+                10, 10, 10, 1000L, 2683382637L, TestIds.id(skuId + 1000), "product-" + skuId,
                 List.of(new SkuShippingOption(METHOD, TEMP, freeThreshold, feePayer)),
                 "img", true);
     }
@@ -50,7 +51,7 @@ class CheckoutValidatorFreeShippingTest {
     void sellerPaysWithoutThreshold_stillFreeAfterFullCoupon() {
         // feePayer=SELLER + freeThreshold=0 + 全額券折到 0 → 仍免運（final，折扣後不翻轉）
         var items = List.of(item(1L, 50, 1, 0L, SELLER));
-        Map<Long, Long> discount = Map.of(1L, 50L); // 商品折到 0
+        Map<java.util.UUID, Long> discount = Map.of(TestIds.id(1L), 50L); // 商品折到 0
         FreeShippingResult fsr = validator.checkFreeShipping(items, METHOD, TEMP, discount);
         assertThat(fsr.eligible()).isTrue(); // issue #1147 核心：0 元訂單路徑不被運費阻斷
     }
@@ -69,7 +70,7 @@ class CheckoutValidatorFreeShippingTest {
     void sellerPaysWithThreshold_flipsOffAfterDiscountBelowThreshold() {
         // 1500 − 600 = 900 < 1000 → 折扣後失去免運（§4.7.0-B 維持）
         var items = List.of(item(1L, 1500, 1, 1000L, SELLER));
-        Map<Long, Long> discount = Map.of(1L, 600L);
+        Map<java.util.UUID, Long> discount = Map.of(TestIds.id(1L), 600L);
         FreeShippingResult fsr = validator.checkFreeShipping(items, METHOD, TEMP, discount);
         assertThat(fsr.eligible()).isFalse();
     }

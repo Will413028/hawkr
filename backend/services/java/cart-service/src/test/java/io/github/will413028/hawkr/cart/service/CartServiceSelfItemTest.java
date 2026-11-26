@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.Map;
 import java.util.Set;
 
@@ -36,9 +37,18 @@ class CartServiceSelfItemTest {
         try { TsidUtil.init(400, 0); } catch (IllegalStateException ignored) { }
     }
 
+    private static final UUID SKU_ID = UUID.fromString("0192f3a4-7b1c-7d2e-8f3a-000000000001");
+    private static UUID sku(long n) {
+        return new UUID(0x0192f3a47b1c7d2eL, 0x8f3a000000000000L | n);
+    }
+
+    private static final UUID PRODUCT_ID = UUID.fromString("0192f3a4-7b1c-7d2e-8f3a-0000000000a1");
+
     private GetProductSimpleResponse productResponse(long storeId) {
         ProductSimpleInfo info = ProductSimpleInfo.newBuilder()
                 .setIsActive(true)
+                .setSkuId(SKU_ID.toString())
+                .setProductId(PRODUCT_ID.toString())
                 .setStoreId(String.valueOf(storeId))
                 .setPrice("100")
                 .build();
@@ -66,7 +76,7 @@ class CartServiceSelfItemTest {
         return buyerClient;
     }
 
-    private CartItemEntity guestItem(long id, String guestId, long storeId, long skuId) {
+    private CartItemEntity guestItem(long id, String guestId, long storeId, UUID skuId) {
         CartItemEntity item = new CartItemEntity();
         item.setId(id);
         item.setGuestId(guestId);
@@ -79,7 +89,7 @@ class CartServiceSelfItemTest {
     @Test
     void grandfathered_differentSellerAndBuyer_allowed() {
         ProductGrpcClient productClient = Mockito.mock(ProductGrpcClient.class);
-        Mockito.when(productClient.getProductSimple("1")).thenReturn(productResponse(200L));
+        Mockito.when(productClient.getProductSimple(SKU_ID.toString())).thenReturn(productResponse(200L));
         SellerGrpcClient sellerClient = Mockito.mock(SellerGrpcClient.class);
         Mockito.when(sellerClient.resolvePrincipals(List.of(200L))).thenReturn(PrincipalResolution.allResolved(Map.of(200L, 200L)));
         CartItemRepository repo = Mockito.mock(CartItemRepository.class);
@@ -88,19 +98,19 @@ class CartServiceSelfItemTest {
 
         CartService service = newService(productClient, sellerClient, repo, cache);
 
-        assertThatCode(() -> service.addItem(100L, null, 1L, 1)).doesNotThrowAnyException();
+        assertThatCode(() -> service.addItem(100L, null, SKU_ID, 1)).doesNotThrowAnyException();
     }
 
     @Test
     void grandfathered_sameIdBothSides_blocked() {
         ProductGrpcClient productClient = Mockito.mock(ProductGrpcClient.class);
-        Mockito.when(productClient.getProductSimple("1")).thenReturn(productResponse(100L));
+        Mockito.when(productClient.getProductSimple(SKU_ID.toString())).thenReturn(productResponse(100L));
         SellerGrpcClient sellerClient = Mockito.mock(SellerGrpcClient.class);
         Mockito.when(sellerClient.resolvePrincipals(List.of(100L))).thenReturn(PrincipalResolution.allResolved(Map.of(100L, 100L)));
         CartService service = newService(productClient, sellerClient,
                 Mockito.mock(CartItemRepository.class), Mockito.mock(CartCacheService.class));
 
-        assertThatThrownBy(() -> service.addItem(100L, null, 1L, 1))
+        assertThatThrownBy(() -> service.addItem(100L, null, SKU_ID, 1))
                 .isInstanceOf(CartBusinessException.class);
     }
 
@@ -109,27 +119,27 @@ class CartServiceSelfItemTest {
         // Guard-regression case: product's storeId (999) is a diverged
         // store_id whose principal is 42 — same human as the buyer.
         ProductGrpcClient productClient = Mockito.mock(ProductGrpcClient.class);
-        Mockito.when(productClient.getProductSimple("1")).thenReturn(productResponse(999L));
+        Mockito.when(productClient.getProductSimple(SKU_ID.toString())).thenReturn(productResponse(999L));
         SellerGrpcClient sellerClient = Mockito.mock(SellerGrpcClient.class);
         Mockito.when(sellerClient.resolvePrincipals(List.of(999L))).thenReturn(PrincipalResolution.allResolved(Map.of(999L, 42L)));
         CartService service = newService(productClient, sellerClient,
                 Mockito.mock(CartItemRepository.class), Mockito.mock(CartCacheService.class));
 
-        assertThatThrownBy(() -> service.addItem(42L, null, 1L, 1))
+        assertThatThrownBy(() -> service.addItem(42L, null, SKU_ID, 1))
                 .isInstanceOf(CartBusinessException.class);
     }
 
     @Test
     void resolvePrincipalsRpcFails_throwsServiceUnavailable_failClosed() {
         ProductGrpcClient productClient = Mockito.mock(ProductGrpcClient.class);
-        Mockito.when(productClient.getProductSimple("1")).thenReturn(productResponse(200L));
+        Mockito.when(productClient.getProductSimple(SKU_ID.toString())).thenReturn(productResponse(200L));
         SellerGrpcClient sellerClient = Mockito.mock(SellerGrpcClient.class);
         Mockito.when(sellerClient.resolvePrincipals(Mockito.anyList()))
                 .thenThrow(new StatusRuntimeException(Status.UNAVAILABLE));
         CartService service = newService(productClient, sellerClient,
                 Mockito.mock(CartItemRepository.class), Mockito.mock(CartCacheService.class));
 
-        assertThatThrownBy(() -> service.addItem(100L, null, 1L, 1))
+        assertThatThrownBy(() -> service.addItem(100L, null, SKU_ID, 1))
                 .isInstanceOf(CartBusinessException.class);
     }
 
@@ -141,7 +151,7 @@ class CartServiceSelfItemTest {
         // principal 42; the product's storeId (200) resolves straight through to 42 too —
         // same human, must still be blocked even though 777 != 200 on the raw ids.
         ProductGrpcClient productClient = Mockito.mock(ProductGrpcClient.class);
-        Mockito.when(productClient.getProductSimple("1")).thenReturn(productResponse(200L));
+        Mockito.when(productClient.getProductSimple(SKU_ID.toString())).thenReturn(productResponse(200L));
         SellerGrpcClient sellerClient = Mockito.mock(SellerGrpcClient.class);
         Mockito.when(sellerClient.resolvePrincipals(List.of(200L))).thenReturn(PrincipalResolution.allResolved(Map.of(200L, 42L)));
         BuyerGrpcClient buyerClient = Mockito.mock(BuyerGrpcClient.class);
@@ -149,14 +159,14 @@ class CartServiceSelfItemTest {
         CartService service = newService(productClient, sellerClient,
                 Mockito.mock(CartItemRepository.class), Mockito.mock(CartCacheService.class), buyerClient);
 
-        assertThatThrownBy(() -> service.addItem(777L, null, 1L, 1))
+        assertThatThrownBy(() -> service.addItem(777L, null, SKU_ID, 1))
                 .isInstanceOf(CartBusinessException.class);
     }
 
     @Test
     void resolveBuyerPrincipalsRpcFails_throwsServiceUnavailable_failClosed() {
         ProductGrpcClient productClient = Mockito.mock(ProductGrpcClient.class);
-        Mockito.when(productClient.getProductSimple("1")).thenReturn(productResponse(200L));
+        Mockito.when(productClient.getProductSimple(SKU_ID.toString())).thenReturn(productResponse(200L));
         SellerGrpcClient sellerClient = Mockito.mock(SellerGrpcClient.class);
         Mockito.when(sellerClient.resolvePrincipals(List.of(200L))).thenReturn(PrincipalResolution.allResolved(Map.of(200L, 200L)));
         BuyerGrpcClient buyerClient = Mockito.mock(BuyerGrpcClient.class);
@@ -165,7 +175,7 @@ class CartServiceSelfItemTest {
         CartService service = newService(productClient, sellerClient,
                 Mockito.mock(CartItemRepository.class), Mockito.mock(CartCacheService.class), buyerClient);
 
-        assertThatThrownBy(() -> service.addItem(100L, null, 1L, 1))
+        assertThatThrownBy(() -> service.addItem(100L, null, SKU_ID, 1))
                 .isInstanceOf(CartBusinessException.class);
     }
 
@@ -173,7 +183,7 @@ class CartServiceSelfItemTest {
 
     @Test
     void mergeCart_grandfathered_differentSellerAndBuyer_notSelfOwned() {
-        CartItemEntity item = guestItem(1L, "guest-1", 200L, 10L);
+        CartItemEntity item = guestItem(1L, "guest-1", 200L, SKU_ID);
         CartItemRepository repo = Mockito.mock(CartItemRepository.class);
         Mockito.when(repo.findNormalByGuestIdForMerge("guest-1")).thenReturn(List.of(item));
         SellerGrpcClient sellerClient = Mockito.mock(SellerGrpcClient.class);
@@ -191,7 +201,7 @@ class CartServiceSelfItemTest {
 
     @Test
     void mergeCart_grandfathered_sameIdBothSides_selfOwnedRemoved() {
-        CartItemEntity item = guestItem(2L, "guest-2", 100L, 20L);
+        CartItemEntity item = guestItem(2L, "guest-2", 100L, sku(20));
         CartItemRepository repo = Mockito.mock(CartItemRepository.class);
         Mockito.when(repo.findNormalByGuestIdForMerge("guest-2")).thenReturn(List.of(item));
         SellerGrpcClient sellerClient = Mockito.mock(SellerGrpcClient.class);
@@ -212,7 +222,7 @@ class CartServiceSelfItemTest {
         // Guard-regression case: guest item's store_id (999) is a diverged id
         // whose principal (42) is the same human as the merging accountId (42) — the
         // pre-fix raw-id comparison (999 != 42) would have wrongly let this merge through.
-        CartItemEntity item = guestItem(3L, "guest-3", 999L, 30L);
+        CartItemEntity item = guestItem(3L, "guest-3", 999L, sku(30));
         CartItemRepository repo = Mockito.mock(CartItemRepository.class);
         Mockito.when(repo.findNormalByGuestIdForMerge("guest-3")).thenReturn(List.of(item));
         SellerGrpcClient sellerClient = Mockito.mock(SellerGrpcClient.class);
@@ -236,7 +246,7 @@ class CartServiceSelfItemTest {
         // store_id directly against the raw accountId and matched 0 rows (stale item lingers).
         long accountId = 1001L;
         long selfOwnedStoreId = 9999L;
-        CartItemEntity item = guestItem(6L, "guest-6", selfOwnedStoreId, 60L);
+        CartItemEntity item = guestItem(6L, "guest-6", selfOwnedStoreId, sku(60));
         CartItemRepository repo = Mockito.mock(CartItemRepository.class);
         Mockito.when(repo.findNormalByGuestIdForMerge("guest-6")).thenReturn(List.of(item));
         SellerGrpcClient sellerClient = Mockito.mock(SellerGrpcClient.class);
@@ -259,7 +269,7 @@ class CartServiceSelfItemTest {
         // The merging accountId (777) is itself a diverged buyer_id resolving to principal 42;
         // the guest item's storeId (100) resolves straight through to 42 — same human, must be
         // treated as self-owned even though the raw ids (777 vs 100) never match.
-        CartItemEntity item = guestItem(7L, "guest-7", 100L, 70L);
+        CartItemEntity item = guestItem(7L, "guest-7", 100L, sku(70));
         CartItemRepository repo = Mockito.mock(CartItemRepository.class);
         Mockito.when(repo.findNormalByGuestIdForMerge("guest-7")).thenReturn(List.of(item));
         SellerGrpcClient sellerClient = Mockito.mock(SellerGrpcClient.class);
@@ -279,8 +289,8 @@ class CartServiceSelfItemTest {
 
     @Test
     void mergeCart_batchesResolvePrincipalsOncePerMergeAcrossMultipleSellers() {
-        CartItemEntity itemA = guestItem(4L, "guest-4", 200L, 40L);
-        CartItemEntity itemB = guestItem(5L, "guest-4", 300L, 50L);
+        CartItemEntity itemA = guestItem(4L, "guest-4", 200L, sku(40));
+        CartItemEntity itemB = guestItem(5L, "guest-4", 300L, sku(50));
         CartItemRepository repo = Mockito.mock(CartItemRepository.class);
         Mockito.when(repo.findNormalByGuestIdForMerge("guest-4")).thenReturn(List.of(itemA, itemB));
         SellerGrpcClient sellerClient = Mockito.mock(SellerGrpcClient.class);
@@ -316,7 +326,7 @@ class CartServiceSelfItemTest {
     @Test
     void addItem_storeUnresolved_failsClosedWithInvalidSku() {
         ProductGrpcClient productClient = Mockito.mock(ProductGrpcClient.class);
-        Mockito.when(productClient.getProductSimple("1")).thenReturn(productResponse(200L));
+        Mockito.when(productClient.getProductSimple(SKU_ID.toString())).thenReturn(productResponse(200L));
         SellerGrpcClient sellerClient = Mockito.mock(SellerGrpcClient.class);
         // 200 查無在架賣家：map 仍有 entry（echo-back），unresolved_ids 才是真話
         Mockito.when(sellerClient.resolvePrincipals(List.of(200L))).thenReturn(echoedBack(200L));
@@ -324,7 +334,7 @@ class CartServiceSelfItemTest {
         CartService service = newService(productClient, sellerClient, repo,
                 Mockito.mock(CartCacheService.class));
 
-        assertThatThrownBy(() -> service.addItem(100L, null, 1L, 1))
+        assertThatThrownBy(() -> service.addItem(100L, null, SKU_ID, 1))
                 .isInstanceOf(CartBusinessException.class)
                 .extracting(e -> ((CartBusinessException) e).code())
                 .isEqualTo(GrpcResponseCode.INVALID_SKU.code());
@@ -336,7 +346,7 @@ class CartServiceSelfItemTest {
     @Test
     void addItem_buyerUnresolved_failsClosedWithInvalidSku() {
         ProductGrpcClient productClient = Mockito.mock(ProductGrpcClient.class);
-        Mockito.when(productClient.getProductSimple("1")).thenReturn(productResponse(200L));
+        Mockito.when(productClient.getProductSimple(SKU_ID.toString())).thenReturn(productResponse(200L));
         SellerGrpcClient sellerClient = Mockito.mock(SellerGrpcClient.class);
         Mockito.when(sellerClient.resolvePrincipals(List.of(200L)))
                 .thenReturn(PrincipalResolution.allResolved(Map.of(200L, 200L)));
@@ -346,7 +356,7 @@ class CartServiceSelfItemTest {
         CartService service = newService(productClient, sellerClient, repo,
                 Mockito.mock(CartCacheService.class), buyerClient);
 
-        assertThatThrownBy(() -> service.addItem(100L, null, 1L, 1))
+        assertThatThrownBy(() -> service.addItem(100L, null, SKU_ID, 1))
                 .isInstanceOf(CartBusinessException.class)
                 .extracting(e -> ((CartBusinessException) e).code())
                 .isEqualTo(GrpcResponseCode.INVALID_SKU.code());
@@ -355,8 +365,8 @@ class CartServiceSelfItemTest {
 
     @Test
     void mergeCart_oneStoreUnresolved_rejectsWithoutDeletingOrMerging() {
-        CartItemEntity resolvable = guestItem(11L, "guest-u1", 200L, 110L);
-        CartItemEntity unresolvable = guestItem(12L, "guest-u1", 999L, 120L);
+        CartItemEntity resolvable = guestItem(11L, "guest-u1", 200L, sku(110));
+        CartItemEntity unresolvable = guestItem(12L, "guest-u1", 999L, sku(120));
         CartItemRepository repo = Mockito.mock(CartItemRepository.class);
         Mockito.when(repo.findNormalByGuestIdForMerge("guest-u1"))
                 .thenReturn(List.of(resolvable, unresolvable));
@@ -382,8 +392,8 @@ class CartServiceSelfItemTest {
         // 買家 principal 100 對上兩個 echo-back（200 / 300）都不相等，舊行為是
         // 「都不是自買 ⇒ 兩筆全部合併進會員車」；本測試釘住新行為＝整筆拒絕、
         // 既不刪也不併。
-        CartItemEntity a = guestItem(13L, "guest-u2", 200L, 130L);
-        CartItemEntity b = guestItem(14L, "guest-u2", 300L, 140L);
+        CartItemEntity a = guestItem(13L, "guest-u2", 200L, sku(130));
+        CartItemEntity b = guestItem(14L, "guest-u2", 300L, sku(140));
         CartItemRepository repo = Mockito.mock(CartItemRepository.class);
         Mockito.when(repo.findNormalByGuestIdForMerge("guest-u2")).thenReturn(List.of(a, b));
         SellerGrpcClient sellerClient = Mockito.mock(SellerGrpcClient.class);
@@ -402,7 +412,7 @@ class CartServiceSelfItemTest {
 
     @Test
     void mergeCart_buyerUnresolved_rejectsWithoutDeletingOrMerging() {
-        CartItemEntity item = guestItem(15L, "guest-u3", 200L, 150L);
+        CartItemEntity item = guestItem(15L, "guest-u3", 200L, sku(150));
         CartItemRepository repo = Mockito.mock(CartItemRepository.class);
         Mockito.when(repo.findNormalByGuestIdForMerge("guest-u3")).thenReturn(List.of(item));
         SellerGrpcClient sellerClient = Mockito.mock(SellerGrpcClient.class);

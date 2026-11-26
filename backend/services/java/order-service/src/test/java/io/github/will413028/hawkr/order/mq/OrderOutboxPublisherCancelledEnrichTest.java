@@ -47,7 +47,7 @@ class OrderOutboxPublisherCancelledEnrichTest {
 
         // core payload：storeId 帶原始 store_id、notify 欄位為 null（鏡像 insertCancelledOutbox 產物）
         OrderCancelledPayload core = new OrderCancelledPayload(
-                "ORD1", "TX1", List.of(new OrderCancelledPayload.StockItemPayload("11", "2")),
+                "ORD1", "TX1", List.of(new OrderCancelledPayload.StockItemPayload(java.util.UUID.fromString("0192f3a4-7b1c-7d2e-8f3a-000000000011"), "2")),
                 "2026-07-22T00:00:00Z", buyerId, null, storeId, null, null, null, "SELLER_SUSPENDED");
         String coreJson = MAPPER.writeValueAsString(core);
 
@@ -112,7 +112,7 @@ class OrderOutboxPublisherCancelledEnrichTest {
         // 不是例外逸出、不是重試到 DEAD。
         String noStoreIdJson = """
                 {"event_id":"no-store-id-evt","order_no":"ORD1","stock_tx_id":"TX1",
-                 "items":[{"sku_id":"11","quantity":"2"}],"occurred_at":"2026-07-22T00:00:00Z",
+                 "items":[{"sku_id":"0192f3a4-7b1c-7d2e-8f3a-000000000011","quantity":"2"}],"occurred_at":"2026-07-22T00:00:00Z",
                  "buyer_id":3001,"notify_buyer_account_id":null,
                  "seller_name":null,"seller_avatar_key":null,"cancel_reason":"SELLER_SUSPENDED"}
                 """;
@@ -181,7 +181,7 @@ class OrderOutboxPublisherCancelledEnrichTest {
         // -> 退避到 DEAD -> 該筆取消的庫存永不歸還。
         String forwardShapedCoreJson = """
                 {"event_id":"future-evt-1","order_no":"ORD1","stock_tx_id":"TX1",
-                 "items":[{"sku_id":"11","quantity":"2"}],"occurred_at":"2026-07-22T00:00:00Z",
+                 "items":[{"sku_id":"0192f3a4-7b1c-7d2e-8f3a-000000000011","quantity":"2"}],"occurred_at":"2026-07-22T00:00:00Z",
                  "buyer_id":3001,"notify_buyer_account_id":null,"store_id":7001,
                  "seller_account_id":null,"seller_name":null,"seller_avatar_key":null,
                  "cancel_reason":"SELLER_SUSPENDED","notify_channel_id":999}
@@ -242,7 +242,7 @@ class OrderOutboxPublisherCancelledEnrichTest {
         long storeId = 7001L;
         long buyerId = 3001L;
         OrderCancelledPayload core = new OrderCancelledPayload(
-                "ORD1", "TX1", List.of(new OrderCancelledPayload.StockItemPayload("11", "2")),
+                "ORD1", "TX1", List.of(new OrderCancelledPayload.StockItemPayload(java.util.UUID.fromString("0192f3a4-7b1c-7d2e-8f3a-000000000011"), "2")),
                 "2026-07-22T00:00:00Z", buyerId, null, storeId, null, null, null, "SELLER_SUSPENDED");
 
         OrderOutboxEntity event = new OrderOutboxEntity();

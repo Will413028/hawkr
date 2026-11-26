@@ -6,6 +6,31 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ProtoConversionUtilsTest {
 
+    // ==================== parseUuid ====================
+
+    @Test
+    void parseUuidRequired_canonicalFormRoundTrips() {
+        String id = "0192f3a4-7b1c-7d2e-8f3a-123456789abc";
+        assertEquals(id, ProtoConversionUtils.parseUuidRequired(id, "sku_id").toString());
+        assertEquals(id, ProtoConversionUtils.parseUuidRequired(id.toUpperCase(), "sku_id").toString());
+    }
+
+    @Test
+    void parseUuidRequired_rejectsEmptyNumericAndAbbreviatedForms() {
+        for (String bad : new String[] {null, "", "  ", "123456789", "1-1-1-1-1", "not-a-uuid", "0192f3a4-7b1c-7d2e-8f3a-123456789abcd"}) {
+            IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                    () -> ProtoConversionUtils.parseUuidRequired(bad, "sku_id"), String.valueOf(bad));
+            assertTrue(e.getMessage().contains("sku_id"));
+        }
+    }
+
+    @Test
+    void parseUuidOrNull_returnsNullInsteadOfThrowing() {
+        assertNull(ProtoConversionUtils.parseUuidOrNull(null));
+        assertNull(ProtoConversionUtils.parseUuidOrNull("123456789"));
+        assertNotNull(ProtoConversionUtils.parseUuidOrNull("0192f3a4-7b1c-7d2e-8f3a-123456789abc"));
+    }
+
     // ==================== parseDecimalToInt ====================
 
     @Test

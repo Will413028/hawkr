@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.order.grpc.converter;
 
 import io.github.will413028.hawkr.order.entity.OrderEntity;
+import io.github.will413028.hawkr.order.TestIds;
 import io.github.will413028.hawkr.order.entity.OrderItemEntity;
 import io.github.will413028.hawkr.order.grpc.OrderAfterSalesView;
 import io.github.will413028.hawkr.order.grpc.OrderDetailView;
@@ -125,11 +126,11 @@ class OrderProtoConverterTest {
     void catalogLineStillCarriesSkuId() {
         OrderEntity order = baseOrder();
         OrderItemEntity item = nonCatalogItem();
-        item.setSkuId(5150L);
+        item.setSkuId(TestIds.id(5150L));
 
         OrderSummaryView summary = OrderProtoConverter.toSummaryView(
                 order, List.of(item), null, null, "", false, null);
-        assertThat(summary.getItems(0).getSkuId()).isEqualTo("5150");
+        assertThat(summary.getItems(0).getSkuId()).isEqualTo(TestIds.id(5150L).toString());
     }
 
     private static OrderItemEntity nonCatalogItem() {

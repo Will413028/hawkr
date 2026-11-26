@@ -151,14 +151,14 @@ public final class OrderProtoConverter {
         for (OrderItemEntity item : items) {
             OrderItemView.Builder itemBuilder = OrderItemView.newBuilder()
                     .setId(ProtoConversionUtils.formatLong(item.getId()))
-                    .setSkuId(ProtoConversionUtils.formatLong(item.getSkuId()))
+                    .setSkuId(ProtoConversionUtils.formatUuid(item.getSkuId()))
                     .setSkuName(item.getSkuName())
                     .setQuantity(ProtoConversionUtils.formatInt(item.getQuantity()))
                     .setUnitPrice(ProtoConversionUtils.formatLong(item.getUnitPrice()))
                     .setListPrice(ProtoConversionUtils.formatLong(item.getListPrice()))
                     .setImageKey(item.getImageObjectKey() != null ? item.getImageObjectKey() : ""); // 49 §6.6：只填 key，Gateway 組 imageUrl
             if (item.getProductId() != null) {
-                itemBuilder.setProductId(ProtoConversionUtils.formatLong(item.getProductId()));
+                itemBuilder.setProductId(ProtoConversionUtils.formatUuid(item.getProductId()));
             }
             if (item.getProductName() != null) {
                 itemBuilder.setProductName(item.getProductName());
@@ -255,7 +255,7 @@ public final class OrderProtoConverter {
         for (OrderItemEntity item : items) {
             OrderItemDetail.Builder itemBuilder = OrderItemDetail.newBuilder()
                     .setId(ProtoConversionUtils.formatLong(item.getId()))
-                    .setSkuId(ProtoConversionUtils.formatLong(item.getSkuId()))
+                    .setSkuId(ProtoConversionUtils.formatUuid(item.getSkuId()))
                     .setSkuName(item.getSkuName())
                     .setQuantity(ProtoConversionUtils.formatInt(item.getQuantity()))
                     .setUnitPrice(ProtoConversionUtils.formatLong(item.getUnitPrice()))
@@ -265,7 +265,7 @@ public final class OrderProtoConverter {
                     .setShareDiscount(ProtoConversionUtils.formatAmount(item.getShareDiscount()))
                     .setImageKey(item.getImageObjectKey() != null ? item.getImageObjectKey() : ""); // 49 §6.6：只填 key，Gateway 組 imageUrl
             if (item.getProductId() != null) {
-                itemBuilder.setProductId(ProtoConversionUtils.formatLong(item.getProductId()));
+                itemBuilder.setProductId(ProtoConversionUtils.formatUuid(item.getProductId()));
             }
             if (item.getProductName() != null) {
                 itemBuilder.setProductName(item.getProductName());
@@ -381,7 +381,7 @@ public final class OrderProtoConverter {
         for (OrderItemEntity item : items) {
             builder.addItems(OrderItemForAfterSales.newBuilder()
                     .setId(ProtoConversionUtils.formatLong(item.getId()))
-                    .setSkuId(ProtoConversionUtils.formatLong(item.getSkuId()))
+                    .setSkuId(ProtoConversionUtils.formatUuid(item.getSkuId()))
                     .setSkuName(item.getSkuName())
                     .setQuantity(ProtoConversionUtils.formatInt(item.getQuantity()))
                     .setUnitPrice(ProtoConversionUtils.formatLong(item.getUnitPrice()))
@@ -441,7 +441,7 @@ public final class OrderProtoConverter {
                         .setImageUrl(buildCdnUrl(cdnBaseUrl, item.getImageObjectKey()))
                         .setImageObjectKey(item.getImageObjectKey() != null ? item.getImageObjectKey() : "")
                         .setPrice(ProtoConversionUtils.formatLong(item.getUnitPrice()))
-                        .setProductId(ProtoConversionUtils.formatLong(item.getProductId()))
+                        .setProductId(ProtoConversionUtils.formatUuid(item.getProductId()))
                         .build())
                 .toList();
     }
@@ -451,7 +451,7 @@ public final class OrderProtoConverter {
                 .map(item -> {
                     var b = OrderItemDetail.newBuilder()
                             .setId(ProtoConversionUtils.formatLong(item.getId()))
-                            .setSkuId(ProtoConversionUtils.formatLong(item.getSkuId()))
+                            .setSkuId(ProtoConversionUtils.formatUuid(item.getSkuId()))
                             .setSkuName(item.getSkuName())
                             .setQuantity(ProtoConversionUtils.formatInt(item.getQuantity()))
                             .setUnitPrice(ProtoConversionUtils.formatLong(item.getUnitPrice()))
@@ -461,7 +461,7 @@ public final class OrderProtoConverter {
                             .setShareDiscount(ProtoConversionUtils.formatAmount(item.getShareDiscount()))
                             .setImageKey(item.getImageObjectKey() != null ? item.getImageObjectKey() : ""); // 49 §6.6：只填 key，Gateway 組 imageUrl
                     if (item.getProductId() != null) {
-                        b.setProductId(ProtoConversionUtils.formatLong(item.getProductId()));
+                        b.setProductId(ProtoConversionUtils.formatUuid(item.getProductId()));
                     }
                     if (item.getProductName() != null) {
                         b.setProductName(item.getProductName());

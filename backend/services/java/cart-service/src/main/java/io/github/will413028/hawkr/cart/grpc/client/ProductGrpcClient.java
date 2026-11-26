@@ -55,7 +55,7 @@ public class ProductGrpcClient {
     /**
      * 取得商品簡化資訊（驗證 SKU + 取得快照）
      *
-     * @param skuId product_spec.id（數字字串）
+     * @param skuId catalog 的 SKU ID（UUID 字串）
      * @return GetProductSimpleResponse，呼叫端需檢查 code 和 is_active
      */
     public GetProductSimpleResponse getProductSimple(String skuId) {
@@ -74,7 +74,7 @@ public class ProductGrpcClient {
      * 批次取得 SKU 即時資訊（庫存+配送溫層+價格+上架狀態）
      * GetCart 時呼叫，降級回傳空 Map
      *
-     * @param skuIds SKU ID 列表（數字字串）
+     * @param skuIds SKU ID 列表（UUID 字串）
      * @return Map<skuId, SkuCartInfo>，失敗時回傳空 Map
      */
     public Map<String, SkuCartInfo> batchGetSkuCartInfo(List<String> skuIds) {

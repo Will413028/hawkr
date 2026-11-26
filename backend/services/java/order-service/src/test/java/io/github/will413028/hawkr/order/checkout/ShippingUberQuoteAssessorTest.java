@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.order.checkout;
 
 import io.github.will413028.hawkr.order.checkout.UberOrderEligibilityGuard.Assessment;
+import io.github.will413028.hawkr.order.TestIds;
 import io.github.will413028.hawkr.order.checkout.UberOrderEligibilityGuard.Item;
 import io.github.will413028.hawkr.order.checkout.UberOrderEligibilityGuard.Probe;
 import io.github.will413028.hawkr.order.grpc.client.ShippingGrpcClient;
@@ -45,7 +46,7 @@ class ShippingUberQuoteAssessorTest {
                 BUYER_ID, STORE_ID, "3202",
                 "王小明", "0912345678",
                 "台北市", "中正區", "測試路1號3樓",
-                List.of(new Item(5001L, "蘋果", 2, 10, 12, 8, 1500L, 500L)));
+                List.of(new Item(TestIds.id(5001L), "蘋果", 2, 10, 12, 8, 1500L, 500L)));
     }
 
     private static GetUberQuoteForCheckoutResponse quoteResponse(UberQuoteData data) {
@@ -91,7 +92,7 @@ class ShippingUberQuoteAssessorTest {
         assertThat(sent.getDropoff().getDistrict()).isEqualTo("中正區");
         assertThat(sent.getDropoff().getDetailAddress()).isEqualTo("測試路1號3樓");
         assertThat(sent.getItemsCount()).isEqualTo(1);
-        assertThat(sent.getItems(0).getSkuId()).isEqualTo("5001");
+        assertThat(sent.getItems(0).getSkuId()).isEqualTo(TestIds.id(5001L).toString());
         assertThat(sent.getItems(0).getName()).isEqualTo("蘋果");
         assertThat(sent.getItems(0).getQuantity()).isEqualTo("2");
         assertThat(sent.getItems(0).getLengthCm()).isEqualTo("10");
@@ -162,7 +163,7 @@ class ShippingUberQuoteAssessorTest {
 
         Probe probe = new Probe(BUYER_ID, STORE_ID, "3202",
                 "王小明", "0912345678", "台北市", "中正區", "測試路1號3樓",
-                List.of(new Item(5001L, "蘋果", 2, 10, 12, 8, 1500L, 500L)),
+                List.of(new Item(TestIds.id(5001L), "蘋果", 2, 10, 12, 8, 1500L, 500L)),
                 "dqt_abc", true, "O20260912001");
 
         Assessment result = assessor.assess(probe);
@@ -198,7 +199,7 @@ class ShippingUberQuoteAssessorTest {
         Assessment result = assessor.assess(new Probe(
                 BUYER_ID, STORE_ID, "3202", "王小明", "0912345678",
                 "台北市", "中正區", "測試路1號3樓",
-                List.of(new Item(5001L, "蘋果", 2, 10, 12, 8, 1500L, 500L)),
+                List.of(new Item(TestIds.id(5001L), "蘋果", 2, 10, 12, 8, 1500L, 500L)),
                 "dqt_old", false, ""));
 
         assertThat(result.eligible()).isFalse();
@@ -218,7 +219,7 @@ class ShippingUberQuoteAssessorTest {
         Assessment result = assessor.assess(new Probe(
                 BUYER_ID, STORE_ID, "3202", "王小明", "0912345678",
                 "台北市", "中正區", "測試路1號3樓",
-                List.of(new Item(5001L, "蘋果", 2, 10, 12, 8, 1500L, 500L)),
+                List.of(new Item(TestIds.id(5001L), "蘋果", 2, 10, 12, 8, 1500L, 500L)),
                 "dqt_old", true, "O20260912001"));
 
         assertThat(result.eligible()).isFalse();

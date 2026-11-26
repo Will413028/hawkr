@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.cart.repository;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import java.util.UUID;
 import io.github.will413028.hawkr.common.utils.code.CartItemStatus;
 import io.github.will413028.hawkr.cart.entity.CartItemEntity;
 import org.apache.ibatis.annotations.*;
@@ -134,16 +135,16 @@ public interface CartItemRepository extends BaseMapper<CartItemEntity> {
 
     /** 查詢會員特定 SKU */
     @Select("SELECT * FROM cart_items WHERE buyer_id = #{buyerId} AND sku_id = #{skuId}")
-    CartItemEntity findByBuyerIdAndSkuId(@Param("buyerId") Long buyerId, @Param("skuId") Long skuId);
+    CartItemEntity findByBuyerIdAndSkuId(@Param("buyerId") Long buyerId, @Param("skuId") UUID skuId);
 
     /** 查詢訪客特定 SKU */
     @Select("SELECT * FROM cart_items WHERE guest_id = #{guestId} AND sku_id = #{skuId}")
-    CartItemEntity findByGuestIdAndSkuId(@Param("guestId") String guestId, @Param("skuId") Long skuId);
+    CartItemEntity findByGuestIdAndSkuId(@Param("guestId") String guestId, @Param("skuId") UUID skuId);
 
     // ==================== SetItemQuantity ====================
 
     /** 更新會員項目數量（需檢查 status=NORMAL） */
-    default int updateQuantityByBuyerSku(Long buyerId, Long skuId, int quantity) {
+    default int updateQuantityByBuyerSku(Long buyerId, UUID skuId, int quantity) {
         return updateQuantityByBuyerSkuInternal(buyerId, skuId, quantity, CartItemStatus.NORMAL.value());
     }
 
@@ -152,12 +153,12 @@ public interface CartItemRepository extends BaseMapper<CartItemEntity> {
         WHERE buyer_id = #{buyerId} AND sku_id = #{skuId} AND status = #{statusNormal}
         """)
     int updateQuantityByBuyerSkuInternal(@Param("buyerId") Long buyerId,
-                                          @Param("skuId") Long skuId,
+                                          @Param("skuId") UUID skuId,
                                           @Param("quantity") int quantity,
                                           @Param("statusNormal") String statusNormal);
 
     /** 更新訪客項目數量 */
-    default int updateQuantityByGuestSku(String guestId, Long skuId, int quantity) {
+    default int updateQuantityByGuestSku(String guestId, UUID skuId, int quantity) {
         return updateQuantityByGuestSkuInternal(guestId, skuId, quantity, CartItemStatus.NORMAL.value());
     }
 
@@ -166,34 +167,34 @@ public interface CartItemRepository extends BaseMapper<CartItemEntity> {
         WHERE guest_id = #{guestId} AND sku_id = #{skuId} AND status = #{statusNormal}
         """)
     int updateQuantityByGuestSkuInternal(@Param("guestId") String guestId,
-                                          @Param("skuId") Long skuId,
+                                          @Param("skuId") UUID skuId,
                                           @Param("quantity") int quantity,
                                           @Param("statusNormal") String statusNormal);
 
     /** 刪除會員特定 SKU（qty=0 時） */
-    default int deleteByBuyerSku(Long buyerId, Long skuId) {
+    default int deleteByBuyerSku(Long buyerId, UUID skuId) {
         return deleteByBuyerSkuInternal(buyerId, skuId, CartItemStatus.NORMAL.value());
     }
 
     @Delete("DELETE FROM cart_items WHERE buyer_id = #{buyerId} AND sku_id = #{skuId} AND status = #{statusNormal}")
     int deleteByBuyerSkuInternal(@Param("buyerId") Long buyerId,
-                                  @Param("skuId") Long skuId,
+                                  @Param("skuId") UUID skuId,
                                   @Param("statusNormal") String statusNormal);
 
     /** 刪除訪客特定 SKU */
-    default int deleteByGuestSku(String guestId, Long skuId) {
+    default int deleteByGuestSku(String guestId, UUID skuId) {
         return deleteByGuestSkuInternal(guestId, skuId, CartItemStatus.NORMAL.value());
     }
 
     @Delete("DELETE FROM cart_items WHERE guest_id = #{guestId} AND sku_id = #{skuId} AND status = #{statusNormal}")
     int deleteByGuestSkuInternal(@Param("guestId") String guestId,
-                                  @Param("skuId") Long skuId,
+                                  @Param("skuId") UUID skuId,
                                   @Param("statusNormal") String statusNormal);
 
     // ==================== CheckoutLock / Unlock / Remove ====================
 
     default int lockItemsByBuyerAndSkus(Long buyerId, String checkoutId,
-                                         LocalDateTime lockExpireTime, List<Long> skuIds) {
+                                         LocalDateTime lockExpireTime, List<UUID> skuIds) {
         return lockItemsByBuyerAndSkusInternal(buyerId, checkoutId, lockExpireTime, skuIds,
                 CartItemStatus.LOCKED.value(), CartItemStatus.NORMAL.value());
     }
@@ -213,14 +214,14 @@ public interface CartItemRepository extends BaseMapper<CartItemEntity> {
     int lockItemsByBuyerAndSkusInternal(@Param("buyerId") Long buyerId,
                                          @Param("checkoutId") String checkoutId,
                                          @Param("lockExpireTime") LocalDateTime lockExpireTime,
-                                         @Param("skuIds") List<Long> skuIds,
+                                         @Param("skuIds") List<UUID> skuIds,
                                          @Param("statusLocked") String statusLocked,
                                          @Param("statusNormal") String statusNormal);
 
     /**
      * 解除鎖定：依 checkout_id 解鎖指定 SKU（補償用，冪等）
      */
-    default int unlockItemsByCheckoutId(Long buyerId, String checkoutId, List<Long> skuIds) {
+    default int unlockItemsByCheckoutId(Long buyerId, String checkoutId, List<UUID> skuIds) {
         return unlockItemsByCheckoutIdInternal(buyerId, checkoutId, skuIds,
                 CartItemStatus.NORMAL.value(), CartItemStatus.LOCKED.value());
     }
@@ -240,7 +241,7 @@ public interface CartItemRepository extends BaseMapper<CartItemEntity> {
         """)
     int unlockItemsByCheckoutIdInternal(@Param("buyerId") Long buyerId,
                                          @Param("checkoutId") String checkoutId,
-                                         @Param("skuIds") List<Long> skuIds,
+                                         @Param("skuIds") List<UUID> skuIds,
                                          @Param("statusNormal") String statusNormal,
                                          @Param("statusLocked") String statusLocked);
 
@@ -261,7 +262,7 @@ public interface CartItemRepository extends BaseMapper<CartItemEntity> {
         """)
     int removeByCheckoutId(@Param("buyerId") Long buyerId,
                            @Param("checkoutId") String checkoutId,
-                           @Param("skuIds") List<Long> skuIds);
+                           @Param("skuIds") List<UUID> skuIds);
 
     // ==================== MergeCart ====================
 

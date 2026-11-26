@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.order.service;
 
 import io.github.will413028.hawkr.common.utils.TsidUtil;
+import io.github.will413028.hawkr.order.TestIds;
 import io.github.will413028.hawkr.common.utils.code.ShippingMethod;
 import io.github.will413028.hawkr.order.checkout.InvoiceIntakeResolver;
 import io.github.will413028.hawkr.order.checkout.OrderPolicyResolver;
@@ -134,6 +135,6 @@ class OrderPolicyPersistenceOnCreationPathsTest {
 
     private static List<OrderService.CreateOrderItemParam> items() {
         return List.of(new OrderService.CreateOrderItemParam(
-                5001L, "Apple", 2, 500L, 500L, 0L, "key/a.jpg", 9001L, "Apple Box"));
+                TestIds.id(5001L), "Apple", 2, 500L, 500L, 0L, "key/a.jpg", TestIds.id(9001L), "Apple Box"));
     }
 }

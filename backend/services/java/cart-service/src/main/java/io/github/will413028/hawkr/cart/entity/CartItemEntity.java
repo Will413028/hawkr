@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.cart.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import java.util.UUID;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -28,8 +29,8 @@ public class CartItemEntity {
     /** 賣家分組 key（store 代理鍵，Product Service 取得，用於分組） */
     private Long storeId;
 
-    /** 商品 SKU ID（= product_spec.id） */
-    private Long skuId;
+    /** 商品 SKU ID（catalog 的 UUID） */
+    private UUID skuId;
 
     /** 數量 */
     private Integer quantity;
@@ -46,8 +47,8 @@ public class CartItemEntity {
     /** 加入時商品名稱快照（展示用） */
     private String skuNameSnapshot;
 
-    /** 商品 ID（AddItem 時從 ProductSimpleInfo 取得） */
-    private Long productId;
+    /** 商品 ID（catalog 的 UUID；AddItem 時從 ProductSimpleInfo 取得） */
+    private UUID productId;
 
     /** SKU 規格名稱快照（product_sku.sku_name） */
     private String specNameSnapshot;

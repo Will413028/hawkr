@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.order.mq;
 
 import io.github.will413028.hawkr.common.utils.code.OrderEventType;
+import java.util.UUID;
 import io.github.will413028.hawkr.common.obs.context.ObsContext;
 import io.github.will413028.hawkr.common.obs.log.ObsLogger;
 import io.github.will413028.hawkr.common.utils.TsidUtil;
@@ -282,7 +283,7 @@ public class PaymentEventHandler {
         // ⇒ MQ 短暫不可用時「訂單已 PAID、dedup 已寫、事件沒送出」，product.sales_count 永久少算，
         // 而 docs/開發規範/後端服務責任邊界規範.md 禁止寫 reconciliation job ⇒ 無任何救濟路徑。
         // ⇒ 改走**例外 A（同 tx outbox）**，與正上方 order.paid 同一個做法與同一個事務。
-        Map<Long, Integer> productQtyMap = orderItemRepository.findByOrderNo(orderId).stream()
+        Map<UUID, Integer> productQtyMap = orderItemRepository.findByOrderNo(orderId).stream()
                 .collect(Collectors.groupingBy(
                         item -> item.getProductId(),
                         Collectors.summingInt(item -> item.getQuantity())));

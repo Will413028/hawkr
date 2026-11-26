@@ -35,6 +35,7 @@ import net.devh.boot.grpc.server.service.GrpcService;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -56,7 +57,7 @@ public class CartGrpcService extends CartServiceGrpc.CartServiceImplBase {
     public void addItem(AddItemRequest request, StreamObserver<AddItemResponse> responseObserver) {
         try {
             OwnerInfo owner = resolveOwner(request.getGuestId());
-            Long skuId = parseLong(request.getSkuId(), "sku_id");
+            UUID skuId = parseUuid(request.getSkuId(), "sku_id");
             int quantity = parseInt(request.getQuantity(), "quantity");
 
             if (quantity <= 0) {
@@ -201,7 +202,7 @@ public class CartGrpcService extends CartServiceGrpc.CartServiceImplBase {
     public void setItemQuantity(SetItemQuantityRequest request, StreamObserver<SetItemQuantityResponse> responseObserver) {
         try {
             OwnerInfo owner = resolveOwner(request.getGuestId());
-            Long skuId = parseLong(request.getSkuId(), "sku_id");
+            UUID skuId = parseUuid(request.getSkuId(), "sku_id");
             int quantity = parseInt(request.getQuantity(), "quantity");
 
             if (quantity < 0) {
@@ -242,8 +243,8 @@ public class CartGrpcService extends CartServiceGrpc.CartServiceImplBase {
                 throw Status.INVALID_ARGUMENT.withDescription("checkout_id 不可為空").asRuntimeException();
             }
 
-            List<Long> skuIds = request.getSkuIdsList().stream()
-                    .map(s -> parseLong(s, "sku_id"))
+            List<UUID> skuIds = request.getSkuIdsList().stream()
+                    .map(s -> parseUuid(s, "sku_id"))
                     .collect(Collectors.toList());
 
             int code = cartService.checkoutLock(buyerId, checkoutId, skuIds);
@@ -276,8 +277,8 @@ public class CartGrpcService extends CartServiceGrpc.CartServiceImplBase {
                 throw Status.INVALID_ARGUMENT.withDescription("checkout_id 不可為空").asRuntimeException();
             }
 
-            List<Long> skuIds = request.getSkuIdsList().stream()
-                    .map(s -> parseLong(s, "sku_id"))
+            List<UUID> skuIds = request.getSkuIdsList().stream()
+                    .map(s -> parseUuid(s, "sku_id"))
                     .collect(Collectors.toList());
 
             int code = cartService.checkoutUnlock(buyerId, checkoutId, skuIds.isEmpty() ? null : skuIds);
@@ -312,8 +313,8 @@ public class CartGrpcService extends CartServiceGrpc.CartServiceImplBase {
                 throw Status.INVALID_ARGUMENT.withDescription("checkout_id 不可為空").asRuntimeException();
             }
 
-            List<Long> skuIds = request.getSkuIdsList().stream()
-                    .map(s -> parseLong(s, "sku_id"))
+            List<UUID> skuIds = request.getSkuIdsList().stream()
+                    .map(s -> parseUuid(s, "sku_id"))
                     .collect(Collectors.toList());
 
             int code = cartService.removeItemsByCheckoutId(buyerId, checkoutId, skuIds.isEmpty() ? null : skuIds);
@@ -353,8 +354,8 @@ public class CartGrpcService extends CartServiceGrpc.CartServiceImplBase {
         return new OwnerInfo(null, guestId);
     }
 
-    private Long parseLong(String value, String fieldName) {
-        return ProtoConversionUtils.parseLongRequired(value, fieldName);
+    private UUID parseUuid(String value, String fieldName) {
+        return ProtoConversionUtils.parseUuidRequired(value, fieldName);
     }
 
     private int parseInt(String value, String fieldName) {

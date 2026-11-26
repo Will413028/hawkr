@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.order.checkout;
 
 import io.github.will413028.hawkr.common.obs.log.ObsLogger;
+import java.util.UUID;
 import io.github.will413028.hawkr.common.utils.code.GrpcResponseCode;
 import io.github.will413028.hawkr.common.utils.code.ShippingFeePayer;
 import io.github.will413028.hawkr.common.utils.code.ShippingMethod;
@@ -343,11 +344,11 @@ public class CheckoutValidator {
      */
     public FreeShippingResult checkFreeShipping(List<ResolvedItem> items,
                                                   String methodCode, String tempCode,
-                                                  Map<Long, Long> shareDiscountBySkuId) {
+                                                  Map<UUID, Long> shareDiscountBySkuId) {
         boolean anyEligible = false;
         String feePayer = ShippingFeePayer.BUYER.value();
         long lowestThreshold = 0;
-        Map<Long, Long> discountMap = shareDiscountBySkuId != null ? shareDiscountBySkuId : Map.of();
+        Map<UUID, Long> discountMap = shareDiscountBySkuId != null ? shareDiscountBySkuId : Map.of();
 
         for (ResolvedItem item : items) {
             for (SkuShippingOption opt : item.shippingOptions()) {
@@ -395,7 +396,7 @@ public class CheckoutValidator {
      * 已解析的結帳商品（由 CheckoutService 從 Product Service 回應轉換而來）
      */
     public record ResolvedItem(
-            long skuId,
+            UUID skuId,
             String skuName,
             int quantity,
             long unitPrice,        // 實際成交單價（無特價=listPrice，有特價=當時 sale_price）
@@ -406,7 +407,7 @@ public class CheckoutValidator {
             int heightCm,
             long weightGram,
             long storeId,
-            String productId,
+            UUID productId,
             String productName,
             List<SkuShippingOption> shippingOptions,
             String imageObjectKey,

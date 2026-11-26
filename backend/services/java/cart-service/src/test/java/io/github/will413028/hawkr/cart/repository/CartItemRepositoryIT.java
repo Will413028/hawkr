@@ -153,17 +153,17 @@ class CartItemRepositoryIT {
 
     /**
      * 直接 SQL insert（避免走 MyBatis-Plus auto-fill，方便精確控制 status / store_id）。
-     * 對應 V1（+ V2 rename）schema 的 NOT NULL 欄位給預設值；sku_id 用 id 本身頂替，確保同一
-     * guest_id 底下每列 sku_id 相異（uk_cart_guest_sku 部分唯一索引：guest_id, sku_id）。
+     * 對應 V1（+ V2、V4）schema 的 NOT NULL 欄位給預設值；sku_id 由 id 組成的 UUID 頂替，確保同一
+     * guest_id 底下每列 sku_id 相異（uk_cart_guest_sku 部分唯一索引：guest_id, sku_id）；product_id 無預設值，同樣給一個 UUID。
      */
     private void insertCartItem(long id, String guestId, long storeId, String status) {
         jdbc.update("""
                 INSERT INTO cart_items
-                    (id, guest_id, store_id, sku_id, quantity,
+                    (id, guest_id, store_id, sku_id, product_id, quantity,
                      added_unit_price, added_list_price, max_limit_snapshot, sku_name_snapshot, status)
-                VALUES (?, ?, ?, ?, 1, 100, 100, 10, 'test sku', ?)
+                VALUES (?, ?, ?, ?, ?, 1, 100, 100, 10, 'test sku', ?)
                 """,
-                id, guestId, storeId, id, status);
+                id, guestId, storeId, new java.util.UUID(1L, id), new java.util.UUID(2L, id), status);
     }
 
     private int countById(long id) {

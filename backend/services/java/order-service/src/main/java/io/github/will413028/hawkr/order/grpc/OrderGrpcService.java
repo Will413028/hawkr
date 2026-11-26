@@ -330,17 +330,17 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                         long listPrice = i.getListPrice().isEmpty()
                                 ? unitPrice
                                 : ProtoConversionUtils.parseLongRequired(i.getListPrice(), "listPrice");
-                        // catalog 建單：走 CreateOrderItemParam.catalog（primitive long）
-                        // ⇒ sku_id 缺值仍是編譯期＋parse 期雙重擋下，不因 RFQ 放寬而鬆掉。
+                        // catalog 建單：走 CreateOrderItemParam.catalog（工廠方法拒絕 null）
+                        // ⇒ sku_id 缺值或不是 UUID 在 parse 期擋下，不因 RFQ 放寬而鬆掉。
                         return OrderService.CreateOrderItemParam.catalog(
-                            ProtoConversionUtils.parseLongRequired(i.getSkuId(), "skuId"),
+                            ProtoConversionUtils.parseUuidRequired(i.getSkuId(), "skuId"),
                             i.getSkuName(),
                             ProtoConversionUtils.parseIntRequired(i.getQuantity(), "quantity"),
                             unitPrice,
                             listPrice,
                             0L,  // CreateOrder 走購物車外建單路徑：share_discount=0（無優惠券分攤）
                             "",
-                            ProtoConversionUtils.parseLongOrNull(i.getProductId()),
+                            i.getProductId().isEmpty() ? null : ProtoConversionUtils.parseUuidRequired(i.getProductId(), "productId"),
                             i.getProductName()
                         );
                     })
@@ -413,12 +413,12 @@ public class OrderGrpcService extends OrderServiceGrpc.OrderServiceImplBase {
                     ProtoConversionUtils.parseLongOrDefault(request.getShippingFee(), 0L),
                     // RFQ 明細是 non-catalog line（64 號 §6.4.9）：wire 上 sku_id 缺值就是
                     // proto3 string 的 ""，映成 null。
-                    // ⛔ 不用 parseLongOrNull——它把格式不合法也吞成 null，那會讓「沒有 SKU」
+                    // ⛔ 不用 parseUuidOrNull——它把格式不合法也吞成 null，那會讓「沒有 SKU」
                     //    與「解析失敗」共用同一個值，而後者是 bug（§6.4.15 對哨兵的同一條立場）。
                     //    慣例取自同一支呼叫裡的 deliveryTemp。
                     request.getSkuId().isEmpty()
                             ? null
-                            : ProtoConversionUtils.parseLongRequired(request.getSkuId(), "skuId"),
+                            : ProtoConversionUtils.parseUuidRequired(request.getSkuId(), "skuId"),
                     request.getSkuName(),
                     ProtoConversionUtils.parseLongRequired(request.getUnitPrice(), "unitPrice"),
                     request.getDeliveryTemp().isEmpty() ? null : request.getDeliveryTemp(),

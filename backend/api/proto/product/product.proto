@@ -304,7 +304,7 @@ message CreateProductResponse {
 
 message UpdateProductRequest {
     string idempotency_key = 1;              // 冪等鍵
-    string product_id = 2;                   // 商品 ID (TSID 數字字串)
+    string product_id = 2;                   // 商品 ID (UUID 字串，catalog 的商品 ID)
     int64 store_id = 3;                      // 用於權限驗證（Gateway JWT 注入，resolver 解析後的 store surrogate）
     string name = 4;                         // 商品名稱
     string category_id = 5;                  // 分類 ID（數字字串）
@@ -334,20 +334,20 @@ message UpdateProductResponse {
 // ========== GetProductForAdmin ==========
 
 message GetProductForAdminRequest {
-    string product_id = 1;  // 商品 ID (TSID 數字字串)
+    string product_id = 1;  // 商品 ID (UUID 字串，catalog 的商品 ID)
 }
 
 // ========== UpdateProductStatus ==========
 
 message UpdateProductStatusRequest {
-    string product_id = 1;  // 商品 ID (TSID 數字字串)
+    string product_id = 1;  // 商品 ID (UUID 字串，catalog 的商品 ID)
     string status = 2;      // 目標狀態（CodeMeta ProductStatus：4003=未上架, 4004=已上架）
 }
 
 // ========== UpdateSellerProductStatus ==========
 
 message UpdateSellerProductStatusRequest {
-    string product_id = 1;  // 商品 ID (TSID 數字字串)
+    string product_id = 1;  // 商品 ID (UUID 字串，catalog 的商品 ID)
     int64 store_id = 2;    // 店家 ID（Gateway JWT 注入，resolver 解析後的 store surrogate）
     string status = 3;      // 目標狀態碼（CodeMeta ProductStatus：4003=未上架, 4004=已上架）
     string expected_version = 4;
@@ -431,7 +431,7 @@ message BatchUpdateSellerProductStatusResponse {
 // ========== GetProduct ==========
 
 message GetProductRequest {
-    string product_id = 1;  // 商品 ID (TSID 數字字串)
+    string product_id = 1;  // 商品 ID (UUID 字串，catalog 的商品 ID)
     int64 store_id = 2;     // 店家 ID（用於權限判斷，0 表示匿名）（Gateway JWT 注入，resolver 解析後的 store surrogate）
     hawkr.common.DelegationContext delegation = 100;
 }
@@ -445,7 +445,7 @@ message GetProductResponse {
 // ========== GetPublicProduct ==========
 
 message GetPublicProductRequest {
-    string product_id = 1;  // 商品 ID (TSID 數字字串)
+    string product_id = 1;  // 商品 ID (UUID 字串，catalog 的商品 ID)
 }
 
 // ========== GetProductList ==========
@@ -493,7 +493,7 @@ message GetProductListResponse {
 
 // 商品詳情（完整資料）
 message ProductDetail {
-    string id = 1;                           // 商品 ID (TSID 數字字串)
+    string id = 1;                           // 商品 ID (UUID 字串，catalog 的商品 ID)
     string name = 2;                         // 商品名稱
     string rating = 3;                       // 評分（數字字串）
     string status = 4;                       // 狀態
@@ -585,7 +585,7 @@ message ReviewPreview {
 
 // 商品列表項目（簡化資料，不含 skus）
 message ProductListItem {
-    string id = 1;                           // 商品 ID (TSID 數字字串)
+    string id = 1;                           // 商品 ID (UUID 字串，catalog 的商品 ID)
     string name = 2;                         // 商品名稱
     string rating = 3;                       // 評分（數字字串）
     string status = 4;                       // 狀態
@@ -637,7 +637,7 @@ message ProductListItem {
 // GetProductsByIDs — 批次查詢商品（買家瀏覽紀錄 / 收藏列表 enrichment）
 // 詳見 02 §5.5.1
 message GetProductsByIDsRequest {
-    repeated string product_ids = 1;  // 商品 ID 列表（TSID 數字字串）
+    repeated string product_ids = 1;  // 商品 ID 列表（UUID 字串，catalog 的商品 ID）
     // 是否回傳非 ACTIVE 商品。
     // false（預設）= 僅回 ACTIVE 且未軟刪除（瀏覽紀錄路徑使用）
     // true = 回所有未軟刪除商品（含 DRAFT/PENDING_REVIEW/INACTIVE，收藏列表 enrichment 使用）
@@ -669,7 +669,7 @@ message ProductResponse {
 // ========== 賣家商品管理 ==========
 
 message DeleteProductRequest {
-    string product_id = 1;   // 商品 ID（TSID 數字字串）
+    string product_id = 1;   // 商品 ID（UUID 字串，catalog 的商品 ID）
     int64 store_id = 2;     // 店家 ID（Gateway JWT 注入，resolver 解析後的 store surrogate）
 }
 
@@ -691,7 +691,7 @@ message RestoreStockRequest {
 }
 
 message StockItem {
-    string sku_id = 1;               // 對應 product_sku.id（數字字串）
+    string sku_id = 1;               // 對應 catalog 的 SKU ID（UUID 字串）
     string quantity = 2;             // 數量（數字字串）
 }
 
@@ -702,13 +702,13 @@ message StockOperationResponse {
 }
 
 message InsufficientItem {
-    string sku_id = 1;               // 庫存不足的 SKU ID（數字字串）
+    string sku_id = 1;               // 庫存不足的 SKU ID（UUID 字串）
     string requested_qty = 2;        // 請求數量（數字字串）
     string available_qty = 3;        // 實際可用庫存（數字字串）
 }
 
 message GetStockRequest {
-    repeated string sku_ids = 1;     // 要查詢的 product_sku.id 列表（數字字串）
+    repeated string sku_ids = 1;     // 要查詢的 catalog 的 SKU ID 列表（UUID 字串）
 }
 
 message GetStockResponse {
@@ -718,7 +718,7 @@ message GetStockResponse {
 }
 
 message StockInfo {
-    string sku_id = 1;              // 對應 product_sku.id（數字字串）
+    string sku_id = 1;              // 對應 catalog 的 SKU ID（UUID 字串）
     string stock_qty = 2;           // 當前庫存數量（數字字串）
 }
 
@@ -745,7 +745,7 @@ message PurgeCacheResult {
 // ========== GetProductSimple（Cart Service 呼叫） ==========
 
 message GetProductSimpleRequest {
-    string sku_id = 1;    // product_sku.id（數字字串）
+    string sku_id = 1;    // catalog 的 SKU ID（UUID 字串）
 }
 
 message GetProductSimpleResponse {
@@ -756,13 +756,13 @@ message GetProductSimpleResponse {
 
 // 商品簡化資訊（供 Cart AddItem 驗證與快照使用）
 message ProductSimpleInfo {
-    string sku_id = 1;                // product_sku.id（數字字串）
+    string sku_id = 1;                // catalog 的 SKU ID（UUID 字串）
     string store_id = 2;              // 賣家 store 代理鍵（= product.store_id，數字字串；② re-key）
     bool is_active = 3;               // 是否上架可售（product.status == '4004' 且未軟刪除）
     string name = 4;                  // 商品名稱（product.name）
     string price = 5;                 // **實際成交單價**（有特價=sale_price，否則=list price，新台幣元，數字字串）。Cart AddItem 寫入 added_unit_price
     string max_limit = 6;             // 限購上限（= product_sku.stock_qty，當前庫存，數字字串）
-    string product_id = 7;            // 商品 ID（product.id，數字字串）
+    string product_id = 7;            // 商品 ID（UUID 字串）
     string sku_name = 8;              // SKU 規格名稱（product_sku.sku_name）
     string image_object_key = 9;      // 商品主圖 objectKey（product.gallery[0].objectKey）
     repeated string delivery_temps = 10; // SKU 支援的配送溫層 value（如 ["3201","3202"]）
@@ -772,13 +772,13 @@ message ProductSimpleInfo {
 // ========== BatchGetSkuCartInfo（購物車列表即時資訊） ==========
 
 message BatchGetSkuCartInfoRequest {
-    repeated string sku_ids = 1;  // SKU ID 列表（數字字串）
+    repeated string sku_ids = 1;  // SKU ID 列表（UUID 字串）
 }
 
 message BatchGetSkuCartInfoResponse {
     int32 code = 1;
     string message = 2;
-    map<string, SkuCartInfo> skus = 3;  // key = sku_id（數字字串）
+    map<string, SkuCartInfo> skus = 3;  // key = sku_id（UUID 字串）
 }
 
 // 購物車列表用的 SKU 即時資訊
@@ -793,7 +793,7 @@ message SkuCartInfo {
 // ========== BatchGetProductForCheckout（結帳鏈路用，接受 inactive） ==========
 
 message BatchGetProductForCheckoutRequest {
-    repeated string sku_ids = 1;         // 批次查詢的 SKU ID（數字字串，長度 ≤ 100）
+    repeated string sku_ids = 1;         // 批次查詢的 SKU ID（UUID 字串，長度 ≤ 100）
 }
 
 message BatchGetProductForCheckoutResponse {
@@ -803,8 +803,8 @@ message BatchGetProductForCheckoutResponse {
 
 // 結帳鏈路用的商品完整資訊（接受 inactive，含 status / weight / dimension / shipping_methods）
 message ProductForCheckoutInfo {
-    string sku_id = 1;                   // SKU ID（數字字串）
-    string product_id = 2;               // 商品 ID（TSID 數字字串）
+    string sku_id = 1;                   // SKU ID（UUID 字串）
+    string product_id = 2;               // 商品 ID（UUID 字串，catalog 的商品 ID）
     string store_id = 3;                 // 賣家 store 代理鍵（= product.store_id，數字字串；② re-key）
     bool is_active = 4;                  // product.status == ACTIVE 且 deleted_at IS NULL
     string price = 5;                    // 實際成交單價（有特價=sale_price，否則=list price，數字字串）
@@ -880,7 +880,7 @@ message ShippingLimitsProto {
 // ========== GetRelatedProducts（相關商品） ==========
 
 message GetRelatedProductsRequest {
-    string product_id = 1;   // 商品 ID（TSID 數字字串）
+    string product_id = 1;   // 商品 ID（UUID 字串，catalog 的商品 ID）
     string limit = 2;        // 回傳上限（數字字串，預設 "8"）
 }
 

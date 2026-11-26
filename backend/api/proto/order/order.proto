@@ -227,12 +227,12 @@ message OrderSummaryView {
 }
 
 message OrderItemView {
-    string sku_id = 1;           // TSID 數字字串
+    string sku_id = 1;           // UUID 字串（catalog 的 SKU ID；non-catalog line 為空）
     string sku_name = 2;         // 規格名稱
     string quantity = 3;         // 數字字串
     string image_key = 4;        // 商品圖片 objectKey（快照；49 §6.6：Gateway 組 imageUrl）
     string id = 5;               // order_item TSID 數字字串
-    string product_id = 6;       // 商品 ID（TSID 數字字串，快照）
+    string product_id = 6;       // 商品 ID（UUID 字串，catalog 的商品 ID，快照）
     string product_name = 7;     // 商品名稱（快照）
     string list_price = 8;       // 原價快照（永遠 = 下單時 SKU.price，數字字串）
     string unit_price = 9;       // 實際成交單價快照（無特價=list_price，有特價=當時 sale_price，數字字串）
@@ -342,7 +342,7 @@ message OrderDetailView {
 
 message OrderItemDetail {
     string id = 1;               // order_item TSID 數字字串
-    string sku_id = 2;           // TSID 數字字串
+    string sku_id = 2;           // UUID 字串（catalog 的 SKU ID；non-catalog line 為空）
     string sku_name = 3;         // 規格名稱
     string quantity = 4;         // 數字字串
     string unit_price = 5;       // **重命名**（原 original_price → unit_price）：實際成交單價快照
@@ -350,7 +350,7 @@ message OrderItemDetail {
     string refund_status = 7;     // OrderItemStatus value，如 "0", "20"
     string share_discount = 8;   // 分攤折扣金額（數字字串）
     string image_key = 9;        // 商品圖片 objectKey（快照；49 §6.6：Gateway 組 imageUrl）
-    string product_id = 10;      // 商品 ID（TSID 數字字串，快照）
+    string product_id = 10;      // 商品 ID（UUID 字串，catalog 的商品 ID，快照）
     string product_name = 11;    // 商品名稱（快照）
     string list_price = 12;      // **新增**：原價快照（永遠 = 下單時 SKU.price，數字字串）
 }
@@ -452,11 +452,11 @@ message CreateRfqOrderResponse {
 }
 
 message CreateOrderItem {
-    string sku_id = 1;            // TSID 數字字串
+    string sku_id = 1;            // UUID 字串（catalog 的 SKU ID；non-catalog line 為空）
     string sku_name = 2;          // 規格名稱（快照）
     string quantity = 3;          // 數字字串
     string unit_price = 4;        // **重命名**（原 original_price → unit_price）：實際成交單價（金額字串）
-    string product_id = 5;        // 商品 ID（TSID 數字字串）
+    string product_id = 5;        // 商品 ID（UUID 字串，catalog 的商品 ID）
     string product_name = 6;      // 商品名稱（快照）
     string list_price = 7;        // **新增**：原價快照（永遠 = SKU.price，金額字串）
 }
@@ -698,9 +698,9 @@ message OrderPaymentInfo {
 
 // 結帳商品項目（4 支結帳 API 共用）
 message CheckoutItem {
-    string sku_id = 1;                         // SKU ID（數字字串）
+    string sku_id = 1;                         // SKU ID（UUID 字串）
     string quantity = 2;                       // 數量（數字字串）
-    string product_id = 3;                     // 商品 ID（TSID 數字字串）
+    string product_id = 3;                     // 商品 ID（UUID 字串，catalog 的商品 ID）
 }
 
 // --- CheckoutValidate（即時驗證）---
@@ -731,7 +731,7 @@ message CheckoutValidationError {
 
 // row 級不可購買明細（Validate / Preview / Confirm 共用）。Preview / Confirm 非空 → envelope code=4001
 message UnavailableItem {
-    string sku_id = 1;                         // SKU ID（數字字串）
+    string sku_id = 1;                         // SKU ID（UUID 字串）
     string sku_name = 2;                       // 商品名稱（來源：cart_items.sku_name_snapshot；lookup 失敗時前端可 fallback「商品已下架」）
     string reason = 3;                         // CartItemUnavailableReason value（DELISTED / OUT_OF_STOCK / INSUFFICIENT_STOCK / LOOKUP_FAILED）
     string requested_qty = 4;                  // 買家本次勾選量（數字字串，承載原 InsufficientStockItem.requested_qty 語意）
@@ -857,8 +857,8 @@ message OrderGroupPreview {
 }
 
 message CheckoutItemPreview {
-    string sku_id = 1;                             // SKU ID（數字字串）
-    string product_id = 2;                         // 商品 ID（TSID 數字字串）
+    string sku_id = 1;                             // SKU ID（UUID 字串）
+    string product_id = 2;                         // 商品 ID（UUID 字串，catalog 的商品 ID）
     string sku_name = 3;                           // SKU 名稱（快照）
     string quantity = 4;                           // 數量（數字字串）
     string price = 5;                              // **語意變更**：實際成交單價（有特價=sale_price，否則=list_price，數字字串）
@@ -1039,7 +1039,7 @@ message OrderItemForReview {
     string sku_name = 2;            // 商品名稱
     string image_url = 3;           // 商品圖片 URL（相容欄位，值為 Order Service 組好的 CDN URL；新流程改讀 image_object_key）
     string price = 4;               // 商品單價（數字字串，元）
-    string product_id = 5;          // 商品 ID（TSID 數字字串）
+    string product_id = 5;          // 商品 ID（UUID 字串，catalog 的商品 ID）
     string image_object_key = 6;    // 商品圖片 objectKey（review-service 直接落庫，免剝殼；49 §5.3 item_image 回填理想解）
 }
 
@@ -1454,7 +1454,7 @@ message OrderInvoiceSnapshotItem {
     // order_items.id（TSID 數字字串）。invoice_document_lines.order_item_id 的來源，
     // 也是明細行排序鍵（升冪 ＝ 建立順序，line_seq 決定性不得依賴 map 迭代序）。
     string order_item_id = 1;
-    string sku_id = 2;          // TSID 數字字串
+    string sku_id = 2;          // UUID 字串（catalog 的 SKU ID；non-catalog line 為空）
     string product_name = 3;
     string sku_name = 4;        // 為空或等於 product_name 時，品名只取 product_name
     string quantity = 5;        // 正整數的數字字串

@@ -232,11 +232,12 @@ public class StockCompensationWorker {
             JsonNode items = MAPPER.readTree(json);
             return java.util.stream.StreamSupport.stream(items.spliterator(), false)
                     .map(node -> StockItem.newBuilder()
-                            .setSkuId(String.valueOf(node.path("skuId").asLong()))
+                            .setSkuId(java.util.UUID.fromString(node.path("skuId").asText()).toString())
                             .setQuantity(String.valueOf(node.path("quantity").asInt()))
                             .build())
                     .toList();
-        } catch (JsonProcessingException e) {
+        } catch (JsonProcessingException | IllegalArgumentException e) {
+            // skuId 不是 UUID（空、舊的數字 ID）也當解析失敗：不把不合法的 ID 當成有效值送去歸還。
             log.error("StockCompensationWorker.parsePayload.error", "解析 payload 失敗", e);
             return List.of();
         }

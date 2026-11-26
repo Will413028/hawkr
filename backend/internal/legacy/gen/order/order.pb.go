@@ -528,12 +528,12 @@ func (x *OrderSummaryView) GetPaymentMethod() string {
 
 type OrderItemView struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	SkuId         string                 `protobuf:"bytes,1,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"`                   // TSID 數字字串
+	SkuId         string                 `protobuf:"bytes,1,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"`                   // UUID 字串（catalog 的 SKU ID；non-catalog line 為空）
 	SkuName       string                 `protobuf:"bytes,2,opt,name=sku_name,json=skuName,proto3" json:"sku_name,omitempty"`             // 規格名稱
 	Quantity      string                 `protobuf:"bytes,3,opt,name=quantity,proto3" json:"quantity,omitempty"`                          // 數字字串
 	ImageKey      string                 `protobuf:"bytes,4,opt,name=image_key,json=imageKey,proto3" json:"image_key,omitempty"`          // 商品圖片 objectKey（快照；49 §6.6：Gateway 組 imageUrl）
 	Id            string                 `protobuf:"bytes,5,opt,name=id,proto3" json:"id,omitempty"`                                      // order_item TSID 數字字串
-	ProductId     string                 `protobuf:"bytes,6,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`       // 商品 ID（TSID 數字字串，快照）
+	ProductId     string                 `protobuf:"bytes,6,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`       // 商品 ID（UUID 字串，catalog 的商品 ID，快照）
 	ProductName   string                 `protobuf:"bytes,7,opt,name=product_name,json=productName,proto3" json:"product_name,omitempty"` // 商品名稱（快照）
 	ListPrice     string                 `protobuf:"bytes,8,opt,name=list_price,json=listPrice,proto3" json:"list_price,omitempty"`       // 原價快照（永遠 = 下單時 SKU.price，數字字串）
 	UnitPrice     string                 `protobuf:"bytes,9,opt,name=unit_price,json=unitPrice,proto3" json:"unit_price,omitempty"`       // 實際成交單價快照（無特價=list_price，有特價=當時 sale_price，數字字串）
@@ -1186,7 +1186,7 @@ func (x *OrderDetailView) GetDeliveredAt() string {
 type OrderItemDetail struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`                                // order_item TSID 數字字串
-	SkuId           string                 `protobuf:"bytes,2,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"`             // TSID 數字字串
+	SkuId           string                 `protobuf:"bytes,2,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"`             // UUID 字串（catalog 的 SKU ID；non-catalog line 為空）
 	SkuName         string                 `protobuf:"bytes,3,opt,name=sku_name,json=skuName,proto3" json:"sku_name,omitempty"`       // 規格名稱
 	Quantity        string                 `protobuf:"bytes,4,opt,name=quantity,proto3" json:"quantity,omitempty"`                    // 數字字串
 	UnitPrice       string                 `protobuf:"bytes,5,opt,name=unit_price,json=unitPrice,proto3" json:"unit_price,omitempty"` // **重命名**（原 original_price → unit_price）：實際成交單價快照
@@ -1194,7 +1194,7 @@ type OrderItemDetail struct {
 	RefundStatus    string                 `protobuf:"bytes,7,opt,name=refund_status,json=refundStatus,proto3" json:"refund_status,omitempty"`    // OrderItemStatus value，如 "0", "20"
 	ShareDiscount   string                 `protobuf:"bytes,8,opt,name=share_discount,json=shareDiscount,proto3" json:"share_discount,omitempty"` // 分攤折扣金額（數字字串）
 	ImageKey        string                 `protobuf:"bytes,9,opt,name=image_key,json=imageKey,proto3" json:"image_key,omitempty"`                // 商品圖片 objectKey（快照；49 §6.6：Gateway 組 imageUrl）
-	ProductId       string                 `protobuf:"bytes,10,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`            // 商品 ID（TSID 數字字串，快照）
+	ProductId       string                 `protobuf:"bytes,10,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`            // 商品 ID（UUID 字串，catalog 的商品 ID，快照）
 	ProductName     string                 `protobuf:"bytes,11,opt,name=product_name,json=productName,proto3" json:"product_name,omitempty"`      // 商品名稱（快照）
 	ListPrice       string                 `protobuf:"bytes,12,opt,name=list_price,json=listPrice,proto3" json:"list_price,omitempty"`            // **新增**：原價快照（永遠 = 下單時 SKU.price，數字字串）
 	unknownFields   protoimpl.UnknownFields
@@ -1931,11 +1931,11 @@ func (x *CreateRfqOrderResponse) GetData() *CreateRfqOrderData {
 
 type CreateOrderItem struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	SkuId         string                 `protobuf:"bytes,1,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"`                   // TSID 數字字串
+	SkuId         string                 `protobuf:"bytes,1,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"`                   // UUID 字串（catalog 的 SKU ID；non-catalog line 為空）
 	SkuName       string                 `protobuf:"bytes,2,opt,name=sku_name,json=skuName,proto3" json:"sku_name,omitempty"`             // 規格名稱（快照）
 	Quantity      string                 `protobuf:"bytes,3,opt,name=quantity,proto3" json:"quantity,omitempty"`                          // 數字字串
 	UnitPrice     string                 `protobuf:"bytes,4,opt,name=unit_price,json=unitPrice,proto3" json:"unit_price,omitempty"`       // **重命名**（原 original_price → unit_price）：實際成交單價（金額字串）
-	ProductId     string                 `protobuf:"bytes,5,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`       // 商品 ID（TSID 數字字串）
+	ProductId     string                 `protobuf:"bytes,5,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`       // 商品 ID（UUID 字串，catalog 的商品 ID）
 	ProductName   string                 `protobuf:"bytes,6,opt,name=product_name,json=productName,proto3" json:"product_name,omitempty"` // 商品名稱（快照）
 	ListPrice     string                 `protobuf:"bytes,7,opt,name=list_price,json=listPrice,proto3" json:"list_price,omitempty"`       // **新增**：原價快照（永遠 = SKU.price，金額字串）
 	unknownFields protoimpl.UnknownFields
@@ -4006,9 +4006,9 @@ func (x *OrderPaymentInfo) GetStoreId() string {
 // 結帳商品項目（4 支結帳 API 共用）
 type CheckoutItem struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	SkuId         string                 `protobuf:"bytes,1,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"`             // SKU ID（數字字串）
+	SkuId         string                 `protobuf:"bytes,1,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"`             // SKU ID（UUID 字串）
 	Quantity      string                 `protobuf:"bytes,2,opt,name=quantity,proto3" json:"quantity,omitempty"`                    // 數量（數字字串）
-	ProductId     string                 `protobuf:"bytes,3,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"` // 商品 ID（TSID 數字字串）
+	ProductId     string                 `protobuf:"bytes,3,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"` // 商品 ID（UUID 字串，catalog 的商品 ID）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4307,7 +4307,7 @@ func (x *CheckoutValidationError) GetErrorMessage() string {
 // row 級不可購買明細（Validate / Preview / Confirm 共用）。Preview / Confirm 非空 → envelope code=4001
 type UnavailableItem struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	SkuId         string                 `protobuf:"bytes,1,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"`                      // SKU ID（數字字串）
+	SkuId         string                 `protobuf:"bytes,1,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"`                      // SKU ID（UUID 字串）
 	SkuName       string                 `protobuf:"bytes,2,opt,name=sku_name,json=skuName,proto3" json:"sku_name,omitempty"`                // 商品名稱（來源：cart_items.sku_name_snapshot；lookup 失敗時前端可 fallback「商品已下架」）
 	Reason        string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`                                 // CartItemUnavailableReason value（DELISTED / OUT_OF_STOCK / INSUFFICIENT_STOCK / LOOKUP_FAILED）
 	RequestedQty  string                 `protobuf:"bytes,4,opt,name=requested_qty,json=requestedQty,proto3" json:"requested_qty,omitempty"` // 買家本次勾選量（數字字串，承載原 InsufficientStockItem.requested_qty 語意）
@@ -5176,8 +5176,8 @@ func (x *OrderGroupPreview) GetStoreCode() string {
 
 type CheckoutItemPreview struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
-	SkuId           string                 `protobuf:"bytes,1,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"`                                  // SKU ID（數字字串）
-	ProductId       string                 `protobuf:"bytes,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`                      // 商品 ID（TSID 數字字串）
+	SkuId           string                 `protobuf:"bytes,1,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"`                                  // SKU ID（UUID 字串）
+	ProductId       string                 `protobuf:"bytes,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`                      // 商品 ID（UUID 字串，catalog 的商品 ID）
 	SkuName         string                 `protobuf:"bytes,3,opt,name=sku_name,json=skuName,proto3" json:"sku_name,omitempty"`                            // SKU 名稱（快照）
 	Quantity        string                 `protobuf:"bytes,4,opt,name=quantity,proto3" json:"quantity,omitempty"`                                         // 數量（數字字串）
 	Price           string                 `protobuf:"bytes,5,opt,name=price,proto3" json:"price,omitempty"`                                               // **語意變更**：實際成交單價（有特價=sale_price，否則=list_price，數字字串）
@@ -6356,7 +6356,7 @@ type OrderItemForReview struct {
 	SkuName        string                 `protobuf:"bytes,2,opt,name=sku_name,json=skuName,proto3" json:"sku_name,omitempty"`                        // 商品名稱
 	ImageUrl       string                 `protobuf:"bytes,3,opt,name=image_url,json=imageUrl,proto3" json:"image_url,omitempty"`                     // 商品圖片 URL（相容欄位，值為 Order Service 組好的 CDN URL；新流程改讀 image_object_key）
 	Price          string                 `protobuf:"bytes,4,opt,name=price,proto3" json:"price,omitempty"`                                           // 商品單價（數字字串，元）
-	ProductId      string                 `protobuf:"bytes,5,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`                  // 商品 ID（TSID 數字字串）
+	ProductId      string                 `protobuf:"bytes,5,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`                  // 商品 ID（UUID 字串，catalog 的商品 ID）
 	ImageObjectKey string                 `protobuf:"bytes,6,opt,name=image_object_key,json=imageObjectKey,proto3" json:"image_object_key,omitempty"` // 商品圖片 objectKey（review-service 直接落庫，免剝殼；49 §5.3 item_image 回填理想解）
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
@@ -9386,7 +9386,7 @@ type OrderInvoiceSnapshotItem struct {
 	// order_items.id（TSID 數字字串）。invoice_document_lines.order_item_id 的來源，
 	// 也是明細行排序鍵（升冪 ＝ 建立順序，line_seq 決定性不得依賴 map 迭代序）。
 	OrderItemId string `protobuf:"bytes,1,opt,name=order_item_id,json=orderItemId,proto3" json:"order_item_id,omitempty"`
-	SkuId       string `protobuf:"bytes,2,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"` // TSID 數字字串
+	SkuId       string `protobuf:"bytes,2,opt,name=sku_id,json=skuId,proto3" json:"sku_id,omitempty"` // UUID 字串（catalog 的 SKU ID；non-catalog line 為空）
 	ProductName string `protobuf:"bytes,3,opt,name=product_name,json=productName,proto3" json:"product_name,omitempty"`
 	SkuName     string `protobuf:"bytes,4,opt,name=sku_name,json=skuName,proto3" json:"sku_name,omitempty"` // 為空或等於 product_name 時，品名只取 product_name
 	Quantity    string `protobuf:"bytes,5,opt,name=quantity,proto3" json:"quantity,omitempty"`              // 正整數的數字字串

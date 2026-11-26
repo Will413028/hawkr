@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.order.grpc;
 
 import io.github.will413028.hawkr.common.config.MediaUrlProperties;
+import io.github.will413028.hawkr.order.TestIds;
 import io.github.will413028.hawkr.common.grpc.GrpcAuthContext;
 import io.github.will413028.hawkr.common.utils.code.GrpcResponseCode;
 import io.github.will413028.hawkr.common.utils.code.InvoiceCarrierSelectionMode;
@@ -108,7 +109,7 @@ class OrderInvoiceSnapshotInternalTest {
         OrderItemEntity i = new OrderItemEntity();
         i.setId(id);
         i.setOrderNo(ORDER_NO);
-        i.setSkuId(skuId);
+        i.setSkuId(TestIds.id(skuId));
         i.setProductName(product);
         i.setSkuName(sku);
         i.setQuantity(qty);
@@ -230,7 +231,7 @@ class OrderInvoiceSnapshotInternalTest {
         assertThat(d.getItemsCount()).isEqualTo(2);
         OrderInvoiceSnapshotItem first = d.getItems(0);
         assertThat(first.getOrderItemId()).isEqualTo("7001");
-        assertThat(first.getSkuId()).isEqualTo("5001");
+        assertThat(first.getSkuId()).isEqualTo(TestIds.id(5001L).toString());
         assertThat(first.getProductName()).isEqualTo("蘋果禮盒");
         assertThat(first.getSkuName()).isEqualTo("大");
         assertThat(first.getQuantity()).isEqualTo("2");

@@ -39,7 +39,7 @@ class StockCompensationWorkerClaimTest {
         r.setOrderNo("ORD1");
         r.setPhase(phase);
         r.setRetryCount(0);
-        r.setPayloadSnapshot("[{\"skuId\":1,\"quantity\":2}]");
+        r.setPayloadSnapshot("[{\"skuId\":\"0192f3a4-7b1c-7d2e-8f3a-000000000001\",\"quantity\":2}]");
         return r;
     }
 

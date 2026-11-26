@@ -96,5 +96,6 @@ public record OrderCancelledPayload(
     }
 
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-    public record StockItemPayload(String skuId, String quantity) {}
+    /** {@code skuId} 是 catalog 的 SKU UUID（D27）；catalog 的 order.cancelled consumer 依 {@code stockTxId} 歸還。 */
+    public record StockItemPayload(UUID skuId, String quantity) {}
 }

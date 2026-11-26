@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.order.checkout;
 
 import io.github.will413028.hawkr.common.grpc.PrincipalResolution;
+import io.github.will413028.hawkr.order.TestIds;
 import io.github.will413028.hawkr.common.utils.code.GrpcResponseCode;
 import io.github.will413028.hawkr.common.utils.code.InvoiceCarrierSelectionMode;
 import io.github.will413028.hawkr.common.utils.code.InvoiceDocumentKind;
@@ -64,7 +65,7 @@ class OrderAmountLimitConfirmTest {
 
     private static final long STORE_ID = 2685914682L;
     private static final long BUYER_ID = 2623900520L;
-    private static final String SKU_ID = "5001";
+    private static final String SKU_ID = TestIds.id(5001L).toString();
     private static final String CHECKOUT_ID = "CHK-LIMIT-1";
     private static final String METHOD = ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value();
     private static final String TEMP = ShippingTemperature.CHILLED.value();
@@ -147,7 +148,7 @@ class OrderAmountLimitConfirmTest {
                 .setBuyerId(BUYER_ID)
                 .setCheckoutId(CHECKOUT_ID)
                 .addItems(CheckoutItem.newBuilder()
-                        .setSkuId(SKU_ID).setProductId("9001").setQuantity(quantity).build())
+                        .setSkuId(SKU_ID).setProductId(TestIds.id(9001L).toString()).setQuantity(quantity).build())
                 .setShippingMethod(METHOD)
                 .setDeliveryTemp(TEMP)
                 .setRecipientName("王小明")

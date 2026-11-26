@@ -85,6 +85,8 @@ class NonCatalogCaseItemConstraintIT {
     @Autowired private AfterSaleCaseItemMapper itemMapper;
     @Autowired private JdbcTemplate jdbc;
 
+    private static final java.util.UUID CATALOG_SKU = java.util.UUID.fromString("0192f3a4-7b1c-7d2e-8f3a-000000000150");
+
     private static final String INSERT = """
             INSERT INTO aftersale_case_items
               (id, case_no, order_item_id, sku_id, sku_name, quantity, original_price, actual_pay_amount)
@@ -124,7 +126,7 @@ class NonCatalogCaseItemConstraintIT {
         item.setId(9103L);
         item.setCaseNo("AS_NC_003");
         item.setOrderItemId(7001L);
-        item.setSkuId(ProtoConversionUtils.parseLongOrNull(""));   // ← 與產線同一支 helper
+        item.setSkuId(null);   // 產線對空字串 sku_id 寫 NULL（AfterSaleCaseService）
         item.setSkuName("文旦柚 200 公斤");
         item.setQuantity(1);
         item.setOriginalPrice(30000L);
@@ -139,9 +141,9 @@ class NonCatalogCaseItemConstraintIT {
     @Test
     @DisplayName("catalog 明細不受影響：有 SKU 就原樣寫入")
     void catalogSkuIdStillPersisted() {
-        jdbc.update(INSERT, 9104L, "AS_NC_004", 5150L, "文旦柚 200 公斤");
+        jdbc.update(INSERT, 9104L, "AS_NC_004", CATALOG_SKU, "文旦柚 200 公斤");
         assertThat(jdbc.queryForMap(
                 "SELECT sku_id FROM aftersale_case_items WHERE id = 9104").get("sku_id"))
-                .isEqualTo(5150L);
+                .isEqualTo(CATALOG_SKU);
     }
 }

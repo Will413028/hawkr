@@ -35,7 +35,7 @@ class CartServiceSellerMetaTest {
         entity.setId(1L);
         entity.setBuyerId(BUYER_ID);
         entity.setStoreId(STORE_ID);
-        entity.setSkuId(90001L);
+        entity.setSkuId(java.util.UUID.fromString("0192f3a4-7b1c-7d2e-8f3a-000000000001"));
         entity.setQuantity(1);
         entity.setAddedUnitPrice(100L);
         entity.setAddedListPrice(120L);

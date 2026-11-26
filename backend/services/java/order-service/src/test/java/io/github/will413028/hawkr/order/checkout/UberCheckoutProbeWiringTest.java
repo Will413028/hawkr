@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.order.checkout;
 
 import io.github.will413028.hawkr.buyer.grpc.AddressInfo;
+import io.github.will413028.hawkr.order.TestIds;
 import io.github.will413028.hawkr.common.grpc.PrincipalResolution;
 import io.github.will413028.hawkr.common.utils.code.ShippingFeePayer;
 import io.github.will413028.hawkr.common.utils.code.ShippingMethod;
@@ -75,7 +76,7 @@ class UberCheckoutProbeWiringTest {
 
     private static final long STORE_ID = 2685914682L;
     private static final long BUYER_ID = 2623900520L;
-    private static final String SKU_ID = "5001";
+    private static final String SKU_ID = TestIds.id(5001L).toString();
     private static final String CHECKOUT_ID = "CHK-UBER-1";
     /** 硬寫字面值，不從 enum 取。 */
     private static final String UBER = "3003";
@@ -198,7 +199,7 @@ class UberCheckoutProbeWiringTest {
 
     private static List<CheckoutItem> items() {
         return List.of(CheckoutItem.newBuilder()
-                .setSkuId(SKU_ID).setProductId("9001").setQuantity("2").build());
+                .setSkuId(SKU_ID).setProductId(TestIds.id(9001L).toString()).setQuantity("2").build());
     }
 
     private CheckoutConfirmRequest.Builder confirmRequest() {

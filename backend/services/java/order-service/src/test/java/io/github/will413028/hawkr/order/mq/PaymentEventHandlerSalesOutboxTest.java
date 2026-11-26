@@ -1,6 +1,7 @@
 package io.github.will413028.hawkr.order.mq;
 
 import io.github.will413028.hawkr.common.mq.MqConstants;
+import io.github.will413028.hawkr.order.TestIds;
 import io.github.will413028.hawkr.common.utils.TsidUtil;
 import io.github.will413028.hawkr.common.utils.code.OrderEventType;
 import io.github.will413028.hawkr.common.utils.code.OrderStatus;
@@ -110,7 +111,7 @@ class PaymentEventHandlerSalesOutboxTest {
     private OrderItemEntity item(long productId, int qty) {
         OrderItemEntity it = new OrderItemEntity();
         it.setOrderNo("O1");
-        it.setProductId(productId);
+        it.setProductId(TestIds.id(productId));
         it.setQuantity(qty);
         return it;
     }
@@ -173,8 +174,8 @@ class PaymentEventHandlerSalesOutboxTest {
                 .extracting(OrderSalesAccumulatedPayload.ProductSalesItem::productId,
                         OrderSalesAccumulatedPayload.ProductSalesItem::quantity)
                 .containsExactlyInAnyOrder(
-                        org.assertj.core.groups.Tuple.tuple(9001L, 3),
-                        org.assertj.core.groups.Tuple.tuple(9002L, 5));
+                        org.assertj.core.groups.Tuple.tuple(TestIds.id(9001L), 3),
+                        org.assertj.core.groups.Tuple.tuple(TestIds.id(9002L), 5));
     }
 
     @Test
