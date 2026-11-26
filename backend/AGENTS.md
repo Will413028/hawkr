@@ -33,7 +33,7 @@
 6. `db/schema.sql` 只放表、約束、索引與 enum；view、函式與複合型別（含 `pub_*`）放 `db/objects.sql`。函式一律 `BEGIN ATOMIC`（觸發函式除外）、只參照自己的表；migration 只往前（無 down；回退是還原程式碼並加新 migration 撤銷 schema），已套用的不得修改或刪除，只有分支內尚未併入 `dev` 的可在合併前壓平（`TestDesiredStateIsSplitBetweenSchemaAndObjects`、`TestSchemaFileMatchesMigrations`）。模組登記在 `cmd/hawkr/modules.go`；沒有自己資料的（`reviewqueue`）登記在 `withoutData`。
 7. 不得出現舊公司的端點或帳號識別碼。
 8. 刪除舊服務之前，它在搬遷清單裡的 RPC、事件、副本都要填好 `disposition`（`scripts/check-migration-inventory.py`）。
-9. 頭尾空白只有 `internal/platform/trimtext` 一個定義：寫入端用 `trimtext.Trim`，DB 的 CHECK 用 `trimtext.Check` 並登記在 `cmd/hawkr` 的 `trimmedColumns`；SQL 不用 `btrim`／`trim`（`TestTrimmedTextChecksUseTheCanonicalPattern`、`TestModuleSQLDoesNotTrim`）。
+9. 頭尾空白只有 `internal/platform/trimtext` 一個定義：寫入端用 `trimtext.Trim` 或 `strings.TrimSpace`，DB 的 CHECK 用 `trimtext.Check` 並登記在 `cmd/hawkr` 的 `trimmedColumns`；SQL 不用 `btrim`／`trim`，也不自己定義空白（`TestTrimmedTextChecksUseTheCanonicalPattern`、`TestModuleSQLDoesNotTrim`）。
 10. extension 只在 `platform/migrate` 宣告，模組 SQL 不寫 `CREATE EXTENSION`。
 
 ## 指令
@@ -50,12 +50,12 @@ make sqlc  # 改 db/schema.sql、objects.sql、queries/ 後
 make jet  # 改 social 的 migration 或擁有者的 pub.sql 後
 make connect  # 改 api/ 的 proto 後
 make uitext  # 改文案目錄、模組的 text/*.json 或 proto 註解後
-make atlas-diff module=<名稱> name=<描述>  # 改 schema.sql 後；objects.sql 用 atlas migrate new 手寫再 atlas migrate hash
+make atlas-diff module=<名稱> name=<名>  # 改 schema.sql 後；objects.sql 手寫（atlas migrate new＋hash）
 ```
 
 營運子命令：`go run ./cmd/hawkr` 不帶參數列出全部（營運用的要 `DATABASE_URL`）。搬模組時的工具（`make new-module`、`make new-characterization`、`scripts/characterize.sh`）見遷移計畫。
 
-`GOWORK=off` 確保單體不依賴 `go.work` 裡的舊服務 module。本機設定集中在 `Makefile`；`DEV_AUTH_KEY_FILE`（本機 dev 金鑰）與 `CF_ACCESS_*` 互斥。舊服務的整套本機環境是 `./dev.sh`，沒搬的路徑由單體轉給 gateway（:9900）；細節見單體開發規範 §3。
+`GOWORK=off` 確保單體不依賴 `go.work` 裡的舊服務 module。`DEV_AUTH_KEY_FILE`（本機 dev 金鑰）與 `CF_ACCESS_*` 互斥。舊服務的整套本機環境是 `./dev.sh`，沒搬的路徑由單體轉給 gateway（:9900）；細節見單體開發規範 §3。
 
 ## 契約規則（單體與舊服務都適用）
 

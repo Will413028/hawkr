@@ -134,6 +134,24 @@
    "new": "",
    "test": "internal/modules/catalog/internal/model ^TestSuggestedSafetyStock$",
    "why": "超過 8 週的輸入全部加總卻仍除以 8：建議值被灌大，測試要紅。"
+  },
+  {
+   "id": "create-loser-skips-readback-after-token-confirmed-elsewhere",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "\tif errors.Is(err, media.ErrUploadAlreadyConfirmed) {\n\t\t// 並行",
+   "new": "\tif false && errors.Is(err, media.ErrUploadAlreadyConfirmed) {\n\t\t// 並行",
+   "test": "internal/modules/catalog ^TestCreateLoserReadsBackTheWinnerWhenItsImageTokenWasConfirmedElsewhere$",
+   "why": "輸家的圖片 token 已被贏家確認時不讀回贏家的商品：回的是圖片已使用的錯誤，不是同一個商品，測試要紅。"
+  },
+  {
+   "id": "migration-backfill-hash-wrong-encoding",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/db/migrations/20261125175058_product_api_support.sql",
+   "old": "'6:ADJUST|36:'",
+   "new": "'6:ADJUST|35:'",
+   "test": "internal/modules/catalog ^TestMigrationBackfillsTheRequestHashOfPreexistingAdjustOperations$",
+   "why": "回填的雜湊編碼和應用層 idempotency.Hash 不同：舊 ADJUST 操作的同鍵同內容重送被當成鍵重用，測試要紅。"
   }
  ]
 }

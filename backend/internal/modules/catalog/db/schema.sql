@@ -1,4 +1,4 @@
--- catalog 模組的 desired state（Atlas）。改完在本目錄執行 `atlas migrate diff <名稱> --env dev`
+-- catalog 模組的 desired state（Atlas）。改完在 backend/ 執行 `make atlas-diff module=catalog name=<名稱>`
 -- 產生 migration，再在 backend/ 跑 `make sqlc`；兩者都讀這個檔。這裡只放表、約束與索引：view、函式與複合型別放 db/objects.sql
 -- （Atlas 社群版在 desired state 裡遇到 view 就報錯；手寫 migration、sqlc.yaml 的 schema 加 objects.sql，見單體規則 6）。
 --
