@@ -115,7 +115,7 @@ func TestMigrationBackfillsTheRequestHashOfPreexistingAdjustOperations(t *testin
 	f.must(f.exec(`INSERT INTO catalog.stock_movements (operation_id, sku_id, delta) VALUES ($1, $2, 7)`, op, sku))
 
 	apply(targetFile)
-	f.m = New(Deps{DB: d, NewID: uuid.NewV7, Now: func() time.Time { return epoch }})
+	f.m = New(Deps{DB: d, NewID: uuid.NewV7, Now: func() time.Time { return epoch }, Restock: stubNotifier{}})
 
 	f.must(f.m.AdjustStock(ctx, 501, "legacy:1", sku, 7))
 	if got := f.stockOf(sku); got != 12 {

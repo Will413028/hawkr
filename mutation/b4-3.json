@@ -185,7 +185,7 @@
    "stack": "go-integration",
    "file": "backend/internal/httpapi/catalog/convert.go",
    "old": "sellable := active && s.StockQty > 0",
-   "new": "sellable := s.StockQty > 0",
+   "new": "sellable := (active || true) && s.StockQty > 0",
    "test": "internal/httpapi/catalog ^TestArchivedProductPageIsReadableButNotPurchasable$",
    "why": "可購買性不看商品狀態：下架商品的 SKU 仍標為可購買，下架頁的 availability 斷言要紅。"
   },
@@ -194,7 +194,7 @@
    "stack": "go-integration",
    "file": "backend/internal/httpapi/catalog/seller.go",
    "old": "return caller{storeID: st.StoreID, accountID: p.ID}, nil",
-   "new": "return caller{storeID: p.ID, accountID: p.ID}, nil",
+   "new": "return caller{storeID: p.ID + 0*st.StoreID, accountID: p.ID}, nil",
    "test": "internal/httpapi/catalog ^TestSellerCannotReadOrWriteAnotherStoresProduct$",
    "why": "賣家方法的店家不取自 seller.ActingStore 而取帳號 ID（store_id 與 account_id 是不同號碼空間）：店家的商品讀寫都找不到，A 讀自己商品的斷言要紅。"
   },
@@ -221,7 +221,7 @@
    "stack": "go-integration",
    "file": "backend/internal/httpapi/catalog/seller.go",
    "old": "h.m.SetProductStatus(ctx, c.storeID, id, version, to)",
-   "new": "h.m.SetProductStatus(ctx, c.storeID, id, 0, to)",
+   "new": "h.m.SetProductStatus(ctx, c.storeID, id, version*0, to)",
    "test": "internal/httpapi/catalog ^TestSellerWritesCarryEtagAndRequestID$",
    "why": "切換狀態的 etag 沒有傳進模組：過時的 etag 不再回 VERSION_CONFLICT（版本 0 被模組當成缺 etag），etag 測試要紅。"
   },
@@ -230,7 +230,7 @@
    "stack": "go-integration",
    "file": "backend/internal/httpapi/catalog/seller.go",
    "old": "rid.String(), sku, msg.GetDelta()",
-   "new": "uuid.NewV7().String(), sku, msg.GetDelta()",
+   "new": "rid.String()[:0]+uuid.NewV7().String(), sku, msg.GetDelta()",
    "test": "internal/httpapi/catalog ^TestSellerWritesCarryEtagAndRequestID$",
    "why": "AdjustStock 每次用新的冪等鍵而不是請求的 request_id：同一個 request_id 重送生效兩次（庫存 7 不是 5），測試要紅。"
   },
