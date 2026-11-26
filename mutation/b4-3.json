@@ -235,6 +235,15 @@
    "why": "AdjustStock 每次用新的冪等鍵而不是請求的 request_id：同一個 request_id 重送生效兩次（庫存 7 不是 5），測試要紅。"
   },
   {
+   "id": "seller-set-stock-request-id-not-passed",
+   "stack": "go-integration",
+   "file": "backend/internal/httpapi/catalog/seller.go",
+   "old": "c.storeID, rid.String(), sku, msg.GetQuantity()",
+   "new": "c.storeID, rid.String()[:0]+uuid.NewV7().String(), sku, msg.GetQuantity()",
+   "test": "internal/httpapi/catalog ^TestSellerCannotReadOrWriteAnotherStoresProduct$",
+   "why": "SetStock 每次用新的冪等鍵而不是請求的 request_id：同一個 request_id 重送時現值已不是預期值，回預期值不符而不是成功，測試要紅。"
+  },
+  {
    "id": "public-filter-store-ids-dropped",
    "stack": "go-integration",
    "file": "backend/internal/httpapi/catalog/input.go",
