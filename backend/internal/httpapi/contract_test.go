@@ -47,11 +47,7 @@ func contractServices(t *testing.T) []string {
 }
 
 // declaredNotYetMounted 是契約已宣告、handler 在後續步驟才接線的 service（值是接線的步驟）。接線之後必須從這裡刪除：下面的測試在它已經掛上時失敗。
-var declaredNotYetMounted = map[string]string{
-	"hawkr.admin.catalog.v1alpha1.CatalogAdminService": "B4-3b",
-	"hawkr.catalog.v1alpha1.CatalogPublicService":      "B4-3b",
-	"hawkr.catalog.v1alpha1.SellerCatalogAppService":   "B4-3b",
-}
+var declaredNotYetMounted = map[string]string{}
 
 func TestEveryServiceInTheContractIsMounted(t *testing.T) {
 	var mounted []string

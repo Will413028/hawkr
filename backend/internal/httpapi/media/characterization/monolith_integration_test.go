@@ -19,6 +19,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	catalogmod "github.com/Will413028/hawkr/backend/internal/modules/catalog"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon"
 	"github.com/Will413028/hawkr/backend/internal/modules/crm"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
@@ -76,7 +77,7 @@ func monolith(t *testing.T) *connectDriver {
 	})
 	h, err := httpapi.NewHandler(httpapi.Deps{
 		Ready: d.Ping, Identity: id, Delegation: del, Media: mediaModule, Logger: log,
-		Procurement: &procurement.Module{}, ImageAI: &imageai.Module{}, Assistant: &assistant.Module{}, Review: &review.Module{}, CRM: &crm.Module{}, Coupon: &coupon.Module{}, IM: &im.Module{}, BizCalendar: &bizcalendar.Store{},
+		Procurement: &procurement.Module{}, Catalog: &catalogmod.Module{}, ImageAI: &imageai.Module{}, Assistant: &assistant.Module{}, Review: &review.Module{}, CRM: &crm.Module{}, Coupon: &coupon.Module{}, IM: &im.Module{}, BizCalendar: &bizcalendar.Store{},
 		// NewHandler 要求的其他模組：特性測試只打 media 的端點，這些以零值或替身佔位，不會被呼叫。
 		Buyer: &buyer.Module{}, Deletion: &accountdeletion.Module{}, Seller: &seller.Module{}, Discovery: &discovery.Module{},
 		ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{}, Moderation: &moderation.Module{}, Notification: &notification.Module{}, Social: &social.Module{}, Stats: ch.Stats(t), WebOrigin: ch.WebOrigin(t), Images: ch.Images(t), DashboardOrders: noDashboardOrders{},

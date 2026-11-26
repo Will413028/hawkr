@@ -16,6 +16,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/bizcalendar/v1alpha1/bizcalendarv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/buyer/v1alpha1/buyerv1alpha1connect"
+	catalogv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/catalog/v1alpha1/catalogv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/content/v1alpha1/contentv1alpha1connect"
 	couponv1alpha1connect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/coupon/v1alpha1/couponv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/identity/v1alpha1/identityv1alpha1connect"
@@ -71,6 +72,9 @@ var declarations = map[string]declaration{
 	bizcalendarv1alpha1connect.BizCalendarAdminServiceGetHolidayCalendarCoverageProcedure: requires(adminperm.BizcalendarHolidayCalendarCoveragesGet, auditReadOnly),
 
 	buyerv1alpha1connect.BuyerAdminServiceGetBuyerStatsProcedure: requires(adminperm.BuyerBuyerStatsGet, auditReadOnly),
+
+	catalogv1alpha1connect.CatalogAdminServiceListProductsProcedure: requires(adminperm.CatalogProductsList, auditReadOnly),
+	catalogv1alpha1connect.CatalogAdminServiceGetProductProcedure:   requires(adminperm.CatalogProductsGet, auditReadOnly),
 
 	contentv1alpha1connect.ContentAdminServiceListBannersProcedure:          requires(adminperm.ContentBannersList, auditReadOnly),
 	contentv1alpha1connect.ContentAdminServiceGetBannerProcedure:            requires(adminperm.ContentBannersGet, auditReadOnly),

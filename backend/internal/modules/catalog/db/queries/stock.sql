@@ -80,3 +80,8 @@ SELECT EXISTS (
     SELECT 1 FROM catalog.product_skus s JOIN catalog.products p ON p.id = s.product_id
     WHERE s.id = sqlc.arg(id) AND p.store_id = sqlc.arg(store_id)
 );
+
+-- name: GetOwnLiveSkuProduct :one
+-- 店家自己的未刪除 SKU 所屬的商品；庫存調整成功後要回該 SKU 的完整內容（價格、選項與可購買性在商品上），用它找商品。
+SELECT s.product_id FROM catalog.product_skus s JOIN catalog.products p ON p.id = s.product_id
+WHERE s.id = sqlc.arg(id) AND s.deleted_at IS NULL AND p.store_id = sqlc.arg(store_id) AND p.deleted_at IS NULL;

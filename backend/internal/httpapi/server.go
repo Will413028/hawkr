@@ -29,6 +29,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/blocks"
 	httpbuyer "github.com/Will413028/hawkr/backend/internal/httpapi/buyer"
 	httpbuyerprocurement "github.com/Will413028/hawkr/backend/internal/httpapi/buyerprocurement"
+	httpcatalog "github.com/Will413028/hawkr/backend/internal/httpapi/catalog"
 	httpchat "github.com/Will413028/hawkr/backend/internal/httpapi/chat"
 	httpcontent "github.com/Will413028/hawkr/backend/internal/httpapi/content"
 	httpcoupon "github.com/Will413028/hawkr/backend/internal/httpapi/coupon"
@@ -37,6 +38,7 @@ import (
 	httpdiscovery "github.com/Will413028/hawkr/backend/internal/httpapi/discovery"
 	adminbizcalendarconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/bizcalendar/v1alpha1/bizcalendarv1alpha1connect"
 	adminbuyerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/buyer/v1alpha1/buyerv1alpha1connect"
+	admincatalogconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/catalog/v1alpha1/catalogv1alpha1connect"
 	admincontentconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/content/v1alpha1/contentv1alpha1connect"
 	admincouponconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/coupon/v1alpha1/couponv1alpha1connect"
 	adminidentityconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/identity/v1alpha1/identityv1alpha1connect"
@@ -49,6 +51,7 @@ import (
 	adminsocialconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/social/v1alpha1/socialv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/assistant/v1alpha1/assistantv1alpha1connect"
 	buyerconnect "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/buyer/v1alpha1/buyerv1alpha1connect"
+	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/catalog/v1alpha1/catalogv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/chat/v1alpha1/chatv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/content/v1alpha1/contentv1alpha1connect"
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/coupon/v1alpha1/couponv1alpha1connect"
@@ -79,6 +82,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	modcatalog "github.com/Will413028/hawkr/backend/internal/modules/catalog"
 	"github.com/Will413028/hawkr/backend/internal/modules/content"
 	"github.com/Will413028/hawkr/backend/internal/modules/coupon"
 	"github.com/Will413028/hawkr/backend/internal/modules/crm"
@@ -135,6 +139,8 @@ type Deps struct {
 	IM *im.Module
 	// Coupon 是優惠券：買家的券與可領的活動、店家發的活動（CouponAppService）。
 	Coupon *coupon.Module
+	// Catalog 是商品模組：CatalogPublicService、SellerCatalogAppService、CatalogAdminService，與買家「追蹤中」動態的商品來源。
+	Catalog *modcatalog.Module
 	// CRM 是店家的客戶與標籤（CrmAppService）。
 	CRM *crm.Module
 	// Moderation 是檢舉的送出與讀自己的檢舉（ModerationAppService）。
@@ -432,6 +438,10 @@ type service struct {
 func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error) {
 	var out []service
 	add := func(path string, h http.Handler) { out = append(out, service{path, h}) }
+	now := deps.Now
+	if now == nil {
+		now = time.Now
+	}
 	// 店面頁、賣家自己的店與所有清單上的店家卡片共用同一份統計組裝（deps.Stats，必填）。
 	stats := deps.Stats
 	add(contentv1alpha1connect.NewContentPublicServiceHandler(httpcontent.NewPublic(deps.Content, deps.Images), opts...))
@@ -492,21 +502,39 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	}
 	add(adminsocialconnect.NewSocialAdminServiceHandler(socialAdmin, opts...))
 	blocking := blocks.Sources{Authors: deps.Social, Reviews: deps.Review, Messages: deps.IM, Identities: blocks.Identities{Buyers: deps.Buyer, Stores: deps.Seller}}
-	buyerApp, err := httpbuyer.NewApp(deps.Buyer, deps.Images, deps.BuyerPorts, stats, blocking)
+	// 商品卡片（公開 service 與買家的「追蹤中」動態共用）的店家卡片與評分組裝。
+	catalogPresenter, err := httpcatalog.NewPresenter(deps.Seller, stats, deps.Images)
+	if err != nil {
+		return nil, err
+	}
+	buyerPorts := deps.BuyerPorts
+	buyerPorts.Followed = httpbuyer.FollowedProducts{Follows: deps.Buyer, Catalog: deps.Catalog, Cards: catalogPresenter, Now: now}
+	buyerApp, err := httpbuyer.NewApp(deps.Buyer, deps.Images, buyerPorts, stats, blocking)
 	if err != nil {
 		return nil, err
 	}
 	add(buyerconnect.NewBuyerAppServiceHandler(buyerApp, opts...))
 	add(adminbuyerconnect.NewBuyerAdminServiceHandler(httpbuyer.NewAdmin(deps.Buyer), opts...))
+	catalogPublic, err := httpcatalog.NewPublic(deps.Catalog, catalogPresenter, now)
+	if err != nil {
+		return nil, err
+	}
+	add(catalogv1alpha1connect.NewCatalogPublicServiceHandler(catalogPublic, opts...))
+	catalogApp, err := httpcatalog.NewApp(deps.Catalog, deps.Seller, deps.Images, deps.Logger)
+	if err != nil {
+		return nil, err
+	}
+	add(catalogv1alpha1connect.NewSellerCatalogAppServiceHandler(catalogApp, opts...))
+	catalogAdmin, err := httpcatalog.NewAdmin(deps.Catalog, deps.Images)
+	if err != nil {
+		return nil, err
+	}
+	add(admincatalogconnect.NewCatalogAdminServiceHandler(catalogAdmin, opts...))
 	appLogin := deps.AppLogin
 	if appLogin == nil {
 		if appLogin, err = httpidentity.NewAppLogin(deps.Identity); err != nil {
 			return nil, err
 		}
-	}
-	now := deps.Now
-	if now == nil {
-		now = time.Now
 	}
 	add(identityconnect.NewIdentityPublicServiceHandler(httpidentity.NewPublic(appLogin), opts...))
 	identityApp, err := httpidentity.NewApp(deps.Identity, deps.Deletion, appLogin, now, deps.Buyer, deps.Images, deps.Logger)

@@ -103,6 +103,24 @@ func (q *Queries) GetOwnLiveSku(ctx context.Context, arg GetOwnLiveSkuParams) (G
 	return i, err
 }
 
+const getOwnLiveSkuProduct = `-- name: GetOwnLiveSkuProduct :one
+SELECT s.product_id FROM catalog.product_skus s JOIN catalog.products p ON p.id = s.product_id
+WHERE s.id = $1 AND s.deleted_at IS NULL AND p.store_id = $2 AND p.deleted_at IS NULL
+`
+
+type GetOwnLiveSkuProductParams struct {
+	ID      uuid.UUID
+	StoreID int64
+}
+
+// 店家自己的未刪除 SKU 所屬的商品；庫存調整成功後要回該 SKU 的完整內容（價格、選項與可購買性在商品上），用它找商品。
+func (q *Queries) GetOwnLiveSkuProduct(ctx context.Context, arg GetOwnLiveSkuProductParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, getOwnLiveSkuProduct, arg.ID, arg.StoreID)
+	var product_id uuid.UUID
+	err := row.Scan(&product_id)
+	return product_id, err
+}
+
 const getStockOperationByKey = `-- name: GetStockOperationByKey :one
 SELECT id, idempotency_key, kind, store_id, deduct_operation_id, request_hash, created_at FROM catalog.stock_operations WHERE idempotency_key = $1 AND store_id IS NULL
 `
