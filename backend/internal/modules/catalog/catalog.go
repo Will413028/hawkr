@@ -10,12 +10,18 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/riverqueue/river"
+
+	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/counter"
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/product"
+	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/restock"
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/stock"
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/taxonomy"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
+	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
+	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
 //go:embed db/migrations/*.sql db/migrations/atlas.sum
@@ -81,6 +87,12 @@ type (
 	StockMismatchError = model.StockMismatchError
 	// Media 是 catalog 對 media 的依賴（*media.Module 與 *media.Fake 都滿足）。
 	Media = model.Media
+	// SalesItem 是一筆訂單裡一個商品的銷量。
+	SalesItem = model.SalesItem
+	// RestockedSKU 是 SKU 由不可買變可買時，通知用的最新快照。
+	RestockedSKU = model.RestockedSKU
+	// RestockNotifier 是 catalog 宣告、補貨通知下游（buyer，B4-4 接線）實作的 port。
+	RestockNotifier = model.RestockNotifier
 )
 
 // 商品狀態與描述區塊的種類。
@@ -157,6 +169,10 @@ type Deps struct {
 	Now func() time.Time
 	// Media 是 media 模組；新圖的 Confirm 與退場資產的 MarkDeleted 在商品寫入的 transaction 內呼叫。
 	Media Media
+	// Jobs 排入補貨通知的 job；在呼叫方的 transaction 內排入時與資料一起 commit 或回滾（單體規則 4）。
+	Jobs jobs.Enqueuer
+	// Restock 是補貨通知的下游：catalog 的 job 在 transaction 外呼叫它（B4-4 接 buyer，之前由組裝點給替身）。
+	Restock RestockNotifier
 }
 
 // Module 是 catalog 模組。
@@ -164,15 +180,44 @@ type Module struct {
 	stock    *stock.Service
 	taxonomy *taxonomy.Service
 	product  *product.Service
+	counter  *counter.Service
+	restock  *restock.Service
 }
 
 // New 建立模組。
 func New(d Deps) *Module {
+	rs := restock.New(restock.Deps{DB: d.DB, Jobs: d.Jobs, Now: d.Now, Notifier: d.Restock})
 	return &Module{
-		stock:    stock.New(stock.Deps{DB: d.DB, NewID: d.NewID, Now: d.Now}),
+		stock:    stock.New(stock.Deps{DB: d.DB, NewID: d.NewID, Now: d.Now, Restock: rs}),
 		taxonomy: taxonomy.New(taxonomy.Deps{DB: d.DB}),
-		product:  product.New(product.Deps{DB: d.DB, NewID: d.NewID, Now: d.Now, Media: d.Media}),
+		product:  product.New(product.Deps{DB: d.DB, NewID: d.NewID, Now: d.Now, Media: d.Media, Restock: rs}),
+		counter:  counter.New(counter.Deps{DB: d.DB, Now: d.Now}),
+		restock:  rs,
 	}
+}
+
+// AddWorkers 登記補貨通知的 River worker（SKU、店家層與清訂閱三種 job）。
+func (m *Module) AddWorkers(workers *river.Workers) { restock.AddWorkers(workers, m.restock) }
+
+// SetRating 把商品的評分平均（0 到 5）與評價則數設成絕對值，由 review 在自己的 transaction 內呼叫（D3、D26）：沒有版本欄，並行的呼叫靠商品列的行鎖序列化，後提交的絕對值勝出；
+// 不改 etag。count 為 0 時 average 必為 0；不合法回 *InvalidInputError，商品不存在回 ErrProductNotFound（已刪除的商品仍更新）。
+func (m *Module) SetRating(ctx context.Context, productID uuid.UUID, average float64, count int32) error {
+	return m.counter.SetRating(ctx, productID, average, count)
+}
+
+// RecordSales 把一筆訂單的銷量累計到各商品（同一個商品多筆先加總），同一個 orderNo 只累計一次，重送回 nil 且不再累計。
+// 必要條件：Java order 以 MQ 送出事件，會重送，直到 ordering 搬進單體（B8）；到時 sales_orders 去重表退場。與呼叫方的 transaction 同進退（ctx 沒有時自己開一個），任何商品不存在整筆回滾、回 ErrProductNotFound。
+func (m *Module) RecordSales(ctx context.Context, orderNo string, items []SalesItem) error {
+	return m.counter.RecordSales(ctx, orderNo, items)
+}
+
+// OnStoreExposureChanged 訂閱 seller 的 StoreExposureChanged（同 transaction 的訂閱者，只排 job）：店家變成可曝光時排一個店家層的補貨 job，
+// 它在 transaction 外展開成該店家目前可買的 SKU 再各自確認；變成不可曝光不需要動作（不可買的 SKU 不通知）。
+func (m *Module) OnStoreExposureChanged(ctx context.Context, e seller.StoreExposureChanged) error {
+	if !e.Exposable {
+		return nil
+	}
+	return m.restock.StoreExposed(ctx, e.StoreID)
 }
 
 // DeductStock 以冪等鍵 key 扣減庫存，與呼叫方的 transaction 同進退（ctx 沒有 transaction 時自己開一個）。

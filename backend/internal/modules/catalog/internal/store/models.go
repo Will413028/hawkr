@@ -84,6 +84,11 @@ type CatalogProductSku struct {
 	UpdatedAt      time.Time
 }
 
+type CatalogSalesOrder struct {
+	OrderNo    string
+	RecordedAt time.Time
+}
+
 type CatalogStockMovement struct {
 	OperationID uuid.UUID
 	SkuID       uuid.UUID

@@ -21,6 +21,7 @@ import (
 
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/description"
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/model"
+	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/restock"
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
@@ -38,6 +39,8 @@ type Deps struct {
 	NewID func() uuid.UUID
 	Now   func() time.Time
 	Media model.Media
+	// Restock 在商品切成 ACTIVE 時排補貨通知，並在商品或 SKU 刪除時排清訂閱的 job（都在寫入的 transaction 內）。
+	Restock *restock.Service
 }
 
 // Service 是商品的 use case。
@@ -119,7 +122,7 @@ func (s *Service) Create(ctx context.Context, storeID int64, uploader media.Uplo
 		if err := s.writeOptions(ctx, q, id, p.axes); err != nil {
 			return err
 		}
-		if err := s.writeSkus(ctx, q, id, nil, p.skus); err != nil {
+		if _, err := s.writeSkus(ctx, q, id, nil, p.skus); err != nil {
 			return err
 		}
 		if err := s.writeTags(ctx, q, id, p); err != nil {
@@ -224,7 +227,11 @@ func (s *Service) Update(ctx context.Context, storeID int64, uploader media.Uplo
 		if err != nil {
 			return err
 		}
-		if err := s.writeSkus(ctx, q, productID, live, p.skus); err != nil {
+		removed, err := s.writeSkus(ctx, q, productID, live, p.skus)
+		if err != nil {
+			return err
+		}
+		if err := s.d.Restock.SkusDeleted(ctx, removed); err != nil {
 			return err
 		}
 		if err := q.DeleteProductHashtags(ctx, productID); err != nil {
@@ -271,7 +278,13 @@ func (s *Service) SetStatus(ctx context.Context, storeID int64, productID uuid.U
 				return model.ErrActiveRequiresGalleryImage
 			}
 		}
-		return q.SetProductStatus(ctx, store.SetProductStatusParams{ID: productID, Status: string(to), Now: s.d.Now()})
+		if err := q.SetProductStatus(ctx, store.SetProductStatusParams{ID: productID, Status: string(to), Now: s.d.Now()}); err != nil {
+			return err
+		}
+		if to == model.StatusActive {
+			return s.d.Restock.ProductActivated(ctx, productID)
+		}
+		return nil
 	})
 }
 
@@ -299,13 +312,21 @@ func (s *Service) Delete(ctx context.Context, storeID int64, productID uuid.UUID
 		}
 		now := s.d.Now()
 		// SKU 一併標刪除，扣減、調整與商品一致地找不到它們；先依 ID 升序鎖列（與 DeductStock 同序）。歸還不看刪除，原扣減的庫存仍記得回去。
-		if _, err := q.LockLiveSkus(ctx, productID); err != nil {
+		live, err := q.LockLiveSkus(ctx, productID)
+		if err != nil {
 			return err
 		}
 		if err := q.SoftDeleteLiveSkus(ctx, store.SoftDeleteLiveSkusParams{ProductID: productID, Now: &now}); err != nil {
 			return err
 		}
-		return q.SoftDeleteProduct(ctx, store.SoftDeleteProductParams{ID: productID, Now: &now})
+		if err := q.SoftDeleteProduct(ctx, store.SoftDeleteProductParams{ID: productID, Now: &now}); err != nil {
+			return err
+		}
+		ids := make([]uuid.UUID, len(live))
+		for i, l := range live {
+			ids[i] = l.ID
+		}
+		return s.d.Restock.SkusDeleted(ctx, ids)
 	})
 }
 
@@ -385,7 +406,8 @@ func deref(s *string) string {
 
 // writeSkus 把輸入的 SKU 對上現有的（以組合辨識）：還在的更新價格，新的新增，不在輸入裡的標刪除，最後重算價格區間。
 // live 是 LockLiveSkus 依 ID 升序鎖住的列，這裡不再取新的 SKU 鎖，所以輸入順序不影響鎖順序。
-func (s *Service) writeSkus(ctx context.Context, q *store.Queries, id uuid.UUID, live []store.LockLiveSkusRow, in []model.SkuInput) error {
+// 回傳被標刪除的 SKU，呼叫端據此排清補貨訂閱的 job。
+func (s *Service) writeSkus(ctx context.Context, q *store.Queries, id uuid.UUID, live []store.LockLiveSkusRow, in []model.SkuInput) ([]uuid.UUID, error) {
 	now := s.d.Now()
 	byCombo := make(map[[2]string]store.LockLiveSkusRow, len(live))
 	for _, l := range live {
@@ -396,7 +418,7 @@ func (s *Service) writeSkus(ctx context.Context, q *store.Queries, id uuid.UUID,
 		if cur, ok := byCombo[key]; ok {
 			delete(byCombo, key)
 			if err := q.UpdateSkuPrices(ctx, store.UpdateSkuPricesParams{ID: cur.ID, Price: sk.Price, CompareAtPrice: sk.CompareAtPrice, Now: now}); err != nil {
-				return err
+				return nil, err
 			}
 			continue
 		}
@@ -404,25 +426,27 @@ func (s *Service) writeSkus(ctx context.Context, q *store.Queries, id uuid.UUID,
 			ID: s.d.NewID(), ProductID: id, Option1Value: optional(sk.Option1), Option2Value: optional(sk.Option2),
 			Price: sk.Price, CompareAtPrice: sk.CompareAtPrice, StockQty: sk.StockQty, Now: now,
 		}); err != nil {
-			return err
+			return nil, err
 		}
 	}
+	var removed []uuid.UUID
 	for _, l := range live {
 		if _, ok := byCombo[[2]string{deref(l.Option1Value), deref(l.Option2Value)}]; !ok {
 			continue
 		}
 		if err := q.SoftDeleteSku(ctx, store.SoftDeleteSkuParams{ID: l.ID, Now: &now}); err != nil {
-			return err
+			return nil, err
 		}
+		removed = append(removed, l.ID)
 	}
 	n, err := q.RecomputePriceRange(ctx, store.RecomputePriceRangeParams{ID: id, Now: now})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if n != 1 {
-		return fmt.Errorf("catalog: price range of product %s not recomputed", id)
+		return nil, fmt.Errorf("catalog: price range of product %s not recomputed", id)
 	}
-	return nil
+	return removed, nil
 }
 
 func (s *Service) writeTags(ctx context.Context, q *store.Queries, id uuid.UUID, p prepared) error {

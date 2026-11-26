@@ -8,7 +8,7 @@
 
 ## 擁有的資料
 
-schema `catalog`（`db/schema.sql`）：`categories`、`products`、`product_option_axes`、`product_option_values`、`product_skus`、`stock_operations`、`stock_movements`、`product_images`、`product_hashtags`。讀取模型：無。依賴 Postgres 擴充 `pg_trgm`（`public`，由平台安裝，見單體規則 6）。
+schema `catalog`（`db/schema.sql`）：`categories`、`products`、`product_option_axes`、`product_option_values`、`product_skus`、`stock_operations`、`stock_movements`、`product_images`、`product_hashtags`、`sales_orders`。讀取模型：無。依賴 Postgres 擴充 `pg_trgm`（`public`，由平台安裝，見單體規則 6）。
 
 ## 發布的讀取介面
 
@@ -34,6 +34,7 @@ schema `catalog`（`db/schema.sql`）：`categories`、`products`、`product_opt
 - 狀態（D22）任兩個都能互切（無效目標回 `InvalidInputError`）；ACTIVE 的商品在切成 ACTIVE 與每次寫入時至少 1 張主圖；`first_published_at` 只在第一次 ACTIVE 填，不清除。刪除把還在的 SKU 一併標刪除（扣減與調整找不到，歸還仍可），不碰圖片引用。守門：`TestDeleteProductMakesItsSkusUndeductibleButRestorable`、`TestProductLifecycleAndFirstPublishedAt`。
 - 公開列表只含 ACTIVE、沒刪除、店家可曝光的商品；公開單筆另含 ARCHIVED（頁面保留），草稿不可讀；賣家清單不過濾狀態與曝光。守門：`TestPublicListOnlyActiveProductsOfExposableStores`、`TestArchivedProductPageIsPublicButDraftIsNot`。
 - SKU 組合、價格區間、etag（`content_version`）、請求冪等、`SetStock`、低庫存、搜尋與列表篩選的不變量在 `internal/product/AGENTS.md`。
+- 補貨通知（D26）：不可買變可買時同 transaction 排 job，通知在外經 `RestockNotifier`；規則見 `internal/restock`。
 - 運費與配送方式不在 catalog（D10）；不依賴 fulfillment。
 
 ## 不負責
