@@ -269,6 +269,27 @@ func (d *restDriver) SellerUpdate(ctx context.Context, c ch.Caller, id string, i
 	return w.product()
 }
 
+// SellerSetStock 以舊的整份編輯改庫存（舊的 product-service 沒有 SetStock，也沒有預期值的比對，expected 不檢查）：
+// 讀回名稱、分類與價格，只換 SKU 的庫存，不動 hashtag。
+func (d *restDriver) SellerSetStock(ctx context.Context, c ch.Caller, id string, quantity, _ int64) error {
+	var cur wireProduct
+	if err := d.rest.Do(ctx, c, http.MethodGet, appProducts+"/"+url.PathEscape(id), nil, &cur); err != nil {
+		return err
+	}
+	if len(cur.Skus) != 1 {
+		return fmt.Errorf("商品 %s 有 %d 個 SKU，情境的商品只有一個", id, len(cur.Skus))
+	}
+	p, err := cur.product()
+	if err != nil {
+		return err
+	}
+	body := wireProductInput{
+		IdempotencyKey: ch.Nonce() + ch.Nonce(), Name: cur.Name, CategoryID: cur.CategoryID,
+		Skus: []wireSkuInput{skuInput(cur.Skus[0].ID, ProductInput{Price: p.PriceMin, Stock: quantity})},
+	}
+	return d.rest.Do(ctx, c, http.MethodPut, appProducts+"/"+url.PathEscape(id), body, nil)
+}
+
 func (d *restDriver) SellerSetListed(ctx context.Context, c ch.Caller, id string, listed bool) error {
 	status := statusWire[StatusArchived]
 	if listed {
