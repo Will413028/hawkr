@@ -241,6 +241,26 @@ var customerEffects = map[string]Effect{
 	"/hawkr.notification.v1alpha1.NotificationAppService/DeleteDeviceToken":            EffectSelfService,
 	"/hawkr.notification.v1alpha1.NotificationAppService/WatchNotifications":           EffectRead,
 
+	// CatalogPublicService：公開讀取，停權的帳號以訪客執行；宣告仍如實標示性質。
+	"/hawkr.catalog.v1alpha1.CatalogPublicService/ListProducts":            EffectRead,
+	"/hawkr.catalog.v1alpha1.CatalogPublicService/SearchProducts":          EffectRead,
+	"/hawkr.catalog.v1alpha1.CatalogPublicService/SuggestProductNames":     EffectRead,
+	"/hawkr.catalog.v1alpha1.CatalogPublicService/GetProduct":              EffectRead,
+	"/hawkr.catalog.v1alpha1.CatalogPublicService/ListCategories":          EffectRead,
+	"/hawkr.catalog.v1alpha1.CatalogPublicService/SuggestHashtags":         EffectRead,
+	"/hawkr.catalog.v1alpha1.CatalogPublicService/SuggestTrendingHashtags": EffectRead,
+
+	// SellerCatalogAppService：賣家的商品管理。寫入在帳號停權時被擋；店家自己的停權由 seller.ActingStore 依能力判斷。
+	"/hawkr.catalog.v1alpha1.SellerCatalogAppService/ListMyProducts":   EffectRead,
+	"/hawkr.catalog.v1alpha1.SellerCatalogAppService/GetMyProduct":     EffectRead,
+	"/hawkr.catalog.v1alpha1.SellerCatalogAppService/CountMyProducts":  EffectRead,
+	"/hawkr.catalog.v1alpha1.SellerCatalogAppService/CreateProduct":    EffectWrite,
+	"/hawkr.catalog.v1alpha1.SellerCatalogAppService/UpdateProduct":    EffectWrite,
+	"/hawkr.catalog.v1alpha1.SellerCatalogAppService/SetProductStatus": EffectWrite,
+	"/hawkr.catalog.v1alpha1.SellerCatalogAppService/DeleteProduct":    EffectWrite,
+	"/hawkr.catalog.v1alpha1.SellerCatalogAppService/AdjustStock":      EffectWrite,
+	"/hawkr.catalog.v1alpha1.SellerCatalogAppService/SetStock":         EffectWrite,
+
 	// SellerReportAppService
 	"/hawkr.seller.v1alpha1.SellerReportAppService/CreateReport":        EffectWrite,
 	"/hawkr.seller.v1alpha1.SellerReportAppService/GetMyReport":         EffectRead,

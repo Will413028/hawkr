@@ -128,6 +128,17 @@ var (
 	ErrVersionConflict = model.ErrVersionConflict
 )
 
+// InvalidInputError.Reason 的值：欄位為什麼不合法。
+const (
+	ReasonRequired   = model.ReasonRequired
+	ReasonTooLong    = model.ReasonTooLong
+	ReasonTooMany    = model.ReasonTooMany
+	ReasonDuplicate  = model.ReasonDuplicate
+	ReasonUnknown    = model.ReasonUnknown
+	ReasonOutOfRange = model.ReasonOutOfRange
+	ReasonInvalid    = model.ReasonInvalid
+)
+
 // Etag 是商品版本對外的 etag；ParseEtag 還原它（不合法回 ErrInvalidInput）。etag 只涵蓋賣家可編輯的內容與狀態：庫存、銷量、收藏數、評分不改它。
 func Etag(version int64) string { return model.Etag(version) }
 
@@ -225,6 +236,11 @@ func (m *Module) DeleteProduct(ctx context.Context, storeID int64, productID uui
 // Product 讀店家自己的商品（任何狀態，沒刪除）。
 func (m *Module) Product(ctx context.Context, storeID int64, productID uuid.UUID) (Product, error) {
 	return m.product.Get(ctx, storeID, productID)
+}
+
+// ProductOfSku 讀店家自己的未刪除 SKU 所屬的商品（任何狀態）；SKU 不存在、不是這家店的或已刪除回 ErrSkuNotFound。庫存調整成功後 Connect 層用它回該 SKU 調整後的內容。
+func (m *Module) ProductOfSku(ctx context.Context, storeID int64, skuID uuid.UUID) (Product, error) {
+	return m.product.GetOfSku(ctx, storeID, skuID)
 }
 
 // PublicProduct 讀公開可見的商品：ACTIVE 或 ARCHIVED（下架的商品頁保留，Status 讓呼叫端決定可不可以買）、沒刪除、店家在 at 可曝光；草稿與其他情況 ErrProductNotFound。at 是請求的 clock。

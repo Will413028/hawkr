@@ -81,6 +81,19 @@ func (s *Service) Get(ctx context.Context, storeID int64, productID uuid.UUID) (
 	return s.load(ctx, s.q(ctx), productID, storeID, nil)
 }
 
+// GetOfSku 讀店家自己的未刪除 SKU 所屬的商品（SKU 不存在、不是這家店的或已刪除回 model.ErrSkuNotFound）。
+func (s *Service) GetOfSku(ctx context.Context, storeID int64, skuID uuid.UUID) (model.Product, error) {
+	q := s.q(ctx)
+	id, err := q.GetOwnLiveSkuProduct(ctx, store.GetOwnLiveSkuProductParams{ID: skuID, StoreID: storeID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.Product{}, model.ErrSkuNotFound
+	}
+	if err != nil {
+		return model.Product{}, err
+	}
+	return s.load(ctx, q, id, storeID, nil)
+}
+
 // GetPublic 讀公開可見的商品：ACTIVE 或 ARCHIVED（下架的商品頁保留，呼叫端以狀態決定可不可以買）、沒刪除、店家在 at 這一刻可曝光（at 是請求的 clock）；
 // 草稿與其他情況回 ErrProductNotFound。
 func (s *Service) GetPublic(ctx context.Context, productID uuid.UUID, at time.Time) (model.Product, error) {

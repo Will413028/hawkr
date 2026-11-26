@@ -34,6 +34,14 @@ var publicViewerDependent = map[string]bool{
 	"/hawkr.content.v1alpha1.ContentPublicService/ListLiveBanners": false,
 	"/hawkr.content.v1alpha1.ContentPublicService/CheckAppVersion": false,
 
+	"/hawkr.catalog.v1alpha1.CatalogPublicService/ListProducts":            false,
+	"/hawkr.catalog.v1alpha1.CatalogPublicService/SearchProducts":          false,
+	"/hawkr.catalog.v1alpha1.CatalogPublicService/SuggestProductNames":     false,
+	"/hawkr.catalog.v1alpha1.CatalogPublicService/GetProduct":              false,
+	"/hawkr.catalog.v1alpha1.CatalogPublicService/ListCategories":          false,
+	"/hawkr.catalog.v1alpha1.CatalogPublicService/SuggestHashtags":         false,
+	"/hawkr.catalog.v1alpha1.CatalogPublicService/SuggestTrendingHashtags": false,
+
 	"/hawkr.seller.v1alpha1.SellerPublicService/GetStore":            false,
 	"/hawkr.seller.v1alpha1.SellerPublicService/ListStores":          false,
 	"/hawkr.seller.v1alpha1.SellerPublicService/BatchGetStores":      false,
