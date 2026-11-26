@@ -40,7 +40,7 @@ func (h *Admin) ListProducts(ctx context.Context, req *connect.Request[adminpb.L
 		return nil, err
 	}
 	query := normalizeQuery(msg.GetQuery())
-	if err := tooLong("query", query, maxMyQueryRunes); err != nil {
+	if err := tooLong("query", query, maxAdminQueryRunes); err != nil {
 		return nil, err
 	}
 	f := catalog.AdminFilter{Query: query}

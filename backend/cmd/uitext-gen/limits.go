@@ -20,6 +20,8 @@ const limitsOption protoreflect.FullName = "hawkr.common.v1alpha1.limits"
 // 常數都生成進擁有它的模組。掛了 limits 的 package 不在這張表裡就報錯。
 var limitsGoTargets = map[string]struct{ Dir, Package string }{
 	"catalog": {"backend/internal/modules/catalog/internal/model", "model"},
+	// 後台的 catalog API（package hawkr.admin.catalog）的請求欄位上限，由 catalog 模組擁有。
+	"admin.catalog": {"backend/internal/modules/catalog/internal/model", "model"},
 }
 
 // 上限的種類，對應 Limits 訊息的欄位。
@@ -63,7 +65,19 @@ func (l *LimitField) Path() string { return l.Message + "." + l.Name }
 // unit 是上限的單位名稱（種類名）。
 func (l *LimitField) unit() string { return l.Kind }
 
-func (l *LimitField) pkg() string { return strings.SplitN(l.Message, ".", 2)[0] }
+// pkg 是訊息所屬 package 的短名：limitsGoTargets 裡登記的、是訊息路徑前綴的最長那個（短名可含點，例如 admin.catalog）；都不符合回第一段，由登記檢查報錯。
+func (l *LimitField) pkg() string {
+	best := ""
+	for k := range limitsGoTargets {
+		if strings.HasPrefix(l.Message, k+".") && len(k) > len(best) {
+			best = k
+		}
+	}
+	if best == "" {
+		return strings.SplitN(l.Message, ".", 2)[0]
+	}
+	return best
+}
 
 func (l *LimitField) kindInfo() (goSuffix, dartSuffix string) {
 	for _, k := range limitKinds {
@@ -78,7 +92,7 @@ func (l *LimitField) kindInfo() (goSuffix, dartSuffix string) {
 // 訊息路徑不含 package：catalog.ProductInput 的 title 的 max_runes 是 MaxProductInputTitleRunes。
 func (l *LimitField) goName() string {
 	suffix, _ := l.kindInfo()
-	_, msg, _ := strings.Cut(l.Message, ".")
+	msg := strings.TrimPrefix(l.Message, l.pkg()+".")
 	return "Max" + pascal(msg) + pascal(l.Name) + suffix
 }
 

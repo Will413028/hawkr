@@ -5,6 +5,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
+	adminpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/admin/catalog/v1alpha1"
 	pb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/catalog/v1alpha1"
 	commonpb "github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/common/v1alpha1"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
@@ -19,6 +20,7 @@ var (
 	maxSearchRunes      = limitOf(&pb.SearchProductsRequest{}, "query").GetMaxRunes()
 	maxSuggestRunes     = limitOf(&pb.SuggestProductNamesRequest{}, "query").GetMaxRunes()
 	maxMyQueryRunes     = limitOf(&pb.MyProductFilter{}, "query").GetMaxRunes()
+	maxAdminQueryRunes  = limitOf(&adminpb.ListProductsRequest{}, "query").GetMaxRunes()
 )
 
 func limitOf(m proto.Message, field string) *commonpb.Limits {

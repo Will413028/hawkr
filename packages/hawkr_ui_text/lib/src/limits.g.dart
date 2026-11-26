@@ -1,6 +1,9 @@
 // dart format off
 // 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。
 
+/// admin.catalog.ListProductsRequest.query 的上限（hawkr.common.v1alpha1.limits，runes）。
+const int adminCatalogListProductsRequestQueryMaxRunes = 100;
+
 /// catalog.BulletList.items 的上限（hawkr.common.v1alpha1.limits，items）。
 const int catalogBulletListItemsMaxItems = 50;
 

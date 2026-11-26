@@ -10,6 +10,7 @@ import "google/api/field_behavior.proto";
 import "google/protobuf/timestamp.proto";
 import "hawkr/catalog/v1alpha1/catalog.proto";
 import "hawkr/common/v1alpha1/image.proto";
+import "hawkr/common/v1alpha1/limits.proto";
 
 // CatalogAdminService 只有管理員能呼叫；權限 catalog.products.list、catalog.products.get（adminauth，唯讀不留稽核）。
 service CatalogAdminService {
@@ -25,8 +26,8 @@ service CatalogAdminService {
 }
 
 message ListProductsRequest {
-  // 關鍵字，比對標題、描述、標籤、分類與選項；空是不篩選。
-  string query = 1;
+  // 關鍵字，比對標題、描述、標籤、分類與選項；去頭尾空白後空的是不篩選。
+  string query = 1 [(hawkr.common.v1alpha1.limits).max_runes = 100];
   // 只列這家店的商品；空是不篩選。
   string store_id = 2;
   // 預設 20，上限 100。
