@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -21,6 +22,7 @@ func searchUUID(n int) uuid.UUID {
 // fakeCatalog 是依 (排序鍵, ID) 遞減排列的商品清單，游標語意與 catalog 的 keyset 相同：回傳游標之後的 size 筆，還有更多時帶 Next。
 type fakeCatalog struct {
 	items []catalog.ProductSummary
+	keys  []int64 // items[i] 的排序鍵，與 items 同長；遞減，同鍵的以 ID 遞減
 	err   error
 
 	gotAt     time.Time
@@ -34,6 +36,7 @@ func newFakeCatalog(n int) *fakeCatalog {
 	f := &fakeCatalog{}
 	for i := range n {
 		f.items = append(f.items, catalog.ProductSummary{ID: searchUUID(n - i), StoreID: int64(n - i)})
+		f.keys = append(f.keys, int64((n-i)/3))
 	}
 	return f
 }
@@ -48,8 +51,8 @@ func (f *fakeCatalog) ListPublicProducts(_ context.Context, at time.Time, filter
 	if after != nil {
 		start = len(f.items)
 		for i, it := range f.items {
-			if it.ID == after.ID {
-				start = i + 1
+			if f.keys[i] < after.Key || (f.keys[i] == after.Key && bytes.Compare(it.ID[:], after.ID[:]) < 0) {
+				start = i
 				break
 			}
 		}
@@ -58,7 +61,7 @@ func (f *fakeCatalog) ListPublicProducts(_ context.Context, at time.Time, filter
 	page := catalog.ProductPage{Items: f.items[start:end]}
 	if end < len(f.items) {
 		last := f.items[end-1]
-		page.Next = &catalog.ListCursor{Key: int64(end), ID: last.ID}
+		page.Next = &catalog.ListCursor{Key: f.keys[end-1], ID: last.ID}
 	}
 	return page, nil
 }
@@ -67,7 +70,7 @@ func searcherOf(c publicProducts) productSearch {
 	return productSearch{catalog: c, now: func() time.Time { return searchNow }}
 }
 
-// 翻頁用上一頁的游標：每一頁都不重複、不遺漏，最後一頁沒有 Next。
+// 翻頁用上一頁的游標（資料不變時）：每一頁都不重複、不遺漏，最後一頁沒有 Next。
 func TestProductSearchKeysetPagesNeitherRepeatNorSkip(t *testing.T) {
 	const total = searchPageSize*2 + 20
 	f := newFakeCatalog(total)
@@ -200,5 +203,20 @@ func TestTaxonomyMapsCatalogCategoriesToNodes(t *testing.T) {
 	boom := errors.New("down")
 	if _, err := (taxonomy{fakeCategories{err: boom}}).CategoryTree(context.Background()); !errors.Is(err, boom) {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+// 游標編碼再解碼要還原 (排序鍵, 商品 ID) 兩個欄位。
+func TestSearchCursorRoundTripKeepsKeyAndID(t *testing.T) {
+	in := &catalog.ListCursor{Key: 42, ID: searchUUID(7)}
+	out, err := decodeSearchCursor(encodeSearchCursor(in))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out == nil || out.Key != in.Key || out.ID != in.ID {
+		t.Fatalf("round trip 得到 %+v，要 %+v", out, in)
+	}
+	if encodeSearchCursor(nil) != "" {
+		t.Fatal("沒有下一頁要編成空游標")
 	}
 }

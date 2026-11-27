@@ -51,6 +51,7 @@ type publicProducts interface {
 }
 
 // productSearch 以 catalog 的公開商品列表實作候選搜尋的 port：依銷量排序，keyset 翻頁；沒有下一頁游標就是最後一頁。
+// 保證的是游標之後的位置固定在 (銷量, ID) 的排序上，同一份資料不重複；銷量與曝光時間（now）在翻頁之間會變，變動的商品可能被跳過或再出現。
 // 只含 ACTIVE 且店家此刻可曝光的商品（now 是模組的時鐘）。
 type productSearch struct {
 	catalog publicProducts

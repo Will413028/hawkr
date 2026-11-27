@@ -270,7 +270,7 @@ type BannerAction_Url struct {
 }
 
 type BannerAction_ProductId struct {
-	// 開啟這個商品的頁面。
+	// 開啟這個商品的頁面；商品 ID 是 UUID（小寫、含連字號）。
 	ProductId string `protobuf:"bytes,3,opt,name=product_id,json=productId,proto3,oneof"`
 }
 

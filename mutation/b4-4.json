@@ -71,6 +71,33 @@
    "new": "\t\t_ = pg.Next\n",
    "test": "internal/modules/procurement/internal/candidate ^TestSearchStopsAfterMaxPages$",
    "why": "候選搜尋的翻頁迴圈不帶上一頁的游標：每頁都要第一頁，翻頁游標測試要紅。"
+  },
+  {
+   "id": "procurement-search-cursor-encode-drops-the-key",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/procurement.go",
+   "old": "strconv.FormatInt(c.Key, 10) + \":\" + c.ID.String()",
+   "new": "\"0:\" + c.ID.String()",
+   "test": "cmd/hawkr ^(TestSearchCursorRoundTripKeepsKeyAndID|TestProductSearchKeysetPagesNeitherRepeatNorSkip)$",
+   "why": "搜尋游標編碼丟掉排序鍵：下一頁的位置只剩 ID，往返測試與依 (鍵, ID) 排序的翻頁測試要紅。"
+  },
+  {
+   "id": "procurement-search-cursor-decode-drops-the-key",
+   "stack": "go",
+   "file": "backend/cmd/hawkr/procurement.go",
+   "old": "return &catalog.ListCursor{Key: k, ID: u}, nil",
+   "new": "_ = k\n\treturn &catalog.ListCursor{Key: 0, ID: u}, nil",
+   "test": "cmd/hawkr ^(TestSearchCursorRoundTripKeepsKeyAndID|TestProductSearchKeysetPagesNeitherRepeatNorSkip)$",
+   "why": "搜尋游標解碼丟掉排序鍵：往返測試與翻頁測試要紅。"
+  },
+  {
+   "id": "content-update-drops-the-product-existence-check",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/content/internal/banner/banner.go",
+   "old": "\t\tif canonical != cur.Action && hasEntityTarget(canonical) {\n\t\t\tif err := m.checkEntityTarget(ctx, canonical, targetID); err != nil {\n\t\t\t\treturn model.Banner{}, err\n\t\t\t}\n\t\t}\n",
+   "new": "\t\t_ = targetID\n",
+   "test": "internal/modules/content ^TestUpdateBannerChecksTheProductOnlyWhenTheTargetChanges$",
+   "why": "更新 banner 換目標時不確認商品：改成合法 UUID 但不存在的商品被收下，更新路徑的拒絕測試要紅。"
   }
  ]
 }

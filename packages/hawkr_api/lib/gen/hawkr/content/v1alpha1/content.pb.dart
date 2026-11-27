@@ -297,7 +297,7 @@ class BannerAction extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearUrl() => $_clearField(2);
 
-  /// 開啟這個商品的頁面。
+  /// 開啟這個商品的頁面；商品 ID 是 UUID（小寫、含連字號）。
   @$pb.TagNumber(3)
   $core.String get productId => $_getSZ(2);
   @$pb.TagNumber(3)
