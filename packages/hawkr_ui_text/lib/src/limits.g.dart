@@ -4,6 +4,9 @@
 /// admin.catalog.ListProductsRequest.query 的上限（hawkr.common.v1alpha1.limits，runes）。
 const int adminCatalogListProductsRequestQueryMaxRunes = 100;
 
+/// catalog.BatchUnpublishStoreProductsRequest.items 的上限（hawkr.common.v1alpha1.limits，items）。
+const int catalogBatchUnpublishStoreProductsRequestItemsMaxItems = 50;
+
 /// catalog.BulletList.items 的上限（hawkr.common.v1alpha1.limits，items）。
 const int catalogBulletListItemsMaxItems = 50;
 

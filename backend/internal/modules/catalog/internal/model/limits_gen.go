@@ -6,6 +6,8 @@ package model
 const (
 	// MaxListProductsRequestQueryRunes 是 admin.catalog.ListProductsRequest.query 的上限（hawkr.common.v1alpha1.limits，runes）。
 	MaxListProductsRequestQueryRunes = 100
+	// MaxBatchUnpublishStoreProductsRequestItems 是 catalog.BatchUnpublishStoreProductsRequest.items 的上限（hawkr.common.v1alpha1.limits，items）。
+	MaxBatchUnpublishStoreProductsRequestItems = 50
 	// MaxBulletListItems 是 catalog.BulletList.items 的上限（hawkr.common.v1alpha1.limits，items）。
 	MaxBulletListItems = 50
 	// MaxBulletListItemsRunes 是 catalog.BulletList.items 的上限（hawkr.common.v1alpha1.limits，runes）。
