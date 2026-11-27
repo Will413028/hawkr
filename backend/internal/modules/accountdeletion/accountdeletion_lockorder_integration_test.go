@@ -122,7 +122,7 @@ func TestDeletionLocksBuyerAndSellerBeforeReviewRows(t *testing.T) {
 			id, buyerID := f.account(t)
 			s := f.store(t, id)
 			if _, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO review.reviews (id, order_no, order_item_id, buyer_id, store_id, product_id, rating, sku_name, price, created_at)
-				VALUES ($1, 'N1', 1, $2, $3, 7, 5, 'sku', 1, now())`, uuid.NewV7(), buyerID, s.StoreID); err != nil {
+				VALUES ($1, 'N1', 1, $2, $3, $4, 5, 'sku', 1, now())`, uuid.NewV7(), buyerID, s.StoreID, uuid.NewV7()); err != nil {
 				t.Fatal(err)
 			}
 			f.orders.mu.Lock()

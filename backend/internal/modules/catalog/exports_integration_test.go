@@ -299,8 +299,13 @@ func TestFavoriteCountOnMissingAndDeletedProducts(t *testing.T) {
 	if err := f.m.RemoveFavorite(f.ct, p.ID); err != nil {
 		t.Fatalf("Remove on a deleted product = %v, the count follows the favorite row", err)
 	}
-	if got := f.counters(p.ID); got.FavoriteCount != 0 {
-		t.Fatalf("count = %d, want 0 after the Remove", got.FavoriteCount)
+	// AdminProduct 不讀已刪除的商品，所以直接讀列上的收藏數。
+	var favorites int32
+	if err := f.d.Pool().QueryRow(f.ct, `SELECT favorite_count FROM catalog.products WHERE id = $1`, p.ID).Scan(&favorites); err != nil {
+		t.Fatal(err)
+	}
+	if favorites != 0 {
+		t.Fatalf("count = %d, want 0 after the Remove", favorites)
 	}
 	for name, err := range map[string]error{
 		"add unknown":    f.m.AddFavorite(f.ct, uuid.NewV7()),

@@ -286,7 +286,7 @@ func TestSuccessWritesRankedCandidatesMovesToMatchingAndSucceeds(t *testing.T) {
 		t.Fatalf("run = %s %v", r.Status, r.FailureReason)
 	}
 	cs := f.candidates(s.CandidateSetID)
-	if len(cs) != 1 || cs[0].StoreID != 30 || cs[0].SourceID != "3000" || cs[0].Rank != 0 || cs[0].Selected {
+	if len(cs) != 1 || cs[0].StoreID != 30 || cs[0].SourceID != categoryID(3000).String() || cs[0].Rank != 0 || cs[0].Selected {
 		t.Fatalf("candidates = %+v，要只剩營業中而且沒封鎖的店", cs)
 	}
 	if got := f.status(); got != "MATCHING" {

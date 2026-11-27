@@ -95,7 +95,7 @@ func setup(t *testing.T) *fixture {
 		migrate.Module{Name: "identity", Dir: identity.Migrations()},
 	))
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	m := content.New(content.Deps{DB: d, Social: noPosts{}, Products: noProducts{}, Media: &fakeMedia{}, NewID: uuid.NewV7, Now: time.Now, Logger: log})
+	m := content.New(content.Deps{DB: d, Social: noPosts{}, Products: publicProducts{}, Media: &fakeMedia{}, NewID: uuid.NewV7, Now: time.Now, Logger: log})
 	dev, err := identity.NewDevAuth(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -391,7 +391,7 @@ func newBanner() *adminpb.Banner {
 		PreviewImageStagedToken: "p1",
 		PopupImageStagedToken:   "q1",
 		CanvasJson:              `{"objects":[]}`,
-		Action:                  &contentpb.BannerAction{Kind: &contentpb.BannerAction_ProductId{ProductId: "42"}},
+		Action:                  &contentpb.BannerAction{Kind: &contentpb.BannerAction_ProductId{ProductId: bannerProduct.String()}},
 		DisplayOrder:            1,
 		Active:                  true,
 	}
@@ -438,7 +438,7 @@ func TestBannerLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(live.Msg.GetBanners()) != 1 || live.Msg.GetBanners()[0].GetAction().GetProductId() != "42" {
+	if len(live.Msg.GetBanners()) != 1 || live.Msg.GetBanners()[0].GetAction().GetProductId() != bannerProduct.String() {
 		t.Fatalf("前台 = %v", live.Msg)
 	}
 
@@ -643,11 +643,16 @@ func (noDashboardOrders) StatusCounts(context.Context, int64) (httpseller.OrderS
 	return httpseller.OrderStatusCounts{}, errors.New("not used")
 }
 
-// noProducts 是沒有任何公開商品的 catalog 替身（這裡的 banner 不指向商品）。
-type noProducts struct{}
+// bannerProduct 是 banner 指向的商品；publicProducts 把它當成公開可見的商品，其餘回 ErrProductNotFound（規則本身由 catalog 的整合測試守）。
+var bannerProduct = uuid.MustParse("018f0000-0000-7000-8000-0000000000a1")
 
-func (noProducts) PublicProduct(context.Context, uuid.UUID, time.Time) (catalogmod.Product, error) {
-	return catalogmod.Product{}, catalogmod.ErrProductNotFound
+type publicProducts struct{}
+
+func (publicProducts) PublicProduct(_ context.Context, id uuid.UUID, _ time.Time) (catalogmod.Product, error) {
+	if id != bannerProduct {
+		return catalogmod.Product{}, catalogmod.ErrProductNotFound
+	}
+	return catalogmod.Product{ID: id}, nil
 }
 
 // noPosts 是沒有任何公開貼文的 social 替身（這裡的 banner 不指向貼文）。
