@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"regexp"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -176,34 +175,32 @@ func TestRD2LengthIsCountedInRunes(t *testing.T) {
 	}
 }
 
-// RD3：隱藏之後可以還原，還原留列、之後可以再隱藏；隱藏與還原都同步 SetRating 並排快取失效，重複隱藏冪等。
+// RD3：隱藏之後可以還原，還原留列、之後可以再隱藏；隱藏與還原都登記評分待重算並排快取失效，worker 跑過才寫 catalog；重複隱藏冪等。
 func TestRD3HideCanBeRestoredAndHiddenAgain(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
 	storeID := f.exposableStore(t)
 	r := f.submit(t, f.newBuyer(t), storeID, 700, 3, "普通")
+	f.runRatings(t)
 	f.jobs.reset()
-	f.ratings.mu.Lock()
-	f.ratings.calls = nil
-	f.ratings.mu.Unlock()
+	f.ratings.reset()
 
 	h := hide(t, f, r.ID)
-	f.ratings.mu.Lock()
-	afterHide := slices.Clone(f.ratings.calls)
-	f.ratings.mu.Unlock()
-	if !h.Created || len(afterHide) != 1 || afterHide[0].productID != pid(700) || afterHide[0].average != 0 || afterHide[0].count != 0 || f.jobs.count("revalidate") != 1 {
+	if _, ok := f.queueRow(t, pid(700)); !ok || f.ratings.callCount() != 0 || f.jobs.count("revalidate") != 1 {
+		t.Fatalf("新隱藏只登記待重算、不碰 catalog：%+v ratings=%d jobs=%v", h, f.ratings.callCount(), f.jobs.kinds())
+	}
+	f.runRatings(t)
+	afterHide := f.ratings.snapshot()
+	if !h.Created || len(afterHide) != 1 || afterHide[0].productID != pid(700) || afterHide[0].average != 0 || afterHide[0].count != 0 || f.jobs.count("revalidate") != 2 {
 		t.Fatalf("新隱藏：%+v ratings=%+v jobs=%v", h, afterHide, f.jobs.kinds())
 	}
 	if _, err := f.module.GetReview(ctx, r.ID, 0); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("隱藏後單筆讀取是 NotFound：%v", err)
 	}
 	again := hide(t, f, r.ID)
-	f.ratings.mu.Lock()
-	afterDup := len(f.ratings.calls)
-	f.ratings.mu.Unlock()
-	if again.Created || again.ID != h.ID || afterDup != 1 {
-		t.Fatalf("重複隱藏冪等、不再同步評分：%+v calls=%d", again, afterDup)
+	if _, ok := f.queueRow(t, pid(700)); ok || again.Created || again.ID != h.ID {
+		t.Fatalf("重複隱藏冪等、不再登記：%+v", again)
 	}
 	if st := must[review.ProductStats](t)(f.module.ProductStats(ctx, pid(700))); st.Count != 0 {
 		t.Fatalf("隱藏的不計分：%+v", st)
@@ -211,9 +208,8 @@ func TestRD3HideCanBeRestoredAndHiddenAgain(t *testing.T) {
 
 	f.advance(time.Hour)
 	restored := must[review.Hide](t)(f.module.Restore(ctx, review.RestoreInput{ReviewID: r.ID, AdminID: 2, Reason: "誤判"}))
-	f.ratings.mu.Lock()
-	afterRestore := slices.Clone(f.ratings.calls)
-	f.ratings.mu.Unlock()
+	f.runRatings(t)
+	afterRestore := f.ratings.snapshot()
 	if restored.RestoredAt == nil || len(afterRestore) != 2 || afterRestore[1].average != 3 || afterRestore[1].count != 1 {
 		t.Fatalf("還原：%+v ratings=%+v", restored, afterRestore)
 	}
@@ -439,17 +435,14 @@ func TestReplyRules(t *testing.T) {
 	ctx := context.Background()
 	storeID, otherStore := f.exposableStore(t), f.exposableStore(t)
 	r := f.submit(t, f.newBuyer(t), storeID, 700, 5, "好")
+	f.runRatings(t)
 	f.jobs.reset()
-	f.ratings.mu.Lock()
-	f.ratings.calls = nil
-	f.ratings.mu.Unlock()
+	f.ratings.reset()
 
 	got := must[review.Review](t)(f.module.Reply(ctx, review.ReplyInput{Store: f.store(t, storeID), ReviewID: r.ID, Content: " 謝謝 "}))
-	f.ratings.mu.Lock()
-	ratingCalls := len(f.ratings.calls)
-	f.ratings.mu.Unlock()
-	if got.Reply == nil || got.Reply.Content != "謝謝" || len(f.jobs.kinds()) != 0 || ratingCalls != 0 {
-		t.Fatalf("回覆不同步評分、不排失效：%+v jobs=%v ratingCalls=%d", got.Reply, f.jobs.kinds(), ratingCalls)
+	_, queued := f.queueRow(t, pid(700))
+	if got.Reply == nil || got.Reply.Content != "謝謝" || len(f.jobs.kinds()) != 0 || queued {
+		t.Fatalf("回覆不登記評分重算、不排失效：%+v jobs=%v queued=%v", got.Reply, f.jobs.kinds(), queued)
 	}
 	got = must[review.Review](t)(f.module.Reply(ctx, review.ReplyInput{Store: f.store(t, storeID), ReviewID: r.ID, Content: "再謝謝"}))
 	if got.Reply.Content != "再謝謝" {

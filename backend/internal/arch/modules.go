@@ -100,13 +100,14 @@ var InternalDependencies = map[string]InternalGraph{
 		"write": {"live", "model", "rows", "store", "text"},
 	}},
 	"review": {Packages: map[string][]string{
-		"model": {},
-		"purge": {"model", "rows", "store"},
-		"read":  {"model", "rows", "store", "text"},
-		"rows":  {"model", "store"},
-		"store": {},
-		"text":  {},
-		"write": {"model", "rows", "store", "text"},
+		"model":  {},
+		"purge":  {"model", "rows", "store"},
+		"rating": {"model", "store"},
+		"read":   {"model", "rows", "store", "text"},
+		"rows":   {"model", "store"},
+		"store":  {},
+		"text":   {},
+		"write":  {"model", "rows", "store", "text"},
 	}},
 	"imageai": {Packages: map[string][]string{
 		"admin":     {"model", "store", "text"}, // 後台的風格與額度維護（7 支）；縮圖與 seller 經介面，由根套件組裝

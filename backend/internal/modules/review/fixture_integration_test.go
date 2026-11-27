@@ -22,6 +22,7 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/catalog"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
@@ -40,8 +41,36 @@ func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
 // queue 記錄排入的 job（必須在 transaction 內，與真正的 jobs.Client 相同）。
 type queue struct {
-	mu   sync.Mutex
-	args []river.JobArgs
+	mu    sync.Mutex
+	args  []river.JobArgs
+	trace *trace
+}
+
+// trace 依序記錄 catalog 替身與 job 佇列的呼叫，讓測試斷言先後。
+type trace struct {
+	mu     sync.Mutex
+	events []string
+}
+
+func (t *trace) add(e string) {
+	if t == nil {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.events = append(t.events, e)
+}
+
+func (t *trace) reset() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.events = nil
+}
+
+func (t *trace) snapshot() []string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return slices.Clone(t.events)
 }
 
 func (q *queue) Enqueue(ctx context.Context, args river.JobArgs, _ *river.InsertOpts) error {
@@ -51,6 +80,7 @@ func (q *queue) Enqueue(ctx context.Context, args river.JobArgs, _ *river.Insert
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	q.args = append(q.args, args)
+	q.trace.add(args.Kind())
 	return nil
 }
 
@@ -108,16 +138,96 @@ type ratingCall struct {
 	count     int32
 }
 
+// ratingSink 是 catalog 的替身：記住每個商品目前的評分（LockProduct 回它、SetRating 改它），可設定商品不存在、錯誤與 SetRating 的 hook。
 type ratingSink struct {
-	mu    sync.Mutex
-	calls []ratingCall
+	mu      sync.Mutex
+	calls   []ratingCall
+	current map[uuid.UUID]catalog.Rating
+	missing map[uuid.UUID]bool
+	err     error
+	onSet   func()
+	onLock  func()
+	locked  []uuid.UUID
+	stores  map[uuid.UUID]int64
+	trace   *trace
+}
+
+func (s *ratingSink) LockProduct(ctx context.Context, productID uuid.UUID) (catalog.Rating, error) {
+	if _, ok := db.TxFrom(ctx); !ok {
+		return catalog.Rating{}, errors.New("LockProduct 必須在 transaction 內呼叫")
+	}
+	s.trace.add("lock")
+	s.mu.Lock()
+	hook := s.onLock
+	s.onLock = nil
+	s.locked = append(s.locked, productID)
+	s.mu.Unlock()
+	if hook != nil {
+		hook()
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.missing[productID] {
+		return catalog.Rating{}, catalog.ErrProductNotFound
+	}
+	if s.err != nil {
+		return catalog.Rating{}, s.err
+	}
+	r := s.current[productID]
+	r.StoreID = s.stores[productID]
+	return r, nil
+}
+
+func (s *ratingSink) lockOrder() []uuid.UUID {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.locked)
+}
+
+func (s *ratingSink) setStore(productID uuid.UUID, storeID int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.stores[productID] = storeID
 }
 
 func (s *ratingSink) SetRating(_ context.Context, productID uuid.UUID, average float64, count int32) error {
+	s.trace.add("set")
+	s.mu.Lock()
+	hook := s.onSet
+	s.onSet = nil
+	s.mu.Unlock()
+	if hook != nil {
+		hook()
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.calls = append(s.calls, ratingCall{productID: productID, average: average, count: count})
+	s.current[productID] = catalog.Rating{Average: average, Count: count}
 	return nil
+}
+
+func (s *ratingSink) setCurrent(productID uuid.UUID, average float64, count int32) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.current[productID] = catalog.Rating{Average: average, Count: count}
+}
+
+func (s *ratingSink) callCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.calls)
+}
+
+func (s *ratingSink) snapshot() []ratingCall {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.calls)
+}
+
+func (s *ratingSink) reset() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.calls = nil
 }
 
 type fixture struct {
@@ -130,6 +240,7 @@ type fixture struct {
 	media   *media.Module
 	orders  *orders
 	ratings *ratingSink
+	trace   *trace
 
 	mu      sync.Mutex
 	now     time.Time
@@ -169,7 +280,9 @@ func setup(t *testing.T) *fixture {
 	f.media = media.New(media.Deps{DB: database, Jobs: f.jobs, Store: media.NewMemoryStore(), Keyring: ring, NewID: uuid.NewV7, Now: f.clock, Logger: logger})
 	f.buyers = buyer.New(buyer.Deps{DB: database, Events: f.bus, Media: f.media, Now: f.clock, Logger: logger})
 	f.sellers = seller.NewReader(database, f.clock)
-	f.ratings = &ratingSink{}
+	f.trace = &trace{}
+	f.jobs.trace = f.trace
+	f.ratings = &ratingSink{current: map[uuid.UUID]catalog.Rating{}, stores: map[uuid.UUID]int64{}, missing: map[uuid.UUID]bool{}, trace: f.trace}
 	f.module = review.New(review.Deps{
 		DB: database, Events: f.bus, Media: f.media, Jobs: f.jobs, Buyers: f.buyers, Stores: f.sellers, Orders: f.orders, Catalog: f.ratings,
 		NewID: uuid.NewV7, Now: f.clock, Logger: logger,
@@ -292,6 +405,7 @@ func (f *fixture) order(b buyer.Profile, storeID int64, productID int) item {
 func (f *fixture) submit(t *testing.T, b buyer.Profile, storeID int64, productID int, rating int, content string) review.Review {
 	t.Helper()
 	it := f.order(b, storeID, productID)
+	f.ratings.setStore(pid(productID), storeID)
 	r, err := f.module.Submit(context.Background(), review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: rating, Content: content})
 	if err != nil {
 		t.Fatal(err)

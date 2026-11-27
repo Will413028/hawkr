@@ -89,6 +89,8 @@ type (
 	SkuState = model.SkuState
 	// SalesItem 是一筆訂單裡一個商品的銷量。
 	SalesItem = model.SalesItem
+	// Rating 是商品目前的評分平均與評價則數，加上所屬店家 ID（LockProduct 回傳）。
+	Rating = model.Rating
 	// RestockedSKU 是 SKU 由不可買變可買時，通知用的最新快照。
 	RestockedSKU = model.RestockedSKU
 	// SkuSnapshot 是一個 SKU 與它的商品此刻的內容（結帳快照與購物車資訊共用）。
@@ -208,7 +210,14 @@ func (m *Module) AddWorkers(workers *river.Workers) { restock.AddWorkers(workers
 // PeriodicJobs 回傳補貨佇列的排程（每 restock.Interval 處理一輪到期的補貨與清訂閱列）；組裝點在 B4-6 接線。
 func (m *Module) PeriodicJobs() []*river.PeriodicJob { return restock.PeriodicJobs() }
 
-// SetRating 把商品的評分平均（0 到 5）與評價則數設成絕對值，由 review 在自己的 transaction 內呼叫（D3、D26）：沒有版本欄，並行的呼叫靠商品列的行鎖序列化，後提交的絕對值勝出；
+// LockProduct 在呼叫方的 transaction 內鎖住商品列（FOR NO KEY UPDATE，不看 deleted_at）並回目前的評分與則數，讓之後的 SetRating 與其他寫入者序列化；
+// review 的評分 worker 先呼叫它、再讀自己的統計（鎖順序 catalog → review，D3），並以回傳值略過沒有變的寫入。
+// ctx 沒有 transaction 是呼叫方的程式錯誤，回一般 error（與 identity.LockAccount 同）；商品不存在回 ErrProductNotFound。
+func (m *Module) LockProduct(ctx context.Context, productID uuid.UUID) (Rating, error) {
+	return m.counter.LockProduct(ctx, productID)
+}
+
+// SetRating 把商品的評分平均（0 到 5）與評價則數設成絕對值，由 review 的評分 worker 在鎖住商品列（LockProduct）的 transaction 內呼叫（D3）：沒有版本欄，並行的呼叫靠商品列的行鎖序列化，後提交的絕對值勝出；
 // 不改 etag。count 為 0 時 average 必為 0；不合法回 *InvalidInputError，商品不存在回 ErrProductNotFound（已刪除的商品仍更新）。
 func (m *Module) SetRating(ctx context.Context, productID uuid.UUID, average float64, count int32) error {
 	return m.counter.SetRating(ctx, productID, average, count)

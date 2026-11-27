@@ -43,17 +43,16 @@ type Stores interface {
 
 // Deps 是寫入路徑的依賴。
 type Deps struct {
-	DB      *db.DB
-	Events  *events.Bus
-	Media   model.Media
-	Jobs    jobs.Enqueuer
-	Buyers  Buyers
-	Stores  Stores
-	Orders  model.Orders
-	Catalog model.Catalog
-	NewID   func() uuid.UUID
-	Now     func() time.Time
-	Logger  *slog.Logger
+	DB     *db.DB
+	Events *events.Bus
+	Media  model.Media
+	Jobs   jobs.Enqueuer
+	Buyers Buyers
+	Stores Stores
+	Orders model.Orders
+	NewID  func() uuid.UUID
+	Now    func() time.Time
+	Logger *slog.Logger
 }
 
 // Service 是寫入路徑的 use case。
@@ -154,7 +153,7 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Revie
 			}
 			images[i] = model.Image{AssetID: a.ID, ObjectKey: a.ObjectKey}
 		}
-		if err := rows.SyncProductRating(ctx, q, s.d.Catalog, item.ProductID); err != nil {
+		if err := rows.RequestRatingRecompute(ctx, q, now, item.ProductID); err != nil {
 			return err
 		}
 		if err := s.bust(ctx, order.StoreID, item.ProductID); err != nil {
@@ -380,7 +379,7 @@ func (s *Service) aggregateChanged(ctx context.Context, q *store.Queries, storeI
 	if err := s.bust(ctx, storeID, productID); err != nil {
 		return err
 	}
-	return rows.SyncProductRating(ctx, q, s.d.Catalog, productID)
+	return rows.RequestRatingRecompute(ctx, q, s.d.Now().UTC(), productID)
 }
 
 func checkReason(in model.HideInput) error {

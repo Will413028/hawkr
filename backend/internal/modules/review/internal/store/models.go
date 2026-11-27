@@ -41,6 +41,18 @@ type ReviewHide struct {
 	RestoreReason  *string
 }
 
+type ReviewRatingRecomputeQueue struct {
+	ProductID    uuid.UUID
+	Seq          int64
+	DueAt        time.Time
+	ClaimedUntil *time.Time
+	Attempts     int32
+	LastError    *string
+	FailedAt     *time.Time
+	Priority     int16
+	ClaimToken   *uuid.UUID
+}
+
 type ReviewReview struct {
 	ID           uuid.UUID
 	OrderNo      string

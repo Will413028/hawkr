@@ -6,7 +6,7 @@
 
 ## 擁有的資料
 
-schema `review`（`db/schema.sql`）：`reviews`（`order_item_id` UNIQUE）、`review_images`（最多 4 張）、`hides`（隱藏紀錄，含還原）。附圖的資產 ID 是 UUID，資產由 media 擁有。讀取模型：無。
+schema `review`（`db/schema.sql`）：`reviews`（`order_item_id` UNIQUE）、`review_images`（最多 4 張）、`hides`（隱藏紀錄，含還原）、`rating_recompute_queue`（商品評分待重算佇列）。附圖的資產 ID 是 UUID，資產由 media 擁有。讀取模型：無。
 
 ## 發布的讀取介面
 
@@ -15,7 +15,7 @@ schema `review`（`db/schema.sql`）：`reviews`（`order_item_id` UNIQUE）、`
 ## 模組內部結構
 
 - 根套件只保留 `Module`、`New`、轉呼叫方法、對外型別別名、事件與 `Orders` port。
-- `internal/write`（提交、回覆、隱藏、還原）、`internal/read`（列表、單筆、統計）、`internal/rows`（列轉對外型別）、`internal/purge`（刪帳的訂閱者邏輯與清除 job）、`internal/text`（伺服器句子目錄）、`internal/model`、`internal/store`（sqlc）。
+- `internal/write`（提交、回覆、隱藏、還原）、`internal/read`（列表、單筆、統計）、`internal/rows`（列轉對外型別）、`internal/purge`（刪帳的訂閱者邏輯與清除 job）、`internal/rating`（評分投影的 worker 與對帳）、`internal/text`（伺服器句子目錄）、`internal/model`、`internal/store`（sqlc）。
 - 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`。
 - 訂單由 `Orders` port 取（`cmd/hawkr/review.go` 以 `legacy/orderservice` 實作，ordering 搬進單體後換）；`Buyers`（查上傳者帳號）與 `Stores`（取 `store_code`）傳 `*buyer.Module`、`*seller.Module`。
 
@@ -26,10 +26,10 @@ schema `review`（`db/schema.sql`）：`reviews`（`order_item_id` UNIQUE）、`
 - 一個訂單項目至多一則評價（`reviews_order_item_key`）；`product_id`、`sku_name`、`price`、商品圖只取自訂單項目，`SubmitInput` 沒有這些欄位；評價建立後不變。
 - 長度以字元計（上限 1000）；附圖最多 4 張（`review_images_position_check`、`MaxImages`）；超過回 InvalidInput，不截斷。
 - 訂單不是提交者的，回與不存在相同的 NotFound（A6-D10，先於狀態檢查）；只有訂單狀態 50 能評價，期限 30 天；`Orders` 回 `ErrOrderNotFound` 才是 NotFound，其他錯誤一律 Unavailable。
-- `hides` 同一則評價至多一筆未還原（部分唯一索引）；`Hide`、`Restore` 只鎖評價自己的列，新隱藏與還原在同 transaction 同步商品評分（`Catalog.SetRating`）、發 `ReviewHidden`、`ReviewRestored`（D24，只帶參照與列舉）並排快取失效；重複隱藏不發事件。
+- `hides` 同一則評價至多一筆未還原（部分唯一索引）；`Hide`、`Restore` 只鎖評價自己的列，新隱藏與還原在同 transaction 登記商品評分待重算（`rating_recompute_queue`）、發 `ReviewHidden`、`ReviewRestored`（D24，只帶參照與列舉）並排快取失效；重複隱藏不發事件。
 - 店家回覆可被 seller 的內容下架措施（`REVIEW_REPLY`，`content_id` 是評價 ID，A6-D21）下架：review 不存複本，`TakenDownReplyIDs` join `seller.pub_content_takedowns()`，列表與單筆讀取把 `Reply` 設為 nil（店家自己的視圖也一樣），評價照常、統計不變；`OnMeasureCreated`／`OnMeasureRevoked` 同 transaction 依 id 升序鎖評價列並核對評價屬於措施的店家（不符回 `TakedownContentError`），不發事件（回覆不進評分彙總）（`TestReviewReplyTakedownHidesOnlyTheReply`）。
 - 附圖在提交的 transaction 內（買家守門鎖之後）`Confirm`，刪帳清除評價時同 transaction 把附圖 `MarkDeleted`；提交回滾時附圖仍是暫存。守門：`TestRD7AtMostFourImages`、`TestRolledBackSubmitLeavesTheImagesStaged`、`TestSubmitRefusesATokenStagedByAnotherAccount`、`TestRD4PurgeDeletesRowsAndImagesAndMarksTheAssetsDeletedAndIsRerunnable`。
-- 買家刪帳（A6-D6、A6-D9）：`OnBuyerDeletionRequested`／`OnBuyerDeleted` 同 transaction 只排 `review.purge_author`（`EnqueuePurge`）（以買家為唯一鍵），不刪列；列由 job 依 id 升序分批刪（附圖 CASCADE），每批把附圖標記刪除並排 `revalidate`，依商品 ID 升序呼叫 `Catalog.SetRating`，可重跑；`review.purge_sweep` 週期掃描補排失敗被丟棄的清除 job（A6-D13）。守門：`TestDeactivationHidesReviewsImmediatelyViaThePubJoin`、`TestRD4PurgeDeletesRowsAndImagesAndMarksTheAssetsDeletedAndIsRerunnable`、`TestDeletionLocksBuyerAndSellerBeforeReviewRows`（accountdeletion）。
+- 買家刪帳（A6-D6、A6-D9）：`OnBuyerDeletionRequested`／`OnBuyerDeleted` 同 transaction 只排 `review.purge_author`（`EnqueuePurge`）（以買家為唯一鍵），不刪列；列由 job 依 id 升序分批刪（附圖 CASCADE），每批把附圖標記刪除並排 `revalidate`，同 transaction 登記商品評分待重算，可重跑；`review.purge_sweep` 週期掃描補排失敗被丟棄的清除 job（A6-D13）。守門：`TestDeactivationHidesReviewsImmediatelyViaThePubJoin`、`TestRD4PurgeDeletesRowsAndImagesAndMarksTheAssetsDeletedAndIsRerunnable`、`TestDeletionLocksBuyerAndSellerBeforeReviewRows`（accountdeletion）。
 - `Submit` 的 insert transaction 第一句 `Buyers.LockActive`（買家列 `FOR KEY SHARE`，與買家轉移的 `FOR UPDATE` 互斥），NotFound 與 FailedPrecondition 都回 `ReviewAuthorInactive`；清除 job 的唯一性不含執行中的狀態。守門：`TestSubmitIsRejectedAfterDeletionRequestAndWaitsForTheGuard`。
 - 本步的 transaction 內不呼叫 provider；`Submit` 撞唯一鍵用 `ON CONFLICT DO NOTHING`，不 catch 23505。
 

@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -48,6 +47,52 @@ func (o *fakeReviewOrders) OrderForReview(_ context.Context, orderNo string) (re
 	return v, nil
 }
 
+// gatedCatalog 包住真的 catalog，在 arm 之後讓第一次 SetRating 停在寫入之前（直到 releaseFirstSet 關閉），
+// 並在第二次 LockProduct 被呼叫時通知；沒有 arm 就是直通。
+type gatedCatalog struct {
+	review.Catalog
+	mu              sync.Mutex
+	armed           bool
+	locks, sets     int
+	secondLock      chan struct{}
+	firstSetEntered chan struct{}
+	releaseFirstSet chan struct{}
+}
+
+func (g *gatedCatalog) arm() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.armed = true
+	g.secondLock, g.firstSetEntered, g.releaseFirstSet = make(chan struct{}), make(chan struct{}), make(chan struct{})
+}
+
+func (g *gatedCatalog) LockProduct(ctx context.Context, productID uuid.UUID) (catalog.Rating, error) {
+	g.mu.Lock()
+	if g.armed {
+		if g.locks++; g.locks == 2 {
+			close(g.secondLock)
+		}
+	}
+	g.mu.Unlock()
+	return g.Catalog.LockProduct(ctx, productID)
+}
+
+func (g *gatedCatalog) SetRating(ctx context.Context, productID uuid.UUID, average float64, count int32) error {
+	g.mu.Lock()
+	first := false
+	if g.armed {
+		g.sets++
+		first = g.sets == 1
+	}
+	entered, release := g.firstSetEntered, g.releaseFirstSet
+	g.mu.Unlock()
+	if first {
+		close(entered)
+		<-release
+	}
+	return g.Catalog.SetRating(ctx, productID, average, count)
+}
+
 type catalogSocialReviewFixture struct {
 	t       *testing.T
 	d       *db.DB
@@ -58,9 +103,32 @@ type catalogSocialReviewFixture struct {
 	catalog *catalog.Module
 	social  *social.Module
 	review  *review.Module
+	gate    *gatedCatalog
 	orders  *fakeReviewOrders
 	now     time.Time
 	seq     int
+}
+
+// runRatings 跑一輪評分投影；清到沒有待重算列為止（最多數輪，處理中到的請求會重排）。
+func (f *catalogSocialReviewFixture) runRatings(ctx context.Context) {
+	f.t.Helper()
+	for range 5 {
+		if err := f.review.RunRatingProjection(ctx); err != nil {
+			f.t.Fatal(err)
+		}
+		if f.pendingRatingRows(ctx) == 0 {
+			return
+		}
+	}
+}
+
+func (f *catalogSocialReviewFixture) pendingRatingRows(ctx context.Context) int64 {
+	f.t.Helper()
+	var n int64
+	if err := f.d.Pool().QueryRow(ctx, `SELECT count(*) FROM review.rating_recompute_queue`).Scan(&n); err != nil {
+		f.t.Fatal(err)
+	}
+	return n
 }
 
 func newCatalogSocialReviewFixture(t *testing.T) *catalogSocialReviewFixture {
@@ -98,8 +166,9 @@ func newCatalogSocialReviewFixture(t *testing.T) *catalogSocialReviewFixture {
 		social.ScheduleAuthorizerFunc(func(context.Context, social.ScheduledPublish) error { return social.ErrScheduleDenied }),
 		logger,
 	)
+	f.gate = &gatedCatalog{Catalog: f.catalog}
 	f.review = review.New(review.Deps{
-		DB: d, Events: bus, Media: med, Jobs: jc, Buyers: f.buyers, Stores: f.sellers, Orders: f.orders, Catalog: f.catalog,
+		DB: d, Events: bus, Media: med, Jobs: jc, Buyers: f.buyers, Stores: f.sellers, Orders: f.orders, Catalog: f.gate,
 		NewID: uuid.NewV7, Now: clock, Logger: logger,
 	})
 
@@ -243,7 +312,7 @@ func TestSocialProductsVerifiesCatalogProductAndStoreOwnership(t *testing.T) {
 	}
 }
 
-func TestReviewSyncsRatingToCatalogAndRollsBackOnMissingProduct(t *testing.T) {
+func TestReviewProjectsRatingToCatalogAsynchronouslyAndToleratesMissingProduct(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := newCatalogSocialReviewFixture(t)
@@ -278,6 +347,14 @@ func TestReviewSyncsRatingToCatalogAndRollsBackOnMissingProduct(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if got.RatingAverage != 0 || got.ReviewCount != 0 {
+		t.Fatalf("評分由 worker 非同步寫入，worker 跑之前 catalog 不變：avg=%v count=%d", got.RatingAverage, got.ReviewCount)
+	}
+	f.runRatings(ctx)
+	got, err = f.catalog.Product(ctx, store1, prod.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got.RatingAverage != 4.5 || got.ReviewCount != 2 {
 		t.Fatalf("Submit 後評分應為 (4.5, 2)：avg=%v count=%d", got.RatingAverage, got.ReviewCount)
 	}
@@ -285,6 +362,7 @@ func TestReviewSyncsRatingToCatalogAndRollsBackOnMissingProduct(t *testing.T) {
 	if _, err := f.review.Hide(ctx, review.HideInput{ReviewID: r1.ID, AdminID: 9, Category: "SPAM", Text: "垃圾訊息"}); err != nil {
 		t.Fatal(err)
 	}
+	f.runRatings(ctx)
 	got, err = f.catalog.Product(ctx, store1, prod.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -296,6 +374,7 @@ func TestReviewSyncsRatingToCatalogAndRollsBackOnMissingProduct(t *testing.T) {
 	if _, err := f.review.Restore(ctx, review.RestoreInput{ReviewID: r1.ID, AdminID: 9, Reason: "誤判"}); err != nil {
 		t.Fatal(err)
 	}
+	f.runRatings(ctx)
 	got, err = f.catalog.Product(ctx, store1, prod.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -304,17 +383,20 @@ func TestReviewSyncsRatingToCatalogAndRollsBackOnMissingProduct(t *testing.T) {
 		t.Fatalf("Restore 後評分應為 (4.5, 2)：avg=%v count=%d", got.RatingAverage, got.ReviewCount)
 	}
 
-	// 不存在的商品：SetRating 回 ErrProductNotFound，評價寫入必須一起回滾。
-	_, err = f.review.Submit(ctx, review.SubmitInput{BuyerID: b2, OrderNo: "ORD-MISSING", OrderItemID: 3, Rating: 5, Content: "不存在商品"})
-	if !errors.Is(err, catalog.ErrProductNotFound) {
-		t.Fatalf("不存在商品應回 catalog.ErrProductNotFound：%v", err)
+	// 不存在的商品：評價照常成功；worker 記錄後刪掉待重算列，不重試。
+	if _, err := f.review.Submit(ctx, review.SubmitInput{BuyerID: b2, OrderNo: "ORD-MISSING", OrderItemID: 3, Rating: 5, Content: "不存在商品"}); err != nil {
+		t.Fatalf("商品不存在不影響評價：%v", err)
 	}
 	var cnt int64
 	if err := f.d.Pool().QueryRow(ctx, `SELECT count(*) FROM review.reviews WHERE order_no = 'ORD-MISSING'`).Scan(&cnt); err != nil {
 		t.Fatal(err)
 	}
-	if cnt != 0 {
-		t.Fatalf("SetRating 失敗時評價必須回滾：count=%d", cnt)
+	if cnt != 1 {
+		t.Fatalf("評價要保留：count=%d", cnt)
+	}
+	f.runRatings(ctx)
+	if n := f.pendingRatingRows(ctx); n != 0 {
+		t.Fatalf("商品不存在：待重算列要被刪掉而不是留著重試：%d", n)
 	}
 
 	// 買家停用並 PurgeAuthor 後，catalog 評分同步為剩餘公開評價 (4.0, 1)。
@@ -324,6 +406,7 @@ func TestReviewSyncsRatingToCatalogAndRollsBackOnMissingProduct(t *testing.T) {
 	if err := f.review.PurgeAuthor(ctx, b1); err != nil {
 		t.Fatal(err)
 	}
+	f.runRatings(ctx)
 	got, err = f.catalog.Product(ctx, store1, prod.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -333,7 +416,7 @@ func TestReviewSyncsRatingToCatalogAndRollsBackOnMissingProduct(t *testing.T) {
 	}
 }
 
-func TestReviewSyncsRatingConcurrentlyWithoutLostUpdates(t *testing.T) {
+func TestReviewRatingProjectionConvergesAfterConcurrentSubmits(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := newCatalogSocialReviewFixture(t)
@@ -383,11 +466,78 @@ func TestReviewSyncsRatingConcurrentlyWithoutLostUpdates(t *testing.T) {
 		}
 	}
 
+	f.runRatings(ctx)
 	got, err := f.catalog.Product(ctx, store1, prod.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got.RatingAverage != 4.0 || got.ReviewCount != 2 {
 		t.Fatalf("並發 Submit 後評分應為 (4.0, 2)：avg=%v count=%d", got.RatingAverage, got.ReviewCount)
+	}
+}
+
+// 評分 worker 的並行安全：租約逾期被第二個 worker 接手時，兩個處理同一商品的 transaction 以 catalog 商品列的行鎖序列化，
+// 後拿到鎖的重讀統計，最終是最新的評分，不被先讀統計、後寫入的舊值覆蓋。
+// 決定性：第一個 worker 停在 SetRating 之前（已鎖商品列、已讀統計），第二個 worker 啟動後，等它要嘛呼叫了 LockProduct（被鎖擋住）要嘛已經做完，才放行第一個。
+func TestRatingProjectionIsSerializedByCatalogLockAgainstStaleLeaseOwner(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := newCatalogSocialReviewFixture(t)
+
+	store1 := f.seedStore(ctx, 5101)
+	prod := f.createProduct(ctx, store1, 5101, catalog.StatusActive)
+	b1 := f.newBuyer(ctx, "g-lease-1")
+	b2 := f.newBuyer(ctx, "g-lease-2")
+	for i, o := range []struct {
+		no    string
+		buyer int64
+	}{{"LEASE-1", b1}, {"LEASE-2", b2}} {
+		f.orders.byNo[o.no] = review.OrderForReview{
+			OrderNo: o.no, BuyerID: o.buyer, StoreID: store1, Status: review.OrderStatusCompleted, CompletedAt: f.now,
+			Items: []review.OrderItem{{OrderItemID: int64(21 + i), ProductID: prod.ID, SkuName: "預設", Price: 120}},
+		}
+	}
+	if _, err := f.review.Submit(ctx, review.SubmitInput{BuyerID: b1, OrderNo: "LEASE-1", OrderItemID: 21, Rating: 5, Content: "第一則"}); err != nil {
+		t.Fatal(err)
+	}
+
+	f.gate.arm()
+	aDone, bDone := make(chan error, 1), make(chan error, 1)
+	go func() { aDone <- f.review.RunRatingProjection(ctx) }()
+	<-f.gate.firstSetEntered
+
+	if _, err := f.review.Submit(ctx, review.SubmitInput{BuyerID: b2, OrderNo: "LEASE-2", OrderItemID: 22, Rating: 1, Content: "第二則"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.d.Pool().Exec(ctx, `UPDATE review.rating_recompute_queue SET claimed_until = '2000-01-01'`); err != nil {
+		t.Fatal(err)
+	}
+	go func() { bDone <- f.review.RunRatingProjection(ctx) }()
+
+	var bErr error
+	bFinished := false
+	select {
+	case <-f.gate.secondLock:
+	case bErr = <-bDone:
+		bFinished = true
+	}
+	close(f.gate.releaseFirstSet)
+	if err := <-aDone; err != nil {
+		t.Fatal(err)
+	}
+	if !bFinished {
+		bErr = <-bDone
+	}
+	if bErr != nil {
+		t.Fatal(bErr)
+	}
+
+	f.runRatings(ctx)
+	got, err := f.catalog.Product(ctx, store1, prod.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.RatingAverage != 3.0 || got.ReviewCount != 2 {
+		t.Fatalf("最終要是最新的評分 (3.0, 2)，不被舊值覆蓋：avg=%v count=%d", got.RatingAverage, got.ReviewCount)
 	}
 }

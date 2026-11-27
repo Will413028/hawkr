@@ -12,6 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/catalog"
 	"github.com/Will413028/hawkr/backend/internal/modules/crm"
 	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
@@ -105,6 +106,10 @@ func TestDeletionLocksBuyerAndSellerBeforeSocialRows(t *testing.T) {
 }
 
 type noopReviewCatalog struct{}
+
+func (noopReviewCatalog) LockProduct(context.Context, uuid.UUID) (catalog.Rating, error) {
+	return catalog.Rating{}, nil
+}
 
 func (noopReviewCatalog) SetRating(context.Context, uuid.UUID, float64, int32) error { return nil }
 

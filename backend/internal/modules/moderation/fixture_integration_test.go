@@ -22,6 +22,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/accountdeletion"
 	"github.com/Will413028/hawkr/backend/internal/modules/accountsuspension"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/catalog"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/im"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
@@ -133,7 +134,6 @@ type fixture struct {
 	review    *review.Module
 	im        *im.Module
 	orders    *reviewOrders
-	aggs      atomic.Int64
 	db        *db.DB
 	identity  *identity.Module
 	buyer     *buyer.Module
@@ -202,7 +202,7 @@ func setup(t *testing.T) *fixture {
 	f.deletion = accountdeletion.New(accountdeletion.Deps{DB: d, Identity: f.identity, Buyer: f.buyer, Seller: f.seller, Orders: noOrders{}, Now: f.clock})
 	f.suspend = accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: f.identity, Seller: f.seller, Logger: log})
 	f.orders = &reviewOrders{byNo: map[string]review.OrderForReview{}}
-	f.review = review.New(review.Deps{DB: d, Events: bus, Media: owner, Jobs: q, Buyers: f.buyer, Stores: f.sellerRd, Orders: f.orders, Catalog: ratingSink{aggs: &f.aggs}, NewID: uuid.NewV7, Now: f.clock, Logger: log})
+	f.review = review.New(review.Deps{DB: d, Events: bus, Media: owner, Jobs: q, Buyers: f.buyer, Stores: f.sellerRd, Orders: f.orders, Catalog: ratingSink{}, NewID: uuid.NewV7, Now: f.clock, Logger: log})
 	f.im = im.New(im.Deps{DB: d, Events: bus, Jobs: q, Media: owner, Buyers: f.buyer, Stores: chatStores{f.seller}, Orders: chatOrders{}, NewID: uuid.NewV7, Now: f.clock, Logger: log})
 	f.module = New(Deps{DB: d, Events: bus, Social: f.social, Review: f.review, IM: f.im, Seller: f.seller, Buyer: f.buyer, Suspension: f.suspend, Media: fm, NewID: uuid.NewV7, Now: f.clock, Logger: log})
 	events.Subscribe(bus, f.buyer.OnAccountCreated)
@@ -396,12 +396,14 @@ func (f *fixture) assetState(t *testing.T, id uuid.UUID) string {
 	return string(st)
 }
 
-type ratingSink struct{ aggs *atomic.Int64 }
+// ratingSink 是 catalog 的替身：這個 fixture 不跑評分 worker，只需要滿足 review.Catalog。
+type ratingSink struct{}
 
-func (s ratingSink) SetRating(context.Context, uuid.UUID, float64, int32) error {
-	s.aggs.Add(1)
-	return nil
+func (ratingSink) LockProduct(context.Context, uuid.UUID) (catalog.Rating, error) {
+	return catalog.Rating{}, nil
 }
+
+func (ratingSink) SetRating(context.Context, uuid.UUID, float64, int32) error { return nil }
 
 // stagedAssets 是推導後處於 STAGED（還沒確認）的資產數。
 func (f *fixture) stagedAssets(t *testing.T) int {

@@ -142,7 +142,7 @@ func (f *fixture) hidden(t *testing.T, party im.Party, conv uuid.UUID, seq int64
 	return false, nil
 }
 
-// 8.1-1：檢舉 → 快照 → 隱藏 → 還原（評價）。公開讀取與統計隨隱藏消失、隨還原回來，隱藏與還原各同步一次 SetRating；案件維持結案、決定不改，撤銷紀錄與稽核在原案件旁。
+// 8.1-1：檢舉 → 快照 → 隱藏 → 還原（評價）。公開讀取與統計隨隱藏消失、隨還原回來，隱藏與還原各登記一次評分待重算（review 的佇列序號加一）；案件維持結案、決定不改，撤銷紀錄與稽核在原案件旁。
 func TestReviewReportHideAndReverse(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -171,7 +171,8 @@ func TestReviewReportHideAndReverse(t *testing.T) {
 		t.Fatalf("快照指向 moderation 自己的複本（B1-D20），複本要記在 asset_ids：%d", got)
 	}
 
-	before := f.aggs.Load()
+	const seqSQL = "SELECT coalesce(max(seq), 0) FROM review.rating_recompute_queue WHERE product_id = $1"
+	before := f.count(t, seqSQL, r.ProductID)
 	mustV[CaseDetail](t)(f.decide(t, res.Case, ActionHide, policy.Spam))
 	if _, err := f.review.GetReview(ctx, r.ID, 0); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("隱藏後 GetReview：%v", err)
@@ -182,11 +183,11 @@ func TestReviewReportHideAndReverse(t *testing.T) {
 	if n := f.count(t, "SELECT count(*) FROM review.hides WHERE review_id = $1 AND source_ref = $2 AND restored_at IS NULL", r.ID, SourceRefPrefix+res.Case.ID.String()); n != 1 {
 		t.Fatalf("隱藏紀錄 = %d", n)
 	}
-	if got := f.aggs.Load() - before; got != 1 {
-		t.Fatalf("隱藏同步了 %d 次 SetRating", got)
+	if got := f.count(t, seqSQL, r.ProductID) - before; got != 1 {
+		t.Fatalf("隱藏登記了 %d 次評分待重算", got)
 	}
 
-	before = f.aggs.Load()
+	before = f.count(t, seqSQL, r.ProductID)
 	d := mustV[CaseDetail](t)(f.reverse(res.Case.ID))
 	if d.Case.ClosedAt == nil || d.Case.Decision == nil || *d.Case.Decision != DecisionViolation || d.Case.Action == nil || *d.Case.Action != ActionHide {
 		t.Fatalf("撤銷不改決定、案件維持結案：%+v", d.Case)
@@ -203,8 +204,8 @@ func TestReviewReportHideAndReverse(t *testing.T) {
 	if n := f.count(t, "SELECT count(*) FROM review.hides WHERE review_id = $1 AND restored_at IS NOT NULL AND restored_by = 9", r.ID); n != 1 {
 		t.Fatalf("還原留列：%d", n)
 	}
-	if got := f.aggs.Load() - before; got != 1 {
-		t.Fatalf("還原同步了 %d 次 SetRating", got)
+	if got := f.count(t, seqSQL, r.ProductID) - before; got != 1 {
+		t.Fatalf("還原登記了 %d 次評分待重算", got)
 	}
 	if n := f.count(t, "SELECT count(*) FROM moderation.cases WHERE id = $1 AND closed_at IS NOT NULL AND reversed_at IS NOT NULL AND reversed_by_admin_id = 9 AND reverse_reason = '誤判'", res.Case.ID); n != 1 {
 		t.Fatal("cases 的 reversed_* 要有值")

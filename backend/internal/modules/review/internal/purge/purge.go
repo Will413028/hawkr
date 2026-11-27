@@ -39,14 +39,13 @@ type Stores interface {
 
 // Deps 是清除的依賴。
 type Deps struct {
-	DB      *db.DB
-	Jobs    jobs.Enqueuer
-	Media   model.Media
-	Stores  Stores
-	Catalog model.Catalog
-	NewID   func() uuid.UUID
-	Now     func() time.Time
-	Logger  *slog.Logger
+	DB     *db.DB
+	Jobs   jobs.Enqueuer
+	Media  model.Media
+	Stores Stores
+	NewID  func() uuid.UUID
+	Now    func() time.Time
+	Logger *slog.Logger
 }
 
 // Service 執行刪帳的清除。
@@ -166,10 +165,8 @@ func (s *Service) purgeBatch(ctx context.Context, buyerID int64) (int, error) {
 		if err := s.d.Media.MarkDeleted(ctx, assets); err != nil {
 			return err
 		}
-		for _, pid := range distinctProductIDs(products) {
-			if err := rows.SyncProductRating(ctx, q, s.d.Catalog, pid); err != nil {
-				return err
-			}
+		if err := rows.RequestRatingRecompute(ctx, q, s.d.Now().UTC(), distinctProductIDs(products)...); err != nil {
+			return err
 		}
 		if err := s.bust(ctx, stores, products); err != nil {
 			return err
