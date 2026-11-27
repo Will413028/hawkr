@@ -221,7 +221,7 @@
    "stack": "go",
    "file": "backend/internal/modules/procurement/internal/turn/apply.go",
    "old": "if a.OptionID == planner.ItemOtherOptionID {\n\t\treturn interrupt(l, describeCard(p.Query)), nil",
-   "new": "if a.OptionID == planner.ItemOtherOptionID {\n\t\treturn resolvedOutcome(slots.Resolution{Kind: slots.CategoryConfirmed, CategoryID: 1, Label: \"\"}), nil",
+   "new": "if a.OptionID == planner.ItemOtherOptionID {\n\t\treturn resolvedOutcome(slots.Resolution{Kind: slots.CategoryConfirmed, CategoryID: [16]byte{1}, Label: \"\"}), nil",
    "test": "internal/modules/procurement/internal/turn ^TestApplyOtherGoesToDescribeNeverConfirms$",
    "why": "選「其他」直接產生空 label 的 CATEGORY_CONFIRMED，不進 DESCRIBE"
   },
