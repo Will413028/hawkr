@@ -45,6 +45,9 @@ type Buyers = write.Buyers
 // Stores 是讀店家（取 store_code）的 seller 公開 API；正式組裝傳 *seller.Module。
 type Stores = write.Stores
 
+// Catalog 是同步商品評分的 catalog 公開 API；正式組裝傳 *catalog.Module。
+type Catalog = model.Catalog
+
 // ErrOrderNotFound 是 Orders 的實作回報「訂單不存在」的方式。
 var ErrOrderNotFound = model.ErrOrderNotFound
 
@@ -53,11 +56,12 @@ type Deps struct {
 	DB     *db.DB
 	Events *events.Bus
 	// Media 是 media 模組（*media.Module）：附圖在寫入的 transaction 內 Confirm，刪帳清除的評價的附圖 MarkDeleted。
-	Media  model.Media
-	Jobs   jobs.Enqueuer
-	Buyers Buyers
-	Stores Stores
-	Orders Orders
+	Media   model.Media
+	Jobs    jobs.Enqueuer
+	Buyers  Buyers
+	Stores  Stores
+	Orders  Orders
+	Catalog Catalog
 	// NewID 產生實體的主鍵與事件 ID，組裝點給 uuid.NewV7（ADR 2026-09-25-row-identity-by-data-kind）。
 	NewID func() uuid.UUID
 	// Now 是目前時間；測試注入固定值。
@@ -81,18 +85,16 @@ type (
 	RestoreInput   = model.RestoreInput
 	Hide           = model.Hide
 	// TakedownContentError 是內容下架的對象不成立；OnMeasureCreated 回這個錯誤讓措施回滾。
-	TakedownContentError   = write.TakedownContentError
-	ProductStats           = model.ProductStats
-	StoreStats             = model.StoreStats
-	StoreRating            = model.StoreRating
-	OrderForReview         = model.OrderForReview
-	OrderItem              = model.OrderItem
-	Reason                 = model.Reason
-	ReviewCreated          = model.ReviewCreated
-	ReviewAggregateChanged = model.ReviewAggregateChanged
-	ReviewHidden           = model.ReviewHidden
-	ReviewRestored         = model.ReviewRestored
-	Target                 = model.Target
+	TakedownContentError = write.TakedownContentError
+	ProductStats         = model.ProductStats
+	StoreStats           = model.StoreStats
+	StoreRating          = model.StoreRating
+	OrderForReview       = model.OrderForReview
+	OrderItem            = model.OrderItem
+	Reason               = model.Reason
+	ReviewCreated        = model.ReviewCreated
+	ReviewHidden         = model.ReviewHidden
+	ReviewRestored       = model.ReviewRestored
 )
 
 const (
@@ -125,20 +127,20 @@ func New(d Deps) *Module {
 	if d.Now == nil || d.NewID == nil {
 		panic("review: Now 與 NewID 是必要的")
 	}
-	if d.Orders == nil || d.Buyers == nil || d.Stores == nil {
-		panic("review: Orders、Buyers 與 Stores 是必要的")
+	if d.Orders == nil || d.Buyers == nil || d.Stores == nil || d.Catalog == nil {
+		panic("review: Orders、Buyers、Stores 與 Catalog 是必要的")
 	}
 	if d.Logger == nil {
 		d.Logger = slog.Default()
 	}
 	return &Module{
 		write: write.New(write.Deps{
-			DB: d.DB, Events: d.Events, Media: d.Media, Jobs: d.Jobs, Buyers: d.Buyers, Stores: d.Stores, Orders: d.Orders,
+			DB: d.DB, Events: d.Events, Media: d.Media, Jobs: d.Jobs, Buyers: d.Buyers, Stores: d.Stores, Orders: d.Orders, Catalog: d.Catalog,
 			NewID: d.NewID, Now: d.Now, Logger: d.Logger,
 		}),
 		read: read.New(read.Deps{DB: d.DB}),
 		purge: purge.New(purge.Deps{
-			DB: d.DB, Events: d.Events, Jobs: d.Jobs, Media: d.Media, Stores: d.Stores, NewID: d.NewID, Now: d.Now, Logger: d.Logger,
+			DB: d.DB, Jobs: d.Jobs, Media: d.Media, Stores: d.Stores, Catalog: d.Catalog, NewID: d.NewID, Now: d.Now, Logger: d.Logger,
 		}),
 	}
 }
@@ -153,10 +155,10 @@ func (m *Module) Reply(ctx context.Context, in ReplyInput) (Review, error) {
 	return m.write.Reply(ctx, in)
 }
 
-// Hide 隱藏一則評價（moderation 呼叫），冪等；新隱藏時發 ReviewAggregateChanged。
+// Hide 隱藏一則評價（moderation 呼叫），冪等；新隱藏時同 transaction 同步商品評分。
 func (m *Module) Hide(ctx context.Context, in HideInput) (Hide, error) { return m.write.Hide(ctx, in) }
 
-// Restore 還原目前未還原的隱藏，發 ReviewAggregateChanged。
+// Restore 還原目前未還原的隱藏，同 transaction 同步商品評分。
 func (m *Module) Restore(ctx context.Context, in RestoreInput) (Hide, error) {
 	return m.write.Restore(ctx, in)
 }

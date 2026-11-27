@@ -151,11 +151,11 @@ func (q *queue) kinds() []string {
 
 type products struct {
 	mu    sync.Mutex
-	owner map[int64]int64 // 商品 → 店家
+	owner map[uuid.UUID]int64 // 商品 → 店家
 	err   error
 }
 
-func (p *products) VerifyProduct(_ context.Context, productID, storeID int64) error {
+func (p *products) VerifyProduct(_ context.Context, productID uuid.UUID, storeID int64) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.err != nil {
@@ -275,7 +275,7 @@ func setup(t *testing.T) *fixture {
 	))
 	f := &fixture{
 		db: database, bus: events.NewBus(), jobs: &queue{},
-		products: &products{owner: map[int64]int64{}}, deleg: &scheduleAuth{}, events: &eventLog{},
+		products: &products{owner: map[uuid.UUID]int64{}}, deleg: &scheduleAuth{}, events: &eventLog{},
 		now: time.Date(2026, 10, 23, 12, 0, 0, 0, time.UTC),
 	}
 	logger := slog.New(slog.NewTextHandler(&f.logs, nil))

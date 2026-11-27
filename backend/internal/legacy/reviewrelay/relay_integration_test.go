@@ -29,12 +29,8 @@ func TestRelayRetryEnqueuesOnePublishJobPerEvent(t *testing.T) {
 	w.Jobs = queue
 
 	createdArgs := ReviewCreatedArgs{eventFields: eventFields{EventID: "event-created", Occurred: occurredAt}, ReviewID: reviewID.String()}
-	changedArgs := ReviewAggregateChangedArgs{eventFields: eventFields{EventID: "event-changed", Occurred: occurredAt}, StoreID: 91, ProductID: product700}
 	for range 2 {
 		if err := w.reviewCreated(ctx, createdArgs); err != nil {
-			t.Fatal(err)
-		}
-		if err := w.reviewAggregateChanged(ctx, changedArgs); err != nil {
 			t.Fatal(err)
 		}
 		reviews.product[product700] = review.ProductStats{Count: 31, Average: 4.5}
@@ -56,17 +52,7 @@ func TestRelayRetryEnqueuesOnePublishJobPerEvent(t *testing.T) {
 	if err := rows.Err(); err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 2 {
-		t.Fatalf("publish jobs = %v，預期 2 個（created、changed 各一個）", got)
-	}
-	if got[0] != [2]string{"event-created", "review.created"} || got[1] != [2]string{"event-changed", "review.hidden"} {
-		t.Fatalf("publish jobs = %v", got)
-	}
-	ids := map[string]bool{}
-	for _, g := range got {
-		if ids[g[0]] {
-			t.Fatalf("event_id 重複：%v", got)
-		}
-		ids[g[0]] = true
+	if len(got) != 1 || got[0] != [2]string{"event-created", "review.created"} {
+		t.Fatalf("publish jobs = %v，預期 1 個 event-created", got)
 	}
 }

@@ -45,7 +45,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/invoiceservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/orderservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/paymentserver"
-	"github.com/Will413028/hawkr/backend/internal/legacy/productservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/rabbitmq"
 	"github.com/Will413028/hawkr/backend/internal/legacy/reviewrelay"
 	"github.com/Will413028/hawkr/backend/internal/legacy/sellerrelay"
@@ -145,7 +144,6 @@ func runServe(ctx context.Context) error {
 	gatewayURL := e.String("GATEWAY_URL")
 	// 單體替舊服務提供 account-service 的 gRPC（h2c），舊服務的 ACCOUNT_SERVICE_* 指向這裡。
 	legacyAddr := e.String("LEGACY_GRPC_ADDR")
-	productAddr := e.String("PRODUCT_SERVICE_ADDR")
 	orderAddr := e.String("ORDER_SERVICE_ADDR")
 	// 直接呼叫單體的 web 的 origin（CSRF 與 gateway 的 WebSocket 比對；後台經自己的 BFF 呼叫，不在這裡）；限流的身分（origin-auth 的金鑰、
 	// CDN 帶的 client IP header）。
@@ -194,10 +192,6 @@ func runServe(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	products, err := productservice.New(productAddr, internalSecret)
-	if err != nil {
-		return err
-	}
 	orders, err := orderservice.New(orderAddr, internalSecret)
 	if err != nil {
 		return err
@@ -240,8 +234,8 @@ func runServe(ctx context.Context) error {
 	subscribePaymentRelay(bus, jc)
 	subscribeBizCalendarRelay(bus, jc)
 	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: sellerModule, NewID: uuid.NewV7, Now: time.Now, Logger: log}
-	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, delegation.NewScheduleAuthorizer(delegationDeps), log)
-	reviewModule := newReview(d, bus, jc, buyerModule, sellerModule, med, orders, log)
+	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{catalog: catalogModule}, delegation.NewScheduleAuthorizer(delegationDeps), log)
+	reviewModule := newReview(d, bus, jc, buyerModule, sellerModule, catalogModule, med, orders, log)
 	imModule := newIM(d, bus, jc, buyerModule, sellerModule, med, orders, log)
 	crmModule := newCRM(d, bus, jc, buyerModule, sellerModule, log)
 	delegationDeps.Social = socialModule
@@ -316,7 +310,7 @@ func runServe(ctx context.Context) error {
 		ReviewQueue:           reviewqueue.New(reviewqueue.Deps{DB: d}),
 		Stats:                 stats,
 		DashboardOrders:       sellerDashboardOrders{orders},
-		SocialProducts:        socialCards{products},
+		SocialProducts:        socialCards{catalogModule},
 		BuyerPorts:            httpbuyer.Ports{Products: buyerProducts{catalogModule}, Skus: buyerSkus{catalogModule}, Stores: sellerModule, Orders: buyerOrders{orders}, CRM: crmModule},
 		Deletion:              deletion,
 		Delegation:            del,
@@ -370,7 +364,6 @@ func runWorker(ctx context.Context) error {
 	// 送給舊服務的事件（RabbitMQ）：還在 RabbitMQ 上的消費者搬進單體之前需要。
 	rabbitURL := e.String("RABBITMQ_URL")
 	orderAddr := e.String("ORDER_SERVICE_ADDR")
-	productAddr := e.String("PRODUCT_SERVICE_ADDR")
 	// 工作日行事曆推給還在舊服務的 invoice-service 當鏡像（bizcalendarrelay；A5 搬進單體後刪除）。
 	invoiceAddr := e.String("INVOICE_SERVICE_ADDR")
 	internalSecret := e.StringOr("INTERNAL_SERVICE_HMAC_SECRET", "")
@@ -410,10 +403,6 @@ func runWorker(ctx context.Context) error {
 		}
 	}()
 	orders, err := orderservice.New(orderAddr, internalSecret)
-	if err != nil {
-		return err
-	}
-	products, err := productservice.New(productAddr, internalSecret)
 	if err != nil {
 		return err
 	}
@@ -459,8 +448,8 @@ func runWorker(ctx context.Context) error {
 	subscribeSellerRelay(bus, jc)
 	subscribePaymentRelay(bus, jc)
 	delegationDeps := delegation.Deps{DB: d, Identity: id, Seller: sellerModule, NewID: uuid.NewV7, Now: time.Now, Logger: log}
-	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{client: products}, delegation.NewScheduleAuthorizer(delegationDeps), log)
-	reviewModule := newReview(d, bus, jc, buyerModule, sellerModule, med, orders, log)
+	socialModule := newSocial(d, bus, jc, buyerModule, sellerModule, med, socialProducts{catalog: catalogModule}, delegation.NewScheduleAuthorizer(delegationDeps), log)
+	reviewModule := newReview(d, bus, jc, buyerModule, sellerModule, catalogModule, med, orders, log)
 	imModule := newIM(d, bus, jc, buyerModule, sellerModule, med, orders, log)
 	crmModule := newCRM(d, bus, jc, buyerModule, sellerModule, log)
 	delegationDeps.Social = socialModule

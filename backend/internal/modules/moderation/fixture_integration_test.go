@@ -82,7 +82,7 @@ func (noOrders) HasOpenStoreOrders(context.Context, int64) (bool, error) { retur
 
 type noProductVerifier struct{}
 
-func (noProductVerifier) VerifyProduct(context.Context, int64, int64) error {
+func (noProductVerifier) VerifyProduct(context.Context, uuid.UUID, int64) error {
 	return social.ErrProductNotAvailable
 }
 
@@ -202,9 +202,8 @@ func setup(t *testing.T) *fixture {
 	f.deletion = accountdeletion.New(accountdeletion.Deps{DB: d, Identity: f.identity, Buyer: f.buyer, Seller: f.seller, Orders: noOrders{}, Now: f.clock})
 	f.suspend = accountsuspension.New(accountsuspension.Deps{DB: d, Events: bus, Identity: f.identity, Seller: f.seller, Logger: log})
 	f.orders = &reviewOrders{byNo: map[string]review.OrderForReview{}}
-	f.review = review.New(review.Deps{DB: d, Events: bus, Media: owner, Jobs: q, Buyers: f.buyer, Stores: f.sellerRd, Orders: f.orders, NewID: uuid.NewV7, Now: f.clock, Logger: log})
+	f.review = review.New(review.Deps{DB: d, Events: bus, Media: owner, Jobs: q, Buyers: f.buyer, Stores: f.sellerRd, Orders: f.orders, Catalog: ratingSink{aggs: &f.aggs}, NewID: uuid.NewV7, Now: f.clock, Logger: log})
 	f.im = im.New(im.Deps{DB: d, Events: bus, Jobs: q, Media: owner, Buyers: f.buyer, Stores: chatStores{f.seller}, Orders: chatOrders{}, NewID: uuid.NewV7, Now: f.clock, Logger: log})
-	events.Subscribe(bus, func(context.Context, review.ReviewAggregateChanged) error { f.aggs.Add(1); return nil })
 	f.module = New(Deps{DB: d, Events: bus, Social: f.social, Review: f.review, IM: f.im, Seller: f.seller, Buyer: f.buyer, Suspension: f.suspend, Media: fm, NewID: uuid.NewV7, Now: f.clock, Logger: log})
 	events.Subscribe(bus, f.buyer.OnAccountCreated)
 	events.Subscribe(bus, f.social.OnBuyerDeletionRequested)
@@ -395,6 +394,13 @@ func (f *fixture) assetState(t *testing.T, id uuid.UUID) string {
 		t.Fatal(err)
 	}
 	return string(st)
+}
+
+type ratingSink struct{ aggs *atomic.Int64 }
+
+func (s ratingSink) SetRating(context.Context, uuid.UUID, float64, int32) error {
+	s.aggs.Add(1)
+	return nil
 }
 
 // stagedAssets 是推導後處於 STAGED（還沒確認）的資產數。

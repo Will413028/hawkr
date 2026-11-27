@@ -127,7 +127,7 @@ func ownPost(storeID int64, status social.PostStatus) social.Post {
 	at := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
 	p := post(storeID)
 	p.Status, p.Version, p.CreatedAt, p.UpdatedAt, p.PublishedAt = status, 4, at, at.Add(time.Hour), nil
-	pid := int64(88)
+	pid := uuid.UUID{15: 88}
 	p.ProductID = &pid
 	p.Hashtags = []social.Hashtag{{Name: "tea", Display: "Tea"}}
 	return p
@@ -144,17 +144,17 @@ func TestOwnerSuccessPaths(t *testing.T) {
 	e := newAppEnvWith(t, &fakeWrites{}, f, &fakeStores{own: own})
 	ctx := t.Context()
 	rid := uuidV4()
-	pid := "88"
+	pid := (uuid.UUID{15: 88}).String()
 
 	cp, err := e.client.CreatePost(ctx, signedIn(&pb.CreatePostRequest{Body: "新品", ImageStagedToken: "tok", ProductId: &pid, HashtagInputs: []string{"#Tea", "烘焙"}, Publish: true, RequestId: rid}))
 	if err != nil {
 		t.Fatal("CreatePost", err)
 	}
-	if in := f.create; in.Body != "新品" || in.ImageToken != "tok" || in.ProductID == nil || *in.ProductID != 88 || len(in.Hashtags) != 2 || !in.Publish || in.RequestID == nil || in.RequestID.String() != rid {
+	if in := f.create; in.Body != "新品" || in.ImageToken != "tok" || in.ProductID == nil || *in.ProductID != (uuid.UUID{15: 88}) || len(in.Hashtags) != 2 || !in.Publish || in.RequestID == nil || in.RequestID.String() != rid {
 		t.Errorf("CreatePost 的輸入 = %+v", in)
 	}
 	got := cp.Msg.GetPost()
-	if got.GetStatus() != pb.PostStatus_POST_STATUS_DRAFT || got.GetEtag() != "4" || got.GetCreateTime() == nil || got.GetProductId() != "88" || got.GetUrl() == "" || !got.GetViewerCanComment() {
+	if got.GetStatus() != pb.PostStatus_POST_STATUS_DRAFT || got.GetEtag() != "4" || got.GetCreateTime() == nil || got.GetProductId() != pid || got.GetUrl() == "" || !got.GetViewerCanComment() {
 		t.Errorf("CreatePost 回應 = %v", got)
 	}
 	if a := got.GetViewerActor(); a.GetKind() != pb.ActorKind_ACTOR_KIND_STORE || a.GetId() != "5" {
@@ -256,12 +256,12 @@ func TestOwnerUpdatePostMergesOnlyTheMaskedFields(t *testing.T) {
 		post  *pb.Post
 		paths []string
 	}{
-		"沒有可修改的欄位":        {&pb.Post{Id: id, Etag: "4"}, []string{"etag"}},
-		"image 是唯讀":       {&pb.Post{Id: id, Etag: "4"}, []string{"image"}},
-		"etag 缺":          {&pb.Post{Id: id}, []string{"body"}},
-		"不認得的路徑":          {&pb.Post{Id: id, Etag: "4"}, []string{"nope"}},
-		"id 不是 UUID":      {&pb.Post{Id: "x", Etag: "4"}, []string{"body"}},
-		"product_id 不是數字": {&pb.Post{Id: id, Etag: "4", ProductId: proto.String("x")}, []string{"product_id"}},
+		"沒有可修改的欄位":           {&pb.Post{Id: id, Etag: "4"}, []string{"etag"}},
+		"image 是唯讀":          {&pb.Post{Id: id, Etag: "4"}, []string{"image"}},
+		"etag 缺":             {&pb.Post{Id: id}, []string{"body"}},
+		"不認得的路徑":             {&pb.Post{Id: id, Etag: "4"}, []string{"nope"}},
+		"id 不是 UUID":         {&pb.Post{Id: "x", Etag: "4"}, []string{"body"}},
+		"product_id 不是 UUID": {&pb.Post{Id: id, Etag: "4", ProductId: proto.String("x")}, []string{"product_id"}},
 	} {
 		n := len(f.calls)
 		if err := up(p.post, p.paths...); connect.CodeOf(err) != connect.CodeInvalidArgument {

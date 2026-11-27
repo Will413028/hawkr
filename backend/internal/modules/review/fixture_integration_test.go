@@ -102,6 +102,24 @@ func (o *orders) OrderForReview(_ context.Context, orderNo string) (review.Order
 	return v, nil
 }
 
+type ratingCall struct {
+	productID uuid.UUID
+	average   float64
+	count     int32
+}
+
+type ratingSink struct {
+	mu    sync.Mutex
+	calls []ratingCall
+}
+
+func (s *ratingSink) SetRating(_ context.Context, productID uuid.UUID, average float64, count int32) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.calls = append(s.calls, ratingCall{productID: productID, average: average, count: count})
+	return nil
+}
+
 type fixture struct {
 	db      *db.DB
 	module  *review.Module
@@ -111,12 +129,12 @@ type fixture struct {
 	jobs    *queue
 	media   *media.Module
 	orders  *orders
+	ratings *ratingSink
 
 	mu      sync.Mutex
 	now     time.Time
 	ids     atomic.Int64
 	created []review.ReviewCreated
-	changed []review.ReviewAggregateChanged
 }
 
 func (f *fixture) clock() time.Time {
@@ -151,20 +169,15 @@ func setup(t *testing.T) *fixture {
 	f.media = media.New(media.Deps{DB: database, Jobs: f.jobs, Store: media.NewMemoryStore(), Keyring: ring, NewID: uuid.NewV7, Now: f.clock, Logger: logger})
 	f.buyers = buyer.New(buyer.Deps{DB: database, Events: f.bus, Media: f.media, Now: f.clock, Logger: logger})
 	f.sellers = seller.NewReader(database, f.clock)
+	f.ratings = &ratingSink{}
 	f.module = review.New(review.Deps{
-		DB: database, Events: f.bus, Media: f.media, Jobs: f.jobs, Buyers: f.buyers, Stores: f.sellers, Orders: f.orders,
+		DB: database, Events: f.bus, Media: f.media, Jobs: f.jobs, Buyers: f.buyers, Stores: f.sellers, Orders: f.orders, Catalog: f.ratings,
 		NewID: uuid.NewV7, Now: f.clock, Logger: logger,
 	})
 	events.Subscribe(f.bus, func(_ context.Context, e review.ReviewCreated) error {
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		f.created = append(f.created, e)
-		return nil
-	})
-	events.Subscribe(f.bus, func(_ context.Context, e review.ReviewAggregateChanged) error {
-		f.mu.Lock()
-		defer f.mu.Unlock()
-		f.changed = append(f.changed, e)
 		return nil
 	})
 	f.exec(t, `DO $$ DECLARE r record; BEGIN

@@ -197,6 +197,33 @@
    "new": "parsed = append(parsed, parsedID{raw: id.String(), id: id})",
    "test": "internal/legacy/buyerserver ^TestParseUUIDsKeepsTheCallersRawString$",
    "why": "批次查詢的回應以解析後的小寫 UUID 為 key：大寫輸入對不上，原字串保留的測試要紅。"
+  },
+  {
+   "id": "review-submit-drops-set-rating",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/write/write.go",
+   "old": "\t\tif err := rows.SyncProductRating(ctx, q, s.d.Catalog, item.ProductID); err != nil {\n\t\t\treturn err\n\t\t}\n",
+   "new": "\t\t_ = rows.SyncProductRating\n",
+   "test": "cmd/hawkr ^TestReviewSyncsRatingToCatalogAndRollsBackOnMissingProduct$",
+   "why": "提交評價後不呼叫 SetRating 同步評分：catalog 商品的評分與則數停在 0，測試要紅。"
+  },
+  {
+   "id": "review-hide-drops-set-rating",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/write/write.go",
+   "old": "\treturn rows.SyncProductRating(ctx, q, s.d.Catalog, productID)\n",
+   "new": "\t_ = q\n\treturn nil\n",
+   "test": "cmd/hawkr ^TestReviewSyncsRatingToCatalogAndRollsBackOnMissingProduct$",
+   "why": "隱藏與還原評價時不呼叫 SetRating 同步評分：catalog 商品的評分在隱藏後沒有更新，測試要紅。"
+  },
+  {
+   "id": "social-verify-product-skips-ownership",
+   "stack": "go-integration",
+   "file": "backend/cmd/hawkr/social.go",
+   "old": "\tcase card.StoreID != storeID:\n\t\treturn social.ErrProductNotOwned\n",
+   "new": "\tcase false && card.StoreID != storeID:\n\t\treturn social.ErrProductNotOwned\n",
+   "test": "cmd/hawkr ^TestSocialProductsVerifiesCatalogProductAndStoreOwnership$",
+   "why": "social 的商品驗證略過店家歸屬比對：他店上架商品被當成自家商品收下，他店商品被拒的測試要紅。"
   }
  ]
 }

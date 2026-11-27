@@ -80,11 +80,11 @@ func requireNames(t *testing.T, got []string, file, fn string, want []string) {
 	}
 }
 
-// 並行期單一生效者（遷移計畫 A6 不變量）：舊 review 的 REST 路由刪除後，單體是 review.created、review.hidden 唯一的 producer，
+// 並行期單一生效者（遷移計畫 A6 不變量）：舊 review 的 REST 路由刪除後，單體是 review.created 唯一的 producer，
 // relay 的訂閱在 serve 與 worker 共用的 newReview 內接上。
 func TestReviewRelayIsSubscribedByNewReview(t *testing.T) {
 	requireCalls(t, "review.go", "newReview", "subscribeReviewRelay")
-	requireRefs(t, "review.go", "subscribeReviewRelay", "reviewrelay.OnReviewCreated", "reviewrelay.OnReviewAggregateChanged")
+	requireRefs(t, "review.go", "subscribeReviewRelay", "reviewrelay.OnReviewCreated")
 }
 
 func TestCRMModuleSubscribesTheLifecycleEvents(t *testing.T) {

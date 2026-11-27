@@ -22,7 +22,7 @@ type postsTable struct {
 	Body         postgres.ColumnString
 	ImageKey     postgres.ColumnString
 	ImageAssetID postgres.ColumnString
-	ProductID    postgres.ColumnInteger
+	ProductID    postgres.ColumnString
 	Status       postgres.ColumnString     // 貼文狀態：DRAFT、PUBLISHED、UNPUBLISHED（儲存的代碼是 UPPER_SNAKE，舊的 publish_status 4401、4402、4403 依序對應）
 	PublishedAt  postgres.ColumnTimestampz // 第一次發布的時間，之後不變（下架不清、再發布沿用）；DRAFT 沒有，發布過的一定有
 	Version      postgres.ColumnInteger    // 樂觀鎖的版本，對外是 etag；每次修改加一
@@ -77,7 +77,7 @@ func newPostsTableImpl(schemaName, tableName, alias string) postsTable {
 		BodyColumn         = postgres.StringColumn("body")
 		ImageKeyColumn     = postgres.StringColumn("image_key")
 		ImageAssetIDColumn = postgres.StringColumn("image_asset_id")
-		ProductIDColumn    = postgres.IntegerColumn("product_id")
+		ProductIDColumn    = postgres.StringColumn("product_id")
 		StatusColumn       = postgres.StringColumn("status")
 		PublishedAtColumn  = postgres.TimestampzColumn("published_at")
 		VersionColumn      = postgres.IntegerColumn("version")

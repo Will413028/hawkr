@@ -4,7 +4,6 @@
 package purge
 
 import (
-	"cmp"
 	"context"
 	"fmt"
 	"log/slog"
@@ -20,7 +19,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
-	"github.com/Will413028/hawkr/backend/internal/platform/events"
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 	"github.com/Will413028/hawkr/backend/internal/platform/revalidate"
 )
@@ -41,14 +39,14 @@ type Stores interface {
 
 // Deps 是清除的依賴。
 type Deps struct {
-	DB     *db.DB
-	Events *events.Bus
-	Jobs   jobs.Enqueuer
-	Media  model.Media
-	Stores Stores
-	NewID  func() uuid.UUID
-	Now    func() time.Time
-	Logger *slog.Logger
+	DB      *db.DB
+	Jobs    jobs.Enqueuer
+	Media   model.Media
+	Stores  Stores
+	Catalog model.Catalog
+	NewID   func() uuid.UUID
+	Now     func() time.Time
+	Logger  *slog.Logger
 }
 
 // Service 執行刪帳的清除。
@@ -121,8 +119,7 @@ func (s *Service) Sweep(ctx context.Context) (int, error) {
 }
 
 // Purge 刪除買家的評價：依 id 升序分批，每批一個 transaction，內含刪列（附圖 CASCADE）、釋放的圖記成退場並排媒體同步、排快取失效。
-// 作者此時已不可見也不計分，刪除不改任何統計，但 Java 的聚合要在刪帳當下重算（A6-D12）：每批在同 transaction 對該批每個不同的 (店, 商品)
-// 發一個 ReviewAggregateChanged；重跑只處理剩下的，做完之後不再發。
+// 作者此時已不可見也不計分，刪除前已不計入公開統計，但 catalog 的評分同步仍在此依商品 ID 升序寫入最新絕對值（可重跑）。
 func (s *Service) Purge(ctx context.Context, buyerID int64) error {
 	for {
 		n, err := s.purgeBatch(ctx, buyerID)
@@ -160,7 +157,6 @@ func (s *Service) purgeBatch(ctx context.Context, buyerID int64) (int, error) {
 		if _, err := q.DeleteReviewsByID(ctx, ids); err != nil {
 			return fmt.Errorf("review：刪除評價：%w", err)
 		}
-		now := s.d.Now().UTC()
 		var assets []uuid.UUID
 		for _, id := range ids {
 			for _, im := range images[id] {
@@ -170,8 +166,8 @@ func (s *Service) purgeBatch(ctx context.Context, buyerID int64) (int, error) {
 		if err := s.d.Media.MarkDeleted(ctx, assets); err != nil {
 			return err
 		}
-		for _, t := range distinctTargets(stores, products) {
-			if err := events.Publish(ctx, s.d.Events, model.ReviewAggregateChanged{EventID: s.d.NewID(), OccurredAt: now, StoreID: t.StoreID, ProductID: t.ProductID}); err != nil {
+		for _, pid := range distinctProductIDs(products) {
+			if err := rows.SyncProductRating(ctx, q, s.d.Catalog, pid); err != nil {
 				return err
 			}
 		}
@@ -184,18 +180,10 @@ func (s *Service) purgeBatch(ctx context.Context, buyerID int64) (int, error) {
 	return n, err
 }
 
-// distinctTargets 把一批評價的店與商品配成不重複、由小到大的 (店, 商品)。
-func distinctTargets(storeIDs []int64, productIDs []uuid.UUID) []model.Target {
-	out := make([]model.Target, len(storeIDs))
-	for i := range storeIDs {
-		out[i] = model.Target{StoreID: storeIDs[i], ProductID: productIDs[i]}
-	}
-	slices.SortFunc(out, func(a, b model.Target) int {
-		if a.StoreID != b.StoreID {
-			return cmp.Compare(a.StoreID, b.StoreID)
-		}
-		return a.ProductID.Compare(b.ProductID)
-	})
+// distinctProductIDs 把一批評價的商品去重並依 UUID 升序排列（鎖順序：同層多列依 ID 升序）。
+func distinctProductIDs(productIDs []uuid.UUID) []uuid.UUID {
+	out := slices.Clone(productIDs)
+	slices.SortFunc(out, uuid.UUID.Compare)
 	return slices.Compact(out)
 }
 

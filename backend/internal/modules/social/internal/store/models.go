@@ -157,7 +157,7 @@ type SocialPost struct {
 	Body         string
 	ImageKey     *string
 	ImageAssetID *uuid.UUID
-	ProductID    *int64
+	ProductID    *uuid.UUID
 	// 貼文狀態：DRAFT、PUBLISHED、UNPUBLISHED（儲存的代碼是 UPPER_SNAKE，舊的 publish_status 4401、4402、4403 依序對應）
 	Status string
 	// 第一次發布的時間，之後不變（下架不清、再發布沿用）；DRAFT 沒有，發布過的一定有

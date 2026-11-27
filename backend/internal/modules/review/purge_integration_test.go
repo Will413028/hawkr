@@ -8,6 +8,7 @@ import (
 	"slices"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
@@ -254,8 +255,8 @@ func TestSweepPurgeReachesBuyersBeyondOneBatch(t *testing.T) {
 	}
 }
 
-// A6-D12：每批刪除在同 transaction 對該批每個不同的 (店, 商品) 發一個 ReviewAggregateChanged；做完之後重跑不再發。
-func TestPurgePublishesOneAggregateChangePerPairPerBatch(t *testing.T) {
+// 刪除時每批依商品 ID 升序同步 catalog 評分；做完之後重跑不再呼叫。
+func TestPurgeSyncsProductRatingPerProductPerBatch(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
@@ -265,37 +266,40 @@ func TestPurgePublishesOneAggregateChangePerPairPerBatch(t *testing.T) {
 		SELECT gen_random_uuid(), 'N' || n, 100000 + n, $1, CASE WHEN n % 2 = 0 THEN $2::bigint ELSE $3::bigint END, lpad(to_hex(700 + n % 2), 32, '0')::uuid, 5, 'sku', 1, $4
 		FROM generate_series(1, 250) AS n`, b.BuyerID, s1, s2, f.clock())
 	f.requestDeletion(t, b)
-	f.mu.Lock()
-	f.changed = nil
-	f.mu.Unlock()
+	f.ratings.mu.Lock()
+	f.ratings.calls = nil
+	f.ratings.mu.Unlock()
 
 	if err := f.module.PurgeAuthor(ctx, b.BuyerID); err != nil {
 		t.Fatal(err)
 	}
-	f.mu.Lock()
-	got := slices.Clone(f.changed)
-	f.mu.Unlock()
-	count := map[review.Target]int{}
-	for _, e := range got {
-		count[review.Target{StoreID: e.StoreID, ProductID: e.ProductID}]++
+	f.ratings.mu.Lock()
+	got := slices.Clone(f.ratings.calls)
+	f.ratings.mu.Unlock()
+	count := map[uuid.UUID]int{}
+	for _, c := range got {
+		count[c.productID]++
+		if c.average != 0 || c.count != 0 {
+			t.Fatalf("刪帳後沒有公開評價，應傳 (0, 0)：%+v", c)
+		}
 	}
-	want := map[review.Target]int{{StoreID: s1, ProductID: pid(700)}: 2, {StoreID: s2, ProductID: pid(701)}: 2}
+	want := map[uuid.UUID]int{pid(700): 2, pid(701): 2}
 	if len(got) != 4 || len(count) != len(want) {
-		t.Fatalf("2 批 x 2 組 = 4 個事件：%+v", got)
+		t.Fatalf("2 批 x 2 商品 = 4 次 SetRating：%+v", got)
 	}
 	for k, n := range want {
 		if count[k] != n {
-			t.Fatalf("%v 應發 %d 次：%v", k, n, count)
+			t.Fatalf("%s 應呼叫 %d 次：%v", k, n, count)
 		}
 	}
 
 	if err := f.module.PurgeAuthor(ctx, b.BuyerID); err != nil {
 		t.Fatal(err)
 	}
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if len(f.changed) != len(got) {
-		t.Fatalf("重跑不再發：%d -> %d", len(got), len(f.changed))
+	f.ratings.mu.Lock()
+	defer f.ratings.mu.Unlock()
+	if len(f.ratings.calls) != len(got) {
+		t.Fatalf("重跑不再呼叫：%d -> %d", len(got), len(f.ratings.calls))
 	}
 }
 

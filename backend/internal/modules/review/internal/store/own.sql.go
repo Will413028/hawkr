@@ -268,6 +268,16 @@ func (q *Queries) ListReviewImages(ctx context.Context, reviewIds []uuid.UUID) (
 	return items, nil
 }
 
+const lockProductRatingSync = `-- name: LockProductRatingSync :exec
+SELECT pg_advisory_xact_lock(hashtextextended($1::uuid::text, 0))
+`
+
+// 以交易層級的 advisory lock 序列化同一商品的評分重算與 SetRating，避免 READ COMMITTED 下並發寫入彼此覆蓋。
+func (q *Queries) LockProductRatingSync(ctx context.Context, productID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, lockProductRatingSync, productID)
+	return err
+}
+
 const lockReview = `-- name: LockReview :one
 SELECT id, order_no, order_item_id, buyer_id, store_id, product_id, rating, content, sku_name, item_image_key, price, created_at, reply_content, replied_at FROM review.reviews WHERE id = $1 FOR NO KEY UPDATE
 `

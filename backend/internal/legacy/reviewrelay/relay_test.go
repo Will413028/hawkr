@@ -131,8 +131,6 @@ func work(w *Worker, args river.JobArgs) error {
 	switch a := args.(type) {
 	case ReviewCreatedArgs:
 		return w.reviewCreated(ctx, a)
-	case ReviewAggregateChangedArgs:
-		return w.reviewAggregateChanged(ctx, a)
 	}
 	panic("unknown job args")
 }
@@ -198,45 +196,15 @@ func TestReviewCreatedSkipsAReviewThatIsNoLongerPublic(t *testing.T) {
 	}
 }
 
-// 統計在 job 執行當下重算：事件發生到 job 執行之間改變的值，送出的是執行當下的。
-func TestStatsAreRecomputedWhenTheJobRuns(t *testing.T) {
-	w, r := newFixture()
-	relayed := &recordingJobs{}
-	if err := OnReviewAggregateChanged(relayed)(context.Background(), review.ReviewAggregateChanged{EventID: eventID, OccurredAt: occurredAt, StoreID: 91, ProductID: product700}); err != nil {
-		t.Fatal(err)
-	}
-	r.product[product700] = review.ProductStats{Count: 29, Average: 4.88}
-	r.store[91] = review.StoreStats{Count: 119, Average: 4.79}
-	out := &recordingJobs{}
-	w.Jobs = out
-	if err := work(w, relayed.args[0]); err != nil {
-		t.Fatal(err)
-	}
-	m := body(t, out.published()[0])
-	if out.published()[0].RoutingKey != "review.hidden" || m["product_avg_rating"] != 4.88 || m["product_review_count"] != float64(29) || m["avg_rating"] != 4.79 || m["total_count"] != float64(119) {
-		t.Fatalf("payload = %v", m)
-	}
-	if m["review_id"] != float64(0) || m["store_id"] != float64(91) || m["product_id"] != product700.String() || m["event_type"] != "REVIEW_HIDDEN" {
-		t.Fatalf("payload = %v", m)
-	}
-}
-
 // 沒有任何可見評價時，聚合是 0 而且仍然是 JSON 數字（Java 的 ReviewStatsConsumer 缺欄位或非數字會進 DLQ，不能省略）。
 func TestZeroAggregatesAreStillNumbers(t *testing.T) {
 	w, r := newFixture()
 	r.product = map[uuid.UUID]review.ProductStats{}
 	r.store = map[int64]review.StoreStats{}
-	m := body(t, run(t, w, OnReviewAggregateChanged, review.ReviewAggregateChanged{EventID: eventID, OccurredAt: occurredAt, StoreID: 91, ProductID: product700})[0])
+	m := body(t, run(t, w, OnReviewCreated, created())[0])
 	for _, k := range []string{"product_avg_rating", "product_review_count", "avg_rating", "total_count"} {
 		if v, ok := m[k].(float64); !ok || v != 0 {
 			t.Errorf("%s = %#v，預期數字 0", k, m[k])
 		}
-	}
-}
-
-// ReviewAggregateChanged 的 job 以整組參數做 unique：父 job 重試重排同一組時只留一個。
-func TestAggregateChangedJobIsUniqueByArgs(t *testing.T) {
-	if o := (ReviewAggregateChangedArgs{}).InsertOpts(); !o.UniqueOpts.ByArgs {
-		t.Fatal("ReviewAggregateChangedArgs 要以參數做 unique")
 	}
 }
