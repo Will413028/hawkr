@@ -20,7 +20,10 @@ function rewriteTarget(path: string): string {
 		headers: { host: "localhost:3000" },
 	});
 	const rewrite = intl(request).headers.get("x-middleware-rewrite");
-	return decodeURI(new URL(rewrite ?? request.url).pathname);
+	const pathname = new URL(rewrite ?? request.url).pathname;
+	const routed = routingPathname(pathname);
+	assert.ok(routed, `next-intl produced invalid pathname ${pathname}`);
+	return routed;
 }
 
 /** What next-intl should route the request to, from `routingPathname`: the default locale is rewritten to /zh-TW. */
