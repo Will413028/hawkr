@@ -89,7 +89,7 @@ type (
 	SkuState = model.SkuState
 	// SalesItem 是一筆訂單裡一個商品的銷量。
 	SalesItem = model.SalesItem
-	// Rating 是商品目前的評分平均與評價則數（LockProduct 回傳）。
+	// Rating 是商品目前的評分平均與評價則數，加上所屬店家 ID（LockProduct 回傳）。
 	Rating = model.Rating
 	// RestockedSKU 是 SKU 由不可買變可買時，通知用的最新快照。
 	RestockedSKU = model.RestockedSKU
@@ -140,8 +140,6 @@ var (
 // 商品讀寫的錯誤；用 errors.Is 判斷。
 var (
 	ErrProductNotFound = model.ErrProductNotFound
-	// ErrTxRequired 見 model.ErrTxRequired。
-	ErrTxRequired = model.ErrTxRequired
 	// ErrActiveRequiresGalleryImage 見 model.ErrActiveRequiresGalleryImage。
 	ErrActiveRequiresGalleryImage = model.ErrActiveRequiresGalleryImage
 	ErrInvalidInput               = model.ErrInvalidInput
@@ -214,7 +212,7 @@ func (m *Module) PeriodicJobs() []*river.PeriodicJob { return restock.PeriodicJo
 
 // LockProduct 在呼叫方的 transaction 內鎖住商品列（FOR NO KEY UPDATE，不看 deleted_at）並回目前的評分與則數，讓之後的 SetRating 與其他寫入者序列化；
 // review 的評分 worker 先呼叫它、再讀自己的統計（鎖順序 catalog → review，D3），並以回傳值略過沒有變的寫入。
-// ctx 沒有 transaction 回 ErrTxRequired，商品不存在回 ErrProductNotFound。
+// ctx 沒有 transaction 是呼叫方的程式錯誤，回一般 error（與 identity.LockAccount 同）；商品不存在回 ErrProductNotFound。
 func (m *Module) LockProduct(ctx context.Context, productID uuid.UUID) (Rating, error) {
 	return m.counter.LockProduct(ctx, productID)
 }

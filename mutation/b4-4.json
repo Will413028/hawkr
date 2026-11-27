@@ -238,8 +238,8 @@
    "id": "rating-finish-ignores-seq",
    "stack": "go-integration",
    "file": "backend/internal/modules/review/internal/store/rating_queue.sql.go",
-   "old": "DELETE FROM review.rating_recompute_queue WHERE product_id = $1 AND seq = $2",
-   "new": "DELETE FROM review.rating_recompute_queue WHERE product_id = $1 AND $2::bigint IS NOT NULL",
+   "old": "DELETE FROM review.rating_recompute_queue WHERE product_id = $1 AND seq = $2 AND claim_token = $3::uuid",
+   "new": "DELETE FROM review.rating_recompute_queue WHERE product_id = $1 AND $2::bigint IS NOT NULL AND claim_token = $3::uuid",
    "test": "internal/modules/review ^TestRequestArrivingWhileProcessingIsNotLost$",
    "why": "完成時不比對序號就刪列：處理中到的新請求被一起刪掉（lost update），測試要紅。"
   },
@@ -249,17 +249,8 @@
    "file": "backend/internal/modules/review/internal/rating/rating.go",
    "old": "\tcur, err := s.d.Catalog.LockProduct(ctx, productID)\n\tif err != nil {\n\t\treturn err\n\t}\n",
    "new": "\tvar cur catalog.Rating\n",
-   "test": "internal/modules/review ^TestProductCacheIsBustedAfterSetRating$",
-   "why": "worker 不先鎖 catalog 商品列就讀統計與寫入：呼叫順序少了 lock，測試要紅。"
-  },
-  {
-   "id": "rating-bust-before-set-rating",
-   "stack": "go-integration",
-   "file": "backend/internal/modules/review/internal/rating/rating.go",
-   "old": "\tif err := s.d.Catalog.SetRating(ctx, productID, st.AvgRating, count); err != nil {\n\t\treturn err\n\t}\n\treturn s.d.Jobs.Enqueue(ctx, revalidate.Args{Tags: []string{revalidate.ProductTag(productID)}}, nil)\n",
-   "new": "\tif err := s.d.Jobs.Enqueue(ctx, revalidate.Args{Tags: []string{revalidate.ProductTag(productID)}}, nil); err != nil {\n\t\treturn err\n\t}\n\treturn s.d.Catalog.SetRating(ctx, productID, st.AvgRating, count)\n",
-   "test": "internal/modules/review ^TestProductCacheIsBustedAfterSetRating$",
-   "why": "商品快取失效排在 SetRating 之前：順序變成 lock、revalidate、set，測試要紅。"
+   "test": "cmd/hawkr ^TestRatingProjectionIsSerializedByCatalogLockAgainstStaleLeaseOwner$",
+   "why": "worker 不先鎖 catalog 商品列：租約逾期被接手時兩個 worker 並行，先讀統計的舊值在後寫入時覆蓋較新的評分，併發覆蓋測試（真的 catalog）要紅。"
   },
   {
    "id": "rating-not-found-is-retried",
@@ -283,10 +274,73 @@
    "id": "rating-reconcile-ignores-products",
    "stack": "go-integration",
    "file": "backend/internal/modules/review/internal/store/rating_queue.sql.go",
-   "old": "    WHERE r.product_id > $2::uuid\n",
-   "new": "    WHERE r.product_id > $2::uuid AND false\n",
+   "old": "    WHERE r.product_id > $1::uuid\n",
+   "new": "    WHERE r.product_id > $1::uuid AND false\n",
    "test": "internal/modules/review ^TestReconcileFixesDriftFromDeactivatedBuyer$",
    "why": "全量對帳不登記任何商品：買家停用造成的評分偏差不會被補正，測試要紅。"
+  },
+  {
+   "id": "rating-worker-drops-store-bust",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/rating/rating.go",
+   "old": "\treturn s.bust(ctx, cur.StoreID, productID)\n",
+   "new": "\treturn s.d.Jobs.Enqueue(ctx, revalidate.Args{Tags: []string{revalidate.ProductTag(productID)}}, nil)\n",
+   "test": "internal/modules/review ^TestProductCacheIsBustedAfterSetRating$",
+   "why": "worker 只清商品頁、不清店家頁的快取 tag：店家頁商品卡的評分與則數維持舊值，測試要紅。"
+  },
+  {
+   "id": "rating-claim-ignores-priority",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/store/rating_queue.sql.go",
+   "old": "    ORDER BY priority, due_at, product_id\n",
+   "new": "    ORDER BY due_at, product_id\n",
+   "test": "internal/modules/review ^TestLiveRequestIsClaimedBeforeReconcileBacklogAndRunDrainsAllBatches$",
+   "why": "認領不分優先序：到期更早的對帳登記列排在即時請求之前，即時請求要等整批對帳待辦，測試要紅。"
+  },
+  {
+   "id": "rating-run-claims-single-batch",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/rating/rating.go",
+   "old": "\tfor !s.stopping(ctx) {\n",
+   "new": "\tfor first := true; first && !s.stopping(ctx); first = false {\n",
+   "test": "internal/modules/review ^TestLiveRequestIsClaimedBeforeReconcileBacklogAndRunDrainsAllBatches$",
+   "why": "一輪 Run 只認領一批（BatchSize）：超過一批的待辦要等下一個 30 秒週期，一輪結束後佇列沒清空，測試要紅。"
+  },
+  {
+   "id": "rating-reconcile-resets-stopped-row",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/store/rating_queue.sql.go",
+   "old": "    WHERE q.failed_at IS NULL)\n",
+   "new": ")\n",
+   "test": "internal/modules/review ^TestReconcileDoesNotResetStoppedRowButLiveRequestDoes$",
+   "why": "對帳的 ON CONFLICT 也更新已停手的列（seq 加一、重新到期）：永遠失敗的商品每小時被對帳救活重試，測試要紅。"
+  },
+  {
+   "id": "rating-fail-uses-canceled-context",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/rating/rating.go",
+   "old": "\tctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), failTimeout)\n",
+   "new": "\tctx, cancel := context.WithTimeout(ctx, failTimeout)\n",
+   "test": "internal/modules/review ^TestFailureIsRecordedEvenWhenContextIsCanceled$",
+   "why": "記失敗沿用已取消的 ctx：job 逾時時失敗沒有寫進列、租約也沒放掉，測試要紅。"
+  },
+  {
+   "id": "rating-finish-ignores-claim-token",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/store/rating_queue.sql.go",
+   "old": "WHERE product_id = $1 AND seq = $2 AND claim_token = $3::uuid",
+   "new": "WHERE product_id = $1 AND seq = $2 AND $3::uuid IS NOT NULL",
+   "test": "internal/modules/review ^TestStaleLeaseOwnerCannotFinishOrFailTheRow$/^finish$",
+   "why": "完成不核對 claim_token：租約已被接手的舊 worker 把新擁有者的列刪掉，測試要紅。"
+  },
+  {
+   "id": "rating-fail-ignores-claim-token",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/review/internal/store/rating_queue.sql.go",
+   "old": "WHERE product_id = $4 AND seq = $5 AND claim_token = $6::uuid",
+   "new": "WHERE product_id = $4 AND seq = $5 AND $6::uuid IS NOT NULL",
+   "test": "internal/modules/review ^TestStaleLeaseOwnerCannotFinishOrFailTheRow$/^fail$",
+   "why": "失敗不核對 claim_token：租約已被接手的舊 worker 在新擁有者的列上記失敗並放掉租約，測試要紅。"
   }
  ]
 }

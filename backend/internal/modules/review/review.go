@@ -141,7 +141,7 @@ func New(d Deps) *Module {
 			NewID: d.NewID, Now: d.Now, Logger: d.Logger,
 		}),
 		read:   read.New(read.Deps{DB: d.DB}),
-		rating: rating.New(rating.Deps{DB: d.DB, Jobs: d.Jobs, Catalog: d.Catalog, Now: d.Now, Logger: d.Logger}),
+		rating: rating.New(rating.Deps{DB: d.DB, Jobs: d.Jobs, Catalog: d.Catalog, Stores: d.Stores, NewID: d.NewID, Now: d.Now, Logger: d.Logger}),
 		purge: purge.New(purge.Deps{
 			DB: d.DB, Jobs: d.Jobs, Media: d.Media, Stores: d.Stores, NewID: d.NewID, Now: d.Now, Logger: d.Logger,
 		}),

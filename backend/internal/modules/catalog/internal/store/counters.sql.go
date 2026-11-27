@@ -53,10 +53,11 @@ func (q *Queries) ClaimSalesOrder(ctx context.Context, arg ClaimSalesOrderParams
 }
 
 const lockProduct = `-- name: LockProduct :one
-SELECT rating_average, review_count FROM catalog.products WHERE id = $1 FOR NO KEY UPDATE
+SELECT store_id, rating_average, review_count FROM catalog.products WHERE id = $1 FOR NO KEY UPDATE
 `
 
 type LockProductRow struct {
+	StoreID       int64
 	RatingAverage float64
 	ReviewCount   int32
 }
@@ -65,7 +66,7 @@ type LockProductRow struct {
 func (q *Queries) LockProduct(ctx context.Context, id uuid.UUID) (LockProductRow, error) {
 	row := q.db.QueryRow(ctx, lockProduct, id)
 	var i LockProductRow
-	err := row.Scan(&i.RatingAverage, &i.ReviewCount)
+	err := row.Scan(&i.StoreID, &i.RatingAverage, &i.ReviewCount)
 	return i, err
 }
 

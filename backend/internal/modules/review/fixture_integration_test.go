@@ -146,14 +146,25 @@ type ratingSink struct {
 	missing map[uuid.UUID]bool
 	err     error
 	onSet   func()
+	onLock  func()
+	locked  []uuid.UUID
+	stores  map[uuid.UUID]int64
 	trace   *trace
 }
 
 func (s *ratingSink) LockProduct(ctx context.Context, productID uuid.UUID) (catalog.Rating, error) {
 	if _, ok := db.TxFrom(ctx); !ok {
-		return catalog.Rating{}, catalog.ErrTxRequired
+		return catalog.Rating{}, errors.New("LockProduct 必須在 transaction 內呼叫")
 	}
 	s.trace.add("lock")
+	s.mu.Lock()
+	hook := s.onLock
+	s.onLock = nil
+	s.locked = append(s.locked, productID)
+	s.mu.Unlock()
+	if hook != nil {
+		hook()
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.missing[productID] {
@@ -162,7 +173,21 @@ func (s *ratingSink) LockProduct(ctx context.Context, productID uuid.UUID) (cata
 	if s.err != nil {
 		return catalog.Rating{}, s.err
 	}
-	return s.current[productID], nil
+	r := s.current[productID]
+	r.StoreID = s.stores[productID]
+	return r, nil
+}
+
+func (s *ratingSink) lockOrder() []uuid.UUID {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.locked)
+}
+
+func (s *ratingSink) setStore(productID uuid.UUID, storeID int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.stores[productID] = storeID
 }
 
 func (s *ratingSink) SetRating(_ context.Context, productID uuid.UUID, average float64, count int32) error {
@@ -257,7 +282,7 @@ func setup(t *testing.T) *fixture {
 	f.sellers = seller.NewReader(database, f.clock)
 	f.trace = &trace{}
 	f.jobs.trace = f.trace
-	f.ratings = &ratingSink{current: map[uuid.UUID]catalog.Rating{}, missing: map[uuid.UUID]bool{}, trace: f.trace}
+	f.ratings = &ratingSink{current: map[uuid.UUID]catalog.Rating{}, stores: map[uuid.UUID]int64{}, missing: map[uuid.UUID]bool{}, trace: f.trace}
 	f.module = review.New(review.Deps{
 		DB: database, Events: f.bus, Media: f.media, Jobs: f.jobs, Buyers: f.buyers, Stores: f.sellers, Orders: f.orders, Catalog: f.ratings,
 		NewID: uuid.NewV7, Now: f.clock, Logger: logger,
@@ -380,6 +405,7 @@ func (f *fixture) order(b buyer.Profile, storeID int64, productID int) item {
 func (f *fixture) submit(t *testing.T, b buyer.Profile, storeID int64, productID int, rating int, content string) review.Review {
 	t.Helper()
 	it := f.order(b, storeID, productID)
+	f.ratings.setStore(pid(productID), storeID)
 	r, err := f.module.Submit(context.Background(), review.SubmitInput{BuyerID: b.BuyerID, OrderNo: it.orderNo, OrderItemID: it.itemID, Rating: rating, Content: content})
 	if err != nil {
 		t.Fatal(err)

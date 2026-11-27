@@ -59,8 +59,9 @@ type SkuSnapshot struct {
 	Active  bool
 }
 
-// Rating 是商品目前的評分平均與評價則數（LockProduct 回傳）。
+// Rating 是商品目前的評分平均與評價則數，與商品所屬的店家（LockProduct 回傳；StoreID 供呼叫方排店面頁的快取失效）。
 type Rating struct {
+	StoreID int64
 	Average float64
 	Count   int32
 }

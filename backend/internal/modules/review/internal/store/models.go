@@ -49,6 +49,8 @@ type ReviewRatingRecomputeQueue struct {
 	Attempts     int32
 	LastError    *string
 	FailedAt     *time.Time
+	Priority     int16
+	ClaimToken   *uuid.UUID
 }
 
 type ReviewReview struct {

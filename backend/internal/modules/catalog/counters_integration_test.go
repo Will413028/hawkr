@@ -165,7 +165,7 @@ func TestLockProductReturnsTheCurrentRatingInsideATransaction(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := f.m.LockProduct(f.ct, p.ID); !errors.Is(err, ErrTxRequired) {
+	if _, err := f.m.LockProduct(f.ct, p.ID); err == nil || errors.Is(err, ErrProductNotFound) {
 		t.Fatalf("outside a transaction the row lock would be released at once: %v", err)
 	}
 	err := f.d.InTx(f.ct, func(ctx context.Context) error {
@@ -173,7 +173,7 @@ func TestLockProductReturnsTheCurrentRatingInsideATransaction(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if got.Average != 4.5 || got.Count != 10 {
+		if got.Average != 4.5 || got.Count != 10 || got.StoreID != storeID {
 			t.Errorf("current rating: %+v", got)
 		}
 		if _, err := f.m.LockProduct(ctx, uuid.NewV7()); !errors.Is(err, ErrProductNotFound) {
