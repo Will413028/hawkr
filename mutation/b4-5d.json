@@ -1,0 +1,103 @@
+{
+ "mutants": [
+  {
+   "id": "capability-check-removed",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/delegation/internal/model/delegation_rules.go",
+   "old": "if !slices.Contains(s.Capabilities, c) {",
+   "new": "if false && !slices.Contains(s.Capabilities, c) {",
+   "test": "internal/modules/delegation ^TestMissingProductCapabilityIsRejectedForEveryWriteAndLeavesFailedRows$",
+   "why": "拿掉 session 的能力檢查：缺少 products.write／products.publish 的代行仍能建立、修改、上下架與批次下架商品"
+  },
+  {
+   "id": "publish-needs-only-write-capability",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/delegation/delegated.go",
+   "old": "productPublishWrite        = postWrite{CapabilityProductsPublish, AuditProductPublish}",
+   "new": "productPublishWrite        = postWrite{CapabilityProductsWrite, AuditProductPublish}",
+   "test": "internal/modules/delegation ^TestMissingProductCapabilityIsRejectedForEveryWriteAndLeavesFailedRows$",
+   "why": "上架只要 products.write：只有寫入能力的 session 能上架，products.publish 不再是獨立的能力"
+  },
+  {
+   "id": "batch-capability-weakened",
+   "stack": "go",
+   "file": "backend/internal/modules/delegation/delegated.go",
+   "old": "productBatchUnpublishWrite = postWrite{CapabilityProductsPublish, AuditProductBatchUnpublish}",
+   "new": "productBatchUnpublishWrite = postWrite{CapabilityProductsRead, AuditProductBatchUnpublish}",
+   "test": "internal/httpapi/catalog ^TestEveryDelegatedMethodDeclaresItsCapabilityAndAuditAction$",
+   "why": "批次下架的宣告被改弱成 products.read：唯讀的代行能批次下架"
+  },
+  {
+   "id": "declared-capability-ignored-by-interceptor",
+   "stack": "go",
+   "file": "backend/internal/httpapi/catalog/delegated.go",
+   "old": "catalogv1alpha1connect.CatalogDelegatedServiceUnpublishStoreProductProcedure:       writeMethod(catalog.ProductUnpublished{}),",
+   "new": "catalogv1alpha1connect.CatalogDelegatedServiceUnpublishStoreProductProcedure: productMethod(moddelegation.CapabilityProductsRead, moddelegation.AuditProductUnpublish),",
+   "test": "internal/httpapi/catalog ^TestMissingCapabilityIsPermissionDeniedForEveryMethod$",
+   "why": "下架的宣告被改成只要 products.read：沒有 products.publish 的代行不再被 interceptor 拒絕"
+  },
+  {
+   "id": "create-store-from-admin-id",
+   "stack": "go",
+   "file": "backend/internal/httpapi/catalog/delegated.go",
+   "old": "h.m.CreateProduct(ctx, st.StoreID, uploaderOf(c, st), op.RequestID, in, actor)",
+   "new": "h.m.CreateProduct(ctx, c.Session.Actor.AdminID, uploaderOf(c, st), op.RequestID, in, actor)",
+   "test": "internal/httpapi/catalog ^TestEveryDelegatedMethodUsesTheSessionStoreAndPassesTheActor$",
+   "why": "建立商品的店家不來自代行 session 的目標店家"
+  },
+  {
+   "id": "batch-store-from-admin-id",
+   "stack": "go",
+   "file": "backend/internal/httpapi/catalog/delegated.go",
+   "old": "h.m.UnpublishProducts(ctx, st.StoreID, items, actor)",
+   "new": "h.m.UnpublishProducts(ctx, c.Session.Actor.AdminID, items, actor)",
+   "test": "internal/httpapi/catalog ^TestEveryDelegatedMethodUsesTheSessionStoreAndPassesTheActor$",
+   "why": "批次下架的店家不來自代行 session 的目標店家"
+  },
+  {
+   "id": "read-store-from-admin-id",
+   "stack": "go",
+   "file": "backend/internal/httpapi/catalog/delegated.go",
+   "old": "p, err := h.m.Product(ctx, st.StoreID, id)\n\t\tif err != nil {\n\t\t\treturn failure(err, noPaths)\n\t\t}\n\t\tout.Product, err = sellerProduct",
+   "new": "p, err := h.m.Product(ctx, c.Session.Actor.AdminID, id)\n\t\tif err != nil {\n\t\t\treturn failure(err, noPaths)\n\t\t}\n\t\tout.Product, err = sellerProduct",
+   "test": "internal/httpapi/catalog ^TestEveryDelegatedMethodUsesTheSessionStoreAndPassesTheActor$",
+   "why": "讀取商品的店家不來自代行 session 的目標店家"
+  },
+  {
+   "id": "actor-store-from-admin-id",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/delegation/delegated.go",
+   "old": "SessionID: c.Session.ID, AdminID: c.Session.Actor.AdminID, StoreID: c.Session.Target.StoreID,",
+   "new": "SessionID: c.Session.ID, AdminID: c.Session.Actor.AdminID, StoreID: c.Session.Actor.AdminID,",
+   "test": "internal/modules/delegation ^TestDelegatedProductWritesStayInTheSessionStore$|^TestEveryDelegatedProductWriteLeavesOneSucceededAuditRow$",
+   "why": "代行者的店家不來自 session 的目標店家：稽核訂閱者核對店家時對不上（寫入全部失敗）或放過別家"
+  },
+  {
+   "id": "batch-commits-per-item",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "\treturn s.d.DB.InTx(ctx, func(ctx context.Context) error {\n\t\tq := s.q(ctx)\n\t\tvar conflicts []uuid.UUID",
+   "new": "\tfor _, it := range sorted {\n\t\t_ = s.SetStatus(ctx, storeID, it.ProductID, it.Version, model.StatusArchived, nil)\n\t}\n\treturn s.d.DB.InTx(ctx, func(ctx context.Context) error {\n\t\tq := s.q(ctx)\n\t\tvar conflicts []uuid.UUID",
+   "test": "internal/modules/catalog ^TestUnpublishProductsIsAllOrNothing$",
+   "why": "批次改成逐項提交：版本衝突的批次仍把沒衝突的商品下架，原子性消失"
+  },
+  {
+   "id": "batch-commits-per-item-delegated",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/catalog/internal/product/product.go",
+   "old": "\treturn s.d.DB.InTx(ctx, func(ctx context.Context) error {\n\t\tq := s.q(ctx)\n\t\tvar conflicts []uuid.UUID",
+   "new": "\tfor _, it := range sorted {\n\t\t_ = s.SetStatus(ctx, storeID, it.ProductID, it.Version, model.StatusArchived, nil)\n\t}\n\treturn s.d.DB.InTx(ctx, func(ctx context.Context) error {\n\t\tq := s.q(ctx)\n\t\tvar conflicts []uuid.UUID",
+   "test": "internal/modules/delegation ^TestBatchUnpublishConflictWritesNothingAndTheRetryRecordsOneRow$",
+   "why": "批次改成逐項提交：被拒絕的批次留下已下架的商品（整合到 delegation 的批次稽核測試）"
+  },
+  {
+   "id": "batch-audit-items-not-recorded",
+   "stack": "go-integration",
+   "file": "backend/internal/modules/delegation/delegated.go",
+   "old": "model.OperationOutcome{ResourceName: name, Items: items})",
+   "new": "model.OperationOutcome{ResourceName: name, Items: items[:0]})",
+   "test": "internal/modules/delegation ^TestBatchUnpublishWritesOneAuditRowWithItsItemsAndOneNotification$",
+   "why": "批次稽核不再記錄本批的商品清單（只剩一列父列）：稽核看不出批次動了哪些商品"
+  }
+ ]
+}

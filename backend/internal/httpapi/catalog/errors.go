@@ -104,6 +104,7 @@ func failure(err error, paths rpc.FieldPaths) error {
 	var invalid *catalog.InvalidInputError
 	var shortage *catalog.InsufficientStockError
 	var mismatch *catalog.StockMismatchError
+	var batchConflict *catalog.BatchVersionConflictError
 	switch {
 	case errors.As(err, &invalid):
 		field := invalid.Field
@@ -119,6 +120,13 @@ func failure(err error, paths rpc.FieldPaths) error {
 		return apperr.NotFound("找不到這個商品")
 	case errors.Is(err, catalog.ErrSkuNotFound):
 		return apperr.NotFound("找不到這個規格")
+	case errors.As(err, &batchConflict):
+		ids := batchConflict.SortedIDs()
+		text := make([]string, len(ids))
+		for i, id := range ids {
+			text[i] = id.String()
+		}
+		return apperr.VersionConflict("有 %d 個商品已經被修改，請重新讀取後再送出", len(ids)).WithMetadata("conflictingProductIds", strings.Join(text, ","))
 	case errors.Is(err, catalog.ErrVersionConflict):
 		return apperr.VersionConflict("商品已經被修改，請重新讀取後再送出")
 	case errors.Is(err, catalog.ErrActiveRequiresGalleryImage):

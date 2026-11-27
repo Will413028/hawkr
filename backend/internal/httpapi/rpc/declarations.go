@@ -41,11 +41,12 @@ func CheckDeclarations[D any](scope string, table map[string]D, services []proto
 }
 
 // DeferredServices 是契約與宣告表已有、但 handler 在後續步驟才掛上的 service（值是掛上的步驟）：舊服務處理商品流量到 B4-6，
-// cmd/hawkr 在那之前不給 httpapi.Deps.Catalog，三支 catalog service 不掛（和 declaredNotYetMounted 同一份）。接線的步驟完成後從這裡刪除。
+// cmd/hawkr 在那之前不給 httpapi.Deps.Catalog，四支 catalog service（含代行）不掛（和 declaredNotYetMounted 同一份）。接線的步驟完成後從這裡刪除。
 var DeferredServices = map[string]string{
 	"hawkr.admin.catalog.v1alpha1.CatalogAdminService": "B4-6",
 	"hawkr.catalog.v1alpha1.CatalogPublicService":      "B4-6",
 	"hawkr.catalog.v1alpha1.SellerCatalogAppService":   "B4-6",
+	"hawkr.catalog.v1alpha1.CatalogDelegatedService":   "B4-6",
 }
 
 // WithoutUnmountedDeferred 回傳 table 去掉 DeferredServices 裡還沒掛的 service 的宣告，給 CheckDeclarations 用：

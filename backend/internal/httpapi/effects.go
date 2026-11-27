@@ -266,6 +266,14 @@ var customerEffects = map[string]Effect{
 	"/hawkr.seller.v1alpha1.SellerReportAppService/GetMyReport":         EffectRead,
 	"/hawkr.seller.v1alpha1.SellerReportAppService/AddReportSupplement": EffectWrite,
 
+	// CatalogDelegatedService：憑證是代行 session，不讀帳號，停權的帳號不受影響；宣告仍要誠實標示方法的性質。
+	"/hawkr.catalog.v1alpha1.CatalogDelegatedService/ListStoreProducts":           EffectRead,
+	"/hawkr.catalog.v1alpha1.CatalogDelegatedService/GetStoreProduct":             EffectRead,
+	"/hawkr.catalog.v1alpha1.CatalogDelegatedService/CreateStoreProduct":          EffectWrite,
+	"/hawkr.catalog.v1alpha1.CatalogDelegatedService/UpdateStoreProduct":          EffectWrite,
+	"/hawkr.catalog.v1alpha1.CatalogDelegatedService/PublishStoreProduct":         EffectWrite,
+	"/hawkr.catalog.v1alpha1.CatalogDelegatedService/UnpublishStoreProduct":       EffectWrite,
+	"/hawkr.catalog.v1alpha1.CatalogDelegatedService/BatchUnpublishStoreProducts": EffectWrite,
 	// SocialDelegatedService：憑證是代行 session，不讀帳號，停權的帳號不受影響；宣告仍要誠實標示方法的性質。
 	"/hawkr.social.v1alpha1.SocialDelegatedService/GetStoreSocialSummary": EffectRead,
 	"/hawkr.social.v1alpha1.SocialDelegatedService/ListStorePosts":        EffectRead,

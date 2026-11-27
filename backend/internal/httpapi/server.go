@@ -522,6 +522,15 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 			return nil, err
 		}
 		add(catalogv1alpha1connect.NewSellerCatalogAppServiceHandler(catalogApp, opts...))
+		catalogDelegated, err := httpdelegation.NewInterceptor(deps.Delegation, deps.Logger, httpcatalog.DelegatedDeclaration)
+		if err != nil {
+			return nil, err
+		}
+		delegatedCatalog, err := httpcatalog.NewDelegated(deps.Delegation, deps.Catalog, deps.Images, deps.Logger)
+		if err != nil {
+			return nil, err
+		}
+		add(catalogv1alpha1connect.NewCatalogDelegatedServiceHandler(delegatedCatalog, append(slices.Clone(opts), connect.WithInterceptors(catalogDelegated))...))
 		catalogAdmin, err := httpcatalog.NewAdmin(deps.Catalog, deps.Images)
 		if err != nil {
 			return nil, err

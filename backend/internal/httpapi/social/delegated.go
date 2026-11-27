@@ -61,11 +61,8 @@ func postMethod(c moddelegation.Capability, a moddelegation.AuditAction) moddele
 	return moddelegation.DelegatedMethod{Capability: c, Action: a, Resource: moddelegation.ResourcePost}
 }
 
-// DelegationRunner 是 handler 需要的 delegation 公開 API（*delegation.Module）：授權、重送偵測與稽核（DelegatedWrite；不開 transaction，稽核由 social 的事件在 social 自己的 transaction 內寫，A7-D26），與讀取的授權（DelegatedRead）。
-type DelegationRunner interface {
-	DelegatedRead(ctx context.Context, c moddelegation.DelegatedCaller, read func(ctx context.Context, st seller.Store) error) error
-	DelegatedWrite(ctx context.Context, c moddelegation.DelegatedCaller, w moddelegation.DelegatedWrite, do func(ctx context.Context, st seller.Store, actor *delegatedactor.Actor) error) (moddelegation.DelegatedWriteResult, error)
-}
+// DelegationRunner 是 handler 需要的 delegation 公開 API（*delegation.Module），各 <模組>DelegatedService 共用同一個介面。
+type DelegationRunner = httpdelegation.Runner
 
 // DelegatedPosts 是代行讀寫貼文的來源（*social.Module）：與店主同一組方法（店家由 delegation 以 session 的目標店家讀出後交給模組），加上重送時讀回排程時間。
 type DelegatedPosts interface {
