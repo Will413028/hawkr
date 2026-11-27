@@ -9,8 +9,11 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/review/internal/store"
 )
 
-// SyncProductRating 重算商品的公開評價平均與則數（與 ProductStats 同一份公開判定），在呼叫方的 transaction 內寫回 catalog。
+// SyncProductRating 先以交易層級 advisory lock 序列化同一商品的評分重算，再讀公開評價平均與則數寫回 catalog（避免 READ COMMITTED 下並發覆蓋）。
 func SyncProductRating(ctx context.Context, q *store.Queries, cat model.Catalog, productID uuid.UUID) error {
+	if err := q.LockProductRatingSync(ctx, productID); err != nil {
+		return err
+	}
 	st, err := q.ProductStats(ctx, productID)
 	if err != nil {
 		return err

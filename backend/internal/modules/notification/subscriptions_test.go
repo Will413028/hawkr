@@ -56,7 +56,7 @@ var adjudicatedEvents = map[string][]string{
 var notNotifiedEvents = []string{
 	"identity.AccountDeleted", "buyer.BuyerDeleted", "seller.StoreRetired",
 	"buyer.FavoriteAdded", "buyer.FavoriteRemoved", "buyer.ProductViewed",
-	"review.ReviewAggregateChanged", "seller.StoreExposureChanged", "seller.StoreProfileChanged",
+	"seller.StoreExposureChanged", "seller.StoreProfileChanged",
 	"seller.MeasureRequestSubmitted", "seller.MeasureRequestClosed", "seller.KYCSubmitted", "seller.KYCCancelled",
 }
 

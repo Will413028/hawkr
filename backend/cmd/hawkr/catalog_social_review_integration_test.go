@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"sync"
 	"testing"
 	"time"
 	"uuid"
@@ -329,5 +330,64 @@ func TestReviewSyncsRatingToCatalogAndRollsBackOnMissingProduct(t *testing.T) {
 	}
 	if got.RatingAverage != 4.0 || got.ReviewCount != 1 {
 		t.Fatalf("PurgeAuthor 後評分應為 (4.0, 1)：avg=%v count=%d", got.RatingAverage, got.ReviewCount)
+	}
+}
+
+func TestReviewSyncsRatingConcurrentlyWithoutLostUpdates(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := newCatalogSocialReviewFixture(t)
+
+	store1 := f.seedStore(ctx, 5001)
+	prod := f.createProduct(ctx, store1, 5001, catalog.StatusActive)
+	b1 := f.newBuyer(ctx, "g-conc-1")
+	b2 := f.newBuyer(ctx, "g-conc-2")
+
+	f.orders.byNo["CONC-1"] = review.OrderForReview{
+		OrderNo: "CONC-1", BuyerID: b1, StoreID: store1, Status: review.OrderStatusCompleted, CompletedAt: f.now,
+		Items: []review.OrderItem{{OrderItemID: 11, ProductID: prod.ID, SkuName: "預設", Price: 120}},
+	}
+	f.orders.byNo["CONC-2"] = review.OrderForReview{
+		OrderNo: "CONC-2", BuyerID: b2, StoreID: store1, Status: review.OrderStatusCompleted, CompletedAt: f.now,
+		Items: []review.OrderItem{{OrderItemID: 12, ProductID: prod.ID, SkuName: "預設", Price: 120}},
+	}
+
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	errs := make(chan error, 2)
+	for _, tc := range []struct {
+		buyerID int64
+		orderNo string
+		itemID  int64
+		rating  int
+	}{
+		{b1, "CONC-1", 11, 5},
+		{b2, "CONC-2", 12, 3},
+	} {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			_, err := f.review.Submit(ctx, review.SubmitInput{
+				BuyerID: tc.buyerID, OrderNo: tc.orderNo, OrderItemID: tc.itemID, Rating: tc.rating, Content: "併發評價",
+			})
+			errs <- err
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	got, err := f.catalog.Product(ctx, store1, prod.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.RatingAverage != 4.0 || got.ReviewCount != 2 {
+		t.Fatalf("並發 Submit 後評分應為 (4.0, 2)：avg=%v count=%d", got.RatingAverage, got.ReviewCount)
 	}
 }

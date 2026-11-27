@@ -94,9 +94,8 @@ type presenter struct {
 	productTimeout time.Duration
 }
 
-// productBudget 是商品批次查詢（舊 product-service 的 gRPC）在讀取路徑上的時間上限，逾時就降級成 product 不設。
-// 它是貼文列表這條公開熱路徑上的選配欄位，不能拖住整個回應：比店面統計的 statsBudget（300 ms）寬一點，
-// 因為這是一次跨服務的批次查詢，又遠小於 RPC 的預設 15 秒。
+// productBudget 是商品批次查詢在讀取路徑上的時間上限，逾時就降級成 product 不設。
+// 它是貼文列表這條公開熱路徑上的選配欄位，不能拖住整個回應。
 const productBudget = 500 * time.Millisecond
 
 // Views 是瀏覽打點的寫入端（*social.Module）。
