@@ -40,7 +40,7 @@ func (noReviewOrders) OrderForReview(context.Context, string) (review.OrderForRe
 
 type noProductChecks struct{}
 
-func (noProductChecks) VerifyProduct(context.Context, int64, int64) error {
+func (noProductChecks) VerifyProduct(context.Context, uuid.UUID, int64) error {
 	return social.ErrProductNotAvailable
 }
 
@@ -104,6 +104,10 @@ func TestDeletionLocksBuyerAndSellerBeforeSocialRows(t *testing.T) {
 	}
 }
 
+type noopReviewCatalog struct{}
+
+func (noopReviewCatalog) SetRating(context.Context, uuid.UUID, float64, int32) error { return nil }
+
 // review 的訂閱者在買家事件的 transaction 內只排清除 job（不寫複本），所以同樣要排在 buyer、seller 之後：帳號刪除停在店家列上時
 // review 的表還沒被碰（pg_locks 沒有 review 的 RowExclusiveLock），放開後 job 才排入。買家的評價列只在 purge job 的 transaction
 // 內鎖，不在刪帳的 transaction 內（訂閱者不碰評價列）。兩條路徑都量。
@@ -115,7 +119,7 @@ func TestDeletionLocksBuyerAndSellerBeforeReviewRows(t *testing.T) {
 			f := setupWith(t, migrate.Module{Name: "review", Dir: review.Migrations()})
 			rm := review.New(review.Deps{
 				DB: f.db, Events: f.bus, Media: media.NewFake(), Jobs: f.queue, Buyers: f.buyer, Stores: seller.NewReader(f.db, time.Now),
-				Orders: noReviewOrders{}, NewID: uuid.NewV7, Now: time.Now,
+				Orders: noReviewOrders{}, Catalog: noopReviewCatalog{}, NewID: uuid.NewV7, Now: time.Now,
 			})
 			events.Subscribe(f.bus, rm.OnBuyerDeletionRequested)
 			events.Subscribe(f.bus, rm.OnBuyerDeleted)

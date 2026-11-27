@@ -40,11 +40,10 @@ func TestProductStatsConsumerContract(t *testing.T) {
 	t.Run("with reviews", func(t *testing.T) {
 		w, _ := newFixture()
 		check(t, body(t, run(t, w, OnReviewCreated, created())[0]), 4.9, 30)
-		check(t, body(t, run(t, w, OnReviewAggregateChanged, review.ReviewAggregateChanged{EventID: eventID, OccurredAt: occurredAt, StoreID: 91, ProductID: product700})[0]), 4.9, 30)
 	})
 	t.Run("no visible reviews", func(t *testing.T) {
 		w, r := newFixture()
 		r.product = map[uuid.UUID]review.ProductStats{}
-		check(t, body(t, run(t, w, OnReviewAggregateChanged, review.ReviewAggregateChanged{EventID: eventID, OccurredAt: occurredAt, StoreID: 91, ProductID: product700})[0]), 0, 0)
+		check(t, body(t, run(t, w, OnReviewCreated, created())[0]), 0, 0)
 	})
 }

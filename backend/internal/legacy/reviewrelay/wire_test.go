@@ -96,7 +96,6 @@ func TestPayloadsMatchTheLegacyStructs(t *testing.T) {
 		mine reflect.Type
 	}{
 		"review.created": {"ReviewCreatedEvent", reflect.TypeOf(reviewCreated{})},
-		"review.hidden":  {"ReviewHiddenEvent", reflect.TypeOf(reviewHidden{})},
 	} {
 		want, got := oldFields(t, mqEvents, c.old), newFields(c.mine)
 		// 舊 BaseEvent 的 correlation_id、metadata 是 omitempty 的空值，從不出現在 wire 上（下面的測試守住這個前提）。

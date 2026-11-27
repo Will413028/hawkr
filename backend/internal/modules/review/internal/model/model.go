@@ -248,13 +248,9 @@ type ReviewCreated struct {
 	ProductID  uuid.UUID
 }
 
-// ReviewAggregateChanged 在隱藏或還原改變一組 (店, 商品) 的公開評價集合時、同一個 transaction 內發布；
-// 只表示「這組聚合要重送」，不指稱單則評價。
-type ReviewAggregateChanged struct {
-	EventID    uuid.UUID
-	OccurredAt time.Time
-	StoreID    int64
-	ProductID  uuid.UUID
+// Catalog 是 review 同步商品評分的 catalog 公開 API；在改變公開評價集合的同一個 transaction 內呼叫，失敗讓整個 transaction 回滾。
+type Catalog interface {
+	SetRating(ctx context.Context, productID uuid.UUID, average float64, count int32) error
 }
 
 // ReviewHidden 一則評價被隱藏（只在真的新增一筆隱藏時發，冪等的重複隱藏不發），在隱藏的同一個 transaction 內發布。只帶參照與列舉，不帶管理員說明文字；
@@ -280,10 +276,4 @@ type ReviewRestored struct {
 	Category   policy.Category
 	SourceRef  string
 	AppealPath policy.AppealPath
-}
-
-// Target 是一組 (店, 商品)：評價聚合的單位。
-type Target struct {
-	StoreID   int64
-	ProductID uuid.UUID
 }

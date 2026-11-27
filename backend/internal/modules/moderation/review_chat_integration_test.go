@@ -142,7 +142,7 @@ func (f *fixture) hidden(t *testing.T, party im.Party, conv uuid.UUID, seq int64
 	return false, nil
 }
 
-// 8.1-1：檢舉 → 快照 → 隱藏 → 還原（評價）。公開讀取與統計隨隱藏消失、隨還原回來，隱藏與還原各發一次 ReviewAggregateChanged；案件維持結案、決定不改，撤銷紀錄與稽核在原案件旁。
+// 8.1-1：檢舉 → 快照 → 隱藏 → 還原（評價）。公開讀取與統計隨隱藏消失、隨還原回來，隱藏與還原各同步一次 SetRating；案件維持結案、決定不改，撤銷紀錄與稽核在原案件旁。
 func TestReviewReportHideAndReverse(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
@@ -183,7 +183,7 @@ func TestReviewReportHideAndReverse(t *testing.T) {
 		t.Fatalf("隱藏紀錄 = %d", n)
 	}
 	if got := f.aggs.Load() - before; got != 1 {
-		t.Fatalf("隱藏發了 %d 次 ReviewAggregateChanged", got)
+		t.Fatalf("隱藏同步了 %d 次 SetRating", got)
 	}
 
 	before = f.aggs.Load()
@@ -204,7 +204,7 @@ func TestReviewReportHideAndReverse(t *testing.T) {
 		t.Fatalf("還原留列：%d", n)
 	}
 	if got := f.aggs.Load() - before; got != 1 {
-		t.Fatalf("還原發了 %d 次 ReviewAggregateChanged", got)
+		t.Fatalf("還原同步了 %d 次 SetRating", got)
 	}
 	if n := f.count(t, "SELECT count(*) FROM moderation.cases WHERE id = $1 AND closed_at IS NOT NULL AND reversed_at IS NOT NULL AND reversed_by_admin_id = 9 AND reverse_reason = '誤判'", res.Case.ID); n != 1 {
 		t.Fatal("cases 的 reversed_* 要有值")

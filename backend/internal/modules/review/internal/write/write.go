@@ -43,16 +43,17 @@ type Stores interface {
 
 // Deps 是寫入路徑的依賴。
 type Deps struct {
-	DB     *db.DB
-	Events *events.Bus
-	Media  model.Media
-	Jobs   jobs.Enqueuer
-	Buyers Buyers
-	Stores Stores
-	Orders model.Orders
-	NewID  func() uuid.UUID
-	Now    func() time.Time
-	Logger *slog.Logger
+	DB      *db.DB
+	Events  *events.Bus
+	Media   model.Media
+	Jobs    jobs.Enqueuer
+	Buyers  Buyers
+	Stores  Stores
+	Orders  model.Orders
+	Catalog model.Catalog
+	NewID   func() uuid.UUID
+	Now     func() time.Time
+	Logger  *slog.Logger
 }
 
 // Service 是寫入路徑的 use case。
@@ -152,6 +153,9 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Revie
 				return err
 			}
 			images[i] = model.Image{AssetID: a.ID, ObjectKey: a.ObjectKey}
+		}
+		if err := rows.SyncProductRating(ctx, q, s.d.Catalog, item.ProductID); err != nil {
+			return err
 		}
 		if err := s.bust(ctx, order.StoreID, item.ProductID); err != nil {
 			return err
@@ -287,7 +291,7 @@ func (s *Service) Reply(ctx context.Context, in model.ReplyInput) (model.Review,
 }
 
 // Hide 隱藏一則評價（moderation 的 transaction 內呼叫）；已有未還原的隱藏時回既有的那一筆（Created 為假，冪等，不發事件）。
-// 新隱藏時同 transaction 發 ReviewAggregateChanged 與 ReviewHidden 並排快取失效。
+// 新隱藏時同 transaction 同步商品評分、發 ReviewHidden 並排快取失效。
 func (s *Service) Hide(ctx context.Context, in model.HideInput) (model.Hide, error) {
 	in.Text, in.SourceRef = trimtext.Trim(in.Text), trimtext.Trim(in.SourceRef)
 	if err := checkReason(in); err != nil {
@@ -314,7 +318,7 @@ func (s *Service) Hide(ctx context.Context, in model.HideInput) (model.Hide, err
 		if !out.Created {
 			return nil
 		}
-		if err := s.aggregateChanged(ctx, r.StoreID, r.ProductID, now); err != nil {
+		if err := s.aggregateChanged(ctx, q, r.StoreID, r.ProductID); err != nil {
 			return err
 		}
 		return events.Publish(ctx, s.d.Events, model.ReviewHidden{
@@ -361,7 +365,7 @@ func (s *Service) Restore(ctx context.Context, in model.RestoreInput) (model.Hid
 			return err
 		}
 		out = toHide(row, false)
-		if err := s.aggregateChanged(ctx, r.StoreID, r.ProductID, now); err != nil {
+		if err := s.aggregateChanged(ctx, q, r.StoreID, r.ProductID); err != nil {
 			return err
 		}
 		return events.Publish(ctx, s.d.Events, model.ReviewRestored{
@@ -372,11 +376,11 @@ func (s *Service) Restore(ctx context.Context, in model.RestoreInput) (model.Hid
 	return out, err
 }
 
-func (s *Service) aggregateChanged(ctx context.Context, storeID int64, productID uuid.UUID, now time.Time) error {
+func (s *Service) aggregateChanged(ctx context.Context, q *store.Queries, storeID int64, productID uuid.UUID) error {
 	if err := s.bust(ctx, storeID, productID); err != nil {
 		return err
 	}
-	return events.Publish(ctx, s.d.Events, model.ReviewAggregateChanged{EventID: s.d.NewID(), OccurredAt: now, StoreID: storeID, ProductID: productID})
+	return rows.SyncProductRating(ctx, q, s.d.Catalog, productID)
 }
 
 func checkReason(in model.HideInput) error {
