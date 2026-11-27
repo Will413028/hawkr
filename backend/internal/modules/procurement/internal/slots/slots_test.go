@@ -177,7 +177,7 @@ func TestApplyItemChangeClearsResolution(t *testing.T) {
 	if changed.Resolution != nil {
 		t.Error("a changed item must clear the old resolution")
 	}
-	both, _ := base.Apply(Patch{Item: ptr("高麗菜"), Resolution: &Resolution{Kind: CategoryConfirmed, CategoryID: 7, Label: "高麗菜"}}, refNow)
+	both, _ := base.Apply(Patch{Item: ptr("高麗菜"), Resolution: &Resolution{Kind: CategoryConfirmed, CategoryID: categoryID(7), Label: "高麗菜"}}, refNow)
 	if both.Resolution == nil || both.Resolution.Label != "高麗菜" {
 		t.Errorf("item and resolution in one patch: resolution = %v", both.Resolution)
 	}
@@ -192,8 +192,8 @@ func TestApplyResolutionRules(t *testing.T) {
 	}{
 		{"no item to resolve", Set{}, Resolution{Kind: BuyerDescribed, Label: "x"}, []Rejection{{ItemResolution, ReasonResolutionNoItem}}},
 		{"unknown kind", Set{Item: ptr("a")}, Resolution{Kind: "OTHER", Label: "x"}, []Rejection{{ItemResolution, ReasonResolutionUnknownKind}}},
-		{"empty label", Set{Item: ptr("a")}, Resolution{Kind: CategoryConfirmed, CategoryID: 7, Label: " "}, []Rejection{{ItemResolution, ReasonResolutionNoLabel}}},
-		{"valid", Set{Item: ptr("a")}, Resolution{Kind: CategoryConfirmed, CategoryID: 7, Label: "x"}, nil},
+		{"empty label", Set{Item: ptr("a")}, Resolution{Kind: CategoryConfirmed, CategoryID: categoryID(7), Label: " "}, []Rejection{{ItemResolution, ReasonResolutionNoLabel}}},
+		{"valid", Set{Item: ptr("a")}, Resolution{Kind: CategoryConfirmed, CategoryID: categoryID(7), Label: "x"}, nil},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -367,7 +367,7 @@ func TestRecordedThisTurn(t *testing.T) {
 	})
 	t.Run("item resolution is recorded when the server sets it", func(t *testing.T) {
 		first := apply(Set{}, Patch{Item: ptr("青菜")})
-		p := Patch{Resolution: &Resolution{Kind: CategoryConfirmed, CategoryID: 7, Label: "小白菜"}}
+		p := Patch{Resolution: &Resolution{Kind: CategoryConfirmed, CategoryID: categoryID(7), Label: "小白菜"}}
 		got := RecordedThisTurn(p, first, apply(first, p))
 		if want := []Recorded{{ItemResolution, "小白菜"}}; !reflect.DeepEqual(got, want) {
 			t.Errorf("got %v, want %v", got, want)
@@ -376,7 +376,7 @@ func TestRecordedThisTurn(t *testing.T) {
 }
 
 func TestApplyRejectedItemRejectsItsResolution(t *testing.T) {
-	res := Resolution{Kind: CategoryConfirmed, CategoryID: 7, Label: "高麗菜"}
+	res := Resolution{Kind: CategoryConfirmed, CategoryID: categoryID(7), Label: "高麗菜"}
 	base, _ := Set{}.Apply(Patch{Item: ptr("青菜")}, refNow)
 	got, rejected := base.Apply(Patch{Item: ptr("  "), Resolution: &res}, refNow)
 	want := []Rejection{{Item, ReasonEmpty}, {ItemResolution, ReasonResolutionNoItem}}

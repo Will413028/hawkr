@@ -40,7 +40,7 @@
    "id": "m5",
    "stack": "go",
    "file": "backend/internal/modules/procurement/internal/candidate/candidate.go",
-   "old": "if pg.Last {",
+   "old": "if pg.Next == \"\" {",
    "new": "if false {",
    "test": "internal/modules/procurement/internal/candidate ^TestSearchStopsAtAShortLastPage$",
    "why": "最後一頁（短頁）不停：繼續要下一頁"
@@ -112,10 +112,10 @@
    "id": "m13",
    "stack": "go",
    "file": "backend/cmd/hawkr/procurement.go",
-   "old": "Last: len(hits) < productservice.SearchPageSize",
-   "new": "Last: len(hits) <= productservice.SearchPageSize",
-   "test": "cmd/hawkr ^TestProductSearchTreatsOnlyAShortPageAsTheLastPage$",
-   "why": "剛好 50 筆的一頁被當成最後一頁：少翻一頁"
+   "old": "Next: encodeSearchCursor(pg.Next)",
+   "new": "Next: \"\"",
+   "test": "cmd/hawkr ^TestProductSearchKeysetPagesNeitherRepeatNorSkip$",
+   "why": "搜尋 adapter 永遠回「沒有下一頁」：只翻第一頁就停，少收後面的商品。"
   },
   {
    "id": "m14",

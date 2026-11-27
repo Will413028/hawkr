@@ -17,14 +17,15 @@ import (
 	"sync"
 	"time"
 	"unicode"
+	"uuid"
 
 	"golang.org/x/text/unicode/norm"
 )
 
-// Node 是分類樹的一個節點；ParentID 是 0 表示根。
+// Node 是分類樹的一個節點；ParentID 是 nil 表示根。
 type Node struct {
-	ID       int64
-	ParentID int64
+	ID       uuid.UUID
+	ParentID *uuid.UUID
 	Name     string
 }
 
@@ -45,13 +46,13 @@ const (
 
 // Match 是命中的一個分類。
 type Match struct {
-	CategoryID int64
+	CategoryID uuid.UUID
 	Name       string
 	// Path 是從根到這個節點的名稱，以「 > 」串接。
 	Path string
 	Via  Via
 	// RootID、RootName 是路徑最上層（大類）的節點；根節點自己的 RootID 是自己的 ID。
-	RootID   int64
+	RootID   uuid.UUID
 	RootName string
 	// Leaf 是這個節點沒有子節點（末層品項）。
 	Leaf bool
@@ -169,7 +170,7 @@ func (r *Resolver) Resolve(ctx context.Context, term string) (Resolution, error)
 }
 
 // Leaves 回傳大類 rootID 底下的末層節點（不含大類自己），順序依分類樹讀取結果。
-func (r *Resolver) Leaves(ctx context.Context, rootID int64) ([]Match, error) {
+func (r *Resolver) Leaves(ctx context.Context, rootID uuid.UUID) ([]Match, error) {
 	idx, err := r.index(ctx)
 	if err != nil {
 		return nil, err
@@ -188,7 +189,7 @@ func (r *Resolver) Leaves(ctx context.Context, rootID int64) ([]Match, error) {
 }
 
 // Leaf 以分類 ID 查現行分類樹：節點存在而且是末層（沒有子節點）才回 true。
-func (r *Resolver) Leaf(ctx context.Context, categoryID int64) (Match, bool, error) {
+func (r *Resolver) Leaf(ctx context.Context, categoryID uuid.UUID) (Match, bool, error) {
 	idx, err := r.index(ctx)
 	if err != nil {
 		return Match{}, false, err
@@ -198,7 +199,7 @@ func (r *Resolver) Leaf(ctx context.Context, categoryID int64) (Match, bool, err
 
 // LeafAsOf 與 Leaf 相同，但答案一定來自「開始讀取的時間不早於 notBefore」且仍在 TTL 之內的分類樹：快取樹較舊或已過期時同步等一次讀取，
 // 失敗（含退避期間）回錯誤，不退回舊樹。給「答案會決定破壞性動作」或「必須看得到某個時間點之前建立的分類」的呼叫端用；Leaf 的 stale-while-revalidate 語意不變。
-func (r *Resolver) LeafAsOf(ctx context.Context, categoryID int64, notBefore time.Time) (Match, bool, error) {
+func (r *Resolver) LeafAsOf(ctx context.Context, categoryID uuid.UUID, notBefore time.Time) (Match, bool, error) {
 	idx, err := r.indexAsOf(ctx, notBefore)
 	if err != nil {
 		return Match{}, false, err
@@ -206,7 +207,7 @@ func (r *Resolver) LeafAsOf(ctx context.Context, categoryID int64, notBefore tim
 	return leafIn(idx, categoryID)
 }
 
-func leafIn(idx *index, categoryID int64) (Match, bool, error) {
+func leafIn(idx *index, categoryID uuid.UUID) (Match, bool, error) {
 	n, ok := idx.nodes[categoryID]
 	if !ok || idx.hasChild[n.ID] {
 		return Match{}, false, nil
@@ -347,22 +348,22 @@ func (r *Resolver) load(ctx context.Context, l *treeLoad) {
 }
 
 type index struct {
-	nodes  map[int64]Node
-	byNorm map[string][]int64
+	nodes  map[uuid.UUID]Node
+	byNorm map[string][]uuid.UUID
 	// order 是節點在分類樹讀取結果中的順序；hasChild 記錄有子節點的節點。
-	order    []int64
-	hasChild map[int64]bool
+	order    []uuid.UUID
+	hasChild map[uuid.UUID]bool
 }
 
 func buildIndex(nodes []Node) *index {
-	idx := &index{nodes: make(map[int64]Node, len(nodes)), byNorm: map[string][]int64{}, hasChild: map[int64]bool{}}
+	idx := &index{nodes: make(map[uuid.UUID]Node, len(nodes)), byNorm: map[string][]uuid.UUID{}, hasChild: map[uuid.UUID]bool{}}
 	for _, n := range nodes {
 		idx.nodes[n.ID] = n
 		idx.order = append(idx.order, n.ID)
 	}
 	for _, n := range nodes {
-		if n.ParentID != 0 {
-			idx.hasChild[n.ParentID] = true
+		if n.ParentID != nil {
+			idx.hasChild[*n.ParentID] = true
 		}
 		k := normalize(n.Name)
 		idx.byNorm[k] = append(idx.byNorm[k], n.ID)
@@ -384,9 +385,9 @@ func (x *index) match(n Node, via Via) Match {
 }
 
 func (x *index) root(n Node) Node {
-	seen := map[int64]bool{n.ID: true}
-	for n.ParentID != 0 && !seen[n.ParentID] {
-		parent, ok := x.nodes[n.ParentID]
+	seen := map[uuid.UUID]bool{n.ID: true}
+	for n.ParentID != nil && !seen[*n.ParentID] {
+		parent, ok := x.nodes[*n.ParentID]
 		if !ok {
 			break
 		}
@@ -398,13 +399,13 @@ func (x *index) root(n Node) Node {
 
 func (x *index) path(n Node) string {
 	parts := []string{n.Name}
-	seen := map[int64]bool{n.ID: true}
-	for p := n.ParentID; p != 0 && !seen[p]; {
-		parent, ok := x.nodes[p]
+	seen := map[uuid.UUID]bool{n.ID: true}
+	for p := n.ParentID; p != nil && !seen[*p]; {
+		parent, ok := x.nodes[*p]
 		if !ok {
 			break
 		}
-		seen[p] = true
+		seen[*p] = true
 		parts = append([]string{parent.Name}, parts...)
 		p = parent.ParentID
 	}

@@ -16,7 +16,7 @@ schema `discovery`（`db/schema.sql`）：`seller_scores`（一家合格店家�
 
 - 根套件只保留 `Module`、`New`、轉呼叫方法、port 與型別別名；port（`Orders`、`Products`、`Reviews`、`Stores`）由 discovery 定義，在 `internal/ranking/ports.go`，根套件 `ports.go` 轉出。
 - `internal/model` 是公式與型別（純函式，沒有 I/O）；`internal/ranking` 是重算、讀取與 River job；`internal/store` 是 sqlc 的查詢套件。
-- 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`。依賴的模組只有 seller；order、product、review 的 legacy client 由 `cmd/hawkr/discovery.go` 注入，模組不 import `internal/legacy`。
+- 依賴圖的唯一來源是 `internal/arch/modules.go` 的 `InternalDependencies`。依賴的模組只有 seller；order 的 legacy client 與 catalog、review 模組由 `cmd/hawkr/discovery.go` 注入，模組不 import `internal/legacy`，也不 import catalog、review。
 
 ## 不變量
 
@@ -36,7 +36,7 @@ schema `discovery`（`db/schema.sql`）：`seller_scores`（一家合格店家�
 
 - 店名、logo、粉絲數等顯示欄位：`internal/httpapi/discovery` 用 seller 的 `StoreCards`、buyer 的 `SubscriberCounts` 組裝；卡片的評分取本模組回傳的快照值，不另查 review。
 - Connect API 與 `max_results` 預設值（10，0 的語意）：傳輸層（`httpapi/discovery.DefaultMaxResults`）。
-- 「可公開曝光」的規則：seller 的 `ExposableStores`；「有公開商品」：product（或 catalog）；訂單統計的口徑：order 端。
+- 「可公開曝光」的規則：seller 的 `ExposableStores`；「有公開商品」：catalog 的 `StoresWithPublicProducts(at)`；訂單統計的口徑：order 端。
 - 營運的置頂與排除、其他探索功能：目前沒有實作，不在本模組。
 - 新鮮度告警：單體對 River job 狀態的監控。
 

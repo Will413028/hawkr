@@ -35,7 +35,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/buyerconsumer"
 	"github.com/Will413028/hawkr/backend/internal/legacy/buyerrelay"
 	"github.com/Will413028/hawkr/backend/internal/legacy/buyerserver"
-	"github.com/Will413028/hawkr/backend/internal/legacy/categoryservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/crmconsumer"
 	"github.com/Will413028/hawkr/backend/internal/legacy/delegationservice"
 	"github.com/Will413028/hawkr/backend/internal/legacy/gatewayproxy"
@@ -195,6 +194,7 @@ func runServe(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	catalogModule := newCatalog(d, med)
 	products, err := productservice.New(productAddr, internalSecret)
 	if err != nil {
 		return err
@@ -256,7 +256,7 @@ func runServe(ctx context.Context) error {
 	couponModule := newCoupon(d, sellerModule, buyerModule)
 	notificationModule := newNotification(d, id, buyerModule, sellerModule, couponModule, moderationModule, jc, box, notificationConfig, images, log)
 	subscribeNotification(bus, notificationModule)
-	discoveryModule := newDiscovery(d, orders, products, reviewModule, sellerModule, log)
+	discoveryModule := newDiscovery(d, orders, catalogModule, reviewModule, sellerModule, log)
 	gateway, err := gatewayproxy.New(gatewayURL, func(ctx context.Context) (gatewayproxy.Caller, bool) {
 		p, ok := rpc.PrincipalFrom(ctx)
 		return gatewayproxy.Caller{Principal: p}, ok
@@ -294,12 +294,13 @@ func runServe(ctx context.Context) error {
 		Moderation:   moderationModule,
 		Notification: notificationModule,
 		Content: content.New(content.Deps{
-			DB:     d,
-			Social: socialModule,
-			Media:  med,
-			NewID:  uuid.NewV7,
-			Now:    time.Now,
-			Logger: log,
+			DB:       d,
+			Social:   socialModule,
+			Products: catalogModule,
+			Media:    med,
+			NewID:    uuid.NewV7,
+			Now:      time.Now,
+			Logger:   log,
 		}),
 		Media:                 med,
 		Identity:              id,
@@ -415,11 +416,6 @@ func runWorker(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// 品項解析讀的分類樹在舊 product-service（catalog 搬進單體前）。
-	categories, err := categoryservice.New(productAddr, internalSecret)
-	if err != nil {
-		return err
-	}
 	invoices, err := invoiceservice.New(invoiceAddr, internalSecret)
 	if err != nil {
 		return err
@@ -437,6 +433,7 @@ func runWorker(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	catalogModule := newCatalog(d, med)
 	buyerModule := buyer.New(buyer.Deps{
 		DB: d, Events: bus,
 		Media: med, Now: time.Now, Logger: log,
@@ -466,7 +463,7 @@ func runWorker(ctx context.Context) error {
 	crmModule := newCRM(d, bus, jc, buyerModule, sellerModule, log)
 	delegationDeps.Social = socialModule
 	newDelegation(bus, delegationDeps)
-	discoveryModule := newDiscovery(d, orders, products, reviewModule, sellerModule, log)
+	discoveryModule := newDiscovery(d, orders, catalogModule, reviewModule, sellerModule, log)
 	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Buyer: buyerModule, Seller: sellerModule, Identity: id, Orders: orders, Now: time.Now, NewID: uuid.NewV7, Logger: log})
 	consumer := buyerconsumer.Consumer{
 		Buyer: buyerModule,
@@ -491,7 +488,7 @@ func runWorker(ctx context.Context) error {
 	workers := river.NewWorkers()
 	river.AddWorker(workers, revalidate.NewWorker(rv, log))
 	med.AddWorkers(workers)
-	procurementModule := newProcurementWorker(d, jc, buyerModule, bus, llm.New(llm.Procurement, llmConfig, log), categories, products, sellerModule, procurementOrders{orders}, log)
+	procurementModule := newProcurementWorker(d, jc, buyerModule, bus, llm.New(llm.Procurement, llmConfig, log), catalogModule, sellerModule, procurementOrders{orders}, log)
 	addProcurementWorkers(workers, procurementModule)
 	buyerModule.AddWorkers(workers)
 	sellerModule.AddWorkers(workers)

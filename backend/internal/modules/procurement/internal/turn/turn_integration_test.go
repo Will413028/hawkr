@@ -57,14 +57,27 @@ func (j *jobs) CancelJob(context.Context, int64) (rivertype.JobState, bool, erro
 	return rivertype.JobStateRunning, true, nil
 }
 
+// catID 是測試用的確定性分類 ID：同一個數字永遠得到同一個 UUID，且不是零值。
+func catID(n int) uuid.UUID {
+	return uuid.MustParse(fmt.Sprintf("00000000-0000-7000-8000-%012d", n))
+}
+
+// optID 是分類 n 在卡上的選項 ID。
+func optID(n int) string { return "category-" + catID(n).String() }
+
+func parentOf(n int) *uuid.UUID {
+	id := catID(n)
+	return &id
+}
+
 // taxonomy 是替身分類樹：小白菜只有一個、蘋果有兩個（跨大類）。
 type taxonomy struct{}
 
 func (taxonomy) CategoryTree(context.Context) ([]resolver.Node, error) {
 	return []resolver.Node{
-		{ID: 1, Name: "葉菜"}, {ID: 2, Name: "水果"}, {ID: 3, Name: "加工品"},
-		{ID: 18, ParentID: 1, Name: "小白菜"},
-		{ID: 21, ParentID: 2, Name: "蘋果"}, {ID: 22, ParentID: 3, Name: "蘋果"},
+		{ID: catID(1), Name: "葉菜"}, {ID: catID(2), Name: "水果"}, {ID: catID(3), Name: "加工品"},
+		{ID: catID(18), ParentID: parentOf(1), Name: "小白菜"},
+		{ID: catID(21), ParentID: parentOf(2), Name: "蘋果"}, {ID: catID(22), ParentID: parentOf(3), Name: "蘋果"},
 	}, nil
 }
 
@@ -72,11 +85,11 @@ func (taxonomy) CategoryTree(context.Context) ([]resolver.Node, error) {
 type wideTaxonomy struct{}
 
 func (wideTaxonomy) CategoryTree(context.Context) ([]resolver.Node, error) {
-	nodes := []resolver.Node{{ID: 1, Name: "水果"}, {ID: 2, Name: "加工品"}}
-	for i := int64(0); i < 3; i++ {
+	nodes := []resolver.Node{{ID: catID(1), Name: "水果"}, {ID: catID(2), Name: "加工品"}}
+	for i := range 3 {
 		nodes = append(nodes,
-			resolver.Node{ID: 10 + i, ParentID: 1, Name: "梨"},
-			resolver.Node{ID: 20 + i, ParentID: 2, Name: "梨"})
+			resolver.Node{ID: catID(10 + i), ParentID: parentOf(1), Name: "梨"},
+			resolver.Node{ID: catID(20 + i), ParentID: parentOf(2), Name: "梨"})
 	}
 	return nodes, nil
 }
@@ -274,7 +287,7 @@ func TestSuccessWritesRevisionTurnEventsAndKeepsUsageConsumed(t *testing.T) { //
 		t.Fatalf("revisions = %+v %v", revs, err)
 	}
 	rev := revs[0]
-	if rev.ItemResolutionKind == nil || *rev.ItemResolutionKind != "CATEGORY_CONFIRMED" || rev.ItemResolutionCategoryID == nil || *rev.ItemResolutionCategoryID != 18 { // item_resolution_category_id 寫入
+	if rev.ItemResolutionKind == nil || *rev.ItemResolutionKind != "CATEGORY_CONFIRMED" || rev.ItemResolutionCategoryID == nil || *rev.ItemResolutionCategoryID != catID(18) { // item_resolution_category_id 寫入
 		t.Errorf("resolution = %v %v %v", rev.ItemResolutionKind, rev.ItemResolutionLabel, rev.ItemResolutionCategoryID)
 	}
 	turns, _ := store.New(f.d.Conn(ctx)).ListTurnsByRequest(ctx, store.ListTurnsByRequestParams{RequestID: f.request, BuyerID: buyer})
@@ -347,7 +360,7 @@ func TestAmbiguousItemInterruptsWithMatchingInterruptID(t *testing.T) { // I2
 	if !strings.Contains(ev, irq.ID.String()) {
 		t.Errorf("turn_result 的 interrupt.interruptId 要等於中斷列 ID %s：%s", irq.ID, ev)
 	}
-	if !strings.Contains(string(irq.Payload), `"category-21"`) || !strings.Contains(string(irq.Payload), "item-other") {
+	if !strings.Contains(string(irq.Payload), `"`+optID(21)+`"`) || !strings.Contains(string(irq.Payload), "item-other") {
 		t.Errorf("payload 要還原整張卡：%s", irq.Payload)
 	}
 	revs, _ := store.New(f.d.Conn(ctx)).ListRevisions(ctx, store.ListRevisionsParams{RequestID: f.request, BuyerID: ptr(buyer)})
@@ -384,7 +397,7 @@ func TestManyMatchesAcrossGroupsInterruptWithAGroupCard(t *testing.T) { // A9-D2
 	if err := json.Unmarshal(irq.Payload, &p); err != nil {
 		t.Fatal(err)
 	}
-	if p.Stage != turn.StageGroup || p.Query != "梨" || len(p.Candidates) != 2 || p.Candidates[0].CategoryID != 1 || p.Candidates[0].Label != "水果" || p.Candidates[1].CategoryID != 2 {
+	if p.Stage != turn.StageGroup || p.Query != "梨" || len(p.Candidates) != 2 || p.Candidates[0].CategoryID != catID(1) || p.Candidates[0].Label != "水果" || p.Candidates[1].CategoryID != catID(2) {
 		t.Errorf("payload 要是列兩個大類的 GROUP 卡：%s", irq.Payload)
 	}
 	if len(p.Question.Options) != 3 || p.Question.Options[2].OptionID != "item-other" {

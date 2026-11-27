@@ -79,7 +79,7 @@ func (f *fakes) noTx() {
 	}
 }
 
-func (f *fakes) Page(_ context.Context, q candidate.Query, page int) (candidate.Page, error) {
+func (f *fakes) Page(_ context.Context, q candidate.Query, after candidate.Cursor) (candidate.Page, error) {
 	f.noTx()
 	f.queries = append(f.queries, q)
 	if f.onPage != nil {
@@ -88,9 +88,10 @@ func (f *fakes) Page(_ context.Context, q candidate.Query, page int) (candidate.
 	if f.pageErr != nil {
 		return candidate.Page{}, f.pageErr
 	}
-	pg, ok := f.pages[page]
-	if !ok {
-		return candidate.Page{Last: true}, nil
+	// 測試給的頁都是最後一頁（Next 為空）：只有第一頁（沒有游標）有內容。
+	pg, ok := f.pages[1]
+	if after != "" || !ok {
+		return candidate.Page{}, nil
 	}
 	return pg, nil
 }
@@ -120,7 +121,7 @@ func (f *fakes) StoreIDsBlockingBuyer(_ context.Context, _ int64, ids []int64) (
 	return out, nil
 }
 
-func (f *fakes) LeafAsOf(_ context.Context, _ int64, notBefore time.Time) (resolver.Match, bool, error) {
+func (f *fakes) LeafAsOf(_ context.Context, _ uuid.UUID, notBefore time.Time) (resolver.Match, bool, error) {
 	f.noTx()
 	f.notBefore = notBefore
 	if f.onLeaf != nil {
@@ -154,9 +155,9 @@ func newFixture(t *testing.T, status, kind string) *fixture {
 	must(t, q.InsertRequest(ctx, store.InsertRequestParams{ID: f.request, BuyerID: &b, Now: now}))
 	must(t, q.InsertConversation(ctx, store.InsertConversationParams{ID: uuid.NewV7(), BuyerID: buyer, RequestID: f.request, Now: now}))
 	item, label, unit, city := "小白菜", "小白菜", "KG", "臺北市"
-	var cat *int64
+	var cat *uuid.UUID
 	if kind == "CATEGORY_CONFIRMED" {
-		c := int64(18)
+		c := categoryID(18)
 		cat = &c
 	}
 	n, err := q.InsertRevision(ctx, store.InsertRevisionParams{
@@ -258,9 +259,9 @@ func (f *fixture) eventTypes(id uuid.UUID) []string {
 func hits(stores ...int64) candidate.Page {
 	var h []candidate.Hit
 	for _, s := range stores {
-		h = append(h, candidate.Hit{ProductID: s * 100, StoreID: s})
+		h = append(h, candidate.Hit{ProductID: categoryID(int(s * 100)), StoreID: s})
 	}
-	return candidate.Page{Hits: h, Last: true}
+	return candidate.Page{Hits: h}
 }
 
 func reasonOf(err error) (apperr.Reason, apperr.Kind) {
@@ -294,7 +295,7 @@ func TestSuccessWritesRankedCandidatesMovesToMatchingAndSucceeds(t *testing.T) {
 	if got := f.eventTypes(s.RunID); len(got) != 2 || got[0] != run.EventRunAccepted || got[1] != run.EventFinished {
 		t.Errorf("events = %v，搜尋 run 只有 run_accepted 與 finished", got)
 	}
-	if len(f.fakes.queries) != 1 || f.fakes.queries[0] != (candidate.Query{CategoryID: 18}) {
+	if len(f.fakes.queries) != 1 || f.fakes.queries[0] != (candidate.Query{CategoryID: categoryID(18)}) {
 		t.Errorf("queries = %+v，確認過的分類只帶分類 ID", f.fakes.queries)
 	}
 }

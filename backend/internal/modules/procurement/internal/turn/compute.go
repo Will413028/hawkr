@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 	"unicode/utf8"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/planner"
@@ -19,9 +20,9 @@ import (
 type Resolver interface {
 	Resolve(ctx context.Context, term string) (resolver.Resolution, error)
 	// Leaves 回傳大類底下的末層節點（不含大類自己），依分類樹順序。
-	Leaves(ctx context.Context, rootID int64) ([]resolver.Match, error)
+	Leaves(ctx context.Context, rootID uuid.UUID) ([]resolver.Match, error)
 	// Leaf 以分類 ID 查現行分類樹：節點存在而且是末層才回 true（不看用詞）。
-	Leaf(ctx context.Context, categoryID int64) (resolver.Match, bool, error)
+	Leaf(ctx context.Context, categoryID uuid.UUID) (resolver.Match, bool, error)
 }
 
 // 請求的狀態（與 schema 的 CHECK 相同）。

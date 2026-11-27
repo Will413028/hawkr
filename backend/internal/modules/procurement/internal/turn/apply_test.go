@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/planner"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/reply"
@@ -110,14 +111,14 @@ func groupPayload(t *testing.T) InterruptPayload {
 	return p
 }
 
-func groupOpt(name string) string { return "category-" + fmt.Sprint(rootID(name)) }
+func groupOpt(name string) string { return "category-" + rootID(name).String() }
 
 func TestApplyGroupChoice(t *testing.T) {
 	all := spread(6, "水果", "加工品") // 水果：品0 品2 品4；加工品：品1 品3 品5
 	t.Run("one match in the group confirms the leaf, never the group", func(t *testing.T) {
 		rs := &fakeResolver{res: resolver.Resolution{Matches: append([]resolver.Match{}, all[:2]...)}}
 		o := apply(t, rs, groupPayload(t), Answer{OptionID: groupOpt("水果")})
-		if o.Kind != OutcomeResolved || o.Resolution.CategoryID != 100 || o.Resolution.Kind != slots.CategoryConfirmed || o.Resolution.Label != "品0" {
+		if o.Kind != OutcomeResolved || o.Resolution.CategoryID != catID(100) || o.Resolution.Kind != slots.CategoryConfirmed || o.Resolution.Label != "品0" {
 			t.Fatalf("要確認末層 100：%+v", o)
 		}
 	})
@@ -141,7 +142,7 @@ func TestApplyGroupChoice(t *testing.T) {
 		root.Leaf = false
 		rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{root, all[0]}}}
 		o := apply(t, rs, groupPayload(t), Answer{OptionID: groupOpt("水果")})
-		if o.Kind != OutcomeResolved || o.Resolution.CategoryID != 100 {
+		if o.Kind != OutcomeResolved || o.Resolution.CategoryID != catID(100) {
 			t.Fatalf("大類本身不是結果：%+v", o)
 		}
 	})
@@ -150,9 +151,9 @@ func TestApplyGroupChoice(t *testing.T) {
 		for i := 0; i < 7; i++ {
 			leaves = append(leaves, match(int64(500+i), fmt.Sprintf("葉%d", i), fmt.Sprintf("水果 > 葉%d", i)))
 		}
-		rs := &fakeResolver{res: resolver.Resolution{Matches: all[1:2]}, leaves: map[int64][]resolver.Match{rootID("水果"): leaves}}
+		rs := &fakeResolver{res: resolver.Resolution{Matches: all[1:2]}, leaves: map[uuid.UUID][]resolver.Match{rootID("水果"): leaves}}
 		o := apply(t, rs, groupPayload(t), Answer{OptionID: groupOpt("水果")})
-		if o.Kind != OutcomeInterrupt || o.Next.Stage != StageItem || len(o.Next.Candidates) != 5 || o.Next.Candidates[0].CategoryID != 500 || o.Next.Candidates[4].CategoryID != 504 {
+		if o.Kind != OutcomeInterrupt || o.Next.Stage != StageItem || len(o.Next.Candidates) != 5 || o.Next.Candidates[0].CategoryID != catID(500) || o.Next.Candidates[4].CategoryID != catID(504) {
 			t.Fatalf("要列末層前 5：%+v", o)
 		}
 	})
@@ -182,8 +183,8 @@ func itemPayload(t *testing.T) InterruptPayload {
 
 func TestApplyItemChoice(t *testing.T) {
 	rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{match(1, "蘋果", "水果 > 蘋果"), match(2, "蘋果乾", "加工品 > 蘋果乾")}}}
-	o := apply(t, rs, itemPayload(t), Answer{OptionID: "category-2"})
-	if o.Kind != OutcomeResolved || o.Resolution.Kind != slots.CategoryConfirmed || o.Resolution.CategoryID != 2 || o.Resolution.Label != "蘋果乾" {
+	o := apply(t, rs, itemPayload(t), Answer{OptionID: optID(2)})
+	if o.Kind != OutcomeResolved || o.Resolution.Kind != slots.CategoryConfirmed || o.Resolution.CategoryID != catID(2) || o.Resolution.Label != "蘋果乾" {
 		t.Fatalf("%+v", o)
 	}
 }
@@ -193,11 +194,11 @@ func TestApplyRejectsOptionsNotOnTheCard(t *testing.T) {
 		p InterruptPayload
 		a Answer
 	}{
-		"item id not in payload":         {itemPayload(t), Answer{OptionID: "category-999"}},
+		"item id not in payload":         {itemPayload(t), Answer{OptionID: optID(999)}},
 		"item id is a group option":      {itemPayload(t), Answer{OptionID: groupOpt("水果")}},
 		"garbage id":                     {itemPayload(t), Answer{OptionID: "x"}},
 		"describe stage has no options":  {*interrupt(uitext.ZhTW, describeCard("q")).Next, Answer{OptionID: planner.ItemOtherOptionID}},
-		"group id not on the group card": {groupPayload(t), Answer{OptionID: "category-999"}},
+		"group id not on the group card": {groupPayload(t), Answer{OptionID: optID(999)}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if o := apply(t, &fakeResolver{}, tc.p, tc.a); o.Kind != OutcomeInvalid || o.Reason != InvalidOptionNotOnCard {
@@ -211,7 +212,7 @@ func TestItemChoiceDoesNotTrustTheCardAlone(t *testing.T) {
 	// 卡上有選項但 payload 的候選沒有它（payload 被改壞）：不確認。
 	p := itemPayload(t)
 	p.Candidates = nil
-	if o := apply(t, &fakeResolver{}, p, Answer{OptionID: "category-1"}); o.Kind != OutcomeInvalid {
+	if o := apply(t, &fakeResolver{}, p, Answer{OptionID: optID(1)}); o.Kind != OutcomeInvalid {
 		t.Fatalf("%+v", o)
 	}
 }
@@ -240,13 +241,13 @@ func TestApplyFreeText(t *testing.T) {
 		kind  OutcomeKind
 		check func(Outcome) bool
 	}{
-		"item: one hit confirms":            {itemPayload(t), "紅蘋果", OutcomeResolved, func(o Outcome) bool { return o.Resolution.CategoryID == 7 }},
-		"group: one hit confirms":           {groupPayload(t), " 紅蘋果 ", OutcomeResolved, func(o Outcome) bool { return o.Resolution.CategoryID == 7 }},
+		"item: one hit confirms":            {itemPayload(t), "紅蘋果", OutcomeResolved, func(o Outcome) bool { return o.Resolution.CategoryID == catID(7) }},
+		"group: one hit confirms":           {groupPayload(t), " 紅蘋果 ", OutcomeResolved, func(o Outcome) bool { return o.Resolution.CategoryID == catID(7) }},
 		"describe: one hit confirms":        {describe, "紅蘋果", OutcomeResolved, func(o Outcome) bool { return o.Resolution.Kind == slots.CategoryConfirmed }},
 		"many hits ask an item card":        {itemPayload(t), "梨", OutcomeInterrupt, func(o Outcome) bool { return o.Next.Stage == StageItem && o.Next.Query == "梨" }},
 		"many hits across groups ask group": {describe, "海", OutcomeInterrupt, func(o Outcome) bool { return o.Next.Stage == StageGroup && o.Next.Query == "海" }},
 		"describe: no hit is buyer described": {describe, "  神秘 水果 ", OutcomeResolved, func(o Outcome) bool {
-			return o.Resolution.Kind == slots.BuyerDescribed && o.Resolution.CategoryID == 0 && o.Resolution.Label == "神秘 水果"
+			return o.Resolution.Kind == slots.BuyerDescribed && o.Resolution.CategoryID == uuid.Nil() && o.Resolution.Label == "神秘 水果"
 		}},
 		"item: no hit goes to describe": {itemPayload(t), "神秘", OutcomeInterrupt, func(o Outcome) bool {
 			return o.Next.Stage == StageDescribe && o.Next.Query == "蘋果"
@@ -278,10 +279,10 @@ func TestApplyInvalidAnswers(t *testing.T) {
 	}{
 		"blank text":        {itemPayload(t), Answer{FreeText: " \t　"}, InvalidBlankText},
 		"neither":           {itemPayload(t), Answer{}, InvalidNeedExactlyOne},
-		"both":              {itemPayload(t), Answer{OptionID: "category-1", FreeText: "x"}, InvalidNeedExactlyOne},
+		"both":              {itemPayload(t), Answer{OptionID: optID(1), FreeText: "x"}, InvalidNeedExactlyOne},
 		"unknown stage":     {InterruptPayload{Stage: "WHAT", Query: "q"}, Answer{FreeText: "x"}, InvalidUnknownStage},
-		"empty stage":       {InterruptPayload{}, Answer{OptionID: "category-1"}, InvalidUnknownStage},
-		"describe + option": {*interrupt(uitext.ZhTW, describeCard("q")).Next, Answer{OptionID: "category-1"}, InvalidOptionNotOnCard},
+		"empty stage":       {InterruptPayload{}, Answer{OptionID: optID(1)}, InvalidUnknownStage},
+		"describe + option": {*interrupt(uitext.ZhTW, describeCard("q")).Next, Answer{OptionID: optID(1)}, InvalidOptionNotOnCard},
 	} {
 		t.Run(name, func(t *testing.T) {
 			rs := &fakeResolver{}
@@ -364,24 +365,24 @@ func TestNonLeafMatchesNeverConfirmOrCount(t *testing.T) {
 	}
 	rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{nonLeaf(match(900, "x", "水果")), match(100, "品0", "水果 > 品0")}}}
 	o := apply(t, rs, *interrupt(uitext.ZhTW, describeCard("蘋果")).Next, Answer{FreeText: "蘋果"})
-	if o.Kind != OutcomeResolved || o.Resolution.CategoryID != 100 {
+	if o.Kind != OutcomeResolved || o.Resolution.CategoryID != catID(100) {
 		t.Fatalf("非末層不能確認：%+v", o)
 	}
 }
 
 func TestChildlessRootGroupPickDoesNotConfirmTheGroup(t *testing.T) {
 	root := match(5000, "孤兒", "孤兒")
-	root.RootID = 5000
+	root.RootID = catID(5000)
 	leaf := match(100, "品0", "孤兒 > 品0")
-	leaf.RootID = 5000
-	rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{root, leaf}}, leaves: map[int64][]resolver.Match{5000: nil}}
-	p := InterruptPayload{Stage: StageGroup, Query: "蘋果", Candidates: []PayloadCandidate{{CategoryID: 5000, Label: "孤兒", Path: "孤兒"}}}
-	p.Question = *questionWire(reply.Question(uitext.ZhTW, planner.BuildGroupDisambiguation([]planner.ItemCandidate{{CategoryID: 5000, Label: "孤兒", Path: "孤兒"}})))
-	o := apply(t, rs, p, Answer{OptionID: "category-5000"})
-	if o.Kind == OutcomeResolved && o.Resolution.CategoryID == 5000 {
+	leaf.RootID = catID(5000)
+	rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{root, leaf}}, leaves: map[uuid.UUID][]resolver.Match{catID(5000): nil}}
+	p := InterruptPayload{Stage: StageGroup, Query: "蘋果", Candidates: []PayloadCandidate{{CategoryID: catID(5000), Label: "孤兒", Path: "孤兒"}}}
+	p.Question = *questionWire(reply.Question(uitext.ZhTW, planner.BuildGroupDisambiguation([]planner.ItemCandidate{{CategoryID: catID(5000), Label: "孤兒", Path: "孤兒"}})))
+	o := apply(t, rs, p, Answer{OptionID: optID(5000)})
+	if o.Kind == OutcomeResolved && o.Resolution.CategoryID == catID(5000) {
 		t.Fatalf("不能確認大類自己：%+v", o)
 	}
-	if o.Kind != OutcomeResolved || o.Resolution.CategoryID != 100 {
+	if o.Kind != OutcomeResolved || o.Resolution.CategoryID != catID(100) {
 		t.Fatalf("要確認末層 100：%+v", o)
 	}
 }
@@ -389,12 +390,12 @@ func TestChildlessRootGroupPickDoesNotConfirmTheGroup(t *testing.T) {
 func TestItemPickRechecksCurrentTaxonomy(t *testing.T) {
 	// category-2 已不在現行分類樹：不確認，用現在的命中重新出卡。
 	rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{match(1, "蘋果", "水果 > 蘋果"), match(3, "蘋果醋", "加工品 > 蘋果醋")}}}
-	o := apply(t, rs, itemPayload(t), Answer{OptionID: "category-2"})
+	o := apply(t, rs, itemPayload(t), Answer{OptionID: optID(2)})
 	if o.Kind != OutcomeInterrupt || o.Next.Stage != StageItem || len(o.Next.Candidates) != 2 {
 		t.Fatalf("要重新出卡：%+v", o)
 	}
 	for _, c := range o.Next.Candidates {
-		if c.CategoryID == 2 {
+		if c.CategoryID == catID(2) {
 			t.Fatalf("不能再列已消失的分類：%+v", o.Next.Candidates)
 		}
 	}
@@ -402,8 +403,8 @@ func TestItemPickRechecksCurrentTaxonomy(t *testing.T) {
 
 func TestOptionWithWhitespaceOnlyTextIsAnOptionAnswer(t *testing.T) {
 	rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{match(1, "蘋果", "水果 > 蘋果"), match(2, "蘋果乾", "加工品 > 蘋果乾")}}}
-	o := apply(t, rs, itemPayload(t), Answer{OptionID: "category-2", FreeText: "  \t"})
-	if o.Kind != OutcomeResolved || o.Resolution.CategoryID != 2 {
+	o := apply(t, rs, itemPayload(t), Answer{OptionID: optID(2), FreeText: "  \t"})
+	if o.Kind != OutcomeResolved || o.Resolution.CategoryID != catID(2) {
 		t.Fatalf("%+v", o)
 	}
 }
@@ -411,23 +412,23 @@ func TestOptionWithWhitespaceOnlyTextIsAnOptionAnswer(t *testing.T) {
 func TestLeafListCardPickConfirms(t *testing.T) {
 	// 大類沒有與原詞相符的末層：列出該大類的末層，選其中一個要能確認（現行分類樹仍有它）。
 	l1, l2 := match(100, "品0", "水果 > 品0"), match(101, "品1", "水果 > 品1")
-	rs := &fakeResolver{res: resolver.Resolution{}, leaves: map[int64][]resolver.Match{rootID("水果"): {l1, l2}}}
+	rs := &fakeResolver{res: resolver.Resolution{}, leaves: map[uuid.UUID][]resolver.Match{rootID("水果"): {l1, l2}}}
 	o := apply(t, rs, groupPayload(t), Answer{OptionID: groupOpt("水果")})
 	if o.Kind != OutcomeInterrupt || o.Next.Stage != StageItem {
 		t.Fatalf("前置：要是末層清單 ITEM 卡：%+v", o)
 	}
-	o2 := apply(t, rs, *o.Next, Answer{OptionID: "category-101"})
-	if o2.Kind != OutcomeResolved || o2.Resolution.CategoryID != 101 {
+	o2 := apply(t, rs, *o.Next, Answer{OptionID: optID(101)})
+	if o2.Kind != OutcomeResolved || o2.Resolution.CategoryID != catID(101) {
 		t.Fatalf("選末層清單卡上的項目要確認：%+v", o2)
 	}
 }
 
 func TestChildlessRootNeverConfirmsOnTypedPath(t *testing.T) {
 	root := match(5000, "蘋果", "蘋果")
-	root.RootID = 5000
+	root.RootID = catID(5000)
 	rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{root}}}
 	o := apply(t, rs, *interrupt(uitext.ZhTW, describeCard("蘋果")).Next, Answer{FreeText: "蘋果"})
-	if o.Kind == OutcomeResolved && o.Resolution.CategoryID == 5000 {
+	if o.Kind == OutcomeResolved && o.Resolution.CategoryID == catID(5000) {
 		t.Fatalf("無子節點的大類不能確認自己：%+v", o)
 	}
 	if p := cardFromMatches([]resolver.Match{root}); p.Stage != StageDescribe {
@@ -438,12 +439,12 @@ func TestChildlessRootNeverConfirmsOnTypedPath(t *testing.T) {
 func TestStalePickRebuildsThroughDecideMatches(t *testing.T) {
 	// 只剩 1 個現行命中：直接確認；0 個：描述卡。
 	one := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{match(1, "蘋果", "水果 > 蘋果")}}}
-	o := apply(t, one, itemPayload(t), Answer{OptionID: "category-2"})
-	if o.Kind != OutcomeResolved || o.Resolution.CategoryID != 1 {
+	o := apply(t, one, itemPayload(t), Answer{OptionID: optID(2)})
+	if o.Kind != OutcomeResolved || o.Resolution.CategoryID != catID(1) {
 		t.Fatalf("剩 1 個要確認：%+v", o)
 	}
 	none := &fakeResolver{}
-	o = apply(t, none, itemPayload(t), Answer{OptionID: "category-2"})
+	o = apply(t, none, itemPayload(t), Answer{OptionID: optID(2)})
 	if o.Kind != OutcomeInterrupt || o.Next.Stage != StageDescribe {
 		t.Fatalf("剩 0 個要 DESCRIBE：%+v", o)
 	}
@@ -455,7 +456,7 @@ func TestStalePickOnGroupNarrowedCardStaysInRoot(t *testing.T) {
 		ms = append(ms, match(int64(100+i), fmt.Sprintf("品%d", i), "水果 > 品"+fmt.Sprint(i)))
 	}
 	p := cardFromMatches(ms)
-	if p.Stage != StageItem || p.Root != rootID("水果") {
+	if p.Stage != StageItem || p.Root == nil || *p.Root != rootID("水果") {
 		t.Fatalf("前置：ITEM 卡要記住大類：%+v", p)
 	}
 	// 選項 100 已消失；現行命中有 2 個水果、6 個別的大類：只在水果內出卡，不退回 GROUP 卡。
@@ -464,7 +465,7 @@ func TestStalePickOnGroupNarrowedCardStaysInRoot(t *testing.T) {
 		cur = append(cur, match(int64(800+i), fmt.Sprintf("他%d", i), root+" > 他"+fmt.Sprint(i)))
 	}
 	rs := &fakeResolver{res: resolver.Resolution{Matches: cur}}
-	o := apply(t, rs, p, Answer{OptionID: "category-100"})
+	o := apply(t, rs, p, Answer{OptionID: optID(100)})
 	if o.Kind != OutcomeInterrupt || o.Next.Stage != StageItem || len(o.Next.Candidates) != 2 {
 		t.Fatalf("要在原大類內出 ITEM 卡：%+v", o)
 	}

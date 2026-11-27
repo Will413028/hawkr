@@ -3,6 +3,7 @@ package turn
 import (
 	"reflect"
 	"time"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/slots"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
@@ -19,7 +20,7 @@ func revisionParams(s slots.Set, p store.InsertRevisionParams) store.InsertRevis
 	if s.Resolution != nil {
 		kind, label := string(s.Resolution.Kind), s.Resolution.Label
 		p.ItemResolutionKind, p.ItemResolutionLabel = &kind, &label
-		if s.Resolution.CategoryID > 0 {
+		if s.Resolution.CategoryID != uuid.Nil() {
 			id := s.Resolution.CategoryID
 			p.ItemResolutionCategoryID = &id
 		}

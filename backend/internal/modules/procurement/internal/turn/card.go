@@ -3,6 +3,7 @@ package turn
 import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/planner"
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/resolver"
+	"uuid"
 )
 
 type pendingCard struct {
@@ -27,16 +28,18 @@ func buildCard(query string, ms []resolver.Match) *pendingCard {
 		cands = append(cands, planner.ItemCandidate{CategoryID: m.CategoryID, Label: m.Name, Path: m.Path})
 	}
 	c := cardOf(StageItem, query, cands, planner.BuildItemDisambiguation(cands))
-	c.payload.Root = commonRoot(ms)
+	if root := commonRoot(ms); root != uuid.Nil() {
+		c.payload.Root = &root
+	}
 	return c
 }
 
-// commonRoot 是命中共同的大類 ID；沒有大類資訊或分屬多個大類回 0。
-func commonRoot(ms []resolver.Match) int64 {
-	var root int64
+// commonRoot 是命中共同的大類 ID；沒有大類資訊或分屬多個大類回 uuid.Nil()。
+func commonRoot(ms []resolver.Match) uuid.UUID {
+	var root uuid.UUID
 	for _, m := range ms {
-		if m.RootID <= 0 || (root != 0 && m.RootID != root) {
-			return 0
+		if m.RootID == uuid.Nil() || (root != uuid.Nil() && m.RootID != root) {
+			return uuid.Nil()
 		}
 		root = m.RootID
 	}
@@ -71,9 +74,9 @@ func cardOf(stage, query string, cands []planner.ItemCandidate, card *planner.Qu
 // groupsOf 依命中順序（resolver 的排序）取不重複的大類；任何命中沒有大類資訊時回 nil，不分組。
 func groupsOf(ms []resolver.Match) []planner.ItemCandidate {
 	var out []planner.ItemCandidate
-	seen := map[int64]bool{}
+	seen := map[uuid.UUID]bool{}
 	for _, m := range ms {
-		if m.RootID <= 0 || m.RootName == "" {
+		if m.RootID == uuid.Nil() || m.RootName == "" {
 			return nil
 		}
 		if seen[m.RootID] {

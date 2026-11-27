@@ -39,7 +39,7 @@ CREATE TABLE procurement.request_revisions (
     item TEXT,
     item_resolution_kind TEXT,
     item_resolution_label TEXT,
-    item_resolution_category_id BIGINT,
+    item_resolution_category_id UUID,
     quantity INT,
     unit TEXT,
     packaging TEXT,
@@ -56,7 +56,7 @@ CREATE TABLE procurement.request_revisions (
     ),
     CONSTRAINT request_revisions_resolution_category_check CHECK (
         (item_resolution_category_id IS NOT NULL) = (item_resolution_kind IS NOT DISTINCT FROM 'CATEGORY_CONFIRMED')
-        AND (item_resolution_category_id IS NULL OR item_resolution_category_id > 0)
+        AND (item_resolution_category_id IS NULL OR item_resolution_category_id <> '00000000-0000-0000-0000-000000000000')
     ),
     CONSTRAINT request_revisions_item_check CHECK (char_length(item) >= 1 AND char_length(item) <= 200 AND item !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
     CONSTRAINT request_revisions_resolution_label_check CHECK (char_length(item_resolution_label) >= 1 AND char_length(item_resolution_label) <= 200 AND item_resolution_label !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),

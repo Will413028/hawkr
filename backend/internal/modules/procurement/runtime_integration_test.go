@@ -43,8 +43,8 @@ func runtimeModule(t *testing.T) (*Module, *db.DB) {
 	return m, d
 }
 
-const itemCard = `{"stage":"ITEM","query":"蘋果","candidates":[{"categoryId":"21","label":"蘋果","path":"水果 > 蘋果"}],` +
-	`"question":{"slotKey":"SLOT_KEY_ITEM_DISAMBIGUATION","prompt":"你說的是哪一個？","options":[{"optionId":"category-21","label":"蘋果"},{"optionId":"item-other","label":"其他"}],"allowFreeText":true}}`
+const itemCard = `{"stage":"ITEM","query":"蘋果","candidates":[{"categoryId":"00000000-0000-7000-8000-000000000021","label":"蘋果","path":"水果 > 蘋果"}],` +
+	`"question":{"slotKey":"SLOT_KEY_ITEM_DISAMBIGUATION","prompt":"你說的是哪一個？","options":[{"optionId":"category-00000000-0000-7000-8000-000000000021","label":"蘋果"},{"optionId":"item-other","label":"其他"}],"allowFreeText":true}}`
 
 // ask 讓 c.run 停在等待輸入並寫一個 PENDING 的中斷，回傳中斷 ID。
 func ask(ctx context.Context, t *testing.T, d *db.DB, c chain) uuid.UUID {
@@ -184,7 +184,7 @@ func TestSnapshotOpenConfirmationShowsProcessingWhileAnAnswerRunIsInProgress(t *
 	if oc == nil || oc.InterruptID != irq || oc.Kind != "CLARIFICATION" || oc.Processing {
 		t.Fatalf("等回答：%+v", oc)
 	}
-	if oc.Question.SlotKey != "ITEM_DISAMBIGUATION" || oc.Question.Prompt != "你說的是哪一個？" || !oc.Question.AllowFreeText || len(oc.Question.Options) != 2 || oc.Question.Options[0].OptionID != "category-21" {
+	if oc.Question.SlotKey != "ITEM_DISAMBIGUATION" || oc.Question.Prompt != "你說的是哪一個？" || !oc.Question.AllowFreeText || len(oc.Question.Options) != 2 || oc.Question.Options[0].OptionID != "category-00000000-0000-7000-8000-000000000021" {
 		t.Errorf("問題要還原同一個畫面：%+v", oc.Question)
 	}
 	if s.ActiveRunID != nil {
@@ -225,7 +225,7 @@ func TestResumeRunRejectsABadShapeWithoutCreatingARun(t *testing.T) { // A9-D30(
 		in     ResumeRunInput
 		fields []string
 	}{
-		"兩個都給":   {ResumeRunInput{OptionID: "category-21", FreeText: "蘋果"}, []string{"OptionID", "FreeText"}},
+		"兩個都給":   {ResumeRunInput{OptionID: "category-00000000-0000-7000-8000-000000000021", FreeText: "蘋果"}, []string{"OptionID", "FreeText"}},
 		"都沒給":    {ResumeRunInput{}, []string{"OptionID", "FreeText"}},
 		"空白文字":   {ResumeRunInput{FreeText: " 　 "}, []string{"FreeText"}},
 		"選項不在卡上": {ResumeRunInput{OptionID: "category-999"}, []string{"OptionID"}},
@@ -250,7 +250,7 @@ func TestResumeRunRejectsABadShapeWithoutCreatingARun(t *testing.T) { // A9-D30(
 	if after := runs(); after != before {
 		t.Errorf("形狀不合不得建 run：%d → %d", before, after)
 	}
-	if _, err := m.ResumeRun(ctx, ResumeRunInput{BuyerID: 8, InterruptID: irq, ClientRequestID: id(), OptionID: "category-21", Locale: uitext.ZhTW}); apperr.KindOf(err) != apperr.KindNotFound {
+	if _, err := m.ResumeRun(ctx, ResumeRunInput{BuyerID: 8, InterruptID: irq, ClientRequestID: id(), OptionID: "category-00000000-0000-7000-8000-000000000021", Locale: uitext.ZhTW}); apperr.KindOf(err) != apperr.KindNotFound {
 		t.Errorf("別的買家的中斷：%v，要 NOT_FOUND", err)
 	}
 }
@@ -266,7 +266,7 @@ func TestResumeRunReportsAnAnsweredInterruptTheSameWhateverTheInput(t *testing.T
 	for name, in := range map[string]ResumeRunInput{
 		"卡外選項": {OptionID: "category-999"},
 		"都沒給":  {},
-		"卡上選項": {OptionID: "category-21"},
+		"卡上選項": {OptionID: "category-00000000-0000-7000-8000-000000000021"},
 	} {
 		in.BuyerID, in.InterruptID, in.ClientRequestID, in.Locale = 7, irq, id(), uitext.ZhTW
 		_, err := m.ResumeRun(ctx, in)
@@ -282,7 +282,7 @@ func TestResumeRunTreatsAnOptionBesideBlankTextAsOptionOnly(t *testing.T) { // A
 	m, d := runtimeModule(t)
 	c := seed(ctx, t, store.New(d.Conn(ctx)), 7, false)
 	irq := ask(ctx, t, d, c)
-	got, err := m.ResumeRun(ctx, ResumeRunInput{BuyerID: 7, InterruptID: irq, ClientRequestID: id(), OptionID: "category-21", FreeText: " ", Locale: uitext.ZhTW})
+	got, err := m.ResumeRun(ctx, ResumeRunInput{BuyerID: 7, InterruptID: irq, ClientRequestID: id(), OptionID: "category-00000000-0000-7000-8000-000000000021", FreeText: " ", Locale: uitext.ZhTW})
 	if err != nil || got.Status != "QUEUED" {
 		t.Errorf("選項加空白文字算只答選項：%+v %v", got, err)
 	}
@@ -293,7 +293,7 @@ func TestResumeRunQueuesTheAnswerRunAndReturnsItImmediately(t *testing.T) { // A
 	m, d := runtimeModule(t)
 	c := seed(ctx, t, store.New(d.Conn(ctx)), 7, false)
 	irq := ask(ctx, t, d, c)
-	in := ResumeRunInput{BuyerID: 7, InterruptID: irq, ClientRequestID: id(), OptionID: "category-21", Locale: uitext.ZhTW}
+	in := ResumeRunInput{BuyerID: 7, InterruptID: irq, ClientRequestID: id(), OptionID: "category-00000000-0000-7000-8000-000000000021", Locale: uitext.ZhTW}
 	got, err := m.ResumeRun(ctx, in)
 	if err != nil {
 		t.Fatal(err)
@@ -306,7 +306,7 @@ func TestResumeRunQueuesTheAnswerRunAndReturnsItImmediately(t *testing.T) { // A
 	if err := d.Pool().QueryRow(ctx, `SELECT i.option_id, r.run_type FROM procurement.agent_run_inputs i JOIN procurement.agent_runs r ON r.id = i.run_id WHERE i.run_id = $1`, got.RunID).Scan(&option, &runType); err != nil {
 		t.Fatal(err)
 	}
-	if option == nil || *option != "category-21" || runType != "CLARIFICATION_RESUME" {
+	if option == nil || *option != "category-00000000-0000-7000-8000-000000000021" || runType != "CLARIFICATION_RESUME" {
 		t.Errorf("輸入 = %v %s", option, runType)
 	}
 	if again, err := m.ResumeRun(ctx, in); err != nil || again.RunID != got.RunID {
@@ -319,7 +319,7 @@ func TestResumeRunResendAfterTheAnswerRunSucceededReplaysTheOriginalRun(t *testi
 	m, d := runtimeModule(t)
 	c := seed(ctx, t, store.New(d.Conn(ctx)), 7, false)
 	irq := ask(ctx, t, d, c)
-	in := ResumeRunInput{BuyerID: 7, InterruptID: irq, ClientRequestID: id(), OptionID: "category-21", Locale: uitext.ZhTW}
+	in := ResumeRunInput{BuyerID: 7, InterruptID: irq, ClientRequestID: id(), OptionID: "category-00000000-0000-7000-8000-000000000021", Locale: uitext.ZhTW}
 	first, err := m.ResumeRun(ctx, in)
 	if err != nil {
 		t.Fatal(err)

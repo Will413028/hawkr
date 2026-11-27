@@ -103,8 +103,8 @@ func TestBlockedStoresBatchesBySellerLimitAndFailsClosed(t *testing.T) {
 
 type fakeSearch struct{}
 
-func (fakeSearch) Page(context.Context, procurement.SearchQuery, int) (procurement.SearchPage, error) {
-	return procurement.SearchPage{Last: true}, nil
+func (fakeSearch) Page(context.Context, procurement.SearchQuery, procurement.SearchCursor) (procurement.SearchPage, error) {
+	return procurement.SearchPage{}, nil
 }
 
 func TestNewWiresTheSearchExecutorWithoutAnLLMAndRejectsEachMissingSearchDependency(t *testing.T) {

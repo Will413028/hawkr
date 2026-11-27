@@ -9,16 +9,16 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
 )
 
-func revision(kind, label *string, category *int64) store.ProcurementRequestRevision {
+func revision(kind, label *string, category *uuid.UUID) store.ProcurementRequestRevision {
 	return store.ProcurementRequestRevision{ID: uuid.NewV7(), ItemResolutionKind: kind, ItemResolutionLabel: label, ItemResolutionCategoryID: category}
 }
 
 func sp(s string) *string { return &s }
 
 func TestQueryUsesTheCategoryIDAndNoKeywordWhenTheCategoryIsConfirmed(t *testing.T) {
-	cat := int64(18)
+	cat := categoryID(18)
 	got, err := queryOf(revision(sp("CATEGORY_CONFIRMED"), sp("小白菜"), &cat))
-	if err != nil || got != (candidate.Query{CategoryID: 18}) {
+	if err != nil || got != (candidate.Query{CategoryID: categoryID(18)}) {
 		t.Fatalf("query = %+v, %v", got, err)
 	}
 }
@@ -31,7 +31,7 @@ func TestQueryUsesTheDescribedTextAsKeywordForBuyerDescribed(t *testing.T) {
 }
 
 func TestQueryRejectsRevisionsWithoutAUsableResolution(t *testing.T) {
-	zero := int64(0)
+	zero := uuid.Nil()
 	for name, rev := range map[string]store.ProcurementRequestRevision{
 		"no resolution":     revision(nil, nil, nil),
 		"confirmed no id":   revision(sp("CATEGORY_CONFIRMED"), sp("x"), nil),

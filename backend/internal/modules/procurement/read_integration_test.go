@@ -167,7 +167,7 @@ func TestGetSnapshotListsTheMissingRequiredSlotsAndHasNoPublicationOrInterruptYe
 	}
 }
 
-const quantityCard = `{"stage":"","query":"","candidates":[{"categoryId":"21","label":"蘋果","path":"水果 > 蘋果"}],` +
+const quantityCard = `{"stage":"","query":"","candidates":[{"categoryId":"00000000-0000-7000-8000-000000000021","label":"蘋果","path":"水果 > 蘋果"}],` +
 	`"question":{"slotKey":"SLOT_KEY_QUANTITY","prompt":"要幾件？","allowFreeText":true}}`
 
 func TestGetSnapshotOpenInterruptOutsideTheItemCardIsTheOpenConfirmation(t *testing.T) {

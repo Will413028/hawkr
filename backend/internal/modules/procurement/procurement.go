@@ -137,13 +137,15 @@ type ProductSearcher = candidate.Searcher
 type (
 	// SearchQuery 是搜尋的輸入：分類 ID 與關鍵字二擇一。
 	SearchQuery = candidate.Query
-	// SearchPage 是依序的一頁命中，Last 表示後面沒有更多頁。
+	// SearchPage 是依序的一頁命中，Next 是下一頁的游標，空字串表示後面沒有更多頁。
 	SearchPage = candidate.Page
+	// SearchCursor 是搜尋翻頁的不透明游標。
+	SearchCursor = candidate.Cursor
 	// SearchHit 是命中的一件上架商品（商品 ID 與店 ID）。
 	SearchHit = candidate.Hit
 )
 
-// TaxonomyReader 讀平台的啟用分類樹（扁平節點，根的 ParentID 為 0）。
+// TaxonomyReader 讀平台的啟用分類樹（扁平節點，根的 ParentID 為 nil）。
 type TaxonomyReader = resolver.TaxonomyReader
 
 // TaxonomyNode 是分類樹的一個節點。

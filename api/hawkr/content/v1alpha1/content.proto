@@ -47,7 +47,7 @@ message BannerAction {
     Popup popup = 1;
     // 開啟這個外部網址，只接受 http:// 或 https:// 開頭。
     string url = 2;
-    // 開啟這個商品的頁面。
+    // 開啟這個商品的頁面；商品 ID 是 UUID（小寫、含連字號）。
     string product_id = 3;
     // 開啟這篇貼文的頁面。
     string post_id = 4;

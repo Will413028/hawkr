@@ -97,7 +97,7 @@ export type BannerAction = Message<"hawkr.content.v1alpha1.BannerAction"> & {
     case: "url";
   } | {
     /**
-     * 開啟這個商品的頁面。
+     * 開啟這個商品的頁面；商品 ID 是 UUID（小寫、含連字號）。
      *
      * @generated from field: string product_id = 3;
      */

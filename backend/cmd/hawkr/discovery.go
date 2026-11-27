@@ -7,7 +7,7 @@ import (
 
 	httpseller "github.com/Will413028/hawkr/backend/internal/httpapi/seller"
 	"github.com/Will413028/hawkr/backend/internal/legacy/orderservice"
-	"github.com/Will413028/hawkr/backend/internal/legacy/productservice"
+	"github.com/Will413028/hawkr/backend/internal/modules/catalog"
 	"github.com/Will413028/hawkr/backend/internal/modules/discovery"
 	"github.com/Will413028/hawkr/backend/internal/modules/review"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
@@ -15,10 +15,10 @@ import (
 )
 
 // newDiscovery 組裝 discovery 模組。worker 用它重算分數（AddWorkers、PeriodicJobs），serve 用它讀排行（對外的
-// DiscoveryPublicService）；只有重算會呼叫三個上游，讀取只用 seller。三個上游還在舊服務，由 internal/legacy 的 client 實作 port：order 的各店統計、
-// product 的「有公開商品的店家」（ordering、catalog 搬進單體後改呼叫它們的公開 API）；評價統計直接讀 review 模組；店家的
+// DiscoveryPublicService）；只有重算會呼叫上游，讀取只用 seller。order 的各店統計還在舊服務，由 internal/legacy 的 client 實作 port（ordering 搬進單體後改呼叫它的公開 API）；
+// 「有公開商品的店家」是 catalog 模組（*catalog.Module 直接滿足 discovery.Products）；評價統計直接讀 review 模組；店家的
 // 曝光資格是 seller 模組（*seller.Module 直接滿足 discovery.Stores）。
-func newDiscovery(d *db.DB, orders *orderservice.Client, products *productservice.Client, reviews *review.Module, sellers *seller.Module, log *slog.Logger) *discovery.Module {
+func newDiscovery(d *db.DB, orders *orderservice.Client, products *catalog.Module, reviews *review.Module, sellers *seller.Module, log *slog.Logger) *discovery.Module {
 	return discovery.New(discovery.Deps{
 		DB: d, Orders: discoveryOrders{orders}, Products: products, Reviews: discoveryReviews{reviews}, Stores: sellers,
 		Now: time.Now, Logger: log,

@@ -106,10 +106,10 @@ func ApplyAnswer(ctx context.Context, rs Resolver, l uitext.Locale, now time.Tim
 		return Outcome{}, fmt.Errorf("turn：解析品項：%w", err)
 	}
 	current := usable(p.Query, res.Matches, now)
-	if p.Root != 0 {
+	if p.Root != nil {
 		var inRoot []confirmed
 		for _, h := range current {
-			if h.match.RootID == p.Root {
+			if h.match.RootID == *p.Root {
 				inRoot = append(inRoot, h)
 			}
 		}

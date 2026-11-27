@@ -30,11 +30,11 @@ CREATE TABLE content.banners (
     -- 排程是 [開始, 結束)：結束必須晚於開始（模組的 BannerInput.validate 是第一道）。
     CONSTRAINT banners_schedule_check CHECK (start_date IS NULL OR end_date IS NULL OR start_date < end_date),
     -- 點擊行為一定完整（模組的 BannerAction.validate 是第一道）：POPUP 不帶值；URL 是 http(s) 網址；
-    -- PRODUCT 帶 ID；POST 帶小寫的標準 UUID（儲存的是標準形式，模組寫入時已正規化，這裡讓直接寫入的列也守住）。
+    -- PRODUCT 與 POST 帶小寫的標準 UUID（儲存的是標準形式，模組寫入時已正規化，這裡讓直接寫入的列也守住）。
     CONSTRAINT banners_action_check CHECK (
         (action_type = 'POPUP' AND action_target = '')
         OR (action_type = 'URL' AND action_target ~ '^https?://')
-        OR (action_type = 'PRODUCT' AND action_target <> '')
+        OR (action_type = 'PRODUCT' AND action_target ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
         OR (action_type = 'POST' AND action_target ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
     )
 );

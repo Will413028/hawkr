@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+	"uuid"
 
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/model"
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
@@ -58,8 +59,8 @@ const (
 // Resolution 是品項原話被判定成什麼。
 type Resolution struct {
 	Kind ItemResolutionKind
-	// CategoryID 是 CategoryConfirmed 的平台分類 ID；BuyerDescribed 沒有分類，必為 0（與 request_revisions 的 CHECK 一致）。
-	CategoryID int64
+	// CategoryID 是 CategoryConfirmed 的平台分類 ID；BuyerDescribed 沒有分類，必為 uuid.Nil()（與 request_revisions 的 CHECK 一致）。
+	CategoryID uuid.UUID
 	Label      string
 }
 
@@ -229,7 +230,7 @@ func boundedText(raw string, reject func(model.SlotKey, Reason), key model.SlotK
 }
 
 func validResolution(r Resolution, reject func(model.SlotKey, Reason)) (Resolution, bool) {
-	if r.Kind != CategoryConfirmed && r.Kind != BuyerDescribed || (r.Kind == CategoryConfirmed) != (r.CategoryID > 0) {
+	if r.Kind != CategoryConfirmed && r.Kind != BuyerDescribed || (r.Kind == CategoryConfirmed) != (r.CategoryID != uuid.Nil()) {
 		reject(ItemResolution, ReasonResolutionUnknownKind)
 		return Resolution{}, false
 	}

@@ -84,7 +84,7 @@ func TestAnswerRunCommitsAnAnswerTurnResolvesTheInterruptAndSucceedsTheAskingRun
 	ctx := context.Background()
 	f := newFixture(t)
 	parent, irq := f.ask(ctx)
-	answer := f.resume(irq, "category-21", "")
+	answer := f.resume(irq, optID(21), "")
 	if f.interruptStatus(irq) != "PENDING" || f.run(parent).Status != run.StatusWaitingForInput {
 		t.Fatal("送出回答時不解決中斷、不動提問的 run")
 	}
@@ -104,10 +104,10 @@ func TestAnswerRunCommitsAnAnswerTurnResolvesTheInterruptAndSucceedsTheAskingRun
 	if got := strings.Join(f.eventTypes(answer), ","); got != "run_accepted,turn_result,finished" {
 		t.Errorf("events = %s", got)
 	}
-	if n := f.count(`SELECT count(*) FROM procurement.turns WHERE request_id = $1 AND source = 'ANSWER' AND buyer_message <> '' AND buyer_message <> 'category-21' AND client_request_id = $2`, f.request, r.ClientRequestID); n != 1 {
+	if n := f.count(`SELECT count(*) FROM procurement.turns WHERE request_id = $1 AND source = 'ANSWER' AND buyer_message <> '' AND buyer_message <> $3 AND client_request_id = $2`, f.request, r.ClientRequestID, optID(21)); n != 1 {
 		t.Errorf("source=ANSWER 的輪次 %d 筆，要 1 筆，買家訊息是選項的標籤", n)
 	}
-	if n := f.count(`SELECT count(*) FROM procurement.request_revisions WHERE request_id = $1 AND status = 'ACTIVE' AND item_resolution_kind = 'CATEGORY_CONFIRMED' AND item_resolution_category_id = 21`, f.request); n != 1 {
+	if n := f.count(`SELECT count(*) FROM procurement.request_revisions WHERE request_id = $1 AND status = 'ACTIVE' AND item_resolution_kind = 'CATEGORY_CONFIRMED' AND item_resolution_category_id = $2`, f.request, catID(21)); n != 1 {
 		t.Errorf("現行版本要存 item_resolution_category_id = 21：%d", n)
 	}
 	if n := f.count(`SELECT count(*) FROM procurement.request_revisions WHERE request_id = $1`, f.request); n != 2 {
@@ -147,7 +147,7 @@ func TestRejectedAnswerFailsWithAnswerRejectedKeepsTheInterruptPendingAndRestore
 	parent, irq := f.ask(ctx)
 	before := f.count(`SELECT count(*) FROM procurement.request_revisions WHERE request_id = $1`, f.request)
 	turnsBefore := f.count(`SELECT count(*) FROM procurement.turns WHERE request_id = $1`, f.request)
-	bad := f.resume(irq, "category-999", "")
+	bad := f.resume(irq, optID(999), "")
 	if err := f.runAnswer(ctx, bad); err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +170,7 @@ func TestRejectedAnswerFailsWithAnswerRejectedKeepsTheInterruptPendingAndRestore
 	if got := strings.Join(f.eventTypes(bad), ","); got != "run_accepted,finished" {
 		t.Errorf("events = %s", got)
 	}
-	good := f.resume(irq, "category-22", "")
+	good := f.resume(irq, optID(22), "")
 	if err := f.runAnswer(ctx, good); err != nil {
 		t.Fatal(err)
 	}
@@ -201,7 +201,7 @@ func TestAnswerCommitLocksTheAskingRunBeforeItsOwnRun(t *testing.T) {
 	defer cancel()
 	f := newFixture(t)
 	parent, irq := f.ask(ctx)
-	answer := f.resume(irq, "category-21", "")
+	answer := f.resume(irq, optID(21), "")
 	claimed, err := f.ledger().Transition(ctx, answer, run.StatusRunning, "")
 	if err != nil {
 		t.Fatal(err)

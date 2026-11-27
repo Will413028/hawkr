@@ -37,7 +37,7 @@ func (s *Service) Recompute(ctx context.Context) (Result, error) {
 		return Result{}, s.fail(ctx, started, "state", err)
 	}
 
-	withProducts, err := s.d.Products.StoresWithPublicProducts(ctx)
+	withProducts, err := s.d.Products.StoresWithPublicProducts(ctx, started)
 	if err != nil {
 		return Result{}, s.fail(ctx, started, "product", err)
 	}

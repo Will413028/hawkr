@@ -17,6 +17,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/Will413028/hawkr/backend/internal/modules/catalog"
 	"github.com/Will413028/hawkr/backend/internal/modules/content/internal/store"
 	"github.com/Will413028/hawkr/backend/internal/modules/media"
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
@@ -37,12 +38,20 @@ type Social interface {
 
 var _ Social = (*social.Module)(nil)
 
+// Products 是 banner 對 catalog 的需求：商品目標要是公開可見的商品（存在、沒刪除、不是草稿、店家此刻可曝光；規則在 catalog）。
+type Products interface {
+	PublicProduct(ctx context.Context, productID uuid.UUID, at time.Time) (catalog.Product, error)
+}
+
+var _ Products = (*catalog.Module)(nil)
+
 type Deps struct {
-	DB     *db.DB
-	Social Social
-	Media  model.Media
-	NewID  func() uuid.UUID
-	Now    func() time.Time
+	DB       *db.DB
+	Social   Social
+	Products Products
+	Media    model.Media
+	NewID    func() uuid.UUID
+	Now      func() time.Time
 }
 
 func New(d Deps) *Service {
@@ -83,17 +92,45 @@ func validateAction(a model.BannerAction) error {
 	}
 }
 
-// canonicalPostTarget 把貼文目標轉成儲存用的正規形（去掉前後空白的 UUID 字串），一併回傳解析出的貼文 ID；其他點擊行為原樣回傳、ID 是零值。
-func canonicalPostTarget(a model.BannerAction) (model.BannerAction, uuid.UUID, error) {
-	if a.Type != model.BannerActionPost {
+// hasEntityTarget 回報點擊行為的目標是 UUID 實體（貼文或商品）。
+func hasEntityTarget(a model.BannerAction) bool {
+	return a.Type == model.BannerActionPost || a.Type == model.BannerActionProduct
+}
+
+// canonicalEntityTarget 把貼文與商品目標轉成儲存用的正規形（去掉前後空白、小寫的標準 UUID 字串），一併回傳解析出的 ID；其他點擊行為原樣回傳、ID 是零值。
+func canonicalEntityTarget(a model.BannerAction) (model.BannerAction, uuid.UUID, error) {
+	if !hasEntityTarget(a) {
 		return a, uuid.UUID{}, nil
 	}
 	id, err := uuid.Parse(strings.TrimSpace(a.Target))
 	if err != nil {
-		return a, uuid.UUID{}, apperr.InvalidInputOn([]string{"Action.Target"}, "貼文 ID 格式不正確")
+		what := "商品"
+		if a.Type == model.BannerActionPost {
+			what = "貼文"
+		}
+		return a, uuid.UUID{}, apperr.InvalidInputOn([]string{"Action.Target"}, "%s ID 格式不正確", what)
 	}
 	a.Target = id.String()
 	return a, id, nil
+}
+
+// checkEntityTarget 在貼文或商品目標寫入前確認它存在：貼文要公開可讀，商品要公開可見。
+func (m *Service) checkEntityTarget(ctx context.Context, a model.BannerAction, id uuid.UUID) error {
+	if a.Type == model.BannerActionProduct {
+		return m.checkProductTarget(ctx, id)
+	}
+	return m.checkPostTarget(ctx, id)
+}
+
+// checkProductTarget 在商品目標寫入前確認商品公開可見（catalog 的 PublicProduct，時間用模組的 clock）。
+func (m *Service) checkProductTarget(ctx context.Context, id uuid.UUID) error {
+	if _, err := m.d.Products.PublicProduct(ctx, id, m.d.Now()); err != nil {
+		if errors.Is(err, catalog.ErrProductNotFound) {
+			return apperr.InvalidInputOn([]string{"Action.Target"}, "找不到這個商品，或商品目前不公開")
+		}
+		return fmt.Errorf("content：確認 banner 的商品目標 %s：%w", id, err)
+	}
+	return nil
 }
 
 // checkPostTarget 在貼文目標寫入前確認貼文 id 存在而且公開可讀（A7-D28 第 7 點）。
@@ -257,13 +294,13 @@ func (m *Service) CreateBanner(ctx context.Context, adminID int64, in model.Bann
 	if err := validateInput(in); err != nil {
 		return model.Banner{}, err
 	}
-	canonical, postID, err := canonicalPostTarget(in.Action)
+	canonical, targetID, err := canonicalEntityTarget(in.Action)
 	if err != nil {
 		return model.Banner{}, err
 	}
 	in.Action = canonical
-	if canonical.Type == model.BannerActionPost {
-		if err := m.checkPostTarget(ctx, postID); err != nil {
+	if hasEntityTarget(canonical) {
+		if err := m.checkEntityTarget(ctx, canonical, targetID); err != nil {
 			return model.Banner{}, err
 		}
 	}
@@ -327,15 +364,15 @@ func (m *Service) UpdateBanner(ctx context.Context, input model.UpdateBannerInpu
 	if cur.Version != input.Version {
 		return model.Banner{}, bannerConflict()
 	}
-	// 貼文目標只在換掉目標時檢查：目標沒變的 banner（例如貼文後來下架）仍可修改其他欄位或停用。
+	// 貼文與商品目標只在換掉目標時檢查：目標沒變的 banner（例如貼文後來下架）仍可修改其他欄位或停用。
 	if input.Banner.Action != cur.Action {
-		canonical, postID, err := canonicalPostTarget(input.Banner.Action)
+		canonical, targetID, err := canonicalEntityTarget(input.Banner.Action)
 		if err != nil {
 			return model.Banner{}, err
 		}
 		input.Banner.Action = canonical
-		if canonical != cur.Action && canonical.Type == model.BannerActionPost {
-			if err := m.checkPostTarget(ctx, postID); err != nil {
+		if canonical != cur.Action && hasEntityTarget(canonical) {
+			if err := m.checkEntityTarget(ctx, canonical, targetID); err != nil {
 				return model.Banner{}, err
 			}
 		}

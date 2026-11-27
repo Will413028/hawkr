@@ -328,7 +328,7 @@
    "id": "fix3-r4",
    "stack": "go",
    "file": "backend/internal/modules/procurement/internal/turn/apply.go",
-   "old": "if h.match.RootID == p.Root {",
+   "old": "if h.match.RootID == *p.Root {",
    "new": "if true {",
    "test": "internal/modules/procurement/internal/turn ^TestStalePickOnGroupNarrowedCardStaysInRoot$",
    "why": "過期選項重建不限在卡的大類內：退回 GROUP 卡"

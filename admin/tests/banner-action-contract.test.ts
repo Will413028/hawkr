@@ -32,7 +32,7 @@ const SHAPES: Record<string, BannerAction> = {
 		kind: { case: "url", value: "https://example.com/promotion" },
 	}),
 	product: create(BannerActionSchema, {
-		kind: { case: "productId", value: "7451098488051643148" },
+		kind: { case: "productId", value: "0190f2a4-7c3e-7b1a-8d2f-5a6b7c8d9e0f" },
 	}),
 	post: create(BannerActionSchema, {
 		kind: { case: "postId", value: "7398765432109876543" },

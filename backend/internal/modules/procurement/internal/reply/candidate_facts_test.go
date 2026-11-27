@@ -15,7 +15,7 @@ func TestCandidateFactsFromTheRevision(t *testing.T) {
 	d := time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC)
 	full := slots.Set{
 		Item: sp("蘋果"), Quantity: &q, Unit: sp("KG"), BudgetPerUnit: &b, DeliveryCity: sp("臺北市"), DeliveryDate: &d,
-		Resolution: &slots.Resolution{Kind: slots.CategoryConfirmed, CategoryID: 5, Label: "蘋果"},
+		Resolution: &slots.Resolution{Kind: slots.CategoryConfirmed, CategoryID: categoryID(5), Label: "蘋果"},
 	}
 	matched, unverifiable := CandidateFacts(uitext.ZhTW, full)
 	if want := []model.MatchedFact{{SlotKey: slots.Item, Label: "品項"}}; !reflect.DeepEqual(matched, want) {

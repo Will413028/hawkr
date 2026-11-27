@@ -29,7 +29,7 @@
 
 ## 3. TURN 執行（A9-3b-2c）
 
-- executor（`internal/turn`）由 `procurement.New` 在給了 `Deps.LLM` 與 `Deps.Taxonomy` 時登記（只給其中一個 panic；`Executors` 已有 TURN 的項目則保留）。worker 角色的 `cmd/hawkr` 給採購用的 `llm.Procurement` 與經 `internal/legacy/categoryservice` 轉接的分類樹；serve 角色不執行 run，不給。
+- executor（`internal/turn`）由 `procurement.New` 在給了 `Deps.LLM` 與 `Deps.Taxonomy` 時登記（只給其中一個 panic；`Executors` 已有 TURN 的項目則保留）。worker 角色的 `cmd/hawkr` 給採購用的 `llm.Procurement` 與 catalog 的 `Categories`（平台分類，ID 是 UUID，名稱用繁體中文）轉成的分類樹；serve 角色不執行 run，不給。
 - 一輪：一次模型呼叫（`internal/extract`：Gemini 走 response schema、DeepSeek 走強制 tool call；買家訊息截 2000 rune；單次 30 秒、含退避總預算 70 秒，呼叫內最多重試一次，只對逾時、429、5xx、連線層錯誤、格式錯誤與 ErrorCode 為 OTHER／MALFORMED_FUNCTION_CALL（輸出不明或壞掉）；4xx、停用與安全類 ErrorCode（SAFETY、PROHIBITED_CONTENT、RECITATION、BLOCKLIST、SPII、MAX_TOKENS、content_filter）不重試；抽取結果不做簡轉繁）→ 套用欄位 → 品項變更或未解析時查分類樹 → 規劃與渲染 → 單一 transaction 提交。模型沒有給出可用答案（含重試用盡）一律失敗並退額度：逾時、429、5xx 用盡是 `MODEL_UNAVAILABLE`，其餘（含帶 ErrorCode 的回應用盡後）`TURN_PIPELINE_ERROR`；空抽取是成功。沒有降級。
 - 提交：新版本（`request_revisions`，品項解析存 `item_resolution_category_id`，BUYER_DESCRIBED 為 NULL）、`turns`、需求狀態、對話預覽與自動標題（`品項｜縣市`，40 rune，只在 `title_source = 'AUTO'` 時寫）、`turn_result` 事件與 run 的終態轉換同一個 transaction；等待輸入時改寫中斷（`InterruptInput.ID` 由呼叫端預先產生，事件內的 `interrupt.interrupt_id` 等於它）。
 - 需求狀態：依齊全與否在 CLARIFYING 與 REQUIREMENT_READY 之間；需求在 MATCHING 時，只有品項解析改了才退回，其餘（數量、單位、縣市、交期、預算等）維持 MATCHING，因為候選搜尋只用品項解析當輸入（A9-D29(2)）。
@@ -39,9 +39,9 @@
 ## 4. 候選搜尋（A9-3b-2d，A9-D29）
 
 - 開始：`Module.StartCandidateSearch`（`internal/search` 的 `Starter`），經 `run.Submitter` 的送出路徑，在買家的送出鎖之內同一個 transaction 先驗證需求屬於買家且狀態允許（別人的需求不因對方有進行中的 run 而洩漏），再檢查同需求的進行中 run 與買家上限，最後讀現行版本並建候選集（不鎖需求列）（指向需求當下的現行版本）與 `CANDIDATE_SEARCH` run 並排入 job。需求不屬於買家回 `NOT_FOUND`；需求不在 `REQUIREMENT_READY` 或 `MATCHING`（或現行版本沒有品項解析）回 `FAILED_PRECONDITION`／`REQUIREMENT_NOT_READY`；同需求已有進行中 run 回 `PROCUREMENT_RUN_IN_PROGRESS`；每買家上限同 TURN；不扣額度；Start 不改需求狀態；CANDIDATE_SEARCH 沒有買家訊息，不寫 `agent_run_inputs`（executor 不讀它），重送只比對需求與 run 類型。冪等以 run 的 `(buyer_id, client_request_id)` 為準，重送回同一個 run 與它的 `candidate_set_id`，內容不同回 `INVALID_ARGUMENT`。
-- executor（`internal/search`）由 `procurement.New` 在給了 `Deps.Search`（商品搜尋 port）時登記，必須同時有 `Deps.Sellers` 與 `Deps.Taxonomy`（否則 panic）；worker 角色的 `cmd/hawkr` 以 `internal/legacy/productservice` 轉接商品搜尋。
+- executor（`internal/search`）由 `procurement.New` 在給了 `Deps.Search`（商品搜尋 port）時登記，必須同時有 `Deps.Sellers` 與 `Deps.Taxonomy`（否則 panic）；worker 角色的 `cmd/hawkr` 以 catalog 的 `ListPublicProducts` 實作商品搜尋（只含 ACTIVE 且店家此刻可曝光的商品）。
 - 輸入只取自候選集所指需求版本的品項解析：`CATEGORY_CONFIRMED` 用分類 ID、不帶關鍵字；`BUYER_DESCRIBED` 用解析的 `Label` 當關鍵字。搜尋前以分類樹確認已確認的分類仍是末層：一律用 `Resolver.LeafAsOf(分類 ID, notBefore)`，`notBefore` 是候選集所指版本的 `created_at`：快取樹開始讀取的時間早於 `notBefore` 或已超過 TTL 時同步重讀（不論快取答案是肯定或否定），只有夠新的樹才能判定分類失效；拿不到這樣的樹回錯誤，run 以 `SEARCH_FAILED` 收斂，不清解析。
-- 翻頁：只取上架商品、依銷量（`SALES`）排序、每頁 50 筆、page 從 1 起；每頁處理後累計不重複且通過過濾的店，滿 20 家（`candidate.MaxStores`）、最後一頁（回傳少於 50 筆）或翻滿 5 頁（`candidate.MaxPages`）即停；任一頁失敗整次搜尋失敗。一店只留第一次出現的商品（`source_id` 是商品 ID），`rank` 從 0 起依出現順序。20 與 5 是推論值。
+- 翻頁：只取上架商品、依銷量（`SALES`）排序、每頁 50 筆、keyset 翻頁（`Searcher.Page` 收上一頁回的不透明游標，第一頁給空字串）；每頁處理後累計不重複且通過過濾的店，滿 20 家（`candidate.MaxStores`）、最後一頁（回應沒有下一頁游標）或翻滿 5 頁（`candidate.MaxPages`）即停；任一頁失敗整次搜尋失敗。一店只留第一次出現的商品（`source_id` 是商品 ID），`rank` 從 0 起依出現順序。20 與 5 是推論值。
 - 過濾（transaction 外，fail-closed）：先 `candidate.KeepOpen`（只收 seller 判定可公開曝光的店），再排除封鎖這位買家的店（`seller.StoresBlockingBuyer`，依 `seller.MaxBatchSize` 分批）；「滿 20 家」以過濾後計。任一讀取失敗即搜尋失敗。
 - 提交（單一 transaction）：`LockRun`（取消搶先時整筆回滾）→ 鎖現行版本列（`LockActiveRevision`）並確認它的 ID 仍等於候選集的 `request_revision_id`（不等回錯誤，run 以 `SEARCH_FAILED` 收斂、需求狀態不動）→ 寫各候選 → 需求轉 `MATCHING`（條件式 UPDATE 鎖需求列，順序在版本列之後）（來源 `REQUIREMENT_READY` 或 `MATCHING`）→ run 轉 `SUCCEEDED`。零結果也是成功。外部呼叫（搜尋、店家狀態、封鎖、分類樹）都在 transaction 外。
 - 失敗原因：搜尋或過濾失敗、版本已變、提交失敗是 `SEARCH_FAILED`（CANDIDATE_SEARCH 不扣額度，沒有額度可退）；已確認的分類不再是末層是 `ITEM_CATEGORY_UNAVAILABLE`：同一個 transaction 寫一個清掉品項解析的新版本（品項文字保留）、需求轉 `CLARIFYING`、run 轉 `FAILED`，executor 回傳 nil。

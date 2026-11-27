@@ -17,9 +17,9 @@ var Dependencies = map[string][]string{
 	"payment":           {},
 	"buyer":             {"identity", "media"},
 	"seller":            {"identity", "media", "payment"},
-	"content":           {"media", "social"}, // banner 的貼文目標：建立時經 social 確認公開可讀，讀取時隱藏失效的（A7-D28、A7-D23 O5）；social 不得依賴 content。
+	"content":           {"media", "social", "catalog"}, // banner 的貼文目標：建立時經 social 確認公開可讀，讀取時隱藏失效的（A7-D28、A7-D23 O5）；social 不得依賴 content。商品目標：建立與換掉時經 catalog 確認公開可見。
 	"fulfillment":       {"buyer", "seller", "media"},
-	"catalog":           {"seller", "buyer", "media", "fulfillment"},
+	"catalog":           {"seller", "buyer", "media"},
 	"invoice":           {"payment", "fulfillment", "buyer", "seller", "media"},
 	"cart":              {"catalog", "buyer", "seller"},
 	"coupon":            {"identity", "buyer", "seller"},

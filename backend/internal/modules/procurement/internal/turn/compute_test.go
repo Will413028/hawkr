@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"hash/fnv"
 	"strings"
 	"testing"
@@ -26,16 +27,16 @@ var now = time.Date(2026, 11, 22, 3, 0, 0, 0, time.UTC)
 type fakeResolver struct {
 	res    resolver.Resolution
 	byTerm map[string][]resolver.Match
-	leaves map[int64][]resolver.Match
+	leaves map[uuid.UUID][]resolver.Match
 	err    error
 	calls  int
 }
 
-func (f *fakeResolver) Leaves(_ context.Context, rootID int64) ([]resolver.Match, error) {
+func (f *fakeResolver) Leaves(_ context.Context, rootID uuid.UUID) ([]resolver.Match, error) {
 	return f.leaves[rootID], f.err
 }
 
-func (f *fakeResolver) Leaf(_ context.Context, id int64) (resolver.Match, bool, error) {
+func (f *fakeResolver) Leaf(_ context.Context, id uuid.UUID) (resolver.Match, bool, error) {
 	var all []resolver.Match
 	all = append(all, f.res.Matches...)
 	for _, ms := range f.byTerm {
@@ -67,14 +68,14 @@ func ip(i int64) *int64   { return &i }
 
 func resolved() slots.Set {
 	return slots.Set{
-		Item: sp("蘋果"), Resolution: &slots.Resolution{Kind: slots.CategoryConfirmed, CategoryID: 5, Label: "蘋果"},
+		Item: sp("蘋果"), Resolution: &slots.Resolution{Kind: slots.CategoryConfirmed, CategoryID: catID(5), Label: "蘋果"},
 		Unit: sp("KG"), DeliveryCity: sp("臺北市"),
 	}
 }
 
 // match 組一個末層命中；大類取路徑的第一段，大類 ID 由大類名固定算出（路徑空白時沒有大類資訊）。
 func match(id int64, name, path string) resolver.Match {
-	m := resolver.Match{CategoryID: id, Name: name, Path: path, Via: resolver.ViaExact, Leaf: true}
+	m := resolver.Match{CategoryID: catID(id), Name: name, Path: path, Via: resolver.ViaExact, Leaf: true}
 	if path != "" {
 		m.RootName = strings.SplitN(path, " > ", 2)[0]
 		m.RootID = rootID(m.RootName)
@@ -82,11 +83,27 @@ func match(id int64, name, path string) resolver.Match {
 	return m
 }
 
-func rootID(name string) int64 {
+// rootID 是大類名固定算出的大類 ID（與 catID 的空間分開，不會撞到）。
+// nilIDMatch 是分類 ID 為零值的命中（不合法，不能被確認）。
+func nilIDMatch(name, path string) resolver.Match {
+	m := match(1, name, path)
+	m.CategoryID = uuid.Nil()
+	return m
+}
+
+func rootID(name string) uuid.UUID {
 	h := fnv.New32a()
 	_, _ = h.Write([]byte(name))
-	return int64(h.Sum32()%100000) + 1
+	return uuid.MustParse(fmt.Sprintf("00000000-0000-7000-9000-%012d", h.Sum32()%100000+1))
 }
+
+// catID 是測試用的確定性分類 ID：同一個數字永遠得到同一個 UUID，且不是零值。
+func catID(n int64) uuid.UUID {
+	return uuid.MustParse(fmt.Sprintf("00000000-0000-7000-8000-%012d", n))
+}
+
+// optID 是分類 n 在卡上的選項 ID。
+func optID(n int64) string { return "category-" + catID(n).String() }
 
 func decideOK(t *testing.T, rs Resolver, prior priorState, patch slots.Patch) decision {
 	t.Helper()
@@ -101,7 +118,7 @@ func TestSingleMatchConfirmsTheCategoryWithItsID(t *testing.T) {
 	rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{match(18, "小白菜", "葉菜 > 小白菜")}}}
 	d := decideOK(t, rs, priorState{requestOf: statusClarifying}, slots.Patch{Item: sp("小白菜"), Unit: sp("kg"), DeliveryCity: sp("台北")})
 	r := d.next.Resolution
-	if r == nil || r.Kind != slots.CategoryConfirmed || r.CategoryID != 18 || r.Label != "小白菜" {
+	if r == nil || r.Kind != slots.CategoryConfirmed || r.CategoryID != catID(18) || r.Label != "小白菜" {
 		t.Fatalf("resolution = %+v", r)
 	}
 	if d.interrupt != nil || d.status != statusRequirementReady {
@@ -142,7 +159,7 @@ func TestAmbiguousItemPausesWithAOneLevelCardCappedAtFive(t *testing.T) {
 	if q.SlotKey != "SLOT_KEY_ITEM_DISAMBIGUATION" || !q.AllowFreeText || q.CanSkip || len(q.Options) != planner.MaxItemOptions+1 {
 		t.Errorf("question = %+v", q)
 	}
-	if !strings.Contains(q.Options[0].Label, "大類 > 品項") || q.Options[0].OptionID != "category-1" {
+	if !strings.Contains(q.Options[0].Label, "大類 > 品項") || q.Options[0].OptionID != optID(1) {
 		t.Errorf("選項要帶大類路徑：%+v", q.Options[0])
 	}
 	if d.plan.Act != planner.ItemNeedsDisambiguation {
@@ -226,7 +243,7 @@ func TestMatchingRegressesOnlyWhenASearchFieldChanges(t *testing.T) {
 		{"預算", func(s *slots.Set) { s.BudgetPerUnit = ip(30) }, statusMatching},
 		{"精確比對", func(s *slots.Set) { v := false; s.ExactMatchRequired = &v }, statusMatching},
 		{"品項解析", func(s *slots.Set) {
-			s.Resolution = &slots.Resolution{Kind: slots.CategoryConfirmed, CategoryID: 6, Label: "香蕉"}
+			s.Resolution = &slots.Resolution{Kind: slots.CategoryConfirmed, CategoryID: catID(6), Label: "香蕉"}
 		}, statusRequirementReady},
 		{"數量", func(s *slots.Set) { v := int32(11); s.Quantity = &v }, statusMatching},
 		{"單位", func(s *slots.Set) { s.Unit = sp("CATTY") }, statusMatching},
@@ -244,7 +261,7 @@ func TestMatchingRegressesOnlyWhenASearchFieldChanges(t *testing.T) {
 		t.Errorf("搜尋欄位沒改就維持 MATCHING（%s）", got)
 	}
 	next := base
-	next.Resolution = &slots.Resolution{Kind: slots.CategoryConfirmed, CategoryID: 6, Label: "香蕉"}
+	next.Resolution = &slots.Resolution{Kind: slots.CategoryConfirmed, CategoryID: catID(6), Label: "香蕉"}
 	if got := nextStatus(statusMatching, base, next, false); got != statusClarifying {
 		t.Errorf("退回時依齊全與否：未齊全是 CLARIFYING（%s）", got)
 	}
@@ -278,7 +295,7 @@ func TestRevisionMapperKeepsEveryFieldAndTheCategoryID(t *testing.T) {
 	q := int32(7)
 	exact := false
 	in := slots.Set{
-		Item: sp("蘋果"), Resolution: &slots.Resolution{Kind: slots.CategoryConfirmed, CategoryID: 5, Label: "蘋果"}, Quantity: &q, Unit: sp("KG"),
+		Item: sp("蘋果"), Resolution: &slots.Resolution{Kind: slots.CategoryConfirmed, CategoryID: catID(5), Label: "蘋果"}, Quantity: &q, Unit: sp("KG"),
 		Packaging: sp("箱"), BudgetPerUnit: ip(30), DeliveryCity: sp("臺北市"), DeliveryDate: &d, ExactMatchRequired: &exact,
 	}
 	p := revisionParams(in, store.InsertRevisionParams{})
@@ -290,7 +307,7 @@ func TestRevisionMapperKeepsEveryFieldAndTheCategoryID(t *testing.T) {
 	if out := setFromRevision(rev); !sameContent(out, in) {
 		t.Errorf("往返後內容不同：%+v vs %+v", out, in)
 	}
-	if p.ItemResolutionCategoryID == nil || *p.ItemResolutionCategoryID != 5 {
+	if p.ItemResolutionCategoryID == nil || *p.ItemResolutionCategoryID != catID(5) {
 		t.Errorf("category id = %v", p.ItemResolutionCategoryID)
 	}
 	described := slots.Set{Item: sp("x"), Resolution: &slots.Resolution{Kind: slots.BuyerDescribed, Label: "x"}}
@@ -369,8 +386,7 @@ func TestClassifyExtractErr(t *testing.T) {
 func TestSingleMatchWithAnInvalidLabelIsTreatedAsNoMatch(t *testing.T) {
 	for name, m := range map[string]resolver.Match{
 		"blank label":    match(5, "  ", "水果 > 蘋果"),
-		"zero id":        match(0, "蘋果", "水果 > 蘋果"),
-		"negative id":    match(-3, "蘋果", "水果 > 蘋果"),
+		"zero id":        nilIDMatch("蘋果", "水果 > 蘋果"),
 		"empty label":    match(5, "", "水果 > 蘋果"),
 		"whitespace tab": match(5, "\t", "水果 > 蘋果"),
 	} {
@@ -389,10 +405,10 @@ func TestSingleMatchWithAnInvalidLabelIsTreatedAsNoMatch(t *testing.T) {
 
 func TestInvalidCandidatesNeverAppearOnTheCard(t *testing.T) {
 	rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{
-		match(1, "蘋果", "水果 > 蘋果"), match(2, " ", "水果 > 空白"), match(0, "壞 ID", "水果 > 壞"), match(3, "蘋果乾", "加工品 > 蘋果乾"),
+		match(1, "蘋果", "水果 > 蘋果"), match(2, " ", "水果 > 空白"), nilIDMatch("壞 ID", "水果 > 壞"), match(3, "蘋果乾", "加工品 > 蘋果乾"),
 	}}}
 	d := decideOK(t, rs, priorState{requestOf: statusClarifying}, slots.Patch{Item: sp("蘋果")})
-	if d.interrupt == nil || len(d.interrupt.Candidates) != 2 || d.interrupt.Candidates[0].CategoryID != 1 || d.interrupt.Candidates[1].CategoryID != 3 {
+	if d.interrupt == nil || len(d.interrupt.Candidates) != 2 || d.interrupt.Candidates[0].CategoryID != catID(1) || d.interrupt.Candidates[1].CategoryID != catID(3) {
 		t.Fatalf("interrupt = %+v，卡上只該有有效的兩個命中", d.interrupt)
 	}
 	if got := len(d.interrupt.Question.Options); got != 3 {
@@ -403,7 +419,7 @@ func TestInvalidCandidatesNeverAppearOnTheCard(t *testing.T) {
 func TestInvalidMatchLeavingOneValidStillConfirmsIt(t *testing.T) {
 	rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{match(1, "蘋果", "水果 > 蘋果"), match(2, "", "水果 > 空白")}}}
 	d := decideOK(t, rs, priorState{requestOf: statusClarifying}, slots.Patch{Item: sp("蘋果")})
-	if d.interrupt != nil || d.next.Resolution == nil || d.next.Resolution.CategoryID != 1 {
+	if d.interrupt != nil || d.next.Resolution == nil || d.next.Resolution.CategoryID != catID(1) {
 		t.Fatalf("interrupt = %+v, resolution = %+v，剩一個有效命中就是單一命中", d.interrupt, d.next.Resolution)
 	}
 }
@@ -411,7 +427,7 @@ func TestInvalidMatchLeavingOneValidStillConfirmsIt(t *testing.T) {
 func TestTruncatedLabelIsAnAdjustmentNotARejection(t *testing.T) {
 	rs := &fakeResolver{res: resolver.Resolution{Matches: []resolver.Match{match(7, strings.Repeat("果", slots.MaxTextLen+10), "水果 > 長")}}}
 	d := decideOK(t, rs, priorState{requestOf: statusClarifying}, slots.Patch{Item: sp("蘋果")})
-	if d.interrupt != nil || d.next.Resolution == nil || d.next.Resolution.CategoryID != 7 || len([]rune(d.next.Resolution.Label)) > slots.MaxTextLen {
+	if d.interrupt != nil || d.next.Resolution == nil || d.next.Resolution.CategoryID != catID(7) || len([]rune(d.next.Resolution.Label)) > slots.MaxTextLen {
 		t.Fatalf("interrupt = %+v, resolution = %+v，被截斷但保留的標籤仍是確認的分類", d.interrupt, d.next.Resolution)
 	}
 }
