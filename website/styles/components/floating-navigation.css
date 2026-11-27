@@ -1,3 +1,5 @@
+
+
 html {
 	scrollbar-gutter: stable;
 }
@@ -29,6 +31,7 @@ select,
 	user-select: text;
 }
 
+
 body .page-content {
 	padding-top: 0;
 }
@@ -37,6 +40,7 @@ html[data-theme="dark"] body .site-nav__logo .brand-logo {
 	color: var(--theme-text-heading);
 }
 
+
 [data-theme="dark"] .market-page,
 [data-theme="dark"] .search-page,
 [data-theme="dark"] .market-content-page,
@@ -44,6 +48,7 @@ html[data-theme="dark"] body .site-nav__logo .brand-logo {
 [data-theme="dark"] .orders-page {
 	background: transparent;
 }
+
 
 [data-theme="dark"] .collection-card,
 [data-theme="dark"] .seller-story-card {
@@ -71,7 +76,11 @@ body {
 		--floating-nav-top-gap: 0px;
 		--page-start-gap: var(--hkui-space-4, 16px);
 	}
+
 }
+
+
+
 
 @keyframes mc-rise {
 	from {
@@ -83,6 +92,9 @@ body {
 		transform: translate3d(0, 0, 0);
 	}
 }
+
+
+
 
 .auto-nav .site-nav,
 .auto-nav .seller-header {

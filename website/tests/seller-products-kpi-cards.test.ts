@@ -170,7 +170,7 @@ test("五張卡在桌面維持五欄，手機則採用訂單同款緊湊單列",
 	);
 	assert.ok(narrow !== -1, "找不到 ≤1100px 的兩欄規則");
 	const mobileRail = css.indexOf(
-		"/* Seller summary cards use a compact multi-browse rail",
+		"@media (max-width: 960px) {\n\t:is(\n\t\t.seller-shell .seller-summary-rail,",
 	);
 	assert.ok(mobileRail !== -1, "找不到 ≤960px 的摘要卡水平滑軌規則");
 	assert.ok(
@@ -178,7 +178,7 @@ test("五張卡在桌面維持五欄，手機則採用訂單同款緊湊單列",
 		"桌面五欄、窄版兩欄與手機水平滑軌的 CSS 順序不正確",
 	);
 	const phoneTiles = css.indexOf(
-		"/* Product and inventory summaries keep the existing 186px browse rail",
+		"@media (max-width: 540px) {\n\t.seller-shell .seller-inventory__stats.seller-summary-rail--compact-phone",
 	);
 	assert.ok(phoneTiles > mobileRail, "手機緊湊覆寫必須放在通用滑軌之後");
 	assert.match(

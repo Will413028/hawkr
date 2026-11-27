@@ -62,7 +62,7 @@ test("SellerPageShell exposes one shared mobile action-rail seam", () => {
 
 	const mobileActions = regionBetween(
 		css,
-		"/* SellerPageShell phone action rail.",
+		"@media (max-width: 960px) {\n\t.seller-shell {\n\t\t--seller-page-header-cta-width",
 		".seller-orders__tabs {",
 	);
 	assert.match(mobileActions, /@media \(max-width: 960px\)/);
@@ -89,7 +89,7 @@ test("SellerPageShell exposes one shared mobile action-rail seam", () => {
 test("all seller header CTAs share the order-page phone geometry", () => {
 	const mobileActions = regionBetween(
 		css,
-		"/* SellerPageShell phone action rail.",
+		"@media (max-width: 960px) {\n\t.seller-shell {\n\t\t--seller-page-header-cta-width",
 		".seller-orders__tabs {",
 	);
 	assert.match(
@@ -108,7 +108,9 @@ test("all seller header CTAs share the order-page phone geometry", () => {
 	assert.doesNotMatch(products, /seller-products__header-actions/);
 
 	const phoneAdaptation = css.slice(
-		css.indexOf("Seller workspace phone adaptation"),
+		css.indexOf(
+			"@media (max-width: 960px) {\n\t.seller-shell {\n\t\tmax-width: 100%",
+		),
 	);
 	assert.match(
 		phoneAdaptation,
@@ -152,7 +154,7 @@ test("ordinary order actions shrink to the phone width without hiding Export", (
 
 	const orderPhoneActions = regionBetween(
 		css,
-		"/* The ordinary order toolbar has exactly three controls.",
+		"@media (max-width: 540px) {\n\t.seller-shell .seller-orders__header-actions > .seller-orders__search",
 		".seller-orders__tabs {",
 	);
 	assert.match(orderPhoneActions, /@media \(max-width: 540px\)/);
@@ -176,7 +178,7 @@ test("ordinary order actions shrink to the phone width without hiding Export", (
 test("dashboard quick actions keep each task label on one phone line", () => {
 	const quickActionPhoneRail = regionBetween(
 		css,
-		"/* Action names are one task label, not card copy.",
+		"@media (max-width: 767px) {\n\t.seller-shell :where(button, a[data-hkui-button]),",
 		"\t.seller-dashboard__top,",
 	);
 	assert.match(
@@ -247,8 +249,8 @@ test("summary card groups opt into one device-width horizontal rail", () => {
 
 	const summaryRail = regionBetween(
 		css,
-		"/* Seller summary cards use a compact multi-browse rail",
-		"/* On orders these four controls are status tabs",
+		"@media (max-width: 960px) {\n\t:is(\n\t\t.seller-shell .seller-summary-rail,",
+		".seller-orders > .seller-orders__status-tabs {",
 	);
 	assert.match(summaryRail, /@media \(max-width: 960px\)/);
 	assert.match(
@@ -295,7 +297,7 @@ test("product and inventory summaries reuse the order tile geometry on phones on
 
 	const phoneTiles = regionBetween(
 		css,
-		"/* Product and inventory summaries keep the existing 186px browse rail",
+		"@media (max-width: 540px) {\n\t.seller-shell .seller-inventory__stats.seller-summary-rail--compact-phone",
 		".seller-inventory__card {",
 	);
 	assert.match(phoneTiles, /@media \(max-width: 540px\)/);
@@ -328,10 +330,10 @@ test("product and inventory summaries reuse the order tile geometry on phones on
 	);
 
 	const genericRail = css.indexOf(
-		"/* Seller summary cards use a compact multi-browse rail",
+		"@media (max-width: 960px) {\n\t:is(\n\t\t.seller-shell .seller-summary-rail,",
 	);
 	const phoneOverride = css.indexOf(
-		"/* Product and inventory summaries keep the existing 186px browse rail",
+		"@media (max-width: 540px) {\n\t.seller-shell .seller-inventory__stats.seller-summary-rail--compact-phone",
 	);
 	assert.ok(
 		genericRail !== -1 && phoneOverride > genericRail,
@@ -347,7 +349,7 @@ test("order status controls are a compact four-column phone rail", () => {
 
 	const statusRail = regionBetween(
 		css,
-		"/* On orders these four controls are status tabs",
+		"@media (max-width: 960px) {\n\t.seller-orders > .seller-orders__status-tabs {",
 		".seller-inventory__card {",
 	);
 	assert.match(statusRail, /@media \(max-width: 960px\)/);
@@ -365,14 +367,15 @@ test("order status controls are a compact four-column phone rail", () => {
 });
 
 test("shared compact stat sizing follows the desktop declarations", () => {
-	const inventorySection = css.indexOf("Seller Inventory — 4 stat grid");
-	const baseCard = css.indexOf(".seller-inventory__stat {", inventorySection);
+	const baseCard = css.indexOf(".seller-inventory__stat {");
 	const baseValue = css.indexOf(".seller-inventory__stat strong {", baseCard);
 	const baseIcon = css.indexOf(".seller-inventory__stat-icon {", baseValue);
-	const compact = css.indexOf("/* Mobile summary sizing", baseIcon);
+	const compact = css.indexOf(
+		"@media (max-width: 540px) {\n\t.seller-inventory__stats {",
+		baseIcon,
+	);
 
-	assert.ok(inventorySection !== -1);
-	assert.ok(baseCard > inventorySection);
+	assert.ok(baseCard >= 0);
 	assert.ok(baseValue > baseCard);
 	assert.ok(baseIcon > baseValue);
 	assert.ok(
@@ -382,8 +385,8 @@ test("shared compact stat sizing follows the desktop declarations", () => {
 
 	const compactRegion = regionBetween(
 		css,
-		"/* Mobile summary sizing",
-		"/* On orders these four controls are status tabs",
+		"@media (max-width: 540px) {\n\t.seller-inventory__stats {",
+		"@media (max-width: 960px) {\n\t.seller-orders > .seller-orders__status-tabs {",
 	);
 	assert.match(compactRegion, /min-height:\s*112px/);
 	assert.match(compactRegion, /width:\s*32px/);
@@ -392,8 +395,8 @@ test("shared compact stat sizing follows the desktop declarations", () => {
 test("order and customer filters stay on one horizontal phone row", () => {
 	const orderFilters = regionBetween(
 		css,
-		"/* Phone filters are one task rail",
-		"/* ============================================================\n * Batch shipping",
+		"@media (max-width: 960px) {\n\t.seller-orders__quick-filters {",
+		".seller-orders__table thead th.seller-orders__col-select,",
 	);
 	assert.match(
 		orderFilters,
@@ -446,7 +449,7 @@ test("product and inventory inner toolbars do not wrap on phones", () => {
 
 	const inventoryPhoneToolbar = regionBetween(
 		css,
-		"@media (max-width: 767px) {\n\t/* Match the product list",
+		"@media (max-width: 767px) {\n\t.seller-inventory__header-search {",
 		".seller-inventory__table {",
 	);
 	assert.match(

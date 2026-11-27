@@ -350,6 +350,7 @@ dialog.editorShell {
 	opacity: 0.45;
 }
 
+
 dialog.editorShell_expanded {
 	position: fixed;
 	inset: 0;
@@ -522,8 +523,7 @@ dialog.editorShell_expanded {
 	padding: 12px 16px;
 	color: var(--theme-text-muted);
 }
-.editorShell
-	[class~="ce-block--focused"]:not([class~="ce-block--selected"])
+.editorShell [class~="ce-block--focused"]:not([class~="ce-block--selected"])
 	[class~="ce-block__content"],
 .editorShell
 	[class~="ce-block"]:hover:not([class~="ce-block--selected"])
@@ -717,7 +717,8 @@ dialog.editorShell_expanded {
 .editorShell
 	.holder
 	:global(
-		.hk-description-image[data-state="uploading"] .hk-description-image__picture
+		.hk-description-image[data-state="uploading"]
+		.hk-description-image__picture
 	) {
 	max-height: 280px;
 	opacity: 0.7;

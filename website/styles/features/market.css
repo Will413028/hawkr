@@ -1,3 +1,4 @@
+
 [data-masonry-grid] {
 	--masonry-fallback-track: var(--masonry-track-wide);
 	--masonry-fallback-gap: var(--masonry-gap-wide);
@@ -32,6 +33,7 @@
 	outline-offset: 0;
 	border-radius: inherit;
 }
+
 
 .market-product-card__media .market-product-card__tags {
 	position: absolute;
@@ -455,6 +457,7 @@
 }
 
 @media (max-width: 840px) {
+
 	.market-seller-card--list {
 		grid-template-columns: 1fr;
 	}
@@ -470,6 +473,7 @@
 		height: 64px;
 	}
 }
+
 
 @media (max-width: 680px) {
 	.market-page .market-product-card__buy-row {

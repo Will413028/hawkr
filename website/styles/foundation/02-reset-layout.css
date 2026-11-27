@@ -1,3 +1,4 @@
+
 *,
 *::before,
 *::after {
@@ -146,6 +147,7 @@ select:where(:not([data-slot])):focus-visible {
 	border: 0;
 }
 
+
 @layer base {
 	h1,
 	h2,
@@ -262,6 +264,8 @@ select:where(:not([data-slot])):focus-visible {
 	margin: 0 auto;
 	line-height: var(--leading-relaxed);
 }
+
+
 
 .brand-logo {
 	display: inline-flex;
@@ -383,14 +387,20 @@ select:where(:not([data-slot])):focus-visible {
 	position: absolute;
 }
 
+
 .page-content {
 	padding-top: 0;
 	min-height: 100dvh;
 }
 
+
+
+
 .page-content:has(.hkui-login) {
 	padding-top: 0;
 }
+
+
 
 .hk-footer__heading {
 	font-size: var(--text-lg);

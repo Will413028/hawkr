@@ -336,7 +336,7 @@ test("published post thumbnails keep the authored 4:3 frame without a second cro
 	const feedImageRule = between(
 		feedCss,
 		".hkui-feed-card__media img {",
-		"/* ===== Top-left badge",
+		".hkui-feed-card__badge {",
 	);
 	assert.match(feedImageRule, /object-fit:\s*contain/);
 	assert.doesNotMatch(feedImageRule, /scale\(/);

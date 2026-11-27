@@ -1,7 +1,9 @@
+
 .page-wrapper {
 	position: relative;
 	z-index: 1;
 }
+
 
 .hk-stale-chunk-reload-pending body::after {
 	content: "";
@@ -77,6 +79,7 @@ html.hk-skip-initial-loader .initial-loader {
 	display: none;
 }
 
+
 @keyframes initial-loader-hard-timeout {
 	to {
 		opacity: 0;
@@ -91,11 +94,7 @@ html.hk-skip-initial-loader .initial-loader {
 	inset: 0;
 	background-image:
 		linear-gradient(rgb(var(--color-ink-700-rgb) / 0.045) 1px, transparent 1px),
-		linear-gradient(
-			90deg,
-			rgb(var(--color-ink-700-rgb) / 0.045) 1px,
-			transparent 1px
-		);
+		linear-gradient(90deg, rgb(var(--color-ink-700-rgb) / 0.045) 1px, transparent 1px);
 	background-size: 28px 28px;
 	mask-image: linear-gradient(
 		to bottom,
@@ -118,12 +117,7 @@ html.hk-skip-initial-loader .initial-loader {
 			rgba(122, 162, 192, 0.12),
 			transparent 30%
 		),
-		linear-gradient(
-			135deg,
-			var(--color-ink-950) 0%,
-			var(--color-ink-950) 54%,
-			var(--color-ink-950) 100%
-		);
+		linear-gradient(135deg, var(--color-ink-950) 0%, var(--color-ink-950) 54%, var(--color-ink-950) 100%);
 }
 
 [data-theme="dark"] .initial-loader::before {
@@ -369,6 +363,7 @@ html.hk-skip-initial-loader .initial-loader {
 	padding: 0 var(--content-padding-mobile);
 }
 
+
 @media (min-width: 1441px) {
 	.content-container {
 		max-width: var(--content-width);
@@ -412,6 +407,7 @@ html.hk-skip-initial-loader .initial-loader {
 	.page-content {
 		padding-top: 0;
 	}
+
 
 	.mobile-nav {
 		display: block;

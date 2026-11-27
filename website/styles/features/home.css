@@ -1,3 +1,4 @@
+
 .hkh-page {
 	--theme-surface-page: #fcfaf4;
 	--theme-surface-card: #ffffff;
@@ -185,6 +186,7 @@ body:has(.hkh-page) .site-nav {
 	-webkit-backdrop-filter: none;
 	backdrop-filter: none;
 }
+
 
 .hkh-page > header,
 .hkh-page > section,
@@ -630,6 +632,9 @@ body:has(.hkh-page) .site-nav {
 	transform: translate(2px, -2px);
 	color: var(--color-accent-500);
 }
+
+
+
 
 .hkh-page .demo .sect-head h2 em {
 	font-style: normal;
@@ -1152,6 +1157,7 @@ body:has(.hkh-page) .site-nav {
 	background: rgba(255, 255, 255, 0.06);
 	border-color: rgba(245, 222, 165, 0.14);
 }
+
 
 .hkh-page .seller-cta {
 	background:

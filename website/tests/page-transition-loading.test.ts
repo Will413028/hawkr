@@ -68,7 +68,10 @@ test("PageTransition controller never paints a navigation fallback", async () =>
 
 test("programmatic routes animate only after commit without moving page geometry", async () => {
 	const source = await readFile(pageTransitionPath, "utf8");
-	const start = source.indexOf("Direct router.push/replace calls");
+	const start = source.lastIndexOf(
+		"useLayoutEffect(() => {",
+		source.indexOf("consumeProgrammaticRouteMotion(pathname)"),
+	);
 	const end = source.indexOf("const endNavPendingRef", start);
 	const arrivalEffect = source.slice(start, end);
 

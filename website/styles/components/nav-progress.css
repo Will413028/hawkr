@@ -1,3 +1,4 @@
+
 html[data-nav-pending]::before {
 	--hk-nav-progress-color: var(--color-brand-primary-strong);
 	--hk-nav-progress-color-rgb: var(--color-brand-ink-rgb);

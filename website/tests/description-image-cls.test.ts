@@ -25,7 +25,7 @@ function source(relativePath: string): string {
  */
 function descriptionFallbackTag(): string {
 	const text = source(LAYOUT);
-	const marker = text.indexOf("dims 無法解析");
+	const marker = text.indexOf("const dims = descriptionImageDims.get(block)");
 	assert.notEqual(
 		marker,
 		-1,

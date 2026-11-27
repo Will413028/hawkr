@@ -1,3 +1,4 @@
+
 .seller-onboarding {
 	position: relative;
 	z-index: 1;
@@ -46,6 +47,7 @@ html.seller-snap-native .seller-onboarding [data-seller-snap] {
 .seller-onboarding.hkh-page {
 	padding-bottom: 0;
 }
+
 
 .seller-faq {
 	width: calc(100% - 40px);
@@ -590,6 +592,7 @@ html.seller-snap-native .seller-onboarding [data-seller-snap] {
 	margin-top: 18px;
 }
 
+
 [data-theme="dark"] .seller-onboarding .seller-hero,
 [data-theme="dark"] .seller-onboarding .process-glass,
 [data-theme="dark"] .seller-onboarding .seller-faq {
@@ -1012,6 +1015,7 @@ html.seller-snap-native .seller-onboarding [data-seller-snap] {
 }
 
 @media (hover: hover) and (pointer: fine) {
+
 	.seller-fit-card:hover .seller-fit-card__scene {
 		transform: translate3d(-1%, -1%, 0) scale(1.05);
 	}

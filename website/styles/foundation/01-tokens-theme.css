@@ -1,3 +1,5 @@
+
+
 :root {
 	--brand-soft-surface-wash: var(--theme-surface-page);
 	--brand-text-black: var(--color-neutral-ink);
@@ -162,6 +164,7 @@
 	--intro-shift-x: 22px;
 }
 
+
 body .page-content {
 	background: transparent;
 }
@@ -226,6 +229,7 @@ body .page-content {
 	background: transparent;
 	color: var(--hkui-foreground);
 }
+
 
 [data-theme="dark"] .feed-card,
 [data-theme="dark"] .market-product-card,
@@ -363,6 +367,10 @@ html[data-theme="dark"] .mega-panel__badge {
 	border-color: rgba(241, 205, 112, 0.4);
 }
 
+
+
+
+
 [data-theme="dark"] body h1,
 [data-theme="dark"] body h2,
 [data-theme="dark"] body h3,
@@ -404,6 +412,8 @@ html[data-theme="dark"] .mega-panel__badge {
 	background: rgba(241, 205, 112, 0.22);
 	color: #ffeec0;
 }
+
+
 
 [data-theme="dark"] {
 	--hk-text-strong: var(--color-brand-ink-on-dark);

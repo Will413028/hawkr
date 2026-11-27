@@ -1,3 +1,5 @@
+
+
 [data-theme="dark"] body .auto-nav {
 	background: transparent;
 	background-image: none;
@@ -129,8 +131,7 @@ body .site-nav-action .site-nav-action__icon svg {
  * button ~80–100px wide. Lives here, not navigation-shell.css, because
  * that file loads first and its rules are overridden by this one. */
 @media (max-width: 1280px) {
-	body
-		.site-nav-action
+	body .site-nav-action
 		> span:not(.site-nav-action__icon):not(.notif-bell__inner):not(
 			.notif-bell__badge
 		),
@@ -196,8 +197,7 @@ body .site-nav-action .site-nav-action__icon svg {
 		--nav-height: 56px;
 	}
 
-	body
-		.site-nav-action
+	body .site-nav-action
 		> span:not(.site-nav-action__icon):not(.notif-bell__inner):not(
 			.notif-bell__badge
 		) {
@@ -278,4 +278,5 @@ body .site-nav-action .site-nav-action__icon svg {
 			16px
 		);
 	}
+
 }

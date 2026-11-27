@@ -1,3 +1,4 @@
+
 :root {
 	--hkui-space-0: 0;
 	--hkui-space-px: 1px;
@@ -107,7 +108,9 @@
 
 	--hkui-control-radius-sm: var(--hkui-radius-sm);
 	--hkui-control-radius-md: var(--hkui-radius-md);
-	--hkui-control-radius-lg: var(--hkui-radius-md);
+	--hkui-control-radius-lg: var(
+		--hkui-radius-md
+	);
 
 	--hkui-stack-sm: var(--hkui-space-1_5);
 	--hkui-stack-md: var(--hkui-space-2);
@@ -271,6 +274,8 @@
 		transform: rotate(360deg);
 	}
 }
+
+
 
 .hkui-dropdown__trigger-wrap:not([data-floating]):not(
 	[data-variant="bordered"]
@@ -686,6 +691,7 @@
 	height: 100%;
 }
 
+
 [data-scroll-fade] {
 	opacity: 0;
 	transform: translate3d(0, 24px, 0);
@@ -705,6 +711,7 @@
 		transition: none;
 	}
 }
+
 
 body[data-hk-overlay-open="true"] .tsqd-open-btn-container {
 	opacity: 0;
@@ -999,6 +1006,7 @@ body[data-hk-overlay-open="true"] .tsqd-open-btn-container {
 	color: var(--hkui-primary-700);
 }
 
+
 .hkui-app-cta {
 	display: inline-flex;
 	align-items: center;
@@ -1055,6 +1063,7 @@ body[data-hk-overlay-open="true"] .tsqd-open-btn-container {
 .hkui-login__hint--error {
 	color: var(--hkui-danger);
 }
+
 
 .hkui-calendar {
 	width: min(100%, 640px);
@@ -1391,6 +1400,13 @@ body[data-hk-overlay-open="true"] .tsqd-open-btn-container {
 		max-width: var(--hkui-calendar-cell-sm);
 	}
 }
+
+
+
+
+
+
+
 
 [data-theme="dark"] {
 	color-scheme: dark;

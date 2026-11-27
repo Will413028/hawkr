@@ -1,4 +1,4 @@
 .search-page:has([data-search-empty] [data-hawkr-agent-entry])
-	.search-page__agent-entry {
+.search-page__agent-entry {
 	display: none;
 }

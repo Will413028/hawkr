@@ -1,11 +1,11 @@
 :where(
-	.cart-shell-page,
-	.cart-page__seller-group,
-	.shipping-group,
-	.cart-sheet--buyer-cart,
-	.coupon-dialog,
-	.cart-typography
-) {
+		.cart-shell-page,
+		.cart-page__seller-group,
+		.shipping-group,
+		.cart-sheet--buyer-cart,
+		.coupon-dialog,
+		.cart-typography
+	) {
 	--cart-type-page: var(--cart-type-section);
 	--cart-type-section: 1.375rem;
 	--cart-type-total: var(--text-2xl);

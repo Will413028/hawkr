@@ -1,8 +1,11 @@
+
 .showcase-phone-wrap {
 	display: flex;
 	justify-content: center;
 	position: relative;
 }
+
+
 
 .desktop-frame {
 	width: 100%;
@@ -36,6 +39,11 @@
 .d-dot--g {
 	background: #28c840;
 }
+
+
+
+
+
 
 @media (max-width: 640px) {
 	.desktop-frame {

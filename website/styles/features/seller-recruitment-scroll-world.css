@@ -1,3 +1,4 @@
+
 .seller-recruitment-world {
 	--srw-paper: #faf6ec;
 	--srw-paper-strong: #fffdf7;
@@ -626,6 +627,7 @@
 		width: 84vw;
 	}
 }
+
 
 [data-theme="dark"] .seller-recruitment-world .srw-copy--has-steps {
 	border-color: rgba(245, 222, 165, 0.16);

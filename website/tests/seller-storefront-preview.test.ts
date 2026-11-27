@@ -303,7 +303,7 @@ test("seller back matches product detail while mobile CTAs keep fixed geometry",
 
 test("storefront App banner keeps mobile copy intact with usable actions", () => {
 	const uiKit = source("../styles/components/ui-kit.css");
-	const bannerStart = uiKit.indexOf("14. APP DOWNLOAD BANNER V2");
+	const bannerStart = uiKit.indexOf(".hkui-app-banner {");
 	assert.notEqual(bannerStart, -1);
 	const banner = uiKit.slice(bannerStart);
 	const mobileStart = banner.indexOf("@media (max-width: 640px)");

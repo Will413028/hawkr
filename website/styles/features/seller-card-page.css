@@ -30,11 +30,7 @@
 	inset: 0;
 	content: "";
 	background:
-		linear-gradient(
-			180deg,
-			rgb(var(--color-ink-950-rgb) / 0.2),
-			transparent 52%
-		),
+		linear-gradient(180deg, rgb(var(--color-ink-950-rgb) / 0.2), transparent 52%),
 		linear-gradient(0deg, rgb(var(--color-ink-950-rgb) / 0.16), transparent 45%);
 	pointer-events: none;
 }
@@ -64,8 +60,7 @@
 	box-shadow: var(--hkui-shadow-sm);
 }
 
-html[data-theme="dark"]
-	.seller-public-card__brand.brand-logo--has-dark
+html[data-theme="dark"] .seller-public-card__brand.brand-logo--has-dark
 	> .brand-logo__lockup--default {
 	opacity: 1;
 }

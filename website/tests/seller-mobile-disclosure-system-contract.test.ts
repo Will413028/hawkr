@@ -36,9 +36,7 @@ test("共用手機清單預設全收合，而且任何時候只保留一筆展�
 });
 
 test("收合列外高 58px，文字層級與觸控尺寸遵守賣家中心規格", () => {
-	const sharedStyles = css.slice(
-		css.indexOf("Shared seller-center phone disclosure contract"),
-	);
+	const sharedStyles = css.slice(css.indexOf(".seller-mobile-disclosure {"));
 	assert.match(
 		sharedStyles,
 		/\.seller-mobile-disclosure\s*\{[\s\S]*?border:\s*1px/s,

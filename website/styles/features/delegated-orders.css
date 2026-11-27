@@ -1,3 +1,5 @@
+
+
 .adm-orders__notice {
 	--adm-notice-bg: rgb(var(--color-brand-secondary-soft-rgb) / 0.34);
 	--adm-notice-border: var(--theme-border-warm);
@@ -24,6 +26,7 @@
 .adm-orders__notice svg {
 	flex: none;
 }
+
 
 .adm-orders__stats {
 	display: grid;
@@ -221,6 +224,7 @@
 	font-size: 0.8125rem;
 	font-weight: 600;
 }
+
 
 .adm-order-detail {
 	display: flex;
@@ -505,6 +509,7 @@
 	line-height: 1.7;
 }
 
+
 .adm-order-handoff {
 	display: flex;
 	flex-direction: column;
@@ -544,6 +549,7 @@
 [data-theme="dark"] .adm-order-handoff:hover {
 	background: rgb(241 205 112 / 0.1);
 }
+
 
 .adm-reveal-form {
 	display: flex;

@@ -122,13 +122,19 @@ test("optimistic removals retain their initiating row until the request settles"
 	const accountHooks = source("lib/hooks/useAccount.ts");
 	const favoriteMutation = accountHooks.slice(
 		accountHooks.indexOf("const removeMutation"),
-		accountHooks.indexOf("/* ===== Follow ===== */"),
+		accountHooks.indexOf(
+			"const items",
+			accountHooks.indexOf("const removeMutation"),
+		),
 	);
 	assert.match(favoriteMutation, /onSuccess:/);
 	assert.doesNotMatch(favoriteMutation, /onMutate:/);
 	const followMutation = accountHooks.slice(
 		accountHooks.indexOf("const unfollowMutation"),
-		accountHooks.indexOf("/* ===== History ===== */"),
+		accountHooks.indexOf(
+			"const items",
+			accountHooks.indexOf("const unfollowMutation"),
+		),
 	);
 	assert.match(followMutation, /onSuccess:/);
 	assert.doesNotMatch(followMutation, /onMutate:/);
