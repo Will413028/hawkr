@@ -898,7 +898,7 @@ class _MerchantItemDetailScreenState
           : await AuthStorage.guestCartId();
       await ref
           .read(cartRepositoryProvider)
-          .addToCart(sidInt, _selectedQty, guestId: guestId);
+          .addToCart(sidInt.toString(), _selectedQty, guestId: guestId);
       ref.invalidate(cartCountProvider);
     } catch (e) {
       HKLog.logE('[Cart] directCheckout addToCart error: $e');
@@ -974,7 +974,7 @@ class _MerchantItemDetailScreenState
           : await AuthStorage.guestCartId();
       await ref
           .read(cartRepositoryProvider)
-          .addToCart(sidInt, _selectedQty, guestId: guestId);
+          .addToCart(sidInt.toString(), _selectedQty, guestId: guestId);
       ref.invalidate(cartCountProvider);
       success = true;
       // Analytics: add_to_cart

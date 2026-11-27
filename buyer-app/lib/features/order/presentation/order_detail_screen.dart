@@ -438,9 +438,9 @@ class _OrderDetailBottomBarState extends ConsumerState<_OrderDetailBottomBar> {
       int skipped = 0;
       Object? firstAddError;
       for (final item in order.items) {
-        final skuId = int.tryParse(item.skuId);
+        final skuId = item.skuId.trim();
         final qty = int.tryParse(item.quantity) ?? 0;
-        if (skuId == null || qty <= 0) {
+        if (skuId.isEmpty || qty <= 0) {
           skipped++;
           continue;
         }

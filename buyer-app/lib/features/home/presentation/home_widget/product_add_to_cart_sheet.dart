@@ -205,7 +205,7 @@ class _ProductAddToCartSheetState
       final guestId = await _resolveGuestId();
       await ref
           .read(cartRepositoryProvider)
-          .addToCart(selectedSkuId, _quantity, guestId: guestId);
+          .addToCart(selectedSkuId.toString(), _quantity, guestId: guestId);
       ref.invalidate(cartCountProvider);
       if (!mounted) return;
       Navigator.of(context).pop();
