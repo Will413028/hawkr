@@ -234,7 +234,6 @@ MEDIA_ORIGIN = http://localhost:8787
 PUBLIC_WEB_ORIGIN = http://localhost:3000
 # 單體是對外的入口（遷移計畫 A2）：還沒搬的 REST、SSE、WebSocket 轉給 ./dev.sh 起的 gateway（9900）。
 GATEWAY_URL = http://localhost:9900
-PRODUCT_SERVICE_ADDR = localhost:9913
 ORDER_SERVICE_ADDR = localhost:9915
 # 行事曆鏡像的推送對象（./dev.sh 的 invoice-service gRPC，10041），A5 搬進單體後刪除
 INVOICE_SERVICE_ADDR = localhost:10041
@@ -259,7 +258,7 @@ MONOLITH_ENV = GOWORK=off DATABASE_URL='$(DATABASE_URL)' MEDIA_STORAGE='$(MEDIA_
 	KYC_HASH_KEYS='$(KYC_HASH_KEYS)' \
 	PAYMENT_PROVIDER='$(PAYMENT_PROVIDER)' \
 	RABBITMQ_URL='$(RABBITMQ_URL)' \
-	PRODUCT_SERVICE_ADDR='$(PRODUCT_SERVICE_ADDR)' ORDER_SERVICE_ADDR='$(ORDER_SERVICE_ADDR)' \
+	ORDER_SERVICE_ADDR='$(ORDER_SERVICE_ADDR)' \
 	INVOICE_SERVICE_ADDR='$(INVOICE_SERVICE_ADDR)'
 
 # 起 Postgres、Redis、RabbitMQ、OTel collector，等到 healthcheck 通過

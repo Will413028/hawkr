@@ -27,7 +27,6 @@ func setSellerEnv(t *testing.T) {
 	t.Helper()
 	setMediaEnv(t, "dev1:ZGV2LW9ubHktbWVkaWEta2VrLTAwMDAwMDAwMDAwMDA=")
 	t.Setenv("ORDER_SERVICE_ADDR", "127.0.0.1:1")
-	t.Setenv("PRODUCT_SERVICE_ADDR", "127.0.0.1:1")
 	t.Setenv("KYC_HASH_KEYS", "test1:dGVzdC1reWMtaGFzaC1obWFjLWtleS0wMDAwMDAwMDE=")
 }
 

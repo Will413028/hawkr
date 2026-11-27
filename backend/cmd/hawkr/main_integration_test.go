@@ -199,7 +199,6 @@ func TestWorkerRunsQueuedJobs(t *testing.T) {
 	t.Setenv("RABBITMQ_URL", "amqp://guest:guest@127.0.0.1:1/")
 	setMediaEnv(t, "dev1:ZGV2LW9ubHktbWVkaWEta2VrLTAwMDAwMDAwMDAwMDA=")
 	t.Setenv("ORDER_SERVICE_ADDR", "127.0.0.1:1")
-	t.Setenv("PRODUCT_SERVICE_ADDR", "127.0.0.1:1")
 	t.Setenv("INVOICE_SERVICE_ADDR", "127.0.0.1:1")
 	// 通知的 provider 替身只在 dev 環境（DEV_AUTH_KEY_FILE）選到，與 Makefile 的 MONOLITH_ENV 同一組；推播圖片網址要 MEDIA_ORIGIN。
 	t.Setenv("DEV_AUTH_KEY_FILE", writeDevKey(t))
