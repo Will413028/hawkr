@@ -8,7 +8,7 @@
 - 額度週期與預設額度（設計書 59、ADR `2026-09-18-buyer-membership-entitlement-model`）。
 - 業務事件在同一個 transaction 內發布（含進入刪除中時的 `BuyerDeletionRequested`、關閉時的 `BuyerDeleted`）；River 釋放頭像與清理 PII。
 - 買家不是 identity 的角色：建立與關閉買家都不授予、移除角色，也不自己鎖帳號。
-- buyer_id、address_id 是資料庫發號的 IDENTITY 整數；membership 是 UUIDv7；收藏、追蹤、補貨等關聯用複合自然鍵（ADR `2026-09-25-row-identity-by-data-kind`）。
+- buyer_id、address_id 是資料庫發號的 IDENTITY 整數；membership 是 UUIDv7；收藏、追蹤、補貨等關聯用複合自然鍵；商品與 SKU 在 catalog，ID 是 UUIDv7（`favorites`、`visit_history`、`restock_subscriptions` 的 `product_id`、`sku_id`，不建跨 schema FK）（ADR `2026-09-25-row-identity-by-data-kind`）。
 - HTTP 路由屬於 httpapi。legacy gRPC（`internal/legacy/buyerserver`）、RabbitMQ relay 與 consumer 在 `internal/legacy`，服務還沒搬進單體的舊服務經它們呼叫 buyer。
 
 ## 2. 買家的建立與生命週期
@@ -58,9 +58,10 @@
 ## 7. 瀏覽與補貨
 
 - `RecordVisit(buyerID, productID)` 不帶店家，請求路徑上不解析商品，每次瀏覽都發 `ProductViewed`。事件只帶 `EventID`、`OccurredAt`、`BuyerID`、`ProductID`；店家由 seller 在背景解析。商品瀏覽的原始事件、彙總與儀表板統計屬 seller（`RecordProductView`、`IngestProductView`、`ProductViewsBetween`）；匿名打點不經 buyer。
+- `PurgeRestockSKUs(skuIDs)` 刪除這些 SKU 的全部訂閱（商品或 SKU 刪除後，由 catalog 的清理 job 在 transaction 外經 `cmd/hawkr` 的 adapter 呼叫），沒有訂閱的 SKU 是 no-op、可重複呼叫。
 - `visit_history` 每個買家與商品一列，存最後瀏覽時間，不設筆數或期限。
-- 補貨只存待通知關聯，PK (buyer_id, product_id)；取消與通知後刪除，沒有終態歷史。
-- `FanOut` 每次獨立 transaction 最多處理 limit 筆（1..100），回 `more` 供呼叫的 job 分批循環；刪除與事件原子提交。輸入是必填的 `FanOutInput`（商品、顯示快照、事件發生時間，全部來自上游事件）；發生時間為零回 InvalidInput，不以處理當下的時間代替。
+- 補貨訂閱是 SKU 粒度的一次性訂閱：只存待通知關聯，PK (buyer_id, sku_id)，另存 SKU 所屬的 `product_id` 供清單顯示；不設到期，取消與通知後刪除，沒有終態歷史（計畫 D26）。SKU 存在與否、有沒有貨（有貨時拒絕訂閱，`RESTOCK_SKU_IN_STOCK`）由 `internal/httpapi/buyer` 經 catalog 的 port 確認，模組本身不看 catalog。`BatchCheckRestock` 以商品回報「任一 SKU 已訂閱」。
+- `FanOut` 每次獨立 transaction 最多處理 limit 筆（1..100），回 `more` 供呼叫的 job 分批循環；刪除與事件原子提交。只處理 `FanOutInput.SKUID` 的訂閱（同商品其他 SKU 的訂閱不被通知也不被刪），事件 `RestockTargeted` 帶商品與 SKU。輸入是必填的 `FanOutInput`（商品、SKU、顯示快照、事件發生時間，全部來自呼叫端：catalog 的補貨快照）；發生時間為零回 InvalidInput，不以處理當下的時間代替。
 
 ## 8. 會員
 
