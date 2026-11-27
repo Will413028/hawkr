@@ -4,7 +4,6 @@ package seller_test
 
 import (
 	"context"
-	"strconv"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -55,13 +54,13 @@ func TestRecordProductViewWritesAnEventOnlyForGuests(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	events := func() int64 { return f.dbCount(t, "SELECT count(*) FROM seller.product_view_events") }
-	if _, err := f.public.RecordProductView(ctx, connect.NewRequest(&pb.RecordProductViewRequest{ProductId: strconv.Itoa(42)})); err != nil {
+	if _, err := f.public.RecordProductView(ctx, connect.NewRequest(&pb.RecordProductViewRequest{ProductId: "0194f1e0-0000-7000-8000-000000000042"})); err != nil {
 		t.Fatal(err)
 	}
 	if got := events(); got != 1 {
 		t.Fatalf("訪客的打點事件=%d，預期 1", got)
 	}
-	if _, err := f.signedIn.RecordProductView(ctx, connect.NewRequest(&pb.RecordProductViewRequest{ProductId: "42"})); err != nil {
+	if _, err := f.signedIn.RecordProductView(ctx, connect.NewRequest(&pb.RecordProductViewRequest{ProductId: "0194f1e0-0000-7000-8000-000000000042"})); err != nil {
 		t.Fatal(err)
 	}
 	if got := events(); got != 1 {
