@@ -13,13 +13,6 @@ import { getStatusMeta } from "@/lib/product-status";
 import { api } from "@/services/api";
 import { useEnvironment } from "@/services/environment";
 
-// GET /api/v1/admin/products?keyword=X&page=X&page_size=X
-// PUT /api/v1/admin/products/{id}/status
-// DELETE /api/v1/admin/products/cache
-//
-// 商品狀態是業務碼字串，值域與顯示文字都以 CodeMeta 的 `ProductStatus` 為準
-// （4001 草稿 / 4002 審核中 / 4003 未上架 / 4004 已上架）——這裡不再複述，
-// 複述過的那一版就是漏了 4002 的那一版。id/storeId 是 TSID，一律 string。
 
 interface Product {
 	id: string;
@@ -32,8 +25,8 @@ interface Product {
 	priceMin?: string;
 	priceMax?: string;
 	stock?: string;
-	createdAt?: string; // unix 秒數字串
-	imageUrl?: string; // gateway 已組好的完整 CDN URL（非 objectKey）
+	createdAt?: string;
+	imageUrl?: string;
 }
 
 interface ProductListResponse {
@@ -53,7 +46,6 @@ const ProductList: React.FC = () => {
 	const [currentPage, setCurrentPage] = useState(1);
 	const [totalCount, setTotalCount] = useState(0);
 	const pageSize = 10;
-	// searchKeyword 以 ref 持有最新值,讓 loadProducts 不隨輸入變動(搜尋為手動觸發)
 	const searchKeywordRef = useRef(searchKeyword);
 	searchKeywordRef.current = searchKeyword;
 
@@ -83,8 +75,6 @@ const ProductList: React.FC = () => {
 		}
 	}, [currentPage]);
 
-	// environment 是刻意的 refetch trigger;keyword 經由 searchKeywordRef 讀取,輸入時不重抓,
-	// 僅手動搜尋(handleSearch)/分頁/環境變動時載入。
 	useEffect(() => {
 		loadProducts();
 		void environment;
@@ -132,12 +122,10 @@ const ProductList: React.FC = () => {
 		);
 	};
 
-	// createdAt 是 unix 秒數字串（非 ISO），要先乘 1000 轉毫秒再交給 Date
 	const formatDate = (unixSeconds?: string) => {
 		if (!unixSeconds) return "--";
 		const seconds = Number(unixSeconds);
 		if (Number.isNaN(seconds)) return "--";
-		// formatDate 自己分得出秒／毫秒，並釘台北（backend#3053 的稽查）。
 		return formatTaipeiDate(seconds);
 	};
 
@@ -166,9 +154,7 @@ const ProductList: React.FC = () => {
 					icon="shopping_bag"
 					variant="success"
 				/>
-				{/* KPI 卡與同頁列表的狀態徽章講的是同一個碼，中間只隔幾十像素——文字必須
-				    同源，否則會出現「同一個狀態、兩種說法」。這裡是**狀態標籤**，走 CodeMeta；
-				    下方那兩顆「上架 / 下架」按鈕是**動作用語**，不在此列、不要一起改。 */}
+
 				<StatCard
 					label={codeLabel(PRODUCT_STATUS_LABEL, ProductStatus.ACTIVE)}
 					value={publishedProducts}
@@ -292,8 +278,7 @@ const ProductList: React.FC = () => {
 										<div className="cell-sub">{formatDate(p.createdAt)}</div>
 									</td>
 									<td>
-										{/* 按鈕上的「上架 / 下架」是**動作用語**，不是狀態標籤——不走 CodeMeta
-										    Label（那邊是「已上架 / 未上架」）。這條界線與網頁賣家中心一致。 */}
+
 										{p.status !== ProductStatus.DRAFT && (
 											<button
 												type="button"

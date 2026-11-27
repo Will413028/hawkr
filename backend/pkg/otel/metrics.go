@@ -14,9 +14,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// metricExporterFactory is kept package-local so exporter construction failure
-// can be tested without making the production bootstrap depend on a fake
-// Collector or a network side effect.
 type metricExporterFactory func(context.Context, string) (sdkmetric.Exporter, error)
 
 // InitMeterProvider installs the process-wide OpenTelemetry MeterProvider.
@@ -93,24 +90,6 @@ func newMeterProvider(
 			logger.Warn("Failed to create OTLP metrics exporter, metrics will not be exported",
 				zap.Error(err))
 		} else {
-			// WithProducer 把 prometheus 的預設 registry 接進這個 reader。
-			//
-			// 沒有它的話，promauto 註冊的指標（auth_refresh_total、
-			// auth_family_revoke_total、auth_dual_write_total…）**完全不會離開
-			// process**：OTel 的 MeterProvider 只讀自己的 instrument，而 gRPC-only
-			// 遷移把 9940 的 HTTP bootstrap 連同 /metrics 一起移除之後，就再也沒有
-			// 東西會去讀那個 registry。
-			//
-			// 2026-09-07 實測：identity 模組的 auth_refresh_total 在剛剛被
-			// 大量增量之後，Prometheus 裡 30 天內 0 個 series；而同一個 process 的
-			// server_start_total（OTel instrument，走 MeterProvider）一直都在。
-			// auth_dual_write_total 的歷史 series 帶 instance=<pod-ip>:9940，
-			// 證實它當初是被 scrape 的、隨 9940 消失而斷線。
-			//
-			// ValidateMetricsConfiguration 的註解寫「removing the application
-			// /metrics surface cannot silently remove all metrics」——那個守門只
-			// 檢查 endpoint 有沒有設定，檢查不到 registry 有沒有人讀。這一行才是
-			// 讓那句話成立的東西。
 			options = append(options, sdkmetric.WithReader(
 				sdkmetric.NewPeriodicReader(exporter,
 					sdkmetric.WithProducer(prometheusbridge.NewMetricProducer()),

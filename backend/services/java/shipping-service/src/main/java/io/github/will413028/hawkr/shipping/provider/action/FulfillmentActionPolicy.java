@@ -44,23 +44,18 @@ public final class FulfillmentActionPolicy {
      * 是 → 進本集合；否（只寫我方狀態）→ 不進。
      */
     private static final Set<FulfillmentAction> DEFAULT_REQUIRES_PROVIDER_CALL = Set.of(
-            FulfillmentAction.DISPATCH,        // 派車／叫件：不打 provider 就沒有司機
-            FulfillmentAction.CANCEL,          // 預設要打；超商與商家自送由 OVERRIDES 改成 false
-            FulfillmentAction.PRINT_LABEL,     // 標籤由 provider 產生
+            FulfillmentAction.DISPATCH,
+            FulfillmentAction.CANCEL,
+            FulfillmentAction.PRINT_LABEL,
             FulfillmentAction.REPRINT_LABEL,
-            FulfillmentAction.TRACK,           // 主動回查
+            FulfillmentAction.TRACK,
             FulfillmentAction.REQUERY,
-            FulfillmentAction.ARRANGE_RETURN,  // 逆向建單
-            FulfillmentAction.VIEW_POD,        // 送達證明要向 provider 取
-            FulfillmentAction.UPDATE,          // 修改配送資料
-            FulfillmentAction.RESUBMIT         // 重新建單
+            FulfillmentAction.ARRANGE_RETURN,
+            FulfillmentAction.VIEW_POD,
+            FulfillmentAction.UPDATE,
+            FulfillmentAction.RESUBMIT
     );
 
-    // ⚠️ 刻意**不在**上面集合裡的，逐群寫下理由（免得下一個人以為是漏的）：
-    //   handover                                   ── 賣家確認出貨只寫我方狀態，provider 端沒有對應 API
-    //   seller_pickup / reselect_store             ── 我方狀態轉換；門市重選的 provider 側同步走取消重建
-    //   open_case / claim / admin_resolve / admin_close_case ── ADM 的案件流程，與 provider 無關
-    //   view_only                                  ── 兜底值，本來就不打任何東西
 
     private FulfillmentActionPolicy() {
     }
@@ -71,19 +66,14 @@ public final class FulfillmentActionPolicy {
      * <p>只列<b>與預設不同</b>的格子；沒列到的走預設。
      */
     private static final Map<String, Boolean> OVERRIDES = Map.ofEntries(
-            // 🔴 取消：四個 provider 中只有 Uber 有真正的 cancel API。
-            //    其餘三條線寫 992 CANCEL_PENDING 或本地終態，由回調／人工補上 provider 側確認。
-            //    ⚠️ 這幾格漏掉的後果不是「多打一次 API」，是那些取消按鈕被 capability 的 empty 整條 gate 掉。
             Map.entry(FulfillmentAction.CANCEL.value() + "@" + ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value(), false),
             Map.entry(FulfillmentAction.CANCEL.value() + "@" + ShippingMethod.MERCHANT_DELIVERY.value(), false),
             Map.entry(FulfillmentAction.CANCEL.value() + "@" + ShippingMethod.TAQBIN.value(), false),
 
-            // 商家自送沒有外部 provider：所有動作都只寫我方狀態。
             Map.entry(FulfillmentAction.DISPATCH.value() + "@" + ShippingMethod.MERCHANT_DELIVERY.value(), false),
             Map.entry(FulfillmentAction.TRACK.value() + "@" + ShippingMethod.MERCHANT_DELIVERY.value(), false),
             Map.entry(FulfillmentAction.VIEW_POD.value() + "@" + ShippingMethod.MERCHANT_DELIVERY.value(), false),
 
-            // Uber 的「派車」就是建單本身（同一支呼叫、不同觸發者），仍需打 provider。
             Map.entry(FulfillmentAction.DISPATCH.value() + "@" + ShippingMethod.UBER_INSTANT.value(), true)
     );
 
@@ -127,7 +117,6 @@ public final class FulfillmentActionPolicy {
      * 而不是買家看到賣家的按鈕。
      */
     private static final Map<FulfillmentAction, Set<AccountType>> ACTORS = Map.ofEntries(
-            // 賣家履約動作：全部掛在 requireSeller(CapOrderFulfill) 的路由上
             Map.entry(FulfillmentAction.DISPATCH, SELLER_ONLY),
             Map.entry(FulfillmentAction.HANDOVER, SELLER_ONLY),
             Map.entry(FulfillmentAction.PRINT_LABEL, SELLER_ONLY),
@@ -135,13 +124,8 @@ public final class FulfillmentActionPolicy {
             Map.entry(FulfillmentAction.ARRANGE_RETURN, SELLER_ONLY),
             Map.entry(FulfillmentAction.UPDATE, SELLER_ONLY),
             Map.entry(FulfillmentAction.RESUBMIT, SELLER_ONLY),
-            // 唯讀動作：買賣雙方都有，各自指向自己的端點（買家 B-1 / 賣家 S-9）
             Map.entry(FulfillmentAction.TRACK, BUYER_AND_SELLER),
             Map.entry(FulfillmentAction.VIEW_ONLY, BUYER_AND_SELLER),
-            // VIEW_POD 是賣家動作：65 唯一的 pod 端點 S-12
-            // GET /app/shipments/:order_no/pod 掛在 sellerHandle 上；買家側的 POD 是
-            // B-1 回應內嵌的 delivery.podImageKeys，不是一個 action。
-            // （本表先前宣告 BUYER，與設計書矛盾；該格今天不在 SUPPORTED 內尚未引爆。）
             Map.entry(FulfillmentAction.VIEW_POD, SELLER_ONLY));
 
     /**
@@ -161,11 +145,7 @@ public final class FulfillmentActionPolicy {
      * 那個布林的預設值是 {@code false}，分不出「明確宣告沒有」與「還沒宣告」。
      */
     private static final Set<String> NOT_APPLICABLE = Set.of(
-            // 黑貓宅配：司機到府取件，沒有「賣家確認出貨」這一步。
             FulfillmentAction.HANDOVER.value() + "@" + ShippingMethod.TAQBIN.value(),
-            // Uber 即時配送：交付確認走 POD，不走我方的「賣家確認出貨」。
-            // ⚠️ 66 尚未落地；列在這裡是因為端點側本來就拒絕它，而兩層必須給同一個答案。
-            //    66 實作時若確認 Uber 有這一步，改的是這一行——不是在端點再加一個 if。
             FulfillmentAction.HANDOVER.value() + "@" + ShippingMethod.UBER_INSTANT.value());
 
     /**

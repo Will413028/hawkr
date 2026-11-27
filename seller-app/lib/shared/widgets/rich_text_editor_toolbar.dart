@@ -83,7 +83,6 @@ class EditorToolbar extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 第一行工具列
             Container(
               height: 48,
               padding: EdgeInsets.symmetric(horizontal: 12.w),
@@ -92,17 +91,14 @@ class EditorToolbar extends StatelessWidget {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    // + 區塊 按鈕
                     _AddBlockButton(onTap: onAddBlock),
                     SizedBox(width: 12.w),
-                    // 分隔線
                     Container(
                       width: 1,
                       height: 24.h,
                       color: AppColors.dividerLight,
                     ),
                     SizedBox(width: 12.w),
-                    // 粗體
                     _ToolbarIconButton(
                       semanticLabel: '粗體',
                       icon: AppIcons.formatBold,
@@ -111,7 +107,6 @@ class EditorToolbar extends StatelessWidget {
                       isEnabled: onBold != null,
                       onTap: onBold,
                     ),
-                    // 斜體
                     _ToolbarIconButton(
                       semanticLabel: '斜體',
                       icon: AppIcons.formatItalic,
@@ -120,7 +115,6 @@ class EditorToolbar extends StatelessWidget {
                       isEnabled: onItalic != null,
                       onTap: onItalic,
                     ),
-                    // 底線
                     _ToolbarIconButton(
                       semanticLabel: '底線',
                       icon: AppIcons.formatUnderlined,
@@ -129,7 +123,6 @@ class EditorToolbar extends StatelessWidget {
                       isEnabled: onUnderline != null,
                       onTap: onUnderline,
                     ),
-                    // 連結
                     _ToolbarIconButton(
                       semanticLabel: '插入連結',
                       icon: AppIcons.link,
@@ -138,7 +131,6 @@ class EditorToolbar extends StatelessWidget {
                       isEnabled: onLink != null,
                       onTap: onLink,
                     ),
-                    // 調色盤
                     _ToolbarIconButton(
                       semanticLabel: '文字顏色',
                       icon: AppIcons.paletteOutlined,
@@ -148,14 +140,12 @@ class EditorToolbar extends StatelessWidget {
                       onTap: onColorPicker,
                     ),
                     SizedBox(width: 8.w),
-                    // 分隔線
                     Container(
                       width: 1,
                       height: 24.h,
                       color: AppColors.dividerLight,
                     ),
                     SizedBox(width: 8.w),
-                    // 對齊方式
                     _AlignmentButton(
                       alignment: TextAlign.left,
                       currentAlignment: selectedStyle?.alignment,
@@ -178,9 +168,7 @@ class EditorToolbar extends StatelessWidget {
                 ),
               ),
             ),
-            // 分隔線
             Container(height: 1, color: AppColors.dividerLight),
-            // 第二行工具列
             Container(
               height: 48,
               padding: EdgeInsets.symmetric(horizontal: 12.w),
@@ -189,7 +177,6 @@ class EditorToolbar extends StatelessWidget {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    // T 文字樣式
                     _ToolbarIconButton(
                       semanticLabel: '文字樣式',
                       icon: AppIcons.textFields,
@@ -198,7 +185,6 @@ class EditorToolbar extends StatelessWidget {
                       onTap: onTextStyle,
                       size: 22,
                     ),
-                    // 圖片插入
                     _ToolbarIconButton(
                       semanticLabel: '插入圖片',
                       icon: AppIcons.imageOutlined,
@@ -207,7 +193,6 @@ class EditorToolbar extends StatelessWidget {
                       onTap: onInsertImage,
                       size: 22,
                     ),
-                    // 表格插入
                     _ToolbarIconButton(
                       semanticLabel: '插入表格',
                       icon: AppIcons.tableChartOutlined,
@@ -216,7 +201,6 @@ class EditorToolbar extends StatelessWidget {
                       onTap: onInsertTable,
                       size: 22,
                     ),
-                    // 項目符號清單插入
                     _ToolbarIconButton(
                       semanticLabel: '插入項目符號清單',
                       icon: AppIcons.formatListBulleted,
@@ -225,7 +209,6 @@ class EditorToolbar extends StatelessWidget {
                       onTap: onInsertBulletList,
                       size: 22,
                     ),
-                    // 編號清單插入
                     _ToolbarIconButton(
                       semanticLabel: '插入編號清單',
                       icon: AppIcons.formatListNumbered,
@@ -234,9 +217,6 @@ class EditorToolbar extends StatelessWidget {
                       onTap: onInsertNumberedList,
                       size: 22,
                     ),
-                    // 注意：之前這裡有一個 # hashtag 按鈕，但用戶反饋輸入框內直接打 #
-                    // 就會自動觸發 autocomplete，按鈕多餘 → 移除。
-                    // hashtag 計數器仍在頂部 bar (# n/10)。
                     SizedBox(width: 12.w),
                     Container(
                       width: 1,
@@ -244,7 +224,6 @@ class EditorToolbar extends StatelessWidget {
                       color: AppColors.dividerLight,
                     ),
                     SizedBox(width: 12.w),
-                    // 撤銷
                     _ToolbarIconButton(
                       semanticLabel: '撤銷',
                       icon: AppIcons.undo,
@@ -253,7 +232,6 @@ class EditorToolbar extends StatelessWidget {
                       onTap: onUndo,
                       size: 20,
                     ),
-                    // 重做
                     _ToolbarIconButton(
                       semanticLabel: '重做',
                       icon: AppIcons.redo,
@@ -263,7 +241,6 @@ class EditorToolbar extends StatelessWidget {
                       size: 20,
                     ),
                     SizedBox(width: 8.w),
-                    // 字數統計
                     Semantics(
                       label: '字數 $currentLength，共 $maxLength',
                       child: ExcludeSemantics(
@@ -279,7 +256,6 @@ class EditorToolbar extends StatelessWidget {
                       ),
                     ),
                     SizedBox(width: 8.w),
-                    // 鍵盤按鈕
                     HkTapTarget(
                       semanticLabel: '隱藏鍵盤',
                       hint: '收起螢幕鍵盤',
@@ -298,7 +274,6 @@ class EditorToolbar extends StatelessWidget {
                 ),
               ),
             ),
-            // 底部安全區域
             if (bottomPadding > 0) SizedBox(height: bottomPadding),
           ],
         ),

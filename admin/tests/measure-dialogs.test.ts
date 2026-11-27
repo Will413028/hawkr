@@ -198,8 +198,6 @@ function measure(
 	});
 }
 
-// ---------------------------------------------------------------------------
-// 修改措施
 
 function updateElement(
 	m: ReturnType<typeof measure>,
@@ -346,7 +344,6 @@ test("修改措施：版本衝突後換上新的措施重送，update_mask 只�
 	await click("確認修改");
 	assert.equal(sent.length, 1);
 	assert.match(bodyText(), new RegExp(MEASURE_CONFLICT_TEXT, "u"));
-	// 呼叫端重讀：別的管理員在這之間改了理由，etag 變了。
 	const refreshed = measure({
 		etag: "e2",
 		statement: "別人改過的理由",
@@ -374,8 +371,6 @@ test("修改措施：版本衝突後換上新的措施重送，update_mask 只�
 	assert.equal(request.measure?.etag, "e2");
 });
 
-// ---------------------------------------------------------------------------
-// 裁定
 
 function openDecide(
 	kind: "appeal" | "remediation",
@@ -554,8 +549,6 @@ test("裁定：送出的內容帶結果、理由與一併撤銷的勾選；失�
 	assert.equal(sent.length, 2);
 });
 
-// ---------------------------------------------------------------------------
-// 內部註記
 
 test("內部註記：標題、說明、placeholder、按鈕；沒有註記時顯示「還沒有註記」", async () => {
 	const m = mount(

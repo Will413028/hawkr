@@ -37,8 +37,6 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// autoMedia 讓測試以任意字串當 staged token：第一次 Confirm 某個 (上傳者, 字串) 時，才以該上傳者在真的 media 模組放一張公開 PNG
-// 並以它的真 token 確認；之後同一個字串回同一個資產。Confirm 本身（轉換、上傳者核對、transaction 語意）是真的 media 模組。
 type autoMedia struct {
 	*media.Module
 	mu     sync.Mutex
@@ -85,7 +83,6 @@ func (f *fixture) postAsset(t *testing.T, postID uuid.UUID) uuid.UUID {
 	return id
 }
 
-// queue 記錄排入的 job（必須在 transaction 內，與真正的 jobs.Client 相同）。
 type queue struct {
 	mu   sync.Mutex
 	args []river.JobArgs
@@ -109,7 +106,6 @@ func (q *queue) reset() {
 	q.args, q.opts = nil, nil
 }
 
-// scheduledJobs 回傳目前排入的排程發布 job（schedule_id 與到點時間 ScheduledAt）。
 func (q *queue) scheduledJobs() map[uuid.UUID]time.Time {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -126,7 +122,6 @@ func (q *queue) scheduledJobs() map[uuid.UUID]time.Time {
 	return out
 }
 
-// revalidations 回傳目前排入的失效 job 的 tag 清單。
 func (q *queue) revalidations() [][]string {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -151,7 +146,7 @@ func (q *queue) kinds() []string {
 
 type products struct {
 	mu    sync.Mutex
-	owner map[uuid.UUID]int64 // 商品 → 店家
+	owner map[uuid.UUID]int64
 	err   error
 }
 
@@ -171,7 +166,6 @@ func (p *products) VerifyProduct(_ context.Context, productID uuid.UUID, storeID
 	return nil
 }
 
-// scheduleAuth 是代行（DELEGATION）的排程授權在測試裡的替身：記下被問的事實，回傳測試設定的結果（預設允許）。
 type scheduleAuth struct {
 	mu    sync.Mutex
 	err   error
@@ -197,7 +191,6 @@ func (a *scheduleAuth) asked() []social.ScheduledPublish {
 	return append([]social.ScheduledPublish(nil), a.calls...)
 }
 
-// eventLog 記下 social 發的排程相關事件。
 type eventLog struct {
 	mu        sync.Mutex
 	published []social.PostPublished
@@ -235,7 +228,6 @@ type fixture struct {
 	logs syncBuffer
 }
 
-// syncBuffer 收集模組的 log（並行安全），測試用它檢查 warn。
 type syncBuffer struct {
 	mu sync.Mutex
 	b  bytes.Buffer
@@ -307,7 +299,6 @@ func setup(t *testing.T) *fixture {
 	events.Subscribe(f.bus, f.module.OnBuyerDeletionRequested)
 	events.Subscribe(f.bus, f.module.OnBuyerDeleted)
 	events.Subscribe(f.bus, f.module.OnStoreRetired)
-	// 測試只關心 social 讀 seller 的 pub_exposable_stores：把 KYC 的表放寬成可以直接寫最小的列（它自己的規則在 seller 的測試）。
 	f.exec(t, `DO $$ DECLARE r record; BEGIN
 		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
 		         WHERE conrelid = 'seller.kyc_applications'::regclass AND contype = 'c'
@@ -333,7 +324,6 @@ func (f *fixture) scalar(t *testing.T, sql string, args ...any) int64 {
 
 func (f *fixture) next() int64 { return f.ids.Add(1) + 100 }
 
-// exposableStore 建一家可以公開曝光的店（直接寫 seller 的表，最小的列），回傳 store_id 與帳號。
 func (f *fixture) exposableStore(t *testing.T) (storeID, accountID int64) {
 	t.Helper()
 	accountID = f.next()
@@ -346,7 +336,6 @@ func (f *fixture) exposableStore(t *testing.T) (storeID, accountID int64) {
 	return storeID, accountID
 }
 
-// setExposable 讓店家回到可曝光（true）或不可曝光（false，KYC 退回）。
 func (f *fixture) setExposable(t *testing.T, storeID int64, ok bool) {
 	t.Helper()
 	status := "APPROVED"
@@ -356,7 +345,6 @@ func (f *fixture) setExposable(t *testing.T, storeID int64, ok bool) {
 	f.exec(t, "UPDATE seller.kyc_applications SET status = $2 WHERE store_id = $1", storeID, status)
 }
 
-// store 讀出店家（已推導條件），作為店家身分的呼叫者。
 func (f *fixture) store(t *testing.T, storeID int64) seller.Store {
 	t.Helper()
 	s, err := f.sellers.Store(context.Background(), storeID)
@@ -372,7 +360,6 @@ func (f *fixture) asStore(t *testing.T, storeID int64) social.Caller {
 	return social.Caller{Store: &s}
 }
 
-// newBuyer 建一位營運中的買家。
 func (f *fixture) newBuyer(t *testing.T) buyer.Profile {
 	t.Helper()
 	id := f.next()
@@ -388,7 +375,6 @@ func (f *fixture) newBuyer(t *testing.T) buyer.Profile {
 
 func (f *fixture) asBuyer(p buyer.Profile) social.Caller { return social.Caller{BuyerID: p.BuyerID} }
 
-// publishedPost 建一篇已發布的貼文（圖是新上傳的 token）。
 func (f *fixture) publishedPost(t *testing.T, storeID int64, body string, tags ...string) social.Post {
 	t.Helper()
 	p, err := f.module.CreatePost(context.Background(), f.store(t, storeID), social.CreatePostInput{
@@ -426,7 +412,6 @@ type (
 
 func uuidNew() uuid.UUID { return uuid.NewV7() }
 
-// storeBlocksFromTable 是 social 的店家封鎖檢查在測試裡的替身：直接讀 seller.store_blocks（seller 自己的封鎖規則由 seller 的測試驗證）。
 type storeBlocksFromTable struct{ db *db.DB }
 
 func (s storeBlocksFromTable) StoreBlocksBuyer(ctx context.Context, storeID, buyerID int64) (bool, error) {

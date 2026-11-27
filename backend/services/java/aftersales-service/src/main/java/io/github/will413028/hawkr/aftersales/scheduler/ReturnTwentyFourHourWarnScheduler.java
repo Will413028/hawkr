@@ -66,7 +66,7 @@ public class ReturnTwentyFourHourWarnScheduler {
 
         scanStorePickupWarn(now, cutoff);
         scanConfirmReceiptWarn(now, cutoff);
-        scanShipBackWarn(now, cutoff); // 2026-06-15 待寄回 D-1 預警
+        scanShipBackWarn(now, cutoff);
     }
 
     private void scanStorePickupWarn(LocalDateTime now, LocalDateTime cutoff) {
@@ -90,7 +90,6 @@ public class ReturnTwentyFourHourWarnScheduler {
                 extra.put("deadline_at",
                         caseEntity.getStorePickupDeadlineAt() != null
                                 ? caseEntity.getStorePickupDeadlineAt().toString() : null);
-                // 例外 B：先 publish，成功才 stamp（publish 失敗 → 不 stamp → 下一輪重發）
                 boolean published = eventPublisher.tryPublishCaseTransitionWithContext(
                         AfterSalesEventType.CASE_RETURN_AT_STORE_24H.value(),
                         MqConstants.EVENT_TYPE_AFTERSALES_CASE_RETURN_AT_STORE_24H,
@@ -134,7 +133,6 @@ public class ReturnTwentyFourHourWarnScheduler {
                 extra.put("deadline_at",
                         caseEntity.getAutoConfirmAt() != null
                                 ? caseEntity.getAutoConfirmAt().toString() : null);
-                // 例外 B：先 publish，成功才 stamp
                 boolean published = eventPublisher.tryPublishCaseTransitionWithContext(
                         AfterSalesEventType.CASE_RETURN_DELIVERED_24H.value(),
                         MqConstants.EVENT_TYPE_AFTERSALES_CASE_RETURN_DELIVERED_24H,
@@ -183,7 +181,6 @@ public class ReturnTwentyFourHourWarnScheduler {
                 extra.put("deadline_at",
                         caseEntity.getShipBackDeadlineAt() != null
                                 ? caseEntity.getShipBackDeadlineAt().toString() : null);
-                // 例外 B：先 publish，成功才 stamp
                 boolean published = eventPublisher.tryPublishCaseTransitionWithContext(
                         AfterSalesEventType.CASE_RETURN_PENDING_24H.value(),
                         MqConstants.EVENT_TYPE_AFTERSALES_CASE_RETURN_PENDING_24H,

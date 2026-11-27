@@ -23,7 +23,6 @@ type Tag = hashtag.Tag
 // Normalize 對一個輸入做正規化，見 platform/hashtag。
 func Normalize(raw string) (name, display string, ok bool) { return hashtag.Normalize(raw) }
 
-// invalid 把 platform/hashtag 的違規種類換成 InvalidInput；不是違規的錯誤原樣回傳。
 func invalid(l uitext.Locale, err error) error {
 	switch {
 	case err == nil:

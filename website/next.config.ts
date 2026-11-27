@@ -17,7 +17,6 @@ import {
 import { PRIVATE_PREFIXES } from "./lib/seo/indexability";
 
 const projectRoot = dirname(fileURLToPath(import.meta.url));
-// pnpm workspace 的依賴在 repo 根目錄的 node_modules/.pnpm，bundler 與 file tracing 的根都要涵蓋它
 const workspaceRoot = resolve(projectRoot, "..");
 const withBundleAnalyzer = bundleAnalyzer({
 	enabled: process.env.ANALYZE === "true",
@@ -209,8 +208,6 @@ const NO_STORE_ROUTE_PREFIXES = [
 	"/api",
 	"/sentinel",
 ] as const;
-// path-to-regexp：`(a|b/c)` 的替代群組可以含斜線，`(/.*)?` 讓前綴本身與其子路徑
-// 都命中、而 `/accounting` 這種只是字首相同的路徑不會。
 const privateRouteSource = (
 	prefixes: readonly string[],
 	localePrefix = "",
@@ -259,18 +256,12 @@ function withLocalizedRedirects(
 	];
 }
 
-// The three rules in `headers()` partition all request shapes: documents, RSC
-// payloads, and the complement below. This keeps the no-cache policy a default
-// even when `Accept` is absent or carries a non-document media type; a fourth
-// rule then tightens private routes to no-store. Fingerprinted assets retain
-// their separate immutable policy in the `/_next/static/*` rule.
 const REQUEST_SHAPES_WITHOUT_A_DOCUMENT_RULE = [
 	{ type: "header" as const, key: "accept", value: ".*text/html.*" },
 	{ type: "header" as const, key: "rsc", value: "1" },
 ];
 
 const nextConfig: NextConfig = {
-	// @hawkr/api 只發佈 TS 原始碼（不 build），由 Next 編譯。
 	transpilePackages: [
 		"@hawkr/api",
 		"@hawkr/icons",
@@ -279,35 +270,14 @@ const nextConfig: NextConfig = {
 	],
 	turbopack: { root: workspaceRoot },
 	outputFileTracingRoot: workspaceRoot,
-	// Hide the bottom-left Next.js dev-tools indicator (the "Rendering…" pill +
-	// the route URL tooltip it shows while prefetching a hovered <Link>). Dev-only
-	// surface; never rendered in prod. Removes the URL preview on all pages.
 	devIndicators: false,
-	// 根 layout 有兩個（app/[locale] 與 app/(delegated)），沒有單一 layout 組得出全站的 404，
 	// 所以找不到任何路由時用 app/global-not-found.tsx（整份文件自己組，見該檔的說明）。
 	experimental: { globalNotFound: true },
-	// Cache Components: dynamic by default with a prerendered static shell.
-	// Data-layer freshness lives in lib/api/cached.ts (a `'use cache'` function per
-	// fetcher, with tags + a cacheLife TTL safety net); revalidateTag
-	// (POST /api/revalidate) busts those entries early on backend
-	// price/stock/publish mutations.
 	cacheComponents: true,
 	images: {
-		// Custom loader → Alibaba OSS image service. We use OSS's own
-		// image-processing pipeline (resize/quality/WebP) instead of Next's
-		// built-in optimizer, and drop the old `unoptimized:true` CWV killer
-		// that shipped every image as the raw original with no srcset/WebP.
 		loader: "custom",
 		loaderFile: "./lib/media/ossImageLoader.ts",
-		// Next 16 requires this list — it validates the `quality` *prop* (and the
-		// built-in default of 75, which ossImageLoader maps down to its lower
-		// sitewide default). Add a value here before passing it as a prop. 70 is
-		// the "hero / full-width cover" tier where Q_45 shows banding on large
-		// smooth gradients (e.g. the seller profile banner).
 		qualities: [70, 75],
-		// Defensive / documentation only — a full custom loaderFile bypasses the
-		// built-in optimizer, so remotePatterns is not enforced here. Drop it in
-		// Step 3 if `pnpm build` warns it is unused.
 		remotePatterns: IMAGE_REMOTE_PATTERNS,
 	},
 
@@ -323,33 +293,20 @@ const nextConfig: NextConfig = {
 				has: [{ type: "header", key: "rsc", value: "1" }],
 				headers: PAGE_RESPONSE_CACHE_HEADERS,
 			},
-			// Everything else. Without this rule the two above are an opt-in, not a
-			// default — see REQUEST_SHAPES_WITHOUT_A_DOCUMENT_RULE for what was
-			// measured escaping through the gap. `missing` is the exact complement
-			// of the two `has` clauses (`!missing.some(hasMatch)`), and it names the
-			// `rsc` VALUE rather than its mere presence so that a request carrying
-			// `rsc: 2` lands here instead of between the rules.
 			{
 				source: "/(.*)",
 				missing: REQUEST_SHAPES_WITHOUT_A_DOCUMENT_RULE,
 				headers: PAGE_RESPONSE_CACHE_HEADERS,
 			},
-			// 私有路由收緊為 no-store。放在三條公開規則之後：同一個 header key
-			// 後匹配者勝（與檔尾 Referrer-Policy 那條依賴的是同一個規則）。
 			{
 				source: PRIVATE_ROUTE_SOURCE,
 				headers: PRIVATE_RESPONSE_CACHE_HEADERS,
 			},
-			// 同一組私有路由在非預設語系下（`/en/account/…`）一樣是 no-store。
 			...NON_DEFAULT_LOCALES.map((locale) => ({
 				source: privateRouteSource(LOCALIZED_NO_STORE_PREFIXES, `/${locale}`),
 				headers: PRIVATE_RESPONSE_CACHE_HEADERS,
 			})),
 			{ source: "/(.*)", headers: SECURITY_HEADERS },
-			// Build assets are fingerprinted, so a new deploy always produces a new
-			// URL and these can stay immutable in the browser. This must come after
-			// the catch-all no-cache rules above: without it `/_next/static/*` is
-			// answered with their `no-cache` (measured with `next start`).
 			{
 				source: "/_next/static/:path*",
 				headers: [
@@ -359,11 +316,6 @@ const nextConfig: NextConfig = {
 					},
 				],
 			},
-			// `/adm/enter?code=…` 的查詢字串本身就是一把單次憑證（§8.1.6）。route
-			// handler 已經在它的 303 上寫了 `Referrer-Policy: no-referrer`，但
-			// `headers()` 的規則會覆蓋 handler 設的同名 header —— 實測 runtime 回的是
-			// 上面那條 `strict-origin-when-cross-origin`，於是那道防線只是一句沒有效果
-			// 的宣告。放在最後一條：同一個 header key 後匹配者勝。
 			{
 				source: "/adm/enter",
 				headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
@@ -373,7 +325,6 @@ const nextConfig: NextConfig = {
 
 	async rewrites() {
 		return {
-			// 部署環境的同源反代；本機反代的 build 為空（lib/api/local-proxy.ts）。
 			beforeFiles: apiProxyRewrites(),
 			afterFiles: [
 				{
@@ -399,15 +350,8 @@ const nextConfig: NextConfig = {
 	 */
 	async redirects() {
 		const pageRedirects: RedirectRule[] = [
-			// Temporary top-level Hawkr Agent gate. Put these before the legacy
-			// redirects so a production request is handled at the HTTP layer and
-			// never streams an Agent shell or flashes its old destination.
 			...(!HAWKR_AGENT_ENABLED
 				? [
-						// Next preserves unmatched query parameters across redirects. Blank
-						// the Agent restore identifier in the first Location response; edge
-						// middleware removes the empty key before auth can wrap the landing
-						// URL into /login?redirect=....
 						{
 							source: "/account/messages/assistant/:path*",
 							has: [{ type: "query" as const, key: "requestId" }],
@@ -430,9 +374,6 @@ const nextConfig: NextConfig = {
 			{ source: "/farmers", destination: "/market/products", permanent: true },
 			{ source: "/sellers", destination: "/market/products", permanent: true },
 			{ source: "/explore", destination: "/feed", permanent: true },
-			// Keep static aliases at the HTTP layer. Rendering these as React pages
-			// first can stream a PPR shell before redirect(), causing a visible loader
-			// and hydration/client-render fallback for a route with no real content.
 			{ source: "/daily-posts", destination: "/feed", permanent: true },
 			{ source: "/market", destination: "/market/products", permanent: true },
 			{
@@ -440,26 +381,9 @@ const nextConfig: NextConfig = {
 				destination: "/market/products",
 				permanent: true,
 			},
-			// These used to be server-component `redirect()` alias pages, but the
-			// root layout streams (async navbar), so by the time the page called
-			// redirect() the response had started — Next degraded it to a
-			// client-side redirect and threw a dev Suspense-boundary pageerror.
-			// Config-level redirects stay at the HTTP layer.
 			{ source: "/seasonal", destination: "/market/products", permanent: true },
 			{ source: "/topics", destination: "/feed", permanent: true },
 			{ source: "/education", destination: "/feed", permanent: true },
-			// Hawkr Agent legacy 入口退場（設計書 v6 §V.10.12-4）：唯一正式新對話
-			// 入口凍結為 /account/messages/assistant/procurement。
-			//
-			// 同樣走 HTTP 層而不是 server-component `redirect()`，理由與上面那組
-			// 別名完全一樣：cacheComponents 下 PPR 會先把 shell 串出去，redirect()
-			// 因此降級成 client-side 導向——實測 `/account/find-sellers` 回的是
-			// 200＋prerender HIT，網址列停在舊路徑直到 RSC payload 抵達才跳走，
-			// 使用者看得到一次閃爍。
-			//
-			// permanent: false（307）而不是 308：§V.14.4-2 要求先用 access metric
-			// 證明 legacy 路徑零流量一個完整相容 slice 才算真正退場，永久轉址會被
-			// 瀏覽器永久快取，等於提前斷掉 rollback 的路。
 			{
 				source: "/account/messages/assistant/new",
 				destination: "/account/messages/assistant/procurement",
@@ -474,21 +398,6 @@ const nextConfig: NextConfig = {
 
 		return [
 			...withLocalizedRedirects(pageRedirects),
-			// ADM 代行工作區沒有獨立落地頁：`/adm/{storeId}` 一律導到商品管理，
-			// 與 `/adm/enter` 兌換成功後的落點同一個（app/(delegated)/adm/enter/
-			// route.ts 的 303）。
-			//
-			// 這裡也是 server-component `redirect()` 別名頁退場，理由與上面那兩組
-			// 一字不差——實測（2026-08-20，本機 next dev）`GET /adm/2685914682` 回的
-			// 是 200 ＋ 69 KB HTML、**沒有 Location**，導向藏在 RSC payload 裡：
-			// 訪客要下載兩份文件，而 HTTP client／爬蟲拿到的是一份內容不對的 200。
-			//
-			// ⚠️ `(\\d+)` 不可省。redirects() 在 filesystem routes **之前**求值，裸
-			// `:storeId` 會把 `/adm/enter`（交接碼兌換 route handler，代行唯一入口）
-			// 與 `/adm/unavailable` 一起吃掉。store_id 是 TSID，恆為純數字。
-			//
-			// permanent: false（307）而非 308：落點日後若要依 capability 決定，308
-			// 已被瀏覽器永久快取就回不來了。
 			{
 				source: "/adm/:storeId(\\d+)",
 				destination: "/adm/:storeId/products",
@@ -503,16 +412,9 @@ const configWithPlugins = withNextIntl(withBundleAnalyzer(nextConfig));
 export default isAnalyzeBuild
 	? configWithPlugins
 	: withSentryConfig(configWithPlugins, {
-			// 上傳目標 org 與 project 由 build env SENTRY_ORG、SENTRY_PROJECT 決定
 			org: process.env.SENTRY_ORG,
 			project: process.env.SENTRY_PROJECT,
-			// Source maps upload only when SENTRY_AUTH_TOKEN is present (CI build).
-			// Without it the build still succeeds — upload is skipped, so prod
-			// stack traces stay minified until the token is wired into CI.
 			silent: true,
 			telemetry: false,
-			// Upload sourcemaps for the full static/chunks tree (not just the
-			// default subset) so client errors landing in edge chunks still
-			// symbolicate. Sentry's recommended setting for Next.js.
 			widenClientFileUpload: true,
 		});

@@ -50,8 +50,6 @@ const _mediaMuted = AppColors.textSecondary;
 bool _hasValidProduct(PostProduct? product) {
   if (product == null) return false;
   final name = product.name.trim();
-  // `"0"` 是後端「無價格」的表達且非空字串 —— 用 isNotEmpty 判斷會讓
-  // 「無名稱＋無價格」的商品節點通過，渲染出一張空卡片。
   final price = PriceDisplay.formatPrice(product.price);
   return name.isNotEmpty || price.isNotEmpty;
 }
@@ -107,7 +105,6 @@ class PostDetailScreen extends HookConsumerWidget {
       return null;
     }, [postId]);
 
-    // 貼文讀到之後記一次瀏覽（背景呼叫，失敗不影響畫面）；下拉重讀時 hasValue 不變，不會再記。
     final loaded = detailAsync.hasValue;
     useEffect(() {
       if (loaded) {
@@ -135,7 +132,6 @@ class PostDetailScreen extends HookConsumerWidget {
           : _PostDetailError(
               message: error.toString(),
               onClose: closeDetail,
-              // 找不到不是暫時的失敗，重試只會得到同一個結果。
               onRetry: error is NotFoundException
                   ? null
                   : () => ref.invalidate(postEntityProvider(postId)),
@@ -145,14 +141,10 @@ class PostDetailScreen extends HookConsumerWidget {
       final sellerId = post.storeId.isNotEmpty
           ? post.storeId
           : merchantId?.trim() ?? '';
-      // 詳情端點不帶 storeCode：sellerId 就是 store_id，經店家卡片（BatchGetStores）取得；
-      // 沒有營業中的店面網址時不給連結，也不退回用 id 定址。
       final card = sellerId.isEmpty
           ? null
           : ref.watch(storeCardProvider(sellerId)).value;
       final uiLocale = ref.watch(uiLocaleProvider);
-      // 名稱與頭像以店家卡片為準；卡片還沒讀到時用手上已有的（貼文詳情、路由帶來的），
-      // 都沒有時是共用文案目錄的已關閉店家，不寫死後備句。
       final apiName = (post.merchantName ?? '').trim();
       final routeName = (merchantName ?? '').trim();
       final displayName = card != null
@@ -932,7 +924,6 @@ class _RelatedProductChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = product.name.trim();
-    // 判準走 PriceDisplay：`"0"` = 無價格，不能印成 `NT$ 0`。
     final price = PriceDisplay.formatPrice(product.price, prefix: 'NT\$ ');
     final image = _toAbsolute(product.image);
 
@@ -1225,9 +1216,6 @@ class _MerchantAvatar extends StatelessWidget {
         color: AppIconColors.onBrand,
       );
     } else if (isInlineImageData(source)) {
-      // inline 判準只看 `data:` scheme。舊寫法是「不是 http 且長度 > 60」，而
-      // objectKey 本來就 78~80 字元（media_image.dart isInlineImageData 的註解），
-      // 商家 logoKey 一路被誤判成 base64、decode 失敗後靜默退回預設 icon。
       try {
         final bytes = base64Decode(
           source.contains(',') ? source.split(',').last : source,

@@ -56,13 +56,7 @@ SPEC = ROOT / "api" / "openapi" / "openapi.yaml"
 NEW_ENTRY_REASON = "TODO：填寫為什麼還沒改（誰在讀舊名／要等哪個前端相容層上線）"
 CHECK_B_DEFAULT_REASON = "TODO：填寫為什麼規格與 handler 輸出不一致、要以哪一邊為準"
 
-# ---------------------------------------------------------------------------
-# Check A：舊身分名偵測
-# ---------------------------------------------------------------------------
 
-# 帶前綴的 account_id 家族 key。刻意不寫死 sellerAccountId/buyerAccountId 清單——
-# 寫死的話，下一個新造的 merchantAccountId / ownerAccountId 就掃不到了。規則是
-# 「account_id 家族 + 非空的角色前綴」，裸 accountId/account_id（登入 principal）不算。
 CAMEL_QUALIFIED = re.compile(r"^[a-z][A-Za-z0-9]*?Account(?:Id|ID|Ids|IDs)$")
 SNAKE_QUALIFIED = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*_account_ids?$")
 BARE = {"accountId", "accountID", "account_id", "accountIds", "account_ids"}
@@ -73,7 +67,6 @@ def is_legacy_identity_key(key: str) -> bool:
     if key in BARE:
         return False
     if CAMEL_QUALIFIED.match(key):
-        # 前綴要真的存在：accountId 本身被 BARE 擋掉了，這裡再擋 Account 開頭的變體
         return not key.startswith("account")
     return bool(SNAKE_QUALIFIED.match(key))
 
@@ -131,10 +124,10 @@ def mask_source(src: str) -> tuple[str, str]:
                 if src[j] == quote:
                     j += 1
                     break
-                if quote != "`" and src[j] == "\n":  # 未閉合，安全退出
+                if quote != "`" and src[j] == "\n":
                     break
                 j += 1
-            blank(code, i + 1, j - 1)  # 保留兩端引號，內容清掉
+            blank(code, i + 1, j - 1)
             i = j
         else:
             i += 1
@@ -158,7 +151,6 @@ def find_struct_blocks(code: str, nc: str) -> list[tuple[int, int, str]]:
         end = brace_span(code, start)
         if end < 0:
             continue
-        # 型別名：type XxxRequest struct { … / var req struct { …
         head = code[max(0, m.start() - 120) : m.start()]
         name_m = re.search(r"type\s+([A-Za-z0-9_]+)\s+$", head)
         type_name = name_m.group(1) if name_m else ""
@@ -196,22 +188,17 @@ def scan_check_a() -> dict[tuple[str, str, str], dict]:
         blocks = find_struct_blocks(code, nc)
         line_of = _line_indexer(src)
 
-        # 1) struct tag
         for m in JSON_TAG_RE.finditer(nc):
             key = m.group(1).split(",")[0].strip()
             if key and is_legacy_identity_key(key):
                 record(path, key, direction_for_offset(blocks, m.start()), line_of(m.start()))
 
-        # 2) map 字面值 key（gin.H{"x": …} / map[string]any{"x": …}）
-        #    註解已被 mask 掉，所以 `// "sellerAccountId": …` 這種說明文字不會誤中。
         for m in MAP_KEY_RE.finditer(nc):
             key = m.group(1)
             if not is_legacy_identity_key(key):
                 continue
-            # struct tag 已由上面處理，這裡不會重疊（tag 是 json:"x"，沒有 "x": 形狀）
             record(path, key, direction_for_offset(blocks, m.start()), line_of(m.start()))
 
-        # 3) Swagger 註解（在原始碼裡，不能用 mask 過的版本）
         for idx, raw in enumerate(src.splitlines(), start=1):
             pm = SWAGGER_PARAM_RE.match(raw)
             if pm and is_legacy_identity_key(pm.group(1)):
@@ -221,7 +208,6 @@ def scan_check_a() -> dict[tuple[str, str, str], dict]:
                     if is_legacy_identity_key(fm.group(1)):
                         record(path, fm.group(1), "swagger", idx)
 
-    # 4) OpenAPI 規格：schema 的欄位名、path／query／header 參數名
     text = SPEC.read_text(encoding="utf-8")
     lines = text.splitlines()
 
@@ -267,11 +253,8 @@ def _line_indexer(src: str):
     return line_of
 
 
-# ---------------------------------------------------------------------------
-# Check B：OpenAPI 規格 ↔ handler 實際輸出
-# ---------------------------------------------------------------------------
 
-UNKNOWN = object()  # 「這層解析不出來」——不比對，不報，只計入 partial
+UNKNOWN = object()
 
 
 def brace_span(code: str, open_idx: int) -> int:
@@ -310,10 +293,8 @@ class HandlerParser:
     """單一檔案內的 handler 解析（helper 解析只跨到同檔的 package-level 函式）。"""
 
     def __init__(self, files: dict[str, tuple[str, str, str]]):
-        # rel -> (src, nc, code)
         self.files = files
-        self.helpers: dict[str, str] = {}  # func name -> gin.H 字面值內容（nc 版）
-        # func name -> (字面值之後以 m["key"] = … 加入的 {key: 運算式}, 函式體 nc, 函式體 code)
+        self.helpers: dict[str, str] = {}
         self.helper_extra: dict[str, tuple[dict[str, str], str, str]] = {}
         for rel, (_src, nc, code) in files.items():
             for m in re.finditer(
@@ -402,14 +383,12 @@ class HandlerParser:
         if depth > 3 or not expr:
             return False, UNKNOWN
 
-        # 內嵌 gin.H{…}
         m = re.match(r"gin\.H\s*\{", expr)
         if m:
             end = brace_span(expr, m.end() - 1)
             if end > 0:
                 return False, self.expand(expr[m.end() - 1 : end + 1], body_nc, body_code, depth)
 
-        # []gin.H{ gin.H{…} }
         m = re.match(r"\[\]gin\.H\s*\{", expr)
         if m:
             end = brace_span(expr, m.end() - 1)
@@ -422,13 +401,11 @@ class HandlerParser:
                         return True, self.expand(inner[m2.end() - 1 : e2 + 1], body_nc, body_code, depth)
             return True, UNKNOWN
 
-        # helper(...) 直接呼叫
         m = re.match(r"([A-Za-z0-9_]+)\s*\(", expr)
         if m and m.group(1) in self.helpers:
             node = self.expand(self.helpers[m.group(1)], body_nc, body_code, depth)
             return False, self.with_helper_extra(m.group(1), node, depth)
 
-        # 識別字 → 回函式體找它怎麼被填的
         m = re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", expr)
         if m:
             return self.resolve_ident(expr, body_nc, body_code, depth)
@@ -454,7 +431,6 @@ class HandlerParser:
         if asg:
             tail_code = body_code[asg.end() :]
             tail_nc = body_nc[asg.end() :]
-            # 取到行尾（字面值可能跨行，交給 brace_span 處理）
             m = re.match(r"(?:\[\])?gin\.H\s*\{", tail_code)
             if m:
                 end = brace_span(tail_code, m.end() - 1)
@@ -487,9 +463,6 @@ class HandlerParser:
     def expand(self, literal_nc: str, body_nc: str, body_code: str, depth: int):
         node = self.literal_keys(literal_nc)
         if not node:
-            # 空 map（或一個 key 都解析不出來）＝ 沒有可信的形狀資訊。回 UNKNOWN 而非
-            # {}，否則會把「解析失敗」誤報成「handler 什麼都不吐」，@Success 宣告的
-            # 欄位會整組被當成 missing_in_handler。
             return UNKNOWN
         out = {}
         for k, v in node.items():
@@ -541,7 +514,7 @@ class Spec:
     def resolve(self, s: dict, seen: tuple = ()) -> tuple[dict, tuple]:
         if "$ref" in s:
             name = s["$ref"].rsplit("/", 1)[-1]
-            if name in seen:  # 遞迴型別（例如分類樹）：這一層不再展開
+            if name in seen:
                 return {}, seen
             return self.resolve(self.schemas[name], seen + (name,))
         if "allOf" in s:
@@ -554,7 +527,7 @@ class Spec:
     def node(self, s: dict, seen: tuple = ()):
         """schema → (array, node)；node 為 dict（物件）、None（純量）、UNKNOWN（自由物件等）。"""
         s, seen = self.resolve(s, seen)
-        if "oneOf" in s or "anyOf" in s:  # 形狀不唯一，這一層不比對
+        if "oneOf" in s or "anyOf" in s:
             return False, UNKNOWN
         if s.get("type") == "array":
             return True, self.node(s.get("items") or {}, seen)[1]
@@ -620,7 +593,6 @@ def scan_check_b() -> tuple[dict[tuple[str, str], dict], dict[str, int]]:
                 skip("規格的成功回應沒有可比對的 data 物件")
                 continue
 
-            # 實際輸出
             ok_sites = [
                 m for m in re.finditer(r"response\.OK(?:Msg)?\s*\(", body_code)
             ]
@@ -662,7 +634,6 @@ def scan_check_b() -> tuple[dict[tuple[str, str], dict], dict[str, int]]:
                 }
                 actual_arr = False
 
-            # 只比對 key 集合，不比對「陣列 vs 物件」——那類不一致誤判率高，報出來只會製造雜訊。
             del actual_arr
             missing_sp: list[str] = []
             missing_hd: list[str] = []
@@ -678,9 +649,6 @@ def scan_check_b() -> tuple[dict[tuple[str, str], dict], dict[str, int]]:
     return findings, stats
 
 
-# ---------------------------------------------------------------------------
-# baseline I/O
-# ---------------------------------------------------------------------------
 
 
 def load_baseline() -> dict:
@@ -759,7 +727,6 @@ def main() -> int:
     failed = False
     out = sys.stderr
 
-    # ---- Check A ----
     base_a = {
         (e["file"], e["key"], e["direction"]): e for e in base.get("check_a", [])
     }
@@ -807,7 +774,6 @@ def main() -> int:
                 file=out,
             )
 
-    # ---- Check B ----
     base_b = {(e["file"], e["handler"]): e for e in base.get("check_b", [])}
     for key in sorted(set(b_hits) - set(base_b)):
         failed = True

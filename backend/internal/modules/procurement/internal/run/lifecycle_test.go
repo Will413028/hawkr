@@ -25,7 +25,6 @@ var allStatuses = []string{
 	StatusSucceeded, StatusFailed, StatusCancelled,
 }
 
-// 期望的邊直接寫在測試裡，不從 edges 推導：表被改動時這裡要同步改。
 var wantEdges = map[string][]string{
 	StatusQueued:          {StatusRunning, StatusCancelRequested, StatusFailed},
 	StatusRunning:         {StatusWaitingForInput, StatusSucceeded, StatusFailed, StatusCancelRequested},

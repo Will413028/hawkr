@@ -51,7 +51,6 @@ void main() {
   });
 
   group('Makefile require-gateway', () {
-    // stage 與 prod 的建置要擋缺少的 GATEWAY_HOST：不然缺值的建置通過、啟動時才丟 StateError。
     Future<ProcessResult> run(Map<String, String> vars) => Process.run('make', [
       '-s',
       'require-gateway',

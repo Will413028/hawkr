@@ -83,7 +83,6 @@ class OnboardingSettingSelectionDeterminismTest {
                 SellerShipmentSettingEntity.class);
     }
 
-    // ---- 硬寫的期望值：一律字面值，不從被測物或它引用的常數推導 ----
     private static final long STORE_ID = 2685914682L;
     /** 超商 = {@code ShippingType.CVS_C2C}；硬寫 {@code "3651"}，跟著 enum 一起變就驗不到東西。 */
     private static final String CVS_SHIPPING_TYPE = "3651";
@@ -146,9 +145,6 @@ class OnboardingSettingSelectionDeterminismTest {
         return e;
     }
 
-    // ==================================================================
-    // fake：只實作「ORDER BY … LIMIT 1 會選到哪一列」，其餘一律拒絕
-    // ==================================================================
 
     private static final Pattern ORDER_BY =
             Pattern.compile("(?i)\\bORDER\\s+BY\\s+([A-Za-z0-9_]+)\\s+(ASC|DESC)\\b");
@@ -213,18 +209,10 @@ class OnboardingSettingSelectionDeterminismTest {
                 ArgumentCaptor.forClass(Wrapper.class);
         verify(settingMapper).selectOne(captor.capture());
         Wrapper<SellerShipmentSettingEntity> wrapper = captor.getValue();
-        // ⚠️ MPGENVAL 佔位名與參數值是在「渲染 SQL 那一刻」才產生的（`.eq()` 只存了 lazy
-        //    ISqlSegment）⇒ 不先 render 就讀，拿到的是空 Map，而空 Map 會讓
-        //    containsExactly... 失敗成「看起來像 WHERE 不見了」。先強制渲染一次。
-        //    MergeSegments 會 cache 渲染結果，所以重複呼叫不會產生第二組 MPGENVAL。
         wrapper.getSqlSegment();
-        // getParamNameValuePairs() 在 AbstractWrapper 上，不在 Wrapper 介面上。
         return ((AbstractWrapper<?, ?, ?>) wrapper).getParamNameValuePairs();
     }
 
-    // ==================================================================
-    // ① findActiveSetting（建單／出貨寫路徑）
-    // ==================================================================
 
     @Nested
     @DisplayName("① findActiveSetting：ACTIVE 設定的選列是確定的")
@@ -238,7 +226,6 @@ class OnboardingSettingSelectionDeterminismTest {
             service.findActiveSetting(STORE_ID, ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value());
 
             String sql = captureGeneratedSql();
-            // 一個 endsWith 同時擋掉三種變異：拿掉 ORDER BY、ASC↔DESC、ORDER BY 寫到 LIMIT 之後。
             assertThat(sql)
                     .as("實際生成 SQL：%s", sql)
                     .endsWith("ORDER BY id ASC LIMIT 1");
@@ -304,15 +291,11 @@ class OnboardingSettingSelectionDeterminismTest {
 
             service.findActiveSetting(STORE_ID, ShippingMethod.TAQBIN.value());
 
-            // 先確認真的解析成宅配的 shipping_type，否則這條可能在驗別的東西。
             assertThat(captureGeneratedParams()).containsEntry("MPGENVAL2", HOME_SHIPPING_TYPE);
             assertThat(captureGeneratedSql()).endsWith("ORDER BY id ASC LIMIT 1");
         }
     }
 
-    // ==================================================================
-    // ② findSettingByMethod（退件讀路徑，候選集更寬）
-    // ==================================================================
 
     @Nested
     @DisplayName("② findSettingByMethod：historical 設定的選列同樣是確定的")
@@ -365,9 +348,6 @@ class OnboardingSettingSelectionDeterminismTest {
         }
     }
 
-    // ==================================================================
-    // ③ fake 自身的鑑別力（沒有這一組，上面那些斷言可能是空轉）
-    // ==================================================================
 
     /**
      * 🔴 <b>這一組驗的是「測試抓得到什麼」，不是產品行為。</b>

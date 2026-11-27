@@ -521,7 +521,6 @@ public class UberOrderEligibilityGuard {
         try {
             assessment = assessor.assess(probe);
         } catch (RuntimeException e) {
-            // 🔴 問不到就是拒絕。把例外吞成「可用」是本檔唯一不能犯的錯。
             return deniedWithoutEvidence(
                     "向 shipping 求證時失敗：" + e.getClass().getSimpleName() + " " + e.getMessage(),
                     Assessment.unavailable(ProviderReason.ASSESSOR_UNAVAILABLE));
@@ -544,7 +543,6 @@ public class UberOrderEligibilityGuard {
         String reason = assessment.unavailableReason();
         Check culprit = checkFor(reason);
         if (culprit == null) {
-            // 不認得的理由碼 ⇒ 不知道是哪一項壞了 ⇒ 六項全拒（絕不挑一項來擋）。
             return deniedWithoutEvidence(
                     "shipping 回了本服務不認得的理由碼 " + safeReason(reason) + "，無法歸屬到任何一項檢查",
                     assessment);

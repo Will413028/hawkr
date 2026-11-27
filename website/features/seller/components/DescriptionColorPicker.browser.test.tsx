@@ -28,7 +28,6 @@ function Controlled({
 	);
 }
 
-// 等入口的測量位置與初始鍵盤焦點都就緒。
 async function waitForPalette() {
 	const panel = await screen.findByRole(
 		"dialog",
@@ -203,7 +202,6 @@ describe("DescriptionColorPicker", () => {
 			name: "文字顏色",
 		});
 		await expect.element(disabled).toBeDisabled();
-		// 停用的按鈕不可操作：強制點擊只送出指標事件，不會觸發 onOpen。
 		await userEvent.click(disabled, { force: true });
 		expect(onOpen).not.toHaveBeenCalled();
 		await userEvent.click(enabled);

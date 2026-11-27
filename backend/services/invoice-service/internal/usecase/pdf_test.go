@@ -24,11 +24,9 @@ func TestLooksLikePDF(t *testing.T) {
 		{"content-type 正確", "application/pdf", "anything", true},
 		{"magic bytes 正確（content-type 缺）", "", "%PDF-1.7\n...", true},
 		{"magic bytes 正確（content-type 錯）", "text/html", "%PDF-1.4", true},
-		// 🔴 這一格是 P8 要防的那個：HTTP 200 ＋ 中文純文字。
 		{"過期回中文純文字 → 必須擋下", "text/plain; charset=utf-8", "檔案已過期，請重新查詢", false},
 		{"HTML 錯誤頁 → 必須擋下", "text/html", "<html><body>error</body></html>", false},
 		{"空 body → 必須擋下", "", "", false},
-		// magic bytes 只認**前綴**：PDF 出現在中間不算（那是把 PDF 嵌在錯誤頁裡的形狀）。
 		{"%PDF- 在中間不算", "text/html", "error %PDF- error", false},
 	}
 	for _, c := range cases {

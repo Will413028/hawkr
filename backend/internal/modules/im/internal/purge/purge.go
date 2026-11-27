@@ -19,10 +19,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
-// batchSize 是每一批抹除的訊息數。
 const batchSize = 200
 
-// sweepBatch 是保底掃描每次最多補排的身分數。
 const sweepBatch = 100
 
 // SweepInterval 是保底掃描的間隔。

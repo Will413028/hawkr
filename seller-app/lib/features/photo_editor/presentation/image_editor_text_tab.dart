@@ -38,7 +38,6 @@ class _ImageEditorTextTabState extends State<ImageEditorTextTab> {
   bool _hasText = false;
   String _selectedFontFamily = 'notoSansTC';
 
-  // 字型選項（使用系統內建中文字型，不需下載）
   final List<Map<String, String>> _fontOptions = [
     {'id': 'notoSansTC', 'label': '黑體'},
     {'id': 'notoSerifTC', 'label': '宋體'},
@@ -87,7 +86,6 @@ class _ImageEditorTextTabState extends State<ImageEditorTextTab> {
     );
   }
 
-  // 快速樣式
   final List<Map<String, dynamic>> _presets = [
     {'id': 'title', 'label': '標題', 'size': 36.0, 'color': AppColors.primary},
     {
@@ -176,7 +174,6 @@ class _ImageEditorTextTabState extends State<ImageEditorTextTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 標題列
             Padding(
               padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 12.h),
               child: Row(
@@ -192,7 +189,6 @@ class _ImageEditorTextTabState extends State<ImageEditorTextTab> {
                 ],
               ),
             ),
-            // 文字輸入框
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.w),
               child: Container(
@@ -216,7 +212,6 @@ class _ImageEditorTextTabState extends State<ImageEditorTextTab> {
               ),
             ),
             SizedBox(height: 12.h),
-            // 新增到畫面按鈕
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.w),
               child: SizedBox(
@@ -229,7 +224,6 @@ class _ImageEditorTextTabState extends State<ImageEditorTextTab> {
               ),
             ),
             SizedBox(height: 16.h),
-            // 快速樣式
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.w),
               child: Text(
@@ -245,7 +239,6 @@ class _ImageEditorTextTabState extends State<ImageEditorTextTab> {
               padding: EdgeInsets.symmetric(horizontal: 16.w),
               child: Column(
                 children: [
-                  // 第一行：標題、大標題
                   Row(
                     children: [
                       Expanded(
@@ -258,7 +251,6 @@ class _ImageEditorTextTabState extends State<ImageEditorTextTab> {
                     ],
                   ),
                   SizedBox(height: 12.h),
-                  // 第二行：小標題、說明
                   Row(
                     children: [
                       Expanded(
@@ -274,7 +266,6 @@ class _ImageEditorTextTabState extends State<ImageEditorTextTab> {
               ),
             ),
             SizedBox(height: 16.h),
-            // 字型選擇
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.w),
               child: Column(
@@ -338,7 +329,6 @@ class _ImageEditorTextTabState extends State<ImageEditorTextTab> {
               ),
             ),
             SizedBox(height: 12.h),
-            // 字體大小
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.w),
               child: Row(
@@ -382,7 +372,6 @@ class _ImageEditorTextTabState extends State<ImageEditorTextTab> {
               ),
             ),
             SizedBox(height: 12.h),
-            // 顏色
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.w),
               child: Column(
@@ -405,7 +394,6 @@ class _ImageEditorTextTabState extends State<ImageEditorTextTab> {
                           onTap: () => setState(() => _selectedColor = color),
                         ),
                       ),
-                      // 彩虹圖示 - 自訂顏色選擇器
                       GestureDetector(
                         onTap: _showColorPicker,
                         child: Container(
@@ -438,7 +426,6 @@ class _ImageEditorTextTabState extends State<ImageEditorTextTab> {
               ),
             ),
             SizedBox(height: 12.h),
-            // 對齊方式
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.w),
               child: Column(
@@ -485,7 +472,7 @@ class _ImageEditorTextTabState extends State<ImageEditorTextTab> {
     required double height,
   }) {
     final isSelected = _selectedPreset == preset['id'];
-    final double displayFontSize = (preset['size'] as double) * 0.5; // 縮小顯示
+    final double displayFontSize = (preset['size'] as double) * 0.5;
     final Color presetColor = preset['color'] as Color;
     return GestureDetector(
       onTap: () => _applyPreset(preset),

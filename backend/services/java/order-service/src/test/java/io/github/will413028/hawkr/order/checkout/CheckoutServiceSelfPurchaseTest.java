@@ -28,11 +28,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class CheckoutServiceSelfPurchaseTest {
 
-    // ResolvedItem field order (CheckoutValidator.java:260-277): skuId, skuName,
-    // quantity, unitPrice, listPrice, stockQty, lengthCm, widthCm, heightCm,
-    // weightGram, storeId, productId, productName, shippingOptions,
-    // imageObjectKey, isActive — storeId is position 11, NOT 6
-    // (verify against the record before reusing this helper elsewhere).
     private ResolvedItem item(long skuId, long storeId) {
         return new ResolvedItem(
                 TestIds.id(skuId), "sku-" + skuId, 1, 100L, 100L, 999L,
@@ -48,7 +43,6 @@ class CheckoutServiceSelfPurchaseTest {
         CheckoutService service = newService(sellerGrpcClient, buyerResolving(100L, 100L));
 
         service.enforceNoSelfPurchaseForTest(100L, List.of(item(1L, 200L)));
-        // no exception = allowed
     }
 
     @Test
@@ -63,8 +57,6 @@ class CheckoutServiceSelfPurchaseTest {
 
     @Test
     void diverged_storeIdResolvesToBuyerPrincipal_stillBlocked() {
-        // The guard-regression case: item's storeId (999) is a diverged
-        // store_id whose principal is 42 — the same human as the buyer.
         SellerGrpcClient sellerGrpcClient = Mockito.mock(SellerGrpcClient.class);
         Mockito.when(sellerGrpcClient.resolvePrincipals(List.of(999L))).thenReturn(PrincipalResolution.allResolved(Map.of(999L, 42L)));
         CheckoutService service = newService(sellerGrpcClient, buyerResolving(42L, 42L));
@@ -107,7 +99,6 @@ class CheckoutServiceSelfPurchaseTest {
         CheckoutService service = newService(sellerGrpcClient, buyerResolving(7001L, 43L));
 
         service.enforceNoSelfPurchaseForTest(7001L, List.of(item(1L, 999L)));
-        // no exception = allowed
     }
 
     @Test
@@ -137,13 +128,10 @@ class CheckoutServiceSelfPurchaseTest {
     }
 
 
-    // ==================== 未解析 principal ⇒ fail-closed（issue #2789 階段 B1/B2） ====================
 
     @Test
     void storeUnresolved_failsClosed_notSilentlyAllowed() {
         SellerGrpcClient sellerGrpcClient = Mockito.mock(SellerGrpcClient.class);
-        // 999 查無在架賣家：map 仍帶 echo-back（server 的 COALESCE 行為），unresolved_ids 才是真話。
-        // 舊碼 getOrDefault(999, 999) ⇒ 999 != 42 ⇒「不是自買」⇒ 放行；本測試釘住新行為＝拒絕。
         Mockito.when(sellerGrpcClient.resolvePrincipals(List.of(999L)))
                 .thenReturn(PrincipalResolution.of(Map.of(999L, 999L), List.of(999L)));
         CheckoutService service = newService(sellerGrpcClient, buyerResolving(42L, 42L));

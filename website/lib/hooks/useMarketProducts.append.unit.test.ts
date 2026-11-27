@@ -18,8 +18,6 @@ vi.mock("@/lib/api/main-tab-pages", () => ({
 vi.mock("./useQueryIdentity", () => ({
 	useQueryIdentity: () => ({ accountId: null }),
 }));
-// Keep the data hook, queue, mapper and TanStack cache real. Only automatic
-// tab scheduling is disabled; explicit refresh() still executes the real hook.
 vi.mock("@/lib/hooks/useMainTabActivationRefresh", () => ({
 	useMainTabActivationRefresh: () => ({ refreshing: false }),
 }));

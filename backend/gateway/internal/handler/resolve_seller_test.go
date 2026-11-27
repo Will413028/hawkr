@@ -16,9 +16,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// ==================== 共用 test resolvers（R4–R8 測試沿用）====================
 
-// storeResolverForTest 回傳固定 surrogate 的 resolver（無 Redis）。
 func storeResolverForTest(surrogate int64) *storeid.Resolver {
 	return storeid.New(storeid.GetterFunc(func(_ context.Context, accountID int64) (int64, error) {
 		return surrogate, nil
@@ -31,9 +29,6 @@ func grandfatherResolverForTest() *storeid.Resolver {
 	}))
 }
 
-// mustNotResolveStore returns a resolver that fails the test if consulted —
-// proves a call whose loginRole isn't 1 or 2 (unresolved active role) never
-// attempts seller resolution.
 func mustNotResolveStore(t *testing.T) *storeid.Resolver {
 	t.Helper()
 	return storeid.New(storeid.GetterFunc(func(context.Context, int64) (int64, error) {
@@ -48,7 +43,6 @@ func noStoreResolverForTest() *storeid.Resolver {
 	}))
 }
 
-// buyerResolverForTest 回傳固定 surrogate 的 resolver（無 Redis）。
 func buyerResolverForTest(surrogate int64) *buyerid.Resolver {
 	return buyerid.New(buyerid.GetterFunc(func(_ context.Context, accountID int64) (*buyerpb.BuyerInfo, error) {
 		return &buyerpb.BuyerInfo{
@@ -67,7 +61,6 @@ func buyerGrandfatherResolverForTest() *buyerid.Resolver {
 	}))
 }
 
-// ==================== resolveStoreID ====================
 
 func setupResolveProbe(h *Holder) *gin.Engine {
 	r := gin.New()
@@ -118,7 +111,6 @@ func TestResolveStoreID_NoCurrentSeller403(t *testing.T) {
 func TestResolveStoreID_MissingIdentity401(t *testing.T) {
 	h := &Holder{Store: storeResolverForTest(7001)}
 	r := gin.New()
-	// 無 auth middleware → context 無 accountId → helper 自己回 401
 	r.GET("/probe", func(c *gin.Context) {
 		if _, ok := h.resolveStoreID(c); !ok {
 			return

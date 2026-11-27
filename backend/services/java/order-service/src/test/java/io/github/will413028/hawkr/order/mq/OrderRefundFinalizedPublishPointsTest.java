@@ -72,7 +72,6 @@ class OrderRefundFinalizedPublishPointsTest {
         try {
             TsidUtil.init(300, 0);
         } catch (IllegalStateException ignored) {
-            // 已初始化
         }
     }
 
@@ -94,7 +93,6 @@ class OrderRefundFinalizedPublishPointsTest {
         o.setBuyerId(BUYER_ID);
         o.setTotalActualAmount(TOTAL_ACTUAL);
         o.setPaymentMethod("CREDIT_CARD");
-        // 刻意設成 0：全額退款路徑從不維護這一欄，讀它會把「已全退」誤判成「沒退過」
         o.setRefundTotalAmount(0L);
         return o;
     }
@@ -111,7 +109,6 @@ class OrderRefundFinalizedPublishPointsTest {
         return MAPPER.readTree(row.getPayload());
     }
 
-    // ==================== E1：售後退款完成 ====================
 
     @Nested
     @DisplayName("E1 AfterSalesRefundEventHandler.handleRefundCompleted")
@@ -156,7 +153,6 @@ class OrderRefundFinalizedPublishPointsTest {
         @Test
         @DisplayName("重複投遞（duplicate == true）：零列 outbox")
         void duplicateDelivery_writesNoOutboxRow() {
-            // logRows == 0 ＝ financial_logs 的 (type, external_txn_id) 已存在 ＝ 重複投遞
             when(financialLogRepository.insertIdempotent(anyLong(), eq(ORDER_NO), anyString(), anyLong(), anyString()))
                     .thenReturn(0);
 
@@ -199,7 +195,6 @@ class OrderRefundFinalizedPublishPointsTest {
             handler.handleRefundCompleted(ORDER_NO,
                     AfterSalePlatformDecisionOutcome.FULL_REFUND, 1200L, "RFD_A2", "AS_9004");
 
-            // order().refundTotalAmount == 0；讀那一欄的話這裡會是 "0" ⇒ 發票端判成「沒退過」而不作廢
             assertThat(capturePayload().get("cumulative_refund_amount").asText()).isEqualTo("1200");
         }
 
@@ -221,7 +216,6 @@ class OrderRefundFinalizedPublishPointsTest {
         }
     }
 
-    // ==================== E2：訂單已取消卻收到付款 → 自動退款 ====================
 
     @Nested
     @DisplayName("E2 AutoRefundTxHandler.completeAutoRefund")
@@ -250,7 +244,6 @@ class OrderRefundFinalizedPublishPointsTest {
             assertThat(p.get("refund_source").asText()).isEqualTo(RefundSource.AUTO_REFUND.value());
             assertThat(p.get("refund_ref").asText()).isEqualTo("PAYUNI_RFD_77");
             assertThat(p.get("refund_amount").asText()).isEqualTo("1200");
-            // 僅 E1 有 refund_outcome；E2/E3 留 null（58 §6.3.2.3 payload 欄位表）
             assertThat(p.get("refund_outcome").isNull()).isTrue();
             assertThat(p.get("case_no").isNull()).isTrue();
             assertThat(p.get("cancel_id").isNull()).isTrue();
@@ -274,7 +267,6 @@ class OrderRefundFinalizedPublishPointsTest {
         }
     }
 
-    // ==================== E3：賣家取消出貨 ====================
 
     @Nested
     @DisplayName("E3 SellerCancelRefundTxHandler.handleCancelCompleted")
@@ -323,7 +315,6 @@ class OrderRefundFinalizedPublishPointsTest {
         }
     }
 
-    // ==================== payload 契約（58 §6.3.2.3 欄位表） ====================
 
     @Nested
     @DisplayName("payload 契約")
@@ -344,8 +335,6 @@ class OrderRefundFinalizedPublishPointsTest {
                     "refund_ref", "refund_source", "refund_outcome", "refund_amount",
                     "order_total_actual_amount", "cumulative_refund_amount",
                     "case_no", "cancel_id", "payment_method", "refunded_at",
-                    // 58 §6.3.2.1：invoice-service 的 invoice_status_history.correlation_id 靠它，
-                    // 恆空時 ADM 稽核在最常查的那條鏈上就是死的，而且沒有任何訊號
                     "correlation_id");
         }
 
@@ -371,9 +360,6 @@ class OrderRefundFinalizedPublishPointsTest {
             JsonNode p = capturePayload();
             for (String key : new String[]{"occurred_at", "refunded_at"}) {
                 String v = p.get(key).asText();
-                // ⚠️ DateTimeUtils.formatIso8601 用 ISO_OFFSET_DATE_TIME，秒與奈秒同時為 0 時
-                // 會省略秒（"…T08:30Z"，非 RFC3339）。nowUtc() 帶微秒 ⇒ 實務上打不到，
-                // 但那個下界不是本層守得住的，已在交付回報列為設計書缺口。
                 assertThat(v).as("%s 必須帶 Z 且可被 RFC3339 解析", key)
                         .matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z");
                 assertThat(java.time.OffsetDateTime.parse(v)).isNotNull();
@@ -393,7 +379,6 @@ class OrderRefundFinalizedPublishPointsTest {
             String a = MAPPER.readTree(captor.getAllValues().get(0).getPayload()).get("event_id").asText();
             String b = MAPPER.readTree(captor.getAllValues().get(1).getPayload()).get("event_id").asText();
             assertThat(a).isNotEqualTo(b);
-            // 而 refund_ref 是穩定的 ⇒ 下游的 REFUND:{refund_ref} 去重才擋得住重發
             assertThat(MAPPER.readTree(captor.getAllValues().get(0).getPayload()).get("refund_ref").asText())
                     .isEqualTo(MAPPER.readTree(captor.getAllValues().get(1).getPayload()).get("refund_ref").asText());
         }

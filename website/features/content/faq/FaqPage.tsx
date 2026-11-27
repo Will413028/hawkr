@@ -14,12 +14,10 @@ export default function FaqPage() {
 	const [activeFaqCategory, setActiveFaqCategory] = useState("buyer-account");
 	const reducedMotion = useReducedMotion();
 
-	// Categories shown depend on the 買家/賣家 switch.
 	const visibleCategories = faqCategories.filter(
 		(cat) => cat.audience === audience,
 	);
 
-	// Switching audience resets the active category to that side's first one.
 	const handleAudience = (next: "buyer" | "seller") => {
 		if (next === audience) return;
 		setAudience(next);
@@ -27,8 +25,6 @@ export default function FaqPage() {
 		if (first) setActiveFaqCategory(first.id);
 	};
 
-	// Lazily load GSAP once (mirrors features/seller/landing SellerAnimations)
-	// so the content route stays light until the page actually mounts.
 	const gsapRef = useRef<Gsap | null>(null);
 	const [gsapReady, setGsapReady] = useState(false);
 	useEffect(() => {
@@ -44,9 +40,6 @@ export default function FaqPage() {
 		};
 	}, []);
 
-	// Cascade the visible category's cards in when the seller switches
-	// tabs. We skip the very first run so SSR content never flashes hidden
-	// on initial load — the questions stay readable with or without JS.
 	const contentRef = useRef<HTMLDivElement>(null);
 	const firstRunRef = useRef(true);
 	useEffect(() => {
@@ -78,10 +71,9 @@ export default function FaqPage() {
 	return (
 		<section className="section relative overflow-hidden">
 			<div className="content-container">
-				{/* sr-only h1 keeps a single, meaningful zh-TW page heading for SEO;
-					    the visible "FAQ" stays an h2 so the layout is untouched. */}
+
 				<h1 className="sr-only">常見問題</h1>
-				{/* Header */}
+
 				<div className="flex flex-col items-center gap-3 mb-9 text-center">
 					<span className="font-[var(--font-primary)] text-[length:var(--text-xl)] font-bold leading-7 text-[var(--color-primary)] uppercase">
 						Return and Exchange Policy
@@ -96,13 +88,10 @@ export default function FaqPage() {
 				</div>
 
 				<div className="grid grid-cols-[308px_1fr] gap-[60px] items-start max-[1024px]:grid-cols-1 max-[1024px]:gap-6">
-					{/* Left sidebar — sticky lives on the wrapper because
-						    .glass-card sets position:relative and would override
-						    a sticky on the <aside> itself (pushing it down by the
-						    top offset even unscrolled). */}
+
 					<div className="self-start sticky top-[88px] max-[1024px]:static">
 						<aside className="p-6 rounded-[30px] flex flex-col gap-3 glass-card glass-card--solid max-[1024px]:flex-row max-[1024px]:flex-wrap max-[1024px]:rounded-[20px] max-[1024px]:p-4 max-[1024px]:gap-2">
-							{/* Buyer / seller switch */}
+
 							<div
 								className="flex gap-1 p-1 rounded-[14px] border border-hk-border-soft max-[1024px]:w-full"
 								role="tablist"
@@ -161,7 +150,7 @@ export default function FaqPage() {
 						</aside>
 					</div>
 
-					{/* Right: FAQ content (show active category only) */}
+
 					<div ref={contentRef} className="flex flex-col gap-9">
 						{visibleCategories.map((cat) => {
 							const isActive = activeFaqCategory === cat.id;

@@ -50,25 +50,10 @@ func newEventPublisher(cfg *config.Config, log *zap.Logger, lc fx.Lifecycle) *Ev
 
 func newIssuancePreparer(u *usecase.Issuance) *usecase.Issuance { return u }
 
-// newAdjustmentApplier 把 G01 usecase 接上退款 consumer（#3073）。
-//
-// 這裡曾經回 `UnimplementedAdjustmentApplier{}`（fail-loud 佔位），那個狀態下每一則
-// 退款事件都會落 inbox FAILED 而**不進 DLQ**：pkg/mq 的 retry 把同一則 body republish
-// 回原 queue，第二次進 handler 會被 inbox 去重擋掉並 return nil ⇒ retry counter 停在 1、
-// `mq_consume_total{result="dlq"}` 對本 handler 結構上恆為 0。那批列還躺在
-// invoice_inbox_events（status=FAILED），要重放的是**那張表**不是 DLQ。
-//
-// ⚠️ `OrderFactsClient` 與 `PaymentFactsClient` 的 provider **不在本檔**：兩支 peer
-// client 回傳本 package 的 port 型別，provider 必須住在 `internal/client/di.go`，
-// 否則 `internal/mq` 會反向 import `internal/client` ⇒ import cycle。
 func newAdjustmentApplier(uc *usecase.RefundAdjustment) AdjustmentApplier {
 	return refundAdjustmentApplier{uc: uc}
 }
 
-// refundAdjustmentApplier 把 mq 的 wire 型別轉成 usecase 的輸入型別。
-//
-// 🔴 方向不可反過來：usecase 不得 import mq（mq 已經 import usecase ⇒ 循環）。
-// 這個 adapter 存在的唯一理由就是把轉換留在正確的一側。
 type refundAdjustmentApplier struct{ uc *usecase.RefundAdjustment }
 
 func (a refundAdjustmentApplier) ApplyRefund(
@@ -100,9 +85,6 @@ func Subscriptions(
 ) []pkgmq.Subscription {
 	return []pkgmq.Subscription{
 		{
-			// C1（§6.3.2.2）：routing key 是 `order.paid`，**不是** `order.paid.v1`。
-			// 後者在 broker 上不存在 ⇒ topic exchange 永遠比對不到 ⇒ 服務啟動正常、
-			// consumers = 1、/metrics 乾淨、DLQ 空的，而整條自動開票鏈靜默不啟動。
 			Exchange:    pkgmq.ExchangeOrder,
 			Queue:       pkgmq.QueueInvoiceOrderPaid,
 			RoutingKeys: []string{pkgmq.RoutingKeyOrderPaid},
@@ -110,7 +92,6 @@ func Subscriptions(
 			MaxRetries:  ConsumerMaxRetries,
 		},
 		{
-			// C2（§6.3.2.3）：訂單層唯一權威退款事件。
 			Exchange:    pkgmq.ExchangeOrder,
 			Queue:       pkgmq.QueueInvoiceOrderRefundFinalized,
 			RoutingKeys: []string{pkgmq.RoutingKeyOrderRefundFinalized},
@@ -118,12 +99,6 @@ func Subscriptions(
 			MaxRetries:  ConsumerMaxRetries,
 		},
 		{
-			// C3（§6.3.2.4，#2904）：訂單取消 ⇒ 買家面不要再說「付款完成後會立即開立發票」。
-			//
-			// ⚠️ routing key 是 `order.cancelled`，不是 `order.cancelled.buyer`／
-			// `.merchant` —— 後兩者是 notification **模板**的名字（golden 檔裡的
-			// `order.cancelled.buyer` 是 template key 不是 routing key），broker 上
-			// 不存在那兩個 key ⇒ 綁上去會永遠比對不到、而服務一切正常。
 			Exchange:    pkgmq.ExchangeOrder,
 			Queue:       pkgmq.QueueInvoiceOrderCancelled,
 			RoutingKeys: []string{pkgmq.RoutingKeyOrderCancelled},
@@ -143,7 +118,6 @@ func startConsumers(
 ) {
 	l := orNopLogger(log)
 	if cfg.MQ.URL == "" {
-		// 不靜默：沒有 MQ 就沒有任何開票觸發，而服務其餘部分照樣 Ready。
 		l.Error("invoice.mq.consumers_disabled", zap.String("reason", "RABBITMQ_URL is empty"))
 		return
 	}
@@ -153,8 +127,6 @@ func startConsumers(
 
 	lc.Append(fx.Hook{
 		OnStart: func(context.Context) error {
-			// 傳 context.Background() 衍生的 ctx，不是 OnStart 收到的那一個：後者是
-			// fx 自己的 start-timeout context，OnStart 一返回就被取消。
 			go consumer.Run(ctx)
 			return nil
 		},
@@ -165,6 +137,4 @@ func startConsumers(
 	})
 }
 
-// 編譯期斷言：usecase.Issuance 必須滿足 handler 要的窄介面。
-// 少一個方法時在這裡紅，不是在 fx 圖建起來的那一刻。
 var _ IssuancePreparer = (*usecase.Issuance)(nil)

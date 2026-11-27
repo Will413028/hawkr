@@ -90,8 +90,6 @@ class AfterSalePayoutHoldLockProtocolIT {
         r.add("hawkr.db.bootstrap.enabled", () -> "false");
         r.add("spring.flyway.enabled", () -> "false");
         r.add("hawkr.tsid.enabled", () -> "false");
-        // -1 關掉對外 gRPC server（本測試用不到）。0 是「先找空 port 再綁」，
-        // 中間可能被 testcontainers 的 port 映射搶走（CI 實測 Address already in use）。
         r.add("grpc.server.port", () -> "-1");
         r.add("spring.cloud.nacos.discovery.enabled", () -> "false");
         r.add("spring.cloud.discovery.enabled", () -> "false");
@@ -122,7 +120,6 @@ class AfterSalePayoutHoldLockProtocolIT {
     @BeforeEach
     void setUp() throws Exception {
         jdbc.execute("TRUNCATE TABLE aftersale_cases RESTART IDENTITY CASCADE");
-        // 生產預設值：deadlineHours=72、payoutHoldGraceMinutes=15
         payoutHold = new AfterSalePayoutHoldService(mapper, new AfterSalesProperties());
         appealTx = DriverManager.getConnection(
                 POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
@@ -137,41 +134,32 @@ class AfterSalePayoutHoldLockProtocolIT {
         }
     }
 
-    // ==================== P0 主證明 ====================
 
     @Test
     @DisplayName("P0：申訴交易在途（已通過 A3、持鎖未 commit）期間，撥款閘門一律不放行——不論過了多久")
     void gateNeverReleasesWhileAppealTransactionIsInFlight() throws Exception {
-        // 駁回於 100 小時前：deadline 已過 28 小時，遠超 15 分鐘 grace。
-        // 這正是 QA 重現用的時序——舊版在這一刻無條件放行。
         insertRejectedCase(DateTimeUtils.nowUtc().minusHours(100));
 
-        // 前提：無人持鎖時，這一刻本來就是「該放行」的 ⇒ 證明後面的 hold 不是恆真
         assertFalse(payoutHold.getPayoutHold(ORDER_NO).hold(),
                 "前提：窗（含 grace）早已過，無在途申訴時必須放行");
 
-        // === 另一個 pod 開始跑 submitAppeal：先持鎖，才做資格判定（A1/A2/A3）===
         lockCaseRowInAppealTransaction();
 
-        // 撥款閘門在這一刻被 GrantPaymentWorker 呼叫：必須 fail-closed
         AfterSalePayoutHoldService.PayoutHold duringAppeal = payoutHold.getPayoutHold(ORDER_NO);
         assertTrue(duringAppeal.hold(),
                 "P0 核心：有交易正壓在這一列上（可能已通過 A3）⇒ 撥款絕對不可放行");
         assertEquals(AfterSalePayoutHoldService.HoldReason.APPEAL_IN_FLIGHT, duringAppeal.reason());
         assertNull(duringAppeal.holdUntil(), "在途申訴無可預期結束時點 ⇒ 無時間界，推遲後重問");
 
-        // === 申訴交易繼續跑（media gRPC / DB / MQ 都在這之間），最後 commit ===
         assertEquals(1, markAppealedInAppealTransaction(),
                 "買家權利不得縮減：通過 A3 之後不論交易跑多久，申訴都必須寫得進去");
         appealTx.commit();
 
-        // commit 之後閘門看得到申訴 ⇒ 轉為無時間界 hold，等 Admin 裁決
         AfterSalePayoutHoldService.PayoutHold afterCommit = payoutHold.getPayoutHold(ORDER_NO);
         assertTrue(afterCommit.hold(), "申訴已成立 ⇒ 撥款仍不得放行");
         assertEquals(AfterSalePayoutHoldService.HoldReason.ACTIVE_CASE, afterCommit.reason());
         assertNull(afterCommit.holdUntil());
 
-        // 全程沒有任何一個時點同時滿足「閘門放行」與「申訴仍可成立」——這就是要證的不變式
     }
 
     @Test
@@ -183,8 +171,6 @@ class AfterSalePayoutHoldLockProtocolIT {
 
         appealTx.rollback();
 
-        // rollback ⇒ 申訴沒落地，而 deadline 早就過了 ⇒ 買家重試會被 A3 擋下
-        // ⇒ 這張訂單再也不可能生出退款 ⇒ 必須放行，不得讓賣家款項卡死
         assertFalse(payoutHold.getPayoutHold(ORDER_NO).hold(),
                 "鎖釋放且申訴未落地 ⇒ 必須恢復放行");
     }
@@ -199,8 +185,6 @@ class AfterSalePayoutHoldLockProtocolIT {
         assertTrue(payoutHold.getPayoutHold(ORDER_NO).hold());
         long elapsedMillis = (System.nanoTime() - startNanos) / 1_000_000L;
 
-        // SKIP LOCKED 立即返回；若誤用 FOR UPDATE（等待）這裡會掛到 appealTx 結束為止。
-        // 取 2 秒是寬鬆上界——真值是毫秒級，而 5 秒是 PAYOUT_HOLD_DEADLINE_SEC 的預算。
         assertTrue(elapsedMillis < 2_000,
                 "閘門必須非阻塞（實際 " + elapsedMillis + "ms）：等待會讓持鎖者的耗時進入"
                         + "《多副本排程搶佔規範》§三第 5 步的租約下界算式，兩個 pod 就可能同時撥款");
@@ -225,7 +209,6 @@ class AfterSalePayoutHoldLockProtocolIT {
         CountDownLatch release = new CountDownLatch(1);
         ExecutorService pool = Executors.newSingleThreadExecutor();
         try {
-            // 另一條「submitAppeal」：在真實交易內呼叫 production 的持鎖讀，然後把交易掛著
             Future<AfterSaleCaseEntity> appealTxTask = pool.submit(() -> txTemplate.execute(status -> {
                 AfterSaleCaseEntity held = mapper.selectByCaseNoForUpdate(CASE_NO);
                 locked.countDown();
@@ -239,7 +222,6 @@ class AfterSalePayoutHoldLockProtocolIT {
 
             assertTrue(locked.await(10, TimeUnit.SECONDS), "持鎖讀應在 10 秒內完成");
 
-            // 閘門此刻被呼叫：探測（production 的 tryLockCaseForPayoutRelease）必須偵測到
             AfterSalePayoutHoldService.PayoutHold duringAppeal = payoutHold.getPayoutHold(ORDER_NO);
             assertTrue(duringAppeal.hold(),
                     "production 的 selectByCaseNoForUpdate 必須真的持有 row lock，"
@@ -249,9 +231,6 @@ class AfterSalePayoutHoldLockProtocolIT {
             release.countDown();
             AfterSaleCaseEntity held = appealTxTask.get(30, TimeUnit.SECONDS);
 
-            // 順帶驗欄位映射：SELECT * → entity 的三個判定用欄位都要正確
-            // （映射壞掉時 status 會是 null ⇒ payoutBlock 走 deny-by-default，
-            //   症狀是「永遠 hold」而不是報錯，很難察覺）
             assertEquals(CASE_NO, held.getCaseNo());
             assertEquals("60", held.getStatus());
             assertEquals("0", held.getAppealState());
@@ -261,11 +240,9 @@ class AfterSalePayoutHoldLockProtocolIT {
             pool.shutdownNow();
         }
 
-        // 交易結束、鎖釋放、申訴未落地 ⇒ 恢復放行
         assertFalse(payoutHold.getPayoutHold(ORDER_NO).hold(), "鎖釋放後必須恢復放行");
     }
 
-    // ==================== helper ====================
 
     /** 模擬 submitAppeal 的第一個動作：持鎖讀（之後才做 A1/A2/A3）。 */
     private void lockCaseRowInAppealTransaction() throws Exception {

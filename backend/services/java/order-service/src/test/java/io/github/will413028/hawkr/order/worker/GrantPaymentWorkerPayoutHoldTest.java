@@ -96,7 +96,6 @@ class GrantPaymentWorkerPayoutHoldTest {
         return counter == null ? 0d : counter.count();
     }
 
-    // ==================== 租約下界不變式（§29 §三 第 5 步）====================
 
     @Test
     @DisplayName("租約必須涵蓋『兩個』外部呼叫的 deadline 總和——閘門加進租約窗口後這條才是完整的")
@@ -120,7 +119,6 @@ class GrantPaymentWorkerPayoutHoldTest {
                         + "調大它之前先重算租約下界");
     }
 
-    // ==================== Case C：hold ⇒ 一次 payment 都不打 ====================
 
     @Test
     @DisplayName("Case C：申訴窗未關 ⇒ 不打 payment，推遲到 hold_until，且不動 retry_count")
@@ -141,7 +139,6 @@ class GrantPaymentWorkerPayoutHoldTest {
         assertTrue(reason.getValue().contains("APPEAL_WINDOW_OPEN"));
         assertTrue(reason.getValue().contains("AS1"));
 
-        // 不是失敗 ⇒ 不得走任何 retry / 人工介入路徑
         verify(grantPaymentTaskRepository, never()).markGrantTaskRetryScheduled(anyLong(), anyInt(), any(), anyString());
         verify(grantPaymentTaskRepository, never()).markGrantTaskManualIntervention(anyLong(), anyString());
         verify(grantPaymentTaskRepository, never()).markGrantTaskMaxRetryReached(anyLong(), anyInt(), anyString());
@@ -210,7 +207,6 @@ class GrantPaymentWorkerPayoutHoldTest {
         }
     }
 
-    // ==================== Case E：窗關了就撥 ====================
 
     @Test
     @DisplayName("Case E：hold 解除 ⇒ 正常撥款（Hotfix 不得讓賣家款項永久卡住）")
@@ -229,7 +225,6 @@ class GrantPaymentWorkerPayoutHoldTest {
         verify(grantPaymentTaskRepository, never()).deferForPayoutHold(anyLong(), any(), anyString());
     }
 
-    // ==================== Case F：重複取得 / 推遲競態 ====================
 
     @Test
     @DisplayName("Case F：租約沒搶到（claim=0）⇒ 連反查都不做，一個副作用都沒有")
@@ -258,7 +253,6 @@ class GrantPaymentWorkerPayoutHoldTest {
         assertEquals(0d, heldCount("APPEAL_WINDOW_OPEN"), "CAS 沒生效就不該記一次 hold");
     }
 
-    // ==================== Case G：重跑必須重新過閘 ====================
 
     @Test
     @DisplayName("Case G：同一筆任務被重複處理（crash 後重跑 / 租約到期）⇒ 每一次都重新反查資格")
@@ -272,7 +266,6 @@ class GrantPaymentWorkerPayoutHoldTest {
         worker.execute();
         worker.execute();
 
-        // 閘門在執行點：資格不是建立時算一次就算數的，每次要撥款前都得重問
         verify(afterSalesGrpcClient, org.mockito.Mockito.times(3)).getPayoutHold(ORDER_NO);
         verifyNoInteractions(paymentGrpcClient);
     }

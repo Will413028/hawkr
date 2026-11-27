@@ -17,15 +17,13 @@ import (
 )
 
 const (
-	testInvoiceBAN = "12345678" // ＝ AMEGO_TEST_INVOICE
-	realInvoiceBAN = "45444444" // 一個真實統編
+	testInvoiceBAN = "12345678"
+	realInvoiceBAN = "45444444"
 )
 
-// recordingSink 收下每一筆稽核，供斷言「恰好寫一次」與遮罩正確。
 type recordingSink struct {
 	mu   sync.Mutex
 	rows []Exchange
-	// panicOnce 讓測試驗證「sink 爆掉不得影響開票」。
 	panicOnce bool
 }
 
@@ -47,7 +45,6 @@ func (s *recordingSink) snapshot() []Exchange {
 	return out
 }
 
-// harness 是一個 httptest.Server ＋ 一個對它說話的 client。
 type harness struct {
 	t        *testing.T
 	server   *httptest.Server
@@ -124,7 +121,6 @@ func sampleIssueRequest() IssueRequest {
 	}
 }
 
-// ── §4.5.8 第二層：guardEnvironment ─────────────────────────────────────────
 
 // TestGuardEnvironmentBlocksBeforeAnyRequest 是本 package 最重要的一支測試。
 //
@@ -194,7 +190,6 @@ func TestGuardAppliesToReadOnlyCalls(t *testing.T) {
 	}
 }
 
-// ── 序列化一次 ─────────────────────────────────────────────────────────────
 
 // TestSignIsComputedOverTheExactBytesSent 是「序列化一次」的端到端鑑別力測試。
 //
@@ -239,7 +234,6 @@ func TestSignIsComputedOverTheExactBytesSent(t *testing.T) {
 	}
 }
 
-// ── 回應形狀 ───────────────────────────────────────────────────────────────
 
 // TestIssueResultComesFromTopLevel：f0401 的業務結果攤在頂層、不放 data。
 func TestIssueResultComesFromTopLevel(t *testing.T) {
@@ -344,8 +338,6 @@ func TestNon200IsRecordedAndReconciled(t *testing.T) {
 // **最需要留下證據的那一筆反而寫不進去**。
 func TestTransportTimeoutIsReconcileAndAudited(t *testing.T) {
 	t.Parallel()
-	// handler 睡得比 deadline 久（不用「永遠阻塞」：httptest.Server.Close 會等
-	// 未完成的 handler，配上 t.Cleanup 的 LIFO 順序會死鎖）。
 	h := newHarness(t, Options{
 		AllowRealInvoice: true,
 		Deadlines:        Deadlines{Issue: 60 * time.Millisecond, Query: time.Second, List: time.Second, Time: time.Second},
@@ -373,7 +365,6 @@ func TestTransportTimeoutIsReconcileAndAudited(t *testing.T) {
 	}
 }
 
-// ── 斷路器 ─────────────────────────────────────────────────────────────────
 
 // TestBreakerTripsAndStopsSendingRequests 斷言跳閘後**不再發出請求**（request count），
 // 而不是只看回傳值。
@@ -394,14 +385,9 @@ func TestBreakerTripsAndStopsSendingRequests(t *testing.T) {
 	if before != 5 {
 		t.Fatalf("跳閘前 request count = %d, want 5", before)
 	}
-	// 2026-08-31 起斷路器拆成 per-store ＋ 全域（§7.3.4）：連 5 敗跳的是**該賣家那顆**。
-	// 這個測試守的不變式（連 5 次失敗後不再送出請求）不變，只是換了層級。
 	if !h.client.BreakerOpenFor(cred.IssuerID) {
 		t.Fatal("連續 5 次計入的失敗之後該賣家的斷路器必須 open")
 	}
-	// 🔴 同時斷言全域**仍然關著**：一家賣家壞掉不得拖垮全服務。
-	// 這一格是修正前壞掉的地方——那時只有一顆全域的、用 per-store 的跳脫條件，
-	// 於是任何一家連 5 敗就讓所有賣家的開票停在 RETRY_SCHEDULED。
 	if h.client.BreakerOpen() {
 		t.Fatal("一家賣家連敗不得讓全域斷路器 open（全域是 60s 窗口失敗率 ≥50% 且樣本 ≥20）")
 	}
@@ -441,7 +427,6 @@ func TestExcludedFailuresNeverTripBreaker(t *testing.T) {
 	}
 }
 
-// ── 稽核 ───────────────────────────────────────────────────────────────────
 
 // TestAuditRecordsOnceWithMaskedSignAndNoAppKey。
 func TestAuditRecordsOnceWithMaskedSignAndNoAppKey(t *testing.T) {
@@ -472,7 +457,6 @@ func TestAuditRecordsOnceWithMaskedSignAndNoAppKey(t *testing.T) {
 	if len(sign) != 8 {
 		t.Errorf("sign 必須只留前 8 碼（全長 sign ＋ 已落庫的 data／time ＝ 破解 AppKey 的 oracle），得到 %q", sign)
 	}
-	// 由稽核留下的 data／time ＋ 前 8 碼，重算完整 sign 前 8 碼必須一致（對單用）。
 	unix, err := strconv.ParseInt(r.RequestMasked["time"], 10, 64)
 	if err != nil {
 		t.Fatalf("time 欄不是整數: %v", err)
@@ -510,7 +494,6 @@ func TestAuditSinkPanicDoesNotFailTheCall(t *testing.T) {
 	}
 }
 
-// ── 其餘端點行為 ───────────────────────────────────────────────────────────
 
 // TestCode71IsNotAnError：71 是「180 天內確定沒有」，與 51「不確定」語意完全不同。
 func TestCode71IsNotAnError(t *testing.T) {

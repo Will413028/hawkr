@@ -74,9 +74,6 @@ export default function ProductEditDrawer({
 		Parameters<typeof form.submit>[0] | null
 	>(null);
 
-	// 儲存 / 上架：成功後 form 已內部 emit onMutated（父頁即時同步）；抽屜的職責
-	// 只剩「成功就關閉」。下架（unshelf）走 form.unshelf —— 就地解鎖編輯、抽屜保持
-	// 開啟，故不經此關閉，但同樣會 emit onMutated。emit 與 close 徹底分離（#1247）。
 	const { submit } = form;
 	const submitAndClose = React.useCallback(
 		async (action: Parameters<typeof submit>[0]) => {
@@ -101,11 +98,7 @@ export default function ProductEditDrawer({
 		[form.submitting, submitAndClose],
 	);
 
-	// The host keys this component by productId, so each open mounts a fresh
-	// form whose `loading` starts true — no need to diff ids to avoid flashing
-	// the previous product.
 	const ready = !!productId && !form.loading && form.loadStatus === "ready";
-	// 上架中(=1)：內容鎖住，需先下架。其餘（草稿/審核/下架）可編輯。
 	const locked = ready && Number(form.draft.status ?? 0) === 1;
 
 	const { primary, secondary } = resolveStatusButtons(
@@ -113,7 +106,6 @@ export default function ProductEditDrawer({
 		Number(form.draft.status ?? 0),
 	);
 
-	// 頂部上下架切換：下架就地重抓轉可編輯；上架等同「儲存並上架」（存目前欄位後上架）。
 	const handleShelfToggle = (target: "4003" | "4004") => {
 		if (target === "4003") {
 			void form.unshelf();
@@ -217,9 +209,6 @@ export default function ProductEditDrawer({
 	);
 }
 
-/* ============================================================
- *               Product summary + shelf toggle
- * ============================================================ */
 
 function ProductSummary({
 	draft,
@@ -250,7 +239,7 @@ function ProductSummary({
 				<strong className="truncate text-sm font-bold text-hk-heading">
 					{draft.name || "未命名商品"}
 				</strong>
-				{/* 一律可點：上架中按一下即下架（解鎖下方欄位），下架/草稿按一下即上架。 */}
+
 				<ShelfStatusControl
 					status={draft.status}
 					busy={busy}
@@ -261,9 +250,6 @@ function ProductSummary({
 	);
 }
 
-/* ============================================================
- *               Quick-edit fields (原價 / 庫存)
- * ============================================================ */
 
 function QuickSkuFields({ form }: { form: ReturnType<typeof useProductForm> }) {
 	const skus = form.draft.skus ?? [];
@@ -312,9 +298,6 @@ function QuickSkuFields({ form }: { form: ReturnType<typeof useProductForm> }) {
 	);
 }
 
-/* ============================================================
- *               Locked overlay (上架中)
- * ============================================================ */
 
 /**
  * Wraps the editable area; when `locked` (商品上架中) the content is blurred and
@@ -337,7 +320,3 @@ function LockableContent({
 		</div>
 	);
 }
-
-/* ============================================================
- *               Skeleton
- * ============================================================ */

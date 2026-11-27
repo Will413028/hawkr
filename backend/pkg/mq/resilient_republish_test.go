@@ -9,15 +9,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
-// mqConsumeCount reads the current mq_consume_total value for (queue, result),
-// so tests can assert the delta handleHandlerError produced without resetting
-// the shared package-level counter between table entries.
 func mqConsumeCount(queue, result string) float64 {
 	return testutil.ToFloat64(mqConsumeTotal.WithLabelValues(queue, result))
 }
 
-// fakePublisher records Publish calls and can be primed to fail, so
-// handleHandlerError's routing decisions are assertable without a live broker.
 type fakePublisher struct {
 	calls []publishCall
 	err   error
@@ -34,8 +29,6 @@ func (f *fakePublisher) Publish(exchange, key string, _, _ bool, msg amqp.Publis
 	return f.err
 }
 
-// fakeAck implements amqp.Acknowledger so we can observe whether the original
-// delivery was Ack'd or Nack'd (and with what requeue flag).
 type fakeAck struct {
 	acked   bool
 	nacked  bool

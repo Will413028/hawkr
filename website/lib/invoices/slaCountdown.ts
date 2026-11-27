@@ -60,9 +60,6 @@ export function foldSlaCountdown(
 		};
 	}
 
-	// 0 有自己的一句話：「剩餘 0 個工作天」會被讀成「還有時間」，而它其實是
-	// **今天最後一天**（58A §S09 的逐字文案表）。分級仍是 warning（1–2 那一級），
-	// 不升成 danger——今天到期還沒逾期。
 	if (remaining === 0) {
 		return { text: "今天到期", tone: "warning", unknown: false };
 	}

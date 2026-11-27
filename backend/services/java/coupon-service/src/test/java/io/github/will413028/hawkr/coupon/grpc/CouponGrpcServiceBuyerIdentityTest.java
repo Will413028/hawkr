@@ -152,9 +152,6 @@ class CouponGrpcServiceBuyerIdentityTest {
         template.setEndAt(LocalDateTime.now().plusDays(1));
         template.setClaimRequired(true);
         template.setTotalIssueLimit(-1);
-        // targetType 留 null：isEligible 對 null targetType 直接回傳 true（舊資料相容分支），
-        // 讓本測試專注在身分來源判別，不需要額外經營 buyerCreatedAt/memberSellerIds/
-        // designatedTemplateIds 三者的資格判定細節（那是 isEligible 自己的既有覆蓋範圍）。
         when(templateService.getActiveTemplate(999L)).thenReturn(template);
         when(accountGrpcClient.getAccountCreatedAt(rawAccountId)).thenReturn(1700000000000L);
         when(orderGrpcClient.getBuyerMemberSellerIds(resolvedBuyerId)).thenReturn(Collections.emptySet());

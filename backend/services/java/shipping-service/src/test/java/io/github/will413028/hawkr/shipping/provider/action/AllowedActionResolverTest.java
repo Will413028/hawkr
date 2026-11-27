@@ -53,9 +53,6 @@ class AllowedActionResolverTest {
                 .collect(Collectors.toMap(ActionAvailability::action, Function.identity()));
     }
 
-    // ==================================================================
-    // ① 陽性：狀態允許 ＋ capability present ⇒ enabled
-    // ==================================================================
 
     @Nested
     @DisplayName("① 狀態允許且 capability present ⇒ enabled")
@@ -151,9 +148,6 @@ class AllowedActionResolverTest {
         }
     }
 
-    // ==================================================================
-    // ② 🔴 requiresProviderCall=false 的動作不因 capability 為 empty 而消失
-    // ==================================================================
 
     @Nested
     @DisplayName("② requiresProviderCall=false 的動作不受 capability 影響")
@@ -172,11 +166,6 @@ class AllowedActionResolverTest {
         @DisplayName("Uber（capability 幾乎全 empty）：handover／view_only 照樣可用")
         void actionsWithoutProviderCallSurviveEmptyCapabilities() {
             ShipmentEntity e = cvs(ShippingStatus.UNPROCESSED, LabelPrintStatus.SUCCEEDED);
-            // 🔴 用 3005（商家自行配送）而不是 3003（Uber）：
-            //    Uber 的交付確認走 POD、不走賣家確認出貨
-            //    ⇒ handover@3003 已明列為「這條線上不存在這個動作」。
-            //    本測試要守的是「requiresProviderCall=false 不受 capability 為 empty 影響」，
-            //    3005 沒有註冊 adapter，論證力相同而不與那條明列衝突。
             e.setShippingMethod(ShippingMethod.MERCHANT_DELIVERY.value());
 
             Map<String, ActionAvailability> actions = resolve(e);
@@ -208,9 +197,6 @@ class AllowedActionResolverTest {
         @Test
         @DisplayName("capability 閘門還在：print_label@3003（永久 empty）與 print_label@3005（無 adapter）")
         void actionsRequiringProviderCallAreGated() {
-            // ⚠️ labelPrintStatus 刻意用 NONE：SUCCEEDED 會先撞上狀態閘門的
-            //    「已取號且不支援重印 ⇒ 5003」而根本走不到 capability 閘門
-            //    ——那樣這條就驗不到它宣稱要驗的東西（實測：期望 9503、實際 5003）。
             ShipmentEntity uber = cvs(ShippingStatus.UNPROCESSED, LabelPrintStatus.NONE);
             uber.setShippingMethod(ShippingMethod.UBER_INSTANT.value());
 
@@ -249,9 +235,6 @@ class AllowedActionResolverTest {
         }
     }
 
-    // ==================================================================
-    // ③ 狀態閘門
-    // ==================================================================
 
     @Nested
     @DisplayName("③ 狀態閘門")
@@ -311,9 +294,6 @@ class AllowedActionResolverTest {
         }
     }
 
-    // ==================================================================
-    // ④ 契約：enabled=false 一律帶得出理由；action 清單與 Gateway 對齊
-    // ==================================================================
 
     @Nested
     @DisplayName("④ 對外契約")

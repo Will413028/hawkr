@@ -106,7 +106,6 @@ function readGatewayHost(flavor: Flavor): string {
 		try {
 			return new URL(value).origin;
 		} catch {
-			// A relative base has no origin; try the next source.
 		}
 	}
 	return "";
@@ -205,16 +204,6 @@ export function resolveHawkrAgentEnabled(
 }
 
 function readApiBase(flavor: Flavor): string {
-	// Browser-facing base. Local dev defaults to the RELATIVE `/api/v1` so the
-	// browser only ever talks to its own origin and the `app/api/v1/[...path]`
-	// route proxies to the gateway server-side — a same-origin topology that
-	// MIRRORS prod (prod serves the API first-party under the web host to dodge
-	// content blockers). Same-origin means the session cookie (`__Host-hk_session`) is sent to the
-	// API host too (the cookie has no Domain, so it can only go same-origin) and CORS / cookie-domain /
-	// VPN / blocker / self-signed-cert friction all disappear. Opt into raw
-	// cross-origin (rarely needed — prod isn't cross-origin) by setting
-	// NEXT_PUBLIC_API_BASE_URL to the absolute gateway URL. Deployed builds always
-	// set NEXT_PUBLIC_API_BASE_URL explicitly, so this dev default never reaches them.
 	const gatewayHost = readGatewayHost(flavor);
 	const fallback =
 		process.env.NODE_ENV === "development"
@@ -262,7 +251,6 @@ function parseOrigin(name: string, raw: string): string {
 			`${name} must be a credential-free http(s) origin without path, query or fragment (got "${raw}")`,
 		);
 	}
-	// Never retain an equivalent-but-noncanonical spelling (case, :443, trailing slash).
 	return parsed.origin;
 }
 
@@ -401,16 +389,9 @@ function buildEnvConfig(flavor: Flavor): EnvConfig {
 		seoIndexable:
 			flavor === "prod" &&
 			process.env.NEXT_PUBLIC_SEO_INDEXABLE?.trim() === "true",
-		// Server/SSR base AND the dev proxy's forward target — ALWAYS absolute.
-		// A relative base can't be fetched server-side, and `apiBaseUrl` is the
-		// relative `/api/v1` in local dev proxy mode (the default), so this must NOT
-		// fall back to apiBaseUrl. Defaults to the absolute gateway; API_BASE_URL
-		// overrides (e.g. local read-hang repro pointing at a stub).
 		serverApiBase,
 		googleClientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "",
 		gaId: process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim() ?? "",
-		// No default on any flavor; canonical origin, so `${mediaBaseUrl}/i/...`
-		// never doubles a slash.
 		mediaBaseUrl: readMediaBaseUrl(),
 		lineUrl: readLineUrl(),
 	};

@@ -120,9 +120,6 @@ export function mergeMarketHeadPages(
 		return { pages: updatedPages, newProducts };
 	}
 
-	// Keep all loaded products. Repacking into the old fixed page sizes would
-	// silently discard the tail while page metadata still advances to the next
-	// cursor, making those products impossible to recover without a full reset.
 	return {
 		pages: updatedPages.map((page, index) =>
 			index === 0

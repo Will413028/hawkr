@@ -85,7 +85,6 @@ test.describe("procurement assistant — 候選搜尋步驟軌", {
 			searchWatchFrames: railFrames,
 		});
 
-		// 完整處理區已在主對話，不另留同一狀態的單行泡泡。
 		await expect(page.locator("li.hawkr-agent-typing-row")).toHaveCount(0);
 
 		const processing = page.getByTestId("agent-processing");
@@ -121,26 +120,14 @@ test.describe("procurement assistant — 候選搜尋步驟軌", {
 			"data-status",
 			"SUCCEEDED",
 		);
-		// 輪詢進度卡片被子列取代，不並存。
 		await expect(page.getByText("正在搜尋候選")).toHaveCount(0);
-		// 子列真的掛在父列底下（一層巢狀），不是攤平的三列。
 		await expect(
 			rail.locator('.hawkr-agent-rail__children [data-row-id="9002"]'),
 		).toHaveCount(1);
 
-		// a11y：軌本身 aria-hidden，唯一的朗讀來源是常駐的 sr-only atomic polite
-		// status。它要播報「現在真的在跑」的那一列（父列「搜尋候選供應商」），
-		// 不是還沒跑到的收尾列，也不是空字串——單元測試只驗過抽出這句話的
-		// helper（lastRunningActivity／activityLabel），沒驗過這條線真的接到
-		// AssistantWorkspace 的 DOM 上。
-		//
-		// 桌機與手機都直接在對話裡看見進度，也都保留唯一的朗讀來源。
 		const announcement = page.locator(
 			'.sr-only[role="status"][aria-atomic="true"]',
 		);
-		// toBeVisible 才是這件事的斷言：`.sr-only` 是 1px＋clip，Playwright 仍
-		// 視為可見，但被 `display:none` 的祖先蓋掉就不是——而 toHaveText 讀得到
-		// 隱藏節點的文字，單靠它抓不出「窄視窗整段被藏起來」。
 		await expect(announcement).toBeVisible();
 		await expect(announcement).toHaveText("搜尋候選供應商");
 		await expect(page.locator(".initial-loader")).toBeHidden();
@@ -158,15 +145,12 @@ test.describe("procurement assistant — 候選搜尋步驟軌", {
 		await setupRfqPriceReview(page, {
 			stopAtSearching: true,
 			candidateSearchPollHandler: runningPoll,
-			// searchWatchFrames 不傳 → helper 預設只有 run_accepted 與 finished（A9-D29）。
 		});
 
 		const processing = page.getByTestId("agent-processing");
 		await expect(processing).toBeVisible();
 		await expect(page.locator("#hawkr-agent-side-panel")).toHaveCount(0);
 
-		// exact: true——sr-only 的常駐播報退回「正在搜尋候選供應商」，是「正在搜尋候選」
-		// 與「搜尋候選供應商」的超字串，鬆散比對都會撞上兩個節點。
 		await expect(
 			processing.getByText("正在搜尋候選", { exact: true }),
 		).toBeVisible({
@@ -175,7 +159,6 @@ test.describe("procurement assistant — 候選搜尋步驟軌", {
 		await expect(
 			processing.getByText("搜尋候選供應商", { exact: true }),
 		).toBeVisible();
-		// 公開池退場（A9-D44）：沒有外部業者那一條。
 		await expect(page.getByText("外部業者")).toHaveCount(0);
 		await expect(
 			processing.getByRole("heading", { name: "搜尋進度" }),
@@ -363,8 +346,6 @@ test.describe("procurement assistant — 候選搜尋步驟軌", {
 			message: "數量改成 80 KG",
 		});
 		expect(turnBodies[0].clientRequestId).toEqual(expect.any(String));
-		// 新版本先使舊候選失效。snapshot 暫時失敗時仍顯示後端的新問題，
-		// 不能退回舊成果，也不能自行猜成 ready 或把買家留在沒有出口的畫面。
 		const question = page.getByTestId("clarify-question-card");
 		await expect(question).toContainText("這批芭樂需要分裝嗎？");
 		await expect(results).toHaveCount(0);

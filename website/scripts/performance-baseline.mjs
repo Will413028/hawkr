@@ -896,7 +896,6 @@ export async function executeBaseline(
 					"utf8",
 				);
 			} finally {
-				// makeProfile() owns this exact OS-temp child. Never delete a caller path.
 				await rm(profilePath, { recursive: true, force: true });
 			}
 

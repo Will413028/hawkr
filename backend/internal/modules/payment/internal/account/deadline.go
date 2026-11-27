@@ -14,12 +14,9 @@ import (
 )
 
 const (
-	// deadlineWindow 是補件期限提醒的窗口：期限在未來 7 天內才發布；deadlineLastDay 內是最後一天的檔位（D23）。
 	deadlineWindow  = 7 * 24 * time.Hour
 	deadlineLastDay = 24 * time.Hour
 	deadlineBatch   = 200
-	// deadlineScanInterval 是補件期限掃描的週期：每小時一次，ONE_DAY 檔位最晚在期限前 23 小時發出、SEVEN_DAYS 最晚在進入窗口後一小時發出；
-	// 期限與檔位相同的重複發布由消費者去重。
 	deadlineScanInterval = time.Hour
 )
 

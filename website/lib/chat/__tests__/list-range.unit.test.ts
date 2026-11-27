@@ -13,8 +13,6 @@ describe("conversationRangeLabel", () => {
 	});
 
 	it("搜尋縮小清單時，分子跟著看得到的列走、分母維持這個分頁載入了幾列", () => {
-		// 「你正在看 6 筆裡的 3 筆」。分母若跟著縮成 3，使用者就無從知道
-		// 篩掉了多少，那正是這一列存在的理由。
 		expect(
 			conversationRangeLabel({
 				visible: 3,
@@ -25,9 +23,6 @@ describe("conversationRangeLabel", () => {
 	});
 
 	it("清單可能被截斷時分母帶 +，不把「載入了幾筆」講成「總共幾筆」", () => {
-		// 兩份清單都以 pageSize 50 抓取，剛好拿滿就可能還有沒載入的對話；
-		// agent 那邊則有後端明講的 hasMore。兩種都只證明「至少這麼多」，
-		// 寫成沒有 + 的 50 是對一個真的存在的對話說謊（同側欄空狀態的紀律）。
 		expect(
 			conversationRangeLabel({
 				visible: 50,
@@ -65,8 +60,6 @@ describe("conversationRangeLabel", () => {
 	});
 
 	it("只有一列時照樣寫成範圍，不為了省字改成另一種句型", () => {
-		// 兩種句型會讓這一列在 1 ↔ 2 之間跳動時整句換掉；範圍句在所有數字下
-		// 都是同一個形狀。
 		expect(
 			conversationRangeLabel({
 				visible: 1,

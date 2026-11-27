@@ -83,10 +83,6 @@ export function SellerInvoiceAppealDetailPage({
 		<SellerPageShell
 			title="申訴詳情"
 			eyebrow="買家發票申訴"
-			// `caseNo` 自 backend#3054 起有值，且**逐字等於** complaintId
-			// ——58 §5.1.12 的 DDL 寫著「id bigint … TSID（對外＝案件編號）」，
-			// 案件編號的來源設計上就是那一列的 id，本表沒有第二個案號欄。
-			// fallback 留著是為了舊回應（部署窗口內），兩者同值 ⇒ 顯示結果不變。
 			subtitle={
 				complaint ? (
 					<CopyableCaseNo value={complaint.caseNo || complaint.complaintId} />
@@ -105,8 +101,6 @@ export function SellerInvoiceAppealDetailPage({
 			{loading ? (
 				<DetailSkeleton />
 			) : !complaint ? (
-				// 端點 35 對「越權」與「真的不存在」回同一個 404＋9309（Tier A）⇒
-				// 文案必須完全相同，不得寫「沒有權限」。
 				<section
 					role="alert"
 					className="seller-card flex flex-col items-center gap-[var(--hkui-space-3)] p-6 text-center"
@@ -161,14 +155,11 @@ function DetailSkeleton() {
 function ComplaintBody({ complaint }: { complaint: SellerInvoiceComplaint }) {
 	const display = invoiceComplaintDisplay(complaint.status);
 	const [respondOpen, setRespondOpen] = React.useState(false);
-	// 🔴 expectedVersion 取自 complaint.version，不得用 responses.length 頂替
-	// ——平台側也會追加事件，兩個數字會分岔。
 	const respond = useRespondSellerInvoiceComplaint(
 		complaint.complaintId,
 		complaint.version,
 	);
 
-	// 送出成功後把 dialog 收掉。回覆是追加語意，整個區塊不收起來。
 	React.useEffect(() => {
 		if (respond.succeeded) {
 			setRespondOpen(false);
@@ -188,8 +179,7 @@ function ComplaintBody({ complaint }: { complaint: SellerInvoiceComplaint }) {
 
 	return (
 		<div className="flex flex-col gap-[var(--hkui-space-4)]">
-			{/* ② SLA 橫幅。逾期對賣家仍是 `status` 不是 `alert`——進頁時就存在的狀態
-			    不是即時事件。 */}
+
 			<section
 				role="status"
 				className={[
@@ -216,12 +206,7 @@ function ComplaintBody({ complaint }: { complaint: SellerInvoiceComplaint }) {
 				)}
 			</section>
 
-			{/*
-			 * ⑥ 回覆申訴。已結案的申訴不渲染入口。
-			 *
-			 * 按鈕文案依狀態換：已回覆過的案子再按是**補充說明**（追加語意），
-			 * 寫成「回覆申訴」會讓賣家以為前一次沒送出去。
-			 */}
+
 			{closed ? null : (
 				<section className="seller-card flex flex-col gap-2 p-[var(--hkui-space-4)]">
 					<strong className="text-sm font-bold">回覆這件申訴</strong>
@@ -251,8 +236,7 @@ function ComplaintBody({ complaint }: { complaint: SellerInvoiceComplaint }) {
 				onSubmit={(args) => respond.respond(args)}
 			/>
 
-			{/* ③ 申訴內容。⚠️「買家」與「買家期待的文件」兩列整列不渲染——`buyerMaskedName`
-			    與 `expectedDocKind` 後端恆為空字串（見 seller-types.ts 檔頭）。 */}
+
 			<section className="seller-card flex flex-col gap-2 p-[var(--hkui-space-4)]">
 				<div className="flex flex-wrap items-center justify-between gap-2">
 					<h2 className="m-0 text-sm font-bold">申訴內容</h2>
@@ -260,7 +244,7 @@ function ComplaintBody({ complaint }: { complaint: SellerInvoiceComplaint }) {
 						<Chip variant="flat" color={display.color} size="sm">
 							{display.label}
 						</Chip>
-						{/* `reopenCount` 是屬性不是狀態。 */}
+
 						{reopened ? (
 							<Chip variant="flat" color="warning" size="sm">
 								{`已重開 ${complaint.reopenCount} 次`}
@@ -304,16 +288,13 @@ function ComplaintBody({ complaint }: { complaint: SellerInvoiceComplaint }) {
 					</p>
 				) : null}
 				{orderHref ? (
-					// ④ 的替代：端點 35 沒有內嵌任何文件摘要（見檔頭），發票狀態只有
-					// S07 看得到。給連結而不是渲染一張空卡。
 					<Link href={orderHref} className="text-sm underline">
 						查看這張訂單的發票狀態
 					</Link>
 				) : null}
 			</section>
 
-			{/* ⑤ 處理紀錄。追加語意 ⇒ 依 occurredAt 遞增；每則帶明確的時間文字，
-			    不用相對時間（「3 天前」對稽核沒用）。 */}
+
 			<section className="seller-card flex flex-col gap-2 p-[var(--hkui-space-4)]">
 				<h2 className="m-0 text-sm font-bold">處理紀錄</h2>
 				{complaint.responses.length === 0 ? (
@@ -342,8 +323,7 @@ function ResponseRow({ item }: { item: SellerInvoiceComplaintResponse }) {
 					{ACTOR_LABEL[item.actor] ?? dash(item.actor)}
 				</strong>
 				<span className="text-sm">
-					{/* 中文一律取自 CodeMeta；查不到就印原始碼（賣家截圖給客服時那串碼
-					    是唯一線索），不顯示空白。 */}
+
 					{INVOICE_COMPLAINT_ACTION_LABEL[item.action] ?? dash(item.action)}
 				</span>
 				{item.occurredAt ? (

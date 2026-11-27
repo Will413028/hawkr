@@ -18,10 +18,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/im/internal/live"
 )
 
-// guard 只是測試卡住時的失敗保險，不是效能斷言。
 const guard = 30 * time.Second
 
-// newModule 是共用同一個資料庫的另一個 im.Module：等同另一個進程，各自有 hub 與專用的 LISTEN 連線。
 func (f *fixture) newModule(cfg im.LiveConfig) *im.Module {
 	return im.New(im.Deps{
 		DB: f.db, Events: f.bus, Jobs: f.jobs, Media: f.media, Buyers: f.buyers, Stores: f.stores, Orders: f.orders,
@@ -29,12 +27,10 @@ func (f *fixture) newModule(cfg im.LiveConfig) *im.Module {
 	})
 }
 
-// fastBackoff 讓重連的退避在測試裡幾乎不等。
 func fastBackoff() im.LiveConfig {
 	return im.LiveConfig{BackoffBase: time.Millisecond, BackoffMax: 5 * time.Millisecond}
 }
 
-// run 啟動 m.Run 並等到它的 LISTEN 連線已經在監聽（存活確認 SELECT now() 在 LISTEN 之後）；測試結束或呼叫 stop 時結束。
 func (f *fixture) run(t *testing.T, m *im.Module) (stop func()) {
 	t.Helper()
 	before := f.listeners(t)
@@ -92,7 +88,6 @@ func next(t *testing.T, s *im.Subscription) im.Event {
 	return ev
 }
 
-// untilReady 取到 Ready 為止（補洞完成），回傳之前的事件與 Ready。
 func untilReady(t *testing.T, s *im.Subscription) (before []im.Event, ready im.Event) {
 	t.Helper()
 	for {
@@ -104,7 +99,6 @@ func untilReady(t *testing.T, s *im.Subscription) (before []im.Event, ready im.E
 	}
 }
 
-// collectUntil 取事件直到 stop 成立（含觸發它的那個事件）。
 func collectUntil(t *testing.T, s *im.Subscription, stop func(im.Event) bool) []im.Event {
 	t.Helper()
 	var out []im.Event
@@ -141,7 +135,6 @@ func count(evs []im.Event, k im.EventKind) (n int) {
 	return n
 }
 
-// rawListener 是測試自己的 LISTEN 連線，記錄收到的 payload（獨立於被測的 hub）。
 type rawListener struct {
 	mu   sync.Mutex
 	got  []live.Payload
@@ -190,7 +183,6 @@ func (r *rawListener) payloads() []live.Payload {
 	return append([]live.Payload(nil), r.got...)
 }
 
-// waitFor 等到收到至少 n 則。
 func (r *rawListener) waitFor(t *testing.T, f *fixture, n int) []live.Payload {
 	t.Helper()
 	f.eventually(t, "收到通知", func() bool { return len(r.payloads()) >= n })

@@ -22,13 +22,7 @@ const root = process.cwd();
 const failures: string[] = [];
 
 const COLOUR_EMOJI = /[\u{1F000}-\u{1FAFF}]|\u{FE0F}/u;
-// Dingbats（2600–27BF）+ Misc Symbols and Arrows（2B00–2BFF，⭐⬛⬅…）+ ‼⁉。
-// 刻意不含 25AA–25FE 幾何形（▶◀▪ 是正當的單色文字 UI 符號）與 2300–23FF
-// （誤殺風險大於價值）；漏網個案靠 review，主力威脅（照抄 plan/AI 產出的
-// ✅⭐❌❗ 類）已在網內。
 const DINGBAT = /[☀-➿⬀-⯿‼⁉]/u;
-// 2026-06 清掃時保留的單色符號（★☆ 評分、✓ 勾選、✕✗ 關閉）——文字預設
-// 呈現、跨平台一致。其餘 dingbat（✅⭐⚡❗❌…）預設 emoji 呈現，一律擋。
 const KEPT_DINGBATS = new Set(["★", "☆", "✓", "✕", "✗"]);
 
 function findEmoji(text: string): string | null {
@@ -74,8 +68,6 @@ function walk(dir: string, extensions: RegExp): string[] {
 			continue;
 		}
 		const rel = relative(root, join(root, dir, entry));
-		// A broken symlink / file deleted mid-scan must degrade to "skipped",
-		// not crash the whole lint chain.
 		let isDirectory: boolean;
 		try {
 			isDirectory = statSync(join(root, rel)).isDirectory();
@@ -92,7 +84,6 @@ const files = [
 	...["lib", "features", "components", "app"].flatMap((d) =>
 		walk(d, /\.(ts|tsx)$/),
 	),
-	// emoji 也可能經 CSS `content: "…"` 進 UI——styles 一併掃。
 	...walk("styles", /\.css$/),
 ];
 for (const path of files) {
@@ -107,8 +98,6 @@ for (const path of files) {
 	}
 }
 
-// Self-check: the gate must fire on colour emoji AND emoji-presentation
-// dingbats, stay quiet on the kept monochrome set and comment-only mentions.
 if (
 	findEmoji("<span>📣</span>") === null ||
 	findEmoji("label: '🌐 官網'") === null ||

@@ -97,8 +97,6 @@ test("handoff trims and caps an oversized query before storing it", () => {
 
 test("the live chat URL carries no search text or handoff identifier", () => {
 	const privateQuery = "公司中秋送禮 預算 50000";
-	// 設計書 v6 §V.10.12-4：唯一正式新對話入口是 procurement，legacy 的
-	// /assistant/new 已改為 redirect。搜尋草稿要不外洩的是這條 URL。
 	const route = new URL(ASSISTANT_PROCUREMENT_PATH, "https://example.com");
 
 	assert.equal(route.pathname, "/account/messages/assistant/procurement");

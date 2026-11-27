@@ -21,27 +21,11 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/usecase"
 )
 
-// ---------------------------------------------------------------------------
-// 作廢→重開全鏈路（#2909）的整合驗證。
-//
-// 🔴 **為什麼一定要有這一層**：本鏈路的失效幾乎全是「DB 層說不」——
-// chk_invdoc_versions、uq_invdoc_order_identity、uq_invadj_void_once、
-// uq_invcorr_open_per_document、各狀態轉移的 allowed-from 述詞。
-// 這些在 unit test 的 fake 上**全部不存在**，而它們正是本 session 反覆踩到的東西
-// （MaxAttempts 未設 → 23514、operation 停 CREATED、分支失敗鎖住閘門）。
-//
-// dev 上跑不了同樣的路徑：AMEGO 共用測試帳號在 2026 年 9-10 月期別
-// **沒有 category=1（自動配號）字軌**（實測 track_all：13 條全是 category=2）
-// ⇒ 任何 f0401 都回 3040111 字軌不足，開不出當期發票就走不到更正。
-// ---------------------------------------------------------------------------
 
-// voidAmego 是可切換回應的 AMEGO 替身：開票、作廢、查詢三支。
 type voidAmego struct {
 	srv *httptest.Server
-	// voidCode 非 0 時 f0501 回該錯誤碼（測 R05）。
-	voidCode atomic.Value // string
-	// queryType 是 invoice_query 回的 invoice_type，用來模擬 C0401 → C0501 的時間差。
-	queryType atomic.Value // string
+	voidCode atomic.Value
+	queryType atomic.Value
 	issueSeq  atomic.Int64
 	voidCalls atomic.Int64
 	queryCall atomic.Int64
@@ -85,7 +69,6 @@ func newVoidAmego(t *testing.T) *voidAmego {
 	return f
 }
 
-// voidEnv 是本檔專用的環境：在 setupE2E 的基礎上多接三個 usecase。
 type voidEnv struct {
 	*e2eEnv
 	fake  *voidAmego
@@ -96,16 +79,11 @@ type voidEnv struct {
 	corrs domain.CorrectionRequestRepository
 }
 
-// setupVoidEnv 先跑一次完整的 order.paid → ISSUED，再把作廢軸接上去。
-//
-// 直接沿用 setupE2E 的種子（issuer／稅務檔／provider account／金鑰環）——
-// 那些都是本鏈路的真實前置，另起一套只會讓兩份 seed 各自漂移。
 func setupVoidEnv(t *testing.T) *voidEnv {
 	t.Helper()
 	env := setupE2E(t)
 	ctx := context.Background()
 
-	// 換成可切換回應的替身：setupE2E 那個只認 f0401。
 	fake := newVoidAmego(t)
 	client, err := amego.New(amego.Options{
 		BaseURL: fake.srv.URL, HTTPClient: fake.srv.Client(),
@@ -116,7 +94,6 @@ func setupVoidEnv(t *testing.T) *voidEnv {
 		t.Fatalf("amego.New: %v", err)
 	}
 
-	// 金鑰環必須與 setupE2E 用同一組，否則讀不回它剛加密落庫的收件人資料。
 	cur, err := crypto.New("integration-master-key")
 	if err != nil {
 		t.Fatalf("crypto.New: %v", err)
@@ -137,23 +114,12 @@ func setupVoidEnv(t *testing.T) *voidEnv {
 		IssueLease: 120 * time.Second, RecheckBase: time.Second,
 	}
 
-	// outbox／issuers 是 P3（invoice.voided）的依賴（#3055 的橫向稽查）：
-	// 作廢確認成功時要在同一交易內寫事件。
 	void := usecase.NewVoiding(tx, docs, ops, corrs, accounts, audit, client,
 		postgres.NewOutboxRepository(env.pool), postgres.NewIssuerRepository(env.pool),
-		// adjustments：cancelReasonFor 讀它決定送給 AMEGO 的 CancelReason（#3073）。
-		// 本檔走 correction 來源（op.AdjustmentID 為 nil）⇒ 真實 repository 傳進去
-		// 也不會被查，但傳真的比傳 nil 誠實：日後有人在本檔加一條退款作廢的案例時，
-		// 它會直接運作而不是 panic。
 		adjs, cfg, nil)
-	// audit 傳 nil：本檔驗的是作廢重開的狀態流轉，不驗 I7 留痕
-	// （recordCorrectionTransition 對 nil audit 靜默跳過）。
 	corr := usecase.NewCorrection(tx, corrs, ops, docs, adjs, noopReviser{}, nil, nil,
 		func() time.Time { return time.Now().UTC() }, newID, 13)
 
-	// 🔴 **必須自己建一支 IssueWorker**：setupE2E 那支綁的是 strictVoider（被呼叫到就
-	// 判測試失敗），因為開票軸的既有測試不該走到作廢路徑。本檔正是要走那條路。
-	// 順帶：它也要用上面那個可切換回應的 AMEGO 替身，setupE2E 的只認 f0401。
 	issuance := usecase.NewIssuance(tx,
 		postgres.NewIssuerRepository(env.pool),
 		postgres.NewSellerTaxProfileRepository(env.pool),
@@ -170,14 +136,12 @@ func setupVoidEnv(t *testing.T) *voidEnv {
 	return &voidEnv{e2eEnv: env, fake: fake, corr: corr, void: void, docs: docs, ops: ops, corrs: corrs}
 }
 
-// noopReviser 讓 R03 分支可編譯；本檔只走 R04，不會呼叫到它。
 type noopReviser struct{}
 
 func (noopReviser) ReviseOrderInvoiceSnapshot(context.Context, domain.ReviseSnapshotInput) (int64, error) {
 	panic("void_reissue_integration_test: R04 不該呼叫 ReviseOrderInvoiceSnapshot")
 }
 
-// issueFirstInvoice 走完整的 order.paid → ISSUED，回傳那張 document。
 func (e *voidEnv) issueFirstInvoice(t *testing.T) domain.Document {
 	t.Helper()
 	ctx := context.Background()
@@ -197,17 +161,8 @@ func (e *voidEnv) issueFirstInvoice(t *testing.T) domain.Document {
 	return doc
 }
 
-// mustClaimForRecheck 走 production 在 INV.rc 上的**兩步**，測試少了它就對不上真實呼叫順序。
-//
-// usecase/recheck.go 的迴圈是：ClaimRecheck 先把 DB 那一列蓋成 PROVIDER_STATUS_RECHECK，
-// 接著把記憶體裡那份 op.Status 同步跟上（該檔明文標紅的那一行），最後才呼叫 ConfirmVoid。
-// 而 MarkInvoiceOperationWaitingConfirmation 的述詞是
-// `status IN ('SENDING', 'PROVIDER_STATUS_RECHECK')`——直接拿受理後的 WAITING_CONFIRMATION
-// 進去，UPDATE 就是命中 0 列。長紅四次 promote 的成因是這裡，不是 production 壞掉。
 func (e *voidEnv) mustClaimForRecheck(t *testing.T, op domain.Operation) domain.Operation {
 	t.Helper()
-	// claim 的候選述詞要求 `next_attempt_at <= now`；受理時那一列已被排到未來的重試點，
-	// 所以要用一個夠晚的 now，否則 claim 會靜默命中 0 列（回 false 而不是 error）。
 	now := time.Now().Add(24 * time.Hour)
 	ok, err := e.ops.ClaimRecheck(context.Background(), op.ID, now, now.Add(60*time.Second))
 	if err != nil {
@@ -228,7 +183,6 @@ func TestIntegration_VoidReissue_HappyPath(t *testing.T) {
 	ctx := context.Background()
 	doc := e.issueFirstInvoice(t)
 
-	// ── R04：建 VOID adjustment ＋ VOID operation(READY) ＋ 重開票 ＋ REISSUE op(CREATED)
 	res, err := e.corr.Submit(ctx, submitCorrectionFor(doc, e.orderNo))
 	if err != nil {
 		t.Fatalf("R04 Submit: %v", err)
@@ -267,7 +221,6 @@ func TestIntegration_VoidReissue_HappyPath(t *testing.T) {
 		t.Fatalf("REISSUE operation status=%s, want CREATED —— 它必須等作廢確認", rOp.Status)
 	}
 
-	// ── f0501：worker 撿 VOID operation 送出
 	if err := e.issue.RunOnce(ctx); err != nil {
 		t.Fatalf("issue worker (void): %v", err)
 	}
@@ -282,7 +235,6 @@ func TestIntegration_VoidReissue_HappyPath(t *testing.T) {
 		t.Fatalf("document status=%s, want VOIDING（受理 ≠ 已作廢）", got.Status)
 	}
 
-	// ── 確認第一輪：AMEGO 還回 C0401 ⇒ 不得提早寫 VOIDED
 	if err := e.void.ConfirmVoid(ctx, e.mustClaimForRecheck(t, *voidOp)); err != nil {
 		t.Fatalf("ConfirmVoid(C0401): %v", err)
 	}
@@ -293,7 +245,6 @@ func TestIntegration_VoidReissue_HappyPath(t *testing.T) {
 		t.Fatalf("C0401 就把 REISSUE 推成 %s", got.Status)
 	}
 
-	// ── 確認第二輪：翻成 C0501 ⇒ VOIDED ＋ REISSUE → READY
 	e.fake.queryType.Store("C0501")
 	voidOp = e.mustGetOp(t, voidOp.ID)
 	if err := e.void.ConfirmVoid(ctx, e.mustClaimForRecheck(t, *voidOp)); err != nil {
@@ -306,7 +257,6 @@ func TestIntegration_VoidReissue_HappyPath(t *testing.T) {
 		t.Fatalf("REISSUE operation status=%s, want READY —— 沒推它就永遠不會開新票", got.Status)
 	}
 
-	// ── 重開：worker 撿 REISSUE operation 開票 ⇒ R10
 	if err := e.issue.RunOnce(ctx); err != nil {
 		t.Fatalf("issue worker (reissue): %v", err)
 	}
@@ -316,13 +266,6 @@ func TestIntegration_VoidReissue_HappyPath(t *testing.T) {
 	if got := e.mustGetDoc(t, doc.ID); got.Status != codemeta.InvoiceDocumentStatusSuperseded.Value {
 		t.Fatalf("R10：原票 status=%s, want SUPERSEDED", got.Status)
 	}
-	// 🔴 重開票必須沿用**原文件的收件人身分**。
-	//
-	// 2026-09-01 dev 實測的 P0：`recipient_ref_id` 沒被帶過去 ⇒ 新文件的收件人是 NULL
-	// ⇒ 買家在 B05／B09 **看不到取代自己那張的新發票**，只看得到已 SUPERSEDED 的舊的。
-	// 完全靜默：欄位可為 NULL、DB 不擋、狀態機一路正確。
-	// 端點 9／10 的述詞是 `recipient_type='BUYER' AND recipient_ref_id = $2`，
-	// 少了它就是「這張發票不屬於任何人」。
 	newDoc := e.mustGetDoc(t, reissue.ID)
 	if newDoc.RecipientRefID == nil || doc.RecipientRefID == nil ||
 		*newDoc.RecipientRefID != *doc.RecipientRefID {
@@ -353,7 +296,7 @@ func TestIntegration_VoidReissue_ProviderRejects(t *testing.T) {
 	}
 	reissue := e.mustLoadReissue(t, doc)
 
-	e.fake.voidCode.Store("3050141") // 已存在折讓單 ⇒ ALLOWANCE_EXISTS
+	e.fake.voidCode.Store("3050141")
 	if err := e.issue.RunOnce(ctx); err != nil {
 		t.Fatalf("issue worker (void): %v", err)
 	}
@@ -376,15 +319,7 @@ func TestIntegration_VoidReissue_ProviderRejects(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 小工具
-// ---------------------------------------------------------------------------
 
-// submitCorrectionFor 組出 R04 的輸入：把 B2C 改成公司統編。
-//
-// Facts 直接給定而不是走 GatherCorrectionFacts：那一支要打 AMEGO 查字軌餘量，
-// 而本檔的替身沒有 track_status。決策路由本身有自己的 unit test（correction_decide_test），
-// 這裡要驗的是**路由之後**的落地。
 func submitCorrectionFor(doc domain.Document, orderNo string) usecase.SubmitCorrectionInput {
 	name := "整合測試股份有限公司"
 	taxID := "12345678"
@@ -407,9 +342,6 @@ func submitCorrectionFor(doc domain.Document, orderNo string) usecase.SubmitCorr
 		},
 		Revised: domain.ReviseDocumentSnapshot{
 			RecipientType: codemeta.InvoiceRecipientTypeBuyer.Value,
-			// 🔴 **鏡射 correction_intake.go 的建構**：它從原文件沿用收件人身分。
-			// 這裡若也省略，測試就會餵一個 nil 進去、然後斷言 nil ——
-			// 自己跟自己對，2026-09-01 那個 P0 正是這樣溜過去的。
 			RecipientRefID: doc.RecipientRefID,
 			RecipientName:  name,
 			RecipientTaxID: taxID,
@@ -449,8 +381,6 @@ func (e *voidEnv) mustGetOp(t *testing.T, id int64) *domain.Operation {
 	return &o
 }
 
-// mustLoadReissue 用**決定性的 provider_request_no** 反查重開票 —— 與正式碼同一條路徑，
-// 而不是掃 original_document_id（那沒有索引，且會讓測試與實作用不同的查法）。
 func (e *voidEnv) mustLoadReissue(t *testing.T, orig domain.Document) domain.Document {
 	t.Helper()
 	no := domain.ProviderRequestNoForOrder(e.orderNo, orig.SnapshotVersion, orig.IssueAttemptSeq+1)
@@ -461,9 +391,6 @@ func (e *voidEnv) mustLoadReissue(t *testing.T, orig domain.Document) domain.Doc
 	return d
 }
 
-// ---------------------------------------------------------------------------
-// 待審接單額度的累加（#2900 的真正前置）
-// ---------------------------------------------------------------------------
 
 // 待審中的賣家接單時，pending_order_count／amount 必須在**建 document 的同交易內**累加。
 //
@@ -479,7 +406,6 @@ func TestIntegration_PendingIntakeCountersBumpOnDocumentCreate(t *testing.T) {
 	e := setupVoidEnv(t)
 	ctx := context.Background()
 
-	// 把賣家改成待審（SELF_ISSUE_PENDING）＋ 給一個足夠大的上限，避免撞到別的分支。
 	if _, err := e.pool.Exec(ctx, `
 		UPDATE seller_tax_profiles
 		   SET review_status = 'SELF_ISSUE_PENDING',
@@ -512,7 +438,6 @@ func TestIntegration_PendingIntakeCountersBumpOnDocumentCreate(t *testing.T) {
 		t.Fatalf("pending_order_amount = %d, want > 0", amt)
 	}
 
-	// 冪等重入：同一筆 order.paid 再來一次，計數**不得**再加。
 	if err := e.paid.Handle(ctx, "order.paid", e2ePaidBody(t, "evt-intake-1", e.e2eEnv)); err != nil {
 		t.Fatalf("order.paid (retry): %v", err)
 	}

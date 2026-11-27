@@ -29,9 +29,9 @@ public class GovApiProperties {
      */
     private int backgroundReadTimeout = 90000;
 
-    private long cacheTtlExists = 604800;      // VALID：7天（秒）
-    private long cacheTtlNotExists = 3600;     // NOT_FOUND：1小時（秒），避免打錯字後被自己的錯誤快取擋住
-    private long cacheTtlInvalid = 86400;      // EXPIRED / TERMINATED / SUSPENDED：1天（秒）
+    private long cacheTtlExists = 604800;
+    private long cacheTtlNotExists = 3600;
+    private long cacheTtlInvalid = 86400;
 
     public String getOrganicUrl() { return organicUrl; }
     public void setOrganicUrl(String organicUrl) { this.organicUrl = organicUrl; }

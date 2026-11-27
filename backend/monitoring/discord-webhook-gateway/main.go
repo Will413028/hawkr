@@ -15,11 +15,9 @@ import (
 	"sync/atomic"
 )
 
-// Alertmanager webhook → Discord Webhook bridge
-// 接收 Alertmanager POST，轉為 Discord Embed 訊息
 
 type alertmanagerPayload struct {
-	Status string  `json:"status"` // "firing" or "resolved"
+	Status string  `json:"status"`
 	Alerts []alert `json:"alerts"`
 }
 
@@ -47,22 +45,11 @@ type discordEmbedField struct {
 	Inline bool   `json:"inline"`
 }
 
-// routeCounters 是每條路由的轉發計數。刻意不引入 prometheus/client_golang——
-// 這個服務的 go.mod 至今零依賴，而 exposition format 的 counter 是三行文字，
-// 為了三行文字換來一整棵依賴樹不划算。
 type routeCounters struct {
 	received atomic.Int64
 	failed   atomic.Int64
 }
 
-// metricsHandler 手寫 Prometheus exposition format。
-//
-// 為什麼這個服務需要 /metrics：它是告警鏈的**最後一跳**。在此之前，
-// sendDiscordWebhook 失敗只會 log.Printf 一行然後回 500 給 Alertmanager
-// ——Alertmanager 會重試，但沒有任何東西會告訴人「告警送不出去」。
-// 而這正是最不能靜默的一種失效：它發生的時候，所有其他告警也送不出去。
-//
-// 另外它本身沒有 up series（2026-09-10 實測），所以 ServiceDown 也蓋不到它。
 func metricsHandler(routes []string, counters map[string]*routeCounters) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
@@ -87,13 +74,10 @@ func metricsHandler(routes []string, counters map[string]*routeCounters) http.Ha
 }
 
 func main() {
-	// 每個路徑對應一個 Discord 頻道 webhook（皆由 env 注入，密鑰不入版控）。
-	// 依告警性質分流：/alert = infra 系統告警（monitor-alert 既有頻道）；business 告警再依 env 分 dev/prod 頻道。
-	// Alertmanager 依 label（channel / env）路由到對應路徑（見 alertmanager/config.yml）。
 	routes := map[string]string{
-		"/alert":            os.Getenv("DISCORD_WEBHOOK_URL"),            // infra 系統告警 monitor-alert（預設，必填）
-		"/alert/dev-alert":  os.Getenv("DISCORD_WEBHOOK_URL_DEV_ALERT"),  // dev 業務告警頻道 dev-警報
-		"/alert/prod-alert": os.Getenv("DISCORD_WEBHOOK_URL_PROD_ALERT"), // prod 業務告警頻道 prod-警報
+		"/alert":            os.Getenv("DISCORD_WEBHOOK_URL"),
+		"/alert/dev-alert":  os.Getenv("DISCORD_WEBHOOK_URL_DEV_ALERT"),
+		"/alert/prod-alert": os.Getenv("DISCORD_WEBHOOK_URL_PROD_ALERT"),
 	}
 	if routes["/alert"] == "" {
 		log.Fatal("DISCORD_WEBHOOK_URL is required")
@@ -103,7 +87,6 @@ func main() {
 	enabled := make([]string, 0, len(routes))
 	for path, url := range routes {
 		if url == "" {
-			// 未設定該頻道 webhook → 不註冊該路徑（Alertmanager 若指向未註冊路徑會收到 404，於部署時可察覺）
 			log.Printf("route %s disabled (webhook url not set)", path)
 			continue
 		}
@@ -113,7 +96,6 @@ func main() {
 		http.HandleFunc(path, makeAlertHandler(url, c))
 		log.Printf("route %s enabled", path)
 	}
-	// 路由順序決定 /metrics 的輸出順序；map 迭代無序，排過才不會每次 scrape 都換行序。
 	sort.Strings(enabled)
 	http.HandleFunc("/metrics", metricsHandler(enabled, counters))
 
@@ -121,7 +103,6 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
-// makeAlertHandler 回傳一個把 Alertmanager POST 轉發到指定 Discord webhook 的 handler。
 func makeAlertHandler(webhookURL string, c *routeCounters) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		c.received.Add(1)
@@ -151,11 +132,10 @@ func makeAlertHandler(webhookURL string, c *routeCounters) http.HandlerFunc {
 }
 
 func buildDiscordWebhook(p alertmanagerPayload) discordWebhook {
-	// 紅色=觸發, 綠色=已恢復
-	color := 0xED4245 // 紅色
+	color := 0xED4245
 	title := fmt.Sprintf("🔥 FIRING — %d alert(s)", len(p.Alerts))
 	if p.Status == "resolved" {
-		color = 0x57F287 // 綠色
+		color = 0x57F287
 		title = fmt.Sprintf("✅ RESOLVED — %d alert(s)", len(p.Alerts))
 	}
 
@@ -197,9 +177,6 @@ func sendDiscordWebhook(webhookURL string, payload discordWebhook) error {
 
 	resp, err := http.Post(webhookURL, "application/json", bytes.NewReader(body))
 	if err != nil {
-		// *url.Error.Error() 會把完整 webhook URL（含 path 裡的 token）原樣印進
-		// 訊息——net/http 的 stripPassword 只處理 userinfo，對 path 完全不起作用。
-		// .Err 是真正的網路層錯誤，不含 URL。
 		var uerr *url.Error
 		if errors.As(err, &uerr) {
 			return fmt.Errorf("discord webhook request: %w", uerr.Err)
@@ -208,7 +185,6 @@ func sendDiscordWebhook(webhookURL string, payload discordWebhook) error {
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	// Discord 回傳 204 No Content 表示成功
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		respBody, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("discord API returned %d: %s", resp.StatusCode, string(respBody))

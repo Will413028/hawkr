@@ -8,9 +8,6 @@ import (
 	"github.com/Will413028/hawkr/go-pkg/codemeta"
 )
 
-// §7.3.1 的 17 列轉移，以 "FROM->TO" 逐名列出（M1 不編號，(From,To) 是自然鍵且在 M1 上唯一）。
-// 這份清單是從設計書的轉換表獨立抄第二次，用來與實作 diff——兩邊都是我寫的，
-// 所以它抓的是「抄漏／抄錯一列」，不是「設計書錯了」。
 var wantDocumentEdges = []string{
 	"[*]->PENDING",
 	"[*]->NOT_APPLICABLE",
@@ -98,7 +95,6 @@ func TestDocumentTransitions_StatesAreCodeMetaValues(t *testing.T) {
 	if len(codemeta.AllInvoiceDocumentStatuss) != 11 {
 		t.Fatalf("InvoiceDocumentStatus 值域 = %d, want 11", len(codemeta.AllInvoiceDocumentStatuss))
 	}
-	// 每個狀態值都要有路徑抵達（否則它在 CHECK 裡、在 DTO 值域裡，唯獨沒有人走得到）。
 	for _, v := range codemeta.AllInvoiceDocumentStatuss {
 		if _, ok := seen[v.Value]; !ok {
 			t.Errorf("狀態 %s 未出現在任何一條轉移上", v.Value)
@@ -117,7 +113,6 @@ func TestDocumentAllowedFrom(t *testing.T) {
 	}
 	diffSets(t, "AllowedFrom(AWAITING_MANUAL)", got, want)
 
-	// SUPERSEDED 的兩個起點（作廢確認遲到的補正路徑）。
 	got, _ = DocumentAllowedFrom(codemeta.InvoiceDocumentStatusSuperseded.Value)
 	diffSets(t, "AllowedFrom(SUPERSEDED)", got, []string{
 		codemeta.InvoiceDocumentStatusVoided.Value,
@@ -127,7 +122,6 @@ func TestDocumentAllowedFrom(t *testing.T) {
 	if _, ok := DocumentAllowedFrom("NOT_A_STATUS"); ok {
 		t.Fatal("unknown target must return ok=false")
 	}
-	// 由 [*] 建立的目標，allowed-from 是空集合而不是「找不到」。
 	got, ok = DocumentAllowedFrom(codemeta.InvoiceDocumentStatusPending.Value)
 	if !ok {
 		t.Fatal("PENDING should have transitions")
@@ -152,10 +146,8 @@ func TestCanTransitionDocument(t *testing.T) {
 	}
 	ok(codemeta.InvoiceDocumentStatusIssuing.Value, codemeta.InvoiceDocumentStatusIssued.Value)
 	ok(codemeta.InvoiceDocumentStatusVoiding.Value, codemeta.InvoiceDocumentStatusIssued.Value)
-	// 終態不得再出發。
 	no(codemeta.InvoiceDocumentStatusVoided.Value, codemeta.InvoiceDocumentStatusIssuing.Value)
 	no(codemeta.InvoiceDocumentStatusNotApplicable.Value, codemeta.InvoiceDocumentStatusPending.Value)
-	// PENDING 不得直接跳到 ISSUED（必須經 ISSUING）。
 	no(codemeta.InvoiceDocumentStatusPending.Value, codemeta.InvoiceDocumentStatusIssued.Value)
 }
 
@@ -170,12 +162,6 @@ func TestDocumentTerminalStates(t *testing.T) {
 		if !IsDocumentTerminal(s) {
 			t.Errorf("IsDocumentTerminal(%s) = false", s)
 		}
-		// 終態不得是任何轉移的起點——唯一例外是 VOIDED。
-		//
-		// ⚠️ 這是 §7.3.1 自身的矛盾，不是抄錯：該節的終態清單列了 VOIDED，而同一節的轉換表
-		// 最後一列是「VOIDED / ISSUED --重開文件已 ISSUED--> SUPERSEDED」，mermaid 也畫了
-		// VOIDED --> SUPERSEDED。實作照轉換表（那是 allowed-from 的 SSOT），本測試把例外
-		// 寫明而不是靜默放過——設計書定案後要回來收掉這個例外。
 		if s == codemeta.InvoiceDocumentStatusVoided.Value {
 			continue
 		}

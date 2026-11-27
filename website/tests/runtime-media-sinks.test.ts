@@ -48,19 +48,12 @@ test("seller cover, AI style, order review, and product form boundaries normaliz
 
 	assert.match(sellerCover, /const imageSrc = buildImageUrl\(src, "banner"\);/);
 	assert.match(aiDialog, /src=\{buildImageUrl\(s\.thumbnailUrl, "thumb"\)\}/);
-	// The slot is the backend `thumb` preset URL of the style's Image, else the
-	// bundled placeholder.
 	const aiRepo = source("lib/seller/ai-image.ts");
 	assert.match(
 		aiRepo,
 		/thumbnailUrl: resolveStyleThumbnail\(s\.thumbnailUrl\)/,
 	);
 	assert.match(orderDetail, /src=\{resolveCdnUrl\(url\)\}/);
-	// 圖庫與主圖都由 objectKey 經 resolveCdnUrl 組 URL（49 §6.1／§6.5）。
-	// #430 A1 之前這裡釘的是「讀 r.images／raw.main_image」的舊寫法——那兩個欄位後端
-	// 從來沒有回過，於是這條斷言替一個壞掉的邊界背書。改釘實際存在的來源欄位。
-	// backend#2235：gallery 條目的圖片欄從 `objectKey`/`url` 收斂成
-	// `imageKey`/`imageUrl`（與商品卡、購物車項、貼文商品同名，49 §6.1）。
 	assert.match(adapter, /const url = resolveCdnUrl\(toStr\(rec\.imageKey\)\);/);
 	assert.match(
 		adapter,
@@ -77,11 +70,6 @@ test("seller and product metadata never emit raw backend image URLs", () => {
 	const storefrontMetadata = source("features/sellers/storefront/metadata.ts");
 	const product = source("app/[locale]/(public)/products/[id]/page.tsx");
 
-	// The pinned value is the NORMALIZED one, and it reaches og:image through
-	// socialImages() so an imageless seller falls back to the site card instead
-	// of the empty array this used to pin (tests/seo-social-image.test.ts).
-	// Which FIELD it normalizes is `sellerSocialImage`'s business and is pinned
-	// once, for all four seller routes, in tests/seller-social-image.test.ts.
 	assert.match(
 		storefrontMetadata,
 		/const socialImage = sellerSocialImage\(s\);[\s\S]*?images: socialImages\(socialImage\)/,
@@ -92,11 +80,6 @@ test("seller and product metadata never emit raw backend image URLs", () => {
 		/images:[\s\S]{0,100}\{ url: s\.(?:coverImage|bannerUrl|avatar|logo_url)/,
 	);
 
-	// #430 D4-R3/R4/R5: `images` was never on the wire (PublicProductDetailItem
-	// has imageKey / imageKeys / imageUrl / imageUrls and nothing else), so the
-	// old pin endorsed a dead fallback. Pin the objectKey SSOT instead — passing
-	// the bare key lets buildImageUrl apply the `detail` preset directly rather
-	// than peeling a `/i/original/` URL back apart first.
 	for (const route of [product]) {
 		assert.match(
 			route,

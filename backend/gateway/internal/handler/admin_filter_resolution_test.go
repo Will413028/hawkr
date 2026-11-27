@@ -13,17 +13,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-// ==================== Adversarial-review sweep #2: 4 more admin filter
-// call sites with the same unresolved-raw-login-id bug class as
-// SearchOrders/ListAbnormalOrdersForAdmin (order.go / admin_order.go), just
-// on aftersales / payment / shipping-service instead of order-service —
-// which is why the first D7 sweep missed them. All 4 now resolve through
-// resolveOptionalBuyerFilterQuery / resolveOptionalSellerFilterQuery instead
-// of forwarding c.Query(...) raw. ====================
 
-// ---- mocks (admin-only RPCs; embed full interface so any other method call
-// nil-panics — same "must not be silently invoked" contract as sibling mocks
-// in aftersales_test.go / payment_test.go / shipping_resolver_test.go) ----
 
 type mockAftersalesAdminServiceClient struct {
 	aftersalespb.AfterSalesServiceClient

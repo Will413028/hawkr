@@ -17,7 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-// lockCase 鎖住案件並比對版本（expected 為 0 表示不比對，給不帶 etag 的指令）：版本不符回版本衝突。
 func lockCase(ctx context.Context, q *store.Queries, caseID uuid.UUID, expected int64) (store.SellerCase, error) {
 	row, err := q.LockCase(ctx, caseID)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -32,7 +31,6 @@ func lockCase(ctx context.Context, q *store.Queries, caseID uuid.UUID, expected 
 	return row, nil
 }
 
-// caseFactsOf 組出一個已鎖住的案件的事實（成員統計、導出的措施、店家是否已關閉）。
 func caseFactsOf(ctx context.Context, q *store.Queries, caseID uuid.UUID) (model.CaseFacts, error) {
 	facts, err := caseFactsByIDs(ctx, q, []uuid.UUID{caseID})
 	if err != nil {
@@ -100,7 +98,6 @@ func (s *Service) Decide(ctx context.Context, in model.DecideCaseInput) (model.A
 			}
 			return err
 		}
-		// 還沒結束的詢問在同一個 transaction 由系統撤回（鎖順序：店家列、通報列、案件列、詢問列）。
 		if err := withdrawOpenInquiry(ctx, q, locked.ID, in.AdminID, now); err != nil {
 			return err
 		}
@@ -285,7 +282,6 @@ func (s *Service) CreateCaseNote(ctx context.Context, in model.CreateCaseNoteInp
 	if err != nil {
 		return model.GovernanceNote{}, err
 	}
-	// 回應取資料庫存下的值（微秒），之後 CaseNotes 讀到的才會完全相同。
 	return toNote(row), nil
 }
 
@@ -328,7 +324,6 @@ func (s *Service) CaseNotes(ctx context.Context, in model.CaseNoteListInput) (mo
 	return page, nil
 }
 
-// toNote 把註記列轉成模型：改嚴重度時寫的那則帶改前與改後。
 func toNote(row store.SellerGovernanceNote) model.GovernanceNote {
 	n := model.GovernanceNote{ID: row.NoteID, AdminID: row.AdminID, Body: row.Body, CreatedAt: row.CreatedAt}
 	if row.SeverityFrom != nil && row.SeverityTo != nil {

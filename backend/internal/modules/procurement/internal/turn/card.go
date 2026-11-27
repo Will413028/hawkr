@@ -11,8 +11,6 @@ type pendingCard struct {
 	card    *planner.Question
 }
 
-// buildCard 是「依命中出卡」的唯一規則（A9-D28(1)）：命中多於 MaxItemOptions 個而且分散在兩個以上大類時先問大類（GROUP，依各大類的最佳命中排序）；
-// 其餘列末層品項（ITEM，照 resolver 的排序，最多 MaxItemOptions 個，同一大類超過也只取前幾個）。呼叫端給的命中已排除無效的。
 func buildCard(query string, ms []resolver.Match) *pendingCard {
 	ms = leavesOnly(ms)
 	if len(ms) == 0 {
@@ -34,7 +32,6 @@ func buildCard(query string, ms []resolver.Match) *pendingCard {
 	return c
 }
 
-// commonRoot 是命中共同的大類 ID；沒有大類資訊或分屬多個大類回 uuid.Nil()。
 func commonRoot(ms []resolver.Match) uuid.UUID {
 	var root uuid.UUID
 	for _, m := range ms {
@@ -46,7 +43,6 @@ func commonRoot(ms []resolver.Match) uuid.UUID {
 	return root
 }
 
-// leavesOnly 只留末層命中：大類、中間層節點與沒有子節點的大類自己都不能被確認，也不計入出卡的門檻與分組。
 func leavesOnly(ms []resolver.Match) []resolver.Match {
 	var out []resolver.Match
 	for _, m := range ms {
@@ -57,7 +53,6 @@ func leavesOnly(ms []resolver.Match) []resolver.Match {
 	return out
 }
 
-// describeCard 是自由描述卡：沒有選項。
 func describeCard(query string) *pendingCard {
 	return cardOf(StageDescribe, query, nil, planner.BuildItemDescribe())
 }
@@ -71,7 +66,6 @@ func cardOf(stage, query string, cands []planner.ItemCandidate, card *planner.Qu
 	return &pendingCard{payload: p, card: card}
 }
 
-// groupsOf 依命中順序（resolver 的排序）取不重複的大類；任何命中沒有大類資訊時回 nil，不分組。
 func groupsOf(ms []resolver.Match) []planner.ItemCandidate {
 	var out []planner.ItemCandidate
 	seen := map[uuid.UUID]bool{}

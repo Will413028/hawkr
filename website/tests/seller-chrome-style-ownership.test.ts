@@ -125,15 +125,10 @@ test("seller and auth owner CSS preserve the exact reviewed semantic AST", () =>
 	const profile = source(SELLER_PROFILE);
 	const share = source(SELLER_SHARE_CARD);
 
-	// The auth-login CSS has no phone verification, account link or GSI
-	// overlay rules; tests/auth-login-style-ownership.test.ts carries the inventory.
 	assert.equal(
 		semanticDigest(authLogin),
 		"5dc86390d29446348d460dc684dedf84d27e361a59f92a370b8c90dabf4a91da",
 	);
-	// 2026-09-10 px→rem for the text-scale setting
-	// 2026-09-19 店家簡介可展開：夾行從 -webkit-line-clamp 改為 max-height +
-	// 浮動佔位塊，並新增 __desc-wrap / __desc-text / __desc-toggle 三條規則。
 	assert.equal(
 		semanticDigest(profile),
 		"52911b95450e30ec9f9d54d1dc49423005bb02dc9a7fd983928c35c621e4636b",
@@ -143,13 +138,6 @@ test("seller and auth owner CSS preserve the exact reviewed semantic AST", () =>
 		"42faf1c871d1b2f7bdae97031e0200a455c90d808a7b94f6b56c60a6e4739579",
 	);
 	assert.deepEqual(inventory(uiKit), {
-		// 2026-09-10 元件健檢（reviewed）：見 auth-login-style-ownership 同日註記。
-		// 2026-09-12 對比文字 token 新增 3 宣告；owner 順序與 selector 不變。
-		// App input 對齊（reviewed）：3 個 input token 宣告，以及 bordered
-		// dropdown trigger 的 1 個 rule / selector、5 個宣告；owner 順序不變。
-		// 2026-10-27 刪除產地地圖（scope-cut 步驟 1）：整段 LOCATION PICKER MODAL
-		// 與 origin-seller-preview 規則一併移除，-42 rules、-42 selectors、
-		// -201 declarations、-1 media；其餘 owner 不變。
 		styleRules: 242,
 		selectors: 263,
 		declarations: 1067,
@@ -164,9 +152,6 @@ test("seller and auth owner CSS preserve the exact reviewed semantic AST", () =>
 		keyframes: 0,
 	});
 	assert.deepEqual(inventory(profile), {
-		// 2026-09-19 店家簡介可展開（reviewed）：+10 rule／selector、+34 宣告，
-		// 全部屬於新的 __desc-wrap／__desc-text／__desc-toggle 三個 owner，
-		// 其中 2 條落在既有的手機 media query 內（media 數不變）。
 		styleRules: 95,
 		selectors: 95,
 		declarations: 386,
@@ -229,17 +214,6 @@ test("seller and auth owner CSS preserve the exact reviewed semantic AST", () =>
 		...meaningfulNodes(postcss.parse(share)).map(canonicalNode),
 		...uiNodesWithAuth.slice(appBannerIndex).map(canonicalNode),
 	];
-	// 2026-09-10 元件健檢（reviewed）：ui-kit 的 dropdown / datepicker / calendar 觸控與
-	// reduced-motion 調整、下拉色值 token 化、移除已無人用的 .hkui-app-modal* 規則。
-	// Keep the reconstructed owner order and every foreground declaration exact.
-	// 2026-09-10 px→rem for the text-scale setting
-	// 2026-09-10 下拉色值 token 化（見 auth-login-style-ownership 同日註記）。
-	// 2026-09-12 同步已檢視的 danger-text / field-copy 與 4 個 dropdown 文字色。
-	// App input 的 3 個 token、bordered trigger 與 padding selector 排除條件
-	// 同步進入重組基線；auth-login / seller-profile / seller-share-card AST 未變。
-	// 2026-09-19 seller-profile 的店家簡介可展開：新增的 10 條規則落在原本
-	// __desc 的位置，owner 順序與 ui-kit／auth-login／share-card 皆未變。
-	// 2026-10-27 ui-kit 刪除 LOCATION PICKER MODAL 整段（產地地圖）；其餘 owner 與順序未變。
 	assert.equal(
 		digest(reconstructed),
 		"68d3f9221265b7b512546af9acce2ef5ecee6e96a06520ebf9ddc4d6a04dc155",
@@ -274,10 +248,6 @@ test("seller and auth owner CSS preserve the exact reviewed semantic AST", () =>
 				inventory(share).keyframes,
 		},
 		{
-			// 2026-09-19 四檔合計跟著 seller-profile 走：+10 rule／selector、
-			// +34 宣告，與上面單檔的差額相同（唯一的來源就是店家簡介那一刀）。
-			// auth-login 的刪除：-89 rule、-93 selector、-318 宣告，同上面單檔的差額。
-			// 2026-10-27 產地地圖刪除：同上面 ui-kit 單檔的差額。
 			styleRules: 423,
 			selectors: 445,
 			declarations: 1810,
@@ -329,8 +299,6 @@ test("public storefront and seller preview keep the server profile owner", () =>
 		/import "@\/styles\/features\/seller-profile\.css";/,
 	);
 
-	// 公開店面的 layout 是 server component；賣家預覽的外框是 client component（資料讀 GetMyStore），
-	// 兩邊都用同一個 SellerProfileV2。
 	for (const [layoutPath, isClient] of [
 		["app/[locale]/(public)/sellers/[id]/(storefront)/layout.tsx", false],
 		["features/seller-center/preview/SellerStorefrontPreviewFrame.tsx", true],

@@ -31,13 +31,9 @@ bool handleShipmentApiError(BuildContext context, Object e, {String? orderNo}) {
   final bizCode = shipmentBusinessCode(e);
   switch (bizCode) {
     case 5001:
-      // 物流單不存在 — 後端 DB 沒對應物流記錄，是永久狀態（重試沒用）。
-      // 通常發生在：訂單從未建立物流單、或訂單過老物流記錄被 GC 清掉。
       FloatingToast.error(context, '此筆訂單異常（找不到物流資料），請聯絡客服處理');
       return true;
     case 5046:
-      // 物流單建立未滿 30 秒，PayUni 後端尚未同步完
-      // 把 cooldown 也記在前端，下次按按鈕會被 guard 擋住並顯示剩餘秒數
       if (orderNo != null && orderNo.isNotEmpty) {
         markShipmentCreated(orderNo);
         incrementShipmentRetryCount(orderNo);
@@ -60,8 +56,6 @@ bool handleShipmentApiError(BuildContext context, Object e, {String? orderNo}) {
       );
       return true;
     case 5047:
-      // 物流商呼叫進行中（後端跟 PayUni 通訊中），背景會自動補上代碼
-      // 跟 5046 一樣加進 cooldown，避免賣家在 PayUni 回應前反覆點按
       if (orderNo != null && orderNo.isNotEmpty) {
         markShipmentCreated(orderNo);
         incrementShipmentRetryCount(orderNo);
@@ -86,7 +80,6 @@ bool handleShipmentApiError(BuildContext context, Object e, {String? orderNo}) {
       );
       return true;
     case 5048:
-      // 5048 帶業務情境訊息，後端已寫成可顯示文字
       FloatingToast.error(context, e.message);
       return true;
     default:
@@ -100,25 +93,16 @@ bool handleShipmentApiError(BuildContext context, Object e, {String? orderNo}) {
 String friendlyShipmentMessage(Object e) {
   if (e is ApiException) {
     var msg = e.message.trim();
-    // 後端常見格式 "[5xxx] 訊息" → 去掉前綴
     msg = msg.replaceFirst(RegExp(r'^\[\d+\]\s*'), '');
-    // 工程備註括號（如「（PayUni 後端需時間同步資料）」）
     msg = msg.replaceAll(RegExp(r'（[^）]*）'), '').trim();
     return msg.isEmpty ? '操作失敗，請稍後再試' : msg;
   }
   return '操作失敗，請稍後再試';
 }
 
-// ─────────────────────────────────────────────────────────────────
-// 5046 / 5047 防護 — client-side cooldown + 連續失敗偵測
-//
-// 正常流程：物流單建立後 30 秒內後端會回 5046，client 先擋一層避免無謂 API
-// 呼叫。但若連續多次 5046（>=3 次）代表 backend reconcile 真的卡住（如
-// B-143 的 LgsType bug），單純等 30 秒沒用，要提示用戶這是 backend 異常。
-// ─────────────────────────────────────────────────────────────────
 
 const _shipmentCooldownDuration = Duration(seconds: 30);
-const _shipmentBackendStuckThreshold = 3; // 連 3 次 5046 視為 backend 卡住
+const _shipmentBackendStuckThreshold = 3;
 final Map<String, DateTime> _shipmentCreatedAt = {};
 final Map<String, int> _shipment5046Count = {};
 
@@ -144,17 +128,6 @@ void markShipmentCreated(String orderNo) {
   _shipmentCreatedAt[orderNo] = DateTime.now();
 }
 
-// ─────────────────────────────────────────────────────────────────
-// 本地 odno 暫存（B-147 workaround）
-//
-// print_cvs_label API 成功會直接回 odno + validationNo，但緊接著的
-// GET /app/orders list endpoint 沒同步那兩個欄位（後端 read replica 或
-// cache lag），導致卡片按鈕仍判斷 odno 為空 → 顯示「預約取號」。
-//
-// workaround：把 print_cvs_label 回的 odno+validationNo 暫存在 client，
-// 按鈕邏輯優先看這份 override 再 fallback 到 order.odno。
-// 等 B-147 後端修好後可以拿掉這段。
-// ─────────────────────────────────────────────────────────────────
 
 final Map<String, ({String odno, String validationNo})> _localOdnoOverrides =
     {};
@@ -199,7 +172,6 @@ bool isShipmentBackendStuck(String orderNo) =>
 bool guardShipmentCooldown(BuildContext context, String orderNo) {
   if (!isUnderShipmentCooldown(orderNo)) return false;
   final remaining = shipmentCooldownRemainingSeconds(orderNo);
-  // 多次 5046 後改提示 backend 異常，避免用戶以為等 30 秒就行
   if (isShipmentBackendStuck(orderNo)) {
     FloatingToast.show(
       context,

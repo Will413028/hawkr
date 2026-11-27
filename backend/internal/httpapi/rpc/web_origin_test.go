@@ -69,7 +69,6 @@ func TestWebOriginURLRejectsAnythingNotAbsolute(t *testing.T) {
 
 const websiteRoot = "../../../../website"
 
-// websiteRoutes 掃 website/app/[locale] 下每一支 page.tsx，回傳不含語系與 route group 的路由。
 func websiteRoutes(t *testing.T) map[string]bool {
 	t.Helper()
 	root := filepath.Join(websiteRoot, "app", "[locale]")
@@ -151,7 +150,6 @@ func TestOnboardingReturnPagesExistInTheWebsiteRoutes(t *testing.T) {
 	}
 }
 
-// validWebLocale 回報 locale 是不是 sitePrefix 接受的網站語系。
 func validWebLocale(locale string) (uitext.Locale, bool) {
 	l := uitext.Locale(locale)
 	_, err := sitePrefix(l)
@@ -175,7 +173,6 @@ func TestWebLocalesMatchTheWebsiteRouting(t *testing.T) {
 			t.Errorf("語系 %q 的前綴 = %q（%v），website 的 as-needed 路由是 %q", locale, prefix, err, want)
 		}
 	}
-	// 反向：伺服器接受的語系網站都要有。sitePrefix 是 switch、列不出來，所以逐一探測候選語系。
 	site := map[string]bool{}
 	for _, locale := range supported {
 		site[locale] = true

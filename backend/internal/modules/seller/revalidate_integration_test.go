@@ -13,8 +13,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/revalidate"
 )
 
-// revalidations 是目前為止為這家店排入的 website 快取失效數（店家頁的 tag 是 seller:<store_code>；queue 的替身要求排入發生在
-// transaction 內）。
 func (f *fixture) revalidations(s Store) int {
 	f.jobs.mu.Lock()
 	defer f.jobs.mu.Unlock()

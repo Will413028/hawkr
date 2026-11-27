@@ -51,7 +51,6 @@ public class CartGrpcService extends CartServiceGrpc.CartServiceImplBase {
         this.cartService = cartService;
     }
 
-    // ==================== AddItem ====================
 
     @Override
     public void addItem(AddItemRequest request, StreamObserver<AddItemResponse> responseObserver) {
@@ -84,7 +83,6 @@ public class CartGrpcService extends CartServiceGrpc.CartServiceImplBase {
         }
     }
 
-    // ==================== GetCart ====================
 
     @Override
     public void getCart(GetCartRequest request, StreamObserver<GetCartResponse> responseObserver) {
@@ -102,7 +100,6 @@ public class CartGrpcService extends CartServiceGrpc.CartServiceImplBase {
                     ? result.skuCartInfoMap() : Collections.emptyMap();
 
             for (CartService.SellerGroup group : result.groups()) {
-                // 49 §6.6：服務側只填 objectKey，顯示 URL 由 Gateway 組（logo_key enrich 自 SellerMeta，S9 過渡期值可能仍為 URL，Gateway BuildURL passthrough）
                 var groupBuilder = CartSellerGroup.newBuilder()
                         .setStoreId(String.valueOf(group.storeId()))
                         .setSellerName(group.sellerName())
@@ -120,17 +117,13 @@ public class CartGrpcService extends CartServiceGrpc.CartServiceImplBase {
                             .setSkuId(skuIdStr)
                             .setQuantity(String.valueOf(item.getQuantity()))
                             .setName(item.getSkuNameSnapshot())
-                            .setPrice(String.valueOf(item.getAddedUnitPrice()))      // 實際成交單價（特價優先）
-                            .setListPrice(String.valueOf(item.getAddedListPrice()))  // 原價快照
+                            .setPrice(String.valueOf(item.getAddedUnitPrice()))
+                            .setListPrice(String.valueOf(item.getAddedListPrice()))
                             .setStatus(item.getStatus())
                             .setProductId(String.valueOf(item.getProductId()))
                             .setSpecName(item.getSpecNameSnapshot() != null ? item.getSpecNameSnapshot() : "")
                             .setImageKey(imageKey);
 
-                    // 補充即時庫存+配送溫層+可購買性（來自 Product Service 批次查詢）
-                    // 判定鏈：LOOKUP_FAILED (null) → DELISTED (!is_active) → OUT_OF_STOCK (stock<=0)
-                    //        → INSUFFICIENT_STOCK (stock<qty) → OK
-                    // 詳見 ProductPurchasabilityRules + 04 §5.2 + 20 §4.14
                     ProductPurchasabilityRules.Purchasability purchasability;
                     if (skuInfo == null) {
                         itemBuilder.setStockQty("0");
@@ -165,12 +158,10 @@ public class CartGrpcService extends CartServiceGrpc.CartServiceImplBase {
         }
     }
 
-    // ==================== MergeCart ====================
 
     @Override
     public void mergeCart(MergeCartRequest request, StreamObserver<MergeCartResponse> responseObserver) {
         try {
-            // 授權：僅 BUYER 可合併購物車
             GrpcAuthContext.requireAccountType(AccountType.BUYER);
             long buyerId = GrpcAuthContext.requireAccountId();
 
@@ -196,7 +187,6 @@ public class CartGrpcService extends CartServiceGrpc.CartServiceImplBase {
         }
     }
 
-    // ==================== SetItemQuantity ====================
 
     @Override
     public void setItemQuantity(SetItemQuantityRequest request, StreamObserver<SetItemQuantityResponse> responseObserver) {
@@ -229,12 +219,10 @@ public class CartGrpcService extends CartServiceGrpc.CartServiceImplBase {
         }
     }
 
-    // ==================== CheckoutLock ====================
 
     @Override
     public void checkoutLock(CheckoutLockRequest request, StreamObserver<CheckoutLockResponse> responseObserver) {
         try {
-            // 授權：僅 BUYER 可結帳鎖定
             GrpcAuthContext.requireAccountType(AccountType.BUYER);
             long buyerId = GrpcAuthContext.requireAccountId();
 
@@ -263,12 +251,10 @@ public class CartGrpcService extends CartServiceGrpc.CartServiceImplBase {
         }
     }
 
-    // ==================== CheckoutUnlock ====================
 
     @Override
     public void checkoutUnlock(CheckoutUnlockRequest request, StreamObserver<CheckoutUnlockResponse> responseObserver) {
         try {
-            // 授權：僅 BUYER 可解除鎖定
             GrpcAuthContext.requireAccountType(AccountType.BUYER);
             long buyerId = GrpcAuthContext.requireAccountId();
 
@@ -297,7 +283,6 @@ public class CartGrpcService extends CartServiceGrpc.CartServiceImplBase {
         }
     }
 
-    // ==================== RemoveItemsByCheckoutId ====================
 
     @Override
     public void removeItemsByCheckoutId(RemoveItemsByCheckoutIdRequest request,
@@ -333,7 +318,6 @@ public class CartGrpcService extends CartServiceGrpc.CartServiceImplBase {
         }
     }
 
-    // ==================== 工具方法 ====================
 
     /**
      * 解析 owner 身分（設計書 §1.2.1）
@@ -345,7 +329,6 @@ public class CartGrpcService extends CartServiceGrpc.CartServiceImplBase {
         if (buyerId != null) {
             return new OwnerInfo(buyerId, null);
         }
-        // guest flow
         if (guestId == null || guestId.isEmpty()) {
             throw Status.UNAUTHENTICATED
                     .withDescription("未提供有效身分（缺少 account_id 和 guest_id）")

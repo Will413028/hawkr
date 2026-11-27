@@ -53,8 +53,6 @@ func TestDevRoutes_EnvGate(t *testing.T) {
 		if code := do(r, http.MethodGet, "/api/v1/public/caches/flush"); code != http.StatusNotFound {
 			t.Fatalf("GET flush must no longer exist (issue #1397): want 404, got %d", code)
 		}
-		// FlushAllCaches itself will fail (no Redis wired) but that's a 503 from
-		// the handler, not a 404 from the router — proves the route is reachable.
 		if code := do(r, http.MethodPost, "/api/v1/public/caches/flush"); code == http.StatusNotFound {
 			t.Fatalf("POST flush under APP_ENV=dev must be registered, got 404")
 		}

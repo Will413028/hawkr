@@ -15,7 +15,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/text"
 )
 
-// validTarget 驗證去處的形狀（無狀態）：剛好設一個；開新案件的嚴重度要是合法的值。
 func validTarget(t model.CaseTarget) error {
 	switch {
 	case t.Join != nil && t.OpenNew != nil, t.Join == nil && t.OpenNew == nil:
@@ -31,11 +30,6 @@ func validTarget(t model.CaseTarget) error {
 	return nil
 }
 
-// joinCase 依去處決定通報要掛進的案件：existing 是這家店這個類別進行中的案件（呼叫方已鎖住店家列與案件列；沒有時 nil）。去處是意圖，此刻必須仍然成立：
-// 加入（Join）時 existing 必須就是讀到的那個案件、版本也沒有前進；開新案件（OpenNew）時這個類別必須還沒有進行中的案件。不成立回版本衝突（加入不成立時 conflictTarget 是 target_case，開新案件時類別剛有了進行中的案件是
-// category_case_opened），讓使用者重新確認，
-// 不悄悄改成另一個去處。嚴重度以案件為準，加入時不給。created 表示開了新案件（版本 1、updated_at 是現在，不必再 BumpCase）。cases_one_open 是保底：
-// 呼叫方已鎖住店家列，同一家店的分案、移動、結案彼此串行。
 func joinCase(ctx context.Context, q *store.Queries, existing *store.SellerCase, storeID int64, category string, target model.CaseTarget, adminID int64, now time.Time) (joined store.SellerCase, created bool, err error) {
 	if join := target.Join; join != nil {
 		if existing == nil || existing.ID != join.CaseID || existing.Version != join.ExpectedVersion {
@@ -107,7 +101,6 @@ func (s *Service) Triage(ctx context.Context, in model.TriageReportInput) (model
 			CaseID: target.ID, Category: category, Now: now, AdminID: in.AdminID, ID: locked.ID, ExpectedVersion: locked.Version,
 		})
 		if errors.Is(err, pgx.ErrNoRows) {
-			// 已鎖住通報並比對過版本與狀態，走到這裡是程式錯誤；回版本衝突讓呼叫方重讀。
 			return errReportVersion()
 		}
 		if err != nil {

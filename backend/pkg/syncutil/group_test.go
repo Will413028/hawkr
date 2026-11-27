@@ -81,6 +81,4 @@ func TestSafeGo_PanicDoesNotCrashOrBlockCaller(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("f did not complete within 1s — panic may have escaped recovery")
 	}
-	// Reaching here without the test process crashing IS the assertion: a
-	// panic in f must never propagate past SafeGo.
 }

@@ -11,8 +11,6 @@ import { fetchSuggestions } from "@/lib/search/repo";
 export async function GET(request: Request) {
 	const q = new URL(request.url).searchParams.get("q")?.trim() ?? "";
 	if (!q) return Response.json({ suggestions: [] });
-	// This proxy calls the gateway on one visitor's behalf, so it is charged to
-	// that visitor rather than to the site's shared SSR subject (backend#2264).
 	let suggestions: Awaited<ReturnType<typeof fetchSuggestions>>;
 	try {
 		suggestions = await fetchSuggestions(q, getVisitorIp(request), {
@@ -27,8 +25,6 @@ export async function GET(request: Request) {
 	}
 	return Response.json(
 		{ suggestions },
-		// Brief shared cache — keystrokes for the same prefix dedupe at the
-		// CDN/edge without making typeahead feel stale.
 		{ headers: { "cache-control": "public, max-age=30" } },
 	);
 }

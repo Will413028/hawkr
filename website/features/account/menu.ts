@@ -45,8 +45,6 @@ const BASE_BUYER_MENU_ITEMS = [
 	{ label: "通知", href: "/account/notifications", icon: "notifications" },
 	{ label: "個人資料", href: "/account/profile", icon: "profile" },
 	{ label: "收貨地址", href: "/account/addresses", icon: "addresses" },
-	// 追加一律到陣列尾端：BUYER_MENU_GROUPS 用 index 引用本陣列，中間插入會讓
-	// 選單項目變成別的頁面，而且不編譯錯、不測試紅。
 	{
 		label: "發票資料",
 		href: "/account/invoice-profiles",
@@ -78,9 +76,9 @@ const HAWKR_AGENT_MENU_ITEM = {
 } as const satisfies BuyerMenuItem;
 
 export const BUYER_MENU_ITEMS: ReadonlyArray<BuyerMenuItem> = [
-	BASE_BUYER_MENU_ITEMS[0], // 帳號總覽
-	BASE_BUYER_MENU_ITEMS[1], // 我的訂單
-	INVOICE_DOCUMENTS_MENU_ITEM, // 發票與收據（緊接「我的訂單」）
+	BASE_BUYER_MENU_ITEMS[0],
+	BASE_BUYER_MENU_ITEMS[1],
+	INVOICE_DOCUMENTS_MENU_ITEM,
 	...BASE_BUYER_MENU_ITEMS.slice(2),
 	...(HAWKR_AGENT_ENABLED ? [HAWKR_AGENT_MENU_ITEM] : []),
 ];
@@ -101,36 +99,36 @@ export const BUYER_MENU_GROUPS: ReadonlyArray<BuyerMenuGroup> = [
 	{
 		heading: "購物",
 		items: [
-			BASE_BUYER_MENU_ITEMS[0], // 帳號總覽
-			BASE_BUYER_MENU_ITEMS[1], // 我的訂單
-			INVOICE_DOCUMENTS_MENU_ITEM, // 發票與收據
-			BASE_BUYER_MENU_ITEMS[4], // 收藏
-			BASE_BUYER_MENU_ITEMS[5], // 瀏覽紀錄
+			BASE_BUYER_MENU_ITEMS[0],
+			BASE_BUYER_MENU_ITEMS[1],
+			INVOICE_DOCUMENTS_MENU_ITEM,
+			BASE_BUYER_MENU_ITEMS[4],
+			BASE_BUYER_MENU_ITEMS[5],
 			...(HAWKR_AGENT_ENABLED ? [HAWKR_AGENT_MENU_ITEM] : []),
 		],
 	},
 	{
 		heading: "優惠與會員",
 		items: [
-			BASE_BUYER_MENU_ITEMS[2], // 我的優惠券
-			BASE_BUYER_MENU_ITEMS[3], // 會員卡
+			BASE_BUYER_MENU_ITEMS[2],
+			BASE_BUYER_MENU_ITEMS[3],
 		],
 	},
 	{
 		heading: "互動",
 		items: [
-			BASE_BUYER_MENU_ITEMS[6], // 我的評論
-			BASE_BUYER_MENU_ITEMS[7], // 通知
-			BASE_BUYER_MENU_ITEMS[11], // 我的檢舉
-			BASE_BUYER_MENU_ITEMS[12], // 封鎖名單
+			BASE_BUYER_MENU_ITEMS[6],
+			BASE_BUYER_MENU_ITEMS[7],
+			BASE_BUYER_MENU_ITEMS[11],
+			BASE_BUYER_MENU_ITEMS[12],
 		],
 	},
 	{
 		heading: "個人設定",
 		items: [
-			BASE_BUYER_MENU_ITEMS[8], // 個人資料
-			BASE_BUYER_MENU_ITEMS[9], // 收貨地址
-			BASE_BUYER_MENU_ITEMS[10], // 發票資料
+			BASE_BUYER_MENU_ITEMS[8],
+			BASE_BUYER_MENU_ITEMS[9],
+			BASE_BUYER_MENU_ITEMS[10],
 		],
 	},
 ];

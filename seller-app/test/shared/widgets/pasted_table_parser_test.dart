@@ -89,8 +89,6 @@ void main() {
       expect(r!.rows.first.first, '  前後空白  ');
     });
 
-    // 混合內容分離（issue #1246）：網站複製常帶前導敘述行（無 tab），
-    // 不可吞進表格變成錯誤的標題列。
     test('前導無 tab 敘述行 → 進 leadingText，不進表格', () {
       final r = detectPastedTable('經典原味\n成分\t發酵奶油\n產地\t臺灣');
       expect(r, isNotNull);

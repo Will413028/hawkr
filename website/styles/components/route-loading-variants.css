@@ -1,7 +1,4 @@
-/* Variant geometry follows the production owners named below. Media heights
- * remain intrinsic; loading cannot know optional text, images or result counts. */
 
-/* HomePage / HomeCompactCategoryNav / HomeCompactMarketStage / NewArrivals. */
 .route-loading-skeleton--home {
 	padding: 12px 0 56px;
 }
@@ -172,8 +169,6 @@
 		width: 72px;
 	}
 }
-/* Tailwind's max-[...] variants are strict upper bounds. The home wrapper
- * and category-row rules above/below originate in regular CSS instead. */
 @media (width < 1080px) {
 	.route-loading-skeleton__home-stage {
 		grid-template-columns: minmax(0, 1fr);
@@ -203,8 +198,6 @@
 	}
 }
 
-/* SearchClient / SearchForm. The hashtag rail is optional live data and is
- * deliberately not assigned a fictitious fixed height here. */
 .route-loading-skeleton--search {
 	padding: 0 0 88px;
 }
@@ -277,7 +270,6 @@
 		padding-top: 38px;
 	}
 }
-/* .search-box is still authored as an inclusive legacy CSS breakpoint. */
 @media (max-width: 840px) {
 	.route-loading-skeleton--search .route-loading-skeleton__search-bar {
 		height: 124px;
@@ -289,7 +281,6 @@
 	}
 }
 
-/* SellerProfileV2 / seller-profile.css / SellerProductsClient breakpoints. */
 .route-loading-skeleton--seller-storefront {
 	padding: 8px 0 32px;
 }
@@ -459,7 +450,6 @@
 	}
 }
 
-/* CheckoutClient: 1100px inclusive container, 380px summary, lg split. */
 .route-loading-skeleton--checkout {
 	padding: 40px 0 64px;
 }
@@ -526,8 +516,6 @@
 	}
 }
 
-/* LoginShell welcome panel: use its containing flex frame, not an arbitrary
- * capped viewport plus a second centering frame. */
 .route-loading-skeleton--auth {
 	padding: 32px 16px;
 	background: transparent;

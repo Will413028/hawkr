@@ -118,7 +118,6 @@ class ChatThread extends _$ChatThread {
     if (arg.peerId.isEmpty && (arg.conversationId ?? '').isEmpty) {
       throw ArgumentError('chat thread needs a peerId or a conversationId');
     }
-    // 先看列表載入時記下的，沒有再依買家向伺服器取；只有對話 ID 又沒記下時，買家資料留空。
     var conv = _session.conversationFor(
       conversationId: arg.conversationId,
       buyerId: arg.peerId,
@@ -144,21 +143,18 @@ class ChatThread extends _$ChatThread {
       buyer: conv?.buyer,
     );
     _session.client.noteSeq(convId, data.lastSeq);
-    // build 回傳之後 state 才有值，所以下一輪事件迴圈再標已讀。
     unawaited(Future<void>(markRead));
     return data;
   }
 
   String? get conversationId => state.value?.conversationId;
 
-  // ── 事件 ───────────────────────────────────────────────────────────────
 
   void _onEvent(ChatStreamEvent e) {
     final data = state.value;
     final conv = data?.conversationId;
     if (data == null) return;
     if (conv == null) {
-      // 對話還不存在時開著這頁：買家（或另一台裝置）送出第一則訊息後對話才出現，認得是這個買家的就接上。
       if (e case ChatMessageArrived(:final message)) {
         unawaited(_adoptConversation(message));
       }
@@ -214,7 +210,6 @@ class ChatThread extends _$ChatThread {
       _session.client.noteSeq(found.id, m.seq);
       _checkGap(m);
     } on Object {
-      // 認不出來就維持空對話；之後的事件會再試。
     } finally {
       _adopting = false;
     }
@@ -246,7 +241,6 @@ class ChatThread extends _$ChatThread {
       }
       _session.client.noteSeq(conv, state.value?.contiguousLastSeq ?? 0);
     } on Object {
-      // 補洞失敗不蓋掉畫面上已有的訊息；下一次事件或重連會再補。
     } finally {
       _fillingGap = false;
     }
@@ -277,7 +271,6 @@ class ChatThread extends _$ChatThread {
     return [...sent, ...local];
   }
 
-  // ── 公開操作 ───────────────────────────────────────────────────────────
 
   /// 重新載入（錯誤畫面的「重試」）。
   Future<void> reload() async {

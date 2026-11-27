@@ -26,7 +26,6 @@ test.describe("navbar reach on the narrowest phone", { tag: ["@ui"] }, () => {
 			try {
 				sessionStorage.setItem("hawkr:initial-loader-seen", "1");
 			} catch {
-				// ignore strict-mode browsers
 			}
 		});
 		await installProviderMocks(page);
@@ -36,10 +35,7 @@ test.describe("navbar reach on the narrowest phone", { tag: ["@ui"] }, () => {
 		page,
 		isMobile,
 	}) => {
-		// 這支量的是手機：桌機瀏覽器縮到 393px 會有 15px 的常駐捲軸吃掉寬度，
-		// 手機的捲軸是浮在內容上的，所以只在 mobile project 跑。
 		test.skip(!isMobile, "只量手機（浮動捲軸）的寬度");
-		// 登入狀態是 HttpOnly 的 session cookie（ADR 2026-10-30-identity-self-hosted-federated-login）：session: "identity" 直接讓瀏覽器帶著 cookie 進站並 mock GetSession。
 		await setupGatewayMocks(page, { identity: BUYER, session: "identity" });
 
 		await page.goto("/");
@@ -47,9 +43,6 @@ test.describe("navbar reach on the narrowest phone", { tag: ["@ui"] }, () => {
 		const trigger = page.getByTestId("account-menu-trigger");
 		await expect(trigger).toBeVisible();
 
-		// Visible is not reachable: assert the box is inside the viewport before
-		// trusting a click, so a failure names the geometry instead of timing out
-		// on an element Playwright reports as visible, enabled and stable.
 		const box = await trigger.boundingBox();
 		expect(box).not.toBeNull();
 		const viewport = page.viewportSize();
@@ -62,15 +55,12 @@ test.describe("navbar reach on the narrowest phone", { tag: ["@ui"] }, () => {
 			"account menu extends past the right edge of the viewport",
 		).toBeLessThanOrEqual(viewport?.width ?? Number.NaN);
 
-		// The nav clips its own overflow, so a cluster wider than the viewport is
-		// unreachable even though nothing about it looks broken.
 		const navOverflow = await page.evaluate(() => {
 			const nav = document
 				.querySelector('[data-testid="account-menu-trigger"]')
 				?.closest("header, nav");
 			return nav ? nav.scrollWidth - nav.clientWidth : -1;
 		});
-		// 溢出時列出超出右緣的元素，失敗訊息直接指出是誰撐寬的。
 		const overflowing = await page.evaluate(() => {
 			const nav = document
 				.querySelector('[data-testid="account-menu-trigger"]')

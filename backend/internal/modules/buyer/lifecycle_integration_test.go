@@ -155,13 +155,13 @@ func TestSubscriberStatsCountsEachWindowHalfOpenForTheStore(t *testing.T) {
 		at    time.Time
 		store int64
 	}{
-		{previous.Start.Add(-time.Second), 20}, // 兩個窗之外
-		{previous.Start, 20},                   // 前期起點：前期
-		{start.Add(-time.Second), 20},          // 前期終點前一秒：前期
-		{start, 20},                            // 當期起點：當期
-		{end.Add(-time.Second), 20},            // 當期終點前一秒：當期
-		{end, 20},                              // 當期終點：窗外
-		{start.Add(time.Hour), 21},             // 別家店
+		{previous.Start.Add(-time.Second), 20},
+		{previous.Start, 20},
+		{start.Add(-time.Second), 20},
+		{start, 20},
+		{end.Add(-time.Second), 20},
+		{end, 20},
+		{start.Add(time.Hour), 21},
 	} {
 		fixture.now = follow.at
 		buyer := profile(t, fixture, int64(index+1))
@@ -173,13 +173,11 @@ func TestSubscriberStatsCountsEachWindowHalfOpenForTheStore(t *testing.T) {
 	if got.Total != 6 || len(got.New) != 2 || got.New[0] != 2 || got.New[1] != 2 {
 		t.Fatalf("stats=%+v, want total 6 and new [2 2] in request order", got)
 	}
-	// 窗的順序就是回傳的順序，也可以重疊與重複。
 	got, err = fixture.module.SubscriberStats(ctx, 20, []TimeWindow{previous, current, {Start: previous.Start, End: end}, previous})
 	must(t, err)
 	if got.Total != 6 || len(got.New) != 4 || got.New[0] != 2 || got.New[1] != 2 || got.New[2] != 4 || got.New[3] != 2 {
 		t.Fatalf("overlapping windows: %+v", got)
 	}
-	// 沒有追蹤的區間是 0，不是沒有列；沒有粉絲的店總數也是 0。
 	got, err = fixture.module.SubscriberStats(ctx, 20, []TimeWindow{{Start: end.AddDate(0, 0, 7), End: end.AddDate(0, 0, 14)}})
 	must(t, err)
 	if got.Total != 6 || len(got.New) != 1 || got.New[0] != 0 {

@@ -67,8 +67,6 @@ function valueFieldText(carrierType: string) {
 		case InvoiceCarrierType.DONATION:
 			return INVOICE_CARRIER_FIELD_TEXT.donation;
 		default:
-			// 前端還不認得的型別（含 TAX_ID，它不用這一欄）。用碼表名稱當 label，
-			// 讓畫面仍然可用而不是空白。
 			return {
 				label: invoiceCarrierLabel(carrierType),
 				placeholder: "",
@@ -119,7 +117,6 @@ export function InvoiceProfileForm({
 	const [setDefault, setSetDefault] = React.useState(false);
 	const [touched, setTouched] = React.useState<Record<string, boolean>>({});
 
-	// 編輯模式的類型來自那筆資料（不可變更）；新增模式來自使用者選擇。
 	const activeType = editing ? profile.carrierType : carrierType;
 	const isTaxId = activeType === InvoiceCarrierType.TAX_ID;
 	const fieldText = valueFieldText(activeType);
@@ -149,7 +146,6 @@ export function InvoiceProfileForm({
 		if (!canSubmit) return;
 		onSubmit({
 			carrierType: activeType as InvoiceCarrierTypeValue,
-			// TAX_ID 的 `value` 必須為空，後端靠「哪幾欄是空的」判形狀。
 			value: isTaxId ? "" : value.trim(),
 			buyerTaxId: isTaxId ? buyerTaxId.trim() : "",
 			buyerName: isTaxId ? buyerName.trim() : "",
@@ -260,8 +256,7 @@ export function InvoiceProfileForm({
 				onChange={(event) => setLabel(event.target.value)}
 			/>
 
-			{/* 端點 3 沒有 setDefault（預設由 supersede 繼承），所以編輯模式不給這個
-			    選項——給了就是宣稱一個送不出去的意圖。改預設走清單列的「設為預設」。 */}
+
 			{editing ? null : (
 				<label className="inline-flex items-start gap-2 text-sm text-foreground-muted cursor-pointer select-none">
 					<input

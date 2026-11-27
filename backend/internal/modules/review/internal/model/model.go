@@ -45,7 +45,6 @@ const (
 	ReasonModerationRejected Reason = "MODERATION_REJECTED"
 )
 
-// reasoned 把業務原因附在 apperr 的錯誤上；Unwrap 讓 apperr.KindOf 與 errors.As(*apperr.Error) 照常運作。
 type reasoned struct {
 	err    *apperr.Error
 	reason Reason

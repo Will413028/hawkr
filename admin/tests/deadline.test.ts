@@ -134,7 +134,6 @@ test("沒有開始時間，或開始時間不早於期限：不轉 warning（算
 	);
 });
 
-// 伺服器給的 Deadline{startTime, dueTime} 的顯示：開始時間就是 startTime，絕對時間是台北的日期時間。
 test("deadlineView：未逾期、逾期 danger、沒有期限是「-」；開始時間用 startTime 算四分之一", () => {
 	const at = (ms: number) => timestampFromDate(new Date(NOW_MS + ms));
 	const now = new Date(NOW_MS);

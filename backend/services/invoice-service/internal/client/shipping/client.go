@@ -111,9 +111,6 @@ func (c *Client) BatchGetShipmentStatus(ctx context.Context, orderNos []string) 
 		if orderNo == "" {
 			continue
 		}
-		// 一張訂單可能有多筆物流單（退貨便會再開一張）。**取最後一筆**與
-		// shipping-service 的回傳順序綁定過緊，所以這裡的規則寫死：
-		// 已存在就不覆寫 ⇒ 取第一筆，與 GetShipmentByOrderNo 的單筆語意一致。
 		if _, dup := out[orderNo]; dup {
 			continue
 		}

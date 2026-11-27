@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-// next.config.ts reads its env when it is evaluated, so each case loads it under its own env.
 (process.env as Record<string, string>).NODE_ENV = "production";
 process.env.NEXT_PUBLIC_MEDIA_BASE_URL = "https://media.example.org";
 process.env.NEXT_PUBLIC_API_BASE_URL = "https://api.example.org/api/v1";

@@ -10,18 +10,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// ---------------------------------------------------------------------------
-// 冪等鍵（#3015 裁決 A，DEC-20260902-163404）
-//
-// 🔴 **本檔的每一支都必須在業務寫入的同一個 transaction 內呼叫。**
-// 那是整個機制唯一的正確性來源：分開寫等於在兩次寫入之間留一個窗口，
-// 而那正是它要消滅的東西。
-//
-// 與 gateway 那一層（PR #3025）的分工：
-//   gateway  —— 單一 process 的重放快取，跨 pod 不生效（prod replicas: 2 ⇒ 約一半）
-//   本層     —— 耐久保證，「同一把鍵絕不產生第二筆」
-// 兩者不是二選一：gateway 那層讓多數重送連下游都不用打，本層負責它漏掉的那些。
-// ---------------------------------------------------------------------------
 
 // 冪等作用域。**一個端點一個常數**，不要共用字串：
 // 共用會讓前端對整個頁面用同一把鍵時，A 端點的請求擋住 B 端點的。
@@ -82,9 +70,6 @@ func ClaimIdempotency(ctx context.Context, repo domain.IdempotencyRepository,
 		return IdempotencyOutcome{}, ErrIdempotencyKeyReused
 	}
 	if rec.ResultRef == nil {
-		// 已認領但結果還沒補上。同交易的中間狀態正常讀不到這一格；
-		// 讀到代表第一次的交易失敗後留下了紀錄（不該發生）或有人在交易外呼叫。
-		// 回「第一次」讓業務寫入自己的唯一鍵去擋，比回放一個不存在的結果安全。
 		return IdempotencyOutcome{FirstTime: true}, nil
 	}
 	return IdempotencyOutcome{ResultRef: *rec.ResultRef}, nil

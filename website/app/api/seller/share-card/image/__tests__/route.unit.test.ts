@@ -50,9 +50,7 @@ describe("share-card image proxy host allowlist", () => {
 		"https://evil.example/public/seller/1/logo.jpg",
 		"https://media.example.org.evil.example/a.jpg",
 		"https://evil-media.example.org/a.jpg",
-		// the origin's scheme is part of the match
 		"http://media.example.org/public/seller/1/logo.jpg",
-		// another media-looking host is not ours unless it is the configured one
 		"https://test-media.example.com/public/seller/1/logo.jpg",
 		"https://media.example.com/public/seller/1/logo.jpg",
 	])("rejects %s with 400 and never fetches upstream", async (url) => {

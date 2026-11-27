@@ -20,7 +20,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
 )
 
-// get 以 token 打 path，回傳狀態碼。
 func (f *fixture) get(t *testing.T, path, tok string) int {
 	t.Helper()
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, f.url+path, nil)
@@ -39,7 +38,6 @@ func (f *fixture) get(t *testing.T, path, tok string) int {
 	return resp.StatusCode
 }
 
-// post 以 token 呼叫一支 Connect 方法（JSON 空訊息），回傳狀態碼與 Connect 的錯誤碼（成功時空字串）。
 func (f *fixture) post(t *testing.T, procedure, tok string) (int, string) {
 	t.Helper()
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, f.url+procedure, strings.NewReader("{}"))
@@ -106,7 +104,6 @@ func TestAdminWithoutRolesIsDeniedEverywhereExceptTheExemptions(t *testing.T) {
 		t.Fatalf("零角色的管理員被轉發了 %d 次", n)
 	}
 
-	// 沒有管理員 principal：照舊轉發。
 	if got := f.get(t, "/api/v1/public/stores", ""); got != http.StatusNoContent {
 		t.Errorf("沒有 token = %d", got)
 	}
@@ -140,7 +137,6 @@ func TestOwnerPassesEveryCheckAndRevocationTakesEffectOnTheNextRequest(t *testin
 	if _, err := admin.ListAccounts(ctx, connect.NewRequest(&adminpb.ListAccountsRequest{})); err != nil {
 		t.Fatalf("OWNER 的 ListAccounts = %v", err)
 	}
-	// 檔案路由過了權限的檢查（不合法的申請 ID 由 handler 回 404）。
 	if got := f.get(t, kycDocument, tok); got != http.StatusNotFound {
 		t.Errorf("OWNER 讀 /api/files/admin = %d，預期通過檢查後由 handler 回 404", got)
 	}

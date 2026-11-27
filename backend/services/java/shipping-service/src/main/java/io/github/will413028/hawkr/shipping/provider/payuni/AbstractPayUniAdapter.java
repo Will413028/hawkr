@@ -78,15 +78,12 @@ public abstract class AbstractPayUniAdapter implements FulfillmentProviderAdapte
         return orderNo + "-Refund";
     }
 
-    // ── track：主動回查 ────────────────────────────────────────────────
     private final TrackCapability trackCapability = new TrackCapability() {
         @Override
         public TrackResult query(ShipmentEntity shipment) {
             QueryShipmentResponse resp = queryProvider(shipment);
 
             if (!resp.isSuccess()) {
-                // provider 明確回失敗：不是「未知狀態」，是這次查詢沒成功。
-                // 兩者要分開——把查詢失敗當成未知狀態，會讓 provider 短暫故障變成資料污染。
                 log.warn("PayUniAdapter.query.failed",
                         "PayUni 查詢失敗", "message", String.valueOf(resp.apiResponse().message()));
                 return new TrackResult(null, null, resp.apiResponse().message(), null);
@@ -94,10 +91,6 @@ public abstract class AbstractPayUniAdapter implements FulfillmentProviderAdapte
 
             String raw = resp.shipStatus();
             ShippingStatus normalized = statusMapper.mapPayUniStatus(raw);
-            // 🔴 normalized 為 null ＝ provider 回了一個映射表不認得的值。
-            //    這裡**照樣把 raw 帶回去**——呼叫端要保存它、要告警、但不推進狀態機。
-            //    舊實作在這一格是 `log.warn(...); return entity;`：raw 值沒有落庫、沒有指標，
-            //    於是「PayUni 新增了一個狀態碼」這件事在系統裡完全沒有痕跡。
             return new TrackResult(
                     normalized == null ? null : normalized.value(),
                     raw,
@@ -151,37 +144,18 @@ public abstract class AbstractPayUniAdapter implements FulfillmentProviderAdapte
         return Map.of();
     }
 
-    // ── inbound：貨態 Notify 的解析與正規化 ──────────────────────────────
     private final InboundCapability inboundCapability = new InboundCapability() {
         @Override
         public InboundStatusEvent parseStatusEvent(InboundPayload payload) {
-            // 🔴 PayUni 是 form-encoded provider ⇒ 只讀 formParams()，rawBody 為 null（ADR-012）。
-            //    ⚠️ 參數名不叫 raw：本方法內的 `String raw` 是 PayUni 的貨態原生值，兩者不同東西。
             Map<String, String> rawPayload = payload.formParams();
-            // 🔴 欄名取自 PayUni 官方文件的貨態 Notify 欄位表
-            //    （docs/第三方整合/PayUni 物流官方 API 總覽.md：ShipStatus／ShipStatusDesc／ShipStatusTime）。
-            //    ⚠️ 2026-09-10 修正：原本讀的是 "Message" 與 "StatusTime"，**PayUni 沒有這兩個欄位**。
-            //    在 inbound() 還是死碼的期間，這個錯誤完全看不出來——沒有任何呼叫端，
-            //    也沒有任何測試拿真實形狀的 payload 餵過它。接上 consumer 的那一刻，
-            //    症狀會是 provider_message 與 provider_status_time **靜默全空**。
             String raw = rawPayload.get("ShipStatus");
             String message = rawPayload.get("ShipStatusDesc");
             LocalDateTime at = parseProviderTime(rawPayload.get("ShipStatusTime"));
             if (raw == null || raw.isBlank()) {
-                // 🔴 **沒有 ShipStatus 不等於「未知貨態」**——那是另一種事件。
-                //    上游 EventKeyBuilder 的註解逐字寫著：
-                //    「建單回傳無 ShipStatus（有 TradeStatus），貨態回傳有 ShipStatus」
-                //    ⇒ 帶 TradeStatus 的是**建單結果回報**，它根本不是貨態轉移事件。
-                //
-                //    2026-09-10 dev 實測到的後果：把它當成未知貨態，會讓呼叫端把
-                //    `provider_status` 寫成 null ——**覆蓋掉原本存著的 provider 證據**。
-                //    （eventKey=HAWK…:S0011789042138064014:STATUS:0，payload 只有 TradeStatus。）
-                //    raw 回 null 讓呼叫端分辨得出「沒有東西可保存」與「有值但看不懂」。
                 return InboundStatusEvent.unknown(null, message, at);
             }
             ShippingStatus normalized = statusMapper.mapPayUniStatus(raw);
             if (normalized == null) {
-                // fail-closed：可查詢的未知，不是例外也不是靜默放行
                 return InboundStatusEvent.unknown(raw, message, at);
             }
             return new InboundStatusEvent(Optional.of(normalized.value()), raw, message, at);
@@ -205,30 +179,12 @@ public abstract class AbstractPayUniAdapter implements FulfillmentProviderAdapte
         @Override
         public String dedupKey(InboundPayload raw) {
             Map<String, String> rawPayload = raw.formParams();
-            // PayUni 的去重鍵：商家代號 + 物流單號 + **事件種類** + 該種類的鑑別欄位。
-            //
-            // 🔴 2026-09-10（BLOCKER 4）修正：舊版一律讀 `ShipStatus`，
-            //    而 Print 回調的 payload **沒有這個欄位** ⇒ `String.valueOf(null)` 產出
-            //    字面字串 "null" ⇒ 同一張單的每一則 Print 回調共用同一個鍵
-            //    （而且會與「ShipStatus 缺失的貨態事件」撞鍵）。
-            //    直接把 consumer 換成呼叫本方法，會把「Print 只處理得到第一則」變成新的 bug。
-            //
-            // ⚠️ 這裡刻意與上游 payuni-webhook-service 的 EventKeyBuilder 對齊
-            //    （STATUS/PRINT 前綴分離）——兩邊算出來的鍵形狀必須一致，
-            //    否則同一則事件在 inbox 與 shipping 的去重表上會被當成兩件事。
-            // 🔴 缺欄一律回空字串，**不是** String.valueOf(null) 的字面 "null"。
-            //    上游 EventKeyBuilder 逐字用 payload.getOrDefault(欄名, "")；
-            //    兩邊對「缺欄」給出不同字面值 ⇒ 同一則事件在 inbox 與 shipping 算出不同的鍵，
-            //    而症狀是「有時會重複處理」這種難重現的形狀。
             String merId = rawPayload.getOrDefault("MerID", "");
             String tradeNo = rawPayload.getOrDefault("ShipTradeNo", "");
             if (isPrintEvent(rawPayload)) {
                 return String.join(":", merId, tradeNo, "PRINT",
                         rawPayload.getOrDefault("Odno", ""));
             }
-            // 🔴 與上游 EventKeyBuilder 逐字對齊：ShipStatus 缺就退 TradeStatus。
-            //    不對齊的話，同一則事件在 inbox（上游）與 shipping（本地）算出不同的鍵
-            //    ⇒ 去重各算各的，而症狀是「有時會重複處理」這種難重現的形狀。
             String statusValue = rawPayload.getOrDefault("ShipStatus", "");
             if (statusValue == null || statusValue.isBlank()) {
                 statusValue = rawPayload.getOrDefault("TradeStatus", "");

@@ -7,7 +7,6 @@ import { formatTaipeiDateTime } from "@/lib/date/taipei";
 
 function formatDateTime(raw?: string): string {
 	if (!raw) return "";
-	// 解不出來就把原字串照登（沿用本卡片原本的行為）。
 	return formatTaipeiDateTime(raw) || raw;
 }
 

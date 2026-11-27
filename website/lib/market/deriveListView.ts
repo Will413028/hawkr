@@ -96,9 +96,6 @@ export function deriveMarketListView(
 ): MarketListView {
 	const { categoryList, trendingHashtags } = data;
 
-	// Merge legacy `category` + multi-select `categories` (csv), dedupe. Values
-	// may be stable ids or names from older links; canonicalisation happens once
-	// the category tree has loaded.
 	const requestedCategories: string[] = (() => {
 		const list: string[] = [];
 		const seen = new Set<string>();
@@ -124,7 +121,6 @@ export function deriveMarketListView(
 		rawTab === "follow" || rawTab === "nearby" ? rawTab : "recommend";
 	const isFollowTab = currentTab === "follow";
 
-	// Preserve other query params when changing one filter dimension.
 	const buildHref = (overrides: Record<string, string | undefined>) => {
 		const next = new URLSearchParams();
 		const merged = { ...params, ...overrides } as Record<
@@ -146,8 +142,6 @@ export function deriveMarketListView(
 		return buildHref({ hashtags: next.length ? next.join(",") : undefined });
 	};
 
-	// New category-picker writes stable ids. Older links that carry names are
-	// canonicalised here after the tree arrives, so both schemas keep working.
 	const currentCategories = normaliseCategorySelections(
 		categoryList,
 		requestedCategories,
@@ -159,7 +153,6 @@ export function deriveMarketListView(
 			currentHashtags.length ||
 			currentQuery,
 	);
-	// Resolve every selection token to a backend id, drop nulls, join as CSV.
 	const categoryIdCsv: string | undefined = (() => {
 		if (!currentCategories.length) return undefined;
 		const ids: string[] = [];
@@ -210,7 +203,6 @@ export function deriveMarketListView(
 		active: currentHashtags.includes(tag.name),
 	}));
 
-	// Applied chips — order preserved: keyword → category → price → hashtags.
 	const appliedChips: AppliedChip[] = [];
 	if (currentQuery) {
 		appliedChips.push({

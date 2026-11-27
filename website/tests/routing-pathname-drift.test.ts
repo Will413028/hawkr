@@ -49,7 +49,6 @@ test("routingPathname is the path next-intl rewrites: unprefixed (default locale
 		"/en/products/1",
 		"/account/orders/%44F-1",
 	]) {
-		// compared in URL form: the rewrite is a URL, `routingPathname` is a decoded path
 		const expected = new URL(expectedTarget(path), "http://localhost").pathname;
 		assert.equal(rewriteTarget(path), expected, path);
 	}

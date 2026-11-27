@@ -15,7 +15,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// 以下是代行營運（設計書 56）的共用定義：參數、封閉的值域與業務拒絕。
 
 // 代行的參數：常數，不是環境變數，沒有任何部署需要不同的值。TTL 的上限同時是 DB 的 CHECK
 // （delegated_operation_sessions_lifetime_check），閒置逾時必須小於 TTL 的上限。
@@ -30,9 +29,7 @@ const (
 	// DelegationAuditRetentionDays 是畫面顯示的稽核保留天數（DELEGATION_AUDIT_RETENTION_DAYS）。只下發給畫面，
 	// 沒有清理：設計書的清理是維運 SQL，系統沒有上線、也沒有會過期的資料（見沿用盤點）。
 	DelegationAuditRetentionDays = 730
-	// delegationMaxBatch 是稽核批次的筆數上限（設計書 56 §7.2.8），與分頁的上限同值。
 	delegationMaxBatch = 50
-	// 分頁：舊契約是 page、page_size 加 total（OFFSET）。
 	delegationDefaultPageSize = 20
 	delegationMaxPageSize     = 50
 )
@@ -83,8 +80,6 @@ type DelegationReasonOption struct {
 	CaseReferenceRequired bool
 }
 
-// delegationReasons 是CodeMeta 的 DelegationReasonCode 登錄的表，順序即顯示順序。三個都要案件編號（#2749：平台維護原本豁免，
-// 找不到任何理由；要推翻只改那一格）。標籤原本在 CodeMeta 的 DelegationReasonCode，隨代行的資料搬進 delegation。
 var delegationReasons = []DelegationReasonOption{
 	{Code: ReasonSellerRequest, Label: "賣家請求（管理員記錄）", CaseReferenceRequired: true},
 	{Code: ReasonPlatformMaintenance, Label: "平台維護", CaseReferenceRequired: true},
@@ -184,7 +179,6 @@ const (
 	DenialStoreClosed
 )
 
-// newError 依拒絕的類別用 apperr 各分類的建構函式建立給新契約的傳輸層用的錯誤；沒有列出的拒絕是 failed_precondition。
 func (d DelegationDenial) newError(format string, args ...any) *apperr.Error {
 	switch d {
 	case DenialInvalidCommand:
@@ -362,19 +356,17 @@ func SameCapabilitySet(a, b []Capability) bool {
 	return slices.Equal(x, y)
 }
 
-// ---- credential 與 handoff code（backend/docs/modules/delegation.md §3） ----
 
 const (
 	HandoffPrefix    = "dhof_"
 	CredentialPrefix = "dops_"
-	// tokenLength 是 5 字的前綴加 32 bytes 的 base64url（43 字）。
 	tokenLength = 48
 )
 
 // NewHandoffCode 產生一次性的 handoff code。
 func NewHandoffCode() string {
 	b := make([]byte, 32)
-	_, _ = rand.Read(b) // crypto/rand.Read 不會失敗
+	_, _ = rand.Read(b)
 	return HandoffPrefix + base64.RawURLEncoding.EncodeToString(b)
 }
 
@@ -401,8 +393,6 @@ func WellFormedToken(s, prefix string) bool {
 	return err == nil
 }
 
-// display_code：OPS- 加 13 碼 0-9A-Z（約 67 bit），CSPRNG 產生，與 ID 無關（ADR 2026-09-25-row-identity-by-data-kind
-// D1）。唯一由 UNIQUE index 保證，撞到時換一個重試（機率可以忽略，但寫入要能收斂）。
 const displayCodeAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 func NewDisplayCode() string {
@@ -412,7 +402,6 @@ func NewDisplayCode() string {
 	for len(out) < cap(out) {
 		_, _ = rand.Read(buf[:])
 		for _, b := range buf {
-			// 252 = 36 × 7：丟掉尾端的值，每個字元的機率才相同。
 			if b < 252 && len(out) < cap(out) {
 				out = append(out, displayCodeAlphabet[b%36])
 			}
@@ -421,8 +410,6 @@ func NewDisplayCode() string {
 	return string(out)
 }
 
-// denialBizCodes 是每一種拒絕的舊業務碼（設計書 56 §6.5.1 的 9260–9299），只服務舊 gateway 的回應與稽核清單的舊欄位（過渡邊界，A10 刪除）；
-// 新路徑的稽核列存 failure_reason 的代碼，不存這組數字。每一種拒絕都要有（TestEveryDenialHasABusinessCode）。
 var denialBizCodes = map[DelegationDenial]int32{
 	DenialInvalidCommand:             9260,
 	DenialAdminRequired:              9261,
@@ -448,8 +435,6 @@ var denialBizCodes = map[DelegationDenial]int32{
 // DenialBizCodes 回傳拒絕對應的業務碼表的副本。
 func DenialBizCodes() map[DelegationDenial]int32 { return maps.Clone(denialBizCodes) }
 
-// denialCodes 是每一種拒絕寫進稽核列 failure_reason 的代碼（UPPER_SNAKE）。與 apperr 的 Reason 共用同一個欄位，所以名稱不得與
-// proto 的 ErrorReason 值名相同（TestDenialCodesAreDistinctFromErrorReasons）。每一種拒絕都要有（TestEveryDenialHasAFailureCode）。
 var denialCodes = map[DelegationDenial]string{ //nolint:gosec // G101 false positive: CREDENTIAL_INVALID is a denial code name, not a secret
 	DenialInvalidCommand:             "INVALID_COMMAND",
 	DenialAdminRequired:              "ADMIN_REQUIRED",

@@ -130,23 +130,18 @@ class CouponGrpcServiceTargetAccountLookupTest {
                 .build();
         when(accountGrpcClient.batchGetAccountInfo(List.of(resolvedAccountId)))
                 .thenReturn(Map.of(resolvedAccountId, resolvedInfo));
-        // 名字走 buyer-service（#2830）：accounts 表沒有 nickname 欄位，
-        // AccountInfo.nickname 在 production 對每一位收券人都是空字串。
         when(buyerGrpcClient.batchGetBuyerDisplayByBuyerIds(List.of(divergedBuyerId)))
                 .thenReturn(Map.of(divergedBuyerId, BuyerDisplay.newBuilder()
                         .setDisplayName("阿明").build()));
 
         SellerGetTemplateDetailResponse response = invoke(newService());
 
-        // 核心斷言：查帳號資訊必須用反查後的 account_id，不能用原始 buyer_id 當主鍵
         verify(accountGrpcClient).batchGetAccountInfo(List.of(resolvedAccountId));
         verify(accountGrpcClient, never()).batchGetAccountInfo(List.of(divergedBuyerId));
 
         assertEquals(1, response.getData().getTargetAccountsList().size());
         TargetAccountInfo target = response.getData().getTargetAccounts(0);
-        // buyer_id 欄位維持原樣（這部分既有邏輯已正確）
         assertEquals(String.valueOf(divergedBuyerId), target.getBuyerId());
-        // nickname/phone 必須來自反查後的帳號資訊，不能因主鍵對不上而靜默回空字串
         assertEquals("阿明", target.getNickname());
         assertEquals("0912345678", target.getPhone());
     }
@@ -159,10 +154,8 @@ class CouponGrpcServiceTargetAccountLookupTest {
         when(templateService.getActiveTemplate(TEMPLATE_ID)).thenReturn(designatedTemplate());
         when(instanceService.countByTemplateAndStatus(eq(TEMPLATE_ID), anyString())).thenReturn(0);
         when(targetAccountMapper.selectBuyerIdsByTemplateId(TEMPLATE_ID)).thenReturn(List.of(buyerId));
-        // 舊 buyer-service 會把輸入回填進 principals，unresolved_ids 才是真相：兩種形狀都不得查帳號。
         when(buyerGrpcClient.resolvePrincipals(List.of(buyerId)))
                 .thenReturn(PrincipalResolution.of(Map.of(buyerId, buyerId), List.of(buyerId)));
-        // 若實作拿 buyer_id 去查，這個 account 剛好存在，電話就會洩漏給別人。
         when(accountGrpcClient.batchGetAccountInfo(List.of(buyerId)))
                 .thenReturn(Map.of(buyerId, AccountInfo.newBuilder().setAccountId(buyerId).setPhone("0987654321").build()));
         when(buyerGrpcClient.batchGetBuyerDisplayByBuyerIds(List.of(buyerId)))
@@ -210,10 +203,8 @@ class CouponGrpcServiceTargetAccountLookupTest {
         when(templateService.getActiveTemplate(TEMPLATE_ID)).thenReturn(designatedTemplate());
         when(instanceService.countByTemplateAndStatus(eq(TEMPLATE_ID), anyString())).thenReturn(0);
         when(targetAccountMapper.selectBuyerIdsByTemplateId(TEMPLATE_ID)).thenReturn(List.of(deletedBuyerId));
-        // 已註銷買家：不是存活的 stint，沒有解析到帳號。
         when(buyerGrpcClient.resolvePrincipals(List.of(deletedBuyerId)))
                 .thenReturn(PrincipalResolution.of(Map.of(), List.of(deletedBuyerId)));
-        // 但 buyer-service 的 Display RPC 仍解得出來，回墓碑字串。
         when(buyerGrpcClient.batchGetBuyerDisplayByBuyerIds(List.of(deletedBuyerId)))
                 .thenReturn(Map.of(deletedBuyerId, BuyerDisplay.newBuilder()
                         .setDisplayName("已刪除帳號").setDeleted(true).build()));
@@ -238,10 +229,6 @@ class CouponGrpcServiceTargetAccountLookupTest {
         long accountId = 8803L;
         when(buyerGrpcClient.resolvePrincipals(List.of(buyerId))).thenReturn(PrincipalResolution.allResolved(Map.of(buyerId, accountId)));
 
-        // 刻意讓兩邊給出**不同**的名字：只有讀對來源才會拿到 buyer-service 那個。
-        // 舊碼讀 AccountInfo.nickname —— 那個欄位在 production 從不被填
-        // （accounts 表無此欄，domain.Account 無此欄，toAccountInfo 不設它），
-        // 但單元測試的 mock 填得出來，於是「名字會顯示」這個假象被測試釘住了。
         when(accountGrpcClient.batchGetAccountInfo(List.of(accountId))).thenReturn(Map.of(accountId,
                 AccountInfo.newBuilder().setAccountId(accountId)
                         .setNickname("這個值在 production 永遠不存在")

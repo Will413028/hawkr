@@ -266,7 +266,6 @@ final _evidenceField = RegExp(r'^evidence_staged_tokens\[(\d+)\]');
 MeasureRequestResult _fieldsResult(SubmitFields failure) {
   final onReason = fieldMessage(failure.fields, const ['reason']);
   final onEvidence = <int, String>{};
-  // 整個欄位的錯誤只認沒有索引的路徑（fieldMessage 也會涵蓋 `[i]`，那是指向某一張的錯誤）。
   final onEvidenceField = failure.fields['evidence_staged_tokens'];
   for (final MapEntry(key: field, value: message) in failure.fields.entries) {
     final match = _evidenceField.firstMatch(field);

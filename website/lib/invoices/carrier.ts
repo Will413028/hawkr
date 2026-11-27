@@ -40,7 +40,6 @@ export function isKnownCarrierType(
 	return carrierType in INVOICE_CARRIER_TYPE_LABEL;
 }
 
-/* ===== 形狀驗證（與後端逐字相同的三條正則） ===== */
 
 const MOBILE_BARCODE_RE = /^\/[0-9A-Z+\-.]{7}$/;
 const CITIZEN_CERT_RE = /^[A-Z]{2}[0-9]{14}$/;
@@ -86,8 +85,6 @@ export function validateCarrierValue(
 		case InvoiceCarrierType.TAX_ID:
 			return null;
 		default:
-			// 前端還不認得的型別：沒有正則可套，交給後端驗。不要在這裡回錯誤——
-			// 那會讓一個後端已經支援的新載具在前端永遠送不出去。
 			return null;
 	}
 }

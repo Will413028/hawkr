@@ -5,9 +5,6 @@ import {
 	type ProductDescription,
 } from "../lib/products/seller-repo";
 
-// compactDescription（issue #1246 存檔掉字修復）：text block 判空必須同時看
-// inline-run 模型的 runs 與 legacy content——只看 content 會把所有 runs 段落
-// 當成空 block 濾掉，UI 儲存時整份描述的文字段落就消失（表格/清單留存）。
 
 test("keeps runs-only text blocks (inline-run model)", () => {
 	const doc: ProductDescription = {
@@ -50,7 +47,7 @@ test("table / list / image blocks are unaffected by the text emptiness rule", ()
 			{ type: "table", tableJson: '{"rows":[]}' },
 			{ type: "list", listJson: '{"ordered":false,"items":[]}' },
 			{ type: "image", imageKey: "img/a.jpg" },
-			{ type: "image" }, // 無任何資產 identity 的 image 仍該被清
+			{ type: "image" },
 		],
 	};
 	const out = compactDescription(doc);

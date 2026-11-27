@@ -104,7 +104,6 @@ void main() {
         find.byWidgetPredicate((w) => w is MerchantShopCard && w.sku == sku),
       );
 
-      // 檢查還沒回來：使用者先收藏再取消收藏商品 1。
       expect(favorites.checks, 1);
       card('1').onToggleFavorite();
       await tester.pump();
@@ -114,7 +113,6 @@ void main() {
       expect(card('1').isFav, isFalse);
       expect(favorites.writes, ['+1', '-1']);
 
-      // 回應是在使用者取消之前讀到的伺服器狀態：1、2 都有收藏。
       favorites.pendingCheck.complete({1, 2});
       await tester.pump();
       await tester.pump();

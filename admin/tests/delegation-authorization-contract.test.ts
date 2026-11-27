@@ -51,7 +51,6 @@ const catalogPayload = {
 			risk: "high",
 			dependsOn: ["posts.read", "posts.write"],
 		},
-		// 九值中唯一「唯讀卻是 high」的一項：每次揭露都落一列 PII 稽核。
 		{ value: "orders.read", risk: "high", dependsOn: [] },
 		{ value: "media.upload", risk: "low", dependsOn: [] },
 	],
@@ -106,8 +105,6 @@ test("能力目錄解析成功並保留後端順序與風險等級", () => {
 });
 
 test("目錄 fail-closed：空目錄、未知風險、指向目錄外的依賴一律不放行", () => {
-	// 空目錄放行會畫出一個永遠送不出去的表單（至少要勾一項），而畫面上看起來像
-	// 設定被清空了。
 	assert.equal(parseDelegationCapabilityCatalog({ capabilities: [] }), null);
 	assert.equal(
 		parseDelegationCapabilityCatalog({
@@ -115,7 +112,6 @@ test("目錄 fail-closed：空目錄、未知風險、指向目錄外的依賴�
 		}),
 		null,
 	);
-	// 依賴指向目錄外 ⇒ 連動算不完整，會給出一個後端必然以 9287 拒絕的組合。
 	assert.equal(
 		parseDelegationCapabilityCatalog({
 			capabilities: [
@@ -132,16 +128,13 @@ test("勾選一項會連帶補上遞移依賴，且順序等同目錄順序", ()
 		selectDelegationCapability(catalog, [], "products.publish"),
 		["products.read", "products.write", "products.publish"],
 	);
-	// posts.publish 的依賴是兩層（publish → write → read），閉包必須遞移展開。
 	assert.deepEqual(
 		delegationCapabilityDependencyClosure(catalog, "posts.publish"),
 		["posts.read", "posts.write"],
 	);
-	// 無依賴者不多補任何東西。
 	assert.deepEqual(selectDelegationCapability(catalog, [], "orders.read"), [
 		"orders.read",
 	]);
-	// 重複勾選是冪等的。
 	assert.deepEqual(
 		selectDelegationCapability(
 			catalog,
@@ -162,12 +155,10 @@ test("取消一項會連帶取消所有依賴它的項（遞移）", () => {
 		deselectDelegationCapability(catalog, all, "products.write"),
 		["products.read"],
 	);
-	// 只取消最上層不動下層。
 	assert.deepEqual(
 		deselectDelegationCapability(catalog, all, "products.publish"),
 		["products.read", "products.write"],
 	);
-	// 跨族群互不影響。
 	assert.deepEqual(
 		deselectDelegationCapability(
 			catalog,
@@ -189,9 +180,7 @@ test("被連帶勾選的項要指得出是被誰要求的（勾選框據此停�
 		"products.publish",
 	]);
 	assert.deepEqual(required.get("products.write"), ["products.publish"]);
-	// 最上層沒有人要求它 ⇒ 可自由取消。
 	assert.equal(required.has("products.publish"), false);
-	// 單獨勾一個沒有依賴者的項，不該被標成連帶。
 	assert.equal(
 		delegationCapabilityRequiredBy(catalog, ["orders.read"]).size,
 		0,
@@ -215,7 +204,6 @@ test("送出前的閉包校驗擋下不完整組合，完整組合放行", () =>
 });
 
 test("目錄認不得的能力被標出來而不是靜默丟掉", () => {
-	// 靜默丟掉會讓「調整授權範圍」在送出時把它一併撤掉，而畫面從未顯示過它。
 	assert.deepEqual(
 		unknownDelegationCapabilities(catalog, ["products.read", "finance.read"]),
 		["finance.read"],
@@ -249,7 +237,6 @@ test("授權列解析：完整投影通過，缺一不可", () => {
 	assert.equal(parsed.effectiveUntil, null);
 	assert.equal(parsed.effective, true);
 
-	// 空範圍＝一列不授權任何東西的授權，畫面會顯示「已開通」卻沒有任何範圍。
 	assert.equal(
 		parseDelegationAuthorization({
 			...authorizationPayload,
@@ -257,7 +244,6 @@ test("授權列解析：完整投影通過，缺一不可", () => {
 		}),
 		null,
 	);
-	// `effective` 是伺服端算的，缺席時不得由前端推導。
 	assert.equal(
 		parseDelegationAuthorization({
 			...authorizationPayload,
@@ -265,7 +251,6 @@ test("授權列解析：完整投影通過，缺一不可", () => {
 		}),
 		null,
 	);
-	// source 是 DB CHECK 的封閉三值。
 	assert.equal(
 		parseDelegationAuthorization({ ...authorizationPayload, source: "verbal" }),
 		null,
@@ -287,7 +272,6 @@ test("尚未開通是 exists=false 的正常狀態，不是錯誤；自相矛盾
 	assert.equal(empty.authorization, null);
 	assert.equal(empty.activeSessionCount, 0);
 
-	// exists=false 卻帶著一列授權 ⇒ 畫面會出現「尚未開通」配上一份範圍。
 	assert.equal(
 		parseDelegationAuthorizationLookup({
 			exists: false,
@@ -296,7 +280,6 @@ test("尚未開通是 exists=false 的正常狀態，不是錯誤；自相矛盾
 		}),
 		null,
 	);
-	// exists=true 卻沒有投影 ⇒ 一個沒有任何欄位的「已開通」。
 	assert.equal(
 		parseDelegationAuthorizationLookup({
 			exists: true,
@@ -305,7 +288,6 @@ test("尚未開通是 exists=false 的正常狀態，不是錯誤；自相矛盾
 		}),
 		null,
 	);
-	// activeSessionCount 是撤回二次確認的唯一來源，空字串會變成 NaN。
 	assert.equal(
 		parseDelegationAuthorizationLookup({
 			exists: false,
@@ -314,7 +296,6 @@ test("尚未開通是 exists=false 的正常狀態，不是錯誤；自相矛盾
 		}),
 		null,
 	);
-	// 進行中筆數與 exists 正交：已撤回的店仍可能有殘留工作階段。
 	const busy = parseDelegationAuthorizationLookup({
 		exists: true,
 		authorization: authorizationPayload,
@@ -361,7 +342,6 @@ test("撤回結果：已撤回是冪等成功，但不得同時宣稱中止了�
 	});
 	assert.equal(idempotent?.alreadyRevoked, true);
 
-	// 「什麼都沒動」卻回報中止了工作階段 ＝ 一份假的撤回證明。
 	assert.equal(
 		parseDelegationAuthorizationRevocation({
 			authorization: revokedPayload,
@@ -370,7 +350,6 @@ test("撤回結果：已撤回是冪等成功，但不得同時宣稱中止了�
 		}),
 		null,
 	);
-	// 缺欄位一律 null，不補一個空陣列冒充成功。
 	assert.equal(
 		parseDelegationAuthorizationRevocation({ alreadyRevoked: false }),
 		null,
@@ -402,7 +381,6 @@ test("授權變更歷程：單列不合契約時整頁失敗，不跳過那一�
 		pageSize: "10",
 	});
 	assert.equal(page?.records.length, 1);
-	// 動作中文由後端逐列下發；缺它就整頁失敗，不退回機器名。
 	assert.equal(
 		parseDelegationAuthorizationHistoryPage({
 			records: [entry, { ...entry, actionLabel: undefined }],
@@ -427,16 +405,8 @@ test("錯誤分派以業務碼為準，未知碼退回呼叫端給的說法", ()
 	assert.match(delegationAuthorizationErrorMessage(9286, "x"), /尚未開通/u);
 	assert.match(delegationAuthorizationErrorMessage(9285, "x"), /已有有效/u);
 	assert.match(delegationAuthorizationErrorMessage(9287, "x"), /相依/u);
-	// 401 是 envelope 的 code（BFF 的 unauthorized()／gateway JWT 中介層都送得出它）。
-	// 漏了它 ⇒ 顯示英文 "Unauthorized" 或「服務暫時無法使用」，而正解是重新登入。
 	assert.match(delegationAuthorizationErrorMessage(401, "x"), /重新登入/u);
-	// 9261 是另一個碼（requireAdmin 過了但取不到 accountID 的窄路徑），有真實
-	// emitter，不可被 401 取代 —— 兩者必須各自答得出話。
 	assert.match(delegationAuthorizationErrorMessage(9261, "x"), /重新登入/u);
-	// 9277（工作階段不存在）與 9280（上游不可用）的下一步相反，而 BFF 的
-	// safeUpstreamError 對兩者送的 message 一字不差 ⇒ 這裡不分派的話畫面就分不出來。
-	// 斷言「兩者各自答得出話」且「答的不是同一句」——後者才是真正的不變式：
-	// 把 9277 複製成 9280 的文案一樣會讓人去等一個永遠不會好的服務。
 	assert.match(delegationAuthorizationErrorMessage(9277, "x"), /找不到/u);
 	assert.match(delegationAuthorizationErrorMessage(9280, "x"), /稍後再試/u);
 	assert.notEqual(
@@ -457,7 +427,6 @@ test("錯誤分派以業務碼為準，未知碼退回呼叫端給的說法", ()
 	);
 });
 
-// ==================== 機械保證（source-level） ====================
 
 /** 授權面的新檔案。加檔案就要加到這裡，否則保證只覆蓋一半。 */
 const AUTHORIZATION_FILES = [
@@ -495,14 +464,9 @@ async function readAuthorizationFiles(): Promise<[string, string][]> {
 
 test("授權面不維護第二份能力依賴表：一律吃後端下發的目錄", async () => {
 	for (const [file, source] of await readAuthorizationFiles()) {
-		// `policy.ts` 的 CAPABILITY_DEPENDENCIES 是 preflight 的私有副本。引用它，
-		// 「畫面允許送出什麼」就由一份沒有人在維護的鏡像決定，而漂移的兩種症狀
-		//（擋掉合法組合／放行後被 9287 拒絕）都不會有東西轉紅。
 		assert.doesNotMatch(source, /CAPABILITY_DEPENDENCIES/u, file);
-		// 也不得自己再寫一份對照表。
 		assert.doesNotMatch(source, /["']products\.publish["']\s*:\s*\[/u, file);
 	}
-	// 連動規則只有一個入口：目錄。四支純函式全部以它為第一個參數。
 	const authorization = stripComments(
 		await readFile(
 			"src/features/delegated-operations/authorization.ts",
@@ -525,7 +489,6 @@ test("授權面不維護第二份能力依賴表：一律吃後端下發的目�
 			fn,
 		);
 	}
-	// `policy.ts` 只准借解析原語，不准借規則。
 	assert.match(authorization, /from "\.\/policy"/u);
 	assert.doesNotMatch(
 		authorization,
@@ -535,9 +498,6 @@ test("授權面不維護第二份能力依賴表：一律吃後端下發的目�
 
 test("授權面錯誤分派看業務碼，不看 HTTP status", async () => {
 	for (const [file, source] of await readAuthorizationFiles()) {
-		// 9286（找不到授權設定）就是 404，而 404 同時也是「這個環境沒有這支端點」的
-		// 形狀。`MerchantOperationEntry` 那條 `status === 404 || 503` 是為 preflight
-		// 寫的，授權面沿用會把「這家店還沒開通」講成「代行營運未啟用」。
 		assert.doesNotMatch(source, /status\s*===\s*(404|403|409|503)/u, file);
 		assert.doesNotMatch(source, /代行營運目前未啟用/u, file);
 	}
@@ -556,9 +516,7 @@ test("授權面對話框走共用 Dialog（modal 語意與 focus trap 在 Dialog
 	assert.match(dialog, /role="dialog"/u);
 	assert.match(dialog, /aria-modal="true"/u);
 	assert.match(dialog, /useEscapeKey/u);
-	// focus trap 掛 dialog、背景隔離掛 overlay：兩個 ref 必須是不同節點。
 	assert.match(dialog, /useFocusTrap\(dialogRef, true, isTopmost\)/u);
-	// 堆疊與背景隔離是同一個 hook，掛在 overlay。
 	assert.match(dialog, /useModalStack\(overlayRef, true\)/u);
 });
 
@@ -569,9 +527,7 @@ test("撤回對話框必須在按下之前講出連帶中止的工作階段數",
 	);
 	assert.match(source, /activeSessionCount/u);
 	assert.match(source, /個進行中的代行工作階段/u);
-	// 實際中止筆數以回應的 revokedSessionIds 為準（中間可能有人自行結束）。
 	assert.match(source, /result\.revokedSessionIds\.length/u);
-	// 撤回失敗不換冪等鍵：撤回可能已經生效而回應沒送到。
 	assert.match(source, /const \[idempotencyKey\] = useState/u);
 });
 
@@ -580,12 +536,10 @@ test("首次開通不預設全選，且沒有一鍵全選的捷徑", async () =>
 		"src/features/delegated-operations/components/DelegationAuthorizationDialog.tsx",
 		"utf8",
 	);
-	// grant 模式一律從空集合開始（設計書「首批一律最小必要子集」）。
 	assert.match(
 		source,
 		/useState<string\[\]>\(\s*isUpdate && current \? current\.grantedCapabilities : \[\],\s*\)/u,
 	);
-	// 全空時送出鍵停用，並說明「請直接使用撤回」。
 	assert.match(source, /disabled=\{selected\.length === 0\}/u);
 	assert.match(source, /請直接使用「撤回授權」/u);
 	assert.doesNotMatch(

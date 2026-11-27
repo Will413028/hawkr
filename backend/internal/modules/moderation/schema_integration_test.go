@@ -77,7 +77,6 @@ func TestCaseChecksRejectIllegalStates(t *testing.T) {
 			c := uuid.NewV7()
 			contentID = &c
 		}
-		// 預設照 cases_measure_check 的合法關係帶措施 ID；measureOverride 給 false/true 強制反過來。
 		hasMeasure := action != nil && *action == "TAKEDOWN"
 		if len(measureOverride) > 0 {
 			hasMeasure = measureOverride[0]

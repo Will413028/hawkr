@@ -110,7 +110,6 @@ export default class DescriptionImageTool implements BlockTool {
 	}
 
 	static get toolbox() {
-		// The production registration supplies the shared AppIcon image glyph.
 		return { title: "圖片", icon: "" };
 	}
 
@@ -194,7 +193,6 @@ export default class DescriptionImageTool implements BlockTool {
 			const icon = document.createElement("span");
 			icon.className = "hk-description-image__icon";
 			icon.setAttribute("aria-hidden", "true");
-			// Source-owned SVG markup supplied by the editor, never uploaded data.
 			icon.innerHTML = this.config.iconMarkup;
 			this.choose.append(
 				icon,
@@ -314,8 +312,6 @@ export default class DescriptionImageTool implements BlockTool {
 		this.removalObserver = new MutationObserver(() => {
 			if (!this.ownsCurrentBlock()) this.destroy();
 		});
-		// Reordering may remove/reinsert a holder in one operation. Inspect the
-		// final connection in the callback; observe only direct block children.
 		this.removalObserver.observe(parent, { childList: true });
 	}
 
@@ -385,8 +381,6 @@ export default class DescriptionImageTool implements BlockTool {
 			this.updateView();
 			return;
 		}
-		// Matches upload.ts DEFAULT_MAX_BYTES. Description images use
-		// compress:false, so the original file must fit the 10 MiB boundary.
 		if (files[0].size > 10 * 1024 * 1024) {
 			this.errorMessage = "圖片不可超過 10 MB，請選擇較小的圖片。";
 			this.selectedFile = null;
@@ -429,7 +423,6 @@ export default class DescriptionImageTool implements BlockTool {
 		try {
 			this.previewUrl = URL.createObjectURL(file);
 		} catch {
-			/* Preview is optional; retain the committed image if unavailable. */
 		}
 		this.updateView();
 		try {
@@ -443,8 +436,6 @@ export default class DescriptionImageTool implements BlockTool {
 			if (!isCurrent()) return;
 			if (!imageUrl({ file: { url: uploaded.url } }))
 				throw new Error("Upload returned no image URL");
-			// New upload identity replaces the whole old file object. Never carry
-			// an old imageKey/assetId alongside the new stagedToken.
 			const next: DescriptionImageData = {
 				file: {
 					url: uploaded.url,
@@ -458,8 +449,6 @@ export default class DescriptionImageTool implements BlockTool {
 			};
 			await this.config.replace(this.block.id, next, isCurrent);
 			if (!isCurrent()) return;
-			// Keeping this fallback supports an owner that updates the same tool
-			// in place; replaced holders are rejected by the current-block guard.
 			this.data = next;
 			this.uploading = false;
 			this.releasePreview();

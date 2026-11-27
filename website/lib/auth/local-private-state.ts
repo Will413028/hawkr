@@ -53,7 +53,6 @@ function isBrowser(): boolean {
 
 function readOwner(): string | null {
 	if (!isBrowser()) return null;
-	// 帳號 ID 是 opaque 的字串（ADR 2026-09-25-row-identity-by-data-kind D5），原樣比較。
 	return localStorage.getItem(LOCAL_STATE_OWNER_KEY);
 }
 
@@ -83,8 +82,6 @@ function notifyCleared(key: string): void {
 			new StorageEvent("storage", { key, oldValue: null, newValue: null }),
 		);
 	} catch {
-		// Synthetic StorageEvent unsupported — storage is still cleared, the
-		// mounted copy just waits for the next natural read.
 	}
 }
 
@@ -92,7 +89,6 @@ function storageFor(area: "local" | "session"): Storage | null {
 	try {
 		return area === "local" ? window.localStorage : window.sessionStorage;
 	} catch {
-		// 隱私模式 / quota：storage 物件存取本身就可能 throw。
 		return null;
 	}
 }
@@ -102,22 +98,14 @@ function storageFor(area: "local" | "session"): Storage | null {
  * 事件通知已掛載的畫面（見 notifyCleared 的說明）。
  */
 function clearRegisteredKey(spec: LocalPrivateKeySpec): void {
-	// reset 先於 removeItem：zustand persist 的 setState 一律會把新狀態
-	// setItem 回 storage（見 zustand/middleware persistImpl），若 removeItem
-	// 先跑，reset 寫回的預設值會讓 key 原地復活（值無害，但不是「已清除」）。
-	// 先 reset 再 removeItem，讓 storage 最終真的是「沒有這把 key」。
 	try {
 		runLocalPrivateReset(spec.key);
 	} catch {
-		// reset 內部最終會呼叫 store.setState → persist 的 setItem → storage.setItem，
-		// 跟 storageFor() 本來就在防的是同一類失敗（隱私模式 / quota exceeded）。
-		// 單一 store 的 reset 失敗不該讓迴圈中止、害 registry 後面的 key 沒被清到。
 	}
 	for (const area of spec.in) {
 		try {
 			storageFor(area)?.removeItem(spec.key);
 		} catch {
-			// 單一 key 清不掉不該讓整輪清除中斷，其餘 key 仍要清。
 		}
 	}
 	notifyCleared(spec.key);
@@ -142,9 +130,6 @@ export function syncLocalPrivateState(ownerId: string | null): void {
 	if (previousOwner === ownerId) return;
 	writeOwner(ownerId);
 	for (const spec of LOCAL_PRIVATE_KEY_SPECS) {
-		// `leaving-a-signed-in-owner` 的 key 要跨得過「訪客 → 登入」（那是它們存在
-		// 的意義），但跨不過「登出」與「換帳號」。判準就是前一個擁有者在不在：
-		// null 代表這份資料是訪客自己剛寫的，沒有別人的東西可洩漏。
 		if (
 			spec.clearOn === "leaving-a-signed-in-owner" &&
 			previousOwner === null

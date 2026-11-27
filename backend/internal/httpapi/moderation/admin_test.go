@@ -126,7 +126,6 @@ func TestListCasesPassesFiltersAndMapsTheCasesAndTheNextToken(t *testing.T) {
 		t.Fatal("有下一頁要給 token")
 	}
 
-	// 帶回 token：游標解回模組；換篩選用同一個 token 是 invalid_argument（token 綁篩選）。
 	if _, err := c.ListCases(t.Context(), connect.NewRequest(&adminpb.ListCasesRequest{
 		State: adminpb.CaseState_CASE_STATE_OPEN, TargetKind: pb.ReportTargetKind_REPORT_TARGET_KIND_COMMENT, PageToken: res.Msg.GetNextPageToken(),
 	})); err != nil {
@@ -267,7 +266,6 @@ func TestAdminHandlerWithoutAnAdminPrincipalDoesNotReachTheModule(t *testing.T) 
 
 func moderationCategory() policy.Category { return policy.Spam }
 
-// newGuardedEnv 掛上真的 adminauth interceptor（宣告表）：呼叫者的角色由 header X-Test-Role 決定（空的是沒有任何角色的管理員）。
 func newGuardedEnv(t *testing.T, f *fakeCases) moderationv1alpha1connect.ModerationAdminServiceClient {
 	t.Helper()
 	log := slog.New(slog.DiscardHandler)

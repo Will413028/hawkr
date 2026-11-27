@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ==================== Admin 異常售後列表（§29 A1）====================
 
 // AdminAfterSaleCaseSummaryResp 售後異常列表單筆
 type AdminAfterSaleCaseSummaryResp struct {
@@ -58,13 +57,6 @@ func (h *Holder) ListAfterSaleCasesForAdmin(c *gin.Context) {
 		response.Unauthorized(c)
 		return
 	}
-	// ② buyer_id 為 admin 搜尋 filter，一律解析成現任 buyer_id（D7，
-	// 跟 SearchOrders/ListAbnormalOrdersForAdmin 一致）。已核對
-	// AfterSalesGrpcService.listAfterSaleCasesForAdmin：StringUtils.hasText +
-	// wrapper.eq(Long.parseLong(...))，非空字串一律套用 filter，"-1" 保證查無
-	// 結果（同 order-service 語意，非 "0 視為未篩選" 那套）。query key 已於
-	// 2026-08 硬切為 buyer_id/store_id，不再相容舊版買家/賣家過濾用的舊查詢
-	// 鍵名（F1，前端已同步遷移）。
 	buyerIDFilter, ok := h.resolveOptionalBuyerFilterQuery(c, c.Query("buyer_id"))
 	if !ok {
 		return
@@ -121,7 +113,6 @@ func (h *Holder) ListAfterSaleCasesForAdmin(c *gin.Context) {
 	})
 }
 
-// ==================== Admin 強制確認收貨（§5.3.12）====================
 
 // AdminForceConfirmReceiptRequest Admin 強制確認收貨請求
 type AdminForceConfirmReceiptRequest struct {

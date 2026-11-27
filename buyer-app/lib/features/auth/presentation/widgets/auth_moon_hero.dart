@@ -170,8 +170,6 @@ class _AuthMoonHeroState extends State<AuthMoonHero>
                   ),
                 ),
                 Center(
-                  // 月面素材四周有透明留白；曝光層只覆蓋實際月球，避免
-                  // 透明區被 radial gradient 畫成灰色圓框。
                   child: SizedBox.square(
                     dimension: widget.size * 0.82,
                     child: const ClipOval(
@@ -227,8 +225,6 @@ class _AuthMoonHeroState extends State<AuthMoonHero>
                   fit: StackFit.expand,
                   children: [
                     OverflowBox(
-                      // 單層大範圍柔光一路淡出到透明；不使用大 blur shadow，
-                      // 也不縮放透明圖層，避免 iOS Impeller 的多邊形瑕疵。
                       maxWidth: widget.size * 2.4,
                       maxHeight: widget.size * 2.4,
                       child: SizedBox.square(

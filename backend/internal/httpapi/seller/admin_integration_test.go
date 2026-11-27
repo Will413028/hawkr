@@ -64,7 +64,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// adminOrders 是買家側與店家側未結訂單 port 的替身（同一個實作，與正式組裝相同）。
 type adminOrders struct {
 	mu                    sync.Mutex
 	buyerOpen, storeOpen  bool
@@ -93,9 +92,7 @@ func (o *adminOrders) HasOpenStoreOrders(_ context.Context, storeID int64) (bool
 
 type adminFixture struct {
 	admin adminsellerconnect.SellerAdminServiceClient
-	// governance 是措施的 client（管理員）：GetMeasure 帶關聯帳號與各自的終止合作生效時機。
 	governance adminsellerconnect.SellerGovernanceAdminServiceClient
-	// prospects 是商家名單的 client：管理員、一般帳號、沒有登入；admin 用 GET 讀取（NO_SIDE_EFFECTS）。
 	prospects         adminsellerconnect.SellerProspectAdminServiceClient
 	prospectsCustomer adminsellerconnect.SellerProspectAdminServiceClient
 	prospectsAnon     adminsellerconnect.SellerProspectAdminServiceClient
@@ -118,17 +115,12 @@ type adminFixture struct {
 	server            *httptest.Server
 	adminToken        string
 	customerToken     string
-	// otherAdminToken 是另一位管理員的 token（授權是一位管理員的，不能互相借用）。
 	otherAdminToken string
-	// media 是 seller 模組的 media 替身（機敏讀取只讀 put 放進來的內容）。
 	media *stagedMedia
-	// registry 是模組的登記資料來源（公司型申請送件時的查詢快照）的替身：回應照順序消耗，沒有排定的是查無。
 	registry *moduleRegistry
-	// skew 讓模組的時鐘往前走（不 sleep）：授權過期的測試用。
 	skew atomic.Int64
 }
 
-// now 是模組的時鐘：真實時間加上 skew。
 func (f *adminFixture) now() time.Time { return time.Now().Add(time.Duration(f.skew.Load())) }
 
 func setupAdmin(t *testing.T) *adminFixture {
@@ -151,7 +143,6 @@ func setupAdmin(t *testing.T) *adminFixture {
 	bus := events.NewBus()
 	id := identity.New(identity.Deps{DB: d, Events: bus, Providers: identity.Providers{Admin: dev.Admins()}, Now: time.Now, Logger: log})
 	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
-	// 與正式組裝相同：買家在建帳的 transaction 內由 AccountCreated 建立。
 	events.Subscribe(bus, buyers.OnAccountCreated)
 	orders := &adminOrders{}
 	kycMAC := sealtest.MAC(t)
@@ -221,7 +212,6 @@ func setupAdmin(t *testing.T) *adminFixture {
 	return f
 }
 
-// newSeller 建立一個帳號（買家在建帳時建立），並為它開店；name 是店名。
 func (f *adminFixture) newSeller(t *testing.T, name string) (int64, seller.Store) {
 	t.Helper()
 	f.users++
@@ -300,7 +290,6 @@ func TestAdminServicesRejectCustomersAndVisitorsAndWriteNothing(t *testing.T) {
 			t.Fatalf("%s DeleteAccount: err=%v want=%v", name, err, want)
 		}
 	}
-	// 什麼都沒有被動到。
 	got, err := f.module.Store(ctx, victim.StoreID)
 	if err != nil {
 		t.Fatal(err)
@@ -345,7 +334,6 @@ func TestAdminReadsTheTerminationClosureOfAStore(t *testing.T) {
 		slices.Contains(grounds, pb.TerminationGround_TERMINATION_GROUND_LINKED_ACCOUNT) {
 		t.Fatalf("開著的店可以建立終止（含預告、不含關聯帳號）：%v", grounds)
 	}
-	// 每個可建立的終止合作一筆（事由不重複），只有預告終止是排程生效：生效時間是讀取當下加 30 日、說明句逐字（含台北時間），其他事由立即生效、不帶時間。
 	seen := map[pb.TerminationGround]bool{}
 	for _, o := range got.Msg.GetAvailableTerminations() {
 		if seen[o.GetGround()] {
@@ -355,7 +343,6 @@ func TestAdminReadsTheTerminationClosureOfAStore(t *testing.T) {
 		if o.GetExplanation().GetLocale() != "zh-TW" {
 			t.Fatalf("事由 %v 的說明句語系 = %q，期望 zh-TW", o.GetGround(), o.GetExplanation().GetLocale())
 		}
-		// 依據的需求與說明句都由事由決定（model.TerminationGround.ViolationRequirement、TerminationEffect.Message）。
 		wantReq := adminsellerpb.TerminationViolationRequirement_TERMINATION_VIOLATION_REQUIREMENT_OPTIONAL
 		if o.GetGround() == pb.TerminationGround_TERMINATION_GROUND_NOTICE {
 			wantReq = adminsellerpb.TerminationViolationRequirement_TERMINATION_VIOLATION_REQUIREMENT_FORBIDDEN
@@ -461,19 +448,16 @@ func TestListStoresPagesOverConnectAndGetStoreCarriesTheKYCSummary(t *testing.T)
 	if !slices.Equal(got, want) {
 		t.Fatalf("got=%v want=%v", got, want)
 	}
-	// 換了篩選就不能沿用 token。
 	first, err := f.admin.ListStores(ctx, connect.NewRequest(&adminsellerpb.ListStoresRequest{PageSize: 2}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, err = f.admin.ListStores(ctx, connect.NewRequest(&adminsellerpb.ListStoresRequest{PageSize: 2, Query: "店", PageToken: first.Msg.GetNextPageToken()}))
 	wantCode(t, err, connect.CodeInvalidArgument, "")
-	// 草稿不能當篩選。
 	_, err = f.admin.ListStores(ctx, connect.NewRequest(&adminsellerpb.ListStoresRequest{KycStatus: pb.KYCStatus_KYC_STATUS_DRAFT}))
 	if field := wantCode(t, err, connect.CodeInvalidArgument, ""); field != "kyc_status" {
 		t.Fatalf("field=%q", field)
 	}
-	// 「待審核」不是儲存的狀態：SUBMITTED 被拒絕，要用 kyc_awaiting_review（待辦的成員，與 kyc_awaiting_review_stores 同一個）。
 	_, err = f.admin.ListStores(ctx, connect.NewRequest(&adminsellerpb.ListStoresRequest{KycStatus: pb.KYCStatus_KYC_STATUS_SUBMITTED}))
 	if field := wantCode(t, err, connect.CodeInvalidArgument, ""); field != "kyc_status" {
 		t.Fatalf("field=%q", field)
@@ -482,7 +466,6 @@ func TestListStoresPagesOverConnectAndGetStoreCarriesTheKYCSummary(t *testing.T)
 	if err != nil || len(awaiting.Msg.GetStores()) != 0 {
 		t.Fatalf("awaiting=%v err=%v", awaiting.Msg, err)
 	}
-	// 營運中的店：代行的店家狀態原因是空的（空不表示能代行，授權在 preflight）。
 	first0, err := f.admin.ListStores(ctx, connect.NewRequest(&adminsellerpb.ListStoresRequest{PageSize: 1}))
 	if err != nil || len(first0.Msg.GetStores()) != 1 || len(first0.Msg.GetStores()[0].GetDelegationUnavailabilities()) != 0 {
 		t.Fatalf("delegation=%v err=%v", first0.Msg, err)
@@ -492,7 +475,6 @@ func TestListStoresPagesOverConnectAndGetStoreCarriesTheKYCSummary(t *testing.T)
 		t.Fatalf("stats=%+v err=%v", stats, err)
 	}
 
-	// KYC 摘要：沒有送出過的申請（沒有、草稿）不設；送出之後有。
 	accountID, s := f.newSeller(t, "有申請的店")
 	noKYC, err := f.admin.GetStore(ctx, connect.NewRequest(&adminsellerpb.GetStoreRequest{Id: sid(s.StoreID)}))
 	if err != nil || noKYC.Msg.GetKyc() != nil {
@@ -514,7 +496,6 @@ func TestListStoresPagesOverConnectAndGetStoreCarriesTheKYCSummary(t *testing.T)
 		t.Fatal(err)
 	}
 	k := withKYC.Msg.GetKyc()
-	// 審核期限：審核中才有，開始是送出時間，期限 7 天（seller.review_kyc_application）。
 	if d := k.GetDecideDeadline(); !d.GetStartTime().AsTime().Equal(k.GetSubmitTime().AsTime()) || !d.GetDueTime().AsTime().Equal(k.GetSubmitTime().AsTime().Add(7*24*time.Hour)) {
 		t.Fatalf("decide_deadline=%+v submit_time=%v", d, k.GetSubmitTime())
 	}
@@ -525,7 +506,6 @@ func TestListStoresPagesOverConnectAndGetStoreCarriesTheKYCSummary(t *testing.T)
 	if err != nil || len(listed.Msg.GetStores()) != 1 || listed.Msg.GetStores()[0].GetStore().GetId() != sid(s.StoreID) {
 		t.Fatalf("listed=%+v err=%v", listed, err)
 	}
-	// 不存在的店，與格式錯誤的 id。
 	_, err = f.admin.GetStore(ctx, connect.NewRequest(&adminsellerpb.GetStoreRequest{Id: "987654"}))
 	wantCode(t, err, connect.CodeNotFound, "")
 	_, err = f.admin.GetStore(ctx, connect.NewRequest(&adminsellerpb.GetStoreRequest{Id: "not-a-number"}))
@@ -591,7 +571,6 @@ func TestDeleteAccountClosesBuyerStoreAndAccountTogetherAndRecordsTheAdmin(t *te
 	if err != nil || closed.Closure == nil || closed.Closure.By != seller.ClosedByDeletion {
 		t.Fatalf("closure=%+v err=%v", closed.Closure, err)
 	}
-	// 重送：帳號已經刪除，回已刪除，不再多一筆申請。
 	again, err := f.identityAdmin.DeleteAccount(ctx, connect.NewRequest(&adminpb.DeleteAccountRequest{AccountId: sid(accountID), Reason: "重送"}))
 	if err != nil || again.Msg.GetState() != identitypb.DeleteAccountResponse_DELETION_STATE_DELETED {
 		t.Fatalf("again=%+v err=%v", again, err)
@@ -617,7 +596,6 @@ func TestDeleteAccountWaitsForOpenStoreOrdersEvenForAnAdmin(t *testing.T) {
 	if got.accountDeleted || got.storeStatus != seller.PendingDeletion || !got.sellerRole || got.buyerStatus == "CLOSED" || got.requests != 1 || got.attempts != 1 {
 		t.Fatalf("state=%+v", got)
 	}
-	// 再申請一次：仍是等待，申請紀錄追加一筆，流程只有一筆。
 	again, err := f.identityAdmin.DeleteAccount(ctx, connect.NewRequest(&adminpb.DeleteAccountRequest{AccountId: sid(accountID), Reason: "再試"}))
 	if err != nil || again.Msg.GetState() != identitypb.DeleteAccountResponse_DELETION_STATE_PENDING_ORDERS {
 		t.Fatalf("again=%+v err=%v", again, err)
@@ -625,7 +603,6 @@ func TestDeleteAccountWaitsForOpenStoreOrdersEvenForAnAdmin(t *testing.T) {
 	if got := f.deletionState(t, accountID, s.StoreID); got.requests != 1 || got.attempts != 2 {
 		t.Fatalf("state=%+v", got)
 	}
-	// 最後一筆訂單完成：流程完成，同一個 transaction 關店與刪帳號。
 	f.orders.set(false, false)
 	state, err := f.deletion.CompletePending(ctx, accountID)
 	if err != nil || state != accountdeletion.Completed {
@@ -838,7 +815,6 @@ func TestGetStoreListsEveryEffectiveSuspensionOfTheAccountAndNothingElse(t *test
 	}
 }
 
-// terminationGrounds 是 GetStore 回應可建立的終止合作的事由（依回應順序）。
 func terminationGrounds(r *adminsellerpb.GetStoreResponse) []pb.TerminationGround {
 	out := make([]pb.TerminationGround, 0, len(r.GetAvailableTerminations()))
 	for _, o := range r.GetAvailableTerminations() {
@@ -908,7 +884,6 @@ func TestGetMeasureLinkedAccountCarriesTheLinkedTerminationOption(t *testing.T) 
 	}
 }
 
-// submitKYC 為店家所屬的帳號存企業賣家草稿並送出申請（統編由參數給，同一個統編的帳號互為關聯帳號）。
 func (f *adminFixture) submitKYC(t *testing.T, storeID int64, taxID string) {
 	t.Helper()
 	ctx := context.Background()

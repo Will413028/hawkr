@@ -88,7 +88,6 @@ func (noDashboardOrders) StatusCounts(context.Context, int64) (httpseller.OrderS
 	return httpseller.OrderStatusCounts{}, errors.New("not used")
 }
 
-// adminStack 是單體的 Connect 入口加真的 moderation 模組：handler 與 production 一樣由 httpapi.NewHandler 組出，資料庫是 testdb 的真實 Postgres。
 type adminStack struct {
 	db         *db.DB
 	identity   *identity.Module
@@ -97,13 +96,10 @@ type adminStack struct {
 	sellers    *seller.Reader
 	sellerMod  *seller.Module
 	moderation *moderation.Module
-	// customerAccount 與 app 是一般顧客帳號與它的買家端入口（ModerationAppService）。
 	customerAccount int64
 	app             appconnect.ModerationAppServiceClient
 	admin           moderationv1alpha1connect.ModerationAdminServiceClient
-	// noRole 是認證過但沒有任何角色的管理員：每支方法都該回 permission_denied。
 	noRole moderationv1alpha1connect.ModerationAdminServiceClient
-	// customer 是一般顧客帳號：後台的 service 只給管理員。
 	customer moderationv1alpha1connect.ModerationAdminServiceClient
 	visitor  moderationv1alpha1connect.ModerationAdminServiceClient
 }
@@ -238,7 +234,6 @@ func (s *adminStack) newBuyer(t *testing.T) int64 {
 	return p.BuyerID
 }
 
-// world 開三個案件：貼文（進行中）、第二篇貼文（已結案）、留言（進行中）。回傳三個案件 ID。
 type world struct{ postOpen, postClosed, commentOpen string }
 
 func (s *adminStack) world(t *testing.T) world {
@@ -377,7 +372,6 @@ func TestListCasesFiltersAndPagesThroughTheConnectEntry(t *testing.T) {
 		State: adminpb.CaseState_CASE_STATE_OPEN, TargetKind: pb.ReportTargetKind_REPORT_TARGET_KIND_POST,
 	}).GetCases()), w.postOpen)
 
-	// 一頁一筆走完：不重不漏，最後一頁沒有 token。
 	var got []string
 	token := ""
 	for range 5 {
@@ -447,14 +441,12 @@ func TestDecideCaseClosesAndRejectsStaleEtags(t *testing.T) {
 		t.Fatalf("後台動作紀錄 %d 筆，預期 1", n)
 	}
 
-	// 結案是終態：再用結案前的 etag 或結案後的 etag 決定都是版本衝突。
 	for _, e := range []string{etag, c.GetEtag()} {
 		_, err = s.admin.DecideCase(ctx, connect.NewRequest(&adminpb.DecideCaseRequest{Id: w.postOpen, Etag: e, Decision: adminpb.CaseDecision_CASE_DECISION_NO_VIOLATION}))
 		wantCode(t, "已結案再決定", err, connect.CodeAborted)
 	}
 }
 
-// ownerMedia 是 social 的 media 替身：每個 staged token 都確認成功，資產 ID 每次新產生。
 type ownerMedia struct{}
 
 func (ownerMedia) Confirm(_ context.Context, _ media.Uploader, token string, _ media.Visibility) (media.ConfirmedAsset, error) {

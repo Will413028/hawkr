@@ -52,11 +52,9 @@ export default function MegaMenuSurface({
 	onMouseLeave: () => void;
 	onFocus: () => void;
 }) {
-	// Start each content at 0 and raise it on the next frame, so a swap reads as
-	// a crossfade rather than a hard cut. No layout is touched.
 	const [shown, setShown] = React.useState(false);
 	React.useEffect(() => {
-		void contentKey; // the swap itself is the trigger; nothing else is read
+		void contentKey;
 		setShown(false);
 		const frame = requestAnimationFrame(() => setShown(true));
 		return () => cancelAnimationFrame(frame);

@@ -14,10 +14,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/content"
 )
 
-// 模組回報的欄位對應到請求的路徑（ADR 2026-09-25-api-error-model D4）。模組的欄位名見各 Input 型別。
 
-// bannerPaths 是 CreateBannerRequest、UpdateBannerRequest 的對應。點擊行為的值依行為的種類是不同的
-// oneof 欄位，所以依模組收到的 b 決定。
 func bannerPaths(b *adminpb.Banner) rpc.FieldPaths {
 	p := rpc.FieldPaths{
 		"Title":             "banner.title",
@@ -39,14 +36,12 @@ func bannerPaths(b *adminpb.Banner) rpc.FieldPaths {
 	return p
 }
 
-// gatePaths 是 CreateAppVersionGateRequest、UpdateAppVersionGateRequest 的對應。
 var gatePaths = rpc.FieldPaths{
 	"AppType":        "app_version_gate.app_type",
 	"MinimumVersion": "app_version_gate.minimum_version",
 	"StoreURL":       "app_version_gate.store_url",
 }
 
-// checkVersionPaths 是 CheckAppVersionRequest 的對應。
 var checkVersionPaths = rpc.FieldPaths{
 	"AppType":       "app_type",
 	"ClientVersion": "client_version",
@@ -66,7 +61,6 @@ func toActionPB(a content.BannerAction) *contentpb.BannerAction {
 	return &contentpb.BannerAction{}
 }
 
-// fromActionPB 把請求的點擊行為轉成模組的型別；沒有指定行為時回零值，由模組回報必填。
 func fromActionPB(a *contentpb.BannerAction) content.BannerAction {
 	switch k := a.GetKind().(type) {
 	case *contentpb.BannerAction_Popup_:
@@ -96,8 +90,6 @@ func fromTimestampPB(t *timestamppb.Timestamp) *time.Time {
 	return &v
 }
 
-// banner 清單的排序鍵：display_order（4 bytes）、created_at 的 Unix 微秒（8 bytes）、id（16 bytes）。
-// created_at 在資料庫是微秒精度，所以編碼後比較不會失真。
 func encodeBannerCursor(scope string, c *content.BannerCursor) string {
 	if c == nil {
 		return ""

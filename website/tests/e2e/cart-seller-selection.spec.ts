@@ -64,7 +64,6 @@ async function setupCart(page: Page, baseURL: string | undefined) {
 			void socket.close();
 		}
 	});
-	// Register the catch-all first: no browser API request reaches a real cart.
 	await page.route("**/api/v1/**", (route) =>
 		route.fulfill({ json: { code: 0, data: {} } }),
 	);
@@ -291,7 +290,6 @@ async function capture(page: Page, testInfo: TestInfo, name: string) {
 	const path = testInfo.outputPath(`${name}.png`);
 	await page.screenshot({ path, fullPage: true });
 	await testInfo.attach(name, { path, contentType: "image/png" });
-	// Keep readable component evidence alongside the long page/rec rail image.
 	for (let index = 0; index < (await groups.count()); index += 1) {
 		const groupPath = testInfo.outputPath(`${name}-store-${index + 1}.png`);
 		await groups.nth(index).screenshot({ path: groupPath, scale: "css" });
@@ -374,7 +372,6 @@ test("依店家選取商品，切店等待物流更新且結帳只帶可購買�
 		.click();
 	await assertCheckedRows(page, ["珍珠芭樂", "金鑽鳳梨", "暫時缺貨的季節水果"]);
 	await expect(checkout(page)).toHaveAttribute("aria-disabled", "false");
-	// Exercise the real click/draft writer, but do not mount the transaction page.
 	await page.route(
 		(url) => url.pathname === "/checkout",
 		(route) =>

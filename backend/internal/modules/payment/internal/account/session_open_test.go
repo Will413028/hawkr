@@ -13,7 +13,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// callCounter 數 Stripe 兩種開通呼叫（Account Session 與 Account Link）各被打了幾次。
 type callCounter struct {
 	mu                    sync.Mutex
 	sessions, accountLink int
@@ -79,7 +78,6 @@ func TestOpenSessionReadsTheStoredCollectionNotTheCurrentConfiguration(t *testin
 	}
 }
 
-// shapeProvider 照 shape 回 session，不管 in.Kind：模擬回傳形狀與要求不一致的 provider。
 type shapeProvider struct {
 	*Fake
 	shape model.OnboardingSession

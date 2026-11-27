@@ -33,7 +33,6 @@ import 'package:hawkr_buyer/shared/widgets/fruit_refresh_indicator.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_skeleton_shimmer.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_placeholder.dart';
 
-// ===================== Skeleton Shimmer Components =====================
 
 class _SkeletonBar extends StatelessWidget {
   const _SkeletonBar({
@@ -93,7 +92,6 @@ class _MemberCardSkeleton extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // 頭像骨架
             Container(
               width: isSmallScreen ? 65 : 85,
               height: isSmallScreen ? 65 : 85,
@@ -104,13 +102,10 @@ class _MemberCardSkeleton extends StatelessWidget {
               ),
             ),
             SizedBox(height: 8.h),
-            // 商家名稱骨架
             _SkeletonBar(width: 120, height: 16.h, radius: 8),
             SizedBox(height: 8.h),
-            // 分隔線骨架
             Container(width: 160, height: 2, color: AppColors.dividerLight),
             SizedBox(height: 8.h),
-            // 累積消費骨架
             _SkeletonBar(width: 180, height: 14.h, radius: 6),
           ],
         ),
@@ -310,7 +305,6 @@ class _CouponSkeletonList extends StatelessWidget {
   }
 }
 
-// ===================== End Skeleton Components =====================
 
 /// Wallet 入口：上方搜尋列、Tab（My wallet / My coupon）、底部導覽
 class WalletScreen extends ConsumerStatefulWidget {
@@ -364,8 +358,6 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
 
   @override
   Widget build(BuildContext context) {
-    // When embedded in MainNavigationScreen (showTopBar: false), skip the
-    // inner Scaffold entirely to avoid duplicate app-bars.
     final body = Container(
       color: AppColors.bgPrimary,
       child: Column(
@@ -387,7 +379,6 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
 
     if (!widget.showTopBar) return body;
 
-    // Standalone mode: wrap in Scaffold with its own app bar
     return PopScope(
       canPop: Navigator.of(context).canPop(),
       onPopInvokedWithResult: (didPop, _) {
@@ -452,14 +443,13 @@ class _MyWalletTab extends ConsumerStatefulWidget {
 class _MyWalletTabState extends ConsumerState<_MyWalletTab> {
   final Duration _animDur = const Duration(milliseconds: 260);
   bool _animating = false;
-  bool _showSkeleton = false; // 延遲顯示 skeleton，避免快速載入閃爍
+  bool _showSkeleton = false;
   bool _isExpanded = false;
   final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    // 300ms 後才顯示 skeleton，如果載入夠快就不會閃
     Future.delayed(const Duration(milliseconds: 300), () {
       if (mounted) setState(() => _showSkeleton = true);
     });
@@ -475,37 +465,29 @@ class _MyWalletTabState extends ConsumerState<_MyWalletTab> {
     if (_animating) return;
     _animating = true;
     setState(() => _isExpanded = !_isExpanded);
-    // 動畫結束後只更新 _animating 狀態，不觸發 setState 避免閃爍
     Future.delayed(_animDur, () {
       if (mounted) _animating = false;
     });
   }
 
-  // 收起時點擊卡片，展開並滾動到該卡片位置
   void _onCardTap(int index) {
     if (_animating) return;
 
     if (_isExpanded) {
-      // 已展開，點擊則收起
       _toggleExpand();
     } else {
-      // 收起狀態，點擊展開並滾動到對應卡片
       _animating = true;
 
-      // 計算該卡片展開後的位置
       const double expandedGap = 220.0;
       final double targetOffset = expandedGap * index;
 
-      // 展開卡片
       setState(() => _isExpanded = true);
 
-      // 等待動畫完成後，再等一幀確保佈局更新，然後滾動
       Future.delayed(_animDur, () {
         if (!mounted) {
           _animating = false;
           return;
         }
-        // 使用 addPostFrameCallback 確保佈局完成後再滾動
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted || !_scrollController.hasClients) {
             _animating = false;
@@ -513,7 +495,6 @@ class _MyWalletTabState extends ConsumerState<_MyWalletTab> {
           }
           final maxScroll = _scrollController.position.maxScrollExtent;
           final clampedOffset = targetOffset.clamp(0.0, maxScroll);
-          // 直接跳到目標位置（不用動畫，避免二次滾動感）
           _scrollController.jumpTo(clampedOffset);
           _animating = false;
         });
@@ -622,7 +603,6 @@ class _MyWalletTabState extends ConsumerState<_MyWalletTab> {
   }
 }
 
-// 新版會員卡樣式：背景圖片、商家頭貼、商家名稱、累積消費、點數
 class _NewLoyaltyCard extends StatefulWidget {
   const _NewLoyaltyCard({
     required this.merchantId,
@@ -645,7 +625,7 @@ class _NewLoyaltyCard extends StatefulWidget {
   final String? merchantAvatarRaw;
   final String? coverUrl;
   final int totalSpending;
-  final bool isExpanded; // 是否展開狀態
+  final bool isExpanded;
 
   @override
   State<_NewLoyaltyCard> createState() => _NewLoyaltyCardState();
@@ -671,11 +651,6 @@ class _NewLoyaltyCardState extends State<_NewLoyaltyCard> {
   ImageProvider? _resolveImage(String? raw) {
     if (raw == null || raw.trim().isEmpty) return null;
     final value = raw.trim();
-    // `data:` URI 是唯一需要走 MemoryImage 的形式。原本還有一條「不是 http 且
-    // 長度 > 60 就當成 base64」的猜測——但 objectKey 本來就有 70~90 字元
-    // （`public/user_avatar/<storeId>/<yyyymmdd>/<uuid>.png` 是 78 字元），
-    // 會被誤判成 base64、decode 失敗後靜默退回預設頭像。objectKey 與完整 URL
-    // 一律交給 buildImageUrl 處理（49 §4.1 唯一入口）。
     if (value.startsWith('data:image/')) {
       try {
         final bytes = base64Decode(
@@ -694,7 +669,6 @@ class _NewLoyaltyCardState extends State<_NewLoyaltyCard> {
     final sw = MediaQuery.of(context).size.width;
     final cardWidth = (sw - 32).clamp(0.0, 360.0);
 
-    // 響應式尺寸
     final isSmallScreen = cardWidth < 300;
     final avatarSize = isSmallScreen ? 65.0 : 85.0;
     final nameFontSize = isSmallScreen ? 14.0 : 16.0;
@@ -712,7 +686,6 @@ class _NewLoyaltyCardState extends State<_NewLoyaltyCard> {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            // 卡片主體（往下偏移讓右上角圖片突出）
             Positioned(
               top: 10,
               left: 0,
@@ -736,7 +709,6 @@ class _NewLoyaltyCardState extends State<_NewLoyaltyCard> {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      // 背景圖片（商家 cover 或預設）
                       if (widget.coverUrl != null &&
                           widget.coverUrl!.isNotEmpty)
                         OssImage(
@@ -751,11 +723,9 @@ class _NewLoyaltyCardState extends State<_NewLoyaltyCard> {
                         )
                       else
                         const HkPlaceholder(HkPlaceholderKind.storeCover),
-                      // 半透明遮罩
                       Container(
                         color: AppColors.textEmphasis.withValues(alpha: 0.25),
                       ),
-                      // 內容：置中排列 - 頭貼在上，名稱在中，累積消費在下
                       Center(
                         child: Padding(
                           padding: EdgeInsets.symmetric(
@@ -766,7 +736,6 @@ class _NewLoyaltyCardState extends State<_NewLoyaltyCard> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              // 商家頭貼 - 展開時可點擊到商家頁
                               GestureDetector(
                                 onTap:
                                     widget.isExpanded &&
@@ -818,7 +787,6 @@ class _NewLoyaltyCardState extends State<_NewLoyaltyCard> {
                                 ),
                               ),
                               SizedBox(height: isSmallScreen ? 2 : 4),
-                              // 商家名稱
                               Text(
                                 widget.merchantName,
                                 maxLines: 1,
@@ -855,14 +823,12 @@ class _NewLoyaltyCardState extends State<_NewLoyaltyCard> {
                                   ),
                                 ),
                               SizedBox(height: isSmallScreen ? 2 : 4),
-                              // 白色分隔線
                               Container(
                                 width: dividerWidth,
                                 height: 2,
                                 color: AppColors.bgCard,
                               ),
                               SizedBox(height: isSmallScreen ? 2 : 4),
-                              // 累積消費（點數轉換成金額）
                               _buildAmountText(fontSize: amountFontSize),
                             ],
                           ),
@@ -873,7 +839,6 @@ class _NewLoyaltyCardState extends State<_NewLoyaltyCard> {
                 ),
               ),
             ),
-            // 右上角浮動的紀錄按鈕圖片（突出卡片上方）- 展開時才能點擊跳轉到消費紀錄頁
             Positioned(
               top: -5,
               right: isSmallScreen ? 4 : 8,
@@ -1361,7 +1326,6 @@ class _CouponIssuerAvatar extends StatelessWidget {
           height: size,
           child: AppCachedImage(
             imageUrl: url,
-            // logoKey 是裸 objectKey，必須帶 scene 才會過 buildImageUrl 組 URL。
             scene: ImageScene.merchantAvatar,
             fit: BoxFit.cover,
             errorWidget: _fallback(),
@@ -1373,7 +1337,6 @@ class _CouponIssuerAvatar extends StatelessWidget {
   }
 
   Widget _fallback() {
-    // 商家券沒有頭像 URL → 用預設商家頭像（不再用首字 fallback）
     if (sellerName.isNotEmpty || storeId.isNotEmpty) {
       return ClipOval(
         child: SizedBox(
@@ -1383,7 +1346,6 @@ class _CouponIssuerAvatar extends StatelessWidget {
         ),
       );
     }
-    // 全平台券：保留原粉紅 + tag icon 設計
     return Container(
       width: size,
       height: size,

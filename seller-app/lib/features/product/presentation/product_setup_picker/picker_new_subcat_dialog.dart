@@ -138,7 +138,6 @@ void showPickerNewSubcatDialog({
                                   final name = controller.text.trim();
                                   Navigator.pop(ctx);
 
-                                  // 立即將新分類加入本地列表
                                   final newL3ByL2 =
                                       Map<String, List<String>>.from(
                                         l3ByL2.value,
@@ -152,7 +151,6 @@ void showPickerNewSubcatDialog({
                                     l3ByL2.value = newL3ByL2;
                                   }
 
-                                  // 建立 active 分類，取得 catalogId
                                   final candidateResult = await ref
                                       .read(productRepositoryProvider)
                                       .submitCategoryCandidate(

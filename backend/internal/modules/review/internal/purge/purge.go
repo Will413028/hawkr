@@ -23,10 +23,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/revalidate"
 )
 
-// batchSize 是每一批刪除的評價數。
 const batchSize = 200
 
-// sweepBatch 是保底掃描每次最多補排的買家數。
 const sweepBatch = 100
 
 // SweepInterval 是保底掃描的間隔。
@@ -177,14 +175,12 @@ func (s *Service) purgeBatch(ctx context.Context, buyerID int64) (int, error) {
 	return n, err
 }
 
-// distinctProductIDs 把一批評價的商品去重並依 UUID 升序排列（鎖順序：同層多列依 ID 升序）。
 func distinctProductIDs(productIDs []uuid.UUID) []uuid.UUID {
 	out := slices.Clone(productIDs)
 	slices.SortFunc(out, uuid.UUID.Compare)
 	return slices.Compact(out)
 }
 
-// bust 排入這一批評價所在的商品頁與店面頁的快取失效（一個 job、去重、由小到大）。
 func (s *Service) bust(ctx context.Context, storeIDs []int64, productIDs []uuid.UUID) error {
 	slices.Sort(storeIDs)
 	slices.SortFunc(productIDs, uuid.UUID.Compare)

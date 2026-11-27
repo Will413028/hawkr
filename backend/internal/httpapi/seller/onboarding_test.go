@@ -21,8 +21,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// onboardingModule 是 GetMyOnboarding 的來源：MyKYC 回 kyc（或 kycErr）。沒有實作 Store：GetMyOnboarding 只讀 interceptor 放進 ctx 的店家，
-// 呼叫 Store 會因為嵌入的 Module 是 nil 而 panic。
 type onboardingModule struct {
 	Module
 	kyc    model.KYCApplication

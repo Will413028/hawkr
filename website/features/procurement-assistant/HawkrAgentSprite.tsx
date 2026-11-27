@@ -51,8 +51,6 @@ export default function HawkrAgentSprite({
 		<span
 			className={cn("hawkr-agent-sprite", className)}
 			data-motion={state}
-			// 外框在內容畫出前就佔好位置——§V.10.10-1「無首屏 layout shift」。
-			// size 省略時寬高留給 className 的 CSS，不寫 inline 值去壓 media query。
 			style={{
 				display: "inline-block",
 				...(size === undefined ? null : { width: size, height: size }),

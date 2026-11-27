@@ -45,7 +45,6 @@ test("fetch, node:http, node:https and a bare TCP connection refuse a host that 
 		() => https.get("https://api.hawkr.example/x"),
 		/hermetic test/,
 	);
-	// underneath everything else: a socket opened without any of the wrappers
 	const error = await new Promise<Error>((resolve) => {
 		const socket = net.connect({ host: "api.hawkr.example", port: 443 });
 		socket.once("error", resolve);
@@ -104,7 +103,6 @@ test("a subprocess started with hermeticEnv() carries the guard, a loopback API 
 		return JSON.parse(child.stdout) as Record<string, string>;
 	};
 
-	// the parent's own pins are removed first, so what the child shows is the preload's work
 	const base = { ...process.env };
 	delete base.API_BASE_URL;
 	delete base.NEXT_PUBLIC_API_BASE_URL;
@@ -114,7 +112,6 @@ test("a subprocess started with hermeticEnv() carries the guard, a loopback API 
 	assert.match(pinned.http, /hermetic test: refusing http\.request/);
 	assert.match(pinned.fetch, /hermetic test: refusing a fetch/);
 
-	// a loopback stub the test names is kept; a real host is replaced
 	const stub = run(
 		hermeticEnv(
 			{ API_BASE_URL: "http://127.0.0.1:41999/api/v1" },
@@ -159,7 +156,6 @@ test("every process a test file spawns gets the guard, call by call", async () =
 				await visit(relative);
 			} else if (
 				/\.(test|unit\.test)\.(ts|tsx)$/.test(entry.name) &&
-				// this file spawns on purpose, with the environments it is checking
 				relative !== "tests/hermetic-guard.test.ts"
 			) {
 				const code = await readFile(path.join(root, relative), "utf8");

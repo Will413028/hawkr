@@ -36,9 +36,6 @@ test("上游路徑一律含 delegated-operations 字面值，catch-all BFF 才�
 	];
 	for (const path of paths) {
 		assert.match(path, /^\/api\/v1\/admin\/delegated-operations\//u, path);
-		// `bff-boundary.ts` 只認 `delegated-operation`／`delegated-operations` 這兩個
-		// 字面值來拒絕代理。換成 `delegation-authorizations` 之類的名字，前端就能用
-		// 泛用 api.get 繞過整套 parser／safeUpstreamError／no-store 保護。
 		assert.equal(
 			isDelegatedOperationNamespace(path.replace(/^\//u, "").split("/")),
 			true,
@@ -83,9 +80,7 @@ test("每支 route 先驗身分再讀 body，且回應一律 no-store", async ()
 		assert.match(source, /export const runtime = "nodejs"/u, file);
 		assert.match(source, /export const dynamic = "force-dynamic"/u, file);
 		assert.match(source, /adminSession\.token\(request\)/u, file);
-		// `ok()` 統一補 Cache-Control: no-store（governance-route.ts）。
 		assert.match(source, /return ok\(/u, file);
-		// 上游 message 一律不透傳：未知服務可能在自由文字錯誤裡回吐憑證或內部拓撲。
 		assert.doesNotMatch(source, /payload\.message/u, file);
 	}
 });
@@ -106,8 +101,6 @@ test("寫入型 route 三道防線齊備：同源、XHR、冪等鍵", async () =
 test("回應必須證明是同一個對象的答案，否則判契約錯", async () => {
 	for (const file of ROUTE_FILES.filter((path) => path.includes("[storeId]"))) {
 		const source = await readFile(file, "utf8");
-		// 回的是另一家店的授權列 ⇒ 畫面會把它當成「這家店」而顯示一份不屬於它的範圍，
-		// 管理員接著會對著它按下撤回。
 		assert.match(source, /storeId !== storeId/u, file);
 		assert.match(source, /contractViolation\(/u, file);
 	}
@@ -120,7 +113,6 @@ test("回應必須證明是同一個對象的答案，否則判契約錯", async
 		"src/app/api/admin/delegated-operations/authorizations/[storeId]/revoke/route.ts",
 		"utf8",
 	);
-	// 宣稱成功卻沒有回出「這一列已撤回」＝一份假的撤回證明。
 	assert.match(revoke, /parsed\.authorization\.revokedAt === null/u);
 });
 
@@ -131,7 +123,6 @@ test("BFF 不重寫第三份依賴閉包規則", async () => {
 	);
 	assert.doesNotMatch(shared, /dependsOn/u);
 	assert.doesNotMatch(shared, /CAPABILITY_DEPENDENCIES/u);
-	// 形狀仍要驗：值域、長度、必填。
 	assert.match(shared, /DELEGATION_AUTHORIZATION_SOURCES/u);
 	assert.match(shared, /INVALID_SOURCE_REFERENCE/u);
 	assert.match(shared, /OPERATION_REASON_REQUIRED/u);
@@ -141,7 +132,6 @@ test("商家詳情頁以 store_id surrogate 掛載代行授權分頁", async () 
 	const page = await readFile("src/app/admin/merchants/[id]/page.tsx", "utf8");
 	assert.match(page, /activeTab === "delegation"/u);
 	assert.match(page, /代行授權/u);
-	// 授權列以 sellers.store_id 為鍵：傳店家的 id（與 URL 上的 params.id 相同），不是 account_id。
 	assert.match(
 		page,
 		/<MerchantDelegationAuthorizationPanel\s+storeId=\{store\.id\}/u,

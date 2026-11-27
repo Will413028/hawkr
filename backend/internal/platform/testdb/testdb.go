@@ -58,32 +58,23 @@ import (
 // Image 是單體統一的 Postgres 主版本：測試、Atlas 的 dev database、jet 的生成（cmd/jetgen）與本機 compose 都用它。
 const Image = "postgres:18-alpine"
 
-// templateFormat 是 template 建法本身的版本；改了建 template 的方式就加一，舊的 template 不再被用到。
 const templateFormat = "1"
 
-// testPoolConns 是每支測試的連線池上限。要容得下測試自己同時佔住的連線（例如一條持鎖加上四個並行請求各佔一條，
-// 上限 4 時會互等到逾時），所以不能太小。
 const testPoolConns = 10
 
-// adminConnsPerTest 是每支測試同時最多佔用的管理連線：建立時一條、清理時一條，加上 template 的建構者一條，各自短暫。
 const adminConnsPerTest = 3
 
-// maxConnections 是 container 的 max_connections，容納整次 go test 的並行上界：
-// go test 同時跑 -p（預設 NumCPU）個套件行程，每個行程同時跑 -parallel（預設 GOMAXPROCS，通常等於 NumCPU）支測試，
-// 每支測試最多 testPoolConns + adminConnsPerTest 條連線，所以上界是 NumCPU² × 13，再留 50 條給 template 與管理。
-// 8 核是 8×8×13+50 = 882。pgxpool 只在需要時才開連線，實際用量遠低於上界。
 func maxConnections() string {
 	n := runtime.NumCPU()
 	return strconv.Itoa(max(100, n*n*(testPoolConns+adminConnsPerTest)+50))
 }
 
-// dbSeq 是行程內測試 database 的流水號；名稱 t_<pid>_<seq> 在整個 container 內唯一。
 var dbSeq atomic.Int64
 
 // Server 是一個測試用的 Postgres container。
 type Server struct {
 	container *tcpostgres.PostgresContainer
-	shared    bool // 與同一次 go test 的其他套件行程共用；由 Ryuk 收掉，Close 不關
+	shared    bool
 	adminURL  string
 
 	mu        sync.Mutex
@@ -95,14 +86,11 @@ type template struct {
 	err  error
 }
 
-// runFunc 是起 container 的函式（tcpostgres.Run）；測試可以換成替身。
 type runFunc func(ctx context.Context, img string, opts ...testcontainers.ContainerCustomizer) (*tcpostgres.PostgresContainer, error)
 
 // Start 起（或找到同一次 go test 已經起好的）Postgres container。
 func Start(ctx context.Context) (*Server, error) { return start(ctx, tcpostgres.Run) }
 
-// start 在共用 container 時最多試兩次：找到的 container 可能在「找到」與「用到」之間被 Ryuk 回收
-// （所有行程的連線都斷了超過 Ryuk 的 reconnection timeout），第二次會起一個新的。
 func start(ctx context.Context, run runFunc) (*Server, error) {
 	srv, err := startOnce(ctx, run)
 	if err != nil && !testcontainers.ReadConfig().RyukDisabled {
@@ -140,7 +128,6 @@ func startOnce(ctx context.Context, run runFunc) (*Server, error) {
 		}
 		return nil, fmt.Errorf("testdb：取得連線字串：%w", err)
 	}
-	// 探測：找到的 container 要真的連得上，否則視為已被回收。
 	probe, err := pgx.Connect(ctx, u)
 	if err != nil {
 		if !shared {
@@ -212,7 +199,6 @@ func Jobs() Step {
 	return Step{key: "river " + riverVersion(), apply: jobs.Migrate}
 }
 
-// riverVersion 是 River 的 module 版本：River 的 migration 跟著版本走。
 func riverVersion() string {
 	if bi, ok := debug.ReadBuildInfo(); ok {
 		for _, dep := range bi.Deps {
@@ -281,11 +267,9 @@ func (s *Server) NewDB(t *testing.T, steps ...Step) *db.DB {
 	return s.newDB(t, t.Error, steps...)
 }
 
-// newDB 是 NewDB 的本體；report 收到每個鎖順序的倒退與無法解析的 SQL。
 func (s *Server) newDB(t *testing.T, report func(...any), steps ...Step) *db.DB {
 	t.Helper()
 	chk := lockorder.NewChecker()
-	// 先登記的 cleanup 後執行：等連線池關掉、所有 query 都結束之後才讀結果。
 	t.Cleanup(func() {
 		for _, err := range chk.Errors() {
 			report(err)
@@ -302,7 +286,6 @@ func (s *Server) newDB(t *testing.T, report func(...any), steps ...Step) *db.DB 
 	return d
 }
 
-// urlFor 是同一個 container 裡 database name 的連線字串。
 func (s *Server) urlFor(name string) (string, error) {
 	u, err := url.Parse(s.adminURL)
 	if err != nil {
@@ -331,8 +314,6 @@ func TemplateName(steps ...Step) (string, error) {
 	return "tpl_" + hex.EncodeToString(sum[:12]), nil
 }
 
-// template 回傳 steps 的 template database，第一次用到時建立；同一個行程只建一次，
-// 不同行程之間以 advisory lock 排隊，先到的建、後到的直接用。
 func (s *Server) template(ctx context.Context, steps []Step) (string, error) {
 	name, err := TemplateName(steps...)
 	if err != nil || name == "" {
@@ -359,14 +340,12 @@ func (s *Server) buildTemplate(ctx context.Context, name string, steps []Step) (
 	if _, err := admin.Exec(ctx, "SELECT pg_advisory_lock(hashtextextended($1, 0))", name); err != nil {
 		return fmt.Errorf("testdb：取得 template 的 advisory lock：%w", err)
 	}
-	// 連線關閉就釋放 lock。
 
 	var isTemplate bool
 	switch err := admin.QueryRow(ctx, "SELECT datistemplate FROM pg_database WHERE datname = $1", name).Scan(&isTemplate); {
 	case err == nil && isTemplate:
-		return nil // 別的行程建好了
+		return nil
 	case err == nil:
-		// 別的行程建到一半就結束了：重建。
 		if _, err := admin.Exec(ctx, "DROP DATABASE "+pgx.Identifier{name}.Sanitize()+" WITH (FORCE)"); err != nil {
 			return fmt.Errorf("testdb：刪除沒建完的 template：%w", err)
 		}

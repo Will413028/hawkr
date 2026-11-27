@@ -101,8 +101,6 @@ func suspendedByRisk(ground seller.RiskGround) seller.Store {
 	return storeIn(seller.Active, riskMeasure(ground))
 }
 
-// storeIn 是 seller 讀出的店家：條件（Conditions）照 status 帶上，KYC 已核准、店名、logo 與鄉鎮市區齊全；KYC 的影響由
-// TestHeaderCarriesOnlyActiveActionCapabilities 驗證。
 func storeIn(status seller.Status, effective ...seller.EffectiveMeasure) seller.Store {
 	var st seller.Store
 	st.StoreID, st.Status, st.Sanctions = 82, status, seller.SanctionedBy(effective...)
@@ -155,7 +153,6 @@ func TestForwardBusinessIdentity(t *testing.T) {
 			}
 			var logs strings.Builder
 			h, err := New("http://gateway.invalid", func(context.Context) (Caller, bool) {
-				// 入口放進 ctx 的 BuyerID 一律被忽略：forwarder 自己解析。
 				return Caller{Principal: identity.Principal{Kind: kind, ID: 7, Roles: tc.roles}, BuyerID: 999}, !tc.guest
 			}, buyerLookupFunc(func(_ context.Context, id int64) (int64, error) {
 				buyerCalls++

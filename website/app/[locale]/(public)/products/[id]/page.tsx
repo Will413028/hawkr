@@ -25,8 +25,6 @@ export function generateStaticParams() {
 	return [{ id: SENTINEL_ENTITY_ID }];
 }
 
-// 商品 id 是純數字 TSID；掃描器打的垃圾路徑（如 /products/styles.css.map）
-// 直接 404，不讓非法 id 流進後端打出 400 ApiClientError。
 function assertValidId(id: string) {
 	if (!/^\d+$/.test(id)) notFound();
 }
@@ -38,9 +36,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 	if (!product) return { title: "找不到商品" };
 
-	// One title and one summary for every surface (see lib/seo/metadata.ts
-	// `productSeoTitle`, lib/seo/product-summary.ts): the page <title>, the
-	// share card and the JSON-LD below must never tell three stories.
 	const pageLocale = localeFromParam(locale);
 	const title = productSeoTitle(
 		{ name: product.name, sellerName: product.seller?.name },
@@ -93,10 +88,6 @@ interface ProductData {
 }
 
 export default async function Page({ params }: Props) {
-	// PDP renders as on-demand ISR (traditional model, cacheComponents off). Entity reads stay
-	// tag-invalidated via `getCachedProduct` / ProductDetailPage; the route-level
-	// ISR entry gives cheap cached renders (no per-request render → no
-	// resume-hang / OOM exposure) and full server-rendered SEO.
 	const { id, locale: rawLocale } = await params;
 	assertValidId(id);
 	const locale = localeFromParam(rawLocale);
@@ -109,11 +100,6 @@ export default async function Page({ params }: Props) {
 	let jsonLd: React.ReactNode = null;
 	let offerLow = 0;
 	if (product) {
-		// Price: prefer sale range, fall back to list range, then to SKU prices;
-		// collapse to a single Offer when low === high. The backend reports "no
-		// sale price" as the string "0" (not null), so a nullish chain would stop
-		// there and emit no offer at all — pick the first POSITIVE number instead.
-		// Only emit a price when one exists (never a fabricated 0).
 		const skuPrices = (Array.isArray(product.skus) ? product.skus : [])
 			.map((s) => Number(s.price))
 			.filter((n) => Number.isFinite(n) && n > 0);
@@ -143,11 +129,6 @@ export default async function Page({ params }: Props) {
 		const hasRange =
 			Number.isFinite(low) && Number.isFinite(high) && high > low && low > 0;
 		const hasPrice = Number.isFinite(low) && low > 0;
-		// Availability: only from stock the wire actually reports — per-SKU
-		// `stockQty` first, the product-level `stock` total when no SKU says.
-		// Unknown stays unknown (no `availability` in the schema): an
-		// unreported quantity used to be advertised as InStock, which is a claim
-		// the page never makes.
 		const skus = Array.isArray(product.skus) ? product.skus : [];
 		const reported = (
 			value: number | string | undefined,
@@ -169,7 +150,6 @@ export default async function Page({ params }: Props) {
 				: knownStock > 0
 					? ("InStock" as const)
 					: ("OutOfStock" as const);
-		// Rating: emit only with a real review count (never fabricated).
 		const ratingValue = Number(product.rating);
 		const reviewCount = Number(product.reviewCount ?? 0);
 		const image = buildImageUrl(product.imageKey, "detail");
@@ -209,8 +189,6 @@ export default async function Page({ params }: Props) {
 		? {
 				item_id: id,
 				item_name: product.name,
-				// Same first-positive semantics as the JSON-LD offer above — the
-				// backend's "0" sale-price sentinel must not suppress the real price.
 				...(offerLow > 0 ? { price: offerLow } : {}),
 				...(product.seller?.name ? { item_brand: product.seller.name } : {}),
 			}

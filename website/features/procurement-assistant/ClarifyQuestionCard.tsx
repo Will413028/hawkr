@@ -108,8 +108,6 @@ const CROP_OTHER_OPTION_ID = "crop-other";
  * 不是需求快照卡的復活——e2e 釘住需求快照的舊 class 不得存在，這裡全部用新 class。
  */
 export default function ClarifyQuestionCard(props: ClarifyQuestionCardProps) {
-	// 大類、小類與自行描述品項可能沿用同一個 slotKey；題目內容改變時，上一題的
-	// 描述與展開狀態不能留在新題目。pending 或 callback 更新不清掉草稿。
 	const questionKey = JSON.stringify(props.question);
 	return <ClarifyQuestionForm key={questionKey} {...props} />;
 }
@@ -144,14 +142,12 @@ function ClarifyQuestionForm({
 	const canSubmitFreeText =
 		question.allowFreeText && Boolean(freeText.trim()) && !pending;
 
-	// 品項分類消歧問句的 D「其他」子表單：本地展開，不經 onPick。
 	const [showCropOtherForm, setShowCropOtherForm] = React.useState(false);
 	const [cropOtherDescription, setCropOtherDescription] = React.useState("");
 	const isCropDisambiguation =
 		question.slotKey === CROP_DISAMBIGUATION_SLOT_KEY;
 	const canRetryCropDescription =
 		isCropDisambiguation && question.allowFreeText;
-	// 沒有候選分類時，直接填寫即可，不再要求點選唯一的「其他」。
 	const isCropOtherOnly =
 		isCropDisambiguation &&
 		!question.allowFreeText &&
@@ -161,9 +157,6 @@ function ClarifyQuestionForm({
 	const canSubmitCropOther =
 		isCropDisambiguation && Boolean(cropOtherDescription.trim()) && !pending;
 
-	// quantity 複合問題卡／單位追問卡（backend-payuni#2442 §4）：quantity 本身
-	// 沒有 canonical options，unitOptions 是它獨立的單位子值，只有 Unit 尚未填
-	// 時後端才會帶。allowFreeText 分岔出兩種型態，同一個 slotKey。
 	const unitOptions = question.unitOptions ?? [];
 	const hasUnitOptions = questionHasUnitOptions(question);
 	const isCompoundQuantity = hasUnitOptions && question.allowFreeText;
@@ -183,13 +176,10 @@ function ClarifyQuestionForm({
 				firstOptionRef.current?.focus();
 				return;
 			}
-			// 日期題的欄位在 DatePicker 內部，拿不到 ref——用它自己的 id 取。
-			// 少了這段，日期題掛載時焦點會留在 <body>，鍵盤流程斷掉。
 			if (isDateQuestion) {
 				document.getElementById(dateInputId)?.focus();
 				return;
 			}
-			// 單位追問卡沒有數字欄——焦點還給第一顆單位 chip。
 			if (isUnitFollowUp) {
 				firstUnitOptionRef.current?.focus();
 				return;
@@ -207,8 +197,6 @@ function ClarifyQuestionForm({
 	]);
 
 	const submitFreeText = () => {
-		// 複合問題卡不透過這裡送出——數字欄只做本地 staging，湊齊單位後靠點
-		// chip 一次送出 freeText+unitOptionId（見下方 onPickUnit）。
 		if (isCompoundQuantity) return;
 		const answer = freeText.trim();
 		if (!answer || !canSubmitFreeText || !onSubmitFreeText) return;
@@ -362,10 +350,6 @@ function ClarifyQuestionForm({
 										question.options.length > 0
 											? "hawkr-agent-question-card__free-text-form--custom"
 											: "",
-										// 日期題的外框由 DatePicker 自己畫；這裡再套一層
-										// 就會是雙框。文字題則相反：這個 form 本身就是
-										// 那個輸入框，所以直接吃共用的 wrapper 樣式，
-										// 跟同一張卡裡的 DatePicker 長得一模一樣。
 										isDateQuestion
 											? "hawkr-agent-question-card__free-text-form--bare"
 											: inputWrapperClasses({
@@ -375,12 +359,6 @@ function ClarifyQuestionForm({
 													invalid: Boolean(freeTextError),
 													disabled: pending || !onSubmitFreeText,
 													floating: false,
-													// 這是一行答案（數量／包裝／交期…），不是多行輸入。
-													// textarea:true 會換成 `items-start + py-2.5 +
-													// min-h-auto` 的多行度量，box 比全站其他輸入框高一截；
-													// 用單行度量才會跟 DatePicker、<Input> 一樣是 lg 的
-													// 48px。元素本身仍是 textarea（要吃 Enter 送出與
-													// 換行組字），高度由下面的 CSS 收成一行。
 													textarea: false,
 												}),
 									]
@@ -421,13 +399,6 @@ function ClarifyQuestionForm({
 									) : (
 										<textarea
 											id={`clarify-free-text-${question.slotKey}`}
-											// foundation 的 bare-control baseline 會給「沒有
-											// data-slot 的原生控制項」畫邊框＋focus glow，因為它
-											// 假設那是獨立欄位。這個 textarea 住在共用 wrapper
-											// 裡（form 就是外框），少了這個屬性就會在外框裡再畫
-											// 一個內縮的小框——那正是 02-reset-layout.css 該段
-											// 註解在講的 double frame。共用 <Input>/<Textarea>
-											// 也是靠同一個屬性豁免。
 											data-slot="textarea"
 											className={TEXTAREA_RESET}
 											ref={freeTextRef}
@@ -561,9 +532,7 @@ function ClarifyQuestionForm({
 										}
 										className="hawkr-agent-question-card__option hawkr-agent-question-card__option--unit"
 									>
-										{/* 單位標籤是一到三個字，不掛右側的圈選標記：城市那種
-										 * 長標籤撐得住 space-between，「盒」撐不住——標籤貼左、
-										 * 圈圈貼右，中間一大片空白。這裡改成置中的緊湊 chip。 */}
+
 										{option.label}
 									</button>
 								))}

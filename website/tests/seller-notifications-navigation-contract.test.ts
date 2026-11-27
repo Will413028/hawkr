@@ -105,7 +105,6 @@ test("通知 unread provider 以帳號與角色 fail closed 並隔離快取", ()
 		unreadContext,
 		/resetSignal\s*=\s*`\$\{identity\.accountId \?\? "anon"\}:\$\{activeRole \?\? "none"\}`/,
 	);
-	// 同一個啟用條件同時管未讀數與唯一的那條串流：兩處都讀它，不各寫一份。
 	assert.match(
 		unreadContext,
 		/const streamEnabled\s*=\s*signedIn\s*&&\s*identity\.accountId !== null\s*&&\s*activeRole !== null/s,

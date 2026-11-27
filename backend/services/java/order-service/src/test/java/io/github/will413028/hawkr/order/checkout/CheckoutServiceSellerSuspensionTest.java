@@ -46,7 +46,6 @@ class CheckoutServiceSellerSuspensionTest {
 
     @Test
     void canManageProductsButNotAcceptOrders_throws9241() {
-        // 店家還不可公開曝光（KYC 或 PayUni 未核准、缺 logo）時賣家可以先上架商品，但結帳只看 can_accept_orders。
         CheckoutService service = newServiceWithSellerClient(Mockito.mock(SellerGrpcClient.class));
         SellerMeta notYetExposable = SellerMeta.newBuilder().setCanManageProducts(true).setCanAcceptOrders(false).build();
 
@@ -57,9 +56,6 @@ class CheckoutServiceSellerSuspensionTest {
 
     @Test
     void sellerMetaQueryFails_exceptionPropagates_failClosed() {
-        // 鏡射 validate()/preview()/confirm() 的實際呼叫序：
-        // sellerGrpcClient.getSellerMeta(storeId) 失敗時，例外必須原樣往外拋，
-        // 不可被靜默吞掉導致 checkout 誤放行停權賣家（fail-closed，46 §6.1 對稱互補）。
         SellerGrpcClient sellerGrpcClient = Mockito.mock(SellerGrpcClient.class);
         Mockito.when(sellerGrpcClient.getSellerMeta(STORE_ID))
                 .thenThrow(new StatusRuntimeException(Status.UNAVAILABLE));
@@ -71,8 +67,6 @@ class CheckoutServiceSellerSuspensionTest {
 
     @Test
     void sellerMetaNotFound_exceptionPropagates_failClosed() {
-        // getSellerMeta 查無資料時拋 OrderBusinessException(NOT_FOUND)（既有硬依賴語意），
-        // 同樣不可被吞掉。
         SellerGrpcClient sellerGrpcClient = Mockito.mock(SellerGrpcClient.class);
         Mockito.when(sellerGrpcClient.getSellerMeta(STORE_ID))
                 .thenThrow(new OrderBusinessException(io.github.will413028.hawkr.common.utils.code.GrpcResponseCode.NOT_FOUND));

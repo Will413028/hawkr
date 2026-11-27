@@ -33,12 +33,9 @@ type paymentModule struct {
 	returnURL  string
 	refreshURL string
 	err        error
-	// session 是 CreateOnboardingSession 回的 session；nil 時回託管連結。
 	session payment.OnboardingSession
-	// syncedFor 記下 SyncAccountUnlessFresh 被呼叫的店家；syncErr 非 nil 時同步失敗。
 	syncedFor []int64
 	syncErr   error
-	// 入帳帳本：記下收到的店家、篩選、游標與筆數；page 與 order 是回應。
 	earningsStore  int64
 	earningsFilter payment.EarningsFilter
 	earningsAfter  *payment.RecordCursor
@@ -265,8 +262,6 @@ func TestCreatePaymentOnboardingSessionAnswersWithExactlyOneSessionShape(t *test
 	}
 }
 
-// unknownSession 模擬 payment 新增了 handler 還沒處理的 session 形狀。payment.OnboardingSession 是封閉的 interface，
-// 這裡以巢狀的內嵌型別取得它的未匯出方法。
 type unknownSession struct{ payment.HostedSession }
 
 func earningsFixture() []payment.EarningsEntry {
@@ -362,7 +357,6 @@ func TestGetMyOrderEarningsPassesNotFoundThrough(t *testing.T) {
 	}
 }
 
-// handler 直接回傳的是 interceptor 轉換之前的傳輸層錯誤，錯誤文字以代碼開頭。
 func isTransportInvalidArgument(err error) bool {
 	return err != nil && strings.HasPrefix(err.Error(), "invalid_argument")
 }

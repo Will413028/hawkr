@@ -15,16 +15,12 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// noBuyerResolverForTest：模擬帳號目前無現任買家 stint（buyer 模組 404，
-// resolver 轉譯成 ErrNoCurrentBuyer）。mirrors noStoreResolverForTest in
-// resolve_seller_test.go.
 func noBuyerResolverForTest() *buyerid.Resolver {
 	return buyerid.New(buyerid.GetterFunc(func(context.Context, int64) (*buyerpb.BuyerInfo, error) {
 		return nil, status.Error(codes.NotFound, "buyer not found")
 	}))
 }
 
-// ==================== resolveBuyerID ====================
 
 func setupResolveBuyerProbe(h *Holder) *gin.Engine {
 	r := gin.New()
@@ -87,7 +83,6 @@ func TestResolveBuyerID_MissingIdentity401(t *testing.T) {
 	assertHTTPStatus(t, w, http.StatusUnauthorized)
 }
 
-// ==================== resolveOptionalBuyerFilterQuery ====================
 
 func setupResolveBuyerFilterProbe(h *Holder) *gin.Engine {
 	r := gin.New()

@@ -19,8 +19,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// errAppealUnavailable 是申覆的前置條件不成立時的失敗，訊息是 AppealUnavailabilities 的第一筆（與 can_appeal、API 的 appeal_unavailabilities 同一個規則與同一份文字）。
-// 原因清單是空的表示呼叫端的判斷與模型不一致，是程式錯誤，回內部錯誤，不對使用者說通用的句子。
 func errAppealUnavailable(l uitext.Locale, m model.Measure) error {
 	us := m.AppealUnavailabilities(l)
 	if len(us) == 0 {
@@ -45,13 +43,11 @@ func (s *Service) SubmitAppeal(ctx context.Context, in model.SubmitAppealInput) 
 	}, in)
 }
 
-// requestSpec 是兩種賣家請求在提出時不同的地方：種類、理由的欄位名稱、前置條件與失敗訊息。
 type requestSpec struct {
 	kind        model.RequestKind
 	reasonLabel string
 	allowed     func(model.Measure) bool
 	unavailable func(uitext.Locale, model.Measure) error
-	// retiredMeansEnded 為 true（申覆）時，措施所在的店家已退場（第一段清理）而且是被這筆終止關閉的，就回「申覆期限已過」。
 	retiredMeansEnded bool
 }
 
@@ -87,7 +83,6 @@ func (s *Service) submitRequest(ctx context.Context, spec requestSpec, in model.
 			if err != nil {
 				return err
 			}
-			// 現在時間在鎖之後取：等鎖的期間退場可能已經 commit，可用性的時間判斷要晚於它；結果不依賴時鐘的是下面的 retired_at 檢查。
 			now := s.now()
 			fresh, err := s.readRow(ctx, q, row, detailList, now)
 			if err != nil {
@@ -99,12 +94,6 @@ func (s *Service) submitRequest(ctx context.Context, spec requestSpec, in model.
 			if !spec.allowed(fresh) {
 				return spec.unavailable(uitext.LocaleFrom(ctx), fresh)
 			}
-			// 「已退場 ⇒ 申覆期限已過」只在造成這家店目前關閉的終止合作上成立：第一段清理（退場，RetireDueStores）對 closed_by = TERMINATION 的
-			// retire_after 是 greatest(關店後 StoreRetireAfter, 帳號上未撤銷終止中最晚的申覆期限)，退場只在 now > retire_after 時發生，所以那一筆終止
-			// （未撤銷）的期限必已過，不論這個實例的時鐘怎麼走（多實例的時鐘差）；第二段（個資清理）一定在退場之後，所以看 retired_at 就涵蓋兩段。
-			// 其他措施不成立：停權與警告沒有申覆期限，賣家自己關店的退場只看關店後 StoreRetireAfter（30 天），預告終止的期限（生效後 184 天）可能還沒到，
-			// 這些照常申覆。只看措施所在的店家（帳號早先自己關閉而退場的舊 stint 不代表這筆措施的期限已過）。解除請求沒有 legal hold，不受影響。
-			// 放在可用性檢查之後：失敗原因的順序要和讀模型一致（已撤銷、已申覆過、期限已過、有待處理的請求），已撤銷的終止在已退場的店家上回的是「已撤銷」。
 			if spec.retiredMeansEnded && locked.RetiredAt != nil {
 				closedByThis, err := s.closedByTermination(ctx, q, row)
 				if err != nil {
@@ -155,7 +144,6 @@ func (s *Service) submitRequest(ctx context.Context, spec requestSpec, in model.
 	return result, nil
 }
 
-// closedByTermination 回傳這筆措施是不是店家目前這次關閉的原因（終止合作、closed_by = TERMINATION 且 closed_by_measure_id 是它）。
 func (s *Service) closedByTermination(ctx context.Context, q *store.Queries, m store.SellerMeasure) (bool, error) {
 	if m.Kind != string(model.MeasureTermination) {
 		return false, nil
@@ -172,11 +160,6 @@ func (s *Service) closedByTermination(ctx context.Context, q *store.Queries, m s
 	return false, nil
 }
 
-// lockForRequest 是賣家請求（申覆與解除請求）的鎖：先鎖措施所在帳號全部的 stint（所有措施的寫入都先鎖它），再鎖措施列，與 lockMeasure 同一個順序。
-// 措施是終止合作時，帳號上以它為來源的關聯終止所在的帳號也要鎖：清理的 legal hold 含「關聯終止的來源有待處理的申覆」，被關聯帳號的清理要和這筆申覆競爭
-// 同一組店家列，鎖了才和清理的再判斷串行（step10e-3cb §2.4）。做法同撤銷（lockForRevoke）：不加鎖預讀被關聯的帳號，依 account_id 升序鎖
-// （stint.LockAccounts，與關聯終止的建立、撤銷同一個跨帳號鎖序），鎖住措施列之後重讀；超出已鎖的範圍（剛好新增了關聯終止）回 errScopeChanged，
-// 呼叫方整個 transaction 重來。回傳措施所在的店家列（鎖住之後讀）與措施列。
 func (s *Service) lockForRequest(ctx context.Context, q *store.Queries, measureID uuid.UUID) (store.SellerStore, store.SellerMeasure, error) {
 	current, err := q.MeasureByID(ctx, measureID)
 	if errors.Is(err, pgx.ErrNoRows) {

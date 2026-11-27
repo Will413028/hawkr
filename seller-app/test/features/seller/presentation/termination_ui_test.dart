@@ -245,7 +245,6 @@ void main() {
             .data,
         '$appealWindowEndedSentence · 申覆期限：2027/05/22 12:30',
       );
-      // 原因與期限同一行，位在按鈕上方。
       expect(
         tester
             .getBottomLeft(find.byKey(const ValueKey('measure-appeal-note')))
@@ -320,7 +319,6 @@ void main() {
           )
           .map((t) => t.data)
           .toList();
-      // 順序照伺服器給的，不依生效時間重排。
       expect(texts, [
         '平台已通知將於 2026/12/01 12:30 終止合作。在此之前店家照常營業；如有異議，可提出申覆。',
         '平台已通知將於 2026/11/20 12:30 終止合作。在此之前店家照常營業；如有異議，可提出申覆。',

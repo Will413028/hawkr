@@ -53,14 +53,12 @@ type Deps struct {
 // Service 是措施的 use case。
 type Service struct {
 	d Deps
-	// hooks 是測試用的同步點（hooks_integration.go，只在 integration build tag 下有內容，正式程式是空的）。
 	hooks requestHooks
 }
 
 // New 建立服務。
 func New(d Deps) *Service { return &Service{d: d} }
 
-// now 是寫入用的現在：截到微秒（Postgres 的 timestamptz 精度），之後與已存的時間比較才不會被奈秒的差異誤判。
 func (s *Service) now() time.Time { return s.d.Now().UTC().Truncate(time.Microsecond) }
 
 func errMeasureNotFound() error { return apperr.NotFound("找不到這筆措施") }
@@ -71,7 +69,6 @@ func errMeasureVersion() error {
 
 func pageSize(size int32) (int32, error) { return pagination.PageSize(size, 20, 100) }
 
-// atMicrosecond 把輸入的時間截到微秒（UTC）。
 func atMicrosecond(t *time.Time) *time.Time {
 	if t == nil {
 		return nil
@@ -80,7 +77,6 @@ func atMicrosecond(t *time.Time) *time.Time {
 	return &v
 }
 
-// detail 是載入的程度：list 帶依據的認定與請求；admin 讀單筆與寫入的結果另帶請求的佐證與全部版本。
 type detail int
 
 const (
@@ -88,7 +84,6 @@ const (
 	detailAdmin
 )
 
-// hydrate 把一批措施轉成模型並載入關聯（固定幾次查詢，與筆數無關）。
 func (s *Service) hydrate(ctx context.Context, q *store.Queries, rows []store.SellerMeasure, level detail, now time.Time) ([]model.Measure, error) {
 	out := make([]model.Measure, len(rows))
 	if len(rows) == 0 {
@@ -199,8 +194,6 @@ type contentKey struct {
 	ref       model.ContentRef
 }
 
-// loadContents 載入內容下架措施的對象（其他種類沒有，整批沒有內容下架時不查）。只讀摘要（本文的前 ExcerptRunes 個字元由資料庫截出），不把全文讀進清單；
-// fullBody 為真（後台讀單筆措施與寫入的結果）才另查全文。
 func loadContents(ctx context.Context, q *store.Queries, measures []model.Measure, index map[uuid.UUID]int, fullBody bool) error {
 	var ids []uuid.UUID
 	for _, m := range measures {
@@ -243,7 +236,6 @@ func loadContents(ctx context.Context, q *store.Queries, measures []model.Measur
 	return nil
 }
 
-// read 讀一筆措施的目前狀態（目前值在 measures、依據與請求）；不存在回 NotFound。
 func (s *Service) read(ctx context.Context, q *store.Queries, id uuid.UUID, level detail, now time.Time) (model.Measure, error) {
 	row, err := q.MeasureByID(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -288,7 +280,6 @@ func toMeasure(row store.SellerMeasure, now time.Time) model.Measure {
 	return m
 }
 
-// toViolations 把認定列轉成模型（與輸入同順序），並載入它們的來源通報（依通報 id 排序）。
 func toViolations(ctx context.Context, q *store.Queries, rows []store.SellerViolation) ([]model.Violation, error) {
 	out := make([]model.Violation, len(rows))
 	if len(rows) == 0 {
@@ -312,7 +303,6 @@ func toViolations(ctx context.Context, q *store.Queries, rows []store.SellerViol
 	return out, nil
 }
 
-// toViolation 把認定列與它的來源通報轉成模型。
 func toViolation(row store.SellerViolation, sourceReportIDs []uuid.UUID) model.Violation {
 	v := model.Violation{
 		ID: row.ID, StoreID: row.StoreID, AccountID: row.AccountID, SourceReportIDs: sourceReportIDs,
@@ -396,8 +386,6 @@ func (s *Service) AccountMeasure(ctx context.Context, accountID int64, measureID
 	return result, err
 }
 
-// lockMeasure 先鎖措施所在帳號的全部 stint（stint.LockAccountOf，所有措施的寫入都先鎖它，鎖順序一致），再鎖措施列。
-// 店家可以已經關閉：措施的效果以帳號為單位，已關閉 stint 上的措施照樣可以撤銷與申覆。
 func (s *Service) lockMeasure(ctx context.Context, q *store.Queries, measureID uuid.UUID) (store.SellerStore, store.SellerMeasure, error) {
 	current, err := q.MeasureByID(ctx, measureID)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -414,9 +402,6 @@ func (s *Service) lockMeasure(ctx context.Context, q *store.Queries, measureID u
 	return locked, current, err
 }
 
-// loadDeadlines 一次讀出這批措施的複審期限（ReviewDeadline）與待處理請求的裁定期限（MeasureRequest.DecideDeadline）。成員、開始與期限只在
-// seller.review_measure_review、review_measure_appeal、review_measure_lift_request（db/objects.sql）；義務不在時維持 nil。呼叫的是哪支函式
-// 只看請求的種類，請求是不是待處理（含解除請求的措施是否仍生效中）由函式判斷，所以不是待處理的請求不在結果裡。
 func loadDeadlines(ctx context.Context, q *store.Queries, measures []model.Measure, now time.Time) error {
 	var reviewIDs, appealIDs, liftIDs []uuid.UUID
 	for _, m := range measures {
@@ -470,7 +455,6 @@ func loadDeadlines(ctx context.Context, q *store.Queries, measures []model.Measu
 	return nil
 }
 
-// contentOf 把 measure_contents 的一列轉成 MeasureContent；快照只在狀態是 CAPTURED 時有（欄位的 CHECK 保證其餘欄位非空）。
 func contentOf(r store.MeasureContentsRow) model.MeasureContent {
 	c := model.MeasureContent{ContentRef: model.ContentRef{Kind: model.ContentKind(r.ContentKind), ID: r.ContentID}, State: model.SnapshotState(r.SnapshotState)}
 	if c.State != model.SnapshotCaptured {

@@ -13,8 +13,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-// resolverThatFailsTest 若被呼叫就讓測試失敗——用來斷言 owner_id=0（不篩選擁有者）
-// 時 handler 完全不該去解析 resolver。
 func resolverThatFailsTest(t *testing.T) *storeid.Resolver {
 	t.Helper()
 	return storeid.New(storeid.GetterFunc(func(context.Context, int64) (int64, error) {

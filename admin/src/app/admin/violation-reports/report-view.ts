@@ -13,7 +13,6 @@ import {
 import { formatDateTimeShort } from "@/lib/format";
 import { policyCategoryText } from "@/lib/policy-category";
 
-// 通報與案件詳情頁的顯示邏輯（純函式）：佐證的名稱、補充與移動紀錄的句子。資料與可做的動作都來自伺服器。
 
 /** 時間的顯示（台北時間，到分鐘）；沒有時間是「-」。 */
 export function timeText(value: Timestamp | undefined): string {

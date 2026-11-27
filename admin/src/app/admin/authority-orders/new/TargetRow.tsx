@@ -89,7 +89,6 @@ export default function TargetRow({
 	onChange,
 	onRemove,
 }: TargetRowProps) {
-	// 帳號 ID 輸入完（離開欄位）才去讀它的店家，不是每打一個字讀一次。
 	const [committed, setCommitted] = useState("");
 	const stores = useAccountStores(committed);
 	const id = `authority-target-${index}`;

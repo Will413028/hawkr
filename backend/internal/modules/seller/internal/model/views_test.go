@@ -19,7 +19,6 @@ func TestViewDayUsesTaipeiBoundaries(t *testing.T) {
 	}{
 		{"台北 00:00 是新的一天", time.Date(2026, 2, 1, 0, 0, 0, 0, twtime.Taipei), date(2026, 2, 1)},
 		{"台北 23:59:59 還是同一天", time.Date(2026, 1, 31, 23, 59, 59, 0, twtime.Taipei), date(2026, 1, 31)},
-		// 2026-01-31 16:00 UTC 已經是台北的 2/1 00:00：UTC 的日曆日還是 1/31。
 		{"UTC 16:00 是台北的隔天", time.Date(2026, 1, 31, 16, 0, 0, 0, time.UTC), date(2026, 2, 1)},
 		{"UTC 15:59:59 還是台北的同一天", time.Date(2026, 1, 31, 15, 59, 59, 0, time.UTC), date(2026, 1, 31)},
 		{"跨年", time.Date(2027, 1, 1, 8, 0, 0, 0, twtime.Taipei), date(2027, 1, 1)},
@@ -39,7 +38,6 @@ func TestViewRange(t *testing.T) {
 	if err != nil || !first.Equal(date(2026, 10, 3)) || !end.Equal(date(2026, 10, 10)) {
 		t.Fatalf("一週: %s %s %v", first, end, err)
 	}
-	// 同一個瞬間以 UTC 表示（前一天 16:00）也是台北 00:00。
 	if first, end, err = ViewRange(tp(2026, 10, 3).UTC(), tp(2026, 10, 4).UTC()); err != nil || !first.Equal(date(2026, 10, 3)) || !end.Equal(date(2026, 10, 4)) {
 		t.Fatalf("UTC 表示: %s %s %v", first, end, err)
 	}
@@ -66,7 +64,7 @@ func TestViewRebuildRange(t *testing.T) {
 		ok       bool
 	}{
 		{"保留期內", day(4), day(10), true},
-		{"起日的時間部分被捨去", day(3).Add(13 * time.Hour), day(10), false}, // 10/3 00:00 早於 10/3 12:00
+		{"起日的時間部分被捨去", day(3).Add(13 * time.Hour), day(10), false},
 		{"起日早於保留期", day(3), day(5), false},
 		{"倒置", day(8), day(7), false},
 		{"迄日在未來", day(8), day(11), false},

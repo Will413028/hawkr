@@ -15,10 +15,6 @@ export function ProductViewTracker({ productId }: { productId: string }) {
 	}, [productId]);
 
 	useEffect(() => {
-		// Logged-in viewers also get this visit written to their personal browse
-		// history (the beacon above only feeds aggregate counts). The mutation
-		// handles the request + history-cache invalidation; we just gate on the
-		// buyer scope and fire once per product mount — guests keep just the beacon.
 		if (!canRecord) return;
 		if (recordedFor.current === productId) return;
 		recordedFor.current = productId;

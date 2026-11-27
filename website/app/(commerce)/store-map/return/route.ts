@@ -147,13 +147,8 @@ function siteOrigin(req: NextRequest): string {
 		try {
 			return new URL(env).origin;
 		} catch {
-			/* fall through */
 		}
 	}
-	// Next standalone behind nginx: NextRequest.url is built from the
-	// container's internal HOSTNAME:PORT (e.g. https://0.0.0.0:3080), not the
-	// proxied Host header — so postMessage targetOrigin would be unreachable
-	// for the opener. Read the proxy-forwarded host explicitly.
 	const proto = req.headers.get("x-forwarded-proto") ?? "https";
 	const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
 	if (host) return `${proto}://${host}`;

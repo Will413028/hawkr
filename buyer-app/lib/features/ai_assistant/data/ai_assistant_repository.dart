@@ -105,7 +105,6 @@ class AiAssistantRepository {
           yield event;
           if (event is AiTurnFinished || event is AiTurnFailed) return;
         }
-        // 被截斷（100 秒到）：立刻接續；一個事件都沒有時隔一秒，避免緊密迴圈。
         failures = progressed ? 0 : failures + 1;
         if (failures >= maxConsecutiveFailures) {
           throw ConnectException(Code.unavailable, 'assistant stream stalled');

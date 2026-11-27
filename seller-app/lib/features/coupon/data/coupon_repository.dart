@@ -18,9 +18,6 @@ class CouponRepository {
 
   static const _basePath = '/api/v1/app/coupon_templates';
 
-  // ---------------------------------------------------------------------------
-  // List
-  // ---------------------------------------------------------------------------
 
   /// GET /app/coupon_templates — 取得賣家優惠券模板列表
   Future<List<Coupon>> getSellerCoupons() async {
@@ -29,9 +26,6 @@ class CouponRepository {
       final data = resp.data;
       if (data is Map<String, dynamic>) {
         final inner = data['data'];
-        // Handle both formats:
-        // 1. data: [...]  (direct array)
-        // 2. data: { records: [...] }  (paginated)
         List? list;
         if (inner is List) {
           list = inner;
@@ -51,9 +45,6 @@ class CouponRepository {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Detail
-  // ---------------------------------------------------------------------------
 
   /// GET /app/coupon_templates/{template_id} — 取得優惠券模板詳情
   ///
@@ -88,9 +79,6 @@ class CouponRepository {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Create
-  // ---------------------------------------------------------------------------
 
   /// POST /app/coupon_templates — 建立並發行優惠券
   ///
@@ -134,9 +122,6 @@ class CouponRepository {
     return AppException.fromDioException(e);
   }
 
-  // ---------------------------------------------------------------------------
-  // Revoke
-  // ---------------------------------------------------------------------------
 
   /// POST /app/coupon_templates/{id}/revoke — 撤銷優惠券模板
   ///
@@ -168,9 +153,6 @@ class CouponRepository {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------
 
   /// Parse API response (CouponTemplateResponse) into [Coupon].
   ///
@@ -222,7 +204,6 @@ class CouponRepository {
     return switch (s) {
       '1' || 'CASH' => 'CASH',
       '2' || 'PERCENT' => 'PERCENT',
-      // 舊版相容
       'DISCOUNT' => 'PERCENT',
       _ => s,
     };

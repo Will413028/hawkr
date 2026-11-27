@@ -5,17 +5,11 @@ import { isConfiguredMediaUrl, resolveCdnUrl } from "@/lib/media/cdn";
 export const size = { width: 180, height: 180 };
 export const contentType = "image/png";
 
-// Per-seller apple-touch-icon。macOS / iOS 分享連結時，那格小圖示抓的是
-// apple-touch-icon——有 canonical logo_url 時顯示商家頭像；缺圖或讀取失敗
-// 時維持空白品牌底色，不替換成另一張圖片或文字縮寫。
 
 type SellerLike = {
 	logo_url?: string;
 } | null;
 
-// 這支會 server-side fetch logo 值：backend 目前已擋掉 generic profile update 寫入
-// 外部 URL，但既有資料/未來其他寫入路徑不能假設一定乾淨，所以只允許設定檔
-// 指定的 media origin（NEXT_PUBLIC_MEDIA_BASE_URL）；沒設定時一律不 fetch。
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 3000;
 

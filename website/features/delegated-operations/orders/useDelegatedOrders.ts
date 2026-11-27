@@ -104,7 +104,6 @@ export function useDelegatedOrderList({
 }: UseDelegatedOrderListArgs): UseDelegatedOrderListResult {
 	const { identity, repo, enabled } = useDelegatedOrderQueryBase();
 	const query = useQuery({
-		// `kind` 這個判別字讓列表與 KPI 兩種查詢即使參數巧合相同也不會共用同一槽。
 		queryKey: queryKeys.delegated.orders(identity, {
 			kind: "list",
 			page,
@@ -125,7 +124,6 @@ export function useDelegatedOrderList({
 				signal,
 			}),
 		enabled,
-		// 翻頁時保留上一頁的列，而不是閃一次空清單。
 		placeholderData: keepPreviousData,
 	});
 

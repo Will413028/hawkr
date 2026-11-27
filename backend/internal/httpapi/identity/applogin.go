@@ -18,8 +18,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// App 的原生登入（ADR 2026-10-30-identity-self-hosted-federated-login D2）：原生 SDK 給 App 的 ID token 換 session，或連結到已登入的帳號。
-// nonce 是伺服器發的單次使用值，ID token 的 nonce claim 必須等於它。
 
 // AppVerifier 驗證一家 provider 的原生 SDK 簽發給 App 的 ID token；*identity.AppLogin 滿足它。
 type AppVerifier interface {
@@ -28,7 +26,6 @@ type AppVerifier interface {
 	Verify(ctx context.Context, idToken, wantNonce string) (identity.ProviderIdentity, error)
 }
 
-// appLoginModule 是 App 登入需要的 identity 方法；*identity.Module 滿足它。
 type appLoginModule interface {
 	IssueAppNonce(ctx context.Context) (string, time.Time, error)
 	ConsumeAppNonce(ctx context.Context, nonce string) error
@@ -60,8 +57,6 @@ func NewAppLogin(m appLoginModule, verifiers ...AppVerifier) (*AppLogin, error) 
 	return a, nil
 }
 
-// identityOf 驗證請求帶的 ID token 與 nonce，回傳 provider 的身分：先驗證 ID token（含 nonce claim 與請求的 nonce 相同），通過才消耗 nonce
-// （單次使用）。無效的 ID token 不消耗 nonce，所以拿到別人 nonce 的人不能用垃圾請求把它作廢。
 func (a *AppLogin) identityOf(ctx context.Context, provider pb.LoginProvider, idToken, nonce string) (identity.ProviderIdentity, error) {
 	if provider == pb.LoginProvider_LOGIN_PROVIDER_UNSPECIFIED {
 		return identity.ProviderIdentity{}, rpc.RequiredField("provider", "provider 必填")
@@ -120,7 +115,6 @@ func (h *Public) ExchangeIdToken(ctx context.Context, req *connect.Request[pb.Ex
 	if token, source := rpc.CredentialFromHeader(req.Header()); source == rpc.CredentialBearer {
 		previous = token
 	}
-	// 只有請求真的帶了語系（Accept-Language 協商成功）才更新帳號語系；沒帶的請求不用預設值蓋掉已存的偏好。
 	locale, _ := uitext.RequestedLocale(ctx)
 	res, err := h.login.m.Login(ctx, identity.LoginInput{Identity: id, Client: identity.ClientApp, PreviousToken: previous, Locale: locale})
 	if err != nil {

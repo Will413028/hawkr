@@ -102,7 +102,6 @@ func TestSD26ForeignWriteOnPublishedIsDenied(t *testing.T) {
 		}
 		for label, p := range map[string]social.Post{"草稿": draft, "下架": unpub, "已刪除": gone} {
 			if name == "DeleteOld" && label == "已刪除" {
-				// 模組的 DeletePost 冪等（SD5）：已刪除的貼文什麼都不做、回 nil。
 				if err := call(p); err != nil {
 					t.Errorf("%s 別家%s：%v", name, label, err)
 				}

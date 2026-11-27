@@ -60,7 +60,6 @@ class SellerCertificationUploadScreen extends HookConsumerWidget {
     final wizard = ref.read(kycWizardProvider.notifier);
     final stepState = useState<KycStep?>(null);
     final privacyChecked = useState(false);
-    // 確認步驟的聯絡信箱欄位依它顯示；讀取在這裡開始，讀完重建畫面。
     ref.watch(currentContactEmailProvider);
 
     final entered = useState(false);
@@ -74,8 +73,6 @@ class SellerCertificationUploadScreen extends HookConsumerWidget {
       if (context.mounted) stepState.value = wizard.resumeStep;
     }
 
-    // 進入時重讀申請（刷新共用快取），缺項與店家缺項才不會是過期的。重讀失敗時快取的 AsyncError 仍帶著先前的值，所以由重讀的
-    // 結果決定：失敗就顯示重試，不用過期的申請載入。
     final rereadFailed = useState(false);
     Future<void> enter() async {
       final ok = await ref.read(kycReaderProvider.notifier).refresh();
@@ -118,7 +115,6 @@ class SellerCertificationUploadScreen extends HookConsumerWidget {
     final locked = application != null && !wizard.editable;
     final busy = wizard.busy;
 
-    // 別處取消了申請（衝突時發現）：和捨棄草稿一樣回到第一步、取消兩個勾選。
     final hasApplication = application != null;
     useEffect(() {
       if (wizardState.hydrated && !hasApplication) {
@@ -307,7 +303,6 @@ class SellerCertificationUploadScreen extends HookConsumerWidget {
         ? ref.watch(kycAgreementsProvider)
         : const AsyncLoading<KycAgreements>();
 
-    // 輸入統編滿 8 碼時自動查登記資料。
     final taxId = wizardState.form.taxId;
     final autoLookup =
         wizardState.hydrated &&

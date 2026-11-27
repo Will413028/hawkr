@@ -87,15 +87,12 @@ class ProductPublicationPolicyTest {
         String active = ProductStatus.ACTIVE.value();
         String inactive = ProductStatus.INACTIVE.value();
         for (boolean exposable : new boolean[] {true, false}) {
-            // 移除永遠優先於店家可曝光
             assertEquals(ProductPublicationState.REMOVED,
                     ProductPublicationPolicy.deriveState(published, active, published, null, exposable));
             assertEquals(ProductPublicationState.REMOVED,
                     ProductPublicationPolicy.deriveState(published, active, null, published, exposable));
-            // 從未公開不因店家可曝光而改變
             assertEquals(ProductPublicationState.NEVER_PUBLISHED,
                     ProductPublicationPolicy.deriveState(null, active, null, null, exposable));
-            // 下架本來就是暫時不可用
             assertEquals(ProductPublicationState.TEMPORARILY_UNAVAILABLE,
                     ProductPublicationPolicy.deriveState(published, inactive, null, null, exposable));
         }

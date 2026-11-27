@@ -126,43 +126,23 @@ function notFoundResponse(request: NextRequest): NextResponse {
 }
 
 async function route(request: NextRequest): Promise<NextResponse> {
-	// next-intl routes on the decoded, slash-collapsed path (`/%65n/…` and `//en/…`
-	// reach the `/en/…` page), so every decision below reads that same string; an
-	// undecodable path is left to Next, which answers 400.
 	const routed = routingPathname(request.nextUrl.pathname);
 	if (routed === null) return NextResponse.next();
 
-	// Staff and infrastructure paths have no locale and never go to next-intl
-	// (it would rewrite them to `/zh-TW/…`, which does not exist): lib/intl/paths.ts
-	// NON_LOCALIZED_PREFIXES / NON_LOCALIZED_EXACT say which and why.
 	if (isNonLocalizedPath(routed)) return NextResponse.next();
 
 	const { locale, prefix, pathname } = splitLocale(routed);
 
-	// An explicit default-locale prefix (`/zh-TW/…`) is not a canonical URL:
-	// next-intl redirects it to the unprefixed one, and the decisions below run on
-	// that second request. The exception is a metadata image route: Next writes
-	// its URL into the HTML from the route params, prefix included even for the
-	// default locale (a seller page's `<link rel="apple-touch-icon">`), so it is
-	// served where it is instead of costing every icon fetch a redirect.
 	if (locale === defaultLocale) {
 		return isMetadataImagePath(pathname)
 			? NextResponse.next()
 			: handleI18nRouting(request);
 	}
 
-	// A locale this surface has not published is not a route. In prod `/en/…` is
-	// already not a locale prefix at all (i18n/routing.ts only knows routable
-	// locales); this is the case of a locale one surface published and another has not.
 	if (locale && !isLocaleRoutableFor(locale, pathname)) {
 		return notFoundResponse(request);
 	}
 
-	// next.config's production Agent gate lands hidden deep links here. Config
-	// redirects preserve unmatched query parameters, and the requestId-specific
-	// rule deliberately blanks the value in its first Location response. Remove
-	// the key itself before the auth bounce can embed this URL into
-	// /login?redirect=..., while preserving unrelated campaign/message params.
 	if (
 		!getEnv().hawkrAgentEnabled &&
 		pathname === "/account/messages" &&
@@ -173,29 +153,12 @@ async function route(request: NextRequest): Promise<NextResponse> {
 		return NextResponse.redirect(cleanUrl, 307);
 	}
 
-	// Storefront 404. It lives here rather than inside the tab pages because
-	// those are statically prerendered, and a prerender has no live response to
-	// carry a status: `notFound()` renders the 404 body but still answers 200.
-	// See lib/seller/storefront-guard.ts.
-	//
-	// The response carries no Set-Cookie, which matters: a Set-Cookie keeps a CDN
-	// from caching the entry, so a cookie here would knock the whole storefront
-	// subtree out of the edge HTML cache.
 	if (pathname.startsWith("/sellers/")) {
-		// Middleware is one of only two places on this site that can see who the
-		// visitor is (a cached RSC render cannot — `headers()` throws inside
-		// `use cache`), so it is where the storefront lookup gets attributed to
-		// the person it is made for rather than to the site's shared SSR quota.
-		// See `getVisitorIp` for why the address is trustworthy.
 		const visitorIp = getVisitorIp(request);
 		const outcome = await resolveStorefrontRequest(pathname, (storeCode) =>
 			lookupStore(storeCode, visitorIp),
 		);
 		if (outcome.kind === "not-found") {
-			// A store_code outside `stores_store_code_check`'s range, a store that does
-			// not exist and one that is not publicly visible all answer the same 404
-			// page, without saying which. Rewriting to the app's not-found route
-			// serves the 404 page with the explicit status the page cannot produce here.
 			return notFoundResponse(request);
 		}
 		const threadPath = canonicalThreadPath(pathname);
@@ -204,9 +167,6 @@ async function route(request: NextRequest): Promise<NextResponse> {
 			threadUrl.pathname = `${prefix}${threadPath}`;
 			return NextResponse.redirect(threadUrl, 308);
 		}
-		// A thread the backend does not hold is a real 404 for the same reason
-		// (the page is prerendered; see lib/forum/thread-guard.ts). The storeId comes
-		// from the lookup above, so a thread URL costs one GetStore plus one thread call.
 		const missing = await isMissingForumThread(
 			pathname,
 			outcome.storeId,
@@ -216,20 +176,10 @@ async function route(request: NextRequest): Promise<NextResponse> {
 		return pass(request, pathname, locale);
 	}
 
-	// /login is never bounced for signed-in visitors (hawkr-website#259): a
-	// session cookie the monolith refuses (deleted account) would
-	// loop them away from the login screen. The authoritative check is the
-	// client-side GetSession; LoginPage itself redirects away once it confirms a
-	// live account (see useAuth().isLoggedIn there).
 	if (pathname === "/login") return pass(request, pathname, locale);
 
 	const access = requiredAccessForPath(pathname);
 	if (!access) return pass(request, pathname, locale);
-	// A session cookie is enough to enter; the account behind it (and its roles)
-	// is checked by the monolith on every call and by the zone layouts (ZoneGate, lib/auth/zone.ts).
-	// The zone layouts have no pathname or query of their own, so the requested URL rides along as a
-	// request header (overwriting anything the client sent under that name) for the login redirect they
-	// issue when the monolith refuses the cookie.
 	const returnPath = `${request.nextUrl.pathname.replace(/^\/{2,}/, "/")}${request.nextUrl.search}`;
 	if (request.cookies.get(SESSION_COOKIE_NAME)?.value) {
 		const headers = new Headers(request.headers);
@@ -238,13 +188,8 @@ async function route(request: NextRequest): Promise<NextResponse> {
 	}
 
 	const loginUrl = request.nextUrl.clone();
-	// The login page of the locale the visitor is in, and the way back is the URL
-	// they asked for: the raw pathname, as before locales (a `%25` stays `%25`; the
-	// decoded `routed` would turn it into `%`). Only leading slashes are collapsed:
-	// `//host/x` as a return target would be a protocol-relative URL.
 	loginUrl.pathname = `${prefix}/login`;
 	loginUrl.search = "";
-	// An account page belongs to no workspace: the login page keeps its default tab.
 	const role = workspaceOfPath(pathname);
 	if (role) loginUrl.searchParams.set("role", role);
 	loginUrl.searchParams.set("redirect", returnPath);

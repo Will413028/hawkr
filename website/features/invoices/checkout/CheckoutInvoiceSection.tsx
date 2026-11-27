@@ -62,14 +62,7 @@ export function CheckoutInvoiceSection({
 				<InvoiceModeBadge mode={invoiceMode} />
 			</div>
 
-			{/*
-			 * 法定告知。四個模式都要有分支——缺一就會讓某類賣家的買家完全不知道
-			 * 自己拿到的不是電子發票（58A §B01 逐字：缺一即落 invalid 而擋付款）。
-			 *
-			 * ⚠️ 這裡**沒有 checkbox**：DEC-20260831-210934 把告知改成只顯示不強制勾選
-			 * （58 號 L1–L13 法規表查無「付款前必須告知」的法源；蝦皮／momo 實查也都
-			 * 沒有結帳時的強制確認）。9314 已無 emitter。
-			 */}
+
 			{disclosure && disclosure.required ? (
 				<div
 					className="mb-3 p-[12px_14px] rounded-hkui-lg border border-warning-200 bg-warning-50"
@@ -84,7 +77,7 @@ export function CheckoutInvoiceSection({
 				</div>
 			) : null}
 
-			{/* 發票方式（目前顯示買家的預設常用資料；沒有就顯示缺省行為） */}
+
 			<div className="flex items-center gap-3 p-[12px_14px] bg-content2 border border-divider rounded-hkui-lg">
 				<div className="flex-1 min-w-0 flex flex-col gap-[2px]">
 					<span className="text-[0.625rem] font-extrabold text-hk-accent tracking-[0.05em]">
@@ -114,10 +107,7 @@ export function CheckoutInvoiceSection({
 				) : null}
 			</div>
 
-			{/*
-			 * 金額明細（N4）。四列逐字對齊後端的 amount，**不拿右欄的實付總額充當發票金額**
-			 * ——兩者在 Phase 1 相等是業務決策不是恆等式（58A §B01）。
-			 */}
+
 			{amount ? (
 				<details className="mt-3 group">
 					<summary className="cursor-pointer text-[0.6875rem] font-extrabold text-hk-accent list-none select-none">
@@ -141,11 +131,7 @@ export function CheckoutInvoiceSection({
 				發票將於付款完成後開立，並寄送至你的電子信箱。
 			</p>
 
-			{/*
-			 * 不可下單 banner。9326（接單上限）與 9327（和單）是**兩件獨立的事**，
-			 * 不合併成一句——買家看到的處置不同（前者等賣家、後者拆單重下）。
-			 * 目前只有 9326 有資料來源；9327 由 confirm 回應驅動，不在本區塊。
-			 */}
+
 			{intakeLimit?.blocked ? (
 				<div
 					className="mt-3 p-[12px_14px] rounded-hkui-lg border border-danger-200 bg-danger-50"

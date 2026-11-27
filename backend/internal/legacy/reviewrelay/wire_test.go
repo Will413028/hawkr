@@ -9,8 +9,6 @@ import (
 	"testing"
 )
 
-// 舊 publisher 的 struct 在另一個 Go module（pkg），單體不能 import：這裡讀它們的原始碼，逐欄位比對 json tag
-// （欄位名、omitempty）與 Go 型別，relay 的 payload struct 只要和舊的有一個欄位不同就失敗。
 const mqEvents = "../../../pkg/mq/events.go"
 
 type wireField struct{ typ, tag string }
@@ -66,7 +64,6 @@ func types(e ast.Expr) string {
 	return "?"
 }
 
-// normalize 把舊碼的具名字串型別（EventType）視為 string。
 func normalize(typ string) string {
 	if typ == "EventType" {
 		return "string"
@@ -98,10 +95,8 @@ func TestPayloadsMatchTheLegacyStructs(t *testing.T) {
 		"review.created": {"ReviewCreatedEvent", reflect.TypeOf(reviewCreated{})},
 	} {
 		want, got := oldFields(t, mqEvents, c.old), newFields(c.mine)
-		// 舊 BaseEvent 的 correlation_id、metadata 是 omitempty 的空值，從不出現在 wire 上（下面的測試守住這個前提）。
 		delete(want, "correlation_id")
 		delete(want, "metadata")
-		// product_id 是 catalog 的 UUID 字串；舊的 int64 是 Java product 的數字 ID，Java product 在 B4-4d 被取代。
 		if f, ok := want["product_id"]; ok && f.typ == "int64" {
 			f.typ = "string"
 			want["product_id"] = f

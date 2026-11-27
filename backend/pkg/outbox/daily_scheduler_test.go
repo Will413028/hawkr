@@ -28,11 +28,6 @@ func TestNextOccurrence_TargetAlreadyPassedToday_ReturnsTomorrow(t *testing.T) {
 }
 
 func TestNextOccurrence_ExactlyAtTarget_ReturnsTomorrow(t *testing.T) {
-	// now == target instant: !next.After(now) is true (they're equal, not
-	// after), so this must roll to tomorrow — matches both pre-existing
-	// hand-rolled implementations this type replaces (buyer-service
-	// and seller-service both use the identical !next.After(now)
-	// check), not a behavior this consolidation is free to redefine.
 	now := time.Date(2026, 8, 15, 19, 5, 0, 0, time.UTC)
 	got := NextOccurrence(now, 19, 5)
 	want := time.Date(2026, 8, 16, 19, 5, 0, 0, time.UTC)
@@ -68,9 +63,6 @@ func TestDailyScheduler_PanicInRunIsRecoveredNotPropagated(t *testing.T) {
 		panic("boom")
 	}, zap.NewNop())
 
-	// tick() must not let the panic escape — a bare call (no recover here in
-	// the test itself) proves DailyScheduler's own recover boundary works,
-	// same proof style as pkg/outbox's TestScheduler_PanicInRunIsRecoveredAndReported.
 	s.tick(context.Background())
 }
 
@@ -92,17 +84,6 @@ func TestDailyScheduler_PanicInOneTickDoesNotPreventNextTick(t *testing.T) {
 }
 
 func TestDailyScheduler_StopBeforeTargetPreventsRun(t *testing.T) {
-	// hourUTC/minuteUTC set far enough in the future (tomorrow relative to any
-	// reasonable test-run wall-clock instant is not guaranteed by a fixed
-	// clock value alone without control of "now" — instead this derives the
-	// target from the real current time plus a safety margin, so the target is
-	// always well outside this test's short real-time window regardless of
-	// when it runs. This does not test genuine cancellation-race behavior
-	// (that would require waiting until the target actually arrives, which is
-	// the same up-to-24h limitation the three pre-existing hand-rolled
-	// implementations already have and never had a unit test for either) — it
-	// tests that Start() does not call run before Stop() and does not call it
-	// spuriously either.
 	future := time.Now().UTC().Add(2 * time.Hour)
 	var calls int32
 	s := NewDailyScheduler(future.Hour(), future.Minute(), "test_job", func(_ context.Context) {
@@ -137,17 +118,13 @@ func TestDailyScheduler_ConcurrentAsyncStartAndStop_NoDataRace(t *testing.T) {
 
 		startCalled := make(chan struct{})
 		go func() {
-			// Simulate a slow startup step (a catch-up step) that
-			// delays the real Start() call, exactly like the production call
-			// site — no synchronization with Stop below is intentional, that
-			// absence is the scenario under test.
 			time.Sleep(time.Millisecond)
 			s.Start(context.Background())
 			close(startCalled)
 		}()
 
-		s.Stop() // races the goroutine above by design
+		s.Stop()
 		<-startCalled
-		s.Stop() // idempotent cleanup so the loop goroutine above doesn't leak past this test
+		s.Stop()
 	}
 }

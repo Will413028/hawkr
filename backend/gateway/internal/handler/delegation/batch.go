@@ -99,7 +99,6 @@ type BatchSpec struct {
 // the front end discards data whenever the envelope code is non-zero and the operator
 // would lose every auditLogId along with it.
 func (o *Orchestrator) OrchestrateBatch(ctx context.Context, spec BatchSpec) ([]BatchResultItem, *Denial) {
-	// 9289 而不是 9280（#2744）：與 Orchestrate 同一個理由，未接線是永久失敗。
 	if o == nil || o.Audit == nil {
 		zap.L().Error("Delegation.dependency.unwired", zap.String("dep", "Audit"), zap.String("op", "OrchestrateBatch"))
 		return nil, Deny(bizcode.DelegationInternalContractMismatch, "代行營運服務設定異常，重試無效")
@@ -139,8 +138,6 @@ func (o *Orchestrator) OrchestrateBatch(ctx context.Context, spec BatchSpec) ([]
 			OperationReason:       spec.OperationReason,
 			ResourceVersionBefore: before.Version,
 			BeforeSnapshotJson:    snapshot,
-			// Per-element key: one header value must not collide across the N rows
-			// of one batch, or the uniqueness constraint would collapse them.
 			IdempotencyKey: spec.IdempotencyKey + ":" + item.ResourceID,
 			RequestId:      spec.RequestID,
 			CorrelationId:  spec.CorrelationID,
@@ -171,9 +168,6 @@ func (o *Orchestrator) OrchestrateBatch(ctx context.Context, spec BatchSpec) ([]
 			itemResult = intentResp.GetResults()[i]
 		}
 		if itemResult == nil || !itemResult.GetOk() {
-			// Per-element intent failure. The single-write path aborts entirely here;
-			// the batch path must NOT — the other elements are unaffected and the
-			// operator needs to know which one did not even get an audit row.
 			results[i].OK = false
 			results[i].Code = bizcode.DelegationAuditIntentFailed
 			if before := befores[item.ResourceID]; before != nil {
@@ -195,8 +189,6 @@ func (o *Orchestrator) OrchestrateBatch(ctx context.Context, spec BatchSpec) ([]
 
 	writeResults, denial := spec.WriteBatch(ctx, o.batchContext(spec, spec.WriteCap, ""), writeItems)
 	if denial != nil {
-		// The whole domain hop failed: every element that had an intent is closed as
-		// FAILED so no row is left dangling in PENDING.
 		confirms := make([]*accountpb.ConfirmAuditResultRequest, 0, len(writeItems))
 		for _, wi := range writeItems {
 			i := indexByResource[wi.ResourceID]
@@ -214,9 +206,6 @@ func (o *Orchestrator) OrchestrateBatch(ctx context.Context, spec BatchSpec) ([]
 	}
 
 	confirms := make([]*accountpb.ConfirmAuditResultRequest, 0, len(writeResults))
-	// Which intents this loop actually closes. The loop walks writeResults, not
-	// writeItems, so an element that got an intent but no matching result silently
-	// falls out — see the sweep after the loop.
 	confirmed := make(map[string]bool, len(writeResults))
 	for _, wr := range writeResults {
 		i, ok := indexByResource[wr.ResourceID]
@@ -255,13 +244,6 @@ func (o *Orchestrator) OrchestrateBatch(ctx context.Context, spec BatchSpec) ([]
 		confirms = append(confirms, confirm)
 	}
 
-	// Every intent we wrote must reach a terminal state, including the ones the domain
-	// service did not report back on. Today the Java side loops per request item and so
-	// returns 1:1, but nothing on this side enforces that: if it ever returns short, or
-	// echoes a resourceId we did not send, those rows sit on PENDING with no log line
-	// and no failed response — the batch looks entirely successful. Close them as
-	// FAILED, which is what "we asked for this write and never learned whether it
-	// happened" means for an audit trail.
 	for _, wi := range writeItems {
 		if confirmed[wi.ResourceID] {
 			continue
@@ -289,16 +271,10 @@ func (o *Orchestrator) OrchestrateBatch(ctx context.Context, spec BatchSpec) ([]
 	return results, nil
 }
 
-// confirmBatch is all-or-nothing on the server side: either all N rows close or all N
-// stay PENDING. That is this shape's single regression versus the per-element form and
-// it must be logged as such, never swallowed.
 func (o *Orchestrator) confirmBatch(ctx context.Context, items []*accountpb.ConfirmAuditResultRequest) {
 	if len(items) == 0 {
 		return
 	}
-	// Detached for the same reason as the single-write confirm: the domain writes have
-	// already landed, so an admin closing the tab must not be what decides whether the
-	// audit rows close. The deadline still applies.
 	ctx = context.WithoutCancel(ctx)
 	resp, err := o.Audit.ConfirmAuditResultBatch(ctx, &accountpb.ConfirmAuditResultBatchRequest{Items: items},
 		o.Cfg.GrpcDeadlineBatchAuditConfirmMs)

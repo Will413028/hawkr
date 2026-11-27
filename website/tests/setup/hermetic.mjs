@@ -95,7 +95,6 @@ http2.connect = function guarded(authority, ...rest) {
 /** The host a `Socket.prototype.connect` call is about, or null for a unix socket. */
 function connectHost(args) {
 	let [first, second] = args;
-	// net.connect() hands over its normalized `[options, callback]` array
 	if (Array.isArray(first)) [first, second] = first;
 	if (first !== null && typeof first === "object") {
 		if (first.path) return null;
@@ -137,5 +136,4 @@ if (typeof RealWebSocket === "function") {
 	};
 }
 
-// `import { request } from "node:http"` binds to the ESM view of the builtin; bring it up to date.
 syncBuiltinESMExports();

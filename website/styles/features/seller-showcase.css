@@ -296,12 +296,6 @@
 	letter-spacing: 0;
 }
 
-/* ===== Night mode =====
- * The local --showcase-* tokens alias --color-hk-* / --hkui-* and flip on
- * their own; what follows re-skins only the hard-coded light surfaces.
- * (Historically the title/desc were pinned back to dark ink to stay legible
- * on the then-light viewport — the viewport now darkens, so headings take
- * the flipped token values like everywhere else.) */
 [data-theme="dark"] .seller-showcase .showcase-title {
 	color: #f5e9c3;
 }

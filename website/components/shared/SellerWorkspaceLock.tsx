@@ -35,16 +35,10 @@ const PUBLIC_ALLOWLIST = [
 	"/return-policy",
 	"/seller-terms",
 	"/faq",
-	// 賣家操作說明：從賣家 footer 連出去的說明書，必須讓賣家讀得到。
 	"/seller-guide",
 	"/about",
 	"/contact",
-	// `/seller/onboarding` 與公開招募頁。
 	"/seller",
-	// Authentication is an in-flight workspace transition. Login hydrates the
-	// new identity immediately before its single hard navigation; trying to
-	// confine that one render can race the login owner and hijack a new seller
-	// away from `/seller/onboarding`.
 	"/login",
 	"/register",
 ];
@@ -53,27 +47,15 @@ export default function SellerWorkspaceLock() {
 	const router = useObservedRouter("seller_workspace_lock");
 	const pathname = usePathname() ?? "";
 	const { activeRole, status } = useAuth();
-	// The redirect is otherwise completely silent: the page simply becomes a
-	// different page. This component renders nothing visible (it is a sibling
-	// guard, not a wrapper), so the announcement is the one thing it CAN add —
-	// a screen-reader user is told why they left the page they asked for.
 	const [redirecting, setRedirecting] = React.useState(false);
 
 	React.useEffect(() => {
 		if (status === "unknown") return;
 		if (status !== "signedIn" || activeRole !== "seller") return;
-		// Freshness check, same reason as WorkspaceAlign's: a buyer-zone deep link
-		// can have just auto-switched the workspace via switchRole(), which writes
-		// localStorage synchronously but commits the context state a beat later.
-		// Trusting the stale in-memory "seller" here would hijack that navigation
-		// back to the dashboard.
 		if (getActiveRole() !== "seller") return;
 		if (!pathname) return;
 		if (pathname.startsWith("/seller-center")) return;
-		// ADM 代行工作區：一個「自己也是賣家、且正以賣家視角瀏覽」的管理員進到
-		// /adm 會被這道 lock 導去 /seller-center/dashboard，工作區根本打不開。
 		if (isDelegatedWorkspacePath(pathname)) return;
-		// 帳號層級的頁面（不屬於任何工作區）：賣家視角也能進。
 		const access = requiredAccessForPath(pathname);
 		if (access && ACCESS_CLASSES[access].workspace === null) return;
 		if (
@@ -86,7 +68,6 @@ export default function SellerWorkspaceLock() {
 		router.replace("/seller-center/dashboard");
 	}, [status, activeRole, pathname, router]);
 
-	// Clear once the destination has committed, so a later lock announces again.
 	React.useEffect(() => {
 		if (pathname.startsWith("/seller-center")) setRedirecting(false);
 	}, [pathname]);

@@ -31,7 +31,6 @@ import {
 const HANDOFF_CODE_PATTERN = /^dhof_[A-Za-z0-9_-]{43}$/;
 
 const SECURITY_HEADERS: Record<string, string> = {
-	// 導向工作區的那一跳不得把 ?code= 帶進 Referer。
 	"Referrer-Policy": "no-referrer",
 	"Cache-Control": "private, no-store",
 };
@@ -48,8 +47,6 @@ function failure(reason: "handoff_invalid" | "upstream"): Response {
 
 export async function GET(request: Request): Promise<Response> {
 	const code = new URL(request.url).searchParams.get("code") ?? "";
-	// 形狀不對就地拒絕：不打上游，也不用另一個碼區分「格式錯」與「不存在」——
-	// 任何能區分兩者的回應都是一支可以用來收窄猜測空間的探測器。
 	if (!HANDOFF_CODE_PATTERN.test(code)) return failure("handoff_invalid");
 
 	let result: Awaited<ReturnType<typeof callDelegatedUpstream>>;
@@ -58,8 +55,6 @@ export async function GET(request: Request): Promise<Response> {
 			method: "POST",
 			path: "/admin/delegated-operations/handoff/redeem",
 			timeout: "session",
-			// Vercel 邊緣寫的、client 設不了。不帶就會簽成 p="ssr"，整個 ADM 的
-			// 代行流量共用一個限流桶（限流主體＝per-admin-IP）。
 			visitorIp: getVisitorIp(request),
 			json: { handoffCode: code },
 		});
@@ -71,7 +66,6 @@ export async function GET(request: Request): Promise<Response> {
 	}
 
 	if (!result.ok) {
-		// 未知／已兌換／code 逾時／工作階段已不可用四種成因共用 9282，這是刻意的。
 		return failure(
 			result.code === DELEGATION_HANDOFF_INVALID_CODE
 				? "handoff_invalid"
@@ -90,8 +84,6 @@ export async function GET(request: Request): Promise<Response> {
 	}
 
 	const options = createDelegatedCookieOptions(summary.expiresAt);
-	// 兌換成功但工作階段已經沒有剩餘時間：寫一個 Max-Age ≤ 0 的 cookie 只會讓
-	// 操作者進到工作區再被踢出來，症狀看起來像「進去就被踢出來」。
 	if (!options) return failure("handoff_invalid");
 
 	return redirect(

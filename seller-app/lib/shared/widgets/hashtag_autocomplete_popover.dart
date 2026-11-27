@@ -240,11 +240,6 @@ class _Row extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 注意：用 Listener.onPointerDown 而非 GestureDetector/InkWell。
-    // popover 是 inline 在 TextField 同一個 Column 內，外層 block 包了一個
-    // GestureDetector(onTap: requestFocus)，會跟 popover 的 tap 在 gesture
-    // arena 競爭，常常輸給外層 → popover row 的 onTap 永遠沒被呼叫到。
-    // Listener 不參與 arena，pointer 一觸下即觸發，最直接、最可靠。
     return Listener(
       behavior: HitTestBehavior.opaque,
       onPointerDown: (_) => onTap(),

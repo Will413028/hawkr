@@ -33,7 +33,6 @@ func (f fakeModule) UpdateProfile(context.Context, model.UpdateProfileInput) (mo
 	return f.profile, nil
 }
 
-// lookupModule 記下 buyer_id 的查詢次數並回傳指定結果。
 type lookupModule struct {
 	Module
 	calls *int
@@ -49,7 +48,6 @@ func (m lookupModule) CurrentBuyerID(_ context.Context, accountID int64) (int64,
 	return m.id, m.err
 }
 
-// profileModule 只允許以帳號一次讀出 profile；呼叫 CurrentBuyerID 代表 GetProfile／UpdateProfile 又多查了一次。
 type profileModule struct {
 	Module
 	calls *int
@@ -120,7 +118,6 @@ func TestCallerResolvesBuyerIDOnlyForAccounts(t *testing.T) {
 			}
 			switch {
 			case tc.wantCode != 0:
-				// rpc.Error 的訊息以 code 開頭；轉成 Connect 的 code 在 interceptor（integration 測試經 HTTP 驗證）。
 				if err == nil || !strings.HasPrefix(err.Error(), tc.wantCode.String()+": ") {
 					t.Fatalf("err=%v want %v", err, tc.wantCode)
 				}
@@ -358,7 +355,6 @@ type visitCall struct {
 	productID uuid.UUID
 }
 
-// visitModule 記下 RecordVisit 收到的參數。
 type visitModule struct {
 	fakeModule
 	calls   *[]visitCall
@@ -371,7 +367,6 @@ func (m visitModule) RecordVisit(_ context.Context, buyerID int64, productID uui
 	return nil
 }
 
-// forbiddenProducts 在被呼叫時讓測試失敗。
 type forbiddenProducts struct{ t *testing.T }
 
 func (f forbiddenProducts) Cards(context.Context, []uuid.UUID, bool) (map[uuid.UUID]ProductInfo, error) {
@@ -396,8 +391,6 @@ func openStoreCard(id int64, name, logo string) seller.StoreCard {
 	return seller.StoreCard{StoreID: id, StoreCode: 2600000000 + id, Name: &name, LogoKey: &logo, Status: seller.CardOpen}
 }
 
-// isInvalidArgument 讀 rpc.Error 的 code：它回的不是 *connect.Error（要到 interceptor 才轉換），
-// connect.CodeOf 會得到 unknown；interceptor 的授權又需要 procedure 與呼叫者，單元測試不經過它。
 func isInvalidArgument(err error) bool {
 	return err != nil && strings.HasPrefix(err.Error(), connect.CodeInvalidArgument.String()+":")
 }

@@ -65,7 +65,6 @@ test("內容不變的重送沿用 request_id，內容或受眾改過就換新的
 	};
 	const first = announcementAttempt(form, null, next);
 	assert.equal(first.requestId, "id-1");
-	// 只差前後空白：送出的內容相同，視為同一次
 	const retry = announcementAttempt(
 		{ ...form, title: " Maintenance " },
 		first,

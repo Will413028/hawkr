@@ -19,8 +19,6 @@ import {
 	toLocalInput,
 } from "./measure";
 
-// 建立措施（違規依據的警告與停權，CreateMeasure 的 warning／suspension.violation）的輸入、驗證與請求組裝
-// （決策簡報 step10e-3-brief-v1 K7、step10e-3-brief D10）。畫面只接結果。時間一律由呼叫端傳入（now），這裡不讀時鐘。
 
 /** 一個新認定最多的來源通報數（NewFinding.source_report_ids 的上限）。 */
 export const SOURCE_REPORTS_MAX = 20;
@@ -102,7 +100,6 @@ export function measureInitialFromSuggestion(
 		: 0;
 	const end = new Date(now.getTime() + days * DAY_MS);
 	if (days > 0 && !Number.isNaN(end.getTime())) {
-		// 對話框接不了的時間（例如年份超過四位數）不預填，免得一開啟就是一個送不出去的值。
 		const text = toLocalInput(end);
 		if (fromLocalInput(text)) endTime = text;
 	}

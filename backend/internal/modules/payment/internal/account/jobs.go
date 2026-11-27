@@ -86,10 +86,8 @@ func (SweepArgs) InsertOpts() river.InsertOpts {
 	return jobs.SweepOpts(10 * time.Minute)
 }
 
-// resyncDelay 是結果寫入後仍有未涵蓋的事件時，等多久再跑一輪。
 const resyncDelay = 2 * time.Second
 
-// pollInterval 是輪詢補漏的週期。
 const pollInterval = 15 * time.Minute
 
 func jobError(err error) error {
@@ -304,18 +302,14 @@ func (s *Service) Sweep(ctx context.Context) (synced, ensured int, err error) {
 	}
 }
 
-// sweepUnresolved 為「呼叫過、沒有外部 ID」的非清理列排入了結 job（D63），不看擁有者是否營運中。
 func (s *Service) sweepUnresolved(ctx context.Context) error {
 	return s.enqueueAll(ctx, s.unresolved, enqueueResolve)
 }
 
-// sweepPurge 為等待清理、沒有進終局的帳戶重排「關閉後刪除」job。
 func (s *Service) sweepPurge(ctx context.Context) error {
 	return s.enqueueAll(ctx, s.purgePending, enqueuePurge)
 }
 
-// enqueueAll 依 store_id 分批讀出 list 選到的帳戶，每個帳戶在自己的 transaction 內排入一個 job（每個 ID 一個 transaction，不是每批一個：
-// 一個 ID 排入失敗不會回滾同批已排入的，已排入的由 job 的唯一鍵保護，下一次掃描對沒排成的再來一次）。
 func (s *Service) enqueueAll(ctx context.Context, list func(ctx context.Context, after int64) ([]int64, error), enqueue func(context.Context, jobs.Enqueuer, int64) error) error {
 	var after int64
 	for {

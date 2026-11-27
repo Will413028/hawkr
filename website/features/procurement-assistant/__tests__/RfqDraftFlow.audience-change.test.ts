@@ -27,9 +27,6 @@ type PublicationExecute = (
 	command: RfqPublicationExecuteCommand,
 ) => Promise<RfqCommandResult<RfqPublicationResult>>;
 
-// ⛔ 用真正的 prop 簽章，不要用 ReturnType<typeof vi.fn>：後者會塌成
-// Mock<Procedure>，tsc 對不上 RfqDraftFlow 的 prop（vitest 執行期不做型別檢查，
-// 所以只有 `pnpm lint` 的 tsc 那一關抓得到）。
 type PublicationPreview = (
 	command: RfqPublicationPreviewCommand,
 ) => Promise<RfqCommandResult<RfqPublicationApproval>>;
@@ -225,8 +222,6 @@ function handlers(approvals: RfqPublicationApproval[] = [approval()]) {
 					data: publicationResult(),
 				}) as RfqCommandResult<RfqPublicationResult>,
 		) as unknown as PublicationExecute,
-		// 明確標註回傳型別：vi.fn 的推導會塌成 Mock<Procedure>，tsc 便對不上
-		// RfqDraftFlow 的 prop 簽章（vitest 執行期不做型別檢查，所以只有 tsc 抓得到）。
 		onPreviewRfqPublication: vi.fn(
 			async (): Promise<RfqCommandResult<RfqPublicationApproval>> => ({
 				ok: true,
@@ -328,13 +323,9 @@ describe("RfqDraftFlow — execute 送出前再比對一次受眾身分", () => 
 		try {
 			view.commitWithoutEffects([candidate("seller-b"), candidate("seller-c")]);
 
-			// 這兩條是「視窗確實存在」的證據，不是順手多驗的東西：作廢核准的 effect
-			// 若已經跑過，CTA 會消失、核准卡片會收起來，底下那一下 click 就什麼都沒測到。
 			const executeButton = screen.getByRole("button", { name: EXECUTE_CTA });
 			expect(screen.getByText("發布核准已建立，尚未送出邀請。")).toBeTruthy();
 
-			// ⛔ 原生 dispatchEvent：RTL 的 fireEvent 包了 act，會先把 effect 沖乾淨，
-			// 視窗就不見了。這裡要的正是「effect 還沒跑，使用者已經按下去」。
 			executeButton.dispatchEvent(
 				new MouseEvent("click", { bubbles: true, cancelable: true }),
 			);
@@ -357,7 +348,6 @@ describe("RfqDraftFlow — execute 送出前再比對一次受眾身分", () => 
 		const view = await renderApprovedWithOwnRoot([candidate("seller-a")], h);
 
 		try {
-			// 名單沒變，只是重新 commit 一次；核准仍然是針對這份名單發的。
 			view.commitWithoutEffects([candidate("seller-a")]);
 
 			screen
@@ -399,7 +389,6 @@ describe("RfqDraftFlow — execute 送出前再比對一次受眾身分", () => 
 			expect(executed).toHaveLength(1);
 		});
 
-		// 送出後才改名單：畫面回到「要重新核准」，但那筆已經在飛的 command 不受影響。
 		rerenderWith([candidate("seller-b")]);
 		await waitFor(() => {
 			expect(screen.queryByRole("button", { name: EXECUTE_CTA })).toBeNull();

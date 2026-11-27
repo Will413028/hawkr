@@ -20,7 +20,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
-// 每條 RD 一個回歸測試（step-1-design.md §8）；這些測試只跑在 CI（真 Postgres）。RD4 的刪帳與 purge 在 A6-1c。
 
 func hide(t *testing.T, f *fixture, id uuid.UUID) review.Hide {
 	t.Helper()
@@ -43,7 +42,6 @@ func TestRD1ViewerBlocksFilterBeforeThePageIsCut(t *testing.T) {
 		authors = append(authors, f.submit(t, b, storeID, product, 4, "好"))
 	}
 	r1, r2, r3, r4, r5 := authors[0], authors[1], authors[2], authors[3], authors[4]
-	// 觀看者封鎖 r5 的作者；r4 的作者封鎖觀看者（任一方向都擋）。
 	must[bool](t)(f.buyers.BlockBuyer(ctx, viewer.BuyerID, buyersList[4]))
 	must[bool](t)(f.buyers.BlockBuyer(ctx, buyersList[3], viewer.BuyerID))
 
@@ -59,27 +57,22 @@ func TestRD1ViewerBlocksFilterBeforeThePageIsCut(t *testing.T) {
 	if !sameIDs(ids(p2), r1.ID) || p2.Next != nil {
 		t.Fatalf("第二頁只有 r1 且沒有下一頁：%v next=%v", ids(p2), p2.Next)
 	}
-	// 賣家評價頁同一個規則（舊碼只過濾商品列表）。
 	sp := must[review.Page](t)(f.module.ListStoreReviews(ctx, storeID, viewer.BuyerID, review.Filter{}, nil, 50))
 	if !sameIDs(ids(sp), r3.ID, r2.ID, r1.ID) {
 		t.Fatalf("店家評價頁也要過濾：%v", ids(sp))
 	}
-	// 店家自己的後台不套觀看者。
 	own := must[review.Page](t)(f.module.ListOwnStoreReviews(ctx, storeID, review.Filter{}, nil, 50))
 	if len(own.Reviews) != 5 {
 		t.Fatalf("店家後台看到全部：%d", len(own.Reviews))
 	}
-	// 統計不過濾觀看者。
 	if st := must[review.ProductStats](t)(f.module.ProductStats(ctx, pid(product))); st.Count != 5 {
 		t.Fatalf("統計不過濾：%+v", st)
 	}
-	// 店家封鎖買家只擋寫入，不影響這位買家（r1 的作者）對觀看者的可見性。
 	f.exec(t, "INSERT INTO seller.store_blocks (store_id, buyer_id, created_at) VALUES ($1, $2, $3)", storeID, buyersList[0], f.clock())
 	again := must[review.Page](t)(f.module.ListProductReviews(ctx, pid(product), viewer.BuyerID, review.Filter{}, nil, 50))
 	if !sameIDs(ids(again), r3.ID, r2.ID, r1.ID) {
 		t.Fatalf("店家封鎖買家不影響可見性：%v", ids(again))
 	}
-	// 觀看者封鎖店：整家店的評價都看不到，匿名照常。
 	must[bool](t)(f.buyers.BlockStore(ctx, viewer.BuyerID, storeID))
 	if got := must[review.Page](t)(f.module.ListProductReviews(ctx, pid(product), viewer.BuyerID, review.Filter{}, nil, 50)); len(got.Reviews) != 0 {
 		t.Fatalf("封鎖店之後看不到：%v", ids(got))
@@ -361,7 +354,6 @@ func TestRD10SingleReadUsesThePublicPredicate(t *testing.T) {
 		t.Fatalf("不存在：%v", err)
 	}
 
-	// 作者刪帳中（buyer.pub_inactive_buyers() 有列）：公開不可讀、不計分。
 	r2 := f.submit(t, f.newBuyer(t), storeID, 700, 1, "差")
 	if err := f.buyers.BeginDeletion(ctx, r2.BuyerID); err != nil {
 		t.Fatal(err)

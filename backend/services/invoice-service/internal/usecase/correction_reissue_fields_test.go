@@ -23,11 +23,9 @@ import (
 // 「已超過法定作廢期限」（#3020 同源）。
 func TestBuildReissueDocument_LegalDateFieldsComputedAtReissue(t *testing.T) {
 	tpe := timeutil.LocationTaipei
-	// 原票：一個**不同期別**的舊日期（115 年第 3 期），期限也早就過了。
 	origDate := time.Date(2026, 6, 15, 0, 0, 0, 0, tpe)
 	origDeadline := time.Date(2026, 6, 17, 23, 59, 59, 0, tpe).UTC()
 	origPeriod := "11503"
-	// 重開當下：跨到 115 年第 5 期。
 	now := time.Date(2026, 9, 2, 3, 0, 0, 0, time.UTC)
 
 	orig := domain.Document{
@@ -57,7 +55,6 @@ func TestBuildReissueDocument_LegalDateFieldsComputedAtReissue(t *testing.T) {
 	wantDate := domain.InvoiceDateTaipei(now)
 	wantPeriod := domain.TaxPeriodCode(wantDate)
 
-	// ---- 陽性：三欄都有值，且是重開當下算出來的 ----
 	if got.InvoiceDateTaipei == nil {
 		t.Fatal("InvoiceDateTaipei 為 nil —— 重開票沒有法定開立日，期別彙總會漏掉它，" +
 			"且該票再也不能被更正（#3010）")
@@ -72,7 +69,6 @@ func TestBuildReissueDocument_LegalDateFieldsComputedAtReissue(t *testing.T) {
 		t.Fatal("StatutoryDeadlineAt 為 nil —— chk_invdoc_deadline_presence 會當場 23514")
 	}
 
-	// ---- 陰性①：不得是原票的值（只斷言「非 nil」的話，複製原值也會通過）----
 	if got.InvoiceDateTaipei.Equal(origDate) {
 		t.Errorf("InvoiceDateTaipei 複製了原票的 %v —— 新票會落在已申報的期別裡", origDate)
 	}
@@ -83,8 +79,6 @@ func TestBuildReissueDocument_LegalDateFieldsComputedAtReissue(t *testing.T) {
 		t.Errorf("StatutoryDeadlineAt 複製了原票的 %v", origDeadline)
 	}
 
-	// ---- 陰性②：chk_invdoc_deadline 是 statutory_deadline_at > issue_not_before。
-	// 複製原票期限時這條在原票開立超過期限天數後必然違反 ⇒ 建列當下 23514。----
 	if !got.StatutoryDeadlineAt.After(got.IssueNotBefore) {
 		t.Errorf("StatutoryDeadlineAt(%v) 不晚於 IssueNotBefore(%v) —— chk_invdoc_deadline 會 23514",
 			*got.StatutoryDeadlineAt, got.IssueNotBefore)
@@ -107,7 +101,6 @@ func TestBuildReissueDocument_DeadlineFollowsRecomputedKind(t *testing.T) {
 		InvoiceDateTaipei: &origDate, TaxPeriodCode: &origPeriod,
 		StatutoryDeadlineAt: &origDeadline,
 	}
-	// 改成公司統編 ⇒ kind 變 B2B ⇒ 期限天數 2 → 7。
 	revised := domain.ReviseDocumentSnapshot{
 		RecipientType:  codemeta.InvoiceRecipientTypeBuyer.Value,
 		RecipientName:  "某某公司",
@@ -175,7 +168,6 @@ func TestBuildReissueDocument_PaidAtIsCopiedNotRecomputed(t *testing.T) {
 	if !got.PaidAt.Equal(paid) {
 		t.Errorf("PaidAt = %v, want %v（原票的收款時點）", *got.PaidAt, paid)
 	}
-	// 陰性：不得跟著重開當下走——那會把收款日講成今天。
 	if got.PaidAt.Equal(now) || got.PaidAt.Equal(got.IssueNotBefore) {
 		t.Errorf("PaidAt 被重算成重開當下（%v）—— 它問的是錢什麼時候進來，不是憑證什麼時候開",
 			*got.PaidAt)

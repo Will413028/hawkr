@@ -141,10 +141,6 @@
 	grid-template-columns: 82px minmax(0, 1fr);
 	gap: var(--hkui-space-3);
 	align-items: end;
-	/* Same lever as .hkui-seller-profile__head on the real seller page:
-	 * the overlap (not title padding) is what clears the name from the
-	 * cover. Scaled to this card's 82px avatar (vs. 112px there) at the
-	 * same ~37% overlap ratio so the bigger display-sm name has room. */
 	margin-top: -30px;
 }
 .seller-business-card__avatar {
@@ -172,7 +168,6 @@
 	flex-direction: column;
 	gap: 4px;
 	min-width: 0;
-	/* The avatar may overlap the cover, but the shop title starts below it. */
 	padding-bottom: 0;
 }
 .seller-business-card__identity strong {
@@ -205,9 +200,6 @@
 	color: var(--theme-text-accent);
 	background: rgb(var(--color-brand-primary-strong-rgb) / 0.1);
 }
-/* 賣家自填獎項 — 與店鋪頁 `.hkui-seller-profile__prize` 同語彙的
- * harvest-gold 獎章 pill。名片輸出成圖片，顏色跟其他卡面元素一樣
- * 釘死 hex（不隨 dark mode 變），維持「印刷品」的固定外觀。 */
 .seller-business-card__prize {
 	margin: calc(-1 * var(--hkui-space-2)) 0 0;
 	display: inline-flex;

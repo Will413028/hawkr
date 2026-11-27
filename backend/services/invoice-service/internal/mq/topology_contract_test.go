@@ -53,13 +53,6 @@ func TestSubscriptionMaxRetriesMatchesTopology(t *testing.T) {
 	}
 }
 
-// loadTopologyRetries 從 topology.yaml 的 `queues:` 區塊解出 {queue 名: retry.max_attempts}。
-//
-// 只認帶 `retry:` 的 queue —— 沒有 `retry:` 的 queue 本來就不該配 `MaxRetries > 0`，
-// 而「找不到」與「max_attempts 不同」在上面是兩種不同的失敗訊息。
-//
-// 刻意不引入 YAML library：它現在是 go.mod 的 indirect 依賴，為了一支測試把它拉成
-// direct 會讓 `go mod tidy` 的輸出跟著動。本檔只需要辨識三種縮排層級固定的行。
 func loadTopologyRetries(t *testing.T) map[string]int {
 	t.Helper()
 	path := filepath.Join("..", "..", "..", "..", "infra", "mq", "topology", "topology.yaml")
@@ -82,7 +75,6 @@ func loadTopologyRetries(t *testing.T) map[string]int {
 			inQueues = true
 			continue
 		case len(line) > 0 && line[0] != ' ' && line[0] != '-' && strings.HasSuffix(line, ":"):
-			// 另一個頂層區塊（exchanges: / bindings: …）開始了。
 			inQueues = false
 			currentQueue, inRetry = "", false
 			continue
@@ -100,7 +92,6 @@ func loadTopologyRetries(t *testing.T) map[string]int {
 			inRetry = true
 			continue
 		}
-		// 任何回到 2 空格縮排的 key（bindings: / arguments: / dlq:）都離開 retry 區塊。
 		if strings.HasPrefix(line, "  ") && !strings.HasPrefix(line, "   ") {
 			inRetry = false
 			continue
@@ -137,7 +128,6 @@ func TestTopologyParserFindsKnownQueues(t *testing.T) {
 			t.Fatalf("%q 的 retry.max_attempts = %d，want %d", q, v, ConsumerMaxRetries)
 		}
 	}
-	// 沒有 retry 區塊的 queue 不能出現在結果裡，證明解析器不是對每個 queue 都回一個值。
 	if v, ok := got["coupon.buyer.deleted"]; ok {
 		t.Errorf("coupon.buyer.deleted 沒有 retry 區塊，解析器卻回了 %d", v)
 	}

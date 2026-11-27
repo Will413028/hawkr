@@ -24,7 +24,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// target 是一次送出的雙方：對話的買家、店家，以及店家的完整資料（G1、G2 用）。
 type target struct {
 	buyerID int64
 	store   seller.Store
@@ -72,10 +71,6 @@ func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, 
 			out = first
 			return err
 		}
-		// 守門鎖緊接在 LockSendRequest 與 transaction 內的重送判定之後，在 guard（含 Orders 的網路呼叫，transaction 之外）之後、AllocateSeq 之前：
-		// 買家先於店家（鎖序同 accountdeletion），持有到 transaction 結束。取到之後才算這次寫入看到的狀態，不重用 guard 的讀取結果。
-		// 不得把 guard 或 legacy 呼叫搬進這個 transaction（列鎖會跨網路呼叫）。
-		// 兩個守門鎖都取（買家先於店家），再依寄件人優先翻譯 NotFound：雙方都已停用時回「寄件人已停用」，不因取鎖順序變成收件人訊息。
 		buyerErr := s.d.Buyers.LockNotClosed(ctx, t.buyerID)
 		if buyerErr != nil && apperr.KindOf(buyerErr) != apperr.KindNotFound {
 			return buyerErr
@@ -127,9 +122,6 @@ func (s *Service) Send(ctx context.Context, in model.SendInput) (model.Message, 
 	return out, err
 }
 
-// replay 是送出冪等的重送判定：同一個 (對話, 寄件方, RequestID) 已有訊息時回傳第一次寫入的那則（found 為真），不配 seq、不通知、不發事件、不碰圖片；
-// 內容不同（Type 不同，或文字訊息正規化後的文字不同）回 InvalidInput 指向 RequestID。圖片訊息只比 Type（staged token 在第一次已被消耗）。
-// 對話還不存在時沒有列，照常往下走。判定在對話解析與授權之後、守門之前：已送出的訊息不因之後才發生的封鎖或停權而重送失敗。
 func (s *Service) replay(ctx context.Context, l uitext.Locale, in model.SendInput, t target, body string) (model.Message, bool, error) {
 	row, err := s.q(ctx).MessageByRequest(ctx, store.MessageByRequestParams{
 		BuyerID: t.buyerID, StoreID: t.store.StoreID, SenderKind: string(in.Sender.Kind), RequestID: in.RequestID,
@@ -150,8 +142,6 @@ func (s *Service) replay(ctx context.Context, l uitext.Locale, in model.SendInpu
 	return rows.Message(rows.MessageRow(row)), true, nil
 }
 
-// closedGuardError 把兩個守門的 NotFound（已關閉、已退場或不存在）翻成原有的訊息與 reason：寄件人那一方先翻（寄件人已停用），
-// 收件人那一方其次（對方已刪除）；兩者都通過回 nil。呼叫前非 NotFound 的錯誤已原樣回傳（fail-closed）。
 func (s *Service) closedGuardError(l uitext.Locale, buyerErr, storeErr error, sender model.PartyKind) error {
 	senderErr, receiverErr := storeErr, buyerErr
 	if sender == model.PartyBuyer {
@@ -180,7 +170,6 @@ func partyID(k model.PartyKind, t target) int64 {
 	return t.store.StoreID
 }
 
-// checkInput 驗證輸入並回傳文字訊息去頭尾空白後的內容（圖片訊息回空字串）。其他 message_type 一律拒絕，不把空字串或未知值當有效值。
 func (s *Service) checkInput(l uitext.Locale, in *model.SendInput) (string, error) {
 	if !in.Sender.Kind.Valid() || in.Sender.ID() <= 0 || (in.Sender.Kind == model.PartyStore && in.Sender.Store == nil) {
 		return "", errors.New("im：寄件人身分不完整")
@@ -215,8 +204,6 @@ func unavailable(l uitext.Locale, cause error) error {
 	return apperr.WithCause(apperr.Unavailable("%s", text.ImIdentityUnavailable(l)), cause)
 }
 
-// resolve 解析對話與對方（不信 client 的寄件人）：給 ConversationID 時以對話授權，寄件人不是該對話的一方回 NotFound；
-// 首則訊息用 CounterpartID，並確認對方存在。同一人（買家的帳號等於店家的帳號）在這裡擋。回傳買家的 account_id（上傳者與同一人判斷用）。
 func (s *Service) resolve(ctx context.Context, l uitext.Locale, in model.SendInput) (target, int64, error) {
 	var buyerID, storeID int64
 	existing := in.ConversationID != (uuid.UUID{})
@@ -268,7 +255,6 @@ func (s *Service) resolve(ctx context.Context, l uitext.Locale, in model.SendInp
 	return t, account, nil
 }
 
-// counterpartErr 把「對方不存在」與「查詢失敗」分開：前者 NotFound，後者 Unavailable（不放行，不當成不存在）。
 func (s *Service) counterpartErr(l uitext.Locale, err error) error {
 	if apperr.KindOf(err) == apperr.KindNotFound {
 		return apperr.NotFound("%s", text.ImCounterpartNotFound(l))
@@ -276,8 +262,6 @@ func (s *Service) counterpartErr(l uitext.Locale, err error) error {
 	return unavailable(l, err)
 }
 
-// guard 是守門 G1..G5，順序固定：停權 → 停業 → 封鎖 → 收件人已刪除 → 詞典。每一項都是 in-process 讀取，任何查詢錯誤都回錯誤（fail-closed），
-// 例外（進行中的訂單或售後）只在 G1 或 G3 命中時才查，兩者共用一次查詢結果。body 是文字訊息的內容（圖片訊息為空，不過詞典）。
 func (s *Service) guard(ctx context.Context, l uitext.Locale, sender model.Party, t target, body string) error {
 	var openKnown, open bool
 	hasOpenOrder := func() (bool, error) {
@@ -291,7 +275,6 @@ func (s *Service) guard(ctx context.Context, l uitext.Locale, sender model.Party
 		return open, nil
 	}
 
-	// G1 停權：只擋寄件人是店家的情況；雙方之間有進行中的訂單或售後時放行。
 	if sender.Kind == model.PartyStore && sender.Store.Suspended() {
 		v, err := hasOpenOrder()
 		if err != nil {
@@ -302,7 +285,6 @@ func (s *Service) guard(ctx context.Context, l uitext.Locale, sender model.Party
 		}
 	}
 
-	// G2 停業：只有店家狀態 CLOSED 算停業（等待刪除雙向都可以聊）；能力判斷以 seller 為準，兩個方向同一個條件。
 	if err := seller.Authorize(t.store, seller.CapChatSend); err != nil {
 		if apperr.KindOf(err) == apperr.KindNotFound {
 			return model.WithReason(apperr.FailedPrecondition("%s", text.ImStoreClosed(l)), model.ReasonStoreClosed)
@@ -310,7 +292,6 @@ func (s *Service) guard(ctx context.Context, l uitext.Locale, sender model.Party
 		return unavailable(l, err)
 	}
 
-	// G3 封鎖：任一方向都擋；有進行中的訂單或售後時放行。
 	blocked, err := s.d.Buyers.IsBlockingStore(ctx, t.buyerID, t.store.StoreID)
 	if err != nil {
 		return unavailable(l, err)
@@ -330,7 +311,6 @@ func (s *Service) guard(ctx context.Context, l uitext.Locale, sender model.Party
 		}
 	}
 
-	// G4 收件人已刪除：transaction 外的這次檢查只是優化，讓已刪除的收件人不必先跑一次媒體 Finalize；正確性由 transaction 內的守門鎖（LockNotClosed、LockNotRetired）保證。
 	receiver := counterpart(sender.Kind)
 	gone, err := s.inactive(ctx, receiver, partyID(receiver, t))
 	if err != nil {
@@ -340,7 +320,6 @@ func (s *Service) guard(ctx context.Context, l uitext.Locale, sender model.Party
 		return model.WithReason(apperr.FailedPrecondition("%s", text.ImReceiverDeleted(l)), model.ReasonReceiverDeleted)
 	}
 
-	// G5 詞典：只查文字。
 	if body != "" {
 		if hit, _ := textfilter.Check(body); hit {
 			return model.WithReason(apperr.InvalidInputOn([]string{"Text"}, "%s", text.ImModerationRejected(l)), model.ReasonModerationRejected)

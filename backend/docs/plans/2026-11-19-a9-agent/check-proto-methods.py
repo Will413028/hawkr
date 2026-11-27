@@ -8,7 +8,6 @@ import re
 import sys
 from pathlib import Path
 
-# (檔案相對 api/, service) -> [(rpc, 盤點 #)]
 EXPECTED = {
     ("hawkr/imageai/v1alpha1/imageai.proto", "ImageAiAppService"): [
         ("TransformImage", "1"),
@@ -23,7 +22,6 @@ EXPECTED = {
         ("UpdateAiQuota", "8"),
         ("DeleteAiQuota", "9"),
     ],
-    # A9-D12：取代 #18、#19、#20、#22（四條助理串流）與 #23 以外的串流形狀；#23 是 GetLatestAssistantSession。
     ("hawkr/assistant/v1alpha1/assistant.proto", "AssistantAppService"): [
         ("SendAssistantMessage", "18,19,20,22"),
         ("WatchAssistantTurn", "18,19,20,22"),
@@ -68,7 +66,6 @@ SERVICE_RE = re.compile(r"\bservice\s+(\w+)\s*(\{|$)")
 RPC_RE = re.compile(r"\brpc\s+(\w+)\s*\(")
 BLOCK_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
 LINE_COMMENT_RE = re.compile(r"//[^\n]*")
-# 引號字串字面值與註解在同一趟掃描：先遇到的先算，字串內的 // 與 /* 不是註解。
 TOKEN_RE = re.compile(r'"(?:\\.|[^"\\\n])*"|/\*.*?\*/|//[^\n]*', re.DOTALL)
 
 

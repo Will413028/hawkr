@@ -25,8 +25,8 @@ public class CommentAddedEvent extends BaseEvent {
     private Long commenterId;
     private String commenterName;
     private String content;
-    private Long parentCommentId;  // null if top-level comment
-    private Long replyToUserId;  // null if not replying to someone
+    private Long parentCommentId;
+    private Long replyToUserId;
 
     public static CommentAddedEvent create(Long commentId, Long postId, Long postAuthorId,
                                             Long commenterId, String commenterName, String content,

@@ -49,8 +49,6 @@ export default function DelegatedSellerDataProvider({
 	const [request, setRequest] = React.useState<SellerMutationRequest | null>(
 		null,
 	);
-	// resolver 放 ref 而不是 state：它是一次性的 continuation，進 state 會讓每次
-	// setState 都重新渲染抽屜、並在 StrictMode 下被呼叫兩次。
 	const resolverRef = React.useRef<
 		((decision: SellerMutationDecision) => void) | null
 	>(null);
@@ -61,8 +59,7 @@ export default function DelegatedSellerDataProvider({
 		() =>
 			summary
 				? delegatedIdentityOf(summary)
-				: // 首抓未回時給一個絕不會與任何真實工作階段相同的身分。這條路徑下
-					// `canRead` 也是 false，所以不會有查詢真的用到它。
+				:
 					{ adminId: "", storeId, issuedAt: "", revision: 0 },
 		[storeId, summary],
 	);
@@ -76,8 +73,6 @@ export default function DelegatedSellerDataProvider({
 
 	const confirmMutation = React.useCallback(
 		(next: SellerMutationRequest): Promise<SellerMutationDecision> => {
-			// 前一筆還開著就先取消它：兩個確認抽屜同時存在時，操作者無從分辨自己正在
-			// 為哪一次寫入填理由。
 			resolverRef.current?.({ ok: false });
 			setRequest(next);
 			return new Promise<SellerMutationDecision>((resolve) => {
@@ -94,8 +89,6 @@ export default function DelegatedSellerDataProvider({
 			keys: {
 				storefront: () => queryKeys.delegated.storefront(identity),
 				products: (params) => queryKeys.delegated.products(identity, params),
-				// 賣家路徑用 `sellerId` 分槽（同一瀏覽器可看多個賣家的貼文）；代行的
-				// 目標店家已經在 identity 裡，第二個店家鍵沒有意義，忽略它。
 				posts: (_sellerId, params) =>
 					queryKeys.delegated.posts(identity, params),
 				orders: (params) => queryKeys.delegated.orders(identity, params),
@@ -120,8 +113,6 @@ export default function DelegatedSellerDataProvider({
 		[bundle, capabilities, confirmMutation, identity, storeId, summary],
 	);
 
-	// 工作階段轉終態（到期／撤銷／結束結果不明）時，開著的確認抽屜必須關掉：那一筆
-	// 寫入此刻必然被拒，留著它等於邀請操作者把理由打完再收到一個沒有 message 的錯誤。
 	React.useEffect(() => {
 		if (writesAllowed) return;
 		if (resolverRef.current) settle({ ok: false });

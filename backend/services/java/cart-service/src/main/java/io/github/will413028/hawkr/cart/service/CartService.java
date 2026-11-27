@@ -107,7 +107,6 @@ public class CartService {
         return new CartBusinessException(GrpcResponseCode.INVALID_SKU);
     }
 
-    // ==================== AddItem（設計書 §5.1） ====================
 
     /**
      * 加入購物車
@@ -115,7 +114,6 @@ public class CartService {
      * @return AddItemResult 包含 code, message, totalItems
      */
     public AddItemResult addItem(Long buyerId, String guestId, UUID skuId, int quantity) {
-        // 1. SKU 驗證（同步呼叫 Product Service）
         GetProductSimpleResponse productResp;
         try {
             productResp = productGrpcClient.getProductSimple(skuId.toString());
@@ -138,18 +136,14 @@ public class CartService {
             throw new CartBusinessException(GrpcResponseCode.INVALID_SKU);
         }
 
-        // 2. 解析 Product 資料（防護 Proto 空值）
-        // info.price = 實際成交單價（特價優先），info.listPrice = 原價
-        // 04 設計書 §4.3.1：雙寫快照 added_unit_price + added_list_price
         Long storeId;
-        Long unitPrice;     // 實際成交單價（無特價=list_price，有特價=當時 sale_price）
-        Long listPrice;     // 原價快照
+        Long unitPrice;
+        Long listPrice;
         int maxLimit;
         UUID productId;
         try {
             storeId = Long.parseLong(info.getStoreId());
             unitPrice = Long.parseLong(info.getPrice());
-            // list_price 若為空字串（過渡期或舊版 Product Service）→ 退化為 unit_price，視為「無特價」
             listPrice = info.getListPrice().isEmpty() ? unitPrice : Long.parseLong(info.getListPrice());
             maxLimit = info.getMaxLimit().isEmpty() ? Integer.MAX_VALUE : Integer.parseInt(info.getMaxLimit());
             productId = ProtoConversionUtils.parseUuidRequired(info.getProductId(), "product_id");
@@ -159,9 +153,6 @@ public class CartService {
                     "skuId", String.valueOf(skuId));
             throw new CartBusinessException(GrpcResponseCode.CART_PRODUCT_DATA_INVALID, e.getMessage());
         }
-        // 自買防護：禁止將自己上架的商品加入購物車（resolve-to-principal，Plan 2b）
-        // 呼叫者身份先 resolve 成 buyerPrincipal 再比較（見 resolveBuyerPrincipals 註解）——
-        // 兩側都必須是登入 account_id 才能正確判斷「是不是同一個人」。
         if (buyerId != null) {
             PrincipalResolution sellerResolution = resolveSellerPrincipals(List.of(storeId), buyerId, guestId);
             PrincipalResolution buyerResolution = resolveBuyerPrincipals(buyerId, guestId);
@@ -183,7 +174,6 @@ public class CartService {
         String specName = info.getSkuName();
         String imageObjectKey = info.getImageObjectKey();
 
-        // 2.5. max_limit 預檢（04 §2.2 #1134）：拒絕超出購買上限，envelope 與 docs/開發規範/API 設計規範.md §十二 對齊
         int currentQty = 0;
         CartItemEntity existingItem = (buyerId != null)
                 ? cartItemRepository.findByBuyerIdAndSkuId(buyerId, skuId)
@@ -201,7 +191,6 @@ public class CartService {
                     String.format(GrpcResponseCode.CART_QUANTITY_EXCEEDS_MAX_LIMIT.message(), maxLimit));
         }
 
-        // 3. 組建 Entity 進行原子 Upsert（quantity 已通過 max_limit 預檢，無需 Math.min 截斷）
         CartItemEntity entity = new CartItemEntity();
         entity.setId(TsidUtil.generate());
         entity.setStoreId(storeId);
@@ -224,17 +213,14 @@ public class CartService {
             rows = cartItemRepository.upsertGuestItem(entity);
         }
 
-        // 4. 判斷結果
         if (rows == 0) {
             log.info("CartService.addItem.locked",
                     "商品處於鎖定狀態 " + ownerTag(buyerId, guestId), "skuId", String.valueOf(skuId));
             throw new CartBusinessException(GrpcResponseCode.CART_ITEM_LOCKED);
         }
 
-        // 5. 失效快取
         cartCacheService.invalidateCartCache(buyerId, guestId);
 
-        // 6. 計算品項數
         int totalItems = countItems(buyerId, guestId);
 
         log.info("CartService.addItem.success",
@@ -242,10 +228,8 @@ public class CartService {
         return new AddItemResult(GrpcResponseCode.SUCCESS.code(), "", totalItems);
     }
 
-    // ==================== GetCart（設計書 §5.2） ====================
 
     public GetCartResult getCart(Long buyerId, String guestId) {
-        // 1a. 讀取 NORMAL items（Cache-Aside）
         List<CartItemEntity> normalItems = cartCacheService.getCartCache(buyerId, guestId);
         if (normalItems == null) {
             normalItems = (buyerId != null)
@@ -254,12 +238,10 @@ public class CartService {
             cartCacheService.fillCartCache(buyerId, guestId, normalItems);
         }
 
-        // 1b. 補齊 LOCKED items（必須從 DB 讀取，不進 Redis）
         List<CartItemEntity> lockedItems = (buyerId != null)
                 ? cartItemRepository.findLockedByBuyerId(buyerId)
                 : cartItemRepository.findLockedByGuestId(guestId);
 
-        // 2. 合併 NORMAL + LOCKED
         List<CartItemEntity> allItems = new ArrayList<>(normalItems);
         allItems.addAll(lockedItems);
 
@@ -267,11 +249,9 @@ public class CartService {
             return new GetCartResult(Collections.emptyList(), Collections.emptyMap(), 0L, 0);
         }
 
-        // 3. 依 store_id 分組
         Map<Long, List<CartItemEntity>> grouped = allItems.stream()
                 .collect(Collectors.groupingBy(CartItemEntity::getStoreId, LinkedHashMap::new, Collectors.toList()));
 
-        // 4. 補齊 Seller 資訊（Lazy + Cache-Aside，單次批次）
         List<Long> allStoreIds = new ArrayList<>(grouped.keySet());
         Map<Long, CartCacheService.SellerMetaCacheEntry> sellerMetaCache = cartCacheService.getSellerMetaBatch(allStoreIds);
 
@@ -291,13 +271,11 @@ public class CartService {
             }
         }
 
-        // 5. 批次查詢 SKU 即時資訊（庫存+配送溫層）
         List<String> allSkuIds = allItems.stream()
                 .map(item -> String.valueOf(item.getSkuId()))
                 .toList();
         Map<String, SkuCartInfo> skuCartInfoMap = productGrpcClient.batchGetSkuCartInfo(allSkuIds);
 
-        // 6. 組裝 SellerGroup
         List<SellerGroup> groups = new ArrayList<>();
         List<Long> storesWithoutMeta = new ArrayList<>();
         for (var entry : grouped.entrySet()) {
@@ -314,14 +292,11 @@ public class CartService {
             groups.add(new SellerGroup(storeId, sellerName, logoUrl, city, district, storeCode, entry.getValue()));
         }
         if (!storesWithoutMeta.isEmpty()) {
-            // 走到這裡代表快取 Miss 且 seller-service 重試後仍拿不到，購物車照樣回（不擋結帳），
-            // 但 store_code 缺值會讓前端店面連結失效。留錯誤訊號，別讓它變成無聲的空字串（#2098）。
             log.error("CartService.getCart.sellerMetaUnavailable",
                     "賣家 meta 取不到，store_code 等欄位降級為空 " + ownerTag(buyerId, guestId),
                     "storeIds", storesWithoutMeta.toString());
         }
 
-        // 7. 計算估算總價（只計 NORMAL + purchasable=true，避免 UI 反灰 row 仍計入總額；04 §5.2）
         long estimatedTotal = normalItems.stream()
                 .filter(item -> {
                     SkuCartInfo info = skuCartInfoMap.get(String.valueOf(item.getSkuId()));
@@ -343,34 +318,26 @@ public class CartService {
         return new GetCartResult(groups, skuCartInfoMap, estimatedTotal, totalItems);
     }
 
-    // ==================== MergeCart（設計書 §5.3） ====================
 
     public record MergeCartResult(int removedSelfOwnedCount) {}
 
     @Transactional
     public MergeCartResult mergeCart(Long buyerId, String guestId) {
-        // 1. 互斥鎖
         if (!cartCacheService.tryMergeLock(guestId, buyerId)) {
             log.info("CartService.mergeCart.skipDuplicate",
                     "合併鎖衝突，跳過 buyerId=" + buyerId, "guestId", guestId);
             return new MergeCartResult(0);
         }
 
-        // 2. 讀取訪客 NORMAL items
         List<CartItemEntity> guestItems = cartItemRepository.findNormalByGuestIdForMerge(guestId);
         if (guestItems.isEmpty()) {
             return new MergeCartResult(0);
         }
 
-        // 3. 自買過濾（§5.3 業務規則，與步驟 4 同一 Transaction，resolve-to-principal，Plan 2b）
         List<Long> distinctStoreIds = guestItems.stream()
                 .map(CartItemEntity::getStoreId)
                 .distinct()
                 .toList();
-        // fail-closed 必須在任何副作用之前：只要有任一 store_id／buyer_id 反解不出真正的
-        // principal，就整筆拒絕，不刪也不併。舊寫法用 echo-back 當 principal 比對，
-        // 而 deleteSelfOwnedGuestItems 是<b>刪除</b>——把「無法確認」誤判成「自己的」
-        // 會直接刪掉訪客車裡的商品（issue #2789）。
         Map<Long, Long> sellerPrincipals;
         long buyerPrincipal;
         try {
@@ -395,7 +362,6 @@ public class CartService {
             cartItemRepository.deleteSelfOwnedGuestItems(guestId, selfOwnedStoreIds);
         }
 
-        // 4. 合併「非自家」items
         List<CartItemEntity> nonSelfOwnedItems = guestItems.stream()
                 .filter(item -> sellerPrincipals.get(item.getStoreId()) != buyerPrincipal)
                 .toList();
@@ -414,7 +380,6 @@ public class CartService {
             }
         }
 
-        // 5. 清理快取
         cartCacheService.invalidateCartCache(buyerId, null);
         cartCacheService.invalidateCartCache(null, guestId);
 
@@ -424,7 +389,6 @@ public class CartService {
         return new MergeCartResult(removedSelfOwnedCount);
     }
 
-    // ==================== SetItemQuantity（設計書 §5.7） ====================
 
     public SetItemResult setItemQuantity(Long buyerId, String guestId, UUID skuId, int quantity) {
         CartItemEntity item = (buyerId != null)
@@ -471,7 +435,6 @@ public class CartService {
         return new SetItemResult(GrpcResponseCode.SUCCESS.code(), "", totalItems);
     }
 
-    // ==================== CheckoutLock（設計書 §5.4） ====================
 
     public int checkoutLock(Long buyerId, String checkoutId, List<UUID> skuIds) {
         if (skuIds == null || skuIds.isEmpty()) {
@@ -500,7 +463,6 @@ public class CartService {
         return GrpcResponseCode.SUCCESS.code();
     }
 
-    // ==================== CheckoutUnlock（設計書 §5.5） ====================
 
     public int checkoutUnlock(Long buyerId, String checkoutId, List<UUID> skuIds) {
         if (skuIds != null && !skuIds.isEmpty()) {
@@ -519,7 +481,6 @@ public class CartService {
         return GrpcResponseCode.SUCCESS.code();
     }
 
-    // ==================== RemoveItemsByCheckoutId（設計書 §5.6） ====================
 
     public int removeItemsByCheckoutId(Long buyerId, String checkoutId, List<UUID> skuIds) {
         if (skuIds != null && !skuIds.isEmpty()) {
@@ -538,7 +499,6 @@ public class CartService {
         return GrpcResponseCode.SUCCESS.code();
     }
 
-    // ==================== 工具方法 ====================
 
     /** 產生身分標記（用於日誌追蹤） */
     private String ownerTag(Long buyerId, String guestId) {
@@ -580,7 +540,6 @@ public class CartService {
                 : cartItemRepository.countByGuestId(guestId);
     }
 
-    // ==================== 結果 DTO ====================
 
     public record AddItemResult(int code, String message, int totalItems) {}
 

@@ -30,7 +30,7 @@ func fieldsOf(t *testing.T, err error) []string {
 func TestPlanAnswerChecksTheShapeAndNamesTheFields(t *testing.T) {
 	for name, tc := range map[string]struct {
 		in     AnswerSlotInput
-		fields []string // 空是合法
+		fields []string
 	}{
 		"city by option":                {AnswerSlotInput{Slot: slots.DeliveryCity, OptionID: "city-taipei"}, nil},
 		"city by text":                  {AnswerSlotInput{Slot: slots.DeliveryCity, FreeText: "宜蘭縣"}, nil},

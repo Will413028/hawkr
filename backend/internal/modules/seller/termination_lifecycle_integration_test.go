@@ -24,7 +24,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-// terminated 開店、建立 21.3 終止並關店（沒有未結訂單）；回傳帳號、店家與措施。
 func (f *fixture) terminated(t *testing.T, ground TerminationGround) (int64, Store, Measure) {
 	t.Helper()
 	accountID, s := f.open(t)
@@ -77,7 +76,6 @@ func TestAppealWindowOfATermination(t *testing.T) {
 	if apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("期滿後送出要 failed_precondition：%v", err)
 	}
-	// 停權沒有期限。
 	other, s2 := f.open(t)
 	ends := f.now.Add(1000 * 24 * time.Hour)
 	susp := f.violate(t, s2.StoreID, SeverityHigh, MeasureSuspension, &ends)
@@ -87,7 +85,6 @@ func TestAppealWindowOfATermination(t *testing.T) {
 	}
 	_ = other
 
-	// 已撤銷且期滿：[REVOKED, APPEAL_WINDOW_ENDED]。
 	f.now = deadline.Add(-time.Hour)
 	revoked := f.revoke(t, notice)
 	f.now = deadline
@@ -143,7 +140,6 @@ func TestRetentionDependsOnWhoClosedTheStore(t *testing.T) {
 		must(t, err)
 		return n
 	}
-	// 賣家自己關店。
 	ownerAccount, owner := f.open(t)
 	closedAt := f.now
 	_, err := f.module.CloseCurrent(ctx, ownerAccount)
@@ -161,8 +157,6 @@ func TestRetentionDependsOnWhoClosedTheStore(t *testing.T) {
 		t.Fatal("保留期＋1µs 要清")
 	}
 
-	// 各段接著上一段的時間往後走（時鐘只前進），每段用自己新開的店家；前一段的店家已經清理，不影響後面的清理筆數。
-	// 因終止而關閉：生效後立刻關店，申覆期限之前都不清。
 	_, s, m := f.terminated(t, GroundBankruptcy)
 	deadline := m.StartsAt.Add(4416 * time.Hour)
 	f.now = deadline.Add(-time.Second)
@@ -178,7 +172,6 @@ func TestRetentionDependsOnWhoClosedTheStore(t *testing.T) {
 		t.Fatal("超過申覆期限要清")
 	}
 
-	// 訂單拖過申覆期限才關店：關閉滿保留期才清。
 	account3, s3 := f.open(t)
 	late := f.terminate(t, s3.StoreID, GroundBankruptcy)
 	f.orders.open = true
@@ -201,7 +194,6 @@ func TestRetentionDependsOnWhoClosedTheStore(t *testing.T) {
 		t.Fatal("關閉滿保留期要清")
 	}
 
-	// 關店之後才生效的另一筆終止：保留期延到它自己的申覆期限；在那之前撤銷，就不再延長。
 	_, s4, m4 := f.terminated(t, GroundBankruptcy)
 	f.now = m4.StartsAt.Add(10 * 24 * time.Hour)
 	extra := f.terminate(t, s4.StoreID, GroundFraud)
@@ -228,12 +220,11 @@ func TestLegalHoldCoversTheWholeAccountAndLinkedAccounts(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	retired := record[StoreRetired](f)
-	// 帳號先有一個賣家自己關閉的舊 stint，之後開新店、被終止（NOTICE 結束後可重新申請，這裡用 21.3 直接建在新店上）。
 	accountID, old := f.open(t)
 	_, err := f.module.CloseCurrent(ctx, accountID)
 	must(t, err)
 	closedAt := f.now
-	f.now = closedAt.Add(10 * 24 * time.Hour) // 終止晚於舊 stint 關店：終止關閉的新店保留期才晚於舊 stint 的
+	f.now = closedAt.Add(10 * 24 * time.Hour)
 	second, err := f.module.Apply(ctx, validApply(accountID))
 	must(t, err)
 	m := f.terminate(t, second.StoreID, GroundOtherSerious)
@@ -262,7 +253,6 @@ func TestRevokingAfterTheRetentionButBeforeThePurgeJobDoesNotReopen(t *testing.T
 	t.Parallel()
 	f := setup(t)
 	accountID, s, m := f.terminated(t, GroundCeasedBusiness)
-	// 賣家自己關閉的對照：終止關店的保留期是申覆期限，所以在申覆期限之前撤銷仍重開（mutation「保留期用 30 天」會在這裡失敗）。
 	f.now = m.StartsAt.Add(60 * 24 * time.Hour)
 	other, s2, m2 := f.terminated(t, GroundCeasedBusiness)
 	f.now = m2.StartsAt.Add(40 * 24 * time.Hour)
@@ -270,7 +260,6 @@ func TestRevokingAfterTheRetentionButBeforeThePurgeJobDoesNotReopen(t *testing.T
 	if back := f.storeRow(t, s2.StoreID); back.Status != Active || !f.isSeller(t, other) {
 		t.Fatalf("申覆期限之前撤銷要重開：%+v", back)
 	}
-	// 保留期已滿、清理還沒跑。
 	f.now = m.StartsAt.Add(4416*time.Hour + time.Hour)
 	revoked := f.revoke(t, m)
 	if revoked.Status != MeasureStatusRevoked {
@@ -279,7 +268,6 @@ func TestRevokingAfterTheRetentionButBeforeThePurgeJobDoesNotReopen(t *testing.T
 	if got := f.storeRow(t, s.StoreID); got.Status != Closed || f.isSeller(t, accountID) || f.storeClosures(t, s.StoreID) != 0 {
 		t.Fatalf("不重開、只撤銷紀錄：%+v", got)
 	}
-	// 撤銷紀錄與禁止入駐：快照刪除、帳號可開新店（新 store_id）。
 	if f.count(t, "SELECT count(*) FROM seller.measure_identities WHERE measure_id=$1", m.ID) != 0 {
 		t.Fatal("快照刪除")
 	}
@@ -446,7 +434,6 @@ func TestLinkedAccountsListCreateAndCascade(t *testing.T) {
 	linkedInput := func(storeID int64, src uuid.UUID) func(*CreateMeasureInput) {
 		return func(in *CreateMeasureInput) { in.Termination.SourceMeasureID = &src }
 	}
-	// 拒絕：來源不存在／同帳號／目標未命中／預告終止當來源。
 	if _, err := f.createTermination(sB.StoreID, GroundLinkedAccount, linkedInput(sB.StoreID, uuid.NewV7())); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("不存在的來源：%v", err)
 	}
@@ -461,7 +448,6 @@ func TestLinkedAccountsListCreateAndCascade(t *testing.T) {
 	if _, err := f.createTermination(sB.StoreID, GroundLinkedAccount, linkedInput(sB.StoreID, notice.ID)); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("預告終止不能當來源：%v", err)
 	}
-	// 建立。
 	linked, err := f.createTermination(sB.StoreID, GroundLinkedAccount, linkedInput(sB.StoreID, source.ID))
 	must(t, err)
 	lm := linked.Measure
@@ -477,12 +463,10 @@ func TestLinkedAccountsListCreateAndCascade(t *testing.T) {
 	if got := f.measureOf(t, source.ID).LinkedAccounts; len(got) != 1 || got[0].LinkedMeasureID == nil || *got[0].LinkedMeasureID != lm.ID {
 		t.Fatalf("linked_measure_id：%+v", got)
 	}
-	// 不成鏈：關聯終止不能當來源。
 	if _, err := f.createTermination(sA.StoreID, GroundLinkedAccount, linkedInput(sA.StoreID, lm.ID)); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("關聯終止不能當來源：%v", err)
 	}
 
-	// 關聯措施自己申覆成立：只撤銷它，來源不變。
 	f.effect(t, f.measureOf(t, lm.ID))
 	f.appeal(t, accountB, f.measureOf(t, lm.ID), "我不是同一人")
 	cur := f.measureOf(t, lm.ID)
@@ -576,7 +560,6 @@ func TestLinkedAccountStoresAreHeldWhileTheSourceHasAPendingAppeal(t *testing.T)
 	source := f.terminate(t, sA.StoreID, GroundFraud)
 	res, err := f.createTermination(sB.StoreID, GroundLinkedAccount, func(in *CreateMeasureInput) { in.Termination.SourceMeasureID = &source.ID })
 	must(t, err)
-	// B 先自己關店（賣家自己關閉，保留期 184 天）。
 	_, err = f.module.CloseCurrent(ctx, accountB)
 	must(t, err)
 	f.effect(t, source)
@@ -804,7 +787,6 @@ func TestTerminationShapesAgreeAcrossStateOfAndTheStateQueries(t *testing.T) {
 			t.Errorf("%s：ScheduledMeasureIDs=%v want=%v", sh.name, scheduled[ids[i]], wantScheduled)
 		}
 	}
-	// ENDED 的篩選是「不在生效中也不在預定生效」。
 	state := StateEnded
 	page, err := f.module.AdminMeasures(ctx, AdminMeasureListInput{State: &state, PageSize: 100})
 	must(t, err)

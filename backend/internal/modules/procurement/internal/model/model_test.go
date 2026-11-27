@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// buyerFacingStrings 是 Candidate 裡允許的「純 string」欄位（路徑含陣列元素）：都是伺服器的固定文字或依買家填的值組出的說明，
-// 不是賣家或 LLM 寫的自由文字。列舉型（具名的 string 型別，例如 SlotKey）不算自由文字。
 var buyerFacingStrings = map[string]bool{
 	"Candidate.MatchedFacts[].Label":       true,
 	"Candidate.UnverifiableFacts[].Reason": true,
@@ -25,7 +23,7 @@ func TestCandidateCarriesNoFreeText(t *testing.T) {
 		}
 		if kind == reflect.Struct {
 			if typ.PkgPath() != reflect.TypeOf(Candidate{}).PkgPath() {
-				return // time.Time 等標準庫型別
+				return
 			}
 			for i := range typ.NumField() {
 				f := typ.Field(i)
@@ -33,13 +31,11 @@ func TestCandidateCarriesNoFreeText(t *testing.T) {
 			}
 			return
 		}
-		// 具名的 string 型別（例如 SlotKey）是列舉，不是自由文字；只有純 string 才算。
 		if typ == reflect.TypeOf("") {
 			found = append(found, path)
 		}
 	}
 	walk("Candidate", reflect.TypeOf(Candidate{}))
-	// path 在陣列上是 "Candidate.MatchedFacts[]" + ".Label"
 	for _, p := range found {
 		if !buyerFacingStrings[p] {
 			t.Errorf("Candidate 有純 string 欄位 %s：買家回應不得帶自由文字（A9-D8）；要加請登記白名單", p)

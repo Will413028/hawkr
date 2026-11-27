@@ -41,7 +41,7 @@ public class AfterSaleAuditService {
             case ADMIN -> entity.setActorAdminAccountId(actorId);
             case BUYER -> entity.setActorBuyerId(actorId);
             case SELLER -> entity.setActorStoreId(actorId);
-            case SYSTEM -> { /* all 3 actor-id columns stay null; actorId is null anyway for SYSTEM callers */ }
+            case SYSTEM -> {  }
         }
         entity.setActorType(actorType);
         entity.setAction(action);

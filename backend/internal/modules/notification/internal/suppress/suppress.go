@@ -132,13 +132,11 @@ func (s *Service) Receive(ctx context.Context, header http.Header, body []byte) 
 	})
 }
 
-// event 是寫進 inbox 的縮減 payload：沒有位址、郵件 ID、主旨與寄件人。
 type event struct {
 	Reason        string   `json:"reason"`
 	AddressHashes []string `json:"address_hashes"`
 }
 
-// redact 把驗過簽章的事件縮成 event 的 JSON：位址在這裡雜湊，原始 payload 不進 inbox。沒有任何合格位址時回 nil（沒有東西可進名單）。
 func (s *Service) redact(ev resend.Event) ([]byte, error) {
 	reason := ReasonHardBounce
 	if ev.Type == resend.EventComplained {

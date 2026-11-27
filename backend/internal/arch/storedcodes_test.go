@@ -7,7 +7,6 @@ import (
 	"testing"
 )
 
-// storedCodeExceptions 是 CHECK 值清單允許小寫的例外，每一筆都要有理由；沒有被任何 schema.sql 用到的筆數會讓測試失敗（過期的例外不留）。
 var storedCodeExceptions = []StoredCodeException{
 	{"delegation", "delegated_operation_sessions_capabilities_check", "能力是「資源.動作」的權限識別字（storefront.read），是 gateway 與 admin 的 allow-list 成員，不是列舉代碼；對外契約的形式"},
 	{"delegation", "admin_operation_audit_logs_capability_check", "同上：能力的權限識別字"},
@@ -85,7 +84,6 @@ func TestCheckStoredCodeCaseFlagsLowercaseValueLists(t *testing.T) {
 			t.Errorf("%s 被誤判：%v", name, got)
 		}
 	}
-	// 例外以（模組、constraint）為鍵並登記使用。
 	ex := []StoredCodeException{{"m", "c", "理由"}}
 	used := map[StoredCodeException]bool{}
 	if got := CheckStoredCodeCase("m", "schema.sql", "CREATE TABLE s.t (v TEXT, CONSTRAINT c CHECK (v IN ('x')));", ex, used); len(got) != 0 || !used[ex[0]] {

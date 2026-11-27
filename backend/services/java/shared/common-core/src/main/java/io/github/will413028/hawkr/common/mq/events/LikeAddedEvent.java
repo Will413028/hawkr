@@ -22,9 +22,9 @@ public class LikeAddedEvent extends BaseEvent {
     private Long likeId;
     private Long likerId;
     private String likerName;
-    private String targetType;  // POST, COMMENT
-    private Long targetId;  // postId or commentId
-    private Long targetOwnerId;  // Owner of the liked content
+    private String targetType;
+    private Long targetId;
+    private Long targetOwnerId;
 
     public static LikeAddedEvent create(Long likeId, Long likerId, String likerName,
                                          String targetType, Long targetId, Long targetOwnerId) {

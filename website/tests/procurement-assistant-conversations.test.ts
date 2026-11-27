@@ -12,7 +12,6 @@ const hook = readFileSync(
 );
 const keys = readFileSync(path.join(root, "lib/query/keys.ts"), "utf8");
 
-/* ── steps.ts 純函式 ─────────────────────────────────────────── */
 
 test("stepIcon 未知碼降級 clock；stepLabel 只使用固定公開字串表", () => {
 	assert.equal(stepIcon("NOT_A_CODE"), "clock");
@@ -43,7 +42,6 @@ test("stepLabel 用 safeArgs 產生動態文案，只限 EXTRACT_SLOTS／PICK_NE
 		}),
 		"條件都齊了：【香蕉】送到【台北市】",
 	);
-	// safeArgs 缺 item（動態模板必要欄位）時退回既有固定文案，不得拼出殘句。
 	assert.equal(
 		stepLabel({ code: "EXTRACT_SLOTS", safeArgs: { city: "台北市" } }),
 		"抓出品項、數量和交期",
@@ -52,14 +50,12 @@ test("stepLabel 用 safeArgs 產生動態文案，只限 EXTRACT_SLOTS／PICK_NE
 		stepLabel({ code: "EXTRACT_SLOTS", safeArgs: undefined }),
 		"抓出品項、數量和交期",
 	);
-	// VALIDATE_SLOTS 沒有動態模板，即使帶了 safeArgs 也必須維持固定文案。
 	assert.equal(
 		stepLabel({ code: "VALIDATE_SLOTS", safeArgs: { item: "香蕉" } }),
 		"核對條件合不合理",
 	);
 });
 
-/* ── useAgentConversations hook 慣例 ────────────────────────────── */
 
 test("query key 走 identity-scoped factory；用 placeholderData 而非 initialData", () => {
 	assert.match(hook, /queryKeys\.assistant\.conversations\(queryIdentity\)/);

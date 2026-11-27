@@ -106,16 +106,6 @@ class UberCreateFailureMappingTest {
 
             assertThat(e.getStatus()).isEqualTo(ShippingStatus.UNPROCESSED.value());
             assertThat(e.getUberDeliveryId()).isEqualTo("del_abc");
-            // 🔴 **建單成功不得寫 provider_status**（V12 的 C4 判準，static gate
-            //    check-shipment-provider-status-semantics.py 擋）。
-            //
-            //    本斷言原本是 `isEqualTo("pending")`，2026-09-12 改判：
-            //    `shipments.provider_status` 只有一條寫入路徑（mapper 的 updateProviderStatus），
-            //    它同時是「未知 provider 原生值」統一 fail-closed 的落點。
-            //    在建單這一格用 entity setter 塞一份等於開第二條寫入路徑，
-            //    而第二條路徑**不會**經過未知值處置。
-            //    ⚠️ 不寫沒有遺失資訊：`pending` 映射到的正是上一行斷言的 91，
-            //    真正的原生值由 webhook／T-8 回查經 canonical ingress 補上。
             assertThat(e.getProviderStatus())
                     .as("建單路徑不得開第二條 provider_status 寫入路徑")
                     .isNull();
@@ -124,8 +114,6 @@ class UberCreateFailureMappingTest {
         @Test
         @DisplayName("🔴 401（憑證問題）⇒ 拋例外，**不寫 990／991**：請求根本沒送出去")
         void authFailureThrowsInsteadOfWritingATerminalish() {
-            // 寫 990 ＝ 因為一次暫時性認證失敗就把買家的錢退掉；
-            // 寫 991 ＝ 讓回查排程去找一個本來就不存在的單，白跑三天才落 990。
             FakeUberTransport transport = new FakeUberTransport().tokenFailsAfter(0);
 
             assertThatThrownBy(() -> createWith(transport))
@@ -148,8 +136,6 @@ class UberCreateFailureMappingTest {
         @Test
         @DisplayName("🔴 查無可用門市對應 ⇒ 990 ＋ 可辨識的 code，**不是**拋例外進 DLQ")
         void missingStoreMappingBecomesCreateFailed() {
-            // 拋例外的話：買家付了錢、連一列 shipment 都沒有、訂單卡住，而 DLQ 沒有人盯。
-            // 990 有既有出口（Admin 重建／Admin 取消＋退款鏈），且 Admin 看得到原因。
             FakeUberTransport transport = new FakeUberTransport()
                     .respondWith(201, "{\"id\":\"del_x\"}");
             UberStoreResolver empty = mock(UberStoreResolver.class);
@@ -273,7 +259,6 @@ class UberCreateFailureMappingTest {
         }
     }
 
-    // ==================== fixtures ====================
 
     private static ShipmentEntity createWith(FakeUberTransport transport) {
         return create(transport, acceptedQuote());

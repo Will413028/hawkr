@@ -66,9 +66,6 @@ func TestAdminWrite_RequiresExpectedVersion(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 9340（作業不存在）的回應必須逐位元相同
-// ---------------------------------------------------------------------------
 
 type notFoundOps struct{ domain.OperationRepository }
 

@@ -13,7 +13,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// 代行資源端點的 request ID 與 correlation ID 應與 tracing 使用相同的值。
 func delegatedSessionForAuditColumns() *accountpb.OperationSessionSummary {
 	return &accountpb.OperationSessionSummary{
 		SessionId: "2701445580000001",
@@ -45,7 +44,6 @@ func TestResolveDelegatedRequest_TraceColumnsComeFromTracingNotInboundHeader(t *
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/t/2685914682", strings.NewReader("{}"))
-	// 刻意不設 X-Request-Id／x-trace-id：這正是 production 的形狀。
 	req.RemoteAddr = "203.0.113.9:51234"
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)

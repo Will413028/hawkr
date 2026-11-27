@@ -22,16 +22,6 @@ import { api } from "@/services/api";
 import "@/styles/pages/Invoice.css";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 
-// A04（列表）｜AMEGO 串接監控（58A §A04，端點 42 `GET /api/v1/admin/invoices/provider_accounts`）。
-//
-// 唯讀頁。三件刻意不做的事：
-//   - **不做自動輪詢**：發票端點與該管理員其他請求共用同一個限流桶，`refetchInterval`
-//     會吃掉額度並連帶打壞同頁其他請求。一律「手動更新」鍵 ＋ 副標明寫快照語意。
-//   - **不做表頭排序**：端點 42 沒有 sort query，做一個只排當前頁的前端排序會讓人
-//     以為看到的是全域排序。
-//   - **不顯示 AppKey 或憑證指紋**：完整 AppKey 沒有任何 RPC 回傳（型別上不存在），
-//     `credentialFingerprint` 也不在 DTO 上——外露 HMAC 指紋是 58 §8 沒有裁決過的
-//     暴露面，畫面規格不能單方面決定。列表只印後四碼。
 
 const PROVIDER_ACCOUNTS_ENDPOINT = "/api/v1/admin/invoices/provider_accounts";
 const PAGE_SIZE = 20;
@@ -124,7 +114,7 @@ export default function ProviderAccountsPage() {
 					}}
 				>
 					<option value="">全部連線狀態</option>
-					{/* 中文一律來自 CodeMeta 生成物，前端不手抄。 */}
+
 					{toOptions(INVOICE_PROVIDER_ACCOUNT_STATUS_LABEL).map(
 						([value, label]) => (
 							<option key={value} value={value}>
@@ -174,15 +164,10 @@ export default function ProviderAccountsPage() {
 										</div>
 										<div className="cell-sub">{item.storeId}</div>
 									</td>
-									{/* 後端遮好的統編，前端不遮也不還原。要完整 8 碼看 A03。 */}
+
 									<td>{item.sellerTaxId || "—"}</td>
 									<td>
-										{/*
-										 * 沒有 `status || "NOT_STARTED"` 這種 fallback（陷阱 T16）：
-										 * 後端刻意區分 NOT_STARTED（上線當天的全體賣家）／
-										 * NOT_CONFIGURED（已建立未填憑證）／CONFIG_ERROR（真正的配置錯誤），
-										 * 壓成兩態會讓既有賣家在上線當天全被標成配置錯誤。
-										 */}
+
 										<StatusBadge
 											variant={
 												PROVIDER_ACCOUNT_STATUS_BADGE_VARIANT[item.status] ??

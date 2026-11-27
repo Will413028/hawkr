@@ -40,7 +40,6 @@ function ActiveMeasureCard({
 }: ActiveMeasureCardProps) {
 	const appealDeadline = appealDeadlineText(measure);
 	const endTime = endTimeText(measure);
-	// 不能結束時（例如依據違規認定的停權）顯示伺服器給的第一個原因，client 不自己寫句子。
 	const endReason = measure.canEnd
 		? undefined
 		: unavailableLabels(measure.endUnavailabilities)[0];

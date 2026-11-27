@@ -1,7 +1,5 @@
 package slots
 
-// protoReasons 把 Reason 對到對外契約 hawkr.procurement.v1alpha1.RejectionReason 的成員名。
-// 模組不能依賴 httpapi 生成碼，所以用成員名字串；handler 以名稱查 proto 的 enum，exhaustive 由測試對 proto 檔守住。
 var protoReasons = map[Reason]string{
 	ReasonEmpty:                 "REJECTION_REASON_EMPTY",
 	ReasonTruncated:             "REJECTION_REASON_TRUNCATED",

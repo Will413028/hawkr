@@ -14,7 +14,6 @@ func TestSQLCReadsOnlyItsOwnSchemaAndAllowedPubContracts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 掃到零份也會「全部通過」：至少要看得到 seller 的。
 	if len(configs) < 2 {
 		t.Fatalf("只找到 %d 份 sqlc.yaml，檢查範圍不對", len(configs))
 	}
@@ -136,7 +135,6 @@ func TestCheckSQLCConfigFlagsForbiddenSchemas(t *testing.T) {
 			}
 		})
 	}
-	// 沒有自己資料的模組（沒有 db/schema.sql）：列了 schema.sql 或一份 pub.sql 都沒讀是違規，只讀依賴表允許的 pub.sql 才通過。
 	for name, tc := range map[string]struct{ config, want string }{
 		"沒有 schema.sql 卻列了":         {"version: \"2\"\nsql:\n  - schema: [\"schema.sql\", \"../../seller/db/pub.sql\"]\n", "模組沒有 db/schema.sql"},
 		"沒有 schema.sql 也沒有 pub.sql": {"version: \"2\"\nsql:\n  - schema: []\n", "至少要讀一份依賴表允許的 pub.sql"},

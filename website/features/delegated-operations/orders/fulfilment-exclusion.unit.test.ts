@@ -17,10 +17,6 @@ import { describe, expect, it } from "vitest";
  * 是本案唯一不准動的東西，它一旦不再命中，代表禁令的措辭已經與真實程式碼脫節。
  */
 
-// fileURLToPath 而不是 .pathname：後者會把路徑裡的空白留成 %20，於是在
-// 「Hawkr Web」這種含空白的 checkout 路徑下 walk() 全部讀不到檔案，
-// delegatedFiles 變成空陣列——整份禁令看起來是紅的，其實是路徑解錯。
-// CI 的 checkout 路徑沒有空白，所以只在本機炸。
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 const DELEGATED_ORDER_DIRS = [
 	"features/delegated-operations/orders",
@@ -81,7 +77,6 @@ const FORBIDDEN_IMPORT_TOKENS = [
 	"useSellerAfterSales",
 	"useSellerSelf",
 	"useQueryIdentity",
-	// 賣家訂單資料層：它打的是 /app/orders，代行必須走 /adm/api/orders/{storeId}。
 	"lib/orders/repo",
 ];
 

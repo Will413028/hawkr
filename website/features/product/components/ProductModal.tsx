@@ -60,11 +60,10 @@ export default function ProductModal({
 	const close = React.useCallback(() => {
 		if (closingRef.current) return;
 		closingRef.current = true;
-		setOpen(false); // play the shrink-back, then drop the modal
+		setOpen(false);
 		window.setTimeout(() => router.back(), PRODUCT_MODAL_TRANSITION_MS);
 	}, [router]);
 
-	// Anchor the scale to the card we opened from (captured on click).
 	React.useLayoutEffect(() => {
 		if (!shouldShow) {
 			handedOffPendingRef.current = false;
@@ -76,9 +75,6 @@ export default function ProductModal({
 		if (panel && origin) {
 			panel.style.transformOrigin = `${origin.cx}px ${origin.cy}px`;
 		}
-		// Legacy pending-shell handoff remains supported for stale documents, but
-		// new documents keep the complete source page visible and enter this
-		// branch only when a real older shell was present.
 		if (hideProductQuickViewPending()) {
 			handedOffPendingRef.current = true;
 			setHandoff(true);
@@ -86,19 +82,6 @@ export default function ProductModal({
 		}
 	}, [shouldShow]);
 
-	// Freeze the page underneath at its click-time scroll while shown, and restore
-	// it on close. `position: fixed` (offset by the captured scroll) holds the
-	// visual still regardless of any scroll Next does on the product nav; on close
-	// we re-pin the scroll for a few frames so Next's own back-restoration (which
-	// is racy here — sometimes lands at the top) can't override the real position.
-	//
-	// That pin belongs to the opener page and ONLY to it. A quick-view is also a
-	// launch pad — 店家頁、購物車、結帳 all lead out of it — and those are ordinary
-	// forward navigations that must start at the top of the new route. Replaying
-	// the list's offset onto them (and out-muscling Next for 18 frames while doing
-	// it) drops the user deep inside a page they never scrolled; when the previous
-	// screen was scrolled far down, the arriving route looks unchanged or blank and
-	// the tap reads as dead. Hence: restore only on a genuine return.
 	React.useEffect(() => {
 		if (!shouldShow) return;
 		const origin = readQuickViewOrigin();
@@ -121,10 +104,6 @@ export default function ProductModal({
 		};
 	}, [shouldShow]);
 
-	// Freezing scroll above stops the auto-hide nav from ever re-evaluating, so
-	// it would otherwise open the modal frozen in whatever shown/hidden state
-	// the list page happened to be in at tap time. useAutoHideNav already
-	// treats this attribute as "force visible" (shared with Dialog).
 	React.useEffect(() => {
 		if (!shouldShow) return;
 		return retainOverlayOpenAttribute();
@@ -150,9 +129,6 @@ export default function ProductModal({
 		let raf: number | null = null;
 		if (handedOffPendingRef.current) {
 			setOpen(true);
-			// Keep transition:none for the first real-content paint. Removing only
-			// the handoff flag next frame leaves transform at scale(1), so no second
-			// zoom is generated; the normal transition is then ready for closing.
 			raf = requestAnimationFrame(() => setHandoff(false));
 		} else {
 			setHandoff(false);
@@ -192,8 +168,6 @@ export default function ProductModal({
 				first.focus({ preventScroll: true });
 			}
 		};
-		// The product page renders its own 返回 button (data-zoom-back). Intercept
-		// it (capture phase, before its router.back) so closing plays the shrink.
 		const onClickCapture = (event: MouseEvent) => {
 			if (event.button !== 0 || !(event.target instanceof Element)) return;
 			if (event.target.closest("[data-zoom-back]")) {
@@ -221,10 +195,6 @@ export default function ProductModal({
 
 	if (!shouldShow || typeof document === "undefined") return null;
 
-	// Portal to <body>: the @modal slot lives inside `main.page-content`, whose
-	// `view-transition-name` (page-transition.css) forces a stacking context —
-	// trapped in there, z-index 400 can never paint above the navbar's 200/250,
-	// breaking this overlay's full-screen design. Escaping to <body> restores it.
 	return createPortal(
 		<div
 			ref={modalRef}

@@ -70,8 +70,6 @@ export function useSellerInvoiceOverview(): UseSellerInvoiceOverviewResult {
 		queryKey: queryKeys.seller.invoiceOverview(identity),
 		queryFn: fetchSellerInvoiceOverview,
 		enabled,
-		// apiClient already retries GET failures once. This shared sidebar query
-		// must not multiply an invoice outage into four requests (backend#3230).
 		retry: false,
 	});
 
@@ -87,8 +85,6 @@ export function useSellerInvoiceOverview(): UseSellerInvoiceOverviewResult {
 }
 
 export interface UseSellerInvoiceDocumentsResult extends BlockedQueryBase {
-	// 端點 30 的分頁結果比標準分頁多一個 shipmentStatusDegraded（backend#3019）。
-	// 用 SellerPagedResult 會把它在型別上抹掉，S06 就再也分不出「降級」與「還沒出貨」。
 	page: SellerInvoiceDocumentsResult | null;
 }
 

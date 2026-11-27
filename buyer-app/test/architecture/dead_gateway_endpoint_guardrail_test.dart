@@ -10,21 +10,15 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// 新增條目前請先對 dev Gateway 實打確認，並在下方註明正確替代來源。
 const _deadEndpointFragments = <String, String>{
-  // 正解：GET /public/products/{id} 的 imageKeys / imageUrls
   '/products/\$skuId/images': '/public/sellers/{id}/products/{sku}/images',
   '/products/\$productId/images': '/public/sellers/{id}/products/{sku}/images',
-  // 正解：GET /public/products/{id} 的 shippingMethods
   '/products/\$skuId/delivery': '/public/sellers/{id}/products/{sku}/delivery',
-  // 正解：GET /public/posts/{id} 的 comment_count
   '/comments/count': '/public/posts/{id}/comments/count',
-  // 正解：POST /app/posts/comments/{id}/like 是 toggle，沒有 DELETE 版本
   "delete<dynamic>(\n        '/app/posts/comments/\$commentId/like'":
       'DELETE /app/posts/comments/{id}/like',
-  // Gateway 沒有留言按讚名單／計數端點
   '/likes/count': '/public/posts/comments/{id}/likes/count',
   "'/public/posts/comments/\$commentId/likes'":
       '/public/posts/comments/{id}/likes',
-  // 正解：POST /app/coupons/{template_id}/claim
   '/receive\'': 'POST /app/coupons/{template_id}/receive',
   '/refunds/method': 'PUT /app/orders/{order_no}/refunds/method',
   '/refund_bank_info': 'POST /app/orders/{order_no}/refund_bank_info',
@@ -55,7 +49,6 @@ final _retiredEndpointPatterns = <RegExp, _Retired>{
   RegExp(r'/public/products/\$[\w{}.]+/view'): _Retired(
     'POST /public/products/{id}/view',
   ),
-  // 貼文、留言、討論區已改走 SocialPublicService／SocialAppService（A7-4c-2）。
   RegExp(r'/public/posts'): _Retired('GET /public/posts…（貼文與留言讀取）'),
   RegExp(r'/app/posts'): _Retired('POST /app/posts…（按讚、留言、回覆）'),
   RegExp(r'/public/sellers/\$[\w{}.]+/posts'): _Retired(
@@ -74,10 +67,7 @@ final _retiredEndpointPatterns = <RegExp, _Retired>{
   RegExp(r'/comments/stream'): _Retired(
     'GET /public/posts/{id}/comments/stream（SSE）',
   ),
-  // 檢舉、封鎖、封鎖名單與貼文分享已改走 ModerationAppService、BuyerAppService 與 `Post.url`；聊天改走
-  // ChatAppService（A6-6c2），不再有允許的舊 REST 呼叫。
   RegExp(r'/app/blocks'): _Retired('POST|GET|DELETE /app/blocks…（封鎖與封鎖名單）'),
-  // ATM 退款頁與 PayUni 付款路由已隨 Java payment 刪除（B2 步驟 6）；退款一律原路退回，付款走 PaymentService。
   RegExp(r'/refund_page\b'): _Retired(
     'POST /app/orders/{order_no}/refund_page（ATM 退款頁）',
   ),

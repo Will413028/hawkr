@@ -34,7 +34,6 @@ type AdminModule interface {
 	ResolveAnomaly(ctx context.Context, actor payment.AdminActor, kind payment.AnomalyKind, id uuid.UUID, outcome payment.AnomalyOutcome, reason payment.AnomalyResolutionReason, note, evidence string) error
 }
 
-// actorFrom 是後台紀錄的操作者：呼叫的管理員 ID 與這個 RPC 的 procedure 名稱（D62）。
 func actorFrom(ctx context.Context, procedure string) (payment.AdminActor, error) {
 	id, err := rpc.RequireAdmin(ctx)
 	if err != nil {
@@ -51,7 +50,6 @@ var _ paymentv1alpha1connect.PaymentAdminServiceHandler = (*Admin)(nil)
 // NewAdmin 建立後台的 handler。
 func NewAdmin(m AdminModule) *Admin { return &Admin{m: m} }
 
-// requirements 把金流商回報的待補條件原始 JSON 轉成 Struct；不是物件時回空物件。
 func requirements(raw json.RawMessage) *structpb.Struct {
 	out := &structpb.Struct{}
 	if len(raw) == 0 || out.UnmarshalJSON(raw) != nil {
@@ -162,7 +160,6 @@ func (h *Admin) DeletePaymentAccountMapping(ctx context.Context, req *connect.Re
 	return connect.NewResponse(&adminpb.DeletePaymentAccountMappingResponse{}), nil
 }
 
-// listPaths 是清單請求的欄位路徑：模組回的欄位錯誤（InvalidInput 的欄位）對到請求。
 var listPaths = rpc.FieldPaths{"Status": "status", "OrderNo": "order_no", "PageSize": "page_size"}
 
 func toAdminPayment(r payment.PaymentRecord) *adminpb.Payment {
@@ -205,7 +202,6 @@ func toAdminRefund(r payment.RefundRecord) *adminpb.PaymentRefund {
 	return out
 }
 
-// pageCursor 解出 page token 的排序鍵；scope 綁定這支 RPC 與請求的篩選，換了篩選的 token 回 invalid_argument。
 func pageCursor(scope, token string) (*payment.RecordCursor, error) {
 	return rpc.ValidCursor[payment.RecordCursor](scope, token)
 }
@@ -294,7 +290,6 @@ func (h *Admin) ListPaymentRefunds(ctx context.Context, req *connect.Request[adm
 	return connect.NewResponse(out), nil
 }
 
-// anomalyKinds 是契約的物件種類到模組的值（模組的值是小寫，不能以去前綴的通則轉換）。
 var anomalyKinds = map[paymentpb.PaymentAnomalyKind]payment.AnomalyKind{
 	paymentpb.PaymentAnomalyKind_PAYMENT_ANOMALY_KIND_PAYMENT:  payment.AnomalyPayment,
 	paymentpb.PaymentAnomalyKind_PAYMENT_ANOMALY_KIND_TRANSFER: payment.AnomalyTransfer,

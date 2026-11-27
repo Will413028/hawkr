@@ -1,7 +1,5 @@
 /** @vitest-environment jsdom */
 
-// 同目錄其他測試已說明這個慣例：vitest 的 include 只吃 `.ts`，所以用
-// React.createElement 而不是 JSX。
 
 import {
 	cleanup,
@@ -163,8 +161,6 @@ const reconfirmCheckbox = () =>
 	});
 
 describe("RfqDraftFlow — 回覆期限", () => {
-	// 站外供應商的落地頁一直有「回覆期限」那一列，但買家在網站上沒有地方填，
-	// 所以它永遠是空的。鏈路每一層都已經支援，缺的就是這個輸入。
 	it("R-01 上有一個回覆期限輸入，格式是曆日", async () => {
 		await renderAtReconfirm();
 
@@ -173,7 +169,6 @@ describe("RfqDraftFlow — 回覆期限", () => {
 		expect(input.value).toBe("");
 	});
 
-	// 後端 DB 是 DATE、`domain.ResponseDeadlineLayout = "2006-01-02"`。
 	it("送出台北曆日 YYYY-MM-DD，不是 RFC3339", async () => {
 		const { fn: onPreviewRfqPublication, commands } = publicationSpy();
 		await renderAtReconfirm(onPreviewRfqPublication);
@@ -189,7 +184,6 @@ describe("RfqDraftFlow — 回覆期限", () => {
 		expect(command.responseDeadline).toBe("2026-09-20");
 	});
 
-	// 選填是既有行為，不得因為多了這一欄就變成必填。
 	it("沒填也能取得發布核准", async () => {
 		const { fn: onPreviewRfqPublication, commands } = publicationSpy();
 		await renderAtReconfirm(onPreviewRfqPublication);
@@ -207,8 +201,6 @@ describe("RfqDraftFlow — 回覆期限", () => {
 		});
 	});
 
-	// 沒填時 command 的 responseDeadline 是 undefined（對應 proto 的 optional 欄位不設），
-	// 不是空字串。
 	it("沒填時 command 的 responseDeadline 是 undefined", async () => {
 		const { fn: onPreviewRfqPublication, commands } = publicationSpy();
 		await renderAtReconfirm(onPreviewRfqPublication);
@@ -223,14 +215,12 @@ describe("RfqDraftFlow — 回覆期限", () => {
 		expect(command.responseDeadline).toBeUndefined();
 	});
 
-	// 下限用的是台北曆日：這一刻 UTC 還是 09-13，台北已經是 09-14。
 	it("下限是台北的今天，不是 UTC 的今天", async () => {
 		await renderAtReconfirm();
 
 		expect(deadlineInput().getAttribute("min")).toBe(TODAY_TAIPEI);
 	});
 
-	// 已經過期的回覆期限對供應商只是雜訊。後端目前不驗，前端擋掉。
 	it("早於今天時擋下發布並說明原因", async () => {
 		const { fn: onPreviewRfqPublication, commands } = publicationSpy();
 		await renderAtReconfirm(onPreviewRfqPublication);
@@ -247,7 +237,6 @@ describe("RfqDraftFlow — 回覆期限", () => {
 		expect(onPreviewRfqPublication).not.toHaveBeenCalled();
 	});
 
-	// 台北的今天本身是合法的（「不得早於今天」不是「必須晚於今天」）。
 	it("選今天不算過期", async () => {
 		await renderAtReconfirm();
 
@@ -262,8 +251,6 @@ describe("RfqDraftFlow — 回覆期限", () => {
 		).toBe(false);
 	});
 
-	// 回覆期限進得了 sellerFacingPayload，所以它被核准的 payload hash 涵蓋：
-	// 改了之後既有核准描述的就不是畫面上這一份，沿用它等於讓買家以為自己核准過。
 	it("改期限會作廢既有核准", async () => {
 		const { fn: onPreviewRfqPublication, commands } = publicationSpy();
 		await renderAtReconfirm(onPreviewRfqPublication);

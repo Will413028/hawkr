@@ -26,14 +26,6 @@ import '../../../../shared/widgets/truck_loading_overlay.dart';
 import '../../../address/data/address_model.dart';
 import '../../data/cart_model.dart';
 
-// ---------------------------------------------------------------------------
-// 結帳付款底部彈窗。
-//
-// 呈現結帳預覽資訊（商品總額、運費、折扣、總付款金額）、
-// 以及滑動確認付款。
-//
-// 內部管理 preview API 呼叫、confirm + payment 流程；付款由 PaymentSheet 完成。
-// ---------------------------------------------------------------------------
 
 /// 結帳付款彈窗的配置參數。
 class CheckoutParams {
@@ -130,22 +122,16 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
     _loadPreview();
   }
 
-  // ── Preview API ──
 
   Future<void> _loadPreview() async {
     if (_previewRequested) return;
     _previewRequested = true;
 
     final p = widget.params;
-    // preview payload 依配送方式**明確分派**。
-    // 🔴 不得用 `!isStorePickup` 當宅配：未知 / 本版未支援的配送方式會因此帶著
-    // receiverZipCode、不帶 storeId 送進 /app/checkout/preview（請求面 P0）。
     final shipping = shippingPresentationOf(
       p.shippingOption['shippingMethod']?.toString(),
     );
     if (shipping == ShippingPresentation.unsupported) {
-      // 首次呼叫來自 initState（第一次 build 之前），該時點 setState 會 assert；
-      // 先讓出一個 event loop turn 再更新狀態，retry 路徑（_refreshPreview）亦適用。
       await Future<void>.delayed(Duration.zero);
       if (!mounted) return;
       setState(() {
@@ -154,7 +140,6 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
       });
       return;
     }
-    // 判準是 [ShippingPresentationX.usesRecipientAddress]，與 confirm 同一份。
     final addr = shipping.usesRecipientAddress ? p.selectedAddress : null;
     final zipCode = postalCodeByTownCode(addr?.townCode ?? '');
     final storePickup = shipping == ShippingPresentation.cvsStorePickup
@@ -196,7 +181,6 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
         final code = body?['code']?.toString();
         final msg = body?['message']?.toString() ?? '';
 
-        // 庫存不足
         if ((code == '4001' || code == '4002') && mounted) {
           Navigator.of(context).pop();
           if (!widget.parentContext.mounted) return;
@@ -208,7 +192,6 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
           return;
         }
 
-        // 商品下架
         if (code == '4003' && mounted) {
           Navigator.of(context).pop();
           if (!widget.parentContext.mounted) return;
@@ -220,7 +203,6 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
           return;
         }
 
-        // 自買防護
         if (code == '4015' && mounted) {
           Navigator.of(context).pop();
           if (!widget.parentContext.mounted) return;
@@ -268,7 +250,6 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
         '';
   }
 
-  // ── Confirm + Pay ──
 
   Future<void> _doConfirm() async {
     if (_isConfirming) return;
@@ -284,9 +265,6 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
 
     final p = widget.params;
     final cb = widget.callbacks;
-    // confirm payload 依配送方式**明確分派**（與 _loadPreview 同一套判定）。
-    // 🔴 不得用 `!confirmIsStorePickup` 當宅配：那會讓未知 / 本版未支援的配送方式
-    // 帶著 receiverZipCode + shippingAddress 建出一張語意錯誤的訂單。
     final confirmShipping = shippingPresentationOf(
       p.shippingOption['shippingMethod']?.toString(),
     );
@@ -324,8 +302,6 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
         );
         return;
     }
-    // switch 的每個分支若彈過 dialog 都已 return，但 analyzer 對 switch 的
-    // async gap 分析較保守；這道 guard 同時是正確行為（跨 await 後 widget 可能已卸載）。
     if (!mounted) return;
 
     _isConfirming = true;
@@ -333,7 +309,6 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
 
     TruckLoadingOverlay.show(context, message: context.l10n.paymentProcessing);
     try {
-      // Step 1: 確認訂單
       final confirmResp = await widget.dio.post<Map<String, dynamic>>(
         '/app/checkout/confirm',
         data: {
@@ -387,7 +362,6 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
           ? '訂單編號：${orderNos.join(', ')}'
           : '訂單已建立';
 
-      // Step 2: 付款
       if (orderNo.isEmpty) {
         if (!mounted) return;
         TruckLoadingOverlay.hide(context);
@@ -425,7 +399,6 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
     final confirmCode = confirmBody?['code']?.toString();
     final confirmMsg = confirmBody?['message']?.toString() ?? '';
 
-    // 庫存問題
     if (confirmCode == '4001' || confirmCode == '4002') {
       if (mounted) Navigator.of(context).pop();
       showCommonSnackBar(
@@ -436,8 +409,6 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
       return;
     }
 
-    // 賣家停權 — 商品暫停販售（46 號設計書「賣家能力權限層」§7.2；文案為
-    // 使用者 2026-07-13 圈選定案，不採後端 message，固定顯示此文案）
     if (confirmCode == SellerSuspensionCode.sellerSuspendedProductUnavailable) {
       if (mounted) Navigator.of(context).pop();
       showCommonSnackBar(widget.parentContext, '部分商品暫停販售，已自結帳移除');
@@ -445,7 +416,6 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
       return;
     }
 
-    // 自買防護
     if (confirmCode == '4015') {
       if (mounted) Navigator.of(context).pop();
       showCommonSnackBar(
@@ -456,7 +426,6 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
       return;
     }
 
-    // 價格變動
     if (confirmCode == '4091' && mounted) {
       Navigator.of(context).pop();
       await showCommonDialog(
@@ -470,7 +439,6 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
       return;
     }
 
-    // 結帳過期
     if (confirmCode == '4006' && mounted) {
       Navigator.of(context).pop();
       showCommonSnackBar(
@@ -535,7 +503,6 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
       );
       cb.onReloadCart();
       cb.onInvalidateCartCount();
-      // GA4 purchase：對每筆 orderNo 觸發一次（多賣家拆單各呼叫一次）。
       for (final no in orderNos.isNotEmpty ? orderNos : [orderNo]) {
         cb.onPaymentSucceeded?.call(no);
       }
@@ -554,7 +521,6 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
     cb.onNavigateToOrders();
   }
 
-  // ── UI ──
 
   /// 付款明細行：icon + label + amount。
   Widget _paymentRow(HkIconName icon, String label, String amount) {
@@ -621,7 +587,6 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
 
   @override
   Widget build(BuildContext context) {
-    // 從 preview 計算顯示值
     final totalOriginal =
         _previewData?['totalOriginalAmount']?.toString() ?? '—';
     final totalShipping = _previewData?['totalShippingFee']?.toString() ?? '—';
@@ -634,7 +599,6 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // 拖拽手柄
         SizedBox(height: 20.h),
         Container(
           width: 50.w,
@@ -646,14 +610,12 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
         ),
         SizedBox(height: 22.h),
 
-        // 可滾動內容
         Flexible(
           child: SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(24.w, 0, 24.w, 16.h),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Loading / Error
                 if (_previewLoading)
                   Padding(
                     padding: EdgeInsets.symmetric(vertical: 32.h),
@@ -682,7 +644,6 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
                     ),
                   )
                 else ...[
-                  // 付款詳情卡片
                   _buildPaymentDetailsCard(
                     totalOriginal,
                     totalShipping,
@@ -701,7 +662,6 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
           ),
         ),
 
-        // 底部滑動付款
         Padding(
           padding: EdgeInsets.fromLTRB(24.w, 0, 24.w, bottomPad + 12),
           child: SwipeToPay(
@@ -745,7 +705,6 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // 標題
           Row(
             children: [
               HkIcon(
@@ -762,12 +721,10 @@ class _CheckoutPaymentSheetState extends State<CheckoutPaymentSheet> {
           SizedBox(height: 10.h),
           _paymentRow(HkIconName.truck, '運費總金額', 'NT\$ $totalShipping'),
           SizedBox(height: 10.h),
-          // 折扣券
           _buildCouponRow(discountNum),
           SizedBox(height: 10.h),
           const Divider(height: 1, color: AppColors.dividerLight),
           SizedBox(height: 10.h),
-          // 總付款金額
           _buildTotalRow(totalActual),
         ],
       ),
@@ -991,7 +948,6 @@ Future<void> showCheckoutPaymentSheet({
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    // 內容已提供專用拖曳把手；關閉 Theme 的預設把手，避免畫出兩條。
     showDragHandle: false,
     backgroundColor: AppColors.bgPrimary,
     shape: const RoundedRectangleBorder(

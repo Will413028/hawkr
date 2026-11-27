@@ -31,7 +31,6 @@ class OrderPolicyResolverTest {
 
     private final OrderPolicyResolver resolver = new OrderPolicyResolver();
 
-    // ===== 履約模式：逐一列舉 ShippingMethod 的全部四個值 =====
 
     @ParameterizedTest(name = "shipping_method={0} → PLATFORM_LOGISTICS")
     @ValueSource(strings = {"3001", "3002", "3003"})
@@ -46,7 +45,6 @@ class OrderPolicyResolverTest {
         assertThat(resolver.resolve("3005").fulfillmentMode()).isEqualTo("SELLER_MANAGED");
     }
 
-    // ===== 值域外：fail-closed，不得猜成平台履約 =====
 
     @Test
     @DisplayName("null → 拋 9504，不是 NPE（Set.of(...).contains(null) 會 NPE，而 NPE 被上層翻成 500，維運看到的碼指不到原因）")
@@ -74,7 +72,6 @@ class OrderPolicyResolverTest {
                 .isInstanceOf(OrderBusinessException.class);
     }
 
-    // ===== 其餘五欄：本波恆定值 =====
 
     @ParameterizedTest(name = "shipping_method={0} 的其餘五欄")
     @ValueSource(strings = {"3001", "3002", "3003", "3005"})
@@ -94,17 +91,11 @@ class OrderPolicyResolverTest {
         assertThat(resolver.resolve("3002")).isEqualTo(resolver.resolve("3002"));
     }
 
-    // ===== 🔴 陰性：resolver 不管 Uber 能不能用 =====
 
     @Test
     @DisplayName("resolver 對 3003 仍回 PLATFORM_LOGISTICS——「值域已定義」與「已啟用」是兩件事，"
             + "擋 Uber 是 UberOrderEligibilityGuard 的責任，不是把 3003 從白名單拿掉")
     void resolverStillClassifiesUberAsPlatformLogistics() {
-        // 這一條看起來像在保護一個 bug，實際上守的是「兩個決定點不重疊」：
-        // 若有人為了擋 Uber 而把 3003 從 PLATFORM_LOGISTICS_METHODS 拿掉，
-        // resolver 會對 3003 拋 9504「無法判定履約模式」——那個碼的語意是「我方配置讀不到」(424)，
-        // 與真正的原因「此配送服務尚未開放」(9503/403) 完全不同，
-        // 而且會連帶讓**未來啟用 Uber 時**的政策推導變成需要改兩個地方。
         assertThat(resolver.resolve("3003").fulfillmentMode()).isEqualTo("PLATFORM_LOGISTICS");
     }
 }

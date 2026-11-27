@@ -19,7 +19,6 @@ var ErrBadParams = errors.New("通知參數永久不合法")
 // MaxFollowerPage 是 StoreFollowers 與 fan-out 一頁的上限，等於 buyer.MaxLiveAccountsPage（根套件的測試守住兩者相等）。
 const MaxFollowerPage = 1000
 
-// permanent 把依賴模組回的 InvalidInput（呼叫方給的值不合法，重試也不會好）轉成 ErrBadParams，讓 worker 取消 job 而不是重試；其餘錯誤原樣回傳。
 func permanent(err error) error {
 	if err != nil && !errors.Is(err, ErrBadParams) && apperr.KindOf(err) == apperr.KindInvalidInput {
 		return fmt.Errorf("%w：%w", ErrBadParams, err)

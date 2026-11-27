@@ -52,19 +52,9 @@ public class SellerDeletedConsumer {
         try {
             JsonNode payload = MAPPER.readTree(body);
             String eventType = textOrEmpty(payload, "event_type");
-            // ② re-key：owner 識別優先用 store_id（store 代理鍵，seller-service 於刪除 tx 內
-            // snapshot）；舊格式 in-flight 事件只有 accountId — fallback 安全
-            // （pre-incarnation surrogate == account_id）。
-            //
-            // D7 Stage 2 PR-B（store_id rename）done 2026-08-02（Phase 2 account_id 命名債
-            // campaign Task 3）：seller-service 的 outbound SELLER_DELETED payload key 已從
-            // sellerAccountId 正名為 store_id，本消費端同一 PR 原子更新。仍保留對舊鍵的相容
-            // fallback 一個 rollout 窗口——若收到部署過渡期間、由尚未更新的舊版
-            // seller-service 發出的事件（JSON 仍帶 sellerAccountId），照樣能解析，不落入
-            // missing-field 分支。待確認兩邊都已完成部署且無舊格式 backlog 後可再移除。
             String sellerIdStr = textOrEmpty(payload, "store_id");
             if (sellerIdStr.isEmpty()) {
-                sellerIdStr = textOrEmpty(payload, "sellerAccountId"); // rollout-window 相容：舊版 publisher
+                sellerIdStr = textOrEmpty(payload, "sellerAccountId");
             }
             if (sellerIdStr.isEmpty()) {
                 sellerIdStr = textOrEmpty(payload, "accountId");
@@ -90,7 +80,7 @@ public class SellerDeletedConsumer {
         } catch (IllegalArgumentException e) {
             log.warn("SellerDeletedConsumer.parse.fail",
                     "payload 格式錯誤 body=" + body + " error=" + e.getMessage());
-            channel.basicAck(deliveryTag, false);   // 不重試
+            channel.basicAck(deliveryTag, false);
         } catch (Exception e) {
             log.error("SellerDeletedConsumer.handle.fail",
                     "處理失敗，進 DLQ body=" + body, e);

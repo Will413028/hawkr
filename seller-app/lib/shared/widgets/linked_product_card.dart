@@ -170,7 +170,6 @@ class LinkedProductCard extends StatelessWidget {
       );
     }
 
-    // ── 買家版關聯商品卡片樣式（hawkr_buyer post_detail_screen.buildProductCard）──
     if (!inset) return content;
     return Padding(
       padding: const EdgeInsets.fromLTRB(HkSpace.lg, HkSpace.md, HkSpace.lg, 0),

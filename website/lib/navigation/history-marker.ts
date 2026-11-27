@@ -48,7 +48,6 @@ export function markAppEntry(): void {
 		if (store.getItem(ENTRY_INDEX_KEY) !== null) return;
 		store.setItem(ENTRY_INDEX_KEY, String(window.history.length));
 	} catch {
-		// Quota / disabled storage: BackLink falls back to its href.
 	}
 }
 
@@ -62,7 +61,6 @@ export function recordPathname(pathname: string): void {
 		if (current) store.setItem(PREVIOUS_PATH_KEY, current);
 		store.setItem(CURRENT_PATH_KEY, pathname);
 	} catch {
-		// Ignore — see markAppEntry.
 	}
 }
 

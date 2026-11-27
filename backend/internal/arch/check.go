@@ -30,14 +30,14 @@ func (v Violation) String() string {
 type layer int
 
 const (
-	layerExternal   layer = iota // 單體 module 以外：標準庫與第三方
-	layerCmd                     // cmd/...：組裝點，可以接任何東西
-	layerPlatform                // internal/platform/...
-	layerModuleAPI               // internal/modules/<名稱>：模組的公開 API
-	layerModuleImpl              // internal/modules/<名稱>/...：模組的實作
-	layerLegacy                  // internal/legacy/...：遷移期的暫時轉接
-	layerHTTPAPI                 // internal/httpapi/...：對外 HTTP 入口
-	layerArch                    // internal/arch：本檢查
+	layerExternal   layer = iota
+	layerCmd
+	layerPlatform
+	layerModuleAPI
+	layerModuleImpl
+	layerLegacy
+	layerHTTPAPI
+	layerArch
 	layerUnknown
 )
 

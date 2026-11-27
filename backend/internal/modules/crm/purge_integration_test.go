@@ -28,7 +28,6 @@ func (f *fixture) seedBuyerEverywhere(buyerID int64) {
 	}
 }
 
-// deleteBuyer 關閉買家（buyer 的 CloseForDeletion，事實的唯一來源）；buyer 在同 transaction 發 BuyerDeleted，crm 的訂閱者排清除 job。
 func (f *fixture) deleteBuyer(buyerID int64) {
 	f.t.Helper()
 	ctx := context.Background()
@@ -44,8 +43,6 @@ func (f *fixture) retireStore(storeID int64) {
 	}
 }
 
-// retireStoreErr 讓店家退場並在同 transaction 發 StoreRetired；回傳錯誤，讓測試可以在 goroutine 內呼叫。
-// 退場批次（seller 的 RetireDueStores）對店家列是 FOR UPDATE：先鎖列（被守門鎖住時等到對方提交）再改 retired_at。
 func (f *fixture) retireStoreErr(storeID int64) error {
 	ctx := context.Background()
 	return f.db.InTx(ctx, func(ctx context.Context) error {
@@ -57,7 +54,6 @@ func (f *fixture) retireStoreErr(storeID int64) error {
 	})
 }
 
-// retireLocked 在呼叫方已持店家列的 FOR UPDATE 時把店家改成已退場並發 StoreRetired。
 func (f *fixture) retireLocked(ctx context.Context, storeID int64) error {
 	if err := closeStoreRows(ctx, f.db, storeID); err != nil {
 		return err
@@ -65,7 +61,6 @@ func (f *fixture) retireLocked(ctx context.Context, storeID int64) error {
 	return events.Publish(ctx, f.bus, seller.StoreRetired{EventID: uuid.New(), StoreID: storeID, OccurredAt: epoch})
 }
 
-// closeStoreRows 把店家改成已關閉並退場，兩張表的列一起合法（stores_current_closure_fkey 在 commit 時檢查，所以必須在 transaction 內，且先寫關店紀錄）。
 func closeStoreRows(ctx context.Context, d *db.DB, storeID int64) error {
 	if _, ok := db.TxFrom(ctx); !ok {
 		return errors.New("closeStoreRows 必須在 transaction 內呼叫")
@@ -109,7 +104,6 @@ func TestBuyerDeletionErasesOnlyThatBuyer(t *testing.T) {
 	if n := f.count("crm.tags"); n != 2 {
 		t.Fatalf("標籤 %d 個：買家刪帳不刪店家的標籤定義，預期 2", n)
 	}
-	// 冪等：重跑不報錯。
 	if err := f.m.ErasePartyData(context.Background(), "BUYER", buyer1); err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +116,6 @@ func TestReplayAfterBuyerDeletionDoesNotRecreateRows(t *testing.T) {
 	f.seedBuyerEverywhere(buyer1)
 	f.deleteBuyer(buyer1)
 	o := "ORD-" + sn(int(buyer1)) + "-0"
-	// 抹除 job 還沒跑：守門在買家關閉之後就擋，不依賴抹除是否完成。
 	before := f.rowsOfBuyer(buyer1)
 	if ok, err := f.order("evt-early", o, storeA, buyer1, 1000); err != nil || ok {
 		t.Fatalf("抹除前重放 order.completed：recorded=%v err=%v，預期 false、nil", ok, err)
@@ -227,12 +220,10 @@ func TestProjectionWaitsForConcurrentClosing(t *testing.T) {
 		ok, err := f.order("evt-1", "O1", storeA, buyer1, 1000)
 		res <- result{ok, err}
 	}()
-	// 投影卡在守門鎖上（買家列的 FOR KEY SHARE 等 FOR UPDATE）；以輪詢等到它出現，不靠固定的睡眠長度。
 	deadline := time.Now().Add(10 * time.Second)
 	for f.lockWaiters() == 0 {
 		select {
 		case r := <-res:
-			// 沒有守門鎖：投影在關閉 commit 之前就跑完了。
 			close(release)
 			if err := <-txDone; err != nil {
 				t.Error(err)

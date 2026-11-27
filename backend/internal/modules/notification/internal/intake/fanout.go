@@ -17,7 +17,6 @@ import (
 // DefaultFanoutChunk 是 fan-out 一頁的預設收件人數（不超過 registry.MaxFollowerPage）。
 const DefaultFanoutChunk = 200
 
-// fanoutChunk 是一頁的收件人數：沒設用預設，設太大夾到 registry.MaxFollowerPage（依賴模組的分頁上限，超過會回 InvalidInput）。
 func (s *Service) fanoutChunk() int {
 	if s.d.FanoutChunk > 0 {
 		return min(s.d.FanoutChunk, registry.MaxFollowerPage)
@@ -34,14 +33,11 @@ type FanoutArgs struct {
 // Kind 是 River 的 job 種類。
 func (FanoutArgs) Kind() string { return "notification.fanout_intent" }
 
-// fanoutOpts：同一頁（母意圖加游標）尚未結束的 job 合併，不含 Completed。合併只是省工，不是正確性的依據：
-// 重跑任何一頁，子意圖的冪等鍵（registry.SpawnedKey）與 ON CONFLICT 保證不重複。
 func fanoutOpts() *river.InsertOpts {
 	o := jobs.UniqueByArgs(0)
 	return &o
 }
 
-// startFanout 在 Process 遇到母意圖時排第一頁；母意圖本身不產生收件匣列。
 func (s *Service) startFanout(ctx context.Context, intent store.NotificationIntent) error {
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		return s.d.Jobs.Enqueue(ctx, FanoutArgs{IntentID: intent.ID}, fanoutOpts())

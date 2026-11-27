@@ -240,7 +240,6 @@ void main() {
           replyToId: '2',
         ),
       ).thenAnswer((_) => response.future);
-      // Two platform send events before the disabled field rebuilds still create one request.
       await tester.testTextInput.receiveAction(TextInputAction.send);
       await tester.testTextInput.receiveAction(TextInputAction.send);
       await tester.pump();
@@ -298,8 +297,6 @@ void main() {
         findsOneWidget,
       );
 
-      // Keep the same modal open for a second successful submission. Its
-      // callbacks must increment the refreshed count, not the opening value.
       when(
         () => repo.createComment(42, body: '第二則獨立留言'),
       ).thenAnswer((_) async => testComment(id: '4'));

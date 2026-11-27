@@ -31,7 +31,6 @@ func (s *stubSessionResolver) GetCurrentDelegationSession(_ context.Context, _ s
 	return s.resp, s.err
 }
 
-// stubStoreState 是 §8.1.3 第 8 項那一跳的替身。
 type stubStoreState struct {
 	calls int
 	resp  *sellerpb.SellerResponse
@@ -74,9 +73,6 @@ func okSession(status string, storeID string, caps ...string) *accountpb.GetCurr
 	}
 }
 
-// stubAudit 記下 guard 送出的稽核 RPC。斷言的是「送了什麼」而不是「有沒有送」：
-// action 記錯面、capability 記成 read、三個 transport 欄位空著，這幾種壞法在任何
-// 其他地方都看不出來——稽核列照樣落地、每個約束都過。
 type stubAudit struct {
 	intents   []*accountpb.RecordAuditIntentRequest
 	confirms  []*accountpb.ConfirmAuditResultRequest
@@ -120,8 +116,6 @@ func newGuardEngineWith(stub *stubSessionResolver, stores *stubStoreState, revok
 func newGuardEngineWithAudit(stub *stubSessionResolver, stores *stubStoreState, revoker *stubRevoker, audit *stubAudit) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	// TracingMiddleware 的替身。真實請求上這兩個值恆存在（有 inbound header 就沿用、
-	// 沒有就現生），不設的話「稽核列有沒有帶上追溯欄」這件事在測試裡驗不出來。
 	r.Use(func(c *gin.Context) {
 		c.Set("request_id", guardTestRequestID)
 		c.Set("trace_id", guardTestCorrelationID)
@@ -234,9 +228,6 @@ func TestRequireDelegatedFailsClosedOnUpstream(t *testing.T) {
 	r.Handle(http.MethodPatch, "/g/sellers/:store_id/products/:product_id",
 		requireDelegated(authz.AdminCapProductsWrite, delegationDeps{}),
 		func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"code": 0}) })
-	// ⚠️ 這一段與上一段的 HTTP 相同（424）而**碼不同**，那正是本測試的價值所在：
-	// 上一段是上游逾時（重試會好，9280），這一段是 resolver 根本沒被 wire 起來
-	// （重試一萬次都一樣，9289，#2744）。兩者外部看起來完全相同，只有碼講不講真話。
 	status, code = doReq(t, r, http.MethodPatch, "/g/sellers/1/products/2", "dopc_x")
 	if status != http.StatusFailedDependency || code != bizcode.DelegationInternalContractMismatch {
 		t.Fatalf("resolver 未接線：HTTP %d / code %d，預期 424 / 9289（未接線是永久失敗，不是 9280 的「稍後再試」）", status, code)
@@ -257,7 +248,6 @@ func TestRequireDelegatedFailsClosedOnUpstream(t *testing.T) {
 //
 // 這支測試的兩半缺一不可：只驗上半會讓「把所有 err 都當成業務碼」也通過。
 func TestRequireDelegatedRestoresBizCodeFromUpstreamError(t *testing.T) {
-	// ① 帶業務碼前綴的 error → 還原成該碼與它登錄的 HTTP status
 	wrapped := grpcstatus.Error(codes.Unauthenticated, "[9274] 代行憑證無效，請重新建立工作階段")
 	status, code := doReq(t, newGuardEngine(&stubSessionResolver{err: wrapped}),
 		http.MethodPatch, "/g/sellers/1/products/2", "dopc_x")
@@ -269,7 +259,6 @@ func TestRequireDelegatedRestoresBizCodeFromUpstreamError(t *testing.T) {
 		t.Fatalf("憑證無效的 HTTP status = %d，預期 401（424 會讓前端顯示可重試）", status)
 	}
 
-	// ② 反向：沒有業務碼前綴的 error 仍必須是 9280/424，不得被誤判成業務拒絕
 	status, code = doReq(t, newGuardEngine(&stubSessionResolver{err: context.DeadlineExceeded}),
 		http.MethodPatch, "/g/sellers/1/products/2", "dopc_x")
 	if status != http.StatusFailedDependency || code != bizcode.DelegationUpstreamUnavailable {
@@ -293,7 +282,6 @@ func TestRequireDelegatedRechecksStoreState(t *testing.T) {
 		{
 			name:   "active 放行",
 			stores: &stubStoreState{resp: operableStore("active")},
-			// 放行時 revoke 一次都不能打：那會把正常代行的工作階段當場撤掉。
 			wantHTTP: http.StatusOK, wantCode: 0,
 		},
 		{
@@ -309,22 +297,18 @@ func TestRequireDelegatedRechecksStoreState(t *testing.T) {
 			wantRevoke: true,
 		},
 		{
-			// 日後新增的生命週期值走 deny-by-default：黑名單會靜默放行它。
 			name:     "未知生命週期值 → 9272",
 			stores:   &stubStoreState{resp: operableStore("dormant")},
 			wantHTTP: http.StatusUnprocessableEntity, wantCode: bizcode.DelegationStoreNotOperable,
 			wantRevoke: true,
 		},
 		{
-			// 軟刪的店在 seller 模組的 lookup 上是 NotFound（濾 deleted_at）。
 			name:     "已刪除／查無 → 9265",
 			stores:   &stubStoreState{err: grpcstatus.Error(codes.NotFound, "seller not found")},
 			wantHTTP: http.StatusForbidden, wantCode: bizcode.DelegationStoreNotDelegable,
 			wantRevoke: true,
 		},
 		{
-			// 已關店回 envelope 4040，經 EnvelopeGuardInterceptor 成為帶業務碼前綴的
-			// FailedPrecondition——那是「答案」不是「答不出來」。
 			name:     "已關店 → 9265",
 			stores:   &stubStoreState{err: grpcstatus.Error(codes.FailedPrecondition, "[4040] 商家不存在或已關閉")},
 			wantHTTP: http.StatusForbidden, wantCode: bizcode.DelegationStoreNotDelegable,
@@ -337,8 +321,6 @@ func TestRequireDelegatedRechecksStoreState(t *testing.T) {
 			wantRevoke: true,
 		},
 		{
-			// 問不到答案 ≠ 確知不可代行：拒絕本次請求，但工作階段必須維持原狀，否則
-			// seller 模組抖動 30 秒就會把當下所有工作階段永久打死。
 			name:     "逾時 → 9280 且不轉終態",
 			stores:   &stubStoreState{err: grpcstatus.Error(codes.DeadlineExceeded, "context deadline exceeded")},
 			wantHTTP: http.StatusFailedDependency, wantCode: bizcode.DelegationUpstreamUnavailable,
@@ -429,7 +411,6 @@ const (
 	guardTestUserAgent     = "ADM-E2E/1.0"
 )
 
-// doGuardReq 與 doReq 的差別只在多帶一個 User-Agent：稽核列的「裝置」欄就是它。
 func doGuardReq(t *testing.T, r *gin.Engine, method, path string) (int, int32) {
 	t.Helper()
 	req := httptest.NewRequest(method, path, nil)
@@ -462,8 +443,6 @@ func TestRequireDelegatedRecordsQ2Q3Denial(t *testing.T) {
 		stores    *stubStoreState
 		wantCode  int32
 		wantAudit bool
-		// wantCapability 是路由宣告的那一個（products.write），不是該面的 read：
-		// §7.1.3「它記的正是『請求了一個不被授予的 capability』這件事本身」。
 		wantCapability string
 	}{
 		{
@@ -546,8 +525,6 @@ func TestRequireDelegatedRecordsQ2Q3Denial(t *testing.T) {
 			if in.GetOrigin() != "interactive" {
 				t.Errorf("origin = %q，預期 interactive", in.GetOrigin())
 			}
-			// 三個 transport 欄位：漏掉不會有任何錯誤，只會讓稽核面板對這一類列永遠
-			// 顯示「—」，而它們正是最需要回答「誰、從哪裡試的」那一群。
 			if in.GetRequestId() != guardTestRequestID || in.GetCorrelationId() != guardTestCorrelationID {
 				t.Errorf("requestId/correlationId = %q/%q，預期 %q/%q",
 					in.GetRequestId(), in.GetCorrelationId(), guardTestRequestID, guardTestCorrelationID)
@@ -584,8 +561,6 @@ func TestGuardDenialFaceMatchesRoute(t *testing.T) {
 			"/g/sellers/2685914682/storefront", "STOREFRONT_READ", "storefront", ""},
 		{"商品", authz.AdminCapProductsPublish, "/sellers/:store_id/products/:product_id/publish",
 			"/g/sellers/2685914682/products/77/publish", "PRODUCT_READ", "product", "77"},
-		// 訂單編號不是數字，delegation 模組的 resourceNameForRow 會把它轉存進
-		// resource_name，那一列因此仍指得回那筆訂單。
 		{"訂單", authz.AdminCapOrdersRead, "/sellers/:store_id/orders/:order_no",
 			"/g/sellers/2685914682/orders/O005001417", "ORDER_READ", "order", "O005001417"},
 	}
@@ -595,7 +570,6 @@ func TestGuardDenialFaceMatchesRoute(t *testing.T) {
 			gin.SetMode(gin.TestMode)
 			audit := &stubAudit{}
 			r := gin.New()
-			// target 不符（session 指向另一家店）⇒ 走 Q2，四個面都到得了。
 			deps := delegationDeps{
 				resolver: &stubSessionResolver{resp: okSession("active", "2632049831", string(tc.cap))},
 				stores:   &stubStoreState{resp: operableStore("active")},
@@ -664,8 +638,6 @@ func TestCredentialHandleAttachesNoGuard(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	// registry 是 map 且這條路徑本來就在白名單內，重複註冊不改變任何集合，
-	// 因此不需要善後。
 	if !reached || w.Code != http.StatusOK {
 		t.Fatalf("credentialHandle 不得攔下請求：reached=%v status=%d", reached, w.Code)
 	}
@@ -696,15 +668,11 @@ func TestStripDelegationReservedHeaders(t *testing.T) {
 	}
 }
 
-// ── 稽核先於回應：順序本身要有東西守 ────────────────────────────────────────────
 
-// responseWriteOrderRecorder 記下「回應第一次被寫出」時的序號。
-//
-// 用序號而不是時間戳：兩者可能落在同一個奈秒刻度上，而我們要判的是先後而非間隔。
 type responseWriteOrderRecorder struct {
 	http.ResponseWriter
 	seq       *int
-	writtenAt int // 0 ＝ 尚未寫出任何位元組
+	writtenAt int
 }
 
 func (w *responseWriteOrderRecorder) mark() {
@@ -724,7 +692,6 @@ func (w *responseWriteOrderRecorder) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
-// intentOrderAudit 記下 RecordAuditIntent 被呼叫時的序號，其餘行為沿用 stubAudit。
 type intentOrderAudit struct {
 	stubAudit
 	seq      *int
@@ -752,8 +719,6 @@ func (a *intentOrderAudit) RecordAuditIntent(ctx context.Context, req *accountpb
 func TestGuardDenialIsRecordedBeforeTheResponse(t *testing.T) {
 	seq := 0
 	audit := &intentOrderAudit{seq: &seq}
-	// 就地組 engine 而不是用 newGuardEngineWithAudit：那支的 audit 參數是 *stubAudit，
-	// 這裡要塞的是包過一層的計序版本。
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(func(c *gin.Context) {

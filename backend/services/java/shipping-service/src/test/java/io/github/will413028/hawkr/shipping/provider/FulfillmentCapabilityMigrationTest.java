@@ -146,21 +146,13 @@ class FulfillmentCapabilityMigrationTest {
                 onboardingService,
                 mock(HolidayService.class),
                 mock(CvsPrintWaitingRegistry.class),
-                // 🔴 用 production 實作而不是 mock：callTcat 的整條路徑（acquire → invoke →
-                //    markSucceeded／markFailed）就是被測的東西之一，mock 掉等於把它跳過。
-                //    其餘既有測試都不經過 executor，換掉不影響它們。
                 new DefaultProviderCallExecutor(),
                 new NoopTxManager(),
                 registry,
-                // 🔴 真的 resolver，不是 mock：write path 的守衛（BLOCKER 3）走的就是它，
-                //    傳 mock 等於把剛加上的守衛在測試裡關掉。
                 new AllowedActionResolver(registry, new ShipmentStatusMapper()),
                 new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
     }
 
-    // ==================================================================
-    // ⓪ 遷移狀態的誠實標註：pendingMigration() 不得把已搬完的項目加回去
-    // ==================================================================
 
     @Nested
     @DisplayName("⓪ pendingMigration()：已搬完的 capability 不得再列為「還沒搬」")
@@ -241,9 +233,6 @@ class FulfillmentCapabilityMigrationTest {
         }
     }
 
-    // ==================================================================
-    // ⓪-b DispatchCapability：黑貓叫件（本波搬入）
-    // ==================================================================
 
     /**
      * 黑貓叫件（{@code callTcat}）走 adapter 之後的行為。
@@ -285,7 +274,7 @@ class FulfillmentCapabilityMigrationTest {
         @Test
         @DisplayName("冷凍單：只有 FreezeQuantity 有值，常溫／冷藏兩格必須是 null")
         void frozenGoesToFreezeQuantityOnly() {
-            CallTcatRequest req = dispatchWithGoodsType("2");   // GoodsType.FROZEN
+            CallTcatRequest req = dispatchWithGoodsType("2");
             assertThat(req.freezeQuantity()).isEqualTo("1");
             assertThat(req.normalQuantity()).as("冷凍不得同時算成常溫件").isNull();
             assertThat(req.coldQuantity()).as("冷凍不得同時算成冷藏件").isNull();
@@ -294,7 +283,7 @@ class FulfillmentCapabilityMigrationTest {
         @Test
         @DisplayName("冷藏單：只有 ColdQuantity 有值")
         void refrigeratedGoesToColdQuantityOnly() {
-            CallTcatRequest req = dispatchWithGoodsType("3");   // GoodsType.REFRIGERATED
+            CallTcatRequest req = dispatchWithGoodsType("3");
             assertThat(req.coldQuantity()).isEqualTo("1");
             assertThat(req.normalQuantity()).isNull();
             assertThat(req.freezeQuantity()).isNull();
@@ -303,7 +292,7 @@ class FulfillmentCapabilityMigrationTest {
         @Test
         @DisplayName("常溫單：只有 NormalQuantity 有值")
         void normalGoesToNormalQuantityOnly() {
-            CallTcatRequest req = dispatchWithGoodsType("1");   // GoodsType.NORMAL
+            CallTcatRequest req = dispatchWithGoodsType("1");
             assertThat(req.normalQuantity()).isEqualTo("1");
             assertThat(req.coldQuantity()).isNull();
             assertThat(req.freezeQuantity()).isNull();
@@ -350,7 +339,6 @@ class FulfillmentCapabilityMigrationTest {
             CallTcatResponse ok = new CallTcatResponse(success(), "2026-09-10 11:22:33");
             when(shippingClient.callTcat(anyString(), any())).thenReturn(ok);
 
-            // 電聯 Y、推車 N（＝ service 的預設值路徑：兩個入參留白）
             shippingService.callTcat(STORE_ID, ORDER_NO, null, null, "請按電鈴");
 
             ArgumentCaptor<CallTcatRequest> req = ArgumentCaptor.forClass(CallTcatRequest.class);
@@ -539,9 +527,6 @@ class FulfillmentCapabilityMigrationTest {
         }
     }
 
-    // ==================================================================
-    // ① ReturnCapability：逆物流建單
-    // ==================================================================
 
     @Nested
     @DisplayName("① 逆物流建單走 adapter")
@@ -569,8 +554,6 @@ class FulfillmentCapabilityMigrationTest {
             when(shippingClient.createCvsShipment(anyString(), any()))
                     .thenReturn(new CreateCvsShipmentResponse(success(), "ST-RETURN", "91"));
 
-            // 成功路徑會在 commit 後排非同步列印（production 由 @Transactional 提供同步器；
-            // 單元測試沒有 Spring proxy，要自己開一個，否則卡在 registerSynchronization）
             ShippingService.ReturnShipmentResult result;
             org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
             try {
@@ -618,9 +601,6 @@ class FulfillmentCapabilityMigrationTest {
             ArgumentCaptor<ShipmentEntity> shell = ArgumentCaptor.forClass(ShipmentEntity.class);
             verify(shipmentMapper).insert(shell.capture());
             assertThat(shell.getValue().getStatus()).isEqualTo(ShippingStatus.CREATE_FAILED.value());
-            // 🔴 建單失敗是 provider 層**失敗**，落 provider_error_*，不佔用貨態證據欄（V12）。
-            //    這一支原本斷言 getProviderStatus()，那是拆欄前的行為——把失敗代碼寫進
-            //    provider_status 正是 ADM 異常判準只能寫成「有值即異常」的成因。
             assertThat(shell.getValue().getProviderErrorCode()).isEqualTo("ERR01");
             assertThat(shell.getValue().getProviderErrorMessage()).isEqualTo("門市代碼錯誤");
             assertThat(shell.getValue().getProviderErrorAt())
@@ -675,9 +655,6 @@ class FulfillmentCapabilityMigrationTest {
         }
     }
 
-    // ==================================================================
-    // ② LabelCapability：列印與標籤識別回查
-    // ==================================================================
 
     @Nested
     @DisplayName("② 標籤能力走 adapter")
@@ -727,7 +704,7 @@ class FulfillmentCapabilityMigrationTest {
         void batchConstraintsAreEnforced() {
             ShipmentEntity a = cvsShipment();
             ShipmentEntity b = cvsShipment();
-            b.setGoodsType("3");   // 與 a 的溫層不同
+            b.setGoodsType("3");
 
             LabelCapability cap = registry.require(ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value())
                     .label(FulfillmentContext.forShipment(a)).orElseThrow();
@@ -829,9 +806,6 @@ class FulfillmentCapabilityMigrationTest {
         }
     }
 
-    // ==================================================================
-    // ③ StoreLocatorCapability：門市地圖
-    // ==================================================================
 
     @Nested
     @DisplayName("③ 門市地圖走 adapter")

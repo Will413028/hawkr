@@ -25,19 +25,11 @@ export async function resolveStagedImages(
 ): Promise<ProductImageInput[]> {
 	const out = await Promise.all(
 		images.map(async (img): Promise<ProductImageInput> => {
-			// A fresh upload already has its token → pass it straight through.
 			if (img.stagedToken) return { stagedToken: img.stagedToken };
-			// An image the product already owns round-trips by assetId; the backend
-			// keeps the existing gallery entry, so there is nothing to re-upload.
 			if (img.assetId) return { assetId: img.assetId };
-			// Enforce the production media boundary at the final network sink too.
-			// Even if a future caller forgets to normalize its draft, a persisted
-			// test-media URL is restored to the production CDN before download.
 			const sourceUrl = resolveCdnUrl(img.url);
 			const res = await fetch(sourceUrl);
 			if (!res.ok) {
-				// Name the offending image — a transient CDN failure on ONE existing
-				// image otherwise surfaces as an opaque "save failed".
 				throw new Error(`無法下載既有圖片 ${sourceUrl} (HTTP ${res.status})`);
 			}
 			const blob = await res.blob();

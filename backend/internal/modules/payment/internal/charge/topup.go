@@ -14,19 +14,13 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
-// 補差額不補了的原因碼（refunds.topup_reason，上限 200 字）。
 const (
-	// topupTransferFailed 轉帳終局失敗：賣家什麼都沒收到，之後新轉帳的金額以當時的退款重算，失敗的退款不在其中。
 	topupTransferFailed = "transfer_failed"
-	// topupCountedInNewAmount 轉帳換新鍵重新算定金額，失敗的退款已不在金額裡，賣家會直接收到。
 	topupCountedInNewAmount = "counted_in_new_amount"
 )
 
-// errTopupRekeyed 標示查回證明上一把鍵不存在、已換新鍵：回錯誤讓 River 以新鍵重送（不計期限）。
 var errTopupRekeyed = errors.New("charge: 補差額上一把鍵查無，已換新鍵")
 
-// startTopups 讓付款底下補差額在 WAITING 的退款開始補差額（SENDING）並排補差額 job。
-// 呼叫方必須已鎖付款列與（成立的）轉帳列、並確認轉帳是 SUCCEEDED：兩個前置事件（退款失敗而它已算進轉帳金額、轉帳成立）誰後到，誰在自己的 transaction 內呼叫它。
 func (s *Service) startTopups(ctx context.Context, q *store.Queries, paymentID uuid.UUID) error {
 	rows, err := q.WaitingTopups(ctx, paymentID)
 	if err != nil {
@@ -44,7 +38,6 @@ func (s *Service) startTopups(ctx context.Context, q *store.Queries, paymentID u
 	return nil
 }
 
-// settleTopupsWithoutTransfer 在轉帳終局失敗時（沒有搬錢）釋出付款底下全部 WAITING 的補差額並清掉「已算進轉帳金額」。呼叫方必須已鎖付款列與轉帳列。
 func (s *Service) settleTopupsWithoutTransfer(ctx context.Context, q *store.Queries, paymentID uuid.UUID) error {
 	if err := s.releaseWaitingTopups(ctx, q, paymentID, topupTransferFailed); err != nil {
 		return err
@@ -52,7 +45,6 @@ func (s *Service) settleTopupsWithoutTransfer(ctx context.Context, q *store.Quer
 	return q.ClearRefundsDeducted(ctx, paymentID)
 }
 
-// releaseWaitingTopups 釋出付款底下全部 WAITING 的補差額。呼叫方必須已鎖付款列與轉帳列。
 func (s *Service) releaseWaitingTopups(ctx context.Context, q *store.Queries, paymentID uuid.UUID, reason string) error {
 	rows, err := q.WaitingTopups(ctx, paymentID)
 	if err != nil {
@@ -156,7 +148,6 @@ func (s *Service) topUp(ctx context.Context, refundID uuid.UUID) error {
 	return s.acceptTopup(ctx, *called, tr, snap)
 }
 
-// lookupTopup 是過了 ResendWindow 的補差額：不再呼叫 provider，只依嘗試 ID 查回。查無滿 NotFoundAfter 證明上一次不存在，換新鍵重送。
 func (s *Service) lookupTopup(ctx context.Context, ref store.PaymentRefund, tr store.PaymentTransfer, pay store.PaymentPayment, order store.PaymentPaymentOrder, now time.Time) error {
 	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
 	defer cancel()
@@ -180,7 +171,6 @@ func (s *Service) lookupTopup(ctx context.Context, ref store.PaymentRefund, tr s
 	return fmt.Errorf("%w：退款 %s", errTopupRekeyed, ref.ID)
 }
 
-// acceptTopup 驗證 provider 回的補差額轉帳（呼叫的回應或查回找到的）與列相符後進 DONE；不符進 ANOMALY。
 func (s *Service) acceptTopup(ctx context.Context, ref store.PaymentRefund, tr store.PaymentTransfer, snap TransferSnapshot) error {
 	if snap.ExternalID == "" || snap.Amount != ref.Amount || (tr.ExternalTransferID != nil && snap.ExternalID == *tr.ExternalTransferID) {
 		return s.anomalyTopup(ctx, ref, "reply_mismatch", snap.ExternalID)
@@ -220,7 +210,6 @@ func (s *Service) acceptTopup(ctx context.Context, ref store.PaymentRefund, tr s
 	return err
 }
 
-// markTopupCalled 在獨立的 transaction 記下「補差額呼叫過」的時刻（呼叫 provider 之前提交）；已不是 SENDING 時回 nil。
 func (s *Service) markTopupCalled(ctx context.Context, refundID uuid.UUID, now time.Time) (*store.PaymentRefund, error) {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
@@ -236,7 +225,6 @@ func (s *Service) markTopupCalled(ctx context.Context, refundID uuid.UUID, now t
 	return row, err
 }
 
-// rotateTopupKey 換新的補差額冪等鍵；已被別的呼叫換過或已不是 SENDING 時什麼都不做。
 func (s *Service) rotateTopupKey(ctx context.Context, refundID, oldKey uuid.UUID, now time.Time) error {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
@@ -249,7 +237,6 @@ func (s *Service) rotateTopupKey(ctx context.Context, refundID, oldKey uuid.UUID
 	})
 }
 
-// topupLookupFailed 記一次查回失敗；連續失敗到上限進 ANOMALY（回 nil），否則回錯誤由 River 重試。
 func (s *Service) topupLookupFailed(ctx context.Context, ref store.PaymentRefund, cause error) error {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
@@ -283,8 +270,6 @@ func (s *Service) clearTopupLookupFailures(ctx context.Context, ref store.Paymen
 	})
 }
 
-// anomalyTopup 讓 SENDING 的補差額進 ANOMALY 並在同一個 transaction 發 MoneyAnomaly；已不是 SENDING 時什麼都不做。
-// 列上只存原因碼 reason；provider 的外部 ID（detail）只進 log 與事件。
 func (s *Service) anomalyTopup(ctx context.Context, ref store.PaymentRefund, reason, detail string) error {
 	s.d.Logger.ErrorContext(ctx, "payment：退款的補差額轉帳進 ANOMALY，待人工核對 provider", "refund_id", ref.ID.String(), "payment_order_id", ref.PaymentOrderID.String(), "reason", reason, "external_id", detail)
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
@@ -301,8 +286,6 @@ func (s *Service) anomalyTopup(ctx context.Context, ref store.PaymentRefund, rea
 	})
 }
 
-// releaseTopup 是補差額的終局失敗（provider 永久拒絕）：SENDING 進 RELEASED，賣家少收的錢留在平台，同一個 transaction 發 MoneyAnomaly 交後台；已不是 SENDING 時什麼都不做。
-// 鎖順序：付款列、訂單應收列、退款列。
 func (s *Service) releaseTopup(ctx context.Context, refundID, paymentOrderID uuid.UUID, reason string) error {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()

@@ -15,7 +15,6 @@ import {
 	normalizeDetail,
 } from "../lib/after-sales/normalize";
 
-/* ===== normalizeCase ===== */
 
 test("normalizeCase reads snake_case wire fields and coerces values to strings", () => {
 	const c = normalizeCase({
@@ -64,7 +63,6 @@ test("normalizeCase yields safe defaults for an empty wire object", () => {
 	assert.equal(c.refundableAmount, "");
 	assert.equal(c.closedAt, undefined);
 	assert.equal(c.storePickupDeadlineAt, undefined);
-	// NONE / absent appealState stays undefined so list rows don't false-fold.
 	assert.equal(c.appealState, undefined);
 });
 
@@ -75,14 +73,12 @@ test("normalizeCase surfaces appeal_state from the list summary so rows can fold
 		appeal_state: "10",
 	});
 	assert.equal(snake.appealState, "10");
-	// camelCase key, same codemeta Value — the wire never carries the Name.
 	const camel = normalizeCase({
 		caseNo: "AS001",
 		status: "0",
 		appealState: "20",
 	});
 	assert.equal(camel.appealState, "20");
-	// DEFAULT "0" on the wire must NOT be read as appealed.
 	const none = normalizeCase({
 		case_no: "AS001",
 		status: "60",
@@ -91,7 +87,6 @@ test("normalizeCase surfaces appeal_state from the list summary so rows can fold
 	assert.equal(none.appealState, "0");
 });
 
-/* ===== normalizeDetail — appeal lock fields ===== */
 
 test("normalizeDetail surfaces appeal_state — the arbitration lock the UI gates on", () => {
 	const snake = normalizeDetail({
@@ -130,7 +125,6 @@ test("normalizeDetail coerces canAppeal/autoEscalated from string and numeric bo
 	assert.equal(d.autoEscalated, false);
 });
 
-/* ===== normalizeDetail — refund progress ===== */
 
 test("normalizeDetail reads refund progress from flat camel and snake fields", () => {
 	const d = normalizeDetail({
@@ -163,7 +157,6 @@ test("normalizeDetail merges a nested refundProgress block over flat fields", ()
 	assert.equal(d.refundProgress?.refundFailureMessage, "卡號錯誤");
 });
 
-/* ===== normalizeDetail — evidence, items, logistics ===== */
 
 /**
  * Contract fixture — captured from the dev Gateway response for case
@@ -259,11 +252,6 @@ const CASE_DETAIL_WIRE = {
 test("normalizeDetail splits the REAL wire evidence by numeric AfterSaleEvidenceType", () => {
 	const d = normalizeDetail(CASE_DETAIL_WIRE);
 
-	// 1 × 8601 → 買家舉證區；2 × 8602 → 驗貨照片區。Both non-empty is the whole
-	// point: the pre-fix code compared against "SELLER" and left sellerPhotos [].
-	// §231 (#430 D3-S5): the evidence entry is read from `imageKey` — the bare
-	// objectKey SSOT — not from the Gateway-composed `imageUrl` twin. Pinning the
-	// key here is what keeps a future revert from silently going back to the URL.
 	assert.deepEqual(
 		d.photos.map((p) => p.url),
 		[
@@ -285,9 +273,6 @@ test("normalizeDetail keeps the 驗貨扣款 resolution fields the real wire car
 
 	assert.equal(d.resolutions.length, 2);
 	assert.equal(inspection.resolutionType, "6");
-	// The wire has NO `actualRefundAmount` / `inspectionPhotos` on a resolution
-	// (gateway ResolutionResponse) — the deducted amount IS `refundAmount`, and
-	// the photos live in `evidence[]` as 8602.
 	assert.equal(inspection.refundAmount, "180");
 	assert.equal(
 		inspection.deductionReason,
@@ -303,7 +288,7 @@ test("normalizeDetail treats untagged / unknown evidence as buyer evidence, neve
 			{ imageKey: "public/a/tagged-8601.jpg", evidenceType: "8601" },
 			{ imageKey: "public/a/untagged.jpg" },
 			{ imageKey: "public/a/snake-8602.jpg", evidence_type: "8602" },
-			{ evidenceType: "8601" }, // no imageKey → dropped
+			{ evidenceType: "8601" },
 		],
 	});
 	assert.deepEqual(
@@ -331,7 +316,6 @@ test("normalizeDetail maps order items with skuName/price fallbacks", () => {
 	});
 	assert.equal(d.items.length, 1);
 	assert.equal(d.items[0].orderItemId, "7");
-	// No product name on the wire → falls back to the sku name.
 	assert.equal(d.items[0].name, "A 規格 600g");
 	assert.equal(d.items[0].quantity, 2);
 	assert.equal(d.items[0].price, "180");
@@ -418,7 +402,6 @@ test("normalizeDetail maps compensation coupon and inspection deduction resoluti
 	assert.equal(d.resolutions[1].inspectionNote, "外盒破損，內容物正常");
 });
 
-/* ===== normalizeArbitration ===== */
 
 test("normalizeArbitration maps state, decision and snake_case timeline events", () => {
 	const arb = normalizeArbitration({

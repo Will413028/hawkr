@@ -149,7 +149,6 @@ void main() {
     });
 
     testWidgets('有排程的未發布貼文顯示排程時間', (tester) async {
-      // UTC 01:05 = 臺北 09:05；顯示不跟著裝置時區。
       final at = DateTime.utc(2026, 10, 20, 1, 5);
       await _pump(
         tester,
@@ -414,7 +413,6 @@ void main() {
       when(
         () => repo.publishPostOrThrow(42, etag: any(named: 'etag')),
       ).thenAnswer((_) async {});
-      // 第一次讀（build）成功，發布後重讀失敗。
       when(
         () => repo.listMyPosts(),
       ).thenThrow(reasonError(Code.internal, 'POST_ERROR', message: '讀取失敗'));
@@ -429,10 +427,8 @@ void main() {
       ).called(1);
       expect(find.textContaining('發布失敗'), findsNothing);
       expect(find.textContaining('Error:'), findsNothing);
-      // 舊列表還在，重讀失敗的原因用既有的 toast 交代。
       expect(find.text('貼文內容'), findsOneWidget);
       expect(find.text('讀取失敗'), findsOneWidget);
-      // 舊列表上的狀態不可信：按鈕還在但停用，點了不再送出。
       expect(_publishButton, findsOneWidget);
       expect(tester.widget<OutlinedButton>(_publishOutlined).onPressed, isNull);
       await tester.tap(_publishButton, warnIfMissed: false);

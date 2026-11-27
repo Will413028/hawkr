@@ -30,7 +30,6 @@ class ProductServiceMediaReleaseTest {
     @Mock MediaGrpcClient mediaGrpcClient;
     @Mock ProductCacheService cacheService;
     @Mock ProductRevalidationService productRevalidationService;
-    // #2820：softDeleteProduct 會連帶撤回待審認證申請 —— 不 mock 會 NPE
     @Mock ProductCertificationApplicationService certificationApplicationService;
     @InjectMocks ProductService productService;
 
@@ -44,7 +43,7 @@ class ProductServiceMediaReleaseTest {
         entity.setId(productId);
         entity.setStoreId(accountId);
         entity.setDeletedAt(null);
-        entity.setStatus(ProductStatus.INACTIVE.value()); // 非 ACTIVE：略過 hashtag 與共發 seller tag 的 revalidate 分支
+        entity.setStatus(ProductStatus.INACTIVE.value());
 
         when(productRepository.findById(productId)).thenReturn(Optional.of(entity));
 

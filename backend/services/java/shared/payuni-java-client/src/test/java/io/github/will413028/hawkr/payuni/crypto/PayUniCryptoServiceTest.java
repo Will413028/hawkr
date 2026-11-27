@@ -17,11 +17,9 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class PayUniCryptoServiceTest {
 
-    // PHP 官方範例測試金鑰
-    private static final String TEST_KEY = "12345678901234567890123456789012";  // 32 字元
-    private static final String TEST_IV = "1234567890123456";                   // 16 字元
+    private static final String TEST_KEY = "12345678901234567890123456789012";
+    private static final String TEST_IV = "1234567890123456";
 
-    // 實際代理商測試金鑰（與 webhook_crypto.sh 一致）
     private static final String AGENT_KEY = "TestOnlyFakeHashKey0123456789AB1";
     private static final String AGENT_IV = "TestOnlyFakeIV00";
 
@@ -31,7 +29,6 @@ class PayUniCryptoServiceTest {
 
         private final PayUniCryptoService crypto = new PayUniCryptoService(TEST_KEY, TEST_IV);
 
-        // PHP 官方預期輸出
         private static final String PHP_EXPECTED =
                 "47396636346f66735853533167396942344f587a3775696b34752b596e70452b3a3a3a4373354a5a5143306b7153467531354c6e6f554a69773d3d";
 
@@ -135,10 +132,8 @@ class PayUniCryptoServiceTest {
             String encrypted = crypto.encrypt(params);
             String hash = crypto.calculateHash(encrypted);
 
-            // 驗簽
             assertTrue(crypto.verifyHash(encrypted, hash));
 
-            // 解密
             Map<String, String> decrypted = crypto.decrypt(encrypted);
             assertEquals("UTF8290000", decrypted.get("MerID"));
             assertEquals("WH010_1708067890", decrypted.get("MerTradeNo"));
@@ -175,13 +170,10 @@ class PayUniCryptoServiceTest {
             String encrypted = crypto.encrypt(params);
             String correctHash = crypto.calculateHash(encrypted);
 
-            // 正確的 hash 通過
             assertTrue(crypto.verifyHash(encrypted, correctHash));
 
-            // 篡改的 hash 被拒絕
             assertFalse(crypto.verifyHash(encrypted, "0000000000000000000000000000000000000000000000000000000000000000"));
 
-            // 空 hash
             assertFalse(crypto.verifyHash(encrypted, ""));
         }
     }
@@ -196,7 +188,6 @@ class PayUniCryptoServiceTest {
         @DisplayName("空參數加密")
         void emptyParamsEncrypt() {
             Map<String, String> params = new LinkedHashMap<>();
-            // 空 map 不該拋異常
             String encrypted = crypto.encrypt(params);
             assertNotNull(encrypted);
         }
@@ -234,7 +225,6 @@ class PayUniCryptoServiceTest {
             params2.put("MerID", "AAA");
             params2.put("MerTradeNo", "BBB");
 
-            // 不同插入順序的 Map 應產出相同加密結果（因 TreeMap 排序）
             String encrypted1 = crypto.encrypt(params1);
             String encrypted2 = crypto.encrypt(params2);
 

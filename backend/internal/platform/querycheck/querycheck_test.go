@@ -9,7 +9,7 @@ func TestCheck(t *testing.T) {
 	tests := []struct {
 		name string
 		sql  string
-		want []string // 違規訊息要包含的片段；空表示通過
+		want []string
 	}{
 		{"自己的表與允許的 pub", `SELECT p.id FROM social.posts p WHERE EXISTS (SELECT 1 FROM seller.pub_exposable_stores($1) e WHERE e.store_id = p.store_id)`, nil},
 		{"CTE 與內建函式", `WITH x AS (SELECT count(*) AS n FROM social.posts) SELECT n FROM x`, nil},

@@ -43,7 +43,6 @@ type Deps struct {
 // Service 是開店的 use case。
 type Service struct{ d Deps }
 
-// maxStoreCodeAttempts 是 store_code 撞號時的重試次數。
 const maxStoreCodeAttempts = 5
 
 // New 建立服務；StoreCode 沒給時用 RandomStoreCode。
@@ -129,8 +128,6 @@ func (s *Service) Apply(ctx context.Context, in model.ApplyInput) (model.Store, 
 	return stint.Load(ctx, store.New(s.d.DB.Conn(ctx)), created, s.d.Now().UTC())
 }
 
-// openingState 讀出判斷能不能開店的全部輸入（開店用 model.OpeningBlock、入口的可用性用 model.OpeningBlockers，都只看這個狀態）：目前的店家、帳號
-// 的生命週期、生效中的措施（讀取時的同一個推導 stint.Effective，處分一到期就不算，不必等到期 job）。
 func (s *Service) openingState(ctx context.Context, q *store.Queries, accountID int64, now time.Time) (model.OpeningState, error) {
 	hasStore := true
 	if _, err := q.CurrentStore(ctx, accountID); errors.Is(err, pgx.ErrNoRows) {
@@ -162,7 +159,6 @@ func (s *Service) Opening(ctx context.Context, accountID int64) (model.StoreOpen
 	return model.StoreOpening{CanApply: len(blockers) == 0, Unavailable: model.OpeningUnavailabilities(uitext.LocaleFrom(ctx), blockers)}, nil
 }
 
-// insert 建立 stint；store_code 撞號時換一個重試（ON CONFLICT DO NOTHING 不會讓 transaction 失效）。
 func (s *Service) insert(ctx context.Context, q *store.Queries, accountID int64, p model.Profile, now time.Time) (store.SellerStore, error) {
 	for range maxStoreCodeAttempts {
 		code, err := s.d.StoreCode(now)
@@ -180,7 +176,6 @@ func (s *Service) insert(ctx context.Context, q *store.Queries, accountID int64,
 		if err != nil {
 			return row, err
 		}
-		// 公告列與店家列同一個 transaction 建立：之後每次公告都只鎖它、不插入（version 0：還沒公告過）。
 		return row, q.InsertStoreExposure(ctx, row.StoreID)
 	}
 	return store.SellerStore{}, fmt.Errorf("seller：store_code 連續 %d 次撞號", maxStoreCodeAttempts)

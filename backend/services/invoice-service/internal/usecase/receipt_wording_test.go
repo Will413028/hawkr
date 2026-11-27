@@ -49,7 +49,6 @@ func TestCarrierSummary_SuppressedForReceipt(t *testing.T) {
 		codemeta.InvoiceDocumentKindReceipt.Value, mobileBarcode, "/DEF5678", "0000000000"); got != "" || ct != "" {
 		t.Errorf("收據仍顯示載具 summary=%q type=%q", got, ct)
 	}
-	// 陰性對照：發票的載具必須照常顯示，否則買家看不到自己歸戶到哪。
 	if got, ct := carrierPresentationOf(
 		codemeta.InvoiceDocumentKindB2c.Value, mobileBarcode, "/DEF5678", "0000000000"); got != "/DEF5678" ||
 		ct != codemeta.InvoiceCarrierTypeMobileBarcode.Value {
@@ -74,9 +73,9 @@ func TestCarrierSummary_SuppressedForReceipt(t *testing.T) {
 func TestCarrierPresentation_TaxIdIsNotACarrier(t *testing.T) {
 	summary, carrierType := carrierPresentationOf(
 		codemeta.InvoiceDocumentKindB2b.Value,
-		"",         // AMEGO 對打統編不帶 CarrierType（domain.AmegoCarrierNone）
-		"",         // 沒有載具值
-		"22223223", // 買受人統編
+		"",
+		"",
+		"22223223",
 	)
 	if summary != "22223223" {
 		t.Errorf("summary = %q，want 統編 —— 裁決 B 明訂統編摘要要留著", summary)
@@ -93,7 +92,7 @@ func TestCarrierPresentation_TaxIdIsNotACarrier(t *testing.T) {
 func TestCarrierTypeFromAmegoCoversEveryCarrier(t *testing.T) {
 	for _, ct := range codemeta.AllInvoiceCarrierTypes {
 		if !domain.CarrierUsesAmegoCarrierField(ct) {
-			continue // TAX_ID／DONATION 在 AMEGO 端不帶 CarrierType，本來就不該有反向
+			continue
 		}
 		amego, ok := domain.CarrierTypeToAmego(ct)
 		if !ok || amego == "" {

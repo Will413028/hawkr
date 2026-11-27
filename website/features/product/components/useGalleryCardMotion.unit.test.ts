@@ -8,8 +8,6 @@ import { useGalleryCardMotion } from "./useGalleryCardMotion";
 
 const { animateMock } = vi.hoisted(() => ({ animateMock: vi.fn() }));
 
-// Keep real MotionValues and gesture logic. Only finish the animation clock
-// immediately so these tests assert destinations without wall-clock timing.
 vi.mock("framer-motion", async (importOriginal) => ({
 	...(await importOriginal<typeof import("framer-motion")>()),
 	animate: animateMock,
@@ -56,7 +54,6 @@ beforeEach(() => {
 	reducedMotion = false;
 	captured = new Set();
 	frame = document.createElement("section");
-	// 388px card + 12px gap makes one card's travel exactly 400px.
 	vi.spyOn(frame, "getBoundingClientRect").mockReturnValue(
 		new DOMRect(0, 0, 388, 291),
 	);

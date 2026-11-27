@@ -8,17 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ADM 端的商品認證審核（19 號設計書 §9.2 / §9.3）。
-//
-// 🔴 路徑用 /admin/product_certification_applications 而不是 /admin/certifications：
-// 後者已經被商家實名認證（KYC，`docs/modules/seller.md` §13）佔用，兩者是完全不同的東西。
-//
-// 🔴 掛在 admin group（JWTAuth + requireAdmin），不是 adminNoAuth——那個 sibling group
-// 是代行營運專用，掛錯會在 boot 斷言直接 panic。
-//
-// 🔴 reviewer 身分一律取 auth context 的 account_id，**不接受 request body 傳入**：
-// 由請求體決定「誰批准的」等於讓稽核紀錄可被偽造。也不得抄 KYC 那個
-// rid=1 / rname="Admin" 的 fallback（既有瑕疵），那會讓所有審核都記在同一個假身分上。
 
 // AdminProductCertificationSummary 是同類型現行有效那筆的精簡投影（currentApproved）。
 //
@@ -89,9 +78,6 @@ func toAdminProductGovVerifyResult(r *pb.GovVerifyResult) *AdminProductGovVerify
 		ProductSummary: nilIfEmptyStr(r.GetProductSummary()),
 		MatchedCount:   r.GetMatchedCount(),
 	}
-	// json.Valid 這一關不能省：raw_excerpt_json 是上游組出來的字串，直接當
-	// json.RawMessage 塞進回應會讓整個 envelope 在 Marshal 時失敗（HTTP 500、
-	// 連 code 都送不出去），而壞掉的只是一個輔助欄位。
 	if raw := r.GetRawExcerptJson(); raw != "" && json.Valid([]byte(raw)) {
 		out.RawExcerpt = json.RawMessage(raw)
 	}
@@ -249,7 +235,6 @@ type ReverifyProductCertificationRequest struct {
 	IdempotencyKey string `json:"idempotencyKey" binding:"required" example:"cert-reverify-2f0c1f2e"`
 }
 
-// adminCertificationApplicationID 取路由上的申請 ID。
 func adminCertificationApplicationID(c *gin.Context) (string, bool) {
 	id := c.Param("id")
 	if id == "" {
@@ -259,31 +244,18 @@ func adminCertificationApplicationID(c *gin.Context) (string, bool) {
 	return id, true
 }
 
-// respondAdminCertificationApplication 是四支寫入端點共用的回應收斂點。
 func respondAdminCertificationApplication(c *gin.Context, resp *pb.ProductCertificationApplicationAdminResponse, err error) {
 	if err != nil {
 		response.GrpcErr(c, "product", err)
 		return
 	}
 	if resp.GetCode() != 0 {
-		// BizStatus 而不是 GrpcResult：3025→404 / 3026→409 / 3027→409 / 3028→400 的
-		// 分流靠 response 的登錄表，走 GrpcResult 會全部變成 HTTP 200，ADM 只能靠讀
-		// body 才知道失敗了。未登錄的碼仍塌縮成 409。
-		//
-		// ⚠️ 這條分支在 production **幾乎不會被執行**：EnvelopeGuardInterceptor 會把
-		// 「gRPC OK ＋ 非零 envelope code」轉成 gRPC error，所以業務碼是從上面那個
-		// err 那側回來的（同一張登錄表由 response.GrpcErr 查，#2755 修的就是它漏查）。
-		// 只有 envelopeCodePreserveData 的三個碼走得到這裡。保留它是為了不依賴
-		// interceptor 的內部名單，但**不要**把它當成這組端點的 status 保證來源——
-		// 用 mock proto client（無 *grpc.ClientConn）寫的測試只驗得到這條死路。
 		response.BizStatus(c, resp.GetCode(), resp.GetMessage())
 		return
 	}
 	response.OK(c, toAdminCertificationApplication(resp.GetData()))
 }
 
-// reviewAdminCertification 是 approve / reject / revoke 三支的共用軀幹：
-// 差別只有要打哪一支 RPC，其餘（身分、參數、回應形狀）完全相同。
 func (h *Holder) reviewAdminCertification(
 	c *gin.Context,
 	call func(*gin.Context, *pb.ReviewProductCertificationForAdminRequest) (*pb.ProductCertificationApplicationAdminResponse, error),
@@ -311,7 +283,6 @@ func (h *Holder) reviewAdminCertification(
 		ReasonCode:      req.ReasonCode,
 		PublicReason:    req.PublicReason,
 		InternalNote:    req.InternalNote,
-		// 🔴 reviewer 一律取 auth context，不讀 body 的任何欄位。
 		AccountId: accountID,
 	})
 	respondAdminCertificationApplication(c, resp, err)

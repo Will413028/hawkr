@@ -45,8 +45,6 @@ export function InvoiceMethodSheet({
 	current?: InvoiceMethodSelection;
 }) {
 	const { profiles, loading, error } = useInvoiceProfiles();
-	// Plain anchors on purpose: leaving the checkout sheet for the account page is a full page
-	// load (tests/native-navigation-contract.test.ts).
 	const invoiceProfilesHref = useLocalizedHref("/account/invoice-profiles");
 	const [choice, setChoice] = React.useState<string>(() =>
 		initialChoice(current),
@@ -62,8 +60,6 @@ export function InvoiceMethodSheet({
 	);
 	const [fieldError, setFieldError] = React.useState<string | null>(null);
 
-	// Sheet 每次開啟都回到「目前的選擇」，而不是上一次關閉時的暫存。
-	// 不重置的話，買家按取消之後再打開會看到自己剛剛放棄的輸入。
 	React.useEffect(() => {
 		if (!open) return;
 		setChoice(initialChoice(current));
@@ -111,7 +107,7 @@ export function InvoiceMethodSheet({
 				</p>
 			) : null}
 
-			{/* 區塊 A：常用發票資料。**只在有 ≥1 筆時渲染**（58A §B02） */}
+
 			{profiles.length > 0 ? (
 				<section className="mb-4">
 					<h3 className="text-[0.6875rem] font-extrabold text-foreground/70 mb-2">
@@ -173,7 +169,7 @@ export function InvoiceMethodSheet({
 				</p>
 			) : null}
 
-			{/* 區塊 B：使用其他方式 */}
+
 			<section>
 				<h3 className="text-[0.6875rem] font-extrabold text-foreground/70 mb-2">
 					使用其他方式
@@ -233,10 +229,7 @@ export function InvoiceMethodSheet({
 					</OtherOption>
 				</div>
 
-				{/*
-				 * 手機條碼／自然人憑證的說明。**不是一個被停用的選項**——放一個點不下去的
-				 * radio 會讓買家一直嘗試。直接說明去哪裡設定，那是唯一可行的路徑。
-				 */}
+
 				<p className="mt-3 text-[0.625rem] leading-relaxed text-foreground/55">
 					要使用手機條碼或自然人憑證，請先到
 					<a
@@ -286,8 +279,6 @@ function buildSelection(
 	}
 	if (choice === "taxId") {
 		if (!/^\d{8}$/.test(v.taxId)) return "統一編號請填 8 碼數字。";
-		// 抬頭上限取自 AMEGO BuyerName（60 字元）。用 Array.from 數字元而不是 .length，
-		// 後者對中文以外的補充平面字元會少算。
 		const len = Array.from(v.title.trim()).length;
 		if (len < 1 || len > 60) return "公司抬頭請填 1–60 個字。";
 		return { kind: "taxId", buyerTaxId: v.taxId, buyerName: v.title.trim() };
@@ -333,7 +324,7 @@ function OtherOption({
 					) : null}
 				</span>
 			</label>
-			{/* 就地展開：只有選中時才渲染欄位，避免未選中的必填欄干擾表單語意 */}
+
 			{checked && children ? <div id={`${id}-fields`}>{children}</div> : null}
 		</div>
 	);

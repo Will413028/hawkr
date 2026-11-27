@@ -40,7 +40,6 @@ public class PayUniCryptoService {
         this.merchantKey = merchantKey;
         this.merchantIv = merchantIv;
 
-        // 驗證長度是否正確（Key 應為 32 字元，IV 應為 16 字元）
         if (merchantKey == null || merchantKey.length() != 32) {
             log.warn("Key 長度不正確！預期 32 字元，實際 {} 字元",
                     merchantKey != null ? merchantKey.length() : 0);
@@ -59,10 +58,8 @@ public class PayUniCryptoService {
      */
     public String encrypt(Map<String, String> params) {
         try {
-            // 1. 使用 TreeMap 依 ASCII 順序排序參數
             TreeMap<String, String> sortedParams = new TreeMap<>(params);
 
-            // 2. 組成 URL encoded 格式（與 PHP http_build_query 等效）
             StringBuilder queryBuilder = new StringBuilder();
             for (Map.Entry<String, String> entry : sortedParams.entrySet()) {
                 if (queryBuilder.length() > 0) {
@@ -74,7 +71,6 @@ public class PayUniCryptoService {
             }
             String plainText = queryBuilder.toString();
 
-            // AES-256-GCM 加密
             return aesGcmEncrypt(plainText);
 
         } catch (Exception e) {
@@ -91,10 +87,8 @@ public class PayUniCryptoService {
      */
     public Map<String, String> decrypt(String encryptedStr) {
         try {
-            // 1. AES-256-GCM 解密
             String decrypted = aesGcmDecrypt(encryptedStr);
 
-            // 2. 解析 URL encoded 參數
             return parseQueryString(decrypted);
 
         } catch (Exception e) {
@@ -111,14 +105,12 @@ public class PayUniCryptoService {
      */
     public String calculateHash(String encryptStr) {
         try {
-            // Hash = SHA256(merKey + encryptStr + merIV).toUpperCase()
             String rawData = merchantKey + encryptStr + merchantIv;
 
             MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
             messageDigest.update(rawData.getBytes(StandardCharsets.UTF_8));
             byte[] hashBytes = messageDigest.digest();
 
-            // 轉換為大寫 hex 字串
             StringBuilder hexString = new StringBuilder();
             for (byte b : hashBytes) {
                 String hex = Integer.toHexString(0xff & b);
@@ -161,21 +153,17 @@ public class PayUniCryptoService {
         GCMParameterSpec gcmParameterSpec = new GCMParameterSpec(
                 GCM_TAG_LENGTH_BITS, merchantIv.getBytes(StandardCharsets.UTF_8));
 
-        // 使用標準 Java Provider（不指定 provider）
         Cipher cipher = Cipher.getInstance(AES_GCM_TRANSFORMATION);
         cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec, gcmParameterSpec);
 
         byte[] encryptedBytes = cipher.doFinal(plainText.getBytes(StandardCharsets.UTF_8));
 
-        // 分離 ciphertext 和 tag（tag 是最後 16 bytes）
         byte[] encryptedInfo = Arrays.copyOfRange(encryptedBytes, 0, encryptedBytes.length - GCM_TAG_LENGTH_BYTES);
         byte[] tagInfo = Arrays.copyOfRange(encryptedBytes, encryptedBytes.length - GCM_TAG_LENGTH_BYTES, encryptedBytes.length);
 
-        // Base64 編碼
         String encodeText = Base64.getEncoder().encodeToString(encryptedInfo);
         String encodeTag = Base64.getEncoder().encodeToString(tagInfo);
 
-        // 組合並轉 hex
         String finalString = encodeText + TAG_SEPARATOR + encodeTag;
         return bytesToHex(finalString.getBytes(StandardCharsets.UTF_8));
     }
@@ -186,7 +174,6 @@ public class PayUniCryptoService {
      * 輸入格式: hex(base64(ciphertext) + ":::" + base64(tag))
      */
     private String aesGcmDecrypt(String encryptedStr) throws Exception {
-        // 使用標準 Java Provider（不指定 provider）
         Cipher cipher = Cipher.getInstance(AES_GCM_TRANSFORMATION);
         SecretKeySpec secretKeySpec = new SecretKeySpec(
                 merchantKey.getBytes(StandardCharsets.UTF_8), "AES");
@@ -194,11 +181,9 @@ public class PayUniCryptoService {
                 GCM_TAG_LENGTH_BITS, merchantIv.getBytes(StandardCharsets.UTF_8));
         cipher.init(Cipher.DECRYPT_MODE, secretKeySpec, gcmParameterSpec);
 
-        // hex 轉 string
         byte[] hexToByte = hexToBytes(encryptedStr);
         String encryptStr = new String(hexToByte, StandardCharsets.UTF_8);
 
-        // 分離 ciphertext 和 tag
         String[] parts = encryptStr.split(TAG_SEPARATOR);
         if (parts.length != 2) {
             throw new PayUniCryptoException("加密資料格式錯誤：找不到分隔符");
@@ -207,16 +192,13 @@ public class PayUniCryptoService {
         String encryptInfo = parts[0];
         String tagString = parts[1];
 
-        // Base64 解碼
         byte[] encryptInfoBytes = Base64.getDecoder().decode(encryptInfo);
         byte[] tagStringBytes = Base64.getDecoder().decode(tagString);
 
-        // 組合 ciphertext + tag
         byte[] encryptData = new byte[encryptInfoBytes.length + tagStringBytes.length];
         System.arraycopy(encryptInfoBytes, 0, encryptData, 0, encryptInfoBytes.length);
         System.arraycopy(tagStringBytes, 0, encryptData, encryptInfoBytes.length, tagStringBytes.length);
 
-        // 解密
         byte[] decodeInfo = cipher.doFinal(encryptData);
         return new String(decodeInfo, StandardCharsets.UTF_8);
     }

@@ -89,7 +89,6 @@ void main() {
         await tester.tap(find.text('刪除留言'));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 350));
-        // A second menu selection while the API is pending must not duplicate.
         await open();
         await tester.tap(find.text('刪除留言'));
         await tester.pump();

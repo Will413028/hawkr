@@ -185,7 +185,6 @@ type exposedStore struct {
 	publishedAt time.Time
 }
 
-// exposed 讀取 storeIDs（依輸入順序、重複只算一次、不存在的略過）並套用曝光規則。
 func (s *Service) exposed(ctx context.Context, storeIDs []int64) ([]exposedStore, error) {
 	if err := model.BatchIDs(storeIDs); err != nil {
 		return nil, err
@@ -201,7 +200,6 @@ func (s *Service) exposed(ctx context.Context, storeIDs []int64) ([]exposedStore
 	return s.exposedRows(ctx, q, inInputOrder(storeIDs, rows))
 }
 
-// inInputOrder 把讀到的列排成輸入的順序，重複的 ID 只留第一次，不存在的略過。
 func inInputOrder(storeIDs []int64, rows []store.SellerStore) []store.SellerStore {
 	byID := make(map[int64]store.SellerStore, len(rows))
 	for _, row := range rows {
@@ -217,15 +215,12 @@ func inInputOrder(storeIDs []int64, rows []store.SellerStore) []store.SellerStor
 	return out
 }
 
-// classified 是一個店家與曝光規則對它的判定。
 type classified struct {
 	exposedStore
 	exposable     bool
 	hasPublicCard bool
 }
 
-// classify 是 exposure.Classify 加上公開時間：規則只在 SQL（seller.pub_exposable_stores），Go 只在 exposure.Classify 讀它一次；
-// 公開時間是 first_exposed_at，沒有時是讀取當下。回傳每一列（依輸入順序）與它是否可曝光；固定三次查詢。
 func (s *Service) classify(ctx context.Context, q *store.Queries, rows []store.SellerStore) ([]classified, error) {
 	verdicts, err := s.d.Exposure.Classify(ctx, q, s.d.Now().UTC(), rows)
 	if err != nil {
@@ -247,7 +242,6 @@ func (s *Service) classify(ctx context.Context, q *store.Queries, rows []store.S
 	return out, nil
 }
 
-// exposedRows 只留下 classify 判定可曝光的列（探索、店面頁、卡片與批次的可公開讀取都經它）。
 func (s *Service) exposedRows(ctx context.Context, q *store.Queries, rows []store.SellerStore) ([]exposedStore, error) {
 	all, err := s.classify(ctx, q, rows)
 	if err != nil {
@@ -294,7 +288,6 @@ func (s *Service) StoreCards(ctx context.Context, storeIDs []int64) ([]model.Sto
 			Status: model.CardStatusOf(model.Status(row.Status), verdicts[i].exposable),
 		}
 		if card.Status == model.CardClosed {
-			// 關店可逆，logo 與封面留在店家列直到個資清理才釋放；卡片的契約仍是「關閉的店沒有 logo 與封面」。
 			card.LogoKey, card.CoverKey = nil, nil
 		}
 		if row.StoreName != nil && *row.StoreName != "" {
@@ -337,14 +330,12 @@ func (s *Service) UpdateProfile(ctx context.Context, in model.UpdateProfileInput
 	return updated, nil
 }
 
-// imageChange 是一次換圖。
 type imageChange struct {
 	kind  image
 	field string
 	token string
 }
 
-// mergeChecked 把輸入疊到 before 的 profile 並驗證；店名與介紹沒有鎖，審核中與核准之後都能改。
 func (s *Service) mergeChecked(ctx context.Context, q *store.Queries, before model.Store, in model.UpdateProfileInput) (model.Profile, error) {
 	merged := merge(before.Profile, in)
 	if err := model.Normalize(&merged); err != nil {
@@ -356,14 +347,11 @@ func (s *Service) mergeChecked(ctx context.Context, q *store.Queries, before mod
 	return merged, nil
 }
 
-// requiredFieldMessages 是審核中或已核准時必填的店家欄位被清掉時回報的說明。
 var requiredFieldMessages = map[string]string{
 	model.StoreFieldSupportEmail: "申請審核中或已核准時，客服電子信箱不能清除",
 	model.StoreFieldAddress:      "申請審核中或已核准時，店家地址不能清除",
 }
 
-// checkRequiredNotCleared：店家目前的 KYC 申請在審核中或已核准時，必填的店家欄位（地址、客服信箱）不能清掉（規則在 model.ClearedLockedFields）。
-// 沒有申請或其他狀態可以清（送出 KYC 之前會再檢查完整性）。原本就缺的欄位不算，不相干的修改照常通過。
 func checkRequiredNotCleared(ctx context.Context, q *store.Queries, before model.Store, merged model.Profile) error {
 	if len(model.NewlyMissing(before.Profile, merged)) == 0 {
 		return nil
@@ -388,7 +376,6 @@ func checkRequiredNotCleared(ctx context.Context, q *store.Queries, before model
 	return apperr.InvalidInputOn([]string{field}, "%s", requiredFieldMessages[cleared[0]])
 }
 
-// writeProfile 是 UpdateProfile 的資料庫部分：文字欄位與圖片在同一個 transaction，每一次寫入以前一次寫入的版本為條件。
 func (s *Service) writeProfile(ctx context.Context, in model.UpdateProfileInput, changes []imageChange) (model.Store, error) {
 	var updated model.Store
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
@@ -463,7 +450,6 @@ func (s *Service) writeProfile(ctx context.Context, in model.UpdateProfileInput,
 		if err := s.changed(ctx, row); err != nil {
 			return err
 		}
-		// 店名、鄉鎮市區代碼與 logo 是可曝光的輸入；公告是這個 transaction 的最後一個鎖。
 		if err := s.d.Exposure.Announce(ctx, q, now, row.StoreID); err != nil {
 			return err
 		}
@@ -473,7 +459,6 @@ func (s *Service) writeProfile(ctx context.Context, in model.UpdateProfileInput,
 	return updated, err
 }
 
-// merge 把輸入疊到目前的 profile：nil 保留原值，空字串清成沒有值。
 func merge(p model.Profile, in model.UpdateProfileInput) model.Profile {
 	if in.StoreName != nil {
 		p.StoreName = *in.StoreName
@@ -491,7 +476,6 @@ func merge(p model.Profile, in model.UpdateProfileInput) model.Profile {
 	return p
 }
 
-// image 描述 logo 或封面：目前的資產與寫入的查詢。
 type image struct {
 	assetOf func(store.SellerStore) *uuid.UUID
 	write   func(ctx context.Context, q *store.Queries, storeID, version int64, asset media.ConfirmedAsset, now time.Time) (store.SellerStore, error)
@@ -506,7 +490,6 @@ var (
 	}}
 )
 
-// changed 在寫入的 transaction 內發出 StoreProfileChanged 並排入快取失效。
 func (s *Service) changed(ctx context.Context, row store.SellerStore) error {
 	if err := events.Publish(ctx, s.d.Events, model.StoreProfileChanged{
 		EventID: uuid.NewV7(), OccurredAt: s.d.Now().UTC(), StoreID: row.StoreID,
@@ -593,7 +576,6 @@ func (s *Service) BatchStores(ctx context.Context, storeIDs []int64) ([]model.St
 	return stores, nil
 }
 
-// loadMany 把列轉成公開型別並帶上推導的停權狀態（一次 stint.EffectiveMany）、能力與曝光的條件（一次 stint.WithConditions）與關店紀錄。
 func (s *Service) loadMany(ctx context.Context, q *store.Queries, rows []store.SellerStore) ([]model.Store, error) {
 	accountIDs := make([]int64, len(rows))
 	for i, row := range rows {
@@ -656,7 +638,6 @@ func (s *Service) ResolvePrincipals(ctx context.Context, storeIDs []int64) (map[
 		return nil, err
 	}
 	for _, row := range rows {
-		// 已關閉的 stint 不解析（舊契約：unresolved 是「沒有存活的店家列」；舊 seller-service 關店一定同時寫 deleted_at）。
 		if row.Status == string(model.Closed) {
 			continue
 		}

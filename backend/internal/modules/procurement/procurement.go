@@ -45,7 +45,7 @@ var migrationFiles embed.FS
 func Migrations() fs.FS {
 	sub, err := fs.Sub(migrationFiles, "db/migrations")
 	if err != nil {
-		panic(err) // 只有 embed 的路徑寫錯才會發生，編譯後的 binary 不可能遇到
+		panic(err)
 	}
 	return sub
 }
@@ -124,7 +124,6 @@ func (q quotaOf) TurnQuota(ctx context.Context, buyerID int64) (turn.Quota, erro
 	return turn.Quota{Limit: e.MonthlyAnswerLimit, PeriodStart: e.PeriodStart, PeriodEnd: e.PeriodEnd}, nil
 }
 
-// noQuota 是沒給 Entitlements 時的額度來源：送出一律失敗（組裝錯誤），不當成不限額。
 type noQuota struct{}
 
 func (noQuota) TurnQuota(context.Context, int64) (turn.Quota, error) {
@@ -219,14 +218,14 @@ func New(d Deps) *Module {
 	m.selector = search.Selector{DB: d.DB, Now: d.Now}
 	m.resumer = turn.Resumer{Submitter: m.submitter}
 	m.direct = turn.Direct{DB: d.DB, Now: d.Now}
-	if rs != nil { // nil 指標放進介面不等於 nil，沒給分類樹時 ITEM 回答要回組裝錯誤
+	if rs != nil {
 		m.direct.Resolver = rs
 	}
 	m.snapshots = snapshot.Reader{DB: d.DB, Ledger: ledger}
 	m.convs = conversation.Service{DB: d.DB, Now: d.Now, Canceller: m.canceller}
 	m.candidates = search.Reader{DB: d.DB}
 	m.rfq = rfq.Service{DB: d.DB, Now: d.Now, Events: d.Events}
-	if !isNil(d.Sellers) { // 沒給 Sellers 時兩個 port 留 nil：發布回組裝錯誤，不當成沒有封鎖
+	if !isNil(d.Sellers) {
 		m.rfq.Blocks, m.rfq.Open = blockingStores{d.Sellers}, openStores{d.Sellers}
 	}
 	m.quotes = quote.Service{DB: d.DB, Now: d.Now, Jobs: d.Jobs}
@@ -236,7 +235,6 @@ func New(d Deps) *Module {
 	return m
 }
 
-// isNil 回報介面是 nil 或裝著 nil 指標：後者 != nil，卻會在第一次呼叫時 nil dereference，要當成沒給。
 func isNil(v any) bool {
 	if v == nil {
 		return true
@@ -248,8 +246,6 @@ func isNil(v any) bool {
 	return false
 }
 
-// executors 在呼叫端給的登記之外補上 TURN、CANDIDATE_SEARCH 與 CLARIFICATION_RESUME 的 executor。
-// TURN 需要 LLM 與 Taxonomy；CANDIDATE_SEARCH 只需要 Search、Sellers 與 Taxonomy，不依賴 LLM；CLARIFICATION_RESUME 只需要 Taxonomy（回答不呼叫模型）。缺依賴是組裝錯誤，panic 訊息指名缺的欄位。
 func executors(d Deps, ledger run.Ledger, rs *resolver.Resolver) map[string]Executor {
 	hasLLM := d.LLM.LLM() != nil
 	switch {
@@ -267,7 +263,7 @@ func executors(d Deps, ledger run.Ledger, rs *resolver.Resolver) map[string]Exec
 		out[k] = v
 	}
 	if _, ok := out[run.RunTypeTurn]; !ok && hasLLM {
-		shape := extract.ShapeSchema // 停用的模型沒有 provider：呼叫一律回 ErrDisabled，形狀無關
+		shape := extract.ShapeSchema
 		if d.LLM.Enabled() {
 			var err error
 			if shape, err = extract.ShapeFor(d.LLM.Provider()); err != nil {
@@ -320,7 +316,6 @@ func (m *Module) OnBuyerDeleted(ctx context.Context, e BuyerDeleted) error {
 	return m.retention.OnBuyerDeleted(ctx, e.BuyerID)
 }
 
-// openStores 把 seller.ExposableStores 轉成 candidate.OpenStores，依 seller 的批次上限分批。
 type openStores struct{ sellers SellerStores }
 
 var _ candidate.OpenStores = openStores{}
@@ -340,7 +335,6 @@ func (o openStores) OpenStoreIDs(ctx context.Context, storeIDs []int64) (map[int
 	return out, nil
 }
 
-// blockingStores 把 seller.StoresBlockingBuyer 轉成 candidate.BlockedStores，依 seller 的批次上限分批；任一批失敗整個失敗（fail-closed）。
 type blockingStores struct{ sellers SellerStores }
 
 var _ candidate.BlockedStores = blockingStores{}

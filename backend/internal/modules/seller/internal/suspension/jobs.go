@@ -71,7 +71,6 @@ func (ReconcileArgs) InsertOpts() river.InsertOpts {
 	return jobs.SweepOpts(time.Hour)
 }
 
-// reconcileBatch 是對帳一次讀取的帳號數。
 const reconcileBatch = 100
 
 // Reconcile 修補停權期間與措施不一致的帳號：有進行中的期間卻沒有生效中的措施（到期 job 遺失或晚到），或有生效中的
@@ -79,7 +78,6 @@ const reconcileBatch = 100
 // 只讀 measures、用部分索引排除已結束與已撤銷的列，讀取量不隨歷史成長）的帳號，各自在自己的 transaction 內以 Recompute 重算（它先鎖再讀）；回傳掃描的帳號數。
 // 權限不靠它：停權狀態每次讀取都由措施推導，這個 job 只讓期間與事件追上來。
 func (s *Service) Reconcile(ctx context.Context) (int, error) {
-	// 措施結束後留下的身分快照（到期 job 遺失、帳號沒有任何期間可掃時）也在這裡刪掉；比對本身不靠它，每次都經 stint.Derive。
 	if err := s.pruneIdentities(ctx); err != nil {
 		return 0, err
 	}
@@ -110,8 +108,6 @@ func (s *Service) Reconcile(ctx context.Context) (int, error) {
 	}
 }
 
-// accountsToReconcile 合併兩個來源（進行中的期間、此刻生效中停權措施的帳號 effective，已排序），回傳 after 之後最小的
-// reconcileBatch 個帳號；進行中的期間取最小的 reconcileBatch 個，合併後取前 reconcileBatch 個不會漏。
 func (s *Service) accountsToReconcile(ctx context.Context, effective []int64, after int64) ([]int64, error) {
 	q := store.New(s.d.DB.Conn(ctx))
 	open, err := q.AccountsWithOpenPeriod(ctx, store.AccountsWithOpenPeriodParams{AfterAccountID: after, BatchSize: reconcileBatch})
@@ -170,8 +166,6 @@ func (s *Service) PeriodicJobs() []*river.PeriodicJob {
 	)}
 }
 
-// pruneIdentities 逐一清理還有身分快照的帳號：在自己的 transaction 內先鎖帳號全部的 stint（與措施的寫入同一個順序），
-// 再只留生效中的措施的快照（stint.PruneIdentities）。
 func (s *Service) pruneIdentities(ctx context.Context) error {
 	accounts, err := store.New(s.d.DB.Conn(ctx)).AccountsWithMeasureSnapshots(ctx)
 	if err != nil {

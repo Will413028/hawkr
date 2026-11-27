@@ -18,8 +18,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// scanInbox 造一列 invoice_inbox_events。next_attempt_at 由呼叫端決定——它同時是候選
-// 述詞的門檻與租約欄，本檔每一支測試都在調它。
 func scanInbox(eventType string, nextAttemptAt time.Time) domain.NewInboxEvent {
 	now := time.Now().UTC()
 	stamp := fmt.Sprintf("%s-%d", eventType, time.Now().UnixNano())
@@ -48,7 +46,6 @@ func containsInboxID(evs []domain.InboxEvent, id int64) bool {
 
 func inboxStatusOf(ctx context.Context, t *testing.T, repo *InboxRepository, id int64) string {
 	t.Helper()
-	// 走 FetchDueByType 拿不到已離開候選集合的列，所以直接讀 DB。
 	var status string
 	if err := repo.pool.QueryRow(ctx, `SELECT status FROM invoice_inbox_events WHERE id=$1`, id).Scan(&status); err != nil {
 		t.Fatalf("scan status: %v", err)
@@ -56,9 +53,6 @@ func inboxStatusOf(ctx context.Context, t *testing.T, repo *InboxRepository, id 
 	return status
 }
 
-// ---------------------------------------------------------------------------
-// ⑦ claim 是租約不是永久旗標（《多副本排程搶佔規範》§二 六步判準）
-// ---------------------------------------------------------------------------
 
 // TestIntegration_Inbox_ClaimIsALeaseNotAPermanentFlag 一次守三件事：
 //
@@ -93,13 +87,11 @@ func TestIntegration_Inbox_ClaimIsALeaseNotAPermanentFlag(t *testing.T) {
 		t.Fatalf("第一次 claim 應成功：ok=%v err=%v", ok, err)
 	}
 
-	// ① CAS：同一個 claimable_before 再 claim 一次必須失敗。
 	if ok, err := repo.Claim(ctx, id, now.Add(lease), now); err != nil || ok {
 		t.Fatalf("第二次 claim 應失敗（ok=%v err=%v）—— 租約 CAS 沒有生效，"+
 			"兩個副本會同時重跑同一列", ok, err)
 	}
 
-	// ② 已離開候選集合。
 	due, err = repo.FetchDueByType(ctx, "order.paid", now, 10)
 	if err != nil {
 		t.Fatalf("FetchDueByType: %v", err)
@@ -108,7 +100,6 @@ func TestIntegration_Inbox_ClaimIsALeaseNotAPermanentFlag(t *testing.T) {
 		t.Fatal("claim 之後該列仍在候選集合裡 —— 這不是搶佔，兩個 pod 都會撈到")
 	}
 
-	// ③ 租約到期後自己回來（這是 lease 與永久旗標唯一的差別）。
 	due, err = repo.FetchDueByType(ctx, "order.paid", now.Add(lease+time.Second), 10)
 	if err != nil {
 		t.Fatalf("FetchDueByType: %v", err)
@@ -117,7 +108,6 @@ func TestIntegration_Inbox_ClaimIsALeaseNotAPermanentFlag(t *testing.T) {
 		t.Fatal("租約到期後該列沒有回到候選集合 —— 這是永久旗標，持有者崩潰即永久卡死")
 	}
 
-	// claim 不得動 status。
 	if got := inboxStatusOf(ctx, t, repo, id); got != "RECEIVED" {
 		t.Fatalf("claim 動了 status（%s）：狀態欄是可觀測資訊不是閘門", got)
 	}
@@ -145,8 +135,6 @@ func TestIntegration_Inbox_ClaimRejectsRowsThatLeftTheCandidateSet(t *testing.T)
 		t.Fatalf("MarkProcessed: ok=%v err=%v", ok, err)
 	}
 
-	// 前提：next_attempt_at 仍在過去（MarkProcessed 不得碰租約欄）。前提不成立的話，
-	// 下面那個斷言會因為租約而通過，變成一支沒有鑑別力的測試。
 	var nextAttemptAt time.Time
 	if err := repo.pool.QueryRow(ctx,
 		`SELECT next_attempt_at FROM invoice_inbox_events WHERE id=$1`, id).Scan(&nextAttemptAt); err != nil {
@@ -222,7 +210,6 @@ func TestIntegration_Inbox_UpdateAttemptBacksOffWithoutTouchingStatus(t *testing
 		`SELECT attempt_count, last_error FROM invoice_inbox_events WHERE id=$1`, id).Scan(&attempts, &lastError); err != nil {
 		t.Fatalf("scan: %v", err)
 	}
-	// 絕對值：Worker 傳的是它自己算好的 newAttempt，SQL 不得寫成 attempt_count + 1。
 	if attempts != 1 {
 		t.Errorf("attempt_count = %d，want 1（絕對值）", attempts)
 	}
@@ -230,7 +217,6 @@ func TestIntegration_Inbox_UpdateAttemptBacksOffWithoutTouchingStatus(t *testing
 		t.Errorf("last_error = %v，want %q", lastError, msg)
 	}
 
-	// 退避期間不得再被撈到；退避到期才回來。
 	if due, err := repo.FetchDueByType(ctx, "order.paid", now, 10); err != nil || containsInboxID(due, id) {
 		t.Fatalf("退避期間仍在候選集合裡（err=%v）", err)
 	}

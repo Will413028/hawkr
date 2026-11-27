@@ -79,11 +79,9 @@ function collectSourceFiles(dir: string): string[] {
 }
 
 test("掃描範圍真的存在且真的被走過（對照組）", () => {
-	// 目錄不存在要 FAIL 不是 SKIP：src/ 哪天被搬走，下面兩支會靜默恆綠。
 	assert.ok(existsSync(SRC), `掃描根目錄不存在：${SRC}`);
 	const files = collectSourceFiles(SRC);
 	assert.ok(files.length > 100, `只掃到 ${files.length} 個檔，範圍不對`);
-	// 「查得到一個確知存在的東西」才輪到談否定結論。
 	const corpus = files.map((f) => readFileSync(f, "utf8")).join("\n");
 	assert.ok(
 		corpus.includes("SHIPPING_METHOD_LABEL"),
@@ -119,7 +117,6 @@ test("src/ 沒有任何物流 provider 的二元 fallback", () => {
 });
 
 test("偵測式本身有鑑別力（抓得到刻意造出來的違規，且不誤報說明文字）", () => {
-	// 沒有這一條，上面兩條正則哪天被改壞成永不命中，前一支會靜默恆綠。
 	const planted = [
 		"const lgsType = isTaqbin ? LGS_TYPE.HOME : LGS_TYPE.C2C;",
 		'<span>{isTaqbinMethod(m) ? "黑貓宅配" : "7-11 賣貨便"}</span>',
@@ -134,7 +131,6 @@ test("偵測式本身有鑑別力（抓得到刻意造出來的違規，且不�
 		"三元偵測式抓不到已知的違規樣本",
 	);
 
-	// 反向：ADM 現有的說明文字與正確寫法不該被誤判。
 	const legit = [
 		"// shippingMethod 是 CodeMeta 的數字 Value（3001＝黑貓宅急便、3201＝常溫）",
 		"<span>{codeLabel(SHIPPING_METHOD_LABEL, o.shippingMethod)}</span>",
@@ -146,14 +142,12 @@ test("偵測式本身有鑑別力（抓得到刻意造出來的違規，且不�
 test("codeLabel 對未知／空的配送方式不得回傳任何已知物流商的名稱", () => {
 	const knownLabels = Object.values(SHIPPING_METHOD_LABEL);
 
-	// 空值 → "—"（不是「宅配」，也不是任何 provider 名稱）。
 	for (const empty of ["", null, undefined]) {
 		const label = codeLabel(SHIPPING_METHOD_LABEL, empty);
 		assert.equal(label, "—");
 		assert.ok(!knownLabels.includes(label), `空值被畫成了 ${label}`);
 	}
 
-	// 後端新增、ADM 碼表還沒同步到的值 → 原碼照顯，不猜。
 	for (const unknown of ["3999", "SOME_NEW_CARRIER"]) {
 		const label = codeLabel(SHIPPING_METHOD_LABEL, unknown);
 		assert.equal(label, unknown);
@@ -162,8 +156,6 @@ test("codeLabel 對未知／空的配送方式不得回傳任何已知物流商�
 });
 
 test("新通路各有自己的標籤，不會被畫成 7-11 店到店", () => {
-	// 碼表沒同步的話，3005 會落到「原碼照顯」——那是安全的，但也代表 ADM 的
-	// 物流欄位會顯示一串數字。這支釘住「拷貝已同步」這件事。
 	for (const value of [ShippingMethod.MERCHANT_DELIVERY]) {
 		const label = codeLabel(SHIPPING_METHOD_LABEL, value);
 		assert.notEqual(label, value, `${value} 沒有標籤（碼表拷貝未同步？）`);

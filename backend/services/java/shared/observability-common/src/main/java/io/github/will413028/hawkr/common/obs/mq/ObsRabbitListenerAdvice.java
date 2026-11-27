@@ -78,7 +78,6 @@ public class ObsRabbitListenerAdvice implements MethodInterceptor {
             eventScope = obsContext.withEvent(event);
         }
 
-        // Only put trace_id/span_id if SpanContext is valid (Hard Rule: no all-zero output)
         if (span.getSpanContext().isValid()) {
             MDC.put(ObsKeys.TRACE_ID, span.getSpanContext().getTraceId());
             MDC.put(ObsKeys.SPAN_ID, span.getSpanContext().getSpanId());

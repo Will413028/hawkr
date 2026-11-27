@@ -28,10 +28,8 @@ export interface InvoiceOperationDisplay {
 
 /** 語意群 → 顏色。五群窮盡 20 個值。 */
 const COLOR_BY_STATUS: Record<string, ChipColor> = {
-	// 已完成
 	[InvoiceOperationStatus.SUCCEEDED]: "success",
 	[InvoiceOperationStatus.RESOLVED_EXTERNALLY]: "success",
-	// 排程中／進行中
 	[InvoiceOperationStatus.CREATED]: "default",
 	[InvoiceOperationStatus.AWAITING_TRIGGER]: "default",
 	[InvoiceOperationStatus.READY]: "default",
@@ -41,15 +39,12 @@ const COLOR_BY_STATUS: Record<string, ChipColor> = {
 	[InvoiceOperationStatus.PROVIDER_STATUS_RECHECK]: "warning",
 	[InvoiceOperationStatus.HELD]: "warning",
 	[InvoiceOperationStatus.CANCEL_REQUESTED]: "warning",
-	// 失敗
 	[InvoiceOperationStatus.FAILED_PERMANENT]: "danger",
 	[InvoiceOperationStatus.FAILED_RETRY_EXHAUSTED]: "danger",
 	[InvoiceOperationStatus.FAILED_UNKNOWN]: "danger",
 	[InvoiceOperationStatus.CANCEL_BLOCKED_UNKNOWN]: "danger",
-	// 待賣家／已解鎖人工
 	[InvoiceOperationStatus.SELLER_ACTION_REQUIRED]: "danger",
 	[InvoiceOperationStatus.MANUAL_PROCESS_ALLOWED]: "primary",
-	// 已終止（非失敗）
 	[InvoiceOperationStatus.CANCELLED_BY_ADMIN]: "default",
 	[InvoiceOperationStatus.NOT_APPLICABLE]: "default",
 	[InvoiceOperationStatus.CANCELLED_BEFORE_ISSUE]: "default",
@@ -60,8 +55,6 @@ export function invoiceOperationDisplay(
 ): InvoiceOperationDisplay {
 	const color = COLOR_BY_STATUS[status];
 	if (!color) {
-		// 值域外：顏色中性、label 直接印原始碼。印原始碼而不是「未知狀態」是刻意的
-		// ——賣家截圖給客服時，那串碼是唯一能定位的東西。
 		return { label: status || "—", color: "default", unknown: true };
 	}
 	return {

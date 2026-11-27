@@ -50,7 +50,6 @@ public class ProductEntityConverter {
      */
     public ProductEntity toEntity(CreateProductDTO dto) {
         ProductEntity entity = new ProductEntity();
-        // 手動生成 TSID（因為使用 IdType.INPUT）
         entity.setId(TsidUtil.generate());
         entity.setName(dto.getName());
         entity.setCategory(dto.getCategoryId());
@@ -59,16 +58,9 @@ public class ProductEntityConverter {
         entity.setStatus(dto.getStatus() != null && !dto.getStatus().isBlank() ? dto.getStatus() : ProductStatus.ACTIVE.value());
         entity.setFirstPublishedAt(ProductPublicationPolicy.firstPublishedAtOnActivation(
                 null, entity.getStatus(), LocalDateTime.now()));
-        entity.setCreatedBy(dto.getStoreId());          // audit（② re-key 後不承載擁有權）
-        entity.setStoreId(dto.getStoreId());            // owner：store 代理鍵（resolver 注入的 surrogate）
+        entity.setCreatedBy(dto.getStoreId());
+        entity.setStoreId(dto.getStoreId());
 
-        // certifications 一律以空陣列落地（19 號設計書 §6.1）。
-        //
-        // 🔴 這裡刻意<b>不</b>把 dto.getCertifications() 寫進投影：product.certifications 已降級為
-        // 「由當前所有 APPROVED 申請重算」的 approved-only 公開投影，唯一寫入者是
-        // ProductCertificationApplicationService.rebuildProjection()。直寫回去等於回到
-        // 「賣家填了就公開」——本設計書要消滅的正是這件事。
-        // 空陣列而非 null：JSONB 存成 {} 會讓讀取路徑炸掉。
         entity.setCertifications(new ArrayList<>());
 
         return entity;
@@ -90,15 +82,8 @@ public class ProductEntityConverter {
         if (dto.getOrigin() != null) {
             entity.setOrigin(dto.getOrigin());
         }
-        // status 不在 UpdateProduct 中處理，賣家狀態變更走 UpdateSellerProductStatus
         entity.setUpdatedBy(dto.getStoreId());
 
-        // 🔴 certifications 刻意不在這裡處理（19 號設計書 §6.1）。
-        //
-        // 投影只由 ProductCertificationApplicationService.rebuildProjection() 產生；
-        // 這裡直寫會讓賣家送出的（尚未審核的）宣稱立刻出現在公開面。
-        // entity 保留從 DB 讀出的既有投影值，後續 updateById 原樣寫回不影響它，
-        // 真正的變更由收斂點在同一交易內完成（ProductService.updateProduct 步驟 6.1）。
     }
 
     /**
@@ -133,12 +118,11 @@ public class ProductEntityConverter {
                 .reviewCount(entity.getReviewCount() != null ? entity.getReviewCount() : 0L)
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
-                .createdBy(entity.getCreatedBy())               // audit
-                .storeId(entity.getStoreId())                   // owner（② re-key，D7 Stage 2 更名）
+                .createdBy(entity.getCreatedBy())
+                .storeId(entity.getStoreId())
                 .version(entity.getVersion() != null ? entity.getVersion() : 0L)
                 .build();
 
-        // 轉換 gallery
         if (entity.getGallery() != null) {
             List<GalleryItemDTO> galleryDTOs = entity.getGallery().stream()
                     .map(g -> GalleryItemDTO.builder()
@@ -151,7 +135,6 @@ public class ProductEntityConverter {
             dto.setGallery(new ArrayList<>());
         }
 
-        // 轉換 certifications
         if (entity.getCertifications() != null) {
             List<CertificationDTO> certDTOs = entity.getCertifications().stream()
                     .map(c -> CertificationDTO.builder()
@@ -164,7 +147,6 @@ public class ProductEntityConverter {
             dto.setCertifications(new ArrayList<>());
         }
 
-        // 配送溫層 / 運送方式：改從 product.shipping_methods 反正規化欄位讀（02 §5.3.6 / §5.13a）
         List<ShippingMethodDTO> allMethods = new ArrayList<>();
         Set<String> allTemps = new LinkedHashSet<>();
         if (entity.getShippingMethods() != null) {
@@ -183,7 +165,6 @@ public class ProductEntityConverter {
         dto.setDeliveryTemp(new ArrayList<>(allTemps));
         dto.setShippingMethods(allMethods);
 
-        // 轉換 skus
         if (skus != null) {
             List<ProductSkuDTO> skuDTOs = skus.stream()
                     .map(skuConverter::toDTO)
@@ -222,7 +203,6 @@ public class ProductEntityConverter {
                 .version(entity.getVersion() != null ? entity.getVersion() : 0L)
                 .build();
 
-        // 轉換 gallery
         if (entity.getGallery() != null) {
             List<GalleryItemDTO> galleryDTOs = entity.getGallery().stream()
                     .map(g -> GalleryItemDTO.builder()
@@ -235,7 +215,6 @@ public class ProductEntityConverter {
             dto.setGallery(new ArrayList<>());
         }
 
-        // 轉換 certifications（02 §5.3.4，商品卡 badge）
         if (entity.getCertifications() != null) {
             List<CertificationDTO> certDTOs = entity.getCertifications().stream()
                     .map(c -> CertificationDTO.builder()
@@ -248,14 +227,12 @@ public class ProductEntityConverter {
             dto.setCertifications(new ArrayList<>());
         }
 
-        // 反正規化欄位：shipping_methods（02 §3.2 / §5.13a）
         if (entity.getShippingMethods() != null) {
             dto.setShippingMethods(new ArrayList<>(entity.getShippingMethods()));
         } else {
             dto.setShippingMethods(new ArrayList<>());
         }
 
-        // deliveryTemp 派生（02 §5.3.6）— 從 shippingMethods 取 distinct temperature
         if (dto.getShippingMethods() != null && !dto.getShippingMethods().isEmpty()) {
             dto.setDeliveryTemp(dto.getShippingMethods().stream()
                     .map(ProductSkuEntity.ShippingMethodItem::getTemperature)
@@ -270,7 +247,6 @@ public class ProductEntityConverter {
         return dto;
     }
 
-    // ========== Description 轉換方法 ==========
 
     /**
      * ProductDescriptionDTO → ProductEntity.ProductDescription
@@ -303,7 +279,6 @@ public class ProductEntityConverter {
         block.setType(dto.getType());
         block.setId(dto.getId());
 
-        // text 類型欄位
         block.setContent(dto.getContent());
         if (dto.getStyleJson() != null && !dto.getStyleJson().isBlank()) {
             try {
@@ -313,12 +288,10 @@ public class ProductEntityConverter {
                 );
                 block.setStyle(style);
             } catch (JsonProcessingException e) {
-                // 解析失敗時保留空的 style
                 block.setStyle(Collections.emptyMap());
             }
         }
 
-        // image 類型欄位
         block.setStagedToken(dto.getStagedToken());
         block.setAssetId(dto.getAssetId());
         block.setObjectKey(dto.getObjectKey());
@@ -326,7 +299,6 @@ public class ProductEntityConverter {
         block.setHeight(dto.getHeight());
         block.setAlt(dto.getAlt());
 
-        // inline-run 模型欄位（02 §3.6）
         if (dto.getRuns() != null) {
             block.setRuns(dto.getRuns().stream()
                     .map(this::convertRunToEntity)
@@ -384,26 +356,22 @@ public class ProductEntityConverter {
         dto.setType(entity.getType());
         dto.setId(entity.getId());
 
-        // text 類型欄位
         dto.setContent(entity.getContent());
         if (entity.getStyle() != null && !entity.getStyle().isEmpty()) {
             try {
                 String styleJson = objectMapper.writeValueAsString(entity.getStyle());
                 dto.setStyleJson(styleJson);
             } catch (JsonProcessingException e) {
-                // 序列化失敗時保留空
                 dto.setStyleJson(null);
             }
         }
 
-        // image 類型欄位（不含 url，url 由 Service 層組裝）
         dto.setAssetId(entity.getAssetId());
         dto.setObjectKey(entity.getObjectKey());
         dto.setWidth(entity.getWidth());
         dto.setHeight(entity.getHeight());
         dto.setAlt(entity.getAlt());
 
-        // inline-run 模型欄位（02 §3.6）
         if (entity.getRuns() != null) {
             dto.setRuns(entity.getRuns().stream()
                     .map(this::convertRunToDTO)

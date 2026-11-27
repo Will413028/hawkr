@@ -252,14 +252,12 @@ describe("SellerSuspendedNotice", () => {
 			.getAllByText("查看措施")
 			.map((el) => el.closest("a")?.getAttribute("href"));
 		expect(hrefs).toEqual(["/seller/measures/m1", "/seller/measures/m2"]);
-		// 申覆入口每張都有：canAppeal 的是連結（不論措施是違規處分還是管理員建立的風險措施），其餘反灰。
 		const links = screen.getAllByRole("link", { name: "提出申覆" });
 		expect(links).toHaveLength(1);
 		expect(links[0]?.getAttribute("href")).toBe("/seller/measures/m1/appeal");
 		expect(screen.getAllByRole("button", { name: "提出申覆" })).toHaveLength(1);
 		expect(container.textContent).not.toContain("停權僅能由平台管理員解除");
 		expect(container.textContent).not.toContain("查看違規紀錄");
-		// 4B 的「管理員停權導向客服」已由措施卡取代（10e 計畫段「排程」）。
 		expect(container.textContent).not.toContain("聯絡客服");
 		expect(container.textContent).not.toContain("對停權決定有疑義");
 	});

@@ -25,7 +25,6 @@ type Fixture = {
 function run(f: Fixture): { code: number; out: string } {
 	const root = mkdtempSync(join(tmpdir(), "override-gate-"));
 	try {
-		// Minimal pnpm side: one override that stays load-bearing, one allowBuilds entry in the tree.
 		write(
 			root,
 			"pnpm-workspace.yaml",

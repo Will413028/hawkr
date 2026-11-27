@@ -90,8 +90,6 @@ void main() {
       expect(share.width, greaterThanOrEqualTo(48));
       expect(share.height, greaterThanOrEqualTo(48));
 
-      // Cancelling all three confirmations keeps the listed product intact;
-      // no product repository or mutation is needed by this fixture.
       for (final action in ['下架', '刪除', '編輯']) {
         await tester.tap(find.byKey(ValueKey('seller-product-action-$action')));
         await tester.pumpAndSettle();

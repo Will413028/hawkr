@@ -57,9 +57,6 @@ type PageData = envelope.PageData
 // 每一支出口「宣告的碼 == 真的寫出去的碼」由 bizcarrier_emitter_matrix_test.go
 // 逐支實測（idle／armed 兩種狀態各跑一次 ＋ 逃逸計數器對帳），不是靠這段註解宣稱。
 
-// writeBizEnvelope 是「HTTP 200 ＋ 非零業務碼 ＋ data」這個形狀的**唯一**寫出點，
-// Biz 與 carrier 改寫共用它 —— 兩者逐位元相同正是「刪掉 handler 內的守門不會改變
-// 任何一個既有回應」的依據，共用同一個寫出點讓那件事不必靠人維護。
 func writeBizEnvelope(c *gin.Context, code int32, message string, data interface{}) {
 	c.JSON(http.StatusOK, Envelope{
 		Code:    code,
@@ -69,8 +66,6 @@ func writeBizEnvelope(c *gin.Context, code int32, message string, data interface
 	})
 }
 
-// guard 見上方區塊註解。emittedCode 必須是呼叫端接下來真的會寫進 envelope 的 Code；
-// data 是改寫時要原樣帶走的 payload（非零碼出口傳 nil，那條路不會改寫）。
 func guard(c *gin.Context, emittedCode int32, data interface{}) bool {
 	code, msg, rewrite := bizcarrier.Emit(c, emittedCode)
 	if !rewrite {
@@ -80,31 +75,10 @@ func guard(c *gin.Context, emittedCode int32, data interface{}) bool {
 	return true
 }
 
-// guardNonSuccess 供「envelope code 由下游決定、但保證恆非零」的出口使用（今天只有
-// GrpcErr 家族：碼是 pkg/envelope.GrpcErr 內部那個 switch 依 gRPC status 決定的，
-// 呼叫點拿不到，重算一次等於把那個 switch 抄第二份）。
-//
-// ⚠️ 它是本檔唯一不交出 code 的守衛，也因此是最容易退化成第二個 MarkEmitted 的地方。
-// 守它的是 TestGrpcErrNeverWritesZeroCode（對每一個 gRPC status code 實跑並斷言
-// body 的 code != 0），不是這段註解。新增出口時不要圖方便用它。
 func guardNonSuccess(c *gin.Context) {
 	bizcarrier.EmitNonSuccess(c)
 }
 
-// ==================== 成功回應（轉發至 pkg/envelope）====================
-//
-// EnvelopeGuardInterceptor 對 preserveData 業務碼刻意不轉 error（它們的 data 過不了
-// status.Error），於是「resp.Code 非零而 err 為 nil」的形狀會抵達 handler。handler
-// 只要忘記看 resp.GetCode() 就會走到這裡，把一個業務失敗寫成 code=0 —— 端點 44
-// （AMEGO 憑證驗證失敗 9331 被顯示成「檢測成功」）就是這樣發生的。
-//
-// 這裡查一次 carrier，那件事就變成寫不出來的，而不是「71 支 handler 每支都要記得」。
-// 自動改正**同時**記 ERROR log 與 gateway_bizcode_swallowed_total —— 它是安全網不是
-// 正常路徑，計數器長期非零代表有 handler 該回去寫對。
-//
-// 改正後的輸出與 handler 自己寫 `response.Biz(c, resp.GetCode(), resp.GetMessage(),
-// data)` 逐位元相同（HTTP 200 ＋ 非零 code ＋ data 原樣），所以把 handler 內的檢查
-// 刪掉不會改變任何一個既有回應。
 
 // OK 成功回應 {code:0, message:"success", data:{...}}
 //
@@ -143,11 +117,9 @@ func Page(c *gin.Context, records interface{}, total, page, pageSize string) {
 	envelope.Page(c, records, total, page, pageSize)
 }
 
-// ==================== 錯誤回應（轉發至 pkg/envelope；自動帶 traceId）====================
 
 // Err 通用錯誤回應
 func Err(c *gin.Context, httpStatus int, code int32, message string) {
-	// code 是呼叫端給的，可能是 0（envelope.Err 會照寫）⇒ 必須交出去讓 guard 判。
 	if guard(c, code, nil) {
 		return
 	}
@@ -205,8 +177,6 @@ func Unauthorized(c *gin.Context) {
 // 用於 middleware 風格的身分守門（取不到 accountId 就不該讓後續 handler 跑），
 // Unauthorized 只寫回應不中止、且訊息固定，兩者差異僅此。
 func AbortUnauthorized(c *gin.Context, message string) {
-	// Abort 在 guard 之前：本函式的契約是「一定中止 chain」，改寫路徑也不例外
-	// （改寫代表守門拒絕 ＋ 有未消化的業務碼，更沒有理由讓後續 handler 跑）。
 	c.Abort()
 	if guard(c, 401, nil) {
 		return
@@ -220,7 +190,6 @@ func AbortUnauthorized(c *gin.Context, message string) {
 // ⚠️ 與 Forbidden 的差別只有「會不會中止」。守門用這支、handler 內部用 Forbidden
 // ——混用的後果是守門寫了回應卻讓後續 handler 照跑，而那在測試裡看起來像「回了 403」。
 func AbortForbidden(c *gin.Context, message string) {
-	// Abort 在 guard 之前，理由同 AbortUnauthorized。
 	c.Abort()
 	if guard(c, 403, nil) {
 		return
@@ -252,7 +221,6 @@ func ServiceUnavailable(c *gin.Context, service string) {
 	envelope.ServiceUnavailable(c, service)
 }
 
-// ==================== Gateway 專屬商業政策（不搬移）====================
 
 // BizDeny 送出 Gateway 原生的業務拒絕：HTTP 409（塌縮）+ envelope 帶業務碼
 // （前端解析 code / messageZh，不用 HTTP status 分流；409 也用於 duplicate，見
@@ -278,9 +246,6 @@ func BizDeny(c *gin.Context, code int32, message string) {
 // {code,message,data}，只是 code 非零，HTTP 維持 200（業務碼不走 HTTP status 分流，
 // 見 reference_gateway_bizcode_collapses_to_409）。
 func Biz(c *gin.Context, code int32, message string, data interface{}) {
-	// 🔴 code 是呼叫端給的。`Biz(c, 0, "success", data)` 就是第十種繞道（checkout.go
-	// 的三個呼叫點用的是同一支），所以這裡**必須**把 code 交出去，不能像第一版那樣
-	// 無條件 MarkEmitted —— 那等於替一個假成功蓋「已檢查」的章。
 	if guard(c, code, data) {
 		return
 	}
@@ -332,7 +297,6 @@ func TooManyRequests(c *gin.Context, message string) {
 	Err(c, http.StatusTooManyRequests, 429, message)
 }
 
-// ==================== 快取政策（Gateway 專屬）====================
 
 // CacheControlPrivateNoStore 是 AI 與採購（Hawkr 幫找）回應的 Cache-Control 值。
 // 這條路徑的回應逐一綁定登入者身分（對話內容、候選廠商、報價金額），被共享快取或
@@ -344,14 +308,11 @@ func TooManyRequests(c *gin.Context, message string) {
 // 政策（可共享的公開資料），不要合併過來。判準見 API 設計規範「回應快取政策」。
 const CacheControlPrivateNoStore = "private, no-store"
 
-// ==================== gRPC 回應轉發（轉發至 pkg/envelope）====================
 
 // GrpcResult 轉發 gRPC 回應
 // code=0 → 成功回應帶 data
 // code≠0 → 錯誤回應帶 traceId（不帶 data）
 func GrpcResult(c *gin.Context, code int32, message string, data interface{}) {
-	// code 由呼叫端給：==0 走成功形狀（要查 carrier），!=0 走 envelope.GrpcResult 的
-	// 錯誤形狀（丟 data，結帳 4092 走這條）。兩者都交給 guard 用實際的 code 判定。
 	if guard(c, code, data) {
 		return
 	}
@@ -361,27 +322,7 @@ func GrpcResult(c *gin.Context, code int32, message string, data interface{}) {
 // GrpcErr 將 gRPC 錯誤轉為 HTTP 錯誤回應
 // 根據 gRPC status code 映射對應的 HTTP 狀態碼
 func GrpcErr(c *gin.Context, service string, err error) {
-	// 🔴 唯一使用 guardNonSuccess 的地方：envelope code 由下面那個 switch ／
-	// pkg/envelope.GrpcErr 依 gRPC status 決定（401/403/404/409/429/499/500/503 或
-	// "[NNNN] " 還原出的業務碼），呼叫點算不出來，而它**恆非零**——這件事由
-	// TestGrpcErrNeverWritesZeroCode 對每一個 status code 實跑斷言，不是宣稱。
 	guardNonSuccess(c)
-	// 代行營運的授權拒絕（9262 能力不足、9263 不是這家店的資源、9261 工作階段已撤銷）
-	// 與參數拒絕（9260）由微服務側的 delegation.Validate 以 "[NNNN] " 前綴帶回，而
-	// pkg/envelope 的 PermissionDenied／InvalidArgument 兩個分支不做前綴還原。不在這裡
-	// 先攔一次就只剩通用的 403／400，前端分不出上述三種——而它們的恢復動作完全不同
-	// （換一個能力／回列表重選店／重新交接）。
-	//
-	// 攔截條件是「訊息帶已登錄的業務碼前綴」，未登錄的碼一律沿用該 gRPC 分支原本的
-	// status——每個 case 的 fallback 就是 envelope.GrpcErr 對同一分支使用的值，所以未
-	// 登錄碼逐位元無變化。登錄表在 bizhttp.go。
-	//
-	// ⚠️ **每一個「會讓業務碼帶著前綴活著抵達這裡」的 gRPC 分支都必須列在下面**，漏一
-	// 個就是一條繞過登錄表的暗路。最容易漏的是 FailedPrecondition：
-	// EnvelopeGuardInterceptor 對**沒有登錄在 envelopeCodeToGRPC 的業務碼**一律轉成
-	// FailedPrecondition ＋ "[NNNN] " 前綴，那一支才是絕大多數領域業務碼的實際入口。
-	// 商品認證的 3025／3028 就是漏了它而在 dev 上雙雙塌成 409（#2755）——登錄表是對的、
-	// BizStatus 是對的，只是那兩個碼從來沒有走到查表的那條路。
 	if st, ok := grpcstatus.FromError(err); ok {
 		switch st.Code() {
 		case codes.PermissionDenied:
@@ -422,7 +363,6 @@ func GrpcDomainErr(c *gin.Context, service string, err error) {
 	GrpcErr(c, service, err)
 }
 
-// ==================== Proto 序列化（轉發至 pkg/envelope）====================
 
 // ProtoToRaw 將 proto message 序列化為 json.RawMessage，
 // 可直接放入 gin.H 或 Envelope.Data 而不會被二次編碼。

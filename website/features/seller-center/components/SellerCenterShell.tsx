@@ -64,19 +64,13 @@ export default function SellerCenterShell({
 		storeName: displayName,
 	} = useSellerIdentity();
 
-	// 賣場建立未完成（沒店鋪 404，或 needs_onboarding／手機未驗）：整個工作區
-	// 的資料都拿不到，把人送回 /seller/onboarding 完成驗證，禁止進入這些頁面。
 	React.useEffect(() => {
 		if (setupIncomplete) router.replace("/seller/onboarding");
 	}, [setupIncomplete, router]);
-	// backend#3066 裁決 B：免用統一發票的賣家在賣家中心看到的是「收據」而不是「發票」。
-	// 端點 16 已被 S01 用同一把 queryKey 查過 ⇒ 走 TanStack 快取，不會多打一次 API。
-	// 停權時 hook 自己不發查詢（blockedBySuspension），此時退回發票措辭即可。
 	const { overview } = useSellerInvoiceOverview();
 	const receiptOnly = isReceiptOnlySeller(overview);
 	const { count: unreadMessageCount } = useChatUnread();
 	const { count: unreadNotificationCount } = useNotificationUnread();
-	// 賣家中心自己的一條 WatchNotifications（STORE 受眾）串流：賣家工作區訊號讓快取失效；連線狀態經 context 給訂單頁。
 	const realtimeStatus = useSellerWorkspaceRealtime(!setupIncomplete);
 	const pathname = usePathname() ?? "";
 	const isMessagesRoute =
@@ -86,16 +80,11 @@ export default function SellerCenterShell({
 		pathname === "/seller-center/notifications" ||
 		pathname.startsWith("/seller-center/notifications/");
 
-	// 進入的頁面需要的能力不在 `GetMyStore.capabilities` 時，主動導去公告頁（不等撞錯誤才反應）。
 	const restrictedBlocked = isBlockedByCapabilities(seller, pathname);
 	React.useEffect(() => {
 		if (restrictedBlocked) router.replace("/seller-center/suspended");
 	}, [restrictedBlocked, router]);
 
-	// 補即時性落差：店家查詢 30s staleTime 快取還沒反映最新停權狀態前，任何 authed
-	// 呼叫先撞到 SELLER_SUSPENDED（REST 9240 或 Connect）→ 廣播全域事件，這裡監聽
-	// 並 invalidate 讓快取盡快追上；這一頁到底開不開放，由更新後的能力判斷決定
-	// （不在事件裡猜，否則背景 badge 輪詢一觸發就會把停留在開放頁的賣家彈回公告頁）。
 	const invalidateSellerSelf = useInvalidateSellerSelf();
 	React.useEffect(() => {
 		const onSuspended = () => {
@@ -105,22 +94,11 @@ export default function SellerCenterShell({
 		return () =>
 			window.removeEventListener(SELLER_SUSPENDED_EVENT, onSuspended);
 	}, [invalidateSellerSelf]);
-	// The nav badges stay fresh without polling: `useSellerWorkspaceRealtime`
-	// invalidates the order/after-sale/dashboard families when the stream pushes a
-	// seller event, and each query refetches when the tab regains focus (30s
-	// staleTime). Stock and post counts have no push signal; focus is their only
-	// refresh.
-	// 這三支 badge 查詢各自需要一種能力（dashboard 與 posts 是 MARKETING、products 是
-	// PRODUCT_MANAGE）：沒有該能力時伺服器必拒絕，直接跳過，避免無謂的錯誤噪音與觸發
-	// SELLER_SUSPENDED_EVENT 的背景輪詢風暴。店家還沒讀到時照常查詢。
 	const canUse = (capability: SellerCapability) =>
 		seller === null || hasCapability(seller, capability);
 	const { data: dashboard } = useSellerDashboard({
 		enabled: canUse(SellerCapability.MARKETING),
 	});
-	// Same single-cache treatment for the low-stock badge: one identity-scoped
-	// query instead of refetching the whole product table on every navigation.
-	// Product mutations invalidate this via useInvalidateSellerProducts.
 	const { data: products } = useSellerProducts(
 		{ page: 1, pageSize: 100 },
 		{ enabled: canUse(SellerCapability.PRODUCT_MANAGE) },
@@ -132,13 +110,10 @@ export default function SellerCenterShell({
 			).length,
 		[products],
 	);
-	// Same identity-scoped cache entry as SellerPostsClient's list query, so
-	// opening the posts page doesn't trigger a second fetch.
 	const { count: postsCount } = useSellerPosts({
 		enabled: canUse(SellerCapability.MARKETING),
 	});
 
-	// 待回覆的詢問以帳號為範圍，不看店家能力；徽章數字由伺服器算（`pending_reply_count`）。
 	const pendingInquiryCount = usePendingInquiryCount();
 
 	const [open, setOpen] = React.useState(false);
@@ -147,15 +122,11 @@ export default function SellerCenterShell({
 		? `賣家 ID：${sellerId}`
 		: ownerName || "賣家中心";
 
-	// Auto-close the drawer when the user navigates to a different
-	// section (clicking a NavLink doesn't unmount the shell so we
-	// need an explicit hook).
 	React.useEffect(() => {
 		void pathname;
 		setOpen(false);
 	}, [pathname]);
 
-	// Lock body scroll while the drawer is open.
 	React.useEffect(() => {
 		if (!open) return;
 		const releaseScrollLock = acquireBodyScrollLock();
@@ -193,27 +164,17 @@ export default function SellerCenterShell({
 	const handleSignOut = async () => {
 		if (signingOut) return;
 		setSigningOut(true);
-		// "登出" in the seller workspace footer signs out of the active
-		// session only and routes back to the public guest homepage —
-		// matches the SellerWorkspaceLock contract that sellers must
-		// re-authenticate from the public site to view buyer surfaces.
 		try {
 			await signOut();
 		} catch {
-			// 撤銷失敗＝session 仍有效（signOut 已跳 toast），留在賣家工作區。
 			setSigningOut(false);
 		}
 	};
 
-	// seller-self 首抓未回前，onboarding 狀態未知。Hard entry 仍由
-	// InitialPageLoader 持有；soft entry 會由 shared Link 先暖好同一 query，
-	// 因此這裡不畫任何 page-local skeleton。
 	if (identityLoading) {
 		return null;
 	}
 
-	// 驗證未完成：別渲染工作區內容（會打一堆 404 API、閃破圖）。顯示過場，
-	// 上面的 effect 會把人導去 /seller/onboarding。
 	if (setupIncomplete) {
 		return (
 			<div className="grid min-h-[60vh] place-items-center px-6 text-center">
@@ -229,7 +190,6 @@ export default function SellerCenterShell({
 		);
 	}
 
-	// 限制中的店家進入能力不足的頁面：別閃一下原本內容才被上面的 effect 導走。
 	if (restrictedBlocked) {
 		return (
 			<div className="grid min-h-[60vh] place-items-center px-6 text-center">
@@ -252,9 +212,7 @@ export default function SellerCenterShell({
 				data-hk-seller-workspace-ready
 				data-sidebar-open={open}
 			>
-				{/* Mobile-only top bar with hamburger + the active section name.
-			    Hidden on desktop via CSS (display: none) — the sticky
-			    sidebar makes this redundant on wider viewports. */}
+
 				<header className="seller-shell__mobile-bar">
 					<button
 						type="button"
@@ -327,7 +285,7 @@ export default function SellerCenterShell({
 					</div>
 				</header>
 
-				{/* Backdrop — only paints on mobile while the drawer is open. */}
+
 				<button
 					type="button"
 					className="seller-shell__backdrop"
@@ -454,10 +412,6 @@ function pathMatchesItem(item: NavItem, pathname: string): boolean {
 	return pathname === target || pathname.startsWith(`${target}/`);
 }
 
-// Active = this item matches the current path AND no other nav item is a more
-// specific (longer) match. Longest-match keeps detail routes (e.g.
-// /seller-center/orders/ORD123) highlighting their parent while avoiding the
-// double-highlight of nested siblings like /me and /me/shipping.
 function isNavItemActive(item: NavItem, pathname: string): boolean {
 	if (!pathMatchesItem(item, pathname)) return false;
 	const targetLength = navMatchTarget(item).length;

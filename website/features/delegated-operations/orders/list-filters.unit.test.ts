@@ -81,9 +81,7 @@ describe("列表：篩選條件送到伺服器", () => {
 		await repo.list({ dateFrom: "2026-08-19", dateTo: "2026-08-19" });
 
 		const qs = queryOf(calls[0]);
-		// 台北 2026-08-19 00:00:00 → 前一日 16:00Z
 		expect(qs.get("date_from")).toBe("2026-08-18T16:00:00Z");
-		// 台北 2026-08-19 23:59:59 → 當日 15:59:59Z
 		expect(qs.get("date_to")).toBe("2026-08-19T15:59:59Z");
 	});
 
@@ -154,7 +152,6 @@ describe("KPI 卡與清單吃同一組條件", () => {
 			expect(qs.get("keyword")).toBe("番茄");
 			expect(qs.get("date_from")).toBe("2026-08-17T16:00:00Z");
 			expect(qs.get("date_to")).toBe("2026-08-19T15:59:59Z");
-			// KPI 只要 total，不要真的把資料撈回來。
 			expect(qs.get("page_size")).toBe("1");
 		}
 	});
@@ -201,8 +198,6 @@ describe("頁面只組一份條件，兩支查詢共用", () => {
 	});
 
 	it("搜尋走伺服端，頁面上沒有對 records 的前端過濾", () => {
-		// 伺服端分頁下 `.filter()` 只篩得到當前這一頁，使用者搜一個在第 4 頁的訂單
-		// 編號會得到「查無資料」——比沒有搜尋更糟。
 		expect(source).not.toMatch(/records\s*\.\s*filter\(/);
 	});
 });

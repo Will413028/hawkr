@@ -57,8 +57,6 @@ public class ProductCertificationApplicationConverter {
         builder.setSubmittedByAccountId(ProtoConversionUtils.formatLong(entity.getSubmittedByAccountId()));
         builder.setInternalNote(nullToEmpty(entity.getInternalNote()));
         builder.setProductName(productBrief == null ? "" : nullToEmpty(productBrief.name()));
-        // 公開生命週期一律走 ProductPublicationPolicy——這裡不得自己寫
-        // 「deletedAt != null || sellerDeletedAt != null」，那會變成同一條規則的第二份定義。
         if (productBrief != null) {
             builder.setProductPublicationState(ProductPublicationPolicy.deriveState(
                     productBrief.firstPublishedAt(),

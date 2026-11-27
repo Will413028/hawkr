@@ -16,7 +16,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/revalidate"
 )
 
-// requestDeletion 讓買家進入刪除中（buyer 的 BeginDeletion，狀態的唯一來源），再呼叫 review 的訂閱者排清除 job。
 func (f *fixture) requestDeletion(t *testing.T, b buyer.Profile) {
 	t.Helper()
 	if err := f.buyers.BeginDeletion(context.Background(), b.BuyerID); err != nil {
@@ -363,7 +362,6 @@ func TestSubmitIsRejectedAfterDeletionRequestAndWaitsForTheGuard(t *testing.T) {
 	}
 }
 
-// lockWaiters 數目前等在鎖上的連線（每個整合測試有自己的資料庫，不受平行測試影響）。
 func (f *fixture) lockWaiters(t *testing.T) int64 {
 	t.Helper()
 	return f.scalar(t, "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'")

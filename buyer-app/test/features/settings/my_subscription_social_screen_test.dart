@@ -88,7 +88,6 @@ void main() {
     expect(policy.width, 384);
     expect(policy.height, 288);
     expect(policy.width! / policy.height!, 4 / 3);
-    // 伺服端裁切語意由 Worker preset 決定：card = 720×540 cover（同 4:3）。
     expect(
       ImageConfig.presetFor(ImageScene.productLandscapeCard),
       ImagePreset.card,
@@ -350,7 +349,6 @@ void main() {
         initialTab: 1,
       );
 
-      // 第一頁載入後不會自己把後面的頁讀完；計數用 API 的 total_size。
       verify(() => _visitRepository.listFavorites(pageToken: '')).called(1);
       verifyNever(() => _visitRepository.listFavorites(pageToken: 'page-2'));
       expect(find.text('7'), findsOneWidget);

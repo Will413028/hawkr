@@ -40,17 +40,11 @@ public record ActionAvailability(String action, boolean enabled, Integer disable
             throw new IllegalArgumentException("action 不得為空");
         }
         if (actorAccountTypes == null || actorAccountTypes.isEmpty()) {
-            // 🔴 與 disabledReasonCode 同一個理由：允許不填 actor，
-            // 等於允許「買家收到賣家才能執行的動作」——那是 QA 實測到的失效
-            // （買家端 /app/orders/{no}/logistics 回三條掛 seller capability 的 href，
-            //   買家跟隨即 403，而賣家在那支端點上根本拿不到自己的動作）。
             throw new IllegalArgumentException(
                     "action=" + action + " 沒有 actor——無法判斷誰可以執行，"
                             + "對外契約會把賣家動作發給買家");
         }
         if (!enabled && disabledReasonCode == null) {
-            // 🔴 這不是防禦性程式碼，是契約：允許 enabled=false 而不給原因，
-            // 就等於允許「按鈕靜默消失」——那正是本模型要消滅的失效模式。
             throw new IllegalArgumentException(
                     "action=" + action + " 標為不可用卻沒有 disabledReasonCode——"
                             + "前端無法向使用者說明原因，按鈕會憑空消失");

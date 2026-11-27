@@ -161,13 +161,9 @@ export function ImageUploader({
 	const fileHintId = `${reactId}-filehint`;
 	const messageId = `${reactId}-message`;
 	const tileTextId = `${reactId}-tiletext`;
-	// Animate only when interacting (hover / dragging) or actively uploading;
-	// stays paused on initial render so the empty state reads as calm.
 	const playing = uploading || dragging || hovering;
 	const inert = disabled || uploading;
 
-	// The crop dialog is only mounted once something is actually queued, and it
-	// stays mounted just past its own exit animation.
 	React.useEffect(() => {
 		if (cropQueue.length > 0) {
 			setCropMounted(true);
@@ -193,8 +189,6 @@ export function ImageUploader({
 			for (const f of picked) onPick(f);
 			return;
 		}
-		// Images queue through the crop dialog; anything else (PDF documents)
-		// has no crop semantics and passes straight through.
 		const images = picked.filter((f) => f.type.startsWith("image/"));
 		for (const f of picked) {
 			if (!f.type.startsWith("image/")) onPick(f);
@@ -217,8 +211,6 @@ export function ImageUploader({
 		if (inert) return;
 		handleFiles(e.dataTransfer.files);
 	};
-	// Touch has no hover: mirror the pressed state onto pointerdown so the tile
-	// reacts to a finger the way it reacts to a cursor.
 	const onPointerDown = (e: React.PointerEvent) => {
 		if (inert || e.pointerType === "mouse") return;
 		setHovering(true);
@@ -258,9 +250,6 @@ export function ImageUploader({
 		variant === "avatar" && "rounded-full",
 	);
 	const previewSize = previewIntrinsicSize(variant, size);
-	// Spread rather than inline attributes so `<img src={previewUrl}` stays on
-	// one line — tests/runtime-media-sinks.test.ts asserts that exact string to
-	// prove the preview goes through resolveCdnUrl.
 	const previewImgAttrs = {
 		width: previewSize.width,
 		height: previewSize.height,
@@ -280,9 +269,7 @@ export function ImageUploader({
 
 	const tileClasses = [
 		"relative flex items-center justify-center w-full border-[1.5px] border-dashed rounded-[var(--radius-lg)] cursor-pointer overflow-hidden transition-[border-color,background-color,transform] duration-160 ease-out motion-reduce:transition-none font-inherit [-webkit-tap-highlight-color:transparent] focus-visible:outline-2 focus-visible:outline-[var(--hkui-primary)] focus-visible:outline-offset-2",
-		// Disabled
 		inert ? "cursor-not-allowed opacity-65" : "",
-		// Aspect / Size / Shape variants
 		variant === "avatar"
 			? `w-[120px] h-[120px] min-h-0 rounded-full p-0 ${size === "sm" ? "w-[88px] h-[88px]" : size === "lg" ? "w-[144px] h-[144px]" : ""}`
 			: variant === "cover"
@@ -290,19 +277,15 @@ export function ImageUploader({
 				: variant === "compact"
 					? "aspect-square min-h-0 p-3 rounded-[var(--radius-md)]"
 					: `min-h-[140px] ${size === "sm" ? "min-h-[96px]" : size === "lg" ? "min-h-[200px]" : ""}`,
-		// Filled vs Empty states
 		hasValue
 			? "border-solid border-[var(--hkui-divider)] bg-[var(--color-neutral-cream)] dark:bg-[var(--hkui-content1)] p-0"
 			: "border-[var(--hkui-divider)] bg-[var(--page-uploader-tile-bg)] dark:bg-[var(--hkui-content2)] text-[var(--brand-text-gray)] dark:text-[var(--hkui-foreground-soft)]",
-		// Invalid / Error state
 		error
 			? "border-[var(--hkui-danger)] bg-[var(--page-uploader-danger-bg-alt)]"
 			: "",
-		// Dragging or Hovering (not disabled)
 		!inert && (hovering || dragging)
 			? "border-[var(--hkui-primary)] bg-[var(--hkui-primary-50)] text-[var(--brand-text-black)] dark:text-[var(--hkui-primary-700)]"
 			: "",
-		// Tile content layout stacking direction
 		variant === "card" || variant === "cover" ? "flex-col" : "",
 	]
 		.filter(Boolean)
@@ -333,9 +316,7 @@ export function ImageUploader({
 				</label>
 			)}
 
-			{/* Sibling of the tile, never nested inside it. `tabIndex={-1}` keeps
-			    the tile button as the single keyboard stop while the label's
-			    `htmlFor` still opens the picker on click. */}
+
 			<input
 				ref={inputRef}
 				id={inputId}
@@ -373,9 +354,6 @@ export function ImageUploader({
 				onPointerDown={onPointerDown}
 				onPointerUp={clearCoarseActive}
 				onPointerCancel={clearCoarseActive}
-				// `uploading` must NOT set `disabled`: that drops the element out of
-				// the tab order mid-interaction and silently moves focus to <body>.
-				// The handlers all guard on `inert` instead.
 				disabled={disabled}
 				aria-disabled={inert || undefined}
 				aria-busy={uploading || undefined}
@@ -468,7 +446,7 @@ export function ImageUploader({
 								aria-valuemax={100}
 								aria-valuenow={Math.round(clampedProgress * 100)}
 							>
-								{/* scaleX instead of width: width animates layout. */}
+
 								<span
 									className="block h-full w-full origin-left bg-[var(--hkui-primary)] transition-transform duration-200 ease-out motion-reduce:transition-none"
 									style={{ transform: `scaleX(${clampedProgress})` }}

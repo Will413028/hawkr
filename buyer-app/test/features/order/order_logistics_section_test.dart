@@ -29,8 +29,6 @@ void main() {
     );
 
     expect(find.byKey(const ValueKey('order-logistics-section')), findsNothing);
-    // 🔴 對照組：下面那幾支同樣的 harness 會命中 `/logistics`，所以
-    //    「零命中」在這裡是真的沒打，不是 harness 沒接上。
     expect(calls, isEmpty);
   });
 
@@ -76,7 +74,6 @@ void main() {
       ),
       body: _trackBody(
         shippingMethod: '3002',
-        // 55 賣家未取：在 DeliveryStatusPresentation.abnormalValues 內。
         status: '55',
         statusLabel: '賣家未取',
         providerMessage: '外包裝破損，退回物流中心',
@@ -95,7 +92,6 @@ void main() {
   });
 
   testWidgets('正常狀態不重複顯示物流商原文（同一件事不講兩次）', (tester) async {
-    // 鑑別力：若把 providerMessage 無條件畫出來，上一條與這一條不會同時通過。
     await _pump(
       tester,
       order: const Order(
@@ -171,9 +167,6 @@ Future<void> _pump(
   addTearDown(tester.view.resetDevicePixelRatio);
   addTearDown(tester.view.resetPhysicalSize);
 
-  // 🔴 用 interceptor 而不是 httpClientAdapter：`testWidgets` 跑在 fake async 區，
-  //    adapter ＋ dio transformer 那條路徑在錯誤分支上不會被 `pump` 推進（實測會停在
-  //    loading），而 interceptor 的 `handler.resolve` 就在同一批 microtask 內完成。
   final dio = Dio(BaseOptions(baseUrl: 'https://example.test'))
     ..interceptors.add(
       InterceptorsWrapper(

@@ -14,7 +14,6 @@ class ProductSellerCitySummaryPolicyTest {
 
     @Test
     void countsOnlyStoresWithPublicProductsAndKeepsPreviewBounded() {
-        // 8 approved sellers in the city; 106 and 107 have nothing on the shelf.
         var taipei = PublicCityStores.newBuilder()
                 .setCityCode("TW-TPE")
                 .setCityName("台北市")
@@ -30,9 +29,6 @@ class ProductSellerCitySummaryPolicyTest {
         assertThat(result.getFirst().cityCode()).isEqualTo("TW-TPE");
         assertThat(result.getFirst().productCount()).isEqualTo(118L);
         assertThat(result.getFirst().sellerCount()).isEqualTo(6L);
-        // 106/107 are dropped, so 108 is pulled into the 6-slot preview: the
-        // preview is the filtered subset's head, NOT seller-service's pass-through
-        // (which would have ended "...105, 106" and shown an empty storefront).
         assertThat(result.getFirst().previewStoreIds())
                 .containsExactly("101", "102", "103", "104", "105", "108");
     }
@@ -59,7 +55,7 @@ class ProductSellerCitySummaryPolicyTest {
                 .build();
 
         var result = ProductSellerCitySummaryPolicy.aggregate(
-                List.of(city), Map.of(201L, 3L, 203L, 4L)); // 202 has none
+                List.of(city), Map.of(201L, 3L, 203L, 4L));
 
         assertThat(result.getFirst().sellerCount()).isEqualTo(2L);
         assertThat(result.getFirst().previewStoreIds()).containsExactly("201", "203");

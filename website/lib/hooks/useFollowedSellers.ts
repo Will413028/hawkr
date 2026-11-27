@@ -33,9 +33,6 @@ export function useFollowedSellers(
 ): FollowedSellersState {
 	const { activeRole, status } = useAuth();
 	const identity = useQueryIdentity();
-	// Keyed by content, not by array identity: callers derive `sellerIds` from
-	// their posts on every render, and a new `ids` would re-run `combine` and
-	// hand back a new `ids` Set, re-running everything downstream of it.
 	const idsKey = [...new Set(sellerIds.map(String).filter(Boolean))].join(",");
 	const ids = React.useMemo(() => (idsKey ? idsKey.split(",") : []), [idsKey]);
 	const shouldFetch = enabled && activeRole === "buyer";
@@ -89,7 +86,6 @@ export function useIsFollowedSeller(
 				if (key.startsWith(LEGACY_FLAG_PREFIX)) localStorage.removeItem(key);
 			}
 		} catch {
-			// Storage may be blocked; these flags were only cosmetic.
 		}
 	}, []);
 	const query = useQuery({

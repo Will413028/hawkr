@@ -58,7 +58,6 @@ async function openAsBuyer(
 		identity: { accountId: "42", roles: ["buyer"] },
 		session: "identity",
 	});
-	// Later routes win in Playwright, so the feed mock must follow the defaults.
 	await registerAfterDefaults();
 	await seedStoredActiveRole(page, "buyer");
 	await page.addInitScript((loaderKey) => {

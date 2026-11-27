@@ -1,8 +1,6 @@
 import type { LocalizedMessage } from "@hawkr/api/gen/google/rpc/error_details_pb";
 import { StoreActionUnavailableReason } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/seller_pb";
 
-// 伺服器給的「此刻不能做」原因的呈現規則（前提 2026-10-15：能不能做與為什麼不能都來自伺服器，client 只呈現）。
-// 措施的原因（MeasureActionUnavailability）與店家動作的原因（StoreActionUnavailability）共用：兩者都是 { reason, message }。
 
 /** 伺服器說不能操作、但沒有給文字（原因清單空，或該原因沒有 message）時的文字：仍然相信伺服器的 false。 */
 export const GENERIC_UNAVAILABLE_LABEL = "目前不能操作";

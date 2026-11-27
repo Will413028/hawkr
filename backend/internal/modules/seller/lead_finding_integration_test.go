@@ -15,7 +15,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-// leadOf 直接讀措施的 lead_finding_id（主要依據），不經過讀取時的排序。
 func (f *fixture) leadOf(t *testing.T, measureID uuid.UUID) uuid.UUID {
 	t.Helper()
 	var lead uuid.UUID
@@ -23,14 +22,12 @@ func (f *fixture) leadOf(t *testing.T, measureID uuid.UUID) uuid.UUID {
 	return lead
 }
 
-// newFindingAt 在 f.now 往後一小時建立一筆指定嚴重度的認定（各由一個警告建立），回傳認定的 id；建立時間因此依呼叫順序遞增。
 func (f *fixture) newFindingAt(t *testing.T, storeID int64, severity Severity) uuid.UUID {
 	t.Helper()
 	f.now = f.now.Add(time.Hour)
 	return f.violate(t, storeID, severity, MeasureWarning, nil).Findings[0].ID
 }
 
-// citeOnly 只引用既有的認定（沒有新的認定）建立警告。
 func (f *fixture) citeOnly(storeID int64, cited []uuid.UUID, mutate func(*CreateMeasureInput)) (CreateMeasureResult, error) {
 	in := CreateMeasureInput{
 		AdminID: 7, StoreID: storeID, Kind: MeasureWarning, StatementToSeller: "y", Note: "x",
@@ -126,7 +123,6 @@ func TestMaterialBreachLeadIsTheMostSevereCitedFindingNotTheFirstOne(t *testing.
 	critical := f.newFindingAt(t, s.StoreID, SeverityCritical)
 	high := f.newFindingAt(t, s.StoreID, SeverityHigh)
 	f.now = f.now.Add(8 * 24 * time.Hour)
-	// 第一筆是最輕的 LOW、最嚴重的 CRITICAL 在中間。
 	res, err := f.createTermination(s.StoreID, GroundMaterialBreach, func(in *CreateMeasureInput) {
 		in.Termination.Violation = &ViolationBasis{CitedFindingIDs: []uuid.UUID{low, critical, high}}
 	})

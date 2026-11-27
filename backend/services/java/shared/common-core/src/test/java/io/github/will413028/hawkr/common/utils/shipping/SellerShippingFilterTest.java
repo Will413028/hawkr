@@ -18,14 +18,12 @@ class SellerShippingFilterTest {
 
     @Test
     void isAvailable_emptySet_returnsFalse_failClose() {
-        // 對應 03 §4.3：empty set 不再 fail-open
         assertFalse(SellerShippingFilter.isAvailable("3001", "3201", Set.of()));
         assertFalse(SellerShippingFilter.isAvailable("3002", "3201", null));
     }
 
     @Test
     void isAvailable_homeDelivery_matchesEmptyGoodsType() {
-        // TAQBIN 宅配 — config goodsType="" → key="3001:"
         Set<String> available = Set.of("3001:");
         assertTrue(SellerShippingFilter.isAvailable("3001", "3201", available));
         assertTrue(SellerShippingFilter.isAvailable("3001", "3203", available));
@@ -34,16 +32,14 @@ class SellerShippingFilterTest {
 
     @Test
     void isAvailable_cvsStorePickup_matchesByTemperature() {
-        // 7-11 — goodsType=temperature
-        Set<String> available = Set.of("3002:3201"); // 只啟用常溫
+        Set<String> available = Set.of("3002:3201");
         assertTrue(SellerShippingFilter.isAvailable("3002", "3201", available));
-        assertFalse(SellerShippingFilter.isAvailable("3002", "3203", available)); // 冷凍未啟用
+        assertFalse(SellerShippingFilter.isAvailable("3002", "3203", available));
     }
 
     @Test
     void isAvailable_disabledShippingMethod_returnsFalse() {
-        // 賣家停用 7-11 (3002) 後，3002 不在 available set 中
-        Set<String> available = Set.of("3001:"); // 只開宅配
+        Set<String> available = Set.of("3001:");
         assertFalse(SellerShippingFilter.isAvailable("3002", "3201", available));
         assertTrue(SellerShippingFilter.isAvailable("3001", "3201", available));
     }
@@ -52,7 +48,7 @@ class SellerShippingFilterTest {
     void onboardingSig_deterministicAndStable() {
         long sellerId = 2683382637L;
         Set<String> set1 = Set.of("3001:", "3002:3201");
-        Set<String> set2 = Set.of("3002:3201", "3001:"); // 不同順序
+        Set<String> set2 = Set.of("3002:3201", "3001:");
 
         String sig1 = SellerShippingFilter.onboardingSig(sellerId, set1);
         String sig2 = SellerShippingFilter.onboardingSig(sellerId, set2);
@@ -63,8 +59,8 @@ class SellerShippingFilterTest {
     @Test
     void onboardingSig_changesWhenToggled() {
         long sellerId = 2683382637L;
-        Set<String> beforeToggle = Set.of("3001:", "3002:3201"); // 兩個都開
-        Set<String> afterToggle = Set.of("3001:");               // 停用 7-11
+        Set<String> beforeToggle = Set.of("3001:", "3002:3201");
+        Set<String> afterToggle = Set.of("3001:");
 
         String before = SellerShippingFilter.onboardingSig(sellerId, beforeToggle);
         String after = SellerShippingFilter.onboardingSig(sellerId, afterToggle);

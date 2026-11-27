@@ -79,8 +79,6 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 
-      // 初次載入只拉第 1 頁（20 筆），不是整批 500 筆——這是本次修法要守住的核心
-      // 行為：舊實作對 500 篇貼文各自補打一次 detail API，總請求數會是 501。
       expect(requestedPageSizes, [20]);
       expect(find.byType(GridView), findsNothing);
       expect(find.byType(SliverGrid), findsOneWidget);
@@ -100,7 +98,6 @@ void main() {
           .position
           .pixels;
 
-      // 捲到接近底部觸發下一頁載入。
       await tester.drag(scroll, const Offset(0, -2000));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
@@ -113,7 +110,6 @@ void main() {
           .pixels;
       expect(afterOffset, greaterThan(beforeOffset));
 
-      // 觸發了第 2 頁，且拿到的還是 20 筆（不是整批剩餘的 480 筆）。
       expect(requestedPageSizes.length, greaterThanOrEqualTo(2));
       expect(requestedPageSizes.length, lessThan(25));
       expect(requestedPageSizes.every((size) => size == 20), isTrue);
@@ -124,9 +120,6 @@ void main() {
       unawaited(refresh.show());
       await tester.pump();
       await tester.pump(const Duration(seconds: 2));
-      // FruitRefreshIndicator 的 onRefresh 呼叫的是 widget.onReloadSeller
-      // （父層擁有的整頁重載，非本頁自己的 _loadPosts），本測試只釘住這條
-      // callback 有被呼叫——跟改動前的行為一致，不是本次修法要驗證的範圍。
       expect(refreshCount, 1);
       expect(tester.takeException(), isNull);
     },

@@ -20,7 +20,6 @@ type LinkAvailability interface {
 
 var errLinksRequired = errors.New("httpapi/seller：措施有內容快照的連結，但沒有 LinkAvailability 可查目標還在不在")
 
-// snapshotLink 回傳內容快照的連結；沒有快照或連結是零值（聊天訊息、評價回覆沒有連結目標）時第二個回傳值為假。
 func snapshotLink(c model.MeasureContent) (model.ContentLink, bool) {
 	if c.Snapshot == nil || c.Snapshot.Link == (model.ContentLink{}) {
 		return model.ContentLink{}, false
@@ -28,8 +27,6 @@ func snapshotLink(c model.MeasureContent) (model.ContentLink, bool) {
 	return c.Snapshot.Link, true
 }
 
-// markLinkAvailability 把 ms 的內容快照連結目標是否還在寫進對應的 ContentRef.LinkAvailable：整批只問 social 一次（每類目標一個查詢），沒有連結目標時不問。
-// refsOf(i) 回傳 ms[i] 轉成回應後的 Contents，順序與 ms[i].Contents 相同。
 func markLinkAvailability(ctx context.Context, src LinkAvailability, ms []model.Measure, refsOf func(i int) []*pb.ContentRef) error {
 	var posts []uuid.UUID
 	var threads []social.ForumThread
@@ -78,7 +75,6 @@ func markLinkAvailability(ctx context.Context, src LinkAvailability, ms []model.
 	return nil
 }
 
-// sellerMeasures 轉成賣家看到的措施（含內容快照連結是否還在）。
 func sellerMeasures(ctx context.Context, src LinkAvailability, ms []model.Measure) ([]*pb.Measure, error) {
 	l := uitext.LocaleFrom(ctx)
 	out := make([]*pb.Measure, len(ms))
@@ -91,7 +87,6 @@ func sellerMeasures(ctx context.Context, src LinkAvailability, ms []model.Measur
 	return out, nil
 }
 
-// adminMeasures 轉成後台看到的措施（含內容快照連結是否還在）。
 func adminMeasures(ctx context.Context, src LinkAvailability, ms []model.Measure) ([]*adminpb.Measure, error) {
 	out := toAdminMeasures(ms)
 	if err := markLinkAvailability(ctx, src, ms, func(i int) []*pb.ContentRef { return out[i].Contents }); err != nil {

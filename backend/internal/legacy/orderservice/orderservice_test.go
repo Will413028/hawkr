@@ -20,7 +20,6 @@ type fakeOrders struct {
 	spending *orderpb.GetBuyerOrdersForSellerResponse
 	err      error
 
-	// 店家端：orders、counts 是回應，ordersErr、countsErr 是傳輸錯誤，seen 記下收到的請求。
 	orders    *orderpb.GetSellerOrdersResponse
 	counts    *orderpb.GetSellerOrderStatusCountsResponse
 	ordersErr error
@@ -170,7 +169,6 @@ func TestHasOpenStoreOrders(t *testing.T) {
 		wantError    bool
 		wantCountsRC int
 	}{
-		// 0 待付款不在 GetSellerOrderStatusCounts 的四桶裡，只有未結篩選的 GetSellerOrders 看得到。
 		{name: "unpaid order blocks", orders: sellerOrdersResponse("1", "0"), want: true},
 		{name: "shipped order blocks", orders: sellerOrdersResponse("3", "30"), want: true},
 		{name: "delivered not yet confirmed blocks", orders: sellerOrdersResponse("1", "40"), want: true},

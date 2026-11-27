@@ -14,15 +14,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-// 代行建立商品的落地狀態碼。
-//
-// 這一格沒有任何自然的訊號會在它出錯時響：漏填 status 時 product-service 落地
-// ACTIVE（ProductEntityConverter.toEntity），HTTP 仍是 200、稽核列仍記
-// PRODUCT_CREATE，只有買家那側多出一件沒有人按過上架的商品。填成 DRAFT(4001)
-// 同樣安靜，症狀是賣家在自己的商品管理裡找不到代行者說已經建好的那件商品
-// （4001 的語意是「僅建立者可查看」）。
-//
-// 兩個方向都要釘：不是 ACTIVE（capability 繞過），也不是 DRAFT（隱藏狀態）。
 
 type capturingCreateProductStub struct {
 	productpb.ProductServiceClient

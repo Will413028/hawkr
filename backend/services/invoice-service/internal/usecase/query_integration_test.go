@@ -32,7 +32,6 @@ const (
 	qitBuyerA = int64(2623900520)
 	qitBuyerB = int64(2688637900)
 
-	// 這兩個值刻意寫成一眼看得出的字串：任何一個出現在回應裡都是明碼外洩。
 	qitCarrierPlain = "/T7R3U+P"
 	qitEmailPlain   = "buyer-qit@example.com"
 )
@@ -45,7 +44,6 @@ type qitEnv struct {
 	storeID  int64
 }
 
-// qitSetup 建一位賣家 issuer ＋ 稅務資格 ＋ 一份已開立的發票文件，並組出真 repo 的 Query。
 func qitSetup(t *testing.T) *qitEnv {
 	t.Helper()
 	ctx := context.Background()
@@ -93,7 +91,6 @@ func qitSetup(t *testing.T) *qitEnv {
 	return &qitEnv{pool: pool, query: q, docs: docs, issuerID: issuerID, storeID: storeID}
 }
 
-// qitSeedDocument 建一份帶載具與 email 的已開立發票（明文由 repository 加密落庫）。
 func qitSeedDocument(t *testing.T, env *qitEnv, docID int64, buyerID int64, orderNo string) domain.Document {
 	t.Helper()
 	ctx := context.Background()
@@ -101,17 +98,15 @@ func qitSeedDocument(t *testing.T, env *qitEnv, docID int64, buyerID int64, orde
 	taipei := time.Now().UTC()
 	doc, inserted, err := env.docs.Create(ctx, domain.NewDocument{
 		ID: docID, IssuerID: env.issuerID, IssuerNameSnapshot: "查詢整合測試賣場",
-		SourceType: "ORDER", SourceRef: orderNo, TriggerType: "AUTO", // chk_invdoc_trigger 只認 AUTO／ADM_MANUAL
+		SourceType: "ORDER", SourceRef: orderNo, TriggerType: "AUTO",
 		RecipientType: "BUYER", RecipientRefID: &buyerID,
 		RecipientName: "測試買家",
-		// B2C 的 chk_invdoc_b2c 要求買受人統編恆為 10 個 0（AMEGO 官方形狀），
-		// 空字串會被 chk_invdoc_taxid_shape 擋下。
 		RecipientTaxID: "0000000000",
 		RecipientEmail: qitEmailPlain,
 		CarrierID1:     qitCarrierPlain,
 		CarrierType:    "3J0002",
 		DocumentKind:   "B2C", FulfillmentMode: "AMEGO_AUTO", Status: "PENDING",
-		SnapshotVersion: 1, IssueAttemptSeq: 1, // chk_invdoc_versions：兩者都必須 >= 1
+		SnapshotVersion: 1, IssueAttemptSeq: 1,
 		SalesAmount: 100, TaxAmount: 0, TotalAmount: 100, TaxType: 1, TaxRateBps: 500,
 		Provider: "AMEGO", ProviderRequestNo: fmt.Sprintf("R%d", docID),
 		InvoiceDateTaipei: &taipei, TaxPeriodCode: "11507",
@@ -126,9 +121,6 @@ func qitSeedDocument(t *testing.T, env *qitEnv, docID int64, buyerID int64, orde
 	return doc
 }
 
-// ---------------------------------------------------------------------------
-// Tier A：擁有者述詞必須在 SQL 裡
-// ---------------------------------------------------------------------------
 
 // TestIntegration_Query_TierA_ComplaintOwnerIsInSQLPredicate 是「把擁有者條件從 WHERE
 // 拿掉」這個變異的唯一偵測點。
@@ -151,17 +143,14 @@ func TestIntegration_Query_TierA_ComplaintOwnerIsInSQLPredicate(t *testing.T) {
 		t.Fatalf("seed complaint: %v", err)
 	}
 
-	// 擁有者本人讀得到。
 	if _, err := env.query.GetBuyerComplaint(ctx, qitBuyerA, "O000000101", complaintID); err != nil {
 		t.Fatalf("擁有者應該讀得到自己的申訴：%v", err)
 	}
 
-	// (a) 另一位買家讀同一件申訴 —— 這一列**存在**，只是不屬於他。
 	_, foreignErr := env.query.GetBuyerComplaint(ctx, qitBuyerB, "O000000101", complaintID)
 	if foreignErr == nil {
 		t.Fatal("🔴 越權讀取成功了 —— complainant_buyer_id 沒有進 SQL 的 WHERE（§8.1.4(b)）")
 	}
-	// (b) 同一位買家讀一個不存在的 id。
 	_, missingErr := env.query.GetBuyerComplaint(ctx, qitBuyerB, "O000000101", complaintID+9999)
 	if missingErr == nil {
 		t.Fatal("不存在的 complaint_id 應該回錯誤")
@@ -209,7 +198,6 @@ func TestIntegration_Query_TierA_BuyerProfilesOwnerIsInSQLPredicate(t *testing.T
 		t.Fatalf("擁有者應該看到 1 筆，實得 total=%d len=%d", mine.Total, len(mine.Records))
 	}
 
-	// 🔴 明碼不出服務邊界：本路徑不解密。
 	if got := mine.Records[0].DisplayValue; got != "/T••••+P" {
 		t.Fatalf("display_value 應為已落庫的遮罩值，實得 %q", got)
 	}
@@ -226,9 +214,6 @@ func TestIntegration_Query_TierA_BuyerProfilesOwnerIsInSQLPredicate(t *testing.T
 	}
 }
 
-// ---------------------------------------------------------------------------
-// §8.1.3(c) 裁定 2：ADM 不遮罩，但每次揭露留一列稽核
-// ---------------------------------------------------------------------------
 
 // TestIntegration_Query_AdminDocumentDetail_RevealsPlaintextAndWritesAuditRow 驗兩半。
 //
@@ -239,7 +224,6 @@ func TestIntegration_Query_AdminDocumentDetail_RevealsPlaintextAndWritesAuditRow
 	env := qitSetup(t)
 	doc := qitSeedDocument(t, env, env.issuerID+400, qitBuyerA, "O000000401")
 
-	// 前提：落庫的是密文，不是明文。這一句同時證明後面看到的明碼真的來自解密。
 	var stored string
 	if err := env.pool.QueryRow(ctx,
 		`SELECT carrier_id1_ciphertext FROM invoice_documents WHERE id=$1`, doc.ID).Scan(&stored); err != nil {
@@ -255,7 +239,6 @@ func TestIntegration_Query_AdminDocumentDetail_RevealsPlaintextAndWritesAuditRow
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// 半一：ADM 端不遮罩。
 	if view.RevealedCarrierID != qitCarrierPlain {
 		t.Fatalf("ADM 端載具應為明碼（§8.1.3(c) 裁定 2），實得 %q", view.RevealedCarrierID)
 	}
@@ -263,8 +246,6 @@ func TestIntegration_Query_AdminDocumentDetail_RevealsPlaintextAndWritesAuditRow
 		t.Fatalf("ADM 端 email 應為明碼，實得 %q", view.RevealedEmail)
 	}
 
-	// 半二：稽核列真的寫進去了（reason_code／reason_detail 都是 NOT NULL，
-	// 少填一個就是寫入失敗而不是少一欄 ⇒ 這裡的 COUNT 也會是 0）。
 	var n int
 	if err := env.pool.QueryRow(ctx,
 		`SELECT COUNT(*) FROM invoice_admin_audit_logs
@@ -276,9 +257,6 @@ func TestIntegration_Query_AdminDocumentDetail_RevealsPlaintextAndWritesAuditRow
 		t.Fatalf("🔴 每次揭露必須留一列 INVOICE_PII_REVEAL，實得 %d 列", n)
 	}
 
-	// 🔴 第二次讀取必須再留一列：uq_invadmaudit_client_request(actor, action, request_id)
-	// 只在 request_id IS NOT NULL 時生效 ⇒ 帶了 request_id 的實作會在這裡只剩 1 列，
-	// 而那等於「同一位 ADM 反覆讀取只被記錄一次」。
 	if _, err := env.query.GetDocumentForAdmin(ctx, actorID, doc.ID); err != nil {
 		t.Fatalf("second read: %v", err)
 	}
@@ -313,10 +291,6 @@ func TestIntegration_Query_SellerTaxProfile_ForeignStoreGetsSameNotFound(t *test
 	}
 }
 
-// assertSameDomainError 比對兩個錯誤的碼與訊息。
-//
-// 判準不是「都是錯誤」：越權與不存在回不同的 message（甚至只差一個字）就足以讓
-// 攻擊者枚舉出「這個 id 存在」，而只斷言「有錯」的測試對此完全無感。
 func assertSameDomainError(t *testing.T, a, b error, why string) {
 	t.Helper()
 	if a.Error() != b.Error() {
@@ -337,8 +311,6 @@ func TestIntegration_Query_SellerCapability_SelfIssueEffectiveAnchorsOnStatus(t 
 	env := qitSetup(t)
 	ctx := context.Background()
 
-	// 兩個狀態都寫滿簽署記錄 —— 差別只在 review_status，
-	// 這樣才分得出判準讀的是哪一欄（chk_stp_attested_when_committed 也要求它們非空）。
 	setStatus := func(status string) {
 		t.Helper()
 		if _, err := env.pool.Exec(ctx,

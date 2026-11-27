@@ -6,15 +6,7 @@ import (
 	"testing"
 )
 
-// 依賴閉包是 #2444 新增的業務規則，而它在 DB **沒有任何落點**：
-// chk_sda_capabilities_closed 的十個 CASE 是去重加總（PG 的 CHECK 不能用子查詢做
-// DISTINCT），不是依賴檢查。⇒ 只勾 products.write 不勾 products.read 的組合，DB 照收，
-// 而畫面上「編輯商品」這個入口會憑空少掉一半功能，零錯誤訊號。
-//
-// 保證因此只有兩層：本檔的 Go 測試，與 scripts/check-delegation-capability-closure.py
-// 的 Go ↔ golden 對拍。兩者都在 repo 內，兩者都必須有鑑別力。
 
-// parseDependencyGolden 讀 golden 檔並解析成 (capability, deps) 的有序清單。
 func parseDependencyGolden(t *testing.T) [][2]string {
 	t.Helper()
 	raw, err := os.ReadFile("testdata/admin_capability_dependencies.golden")
@@ -80,8 +72,6 @@ func TestAdminCapabilityTablesCoverEveryCapability(t *testing.T) {
 	if len(adminCapabilityRisks) != len(AllAdminCapabilities) {
 		t.Errorf("風險表有 %d 條、capability 有 %d 個", len(adminCapabilityRisks), len(AllAdminCapabilities))
 	}
-	// 依賴項本身必須是十值之一，且不得自我依賴——自我依賴會讓閉包展開對它恆為
-	// 「缺自己」，任何含它的組合都送不出去。
 	for cap, deps := range adminCapabilityDependencies {
 		for _, d := range deps {
 			if !IsKnownAdmin(d) {
@@ -105,8 +95,6 @@ func TestAdminCapabilityDependsOnReturnsCopy(t *testing.T) {
 	if again := AdminCapabilityDependsOn(AdminCapProductsPublish); again[0] != AdminCapProductsRead {
 		t.Fatalf("回傳值與表共用底層陣列，被呼叫端改壞了：%v", again)
 	}
-	// 無依賴者回空 slice 而不是 nil：呼叫端會序列化成 JSON 陣列，nil 變成 null 之後
-	// 前端對 dependsOn 做 .length 就炸。
 	if deps := AdminCapabilityDependsOn(AdminCapOrdersRead); deps == nil {
 		t.Fatal("無依賴的能力必須回空 slice，不得回 nil")
 	}

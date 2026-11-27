@@ -148,16 +148,12 @@ function respond(result: DelegatedUpstreamResult): Response {
 			200,
 		);
 	}
-	// 上游給了業務碼 → 原碼原狀態轉出去。前端對 9270／9271／9272 有終態處置，
-	// 塌成單一錯誤碼會讓工作區在工作階段已撤銷時仍顯示「暫時性錯誤，請重試」。
 	if (result.code !== null && result.status >= 400 && result.status <= 599) {
 		return delegatedJson(
 			{ code: result.code, traceId: result.traceId },
 			result.status,
 		);
 	}
-	// 2xx 卻沒有可解析的 envelope、或 3xx（§6.1.0 明令上游不得回 3xx，
-	// `_upstream.ts` 以 `redirect: "manual"` 讓它現形）——都算上游壞掉。
 	return delegatedJson(
 		{ code: UPSTREAM_FAILURE, traceId: result.traceId },
 		502,
@@ -234,8 +230,6 @@ export async function forwardDelegated(
 				timeout: spec.timeout,
 				credential,
 				idempotencyKey,
-				// Vercel 邊緣寫的、client 設不了。不帶就會簽成 p="ssr"，整個 ADM
-				// 的代行流量共用一個限流桶（限流主體＝per-admin-IP）。
 				visitorIp: getVisitorIp(request),
 				json,
 			}),
@@ -325,7 +319,6 @@ export async function forwardDelegatedConnect<
 		if (!credential) {
 			throw new DelegatedRequestRejectedError("CREDENTIAL_MISSING", 401);
 		}
-		// buildQuery 的 allow-list 檢查沿用，但 Connect 呼叫自己讀 query 的值。
 		const search = buildQuery(request, spec.query ?? []);
 		const json =
 			spec.method === "GET" ? undefined : await readJsonBody(request);
@@ -383,7 +376,6 @@ function fileResponse(upstream: Response): Response {
 	});
 	const ok = upstream.status >= 200 && upstream.status <= 299;
 	for (const name of FILE_RESPONSE_HEADERS) {
-		// 失敗回應的 body 不轉（只轉狀態與重試所需的標頭），所以 content-type 也不帶。
 		if (!ok && (name === "content-type" || name === "content-disposition")) {
 			continue;
 		}

@@ -14,7 +14,6 @@ import (
 
 var update = flag.Bool("update", false, "重寫 testdata/golden 的 SQL 快照")
 
-// rendered 是語句渲染出來的 SQL 加上參數（golden 檔的內容）。
 func rendered(e reads.Entry, v visibility.Viewer) string {
 	q, args := e.Build(v).Sql()
 	var b strings.Builder

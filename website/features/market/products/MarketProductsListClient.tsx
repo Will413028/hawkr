@@ -65,12 +65,6 @@ export default function MarketProductsListClient({
 		[params, categoryList, trendingHashtags],
 	);
 
-	// Only the canonical (no-filter, default sort, recommend tab) page carries an
-	// authoritative SSR product seed. Everything else resolves its own page 1 on
-	// the client:
-	//   - follow tab       → seed an empty page so the grid's mount loadMore
-	//                         fetches the buyer-scoped page 1 (no double fetch)
-	//   - any other filter  → no seed; the grid fetches page 1 for the new key
 	const isCanonical =
 		!view.hasActiveFilters &&
 		!view.isFollowTab &&

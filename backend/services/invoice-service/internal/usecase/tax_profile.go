@@ -20,55 +20,16 @@ import (
 	"go.uber.org/zap"
 )
 
-// 本檔是 M3 稅務資格狀態機（§7.3.3 T01–T16）的**寫入面**：賣家側 §6.1.7 的端點 18／19／
-// 20／22，ADM 側 §6.1.12 的端點 40／41。讀取面（端點 17／21／39）在 query.go。
-//
-// 五條貫穿全檔的約束：
-//
-//	① **allowed-from 只有一份，住在 SQL 的 WHERE**（db/queries/seller_tax_profiles.sql）。
-//	   本層先讀一次是為了回**可分辨的碼**（9321／9322／9323／9324／9348），不是正確性
-//	   防線——兩個分頁同時送出時應用層的 if 會各自讀到舊值。真正的守衛是那句 CAS，
-//	   而 rows=0 一律回明確業務碼，**絕不當成功往下走**。
-//	② **一次動作 ＝ 一個交易**：狀態轉移 ＋ 狀態歷程 ＋（ADM 的）稽核列 ＋ outbox 必須
-//	   同進同退。少了交易會出現「狀態轉了但沒有人知道是誰轉的」，而那正是事後查不出來
-//	   的來源；ADM 側更嚴重——`invoice_admin_audit_logs` 是 5 年保存義務（§9.5）。
-//	③ **Tier A**：賣家側的歸屬鍵是 `store_id`，而它由 Gateway 的 sellerid resolver 注入、
-//	   前端不可控。解析路徑是 `invoice_issuers.issuer_ref_id = store_id AND
-//	   issuer_type='SELLER'`（GetByRef）⇒ 別的 store_id 解出別的 issuer，拿不到這一列。
-//	   **越權與查無共用 9320、同一段 message、同一行程式碼**。
-//	④ **60 天是單一時鐘**：`submitted_at` 是唯一起算點（決策 C4），`pending_valid_until`
-//	   ＝ 它 + 60 天。補件（T05）不重算、接受條款（T04）不重算——重算等於讓賣家用
-//	   「停在某個狀態」把窗口無限延長。
-//	⑤ **媒體換發不在交易內**：FinalizeImages／LinkImages 是網路呼叫，包進交易等於讓一把
-//	   資料庫連線被外部服務的延遲綁住。順序契約（§6.1.7）因此展開成
-//	   「建列（交易）→ 換發（網路，致命）→ 更新（交易）→ 回收（網路，best-effort）」。
 
 const (
-	// taxSubmitWindow 是 T02 寫入 pending_valid_until 的長度（決策 C4 的 60 天）。
 	taxSubmitWindow = 60 * 24 * time.Hour
-	// taxReapplyCooldown 是 T09／T10 之後的重申冷卻（決策 C3 的 7 天）。
 	taxReapplyCooldown = 7 * 24 * time.Hour
-	// taxApprovalValidity 是 approval_valid_until 的預設長度（T07／T08 的 365 天）。
-	//
-	// ⚠️ 它是「該複審了」的到期日，**不是資格失效日**：§7.3.3 沒有任何一條邊會因為它
-	// 屆滿而改狀態。自動改狀態會讓賣家在毫無操作下，於核准滿一年那天起全部新訂單靜默
-	// 改判 LEGACY_MANUAL，而發票人是賣家、罰的也是賣家。
 	taxApprovalValidity = 365 * 24 * time.Hour
-	// taxExtensionDefaultDays 是端點 41 未指定 extendDays 時的天數（§6.1.12 逐字的 "30"）。
 	taxExtensionDefaultDays = 30
-	// taxExtensionMaxDays 是 extendDays 的上界。60 天窗口只能延一次，延超過一年等於
-	// 讓「待審」變成一個沒有期限的狀態。
 	taxExtensionMaxDays = 365
 
-	// taxEvidenceMax 是 evidence_object_keys 的筆數上限（§6.1.7：保留清單 ∪ 新 key ≤ 10）。
 	taxEvidenceMax = 10
-	// taxReasonMaxRunes 是理由類自由文字的長度上限，與 B07 同值。
-	//
-	// 在這裡擋而不是讓 DB 擋：review_note／reason_detail 都是 text 欄，DB 根本不會擋，
-	// 少了本檢查，前端的 maxLength 是唯一防線，而那是 client-side 的。
 	taxReasonMaxRunes = 500
-	// taxAttestationVersionMax 對齊 seller_tax_profiles.attestation_version 的 varchar(32)。
-	// 超長在 DB 是 22001（字串截斷）而不是可讀的 400。
 	taxAttestationVersionMax = 32
 	// SelfIssueTermsVersion 是**當期生效**的自行開票責任條款版本，服務端唯一真實來源。
 	//
@@ -81,34 +42,21 @@ const (
 	// 形狀與買家側法定告知的 invoiceDisclosureTermsVersion（checkout.go）一致：
 	// 日期字串、改版時同時改本常數與 docs/legal/ 的條款全文。
 	SelfIssueTermsVersion = "2026-10-25"
-	// taxLegalNameMax 對齊 legal_name varchar(120)／invoice_issuers.display_name varchar(120)。
 	taxLegalNameMax = 120
-	// 以下三個逐欄對齊 seller_tax_profiles 的 DDL（#3089 稽核 A-4）：
-	// entity_tax_type varchar(32)／responsible_person varchar(60)／
-	// address_city varchar(32)／address_district varchar(32)。
-	// 超長的症狀是 22001 ⇒ 整個交易 aborted ⇒ HTTP 500。
 	taxEntityTypeMax      = 32
 	taxResponsibleNameMax = 60
 	taxAddressPartMax     = 32
 
-	// taxIssuerPlaceholderPrefix 是 issuer 建列當下的 display_name 佔位字串。
-	//
-	// display_name ＝ 法定名稱（§5.1.1），但 issuer 必須先存在（seller_tax_profiles 的 FK）
-	// 而法定名稱要等賣家填。⇒ 先放佔位、法定名稱一出現就由 UpdateDisplayName 覆蓋。
-	// 佔位字串刻意帶 store_id：留在 DB 裡時看得出是哪一家，而不是一串「未命名」。
 	taxIssuerPlaceholderPrefix = "store-"
 )
 
-// 稽核與歷程的固定字串。
 const (
-	taxSubjectType  = "TAX_PROFILE" // invoice_status_history.subject_type（chk_invhist_subject 七值之一）
+	taxSubjectType  = "TAX_PROFILE"
 	taxResourceType = "SELLER_TAX_PROFILE"
 
 	taxActorSeller = "SELLER"
 	taxActorAdmin  = "ADMIN"
 
-	// invoice_status_history.reason_code 的稅務軸取值。它們不是 CodeMeta 碼值——
-	// 該欄是自由的 varchar(48)，而 CodeMeta 沒有「歷程原因」這張碼表。
 	taxReasonCreated            = "SELLER_TAX_DRAFT_CREATED"
 	taxReasonReapply            = "SELLER_TAX_REAPPLY"
 	taxReasonSubmitted          = "SELLER_TAX_SUBMITTED"
@@ -117,16 +65,12 @@ const (
 	taxReasonExtensionApproved  = "ADMIN_TAX_EXTENSION_APPROVED"
 	taxReasonAdminDecision      = "ADMIN_TAX_DECISION"
 
-	// invoice_admin_audit_logs.action。前綴與既有的 INVOICE_* 一致。
 	taxAuditActionDecision  = "INVOICE_TAX_REVIEW_DECIDE"
 	taxAuditActionExtension = "INVOICE_TAX_EXTENSION_DECIDE"
 
-	// outbox aggregate_type 的稅務軸（schema 欄位註解列的四值之一）。
 	outboxAggregateTaxProfile = "TAX_PROFILE"
 )
 
-// 端點 41 的兩個 decision 值。它們**不是** SellerTaxReviewDecision 的成員：
-// §6.1.12 逐字「端點 41 自己的 Decision 欄（APPROVE／REJECT）是另一組值域」。
 const (
 	taxExtensionApprove = "APPROVE"
 	taxExtensionReject  = "REJECT"
@@ -237,9 +181,6 @@ func (u *TaxProfile) WithClock(now func() time.Time) *TaxProfile {
 	return u
 }
 
-// ---------------------------------------------------------------------------
-// 賣家：端點 18 草稿存檔
-// ---------------------------------------------------------------------------
 
 // SaveTaxDraftInput 是端點 18 的輸入。
 //
@@ -276,15 +217,9 @@ func (u *TaxProfile) SaveDraft(ctx context.Context, in SaveTaxDraftInput) (Selle
 	if utf8.RuneCountInString(in.LegalName) > taxLegalNameMax {
 		return SellerTaxProfileView{}, ErrTaxLegalNameTooLong
 	}
-	// #3089 B 組第 4 項：擋在應用層，不要讓 chk_stp_tax_id 的 23514 冒泡成 500。
-	// 空字串是合法輸入（還沒填／清掉重填），非空就必須是 8 位數字。
 	if in.TaxID != "" && !domain.IsBusinessTaxID(in.TaxID) {
 		return SellerTaxProfileView{}, ErrTaxIDInvalid
 	}
-	// 🔴 同一個缺陷類的另一半：**超長字串是 22001 不是 23514**，但症狀一模一樣
-	// （SQLSTATE 冒泡成 HTTP 500，賣家看到「系統錯誤」）。
-	// 在此之前這四欄一個都沒守——只有 legal_name(120) 被守著。
-	// 長度逐欄取自 DDL，不是抓一個整數：varchar 的界線就是那些數字。
 	for _, f := range []struct {
 		value string
 		max   int
@@ -299,39 +234,25 @@ func (u *TaxProfile) SaveDraft(ctx context.Context, in SaveTaxDraftInput) (Selle
 			return SellerTaxProfileView{}, f.err
 		}
 	}
-	// entity_tax_type 對應 CodeMeta SellerTaxEntityType ⇒ 寫入 DB 前必須過共用
-	// validator（CLAUDE.md §8）。在此之前它**完全沒被驗過**，任何字串都寫得進去
-	// ——那不是 500，是更難發現的髒資料：ADM 審件時看到一個不在值域裡的型態。
-	// 空字串合法（草稿階段還沒選）。
 	if in.EntityType != "" {
 		if _, ok := codemeta.SellerTaxEntityTypeFromValue(in.EntityType); !ok {
 			return SellerTaxProfileView{}, ErrTaxEntityTypeInvalid
 		}
 	}
-	// 先擋筆數再換發：換發是有副作用的（資產轉正 ＋ 建引用），為了一個一定會被拒的
-	// 請求去製造 11 份正式資產，是把清理成本留給別人。
 	if len(in.EvidenceObjectKeys)+len(in.EvidenceStagedTokens) > taxEvidenceMax {
 		return SellerTaxProfileView{}, ErrTaxEvidenceTooMany
 	}
 
-	// ① 建列。issuer 與 profile 各自 ON CONFLICT DO NOTHING ⇒ 併發的兩個分頁只會有
-	//    一個真的插入，另一個讀既有列，兩者都不報錯。
 	issuer, profile, err := u.ensureProfile(ctx, in.StoreID, in.LegalName, in.SavedByAccountID)
 	if err != nil {
 		return SellerTaxProfileView{}, err
 	}
 
-	// 保留清單必須是這位賣家**當前**的 key 的子集。
-	//
-	// 🔴 少了本檢查就是 IDOR：賣家可以把別人的 objectKey 塞進自己的佐證列，而那些 key
-	// 會被 ADM 在複審時下載（§6.1.7 逐字）。比對在換發之前做——這樣越權請求連一份資產
-	// 都不會被轉正。
 	current := profile.EvidenceKeys()
 	if !isSubset(in.EvidenceObjectKeys, current) {
 		return SellerTaxProfileView{}, ErrTaxEvidenceNotOwned
 	}
 
-	// ② 換發。致命：失敗即中止，DB 一個字都不寫。
 	newKeys, assetIDs, err := u.evidence.FinalizeEvidence(ctx, in.EvidenceStagedTokens, profile.ID)
 	if err != nil {
 		return SellerTaxProfileView{}, err
@@ -341,7 +262,6 @@ func (u *TaxProfile) SaveDraft(ctx context.Context, in SaveTaxDraftInput) (Selle
 		return SellerTaxProfileView{}, ErrTaxEvidenceTooMany
 	}
 
-	// ③ 更新。
 	var out SellerTaxProfileView
 	err = u.tx.WithTx(ctx, func(ctx context.Context) error {
 		fresh, err := u.profiles.GetByIssuer(ctx, issuer.ID)
@@ -353,10 +273,6 @@ func (u *TaxProfile) SaveDraft(ctx context.Context, in SaveTaxDraftInput) (Selle
 		}
 		now := u.now()
 
-		// T01 第二形態：REJECTED／EXPIRED 的賣家要編輯，先把它推回 DRAFT。
-		// 冷卻守衛住在 SQL 的 WHERE（決策 C3）——寫在這裡的 if 會在併發重送時
-		// 同時通過兩次。rows=0 ⇒ 冷卻未到，回 9321（端點 18 的碼表只有 9321／9322；
-		// 冷卻的到期時刻本來就在 S02 讀得到的 reapplyCooldownUntil 上）。
 		if fresh.ReviewStatus == codemeta.SellerTaxReviewStatusRejected.Value ||
 			fresh.ReviewStatus == codemeta.SellerTaxReviewStatusExpired.Value {
 			ok, err := u.profiles.ResetToDraft(ctx, fresh.ID, now)
@@ -371,8 +287,6 @@ func (u *TaxProfile) SaveDraft(ctx context.Context, in SaveTaxDraftInput) (Selle
 				taxActorSeller, actorAccountIDPtr(in.SavedByAccountID), now); err != nil {
 				return err
 			}
-			// 重讀而不是就地 +1：version 的新值由 SQL 算出（version + 1），
-			// Go 端拼一份等於維護第二套算式。
 			if fresh, err = u.profiles.GetByIssuer(ctx, issuer.ID); err != nil {
 				return err
 			}
@@ -391,15 +305,10 @@ func (u *TaxProfile) SaveDraft(ctx context.Context, in SaveTaxDraftInput) (Selle
 			TaxID:             in.TaxID,
 			ResponsiblePerson: in.ResponsibleName,
 			BusinessAddress:   joinAddress(in.AddressCity, in.AddressDistrict, in.AddressDetail),
-			// #3031：三段分開存。串接結果留在 business_address（AMEGO 送件與單行顯示），
-			// 前兩段另外落庫，讓回程還原得回表單的三格。
 			AddressCity:     strings.TrimSpace(in.AddressCity),
 			AddressDistrict: strings.TrimSpace(in.AddressDistrict),
-			// default_tax_category 不由端點 18 決定：它是**核定**的結果（§7.1.3 的唯一
-			// 稅別來源），賣家自述只寫進 claimed_obligation。沿用現值，不讓草稿改稅別。
 			DefaultTaxCategory: fresh.DefaultTaxCategory,
 			EvidenceObjectKeys: merged,
-			// review_note 是 ADM 的欄位（補件說明／駁回理由），賣家的草稿不得覆蓋它。
 			ReviewNote: derefString(fresh.ReviewNote),
 			Now:        now,
 		})
@@ -407,12 +316,9 @@ func (u *TaxProfile) SaveDraft(ctx context.Context, in SaveTaxDraftInput) (Selle
 			return err
 		}
 		if !ok {
-			// 🔴 rows=0 ＝ 守衛不成立（狀態被搶先改掉／版本被搶先 +1），
-			// 不得當成功往下走——那正是靜默失敗的形狀。
 			return taxBiz(bizcode.SellerTaxProfileStateInvalid)
 		}
 
-		// display_name ＝ 法定名稱。同交易同步，否則 issuer 上會留著佔位字串直到開票。
 		if in.LegalName != "" {
 			if _, err := u.issuers.UpdateDisplayName(ctx, issuer.ID, in.LegalName, now); err != nil {
 				return err
@@ -430,12 +336,6 @@ func (u *TaxProfile) SaveDraft(ctx context.Context, in SaveTaxDraftInput) (Selle
 		return SellerTaxProfileView{}, err
 	}
 
-	// ④ 回收。best-effort：失敗的後果是舊資產永遠不被 GC 回收（洩漏），
-	// 而洩漏可以事後清、實體刪除不能 ⇒ 不讓它回滾已經成功的業務寫入。
-	//
-	// ⚠️ 只在本次真的有換發時才呼叫：keep 名單認的是 assetId，而保留清單存的是
-	// objectKey（本服務沒有 objectKey → assetId 的反查）⇒ 純刪除的草稿存檔若也呼叫，
-	// 會把所有既有佐證的引用一起釋放掉。
 	if len(assetIDs) > 0 {
 		if err := u.evidence.ReleaseEvidence(ctx, profile.ID, assetIDs); err != nil {
 			u.logger().Warn("invoice.tax_profile.release_evidence.failed",
@@ -445,11 +345,6 @@ func (u *TaxProfile) SaveDraft(ctx context.Context, in SaveTaxDraftInput) (Selle
 	return out, nil
 }
 
-// ensureProfile 保證這位賣家有 issuer 與 seller_tax_profiles 兩列，並回它們。
-//
-// 🔴 它是**冪等的**：兩句 INSERT 都是 ON CONFLICT DO NOTHING，rows=0 就改讀既有列。
-// 這也是本服務唯一的 invoice_issuers 建列點——在它接上之前，seller_tax_profiles 的 FK
-// 永遠找不到對象，整條 S02 一列都建不出來。
 func (u *TaxProfile) ensureProfile(
 	ctx context.Context, storeID int64, legalName string, actorAccountID int64,
 ) (domain.Issuer, domain.SellerTaxProfile, error) {
@@ -478,7 +373,6 @@ func (u *TaxProfile) ensureProfile(
 				return cerr
 			}
 			if !inserted {
-				// 併發的另一個請求搶先建了 ⇒ 讀它建的那一列。
 				if created, cerr = u.issuers.GetByRef(ctx, codemeta.InvoiceIssuerTypeSeller.Value, storeID); cerr != nil {
 					return cerr
 				}
@@ -505,8 +399,6 @@ func (u *TaxProfile) ensureProfile(
 				return nil
 			}
 			profile = created
-			// 建列也是一次狀態轉移（T01 的 `[*]` → DRAFT）：from_status = NULL。
-			// 不記的話，「這位賣家什麼時候開始填的」在事後查不出來。
 			return u.appendHistory(ctx, profile.ID, nil,
 				codemeta.SellerTaxReviewStatusDraft.Value, taxReasonCreated, "",
 				taxActorSeller, actorAccountIDPtr(actorAccountID), now)
@@ -517,9 +409,6 @@ func (u *TaxProfile) ensureProfile(
 	return issuer, profile, err
 }
 
-// ---------------------------------------------------------------------------
-// 賣家：端點 19 送出審核
-// ---------------------------------------------------------------------------
 
 // SubmitTaxProfileInput 是端點 19 的輸入。
 type SubmitTaxProfileInput struct {
@@ -590,8 +479,6 @@ func (u *TaxProfile) Submit(ctx context.Context, in SubmitTaxProfileInput) (Subm
 				return err
 			}
 			if !ok {
-				// 冷卻未到。回當前單筆讓前端顯示倒數——這是全檔唯一一個
-				// 「非零碼 ＋ data」的出口。
 				out = SubmitTaxProfileResult{
 					View:            SellerTaxProfileView{StoreID: in.StoreID, Issuer: issuer, Profile: profile},
 					CooldownBlocked: true,
@@ -611,8 +498,6 @@ func (u *TaxProfile) Submit(ctx context.Context, in SubmitTaxProfileInput) (Subm
 		if profile.ReviewStatus != codemeta.SellerTaxReviewStatusDraft.Value {
 			return taxBiz(bizcode.SellerTaxProfileStateInvalid)
 		}
-		// T02 的兩個守衛（§7.3.3）。兩者都回 400 而不是業務碼：賣家的下一步是
-		// 「回去把欄位填完／把檔案傳上來」，不是「等審核」。
 		if err := validateTaxIdentity(profile); err != nil {
 			return err
 		}
@@ -620,11 +505,6 @@ func (u *TaxProfile) Submit(ctx context.Context, in SubmitTaxProfileInput) (Subm
 			return ErrTaxEvidenceRequired
 		}
 
-		// 單一時鐘：submitted_at ＝ now，pending_valid_until ＝ now + 60 天。
-		// 兩欄必須同一句寫（chk_stp_pending_window 對下游兩個狀態要求兩者皆非空）。
-		//
-		// 條款版本取服務端當期常數，**不是** request 帶進來的值：accepted_terms 只是
-		// 一個 bool，「簽的是哪一版」由平台認定（見 SelfIssueTermsVersion 的紅字）。
 		ok, err := u.profiles.Submit(ctx, profile.ID, profile.Version,
 			SelfIssueTermsVersion, in.AcceptedByAccountID, now.Add(taxSubmitWindow), now)
 		if err != nil {
@@ -633,10 +513,6 @@ func (u *TaxProfile) Submit(ctx context.Context, in SubmitTaxProfileInput) (Subm
 		if !ok {
 			return taxBiz(bizcode.SellerTaxProfileStateInvalid)
 		}
-		// detail 記下簽的是哪一版：稽核要能回答「這家在什麼時候同意了哪一版條款」，
-		// 而 seller_tax_profiles 只留得住**最後一次**（T04 補簽會覆寫同兩欄）。
-		// actor 記下是**誰**簽的：裁決 C 讓送審同時是簽署，而條款是自然人的意思表示
-		// （§6.1.7）——只有版本沒有人，爭議時舉不出簽署主體。
 		if err := u.appendHistory(ctx, profile.ID, &profile.ReviewStatus,
 			codemeta.SellerTaxReviewStatusSubmitted.Value, taxReasonSubmitted, SelfIssueTermsVersion,
 			taxActorSeller, actorAccountIDPtr(in.AcceptedByAccountID), now); err != nil {
@@ -655,9 +531,6 @@ func (u *TaxProfile) Submit(ctx context.Context, in SubmitTaxProfileInput) (Subm
 	return out, nil
 }
 
-// ---------------------------------------------------------------------------
-// 賣家：端點 20 申請延長
-// ---------------------------------------------------------------------------
 
 // RequestTaxExtensionInput 是端點 20 的輸入。
 type RequestTaxExtensionInput struct {
@@ -692,17 +565,9 @@ func (u *TaxProfile) RequestExtension(ctx context.Context, in RequestTaxExtensio
 		if profile.Version != in.ExpectedVersion {
 			return taxBiz(bizcode.SellerTaxProfileVersionConflict)
 		}
-		// allowed-from 逐字取自 §6.1.12 的相容表：EXTEND 只在 SELF_ISSUE_PENDING。
-		//
-		// ⚠️ 這兩道守衛與端點 17 的 canRequestExtension 旗標**是同一個判準的兩個出口**，
-		// 唯一定義在 query_read.go 的 canRequestTaxExtension。改這裡要一起改那裡：
-		// 2026-09-02 之前旗標只做了第二道（次數），於是 SUBMITTED 的賣家看得到
-		// 「申請延長期限」按鈕、按下去必回 9321（#3021）。
 		if profile.ReviewStatus != codemeta.SellerTaxReviewStatusSelfIssuePending.Value {
 			return taxBiz(bizcode.SellerTaxProfileStateInvalid)
 		}
-		// 只能延一次（T11）。旗標為 false 時 UI 不渲染 CTA，但後端仍必須擋
-		// ——UI 隱藏不是授權。
 		if profile.ExtensionCount != 0 {
 			return taxBiz(bizcode.SellerTaxExtensionAlreadyUsed)
 		}
@@ -721,9 +586,6 @@ func (u *TaxProfile) RequestExtension(ctx context.Context, in RequestTaxExtensio
 	return out, nil
 }
 
-// ---------------------------------------------------------------------------
-// 賣家：端點 22 接受自行開票責任條款
-// ---------------------------------------------------------------------------
 
 // AcceptAttestationInput 是端點 22 的輸入。
 type AcceptAttestationInput struct {
@@ -749,9 +611,6 @@ func (u *TaxProfile) AcceptAttestation(ctx context.Context, in AcceptAttestation
 	if v == "" || utf8.RuneCountInString(v) > taxAttestationVersionMax {
 		return SellerTaxProfileView{}, ErrTaxTermsVersionInvalid
 	}
-	// 58A §S04 逐字：termsVersion **必須原樣回送**，不符後端回 400。
-	// 少了這一句，賣家可以簽下一個平台從未發布過的版本字串，而那份記錄是
-	// 「審核期間由賣家自行開票、責任在賣家」的唯一書面憑據。
 	if v != SelfIssueTermsVersion {
 		return SellerTaxProfileView{}, ErrTaxTermsVersionStale
 	}
@@ -787,9 +646,6 @@ func (u *TaxProfile) AcceptAttestation(ctx context.Context, in AcceptAttestation
 	return out, nil
 }
 
-// ---------------------------------------------------------------------------
-// ADM：端點 40 稅務審核裁決
-// ---------------------------------------------------------------------------
 
 // TaxDecisionInput 是端點 40 的輸入。
 type TaxDecisionInput struct {
@@ -818,14 +674,6 @@ type TaxDecisionResult struct {
 	RevokedEffectiveAt *time.Time
 }
 
-// taxDecisionAllowedFrom 是「決策 × 允許的來源狀態」相容表。
-//
-// 🔴 **每一列逐字等於 §7.3.3 對應轉移的來源狀態欄（＝ CAS 的 allowed-from）**：
-// 多一個值 ⇒ 該狀態下 CAS rows=0 而本層已經放行 ⇒ 靜默失敗（ADM 按下去沒反應，
-// 稽核也沒有紀錄）；少一個值 ⇒ 合法決策被 9348 擋掉。
-//
-// ⚠️ SUPPLEMENT_REQUIRED 不在任何一列：賣家補齊後由 T06 先推回 UNDER_REVIEW。
-// A03 對該狀態不顯示決策按鈕（§6.1.12），否則 ADM 按下去會拿到 9348 而不知道為什麼。
 var taxDecisionAllowedFrom = map[string][]string{
 	codemeta.SellerTaxReviewDecisionApproveInvoiceRequired.Value: {
 		codemeta.SellerTaxReviewStatusUnderReview.Value,
@@ -857,11 +705,6 @@ var taxDecisionAllowedFrom = map[string][]string{
 	},
 }
 
-// taxDecisionNeedsConfirm 是需要二次確認的兩個決策（§6.1.12）。
-//
-// 🔴 confirmed 缺席或 false ⇒ **400**，不得用 9348：那是「狀態不相容」，語意不同。
-// 二次確認是授權設計的一部分（B4：以強制填理由 ＋ 二次確認 ＋ 完整稽核取代細粒度
-// capability），不是 UX。
 var taxDecisionNeedsConfirm = map[string]bool{
 	codemeta.SellerTaxReviewDecisionApproveInvoiceExempt.Value: true,
 	codemeta.SellerTaxReviewDecisionRevoke.Value:               true,
@@ -929,8 +772,6 @@ func (u *TaxProfile) Decide(ctx context.Context, in TaxDecisionInput) (TaxDecisi
 		if err != nil {
 			return err
 		}
-		// P11 只在狀態**真的**改變時發（T16 是自轉移 ⇒ 不發）：
-		// 事件名字叫 status_changed，發一則狀態沒變的出去，下游的去重鍵會撞。
 		if nextStatus != profile.ReviewStatus {
 			if err := u.emitStatusChanged(ctx, issuer, profile, nextStatus, now); err != nil {
 				return err
@@ -948,10 +789,6 @@ func (u *TaxProfile) Decide(ctx context.Context, in TaxDecisionInput) (TaxDecisi
 	return out, nil
 }
 
-// applyDecision 把七個決策折成一次 CAS，回「目標狀態」與（REVOKE 專有的）分界時點。
-//
-// 🔴 每一支的 rows=0 都回 9348 而不是靜默成功：本層剛剛才讀過狀態，rows=0 只可能是
-// 「在讀與寫之間被別人改掉了」——那對 ADM 而言就是「這個決策現在不適用」。
 func (u *TaxProfile) applyDecision(
 	ctx context.Context, in TaxDecisionInput, profile domain.SellerTaxProfile, now time.Time,
 ) (string, *time.Time, error) {
@@ -962,51 +799,18 @@ func (u *TaxProfile) applyDecision(
 		if in.Decision == codemeta.SellerTaxReviewDecisionApproveInvoiceExempt.Value {
 			next = codemeta.SellerTaxReviewStatusApprovedInvoiceExempt.Value
 		}
-		// 🔴 REQUIRED 需要 tax_id ＋ legal_name 齊備（chk_stp_required_needs_taxid）。
-		// 少了這道守衛，DB CHECK 就是第一道防線：23514 冒泡成 500，ADM 看到 Postgres
-		// 原文而不是「這個賣家要先補件」（#3049）。
-		//
-		// 這不是邊角案例：validateTaxIdentity（T02）只在賣家**自述 REQUIRED** 時要求統編，
-		// 而「賣家自述免用、ADM 判定應開」正是 A03 這個頁面存在的理由 ⇒ 走完正常流程
-		// 就會撞上。EXEMPT 那條路不檢查（chk_stp_exempt_no_taxid 反過來禁止帶統編）。
 		if next == codemeta.SellerTaxReviewStatusApprovedInvoiceRequired.Value &&
 			(derefString(profile.TaxID) == "" || derefString(profile.LegalName) == "") {
 			return "", nil, taxBiz(bizcode.InvoiceTaxApprovalIdentityIncomplete)
 		}
-		// 🔴 **鏡像的另一半**（#3089 B 組第 5 項）：EXEMPT 反過來禁止帶統編
-		// （chk_stp_exempt_no_taxid）。上面那道守衛在 2026-09-03 就補了（#3049），
-		// 而這一邊當時只在註解裡寫了「EXEMPT 那條路不檢查」——於是同一個形狀
-		// 在對稱的另一格原封不動地留著：profile 已有 tax_id 且狀態 UNDER_REVIEW 時
-		// 核准免開，實打 **HTTP 500**。可達性與 #3049 逐字對稱。
-		//
-		// 回 9348（此審核決定與目前的稅務資格狀態不相容）而不是新增碼：ADM 的下一步
-		// 是「改核應開，或先要求賣家清掉統編」——那正是 9348 描述的情境。
 		if next == codemeta.SellerTaxReviewStatusApprovedInvoiceExempt.Value &&
 			derefString(profile.TaxID) != "" {
 			return "", nil, taxBiz(bizcode.InvoiceTaxDecisionInvalid)
 		}
-		// 🔴 **T08 的守衛本體**（2026-09-05 使用者裁決 DEC-20260905-015836 選 A）：
-		// 核定免用統一發票之前，賣家必須已經簽過平台代製收據授權（S05）。
-		//
-		// 在此之前這道守衛**根本不存在**，而 S05 的 allowed-from 又只有
-		// APPROVED_INVOICE_EXEMPT ⇒ 授權只可能發生在核定之後 ⇒ 設計書 §7 T08 寫的
-		// 「核定免用統一發票需已取得收據代製授權」在實作上是反的。裁決 A 的兩半：
-		// 放寬 S05 讓賣家提早簽（見 seller_tax_profiles.sql 的 ConfirmSellerReceiptAuthorization），
-		// 核定側補上這道守衛，兩者缺一都回不到設計書寫的順序。
-		//
-		// 🔴 **寫在應用層而不是那句 CAS 的 WHERE**：塞進 WHERE 之後 rows=0 會同時代表
-		// 「版本衝突」「狀態不對」「未授權」三件事，呼叫端只能猜——那正是本輪 P0-B
-		// （createOperation 的 `if !inserted { return nil }`）的形狀。這裡與上面兩道
-		// 對稱守衛同一個位置、同一個風格，各自回自己的碼。
-		// ⚠️ 讀後寫的窗口由 version CAS 封住：賣家在這中間取消授權會使 version+1，
-		//    下面那句 Approve 於是 rows=0 回 9348，不會核定出一張沒有授權的 EXEMPT。
 		if next == codemeta.SellerTaxReviewStatusApprovedInvoiceExempt.Value &&
 			profile.ReceiptAuthorizedAt == nil {
 			return "", nil, taxBiz(bizcode.InvoiceTaxApprovalReceiptAuthMissing)
 		}
-		// approval_valid_until 恆由 approved_at 算出（I-63）。請求沒帶就用 365 天；
-		// 帶了就必須嚴格大於 approved_at（chk_stp_valid_until_needs_approved），
-		// 不然是 23514 而不是一句看得懂的 400。
 		validUntil := now.Add(taxApprovalValidity)
 		if in.ApprovalValidUntil != nil {
 			if !in.ApprovalValidUntil.After(now) {
@@ -1035,16 +839,12 @@ func (u *TaxProfile) applyDecision(
 		return next, nil, taxCASResult(ok, err, next)
 
 	case codemeta.SellerTaxReviewDecisionKeepUnderReview.Value:
-		// T16 自轉移：狀態不變、**不動任何時鐘欄位**。留痕落在 invoice_status_history
-		// （from_status = to_status），不在本表。
 		next := codemeta.SellerTaxReviewStatusUnderReview.Value
 		ok, err := u.profiles.KeepUnderReview(ctx, profile.ID, profile.Version, in.Reason, now)
 		return next, nil, taxCASResult(ok, err, next)
 
 	case codemeta.SellerTaxReviewDecisionReject.Value:
 		next := codemeta.SellerTaxReviewStatusRejected.Value
-		// cooldown_until 是 T01 第二形態那個守衛讀的欄位——少寫它，被駁回的賣家
-		// 可以立刻無限重送。
 		ok, err := u.profiles.Reject(ctx, profile.ID, profile.Version, in.Reason, now.Add(taxReapplyCooldown), now)
 		return next, nil, taxCASResult(ok, err, next)
 
@@ -1054,7 +854,6 @@ func (u *TaxProfile) applyDecision(
 		if e := taxCASResult(ok, err, next); e != nil {
 			return "", nil, e
 		}
-		// 已代製收據不追溯，但要留分界時點（T-C04）：A09 的版本歷程據此顯示。
 		effective := now
 		return next, &effective, nil
 
@@ -1063,13 +862,9 @@ func (u *TaxProfile) applyDecision(
 		ok, err := u.profiles.ReopenReview(ctx, profile.ID, profile.Version, in.Reason, now)
 		return next, nil, taxCASResult(ok, err, next)
 	}
-	// known 已在呼叫端驗過，走到這裡代表 taxDecisionAllowedFrom 與本 switch 漂移了。
 	return "", nil, ErrTaxDecisionUnknown
 }
 
-// ---------------------------------------------------------------------------
-// ADM：端點 41 延長裁決
-// ---------------------------------------------------------------------------
 
 // TaxExtensionDecisionInput 是端點 41 的輸入。
 type TaxExtensionDecisionInput struct {
@@ -1123,13 +918,8 @@ func (u *TaxProfile) DecideExtension(ctx context.Context, in TaxExtensionDecisio
 				return taxBiz(bizcode.SellerTaxExtensionAlreadyUsed)
 			}
 			if profile.PendingValidUntil == nil {
-				// chk_stp_pending_window 保證 SELF_ISSUE_PENDING 必有這一欄；
-				// 走到這裡代表資料已經不自洽 ⇒ 不要拿 now 當基準硬算一個新期限，
-				// 那會把「原本什麼時候到期」這件事永久抹掉。
 				return taxBiz(bizcode.SellerTaxProfileStateInvalid)
 			}
-			// 基準是**原到期日**不是 now：以 now 起算會讓一個早就快到期的案子
-			// 被延成完整的 30 天，而 §6.1.12 要求「必填原到期日／新到期日」。
 			newDeadline := profile.PendingValidUntil.AddDate(0, 0, days)
 			ok, err := u.profiles.ExtendPending(ctx, profile.ID, profile.Version, newDeadline, in.Reason, now)
 			if err != nil {
@@ -1154,9 +944,6 @@ func (u *TaxProfile) DecideExtension(ctx context.Context, in TaxExtensionDecisio
 			ResourceID:     profile.ID,
 			BeforeState:    before,
 			AfterState:     after,
-			// reason_code 用 EXTEND／REJECT：EXTEND 是 SellerTaxReviewDecision 的第 8 值，
-			// 讓決策歷程看得出「誰在什麼時候、用什麼理由准了延長」——extension_count
-			// 只說得出**有沒有**（§6.1.12）。
 			ReasonCode:   taxExtensionReasonCode(in.Decision),
 			ReasonDetail: in.Reason,
 			Now:          now,
@@ -1180,17 +967,7 @@ func (u *TaxProfile) DecideExtension(ctx context.Context, in TaxExtensionDecisio
 	return out, nil
 }
 
-// ---------------------------------------------------------------------------
-// 共用
-// ---------------------------------------------------------------------------
 
-// loadForSeller 解析 store_id → issuer → profile（Tier A 的兩段述詞都在 SQL）。
-//
-// 🔴 issuer 查無與 profile 查無**必須回同一個碼**（9320）：GetByRef 內部把 pgx.ErrNoRows
-// 映成 9330（provider 語意），在稅務資格這條路徑上直接回它，會讓「這個 store 還沒有
-// issuer」與「有 issuer 但沒送過審」對外可分辨，而兩者對外都只是「還沒設定」。
-// ADM 路徑用同一支：越權在這條路上不成立（ADM 本來就看得到全部），但「查無」的形狀
-// 必須與賣家側一致，否則同一份資料兩個入口回兩種碼。
 func (u *TaxProfile) loadForSeller(ctx context.Context, storeID int64) (domain.Issuer, domain.SellerTaxProfile, error) {
 	issuer, err := u.issuers.GetByRef(ctx, codemeta.InvoiceIssuerTypeSeller.Value, storeID)
 	if err != nil {
@@ -1206,12 +983,6 @@ func (u *TaxProfile) loadForSeller(ctx context.Context, storeID int64) (domain.I
 	return issuer, profile, nil
 }
 
-// appendHistory 記一次狀態轉移（與造成它的那次寫入同交易）。
-// actorAccountIDPtr 把 Gateway 注入的登入 principal 折成 status history 的 actor。
-//
-// 接受條款是**自然人的意思表示**（§6.1.7）：稽核要能回答「是誰按的」，而那是 account
-// 層的事實不是 store 層的。0 ＝ 沒有可信身分 ⇒ NULL（誠實記成「查不到人」），
-// 不用 store_id 頂替——賣家換手後 store_id 會指向新任賣家，而條款是前任簽的。
 func actorAccountIDPtr(accountID int64) *int64 {
 	if accountID <= 0 {
 		return nil
@@ -1246,15 +1017,6 @@ func (u *TaxProfile) appendHistory(
 	})
 }
 
-// taxStatusChangedEvent 是 P11 的 payload。
-//
-// 🔴 payload 邊界（36 號）：不放載具識別碼、買受人統編、email、電話，也不放 AppKey。
-// 稅務身分事件本來就沒有那些欄位，但明寫在這裡是為了讓後來加欄位的人看得到界線。
-// 🔴 wire 欄名一律 snake_case（§6.3.4「業務欄位一律 snake_case」）。
-// 這支曾是全 12 個 invoice 事件裡唯一的 camelCase，後果不是風格不一致而是**功能失效**：
-// outbox dispatcher 的 withNotifyRouting 找的是 `payload["store_id"]`，而這支只有
-// `storeId` ⇒ 找不到 ⇒ notify_seller_account_id 恆為 "0" ⇒ 賣家永遠收不到稅務狀態通知，
-// 全程沒有錯誤、沒有 DLQ、沒有 metric。
 type taxStatusChangedEvent struct {
 	NotificationRefID string            `json:"notification_ref_id"`
 	StoreID           eventwire.StoreID `json:"store_id"`
@@ -1264,13 +1026,10 @@ type taxStatusChangedEvent struct {
 	OccurredAt        string            `json:"occurred_at"`
 }
 
-// emitStatusChanged 把 P11 寫進 outbox（與狀態轉移同交易）。
 func (u *TaxProfile) emitStatusChanged(
 	ctx context.Context, issuer domain.Issuer, profile domain.SellerTaxProfile, next string, now time.Time,
 ) error {
 	payload, err := json.Marshal(taxStatusChangedEvent{
-		// 去重鍵帶目標狀態：同一列會經過多次轉移（REVOKE → REOPEN → APPROVE 是合法
-		// 路徑），只用 profile id 當鍵會讓第二次之後的通知被 notification 去重掉。
 		NotificationRefID: "INVSTP:" + strconv.FormatInt(profile.ID, 10) + ":" + next,
 		StoreID:           eventwire.StoreIDOf(issuer),
 		TaxProfileID:      strconv.FormatInt(profile.ID, 10),
@@ -1301,9 +1060,6 @@ func (u *TaxProfile) logger() *zap.Logger {
 	return u.log
 }
 
-// taxCASResult 把 CAS 的 (ok, err) 折成一個錯誤。
-//
-// 🔴 ok=false 一律回 9348，**不得**回 nil：那是 ADM 側靜默失敗的唯一形狀。
 func taxCASResult(ok bool, err error, _ string) error {
 	if err != nil {
 		return err
@@ -1314,7 +1070,6 @@ func taxCASResult(ok bool, err error, _ string) error {
 	return nil
 }
 
-// taxBiz 造一個帶業務碼的 DomainError，message 一律取自 CodeMeta。
 func taxBiz(code int32) error {
 	return pkgerrors.NewBusiness(code, bizcode.Message(code))
 }
@@ -1329,10 +1084,6 @@ func requireReason(reason string) error {
 	return nil
 }
 
-// validateTaxIdentity 是 T02 的「必填欄位齊全」守衛。
-//
-// 統編只在賣家自述 REQUIRED 時必填：EXEMPT 的賣家依 chk_stp_exempt_no_taxid 根本
-// 不得帶統編，把它列成無條件必填會讓免用統一發票的賣家永遠送不出去。
 func validateTaxIdentity(p domain.SellerTaxProfile) error {
 	if derefString(p.EntityTaxType) == "" ||
 		derefString(p.LegalName) == "" ||
@@ -1349,11 +1100,6 @@ func validateTaxIdentity(p domain.SellerTaxProfile) error {
 	return nil
 }
 
-// normalizeObligation 把賣家自述折進 chk_stp_obligation 的三值。
-//
-// 🔴 未知值一律落 UNKNOWN 而不是原樣寫入：原樣寫入是 23514（整個交易 aborted），
-// 而 UNKNOWN 的語意正好是「尚未填答」——它也讓 T02 的守衛擋下這筆，賣家看到的是
-// 「請把資料填完」而不是 500。
 func normalizeObligation(v string) string {
 	if _, ok := codemeta.SellerTaxObligationFromValue(v); ok {
 		return v
@@ -1361,12 +1107,6 @@ func normalizeObligation(v string) string {
 	return codemeta.SellerTaxObligationUnknown.Value
 }
 
-// joinAddress 把三段地址折成 business_address 單欄（DDL 只有一欄 varchar(255)）。
-//
-// ⚠️ **折起來就拆不回去**，所以 city／district 另外分開落庫（#3031，2026-09-02）：
-// 本函式的輸出只進 business_address（AMEGO 送件與單行顯示用），而回程要還原到 S02
-// 表單的三格靠的是 seller_tax_profiles.address_city／address_district。
-// 在那之前 toSellerTaxIdentity 只填得出 detail ⇒ 賣家重新編輯時前兩格是空的。
 func joinAddress(city, district, detail string) string {
 	parts := make([]string, 0, 3)
 	for _, p := range []string{city, district, detail} {
@@ -1410,11 +1150,6 @@ func isSubset(sub, super []string) bool {
 	return true
 }
 
-// taxAuditStates 產生稽核列的 before／after。
-//
-// 只放狀態一欄：before_state／after_state 是 jsonb，塞整列 profile 會把統編、法定名稱、
-// 負責人姓名複製進一張**保存 5 年**的表（§9.5）——那是憑空造一個五年期的 PII 倉庫，
-// 而稽核要回答的問題只是「誰把它從什麼狀態改成什麼狀態」。
 func taxAuditStates(from, to string) (json.RawMessage, json.RawMessage) {
 	before, _ := json.Marshal(map[string]string{"reviewStatus": from})
 	after, _ := json.Marshal(map[string]string{"reviewStatus": to})
@@ -1439,10 +1174,6 @@ func taxExtensionAuditStates(p domain.SellerTaxProfile, decision string, days in
 	return before, after
 }
 
-// taxExtensionReasonCode 把端點 41 的 APPROVE 映成 SellerTaxReviewDecision 的第 8 值。
-//
-// §6.1.12：端點 41 成功時要往決策歷程寫一筆 decision = "EXTEND"，否則歷程會漏掉
-// 「誰在什麼時候、用什麼理由准了延長」。REJECT 沒有對應的 decision 值，原樣留著。
 func taxExtensionReasonCode(decision string) string {
 	if decision == taxExtensionApprove {
 		return codemeta.SellerTaxReviewDecisionExtend.Value
@@ -1450,24 +1181,12 @@ func taxExtensionReasonCode(decision string) string {
 	return taxExtensionReject
 }
 
-// resolveReceiptApprovalBasis 驗並折出核定依據文件（§6.1.9，端點 40 的 APPROVE_INVOICE_EXEMPT）。
-//
-// 三條規則：
-//
-//	① **兩欄同進同出**：只給其中一個回 400（DB 的 chk_stp_receipt_basis_pair 會回 23514，
-//	   而那對 ADM 是一句 500）。
-//	② **只有 APPROVE_INVOICE_EXEMPT 收**：核定為「應開發票」的賣家不會走收據流程，
-//	   給了它一份依據文件只會讓端點 28 顯示一個永遠用不到的下載連結。
-//	③ 🔴 **必須是該賣家自己在 S02 上傳的稅籍文件之一**：媒體的授權述詞等價於
-//	   「只有上傳者本人」⇒ 指名一份 ADM 自己上傳的檔案，賣家點下載一律 404，而
-//	   端點 28 的三態只看得出 UPLOADER_NOT_SELLER、看不出是誰指錯的。在寫入時擋掉，
-//	   ADM 當場就知道自己選錯了。
 func resolveReceiptApprovalBasis(
 	in TaxDecisionInput, profile domain.SellerTaxProfile, nextStatus string,
 ) (*string, *int64, error) {
 	key, assetID := strings.TrimSpace(in.ApprovalBasisKey), strings.TrimSpace(in.ApprovalBasisAssetID)
 	if key == "" && assetID == "" {
-		return nil, nil, nil // 不指名（端點 28 回 NOT_DESIGNATED）
+		return nil, nil, nil
 	}
 	if key == "" || assetID == "" {
 		return nil, nil, ErrTaxApprovalBasisIncomplete

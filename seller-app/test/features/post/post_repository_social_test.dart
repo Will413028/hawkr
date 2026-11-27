@@ -347,7 +347,6 @@ void main() {
       expect(c.etag, 'ce-5');
       expect(c.placeholderTextFor(UiLocale.zhTW), isNull);
       expect(list.last.placeholderTextFor(UiLocale.zhTW), '此留言已刪除');
-      // viewer_can_* 取伺服器的值：沒設的就是 false，不由 client 補。
       expect(list.last.viewerCanDelete, isFalse);
       expect(list.last.viewerCanReply, isFalse);
       expect(list.last.viewerCanEdit, isFalse);

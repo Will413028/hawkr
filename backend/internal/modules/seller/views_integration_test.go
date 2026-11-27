@@ -18,7 +18,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 )
 
-// fakeProductStores 是商品→店家 port 的替身：stores 沒有的商品視為不存在，err 非 nil 時整批失敗；記下每次呼叫的商品 ID。
 type fakeProductStores struct {
 	mu     sync.Mutex
 	stores map[uuid.UUID]int64
@@ -26,7 +25,6 @@ type fakeProductStores struct {
 	calls  [][]uuid.UUID
 }
 
-// pid 是測試用的確定性商品 ID（UUID）：n 放在最後 8 個位元組。
 func pid(n int64) uuid.UUID {
 	var id uuid.UUID
 	binary.BigEndian.PutUint64(id[8:], uint64(n))
@@ -65,19 +63,16 @@ func (p *fakeProductStores) callCount() int {
 	return len(p.calls)
 }
 
-// viewRow 讀一家店一個台北日的彙總；沒有列回 0。
 func (f *fixture) viewRow(t *testing.T, storeID int64, day string) int64 {
 	t.Helper()
 	return f.count(t, "SELECT COALESCE(SUM(views), 0) FROM seller.product_views_daily WHERE store_id = $1 AND day = $2::date", storeID, day)
 }
 
-// pendingEvents 是還沒處理的事件數。
 func (f *fixture) pendingEvents(t *testing.T) int64 {
 	t.Helper()
 	return f.count(t, "SELECT count(*) FROM seller.product_view_events WHERE processed_at IS NULL")
 }
 
-// view 在 at 記一次這家店的商品瀏覽並立刻彙總（儀表板的統計測試用）。
 func (f *fixture) view(t *testing.T, storeID int64, at time.Time) {
 	t.Helper()
 	f.now = at
@@ -90,7 +85,6 @@ func (f *fixture) view(t *testing.T, storeID int64, at time.Time) {
 	}
 }
 
-// buckets 是全部每日彙總的快照，依鍵排序。
 func (f *fixture) buckets(t *testing.T) []string {
 	t.Helper()
 	ctx := context.Background()
@@ -121,7 +115,6 @@ func TestRecordProductViewOnlyAppendsAnEvent(t *testing.T) {
 	if f.products.callCount() != 0 || len(f.buckets(t)) != 0 {
 		t.Fatalf("record path resolved stores (%d port calls) or wrote buckets %v", f.products.callCount(), f.buckets(t))
 	}
-	// 事件重送（同一個 event_id）不會多一列。
 	id := uuid.NewV7()
 	for range 2 {
 		must(t, f.module.IngestProductView(ctx, ProductView{EventID: id, ProductID: pid(11), OccurredAt: f.now}))
@@ -149,14 +142,12 @@ func TestRollupBucketsByStoreAndTaipeiDayOfOccurrence(t *testing.T) {
 	}
 	f.products.set(pid(10), s.StoreID)
 	f.products.set(pid(11), s.StoreID)
-	// UTC 的 10/3 15:59:59 還是台北的 10/3，16:00:00 已經是台北的 10/4。
 	for i, at := range []time.Time{
 		time.Date(2026, 10, 3, 15, 59, 59, 0, time.UTC), time.Date(2026, 10, 3, 15, 59, 59, 0, time.UTC),
 		time.Date(2026, 10, 3, 16, 0, 0, 0, time.UTC),
 	} {
 		must(t, f.module.IngestProductView(ctx, ProductView{EventID: uuid.NewV7(), ProductID: pid(10 + int64(i%2)), OccurredAt: at}))
 	}
-	// 處理發生在台北的 10/4 中午，晚了半天。
 	f.now = time.Date(2026, 10, 4, 12, 0, 0, 0, twtime.Taipei)
 	n, err := f.module.RollupProductViews(ctx)
 	must(t, err)
@@ -175,7 +166,6 @@ func TestRollupBucketsByStoreAndTaipeiDayOfOccurrence(t *testing.T) {
 	if got := f.count(t, "SELECT count(*) FROM seller.product_view_events WHERE outcome = 'COUNTED' AND store_id = $1 AND processed_at = $2", s.StoreID, f.now); got != 3 {
 		t.Fatalf("counted events=%d, want 3 with store_id and processed_at", got)
 	}
-	// 沒有去重：同一天一直加。
 	for range 3 {
 		must(t, f.module.IngestProductView(ctx, ProductView{EventID: uuid.NewV7(), ProductID: pid(10), OccurredAt: time.Date(2026, 10, 4, 3, 0, 0, 0, twtime.Taipei)}))
 	}
@@ -240,7 +230,7 @@ func TestRollupMarksUnresolvedProductsAndDoesNotRetryThem(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	f.products.set(pid(30), 0) // 商品存在但沒有店家
+	f.products.set(pid(30), 0)
 	must(t, f.module.RecordProductView(ctx, pid(404)))
 	must(t, f.module.RecordProductView(ctx, pid(30)))
 	n, err := f.module.RollupProductViews(ctx)
@@ -300,7 +290,7 @@ func TestRollupRerunDoesNotDoubleCountAndDrainsBacklog(t *testing.T) {
 	ctx := context.Background()
 	_, s := f.open(t)
 	f.products.set(pid(10), s.StoreID)
-	const n = 250 // 超過一批（100）
+	const n = 250
 	for range n {
 		must(t, f.module.RecordProductView(ctx, pid(10)))
 	}
@@ -332,7 +322,7 @@ func TestRollupConcurrentRunsCountEachEventOnce(t *testing.T) {
 	for range runners {
 		must(t, <-errs)
 	}
-	_, err := f.module.RollupProductViews(ctx) // 被別的 job 鎖住而跳過的列，下一輪補上
+	_, err := f.module.RollupProductViews(ctx)
 	must(t, err)
 	if got := f.viewRow(t, s.StoreID, f.now.In(twtime.Taipei).Format(time.DateOnly)); got != events || f.pendingEvents(t) != 0 {
 		t.Fatalf("views=%d pending=%d, want %d and 0", got, f.pendingEvents(t), events)
@@ -363,14 +353,12 @@ func TestRebuildMatchesIncrementalRollup(t *testing.T) {
 	if _, err := f.module.RollupProductViews(ctx); err != nil {
 		t.Fatal(err)
 	}
-	// 還沒處理的事件：重算不能把它算進去。
 	must(t, f.module.IngestProductView(ctx, ProductView{EventID: uuid.NewV7(), ProductID: pid(10), OccurredAt: time.Date(2026, 10, 6, 9, 0, 0, 0, twtime.Taipei)}))
 	incremental := f.buckets(t)
 	if len(incremental) != 5 {
 		t.Fatalf("incremental buckets=%v", incremental)
 	}
 	day := func(d int) time.Time { return time.Date(2026, 10, d, 0, 0, 0, 0, time.UTC) }
-	// 弄壞區間內外各一列與一個多餘的列，再重算 10/3 到 10/7。
 	for _, q := range []string{
 		fmt.Sprintf("UPDATE seller.product_views_daily SET views = 999 WHERE store_id = %d AND day = '2026-10-05'", a.StoreID),
 		fmt.Sprintf("INSERT INTO seller.product_views_daily (store_id, day, views) VALUES (%d, '2026-10-06', 5)", a.StoreID),
@@ -384,13 +372,12 @@ func TestRebuildMatchesIncrementalRollup(t *testing.T) {
 	want := slices.Clone(incremental)
 	for i, row := range want {
 		if row == fmt.Sprintf("%d/2026-10-02=1", a.StoreID) {
-			want[i] = fmt.Sprintf("%d/2026-10-02=777", a.StoreID) // 區間外維持原樣
+			want[i] = fmt.Sprintf("%d/2026-10-02=777", a.StoreID)
 		}
 	}
 	if got := f.buckets(t); !slices.Equal(got, want) {
 		t.Fatalf("rebuilt buckets=%v, want %v", got, want)
 	}
-	// 完整重算（10/2 起）與逐步彙總一致。
 	must(t, f.module.RebuildProductViews(ctx, day(2), day(7)))
 	if got := f.buckets(t); !slices.Equal(got, incremental) {
 		t.Fatalf("full rebuild=%v, want incremental %v", got, incremental)
@@ -433,7 +420,7 @@ func TestRebuildRejectsRangesOutsideRetention(t *testing.T) {
 	f.now = time.Date(2026, 10, 10, 12, 0, 0, 0, twtime.Taipei)
 	day := func(d int) time.Time { return time.Date(2026, 10, d, 0, 0, 0, 0, time.UTC) }
 	for name, r := range map[string][2]time.Time{
-		"超出保留期":  {day(2), day(5)}, // 10/3 12:00 之前的日子（10/3 本身 00:00 早於 10/3 12:00）
+		"超出保留期":  {day(2), day(5)},
 		"起日晚於迄日": {day(8), day(7)},
 		"迄日在未來":  {day(8), day(11)},
 	} {
@@ -482,7 +469,6 @@ func TestPurgeOnlyDeletesProcessedEventsOlderThanRetention(t *testing.T) {
 	if after := f.buckets(t); !slices.Equal(before, after) {
 		t.Fatalf("purge changed the daily buckets: %v → %v", before, after)
 	}
-	// 清理後沒處理的舊事件仍然會被彙總，之後才輪到清理。
 	if _, err := f.module.RollupProductViews(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -499,11 +485,11 @@ func TestProductViewsBetweenCountsTaipeiDaysHalfOpen(t *testing.T) {
 	_, s := f.open(t)
 	day := time.Date(2026, 2, 2, 0, 0, 0, 0, twtime.Taipei)
 	for _, at := range []time.Time{
-		day.Add(-time.Second),                  // 前一天 23:59:59：期間外
-		day,                                    // 起日 00:00：算
-		day.AddDate(0, 0, 1).Add(time.Hour),    // 隔天：算
-		day.AddDate(0, 0, 2).Add(-time.Second), // 終點前一秒：算
-		day.AddDate(0, 0, 2),                   // 終點 00:00：期間外
+		day.Add(-time.Second),
+		day,
+		day.AddDate(0, 0, 1).Add(time.Hour),
+		day.AddDate(0, 0, 2).Add(-time.Second),
+		day.AddDate(0, 0, 2),
 	} {
 		f.view(t, s.StoreID, at)
 	}
@@ -513,11 +499,9 @@ func TestProductViewsBetweenCountsTaipeiDaysHalfOpen(t *testing.T) {
 	if got != 3 {
 		t.Fatalf("views=%d, want 3", got)
 	}
-	// 一天的期間。
 	if got, err = f.module.ProductViewsBetween(ctx, s.StoreID, day, day.AddDate(0, 0, 1)); err != nil || got != 1 {
 		t.Fatalf("single day: views=%d err=%v", got, err)
 	}
-	// 沒有彙總列的期間是 0。
 	if got, err = f.module.ProductViewsBetween(ctx, s.StoreID, day.AddDate(0, 0, 30), day.AddDate(0, 0, 40)); err != nil || got != 0 {
 		t.Fatalf("empty range: views=%d err=%v", got, err)
 	}

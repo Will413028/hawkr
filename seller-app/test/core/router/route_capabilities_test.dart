@@ -60,7 +60,6 @@ void main() {
     );
     expect(routeCapabilities[SellerRoutes.measures], isNull);
     expect(routeCapabilities.containsKey(SellerRoutes.measures), isTrue);
-    // 措施與申覆是帳號層級：列表與表單都不需要能力（停權中也要能申覆）。
     expect(routeCapabilities[SellerRoutes.measureRequest], isNull);
     expect(routeCapabilities.containsKey(SellerRoutes.measureRequest), isTrue);
     expect(

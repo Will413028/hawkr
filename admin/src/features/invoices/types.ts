@@ -125,9 +125,6 @@ export interface TaxReviewItem {
 	riskFlags: string[];
 }
 
-// ---------------------------------------------------------------------------
-// A03　稅務身分審核詳情（端點 39 `GET /admin/invoices/tax_reviews/{store_id}`）
-// ---------------------------------------------------------------------------
 
 /**
  * 一份稅務證明文件。
@@ -285,9 +282,6 @@ export interface TaxExtensionRequestInfo {
 	reason: string;
 }
 
-// ---------------------------------------------------------------------------
-// A04　AMEGO 串接監控（端點 42 列表 / 43 詳情）
-// ---------------------------------------------------------------------------
 
 /**
  * 端點 42 的一列。
@@ -373,9 +367,6 @@ export interface RevokeProviderAccountResultData {
 	auditLogId: string;
 }
 
-// ---------------------------------------------------------------------------
-// A06　發票異常詳情（端點 51 `GET /admin/invoices/jobs/{job_id}`）
-// ---------------------------------------------------------------------------
 
 /** 與結帳 preview 同一個金額 DTO。金額一律字串。 */
 export interface InvoiceAmountBreakdown {
@@ -473,9 +464,6 @@ export interface AdminInvoiceJobDetail {
 	manualUnlock: ManualUnlockInfo;
 }
 
-// ---------------------------------------------------------------------------
-// A07／A08　未收到發票申訴（端點 58 列表 / 59 詳情，同一個 DTO）
-// ---------------------------------------------------------------------------
 
 /**
  * 一筆往來紀錄（買家申訴 → 賣家回覆 → ADM 動作）。
@@ -530,9 +518,6 @@ export interface InvoiceComplaintInfo {
 	reopenAllowedAfter: string;
 }
 
-// ---------------------------------------------------------------------------
-// A12／A13　發票文件（端點 47 列表 / 48 詳情）
-// ---------------------------------------------------------------------------
 
 /**
  * 文件摘要（Gateway `InvoiceDocumentSummary`，列表與詳情共用）。
@@ -718,10 +703,6 @@ export interface AdminInvoiceDocumentDetail {
 	canResumeFromManual: boolean;
 }
 
-// ---------------------------------------------------------------------------
-// A09　AMEGO 啟用切點與版本歷程（端點 46
-// `GET /admin/invoices/provider_accounts/{store_id}/cutovers`）
-// ---------------------------------------------------------------------------
 
 /**
  * 一筆自動開立切點（Gateway `ProviderCutoverItem`）。
@@ -746,9 +727,6 @@ export interface ProviderCutoverItem {
 	reason: string;
 }
 
-// ---------------------------------------------------------------------------
-// A11　手動開立發票（端點 57 `POST /admin/invoices/issuances`）
-// ---------------------------------------------------------------------------
 
 /** 開票人。`kind === "SELLER"` 時 `storeId` 必填。 */
 export interface IssuanceIssuer {
@@ -814,13 +792,6 @@ export interface ManualIssuanceResultData {
 	auditLogId: string;
 }
 
-// ---------------------------------------------------------------------------
-// ADM 寫入端點的回應（40／41／52／53／54／55／56／60／49）
-// ---------------------------------------------------------------------------
-//
-// 這一組在 2026-09-02 補上。它們原本不在本檔，因為那時的判斷是「後端沒實作」——
-// 而那個判斷來自用**猜的路徑名**去探測（`complaints/{id}/decisions` 回 404，真名是
-// `.../actions`）。九支 RPC 實際上全在，見 `features/invoices/admin-actions.ts` 的檔頭。
 
 /**
  * 端點 40／41 的回應（Gateway `DecideTaxReviewForAdminData`）。

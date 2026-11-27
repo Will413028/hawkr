@@ -14,9 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// 線格式的 golden：模組不能 import httpapi/gen，所以 internal/httpapi 的 TestProcurementTurnWireMatchesProto 讀這些檔案，
-// 以 protojson（DiscardUnknown=false）解析。這裡守住「產生器的輸出 = golden」，那邊守住「golden = proto」，兩邊合起來擋欄位漂移。
-// 刻意改線格式時以 UPDATE_GOLDEN=1 重寫。
 
 func goldenIDs() ids {
 	mk := func(s string) uuid.UUID { return uuid.MustParse(s) }

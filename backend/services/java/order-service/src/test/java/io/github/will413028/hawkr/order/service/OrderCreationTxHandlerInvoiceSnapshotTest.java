@@ -61,7 +61,6 @@ class OrderCreationTxHandlerInvoiceSnapshotTest {
         try {
             TsidUtil.init(300, 0);
         } catch (IllegalStateException ignored) {
-            // 已初始化
         }
     }
 

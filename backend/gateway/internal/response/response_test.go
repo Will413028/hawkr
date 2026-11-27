@@ -44,7 +44,6 @@ func TestEnvelopeAndPageDataAreEnvelopePkgAliases(t *testing.T) {
 // handler 接上這個別名的人會拿到塌掉業務碼的 403。
 func TestGrpcDomainErr_StaysEquivalentToGrpcErr(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	// 挑代行專屬碼：這正是 envelope 版不會還原、本地版會還原的那一類。
 	err := grpcstatus.Error(codes.PermissionDenied, "[9262] 這個能力不在授權範圍")
 
 	run := func(fn func(*gin.Context, string, error)) (int, Envelope) {

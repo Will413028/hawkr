@@ -25,7 +25,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
-// feedModule 是 BuyerAppService 的 Module：「追蹤中」動態只用到帳號到買家的對應，其餘方法沒有被呼叫（呼叫就是測試寫錯了，nil 介面會 panic）。
 type feedModule struct {
 	httpbuyer.Module
 	account, buyerID int64
@@ -136,7 +135,6 @@ func TestListFollowedStoreProductsReturnsOnlyFollowedStoresProducts(t *testing.T
 			t.Fatalf("不該出現的商品 %s：%v", id, got)
 		}
 	}
-	// 沒有追蹤任何店家：空清單（不是全站商品）。
 	w.Exec(`DELETE FROM buyer.seller_subscriptions`)
 	empty, err := app.ListFollowedStoreProducts(signed, connect.NewRequest(&pb.ListFollowedStoreProductsRequest{}))
 	if err != nil || len(empty.Msg.GetProducts()) != 0 || empty.Msg.GetNextPageToken() != "" {

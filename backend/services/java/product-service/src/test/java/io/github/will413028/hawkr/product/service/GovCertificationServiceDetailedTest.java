@@ -80,13 +80,12 @@ class GovCertificationServiceDetailedTest {
         props.setApiKey1("TESTAPIKEYFAKEVALUE7Q4W8E2R6T0Y5");
 
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
-        when(valueOps.get(anyString())).thenReturn(null); // 預設：快取與 circuit 都不命中
+        when(valueOps.get(anyString())).thenReturn(null);
 
         service = new GovCertificationService(props, redisTemplate);
         ReflectionTestUtils.setField(service, "httpClient", httpClient);
     }
 
-    // ==================== fixtures ====================
 
     @SuppressWarnings("unchecked")
     private void stubBody(String body) throws Exception {
@@ -131,7 +130,6 @@ class GovCertificationServiceDetailedTest {
                     {"ProcessDate":"2025/12/17","ProcessItem":"碾製-%d","ProcessArea":"採後處理場所：某某農會","ProcessMemo":""}"""
                     .formatted(i));
         }
-        // TraceCodelist 實測可達 255 KB；這裡塞 60 KB 已足以讓「沒剔除」與「有剔除」差一個數量級。
         String hugeList = "2512170009600018,".repeat(3500);
         return """
                 {"RS":"OK","Data":[{
@@ -166,7 +164,6 @@ class GovCertificationServiceDetailedTest {
 
     private static final String EMPTY_BODY = "{\"RS\":\"OK\",\"Data\":[],\"Next\":false}";
 
-    // ==================== 防線 1：RS != "OK" ====================
 
     @Nested
     @DisplayName("防線 1：RS != OK 一律不可用，絕不得落成「查無此認證」")
@@ -186,7 +183,6 @@ class GovCertificationServiceDetailedTest {
             assertThrows(GovCertificationService.GovApiUnavailableException.class,
                     () -> service.verifyDetailed(ORGANIC_NO, CertificationType.ORGANIC));
 
-            // 4 參數 set() 同時是快取寫入與 openCircuit 的唯一出口：一次都不該發生。
             verify(valueOps, never()).set(anyString(), anyString(), anyLong(), any());
         }
 
@@ -230,7 +226,6 @@ class GovCertificationServiceDetailedTest {
         }
     }
 
-    // ==================== 防線 2：編號自我校驗 ====================
 
     @Nested
     @DisplayName("防線 2：回傳列的編號必須等於送查的編號")
@@ -300,7 +295,6 @@ class GovCertificationServiceDetailedTest {
         }
     }
 
-    // ==================== 防線 3：我方截斷 payload ====================
 
     @Nested
     @DisplayName("防線 3：payload 由我方截斷（$top 實測被伺服器忽略）")
@@ -328,7 +322,6 @@ class GovCertificationServiceDetailedTest {
                     "ProcessDetail 未截斷");
             assertTrue(r.rawExcerpt().toString().length() < 4_000,
                     "截斷後仍過大：" + r.rawExcerpt().toString().length());
-            // 查驗需要的欄位不能被一起砍掉
             assertEquals("某某產銷班", r.holderName());
             assertEquals("2099-12-31", r.expiresOn());
         }
@@ -351,7 +344,6 @@ class GovCertificationServiceDetailedTest {
         }
     }
 
-    // ==================== validity 推導（三支規則不同）====================
 
     @Nested
     @DisplayName("validity 推導：3701 讀 Status＋效期 / 3702 只有 ValidDate / 3703 found 即 VALID")
@@ -473,7 +465,6 @@ class GovCertificationServiceDetailedTest {
         }
     }
 
-    // ==================== 效期比較時區（設計書 19 §8.3.9(a)）====================
 
     /**
      * 政府資料的 {@code EffectiveDate}／{@code ValidDate} 是<b>台灣在地日期</b>（無時區資訊），
@@ -553,7 +544,6 @@ class GovCertificationServiceDetailedTest {
         }
     }
 
-    // ==================== 結構化快取（新前綴 / TTL 分級 / UNKNOWN 不寫）====================
 
     @Nested
     @DisplayName("結構化快取：新前綴、TTL 分級、UNKNOWN 不寫")
@@ -655,7 +645,6 @@ class GovCertificationServiceDetailedTest {
         }
     }
 
-    // ==================== 背景查驗路徑 ====================
 
     @Nested
     @DisplayName("背景查驗：90 秒 timeout，且與同步 circuit breaker 完全解耦")
@@ -723,7 +712,6 @@ class GovCertificationServiceDetailedTest {
         }
     }
 
-    // ==================== ADM 手動重新查驗：繞過結果快取 ====================
 
     /**
      * §9.3。dev 實測的病徵：對已查驗過的申請按「重新查驗」，{@code version} 有 bump、
@@ -746,14 +734,12 @@ class GovCertificationServiceDetailedTest {
         @Test
         @DisplayName("🔴 快取有值也照打政府 API，而且連讀都不讀那把 key")
         void forceRefreshNeverReadsResultCache() throws Exception {
-            // 快取裡躺著一筆「有效」的舊結果（就是那個最長活七天的東西）
             stubBody(organicBody(ORGANIC_NO, "通過", FUTURE));
             service.verifyDetailed(ORGANIC_NO, CertificationType.ORGANIC);
             String staleJson = writtenValue(ORGANIC_NO, CertificationType.ORGANIC);
             org.mockito.Mockito.clearInvocations(valueOps, httpClient);
 
             when(valueOps.get(startsWith("gov:certv2:"))).thenReturn(staleJson);
-            // 政府端這次的答案已經不一樣了（證書被終止）——只有真的打，才看得到這件事
             stubBody(organicBody(ORGANIC_NO, "結束", FUTURE));
 
             GovVerifyResult r = service.verifyDetailedForceRefresh(ORGANIC_NO, CertificationType.ORGANIC);
@@ -841,7 +827,6 @@ class GovCertificationServiceDetailedTest {
         }
     }
 
-    // ==================== verify() 薄 wrapper 與新前綴共用 ====================
 
     @Test
     @DisplayName("verify() 走的是 verifyDetailed 的內部實作：讀寫同一個新前綴")

@@ -55,7 +55,6 @@ func (r *ManualUnlockRepository) Create(ctx context.Context, in domain.NewManual
 		ProviderCheckedAt:     ts(in.ProviderCheckedAt),
 		Now:                   ts(in.Now),
 		ExpiresAt:             ts(in.ExpiresAt),
-		// J28 證據：只有從 CANCEL_BLOCKED_UNKNOWN 發起的解鎖有值。
 		CancelEvidenceKind:      in.CancelEvidenceKind,
 		CancelEvidenceObjectKey: in.CancelEvidenceObjectKey,
 	})
@@ -125,7 +124,6 @@ func (r *ManualUnlockRepository) Decide(ctx context.Context, in domain.DecideMan
 	return rows > 0, err
 }
 
-// toManualUnlock 把生成列映成 domain 型別。
 func toManualUnlock(row gen.InvoiceManualUnlock) domain.ManualUnlock {
 	return domain.ManualUnlock{
 		ID:                      row.ID,

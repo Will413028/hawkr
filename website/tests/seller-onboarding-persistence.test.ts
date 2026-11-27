@@ -69,7 +69,6 @@ test("updates a store that registration already created, with its etag", async (
 			address: { townCode: "66000290", addressDetail: "東關路一段100號" },
 		},
 	]);
-	// 之後標記完成要用寫入之後的版本。
 	assert.equal(persisted.etag, "updated-etag");
 });
 

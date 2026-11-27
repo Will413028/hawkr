@@ -27,7 +27,6 @@ func (f *fixture) direct() turn.Direct {
 	return turn.Direct{DB: f.d, Resolver: resolver.New(taxonomy{}, resolver.Synonyms{}, func() time.Time { return now }), Now: func() time.Time { return now }}
 }
 
-// seed 建第一個版本：已解析的品項（小白菜）、單位 KG、縣市 city（空字串是沒填），需求狀態 status。
 func (f *fixture) seed(city, status string) uuid.UUID {
 	f.t.Helper()
 	ctx := context.Background()
@@ -393,7 +392,7 @@ func TestAnswerMovesAMatchingRequestBackOnlyWhenTheItemResolutionChanges(t *test
 	_, err := f.direct().Answer(context.Background(), turn.AnswerSlotInput{
 		BuyerID: buyer, RequestID: f.request, Slot: slots.Item, FreeText: "蘋果", ExpectedRevisionID: f.active().ID, ClientRequestID: uuid.NewV7(), Locale: uitext.ZhTW,
 	})
-	wantErr(t, err, apperr.KindInvalidInput, "") // 蘋果有兩個分類：SubmitAnswer 不出卡
+	wantErr(t, err, apperr.KindInvalidInput, "")
 	if _, err := f.direct().Answer(context.Background(), turn.AnswerSlotInput{
 		BuyerID: buyer, RequestID: f.request, Slot: slots.Item, FreeText: "  小白菜 ", ExpectedRevisionID: f.active().ID, ClientRequestID: uuid.NewV7(), Locale: uitext.ZhTW,
 	}); err != nil {
@@ -527,7 +526,6 @@ func TestRewindReplayReturnsTheStoredResultAndDetectsADifferentSlot(t *testing.T
 func TestRewindItemFromMatchingGoesBackToReadyButRewindingTheCityStaysMatching(t *testing.T) {
 	f := newFixture(t)
 	rev1 := f.seed("臺北市", "MATCHING")
-	// 第二版把品項換成另一個分類：結果與第一版的解析不同（用資料列直接寫，模擬較早的 TURN 結果）。
 	q := store.New(f.d.Conn(context.Background()))
 	item, kind, label, cat, unit, city := "梨", "CATEGORY_CONFIRMED", "梨", catID(30), "KG", "臺北市"
 	if _, err := q.SupersedeActiveRevision(context.Background(), store.SupersedeActiveRevisionParams{RequestID: f.request, BuyerID: ptr(buyer)}); err != nil {
@@ -695,7 +693,6 @@ func TestResumeRunAnswerTurnHasNoCommandSlotAndIsNeverReplayedBySubmitAnswer(t *
 	if err := f.d.Pool().QueryRow(ctx, `SELECT buyer_message FROM procurement.turns WHERE client_request_id = $1 AND source = 'ANSWER' AND command_slot IS NULL`, cid).Scan(&message); err != nil {
 		t.Fatalf("ResumeRun 的回答輪次要是 source = ANSWER 且 command_slot 為 NULL：%v", err)
 	}
-	// 其他比對（需求、來源、回答、讀到的版本）都對得上，只剩欄位：SubmitAnswer 不能回放 ResumeRun 的輪次。
 	first := f.revisions()[0].ID
 	_, err := f.answer(first, turn.AnswerSlotInput{Slot: slots.Packaging, FreeText: message}, cid)
 	if _, fields := wantErr(t, err, apperr.KindInvalidInput, ""); len(fields) != 1 || fields[0] != "client_request_id" {

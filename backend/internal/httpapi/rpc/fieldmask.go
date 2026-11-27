@@ -43,7 +43,6 @@ func ApplyUpdateMask(dst, src proto.Message, mask *fieldmaskpb.FieldMask) error 
 	return nil
 }
 
-// notWritable 是呼叫者不能寫入的欄位（OUTPUT_ONLY、IDENTIFIER）：列在 mask 裡也略過、不回錯。這個判斷只在這裡。
 func notWritable(fd protoreflect.FieldDescriptor) bool {
 	return HasBehavior(fd, annotations.FieldBehavior_OUTPUT_ONLY) || HasBehavior(fd, annotations.FieldBehavior_IDENTIFIER)
 }
@@ -93,12 +92,10 @@ func WritableFields(src proto.Message, mask *fieldmaskpb.FieldMask) ([]string, e
 	return out, nil
 }
 
-// isBranch 回報欄位是 oneof 的子訊息（可以在 mask 裡下到它裡面）。
 func isBranch(fd protoreflect.FieldDescriptor) bool {
 	return fd.Kind() == protoreflect.MessageKind && !fd.IsList() && !fd.IsMap() && fd.ContainingOneof() != nil && !fd.ContainingOneof().IsSynthetic()
 }
 
-// expandMode 是沒帶 mask（implicit：只有有值的欄位）與 "*"（wildcard：所有欄位，oneof 只展開有設定的一支）的展開方式。
 type expandMode int
 
 const (
@@ -106,7 +103,6 @@ const (
 	modeWildcard
 )
 
-// expandWritable 把一個欄位展開成可寫的路徑：oneof 的子訊息展開成它裡面可寫的欄位。
 func expandWritable(msg protoreflect.Message, fd protoreflect.FieldDescriptor, prefix string, mode expandMode) []string {
 	if notWritable(fd) || HasBehavior(fd, annotations.FieldBehavior_IMMUTABLE) {
 		return nil
@@ -126,13 +122,11 @@ func expandWritable(msg protoreflect.Message, fd protoreflect.FieldDescriptor, p
 		if mode == modeImplicit && !child.Has(c) {
 			continue
 		}
-		// 展開到子訊息裡面之後，欄位都是「列出的欄位」：wildcard 的子訊息裡所有可寫的欄位都算。
 		out = append(out, expandWritable(child, c, path+".", modeWildcard)...)
 	}
 	return out
 }
 
-// explicitWritable 解析 mask 明列的一條路徑。
 func explicitWritable(desc protoreflect.MessageDescriptor, path string) ([]string, error) {
 	segments := strings.Split(path, ".")
 	prefix := ""
@@ -173,12 +167,6 @@ func explicitWritable(desc protoreflect.MessageDescriptor, path string) ([]strin
 	return nil, nil
 }
 
-// updateMaskFields 回傳 update_mask 選到的 src 的欄位（Google AIP-134），不看欄位的行為標註：
-//   - mask 為 nil 或沒有路徑：src 裡所有有值的欄位。
-//   - "*"：所有欄位。
-//   - 只支援最上層的欄位；不認得或巢狀的路徑回 INVALID_ARGUMENT。
-//
-// 呼叫方用 ApplyUpdateMask 或 WritableFields。
 func updateMaskFields(src proto.Message, mask *fieldmaskpb.FieldMask) ([]protoreflect.FieldDescriptor, error) {
 	s := src.ProtoReflect()
 	fields := s.Descriptor().Fields()

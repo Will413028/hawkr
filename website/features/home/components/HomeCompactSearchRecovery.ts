@@ -21,7 +21,6 @@ export function saveSearchDraftForTechnicalReload(
 			JSON.stringify({ ...draft, path, savedAt: now }),
 		);
 	} catch {
-		// Storage may be blocked. Never obstruct the existing recovery mechanism.
 	}
 }
 

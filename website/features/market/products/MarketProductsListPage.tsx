@@ -34,9 +34,6 @@ export default async function MarketProductsListPage({
 	/** The locale of the page: the ItemList JSON-LD lists that locale's product URLs. */
 	locale?: AppLocale;
 } = {}) {
-	// Every sidebar / rail fetch is wrapped so a single backend hiccup renders an
-	// empty section instead of crashing the whole page. All are param-independent
-	// and cached, keeping this render static.
 	const [categories, trendingHashtags, recommendedSellers] = await Promise.all([
 		getCachedCategoryTree().catch(() => [] as CategoryNode[]),
 		getCachedPopularHashtags(8).catch(() => []),
@@ -51,8 +48,6 @@ export default async function MarketProductsListPage({
 		label?: string;
 	}>;
 
-	// Canonical (no-param) view — the SEO body shipped in the ISR HTML. Derived
-	// with the same pure function the client re-runs against the real URL params.
 	const defaultView = deriveMarketListView(
 		{},
 		{

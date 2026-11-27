@@ -6,7 +6,6 @@ import (
 	"strings"
 )
 
-// 輸出路徑（相對於 repo 根目錄）。
 const (
 	catalogDir = "backend/internal/platform/uitext/catalog"
 	goDir      = "backend/internal/platform/uitext"
@@ -93,7 +92,6 @@ func (m *Model) Outputs() (map[string][]byte, error) {
 	return out, nil
 }
 
-// checkEnumValueNames 擋下值號表的鍵（enumValueKey）重複：重複的鍵會讓 golden 查到另一個值的值號。
 func (m *Model) checkEnumValueNames() error {
 	var errs errList
 	for _, k := range duplicateEnumKeys(m.usedEnums()) {

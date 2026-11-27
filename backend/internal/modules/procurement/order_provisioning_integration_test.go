@@ -28,7 +28,6 @@ type scriptedOrders struct {
 	results []provisioning.Result
 	errs    []error
 	got     []provisioning.Command
-	// parties 與 partiesErr 是 OrderParties 的回答；onCreate 在每次 CreateOrder 開頭執行（模擬呼叫期間接受單被別處改了）。
 	parties    provisioning.Parties
 	partiesErr error
 	onCreate   func()
@@ -59,7 +58,6 @@ func okResult() provisioning.Result {
 	return provisioning.Result{OrderNo: "HK1", PaymentDeadline: paymentDeadline}
 }
 
-// orderFixture 是一筆 CREATING_ORDER 的接受單（被接受的版本：外套、12.500 件）與一個用替身建單的模組。
 type orderFixture struct {
 	t      *testing.T
 	d      *db.DB
@@ -503,7 +501,6 @@ func TestAddOrderWorkersRequiresTheOrdersPort(t *testing.T) {
 	m.AddOrderWorkers(river.NewWorkers())
 }
 
-// failOnce 在接受單轉成 provisioning 狀態 state 的更新上裝一個觸發器：前 n 次擲出錯誤，之後放行（序列不隨 rollback 還原）。
 func (f *orderFixture) failUpdatesTo(state string, n int) {
 	f.t.Helper()
 	ctx := context.Background()
@@ -636,7 +633,6 @@ func TestReconcilerCountsOnlyRealTransitions(t *testing.T) {
 	}
 }
 
-// gateOrders 的第一次 CreateOrder 停在 release 之前（模擬進行中的外部呼叫），之後的呼叫立刻回傳輸錯誤。
 type gateOrders struct {
 	mu      sync.Mutex
 	calls   int

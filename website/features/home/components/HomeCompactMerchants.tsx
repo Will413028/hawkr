@@ -50,8 +50,6 @@ export default function HomeCompactMerchants({
 		canPrev: false,
 		canNext: false,
 	});
-	// Mouse drag-to-scroll. `moved` gates the post-drag click so a pull
-	// doesn't navigate into a seller. Touch is left to native scrolling.
 	const drag = React.useRef({
 		active: false,
 		moved: false,
@@ -91,10 +89,6 @@ export default function HomeCompactMerchants({
 		};
 	}, [updateScrollState]);
 
-	// 行動端沒有 hover，卡片捲進 rail 視口就用與桌面 hover 暖身相同的
-	// router.prefetch 預抓 storefront payload——點擊時已在 client cache，
-	// 消掉「點賣家等整輪後端 RTT」的死等。每個 href 只抓一次，rail 最多
-	// 8 張卡，成本有上限。
 	React.useEffect(() => {
 		const rail = railRef.current;
 		if (!rail || typeof IntersectionObserver === "undefined") return;
@@ -102,10 +96,6 @@ export default function HomeCompactMerchants({
 		const prefetched = new Set<string>();
 		const observer = new IntersectionObserver(
 			(entries) => {
-				// Same network gate as the main-tab idle warm: this observer fires on
-				// scroll, not on user intent, so it must back off exactly where that
-				// coordinator does (offline / save-data / 2G / 3G) instead of racing a
-				// real navigation for the connection.
 				if (!canPrefetchMainNav("idle")) return;
 				for (const entry of entries) {
 					if (!entry.isIntersecting) continue;
@@ -116,7 +106,6 @@ export default function HomeCompactMerchants({
 					observer.unobserve(entry.target);
 				}
 			},
-			// 橫向預留一張卡寬，捲動到達前就開抓。
 			{ root: rail, rootMargin: "0px 240px" },
 		);
 		for (const anchor of rail.querySelectorAll<HTMLAnchorElement>(
@@ -181,10 +170,7 @@ export default function HomeCompactMerchants({
 
 	return (
 		<section className="home-fixed-section relative z-[2]" aria-label={title}>
-			{/* Padding lives on the rail (`-mx-4 px-4 pb-5`), not here — see the
-			    full note in HomeCompactNewArrivals: the rail is a scroll
-			    container and clips the cards' hover shadow at its own padding
-			    box, so room on the outside doesn't help. */}
+
 			<div className="home-section-surface rounded-[24px] border border-[rgba(58,42,26,0.07)] bg-hk-home-postcard px-[18px] pt-[18px] shadow-[0_1px_0_rgba(255,255,255,0.6)_inset,0_12px_36px_-22px_rgba(76,50,20,0.18)] dark:border-[rgba(245,222,165,0.12)] dark:shadow-[0_12px_36px_-22px_rgba(0,0,0,0.55)]">
 				<header className="mb-4 flex items-center justify-between gap-3 px-1">
 					<h2 className="m-0 text-[1.625rem] font-black leading-tight text-hk-heading">
@@ -242,7 +228,6 @@ export default function HomeCompactMerchants({
 										preset="banner"
 										sizes="(max-width: 640px) 52vw, 230px"
 										loading="lazy"
-										// 推薦商家在首屏之下，交給瀏覽器接近視口時載入。
 										fetchPriority="low"
 										className="object-cover object-center"
 									/>
@@ -254,8 +239,7 @@ export default function HomeCompactMerchants({
 									</span>
 								</Link>
 								<div className="flex flex-1 flex-col px-2.5 pb-2.5 pt-0">
-									{/* Keep the avatar just below the location chip on the shallow
-									    4:1 seller cover while retaining a small seam overlap. */}
+
 									<Link
 										href={seller.href}
 										draggable={false}

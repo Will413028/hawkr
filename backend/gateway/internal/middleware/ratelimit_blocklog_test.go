@@ -17,14 +17,7 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 )
 
-// A blocked request leaves no access-log entry (Logger runs after the cheap
-// gates) and Prometheus carries no client IP, so the block-log line is the only
-// record of WHO was throttled. These drive the real middleware — a 429 through
-// gin, the line read back off a zap observer — because the previous suite
-// exercised the sampler's backing limiter directly and therefore never executed
-// logBlocked at all (0% coverage) while appearing to cover it.
 
-// fakeClock lets a test cross a window boundary without sleeping through one.
 type fakeClock struct {
 	mu sync.Mutex
 	t  time.Time
@@ -42,8 +35,6 @@ func (f *fakeClock) Advance(d time.Duration) {
 	f.t = f.t.Add(d)
 }
 
-// blockLogPolicy gives the default tier a quota of 1 so the second request from
-// any source is blocked, which is the only way to reach logBlocked.
 func blockLogPolicy() RateLimitPolicy {
 	return RateLimitPolicy{
 		ModeratePerWindow: 1, DefaultPerWindow: 1,
@@ -53,9 +44,6 @@ func blockLogPolicy() RateLimitPolicy {
 	}
 }
 
-// blockLogEngine wires the real middleware with an injectable sampler clock and
-// captures whatever it logs. Trusted proxies are cleared so ClientIP is the peer
-// address and never the (test-supplied, deliberately hostile) XFF header.
 func blockLogEngine(sampler *logSampler) (*gin.Engine, *observer.ObservedLogs) {
 	core, logs := observer.New(zapcore.WarnLevel)
 	obs := zap.New(core)
@@ -78,7 +66,6 @@ func blockLogSamplerAt(clk *fakeClock) *logSampler {
 	return s
 }
 
-// hit sends one request from remoteIP and returns the status.
 func hit(r *gin.Engine, remoteIP string, xff string) int {
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/app/orders", nil)
 	req.RemoteAddr = remoteIP + ":40000"
@@ -146,9 +133,9 @@ func TestBlockLog_HighCardinalityStaysUnderHardCap(t *testing.T) {
 	const sources = 50000
 	for i := 0; i < sources; i++ {
 		ip := fmt.Sprintf("10.0.%d.%d", (i/256)%256, i%256)
-		hit(r, ip, "") // consumes the quota of 1
-		hit(r, ip, "") // blocked #1
-		hit(r, ip, "") // blocked #2
+		hit(r, ip, "")
+		hit(r, ip, "")
+		hit(r, ip, "")
 	}
 
 	n := len(blockedLines(logs))
@@ -167,7 +154,6 @@ func TestBlockLog_ReportsDropsAndResurfacesNextWindow(t *testing.T) {
 	clk := &fakeClock{t: time.Unix(1700000000, 0)}
 	r, logs := blockLogEngine(blockLogSamplerAt(clk))
 
-	// Exhaust the per-window budget, then keep blocking so drops accumulate.
 	for i := 0; i < blockLogMaxLinesPerWindow+50; i++ {
 		ip := fmt.Sprintf("10.1.%d.%d", (i/256)%256, i%256)
 		hit(r, ip, "")
@@ -179,8 +165,6 @@ func TestBlockLog_ReportsDropsAndResurfacesNextWindow(t *testing.T) {
 
 	clk.Advance(blockLogWindow + time.Second)
 
-	// A source already logged in the previous window must be logged again: an
-	// ongoing incident must not go permanently silent.
 	hit(r, "10.1.0.0", "")
 	if n := len(blockedLines(logs)); n != blockLogMaxLinesPerWindow+1 {
 		t.Fatalf("got %d lines after the window rolled, want %d — a continuing flood must resurface", n, blockLogMaxLinesPerWindow+1)
@@ -201,7 +185,7 @@ func TestBlockLog_TruncatesLongXFF(t *testing.T) {
 	clk := &fakeClock{t: time.Unix(1700000000, 0)}
 	r, logs := blockLogEngine(blockLogSamplerAt(clk))
 
-	long := strings.Repeat("198.51.100.1, ", 4000) // ~56KB
+	long := strings.Repeat("198.51.100.1, ", 4000)
 	hit(r, "203.0.113.10", long)
 	hit(r, "203.0.113.10", long)
 

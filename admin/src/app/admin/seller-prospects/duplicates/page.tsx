@@ -91,8 +91,7 @@ export default function SellerProspectDuplicatesPage() {
 				</div>
 			</div>
 
-			{/* `.table-container` 的 `overflow: hidden`（globals.css）只裁切、不提供橫向捲軸；
-			    行內覆寫 `overflow-x: auto` 才是真的讓窄螢幕能在自身容器捲動。 */}
+
 			<div className="table-container" style={{ overflowX: "auto" }}>
 				<table className="data-table">
 					<thead>

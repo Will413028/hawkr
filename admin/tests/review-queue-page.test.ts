@@ -226,7 +226,6 @@ test("種類標籤：涵蓋 enum 的每個非 UNSPECIFIED 值；UNSPECIFIED 不�
 	}
 	assert.equal(Object.keys(QUEUE_KIND_TEXT).length, ALL_KIND_VALUES.length);
 	assert.equal(queueKindText(ReviewQueueItemKind.UNSPECIFIED), undefined);
-	// §5 #104a–k 逐字：改錯任一字都要失敗。
 	const expected: [ReviewQueueItemKind, string][] = [
 		[ReviewQueueItemKind.REPORT_TRIAGE, "分案通報"],
 		[ReviewQueueItemKind.CASE_DECISION, "決定案件"],

@@ -18,7 +18,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-// ==================== Mock CouponServiceClient ====================
 
 type couponMockCouponSvcClient struct {
 	ListMyCouponsFn                func(ctx context.Context, in *pb.ListMyCouponsRequest, opts ...grpc.CallOption) (*pb.ListMyCouponsResponse, error)
@@ -131,9 +130,7 @@ func (m *couponMockCouponSvcClient) GrantSellerCompensationCoupon(ctx context.Co
 	return nil, nil
 }
 
-// ==================== Fake Auth Middleware ====================
 
-// fakeBuyerAuth sets accountId and accountType=1 (BUYER)
 func fakeBuyerAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		idStr := c.GetHeader("X-Account-Id")
@@ -146,15 +143,11 @@ func fakeBuyerAuth() gin.HandlerFunc {
 			accountID = accountID*10 + int64(ch-'0')
 		}
 		c.Set("accountId", accountID)
-		c.Set("accountType", 1) // BUYER
+		c.Set("accountType", 1)
 		c.Next()
 	}
 }
 
-// fakeAdminAuth 模擬已登入的 admin caller（測試用）。AdminGrantCompensation/
-// AdminIssueCouponsHandler 只讀 accountId，角色把關在 route 層 middleware，
-// handler 本身不檢查 accountType，故沿用跟 fakeBuyerAuth 相同的 accountId 抽取
-// 邏輯即可。
 func fakeAdminAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		idStr := c.GetHeader("X-Account-Id")
@@ -167,22 +160,12 @@ func fakeAdminAuth() gin.HandlerFunc {
 			accountID = accountID*10 + int64(ch-'0')
 		}
 		c.Set("accountId", accountID)
-		c.Set("accountType", 4) // ADMIN
+		c.Set("accountType", 4)
 		c.Next()
 	}
 }
 
-// ==================== Buyer Resolver Test Helpers ====================
-//
-// buyerResolverForTest / buyerGrandfatherResolverForTest 定義於
-// resolve_seller_test.go；noBuyerResolverForTest 定義於 resolve_buyer_test.go
-// （② 買家 store-stint re-key W2 新增的共用 helper，多個 sibling
-// gateway-wiring task 都會用到；package 內已存在，這裡不重複定義）。這裡只補
-// 這個測試檔特有的 offsetBuyerResolverForTest。
 
-// offsetBuyerResolverForTest 讓每個 accountID 解析出不同的 surrogate
-// （accountID+offset），用於證明批次解析（resolveTargetBuyerIDs）逐筆
-// 呼叫 resolver、不是整批共用同一個值。
 func offsetBuyerResolverForTest(offset int64) *buyerid.Resolver {
 	return buyerid.New(buyerid.GetterFunc(func(_ context.Context, accountID int64) (*buyerpb.BuyerInfo, error) {
 		return &buyerpb.BuyerInfo{
@@ -192,7 +175,6 @@ func offsetBuyerResolverForTest(offset int64) *buyerid.Resolver {
 	}))
 }
 
-// ==================== Router Setup ====================
 
 func setupCouponRouter(h *Holder) *gin.Engine {
 	r := gin.New()
@@ -207,8 +189,6 @@ func setupCouponRouter(h *Holder) *gin.Engine {
 	return r
 }
 
-// setupAdminCouponRouter 建立 admin 優惠券路由（AdminGrantCompensation /
-// AdminIssueCouponsHandler）的測試 Router。
 func setupAdminCouponRouter(h *Holder) *gin.Engine {
 	r := gin.New()
 	v1 := r.Group("/api/v1")
@@ -261,7 +241,6 @@ func TestAdminCreateCouponTemplate_ResolvesBuyerAccountIds(t *testing.T) {
 	assertHTTPStatus(t, w, http.StatusOK)
 }
 
-// ==================== GetCoupons (ListMyCoupons) ====================
 
 func TestGetCoupons_Success(t *testing.T) {
 	couponMock := &couponMockCouponSvcClient{
@@ -419,14 +398,12 @@ func TestGetCoupons_Unauthorized(t *testing.T) {
 	h := &Holder{}
 	router := setupCouponRouter(h)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/app/coupons", nil)
-	// No X-Account-Id header
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
 	assertHTTPStatus(t, w, http.StatusUnauthorized)
 }
 
-// ==================== ListAvailableCoupons ====================
 
 func TestListAvailableCoupons_Success(t *testing.T) {
 	couponMock := &couponMockCouponSvcClient{
@@ -512,7 +489,6 @@ func TestListAvailableCoupons_WithSellerFilter(t *testing.T) {
 	assertCode(t, resp, 0)
 }
 
-// ==================== CreateCouponTemplate (Seller) ====================
 
 func setupSellerCouponRouter(h *Holder) *gin.Engine {
 	r := gin.New()
@@ -582,9 +558,6 @@ func TestCreateCouponTemplate_Success(t *testing.T) {
 }
 
 func TestCreateCouponTemplate_BadRequest_MissingTitle(t *testing.T) {
-	// SellerID must be set: CreateCouponTemplate now resolves store_id before
-	// binding the request body, so a nil resolver would panic before reaching
-	// the missing-title validation this test actually checks.
 	h := &Holder{Store: grandfatherResolverForTest()}
 	router := setupSellerCouponRouter(h)
 	body, _ := json.Marshal(map[string]interface{}{
@@ -605,7 +578,6 @@ func TestCreateCouponTemplate_BadRequest_MissingTitle(t *testing.T) {
 	assertCode(t, resp, 400)
 }
 
-// ==================== ListCouponTemplates (Seller) ====================
 
 func TestListCouponTemplates_Success(t *testing.T) {
 	couponMock := &couponMockCouponSvcClient{
@@ -658,7 +630,6 @@ func TestListCouponTemplates_Success(t *testing.T) {
 	}
 }
 
-// ==================== GetCouponTemplateDetail (Seller) ====================
 
 func TestGetCouponTemplateDetail_ResolvesStoreId(t *testing.T) {
 	couponMock := &couponMockCouponSvcClient{
@@ -693,7 +664,6 @@ func TestGetCouponTemplateDetail_ResolvesStoreId(t *testing.T) {
 	assertCode(t, resp, 0)
 }
 
-// ==================== RevokeCouponTemplate (Seller) ====================
 
 func TestRevokeCouponTemplate_ResolvesStoreId(t *testing.T) {
 	couponMock := &couponMockCouponSvcClient{
@@ -725,7 +695,6 @@ func TestRevokeCouponTemplate_ResolvesStoreId(t *testing.T) {
 	assertCode(t, resp, 0)
 }
 
-// ==================== sellerAvatarUrl 欄位透傳 ====================
 
 func TestGetCoupons_SellerAvatarKey_PassThrough(t *testing.T) {
 	const avatarURL = "https://cdn.example.com/seller/avatar.jpg"
@@ -828,14 +797,7 @@ func TestGetCoupons_SellerAvatarKey_EmptyForPlatformCoupon(t *testing.T) {
 	}
 }
 
-// ==================== ② buyer store-stint re-key W2/W3: PR1 gateway wiring ====================
-//
-// gateway/internal/buyerid.Resolver 已在 W1（PR #1571）建好骨架，但只接進
-// notification.go/notification_inbox.go/resolve_seller.go 三支 handler。以下
-// 補 coupon-service 買家相關 call site（設計書
-// docs/superpowers/specs/2026-07-16-buyer-store-stint-rekey-w2w3-design.md §3.1）。
 
-// ---- handleListMyCoupons / GetCoupons（呼叫者自身身分）----
 
 func TestGetCoupons_ResolvesBuyerID(t *testing.T) {
 	couponMock := &couponMockCouponSvcClient{
@@ -883,7 +845,6 @@ func TestGetCoupons_NoCurrentBuyer_Returns403(t *testing.T) {
 	}
 }
 
-// ---- ListAvailableCoupons（呼叫者自身身分）----
 
 func TestListAvailableCoupons_ResolvesBuyerID(t *testing.T) {
 	couponMock := &couponMockCouponSvcClient{
@@ -911,7 +872,6 @@ func TestListAvailableCoupons_ResolvesBuyerID(t *testing.T) {
 	assertHTTPStatus(t, w, http.StatusOK)
 }
 
-// ---- ClaimCoupon（呼叫者自身身分；先前無測試覆蓋）----
 
 func TestClaimCoupon_ResolvesBuyerID(t *testing.T) {
 	couponMock := &couponMockCouponSvcClient{
@@ -961,7 +921,6 @@ func TestClaimCoupon_NoCurrentBuyer_Returns403(t *testing.T) {
 	assertCode(t, resp, 403)
 }
 
-// ---- handleListBuyerCouponsForSeller（第三方目標買家：query param）----
 
 func TestGetCoupons_SellerView_RejectsLegacyBuyerAccountIDQuery(t *testing.T) {
 	h := &Holder{
@@ -1005,7 +964,6 @@ func TestGetCoupons_SellerView_BuyerIDDirect_NoDoubleResolve(t *testing.T) {
 	assertHTTPStatus(t, w, http.StatusOK)
 }
 
-// ---- AdminGrantCompensation（第三方目標買家：body 欄位）----
 
 func TestAdminGrantCompensation_ResolvesTargetBuyerID(t *testing.T) {
 	couponMock := &couponMockCouponSvcClient{
@@ -1132,7 +1090,6 @@ func TestAdminGrantCompensation_LegacySellerAccountIDKey_ReturnsBadRequest(t *te
 	}
 }
 
-// ---- CreateCouponTemplate（第三方目標買家清單：body 陣列）----
 
 func TestCreateCouponTemplate_ResolvesBuyerAccountIds(t *testing.T) {
 	couponMock := &couponMockCouponSvcClient{
@@ -1174,8 +1131,6 @@ func TestCreateCouponTemplate_ResolvesBuyerAccountIds(t *testing.T) {
 	assertHTTPStatus(t, w, http.StatusOK)
 }
 
-// ---- CreateCouponTemplate 的 buyerIds（已解析 buyer_id，跟 buyerAccountIds
-// 並存不互斥；CRM 顧客列表/標籤搜尋只吐得出 buyer_id，見 2026-07-30 事故）----
 
 func TestCreateCouponTemplate_AcceptsAlreadyResolvedBuyerIds(t *testing.T) {
 	couponMock := &couponMockCouponSvcClient{
@@ -1290,7 +1245,6 @@ func TestCreateCouponTemplate_InvalidBuyerIds_BadRequest(t *testing.T) {
 	assertHTTPStatus(t, w, http.StatusBadRequest)
 }
 
-// ---- AdminIssueCouponsHandler（第三方目標買家清單：body 陣列；先前無測試覆蓋）----
 
 func TestAdminIssueCoupons_ResolvesBuyerAccountIds(t *testing.T) {
 	couponMock := &couponMockCouponSvcClient{

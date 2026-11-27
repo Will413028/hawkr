@@ -26,9 +26,6 @@ export default function ReviewsClient({
 	initialTotalPages,
 	paginationWrapper,
 }: ReviewsClientProps) {
-	// The first page is the ISR/SEO body already in the server HTML; later pages
-	// are fetched client-side (below). `useUrlPageParam` reads `?page` WITHOUT
-	// useSearchParams so the route is not bailed out to client-side rendering.
 	const [currentPage, setPage] = useUrlPageParam();
 
 	const [reviews, setReviews] = React.useState(initialReviews);
@@ -39,7 +36,6 @@ export default function ReviewsClient({
 
 	React.useEffect(() => {
 		void reloadKey;
-		// Page 1 is already in the server HTML — restore it without a fetch.
 		if (currentPage <= 1) {
 			setReviews(initialReviews);
 			setTotalPages(initialTotalPages);
@@ -51,7 +47,6 @@ export default function ReviewsClient({
 		const ac = new AbortController();
 		setPending(true);
 		setFailed(false);
-		// 讀取失敗一律顯示錯誤與重試，不當成沒有評價；總頁數沿用伺服器端依統計算出的值。
 		fetchStoreReviewsAtPage(sellerId, currentPage, { signal: ac.signal })
 			.then((data) => {
 				if (!active) return;

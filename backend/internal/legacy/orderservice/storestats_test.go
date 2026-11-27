@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/legacy/gen/order/orderconnect"
 )
 
-// fakeStats 依序回傳 pages，並記下每次請求。
 type fakeStats struct {
 	orderconnect.OrderServiceClient
 	pages []*orderpb.ListStoreOrderStatsResponse
@@ -29,7 +28,7 @@ func (f *fakeStats) ListStoreOrderStats(ctx context.Context, req *connect.Reques
 	}
 	i := len(f.seen) - 1
 	if i >= len(f.pages) {
-		i = len(f.pages) - 1 // 最後一頁重複回，用來測保險
+		i = len(f.pages) - 1
 	}
 	return connect.NewResponse(f.pages[i]), nil
 }

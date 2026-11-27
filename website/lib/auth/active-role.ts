@@ -49,7 +49,6 @@ export function effectiveActiveRole(
 
 export function getStoredActiveRole(): RoleSlot | null {
 	if (!isBrowser()) return null;
-	// ponytail: storage access can throw even when the object exists (Safari private
 	// mode, quota) or be a backendless global (Node 22+ test env) — guard, don't detect.
 	try {
 		return parseRole(localStorage.getItem(ACTIVE_ROLE_STORAGE_KEY));
@@ -64,6 +63,5 @@ export function setStoredActiveRole(role: RoleSlot | null): void {
 		if (role) localStorage.setItem(ACTIVE_ROLE_STORAGE_KEY, role);
 		else localStorage.removeItem(ACTIVE_ROLE_STORAGE_KEY);
 	} catch {
-		/* storage unavailable — best-effort, role still applied in-memory */
 	}
 }

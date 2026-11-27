@@ -45,7 +45,7 @@ export default function Footer({
 			<div
 				className={`${FOOTER_SHELL} grid grid-cols-[minmax(200px,1.5fr)_repeat(3,minmax(0,1fr))_minmax(112px,1fr)_minmax(220px,1.5fr)] items-start gap-x-6 gap-y-6 max-[1200px]:grid-cols-4 max-[768px]:grid-cols-2 max-[560px]:grid-cols-1 max-[560px]:gap-x-3 max-[560px]:gap-y-1`}
 			>
-				{/* Brand column */}
+
 				<div className="min-w-0 max-w-[300px] max-[1200px]:max-w-none max-[1200px]:col-span-full max-[560px]:pb-4">
 					<BrandLogo tone="light" className={FOOTER_BRAND_LOGO} />
 					<p className={FOOTER_BRAND_TAGLINE}>台灣小農與在地職人的線上市集。</p>
@@ -76,7 +76,7 @@ export default function Footer({
 					</div>
 				</div>
 
-				{/* Quick links column */}
+
 				<details className={FOOTER_COLUMN} open>
 					<summary className={FOOTER_SUMMARY}>
 						<h2 className={FOOTER_HEADING}>
@@ -113,10 +113,10 @@ export default function Footer({
 					</ul>
 				</details>
 
-				{/* 商品分類 + 熱門話題 — the two data-driven columns. */}
+
 				{categoryColumns}
 
-				{/* Customer service column */}
+
 				<details className={FOOTER_COLUMN} open>
 					<summary className={FOOTER_SUMMARY}>
 						<h2 className={FOOTER_HEADING}>
@@ -159,7 +159,7 @@ export default function Footer({
 					</ul>
 				</details>
 
-				{/* Contact info column */}
+
 				<details
 					className={`${FOOTER_COLUMN} max-[1200px]:col-span-full max-[560px]:col-span-1`}
 					open

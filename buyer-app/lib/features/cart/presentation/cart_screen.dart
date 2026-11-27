@@ -32,7 +32,6 @@ import '../../../config/image_config.dart';
 import 'widgets/cart_checkout_action.dart';
 import 'widgets/cart_top_bar.dart';
 
-// ── 拆分後的子組件 ──
 import 'widgets/merchant_group.dart';
 import 'widgets/coupon_helpers.dart';
 import 'widgets/coupon_selection_sheet.dart';
@@ -63,10 +62,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   Future<List<Map<String, dynamic>>>? _couponFuture;
   String _couponCachedSellerId = '';
 
-  // Analytics: view_cart fires once per screen session
   bool _viewCartSent = false;
 
-  // Expanded shipping method groups (by shippingMethod key)
 
   @override
   void initState() {
@@ -142,8 +139,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   Future<void> _loadCartItems() =>
       ref.read(cartControllerProvider.notifier).refresh();
 
-  // 舊版自動移除 / toast 邏輯已下線（issue #1127）。
-  // 不可購買商品改由 CartProductTile 反灰 + badge + disabled checkbox 呈現，user 自主決定移除。
 
   Future<void> _deleteCartItem(CartItem item) async {
     final itemName = item.title ?? '商品';
@@ -180,9 +175,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     return effect?.deduction ?? 0;
   }
 
-  // ---------------------------------------------------------------------------
-  // Pricing computed properties
-  // ---------------------------------------------------------------------------
 
   double get _productTotal {
     return _cartItems
@@ -194,9 +186,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     return switch (_shippingSelection) {
       ShippingUnselected() => 0.0,
       TieredShippingSelected(:final option) => () {
-        // Use precise fee from shipping_fee API if available
         if (_preciseShippingFee != null) return _preciseShippingFee!;
-        // Otherwise fall back to validate estimate
         if (option['freeShippingEligible'] == true) return 0.0;
         return double.tryParse(option['fee']?.toString() ?? '0') ?? 0.0;
       }(),
@@ -233,13 +223,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     return checkedSellerIds.first;
   }
 
-  // ---------------------------------------------------------------------------
-  // Group check/uncheck
-  //
-  // 單一賣家選擇模式：購物車一次只能勾選同一個賣家的商品
-  // （後端不支援跨賣家合併出貨，避免使用者勾完才在「寄送方式」看到無法配送錯誤）。
-  // 切換賣家時自動清掉舊賣家的勾選。
-  // ---------------------------------------------------------------------------
 
   /// 取得目前已勾選商品所屬的 storeId（單選模式下所有勾選都是同一個）。
   /// 沒有勾選則回 null。
@@ -264,9 +247,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         .read(cartControllerProvider.notifier)
         .updateQuantity(item.skuId, quantity);
   }
-  // ---------------------------------------------------------------------------
-  // Clear cart
-  // ---------------------------------------------------------------------------
 
   Future<void> _clearCart() async {
     final confirmed =
@@ -297,12 +277,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Coupon sheet (order-level)
-  // ---------------------------------------------------------------------------
 
   Future<List<Map<String, dynamic>>> _loadCoupons() {
-    // Invalidate cache when seller changes
     final storeId = _checkedStoreId ?? '';
     if (_couponFuture != null && _couponCachedSellerId == storeId) {
       return _couponFuture!;
@@ -334,7 +310,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       ),
     );
     if (!mounted || selected == null) return null;
-    // Apply coupon to all checked items
     setState(() {
       for (final item in _cartItems) {
         if (_checkedSkuIds.contains(item.skuId)) {
@@ -347,9 +322,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     return selected;
   }
 
-  // ---------------------------------------------------------------------------
-  // Payment sheet (swipe-up checkout)
-  // ---------------------------------------------------------------------------
 
   void _openPaymentSheet() {
     if (_isOpeningSheet) return;
@@ -364,7 +336,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       showCommonSnackBar(context, '請先勾選要結帳的商品');
       return;
     }
-    // 「現在選了什麼」只問一次（[CartState.shippingSelection]），不在這裡重新推導。
     final selection = _shippingSelection;
     final ShippingPresentation shipping;
     final Map<String, dynamic> shippingOption;
@@ -374,9 +345,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         return;
       case TieredShippingSelected(:final option):
         shippingOption = option;
-        // 結帳前置檢查依配送方式**明確分派**。
-        // 🔴 不得用 `!isStorePickup` 當宅配：那會讓未知 / 本版未支援的配送方式被要求
-        // 填一個對它不適用的宅配地址，接著把宅配 payload 送進 /app/checkout/preview。
         shipping = shippingPresentationOf(option['shippingMethod']?.toString());
         switch (shipping) {
           case ShippingPresentation.cvsStorePickup:
@@ -403,15 +371,11 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       return;
     }
 
-    // GA4: begin_checkout — checked (selected) items only
     ref
         .read(analyticsEventsProvider)
         .trackBeginCheckout(selectedItems.map(cartItemToGA4Item).toList());
 
     _isOpeningSheet = true;
-    // 🔴 merge origin/dev：上游把優惠券的取法改成「依勾選的品項反查」
-    //    （_cartItemKeyFor + firstOrNull），取代舊的 `_appliedCoupons.values.first`。
-    //    舊寫法在多賣家情境會取到別家的券。
     final selectedCoupon = selectedItems
         .map((item) => _appliedCoupons[_cartItemKeyFor(item)])
         .whereType<Map<String, dynamic>>()
@@ -427,8 +391,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       params: CheckoutParams(
         selectedItems: selectedItems,
         shippingOption: shippingOption,
-        // 宅配要收件地址；超商取貨才是門市。
-        // 判準走 [ShippingPresentationX.usesRecipientAddress]，與 preview／confirm 同一份。
         selectedAddress: shipping.usesRecipientAddress
             ? _selectedAddress
             : null,
@@ -454,9 +416,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         },
         onInvalidateCartCount: () => ref.invalidate(cartCountProvider),
         onPaymentSucceeded: (orderNo) async {
-          // GA4 purchase for Apple Pay / Google Pay immediately-paid orders.
-          // Deduped (markPurchaseTracked returns false if already tracked).
-          // Fire-and-forget: errors are swallowed so analytics never breaks checkout.
           if (orderNo.isEmpty || !markPurchaseTracked(orderNo)) return;
           try {
             final order = await ref
@@ -464,7 +423,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 .getOrderDetail(orderNo);
             ref.read(analyticsEventsProvider).trackPurchase(order);
           } catch (_) {
-            // Analytics must not break checkout — silently skip on fetch failure.
             HKLog.logW('[GA4] purchase fetch failed for orderNo=$orderNo');
           }
         },
@@ -474,9 +432,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // Image helper
-  // ---------------------------------------------------------------------------
 
   ImageProvider? _resolveImageProvider(String? source) {
     if (source == null) return null;
@@ -517,7 +472,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 
   /// handler.CartGroupResponse.logoUrl — 直接使用 API 回傳的值
   String? _sellerAvatarUrl(String storeId, {String? groupLogoUrl}) {
-    // handler.CartGroupResponse: logoUrl
     if (groupLogoUrl != null &&
         groupLogoUrl.isNotEmpty &&
         groupLogoUrl.toLowerCase() != 'null') {
@@ -536,9 +490,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     return url;
   }
 
-  // ---------------------------------------------------------------------------
-  // BUILD
-  // ---------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -573,14 +524,12 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             top: false,
             child: Column(
               children: [
-                // ── App Bar ──
                 CartTopBar(
                   onBack: () => context.pop(),
                   onClear: _cartItems.isNotEmpty ? _clearCart : null,
                   chatAction: const ChatIconWithBadge(),
                 ),
 
-                // ── Content ──
                 Expanded(
                   child: cartAsync.isLoading && visibleState == null
                       ? const Center(
@@ -679,7 +628,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                         ],
                                       ),
                                     ),
-                                  // Merchant group cards
                                   ..._groups.map((group) {
                                     final card = ref
                                         .watch(storeCardProvider(group.storeId))
@@ -709,7 +657,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                       sellerAvatarUrl: _sellerAvatarUrl,
                                     );
                                   }),
-                                  // Shipping section
                                   ShippingSection(
                                     shippingOptions: _shippingOptions,
                                     selectedShippingIdx: _selectedShippingIdx,
@@ -725,7 +672,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                       ref
                                           .read(cartControllerProvider.notifier)
                                           .selectShippingOption(idx);
-                                      // GA4: add_shipping_info
                                       if (idx < _shippingOptions.length) {
                                         final checkedItems = _cartItems
                                             .where(
@@ -760,11 +706,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                     },
                                     onRetryValidate: _triggerValidate,
                                   ),
-                                  // Delivery notes
                                   DeliveryNotesSection(
                                     controller: _deliveryNotesController,
                                   ),
-                                  // Payment details
                                   PaymentDetailsSection(
                                     productTotal: _productTotal,
                                     shippingTotal: _shippingTotal,
@@ -800,7 +744,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             ),
           ),
         ),
-        // ── 清空購物車遮罩 + 卡車動畫 ──
         if (_isClearing)
           Positioned.fill(
             child: Container(
@@ -838,7 +781,4 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Clear Cart Button
-  // ---------------------------------------------------------------------------
 }

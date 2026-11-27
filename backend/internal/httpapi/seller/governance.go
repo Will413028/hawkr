@@ -103,8 +103,6 @@ func NewGovernance(d GovernanceDeps) (*Governance, error) {
 	return &Governance{m: d.Module, images: d.Images, snapshots: d.ContentSnapshots, links: d.Links}, nil
 }
 
-// 模組輸入的欄位對應到請求的路徑。名稱與請求的頂層欄位同名（snake_case）的欄位由 rpc 自動對應，這裡只列其餘的；空的對應表
-// 表示全部由自動規則對應。
 var (
 	listReportsPaths       = rpc.FieldPaths{}
 	triagePaths            = rpc.FieldPaths{"AssessedCategory": "assessed_category", "Target": "target", "ExpectedVersion": "etag"}
@@ -133,7 +131,6 @@ var (
 	listViolationsPaths    = rpc.FieldPaths{}
 )
 
-// reportEvidenceURI 與 requestEvidenceURI 是佐證的檢視網址（EvidenceReportRoute、EvidenceRequestRoute 的實例）。
 func reportEvidenceURI(reportID uuid.UUID, position int) string {
 	return "/api/files/admin/seller/reports/" + reportID.String() + "/evidence/" + strconv.Itoa(position)
 }
@@ -142,7 +139,6 @@ func requestEvidenceURI(requestID uuid.UUID, position int) string {
 	return "/api/files/admin/seller/measure_requests/" + requestID.String() + "/evidence/" + strconv.Itoa(position)
 }
 
-// toEvidence 只帶位置與檢視網址：asset ID 與 object key 不對外（佐證是機敏檔，只經擁有者的端點讀）。
 func toEvidence(n int, uri func(int) string) []*adminpb.Evidence {
 	out := make([]*adminpb.Evidence, n)
 	for i := range out {
@@ -158,7 +154,6 @@ func formatAdminID(id *int64) string {
 	return rpc.FormatID(*id)
 }
 
-// toDeadline 把模組的期限轉成契約的 Deadline；義務不在（nil）時回 nil，欄位不設。
 func toDeadline(d *model.Deadline) *commonpb.Deadline {
 	if d == nil {
 		return nil
@@ -173,7 +168,6 @@ func optionalTimestamp(t *time.Time) *timestamppb.Timestamp {
 	return timestamppb.New(*t)
 }
 
-// toReport 把後台看到的通報轉成契約：處理狀態與 can_*、available_outcomes 取自同一個 Availability（不輸出原因）。補充與佐證只在讀單筆與匯出時載入（清單的是空的）。
 func toReport(r model.AdminReport) *adminpb.Report {
 	outcomes := r.Availability.AvailableOutcomes()
 	out := &adminpb.Report{
@@ -217,7 +211,6 @@ func toReport(r model.AdminReport) *adminpb.Report {
 	return out
 }
 
-// toTriageTarget 把分案或移動的去處轉成契約：有進行中的案件就帶它的 id、嚴重度與 etag，沒有就只有類別（開新案件）。
 func toTriageTarget(t model.TriageTarget) *adminpb.TriageTarget {
 	out := &adminpb.TriageTarget{Category: rpc.EnumToProto[commonpb.PolicyCategory](t.Category)}
 	if c := t.Case; c != nil {
@@ -227,7 +220,6 @@ func toTriageTarget(t model.TriageTarget) *adminpb.TriageTarget {
 	return out
 }
 
-// caseTargetFrom 解析請求的去處（oneof）；沒有設時回空的 CaseTarget，由模組以欄位錯誤回應。
 func caseTargetFrom(t *adminpb.CaseTarget) (model.CaseTarget, error) {
 	switch v := t.GetTarget().(type) {
 	case *adminpb.CaseTarget_Join:
@@ -247,8 +239,6 @@ func caseTargetFrom(t *adminpb.CaseTarget) (model.CaseTarget, error) {
 	return model.CaseTarget{}, nil
 }
 
-// civilDate 把 google.type.Date 轉成 UTC 午夜的 time.Time（模組的日期形狀）；沒設是 nil。不是有效日期（年月日超出範圍或不存在的日子）回零值，
-// 模組把零值當成「早於任何日期」，回該欄位原本的範圍句子，所以不另加一種錯誤。
 func civilDate(d *date.Date) *time.Time {
 	if d == nil {
 		return nil
@@ -260,7 +250,6 @@ func civilDate(d *date.Date) *time.Time {
 	return &t
 }
 
-// toCase 把後台看到的案件轉成契約：can_*、decision_options 取自同一個 Availability（不輸出原因）。
 func toCase(c model.AdminCase) *adminpb.Case {
 	options := c.Availability.DecisionOptions()
 	out := &adminpb.Case{
@@ -298,7 +287,6 @@ func toCase(c model.AdminCase) *adminpb.Case {
 	return out
 }
 
-// parseOptionalStoreID 解析選填的店家 ID 篩選：空字串是不篩（0）。
 func parseOptionalStoreID(raw string) (int64, error) {
 	if raw == "" {
 		return 0, nil
@@ -327,7 +315,6 @@ func (h *Governance) ListReports(ctx context.Context, req *connect.Request[admin
 		in.CaseID = &caseID
 	}
 	in.CitableAsSource = msg.GetCitableAsSource()
-	// page token 只能用在同一組篩選：換了篩選就從第一頁開始。
 	scope := rpc.FilterScope(sellerv1alpha1connect.SellerGovernanceAdminServiceListReportsProcedure, msg.GetState().String(), msg.GetCategory().String(), msg.GetStoreId(), msg.GetCaseId(), strconv.FormatBool(msg.GetCitableAsSource()))
 	after, err := rpc.ValidCursor[model.ReportCursor](scope, msg.GetPageToken())
 	if err != nil {
@@ -594,8 +581,6 @@ func (h *Governance) ListCaseNotes(ctx context.Context, req *connect.Request[adm
 	return connect.NewResponse(out), nil
 }
 
-// createMeasurePaths 是建立措施的欄位對應：共同的欄位加上這一種措施專屬的對應（模組的欄位名不分種類，proto 路徑依設定的是哪一支輸入）。
-// SourceCaseID 是來源案件（任何種類與依據都可以帶）：模組在案件不存在或不是這家店的時候以它回 invalid_argument。
 func createMeasurePaths(parts ...rpc.FieldPaths) rpc.FieldPaths {
 	out := rpc.FieldPaths{"RequestID": "request_id", "StoreID": "store_id", "StatementToSeller": "statement", "Note": "note", "SourceCaseID": "source_case_id", "SourceAuthorityOrderID": "source_authority_order_id"}
 	for _, p := range parts {
@@ -604,7 +589,6 @@ func createMeasurePaths(parts ...rpc.FieldPaths) rpc.FieldPaths {
 	return out
 }
 
-// violationPaths 是違規依據（ViolationBasis）的欄位對應：domain 是模組裡依據的欄位名，proto 是它在請求裡的路徑。
 func violationPaths(domain, proto string) rpc.FieldPaths {
 	return rpc.FieldPaths{
 		domain:                                        proto,

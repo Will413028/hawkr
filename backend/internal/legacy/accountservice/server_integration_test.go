@@ -38,7 +38,6 @@ type fixture struct {
 	client accountconnect.AccountServiceClient
 }
 
-// setup 起 identity 與 legacy 的 AccountService，client 以舊服務的方式（gRPC、h2c）呼叫。
 func setup(t *testing.T) *fixture {
 	t.Helper()
 	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(migrate.Module{Name: "identity", Dir: identity.Migrations()}))
@@ -65,7 +64,6 @@ func setup(t *testing.T) *fixture {
 	return f
 }
 
-// account 以 dev token 建立帳號（第一次認證時建立），再授予 roles。買家不是角色（W5）：帳號活著就是買家。
 func (f *fixture) account(t *testing.T, roles ...identity.Role) int64 {
 	t.Helper()
 	ctx := context.Background()
@@ -78,7 +76,6 @@ func (f *fixture) account(t *testing.T, roles ...identity.Role) int64 {
 		t.Fatal(err)
 	}
 	id := a.Principal.ID
-	// dev 帳號沒有登入身分，所以沒有 email；legacy AccountInfo 要帶出 accounts.email，這裡直接寫入（provider 回報的 email 的位置）。
 	if _, err := f.db.Pool().Exec(ctx, `UPDATE identity.accounts SET email = $1 WHERE id = $2`, fmt.Sprintf("dev_%d@dev.localhost", id), id); err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +113,6 @@ func TestGetAccountInfo(t *testing.T) {
 	if resp.Msg.GetData().GetStatus() != "suspended" {
 		t.Fatalf("停權的狀態 = %q", resp.Msg.GetData().GetStatus())
 	}
-	// 刪除的帳號與不存在的帳號一樣是 404（舊的 account-service 查不到軟刪的帳號）。
 	other := f.account(t)
 	if err := f.m.DeleteAccount(ctx, other); err != nil {
 		t.Fatal(err)
@@ -139,7 +135,6 @@ func TestRolesAndDeletion(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	id := f.account(t)
-	// 賣家角色由 seller 模組建店時授予；這裡直接以 identity 授予。
 	if err := f.m.GrantRole(ctx, identity.GrantRoleInput{AccountID: id, Role: identity.RoleSeller}); err != nil {
 		t.Fatal(err)
 	}

@@ -45,8 +45,6 @@ const Color _kMediaMuted = AppColors.textSecondary;
 bool _hasValidProduct(PostProduct? product) {
   if (product == null) return false;
   final name = product.name.trim();
-  // `"0"` 是後端「無價格」的表達且非空字串 —— 用 isNotEmpty 判斷會讓
-  // 「無名稱＋無價格」的商品節點通過，渲染出一張空卡片。
   final price = PriceDisplay.formatPrice(product.price);
   return name.isNotEmpty || price.isNotEmpty;
 }
@@ -74,7 +72,6 @@ class _GsapCardPagePhysics extends PageScrollPhysics {
     return _GsapCardPagePhysics(parent: buildParent(ancestor));
   }
 
-  // 略低於臨界阻尼：保留 GSAP Inertia 式的動量，但會穩定 snap 回卡片中心。
   @override
   SpringDescription get spring =>
       const SpringDescription(mass: 0.9, stiffness: 310, damping: 30);
@@ -112,20 +109,16 @@ class MerchantPostsFeedScreen extends HookConsumerWidget {
         ? ref.watch(postFeedControllerProvider())
         : const AsyncValue<PostListState>.data(PostListState(ids: <int>[]));
 
-    // Merge 兩個來源（只有 id）
     final List<int>? mergedPosts;
     if (merchantPostsAsync.hasValue && globalPostsAsync.hasValue) {
       final merchantPosts = merchantPostsAsync.value!.ids;
       final globalPosts = globalPostsAsync.value!.ids;
       if (includeGlobalFeed) {
         if (merchantPosts.length > 1) {
-          // 商家還有其他貼文：擺前面 + 全平台其他商家貼文（去重）
           final seen = merchantPosts.toSet();
           final others = globalPosts.where((id) => !seen.contains(id)).toList();
           mergedPosts = [...merchantPosts, ...others];
         } else {
-          // 商家只有 1 篇（即點擊那篇）→ 切成純全平台 feed，不強制置頂。
-          // 若全平台 list 沒包含該篇（後端 pagination 未回），把它前置以保證能找到。
           final hasInitial =
               (initialPostId ?? '').isEmpty ||
               globalPosts.any((id) => id.toString() == initialPostId);
@@ -163,7 +156,6 @@ class MerchantPostsFeedScreen extends HookConsumerWidget {
       return null;
     }, [mergedPosts == null]);
 
-    // 有值就先顯示（重讀失敗保留舊資料）；沒有值才看 loading／錯誤。
     if (mergedPosts == null &&
         (merchantPostsAsync.isLoading ||
             (includeGlobalFeed && globalPostsAsync.isLoading))) {
@@ -313,7 +305,6 @@ class MerchantPostsFeedScreen extends HookConsumerWidget {
                 itemCount: posts.length,
                 onPageChanged: (i) {
                   currentIndex.value = i;
-                  // 左右滑動預載：距尾端 ≤ 3 篇時觸發 loadMore。
                   if (i >= posts.length - 3) {
                     if (includeGlobalFeed) {
                       ref
@@ -398,7 +389,6 @@ class MerchantPostsFeedScreen extends HookConsumerWidget {
   }
 }
 
-// ─── 單篇貼文（Figma Design 1：image + 商家 + 日期 + 內文 + 留言 + bottom bar） ──
 class _PostPage extends HookConsumerWidget {
   const _PostPage({
     required this.postId,
@@ -1048,7 +1038,6 @@ class _ExpandablePostText extends StatelessWidget {
   }
 }
 
-// ─── 貼文卡內建互動列 ───────────────────────────────────────
 class _BottomActionBar extends StatelessWidget {
   const _BottomActionBar({
     super.key,
@@ -1185,7 +1174,6 @@ class _IconCountAction extends StatelessWidget {
   }
 }
 
-// ─── 圓形 overlay icon（白色霧面玻璃）────────────────────────────────
 class _CircleIconButton extends StatelessWidget {
   const _CircleIconButton({
     super.key,
@@ -1229,7 +1217,6 @@ class _CircleIconButton extends StatelessWidget {
   }
 }
 
-// ─── 商品卡片（圖片下方，inline） ─────────────────────────────────────
 class _ProductOverlayChip extends StatelessWidget {
   const _ProductOverlayChip({
     super.key,
@@ -1245,7 +1232,6 @@ class _ProductOverlayChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = product.name;
-    // 判準走 PriceDisplay：`"0"` = 無價格，不能印成 `NT$ 0`。
     final price = PriceDisplay.formatPrice(product.price, prefix: 'NT\$ ');
     final imageUrl = _toAbsolute(product.image);
 
@@ -1345,7 +1331,6 @@ class _ProductOverlayChip extends StatelessWidget {
   }
 }
 
-// ─── 圓形頭像（支援 base64 / URL / 預設） ────────────────────────────
 class _Avatar extends StatelessWidget {
   const _Avatar({required this.size, this.url});
   final double size;
@@ -1374,8 +1359,6 @@ class _Avatar extends StatelessWidget {
         child: defaultAvatar,
       );
     }
-    // inline 判準只看 `data:` scheme（media_image.dart isInlineImageData）。
-    // 舊寫法「不是 http 且長度 > 60」會把 78~80 字元的 objectKey 誤判成 base64。
     final looksBase64 = isInlineImageData(s);
     Widget img;
     if (looksBase64) {
@@ -1469,7 +1452,6 @@ class _ErrorState extends StatelessWidget {
   }
 }
 
-// ─── helpers ──────────────────────────────────────────────────────────
 String _toAbsolute(String? u) {
   if (u == null) return '';
   final s = u.trim();

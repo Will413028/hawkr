@@ -44,16 +44,15 @@ class TestGen(unittest.TestCase):
 
     def test_generate(self):
         topo, report = self._run(DEV, PROD)
-        self.assertEqual([e["name"] for e in topo["exchanges"]], ["hawkr.marketing", "hawkr.order"])  # amq.* 剔除、union、排序
-        # order.paid.queue 帶非 string arg（x-message-ttl: 60000）→ 分流進 queues_json_args，不進 queues
-        self.assertEqual(len(topo["queues"]), 0)                                     # gateway.sse.* 剔除 + 唯一剩下的 queue 因 int arg 分流走
+        self.assertEqual([e["name"] for e in topo["exchanges"]], ["hawkr.marketing", "hawkr.order"])
+        self.assertEqual(len(topo["queues"]), 0)
         self.assertEqual(len(topo["queues_json_args"]), 1)
         self.assertEqual(topo["queues_json_args"][0]["name"], "order.paid.queue")
-        self.assertNotIn("x-queue-type", topo["queues_json_args"][0]["arguments"])        # x-queue-type 剝除
-        self.assertIn("x-dead-letter-exchange", topo["queues_json_args"][0]["arguments"]) # 其餘 args 保留
-        self.assertEqual(len(topo["bindings"]), 1)                              # 指向被剔除 queue 的 binding 一併剔除；指向 json_args queue 的 binding 保留
+        self.assertNotIn("x-queue-type", topo["queues_json_args"][0]["arguments"])
+        self.assertIn("x-dead-letter-exchange", topo["queues_json_args"][0]["arguments"])
+        self.assertEqual(len(topo["bindings"]), 1)
         self.assertIn("prod-only", report)
-        self.assertIn("x-message-ttl", report)  # 非 string arg 要被 audit 點名（module 用 map(string) 送出會變型別）
+        self.assertIn("x-message-ttl", report)
 
     def test_json_args_split(self):
         """queue 的 arguments 含任何非 string 值 → 分流進 queues_json_args，不進 queues；
@@ -61,14 +60,13 @@ class TestGen(unittest.TestCase):
         topo, report = self._run(DEV_JSON_ARGS, EMPTY)
         json_args_names = {q["name"] for q in topo["queues_json_args"]}
         plain_names = {q["name"] for q in topo["queues"]}
-        self.assertIn("sample.job.run.retry", json_args_names)   # x-message-ttl 是 int → json_args
+        self.assertIn("sample.job.run.retry", json_args_names)
         self.assertNotIn("sample.job.run.retry", plain_names)
-        self.assertIn("order.paid.queue", plain_names)                  # 剩下皆 string arg（x-queue-type 已被剝除）→ 留在 queues
+        self.assertIn("order.paid.queue", plain_names)
         self.assertNotIn("order.paid.queue", json_args_names)
-        # binding 指向 json_args queue，不應被當成「指向被剔除 queue」而濾掉
         self.assertEqual(len(topo["bindings"]), 1)
         self.assertEqual(topo["bindings"][0]["destination"], "sample.job.run.retry")
-        self.assertIn("sample.job.run.retry", report)  # audit report 仍點名該 queue 的非 string arg
+        self.assertIn("sample.job.run.retry", report)
 
 if __name__ == "__main__":
     unittest.main()

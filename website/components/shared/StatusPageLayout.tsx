@@ -56,8 +56,7 @@ export default function StatusPageLayout({
 				className="flex w-full max-w-[460px] flex-col items-center text-center"
 				role={announce ? "alert" : undefined}
 			>
-				{/* Cream disc gives the themed artwork a consistent porthole ground
-				    in both light and dark mode — same ground as the splash screen. */}
+
 				<div
 					className={cn(
 						"hk-status-icon-disc grid size-[216px] place-items-center rounded-full max-[480px]:size-[176px]",

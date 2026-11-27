@@ -68,8 +68,6 @@ describe("DocumentTimeline", () => {
 		);
 		expect(markup).toContain("已開立");
 		expect(markup).toContain("已作廢");
-		// React 的 SSR 輸出保留 `dateTime` 的大小寫（HTML 屬性不分大小寫，瀏覽器
-		// 一樣認得），所以這裡不分大小寫地比對，不是把斷言放寬。
 		expect(markup.toLowerCase()).toContain('datetime="2026-08-30t02:00:00z"');
 		expect(markup).toContain("買家申請更正");
 	});

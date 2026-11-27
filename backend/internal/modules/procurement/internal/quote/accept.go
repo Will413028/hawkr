@@ -91,7 +91,7 @@ func (s Service) Accept(ctx context.Context, in AcceptInput) (model.Acceptance, 
 		if err != nil {
 			return fmt.Errorf("quote：寫入接受單：%w", err)
 		}
-		if n == 0 { // 冪等鍵或 live 鎖擋下：先看是不是同一個鍵的另一個請求剛寫完
+		if n == 0 {
 			if out, found, err = replay(ctx, q, in); err != nil || found {
 				return err
 			}
@@ -113,7 +113,6 @@ func (s Service) Accept(ctx context.Context, in AcceptInput) (model.Acceptance, 
 	return out, err
 }
 
-// replay 以冪等鍵找第一次的接受單：沒有時 found 為 false；有但內容（需求、回價、版本、hash）不同回 INVALID_ARGUMENT。
 func replay(ctx context.Context, q *store.Queries, in AcceptInput) (model.Acceptance, bool, error) {
 	a, err := q.GetAcceptanceByClientRequest(ctx, store.GetAcceptanceByClientRequestParams{BuyerID: &in.BuyerID, ClientRequestID: in.ClientRequestID})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -131,7 +130,6 @@ func replay(ctx context.Context, q *store.Queries, in AcceptInput) (model.Accept
 	}, true, nil
 }
 
-// liveCollision 回這張需求已有進行中的成交；既有接受單已有訂單時帶 orderNo。
 func liveCollision(ctx context.Context, q *store.Queries, in AcceptInput) error {
 	e := apperr.FailedPrecondition("這張需求已經有進行中的成交").WithReason(apperr.ReasonRfqCheckoutAlreadyActive)
 	live, err := q.GetLiveAcceptance(ctx, store.GetLiveAcceptanceParams{RequestID: in.RequestID, BuyerID: &in.BuyerID})

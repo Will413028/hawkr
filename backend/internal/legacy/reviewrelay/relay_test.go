@@ -80,7 +80,6 @@ var (
 	reviewID   = uuid.MustParse("01990000-0000-7000-8000-0000000000a1")
 	product700 = uuid.MustParse("01990000-0000-7000-8000-000000000700")
 	occurredAt = time.Date(2026, 11, 20, 9, 30, 15, 123456789, time.FixedZone("TST", 8*3600))
-	// timestamp 是 Go time.Time 的 JSON：UTC、RFC3339Nano。
 	wireTimestamp = "2026-11-20T01:30:15.123456789Z"
 	createdAt     = time.Date(2026, 11, 20, 1, 0, 0, 0, time.UTC)
 )
@@ -97,7 +96,6 @@ func newFixture() (*Worker, *fakeReviews) {
 	return NewWorker(r, &recordingJobs{}, nil), r
 }
 
-// run 把模組事件交給 OnX，取出排入的 job，再交給 worker，回傳送出的訊息。
 func run[E any](t *testing.T, w *Worker, on func(jobs.Enqueuer) func(context.Context, E) error, event E) []rabbitmq.PublishArgs {
 	t.Helper()
 	relayed := &recordingJobs{}
@@ -110,7 +108,6 @@ func run[E any](t *testing.T, w *Worker, on func(jobs.Enqueuer) func(context.Con
 	published := &recordingJobs{}
 	w2 := *w
 	w2.Jobs = published
-	// 逐個執行排入的 relay job（刪帳會扇出成每組一個 job），直到只剩送出的 PublishArgs。
 	pending := relayed.args
 	for len(pending) > 0 {
 		next := &recordingJobs{}

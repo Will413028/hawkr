@@ -10,7 +10,6 @@ abstract class Address with _$Address {
     required String etag,
     required String receiverName,
     required String receiverPhone,
-    // 內政部 8 碼鄉鎮市區代碼與其後的明細（postal_address）；縣市、郵遞區號、名稱由 hawkr_twaddr 依代碼取得。
     @Default('') String townCode,
     @Default('') String addressDetail,
     @Default(false) bool isDefault,

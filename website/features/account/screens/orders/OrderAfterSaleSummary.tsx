@@ -13,7 +13,6 @@ function reasonLabel(reason: string): string {
 }
 
 function formatDate(raw: string): string {
-	// 解不出來就把原字串照登（沿用原行為）。
 	return formatTaipeiDate(raw) || raw;
 }
 
@@ -39,13 +38,10 @@ export function OrderAfterSaleSummary({
 	const { lookup, loading } = useMyAfterSales();
 	const aftersale = lookup.get(orderNo);
 
-	// Nothing to show and can't apply → render nothing (no empty noise).
 	if (!aftersale && !canRefund) return null;
-	// Still loading the list and there's no reason to apply yet — wait.
 	if (!aftersale && loading) return null;
 
 	if (!aftersale) {
-		// Apply CTA owned elsewhere (delivered action card) → stay silent.
 		if (hideApplyCta) return null;
 		return (
 			<section className="bg-content1 border border-divider rounded-hkui-lg p-5">

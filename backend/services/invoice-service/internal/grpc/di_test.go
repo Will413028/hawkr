@@ -9,8 +9,6 @@ import (
 	grpclib "google.golang.org/grpc"
 )
 
-// serviceFullName 是 proto 契約上的完整服務名。寫死字面值是刻意的：
-// 它就是註冊到 gRPC server 上的那把鍵，改了 proto package 就該讓這支測試轉紅。
 const serviceFullName = "hawkr.invoice.InvoiceService"
 
 // TestModule_RegistersInvoiceService 驗 handler **真的被註冊進 server**。

@@ -126,7 +126,6 @@ async function copyText(value: string): Promise<boolean> {
 			return true;
 		}
 	} catch {
-		// Some in-app browsers expose Clipboard but deny it at runtime.
 	}
 
 	const textarea = document.createElement("textarea");

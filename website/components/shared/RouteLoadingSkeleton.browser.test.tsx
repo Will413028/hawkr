@@ -22,7 +22,6 @@ const variants: Variant[] = [
 	"generic",
 ];
 
-// 各 variant 渲染的區塊（RouteLoadingVariants.tsx）；沒列出的 variant 沒有可比對的元素。
 const blockSelectors: Partial<Record<NonNullable<Variant>, string>> = {
 	"product-detail": ".route-loading-skeleton__purchase > span",
 	checkout: ".route-loading-skeleton__commerce-main > span",
@@ -46,7 +45,6 @@ describe("RouteLoadingSkeleton", () => {
 			const bounds = root.getBoundingClientRect();
 			const selector = variant ? blockSelectors[variant] : undefined;
 			const blocks = selector ? root.querySelectorAll(selector) : [];
-			// 渲染這些區塊的 variant 必須真的找到元素，不能讓迴圈對零個元素通過。
 			if (selector) expect(blocks.length).toBeGreaterThan(0);
 			for (const element of blocks) {
 				const box = element.getBoundingClientRect();

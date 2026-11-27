@@ -85,8 +85,6 @@ void main() {
         expect(find.text('訂單 QA-PENDING-2').hitTestable(), findsOneWidget);
         expect(tester.takeException(), isNull);
 
-        // Tabs still use the server status contract. Clear the action filter
-        // before checking a delivery order that needs no seller action.
         await tester.tap(find.text('全部 (2)'));
         await tester.tap(find.byKey(const ValueKey('seller_order_tab_1')));
         await tester.pump();

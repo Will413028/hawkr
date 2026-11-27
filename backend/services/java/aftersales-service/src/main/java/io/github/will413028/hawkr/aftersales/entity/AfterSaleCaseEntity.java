@@ -105,7 +105,6 @@ public class AfterSaleCaseEntity {
     /** §5.3.11 PayUni 解密後錯誤訊息原文（status=28 時填入，回傳前端顯示） */
     private String returnProviderMessage;
 
-    // ==================== 2026-05-22 逆物流退貨政策修訂 ====================
 
     /** §5.3.10.2 超商退貨到店時間（PayUni 碼 32 觸發 25→26 流轉時 stamp） */
     private LocalDateTime storeArrivedAt;
@@ -131,7 +130,6 @@ public class AfterSaleCaseEntity {
     @TableField("warned_confirm_receipt_24h_at")
     private LocalDateTime warnedConfirmReceipt24hAt;
 
-    // ==================== 2026-06-15 待寄回逾時政策修訂 ====================
 
     /** §5.3.8 買家寄回退貨逾時截止（= NOW + return.timeout-days；於 0/65 → 20 流轉當下 stamp；ReturnTimeoutWorker 與 ReturnTwentyFourHourWarnScheduler 掃此欄位） */
     private LocalDateTime shipBackDeadlineAt;
@@ -160,7 +158,6 @@ public class AfterSaleCaseEntity {
 
     private LocalDateTime closedAt;
 
-    // §10 申訴與平台裁決
     private String appealState;
 
     private LocalDateTime appealSubmittedAt;
@@ -169,12 +166,10 @@ public class AfterSaleCaseEntity {
 
     private LocalDateTime lastRejectedAt;
 
-    // §10.6.6 申訴內容結構化欄位（供 Admin 詳情 API 直讀，SubmitAppeal 時分別寫入）
     private String appealReason;
 
     private String appealDescription;
 
-    // §5.10 賣家處理期限自動升級
     private LocalDateTime processDeadline;
 
     private Boolean autoEscalated;

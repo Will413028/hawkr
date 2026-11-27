@@ -19,11 +19,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// 錯誤模型見 ADR 2026-09-25-api-error-model 與 API 設計規範（Connect）§八：code 表示類別，details 用
-// google.rpc 的標準型別。ErrorInfo 只在 client 需要分支時帶，給使用者的文字只放在 LocalizedMessage，
-// message 給開發者看。
 
-// errorDomain 是 ErrorInfo 的 domain。錯誤只有我們自己的產生者，正式網域上線時才確定。
 const errorDomain = "hawkr"
 
 // LocalizedMessage 回傳給使用者看的文字；locale 一律取自文字本身（Message.Locale 是實際使用的語系，缺字退回 zh-TW 時就是 zh-TW，
@@ -50,12 +46,10 @@ func CommonFailure(ctx context.Context, code connect.Code) error {
 	return userError(code, CommonText(ctx, code))
 }
 
-// transportError 是傳輸層自己判斷的錯誤。它與模組的 apperr 是 toConnect 僅有的兩種來源：其他錯誤
-// （包括下游 client 回的 *connect.Error）一律變成 internal，不把下游的 code 與訊息轉給 client。
 type transportError struct {
 	code      connect.Code
-	message   string         // 給開發者看
-	localized uitext.Message // 給使用者看；Text 是空字串表示不帶 LocalizedMessage
+	message   string
+	localized uitext.Message
 }
 
 func (e *transportError) Error() string { return e.code.String() + ": " + e.message }
@@ -86,12 +80,10 @@ func RetryLater(ctx context.Context, wait time.Duration) *connect.Error {
 	return ce
 }
 
-// userError 是要讓使用者看到文字的傳輸層錯誤（認證、授權、逾時）。
 func userError(code connect.Code, m uitext.Message) error {
 	return &transportError{code: code, message: m.Text, localized: m}
 }
 
-// kindCodes 是模組錯誤的分類對應的 Connect 錯誤碼。
 var kindCodes = map[apperr.Kind]connect.Code{
 	apperr.KindInvalidInput:       connect.CodeInvalidArgument,
 	apperr.KindNotFound:           connect.CodeNotFound,
@@ -104,16 +96,12 @@ var kindCodes = map[apperr.Kind]connect.Code{
 	apperr.KindResourceExhausted:  connect.CodeResourceExhausted,
 }
 
-// converted 是 toConnect 的結果。internal 為 true 表示這是沒有分類的錯誤：回給 client 的訊息是固定的，
-// 細節只進 log。unmapped 是模組回報、但沒有附給 client 的欄位（handler 沒有對應到請求路徑）：
-// client 只拿到摘要文字，這是 handler 的 bug，interceptor 以 error 等級記錄。
 type converted struct {
 	err      *connect.Error
 	internal bool
 	unmapped []string
 }
 
-// toConnect 把 handler 回傳的錯誤轉成 Connect 的錯誤，這是單體唯一的轉換點。
 func toConnect(ctx context.Context, err error) converted {
 	if err == nil {
 		return converted{}
@@ -164,8 +152,6 @@ func fromAppErr(code connect.Code, ae *apperr.Error, paths FieldPaths, request p
 	if ae.RetryAfter > 0 {
 		addDetail(ce, &errdetails.RetryInfo{RetryDelay: durationpb.New(ae.RetryAfter)})
 	}
-	// BadRequest 只屬於 invalid_argument（API 設計規範「八、錯誤」）：欄位只能由 InvalidInputOn、InvalidInputFields
-	// 在建立時帶，分類建立後不能改，所以有欄位的錯誤一定是 invalid_argument。
 	var violations []*errdetails.BadRequest_FieldViolation
 	var unmapped []string
 	for _, v := range ae.FieldViolations() {
@@ -192,7 +178,6 @@ func fromAppErr(code connect.Code, ae *apperr.Error, paths FieldPaths, request p
 func addDetail(ce *connect.Error, m proto.Message) {
 	d, err := connect.NewErrorDetail(m)
 	if err != nil {
-		// 只有訊息無法序列化時才會發生；這些都是固定的標準型別。
 		panic(err)
 	}
 	ce.AddDetail(d)
@@ -206,10 +191,6 @@ func addDetail(ce *connect.Error, m proto.Message) {
 // （"Reason[2]"）或沒有對應的欄位對應不到，會被當成沒有對應的欄位記錄。
 type FieldPaths map[string]string
 
-// sameNameField 是沒有明列對應時的自動規則：模組的欄位名是單純的識別字（沒有 []、沒有 .），而且它的 snake_case
-// 寫法（PageSize → page_size、RequestID → request_id）是請求訊息的頂層欄位，就對應到那個欄位。明列的 FieldPaths 優先；
-// 請求沒有同名欄位時不對應（例如請求欄位叫 max_results 的 PageSize），由 handler 以 WithFieldPaths 列對應。
-// 請求訊息未知（request 為 nil：沒有請求訊息可對照的路徑，例如入口中介層的 ConnectError）時不對應。
 func sameNameField(request protoreflect.MessageDescriptor, field string) (string, bool) {
 	if request == nil || field == "" {
 		return "", false
@@ -226,7 +207,6 @@ func sameNameField(request protoreflect.MessageDescriptor, field string) (string
 	return name, true
 }
 
-// snakeCase 把 Go 欄位名轉成 proto 欄位名：連續的大寫視為一個詞（RequestID → request_id）。
 func snakeCase(s string) string {
 	rs := []rune(s)
 	var b strings.Builder
@@ -248,7 +228,6 @@ func snakeCase(s string) string {
 	return b.String()
 }
 
-// requestError 讓轉換看得到請求訊息的 descriptor，由 interceptor 在 handler 回錯後附上。
 type requestError struct {
 	err  error
 	desc protoreflect.MessageDescriptor
@@ -291,7 +270,6 @@ func (p FieldPaths) path(field string) (string, bool) {
 	key := fieldIndex.ReplaceAllString(field, "[]")
 	path, ok := p[key]
 	if !ok && !strings.HasSuffix(key, "[]") {
-		// 整個 repeated 欄位的錯誤：找結尾帶 [] 的那一筆，去掉結尾的 []。
 		if elem, found := p[key+"[]"]; found {
 			path, ok = strings.CutSuffix(elem, "[]")
 		}
@@ -318,8 +296,6 @@ func CheckFieldPaths(desc protoreflect.MessageDescriptor, paths FieldPaths) []st
 	return missing
 }
 
-// pathExists 檢查以 . 分隔的欄位路徑在訊息裡存在，而且帶 [] 的每一段都是 repeated 欄位；中間的 repeated 段一定要帶 []，
-// 只有最後一段可以不帶（整個欄位的錯誤指到 repeated 欄位本身）。
 func pathExists(desc protoreflect.MessageDescriptor, path string) bool {
 	parts := strings.Split(path, ".")
 	for i, p := range parts {

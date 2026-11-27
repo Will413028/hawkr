@@ -13,7 +13,6 @@ import (
 type fakeTimeSource struct {
 	unix atomic.Int64
 	err  error
-	// calls 記錄 Resync 打了幾次。
 	calls atomic.Int64
 }
 
@@ -43,10 +42,10 @@ func TestClockZeroOffsetBehavesLikeNoLayer(t *testing.T) {
 // ⇒ 補償後送出的 time 必須落回伺服器時間。
 func TestClockResyncCompensatesOffset(t *testing.T) {
 	t.Parallel()
-	local := time.Unix(1787577174, 0).UTC() // 本機時間
+	local := time.Unix(1787577174, 0).UTC()
 	c := newClockWithSource(func() time.Time { return local })
 	src := &fakeTimeSource{}
-	src.unix.Store(local.Unix() + 300) // 伺服器快 5 分鐘
+	src.unix.Store(local.Unix() + 300)
 
 	if err := c.Resync(context.Background(), src); err != nil {
 		t.Fatalf("Resync: %v", err)

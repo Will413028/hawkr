@@ -11,7 +11,6 @@ func TestOnlyPlatformLLMImportsLLMClients(t *testing.T) {
 	for _, v := range violations {
 		t.Error(v)
 	}
-	// 允許的套件實際用到三條受限路徑；沒看到代表掃描範圍或規則失效。
 	seen := map[string]bool{}
 	for _, p := range pkgs {
 		if p.ImportPath != ModulePath+"/internal/platform/llm" {

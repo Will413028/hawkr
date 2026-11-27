@@ -31,11 +31,8 @@ const DefaultBaseURL = "https://data.gcis.nat.gov.tw"
 // DefaultTimeout 是 Config.Timeout 的預設值：一次 Lookup（最多兩個請求）的總上限。
 const DefaultTimeout = 5 * time.Second
 
-// maxResponse 是單一回應本文的讀取上限（一筆登記資料遠小於它）。
 const maxResponse = 1 << 20
 
-// 兩個資料集的 oid。公司登記基本資料（應用一）以 Business_Accounting_NO 篩選；商業登記基本資料（應用三）只用統編
-// 篩選，不需要登記機關代碼。
 const (
 	companyOid  = "5F64D864-61CB-4D0D-8AD9-492047CC1EA6"
 	businessOid = "426D5542-5F05-43EB-83F9-F1300F14E1F1"
@@ -195,8 +192,6 @@ func (c *Client) Lookup(ctx context.Context, taxID string) (reg Registration, fo
 	}, true, nil
 }
 
-// checkRecord 確認回來的那一筆就是查的統編、而且有名稱：對方忽略篩選條件（回資料集的第一筆）或回 [null]、[{}] 時，
-// 不能當成查到，那是沒有給出可用的答案。
 func checkRecord(asked, got, name string) error {
 	if got != asked || strings.TrimSpace(name) == "" {
 		return errors.New("資料來源回的不是查詢的統編，或沒有名稱")
@@ -204,11 +199,8 @@ func checkRecord(asked, got, name string) error {
 	return nil
 }
 
-// controlChars 是對方夾在 JSON 裡的控制字元（會讓標準的 JSON 解析失敗）。
 var controlChars = regexp.MustCompile(`[\x00-\x08\x0b\x0c\x0e-\x1f]`)
 
-// fetchOne 以 $filter=<field> eq <統編> 查一個資料集，回第一筆的原始 JSON；nil 是這個資料集查無（空本文與空陣列都是
-// 對方表示查無的寫法）。非 200 與無法解讀的回應是錯誤。
 func (c *Client) fetchOne(ctx context.Context, oid, field, taxID string) (json.RawMessage, error) {
 	u := *c.base
 	u.Path = strings.TrimRight(u.Path, "/") + "/od/data/api/" + oid
@@ -246,7 +238,6 @@ func (c *Client) fetchOne(ctx context.Context, oid, field, taxID string) (json.R
 	return records[0], nil
 }
 
-// parseRepublicDate 把民國 YYYMMDD 轉成日曆日（UTC 午夜）；格式不合或不是存在的日期時回零值。
 func parseRepublicDate(s string) time.Time {
 	if len(s) != 7 {
 		return time.Time{}
@@ -270,7 +261,6 @@ func parseRepublicDate(s string) time.Time {
 	return d
 }
 
-// companyTypes 是公司型態的結尾；「股份有限公司」以「有限公司」為結尾，所以先判斷它。
 var companyTypes = []string{"股份有限公司", "有限合夥", "無限公司", "兩合公司", "有限公司"}
 
 func companyType(name string) string {

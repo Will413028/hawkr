@@ -1,5 +1,4 @@
 -- name: DeleteExpiredDeliveries :execrows
--- 保留期清除：created_at 早於 cutoff 的投遞紀錄，依 created_at 分批。先刪投遞，intents 才刪得掉（deliveries.intent_id 是 RESTRICT）。
 DELETE FROM notification.deliveries
 WHERE id IN (
     SELECT d.id FROM notification.deliveries d
@@ -9,7 +8,6 @@ WHERE id IN (
 );
 
 -- name: DeleteExpiredIntents :execrows
--- 保留期清除：created_at 早於 cutoff 且已沒有投遞紀錄的意圖（投遞紀錄還在保留期內的意圖留著）；inbox_item_intents 的連結隨意圖 CASCADE 刪除。
 DELETE FROM notification.intents
 WHERE id IN (
     SELECT i.id FROM notification.intents i
@@ -20,7 +18,6 @@ WHERE id IN (
 );
 
 -- name: DeleteExpiredInboxItems :execrows
--- 保留期清除：updated_at（最後一次合併）早於 cutoff 的收件匣列，依 updated_at 分批；連結隨列 CASCADE 刪除。
 DELETE FROM notification.inbox_items
 WHERE id IN (
     SELECT x.id FROM notification.inbox_items x
@@ -30,16 +27,11 @@ WHERE id IN (
 );
 
 -- name: ScrubIntentParams :exec
--- 個資清除：Process 發現收件人已刪除或退場而略過時，把這一個意圖的參數換成 '{}'（意圖還沒有收件匣連結或投遞紀錄，
--- ScrubRecipientIntentParams 找不到它）；已是 '{}' 時不動，所以可重跑。
 UPDATE notification.intents
 SET params = '{}'::jsonb
 WHERE id = sqlc.arg(id) AND params <> '{}'::jsonb;
 
 -- name: ScrubRecipientIntentParams :execrows
--- 個資清除：把該收件人的意圖參數換成 '{}'（意圖經 inbox_item_intents 與 deliveries 找到），分批；已是 '{}' 的不再處理，所以可重跑。
--- 收件人範圍：audience 為 NULL 是帳號的全部列；store_id 為 NULL 不限店。
--- 公告的意圖（id 與公告相同）由全部推播收件人共用，參數只有公告 ID、沒有個資，不在單一收件人的清除範圍內。
 UPDATE notification.intents
 SET params = '{}'::jsonb
 WHERE id IN (
@@ -64,7 +56,6 @@ WHERE id IN (
 );
 
 -- name: ScrubRecipientDeliveryText :execrows
--- 個資清除：該收件人的投遞紀錄清掉送出文字與語系（列留著，D16），分批；已清過的不再處理。
 UPDATE notification.deliveries
 SET locale = NULL, sent_title = NULL, sent_body = NULL
 WHERE id IN (
@@ -77,7 +68,6 @@ WHERE id IN (
 );
 
 -- name: DeleteRecipientInboxItems :execrows
--- 個資清除：刪該收件人的收件匣列（連結隨列 CASCADE），分批。
 DELETE FROM notification.inbox_items
 WHERE id IN (
     SELECT x.id FROM notification.inbox_items x
@@ -88,7 +78,6 @@ WHERE id IN (
 );
 
 -- name: DeleteAccountPreferenceOverrides :exec
--- 個資清除：刪帳號的偏好覆寫；偏好是 (帳號, 受眾) 的，沒有店別，audience 為 NULL 是全部受眾。每個帳號最多 14 分類乘 3 渠道乘 2 受眾列，一次刪完。
 DELETE FROM notification.preference_overrides
 WHERE account_id = sqlc.arg(account_id)
   AND (sqlc.narg(audience)::text IS NULL OR audience = sqlc.narg(audience)::text);

@@ -2,7 +2,6 @@ package discovery
 
 import "github.com/Will413028/hawkr/backend/internal/modules/discovery/internal/ranking"
 
-// 模組擁有的 port（形狀由 discovery 定義，見 internal/ranking/ports.go）。
 
 // Orders 是訂單統計的 port；OrderStats 是它的回傳。
 type Orders = ranking.Orders

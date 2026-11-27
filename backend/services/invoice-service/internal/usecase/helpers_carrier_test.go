@@ -30,7 +30,6 @@ func TestNormalizeBuyerIdentity_CarrierHiddenCodeMirrorsDisplay(t *testing.T) {
 		carrier string
 		value   string
 	}{
-		// 三種載具類型的規則相同（3040131 / 3040133 / 3040135 只是碼不同）。
 		{"手機條碼", "3J0002", "/GHI+.2"},
 		{"自然人憑證", "CQ0001", "AB12345678901234"},
 		{"光貿會員載具", "amego", "a0911222333"},
@@ -45,7 +44,6 @@ func TestNormalizeBuyerIdentity_CarrierHiddenCodeMirrorsDisplay(t *testing.T) {
 			if id1 != c.value {
 				t.Errorf("顯碼 = %q, want %q", id1, c.value)
 			}
-			// 🔴 這一格是本測的本體：隱碼留空 ⇒ AMEGO 回 3040131，發票開不出來。
 			if id2 != c.value {
 				t.Errorf("隱碼 = %q, want %q（與顯碼相同）—— 留空會讓 AMEGO 回 3040131，"+
 					"每一張帶載具的發票都落 ISSUE_FAILED", id2, c.value)
@@ -74,7 +72,6 @@ func TestNormalizeBuyerIdentity_NoCarrierLeavesBothEmpty(t *testing.T) {
 	})
 
 	t.Run("B2B 不帶載具", func(t *testing.T) {
-		// 統編發票不得同時帶載具（chk_invdoc_exclusive），且 AMEGO 對 B2B 只看統編。
 		draft := &domain.IssueDraft{CarrierType: "3J0002", CarrierValue: "/GHI+.2"}
 		ct, id1, id2, donation := normalizeBuyerIdentity(codemeta.InvoiceDocumentKindB2b.Value, draft, "")
 		if ct != "" || id1 != "" || id2 != "" || donation != "" {

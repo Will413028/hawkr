@@ -11,7 +11,6 @@ import (
 	"time"
 )
 
-// fake 以資料集的 oid 回不同的本文，記下每個請求。
 type fake struct {
 	company, business         string
 	companyStatus, bizStatus  int
@@ -199,7 +198,7 @@ func TestParseRepublicDate(t *testing.T) {
 	for in, want := range map[string]time.Time{
 		"0760221": time.Date(1987, 2, 21, 0, 0, 0, 0, time.UTC),
 		"1120101": time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC),
-		"1120229": {}, // 民國 112 年不是閏年
+		"1120229": {},
 		"1090229": time.Date(2020, 2, 29, 0, 0, 0, 0, time.UTC),
 		"0761301": {}, "0760232": {}, "0760000": {}, "0000101": {}, "": {}, "076022": {}, "07602210": {}, "abc0221": {},
 	} {
@@ -284,19 +283,16 @@ func TestLookupReturnsTheRawStatusAndSuspensionPeriod(t *testing.T) {
 			t.Errorf("%q：reg=%+v", text, reg)
 		}
 	}
-	// 迄日早於起日：兩個日期原樣回傳。
 	inverted := `[{"Business_Accounting_NO":"33330333","Company_Name":"某某有限公司","Sus_Beg_Date":"0830331","Sus_End_Date":"0821101"}]`
 	reg, _, err := newClient(t, &fake{company: inverted}, 0).Lookup(ctx, "33330333")
 	if err != nil || !reg.SuspendedFrom.Equal(time.Date(1994, 3, 31, 0, 0, 0, 0, time.UTC)) || !reg.SuspendedUntil.Equal(time.Date(1993, 11, 1, 0, 0, 0, 0, time.UTC)) {
 		t.Fatalf("reg=%+v err=%v", reg, err)
 	}
-	// 缺漏或不合法的日期是零值。
 	broken := `[{"Business_Accounting_NO":"33330333","Company_Name":"某某有限公司","Sus_Beg_Date":"","Sus_End_Date":"abc"}]`
 	reg, _, err = newClient(t, &fake{company: broken}, 0).Lookup(ctx, "33330333")
 	if err != nil || !reg.SuspendedFrom.IsZero() || !reg.SuspendedUntil.IsZero() {
 		t.Fatalf("reg=%+v err=%v", reg, err)
 	}
-	// 商業登記：代碼與原文各自回傳，沒有停業期間。
 	biz := `[{"President_No":"71777777","Business_Name":"某某企業社","Business_Current_Status":"02","Business_Current_Status_Desc":"某個現況"}]`
 	reg, _, err = newClient(t, &fake{company: `[]`, business: biz}, 0).Lookup(ctx, "71777777")
 	if err != nil || reg.Source != SourceBusiness || reg.StatusCode != "02" || reg.StatusText != "某個現況" || !reg.SuspendedFrom.IsZero() {

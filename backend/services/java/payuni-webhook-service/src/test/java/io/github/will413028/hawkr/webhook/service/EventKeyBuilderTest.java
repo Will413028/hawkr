@@ -78,7 +78,6 @@ class EventKeyBuilderTest {
         @DisplayName("UNKNOWN 使用 timestamp 確保唯一，避免 UNIQUE 衝突")
         void unknown_usesTimestamp() {
             String key1 = EventKeyBuilder.build(PayUniEventType.UNKNOWN, Map.of("MerID", "HAWK9"));
-            // 短暫延遲避免同毫秒
             try { Thread.sleep(2); } catch (InterruptedException ignored) {}
             String key2 = EventKeyBuilder.build(PayUniEventType.UNKNOWN, Map.of("MerID", "HAWK9"));
             assertNotEquals(key1, key2,

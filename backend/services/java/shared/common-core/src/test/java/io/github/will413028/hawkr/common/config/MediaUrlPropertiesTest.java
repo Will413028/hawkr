@@ -28,16 +28,11 @@ class MediaUrlPropertiesTest {
 
     @Test
     void buildUrl_hasNoDefaultDomain() {
-        // 無預設域名（backend#2283）：媒體域名不做新舊相容，dev 一律 test-media、prod 一律 media，
-        // 一律由 MEDIA_BASE_URL 注入。舊實作預設回退一個已退役的 OSS 網域，DNS 一撤就靜默吐死連結。
         assertEquals("", new MediaUrlProperties().getBaseUrl());
     }
 
     @Test
     void buildUrl_emptyBaseReturnsBareObjectKey() {
-        // 對齊 Go pkg/mediaurl.BuildImageURL：base 未設時回裸 objectKey，讓前端 buildImageUrl
-        // 補上自己的 media base。**不可**回 "/i/original/..." 相對路徑，前端會再組一次而
-        // 變成 /i/original/i/original/...。
         assertEquals("public/product/x.jpg", props("").buildUrl("public/product/x.jpg"));
         assertEquals("public/product/x.jpg", props("").buildUrl("/public/product/x.jpg"));
         assertEquals("public/product/x.jpg", props("").buildUrl("public/product/x.jpg", "thumb"));

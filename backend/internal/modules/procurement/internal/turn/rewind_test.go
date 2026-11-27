@@ -14,7 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// chainOf 依序建立版本：每一版的內容祖先是 parents 指的那一版（-1 是沒有祖先）。city 是縣市（空字串是沒填）。
 func chainOf(cities []string, parents []int) []store.ProcurementRequestRevision {
 	var out []store.ProcurementRequestRevision
 	for i, c := range cities {
@@ -56,7 +55,6 @@ func TestRewindTargetSkipsRevisionsThatLeftTheSlotAlone(t *testing.T) {
 }
 
 func TestRewindTargetStepsFurtherBackAfterARewindAndThenRunsOut(t *testing.T) {
-	// 1 臺北市 → 2 臺中市 → 3 高雄市；倒回得到第 4 版（內容同第 2 版，祖先是第 2 版）；再倒回得到第 5 版（內容同第 1 版）。
 	revs := chainOf([]string{"臺北市", "臺中市", "高雄市", "臺中市"}, []int{-1, 0, 1, 1})
 	got, err := rewindTarget(revs, revs[3], slots.DeliveryCity)
 	if err != nil || got.ID != revs[0].ID {
@@ -75,7 +73,6 @@ func TestRewindTargetCanLandOnAVersionWhereTheSlotWasUnset(t *testing.T) {
 	if err != nil || got.ID != revs[0].ID || got.DeliveryCity != nil {
 		t.Fatalf("target = %+v %v，要欄位還沒填的第一版", got, err)
 	}
-	// 倒回之後（第 3 版內容同第 1 版）欄位沒有值，沒有東西可倒回。
 	revs = append(revs, store.ProcurementRequestRevision{ID: uuid.NewV7(), RevisionNo: 3, Item: sp("蘋果"), ParentRevisionID: &revs[0].ID})
 	_, err = rewindTarget(revs, revs[2], slots.DeliveryCity)
 	wantNothingToRewind(t, err)

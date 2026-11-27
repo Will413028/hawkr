@@ -51,7 +51,6 @@ Future<_Repo> _openComments(
   addTearDown(tester.view.resetDevicePixelRatio);
   final repo = _Repo();
   when(() => repo.listMyPosts()).thenAnswer((_) async => [post]);
-  // 伺服器計數的校正預設不回來；要驗證校正的測試自己覆寫。
   when(() => repo.getMyPost(any())).thenAnswer((_) => Completer<Post>().future);
   when(
     () => repo.listComments(42),

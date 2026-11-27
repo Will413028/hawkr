@@ -160,8 +160,6 @@ export function isConfiguredMediaUrl(url: URL): boolean {
 	const base = getEnv().mediaBaseUrl;
 	if (!base) return false;
 	const origin = new URL(base);
-	// `URL.port` is "" for a scheme's default port, so an explicit `:443` on an
-	// https URL equals the configured origin without one.
 	return (
 		url.protocol === origin.protocol &&
 		url.port === origin.port &&
@@ -170,9 +168,6 @@ export function isConfiguredMediaUrl(url: URL): boolean {
 }
 
 export function normalizeMediaHostname(hostname: string): string {
-	// A fully-qualified DNS name may carry a trailing dot. Browsers resolve it
-	// to the same host, so host-boundary checks must not let that spelling turn
-	// the media host into a "foreign" passthrough URL.
 	return hostname.toLowerCase().replace(/\.+$/, "");
 }
 
@@ -199,20 +194,18 @@ function restoreMediaObjectKey(value: string): RestoredMediaObject | null {
 	try {
 		sourceUrl = new URL(value);
 	} catch {
-		return null; // not an absolute URL
+		return null;
 	}
 	if (!isConfiguredMediaHost(sourceUrl.hostname)) return null;
-	let rest = sourceUrl.pathname.replace(/^\/+/, ""); // drop leading slash(es)
+	let rest = sourceUrl.pathname.replace(/^\/+/, "");
 	if (rest.startsWith("i/")) {
-		const afterI = rest.slice(2); // "{preset}/{objectKey}"
+		const afterI = rest.slice(2);
 		const idx = afterI.indexOf("/");
 		if (idx >= 0) rest = afterI.slice(idx + 1);
 	}
 	return {
 		objectKey: rest,
 		sourceUrl,
-		// URL.search / URL.hash are empty for a bare `?` / `#`; inspect the raw
-		// absolute URL as well so even those delimiters remain opaque.
 		hasOpaqueSuffix: value.includes("?") || value.includes("#"),
 	};
 }
@@ -231,18 +224,12 @@ export function buildImageUrl(
 
 	const base = getEnv().mediaBaseUrl;
 
-	// A value already on the configured media host is peeled back to its
-	// objectKey so it re-renders under the requested preset. A query or fragment
-	// makes the existing URL opaque: changing its path can invalidate a
-	// signature, so the entire URL is preserved instead.
 	const restored = restoreMediaObjectKey(trimmed);
 	if (restored !== null) {
 		if (restored.hasOpaqueSuffix) return trimmed;
 		return `${base}/i/${preset}/${restored.objectKey}`;
 	}
-	// Foreign URLs / data / blob / local assets are not objectKeys → passthrough.
 	if (isPassthrough(trimmed)) return trimmed;
-	// No media origin configured: there is no host to build an object URL on.
 	if (!base) return "";
 	const key = trimmed.startsWith("/") ? trimmed.slice(1) : trimmed;
 	return `${base}/i/${preset}/${key}`;

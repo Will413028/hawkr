@@ -23,7 +23,6 @@ func TestAvatarDTOs_OutwardJSONKeyIsFlatAvatarKey(t *testing.T) {
 	cases := []struct {
 		name string
 		v    any
-		// 同物件內共存的其他媒體欄（若有）——順帶證明扁平化沒有跟它們撞名。
 		alsoWant []string
 	}{
 		{"OrderDetailResponse", OrderDetailResponse{
@@ -47,7 +46,6 @@ func TestAvatarDTOs_OutwardJSONKeyIsFlatAvatarKey(t *testing.T) {
 		}, []string{`"logoKey"`, `"logoUrl"`}},
 	}
 
-	// 收斂掉的舊名一個都不准回來。
 	banned := []string{
 		`"buyerAvatarKey"`, `"buyerAvatarUrl"`,
 		`"userAvatarKey"`, `"userAvatarUrl"`,

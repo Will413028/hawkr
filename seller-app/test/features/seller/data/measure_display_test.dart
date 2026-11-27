@@ -9,7 +9,7 @@ import '../../../support/taipei_display.dart';
 
 void main() {
   group('measureEffect：措施目前的影響（讀 state）', () {
-    final end = DateTime.utc(2026, 10, 19, 8, 30); // 臺北 2026/10/19 16:30
+    final end = DateTime.utc(2026, 10, 19, 8, 30);
 
     test('已撤銷：一般寫「已撤銷」，依據的認定被撤銷時寫原因', () {
       final revoked = measureOf(
@@ -64,7 +64,6 @@ void main() {
     });
 
     test('state 讀伺服器的值，不用現在時間與 end_time 比較', () {
-      // end_time 在遠古的過去、伺服器仍說生效中：照 state。
       final m = measureOf(
         period: measurePeriod(end: DateTime.utc(2020, 1, 1, 8)),
       );
@@ -504,7 +503,7 @@ void main() {
     });
 
     test('原因取伺服器排好的第一筆的句子（不取最後一筆、不自己依優先序推導）', () {
-      final next = DateTime.utc(2026, 11, 1, 6, 5); // 臺北 2026/11/01 14:05
+      final next = DateTime.utc(2026, 11, 1, 6, 5);
       String? reasonOf(List<RemediationUnavailableReason> reasons) =>
           remediationAction(
             riskSuspension(

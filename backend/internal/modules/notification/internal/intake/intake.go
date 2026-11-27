@@ -160,7 +160,6 @@ func (s *Service) Process(ctx context.Context, intentID uuid.UUID) error {
 	}
 	resolved := x.Resolved
 	if slices.Contains(resolved.ActorAccounts, resolved.Recipient.AccountID) {
-		// 自己觸發的事不通知自己；比的是帳號，不是店或買家 ID。
 		s.log().InfoContext(ctx, "收件人就是 actor，略過通知", "intent_id", intent.ID, "type", intent.Type)
 		return s.d.DB.InTx(ctx, func(ctx context.Context) error { return s.scrubSkipped(ctx, intent.ID) })
 	}
@@ -185,8 +184,6 @@ func (s *Service) Process(ctx context.Context, intentID uuid.UUID) error {
 		if err != nil {
 			return err
 		}
-		// 同 transaction 內 pg_notify：commit 後才送達所有 serve 行程（worker 與 serve 是不同行程，記憶體內的通知到不了）；
-		// payload 只有業務鍵，訊號內容由 serve 端讀取；訊號可合併，重試重複通知無害。
 		if wroteInbox && s.d.Signals != nil {
 			if err := s.d.Signals.InboxChanged(ctx, resolved.Recipient.AccountID, spec.Audience(), resolved.Recipient.StoreID, spec.StateHint, itemID); err != nil {
 				return err
@@ -196,9 +193,6 @@ func (s *Service) Process(ctx context.Context, intentID uuid.UUID) error {
 	})
 }
 
-// scrubSkipped 在 Process 因收件人已刪除、已關閉、已退場、就是 actor 或有封鎖而略過時，把這個意圖的參數換成 '{}'（D16）：意圖還沒有收件匣連結或投遞紀錄，
-// 收件人的清除 job 找不到它；與略過同一個 transaction。重試時意圖已經有連結或投遞紀錄（先前的嘗試寫過）就不清：那些列與渠道 job 還要讀這份參數，
-// 收件人的清除 job 也找得到它。
 func (s *Service) scrubSkipped(ctx context.Context, intentID uuid.UUID) error {
 	q := store.New(s.d.DB.Conn(ctx))
 	written, err := q.IntentHasRecipientRows(ctx, intentID)
@@ -214,7 +208,6 @@ func (s *Service) scrubSkipped(ctx context.Context, intentID uuid.UUID) error {
 	return nil
 }
 
-// logGone 記下略過的原因：帳號或買家列不存在是資料異常（Warn），已刪除、已關閉、已退場是正常的略過（Info）。店家已退場與不存在無法區分（同樣回 NotFound）。
 func (s *Service) logGone(ctx context.Context, intent store.NotificationIntent, gone Gone) {
 	switch gone {
 	case GoneNone:
@@ -238,7 +231,6 @@ func (s *Service) log() *slog.Logger {
 	return slog.Default()
 }
 
-// deliver 寫入每個渠道的紀錄，回報這次有沒有碰收件匣（寫入或已連結的重試都算，由呼叫端在同一個 transaction 內通知串流）。
 func (s *Service) deliver(ctx context.Context, intent store.NotificationIntent, spec registry.Spec, r registry.Resolved) (bool, uuid.UUID, error) {
 	q := store.New(s.d.DB.Conn(ctx))
 	var storeID *int64
@@ -264,8 +256,6 @@ func (s *Service) deliver(ctx context.Context, intent store.NotificationIntent, 
 			continue
 		}
 		if model.DeliveryChannel(ch) {
-			// 投遞紀錄是推播與 email 的唯一帳本；每筆新紀錄在同一個 transaction 排一個渠道 job（deliver 套件執行）。
-			// 紀錄已存在（重試）時 job 已隨第一次的 transaction 排過，不再排。
 			id, err := q.InsertDelivery(ctx, store.InsertDeliveryParams{
 				ID: s.d.NewID(), IntentID: intent.ID, AccountID: r.Recipient.AccountID, Audience: string(spec.Audience()),
 				StoreID: storeID, Channel: string(ch), Now: now,

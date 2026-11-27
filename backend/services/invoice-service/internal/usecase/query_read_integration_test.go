@@ -27,9 +27,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/repository/postgres"
 )
 
-// ---------------------------------------------------------------------------
-// §8.1.3(b)：同一份文件、三個視角、三種形態
-// ---------------------------------------------------------------------------
 
 // TestIntegration_QueryRead_ThreeFacesOfTheSameCarrier 是本波最重要的一支。
 //
@@ -46,7 +43,6 @@ func TestIntegration_QueryRead_ThreeFacesOfTheSameCarrier(t *testing.T) {
 	env := qitSetup(t)
 	doc := qitSeedDocument(t, env, env.issuerID+1100, qitBuyerA, "O000001101")
 
-	// 前提：落庫的是密文。這一句同時證明後面看到的明碼真的來自解密。
 	var stored string
 	if err := env.pool.QueryRow(ctx,
 		`SELECT carrier_id1_ciphertext FROM invoice_documents WHERE id=$1`, doc.ID).Scan(&stored); err != nil {
@@ -56,7 +52,6 @@ func TestIntegration_QueryRead_ThreeFacesOfTheSameCarrier(t *testing.T) {
 		t.Fatal("🔴 載具明碼直接落庫了（§5.1.5 要求密文儲存）")
 	}
 
-	// ── 買家面：完整 ──
 	buyerView, err := env.query.GetBuyerDocument(ctx, qitBuyerA, doc.ID)
 	if err != nil {
 		t.Fatalf("買家應讀得到自己的文件：%v", err)
@@ -65,7 +60,6 @@ func TestIntegration_QueryRead_ThreeFacesOfTheSameCarrier(t *testing.T) {
 		t.Fatalf("🔴 買家是資料主體，載具應為完整值（§8.1.3(b)），實得 %q", buyerView.CarrierSummary)
 	}
 
-	// ── 賣家面：遮罩 ──
 	sellerView, err := env.query.GetSellerDocument(ctx, env.storeID, doc.ID)
 	if err != nil {
 		t.Fatalf("賣家應讀得到自己開出的文件：%v", err)
@@ -74,21 +68,16 @@ func TestIntegration_QueryRead_ThreeFacesOfTheSameCarrier(t *testing.T) {
 	if sellerView.Detail.CarrierSummary != wantMasked {
 		t.Fatalf("🔴 賣家不是資料主體，載具必須遮罩成 %q，實得 %q", wantMasked, sellerView.Detail.CarrierSummary)
 	}
-	// 判準的第二層：**整個投影裡找不到明碼**。只驗欄位值擋不住
-	// 「有人多帶一個欄位把明碼撈出去」，而那正是 write-only 語意最常見的破法。
 	if blob := fmt.Sprintf("%+v", sellerView); strings.Contains(blob, qitCarrierPlain) {
 		t.Fatalf("🔴 買家載具明碼出現在賣家的投影裡：%s", blob)
 	}
 	if strings.Contains(fmt.Sprintf("%+v", sellerView), qitEmailPlain) {
 		t.Fatal("🔴 買家 email 明碼出現在賣家的投影裡")
 	}
-	// 賣家讀取**不得**留 PII 揭露稽核：他看到的是遮罩值，沒有揭露任何 P 類明文。
-	// 留了的話 InvoicePiiRevealSpike 告警會被賣家的日常操作淹沒。
 	if n := countPiiReveals(t, env, doc.ID); n != 0 {
 		t.Fatalf("🔴 賣家面（遮罩）不該留 PII 揭露稽核，實得 %d 列", n)
 	}
 
-	// ── ADM 面：明碼 ＋ 稽核 ──
 	const actorID = int64(90101)
 	adminView, err := env.query.GetDocumentForAdmin(ctx, actorID, doc.ID)
 	if err != nil {
@@ -105,7 +94,6 @@ func TestIntegration_QueryRead_ThreeFacesOfTheSameCarrier(t *testing.T) {
 	}
 }
 
-// countPiiReveals 回這份文件目前有幾列 INVOICE_PII_REVEAL 稽核。
 func countPiiReveals(t *testing.T, env *qitEnv, documentID int64) int {
 	t.Helper()
 	var n int
@@ -118,7 +106,6 @@ func countPiiReveals(t *testing.T, env *qitEnv, documentID int64) int {
 	return n
 }
 
-// failingAudit 讓稽核寫入失敗，其餘讀取照常。
 type failingAudit struct {
 	domain.AuditRepository
 }
@@ -166,16 +153,11 @@ func TestIntegration_QueryRead_AdminRevealFailsClosedWhenAuditFails(t *testing.T
 	if !errors.Is(err, errAuditDown) {
 		t.Fatalf("錯誤應由稽核寫入失敗造成，實得 %v", err)
 	}
-	// 回傳值必須是零值：帶著明碼的 view ＋ 一個 error，呼叫端只要漏判一次 err
-	// 就等於繞過了整條 fail-closed。
 	if view.RevealedCarrierID != "" || view.RevealedEmail != "" {
 		t.Fatalf("🔴 fail-closed 時仍帶出了明碼：carrier=%q email=%q", view.RevealedCarrierID, view.RevealedEmail)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tier A：擁有者述詞必須在 SQL 裡
-// ---------------------------------------------------------------------------
 
 // TestIntegration_QueryRead_TierA_SellerDocumentOwnerIsInSQLPredicate 是
 // 「把 `AND i.issuer_ref_id = $2` 從 GetSellerInvoiceDocumentByID 拿掉」這個變異的
@@ -189,12 +171,10 @@ func TestIntegration_QueryRead_TierA_SellerDocumentOwnerIsInSQLPredicate(t *test
 		t.Fatalf("擁有者應讀得到自己的文件：%v", err)
 	}
 
-	// (a) 別的 store 讀同一份文件 —— 這一列**存在**，只是不屬於他。
 	_, foreignErr := env.query.GetSellerDocument(ctx, env.storeID+1, doc.ID)
 	if foreignErr == nil {
 		t.Fatal("🔴 越權讀取成功了 —— issuer_ref_id 沒有進 SQL 的 WHERE（§8.1.4(b)）")
 	}
-	// (b) 同一個 store 讀一個不存在的 document_id。
 	_, missingErr := env.query.GetSellerDocument(ctx, env.storeID+1, doc.ID+999_999)
 	if missingErr == nil {
 		t.Fatal("不存在的 document_id 應該回錯誤")
@@ -236,9 +216,6 @@ func TestIntegration_QueryRead_TierA_BuyerDocumentListIsOwnerScoped(t *testing.T
 	}
 }
 
-// ---------------------------------------------------------------------------
-// total 與 records 必須是同一個母體
-// ---------------------------------------------------------------------------
 
 // TestIntegration_QueryRead_TotalEqualsSumOfPages 是分頁的鑑別力測試。
 //
@@ -259,7 +236,6 @@ func TestIntegration_QueryRead_TotalEqualsSumOfPages(t *testing.T) {
 	seen := map[int64]int{}
 	summed := 0
 	total := int32(-1)
-	// page_size=2 ⇒ 5 筆會落在 3 頁（2/2/1），最後一頁不滿也要正確。
 	for page := int32(1); page <= 4; page++ {
 		got, err := env.query.ListBuyerDocuments(ctx, BuyerDocumentsInput{
 			BuyerID: qitBuyerA, Page: page, PageSize: 2,
@@ -292,9 +268,6 @@ func TestIntegration_QueryRead_TotalEqualsSumOfPages(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 端點 8：作廢重開鏈上的每一份都要回
-// ---------------------------------------------------------------------------
 
 // TestIntegration_QueryRead_OrderInvoiceReturnsWholeReissueChain 是
 // 「ListOrderInvoiceDocumentsForBuyer 必須是 :many」那條註解的偵測點。
@@ -324,7 +297,6 @@ func TestIntegration_QueryRead_OrderInvoiceReturnsWholeReissueChain(t *testing.T
 	if !got[first.ID] || !got[second.ID] {
 		t.Fatalf("兩份文件都要在，實得 %v", got)
 	}
-	// 排序是 snapshot_version DESC ⇒ 第一列是最新那一份，state／snapshot_version 取它。
 	if view.Documents[0].Document.ID != second.ID {
 		t.Fatalf("最新一份（snapshot_version=2）應排最前，實得 id=%d", view.Documents[0].Document.ID)
 	}
@@ -332,12 +304,10 @@ func TestIntegration_QueryRead_OrderInvoiceReturnsWholeReissueChain(t *testing.T
 		t.Fatalf("snapshot_version 應取最新一份（2），實得 %d", view.SnapshotVersion)
 	}
 
-	// 買家是資料主體 ⇒ 兩份都是完整載具（有載具的那一份）。
 	if view.NotifiedEmailMasked != MaskEmail(qitEmailPlain) {
 		t.Fatalf("notified_email_masked 應為遮罩值 %q，實得 %q", MaskEmail(qitEmailPlain), view.NotifiedEmailMasked)
 	}
 
-	// 別的買家拿到的是「還沒付款」，不是這兩份文件。
 	foreign, err := env.query.GetOrderInvoice(ctx, qitBuyerB, orderNo)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -347,8 +317,6 @@ func TestIntegration_QueryRead_OrderInvoiceReturnsWholeReissueChain(t *testing.T
 	}
 }
 
-// qitSeedDocumentWithVersion 與 qitSeedDocument 相同，但可指定 snapshot_version
-// （作廢重開鏈的第二份）。
 func qitSeedDocumentWithVersion(t *testing.T, env *qitEnv, docID, buyerID int64, orderNo string, version int32) domain.Document {
 	t.Helper()
 	ctx := context.Background()
@@ -380,9 +348,6 @@ func qitSeedDocumentWithVersion(t *testing.T, env *qitEnv, docID, buyerID int64,
 	return doc
 }
 
-// ---------------------------------------------------------------------------
-// S12：用途說明由明細行推導
-// ---------------------------------------------------------------------------
 
 // TestIntegration_QueryRead_ReceivedNoteIsDerivedFromLines 釘住 proto 對
 // recipient_note 的定案（不加 DB 欄、由 invoice_document_lines 推導）。
@@ -414,8 +379,6 @@ func TestIntegration_QueryRead_ReceivedNoteIsDerivedFromLines(t *testing.T) {
 		t.Fatalf("多行文件應後綴「等 N 項」，實得 %q", notes[multi.ID])
 	}
 
-	// 進項的授權述詞是 recipient_type='SELLER' 對 recipient_ref_id ——
-	// 與銷項（issuer 側）是**兩套述詞**，不得互相回退。
 	foreign, err := env.query.ListSellerReceivedDocuments(ctx, ReceivedDocumentsInput{StoreID: env.storeID + 1})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -425,28 +388,18 @@ func TestIntegration_QueryRead_ReceivedNoteIsDerivedFromLines(t *testing.T) {
 	}
 }
 
-// qitSeedReceivedDocument 建一份「開給這位賣家」的進項文件（recipient_type=SELLER）。
-//
-// source_ref 必須留空：chk_invdoc_source_ref 是雙向等式
-// （source_type='ORDER' ⇔ source_ref IS NOT NULL），MANUAL 帶了 ref 就是 23514。
 func qitSeedReceivedDocument(t *testing.T, env *qitEnv, docID int64, lineNames []string) domain.Document {
 	t.Helper()
 	ctx := context.Background()
 	now := time.Now().UTC()
 	storeID := env.storeID
-	// chk_invdoc_deadline_presence 是**雙向等式**：document_kind ∈ {B2C,B2B} ⇔
-	// statutory_deadline_at IS NOT NULL。B2B 少給它就是 23514，而不是「少一欄」。
 	deadline := now.Add(7 * 24 * time.Hour)
 	doc, inserted, err := env.docs.Create(ctx, domain.NewDocument{
 		ID: docID, IssuerID: env.issuerID, IssuerNameSnapshot: "範例生鮮",
-		// 方向三／四由端點 57 產生，走 MANUAL_LINES。
 		SourceType: "MANUAL", TriggerType: "ADM_MANUAL",
 		RecipientType: "SELLER", RecipientRefID: &storeID,
 		RecipientName: "查詢整合測試賣場", RecipientTaxID: "12345678",
 		DocumentKind: "B2B", FulfillmentMode: "AMEGO_AUTO",
-		// 建成 PENDING 而不是 ISSUED：chk_invdoc_issued_has_no 要求 ISSUED 必須帶
-		// 發票號碼，而號碼只有 MarkIssued 這條路寫得進去。本支驗的是 recipient_note
-		// 的推導與擁有者述詞，兩者都與 status 無關（列表沒有帶 status 篩選）。
 		Status:          codemeta.InvoiceDocumentStatusPending.Value,
 		SnapshotVersion: 1, IssueAttemptSeq: 1,
 		SalesAmount: 100, TaxAmount: 5, TotalAmount: 105, TaxType: 1, TaxRateBps: 500,

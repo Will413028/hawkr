@@ -162,9 +162,6 @@ test("auth login owner preserves the exact unlayered semantic CSS", () => {
 	const uiKit = source(UI_KIT);
 	const authLogin = source(AUTH_LOGIN);
 
-	// Reviewed update: the phone-verification, account-link and GSI-overlay
-	// rules were removed with those screens (OAuth redirect sign-in); the login panel,
-	// OAuth buttons, role tabs and cascade are intact.
 	assert.equal(
 		semanticDigest(authLogin),
 		"5dc86390d29446348d460dc684dedf84d27e361a59f92a370b8c90dabf4a91da",
@@ -176,28 +173,11 @@ test("auth login owner preserves the exact unlayered semantic CSS", () => {
 		media: 1,
 		keyframes: 0,
 	});
-	// 2026-09-10 元件健檢（reviewed）：dropdown / datepicker / calendar 觸控尺寸
-	// 與 reduced-motion、下拉色值 token 化，並移除 AppDownloadModal 改建到 Dialog 後
-	// 已無人使用的 .hkui-app-modal* 規則。
-	// 2026-09-10 px→rem for the text-scale setting
-	// 2026-09-10 下拉夜間色改由 --page-dropdown-* token 提供（seller-center.css 的
-	// `[data-theme="dark"] .hkui-dropdown__*` patch 已刪除）；light 值逐條沿用原本
-	// 畫出來的顏色，所以日間渲染不變。
-	// 2026-09-12 元件庫對比檢查（reviewed）：新增 light/dark danger-text 與
-	// field-copy 共 3 個宣告；4 個 dropdown 輔助文字色改走 field-copy。
-	// Selector、media、keyframes 與 auth/seller stylesheet ownership 不變。
-	// App input 對齊（reviewed）：新增 2 個 root input token、1 個 dark surface
-	// 宣告，以及 bordered dropdown trigger 的 5 個宣告；既有 padding selector
-	// 排除 bordered。合計 +1 rule、+1 selector、+8 declarations；auth CSS、
-	// stylesheet owner、media 與 keyframes 均未改動。
 	assert.equal(
 		semanticDigest(uiKit),
 		"68a05a43006f44030c0a8caa58b24934f7dc618f2d1397aba31faf34b33077c4",
 	);
 	assert.deepEqual(inventory(uiKit), {
-		// 2026-10-27 刪除產地地圖（scope-cut 步驟 1）：整段 LOCATION PICKER MODAL
-		// 與 origin-seller-preview 規則一併移除，-42 rules、-42 selectors、
-		// -201 declarations、-1 media；其餘 owner 不變。
 		styleRules: 242,
 		selectors: 263,
 		declarations: 1067,

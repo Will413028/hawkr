@@ -43,7 +43,6 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  // 路徑（不含語系前綴）→ 最上層頁面的 location。
   final storeRows = <String, String>{
     '/seller-center/messages/7': SettingsRoutes.chatThread,
     '/seller-center/orders/O1': OrderRoutes.matchedDetail,

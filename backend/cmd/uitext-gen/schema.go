@@ -17,16 +17,11 @@ var versionSegment = regexp.MustCompile(`^v[0-9]+((alpha|beta)[0-9]+)?$`)
 // Schema 是 buf image 的索引：package 的短名、型別、列舉與註解。
 type Schema struct {
 	files *protoregistry.Files
-	// pkgShort 是 proto package 到短名（去掉 hawkr. 與版本段）。
 	pkgShort map[string]string
-	// shortPkg 是短名到 proto package。
 	shortPkg map[string]string
-	// enums 依全名排序。
 	enums    []*EnumInfo
 	enumByFn map[protoreflect.FullName]*EnumInfo
-	// serverOwned 是伺服器擁有文字的列舉（§2.3）。
 	serverOwned map[protoreflect.FullName]bool
-	// unavailableShapeErrors 是 §2.2 第 8 條的違規清單。
 	unavailableShapeErrors []string
 }
 
@@ -89,7 +84,7 @@ func LoadSchema(fds *descriptorpb.FileDescriptorSet) (*Schema, error) {
 
 func shortPackage(pkg string) string {
 	parts := strings.Split(pkg, ".")
-	parts = parts[1:] // hawkr
+	parts = parts[1:]
 	if n := len(parts); n > 0 && versionSegment.MatchString(parts[n-1]) {
 		parts = parts[:n-1]
 	}
@@ -128,12 +123,10 @@ func (s *Schema) collectMessages(ms protoreflect.MessageDescriptors) {
 	}
 }
 
-// findServerOwned 依 §2.3 的結構規則找出伺服器擁有文字的列舉，並依 §2.2 第 8 條檢查 UnavailableReason 的形狀。
 func (s *Schema) findServerOwned() {
 	if e, ok := s.enumByName("hawkr.common.v1alpha1.ErrorReason"); ok {
 		s.serverOwned[e.Desc.FullName()] = true
 	}
-	// *Unavailability message 的 reason 欄位。
 	allowed := map[protoreflect.FullName]bool{}
 	var walk func(ms protoreflect.MessageDescriptors)
 	walk = func(ms protoreflect.MessageDescriptors) {
@@ -148,7 +141,6 @@ func (s *Schema) findServerOwned() {
 			walk(m.Messages())
 		}
 	}
-	// 形狀守門：名字以 UnavailableReason 結尾的列舉，只能出現在 *Unavailability.reason。
 	var check func(ms protoreflect.MessageDescriptors)
 	check = func(ms protoreflect.MessageDescriptors) {
 		for i := range ms.Len() {
@@ -196,15 +188,12 @@ func (s *Schema) EnumByPath(path string) (*EnumInfo, error) {
 	return t.enum, nil
 }
 
-// typeRef 是 key 解析出的型別。
 type typeRef struct {
 	enum *EnumInfo
 	msg  protoreflect.MessageDescriptor
 	path string
 }
 
-// resolveType 依 §1.2 的解析規則：最長相符的 package，再逐段往下找巢狀型別，直到不再是型別名。
-// 回傳最後找到的型別與剩下的段。
 func (s *Schema) resolveType(tokens []string) (typeRef, []string, error) {
 	var pkg string
 	n := 0
@@ -250,7 +239,6 @@ func (s *Schema) resolveType(tokens []string) (typeRef, []string, error) {
 		next := protoreflect.FullName(string(scopeMsg.FullName()) + "." + rest[idx])
 		nd, err := s.files.FindDescriptorByName(next)
 		if err != nil {
-			// 找不到巢狀型別：型別路徑到此為止，剩下的段是值名、變體或句子名稱。
 			return cur, rest[idx:], nil //nolint:nilerr // 找不到不是錯誤
 		}
 		switch nd.(type) {
@@ -263,7 +251,6 @@ func (s *Schema) resolveType(tokens []string) (typeRef, []string, error) {
 	}
 }
 
-// comment 取描述子的前導註解，各行去掉前後空白後以換行相接。
 func comment(d protoreflect.Descriptor) string {
 	loc := d.ParentFile().SourceLocations().ByDescriptor(d)
 	text := strings.TrimSpace(loc.LeadingComments)

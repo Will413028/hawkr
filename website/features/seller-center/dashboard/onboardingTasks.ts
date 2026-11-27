@@ -125,7 +125,6 @@ function buildRecommendedTasks({
 	shippingRows: ShippingOnboarding[];
 	productCount: number | null;
 }): OnboardingTask[] {
-	// 物流閘門只有 shippingGateOf 一個推導（等待刪除 > 停權 > 認證）。
 	const shippingGate = shippingGateOf(my);
 	const shippingOpen = shippingGate === "open";
 	const shippingProcessing = shippingRows.some(isProcessing);

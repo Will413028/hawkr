@@ -3,7 +3,6 @@ import UIKit
 import FirebaseCore
 import FirebaseMessaging
 
-// MARK: - HKLog Helper
 private func HKLog(_ message: String, file: String = #file, function: String = #function, line: Int = #line) {
     #if DEBUG
     let fileName = (file as NSString).lastPathComponent
@@ -19,7 +18,6 @@ private func HKLog(_ message: String, file: String = #file, function: String = #
   ) -> Bool {
     HKLog("[AppDelegate] didFinishLaunchingWithOptions")
 
-    // 沒有 GoogleService-Info.plist，或其內容缺 GOOGLE_APP_ID 或 API_KEY（Firebase 未設定）時不初始化，推播與分析停用
     if let plistPath = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist"),
        let options = FirebaseOptions(contentsOfFile: plistPath),
        !options.googleAppID.isEmpty,

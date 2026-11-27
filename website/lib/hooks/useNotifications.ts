@@ -38,7 +38,6 @@ import { useQueryIdentity } from "./useQueryIdentity";
  * The route role picks the inbox audience and scopes cache keys.
  */
 
-/* ===== List page ===== */
 
 interface UseNotificationListOptions {
 	pageSize?: number;
@@ -76,7 +75,7 @@ export function nextNotificationListPage(lastPage: InboxPage) {
 
 interface UseNotificationListResult {
 	items: InboxItem[];
-	loading: boolean; // initial / refresh
+	loading: boolean;
 	loadingMore: boolean;
 	hasMore: boolean;
 	error: string | null;
@@ -134,9 +133,6 @@ export function useNotificationList(
 		),
 		initialPageParam: null as string | null,
 		getNextPageParam: nextNotificationListPage,
-		// A category change keeps the complete previous list in place until the
-		// replacement query resolves instead of clearing the workspace to a
-		// loading surface.
 		placeholderData: (previousData) => previousData,
 	});
 	const updatePages = React.useCallback(
@@ -158,16 +154,11 @@ export function useNotificationList(
 		[queryClient, listKey],
 	);
 
-	// Mark-read / mark-all stay optimistic. Delete deliberately keeps the row
-	// mounted until success so its initiating Button can report pending state.
-	// Every path still cancels late refetches and keeps the unread bell in sync.
 	const markReadMutation = useMutation({
 		mutationFn: (id: InboxItem["id"]) => markInboxItemRead(id),
 		onMutate: async (id) => {
 			await queryClient.cancelQueries({ queryKey: listKey });
 			const snapshot = queryClient.getQueryData<NotificationPages>(listKey);
-			// Only nudge the shared count when the row was actually unread —
-			// re-marking an already-read row would otherwise double-decrement.
 			let wasUnread = false;
 			updatePages((n) => {
 				if (n.id !== id) return n;
@@ -178,8 +169,6 @@ export function useNotificationList(
 			return { snapshot, wasUnread };
 		},
 		onError: (_e, _id, ctx) => {
-			// Revert list + resync the bell from server (safer than hand-rolling
-			// +1, since another tab may have shifted it).
 			if (ctx) queryClient.setQueryData(listKey, ctx.snapshot);
 			if (ctx?.wasUnread) void refreshUnread();
 		},
@@ -232,8 +221,6 @@ export function useNotificationList(
 		[status, listQuery.data],
 	);
 
-	// Thin wrappers: the optimistic + rollback work lives in the mutation
-	// lifecycle above; these just fire-and-forget (failures self-revert).
 	const markRead = React.useCallback(
 		(id: InboxItem["id"]) =>
 			markReadMutation.mutateAsync(id).then(

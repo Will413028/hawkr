@@ -18,10 +18,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 )
 
-// 審閱政策（step10e-3d-design.md E10、§3.1）：每種待辦一支 seller.review_<種類>(at)，成員、開始與期限只寫在 SQL。
-// 這個檔的測試：逐種的表格（成員集合、開始、期限、邊界 ±1µs）、成員 ⇔ Go 判定式的資料集、依 ID 批次讀的計畫。
 
-// reviewKinds 是函式的種類與 SQL 函式名。
 var reviewKinds = []struct{ kind, fn string }{
 	{"REPORT_TRIAGE", "review_report_triage"},
 	{"CASE_DECISION", "review_case_decision"},
@@ -35,7 +32,6 @@ var reviewKinds = []struct{ kind, fn string }{
 	{"SHARED_BANK_ACCOUNT", "review_shared_bank_account"},
 }
 
-// reviewRow 是函式的一列（seller.review_item 的欄位）。
 type reviewRow struct {
 	Kind, ItemID                         string
 	ReportID, CaseID, InquiryID, OrderID *uuid.UUID
@@ -47,7 +43,6 @@ type reviewRow struct {
 	Start, Due                           *time.Time
 }
 
-// reviewOf 以 at 呼叫一支審閱政策函式，依 item_id 排序。
 func (f *fixture) reviewOf(t *testing.T, fn string, at time.Time) []reviewRow {
 	t.Helper()
 	ctx := context.Background()
@@ -67,13 +62,11 @@ func (f *fixture) reviewOf(t *testing.T, fn string, at time.Time) []reviewRow {
 	return out
 }
 
-// span 是一件待辦預期的開始與期限；store 是預期的店家（0 是沒有單一店家）。
 type span struct {
 	start, due time.Time
 	store      int64
 }
 
-// reviewSet 是函式在 at 的結果：item_id → 一列。
 func (f *fixture) reviewSet(t *testing.T, fn string, at time.Time) map[string]reviewRow {
 	t.Helper()
 	out := map[string]reviewRow{}
@@ -97,7 +90,6 @@ func (f *fixture) storeNameOf(t *testing.T, storeID int64) string {
 	return *name
 }
 
-// wantReview 比較函式在 at 的結果與預期：成員集合相等，每一列的種類、店家、開始與期限等於預期（時間精確到 µs，不用容差）。
 func (f *fixture) wantReview(t *testing.T, kind, fn string, at time.Time, want map[string]span) {
 	t.Helper()
 	got := f.reviewSet(t, fn, at)
@@ -139,7 +131,6 @@ func fmtTime(t *time.Time) string {
 	return t.Format(time.RFC3339Nano)
 }
 
-// submitKYCFor 為帳號建立並送出一份個人賣家的申請，回傳送出的申請。
 func (f *fixture) submitKYCFor(t *testing.T, accountID int64) KYCApplication {
 	t.Helper()
 	d := f.savedDraft(t, kycDraft(accountID))
@@ -148,21 +139,17 @@ func (f *fixture) submitKYCFor(t *testing.T, accountID int64) KYCApplication {
 	return a
 }
 
-// tick 讓時鐘前進 d（模組用同一個時鐘，之後建立的列從這一刻起算）。
 func (f *fixture) tick(d time.Duration) time.Time {
 	f.now = f.now.Add(d)
 	return f.now
 }
 
-// reviewWorld 是每一種待辦的成員，加上每一種「差一點不是」的反例。want 是世界建完的那一刻（at）函式預期的結果：種類 → item_id → 開始、期限與店家；
-// 預期的時間都是建立當下的時鐘加上設計 §1.3 的時長（字面值寫在這裡，不從 SQL 或 Go 常數讀，所以任一分支的時長改掉測試會失敗）。
 type reviewWorld struct {
 	f    *fixture
 	at   time.Time
 	want map[string]map[string]span
 
-	// 邊界與判定式比對用的對象。
-	openInquiry     uuid.UUID // 還沒結束、due_at 在 at 之後的詢問
+	openInquiry     uuid.UUID
 	openInquiryDue  time.Time
 	openInquiryCase uuid.UUID
 	withheld        struct {
@@ -171,13 +158,13 @@ type reviewWorld struct {
 		recheck  time.Time
 		store    int64
 	}
-	risks            []riskMember // 全部的 RISK 措施（複審用）
-	reviewSoon       riskMember   // 複審已進入的 RISK 措施（review_by 在建立後 20 小時，at 時還沒到）
-	reviewLater      riskMember   // 複審還沒進入的 RISK 措施（review_by 在建立後 60 小時，at 時進入時間還沒到）
+	risks            []riskMember
+	reviewSoon       riskMember
+	reviewLater      riskMember
 	appealID, liftID uuid.UUID
 	appealMeasure    uuid.UUID
 	liftMeasure      uuid.UUID
-	mootMeasure      uuid.UUID // 解除請求還是 PENDING、措施已結束
+	mootMeasure      uuid.UUID
 }
 
 type riskMember struct {
@@ -201,7 +188,6 @@ func newReviewWorld(t *testing.T, f *fixture) *reviewWorld {
 		day  = 24 * time.Hour
 	)
 
-	// 待分案：食安 4 小時、其他類別 72 小時；已分案與已有結果的不是。
 	_, sR := f.open(t)
 	ra := f.reportBy(t, sR.StoreID, policy.Fraud)
 	add("REPORT_TRIAGE", ra.ID.String(), sR.StoreID, f.now, f.now.Add(72*hour))
@@ -211,7 +197,6 @@ func newReviewWorld(t *testing.T, f *fixture) *reviewWorld {
 	f.tick(hour)
 	f.mustResolve(t, f.reportBy(t, sR.StoreID, policy.Fraud).ID, OutcomeNoViolation)
 
-	// 待決定：每個嚴重度都有期限（逐一取自 SeverityValues，新增嚴重度而 SQL 的 CASE 沒有對應時，期限是 NULL 或這裡查不到時長，測試失敗）；已結案的不是。
 	_, sK := f.open(t)
 	severityDue := map[Severity]time.Duration{
 		SeverityCritical: 24 * hour, SeverityHigh: 72 * hour, SeverityMedium: 7 * day, SeverityLow: 14 * day,
@@ -236,7 +221,6 @@ func newReviewWorld(t *testing.T, f *fixture) *reviewWorld {
 	_, err := f.decide(t, closed.ID, DecisionNoAction, "")
 	must(t, err)
 
-	// 詢問：沒結束的案件不在待決定；回覆後的開始是「收到」的時間（不是記下的時間），管理員撤回後的開始是撤回時間。
 	_, sQ := f.open(t)
 	f.tick(hour)
 	open, _ := f.newCase(t, sQ.StoreID, policy.ProhibitedGoods, SeverityHigh, 1)
@@ -258,7 +242,6 @@ func newReviewWorld(t *testing.T, f *fixture) *reviewWorld {
 	must(t, err)
 	add("CASE_DECISION", withdrawn.ID.String(), sQ.StoreID, f.now, f.now.Add(7*day))
 
-	// 主管機關來函：沒完成也沒撤銷的；暫不告知的對象在確認日期（台北）到了之後進入，已告知與由措施告知的不是。
 	accountA, sA := f.open(t)
 	accountB, _ := f.open(t)
 	accountC, _ := f.open(t)
@@ -281,7 +264,6 @@ func newReviewWorld(t *testing.T, f *fixture) *reviewWorld {
 	must(t, err)
 	w.withheld.order, w.withheld.position, w.withheld.recheck, w.withheld.store = done.ID, 0, recheck, sA.StoreID
 
-	// 申覆與解除請求：待處理的；解除請求還要措施在生效中（措施已結束的不是，儲存的請求仍是 PENDING）。
 	f.tick(hour)
 	appealAccount, sAppeal, appealMeasure := f.appealable(t)
 	appealed := f.appeal(t, appealAccount, appealMeasure, "不成立")
@@ -295,7 +277,6 @@ func newReviewWorld(t *testing.T, f *fixture) *reviewWorld {
 	w.liftMeasure, w.liftID = liftMeasure.ID, lifted.Pending().ID
 	add("MEASURE_LIFT_REQUEST", w.liftID.String(), sLift.StoreID, f.now, f.now.Add(7*day))
 	f.tick(hour)
-	// 固定期間的 RISK 停權在世界建完之前到期：儲存的請求仍是 PENDING，但措施已不在生效中，推導為 CLOSED，不是待辦。
 	mootAccount, sMoot := f.open(t)
 	mootEnds := f.now.Add(2 * hour)
 	mootMeasure := f.riskMeasure(t, sMoot.StoreID, &mootEnds)
@@ -303,7 +284,6 @@ func newReviewWorld(t *testing.T, f *fixture) *reviewWorld {
 	must(t, err)
 	w.mootMeasure = mootMeasure.ID
 
-	// 複審：RISK、生效中、review_by 前 24 小時進入。建立後 20 小時到期的已進入，60 小時到期的（建立後 36 小時才進入）還沒；已結束的不是。
 	reviewRisk := func(in time.Duration) riskMember {
 		_, s := f.open(t)
 		review := f.now.Add(in)
@@ -319,7 +299,6 @@ func newReviewWorld(t *testing.T, f *fixture) *reviewWorld {
 	w.reviewSoon, w.reviewLater = reviewRisk(20*hour), reviewRisk(60*hour)
 	add("MEASURE_REVIEW", w.reviewSoon.id.String(), w.reviewSoon.store, w.reviewSoon.reviewBy.Add(-24*hour), w.reviewSoon.reviewBy)
 
-	// 商家認證：審核中的；草稿、被退回、已核准的不是。
 	f.tick(hour)
 	accountK1, sK1 := f.open(t)
 	k1 := f.submitKYCFor(t, accountK1)
@@ -330,8 +309,6 @@ func newReviewWorld(t *testing.T, f *fixture) *reviewWorld {
 	accountK3, _ := f.open(t)
 	f.savedDraft(t, kycDraft(accountK3))
 
-	// 共用銀行帳號：處分建立之後才同步同一個 fingerprint 的帳號 O 是成員（開始是它最早的 fingerprint 寫入時間，期限 168 小時）；
-	// 處分建立之前就已同步的 P、fingerprint 不同的 N 不是。
 	f.tick(hour)
 	_, sBankS := f.approvedWithFingerprints(t, fpShared)
 	f.approvedWithFingerprints(t, fpShared)
@@ -355,7 +332,6 @@ func riskOf(m Measure) riskMember {
 	return riskMember{id: m.ID, store: m.StoreID, reviewBy: *m.ReviewBy}
 }
 
-// day2026 是 2026 年某月某日的 DATE（UTC 午夜，Go 端 DATE 的形狀）。
 func day2026(m time.Month, d int) time.Time { return time.Date(2026, m, d, 0, 0, 0, 0, time.UTC) }
 
 // 每一種函式一張表：成員集合、開始、期限與店家，反例（差一點不是）不在結果裡。時長的字面值寫在 newReviewWorld，不從 SQL 或 Go 常數讀：
@@ -369,7 +345,6 @@ func TestReviewFunctionsReturnTheDesignedMembersStartsAndDeadlines(t *testing.T)
 			f.wantReview(t, k.kind, k.fn, w.at, w.want[k.kind])
 		})
 	}
-	// 沒有空的種類：每一種至少有一個成員（複審的在 at 已進入；詢問逾期與告知的成員由邊界測試涵蓋，這兩種在 at 還沒有成員）。
 	for _, k := range reviewKinds {
 		if len(w.want[k.kind]) == 0 && k.kind != "CASE_INQUIRY_OVERDUE" && k.kind != "AUTHORITY_TARGET_NOTICE" {
 			t.Errorf("%s：世界裡沒有成員，反例沒有對照", k.kind)
@@ -390,7 +365,6 @@ func TestReviewBoundariesAreExactToTheMicrosecond(t *testing.T) {
 		return r, ok
 	}
 
-	// 詢問逾期：due_at 當下進入，開始是 due_at，期限再 24 小時。
 	due := w.openInquiryDue
 	id := w.openInquiry.String()
 	if _, ok := member("review_case_inquiry_overdue", due.Add(-us), id); ok {
@@ -406,7 +380,6 @@ func TestReviewBoundariesAreExactToTheMicrosecond(t *testing.T) {
 		}
 	}
 
-	// 告知被指名者：確認日期 10-05（台北）的 00:00 進入（不是 UTC 的 00:00，差 8 小時）；10-08 的那個對象晚進入。
 	midnight := time.Date(2026, 10, 5, 0, 0, 0, 0, twtime.Taipei)
 	item := fmt.Sprintf("%s/%05d", w.withheld.order, w.withheld.position)
 	for _, tt := range []struct {
@@ -416,7 +389,7 @@ func TestReviewBoundariesAreExactToTheMicrosecond(t *testing.T) {
 		{midnight.Add(-us), false},
 		{midnight, true},
 		{midnight.Add(us), true},
-		{time.Date(2026, 10, 5, 0, 0, 0, 0, time.UTC), true}, // UTC 的 10-05 00:00 已經是台北 08:00
+		{time.Date(2026, 10, 5, 0, 0, 0, 0, time.UTC), true},
 		{time.Date(2026, 10, 4, 15, 59, 59, 999999000, time.UTC), false},
 	} {
 		r, ok := member("review_authority_target_notice", tt.at, item)
@@ -428,7 +401,6 @@ func TestReviewBoundariesAreExactToTheMicrosecond(t *testing.T) {
 			t.Errorf("告知：%v 的開始 %v、期限 %v（預期 %v、%v）：%+v", tt.at, fmtTime(r.Start), fmtTime(r.Due), midnight, midnight.Add(72*time.Hour), r)
 		}
 	}
-	// 位置 1（確認日期 10-08、沒有指名店家）：10-08 的台北 00:00 才進入，店家欄是 NULL。
 	second := fmt.Sprintf("%s/%05d", w.withheld.order, 1)
 	secondMidnight := time.Date(2026, 10, 8, 0, 0, 0, 0, twtime.Taipei)
 	if _, ok := member("review_authority_target_notice", secondMidnight.Add(-us), second); ok {
@@ -437,12 +409,10 @@ func TestReviewBoundariesAreExactToTheMicrosecond(t *testing.T) {
 	if r, ok := member("review_authority_target_notice", secondMidnight, second); !ok || r.StoreID != nil || r.StoreName != nil || r.AccountID == nil {
 		t.Errorf("告知：位置 1 在 10-08 進入，沒有指名店家時 store 是 NULL、帳號有值：%+v", r)
 	}
-	// 已告知的對象（位置 2）永遠不是。
 	if _, ok := member("review_authority_target_notice", secondMidnight.Add(240*time.Hour), fmt.Sprintf("%s/%05d", w.withheld.order, 2)); ok {
 		t.Errorf("告知：已告知的對象不該進入")
 	}
 
-	// 複審：review_by 前 24 小時進入，之後仍在（review_by 過了也還在，直到措施結束或撤銷）。
 	risk := w.reviewLater
 	start := risk.reviewBy.Add(-24 * time.Hour)
 	rid := risk.id.String()
@@ -456,7 +426,6 @@ func TestReviewBoundariesAreExactToTheMicrosecond(t *testing.T) {
 		}
 	}
 
-	// 解除請求只在措施生效中：固定期間的 RISK 停權，ends_at 當下離開（effective_measures：ends_at > at）；進入時間是提出時間。
 	accountID, s := f.open(t)
 	ends := f.now.Add(10 * 24 * time.Hour)
 	m := f.riskMeasure(t, s.StoreID, &ends)
@@ -478,11 +447,6 @@ func TestReviewBoundariesAreExactToTheMicrosecond(t *testing.T) {
 	}
 }
 
-// goReviewSets 是逐種套用指令真正用的 Go 定義得到的成員（item_id 的集合）：Report.State()、Case.Open() 加 AwaitingSeller()、
-// CaseInquiry.Open() 加 DueAt、AuthorityOrder.Open、AuthorityOrderTarget 的告知欄位、
-// Measure.Pending／PendingRemediation、KYC 的 SUBMITTED，以及複審到期分頁（收件匣的成員）。
-// 正式程式沒有第二份成員規則，這些只在測試裡當比對的對象。時間用 f.now（模組的時鐘）。
-// 同時回傳待決定的案件（比對開始時間用）。
 func (f *fixture) goReviewSets(t *testing.T) (sets map[string]map[string]bool, decisionStarts map[string]time.Time) {
 	t.Helper()
 	ctx := context.Background()
@@ -500,7 +464,6 @@ func (f *fixture) goReviewSets(t *testing.T) (sets map[string]map[string]bool, d
 	for _, c := range f.allCases(t, CaseListInput{}) {
 		if c.Open() && !c.AwaitingSeller() {
 			sets["CASE_DECISION"][c.ID.String()] = true
-			// 開始時間由 fixture 的事實算：max(開案, 各詢問回覆收到或管理員撤回的時間)；不讀函式或 DecideDeadline（那是被比對的對象）。
 			start := c.OpenedAt
 			for _, i := range f.inquiriesOf(t, c.ID) {
 				if r := inquiryClockRestart(i); r != nil && r.After(start) {
@@ -560,7 +523,6 @@ func (f *fixture) goReviewSets(t *testing.T) (sets map[string]map[string]bool, d
 		}
 		afterMeasure = page.Next
 	}
-	// 複審到期分頁：收件匣的成員，與 review_measure_review 讀同一支函式。
 	afterMeasure = nil
 	for {
 		page, err := f.module.AdminMeasures(ctx, AdminMeasureListInput{PageSize: 2, ReviewDue: true, After: afterMeasure})
@@ -573,7 +535,6 @@ func (f *fixture) goReviewSets(t *testing.T) (sets map[string]map[string]bool, d
 		}
 		afterMeasure = page.Next
 	}
-	// 共用銀行帳號：處分頁關聯帳號列的「在待辦」旗標（sqlc 查詢路徑，與函式分開讀）。
 	afterMeasure = nil
 	for {
 		page, err := f.module.AdminMeasures(ctx, AdminMeasureListInput{PageSize: 3, After: afterMeasure})
@@ -692,7 +653,6 @@ func TestReviewDeadlinePushdown(t *testing.T) {
 	}
 }
 
-// planNodes 攤平 EXPLAIN (FORMAT JSON) 的全部計畫節點。
 func planNodes(t *testing.T, plan []byte) []map[string]any {
 	t.Helper()
 	var doc []struct {
@@ -716,7 +676,6 @@ func planNodes(t *testing.T, plan []byte) []map[string]any {
 	return out
 }
 
-// anyOn 比對計畫條件裡 `(<column> = ANY (` 的寫法。
 func anyOn(column string) *regexp.Regexp {
 	return regexp.MustCompile(`\(` + regexp.QuoteMeta(column) + ` = ANY \(`)
 }
@@ -746,7 +705,6 @@ func TestResourceDeadlinesExistWhileTheObligationDoes(t *testing.T) {
 	ctx := context.Background()
 	const hour = time.Hour
 
-	// 通報：待分案有分案期限（食安 4 小時、其他 72 小時），分案後沒有。
 	_, sR := f.open(t)
 	food := f.reportBy(t, sR.StoreID, policy.FoodSafety)
 	fraud := f.reportBy(t, sR.StoreID, policy.Fraud)
@@ -767,7 +725,6 @@ func TestResourceDeadlinesExistWhileTheObligationDoes(t *testing.T) {
 	wantNoDeadline(t, "分案後的通報（分案的回應）", triaged.TriageDeadline)
 	opened := f.now
 
-	// 案件：待決定有決定期限（嚴重度 HIGH 72 小時），詢問期間沒有，回覆後從收到的時間重新起算；結案後沒有。
 	c := f.caseOf(t, *triaged.CaseID)
 	wantDeadline(t, "待決定", c.DecideDeadline, opened, opened.Add(72*hour))
 	f.tick(hour)
@@ -786,7 +743,6 @@ func TestResourceDeadlinesExistWhileTheObligationDoes(t *testing.T) {
 	must(t, err)
 	wantNoDeadline(t, "結案後的決定期限", decided.DecideDeadline)
 
-	// 主管機關來函：處理中有期限（收文到登記時存下的 due_at），完成後沒有。
 	accountA, _ := f.open(t)
 	f.tick(hour)
 	order := f.createOrder(t, f.orderIn(AuthorityDataRequest, AuthorityTargetInput{AccountID: accountA}))
@@ -797,7 +753,6 @@ func TestResourceDeadlinesExistWhileTheObligationDoes(t *testing.T) {
 	wantNoDeadline(t, "完成的來函", done.Deadline)
 	wantNoDeadline(t, "完成的來函（重讀）", f.orderOf(t, order.ID).Deadline)
 
-	// 措施請求：待處理有裁定期限（7 天），裁定後沒有；複審：進入 review_by 前 24 小時後有，措施結束後沒有。
 	f.tick(hour)
 	appealAccount, _, appealable := f.appealable(t)
 	f.appeal(t, appealAccount, appealable, "不成立")
@@ -830,7 +785,6 @@ func TestResourceDeadlinesExistWhileTheObligationDoes(t *testing.T) {
 	wantNoDeadline(t, "結束的措施沒有複審期限", ended.ReviewDeadline)
 	wantNoDeadline(t, "結束的措施沒有複審期限（重讀）", f.measureOf(t, risk.Measure.ID).ReviewDeadline)
 
-	// 商家認證：審核中有期限（送出起算 7 天），核准後沒有。
 	f.tick(hour)
 	accountK, sK := f.open(t)
 	kyc := f.submitKYCFor(t, accountK)
@@ -851,8 +805,6 @@ func mustStoreKYC(t *testing.T, f *fixture, storeID int64) KYCApplication {
 	return a
 }
 
-// inquiryClockRestart 是測試的 oracle：這筆詢問讓案件「待決定」重新起算的時間（回覆收到的時間，或管理員撤回的時間；系統撤回與還沒結束的是 nil）。
-// 正式程式的規則只在 SQL 的 seller.review_case_decision，這裡由 fixture 的事實直接寫出。
 func inquiryClockRestart(i AdminInquiry) *time.Time {
 	switch {
 	case i.Reply != nil:

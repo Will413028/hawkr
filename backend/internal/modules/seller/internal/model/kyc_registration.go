@@ -14,8 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 )
 
-// 公司型申請送件時對經濟部商業司公開資料的查詢快照（ADR 2026-11-13-seller-platform-review-and-identity-matching「登記資料快照」）：審核的依據
-// 是送件當時查到的登記資料與比對結果，不是審核當下才查。
 
 // RegistrationOutcome 是一次登記資料查詢的結果，與 DB 的 kyc_registration_checks_outcome_check 一致。
 type RegistrationOutcome string
@@ -207,8 +205,6 @@ const (
 	cmpUnverifiable
 )
 
-// companyStatuses 是公司登記現況文字（Company_Status_Desc，沒有代碼）的對照，2026-10-07 以公開資料取樣（名稱查詢端點的
-// Company_Status 代碼 01–14 的 13 種；03、15 查無樣本，落在 RegistrationStatusUnknown）。現況分類只有這一份。
 var companyStatuses = map[string]RegistrationStatus{
 	"核准設立":        RegistrationStatusActive,
 	"核准設立，但已命令解散": RegistrationStatusOrderedToDissolve,
@@ -225,8 +221,6 @@ var companyStatuses = map[string]RegistrationStatus{
 	"撤回登記已清算完結":   RegistrationStatusTerminated,
 }
 
-// classifyRegistrationStatus 把來源的現況分類：公司看文字，商業登記看代碼（目前只有 '01' 核准設立有樣本，其他代碼沒有樣本，一律
-// UNKNOWN 並保留原文；觸發：取得商業登記非 01 的樣本時補對照）。對照以外的值是 UNKNOWN，不是空字串。
 func classifyRegistrationStatus(src gcis.Registration) RegistrationStatus {
 	if src.Source == gcis.SourceBusiness {
 		if strings.TrimSpace(src.StatusCode) == "01" {

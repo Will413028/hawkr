@@ -51,7 +51,6 @@ class ShippingEventPublisherTest {
 
         JsonNode wire = new ObjectMapper().readTree(bodyCaptor.getValue());
         assertEquals("O100", wire.get("orderNo").asText());
-        // sellerAccountId 保留原名：這裡裝的確實是已解析的登入 account_id，不動。
         assertEquals("11", wire.get("sellerAccountId").asText());
 
         assertTrue(wire.has("buyerId"), "shipment.processing.timeout 必須發 buyerId");

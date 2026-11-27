@@ -57,11 +57,9 @@ public final class SearchableTextBuilder {
             return mandatoryPart;
         }
 
-        // 必保部分加一個空格與 pureDesc 起始
         int reserved = mandatoryBytes + (mandatoryBytes > 0 ? 1 : 0);
         int budget = MAX_BYTES - reserved;
         if (budget <= 0) {
-            // 必保部分已逼近或超過上限：不夾帶 pure_description
             return mandatoryPart;
         }
 
@@ -70,7 +68,6 @@ public final class SearchableTextBuilder {
             return mandatoryPart.isEmpty() ? pureDesc : mandatoryPart + " " + pureDesc;
         }
 
-        // 截斷：依 budget 切到 char 邊界（避免切壞 UTF-8 多 byte 字元）
         String truncated = truncateToByteBudget(pureDesc, budget);
         int truncatedBytes = truncated.getBytes(StandardCharsets.UTF_8).length;
         log.info("searchableTextTruncated",
@@ -94,7 +91,6 @@ public final class SearchableTextBuilder {
         if (byteBudget <= 0) return "";
         byte[] bytes = s.getBytes(StandardCharsets.UTF_8);
         if (bytes.length <= byteBudget) return s;
-        // 二分逼近：找最大 char 長度使 UTF-8 編碼 ≤ budget
         int lo = 0;
         int hi = s.length();
         while (lo < hi) {

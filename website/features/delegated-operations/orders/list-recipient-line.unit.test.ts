@@ -57,7 +57,6 @@ describe("代行訂單列表：買家欄的收件人副行", () => {
 	});
 
 	it("帶「收件人：」前綴——兩行都是人名，不標分不出誰是誰", () => {
-		// 斷言的是那顆 <small> 的內容，不是「整格出現過這五個字」（本檔註解裡也有）。
 		expect(recipientLine()).toContain("收件人：");
 		expect(recipientLine()).toContain("order.recipient.name");
 	});

@@ -46,10 +46,6 @@ describe("delegated nav policy", () => {
 	});
 
 	it("hides the invoice module from the delegated workspace", () => {
-		// 這一條不是取捨：`gateway/internal/router/seller_route_assert.go` 的
-		// `delegatedPathForbiddenWords` 含 "invoice" ⇒ 代行 namespace 底下永遠掛不了
-		// 發票路由，Gateway 會在開機時 panic。渲染那個選單項只會得到一個點進去
-		// 必定空白的入口。
 		expect(isDelegatedHiddenHref("/seller-center/invoices")).toBe(true);
 		expect(isDelegatedHiddenHref("/seller-center/invoices/documents")).toBe(
 			false,

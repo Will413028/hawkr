@@ -14,9 +14,6 @@ test("購物車缺圖與載入失敗縮圖不裁切，正常圖片及數量／�
 	await page.setViewportSize(
 		isMobile ? { width: 390, height: 844 } : { width: 1440, height: 1000 },
 	);
-	// Next dev needs its same-origin HMR handshake before hydrating. Closing
-	// localhost's ws connection prevented every session/cart request from starting.
-	// Only this development connection is allowed; application sockets stay mocked.
 	await page.context().routeWebSocket("**/*", (socket) => {
 		const url = new URL(socket.url());
 		const appUrl = new URL(baseURL ?? "http://localhost:3000");
@@ -30,8 +27,6 @@ test("購物車缺圖與載入失敗縮圖不裁切，正常圖片及數量／�
 			void socket.close();
 		}
 	});
-	// Catch every gateway route before specific identity/cart fixtures so no
-	// browser request, including the mutations below, reaches a real cart.
 	await page.route("**/api/v1/**", (route) =>
 		route.fulfill({ json: { code: 0, data: {} } }),
 	);

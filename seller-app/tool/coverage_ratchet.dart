@@ -116,7 +116,6 @@ String? normalizeCoveragePath(String rawPath, String workspacePath) {
   if (path.startsWith('$root/')) {
     path = path.substring(root.length + 1);
   } else if (path.startsWith('/')) {
-    // Never count Flutter SDK or pub-cache sources that contain `/lib/`.
     return null;
   }
   while (path.startsWith('./')) {
@@ -155,7 +154,6 @@ List<String> evaluateCoverage({
     return ['LCOV contains no eligible production lines.'];
   }
 
-  // Compare exact fractions; rounded display percentages never decide a gate.
   if (current.coveredLines * baseline.instrumentedLines <
       baseline.coveredLines * current.instrumentedLines) {
     failures.add(

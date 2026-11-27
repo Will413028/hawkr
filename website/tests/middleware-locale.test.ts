@@ -8,7 +8,6 @@ import { __setPublishedLocalesForTest } from "../lib/intl/locales";
 import { __resetStorefrontGuardMemoForTest } from "../lib/seller/storefront-guard";
 import { siteMiddleware } from "../middleware";
 
-// The prod flavor requires the browser API base on the web origin; a relative base is.
 process.env.NEXT_PUBLIC_API_BASE_URL = "/api/v1";
 
 /**
@@ -19,12 +18,9 @@ process.env.NEXT_PUBLIC_API_BASE_URL = "/api/v1";
  * tests of lib/intl and the built-server smoke.
  */
 
-// 登入與否只看 session cookie 在不在（middleware.ts；值不驗，權威是 GetSession）。
 const SIGNED_IN = { cookie: "__Host-hk_session=opaque" };
 
 function request(path: string, headers: Record<string, string> = {}) {
-	// A request with no Host header is an unidentifiable client and middleware
-	// de-indexes it (lib/seo/canonical-host.ts); real ones always send it.
 	return new NextRequest(`http://localhost:3000${path}`, {
 		headers: { host: "localhost:3000", ...headers },
 	});
@@ -51,7 +47,6 @@ const noNetwork = (async (input: RequestInfo | URL) => {
 
 beforeEach(() => {
 	globalThis.fetch = noNetwork;
-	// the API base is loopback whatever the flavor's default is (tests/setup/hermetic.ts pins it too)
 	__setEnvForTest(null);
 	__setEnvForTest({ ...getEnv(), serverApiBase: "http://127.0.0.1:9/api/v1" });
 });
@@ -93,7 +88,6 @@ test("an explicit /zh-TW prefix is redirected to the unprefixed URL, before any 
 	for (const [path, to] of [
 		["/zh-TW", "/"],
 		["/zh-TW/about", "/about"],
-		// not turned into a login redirect carrying a /zh-TW return path
 		["/zh-TW/account/orders", "/account/orders"],
 	] as const) {
 		const response = await siteMiddleware(request(path));
@@ -115,11 +109,8 @@ test("a metadata image route keeps its /zh-TW prefix: Next writes it into the HT
 		assert.equal(location(response), null, path);
 		assert.equal(rewrittenTo(response), null, path);
 	}
-	// ...while a page under the same explicit prefix is still redirected
 	const page = await siteMiddleware(request("/zh-TW/sellers/9"));
 	assert.ok([307, 308].includes(page.status));
-	// and a page whose dynamic segment happens to be called icon is not an image route: it
-	// is redirected to its canonical URL, where the login guard applies
 	const order = await siteMiddleware(request("/zh-TW/account/orders/icon"));
 	assert.ok([307, 308].includes(order.status));
 	assert.equal(location(order)?.pathname, "/account/orders/icon");
@@ -140,7 +131,6 @@ test("the browser's language never routes: Accept-Language: en on / stays zh-TW,
 	}
 	const home = await siteMiddleware(request("/", { "accept-language": "en" }));
 	assert.equal(rewrittenTo(home), "/zh-TW");
-	// and a stale NEXT_LOCALE cookie from an older deployment does not route either
 	const withCookie = await siteMiddleware(
 		request("/", { cookie: "NEXT_LOCALE=en" }),
 	);
@@ -159,13 +149,11 @@ test("a guest on a protected page is sent to the login of the SAME locale, and c
 		assert.equal(to.searchParams.get("role"), role, path);
 		assert.equal(to.searchParams.get("redirect"), path, path);
 	}
-	// the unprefixed (zh-TW) flow is unchanged
 	const zh = location(
 		await siteMiddleware(request("/account/orders?tab=open")),
 	);
 	assert.equal(zh?.pathname, "/login");
 	assert.equal(zh?.searchParams.get("redirect"), "/account/orders?tab=open");
-	// a signed-in visitor passes in either locale
 	for (const path of [
 		"/en/account",
 		"/account",
@@ -225,18 +213,15 @@ test("an alternate spelling of a path is judged as next-intl routes it: no way a
 		assert.equal(to.pathname, login, path);
 		assert.equal(
 			to.searchParams.get("redirect"),
-			// the requested spelling, minus leading slashes (a `//x` return target is a URL)
 			path.replace(/^\/{2,}/, "/"),
 			path,
 		);
 	}
-	// the infrastructure paths stay out of next-intl in either spelling
 	for (const path of ["/%61pi/health", "//api/health", "/%61dm/enter"]) {
 		const response = await siteMiddleware(request(path));
 		assert.equal(response.status, 200, path);
 		assert.equal(rewrittenTo(response), null, path);
 	}
-	// a path that cannot be decoded is left to Next, which answers 400
 	const broken = await siteMiddleware(request("/%E0%A4%A"));
 	assert.equal(rewrittenTo(broken), null);
 	assert.equal(location(broken), null);
@@ -246,7 +231,6 @@ test("a prefix spelled in another case is not a way around anything: next-intl m
 	for (const [path, to] of [
 		["/EN/account/orders", "/en/account/orders"],
 		["/En/about", "/en/about"],
-		// two hops: to the canonical-case prefix, then (default locale) to the unprefixed URL, then the guard
 		["/ZH-tw/account/orders", "/zh-TW/account/orders"],
 	] as const) {
 		const response = await siteMiddleware(request(path));
@@ -256,7 +240,6 @@ test("a prefix spelled in another case is not a way around anything: next-intl m
 		);
 		assert.equal(location(response)?.pathname, to, path);
 	}
-	// a locale that is not at the front is just a path segment (and, being unknown, a 404 page)
 	const nested = await siteMiddleware(request("/en/en/account"));
 	assert.equal(location(nested)?.pathname, "/en/login");
 });
@@ -266,7 +249,6 @@ test("a root-level path that is no file is rewritten to its /zh-TW twin, which h
 		const response = await siteMiddleware(request(path));
 		assert.equal(rewrittenTo(response), `/zh-TW${path}`, path);
 	}
-	// and an asset-looking tail does not take a guarded page out of the guard
 	const guarded = await siteMiddleware(request("/account/orders/HK-1.png"));
 	assert.equal(location(guarded)?.pathname, "/login");
 });
@@ -375,8 +357,6 @@ test("the agent-gate cleanup keeps the locale prefix", async () => {
 });
 
 test("a locale one surface has published and another has not is a 404 on the second (per-surface publication)", async () => {
-	// The dev flavor routes every locale; the per-surface guard is exercised in the
-	// prod flavor, where only the published lists route: en for buyers only.
 	__setFlavorForTest("prod");
 	__setEnvForTest(null);
 	__setPublishedLocalesForTest({ buyer: ["zh-TW", "en"], seller: ["zh-TW"] });
@@ -392,7 +372,6 @@ test("a locale one surface has published and another has not is a 404 on the sec
 		assert.equal(response.status, 404, path);
 		assert.equal(rewrittenTo(response), "/_not-found", path);
 	}
-	// zh-TW is unaffected on the seller surface
 	const zh = await siteMiddleware(request("/seller/pricing"));
 	assert.equal(zh.status, 200);
 });
@@ -400,7 +379,6 @@ test("a locale one surface has published and another has not is a 404 on the sec
 test("a non-default locale's UGC page answers X-Robots-Tag: noindex on an indexable deployment, and nothing else does", async () => {
 	__setEnvForTest(null);
 	__setEnvForTest({ ...getEnv(), seoIndexable: true });
-	// storefront paths resolve their store_code first; answer it locally (store 9 is its own code)
 	globalThis.fetch = (async () =>
 		new Response(
 			JSON.stringify({ code: 0, message: "ok", data: { storeCode: "9" } }),

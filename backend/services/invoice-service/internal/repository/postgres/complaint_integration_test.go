@@ -79,26 +79,20 @@ func TestIntegration_Complaint_EscalateByBuyerGuards(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// 狀態不對（建案後是 OPEN，K07 只收 SELLER_RESPONDED）。
 	if ok, err := repo.EscalateByBuyer(ctx, row.ID, iBuyerA, 0, now); err != nil || ok {
 		t.Fatalf("OPEN 不該可以升級：ok=%v err=%v", ok, err)
 	}
 
-	// 推進到 SELLER_RESPONDED 再驗買家與版本。
 	mustExec(ctx, t, repo.pool,
 		`UPDATE invoice_complaints SET status='SELLER_RESPONDED', buyer_review_due_at=now()+interval '72 hours', version=version+1 WHERE id=$1`,
 		row.ID)
 
-	// 🔴 買家不對 ⇒ rows=0。這一條是 Tier A 的第二道防線：呼叫端的 GetForBuyer 若被
-	// 改成 GetByID，這句 UPDATE 仍然擋得住。
 	if ok, err := repo.EscalateByBuyer(ctx, row.ID, iBuyerB, 1, now); err != nil || ok {
 		t.Fatalf("別的買家不該可以升級：ok=%v err=%v", ok, err)
 	}
-	// 版本不對 ⇒ rows=0。
 	if ok, err := repo.EscalateByBuyer(ctx, row.ID, iBuyerA, 0, now); err != nil || ok {
 		t.Fatalf("舊版本不該可以升級：ok=%v err=%v", ok, err)
 	}
-	// 三條都對 ⇒ rows=1。
 	if ok, err := repo.EscalateByBuyer(ctx, row.ID, iBuyerA, 1, now); err != nil || !ok {
 		t.Fatalf("合法升級失敗：ok=%v err=%v", ok, err)
 	}
@@ -143,7 +137,6 @@ func TestIntegration_Complaint_WithdrawLeavesResolvedAtNullAndFreesTheDocument(t
 	if err != nil || n != 1 {
 		t.Fatalf("CountWithdrawnByDocument = %d, err=%v, want 1", n, err)
 	}
-	// 撤回之後名額釋放：誤開案要的正是這個行為（配額由 K01 守衛②另外守）。
 	if _, inserted, err := repo.Create(ctx, newComplaintInput(nextID(), issuerID, docID, iBuyerA, orderNo, now)); err != nil || !inserted {
 		t.Fatalf("撤回後應可重新申訴：inserted=%v err=%v", inserted, err)
 	}
@@ -161,7 +154,6 @@ func TestIntegration_Complaint_ReopenClearsResolvedAtAndEnforcesQuota(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 模擬 K06：進 RESOLVED 時同時寫 resolved_at 與 reopen_allowed_after（冷卻已過）。
 	toResolved := func(reopenCount int) {
 		mustExec(ctx, t, repo.pool,
 			`UPDATE invoice_complaints
@@ -177,7 +169,6 @@ func TestIntegration_Complaint_ReopenClearsResolvedAtAndEnforcesQuota(t *testing
 		t.Fatal(err)
 	}
 
-	// 冷卻未到 ⇒ rows=0。
 	mustExec(ctx, t, repo.pool,
 		`UPDATE invoice_complaints SET reopen_allowed_after=now()+interval '1 hour', version=version+1 WHERE id=$1`, row.ID)
 	if ok, err := repo.Reopen(ctx, row.ID, iBuyerA, current.Version+1, now.Add(72*time.Hour), now); err != nil || ok {
@@ -201,7 +192,6 @@ func TestIntegration_Complaint_ReopenClearsResolvedAtAndEnforcesQuota(t *testing
 			after.Status, after.ResolvedAt, after.ReopenCount, after.ReopenAllowedAfter)
 	}
 
-	// 次數用完（chk_invcomp_reopen 上限 2）⇒ rows=0。
 	toResolved(2)
 	current, err = repo.GetForBuyer(ctx, row.ID, iBuyerA)
 	if err != nil {

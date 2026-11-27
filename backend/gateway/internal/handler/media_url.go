@@ -13,8 +13,6 @@ func buildURLs(base string, keys []string) []string {
 	return urls
 }
 
-// buildURL 將單一 objectKey 組為顯示 URL（Gateway 唯一組裝點）。
-// key 為空回傳空字串（omitempty 生效）；http 開頭值由 mediaurl.BuildURL passthrough。
 func buildURL(base, key string) string {
 	if key == "" {
 		return ""

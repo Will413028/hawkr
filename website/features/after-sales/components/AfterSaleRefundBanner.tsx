@@ -16,8 +16,6 @@ interface Props {
 export function AfterSaleRefundBanner({ progress }: Props) {
 	if (!progress) return null;
 
-	// 對帳無法判定時退款任務轉為人工處理（refundTaskStatus="40"），由客服／對帳流程接手，
-	// 因此獨立於「退款失敗」處置。此判斷須先於 refundFailureMessage（狀態 40 可能一併帶回訊息）。
 	if (progress.refundTaskStatus === REFUND_TASK_STATUS.MANUAL_INTERVENTION) {
 		return (
 			<section

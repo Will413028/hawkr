@@ -16,7 +16,7 @@ class SwipeToPay extends StatefulWidget {
 }
 
 class _SwipeToPayState extends State<SwipeToPay> {
-  double _dx = 0; // current drag x in px
+  double _dx = 0;
   bool _done = false;
 
   Future<void> _complete(double maxDx) async {
@@ -28,9 +28,6 @@ class _SwipeToPayState extends State<SwipeToPay> {
     try {
       await widget.onComplete!();
     } finally {
-      // Successful checkout normally closes this surface. If validation or a
-      // request fails and the sheet stays open, restore the control so the
-      // buyer can correct the issue and retry.
       if (mounted) {
         setState(() {
           _dx = 0;
@@ -97,7 +94,6 @@ class _SwipeToPayState extends State<SwipeToPay> {
               height: barHeight,
               child: Stack(
                 children: [
-                  // Base green track
                   Positioned.fill(
                     child: Container(
                       decoration: BoxDecoration(
@@ -107,7 +103,6 @@ class _SwipeToPayState extends State<SwipeToPay> {
                     ),
                   ),
 
-                  // Progress sheen
                   Positioned.fill(
                     child: Align(
                       alignment: Alignment.centerLeft,
@@ -123,7 +118,6 @@ class _SwipeToPayState extends State<SwipeToPay> {
                     ),
                   ),
 
-                  // Reserve room for both icons so large text never overlaps.
                   Positioned.fill(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
@@ -140,7 +134,6 @@ class _SwipeToPayState extends State<SwipeToPay> {
                     ),
                   ),
 
-                  // Left chevron-right icon (moves with drag)
                   if (!_done)
                     Positioned(
                       left: sidePadding + progress * maxDx,
@@ -153,7 +146,6 @@ class _SwipeToPayState extends State<SwipeToPay> {
                       ),
                     ),
 
-                  // Right lock icon
                   Positioned(
                     right: sidePadding,
                     top: 0,

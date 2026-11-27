@@ -71,13 +71,11 @@ func TestMountedAdminServiceWithoutDeclarationsIsRejected(t *testing.T) {
 		t.Fatalf("掛了沒有宣告的 admin service：err=%v", err)
 	}
 
-	// 沒有 descriptor 的 admin service 也不能啟動。
 	err = checkAdminDeclarations([]service{{path: "/hawkr.admin.nodescriptor.v1alpha1.NoneAdminService/", handler: http.NotFoundHandler()}})
 	if err == nil || !strings.Contains(err.Error(), "找不到 admin service") {
 		t.Fatalf("沒有 descriptor：err=%v", err)
 	}
 
-	// 宣告了但沒有掛載的方法（少掛一個 service）同樣失敗。
 	if err := checkAdminDeclarations(real[:1]); err == nil {
 		t.Fatal("少掛 admin service 卻沒有失敗")
 	}

@@ -14,15 +14,9 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// 退回的逐項問題（model.KYCIssue）：退回時寫入（kyc_review_issues），賣家在寫入申請時由同一個 transaction 比對新舊值標成
-// 已處理（resolved_at），讀取時只列最近一次退回、賣家還沒處理的那些。審核紀錄不存欄位值，所以「改過沒有」只比寫入前後的列。
 
-// issueField 是 Reject 的輸入錯誤指到的欄位路徑（模組輸入的欄位名，索引寫成 [i]）。
 func issueField(i int, name string) string { return fmt.Sprintf("Issues[%d].%s", i, name) }
 
-// validateIssues 檢查退回的問題清單與申請無關的部分：至少一項；欄位是 KYCFieldNames 的路徑、原因碼在值集合內、說明去掉前後空白
-// 後 1 到 MaxKYCIssueMessage 字、非文件類的欄位不帶 asset ID；文件類的欄位依原因碼：UNREADABLE、EXPIRED、MISMATCH、INVALID 必須帶
-// asset ID（問題出在某一張文件上），MISSING 不可以帶（缺的是整個位置），OTHER 兩者皆可。回傳正規化（去空白）後的清單。
 func validateIssues(in []model.KYCIssue) ([]model.KYCIssue, error) {
 	if len(in) == 0 {
 		return nil, apperr.InvalidInputOn([]string{"Issues"}, "退回至少要指出一個問題")
@@ -62,8 +56,6 @@ func validateIssues(in []model.KYCIssue) ([]model.KYCIssue, error) {
 	return out, nil
 }
 
-// checkIssuesAgainstApplication 檢查問題指到的是這份申請實際有的東西：欄位適用於申請的賣家型態；指到的文件是申請目前的文件，
-// （文件類的欄位只有公司補充文件）。
 func checkIssuesAgainstApplication(issues []model.KYCIssue, sellerType model.KYCSellerType, docs []store.SellerKycDocument) error {
 	for i, issue := range issues {
 		if !slices.Contains(model.IssuableFields(sellerType), issue.Field) {
@@ -80,7 +72,6 @@ func checkIssuesAgainstApplication(issues []model.KYCIssue, sellerType model.KYC
 	return nil
 }
 
-// insertIssues 把退回的問題寫在審核紀錄底下，順序就是 position。
 func insertIssues(ctx context.Context, q *store.Queries, reviewID uuid.UUID, issues []model.KYCIssue) error {
 	for i, issue := range issues {
 		params := store.InsertKYCReviewIssueParams{
@@ -105,7 +96,6 @@ func toIssue(row store.SellerKycReviewIssue) model.KYCIssue {
 	return model.KYCIssue{Field: row.Field, DocumentAssetID: assetText(row.DocumentAssetID), Code: model.KYCIssueCode(row.Code), Message: row.Message}
 }
 
-// issuesByReview 把整份申請的問題依審核紀錄分組（保持 position 的順序）。
 func issuesByReview(rows []store.SellerKycReviewIssue) map[uuid.UUID][]model.KYCIssue {
 	out := map[uuid.UUID][]model.KYCIssue{}
 	for _, row := range rows {
@@ -114,8 +104,6 @@ func issuesByReview(rows []store.SellerKycReviewIssue) map[uuid.UUID][]model.KYC
 	return out
 }
 
-// pendingRejection 是賣家要處理的那次退回：審核紀錄（依時間排序）的最後一筆是 REJECT；
-// 重新送出、核准、取消都會留下之後的紀錄，所以那之後就沒有了。
 func pendingRejection(reviews []store.SellerKycReview) *store.SellerKycReview {
 	i := len(reviews) - 1
 	if i < 0 || reviews[i].Action != string(model.ReviewReject) {
@@ -124,7 +112,6 @@ func pendingRejection(reviews []store.SellerKycReview) *store.SellerKycReview {
 	return &reviews[i]
 }
 
-// outstandingIssues 是賣家還沒處理的問題：只算要處理的那次退回（pendingRejection）裡還沒標成已處理的。
 func outstandingIssues(reviews []store.SellerKycReview, rows []store.SellerKycReviewIssue) []model.KYCIssue {
 	out := []model.KYCIssue{}
 	r := pendingRejection(reviews)
@@ -139,7 +126,6 @@ func outstandingIssues(reviews []store.SellerKycReview, rows []store.SellerKycRe
 	return out
 }
 
-// assetText 是可為 NULL 的 asset ID 的文字；沒有值是空字串。
 func assetText(id *uuid.UUID) string {
 	if id == nil {
 		return ""
@@ -147,7 +133,6 @@ func assetText(id *uuid.UUID) string {
 	return id.String()
 }
 
-// sortedAssetTexts 回傳文件的 asset ID 文字（排序，順序不算）。
 func sortedAssetTexts(docs []store.SellerKycDocument) []string {
 	out := make([]string, 0, len(docs))
 	for _, d := range docs {
@@ -157,8 +142,6 @@ func sortedAssetTexts(docs []store.SellerKycDocument) []string {
 	return out
 }
 
-// issueResolved 回報一個問題在這次寫入之後是不是已處理：非文件類的欄位是值有變；文件類的欄位指到一張文件時是那張文件不在了
-// （移除或替換），沒有指到特定一張時是文件的組成變了。
 func issueResolved(field, assetID string, changed map[string]bool, before, after []store.SellerKycDocument) bool {
 	switch {
 	case !model.IsDocumentField(field):
@@ -170,8 +153,6 @@ func issueResolved(field, assetID string, changed map[string]bool, before, after
 	}
 }
 
-// resolveIssues 在寫入申請的同一個 transaction 內，把還沒處理的問題中這次寫入處理掉的標上時間：欄位用寫入路徑回報的 diff，
-// 文件用寫入前後的證件（before、after）。
 func resolveIssues(ctx context.Context, q *store.Queries, applicationID uuid.UUID, now time.Time, diff draftDiff, docsBefore, docsAfter []store.SellerKycDocument) error {
 	open, err := q.UnresolvedKYCReviewIssues(ctx, applicationID)
 	if err != nil || len(open) == 0 {

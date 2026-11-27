@@ -10,7 +10,6 @@ function buildMediaUrl(path: string | undefined): string {
 	return path.startsWith("/") ? path : `/${path}`;
 }
 
-// 同源 BFF，永遠 /api/bff（保留給既有呼叫點）。
 const GATEWAY_URL = "/api/bff";
 
 export const environmentService = {

@@ -150,7 +150,6 @@ class _TestApp extends StatelessWidget {
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: SharedOrderDetailScreen(
-            // 空 id 可避免 widget test 觸發後端；生產 route 會傳真實單號。
             orderId: orderId,
             initialSummary: order,
             fallbackDateText: order.dateTime,
@@ -191,8 +190,6 @@ const _detailedOrder = OrderSummary(
   buyerId: 123,
   buyerName: '陳小日',
   recipientName: '陳小日',
-  // 真實賣家訂單一定帶 CodeMeta ShippingMethod value（order-service 建單時寫入）；
-  // 留空會走「未知配送方式」的 fail-safe 呈現（label 變成中性的「配送資訊」）。
   shippingMethod: '3001',
   shippingAddress: '桃園市桃園區鎮撫街1號',
   phone: '0912345678',

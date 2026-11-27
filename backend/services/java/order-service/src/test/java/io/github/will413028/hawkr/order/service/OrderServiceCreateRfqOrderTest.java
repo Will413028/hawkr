@@ -75,7 +75,6 @@ class OrderServiceCreateRfqOrderTest {
         try {
             TsidUtil.init(301, 0);
         } catch (Exception ignored) {
-            // 已初始化
         }
     }
 
@@ -122,7 +121,6 @@ class OrderServiceCreateRfqOrderTest {
         orderService.createRfqOrder(100L, SETTLEMENT_STORE_ID, ACCEPTANCE_ID,
                 30800L, 800L, null, "文旦柚 200 公斤", 30000L, "3201", "EXTERNAL");
 
-        // 期望值一律硬寫字面字串：拿 CodeMeta 常數當期望值會讓值域與斷言一起變。
         OrderPolicySnapshot policy = capturedPolicy();
         assertThat(policy.commerceModel())
                 .as("⛔ 退回 PLATFORM_CONSIGNMENT ＝ 又一次繞過 OrderPolicyResolver 刻意關掉的閘門："
@@ -169,11 +167,9 @@ class OrderServiceCreateRfqOrderTest {
         assertThat(items).hasSize(1);
         OrderService.CreateOrderItemParam item = items.get(0);
         assertThat(item.quantity()).isEqualTo(1);
-        // unitPrice ＝ goods + tax；運費另計在 shipping_fee，對帳式因此成立。
         assertThat(item.unitPrice()).isEqualTo(30000L);
         assertThat(item.listPrice()).isEqualTo(30000L);
         assertThat(item.shareDiscount()).isEqualTo(0L);
-        // 真實數量與單位寫在品名裡（⛔ 不得使用 sentinel）。
         assertThat(item.skuName()).isEqualTo("文旦柚 200 公斤");
     }
 
@@ -184,10 +180,7 @@ class OrderServiceCreateRfqOrderTest {
                 30800L, 800L, null, "文旦柚 200 公斤", 30000L, "3201", "EXTERNAL");
 
         OrderService.CreateOrderItemParam item = capturedItems().get(0);
-        // ⛔ 判準是 null，不是 0：0 在 TSID 定義域外看起來安全，但它會讓「沒有 SKU」與
-        //    「解析失敗」共用同一個值（64 號 §6.4.15 對哨兵的立場）。
         assertThat(item.skuId()).isNull();
-        // 品名仍必須是真品名——放寬的是參照，不是 sku_name 的禁 sentinel 規則。
         assertThat(item.skuName()).isEqualTo("文旦柚 200 公斤");
     }
 
@@ -311,7 +304,6 @@ class OrderServiceCreateRfqOrderTest {
                 anyLong(), anyLong(), any(), any(), any(), any(), any());
     }
 
-    // ==================== helpers ====================
 
     @SuppressWarnings("unchecked")
     private List<OrderService.CreateOrderItemParam> capturedItems() {

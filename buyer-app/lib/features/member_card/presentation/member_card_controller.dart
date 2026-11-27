@@ -19,7 +19,6 @@ class MemberCardsController extends _$MemberCardsController {
     final generation = ++_generation;
     _loadingMore = false;
     _nextPageToken = '';
-    // Apple App Review 合規：訪客（無 token）打 member-cards API 必 401，回空不打。
     final session = ref.watch(sessionProvider).value;
     if (!hasUsableSession(session)) {
       return (records: const <MemberCard>[], hasMore: false);

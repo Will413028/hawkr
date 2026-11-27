@@ -24,7 +24,6 @@ type ModuleKey struct {
 	Staff bool
 }
 
-// buildModule 驗證並建立模組句子（§2.2 第 9 條：key 是 lower_snake 的點分路徑，其餘同 3–6）。
 func buildModule(cfg *Config, mi ModuleInput, errs *errList) *ModuleModel {
 	mm := &ModuleModel{Dir: mi.Dir, Files: mi.Files}
 	src := mi.Files[cfg.SourceLocale]

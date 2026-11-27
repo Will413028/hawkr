@@ -32,7 +32,6 @@ const render = (
 let content: HTMLElement;
 beforeEach(() => {
 	vi.useFakeTimers();
-	// The pending surface now reuses StoryRail's responsive/collapse geometry.
 	vi.stubGlobal(
 		"matchMedia",
 		vi.fn((media: string) => ({
@@ -114,7 +113,6 @@ it("cancels the reveal timer when its surface owner unmounts", () => {
 	const view = render(createElement(MainTabPending));
 	act(() => beginMainTabPending("/feed", "push"));
 	view.unmount();
-	// Only the store's navigation watchdog remains; the local reveal is gone.
 	expect(vi.getTimerCount()).toBe(1);
 	act(() => vi.advanceTimersByTime(1000));
 	expect(document.querySelector("[data-main-tab-loading]")).toBeNull();

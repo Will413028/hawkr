@@ -128,7 +128,6 @@ func TestProductWithABadImageKeyKeepsTheSummaryWithoutTheImage(t *testing.T) {
 	}
 }
 
-// blockingProducts 只在 ctx 結束時回傳，所以逾時降級的測試不靠牆上時鐘斷言。
 type blockingProducts struct{}
 
 func (blockingProducts) Cards(ctx context.Context, _ []uuid.UUID, _ bool) (map[uuid.UUID]ProductInfo, error) {
@@ -149,7 +148,6 @@ func TestProductLookupTimeoutDegradesTheReadToNoProduct(t *testing.T) {
 	}
 }
 
-// rendezvousStores 的 StoreCards 要等商品查詢開始才回：商品查詢排在它後面（序列）就永遠等不到。
 type rendezvousStores struct {
 	fakeStores
 	productsStarted chan struct{}

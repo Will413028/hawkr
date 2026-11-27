@@ -1,7 +1,5 @@
 /** @vitest-environment jsdom */
 
-// 同目錄其他測試已說明這個慣例：vitest 的 include 只吃 `.ts`，所以用
-// React.createElement 而不是 JSX。
 
 import {
 	cleanup,
@@ -118,16 +116,13 @@ async function renderAtReconfirm(
 	fireEvent.click(
 		screen.getByRole("checkbox", { name: /我已核對這份需求版本與價格範圍/ }),
 	);
-	// P-01 的 CTA 逐字是「檢視不可變 RFQ 快照」（稿 P-01），前往 R-01。
 	fireEvent.click(screen.getByRole("button", { name: "檢視不可變 RFQ 快照" }));
 	await waitFor(() => {
 		expect(screen.getByText("重新確認 RFQ 快照")).toBeTruthy();
 	});
 }
 
-// docx §V 圖說寫死：「snapshot reconfirm heading 固定為『重新確認 RFQ 快照』」。
 describe("RfqDraftFlow — R-01 重新確認 RFQ 快照", () => {
-	// 快照追蹤只在取得發布核准之後出現：snapshotHash 與有效至都取自核准。
 	it("取得發布核准後快照追蹤顯示 snapshotHash 與有效至", async () => {
 		await renderAtReconfirm(preview());
 		expect(screen.queryByText("snapshotHash")).toBeNull();
@@ -146,15 +141,12 @@ describe("RfqDraftFlow — R-01 重新確認 RFQ 快照", () => {
 		expect(screen.queryByText("pricePreviewId")).toBeNull();
 	});
 
-	// ADR 2026-09-12「confirmed snapshot 不加 version 欄」D2：稿上的「快照版本 v3」
-	// badge 不實作，也不得改用 snapshot id 短碼或前端自行編號替代。
 	it("不顯示稿上的快照版本 badge", async () => {
 		await renderAtReconfirm(preview());
 
 		expect(screen.queryByText(/快照版本/)).toBeNull();
 	});
 
-	// 稿 R-01：未勾選時「確認並準備發布」disabled。
 	it("未勾選重新檢查前無法準備發布", async () => {
 		await renderAtReconfirm(preview());
 
@@ -173,7 +165,6 @@ describe("RfqDraftFlow — R-01 重新確認 RFQ 快照", () => {
 		).toBe(false);
 	});
 
-	// docx §V 圖說：CTA 下固定說明，逐字不可改寫。
 	it("CTA 下方帶固定的發布語意說明", async () => {
 		await renderAtReconfirm(preview());
 
@@ -184,8 +175,6 @@ describe("RfqDraftFlow — R-01 重新確認 RFQ 快照", () => {
 		).toBeTruthy();
 	});
 
-	// 稿 R-01 ④。docx V.7.5：publicationAudience 是互斥的 discriminator，
-	// 受眾只有直接邀請，沒有可切換的模式。
 	it("發布受眾是唯讀事實，只說明這份名單會收到", async () => {
 		await renderAtReconfirm(preview());
 
@@ -194,12 +183,8 @@ describe("RfqDraftFlow — R-01 重新確認 RFQ 快照", () => {
 		expect(screen.queryByRole("radiogroup")).toBeNull();
 	});
 
-	// 候選家數取自這張詢價單實際帶進來的候選，前端不自行編造數字。
 
-	// docx §V 圖說：「勾選確認後先以『確認並準備發布』取得 immutable RFQ
-	// Publication Approval」。這一步不建立發布、不通知任何賣家。
 
-	// 順序有意義：audienceHash 涵蓋它，換順序等於換受眾。
 	it("送出候選集與候選 id", async () => {
 		const onPreviewRfqPublication = vi.fn(
 			async () =>
@@ -228,8 +213,6 @@ describe("RfqDraftFlow — R-01 重新確認 RFQ 快照", () => {
 		);
 	});
 
-	// ⛔ 取得核准 ≠ 已發布。docx §V 圖說：只有 server 回傳可執行 approval 之後，
-	// 最終 execute CTA 才出現——這裡只呈現 server 回的受眾事實，不得出現任何宣稱已送出的字樣。
 	it("取得核准後呈現伺服器的受眾事實，且不宣稱已發布", async () => {
 		const onPreviewRfqPublication = vi.fn(
 			async () =>
@@ -253,10 +236,7 @@ describe("RfqDraftFlow — R-01 重新確認 RFQ 快照", () => {
 		expect(screen.queryByText(/已發布|已送出|已通知/)).toBeNull();
 	});
 
-	// 警示條承諾「任一…受眾變更，都會使此確認失效」。既有核准描述的是舊受眾，
-	// 沿用它等於讓買家以為自己核准過現在畫面上這一份。
 
-	// 稿 R-01 的警示條：任一事實變更都會使確認失效。
 	it("顯示事實變更會使確認失效的警示", async () => {
 		await renderAtReconfirm(preview());
 

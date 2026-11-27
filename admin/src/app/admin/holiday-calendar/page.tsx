@@ -29,19 +29,16 @@ interface ImportResult {
 export default function HolidayCalendarPage() {
 	const fileInputRef = useRef<HTMLInputElement>(null);
 
-	// 上傳 / 解析狀態
 	const [fileName, setFileName] = useState("");
 	const [csvText, setCsvText] = useState("");
 	const [fileLoaded, setFileLoaded] = useState(false);
-	const [pickedYear, setPickedYear] = useState(""); // 使用者明確選的年份；空字串 = 用預設
+	const [pickedYear, setPickedYear] = useState("");
 	const [parseError, setParseError] = useState("");
 	const [dragging, setDragging] = useState(false);
 
-	// 二次確認 / 結果
 	const [showConfirm, setShowConfirm] = useState(false);
 	const [importResult, setImportResult] = useState<ImportResult | null>(null);
 
-	// 覆蓋現況
 	const coverageQuery = useQuery(
 		BizCalendarAdminService.method.getHolidayCalendarCoverage,
 		{},
@@ -84,7 +81,6 @@ export default function HolidayCalendarPage() {
 	const declaredYear =
 		pickedYear || String(defaultImportYear(thisYear, coverage?.coveredThrough));
 
-	// 讀檔 → 以選定年份交給伺服器預覽
 	const handleFile = (file: File) => {
 		setParseError("");
 		setImportResult(null);
@@ -128,11 +124,9 @@ export default function HolidayCalendarPage() {
 			? `${formatDate(previewData.firstDate)} ~ ${formatDate(previewData.lastDate)}`
 			: "-";
 
-	// 該宣告年份於覆蓋現況中的現有天數（= 將取代的天數）
 	const existingCount =
 		coverage?.years.find((y) => y.year === yearNum)?.dayCount ?? 0;
 
-	// 「確認匯入」：先讀最新覆蓋現況取得現有天數，再開二次確認 dialog
 	const handleRequestImport = async () => {
 		if (!previewReady || !declaredYear || writeCount === 0) return;
 		importMutation.reset();
@@ -158,7 +152,7 @@ export default function HolidayCalendarPage() {
 
 	return (
 		<div className="hcal-page">
-			{/* Page Header */}
+
 			<div className="page-header">
 				<div>
 					<h1 className="page-title">假日行事曆管理</h1>
@@ -168,7 +162,7 @@ export default function HolidayCalendarPage() {
 				</div>
 			</div>
 
-			{/* ==================== 上傳與匯入 ==================== */}
+
 			<div className="hcal-card">
 				<h2 className="hcal-card-title">
 					<MaterialSymbol name="cloud_upload" />
@@ -181,7 +175,7 @@ export default function HolidayCalendarPage() {
 					2，須涵蓋整年每一天）。系統會先檢查並預覽，確認後才覆寫該年度假日資料。
 				</p>
 
-				{/* 隱藏檔案輸入 + dashed dropzone（reuse ai-styles 視覺） */}
+
 				<input
 					ref={fileInputRef}
 					type="file"
@@ -220,7 +214,7 @@ export default function HolidayCalendarPage() {
 					</div>
 				)}
 
-				{/* 伺服器預覽 */}
+
 				{hasFile && (
 					<div className="hcal-preview">
 						<div className="hcal-year-field">
@@ -302,7 +296,7 @@ export default function HolidayCalendarPage() {
 					</div>
 				)}
 
-				{/* 結果回饋 */}
+
 				{importResult && (
 					<div className="hcal-result success">
 						<MaterialSymbol name="check_circle" />
@@ -313,7 +307,7 @@ export default function HolidayCalendarPage() {
 				)}
 			</div>
 
-			{/* ==================== 各年度覆蓋現況 ==================== */}
+
 			<div className="hcal-card">
 				<h2 className="hcal-card-title">
 					<MaterialSymbol name="calendar_month" />
@@ -385,7 +379,7 @@ export default function HolidayCalendarPage() {
 				</div>
 			</div>
 
-			{/* ==================== 二次確認對話框（reuse merchants modal + a11y）==================== */}
+
 			{showConfirm && previewReady && (
 				<Dialog
 					title={

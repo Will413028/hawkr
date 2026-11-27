@@ -69,7 +69,6 @@ test("role-zone markers come from the access table, account pages included", () 
 	assert.deepEqual(routeContentReadySelectors("/checkout/pay"), [
 		'[data-hk-role-zone-ready="buyer"]',
 	]);
-	// Public and onboarding pages under /seller wait for no role zone.
 	assert.deepEqual(routeContentReadySelectors("/seller/pricing"), []);
 	assert.deepEqual(routeContentReadySelectors("/seller/onboarding"), []);
 });
@@ -77,8 +76,6 @@ test("role-zone markers come from the access table, account pages included", () 
 test("every public handoff selector is emitted by complete or terminal content", async () => {
 	const sources = await Promise.all(
 		[
-			// /search is ISR: the ready marker lives in the client shell that renders
-			// the landing/results, not the server page.
 			"../features/search/SearchClient.tsx",
 			"../features/product/ProductDetailLayout.tsx",
 			"../features/product/ProductUnavailableView.tsx",
@@ -88,8 +85,6 @@ test("every public handoff selector is emitted by complete or terminal content",
 			"../features/sellers/messages/SellerMessagesPage.tsx",
 			"../features/sellers/reviews/ReviewsClient.tsx",
 			"../components/shared/ErrorState.tsx",
-			// The 404 markup, split out of app/[locale]/not-found.tsx so that route file
-			// can be a server component and carry its own metadata title.
 			"../components/shared/NotFoundView.tsx",
 		].map((path) => readFile(new URL(path, import.meta.url), "utf8")),
 	);

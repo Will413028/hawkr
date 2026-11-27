@@ -60,8 +60,6 @@
 	box-shadow: var(--hkui-shadow-sm);
 }
 
-/* The logo sits on a light badge in every theme, so keep the official
- * multicolour lockup instead of swapping to the wheat dark-surface asset. */
 html[data-theme="dark"] .seller-public-card__brand.brand-logo--has-dark
 	> .brand-logo__lockup--default {
 	opacity: 1;

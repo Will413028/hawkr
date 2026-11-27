@@ -25,8 +25,6 @@ export default async function StorefrontTabsLayout({
 	const { id } = await params;
 	const seller = await getCachedStore(id);
 	if (!seller) {
-		// Traditional on-demand ISR: notFound() renders the 404 for this segment
-		// at request time (no PPR static-shell postpone to guard against).
 		notFound();
 	}
 

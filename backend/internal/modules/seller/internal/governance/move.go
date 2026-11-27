@@ -44,12 +44,10 @@ func (s *Service) Move(ctx context.Context, in model.MoveReportInput) (model.Mov
 		if err != nil {
 			return err
 		}
-		// 不在案件裡的通報沒有案件可鎖，由下面的 Availability().Move（NOT_IN_OPEN_CASE）回錯誤。
 		category := string(in.AssessedCategory)
 		var source *store.SellerCase
 		var target *store.SellerCase
 		if locked.CaseID != nil {
-			// 這家店新類別進行中的案件不鎖就讀：呼叫方已鎖住店家列，所有改案件的指令都先鎖店家，所以讀到之後不會被別人關閉或另開。
 			ids := []uuid.UUID{*locked.CaseID}
 			if open, err := q.OpenCaseOf(ctx, store.OpenCaseOfParams{StoreID: locked.StoreID, Category: category}); err == nil {
 				ids = append(ids, open.ID)
@@ -98,11 +96,9 @@ func (s *Service) Move(ctx context.Context, in model.MoveReportInput) (model.Mov
 		}); err != nil {
 			return err
 		}
-		// 原案件：沒有成員了就以 NO_REPORTS 關閉（同時版本加一），否則是一次處理（BumpCase）。
 		_, closeErr := q.CloseEmptyCase(ctx, store.CloseEmptyCaseParams{Now: now, AdminID: in.AdminID, ID: source.ID})
 		closed := closeErr == nil
 		if closed {
-			// 結案時還沒結束的詢問由系統撤回（鎖順序：店家列、通報列、案件列、詢問列）。
 			if err := withdrawOpenInquiry(ctx, q, source.ID, in.AdminID, now); err != nil {
 				return err
 			}

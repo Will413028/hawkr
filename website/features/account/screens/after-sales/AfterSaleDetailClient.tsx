@@ -59,7 +59,6 @@ function reasonLabel(reason: string): string {
 
 function formatDateTime(raw?: string): string {
 	if (!raw) return "";
-	// 解不出來就把原字串照登（沿用本畫面原本的行為）。
 	return formatTaipeiDateTime(raw) || raw;
 }
 
@@ -77,8 +76,6 @@ const Card = ({
 );
 
 export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
-	// Case detail (+ arbitration once appeal-locked) is keyed by caseNo; buyer
-	// actions invalidate it instead of an imperative reload.
 	const { data, loading, error } = useMyAfterSaleDetail(caseNo);
 	const detail = data?.detail ?? null;
 	const arbitration = data?.arbitration ?? null;
@@ -155,8 +152,6 @@ export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
 		);
 	}
 
-	// `!detail` (not `error || !detail`): keep the last-good case visible if a
-	// background refetch fails — only fall to not-found when there's no data.
 	if (!detail) {
 		return (
 			<div>
@@ -182,9 +177,6 @@ export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
 	}
 
 	const status = detail.status;
-	// Once an appeal exists the case is locked by platform arbitration — hide
-	// buyer actions so the case can't be pushed back to a seller-actionable
-	// state mid-arbitration. After a rejection, appeal is the only escalation.
 	const isUnderAppeal = afterSaleIsUnderAppeal(detail.appealState);
 	const isAppealLocked = afterSaleIsAppealLocked(detail.appealState);
 	const isAppealResolved = afterSaleIsAppealResolved(detail.appealState);
@@ -195,10 +187,6 @@ export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
 		status === AFTER_SALE_STATUS.AUTO_COMPLETED_RETURN_PENDING_TIMEOUT;
 	const canAppeal = afterSaleCanAppeal(detail.canAppeal, detail.appealState);
 
-	// Ship-back countdown is only meaningful while the buyer still has time to
-	// send the parcel back (status=20 RETURN_PENDING + a backend-issued deadline).
-	// Surface the D-1 warning banner inside the final 24h window only — outside
-	// of that, the inline countdown on the progress narrative is enough.
 	const shipBackDeadlineMs = (() => {
 		if (status !== AFTER_SALE_STATUS.RETURN_PENDING) return null;
 		const raw = detail.shipBackDeadlineAt;
@@ -235,7 +223,7 @@ export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
 				}
 			>
 				<div className="flex flex-col gap-4 min-w-0">
-					{/* 1 · Progress + narrative */}
+
 					<section className="bg-content1 border border-divider rounded-hkui-lg p-5">
 						<AfterSaleProgress
 							status={status}
@@ -247,7 +235,7 @@ export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
 						</p>
 					</section>
 
-					{/* 2 · Next action banners */}
+
 					<AfterSaleRefundBanner progress={detail.refundProgress} />
 
 					{shipBackDeadlineMs !== null && !shipBackShowD1Banner ? (
@@ -379,7 +367,7 @@ export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
 						</p>
 					) : null}
 
-					{/* 3 · Application summary */}
+
 					<Card title="申請內容">
 						<dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-sm">
 							<dt className="text-hk-muted">申請原因</dt>
@@ -405,7 +393,7 @@ export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
 						) : null}
 					</Card>
 
-					{/* Order items snapshot */}
+
 					{detail.items.length > 0 ? (
 						<Card title="商品">
 							<ul className="list-none m-0 p-0 flex flex-col gap-2">
@@ -448,7 +436,7 @@ export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
 						</Card>
 					) : null}
 
-					{/* 4 · Return logistics */}
+
 					{detail.returnLogistics ? (
 						<Card title="退貨資訊">
 							<ReturnLogistics
@@ -459,7 +447,7 @@ export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
 						</Card>
 					) : null}
 
-					{/* 5 · Refund progress detail */}
+
 					{detail.refundProgress?.refundTaskStatus ? (
 						<Card title="退款進度">
 							<dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-sm">
@@ -473,14 +461,14 @@ export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
 						</Card>
 					) : null}
 
-					{/* Seller inspection evidence */}
+
 					{detail.sellerPhotos.length > 0 ? (
 						<Card title="賣家驗貨照片">
 							<AfterSaleEvidenceGrid photos={detail.sellerPhotos} />
 						</Card>
 					) : null}
 
-					{/* 6 · Resolution history */}
+
 					{detail.resolutions.length > 0 ? (
 						<Card title="處理紀錄">
 							<ul className="list-none m-0 p-0 flex flex-col gap-3">
@@ -494,7 +482,7 @@ export default function AfterSaleDetailClient({ caseNo }: { caseNo: string }) {
 						</Card>
 					) : null}
 
-					{/* Footer actions */}
+
 					{canCancel ? (
 						<section className="flex gap-2 flex-wrap justify-end">
 							<Button
@@ -545,7 +533,6 @@ function ReturnLogistics({
 			logistics.method)
 		: undefined;
 
-	// 7-11 store-to-store shows three segment codes.
 	const isCvs = logistics.partnerId || logistics.odno || logistics.validationNo;
 	const logisticsStatus = returnLogisticsStatusLabel(status, logistics);
 

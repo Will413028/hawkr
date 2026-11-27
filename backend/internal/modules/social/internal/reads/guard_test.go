@@ -17,7 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/querycheck"
 )
 
-// viewers 是每支 query 都要檢查的觀看者：匿名與登入的買家（封鎖加入後語句文字會不同）。
 var viewers = []visibility.Viewer{visibility.Anonymous, {BuyerID: 42}}
 
 // 單體規則 2：渲染出來的 SQL 只能參照 social 自己的表，函式只能是 social 的、內建的，或依賴表允許的 <擁有者>.pub_*。
@@ -37,7 +36,6 @@ func TestRenderedQueriesStayInsideTheModuleBoundary(t *testing.T) {
 	}
 }
 
-// pubOwners 是 social 可以呼叫 pub_* 的擁有者：pubsql 目錄下每個生成檔一個（cmd/jetgen 只為 internal/arch 的依賴表允許的擁有者生成）。
 func pubOwners(t *testing.T) []string {
 	t.Helper()
 	files, err := filepath.Glob("../pubsql/*.go")
@@ -64,7 +62,6 @@ func TestRuleCodesAreInlineConstants(t *testing.T) {
 			}
 		}
 	}
-	// 公開貼文的 query 一定含 'PUBLISHED' 常數（partial index posts_feed 的述詞）。
 	for _, name := range []string{"ListFeedPosts", "ListStorePublicPosts", "ListHashtagPosts", "GetPublicPost", "TopPosts", "TrendingHashtags"} {
 		e := entry(t, name)
 		q, _ := e.Build(visibility.Anonymous).Sql()
@@ -111,7 +108,6 @@ func TestKeysetQueriesCompareOneRowAndHaveNoBooleanSwitch(t *testing.T) {
 	}
 }
 
-// parseDir 解析目錄裡的非測試 Go 檔。
 func parseDir(t *testing.T, dir string) map[string]*ast.File {
 	t.Helper()
 	fset := token.NewFileSet()

@@ -46,9 +46,5 @@ export default function SellerShowcaseImageWarmer() {
 		};
 	}, []);
 
-	// This boundary sits above the carousel, so its effect runs with initial
-	// hydration instead of waiting for the below-fold slides. Rendering a script
-	// tag from a client component makes React warn during hydration; Image
-	// objects provide the same cache warming without altering the DOM.
 	return null;
 }

@@ -56,8 +56,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 class CartGrpcClientCheckoutLockAccountIdTest {
 
-    private static final long STALE_AMBIENT_ACCOUNT_ID = 111L; // order-service's own raw/unresolved account_id
-    private static final long RESOLVED_BUYER_ID = 999L; // gateway-resolved buyer_id (diverged case)
+    private static final long STALE_AMBIENT_ACCOUNT_ID = 111L;
+    private static final long RESOLVED_BUYER_ID = 999L;
 
     private final AtomicReference<Long> receivedAccountId = new AtomicReference<>();
 
@@ -67,9 +67,6 @@ class CartGrpcClientCheckoutLockAccountIdTest {
 
     @BeforeEach
     void setUp() throws IOException {
-        // Fake cart-service: records whatever account id it actually sees via
-        // GrpcAuthContext, the exact same extraction cart-service's real
-        // CartGrpcService.checkoutLock uses (GrpcAuthContext.requireAccountId()).
         CartServiceGrpc.CartServiceImplBase fakeCartService = new CartServiceGrpc.CartServiceImplBase() {
             @Override
             public void checkoutLock(CheckoutLockRequest request, StreamObserver<CheckoutLockResponse> responseObserver) {
@@ -81,7 +78,7 @@ class CartGrpcClientCheckoutLockAccountIdTest {
 
         server = ServerBuilder.forPort(0)
                 .addService(fakeCartService)
-                .intercept(new GrpcAuthServerInterceptor()) // same metadata->Context extraction cart-service runs
+                .intercept(new GrpcAuthServerInterceptor())
                 .build()
                 .start();
 
@@ -93,8 +90,6 @@ class CartGrpcClientCheckoutLockAccountIdTest {
         cartTarget.setPlaintext(true);
         obsProperties.getGrpc().getTargets().put("cart", cartTarget);
 
-        // Mirrors ObsAutoConfiguration's real wiring: every channel gets
-        // [ObsGrpcClientInterceptor, GrpcAuthClientInterceptor] baked in, unconditionally.
         registry = new GrpcChannelRegistry(
                 obsProperties,
                 new ObsGrpcClientInterceptor(new ObsContext(), TextMapPropagator.noop()),
@@ -112,12 +107,6 @@ class CartGrpcClientCheckoutLockAccountIdTest {
     @Test
     @DisplayName("checkoutLock sends the resolved buyer_id, not order-service's own ambient/raw account id")
     void checkoutLock_usesResolvedBuyerId_notAmbientCallerAccountId() {
-        // Simulate order-service handling a request where ITS OWN inbound identity
-        // (GrpcAuthContext.ACCOUNT_ID, extracted by GrpcAuthServerInterceptor from the
-        // gateway's call) is the raw, unresolved login account_id — while the caller
-        // explicitly passes the gateway-resolved buyer_id as the argument
-        // (exactly what CheckoutService.confirm -> OrderService.createOrder does:
-        // request.getBuyerId() is the resolved value, GrpcAuthContext is the raw one).
         Context ctx = Context.current().withValue(GrpcAuthContext.ACCOUNT_ID, STALE_AMBIENT_ACCOUNT_ID);
         Context previous = ctx.attach();
         try {

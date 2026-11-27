@@ -79,42 +79,25 @@ export default function RootDocument({
 	locale: AppLocale;
 	children: React.ReactNode;
 }) {
-	// Not awaited: AuthProvider takes the promise without suspending (status
-	// `unknown` until it settles), so the shell and {children} stay static.
 	const session = verifySession();
 	return (
 		<html
 			lang={locale}
-			// Font CSS variables MUST live on <html> (:root), not <body>:
-			// the font tokens (--font-primary/--font-brand/--font-chinese) are
-			// declared in :root and reference --font-roboto/--font-openhuninn, so
-			// those vars have to be in :root scope or the whole token computes to
-			// the guaranteed-invalid value and headings/body fall back to the
-			// Tailwind default sans.
 			className={`${roboto.variable} ${openhuninn.variable} initial-loader-active`}
 			data-scroll-behavior="smooth"
-			// The theme boot script mutates <html> before hydration to avoid
-			// first-paint colour flash, which can otherwise trigger a hydration
-			// attribute warning.
 			suppressHydrationWarning
 		>
 			<head>
 				<JsonLd data={[organizationSchema(locale), webSiteSchema(locale)]} />
 			</head>
 			<body>
-				{/* Keep synchronous bootstrap code as the first React-owned body
-				    nodes. App Router serializes inline scripts declared in <head>
-				    into the body stream without adding them to the body fiber, so
-				    hydration can see SCRIPT where it expects InitialPageLoader.
-				    These scripts still block parsing before visual body content. */}
+
 				<script
 					id="hk-theme-boot"
 					// biome-ignore lint/security/noDangerouslySetInnerHtml: trusted boot script
 					dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }}
 				/>
-				{/* Text-size preference (字體大小：小 / 中 / 大). Must run with the
-				    theme boot script — it changes the root font-size, so applying it
-				    after hydration would reflow the whole document. */}
+
 				<script
 					id="hk-text-scale-boot"
 					// biome-ignore lint/security/noDangerouslySetInnerHtml: trusted boot script
@@ -135,8 +118,7 @@ export default function RootDocument({
 						__html: STALE_CHUNK_RELOAD_BOOT_SCRIPT,
 					}}
 				/>
-				{/* Block native image dragging without blocking files dragged into
-				    upload wrapper elements. */}
+
 				<script
 					id="hk-image-drag-guard"
 					// biome-ignore lint/security/noDangerouslySetInnerHtml: trusted boot script
@@ -145,14 +127,11 @@ export default function RootDocument({
 							"document.addEventListener('dragstart',function(e){if(e.target&&e.target.tagName==='IMG')e.preventDefault()},true)",
 					}}
 				/>
-				{/* Keep the client context inside the document body. A client
-					    provider above <html> can be detached from the replayed route
-					    subtree during a Next SSR POST, leaving shared Link
-					    consumers without their ViewTransitions context. */}
+
 				<ViewTransitions>
 					<ProductQuickViewPendingBridge />
 					<InitialPageLoader />
-					{/* SVG noise filter for frosted glass texture */}
+
 					<svg
 						style={{
 							position: "absolute",
@@ -193,11 +172,7 @@ export default function RootDocument({
 												<SellerWorkspaceLock />
 											</Suspense>
 											<div className="page-wrapper">
-												{/* Keep the root navbar free of server-side async work. The
-												    client usePathname() sits behind a persistent Suspense
-												    boundary, but unlike the old cookies()/gateway boundary
-												    this one completes in the static shell and cannot be
-												    stranded when /cart finishes streaming. */}
+
 												<Suspense
 													fallback={
 														<div
@@ -210,9 +185,7 @@ export default function RootDocument({
 												</Suspense>
 												<AccountSuspensionBanner />
 												<main className="page-content">
-													{/* Keep route children outside a root Suspense boundary so
-											    notFound() can set the document HTTP status. The controller
-											    remains isolated because it owns no route content. */}
+
 													<Suspense fallback={null}>
 														<PageTransition controllerOnly />
 														<MainTabPending />
@@ -228,30 +201,18 @@ export default function RootDocument({
 													/>
 												</Suspense>
 											</div>
-											{/* 掛載條件走共用開關而非各自寫 NODE_ENV：本機 E2E 要能把
-											    所有 dev-only 浮動工具一次關掉，量到與 CI 相同的
-											    DOM（web#425）。 */}
+
 											{DEV_OVERLAYS_ENABLED && (
 												<Suspense fallback={null}>
 													<DevRoleSwitcherSlot />
 												</Suspense>
 											)}
 											<CartSnackbar />
-											{/* App-wide in-place chat: any 發訊息 / 聯絡買家 /
-												    聊天 button opens this drawer via the chat-drawer
-												    store. Lives under AuthProvider so the embedded
-												    ThreadClient has session + query context.
-												    Reads usePathname() at render (navigation-dismiss),
-												    which is a request-time read — so it
-												    needs the same <Suspense> boundary as the other
-												    usePathname()-reading chrome above, or it blocks the
-												    static shell during streaming. */}
+
 											<Suspense fallback={null}>
 												<ChatDrawer />
 											</Suspense>
-											{/* Effects-only, renders null, reads no request-time
-												    data at render — safe to mount bare (no Suspense
-												    dynamic boundary needed). */}
+
 											<NotificationToastBridge />
 										</UIProvider>
 									</NotificationToastProvider>

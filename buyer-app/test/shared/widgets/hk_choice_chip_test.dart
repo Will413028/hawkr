@@ -34,7 +34,6 @@ void main() {
 
     final chip = find.byType(HkChoiceChip);
     expect(tester.getSize(chip).height, HkControl.minTap);
-    // 網頁設計系統 sm 控制項階梯：32px 高、12px 字。
     expect(tester.getSize(_pill).height, HkControl.compactChoiceHeight);
     expect(tester.getSize(_pill).height, 32);
     expect(_renderedStyle(tester)?.fontSize, 12);
@@ -58,7 +57,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.getSize(find.byType(HkChoiceChip)), unselected);
-    // 字重不跳（跳了寬度就會變）；選取狀態靠實底與反白文字表達。
     expect(_renderedStyle(tester)?.fontWeight, FontWeight.w500);
     expect(_renderedStyle(tester)?.color, AppColors.textInverse);
   });
@@ -82,7 +80,6 @@ void main() {
 
     final rect = tester.getRect(find.byType(HkChoiceChip));
     expect(rect.height, greaterThanOrEqualTo(HkControl.minTap));
-    // 膠囊只有 32dp 高並置中，上下各留 8dp。那 8dp 以前不會反應。
     for (final point in [
       Offset(rect.center.dx, rect.top + 2),
       rect.center,
@@ -110,12 +107,10 @@ void main() {
       ),
     );
 
-    // 固定高度會把 tight constraint 傳到 Text，少了 Align 文字會被釘在頂端。
     final pill = tester.getRect(_pill);
     final text = tester.getRect(find.text('最新上架'));
     expect(text.center.dy, moreOrLessEquals(pill.center.dy, epsilon: 0.5));
 
-    // Container 設了 alignment 會撐滿整行，Wrap 就變成一行一顆。
     expect(tester.getSize(find.byType(HkChoiceChip)).width, lessThan(200));
   });
 }

@@ -27,7 +27,6 @@ export interface DescriptionColorPickerProps {
 	portalContainer?: HTMLElement | null;
 }
 
-// Hawkr brand and status colors from DESIGN.md, used as editable content.
 const PRESETS = [
 	{ value: "#191c18", label: "墨黑" },
 	{ value: "#42493f", label: "正文灰" },

@@ -14,8 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// 封鎖的讀寫語意（A7-1b，block-brief.md）：個人封鎖依觀看者過濾讀取（買家↔買家雙向，買家→店家），店家封鎖買家只擋寫入；
-// 計數不依封鎖；匿名與店主以店家身分的讀取不受影響。
 
 func (f *fixture) blockBuyer(t *testing.T, blocker, target buyerP) {
 	t.Helper()
@@ -40,7 +38,6 @@ func (f *fixture) unblockStore(t *testing.T, blocker buyerP, storeID int64) {
 	}
 }
 
-// storeBlocksBuyer 讓店家封鎖買家（直接寫 seller 的表，最小的列；seller 自己的規則在 seller 的測試）。
 func (f *fixture) storeBlocksBuyer(t *testing.T, storeID int64, b buyerP) {
 	t.Helper()
 	f.exec(t, "INSERT INTO seller.store_blocks (store_id, buyer_id, created_at) VALUES ($1, $2, $3)", storeID, b.BuyerID, f.clock())
@@ -108,9 +105,8 @@ func TestBlockedBuyersCommentsAreHiddenInBothDirections(t *testing.T) {
 	rB := mustV[social.Comment](t)(f.module.CreateComment(ctx, store, social.CommentInput{PostID: p.ID, Body: "回 B", ParentID: &cB.ID}))
 	rC := mustV[social.Comment](t)(f.module.CreateComment(ctx, store, social.CommentInput{PostID: p.ID, Body: "回 C", ParentID: &cC.ID}))
 
-	f.blockBuyer(t, a, b) // A 封鎖 B（單向發起，效果雙向）
+	f.blockBuyer(t, a, b)
 
-	// 封鎖者 A：B 的頂層連同回覆整則不出現，沒有佔位項目。
 	got := f.topLevel(t, f.asBuyer(a), p.ID)
 	if !sameIDs(commentIDs(got), cA.ID, cC.ID) {
 		t.Fatalf("被封鎖者的頂層連同回覆整則不出現、不留佔位：%v", commentIDs(got))
@@ -120,18 +116,15 @@ func TestBlockedBuyersCommentsAreHiddenInBothDirections(t *testing.T) {
 			t.Fatalf("不該有佔位項目：%+v", x)
 		}
 	}
-	// 帶被封鎖者的頂層 ID 讀不到回覆；別串的回覆照常。
 	if got := f.replies(t, f.asBuyer(a), cB); len(got.Comments) != 0 {
 		t.Fatalf("帶被封鎖者的頂層 ID 讀不到回覆：%v", commentIDs(got))
 	}
 	if got := f.replies(t, f.asBuyer(a), cC); !sameIDs(commentIDs(got), rC.ID) {
 		t.Fatalf("別串的回覆照常：%v", commentIDs(got))
 	}
-	// 被封鎖者 B：看不到 A 的留言（雙向互不可見）。
 	if got := f.topLevel(t, f.asBuyer(b), p.ID); !sameIDs(commentIDs(got), cB.ID, cC.ID) {
 		t.Fatalf("被封鎖者看不到封鎖者的留言：%v", commentIDs(got))
 	}
-	// 第三人與匿名看得到全部。
 	for name, viewer := range map[string]social.Caller{"第三人": f.asBuyer(c), "匿名": {}} {
 		if got := f.topLevel(t, viewer, p.ID); !sameIDs(commentIDs(got), cA.ID, cB.ID, cC.ID) {
 			t.Fatalf("%s看得到全部：%v", name, commentIDs(got))
@@ -140,7 +133,6 @@ func TestBlockedBuyersCommentsAreHiddenInBothDirections(t *testing.T) {
 			t.Fatalf("%s看得到被封鎖者那串的回覆：%v", name, commentIDs(got))
 		}
 	}
-	// 封鎖者不能對看不到的留言按讚；看得到的可以。
 	if _, err := f.module.LikeComment(ctx, f.asBuyer(a), cB.ID); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("讀不到的留言不能按讚：%v", err)
 	}
@@ -165,7 +157,6 @@ func TestBlockedBuyersForumEntriesAreHiddenInBothDirections(t *testing.T) {
 	eC := enter(c, social.ForumInput{Body: "C"})
 	storeReply := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asStore(t, storeID), social.ForumInput{StoreID: storeID, Body: "店家回 B", ParentID: &eB.ID}))
 	bReplyToC := enter(b, social.ForumInput{Body: "B 回 C", ParentID: &eC.ID})
-	// 已刪除的頂層 D，底下只剩 B 的回覆。
 	eD := enter(c, social.ForumInput{Body: "D"})
 	bReplyToD := enter(b, social.ForumInput{Body: "B 回 D", ParentID: &eD.ID})
 	must(t, f.module.DeleteForumEntry(ctx, f.asBuyer(c), eD.ID, 0))
@@ -182,11 +173,9 @@ func TestBlockedBuyersForumEntriesAreHiddenInBothDirections(t *testing.T) {
 	if got := f.forumReplies(t, f.asBuyer(a), eC); len(got.Entries) != 0 {
 		t.Fatalf("同一串裡被封鎖者的回覆不出現：%v", forumIDs(got))
 	}
-	// 被封鎖者 B：看不到 A 的留言，其餘照常。
 	if got := f.forumTop(t, f.asBuyer(b), storeID); !sameIDs(forumIDs(got), eB.ID, eC.ID, eD.ID) {
 		t.Fatalf("被封鎖者看不到封鎖者的留言：%v", forumIDs(got))
 	}
-	// 第三人與匿名：全部，含已刪除頂層的佔位項目與底下 B 的回覆。
 	for name, viewer := range map[string]social.Caller{"第三人": f.asBuyer(c), "匿名": {}} {
 		got := f.forumTop(t, viewer, storeID)
 		if !sameIDs(forumIDs(got), eA.ID, eB.ID, eC.ID, eD.ID) {
@@ -202,7 +191,6 @@ func TestBlockedBuyersForumEntriesAreHiddenInBothDirections(t *testing.T) {
 			t.Fatalf("%s看得到被封鎖者那串的回覆：%v", name, forumIDs(got))
 		}
 	}
-	// 讀不到的留言不能回覆（讀寫對「看得到」的定義一致）。
 	if _, err := f.module.CreateForumEntry(ctx, f.asBuyer(a), social.ForumInput{StoreID: storeID, Body: "x", ParentID: &eB.ID}); kindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("讀不到的留言不能回覆：%v", err)
 	}
@@ -249,7 +237,7 @@ func TestBuyerBlockingAStoreHidesItsContentAndStopsWrites(t *testing.T) {
 	cmt := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(c), social.CommentInput{PostID: pBlocked.ID, Body: "留言"}))
 	entry := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(c), social.ForumInput{StoreID: blockedStore, Body: "討論"}))
 	reply := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asStore(t, blockedStore), social.ForumInput{StoreID: blockedStore, Body: "店家回", ParentID: &entry.ID}))
-	mustV[bool](t)(f.module.LikePost(ctx, a.BuyerID, pBlocked.ID)) // 封鎖之前按的讚
+	mustV[bool](t)(f.module.LikePost(ctx, a.BuyerID, pBlocked.ID))
 
 	f.blockStore(t, a, blockedStore)
 	viewer := f.asBuyer(a)
@@ -281,7 +269,6 @@ func TestBuyerBlockingAStoreHidesItsContentAndStopsWrites(t *testing.T) {
 	if got := f.forumReplies(t, viewer, entry); len(got.Entries) != 0 {
 		t.Fatalf("討論區的回覆也讀不到：%v", forumIDs(got))
 	}
-	// 寫入：讀不到就不能寫。
 	if _, err := f.module.CreateComment(ctx, viewer, social.CommentInput{PostID: pBlocked.ID, Body: "x"}); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("不能留言：%v", err)
 	}
@@ -294,11 +281,9 @@ func TestBuyerBlockingAStoreHidesItsContentAndStopsWrites(t *testing.T) {
 	if _, err := f.module.RecordShare(ctx, a.BuyerID, pBlocked.ID); kindOf(err) != apperr.KindNotFound {
 		t.Fatalf("不能分享讀不到的貼文：%v", err)
 	}
-	// 收回自己的讚不需要讀得到。
 	if removed, err := f.module.UnlikePost(ctx, a.BuyerID, pBlocked.ID); err != nil || !removed {
 		t.Fatalf("取消讚：%v %v", removed, err)
 	}
-	// 第三人與匿名不受影響。
 	for name, who := range map[string]social.Caller{"第三人": f.asBuyer(c), "匿名": {}} {
 		if feed := mustV[social.PostPage](t)(f.module.ListFeed(ctx, who, nil, 50)); len(feed.Posts) != 2 || !slices.Contains(postIDs(feed), pBlocked.ID) || !slices.Contains(postIDs(feed), pOther.ID) {
 			t.Fatalf("%s的動態牆含兩家店：%v", name, postIDs(feed))
@@ -307,7 +292,6 @@ func TestBuyerBlockingAStoreHidesItsContentAndStopsWrites(t *testing.T) {
 			t.Fatalf("%s看得到討論區的回覆：%v", name, forumIDs(got))
 		}
 	}
-	// 解除後恢復。
 	f.unblockStore(t, a, blockedStore)
 	if _, err := f.module.PublicPost(ctx, viewer, pBlocked.ID); err != nil {
 		t.Fatalf("解除後讀得到：%v", err)
@@ -332,7 +316,6 @@ func TestStoreBlockingABuyerLeavesPublicContentReadable(t *testing.T) {
 	f.storeBlocksBuyer(t, storeID, b)
 	viewer := f.asBuyer(b)
 
-	// 仍看得到店家的公開內容。
 	if _, err := f.module.PublicPost(ctx, viewer, p.ID); err != nil {
 		t.Fatalf("被封鎖的買家仍讀得到貼文：%v", err)
 	}
@@ -348,12 +331,10 @@ func TestStoreBlockingABuyerLeavesPublicContentReadable(t *testing.T) {
 	if got := f.forumTop(t, viewer, storeID); !sameIDs(forumIDs(got), entry.ID) {
 		t.Fatalf("被封鎖的買家仍看得到討論區：%v", forumIDs(got))
 	}
-	// 店家那邊也一樣看得到他的內容（店家不受個人封鎖）。
 	if got := f.topLevel(t, f.asStore(t, storeID), p.ID); !sameIDs(commentIDs(got), mine.ID) {
 		t.Fatalf("店主看得到：%v", commentIDs(got))
 	}
 
-	// 寫入：每個入口一個子測試。
 	denied := map[string]func() error{
 		"留言": func() error {
 			_, err := f.module.CreateComment(ctx, viewer, social.CommentInput{PostID: p.ID, Body: "x"})
@@ -392,15 +373,12 @@ func TestStoreBlockingABuyerLeavesPublicContentReadable(t *testing.T) {
 			}
 		})
 	}
-	// 沒被擋的買家（第三人）同樣的動作成功。
 	if _, err := f.module.CreateComment(ctx, f.asBuyer(c), social.CommentInput{PostID: p.ID, Body: "第三人"}); err != nil {
 		t.Fatalf("第三人可以留言：%v", err)
 	}
-	// 店家自己照常寫入。
 	if _, err := f.module.CreateComment(ctx, store, social.CommentInput{PostID: p.ID, Body: "店家", ParentID: &mine.ID}); err != nil {
 		t.Fatalf("店家可以回覆：%v", err)
 	}
-	// 不擋：取消讚、分享、瀏覽、刪除自己的內容。
 	t.Run("不擋取消讚", func(t *testing.T) {
 		other := f.publishedPost(t, storeID, "另一篇")
 		f.exec(t, "INSERT INTO social.post_likes (post_id, buyer_id, created_at) VALUES ($1, $2, $3)", other.ID, b.BuyerID, f.clock())
@@ -449,12 +427,9 @@ func TestStoreOwnerReadsOwnStoreIgnoringPersonalBlocks(t *testing.T) {
 	if got := f.forumTop(t, ownerCaller, storeID); !sameIDs(forumIDs(got), e1.ID, e2.ID) {
 		t.Fatalf("店主仍看得到討論區：%v", forumIDs(got))
 	}
-	// 同一個人以買家身分讀（沒有以店家身分）才套個人封鎖。
 	if got := f.topLevel(t, f.asBuyer(owner), p.ID); len(got.Comments) != 0 {
-		// 作為買家的店主封鎖了 blockedByOwner、被 blocksOwner 封鎖，兩則留言都看不到。
 		t.Fatalf("以買家身分讀才套個人封鎖：%v", commentIDs(got))
 	}
-	// 店家身分回覆被個人封鎖的買家的留言：寫入前置檢查不套個人封鎖。
 	if _, err := f.module.CreateComment(ctx, ownerCaller, social.CommentInput{PostID: p.ID, Body: "再回", ParentID: &c1.ID, ReplyToID: &c1.ID}); err != nil {
 		t.Fatalf("店家仍可回覆被個人封鎖的買家：%v", err)
 	}
@@ -477,7 +452,7 @@ func TestBlockFilterRunsBeforePagination(t *testing.T) {
 	for i := range 6 {
 		author := c
 		if i%2 == 0 {
-			author = b // 被封鎖者的留言夾在中間
+			author = b
 		}
 		f.advance(time.Second)
 		cm := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(author), social.CommentInput{PostID: p.ID, Body: fmt.Sprintf("留言%d", i)}))
@@ -494,7 +469,7 @@ func TestBlockFilterRunsBeforePagination(t *testing.T) {
 		f.advance(time.Second)
 		post := f.publishedPost(t, sid, fmt.Sprintf("貼文%d", i))
 		if sid == storeID {
-			wantPosts = append([]uuid.UUID{post.ID}, wantPosts...) // 最新的在前
+			wantPosts = append([]uuid.UUID{post.ID}, wantPosts...)
 		}
 	}
 	f.blockBuyer(t, a, b)
@@ -538,7 +513,6 @@ func TestBlockFilterRunsBeforePagination(t *testing.T) {
 	if !sameIDs(gotComments, wantComments...) || !sameIDs(gotForum, wantForum...) {
 		t.Fatalf("keyset 跨頁不重不漏：\n留言 %v\n要   %v\n討論 %v\n要   %v", gotComments, wantComments, gotForum, wantForum)
 	}
-	// 動態牆還有 storeID 的第一篇貼文 p（最舊）；扣掉後只剩沒被封鎖的店的貼文。
 	if !sameIDs(gotPosts, wantPosts...) {
 		t.Fatalf("動態牆跨頁不重不漏：%v 要 %v", gotPosts, wantPosts)
 	}
@@ -574,7 +548,6 @@ func TestBlocksDoNotChangeCounts(t *testing.T) {
 	if got := mustV[social.Post](t)(f.module.PublicPost(ctx, social.Caller{}, p.ID)); got.Stats.Comments != 2 {
 		t.Fatalf("匿名看到的留言數是全域的數字：%+v", got.Stats)
 	}
-	// 熱門標籤與建議是全域彙總，封鎖者看到的與匿名相同。
 	trend := func() []social.HashtagCount {
 		return mustV[[]social.HashtagCount](t)(f.module.TrendingHashtags(ctx, f.clock().AddDate(0, 0, -7), f.clock().Add(time.Second), 10))
 	}

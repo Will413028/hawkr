@@ -63,9 +63,6 @@ export function normalizeCase(raw: Wire): AfterSaleCase {
 		orderNo: str(raw.orderNo, raw.order_no),
 		buyerId: str(raw.buyerId),
 		buyerName: str(raw.buyerName, raw.buyer_name),
-		// §231: AfterSaleCaseSummaryResponse sends the flat pair `avatarKey`
-		// (objectKey SSOT) + `avatarUrl` (Gateway-composed). Read the key;
-		// buildImageUrl resolves it.
 		avatarKey: optStr(raw.avatarKey),
 		sellerName: optStr(raw.sellerName, raw.seller_name),
 		status: str(raw.status),
@@ -85,8 +82,6 @@ export function normalizeCase(raw: Wire): AfterSaleCase {
 		),
 		createdAt: str(raw.createdAt, raw.created_at),
 		closedAt: optStr(raw.closedAt, raw.closed_at),
-		// 後端列表端點（AfterSaleCaseSummaryResponse）已回傳 appealState；列表 row
-		// 需消費它才能在 badge / 下一步 / 操作上反映「申訴仲裁中」。
 		appealState: optStr(raw.appealState, raw.appeal_state),
 		processDeadline: optStr(
 			raw.processDeadline,
@@ -106,9 +101,6 @@ export function normalizeCase(raw: Wire): AfterSaleCase {
 }
 
 function normalizeItem(raw: Wire): AfterSaleItem {
-	// Detail items carry skuName (no product name) + imageKey/imageUrl +
-	// originalPrice / actualPayAmount. Fall back across the camel/snake variants.
-	// §231: `imageKey` is the objectKey SSOT (aftersales.go:141-142).
 	const skuName = optStr(raw.skuName, raw.sku_name, raw.spec);
 	return {
 		orderItemId: str(raw.orderItemId, raw.order_item_id, raw.id),
@@ -197,9 +189,6 @@ function splitEvidence(raw: unknown): {
 	const buyer: AfterSaleEvidence[] = [];
 	const seller: AfterSaleEvidence[] = [];
 	for (const item of asArray(raw)) {
-		// §231: EvidenceResponse is `assetId / imageKey / imageUrl / evidenceType /
-		// createdAt` (aftersales.go:146-152); imageKey is the objectKey SSOT and the
-		// grid feeds it through resolveCdnUrl.
 		const url = str(item.imageKey);
 		if (!url) continue;
 		const type = str(item.evidenceType, item.evidence_type);
@@ -241,13 +230,10 @@ export function normalizeDetail(raw: Wire): AfterSaleDetail {
 		resolutions: asArray(
 			raw.resolutions ?? raw.decisions ?? raw.resolutionHistory,
 		).map(normalizeResolution),
-		// Detail return-logistics fields are flat; prefer the nested object if
-		// the backend ever sends one.
 		returnLogistics:
 			normalizeReturnLogistics(
 				(raw.returnLogistics ?? raw.return_logistics) as Wire | undefined,
 			) ?? flatReturnLogistics(raw),
-		// Flat top-level refund fields + optional nested object.
 		refundProgress: normalizeRefundProgress(
 			raw,
 			(raw.refundProgress ?? raw.refund_progress) as Wire | undefined,

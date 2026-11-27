@@ -98,7 +98,6 @@ func (r Ref) set() int {
 	return n
 }
 
-// socialTarget 解析社群內容的參照；ID 格式錯誤回 invalid_argument。
 func (r Ref) socialTarget() (social.Target, error) {
 	if r.ForumEntryID != "" {
 		id, err := rpc.ParseUUID("forum_entry_id", r.ForumEntryID)
@@ -141,8 +140,6 @@ func (s Sources) ResolveAuthor(ctx context.Context, c social.Caller, ref Ref) (s
 	return got, nil
 }
 
-// reviewAuthor 解析評價的作者：店家封鎖的是寫評價的買家；買家封鎖的是評價的回覆店家，所以評價沒有（讀得到的）回覆時沒有可封鎖的對象。
-// 讀取以公開可讀的規則（店家以訪客讀，買家帶自己的封鎖）：讀不到的評價在 GetReview 就是 not_found。
 func (s Sources) reviewAuthor(ctx context.Context, c social.Caller, rawID string) (social.ContentAuthor, error) {
 	id, err := rpc.ParseUUID("review_id", rawID)
 	if err != nil {
@@ -165,8 +162,6 @@ func (s Sources) reviewAuthor(ctx context.Context, c social.Caller, rawID string
 	return social.ContentAuthor{Found: true, Author: social.Actor{Kind: social.ActorStore, ID: r.StoreID}, StoreID: r.StoreID}, nil
 }
 
-// messageAuthor 解析聊天訊息參照的對象：封鎖的是聊天的對方（買家封鎖店家、店家封鎖買家），與訊息是誰寄的無關，隱藏與抹除的訊息照樣可以當參照。
-// 呼叫者不是該對話的一方與訊息不存在是同一個 not_found，不洩漏訊息或對話存在。
 func (s Sources) messageAuthor(ctx context.Context, c social.Caller, rawID string) (social.ContentAuthor, error) {
 	id, err := rpc.ParseUUID("message_id", rawID)
 	if err != nil {

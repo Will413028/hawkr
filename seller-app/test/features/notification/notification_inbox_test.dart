@@ -65,7 +65,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('SERVER-TITLE'), findsOneWidget);
-    // 伺服器文字不被 client 改寫（舊版把「買家」換成買家名）。
     expect(find.text('SERVER-BODY: 買家 A'), findsOneWidget);
     expect(
       listRequests.first.audience,

@@ -26,7 +26,6 @@ import {
 } from "./kyc-application";
 import { addressText } from "./store-detail";
 
-// 商家詳情的商家認證申請內容（GetKYCApplication）：基本資料（公司型含商業登記 GCIS 並列）、檢附文件與審核紀錄。每個元件只吃已經整理好的 props，沒有自己的查詢。退回時指出問題在 RejectKycDialog。
 
 /** 一個欄位列：標籤與值（沿用 info-field 的樣式）。 */
 function FieldRow({
@@ -46,8 +45,6 @@ function FieldRow({
 	);
 }
 
-// ---------------------------------------------------------------------------
-// 基本資料與商業登記（GCIS）並列
 
 /**
  * 基本資料：店家欄位（GetStore）與申請的欄位。公司型申請在同一張卡的下半部把申請內容與商業登記（GCIS）逐列並列：名稱、統編、
@@ -86,9 +83,9 @@ export function KycBasicInfoCard({
 					<FieldRow label="電子信箱" value={store.supportEmail || "-"} />
 					<FieldRow label="聯絡人姓名" value={store.contactName || "-"} />
 					<FieldRow label="聯絡手機" value={store.contactMobile || "-"} />
-					{/* 聯絡電話：退件後要打電話請賣家補件。「賣家沒留電話」本身就是審核者要知道的事，所以沒有值也顯示 "-"。 */}
+
 					<FieldRow label="聯絡電話" value={store.contactPhone || "-"} />
-					{/* 公司電話是企業賣家限定且選填；個人賣家沒有這個欄位，整欄不顯示而不是顯示空值。 */}
+
 					{application.subject.case === "business" && (
 						<FieldRow
 							label="公司電話"
@@ -200,8 +197,6 @@ function GcisRowCells({
 	);
 }
 
-// ---------------------------------------------------------------------------
-// 檢附文件
 
 /** 檔案端點的 HTTP 狀態對應的錯誤碼，文字走目錄的預設文字（沒有收到回應視為暫時不可用）。 */
 function fileFailure(status: number | undefined): ConnectError {
@@ -328,8 +323,6 @@ export function KycDocumentsCard({
 	);
 }
 
-// ---------------------------------------------------------------------------
-// 其他資訊
 
 export function KycOtherInfoCard({
 	store,
@@ -376,8 +369,6 @@ export function KycOtherInfoCard({
 	);
 }
 
-// ---------------------------------------------------------------------------
-// 退回的問題與審核紀錄
 
 /** 一份問題清單（欄位、原因、說明；指定文件時註明）。 */
 function IssueList({
@@ -393,7 +384,6 @@ function IssueList({
 	return (
 		<ul className="kyc-issue-list">
 			{issues.map((i, index) => (
-				// 清單是唯讀的、順序固定，沒有穩定的 ID 可用，順序即身分。
 				<li key={index}>
 					<strong>{i.field}</strong>
 					{i.document && <span>（{i.document}）</span>}

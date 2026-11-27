@@ -35,12 +35,12 @@ func TestPreviewPublicationFreezesTheRecipientAndTheHashesAreRecomputable(t *tes
 		p.Payload.ResponseDate == nil || !p.Payload.ResponseDate.Equal(deadline) {
 		t.Fatalf("賣家看得到的內容：%+v", p.Payload)
 	}
-	again, err := f.service().PreviewPublication(context.Background(), in) // 重送回同一份核准
+	again, err := f.service().PreviewPublication(context.Background(), in)
 	must(t, err)
 	if again.ApprovalID != p.ApprovalID || again.SellerFacingHash != p.SellerFacingHash || again.AudienceHash != p.AudienceHash {
 		t.Fatalf("重送要回同一份核准：%+v vs %+v", again, p)
 	}
-	other := f.approved(f.publicationIn()) // 另一把鍵、沒有期限：內容不同，hash 不同
+	other := f.approved(f.publicationIn())
 	if other.ApprovalID == p.ApprovalID || other.SellerFacingHash == p.SellerFacingHash {
 		t.Fatal("有沒有回價期限，賣家可見內容的 hash 要不同")
 	}
@@ -80,14 +80,14 @@ func TestPreviewPublicationDirectOnlyAcceptsTheEffectiveCandidateSet(t *testing.
 	newSet, newCands := f.searched(10, 20)
 
 	_, err := f.service().PreviewPublication(ctx, f.directIn(oldSet, oldCands[0]))
-	wantConflict(t, err, "candidate_set") // 有更新的搜尋成功
+	wantConflict(t, err, "candidate_set")
 	if _, err := f.service().PreviewPublication(ctx, f.directIn(newSet, newCands[0])); err != nil {
 		t.Fatalf("有效的候選集要收：%v", err)
 	}
 
 	f.setStatus("CLARIFYING")
 	_, err = f.service().PreviewPublication(ctx, f.directIn(newSet, newCands[1]))
-	wantKind(t, err, apperr.KindFailedPrecondition) // 需求已離開 MATCHING：狀態檢查先於候選集檢查
+	wantKind(t, err, apperr.KindFailedPrecondition)
 	if n := f.count("procurement.rfq_publication_approvals"); n != 1 {
 		t.Fatalf("被拒的請求不寫入，rfq_publication_approvals %d 列", n)
 	}
@@ -101,16 +101,16 @@ func TestPreviewPublicationDirectBranches(t *testing.T) {
 	otherSet, otherCands := other.searched(10)
 
 	_, err := f.service().PreviewPublication(ctx, f.directIn(set, otherCands[0]))
-	wantInvalid(t, err, "SelectedCandidateIDs[0]") // 候選不在這個候選集
+	wantInvalid(t, err, "SelectedCandidateIDs[0]")
 	_, err = f.service().PreviewPublication(ctx, f.directIn(set, c[0], uuid.NewV7()))
 	wantInvalid(t, err, "SelectedCandidateIDs[1]")
 	_, err = f.service().PreviewPublication(ctx, f.directIn(uuid.NewV7(), c[0]))
 	wantKind(t, err, apperr.KindNotFound)
-	_, err = f.service().PreviewPublication(ctx, f.directIn(otherSet, otherCands[0])) // 同一位買家另一張需求的候選集
+	_, err = f.service().PreviewPublication(ctx, f.directIn(otherSet, otherCands[0]))
 	wantKind(t, err, apperr.KindNotFound)
 	foreign := f.sibling(buyer + 1)
 	theirSet, theirCands := foreign.searched(10)
-	_, err = f.service().PreviewPublication(ctx, f.directIn(theirSet, theirCands[0])) // 別的買家的候選集
+	_, err = f.service().PreviewPublication(ctx, f.directIn(theirSet, theirCands[0]))
 	wantKind(t, err, apperr.KindNotFound)
 	if n := f.count("procurement.rfq_publication_approvals"); n != 0 {
 		t.Fatalf("被拒的請求不寫入，rfq_publication_approvals %d 列", n)
@@ -146,12 +146,12 @@ func TestPreviewPublicationStaleBranches(t *testing.T) {
 
 	foreign := f.sibling(buyer + 1)
 	notMine := f.publicationIn()
-	notMine.RequestID, notMine.ExpectedRevisionID = foreign.request, foreign.revision // 買家是 f.buyer，需求是別人的
+	notMine.RequestID, notMine.ExpectedRevisionID = foreign.request, foreign.revision
 	_, err = f.service().PreviewPublication(ctx, notMine)
 	wantKind(t, err, apperr.KindNotFound)
 
 	old := f.publicationIn()
-	f.revise(func(*store.InsertRevisionParams) {}) // 買家帶著舊版本來預覽
+	f.revise(func(*store.InsertRevisionParams) {})
 	_, err = f.service().PreviewPublication(ctx, old)
 	wantConflict(t, err, "request_revision")
 	if n := f.count("procurement.rfq_publication_approvals WHERE request_id = $1", f.request); n != 0 {
@@ -203,7 +203,6 @@ func TestPreviewPublicationStoresTheRangeAndTheTrimmedNote(t *testing.T) {
 	if b.Payload.BuyerNote != "" {
 		t.Fatalf("只有空白的補充說明存成空字串：%q", b.Payload.BuyerNote)
 	}
-	// 賣家看到的範圍與補充說明都進 hash：不同的區間、不同的說明得到不同的 hash
 	wider := f.publicationIn()
 	wider.UpperBoundAmount = 300
 	if f.approved(wider).SellerFacingHash == f.approved(f.publicationIn()).SellerFacingHash {
@@ -264,7 +263,7 @@ func TestPreviewPublicationReplayIsNotBlockedByADeadlineThatPassedSinceTheFirstC
 	d := time.Date(2026, 11, 23, 0, 0, 0, 0, time.UTC)
 	in.ResponseDeadline = &d
 	first := f.approved(in)
-	f.now = f.now.Add(23 * time.Hour) // 台北已是隔天，期限過了
+	f.now = f.now.Add(23 * time.Hour)
 	again, err := f.service().PreviewPublication(context.Background(), in)
 	must(t, err)
 	if again.ApprovalID != first.ApprovalID {
@@ -276,7 +275,7 @@ func TestPreviewPublicationRejectsTheSameKeyWithDifferentContent(t *testing.T) {
 	ctx := context.Background()
 	f := newFixture(t)
 	set, c := f.searched(10, 20)
-	otherSet, otherCands := f.searched(10, 20) // 之後的搜尋：同樣的店、不同的候選集
+	otherSet, otherCands := f.searched(10, 20)
 	direct := f.directIn(otherSet, otherCands[0], otherCands[1])
 	f.approved(direct)
 	for name, edit := range map[string]func(*rfq.PreviewPublicationInput){
@@ -290,7 +289,6 @@ func TestPreviewPublicationRejectsTheSameKeyWithDifferentContent(t *testing.T) {
 		"note":     func(i *rfq.PreviewPublicationInput) { i.BuyerNote = "x" },
 		"revision": func(i *rfq.PreviewPublicationInput) { i.ExpectedRevisionID = uuid.NewV7() },
 		"request":  func(i *rfq.PreviewPublicationInput) { i.RequestID = uuid.NewV7() },
-		// 同一批店、同樣的順序，但候選集是另一個：沒有比對候選集本身的話這個重送會被當成同一份
 		"candidate set": func(i *rfq.PreviewPublicationInput) {
 			i.CandidateSetID, i.SelectedCandidateIDs = set, []uuid.UUID{c[0], c[1]}
 		},
@@ -368,7 +366,7 @@ func TestExecuteReplaysTheFirstPublicationWithoutNewInvitesOrEvents(t *testing.T
 	in := f.executeIn(p)
 	first, err := f.execute(in)
 	must(t, err)
-	f.now = f.now.Add(rfq.ApprovalTTL + time.Hour) // 核准已過期，重送仍回第一次的發布
+	f.now = f.now.Add(rfq.ApprovalTTL + time.Hour)
 	again, err := f.execute(in)
 	must(t, err)
 	if !again.Replayed || again.ID != first.ID || again.SellerFacingHash != first.SellerFacingHash || again.AudienceHash != first.AudienceHash || !again.PublishedAt.Equal(first.PublishedAt) {
@@ -416,7 +414,7 @@ func TestExecuteAnApprovalThatWasAlreadyExecutedIsAVersionConflict(t *testing.T)
 	p := f.approved(f.publicationIn())
 	_, err := f.execute(f.executeIn(p))
 	must(t, err)
-	_, err = f.execute(f.executeIn(p)) // 新的 client_request_id，同一份核准
+	_, err = f.execute(f.executeIn(p))
 	wantConflict(t, err, "publication_approval")
 	if n, e := f.count("procurement.rfq_publications"), len(f.events()); n != 1 || e != 1 {
 		t.Fatalf("發布 %d、事件 %d（要 1、1）", n, e)
@@ -488,14 +486,14 @@ func TestExecuteStaleBranchesLeaveTheApprovalPending(t *testing.T) {
 
 	again := f.sibling(buyer)
 	crossed := again.approved(again.publicationIn())
-	other := f.executeIn(crossed) // 同一位買家另一張需求的核准
+	other := f.executeIn(crossed)
 	_, err = f.execute(other)
 	wantConflict(t, err, "publication_approval")
 	if state, _ := again.approvalState(crossed.ApprovalID); state != "PENDING" {
 		t.Fatalf("另一張需求的核准不受影響，卻是 %s", state)
 	}
 
-	f.revise(func(*store.InsertRevisionParams) {}) // 核准之後需求又改了一版：核准凍的版本不是現行版本
+	f.revise(func(*store.InsertRevisionParams) {})
 	_, err = f.execute(f.executeIn(p))
 	wantConflict(t, err, "publication_approval")
 	pending("核准凍的版本")
@@ -506,7 +504,7 @@ func TestExecuteRejectsAnApprovalWhoseVersionMatchesButIsNotPending(t *testing.T
 	for _, state := range []string{"EXECUTING", "SUCCEEDED"} {
 		f := newFixture(t)
 		p := f.approved(f.publicationIn())
-		f.exec(`UPDATE procurement.rfq_publication_approvals SET state = $2 WHERE id = $1`, p.ApprovalID, state) // 版本不變
+		f.exec(`UPDATE procurement.rfq_publication_approvals SET state = $2 WHERE id = $1`, p.ApprovalID, state)
 		_, err := f.execute(f.executeIn(p))
 		wantConflict(t, err, "publication_approval")
 		if got, version := f.approvalState(p.ApprovalID); got != state || version != 1 {
@@ -575,7 +573,7 @@ func TestExecuteDirectRechecksTheEffectiveCandidateSet(t *testing.T) {
 	f := newFixture(t)
 	set, c := f.searched(10, 20)
 	p := f.approved(f.directIn(set, c[0], c[1]))
-	f.searched(10, 20) // 預覽之後又搜尋成功：舊的候選集不再有效
+	f.searched(10, 20)
 	_, err := f.execute(f.executeIn(p))
 	wantConflict(t, err, "candidate_set")
 	if state, version := f.approvalState(p.ApprovalID); state != "PENDING" || version != 1 {
@@ -607,7 +605,7 @@ func TestExecuteRechecksTheResponseDeadlineInTaipei(t *testing.T) {
 	today := time.Date(2026, 11, 23, 0, 0, 0, 0, time.UTC)
 	in.ResponseDeadline = &today
 	p := f.approved(in)
-	f.now = f.now.Add(23 * time.Hour) // 核准還沒過期（24 小時），但台北已是 11/24
+	f.now = f.now.Add(23 * time.Hour)
 	_, err := f.execute(f.executeIn(p))
 	wantConflict(t, err, "publication_approval")
 	if state, version := f.approvalState(p.ApprovalID); state != "PENDING" || version != 1 {

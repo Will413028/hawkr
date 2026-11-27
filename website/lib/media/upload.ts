@@ -281,8 +281,6 @@ async function decodeImage(file: File): Promise<DecodedImage> {
 		try {
 			return await createImageBitmap(file);
 		} catch {
-			// Fall through to the HTMLImageElement path for browsers/codecs that
-			// do not support createImageBitmap for a given file.
 		}
 	}
 	return loadHtmlImage(file);

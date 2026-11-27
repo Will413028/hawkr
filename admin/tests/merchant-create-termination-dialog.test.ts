@@ -38,7 +38,6 @@ const dom = new JSDOM("<!doctype html><body></body>", {
 });
 const g = globalThis as Record<string, unknown>;
 g.window = dom.window;
-// next/link 載入時讀 `self`。
 g.self = dom.window;
 g.document = dom.window.document;
 g.HTMLElement = dom.window.HTMLElement;
@@ -199,7 +198,6 @@ async function settle(m: { queryClient: QueryClient }) {
 			await new Promise((resolve) => setTimeout(resolve, 1));
 		});
 	}
-	// React Query 把訂閱者的通知排到下一個 macrotask，所以查詢完成後再讓出一輪，渲染才會反映結果。
 	await React.act(async () => {
 		await new Promise((resolve) => setTimeout(resolve, 0));
 	});
@@ -472,7 +470,6 @@ test("重大違約：出現「依據的認定」複選（只列生效中的認�
 	await click("確認建立");
 	assert.equal(requests.length, 0);
 	assert.match(bodyText(), /請選擇依據的認定/u);
-	// 先勾 f2 再勾 f1：引用的認定是集合，送出的 id 排序（不取決於勾選順序）。
 	await React.act(async () => {
 		boxes[1]?.click();
 	});
@@ -515,7 +512,6 @@ test("依據的認定欄位依選項的需求：選填的事由出現欄位、�
 	const boxes = () =>
 		dom.window.document.querySelectorAll('input[type="checkbox"]');
 
-	// 選填而沒選：欄位出現、說明是「選填。」、不選也能送出、請求沒有 violation。
 	const unpicked = open();
 	await unpicked.mount();
 	await fillCommon(TerminationGround.NOTICE);
@@ -530,7 +526,6 @@ test("依據的認定欄位依選項的需求：選填的事由出現欄位、�
 	assert.equal(unpicked.requests[0]?.measure?.value?.violation, undefined);
 	await unpicked.unmount();
 
-	// 選填而有選：送出所選的 id。
 	const picked = open();
 	await picked.mount();
 	await fillCommon(TerminationGround.FRAUD);
@@ -545,7 +540,6 @@ test("依據的認定欄位依選項的需求：選填的事由出現欄位、�
 	);
 	await picked.unmount();
 
-	// 必填：說明只有「至少選一筆。」，7 日規則由伺服器的說明句呈現。
 	const required = open();
 	await required.mount();
 	await fillCommon(TerminationGround.MATERIAL_BREACH);
@@ -624,8 +618,6 @@ test("關聯終止：事由固定且不能改、顯示來源措施、請求帶�
 	await d.unmount();
 });
 
-// ---------------------------------------------------------------------------
-// 措施詳情
 
 function detail(measure: unknown) {
 	const linked: Array<[string, string]> = [];
@@ -735,7 +727,6 @@ test("措施詳情頁：沒有命中不顯示區塊；來源措施不能建立�
 	);
 	await suspension.unmount();
 
-	// 按鈕只看伺服器給的 can_create_linked_termination：措施是生效中的詐欺終止，但伺服器說不行（例如該帳號的店家不允許）就沒有按鈕。
 	const refused = detail(
 		create(MeasureSchema, {
 			id: "m1",
@@ -771,8 +762,6 @@ test("措施詳情頁：沒有命中不顯示區塊；來源措施不能建立�
 	await child.unmount();
 });
 
-// ---------------------------------------------------------------------------
-// 預定終止與生效中的終止卡
 
 test("預定終止：以帳號與 state=SCHEDULED 讀 ListMeasures，顯示最早的生效時間；沒有預定終止時不渲染", async () => {
 	let seen: { accountId?: string; state?: number } = {};

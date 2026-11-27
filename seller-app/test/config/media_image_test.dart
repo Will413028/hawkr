@@ -123,7 +123,6 @@ void main() {
         buildImageUrl('products/x.jpg', ImagePreset.thumb),
         '$_mediaBase/i/thumb/products/x.jpg',
       );
-      // 前導斜線去除
       expect(
         buildImageUrl('/products/x.jpg', ImagePreset.thumb),
         '$_mediaBase/i/thumb/products/x.jpg',
@@ -142,8 +141,6 @@ void main() {
       expect(buildImageUrl(other, ImagePreset.card), other);
     });
 
-    // 媒體域名不做新舊相容（backend#2283）：已退役的 OSS CDN／aliyuncs 不再被當成
-    // 媒體來源，一律視為外部網址原樣 passthrough，不會被靜默還原成 key。
     test('已退役的舊儲存域名一律 passthrough，不還原 key', () {
       const retiredCdn = 'https://cdn.example.com/products/x.jpg';
       expect(buildImageUrl(retiredCdn, ImagePreset.card), retiredCdn);

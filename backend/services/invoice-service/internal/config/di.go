@@ -23,9 +23,6 @@ var Module = fx.Module("config",
 	fx.Invoke(initOTel),
 )
 
-// newCipher builds the AES-256-GCM cipher used for AppKey at-rest encryption
-// （§4.5.4）。Validate 已保證 MasterKey 非空，crypto.New 在此不會 fail-closed；
-// 真正的密文↔明文轉換只准發生在 internal/repository/postgres/mapper.go。
 func newCipher(cfg *Config) (*crypto.Cipher, error) {
 	return crypto.New(cfg.Encryption.MasterKey)
 }

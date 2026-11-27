@@ -22,13 +22,6 @@ import (
 	invoicemq "github.com/Will413028/hawkr/invoice-service/internal/mq"
 )
 
-// ---------------------------------------------------------------------------
-// fakes
-//
-// fakeInboxRepo 只實作 INV.dl 真的會用到的那幾支；其餘由嵌入的 nil 介面承接，**呼叫到
-// 就 panic**。這是刻意的：deadlineInboxRepo 若哪天走了設計外的路徑（例如自己 MarkDeferred
-// 把 DEFERRED 列翻掉），要在測試裡當場炸掉而不是靜默通過。
-// ---------------------------------------------------------------------------
 
 type dlClaim struct {
 	id              int64
@@ -88,10 +81,6 @@ func (f *fakeInboxRepo) FetchDueActionableByType(_ context.Context, eventType st
 	return f.rowsOf(eventType, false), nil
 }
 
-// rowsOf 依 event_type 過濾，withDeferred=false 時另外排除 DEFERRED。
-//
-// 舊版回 `f.rows` 全部、不看型別——那在「只撈一次」的年代看不出問題，
-// 但撈兩次之後每一列都會出現兩遍，型別分派就驗不到任何東西了。
 func (f *fakeInboxRepo) rowsOf(eventType string, withDeferred bool) []domain.InboxEvent {
 	var out []domain.InboxEvent
 	for _, r := range f.rows {
@@ -155,30 +144,23 @@ func dlRow(id int64, attempts int32) domain.InboxEvent {
 	}
 }
 
-// newDLWorker 一律走 deadlineCfg()（＝生產參數），不在測試裡另組一份 outbox.Config。
 func newDLWorker(repo domain.InboxRepository, uc InboxOrderPaidReprocessor) *DeadlineWorker {
 	return newDLWorkerWithRefund(repo, uc, strictRefundReprocessor{})
 }
 
-// newDLWorkerWithRefund 讓退款那一軸也可以指定替身（#3073）。
 func newDLWorkerWithRefund(repo domain.InboxRepository, uc InboxOrderPaidReprocessor, rf InboxRefundReprocessor) *DeadlineWorker {
-	// K05 的 sweeper 傳 nil：本檔驗的是 inbox 兜底那一半，而 RunOnce 對未 wire 的
-	// sweeper 安靜跳過（見該處註解）。K05 自己的行為由 usecase 側的測試守。
 	return NewDeadlineWorker(repo, uc, rf, deadlineCfg(), dlParkInterval, nil, testObsC, nil)
 }
 
-// newDLWorkerWithSweeper 掛上申訴掃描那一半，用來驗 RunOnce 的**編排**。
 func newDLWorkerWithSweeper(repo domain.InboxRepository, sw OverdueComplaintSweeper) *DeadlineWorker {
 	return NewDeadlineWorker(repo, &fakeReprocessor{}, strictRefundReprocessor{},
 		deadlineCfg(), dlParkInterval, sw, testObsC, nil)
 }
 
-// newDLWorkerWithBoth 同時掛申訴那三支與 §5.2.1 的逾期分類，用來驗四者的編排。
 func newDLWorkerWithBoth(repo domain.InboxRepository, sw OverdueComplaintSweeper, st StatutoryDeadlineSweeper) *DeadlineWorker {
 	return newDLWorkerWithSweeper(repo, sw).WithStatutorySweeper(st)
 }
 
-// dlStatutory 是 §5.2.1 逾期分類的替身。
 type dlStatutory struct {
 	n     int
 	err   error
@@ -232,8 +214,6 @@ func TestDeadlineWorker_NilStatutoryIsSkipped(t *testing.T) {
 	}
 }
 
-// dlSweeper 是 K04／K05 的替身。**兩支各自記呼叫次數**——只記一個總數的替身對
-// 「K04 失敗時 K05 有沒有跑到」零鑑別力，而那正是本節要守的東西。
 type dlSweeper struct {
 	sweepN, escN, revN             int
 	sweepErr, escErr, revErr       error
@@ -306,7 +286,6 @@ func TestDeadlineWorker_BothSweepsSucceed(t *testing.T) {
 	}
 }
 
-// strictRefundReprocessor 被呼叫到就回 error：預設情境下不該有退款列走進來。
 type strictRefundReprocessor struct{}
 
 func (strictRefundReprocessor) ReprocessFromInbox(_ context.Context, ev domain.InboxEvent) error {
@@ -314,7 +293,6 @@ func (strictRefundReprocessor) ReprocessFromInbox(_ context.Context, ev domain.I
 		ev.ID, ev.EventType)
 }
 
-// recordingRefundReprocessor 記下走進來的 inbox id。
 type recordingRefundReprocessor struct {
 	seen []int64
 	err  error
@@ -325,9 +303,6 @@ func (r *recordingRefundReprocessor) ReprocessFromInbox(_ context.Context, ev do
 	return r.err
 }
 
-// ---------------------------------------------------------------------------
-// 搶佔規範（docs/開發規範/多副本排程搶佔規範.md）
-// ---------------------------------------------------------------------------
 
 // TestDeadlineWorker_ClaimHappensBeforeSideEffect 守規則 ①：搶佔在副作用之前。
 //
@@ -388,15 +363,11 @@ func TestDeadlineWorker_LeaseBaselineIsPerRow(t *testing.T) {
 	if gap := repo.claims[1].leaseUntil.Sub(repo.claims[0].leaseUntil); gap < processDelay*3/4 {
 		t.Fatalf("兩筆的租約基準只差 %v（第一筆處理花了 %v）—— 基準被提到批次迴圈外算了一次", gap, processDelay)
 	}
-	// 租約長度本身仍是設定值（差距來自基準推移，不是租約變長）。
 	for i, c := range repo.claims {
 		if d := c.leaseUntil.Sub(c.at); d > dlClaimLease || d < dlClaimLease-time.Second {
 			t.Errorf("第 %d 筆的租約長度 = %v，want ≈ %v", i+1, d, dlClaimLease)
 		}
 	}
-	// CAS 上界（claimable_before）刻意**共用 tick 起點**：它讓候選集合更小，是保守方向。
-	// 若哪天改成逐筆的 now，一列在本 tick 稍早被別的副本 claim 走、租約落在兩者之間時，
-	// 本副本會再 claim 成功一次 ⇒ 搶佔失效。
 	if !repo.claims[0].claimableBefore.Equal(repo.claims[1].claimableBefore) {
 		t.Errorf("claimable_before 逐筆變動（%v vs %v）：CAS 上界必須共用 tick 起點",
 			repo.claims[0].claimableBefore, repo.claims[1].claimableBefore)
@@ -425,28 +396,14 @@ func TestDeadlineWorker_LeaseBaselineIsPerRow(t *testing.T) {
 // 加總全部 peer 會**高估** INV.dl 的真實最壞耗時（它只打 order 與 payment），
 // 而高估是下界檢查的安全方向：寧可要求租約更長，也不要在前提破掉時保持綠燈。
 func TestDeadlineWorker_LeaseCoversWorstCaseRowTime(t *testing.T) {
-	// 單筆最壞耗時的骨幹＝全部 peer gRPC 的 deadline 加總；其餘（claim／Prepare 的
-	// 本地交易／標記）都是本地 DB，用 1s 一起概括。
 	const localOverhead = time.Second
 	deadlines := peerClientDeadlines(t)
-	// 鑑別力自檢：掃不到任何常數時「加總 = 0」看起來跟「全部很小」一模一樣。
 	for _, must := range []string{"order", "payment"} {
 		if _, ok := deadlines[must]; !ok {
 			t.Fatalf("internal/client/%s 掃不到 DefaultDeadline（實際掃到 %v）—— "+
 				"這不是「deadline 很短」，是這支檢查瞎了", must, deadlines)
 		}
 	}
-	// 🔴 兩個數字，不是一個 —— 兩條斷言要的方向相反：
-	//
-	//   worstAllPeers  安全性下界用。加總**全部** peer，刻意高估：高估只會要求租約更長，
-	//                  而「租約不夠長」是重複處理（正確性問題）。這一條必須 fail-closed。
-	//   worstOnPath    容量上界用。只算這條路徑**實際**會打的兩支。這裡高估會造成假紅，
-	//                  而假紅的下場是被放寬或刪掉 —— 那比沒有檢查更糟。
-	//
-	// ⚠️ worstOnPath 仍是手列的（AST 判不出「哪些 client 出現在這條呼叫鏈上」）。
-	// 它的失效後果是**容量**不是正確性：新增第三個外部呼叫而沒更新它，一輪掃描會超出
-	// tick 預算，訊號是 M25／告警 ⑲（invoice_worker_tick_duration_seconds）。
-	// 正確性那一半已經由 worstAllPeers 接住。
 	worstAllPeers := localOverhead
 	for _, d := range deadlines {
 		worstAllPeers += d
@@ -464,15 +421,10 @@ func TestDeadlineWorker_LeaseCoversWorstCaseRowTime(t *testing.T) {
 			"數字關係，不是任何機制。",
 			dlClaimLease, worstAllPeers, localOverhead)
 	}
-	// 上界：候選述詞（status IN(RECEIVED,DEFERRED,FAILED) AND next_attempt_at <= now）
-	// 沒有第二個時間上界 ⇒ 候選窗口 = ∞ ⇒ §三 第 1–3 步無條件成立。真正的上界是
-	// 「持有者崩潰後多久這一列回到候選集合」，取一個 tick 的量級即可。
 	if dlClaimLease > 4*dlScanInterval {
 		t.Errorf("dlClaimLease=%v 遠大於 tick %v —— 持有者崩潰後這一列要等太久才回到候選集合",
 			dlClaimLease, dlScanInterval)
 	}
-	// §9.4.4 給 INV.dl 的 tick 預算是 240s；批次大小乘上單筆最壞耗時不得超過它，
-	// 否則一輪掃描會吃掉其他 INV.dl 工作（K04–K06 申訴 SLA、I8 掃描）的時間。
 	const tickBudget = 240 * time.Second
 	if got := time.Duration(dlFetchBatch) * worstOnPath; got > tickBudget {
 		t.Errorf("dlFetchBatch(%d) × 本路徑單筆最壞耗時(%v) = %v，超過 tick 預算 %v",
@@ -517,7 +469,6 @@ func TestDeadlineWorker_RetryableFailureKeepsStatusAndBacksOff(t *testing.T) {
 	if len(repo.attempts) != 1 {
 		t.Fatalf("UpdateAttempt 被呼叫 %d 次，want 1", len(repo.attempts))
 	}
-	// 絕對值，不是增量。
 	if repo.attempts[0].attemptCount != 1 {
 		t.Errorf("attempt_count = %d，want 1（絕對值）", repo.attempts[0].attemptCount)
 	}
@@ -629,8 +580,6 @@ func TestDeadlineWorker_DispatchesByEventType(t *testing.T) {
 // 而這條不變式的右邊正是那兩個 DefaultDeadline。放在這裡才能拿真的常數比，不抄數字。
 func TestDeadlineScanCannotPreemptARunningHandler(t *testing.T) {
 	const localOverhead = time.Second
-	// 與 TestDeadlineWorker_LeaseCoversWorstCaseRowTime 同一個理由用同一支 helper：
-	// 手列「今天會打哪兩支 gRPC」的公式，對「日後多了第三支」是全盲的。
 	deadlines := peerClientDeadlines(t)
 	for _, must := range []string{"order", "payment"} {
 		if _, ok := deadlines[must]; !ok {
@@ -644,8 +593,6 @@ func TestDeadlineScanCannotPreemptARunningHandler(t *testing.T) {
 
 	now := time.Date(2026, 8, 30, 12, 0, 0, 0, time.UTC)
 	inbox := &fakeInboxRepo{}
-	// peer client 一律回 ErrPeerClientUnavailable ⇒ handler 在步驟 5 就失敗、那一列留在
-	// RECEIVED，正是「兜底掃描要接手」的形狀。issuance／applier／docs 走不到，傳 nil。
 	c := invoicemq.NewOrderPaidConsumer(inbox, nil,
 		invoicemq.UnavailableOrderFactsClient{}, invoicemq.UnavailablePaymentFactsClient{},
 		nil, nil, nil).WithClock(func() time.Time { return now })
@@ -670,31 +617,6 @@ func TestDeadlineScanCannotPreemptARunningHandler(t *testing.T) {
 	}
 }
 
-// peerClientDeadlines 掃出 internal/client/*/ 底下**每一支** peer client 的 per-call
-// deadline，並在掃不出來時 t.Fatalf。
-//
-// 為什麼是掃原始碼而不是 import 那幾個常數：import 的那份清單是**手寫**的，
-// 而本檢查要守的正是「清單有沒有漏掉新加的那一支」。手寫清單守不了自己。
-//
-// 🔴 **fail-closed（2026-08-31）**：舊版只認 `const DefaultDeadline = <n> * time.<Unit>`
-// 這一種形狀，認不出來就**靜默略過那個目錄**。而 internal/client/amego 從第一天起就是
-// 另一種形狀（`func DefaultDeadlines() Deadlines { ... }`，Issue 30s／Query 10s／
-// List 20s／Time 5s）⇒ 它從來沒有被加總過，而呼叫端的鑑別力自檢只點名 order 與 payment
-// ⇒ 沒有任何東西會轉紅。「換寫法會讓那一支從加總中消失」在舊版註解裡是**已知風險**，
-// 而它當時就已經發生了。
-//
-// 現在認兩種形狀，第三種一律報錯而不是略過：
-//
-//	const / var DefaultDeadline  = 3 * time.Second           → 3s
-//	func DefaultDeadlines() Deadlines { return Deadlines{    → 取**最大值** 30s
-//	    Issue: 30 * time.Second, Query: 10 * time.Second, …}}
-//
-// 取最大值而不是加總：這個函式回的語意是「這支 client **一次呼叫**的時間預算」，
-// 與單一 DefaultDeadline 對齊。跨 client 的保守方向由呼叫端負責（它加總全部 peer）。
-//
-// 新增一支 peer client 而沒有可辨識的 deadline 宣告時，這裡會直接 fail 並告訴對方
-// 要補什麼 —— 那是刻意的：一支沒有 per-call deadline 的 gRPC client 讓「單筆最壞耗時」
-// 失去上界，而整條 INV.dl 路徑的正確性靠的就是「租約 > 單筆最壞耗時」這個數字關係。
 func peerClientDeadlines(t *testing.T) map[string]time.Duration {
 	t.Helper()
 	out := map[string]time.Duration{}
@@ -746,16 +668,12 @@ func peerClientDeadlines(t *testing.T) map[string]time.Duration {
 	return out
 }
 
-// deadlinesDeclaredIn 回一個檔案裡所有可辨識的 per-call deadline。
-//
-// 🔴 「認得出名字但解不開值」一律 t.Fatalf，不回空：那正是舊版靜默略過 amego 的形狀。
 func deadlinesDeclaredIn(t *testing.T, path string, f *ast.File) []time.Duration {
 	t.Helper()
 	var out []time.Duration
 	for _, d := range f.Decls {
 		switch decl := d.(type) {
 		case *ast.GenDecl:
-			// 形狀一：const / var DefaultDeadline = <n> * time.<Unit>
 			for _, spec := range decl.Specs {
 				vs, ok := spec.(*ast.ValueSpec)
 				if !ok || len(vs.Names) != 1 || vs.Names[0].Name != "DefaultDeadline" {
@@ -773,7 +691,6 @@ func deadlinesDeclaredIn(t *testing.T, path string, f *ast.File) []time.Duration
 				out = append(out, d)
 			}
 		case *ast.FuncDecl:
-			// 形狀二：func DefaultDeadlines() T { return T{F: <n> * time.<Unit>, ...} }
 			if decl.Recv != nil || decl.Name.Name != "DefaultDeadlines" || decl.Body == nil {
 				continue
 			}
@@ -783,13 +700,6 @@ func deadlinesDeclaredIn(t *testing.T, path string, f *ast.File) []time.Duration
 	return out
 }
 
-// maxReturnedDeadline 解 `func DefaultDeadlines() T { return T{F: <n> * time.<Unit>, …} }`
-// 並回其中最大的一個。
-//
-// 🔴 **每一個欄位都必須解得開**，解不開就 t.Fatalf。只取「解得開的那些」的最大值是一個
-// 很隱蔽的洞：把最大的那一欄（amego 的 Issue 30s）改成 `time.Duration(30) * time.Second`
-// 之後，其餘三欄照樣解得開 ⇒ 這支回 20s ⇒ 上界少算 10s ⇒ 租約檢查靜默假綠。
-// 那正是本輪要修的那個形狀（少算 amego 30s），只是換了一層。
 func maxReturnedDeadline(t *testing.T, path string, fn *ast.FuncDecl) time.Duration {
 	t.Helper()
 	best, found := time.Duration(0), false
@@ -838,7 +748,6 @@ func exprName(e ast.Expr) string {
 	return "<expr>"
 }
 
-// durationLiteral 解 `<int literal> * time.<Unit>`。
 func durationLiteral(e ast.Expr) (time.Duration, bool) {
 	units := map[string]time.Duration{
 		"Nanosecond": time.Nanosecond, "Microsecond": time.Microsecond,

@@ -559,13 +559,6 @@ func (r *CorrectionRequestRepository) Complete(ctx context.Context, id, reissued
 	return rows > 0, nil
 }
 
-// ---------------------------------------------------------------------------
-// M7 執行軸的 adapter（§7.3.7 G01 明細／G08–G15）
-//
-// 🔴 這一層之前**整層不存在**：19 支 SQL 與 sqlc 生成物都在，但沒有任何 Go 方法把
-// 它們包出來、domain 介面也只宣告了 5 個唯讀方法 ⇒ 折讓的執行面等於不存在
-// （#3073 的稽查結論）。每一支都是 CAS，rows=0 一律回 false 讓呼叫端當衝突處理。
-// ---------------------------------------------------------------------------
 
 // InsertLines 建折讓明細（G01 的一部分，與 adjustment 同交易）。
 func (r *AdjustmentRepository) InsertLines(
@@ -658,15 +651,6 @@ func (r *AdjustmentRepository) MarkFailedUnknown(ctx context.Context, id int64, 
 	return rows > 0, err
 }
 
-// ---------------------------------------------------------------------------
-// 冪等反查（#3073）
-//
-// ⚠️ 這裡**刻意沒有** G04／G05／G06／G07 的 adapter（閘門釋放）：那四條邊的 SQL 早就
-// 存在，但它們釋放的 `BLOCKED_*` 狀態在全 repo 零寫入者 —— 原因寫在
-// `usecase/refund_adjustment.go` 的 `refundPlanRetryLater`（chk_invadj_allowance_shape
-// 要求 ALLOWANCE 帶齊六欄，而 BLOCKED 的觸發條件正是「那六欄還算不出來」）。
-// 加一組沒有呼叫端的 adapter 會讓下一個人以為閘門釋放已經接好了。
-// ---------------------------------------------------------------------------
 
 // GetByRefund 是 uq_invadj_allowance_refund 的反查（I-11）。
 //

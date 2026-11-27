@@ -45,7 +45,6 @@ type orderDetailInput struct {
 	OrderNo string `json:"order_no" jsonschema:"訂單編號"`
 }
 
-// orderDetailOutput 的 Result 是訂單詳情；明寫 result 外層，LLM 看到的形狀與舊服務一致。
 type orderDetailOutput struct {
 	Result map[string]any `json:"result"`
 }
@@ -64,17 +63,12 @@ type trackingItem struct {
 }
 
 type trackingOutput struct {
-	// Note 是不帶語言的代碼（noteNoPackages、noteSomePackagesUnavailable、noteMorePackagesNotShown），多個以逗號分隔，模型依買家的語言轉述。
 	Note     string         `json:"note,omitempty"`
 	Packages []trackingItem `json:"packages"`
 }
 
-// trackingStatuses 是「追蹤中的包裹」的訂單狀態：20 待出貨（已建物流單）、30 配送中、32 待取貨、35 物流異常、40 已送達、
-// 54 配送失敗未退款。集合由 ordering 擁有（CodeMeta〈業務狀態碼〉的 OrderStatus；order-service 的 status filter 以逗號分隔多個值，
-// 見 OrderService.parseStatusFilter）：ordering 搬進單體後改由它提供，這裡不另行決定；每筆包裹帶自己的狀態碼，由模型回答。
 const trackingStatuses = "20,30,32,35,40,54"
 
-// upstream 把訂單服務的錯誤換成給模型的代碼；錯誤原因由 guardedTool 記一次 log。port 約定「不存在或不屬於該買家」回 ErrOrderNotFound。
 func upstream(err error) error {
 	if errors.Is(err, ErrOrderNotFound) {
 		return toolFail(codeOrderNotFound, err)
@@ -82,7 +76,6 @@ func upstream(err error) error {
 	return toolFail(codeUpstreamUnavailable, err)
 }
 
-// scopedBuyer 回這一輪的買家 ID，前提是 session state 記的買家與它一致。ADK v2 的 callback 與 tool 一律從 ctx.State() 讀。
 func (d Deps) scopedBuyer(ctx agent.Context) (int64, error) {
 	raw, err := ctx.State().Get(StateKeyBuyer)
 	if err != nil {
@@ -99,7 +92,6 @@ func (d Deps) scopedBuyer(ctx agent.Context) (int64, error) {
 	return id, nil
 }
 
-// newTool 建一支 tool：handler 先驗身分範圍，再執行；外面包一層 guardedTool（唯一能掛上 agent 的型別）。
 func newTool[In, Out any](d Deps, id model.Tool, name, description string, run func(ctx context.Context, buyerID int64, in In) (Out, error)) (*guardedTool, error) {
 	t, err := functiontool.New(functiontool.Config{Name: name, Description: description}, func(ctx agent.Context, in In) (Out, error) {
 		var zero Out
@@ -163,9 +155,6 @@ func (d Deps) orderDetailTool() (*guardedTool, error) {
 		})
 }
 
-// trackingPageSize 是追蹤 tool 一次查的包裹數。舊 order-service 的列表只有 status filter 與分頁，沒有「排除已送達」之類的條件
-// （legacy/orderservice/buyerorders.go MyOrders：只有 statusFilter、page、pageSize），每多一頁就多 N 次詳情查詢；
-// 所以只查第一頁，滿頁時以 noteMorePackagesNotShown 告訴模型清單可能不完整，不在這裡翻頁。
 const trackingPageSize = 10
 
 func (d Deps) trackingTool() (*guardedTool, error) {
@@ -179,7 +168,6 @@ func (d Deps) trackingTool() (*guardedTool, error) {
 				return trackingOutput{Note: noteNoPackages}, nil
 			}
 			packages := make([]trackingItem, 0, len(orders))
-			// 詳情失敗的原因：訂單已不存在（ErrOrderNotFound）靜默略過；其餘是上游問題。
 			var upstreamFailures []error
 			gone := 0
 			for _, o := range orders {
@@ -198,14 +186,11 @@ func (d Deps) trackingTool() (*guardedTool, error) {
 				})
 			}
 			if len(packages) == 0 {
-				// 全部失敗一律 upstream_unavailable，不看最後一筆是什麼錯誤；原因合併成一個 error，由 guardedTool 記一次 log
-				// （這條路徑不另外逐筆記 log，避免同一批原因記兩次）。
 				if gone > 0 {
 					upstreamFailures = append(upstreamFailures, fmt.Errorf("另有 %d 筆訂單已不存在：%w", gone, ErrOrderNotFound))
 				}
 				return trackingOutput{}, toolFail(codeUpstreamUnavailable, errors.Join(upstreamFailures...))
 			}
-			// 部分失敗：逐筆記 log（含訂單號與 tool 名稱），因為 guardedTool 只會在整體失敗時記。
 			for _, err := range upstreamFailures {
 				slog.WarnContext(ctx, "assistant：包裹詳情查詢失敗", "tool", "track_my_package", "error", err)
 			}

@@ -34,8 +34,6 @@ describe("invoiceComplaintDisplay", () => {
 	});
 
 	it("does not fold VIOLATION_CONFIRMED into RESOLVED the way the buyer view does", () => {
-		// 買家面兩者刻意相同（買家面不得出現「違規」二字）；賣家面必須分開，
-		// 否則賣家不知道自己被記了一次違規。這一條是兩張表不可共用的機械證據。
 		const buyerResolved = foldInvoiceComplaintStatus(
 			InvoiceComplaintStatus.RESOLVED,
 		);
@@ -54,8 +52,6 @@ describe("invoiceComplaintDisplay", () => {
 	});
 
 	it("keeps the three views mutually exclusive and exhaustive over the 7 DB values", () => {
-		// 這一條守的是「不會有案件從三個分頁一起消失」。分頁名是視圖名不是 DB 值，
-		// 所以對照表寫在這裡、與後端 sellerComplaintViews 逐列對齊。
 		const COVERAGE: Record<string, readonly string[]> = {
 			AWAITING_SELLER: [
 				InvoiceComplaintStatus.OPEN,
@@ -82,17 +78,14 @@ describe("invoiceComplaintDisplay", () => {
 
 	it("rejects a view name the API does not accept", () => {
 		expect(normalizeSellerComplaintView("CLOSED")).toBe("CLOSED");
-		// DB 狀態值不是視圖名——送進 API 會 400，所以在這裡就退回預設。
 		expect(normalizeSellerComplaintView("OPEN")).toBe("AWAITING_SELLER");
 		expect(normalizeSellerComplaintView("")).toBe("AWAITING_SELLER");
 	});
 
 	it("treats a passed dueAt as overdue even before the scanner flips the status", () => {
-		// 掃描與到期之間的窗口：dueAt 已過、狀態還是 OPEN。判準是 OR。
 		expect(isComplaintOverdue(InvoiceComplaintStatus.OPEN, "-1")).toBe(true);
 		expect(isComplaintOverdue(InvoiceComplaintStatus.OVERDUE, "2")).toBe(true);
 		expect(isComplaintOverdue(InvoiceComplaintStatus.OPEN, "2")).toBe(false);
-		// 後端算不出來（空字串）不等於逾期。
 		expect(isComplaintOverdue(InvoiceComplaintStatus.OPEN, "")).toBe(false);
 	});
 

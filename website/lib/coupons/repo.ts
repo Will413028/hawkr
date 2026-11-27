@@ -18,7 +18,7 @@ import { authedFetch } from "../api/client";
 export type CouponKind = "cash" | "percent";
 
 export interface CouponItem {
-	id: number; // legacy numeric id (falls back to templateId hash)
+	id: number;
 	instanceId?: string;
 	templateId?: string;
 	code?: string;
@@ -29,7 +29,7 @@ export interface CouponItem {
 	type?: "amount" | "percent" | string;
 	/** Normalized kind derived from OpenAPI type code. */
 	kind?: CouponKind;
-	value?: number; // amount (cash) or percent (% off)
+	value?: number;
 	discountAmount?: number;
 	discountPercent?: number;
 	maxDiscountAmount?: number;
@@ -105,7 +105,6 @@ function toEpoch(raw: unknown): number | undefined {
 		return raw < 1e12 ? raw * 1000 : raw;
 	}
 	const s = String(raw);
-	// Numeric string (seconds or ms)
 	if (/^\d+$/.test(s)) {
 		const n = Number(s);
 		return n < 1e12 ? n * 1000 : n;
@@ -133,7 +132,6 @@ export function normalizeCoupon(input: Partial<CouponItem>): CouponItem {
 	const legacyType = kind === "percent" ? "percent" : "amount";
 	const id =
 		Number(raw.id ?? raw.instanceId ?? raw.templateId ?? 0) ||
-		// Stringy ids — hash to a stable positive int so React keys stay unique.
 		Math.abs(
 			(String(raw.instanceId ?? raw.templateId ?? "")
 				.split("")
@@ -206,13 +204,6 @@ export async function fetchAvailableCoupons({
 	records: CartAvailableCoupon[];
 	total: number;
 }> {
-	// Backend currently requires BOTH `store_id` AND `order_amount` and
-	// returns 400 "store_id and order_amount are required" when either is
-	// missing. OpenAPI marks them optional ("空 = 全部") but the runtime
-	// disagrees — so this endpoint only works in the cart-context per-seller
-	// picker. Until backend exposes a real platform-wide listing, the
-	// account-level 全站可領 hub short-circuits to empty instead of
-	// triggering a console 400.
 	if (!storeId) {
 		return { records: [], total: 0 };
 	}
@@ -237,8 +228,6 @@ export async function fetchAvailableCoupons({
 		? rawRecords.length
 		: Number((data as { total?: number })?.total ?? rawRecords.length);
 	const records: CartAvailableCoupon[] = rawRecords.map((raw) => {
-		// Cart-context shape: { template: {...}, estimatedDiscount: "..." }
-		// Fallback: the record itself is the template (older API revisions).
 		const r = raw as Record<string, unknown>;
 		const template = (r.template ?? r) as Partial<CouponItem>;
 		const normalized = normalizeCoupon(template);
@@ -276,7 +265,6 @@ function statusFilterToCode(s?: string): string | undefined {
 		case "void":
 			return "5";
 		default:
-			// Already a numeric code, or unknown — pass through.
 			return s;
 	}
 }

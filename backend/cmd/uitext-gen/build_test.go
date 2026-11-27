@@ -59,16 +59,12 @@ func TestCompleteness(t *testing.T) {
 		"fx.Color.COLOR_BLUE", "缺 [default zh-TW]")
 	wantError(t, func(in *Inputs) { delete(in.Catalog["zh-TW"].Default, "fx.Color.label.COLOR_BLUE") },
 		"fx.Color.label.COLOR_BLUE", "缺 [default zh-TW]")
-	// staff：一個 enum 只要有一個 staff key，每個值都要有。
 	wantError(t, func(in *Inputs) { delete(in.Catalog["zh-TW"].Staff, "fx.Mode.MODE_B") },
 		"fx.Mode.MODE_B", "缺 [staff zh-TW]")
-	// required 的語系要完整；非 required 只回報覆蓋率。
 	wantError(t, func(in *Inputs) { in.Config.Required = []string{"zh-TW", "en"} },
 		"fx.Color.COLOR_BLUE", "缺 [default en]")
-	// 刪掉 enum 的值之外的任何一個非零值都會被抓到：用 Size 的巢狀 enum 驗證。
 	wantError(t, func(in *Inputs) { delete(in.Catalog["zh-TW"].Default, "fx.Box.Size.SIZE_LARGE") },
 		"fx.Box.Size.SIZE_LARGE", "缺 [default zh-TW]")
-	// 句子與 common。
 	wantError(t, func(in *Inputs) { delete(in.Catalog["zh-TW"].Default, "common.unknown") }, "common.unknown", "缺 zh-TW")
 	wantError(t, func(in *Inputs) { delete(in.Catalog["zh-TW"].Default, "common.error.NOT_FOUND") },
 		"common.error.NOT_FOUND", "缺 zh-TW")
@@ -89,11 +85,9 @@ func TestExtraKeys(t *testing.T) {
 	wantError(t, func(in *Inputs) {
 		in.Catalog["en"].Variants = map[string]VariantDecl{"fx.Color.label": {Description: "x"}}
 	}, "en.json：variants 只在來源語系")
-	// omit 列的值仍有 default 文字。
 	wantError(t, func(in *Inputs) {
 		in.Catalog["zh-TW"].Default["fx.Color.label.COLOR_GREEN"] = Entry{Message: "綠色"}
 	}, "fx.Color.label.COLOR_GREEN", "omit.default 列了 COLOR_GREEN")
-	// omit 列的值不存在、未宣告的變體、宣告了卻沒有 key 的變體。
 	wantError(t, func(in *Inputs) {
 		d := in.Catalog["zh-TW"].Variants["fx.Color.label"]
 		d.Omit["default"] = append(d.Omit["default"], "COLOR_PINK")
@@ -109,7 +103,6 @@ func TestExtraKeys(t *testing.T) {
 		d.Omit["staff"] = []string{"COLOR_GREEN"}
 		in.Catalog["zh-TW"].Variants["fx.Color.label"] = d
 	}, "omit.staff 沒有意義")
-	// 非來源語系只放 message。
 	wantError(t, func(in *Inputs) {
 		in.Catalog["en"].Default["fx.Color.COLOR_RED"] = Entry{Message: "Red", Description: "x"}
 	},
@@ -141,14 +134,11 @@ func TestICURules(t *testing.T) {
 	wantError(t, set("fx.Note.count", "{n, select, a {x} other {y}}", nil), "n", "integer 參數 n 不能用在 select")
 	wantError(t, set("fx.Box.title", "盒子：{color, plural, other {x}}", nil), "名詞參數 color 只能寫成")
 	wantError(t, set("fx.Box.title", "盒子", nil), "宣告了參數 color")
-	// 語系之間的參數集合必須相同。
 	wantError(t, func(in *Inputs) { in.Catalog["en"].Default["fx.Box.title"] = Entry{Message: "Box"} }, "en.default fx.Box.title", "宣告了參數 color 但訊息沒有用到")
 	wantError(t, func(in *Inputs) { in.Catalog["en"].Default["fx.Box.title"] = Entry{Message: "Box {color} {other}"} }, "沒有宣告的參數 other")
-	// en 的 plural 分支合乎 CLDR 就通過。
 	mustBuild(t, func(in *Inputs) {
 		in.Catalog["en"].Default["fx.Note.count"] = Entry{Message: "{n, plural, one {{n} item} other {{n} items}}"}
 	})
-	// 參數宣告本身。
 	wantError(t, set("fx.Box.title", "盒子：{color}", map[string]ParamSpec{"color": {Noun: "fx.Tone"}}), "沒有名詞在目錄裡")
 	wantError(t, set("fx.Box.title", "盒子：{color}", map[string]ParamSpec{"color": {Noun: "fx.Missing"}}), "沒有型別 Missing")
 	wantError(t, set("fx.Box.title", "盒子：{color}", map[string]ParamSpec{"color": {Noun: "fx.Color", Type: "string"}}), "剛好指定")
@@ -173,7 +163,6 @@ func TestDescriptions(t *testing.T) {
 		d.Description = ""
 		in.Catalog["zh-TW"].Variants["fx.Color.label"] = d
 	}, "variants fx.Color.label", "缺 description")
-	// 值與列舉都沒有註解、也沒有 descriptionOverride。
 	wantError(t, func(in *Inputs) {
 		e := in.Catalog["zh-TW"].Default["fx.Box.Size.SIZE_SMALL"]
 		e.DescriptionOverride = ""
@@ -214,7 +203,6 @@ func TestCommonKeys(t *testing.T) {
 		delete(in.Catalog["en"].Default, "common.unknown")
 	},
 		"common.unknown", "缺 en")
-	// Connect 的 code 剛好是 15 個（16 個 code 扣掉 CANCELED）。
 	if len(connectCodes) != 15 {
 		t.Errorf("connectCodes = %d", len(connectCodes))
 	}

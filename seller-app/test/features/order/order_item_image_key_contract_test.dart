@@ -4,15 +4,7 @@ import 'package:hawkr_seller/config/media_image.dart';
 import 'package:hawkr_seller/features/order/data/order_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-// 訂單商品圖欄位契約（49 §6.1 objectKey 為 SSOT）。
-//
-// fixture 全部是 2026-08-05 對 dev 實打的逐字複製，未經改寫：
-//   GET /api/v1/app/orders?view=seller&page=1&page_size=3
-//   GET /api/v1/app/orders/O578806254?view=seller
-// seller account 2685914682（store_id 同值）。
 
-// buildImageUrl 於 runtime 讀 F.appFlavor.mediaBaseHost；測試以 dev flavor
-// 初始化（與 product_image_resolver_test 同慣例），故 base = 本機單體（沒有 MEDIA_BASE_HOST define）。
 const String _mediaBase = 'http://localhost:8080';
 
 const String _itemKey =
@@ -155,8 +147,6 @@ void main() {
       final order = OrderSummary.fromJson(_liveListOrder());
       final key = order.items.single.imageKey;
 
-      // UI 端把 objectKey 交給 OptimizedNetworkImage(scene: orderItem)，
-      // 內部走 ImageConfig.urlFor → buildImageUrl。
       expect(
         ImageConfig.urlFor(key, ImageScene.orderItem),
         '$_mediaBase/i/thumb/$_itemKey',
@@ -238,8 +228,6 @@ void main() {
 
       final order = OrderSummary.fromJson(payload);
 
-      // logoKey / avatar 都還在 payload 裡（實打回應本來就有），但它們是賣家
-      // 商店 logo 與買家頭像，不是商品圖。
       expect(order.items.single.imageKey, isEmpty);
     });
   });

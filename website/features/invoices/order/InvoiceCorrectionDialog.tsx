@@ -79,7 +79,7 @@ export function InvoiceCorrectionDialog({
 					</div>
 				}
 			>
-				{/* 後端的人話 ＋ 下一步，原樣顯示。 */}
+
 				<p className="text-xs leading-relaxed text-foreground">
 					{resultNotice}
 				</p>

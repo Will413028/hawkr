@@ -25,18 +25,9 @@ func TestModule_GraphResolves(t *testing.T) {
 			func() domain.InboxRepository { return nil },
 			func() domain.DocumentRepository { return nil },
 			func() *usecase.Issuance { return nil },
-			// G01 usecase（#3073）：AdjustmentApplier 的唯一依賴。
 			func() *usecase.RefundAdjustment { return nil },
-			// ORD／PAY 的 provider 住在 internal/client（見 di.go 的註解：反向 import
-			// 會造成 cycle）⇒ 本層的圖測試必須自己供這兩個型別。
-			// ⚠️ 這正是 `internal/app/app_test.go` 的整圖 ValidateApp 存在的理由：
-			// 這裡供得出來，不代表真實的 client.Module 供得出來。
 			func() OrderFactsClient { return UnavailableOrderFactsClient{} },
 			func() PaymentFactsClient { return UnavailablePaymentFactsClient{} },
-			// C3（#2904）多要兩個型別：TxManager（它是唯一一個把去重列與業務寫入
-			// 放進同一交易的 consumer）與 CancelledOrderRepository。
-			// 真實的 provider 分別住在 internal/config（Layer 0）與
-			// internal/repository/postgres（Layer 2）。
 			func() database.TxManager { return nil },
 			func() domain.CancelledOrderRepository { return nil },
 		),

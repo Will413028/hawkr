@@ -13,8 +13,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// 端點 57 是**不可逆的對外動作**：開出去的發票收不回來。本檔的陰性測試因此全部
-// 額外斷言「一列都沒建」——只回錯誤但已經建了 document，比不回錯誤更糟。
 
 type issuanceFixture struct {
 	uc       *AdminIssuance
@@ -72,45 +70,36 @@ func TestAdminIssuance_PlatformToExternal_B2C(t *testing.T) {
 		t.Fatalf("應建一列 document，實得 %d", len(fx.docs.created))
 	}
 	d := fx.docs.created[0]
-	// chk_invdoc_source_ref 是雙向等式：MANUAL ⇒ source_ref 必須留空。
 	if d.SourceType != sourceTypeManual || d.SourceRef != "" {
 		t.Fatalf("MANUAL 來源不得帶 source_ref，實得 type=%q ref=%q", d.SourceType, d.SourceRef)
 	}
 	if d.TriggerType != triggerTypeManual {
 		t.Fatalf("trigger 應為 ADM_MANUAL，實得 %q", d.TriggerType)
 	}
-	// chk_invdoc_kind_mode：非 RECEIPT ⇒ 不得是 PLATFORM_RECEIPT。
 	if d.FulfillmentMode != codemeta.InvoiceFulfillmentModeAmegoAuto.Value {
 		t.Fatalf("B2C 的履約模式應為 AMEGO_AUTO，實得 %q", d.FulfillmentMode)
 	}
-	// chk_invdoc_receipt 是雙向等式：非 RECEIPT ⇒ receipt_no 必須留空。
 	if d.ReceiptNo != "" {
 		t.Fatalf("非 RECEIPT 不得帶 receipt_no，實得 %q", d.ReceiptNo)
 	}
-	// chk_invdoc_deadline_presence：B2C/B2B ⟺ statutory_deadline_at 非空。
 	if d.StatutoryDeadlineAt == nil {
 		t.Fatal("B2C 必須有法定期限")
 	}
-	// chk_invdoc_b2c：B2C 的稅額恆 0、統編恆 10 個 0。
 	if d.TaxAmount != 0 || d.RecipientTaxID != domain.B2CBuyerIdentifier {
 		t.Fatalf("B2C 的稅額應為 0、統編應為 10 個 0，實得 tax=%d id=%q", d.TaxAmount, d.RecipientTaxID)
 	}
-	// chk_invdoc_total：TotalAmount = Sales + FreeTax + ZeroTax + Tax。
 	if d.TotalAmount != d.SalesAmount+d.FreeTaxSalesAmount+d.ZeroTaxSalesAmount+d.TaxAmount {
 		t.Fatalf("表頭四欄不自洽：%+v", d)
 	}
 	if d.TotalAmount != 1000 {
 		t.Fatalf("總額應為 1000，實得 %d", d.TotalAmount)
 	}
-	// issuer_name_snapshot 是印在發票上的銷售人名稱，不得是佔位字串。
 	if d.IssuerNameSnapshot != "範例生鮮股份有限公司" || d.IssuerTaxIDSnapshot != "45444444" {
 		t.Fatalf("PLATFORM 的抬頭／統編快照不正確：%q / %q", d.IssuerNameSnapshot, d.IssuerTaxIDSnapshot)
 	}
-	// 冪等鍵落 provider_request_no（唯一擋得住重複開票的索引），且長度不得超過 varchar(40)。
 	if !strings.HasPrefix(d.ProviderRequestNo, "MAN-") || len(d.ProviderRequestNo) > 40 {
 		t.Fatalf("provider_request_no 不合格：%q（len=%d）", d.ProviderRequestNo, len(d.ProviderRequestNo))
 	}
-	// operation 必須建立**並**推進到 READY：停在 CREATED 的話沒有任何 worker 撈得到它。
 	if len(fx.ops.created) != 1 || got.Status != "READY" {
 		t.Fatalf("應建 operation 並推進 READY，實得 created=%d status=%q", len(fx.ops.created), got.Status)
 	}
@@ -128,8 +117,6 @@ func TestAdminIssuance_Receipt(t *testing.T) {
 		t.Fatalf("Create 失敗：%v", err)
 	}
 	d := fx.docs.created[0]
-	// 三條雙向等式一起看：RECEIPT ⟺ PLATFORM_RECEIPT ⟺ receipt_no 非空；
-	// 且 RECEIPT 不得有 provider（chk_invdoc_receipt_no_provider）、不得有法定期限。
 	if d.FulfillmentMode != codemeta.InvoiceFulfillmentModePlatformReceipt.Value {
 		t.Fatalf("RECEIPT 的履約模式應為 PLATFORM_RECEIPT，實得 %q", d.FulfillmentMode)
 	}
@@ -168,7 +155,6 @@ func TestAdminIssuance_ComboMatrix(t *testing.T) {
 			in.Issuer = ManualIssuanceIssuer{Kind: c.issuer, StoreID: 2685914682}
 			in.Recipient = ManualIssuanceRecipient{Kind: c.recipient, StoreID: 2685914682, Name: "某公司"}
 			in.Source.Kind = c.source
-			// 方向二恆為 B2B（平台對營業人開票）。
 			if c.recipient == "SELLER" {
 				in.DocumentKind = "B2B"
 			}
@@ -183,10 +169,6 @@ func TestAdminIssuance_ComboMatrix(t *testing.T) {
 			if err == nil {
 				t.Fatal("非法組合被放行了")
 			}
-			// 矩陣檢查排在能力缺口之前，所以本表的每一列非法組合都是 9346——
-			// 包含那兩列 EXTERNAL ＋ ORDER_SNAPSHOT（它們本來就不在 ✅ 四列裡，
-			// 不是「合法但還沒接線」）。唯一走到能力缺口的是 SELLER→BUYER＋ORDER_SNAPSHOT，
-			// 由 TestAdminIssuance_OrderSnapshotUnavailable 守。
 			if got := bizCodeOf(t, err); got != bizcode.InvoiceIssuanceTargetInvalid {
 				t.Fatalf("期望 9346，實得 %d", got)
 			}
@@ -231,25 +213,16 @@ func TestAdminIssuance_Guards(t *testing.T) {
 			i.Source.Lines[0].NetAmount = -1000
 		}, ErrIssuanceLineSignInvalid},
 		{"未知 lineType", func(i *ManualIssuanceInput) { i.Source.Lines[0].LineType = "BUNDLE" }, ErrIssuanceLineTypeInvalid},
-		// #3089 B 組第 6 項：chk_invline_qty 在此之前**全鏈路零業務守衛**
-		// （usecase／grpc／gateway／domain 四層皆無）⇒ 實打 HTTP 500。
-		// quantity=0 是真實誤操作的形狀（ADM 在數量格打 0）。
 		{"數量 0", func(i *ManualIssuanceInput) {
 			i.Source.Lines[0].Quantity = 0
 			i.Source.Lines[0].NetAmount = 0
 		}, ErrIssuanceLineQuantityInvalid},
-		// 🔴 這一格是本項的關鍵：quantity=-1 ＋ unitPrice=-100 ⇒ netAmount=100，
-		// **chk_invline_amount 與 chk_invline_sign 兩道都會通過**（乘法對得上、
-		// 非折扣行金額為正）。只有數量那一道擋得住 ⇒ 它必須排在那兩道之前。
 		{"數量負且金額與 sign 都對得上", func(i *ManualIssuanceInput) {
 			i.Source.Lines[0].Quantity = -1
 			i.Source.Lines[0].UnitPrice = -100
 			i.Source.Lines[0].NetAmount = 100
 		}, ErrIssuanceLineQuantityInvalid},
 		{"未知稅別", func(i *ManualIssuanceInput) { i.Source.Lines[0].TaxCategory = "SOMETHING" }, ErrIssuanceLineTaxInvalid},
-		// #3089 稽核 A-2：折扣行與商品行稅別不同 ⇒ 單一稅別的加總為負，
-		// **而總額仍為正** ⇒ ErrIssuanceTotalNotPositive 那道放行，落庫 23514。
-		// 每一行單獨看都合法（qty／amount／sign 三道全過），只有表頭看得出來。
 		{"折扣行稅別與商品行不同（表頭單欄為負）", func(i *ManualIssuanceInput) {
 			i.Source.Lines[0].TaxCategory = "TAX_EXEMPT"
 			i.Source.Lines[0].Quantity = 1
@@ -294,7 +267,7 @@ func TestAdminIssuance_DiscountLineAndZeroTotal(t *testing.T) {
 func TestAdminIssuance_B2BRequiresEightDigitTaxID(t *testing.T) {
 	fx := newIssuanceFixture()
 	in := manualInput("B2B")
-	in.Recipient.TaxID = "0012345678" // 左補零成 10 碼會被 AMEGO 3040122 拒
+	in.Recipient.TaxID = "0012345678"
 	if _, err := fx.uc.Create(context.Background(), in); !errors.Is(err, ErrIssuanceRecipientTaxID) {
 		t.Fatalf("期望 ErrIssuanceRecipientTaxID，實得 %v", err)
 	}
@@ -307,7 +280,6 @@ func TestAdminIssuance_Idempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("第一次開票失敗：%v", err)
 	}
-	// 把第一次的結果放進「已存在」表，模擬第二次請求。
 	fx.docs.byRequestNo[fx.docs.created[0].ProviderRequestNo] = domain.Document{
 		ID: first.DocumentID, Status: "PENDING",
 	}
@@ -338,7 +310,6 @@ func TestAdminIssuance_RequestNoVariesWithContent(t *testing.T) {
 	if a == b {
 		t.Fatal("金額不同的兩份請求不得共用同一把冪等鍵")
 	}
-	// Idempotency-Key 不進鍵：同內容配不同鍵仍然是同一張發票。
 	in2 := manualInput("B2C")
 	in2.IdempotencyKey = "another-key"
 	if manualProviderRequestNo(issuer, in2) != a {

@@ -39,10 +39,8 @@ type Followers interface {
 	SubscriberCounts(ctx context.Context, storeIDs []int64) (map[int64]int64, error)
 }
 
-// ratingTimeout 是 GetSeller、GetSellerStats 讀評分的上限：評分是補充欄位，review 變慢時不拖住入口每個請求都經過的店家狀態讀取。
 const ratingTimeout = 300 * time.Millisecond
 
-// 舊契約的業務碼：找不到商家（目前店家）。
 const (
 	codeSellerNotFound = 9233
 )
@@ -69,8 +67,6 @@ func New(m *seller.Module, ratings Ratings, followers Followers, log *slog.Logge
 	return &Server{seller: m, ratings: ratings, followers: followers, log: log}
 }
 
-// failure 把模組的分類錯誤轉成舊契約的業務碼（NotFound 404、InvalidInput 400、FailedPrecondition 428，與舊 seller-service 相同）；
-// 其他錯誤回 fatal，讓呼叫方得到 gRPC 錯誤。
 func failure(err error) (int32, string, error) {
 	switch apperr.KindOf(err) {
 	case apperr.KindNotFound:
@@ -96,13 +92,8 @@ func deref(p *string) string {
 	return *p
 }
 
-// roundRating 與舊 seller-service 相同：四捨五入到小數 2 位。
 func roundRating(r float64) float64 { return math.Round(r*100) / 100 }
 
-// lifecycleStatus 是舊契約的 lifecycle_status：closed、suspended（管理員停權，對應依據風險類型的停權措施）、suspended_governance
-// （違規停權，對應只依據認定的停權措施）、active，加上舊契約沒有的 pending_deletion（呼叫方的 deny-by-default 白名單不放行它）。
-// 已關閉優先，其次停權（管理員優先於違規），再其次等待刪除。不認得的生命週期回錯誤，不當成有效值傳下去。停權種類由店家此刻
-// 生效中的停權措施推導（sellerreason.Classify）。
 func lifecycleStatus(s seller.Store) (string, error) {
 	class, err := sellerreason.Classify(s.Sanctions)
 	if err != nil {
@@ -123,7 +114,6 @@ func lifecycleStatus(s seller.Store) (string, error) {
 	return "", fmt.Errorf("sellerserver：不認得的店家狀態 status=%q class=%d", s.Status, class)
 }
 
-// location 由鄉鎮市區代碼推導縣市、鄉鎮市區與郵遞區號；沒有代碼或不是現行代碼時都是空字串。縣市用舊契約的寫法（台）。
 func location(town *string) (cityName, district, postal string) {
 	if town == nil {
 		return "", "", ""
@@ -135,12 +125,6 @@ func location(town *string) (cityName, district, postal string) {
 	return strings.ReplaceAll(t.CountyName, "臺", "台"), t.Name, t.PostalCode
 }
 
-// sellerInfo 逐欄位建立 SellerInfo。填的欄位：account_id、name、logo_key、description、contact_phone、rating、cover_key、prize、
-// city、district、address_detail、postal_code、onboarding_completed、nickname（= 店名）、phone（= 聯絡電話）、
-// store_id、store_code、lifecycle_status、website_url、version。
-// 不填的欄位：seo_title、seo_description（欄位已從模組刪除，ADR 2026-10-09-store-seo-platform-generated；舊契約的欄位只能留著不填）；
-// is_processed_food、food_business_reg_no（模組沒有食品業者登錄，ADR 2026-10-27-general-ecommerce-scope-cut D3）；status、created_at（舊 server 也沒填）；email、avatar_key、account_type、birthday、gender（模組沒有）；seller_type、
-// overall_certification_status、current_certification_id（KYC 的流程狀態，沒有 legacy 讀者）；suspension_reason_code 只在 GetSeller 填。
 func sellerInfo(s seller.Store, rating float64) (*pb.SellerInfo, error) {
 	lifecycle, err := lifecycleStatus(s)
 	if err != nil {
@@ -171,9 +155,6 @@ func sellerInfo(s seller.Store, rating float64) (*pb.SellerInfo, error) {
 	}, nil
 }
 
-// sellerMeta 逐欄位建立 SellerMeta（舊契約的欄位全部填）：can_accept_orders 是 Exposable（結帳閘），can_manage_products 是店家
-// 的 CapProductManage（上架閘，營運中且沒有停權，不要求 KYC 或收款帳戶）；舊契約的 payuni_mer_id 與物流的 mer_id 一律空字串（單體不產生商店
-// 代號）；has_public_card 是 seller.HasPublicCard 的結果（曾經公開過或此刻可曝光，StoreCards 的可見性規則）。
 func sellerMeta(e seller.StoreExposure) *pb.SellerMeta {
 	s := e.Store
 	cityName, district, postal := location(s.TownCode)
@@ -192,7 +173,6 @@ func sellerMeta(e seller.StoreExposure) *pb.SellerMeta {
 	}
 }
 
-// bestEffortRatings 批次讀評分，失敗時記 warn 並回 nil（評分是補充欄位，欄位留 0）。
 func (s *Server) bestEffortRatings(ctx context.Context, storeIDs []int64) map[int64]RatingStats {
 	ctx, cancel := context.WithTimeout(ctx, ratingTimeout)
 	defer cancel()
@@ -245,7 +225,6 @@ func (s *Server) GetSeller(ctx context.Context, req *connect.Request[pb.GetSelle
 	return connect.NewResponse(&pb.SellerResponse{Data: info}), nil
 }
 
-// currentStore 讀帳號目前的店家；account_id 不是正數時和舊 server 一樣是找不到（不是輸入錯誤）。
 func (s *Server) currentStore(ctx context.Context, accountID int64) (seller.Store, error) {
 	if accountID <= 0 {
 		return seller.Store{}, apperr.NotFound("找不到目前的店家")
@@ -253,7 +232,6 @@ func (s *Server) currentStore(ctx context.Context, accountID int64) (seller.Stor
 	return s.seller.CurrentStore(ctx, accountID)
 }
 
-// positive 去掉不是正數的 ID：這種 ID 不可能對應店家，舊 server 把它們當成不存在（不是輸入錯誤）。
 func positive(ids []int64) []int64 {
 	out := make([]int64, 0, len(ids))
 	for _, id := range ids {
@@ -268,7 +246,6 @@ func (s *Server) ResolveSellerAccountID(ctx context.Context, req *connect.Reques
 	if req.Msg.GetStoreId() <= 0 {
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("seller not found for store_id"))
 	}
-	// 舊 server 不論店家是否隨帳號刪除都回帳號（發票通知要送給它），所以讀整個 stint，不用 ResolvePrincipals。
 	st, err := s.seller.Store(ctx, req.Msg.GetStoreId())
 	if err != nil {
 		return nil, connectError(err)
@@ -463,7 +440,6 @@ func (s *Server) ListPublicStoreIDsByCity(ctx context.Context, req *connect.Requ
 	return connect.NewResponse(&pb.ListPublicStoreIDsByCityResponse{City: c.Name, CityCode: c.ISO, StoreIds: formatAll(byCounty[c.CountyCode])}), nil
 }
 
-// previewSize 是 ListPublicStoresByCity 的 preview_store_ids 筆數（舊契約：每個縣市前 6 家，沒有讀者）。
 const previewSize = 6
 
 func (s *Server) ListPublicStoresByCity(ctx context.Context, _ *connect.Request[pb.ListPublicStoresByCityRequest]) (*connect.Response[pb.ListPublicStoresByCityResponse], error) {

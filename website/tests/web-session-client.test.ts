@@ -4,7 +4,6 @@ import { __setEnvForTest, getEnv } from "../lib/config/env";
 import { __setFlavorForTest } from "../lib/config/flavor";
 import { withApiBase } from "./helpers/default-api-base";
 
-// The prod flavor requires the browser API base on the web origin; this file's base is https://api.example.com.
 process.env.NEXT_PUBLIC_WEB_ORIGIN = "https://api.example.com";
 
 let calls: Array<{ url: string; init: RequestInit }> = [];
@@ -28,10 +27,9 @@ const fakeLocalStorage = {
 beforeEach(() => {
 	calls = [];
 	dispatchedEvents = [];
-	// prod has no default gateway: its base comes from env, not from the loopback pins of the test guard
 	restoreApiBasePins = withApiBase("https://api.example.com/api/v1");
 	__setEnvForTest(null);
-	__setFlavorForTest("prod"); // absolute base so URL assertions are stable
+	__setFlavorForTest("prod");
 	getEnv();
 	// @ts-expect-error test stub
 	globalThis.fetch = async (url: string, init: RequestInit = {}) => {
@@ -41,7 +39,6 @@ beforeEach(() => {
 			headers: { "content-type": "application/json" },
 		});
 	};
-	// stub window with dispatchEvent capture + localStorage
 	(globalThis as Record<string, unknown>).window = {
 		dispatchEvent(evt: Event) {
 			dispatchedEvents.push(evt);
@@ -65,7 +62,6 @@ test("public GET goes direct to gateway WITHOUT credentials", async () => {
 	await apiClient.public.get("/products");
 	const c = calls[0];
 	assert.equal(c.url, `${getEnv().gatewayHost}/api/v1/public/products`);
-	// Anonymous read must not carry the session cookie (cache hygiene + exposure).
 	assert.equal(
 		(c.init as RequestInit & { credentials: string }).credentials,
 		"omit",
@@ -73,8 +69,6 @@ test("public GET goes direct to gateway WITHOUT credentials", async () => {
 });
 
 test("public POST honours an explicit credentials:'include' (login Set-Cookie)", async () => {
-	// A session-establishing login (POST /public/auth/web/*) must keep "include"
-	// so the gateway's Set-Cookie response is stored; the public default is "omit".
 	const { apiClient } = await import("../lib/api/client");
 	await apiClient.public.post("/auth/web/google", {
 		json: { idToken: "x" },
@@ -111,9 +105,7 @@ test("authed POST carries X-Active-Role from stored role and no CSRF header", as
 	const c = calls[0];
 	assert.equal(c.url, `${getEnv().gatewayHost}/api/v1/app/carts/items`);
 	const h = new Headers(c.init.headers);
-	// The monolith's CSRF check reads Sec-Fetch-Site / Origin, not a custom header.
 	assert.equal(h.get("X-Requested-With"), null);
-	// The credential is the HttpOnly session cookie the browser attaches itself.
 	assert.equal(h.get("Authorization"), null);
 	assert.equal(h.get("X-Active-Role"), "SELLER");
 	assert.equal(
@@ -184,8 +176,6 @@ test("authed request with suppressAuthExpired:true throws but does NOT emit", as
 });
 
 test("authed GET retries once on 503 then succeeds (B-199)", async () => {
-	// A transient Redis blip makes the gateway answer 503; the client absorbs it
-	// with a single retry so the user never sees the failure.
 	let attempt = 0;
 	// @ts-expect-error test stub
 	globalThis.fetch = async (url: string, init: RequestInit = {}) => {

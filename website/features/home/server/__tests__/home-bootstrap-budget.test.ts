@@ -23,8 +23,6 @@ const mocks = vi.hoisted(() => ({
 	getCachedCategoryTree: vi.fn(),
 }));
 
-// The aggregates under test are the cache bodies; run them inline so the test
-// exercises the route's own budget logic rather than Next's cache machinery.
 vi.mock("next/cache", () => ({
 	cacheTag: () => undefined,
 	cacheLife: () => undefined,
@@ -117,7 +115,6 @@ describe("home bootstrap request budget", () => {
 		expect(response.status).toBe(200);
 		expect(Date.now() - startedAt).toBe(0);
 		expect(body.schemaVersion).toBe("home.v2");
-		// The tree is rolled up server-side: the browser gets the lv1 index only.
 		expect(body.categoryGroups).toEqual(CATEGORY_GROUPS);
 		expect(body.degraded).toBeUndefined();
 		expect(response.headers.get("x-bootstrap-degraded")).toBeNull();
@@ -143,8 +140,6 @@ describe("home bootstrap request budget", () => {
 		const elapsedMs = Date.now() - startedAt;
 
 		expect(response.status).toBe(200);
-		// The cache answers immediately, so the whole request costs one budget —
-		// never the primary budget plus a second full one.
 		expect(elapsedMs).toBe(budget.totalMs);
 		expect(elapsedMs).toBeLessThanOrEqual(
 			budget.totalMs + budget.fallbackFloorMs,
@@ -180,12 +175,9 @@ describe("home bootstrap request budget", () => {
 
 		expect(elapsedMs).toBe(budget.totalMs + budget.fallbackFloorMs);
 		expect(elapsedMs).toBeLessThan(budget.totalMs * 2);
-		// No source could supply the commerce wave, so the answer is an outage —
-		// not an empty catalogue the caller would paint over real content.
 		expect(response.status).toBe(503);
 		expect(response.headers.get("retry-after")).toBe("1");
 		expect(body.error).toBe("bootstrap_unavailable");
-		// Only the commerce surface makes an outage; posts are labelled, not fatal.
 		expect(body.unavailable.sort()).toEqual(["hotProducts", "products"]);
 	});
 
@@ -200,8 +192,6 @@ describe("home bootstrap request budget", () => {
 		const response = await pending;
 		const body = (await response.json()) as Record<string, unknown>;
 
-		// A sick social service must not stop the price/stock wave: that is the
-		// whole reason the visitor reloads Home.
 		expect(response.status).toBe(200);
 		expect(body.products).toEqual(PRODUCTS);
 		expect(body.hotProducts).toEqual(HOT_PRODUCTS);
@@ -227,7 +217,6 @@ describe("home bootstrap request budget", () => {
 		expect(response.status).toBe(200);
 		expect(body.products).toEqual(PRODUCTS);
 		expect(body.recommendedSellers).toEqual([]);
-		// The healthy half of the same wave still answers from cache.
 		expect(body.posts).toEqual(POSTS);
 		expect(body.categoryGroups).toEqual(CATEGORY_GROUPS);
 		expect(body.degraded).toEqual(["recommendedSellers"]);
@@ -248,7 +237,6 @@ describe("home bootstrap budget sizing", () => {
 	const PROD_VISITOR_WAIT_CEILING_MS = 4_500;
 
 	beforeEach(() => {
-		// The prod flavor requires a browser API base on the web origin; a relative one is.
 		vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "/api/v1");
 	});
 
@@ -264,10 +252,6 @@ describe("home bootstrap budget sizing", () => {
 			__setEnvForTest(null);
 			const budget = homeBootstrapBudget();
 
-			// features/home/HomePage.tsx aborts the refresh at homeSnapshotDeadlineMs();
-			// a response produced after that can reach no visitor, so any budget past
-			// it is dead time. Imported, never re-typed: a copied literal would keep
-			// passing after someone shortened the deadline it is meant to track.
 			expect(budget.totalMs + budget.fallbackFloorMs).toBeLessThanOrEqual(
 				homeSnapshotDeadlineMs(),
 			);

@@ -18,7 +18,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-// ==================== Mock CartServiceClient ====================
 
 type mockCartServiceClient struct {
 	AddItemFn         func(ctx context.Context, in *cartpb.AddItemRequest, opts ...grpc.CallOption) (*cartpb.AddItemResponse, error)
@@ -61,15 +60,11 @@ func (m *mockCartServiceClient) RemoveItemsByCheckoutId(ctx context.Context, in 
 	return nil, nil
 }
 
-// ==================== Router Setup ====================
 
-// setupCartRouter creates routes for cart handlers.
-// Guest routes (no auth middleware) and auth routes (with fakeJWTAuth).
 func setupCartRouter(h *Holder) *gin.Engine {
 	r := gin.New()
 	v1 := r.Group("/api/v1")
 
-	// Public cart routes (optional auth via getOptionalAccountID)
 	pub := v1.Group("/public/carts")
 	{
 		pub.GET("", h.GetCartList)
@@ -78,14 +73,12 @@ func setupCartRouter(h *Holder) *gin.Engine {
 		pub.DELETE("/items/:sku_id", h.DeleteCartItem)
 	}
 
-	// Auth-required cart routes
 	app := v1.Group("/app/carts")
 	app.Use(fakeJWTAuth())
 	{
 		app.POST("/merge", h.MergeCart)
 	}
 
-	// Public cart routes with optional auth (logged-in user)
 	pubAuth := v1.Group("/public/carts-auth")
 	pubAuth.Use(fakeJWTAuth())
 	{
@@ -98,7 +91,6 @@ func setupCartRouter(h *Holder) *gin.Engine {
 	return r
 }
 
-// ==================== GetCartList ====================
 
 func TestGetCartList_Success(t *testing.T) {
 	mock := &mockCartServiceClient{
@@ -201,7 +193,6 @@ func TestGetCartList_GrpcError(t *testing.T) {
 	assertHTTPStatus(t, w, http.StatusServiceUnavailable)
 }
 
-// ==================== AddToCart ====================
 
 func TestAddToCart_Success(t *testing.T) {
 	mock := &mockCartServiceClient{
@@ -240,7 +231,6 @@ func TestAddToCart_BadRequest_MissingFields(t *testing.T) {
 	h := &Holder{}
 	router := setupCartRouter(h)
 
-	// Missing skuId and quantity
 	body, _ := json.Marshal(map[string]interface{}{
 		"guestId": "guest-123",
 	})
@@ -258,7 +248,6 @@ func TestAddToCart_BadRequest_GuestNoGuestId(t *testing.T) {
 	h := &Holder{}
 	router := setupCartRouter(h)
 
-	// Guest user without guestId
 	body, _ := json.Marshal(map[string]interface{}{
 		"skuId":    "sku-1",
 		"quantity": "1",
@@ -295,7 +284,6 @@ func TestAddToCart_GrpcError(t *testing.T) {
 	assertHTTPStatus(t, w, http.StatusServiceUnavailable)
 }
 
-// ==================== SetItemQuantity ====================
 
 func TestSetItemQuantity_Success(t *testing.T) {
 	mock := &mockCartServiceClient{
@@ -333,7 +321,6 @@ func TestSetItemQuantity_BadRequest(t *testing.T) {
 	h := &Holder{}
 	router := setupCartRouter(h)
 
-	// Missing quantity
 	body, _ := json.Marshal(map[string]interface{}{
 		"guestId": "guest-123",
 	})
@@ -347,7 +334,6 @@ func TestSetItemQuantity_BadRequest(t *testing.T) {
 	assertCode(t, resp, 400)
 }
 
-// ==================== DeleteCartItem ====================
 
 func TestDeleteCartItem_Success(t *testing.T) {
 	mock := &mockCartServiceClient{
@@ -380,7 +366,6 @@ func TestDeleteCartItem_GuestNoGuestId(t *testing.T) {
 	h := &Holder{}
 	router := setupCartRouter(h)
 
-	// Guest user without guest_id query param
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/public/carts/items/sku-1", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
@@ -390,7 +375,6 @@ func TestDeleteCartItem_GuestNoGuestId(t *testing.T) {
 	assertCode(t, resp, 400)
 }
 
-// ==================== MergeCart ====================
 
 func TestMergeCart_Success(t *testing.T) {
 	mock := &mockCartServiceClient{
@@ -423,33 +407,7 @@ func TestMergeCart_Success(t *testing.T) {
 	assertCode(t, resp, 0)
 }
 
-// ==================== Buyer ID resolution (W2 buyer-store-stint rekey) ====================
-//
-// gateway/internal/buyerid.Resolver wiring (design doc
-// docs/superpowers/specs/2026-07-16-buyer-store-stint-rekey-w2w3-design.md
-// §3.1, D3): every cart call site must forward the CALLER'S CURRENT buyer_id
-// (stint surrogate), not the raw JWT, so a re-registered buyer
-// (new stint) doesn't inherit a stale cart. Guest requests (accountID==0) and
-// logged-in accounts without a buyer profile yet (ErrNoCurrentBuyer — e.g. a
-// seller-only account browsing the storefront) must NOT be blocked; cart has
-// no FK/join dependency on the identity value (D3), so both fall back to the
-// pre-resolution behaviour of forwarding accountID unchanged.
 
-// capturedXAccountID extracts the resolved identity CartClient's
-// ctxWithAccount stamped onto the context for this call (see
-// gateway/internal/grpc/cart_client.go) — the only way to observe, from the
-// mock's ctx, which identity the handler actually resolved and forwarded.
-//
-// Reads the CtxKeyAccountID context value (via WithAuthContext), not
-// outgoing gRPC metadata: NewCartClientForTest injects the mock proto client
-// directly (see internal/grpc/testing.go), bypassing the real
-// grpc.ClientConn/DefaultDialOpts — so AuthMetadataInterceptor, which is what
-// actually turns this context value into "x-account-id" wire metadata in
-// production, never runs here. That interceptor behavior (including the
-// regression it once had — a second, stale x-account-id value silently
-// winning over this one, see cart_client_test.go) is covered separately at
-// the internal/grpc layer; this helper only needs to confirm the handler
-// resolved and handed off the right identity.
 func capturedXAccountID(ctx context.Context) string {
 	accountID, ok := ctx.Value(grpcclient.CtxKeyAccountID).(int64)
 	if !ok {
@@ -651,10 +609,6 @@ func TestAddToCart_BuyerResolverErrorReturns503(t *testing.T) {
 }
 
 func TestAddToCart_GuestSkipsBuyerResolution(t *testing.T) {
-	// accountID==0（訪客）必須完全略過 resolver——h.BuyerID 甚至可以是 nil。
-	// 這條斷言鎖住 resolveCartBuyerID 的 accountID==0 短路分支：不能因為新增
-	// 的呼叫而動到訪客路徑（含 h.BuyerID 未注入的情況，例如某些較舊的訪客
-	// 專用 wiring）。
 	mock := &mockCartServiceClient{
 		AddItemFn: func(ctx context.Context, in *cartpb.AddItemRequest, opts ...grpc.CallOption) (*cartpb.AddItemResponse, error) {
 			if got := capturedXAccountID(ctx); got != "" {
@@ -663,7 +617,7 @@ func TestAddToCart_GuestSkipsBuyerResolution(t *testing.T) {
 			return &cartpb.AddItemResponse{Code: 0, TotalItems: "1"}, nil
 		},
 	}
-	h := &Holder{Cart: grpcclient.NewCartClientForTest(mock)} // BuyerID intentionally nil
+	h := &Holder{Cart: grpcclient.NewCartClientForTest(mock)}
 
 	router := setupCartRouter(h)
 

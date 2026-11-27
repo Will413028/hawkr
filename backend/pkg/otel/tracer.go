@@ -24,7 +24,6 @@ func InitTracer(serviceName string, logger *zap.Logger) func(context.Context) er
 
 	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
 	if endpoint != "" {
-		// otlptracegrpc.WithEndpoint() expects host:port only, strip http(s):// scheme
 		endpoint = strings.TrimPrefix(endpoint, "https://")
 		endpoint = strings.TrimPrefix(endpoint, "http://")
 		exporter, err := otlptracegrpc.New(context.Background(),
@@ -51,13 +50,6 @@ func InitTracer(serviceName string, logger *zap.Logger) func(context.Context) er
 	return tp.Shutdown
 }
 
-// buildSampler returns a ParentBased sampler with ratio from TRACING_SAMPLING env var.
-// Default 1.0 (100%).
-//
-// Special case: when the remote parent was NOT sampled (traceparent -00, e.g. from a
-// Sentry-instrumented frontend), we re-decide using our own ratio sampler instead of
-// being dropped — so TRACING_SAMPLING still governs volume while still giving Sentry's
-// sentry-trace tag a chance to link to an existing Tempo trace.
 func buildSampler() sdktrace.Sampler {
 	ratio := 1.0
 	if v := os.Getenv("TRACING_SAMPLING"); v != "" {

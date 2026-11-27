@@ -19,7 +19,6 @@ var (
 	protoService = regexp.MustCompile(`(?m)^service\s+(\w+)\s*\{`)
 )
 
-// contractServices 列出根目錄 api/ 宣告的每個 service 全名。
 func contractServices(t *testing.T) []string {
 	t.Helper()
 	var out []string
@@ -48,7 +47,6 @@ func contractServices(t *testing.T) []string {
 	return out
 }
 
-// declaredNotYetMounted 是契約已宣告、handler 在後續步驟才接線的 service（值是接線的步驟）。接線之後必須從這裡刪除：下面的測試在它已經掛上時失敗。
 var declaredNotYetMounted = rpc.DeferredServices
 
 func TestEveryServiceInTheContractIsMounted(t *testing.T) {

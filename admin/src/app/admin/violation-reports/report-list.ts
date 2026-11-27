@@ -16,8 +16,6 @@ import { type DeadlineView, deadlineView } from "@/lib/deadline";
 import { ALL_CATEGORIES, ASSESSABLE_CATEGORIES } from "@/lib/policy-category";
 import { caseStatusText, reportStatusText } from "./report-text";
 
-// 商家通報清單（/admin/violation-reports）的純邏輯：分頁籤對應的伺服器請求與篩選選項、空狀態文字、欄位文字。
-// 篩選與排序都由伺服器決定（待分案與案件內的通報舊到新，其餘新到舊），這裡與畫面都不重排。時間一律由呼叫端傳入（now）。
 
 export type ReportTabKey = "awaiting-triage" | "cases" | "all-reports";
 

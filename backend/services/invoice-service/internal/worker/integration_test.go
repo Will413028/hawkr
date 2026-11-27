@@ -42,10 +42,6 @@ const (
 	e2eAppKey = "integration-app-key"
 )
 
-// e2eAmego 是 AMEGO 的替身。
-//
-// requests 是 atomic 計數器：「AMEGO 沒有再被打一次」這種**陰性**宣稱只有數它才算數
-// ——用「有沒有第二張發票」去推論，遇到「送出去但回應遺失」就會答錯。
 type e2eAmego struct {
 	srv      *httptest.Server
 	requests atomic.Int64
@@ -84,7 +80,6 @@ type e2eEnv struct {
 	issuerID int64
 }
 
-// e2eOrderFacts 供應 consumer 拿不到的那份訂單快照（真實環境走 ORD 的 gRPC）。
 type e2eOrderFacts struct{ calls atomic.Int64 }
 
 func (f *e2eOrderFacts) GetOrderInvoiceSnapshot(context.Context, string, int64) (invoicemq.OrderFacts, error) {
@@ -220,7 +215,6 @@ func e2ePaidBody(t *testing.T, eventID string, env *e2eEnv) []byte {
 		"buyer_id":            2623900520,
 		"store_id":            env.storeID,
 		"total_actual_amount": 100,
-		// C1 的格式：LocalDateTime.toString()，無 Z、無時區（§6.3.2.2 陷阱表第 1 列）。
 		"occurred_at": time.Now().UTC().Format("2006-01-02T15:04:05.999999999"),
 	})
 	if err != nil {
@@ -229,15 +223,11 @@ func e2ePaidBody(t *testing.T, eventID string, env *e2eEnv) []byte {
 	return b
 }
 
-// ---------------------------------------------------------------------------
-// 驗收 3：端到端一條龍
-// ---------------------------------------------------------------------------
 
 func TestIntegration_EndToEnd_PaidToPublished(t *testing.T) {
 	ctx := context.Background()
 	env := setupE2E(t)
 
-	// ① consumer：order.paid → document ＋ operation
 	if err := env.paid.Handle(ctx, "order.paid", e2ePaidBody(t, "evt-1", env)); err != nil {
 		t.Fatalf("order.paid handle: %v", err)
 	}
@@ -259,7 +249,6 @@ func TestIntegration_EndToEnd_PaidToPublished(t *testing.T) {
 		t.Fatalf("inbox 列數 = %d，want 1", n)
 	}
 
-	// ② INV.op：claim → 送 AMEGO → ISSUED ＋ SUCCEEDED ＋ 一列 outbox
 	if err := env.issue.RunOnce(ctx); err != nil {
 		t.Fatalf("INV.op RunOnce: %v", err)
 	}
@@ -298,7 +287,6 @@ func TestIntegration_EndToEnd_PaidToPublished(t *testing.T) {
 		t.Fatalf("outbox 列：routing_key=%s status=%s", routingKey, outboxStatus)
 	}
 
-	// ③ INV.ob：派送
 	if err := env.ob.RunOnce(ctx); err != nil {
 		t.Fatalf("INV.ob RunOnce: %v", err)
 	}
@@ -317,8 +305,6 @@ func TestIntegration_EndToEnd_PaidToPublished(t *testing.T) {
 		t.Fatalf("派送後 outbox status = %s，want done", outboxStatus)
 	}
 
-	// payload 逐 key 檢查：notify_seller_account_id 必須在派送當下補上（§6.3.3.2），
-	// 解析不到時是字串 "0"，而不是缺欄或裸數字。
 	var published map[string]any
 	if err := json.Unmarshal(env.pub.calls[0].body, &published); err != nil {
 		t.Fatalf("decode published: %v", err)
@@ -329,16 +315,11 @@ func TestIntegration_EndToEnd_PaidToPublished(t *testing.T) {
 	if published["invoice_no"] != "AB12345678" {
 		t.Errorf("invoice_no = %#v", published["invoice_no"])
 	}
-	// 🔴 憑證邊界：invoice_no + random_code 就能在財政部平台查到整張發票 ⇒ random_code
-	// 是憑證不是資料，絕不上 MQ（§6.3.3.2 第 2 條）。
 	if _, leaked := published["random_code"]; leaked {
 		t.Error("random_code 洩漏進 MQ payload —— 它是憑證不是資料")
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 驗收 4：重送同一則 order.paid → 只有一份 document，AMEGO 不再被打
-// ---------------------------------------------------------------------------
 
 func TestIntegration_EndToEnd_DuplicateOrderPaidIsIdempotent(t *testing.T) {
 	ctx := context.Background()
@@ -355,8 +336,6 @@ func TestIntegration_EndToEnd_DuplicateOrderPaidIsIdempotent(t *testing.T) {
 		t.Fatalf("第一輪 AMEGO 請求數 = %d，want 1", first)
 	}
 
-	// 重送兩次：一次同 event_id（RabbitMQ 重投），一次換 event_id（上游重發）。
-	// 兩把唯一鍵各守一種，只做其中一把的實作會在第二種上破。
 	for _, eventID := range []string{"evt-1", "evt-2"} {
 		if err := env.paid.Handle(ctx, "order.paid", e2ePaidBody(t, eventID, env)); err != nil {
 			t.Fatalf("重送 %s: %v", eventID, err)
@@ -382,12 +361,6 @@ func TestIntegration_EndToEnd_DuplicateOrderPaidIsIdempotent(t *testing.T) {
 		"ORDER_PAID:"+env.orderNo); n != 1 {
 		t.Fatalf("inbox 列數 = %d，want 1", n)
 	}
-	// 🔴 這一條才是**consumer 層**去重的鑑別力所在。
-	//
-	// 上面那幾條（document 數、AMEGO 請求數）在 consumer 的去重被拿掉之後**仍然會通過**
-	// ——因為 Prepare 自己在 DB 層還有一道 ON CONFLICT DO NOTHING。兩層防線是好事，
-	// 但它讓「document 只有一份」對「consumer 有沒有去重」完全沒有鑑別力。
-	// 取快照的次數只有 consumer 那一層擋得住：去重被拿掉 ⇒ 每次重送都會多打一次 ORD 的 gRPC。
 	if n := env.orderFax.calls.Load(); n != 1 {
 		t.Fatalf("ORD 快照被取了 %d 次，want 1 —— consumer 層的去重沒有生效", n)
 	}
@@ -403,9 +376,6 @@ func TestIntegration_EndToEnd_OutOfOrderRefundIsDeferred(t *testing.T) {
 	realDocs := postgres.NewDocumentRepository(env.pool, testKeyRing(t))
 	refund := invoicemq.NewRefundFinalizedConsumer(inbox, realDocs, invoicemq.UnimplementedAdjustmentApplier{}, nil)
 
-	// 🔴 形狀逐欄照 order-service 的 OrderRefundFinalizedPayload：16 個 component
-	// 全是 String（@JsonNaming(SnakeCaseStrategy)）。金額寫成 JSON 數字的 fixture 會
-	// 讓這支測試證明一件現實中不存在的事 —— 而那正是原缺陷能活下來的原因。
 	nowIso := time.Now().UTC().Format(time.RFC3339)
 	body, _ := json.Marshal(map[string]any{
 		"event_id": "r-1", "order_no": env.orderNo, "occurred_at": nowIso,
@@ -436,14 +406,7 @@ func TestIntegration_EndToEnd_OutOfOrderRefundIsDeferred(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 驗收 5：出向事件的 store_id 解得出賣家 account_id（P0-3 的端到端證明）
-// ---------------------------------------------------------------------------
 
-// resolveOnlyStoreID 只認得**真正的 store_id**，其餘一律回錯。
-//
-// 🔴 這個 fake 的鑑別力全在「其餘一律回錯」：接受任何 int64 的 resolver 會讓
-// publisher 填 invoice_issuers 的 PK 也照樣通過 —— 而那正是原缺陷的形狀。
 type resolveOnlyStoreID struct {
 	storeID   int64
 	accountID int64
@@ -536,10 +499,6 @@ func countRows(t *testing.T, env *e2eEnv, q string, args ...any) int {
 	return n
 }
 
-// ---------------------------------------------------------------------------
-// 平台代製收據的替身（#3026）。本套 worker 整合測試走的是 AMEGO_AUTO 那條線，
-// 收據路徑不會被觸發 —— 兩個 stub 因此**故意會失敗**：被呼叫到就代表有東西走錯了路。
-// ---------------------------------------------------------------------------
 
 type stubReceiptRenderer struct{}
 

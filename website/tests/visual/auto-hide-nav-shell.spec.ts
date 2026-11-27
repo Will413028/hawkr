@@ -58,7 +58,6 @@ test.describe("AutoHideNavShell CSS → Tailwind — computed-style gate", {
 		const edge = page.locator('.auto-nav + [aria-hidden="true"]');
 		await expect(edge).toBeAttached();
 
-		// --- wrapper: read transition props BEFORE killing transitions ---
 		const w = await wrapper.evaluate((el) => {
 			const s = getComputedStyle(el);
 			return {
@@ -85,7 +84,6 @@ test.describe("AutoHideNavShell CSS → Tailwind — computed-style gate", {
 		expect(w.transTiming).toBe(TIMING);
 		expect(w.pointer).toBe("auto");
 
-		// --- edge: fixed reveal strip ---
 		const e = await edge.evaluate((el) => {
 			const s = getComputedStyle(el);
 			return {
@@ -105,17 +103,9 @@ test.describe("AutoHideNavShell CSS → Tailwind — computed-style gate", {
 		expect(e.right).toBe("0px");
 		expect(e.height).toBe(isMobile ? "24px" : "64px");
 		expect(e.zIndex).toBe("199");
-		// The strip is a layout marker, not a hit target: useAutoHideNav listens
-		// for pointermove on `window`, so the reveal works without the strip
-		// capturing anything. Pinning "auto" here pinned an implementation the
-		// component deliberately moved away from; the capability that actually
-		// matters is covered by "a hidden bar is revealed from the top edge".
 		expect(e.pointer).toBe("none");
 		expect(e.bg).toBe("rgba(0, 0, 0, 0)");
 
-		// --- hidden state: bar translates fully off the top + goes inert. ---
-		// Kill transitions first so the transform settles synchronously (a
-		// mid-animation getBoundingClientRect would read an interpolated pos).
 		await page.addStyleTag({ content: "*{transition:none !important}" });
 		const hidden = await wrapper.evaluate((el) => {
 			const before = el.getBoundingClientRect().bottom;
@@ -123,27 +113,20 @@ test.describe("AutoHideNavShell CSS → Tailwind — computed-style gate", {
 			const after = el.getBoundingClientRect().bottom;
 			return { before, after, pointer: getComputedStyle(el).pointerEvents };
 		});
-		// Visible at top: bottom edge is on-screen.
 		expect(hidden.before).toBeGreaterThan(0);
-		// Hidden: translated fully above the viewport (≥100% of its own height).
 		expect(hidden.after).toBeLessThanOrEqual(1);
 		expect(hidden.pointer).toBe("none");
 	});
 
-	// The reveal strip is inert, so this is the assertion that keeps the
-	// top-edge reveal honest: it exercises the window-level listener the
-	// component relies on instead of the strip's computed styles.
 	test("a hidden bar is revealed from the top edge", async ({ page }) => {
 		await gotoThemed(page, "/", "light");
 
 		const wrapper = page.locator(".auto-nav");
 		await expect(wrapper).toBeAttached();
 
-		// Scroll far enough for the hook to hide the bar.
 		await page.evaluate(() => window.scrollTo(0, 1200));
 		await expect(wrapper).toHaveAttribute("data-hidden", "true");
 
-		// A mouse entering the reveal zone brings it back.
 		const width = page.viewportSize()?.width ?? 1280;
 		await page.mouse.move(Math.floor(width / 2), 2);
 		await expect(wrapper).toHaveAttribute("data-hidden", "false");

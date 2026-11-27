@@ -1,6 +1,5 @@
 @import "tailwindcss";
 
-/* 供 div/span 轉成 <button> 時清除瀏覽器預設樣式,保留元素原 class 的版面 */
 .btn-reset {
 	appearance: none;
 	border: none;
@@ -14,8 +13,6 @@
 }
 
 :root {
-	/* Neutral ink ramp shared with the website (website/styles/foundation/00-color-config.css):
-	 * 900 is brand ink and 50 is brand ink-on-dark. Use a step instead of a hand-written value. */
 	--color-ink-50: #f5f7fa;
 	--color-ink-50-rgb: 245 247 250;
 	--color-ink-100: #e4e7eb;
@@ -49,10 +46,6 @@
 	--color-status-success-soft: #e6f0ea;
 	--color-status-success-soft-rgb: 230 240 234;
 
-	/* Hawkr canonical semantic bridge.
-	 * New operational surfaces use these names while legacy pages continue to
-	 * consume the historical aliases below. This avoids a risky whole-console
-	 * recolor and gives safety context a stable, product-wide vocabulary. */
 	--hk-primary-strong: #b8441f;
 	--hk-primary: #e4572e;
 	--hk-cream: #f8f6ef;
@@ -71,7 +64,6 @@
 	--hk-warning-soft: #fff3d6;
 	--hk-focus-ring: #b8441f;
 
-	/* Legacy palette aliases: AdminVisualRefresh.css remaps them onto the Hawkr tokens. */
 	--color1: var(--color-ink-300);
 	--c1: var(--color-ink-300);
 	--c2: var(--color-ink-400);
@@ -83,45 +75,32 @@
 	--color-3: var(--color-status-success);
 	--color-5: var(--color-status-success);
 
-	/* Gray Scale */
 	--brand-gray1-20: rgba(86, 86, 86, 0.2);
 	--brand-gray1-30: rgba(86, 86, 86, 0.3);
 	--brand-gray1-50: rgba(86, 86, 86, 0.5);
 	--brand-gray1-80: rgba(86, 86, 86, 0.8);
 	--brand-gray1-100: #565656;
 
-	/* Black/White Scale */
 	--brand-black-80: rgba(0, 0, 0, 0.8);
 	--brand-black-100: #000000;
 	--brand-white-40: rgba(255, 255, 255, 0.4);
 	--brand-white-70: rgba(255, 255, 255, 0.7);
 	--brand-white-100: #ffffff;
 
-	/* Orange (Secondary/Accent) */
 	--brand-orange-50: rgba(238, 150, 75, 0.5);
 	--brand-orange-100: #ee964b;
 
-	/* Backgrounds */
 	--white: #ffffff;
 	--bgapp: var(--color-ink-50);
-	/* App background */
 	--border-color: #dadada;
-	/* Border gray */
 	--dialog-bg: #f3f3f5;
-	/* Dialog background */
 	--sencoy-bg: var(--color-ink-50);
-	/* Secondary background */
 
-	/* Text */
 	--text: #3537a6;
-	/* Primary text - dark blue */
 	--text-secondary: rgba(86, 86, 86, 0.8);
 
-	/* Danger */
 	--color-10: #e7000b;
-	/* Danger red */
 
-	/* Legacy mappings for backward compatibility */
 	--primary: var(--color-ink-300);
 	--primary-light: var(--color-ink-100);
 	--primary-dark: var(--color-ink-400);
@@ -169,7 +148,6 @@ body {
 	line-height: 1.5;
 }
 
-/* ========== 後台主框架 ========== */
 .admin-app {
 	display: none;
 	min-height: 100vh;
@@ -179,7 +157,6 @@ body {
 	display: flex;
 }
 
-/* ========== 側邊欄 - Figma Design ========== */
 .sidebar {
 	width: var(--sidebar-width);
 	background: var(--white);
@@ -368,7 +345,6 @@ body {
 	color: var(--gray-800);
 }
 
-/* ========== 主內容區 ========== */
 .main-content {
 	flex: 1;
 	margin-left: var(--sidebar-width);
@@ -480,7 +456,6 @@ body {
 	color: var(--gray-500);
 }
 
-/* ========== 頁面內容 ========== */
 .page-content {
 	padding: 24px 32px;
 }
@@ -564,7 +539,6 @@ body {
 	font-size: 14px;
 }
 
-/* ========== 統計卡片 ========== */
 .stats-row {
 	display: flex;
 	gap: 24px;
@@ -661,7 +635,6 @@ body {
 	transform: translateY(-2px);
 }
 
-/* ========== 篩選列 ========== */
 .filter-bar {
 	display: flex;
 	align-items: center;
@@ -709,7 +682,6 @@ body {
 	cursor: pointer;
 }
 
-/* ========== 表格 ========== */
 .table-container {
 	background: var(--white);
 	box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.1);
@@ -750,7 +722,6 @@ body {
 	background: var(--gray-50);
 }
 
-/* Table cell styles */
 .cell-main {
 	font-size: 18px;
 	font-weight: 500;
@@ -772,7 +743,6 @@ body {
 	font-size: 24px;
 }
 
-/* Shop info cell */
 .shop-info {
 	display: flex;
 	align-items: center;
@@ -823,8 +793,6 @@ body {
 	line-height: 24px;
 }
 
-/* ========== 狀態標籤 ========== */
-/* ========== 審核狀態徽章 ========== */
 .status-badge {
 	display: inline-flex;
 	align-items: center;
@@ -839,31 +807,26 @@ body {
 	white-space: nowrap;
 }
 
-/* 待審核 - 橙色背景白色文字 */
 .status-badge.pending {
 	background: var(--warning);
 	color: var(--white);
 }
 
-/* 已通過 - 綠色背景白色文字 */
 .status-badge.approved {
 	background: var(--primary);
 	color: var(--white);
 }
 
-/* 已退回 - 紅色背景白色文字 */
 .status-badge.rejected {
 	background: var(--danger);
 	color: var(--white);
 }
 
-/* 審核中 - 藍色背景白色文字（等平台動作，與「草稿」的橙、「未上架」的灰都要分得開） */
 .status-badge.info {
 	background: var(--info);
 	color: var(--white);
 }
 
-/* 已禁用 - 灰色背景白色文字 */
 .status-badge.disabled {
 	background: var(--gray-400);
 	color: var(--white);
@@ -879,7 +842,6 @@ body {
 	line-height: 1;
 }
 
-/* ========== 狀態容器（包含狀態和原因） ========== */
 .status-container {
 	display: flex;
 	flex-direction: column;
@@ -887,7 +849,6 @@ body {
 	gap: 8px;
 }
 
-/* 退回原因文字 */
 .reject-reason {
 	font-size: 14px;
 	font-weight: 500;
@@ -916,7 +877,6 @@ body {
 	color: var(--danger);
 }
 
-/* ========== 操作按鈕 ========== */
 .action-link {
 	font-size: 16px;
 	font-weight: 500;
@@ -932,7 +892,6 @@ body {
 	text-decoration: underline;
 }
 
-/* ========== 卡片 ========== */
 .card {
 	background: var(--white);
 	border: 1px solid var(--gray-300);
@@ -990,7 +949,6 @@ body {
 	color: var(--gray-800);
 }
 
-/* Form Styles */
 .form-group {
 	margin-bottom: 20px;
 }
@@ -1088,7 +1046,6 @@ textarea.form-control {
 	display: none;
 }
 
-/* ========== 系統狀態頁面 ========== */
 .vm-card {
 	background: var(--white);
 	border: 1px solid var(--gray-300);
@@ -1196,7 +1153,6 @@ textarea.form-control {
 	margin-top: 4px;
 }
 
-/* ========== Tabs ========== */
 .tabs {
 	display: flex;
 	gap: 8px;
@@ -1226,7 +1182,6 @@ textarea.form-control {
 	color: var(--primary);
 }
 
-/* ========== 工具類別 ========== */
 .mb-20 {
 	margin-bottom: 20px;
 }
@@ -1247,7 +1202,6 @@ textarea.form-control {
 	gap: 20px;
 }
 
-/* ========== 商家審核詳情頁 ========== */
 .certification-detail-page {
 	padding: 0;
 }
@@ -1366,7 +1320,6 @@ textarea.form-control {
 	gap: 6px;
 }
 
-/* 審核備註 */
 .audit-notice {
 	display: flex;
 	align-items: flex-start;
@@ -1397,7 +1350,6 @@ textarea.form-control {
 	line-height: 1.5;
 }
 
-/* 金流狀態卡片 */
 .payment-status-card {
 	display: flex;
 	justify-content: space-between;
@@ -1444,7 +1396,6 @@ textarea.form-control {
 	color: var(--gray-400);
 }
 
-/* 內容區域 */
 .detail-content-grid {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
@@ -1458,7 +1409,6 @@ textarea.form-control {
 	gap: 24px;
 }
 
-/* 詳情卡片 */
 .detail-card {
 	background: var(--white);
 	border-radius: 16px;
@@ -1486,7 +1436,6 @@ textarea.form-control {
 	padding: 24px;
 }
 
-/* 資訊網格 */
 .info-grid {
 	display: grid;
 	grid-template-columns: repeat(2, 1fr);
@@ -1517,7 +1466,6 @@ textarea.form-control {
 	color: var(--gray-900);
 }
 
-/* 文件影像占位 */
 .id-card-placeholder {
 	display: flex;
 	flex-direction: column;
@@ -1530,7 +1478,6 @@ textarea.form-control {
 	font-size: 48px;
 }
 
-/* 文件列表 */
 .document-list {
 	display: flex;
 	flex-direction: column;
@@ -1627,7 +1574,6 @@ textarea.form-control {
 	background: var(--danger-light);
 }
 
-/* ========== Banner 預覽輪播動畫 ========== */
 @keyframes bannerFadeIn {
 	from {
 		opacity: 0;
@@ -1661,7 +1607,6 @@ textarea.form-control {
 	}
 }
 
-/* 響應式 */
 @media (max-width: 1280px) {
 	.detail-content-grid {
 		grid-template-columns: 1fr;
@@ -1707,7 +1652,6 @@ textarea.form-control {
 	}
 }
 
-/* ========== Stat Card V2 (Shared Component) ========== */
 .stat-card-v2 {
 	background: white;
 	border-radius: 15px;
@@ -1758,7 +1702,6 @@ textarea.form-control {
 	color: #e7000b;
 }
 
-/* Flag-Shaped Icon (Top-Right) */
 .stat-card-v2-icon {
 	position: absolute;
 	top: 0;
@@ -1785,7 +1728,6 @@ textarea.form-control {
 	border-radius: 4px;
 }
 
-/* Icon Color Variants */
 .stat-card-v2-icon.store {
 	background: #565656;
 }
@@ -1806,7 +1748,6 @@ textarea.form-control {
 	background: #565656;
 }
 
-/* Stats Row Container */
 .stats-row-v2 {
 	display: flex;
 	gap: 24px;
@@ -1817,7 +1758,6 @@ textarea.form-control {
 	flex: 1;
 }
 
-/* Clickable Stat Card */
 .stat-card-clickable {
 	cursor: pointer;
 	border-radius: 16px;
@@ -1849,7 +1789,6 @@ textarea.form-control {
 	}
 }
 
-/* Material Symbols（@hawkr/icons）的版面對齊；尺寸由元件的 size（預設 1em）決定。 */
 :where(svg[viewBox="0 -960 960 960"]) {
 	flex-shrink: 0;
 	vertical-align: -0.125em;

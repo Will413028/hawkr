@@ -67,8 +67,6 @@ public class ShipmentAnomalyEventPublisher {
                                        String shipmentId,
                                        Long storeId,
                                        Long buyerId) {
-        // 單一 choke point：TcatCallStuckAlertScheduler / ShipmentStatusReconcileScheduler /
-        // ShipmentLabelReconcileScheduler / ShippingService 共 7 個呼叫點都經此解析，無需逐一修改
         Long resolvedSellerAccountId = resolveSellerAccountId(storeId);
         Long resolvedBuyerAccountId = resolveNotifyBuyerAccountId(buyerId);
         try {
@@ -96,7 +94,6 @@ public class ShipmentAnomalyEventPublisher {
                     "配送異常事件發布成功 anomalyType=" + type.value() + " severity=" + severity.value(),
                     "orderNo", orderNo);
         } catch (Exception e) {
-            // §5.21 fire-and-forget：不丟例外影響 scheduler / consumer 主流程
             log.error("ShipmentAnomalyEventPublisher.publishAnomalyDetected.error",
                     "配送異常事件發布失敗 orderNo=" + orderNo + " type=" + type.value()
                             + " err=" + e.getMessage());

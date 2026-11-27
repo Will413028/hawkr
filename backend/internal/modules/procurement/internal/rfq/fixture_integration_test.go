@@ -32,7 +32,6 @@ const buyer int64 = 1
 
 func ptr[T any](v T) *T { return &v }
 
-// fixture 是一位買家的一張需求（REQUIREMENT_READY；現行版本：小白菜、3 KG、台北市）與一個可注入時間、可注入訂閱者失敗的服務。
 type fixture struct {
 	t             *testing.T
 	d             *db.DB
@@ -68,7 +67,6 @@ func newFixture(t *testing.T) *fixture {
 	return f
 }
 
-// sibling 在同一個資料庫為另一位買家（或同一位買家的另一張需求）建一張需求；時間與事件匯流排共用。
 func (f *fixture) sibling(buyerID int64) *fixture {
 	g := &fixture{t: f.t, d: f.d, bus: f.bus, now: f.now}
 	g.adopt(buyerID)
@@ -85,7 +83,6 @@ func (f *fixture) adopt(buyerID int64) {
 	f.setStatus("REQUIREMENT_READY")
 }
 
-// setStatus 直接改需求狀態：狀態改變不產生新版本，發布鏈要在預覽與執行時各查一次。
 func (f *fixture) setStatus(status string) {
 	f.t.Helper()
 	f.exec(`UPDATE procurement.requests SET status = $2 WHERE id = $1`, f.request, status)
@@ -95,7 +92,6 @@ func (f *fixture) service() rfq.Service {
 	return rfq.Service{DB: f.d, Now: func() time.Time { return f.now }, Events: f.bus, Blocks: &f.stores, Open: &f.stores}
 }
 
-// stores 是替身的 seller：blocked 的店封鎖買家，closed 的店不是營業中，err 不為空時兩個查詢都失敗。
 type stores struct {
 	mu      sync.Mutex
 	blocked map[int64]bool
@@ -133,7 +129,6 @@ func (s *stores) set(blocked, closed map[int64]bool, err error) {
 	s.blocked, s.closed, s.err = blocked, closed, err
 }
 
-// revise 把現行版本取代成新的一版（預設內容：小白菜、3 KG、台北市），f.revision 指向新版。
 func (f *fixture) revise(edit func(*store.InsertRevisionParams)) {
 	f.t.Helper()
 	ctx := context.Background()
@@ -159,7 +154,6 @@ func (f *fixture) revise(edit func(*store.InsertRevisionParams)) {
 	f.revision = p.ID
 }
 
-// searched 建一次成功的候選搜尋（候選依序是 stores），需求轉 MATCHING，回候選集與每個候選的 ID（依 stores 的順序）。
 func (f *fixture) searched(stores ...int64) (uuid.UUID, []uuid.UUID) {
 	f.t.Helper()
 	set, ids := f.seedSearch(stores...)
@@ -167,7 +161,6 @@ func (f *fixture) searched(stores ...int64) (uuid.UUID, []uuid.UUID) {
 	return set, ids
 }
 
-// seedSearch 建一次成功的候選搜尋但不動需求狀態，並記住它是現行版本最後一次搜尋（publicationIn 用）。
 func (f *fixture) seedSearch(stores ...int64) (uuid.UUID, []uuid.UUID) {
 	f.t.Helper()
 	ctx := context.Background()
@@ -221,8 +214,6 @@ func (f *fixture) priceIn() rfq.PriceInput {
 	return rfq.PriceInput{BuyerID: f.buyer, RequestID: f.request, ExpectedRevisionID: f.revision, LowerBoundAmount: 100, UpperBoundAmount: 200}
 }
 
-// publicationIn 是預設輸入：選現行版本最後一次搜尋的第一個候選；現行版本還沒有搜尋就先搜尋一次（店 10、20）。
-// 候選集有效的前提是需求在 MATCHING（A9-D29(4)），所以 REQUIREMENT_READY 的需求在這裡轉成 MATCHING；其他狀態不動。
 func (f *fixture) publicationIn() rfq.PreviewPublicationInput {
 	f.t.Helper()
 	if f.lastSetRev != f.revision {
@@ -294,7 +285,6 @@ func wantInvalid(t *testing.T, err error, field string) {
 	t.Fatalf("INVALID_ARGUMENT 要指向 %s，得到 %v", field, ae.FieldViolations())
 }
 
-// wantReason 檢查錯誤帶（或不帶）指定的 reason。
 func wantReason(t *testing.T, err error, reason apperr.Reason, present bool) {
 	t.Helper()
 	var ae *apperr.Error

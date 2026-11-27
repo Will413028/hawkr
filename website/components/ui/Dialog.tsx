@@ -243,8 +243,6 @@ function OverlayRoot({
 	);
 	const overlayRef = React.useRef<HTMLDivElement | null>(null);
 	const panelRef = React.useRef<HTMLDivElement | null>(null);
-	// 生命週期 effect 的依賴固定為 [mounted, present]（tests/dialog-focus-lifecycle
-	// 釘住），autoFocus 走 ref 讀最新值，避免切換它時重新取得 scroll lock。
 	const autoFocusRef = React.useRef(autoFocus);
 	autoFocusRef.current = autoFocus;
 
@@ -264,8 +262,6 @@ function OverlayRoot({
 	React.useEffect(() => {
 		if (!mounted || !present) return;
 		if (!open) {
-			// transitionend normally owns the unmount. This fallback covers browsers
-			// that suppress the event and keeps the exit duration bounded.
 			const reducedMotion = window.matchMedia?.(
 				"(prefers-reduced-motion: reduce)",
 			).matches;
@@ -279,8 +275,6 @@ function OverlayRoot({
 			return () => window.clearTimeout(timer);
 		}
 
-		// Commit the closed pose for one frame before retargeting to open. This also
-		// makes a rapid close -> reopen resume from its current visual position.
 		const frame = window.requestAnimationFrame(() => setVisualState("open"));
 		return () => window.cancelAnimationFrame(frame);
 	}, [mounted, open, present]);
@@ -316,9 +310,6 @@ function OverlayRoot({
 			return;
 		}
 		if (event.key !== "Tab" || !panelRef.current) return;
-		// Shared trap (lib/a11y/focusable): it leaves focus alone when the
-		// active element sits outside the panel — e.g. a nested portal's
-		// listbox — instead of yanking it back to the panel's first control.
 		wrapTabFocus(event, panelRef.current);
 	});
 
@@ -329,9 +320,6 @@ function OverlayRoot({
 		const overlay = overlayRef.current;
 		const stopBackdropMotionEvent = (event: Event) => {
 			const target = event.target;
-			// Keep backdrop motion isolated from document-level visual effects, but
-			// let gestures that start inside the panel reach document listeners.
-			// Libraries such as react-easy-crop continue a mouse drag there.
 			if (!(target instanceof Node) || !panelRef.current?.contains(target)) {
 				event.stopPropagation();
 			}
@@ -430,7 +418,6 @@ function DialogHeader({
 	return (
 		<header
 			data-hk-dialog-header
-			// right-4 (16px) + size-11 (44px) = 60px of chrome to clear.
 			className="grid gap-2 border-b border-[var(--hkui-border)] px-6 py-5 pr-16"
 		>
 			{title ? (
@@ -461,9 +448,6 @@ function DialogBody({
 	return (
 		<div
 			data-hk-dialog-body
-			// `scrollbar-gutter: stable`：抽屜內容非同步載入/展開收合時高度會在
-			// 面板高度上下穿越，捲軸出現↔消失會讓內容反覆重排（底部抖動）。
-			// 預留 gutter 讓捲軸切換不再改變內容寬度。
 			className={cn(
 				"overflow-auto px-6 py-5 [scrollbar-gutter:stable]",
 				className,

@@ -62,8 +62,6 @@ export function useCustomerDetail(
 	});
 	const failure = storeError ?? query.error;
 	return {
-		// `data` (not `error || !data`): a failed background refetch keeps the
-		// last-good detail rather than blanking the panel.
 		data: query.data ?? null,
 		loading: storeLoading || query.isLoading,
 		error: failure ? errorText(failure, defaults) : null,
@@ -79,8 +77,6 @@ export function useInvalidateCustomerDetail(): (
 ) => Promise<void> {
 	const queryClient = useQueryClient();
 	const identity = useQueryIdentity();
-	// Stable ref so `handleMutate` (and any host callback wrapping it) keeps a
-	// constant identity across re-renders.
 	return useCallback(
 		(buyerId) =>
 			queryClient.invalidateQueries({

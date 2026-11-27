@@ -26,7 +26,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog"
 )
 
-// 舊契約的業務碼（`GrpcResponseCode`）與庫存操作的 status（`StockOperationStatus`）。
 const (
 	codeOK           = 0
 	codeInvalidParam = 400
@@ -37,7 +36,6 @@ const (
 	statusNoopNotFound      = "NOOP_NOT_FOUND"
 	statusSystemError       = "SYSTEM_ERROR"
 
-	// 舊 product-service 的單次上限。
 	maxCheckoutSkus = 100
 	maxCartSkus     = 200
 )
@@ -78,7 +76,6 @@ func stockResponse(status, msg string, insufficient ...*pb.InsufficientItem) *co
 	return connect.NewResponse(&pb.StockOperationResponse{Status: status, Message: msg, InsufficientItems: insufficient})
 }
 
-// parseItems 解析扣減與歸還的品項：sku_id 是 UUID、quantity 是正整數；格式錯誤回說明文字（呼叫端回 SYSTEM_ERROR「參數格式錯誤」），沒有錯誤時為空字串。
 func parseItems(in []*pb.StockItem) ([]catalog.StockItem, string) {
 	out := make([]catalog.StockItem, 0, len(in))
 	for _, it := range in {
@@ -95,7 +92,6 @@ func parseItems(in []*pb.StockItem) ([]catalog.StockItem, string) {
 	return out, ""
 }
 
-// checkStockRequest 檢查扣減與歸還共同的必填欄位，回 nil 表示可繼續；否則回要送出的 SYSTEM_ERROR 回應。
 func checkStockRequest(txID string, items []*pb.StockItem) *connect.Response[pb.StockOperationResponse] {
 	switch {
 	case txID == "":
@@ -135,8 +131,6 @@ func (s *Server) DeductStock(ctx context.Context, req *connect.Request[pb.Deduct
 	}
 }
 
-// insufficient 組出 INSUFFICIENT_STOCK 回應：match 選出不足的品項，available 是那個 SKU 此刻的庫存（讀不到或不存在為 0）。
-// 沒有任何品項對得上（讀快照時狀態已變）回 SYSTEM_ERROR，不編造明細。
 func (s *Server) insufficient(ctx context.Context, cause error, items []catalog.StockItem, match func(catalog.StockItem, catalog.SkuSnapshot, bool) bool) *connect.Response[pb.StockOperationResponse] {
 	ids := make([]uuid.UUID, len(items))
 	for i, it := range items {
@@ -190,7 +184,6 @@ func (s *Server) RestoreStock(ctx context.Context, req *connect.Request[pb.Resto
 	}
 }
 
-// listPrice 是原價：有 compare_at_price 用它，否則同售價。
 func listPrice(s catalog.SkuSnapshot) int64 {
 	if s.CompareAtPrice != nil {
 		return *s.CompareAtPrice
@@ -227,7 +220,6 @@ func (s *Server) GetProductSimple(ctx context.Context, req *connect.Request[pb.G
 	})
 }
 
-// parseIDs 解析批次的 SKU ID：格式錯誤與全零的略過（當作查無的 SKU，舊契約），重複的合併。
 func parseIDs(raw []string) []uuid.UUID {
 	out := make([]uuid.UUID, 0, len(raw))
 	for _, r := range raw {

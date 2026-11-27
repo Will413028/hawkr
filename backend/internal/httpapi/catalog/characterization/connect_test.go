@@ -18,19 +18,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// connectPageSize 是列表的頁大小（契約上限 100）；driver 翻完所有頁，情境不看分頁。
 const connectPageSize = 100
 
-// connectDriver 以單體的 CatalogPublicService、SellerCatalogAppService 與 CatalogAdminService 操作 catalog。每個呼叫者一組帶著自己
-// Bearer token 的 client；Connect 錯誤以 ch.ConnectKind 分類，另外兩個 catalog 的失敗：商品狀態不允許（ACTIVE 沒有主圖，D22）與
-// SetStock 的預期值不符（D24 Q13）都是 failed_precondition，依呼叫的方法對應。
-//
-// 與 REST 的 wire 不同之處由 driver 吸收，情境只看業務結果：
-//   - 寫入要帶讀取時拿到的 etag（D24 Q3）：driver 在寫入前讀一次 GetMyProduct；別家店的商品在這一步就是 not_found。
-//   - 庫存只由 SetStock 改（D24 Q13）：SellerUpdate 不送庫存；SetStock 以 SKU ID 指定，driver 讀出商品唯一的 SKU。
-//   - 公開商品只帶 availability（D24 Q12）：Purchasable 是它是否為 AVAILABLE；公開的列表項沒有狀態與庫存，Status、Stock 空著。
-//   - 列表是 keyset：driver 翻完所有頁。公開的關鍵字走 SearchProducts，沒有關鍵字走 ListProducts。
-//   - 商品只有一個 SKU（D18 沒有選項軸）：價格與庫存是它的售價與庫存，Stock 是各 SKU 的庫存和。
 type connectDriver struct {
 	public  map[ch.Caller]catalogv1alpha1connect.CatalogPublicServiceClient
 	sellers map[ch.Caller]catalogv1alpha1connect.SellerCatalogAppServiceClient
@@ -101,7 +90,6 @@ func totalStock(skus []*pb.Sku) int64 {
 	return n
 }
 
-// sellerProduct 把賣家讀到的完整商品轉成情境的 Product；店家是呼叫者的店。
 func (d *connectDriver) sellerProduct(c ch.Caller, p *pb.SellerProduct) Product {
 	return Product{
 		ID: p.GetId(), Name: p.GetTitle(), StoreID: d.stores[c], CategoryID: p.GetCategoryId(), Status: statusFromProto[p.GetStatus()],
@@ -132,7 +120,6 @@ func publicSummary(p *pb.ProductSummary) Product {
 	}
 }
 
-// pages 翻完所有頁：fetch 以 page token 取一頁，回傳這頁的項目與下一頁的 token（空字串是最後一頁）。
 func pages[T any](fetch func(token string) ([]T, string, error)) ([]T, error) {
 	var out []T
 	token := ""
@@ -187,7 +174,6 @@ func (d *connectDriver) SellerCreate(ctx context.Context, c ch.Caller, in Produc
 	return d.sellerProduct(c, res.Msg.GetProduct()), nil
 }
 
-// mine 讀呼叫者自己的商品（寫入前要拿 etag，D24 Q3）。
 func (d *connectDriver) mine(ctx context.Context, c ch.Caller, id string) (*pb.SellerProduct, error) {
 	res, err := d.seller(c).GetMyProduct(ctx, connect.NewRequest(&pb.GetMyProductRequest{ProductId: id}))
 	if err != nil {
@@ -270,7 +256,6 @@ func (d *connectDriver) SellerDelete(ctx context.Context, c ch.Caller, id string
 	return ch.ConnectKind(err)
 }
 
-// preconditionAs 把 failed_precondition 對應到 kind，其餘依 ch.ConnectKind 分類。
 func preconditionAs(err, kind error) error {
 	if err == nil {
 		return nil

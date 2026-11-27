@@ -68,7 +68,6 @@ class CouponConsumptionWorkerReleaseTest {
         run(task(OrderConstants.COUPON_TASK_TYPE_RELEASE));
 
         verify(repo, never()).markDone(anyLong());
-        // retryCount 2 → 60 * 2^2 秒
         verify(repo).updateFailed(eq(3003L), eq(OrderConstants.TASK_STATUS_FAILED), contains("coupon down"), eq(240));
     }
 
@@ -83,7 +82,6 @@ class CouponConsumptionWorkerReleaseTest {
         run(t);
 
         verify(repo, never()).markDone(anyLong());
-        // retryCount 2 → 60 * 2^2 秒
         verify(repo).updateFailed(eq(3003L), eq(OrderConstants.TASK_STATUS_FAILED), contains("coupon down"), eq(240));
     }
 

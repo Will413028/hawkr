@@ -122,8 +122,6 @@ class IssuerIdentityMigrationIT {
             String username = backfillContainer.getUsername();
             String password = backfillContainer.getPassword();
 
-            // Step 1：只 migrate 到 V5（拆分前的最後一版），此時 coupon_templates 只有
-            // 單一 issuer_store_id BIGINT NOT NULL 欄位，尚無 issuer_account_id。
             Flyway.configure()
                     .dataSource(jdbcUrl, username, password)
                     .locations("classpath:db/migration")
@@ -131,10 +129,6 @@ class IssuerIdentityMigrationIT {
                     .load()
                     .migrate();
 
-            // Step 2：用 JDBC 直接插入「V1~V5 舊 schema 下」的既有資料，模擬 V3 rename
-            // 之後仍在線上、尚未經過本次拆分的真實模板列：
-            //   - ADMIN 列：issuer_store_id 存的是管理員 account_id（舊混合語意）。
-            //   - SELLER 列：issuer_store_id 存的本來就是 store_id（語意本來就對）。
             try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password)) {
                 String insertOldSchemaSql = """
                     INSERT INTO coupon_templates
@@ -144,19 +138,17 @@ class IssuerIdentityMigrationIT {
                     """;
                 try (PreparedStatement ps = conn.prepareStatement(insertOldSchemaSql)) {
                     ps.setLong(1, 2001L);
-                    ps.setString(2, "1"); // ADMIN
-                    ps.setLong(3, 777L); // 舊語意：其實是 admin account_id
+                    ps.setString(2, "1");
+                    ps.setLong(3, 777L);
                     ps.executeUpdate();
 
                     ps.setLong(1, 2002L);
-                    ps.setString(2, "2"); // SELLER
-                    ps.setLong(3, 888L); // 語意本來就對：store_id
+                    ps.setString(2, "2");
+                    ps.setLong(3, 888L);
                     ps.executeUpdate();
                 }
             }
 
-            // Step 3：繼續 migrate 到底（套用 V6），這是唯一會讓 backfill UPDATE
-            // 對非空、既有髒資料真正執行的路徑。
             Flyway.configure()
                     .dataSource(jdbcUrl, username, password)
                     .locations("classpath:db/migration")

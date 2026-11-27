@@ -78,8 +78,6 @@ test("a degraded home bootstrap is labelled, short-lived and never blanks the ra
 	assert.deepEqual(first.recommendedSellers, SELLERS);
 	assert.deepEqual(first.posts, POSTS);
 
-	// 1. A degraded answer keeps the fresh commerce half and carries the labelled
-	//    domains forward, so the seller / story rails do not blink to empty.
 	now += HOME_TAB_BOOTSTRAP_FRESH_MS + 1;
 	const degradedAt = now;
 	nextBody = degraded("9002", ["posts", "recommendedSellers"]);
@@ -93,14 +91,10 @@ test("a degraded home bootstrap is labelled, short-lived and never blanks the ra
 		"labelled gap must not blank",
 	);
 
-	// 2. It is trusted for seconds, not the full minute a healthy answer earns.
 	now += HOME_TAB_BOOTSTRAP_DEGRADED_FRESH_MS - 1;
 	await preloadHomeTabBootstrap();
 	assert.equal(fetchCalls, 2, "inside the degraded window: no refetch");
 
-	// 3. The header alone is enough of a label (an intermediary may strip the
-	//    body field), and the retry happens while a healthy answer would still be
-	//    considered fresh.
 	now += 2;
 	assert.ok(
 		now - degradedAt < HOME_TAB_BOOTSTRAP_FRESH_MS,
@@ -119,8 +113,6 @@ test("a degraded home bootstrap is labelled, short-lived and never blanks the ra
 		"header-only label must be honoured too",
 	);
 
-	// 4. Retention is bounded: past one TTL from the last intact read the carried
-	//    content may no longer exist, so the gap is served as it is.
 	now = intactAt + HOME_TAB_BOOTSTRAP_TTL_MS + 1;
 	nextBody = degraded("9004", ["recommendedSellers"]);
 	nextHeaders = {};
@@ -132,7 +124,6 @@ test("a degraded home bootstrap is labelled, short-lived and never blanks the ra
 		"retention must not chain past one TTL of real age",
 	);
 
-	// 5. A healthy answer restarts that clock.
 	now += HOME_TAB_BOOTSTRAP_DEGRADED_FRESH_MS + 1;
 	nextBody = intact("9005");
 	const recovered = await fetchHomeTabBootstrap();

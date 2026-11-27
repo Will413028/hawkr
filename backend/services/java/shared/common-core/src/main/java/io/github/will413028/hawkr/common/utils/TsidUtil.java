@@ -57,8 +57,8 @@ public class TsidUtil {
         }
 
         factory = TsidFactory.builder()
-            .withNodeBits(10)      // 10-bit node id (0-1023)
-            .withNode(nodeId)       // 實際 node id
+            .withNodeBits(10)
+            .withNode(nodeId)
             .build();
 
         initialized = true;

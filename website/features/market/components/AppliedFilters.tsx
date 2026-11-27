@@ -49,8 +49,6 @@ export default function AppliedFilters({
 	const router = useObservedRouter("market_applied_filters");
 	const hasChips = chips.length > 0;
 
-	// Easing matches the sidebar chevron / popover transitions already in
-	// market-products-list.css for a consistent feel.
 	const ease = [0.16, 1, 0.3, 1] as const;
 
 	return (
@@ -59,9 +57,6 @@ export default function AppliedFilters({
 				<motion.div
 					key="applied"
 					layout={reduceMotion ? false : "position"}
-					// `marginBottom: -24` cancels the sidebar body's `gap: 24px`
-					// while collapsed, so an empty sidebar shows no residual gap —
-					// keeping the resting layout identical to before.
 					initial={
 						reduceMotion ? false : { height: 0, opacity: 0, marginBottom: -24 }
 					}

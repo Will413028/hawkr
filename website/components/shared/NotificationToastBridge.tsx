@@ -68,7 +68,6 @@ export default function NotificationToastBridge() {
 		? `${myId || "unknown"}:${activeRole ?? "none"}`
 		: "guest";
 
-	/* ── New chat messages (immediate, via the chat stream) ─────── */
 	const ut = useUiText();
 	const chatSide = chatSideOf(activeRole);
 	const seenMessagesRef = React.useRef(new Set<string>());
@@ -78,11 +77,10 @@ export default function NotificationToastBridge() {
 		(e: ChatStreamEvent) => {
 			if (e.type !== "message" || e.updated) return;
 			const m: ChatMessage = e.message;
-			if (m.sender === chatSide) return; // my own outgoing
+			if (m.sender === chatSide) return;
 			if (m.hidden || m.erased) return;
 			const seen = seenMessagesRef.current;
 			if (seen.has(m.id)) return;
-			// Insertion-ordered: dropping from the front evicts the oldest.
 			if (seen.size >= SEEN_MESSAGE_LIMIT) {
 				for (const oldest of seen) {
 					seen.delete(oldest);
@@ -90,11 +88,6 @@ export default function NotificationToastBridge() {
 				}
 			}
 			seen.add(m.id);
-			// Don't toast while the user is already in the messaging area. Read
-			// the path at event time (window.location) rather than usePathname()
-			// at render — this bridge renders null and only needs the path inside
-			// this callback, so reading it here keeps the component free of any
-			// request-time data access and fully static-prerenderable.
 			if (isMessagesArea(window.location.pathname)) return;
 
 			const role = notificationWorkspaceRole(window.location.pathname);
@@ -103,15 +96,12 @@ export default function NotificationToastBridge() {
 			void (async () => {
 				let peer = peersRef.current.get(m.conversationId);
 				if (!peer) {
-					// 串流的訊息只帶對話 ID：連結要對方的 ID，從對話列表取。
-					// 同時來一串訊息時共用同一次讀取，不為每則各打一次。
 					lookupRef.current ??= (async () => {
 						try {
 							for (const c of await listConversations(chatSide)) {
 								peersRef.current.set(c.id, c);
 							}
 						} catch {
-							// 讀不到對話列表：通知仍顯示，連結退到收件匣。
 						} finally {
 							lookupRef.current = null;
 						}
@@ -131,7 +121,6 @@ export default function NotificationToastBridge() {
 					}),
 					href: peer ? `${base}/${peer.targetUserId}` : base,
 					dedupeKey: `msg:${m.id}`,
-					// Collapse a burst from the same conversation into one stack.
 					groupKey: `chat:${m.conversationId}`,
 				});
 			})();
@@ -140,17 +129,6 @@ export default function NotificationToastBridge() {
 	);
 	useChatStream(chatSide, signedIn, onChatEvent);
 
-	/* ── New orders / notifications (via the inbox signal) ───────────────
-	 * The server decides what is new: an inbox signal carries `newInboxItemIds`
-	 * (rows created or aggregated since the previous signal on this stream) and
-	 * only those rows are toasted, with the server-composed title, body and deep
-	 * link. There is no get-by-id RPC, so the newest page is read once per
-	 * signal and the ids picked from it. An aggregated bump repeats an id; the
-	 * toast context replaces the toast that has the same `dedupeKey`.
-	 * A truncated signal (too many new rows), a signal without ids (initial,
-	 * reconnect, read, delete) and a hidden tab toast nothing. Message rows
-	 * belong to the chat socket path above and never double-toast.
-	 */
 	const workspaceKeyRef = React.useRef(workspaceKey);
 	workspaceKeyRef.current = workspaceKey;
 	const audience = audienceForRole(activeRole ?? "buyer");
@@ -181,7 +159,6 @@ export default function NotificationToastBridge() {
 							!n.read &&
 							n.presentation !== InboxPresentation.MESSAGE,
 					);
-					// Oldest first so the newest ends up on top of the stack.
 					for (const n of [...fresh].reverse()) {
 						show({
 							kind:
@@ -191,12 +168,10 @@ export default function NotificationToastBridge() {
 							imageUrl: imageUri(n.image, "thumb"),
 							href: n.deepLink || undefined,
 							dedupeKey: `notif:${n.id}`,
-							// Same notification title (e.g.「貼文被回覆」) collapses into one stack.
 							groupKey: `notif:${n.title}`,
 						});
 					}
 				} catch {
-					/* transient fetch error — the list refetch still shows the rows */
 				}
 			})();
 		};

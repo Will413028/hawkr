@@ -17,14 +17,8 @@ const (
 	testPrefID   int64 = 2685914682123456
 )
 
-// fakePrefs 是完整能力的 reader（GetByID／GetDefault／OpenCarrierValue 都真的實作）。
-//
-// 🔴 GetByID 的歸屬述詞在這裡是**模擬 SQL 的 WHERE**：真實 repository 把
-// `buyer_id = ?` 寫進 SQL，查不到與不屬於你不可分辨。本假物件必須複製同一個語意，
-// 否則「歸屬錯誤」那支測試驗的就不是它要驗的東西。
 type fakePrefs struct {
 	rows map[int64]domain.BuyerPreference
-	// defaultOf[buyerID] = preference id
 	defaultOf map[int64]int64
 	plaintext map[int64]string
 
@@ -94,12 +88,8 @@ func newPrefs(rows ...domain.BuyerPreference) *fakePrefs {
 	return f
 }
 
-// ---------------------------------------------------------------------------
-// 四條路徑
-// ---------------------------------------------------------------------------
 
 func TestResolveCarrier_None(t *testing.T) {
-	// B2B 一律走 NONE：統編與抬頭由結帳快照直接帶，沒有載具要解析。
 	prefs := newPrefs()
 	got, err := resolveCarrier(context.Background(), prefs,
 		codemeta.InvoiceCarrierSelectionModeNone.Value, 0, testBuyerID,
@@ -139,8 +129,6 @@ func TestResolveCarrier_Donation(t *testing.T) {
 }
 
 func TestResolveCarrier_Donation_EmptyCodeFailsLoud(t *testing.T) {
-	// chk_ois_donation_pair 是雙向等式 ⇒ 走到這裡代表快照壞了。
-	// 靜默開成無載具會把買家的捐贈意願吞掉，而發票不可回收。
 	if _, err := resolveCarrier(context.Background(), newPrefs(),
 		codemeta.InvoiceCarrierSelectionModeDonation.Value, 0, testBuyerID, "", "", ""); err == nil {
 		t.Fatalf("DONATION 而 donation_code 為空必須 fail-loud")
@@ -175,7 +163,6 @@ func TestResolveCarrier_ExplicitPreference_OwnershipOK(t *testing.T) {
 // 🔴 陰性斷言在最後兩行：歸屬錯誤時**不得**回一個「看起來解析成功的無載具結果」。
 // 那正是「fallback 成無載具」的形狀，而它會把 IDOR 靜默吞掉。
 func TestResolveCarrier_ExplicitPreference_OwnershipMismatch(t *testing.T) {
-	// 這一列真的存在，但屬於**別的**買家。
 	prefs := newPrefs(mobilePref(testPrefID, otherBuyerID))
 	prefs.plaintext[testPrefID] = "/T7R3U+P"
 
@@ -194,7 +181,6 @@ func TestResolveCarrier_ExplicitPreference_OwnershipMismatch(t *testing.T) {
 }
 
 func TestResolveCarrier_ExplicitPreference_TransportErrorPropagates(t *testing.T) {
-	// 「連線斷了」與「不屬於你」的正確處置相反（重試 vs 轉人工）⇒ 不得吞成 mismatch。
 	prefs := newPrefs()
 	prefs.getByIDErr = errors.New("connection reset by peer")
 
@@ -310,18 +296,13 @@ func TestResolveCarrier_UnknownModeFailsLoud(t *testing.T) {
 
 func TestFromPreference_EmptyDecryptedValueFailsLoud(t *testing.T) {
 	prefs := newPrefs(mobilePref(testPrefID, testBuyerID))
-	prefs.plaintext[testPrefID] = "" // 解密路徑壞了
+	prefs.plaintext[testPrefID] = ""
 	if _, err := resolveCarrier(context.Background(), prefs,
 		codemeta.InvoiceCarrierSelectionModeExplicitPreference.Value, testPrefID, testBuyerID, "", "", ""); err == nil {
 		t.Fatalf("載具明文為空必須 fail-loud（AMEGO 不擋，買家會歸不到戶）")
 	}
 }
 
-// fakePrefRepo 是 domain.BuyerPreferenceRepository 的最小假物件。
-//
-// 嵌入介面而不是逐支實作：本檔只在乎讀取面（GetDefault／WithDecryptedCarrierValue），
-// 寫入面（B08 端點 2–5）沒被覆寫 ⇒ 呼叫即 panic 並指名方法——「這條路徑本來就不該
-// 被走到」與「回了零值」因此分得開。
 type fakePrefRepo struct {
 	domain.BuyerPreferenceRepository
 
@@ -370,8 +351,6 @@ func TestRepoPreferenceReader_NoDefaultIsNotAnError(t *testing.T) {
 		t.Fatalf("沒有預設必須回 ErrNoDefaultPreference（讓呼叫端走無載具那一步），實際 err = %v", err)
 	}
 
-	// 陰性：真的 DB 錯誤**不得**被翻成 ErrNoDefaultPreference，否則會把故障靜默成
-	// 「這個買家沒設預設」，開出一張本來該有載具的無載具發票。
 	boom := errors.New("connection reset")
 	r2 := RepoPreferenceReader{Repo: &fakePrefRepo{defaultErr: boom}}
 	_, err2 := r2.GetDefault(context.Background(), testBuyerID)
@@ -387,14 +366,12 @@ func TestRepoPreferenceReader_NoDefaultIsNotAnError(t *testing.T) {
 func TestRepoPreferenceReader_OpenCarrierValue(t *testing.T) {
 	r := RepoPreferenceReader{Repo: &fakePrefRepo{plain: "/ABC+-9"}}
 
-	// 有密文 ⇒ 走 repository 的明文出口。
 	got, err := r.OpenCarrierValue(context.Background(),
 		domain.BuyerPreference{ID: testPrefID, BuyerID: testBuyerID, CarrierValueCiphertext: strp("cipher")})
 	if err != nil || got != "/ABC+-9" {
 		t.Fatalf("有密文時應取得明文，實際 (%q, %v)", got, err)
 	}
 
-	// 沒有密文（TAX_ID／DONATION）⇒ 回空字串 ＋ nil，且**不得**去打 repository。
 	if v, err := r.OpenCarrierValue(context.Background(), domain.BuyerPreference{}); err != nil || v != "" {
 		t.Fatalf("沒有載具值的列應回 (\"\", nil)，實際 (%q, %v)", v, err)
 	}

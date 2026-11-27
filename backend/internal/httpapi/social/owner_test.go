@@ -23,7 +23,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/delegatedactor"
 )
 
-// fakeOwner 記錄店主方法的呼叫並回固定的結果；它不判斷能力與去重，那些是模組的規則（見 TestOwnerDeclarationsMatchTheModuleChecks 與模組的 integration 測試）。
 type fakeOwner struct {
 	readability
 	calls      []string
@@ -203,7 +202,6 @@ func TestOwnerSuccessPaths(t *testing.T) {
 	if err != nil || f.scheduled.By.Kind != social.ScheduleByOwner || !f.scheduled.PublishAt.Equal(at) || f.scheduled.Version != 4 || !sp.Msg.GetPublishTime().AsTime().Equal(at) || sp.Msg.GetPost().GetId() != id.String() {
 		t.Fatal("SchedulePost", err, f.scheduled)
 	}
-	// A7-D27：店主的寫入明確傳 nil 代行者（不稽核）。
 	if len(f.actors) == 0 {
 		t.Fatal("沒有記到任何寫入")
 	}
@@ -223,7 +221,6 @@ func TestOwnerUpdatePostMergesOnlyTheMaskedFields(t *testing.T) {
 		_, err := e.client.UpdatePost(ctx, signedIn(&pb.UpdatePostRequest{Post: p, UpdateMask: mask(paths...)}))
 		return err
 	}
-	// 只列 product_id：商品被清掉（沒設值），內文不在輸入裡（模組以鎖住的列為準），圖與標籤不動。
 	if err := up(&pb.Post{Id: id, Etag: "4"}, "product_id"); err != nil {
 		t.Fatal(err)
 	}
@@ -231,14 +228,12 @@ func TestOwnerUpdatePostMergesOnlyTheMaskedFields(t *testing.T) {
 	if u.Body != nil || !u.SetProduct || u.ProductID != nil || u.ImageToken != "" || u.ClearImage || u.Hashtags != nil || u.Version != 4 {
 		t.Errorf("只改商品：%+v", u)
 	}
-	// 只列 body：商品不在輸入裡（SetProduct 為假，模組不重驗商品）。
 	if err := up(&pb.Post{Id: id, Etag: "4", Body: "新內文"}, "body"); err != nil {
 		t.Fatal(err)
 	}
 	if u = f.update; u.Body == nil || *u.Body != "新內文" || u.SetProduct || u.ProductID != nil {
 		t.Errorf("只改內文：%+v", u)
 	}
-	// 換圖、清圖、標籤整批取代（含空清單）。
 	if err := up(&pb.Post{Id: id, Etag: "4", ImageStagedToken: "tok", HashtagInputs: []string{"a"}}, "image_staged_token", "hashtag_inputs"); err != nil {
 		t.Fatal(err)
 	}
@@ -251,7 +246,6 @@ func TestOwnerUpdatePostMergesOnlyTheMaskedFields(t *testing.T) {
 	if u = f.update; u.ImageToken != "" || !u.ClearImage || u.Hashtags == nil || len(*u.Hashtags) != 0 {
 		t.Errorf("清圖與清標籤：%+v", u)
 	}
-	// etag 在 mask 裡略過，但單獨列它不是修改。
 	for name, p := range map[string]struct {
 		post  *pb.Post
 		paths []string
@@ -324,7 +318,6 @@ func TestOwnerStoreScopedCommentsAndSummary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 計數是模組（DB）給的；每個 PostStatus 值都有一項，沒有計數的是 0，不含 UNSPECIFIED。
 	want := map[pb.PostStatus]int64{pb.PostStatus_POST_STATUS_DRAFT: 3, pb.PostStatus_POST_STATUS_PUBLISHED: 12, pb.PostStatus_POST_STATUS_UNPUBLISHED: 0}
 	got := map[pb.PostStatus]int64{}
 	for _, c := range sum.Msg.GetPostCounts() {
@@ -457,7 +450,6 @@ func TestDeclarationsMatchTheServiceMethods(t *testing.T) {
 			t.Errorf("%s 的宣告通過了檢查", name)
 		}
 	}
-	// 每個宣告了能力的方法都是店主方法：不是共用方法，共用方法的豁免要有理由。
 	for procedure, d := range declarations {
 		if d.capability == "" && d.exemptReason == "" {
 			t.Errorf("%s 沒有能力也沒有理由", procedure)
@@ -465,8 +457,6 @@ func TestDeclarationsMatchTheServiceMethods(t *testing.T) {
 	}
 }
 
-// reaching 把模組的店主方法包起來：模組的能力檢查（seller.Authorize）在碰資料庫之前，通過檢查的呼叫會在沒有資料庫的測試模組裡 panic，
-// 這裡接住並記下「這個方法通過了授權」；被拒的呼叫原樣回傳模組的錯誤。
 type reaching struct {
 	m       *social.Module
 	mu      sync.Mutex
@@ -579,7 +569,7 @@ func TestOwnerDeclarationsMatchTheModuleChecks(t *testing.T) {
 	id := uuid.New().String()
 	future := timestamppb.New(time.Now().Add(24 * time.Hour))
 	type call struct {
-		module string // 這個 procedure 最後呼叫的模組方法
+		module string
 		do     func(e *appEnv) error
 	}
 	calls := map[string]call{

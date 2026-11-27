@@ -117,7 +117,6 @@ func TestCreateStyleDuplicateNameIsAlreadyExists(t *testing.T) {
 	if len(h.audit.entries) != 0 || len(h.media.deleted) != 0 {
 		t.Fatal("衝突時不該寫稽核或標記刪除")
 	}
-	// 同名但不同用途可以。
 	in := createInput()
 	in.Category = model.CategoryPost
 	if _, err := h.s.CreateStyle(context.Background(), in); err != nil {

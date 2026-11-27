@@ -17,11 +17,9 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-// reportWithEvidence 建立一筆附佐證的通報（登入的買家）：每個 name 放一份機敏佐證（內容是 evidencePDF(name)）。
 func (f *fixture) reportWithEvidence(t *testing.T, storeID, ownerAccountID int64, names ...string) Report {
 	t.Helper()
 	f.everExposed(t, storeID)
-	// 檢舉人（上傳者）的帳號不能是店家自己的帳號：不能檢舉自己的店。
 	reporter := ownerAccountID + 1000
 	r, err := f.module.SubmitReport(context.Background(), SubmitReportInput{
 		StoreID: storeID, ReporterBuyerID: 5, AccountID: reporter, Category: policy.FoodSafety,
@@ -31,7 +29,6 @@ func (f *fixture) reportWithEvidence(t *testing.T, storeID, ownerAccountID int64
 	return *r.Report
 }
 
-// appealable 建立一個帳號、店家與一個可以申覆的措施（依據認定的 30 天停權）。
 func (f *fixture) appealable(t *testing.T) (int64, Store, Measure) {
 	t.Helper()
 	accountID, s := f.open(t)
@@ -39,7 +36,6 @@ func (f *fixture) appealable(t *testing.T) (int64, Store, Measure) {
 	return accountID, s, f.violate(t, s.StoreID, SeverityHigh, MeasureSuspension, &ends)
 }
 
-// appeal 以賣家讀到的版本對措施提出申覆；每個 name 放一份機敏佐證（內容是 evidencePDF(name)）。
 func (f *fixture) appeal(t *testing.T, accountID int64, m Measure, reason string, names ...string) Measure {
 	t.Helper()
 	got, err := f.module.SubmitAppeal(context.Background(), SubmitAppealInput{
@@ -133,7 +129,6 @@ func TestEvidenceReadIsRecordedBeforeTheBytesAreRead(t *testing.T) {
 		t.Fatalf("appeal access rows=%d", n)
 	}
 
-	// 讀取紀錄寫不進去：不讀、不回傳。
 	_, err = f.db.Conn(ctx).Exec(ctx, "ALTER TABLE seller.evidence_accesses ADD CONSTRAINT test_no_writes CHECK (false) NOT VALID")
 	must(t, err)
 	calls := f.readSecureCalls()
@@ -144,7 +139,6 @@ func TestEvidenceReadIsRecordedBeforeTheBytesAreRead(t *testing.T) {
 	_, err = f.db.Conn(ctx).Exec(ctx, "ALTER TABLE seller.evidence_accesses DROP CONSTRAINT test_no_writes")
 	must(t, err)
 
-	// media 讀失敗：紀錄還在，錯誤原樣交回。
 	f.media.setFailRead(errors.New("media down"))
 	if _, err := f.module.ReadEvidence(ctx, ReadEvidenceInput{AdminID: 9, Kind: EvidenceReport, RefID: report.ID, Position: 0}); err == nil {
 		t.Fatal("media 失敗要回錯誤")
@@ -282,7 +276,6 @@ func TestAppealRecordsTheRevisionItWasSubmittedAgainst(t *testing.T) {
 	if appealed.Appeal().Revision != 2 || appealed.CurrentRevision != 2 {
 		t.Fatalf("appeal revision=%d current=%d", appealed.Appeal().Revision, appealed.CurrentRevision)
 	}
-	// 提出申覆起措施凍結，申覆之後只能縮短結束時間，這也產生新的一版。
 	shorter := appealed.EndsAt.Add(-time.Hour)
 	admin := f.measureOf(t, v.ID)
 	third, err := f.module.UpdateMeasure(ctx, UpdateMeasureInput{MeasureID: v.ID, AdminID: 8, ExpectedVersion: admin.Version, ChangeEndsAt: true, EndsAt: &shorter})
@@ -363,13 +356,11 @@ func TestMeasureNotesAreAppendOnlyAndDoNotBumpAnyVersion(t *testing.T) {
 	if got := notes(); after.Version != v.Version || after.CurrentRevision != v.CurrentRevision || !after.UpdatedAt.Equal(v.UpdatedAt) || len(got) != 2 || got[0].Body != "內部紀錄" || got[1].ID != note.ID {
 		t.Fatalf("寫註記不能改 version、current_revision 與 updated_at，舊到新：version %d → %d notes=%+v", v.Version, after.Version, got)
 	}
-	// 賣家讀到註記之前的 etag 照樣可以申覆；後台讀到註記之前的 etag 照樣可以裁定。
 	appealed := f.appeal(t, accountID, v, "誤判")
 	adminView := f.measureOf(t, v.ID)
 	if adminView.Version != v.Version+1 || appealed.Version != v.Version+1 {
 		t.Fatalf("appealed.Version=%d", appealed.Version)
 	}
-	// 申覆中、撤銷之後都可以繼續寫。
 	decided, err := f.module.DecideAppeal(ctx, DecideAppealInput{MeasureID: v.ID, AdminID: 7, ExpectedVersion: adminView.Version, Outcome: RequestAccepted, Reason: "接受"})
 	must(t, err)
 	if _, err := f.module.CreateMeasureNote(ctx, CreateMeasureNoteInput{MeasureID: v.ID, AdminID: 9, Body: "已撤銷之後的說明"}); err != nil {
@@ -378,7 +369,6 @@ func TestMeasureNotesAreAppendOnlyAndDoNotBumpAnyVersion(t *testing.T) {
 	if final := f.measureOf(t, v.ID); final.Version != decided.Version || len(notes()) != 3 {
 		t.Fatalf("final=%+v notes=%d", final, len(notes()))
 	}
-	// 只新增：資料庫沒有更新與刪除的 API，模組也沒有；這裡只確認 id 之外沒有可以重複的鍵（同一則不會寫兩次）。
 	if n := f.count(t, "SELECT count(DISTINCT note_id) FROM seller.governance_notes WHERE measure_id = $1", v.ID); n != 3 {
 		t.Fatalf("notes=%d", n)
 	}
@@ -395,7 +385,6 @@ func TestEvidenceAccessesRequireAnOwnerAndExistingEvidence(t *testing.T) {
 	if _, err := f.db.Conn(ctx).Exec(ctx, "INSERT INTO seller.evidence_accesses (access_id, report_id, request_id, position, admin_id, accessed_at) VALUES (uuidv7(), NULL, NULL, 0, 1, now())"); err == nil {
 		t.Fatal("讀取紀錄必須屬於一筆通報或一筆請求")
 	}
-	// 讀取紀錄以外鍵指向佐證列本身：沒有那一張佐證就寫不進去（這筆申覆沒有佐證）。
 	if _, err := f.db.Conn(ctx).Exec(ctx, "INSERT INTO seller.evidence_accesses (access_id, request_id, position, admin_id, accessed_at) VALUES (uuidv7(), $1, 0, 1, now())", request); err == nil {
 		t.Fatal("讀取紀錄必須指向存在的佐證")
 	}

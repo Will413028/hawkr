@@ -184,10 +184,6 @@ test("seller process shows web screen placeholders in a mobile snap row", () => 
 	assert.match(landing, /<AppImage/);
 	assert.match(landing, /width=\{1040\}/);
 	assert.match(landing, /height=\{650\}/);
-	// Eager, not lazy: the long-page stability E2E gate requires every image on
-	// this landing page to materialise before scroll (see SellerShowcaseImageWarmer
-	// + eager carousel slides). A lazy process image fetched only on scroll, which
-	// the gate rejects as an unscheduled request.
 	assert.match(landing, /loading="eager"/);
 	assert.match(landing, /商家名稱、所在地、寄件地址與商店介紹/);
 	assert.doesNotMatch(landing, /基本資料、商品類型與產地/);

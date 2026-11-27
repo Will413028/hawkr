@@ -80,7 +80,6 @@ public class UberWebhookSignatureConfig {
                     signingKeysJson, new TypeReference<Map<String, String>>() { });
             return parsed == null ? Map.of() : parsed;
         } catch (Exception e) {
-            // 🔴 不記內容：解析失敗的字串裡就是金鑰本身（66 §8.6「永不進 log，連遮罩後的長度都不要記」）。
             log.error("uber-signing-keys-malformed",
                     "UBER_WEBHOOK_SIGNING_KEYS 不是合法的 JSON map，視為零把金鑰");
             return Map.of();

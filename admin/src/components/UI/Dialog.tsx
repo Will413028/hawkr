@@ -124,9 +124,6 @@ function DialogPortal({
 	children: ReactNode;
 	modalId: object;
 }) {
-	// 沒有 document（SSR、renderToStaticMarkup）時就地渲染而不是回 null，否則 markup 測試只會驗到空殼。
-	// 對話框都是使用者互動後才掛載，真正的 SSR／hydration 渲染不到它們。
-	// 裡面再開的 Dialog 靠這個 context 知道外層是誰（見 `ModalParentContext`）。
 	const scoped = (
 		<ModalParentContext.Provider value={modalId}>
 			{children}
@@ -148,7 +145,6 @@ export default function Dialog(props: DialogProps) {
 	const titleId = useId();
 	const descriptionId = useId();
 
-	// 先登記進堆疊（同時負責背景隔離），Escape 與 focus trap 才問得到自己是不是最上層。
 	const { isTopmost, id: modalId } = useModalStack(overlayRef, true);
 	useEscapeKey(
 		() => {

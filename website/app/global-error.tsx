@@ -17,8 +17,6 @@ export default function GlobalError({
 	reset: () => void;
 }) {
 	React.useEffect(() => {
-		// Root-layout crashes bypass ErrorState — capture here or they are
-		// invisible in Sentry (boundary-caught errors never hit window.onerror).
 		Sentry.captureException(error);
 	}, [error]);
 	return (
@@ -29,8 +27,6 @@ export default function GlobalError({
 					minHeight: "100vh",
 					display: "grid",
 					placeItems: "center",
-					// The root provider may be broken: retain the market's solid
-					// fallback without importing the failed theme/animation tree.
 					background: "#f8f6ef",
 					color: "#1f2933",
 					fontFamily:

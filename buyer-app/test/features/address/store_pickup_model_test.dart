@@ -19,8 +19,6 @@ void main() {
     expect(pickup.toJson()['isDefault'], isTrue);
   });
 
-  // /app/store_pickups 的欄名一律 camelCase，沒有相容層。只餵舊的
-  // snake_case 名字必須整筆讀不到 —— 誰把 fallback 加回來這條就轉紅。
   test('只餵舊 snake_case 欄名一律讀不到（無相容層）', () {
     final pickup = StorePickup.fromJson({
       'id': 42,

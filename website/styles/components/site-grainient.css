@@ -1,6 +1,3 @@
-/* One persistent canvas for every route, including auth and workspaces.
-   Page shells are transparent; foreground cards and dialogs own their surfaces.
-   No pathname/DOM allowlist: navigation must never hide or restart the field. */
 .site-grainient {
 	display: block;
 	position: fixed;
@@ -30,7 +27,6 @@ body,
 	height: 100%;
 }
 
-/* Footer control reserves its size before the deferred renderer arrives. */
 .site-background-control {
 	display: block;
 	margin-top: 8px;
@@ -60,7 +56,6 @@ body,
 	cursor: default;
 }
 
-/* Minimal in-flow access for standalone pages without a branded footer. */
 .site-background-control--page .site-background-control__button {
 	color: var(--ink-heading);
 	background: var(--surface-card);

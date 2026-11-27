@@ -47,7 +47,6 @@ DetectedTable? detectPastedTable(
 }) {
   if (text.isEmpty || !text.contains('\t')) return null;
 
-  // 統一換行、去掉結尾多餘空行（Excel / Sheets 常在尾端帶換行）。
   final normalized = text.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
   final rawLines = normalized.split('\n');
   while (rawLines.isNotEmpty && rawLines.last.trim().isEmpty) {
@@ -55,9 +54,6 @@ DetectedTable? detectPastedTable(
   }
   if (rawLines.isEmpty) return null;
 
-  // 混合內容分離：開頭/結尾連續「無 tab 行」是敘述文字，不屬於表格——
-  // 吞進表格會變成錯誤的標題列/資料列。表格區 = 第一個含 tab 的行起、
-  // 最後一個含 tab 的行止；區間內夾雜的無 tab 行維持原樣（視為單欄列）。
   var start = 0;
   while (start < rawLines.length && !rawLines[start].contains('\t')) {
     start++;
@@ -78,14 +74,12 @@ DetectedTable? detectPastedTable(
 
   var truncated = false;
 
-  // 列上限。
   List<String> lines = rawLines.sublist(start, end + 1);
   if (lines.length > maxRows) {
     lines = lines.sublist(0, maxRows);
     truncated = true;
   }
 
-  // 每列以 tab 分欄，記錄最大欄數。
   final parsed = <List<String>>[];
   var cols = 0;
   for (final line in lines) {
@@ -94,16 +88,13 @@ DetectedTable? detectPastedTable(
     parsed.add(cells);
   }
 
-  // 欄上限。
   if (cols > maxCols) {
     cols = maxCols;
     truncated = true;
   }
 
-  // 需要真的有「欄」（>=2）才算表格；否則只是多行純文字。
   if (cols < 2) return null;
 
-  // 正規化：補齊欄數 + 單格長度上限。
   final rows = <List<String>>[];
   for (final cells in parsed) {
     final row = <String>[];

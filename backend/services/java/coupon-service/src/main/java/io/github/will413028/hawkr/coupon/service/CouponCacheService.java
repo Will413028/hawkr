@@ -68,7 +68,6 @@ public class CouponCacheService {
      */
     public void evictAvailableList() {
         try {
-            // 非阻塞 SCAN + UNLINK 取代阻塞式 KEYS + DEL（清除範圍不變，見 RedisPatternEvictor）
             RedisPatternEvictor.scanUnlink(redisTemplate, CacheKeyConstants.AVAILABLE_LIST_PATTERN);
         } catch (Exception e) {
             log.error("CouponCacheService.evictAvailableList.failed", "清除可領取列表快取失敗", e);

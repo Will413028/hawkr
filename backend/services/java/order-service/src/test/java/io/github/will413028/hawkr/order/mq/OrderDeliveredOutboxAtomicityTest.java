@@ -105,7 +105,6 @@ class OrderDeliveredOutboxAtomicityTest {
                 .as("outbox 寫不進去時，DELIVERED 狀態必須跟著 rollback")
                 .isEqualTo(1);
         assertThat(txManager.commitCount).isEqualTo(0);
-        // best-effort 的賣家 realtime 也不該在失敗路徑上發出去
         verify(eventPublisher, never()).emitSellerOrderUpdated(
                 any(), anyString(), anyString(), any(), any(), any());
     }
@@ -135,8 +134,6 @@ class OrderDeliveredOutboxAtomicityTest {
 
         consumer.onShipmentDelivered(message("O4"), channel, 4L);
 
-        // 建構子已不再收 BuyerGrpcClient（編譯層保證），這裡再從行為面確認：
-        // 落進 outbox 的 core payload 的 notify 欄位為 null ⇒ 沒有在 tx 內做過反解。
         ArgumentCaptor<OrderOutboxEntity> captor = ArgumentCaptor.forClass(OrderOutboxEntity.class);
         verify(outboxMapper).insert(captor.capture());
         assertThat(captor.getValue().getPayload())

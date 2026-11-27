@@ -15,7 +15,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
-// announced 讀這家店最後公告的值；沒有列等同 version 0 的列。
 func (f *fixture) announced(t *testing.T, storeID int64) (exposable bool, version int64) {
 	t.Helper()
 	rows, err := f.db.Conn(context.Background()).Query(context.Background(), "SELECT exposable, version FROM seller.store_exposures WHERE store_id=$1", storeID)
@@ -28,7 +27,6 @@ func (f *fixture) announced(t *testing.T, storeID int64) (exposable bool, versio
 	return exposable, version
 }
 
-// wantAnnouncements 比對這一輪收到的 StoreExposureChanged（依序）：店家、公告的值與版本，並且最後公告的列等於最後一個事件。
 func (f *fixture) wantAnnouncements(t *testing.T, got *recorded[StoreExposureChanged], from int, storeID int64, want ...bool) {
 	t.Helper()
 	all := got.all()
@@ -86,7 +84,6 @@ func TestExposureFlipsAreAnnouncedByEveryKindOfWrite(t *testing.T) {
 	n = len(announcements.all())
 	cur, err := f.module.Store(ctx, s.StoreID)
 	must(t, err)
-	// 已核准的店家不能經 UpdateProfile 清掉地址：直接清（代表地址不合法的歷史資料），再以別的欄位的寫入觸發公告。
 	_, err = f.db.Conn(ctx).Exec(ctx, "UPDATE seller.stores SET town_code = NULL, address_detail = NULL WHERE store_id = $1", s.StoreID)
 	must(t, err)
 	_, err = f.module.UpdateProfile(ctx, UpdateProfileInput{StoreID: s.StoreID, ExpectedVersion: cur.Version, Prize: ptr("優良農民")})

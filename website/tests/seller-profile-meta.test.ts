@@ -4,10 +4,6 @@ import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-// This Node-only render test has no CSS loader. Intercept only the two inert
-// seller chrome stylesheets reached by SellerProfileV2; all business and render
-// modules remain real, so the markup assertions below keep exercising the
-// production SellerProfileMeta implementation.
 const sellerChromeStyles = new Set([
 	new URL("../styles/features/seller-profile.css", import.meta.url).href,
 	new URL("../styles/features/seller-share-card.css", import.meta.url).href,

@@ -22,7 +22,6 @@ func newDEK(t *testing.T) []byte {
 	return dek
 }
 
-// single 是只有一個上傳段的資產（序號 0、總數 1）。
 var single = secure.Chunk{Asset: uuid.UUID{1}, Index: 0, Count: 1}
 
 func seal(t *testing.T, dek, plain []byte) []byte {
@@ -43,7 +42,6 @@ func sealChunk(t *testing.T, dek, plain []byte, c secure.Chunk) []byte {
 	return buf.Bytes()
 }
 
-// open 解密並回傳「已交出的明文」與錯誤；測試要檢查被竄改的段沒有交出任何位元組。
 func open(dek, ct []byte) ([]byte, error) {
 	return openChunk(dek, ct, single)
 }
@@ -88,7 +86,7 @@ func TestCiphertextHoldsNoPlaintext(t *testing.T) {
 func TestDecrypt_RejectsTamperingAndDeliversNothingFromBadSegment(t *testing.T) {
 	seg := secure.SegmentSize
 	dek := newDEK(t)
-	plain := randBytes(3*seg + 100) // 4 段：3 個滿段加一個末段
+	plain := randBytes(3*seg + 100)
 	ct := seal(t, dek, plain)
 	hdr := secure.HeaderSize
 	full := seg + secure.TagSize
@@ -101,7 +99,7 @@ func TestDecrypt_RejectsTamperingAndDeliversNothingFromBadSegment(t *testing.T) 
 	cases := []struct {
 		name      string
 		ct        []byte
-		maxPlain  int // 錯誤之前最多可以交出的明文位元組數（已驗過 tag 的段）
+		maxPlain  int
 		wantError bool
 	}{
 		{"header-magic", flip(0), 0, true},
@@ -118,7 +116,6 @@ func TestDecrypt_RejectsTamperingAndDeliversNothingFromBadSegment(t *testing.T) 
 		{"trailing-segment", append(bytes.Clone(ct), ct[hdr:hdr+full]...), 3 * seg, true},
 		{"header-only", ct[:hdr], 0, true},
 	}
-	// 兩段對調
 	swapped := bytes.Clone(ct)
 	copy(swapped[hdr:hdr+full], ct[hdr+full:hdr+2*full])
 	copy(swapped[hdr+full:hdr+2*full], ct[hdr:hdr+full])
@@ -266,7 +263,6 @@ func TestKeyring_UnwrapWithAnotherKeyOfSameID(t *testing.T) {
 	}
 }
 
-// threeChunks 是同一份資產的三個上傳段（共用一把 DEK），回傳各段的明文與密文。
 func threeChunks(t *testing.T, dek []byte, asset uuid.UUID) (plain, ct [3][]byte) {
 	t.Helper()
 	for i := range 3 {

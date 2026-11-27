@@ -55,7 +55,6 @@ const request = (
 ) => create(MeasureRequestSchema, { kind, state, ...extra });
 const appeal = (state: MeasureRequestState, decisionReason = "") =>
 	request(MeasureRequestKind.APPEAL, state, { decisionReason });
-// 2026-10-01 02:00 UTC = 台北 10:00
 const at = (iso: string) => timestampFromDate(new Date(iso));
 
 describe("依據的名稱", () => {
@@ -84,7 +83,6 @@ describe("依據的名稱", () => {
 		);
 		expect(new Set(labels).size).toBe(12);
 		expect(labels).not.toContain("措施紀錄");
-		// 術語表的名稱：「個人資料」本身不是違規的名稱，所以是「不當使用個人資料」。
 		expect(labels).toContain("不當使用個人資料");
 		expect(labels).toContain("食品安全");
 		expect(
@@ -396,11 +394,11 @@ describe("rejectionCooldownWarning", () => {
 
 	it("天數是無條件進位、至少 1：不足整天的 Duration 不會少報", () => {
 		expect(days(14 * 86400)).toBe(text(14));
-		expect(days(6 * 86400 + 23 * 3600)).toBe(text(7)); // 6 日 23 小時
-		expect(days(3600)).toBe(text(1)); // 1 小時
-		expect(days(7 * 86400 + 1)).toBe(text(8)); // 7 日又 1 秒
-		expect(days(0, 1)).toBe(text(1)); // 只有 1 奈秒
-		expect(days(7 * 86400)).toBe(text(7)); // 整天不進位
+		expect(days(6 * 86400 + 23 * 3600)).toBe(text(7));
+		expect(days(3600)).toBe(text(1));
+		expect(days(7 * 86400 + 1)).toBe(text(8));
+		expect(days(0, 1)).toBe(text(1));
+		expect(days(7 * 86400)).toBe(text(7));
 	});
 
 	it("沒有 rejectionCooldown：不顯示警告", () => {
@@ -536,7 +534,6 @@ describe("解除請求入口 remediationEntry", () => {
 				}),
 			),
 		).toBeUndefined();
-		// 沒有任何原因、也不能請求：沒有可顯示的東西
 		expect(remediationEntry(measure({}))).toBeUndefined();
 		expect(
 			remediationEntry(
@@ -608,7 +605,6 @@ describe("請求進度的顯示優先序", () => {
 		expect(note).toBe("平台回覆：照片不清楚");
 		expect(note).not.toContain("後可再提出");
 		expect(measureStatusDisplay(ut, cooling)?.label).toBe("解除請求已駁回");
-		// 冷卻時間只在按鈕的反灰原因
 		expect(remediationEntry(cooling)?.reason).toBe(COOLDOWN_SENTENCE);
 	});
 
@@ -647,7 +643,6 @@ describe("請求進度的顯示優先序", () => {
 				appeal(MeasureRequestState.REJECTED, "申覆不成立"),
 				remediation(MeasureRequestState.REJECTED, {
 					decisionReason: "照片不清楚",
-					// 時間比第一筆新也不影響：順序以伺服器為準
 					...decidedAt("2030-01-01T00:00:00Z"),
 				}),
 			],
@@ -858,7 +853,6 @@ describe("終止合作的呈現", () => {
 		expect(measureMeta(ut, m)).toBe(
 			"措施：終止合作 · 事由：預告終止（第 21.2 條）",
 		);
-		// 事由只在終止合作顯示
 		expect(
 			measureMeta(
 				ut,
@@ -971,7 +965,6 @@ describe("appealEntry", () => {
 		expect(
 			appealEntry(ut, measure({ canAppeal: false })).reason,
 		).toBeUndefined();
-		// 即使 state 是 REVOKED，伺服器沒給原因就不顯示原因
 		expect(
 			appealEntry(
 				ut,

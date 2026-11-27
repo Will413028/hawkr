@@ -15,15 +15,10 @@ test("navbar chat navigation defers its route prefetch to user intent", () => {
 	const chatBubble = source("components/shared/ChatBubble.tsx");
 	const bubbleBase = source("components/shared/NavBubbleLink.tsx");
 
-	// The bypass of the shared <Link> is gone. It saved nothing — the two
-	// sibling bubbles in the same navbar already pull the shared link in — and
-	// it cost this one bubble the role-aware / hard-navigation behaviour every
-	// other in-app link gets. All three bubbles now render through one base.
 	assert.match(chatBubble, /from "@\/components\/shared\/NavBubbleLink"/);
 	assert.doesNotMatch(chatBubble, /from "next\/link"/);
 	assert.match(bubbleBase, /import Link from "@\/components\/shared\/Link";/);
 
-	// The intent gate itself is unchanged, it just lives in the base now.
 	assert.match(chatBubble, /prefetchOnIntent/);
 	assert.match(
 		bubbleBase,
@@ -118,13 +113,10 @@ test("mobile hides the conversation list by route, not by the content pane's cla
 		"app/[locale]/(seller)/seller-center/messages/layout.tsx",
 	);
 
-	// 綁在 class 名上的舊寫法會在 Hawkr Agent 進入候選階段（根節點換成
-	// .hawkr-agent-workspace）時失配，清單留著蓋住對話＝「點了進不去」。
 	assert.doesNotMatch(messages, /\.chat-sidebar:has\(\+ \.thread-page\)/);
 	assert.match(
 		messages,
 		/\.chat-page\[data-chat-view="thread"\] > \.chat-shell > \.chat-sidebar \{ display: none;/,
 	);
-	// 兩個收件匣共用同一份契約，賣家中心的 shell 也必須宣告 view。
 	assert.match(sellerLayout, /data-chat-view="thread"/);
 });

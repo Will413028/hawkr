@@ -26,13 +26,11 @@ type permanentError struct{ error }
 
 func invalid(format string, args ...any) error { return permanentError{fmt.Errorf(format, args...)} }
 
-// isPermanent：解碼失敗與必要欄位缺漏、格式不合都是 permanent（進 dead-letter queue、不重試）；其餘（資料庫）照常重排。
 func isPermanent(err error) bool {
 	var p permanentError
 	return errors.As(err, &p)
 }
 
-// orderCompletedEvent 只列投影用到的欄位（Java 的 OrderCompletedPayload 其餘忽略；ID 是字串）。
 type orderCompletedEvent struct {
 	BuyerID string `json:"buyer_id"`
 	StoreID string `json:"store_id"`

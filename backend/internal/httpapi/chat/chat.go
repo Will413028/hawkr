@@ -52,7 +52,6 @@ type Stores interface {
 	StoreCards(ctx context.Context, storeIDs []int64) ([]seller.StoreCard, error)
 }
 
-// cursor 是對話列表的 page token 內容：上一頁最後一列的 (last_message_at, id)。
 type cursor struct {
 	At time.Time `json:"c"`
 	ID uuid.UUID `json:"i"`
@@ -75,7 +74,6 @@ func nextToken(scope string, next *im.Cursor) string {
 	return rpc.TokenFor(scope, cursor{At: next.At, ID: next.ID})
 }
 
-// pageSize 檢查 page_size：負數是呼叫方的錯（API 設計規範（Connect）§六），0 與過大由模組用預設與上限。
 func pageSize(n int32) (int32, error) {
 	if n < 0 {
 		return 0, rpc.RequiredField("page_size", "page_size 不能是負數")
@@ -83,8 +81,6 @@ func pageSize(n int32) (int32, error) {
 	return n, nil
 }
 
-// reasons 是模組的業務原因對到契約的 ErrorReason（apperr.Reason）：只有 client 會依它分支的才對應。
-// 詞典拒絕（ReasonModerationRejected）是欄位錯誤，不帶 reason。
 var reasons = map[im.Reason]apperr.Reason{
 	im.ReasonSelfMessageNotAllowed: apperr.ReasonSelfMessageNotAllowed,
 	im.ReasonSellerSuspended:       apperr.ReasonSellerSuspended,
@@ -93,7 +89,6 @@ var reasons = map[im.Reason]apperr.Reason{
 	im.ReasonReceiverDeleted:       apperr.ReasonReceiverDeleted,
 }
 
-// 模組回報的欄位名對到請求的欄位路徑；CounterpartID 依方法對到 store_id 或 buyer_id。
 var (
 	contentPaths = rpc.FieldPaths{
 		"Text": "content.text", "StagedToken": "content.image_staged_token", "Type": "content",
@@ -111,7 +106,6 @@ func withPath(base rpc.FieldPaths, k, v string) rpc.FieldPaths {
 	return out
 }
 
-// failure 把模組的錯誤轉成對外的錯誤：業務原因附上契約的 ErrorReason，欄位對到請求路徑。
 func (h *App) failure(err error, paths rpc.FieldPaths) error {
 	if err == nil {
 		return nil
@@ -123,7 +117,6 @@ func (h *App) failure(err error, paths rpc.FieldPaths) error {
 	return rpc.WithFieldPaths(err, paths)
 }
 
-// buyerParty 回傳呼叫者的買家身分；只有顧客帳號能呼叫（沒有登入由 interceptor 擋，管理員回 permission_denied）。
 func (h *App) buyerParty(ctx context.Context) (im.Party, error) {
 	p, err := rpc.RequireAccount(ctx)
 	if err != nil {
@@ -132,7 +125,6 @@ func (h *App) buyerParty(ctx context.Context) (im.Party, error) {
 	return h.buyerPartyOf(ctx, p.ID)
 }
 
-// buyerPartyOf 讀帳號現任的買家身分（串流重新驗證時帳號來自重新驗證的 session，不來自 ctx）。
 func (h *App) buyerPartyOf(ctx context.Context, accountID int64) (im.Party, error) {
 	id, err := h.buyers.CurrentBuyerID(ctx, accountID)
 	if err != nil {
@@ -141,7 +133,6 @@ func (h *App) buyerPartyOf(ctx context.Context, accountID int64) (im.Party, erro
 	return im.Party{Kind: im.PartyBuyer, BuyerID: id}, nil
 }
 
-// storeParty 回傳呼叫者此刻的店的身分（seller.CurrentStore）；沒有店回 not_found。賣家能力由模組檢查，宣告見 declarations。
 func (h *App) storeParty(ctx context.Context) (im.Party, error) {
 	p, err := rpc.RequireAccount(ctx)
 	if err != nil {
@@ -160,8 +151,6 @@ func (h *App) storePartyOf(ctx context.Context, accountID int64) (im.Party, erro
 
 func conversationNotFound() error { return apperr.NotFound("找不到這個對話") }
 
-// partyOf 由對話的歸屬推導呼叫者是買家方或店家方：對話不存在與呼叫者不是任何一方回同一個 not_found（不洩漏對話存在）；
-// ConversationParties 的結果只用在這裡，不進任何回應。兩邊都是（同一帳號是買家方又擁有該店）是不變量被破壞：模組擋下自己傳訊息給自己的店。
 func (h *App) partyOf(ctx context.Context, conversationID uuid.UUID) (im.Party, error) {
 	acct, err := rpc.RequireAccount(ctx)
 	if err != nil {
@@ -198,7 +187,6 @@ func (h *App) partyOf(ctx context.Context, conversationID uuid.UUID) (im.Party, 
 	return party, nil
 }
 
-// toMessage 把訊息轉成回應。隱藏與抹除的訊息是墓碑，不帶內容（模組已保證，這裡不依賴它：墓碑一律不讀 Text 與 Image）。
 func (h *App) toMessage(m im.Message) (*pb.Message, error) {
 	out := &pb.Message{
 		Id: m.ID.String(), ConversationId: m.ConversationID.String(), Seq: m.Seq,
@@ -260,7 +248,6 @@ func baseConversation(c im.Conversation) *pb.Conversation {
 	}
 }
 
-// buyerConversations 組買家版的對話：對方是店家，卡片以一次批次查詢補上（沒有卡片的店不設 store）。
 func (h *App) buyerConversations(ctx context.Context, in []im.Conversation) ([]*pb.Conversation, error) {
 	cards := map[int64]seller.StoreCard{}
 	if ids := uniqueIDs(in, func(c im.Conversation) int64 { return c.StoreID }); len(ids) > 0 {
@@ -285,7 +272,6 @@ func (h *App) buyerConversations(ctx context.Context, in []im.Conversation) ([]*
 	return out, nil
 }
 
-// storeConversations 組店家版的對話：對方是買家，名稱與頭像以一次批次查詢補上（已關閉或查不到的買家是 deleted）。
 func (h *App) storeConversations(ctx context.Context, in []im.Conversation) ([]*pb.Conversation, error) {
 	views, err := blocks.BuyerViews(ctx, h.buyers, uniqueIDs(in, func(c im.Conversation) int64 { return c.BuyerID }))
 	if err != nil {

@@ -1,45 +1,4 @@
 #!/usr/bin/env bash
-# =============================================================================
-# check-fullwidth-var-expansion.sh
-#   shell 腳本中 `$var` 不得緊接全角／非 ASCII 字元（要寫 `${var}`）
-# =============================================================================
-# 為何存在（issue #2025 週邊，2026-07-30）：bash 決定變數名邊界時是按「位元組」掃
-# 的，遇到多位元組（UTF-8）字元不會停——`$total，` 會被解析成變數名 `total\xef`
-# （全角逗號的第一個位元組被吃進名字裡）。於是：
-#   * `set -u` 下 → `total?: unbound variable`，非互動 shell 直接中止
-#   * 無 `set -u` → 展開成空字串，訊息靜默少字（假的輸出）
-#
-# 本 repo 全繁體中文輸出，`echo "...$var（...）"`、`...$var，...` 是最自然的寫法，
-# 因此這個地雷密度高、且**只在被踩到的那條路徑上爆炸**，靜態掃描是唯一可靠防線：
-#
-#   1. `dev.sh:459` — `($healthy/$total，$problem 異常)`，健康檢查的 DEGRADED 分支
-#      從來沒執行成功過（只吐一行 bash 錯誤、不給判定）。6 個服務壞 9 天沒被發現。
-#   2. `scripts/prod-smoke-test.sh` — `（ID=$SELLER_ID）` 在 **token 產生成功**
-#      的正常路徑上，整支 prod 部署後冒煙測試在打第一個 API 前就死掉。
-#   3. `docs/代碼管理（CodeMeta）/scripts/generate.sh:939` — 靠第 23 行為了 awk 而設
-#      的 `export LC_ALL=C` 意外擋住（C locale 下 bash 不把 UTF-8 位元組收進識別
-#      字）。那行註解寫的是「awk 多位元組 offset」，與此毫無關聯——哪天 awk 換掉、
-#      那行被刪，CodeMeta 生成器的「找不到 md 檔」錯誤路徑立刻變成 unbound。
-#
-# 判定規則：`$name` 後緊接非 ASCII 位元組，且該處會被 shell 展開。以下**不算**違規：
-#   * `${name}` / `"$name"`（已有明確邊界）
-#   * `$1` / `$?` / `$#` 等位置參數與特殊變數（只吃一個字元，實測安全）
-#   * 單引號字串、註解、quoted heredoc（`<<'EOF'`）內 —— 不展開
-#   * 轉義字面值 `\$name`（印出變數名而非其值，例如 API 路徑樣板）
-# 真有必要保留裸寫法時，在該行加行內註解 `# fullwidth-var-ok` 豁免（請附理由）。
-#
-# Makefile（含 *.mk）的 recipe 行（tab 開頭）也掃：recipe 是 shell，其中 shell 變數寫成 `$$name`，
-# 同樣要寫成 `$${name}`（2026-09-27 backend/Makefile 的 sqlc 略過訊息印出亂碼）。
-#
-# 已知未覆蓋（刻意的範圍界定，不是漏掉）：
-#   * `.github/workflows/*.yml` 的 `run:` block —— 需 YAML 解析才能正確定位行號；
-#     且 Actions 的 run 是 `bash -e`（無 `-u`），後果僅「log 少一個字」而非中止。
-#   * `.claude/` `.agents/` 等未進版控的本機工具目錄（CI 檢不到，也不影響 CI）。
-#
-# 相依：純 bash + python3 標準庫（對齊 self-hosted light runner 慣例）。
-# 用法：scripts/check-fullwidth-var-expansion.sh [--help]
-#   exit 0 = 乾淨；exit 1 = 有違規（列出 檔案:行號 + 該變數 + 後果）。
-# =============================================================================
 set -euo pipefail
 
 usage() {
@@ -64,8 +23,6 @@ fi
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-# 候選檔＝版控內的 shell 腳本與 Makefile。副檔名認 .sh/.bash/.bats，另外收有 shell shebang 的
-# 無副檔名檔（用 git ls-files 而非 find，避免掃到 node_modules / 生成物）。
 python3 - <<'PY'
 import re, subprocess, sys, pathlib
 

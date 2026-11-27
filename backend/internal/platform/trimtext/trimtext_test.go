@@ -70,7 +70,7 @@ func TestTrimAndStringsTrimSpaceRemoveTheSameSetOverAllRunes(t *testing.T) {
 	removed := 0
 	for r := rune(0); r <= unicode.MaxRune; r++ {
 		if r >= 0xD800 && r <= 0xDFFF {
-			continue // 代理碼位不是合法的 UTF-8 字元
+			continue
 		}
 		s := string(r)
 		for _, v := range []string{s, s + "字", "字" + s} {

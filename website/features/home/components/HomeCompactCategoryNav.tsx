@@ -83,10 +83,6 @@ const compactCategories: CompactCategoryItem[] = [
 
 export default function HomeCompactCategoryNav() {
 	const railRef = React.useRef<HTMLDivElement>(null);
-	// Mouse drag-to-scroll. Native overflow-x already gives touch inertia;
-	// this adds the missing pointer-drag so desktop / narrow-viewport users
-	// can reach the categories that overflow off-screen. A drag past ~6px
-	// suppresses the trailing click so dragging never fires a chip's link.
 	useDragScroll(railRef);
 
 	return (
@@ -116,8 +112,7 @@ interface CompactCategoryChipProps {
 function CompactCategoryChip({ item }: CompactCategoryChipProps) {
 	const body = (
 		<>
-			{/* `home-chip-icon` is the breathing/pop animation target — keyframes
-			    live in styles/features/home.css so they cascade from one source. */}
+
 			<span className="home-chip-icon grid size-9 place-items-center overflow-hidden rounded-hk-lg text-sm font-black text-hk-primary">
 				{item.categoryId ? (
 					<FoodCategoryIcon categoryId={item.categoryId} />

@@ -55,9 +55,6 @@ function enqueueToast(
 ): string | number {
 	const id = data.id ?? `hk-toast-${Date.now()}-${++toastSequence}`;
 
-	// Keep calls queued until AppToaster has both crossed the document barrier
-	// and committed Sonner's subscriber. This prevents an early call from either
-	// mutating <head> during hydration or disappearing before Sonner is ready.
 	void whenDocumentSettled().then(() => {
 		toastQueue.push({ kind, message, data: { ...data, id } });
 	});

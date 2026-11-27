@@ -16,17 +16,14 @@ type FlexibleString string
 //   - 數字: 1000 -> "1000" ✅ (向後兼容)
 //   - 浮點數: 1000.0 -> "1000" ✅ (自動轉整數)
 func (fs *FlexibleString) UnmarshalJSON(data []byte) error {
-	// 嘗試解析為字串
 	var s string
 	if err := json.Unmarshal(data, &s); err == nil {
 		*fs = FlexibleString(s)
 		return nil
 	}
 
-	// 嘗試解析為浮點數（可以涵蓋整數）
 	var f float64
 	if err := json.Unmarshal(data, &f); err == nil {
-		// 轉為整數字串（金額不應有小數）
 		*fs = FlexibleString(strconv.FormatInt(int64(f), 10))
 		return nil
 	}

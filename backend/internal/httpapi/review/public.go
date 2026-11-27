@@ -97,7 +97,6 @@ func (h *Public) GetStoreReviewStats(ctx context.Context, req *connect.Request[p
 	return connect.NewResponse(&pb.GetStoreReviewStatsResponse{Count: statCount(s.Count), Average: s.Average, Distribution: ratingCounts(s.Distribution)}), nil
 }
 
-// statCount 把評價數轉成 int32；一個商品或店家的評價數遠小於 int32 上限（API 設計規範第四節：有界計數用 int32）。
 func statCount(n int64) int32 {
 	return int32(min(n, math.MaxInt32)) //nolint:gosec // clamped above
 }

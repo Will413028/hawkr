@@ -14,8 +14,6 @@ import test from "node:test";
 const UI_FILES = [
 	"src/features/delegated-operations/components/MerchantOperationEntry.tsx",
 	"src/features/delegated-operations/components/OperationPreflightDialog.tsx",
-	// 治理台（代行紀錄／稽核內容／撤銷）與入口走同一條保證：它們讀的是稽核與工作
-	// 階段摘要，任何一支改打 /api/bff 或賣家 API 都會讓治理查詢帶著錯誤的身分。
 	"src/features/delegated-operations/components/SessionAuditConsole.tsx",
 	"src/features/delegated-operations/components/AuditDetailDialog.tsx",
 	"src/features/delegated-operations/components/SessionRevokeDialog.tsx",
@@ -88,7 +86,6 @@ test("詳情頁的代行入口資格交給 preflight，不自建第二份店家�
 	);
 	assert.match(entry, /getDelegatedOperationPreflight/u);
 	assert.match(entry, /preflightQuery\.data\.target\.storeId !== storeId/u);
-	// 不合格時按鈕停用並把伺服器下發的原因寫在上面，不是「可以按，按了才知道」。
 	assert.match(entry, /eligibilityGateLabel/u);
 	assert.match(entry, /preflightDenial\.message/u);
 });
@@ -105,7 +102,6 @@ test("賣家列表提供分離的詳情與代行入口，且 preflight 只在開
 			"utf8",
 		),
 	]);
-	// 代行資格只讀伺服器的 delegationUnavailabilities（tests/delegated-operation-entry-gating.test.ts 逐項釘住），列表頁沒有本地判準；rowState 只用於徽章與按鈕顏色。
 	assert.match(merchantList, /m\.delegationUnavailabilities/u);
 	assert.doesNotMatch(merchantList, /isActive && !isSuspended/u);
 	assert.match(merchantList, /rowState\(m\)/u);
@@ -116,9 +112,6 @@ test("賣家列表提供分離的詳情與代行入口，且 preflight 只在開
 	);
 	assert.match(merchantList, /label="代行營運"/u);
 	assert.match(merchantList, /<MaterialSymbol name="search"/u);
-	// preflight 不得在列表 render 時無條件核發（一頁十列＝十次）。除了使用者觸發的
-	// 兩個一次性事件（開啟對話框、剛被拒導回本頁要問「現在為什麼不行」）之外，只有
-	// 單店畫面可以用 `resolveEligibility` 進場就問 —— 列表頁不得傳它。
 	assert.match(
 		entry,
 		/enabled: enabled && \(resolveEligibility \|\| dialogOpen \|\| startDenied\)/u,
@@ -156,7 +149,6 @@ test("建立工作階段是頂層表單導覽，不是 fetch，也不在瀏覽�
 	assert.match(preflight, /name="ttlSeconds"/u);
 	assert.match(preflight, /name="idempotencyKey"/u);
 	assert.doesNotMatch(preflight, /fetch\(/u);
-	// 工作區已不在 ADM：任何指向舊工作區路徑或自組的兌換網址都是回歸。
 	assert.doesNotMatch(preflight, /\/operate\//u);
 	assert.doesNotMatch(preflight, /adm\/enter/u);
 });
@@ -202,14 +194,11 @@ test("動作下拉渲染標籤而不是常數，且權威值優先於鏡像", as
 		"src/features/delegated-operations/components/SessionAuditConsole.tsx",
 		"utf8",
 	);
-	// 修前是 `<option key={value} value={value}>{value}</option>`。
 	assert.match(
 		console_,
 		/<option key=\{value\} value=\{value\}>\s*\{codeLabel\(actionLabels, value\)\}/u,
 	);
-	// 資料一到就用該列自己帶的 actionLabel 覆蓋鏡像，鏡像只補沒出現過的動作。
 	assert.match(console_, /labels\[entry\.action\] = entry\.actionLabel/u);
-	// 稽核列本身永遠只讀後端下發的值，不查鏡像。
 	assert.match(console_, /<strong>\{entry\.actionLabel\}<\/strong>/u);
 });
 
@@ -223,21 +212,14 @@ test("兩張寬表的關鍵欄有結構性保護，不是靠剛好塞得下", as
 		readFile("src/styles/pages/MerchantManagement.css", "utf8"),
 		readFile("src/styles/pages/DelegatedOperations.css", "utf8"),
 	]);
-	// 賣家表：「操作」欄釘在右緣，欄位再長也還在畫面上。
 	assert.match(
 		merchantCss,
 		/\.merchant-management \.merchant-table td:last-child \{[^}]*position: sticky;[^}]*right: 0;/u,
 	);
-	// 列狀態以 token 表達，底色與色調才拆得開（不透明性由下一支測試單獨守）。
 	assert.match(
 		merchantCss,
 		/\.merchant-table tbody tr \{[^}]*--merchant-row-tint: transparent;/u,
 	);
-	// 稽核表獨佔整個寬度：稽核內容是 modal，不得再有東西跟主表搶同一條水平空間。
-	// 側欄版有過兩代（`grid-template-columns: minmax(0,1fr) 340px` 會把「結果」欄裁掉，
-	// 之後的 `flex-wrap: wrap` 則讓面板換行到表格下方、開在畫面外），兩代都不要回來。
-	//
-	// 剝註解再比：解釋「為什麼不要那個佈局」的註解本身就寫著那些選擇器名。
 	const delegationRules = stripCssComments(delegationCss);
 	assert.doesNotMatch(delegationRules, /\.adm-audit-layout\b/u);
 	assert.doesNotMatch(
@@ -245,7 +227,6 @@ test("兩張寬表的關鍵欄有結構性保護，不是靠剛好塞得下", as
 		/\.adm-audit-main \{[^}]*flex(?:-basis)?:/u,
 		".adm-audit-main 又有 flex-basis ⇒ 它旁邊被塞了第二欄",
 	);
-	// 「變更摘要」是唯一可換行的欄，必須同時有下限與吃下剩餘寬度的能力。
 	assert.match(
 		delegationCss,
 		/\.adm-audit-col-summary \{[^}]*width: 100%;[^}]*min-width: var\(--adm-audit-summary-min\);/u,
@@ -295,7 +276,6 @@ function parseCss(
 			const brace = text.indexOf("{", i);
 			if (brace === -1) break;
 			const prelude = text.slice(i, brace).trim();
-			// 找對應的右括號
 			let depth = 1;
 			let j = brace + 1;
 			while (j < text.length && depth > 0) {
@@ -315,9 +295,6 @@ function parseCss(
 					if (c === -1) continue;
 					const prop = part.slice(0, c).trim();
 					const value = part.slice(c + 1).trim();
-					// 自訂屬性也收：列的狀態色是以 `--merchant-row-tint` 表達的，不解它就
-					// 只能比到「兩格都寫著 var(--merchant-row-tint)」這種恆真的字串。
-					// `resolveBackground` 只看 background 三個屬性，多收這些不影響它。
 					if (prop && value) decls.push({ prop, value });
 				}
 				if (decls.length)
@@ -367,7 +344,6 @@ function matches(selector: string, el: ElementPath): boolean {
 	const subject = tokenize(parts.at(-1) as string);
 	if (!subject.every((t) => el.subject.has(t))) return false;
 	let idx = el.ancestors.length - 1;
-	// 下一個（往左的）compound 是否必須恰好是直接父層
 	let directParent = false;
 	for (let p = parts.length - 2; p >= 0; p--) {
 		if (parts[p] === ">") {
@@ -434,7 +410,6 @@ function resolveBackground(rules: ParsedRule[], el: ElementPath) {
 			const spec = specificity(s);
 			for (const d of rule.decls) {
 				if (d.prop === "background") {
-					// 簡寫：兩個 longhand 一起被設定（未指定的部分回到初始值）
 					consider("background-color", d.value, spec, rule.order);
 					consider(
 						"background-image",
@@ -488,10 +463,6 @@ function resolveProps(
 					consider("overflow-y", d.value, spec, rule.order);
 				} else if (d.prop === "flex") {
 					const parts = d.value.split(/\s+/u);
-					// 形態：`none`／`auto`／`initial`（關鍵字）、`<g> <s> <basis>`、`<g> <s>`、`<g>`。
-					// 關鍵字必須單獨列出 —— 把 `flex: none` 當成 `<g>` 會解出 grow="none"、
-					// shrink="1"，而它實際是 `0 0 auto`。那個 "1" 會讓「shrink 必須是 0」這類
-					// 斷言**假通過**（本 repo 的 MerchantManagement.css 就有一處 `flex: none`）。
 					const KEYWORDS: Record<string, [string, string, string]> = {
 						none: ["0", "0", "auto"],
 						auto: ["1", "1", "auto"],
@@ -519,23 +490,6 @@ function resolveProps(
 	return out;
 }
 
-/* ─────────────────────────── JSX 結構 harness ───────────────────────────
- *
- * 上面那套 cascade harness 只回答「這個 element path 上，誰贏了哪個屬性」——
- * element path 是**呼叫端自己組出來的**，它從不讀 `.tsx`。於是凡是用了子組合子
- * （`>`）的規則，都有一半的前提落在 harness 的視野外：選擇器命不命中，取決於
- * JSX 真的長成那個形狀。這一節補的就是那一半。
- *
- * 本檔目前有一條這樣的規則，失效方式是「CSS 還在、build 照過、測試照綠」：
- *   `.adm-operation-dialog > form` 中間插一層 `<div>` ⇒ min-height 不傳遞，送出鍵出畫面
- *
- * 為什麼是自己刻的掃描器而不是鬆的字串比對：`assert.match(source, /<span/)` 這種
- * 會被檔案任何角落的無關 span、甚至註解裡的字滿足（本檔的 `noValidate` 斷言第一版
- * 就是這樣零鑑別力的，見該支測試的註解）。要守的是**父子關係**，就必須真的把層級
- * 建出來——而層級只有兩件事會影響它：元素開合，以及 fragment 不產生節點。
- *
- * 掃描器的鑑別力由「harness：JSX 結構掃描器…」那支測試直接驗證，不靠推測。
- */
 
 type JsxNode = {
 	/** 標籤名；fragment（`<>`）為空字串。元件（`Button`）保留原樣。 */
@@ -559,8 +513,6 @@ type JsxNode = {
 const JSX_TAG =
 	/<(\/?)([A-Za-z][\w.]*)?((?:"[^"]*"|'[^']*'|`[^`]*`|\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\}|[^>"'`{}])*?)(\/?)>/gu;
 
-// 先剝註解：JSX 註解裡寫到的標籤名（本檔守的兩處，原始碼註解正好都在解釋那個標籤
-// 為什麼存在）會讓掃描器看到不存在的節點。
 /** CSS 註解常在解釋「為什麼不要某個舊佈局」，裡面就寫著那些選擇器名。 */
 function stripCssComments(css: string): string {
 	return css.replace(/\/\*[\s\S]*?\*\//gu, "");
@@ -571,7 +523,6 @@ function stripJsxComments(source: string): string {
 		source
 			.replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/gu, "")
 			.replace(/\/\*[\s\S]*?\*\//gu, "")
-			// 只剝整行註解：`//` 也會出現在字串裡的網址中。
 			.replace(/^[ \t]*\/\/.*$/gmu, "")
 	);
 }
@@ -601,8 +552,6 @@ function parseJsx(rawSource: string): JsxNode {
 		consumed = at + match[0].length;
 		const tag = match[2] ?? "";
 		if (match[1] === "/") {
-			// 只在標籤名對得上時才收：不成對的 `<` 若被誤判成開標籤（例如泛型），
-			// 這裡不會連帶把真正的層級一起彈掉。
 			for (let i = stack.length - 1; i > 0; i--) {
 				if (stack[i].tag === tag) {
 					stack.length = i;
@@ -670,7 +619,6 @@ function rowStates(): Array<{ name: string; row: string[] }> {
 }
 
 async function merchantTableRules(viewport: number) {
-	// 匯入順序＝ layout.tsx 先（AdminVisualRefresh），page.tsx 後（MerchantManagement）。
 	const [refresh, merchant] = await Promise.all([
 		readFile("src/styles/AdminVisualRefresh.css", "utf8"),
 		readFile("src/styles/pages/MerchantManagement.css", "utf8"),
@@ -704,7 +652,6 @@ test("解 cascade：釘住的欄與同列其他儲存格在每一種列狀態下
 				first,
 				`${viewport}px / ${name}：釘住的欄(${JSON.stringify(last)}) 與其他儲存格(${JSON.stringify(first)}) 不同色`,
 			);
-			// 釘住的欄下面會有捲過去的內容，底層必須不透明。
 			assert.notEqual(
 				last["background-color"],
 				"transparent",
@@ -758,7 +705,6 @@ test("摘要欄下限讀的是變數，且不加無效的 max-width", async () =
 		css,
 		/\.adm-audit-col-summary \{[^}]*min-width: var\(--adm-audit-summary-min\)/u,
 	);
-	// max-width 在 table cell 上會被瀏覽器忽略（CSS 2.1 §17.5.2），加回來就是死碼。
 	const summary = /\.adm-audit-col-summary \{[^}]*\}/u.exec(css)?.[0] ?? "";
 	assert.doesNotMatch(summary, /max-width/u);
 });
@@ -900,7 +846,6 @@ test("解 cascade：selected 與 selected:hover 是同一個色系，且 hover �
 		delta <= 15,
 		`selected(hue ${hs.toFixed(1)}°) 與 selected:hover(hue ${hh.toFixed(1)}°) 差 ${delta.toFixed(1)}° —— 同一個狀態在滑鼠移入時換了色系`,
 	);
-	// 兩者若被「統一」成完全同色，色系斷言照樣過，但 hover 就沒有回饋了。
 	assert.ok(
 		hovered.a > selected.a,
 		`selected:hover(alpha ${hovered.a}) 必須比 selected(alpha ${selected.a}) 深，否則 hover 沒有視覺回饋`,
@@ -929,7 +874,6 @@ test("解 cascade：selected 與 selected:hover 是同一個色系，且 hover �
  * （「解 DOM：<form> 是對話框的直接子層」）守。
  */
 async function dialogRules(viewport: number) {
-	// 匯入順序：layout.tsx 先（globals → AdminVisualRefresh），Dialog.css（Dialog.tsx 自己 import）次之，page.tsx 後。
 	const [globals, refresh, dialogCss, delegation] = await Promise.all([
 		readFile("src/app/globals.css", "utf8"),
 		readFile("src/styles/AdminVisualRefresh.css", "utf8"),
@@ -958,13 +902,10 @@ function scrolls(value: string | undefined): boolean {
 }
 
 test("解 cascade：對話框三段式，只有內容區捲動、動作列永遠在畫面上", async () => {
-	// 760 是 `@media (max-width: 760px)` 的另一側：那一段會重寫對話框的
-	// max-height 與各層的 min/max-width，不能只驗桌機那一支。
 	for (const viewport of [1440, 760]) {
 		const rules = await dialogRules(viewport);
 		const where = `${viewport}px`;
 
-		// ① 對話框：column flex 容器，且自己不是捲動區。
 		const dialog = resolveProps(
 			rules,
 			{ ancestors: DIALOG_CHROME, subject: DIALOG },
@@ -985,7 +926,6 @@ test("解 cascade：對話框三段式，只有內容區捲動、動作列永遠
 			`${where}：對話框沒有 max-height，內容長時會超出視窗`,
 		);
 
-		// ② 中間的 <form>：column flex ＋ min-height: 0，否則 min-height 不會傳遞。
 		const form = resolveProps(
 			rules,
 			{ ancestors: [...DIALOG_CHROME, DIALOG], subject: new Set(["form"]) },
@@ -1004,7 +944,6 @@ test("解 cascade：對話框三段式，只有內容區捲動、動作列永遠
 		);
 		assert.equal(form["flex-grow"], "1", `${where}：<form> 不吃剩餘高度`);
 
-		// ③ body：唯一捲動區，且解除 flex 的自動最小尺寸。
 		const body = resolveProps(
 			rules,
 			{
@@ -1024,7 +963,6 @@ test("解 cascade：對話框三段式，只有內容區捲動、動作列永遠
 		);
 		assert.equal(body["flex-grow"], "1", `${where}：內容區不吃剩餘高度`);
 
-		// ④ 動作列：不收縮。
 		const actions = resolveProps(
 			rules,
 			{
@@ -1073,7 +1011,6 @@ const FORM_DIALOGS = [
 ] as const;
 
 test("解 DOM：<form> 是對話框的直接子層，`> form` 那條規則才命中", async () => {
-	// 結構由共用 Dialog 產生；這裡把它真的渲染出來，用 DOM 的子層關係驗證，再確認兩支對話框都走 `form` 屬性。
 	const { createRequire } = await import("node:module");
 	const req = createRequire(`${process.cwd()}/tests/anchor.js`);
 	req.extensions[".css"] = () => {};
@@ -1145,7 +1082,6 @@ async function merchantHeaderRules(viewport: number) {
 	return [
 		...parseCss(globals, viewport, 0),
 		...parseCss(refresh, viewport, 100_000),
-		// page.tsx 的匯入順序：DelegatedOperations 先、MerchantCertificationDetail 後。
 		...parseCss(delegation, viewport, 200_000),
 		...parseCss(cert, viewport, 300_000),
 	];
@@ -1159,7 +1095,6 @@ test("解 cascade：代行錯誤帶不定義 header 工具列的寬度", async (
 		new Set(["div", ".detail-header"]),
 	];
 
-	// ① 入口本體上下排列 ＋ 錯誤帶有寬度上限。
 	const entryPath: ElementPath = {
 		ancestors: [...headerChrome, new Set(["div", ".header-actions"])],
 		subject: new Set(["div", ".adm-operation-entry"]),
@@ -1185,11 +1120,6 @@ test("解 cascade：代行錯誤帶不定義 header 工具列的寬度", async (
 		`入口內的錯誤帶沒有寬度上限（max-width: ${band["max-width"]}）⇒ 它會以 max-content 撐寬整個 header`,
 	);
 
-	// ①b 上限與「追蹤編號能斷行」是一組，缺一即等於沒修。
-	// 追蹤編號是不含空白的字串（上游允許 128 字純英數），正常換行點一個都沒有；
-	// 只加上限不讓它斷，實測 64 字純十六進位在 1440 下穿出錯誤帶 174.7px、右緣
-	// 1453.7 已超出視窗 ⇒ 症狀從「錯誤帶撐爆 header」變成「文字自己跑出去」，
-	// 兩個改動各自都對、組合起來互相抵銷。
 	const trace = resolveProps(
 		rules,
 		{
@@ -1210,7 +1140,6 @@ test("解 cascade：代行錯誤帶不定義 header 工具列的寬度", async (
 		`追蹤編號不會斷行（overflow-wrap: ${trace["overflow-wrap"]} / word-break: ${trace["word-break"]}）⇒ 它會穿出被 max-width 夾住的錯誤帶`,
 	);
 
-	// 反面：對話框／治理頁裡的同一個元件不該被這個上限波及（那裡它是整列寬的告示）。
 	const dialogBand = resolveProps(
 		rules,
 		{
@@ -1230,7 +1159,6 @@ test("解 cascade：代行錯誤帶不定義 header 工具列的寬度", async (
 		`對話框內的錯誤帶被加了寬度上限（${dialogBand["max-width"]}），那裡它應該撐滿`,
 	);
 
-	// ② 左側識別區只拿剩餘寬度：hypothetical main size 降為 0 ＋ 解除自動最小尺寸。
 	const left = resolveProps(
 		rules,
 		{
@@ -1280,26 +1208,19 @@ test("帶自訂 onSubmit 驗證的表單一律 noValidate，錯誤走產品自�
 	] as const;
 	for (const [file, messages] of forms) {
 		const source = await readFile(file, "utf8");
-		// ⚠️ 必須先剝掉註解再比對。第一版直接 `assert.match(source, /noValidate/)`
-		// 完全沒有鑑別力：把屬性從 `<form>` 上拿掉，測試照樣綠 —— 因為這兩個檔的
-		// 檔頭註解正好在解釋「為什麼帶 noValidate」，那個字還在。變異測試才抓到。
 		const code = source
 			.replace(/\/\*[\s\S]*?\*\//gu, "")
 			.replace(/^\s*\/\/.*$/gmu, "");
-		// noValidate 由 Dialog 固定開啟（見 Dialog.tsx）；這裡確認檔案不自己放 <form>。
 		assert.doesNotMatch(code, /<form\b/u, `${file}：自己放了 <form>`);
 		assert.match(code, /\bform=\{/u, `${file}：沒有走 Dialog 的 form`);
-		// 有 required 才需要 noValidate；沒有 required 的表單（查詢頁）不在本清單。
 		assert.match(
 			code,
 			/\brequired\b/u,
 			`${file}：沒有 required 了？請重看本清單`,
 		);
-		// 那些訊息必須真的存在，否則這支測試在守一個不存在的東西。
 		for (const message of messages) {
 			assert.ok(code.includes(message), `${file}：找不到訊息「${message}」`);
 		}
-		// 錯誤一律渲染在產品自有的錯誤帶裡。
 		assert.match(code, /className="adm-operation-error"/u, file);
 	}
 });
@@ -1335,8 +1256,6 @@ test("解 DOM：工作階段代號卡帶複製鍵，且剪貼簿實作在治理�
 		`「工作階段代號」卡沒有掛複製鍵（屬性為 ${JSON.stringify(cards[0].attrs)}）⇒ 這個代號只能用滑鼠圈選`,
 	);
 
-	// 標籤與它顯示的值必須對得上：這張卡的值是 `displayCode`（`OPS-…`），叫成
-	// 「工作階段 ID」會讓人把代號貼進只收數字 ID 的地方（查詢框、維運 SQL）而被擋。
 	assert.equal(
 		findJsx(
 			root,
@@ -1362,18 +1281,8 @@ test("解 DOM：工作階段代號卡帶複製鍵，且剪貼簿實作在治理�
 	);
 });
 
-// harness 自己的正確性：`flex` 簡寫的關鍵字形態必須展開對。
-//
-// 這一支守的不是產品 CSS，是**上面每一支 flex 斷言的可信度**。`flex: none` 實際是
-// `0 0 auto`，但若把它當成單值形態（`<grow>`）處理，會解出 grow="none"、
-// **shrink="1"** —— 而「shrink 必須是 0」正是「動作列不得被壓縮」那類斷言的核心，
-// 錯值 "1" 不會讓測試變紅，它會讓測試**假通過**。
-//
-// 這種錯誤沒有任何產品端症狀可以暴露它：CSS 是對的、畫面是對的，只有守門的那支
-// 測試悄悄失去鑑別力。所以必須直接測 harness。
 test("harness：flex 簡寫的關鍵字形態展開正確", async () => {
 	const cases: [string, string, string, string][] = [
-		// 宣告值            grow  shrink basis
 		["none", "0", "0", "auto"],
 		["auto", "1", "1", "auto"],
 		["initial", "0", "1", "auto"],
@@ -1400,17 +1309,6 @@ test("harness：flex 簡寫的關鍵字形態展開正確", async () => {
 	}
 });
 
-// harness 自己的正確性（第二支）：JSX 掃描器的層級要建對。
-//
-// 理由與上面那支相同——兩支「解 DOM：…」全都建立在 `domChildren()` 真的等於 CSS 子
-// 組合子的語意上。掃描器若在某種寫法下把層級建歪，那兩支不會轉紅，它們會**假通過**：
-// 產品端已經插了一層 wrapper，測試卻還說是直接子層。
-//
-// 每一列都是「若掃描器少處理這件事，就會答錯」的最小反例：
-//   fragment          不穿透 ⇒ 真正的直接子層被算成孫層（會誤紅）
-//   自閉標籤          誤入棧 ⇒ 之後的兄弟全被算進它底下（會誤綠）
-//   屬性含 `>`        誤判標籤結束 ⇒ 同上，而且是本 repo 最常見的寫法
-//   註解含標籤名      看到不存在的節點 ⇒ 同上
 test("harness：JSX 結構掃描器的直接子層等於 CSS 子組合子", () => {
 	const kidsOf = (source: string): string[] | null => {
 		const hit = findJsx(parseJsx(source), (n) => hasJsxClass(n, "probe"))[0];
@@ -1465,9 +1363,6 @@ test("harness：JSX 結構掃描器的直接子層等於 CSS 子組合子", () =
 			["Button", "form"],
 		],
 		[
-			// 刻意寬鬆：`className={cx("probe", x)}` 仍要找得到那個節點。反過來若找不到，
-			// 「解 DOM：…」開頭那句 `cells.length === 1` 會轉紅而不是靜默跳過——
-			// 兩個方向都不會變成假綠，所以這裡選對重構更耐受的那一邊。
 			"className 寫成表達式時仍認得類名",
 			`<div className={cx("probe")}><form></form></div>`,
 			["form"],
@@ -1483,8 +1378,6 @@ test("harness：JSX 結構掃描器的直接子層等於 CSS 子組合子", () =
 		);
 	}
 
-	// 文字歸屬：`{expr}` 必須落在它真正的所在節點上，否則 P1-1 的「容器不得有裸文字」
-	// 那道反面夾擊會恆真（永遠看不到文字）或恆假（永遠看到）。
 	const wrapped = findJsx(
 		parseJsx(`<div className="probe"><i /><span>{m.contactEmail}</span></div>`),
 		(n) => hasJsxClass(n, "probe"),
@@ -1508,15 +1401,6 @@ test("harness：JSX 結構掃描器的直接子層等於 CSS 子組合子", () =
 });
 
 test("可收縮欄的 class 每張表只掛一欄——掛兩欄是靜默的版面破壞", async () => {
-	// `.adm-audit-col-summary` 宣告 `width: 100%`（DelegatedOperations.css 該處註解：
-	// 「全表唯一可收縮的那一欄」）。把它掛在兩個欄位上不會報錯、不會轉紅、CSS 也照樣生效，
-	// 只是 table auto layout 會把剩餘壓力全丟給沒宣告的欄——實測後果是「動作」欄被壓成
-	// 一字一行（調/整/授/權/範/圍 直排六行），而右側還留著大片空白。
-	//
-	// 2026-08-19 dev 實測抓到：代行授權歷程表把它掛在「範圍變更」與「理由」兩個 <td> 上，
-	// 且一個 <th> 都沒掛。修法是掛回一欄、th/td 成對。
-	//
-	// 每張表的合法數量恰為 2：一個 <th> ＋ 一個 <td>。
 	const tables = [
 		"src/features/delegated-operations/components/MerchantDelegationAuthorizationPanel.tsx",
 		"src/features/delegated-operations/components/SessionAuditConsole.tsx",
@@ -1539,9 +1423,6 @@ test("可收縮欄的 class 每張表只掛一欄——掛兩欄是靜默的版�
 });
 
 test("稽核表的操作者欄：識別碼不得與顯示名黏在同一行", async () => {
-	// `.adm-audit-table td strong { display: block }` 是換行的唯一來源；顯示名若是裸
-	// text node，後面那個 <span>{adminId}</span> 會直接接在它屁股後面，實測畫面上是
-	// 「alexischen@example.com2661027599」連成一串，中間沒有任何分隔。
 	const source = await readFile(
 		"src/features/delegated-operations/components/MerchantDelegationAuthorizationPanel.tsx",
 		"utf8",
@@ -1554,13 +1435,6 @@ test("稽核表的操作者欄：識別碼不得與顯示名黏在同一行", as
 });
 
 test("摘要欄下限只宣告一次——第二份就是會漂移的第二個數字", async () => {
-	// `--adm-audit-summary-min` 只宣告在 `.adm-audit-table-wrap`，讀它的
-	// `.adm-audit-col-summary` 在三張表裡都包在那層之下，一份就夠。
-	//
-	// 曾經有第二份宣告在 `.adm-audit-layout`（側欄版拿它算換行門檻），而獨立使用本
-	// wrap 的代行授權歷程面板不在那層之下 —— 2026-08-19 實測它的 min-width computed
-	// 成 auto，240px 下限從未生效。一個解析不到的 var() 不會報錯、不會轉紅，
-	// 只是那條規則整條失效。側欄拆掉之後那份已移除，別再加回來。
 	const css = await readFile(
 		"src/styles/pages/DelegatedOperations.css",
 		"utf8",
@@ -1576,10 +1450,6 @@ test("摘要欄下限只宣告一次——第二份就是會漂移的第二個�
 });
 
 test("動作欄有 nowrap，否則它是全表唯一沒有寬度保護的欄", async () => {
-	// `.adm-audit-col-summary` 的 width:100% 吃掉剩餘寬度後，時間與理由靠
-	// `td:first-child`／`td:last-child` 的 nowrap 守住 max-content，操作者靠內容長度，
-	// 只有動作欄什麼都沒有 ⇒ 壓力全落在它身上。2026-08-19 在 1440/1600/1920 三個寬度
-	// 實測欄寬恆為 58.3px，「調整授權範圍」被壓成直排六行。
 	const [css, panel] = await Promise.all([
 		readFile("src/styles/pages/DelegatedOperations.css", "utf8"),
 		readFile(

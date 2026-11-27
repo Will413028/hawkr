@@ -15,7 +15,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// 清理之後可以留下值的欄位（其餘一律必須是 NULL）。新增欄位時這份清單逼人決定：留下的要有理由（事實、狀態碼、時間），不是個資。
 var (
 	storeKept = []string{
 		"store_id", "store_code", "account_id", "status", "version", "logo_key", "logo_asset_id", "cover_key", "cover_asset_id",
@@ -27,7 +26,6 @@ var (
 	}
 )
 
-// loadedStore 建一間把每個個資欄位都填滿的店：profile、KYC（個人或企業，含證件）、核准。
 func (f *fixture) loadedStore(t *testing.T, company bool) (int64, Store) {
 	t.Helper()
 	ctx := context.Background()
@@ -54,7 +52,6 @@ func (f *fixture) loadedStore(t *testing.T, company bool) (int64, Store) {
 	return accountID, s
 }
 
-// row 讀一列的全部欄位（to_jsonb），讓測試不必逐欄寫死。
 func (f *fixture) row(t *testing.T, table, key string, id any) map[string]any {
 	t.Helper()
 	var raw []byte
@@ -88,7 +85,6 @@ func (f *fixture) purged(t *testing.T, storeID int64) bool {
 	return f.count(t, "SELECT count(*) FROM seller.stores WHERE store_id=$1 AND pii_purged_at IS NOT NULL", storeID) == 1
 }
 
-// retired 回報店家已退場（第一段清理：公開內容與圖片清掉、發了 StoreRetired）。
 func (f *fixture) retired(t *testing.T, storeID int64) bool {
 	t.Helper()
 	return f.count(t, "SELECT count(*) FROM seller.stores WHERE store_id=$1 AND retired_at IS NOT NULL", storeID) == 1
@@ -154,18 +150,15 @@ func TestPurgeClearsEveryPersonalColumn(t *testing.T) {
 		if f.count(t, "SELECT count(*) FROM seller.kyc_documents WHERE application_id=$1::uuid", st.app) != 0 {
 			t.Error("公司文件列沒刪")
 		}
-		// 保留的事實：審核紀錄。
 		if f.count(t, "SELECT count(*) FROM seller.kyc_reviews WHERE application_id=$1::uuid", st.app) < 2 {
 			t.Error("審核紀錄被清掉")
 		}
 	}
-	// 證件圖片在清理的 transaction 內標為刪除（刪證件列的同一個 transaction）。
 	for _, st := range stints {
 		for _, id := range st.docs {
 			f.wantAsset(t, id, "DELETING")
 		}
 	}
-	// 呈現層看到的 Store：已關閉、店名是空字串（墓碑由呈現層依 Status 決定）。
 	got, err := f.module.Store(ctx, stints[0].store.StoreID)
 	must(t, err)
 	if got.Status != Closed || got.StoreName != "" || got.Description != nil || got.ContactPhone != nil || got.AddressDetail != nil {
@@ -193,7 +186,6 @@ func TestPurgeOnlyTouchesStintsClosedForMoreThanTheStoreRetention(t *testing.T) 
 	_, err = f.module.CloseCurrent(ctx, recentAccount)
 	must(t, err)
 
-	// oldStore 關閉後的保留期前一秒、剛好保留期：都不清。
 	f.now = closedAt.Add(StoreRetention - time.Second)
 	if n, err := f.module.PurgePII(ctx); err != nil || n != 0 {
 		t.Fatalf("保留期前一秒不該清：n=%d err=%v", n, err)
@@ -217,7 +209,6 @@ func TestPurgeOnlyTouchesStintsClosedForMoreThanTheStoreRetention(t *testing.T) 
 			t.Errorf("%s的店個資被動到", name)
 		}
 	}
-	// 資料庫的保底：直接寫入也過不了。
 	for name, q := range map[string]string{
 		"營業中":     fmt.Sprintf("UPDATE seller.stores SET pii_purged_at=$1, store_name=NULL, description=NULL, contact_phone=NULL, contact_name=NULL, contact_mobile=NULL, support_email=NULL, town_code=NULL, address_detail=NULL, prize=NULL, website_url=NULL WHERE store_id=%d", openStore.StoreID),
 		"沒有清聯絡資料": fmt.Sprintf("UPDATE seller.stores SET status='CLOSED', pii_purged_at=$1, store_name=NULL, description=NULL, contact_phone=NULL, town_code=NULL, address_detail=NULL, prize=NULL, website_url=NULL WHERE store_id=%d", recentStore.StoreID),
@@ -260,7 +251,6 @@ func TestSanctionSnapshotSurvivesThePurgeOfItsSourceKYC(t *testing.T) {
 	if _, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: other, ExpectedVersion: d.Version}); err == nil {
 		t.Fatal("清理之後同一個統編不該通過認證")
 	}
-	// 措施結束才刪快照。
 	_, err = f.lift(ctx, sanction)
 	must(t, err)
 	if n := f.count(t, "SELECT count(*) FROM seller.measure_identities"); n != 0 {

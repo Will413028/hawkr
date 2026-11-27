@@ -43,7 +43,7 @@ var migrationFiles embed.FS
 func Migrations() fs.FS {
 	sub, err := fs.Sub(migrationFiles, "db/migrations")
 	if err != nil {
-		panic(err) // 只有 embed 的路徑寫錯才會發生，編譯後的 binary 不可能遇到
+		panic(err)
 	}
 	return sub
 }
@@ -656,7 +656,6 @@ func (m *Module) OnMeasureRevoked(ctx context.Context, e seller.MeasureRevoked) 
 	return m.stats.ReleaseTakedowns(ctx, e.MeasureID)
 }
 
-// takedownContents 略過社群以外的已知種類（聊天訊息、評價回覆由 im、review 讀取時判斷）；不認得的種類留給 stats 回錯誤。
 func takedownContents(refs []seller.ContentRef) []stats.Content {
 	var out []stats.Content
 	for _, r := range refs {

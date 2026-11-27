@@ -6,8 +6,6 @@ import {
 	StoreStatus,
 } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 
-// 店家清單與搜尋（SellerAdminService.ListStores）的請求組法。畫面只管狀態，哪個篩選分頁對應哪些請求欄位、
-// 搜尋字串怎麼分流都在這裡，才能不靠畫面測試。
 
 /** 商家清單的篩選分頁（決策簡報 D4 第 1 點）。 */
 export const FILTER_TABS = [
@@ -55,7 +53,6 @@ export function filterFields(
 		case "approved":
 			return { kycStatus: KYCStatus.KYC_STATUS_APPROVED };
 		case "pending":
-			// 「待審核」是後台待辦的成員（審核中、店家營運中、帳號沒有停權），不是申請的儲存狀態：伺服器的 kycAwaitingReview。
 			return { kycAwaitingReview: true };
 		case "rejected":
 			return { kycStatus: KYCStatus.KYC_STATUS_REJECTED };

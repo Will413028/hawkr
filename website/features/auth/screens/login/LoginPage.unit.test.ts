@@ -86,7 +86,6 @@ describe("LoginPage: the buttons hand the browser to the monolith's OAuth start"
 		const url = new URL(target, "https://hawkr.local");
 		expect(url.pathname).toBe("/api/auth/google/start");
 		const returnTo = url.searchParams.get("return_to") ?? "";
-		// the monolith only accepts a relative path that starts with a single "/"
 		expect(returnTo.startsWith("/")).toBe(true);
 		expect(returnTo.startsWith("//")).toBe(false);
 		const back = new URL(returnTo, "https://hawkr.local");

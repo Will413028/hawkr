@@ -63,9 +63,6 @@ const tabs = [
 				(m) => m.generateMetadata,
 			),
 	},
-	// The storefront index. It was excluded from this file on the grounds that
-	// it "already did this" — and it was the first route to break, because
-	// "already does this" was never asserted anywhere.
 	{
 		name: "storefront index",
 		tail: "",
@@ -95,7 +92,6 @@ describe.each(tabs)("$name metadata", ({ tail, load }) => {
 		timeout: IMPORT_BUDGET_MS,
 	}, async () => {
 		cachedMocks.getCachedStore.mockResolvedValue({
-			// camelCase `storeCode`, verbatim what the route sees.
 			name: "測試",
 			storeCode: STORE_CODE,
 			rating: 5,
@@ -105,10 +101,6 @@ describe.each(tabs)("$name metadata", ({ tail, load }) => {
 			params: Promise.resolve({ locale: "zh-TW", id: STORE_ID }),
 		});
 
-		// SELF-canonical: the tab's own URL on the canonical id, not the storefront
-		// index. Dropping the suffix would additionally ask search engines to
-		// de-index this tab, which is a separate decision from consolidating the
-		// two ids.
 		expect(metadata.alternates?.canonical).toBe(
 			`https://web-dev.example.com/sellers/${STORE_CODE}${tail}`,
 		);
@@ -137,10 +129,6 @@ describe.each(tabs)("$name metadata", ({ tail, load }) => {
 	it("does not honour the retired store_code spelling", {
 		timeout: IMPORT_BUDGET_MS,
 	}, async () => {
-		// A payload carrying ONLY the pre-backend#2235 name must be treated as
-		// carrying no code at all. Without this the fix is unpinnable: a route
-		// that reads BOTH names satisfies the first case while still depending on
-		// a key the gateway stopped sending.
 		cachedMocks.getCachedStore.mockResolvedValue({
 			name: "測試",
 			store_code: STORE_CODE,

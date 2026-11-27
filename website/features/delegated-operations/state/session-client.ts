@@ -63,7 +63,6 @@ async function callSessionBff(
 	const method = (init.method ?? "GET").toUpperCase();
 	const headers = new Headers(init.headers);
 	headers.set("Accept", "application/json");
-	// 非 GET 一律帶：BFF 的 CSRF 檢查同時要求它與同源 Origin（L1045）。
 	if (method !== "GET") headers.set("X-Requested-With", "XMLHttpRequest");
 	const response = await fetch(path, { ...init, headers, cache: "no-store" });
 	let payload: unknown = null;

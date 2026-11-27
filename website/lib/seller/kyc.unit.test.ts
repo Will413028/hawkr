@@ -335,7 +335,6 @@ describe("續填：位置與缺項由 missing_fields 決定", () => {
 			KYCField.KYC_FIELD_BUSINESS_TAX_ID,
 		);
 		expect(kycFieldOfPath("contact_email")).toBeUndefined();
-		// 重複欄位裡的單一元素（公司文件的第 3 份被拒絕）指到整個欄位。
 		expect(kycFieldOfPath("business.company_documents[2]")).toBe(
 			KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS,
 		);

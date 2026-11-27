@@ -152,7 +152,6 @@ export function usePostComments(
 		initialPageParam: FIRST_PAGE_PARAM,
 		getNextPageParam: nextPageParam,
 		staleTime: 30_000,
-		// 沒有即時推送：每次開啟（掛載）都重新讀，不沿用上次的列表。
 		refetchOnMount: "always",
 		queryFn: ({ pageParam, signal }) =>
 			fetchPostComments(postId ?? "", {
@@ -199,7 +198,6 @@ export function usePostComments(
 			onMutate: async (v) => {
 				await cancelListRefetch(queryClient, commentsKey);
 				const current = queryClient.getQueryData<CommentData>(commentsKey);
-				// 伺服器把新留言放在最後：最後一頁還沒載入時它不在已載入的資料裡。
 				if (!current || !postId || !lastPageLoaded(current)) return {};
 				const optimistic = optimisticComment(
 					postId,
@@ -327,7 +325,6 @@ export function usePostComments(
 	};
 }
 
-/* ===== Post viewer state (who comments, and whether they can) ===== */
 
 /**
  * 觀看者在這則貼文的留言權限與身分，由伺服器依觀看者算。貼文已經帶著（依觀看者讀的）答案時呼叫端傳
@@ -346,7 +343,6 @@ export function usePostViewerState(
 	});
 }
 
-/* ===== Post like toggle hook ===== */
 
 interface UsePostInteractionsResult {
 	liked: boolean;
@@ -455,7 +451,6 @@ export function usePostInteractions(
 	};
 }
 
-/* ===== Replies (per-comment thread) ===== */
 
 interface ReplyContext extends SubmitContext {
 	countBumped?: boolean;

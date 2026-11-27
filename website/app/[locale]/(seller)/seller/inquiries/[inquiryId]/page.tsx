@@ -7,8 +7,6 @@ interface PageProps {
 }
 
 export function generateStaticParams() {
-	// A sentinel PPR shell keeps the dynamic param from turning the whole route
-	// into a blocking render. No real inquiry id is ever prerendered.
 	return [{ inquiryId: "0" }];
 }
 

@@ -26,8 +26,6 @@ class MqErrorHandlerTest {
 
     @AfterEach
     void resetMeterRegistry() {
-        // handleFailure 讀的是 static 欄位；每個 test 結束後清掉，避免污染其他測試檔
-        // 在同一個 JVM 內對 MqErrorHandler 的呼叫（static 狀態跨測試類別共享）。
         MqErrorHandler.setMeterRegistry(null);
     }
 
@@ -63,8 +61,6 @@ class MqErrorHandlerTest {
 
     @Test
     void noMeterRegistrySetDoesNotThrow() throws Exception {
-        // setMeterRegistry 從未被呼叫過（@AfterEach 保證每個 test 都是 null 起手）——
-        // 對應「沒有 Spring context 時直接呼叫這個 static 方法」的情境。
         Channel channel = mock(Channel.class);
         Message message = buildMessage("order.paid", 3);
 

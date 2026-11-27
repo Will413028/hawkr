@@ -34,7 +34,6 @@ import { socialAppClient } from "../connect/social";
 import { createOwnerPostApi, type OwnerPostClient } from "../posts/owner";
 import type { AgreementAcceptanceInput } from "./agreements";
 
-/* ===== Store (Connect) ===== */
 
 /** 店面的地址：鄉鎮市區代碼（8 碼）與明細；明細可以是空字串。 */
 export interface StoreAddress {
@@ -212,25 +211,6 @@ export async function closeMyStore(): Promise<Store> {
 	return res.store;
 }
 
-/* ===== Seller coupons =====
- *
- * Backend (POST /app/coupon_templates) wire format per OpenAPI:
- *
- *   {
- *     title: string,
- *     type: "1" | "2",               // 1=現金 / 2=折扣
- *     targetType: "1" | "2" | "3",   // 1=全體 / 2=賣家會員 / 3=指定買家
- *     startAt: string, endAt: string,// ISO 8601 UTC, YYYY-MM-DDTHH:mm:ssZ (REQUIRED)
- *     thresholdAmount?: string,
- *     discountAmount?: string,       // type=1 only
- *     discountPercent?: string,      // type=2 only
- *     maxDiscountAmount?: string,    // type=2 cap (avoids 100%-off on big carts)
- *     buyerAccountIds?: string[],    // targetType=3 only
- *   }
- *
- * Web kept legacy `"amount"|"percent"` strings for `type` for compat —
- * they're translated to the numeric codes inside `createSellerCoupon`.
- */
 
 /** Semantic coupon kind used by the web form (UI-friendly). Repo maps to
  * the backend's numeric `type` enum at send time. */
@@ -252,9 +232,6 @@ export interface SellerCoupon {
 	maxDiscountAmount?: number;
 	discountAmount?: number;
 	discountPercent?: number;
-	/* 以下六個 snake 欄是**前端表單的欄名**，不是 wire 名（`/app/coupon_templates`
-	 * 的 body 一直是 camelCase：thresholdAmount / startAt / endAt / totalIssueLimit
-	 * / issuedCount / createdAt）。normalizeSellerCoupon 負責 wire → 表單的換名。 */
 	min_spend?: number;
 	thresholdAmount?: number;
 	starts_at?: number;
@@ -328,9 +305,6 @@ function normalizeSellerCoupon(raw: Partial<SellerCoupon>): SellerCoupon {
 		kindFromCode(raw.type) ?? (raw.discountPercent ? "percent" : "amount");
 	const valueSource =
 		kind === "percent" ? raw.discountPercent : raw.discountAmount;
-	// Backend uses 0 / -1 as the "unlimited" sentinel for the issue cap; keep
-	// only a positive value as a real limit so the card shows ∞ instead of a
-	// literal "/ -1" and couponState doesn't read 0 >= -1 as 已領完.
 	const issueLimit = Number(raw.totalIssueLimit ?? 0);
 	return {
 		...raw,
@@ -384,19 +358,11 @@ export async function fetchSellerCoupon(
 			`/app/coupon_templates/${encodeURIComponent(id)}`,
 		);
 	} catch (e) {
-		// 詳情端點對某些「列表存在」的優惠券回 7001「優惠券不存在」
-		// (list / detail contract gap)。視為查無此券回 null —— 對齊本函式的
-		// `| null` 契約，避免 reject 變成 unhandledRejection。其餘錯誤照常上拋
-		// 給呼叫端處理(顯示錯誤、而非吞掉)。
 		if (e instanceof ApiClientError && e.code === 7001) return null;
 		throw e;
 	}
 	const data = env.data;
 	if (!data) return null;
-	// The detail endpoint wraps the coupon under `data.template` (with
-	// usedCount / reservedCount as siblings), unlike the list endpoint which
-	// returns each record flat. Unwrap so the edit form binds to the real
-	// fields instead of an empty shell (everything falling back to defaults).
 	return normalizeSellerCoupon(data.template ?? data);
 }
 
@@ -441,8 +407,6 @@ export async function createSellerCoupon(
 	const target = (targetFromCode(body.targetType) ??
 		"all") as SellerCouponTarget;
 	if (!body.starts_at || !body.expires_at) {
-		// Backend marks startAt + endAt as required — fail fast instead of
-		// sending a malformed request that returns a noisy 400.
 		throw new Error("請設定優惠券的開始與到期時間。");
 	}
 	if (target === "specific" && (body.buyerAccountIds?.length ?? 0) === 0) {
@@ -474,9 +438,6 @@ export async function createSellerCoupon(
 	};
 }
 
-// No seller-side coupon update endpoint exists — coupons are immutable once
-// issued (the web edit route is a read-only 檢視 view; adjust by revoke +
-// recreate). Reintroduce an updateSellerCoupon() here if the backend ships one.
 
 export async function deleteSellerCoupon(id: string): Promise<void> {
 	await authedFetch(`/app/coupon_templates/${encodeURIComponent(id)}/revoke`, {
@@ -484,7 +445,6 @@ export async function deleteSellerCoupon(id: string): Promise<void> {
 	});
 }
 
-/* ===== Seller posts ===== */
 
 /**
  * 建立貼文（`SocialAppService.CreatePost`）的輸入 — 可附一張圖片（stagedToken）與一個商品（productId）。

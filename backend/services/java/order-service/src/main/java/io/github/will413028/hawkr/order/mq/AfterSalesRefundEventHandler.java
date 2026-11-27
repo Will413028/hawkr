@@ -54,8 +54,6 @@ public class AfterSalesRefundEventHandler {
     @Transactional
     public void handleRefundCompleted(String orderNo, AfterSalePlatformDecisionOutcome outcome,
                                       long refundAmount, String externalRefId, String caseNo) {
-        // 冪等守門：financial_log (type, external_txn_id) UNIQUE（36 號策略 1）。
-        // 衝突 = 本事件已處理過（at-least-once 重複投遞）→ 跳過狀態/累加，只重跑共用尾段。
         boolean duplicate = false;
         String txnId = null;
         if (refundAmount > 0) {
@@ -85,16 +83,6 @@ public class AfterSalesRefundEventHandler {
                         "未處理的 outcome: " + outcome + ", orderNo=" + orderNo);
             }
 
-            // E1（58 §6.3.2.3）：order.refund.finalized 同事務落 outbox。
-            //
-            // 🔴 **必須在 duplicate == false 分支內**，這是本章最貴的一個實作細節：
-            // aftersales 的 RefundSyncWorker（@Scheduled 每小時）會把任何 1 小時前的 DONE
-            // refund task 無限重發（DONE 是終態、沒有任何後續寫入會把它推出候選集合 ⇒ 重發無時間上界）。
-            // 放到分支外 = 每小時多發一則 ⇒ 下游每小時對同一筆退款多開一張折讓單，
-            // 而折讓單開出去無法撤回（AMEGO 3050141 明定已存在折讓單則不得作廢）。
-            //
-            // 只在 refundAmount > 0 時有 txnId：金額為 0 沒有 financial_log、沒有 refund_ref，
-            // 也沒有「錢退出去」這個事實可供發票端判定。
             if (txnId != null) {
                 refundFinalizedOutboxWriter.write(orderNo, RefundSource.AFTERSALE_CASE, txnId,
                         refundAmount, outcome.value(), caseNo, null);
@@ -119,7 +107,6 @@ public class AfterSalesRefundEventHandler {
         if (statusRows > 0) {
             log.info("AfterSalesRefundEventHandler.fullRefund.statusUpdated",
                     "訂單狀態更新為 " + targetStatus, "orderNo", orderNo);
-            // [B-207] #1181：賣家工作區 realtime — 退款後訂單狀態變更（事務內註冊 afterCommit 發送）
             eventPublisher.emitSellerOrderUpdated(orderNo, OrderEventPublisher.SRC_AFTER_SALE,
                     null, targetStatus);
         } else {
@@ -141,8 +128,6 @@ public class AfterSalesRefundEventHandler {
         }
         log.info("AfterSalesRefundEventHandler.partialRefund.accumulated",
                 "refund_total_amount 已累加 " + refundAmount, "orderNo", orderNo);
-        // 累加成功即 emit（best-effort realtime invalidation；status 不在本層讀取，帶 null 讓
-        // 賣家工作區收到後 REST 全刷——退款金額變化本身就是賣家可見的訂單變更）
         eventPublisher.emitSellerOrderUpdated(orderNo, OrderEventPublisher.SRC_AFTER_SALE, null, null);
     }
 }

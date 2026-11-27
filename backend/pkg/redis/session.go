@@ -16,15 +16,6 @@ import (
 
 const sessionPrefix = "session:"
 
-// getSessionWithTTLScript reads a session AND its remaining TTL in one
-// round-trip, mutating nothing. Returns a 3-tuple {found, ttl, value}: found=0
-// when the key is absent/expired (ttl 0, value empty).
-//
-// Read and slide are deliberately NOT fused (they were, until #2014's
-// follow-up): the caller has to be able to run its own checks — is this account
-// blocked? does the source of truth still hold this session? — in between, and
-// only then decide to extend the session. A request that is about to be refused
-// must not have already renewed the session it is refused on.
 const getSessionWithTTLScript = `
 local v = redis.call("GET", KEYS[1])
 if not v then

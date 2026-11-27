@@ -46,11 +46,5 @@ export const zenMaruGothic = localFont({
 	],
 	variable: "--font-zen-maru",
 	display: "optional",
-	// This helper is imported by the shared public route graph, including
-	// pages that never apply `--font-zen-maru`. Preloading all four weights
-	// globally therefore produces Chrome's "preloaded but not used" warning on
-	// /feed and /market/products. Let CSS request it only where used and keep a
-	// slow cold visit on the metric-compatible fallback instead of swapping
-	// after the stable content handoff.
 	preload: false,
 });

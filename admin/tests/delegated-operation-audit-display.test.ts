@@ -79,12 +79,10 @@ test("有紀錄且都已確認才說「所有結果均已確認」（成功或�
 		auditConfirmationText({ operationCount: 3, pendingAuditCount: 0 }, 0),
 		"所有結果均已確認",
 	);
-	// 全部失敗也是「有紀錄」：不必等 operationCount 非零才承認做過事。
 	assert.equal(
 		auditConfirmationText({ operationCount: 0, pendingAuditCount: 0 }, 2),
 		"所有結果均已確認",
 	);
-	// 成功數非零時不必等失敗查詢回來就答得出來。
 	assert.equal(
 		auditConfirmationText({ operationCount: 3, pendingAuditCount: 0 }, null),
 		"所有結果均已確認",
@@ -161,14 +159,11 @@ test("已撤銷但沒有 endedAt 時，工作時長不得印出一個以「現�
 });
 
 test("右端釘得住的三種情形照印秒數，不因為守門而漏掉真的量得到的時長", () => {
-	// 撤銷有寫 ended_at（現行 RevokeSession 的行為）。
 	assert.equal(
 		sessionDurationText(48, "2026-08-16T12:22:45Z", "revoked"),
 		"48 秒",
 	);
-	// 已到期＝兩支到期述詞至少一支成立，右端必在過去，即使 ended_at 還沒被寫上。
 	assert.equal(sessionDurationText(900, null, "expired"), "15 分 0 秒");
-	// 進行中本來就該以 now 為右端，這一列問的正是「目前已經進行多久」。
 	assert.equal(sessionDurationText(48, null, "active"), "48 秒");
 });
 
@@ -192,7 +187,6 @@ test("摘要卡的工作時長走 sessionDurationText，且三個參數都傳", 
 		"src/features/delegated-operations/components/SessionAuditConsole.tsx",
 		"utf8",
 	);
-	// 先剝註解：本次修改在那一列上方留了一段解釋，函式名寫在裡面。
 	const code = source
 		.replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/gu, "")
 		.replace(/\/\*[\s\S]*?\*\//gu, "")
@@ -202,7 +196,6 @@ test("摘要卡的工作時長走 sessionDurationText，且三個參數都傳", 
 		/sessionDurationText\(\s*report\.durationSeconds,\s*report\.endedAt,\s*report\.status,?\s*\)/u,
 		"工作時長沒有同時吃進 endedAt 與 status ⇒ 它無從得知右端是不是 now",
 	);
-	// 本地重新實作一份格式化＝繞過守門的最短路徑。
 	assert.doesNotMatch(code, /function formatDuration\b/u);
 });
 
@@ -242,13 +235,10 @@ test("範圍差異：新增／移除／同時增減／未變／首次開通各�
 		added: [],
 		removed: [],
 	});
-	// 首次開通：before 為空 ⇒ 全部算新增（呼叫端據 before.length === 0 再標「首次開通」，
-	// 否則九項全列成「新增」會看不出這是開通不是擴權）。
 	assert.deepEqual(
 		delegationScopeDelta([], ["products.read", "products.write"]),
 		{ added: ["products.read", "products.write"], removed: [] },
 	);
-	// 撤回：after 為空。與「未變更」必須分得開。
 	assert.deepEqual(delegationScopeDelta(["products.read"], []), {
 		added: [],
 		removed: ["products.read"],
@@ -277,16 +267,13 @@ test("歷程表的範圍欄走差異呈現，且完整清單有地方可看", as
 		.replace(/^[ \t]*\/\/.*$/gmu, "");
 	assert.match(code, /delegationScopeDelta\(before, after\)/u);
 	assert.match(code, /<ScopeChangeCell/u);
-	// 修前那個形狀：兩份完整清單並排。回退到它就轉紅。
 	assert.doesNotMatch(
 		code,
 		/capabilitiesBefore\s*\n?\s*\.map\(delegationCapabilityLabel\)/u,
 		"範圍欄又把 before 完整清單直接印進儲存格",
 	);
-	// 差異隱藏了 after 全集，展開面板是它的歸宿；沒有它就等於把資訊刪掉。
 	assert.match(code, /查看完整範圍/u);
 	assert.match(code, /aria-expanded=\{expanded\}/u);
-	// 「未變更」不得畫成「—」：那與「首次開通」（before 為空）在畫面上長得一樣。
 	assert.match(code, /範圍未變更/u);
 });
 
@@ -320,8 +307,6 @@ test("理由欄有自己的下限與換行規則，且兩張表都掛上了", as
 	);
 	assert.match(rule[0], /min-width: var\(--adm-audit-reason-min\)/u);
 	assert.match(rule[0], /white-space: normal/u);
-	// 變數只宣告在 `.adm-audit-table-wrap`（兩張表都在它之下）。多一份就多一個會漂移
-	// 的數字；少了它 var() 解析不到，整條規則靜默失效。
 	const declarations = [
 		...css.matchAll(/--adm-audit-reason-min:\s*(\d+)px;/gu),
 	];

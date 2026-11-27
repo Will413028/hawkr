@@ -95,7 +95,6 @@ test("徽章：已關閉與停權優先於申請狀態", () => {
 		"停權中",
 		"停權優先於申請狀態",
 	);
-	// 已關閉優先於停權。
 	assert.equal(
 		rowBadge(
 			item(K.KYC_STATUS_APPROVED, {

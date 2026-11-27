@@ -12,50 +12,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// 56 號代行授權列的七支治理端點（#2444）。
-//
-// 它們與 admin_delegation.go 的 S1–S6 是**不同層**的東西：S1–S6 管「這一次代行」，本檔
-// 管「這家店可不可以被代行、範圍多大」。授權的建立與撤回發生在任何工作階段之前，所以
-// 七支全部掛在 ADM host 組（JWTAuth + requireAdmin），沒有 operation credential、
-// 不宣告 capability、也不寫 admin_operation_audit_logs（那張表的 session_id 是
-// NOT NULL REFERENCES delegated_operation_sessions，結構上就填不進去）。留痕走
-// delegation 模組的 delegation_authorization_audit_logs，與授權列同一個交易。
-//
-// ⚠️ 路徑一律含 `delegated-operations` 這個 segment。hawkr-admin 的 catch-all BFF
-// （features/delegated-operations/server/bff-boundary.ts）只認 `delegated-operation`／
-// `delegated-operations` 兩個字面值來拒絕代理；換成 `delegation-authorizations` 之類的
-// 名字，前端就能用泛用 api.get 繞過整套 parser／safeUpstreamError／no-store 保護，而且
-// 不會有任何東西轉紅。
 
-// ==================== 值域 ====================
 
-// delegationAuthorizationSources 是 chk_sda_source 的三值。授權依據的種類是封閉列舉，
-// 不是自由文字——「憑什麼授權這家店」必須指得出一份可查的東西。
 var delegationAuthorizationSources = map[string]struct{}{
 	"contract":        {},
 	"ticket":          {},
 	"platform_policy": {},
 }
 
-// delegationAuthorizationStatuses 是列表篩選的全覆蓋二分。
-//
-// 刻意不做 {active, revoked, expired} 那種三分：effective_from 落在未來的列（維運 SQL
-// 仍可能建）不屬於其中任何一類，篩選時會靜默消失。二分不會漏，畫面要說明「為什麼無效」
-// 時讀該列的 revokedAt／effectiveUntil 自己判斷。
 var delegationAuthorizationStatuses = map[string]struct{}{
 	"effective":   {},
 	"ineffective": {},
 }
 
-// delegationEffectiveUntilRE 是對外時間格式（ISO 8601 UTC 秒精度）。
-//
-// 只驗形狀，不驗「是不是已經過去了」：那個判斷要用 now()，而 now() 的權威在
-// delegation 模組（回應的 effective 欄就是它算的）。在 Gateway 用自己的時鐘再判一次，
-// 兩邊時鐘差幾秒就會出現「Gateway 說不行、服務說可以」的分歧，而分歧的那一側永遠是
-// 使用者看到的那一側。
 var delegationEffectiveUntilRE = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$`)
 
-// ==================== 回應 DTO ====================
 
 // DelegationAuthorizationData 是授權列對外的唯一投影。
 //
@@ -169,7 +140,6 @@ type DelegationAuthorizationHistoryEntry struct {
 	CreatedAt            string   `json:"createdAt"`
 }
 
-// ==================== 請求 DTO ====================
 
 // GrantDelegationAuthorizationRequest 是開通／復權的 body。
 type GrantDelegationAuthorizationRequest struct {
@@ -198,12 +168,7 @@ type RevokeDelegationAuthorizationRequest struct {
 	RevokeReason string `json:"revokeReason"`
 }
 
-// ==================== 共用小工具 ====================
 
-// delegationAuthorizationStoreID 讀 path 上的 store_id。
-//
-// 值域與 S1 preflight 的 storeId 完全相同（isDelegationOpaqueID）：同一個識別碼在同一組
-// 端點上不該有兩套值域，否則同一個值在 preflight 過得了、在授權面被擋掉。
 func delegationAuthorizationStoreID(c *gin.Context) (string, bool) {
 	storeID := c.Param("store_id")
 	if !isDelegationOpaqueID(storeID) {
@@ -213,12 +178,6 @@ func delegationAuthorizationStoreID(c *gin.Context) (string, bool) {
 	return storeID, true
 }
 
-// validateDelegationAuthorizationScope 驗證三個「授權變成什麼」的欄位，Grant 與 Update
-// 共用。回傳已 trim 的值。
-//
-// 依賴閉包（9287）與其他值域（9260）刻意用不同的碼：前者是「這組能力互相矛盾」，UI 要
-// 自動補上缺的那幾項再讓人確認；後者是「這個參數本身就不對」，UI 只能請人重填。混成
-// 一個碼之後，前端唯一能做的就是對所有錯誤顯示同一句話。
 func validateDelegationAuthorizationScope(c *gin.Context, source, sourceReference string, caps []string, effectiveUntil *string, reason string) (outSource, outRef, outReason string, ok bool) {
 	if _, known := delegationAuthorizationSources[source]; !known {
 		delegationDeny(c, bizcode.DelegationInvalidCommand, "source 必須為 contract、ticket 或 platform_policy")
@@ -227,8 +186,6 @@ func validateDelegationAuthorizationScope(c *gin.Context, source, sourceReferenc
 
 	ref := strings.TrimSpace(sourceReference)
 	if n := len([]rune(ref)); n < 4 || n > 200 || hasControlChar(ref) || !strings.ContainsAny(ref, "0123456789") {
-		// 「至少含一個數字」是 chk_sda_source_reference 的規則：它要的是依據**編號**
-		// （合約號／工單號／政策文號），不是「賣家說要開通」這種說明文字。
 		delegationDeny(c, bizcode.DelegationInvalidCommand, "sourceReference 必須為 4–200 字且至少含一個數字")
 		return "", "", "", false
 	}
@@ -266,8 +223,6 @@ func validateDelegationAuthorizationScope(c *gin.Context, source, sourceReferenc
 	return source, ref, r, true
 }
 
-// toDelegationAuthorizationData 投影授權列。proto struct 一律不直出：protoc-gen-go 的
-// tag 是 snake_case ＋ omitempty，直出即欄名全錯、且 false／空字串整個欄位消失。
 func toDelegationAuthorizationData(a *accountpb.DelegationAuthorization) DelegationAuthorizationData {
 	caps := a.GetGrantedCapabilities()
 	if caps == nil {
@@ -351,8 +306,6 @@ func toDelegationAuthorizationHistoryEntry(e *accountpb.DelegationAuthorizationA
 	return out
 }
 
-// delegationAuthorizationUpstream 檢查 account client 是否可用。Holder 在測試裡可能是
-// 零值，而 nil client 會在呼叫的那一行 panic 而不是回一個可讀的錯誤。
 func delegationAuthorizationUpstream(h *Holder, c *gin.Context, event string) bool {
 	if h.Account == nil {
 		delegationUpstreamFailure(c, event, nil)
@@ -361,7 +314,6 @@ func delegationAuthorizationUpstream(h *Holder, c *gin.Context, event string) bo
 	return true
 }
 
-// ==================== 1｜能力目錄 ====================
 
 // ListDelegationCapabilities 下發代行能力目錄（值／風險／依賴）
 // GET /api/v1/admin/delegated-operations/capabilities
@@ -395,7 +347,6 @@ func (h *Holder) ListDelegationCapabilities(c *gin.Context) {
 	response.OK(c, DelegationCapabilityCatalogData{Capabilities: caps})
 }
 
-// ==================== 2｜授權列表 ====================
 
 // ListDelegationAuthorizations 列出代行授權（治理總覽）
 // GET /api/v1/admin/delegated-operations/authorizations
@@ -465,7 +416,6 @@ func (h *Holder) ListDelegationAuthorizations(c *gin.Context) {
 	response.Page(c, records, resp.GetTotal(), resp.GetPage(), resp.GetPageSize())
 }
 
-// ==================== 3｜單店授權詳情 ====================
 
 // GetDelegationAuthorization 查詢單店的代行授權設定
 // GET /api/v1/admin/delegated-operations/authorizations/{store_id}
@@ -519,8 +469,6 @@ func (h *Holder) GetDelegationAuthorization(c *gin.Context) {
 		Exists:             data.GetExists(),
 		ActiveSessionCount: data.GetActiveSessionCount(),
 	}
-	// exists=true 卻沒有投影，就是一份自相矛盾的回應：面板會渲染出一個沒有任何欄位的
-	// 「已開通」，而管理員據此判斷這家店可以被代行。回可重試的 424 才誠實。
 	if data.GetExists() {
 		if data.GetAuthorization() == nil {
 			delegationUpstreamFailure(c, "查詢單店代行授權：exists 為真但缺少授權列", nil)
@@ -530,14 +478,11 @@ func (h *Holder) GetDelegationAuthorization(c *gin.Context) {
 		out.Authorization = &v
 	}
 	if out.ActiveSessionCount == "" {
-		// 計數欄缺席時補 "0" 而不是留空字串：前端要拿它做 Number() 與二次確認文案，
-		// 空字串會變成 NaN 並把「將中止 N 個工作階段」渲染成空白。
 		out.ActiveSessionCount = "0"
 	}
 	response.OK(c, out)
 }
 
-// ==================== 4｜開通／復權 ====================
 
 // GrantDelegationAuthorization 開通或重新開通一家店的代行授權
 // POST /api/v1/admin/delegated-operations/authorizations
@@ -618,7 +563,6 @@ func (h *Holder) GrantDelegationAuthorization(c *gin.Context) {
 	})
 }
 
-// ==================== 5｜調整授權範圍 ====================
 
 // UpdateDelegationAuthorization 調整既有有效授權的範圍／依據／期限
 // PUT /api/v1/admin/delegated-operations/authorizations/{store_id}
@@ -700,7 +644,6 @@ func (h *Holder) UpdateDelegationAuthorization(c *gin.Context) {
 	})
 }
 
-// ==================== 6｜撤回 ====================
 
 // RevokeDelegationAuthorization 撤回一家店的代行授權
 // POST /api/v1/admin/delegated-operations/authorizations/{store_id}/revoke
@@ -782,7 +725,6 @@ func (h *Holder) RevokeDelegationAuthorization(c *gin.Context) {
 	})
 }
 
-// ==================== 7｜授權變更歷程 ====================
 
 // ListDelegationAuthorizationHistory 列出單店的授權變更歷程
 // GET /api/v1/admin/delegated-operations/authorizations/{store_id}/history

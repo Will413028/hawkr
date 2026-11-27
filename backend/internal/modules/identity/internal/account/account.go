@@ -95,7 +95,6 @@ func contactEmail(r store.IdentityAccount) (model.ContactEmail, bool) {
 	return model.ContactEmail{}, false
 }
 
-// validEmail 回傳通過 emailaddr.Normalize 的正規化信箱；沒有值或格式不合都視為沒有。聯絡信箱與設定自填信箱共用這一條規則。
 func validEmail(raw *string) (string, bool) {
 	if raw == nil {
 		return "", false
@@ -139,7 +138,6 @@ func (m *Service) SetSelfEnteredEmail(ctx context.Context, accountID int64, raw 
 	var out model.ContactEmail
 	err := m.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := m.q(ctx)
-		// 鎖住帳號列：與登入時更新 email 的 UPDATE 互斥，驗證與寫入之間 email 不會變。
 		r, err := lockLiveAccount(ctx, q, accountID)
 		if err != nil {
 			return err
@@ -236,7 +234,6 @@ func (m *Service) ShareLockAccount(ctx context.Context, id int64) (deleted bool,
 	return a.Deleted, nil
 }
 
-// lockLiveAccount 鎖住存活的帳號；不存在或已刪除時回 NotFound。
 func lockLiveAccount(ctx context.Context, q *store.Queries, id int64) (store.IdentityAccount, error) {
 	a, err := q.LockLiveAccount(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -288,7 +285,6 @@ func (m *Service) RemoveRole(ctx context.Context, in model.RemoveRoleInput) erro
 	})
 }
 
-// knownRole 擋下不是角色的值（例如舊的 BUYER：買家不是角色）。
 func knownRole(r model.Role) error {
 	if !slices.Contains(model.Roles(), r) {
 		return apperr.InvalidInput("%q 不是可以授予或移除的角色", r)
@@ -408,7 +404,6 @@ func (m *Service) CurrentSuspension(ctx context.Context, accountID int64) (rec m
 	return suspensionOf(row), true, nil
 }
 
-// suspensionRow 驗證輸入並轉成寫入的參數：類別必須是政策分類的值，說明與來源參照去掉前後空白。
 func suspensionRow(in model.SuspendInput) (store.InsertAccountSuspensionParams, error) {
 	if !slices.Contains(policy.Values(), in.Category) {
 		return store.InsertAccountSuspensionParams{}, apperr.InvalidInputOn([]string{"Category"}, "停權的理由類別 %q 不是政策分類", in.Category)
@@ -429,7 +424,6 @@ func suspensionRow(in model.SuspendInput) (store.InsertAccountSuspensionParams, 
 	}, nil
 }
 
-// maxSourceRefRunes 是 account_suspensions.source_ref 的字數上限（CHECK 以 char_length，即字元數計）。
 const maxSourceRefRunes = 200
 
 func suspensionOf(r store.IdentityAccountSuspension) model.AccountSuspension {
@@ -458,8 +452,6 @@ func (m *Service) DeleteAccount(ctx context.Context, accountID int64) error {
 	})
 }
 
-// deleteAccount 在呼叫方的 transaction 內刪除已鎖定的帳號：解除未解除的停權紀錄（release_reason 為 ACCOUNT_DELETED），刪角色、全部 session 與登入身分，帳號只留沒有個資的墓碑（登入身分留作墓碑，
-// 同一個登入身分不會再建一個帳號），並發出 AccountDeleted；所有刪除路徑都經過這裡。
 func (m *Service) deleteAccount(ctx context.Context, q *store.Queries, a store.IdentityAccount) error {
 	now := m.d.Now()
 	if a.SuspendedAt != nil {

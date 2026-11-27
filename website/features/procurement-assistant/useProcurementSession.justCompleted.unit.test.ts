@@ -74,13 +74,8 @@ describe("justCompletedTurnId", () => {
 
 		const restored = restoredStateFrom(transcript, snapshot);
 
-		// 回傳的 Partial<SessionState> 完全不該提到這個欄位——一旦有人不小心
-		// 把最後一則 assistant turn 標成剛完成，merge 進 initialState() 就會讓
-		// 已讀取的歷史對話也播交錯淡入動畫。
 		expect(restored).not.toHaveProperty("justCompletedTurnId");
 
-		// 對齊掛載時實際的 merge 方式（useState 初始化那行：
-		// `{ ...initialState(), ...cached }`）。
 		const merged = { ...initialState(), ...restored };
 		expect(merged.justCompletedTurnId).toBeNull();
 	});

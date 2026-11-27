@@ -13,8 +13,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 )
 
-// 商家名單（站外業者的 BD 名單，遷移計畫 A3b 步驟 7c 階段 4）的型別與輸入規則。聯絡方式與比對鍵的規則見 ADR
-// 2026-10-04-prospect-contact-points-and-matching；比對鍵的解析器在 prospect_match.go（舊 seller-service 的 P1，加上共用平台的排除）。
 
 // ProspectStatus 是業者的狀態。
 type ProspectStatus string
@@ -96,7 +94,6 @@ type ContactPoint struct {
 	Primary bool
 }
 
-// 聯絡方式的上限：值的長度與 DB 的 prospect_contacts_value_check 一致；每個業者的總數是服務端的安全上限。
 const maxContacts = 50
 
 func contactValueMax(k ContactKind) int {
@@ -161,7 +158,6 @@ func NormalizeContacts(in []ContactPoint) ([]ContactPoint, error) {
 	return out, nil
 }
 
-// compareContacts 依類型順序、再依值排序。
 func compareContacts(a, b ContactPoint) int {
 	order := ContactKindValues()
 	if c := slices.Index(order, a.Kind) - slices.Index(order, b.Kind); c != 0 {
@@ -458,7 +454,6 @@ func NewProspectMatchFound(ids []int64) *apperr.Error {
 
 var taxIDPattern = regexp.MustCompile(`^[0-9]{8}$`)
 
-// 欄位的長度上限與 DB 的 prospects_*_check 一致（文字欄位另有上限，只在這裡擋）。
 const (
 	prospectTextMax     = 10000
 	prospectCategoryMax = 64

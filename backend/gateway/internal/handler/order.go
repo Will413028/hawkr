@@ -11,7 +11,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ==================== DTO ====================
 
 // OrderDetailResponse 訂單詳情回應
 type OrderDetailResponse struct {
@@ -256,7 +255,6 @@ type SuccessResponse struct {
 	Success bool `json:"success"`
 }
 
-// ==================== 轉換函式 ====================
 
 func convertOrderDetail(d *pb.OrderDetailView, mediaBase string) *OrderDetailResponse {
 	if d == nil {
@@ -429,7 +427,6 @@ func convertOrderSummaries(orders []*pb.OrderSummaryView, mediaBase string) []Or
 	return result
 }
 
-// convertAdminOrderSummaries Admin 列表：共用摘要 + admin 專屬欄位（paymentMethod）
 func convertAdminOrderSummaries(orders []*pb.OrderSummaryView, mediaBase string) []AdminOrderSummaryResponse {
 	base := convertOrderSummaries(orders, mediaBase)
 	result := make([]AdminOrderSummaryResponse, 0, len(orders))
@@ -457,7 +454,6 @@ func convertAdminOrderDetail(d *pb.AdminOrderDetailData, mediaBase string) *Admi
 			CreateTime:    log.CreateTime,
 		})
 	}
-	// §29 providerContext
 	if pc := d.GetProviderContext(); pc != nil && pc.GetProviderSource() != "" {
 		r.ProviderContext = &AdminOrderProviderContextResp{
 			ProviderSource:   pc.GetProviderSource(),
@@ -471,7 +467,6 @@ func convertAdminOrderDetail(d *pb.AdminOrderDetailData, mediaBase string) *Admi
 	return r
 }
 
-// ==================== 買家端 ====================
 
 // CreateOrder 建立訂單
 // @Summary      建立訂單
@@ -503,10 +498,10 @@ func (h *Holder) CreateOrder(c *gin.Context) {
 		TotalOriginalAmount string `json:"totalOriginalAmount" binding:"required"`
 		TotalActualAmount   string `json:"totalActualAmount" binding:"required"`
 		CheckoutID          string `json:"checkoutId"`
-		DeliveryTemp        string `json:"deliveryTemp"`     // 配送溫層 Enum code
-		ShippingMethod      string `json:"shippingMethod"`   // 運送方式 Enum code
-		ShippingFee         string `json:"shippingFee"`      // 運費（新台幣元，數字字串）
-		ShippingFeePayer    string `json:"shippingFeePayer"` // 運費負擔方 Enum code
+		DeliveryTemp        string `json:"deliveryTemp"`
+		ShippingMethod      string `json:"shippingMethod"`
+		ShippingFee         string `json:"shippingFee"`
+		ShippingFeePayer    string `json:"shippingFeePayer"`
 		Items               []struct {
 			SkuID     string `json:"skuId" binding:"required"`
 			SkuName   string `json:"skuName" binding:"required"`
@@ -522,7 +517,6 @@ func (h *Holder) CreateOrder(c *gin.Context) {
 
 	items := make([]*pb.CreateOrderItem, 0, len(req.Items))
 	for _, item := range req.Items {
-		// listPrice 缺省時退化為 unitPrice（無特價情境向下相容）
 		listPrice := item.ListPrice
 		if listPrice == "" {
 			listPrice = item.UnitPrice
@@ -632,7 +626,6 @@ func (h *Holder) GetMyOrders(c *gin.Context) {
 	rawSize := httputil.ParsePageParam(c.Query("page_size"), defaultLimit)
 	page, size, _ := pagination.NormalizePage(rawPage, rawSize, defaultLimit, maxPageSize)
 
-	// 賣家視角：view=seller → 呼叫 GetSellerOrders gRPC（§5.1 角色分離，獨立 RPC 由 Gateway 分發）
 	view := c.DefaultQuery("view", "")
 	if view == "seller" {
 		storeID, ok := h.resolveStoreID(c)
@@ -704,7 +697,6 @@ func (h *Holder) GetMyOrderStatusCounts(c *gin.Context) {
 		return
 	}
 
-	// 賣家視角不走本 API：與 dashboard 四桶（含售後覆蓋）會形成兩套對不上的數字，違反單一真相源
 	if authz.IsSellerView(c.Query("view")) {
 		response.BadRequest(c, "賣家統計請走 Connect SellerAppService.GetMyDashboard（四桶狀態卡），本 API 僅回買家各狀態筆數")
 		return
@@ -727,7 +719,6 @@ func (h *Holder) GetMyOrderStatusCounts(c *gin.Context) {
 	for _, sc := range resp.Counts {
 		counts = append(counts, OrderStatusCountResponse{Status: sc.GetStatus(), Count: sc.GetCount()})
 	}
-	// total 由 order-service 計算（構造上恆 = counts 加總）；空字串兜 "0" 防 proto3 預設值外漏
 	total := resp.GetTotal()
 	if total == "" {
 		total = "0"
@@ -841,7 +832,6 @@ func (h *Holder) ConfirmReceipt(c *gin.Context) {
 	}
 
 	var req ConfirmReceiptRequest
-	// body 為選填，忽略解析錯誤（允許空 body）
 	_ = c.ShouldBindJSON(&req)
 
 	resp, err := h.Order.ConfirmReceipt(c.Request.Context(), &pb.ConfirmReceiptRequest{
@@ -857,7 +847,6 @@ func (h *Holder) ConfirmReceipt(c *gin.Context) {
 	response.GrpcResult(c, resp.Code, resp.Message, map[string]bool{"success": resp.Success})
 }
 
-// ==================== 管理端 ====================
 
 // SearchOrders 後台搜尋訂單
 // @Summary      後台搜尋訂單

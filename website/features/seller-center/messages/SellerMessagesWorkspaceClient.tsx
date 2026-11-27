@@ -201,8 +201,6 @@ export default function SellerMessagesWorkspaceClient() {
 		React.useState<SellerCustomer | null>(null);
 	const openChat = useChatDrawerStore((state) => state.openChat);
 
-	// 外部連結（如聊天通知）帶 ?chat={targetId} 進來時，自動開啟聊天半彈窗。
-	// 消費後立即清掉參數讓網址乾淨，再次點同一則通知仍會重新觸發開啟。
 	const [chatParam, setChatParam] = useQueryState("chat", parseAsString);
 	React.useEffect(() => {
 		const t = chatParam?.trim();
@@ -292,8 +290,6 @@ export default function SellerMessagesWorkspaceClient() {
 						},
 					] as const;
 				} catch {
-					// Purchase enrichment is best-effort. Record an empty settled value
-					// so a failed buyer lookup cannot create an automatic retry loop.
 					return [
 						id,
 						{ total: 0, lastOrderAt: 0, lastOrderNo: "", lastAmount: 0 },
@@ -803,7 +799,6 @@ export default function SellerMessagesWorkspaceClient() {
 				open={activeCustomer !== null}
 				customer={activeCustomer}
 				onClose={closeCustomerDrawer}
-				// 分類 / 標籤變更當下即時重載客戶清單，不再等關閉抽屜。
 				onMutated={() => {
 					void loadCustomers();
 				}}

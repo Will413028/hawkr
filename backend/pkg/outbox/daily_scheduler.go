@@ -31,7 +31,7 @@ type DailyScheduler struct {
 	run                func(ctx context.Context)
 	logger             *zap.Logger
 
-	mu     sync.Mutex // guards cancel — Start/Stop are not guaranteed to be called from the same goroutine (see Stop's doc comment)
+	mu     sync.Mutex
 	cancel context.CancelFunc
 }
 
@@ -98,10 +98,6 @@ func (s *DailyScheduler) loop(ctx context.Context) {
 		case <-time.After(time.Until(next)):
 		}
 
-		// Re-check after waking: select above picks a ready case at random
-		// when both ctx.Done() and the timer are ready simultaneously (Stop()
-		// racing the scheduled instant) — without this, the timer branch
-		// could win and run fn against an already-cancelled ctx.
 		if ctx.Err() != nil {
 			return
 		}

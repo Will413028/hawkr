@@ -134,8 +134,6 @@ test("releasing without restore un-pins the body but leaves the new route at the
 	assert.equal(bodyStyle.position, "fixed");
 	assert.equal(bodyStyle.top, "-2400px");
 
-	// The document moved on to another route while the overlay was open — the
-	// pinned offset belongs to the page underneath, not to the arriving one.
 	releaseQuickView({ restoreScrollPosition: false });
 
 	assert.equal(bodyStyle.position, "");

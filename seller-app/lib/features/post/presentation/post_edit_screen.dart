@@ -46,7 +46,6 @@ class PostEditScreen extends HookConsumerWidget {
     final contentCtrl = useTextEditingController(text: post.content);
     final submitting = useState(false);
 
-    // 圖片狀態：新圖（bytes）；保留/清除由 post.imageUrl 衍生
     final newImageBytes = useState<Uint8List?>(null);
     final newStagedToken = useState<String?>(null);
 
@@ -69,7 +68,6 @@ class PostEditScreen extends HookConsumerWidget {
 
     final repo = ref.read(postRepositoryProvider);
 
-    // 初始化：載入商品列表；關聯商品從 post.linkedProduct 起算，與列表是否載入無關
     useEffect(() {
       Future.microtask(() async {
         final sellerId = ref.read(sellerStoreIdProvider);
@@ -99,14 +97,12 @@ class PostEditScreen extends HookConsumerWidget {
 
     Future<void> pickNewImage() async {
       final picker = ImagePicker();
-      // 不指定 imageQuality，避免額外要求相簿轉碼；選取後仍依檔頭判斷格式。
-      // 靜態圖由共用上傳層沿用原本壓縮策略。
       final picked = await picker.pickImage(source: ImageSource.gallery);
       if (picked == null) return;
       final bytes = await picked.readAsBytes();
       if (!context.mounted) return;
       newImageBytes.value = bytes;
-      newStagedToken.value = null; // 先清，submit 時上傳
+      newStagedToken.value = null;
     }
 
     Future<void> openImageEditor() async {
@@ -152,7 +148,6 @@ class PostEditScreen extends HookConsumerWidget {
         String? stagedToken;
 
         if (newImageBytes.value != null && newStagedToken.value == null) {
-          // 使用者換了新圖，上傳取得 staged token
           final ts = DateTime.now().millisecondsSinceEpoch;
           final (ext, mime) = ImageFormatDetector.detect(newImageBytes.value!);
           final token = await repo.uploadMedia(
@@ -238,7 +233,6 @@ class PostEditScreen extends HookConsumerWidget {
               clipBehavior: Clip.antiAlias,
               child: _buildImageContent(newImageBytes.value, basePost.value),
             ),
-            // AI 編輯按鈕
             if (newImageBytes.value != null)
               Positioned(
                 top: 16,
@@ -261,7 +255,6 @@ class PostEditScreen extends HookConsumerWidget {
                   ),
                 ),
               ),
-            // 更換圖片按鈕
             Positioned(
               bottom: 16,
               right: 16,
@@ -308,7 +301,6 @@ class PostEditScreen extends HookConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
               Container(
                 padding: EdgeInsets.fromLTRB(24.w, 16.h, 24.w, 16.h),
                 decoration: const BoxDecoration(
@@ -338,7 +330,6 @@ class PostEditScreen extends HookConsumerWidget {
                   ],
                 ),
               ),
-              // Text input
               Padding(
                 padding: EdgeInsets.all(20.w),
                 child: Container(
@@ -385,7 +376,6 @@ class PostEditScreen extends HookConsumerWidget {
           product['skuName'] ??
           product['productName'] ??
           '未命名商品';
-      // PayUni #758: 主價 = salePrice ?? price；有特價就顯示原價刪除線
       final rawPrice = product['price'];
       final rawSalePrice = product['salePrice'] ?? product['sale_price'];
       final eff = PriceDisplay.effectiveSkuPrice(
@@ -398,7 +388,6 @@ class PostEditScreen extends HookConsumerWidget {
         salePrice: rawSalePrice,
       );
       final original = PriceDisplay.parseMoney(rawPrice);
-      // `SellerProductItem` 的圖片欄位只有 imageKey / imageUrl（49 §6.6.1）。
       final productImageUrl = product['imageUrl'];
       return GestureDetector(
         onTap: () {

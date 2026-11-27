@@ -16,8 +16,6 @@ class MediaUberPodStorageTest {
     @Test
     @DisplayName("🔴 public/ 前綴的 objectKey 一律拒絕落庫（A6 沒有任何其他訊號）")
     void publicPrefixIsRejected() {
-        // 用 public 上傳的症狀是「什麼事都沒發生」：上傳成功、圖片看得到、
-        // 只是收件地址與門口實景可被任何拿到 objectKey 的人取得。
         assertThatThrownBy(() -> MediaUberPodStorage.requireSecureObjectKey("public/uber-pod-1.jpg"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("secure/");

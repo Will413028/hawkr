@@ -35,7 +35,6 @@ test("§V.10.6-4：舊 reply string 只轉成單一 SUMMARY block，不自己切
 	);
 	assert.equal(blocks.length, 1);
 	assert.equal(blocks[0].kind, "SUMMARY");
-	// 空回覆不渲染一個空的 icon 列。
 	assert.deepEqual(legacyReplyToBlocks("   "), []);
 });
 
@@ -60,40 +59,31 @@ test("§F：icon 由 kind 查表決定，模型不得傳入任意 icon name", ()
 	for (const kind of kinds) {
 		assert.ok(narrativeIcon(kind), `${kind} 必須有 allowlisted icon`);
 	}
-	// §F 指定的 production key。
 	assert.equal(narrativeIcon("COMPLETE"), "check");
 	assert.equal(narrativeIcon("CONTEXT"), "clipboard");
 	assert.equal(narrativeIcon("RATIONALE"), "info");
 	assert.equal(narrativeIcon("NEXT_STEP"), "arrow-right");
-	// 未知 kind 不掉到一個看起來像某種狀態的預設圖示。
 	assert.equal(narrativeIcon("NOT_A_KIND" as PublicNarrativeKind), null);
 
-	// block 型別只有 kind/text——有 icon 欄位就代表 wire 可以指定圖示。
 	const source = read("features/procurement-assistant/narrative.ts");
 	assert.doesNotMatch(source, /interface PublicNarrativeBlock \{[^}]*icon/s);
 });
 
 test("§V.10.6-4：assistant 回覆是無泡泡正文，且不重複 Agent avatar", () => {
-	// assistant 那一側不再套 thread-page__bubble，也不再掛 HawkrAgentMark。
 	assert.match(chat, /className="hawkr-agent-narrative"/);
 	assert.doesNotMatch(stripComments(chat), /HawkrAgentMark/);
 	assert.match(chat, /legacyReplyToBlocks\(turn\.text\)/);
-	// 買家訊息維持氣泡——已核准的三張圖裡它就是右側綠色氣泡。
 	assert.match(chat, /"thread-page__bubble is-mine"/);
 });
 
 test("§V.11.1：進行中那一列有非色彩線索，尚未開放的停止能力不出現在介面", () => {
 	assert.match(rail, /step\.status === "RUNNING"/);
 	assert.match(rail, /進行中/);
-	// 前導 icon 的兩段時間：跑的時候是標誌，跑完換成該步驟的 AppIcon glyph。
-	// 標誌只出現在 RUNNING 這一列——已完成的列是既成事實，不該還在呼吸。
 	assert.match(
 		rail,
 		/running \? \(\s*<HawkrAgentSprite[\s\S]*?\) : \(\s*<AppIcon/,
 	);
-	// 旁邊不再另外掛一顆常駐標誌，否則同一畫面會有兩顆。
 	assert.doesNotMatch(rail, /className="hawkr-agent-rail__sprite"/);
-	// 尚無 durable cancel 契約，不提供無法操作的停止控制，也不假裝可取消。
 	assert.doesNotMatch(taskPanel, /AgentStopTaskAction|停止處理|規劃中/);
 	assert.doesNotMatch(
 		stripComments(

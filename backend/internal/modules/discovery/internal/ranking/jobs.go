@@ -10,13 +10,10 @@ import (
 )
 
 const (
-	// recomputeID 是重算排程的識別，也是 River job 的 kind。
 	recomputeID = "discovery.recompute_seller_scores"
 	// RecomputeInterval 是重算的間隔：榜單最多落後這麼久（website 的快取是 900 秒，同一個量級）。
 	RecomputeInterval = 15 * time.Minute
-	// recomputeTimeout 是單次嘗試的上限（River 預設 1 分鐘；四個上游的呼叫加起來可能超過）。
 	recomputeTimeout = 10 * time.Minute
-	// recomputeAttempts 是失敗時的嘗試次數；下一個週期本來就會重算，不需要 River 預設的 25 次退避。
 	recomputeAttempts = 3
 )
 

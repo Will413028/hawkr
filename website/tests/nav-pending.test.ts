@@ -5,10 +5,6 @@ import {
 	beginNavPending,
 } from "../lib/loading/nav-pending";
 
-// The top progress rail is driven purely by html[data-nav-pending]; these
-// cases pin the ref-count, reveal-window, and done/abort semantics both
-// producers rely on (PageTransition's setLoading mirror and Link's
-// atomic-ensure + commit-poll window).
 
 const realSetTimeout = globalThis.setTimeout;
 const realClearTimeout = globalThis.clearTimeout;
@@ -76,7 +72,6 @@ test("a wait longer than the reveal window sweeps done then clears", () => {
 });
 
 test("a fast wait clears silently — no done flash inside the reveal delay", () => {
-	// Quick-view open/close style navigation: ends in well under 250ms.
 	const end = beginNavPending();
 	now += 120;
 	end();
@@ -106,7 +101,6 @@ test("end is idempotent — double invoke cannot underflow a later wait", () => 
 });
 
 test("overlapping producers keep the rail until the last end", () => {
-	// Link's ensure window hands over to PageTransition's signal mid-nav.
 	const ensureWindow = beginNavPending();
 	const pageTransition = beginNavPending();
 	elapseRevealWindow();
@@ -121,10 +115,8 @@ test("a new wait during the done sweep restarts the trickle", () => {
 	elapseRevealWindow();
 	first();
 	assert.equal(pendingAttr(), "done");
-	// Next navigation starts before the sweep timer fires.
 	const second = beginNavPending();
 	assert.equal(pendingAttr(), "", "sweep interrupted, trickle restarted");
-	// The stale sweep timer must not clear the new wait's rail.
 	scheduled?.();
 	assert.equal(pendingAttr(), "");
 	elapseRevealWindow();
@@ -137,8 +129,6 @@ test("restart during the sweep resets the reveal clock", () => {
 	elapseRevealWindow();
 	first();
 	assert.equal(pendingAttr(), "done");
-	// New wait restarts the trickle; ending it quickly must clear silently —
-	// the restarted animation begins from scaleX(0) again.
 	const second = beginNavPending();
 	now += 100;
 	second();

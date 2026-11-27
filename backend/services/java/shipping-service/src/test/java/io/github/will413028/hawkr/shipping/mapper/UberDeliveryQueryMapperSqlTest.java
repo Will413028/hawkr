@@ -81,7 +81,6 @@ class UberDeliveryQueryMapperSqlTest {
 
     @Test
     void sellerOwnershipPredicateBindsStoreIdParameter() {
-        // 防「述詞還在但綁到別的參數」——例如被改成 #{sellerId} 之後靜默恆不命中。
         assertTrue(UberDeliveryQueryMapper.SELLER_OWNERSHIP_PREDICATE.contains("#{storeId}"),
                 "歸屬述詞必須綁 storeId 參數，實際：" + UberDeliveryQueryMapper.SELLER_OWNERSHIP_PREDICATE);
         assertTrue(UberDeliveryQueryMapper.SELLER_OWNERSHIP_PREDICATE.contains("s.store_id"),
@@ -121,8 +120,6 @@ class UberDeliveryQueryMapperSqlTest {
 
     @Test
     void failureOnlyDoesNotUseProviderStatusAsTheCriterion() {
-        // provider_status 保存的是**正常軌跡**；以「有值」判失敗會把每張正常單撈進來
-        // （V12 對 shipments 修過同一個 regression）。
         for (String method : new String[]{"selectAdminDeliveries", "countAdminDeliveries"}) {
             String branch = failureOnlyBranch(sqlOf(method), method);
             assertFalse(branch.contains("provider_status"),
@@ -164,7 +161,6 @@ class UberDeliveryQueryMapperSqlTest {
             }
             checked++;
         }
-        // 不印計數的話，「沒有失敗」與「迴圈根本沒跑」長得一模一樣。
         assertTrue(checked >= 5, "只檢查了 " + checked + " 支查詢，預期至少 5 支（3 賣家 + 3 Admin）");
     }
 

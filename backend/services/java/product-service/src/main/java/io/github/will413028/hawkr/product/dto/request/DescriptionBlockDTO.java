@@ -33,7 +33,6 @@ public class DescriptionBlockDTO implements Serializable {
      */
     private String id;
 
-    // === text 類型欄位 ===
 
     /**
      * 文字內容（type=text 時使用）
@@ -46,7 +45,6 @@ public class DescriptionBlockDTO implements Serializable {
      */
     private String styleJson;
 
-    // === image 類型欄位 ===
 
     /**
      * 暫存 Token（新增圖片時傳入，Finalize 前）
@@ -83,7 +81,6 @@ public class DescriptionBlockDTO implements Serializable {
      */
     private String alt;
 
-    // === inline-run 模型欄位（02 §3.6）===
 
     /**
      * 行內 runs（type=text 時使用；取代 legacy content）

@@ -130,8 +130,6 @@ export function createSessionOperationGuard(): SessionOperationGuard {
 		generation += 1;
 		const previous = current;
 		current = null;
-		// Clear the identity before aborting: abort listeners run synchronously and
-		// must already see the previous operation as stale.
 		previous?.controller.abort();
 	};
 	const isCurrent = (operation: SessionOperationIdentity) =>
@@ -156,8 +154,6 @@ export function createSessionOperationGuard(): SessionOperationGuard {
 				signal: controller.signal,
 			});
 			current = { operation, controller };
-			// Publish the replacement identity first. If an abort listener starts an
-			// even newer operation synchronously, that newer generation remains current.
 			previous?.controller.abort();
 			return operation;
 		},

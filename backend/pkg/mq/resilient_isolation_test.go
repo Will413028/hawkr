@@ -71,7 +71,6 @@ func TestIsPreconditionFailed(t *testing.T) {
 	if !isPreconditionFailed(&amqp.Error{Code: amqp.PreconditionFailed}) {
 		t.Error("raw *amqp.Error PRECONDITION_FAILED should be detected")
 	}
-	// 包裝過的 error 也要認得（connectAndConsume 會 fmt.Errorf %w 包裝）
 	wrapped := errors.Join(errors.New("ctx"), &amqp.Error{Code: amqp.PreconditionFailed})
 	if !isPreconditionFailed(wrapped) {
 		t.Error("wrapped PRECONDITION_FAILED should be detected")

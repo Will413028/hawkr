@@ -14,8 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// commitDirect 是直接寫入（PutPublic）的後半段：暫存列已以 UPLOADED 與 final_key 建好；transaction 外 Put，
-// 再以一個 transaction 建資產列並把暫存列轉 READY。任何一步失敗都走 abortDirect 收斂；最後的 transaction 其實已提交時視為成功。
 func (s *Service) commitDirect(ctx context.Context, uploadID uuid.UUID, asset store.InsertAssetParams, body io.Reader, size int64, objectType string) error {
 	putCtx, cancel := context.WithTimeout(ctx, model.DirectPutTimeout)
 	defer cancel()
@@ -44,10 +42,6 @@ func (s *Service) commitDirect(ctx context.Context, uploadID uuid.UUID, asset st
 	return nil
 }
 
-// abortDirect 收斂失敗：先把列條件式轉 REJECTED，轉成功才刪物件；轉換 0 列且重讀是 READY（最後的 transaction 其實已提交）就照成功回傳 nil，
-// 重讀是 DELETING 或 DELETED（輸給 GC）回 FailedPrecondition「已過期」。內部的 errLost 不外漏。
-// 不受 ctx 取消影響：client 斷線時列與物件仍要收尾，但整段收尾有 model.DirectAbortTimeout 的時限。
-// 轉換本身失敗時什麼都不刪，列與物件留給 GC 在過期加寬限後回收。
 func (s *Service) abortDirect(ctx context.Context, uploadID uuid.UUID, finalKey string, cause error) error {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), model.DirectAbortTimeout)
 	defer cancel()

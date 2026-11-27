@@ -11,11 +11,6 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
-// 測試用的 proto：不依賴 buf（離線也能跑）。
-//
-//	hawkr.fx.v1alpha1：Color、Mode、Box.Size（巢狀）、Note、Box、Gadget（有 reason 欄位的 *Unavailability）
-//	hawkr.admin.v1alpha1：Role；hawkr.admin.fx.v1alpha1：Level（最長相符）
-//	hawkr.common.v1alpha1：ErrorReason（伺服器擁有）
 func enumProto(name, prefix string, values ...string) *descriptorpb.EnumDescriptorProto {
 	e := &descriptorpb.EnumDescriptorProto{Name: proto.String(name)}
 	e.Value = append(e.Value, &descriptorpb.EnumValueDescriptorProto{Name: proto.String(prefix + "UNSPECIFIED"), Number: proto.Int32(0)})
@@ -96,7 +91,6 @@ func fixtureImage(opts ...func(*descriptorpb.FileDescriptorSet)) *descriptorpb.F
 		Syntax:   proto.String("proto3"),
 		EnumType: []*descriptorpb.EnumDescriptorProto{enumProto("ErrorReason", "", "BOOM")},
 	}
-	// ErrorReason 的零值名稱是 UNSPECIFIED（沒有前綴），enumProto 已處理。
 	policy, ext := acceptedDefinitionFiles()
 	fds := &descriptorpb.FileDescriptorSet{File: []*descriptorpb.FileDescriptorProto{
 		fx, protodesc.ToFileDescriptorProto(descriptorpb.File_google_protobuf_descriptor_proto), adminRoot, adminFx, common, policy, ext, limitsDefinitionFile(),
@@ -107,7 +101,6 @@ func fixtureImage(opts ...func(*descriptorpb.FileDescriptorSet)) *descriptorpb.F
 	return fds
 }
 
-// validFiles 是一組可以通過驗證的來源檔。
 func validFiles() (*Config, map[string]*File) {
 	cfg := &Config{SourceLocale: "zh-TW", Locales: []string{"zh-TW", "en"}, Required: []string{"zh-TW"}}
 	zh := &File{
@@ -140,7 +133,6 @@ func validFiles() (*Config, map[string]*File) {
 			"fx.Color.label": {Omit: map[string][]string{"default": {"COLOR_GREEN"}}, Description: "顏色的標籤。"},
 		},
 	}
-	// green 的 label 被 omit，不能有文字。
 	delete(zh.Default, "fx.Color.label.COLOR_GREEN")
 	for _, c := range connectCodes {
 		zh.Default["common.error."+c] = Entry{Message: "錯誤", Description: "預設錯誤文字。"}
@@ -149,7 +141,6 @@ func validFiles() (*Config, map[string]*File) {
 	return cfg, map[string]*File{"zh-TW": zh, "en": en}
 }
 
-// clone 深複製來源檔，讓每個失敗案例各自修改。
 func cloneFiles(files map[string]*File) map[string]*File {
 	out := map[string]*File{}
 	for loc, f := range files {
@@ -171,7 +162,6 @@ func validInputs() Inputs {
 	return Inputs{Image: fixtureImage(), Config: cfg, Catalog: files}
 }
 
-// buildWith 複製一份有效輸入，套用 mutate 後 Build。
 func buildWith(t *testing.T, mutate func(*Inputs)) (*Model, error) {
 	t.Helper()
 	in := validInputs()
@@ -193,7 +183,6 @@ func mustBuild(t *testing.T, mutate func(*Inputs)) *Model {
 	return m
 }
 
-// wantError 斷言 Build 失敗，且錯誤訊息逐一包含 substrs（點名 key 與原因）。
 func wantError(t *testing.T, mutate func(*Inputs), substrs ...string) {
 	t.Helper()
 	m, err := buildWith(t, mutate)
@@ -207,7 +196,6 @@ func wantError(t *testing.T, mutate func(*Inputs), substrs ...string) {
 	}
 }
 
-// 測試裡常用的別名。
 type (
 	descriptorSet = descriptorpb.FileDescriptorSet
 	messageProto  = descriptorpb.DescriptorProto

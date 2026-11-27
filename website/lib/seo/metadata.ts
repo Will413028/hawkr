@@ -193,27 +193,6 @@ export function buildRootMetadata(
 		},
 		description: identity.description,
 		applicationName: identity.name,
-		// Shape and identity only — deliberately no title/description, for the
-		// same reason as `twitter` below and one level further up the same chain.
-		//
-		// Next resolves social titles by falling back: twitter → openGraph →
-		// `metadata.title` (postProcessMetadata + inheritFromMetadata). Each link
-		// only fires when the one before it is EMPTY. Segment merging replaces
-		// `openGraph` wholesale when a segment declares one and otherwise leaves
-		// the parent's in place, so a title spelled out here is inherited by every
-		// descendant that does not declare its own openGraph — permanently
-		// short-circuiting the fallback at the first link. That is precisely what
-		// happened: 84 of the site's 98 routes served the root's DEFAULT_TITLE as
-		// their og:title AND twitter:title, and the four legal pages plus /cart
-		// served DEFAULT_DESCRIPTION as their og:description while their own
-		// <meta name="description"> said something else entirely.
-		//
-		// Leaving both unset makes the fallback reach `metadata.title` /
-		// `metadata.description`, so EVERY page — including ones not written yet —
-		// gets a share card that matches its own <title>, with no per-page work
-		// and nothing to remember. The root's own card is unaffected: this
-		// layout's `title.default` / `description` above are what the fallback
-		// lands on when a page supplies neither.
 		openGraph: {
 			type: "website",
 			siteName: identity.name,
@@ -223,15 +202,10 @@ export function buildRootMetadata(
 				? {}
 				: { images: [rootSocialImage(identity.defaultTitle)] }),
 		},
-		// Card type only — same rule, next link down the chain. (Images follow
-		// `openGraph.images`; see the note on the function.)
 		twitter: { card: "summary_large_image" },
 		robots: indexable
 			? { index: true, follow: true }
 			: { index: false, follow: false },
-		// 圖示改走檔案慣例（app/icon.svg、app/apple-icon.tsx，以及賣家頁的
-		// app/[locale]/(public)/sellers/[id]/apple-icon.tsx）。這裡若顯式設 metadata.icons
-		// 會壓過檔案慣例，導致 apple-touch-icon 不被注入、分享連結圖示變白底。
 	};
 }
 

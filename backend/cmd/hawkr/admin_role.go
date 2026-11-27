@@ -21,7 +21,6 @@ import (
 
 const adminRoleUsage = "用法：admin-role grant|revoke -admin <ID 或 email> -role <角色> -reason <理由>"
 
-// adminRoleAction 是 admin-role 的子命令。
 type adminRoleAction string
 
 const (
@@ -29,8 +28,6 @@ const (
 	adminRoleRevoke adminRoleAction = "revoke"
 )
 
-// parseAdminRole 解析 admin-role 的子命令與旗標：-admin（ID 或 email）、-role 與 -reason 都必填，沒有預設值。
-// 來源固定是 CLI；osUser 是執行者的作業系統使用者（未經驗證、只供參考），取不到時是空字串。
 func parseAdminRole(args []string, osUser string) (adminRoleAction, identity.AdminRoleChangeInput, error) {
 	var in identity.AdminRoleChangeInput
 	if len(args) == 0 || (args[0] != string(adminRoleGrant) && args[0] != string(adminRoleRevoke)) {
@@ -74,14 +71,11 @@ func parseAdminRole(args []string, osUser string) (adminRoleAction, identity.Adm
 	return action, in, nil
 }
 
-// adminRoleAPI 是 identity 的授予與撤銷。
 type adminRoleAPI interface {
 	GrantAdminRole(context.Context, identity.AdminRoleChangeInput) (identity.AdminRoleChange, error)
 	RevokeAdminRole(context.Context, identity.AdminRoleChangeInput) (identity.AdminRoleChange, error)
 }
 
-// applyAdminRole 執行一次授予或撤銷並印出結果。撤掉之後沒有任何管理員持有該角色是允許的（CLI 本身就是 break-glass，
-// ADR 2026-10-04-admin-roles），但印出警告。
 func applyAdminRole(ctx context.Context, api adminRoleAPI, action adminRoleAction, in identity.AdminRoleChangeInput, out io.Writer) error {
 	if action == adminRoleGrant {
 		res, err := api.GrantAdminRole(ctx, in)

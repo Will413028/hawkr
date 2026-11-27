@@ -11,8 +11,6 @@ import {
 	Triangle,
 } from "fabric";
 
-// fabric 7 把物件的 originX/originY 預設改成 center（升級指南的 breaking change）。
-// 本編輯器所有定位（left/top、對齊、貼上位移）都以左上角為基準，沿用 fabric 6 的預設。
 FabricObject.ownDefaults.originX = "left";
 FabricObject.ownDefaults.originY = "top";
 
@@ -76,7 +74,6 @@ export class CanvasEditor {
 		this.canvas.on("object:added", () => this.notifyLayersChange());
 		this.canvas.on("object:removed", () => this.notifyLayersChange());
 
-		// Keyboard shortcuts
 		document.addEventListener("keydown", this.boundKeyboardHandler);
 	}
 
@@ -128,7 +125,6 @@ export class CanvasEditor {
 		this.onLayersChange = callback;
 	}
 
-	// ===== History (Undo/Redo) =====
 	private saveHistory() {
 		const json = JSON.stringify(this.canvas.toJSON());
 		if (this.historyIndex < this.history.length - 1) {
@@ -163,7 +159,6 @@ export class CanvasEditor {
 		});
 	}
 
-	// ===== Clipboard =====
 	public copy() {
 		const activeObj = this.canvas.getActiveObject();
 		if (activeObj) {
@@ -201,7 +196,6 @@ export class CanvasEditor {
 		}
 	}
 
-	// ===== Text =====
 	public addText(text: string, style?: TextStyle) {
 		const iText = new IText(text, {
 			left: this.width / 2 - 100,
@@ -244,7 +238,6 @@ export class CanvasEditor {
 		}
 	}
 
-	// ===== Shapes =====
 	public addRect(options?: {
 		fill?: string;
 		stroke?: string;
@@ -393,7 +386,6 @@ export class CanvasEditor {
 		return points;
 	}
 
-	// ===== Images =====
 	public addImage(url: string) {
 		Image.fromURL(url, { crossOrigin: "anonymous" })
 			.then((img) => {
@@ -429,7 +421,6 @@ export class CanvasEditor {
 		reader.readAsDataURL(file);
 	}
 
-	// ===== Object Properties =====
 	public setObjectFill(color: string) {
 		const activeObj = this.canvas.getActiveObject();
 		if (activeObj) {
@@ -481,7 +472,6 @@ export class CanvasEditor {
 		}
 	}
 
-	// ===== Layers =====
 	public getLayers(): LayerInfo[] {
 		const objects = this.canvas.getObjects();
 		return objects
@@ -593,7 +583,6 @@ export class CanvasEditor {
 		}
 	}
 
-	// ===== Alignment =====
 	public alignLeft() {
 		const activeObj = this.canvas.getActiveObject();
 		if (activeObj) {
@@ -660,7 +649,6 @@ export class CanvasEditor {
 		}
 	}
 
-	// ===== Background =====
 	public setBackgroundColor(color: string) {
 		this.canvas.backgroundColor = color;
 		this.canvas.requestRenderAll();
@@ -699,7 +687,6 @@ export class CanvasEditor {
 		});
 	}
 
-	// ===== Delete =====
 	public deleteActiveObject() {
 		const activeObject = this.canvas.getActiveObject();
 		if (activeObject) {
@@ -717,7 +704,6 @@ export class CanvasEditor {
 		this.saveHistory();
 	}
 
-	// ===== Export =====
 	public toDataURL(format: "png" | "jpeg" = "png", quality: number = 1) {
 		return this.canvas.toDataURL({ format, quality, multiplier: 1 });
 	}
@@ -746,7 +732,6 @@ export class CanvasEditor {
 		link.click();
 	}
 
-	// ===== Canvas Properties =====
 	public getActiveObject() {
 		return this.canvas.getActiveObject();
 	}

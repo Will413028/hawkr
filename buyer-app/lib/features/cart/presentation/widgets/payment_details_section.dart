@@ -6,12 +6,6 @@ import 'package:hawkr_buyer/shared/widgets/hk_button_label.dart';
 import 'package:hawkr_buyer/shared/widgets/hk_icon.dart';
 import 'package:flutter/material.dart';
 
-// ---------------------------------------------------------------------------
-// 付款詳情區塊。
-//
-// 白色圓角卡片，展示商品總額、運費、折扣券、總付款金額。
-// 包含「選擇優惠券」按鈕，點擊後由外部處理彈出優惠券選擇器。
-// ---------------------------------------------------------------------------
 
 /// 購物車底部的付款詳情摘要卡片。
 ///
@@ -56,7 +50,6 @@ class PaymentDetailsSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // 標題
           Row(
             children: [
               HkIcon(
@@ -70,7 +63,6 @@ class PaymentDetailsSection extends StatelessWidget {
           ),
           const SizedBox(height: HkSpace.md),
 
-          // 商品總金額
           _paymentRow(
             context,
             HkIconName.goods,
@@ -79,7 +71,6 @@ class PaymentDetailsSection extends StatelessWidget {
           ),
           const SizedBox(height: HkSpace.md),
 
-          // 運費總金額
           _paymentRow(
             context,
             HkIconName.truck,
@@ -88,15 +79,12 @@ class PaymentDetailsSection extends StatelessWidget {
           ),
           const SizedBox(height: HkSpace.md),
 
-          // 折扣券列
           _couponRow(context),
           const SizedBox(height: HkSpace.md),
 
-          // 分隔線
           const Divider(height: 1, color: AppColors.dividerLight),
           const SizedBox(height: HkSpace.md),
 
-          // 總付款金額
           _totalRow(context),
         ],
       ),
@@ -123,7 +111,6 @@ class PaymentDetailsSection extends StatelessWidget {
             _singleLineWidth(context, label, labelStyle) +
             HkSpace.sm +
             _singleLineWidth(context, amount, amountStyle);
-        // A narrow layout stays stacked even while browser fallback fonts load.
         final stack =
             constraints.maxWidth <
                 280 * MediaQuery.textScalerOf(context).scale(16) / 16 ||
@@ -233,7 +220,6 @@ class PaymentDetailsSection extends StatelessWidget {
                 : 0) +
             _singleLineWidth(context, buttonLabel, buttonStyle) +
             HkSpace.md * 2;
-        // A narrow layout stays stacked even while browser fallback fonts load.
         final stack =
             constraints.maxWidth <
                 280 * MediaQuery.textScalerOf(context).scale(16) / 16 ||

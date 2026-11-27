@@ -11,10 +11,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// auditResultPending is the audit row's open state. It is the value the delegation module
-// echoes back on a replayed intent (`api/proto/account/delegation.proto:422`) and the
-// one the pending-rows gauge counts, so gateway must compare against the same literal
-// rather than "no result".
 const auditResultPending = "PENDING"
 
 // AuditClient is the slice of the account gRPC client the orchestrator needs. An
@@ -141,12 +137,6 @@ type Result struct {
 // Orchestrate runs one delegated mutation end to end.
 func (o *Orchestrator) Orchestrate(ctx context.Context, spec Spec) (*Result, *Denial) {
 	if o == nil || o.Audit == nil {
-		// An unwired audit dependency must never read as "authorized to write":
-		// fail closed, exactly as a failed intent does.
-		//
-		// 9289 rather than 9280 (#2744): unwired means this build never connected the
-		// dependency, so "try again shortly" is a lie that costs the operator an
-		// unbounded number of retries and hides the fault from whoever is on call.
 		zap.L().Error("Delegation.dependency.unwired", zap.String("dep", "Audit"), zap.String("op", "Orchestrate"))
 		return nil, Deny(bizcode.DelegationInternalContractMismatch, "代行營運服務設定異常，重試無效")
 	}
@@ -155,9 +145,6 @@ func (o *Orchestrator) Orchestrate(ctx context.Context, spec Spec) (*Result, *De
 	if spec.ReadBefore != nil {
 		res, denial := spec.ReadBefore(ctx, o.Context(spec, spec.ReadCap, ""))
 		if denial != nil {
-			// Q4 (resource does not belong to the target store) is a security
-			// signal, not a plain error: it is the only trace an attempted
-			// cross-store read leaves behind.
 			if denial.Code == bizcode.DelegationResourceNotOwned {
 				o.RecordReadDenial(ctx, ReadDenial{
 					Session:       spec.Session,
@@ -221,17 +208,6 @@ func (o *Orchestrator) Orchestrate(ctx context.Context, spec Spec) (*Result, *De
 	}
 	auditLogID := intent.GetData().GetAuditLogId()
 	if intent.GetData().GetReplayed() {
-		// Same key, same payload: the write already happened. Re-running the domain
-		// mutation would apply it twice, and the version check would then fail on a
-		// request the caller legitimately retried.
-		//
-		// If that earlier attempt never got its confirm through, the row is still
-		// PENDING and every subsequent retry lands here — the retry that was supposed
-		// to heal it is precisely the path that skips the healing. Close it now: the
-		// snapshot we just read IS the post-write state, since the write is what made
-		// this a replay. ChangedFields stays empty because the pre-write snapshot is
-		// gone; an empty diff on a SUCCEEDED row is honest, a row stuck on PENDING is
-		// not (it claims we do not know whether the write landed, and we do).
 		if intent.GetData().GetResult() == auditResultPending {
 			o.confirm(ctx, &accountpb.ConfirmAuditResultRequest{
 				AuditLogId:           auditLogID,
@@ -286,17 +262,6 @@ func (o *Orchestrator) Orchestrate(ctx context.Context, spec Spec) (*Result, *De
 	return &Result{AuditLogID: auditLogID, Version: after.Version, Resource: after.Payload}, nil
 }
 
-// confirm closes an audit row. A failed confirm leaves the row PENDING, which is a
-// legitimate terminal state the UI shows as 「結果未確認」 — it must not be reported
-// to the caller as a failed write, because the write itself did happen.
-//
-// The context is detached from the caller's: by the time we get here the domain write
-// has already landed, so the audit row must close even if the admin closed the tab a
-// millisecond earlier. Keeping the request context would cancel this RPC on exactly
-// the requests whose outcome is least obvious from the outside — the write is durable,
-// the audit row says PENDING forever, and nothing in the response hints at it. The
-// deadline still applies (ConfirmAuditResult applies GrpcDeadlineAuditConfirmMs);
-// WithoutCancel drops the cancellation, not the timeout, and keeps trace values.
 func (o *Orchestrator) confirm(ctx context.Context, req *accountpb.ConfirmAuditResultRequest) {
 	ctx = context.WithoutCancel(ctx)
 	resp, err := o.Audit.ConfirmAuditResult(ctx, req, o.Cfg.GrpcDeadlineAuditConfirmMs)
@@ -330,9 +295,6 @@ func (s Spec) origin() string {
 	return s.Origin
 }
 
-// readDenialAction maps a resource face to its READ denial action. Those three actions
-// exist for exactly one purpose: leaving a trace when someone tried to read across
-// stores. Losing that trace is the failure mode this function guards.
 func readDenialAction(resourceType string) string {
 	switch resourceType {
 	case "storefront":
@@ -404,7 +366,6 @@ type ReadDenial struct {
 // cannot write an intent at all.
 func (o *Orchestrator) RecordReadDenial(ctx context.Context, d ReadDenial) {
 	if o == nil || o.Audit == nil || d.Session == nil {
-		// 這一支不回錯（讀取拒絕的稽核是 best-effort），但未接線一樣要留痕。
 		if o == nil || o.Audit == nil {
 			zap.L().Error("Delegation.dependency.unwired", zap.String("dep", "Audit"), zap.String("op", "RecordReadDenial"))
 		}

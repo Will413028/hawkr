@@ -164,7 +164,6 @@ func (s *Service) Decide(ctx context.Context, in model.DecideInput) (model.CaseD
 	return out, err
 }
 
-// audit 在結案的同一個 transaction 寫後台動作紀錄：決定、處置與類別（不放理由文字）。
 func (s *Service) audit(ctx context.Context, c model.Case, in model.DecideInput, res applied) error {
 	detail := map[string]any{"decision": string(in.Decision), "target_kind": string(c.Target.Kind), "version": in.Version}
 	if in.Decision == model.DecisionViolation {
@@ -181,7 +180,6 @@ func (s *Service) audit(ctx context.Context, c model.Case, in model.DecideInput,
 	})
 }
 
-// close 是最後一步：結案轉移。
 func (s *Service) close(ctx context.Context, q *store.Queries, in model.DecideInput, measureID *uuid.UUID, now time.Time) error {
 	p := store.CloseCaseParams{
 		ID: in.CaseID, Version: in.Version, Decision: ptr(string(in.Decision)), AdminID: &in.Actor.AdminID, ClosedAt: &now, MeasureID: measureID,
@@ -199,7 +197,6 @@ func (s *Service) close(ctx context.Context, q *store.Queries, in model.DecideIn
 	return nil
 }
 
-// publishClosed 在結案的同一個 transaction 發 CaseClosedEvent：結果由決定推導，政策分類只在違規時帶；OccurredAt 是 close 寫入 closed_at 的同一個 now。
 func (s *Service) publishClosed(ctx context.Context, c model.Case, in model.DecideInput, now time.Time) error {
 	decision := string(in.Decision)
 	e := model.CaseClosedEvent{
@@ -214,14 +211,12 @@ func (s *Service) publishClosed(ctx context.Context, c model.Case, in model.Deci
 
 func ptr[T any](v T) *T { return &v }
 
-// applied 是處置的結果：內容下架時快照的店家與建立的措施（其他處置是零值）。
 type applied struct {
 	storeID   int64
 	measureID *uuid.UUID
 	frozen    *snapshot.Content
 }
 
-// apply 呼叫擁有處分的模組建立處分。
 func (s *Service) apply(ctx context.Context, q *store.Queries, c model.Case, in model.DecideInput, res *applied) error {
 	ref := SourceRefPrefix + c.ID.String()
 	author, owner, err := s.author(ctx, q, c, res)
@@ -259,9 +254,6 @@ func (s *Service) apply(ctx context.Context, q *store.Queries, c model.Case, in 
 	return apperr.InvalidInputOn([]string{"Action"}, "%s", text.DecideActionInvalid())
 }
 
-// author 回傳對象的作者與歸屬：買家對象的作者就是那位買家；評價與聊天訊息的作者一律取案件快照凍結的作者（評價作者與訊息寄件方都不會變，不回頭問擁有者）；
-// 社群內容向 social 讀。社群內容已被刪除時（Exists 為假）改用案件快照裡凍結的作者與店家，所以作者刪掉內容不能躲過警告、停權與內容下架的歸屬驗證；
-// 隱藏的目的（內容不可見）已達成，由呼叫端視為成功。評價與聊天的擁有者模組在隱藏時回 NotFound（已清除）的情形由 hide 視為成功。
 func (s *Service) author(ctx context.Context, q *store.Queries, c model.Case, res *applied) (social.Actor, social.ContentOwner, error) {
 	t := c.Target
 	switch t.Kind {
@@ -297,8 +289,6 @@ func (s *Service) author(ctx context.Context, q *store.Queries, c model.Case, re
 	return social.Actor{}, social.ContentOwner{}, fmt.Errorf("moderation：不認得的對象種類 %q", t.Kind)
 }
 
-// hide 呼叫擁有內容的模組隱藏內容，來源參照指回案件。評價或聊天訊息已被清除（擁有者回 NotFound）時視為成功、不寫隱藏紀錄：隱藏的目的已達成。
-// 隱藏不取擁有者的守門（LockNotClosed、LockNotRetired、LockActive）：作者停用不該讓處分失敗。
 func (s *Service) hide(ctx context.Context, c model.Case, in model.DecideInput, ref string) error {
 	var err error
 	switch c.Target.Kind {
@@ -323,12 +313,10 @@ func (s *Service) hide(ctx context.Context, c model.Case, in model.DecideInput, 
 	return err
 }
 
-// snapshotReader 是讀案件快照的查詢（*store.Queries）。
 type snapshotReader interface {
 	LatestSnapshotContent(ctx context.Context, caseID uuid.UUID) (string, error)
 }
 
-// frozenContent 讀案件最近一份凍結的內容，一次處理只讀一次；沒有快照回 FailedPrecondition，句子由呼叫端依情境給。
 func (a *applied) frozenContent(ctx context.Context, q snapshotReader, caseID uuid.UUID, missing func() uitext.Message) (snapshot.Content, error) {
 	if a.frozen != nil {
 		return *a.frozen, nil
@@ -369,15 +357,12 @@ func (s *Service) takedown(ctx context.Context, q *store.Queries, c model.Case, 
 		return err
 	}
 	ref := seller.ContentRef{Kind: seller.ContentKind(c.Target.Kind), ID: c.Target.ContentID}
-	// 內容已在生效中的下架措施之下（例如後台貼文頁先下架）：不再建第二個措施（恢復時只撤銷一個、內容仍下架），案件綁定既有措施並結案；
-	// 這個案件的檢舉不另外產生認定（認定隨措施建立，既有措施的處分已經涵蓋這則內容）。
 	if existing, err := s.d.Seller.ActiveTakedownOfContent(ctx, ref); err != nil {
 		return err
 	} else if existing != nil {
 		res.storeID, res.measureID = storeID, existing
 		return nil
 	}
-	// 引用最早的 MaxSourceReports 筆，備註寫真正的檢舉數。檢舉集合在結案的版本比對下才算定案：這之後掛進來的檢舉會讓版本加一，結案回 VersionConflict、處置整個回滾。
 	ids, err := q.ReportIDsOfCase(ctx, store.ReportIDsOfCaseParams{CaseID: c.ID, MaxRows: model.MaxSourceReports})
 	if err != nil {
 		return fmt.Errorf("moderation：讀取案件的檢舉：%w", err)
@@ -408,15 +393,13 @@ func (s *Service) takedown(ctx context.Context, q *store.Queries, c model.Case, 
 	return nil
 }
 
-// measureSnapshot 把案件最近一份凍結的內容轉成措施的內容快照（處分依據的內容版本，A7-D29）：組裝與格式檢查都是 seller 的（NewContentSnapshot、ValidateContentSnapshot），
-// 這裡只依種類取出凍結的欄位並解析字串 id（只有社群內容有連結；聊天訊息與評價回覆的連結必須全空）。凍結的內容缺連結（舊格式）或不合格式時回錯，不傳半個快照給 seller。
 func measureSnapshot(kind model.TargetKind, storeID int64, f snapshot.Content) (seller.ContentSnapshot, error) {
 	k := seller.ContentKind(kind)
 	var sn seller.ContentSnapshot
 	switch {
 	case f.Social != nil:
-		post, _ := uuid.Parse(f.Social.PostID)     // 空字串與壞格式都是零值，由 ValidateContentSnapshot 依種類判斷缺不缺
-		thread, _ := uuid.Parse(f.Social.ThreadID) // 同上
+		post, _ := uuid.Parse(f.Social.PostID)
+		thread, _ := uuid.Parse(f.Social.ThreadID)
 		sn = seller.NewContentSnapshot(k, f.Social.Body, f.Social.AuthoredAt, len(f.Social.MediaRefs), storeID, post, thread)
 	case f.Chat != nil:
 		sn = seller.NewContentSnapshot(k, f.Chat.Body, f.Chat.AuthoredAt, len(f.Chat.MediaRefs), storeID, uuid.UUID{}, uuid.UUID{})
@@ -497,8 +480,6 @@ func (s *Service) Reverse(ctx context.Context, in model.ReverseInput) (model.Cas
 	return out, err
 }
 
-// restore 呼叫擁有內容的模組還原這個案件造成的隱藏（帶來源參照 moderation:case:<id>，別的案件或別處造成的隱藏不動，回 FailedPrecondition）；不取擁有者的守門（同 hide）。
-// 內容已被清除或刪除（擁有者回 NotFound）時視為成功：內容本來就不可見，同 hide 的規則（設計 §1.3），撤銷仍照常記在案件上。
 func (s *Service) restore(ctx context.Context, c model.Case, in model.ReverseInput) (bool, error) {
 	ref := SourceRefPrefix + c.ID.String()
 	var err error

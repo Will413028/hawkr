@@ -13,7 +13,6 @@ afterEach(() => {
 	mock.restoreAll();
 });
 
-// 兌換去向在 module 載入時解析，因此必須早於 route 的 import（動態載入）。
 const WEB_ORIGIN = "https://web-dev.example.com";
 process.env.WEB_ORIGIN = WEB_ORIGIN;
 
@@ -280,7 +279,6 @@ test("create route reconciles upstream state before releasing the handoff code",
 			assert.equal(createHeaders.get("idempotency-key"), idempotencyKey);
 			const createBody = JSON.parse(String(calls[1]?.init?.body));
 			assert.deepEqual(createBody.capabilities, capabilities);
-			// The browser asked for 900s; the preflight ceiling wins.
 			assert.equal(createBody.ttlSeconds, preflight.ttlSeconds);
 			if (expectedCalls === 3) {
 				const summaryHeaders = new Headers(calls[2]?.init?.headers);

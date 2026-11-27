@@ -19,31 +19,11 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-// 稽核與摘要三支端點的業務碼還原（A-4）。
-//
-// 這是同一個 bug class 的第二次發作：第一次修的是 admin_delegation.go（見
-// TestDelegationGrpcFailure_RestoresBizCode 的註解），而 admin_delegated_audit.go
-// 從未一起轉換，於是「sessionId 查無」在這三支上仍舊塌成 424／9280 —— 前端據此走
-// 「代行服務暫時不可用，請稍後再試」，而稍後再試永遠不會成功，因為那個工作階段本來
-// 就不存在。正解是 410／9277「找不到指定的代行工作階段」。
-//
-// ⚠️ **不能用 grpcclient.NewAccountDelegationClientForTest 注 mock 來測這件事**：
-// 那條路沒有 *grpc.ClientConn，EnvelopeGuardInterceptor 根本不會跑，mock 回的
-// {Code: 9277} 會原樣抵達 handler 並走進 `resp.GetCode() != 0` 那條分支 —— 修不修
-// 都綠（#2050 就是這樣讓一個真實安全漏洞全綠出廠的）。所以這裡起一台 bufconn 上的
-// 假 DelegationService，讓真的 interceptor 把「gRPC OK ＋ 非零 envelope code」轉成
-// FailedPrecondition ＋ "[9277] " 前綴，handler 收到的形狀與 production 逐位元相同。
-//
-// 每個端點都配一筆 codes.Unavailable：少了它，「把所有 err 一律翻成 410」也會全綠，
-// 而那是另一個方向的同一個 bug（真的上游故障被講成「工作階段不存在」，操作者不會重試）。
 
 type delegationAuditFakeServer struct {
 	accountpb.UnimplementedDelegationServiceServer
-	// envelopeCode 非零時回 gRPC OK ＋ 該 envelope code，鏡射 delegation 模組的
-	// bizOf(err) 分支（internal/grpc/delegation.go）：業務拒絕從來不是 gRPC error。
 	envelopeCode int32
 	envelopeMsg  string
-	// transportErr 非 nil 時直接回它，鏡射真正問不到答案的那一側。
 	transportErr error
 	summaryData  *accountpb.SessionSummaryData
 }
@@ -97,10 +77,6 @@ func (s *delegationAuditFakeServer) GetCurrentSession(_ context.Context, _ *acco
 	return &accountpb.GetCurrentSessionResponse{Code: s.envelopeCode, Message: s.envelopeMsg}, nil
 }
 
-// newDelegationAuditHolder 起 bufconn 假 server，並以掛真 EnvelopeGuardInterceptor 的
-// 連線建 AccountClient —— 那正是 production DefaultDialOpts 中 envelope guard 的位置。
-// 其餘 auth／breaker interceptor 與本主張無關故不掛（breaker 的 registry 是以
-// cc.Target() 為鍵的全域 sync.Map，掛上去會讓幾個 subtest 共用同一顆計數器）。
 func newDelegationAuditHolder(t *testing.T, srv accountpb.DelegationServiceServer) *Holder {
 	t.Helper()
 	lis := bufconn.Listen(1024 * 1024)
@@ -125,8 +101,6 @@ func newDelegationAuditHolder(t *testing.T, srv accountpb.DelegationServiceServe
 	return &Holder{Account: grpcclient.NewAccountDelegationClientForTest(accountpb.NewDelegationServiceClient(conn))}
 }
 
-// delegationAuditEndpoints 是本 class 命中的三支。invoke 只負責把 handler 需要的
-// 路徑參數／header 補齊，其餘一律共用。
 var delegationAuditEndpoints = []struct {
 	name   string
 	invoke func(h *Holder, c *gin.Context)

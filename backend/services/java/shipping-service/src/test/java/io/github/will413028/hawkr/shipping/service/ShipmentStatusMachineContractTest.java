@@ -62,13 +62,9 @@ class ShipmentStatusMachineContractTest {
         void everyNonTerminalCanRequestCancel() {
             for (ShippingStatus from : ShippingStatus.values()) {
                 if (from == ShippingStatus.CANCEL_PENDING) {
-                    continue; // from == to 由另一條規則擋
+                    continue;
                 }
                 boolean terminal = from == ShippingStatus.PICKED_UP || from == ShippingStatus.CANCELLED;
-                // 🔴 990 建單失敗是第三個例外（2026-09-10 補）：它的出邊只有 {91 重建, 41 取消}，
-                //    provider 側根本沒有單子可取消 ⇒ 走 992「取消處理中」會停在一個
-                //    永遠等不到 provider 回覆的狀態。本方法的 javadoc 一直是這樣寫的，
-                //    先前允許它只是因為 CANCEL_PENDING 的 blanket allow 排在 CREATE_FAILED 分支之前。
                 boolean createFailed = from == ShippingStatus.CREATE_FAILED;
                 assertEquals(!terminal && !createFailed,
                         mapper.isValidTransition(from, ShippingStatus.CANCEL_PENDING),
@@ -170,7 +166,6 @@ class ShipmentStatusMachineContractTest {
         @Test
         @DisplayName("3002 超商 C2C：取號前段 ＋ 賣家確認後的配送段（中間那條邊不走本方法）")
         void cvsC2cChain() {
-            // 整條鏈連續可達：建單 → 上游確認 → 取號 → **賣家確認出貨** → provider 回報的每一步
             assertChainReachable("3002 超商 C2C 全鏈", List.of(
                     ShippingStatus.UNPROCESSED,
                     ShippingStatus.PROCESSING,
@@ -180,8 +175,6 @@ class ShipmentStatusMachineContractTest {
                     ShippingStatus.WAITING_PICKUP,
                     ShippingStatus.PICKED_UP));
 
-            // 🔴 反向仍被拒：加的是一條**具名單向邊**，不是把 LOCAL_PROCESSING_DONE 整組打開。
-            //    這一條同時是本測試的鑑別力來源——若有人真的去放寬那個集合，這裡會轉紅。
             assertFalse(mapper.isValidTransition(
                             ShippingStatus.SELLER_CONFIRMED, ShippingStatus.CVS_CODE_RECEIVED),
                     "921 → 920 是倒退，必須維持被拒；若這裡變成 true，"
@@ -308,15 +301,12 @@ class ShipmentStatusMachineContractTest {
         @Test
         @DisplayName("本方法守全部寫入路徑：920→921 現在是合法邊，且反向仍被拒")
         void isValidTransitionGuardsEveryWritePath() {
-            // 920 → 921：我方端點真的在走這條邊 ⇒ 判定必須承認它
             assertTrue(mapper.isValidTransition(
                     ShippingStatus.CVS_CODE_RECEIVED, ShippingStatus.SELLER_CONFIRMED));
 
-            // 反向是倒退，仍必須被拒（鑑別力：證明上一行不是「整組放行」造成的）
             assertFalse(mapper.isValidTransition(
                     ShippingStatus.SELLER_CONFIRMED, ShippingStatus.CVS_CODE_RECEIVED));
 
-            // provider 回報路徑上的同一段（921 之後的貨態）必須進得來
             assertTrue(mapper.isValidTransition(
                     ShippingStatus.SELLER_CONFIRMED, ShippingStatus.IN_TRANSIT));
         }

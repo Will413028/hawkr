@@ -73,19 +73,12 @@ function LoginPageContent({
 	searchParams: NonNullable<ReturnType<typeof useSearchParams>>;
 	initialInAppBrowser: InAppBrowserInfo;
 }) {
-	// 單體的 callback 沒有完成登入時 302 回這頁並帶 `?error=<代碼>`（weblogin.go）；代碼對到三句之一
-	// （取消授權、服務暫時不能用、其他失敗），不認得的代碼不顯示。
 	const tError = useTranslations("auth.error");
 	const errorKey = loginErrorKey(searchParams.get("error"));
 	const error = errorKey ? tError(errorKey) : null;
 	const locale = useRoutedLocale();
-	// 單體 302 回來時帶 `?provider=`：剛從 Google 或 LINE 登入完成。
 	const returnedProvider = parseLoginProvider(searchParams.get("provider"));
-	// True from the click until the browser leaves for the start URL — the form
-	// can't flash idle or accept a second provider.
 	const [signingIn, setSigningIn] = React.useState(false);
-	// Back from the provider's page restores this page from the bfcache with the
-	// overlay still up; the flow it covered is no longer running.
 	React.useEffect(() => {
 		const onPageShow = (event: PageTransitionEvent) => {
 			if (event.persisted) setSigningIn(false);
@@ -127,31 +120,17 @@ function LoginPageContent({
 	const requiresBrowserGuide = inAppBrowser.isInApp;
 	const showBrowserGuide = requiresBrowserGuide && browserGuideOpen;
 
-	// middleware.ts never bounces /login (hawkr-website#259): a session cookie
-	// the monolith refuses (deleted account) would otherwise
-	// loop the visitor away from this form. The AUTHORITATIVE check happens here
-	// — once the signed-in account resolves to a real identity, leave
-	// immediately. Hard nav (not router.replace): matches the provider-return redirect's
-	// own reasoning, and an already-logged-in visitor landing here has nothing
-	// to lose from a full reload.
 	const { identity, status, activeRole, switchRole } = useAuth();
 	const [redirectingAway, setRedirectingAway] = React.useState(false);
 	const awayNavigationRef = React.useRef(false);
-	// Guard a self-referential `?redirect=/login`: middleware used to be the
-	// backstop against that (it always intercepted /login), so redirectForRole
-	// never had to. Now that /login is unguarded, redirecting straight back to
-	// /login would loop forever.
 	const awayTarget = stripLocale(redirectAfter).startsWith("/login")
 		? ""
 		: redirectAfter;
 	React.useEffect(() => {
-		// Once a provider flow is in progress, the browser is about to leave for
-		// the provider.
 		if (signingIn || awayNavigationRef.current) return;
 		if (status !== "signedIn") return;
 		awayNavigationRef.current = true;
 		setRedirectingAway(true);
-		// 從 provider 回來（單體 302 到這頁）才是剛登入；已經登入的人直接打開這頁不算。
 		if (returnedProvider) trackLogin(returnedProvider);
 		const requestedRole =
 			roleHint === "buyer" || roleHint === "seller" ? roleHint : activeRole;
@@ -159,9 +138,6 @@ function LoginPageContent({
 			requestedRole,
 			redirectAfter: awayTarget,
 			account: identity,
-			// GetSession does not expose this field. Preserve the existing
-			// logged-in behavior for an owned seller role; a buyer-only seller intent
-			// still fails closed to onboarding through hasSellerRole=false.
 			needsOnboarding: false,
 		});
 		if (target.activeRole && target.activeRole !== activeRole) {
@@ -190,7 +166,6 @@ function LoginPageContent({
 	const signInWith = React.useCallback(
 		(provider: LoginProvider) => {
 			if (signingIn) return;
-			// 單體登入成功後 302 回這頁（帶著工作區、目的地與登入方式），上面的 effect 讀到帳號就離開。
 			const returnTo = localizeHref(
 				loginPath({ role: selectedRole, redirect: redirectAfter, provider }),
 				locale,
@@ -331,7 +306,7 @@ function LoginPageContent({
 				繼續代表你同意 <Link href="/terms">服務條款</Link> 與{" "}
 				<Link href="/privacy">隱私政策</Link>。
 			</p>
-			{/* Fixed fullscreen overlay while the browser leaves for the provider. */}
+
 			{(signingIn ||
 				redirectingAway ||
 				(returnedProvider && status === "unknown")) && <AuthBrandLoading />}

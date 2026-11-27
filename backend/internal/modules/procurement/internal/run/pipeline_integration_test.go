@@ -254,7 +254,6 @@ func TestAtMostTenSubmitsPerBuyerPerMinute(t *testing.T) {
 	}
 }
 
-// waitingParent 建一個 TURN run 並讓它停在 WAITING_FOR_INPUT，回傳 run 與它的中斷 ID。
 func waitingParent(ctx context.Context, t *testing.T, d *db.DB, s run.Submitter, buyer int64) (uuid.UUID, uuid.UUID, uuid.UUID) {
 	t.Helper()
 	req := seedRequest(ctx, t, d, buyer)

@@ -54,9 +54,6 @@ class UberWebhookResponseContractTest {
     void landingFailureReturns5xx() throws Exception {
         doThrow(new RuntimeException("DB down")).when(receiveService).receive(any(), any());
 
-        // standaloneSetup 沒有 servlet container 的錯誤轉譯層：例外會直接從 perform() 冒出來。
-        // 那本身就是「沒有任何東西把它轉成回應」的證據 —— 真實部署中它會變成 500。
-        // 兩種表現都算通過（例外冒出、或 status >= 500），但「被轉成 4xx」一定不算。
         try {
             MvcResult result = mockMvc.perform(post("/webhooks/uber/delivery")
                             .contentType(MediaType.APPLICATION_JSON)

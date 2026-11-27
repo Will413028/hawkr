@@ -68,7 +68,6 @@ test("an intro is whitespace-collapsed and cut at the product limit", () => {
 	const out = storeSeoDescription({ ...farm, description: long });
 	assert.equal(out, `${"鮮".repeat(100)} ${"果".repeat(58)}…`);
 	assert.equal(out?.length, 160);
-	// Exactly at the limit is not cut.
 	const exact = "鮮".repeat(160);
 	assert.equal(storeSeoDescription({ description: exact }), exact);
 });
@@ -89,17 +88,13 @@ test("a missing intro is replaced by the facts the record states", () => {
 });
 
 test("the intro is counted and cut in code points, never inside a surrogate pair", () => {
-	// 159 CJK + one emoji straddling the cut: the emoji must not be split.
 	const emojiAtCut = `${"鮮".repeat(158)}🍎🍎${"果".repeat(20)}`;
 	const out = storeSeoDescription({ description: emojiAtCut }) ?? "";
 	assert.equal(out, `${"鮮".repeat(158)}🍎…`);
 	assert.equal(Array.from(out).length, 160);
 	assert.doesNotMatch(out, /[\ud800-\udbff](?![\udc00-\udfff])/);
-	// Exactly 160 code points (emoji count once) is not cut.
 	const exact = `${"鮮".repeat(150)}${"🍎".repeat(10)}`;
 	assert.equal(storeSeoDescription({ description: exact }), exact);
-	// The 10-character threshold counts code points: 5 emoji are 10 UTF-16
-	// units but only 5 characters, so they are a fragment, not a summary.
 	assert.equal(
 		storeSeoDescription({ name: "小店", description: "🍎🍎🍎🍎🍎" }),
 		"小店｜🍎🍎🍎🍎🍎",

@@ -24,10 +24,6 @@ export default function SellerCoverMedia({
 	className = "",
 	mode = "cover",
 }: SellerCoverMediaProps) {
-	// The configured media loader exposes named presets rather than arbitrary
-	// width variants. This component already receives its final cover URL, so
-	// asking next/image for a width ladder only creates duplicate srcset entries
-	// and a missing-width warning.
 	const unoptimized = true;
 	const imageSrc = buildImageUrl(src, "banner");
 	if (mode === "cover") {

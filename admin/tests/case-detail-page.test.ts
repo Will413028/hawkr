@@ -811,11 +811,9 @@ function moveConflictServices(opts: {
 			getReport: () => {
 				detailCalls++;
 				if (detailCalls === 1) {
-					// 讀到的時候這個類別還沒有案件：開新案件。
 					return { report: detail("r-1", [target(PolicyCategory.FRAUD)]) };
 				}
 				if (opts.rereadFails) throw new ConnectError("down", Code.Unavailable);
-				// 衝突之後再讀：別人先開了詐欺案件，去處變成加入它，通報的 etag 也前進了。
 				return {
 					report: detail("r-2", [
 						target(PolicyCategory.FRAUD, {
@@ -860,7 +858,6 @@ test("案件頁移到其他案件遇到版本衝突：重讀對話框那一筆�
 		/已有進行中的案件/u,
 		"對話框的去處說明跟著重讀的通報更新",
 	);
-	// 使用者看到新的去處之後重新確認：重送帶的是重讀後的 etag 與新的去處。
 	await pick("move-report-category", PolicyCategory.FRAUD);
 	await click("確認移動");
 	await until(() => maybeById("move-report-category") === null, "對話框關閉");
@@ -1121,8 +1118,6 @@ test("改嚴重度：開對話框送出，請求帶案件的 etag", async () => 
 	assert.equal(changed[0].note, "又有人送醫");
 });
 
-// ---------------------------------------------------------------------------
-// 從案件建立措施
 
 function citableReports(count: number, prefix = "r") {
 	return Array.from({ length: count }, (_, i) =>

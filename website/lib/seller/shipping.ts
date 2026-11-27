@@ -18,11 +18,10 @@
 import { authedFetch } from "@/lib/api/client";
 import { ShippingMethod } from "@/lib/codemeta/enums";
 
-/* ===== Code-meta enums (mirroring Flutter codemeta) ===== */
 
 export const SHIPPING_TYPE = {
-	HOME_DELIVERY: "3652", // 黑貓宅配
-	CVS: "3651", // 7-11 店到店
+	HOME_DELIVERY: "3652",
+	CVS: "3651",
 } as const;
 export type ShippingType = (typeof SHIPPING_TYPE)[keyof typeof SHIPPING_TYPE];
 
@@ -45,13 +44,12 @@ export const ONBOARDING_STATUS = {
 export type OnboardingStatus =
 	(typeof ONBOARDING_STATUS)[keyof typeof ONBOARDING_STATUS];
 
-/* ===== Wire types ===== */
 
 export interface ShippingOnboarding {
 	onboardingId?: string;
-	shippingType?: string; // ShippingType but tolerate strings from older payloads
-	enabled?: string; // "true" / "false"
-	payuniSubmitStatus?: string; // PayuniSubmitStatus
+	shippingType?: string;
+	enabled?: string;
+	payuniSubmitStatus?: string;
 	providerMessage?: string;
 	onboardingStatus?: string;
 	senderName?: string;
@@ -77,10 +75,9 @@ export async function fetchShippingOnboardings(): Promise<
 	return Array.isArray(env.data) ? env.data : [];
 }
 
-/* ===== 黑貓宅配 ===== */
 
 export interface SubmitHomeDeliveryInput {
-	productCategory?: string; // default "0001"
+	productCategory?: string;
 	senderName: string;
 	senderPhone: string;
 	senderCity: string;
@@ -102,7 +99,6 @@ export async function submitHomeDeliveryOnboarding(
 	return env.data ?? {};
 }
 
-/* ===== 7-11 店到店 ===== */
 
 export interface SubmitCvsInput {
 	senderName: string;
@@ -139,7 +135,6 @@ export async function toggleOnboarding(
 	return env.data ?? {};
 }
 
-/* ===== Helpers for UI state machines ===== */
 
 /**
  * 這批 onboarding 裡「本頁畫不出來」的 shippingType（去重、保留原碼）。
@@ -215,9 +210,9 @@ export function statusLabel(o: ShippingOnboarding | undefined): string {
 }
 
 export type ShippingMethodOpenState =
-	| "open" // 已開通且啟用，可選
-	| "disabled" // 已開通但在物流設定停用
-	| "not_opened"; // 尚未開通
+	| "open"
+	| "disabled"
+	| "not_opened";
 
 /**
  * 判斷賣家是否已在「物流設定」開通某個物流商，給商品上架的可配送方案

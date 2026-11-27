@@ -24,14 +24,9 @@ void main() {
   setUpAll(() async {
     if (!F.isInitialized) F.init(Flavor.dev);
 
-    // Session.login() → _syncToStaticServices() reaches
-    // PushNotificationManager.instance, whose field initializer calls
-    // FirebaseMessaging.instance (→ Firebase.app()) — throws `core/no-app`
-    // unless a Firebase app is registered first.
     setupFirebaseCoreMocks();
     await Firebase.initializeApp();
 
-    // login() completes without a MissingPluginException in the test binary.
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
           const MethodChannel('plugins.it_nomads.com/flutter_secure_storage'),

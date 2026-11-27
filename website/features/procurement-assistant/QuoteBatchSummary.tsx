@@ -127,8 +127,6 @@ export default function QuoteBatchSummary({
 	);
 
 	const itemText = slots?.itemResolution?.displayValue || slots?.item || "";
-	// slots.quantity 是 number（batch.quantity 曾經是字串），所以要自己轉；
-	// 缺席時整段不顯示，不補 0。
 	const quantityText = [
 		slots?.quantity === undefined ? "" : String(slots.quantity),
 		slots?.unit ?? "",
@@ -146,12 +144,6 @@ export default function QuoteBatchSummary({
 				buyerRequestedRange.upperBoundAmount,
 			)} / ${buyerRequestedRange.basisQuantity} ${buyerRequestedRange.basisUnit}`
 		: "";
-	/*
-	 * 標題那句只在有發布結果時才成立。
-	 *
-	 * 「幾筆邀請」唯一的伺服器來源是 `recipientCount`；沒有 publication 就沒有
-	 * 這個數字，也沒有任何證據支撐「已建立 1 組詢價」——整句不顯示，不補 0。
-	 */
 	const inviteHeadline = publication
 		? `已建立 1 組詢價・${publication.recipientCount} 筆邀請${
 				quantityText ? `（${quantityText}）` : ""
@@ -171,10 +163,7 @@ export default function QuoteBatchSummary({
 				<h2 id="quote-summary-title">
 					{publication ? "詢價已發布" : "詢價建立摘要"}
 				</h2>
-				{/* §V.11.4 Delivery truth：邀請建立、publisher ack、consumer retry
-				 * 與 provider delivered 是四層不同的事實。核准只建立 publication、
-				 * 收件人清單與 outbox 排程，所以這裡只能說「已建立」與「已排入
-				 * 處理」——寫「已寄送」會把 outbox commit 當成送達證明。 */}
+
 				{inviteHeadline ? <p>{inviteHeadline}</p> : null}
 				<p className="assistant-quote-summary__delivery">
 					通知已排入處理；不代表通知或聯絡已送達。
@@ -194,8 +183,7 @@ export default function QuoteBatchSummary({
 					>
 						<h3 id="quote-summary-snapshot">詢價快照</h3>
 						<dl className={styles.facts}>
-							{/* 「結果版本」是 §V.11.4 Copy freeze 指定的買家可見說法；
-							 * 不得寫成「Artifact 版本」或任何 outbox 內部術語。 */}
+
 							{publication ? (
 								<div>
 									<dt>結果版本</dt>
@@ -209,9 +197,7 @@ export default function QuoteBatchSummary({
 							<Fact label="數量" value={quantityText} />
 							<Fact label="配送" value={deliveryText} />
 							<Fact label="希望詢價" value={rangeText} />
-							{/* ⛔ 這裡沒有「截止」列：回覆期限的買家側來源隨 legacy
-							 * quoteDeadline 一起下架，而 slots.deliveryDate 是交期不是
-							 * 回覆期限，拿它頂替等於宣告一個伺服器沒說過的期限。 */}
+
 						</dl>
 						<p className={styles.note}>
 							<AppIcon name="info" size={17} aria-hidden="true" />
@@ -223,8 +209,7 @@ export default function QuoteBatchSummary({
 						</p>
 					</section>
 
-					{/* 三個 count 是發布當下的意圖分布，不是投遞結果：`queuedCount` 標的是
-					 * 「已排入處理」而不是「已送出」，「未排入處理」是收件人減去已排入處理的數。 */}
+
 					{publication ? (
 						<section
 							className={styles.card}
@@ -300,10 +285,7 @@ export default function QuoteBatchSummary({
 									: `${counts.shortlistCount}`}
 							</dd>
 						</div>
-						{/* 這兩列只看 acceptance：伺服器的接受回執是 acceptedDealPrice 與
-						 * 待付款訂單唯一的來源（doc 64 §4.2，ACK 即商務 award）。沒有它時
-						 * 「尚未成立」講的是「本畫面沒有任何成立證據」，不是在推測伺服器
-						 * 狀態——而這正是稿 R-02 要求呈現的空狀態。 */}
+
 						<div className={styles.truthRow}>
 							<dt>成交價格</dt>
 							<dd data-empty={acceptance ? undefined : ""}>

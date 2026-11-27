@@ -28,7 +28,6 @@ func TestBreakerFor_PerIssuerIsolation(t *testing.T) {
 		t.Fatal("同一個 issuer 必須拿到同一顆（否則連敗計數每次歸零、永遠跳不起來）")
 	}
 
-	// 讓 issuer 101 連敗到開路（DefaultBreakerSettings().Failures = 5）。
 	boom := &APIError{Endpoint: "/json/f0401", Code: "10", Class: ClassRetryable, Kind: ErrorKindProvider, KnownCode: true}
 	for i := uint32(0); i < DefaultBreakerSettings().Failures; i++ {
 		_, _ = a.Execute(func() ([]byte, error) { return nil, boom })
@@ -37,7 +36,6 @@ func TestBreakerFor_PerIssuerIsolation(t *testing.T) {
 		t.Fatalf("issuer 101 連敗 %d 次應開路，實得 %v", DefaultBreakerSettings().Failures, a.State())
 	}
 
-	// 🔴 關鍵斷言：另一家**完全不受影響**。這一格就是修正前壞掉的地方。
 	if b.State() != gobreaker.StateClosed {
 		t.Errorf("issuer 102 不該被 101 拖累，實得 %v", b.State())
 	}
@@ -63,7 +61,6 @@ func TestGlobalBreakerExcludesPerStoreOpen(t *testing.T) {
 	if !excluded(gobreaker.ErrTooManyRequests) {
 		t.Error("per-store half-open 限流必須被全域排除")
 	}
-	// 真正的上游故障仍要計入全域——否則全域斷路器永遠跳不起來。
 	upstream := &APIError{Endpoint: "/json/f0401", Code: "10", Class: ClassRetryable, Kind: ErrorKindProvider, KnownCode: true}
 	if excluded(upstream) {
 		t.Error("真正的上游故障必須計入全域，否則全域斷路器形同虛設")

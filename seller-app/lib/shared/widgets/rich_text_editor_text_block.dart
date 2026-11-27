@@ -78,18 +78,15 @@ class TextBlockData {
   /// 文字 block 的行內富文本 controller（inline runs 存這裡；由父層建立/釋放）。
   QuillController? quillController;
 
-  // 圖片相關
   Uint8List? imageBytes;
   String? imageUrl;
   String? objectKey;
   String? stagedToken;
   bool isUploading;
 
-  // 表格相關（type=table）
   List<List<TableCellData>>? tableCells;
   bool tableWithHeadings;
 
-  // 清單相關（type=list）：項目純文字（賣家 app 內部編輯用純文字單一 run）
   List<String>? listItems;
   bool listOrdered;
 
@@ -199,7 +196,6 @@ class _TextBlockWidgetState extends State<TextBlockWidget> {
   final FocusNode _focusNode = FocusNode();
   final ScrollController _editorScroll = ScrollController();
 
-  // Hashtag autocomplete tagging-mode 狀態（caret 在 #xxx 中間就會 non-null）
   HashtagTaggingMode? _taggingMode;
 
   QuillController? get _qc => widget.data.quillController;
@@ -214,7 +210,6 @@ class _TextBlockWidgetState extends State<TextBlockWidget> {
   @override
   void didUpdateWidget(TextBlockWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // undo/redo 會換掉 controller instance → 重新掛 listener
     if (oldWidget.data.quillController != widget.data.quillController) {
       oldWidget.data.quillController?.removeListener(_onQuillChanged);
       widget.data.quillController?.addListener(_onQuillChanged);
@@ -228,7 +223,6 @@ class _TextBlockWidgetState extends State<TextBlockWidget> {
 
   @override
   void dispose() {
-    // controller 由父層擁有並釋放，這裡只移除 listener
     _qc?.removeListener(_onQuillChanged);
     _focusNode.removeListener(_onFocusChanged);
     _focusNode.dispose();
@@ -318,7 +312,6 @@ class _TextBlockWidgetState extends State<TextBlockWidget> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 拖曳把手
             ReorderableDragStartListener(
               index: widget.index,
               child: Padding(
@@ -332,7 +325,6 @@ class _TextBlockWidgetState extends State<TextBlockWidget> {
                 ),
               ),
             ),
-            // 內容區
             Expanded(
               child: widget.data.type == BlockType.image
                   ? _buildImageContent()
@@ -342,7 +334,6 @@ class _TextBlockWidgetState extends State<TextBlockWidget> {
                   ? _buildListContent()
                   : _buildTextContent(),
             ),
-            // 刪除按鈕（選中時）
             if (widget.isSelected)
               GestureDetector(
                 onTap: widget.onDelete,
@@ -369,9 +360,6 @@ class _TextBlockWidgetState extends State<TextBlockWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 行內富文本編輯器（flutter_quill）：粗體/斜體/底線/顏色/連結由上方
-          // 工具列對「目前選取範圍」套用，inline runs 存 QuillController。
-          // hashtag 偵測/插入改讀 QuillController（見 _onQuillChanged / _onSelectHashtag）。
           QuillEditor(
             controller: qc,
             focusNode: _focusNode,
@@ -436,7 +424,7 @@ class _TextBlockWidgetState extends State<TextBlockWidget> {
           rows[tr][tc].text = v;
         }
       }
-      _tableGen++; // 讓所有 cell 以新 initialValue 重建
+      _tableGen++;
     });
   }
 
@@ -452,7 +440,6 @@ class _TextBlockWidgetState extends State<TextBlockWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 列/欄增減控制
           Wrap(
             spacing: 8.w,
             children: [
@@ -552,7 +539,6 @@ class _TextBlockWidgetState extends State<TextBlockWidget> {
                             onTap: () {
                               _tableFocusRow = r;
                               _tableFocusCol = c;
-                              // 只更新刪列/欄按鈕文案，不重建 cell
                               setState(() {});
                             },
                             inputFormatters: [
@@ -599,7 +585,6 @@ class _TextBlockWidgetState extends State<TextBlockWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 加/刪項 + 有序切換
           Wrap(
             spacing: 8.w,
             children: [
@@ -776,13 +761,10 @@ class _CellPasteExpandFormatter extends TextInputFormatter {
     TextEditingValue newValue,
   ) {
     final inserted = newValue.text.length - oldValue.text.length;
-    // 只攔「一次插入多字元且含 tab/換行」的貼上；避免誤攔輸入法組字
     if (inserted > 1 &&
         (newValue.text.contains('\t') || newValue.text.contains('\n')) &&
         !oldValue.text.contains('\t') &&
         !oldValue.text.contains('\n')) {
-      // 從差異推出貼入的原始片段：以 selection 起點對齊（簡化：整段 newText
-      // 拆格。貼上場景 old 幾乎總是空格或短文字，整段解析即符合預期）。
       final lines = newValue.text
           .replaceAll('\r\n', '\n')
           .replaceAll('\r', '\n')
@@ -791,13 +773,12 @@ class _CellPasteExpandFormatter extends TextInputFormatter {
           .toList();
       if (lines.isNotEmpty) {
         final grid = lines.map((l) => l.split('\t')).toList();
-        // 至少要形成 2 格以上才算表格資料，否則放行原生貼上
         final cellsTotal = grid.fold<int>(0, (a, r) => a + r.length);
         if (cellsTotal >= 2) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             onGridPasted(grid);
           });
-          return oldValue; // 吞掉本次插入，由展開流程填格
+          return oldValue;
         }
       }
     }

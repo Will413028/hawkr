@@ -69,7 +69,6 @@ export function createHomePostDetailViewerResource(
 		load,
 		prewarm: () => {
 			void load().catch(() => {
-				// Intent prewarming is speculative. A visible open can retry.
 			});
 		},
 	};

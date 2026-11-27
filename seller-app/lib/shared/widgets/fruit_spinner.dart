@@ -85,15 +85,12 @@ class _FruitSpinnerState extends State<FruitSpinner>
     return AnimatedBuilder(
       animation: Listenable.merge([_spin, _pulse]),
       builder: (context, _) {
-        // 呼吸：背景圓暈隨 pulse 放大 1.0→1.08，淡入淡出。
         final pulseT = Curves.easeInOut.transform(_pulse.value);
         final haloScale = 1.0 + 0.08 * pulseT;
         final haloOpacity = 0.55 + 0.45 * (1 - pulseT);
 
-        // 上下浮動：sin wave 給水果一點「被拋」的感覺。
         final bob = sin(_spin.value * 2 * pi) * (widget.size * 0.06);
 
-        // 旋轉：輕度 ease（fast→slow→fast）讓動作不要那麼機械。
         final spinT = _easedSpin(_spin.value);
 
         return SizedBox(
@@ -102,7 +99,6 @@ class _FruitSpinnerState extends State<FruitSpinner>
           child: Stack(
             alignment: Alignment.center,
             children: [
-              // 背景呼吸暈
               Transform.scale(
                 scale: haloScale,
                 child: Opacity(
@@ -117,7 +113,6 @@ class _FruitSpinnerState extends State<FruitSpinner>
                   ),
                 ),
               ),
-              // 水果（旋轉 + 上下浮動 + 切換時 cross-fade）
               Transform.translate(
                 offset: Offset(0, bob),
                 child: Transform.rotate(

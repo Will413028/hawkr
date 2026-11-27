@@ -26,7 +26,6 @@ func (s *Service) SeedApproved(ctx context.Context, q *store.Queries, storeID in
 	if err := s.p.syncHashes(ctx, q, nil, draft, now); err != nil {
 		return store.SellerKycApplication{}, uuid.Nil(), err
 	}
-	// 照正式流程的狀態轉移：草稿 → SUBMITTED（submission_seq 加一）→ APPROVED，用同一個 TransitionKYCApplication。
 	submitted, err := q.TransitionKYCApplication(ctx, store.TransitionKYCApplicationParams{
 		ApplicationID: draft.ApplicationID, ExpectedVersion: draft.Version, FromStatus: string(model.KYCStatusDraft),
 		ToStatus: string(model.KYCStatusSubmitted), SubmittedAt: &now, Now: now,

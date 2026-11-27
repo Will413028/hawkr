@@ -40,11 +40,8 @@ type Envelope struct {
 	Code      int32       `json:"code"`
 }
 
-// bizMsgRE 解析 "[9201] 不能傳訊息給自己" 格式
 var bizMsgRE = regexp.MustCompile(`^\[(\d+)\]\s*(.*)$`)
 
-// parseBizMessage 從 "[NNNN] message" 解析出業務碼與訊息。
-// 若格式不符回傳 (0, "")。
 func parseBizMessage(msg string) (int32, string) {
 	m := bizMsgRE.FindStringSubmatch(msg)
 	if m == nil {
@@ -73,7 +70,6 @@ type PageData struct {
 	PageSize string      `json:"pageSize"`
 }
 
-// ==================== 成功回應 ====================
 
 // OK 成功回應 {code:0, message:"success", data:{...}}
 func OK(c *gin.Context, data interface{}) {
@@ -97,7 +93,6 @@ func Page(c *gin.Context, records interface{}, total, page, pageSize string) {
 	})
 }
 
-// ==================== 錯誤回應（自動帶 traceId）====================
 
 // Err 通用錯誤回應
 func Err(c *gin.Context, httpStatus int, code int32, message string) {
@@ -144,7 +139,6 @@ func ServiceUnavailable(c *gin.Context, service string) {
 	Err(c, http.StatusServiceUnavailable, 503, service+" service unavailable")
 }
 
-// ==================== gRPC 回應轉發 ====================
 
 // GrpcResult 轉發 gRPC 回應
 // code=0 → 成功回應帶 data
@@ -161,13 +155,6 @@ func GrpcResult(c *gin.Context, code int32, message string, data interface{}) {
 	c.JSON(http.StatusOK, Envelope{Code: 0, Message: "success", Data: data})
 }
 
-// writeBizCodeEnvelopeIfPrefixed 若 message 符合 "[NNNN] xxx" 前綴格式，還原業務碼
-// 進 envelope Code（message 去前綴），回傳 true；否則不寫入回應、回傳 false 交由呼叫端
-// 走預設塌縮路徑。GrpcErr 各 status 分支共用同一份還原邏輯。
-//
-// httpStatus 由呼叫端的 gRPC status 分支決定：業務碼一律不走 HTTP status 分流，
-// 但同一個 status 分支內的塌縮值必須與該分支的預設一致，否則同一類錯誤會因為
-// 「有沒有帶業務碼」而回不同的 HTTP status。
 func writeBizCodeEnvelopeIfPrefixed(c *gin.Context, httpStatus int, msg string) bool {
 	bizCode, bizMsg := parseBizMessage(msg)
 	if bizCode <= 0 {
@@ -205,20 +192,13 @@ func GrpcErr(c *gin.Context, service string, err error) {
 	case codes.AlreadyExists:
 		Err(c, http.StatusConflict, 409, st.Message())
 	case codes.FailedPrecondition:
-		// 業務碼統一透傳（issue #1479）：訊息帶 "[NNNN] " 前綴即還原為 envelope Code，
-		// message 去前綴。無前綴維持 code=409 塌縮。行為與 GrpcDomainErr 一致
-		// （該函式現為 GrpcErr 的相容別名）。
 		if writeBizCodeEnvelopeIfPrefixed(c, http.StatusConflict, st.Message()) {
 			return
 		}
 		Err(c, http.StatusConflict, 409, st.Message())
 	case codes.Aborted:
-		// 樂觀鎖衝突 / 同事務衝突等：屬業務拒絕，HTTP 409 透傳訊息
 		Err(c, http.StatusConflict, 409, st.Message())
 	case codes.ResourceExhausted:
-		// 容量上限（並發 job 數、quota 等）：HTTP 429 透傳訊息。帶 "[NNNN] " 前綴者
-		// 還原成業務碼——限流 middleware 也寫 HTTP 429 但 envelope code 是 429，前端
-		// 得靠 code 才分得出「額度用完」與「請求太頻繁」（#2272）。
 		if writeBizCodeEnvelopeIfPrefixed(c, http.StatusTooManyRequests, st.Message()) {
 			return
 		}
@@ -226,17 +206,12 @@ func GrpcErr(c *gin.Context, service string, err error) {
 	case codes.Internal:
 		Err(c, http.StatusInternalServerError, 500, st.Message())
 	case codes.Unavailable, codes.DeadlineExceeded:
-		// 上游服務（含外部 API）不可用，透傳 message 讓前端顯示具體原因
 		msg := st.Message()
 		if msg == "" {
 			msg = service + " service unavailable"
 		}
 		Err(c, http.StatusServiceUnavailable, 503, msg)
 	case codes.Canceled:
-		// 呼叫方主動斷線（分頁關閉/App 背景化/導頁）會讓 c.Request.Context() 取消，
-		// 沿此 context 發出的 gRPC 呼叫收到 codes.Canceled——這不是下游服務異常。
-		// 寫 499（nginx 慣例 "Client Closed Request"）而非 503，讓
-		// http_requests_total 的 5xx 率不被 client 噪音污染。
 		if c.Request.Context().Err() != nil {
 			Err(c, 499, 499, service+" request canceled by client")
 			return
@@ -254,9 +229,7 @@ func GrpcDomainErr(c *gin.Context, service string, err error) {
 	GrpcErr(c, service, err)
 }
 
-// ==================== Proto 序列化 ====================
 
-// protoMarshaler 使用 protojson 序列化，不會丟掉 false / 0 / "" 等零值
 var protoMarshaler = protojson.MarshalOptions{EmitUnpopulated: true}
 
 // ProtoToRaw 將 proto message 序列化為 json.RawMessage，
@@ -269,7 +242,6 @@ func ProtoToRaw(msg proto.Message) json.RawMessage {
 	return b
 }
 
-// ==================== 內部工具 ====================
 
 // ExtractTraceID 從請求中提取 trace ID。
 //
@@ -277,14 +249,11 @@ func ProtoToRaw(msg proto.Message) json.RawMessage {
 // context key），會退回讀 header——沒有 header 就是空字串，這是預期的
 // 漸進式行為，見本檔套件文件。
 func ExtractTraceID(c *gin.Context) string {
-	// 優先從 TracingMiddleware 注入的 gin context 取（key 與
-	// gateway/internal/middleware/tracing.go 一致）
 	if tid, exists := c.Get("trace_id"); exists {
 		if s, ok := tid.(string); ok && s != "" {
 			return s
 		}
 	}
-	// fallback: 上游 propagate 的 header
 	if tid := c.GetHeader("x-trace-id"); tid != "" {
 		return tid
 	}

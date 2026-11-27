@@ -183,7 +183,6 @@ export async function passThroughToUpstream(
 		return new Response("upstream unreachable", { status: 502 });
 	}
 	const respHeaders = new Headers(upstream.headers);
-	// Node 的 fetch 已經解壓縮，去掉過時的編碼與長度，瀏覽器才不會再解一次。
 	respHeaders.delete("content-encoding");
 	respHeaders.delete("transfer-encoding");
 	respHeaders.delete("content-length");

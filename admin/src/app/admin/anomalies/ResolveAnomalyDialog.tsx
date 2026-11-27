@@ -70,7 +70,6 @@ export default function ResolveAnomalyDialog({
 		setError(null);
 		setSubmitting(true);
 		const result = await onConfirm(draft);
-		// 成功時呼叫端會關掉對話框；失敗留在原地，輸入還在。
 		if (!result.ok) setError(result.text);
 		setSubmitting(false);
 	};

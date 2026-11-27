@@ -88,15 +88,6 @@ export function TruckOverlay({
 }: TruckOverlayProps) {
 	const hostRef = useRef<HTMLDivElement | null>(null);
 
-	// Lock background scroll while the fullscreen scrim is mounted — `position:
-	// fixed` stops clicks but not wheel scrolling, so the page would otherwise
-	// scroll behind the overlay. Inline mode (fullscreen=false) lives inside a
-	// Dialog body that already owns the lock, so leave the body untouched.
-	//
-	// The scrim also has to stop KEYBOARD reach: it covers the page but nothing
-	// stopped Tab walking into the controls behind it, so a bulk operation could
-	// be fired twice from a screen the user could not see. Same isolation the
-	// Dialog uses.
 	useEffect(() => {
 		if (!fullscreen) return;
 		const releaseScroll = acquireBodyScrollLock();
@@ -122,7 +113,7 @@ export function TruckOverlay({
 			aria-live="polite"
 		>
 			<div className="relative w-[200px] h-20 bg-[var(--hkui-content1)] border border-[var(--hkui-divider)] rounded-[14px] overflow-hidden dark:bg-[var(--page-truck-panel-on-dark)] dark:border-[var(--page-truck-panel-border-on-dark)]">
-				{/* The truck colour maps to the shared light/dark truck tokens. */}
+
 				<span
 					className="absolute bottom-2.5 left-1/2 -translate-x-1/2"
 					aria-hidden="true"

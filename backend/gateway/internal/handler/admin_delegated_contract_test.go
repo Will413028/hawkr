@@ -13,46 +13,24 @@ import (
 	"testing"
 )
 
-// 三層鎖定的路由禁字斷言只掃**路徑**（§6.1.1 的 10 個禁字）。DTO 層漏掉一個履約或
-// 金流欄位不會 panic、不會有測試轉紅，只會靜默把託運單資訊、金流交易明細或未遮罩的
-// 收件資訊交給代行者——20 號 #8d 明講這是該條最容易出錯的一項。
-//
-// 這支測試就是那道缺的鎖：以**欄位名**為錨掃過每一個代行 DTO 的完整結構（含巢狀），
-// 命中禁列即失敗。
-//
-// 為什麼是欄位名而不是型別：投影是人手寫的，出錯的形狀是「有人從上游 message 多抄了
-// 一欄過來」，而那一欄會沿用上游的名字。
 
-// delegatedForbiddenFields 逐項對應 §8.1.5「明確排除」欄與三層鎖定的履約禁區。
-// 比對前一律轉小寫，所以 labelKey / label_key / LabelURL 全部命中同一條。
 var delegatedForbiddenFields = []string{
-	// 履約物件（託運單、出貨便、取件門市、出貨與收貨照片）
 	"shipmentno", "labelkey", "labelurl", "labelexpireat",
 	"odno", "validationno", "partnerid", "pickupstorename",
 	"shipmentphotokeys", "receiptphotokeys", "cvsstoreid",
-	// 金流
 	"transactionid", "providerstatus", "providermessage",
-	// 退款與撥款
 	"refundhistory",
-	// 買家側行為與社群互動計數
 	"review", "isreviewed", "canreview", "reviewdeadline",
 	"likecount", "commentcount", "viewcount", "sharecount", "isliked",
-	// 帳號與治理內部狀態（storefront allow-list 的排除項）
 	"seotitle", "seodescription", "birthday", "gender", "foodbusinessregno",
 	"email", "avatarkey", "avatarurl", "lifecyclestatus", "suspensionreasoncode",
 	"overallcertificationstatus", "currentcertificationid",
-	// 完整收件資訊只走 recipient-contact 端點，其他 DTO 一律不得出現
 	"recipientphone", "shippingaddress",
-	// 媒體欄位只回 objectKey（*Key）；URL 由前端組
 	"imageurl", "imageurls", "logourl", "coverurl", "previewurl",
 }
 
-// delegatedForbiddenFieldExceptions 是禁用欄位清單的具名例外，鍵為 `DTO.欄位名`。
-// 例外逐個具名，不得以整個 DTO 豁免的形式存在。
 var delegatedForbiddenFieldExceptions = map[string]struct{}{}
 
-// delegatedResponseDTOs 是四類資源端點與稽核端點對外吐出的每一個 struct。
-// 新增一個代行 DTO 卻忘了列進來，這支測試就守不到它——所以清單本身也是契約的一部分。
 func delegatedResponseDTOs() map[string]any {
 	return map[string]any{
 		"DelegatedProductListItem":        DelegatedProductListItem{},
@@ -64,12 +42,7 @@ func delegatedResponseDTOs() map[string]any {
 		"DelegatedOperationSessionRecord": DelegatedOperationSessionRecord{},
 		"DelegatedBatchUnpublishData":     DelegatedBatchUnpublishData{},
 		"DelegatedRecipientContactData":   DelegatedRecipientContactData{},
-		// 每一支寫入端點的統一出口。它一度不在清單內，而它正是所有代行寫入
-		// 回應的形狀 —— 漏掉它等於整條寫入路徑沒有被這支契約守到。
 		"delegatedMutationData": delegatedMutationData{},
-		// 代行商品建立／更新的專屬出口（共用三欄 ＋ certificationWarnings，19 §9.5）。
-		// 它是 delegatedMutationData 的旁支而不是取代品，所以兩個都要在清單裡——
-		// 少列這一個，商品寫入路徑就從禁用欄位契約裡整條掉出去。
 		"delegatedProductMutationData": delegatedProductMutationData{},
 	}
 }
@@ -95,8 +68,6 @@ func TestDelegatedDTOs_CarryNoFulfilmentOrFinanceFields(t *testing.T) {
 				"不會轉紅，只會靜默把履約／金流／未遮罩 PII 交給代行者", name, field)
 		}
 	}
-	// 例外清單本身也要被守：一條不再對應任何欄位的例外會靜默留在那裡，而下一個同名
-	// 欄位長出來時它就是一個沒人記得為什麼存在的豁免。
 	for key := range delegatedForbiddenFieldExceptions {
 		if !usedExceptions[key] {
 			t.Errorf("例外 %q 已不對應任何 DTO 欄位，請一併移除", key)
@@ -128,7 +99,6 @@ func TestDelegatedRecipientContact_IsTheOnlyUnmaskedShape(t *testing.T) {
 			t.Errorf("DelegatedRecipientContact 缺少 %q", f)
 		}
 	}
-	// 揭露欄位集合是白名單：不得順手多回 email、身分證、付款資訊。
 	if len(fields) != len(want) {
 		t.Errorf("DelegatedRecipientContact 欄位數 = %d, want %d（揭露集合是白名單）", len(fields), len(want))
 	}
@@ -177,7 +147,6 @@ func TestDelegatedOperationSessionRecord_FieldSetIsAWhitelist(t *testing.T) {
 		}
 	}
 
-	// 憑證與重放鍵永遠不在裡面。前兩者單獨持有即可操作，第三者是可預測的重放鍵。
 	for _, f := range got {
 		switch strings.ToLower(f) {
 		case "operationcredential", "handoffcode", "handoffcodehash", "credentialhash", "idempotencykey":
@@ -240,8 +209,6 @@ func TestDelegatedOrderList_DeclaresNoDetailOnlyMaskedPhone(t *testing.T) {
 	}
 }
 
-// collectJSONFieldNames walks a struct and returns every json field name it can emit,
-// including nested structs and slice/pointer element types.
 func collectJSONFieldNames(t reflect.Type, seen map[reflect.Type]bool) []string {
 	for t != nil && (t.Kind() == reflect.Pointer || t.Kind() == reflect.Slice || t.Kind() == reflect.Array) {
 		t = t.Elem()
@@ -255,7 +222,7 @@ func collectJSONFieldNames(t reflect.Type, seen map[reflect.Type]bool) []string 
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
 		if f.PkgPath != "" {
-			continue // unexported
+			continue
 		}
 		tag := f.Tag.Get("json")
 		if tag == "-" {
@@ -311,7 +278,6 @@ func TestDelegatedDTOCatalog_CoversEveryResponseOutlet(t *testing.T) {
 			if pkg, ok := sel.X.(*ast.Ident); !ok || pkg.Name != "response" {
 				return true
 			}
-			// response.OK(c, X{...}) — 取第二個實參的複合字面型別名
 			lit, ok := call.Args[1].(*ast.CompositeLit)
 			if !ok {
 				return true

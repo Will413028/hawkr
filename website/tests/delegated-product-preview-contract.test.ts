@@ -68,7 +68,6 @@ const DETAIL: DelegatedProductDetail = {
 					freeThreshold: "1500",
 					feePayer: "3101",
 				},
-				// 與上一筆逐欄相同 → 聚合時去重（公開端的商品層 shippingMethods 是聯集）。
 				{
 					type: "3001",
 					freeThreshold: "1200",
@@ -93,7 +92,6 @@ function derive(detail: DelegatedProductDetail = DETAIL) {
 	});
 }
 
-/* ── 三處改名 ────────────────────────────────────────────────────────── */
 
 test("預覽映射：images[].imageKey → imageKeys（漏掉＝圖庫整片空白）", () => {
 	assert.deepEqual(derive().thumbnails, [
@@ -107,7 +105,6 @@ test("預覽映射：skus[].skuId → id（漏掉＝規格鍵退成索引字串�
 		derive().skus.map((sku) => sku.id),
 		["9001", "9002"],
 	);
-	// 反向：derive 對缺 id 的 SKU 會填索引 "0"/"1"，而那正是「看起來有值」的失敗形狀。
 	const unmapped = deriveDetailLayoutProps({
 		product: { skus: DETAIL.skus },
 		seller: null,
@@ -141,7 +138,6 @@ test("預覽映射：skus[].spec → skuName（漏掉＝規格名變成「規格
 	);
 });
 
-/* ── 一處由 SKU 聚合（公開端是後端算好才下發的） ──────────────────────── */
 
 test("預覽聚合：商品層 shippingMethods 取聯集並去重，配送業者 icon 因此畫得出來", () => {
 	assert.deepEqual(
@@ -156,7 +152,6 @@ test("預覽聚合：商品層 shippingMethods 取聯集並去重，配送業者
 	);
 });
 
-/* ── 三處刻意留空 ───────────────────────────────────────────────────── */
 
 test("預覽不借用評價：rating／reviewCount／reviews 全部缺席 → 尚無評價", () => {
 	const derived = derive();
@@ -168,7 +163,6 @@ test("預覽不借用評價：rating／reviewCount／reviews 全部缺席 → �
 	assert.equal(derived.reviewTotal, 0);
 });
 
-/* ── 賣家卡的鍵 ─────────────────────────────────────────────────────── */
 
 test("預覽注入 storeId，否則整張賣家卡不畫", () => {
 	assert.equal(derive().sellerStoreId, "2685914682");
@@ -182,7 +176,6 @@ test("預覽注入 storeId，否則整張賣家卡不畫", () => {
 	assert.equal(withoutStore.sellerStoreId, "");
 });
 
-/* ── 真的渲染一次 ───────────────────────────────────────────────────── */
 
 /**
  * 上面每一條驗的都是**送進 layout 的 props**。這一條驗的是 layout 真的把它畫出來、
@@ -194,15 +187,10 @@ test("預覽注入 storeId，否則整張賣家卡不畫", () => {
  */
 test("預覽真的渲染得出來，且畫面上沒有通往買家公開面的連結", async () => {
 	const React = (await import("react")).default;
-	// `next/image` 的 default export 在裸 node runner 下是一個 object 而不是元件
-	// （Next 的 client-component 包裝），renderToStaticMarkup 會直接 throw。換成
-	// 一個只吐 <img> 的替身 —— 這條測試要驗的是連結，不是圖片元件本身。
 	mock.module("next/image", {
 		defaultExport: ({ alt, src }: { alt?: string; src?: string }) =>
 			React.createElement("img", { alt: alt ?? "", src: String(src ?? "") }),
 	});
-	// 購買盒讀登入態。代行的瀏覽器在 www 上**沒有**登入態，所以 guest 是這條路徑上
-	// 的真實值 —— 這不是為了讓測試過而調的參數。
 	const anonymousAuth = { status: "guest", identity: null, activeRole: null };
 	mock.module("@/lib/auth/context", {
 		namedExports: {
@@ -220,8 +208,6 @@ test("預覽真的渲染得出來，且畫面上沒有通往買家公開面的�
 		await import("../features/product/ProductDetailLayout")
 	).default;
 
-	// 非預覽模式（③ 的反向自檢）會渲染 `ProductSellerIntro` → `SellerChatButton`，
-	// 那一支用 react-query。SSR 不跑 effect，所以這個 client 不會發任何請求。
 	const withProviders = (node: React.ReactElement) =>
 		withAppRouter(
 			React.createElement(
@@ -238,14 +224,11 @@ test("預覽真的渲染得出來，且畫面上沒有通往買家公開面的�
 				...derived,
 				previewMode: true,
 				productId: DETAIL.productId,
-				// 預覽頁自繪的賣家卡（不可點）。傳 null 等於不畫，那會讓下面的
-				// 「沒有 /sellers 連結」變成空過 —— 所以這裡刻意放一個真的有內容的節點。
 				sellerIntroSlot: React.createElement("aside", null, "梨山盛花園"),
 			}),
 		),
 	);
 
-	// ① 真的畫出草稿的內容（渲染成功、而且吃的是代行 DTO 而不是空殼）。
 	assert.ok(html.includes("梨山高冷茶"), "商品名沒有渲染出來");
 	assert.ok(
 		html.includes("四兩裝"),
@@ -254,13 +237,6 @@ test("預覽真的渲染得出來，且畫面上沒有通往買家公開面的�
 	assert.ok(html.includes("台中市和平區"), "產地沒有渲染出來");
 	assert.ok(html.includes("梨山盛花園"), "自繪賣家卡沒有掛上去");
 
-	// ⑤ 不可購買的商品必須畫出「不可購買」。
-	// ⚠️ 這一條的錨**必須下在渲染結果**，不能下在 deriveDetailLayoutProps 的輸出。
-	// 2026-08-19 dev 實測踩過：`purchasable:false` 確實一路傳到 ProductPurchaseBox
-	// （React fiber 的 memoizedProps 實測為 false），但該檔 `:450` 的條件曾是
-	// `outOfStock && !previewMode`，而預覽固定傳 previewMode ⇒ 不可購買分支**永遠
-	// 不會渲染**，畫面與可購買商品逐項相同。derive 層的斷言全綠、完全擋不住。
-	// previewMode 在那一格真正要擋的是會發 `/app/*` 請求的補貨通知鈕，不是整個狀態。
 	assert.ok(
 		html.includes("暫不可購買") || html.includes("已售完"),
 		"不可購買的商品在預覽裡沒有畫出任何不可購買的字樣——代行者看不出買家買不到它",
@@ -270,7 +246,6 @@ test("預覽真的渲染得出來，且畫面上沒有通往買家公開面的�
 		"預覽不得渲染補貨通知鈕：它會用操作者的買家身分打 /app/* 請求",
 	);
 
-	// ⑥ 反向：可購買的商品在預覽裡不得被畫成不可購買（防「一律畫成不可購買」）。
 	const activeHtml = renderToStaticMarkup(
 		withProviders(
 			React.createElement(ProductDetailLayout, {
@@ -290,8 +265,6 @@ test("預覽真的渲染得出來，且畫面上沒有通往買家公開面的�
 	);
 	assert.ok(!activeHtml.includes("暫不可購買"), "可購買的商品被誤判成不可購買");
 
-	// ② 畫面上一條公開面連結都沒有。`/products/`、`/market/`、`/sellers/` 分別是
-	//    購買盒的商品連結、麵包屑的分類連結、賣家卡的店面連結 —— 三個不同的來源。
 	for (const forbidden of [
 		'href="/products/',
 		'href="/market/',
@@ -303,7 +276,6 @@ test("預覽真的渲染得出來，且畫面上沒有通往買家公開面的�
 		);
 	}
 
-	// ③ 反向自檢：非預覽模式下那些連結**確實會出現**，否則 ② 是空過的。
 	const live = renderToStaticMarkup(
 		withProviders(
 			React.createElement(ProductDetailLayout, {
@@ -342,7 +314,6 @@ test("預覽映射：purchasable=false 必須傳到 derive 之後（漏掉＝草
 		"derive 之後仍必須是 false —— 這是畫面真正吃到的值",
 	);
 
-	// 反向：可購買的商品不得被誤判成不可買（防「寫死 false」）
 	assert.equal(
 		derive({
 			...DETAIL,

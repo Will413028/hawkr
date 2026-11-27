@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# 確認 buf CLI 是 api/.buf-version 的版本。api/generate.sh 與 backend 的 `make uitext` 共用。
 set -euo pipefail
 
 want=$(cat "$(dirname "$0")/.buf-version")

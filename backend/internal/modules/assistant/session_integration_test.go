@@ -290,7 +290,6 @@ func TestListEmptyUserIDListsAllUsersWithTheirOwnUserState(t *testing.T) {
 	}
 }
 
-// foreignSession 是別人的 session 型別：AppendEvent 只該用它的 AppName、UserID、ID。
 type foreignSession struct{ appName, userID, id string }
 
 func (f foreignSession) ID() string                { return f.id }

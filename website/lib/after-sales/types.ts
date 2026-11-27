@@ -185,7 +185,6 @@ export interface AfterSaleDetail extends AfterSaleCase {
 	returnProviderStatus?: string;
 }
 
-/* ---- Platform arbitration (申訴 / 仲裁) -------------------------------- */
 
 /** A single arbitration timeline event. */
 export interface AfterSaleArbitrationEvent {
@@ -227,7 +226,6 @@ export interface AfterSaleListResult {
 	total: number;
 }
 
-/* ---- Request inputs ---------------------------------------------------- */
 
 /** Buyer: POST /app/after_sales. */
 export interface CreateAfterSaleInput {

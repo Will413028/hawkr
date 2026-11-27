@@ -60,7 +60,6 @@ type App struct {
 	stores    Stores
 	images    rpc.Images
 	log       *slog.Logger
-	// reasonOf 取出模組錯誤帶的業務原因；正式組裝是 coupon.ReasonOf，測試換成固定的原因（模組的原因型別不能在模組外建構）。
 	reasonOf func(error) coupon.Reason
 	table    map[string]declaration
 }
@@ -72,7 +71,6 @@ func NewApp(m Module, buyers Buyers, customers Customers, stores Stores, images 
 	return newApp(declarations, m, buyers, customers, stores, images, log)
 }
 
-// newApp 的宣告表由參數給（測試用缺一列的表驗證啟動檢查）。
 func newApp(table map[string]declaration, m Module, buyers Buyers, customers Customers, stores Stores, images rpc.Images, log *slog.Logger) (*App, error) {
 	switch {
 	case log == nil:
@@ -92,7 +90,6 @@ func newApp(table map[string]declaration, m Module, buyers Buyers, customers Cus
 	return &App{module: m, buyers: buyers, customers: customers, stores: stores, images: images, log: log, reasonOf: coupon.ReasonOf, table: table}, nil
 }
 
-// buyerID 回傳呼叫者的買家身分；只有顧客帳號能呼叫（沒有登入由 interceptor 擋，管理員回 permission_denied）。
 func (h *App) buyerID(ctx context.Context) (int64, error) {
 	p, err := rpc.RequireAccount(ctx)
 	if err != nil {
@@ -105,8 +102,6 @@ func (h *App) buyerID(ctx context.Context) (int64, error) {
 	return id, nil
 }
 
-// actingStore 回傳呼叫者此刻的店，只在它有 procedure 宣告的能力時成功（seller.ActingStore：停權回 permission_denied 與 SELLER_SUSPENDED，
-// 其他前置條件沒有滿足回 failed_precondition，沒有店回 not_found）。宣告表是執行的依據，沒有宣告能力的方法不能呼叫它。
 func (h *App) actingStore(ctx context.Context, procedure string) (seller.Store, error) {
 	d, ok := h.table[procedure]
 	if !ok || d.capability == "" {
@@ -119,7 +114,6 @@ func (h *App) actingStore(ctx context.Context, procedure string) (seller.Store, 
 	return h.stores.ActingStore(ctx, p.ID, d.capability)
 }
 
-// reasons 是模組的業務原因對到契約的 ErrorReason（apperr.Reason）：只有 client 會依它分支的才對應，找不到的類不帶原因。
 var reasons = map[coupon.Reason]apperr.Reason{
 	coupon.ReasonCampaignNotActive: apperr.ReasonCouponCampaignNotActive,
 	coupon.ReasonOutsideWindow:     apperr.ReasonCouponOutsideWindow,
@@ -129,12 +123,10 @@ var reasons = map[coupon.Reason]apperr.Reason{
 	coupon.ReasonQuotaExceeded:     apperr.ReasonCouponQuotaExceeded,
 }
 
-// failure 把模組的錯誤轉成對外的錯誤：業務原因附上契約的 ErrorReason，欄位對到請求路徑 paths。
 func (h *App) failure(err error, paths rpc.FieldPaths) error {
 	return failure(h.reasonOf, err, paths)
 }
 
-// failure 是 App 與 Admin 共用的轉換：reasonOf 取出模組錯誤帶的業務原因。
 func failure(reasonOf func(error) coupon.Reason, err error, paths rpc.FieldPaths) error {
 	if err == nil {
 		return nil
@@ -165,8 +157,6 @@ var (
 	}
 )
 
-// requireCustomers 檢查名單裡的每位買家都是這家店的客戶（crm，一次查詢）；不是客戶的回 invalid_argument 並指出第一個是第幾個。
-// crm 讀取失敗（不是「不是客戶」）整個請求失敗。
 func (h *App) requireCustomers(ctx context.Context, storeID int64, raw []string, ids []int64) error {
 	have, err := h.customers.CustomersAmong(ctx, storeID, ids)
 	if err != nil {
@@ -180,7 +170,6 @@ func (h *App) requireCustomers(ctx context.Context, storeID int64, raw []string,
 	return nil
 }
 
-// cursor 是列表的 page token 內容：上一頁最後一筆的建立時間與 ID。
 type cursor struct {
 	At time.Time `json:"a"`
 	ID uuid.UUID `json:"i"`
@@ -203,7 +192,6 @@ func nextToken(scope string, next *coupon.Cursor) string {
 	return rpc.TokenFor(scope, cursor{At: next.At, ID: next.ID})
 }
 
-// pageSize 檢查 page_size：負數回 invalid_argument，0 與超過上限由模組套預設與上限。
 func pageSize(n int32) (int32, error) {
 	if n < 0 {
 		return 0, rpc.RequiredField("page_size", "page_size 不能是負數")

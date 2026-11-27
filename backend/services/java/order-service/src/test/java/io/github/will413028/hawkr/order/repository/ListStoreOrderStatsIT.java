@@ -103,8 +103,6 @@ class ListStoreOrderStatsIT {
     @Test
     @DisplayName("成交口徑、不重複買家、賣家取消與空店排除")
     void countsQualifyingBuyersAndSellerCancellations() {
-        // 店 100：買家 1 兩單（PAID、COMPLETED）、買家 2 一單（PARTIALLY_REFUNDED）→ 3 單 2 人；
-        // 另有待付款(0)、全額退款(70)、買家取消、系統取消各一單，都不算成交也不算賣家取消；賣家取消一單。
         order("100", 1, "10", "1 day");
         order("100", 1, "50", "1 day");
         order("100", 2, "60", "1 day");
@@ -113,12 +111,9 @@ class ListStoreOrderStatsIT {
         order("100", 4, CANCELLED, "1 day", "BUYER");
         order("100", 5, CANCELLED, "1 day", "SYSTEM");
         order("100", 6, CANCELLED, "1 day", "SELLER");
-        // 店 200：只有賣家取消 → 出現，成交為 0。
         order("200", 7, CANCELLED, "1 day", "SELLER");
-        // 店 300：只有待付款與買家取消 → 不出現。
         order("300", 8, "0", "1 day");
         order("300", 9, CANCELLED, "1 day", "BUYER");
-        // 店 400：成交單在時間窗之外 → 不出現。
         order("400", 10, "50", "40 days");
 
         List<StoreOrderStatsResult> rows = query(30, 0L, 100);
@@ -164,10 +159,10 @@ class ListStoreOrderStatsIT {
     @Test
     @DisplayName("成立訂單的時間窗以付款時間計：40 天前下單、2 天前付款算；5 天前下單但付款時間在窗外不算")
     void qualifyingOrdersAreWindowedByPayTime() {
-        order("100", 1, "50", "40 days", null, "2 days", null);   // 下單在窗外、付款在窗內 → 算
-        order("100", 2, "50", "10 days", null, "9 days", null);   // 付款在 7 天窗外、30 天窗內
-        order("200", 3, "50", "5 days", null, "40 days", null);   // 付款時間在窗外（資料上不合理的下單晚於付款，仍以付款時間為準）→ 不算
-        order("300", 4, "10", "5 days", null, null, null);        // 已付款狀態但沒有 pay_time → 不算（沒有付款時間就無從落入時間窗）
+        order("100", 1, "50", "40 days", null, "2 days", null);
+        order("100", 2, "50", "10 days", null, "9 days", null);
+        order("200", 3, "50", "5 days", null, "40 days", null);
+        order("300", 4, "10", "5 days", null, null, null);
 
         assertThat(query(7, 0L, 10)).extracting(StoreOrderStatsResult::getStoreId).containsExactly(100L);
         assertThat(query(7, 0L, 10).get(0).getQualifyingOrders()).isEqualTo(1);

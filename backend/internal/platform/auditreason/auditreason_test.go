@@ -17,7 +17,6 @@ func TestRequired(t *testing.T) {
 	if err != nil || got != "違規經營" {
 		t.Fatalf("got=%q err=%v", got, err)
 	}
-	// 去掉空白之後剛好 1000 字可以。
 	if got, err := Required(" "+strings.Repeat("理", MaxRunes)+" ", "Reason"); err != nil || len([]rune(got)) != MaxRunes {
 		t.Fatalf("boundary: %v", err)
 	}

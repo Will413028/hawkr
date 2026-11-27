@@ -18,7 +18,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/migrate"
 )
 
-// racingMedia 在第一次 Confirm 之前先跑 before（贏家的整個 CreateProduct 在這裡提交），再回 media 在 token 已被別的 transaction 確認時的錯誤。
 type racingMedia struct {
 	Media
 	once   sync.Once
@@ -52,7 +51,6 @@ func TestCreateLoserReadsBackTheWinnerWhenItsImageTokenWasConfirmedElsewhere(t *
 		winner = w
 	}
 	loser := New(f.deps(f.d, rm))
-	// 輸家的第一次查詢（transaction 內）還沒有商品；贏家在輸家確認圖片時才提交。
 	got, err := loser.CreateProduct(f.ct, storeID, up, key, in)
 	if err != nil {
 		t.Fatalf("the loser reads back the winner: %v", err)

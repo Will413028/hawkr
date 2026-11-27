@@ -13,8 +13,6 @@ const searchPath = new URL(
 	"../features/search/SearchPage.tsx",
 	import.meta.url,
 );
-// The query-aware hashtag rail moved to a client component when /search became
-// ISR (server renders only the landing; `?q` is read on the client).
 const searchHashtagNavPath = new URL(
 	"../features/search/components/SearchHashtagNav.tsx",
 	import.meta.url,
@@ -58,12 +56,6 @@ const mainTabPagePaths = [
 	"../app/[locale]/(public)/search/page.tsx",
 ].map((pathname) => new URL(pathname, import.meta.url));
 
-// Every reader's cache scope in lib/api/cached.ts is a `'use cache'` function named
-// `read<Name>` (or the exported `getCached<Name>` itself for a wrapper-less one):
-// the public `getCached<Name>` only fills argument defaults and unwraps the
-// build-time failure marker. Slice a scope's body from its declaration to the next
-// declaration — the tag/TTL invariants below are what these tests protect; the
-// declaration shape is only how they are located.
 const readerBody = (source: string, name: string) => {
 	const scope = `read${name.replace(/^getCached/, "")}`;
 	const start = source.indexOf(`async function ${scope}(`);
@@ -76,13 +68,9 @@ const readerBody = (source: string, name: string) => {
 	return body;
 };
 
-// A landing read tags the data domains it embeds — never the page it renders on
-// and never a legacy catch-all, so one mutation cannot shotgun unrelated caches.
 test("public landing reads tag exactly the domains they embed", async () => {
 	const source = await readFile(cachedPath, "utf8");
 
-	// The literal arguments of the scope's `cacheTag(...)` call (paren-matched,
-	// so nested calls or later statements never leak in).
 	const tagsArrayOf = (name: string) => {
 		const body = readerBody(source, name);
 		const open = body.indexOf("cacheTag(");
@@ -113,16 +101,11 @@ test("public landing reads tag exactly the domains they embed", async () => {
 		const found = [...declared.matchAll(TAG_REF)].map(
 			(match) => `PUBLIC_CACHE_TAGS.${match[1]}`,
 		);
-		// Exact set, not "contains": one extra domain tag on a landing fetcher
-		// re-creates the shotgun blast this taxonomy removed (a product edit would
-		// bust hashtags again), and a containment assertion cannot see it.
 		assert.deepEqual(
 			[...found].sort(),
 			[...tags].sort(),
 			`${name} tags: expected exactly ${tags.join(", ")}`,
 		);
-		// Nothing but PUBLIC_CACHE_TAGS entries in the array — catches a raw
-		// "marketplace"/"home" string, a tab:* literal or a smuggled entity tag.
 		const residual = declared.replace(TAG_REF, "").replace(/[\s,]/g, "");
 		assert.equal(
 			residual,
@@ -141,8 +124,6 @@ test("canonical navbar destinations keep Feed bounded and reuse safe cache entri
 		readFile(searchHashtagNavPath, "utf8"),
 	]);
 
-	// The /feed seed is the anonymous tagged cache entry (it carries posts:list and its own
-	// upstream timeout); a failed seed is told apart from an empty feed.
 	assert.match(feed, /getCachedPublicPosts\(PAGE_SIZE\)/);
 	assert.match(feed, /initialSeedFailed = true/);
 	assert.doesNotMatch(feed, /fetchPostsPage|fetchPublicPostsTyped/);
@@ -151,7 +132,6 @@ test("canonical navbar destinations keep Feed bounded and reuse safe cache entri
 	assert.match(market, /getCachedProductsFirstPage\(100\)/);
 	assert.match(search, /getCachedHotProducts\(8\)/);
 	assert.match(search, /getCachedPublicPosts\(8\)/);
-	// Live, query-aware hashtags (not the cached popular set) — now client-side.
 	assert.match(searchHashtagNav, /searchHashtags\(query\)/);
 	assert.doesNotMatch(searchHashtagNav, /getCachedPopularHashtags/);
 	assert.doesNotMatch(search, /getCachedPopularHashtags\(10\)/);
@@ -165,9 +145,6 @@ test("home bootstrap is versioned, anonymous and browser no-store", async () => 
 	]);
 
 	assert.match(home, /fetchHomeTabBootstrap\(controller\.signal\)/);
-	// The client abort deadline is per-flavor config, never a literal here: a
-	// local number can be shortened below the server budget, turning the tail of
-	// that budget into an answer nobody is still listening for.
 	assert.match(home, /homeSnapshotDeadlineMs\(\)/);
 	assert.doesNotMatch(home, /DEADLINE_MS\s*=\s*\d/);
 	assert.match(
@@ -175,7 +152,6 @@ test("home bootstrap is versioned, anonymous and browser no-store", async () => 
 		/export \{ GET \} from "@\/features\/home\/server\/home-tab-bootstrap-route"/,
 	);
 	assert.doesNotMatch(route, /use cache|fetchHotProducts|function GET/);
-	// Request-time by construction: the handler opts out of the build prerender.
 	assert.match(
 		handler,
 		/export async function GET\(\) \{\s*await connection\(\);/,
@@ -188,8 +164,6 @@ test("home bootstrap is versioned, anonymous and browser no-store", async () => 
 		/fetchProducts\("", 1, 100, undefined, undefined, \{ strict: true \}\)/,
 	);
 	assert.match(handler, /fetchPostsPage\(\{ pageSize: 8, strict: true \}\)/);
-	// Live aggregate keeps the live-commerce revalidate window (the shared
-	// CACHE_TTL model, applied to the `'use cache'` scope with `applyCacheTier`).
 	assert.match(handler, /applyCacheTier\("COMMERCE_LIVE"\)/);
 	const liveStart = handler.indexOf("async function readHomeLiveBootstrap(");
 	const discoveryStart = handler.indexOf(
@@ -237,9 +211,6 @@ test("seller storefront product cards use live commerce cache windows", async ()
 	]) {
 		const body = readerBody(source, name);
 		assert.match(body, /applyCacheTier\("COMMERCE_LIVE"\)/);
-		// products:list (busted by the revalidate parser for ANY product mutation)
-		// + seller:<id> replace the result-derived per-product tags that
-		// a cache scope cannot attach dynamically.
 		assert.match(body, /PUBLIC_CACHE_TAGS\.products/);
 		assert.match(body, /sellerTag\(id\)/);
 		assert.doesNotMatch(body, /applyCacheTier\("SELLER_PROFILE"\)/);

@@ -12,7 +12,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// seedKeysetStore 在店 A 建 n 位客戶：買家 id 從 base 起；total_spent 只有三個值（同值很多）、order_count 只有兩個值、first_order_at 依建立順序遞增。
 func (f *fixture) seedKeysetStore(base int64, n int) {
 	f.t.Helper()
 	for i := 0; i < n; i++ {
@@ -143,7 +142,6 @@ func TestListCustomersFilters(t *testing.T) {
 	if ids := buyerIDs(got); !slices.Equal(ids, []int64{buyer1 + 3}) {
 		t.Fatalf("標籤加 VIP 篩選 %v", ids)
 	}
-	// 列表帶標籤（名稱升序），沒有標籤的客戶 Tags 是空 slice 不是 nil。
 	all := f.allCustomers(crm.CustomerListInput{Sort: crm.SortFirstOrderAt})
 	for _, c := range all {
 		if c.Tags == nil {
@@ -156,7 +154,6 @@ func TestListCustomersFilters(t *testing.T) {
 	if _, err := f.m.ListCustomers(ctx, crm.CustomerListInput{StoreID: storeA, Type: ptr(crm.CustomerType("BLOCKLIST"))}); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("未知分類：err=%v，預期 InvalidInput", err)
 	}
-	// 別家店看不到。
 	other, err := f.m.ListCustomers(ctx, crm.CustomerListInput{StoreID: storeB})
 	if err != nil || len(other.Customers) != 0 || other.Next != nil {
 		t.Fatalf("店 B：%+v err=%v", other, err)
@@ -186,7 +183,6 @@ func TestSetCustomerType(t *testing.T) {
 			t.Errorf("%q：err=%v，預期 InvalidInput", bad, err)
 		}
 	}
-	// DB 的 CHECK 是第二道防線：繞過 Go 直接寫值域外的字串也被拒絕。
 	if _, err := f.db.Pool().Exec(ctx, "UPDATE crm.customers SET customer_type = 'BLOCKLIST'"); err == nil {
 		t.Fatal("DB 接受了 BLOCKLIST")
 	}
@@ -197,7 +193,6 @@ func TestSetCustomerType(t *testing.T) {
 	if err != nil || c.Type != crm.TypeVIP {
 		t.Fatalf("customer=%+v err=%v", c, err)
 	}
-	// 其他店的同一位買家不受影響（店家對買家的分類只屬於那家店）。
 	wantKind(t, errOnly(f.m.SetCustomerType(ctx, storeB, buyer1, crm.TypeVIP)), apperr.KindNotFound, crm.ReasonCustomerNotFound)
 }
 

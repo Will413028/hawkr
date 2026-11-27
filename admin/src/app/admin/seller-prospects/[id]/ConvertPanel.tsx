@@ -60,7 +60,6 @@ export default function ConvertPanel({
 	const [debouncedQuery, setDebouncedQuery] = useState("");
 	const [selectedStore, setSelectedStore] = useState<Store | null>(null);
 
-	// 每次按鍵都打店家搜尋對後端沒必要，也會讓下拉結果一直閃爍重排，所以停打 DEBOUNCE_MS 後才查。
 	useEffect(() => {
 		const timer = setTimeout(() => {
 			setDebouncedQuery(queryInput.trim());
@@ -69,7 +68,6 @@ export default function ConvertPanel({
 	}, [queryInput]);
 
 	const searching = debouncedQuery !== "";
-	// 輸入框已經改了、但還沒送出查詢（debounce 中）：畫面上的結果是上一個關鍵字的，不能讓人點。
 	const inputSettled = queryInput.trim() === debouncedQuery;
 
 	const searchQuery = useStoreSearch({

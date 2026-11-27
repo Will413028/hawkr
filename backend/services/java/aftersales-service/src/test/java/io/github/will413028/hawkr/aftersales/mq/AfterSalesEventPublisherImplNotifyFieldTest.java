@@ -89,9 +89,9 @@ class AfterSalesEventPublisherImplNotifyFieldTest {
     @DisplayName("publishRefundCompleted resolves storeId->sellerAccountId and buyerId->notifyBuyerAccountId (discriminating)")
     void publishRefundCompleted_resolvesIdentityFields() throws Exception {
         long storeId = 7001L;
-        long resolvedSellerAccountId = 42L; // 不同於 storeId
+        long resolvedSellerAccountId = 42L;
         long buyerId = 9001L;
-        long resolvedBuyerAccountId = 55L; // 不同於 buyerId
+        long resolvedBuyerAccountId = 55L;
 
         ObsRabbitPublisher obsRabbitPublisher = mock(ObsRabbitPublisher.class);
         SellerGrpcClient sellerGrpcClient = mock(SellerGrpcClient.class);
@@ -131,7 +131,6 @@ class AfterSalesEventPublisherImplNotifyFieldTest {
         BuyerGrpcClient buyerGrpcClient = mock(BuyerGrpcClient.class);
 
         when(sellerGrpcClient.resolveAccountIdForStore(7001L)).thenReturn(7001L);
-        // 單體不回填；舊 buyer-service 會把輸入原樣放進 principals，兩種形狀都不得被當成帳號。
         when(buyerGrpcClient.resolvePrincipals(java.util.List.of(buyerId)))
                 .thenReturn(new PrincipalResolution(Map.of(buyerId, buyerId), Set.of(buyerId)));
 

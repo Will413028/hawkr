@@ -29,9 +29,6 @@ const PUBLIC_STATIC_ROUTES = discoverAppPageRoutes({
 const EXPECTED_PUBLIC_STATIC_ROUTES = [
 	"/",
 	"/about",
-	// 代行交接失敗的落地頁（56 號 §4.5）。它必須匿名可達——兌換失敗的人正好就是
-	// 沒有工作階段的人，擋掉他等於讓失敗無處落地。頁面本身只有兩段固定文案、
-	// 不透傳 gateway 的 message，也不帶任何賣家資料。
 	"/adm/unavailable",
 	"/cart",
 	"/contact",
@@ -98,8 +95,6 @@ function attachRuntimeMonitors(page: Page, baseURL: string): string[] {
 	});
 	page.on("console", (message) => {
 		if (message.type() !== "error") return;
-		// The browser logs a failed fetch's status as a console error; the guest
-		// session probe's 401 is the answer "no session", not a broken page.
 		if (
 			message.text().includes("status of 401") &&
 			isGetSessionUrl(message.location().url)
@@ -110,7 +105,6 @@ function attachRuntimeMonitors(page: Page, baseURL: string): string[] {
 	});
 	page.on("response", (response) => {
 		if (response.status() < 400) return;
-		// A guest's GetSession probe answers 401 `unauthenticated` (guest, not broken).
 		if (
 			response.status() === 401 &&
 			response.request().method() === "GET" &&
@@ -135,9 +129,6 @@ function attachRuntimeMonitors(page: Page, baseURL: string): string[] {
 		} catch {
 			return;
 		}
-		// Chromium aborts superseded fetches when a guard redirects or a query
-		// observer is disposed during navigation. The destination document is
-		// still verified below; only completed HTTP failures are actionable.
 		if (/net::ERR_ABORTED|cancelled/i.test(failure)) {
 			return;
 		}
@@ -157,8 +148,6 @@ async function prepareGuestPage(page: Page): Promise<GuestPageState> {
 	await page.addInitScript((loaderKey) => {
 		sessionStorage.setItem(loaderKey, "1");
 	}, LOADER_KEY);
-	// The session cookie is HttpOnly, so every page load asks GetSession; a guest
-	// gets `unauthenticated`. The monitors above exempt exactly this probe.
 	await page.route(GET_SESSION_URL, (route) => {
 		if (route.request().method() !== "GET") {
 			void route.fallback();
@@ -309,13 +298,6 @@ async function assertPublicStaticRoute(
 		})
 		.toBe(expectedPathname);
 
-	// Scope marker lookups to the visible route tree. While React streams a
-	// route, the same subtree transiently exists twice: once relocated into
-	// place under <main> and once inside the body-level `<div hidden id="S:…">`
-	// staging container it streamed into (~200ms until cleanup). An unscoped
-	// strict locator that polls inside that window fails instantly with a
-	// strict-mode violation. The app filters the same way — PageTransition's
-	// isCurrentTabContentReady ignores markers under a [hidden] ancestor.
 	if (expectedPathname === route && READY_SELECTOR[route]) {
 		await expect(
 			page.locator(`main.page-content ${READY_SELECTOR[route]}`),
@@ -364,16 +346,6 @@ test.describe("canonical public static route browser health", {
 		expect(PUBLIC_STATIC_ROUTES).toHaveLength(22);
 	});
 
-	// EVERY route here is `@live`, including the ones that render nothing but
-	// static copy (`/terms`, `/privacy`, `/faq`…). Measured, not assumed: with
-	// API_BASE_URL pointed at a closed port, all 21 fail — the shared guest
-	// chrome client-fetches `/public/categories/tree`, `/public/hashtags/popular`,
-	// `SuggestTrendingTags` and `SuggestTrendingPosts` (Connect) on every guest-facing document,
-	// and this suite counts any same-origin >=400 as a page-health failure. So a
-	// legal page's "does it load cleanly" check is coupled to the shared dev
-	// backend just as tightly as the storefront's. That coupling — UI intent,
-	// live dependency — is the thing recorded fixtures are meant to cut
-	// (hawkr-website#369), and it is four endpoints wide, not three specs wide.
 	for (const route of PUBLIC_STATIC_ROUTES) {
 		test(`${route} hard-loads, hydrates, and renders safe links`, {
 			tag: ["@live"],

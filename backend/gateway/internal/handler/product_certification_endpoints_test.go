@@ -14,16 +14,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-// 十支認證端點的契約斷言（19 號設計書 §9.1 / §9.2 / §9.3）。
-//
-// 兩件事在這裡守：
-//   ① 賣家 DTO 與 ADM DTO 是**兩個型別**，Admin-only 欄位不是靠執行期清空而是根本
-//      不映射。靠清空的話 swagger 宣告會與實際輸出對不上，而且下一個複製這段 code
-//      的人不會知道要清。
-//   ② reviewer 身分一律取 auth context。由 request body 決定「誰批准的」＝稽核紀錄
-//      可被偽造，而那正是這組端點存在的理由。
 
-// certEndpointStub 記下每一支 RPC 收到的 request。
 type certEndpointStub struct {
 	productpb.ProductServiceClient
 	lastList     *productpb.ListProductCertificationApplicationsRequest
@@ -33,12 +24,9 @@ type certEndpointStub struct {
 	lastReverify *productpb.ReverifyProductCertificationForAdminRequest
 	lastGetAdmin *productpb.GetProductCertificationApplicationForAdminRequest
 	lastAudit    *productpb.ListProductCertificationAuditLogsForAdminRequest
-	// code 非 0 時所有 RPC 回這個業務碼（驗 HTTP status 分流）。
 	code int32
 }
 
-// fullApplication 是一筆「所有欄位都有值」的申請，用來證明賣家 DTO 真的沒把
-// Admin-only 欄位帶出去——欄位是空的時候，漏映射與正確隔離看起來一模一樣。
 func fullApplication() *productpb.ProductCertificationApplication {
 	return &productpb.ProductCertificationApplication{
 		Id:                      "843856384063471761",
@@ -59,7 +47,7 @@ func fullApplication() *productpb.ProductCertificationApplication {
 		Version:                 "2",
 		SubmittedByAccountId:    "2685914682",
 		ProductName:             "有機小松菜",
-		ProductPublicationState: "4014", // 已移除：認證申請結構上會指向已軟刪商品（#2818）
+		ProductPublicationState: "4014",
 		InternalNote:            "已致電賣家確認",
 		GovVerifyPayload: &productpb.GovVerifyResult{
 			CertType: "3703", CertNo: "010105", Found: true, Validity: "VALID",
@@ -205,7 +193,6 @@ func TestSellerCertificationDTO_HidesAdminOnlyFields(t *testing.T) {
 			t.Errorf("賣家 DTO 不得含 %q（上游有填值 ⇒ 這是真的被帶出去了，不是碰巧為空）", forbidden)
 		}
 	}
-	// 控制組：賣家真正需要的欄位必須在，否則上面的斷言可以靠「回一個空物件」通過。
 	for _, want := range []string{"id", "productId", "certificationType", "certificateNo", "status", "govVerifyState", "publicReason", "version"} {
 		if _, present := data[want]; !present {
 			t.Errorf("賣家 DTO 缺少 %q", want)
@@ -273,7 +260,6 @@ func TestAdminCertificationReview_ReviewerComesFromAuthContextNotBody(t *testing
 			stub := &certEndpointStub{}
 			r := newCertEndpointRouter(stub)
 
-			// body 刻意塞入偽造身分：accountId / reviewedByAccountId / adminId 都不該被讀。
 			body := `{"idempotencyKey":"k-` + action + `","expectedVersion":"2",` +
 				`"reasonCode":"CERT_NOT_FOUND","publicReason":"查無此編號","internalNote":"n",` +
 				`"accountId":"1","reviewedByAccountId":"1","adminId":"1"}`
@@ -341,10 +327,6 @@ func TestAdminCertificationDetail_ExposesAdminOnlyBlocks(t *testing.T) {
 			t.Errorf("ADM 詳情缺少 %q（實際 = %#v）", want, v)
 		}
 	}
-	// 🔴 上面那條 `!present || v == nil` 對 productPublicationState **沒有鑑別力**：
-	// 它是非指標 string 且無 omitempty，刪掉 handler 的映射那一行之後 JSON 仍會吐 ""，
-	// present=true 且 v≠nil ⇒ 測試照樣綠。而「刪掉映射那一行」正是這個欄位唯一的失效模式，
-	// 所以必須斷言值本身。fixture（fullApplication）設的是 "4014"。
 	if got := data["productPublicationState"]; got != "4014" {
 		t.Errorf("productPublicationState = %#v，want \"4014\"（上游有填值 ⇒ 空字串代表映射漏了）", got)
 	}
@@ -419,7 +401,6 @@ func TestCertificationEndpoints_BusinessCodeMapsToHTTPStatus(t *testing.T) {
 		t.Errorf("3026 → HTTP %d, want 409；body = %s", w.Code, w.Body.String())
 	}
 
-	// 賣家側同樣要分流（非本人商品 → 3025 → 404，而不是一個空列表）。
 	stub.code = 3025
 	w = certCall(t, r, http.MethodGet,
 		"/api/v1/app/products/843856384063471755/certification_applications", "", "777")

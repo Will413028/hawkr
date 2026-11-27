@@ -1,19 +1,11 @@
 @import "./cart-typography.css";
 
-/* ============================================================
-   /cart — full-featured buyer shopping cart page
-   ============================================================ */
 
-/* Cart-scoped danger ramp. Values are the page's legacy crimson exactly as
- * shipped (NOT --hkui-danger, which resolves to the status danger #ea6021) — pulled
- * into one declaration so a future palette decision is a one-line change
- * instead of a 15-place hunt. Do not "fix" these to the hkui ramp without a
- * design sign-off: that visibly recolors every destructive control on /cart. */
 :root {
 	--cart-danger: #c0392b;
 	--cart-danger-rgb: 192 57 43;
 	--cart-danger-pressed: #a93226;
-	--cart-danger-deep: #b91c1c; /* shipping-error text (Tailwind red family) */
+	--cart-danger-deep: #b91c1c;
 	--cart-danger-on-dark: #f5a3a3;
 	--cart-danger-on-dark-soft: #f5b6b6;
 }
@@ -63,13 +55,8 @@
 	color: var(--cart-danger-on-dark-soft);
 }
 
-/* Per-seller free-shipping meter — kept as one stable block for both
-   "remaining amount" and "threshold reached" states so the card doesn't jump. */
 .cart-page__seller-group {
 	--cart-group-inline: 22px;
-	/* The tile grid reflows off THIS card's width (see the @container block at
-	 * the foot of the file), not the viewport — the cart column is far narrower
-	 * than the screen when the order-summary sidebar sits beside it. */
 	container-type: inline-size;
 }
 
@@ -301,7 +288,6 @@
 	box-shadow: 0 8px 18px rgb(0 0 0 / 0.2);
 }
 
-/* ───── Seller groups ───── */
 
 .cart-page__shop-icon {
 	width: 28px;
@@ -350,7 +336,6 @@
 	text-decoration: underline;
 }
 
-/* ───── Summary aside ───── */
 
 .cart-page__summary-action {
 	width: 100%;
@@ -385,7 +370,6 @@
 	transform: translateY(-1px);
 }
 
-/* ───── Totals ───── */
 
 .cart-page__checkout {
 	justify-content: center;
@@ -421,18 +405,10 @@
 	text-decoration: underline;
 }
 
-/* ============================================================
-   New cart components (Tile, Sheet, ShippingGroup, etc.)
-   ============================================================ */
 
-/* ───── Cart product tile ───── */
 
 .cart-tile {
 	display: grid;
-	/* body flexes; qty / total / actions size to their content and cluster on the
-	 * right. The qty column used to be `minmax(120px, 0.55fr)`, which both
-	 * stretched the stepper pill at wide widths AND starved the body column at
-	 * narrow ones (the temp label collapsed to one char per line). */
 	grid-template-columns: 44px 118px minmax(0, 1fr) auto auto auto;
 	gap: 16px;
 	align-items: center;
@@ -444,12 +420,6 @@
 	border-bottom: 0;
 }
 
-/* issue #1127：不可購買 row 視覺處理。
- * 用 background-color rgba 微暗 row（不用 opacity，避免 CSS cascade 把移除按鈕也蓋掉）。
- * 圖不灰階（對彩色食物 grayscale 變太黑太厚重）。
- * 視覺訊號：row 微暗背景 + 品名下方 badge「已下架」/「已售完」+ 庫存欄文字 +
- * checkbox/數量 disabled 視覺 + 「移除」按鈕紅色 vivid。
- */
 .cart-tile--off {
 	background-color: rgba(0, 0, 0, 0.04);
 }
@@ -474,9 +444,6 @@
 	width: 118px;
 	height: 88px;
 	border-radius: 14px;
-	/* Subtle tint while image loads — sage-tinted, not heavy beige, so
-	 * the thumbnail block doesn't read as a placeholder when the photo
-	 * is just slow to arrive. */
 	background: rgb(var(--color-brand-primary-rgb) / 0.08);
 	overflow: hidden;
 	display: flex;
@@ -607,7 +574,6 @@
 	display: inline-grid;
 	grid-template-columns: 44px 48px 44px;
 	align-items: center;
-	/* Stay at the stepper's intrinsic width — never stretch to fill the cell. */
 	justify-self: start;
 	border: 1px solid var(--border-soft);
 	border-radius: var(--radius-pill);
@@ -699,7 +665,6 @@
 	background: rgb(var(--cart-danger-rgb) / 0.08);
 }
 
-/* ───── Multi-seller + cold-chain warning banners ───── */
 
 .cart-page__multi-seller {
 	padding: 12px 16px;
@@ -710,7 +675,6 @@
 	font-size: var(--cart-type-support);
 }
 
-/* ───── Shipping method group (collapsible by carrier) ───── */
 
 .shipping-group {
 	display: flex;
@@ -886,7 +850,6 @@
 	line-height: calc(20 / 14);
 }
 
-/* ───── Coupon sheet rows ───── */
 
 .coupon-dialog {
 	--coupon-row-background: var(--hkui-surface);
@@ -919,8 +882,6 @@
 }
 
 [data-theme="dark"] .coupon-dialog {
-	/* Portal content can inherit the late light `--hkui-content*` aliases from
-	 * ui-kit.css. Keep this component on the canonical dark ramp. */
 	--coupon-row-background: var(--color-ink-900);
 	--coupon-row-hover-background: var(--color-ink-850);
 	--coupon-row-disabled-background: var(--color-ink-800);
@@ -1191,7 +1152,6 @@
 	color: var(--cart-danger-on-dark);
 }
 
-/* ───── Coupon trigger button (in summary) ───── */
 
 .cart-page__coupon-trigger {
 	width: 100%;
@@ -1212,7 +1172,6 @@
 	background: rgb(var(--color-brand-primary-rgb) / 0.06);
 }
 
-/* ───── Responsive ───── */
 
 @media (max-width: 960px) {
 	.cart-page__seller-group {
@@ -1258,8 +1217,6 @@
 	}
 }
 
-/* Keep the same coupon anatomy when a narrow dialog cannot fit a legible
- * details column beside the value. Loading rows use these production classes. */
 @media (max-width: 360px) {
 	.coupon-sheet__row {
 		grid-template-columns: minmax(0, 1fr) 22px;
@@ -1297,11 +1254,6 @@
 	}
 }
 
-/* Tile reflow keys off the seller card's OWN width, not the viewport. Below
- * ~780px the 6-column row can no longer give the body a usable width, so it
- * stacks into check | thumb | (body / qty+total / actions). This fires whether
- * the card is narrow because of a small screen OR because the order-summary
- * sidebar is taking half the desktop width. */
 @container (max-width: 780px) {
 	.cart-tile {
 		grid-template-columns: 44px 84px minmax(0, 1fr) auto;
@@ -1356,8 +1308,6 @@
 	}
 }
 
-/* Keep quantity beside the product photo on phones. The photo yields width
- * before touch targets or text do; details keep the full card width below. */
 @container (max-width: 600px) {
 	.cart-tile {
 		grid-template-columns: 44px minmax(48px, 1fr) auto;

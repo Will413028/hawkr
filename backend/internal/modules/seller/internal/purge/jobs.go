@@ -9,7 +9,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
-// jobID 是排程的識別，也是 River job 的 kind。
 const jobID = "seller.purge_pii"
 
 // Args 是個資清理的工作。

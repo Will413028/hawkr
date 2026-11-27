@@ -31,14 +31,12 @@ func TestPrepare_PreferenceOwnershipMismatchGoesToAwaitingManual(t *testing.T) {
 		t.Fatalf("manual_reason_code = %q, want %q（用 BUYER_INFO_CONFLICT 之類會讓 ADM 看到指錯方向的理由）",
 			got.ManualReasonCode, codemeta.InvoiceManualReasonPreferenceOwnershipMismatch.Value)
 	}
-	// 陰性：沒有送出去、沒有建 operation。
 	if n := len(h.provider.requests); n != 0 {
 		t.Fatalf("provider 收到 %d 次請求，歸屬驗證失敗的訂單不得送出", n)
 	}
 	if got.OperationID != 0 {
 		t.Fatalf("AWAITING_MANUAL 不應建立 operation，卻建了 %d", got.OperationID)
 	}
-	// 理由碼必須與狀態同一交易寫入（不是先建 PENDING 再靠掃描器改過去）。
 	if len(h.docs.awaitingManual) != 1 ||
 		h.docs.awaitingManual[0] != codemeta.InvoiceManualReasonPreferenceOwnershipMismatch.Value {
 		t.Fatalf("manual_reason_code 未與狀態同一交易寫入：%v", h.docs.awaitingManual)

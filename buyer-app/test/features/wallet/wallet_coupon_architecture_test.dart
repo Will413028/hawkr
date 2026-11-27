@@ -93,7 +93,6 @@ void main() {
     expect(coupons.single.endAt, '2026-08-31T00:00:00Z');
     expect(coupons.single.sellerName, '陳記');
     expect(coupons.single.storeId, '2685914682');
-    // 49 §6.1：裸 key 優先，顯示端帶 scene 過 buildImageUrl。
     expect(
       coupons.single.sellerAvatarUrl,
       'public/seller_logo/2685914682/20260805/3f47a6bf.png',

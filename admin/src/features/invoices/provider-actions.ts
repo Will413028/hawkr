@@ -123,13 +123,11 @@ export function providerVerifyResultOf(status: string): ProviderVerifyResult {
 		case InvoiceProviderAccountStatus.CREDENTIAL_VERIFYING:
 			return {
 				tone: "warning",
-				// ⚠️ 這一句會被端點 66 前綴「已送出重新驗證。」再接一次 ⇒ 自己不要再說一遍。
 				text: "AMEGO 尚未回覆驗證結果，稍後用「手動更新」看最新狀態。",
 			};
 		case InvoiceProviderAccountStatus.ACTIVE:
 			return { tone: "success", text: "連線正常，憑證通過驗證。" };
 		default:
-			// 後端新增狀態值時不要白畫面，也不要謊稱成功。
 			return {
 				tone: "warning",
 				text: "已完成檢查，目前的連線狀態顯示在下方。",
@@ -137,17 +135,6 @@ export function providerVerifyResultOf(status: string): ProviderVerifyResult {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 五顆 CTA 的渲染條件（58A §A04「CTA 五顆，依 status 分成互斥的兩組」）
-// ---------------------------------------------------------------------------
-//
-// 🔴 條件不成立時**不渲染**（不是 disabled）——58A §A04「四態．disabled」逐字。
-// 一顆按不下去的按鈕會讓管理員一直找「為什麼不能按」，而正確的訊息是「這個狀態
-// 根本沒有這個動作」。
-//
-// ⚠️ 這四組住在這裡而不是頁面裡，是為了讓 `tests/invoice-adm-contract.test.ts`
-// 逐一比對得到——寫在頁面裡的話，把「恢復」放寬成 `ACTIVE` 也能顯示這種事，
-// 沒有任何東西會轉紅。
 
 /** 端點 44（重新測試）不渲染的狀態：除這三個外恆在。 */
 export const HEALTH_CHECK_HIDDEN_STATUSES = new Set<string>([

@@ -158,8 +158,6 @@ export function StorePickupPickerSheet({
 		}
 	};
 
-	// 超商取貨收件人姓名：顯示長度 [4, 10]（中文 1 字算 2、英文 1 字算 1），
-	// 對齊後端 PayUni 物流欄位約束。只有使用者已輸入時才即時提示。
 	const receiverNameError =
 		form.receiverName.trim().length > 0
 			? checkDisplayLength(form.receiverName, {

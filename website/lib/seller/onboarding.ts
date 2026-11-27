@@ -114,7 +114,6 @@ async function fetchExistingStore(
 	try {
 		return (await fetchStore()).store ?? null;
 	} catch (e) {
-		// 只有確認沒有店家才是 null；暫時失敗不能當成「沒有店家」。
 		if (isCode(e, Code.NotFound)) return null;
 		throw e;
 	}
@@ -183,8 +182,6 @@ export async function finalizeSellerOnboarding(
 	try {
 		deps.onCompleted(result);
 	} catch {
-		// Onboarding is already authoritative and complete. Analytics is best-effort
-		// and must never reverse the product result shown to the seller.
 	}
 	return result;
 }

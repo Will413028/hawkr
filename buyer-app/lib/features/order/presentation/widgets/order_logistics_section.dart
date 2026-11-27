@@ -198,7 +198,6 @@ class _ErrorRow extends ConsumerWidget {
               children: [
                 Text('暫時查不到物流狀態', style: AppTypography.productName),
                 const SizedBox(height: HkSpace.xs),
-                // 把後端／網路的原訊息帶出來，不換成通用字串。
                 Text(message, style: AppTypography.caption),
               ],
             ),
@@ -277,8 +276,6 @@ class _TrackBody extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _StatusBanner(track: track, isAbnormal: _isAbnormal),
-        // provider 的原文只在「我們的碼表不認得這個狀態」或「有異常」時才補上。
-        // 平時顯示它只是把同一件事講兩次。
         if (track.providerMessage.isNotEmpty &&
             (_isAbnormal || !track.isKnownStatus)) ...[
           SizedBox(height: 6.h),
@@ -331,7 +328,6 @@ class _StatusBanner extends StatelessWidget {
               const SizedBox(width: HkSpace.sm),
               Expanded(
                 child: Text(
-                  // 正規化後的狀態文案：後端優先、CodeMeta 回退、最後原樣顯示碼值。
                   track.normalizedStatusLabel,
                   style: AppTypography.productName.copyWith(color: color),
                 ),

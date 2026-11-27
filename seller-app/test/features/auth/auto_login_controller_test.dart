@@ -37,7 +37,6 @@ void main() {
 
   setUpAll(() async {
     if (!F.isInitialized) F.init(Flavor.dev);
-    // 恢復 session 時同步 chat / 頭像等 singleton，會碰到 Firebase。
     setupFirebaseCoreMocks();
     await Firebase.initializeApp();
   });

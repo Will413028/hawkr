@@ -10,9 +10,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// wsTicketTestRedis returns a go-redis client backed by an in-process miniredis
-// (always available — no external Redis, no skip). The returned *miniredis lets
-// a test FastForward the clock to exercise TTL expiry deterministically.
 func wsTicketTestRedis(t *testing.T) (*redis.Client, *miniredis.Miniredis) {
 	t.Helper()
 	mr := miniredis.RunT(t)
@@ -39,7 +36,6 @@ func TestWSTicket_ConsumeIsSingleUse(t *testing.T) {
 		t.Fatalf("ConsumeWSTicket = %+v, want %+v", got, want)
 	}
 
-	// Second consume must miss — the ticket is single-use (GETDEL).
 	again, err := pkgredis.ConsumeWSTicket(ctx, rdb, token)
 	if err != nil {
 		t.Fatalf("second ConsumeWSTicket err: %v", err)
@@ -67,7 +63,7 @@ func TestWSTicket_Expiry(t *testing.T) {
 	if err := pkgredis.PutWSTicket(ctx, rdb, token, &pkgredis.WSTicket{AccountID: 1}, 30*time.Second); err != nil {
 		t.Fatalf("PutWSTicket: %v", err)
 	}
-	mr.FastForward(31 * time.Second) // advance the miniredis clock past the TTL
+	mr.FastForward(31 * time.Second)
 	got, err := pkgredis.ConsumeWSTicket(ctx, rdb, token)
 	if err != nil {
 		t.Fatalf("ConsumeWSTicket: %v", err)

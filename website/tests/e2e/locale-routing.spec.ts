@@ -44,7 +44,6 @@ test.describe("locale routing", { tag: ["@ui"] }, () => {
 			"content",
 			"en_US",
 		);
-		// the page itself is still the zh-TW text until the English copy exists
 		await expect(page.locator("main")).toContainText("常見問題");
 	});
 
@@ -200,13 +199,10 @@ test.describe("locale routing", { tag: ["@ui"] }, () => {
 	}) => {
 		const health = await request.get("/api/health");
 		expect(health.status()).toBe(200);
-		// `/en/api/health` is not a route
 		expect((await request.get("/en/api/health")).status()).toBe(404);
-		// platform files that are not pages
 		expect((await request.get("/apple-app-site-association")).status()).toBe(
 			200,
 		);
-		// the delegated workspace has its own zh-TW root layout
 		const adm = await request.get("/adm/unavailable");
 		expect(adm.status()).toBe(200);
 		expect(await adm.text()).toMatch(/<html[^>]*\blang="zh-TW"/);
@@ -224,7 +220,6 @@ test.describe("locale routing", { tag: ["@ui"] }, () => {
 		]) {
 			expect((await request.get(path)).status(), path).toBe(404);
 		}
-		// an asset-looking tail does not take a guarded page out of the guard
 		const guarded = await request.get("/account/orders/HK-1.png", {
 			maxRedirects: 0,
 		});
@@ -232,7 +227,6 @@ test.describe("locale routing", { tag: ["@ui"] }, () => {
 		expect(new URL(guarded.headers().location ?? "", "http://x").pathname).toBe(
 			"/login",
 		);
-		// generated root files and public/ files
 		for (const path of [
 			"/robots.txt",
 			"/sitemap.xml",
@@ -247,7 +241,6 @@ test.describe("locale routing", { tag: ["@ui"] }, () => {
 		page,
 	}) => {
 		await page.goto("/en/faq");
-		// the footer streams in after the document: wait for it, then read every link
 		await expect(
 			page.locator('footer a[href="/en/about"]').first(),
 		).toBeVisible();
@@ -256,7 +249,6 @@ test.describe("locale routing", { tag: ["@ui"] }, () => {
 			.evaluateAll((anchors) =>
 				anchors.map((anchor) => anchor.getAttribute("href") ?? ""),
 			);
-		// Pages only: staff, API and platform paths and files are not localized.
 		const notPages =
 			/^\/(?:api|adm|_next|\.well-known)(?:\/|$)|\.[A-Za-z0-9]{1,8}$/;
 		const pages = hrefs.filter(
@@ -267,7 +259,6 @@ test.describe("locale routing", { tag: ["@ui"] }, () => {
 			"links that would drop the reader into the zh-TW site",
 		).toEqual([]);
 		expect(pages.length, "page links found").toBeGreaterThan(12);
-		// the home link is the bare locale, not /
 		expect(pages).toContain("/en");
 	});
 
@@ -297,7 +288,6 @@ test.describe("locale routing", { tag: ["@ui"] }, () => {
 		page,
 	}) => {
 		await page.goto("/en/faq");
-		// 手機版導覽列的登入連結與桌機版是不同元素，只取看得到的那一個。
 		const login = page.locator('a[href^="/en/login"]:visible').first();
 		await expect(login).toHaveAttribute("data-hk-hard-navigation", "");
 		await login.click();

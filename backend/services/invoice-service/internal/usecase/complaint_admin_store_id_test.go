@@ -39,7 +39,6 @@ func TestGetComplaintForAdmin_CarriesStoreID(t *testing.T) {
 	if v.StoreID != storeID {
 		t.Fatalf("StoreID = %d，want %d（issuer_ref_id）—— A08 的「賣家：」讀這一欄", v.StoreID, storeID)
 	}
-	// 🔴 鑑別力：兩個 id 都是 bigint，取錯不會有任何東西報錯。
 	if v.StoreID == issuerPK {
 		t.Fatal("取到 IssuerID（PK）了 —— §6 明訂 store_id 與 issuer PK 不可互換")
 	}

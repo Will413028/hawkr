@@ -106,7 +106,6 @@ public class IdempotencyService {
             handler.run();
             return true;
         } catch (Exception e) {
-            // On failure, remove the key to allow retry
             removeKey(eventType, eventId);
             throw e;
         }

@@ -178,8 +178,6 @@ void main() {
       );
 
       expect(find.text('載入中…'), findsOneWidget);
-      // 還不知道是停權還是終止合作：不出現停權的字樣（終止合作的賣家不會先看到「停權」）。
-      // 標題與失敗狀態同為「商店已暫停營業」，狀態列標題「帳號狀態」。
       expect(find.text('商店已暫停營業'), findsOneWidget);
       expect(find.text('帳號狀態'), findsOneWidget);
       expect(find.text('目前仍可使用'), findsOneWidget);
@@ -200,7 +198,7 @@ void main() {
         ),
       );
 
-      expect(find.text('商店已暫停營業'), findsNWidgets(2)); // 標題與狀態列
+      expect(find.text('商店已暫停營業'), findsNWidgets(2));
       expect(find.text('帳號狀態'), findsOneWidget);
       expect(find.text('目前仍可使用'), findsOneWidget);
       expect(find.textContaining('停權'), findsNothing);
@@ -266,7 +264,6 @@ void main() {
       expect(find.text('到措施與申覆查看措施內容與期間，並可對仍可申覆的措施提出申覆。'), findsOneWidget);
       expect(find.widgetWithText(OutlinedButton, '措施與申覆'), findsOneWidget);
       expectNoLegacyCopy();
-      // 不承諾回覆時間（「盡快」「天內」「小時內」「回覆」）。
       for (final promise in ['盡快', '天內', '小時內', '回覆']) {
         expect(find.textContaining(promise), findsNothing, reason: promise);
       }

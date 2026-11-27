@@ -22,7 +22,6 @@ const OTHER_MODE = "AMEGO_AUTO";
 
 describe("showsReceiptAuth", () => {
 	it("審核進行中的四個狀態就開入口，不必等核定", () => {
-		// 這四個是本次放寬的重點：核定完成到賣家簽授權之間的空窗要靠它消滅。
 		for (const status of [
 			SellerTaxReviewStatus.SUBMITTED,
 			SellerTaxReviewStatus.UNDER_REVIEW,
@@ -49,8 +48,6 @@ describe("showsReceiptAuth", () => {
 	});
 
 	it("不在 allowed-from 的狀態不開入口（陰性）", () => {
-		// 草稿／被駁回／逾期／已撤銷／核定為應開立統一發票 —— 這些人點進去只會撞
-		// 端點 28 的 gate。
 		for (const status of [
 			SellerTaxReviewStatus.NOT_STARTED,
 			SellerTaxReviewStatus.DRAFT,

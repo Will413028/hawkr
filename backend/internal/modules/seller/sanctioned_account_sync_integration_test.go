@@ -9,7 +9,6 @@ import (
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
-// bankFingerprintRowsAfter 是店家在 at 之後寫入的 BANK_FINGERPRINT 雜湊列數。
 func (f *fixture) bankFingerprintRowsAfter(t *testing.T, storeID int64, at time.Time) int64 {
 	t.Helper()
 	return f.count(t, "SELECT count(*) FROM seller.account_identity_hashes WHERE source_store_id = $1 AND field = 'BANK_FINGERPRINT' AND created_at > $2", storeID, at)

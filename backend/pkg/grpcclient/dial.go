@@ -31,20 +31,6 @@ func Dial(target string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
 	allOpts := make([]grpc.DialOption, 0, len(opts)+2)
 	allOpts = append(allOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	allOpts = append(allOpts, grpc.WithKeepaliveParams(keepalive.ClientParameters{
-		// Time/Timeout give every internal gRPC client a real liveness signal
-		// on an idle-but-open stream — replacing the application-layer
-		// per-frame idle guess gateway/internal/proxy/ai_assistant_stream.go
-		// used to stand in for this, before that guess was removed in favor
-		// of this transport-level check. PermitWithoutStream stays false:
-		// this repo's clients only need liveness checks while a stream is
-		// actually open, and true would additionally ping fully-idle
-		// connections, generating traffic this fix has no reason to add.
-		//
-		// Time (20s) MUST stay <= the server's KeepaliveEnforcementPolicy
-		// MinTime (pkg/server/grpc.go BuildServerOptions, currently 10s) or
-		// the server sends GOAWAY("too_many_pings") and tears the connection
-		// down — the exact opposite of what a liveness check is for. If you
-		// change either value, check the other file first.
 		Time:                20 * time.Second,
 		Timeout:             10 * time.Second,
 		PermitWithoutStream: false,

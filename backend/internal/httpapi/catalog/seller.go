@@ -32,7 +32,6 @@ func NewApp(m SellerModule, stores ActingStores, images rpc.Images, log *slog.Lo
 	return newApp(declarations, m, stores, images, log)
 }
 
-// newApp 的宣告表由參數給（測試用缺一列的表驗證啟動檢查）。
 func newApp(table map[string]declaration, m SellerModule, stores ActingStores, images rpc.Images, log *slog.Logger) (*App, error) {
 	switch {
 	case log == nil:
@@ -48,7 +47,6 @@ func newApp(table map[string]declaration, m SellerModule, stores ActingStores, i
 	return &App{m: m, stores: stores, images: images, log: log, table: table}, nil
 }
 
-// caller 是呼叫的店家與帳號：店家只來自登入身分（seller.ActingStore 依 procedure 宣告的能力），不信任請求裡的任何店家。
 type caller struct {
 	storeID   int64
 	accountID int64
@@ -316,7 +314,6 @@ func (h *App) SetStock(ctx context.Context, req *connect.Request[pb.SetStockRequ
 	return connect.NewResponse(&pb.SetStockResponse{Sku: out}), nil
 }
 
-// stockResult 讀回調整後的 SKU（含已刪除的）：調整已經 commit 或重送時，並行刪除不能讓已生效的操作回失敗。
 func (h *App) stockResult(ctx context.Context, c caller, sku uuid.UUID) (*pb.Sku, error) {
 	st, err := h.m.OwnSku(ctx, c.storeID, sku)
 	if err != nil {

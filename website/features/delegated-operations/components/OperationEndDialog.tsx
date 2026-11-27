@@ -89,8 +89,7 @@ export default function OperationEndDialog({
 
 				{summary ? <SafetyCard summary={summary} /> : null}
 
-				{/* 清的是這個瀏覽器記憶體裡的代行快取（`removeQueries(["delegated"])`），
-					不是伺服器端的任何東西 —— 文案要講得出清的是什麼、在哪裡。 */}
+
 				<p className="text-center text-[0.75rem] text-foreground-soft">
 					結束後將清除本機暫存的商店資料並返回 ADM 商家詳情。
 				</p>
@@ -116,11 +115,7 @@ function EndSummaryRows({ summary }: { summary: DelegatedEndSummary }) {
 		<>
 			<dl className="flex flex-col gap-2 rounded-hk-md bg-default-50 p-4 text-[0.8125rem]">
 				<Row label="工作時長" value={`${durationMinutes} 分鐘`} />
-				{/* `operationCount` 的後端述詞是 `count(*) FILTER (WHERE result='SUCCEEDED')`
-				    —— 它**只數成功**。這一列曾經叫「總操作數」，於是一個做了 4 件事、3 件
-				    失敗（其中 2 件高風險）的工作階段，在結束摘要上是「1 項操作」，而 ADM 的
-				    同一個欄位標的是「成功操作」：兩邊對同一份資料給出兩種說法，而操作者只會
-				    看到其中一邊。標籤與 ADM `SessionAuditConsole` 對齊，口徑由下面那行講明。 */}
+
 				<Row label="成功操作" value={`${summary.operationCount} 項操作`} />
 				<Row
 					label="稽核狀態"
@@ -128,8 +123,7 @@ function EndSummaryRows({ summary }: { summary: DelegatedEndSummary }) {
 						pending === "0" ? "均已寫入稽核紀錄" : `${pending} 筆結果未確認`
 					}
 				/>
-				{/* 語意是「本次至少有一列已發出通知事件」，不是每一筆都通知、更不是賣家已讀。
-				    「賣家已通知」會被讀成前者。與 ADM 同一列的文案對齊。 */}
+
 				<Row
 					label="賣家通知"
 					value={

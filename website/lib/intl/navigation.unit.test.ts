@@ -79,7 +79,6 @@ describe("localizeHref", () => {
 	});
 
 	it("the default language leaves every href exactly as it was written", () => {
-		// zh-TW hrefs pass through untouched: no normalizing.
 		for (const href of [
 			"/",
 			"/faq/",

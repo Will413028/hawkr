@@ -44,7 +44,7 @@ import static org.mockito.Mockito.when;
 @DisplayName("IdempotencyService: hash 不可用時必須拒絕，不得重用既有記錄")
 class IdempotencyServiceHashUnavailableTest {
 
-    private static final String KEY = "b5-072009-9"; // dev 實測 132 筆中 127 筆是這種短鍵
+    private static final String KEY = "b5-072009-9";
     private static final Long STORE_A = 4L;
     private static final Long STORE_B = 9L;
 
@@ -56,7 +56,6 @@ class IdempotencyServiceHashUnavailableTest {
     @BeforeEach
     void setUp() {
         service = new IdempotencyService(repository, new ObjectMapper());
-        // 撞鍵：插入回 0 列
         when(repository.tryInsert(anyString(), any(), anyString(), any())).thenReturn(0);
     }
 
@@ -66,7 +65,7 @@ class IdempotencyServiceHashUnavailableTest {
         e.setStoreId(STORE_A);
         e.setEndpoint("CreateProduct");
         e.setRequestHash(storedHash);
-        e.setStatus("8002"); // SUCCEEDED — 這正是會把別人的 response 交出去的狀態
+        e.setStatus("8002");
         e.setResponseBody("{\"productId\":\"873483808124207639\",\"name\":\"賣家A的商品\"}");
         when(repository.findByKeyAndStoreId(KEY, STORE_A)).thenReturn(Optional.of(e));
     }
@@ -109,8 +108,6 @@ class IdempotencyServiceHashUnavailableTest {
     @DisplayName("hash 相同 → 正常回傳先前結果（不得過度收緊，冪等本身要還能用）")
     void hashMatchStillReturnsCachedResult() {
         existingRecord("samehash");
-        // responseType 用 Map：responseBody 是 JSON 物件，拿 String.class 去接會在
-        // 反序列化就失敗、走進 catch 回 empty，測到的就不是這裡要釘的分支了。
         Optional<Map> got = service.acquireLock(KEY, STORE_A, "CreateProduct", "samehash", Map.class);
         assertTrue(got.isPresent(), "hash 一致時仍應回傳既有結果，否則冪等失效");
         assertEquals("873483808124207639", got.get().get("productId"));
@@ -119,15 +116,11 @@ class IdempotencyServiceHashUnavailableTest {
     @Test
     @DisplayName("撈既有記錄必須帶 storeId：撞鍵時不得撈到另一個賣家的記錄")
     void lookupIsScopedToStore() {
-        existingRecord("deadbeef"); // 記錄屬於 STORE_A
+        existingRecord("deadbeef");
 
-        // 賣家 B 用同一把 key。撈不到「B 自己的」記錄，於是走「記錄狀態不一致」——
-        // 這是階段 1 的過渡行為（舊的單欄 key 主鍵還在，插入仍被它擋下）。
-        // 階段 2 移除舊 PK 之後，這裡會變成正常插入成功，兩個賣家互不干擾。
         assertThrows(IdempotencyConflictException.class,
                 () -> service.acquireLock(KEY, STORE_B, "CreateProduct", "abc123", String.class));
 
-        // 關鍵斷言：查詢帶的是呼叫者自己的 storeId，不是裸 key。
         verify(repository).findByKeyAndStoreId(KEY, STORE_B);
         verify(repository, never()).findByKey(anyString());
     }
@@ -138,9 +131,6 @@ class IdempotencyServiceHashUnavailableTest {
         existingRecord("deadbeef");
         IdempotencyConflictException ex = assertThrows(IdempotencyConflictException.class,
                 () -> service.acquireLock(KEY, STORE_A, "CreateProduct", "abc123", String.class));
-        // 修前四個呼叫端都誤用 2-arg 版（第二參數是 status 不是 message），於是所有
-        // 衝突對外都變成「請求正在處理中」——一句暗示「稍後重試會成功」的話，而重試
-        // 永遠失敗到 24–48 小時後清理為止。
         assertTrue(ex.getMessage().contains("請求內容不同"),
                 "應說明是內容不同，實際：" + ex.getMessage());
         assertEquals("8002", ex.getStatus(), "status 欄位應是真正的狀態碼，不是訊息文字");

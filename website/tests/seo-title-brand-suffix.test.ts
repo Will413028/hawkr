@@ -8,10 +8,8 @@ import { __setEnvForTest } from "../lib/config/env";
 import { __setFlavorForTest } from "../lib/config/flavor";
 import { buildRootMetadata, SITE_NAME } from "../lib/seo/metadata";
 
-// The prod flavor requires the browser API base on the web origin; a relative base is.
 process.env.NEXT_PUBLIC_API_BASE_URL = "/api/v1";
 
-// The prod flavor requires its own web origin (NEXT_PUBLIC_WEB_ORIGIN); these cases describe a deployment at this one.
 process.env.NEXT_PUBLIC_WEB_ORIGIN = "https://example.com";
 
 /**
@@ -288,7 +286,6 @@ test("no page title renders the brand twice", () => {
 });
 
 test("the scan reaches the titles it is meant to guard", () => {
-	// A scanner that silently matches nothing would pass the assertion above.
 	assert.ok(
 		titles.length >= 60,
 		`expected the metadata title scan to reach the ~90 page titles under ` +
@@ -298,11 +295,6 @@ test("the scan reaches the titles it is meant to guard", () => {
 	const inProductPage = titles.filter(
 		(t) => t.file === "app/[locale]/(public)/products/[id]/page.tsx",
 	);
-	// Exactly the not-found title. The success title is `{ absolute:
-	// productSeoTitle(...) }` — runtime data the scan cannot read, so it is
-	// covered by tests/product-seo-title.test.ts instead. Seeing a second value
-	// here would mean someone put a template literal back and re-entered the
-	// root template (the double-suffix path this file guards).
 	assert.deepEqual(
 		inProductPage.map((t) => t.value),
 		["找不到商品"],
@@ -310,8 +302,6 @@ test("the scan reaches the titles it is meant to guard", () => {
 });
 
 test("the home title still opts out of the template, and takes its locale's default title", async () => {
-	// The title is the locale's own default title (`defaultTitleFor`), which the scan cannot read as
-	// text — so assert on the source: it is `{ absolute }`, never a plain string.
 	const home = await readFile(
 		path.join(ROOT, "app/[locale]/(public)/page.tsx"),
 		"utf8",
@@ -328,14 +318,6 @@ test("the home title still opts out of the template, and takes its locale's defa
 });
 
 test("the hand-written og:titles keep the brand the template never gives them, in their locale's spelling", () => {
-	// og:title is not run through title.template, so these three carry the
-	// brand themselves. They sit within a few lines of a page title that reads
-	// identically, which is exactly how a whole-file search-and-replace strips
-	// the brand from a share card while every page title still looks right.
-	// The brand is the page locale's site name (`siteNameFor`), so in the scan it is an
-	// interpolation after the separator, not literal text.
-	// (The two product routes now share one composed string between page and
-	// og:title — see productSeoTitle — so no literal of theirs is scanned here.)
 	const branded = socialTitles
 		.filter((t) => t.value.endsWith(` | ${INTERPOLATION}`))
 		.map((t) => t.file)
@@ -346,7 +328,6 @@ test("the hand-written og:titles keep the brand the template never gives them, i
 		"features/sellers/posts/SellerPostsPage.tsx",
 		"features/sellers/reviews/SellerReviewsPage.tsx",
 	]);
-	// ...and none of them spells the zh-TW brand out, which would be wrong in English
 	assert.deepEqual(
 		socialTitles.filter((t) => t.value.includes(SITE_NAME)).map((t) => t.file),
 		[],
@@ -356,12 +337,6 @@ test("the hand-written og:titles keep the brand the template never gives them, i
 const jsxTitles = await collectJsxTitles();
 
 test("no component renders a document <title> of its own", () => {
-	// React 19 hoists a `<title>` rendered anywhere in the tree into <head>,
-	// where it does NOT replace the one Metadata produced — it joins it, and the
-	// document ships two. /faq and /contact each served two that way, and the
-	// Metadata scan above cannot see it: these are JSX elements, not `title:`
-	// properties. Titles belong to Metadata; a component that wants a different
-	// one is asking for its route's buildPageMetadata to change.
 	assert.deepEqual(
 		jsxTitles.filter((t) => !t.svg).map((t) => `${t.file}:${t.line}`),
 		[],
@@ -372,9 +347,6 @@ test("no component renders a document <title> of its own", () => {
 });
 
 test("the JSX scan reaches the <title> elements it is meant to guard", () => {
-	// Same discriminating-power check as above: without this, a scan that
-	// matched nothing at all (wrong dirs, tag name read the wrong way) would
-	// sail through the assertion above forever.
 	assert.ok(
 		jsxTitles.some((t) => t.svg),
 		`expected the JSX scan to find the accessible <title> elements inside ` +

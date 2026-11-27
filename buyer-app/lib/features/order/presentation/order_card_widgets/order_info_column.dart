@@ -16,10 +16,8 @@ import '../../data/order_model.dart';
 import '../../order_color_tokens.dart';
 import '../../../../shared/time/taipei_display.dart';
 
-// 文字色：基底 #565656，最淺不低於 80% 透明度
-// 80% 在白底實際渲染 ≈ #797979（偏淡），改用 100% / 90% 讓視覺貼近實際 #565656
-const Color _kTextPrimary = AppColors.textPrimary; // 100% #565656
-const Color _kTextMuted = AppColors.textPrimary; // 100% #565656（避免在白底渲染過淡）
+const Color _kTextPrimary = AppColors.textPrimary;
+const Color _kTextMuted = AppColors.textPrimary;
 
 /// 訂單卡片收合資訊區。
 ///
@@ -37,7 +35,6 @@ class OrderInfoColumn extends StatelessWidget {
   final bool isPendingPayment;
 
   String _buildFullAddress() {
-    // 7-11 店到店訂單：優先顯示門市名稱（pickupStoreName）
     if (order.shippingMethod == ShippingMethod.sevenElevenStorePickup.value &&
         order.pickupStoreName.isNotEmpty) {
       final name = order.pickupStoreName;
@@ -57,7 +54,6 @@ class OrderInfoColumn extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 賣家名稱（截斷）— 14sp Regular #565656 lineHeight 24
         Text(
           order.sellerName.isNotEmpty ? order.sellerName : '賣家',
           maxLines: 1,
@@ -71,7 +67,6 @@ class OrderInfoColumn extends StatelessWidget {
         if (isPendingPayment)
           Builder(
             builder: (_) {
-              // B-185：用 paymentDeadline 算實際倒數，不再用 statusTime。
               final countdown = order.paymentCountdownLabel;
               final hasDeadline = countdown.isNotEmpty;
               final urgent = order.paymentDeadlineUrgent;

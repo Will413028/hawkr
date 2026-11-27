@@ -14,12 +14,6 @@
 @import "./components/navigation-final.css";
 @import "./components/floating-navigation.css";
 
-/* Generate utilities from product code only. Paths are relative to this file,
-   not the repository root: automatic scanning also picks up tooling/docs and
-   can emit their example classes (or invalid placeholder candidates).
-   Keep complete runtime class maps in these roots; register a new runtime
-   source here if its utilities live elsewhere. Imported vendor CSS/@apply
-   remains part of the normal CSS graph, independent of source scanning. */
 @source "../app";
 @source "../components";
 @source "../features";
@@ -35,18 +29,6 @@
 @theme {
 	--font-sans: var(--font-primary);
 
-	/* Tailwind v4's whole spacing scale is rem-based: `p-4` compiles to
-	   `calc(var(--spacing) * 4)` with `--spacing: 0.25rem`. The 字體大小 setting
-	   (小 / 中 / 大, styles/foundation/02-reset-layout.css) works by changing the
-	   ROOT font-size — which means without this line it would silently zoom every
-	   padding, gap, width, height and icon box in the product too: 「小」 would
-	   shrink every 44px touch target to 38.5px and 「大」 would blow up every
-	   card's rhythm. That is a zoom control, not a text-size control.
-
-	   Dividing by the same factor cancels the rem change exactly, so
-	   `--spacing` always resolves back to 4 CSS px: `p-4` stays 16px and
-	   `size-11` stays 44px at every setting, while type (rem font sizes,
-	   which are NOT compensated) scales as intended. */
 	--spacing: calc(0.25rem / var(--hk-text-scale, 1));
 
 	--color-hk-primary-strong: var(--color-brand-primary-strong);
@@ -67,22 +49,12 @@
 	--color-hk-ink-850: var(--color-ink-850);
 	--color-hk-ink-900: var(--color-ink-900);
 	--color-hk-ink-950: var(--color-ink-950);
-	/* Off-white surface tone for dark backgrounds (footer, dark CTAs).
-	   Resolves to #fffdf7 — used with Tailwind opacity modifier as
-	   text-hk-cream/70 / bg-hk-cream/10 / border-hk-cream/15 etc. */
 	--color-hk-cream: var(--color-neutral-cream);
 	--color-hk-success: var(--color-status-success);
 	--color-hk-warning: var(--color-status-warning);
 	--color-hk-danger: var(--color-status-danger);
-	/* Liked heart — NOT the danger role. See --color-like-heart in
-	   styles/foundation/00-color-config.css. */
 	--color-hk-like: var(--color-like-heart);
 
-	/* ---------- Home page warm palette (theme-invariant, light-only) ----------
-	   home is intentionally light-only with a warm aesthetic distinct from the
-	   site's primary-color system; these do NOT cascade in dark. See
-	   docs/superpowers/specs/2026-05-26-home-css-tokenize-migration-design.md
-	   （已從 repo 移除，原文在私人封存） */
 	--color-hk-home-paper: #fcfaf4;
 	--color-hk-home-cream: #f5f2e8;
 	--color-hk-home-ink: #3a2a1a;
@@ -101,11 +73,6 @@
 	--color-hk-home-tint-pink: #f2d6cf;
 	--color-hk-home-tint-amber: #f9db96;
 	--color-hk-home-cream-deep: #f3eddc;
-	/* Rounded "postcard" surface behind the home rails (新品上市 / 精選商家).
-	   Flat on purpose: it used to be a 180deg gradient down to #f7f1e3, but
-	   the white cards cover everything except the container's bottom padding,
-	   so the gradient's dark end only ever showed as a hard-edged band under
-	   the last row. */
 	--color-hk-home-postcard: #fcf7eb;
 	--color-hk-home-postcard-dark: var(--color-ink-900);
 
@@ -336,22 +303,7 @@
 	}
 }
 
-/* ============================================================
-   HeroUI (--hkui-*) token bridge
-
-   `@theme inline` so each utility compiles to `var(--hkui-*)` at the use
-   site (not the resolved value). That lets the .account-shell /
-   [data-theme="dark"] scope overrides of the underlying --hkui-* tokens
-   flip these utilities automatically — no per-element dark: variant.
-
-   Spacing and font-size are intentionally NOT bridged: --hkui-space-*
-   and --hkui-text-* already match Tailwind's default scale, so use the
-   built-ins (gap-3, p-4, text-sm/base/lg, text-4xl) directly.
-   ============================================================ */
 @theme inline {
-	/* Theme-semantic colors — bridged INLINE so each utility compiles to
-	 * var(--theme-*) and re-resolves under [data-theme="dark"] at the
-	 * element scope (automatic dark cascade, no per-component dark: variant). */
 	--color-hk-surface-page: var(--theme-surface-page);
 	--color-hk-surface-card: var(--theme-surface-card);
 	--color-hk-surface-muted: var(--theme-surface-muted);
@@ -405,9 +357,6 @@
 	--color-info-50: var(--hkui-info-50);
 	--color-info-700: var(--hkui-info-700);
 
-	/* `primary` is taken by the legacy :root --color-primary (action color
-	 * that flips to gold in dark); the HeroUI primary is a constant
-	 * brand-primary-strong, so namespace it under hkui- to avoid divergence. */
 	--color-hkui-primary: var(--hkui-primary);
 	--color-hkui-primary-50: var(--hkui-primary-50);
 	--color-hkui-primary-200: var(--hkui-primary-200);
@@ -415,7 +364,6 @@
 	--color-hkui-primary-700: var(--hkui-primary-700);
 	--color-hkui-primary-foreground: var(--hkui-primary-foreground, #fff);
 
-	/* HeroUI radii don't line up with Tailwind's default rounded-* scale. */
 	--radius-hkui-md: var(--hkui-radius-md);
 	--radius-hkui-lg: var(--hkui-radius-lg);
 
@@ -506,7 +454,6 @@ body .page-content:has(.seller-shell) {
 	background: transparent;
 }
 
-/* Scoped seller-card chrome shared across buyer and seller dashboards */
 .seller-card {
 	background: var(--seller-surface, var(--hkui-content1));
 	border: 1px solid var(--hkui-divider);
@@ -585,5 +532,3 @@ body .page-content:has(.seller-shell) {
 		stroke-dashoffset: -28;
 	}
 }
-
-/* cache-bust: font unify 1781442270 */

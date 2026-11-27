@@ -62,7 +62,6 @@ export function saveMarketListSnapshot(snapshot: MarketListSnapshot): void {
 			JSON.stringify({ ...snapshot, savedAt: Date.now() }),
 		);
 	} catch {
-		// Quota / privacy mode — back-restore just degrades to a fresh list.
 	}
 }
 
@@ -96,7 +95,6 @@ export function takeMarketListSnapshot(key: string): MarketListSnapshot | null {
 	try {
 		window.sessionStorage.removeItem(STORAGE_KEY);
 	} catch {
-		// Storage may be blocked. The validated in-memory value is still usable.
 	}
 	return snapshot;
 }

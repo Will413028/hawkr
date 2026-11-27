@@ -9,7 +9,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/pagination"
 )
 
-// 搜尋結果的筆數：預設與上限（服務端的安全上限，不是相關性排序的截斷點）。
 const (
 	defaultSearchLimit = 500
 	maxSearchLimit     = 1000
@@ -136,7 +135,6 @@ func (s *Service) TaxIDMatches(ctx context.Context, pageSize int32, after *model
 	return page, nil
 }
 
-// reasonsOf 把查詢回的原因（'NAME' 或比對鍵的前綴）轉成模組的值。
 func reasonsOf(in []string) []model.MatchReason {
 	out := make([]model.MatchReason, len(in))
 	for i, s := range in {

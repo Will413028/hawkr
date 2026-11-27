@@ -44,7 +44,6 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// testQueue 記錄排入的 job（必須在 transaction 內，與真正的 jobs.Client 相同）。
 type testQueue struct {
 	mu   sync.Mutex
 	args []river.JobArgs
@@ -87,7 +86,6 @@ func (noProductVerifier) VerifyProduct(context.Context, uuid.UUID, int64) error 
 	return social.ErrProductNotAvailable
 }
 
-// storeBlocksFromTable 是 social 的店家封鎖檢查在測試裡的替身（seller 自己的封鎖規則由 seller 的測試驗證）。
 type storeBlocksFromTable struct{ db *db.DB }
 
 func (s storeBlocksFromTable) StoreBlocksBuyer(ctx context.Context, storeID, buyerID int64) (bool, error) {
@@ -96,7 +94,6 @@ func (s storeBlocksFromTable) StoreBlocksBuyer(ctx context.Context, storeID, buy
 	return blocked, err
 }
 
-// reviewOrders 是 review 的訂單 port 的替身：以訂單號查。
 type reviewOrders struct {
 	mu   sync.Mutex
 	byNo map[string]review.OrderForReview
@@ -112,12 +109,10 @@ func (o *reviewOrders) OrderForReview(_ context.Context, orderNo string) (review
 	return v, nil
 }
 
-// chatOrders 是 im 的訂單 port 的替身：雙方之間沒有進行中的訂單。
 type chatOrders struct{}
 
 func (chatOrders) OpenOrderBetween(context.Context, int64, int64) (bool, error) { return false, nil }
 
-// chatStores 是 im 的 Stores port：守門的鎖與封鎖檢查走真正的 seller 模組，店家資料的條件在這裡固定成營運中（seller 自己的條件推導由 seller 的測試驗證）。
 type chatStores struct{ *seller.Module }
 
 func (s chatStores) Store(ctx context.Context, id int64) (seller.Store, error) {
@@ -218,7 +213,6 @@ func setup(t *testing.T) *fixture {
 	events.Subscribe(bus, f.module.Retention().OnBuyerDeletionRequested)
 	events.Subscribe(bus, f.module.Retention().OnBuyerDeleted)
 	events.Subscribe(bus, f.module.Retention().OnStoreRetired)
-	// 測試只關心社群內容與 social 讀 seller 的 pub_exposable_stores：把 KYC 的表放寬成可以直接寫最小的列（它自己的規則在 seller 的測試）。
 	f.exec(t, `DO $$ DECLARE r record; BEGIN
 		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
 		         WHERE conrelid = 'seller.kyc_applications'::regclass AND contype = 'c'
@@ -244,7 +238,6 @@ func (f *fixture) count(t *testing.T, sql string, args ...any) int {
 	return n
 }
 
-// newBuyer 建一位營運中的買家（走正式的建帳事件），回傳買家與帳號。
 func (f *fixture) newBuyer(t *testing.T) (buyerID, accountID int64) {
 	t.Helper()
 	ctx := context.Background()
@@ -261,13 +254,11 @@ func (f *fixture) newBuyer(t *testing.T) (buyerID, accountID int64) {
 	return p.BuyerID, accountID
 }
 
-// exposableStore 建一家可以公開曝光的店（直接寫 seller 的表，最小的列），回傳 store_id 與帳號。帳號是不存在於 identity 的編號。
 func (f *fixture) exposableStore(t *testing.T) (storeID, accountID int64) {
 	t.Helper()
 	return f.exposableStoreOn(t, f.next())
 }
 
-// exposableStoreOnIdentityAccount 同 exposableStore，但帳號是真的 identity 帳號（沒有買家列），讓 CloseCurrent 這類要鎖帳號列的路徑走得通。
 func (f *fixture) exposableStoreOnIdentityAccount(t *testing.T) (storeID, accountID int64) {
 	t.Helper()
 	if err := f.db.Conn(context.Background()).QueryRow(context.Background(), "INSERT INTO identity.accounts DEFAULT VALUES RETURNING id").Scan(&accountID); err != nil {
@@ -348,11 +339,8 @@ func identityCreated(accountID int64) identity.AccountCreated {
 	return identity.AccountCreated{AccountID: accountID, Name: "店主"}
 }
 
-// stagedUploader 是測試裡所有暫存圖片的上傳者：擁有媒體的模組（social、review、im、seller）換了各自的擁有者 ID 呼叫 Confirm，
-// ownerMedia 一律以這個上傳者確認。
 var stagedUploader = media.Uploader{ID: 1}
 
-// ownerMedia 是擁有媒體的模組的 media 替身：確認真的 media 模組裡由 stage 建立的暫存，上傳者固定是 stagedUploader。
 type ownerMedia struct{ m *media.Module }
 
 func (o ownerMedia) Confirm(ctx context.Context, _ media.Uploader, token string, want media.Visibility) (media.ConfirmedAsset, error) {
@@ -376,7 +364,6 @@ func tinyPNG(t *testing.T) []byte {
 	return b.Bytes()
 }
 
-// stage 在真的 media 模組建立一筆就緒的暫存圖片並回 token。
 func (f *fixture) stage(t *testing.T) string {
 	t.Helper()
 	res, err := f.media.PutPublic(context.Background(), stagedUploader, bytes.NewReader(tinyPNG(t)))
@@ -386,7 +373,6 @@ func (f *fixture) stage(t *testing.T) string {
 	return res.Token
 }
 
-// assetState 是資產在 media 的狀態；資產不存在時失敗。
 func (f *fixture) assetState(t *testing.T, id uuid.UUID) string {
 	t.Helper()
 	st, err := media.AssetStateOf(context.Background(), f.db, id)
@@ -396,7 +382,6 @@ func (f *fixture) assetState(t *testing.T, id uuid.UUID) string {
 	return string(st)
 }
 
-// ratingSink 是 catalog 的替身：這個 fixture 不跑評分 worker，只需要滿足 review.Catalog。
 type ratingSink struct{}
 
 func (ratingSink) LockProduct(context.Context, uuid.UUID) (catalog.Rating, error) {
@@ -405,7 +390,6 @@ func (ratingSink) LockProduct(context.Context, uuid.UUID) (catalog.Rating, error
 
 func (ratingSink) SetRating(context.Context, uuid.UUID, float64, int32) error { return nil }
 
-// stagedAssets 是推導後處於 STAGED（還沒確認）的資產數。
 func (f *fixture) stagedAssets(t *testing.T) int {
 	t.Helper()
 	n, err := media.CountAssetsInState(context.Background(), f.db, media.AssetStaged)

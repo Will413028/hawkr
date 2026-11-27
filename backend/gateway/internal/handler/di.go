@@ -14,12 +14,10 @@ var Module = fx.Module("handler",
 	fx.Provide(NewHolder),
 )
 
-// newStoreResolver 建立店家身分解析器。
 func newStoreResolver(seller *grpcclient.SellerClient) *storeid.Resolver {
 	return storeid.New(seller)
 }
 
-// newBuyerResolver 建立買家身分解析器。
 func newBuyerResolver(buyer *grpcclient.BuyerClient) *buyerid.Resolver {
 	return buyerid.New(buyer)
 }

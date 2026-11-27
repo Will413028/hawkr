@@ -42,8 +42,6 @@ func TestIsKnownAdminRejectsNonMembers(t *testing.T) {
 			t.Errorf("%q 應為已知 capability", c)
 		}
 	}
-	// 空字串必須是未知，否則「漏宣告 capability」會靜默掛上一條無防護的代行路由。
-	// 履約禁區機器名與賣家 token 同樣不得被誤認。
 	for _, c := range []AdminCapability{"", "fulfillment", "shipment.write", "orders.write", "CAP_ORDER_FULFILL", "products.bulk", "audit.read"} {
 		if IsKnownAdmin(c) {
 			t.Errorf("%q 不在封閉十值內，不得被認為已知", c)
@@ -81,7 +79,7 @@ func TestGrantedAdminCapabilities(t *testing.T) {
 		{name: "active + 同店 + 持有 capability", wantCode: 0},
 		{name: "expired 短路在 status", mutate: func(c *AdminDelegationContext) {
 			c.SessionStatus = DelegationSessionExpired
-			c.RequestedStoreID = 1 // 後兩項也違規，仍必須回 status 的碼
+			c.RequestedStoreID = 1
 			c.RequiredCapability = AdminCapOrdersRead
 		}, wantCode: bizcode.DelegationSessionExpired},
 		{name: "revoked", mutate: func(c *AdminDelegationContext) { c.SessionStatus = DelegationSessionRevoked }, wantCode: bizcode.DelegationSessionRevoked},
@@ -89,7 +87,7 @@ func TestGrantedAdminCapabilities(t *testing.T) {
 		{name: "空 status", mutate: func(c *AdminDelegationContext) { c.SessionStatus = "" }, wantCode: bizcode.DelegationSessionRevoked},
 		{name: "target 不符短路在 target", mutate: func(c *AdminDelegationContext) {
 			c.RequestedStoreID = 2632049831
-			c.RequiredCapability = AdminCapOrdersRead // capability 也不足，仍必須回 target 的碼
+			c.RequiredCapability = AdminCapOrdersRead
 		}, wantCode: bizcode.DelegationTargetMismatch},
 		{name: "snapshot 無 target", mutate: func(c *AdminDelegationContext) { c.TargetStoreID = 0 }, wantCode: bizcode.DelegationTargetMismatch},
 		{name: "URL 無 store", mutate: func(c *AdminDelegationContext) { c.RequestedStoreID = 0 }, wantCode: bizcode.DelegationTargetMismatch},
@@ -112,7 +110,6 @@ func TestGrantedAdminCapabilities(t *testing.T) {
 			if code != tc.wantCode {
 				t.Fatalf("deniedCode = %d，預期 %d", code, tc.wantCode)
 			}
-			// granted 非空 ⇔ deniedCode == 0。
 			if (len(granted) > 0) != (code == 0) {
 				t.Fatalf("granted=%v 與 deniedCode=%d 不一致", granted, code)
 			}

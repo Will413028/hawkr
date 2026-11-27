@@ -16,11 +16,10 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/llm"
 )
 
-// step 是替身 LLM 一次呼叫的回應。
 type step struct {
 	resp  *adkmodel.LLMResponse
 	err   error
-	block bool // 阻塞到 ctx 結束，模擬逾時
+	block bool
 }
 
 type fakeLLM struct {
@@ -211,7 +210,6 @@ func TestMessageIsTruncatedAtTheRuneLimitAndKnownSlotsAreSent(t *testing.T) {
 		t.Fatal(err)
 	}
 	sent := f.reqs[0].Contents[0].Parts[0].Text
-	// 已知需求 JSON 裡的「小白菜」含一個「菜」。
 	if got := strings.Count(sent, "菜"); got != MaxMessageRunes+1 {
 		t.Errorf("「菜」共 %d 個，要 %d 個（截斷後的訊息加已知需求裡的 1 個）", got, MaxMessageRunes+1)
 	}

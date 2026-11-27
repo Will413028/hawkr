@@ -34,7 +34,6 @@ const (
 	ReasonJobLost        = "ORDER_JOB_LOST"
 )
 
-// internalErrorCode 是舊 order-service 的 INTERNAL_ERROR(500)：唯一當成暫時性的回應碼。
 const internalErrorCode int32 = 500
 
 // Command 是一筆建單命令；OrderRef 是冪等鍵，金額是接受時凍結的值。
@@ -143,19 +142,15 @@ func (w *Worker) Provision(ctx context.Context, id uuid.UUID, last bool) error {
 	return w.retry(ctx, id, last, o, cause)
 }
 
-// outcome 是 create 的結果。
 type outcome int
 
 const (
-	// outcomeNone 是沒有轉換：接受單已不是 CREATING_ORDER、標記沒有更新任何列，或是暫時性錯誤。
 	outcomeNone outcome = iota
 	outcomeCreated
 	outcomeFailed
-	// outcomeUnrecorded 是 ordering 已回了訂單號，但還沒記進接受單（確認既有訂單或寫入暫時失敗）：訂單可能已存在，絕不標成失敗。
 	outcomeUnrecorded
 )
 
-// markError 是終態答案已知（reason）、但標記建單失敗沒寫成：之後只重試標記，不再呼叫 ordering，也不用別的原因覆蓋。
 type markError struct {
 	reason string
 	err    error
@@ -164,13 +159,10 @@ type markError struct {
 func (e *markError) Error() string { return e.err.Error() }
 func (e *markError) Unwrap() error { return e.err }
 
-// finalTimeout 是最後一次再呼叫與標記失敗的上限：job 的 context 可能已經因逾時結束，所以另起一個。
 const finalTimeout = 30 * time.Second
 
-// pendingPaymentStatus 是舊 order-service 的待付款狀態（OrderStatus 0）：剛建好、還沒付款的單。
 const pendingPaymentStatus = "0"
 
-// create 嘗試建單一次。終態（已建好、已標失敗、已不是 CREATING_ORDER）回 nil error；暫時性失敗回 cause，由呼叫端決定重試或收尾。
 func (w *Worker) create(ctx context.Context, id uuid.UUID) (outcome, error) {
 	q := store.New(w.DB.Conn(ctx))
 	b, err := q.GetOrderBasis(ctx, id)
@@ -207,8 +199,6 @@ func (w *Worker) create(ctx context.Context, id uuid.UUID) (outcome, error) {
 	case OutcomeCreated:
 	}
 	if res.Replayed {
-		// order_ref 從 1 起算，舊 order-service 的 orders.acceptance_id 可能已有同值的別人的單或早已取消的單：命中既有訂單時要確認
-		// 買家與店家都對、訂單還在待付款、付款期限沒過。
 		p, err := w.Orders.OrderParties(ctx, res.OrderNo)
 		if err != nil {
 			return outcomeUnrecorded, fmt.Errorf("provisioning：確認既有訂單 %s 的買家與店家：%w", res.OrderNo, err)
@@ -230,7 +220,6 @@ func (w *Worker) create(ctx context.Context, id uuid.UUID) (outcome, error) {
 	return outcomeCreated, nil
 }
 
-// failed 標記建單失敗並換算成 create 的結果：沒有更新任何列不算轉換；寫入失敗回 *markError，帶著已知的終態原因。
 func (w *Worker) failed(ctx context.Context, id uuid.UUID, reason string) (outcome, error) {
 	changed, err := w.fail(ctx, id, reason)
 	switch {
@@ -242,7 +231,6 @@ func (w *Worker) failed(ctx context.Context, id uuid.UUID, reason string) (outco
 	return outcomeNone, nil
 }
 
-// detached 回傳收尾用的 context：job 逾時（DeadlineExceeded）時脫離父 context 的期限；關機取消（Canceled）要連它一起取消。
 func detached(ctx context.Context) (context.Context, context.CancelFunc) {
 	fresh, cancel := context.WithTimeout(context.WithoutCancel(ctx), finalTimeout)
 	if ctx.Err() != nil {
@@ -256,9 +244,6 @@ func detached(ctx context.Context) (context.Context, context.CancelFunc) {
 	return fresh, func() { stop(); cancel() }
 }
 
-// retry 回傳暫時性錯誤。已記下訂單號的暫時失敗（outcomeUnrecorded）絕不標成失敗，留給重試或 reconciler。
-// 終態答案已知但標記沒寫成（*markError）只重試標記、用那個原因。最後一次嘗試先用同一個 order_ref 再呼叫一次（回應遺失時取回既有訂單），
-// 仍失敗才標成建單失敗；關機取消（context.Canceled）不收尾，逾時則用新的 context 收尾。標記失敗時連同原因一併回傳，留給 reconciler。
 func (w *Worker) retry(ctx context.Context, id uuid.UUID, last bool, o outcome, cause error) error {
 	if o == outcomeUnrecorded || errors.Is(ctx.Err(), context.Canceled) {
 		return cause
@@ -294,7 +279,6 @@ func (w *Worker) retry(ctx context.Context, id uuid.UUID, last bool, o outcome, 
 	return cause
 }
 
-// fail 標記建單失敗；回傳是否真的轉換了一列。
 func (w *Worker) fail(ctx context.Context, id uuid.UUID, reason string) (bool, error) {
 	changed, err := markFailed(ctx, w.Logger, store.New(w.DB.Conn(ctx)), id, reason, w.Now())
 	if err != nil {
@@ -389,8 +373,6 @@ func (r Reconciler) reconcileOne(ctx context.Context, states run.JobStates, id u
 	if !dead {
 		return outcomeNone, nil
 	}
-	// 呼叫 ordering 與記下結果在同一個持有接受單 advisory lock 的 transaction 內（A9-D45 補充）：重疊的對帳拿不到鎖就略過，
-	// 不會一個記下訂單、另一個把同一筆標成失敗。這個 transaction 在外部呼叫期間佔一條連線，由唯一的週期 job 限制成一條。
 	err = r.DB.InTx(ctx, func(ctx context.Context) error {
 		locked, err := store.New(r.DB.Conn(ctx)).TryLockOrderProvisioning(ctx, id)
 		if err != nil {

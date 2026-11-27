@@ -32,13 +32,10 @@ String? resolveBuyerRedirect({
   String? loginContinueParam,
   String? currentUri,
 }) {
-  // App 強制更新（`packages/hawkr_app_update/docs/spec.md`）：必須早於登入判斷。截圖模式豁免。
-  // [forceUpdateRoute] 自身放行，否則 redirect 自我循環。
   if (!isScreenshotMode && needsForceUpdate) {
     return location == forceUpdateRoute ? null : forceUpdateRoute;
   }
 
-  // Login: if already authenticated, go to continue URL or home
   if (location == loginRoute) {
     if (isLoggedIn) {
       return loginContinueParam ?? '/';
@@ -46,8 +43,6 @@ String? resolveBuyerRedirect({
     return null;
   }
 
-  // Apple App Review: guest mode required. All routes default to
-  // guest-accessible; only account-scoped routes force login.
   if (!isScreenshotMode && !isLoggedIn && requiresLoginForRoute(location)) {
     final encoded = Uri.encodeComponent(currentUri ?? location);
     return '$loginRoute?continue=$encoded';

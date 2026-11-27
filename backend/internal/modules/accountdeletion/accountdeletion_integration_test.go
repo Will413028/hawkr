@@ -36,7 +36,6 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// testQueue 記下排入的 job 種類與次數：這些測試不執行 job。
 type testQueue struct {
 	mu    sync.Mutex
 	kinds map[string]int
@@ -52,7 +51,6 @@ func (q *testQueue) Enqueue(_ context.Context, args river.JobArgs, _ *river.Inse
 	return nil
 }
 
-// count 回傳某種 job 排入的次數。
 func (q *testQueue) count(kind string) int {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -63,8 +61,6 @@ func (*testQueue) EnqueueReport(context.Context, river.JobArgs, *river.InsertOpt
 	return true, nil
 }
 
-// noProducts 是商品 port 的替身：這裡的測試不彙總瀏覽事件。
-// noRegistry 是登記資料來源的替身：這個測試不送公司型申請，來源不會被呼叫。
 type noRegistry struct{}
 
 func (noRegistry) Lookup(context.Context, string) (gcis.Registration, bool, error) {
@@ -77,8 +73,6 @@ func (noProducts) StoreIDs(context.Context, []uuid.UUID) (map[uuid.UUID]int64, e
 	return nil, nil
 }
 
-// testOrders 是訂單 port 的替身：買家側（open、err）與店家側（storeOpen、storeErr）各自設定。onStoreCall 在店家側的查詢
-// 時執行一次（鎖外），用來製造「查完訂單、進交易之前」的交錯。
 type testOrders struct {
 	mu          sync.Mutex
 	open        bool
@@ -127,7 +121,6 @@ type fixture struct {
 
 func setup(t *testing.T) *fixture { return setupWith(t) }
 
-// setupWith 是 setup 加上額外要套用 migration 的模組（訂閱者模組的測試用）。
 func setupWith(t *testing.T, extra ...migrate.Module) *fixture {
 	t.Helper()
 	d := pg.NewDB(t, testdb.Migrations(append([]migrate.Module{{Name: "identity", Dir: identity.Migrations()}, {Name: "buyer", Dir: buyer.Migrations()}, {Name: "seller", Dir: seller.Migrations()}, {Name: "accountdeletion", Dir: Migrations()}}, extra...)...))
@@ -143,7 +136,6 @@ func setupWith(t *testing.T, extra ...migrate.Module) *fixture {
 	return &fixture{db: d, identity: id, buyer: b, seller: sl, orders: orders, module: m, queue: queue, bus: bus}
 }
 
-// account 走正式的建帳事件建立帳號與它唯一的買家。
 func (f *fixture) account(t *testing.T) (int64, int64) {
 	t.Helper()
 	ctx := context.Background()
@@ -158,7 +150,6 @@ func (f *fixture) account(t *testing.T) (int64, int64) {
 	return id, p.BuyerID
 }
 
-// accountWithoutBuyer 直接寫入帳號、不建買家，只用來製造被破壞的不變量。
 func (f *fixture) accountWithoutBuyer(t *testing.T) int64 {
 	t.Helper()
 	ctx := context.Background()
@@ -365,7 +356,6 @@ func TestStoreOpenedBetweenOrdersReadAndTransactionWritesNothing(t *testing.T) {
 	}
 }
 
-// grantSellerBeforeLock 在 transaction 取得帳號鎖之前授予 SELLER，模擬交易外讀取之後、鎖定之前的交錯。
 type grantSellerBeforeLock struct {
 	inner     *identity.Module
 	accountID int64
@@ -591,7 +581,6 @@ func TestRequestConstraints(t *testing.T) {
 func ptrTime(v time.Time) *time.Time { return &v }
 func ptrInt(v int64) *int64          { return &v }
 
-// store 以正式的開店流程為帳號開一間店。
 func (f *fixture) store(t *testing.T, accountID int64) seller.Store {
 	t.Helper()
 	s, err := f.seller.Apply(context.Background(), seller.ApplyInput{AcceptedAgreements: seller.CurrentApplyAcceptances(), AccountID: accountID, StoreName: "測試小店"})
@@ -814,7 +803,6 @@ func TestAdminRequestIsPendingWhileTheStoreHasOpenOrders(t *testing.T) {
 	if f.storeStatus(t, s.StoreID) != seller.PendingDeletion || f.buyerStatus(t, buyerID) != "PENDING_DELETION" {
 		t.Fatalf("store=%s buyer=%s", f.storeStatus(t, s.StoreID), f.buyerStatus(t, buyerID))
 	}
-	// 還沒結清：重送與完成都維持等待。
 	if state, err = f.module.CompletePending(ctx, id); err != nil || state != PendingOrders {
 		t.Fatalf("still open: %s %v", state, err)
 	}

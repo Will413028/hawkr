@@ -21,10 +21,7 @@ public final class PayUniEventRouting {
     public static String topic(PayUniEventType type) {
         return switch (type) {
             case SHIPPING_STATUS -> MqConstants.ROUTING_KEY_PAYUNI_SHIPPING_STATUS;
-            // 超商列印與貨態共用 routing key，由下游按 ApiType 分流
             case SHIPPING_PRINT  -> MqConstants.ROUTING_KEY_PAYUNI_SHIPPING_STATUS;
-            // AGENT_NOTIFY 已收斂為單通道（#1757）：不經 payuni.events，改由 buildRoutes 直接發
-            // seller.review.result。case 保留以維持窮舉，但不應被呼叫到。
             case AGENT_NOTIFY    -> throw new IllegalStateException(
                     "AGENT_NOTIFY 走 seller.review.result，不經 payuni.events");
             case UNKNOWN         -> throw new IllegalStateException(

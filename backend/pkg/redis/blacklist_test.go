@@ -11,11 +11,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// newTestClient returns a client backed by a per-test in-process miniredis, and
-// still builds it through pkgredis.NewClient so the constructor stays on the
-// tested path. Previously it dialled a real 127.0.0.1:6379 and skipped on
-// failure, so the live-Redis blacklist tests never ran anywhere the local
-// Redis had a password — see sessionTestRedis for the same fix and its history.
 func newTestClient(t *testing.T) *redis.Client {
 	t.Helper()
 	mr := miniredis.RunT(t)
@@ -165,7 +160,6 @@ func TestAccountSuspendedTTL_FloorsAtBearerLifetimePlusBuffer(t *testing.T) {
 	if got := pkgredis.AccountSuspendedTTL(longBearer); got <= longBearer {
 		t.Errorf("AccountSuspendedTTL(%v) = %v, want > the bearer lifetime", longBearer, got)
 	}
-	// And it never drops below what a soft-delete would get.
 	if got := pkgredis.AccountSuspendedTTL(time.Minute); got < pkgredis.AccountBlockedTTL() {
 		t.Errorf("AccountSuspendedTTL(1m) = %v, want >= AccountBlockedTTL (%v)",
 			got, pkgredis.AccountBlockedTTL())

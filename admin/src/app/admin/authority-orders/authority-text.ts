@@ -9,8 +9,6 @@ import {
 } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/authority_order_pb";
 import { unknownText } from "@/lib/ui-text";
 
-// 主管機關來函的名稱（3c-b 設計書 §5.4 (d) L3、L6、M5、M6）。這些列舉只有 admin 用，不在共用文案目錄裡，所以是 admin 的單端表
-// （UNSPECIFIED 不在表裡）；不認得的值與 UNSPECIFIED 顯示「未知」。
 
 function textOf<E extends number>(
 	table: Partial<Record<E, string>>,
@@ -93,7 +91,6 @@ const COVERAGE_TEXT: Record<
 	[AuthorityStoreCoverage.HOLD_ENDED]: "保存期限已過",
 	[AuthorityStoreCoverage.PURGED_AFTER_HOLD_ENDED]:
 		"保存期限已過，個資已依保留期限清除",
-	// 撤銷登記的文案：Will 2026-10-20 授權由 lead 定稿。
 	[AuthorityStoreCoverage.HOLD_RELEASED_BY_REVOCATION]: "撤銷登記時解除保存",
 };
 

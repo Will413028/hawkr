@@ -52,7 +52,6 @@ const double _kAvatarRadius = 50.0;
 class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // Display fields
   String header = '';
   String userName = '';
   String mobile = '';
@@ -63,7 +62,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   Gender? gender;
   DateTime? birth;
 
-  // Inputs
   final TextEditingController _userNameCtrl = TextEditingController();
   final TextEditingController _mobileCtrl = TextEditingController();
   final TextEditingController _cityCtrl = TextEditingController();
@@ -131,12 +129,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     _syncControllers();
   }
 
-  // 這裡原有 _resolveEmail（5 個候選鍵）與 _resolveUserName（8 個候選鍵）。
-  // 兩者都只餵 `GET /app/buyers/me`，而它只回 `email` 與 `nickname`。
-  //
-  // _resolveUserName 的候選鏈還會在 nickname 為空時退回 email 或 mobile，
-  // 把它填進「用戶名稱」輸入框——使用者按下儲存，那個 email 就會被當成暱稱
-  // 寫進 buyers.display_name。空的欄位顯示為空才是對的。
   void _syncControllers() {
     _userNameCtrl.text = userName;
     _mobileCtrl.text = mobile;
@@ -144,11 +136,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     _jobCtrl.text = job;
   }
 
-  // 這裡原有 _firstNonEmpty：給一組候選鍵，在整個 JSON 樹裡**遞迴**尋找，
-  // 任何一層的 Map 或 List 命中就回傳。它是上面那兩段猜測的引擎，
-  // 唯一的兩個呼叫點（provider 判斷、Google 名字覆蓋）都已移除。
-  // 這種「在任意深度找任意鍵」的取值方式沒有可預期的行為——同名欄位出現在
-  // 巢狀結構的任何位置都會被當成答案，而且永遠不會報錯。
 
   Future<void> _pickAvatar() async {
     final picker = ImagePicker();
@@ -215,8 +202,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         return;
       }
 
-      // 用 stagedToken 走 UpdateProfile（avatar_staged_token 進 update mask），取回永久 object_key。
-      // 不要存 result.previewUrl（tmp/ 暫時簽章 URL，過一陣子就失效）。
       final objectKey = await ref
           .read(authRepositoryProvider)
           .updateAvatar(
@@ -278,8 +263,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       if (profile == null) {
         throw const ServerException('個人資料版本資訊不存在，請重新載入');
       }
-      // 這個表單的文字欄位不含頭像：頭像走 staged token 流程（_pickAvatar），
-      // 同一個 UpdateProfile、另一組 update mask。
       final edit = (
         id: profile.id,
         etag: profile.etag,
@@ -291,13 +274,11 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         birthDate: birthValue == null ? null : dateFromDateTime(birthValue),
       );
 
-      // Update remote via auth repository
       final session = await ref.read(sessionProvider.future);
       final id = session?.userId;
       _logSave('Remote update started (id=$id)');
       await ref.read(authRepositoryProvider).updateProfile(edit);
       _logSave('Remote update success (id=$id)');
-      // Update session nickname so settings screen reflects the change
       await ref.read(sessionProvider.notifier).updateNickname(nameValue);
 
       if (!mounted) return;
@@ -350,7 +331,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
         v.startsWith('public/')) {
       final full = v.normalizeAvatarUrl();
       if (!full.startsWith('http')) {
-        return null; // 無法解析（如 /public/defaults/...）→ 用預設頭像
+        return null;
       }
       return getOssSceneImageProvider(full, ImageScene.avatarLarge) ??
           NetworkImage(full);

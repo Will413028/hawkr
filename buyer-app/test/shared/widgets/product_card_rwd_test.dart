@@ -57,8 +57,6 @@ void main() {
           find.byKey(const ValueKey('product-card-seller-row')),
         );
 
-        // The add action remains part of the single card surface and is
-        // centered precisely on the media/body seam.
         expect(actionRect.center.dy, closeTo(imageRect.bottom, 0.1));
         _expectRectInside(surfaceRect, addSurfaceRect);
         expect(sellerRect.right, lessThanOrEqualTo(actionRect.left));
@@ -361,7 +359,6 @@ void main() {
     final imageRect = tester.getRect(
       find.byKey(const ValueKey('product-card-image')),
     );
-    // The foreground border preserves the exact Web 4:3 parent geometry.
     expect(imageRect.width / imageRect.height, closeTo(4 / 3, 0.001));
   });
 

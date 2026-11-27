@@ -66,7 +66,6 @@ public class CheckoutCouponGrpcClient {
                 .setOrderAmount(String.valueOf(orderAmount))
                 .build();
 
-        // coupon-service 失敗時會拋 StatusRuntimeException，由上層 RPC catch-all 處理
         ValidateCouponResponse response = couponStub
                 .withDeadlineAfter(INTERNAL_READ_DEADLINE_SEC, TimeUnit.SECONDS)
                 .validateCoupon(request);
@@ -103,7 +102,6 @@ public class CheckoutCouponGrpcClient {
                 .setOrderAmount(String.valueOf(orderAmount))
                 .build();
 
-        // coupon-service 失敗時會拋 StatusRuntimeException，由上層 RPC catch-all 處理
         ReserveCouponResponse response = couponStub
                 .withDeadlineAfter(INTERNAL_READ_DEADLINE_SEC, TimeUnit.SECONDS)
                 .reserveCoupon(request);

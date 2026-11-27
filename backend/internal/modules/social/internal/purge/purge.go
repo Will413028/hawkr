@@ -23,10 +23,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 )
 
-// batchSize 是每一批處理的列數。
 const batchSize = 200
 
-// sweepBatch 是保底掃描每頁最多補排的買家數或店家數。
 const sweepBatch = 100
 
 // SweepInterval 是保底掃描的間隔。
@@ -159,25 +157,20 @@ func sweepPages(ctx context.Context, s *Service, list func(*store.Queries, int64
 	}
 }
 
-// batch 收集一批清除影響到的對象：touch 是這一批的 trigger 會寫的 stats 列（貼文、父留言、父討論區留言）；likedComments 是只有讚數變的留言
-// （只鎖）；bust 是要排快取失效的貼文。
 type batch struct {
 	touch         stats.Set
 	likedComments []uuid.UUID
 	bust          []uuid.UUID
-	bustStores    []int64 // 討論區留言被刪的店家：店面頁的快取失效（與隱藏討論區留言相同）
+	bustStores    []int64
 	n             int
 }
 
-// lock 依固定順序（貼文的 stats、留言的 stats、討論區留言的 stats，各自依 ID）鎖住這一批會碰到的全部 stats 列。必須在這一批的
-// 第一個寫入之前呼叫：清除會同時碰多列（counts-brief.md §4.6），不在寫入當中才取鎖，才不會和 trigger 的順序相反而死結。
 func (s *Service) lock(ctx context.Context, b *batch) error {
 	set := b.touch
 	set.Comments = append(slices.Clone(set.Comments), b.likedComments...)
 	return s.d.Stats.Lock(ctx, set)
 }
 
-// finish 排入受影響貼文與店面頁的快取失效（店面頁：討論區留言被刪，依店家去重、由小到大）。
 func (s *Service) finish(ctx context.Context, b *batch) error {
 	if err := s.d.Cache.BustPosts(ctx, stats.Sorted(append(slices.Clone(b.bust), b.touch.Posts...))); err != nil {
 		return err
@@ -283,10 +276,6 @@ func (s *Service) PurgeBuyer(ctx context.Context, buyerID int64) error {
 	return s.scrubBodies(ctx, buyerID)
 }
 
-// scrubBodies 把買家全部已刪除的留言與討論區留言的內文設為 NULL，每批一個 transaction，直到沒有剩下的（DR-A4，計畫 P2：實體刪除由 job 執行）。
-// 軟刪只設 deleted_at，內文還在資料庫裡；買家刪帳之後他的文字不該留著。列保留（deleted_at 已設）：討論串的結構與頂層的佔位項目要靠它們，
-// 而讀取本來就不回已刪除內容的內文。這一步也處理買家在申請刪除之前自己刪掉的留言（內文還在）。留言與討論區留言沒有圖片欄位，
-// 所以沒有圖片資產要標記刪除（只有貼文有）；計數不受影響（只改 body，不碰 deleted_at 與 stats 的 trigger）。
 func (s *Service) scrubBodies(ctx context.Context, buyerID int64) error {
 	for {
 		var n int64

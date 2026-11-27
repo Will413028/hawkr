@@ -19,7 +19,7 @@ import (
 func TestCachePolicyVary(t *testing.T) {
 	cases := []struct {
 		name string
-		set  []string // handler 自己寫的 Vary
+		set  []string
 		want []string
 	}{
 		{"handler 沒有寫", nil, []string{"Accept-Encoding", "Authorization", "Cookie"}},

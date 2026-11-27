@@ -22,7 +22,7 @@ interface TreeResponse {
 interface FlatCategory {
 	id: string;
 	name: string;
-	parentPath: string; // e.g. "蔬果 > 葉菜類"
+	parentPath: string;
 	status: string;
 }
 
@@ -52,10 +52,8 @@ const CategoryAudit: React.FC = () => {
 	const [currentPage, setCurrentPage] = useState(1);
 	const [statusFilter, setStatusFilter] = useState<string>(STATUS_PENDING);
 
-	// 批次選取
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-	// 整棵分類樹一次抓，client 端 filter / 分頁 / 統計
 	const { data: allCategories = [], isLoading: loading } = useQuery({
 		queryKey: ["categories", "tree"],
 		queryFn: async () => {
@@ -64,7 +62,6 @@ const CategoryAudit: React.FC = () => {
 		},
 	});
 
-	// 審核（批次 / 單筆同一個 endpoint）→ 成功後 invalidate 自動重抓
 	const updateMutation = useMutation({
 		mutationFn: (vars: { categoryIds: string[]; status: string }) =>
 			api.patch("/api/v1/admin/categories", vars),
@@ -74,7 +71,6 @@ const CategoryAudit: React.FC = () => {
 	});
 	const submitting = updateMutation.isPending;
 
-	// 篩選 + 搜尋
 	const filtered = useMemo(() => {
 		return allCategories.filter((c) => {
 			if (statusFilter && c.status !== statusFilter) return false;
@@ -89,7 +85,6 @@ const CategoryAudit: React.FC = () => {
 		});
 	}, [allCategories, statusFilter, keyword]);
 
-	// 統計
 	const stats = useMemo(() => {
 		let pending = 0,
 			active = 0,
@@ -102,14 +97,12 @@ const CategoryAudit: React.FC = () => {
 		return { pending, active, inactive };
 	}, [allCategories]);
 
-	// 分頁
 	const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
 	const pageItems = filtered.slice(
 		(currentPage - 1) * PAGE_SIZE,
 		currentPage * PAGE_SIZE,
 	);
 
-	// 切換篩選時重置頁碼和選取
 	const changeFilter = (s: string) => {
 		setStatusFilter(s);
 		setCurrentPage(1);
@@ -122,7 +115,6 @@ const CategoryAudit: React.FC = () => {
 		setKeyword(searchInput.trim());
 	};
 
-	// 勾選
 	const toggleSelect = (id: string) => {
 		setSelectedIds((prev) => {
 			const next = new Set(prev);
@@ -139,7 +131,6 @@ const CategoryAudit: React.FC = () => {
 		}
 	};
 
-	// 批次審核
 	const batchUpdate = async (status: string) => {
 		if (selectedIds.size === 0) return;
 		await updateMutation.mutateAsync({
@@ -149,7 +140,6 @@ const CategoryAudit: React.FC = () => {
 		setSelectedIds(new Set());
 	};
 
-	// 單筆快速審核
 	const singleUpdate = async (id: string, status: string) => {
 		await updateMutation.mutateAsync({ categoryIds: [id], status });
 	};
@@ -173,7 +163,7 @@ const CategoryAudit: React.FC = () => {
 				</div>
 			</div>
 
-			{/* 統計卡片 */}
+
 			<div className="category-stats-row">
 				<button
 					type="button"
@@ -263,7 +253,7 @@ const CategoryAudit: React.FC = () => {
 				</button>
 			</div>
 
-			{/* 搜尋列 + 批次操作 */}
+
 			<div
 				style={{
 					display: "flex",
@@ -309,7 +299,7 @@ const CategoryAudit: React.FC = () => {
 				)}
 			</div>
 
-			{/* 表格 */}
+
 			<div className="category-table-container">
 				<div style={{ overflowX: "auto" }}>
 					<table>
@@ -449,7 +439,7 @@ const CategoryAudit: React.FC = () => {
 					</table>
 				</div>
 
-				{/* 分頁 */}
+
 				{totalPages > 1 && (
 					<div className="category-pagination">
 						<button

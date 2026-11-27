@@ -37,7 +37,6 @@ func TestAmegoPeriod(t *testing.T) {
 // 跨期邊界的那八個小時：UTC 還在 2 月、台北已經是 3 月。
 // 直接拿 UTC 的月份會落到前一期，而錯誤只在每兩個月的邊界日出現。
 func TestAmegoPeriod_CrossPeriodBoundaryWindow(t *testing.T) {
-	// 2026-02-28 16:00Z ＝ 2026-03-01 00:00 台北
 	in := utc(2026, time.February, 28, 16, 0)
 	if got := in.In(timeutil.LocationTaipei).Month(); got != time.March {
 		t.Fatalf("fixture wrong: taipei month = %v", got)
@@ -52,7 +51,6 @@ func TestAmegoPeriod_CrossPeriodBoundaryWindow(t *testing.T) {
 	if got := InvoiceDateTaipei(in); got.Year() != 2026 || got.Month() != time.March || got.Day() != 1 {
 		t.Fatalf("InvoiceDateTaipei = %v, want 2026-03-01", got)
 	}
-	// 邊界前一分鐘仍屬上一期。
 	before := utc(2026, time.February, 28, 15, 59)
 	if _, p := AmegoPeriod(before); p != 0 {
 		t.Fatalf("one minute earlier should still be period 0, got %d", p)
@@ -94,7 +92,7 @@ func TestTaxPeriodCode(t *testing.T) {
 // 兩套編碼差 1、年基準也不同 ⇒ 不得互相推導。
 func TestTwoPeriodEncodingsAreNotInterchangeable(t *testing.T) {
 	in := utc(2026, time.August, 15, 3, 0)
-	code := TaxPeriodCode(in) // "11504"
+	code := TaxPeriodCode(in)
 	_, amego := AmegoPeriod(in)
 	if amego != 3 {
 		t.Fatalf("AmegoPeriod = %d, want 3", amego)
@@ -139,12 +137,10 @@ func TestPeriodBounds(t *testing.T) {
 			taipei(2026, time.August, 31, 23, 59, 59),
 			taipei(2026, time.September, 15, 23, 59, 59),
 			taipei(2026, time.September, 5, 23, 59, 59)},
-		// 期別 6 跨年
 		{"11506",
 			taipei(2026, time.December, 31, 23, 59, 59),
 			taipei(2027, time.January, 15, 23, 59, 59),
 			taipei(2027, time.January, 5, 23, 59, 59)},
-		// 閏年 2 月
 		{"11301",
 			taipei(2024, time.February, 29, 23, 59, 59),
 			taipei(2024, time.March, 15, 23, 59, 59),
@@ -191,7 +187,6 @@ func TestWithinVoidWindow(t *testing.T) {
 			}
 		})
 	}
-	// 以 UTC 傳入同一時刻也必須得到同樣答案（函式自己轉時區）。
 	got, err := WithinVoidWindow("11501", taipei(2026, time.March, 6, 0, 0, 0).UTC())
 	if err != nil || got {
 		t.Fatalf("UTC 傳入應得同一答案，got %v (%v)", got, err)

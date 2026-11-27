@@ -58,8 +58,6 @@ export function SellerTaxStatusPage() {
 	const { profile, notStarted, loading, error, refresh } =
 		useSellerTaxProfile();
 
-	// 兩條路徑會走到「尚未開始」：後端 404 ＋ 9320（還沒建過任何列），以及端點 17
-	// 直接回 `reviewStatus = "NOT_STARTED"`（合成值）。兩者都不是錯誤態。
 	const reviewStatus = notStarted
 		? SellerTaxReviewStatus.NOT_STARTED
 		: (profile?.reviewStatus ?? "");
@@ -83,8 +81,6 @@ export function SellerTaxStatusPage() {
 		[profile?.admNotes],
 	);
 
-	// 冷卻是否仍在進行中。在這裡算而不是在 `taxSubmitGate` 內：那一支是純函式，
-	// 讓它自己讀 `Date.now()` 會讓判準隨測試的執行時刻飄。
 	const cooldownActive = React.useMemo(() => {
 		const until = profile?.reapplyCooldownUntil;
 		if (!until) return false;
@@ -99,7 +95,6 @@ export function SellerTaxStatusPage() {
 		cooldownActive,
 	});
 
-	// `expectedVersion` 只能來自端點 17 的 `version`（樂觀鎖）；不符後端回 9322。
 	const {
 		submit,
 		submitting,
@@ -162,21 +157,8 @@ export function SellerTaxStatusPage() {
 						</section>
 					) : null}
 
-					{/*
-					 * 送審（端點 19）＋ 自行開票責任條款勾選。
-					 *
-					 * 🔴 `gate.visible === false` ＝ 這個狀態根本沒有「送審」這件事
-					 * （審核中／已核定／已撤銷）⇒ 整塊不渲染。渲染一顆必定回 9321 的鍵
-					 * 比缺一顆鍵更糟。缺草稿／缺佐證則**要**渲染，因為那時賣家需要
-					 * 知道下一步是什麼。
-					 */}
-					{/*
-					 * 端點 18 的表單。**gate.visible 為真時就渲染**——那正是「這個狀態
-					 * 還能編輯」的意思，而賣家要能填、要能補件。
-					 *
-					 * 🔴 這張表單是整條發票鏈的第一步：端點 19 的守衛讀的是已落庫的
-					 * `evidence_object_keys`，而只有端點 18 會寫它。
-					 */}
+
+
 					{gate.visible ? <TaxIdentityForm profile={profile} /> : null}
 
 					{gate.visible ? (
@@ -189,18 +171,7 @@ export function SellerTaxStatusPage() {
 						/>
 					) : null}
 
-					{/*
-					 * S04 的入口。
-					 *
-					 * 🔴 只在 `SUBMITTED` 渲染，而那正是送審表單**收起來**的時候
-					 * （`gate.visible === false`）⇒ 沒有這一段，補簽條款、把自己推進
-					 * `SELF_ISSUE_PENDING` 這條路在整個站上沒有任何可達路徑
-					 * （送審表單裡的「閱讀完整條款」在這個狀態下不渲染）。
-					 *
-					 * ⚠️ 判準是 `reviewStatus === SUBMITTED`（T04 的 allowed-from），
-					 * 不是 `selfIssueAttestation.effective === false`——後者在 `DRAFT`
-					 * 也成立，會對還沒送審的賣家給一顆必定回 9321 的鍵。
-					 */}
+
 					{reviewStatus === SellerTaxReviewStatus.SUBMITTED ? (
 						<section className="seller-card flex flex-col gap-2 p-5">
 							<strong className="text-sm font-extrabold text-foreground">
@@ -223,7 +194,7 @@ export function SellerTaxStatusPage() {
 						</section>
 					) : null}
 
-					{/* 端點 20。元件自己看 canRequestExtension，不可申請時回 null。 */}
+
 					{profile ? <TaxExtensionSection profile={profile} /> : null}
 
 					{profile ? <SubmittedSection profile={profile} /> : null}
@@ -258,11 +229,7 @@ function SubmittedSection({ profile }: { profile: SellerTaxProfile }) {
 								identity.entityType
 							}
 						/>
-						{/*
-						 * 🔴 `claimedStatus` 是**賣家自述**，與 `reviewStatus`（平台核定）
-						 * 分開顯示。UI 不得把自述免用寫成「已核定免用統一發票」——那是
-						 * ADM 的裁決（§S02 ⑤）。
-						 */}
+
 						<Row
 							label="自述稅務身分"
 							value={
@@ -321,7 +288,7 @@ function DocumentRow({ document }: { document: SellerTaxDocument }) {
 	return (
 		<li className="flex items-center justify-between gap-3 text-[0.8125rem]">
 			<span className="flex min-w-0 flex-col gap-0.5">
-				{/* 每列都有可見檔名文字，不只 icon（§S02 A11y）。 */}
+
 				<span className="truncate text-[var(--hkui-foreground)]">
 					{document.fileName || document.documentId}
 				</span>

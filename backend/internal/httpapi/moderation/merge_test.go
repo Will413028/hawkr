@@ -20,8 +20,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-// pagedCommunity 與 pagedStores 以真的 keyset 語意（建立時間新到舊、id 新到舊、取 size 筆並以 Next 標示還有）回傳固定的資料，
-// 並記錄每次呼叫的游標，讓測試能看「取完的來源是否不再被讀」。
 type pagedCommunity struct {
 	rows   []moderation.ReportItem
 	calls  []*moderation.ReportCursor
@@ -62,7 +60,6 @@ type pagedStores struct {
 	rows   []sellermod.Report
 	calls  []*sellermod.ReportCursor
 	buyers []int64
-	// current 是呼叫者此刻的店；nil 表示沒有店（NotFound）。
 	current *sellermod.Store
 }
 
@@ -94,7 +91,6 @@ func (p *pagedStores) BuyerReports(_ context.Context, in sellermod.BuyerReportLi
 
 type fakeStores struct{ pagedStores }
 
-// shortStores 每頁比要求的少回一筆（至少一筆）、但仍以 Next 標示還有：合併不能假設來源剛好回 size 筆。
 type shortStores struct{ pagedStores }
 
 func (p *shortStores) BuyerReports(ctx context.Context, in sellermod.BuyerReportListInput) (sellermod.ReportPage, error) {
@@ -106,7 +102,6 @@ func idOf(n byte) uuid.UUID { return uuid.UUID{15: n} }
 
 var base = time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC)
 
-// community 與 store 是以「第幾分鐘前」與序號建立的資料；序號大的 id 大（同時間 id 新到舊 = 序號大的在前）。
 func community(minutesAgo int, n byte) moderation.ReportItem {
 	return moderation.ReportItem{
 		Report: moderation.Report{ID: idOf(n), Category: policy.Spam, CreatedAt: base.Add(-time.Duration(minutesAgo) * time.Minute), Outcome: moderation.OutcomeNone},
@@ -138,7 +133,6 @@ func sortedStores(rows ...sellermod.Report) []sellermod.Report {
 	return rows
 }
 
-// pageAll 以 size 讀完所有頁，回傳依序的標籤（c<n> 或 s<n>）與每頁的筆數。
 func pageAll(t *testing.T, e *env, size int32) (labels []string, sizes []int) {
 	t.Helper()
 	token := ""
@@ -168,7 +162,6 @@ func pageAll(t *testing.T, e *env, size int32) (labels []string, sizes []int) {
 }
 
 func TestListMyReportsInterleavesBothSourcesByTimeAcrossPages(t *testing.T) {
-	// 時間（分鐘前）：c1=1, s2=2, c3=3, s4=4, c5=5, s6=6, c7=7, s8=8
 	c := &pagedCommunity{rows: sortedCommunity(community(1, 1), community(3, 3), community(5, 5), community(7, 7))}
 	s := &pagedStores{rows: sortedStores(storeReport(2, 2), storeReport(4, 4), storeReport(6, 6), storeReport(8, 8))}
 	e := newEnvWith(t, c, s)
@@ -215,7 +208,6 @@ func TestListMyReportsTailCrossingThePageBoundaryKeepsTheUnemittedSideCursor(t *
 	if want := []string{"c1", "c2", "c3", "s4"}; !slices.Equal(got, want) {
 		t.Fatalf("%v，預期 %v，頁 %v", got, want, sizes)
 	}
-	// 第一頁：社群取到 2 筆（Next 非 nil，都輸出），店家取到 1 筆（沒輸出到，Next 為 nil 但不算取完）。第二頁店家必須仍從頭讀。
 	if len(s.calls) < 2 || s.calls[1] != nil {
 		t.Fatalf("沒輸出到的店家來源要保留原游標（nil）：%v", s.calls)
 	}

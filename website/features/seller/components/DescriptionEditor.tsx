@@ -288,8 +288,6 @@ function attachBlockDragReorder(
 	editor: EditorJS,
 	holder: HTMLElement,
 ): () => void {
-	// Our own ↕ handle. The +/⋮⋮ controls own the left gutter; this sits in the
-	// RIGHT gutter of the block content — it, not ⋮⋮, is what the user grabs.
 	const handle = document.createElement("button");
 	handle.type = "button";
 	handle.className = "desc-editor-drag-handle";
@@ -298,12 +296,6 @@ function attachBlockDragReorder(
 	handle.setAttribute("aria-label", "區塊排序（方向鍵上下移動）");
 	handle.innerHTML = DRAG_HANDLE_ICON_MARKUP;
 
-	// Editor.js builds its toolbar lazily (first block hover via `moveAndOpen`)
-	// and may rebuild it, so `.ce-toolbar__content` often doesn't exist yet at
-	// `isReady`. Watch the holder and (re)mount the handle into the toolbar
-	// content (centred to the block, position:relative) as soon as it appears;
-	// CSS floats it into the right gutter. The `isConnected` guard makes it a
-	// no-op once placed.
 	const ensureHandle = () => {
 		for (const scrollArea of holder.querySelectorAll<HTMLElement>(
 			".ce-popover__items",
@@ -331,9 +323,6 @@ function attachBlockDragReorder(
 			? Array.from(r.querySelectorAll<HTMLElement>(":scope > .ce-block"))
 			: [];
 	};
-	// The toolbar (and thus our handle) is anchored to the hovered block, but
-	// pressing a non-⋮⋮ element doesn't update Editor.js's "current block", so the
-	// source is resolved from the handle's own Y against the block bounds.
 	const blockIndexAtY = (y: number, blocks: HTMLElement[]) => {
 		let best = -1;
 		let bestDist = Number.POSITIVE_INFINITY;
@@ -360,20 +349,17 @@ function attachBlockDragReorder(
 		draggedEl = blocks[sourceIndex] ?? null;
 		if (e.dataTransfer) {
 			e.dataTransfer.effectAllowed = "move";
-			e.dataTransfer.setData("text/plain", ""); // Firefox needs a payload
+			e.dataTransfer.setData("text/plain", "");
 		}
-		// Let the browser snapshot the drag image first, then dim the live block.
 		const el = draggedEl;
 		requestAnimationFrame(() => el?.classList.add("desc-block--dragging"));
 	};
 
 	const onDragOver = (e: DragEvent) => {
 		if (sourceIndex < 0) return;
-		e.preventDefault(); // mark the whole editor box as a drop zone
+		e.preventDefault();
 		if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
 		const blocks = blockEls();
-		// Insert-before slot = first block whose vertical midpoint sits below the
-		// cursor; falls through to "after the last block".
 		let insertBefore = blocks.length;
 		for (let i = 0; i < blocks.length; i++) {
 			const rect = blocks[i].getBoundingClientRect();
@@ -418,8 +404,6 @@ function attachBlockDragReorder(
 			return;
 		}
 		e.preventDefault();
-		// `targetIndex` is an insert-*before* slot; once the source is lifted out,
-		// every later index shifts down by one.
 		let to = targetIndex > sourceIndex ? targetIndex - 1 : targetIndex;
 		to = Math.max(0, Math.min(to, editor.blocks.getBlocksCount() - 1));
 		if (to !== sourceIndex) editor.blocks.move(to, sourceIndex);
@@ -430,7 +414,6 @@ function attachBlockDragReorder(
 		if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
 		event.preventDefault();
 		event.stopPropagation();
-		// The handle follows the hovered block, which may differ from the caret.
 		const handleRect = handle.getBoundingClientRect();
 		const current = blockIndexAtY(
 			handleRect.top + handleRect.height / 2,
@@ -498,8 +481,6 @@ function attachMobileBlockToolbarAlignment(
 		const offsetParent = toolbar.offsetParent as HTMLElement | null;
 		if (!block || !offsetParent) return;
 
-		// Prefer the first actual writing surface. Filled images have an editable
-		// caption at the bottom, so their image frame intentionally wins instead.
 		const anchor =
 			block.querySelector<HTMLElement>(
 				'.image-tool__image, .tc-cell[contenteditable="true"], .tc-cell [contenteditable="true"], .cdx-list [contenteditable="true"], .ce-paragraph[contenteditable="true"], .ce-header[contenteditable="true"], [contenteditable="true"]',
@@ -574,8 +555,6 @@ function attachMobileBlockToolbarAlignment(
 			if (frame) window.cancelAnimationFrame(frame);
 			frame = 0;
 			if (toolbar) delete toolbar.dataset.mobileBlockIndex;
-			// Reset Editor.js's inline mobile coordinate before desktop positioning
-			// takes over on the next hover/focus.
 			editor.toolbar.close();
 			return;
 		}
@@ -612,8 +591,6 @@ function attachMobileBlockToolbarAlignment(
  */
 async function safeSaveEditor(editor: EditorJS) {
 	const data = await editor.save();
-	// Editor.js catches saver errors internally and may resolve undefined.
-	// Never turn that failure into a valid empty description.
 	if (!data || !Array.isArray(data.blocks))
 		throw new Error("Editor could not save the current content");
 	return data;
@@ -644,15 +621,12 @@ async function applySnapshotToEditor(
 		if (firstChanged === -1 || i < firstChanged) firstChanged = i;
 	};
 
-	// Insert/move the target first, then trim leftovers. Deleting the last live
-	// block first makes Editor.js insert an untracked placeholder of its own.
 	for (let j = 0; j < target.length; j++) {
 		const t = target[j];
 		const at = t.id ? current.findIndex((c) => c.id === t.id) : -1;
 		if (!t.id || at === -1) {
 			const [inserted] = editor.blocks.insertMany([t], j);
 			if (!inserted) throw new Error("Could not restore block");
-			// Editor.js insertMany discards tunes; restore them explicitly.
 			if (t.tunes) await editor.blocks.update(inserted.id, undefined, t.tunes);
 			current.splice(j, 0, { id: inserted.id, name: t.type });
 			markChanged(j);
@@ -665,7 +639,6 @@ async function applySnapshotToEditor(
 			markChanged(j);
 		}
 		if (current[j].name !== t.type) {
-			// Replace the tool first, then restore tunes omitted by insertMany.
 			const [inserted] = editor.blocks.insertMany([t], j);
 			if (!inserted) throw new Error("Could not restore block type");
 			editor.blocks.delete(j + 1);
@@ -674,15 +647,12 @@ async function applySnapshotToEditor(
 			markChanged(j);
 			continue;
 		}
-		// 3) 內容 / 對齊 tune 跟 prev 快照有差才 update（re-render 單一區塊）
 		const p = prevById.get(t.id);
 		const changed =
 			!p ||
 			JSON.stringify(p.data) !== JSON.stringify(t.data) ||
 			JSON.stringify(p.tunes) !== JSON.stringify(t.tunes);
 		if (changed) {
-			// target 沒帶 tunes 但 prev 有（置中/置右 → 置左）時要明確送回
-			// 預設值 — update 的 tunes 參數缺省就完全不會動到既有 tune。
 			const tunes =
 				t.tunes ?? (p?.tunes ? { align: { alignment: "left" } } : undefined);
 			await editor.blocks.update(t.id, t.data, tunes);
@@ -695,13 +665,11 @@ async function applySnapshotToEditor(
 		markChanged(Math.max(0, target.length - 1));
 	}
 
-	// 游標放回第一個變動區塊的尾端，還原後接續編輯不用重新點位。
 	if (firstChanged !== -1) {
 		const total = editor.blocks.getBlocksCount();
 		try {
 			editor.caret.setToBlock(Math.min(firstChanged, total - 1), "end");
 		} catch {
-			/* image 等不可聚焦區塊 — 略過 */
 		}
 	}
 }
@@ -753,7 +721,6 @@ function expandGridIntoTable(
 	) {
 		addColBtn.click();
 	}
-	// 擴增未達位（唯讀模式無按鈕 / tool 內建上限擋下）也算截切，讓 caller 提示
 	const shortRows = rows().length < neededRows;
 	const shortCols = cellsOf(rows()[0]).length < neededCols;
 
@@ -1132,17 +1099,9 @@ export function DescriptionEditorCanvas({
 	const holderRef = React.useRef<HTMLDivElement>(null);
 	const editorRef = React.useRef<EditorJS | null>(null);
 	const toasterId = `description-editor-${React.useId()}`;
-	// 放大編輯 dialog（原生 <dialog>）。宣告在最上面，undo/redo 的
-	// ⌘Z keydown effect（下面）跟展開狀態的 effect（檔案後段）都要用。
 	const dialogRef = React.useRef<HTMLDialogElement>(null);
 	const echo = React.useRef(new DescriptionEditorEcho(JSON.stringify(value)));
-	// editor.render() 是 async 的（清空再逐塊重建）——外部變動（undo/redo
-	// 連點、AI patch）觸發的 render 必須串成一條 chain 逐一跑，兩發重疊
-	// 會清掉一半又插一半，內容直接壞掉。
 	const renderChainRef = React.useRef<Promise<unknown>>(Promise.resolve());
-	// Toolbar commands can update several Editor.js blocks in succession. Suppress
-	// their intermediate onChange saves and publish one canonical snapshot after
-	// the whole command finishes, so undo treats the command as one action.
 	const editorMutationBatchRef = React.useRef(false);
 	const saveGenerationRef = React.useRef(0);
 	const pendingHistoryRef = React.useRef(0);
@@ -1171,8 +1130,6 @@ export function DescriptionEditorCanvas({
 	const rememberInlineSelection = React.useCallback(() => {
 		const holder = holderRef.current;
 		const selection = window.getSelection();
-		// Browsers may leave a collapsed editor Range behind while focus moves
-		// into a toolbar/picker input. Keep the last real editor selection then.
 		if (!holder?.contains(document.activeElement) || !selection?.rangeCount)
 			return;
 		const range = selection.getRangeAt(0);
@@ -1250,15 +1207,6 @@ export function DescriptionEditorCanvas({
 		lastHistoryInputRef.current = null;
 	}, []);
 
-	/* ---- undo/redo：對 `value`（controlled ProductDescription）做快照。
-	 *      跳轉時同步呼叫 onChange 更新表單 state，並用 applySnapshotToEditor
-	 *      對編輯器做「區塊級」套用（即時、不閃爍）——跳轉前先把 echo 的 signature 寫成
-	 *      快照 sig，套用過程的 editor onChange echo 與父層 value echo 都會被
-	 *      sig 擋掉，不會變成新編輯。合併規則接近 Word：同一區塊的連續字元
-	 *      合併；空白/標點後的新字、輸入與刪除切換、換段、貼上、格式操作、
-	 *      跨區塊或停頓都會開新一步。 ---- */
-	// Keep the initial snapshot plus the latest 20 user actions, so the seller
-	// can always step back through exactly 20 edits without unbounded memory use.
 	const historyRef = React.useRef<{
 		stack: ProductDescription[];
 		index: number;
@@ -1268,10 +1216,6 @@ export function DescriptionEditorCanvas({
 		undoCount: 0,
 		redoCount: 0,
 	});
-	// Stable (empty-deps) callbacks — they only close over refs and the
-	// setState setter, both stable across renders, so it's safe to also
-	// call these from the Cmd+Z/Cmd+Shift+Z listener below without
-	// re-subscribing that effect on every render.
 	const syncHistoryFlags = React.useCallback(() => {
 		const { stack, index } = historyRef.current;
 		setHistoryState({
@@ -1281,8 +1225,6 @@ export function DescriptionEditorCanvas({
 	}, []);
 	const checkpointHistory = React.useCallback(
 		(next: ProductDescription) => {
-			// 同一個區塊的連續文字編輯才能併成一步：區塊數/順序一樣，且內容
-			// 有差的區塊最多一個。跨區塊或結構變動一律開新 checkpoint。
 			const isSameSingleBlockEdit = (
 				a: ProductDescription,
 				b: ProductDescription,
@@ -1300,10 +1242,6 @@ export function DescriptionEditorCanvas({
 			};
 			const now = Date.now();
 			const { stack, index } = historyRef.current;
-			// 內容跟目前所在的快照一樣就不佔步驟 —— Editor.js 初始 render 後
-			// 會補發一次 onChange（存檔輸出是 canonical 形，跟 mount 時的
-			// echo 的 signature 不同、擋不掉），沒有這條會在堆疊裡多出一格「按了沒
-			// 反應」的重複初始狀態。
 			if (JSON.stringify(stack[index]) === JSON.stringify(next)) return;
 			const forceNewAction = forceNextHistoryCheckpointRef.current;
 			forceNextHistoryCheckpointRef.current = false;
@@ -1351,8 +1289,6 @@ export function DescriptionEditorCanvas({
 			saveGenerationRef.current++;
 			editorMutationBatchRef.current = true;
 			setBusy(true);
-			// Flush live text before choosing the history entry: Editor.js batches
-			// onChange, so Delete followed immediately by Undo may not be saved yet.
 			renderChainRef.current = renderChainRef.current
 				.then(async () => {
 					await editor.isReady;
@@ -1444,8 +1380,6 @@ export function DescriptionEditorCanvas({
 					const readEndpoint = async (id: string) => {
 						const saved = before.blocks.find((block) => block.id === id);
 						if (saved) return saved;
-						// Saver validation omits empty paragraphs/list items, but a
-						// native selection can legitimately start or end in one.
 						const raw = await editor.blocks.getById(id)?.save();
 						if (!raw?.data) return undefined;
 						return {
@@ -1537,8 +1471,6 @@ export function DescriptionEditorCanvas({
 		(id: string, data: DescriptionImageData, isCurrent: () => boolean) => {
 			const editor = editorRef.current;
 			if (!editor) return Promise.resolve();
-			// Keep uploading independent from text editing. Only the final local
-			// replacement joins the editor's history queue, using the current file.
 			const operation = renderChainRef.current.then(async () => {
 				await editor.isReady;
 				await beforeDeleteCheckpointRef.current;
@@ -1567,17 +1499,12 @@ export function DescriptionEditorCanvas({
 					}
 				}
 			});
-			// The tool shows a persistent, retryable upload error; keep a rejection
-			// from poisoning subsequent Undo, Delete or external-value operations.
 			renderChainRef.current = operation.catch(() => {});
 			return operation;
 		},
 		[checkpointHistory, commitEditorValue, markHistoryActionBoundary],
 	);
 
-	// ⌘Z / ⌘⇧Z（Windows/Linux 也收 Ctrl+Z / Ctrl+Y）：攔在 capture 前，preventDefault
-	// 蓋掉 contenteditable 原生的逐字 undo，改走上面這條跨區塊的快照式
-	// undo/redo，不然兩套機制會互相打架。
 	React.useEffect(() => {
 		const dialog = dialogRef.current;
 		if (!dialog) return;
@@ -1644,8 +1571,6 @@ export function DescriptionEditorCanvas({
 						);
 						lastHistoryInputRef.current = decision.next;
 						if (decision.forceNewAction) {
-							// Start save before the browser/tool applies deletion. The tools
-							// read their content synchronously, then sanitize asynchronously.
 							const before = safeSaveEditor(editor);
 							beforeDeleteCheckpointRef.current =
 								beforeDeleteCheckpointRef.current
@@ -1656,7 +1581,6 @@ export function DescriptionEditorCanvas({
 										forceNextHistoryCheckpointRef.current = true;
 									})
 									.catch(() => {
-										/* the editor may have unmounted */
 									});
 						}
 					}
@@ -1698,9 +1622,6 @@ export function DescriptionEditorCanvas({
 			]);
 			if (destroyed || !holderRef.current) return;
 
-			// @editorjs/list 2.x 實作了 merge()，Backspace 會把後面標題或段落的文字
-			// 併進清單最後一項而消掉原區塊；本編輯器要保留區塊邊界（story
-			// 「清單與標題交界 · Backspace 保留內容」），所以讓 core 判定清單不可合併。
 			class NonMergingListTool extends List {
 				// biome-ignore lint/suspicious/noExplicitAny: Editor.js tool types are loose
 				merge: any = undefined;
@@ -1726,19 +1647,11 @@ export function DescriptionEditorCanvas({
 				}
 			}
 
-			// 快照堆疊的底部（初始 value）先過一次 canonical round-trip：後端
-			// 來的 JSON key 順序 / legacy content 形狀跟 fromEditorData 的輸出
-			// 不一定 byte-equal，若不先正規化，undo 回到底部時 render-echo 的
-			// onChange 會把同內容誤判成新編輯，redo 分支就被 truncate 掉。
-			//（放在這裡是因為 htmlToRuns 需要 document，只能在 client 做。）
 			historyRef.current = {
 				stack: [fromEditorData(toEditorData(initialRef.current))],
 				index: 0,
 			};
 
-			// 最後一次存檔失敗時沒有更新的存檔會接手，輸入停下後就不會再有
-			// 下一次存檔；由這裡補存，否則 onChange 會停在失敗前的舊快照。
-			// 重試額度每次新的存檔觸發都重算，前一次觸發用掉的不影響這次。
 			const MAX_SAVE_RETRIES = 3;
 			let saveRetries = 0;
 			const saveCurrentEditor = async (retry = false) => {
@@ -1763,8 +1676,6 @@ export function DescriptionEditorCanvas({
 						return;
 					commitEditorValue(fromEditorData(data));
 				} catch {
-					// A pending save may settle after a block/editor was destroyed.
-					// Keep the last good snapshot and retry when no newer save took over.
 					if (
 						destroyed ||
 						generation !== saveGenerationRef.current ||
@@ -1783,8 +1694,6 @@ export function DescriptionEditorCanvas({
 				placeholder: "撰寫商品故事…",
 				i18n: I18N,
 				tools: {
-					// Built-in paragraph, re-declared to attach the align tune and
-					// pin the inline toolbar (drops the built-in link tool).
 					paragraph: {
 						inlineToolbar: [...INLINE_TOOLS],
 						tunes: ["align"],
@@ -1800,15 +1709,12 @@ export function DescriptionEditorCanvas({
 					table: {
 						// biome-ignore lint/suspicious/noExplicitAny: Editor.js tool types are loose
 						class: AlignedTableTool as any,
-						// 儲存格支援行內樣式 / 連結（inline-run 模型）
 						inlineToolbar: [...INLINE_TOOLS],
 						config: { rows: 2, cols: 2, withHeadings: true },
 					},
 					list: {
 						// biome-ignore lint/suspicious/noExplicitAny: Editor.js tool types are loose
 						class: NonMergingListTool as any,
-						// 項目支援行內樣式 / 連結（inline-run 模型）；外部貼上的 <ol>/<ul>
-						// 由 tool 的 pasteConfig（OL/UL/LI）自動轉為 list block
 						inlineToolbar: [...INLINE_TOOLS],
 						config: { defaultStyle: "unordered" },
 						tunes: ["align"],
@@ -1867,12 +1773,9 @@ export function DescriptionEditorCanvas({
 			editorRef.current = editor;
 			await editor.isReady;
 			if (destroyed) return;
-			// Y-axis magnetic reordering off the dedicated handle (replaces the
-			// X-sensitive editorjs-drag-drop plugin).
 			try {
 				detachDrag = attachBlockDragReorder(editor, holderRef.current);
 			} catch {
-				/* reordering is a nicety; never block the editor on it */
 			}
 			try {
 				detachMobileToolbar = attachMobileBlockToolbarAlignment(
@@ -1880,14 +1783,9 @@ export function DescriptionEditorCanvas({
 					holderRef.current,
 				);
 			} catch {
-				/* mobile alignment is progressive enhancement */
 			}
 			setReady(true);
 
-			// The "+" should drop a fresh 內文 block straight below the active
-			// block — no insert menu — and the seller re-types it via 內容轉換.
-			// Pointer events also cover touch, unlike the previous mouseover-only
-			// tracking that could make mobile insert at the document end.
 			const holder = holderRef.current;
 			if (holder) {
 				const rememberToolbarSelection = () => {
@@ -1896,8 +1794,6 @@ export function DescriptionEditorCanvas({
 					if (snapshot) toolbarSelectionRef.current = snapshot;
 				};
 				const onEditorPointerDown = () => {
-					// A new editor gesture invalidates an older persistent selection. The
-					// pointerup/selection observer below records the replacement, if any.
 					toolbarSelectionRef.current = null;
 					inlineRangeRef.current = null;
 				};
@@ -1964,8 +1860,6 @@ export function DescriptionEditorCanvas({
 					editor.blocks.insert("paragraph", undefined, undefined, at, true);
 					activeIndex = at;
 				};
-				// Capture the menu's stable target when it opens, before focusing its
-				// search field or later editor gestures can change the current index.
 				let deleteTargetId: string | undefined;
 				let settingsPopover: Element | null = null;
 				const rememberDeleteTarget = () => {
@@ -1981,7 +1875,6 @@ export function DescriptionEditorCanvas({
 				const settingsObserver = new MutationObserver(rememberDeleteTarget);
 				settingsObserver.observe(holder, { childList: true, subtree: true });
 
-				// One click remains reversible as a single history action.
 				const onDeleteTune = (e: MouseEvent) => {
 					const item = (e.target as HTMLElement | null)?.closest?.(
 						'.ce-popover-item[data-item-name="delete"]',
@@ -1993,12 +1886,6 @@ export function DescriptionEditorCanvas({
 					const id = deleteTargetId;
 					if (id) deleteEditorBlocks([id]);
 				};
-				// ---- Notion 式貼上（#1246）----
-				// capture 階段先於 Editor.js 管線：
-				//   1. 游標在表格儲存格＋剪貼簿是表格資料（HTML <table> 或 TSV 純文字）
-				//      → 試算表語意：從錨點格逐格填入、列/欄不足自動擴增、超上限裁切。
-				//   2. 游標在段落/標題＋純文字 TSV（無 HTML 表格）→ 插入表格 block。
-				//   其餘（含 HTML 表格貼在段落 = tool 原生 pasteConfig）一律放行。
 				const onBeforeInput = (e: InputEvent) => {
 					if (previewRef.current || e.isComposing) return;
 					if (e.inputType.startsWith("delete") && e.cancelable) {
@@ -2111,7 +1998,6 @@ export function DescriptionEditorCanvas({
 									);
 									uploaded += 1;
 								} catch {
-									// Continue with the remaining clipboard images.
 								}
 							}
 							if (uploaded === imageFiles.length) {
@@ -2158,7 +2044,6 @@ export function DescriptionEditorCanvas({
 							try {
 								checkpointHistory(fromEditorData(await safeSaveEditor(editor)));
 								markHistoryActionBoundary();
-								// Insert first, then remove the empty target: Editor.js never auto-adds a spare block.
 								markdown.forEach((block, index) => {
 									editor.blocks.insert(
 										block.type,
@@ -2196,9 +2081,6 @@ export function DescriptionEditorCanvas({
 						return;
 					}
 
-					// HTML 表格貼在文字區也走自己的解析器——原生 pasteConfig 對真實
-					// 網站標記（colspan 跨欄標題列、th/td 混排）解析失敗會退回預設
-					// 空表（#1246 cookie886 案例），不再放行。
 					if (!target.closest?.(".ce-paragraph, .ce-header")) return;
 					e.preventDefault();
 					e.stopImmediatePropagation();
@@ -2219,14 +2101,12 @@ export function DescriptionEditorCanvas({
 						);
 					}
 				};
-				// ---- 內容以表格/圖片結尾時，點下方空白自動補段落（Notion「點哪都能寫」）----
 				const onEmptyAreaClick = (e: MouseEvent) => {
 					if (previewRef.current) return;
 					const t = e.target as HTMLElement | null;
 					if (!t || t.closest(".ce-block") || t.closest(".ce-toolbar")) return;
 					const redactor = holder.querySelector(".codex-editor__redactor");
 					if (!redactor?.contains(t)) {
-						// 點在 redactor 外（holder padding）也算空白區，但要在 holder 內
 						if (!t.closest(".codex-editor")) return;
 					}
 					const blocks = holder.querySelectorAll(
@@ -2235,7 +2115,6 @@ export function DescriptionEditorCanvas({
 					const last = blocks[blocks.length - 1] as HTMLElement | undefined;
 					if (!last) return;
 					if (e.clientY <= last.getBoundingClientRect().bottom) return;
-					// 段落/標題結尾：Editor.js 原生點擊已能聚焦，不插手
 					if (!last.querySelector("table, .tc-table, .image-tool")) return;
 					editor.blocks.insert(
 						"paragraph",
@@ -2293,8 +2172,6 @@ export function DescriptionEditorCanvas({
 			editorRef.current?.destroy?.();
 			editorRef.current = null;
 		};
-		// These callbacks are ref-backed and stable, so this remains a mount-once
-		// editor lifecycle in practice.
 	}, [
 		commitEditorValue,
 		deleteEditorBlocks,
@@ -2306,8 +2183,6 @@ export function DescriptionEditorCanvas({
 		checkpointHistory,
 	]);
 
-	// Re-render the editor only for *external* value changes (undo/redo 跳轉、
-	// AI patch)。
 	React.useEffect(() => {
 		if (echo.current.receive(JSON.stringify(value)) === "echo") return;
 		const editor = editorRef.current;
@@ -2316,11 +2191,9 @@ export function DescriptionEditorCanvas({
 			.then(() => editor.isReady)
 			.then(() => editor.render(toEditorData(value)))
 			.catch(() => {
-				/* editor torn down mid-render — nothing to restore */
 			});
 	}, [value]);
 
-	/* ---- top toolbar actions (drive the same Editor.js APIs) ---- */
 	const captureToolbarSelection = React.useCallback(() => {
 		rememberInlineSelection();
 		markHistoryActionBoundary();
@@ -2329,9 +2202,6 @@ export function DescriptionEditorCanvas({
 			return;
 		}
 		let snapshot = toolbarSelectionSnapshot(holder);
-		// Keyboard activation can happen after focus has moved into the toolbar.
-		// In that case the live DOM selection is already empty, but the last
-		// non-empty editor snapshot is still the user's intended target.
 		if (!snapshot && toolbarSelectionRef.current) return;
 		if (!snapshot) {
 			const editor = editorRef.current;
@@ -2346,9 +2216,6 @@ export function DescriptionEditorCanvas({
 				};
 			}
 		}
-		// Editor.js clears `.ce-block--selected` from a document-level capture
-		// mousedown listener. A later empty React mousedown must never overwrite
-		// the snapshot captured on pointerdown or while the selection was active.
 		if (snapshot) toolbarSelectionRef.current = snapshot;
 	}, [markHistoryActionBoundary, rememberInlineSelection]);
 
@@ -2630,9 +2497,6 @@ export function DescriptionEditorCanvas({
 		if (!editor) return;
 		const currentIndex = editor.blocks.getCurrentBlockIndex();
 		const insertAt = currentIndex >= 0 ? currentIndex + 1 : undefined;
-		// Table tool sizes itself from `content`'s dimensions (see
-		// computeInitialSize in @editorjs/table) — rows/cols in `config` are
-		// only a fallback for when no content is given.
 		const content = Array.from({ length: rows }, () =>
 			Array.from({ length: cols }, () => ""),
 		);
@@ -2684,8 +2548,6 @@ export function DescriptionEditorCanvas({
 			toast.info("請先選取段落或表格儲存格", { toasterId });
 			return;
 		}
-		// Saver omits empty/invalid blocks, so its positions are not DOM indexes.
-		// Preflight the actual selected tools even when a block was not saved.
 		const targetBlocks = indexes.map((index) =>
 			editor.blocks.getBlockByIndex(index),
 		);
@@ -2734,7 +2596,6 @@ export function DescriptionEditorCanvas({
 				first,
 				true,
 			);
-			// One paragraph keeps its alignment when converted into a list.
 			if (blocks.length === 1 && blocks[0].tunes) {
 				await editor.blocks.update(inserted.id, undefined, blocks[0].tunes);
 				editor.caret.setToBlock(first, "end");
@@ -2775,24 +2636,15 @@ export function DescriptionEditorCanvas({
 		}
 	};
 
-	/* ---- 放大編輯：外殼是常駐的 <dialog open>（inline 顯示），放大時
-	 *      close()→showModal() 原地抬進瀏覽器 top layer — 不重掛 holder，
-	 *      Editor.js 實例與內容原封不動，且不受任何祖先 stacking context
-	 *      （view-transition-name / transform）壓制。Esc（native cancel）
-	 *      與 ::backdrop 點擊收合。 ---- */
 	const [expanded, setExpanded] = React.useState(false);
 
 	React.useEffect(() => {
 		const dialog = dialogRef.current;
 		if (!expanded || !dialog) return;
-		// showModal() 只接受 closed 起手；close→showModal 同一 tick 完成，
-		// 中間不會 paint，DOM 不動。
 		dialog.close();
 		dialog.showModal();
 		const release = retainOverlayOpenAttribute();
 		const releaseScrollLock = acquireBodyScrollLock();
-		// ::backdrop 點擊收合：backdrop 的 click target 是 <dialog> 本身
-		//（padding 0，內容佔滿面板，點到內容時 target 都是子節點）。
 		const onBackdropClick = (e: MouseEvent) => {
 			if (e.target === dialog) setExpanded(false);
 		};
@@ -2801,7 +2653,6 @@ export function DescriptionEditorCanvas({
 			dialog.removeEventListener("click", onBackdropClick);
 			release();
 			releaseScrollLock();
-			// 退出 top layer、回到 inline 顯示（open 需與 JSX 的 open prop 對齊）。
 			if (dialog.open) dialog.close();
 			dialog.setAttribute("open", "");
 		};
@@ -2819,8 +2670,6 @@ export function DescriptionEditorCanvas({
 			aria-busy={busy || !ready}
 			aria-label="商品描述編輯器"
 			onCancel={(e) => {
-				// 攔下 Esc 的自動關閉，統一走 expanded state → effect cleanup
-				// 收合（避免 dialog 短暫 closed 造成一幀消失）。
 				e.preventDefault();
 				setExpanded(false);
 			}}
@@ -2903,9 +2752,6 @@ export function DescriptionEditorCanvas({
 	);
 }
 
-/* ============================================================
- *                 Top style toolbar
- * ============================================================ */
 
 type EditorFormatState = {
 	block: string;
@@ -3228,9 +3074,6 @@ function TbButton({
 	);
 }
 
-/* ---- 插入表格：Excel/Notion 式懸浮網格挑尺寸。左鍵按住表格鈕直接往下/
- *      往右拖，拉到網格邊緣會自動再長一行/列（上限 12×10），放開即插入
- *      該尺寸；純點一下則進 hover 模式（移動預覽、再點一格插入）。 ---- */
 const TABLE_PICKER_START_ROWS = 6;
 const TABLE_PICKER_START_COLS = 8;
 const TABLE_PICKER_MAX_ROWS = 12;
@@ -3270,18 +3113,13 @@ function TableInsertButton({
 	const [sel, setSel] = React.useState<TablePickerSel>(
 		TABLE_PICKER_INITIAL_SEL,
 	);
-	// pointerup 的 document listener 需要當下的選取值，state 在 listener
-	// closure 裡是 stale 的 — 用 ref 鏡像。
 	const selRef = React.useRef(sel);
 	const triggerRef = React.useRef<HTMLSpanElement>(null);
 	const panelRef = React.useRef<HTMLDivElement>(null);
 	const gridRef = React.useRef<HTMLDivElement>(null);
-	// 按住左鍵從表格鈕拖進網格的 drag session；entered = 指標進過網格
-	//（純點擊不會 entered，放開後留在 hover 模式）。
 	const dragRef = React.useRef<{ pointerId: number; entered: boolean } | null>(
 		null,
 	);
-	// pointerdown 已處理過開/關 → 隨後補發的 click 不要再 toggle 一次。
 	const skipClickRef = React.useRef(false);
 
 	const hoverCell = React.useCallback((row: number, col: number) => {
@@ -3289,7 +3127,6 @@ function TableInsertButton({
 			const r = Math.max(0, Math.min(row, TABLE_PICKER_MAX_ROWS - 1));
 			const c = Math.max(0, Math.min(col, TABLE_PICKER_MAX_COLS - 1));
 			const next: TablePickerSel = {
-				// 反白到最後一行/列時自動再長一行/列，永遠留一格可以繼續拉
 				rows: Math.min(Math.max(prev.rows, r + 2), TABLE_PICKER_MAX_ROWS),
 				cols: Math.min(Math.max(prev.cols, c + 2), TABLE_PICKER_MAX_COLS),
 				row: r,
@@ -3352,8 +3189,6 @@ function TableInsertButton({
 		};
 	}, [close, open]);
 
-	// 拖曳選尺寸：pointer 座標對網格 rect 換算成 row/col（不是靠 cell 的
-	// mouseenter），所以指標拖出網格右/下邊界照樣算成最遠那格 → 觸發長大。
 	React.useEffect(() => {
 		if (!open) return;
 		const onPointerMove = (e: PointerEvent) => {
@@ -3370,14 +3205,12 @@ function TableInsertButton({
 				(cell?.height || 20) + (Number.parseFloat(gridStyle.rowGap) || 3);
 			const x = e.clientX - rect.left;
 			const y = e.clientY - rect.top;
-			// 還在網格左/上方（多半仍停在觸發鈕上）就先不選
 			if (x < 0 || y < 0) return;
 			session.entered = true;
 			hoverCell(Math.floor(y / pitchY), Math.floor(x / pitchX));
 		};
 		const endSession = () => {
 			dragRef.current = null;
-			// 若放開的位置回到觸發鈕上，隨後的 click 先讓 skip 旗標吞掉
 			window.setTimeout(() => {
 				skipClickRef.current = false;
 			}, 0);
@@ -3387,7 +3220,6 @@ function TableInsertButton({
 			if (!session || e.pointerId !== session.pointerId) return;
 			const entered = session.entered;
 			endSession();
-			// 拖進網格後放開 = 插入；純點擊（沒進過網格）則留在 hover 模式
 			if (entered) commit();
 		};
 		const onPointerCancel = (e: PointerEvent) => {
@@ -3425,7 +3257,6 @@ function TableInsertButton({
 					ready={ready}
 					onMouseDown={onMouseDown}
 					onClick={() => {
-						// 滑鼠路徑已在 pointerdown 處理；這裡只收鍵盤觸發的 click。
 						if (skipClickRef.current) {
 							skipClickRef.current = false;
 							return;

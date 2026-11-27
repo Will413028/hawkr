@@ -1,17 +1,11 @@
 #!/usr/bin/env python3
-# infra/mq/tools/definitions_to_topology.py
-# ⚠️ 2026-07-26 起 topology.yaml 是唯一真相，本工具產出的是「攤平形式」，
-# 不能直接覆蓋 topology.yaml。用途降級為：
-#   (a) bootstrap 新環境
-#   (b) 災難復原 — broker definitions → 本工具 → fold.py → topology.yaml
-# 正常的新增 / 修改 queue 流程不需要跑這支。
 """RabbitMQ definitions export（dev+prod 兩份）→ canonical topology.json + drift report。
 raw export 含 password_hash，只在 scratchpad 使用；輸出 topology.json 不含任何 credential。"""
 import argparse
 import json
 
-IGNORED_QUEUE_PREFIXES = ("gateway.sse.",)  # per-pod 動態 queue，gateway active declare
-STRIP_QUEUE_ARGS = ("x-queue-type",)        # 由 module 依 env 注入
+IGNORED_QUEUE_PREFIXES = ("gateway.sse.",)
+STRIP_QUEUE_ARGS = ("x-queue-type",)
 
 
 def load(path):
@@ -46,7 +40,7 @@ def norm_bindings(defs, queues):
         if b["vhost"] != "/":
             continue
         if b["destination_type"] == "queue" and b["destination"] not in queues:
-            continue  # 指向被剔除 queue（gateway.sse.*）的 binding
+            continue
         key = f'{b["source"]}|{b["destination_type"]}|{b["destination"]}|{b["routing_key"]}'
         out[key] = {"source": b["source"], "destination": b["destination"],
                     "destination_type": b["destination_type"],
@@ -79,10 +73,6 @@ def main():
         report.append("")
 
     merged_queues = {**qu["dev"], **qu["prod"]}
-    # queue 的 arguments 含任何非 string 值（int/float/bool，如 x-message-ttl）→ RabbitMQ 拒收
-    # string 化後的值（empirical 驗證：400 expected integer, got longstr）。這種 queue 分流進
-    # queues_json_args，module 用 arguments_json（jsonencode）送出以保留原生型別；其餘 queue
-    # 仍用 arguments（map(string)），import 相容性見 Task 3 main.tf 註解。
     queues_plain, queues_json_args = {}, {}
     for name, q in merged_queues.items():
         if any(not isinstance(v, str) for v in q["arguments"].values()):
@@ -98,7 +88,6 @@ def main():
                            key=lambda x: (x["source"], x["destination"], x["routing_key"])),
     }
 
-    # audit：即使已分流，仍保留這段 report（未來新增數值型 arg 時持續被點名，供人工複核）
     non_string = []
     for q in list(topo["queues"]) + list(topo["queues_json_args"]):
         for k, v in q["arguments"].items():

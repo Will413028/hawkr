@@ -18,7 +18,7 @@ import '../../../product/presentation/merchant_item_detail_screen.dart';
 class BannerAction {
   const BannerAction({this.type, this.url, this.id, this.buttonText});
 
-  final String? type; // 'popup' | 'url' | 'product' | 'post'
+  final String? type;
   final String? url;
   final String? id;
   final String? buttonText;
@@ -154,7 +154,6 @@ class _BannerPopupDialog extends StatelessWidget {
           final dialogWidth = constraints.maxWidth > 360
               ? 360.0
               : constraints.maxWidth;
-          // Figma: 360 × 404 (ratio 360/404 ≈ 0.891).
           final dialogHeight = dialogWidth * 404 / 360;
 
           return SingleChildScrollView(

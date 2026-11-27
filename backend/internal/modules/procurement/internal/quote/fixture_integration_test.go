@@ -32,7 +32,6 @@ const buyer int64 = 1
 
 func ptr[T any](v T) *T { return &v }
 
-// fixture 是一位買家的一張需求（現行版本：小白菜、3 KG、台北市）、它的一次發布（指定一家店，買家預期單價 100 到 200 元每 KG）與一個可注入時間的服務。
 type fixture struct {
 	t           *testing.T
 	d           *db.DB
@@ -58,14 +57,12 @@ func newFixture(t *testing.T) *fixture {
 	return f
 }
 
-// sibling 在同一個資料庫為另一位買家建一張需求並發布；時間與 job 佇列共用。
 func (f *fixture) sibling(buyerID int64) *fixture {
 	g := &fixture{t: f.t, d: f.d, jobs: f.jobs, now: f.now, bus: f.bus}
 	g.adopt(buyerID)
 	return g
 }
 
-// adopt 為買家建一張 REQUIREMENT_READY 的需求並發布一次。
 func (f *fixture) adopt(buyerID int64) {
 	ctx := context.Background()
 	f.buyer, f.request, f.revision = buyerID, uuid.NewV7(), uuid.NewV7()
@@ -90,7 +87,6 @@ func (f *fixture) insertRevision(no int32, parent *uuid.UUID) {
 	}
 }
 
-// revise 把現行版本換成新的一版（內容不同：數量 5）；已發布的核准仍指著舊版。
 func (f *fixture) revise() {
 	f.t.Helper()
 	ctx := context.Background()
@@ -104,7 +100,6 @@ func (f *fixture) revise() {
 	f.exec(`UPDATE procurement.request_revisions SET quantity = 5 WHERE id = $1`, f.revision)
 }
 
-// publish 預覽並執行一次發布（候選集有效的前提是需求在 MATCHING，A9-D29(4)，所以先轉成 MATCHING），邀請測試會回價的店（inviteFirstStore 到 inviteLastStore；回價列的外鍵要求有邀請列），回發布 ID 與賣家可見內容的 hash。
 func (f *fixture) publish() (uuid.UUID, string) {
 	f.t.Helper()
 	ctx := context.Background()
@@ -136,7 +131,6 @@ func (f *fixture) publish() (uuid.UUID, string) {
 
 const inviteFirstStore, inviteLastStore = 10, 21
 
-// allStores 是替身的 seller：沒有店封鎖買家，每家店都營業中。
 type allStores struct{}
 
 func (allStores) StoreIDsBlockingBuyer(context.Context, int64, []int64) (map[int64]struct{}, error) {
@@ -151,13 +145,12 @@ func (allStores) OpenStoreIDs(_ context.Context, ids []int64) (map[int64]struct{
 	return out, nil
 }
 
-// version 是賣家回價的一個版本（測試直接寫表）。
 type version struct {
 	goods      int64
 	validUntil time.Time
 	submitted  time.Time
 	quantity   string
-	unit       string // 報價數量的單位，預設 KG
+	unit       string
 	unitBasis  string
 }
 
@@ -165,13 +158,11 @@ func (f *fixture) service() quote.Service {
 	return quote.Service{DB: f.d, Now: func() time.Time { return f.now }, Jobs: f.jobs}
 }
 
-// respond 為一家店在發布上建回價，依序寫入版本（版本號從 1 起），latest_version 是最後一個。
 func (f *fixture) respond(publication uuid.UUID, storeID int64, versions ...version) uuid.UUID {
 	f.t.Helper()
 	return f.respondAt(start, publication, storeID, versions...)
 }
 
-// respondAt 同 respond，回價身分列的建立時間是 created；店不在發布的邀請裡就補一列邀請（回價列的外鍵要求有邀請列）。
 func (f *fixture) respondAt(created time.Time, publication uuid.UUID, storeID int64, versions ...version) uuid.UUID {
 	f.t.Helper()
 	ctx := context.Background()
@@ -223,7 +214,6 @@ func (f *fixture) count(sql string, args ...any) int {
 	return n
 }
 
-// provisioningJobs 回排入的建單 job 的接受單 ID。
 func (f *fixture) provisioningJobs() []string {
 	f.t.Helper()
 	rows, err := f.d.Pool().Query(context.Background(), `SELECT args->>'acceptanceId' FROM river.river_job WHERE kind = $1 ORDER BY id`, quote.OrderProvisioningArgs{}.Kind())

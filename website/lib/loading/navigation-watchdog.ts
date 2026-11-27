@@ -85,9 +85,6 @@ export function armNavigationWatchdog(
 ): void {
 	if (typeof window === "undefined") return;
 
-	// Every transition, including same-page, malformed, or redirected work,
-	// invalidates the previous timer before any early return. Otherwise a stale
-	// product timer can pull the user forward again after Back/Cancel.
 	cancelNavigationRecovery();
 
 	let target: URL;
@@ -96,8 +93,6 @@ export function armNavigationWatchdog(
 	} catch {
 		return;
 	}
-	// Cross-origin jumps and hash-only / same-URL transitions don't stream RSC
-	// through the client router, so there's nothing here to rescue.
 	if (
 		target.origin !== window.location.origin ||
 		!["http:", "https:"].includes(target.protocol)
@@ -105,9 +100,6 @@ export function armNavigationWatchdog(
 		return;
 	if (isSamePage(target)) return;
 
-	// Snapshot where we started. The transition is considered committed the
-	// moment the address bar moves off this URL for ordinary routes. Product
-	// routes additionally require their target-specific visible ready marker.
 	const startUrl = window.location.href;
 	scheduleNavigationRecovery({
 		timeoutMs,
@@ -115,15 +107,10 @@ export function armNavigationWatchdog(
 			const isProductTarget = productIdFromPathname(target.pathname) !== null;
 			if (isProductTarget && isCurrentTarget(target)) {
 				if (isProductDetailReady(target.pathname)) return;
-				// History already contains the product URL. Replace that entry with a
-				// full document so recovery does not add a duplicate Back step.
 				hardNavigate(target.href, true);
 				return;
 			}
-			// The URL moved off the start page → committed (possibly via redirect).
 			if (window.location.href !== startUrl) return;
-			// Still stranded on the start URL past the budget → the soft-nav hung.
-			// Reload the target as a full document so the skeleton can't hold forever.
 			hardNavigate(target.href, false);
 		},
 	});

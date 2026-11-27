@@ -53,11 +53,9 @@ void main() {
 
       final scrubbed = scrubSentryEvent(event, Hint());
 
-      // Verify sensitive fields are scrubbed
       expect(scrubbed.request!.headers.containsKey('authorization'), isFalse);
       expect(scrubbed.user!.email, isNull);
 
-      // Verify other fields survive untouched
       expect(scrubbed.environment, 'production');
       expect(scrubbed.release, '1.0.0');
       expect(scrubbed.serverName, 'api.example.com');

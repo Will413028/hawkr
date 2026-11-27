@@ -20,8 +20,6 @@ export const ORDER_STATUS_TIMELINE_INDEX: Record<string, number> = {
 	paid: 1,
 	preparing: 2,
 	shipping: 3,
-	// 待取貨（超商包裹配達門市待取）與配送異常皆屬「運送中」階段，折疊到運送中里程碑；
-	// 若缺這兩個 key，`?? 0` 會讓進度條錯誤倒退回「待付款」（[B-207] dev 驗證發現）。
 	waiting_pickup: 3,
 	shipping_abnormal: 3,
 	delivered: 4,

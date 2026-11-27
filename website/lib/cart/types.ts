@@ -23,12 +23,8 @@ export interface CartItemWire {
 	specName?: string;
 	productId?: string | number;
 	stockQty?: string;
-	// row 級可購買性（backend issue #1127）。purchasable=false 時前端反灰 + disable checkbox；
-	// unavailableReason ∈ {DELISTED, OUT_OF_STOCK, INSUFFICIENT_STOCK, LOOKUP_FAILED}
 	purchasable?: boolean;
 	unavailableReason?: string;
-	// Legacy local-cache fields (older entries written before the wire
-	// rename); kept readable so existing localStorage payloads still hydrate.
 	image?: string;
 	unit?: string;
 	href?: string;
@@ -54,7 +50,7 @@ export interface CartSummary {
 
 /** Normalized item used by the UI components (always has numeric quantity). */
 export interface CartItem {
-	id: string; // = skuId
+	id: string;
 	skuId: string;
 	productId?: string | number;
 	name: string;
@@ -110,8 +106,6 @@ export function flattenGroups(groups: CartGroupWire[]): CartItem[] {
 					Number.isFinite(listPrice) && listPrice > 0 ? listPrice : undefined,
 				quantity: Number(it.quantity) || 0,
 				status: it.status,
-				// Wire → `imageKey` (§231). `it.image` is the legacy LOCAL-CACHE field, not a
-				// backend guess: guest carts persisted before the rename still hydrate from it.
 				image: it.imageKey ?? it.image,
 				unit: it.specName ?? it.unit,
 				sellerName: g.sellerName,
@@ -122,7 +116,6 @@ export function flattenGroups(groups: CartGroupWire[]): CartItem[] {
 				sellerDistrict: g.sellerDistrict,
 				href,
 				stockQty: Number.isFinite(stock) ? stock : undefined,
-				// 後端缺欄位時（舊版 backend / 訪客舊本地快取）forward-compat：default purchasable=true
 				purchasable: it.purchasable !== false,
 				unavailableReason: it.unavailableReason,
 			});

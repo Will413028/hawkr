@@ -1,7 +1,5 @@
 /** @vitest-environment jsdom */
 
-// 同目錄其他測試已說明這個慣例：vitest 的 include 只吃 `.ts`，所以用
-// React.createElement 而不是 JSX。
 
 import {
 	cleanup,

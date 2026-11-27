@@ -13,7 +13,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-// ==================== Mock proto clients（介面 embed：未 stub 的方法呼叫即 nil-panic）====================
 
 func setupSellerRekeyRouter(h *Holder) *gin.Engine {
 	r := gin.New()
@@ -72,7 +71,6 @@ func TestGetSellerProductDetail_RawAccountIDDoesNotMatchOwner(t *testing.T) {
 				Code: 0,
 				Data: &productpb.ProductDetail{
 					Id: in.ProductId,
-					// 別人的商品：owner surrogate ≠ 本帳號的 surrogate
 					CreatedBy: strconv.FormatInt(rekeyTestSurrogate+1, 10),
 				},
 			}, nil

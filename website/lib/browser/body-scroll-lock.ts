@@ -83,8 +83,6 @@ function restorePinnedPosition(base: StyleSnapshot, restoreScroll: boolean) {
 	body.style.left = base.body.left;
 	body.style.right = base.body.right;
 	body.style.width = base.body.width;
-	// Un-pinning alone already drops the document back to offset 0, which is
-	// the correct start for whatever route replaced the pinned one.
 	if (restoreScroll) {
 		const previousBehavior = root.style.scrollBehavior;
 		root.style.scrollBehavior = "auto";
@@ -111,8 +109,6 @@ function reconcileLocks(restoreScroll = true) {
 		root.style.overflow = base.root.overflow;
 		root.style.overscrollBehavior = base.root.overscrollBehavior;
 		root.style.scrollBehavior = base.root.scrollBehavior;
-		// Restore scrollability before scrollTo. With overflow still hidden,
-		// browsers can clamp the saved offset to 0 even after body is unpinned.
 		restorePinnedPosition(base, restoreScroll);
 		snapshot = null;
 		return;

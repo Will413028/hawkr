@@ -9,15 +9,11 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/assistant"
 )
 
-// orderClient 是 assistantOrders 用到的訂單服務 client 方法（*orderservice.Client）。
 type orderClient interface {
 	MyOrders(ctx context.Context, buyerID int64, statusFilter string, page, pageSize int) ([]orderservice.BuyerOrder, error)
 	BuyerOrderDetail(ctx context.Context, buyerID int64, orderNo string) (orderservice.BuyerOrderDetail, error)
 }
 
-// assistantOrders 以訂單服務的 client 實作買家助理讀訂單的 port（assistant.OrderReader）。
-// 訂單不存在或不屬於該買家時，把 orderservice.ErrOrderNotFound 轉成 assistant.ErrOrderNotFound（保留原錯誤）：
-// 不轉的話，查無訂單會被助理當成下游故障（upstream_unavailable）。
 type assistantOrders struct{ client orderClient }
 
 var _ assistant.OrderReader = assistantOrders{}

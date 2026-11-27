@@ -37,7 +37,6 @@ class ShippingMethodCheckContractTest {
     void checkValuesEqualShippingMethodValues() throws IOException {
         Set<String> inCheck = checkValues();
 
-        // 硬寫字面值：期望值若來自被測檔案或 enum 自己，這條就只是在跟自己對。
         assertEquals(Set.of("3001", "3002", "3003", "3005"), inCheck);
 
         Set<String> inEnum = new TreeSet<>();

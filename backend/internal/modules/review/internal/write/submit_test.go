@@ -14,7 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/textfilter"
 )
 
-// 這些測試走到資料庫之前就會結束（輸入驗證、訂單資格、狀態與擁有者），所以不需要資料庫；走到 transaction 的情境在模組的 integration 測試。
 
 type orders struct {
 	order model.OrderForReview

@@ -22,8 +22,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// buildMediaURLs 將一組 objectKey 逐一組為顯示 URL（49 §6.1/§6.6：Gateway 唯一組裝點）。
-// keys 為空回傳空 slice（omitempty 生效）；單一 http 值由 mediaurl.BuildURL passthrough。
 func buildMediaURLs(base string, keys []string) []string {
 	if len(keys) == 0 {
 		return nil
@@ -35,8 +33,6 @@ func buildMediaURLs(base string, keys []string) []string {
 	return urls
 }
 
-// productSortAllowed 合法 ProductSort Value 集合（35 設計書）。
-// 與 common-core ProductSort enum 對應；後端做白名單驗證，避免靜默 fallback。
 var productSortAllowed = map[string]struct{}{
 	"LATEST":     {},
 	"PRICE_ASC":  {},
@@ -50,7 +46,6 @@ func isValidProductSort(v string) bool {
 	return ok
 }
 
-// nilSafeSlice 把 nil slice 換成 empty slice，避免 JSON 輸出 null（前端契約：deliveryTemp 必為陣列）。
 func nilSafeSlice(s []string) []string {
 	if s == nil {
 		return []string{}
@@ -58,7 +53,6 @@ func nilSafeSlice(s []string) []string {
 	return s
 }
 
-// parseCSVQuery 通用：把 query string 「a,b , c」拆為 ["a","b","c"]，去重 + 修整 whitespace；空字串回 nil
 func parseCSVQuery(raw string) []string {
 	if raw == "" {
 		return nil
@@ -82,14 +76,6 @@ func parseCSVQuery(raw string) []string {
 	return out
 }
 
-// parseCategoryIDsQuery 解析 ?category_id=... 支援 CSV 與重複 param 兩種形式：
-//
-//	?category_id=1,5         → ["1","5"]
-//	?category_id=1&category_id=5 → ["1","5"]
-//	?category_id=1,0,5       → ["1","5"]（過濾 "0"=全部）
-//
-// 空字串 / 純 "0" / 全為空白 → nil（不篩選）；自動 trim + 去重。
-// 上限校驗（50 個）在 product-service 入口執行，回 INVALID_ARGUMENT。
 func parseCategoryIDsQuery(c *gin.Context) []string {
 	raw := c.QueryArray("category_id")
 	if len(raw) == 0 {
@@ -116,7 +102,6 @@ func parseCategoryIDsQuery(c *gin.Context) []string {
 	return out
 }
 
-// parseHashtagsQuery 把 query string 「a,b , c」拆為 ["a","b","c"]，去重 + 修整 whitespace；空字串回 nil
 func parseHashtagsQuery(raw string) []string {
 	if raw == "" {
 		return nil
@@ -140,8 +125,6 @@ func parseHashtagsQuery(raw string) []string {
 	return out
 }
 
-// getProductAccountID 從 context 獲取 accountId（用於產品存取權限判斷）
-// 如果用戶未登入則返回 0
 func getProductAccountID(c *gin.Context) int64 {
 	accountIDRaw, exists := c.Get("accountId")
 	if !exists {
@@ -154,8 +137,6 @@ func getProductAccountID(c *gin.Context) int64 {
 	return accountID
 }
 
-// toShippingMethodResponses 將 proto ShippingMethod 列表轉為 ShippingMethodResponse 陣列
-// 供 list / detail 共用，避免重複構造。
 func toShippingMethodResponses(in []*pb.ShippingMethod) []ShippingMethodResponse {
 	if len(in) == 0 {
 		return nil
@@ -261,17 +242,14 @@ func (h *Holder) GetProductList(c *gin.Context) {
 	size := c.DefaultQuery("page_size", defaultPageSizeStr)
 	sort := strings.TrimSpace(c.DefaultQuery("sort", ""))
 
-	// sort 合法值驗證（35 設計書）；不送（空字串）等同 LATEST
 	if sort != "" && !isValidProductSort(sort) {
 		response.BadRequest(c, "invalid sort value")
 		return
 	}
 
-	// Hashtag 精確篩選（02 §3.9 / §5.3）
 	hashtags := parseHashtagsQuery(c.DefaultQuery("hashtags", ""))
 	matchAll := strings.EqualFold(c.DefaultQuery("match", "any"), "all")
 
-	// 02 §5.3.4 新增 server-side filter
 	deliveryTemp := parseCSVQuery(c.DefaultQuery("delivery_temp", ""))
 	priceMin := strings.TrimSpace(c.DefaultQuery("price_min", ""))
 	priceMax := strings.TrimSpace(c.DefaultQuery("price_max", ""))
@@ -283,11 +261,6 @@ func (h *Holder) GetProductList(c *gin.Context) {
 
 	accountID := getProductAccountID(c)
 
-	// followed_* filter 必須有目前有效的 buyer stint；resolveBuyerID 內部同時
-	// 涵蓋「未登入」（401）與「登入但無 buyer stint」（403）兩種情況，比舊版
-	// 只檢查 accountID != 0 更嚴格——沒有 buyer profile 的帳號本來就不可能有
-	// 收藏/追蹤。未啟用任一 filter 時不呼叫 resolveBuyerID，避免多一次 Redis
-	// 往返（一般公開瀏覽維持原本行為，ViewerBuyerID 為 0）。
 	var viewerBuyerID int64
 	if followedProductOnly || followedSellerOnly {
 		buyerID, ok := h.resolveBuyerID(c)
@@ -297,8 +270,6 @@ func (h *Holder) GetProductList(c *gin.Context) {
 		viewerBuyerID = int64(buyerID)
 	}
 
-	// 公開 API：由 Product Service 強制只返回 ACTIVE 狀態；
-	// viewerBuyerID 由 gateway 解析後傳入，只作為 ViewerBuyerID（不會變成 owner filter）
 	resp, err := h.Product.GetPublicProductListFiltered(c.Request.Context(), grpc.PublicProductListFilters{
 		CategoryIDs:         categoryIDs,
 		Keyword:             keyword,
@@ -363,7 +334,6 @@ func (h *Holder) GetProductList(c *gin.Context) {
 			ShippingMethods: toShippingMethodResponses(p.ShippingMethods),
 		}
 
-		// 商家資訊（含 city / district / address）
 		if p.Seller != nil {
 			item.Seller = buildSellerInfoItem(base, p.Seller)
 			item.SellerName, item.SellerLogoKey, item.SellerLogoUrl = flatSellerFields(item.Seller)
@@ -372,7 +342,6 @@ func (h *Holder) GetProductList(c *gin.Context) {
 		products = append(products, item)
 	}
 
-	// Aggregate isFavorited + isRestockSubscribed: only if user is logged in and there are products
 	if accountID != 0 && len(products) > 0 {
 		productIDStrs := make([]string, 0, len(products))
 		for _, p := range products {
@@ -380,12 +349,6 @@ func (h *Holder) GetProductList(c *gin.Context) {
 		}
 
 		if len(productIDStrs) > 0 {
-			// 收藏、補貨訂閱都是 buyer_id 資源，共用同一次 soft-fail 解析（不能用
-			// h.resolveBuyerID(c)，它會直接寫 401/403 回 c，PDP 聚合失敗不該阻斷主回應）。
-			// ErrNoCurrentBuyer 併入下面既有的「err != nil → Debug + 整塊略過」skip
-			// path，不另開分支；下方 applyRestockSubscribed 重複使用同一個 buyerID，
-			// 解析失敗時 buyerID 是零值，helper 自己的 buyerID<=0 guard 會 no-op，
-			// 不需要再判斷一次 berr。
 			buyerID, berr := h.BuyerID.CurrentBuyerID(c.Request.Context(), identity.AccountID(accountID))
 			if berr != nil {
 				pkglogger.Debug(c.Request.Context(), "Failed to resolve buyer id for favorites aggregation", zap.Error(berr))
@@ -403,7 +366,6 @@ func (h *Holder) GetProductList(c *gin.Context) {
 				}
 			}
 
-			// isRestockSubscribed aggregation (issue #1005 / B-203, 39 §5.5b)
 			subscribedIdx := make(map[string]int, len(products))
 			for i := range products {
 				subscribedIdx[products[i].ID] = i
@@ -582,18 +544,6 @@ type SellerInfoItem struct {
 	StoreID   string  `json:"storeId"`
 }
 
-// buildSellerInfoItem 是 pb.SellerInfo → SellerInfoItem 的**唯一**映射點。
-//
-// 每個吐 `seller` 物件的端點（商品列表 / 商品詳情 / 市集 / 搜尋 / 賣家店內列表）
-// 都必須走這裡：日後 SellerInfoItem 新增欄位只要改這一個函式，不必再去獵五份
-// 手抄副本。這正是本函式存在的理由——過去五處各自手抄，欄位覆蓋長期不一致：
-// 賣家店內列表與市集漏了 city/district/address（前端 readDisplayOrigin 會讀
-// seller.city 當產地 fallback，缺了商品卡產地就空白），store_code 也是事後
-// 逐處補釘（commit a2419f271「2 missed SellerInfoItem sites」即同一類事故）。
-//
-// s 為 nil 回傳 nil，呼叫端直接指派即可（`seller` 欄位帶 omitempty，nil 時省略）。
-// proto 空字串一律收斂成 nil 指標而非空字串指標，讓 omitempty 真的把欄位拿掉，
-// 而不是吐出 `"city": ""` 這種前端得再判一次的雜訊。
 func buildSellerInfoItem(base string, s *pb.SellerInfo) *SellerInfoItem {
 	if s == nil {
 		return nil
@@ -628,16 +578,6 @@ func buildSellerInfoItem(base string, s *pb.SellerInfo) *SellerInfoItem {
 	return si
 }
 
-// flatSellerFields 取出商品卡 DTO（ProductItem / ProductHitData）在 nested
-// `seller` 之外另外攤平的三個便利欄（sellerName / sellerLogoKey / sellerLogoUrl）。
-//
-// 為什麼不併進 buildSellerInfoItem：這三欄不屬於 SellerInfoItem，而是掛在**容器**
-// 上，而容器有兩種不同型別（ProductItem 與 ProductHitData），無法由一個回傳
-// *SellerInfoItem 的函式代為填寫。拆成這支 helper 至少讓「攤平值怎麼來的」只有
-// 一份定義——攤平欄恆等於 nested 值，不容許兩者說法不一致。
-//
-// 注意 PublicProductDetailItem（商品詳情）沒有這三欄，故詳情端點只呼叫
-// buildSellerInfoItem 不呼叫本函式；那是容器型別本身的差異，不是漏抄。
 func flatSellerFields(si *SellerInfoItem) (name, logoKey, logoURL string) {
 	if si == nil {
 		return "", "", ""
@@ -708,7 +648,7 @@ type ShippingMethodResponse struct {
 // @Failure      404  {object}  object{code=int,message=string}
 // @Router       /public/products/{id} [get]
 func (h *Holder) GetProductDetailByID(c *gin.Context) {
-	productID := c.Param("id") // UUID string
+	productID := c.Param("id")
 
 	if productID == "" {
 		response.BadRequest(c, "invalid product id")
@@ -724,8 +664,6 @@ func (h *Holder) GetProductDetailByID(c *gin.Context) {
 	}
 	var resp *pb.GetProductResponse
 	var err error
-	// 公開 PDP 一律使用 publication contract；只有賣家身分保留既有的 owner preview，
-	// 避免登入買家因走私有 GetProduct 而把 TEMPORARILY_UNAVAILABLE 誤判成 404。
 	if isSellerRole(c) && accountID != 0 {
 		resp, err = h.Product.GetProduct(c.Request.Context(), productID, accountID)
 	} else {
@@ -744,10 +682,6 @@ func (h *Holder) GetProductDetailByID(c *gin.Context) {
 	data := resp.Data
 	detail := convertToPublicProductDetail(h.MediaBaseURL, data)
 
-	// Aggregate isFavorited + isRestockSubscribed: only if user is logged in.
-	// 兩個 best-effort 聚合，失敗不阻斷 PDP 回應（02 §5.13b / §5.5.1）。
-	// syncutil.Group 平行兩個 gRPC（不 WithContext — 任一失敗不應 cancel 對方；
-	// panic 會被 recover 並記錄，不會讓整個 gateway process crash）。
 	if buyerAccountID != 0 && detail.ID != "" {
 		if _, err := strconv.ParseInt(detail.ID, 10, 64); err == nil {
 			ctx := c.Request.Context()
@@ -755,9 +689,6 @@ func (h *Holder) GetProductDetailByID(c *gin.Context) {
 				favorited     bool
 				subscribedMap map[string]bool
 			)
-			// 收藏、補貨訂閱都是 buyer_id 資源，共用同一次 soft-fail 解析（同
-			// GetProductList 的理由：失敗不阻斷 PDP）。解析失敗（含 ErrNoCurrentBuyer）
-			// 兩個 goroutine 一起略過，不各自再解析一次。
 			buyerID, berr := h.BuyerID.CurrentBuyerID(ctx, identity.AccountID(buyerAccountID))
 			g := syncutil.NewGroup(ctx)
 			if berr != nil {
@@ -806,7 +737,7 @@ func (h *Holder) GetProductDetailByID(c *gin.Context) {
 // @Failure      404  {object}  object{code=int,message=string}
 // @Router       /public/products/{id}/brief [get]
 func (h *Holder) GetProductInfoByID(c *gin.Context) {
-	productID := c.Param("id") // UUID string
+	productID := c.Param("id")
 
 	if productID == "" {
 		response.BadRequest(c, "invalid product id")
@@ -826,16 +757,6 @@ func (h *Holder) GetProductInfoByID(c *gin.Context) {
 
 	p := resp.Data
 	base := h.MediaBaseURL
-	// 刻意不組 Seller（也不設 StoreID）：本端點回的是「商品基本資訊」，
-	// 沒有任何客戶端讀賣家欄位。2026-07-31 實測四個前端 repo（website / admin /
-	// buyer app / seller app），全站唯一呼叫者是 buyer app 的
-	// features/product/data/product_repository.dart:206 getSkuImageUrl()，它只讀
-	// url / imageUrl / data 三個鍵，而且該方法本身無人呼叫（dead code）。
-	// 上游其實帶得出來（GetPublicProduct 走 ProductDetail，seller 已由
-	// product-service 填充），所以要補只是兩行 buildSellerInfoItem——
-	// **觸發條件**：哪天有客戶端要在這支端點顯示店名 / 店家 logo / 產地，
-	// 就照 §SellerInfoItem 覆蓋矩陣補上並把本端點納入 seller_info_matrix_test.go。
-	// 在那之前補 = 白白多打一次 seller batch RPC 並放大回應體，不做。
 	item := ProductItem{
 		ID:           p.Id,
 		Name:         p.Name,
@@ -858,10 +779,6 @@ func (h *Holder) GetProductInfoByID(c *gin.Context) {
 		CreatedAt:    p.CreatedAt,
 	}
 
-	// isRestockSubscribed aggregation (issue #1005 / B-203, 39 §5.5b)
-	// buyer_id-first：這裡沒有其他地方已解析過 buyerID，比照 GetProductList 的
-	// favorites soft-fail 解析自己做一次；ErrNoCurrentBuyer 等同「無 stint」，
-	// 略過聚合、不阻斷本端點。
 	accountID := getProductAccountID(c)
 	if accountID != 0 {
 		if buyerID, berr := h.BuyerID.CurrentBuyerID(c.Request.Context(), identity.AccountID(accountID)); berr != nil {
@@ -895,7 +812,7 @@ type ProductRatingResponse struct {
 // @Failure      404  {object}  object{code=int,message=string}
 // @Router       /public/products/{id}/rating [get]
 func (h *Holder) GetProductRating(c *gin.Context) {
-	productID := c.Param("id") // UUID string
+	productID := c.Param("id")
 
 	if productID == "" {
 		response.BadRequest(c, "invalid product id")
@@ -931,7 +848,7 @@ func (h *Holder) GetProductRating(c *gin.Context) {
 // @Failure      400  {object}  object{code=int,message=string}
 // @Router       /public/products/{id}/related [get]
 func (h *Holder) GetRelatedProducts(c *gin.Context) {
-	productID := c.Param("id") // UUID string
+	productID := c.Param("id")
 
 	if productID == "" {
 		response.BadRequest(c, "invalid product id")
@@ -951,18 +868,6 @@ func (h *Holder) GetRelatedProducts(c *gin.Context) {
 
 	base := h.MediaBaseURL
 	products := make([]ProductItem, 0, len(resp.Products))
-	// 刻意不組 Seller（也不設 StoreID）：2026-07-31 實測四個前端 repo
-	// （website / admin / buyer app / seller app）**無任何客戶端呼叫本端點**——
-	// 網頁的「相關商品」是自己用 /public/search/products 併「同分類補齊」實作的
-	// （app/api/public/search/products/route.ts），不走這裡。
-	// 上游帶得出來：product-service getRelatedProducts 用 publicApi(true) 查詢，
-	// ProductService.java:1085 的公開分支會 batch 填 seller meta，
-	// 故 ProductListItem.seller 有值，是 Gateway 這裡沒往下傳。
-	// **觸發條件**：哪天有客戶端真的改用本端點渲染商品卡，就得補 Seller——
-	// 前端商品卡的產地是 `origin || seller.city`（website
-	// lib/market/listFilters.ts readDisplayOrigin），缺 city 產地會空白。
-	// 屆時用 buildSellerInfoItem + flatSellerFields 兩行補上，並把本端點納入
-	// seller_info_matrix_test.go 的覆蓋矩陣。在那之前補 = 為零消費者放大回應體。
 	for _, p := range resp.Products {
 		products = append(products, ProductItem{
 			ID:              p.Id,
@@ -990,9 +895,6 @@ func (h *Holder) GetRelatedProducts(c *gin.Context) {
 		})
 	}
 
-	// isRestockSubscribed aggregation (issue #1005 / B-203, 39 §5.5b)
-	// buyer_id-first：沒有其他地方已解析過 buyerID，自己做一次 soft-fail 解析
-	// （同 GetProductInfoByID／GetProductList 的理由）。
 	accountID := getProductAccountID(c)
 	if accountID != 0 && len(products) > 0 {
 		ids := make([]string, 0, len(products))
@@ -1015,8 +917,6 @@ func (h *Holder) GetRelatedProducts(c *gin.Context) {
 	response.OK(c, products)
 }
 
-// convertDescriptionProtoToResponse 將 proto ProductDescription 轉換為 ProductDescriptionResponse
-// Proto 的 style_json 字串反序列化為 style 物件給前端
 func convertDescriptionProtoToResponse(base string, desc *pb.ProductDescription) *ProductDescriptionResponse {
 	if desc == nil {
 		return nil
@@ -1032,13 +932,12 @@ func convertDescriptionProtoToResponse(base string, desc *pb.ProductDescription)
 			ListJson:  b.ListJson,
 			AssetID:   b.AssetId,
 			ImageKey:  b.ObjectKey,
-			ImageURL:  mediaurl.BuildURL(base, b.ObjectKey), // 49 §6.6：Gateway 由 objectKey 組顯示 URL
+			ImageURL:  mediaurl.BuildURL(base, b.ObjectKey),
 			Width:     b.Width,
 			Height:    b.Height,
 			Alt:       b.Alt,
 		}
 
-		// 行內 runs（inline-run 模型）
 		if len(b.Runs) > 0 {
 			runs := make([]InlineRunDTO, 0, len(b.Runs))
 			for _, r := range b.Runs {
@@ -1054,7 +953,6 @@ func convertDescriptionProtoToResponse(base string, desc *pb.ProductDescription)
 			block.Runs = runs
 		}
 
-		// 將 style_json 字串反序列化為 style 物件
 		if b.StyleJson != "" {
 			var style map[string]interface{}
 			if err := json.Unmarshal([]byte(b.StyleJson), &style); err == nil {
@@ -1071,10 +969,6 @@ func convertDescriptionProtoToResponse(base string, desc *pb.ProductDescription)
 	}
 }
 
-// toPublicDescription 把賣家形狀的描述轉成公開形狀（逐欄搬過去，就是不搬 assetId）。
-//
-// 從 ProductDescriptionResponse 轉而不是從 proto 直接轉，是為了讓 runs 展開與 style_json
-// 反序列化只留 convertDescriptionProtoToResponse 一份——複製一份解析邏輯出來，兩邊遲早分岔。
 func toPublicDescription(desc *ProductDescriptionResponse) *PublicProductDescription {
 	if desc == nil {
 		return nil
@@ -1104,7 +998,6 @@ func toPublicDescription(desc *ProductDescriptionResponse) *PublicProductDescrip
 	}
 }
 
-// convertToProductDetail converts proto ProductDetail to handler ProductDetailItem
 func convertToProductDetail(base string, data *pb.ProductDetail) ProductDetailItem {
 	certifications := make([]CertificationItem, 0, len(data.Certifications))
 	for _, cert := range data.Certifications {
@@ -1116,7 +1009,6 @@ func convertToProductDetail(base string, data *pb.ProductDetail) ProductDetailIt
 
 	skus := make([]SkuItem, 0, len(data.Skus))
 	for _, v := range data.Skus {
-		// 轉換 SKU 層級的運送方式
 		skuShippingMethods := make([]ShippingMethodResponse, 0, len(v.ShippingMethods))
 		for _, sm := range v.ShippingMethods {
 			skuShippingMethods = append(skuShippingMethods, ShippingMethodResponse{
@@ -1142,7 +1034,6 @@ func convertToProductDetail(base string, data *pb.ProductDetail) ProductDetailIt
 		})
 	}
 
-	// 配送資訊（聚合自所有 SKU）
 	shippingMethods := make([]ShippingMethodResponse, 0, len(data.ShippingMethods))
 	for _, sm := range data.ShippingMethods {
 		shippingMethods = append(shippingMethods, ShippingMethodResponse{
@@ -1153,15 +1044,12 @@ func convertToProductDetail(base string, data *pb.ProductDetail) ProductDetailIt
 		})
 	}
 
-	// 結構化圖片集（含 assetId），供賣家編輯只調順序時 round-trip 保留既有圖，
-	// 與 list 端（SellerProductItem.Gallery）對稱。公開端不吐 assetId，作法是另立
-	// PublicGalleryItem 型別（非執行期清欄位），見 convertToPublicProductDetail 與 02 §2.2.2。
 	gallery := make([]GalleryItem, 0, len(data.Gallery))
 	for _, g := range data.Gallery {
 		gallery = append(gallery, GalleryItem{
 			AssetID:  g.AssetId,
 			ImageKey: g.ObjectKey,
-			ImageURL: mediaurl.BuildURL(base, g.ObjectKey), // 49 §6.6：Gateway 由 objectKey 組
+			ImageURL: mediaurl.BuildURL(base, g.ObjectKey),
 		})
 	}
 
@@ -1208,33 +1096,16 @@ func convertToProductDetail(base string, data *pb.ProductDetail) ProductDetailIt
 	}
 }
 
-// convertToPublicProductDetail converts proto ProductDetail to PublicProductDetailItem（含 seller + reviews）
 func convertToPublicProductDetail(base string, data *pb.ProductDetail) PublicProductDetailItem {
 	detail := convertToProductDetail(base, data)
 
-	// 公開端（匿名 PDP）不吐的只有 assetId（媒體資產 TSID＝內部識別碼），作法是換一組
-	// 公開型別而非清欄位——型別上沒有那個欄位，swagger 才不會宣告出永不出現的東西。
-	// objectKey 保留：
-	// 它是 public/ 前綴的公開物件路徑，且同一份回應的 imageKeys 已列出全部 gallery objectKey，
-	// 清空它保護不到任何東西，卻讓前端只能載 /i/original/（描述內嵌圖的 objectKey 更不在
-	// imageKeys 裡，清掉即永久無法壓縮）。見 02 設計書 §2.2.2。
 	publicGallery := make([]PublicGalleryItem, 0, len(detail.Gallery))
 	for _, g := range detail.Gallery {
 		publicGallery = append(publicGallery, PublicGalleryItem{ImageKey: g.ImageKey, ImageURL: g.ImageURL})
 	}
-	// 商品描述區塊（富文本內嵌圖）走同一條界線：型別上就沒有 assetId，objectKey / url 保留供
-	// 顯示與 preset 壓縮（單層 Blocks，無巢狀）。
 	publicDescription := toPublicDescription(detail.Description)
-	// 內嵌的 ProductDetailItem.Gallery / .Description 被外層同名欄位遮蔽、不會序列化；
-	// 一併清空避免有人誤用它們。
 	detail.Gallery = nil
 	detail.Description = nil
-	// SKU 的樂觀鎖版本（#2545）只給寫得到這筆 SKU 的人（賣家／代行／admin）。
-	// 匿名 PDP 用不到它，而它是一個**寫入次數計數器**——扣庫存與訂單取消都會 +1，
-	// 公開等於把每個規格的成交／取消事件次數（比 salesCount 更細）攤在匿名端。
-	// 這裡用清欄位而非另立公開型別（上面 assetId 的作法），因為 SkuItem 是 public／app／
-	// admin 三個 namespace 共用的葉節點：換型別要連帶動到三條路徑的回應形狀，
-	// 而本欄有 omitempty ⇒ 清掉之後公開回應裡根本不會出現這個鍵。
 	for i := range detail.Skus {
 		detail.Skus[i].Version = ""
 	}
@@ -1247,11 +1118,8 @@ func convertToPublicProductDetail(base string, data *pb.ProductDetail) PublicPro
 		SelfOwned:         data.SelfOwned,
 	}
 
-	// 商家資訊（含 city / district / address，list 與 detail 對稱）
-	// PublicProductDetailItem 沒有攤平便利欄（見 flatSellerFields 註解），故只組 nested。
 	result.Seller = buildSellerInfoItem(base, data.Seller)
 
-	// 評論預覽
 	for _, r := range data.Reviews {
 		result.Reviews = append(result.Reviews, ReviewPreviewItem{
 			ReviewID:  r.ReviewId,
@@ -1304,8 +1172,6 @@ func (h *Holder) PurgeProductCache(c *gin.Context) {
 		resolved, err := h.Store.CurrentStoreID(c.Request.Context(), identity.AccountID(req.AccountID))
 		if err != nil {
 			if errors.Is(err, storeid.ErrNoCurrentStore) {
-				// 該帳號目前沒有現任店 → 沒有對應的 list bucket 可清，
-				// 呼應 SearchAdminProducts 對同一情境回空結果的處理，視為清除成功（0 筆）。
 				response.OK(c, &PurgeCacheResult{
 					Scope:       req.Scope,
 					PurgedKeys:  "0",
@@ -1336,51 +1202,22 @@ func (h *Holder) PurgeProductCache(c *gin.Context) {
 	})
 }
 
-// ---- 認證驗證 DTO 區塊 ----
 
 // VerifyCertificationResponse 認證驗證回應
 type VerifyCertificationResponse struct {
 	Exists bool `json:"exists" example:"true"` // 認證編號是否存在
 }
 
-// certNoMaxLength 認證編號長度上限。
-//
-// certifications 存成 JSONB（product-service V1__init_product_schema.sql），沒有可比照的
-// 欄位長度；repo 內最長的實際樣本是 18 碼（seed data 的 HACCP-2026-DP-0047），可線上驗證的
-// 三型最長 16 碼，取 64 留餘裕，同時讓送往農業部 API 的查詢字串長度有界。
 const certNoMaxLength = 64
 
-// certNoPattern 認證編號合法字元：英數 + 連字號 + 底線。
-//
-// 農業部三支端點沒有公開的編號格式規範，docs/開發規範/ 也沒有記載，因此取保守通用集合；
-// 實際樣本（設計書 19 §3/§7.1 的 1-009-300022、seed data 的 1-008-131005 / TAP-2025-0032 /
-// CAS-2025-1234）都落在這個集合內。這一組字元全屬 RFC 3986 unreserved character。
-//
-// 擋在這裡的理由：product-service 的 GovCertificationService.buildGovApiUrl 把 certNo
-// 原字未編碼串進農業部 API 的查詢字串，後面緊接著 &api_key=<真實金鑰>。放行 URI 保留字元
-// 等於讓任何呼叫端反覆把整條含金鑰的 URL 逼進上游的例外訊息。
-//
-// ⚠️ 規則與 Java 側 GovCertificationService.isValidCertNo 必須逐字一致，改動時兩邊一起改。
-//
-// ⚠️ 適用範圍限「可線上驗證的三型」（verifiableCertTypes），advisory 查驗端點與商品
-// 寫入路徑的 filter 都是如此。3704/3705/3706 走 unverifiableCertNoValid 的放寬規則——
-// 拿這個 pattern 去擋它們會把 `ISO 22000:2018` 這種真實編號靜默剔除（19 §6.2.9）。
 var certNoPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,` + strconv.Itoa(certNoMaxLength) + `}$`)
 
-// verifiableCertTypes 是可線上驗證的 CertificationType value（3701 ORGANIC / 3702 TAP /
-// 3703 CAS），與 product-service 的 CertificationTypeRules.isVerifiable 同一組。
-//
-// 只有這三型的 cert_no 會被 product-service 串進農業部 API 的查詢字串，所以也只有這三型
-// 需要套 certNoPattern。3704/3705/3706（HACCP/ISO/GMP）在 product-service 端會先短路成
-// 「暫不支援線上驗證」（3003），cert_no 根本不會離開系統；對它們套白名單零安全效益，卻會
-// 把 `ISO 22000:2018` 這種該類型的常見合法編號誤判成 400。
 var verifiableCertTypes = map[string]struct{}{
 	"3701": {},
 	"3702": {},
 	"3703": {},
 }
 
-// ---- 認證輸入 filter（19 號設計書 §6.2 / §6.2.1）----
 
 // CertificationWarningOutput 認證未被採用的提示（每筆對應一個被剔除或被跳過的認證輸入）。
 //
@@ -1394,20 +1231,11 @@ type CertificationWarningOutput struct {
 	Message           string `json:"message" example:"另一個視窗剛送出同類型的認證，這一筆未被採用，請重新儲存"`
 }
 
-// 認證未被採用的原因（19 §9.5）。Gateway 只產出前兩個；CONCURRENT_CONFLICT 由
-// product-service 在收斂點判定後經 certification_warnings 帶回來。
 const (
 	certWarningInvalidType   = "INVALID_TYPE"
 	certWarningInvalidCertNo = "INVALID_CERT_NO"
 )
 
-// certificationInputTypes 是 certifications 輸入的合法 type 值域（CertificationType
-// value 3701–3706）。值取自 pkg/codemeta 的生成常數而不是重打一次字面值——CodeMeta 是
-// SSOT，在這裡寫死 "3701" 就是憑空多出來的第二份。
-//
-// ⚠️ 與 verifiableCertTypes 是兩件事：那個回答「這一型能不能線上查驗」（只有前三型），
-// 這個回答「這一型存不存在」。拿 verifiableCertTypes 當值域會把合法的 HACCP / ISO / GMP
-// 認證整批剔除。
 var certificationInputTypes = func() map[string]struct{} {
 	values := []int{
 		codemeta.CertificationTypeOrganic,
@@ -1424,25 +1252,6 @@ var certificationInputTypes = func() map[string]struct{} {
 	return out
 }()
 
-// certificationInputRejection 回傳這一筆認證輸入被剔除的原因；合法則回兩個空字串。
-//
-// 🔴 certNo 的規則**依 type 分兩類**（19 §6.2.9）。一套規則走天下會靜默吃掉真實編號：
-// `ISO 22000:2018` 含冒號、HACCP／GMP 的編號常含空格與斜線，而嚴格白名單只收
-// `[A-Za-z0-9_-]` ⇒ 賣家填的是對的編號，卻被剔除、送出成功、什麼都沒發生、零訊號。
-// 那正是這份設計要防的失效形狀本身。
-//
-//	3701 / 3702 / 3703（可線上驗證）
-//	  嚴格 certNoPattern。這個值會被 product-service 原字未編碼組進農業部 API 的查詢
-//	  字串（後面緊接著 &api_key=<真實金鑰>），格式由對方決定不是由我們決定；而且它與
-//	  Java 的 GovCertificationService.isValidCertNo 是**同一條規則的拷貝**，不得分岔。
-//
-//	3704 / 3705 / 3706（不支援線上驗證）
-//	  放寬：trim 後非空、≤ certNoMaxLength 字、禁控制字元與角括號，其餘字元允許。
-//	  它們不會被組進任何外部 URL，格式由 ADM 人眼判斷。這與 advisory 查驗端點
-//	  （VerifyCertification）對這三型本來就不套白名單的既有行為一致——同一個理由。
-//
-// ⚠️ 放寬**不等於不驗**：控制字元與 `<` `>` 仍然擋，那是防注入與防髒資料進 ADM 佇列，
-// 與「格式由誰決定」無關。
 func certificationInputRejection(certType, certNo string) (reason string, message string) {
 	if _, ok := certificationInputTypes[certType]; !ok {
 		return certWarningInvalidType, "認證類型格式不正確，這一筆未被採用"
@@ -1459,15 +1268,6 @@ func certificationInputRejection(certType, certNo string) (reason string, messag
 	return "", ""
 }
 
-// unverifiableCertNoValid 是 3704／3705／3706 的放寬規則（19 §6.2.9）。
-//
-// 判在 trim 之後：尾端換行是 CSV／試算表貼上來的常態，把它判成非法等於用一個排版字元
-// 靜默吃掉一張真的證書。⚠️ 判什麼就得送什麼——normalizedCertNo 負責讓送下游的值與這裡
-// 驗過的值是同一個。
-//
-// 長度算的是**字元不是位元組**：這三型的編號可能含中文（例：「食品GMP認證字第○○號」），
-// 用 len() 會讓 22 個中文字就超過 64 而被剔除。可驗證三型不受影響——它們的字元集全是
-// ASCII，兩種算法等值。
 func unverifiableCertNoValid(certNo string) bool {
 	trimmed := strings.TrimSpace(certNo)
 	if trimmed == "" {
@@ -1477,8 +1277,6 @@ func unverifiableCertNoValid(certNo string) bool {
 		return false
 	}
 	for _, r := range trimmed {
-		// 角括號單獨列出而不是靠某個字元集白名單：白名單正是這條放寬規則要拿掉的東西，
-		// 而這兩個字元擋的是「值被當成標記語言渲染」，與格式由誰決定無關。
 		if unicode.IsControl(r) || r == '<' || r == '>' {
 			return false
 		}
@@ -1486,14 +1284,6 @@ func unverifiableCertNoValid(certNo string) bool {
 	return true
 }
 
-// normalizedCertNo 回傳真正要送下游的 certNo。
-//
-// 存在的理由只有一個：**驗過的值與送出的值必須是同一個**。放寬那三型驗的是 trim 後的
-// 結果，若送出的仍是原值，一個從試算表貼進來的尾端換行就會通過驗證然後原樣落進申請表
-// 與 ADM 佇列——驗證看起來有做，擋下來的東西卻進去了。
-//
-// 可驗證三型原樣回：certNoPattern 本來就不容許任何空白，走到這裡的值已經是乾淨的，
-// 在這裡多做一次 trim 只會讓「Gateway 與 Java 是同一條規則」這句話變得不精確。
 func normalizedCertNo(certType, certNo string) string {
 	if _, verifiable := verifiableCertTypes[certType]; verifiable {
 		return certNo
@@ -1501,27 +1291,11 @@ func normalizedCertNo(certType, certNo string) string {
 	return strings.TrimSpace(certNo)
 }
 
-// certificationInputRef 是「一筆認證輸入」在判定時唯一需要的兩個值。
-//
-// 抽這個中介型別是因為兩條寫入路徑的 DTO 不同（賣家 pb.Certification、代行
-// DelegatedProductCertification，19 §6.2 的表），而判定規則必須只有一份。
 type certificationInputRef struct {
 	Type string
 	No   string
 }
 
-// certificationInputDecision 對一組認證輸入逐筆判定，回傳「第 i 筆留不留」的遮罩與
-// 對應 warning，並為每一筆被剔除的輸入記一行 warn log（19 §6.2.1 第 ① 層）。
-//
-// 🔴 為什麼是 handler 內的 filter 而不是 binding tag：本 repo 的 `binding:` 只有一條
-// 出口——ShouldBindJSON 失敗 → response.BadRequest ⇒ 400，而 `dive` 讓元素 tag 生效的
-// 意思正是「元素違規時 bind 失敗」。AI 上架助手 patch 進來的 certNo 會繞過畫面驗證原樣
-// 送出，後端現況照收 200；改成 400 會讓**已上架 App** 的 AI 上架流程當場壞掉（19
-// §6.2.2）。所以非法輸入一律「剔除該筆 ＋ warn log」，回應維持 200。
-// ✅ 筆數上限不受此限：binding:"max=N" 擋的是 DoS 不是值域，超量回 400 是正確行為。
-//
-// 呼叫時機固定是 **bind 之後、組 gRPC request 之前**：被剔掉的那一筆不得離開 Gateway。
-// log 欄位刻意不含 certNo（19 §6.2.1 只要求 productId／storeId／type／原因）。
 func certificationInputDecision(c *gin.Context, inputs []certificationInputRef, productID string, storeID int64) ([]bool, []CertificationWarningOutput) {
 	keep := make([]bool, len(inputs))
 	warnings := make([]CertificationWarningOutput, 0)
@@ -1547,8 +1321,6 @@ func certificationInputDecision(c *gin.Context, inputs []certificationInputRef, 
 	return keep, warnings
 }
 
-// filterCertificationInputs 是賣家路徑（W1／W2）的 filter：剔除非法輸入後回傳可以送進
-// gRPC 的那幾筆，以及要回給前端的 warning。
 func filterCertificationInputs(c *gin.Context, certs []*pb.Certification, productID string, storeID int64) ([]*pb.Certification, []CertificationWarningOutput) {
 	compact := make([]*pb.Certification, 0, len(certs))
 	for _, cert := range certs {
@@ -1566,8 +1338,6 @@ func filterCertificationInputs(c *gin.Context, certs []*pb.Certification, produc
 		if !keep[i] {
 			continue
 		}
-		// 送出 normalizedCertNo 而不是原值：驗過的值與送出的值必須是同一個
-		// （見 normalizedCertNo 的註解）。可驗證三型這裡是 no-op。
 		kept = append(kept, &pb.Certification{
 			Name:   cert.GetName(),
 			CertNo: normalizedCertNo(cert.GetName(), cert.GetCertNo()),
@@ -1576,10 +1346,6 @@ func filterCertificationInputs(c *gin.Context, certs []*pb.Certification, produc
 	return kept, warnings
 }
 
-// mergeCertificationWarnings 併入 product-service 回傳的 warning（CONCURRENT_CONFLICT）。
-// Gateway 側剔除的排前面：那是操作者自己送錯的，先看到比較合理。
-//
-// 回傳恆非 nil——json 序列化成 [] 而不是 null，19 §9.5 的硬性要求。
 func mergeCertificationWarnings(local []CertificationWarningOutput, upstream []*pb.CertificationWarning) []CertificationWarningOutput {
 	out := make([]CertificationWarningOutput, 0, len(local)+len(upstream))
 	out = append(out, local...)
@@ -1623,9 +1389,6 @@ func (h *Holder) VerifyCertification(c *gin.Context) {
 		response.BadRequest(c, "認證類型不可為空")
 		return
 	}
-	// 字元白名單擋在送進 gRPC 之前：非法字元不得繼續往下游送。
-	// 只套用在可線上驗證的三型——其餘類型的 cert_no 不會被串進政府 API URL，擋了不會多安全，
-	// 只會把該類型的合法編號從 3003（暫不支援線上驗證）改判成 400。
 	if _, verifiable := verifiableCertTypes[certType]; verifiable && !certNoPattern.MatchString(certNo) {
 		response.BadRequest(c, "認證編號格式不正確，僅接受英數字、連字號與底線")
 		return
@@ -1634,7 +1397,6 @@ func (h *Holder) VerifyCertification(c *gin.Context) {
 	resp, err := h.Product.VerifyCertification(c.Request.Context(), certNo, certType)
 	if err != nil {
 		pkglogger.Error(c.Request.Context(), "VerifyCertification gRPC error", zap.Error(err))
-		// 透傳 gRPC status description（含農業部 API 失敗的具體訊息）
 		response.GrpcErr(c, "product", err)
 		return
 	}

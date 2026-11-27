@@ -112,8 +112,6 @@ test("shared phone controls stay single-line and meet the touch target", () => {
 });
 
 test("product and profile fixed actions stay usable at 320px", () => {
-	// The adapter remains the business-truth owner. Mobile only changes which
-	// adapter-provided action is prominent and where the alternate is disclosed.
 	assert.match(
 		productForm,
 		/const mobileProminentAction = secondary \?\? primary/,
@@ -192,7 +190,6 @@ test("seller portal drawers and certification flows keep phone-safe controls", (
 	assert.match(dialog, /data-hk-dialog-body/);
 	assert.match(dialog, /data-hk-dialog-footer/);
 	assert.match(dialog, /data-hk-overlay-close/);
-	// 44px close button (was size-9 = 36px); the header's pr-16 clears it.
 	assert.match(dialog, /right-4 top-4[\s\S]*size-11/);
 	assert.match(
 		adaptation,

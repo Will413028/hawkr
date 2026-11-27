@@ -72,7 +72,6 @@ class SocialContentRepository {
         pb.RecordPostViewRequest(postId: postId.toString()),
       );
     } catch (_) {
-      // 瀏覽計數失敗不影響畫面。
     }
   }
 

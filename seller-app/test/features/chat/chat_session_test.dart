@@ -47,7 +47,6 @@ void main() {
     );
     addTearDown(c.dispose);
     addTearDown(session.dispose);
-    // 建立 provider（它在建立時掛上店家變化的監聽）。
     c.listen(sellerStoreIdProvider, (_, _) {});
     c.read(chatSessionProvider);
     session.start();

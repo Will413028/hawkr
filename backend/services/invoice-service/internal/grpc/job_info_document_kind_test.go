@@ -43,7 +43,6 @@ func TestToJobInfo_CarriesDocumentKind(t *testing.T) {
 				t.Fatalf("document_kind 應為 %q，實得 %q —— 前端靠它分辨並列的發票／收據兩個區塊，"+
 					"且不得從 operation_type 推導（那個 enum 沒有 RECEIPT）", kind, got.GetDocumentKind())
 			}
-			// 文案跟著 kind 走：收據賣家不該讀到「發票開立…」。
 			wantNotice := shipmentUnaffectedNotice
 			if kind == codemeta.InvoiceDocumentKindReceipt.Value {
 				wantNotice = shipmentUnaffectedNoticeReceipt

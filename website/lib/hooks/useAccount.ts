@@ -84,7 +84,6 @@ function cursorListControls(
 	};
 }
 
-/* ===== Coupons ===== */
 
 interface CouponState {
 	my: MyCouponItem[];
@@ -140,7 +139,6 @@ export function useCoupons() {
 	};
 }
 
-/* ===== Favorites ===== */
 
 export function useFavorites(options: { enabled?: boolean } = {}) {
 	const { identity, status, scope } = useBuyerQueryScope();
@@ -159,9 +157,6 @@ export function useFavorites(options: { enabled?: boolean } = {}) {
 	});
 	const removeMutation = useMutation({
 		mutationFn: (productId: number | string) => removeFavorite(productId),
-		// Keep the initiating row mounted while the request is pending so its
-		// Button can expose the shared branded loading state. Remove it only after
-		// the backend confirms success; a failure therefore needs no visual rollback.
 		onSuccess: async (_result, productId) => {
 			await queryClient.cancelQueries({ queryKey });
 			queryClient.setQueryData<
@@ -200,7 +195,6 @@ export function useFavorites(options: { enabled?: boolean } = {}) {
 	};
 }
 
-/* ===== Follow ===== */
 
 export function useFollowing(options: { enabled?: boolean } = {}) {
 	const { identity, status, scope } = useBuyerQueryScope();
@@ -219,8 +213,6 @@ export function useFollowing(options: { enabled?: boolean } = {}) {
 	});
 	const unfollowMutation = useMutation({
 		mutationFn: ({ id }: { id: number | string }) => setSellerFollow(id, false),
-		// As with favourites, retain the row until success so the initiating
-		// control remains visible and can be locked against duplicate requests.
 		onSuccess: async (_result, { id }) => {
 			await queryClient.cancelQueries({ queryKey });
 			queryClient.setQueryData<
@@ -260,7 +252,6 @@ export function useFollowing(options: { enabled?: boolean } = {}) {
 	};
 }
 
-/* ===== History ===== */
 
 export function useHistory() {
 	const { identity, status, scope } = useBuyerQueryScope();
@@ -316,7 +307,6 @@ export function useHistory() {
 	};
 }
 
-/* ===== Member cards (會員卡) ===== */
 
 export function useMemberCards() {
 	const { identity, status, scope } = useBuyerQueryScope();
@@ -344,7 +334,6 @@ export function useMemberCards() {
 	};
 }
 
-/* ===== Profile ===== */
 
 /**
  * `enabled` lets a caller that doesn't always need the buyer profile skip the

@@ -79,7 +79,6 @@ func TestHandlerPathSendWatchResendAndLatest(t *testing.T) {
 	if last := events[len(events)-1]; text != "你好！" || last.GetFinished().GetSessionId() != first.Msg.GetSessionId() {
 		t.Fatalf("text = %q，最後一筆 = %v", text, last)
 	}
-	// 從最後一個 cursor 接續：沒有新事件。
 	rest, err := drain(t, c, &pb.WatchAssistantTurnRequest{TurnId: first.Msg.GetTurnId(), Cursor: events[len(events)-1].GetCursor()}, accountID)
 	if err != nil || len(rest) != 0 {
 		t.Fatalf("接續 = %v, %v", rest, err)

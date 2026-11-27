@@ -60,7 +60,6 @@ type App struct {
 	stores Stores
 	images rpc.Images
 	log    *slog.Logger
-	// reasonOf 取出模組錯誤帶的業務原因；正式組裝是 crm.ReasonOf，測試換成固定的原因（模組的原因型別不能在模組外建構）。
 	reasonOf func(error) crm.Reason
 }
 
@@ -71,7 +70,6 @@ func NewApp(reads Reads, writes Writes, buyers Buyers, stores Stores, images rpc
 	return newApp(declarations, reads, writes, buyers, stores, images, log)
 }
 
-// newApp 的宣告表由參數給（測試用缺一列的表驗證啟動檢查）。
 func newApp(table map[string]seller.Capability, reads Reads, writes Writes, buyers Buyers, stores Stores, images rpc.Images, log *slog.Logger) (*App, error) {
 	switch {
 	case log == nil:
@@ -89,9 +87,6 @@ func newApp(table map[string]seller.Capability, reads Reads, writes Writes, buye
 	return &App{reads: reads, writes: writes, buyers: buyers, stores: stores, images: images, log: log, reasonOf: crm.ReasonOf}, nil
 }
 
-// ownStore 檢查呼叫者是 storeID 這家店的店主（店家由 seller.CurrentStore 推導）。沒有登入由 interceptor 擋，管理員回 permission_denied；呼叫者沒有店回 not_found，
-// 店不是呼叫者的回 permission_denied（店家 ID 是公開的，不需要反列舉）。賣家能力（停權、前置條件）不在這裡檢查：由 crm 模組在寫入的 transaction 內、
-// 讀取之前檢查（ADR 2026-09-29 的修訂），宣告見 declarations。欄位格式的檢查先於它。
 func (h *App) ownStore(ctx context.Context, storeID int64) error {
 	p, err := rpc.RequireAccount(ctx)
 	if err != nil {
@@ -107,13 +102,11 @@ func (h *App) ownStore(ctx context.Context, storeID int64) error {
 	return nil
 }
 
-// reasons 是模組的業務原因對到契約的 ErrorReason（apperr.Reason）：只有 client 會依它分支的才對應，找不到類不帶原因。
 var reasons = map[crm.Reason]apperr.Reason{
 	crm.ReasonTagNameTaken: apperr.ReasonCrmTagNameTaken,
 	crm.ReasonTagLimit:     apperr.ReasonCrmTagLimit,
 }
 
-// failure 把模組的錯誤轉成對外的錯誤：業務原因附上契約的 ErrorReason，欄位對到請求路徑 paths。
 func (h *App) failure(err error, paths rpc.FieldPaths) error {
 	if err == nil {
 		return nil
@@ -134,7 +127,6 @@ var (
 	noFieldPaths = rpc.FieldPaths{}
 )
 
-// cursor 是客戶頁的 page token 內容：上一頁最後一列的排序鍵與買家 ID（排序與方向在 page token 的 scope）。
 type cursor struct {
 	Number  int64     `json:"n"`
 	At      time.Time `json:"a"`
@@ -158,7 +150,6 @@ func nextToken(scope string, next *crm.CustomerCursor) string {
 	return rpc.TokenFor(scope, cursor{Number: next.Number, At: next.At, BuyerID: next.BuyerID})
 }
 
-// sortOf 把請求的排序欄位轉成模組的排序；UNSPECIFIED 是預設的首筆訂單時間，契約沒有的數字回 invalid_argument。
 func sortOf(s pb.CustomerSort) (crm.SortBy, error) {
 	switch s {
 	case pb.CustomerSort_CUSTOMER_SORT_UNSPECIFIED, pb.CustomerSort_CUSTOMER_SORT_FIRST_ORDER_TIME:
@@ -171,7 +162,6 @@ func sortOf(s pb.CustomerSort) (crm.SortBy, error) {
 	return 0, rpc.RequiredField("sort", "sort 不是已知的排序欄位")
 }
 
-// pageSize 檢查 page_size：負數回 invalid_argument（API 設計規範 §page_size），0 與超過上限由模組套預設與上限。
 func pageSize(n int32) (int32, error) {
 	if n < 0 {
 		return 0, rpc.RequiredField("page_size", "page_size 不能是負數")
@@ -179,12 +169,10 @@ func pageSize(n int32) (int32, error) {
 	return n, nil
 }
 
-// lists 回報 update_mask 是否列了 field（或 "*"，所有可修改的欄位）。
 func lists(mask *fieldmaskpb.FieldMask, field string) bool {
 	return slices.ContainsFunc(mask.GetPaths(), func(p string) bool { return p == field || p == "*" })
 }
 
-// 每個方法的順序：欄位格式檢查（含 store_id）→ 店家身分（ownStore）→ 模組呼叫（能力由模組檢查）。
 
 func (h *App) ListCustomers(ctx context.Context, req *connect.Request[pb.ListCustomersRequest]) (*connect.Response[pb.ListCustomersResponse], error) {
 	msg := req.Msg
@@ -264,7 +252,6 @@ func (h *App) UpdateCustomer(ctx context.Context, req *connect.Request[pb.Update
 	if err != nil {
 		return nil, err
 	}
-	// 客戶沒有 INPUT_ONLY 或遮蔽的欄位，用規範的第一種做法：ApplyUpdateMask 檢查路徑並把 mask 選到的欄位套上去（唯一可修改的是 type）。
 	if !lists(msg.GetUpdateMask(), "type") {
 		return nil, rpc.RequiredField("update_mask", "update_mask 必須列 type（分類是唯一可以修改的欄位）")
 	}
@@ -410,7 +397,6 @@ func (h *App) RemoveCustomerTag(ctx context.Context, req *connect.Request[pb.Rem
 	return connect.NewResponse(&pb.RemoveCustomerTagResponse{Customer: c}), nil
 }
 
-// customerKey 解析 store_id 與買家 ID（欄位格式先於身分檢查），再檢查店家身分。
 func (h *App) customerKey(ctx context.Context, rawStoreID, rawBuyerID, buyerField string) (storeID, buyerID int64, err error) {
 	if storeID, err = rpc.ParseID("store_id", rawStoreID); err != nil {
 		return 0, 0, err
@@ -424,7 +410,6 @@ func (h *App) customerKey(ctx context.Context, rawStoreID, rawBuyerID, buyerFiel
 	return storeID, buyerID, nil
 }
 
-// customer 把模組回的一位客戶組成回應。客戶的可見性（買家已關閉、店家已退場）由模組在寫入或讀取之前判斷並回 not_found，這裡只做顯示資料的對應。
 func (h *App) customer(ctx context.Context, c crm.Customer) (*pb.Customer, error) {
 	out, err := h.toCustomers(ctx, []crm.Customer{c})
 	if err != nil {
@@ -443,7 +428,6 @@ func toTags(in []crm.Tag) []*pb.Tag {
 	return out
 }
 
-// toCustomers 把一頁客戶轉成回應：暱稱與頭像以批次查詢補上；buyer 沒有回這位買家的資料（買家已不在）當成已刪除。
 func (h *App) toCustomers(ctx context.Context, in []crm.Customer) ([]*pb.Customer, error) {
 	ids := make([]int64, 0, len(in))
 	for _, c := range in {

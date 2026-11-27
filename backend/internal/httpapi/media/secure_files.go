@@ -21,8 +21,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// 機敏檔分段上傳的單體端點（B1-D17，API 設計規範（Connect）§十三）：原始位元組 body，不經 Connect。錯誤沿用 /api/files/ 的做法：
-// 只回 HTTP 狀態、純文字、不帶細節；唯一例外是 index 不符回 409 並帶 Hawkr-Next-Index。
 
 const (
 	// ChunkRoute 是段上傳端點的 ServeMux 樣式。
@@ -40,7 +38,6 @@ const (
 	// ChunkReadTimeout 是每個段請求讀 body 的時限：4 MiB 在 512 kbit/s 上行約 66 秒，低於 Vercel 外部 rewrite 的 120 秒。
 	ChunkReadTimeout = 90 * time.Second
 
-	// metaNextIndex 是 media 模組放在 FailedPrecondition metadata 的鍵（upload.metaNextIndex）。
 	metaNextIndex = "next_index"
 )
 
@@ -55,7 +52,6 @@ type SecureUploads struct {
 	m           SecureFiles
 	log         *slog.Logger
 	readTimeout time.Duration
-	// sessions 是後台路由驗代行 session 的來源（*delegation.Module）；nil 時後台路由一律 503。
 	sessions DelegationAccess
 }
 
@@ -101,7 +97,6 @@ func (h *SecureUploads) DelegatedPreview() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.preview(w, r, h.delegatedUploader) })
 }
 
-// authenticate 設好機敏回應的 header 後取出上傳者；ok 為 false 時已回應。touch 非 nil 時，請求成功之後要呼叫它。
 type authenticate func(w http.ResponseWriter, r *http.Request) (u media.Uploader, touch func(), ok bool)
 
 func sensitiveHeaders(w http.ResponseWriter) {
@@ -109,7 +104,6 @@ func sensitiveHeaders(w http.ResponseWriter) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 }
 
-// uploader 取出呼叫的顧客帳號；沒有登入 401、不是顧客帳號 403。
 func (h *SecureUploads) uploader(w http.ResponseWriter, r *http.Request) (media.Uploader, func(), bool) {
 	sensitiveHeaders(w)
 	p, ok := rpc.PrincipalFrom(r.Context())
@@ -124,12 +118,6 @@ func (h *SecureUploads) uploader(w http.ResponseWriter, r *http.Request) (media.
 	return media.Uploader{ID: p.ID}, nil, true
 }
 
-// delegatedUploader 只以 X-HK-Operation-Session 的代行 session 授權，與 BeginSecureUpload 同一組檢查：
-// httpdelegation.Authorize 解析憑證並檢查 session 此刻可用且帶 media.upload（被拒絕寫一列 FAILED 稽核並提早回應），
-// 通過後 DelegatedRead 再檢查店家此刻可代行（關店、停權、撤回代行授權；被拒絕寫一列 FAILED 稽核），店家取自它交回的 st.StoreID，
-// 所以兩段拒絕互斥、每次請求最多一列稽核。
-// 缺憑證或解析不到 401；session 已撤銷或逾時、沒有 media.upload、店家不可代行 403。管理員只來自 session，
-// 請求上的顧客 cookie、Bearer 與管理員身分都不參與授權。
 func (h *SecureUploads) delegatedUploader(w http.ResponseWriter, r *http.Request) (media.Uploader, func(), bool) {
 	sensitiveHeaders(w)
 	if h.sessions == nil {
@@ -164,7 +152,6 @@ func (h *SecureUploads) delegatedUploader(w http.ResponseWriter, r *http.Request
 	return media.Uploader{}, nil, false
 }
 
-// delegatedUploadMethod 是代行路由要的宣告：與 BeginSecureUpload 同一份（能力 media.upload、被拒絕的稽核動作與資源）。
 var delegatedUploadMethod = DelegatedDeclaration.Methods[mediav1alpha1connect.MediaDelegatedServiceBeginSecureUploadProcedure]
 
 func (h *SecureUploads) chunk(w http.ResponseWriter, r *http.Request, who authenticate) {
@@ -229,9 +216,6 @@ func (h *SecureUploads) preview(w http.ResponseWriter, r *http.Request, who auth
 	}
 }
 
-// failure 把錯誤轉成 HTTP 狀態：讀 body 的問題（超過上限 413、逾時 408、client 中斷 400）；index 不符 409 加 Hawkr-Next-Index；
-// 其他的 FailedPrecondition（過期、已完成、不能預覽）412；沒有授權與不存在一律 404 或 403 不可區分；滿載與暫時性問題 503（滿載帶
-// Retry-After）；其餘 500 並記 error。
 func (h *SecureUploads) failure(w http.ResponseWriter, r *http.Request, err error) {
 	var tooLarge *http.MaxBytesError
 	var ae *apperr.Error
@@ -288,13 +272,11 @@ func (h *SecureUploads) failure(w http.ResponseWriter, r *http.Request, err erro
 	}
 }
 
-// bodyReadError 標記錯誤來自讀請求 body。
 type bodyReadError struct{ err error }
 
 func (e *bodyReadError) Error() string { return e.err.Error() }
 func (e *bodyReadError) Unwrap() error { return e.err }
 
-// originReader 把讀 body 的錯誤標成 bodyReadError，讓 failure 分辨 client 斷線與儲存或資料庫的失敗。
 type originReader struct{ r io.Reader }
 
 func (o *originReader) Read(p []byte) (int, error) {
@@ -305,13 +287,11 @@ func (o *originReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
-// isClientAbort 判斷是 client 中途斷線或取消（不是伺服器的錯，不記 error）：請求的 context 已結束，或錯誤出自讀 body。
 func isClientAbort(r *http.Request, err error) bool {
 	var be *bodyReadError
 	return r.Context().Err() != nil || errors.As(err, &be)
 }
 
-// safeContentType 只放行圖片與 PDF 的型別，其餘（含 SVG）一律當不透明的二進位。
 func safeContentType(ct string) string {
 	base, _, _ := strings.Cut(strings.ToLower(strings.TrimSpace(ct)), ";")
 	if strings.HasPrefix(base, "image/") && !strings.Contains(base, "svg") || base == "application/pdf" {

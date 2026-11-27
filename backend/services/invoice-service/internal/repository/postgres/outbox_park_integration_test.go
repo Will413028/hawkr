@@ -50,7 +50,6 @@ func TestIntegration_OutboxPark_KeepsTheRowInTheBacklogAndBringsItBack(t *testin
 		t.Fatal("Park 回 rows=0：那一列不在 'pending'，本測試的前提就不成立")
 	}
 
-	// ① 仍在積壓指標裡 —— 這是告警不熄滅的**充要條件**。
 	n, err := repo.CountPending(ctx)
 	if err != nil {
 		t.Fatalf("CountPending: %v", err)
@@ -67,7 +66,6 @@ func TestIntegration_OutboxPark_KeepsTheRowInTheBacklogAndBringsItBack(t *testin
 		t.Fatal("停泊之後最舊未派送列變成 nil —— 積壓年齡會被寫成 0，告警反向")
 	}
 
-	// ② 停泊期間不重撈（沒有熱迴圈）。
 	due, err := repo.FetchPending(ctx, now.Add(park-time.Minute), 100)
 	if err != nil {
 		t.Fatalf("FetchPending: %v", err)
@@ -76,7 +74,6 @@ func TestIntegration_OutboxPark_KeepsTheRowInTheBacklogAndBringsItBack(t *testin
 		t.Fatal("停泊未到期就被撈回來了 —— 那是一條沒有退避的熱迴圈")
 	}
 
-	// ③ 到期之後自己回到候選集合 —— 這是「不是永久旗標」的定義。
 	due, err = repo.FetchPending(ctx, now.Add(park+time.Minute), 100)
 	if err != nil {
 		t.Fatalf("FetchPending: %v", err)
@@ -86,7 +83,6 @@ func TestIntegration_OutboxPark_KeepsTheRowInTheBacklogAndBringsItBack(t *testin
 			"broker 修好之後也不會自己排空")
 	}
 
-	// ④ last_error 有落地（維運唯一需要的線索）。
 	var lastErr *string
 	if err := pool.QueryRow(ctx,
 		`SELECT last_error FROM invoice_outbox_events WHERE id=$1`, ev.ID).Scan(&lastErr); err != nil {
@@ -120,7 +116,6 @@ func TestIntegration_ExporterStrandedQueriesRunAndDiscriminate(t *testing.T) {
 	outboxQ := exporterQuery(t, "invoice_outbox_stranded_rows")
 	inboxQ := exporterQuery(t, "invoice_inbox_stranded_rows")
 
-	// 鑑別力自檢：兩支必須真的打在不同的表上（M31 的存在理由）。
 	if !strings.Contains(outboxQ, "invoice_outbox_events") {
 		t.Fatalf("invoice_outbox_stranded_rows 的 FROM 不是 invoice_outbox_events：\n%s", outboxQ)
 	}
@@ -135,7 +130,6 @@ func TestIntegration_ExporterStrandedQueriesRunAndDiscriminate(t *testing.T) {
 
 	base := countStranded(t, ctx, pool, outboxQ)
 
-	// (a) 維運 SQL 隔離出來的 'failed' —— 程式已不再寫這個值，而本表沒有任何查詢會撈它。
 	repo := NewOutboxRepository(pool)
 	quarantined, err := repo.Insert(ctx, newOutbox(rk))
 	if err != nil {
@@ -151,7 +145,6 @@ func TestIntegration_ExporterStrandedQueriesRunAndDiscriminate(t *testing.T) {
 			"DeleteDoneBefore 只刪 'done'），M31 是它唯一的能見度。查詢：\n%s", got, base+1, outboxQ)
 	}
 
-	// (b) 停泊了一整週還沒好的 'pending'。
 	longParked, err := repo.Insert(ctx, newOutbox(rk))
 	if err != nil {
 		t.Fatalf("Insert: %v", err)
@@ -165,8 +158,6 @@ func TestIntegration_ExporterStrandedQueriesRunAndDiscriminate(t *testing.T) {
 		t.Fatalf("再加一列停泊超過 7 天之後 M31 = %.0f，want %.0f。查詢：\n%s", got, base+2, outboxQ)
 	}
 
-	// (c) 陰性：剛建立、還在正常退避的 'pending' **不得**被數進來，否則本指標會恆紅、
-	//     然後被調靜音 —— 那比沒有指標更糟。
 	fresh, err := repo.Insert(ctx, newOutbox(rk))
 	if err != nil {
 		t.Fatalf("Insert: %v", err)
@@ -177,7 +168,6 @@ func TestIntegration_ExporterStrandedQueriesRunAndDiscriminate(t *testing.T) {
 			"指標會恆紅，而恆紅的指標等於沒有指標", got, base+2)
 	}
 
-	// M30 只驗「跑得起來」：它的鑑別力屬於 inbox 那一側，這裡要的是它沒有壞掉。
 	countStranded(t, ctx, pool, inboxQ)
 }
 
@@ -190,10 +180,6 @@ func containsOutbox(rows []domain.OutboxEvent, id int64) bool {
 	return false
 }
 
-// countStranded 跑一支 exporter 查詢並把各 label 組的 cnt 加總。
-//
-// 這裡刻意用 `pool.Query` 跑**原文**，不做任何改寫：改寫過的查詢驗的是我的改寫，
-// 不是 exporter 真的會送出去的那一句。
 func countStranded(t *testing.T, ctx context.Context, pool *pgxpool.Pool, query string) float64 {
 	t.Helper()
 	rows, err := pool.Query(ctx, query)

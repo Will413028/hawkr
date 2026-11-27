@@ -11,9 +11,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 )
 
-// 單一請求的處理時間。client 以 Connect-Timeout-Ms 帶自己的 deadline；沒帶時用預設值，
-// 超過上限時以上限計，避免沒有 deadline 的請求一直佔著資料庫連線。只套用在 unary：串流的長度
-// 由各方法自己決定。
 const (
 	defaultTimeout = 15 * time.Second
 	maxTimeout     = 60 * time.Second
@@ -74,7 +71,6 @@ func (i *interceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) co
 	}
 }
 
-// finish 把錯誤轉成 Connect 的錯誤，並為每個請求記一筆 log。沒有分類的錯誤只有 log 看得到原因。
 func (i *interceptor) finish(ctx context.Context, procedure string, start time.Time, err error) error {
 	markLogged(ctx)
 	c := toConnect(ctx, err)
@@ -102,7 +98,6 @@ func (i *interceptor) finish(ctx context.Context, procedure string, start time.T
 	return ce
 }
 
-// bounded 在 client 沒帶 deadline 時套用預設值，帶了但超過上限時縮到上限。
 func bounded(ctx context.Context) (context.Context, context.CancelFunc) {
 	limit := defaultTimeout
 	if d, ok := ctx.Deadline(); ok {
@@ -114,7 +109,6 @@ func bounded(ctx context.Context) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(ctx, limit)
 }
 
-// principalLabel 是給 log 的呼叫者，例如 account:7、admin:3（兩者的 ID 各自發號，要連同類型才能識別）。
 func principalLabel(p identity.Principal) string {
 	if p.Kind == identity.PrincipalAdmin {
 		return "admin:" + strconv.FormatInt(p.ID, 10)

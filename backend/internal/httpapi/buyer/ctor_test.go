@@ -29,7 +29,6 @@ func (noRatings) StoreRatingStats(context.Context, []int64) (map[int64]httpselle
 	return nil, nil
 }
 
-// 沒有指定封鎖來源的測試：來源都在，但不會被呼叫（呼叫就是測試寫錯了）。
 type unusedBlocking struct{}
 
 func (unusedBlocking) ContentAuthorFor(context.Context, social.Caller, social.Target) (social.ContentAuthor, error) {
@@ -48,13 +47,11 @@ func unusedSources() blocks.Sources {
 	return blocks.Sources{Authors: unusedBlocking{}, Reviews: unusedBlocking{}, Messages: unusedBlocking{}, Identities: blocks.Identities{Buyers: unusedBlocking{}, Stores: unusedBlocking{}}}
 }
 
-// mustApp 是測試的建構：StatsSource 是必要的（零值被建構子擋下）；沒有指定的測試給一份沒有任何資料的來源。
 func mustApp(t testing.TB, m Module, images rpc.Images, ports Ports, stats ...*httpseller.StatsSource) *App {
 	t.Helper()
 	return mustAppWith(t, m, images, ports, unusedSources(), stats...)
 }
 
-// mustAppWith 是 mustApp 加上指定的封鎖來源。
 func mustAppWith(t testing.TB, m Module, images rpc.Images, ports Ports, blocking blocks.Sources, stats ...*httpseller.StatsSource) *App {
 	t.Helper()
 	var s *httpseller.StatsSource

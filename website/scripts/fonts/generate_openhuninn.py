@@ -77,9 +77,6 @@ FALLBACK_METRICS = {
     "size_adjust": "106.13%",
 }
 
-# Keep every source-supported Latin base/mark/precomposed glyph in one face.
-# Splitting these ranges can break grapheme-cluster shaping and Tai-lo tone-mark
-# fallback even when individual codepoints appear to be covered.
 SHAPING_SAFE_RANGES = (
     (0x0000, 0x024F),
     (0x0300, 0x036F),
@@ -444,9 +441,6 @@ def subset_font(
         options.notdef_outline = True
         options.recommended_glyphs = True
         options.recalc_timestamp = False
-        # The legacy production subset was generated with --no-hinting. The
-        # upstream v2.0 glyf table currently has zero instruction bytes, but
-        # keeping this explicit prevents a future input from changing parity.
         options.hinting = False
 
         subsetter = subset.Subsetter(options=options)
@@ -573,7 +567,6 @@ def build_artifacts(config: BuildConfig, stage_dir: Path, stage_css: Path) -> di
                 "cmap_sha256": canonical_codepoint_digest(plan.codepoints),
                 "unicode_ranges": range_string(plan.codepoints),
                 "postscript_name": postscript_name,
-                # Kept only while rendering CSS; removed from the persisted manifest.
                 "codepoint_values": sorted(plan.codepoints),
             }
         )

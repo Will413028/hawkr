@@ -52,8 +52,6 @@ class UberAmountBoundaryContractTest {
         @Test
         @DisplayName("出站：元 → cents 是 ×100（官方換算例 $10.99 => 1099 的 TWD 形式）")
         void toMinorUnitsMultipliesByHundred() {
-            // 🔴 期望值硬寫字面值，不得由 TWD_MINOR_UNIT_FACTOR 導出——
-            //    否則把係數改回 1，這支測試會跟著變成恆真（§0.3 第二種形態）。
             assertThat(UberFieldFormat.toMinorUnits(115L, "TWD")).isEqualTo(11500L);
             assertThat(UberFieldFormat.toMinorUnits(75L, "TWD")).isEqualTo(7500L);
             assertThat(UberFieldFormat.toMinorUnits(0L, "TWD")).isEqualTo(0L);
@@ -81,9 +79,6 @@ class UberAmountBoundaryContractTest {
         @Test
         @DisplayName("🔴 入站不整除 ⇒ fail-closed，不截斷也不四捨五入")
         void fromMinorUnitsRejectsNonMultiples() {
-            // TWD 沒有小數位 ⇒ 有餘數代表我方對這條 wire 的理解錯了。
-            // 靜默截斷會產生「看起來正常、卻對不上 provider 帳單」的收款金額，
-            // 而差額要等月結對帳才會發現。
             assertThatThrownBy(() -> UberFieldFormat.fromMinorUnits(11501L, "TWD"))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("11501");
@@ -110,8 +105,6 @@ class UberAmountBoundaryContractTest {
         @Test
         @DisplayName("🔴 官方回 cents，QuoteResult.fee 必須是元")
         void quoteFeeIsConvertedToDollars() {
-            // 官方 E1 回應形狀（總覽 §2.1 欄位表：id／fee／currency／expires／dropoff_eta）。
-            // fee = 11500 cents ＝ NT$115。
             FakeUberTransport transport = new FakeUberTransport().respondWith(200, """
                     {"id":"dqt_test","fee":11500,"currency":"twd",
                      "expires":"2026-09-17T12:00:00Z","dropoff_eta":"2026-09-17T11:30:00Z"}
@@ -151,9 +144,6 @@ class UberAmountBoundaryContractTest {
         }
     }
 
-    // =========================================================================
-    // helpers
-    // =========================================================================
 
     /** 🔴 sleeper 換成 no-op：退避階梯會讓測試真的睡。 */
     private static UberApiClient client(FakeUberTransport transport) {

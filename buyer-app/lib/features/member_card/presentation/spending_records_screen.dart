@@ -273,10 +273,6 @@ class _TableRow extends StatelessWidget {
             flex: _kFlexDate,
             child: _oneLine(record.orderDate, textStyle),
           ),
-          // 優惠券標示改掛在訂單編號底下：它描述的是「這筆訂單怎麼付的」，
-          // 與退款金額是兩件事。之前兩者共用第 4 格，導致「退回」欄從頭到尾
-          // 沒顯示過 record.refund（表頭寫「退回」、格子畫的是優惠券 badge），
-          // 而且 badge 在那個窄欄裡還會被折成「優惠券折」+「抵」。
           Expanded(
             flex: _kFlexOrderSn,
             child: Column(
@@ -315,8 +311,6 @@ class _TableRow extends StatelessWidget {
             flex: _kFlexAmount,
             child: _oneLine('NT\$${record.amount}', textStyle),
           ),
-          // 「退回」欄現在真的畫退款金額。0 維持原本的灰色「-」，
-          // 非 0 用 danger 色 + 粗體，讓它在整片綠字裡一眼看得出來。
           Expanded(
             flex: _kFlexRefund,
             child: _refund > 0

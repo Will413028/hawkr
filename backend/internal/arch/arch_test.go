@@ -31,7 +31,6 @@ var (
 	listOutput       []byte
 )
 
-// listPackages 列出單體的每個套件與它的 import（含測試的 import）。
 func listPackages(t *testing.T, root string) []Package {
 	t.Helper()
 	listPackagesOnce.Do(func() {
@@ -56,17 +55,12 @@ func listPackages(t *testing.T, root string) []Package {
 	if listErr != nil {
 		t.Fatalf("go list 失敗：%v\n%s", listErr, listOutput)
 	}
-	// 掃到零個套件也會「全部通過」，所以先確認至少看得到這個套件自己。
 	if !containsPackage(listedPackages, ModulePath+"/internal/arch") {
 		t.Fatalf("go list 沒有列出 internal/arch，檢查範圍不對：\n%s", listOutput)
 	}
 	return listedPackages
 }
 
-// codemetaImporters 是還在 import internal/platform/codemeta 的套件。CodeMeta 凍結、隨模組搬遷退場
-// （ADR 2026-09-25-codemeta-retirement 過渡第 1 步），名單只准變短：新的 import 會失敗，不再 import 的
-// 也要從名單刪掉。遷移計畫 A2 收尾時名單清空（media 的上傳者是模組自己的型別，不依賴舊的帳號類型）；
-// 生成物留到階段 C 隨 CodeMeta 一起刪除。
 var codemetaImporters []string
 
 func TestCodemetaImportsOnlyShrink(t *testing.T) {

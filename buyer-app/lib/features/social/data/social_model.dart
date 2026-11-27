@@ -25,9 +25,7 @@ abstract class Post with _$Post {
   const factory Post({
     required int id,
     @Default('') String content,
-    // 發文店家的不透明 ID（封鎖、比對用）；沒有店家時空字串。
     @Default('') String storeId,
-    // 店面網址的路徑段；空字串代表沒有可進的店面。
     @Default('') String storeCode,
     String? merchantName,
     String? merchantAvatar,
@@ -37,15 +35,10 @@ abstract class Post with _$Post {
     @Default(0) int shareCount,
     @Default(0) int viewCount,
     @Default(false) bool liked,
-    // 第一次發布的時間，epoch 秒；沒有時 null。
     int? createdAt,
-    // 商品卡片要的 id、name、image、price（最低價）。
     PostProduct? product,
-    // 觀看者此刻能不能留言（伺服器算的顯示用提示）。
     @Default(false) bool viewerCanComment,
-    // 觀看者留言時的身分；訪客 null。
     pb.Actor? viewerActor,
-    // 單篇網址（絕對網址，伺服器組，分享用）；沒有時空字串。
     @Default('') String shareUrl,
   }) = _Post;
 

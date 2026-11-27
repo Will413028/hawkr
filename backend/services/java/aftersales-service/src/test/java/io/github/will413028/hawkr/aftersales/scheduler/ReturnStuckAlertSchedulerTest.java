@@ -59,7 +59,7 @@ class ReturnStuckAlertSchedulerTest {
     @Test
     void run_resolvesStoreIdToAccountIdInShipmentAnomalyPayload() {
         long storeId = 7001L;
-        long resolvedAccountId = 42L; // 不同於 storeId：模擬已重新上架的賣家
+        long resolvedAccountId = 42L;
 
         AfterSaleCaseEntity acase = new AfterSaleCaseEntity();
         acase.setCaseNo("A001");
@@ -68,7 +68,6 @@ class ReturnStuckAlertSchedulerTest {
         acase.setBuyerId(2001L);
 
         when(caseMapper.selectList(any())).thenReturn(List.of(acase));
-        // issue #2294 L6：新增 lease claim 閘門，Mockito 對 int 預設回 0 ⇒ 必須 stub 成搶到
         when(caseMapper.claimReturnStuckAlert(anyString(), anyString(), any(), any())).thenReturn(1);
         when(sellerGrpcClient.resolveAccountIdForStore(storeId)).thenReturn(resolvedAccountId);
 
@@ -84,7 +83,6 @@ class ReturnStuckAlertSchedulerTest {
                 "shipment anomaly payload 的 seller_account_id 必須是反解後的 account_id(" + resolvedAccountId + ")，不是 store_id(" + storeId + ")：" + json);
         assertFalse(json.contains("\"seller_account_id\":" + storeId),
                 "shipment anomaly payload 不應直接帶未反解的 store_id：" + json);
-        // issue #2707 Phase A：新增 storeId 欄位必須是未反解的原始值，與 seller_account_id 分開帶。
         assertTrue(json.contains("\"store_id\":" + storeId),
                 "shipment anomaly payload 必須帶原始 store_id(" + storeId + ")：" + json);
     }
@@ -105,7 +103,7 @@ class ReturnStuckAlertSchedulerTest {
         long storeId = 7001L;
         long resolvedSellerAccountId = 42L;
         long buyerId = 2001L;
-        long resolvedBuyerAccountId = 88L; // 刻意 != buyerId，也 != 上面任何一個數字
+        long resolvedBuyerAccountId = 88L;
 
         AfterSaleCaseEntity acase = new AfterSaleCaseEntity();
         acase.setCaseNo("A001");
@@ -114,7 +112,6 @@ class ReturnStuckAlertSchedulerTest {
         acase.setBuyerId(buyerId);
 
         when(caseMapper.selectList(any())).thenReturn(List.of(acase));
-        // issue #2294 L6：新增 lease claim 閘門，Mockito 對 int 預設回 0 ⇒ 必須 stub 成搶到
         when(caseMapper.claimReturnStuckAlert(anyString(), anyString(), any(), any())).thenReturn(1);
         when(sellerGrpcClient.resolveAccountIdForStore(storeId)).thenReturn(resolvedSellerAccountId);
         when(buyerGrpcClient.resolvePrincipals(List.of(buyerId)))
@@ -155,7 +152,6 @@ class ReturnStuckAlertSchedulerTest {
         acase.setBuyerId(buyerId);
 
         when(caseMapper.selectList(any())).thenReturn(List.of(acase));
-        // issue #2294 L6：新增 lease claim 閘門，Mockito 對 int 預設回 0 ⇒ 必須 stub 成搶到
         when(caseMapper.claimReturnStuckAlert(anyString(), anyString(), any(), any())).thenReturn(1);
         when(sellerGrpcClient.resolveAccountIdForStore(storeId)).thenReturn(42L);
         when(buyerGrpcClient.resolvePrincipals(List.of(buyerId)))
@@ -204,11 +200,8 @@ class ReturnStuckAlertSchedulerTest {
         acase.setBuyerId(buyerId);
 
         when(caseMapper.selectList(any())).thenReturn(List.of(acase));
-        // issue #2294 L6：新增 lease claim 閘門，Mockito 對 int 預設回 0 ⇒ 必須 stub 成搶到
         when(caseMapper.claimReturnStuckAlert(anyString(), anyString(), any(), any())).thenReturn(1);
         when(sellerGrpcClient.resolveAccountIdForStore(storeId)).thenReturn(42L);
-        // 查無對應買家列：principals 依 server 端 COALESCE 行為 echo 回原始 buyerId，
-        // 但 buyerId 同時出現在 unresolvedIds，證明那個 echo-back 值不可信任。
         when(buyerGrpcClient.resolvePrincipals(List.of(buyerId)))
                 .thenReturn(new PrincipalResolution(
                         Map.of(buyerId, buyerId), Set.of(buyerId)));
@@ -289,7 +282,6 @@ class ReturnStuckAlertSchedulerTest {
 
         ReturnStuckAlertScheduler scheduler = new ReturnStuckAlertScheduler(
                 caseMapper, obsRabbitPublisher, sellerGrpcClient, buyerGrpcClient);
-        // 租約長度取真實預設值（14 天），確保驗的是「基準」而非退化成 plusDays(0)
         ReflectionTestUtils.setField(scheduler, "returnStuckDays", 14);
         ReflectionTestUtils.setField(scheduler, "batchSize", 200);
         scheduler.run();
@@ -385,7 +377,6 @@ class ReturnStuckAlertSchedulerTest {
                 "租約長度至少一天（單筆最壞耗時 = 一次 gRPC 解析 + 一次 MQ publish，遠小於此）");
     }
 
-    // ==================== R4 追加：publish 失敗時的租約釋放 ====================
 
     private static AfterSaleCaseEntity stuckCase(String caseNo) {
         AfterSaleCaseEntity acase = new AfterSaleCaseEntity();

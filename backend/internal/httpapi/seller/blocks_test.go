@@ -91,7 +91,6 @@ func (s storesOf) Store(_ context.Context, id int64) (model.Store, error) {
 	return model.Store{}, apperr.NotFound("no store")
 }
 
-// blockEnv：呼叫者店是 11（帳號 7）；買家 70 是帳號 7 自己的買家身分，買家 80 是別人，買家 81 已關閉。
 type blockEnv struct {
 	h       *App
 	m       *blockModuleFake
@@ -150,7 +149,7 @@ func TestBlockBuyerBlocksTheAuthorOfAReferenceInTheCallersStore(t *testing.T) {
 
 func TestBlockBuyerRejectsTheOwnersOwnBuyerIdentity(t *testing.T) {
 	e := newBlockEnv(t)
-	e.authors.author = buyerAuthor(70, 11) // 帳號 7 的買家身分，帳號 7 也擁有店 11
+	e.authors.author = buyerAuthor(70, 11)
 	_, err := e.h.BlockBuyer(e.ctx, connect.NewRequest(commentRef()))
 	if apperr.KindOf(err) != apperr.KindInvalidInput || len(e.m.blocked) != 0 {
 		t.Fatalf("店家封鎖店主本人的買家身分要 invalid_argument、不寫入：%v %+v", err, e.m.blocked)
@@ -167,7 +166,7 @@ func TestBlockBuyerRejectsAStoreAuthorAndUnreadableOrForeignReferences(t *testin
 	if _, err := e.h.BlockBuyer(e.ctx, connect.NewRequest(commentRef())); apperr.KindOf(err) != apperr.KindNotFound {
 		t.Fatalf("讀不到：%v", err)
 	}
-	e.authors.author = buyerAuthor(80, 12) // 別家店的內容
+	e.authors.author = buyerAuthor(80, 12)
 	if _, err := e.h.BlockBuyer(e.ctx, connect.NewRequest(commentRef())); apperr.KindOf(err) != apperr.KindNotFound {
 		t.Fatalf("別家店的內容與讀不到同一個答案：%v", err)
 	}
@@ -178,7 +177,7 @@ func TestBlockBuyerRejectsAStoreAuthorAndUnreadableOrForeignReferences(t *testin
 
 func TestBlockBuyerChecksThatTheTargetBuyerExists(t *testing.T) {
 	e := newBlockEnv(t)
-	e.authors.author = buyerAuthor(81, 11) // 已關閉
+	e.authors.author = buyerAuthor(81, 11)
 	if _, err := e.h.BlockBuyer(e.ctx, connect.NewRequest(commentRef())); apperr.KindOf(err) != apperr.KindNotFound || len(e.m.blocked) != 0 {
 		t.Fatalf("已關閉的買家不能封鎖：%v %+v", err, e.m.blocked)
 	}
@@ -219,7 +218,6 @@ func TestListBlockedBuyersShowsClosedBuyersAsDeletedWithOneBatchLookup(t *testin
 	if _, err := e.h.ListBlockedBuyers(e.ctx, connect.NewRequest(&pb.ListBlockedBuyersRequest{PageToken: resp.Msg.GetNextPageToken()})); err != nil || e.m.input.After == nil || e.m.input.After.BuyerID != 82 {
 		t.Fatalf("游標：%v %+v", err, e.m.input.After)
 	}
-	// page token 只對同一家店有效。
 	other := currentStore()
 	other.StoreID = 12
 	if _, err := e.h.ListBlockedBuyers(ctxWithStore(other), connect.NewRequest(&pb.ListBlockedBuyersRequest{PageToken: resp.Msg.GetNextPageToken()})); err == nil {
@@ -266,7 +264,7 @@ func TestBlockBuyerByAnotherStoresReviewIsNotFound(t *testing.T) {
 func TestBlockBuyerByAReviewWrittenByTheOwnersBuyerIdentityIsRejected(t *testing.T) {
 	e := newBlockEnv(t)
 	e.reviews.err = nil
-	e.reviews.r = review.Review{ID: uuid.UUID{9}, BuyerID: 70, StoreID: 11} // 帳號 7 的買家身分，帳號 7 也擁有店 11
+	e.reviews.r = review.Review{ID: uuid.UUID{9}, BuyerID: 70, StoreID: 11}
 	if _, err := e.h.BlockBuyer(e.ctx, connect.NewRequest(reviewRef())); apperr.KindOf(err) != apperr.KindInvalidInput || len(e.m.blocked) != 0 {
 		t.Fatalf("店家封鎖店主本人的買家身分要 invalid_argument、不寫入：%v %+v", err, e.m.blocked)
 	}

@@ -37,7 +37,6 @@ vi.mock("@/lib/seller/shipping", async (importOriginal) => ({
 	submitHomeDeliveryOnboarding: h.submitHome,
 	submitCvsOnboarding: h.submitCvs,
 }));
-// 閘門：SellerCertGate 本身只負責版面；這裡只讓測試看得到 ShippingClient 傳給它的申請、收款帳戶與 subject。
 vi.mock("@/features/seller-center", () => ({
 	SellerCertGate: (p: {
 		application?: { status: number } | null;
@@ -174,7 +173,6 @@ describe("ShippingClient prefill", () => {
 		const view = render(React.createElement(ShippingClient));
 		fireEvent.change(input("寄件人姓名"), { target: { value: "手動輸入" } });
 		fireEvent.change(input("路名門牌"), { target: { value: "新路 9 號" } });
-		// 重新讀取：row 出現（含不同的寄件人值），元件重新渲染。
 		setData({
 			rows: [
 				{
@@ -307,7 +305,7 @@ describe("ShippingClient 黑貓 submit", () => {
 	});
 
 	it("shows the display-width name error inline for an overlong prefilled name", () => {
-		setData({ contactName: "一二三四五六七八九十一二三四五六" }); // 16 個中文字 = 32 > 30
+		setData({ contactName: "一二三四五六七八九十一二三四五六" });
 		render(React.createElement(ShippingClient));
 		expect(screen.getByText(/寄件人姓名最多 30 個字/)).toBeTruthy();
 	});

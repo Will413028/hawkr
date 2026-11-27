@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "@/styles/features/cart.css";
-/* MarketProductCard still leans on .market-product-card styles. */
 import "@/styles/features/market.css";
 import "@/styles/features/cart-recommendations.css";
 import CartClient from "@/features/cart/CartClient";
@@ -48,9 +47,6 @@ function toRecommendedProduct(
 	return {
 		id,
 		name: (product.name ?? "").trim() || "推薦商品",
-		// Empty when absent → MarketProductCard's <AppImage> shows the
-		// design-system ImageFallback (folder-image) rather than a branded
-		// stand-in.
 		image: product.imageUrl || "",
 		sellerName: (product.sellerName ?? "").trim(),
 		sellerAvatar: product.seller?.logoUrl?.trim() || undefined,
@@ -62,8 +58,6 @@ function toRecommendedProduct(
 		hashtags: normaliseHashtags(product.hashtags),
 		unit: product.skuNames?.[0] || "份",
 		rating: parseRating(product.rating),
-		// reviewCount 由 /public/products 提供（#1156 後端修復後為真實值）；
-		// rating 為 null 時卡片仍顯示「尚無評價」。
 		reviews: parseReviewCount(product.reviewCount),
 		href: `/products/${id}`,
 		priceValue: 0,
@@ -73,11 +67,6 @@ function toRecommendedProduct(
 }
 
 export default async function CartPage() {
-	// Pull a small slice of hot products so the
-	// "KEEP SHOPPING" rail surfaces real products. Best-effort: if the
-	// call fails or returns nothing we render NOTHING — never fall back
-	// to hard-coded placeholder bundles. An empty cart-recommendation
-	// rail showing fake "五月蔬果" cards is worse than no rail at all.
 	const hotProducts = await getCachedHotProducts(6).catch(() => []);
 	const cards: MarketProductItem[] = hotProducts
 		.slice(0, 6)

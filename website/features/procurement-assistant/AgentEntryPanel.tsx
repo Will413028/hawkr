@@ -31,10 +31,6 @@ function usePrefill(
 	apply: (target: PrefillTarget) => void;
 } {
 	const lastAppliedRef = React.useRef<string | null>(null);
-	// 連草稿一起記下來。待確認狀態綁的是「使用者當時看到的那份草稿」——
-	// 之後又打了字，那個確認就不再對應同一個決定，於是自動失效。用 effect
-	// 去 reset 也做得到，但那會多一次 render，而且會把「什麼時候失效」的
-	// 規則藏在依賴陣列裡。
 	const [pending, setPending] = React.useState<{
 		id: string;
 		draftAtPrompt: string;
@@ -147,15 +143,11 @@ export default function AgentEntryPanel({
 		<section
 			className="hawkr-agent-entry"
 			aria-labelledby="hawkr-agent-entry-heading"
-			// entry 與 thread 是同一個 workspace 的兩個 view state，所以共用
-			// data-assistant-mode——E2E 與樣式都靠它辨認「這是 live agent 表面」，
-			// 換 view 不該讓那個判斷失效。
 			data-assistant-mode="live"
 			data-assistant-view="entry"
 		>
 			<div className="hawkr-agent-entry__hero">
-				{/* 入口品牌記號，不是 run status。工作開始後由
-				 * HawkrAgentSprite + canonical events 表達狀態。 */}
+
 				<span
 					className="hawkr-agent-entry__sprite hawkr-agent-sprite"
 					aria-hidden="true"

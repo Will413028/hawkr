@@ -11,21 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// ---------------------------------------------------------------------------
-// INV.ob —— outbox 派送（§4.3.3 第 3 組、§7.1.2 步驟 15）
-//
-// 🔴 **順序是 publish → MarkDone，不可對調。** 反過來（先標完成再發）的失效形狀是
-// 「事件蒸發」：MarkDone 成功、publish 失敗 ⇒ 那一列變成 done、永遠不會再被撈到，
-// 而買家該收到的發票通知從此不存在，沒有任何錯誤、沒有任何告警。
-// 本順序由 pkg/outbox.Worker 保證（processRow：Process 回 nil 才 MarkDone），
-// 而「Process 就是 publish 本身」是本檔唯一要守住的事。
-//
-// 相反方向的代價是重送（publish 成功但 MarkDone 失敗 ⇒ 下一輪再發一次），由
-// notification-service 的冪等鍵 `(event_type, reference_id, user_id, user_type)`
-// 承接 —— 這正是每則 payload 都自帶 `notification_ref_id` 的理由（§6.3.3.4）。
-// ---------------------------------------------------------------------------
 
-// outboxRow 把 domain.OutboxEvent 套進 pkg/outbox.Row。
 type outboxRow struct{ ev domain.OutboxEvent }
 
 func (r outboxRow) OutboxID() int64         { return r.ev.ID }
@@ -59,12 +45,8 @@ func (UnresolvedSellerAccountResolver) ResolveSellerAccountID(context.Context, i
 	return 0, fmt.Errorf("invoice: seller account resolver is not wired yet (see 58 §6.2)")
 }
 
-// outboxRepo 是 pkg/outbox.Repository[outboxRow] 的實作。
 type outboxRepo struct {
 	repo domain.OutboxRepository
-	// parkInterval 是「打滿 MaxAttempts 之後多久再試一次」。見 MarkFailed 的說明：
-	// 本表的終態 'failed' 是永久旗標且會讓告警反向，所以耗盡重試走停泊不走終結，
-	// 而停泊必須自帶退避，否則會變成每 tick 重撈的熱迴圈。
 	parkInterval time.Duration
 	log          *zap.Logger
 }
@@ -120,8 +102,6 @@ func (r *outboxRepo) MarkFailed(ctx context.Context, id int64, lastErr string, n
 		return err
 	}
 	if !parked {
-		// rows=0 ⇒ 那一列已不在 'pending'（唯一來源是維運 SQL 的隔離）。不是錯誤，
-		// 但必須留痕：它從此沒有任何自動執行者，靠 M31 讓人看見。
 		r.log.Warn("invoice.ob.park_skipped_row_not_pending", zap.Int64("outbox_id", id))
 	}
 	return nil
@@ -172,10 +152,6 @@ func NewOutboxWorker(
 				if markErr == nil {
 					obs.FailedTotal().Inc()
 				}
-				// 一則發票事件停泊 ＝ 有買家在停泊期間收不到「發票已開立」的通知。
-				// 它會在 parkInterval 之後自己回到候選集合（見 outboxRepo.MarkFailed），
-				// 但在那之前需要有人看見——outbox_oldest_pending_age_seconds 會持續
-				// 上升（告警 InvoiceOutboxLag），久留不去的則由 M31／InvoiceOutboxStranded 接。
 				l.Error("invoice.ob.parked",
 					zap.Int64("outbox_id", row.ev.ID), zap.String("routing_key", row.ev.RoutingKey),
 					zap.Int("attempt", attempt), zap.String("last_error", lastErr), zap.Error(markErr))
@@ -192,11 +168,6 @@ func (w *OutboxWorker) RefreshMetrics(ctx context.Context) error {
 	return w.obs.Refresh(ctx, w.monitorR, time.Now().UTC())
 }
 
-// process 是 ProcessFunc：解析通知路由欄位，然後發出去。
-//
-// 🔴 **這個函式裡不得出現任何 MarkDone。** 標記完成是 pkg/outbox.Worker 在本函式回 nil
-// **之後**做的事；把它挪進來（不論放在 publish 前或後）都等於自己決定「發出去了沒有」，
-// 而 publish 失敗時該列就永遠留不下來。
 func (w *OutboxWorker) process(ctx context.Context, row outboxRow) (any, error) {
 	body, err := w.withNotifyRouting(ctx, row.ev)
 	if err != nil {
@@ -213,15 +184,6 @@ func (w *OutboxWorker) process(ctx context.Context, row outboxRow) (any, error) 
 	return row.ev.RoutingKey, nil
 }
 
-// withNotifyRouting 在派送當下補上 `notify_seller_account_id`（§6.3.3.2）。
-//
-// 為什麼在這裡而不是在業務交易內：解析要打 seller-service 的 gRPC，放進開票交易會讓
-// 一次逾時把整筆開票一起回滾。
-//
-// 🔴 規則本體住在 internal/notifyrouting（葉 package），不在這裡：出向事件的生產者
-// 在 internal/usecase，而 worker import usecase ⇒ 生產者的測試沒辦法 import 這裡。
-// 規則留在 worker 的話，usecase 側只能對著自己抄的一份驗證，而「自己跟自己對必然
-// 全綠」正是這批缺陷的結構性成因。搬成葉 package 之後，兩邊打的是同一份。
 func (w *OutboxWorker) withNotifyRouting(ctx context.Context, ev domain.OutboxEvent) ([]byte, error) {
 	body, err := notifyrouting.Apply(ctx, ev.Payload, w.sellers, w.log.With(zap.Int64("outbox_id", ev.ID)))
 	if err != nil {
@@ -230,7 +192,6 @@ func (w *OutboxWorker) withNotifyRouting(ctx context.Context, ev domain.OutboxEv
 	return body, nil
 }
 
-// outboxMonitor 把 domain.OutboxRepository 的三支監控查詢接上 pkg/outbox.MonitorRepo。
 type outboxMonitor struct{ repo domain.OutboxRepository }
 
 func (m *outboxMonitor) CountPending(ctx context.Context) (int, error) {

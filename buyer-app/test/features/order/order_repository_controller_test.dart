@@ -31,7 +31,6 @@ void main() {
                       {
                         'orderNo': 'HK-1',
                         'status': '0',
-                        // gateway `OrderSummaryResponse` 只回這一組成對欄位。
                         'logoKey': 'seller/logo.webp',
                         'logoUrl':
                             'https://media.test/i/original/seller/logo.webp',
@@ -59,7 +58,6 @@ void main() {
       });
       expect(result.total, 1);
       expect(result.records.single.orderSn, 'HK-1');
-      // 49 §6.1：裸 key 優先（顯示端帶 scene 走 buildImageUrl dual-mode）。
       expect(result.records.single.sellerAvatarUrl, 'seller/logo.webp');
     },
   );
@@ -81,8 +79,6 @@ void main() {
                     {
                       'orderNo': 'HK-2',
                       'status': '0',
-                      // 以下八個是 08-05 契約收斂前被當成候選 key 讀的名字，
-                      // wire 上一個都不存在；讀得到任何一個代表死候選又長回來。
                       'sellerAvatarKey': 'dead/1.webp',
                       'seller_avatar_key': 'dead/2.webp',
                       'seller_logo_key': 'dead/3.webp',

@@ -3,7 +3,6 @@ import 'package:hawkr_buyer/features/chat/data/active_chat_gate.dart';
 import 'package:hawkr_buyer/features/notification/data/push/deep_link.dart';
 
 void main() {
-  // deep-links.md 的 BUYER 受眾路徑。
   const table = <String, String>{
     '/account/orders/O123': '/account/orders/O123',
     '/account/after-sales/A9': '/account/after-sales/A9',

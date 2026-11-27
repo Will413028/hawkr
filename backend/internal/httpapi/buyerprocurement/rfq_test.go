@@ -15,7 +15,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// rfqFake 記下詢價發布鏈三支方法收到的輸入，並回預設的結果或指定的錯誤。
 type rfqFake struct {
 	prices     []procurement.PreviewRfqPriceInput
 	previews   []procurement.PreviewRfqPublicationInput

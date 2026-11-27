@@ -24,7 +24,7 @@ func d(s string) time.Time {
 	return t
 }
 
-func at(s string) time.Time { return d(s).Add(4 * time.Hour) } // 台北中午前，與 UTC 同一天
+func at(s string) time.Time { return d(s).Add(4 * time.Hour) }
 
 func readFixture(t *testing.T, name string) string {
 	t.Helper()
@@ -64,19 +64,13 @@ func TestBatchIsWindowIntersectImportedYearsContiguousFromStart(t *testing.T) {
 		now        string
 		ok         bool
 		from, to   string
-		wantFirstH string // 區間內第一個假日；空字串 = 不檢查
+		wantFirstH string
 	}{
-		// 2026-11-22 −30 天 ＝ 2026-10-23；+400 天 ＝ 2027-12-27；兩年都匯入 ⇒ 取窗口迄日。
 		{"both years cover the whole window", []int{2026, 2027}, "2026-11-22", true, "2026-10-23", "2027-12-27", "2026-10-24"},
-		// 只匯入 2026：涵蓋只到年底，不宣稱 2027 已涵蓋。
 		{"only the first year imported", []int{2026}, "2026-11-22", true, "2026-10-23", "2026-12-31", "2026-10-24"},
-		// 今天在 2027（匯入的第二年），2028 沒有 ⇒ 只到 2027-12-31。
 		{"today in the last imported year", []int{2026, 2027}, "2027-12-20", true, "2027-11-20", "2027-12-31", ""},
-		// 窗口起日在前一年（沒匯入），今天的年份有 ⇒ 從今天所在連續區段的 1 月 1 日起。
 		{"window start year not imported but today's is", []int{2027}, "2027-01-10", true, "2027-01-01", "2027-12-31", ""},
-		// 窗口起日在前一年且前一年也已匯入 ⇒ 往回延伸到窗口起日，不停在今天所在年的 1 月 1 日。
 		{"window start year imported too", []int{2026, 2027}, "2027-01-10", true, "2026-12-11", "2027-12-31", ""},
-		// 今天的年份沒有匯入 ⇒ 沒有涵蓋，即使窗口後段落在已匯入的年份。
 		{"today's year not imported", []int{2027}, "2026-11-22", false, "2026-10-23", "", ""},
 		{"nothing imported", nil, "2026-11-22", false, "2026-10-23", "", ""},
 	}
@@ -237,7 +231,6 @@ func TestPushArgsHaveNoUniquenessAndBoundedAttempts(t *testing.T) {
 	}
 }
 
-// seqLoader 依序回傳行事曆；用完後一直回傳最後一個。
 type seqLoader struct {
 	cals []*bizcalendar.Calendar
 	n    int
@@ -304,7 +297,6 @@ func TestPeriodicConfiguration(t *testing.T) {
 	if len(periodicJobs) != 1 {
 		t.Fatalf("periodic jobs=%d", len(periodicJobs))
 	}
-	// River 沒有公開 PeriodicJob 的設定；這裡驗證建構時用的排程、選項與參數。
 	t0 := at("2026-11-22")
 	if next := periodicSchedule().Next(t0); !next.Equal(t0.Add(24 * time.Hour)) {
 		t.Fatalf("next = %s", next)

@@ -40,7 +40,6 @@ const SITES = [
 test("兩個渲染點都不得用純真值判斷 recipientTaxId", () => {
 	for (const site of SITES) {
 		const source = stripComments(read(site));
-		// `{detail.recipientTaxId ? …` / `{recipientTaxId ? …` 這個形狀。
 		assert.ok(
 			!/\brecipientTaxId\s*\?/.test(source),
 			`${site} 用純真值判斷 recipientTaxId ⇒ B2C 的哨兵值 0000000000 會被印出來（#3012）`,
@@ -55,26 +54,21 @@ test("兩個渲染點都不得用純真值判斷 recipientTaxId", () => {
 test("判準只有一份，且兩邊都餵 documentKind", () => {
 	for (const site of SITES) {
 		const source = stripComments(read(site));
-		// 🔴 錨在「有沒有把 documentKind 傳進去」：只傳值不傳 kind 的話，判準就退化
-		// 成字面值比對的變形，而那在哨兵值改變的那天會靜默失效。
 		assert.ok(
 			/hasRecipientTaxId\(\s*[\s\S]{0,60}?documentKind/.test(source),
 			`${site} 呼叫 hasRecipientTaxId 但沒有傳 documentKind`,
 		);
-		// 判準不得在畫面層被就地重寫（例如自己再比一次 "0000000000"）。
 		assert.ok(
 			!source.includes("0000000000"),
 			`${site} 出現硬編碼的哨兵值 ⇒ 判準被複製了一份，哨兵值改變時會分岔`,
 		);
 	}
 
-	// 判準的唯一實作處。
 	const helper = stripComments(read("lib/invoices/display.ts"));
 	assert.ok(
 		/export function hasRecipientTaxId/.test(helper),
 		"hasRecipientTaxId 不在 lib/invoices/display.ts",
 	);
-	// 語意閘門必須錨在 documentKind === B2B，不是「值不等於哨兵值」。
 	assert.ok(
 		/InvoiceDocumentKind\.B2B/.test(helper),
 		"判準沒有錨在 documentKind === B2B（改成字面值比對會在哨兵值改變時靜默失效）",

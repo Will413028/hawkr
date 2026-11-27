@@ -77,11 +77,6 @@ export default function FeedClientShell({
 		),
 	);
 	React.useEffect(() => {
-		// Hard hydration deliberately ignored any pre-existing browser snapshot
-		// so its first client tree matched SSR. Consume that stale entry now.
-		// A client-only mount already peeked the same entry synchronously above;
-		// consuming after commit preserves no-flash back restoration while
-		// remaining safe under Strict Mode/concurrent render retries.
 		takeFeedListSnapshot(window.location.pathname + window.location.search);
 	}, []);
 	const canEnrichStories =
@@ -129,9 +124,6 @@ export default function FeedClientShell({
 					items={enrichedStories}
 					activeTab={activeTab}
 					onTabChange={setScopedActiveTab}
-					// When the rail will be enriched with region-bearing sellers
-					// client-side, reserve the region sub-line from the server render
-					// so the swap doesn't grow the rail 16px and push the grid down.
 					reserveRegion={canEnrichStories}
 				/>
 			) : null}

@@ -12,7 +12,7 @@ export interface StatCardProps {
 	value: string | number;
 	icon?: MaterialSymbolName;
 	variant?: StatCardVariant;
-	prefix?: string; // e.g., "NT$"
+	prefix?: string;
 	onClick?: () => void;
 	/**
 	 * 值右側的行內動作（目前唯一的用例是複製鍵）。省略時不產生任何節點，因此對既有
@@ -44,11 +44,9 @@ const StatCard: React.FC<StatCardProps> = ({
 	onClick,
 	valueAction,
 }) => {
-	// Determine value color class
 	const valueColorClass =
 		variant === "warning" ? "warning" : variant === "danger" ? "danger" : "";
 
-	// Determine icon background class
 	const iconVariant = variant === "default" ? "success" : variant;
 
 	const displayValue = prefix

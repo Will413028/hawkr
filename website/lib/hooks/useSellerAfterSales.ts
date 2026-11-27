@@ -45,9 +45,7 @@ export function useSellerAfterSales(): UseSellerAfterSalesResult {
 			return records;
 		},
 		enabled,
-		// placeholderData (not initialData): initialData seeds [] as fresh cache,
 		// which the global 30s staleTime then treats as up-to-date and skips the
-		// mount fetch — the seller case table would stay empty for up to 30s.
 		placeholderData: [] as AfterSaleCase[],
 	});
 	const records = useMemo(

@@ -70,7 +70,6 @@ func (s *Service) ListInbox(ctx context.Context, r Recipient, category *model.Pr
 	}
 	var rows []store.ListInboxItemsRow
 	var page Page
-	// 列與總筆數在同一份快照讀，兩者之間提交的新通知不會讓 total 與列對不上。
 	err = s.d.DB.InReadSnapshot(ctx, func(ctx context.Context) error {
 		q := store.New(s.d.DB.Conn(ctx))
 		var err error
@@ -98,8 +97,6 @@ func (s *Service) ListInbox(ctx context.Context, r Recipient, category *model.Pr
 	return page, nil
 }
 
-// renderRows 把一頁的列組成文字，順序不變。每個型別一次 Load（一頁每個型別一次查詢）：讀取失敗（資料庫錯誤、請求取消）整頁失敗回 error，
-// 不能讓暫時性錯誤悄悄藏掉通知；單列的問題（快照解不開、內容查不到、組不出文字）記錄後只略過那一列。
 func (s *Service) renderRows(ctx context.Context, l uitext.Locale, rows []store.ListInboxItemsRow) ([]Item, error) {
 	byType := map[string][]int{}
 	for i, row := range rows {
@@ -110,7 +107,6 @@ func (s *Service) renderRows(ctx context.Context, l uitext.Locale, rows []store.
 	for typ, idx := range byType {
 		e, ok := s.d.Registry.Lookup(typ)
 		if !ok {
-			// types 只含註冊表的型別，查詢之後型別不會消失：走到這裡是註冊表不一致。
 			for _, i := range idx {
 				rowErr[i] = fmt.Errorf("收件匣列 %s 的型別 %q 沒有註冊", rows[i].ID, typ)
 			}
@@ -155,7 +151,6 @@ func (s *Service) render(l uitext.Locale, row store.ListInboxItemsRow, loaded re
 	}, nil
 }
 
-// types 回傳收件匣查詢要用的型別名稱；category 不屬於受眾回 invalid_argument。
 func (s *Service) types(ctx context.Context, r Recipient, category *model.PrefCategory) ([]string, error) {
 	if category != nil && !model.ValidCategoryFor(r.Audience, *category) {
 		return nil, apperr.InvalidInputOn([]string{"Category"}, "%s", text.PreferenceNotAvailable(uitext.LocaleFrom(ctx)))

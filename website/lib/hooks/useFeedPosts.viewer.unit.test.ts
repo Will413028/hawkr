@@ -91,7 +91,6 @@ describe("feed reads depend on the viewer", () => {
 				}),
 			{ wrapper: wrapper() },
 		);
-		// The shared anonymous seed is not trusted for a signed-in viewer.
 		expect(result.current.posts).toEqual([]);
 		await waitFor(() =>
 			expect(result.current.posts.map((p) => p.id)).toEqual(["mine"]),
@@ -99,7 +98,6 @@ describe("feed reads depend on the viewer", () => {
 		expect(repo.fetchPostsPage).toHaveBeenCalledWith(
 			expect.objectContaining({ viewer: true, pageToken: "" }),
 		);
-		// The anonymous same-origin canonical route is bypassed.
 		expect(canonical.fetchCanonicalFeedPage).not.toHaveBeenCalled();
 	});
 

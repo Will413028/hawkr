@@ -137,7 +137,6 @@ func TestInterceptorEnforcesEachDeclaration(t *testing.T) {
 	}
 }
 
-// limiterFake 記下每次計數；deny 為 true 時一律拒絕。
 type limiterFake struct {
 	calls []limiterCall
 	deny  bool
@@ -230,7 +229,6 @@ func TestInterceptorCountsPerAccountAfterTheCapabilityCheck(t *testing.T) {
 		t.Fatalf("wait=%v", exhausted.RetryAfter)
 	}
 
-	// 能力檢查沒有通過：回能力的錯誤，額度不被消耗。
 	denied := errors.New("suspended")
 	blocked, counted := &actingFake{err: denied}, &limiterFake{}
 	j, err := NewInterceptor(blocked, counted)
@@ -241,7 +239,6 @@ func TestInterceptorCountsPerAccountAfterTheCapabilityCheck(t *testing.T) {
 		t.Fatalf("err=%v counted=%+v", err, counted.calls)
 	}
 
-	// 沒有額度的方法不計數。
 	if _, err := i.WrapUnary(next)(accountContext(7), fakeRequest{procedure: sellerv1alpha1connect.SellerAppServiceGetMyKYCProcedure}); err != nil || len(limiter.calls) != 3 {
 		t.Fatalf("err=%v calls=%d", err, len(limiter.calls))
 	}
@@ -291,11 +288,9 @@ func TestInterceptorRejectsWithoutCallingTheHandler(t *testing.T) {
 	if _, err := i.WrapUnary(next)(accountContext(7), fakeRequest{procedure: sellerv1alpha1connect.SellerAppServiceUpdateMyStoreProcedure}); !errors.Is(err, boom) || called {
 		t.Fatalf("err=%v called=%v", err, called)
 	}
-	// 沒有呼叫者（rpc 的授權已經擋下；這裡是授權鏈壞了）：不查店家，沒有分類的錯誤（internal），不是給使用者的訊息。
 	if _, err := i.WrapUnary(next)(context.Background(), fakeRequest{procedure: sellerv1alpha1connect.SellerAppServiceGetMyStoreProcedure}); apperr.KindOf(err) != apperr.KindInternal || called {
 		t.Fatalf("err=%v called=%v", err, called)
 	}
-	// 表裡沒有的 procedure 一律拒絕。
 	if _, err := i.WrapUnary(next)(accountContext(7), fakeRequest{procedure: "/hawkr.seller.v1alpha1.SellerAppService/Nope"}); err == nil || called {
 		t.Fatalf("err=%v called=%v", err, called)
 	}
@@ -311,7 +306,6 @@ func TestEnumsMatchTheModule(t *testing.T) {
 	if mismatches := rpc.EnumMismatches[pb.SellerCapability](names); len(mismatches) > 0 {
 		t.Errorf("SellerCapability：%v", mismatches)
 	}
-	// 順序：模組依契約的數字順序列出（刪除的數字保留不重用，所以數字可以不連續，不能用位置推數字）。
 	for i := 1; i < len(all); i++ {
 		if capabilityPB(all[i-1]) >= capabilityPB(all[i]) {
 			t.Errorf("能力 %s 與 %s 的順序和契約的數字順序不一致", all[i-1], all[i])

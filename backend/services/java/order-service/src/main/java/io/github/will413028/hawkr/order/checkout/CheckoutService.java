@@ -115,7 +115,6 @@ public class CheckoutService {
         this.paymentEventHandler = paymentEventHandler;
     }
 
-    // ==================== 自買防護 ====================
 
     /**
      * 自買防護（共用 helper，§4.1/§4.3/§4.4）
@@ -134,8 +133,6 @@ public class CheckoutService {
         enforceNoSelfPurchaseForTest(buyerId, resolved);
     }
 
-    // package-visible test seam — logic lives here so tests don't need a full
-    // validate()/preview()/confirm() fixture just to exercise the guard.
     void enforceNoSelfPurchaseForTest(long buyerId, List<ResolvedItem> resolved) {
         List<Long> storeIds = resolved.stream()
                 .map(ResolvedItem::storeId)
@@ -151,10 +148,6 @@ public class CheckoutService {
                     "Seller / Buyer Service principal 解析失敗", e);
             throw new OrderBusinessException(GrpcResponseCode.SERVICE_UNAVAILABLE);
         }
-        // fail-closed（issue #2789 階段 B1/B2）：查無在架賣家／買家的 id 會被 server 原樣回吐，
-        // 舊寫法 getOrDefault(id, id) 拿那個未驗證的值來比對 ⇒「無法確認」被當成
-        // 「不是自己」⇒ 自買防護靜默失效。未解析代表該身分已不在架，這筆本來就不該成單。
-        // 兩軸必須同批 fail-closed：只修一半就是「兩個各自正確的改動組合起來互相抵銷」。
         Map<Long, Long> storePrincipals;
         long buyerPrincipal;
         try {
@@ -173,7 +166,6 @@ public class CheckoutService {
         }
     }
 
-    // ==================== 即時驗證 ====================
 
     /**
      * 即時驗證（購物車勾選時呼叫，輕量級，預設 DOMESTIC 運費）
@@ -198,7 +190,6 @@ public class CheckoutService {
         List<ResolvedItem> resolved = resolveResult.resolved();
         List<UnavailableItemInfo> unavailable = resolveResult.unavailable();
 
-        // 全部 LOOKUP_FAILED → resolved 空，僅回 unavailable_items（20 §4.14 / §4.15）
         if (resolved.isEmpty()) {
             return CheckoutValidateData.newBuilder()
                     .setValid(false)
@@ -206,20 +197,15 @@ public class CheckoutService {
                     .build();
         }
 
-        // 自買防護（short-circuit，§4.1 步驟 3）
         enforceNoSelfPurchase(buyerId, resolved);
 
         ValidationResult result = checkoutValidator.validate(resolved, ShippingRoute.DOMESTIC);
 
-        // 03 §4.3 fail-close：shipping-service 失敗即拋 SERVICE_UNAVAILABLE，禁止 fail-open 把 dangling shipping options 回給前端
         long storeId = resolved.get(0).storeId();
         Set<String> sellerAvailableMethods = resolveSellerAvailableMethods(storeId);
 
-        // 03 §5.1a.1 / 46 §6.2：賣家停權收斂點 backstop（首次接線 A5，fail-closed）。
-        // 此為結帳鏈最前的驗證收斂點，主防線放這裡（Confirm 為第二道，見 confirm()）。
         requireSellerAcceptingOrders(sellerGrpcClient.getSellerMeta(storeId));
 
-        // 20 §4.14：valid = unavailable.empty && errors.empty
         boolean valid = result.valid() && unavailable.isEmpty();
         CheckoutValidateData.Builder builder = CheckoutValidateData.newBuilder()
                 .setValid(valid)
@@ -227,7 +213,6 @@ public class CheckoutService {
                 .addAllUnavailableItems(toProtoUnavailable(unavailable));
 
         for (AvailableOption opt : result.availableOptions()) {
-            // 賣家配送方式啟用過濾（SellerShippingFilter 對齊 02 §2.7.2 / 03 §4.3）
             if (!SellerShippingFilter.isAvailable(opt.method().value(), opt.temp().value(), sellerAvailableMethods)) {
                 continue;
             }
@@ -269,7 +254,6 @@ public class CheckoutService {
         return out;
     }
 
-    // ==================== Uber 即時報價中繼 ====================
 
     /**
      * 取一筆 Uber 即時報價（Stage 8B W2-2）。
@@ -313,24 +297,18 @@ public class CheckoutService {
         try {
             resolveResult = resolveItems(items);
         } catch (StatusRuntimeException e) {
-            // product-service 掛了／逾時 ＝ 基礎設施失敗，往上拋（不是「Uber 不可用」）
             throw e;
         } catch (Exception e) {
             log.warn("CheckoutService.uberQuote.resolveItems.failed", "商品解析失敗: " + e.getMessage());
             return uberUnavailable("INVALID_ITEM");
         }
         List<ResolvedItem> resolved = resolveResult.resolved();
-        // 🔴 有任何一列不可購買就不報價：報價的 payload hash 綁死這一組品項（66 INV-U1），
-        //    為一個下不了單的購物車報價，只會產生一筆永遠驗不過的 quote ＋ 一次真實的 Uber 呼叫。
         if (resolved.isEmpty() || !resolveResult.unavailable().isEmpty()) {
             return uberUnavailable("ITEMS_UNAVAILABLE");
         }
 
         ValidationResult validation = checkoutValidator.validate(resolved, ShippingRoute.DOMESTIC);
         for (ValidationError err : validation.errors()) {
-            // ⚠️ 只收這兩個碼。validate 還會產出 ALL_SHIPPING_EXCEEDED（＝黑貓／超商的材積級距
-            //    全都放不下），那是「其他業者」的限制——Uber 的承載判定在 shipping-service 的
-            //    UberPackingPlanner，拿別人的限制否決 Uber 會讓「只有 Uber 送得了」的購物車看不到它。
             if ("DIFFERENT_SELLER".equals(err.errorCode())) {
                 return uberUnavailable("MULTI_SELLER_CART");
             }
@@ -339,21 +317,17 @@ public class CheckoutService {
             }
         }
 
-        // 整車要用的溫層 ＝ 各品項儲存溫層中「最冷」的那一個（冷凍品不能用冷藏送），
-        // 且它必須落在溫層交集內（＝每個品項都支援這個溫層），否則這車併不起來。
         String deliveryTemp = coldestTemperature(resolved);
         if (!validation.deliveryTempIntersection().contains(deliveryTemp)) {
             return uberUnavailable("MIXED_TEMPERATURE");
         }
 
-        // proto 的 string 欄位取不到 null，空字串與非數字都落在 NumberFormatException
         long addressIdValue;
         try {
             addressIdValue = Long.parseLong(addressId);
         } catch (NumberFormatException e) {
             return uberUnavailable("ADDRESS_NOT_FOUND");
         }
-        // 歸屬由 buyer-service 以 (buyer_id, address_id) 一起查保證，這裡不另外比對回程的 buyer_id
         AddressInfo address = buyerGrpcClient.getAddress(buyerId, addressIdValue);
         if (address == null) {
             return uberUnavailable("ADDRESS_NOT_FOUND");
@@ -361,9 +335,6 @@ public class CheckoutService {
 
         long storeId = resolved.get(0).storeId();
 
-        // 🔴 報價<b>與</b>資格判定走同一次呼叫：本端點回 available=true 而結帳鏈回 9503，
-        //    正是「看得到選項、按不下去」的來源。閘門內部打的就是同一支 shipping RPC，
-        //    這裡不再自己打第二次（兩次求值＝兩個可能不同的答案）。
         UberOrderEligibilityGuard.Decision decision = checkoutValidator.assessUberQuote(
                 UberOrderEligibilityGuard.Probe.forQuote(
                         buyerId, storeId, deliveryTemp,
@@ -375,8 +346,6 @@ public class CheckoutService {
             log.info("CheckoutService.uberQuote.unavailable",
                     "Uber 不可用：" + decision.denyReason(),
                     "reason", decision.providerReason());
-            // providerReason 為空 ⇒ 取不到證據（RPC 失敗／契約被改）。回一個具名的理由碼，
-            // 不要回空字串——前端拿到空 reason 只能顯示「不可用」，維運也查不到是哪一段斷了。
             String reason = decision.providerReason().isEmpty()
                     ? UberOrderEligibilityGuard.ProviderReason.ASSESSOR_UNAVAILABLE
                     : decision.providerReason();
@@ -486,7 +455,6 @@ public class CheckoutService {
                     "address_id 不是數字字串：" + addressId, "buyerId", String.valueOf(buyerId));
             return null;
         }
-        // 歸屬由 buyer-service 以 (buyer_id, address_id) 一起查保證，這裡不另外比對回程的 buyer_id
         AddressInfo address = buyerGrpcClient.getAddress(buyerId, addressIdValue);
         if (address == null) {
             log.warn("CheckoutService.uberProbe.addressNotFound",
@@ -545,7 +513,6 @@ public class CheckoutService {
         throw new OrderBusinessException(GrpcResponseCode.FULFILLMENT_PROVIDER_NOT_ENABLED);
     }
 
-    // ==================== 運費精算 ====================
 
     /**
      * 運費精算（選配送方式 + 填地址/選門市後呼叫）
@@ -555,17 +522,12 @@ public class CheckoutService {
                                                 String shippingMethodCode, String deliveryTempCode,
                                                 String receiverZipCode, String cvsStoreId) {
         log.info("CheckoutService.shippingFee.start", "運費精算");
-        // 20 §4.2 明文：ShippingFee 不做可購買性判定（已由 Validate 階段 cover），
-        // 但 resolveItems 已升級為 BatchGetProductForCheckout — 直接取 resolved（不可購買 row 已排除）。
-        // code-reviewer #2：resolved 空（如所有 SKU 都 LOOKUP_FAILED）時 throw UnavailableItemsException，
-        // 由 OrderGrpcService 兜底成 envelope code=4001 + unavailable_items[]，避免 IndexOutOfBoundsException → 500。
         ResolveResult shippingResolve = resolveItems(items);
         if (shippingResolve.resolved().isEmpty()) {
             throw new UnavailableItemsException(shippingResolve.unavailable());
         }
         List<ResolvedItem> resolved = shippingResolve.resolved();
 
-        // 推導運費路線（防護空值）
         if (shippingMethodCode == null || shippingMethodCode.isEmpty()) {
             throw new IllegalArgumentException("配送方式不可為空");
         }
@@ -575,19 +537,12 @@ public class CheckoutService {
         ShippingMethod method = ShippingMethod.fromValue(shippingMethodCode);
         ShippingTemperature temp = ShippingTemperature.fromValue(deliveryTempCode);
 
-        // 03 §4.3：先驗賣家對該 shippingMethod 已開通且 enabled=true（無視超商與否，修復 7-11 短路 bug）
         long storeId = resolved.get(0).storeId();
         requireSellerOnboarded(storeId, shippingMethodCode);
 
-        // 取得賣家寄件郵遞區號（物流設定獨立化：從 Shipping Service 取得）
         String senderPostalCode = getSenderPostalCode(storeId, shippingMethodCode, deliveryTempCode);
         ShippingRoute route = resolveRoute(method, senderPostalCode, receiverZipCode);
 
-        // 運費查找
-        //
-        // 🔴 methodOnly（＝3003 一律拒絕）是**正確行為不是缺口**：本端點算的是級距費率表，
-        //    而 Uber 沒有級距表、價格是一筆會過期的即時報價。讓它從這裡出價，
-        //    「會過期」就在那一刻被弄丟。Uber 的價格只有 POST /app/checkout/uber_quote 出得來。
         AvailableOption option = checkoutValidator.lookupSingleOption(
                 resolved, method, temp, route,
                 UberOrderEligibilityGuard.Context.methodOnly(method.value()));
@@ -613,7 +568,6 @@ public class CheckoutService {
                 .build();
     }
 
-    // ==================== 結帳預覽 ====================
 
     /**
      * 結帳預覽（完整驗證 + 精算總額 + 優惠券驗證，不建單）
@@ -631,32 +585,24 @@ public class CheckoutService {
         List<ResolvedItem> resolved = resolveResult.resolved();
         List<UnavailableItemInfo> unavailable = resolveResult.unavailable();
 
-        // 自買防護（§4.3 步驟 2.5）
-        // 全部 LOOKUP_FAILED → resolved 空，自買防護不適用，直接拋 unavailable
         if (resolved.isEmpty()) {
             throw new UnavailableItemsException(unavailable);
         }
         enforceNoSelfPurchase(buyerId, resolved);
 
-        // §4.3 步驟 2.6：可購買性收集非空 → 不繼續，由 OrderGrpcService 包成 code=4001 + unavailable_items
         if (!unavailable.isEmpty()) {
             throw new UnavailableItemsException(unavailable);
         }
 
-        // 03 §4.3：先驗賣家對該 shippingMethod 已開通且 enabled=true（無視超商與否，修復 7-11 短路 bug）
         long storeId = resolved.get(0).storeId();
         requireSellerOnboarded(storeId, shippingMethodCode);
 
-        // 賣家寄件郵遞區號（物流設定獨立化：從 Shipping Service 取得）
         String senderPostalCode = getSenderPostalCode(storeId, shippingMethodCode, deliveryTempCode);
 
-        // 賣家元資料（僅用於 sellerName）
         SellerMeta sellerMeta = sellerGrpcClient.getSellerMeta(storeId);
 
-        // 03 §5.1a.1 / 46 §6.2：賣家停權收斂點 backstop（與 validate() 對稱，避免 preview 通過但 confirm 才擋）
         requireSellerAcceptingOrders(sellerMeta);
 
-        // 運費路線（防護空值）
         if (shippingMethodCode == null || shippingMethodCode.isEmpty()) {
             throw new IllegalArgumentException("配送方式不可為空");
         }
@@ -667,7 +613,6 @@ public class CheckoutService {
         ShippingTemperature temp = ShippingTemperature.fromValue(deliveryTempCode);
         ShippingRoute route = resolveRoute(method, senderPostalCode, receiverZipCode);
 
-        // 完整驗證
         ValidationResult validationResult = checkoutValidator.validate(resolved, route);
         if (!validationResult.valid()) {
             String msg = validationResult.errors().stream()
@@ -676,7 +621,6 @@ public class CheckoutService {
             throw new OrderBusinessException(GrpcResponseCode.CHECKOUT_VALIDATION_FAILED, msg);
         }
 
-        // 運費查找。3003 走報價（accept=false：只重驗與定價，不落任何狀態）。
         AvailableOption option = checkoutValidator.lookupSingleOption(
                 resolved, method, temp, route,
                 uberContext(method, uberProbeOrNull(
@@ -685,7 +629,6 @@ public class CheckoutService {
             throw new OrderBusinessException(GrpcResponseCode.SHIPPING_METHOD_UNAVAILABLE);
         }
 
-        // 優惠券驗證（不消耗）— couponTemplateId 為使用者選擇的模板 ID
         long orderSubtotal = calcSubtotal(resolved);
         long discountAmount = 0;
         if (couponTemplateId != null && !couponTemplateId.isEmpty()) {
@@ -694,21 +637,14 @@ public class CheckoutService {
             discountAmount = InputValidator.requireNonNegativeAmount(couponResult.getDiscountAmount(), "折扣金額");
         }
 
-        // 生成結帳批次 ID，存入 Redis（TTL 30 分鐘，含金額快照供 Confirm 比對）
-        // 注意：snapshot 與最終回應使用 finalShippingFee（折扣後免運判定的結果），不再使用 option.fee()
-        // option.fee() 為「暫定免運」對應的運費，此時尚未考慮優惠券折扣
         String checkoutId = UUID.randomUUID().toString();
 
-        // 折扣分攤：依 unit_price × qty 比例分攤 discountAmount，尾差歸最後一筆（20 設計書 §4.10）
         Map<UUID, Long> shareDiscountBySku = allocateShareDiscount(resolved, discountAmount);
 
-        // 最終免運判定（折扣後）：以 unit_price × qty − share_discount 對門檻判定（20 設計書 §4.7.2）
         var finalFsr = checkoutValidator.checkFreeShipping(
                 resolved, shippingMethodCode, deliveryTempCode, shareDiscountBySku);
-        // 折扣後若失去免運資格，必須使用級距原始運費（option.rawFee()），不可沿用 option.fee()（暫定免運後可能=0）
         long finalShippingFee = finalFsr.eligible() ? 0L : option.rawFee();
 
-        // 商品明細（每品項回傳 list_price / sale_price / share_discount / actual_pay_amount）
         List<CheckoutItemPreview> itemPreviews = resolved.stream()
                 .map(r -> {
                     long subtotal = r.unitPrice() * r.quantity();
@@ -736,31 +672,24 @@ public class CheckoutService {
                 .setGroupIndex("0")
                 .setStoreId(String.valueOf(storeId))
                 .setSellerName(sellerMeta.getSellerName())
-                // 賣家頁 canonical 網址走 store_code；值已在上面同一次 getSellerMeta 回應裡
                 .setStoreCode(sellerMeta.getStoreCode())
                 .setShippingMethod(shippingMethodCode)
                 .setDeliveryTemp(deliveryTempCode)
                 .setShippingLabel(option.label())
                 .setShippingFee(String.valueOf(finalShippingFee))
                 .setShippingFeePayer(option.feePayer())
-                .setFreeShippingEligible(finalFsr.eligible())                  // 最終免運判定
-                .setTentativeFreeShippingEligible(option.freeShippingEligible())  // 暫定免運判定
+                .setFreeShippingEligible(finalFsr.eligible())
+                .setTentativeFreeShippingEligible(option.freeShippingEligible())
                 .addAllItems(itemPreviews)
                 .setSubtotalOriginalAmount(String.valueOf(orderSubtotal))
                 .setDiscountAmount(String.valueOf(discountAmount))
                 .build();
 
-        // 計算最終實付總額
         long totalActualAmount = Math.max(0, orderSubtotal + finalShippingFee - discountAmount);
 
-        // 政策快照：伺服端推導，**不讀** request 的 consolidated（65）。
-        // ⚠️ consolidated 參數仍留在簽章與 proto 上：移除它是跨 repo 的破壞性契約變更，
-        //    要走擴張—收縮（後端先不讀 → 前端停送 → 再移欄）。**本波只做「不讀」這一半**，
-        //    留著不讀比留著讀更安全，但它是一個尚未收縮的欄位，登記在此以免被當成 target design。
         OrderPolicySnapshot policySnapshot = orderPolicyResolver.resolve(method.value());
         requireSupportedCollectionModel(policySnapshot);
 
-        // 寫入 Redis 金額快照
         String snapshotJson = buildPriceSnapshot(orderSubtotal, finalShippingFee, discountAmount,
                 totalActualAmount, finalFsr.eligible(), option.freeShippingEligible(),
                 policySnapshot);
@@ -776,7 +705,6 @@ public class CheckoutService {
                 .setTotalDiscount(String.valueOf(discountAmount))
                 .setTotalActualAmount(String.valueOf(totalActualAmount));
 
-        // §6.2.4 order ②：發票區（58A §B01）。拿不到就不設這一欄，前端不渲染發票區。
         CheckoutInvoicePreview invoicePreview = resolveInvoicePreview(
                 storeId, buyerId, checkoutId, orderSubtotal, finalShippingFee, discountAmount);
         if (invoicePreview != null) {
@@ -804,13 +732,11 @@ public class CheckoutService {
             return;
         }
         if (CollectionModel.PLATFORM_AGENT_MERCHANT.value().equals(model)) {
-            // 平台代收（受託代銷）沒有收款路徑：fail-closed 在結帳當下。
             throw new OrderBusinessException(GrpcResponseCode.PLATFORM_COLLECTION_NOT_CONFIGURED);
         }
         throw new OrderBusinessException(GrpcResponseCode.FULFILLMENT_COMMERCE_MODEL_UNKNOWN);
     }
 
-    // ==================== 確認結帳 ====================
 
     /**
      * 確認結帳（建單 + 回傳付款資訊）
@@ -820,16 +746,11 @@ public class CheckoutService {
         log.info("CheckoutService.confirm.start", "確認結帳",
                 "checkoutId", request.getCheckoutId());
 
-        // 驗證 checkoutId 有效性（原子 GET+DEL，同時取出金額快照）
         String snapshotJson = redisTemplate.opsForValue().getAndDelete(CHECKOUT_KEY_PREFIX + request.getCheckoutId());
         if (snapshotJson == null || snapshotJson.isEmpty()) {
             throw new CheckoutExpiredException();
         }
 
-        // 🔴 政策快照同樣只從 preview 讀回，**不在 confirm 重算**（65）。
-        //    重算會讓「preview 顯示的運費／收款主體」與「訂單實際寫入的政策」來自兩次求值；
-        //    而 confirm 的 request 是可以帶不同 shippingMethod 的（見下方 assertPolicyMatchesMethod）。
-        //    缺欄位一律 fail-closed：讓買家重新 preview，而不是靜默吃 DB DEFAULT。
         OrderPolicySnapshot policySnapshot = extractPolicySnapshot(snapshotJson);
 
         long buyerId = request.getBuyerId();
@@ -838,7 +759,6 @@ public class CheckoutService {
         List<ResolvedItem> resolved = resolveResult.resolved();
         List<UnavailableItemInfo> unavailable = resolveResult.unavailable();
 
-        // §4.4 步驟 2.5 自買防護 + 步驟 2.6 可購買性最終攔截
         if (resolved.isEmpty()) {
             throw new UnavailableItemsException(unavailable);
         }
@@ -847,15 +767,12 @@ public class CheckoutService {
             throw new UnavailableItemsException(unavailable);
         }
 
-        // 賣家寄件郵遞區號（物流設定獨立化）+ 賣家元資料（merId + sellerName）
         long storeId = resolved.get(0).storeId();
 
         String shippingMethodCode = request.getShippingMethod();
         String deliveryTempCode = request.getDeliveryTemp();
         InputValidator.requireNotEmpty(shippingMethodCode, "配送方式");
         InputValidator.requireNotEmpty(deliveryTempCode, "配送溫層");
-        // 收件人姓名：依配送方式套用 PayUni 物流約束（超商 7-11 取件人姓名顯示長度 [4,10]、宅配上限 30），
-        // 從結帳源頭攔截不符合 provider 約束的輸入，避免建單階段才失敗落 CREATE_FAILED 空殼（06 §2.5）
         ShippingMethod methodForAddrCheck = ShippingMethod.fromValue(shippingMethodCode);
         if (methodForAddrCheck == ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP) {
             InputValidator.requireDisplayLengthBetween(request.getRecipientName(),
@@ -866,32 +783,23 @@ public class CheckoutService {
                     1, PayUniShippingConstraints.HOME_RECIPIENT_NAME_MAX, "收件人姓名");
         }
         InputValidator.requireMobile(request.getRecipientPhone(), "收件人電話");
-        // 宅配需要驗證地址，超商取貨不需要（用 storeId）
         if (methodForAddrCheck != ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP) {
             InputValidator.requireAddress(request.getShippingAddress(), "收件地址");
             InputValidator.requireDisplayLengthBetween(request.getShippingAddress(),
                     1, PayUniShippingConstraints.RECIPIENT_ADDRESS_MAX, "收件地址");
         }
 
-        // 03 §4.3：先驗賣家對該 shippingMethod 已開通且 enabled=true（無視超商與否，修復 7-11 短路 bug）
         requireSellerOnboarded(storeId, shippingMethodCode);
 
         String senderPostalCode = getSenderPostalCode(storeId, shippingMethodCode, deliveryTempCode);
         SellerMeta sellerMeta = sellerGrpcClient.getSellerMeta(storeId);
 
-        // 03 §5.1a.1 / 46 §6.2：賣家停權收斂點 backstop 第二道（建單前最後防線；race：驗證通過後
-        // 到本行之間才被停權的極窄窗口仍可能建單，屬既有 race 容忍範圍，見 03 §5.1a.1 race 說明）
         requireSellerAcceptingOrders(sellerMeta);
 
         ShippingMethod method = ShippingMethod.fromValue(shippingMethodCode);
         ShippingTemperature temp = ShippingTemperature.fromValue(deliveryTempCode);
         ShippingRoute route = resolveRoute(method, senderPostalCode, request.getReceiverZipCode());
 
-        // 🔴 快照凍結的政策必須與**本次建單實際採用的配送方式**一致。
-        //    confirm 的 request 可以帶與 preview 不同的 shippingMethod（DTO 上就是獨立欄位），
-        //    而 fulfillment_mode 由配送方式決定 ⇒ 不比對的話，訂單會帶著
-        //    「為另一種配送方式算出來的政策」落庫，且 DB CHECK 只擋 3005 那一格。
-        //    比對用的是同一支 resolver，不是另一套推導——這裡不引入第二個決定點。
         OrderPolicySnapshot expectedPolicy = orderPolicyResolver.resolve(method.value());
         if (!expectedPolicy.equals(policySnapshot)) {
             log.warn("CheckoutService.confirm.policyDrift",
@@ -902,7 +810,6 @@ public class CheckoutService {
             throw new OrderBusinessException(GrpcResponseCode.FULFILLMENT_COMMERCE_MODEL_UNKNOWN);
         }
 
-        // 完整驗證
         ValidationResult validationResult = checkoutValidator.validate(resolved, route);
         if (!validationResult.valid()) {
             String msg = validationResult.errors().stream()
@@ -911,8 +818,6 @@ public class CheckoutService {
             throw new OrderBusinessException(GrpcResponseCode.CHECKOUT_VALIDATION_FAILED, msg);
         }
 
-        // 運費查找。3003 先 accept=false 重驗並定價；鎖定（CHECKOUT_ACCEPTED）留到建單成功之後，
-        // 因為 CAS 需要 order_no，而 order_no 是 createOrderFromCheckout 才生出來的。
         UberOrderEligibilityGuard.Probe uberProbe = uberProbeOrNull(
                 method, buyerId, storeId, temp.value(),
                 request.getAddressId(), request.getUberQuoteId(), resolved);
@@ -922,7 +827,6 @@ public class CheckoutService {
             throw new OrderBusinessException(GrpcResponseCode.SHIPPING_METHOD_UNAVAILABLE);
         }
 
-        // 優惠券驗證 — couponTemplateId 為使用者選擇的模板 ID
         long orderSubtotal = calcSubtotal(resolved);
         long discountAmount = 0;
         String couponTemplateId = request.getCouponTemplateId();
@@ -932,16 +836,13 @@ public class CheckoutService {
             discountAmount = InputValidator.requireNonNegativeAmount(couponResult.getDiscountAmount(), "折扣金額");
         }
 
-        // 折扣分攤 + 最終免運判定（與 preview 一致，§4.7.2 折扣後判定）
         Map<UUID, Long> shareDiscountBySku = allocateShareDiscount(resolved, discountAmount);
         var finalFsr = checkoutValidator.checkFreeShipping(
                 resolved, shippingMethodCode, deliveryTempCode, shareDiscountBySku);
-        // 同 preview：折扣後失去免運必須用 rawFee
         long finalShippingFee = finalFsr.eligible() ? 0L : option.rawFee();
 
         long totalActualAmount = Math.max(0, orderSubtotal + finalShippingFee - discountAmount);
 
-        // 訂單金額上限（業務規則，invoice-service A20 依賴它）。0 元由 §2A.1 零元路徑處理，不進入本檢查。
         if (totalActualAmount > OrderAmountLimit.ORDER_MAX_AMOUNT) {
             log.warn("CheckoutService.confirm.amountExceedsLimit",
                     "訂單金額超出上限 amount=" + totalActualAmount
@@ -953,14 +854,11 @@ public class CheckoutService {
                     OrderAmountLimit.ORDER_MAX_AMOUNT);
         }
 
-        // 金額比對（Preview → Confirm 防護，含最終免運狀態比對）
         comparePriceSnapshot(snapshotJson, orderSubtotal, finalShippingFee, discountAmount,
                 totalActualAmount, finalFsr.eligible());
 
-        // 配送區域
         String shippingArea = ShippingAreaResolver.resolve(request.getReceiverZipCode()).value();
 
-        // 取得出貨城市/地區（從 Shipping Service 快照至訂單）
         String senderCity = "";
         String senderDistrict = "";
         GetSellerShippingConfigResponse configResp =
@@ -975,43 +873,20 @@ public class CheckoutService {
             }
         }
 
-        // 建立訂單（傳入 unit_price + list_price 雙快照 + share_discount 分攤）
         List<OrderService.CreateOrderItemParam> orderItems = resolved.stream()
-                // catalog 建單：走 CreateOrderItemParam.catalog（primitive long），
-                // RFQ 放寬 sku_id 之後這是 catalog 路徑剩下的型別層守門（64 號 §6.4.15）。
                 .map(r -> OrderService.CreateOrderItemParam.catalog(
                         r.skuId(), r.skuName(), r.quantity(), r.unitPrice(), r.listPrice(),
-                        shareDiscountBySku.getOrDefault(r.skuId(), 0L),  // 03 §3.2.1：建單時寫入分攤折扣
+                        shareDiscountBySku.getOrDefault(r.skuId(), 0L),
                         r.imageObjectKey(),
                         r.productId(), r.productName()))
                 .toList();
 
-        // 收款模式 fail-closed：與 preview 同一份政策快照，不在 confirm 重新決策。
         requireSupportedCollectionModel(policySnapshot);
-        // orders.mer_id 欄位仍由出貨與售後讀取，收款改走 payment 模組後恆為空字串。
         String orderMerId = "";
 
-        // 58 號 §7.1.2 步驟 1：採集買家發票選擇。**選填**——未帶時走 USE_BUYER_DEFAULT，
-        // 由 invoice-service 在建立文件時解析（見 InvoiceIntakeResolver 的類別註解）。
-        // 驗證在建單**之前**做：格式錯要讓買家當場改，而不是建完單才在 DB CHECK 上炸。
-        //
-        // §6.2.4 order 的第 ③ 項：呼叫 invoice-service 的 ValidateOrderInvoiceInputInternal。
-        //
-        // 2026-09-01 接線（原本因法定告知而擱置，見 #2900）。解除的是**兩個**前提，缺一都不能接：
-        //   ① DEC-20260831-210934 把法定告知改成「只顯示不強制勾選」⇒ 那支 RPC 的第一格
-        //      不再是擋門，`disclosure_accepted` 兩個欄位已從 proto 移除（欄號 reserved）。
-        //      在此之前接線＝凡賣家非 AMEGO_AUTO 一律 9314，而沒有任何客戶端送得出那個欄位。
-        //   ② 待審接單額度的累加補上了（BumpPendingOrderCounters 先前零呼叫端）。
-        //      在此之前接線＝五格檢查全部不會拒絕任何東西，裝一個永遠不作用的檢查。
-        //
-        // ⚠️ 今天真正會拒絕的只有 **9326（待審接單雙上限）**：其餘四格都要買家送出
-        //    `invoice` 區塊才觸發，而已上架 App 不帶、網頁 B02 尚未實作。B02 上線後
-        //    9302／9305／9306 才會開始發揮作用。
         validateInvoiceInputOrThrow(request, buyerId, storeId,
                 orderSubtotal, finalShippingFee, discountAmount, totalActualAmount);
 
-        // 58 號 §7.1.2 步驟 1：採集買家發票選擇。**選填**——未帶時走 USE_BUYER_DEFAULT，
-        // 由 invoice-service 在建立文件時解析（見 InvoiceIntakeResolver 的類別註解）。
         InvoiceIntakeResolver.Snapshot invoiceSnapshot =
                 InvoiceIntakeResolver.resolve(request.getInvoice(), request.hasInvoice());
 
@@ -1033,14 +908,10 @@ public class CheckoutService {
 
         String orderNo = orderService.createOrderFromCheckout(params);
 
-        //「確認 → 重驗 TTL>180s ＋ hash → CHECKOUT_ACCEPTED → 收款」：
-        // 建單成功才鎖報價（CAS 需要 order_no）。鎖不到就取消這張單，見方法 javadoc。
         if (uberProbe != null) {
             acceptUberQuoteOrCancel(uberProbe, option.uberQuoteId(), orderNo, buyerId);
         }
 
-        // 建單成功後鎖定優惠券（硬依賴：失敗需補償）
-        // reserveCoupon 接受 templateId，回傳 instanceId 寫入 orders.coupon_instance_id
         if (couponTemplateId != null && !couponTemplateId.isEmpty()) {
             try {
                 String instanceId = couponGrpcClient.reserveCoupon(couponTemplateId, buyerId, orderNo, storeId, orderSubtotal);
@@ -1050,20 +921,14 @@ public class CheckoutService {
                 try {
                     orderService.cancelOrder(buyerId, orderNo);
                     orderService.releaseStockAfterCancel(orderNo);
-                    // 購物車已在建單時清理（建單即清策略），無需解鎖
                 } catch (Exception compensateErr) {
                     log.error("CheckoutService.confirm.compensate.failed", "補償操作失敗", compensateErr);
                 }
-                // reserve 可能在 coupon 端已成功、只是回應遺失或回寫 instance id 失敗：訂單沒有記下 instance id，
-                // 其他釋放路徑都找不到這張券；reserve 逾時時 Lock 也可能還在途中、晚於當場釋放才提交。
-                // 以 order_no 釋放（冪等；coupon 端沒鎖時是空操作）並排一筆延後到 reserve deadline 之後的任務（D3）。
                 couponReleaseService.releaseWithLateLockRecheck(orderNo);
                 throw new OrderBusinessException(GrpcResponseCode.COUPON_LOCK_FAILED, e.getMessage());
             }
         }
 
-        // 零元訂單沒有可收的款：不經 payment，由訂單方直接確認為已付款（放在優惠券鎖定之後，
-        // 核銷任務才讀得到 coupon_instance_id）。
         if (totalActualAmount == 0) {
             paymentEventHandler.completeZeroAmountOrder(orderNo);
         }
@@ -1077,7 +942,6 @@ public class CheckoutService {
                 .build();
     }
 
-    // ==================== 工具方法 ====================
 
     /**
      * 解析結帳商品（02 §5.5.2 + 20 §4.14）：
@@ -1093,7 +957,6 @@ public class CheckoutService {
      * </ul>
      */
     private ResolveResult resolveItems(List<CheckoutItem> checkoutItems) {
-        // 批次取所有 SKU（接受 inactive）— 取代既有 N+1 getPublicProduct（後者對 inactive throw）
         List<String> skuIds = checkoutItems.stream().map(CheckoutItem::getSkuId).toList();
         BatchGetProductForCheckoutResponse batchResp = productGrpcClient.batchGetProductForCheckout(skuIds);
         Map<String, ProductForCheckoutInfo> infoMap = batchResp.getDataMap();
@@ -1102,13 +965,9 @@ public class CheckoutService {
         List<UnavailableItemInfo> unavailable = new ArrayList<>();
 
         for (CheckoutItem item : checkoutItems) {
-            // 伺服器回的 key 是小寫的標準 UUID；請求的寫法不同（大寫）或不是 UUID 時查不到，走 LOOKUP_FAILED。
             UUID skuId = ProtoConversionUtils.parseUuidOrNull(item.getSkuId());
             ProductForCheckoutInfo info = skuId == null ? null : infoMap.get(skuId.toString());
 
-            // quantity 防護式解析（code-reviewer #7）：若 quantity 不合法（"0" / 負數 / 非數字）
-            // 不 throw，視為 INVALID_ITEM 進 unavailable 並 continue。
-            // 確保「下架商品 + 異常 quantity」混合場景仍能回 structured unavailable_items。
             Integer requestedQtyOrNull = parseIntPositive(item.getQuantity());
             if (requestedQtyOrNull == null) {
                 unavailable.add(new UnavailableItemInfo(
@@ -1122,7 +981,6 @@ public class CheckoutService {
             int requestedQty = requestedQtyOrNull;
 
             if (info == null) {
-                // LOOKUP_FAILED — 不進 resolved，純 unavailable_items 表達
                 ProductPurchasabilityRules.Purchasability lf = ProductPurchasabilityRules.lookupFailed();
                 unavailable.add(new UnavailableItemInfo(
                         item.getSkuId(), "", lf.reason(),
@@ -1139,22 +997,14 @@ public class CheckoutService {
                         info.getSkuName() != null ? info.getSkuName() : "",
                         p.reason(),
                         String.valueOf(requestedQty),
-                        // INSUFFICIENT_STOCK 帶 stock；OUT_OF_STOCK 帶 "0"；DELISTED / LOOKUP_FAILED 空字串
                         switch (p.reason()) {
                             case "INSUFFICIENT_STOCK" -> String.valueOf(stockQty);
                             case "OUT_OF_STOCK" -> "0";
                             default -> "";
                         }));
-                // **不可購買 item 不進 resolved**（code-reviewer #1 / #3）：
-                // 若進 resolved，後續 InputValidator.requirePositiveAmount 對 price=0/null 的 inactive
-                // SKU 會 throw IllegalArgumentException → 整批 INVALID_PARAM(400)，unavailable_items 永遠拿不到。
-                // 且 inactive item 的 weight / dimension 會污染 validator 材積判定 → 運費失真。
-                // Validator 仍能對 purchasable 子集跑跨賣家 / 溫層 errors，§4.15「一次看完整錯誤」由
-                // unavailable_items + errors 並列回傳達成。
                 continue;
             }
 
-            // 重量轉換為公克（跳過空值、"0" 或單位為空的情況）
             long weightGram = 0;
             String weightStr = info.getWeight();
             String unitStr = info.getUnit();
@@ -1164,7 +1014,6 @@ public class CheckoutService {
                 weightGram = WeightConverter.convertToGrams(weightStr, unit);
             }
 
-            // 轉換配送方式
             List<SkuShippingOption> options = info.getShippingMethodsList().stream()
                     .map(sm -> new SkuShippingOption(
                             sm.getType(),
@@ -1173,7 +1022,6 @@ public class CheckoutService {
                             sm.getFeePayer()))
                     .toList();
 
-            // 02 / 20 §2.8 / §4.3：實際成交單價 = sale_price ?? list_price
             long listPrice = InputValidator.requirePositiveAmount(info.getListPrice(), "商品原價");
             long unitPrice = info.getSalePrice().isEmpty()
                     ? listPrice
@@ -1220,16 +1068,13 @@ public class CheckoutService {
      * <p>超商固定回傳空字串（resolveRoute 會走 DOMESTIC，超商不需要寄件郵遞區號）。
      */
     private String getSenderPostalCode(long storeId, String shippingMethodCode, String deliveryTempCode) {
-        // 超商店到店固定 DOMESTIC，不需要寄件郵遞區號
         if (ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value().equals(shippingMethodCode)) {
             return "";
         }
 
-        // shipping-service 失敗時會拋 StatusRuntimeException，由上層 RPC catch-all 處理
         GetSellerShippingConfigResponse configResp =
                 shippingGrpcClient.getSellerShippingConfig(storeId);
 
-        // 找到對應配送方式的設定 — 此處僅取 postal code，enabled 檢查由 requireSellerOnboarded 負責
         for (SellerShippingConfigItem config : configResp.getConfigsList()) {
             if (config.getShippingMethod().equals(shippingMethodCode)) {
                 String postalCode = config.getSenderPostalCode();
@@ -1240,7 +1085,6 @@ public class CheckoutService {
             }
         }
 
-        // 走到這代表 requireSellerOnboarded 應該已先擋下，這裡只是防禦性
         throw new OrderBusinessException(GrpcResponseCode.SELLER_NOT_ONBOARDED);
     }
 
@@ -1288,9 +1132,6 @@ public class CheckoutService {
      */
     private void requireSellerOnboarded(long storeId, String shippingMethodCode) {
         Set<String> available = resolveSellerAvailableMethods(storeId);
-        // 用 SellerShippingFilter 統一比對 — 涵蓋宅配（goodsType="" → keyNoTemp）與超商
-        // shippingFee/preview/confirm 都會帶 deliveryTempCode，但 require 只關心 shippingMethod 是否在 set
-        // 故用 keyNoTemp / 用空 temperature 都可（filter 內部會比 method:"" 與 method:temperature 兩種 key）
         boolean ok = available.stream()
                 .anyMatch(k -> k.startsWith(shippingMethodCode + ":"));
         if (!ok) {
@@ -1314,8 +1155,6 @@ public class CheckoutService {
         }
     }
 
-    // package-visible test seams（mirrors CheckoutServiceSelfPurchaseTest 的 xxxForTest 慣例）：
-    // 讓測試不需要 bootstrap 整條 validate()/preview()/confirm() pipeline 就能直接驗業務規則。
 
     /** 直接驗證業務規則本身（can_accept_orders=false → 拋 9241）。 */
     void requireSellerAcceptingOrdersForTest(SellerMeta sellerMeta) {
@@ -1329,7 +1168,6 @@ public class CheckoutService {
     }
 
     private long calcSubtotal(List<ResolvedItem> items) {
-        // 實際成交小計：使用 unit_price（特價優先）× quantity
         return items.stream().mapToLong(i -> i.unitPrice() * i.quantity()).sum();
     }
 
@@ -1347,7 +1185,6 @@ public class CheckoutService {
     private int parseIntSafe(String value) {
         if (value == null || value.isEmpty()) return 0;
         try {
-            // Proto 回傳的數字字串可能帶小數（如 "25.00"），先轉 double 再取整
             return (int) Math.round(Double.parseDouble(value));
         } catch (NumberFormatException e) {
             return 0;
@@ -1410,8 +1247,6 @@ public class CheckoutService {
     /**
      * 組裝金額快照 JSON（Preview 存入 Redis）。20 設計書 §4.11 + §4.13.4。
      */
-    // package-private（非 private）：讓同 package 的測試用**產線這一支**組快照，
-    // 而不是各自手寫一份 JSON——手寫 fixture 等於自己跟自己對，欄名改了不會有人發現。
     String buildPriceSnapshot(long subtotal, long shippingFee, long discount, long totalAmount,
                                        boolean freeShippingEligible, boolean tentativeFreeShippingEligible,
                                        OrderPolicySnapshot policy) {
@@ -1423,7 +1258,6 @@ public class CheckoutService {
             snapshot.put("totalAmount", totalAmount);
             snapshot.put("freeShippingEligible", freeShippingEligible);
             snapshot.put("tentativeFreeShippingEligible", tentativeFreeShippingEligible);
-            // 政策五欄來自 preview 的同一次求值，confirm 只讀回、不重算。
             Map<String, Object> policyMap = new LinkedHashMap<>();
             policyMap.put("commerceModel", policy.commerceModel());
             policyMap.put("collectionModel", policy.collectionModel());
@@ -1433,9 +1267,6 @@ public class CheckoutService {
             snapshot.put("policy", policyMap);
             return objectMapper.writeValueAsString(snapshot);
         } catch (Exception e) {
-            // 🔴 不再退化成 "1"。退化版本沒有政策欄，而 confirm 對缺政策一律 fail-closed
-            //    ⇒ 留著這條路只會把「序列化壞了」變成 confirm 階段一個看不懂的錯誤。
-            //    在 preview 就炸，錯誤訊息才指得到真正的原因。
             log.error("CheckoutService.buildPriceSnapshot.failed", "金額快照序列化失敗", e);
             throw new OrderBusinessException(GrpcResponseCode.FULFILLMENT_COMMERCE_MODEL_UNKNOWN);
         }
@@ -1470,7 +1301,7 @@ public class CheckoutService {
                 ValidateOrderInvoiceInputInternalRequest.newBuilder()
                         .setStoreId(String.valueOf(storeId))
                         .setBuyerId(String.valueOf(buyerId))
-                        .setOrderNo("")   // 建單前還沒有訂單編號；本 RPC 只拿它做 log 關聯
+                        .setOrderNo("")
                         .setAmount(InvoiceAmountBreakdown.newBuilder()
                                 .setProductAmount(String.valueOf(orderSubtotal))
                                 .setShippingAmount(String.valueOf(shippingFee))
@@ -1484,14 +1315,13 @@ public class CheckoutService {
         ValidateOrderInvoiceInputInternalResponse resp =
                 invoiceGrpcClient.validateOrderInvoiceInput(req.build());
         if (resp == null) {
-            return;   // 服務不可用 ⇒ 這一輪不驗（見 javadoc）
+            return;
         }
         if (resp.getCode() == 0) {
             return;
         }
         GrpcResponseCode code = GrpcResponseCode.fromCode(resp.getCode());
         if (code == null) {
-            // 值域長胖而 order 這側還沒同步 ⇒ 不得靜默放行，也不得回一個猜的碼。
             throw new OrderBusinessException(GrpcResponseCode.SERVICE_UNAVAILABLE);
         }
         throw new OrderBusinessException(code);
@@ -1529,23 +1359,10 @@ public class CheckoutService {
                 .setBuyerTaxId(in.getBuyerTaxId())
                 .setBuyerName(in.getBuyerTitle())
                 .setEmail(in.getNotifyEmail());
-        // 🔴 兩個 carrierType 都必須由這裡明說，**不可以只設 DONATION**。
-        //
-        // invoice-service 的 identityFromManualInput 第一件事就是
-        // `InvoiceCarrierTypeFromValue(spec.CarrierType)`，值域外（含空字串）一律回
-        // 9305；它的原地註解逐字寫著「只帶 buyerTaxId 而不帶 carrierType 也走這裡：
-        // 統編必須明說 carrierType=TAX_ID，由欄位有沒有值去推語意，就是在憑證上猜
-        // 買受人身分」。⇒ 少設這一行，**打統編這條路在 gateway 上結構性不可能成功**。
-        //
-        // ⚠️ 這個缺口在單元測試裡看不到（order 側自己的 mapper 測試怎麼寫都會過），
-        // 也不會讓 CI 紅——它只在真的打一次 dev 的 confirm 時才現形（2026-09-01 實測）。
-        // 對應的契約測試在 CheckoutServiceInvoiceInputSpecTest。
         if (!in.getDonationCode().isBlank()) {
             out.setCarrierType(InvoiceCarrierType.DONATION.value())
                .setValue(in.getDonationCode());
         } else if (!in.getBuyerTaxId().isBlank()) {
-            // TAX_ID 的 value 必須留空（§6.1.1）：統編走 buyer_tax_id 那一格，
-            // 把它同時塞進 value 會被 validateIdentityShape 判成「載具塞進統編欄」。
             out.setCarrierType(InvoiceCarrierType.TAX_ID.value());
         }
         return out.build();
@@ -1579,7 +1396,7 @@ public class CheckoutService {
         ResolveOrderInvoiceModeInternalData d = resp.getData();
         CheckoutInvoicePreview.Builder b = CheckoutInvoicePreview.newBuilder()
                 .setInvoiceMode(d.getInvoiceMode())
-                .setSnapshotVersion("1")   // ← 見 javadoc 紅字：不得用 d.getSnapshotVersion()
+                .setSnapshotVersion("1")
                 .setPreviewExpiresAt(d.getPreviewExpiresAt());
         if (d.hasAmount()) {
             b.setAmount(CheckoutInvoiceAmount.newBuilder()
@@ -1596,7 +1413,6 @@ public class CheckoutService {
                     .setTitle(d.getDisclosure().getTitle())
                     .setBody(d.getDisclosure().getBody()));
         }
-        // default_profile 可為空 message（買家無 profile）⇒ 只有 profile_id 非空才帶。
         if (d.hasDefaultProfile() && !d.getDefaultProfile().getProfileId().isBlank()) {
             b.setDefaultProfile(CheckoutInvoiceProfile.newBuilder()
                     .setProfileId(d.getDefaultProfile().getProfileId())
@@ -1634,7 +1450,7 @@ public class CheckoutService {
             ResolvedItem r = items.get(i);
             long share;
             if (i == items.size() - 1) {
-                share = discountAmount - allocated;            // 尾差歸最後一筆
+                share = discountAmount - allocated;
             } else {
                 long itemSubtotal = r.unitPrice() * r.quantity();
                 share = Math.round((double) discountAmount * itemSubtotal / totalSubtotal);
@@ -1654,7 +1470,6 @@ public class CheckoutService {
                                        long newDiscount, long newTotalAmount,
                                        boolean newFreeShippingEligible) {
         if ("1".equals(snapshotJson)) {
-            // 向下相容：舊格式快照，跳過比對
             return;
         }
 
@@ -1672,7 +1487,6 @@ public class CheckoutService {
         long oldTotalAmount = snapshot.path("totalAmount").asLong(0);
         boolean oldFreeShippingEligible = snapshot.path("freeShippingEligible").asBoolean(false);
 
-        // 逐項比對，收集變動原因
         List<String> reasons = new ArrayList<>();
         List<String> reasonLabels = new ArrayList<>();
 
@@ -1699,7 +1513,6 @@ public class CheckoutService {
         }
 
         if (reasons.isEmpty()) {
-            // 個別項目都一致但總額不同（不應發生，防禦性檢查）
             if (oldTotalAmount != newTotalAmount) {
                 reasons.add("AMOUNT_CALCULATION");
                 reasonLabels.add("金額計算");

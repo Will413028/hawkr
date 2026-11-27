@@ -17,13 +17,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// 本檔驗 M3 寫入面的**型別邊界與 Tier A 出口形狀**；業務規則本身在
-// internal/usecase/tax_profile_test.go。
-//
-// 🔴 核心斷言是「越權與查無的回應逐位元相同」，而且用 proto.Marshal 比對不是比 code：
-// 比 code 只證明兩者同碼，證明不了 message、data 或任何未來新增的欄位沒有洩漏
-// 「這家店有稅務資格，只是不是你的」。稅務資格帶統編、法定名稱、負責人與營業地址，
-// 光是「存在與否」就是可枚舉的商業情報。
 
 const (
 	yStoreA int64 = 2685914682
@@ -35,9 +28,6 @@ const (
 
 var yNow = time.Date(2026, 3, 2, 6, 0, 0, 0, time.UTC)
 
-// ---------------------------------------------------------------------------
-// fakes（只到 repository 邊界：本檔驗 handler，不驗 SQL）
-// ---------------------------------------------------------------------------
 
 type yIssuers struct {
 	domain.IssuerRepository
@@ -46,11 +36,6 @@ type yIssuers struct {
 
 func (r yIssuers) GetByRef(_ context.Context, _ string, refID int64) (domain.Issuer, error) {
 	if refID != r.ref {
-		// repository 的 notFound 對 issuer 映的是 9330（provider 語意）；
-		// usecase 必須把它翻成 9320——那正是本檔要驗的其中一件事。
-		// message 一律取自 bizcode.Message：repository 的 notFound() 就是這樣做的，
-		// fake 自己打一個字串會讓 Tier A 的逐位元比對因為**測試替身**而失敗（或更糟：
-		// 因為兩邊都寫同一個假字串而假綠）。
 		return domain.Issuer{}, pkgerrors.NewBusiness(bizcode.InvoiceProviderAccountNotFound,
 			bizcode.Message(bizcode.InvoiceProviderAccountNotFound))
 	}
@@ -111,10 +96,6 @@ type yTx struct{}
 
 func (yTx) WithTx(ctx context.Context, fn func(ctx context.Context) error) error { return fn(ctx) }
 
-// newTaxServer 組出只掛了 TaxProfile 的 InvoiceServer。
-//
-// present=false 讓「這個 store 有 issuer 但沒有 profile」與「連 issuer 都沒有」
-// 兩條路徑都走得到——它們必須回同一個東西。
 func newTaxServer(present bool, row domain.SellerTaxProfile) *InvoiceServer {
 	uc := usecase.NewTaxProfile(
 		yTx{}, yIssuers{ref: yStoreA}, yProfiles{row: row, present: present},
@@ -141,9 +122,6 @@ func yProfile(status string) domain.SellerTaxProfile {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tier A：越權與查無逐位元相同
-// ---------------------------------------------------------------------------
 
 // TestTaxProfile_TierA_ForeignStoreIsByteIdenticalToMissing 驗四支賣家 RPC。
 //
@@ -156,9 +134,6 @@ func TestTaxProfile_TierA_ForeignStoreIsByteIdenticalToMissing(t *testing.T) {
 		call func(*InvoiceServer, int64) (proto.Message, int32, error)
 	}{
 		{"SubmitSellerTaxProfile", func(s *InvoiceServer, store int64) (proto.Message, int32, error) {
-			// AcceptedTerms 必帶：9325 的判定在 Tier A 之前（裁決 C，它保證未同意的
-			// 請求零寫入）⇒ 不帶就永遠測不到這裡要驗的 9320。
-			// 兩者都是 store 無關的碼，先後順序不洩漏任何東西。
 			r, err := s.SubmitSellerTaxProfile(context.Background(), &pb.SubmitSellerTaxProfileRequest{
 				StoreId: store, AcceptedTerms: true,
 			})
@@ -180,7 +155,6 @@ func TestTaxProfile_TierA_ForeignStoreIsByteIdenticalToMissing(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			// 越權：store 存在於請求，但不是這台 server 認得的那一家。
 			foreignSrv := newTaxServer(true, yProfile("SUBMITTED"))
 			foreign, code, err := tc.call(foreignSrv, yStoreB)
 			if err != nil {
@@ -189,7 +163,6 @@ func TestTaxProfile_TierA_ForeignStoreIsByteIdenticalToMissing(t *testing.T) {
 			if code != bizcode.SellerTaxProfileNotFound {
 				t.Fatalf("code = %d, want 9320", code)
 			}
-			// 查無：自己的 store，但還沒有 profile。
 			missingSrv := newTaxServer(false, domain.SellerTaxProfile{})
 			missing, _, err := tc.call(missingSrv, yStoreA)
 			if err != nil {
@@ -236,12 +209,8 @@ func TestTaxProfile_TierA_AdminMissingStore(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 狀態機陰性：回明確業務碼（envelope），不是 gRPC error
-// ---------------------------------------------------------------------------
 
 func TestTaxProfile_StateInvalidReturnsEnvelope(t *testing.T) {
-	// 端點 18：SUBMITTED 不得就地改內容。
 	s := newTaxServer(true, yProfile("SUBMITTED"))
 	resp, err := s.SaveSellerTaxProfileDraft(context.Background(), &pb.SaveSellerTaxProfileDraftRequest{
 		StoreId: yStoreA, TaxIdentity: &pb.SellerTaxIdentity{LegalName: "改名"},
@@ -256,7 +225,6 @@ func TestTaxProfile_StateInvalidReturnsEnvelope(t *testing.T) {
 		t.Fatalf("9321 不在 preserveData 清單內，不得帶 data：%+v", resp.GetData())
 	}
 
-	// 端點 40：DRAFT 不是任何決策的來源狀態 ⇒ 9348。
 	s2 := newTaxServer(true, yProfile("DRAFT"))
 	dec, err := s2.DecideTaxReviewForAdmin(context.Background(), &pb.DecideTaxReviewForAdminRequest{
 		ActorAccountId: yAdmin, StoreId: "2685914682",
@@ -325,7 +293,6 @@ func TestTaxProfile_Submit_UnacceptedTermsIsEnvelope9325(t *testing.T) {
 // 🔴 沒有它，未簽過的賣家從 terms_version 只拿得到空字串，而端點 22 要求原樣回送
 // ⇒ S04 的「同意」按鈕對新賣家從來按不成功（補簽路徑實際上是斷的）。
 func TestTaxProfile_Attestation_ExposesCurrentTermsVersion(t *testing.T) {
-	// 未簽過：terms_version 空、effective false、current_terms_version 仍必須非空。
 	d := toSelfIssueAttestation(yProfile("DRAFT"))
 	if d.GetCurrentTermsVersion() != usecase.SelfIssueTermsVersion {
 		t.Fatalf("current_terms_version = %q，want %q（端點 22 要靠它回送）",
@@ -335,7 +302,6 @@ func TestTaxProfile_Attestation_ExposesCurrentTermsVersion(t *testing.T) {
 		t.Fatalf("未簽過的賣家不得顯示成已簽：%+v", d)
 	}
 
-	// 已簽舊版：兩欄必須不同——合併成一欄就沒辦法表達「簽過但不是這一版」。
 	signed := yProfile("SUBMITTED")
 	old, at := "2000-01-01", yNow
 	signed.AttestationVersion, signed.AttestedAt = &old, &at
@@ -358,7 +324,6 @@ func TestTaxProfile_AttestationEffective_AnchorsOnReviewStatus(t *testing.T) {
 	at := yNow
 	v := usecase.SelfIssueTermsVersion
 
-	// 陰性（本測試的重點）：已簽 ＋ 還沒具結 ⇒ 責任**未**生效。
 	for _, status := range []string{"SUBMITTED", "UNDER_REVIEW", "SUPPLEMENT_REQUIRED",
 		"APPROVED_INVOICE_REQUIRED", "APPROVED_INVOICE_EXEMPT", "REJECTED", "EXPIRED", "REVOKED"} {
 		p := yProfile(status)
@@ -367,13 +332,11 @@ func TestTaxProfile_AttestationEffective_AnchorsOnReviewStatus(t *testing.T) {
 		if d.GetEffective() {
 			t.Fatalf("%s：已簽但責任尚未生效，effective 必須是 false（判準是狀態值不是 attested_at）", status)
 		}
-		// 同一列的「簽過沒」仍要答得出來——兩個問題分開，不是把資訊丟掉。
 		if d.GetTermsVersion() != v || d.GetAcceptedAt() == "" {
 			t.Fatalf("%s：簽署事實不得因為 effective=false 而消失：%+v", status, d)
 		}
 	}
 
-	// 陽性：SELF_ISSUE_PENDING ＝ ResolveFulfillmentMode 唯一判出 SELLER_SELF_ISSUE 的狀態。
 	p := yProfile("SELF_ISSUE_PENDING")
 	p.AttestationVersion, p.AttestedAt = &v, &at
 	if !toSelfIssueAttestation(p).GetEffective() {
@@ -381,9 +344,6 @@ func TestTaxProfile_AttestationEffective_AnchorsOnReviewStatus(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 型別邊界：契約違規 ⇒ InvalidArgument（400），不借業務碼
-// ---------------------------------------------------------------------------
 
 func TestTaxProfile_ContractViolationsAreInvalidArgument(t *testing.T) {
 	s := newTaxServer(true, yProfile("UNDER_REVIEW"))
@@ -468,7 +428,6 @@ func TestTaxProfile_DecideReturnsStringTypedData(t *testing.T) {
 	if d.GetStoreId() != "2685914682" || d.GetAuditLogId() != "42" {
 		t.Fatalf("id 欄位必須是 string：%+v", d)
 	}
-	// 只有 REVOKE 帶 revokedEffectiveAt（T-C04 的分界時點）。
 	if d.GetRevokedEffectiveAt() == "" {
 		t.Fatalf("REVOKE 必須帶 revokedEffectiveAt：%+v", d)
 	}

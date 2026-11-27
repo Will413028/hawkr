@@ -14,7 +14,6 @@ export default async function ReviewsAsync({
 }: {
 	productId: string;
 }) {
-	// 讀取失敗不顯示成「還沒有評價」，也不讓整段消失：顯示讀取失敗與重試。
 	const reviewsResult = await getCachedProductReviews(productId, 6).catch(
 		() => undefined,
 	);

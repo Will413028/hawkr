@@ -67,7 +67,6 @@ func currentStore() model.Store {
 			StoreName: "範例小農", Description: text("介紹"), TownCode: text("63000050"),
 		},
 		StoreID: 11, StoreCode: 2600000001, AccountID: 7, Version: 3, Status: model.Active, Sanctions: model.NoSanctions(),
-		// seller 讀出的條件：營運中、有店名與鄉鎮市區，KYC 還沒核准、沒有 logo。
 		Conditions: model.Conditions{Derived: true, Active: true, NotPendingDeletion: true, StoreName: true, TownCode: true},
 	}
 }
@@ -88,7 +87,6 @@ func TestUpdateMyStoreAppliesTheMask(t *testing.T) {
 		t.Fatalf("input=%+v", in)
 	}
 
-	// address 列在 mask 但沒有值時清成空字串（模組會清成 NULL）。
 	req = connect.NewRequest(&pb.UpdateMyStoreRequest{
 		Store:      &pb.Store{Etag: "3"},
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"address"}},
@@ -100,7 +98,6 @@ func TestUpdateMyStoreAppliesTheMask(t *testing.T) {
 		t.Fatalf("clearing address failed: %+v", in)
 	}
 
-	// 只有鄉鎮沒有明細時正常送出，明細為空字串。
 	req = connect.NewRequest(&pb.UpdateMyStoreRequest{
 		Store: &pb.Store{
 			Address: &commonpb.PostalAddress{TownCode: "63000050"},
@@ -207,8 +204,6 @@ func TestApplyStoreSendsExactlyTheFieldsTheModuleAccepts(t *testing.T) {
 		t.Fatalf("input=%+v", m.apply)
 	}
 	fields := (&pb.ApplyStoreRequest{}).ProtoReflect().Descriptor().Fields()
-	// ApplyStoreRequest 的 address 是 PostalAddress（包含 town_code 與 address_detail 2 個欄位），因此 proto 欄位數比 ApplyInput 少 1
-	// （扣除 AccountID、ClientIP、UserAgent：來自呼叫者與傳輸層）。
 	inputFields := reflect.TypeFor[model.ApplyInput]().NumField() - 3
 	if fields.Len() != inputFields-1 {
 		t.Fatalf("ApplyStoreRequest 有 %d 個欄位，ApplyInput 接受 %d 個", fields.Len(), inputFields)

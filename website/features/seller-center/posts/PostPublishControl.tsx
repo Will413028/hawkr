@@ -63,7 +63,6 @@ export default function PostPublishControl({
 	onToggle,
 }: PostPublishControlProps) {
 	const target = postPublishToggleTarget(publishStatus);
-	// 缺值＝上游沒給。畫一顆方向不明的按鈕，比不畫更糟：按錯方向的 4403 是回不去的。
 	if (target === null) return null;
 
 	const expanding = isExpandingPublishTarget(target);
@@ -90,7 +89,6 @@ export default function PostPublishControl({
 			data-image-required={imageRequired || undefined}
 			isLoading={busy}
 			loadingLabel={pendingLabel}
-			// 兩個方向的 pending 字寬不同，閒置時就預留最寬的那個，避免送出瞬間整排位移。
 			loadingReservationLabel={
 				POST_PUBLISH_PENDING_LABEL[PostPublishStatus.UNPUBLISHED]
 			}

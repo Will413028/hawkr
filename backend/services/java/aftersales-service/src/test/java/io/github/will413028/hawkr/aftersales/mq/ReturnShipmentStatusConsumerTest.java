@@ -103,8 +103,6 @@ class ReturnShipmentStatusConsumerTest {
 
     @Test
     void code31_marksReturnInTransit_publishesEvent() throws Exception {
-        // #1226：碼 31（IN_TRANSIT）RETURN_PENDING(20)→RETURN_SHIPPING(25) 必須補發
-        // CASE_RETURN_IN_TRANSIT（→ 賣家通知 + 賣家工作區 realtime）；原本此轉換不發任何 domain event
         AfterSaleCaseEntity entity = caseWith("A007", "O700", "20", "3002", 1001L, 2001L);
         when(caseMapper.selectOne(any())).thenReturn(entity);
         when(caseMapper.markReturnInTransit("A007")).thenReturn(1);
@@ -122,7 +120,6 @@ class ReturnShipmentStatusConsumerTest {
 
     @Test
     void code31_inTransit_skipped_whenNotReturnPending() throws Exception {
-        // CAS rows=0（case 已離開 RETURN_PENDING）→ 不發事件（冪等 skip）
         AfterSaleCaseEntity entity = caseWith("A008", "O800", "25", "3002", 1001L, 2001L);
         when(caseMapper.selectOne(any())).thenReturn(entity);
         when(caseMapper.markReturnInTransit("A008")).thenReturn(0);
@@ -159,7 +156,6 @@ class ReturnShipmentStatusConsumerTest {
 
         ArgumentCaptor<java.time.LocalDateTime> sellerPickedUpAt = ArgumentCaptor.forClass(java.time.LocalDateTime.class);
         verify(caseMapper).markReturnDelivered(eq("A003"), any(), any(), sellerPickedUpAt.capture());
-        // sellerPickedUpAt 必須非 null（2026-05-22 修訂新欄位）
         org.junit.jupiter.api.Assertions.assertNotNull(sellerPickedUpAt.getValue());
         verify(eventPublisher).tryPublishCaseTransitionWithContext(
                 eq("aftersales.case.return_delivered"), anyString(),
@@ -180,7 +176,6 @@ class ReturnShipmentStatusConsumerTest {
 
     @Test
     void code53_廠退_isAbnormalNotDelivered() throws Exception {
-        // 2026-05-22 bug 修正：碼 53 是「廠退」屬於 ABNORMAL，原誤列為 DELIVERED 已修正
         AfterSaleCaseEntity entity = caseWith("A005", "O500", "25", "3001", 1001L, 2001L);
         when(caseMapper.selectOne(any())).thenReturn(entity);
         when(caseMapper.markReturnFailed(eq("A005"), anyString(), any())).thenReturn(1);
@@ -194,7 +189,6 @@ class ReturnShipmentStatusConsumerTest {
 
     @Test
     void code55_sellerNotPicked_persistsMessageWithoutStateChange() throws Exception {
-        // 我方 72h timer 是唯一真實來源；碼 55 僅供 audit
         AfterSaleCaseEntity entity = caseWith("A006", "O600", "30", "3002", 1001L, 2001L);
         when(caseMapper.selectOne(any())).thenReturn(entity);
         when(caseMapper.stampReturnProviderInfo(eq("A006"), anyString(), anyString())).thenReturn(1);
@@ -215,9 +209,6 @@ class ReturnShipmentStatusConsumerTest {
 
     @Test
     void dispositionRegression_abnormalCovers33_44_53_andNot11_or_32() {
-        // 分類回歸測試 —— 防止後人誤改回 2026-05-22 修掉的 bug 狀態。
-        // 🔴 錨已從 AfterSalesConstants 的 5 個字面值集合移到 common-core 的 canonical
-        //    分類器（ADR-013）；斷言的是**語意**不是集合成員。
         assertEquals(ReturnShippingRules.Disposition.RETURN_ABNORMAL,
                 ReturnShippingRules.dispositionOf(ShippingStatus.ABNORMAL));
         assertEquals(ReturnShippingRules.Disposition.RETURN_ABNORMAL,
@@ -289,15 +280,12 @@ class ReturnShipmentStatusConsumerTest {
         consumer.onReturnStatusChanged(
                 buildMessage(payload("O999X", "7777", true, "SR999", null)), channel, 32L);
 
-        // MqErrorHandler 的重試路徑：ACK 後以 x-retry-count 重新 publish；
-        // 關鍵斷言是「沒有走完正常處理」——四個 mapper 動作一個都不得發生。
         verify(caseMapper, never()).markReturnInTransit(anyString());
         verify(caseMapper, never()).markReturnAtStore(anyString(), any(), any());
         verify(caseMapper, never()).markReturnDelivered(anyString(), any(), any(), any());
         verify(caseMapper, never()).markReturnFailed(anyString(), anyString(), any());
     }
 
-    // ==================== 副作用失敗無訊號修復（出路 4） ====================
 
     /**
      * 核心保證：case transition 事件送不出去時，短 tx 必須 rollback，狀態不得單獨前進。
@@ -357,7 +345,6 @@ class ReturnShipmentStatusConsumerTest {
         assertThat(txManager.commitCount).isEqualTo(1);
     }
 
-    // ==================== W5-4 陰性：不得 parse Uber raw code ====================
 
     /**
      * 🔴 Uber 原生狀態字串進來時必須 <b>fail-loud</b>，一個 mapper 動作都不得發生。
@@ -383,7 +370,6 @@ class ReturnShipmentStatusConsumerTest {
                     buildMessage(payload("OUBER", raw, true, null, null)), channel, tag++);
         }
 
-        // 四個狀態推進動作一個都不得發生——不論那個原生值在 Uber 那邊代表什麼。
         verify(caseMapper, never()).markReturnInTransit(anyString());
         verify(caseMapper, never()).markReturnAtStore(anyString(), any(), any());
         verify(caseMapper, never()).markReturnDelivered(anyString(), any(), any(), any());
@@ -393,7 +379,6 @@ class ReturnShipmentStatusConsumerTest {
                 anyString(), anyString(), anyString(), anyString(), any(), any(), anyString(),
                 any(), any(EventPrincipals.class));
 
-        // 對照組：上面那圈「什麼都沒發生」必須是因為值被拒絕，不是因為根本沒跑到 consumer。
         verify(caseMapper, times(rawCodes.size())).selectOne(any());
     }
 
@@ -426,11 +411,9 @@ class ReturnShipmentStatusConsumerTest {
         verify(eventPublisher, never()).tryPublishCaseTransitionWithContext(
                 anyString(), anyString(), anyString(), anyString(), any(), any(), anyString(),
                 any(), any(EventPrincipals.class));
-        // 值域內 ⇒ 重投沒有意義 ⇒ 必須 ACK（與值域外的 fail-loud 相反）。
         verify(channel).basicAck(eq(41L), eq(false));
     }
 
-    // ==================== helpers ====================
 
     private AfterSaleCaseEntity caseWith(String caseNo, String orderNo, String status, String returnShippingMethod,
                                           Long sellerId, Long buyerId) {
@@ -446,7 +429,6 @@ class ReturnShipmentStatusConsumerTest {
 
     private String payload(String orderNo, String status, boolean isReturn,
                             String providerStatus, String providerMessage) throws Exception {
-        // ShippingEventPayload wire 格式為 snake_case（2026-06-19 統一），consumer 依此解析
         Map<String, Object> map = new java.util.HashMap<>();
         map.put("order_no", orderNo);
         map.put("status", status);

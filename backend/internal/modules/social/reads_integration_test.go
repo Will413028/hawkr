@@ -17,8 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/visibility"
 )
 
-// rowFields 攤平 row struct（內嵌的 struct 展開）成「pgx 對應用的欄位名 → 型別」，規則同 pgx.RowToStructByName：有 db tag 用 tag，
-// 沒有就用欄位名去掉底線後不分大小寫比對。
 type rowField struct {
 	key string
 	typ reflect.Type
@@ -46,7 +44,6 @@ func rowFields(t reflect.Type) []rowField {
 
 func normalizeColumn(s string) string { return strings.ToLower(strings.ReplaceAll(s, "_", "")) }
 
-// scansInto：Postgres 欄位型別（OID）可以掃進 Go 型別（指標算它指向的型別；Describe 看不出欄位可不可以是 NULL，所以指標或非指標都接受）。
 func scansInto(oid uint32, t reflect.Type) bool {
 	if t.Kind() == reflect.Pointer {
 		t = t.Elem()

@@ -51,17 +51,13 @@ type SecureChunkResult struct {
 const (
 	sniffBytes     = 512
 	pdfContentType = "application/pdf"
-	// secureObjectType 是 R2 物件的型別：密文一律是 octet-stream，真正的型別存在資產列。
 	secureObjectType = "application/octet-stream"
-	// secureBusyRetryAfter 是滿載時建議 client 重試的間隔。
 	secureBusyRetryAfter = 5 * time.Second
-	// metaNextIndex 是 FailedPrecondition 的 metadata 鍵：client 依它續傳（比照 tus 的 offset 不符）。
 	metaNextIndex = "next_index"
 )
 
 var errTooLarge = errors.New("media：上傳超過大小上限")
 
-// capReader 在讀超過 max 個位元組時回錯誤：大小不收宣告，上限以實際讀到的位元組數套用。
 type capReader struct {
 	r   io.Reader
 	n   int64
@@ -77,7 +73,6 @@ func (c *capReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
-// sniffSecure 依前 512 位元組的 magic bytes 辨認：PDF 與 image.Detect 放行的圖片，其餘 InvalidInput。型別不收宣告。
 func sniffSecure(ctx context.Context, head []byte) (string, error) {
 	if len(head) == 0 {
 		return "", apperr.InvalidInputOn([]string{"body"}, "%s", text.MediaSecureContentEmpty(loc(ctx)))
@@ -92,8 +87,6 @@ func sniffSecure(ctx context.Context, head []byte) (string, error) {
 	return f.ContentType(), nil
 }
 
-// secureChunkCount 是宣告的總大小（1 到 MaxSecureUploadSize）要切成的段數。
-// u32 與 i32 轉換段序號與段總數：兩者最多 MaxSecureUploadSize / SecureChunkSize（25），不會溢位。
 func u32(n int) uint32 { return uint32(n) } //nolint:gosec // 見上
 func i32(n int) int32  { return int32(n) }  //nolint:gosec // 見上
 
@@ -101,7 +94,6 @@ func secureChunkCount(size int64) int {
 	return int((size + model.SecureChunkSize - 1) / model.SecureChunkSize)
 }
 
-// secureChunkLength 是第 index 段應有的明文長度：除最後一段外剛好 SecureChunkSize，最後一段是餘數（1 到 SecureChunkSize）。
 func secureChunkLength(size int64, count, index int) int64 {
 	if index < count-1 {
 		return model.SecureChunkSize
@@ -246,7 +238,6 @@ func (s *Service) putChunk(ctx context.Context, uploader model.Uploader, token s
 	return s.chunkResult(row, index, count, sniffed)
 }
 
-// advance 是推進的 transaction：條件式推進 next_index 並記下這段的 key；最後一段同一個 transaction 建資產列並轉 READY。
 func (s *Service) advance(ctx context.Context, row store.MediaStagedUpload, index, count int, key string, sniffed *string) error {
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		now := s.d.Now()
@@ -279,9 +270,6 @@ func (s *Service) advance(ctx context.Context, row store.MediaStagedUpload, inde
 	})
 }
 
-// settleLostChunk 處理推進失敗：先看這段的 key 是不是已經記進 secure_chunks（transaction 其實已提交，例如 commit 時連線中斷），
-// 是就回 errChunkCommitted（caller 照成功處理）；只有推進確定 rollback（errLost：條件不成立）才刪自己的物件，commit 結果不明或查不出來就什麼都不刪（刪錯會破壞已提交的段，
-// 沒刪的孤兒密文：已確認的資產只在資產被刪除時移除，從未確認的暫存上傳在過期回收時移除）。回傳給 client 的錯誤依會話現況：輸給並行的同一段、過期、已被拒。
 func (s *Service) settleLostChunk(ctx context.Context, row store.MediaStagedUpload, index int, key string, cause error) error {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), model.DirectAbortTimeout)
 	defer cancel()
@@ -292,7 +280,6 @@ func (s *Service) settleLostChunk(ctx context.Context, row store.MediaStagedUplo
 	case (err == nil || errors.Is(err, pgx.ErrNoRows)) && errors.Is(cause, errLost):
 		s.deleteChunkObject(ctx, row.ID, key)
 	case err == nil || errors.Is(err, pgx.ErrNoRows):
-		// commit 結果不明（errLost 以外的錯誤，例如 commit 時連線中斷）：這次查到沒有記錄，但提交可能還在途，不刪；孤兒密文只在資產被刪除（已確認）或暫存上傳過期回收（從未確認）時移除。
 		s.d.Logger.WarnContext(ctx, "media：推進結果不明，密文不刪，等資產刪除或暫存過期回收時移除", "upload_id", row.ID, "index", index, "error", cause)
 		return cause
 	default:
@@ -315,7 +302,6 @@ func (s *Service) settleLostChunk(ctx context.Context, row store.MediaStagedUplo
 	return cause
 }
 
-// errChunkCommitted 是 settleLostChunk 的內部訊號：推進的 transaction 其實已提交，這段算成功。
 var errChunkCommitted = errors.New("media：機敏段其實已記錄")
 
 func (s *Service) chunkResult(row store.MediaStagedUpload, index, count int, sniffed *string) (SecureChunkResult, error) {
@@ -331,7 +317,6 @@ func (s *Service) chunkResult(row store.MediaStagedUpload, index, count int, sni
 	}, nil
 }
 
-// deleteChunkObject 刪自己這次嘗試寫的物件（key 只屬於這次嘗試）；不受 ctx 取消影響但有時限，失敗只記錄，孤兒密文不再另有背景清理：已確認的資產只在資產被刪除時移除，從未確認的暫存上傳在過期回收時移除。
 func (s *Service) deleteChunkObject(ctx context.Context, uploadID uuid.UUID, key string) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), model.DirectAbortTimeout)
 	defer cancel()
@@ -340,8 +325,6 @@ func (s *Service) deleteChunkObject(ctx context.Context, uploadID uuid.UUID, key
 	}
 }
 
-// rejectFirstChunk 把第 0 段辨認不出的會話條件式轉 REJECTED（只在 UPLOADING 且 next_index 0），然後回 InvalidInput；不寫任何物件。
-// 轉換失敗或輸給並行的請求都不改變回給這次請求的結論（這份內容不是 PDF 或圖片）。
 func (s *Service) rejectFirstChunk(ctx context.Context, uploadID uuid.UUID, cause error) error {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), model.DirectAbortTimeout)
 	defer cancel()
@@ -352,7 +335,6 @@ func (s *Service) rejectFirstChunk(ctx context.Context, uploadID uuid.UUID, caus
 	return cause
 }
 
-// exactReader 記錄 PutSecure 從 body 實際讀到的位元組數，以及底層是否已回 io.EOF。
 type exactReader struct {
 	r   io.Reader
 	n   int64
@@ -403,8 +385,6 @@ func (s *Service) PutSecure(ctx context.Context, uploader model.Uploader, body i
 	return SecureResult{Token: begin.Token, ContentType: last.ContentType, SizeBytes: last.SizeBytes, ExpiresAt: last.ExpiresAt}, nil
 }
 
-// chunkSessionOpen 檢查會話還能收段：只有 UPLOADING 且未過期；已完成（READY、CONFIRMED）回 FailedPrecondition 並帶段總數當 next_index
-// （client 重送最後一段時知道已經完成），被拒與過期、已進 GC 各回對應的 FailedPrecondition。
 func chunkSessionOpen(ctx context.Context, row store.MediaStagedUpload, now time.Time) error {
 	switch model.UploadState(row.State) {
 	case model.StateUploading:
@@ -433,7 +413,6 @@ func chunkLengthMismatch(ctx context.Context, expected int64) error {
 	return apperr.InvalidInputOn([]string{"length"}, "%s", text.MediaSecureChunkLengthMismatch(loc(ctx), text.MediaSecureChunkLengthMismatchArgs{Expected: int(expected)}))
 }
 
-// chunkReadErr 把讀 body 的錯誤分類：超過這段的長度是 InvalidInput，其餘（client 中斷等）原樣回傳。
 func chunkReadErr(ctx context.Context, err error, expected int64) error {
 	if errors.Is(err, errTooLarge) {
 		return chunkLengthMismatch(ctx, expected)

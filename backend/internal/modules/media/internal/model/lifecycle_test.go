@@ -10,7 +10,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/media/internal/model"
 )
 
-// checkValues 回傳 schema.sql 裡名為 constraint 的 CHECK 的 IN (...) 值清單。
 func checkValues(t *testing.T, schema, constraint string) []string {
 	t.Helper()
 	re := regexp.MustCompile(`CONSTRAINT ` + constraint + ` CHECK \(\s*(?:[a-z_]+ )?IN \(([^)]*)\)`)

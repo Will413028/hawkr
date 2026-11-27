@@ -31,7 +31,6 @@ public class ProductSkuConverter {
         entity.setWidthCm(dto.getWidthCm());
         entity.setHeightCm(dto.getHeightCm());
 
-        // 運送方式
         if (dto.getShippingMethods() != null) {
             List<ProductSkuEntity.ShippingMethodItem> methods = dto.getShippingMethods().stream()
                     .map(sm -> {
@@ -66,12 +65,9 @@ public class ProductSkuConverter {
                 .lengthCm(entity.getLengthCm())
                 .widthCm(entity.getWidthCm())
                 .heightCm(entity.getHeightCm())
-                // SKU 樂觀鎖版本（#2545）：client 必須讀得到它才有辦法在下次寫回時回送
-                // expectedVersion；不下發就等於這把鎖永遠沒有人拿得到鑰匙。
                 .version(entity.getVersion() != null ? entity.getVersion().toString() : null)
                 .build();
 
-        // 運送方式
         if (entity.getShippingMethod() != null) {
             List<ShippingMethodDTO> smDTOs = entity.getShippingMethod().stream()
                     .map(sm -> ShippingMethodDTO.builder()
@@ -105,12 +101,6 @@ public class ProductSkuConverter {
         if (dto.getPrice() != null) {
             entity.setPrice(dto.getPrice());
         }
-        // 特價更新：dto.salePrice == null 視為「未提供」or「清空」？
-        // 採用設計書語意：updateProduct 接受清空 → 採以下規則：
-        // - 若 dto.getSalePrice() != null：更新為該值
-        // - 若 dto 物件 SaleClear 標記未來可加（本期不支援單獨清空欄位的 API 標記）
-        // 由於 UpdateProductDTO 不區分「null=清空」與「null=未變更」，
-        // 為避免歧義，本期明確規定：updateProduct 傳入 SKU 時，salePrice 一律以 dto 的值為準（null=清空）
         entity.setSalePrice(dto.getSalePrice());
         if (dto.getStockQty() != null) {
             entity.setStockQty(dto.getStockQty());
@@ -125,7 +115,6 @@ public class ProductSkuConverter {
             entity.setHeightCm(dto.getHeightCm());
         }
 
-        // 運送方式
         if (dto.getShippingMethods() != null) {
             List<ProductSkuEntity.ShippingMethodItem> methods = dto.getShippingMethods().stream()
                     .map(sm -> {

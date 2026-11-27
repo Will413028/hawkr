@@ -37,9 +37,6 @@ import {
 } from "./payment-account";
 import type { usePaymentAccount } from "./use-store-detail";
 
-// 商家詳情的收款帳戶卡（PaymentAdminService 的 GetPaymentAccount、RefreshPaymentAccount、RetryPaymentAccountCreate、RetryPaymentAccountPurge、DeletePaymentAccountMapping；
-// 附件 step7-screen-drafts.md 第 3 節；清理終局的文字與位置見 收款開通 ADR D60）。
-// 徽章文字與賣家共用目錄（D24 Q6），細節看原始的 status_reason 與待補條件。
 
 /** 錨點：審核待辦 PAYMENT_ACCOUNT_CREATE_FAILED 與 PAYMENT_ACCOUNT_PURGE_STUCK 的連結帶這個 hash（queue-item.ts）。 */
 export const PAYMENT_ACCOUNT_ANCHOR = "payment-account";
@@ -146,9 +143,7 @@ export function PaymentAccountCard({
 		label: staffTextOrUnknown(paymentPaymentAccountStatus(account.status)),
 		variant: STATUS_VARIANT[account.status] ?? "gray",
 	};
-	// 清理進終局（金流商拒絕關閉，或等待清理超過期限仍關不掉）：卡片在「重試建立」的位置改顯示被擋下的原因與時間，以及「重試關閉」「已在金流商處理，刪除對應」。
 	const blockedTime = account.purgeBlockedTime;
-	// 等待清理、還沒進終局（D63）：在同一個位置顯示「關閉中」，隱藏重新整理、重試建立與其他動作（關閉由清理 job 處理）。
 	const closingTime = blockedTime ? undefined : account.purgePendingTime;
 	const failedTime =
 		blockedTime || closingTime ? undefined : account.createFailedTime;
@@ -211,7 +206,7 @@ export function PaymentAccountCard({
 				</details>
 			)}
 			<div className="payment-account-actions">
-				{/* RefreshPaymentAccount 在外部帳戶還沒建立完成時回 failed_precondition（半建立的列已有外部 ID，狀態仍是 NOT_CREATED）：只在已建立時給這個動作。 */}
+
 				{paymentAccountCreated(account) && !blockedTime && !closingTime && (
 					<Button
 						variant="outline"
@@ -289,7 +284,6 @@ export function PaymentAccountSection({
 	);
 	const [confirmingDelete, setConfirmingDelete] = useState(false);
 	const [confirmingRetryCreate, setConfirmingRetryCreate] = useState(false);
-	// 處理過的待辦（建立失敗）依帳戶狀態出入佇列：重新整理完成、重試建立成功都重讀。
 	const invalidateQueue = () => {
 		void queryClient.invalidateQueries({
 			queryKey: createConnectQueryKey({
@@ -298,7 +292,6 @@ export function PaymentAccountSection({
 			}),
 		});
 	};
-	// 開通任務的收款帳戶項跟著帳戶結果走：重新整理完成與重試建立成功時重讀。
 	const invalidateOnboarding = () => {
 		void queryClient.invalidateQueries({
 			queryKey: createConnectQueryKey({
@@ -349,7 +342,6 @@ export function PaymentAccountSection({
 		}
 	};
 
-	// 建立結果不明且逾期（create_unresolved）：確認框裡按下確認才帶 acknowledge_no_provider_account；失敗由對話框就地顯示。
 	const handleConfirmRetryCreate = async () => {
 		const res = await retryMutation.mutateAsync({
 			storeId,
@@ -376,7 +368,6 @@ export function PaymentAccountSection({
 			});
 		}
 	};
-	// 刪除對應之後帳戶列不在了：重讀帳戶（not_found 是「尚未建立」），待辦與開通任務一併重讀；失敗由對話框就地顯示。
 	const handleDeleteMapping = async () => {
 		await mappingMutation.mutateAsync({ storeId });
 		setConfirmingDelete(false);

@@ -8,7 +8,6 @@ export function resolveBannerActionHref(
 	if (action.type === "url") {
 		return normalizeWebHref(action.url, { allowExternal: true });
 	}
-	// ID 是不透明的字串（ADR 2026-09-25-row-identity-by-data-kind D5），只編碼、不檢查格式。
 	const id = encodeURIComponent(action.id);
 	return action.type === "product" ? `/products/${id}` : `/feed?post=${id}`;
 }

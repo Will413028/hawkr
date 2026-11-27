@@ -65,7 +65,6 @@ test("待分案分頁：ListReports 只列 AWAITING_TRIAGE；沒有篩選時不�
 		pageToken: "",
 		pageSize: 20,
 	});
-	// 請求要是契約接得住的形狀。
 	assert.doesNotThrow(() => create(ListReportsRequestSchema, req));
 });
 
@@ -233,7 +232,6 @@ test("分案期限：伺服器沒有輸出就是「-」；有期限時從伺服�
 		return { text, tone };
 	};
 	assert.deepEqual(shown(report({}), now(0)), { text: "-", tone: "" });
-	// 開始時間用 triageDeadline.startTime，不是通報的 createTime（createTime 在這裡故意設得很早）。
 	const r = report({
 		createTime: ts(now(-100 * HOUR)),
 		triageDeadline: { startTime: ts(now(0)), dueTime: due },

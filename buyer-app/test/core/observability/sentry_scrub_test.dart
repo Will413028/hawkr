@@ -59,13 +59,10 @@ void main() {
 
       final scrubbed = scrubSentryEvent(event, Hint());
 
-      // The scrub must not silently drop unrelated event fields when it
-      // rebuilds/replaces the request or user.
       expect(scrubbed.environment, 'prod');
       expect(scrubbed.release, 'hawkr_buyer@1.0.0');
       expect(scrubbed.serverName, 'buyer-app');
 
-      // Sensitive data should still be scrubbed.
       expect(scrubbed.request?.headers.containsKey('authorization'), isFalse);
       expect(scrubbed.request?.cookies, isNull);
       expect(scrubbed.user?.email, isNull);

@@ -18,16 +18,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// 本檔驗 §6.1 剩餘唯讀 RPC 的 handler 層。
-//
-// 每個 fake 都**照 SQL 述詞的形狀**回答（擁有者是查詢條件的一部分）——與 query_test.go
-// 同一條理由：真正守住 Tier A 的是 db/queries 的 WHERE，本層驗的是「repository 依述詞
-// 交出什麼，handler 就吐出什麼形狀的 envelope」。SQL 那一半由
-// internal/usecase/query_read_integration_test.go 用真的 PostgreSQL 驗。
 
-// ---------------------------------------------------------------------------
-// 三個與 query_test.go 共用的 fake（該檔的 fixture 也用它們的零值）
-// ---------------------------------------------------------------------------
 
 type qAdjustments struct {
 	domain.AdjustmentRepository
@@ -41,7 +32,6 @@ func (q qAdjustments) ListByDocument(_ context.Context, docID int64) ([]domain.A
 type qCorrections struct {
 	domain.CorrectionRequestRepository
 	rows []domain.CorrectionRequest
-	// 兩張表模擬 SQL 的第二、三段述詞（該 document 的買受人／所屬訂單）。
 	docBuyer map[int64]int64
 	docOrder map[int64]string
 }
@@ -93,9 +83,6 @@ func (q qOverview) AdminCounts(context.Context, domain.AdminOverviewCountsQuery)
 	return q.admin, nil
 }
 
-// ---------------------------------------------------------------------------
-// 讀取面的 fake
-// ---------------------------------------------------------------------------
 
 const (
 	rIssuerA = int64(9101)
@@ -124,10 +111,6 @@ func (r rIssuers) GetByID(_ context.Context, id int64) (domain.Issuer, error) {
 	return domain.Issuer{}, notFoundBiz(bizcode.InvoiceProviderAccountNotFound)
 }
 
-// rDocs 照 SQL 的形狀回答：擁有者是述詞不是「查回來再比對」。
-//
-// countBias 刻意讓 Count 與 List 回不同的母體大小，用來釘住「total 來自 count query」——
-// 用 len(records) 充數的實作在這裡當場紅。
 type rDocs struct {
 	domain.DocumentRepository
 	all       []domain.Document
@@ -251,7 +234,6 @@ func (r rDocs) WithDecryptedRecipient(_ context.Context, id int64, fn func(domai
 	return fn(r.secrets[id])
 }
 
-// issuerOfStore 是本檔 fixture 的 store_id → issuer_id 對應（模擬 SQL 的 join）。
 func issuerOfStore(storeID int64) int64 {
 	switch storeID {
 	case storeA:
@@ -265,8 +247,7 @@ func issuerOfStore(storeID int64) int64 {
 
 type rOps struct {
 	domain.OperationRepository
-	views map[int64]domain.OperationView // jobID -> view
-	// storeOf 模擬三表 join 的擁有者述詞。
+	views map[int64]domain.OperationView
 	storeOf map[int64]int64
 	byDoc   map[int64][]domain.Operation
 }
@@ -310,7 +291,7 @@ func (r rOps) ListPriorityViewsForAdmin(context.Context, domain.PriorityOperatio
 type rComplaints struct {
 	domain.ComplaintRepository
 	rows    []domain.Complaint
-	storeOf map[int64]int64 // complaintID -> store
+	storeOf map[int64]int64
 }
 
 func (r rComplaints) ListForBuyerOrder(_ context.Context, in domain.BuyerComplaintQuery) ([]domain.Complaint, error) {
@@ -363,13 +344,10 @@ func (r *rAudit) ListStatusHistory(context.Context, string, int64) ([]domain.Sta
 	return nil, nil
 }
 
-// ---------------------------------------------------------------------------
-// harness
-// ---------------------------------------------------------------------------
 
 const (
-	rDocOldID = int64(7001) // 作廢重開鏈的舊件
-	rDocNewID = int64(7002) // 作廢重開鏈的新件
+	rDocOldID = int64(7001)
+	rDocNewID = int64(7002)
 	rOrderNo  = "O000000701"
 )
 
@@ -384,15 +362,11 @@ func newReadServer(t *testing.T, mut func(*rFixture)) *rFixture {
 	return newReadServerWithCorrections(t, qCorrections{}, mut)
 }
 
-// newReadServerWithCorrections 讓測試注入更正請求。它與 newReadServer 分開，
-// 是因為絕大多數讀取測試不該有任何更正列（有的話 latest_correction_id 會意外非空）。
 func newReadServerWithCorrections(t *testing.T, corrs qCorrections, mut func(*rFixture)) *rFixture {
 	t.Helper()
 	buyer := buyerA
 	docs := &rDocs{
 		all: []domain.Document{
-			// 舊件（已被取代）與新件（現行）：ListOrderDocumentsForBuyer 的排序是
-			// snapshot_version DESC → 新件在前。
 			{
 				ID: rDocNewID, IssuerID: rIssuerA, IssuerNameSnapshot: "測試賣場",
 				SourceType: sourceTypeOrder, SourceRef: strp(rOrderNo),
@@ -479,9 +453,6 @@ func newReadServerWithCorrections(t *testing.T, corrs qCorrections, mut func(*rF
 	return fx
 }
 
-// ---------------------------------------------------------------------------
-// 端點 8：documents 是 repeated
-// ---------------------------------------------------------------------------
 
 // TestGetOrderInvoice_ReturnsEveryDocumentInTheReissueChain 釘住
 // ListOrderDocumentsForBuyer 被寫成 :many 的那個理由。
@@ -507,11 +478,9 @@ func TestGetOrderInvoice_ReturnsEveryDocumentInTheReissueChain(t *testing.T) {
 		t.Fatalf("兩份文件的 id 應同時出現，實得 %v", got)
 	}
 
-	// state 取**最新一份主文件**（排序第一列），不是任意一份。
 	if resp.GetData().GetState() != "ISSUED" {
 		t.Fatalf("state 應取最新一份主文件（ISSUED），實得 %q", resp.GetData().GetState())
 	}
-	// snapshot_version 同樣取最新那一份：端點 11 的 expected_snapshot_version 唯一由此取。
 	if resp.GetData().GetSnapshotVersion() != "2" {
 		t.Fatalf("snapshot_version 應取最新一份（2），實得 %q", resp.GetData().GetSnapshotVersion())
 	}
@@ -550,7 +519,6 @@ func TestGetOrderInvoice_LatestCorrectionSurvivesReissue(t *testing.T) {
 			"更正掛在被作廢的舊件上，以最新 document 查會讓成功的作廢重開把它打回空字串", got)
 	}
 
-	// 陰性：別的買家看不到這一筆（述詞含 requested_by_buyer_id）。
 	other, err := fx.server.GetOrderInvoice(context.Background(),
 		&pb.GetOrderInvoiceRequest{BuyerId: buyerB, OrderNo: rOrderNo})
 	if err == nil && other.GetData().GetLatestCorrectionId() != "" {
@@ -584,9 +552,6 @@ func TestGetOrderInvoice_TierA_ForeignBuyerSeesAwaitingPayment(t *testing.T) {
 	fx := newReadServer(t, nil)
 	ctx := context.Background()
 
-	// 兩次都用**同一個 order_no**：order_no 是請求回聲，換一個訂單號來比對只會
-	// 比到那個回聲不同，測試會為了一個與越權無關的欄位而紅（第一版就是這樣）。
-	// 要比的是「這張訂單不是我的」與「這位使用者什麼都沒有」。
 	foreign, err := fx.server.GetOrderInvoice(ctx, &pb.GetOrderInvoiceRequest{BuyerId: buyerB, OrderNo: rOrderNo})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -601,9 +566,6 @@ func TestGetOrderInvoice_TierA_ForeignBuyerSeesAwaitingPayment(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// total 來自 count query
-// ---------------------------------------------------------------------------
 
 // TestListBuyerInvoiceDocuments_TotalComesFromCountNotPageLength 釘住 total 的來源。
 //
@@ -620,7 +582,6 @@ func TestListBuyerInvoiceDocuments_TotalComesFromCountNotPageLength(t *testing.T
 	if n := len(resp.GetData().GetRecords()); n != 1 {
 		t.Fatalf("page_size=1 應只回 1 列，實得 %d", n)
 	}
-	// 母體 2 列 ＋ bias 3 ＝ 5。用 len(records) 的實作會回 "1"。
 	if got := resp.GetData().GetTotal(); got != "5" {
 		t.Fatalf("🔴 total 必須來自 count query（預期 \"5\"），實得 %q", got)
 	}
@@ -672,9 +633,6 @@ func TestListBuyerInvoiceDocuments_PagesCoverTheWholeSetExactlyOnce(t *testing.T
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 端點 31：賣家看買家 PII 要遮罩
-// ---------------------------------------------------------------------------
 
 // TestGetSellerInvoiceDocument_MasksBuyerCarrier 是 §8.1.3(b)「載具識別碼：
 // 賣家視角遮罩」的 handler 層斷言。
@@ -695,13 +653,9 @@ func TestGetSellerInvoiceDocument_MasksBuyerCarrier(t *testing.T) {
 	}
 	assertNoSubstring(t, resp, "買家載具明碼不得出現在賣家的回應裡", "/T7R3U+P", "acmestore@example.com")
 
-	// funded_by 是 fail-closed 的 UNDETERMINED，不是常數 "SELLER"：
-	// 寫成 SELLER 等於在契約層宣告 ADMIN 券不可能出現，真的出現時會靜默以
-	// 折扣後金額開票 —— 那是稅務錯誤不是顯示錯誤。
 	if resp.GetData().GetFundedBy() != fundedByUndetermined {
 		t.Fatalf("funded_by 應為 UNDETERMINED（E4 fail-closed），實得 %q", resp.GetData().GetFundedBy())
 	}
-	// latest_job_id 是 S07「查看異常」的唯一 href 來源，少了它「看得到異常，點不進去」。
 	if resp.GetData().GetLatestJobId() != "8001" {
 		t.Fatalf("latest_job_id 應為 8001，實得 %q", resp.GetData().GetLatestJobId())
 	}
@@ -762,9 +716,6 @@ func TestGetSellerInvoiceJob_TierA_ForeignStoreIsIndistinguishable(t *testing.T)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 62R：述詞寫死是安全邊界不是效能優化
-// ---------------------------------------------------------------------------
 
 // TestListOrderExternalIssuances_DoesNotLeakOtherJobs 釘住 §6.1.10 對 62R 的測試要求
 // （逐字：「要斷言同一張訂單有一筆 FAILED_PERMANENT 的 operation 時，它不出現在回應裡」）。
@@ -787,7 +738,6 @@ func TestListOrderExternalIssuances_DoesNotLeakOtherJobs(t *testing.T) {
 			t.Fatal("🔴 FAILED_PERMANENT 的 job 洩漏進 62R —— 這條路由的述詞是安全邊界")
 		}
 	}
-	// can_report_external 由後端判定（真值 ＝ MANUAL_PROCESS_ALLOWED），前端不得從 status 推導。
 	if !records[0].GetCanReportExternal() {
 		t.Fatal("MANUAL_PROCESS_ALLOWED 的 job 必須 can_report_external=true")
 	}
@@ -810,9 +760,6 @@ func TestListOrderExternalIssuances_ForeignStoreGetsEmptyNot404(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// A01：取不到的 KPI 不得回 0
-// ---------------------------------------------------------------------------
 
 // TestGetInvoiceOverviewForAdmin_SuspendedSellersIsUnavailableNotZero 釘住
 // §6.1.11a 對 suspended_sellers 的逐字要求。
@@ -836,8 +783,6 @@ func TestGetInvoiceOverviewForAdmin_SuspendedSellersIsUnavailableNotZero(t *test
 		if k.GetKey() == "suspended_sellers" {
 			suspended = k
 		}
-		// 每個 KPI 都必須帶自己的口徑：沒有口徑的儀表板數字會讓兩個人看同一個
-		// 畫面得到不同結論（T-I12）。
 		if k.GetDefinition() == "" {
 			t.Fatalf("KPI %q 缺 definition", k.GetKey())
 		}
@@ -853,9 +798,6 @@ func TestGetInvoiceOverviewForAdmin_SuspendedSellersIsUnavailableNotZero(t *test
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 型別邊界：400 而不是靜默
-// ---------------------------------------------------------------------------
 
 // TestListRPCs_RejectContractViolations 把四類契約違規一次釘住。
 //
@@ -959,8 +901,6 @@ func TestGetSellerInvoiceComplaint_TierA(t *testing.T) {
 // 第三段（該 document 屬於 request 帶進來的那張訂單）最容易被省略，
 // 而省略之後「訂單是我的但發票的買受人不是我」（ADM 事後改過買受人）就變成可讀。
 func TestGetInvoiceCorrection_TierA_ThreePredicates(t *testing.T) {
-	// 本檔的 fixture 沒有 correction 列 ⇒ 三種入參都應該落在**同一個** not-found，
-	// 而那正是三段述詞都在 SQL 裡時的必然結果。
 	fx := newReadServer(t, nil)
 	ctx := context.Background()
 	mine, err := fx.server.GetInvoiceCorrection(ctx, &pb.GetInvoiceCorrectionRequest{
@@ -1003,7 +943,6 @@ func TestGetInvoiceCorrection_TierA_ThreePredicates(t *testing.T) {
 func TestGetSellerInvoiceCapabilitySimple_RequiresInternalCallAndSharesTheOverviewProjection(t *testing.T) {
 	fx := newReadServer(t, nil)
 
-	// 沒有內部呼叫標記 ⇒ 拒絕。
 	if _, err := fx.server.GetSellerInvoiceCapabilitySimple(context.Background(),
 		&pb.GetSellerInvoiceCapabilitySimpleRequest{StoreId: "2685914682"}); err == nil {
 		t.Fatal("🔴 非內部呼叫不得取得賣家稅務狀態")
@@ -1015,8 +954,6 @@ func TestGetSellerInvoiceCapabilitySimple_RequiresInternalCallAndSharesTheOvervi
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// 與 S01 總覽讀同一份投影 —— 兩份實作漂移的症狀是「seller-service 說可以、
-	// 發票模組說不行」，而兩邊都不會報錯。
 	overview, err := fx.server.GetSellerInvoiceOverview(internalCtx(),
 		&pb.GetSellerInvoiceOverviewRequest{StoreId: storeA})
 	if err != nil {
@@ -1035,24 +972,13 @@ func TestGetSellerInvoiceCapabilitySimple_RequiresInternalCallAndSharesTheOvervi
 		t.Fatalf("can_issue_automatically 的唯一定義是 invoice_mode==AMEGO_AUTO，實得 %v（mode=%q）",
 			resp.GetData().GetCanIssueAutomatically(), resp.GetData().GetInvoiceMode())
 	}
-	// 本 fixture 的賣家沒有稅務資格也沒有 provider 帳號 ⇒ 決策樹落在
-	// LEGACY_MANUAL，能力必須是 false。回 true 代表雙條件被簡化成單條件。
 	if resp.GetData().GetCanIssueAutomatically() {
 		t.Fatalf("🔴 沒有稅務資格與 provider 帳號的賣家不得判為可自動開票（mode=%q）",
 			resp.GetData().GetInvoiceMode())
 	}
 }
 
-// ---------------------------------------------------------------------------
-// #3017：ADM 工作台的識別對象欄
-// ---------------------------------------------------------------------------
 
-// rSellerNames 是店名解析的替身。
-//
-// 🔴 它**記下自己收到什麼**，而不是無條件回一個名字：本票的成因正是
-// 「gateway 的契約測試自己手寫了 StoreName: "測試商店"，於是驗的是會不會透傳、
-// 不是會不會有值」。無條件回值的替身會重蹈同一個覆轍——把 store_id 傳錯（或根本
-// 沒傳）照樣全綠。
 type rSellerNames struct {
 	got  []int64
 	byID map[int64]string
@@ -1123,8 +1049,6 @@ func TestAdminListsPopulateStoreName(t *testing.T) {
 	}
 	body := string(src)
 
-	// 對照組：先證明這個檔案裡確實找得到我們預期存在的東西。
-	// 少了它，「零命中」既可能是「賦值被刪了」也可能是「檔名改了、我在讀空氣」。
 	if !strings.Contains(body, "func (s *InvoiceServer) ListTaxReviewsForAdmin(") {
 		t.Fatal("對照組不成立：query_read.go 裡找不到 ListTaxReviewsForAdmin —— 本測試在讀錯的檔案")
 	}
@@ -1141,6 +1065,4 @@ func TestAdminListsPopulateStoreName(t *testing.T) {
 	}
 }
 
-// 編譯期斷言：真正的 seller client 滿足本層宣告的介面。
-// 少了它，介面與實作漂移只會在 fx 圖組裝時才發現，而那是開機。
 var _ SellerNameResolver = (*sellerclient.Client)(nil)

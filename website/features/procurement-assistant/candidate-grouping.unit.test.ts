@@ -22,8 +22,6 @@ function candidate(
 }
 
 describe("canGroupBySeller", () => {
-	// 這是整個「不做假分頁」約定的前端執行點：後端還沒部署 #2377 時所有候選都沒有
-	// storeId，分組必須自動退場，而不是渲染一堆「商家 undefined」的空名片。
 	it("後端尚未提供 storeId 時不得分組", () => {
 		expect(
 			canGroupBySeller([
@@ -48,8 +46,6 @@ describe("canGroupBySeller", () => {
 });
 
 describe("groupPlatformCandidates", () => {
-	// 後端 #2377 驗收條件 2 的前端對應面：同店的多個商品必須落在同一組，
-	// 否則使用者會看到同一家商家出現兩次。
 	it("同一家商家的多個商品合成一組", () => {
 		const { groups, ungrouped } = groupPlatformCandidates([
 			candidate({ candidateId: "1", storeId: "1001", displayName: "青果行 A" }),
@@ -65,7 +61,6 @@ describe("groupPlatformCandidates", () => {
 		expect(ungrouped).toEqual([]);
 	});
 
-	// 群組順序＝首次出現順序。後端已依 rank 排好候選，重排會把最相關的推到下面。
 	it("群組依候選首次出現順序排列，不重排", () => {
 		const { groups } = groupPlatformCandidates([
 			candidate({ candidateId: "1", storeId: "2002" }),
@@ -74,7 +69,6 @@ describe("groupPlatformCandidates", () => {
 		expect(groups.map((g) => g.storeId)).toEqual(["2002", "1001"]);
 	});
 
-	// 靜默丟棄候選比不分組更糟：使用者會以為系統只找到這幾筆。
 	it("帶不出商家身分的候選進 ungrouped，不得被丟掉", () => {
 		const { groups, ungrouped } = groupPlatformCandidates([
 			candidate({ candidateId: "1", storeId: "1001" }),
@@ -95,7 +89,6 @@ describe("groupPlatformCandidates", () => {
 		expect(groups[0].sellerName).toBe("已關閉的店家");
 	});
 
-	// storeCode 缺值不得退回 storeId 組連結：`/sellers/{storeId}` 那條路徑正在被收掉。
 	it("缺 storeCode 時 storeCode 為 null，不得用 storeId 頂替", () => {
 		const { groups } = groupPlatformCandidates([
 			candidate({ candidateId: "1", storeId: "1001" }),
@@ -123,9 +116,6 @@ describe("groupPlatformCandidates", () => {
 });
 
 describe("群組的查核結果與時間", () => {
-	// 後端目前對同一次搜尋的每筆 PLATFORM 候選算出的 matched/unverifiable 完全相同
-	// （candidate_platform_lane.go 只依 slots 計算）。用聯集而不是取第一筆，是為了讓
-	// 後端日後改成逐候選判定時這裡仍然誠實。
 	it("matched/unverifiable 取聯集並依 key 去重", () => {
 		const { groups } = groupPlatformCandidates([
 			candidate({
@@ -181,14 +171,12 @@ describe("賣家層勾選", () => {
 		).groups[0];
 	}
 
-	// 三態而不是布林：部分勾選必須表達得出來，否則使用者對「這家我選了嗎」得不到正確答案。
 	it("勾選狀態是 none / partial / all 三態", () => {
 		expect(sellerSelectionState(group([false, false]))).toBe("none");
 		expect(sellerSelectionState(group([true, false]))).toBe("partial");
 		expect(sellerSelectionState(group([true, true]))).toBe("all");
 	});
 
-	// 詢價單的收件人是商家，一家只需要問一次——選這家＝底下候選全帶進去。
 	it("未選時勾選 → 把全部候選切成已選", () => {
 		const { candidates, nextSelected } = candidatesToToggleForSeller(
 			group([false, false]),
@@ -197,7 +185,6 @@ describe("賣家層勾選", () => {
 		expect(candidates.map((c) => c.candidateId)).toEqual(["1", "2"]);
 	});
 
-	// 使用者點一個「部分勾選」的框，預期是補齊而不是清空。
 	it("部分勾選時往全選走，且只送需要改變的那幾筆", () => {
 		const { candidates, nextSelected } = candidatesToToggleForSeller(
 			group([true, false]),
@@ -214,14 +201,13 @@ describe("賣家層勾選", () => {
 		expect(candidates.map((c) => c.candidateId)).toEqual(["1", "2"]);
 	});
 
-	// 已經是目標狀態的不重送：每一筆都會打一次 toggle API，重送等於白白製造請求。
 	it("已在目標狀態的候選不重送", () => {
 		const { candidates } = candidatesToToggleForSeller(
 			group([true, true, true]),
 		);
-		expect(candidates).toHaveLength(3); // 目標是取消，三筆都要改
+		expect(candidates).toHaveLength(3);
 		const partial = candidatesToToggleForSeller(group([true, true, false]));
-		expect(partial.candidates).toHaveLength(1); // 目標是補齊，只有一筆要改
+		expect(partial.candidates).toHaveLength(1);
 	});
 });
 
@@ -240,7 +226,6 @@ describe("countSelectedRecipients", () => {
 		).toBe(2);
 	});
 
-	// 帶不出 storeId 的候選畫面上本來就是一家一列。
 	it("帶不出 storeId 的候選各自算一家", () => {
 		expect(
 			countSelectedRecipients([
@@ -250,7 +235,6 @@ describe("countSelectedRecipients", () => {
 		).toBe(2);
 	});
 
-	// 部署窗口內混到的舊候選走 ungrouped、各自成列，與收斂後的商家列相加。
 	it("收斂得了的與收斂不了的相加", () => {
 		expect(
 			countSelectedRecipients([

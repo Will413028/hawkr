@@ -122,14 +122,10 @@ class AfterSaleLabelRetryServiceClaimTest {
         verify(mapper, never()).markLabelRetried(anyString());
         verifyNoInteractions(audit);
 
-        // 租約立刻釋放 ⇒ 下一個 tick（2 分）就重試，而不是等滿租約
         ArgumentCaptor<LocalDateTime> lease = ArgumentCaptor.forClass(LocalDateTime.class);
         ArgumentCaptor<LocalDateTime> expiredAt = ArgumentCaptor.forClass(LocalDateTime.class);
         verify(mapper).releaseLabelRetryLease(eq(CASE_NO), lease.capture(), expiredAt.capture());
 
-        // 🚨 釋放值不得是 null：那會把耗盡掃描述詞 (count=0 AND label_retry_at IS NOT NULL)
-        // 賴以判定的證據抹掉，使 LABEL_RETRY_EXHAUSTED 只在租約被持有的那幾秒可見，
-        // 而 checkExhausted 每 10 分鐘才取樣 ⇒ 告警實質失效。
         assertNotNull(expiredAt.getValue(),
                 "釋放必須寫入一個過去時間，不得還原成 NULL——NULL 的語意是「從未嘗試過」，"
                         + "會讓耗盡告警在 shipping 持續打不通時永遠不發");

@@ -48,9 +48,6 @@ import { SellerTableSkeletonRows } from "../components/SellerSkeletons";
 import { StatCard } from "../components/StatCard";
 import OnboardingProgressCard from "./OnboardingProgressCard";
 
-// 待出貨 = PAID(10) + PENDING_SHIPMENT(20), as the numeric CodeMeta CSV the
-// backend `/app/orders` status filter expects (matching SellerOrdersPage's
-// "待出貨" tab) — NOT the web semantic name "preparing".
 const PENDING_SHIP_STATUS_CSV = [
 	OrderStatus.PAID,
 	OrderStatus.PENDING_SHIPMENT,
@@ -63,9 +60,6 @@ const SELLER_ORDERS_AFTERSALE_HREF = "/seller-center/orders?tab=aftersale";
 
 export default function DashboardPage() {
 	const identity = useZoneIdentity();
-	// `view: "seller"` is required — `/app/orders` defaults to the BUYER view,
-	// so without it a seller account gets its (empty) buyer orders and the
-	// "待處理訂單" block is always empty. See SellerOrdersPage.
 	const pendingShip = useOrderList(PENDING_SHIP_STATUS_CSV, {
 		view: "seller",
 	});
@@ -84,19 +78,13 @@ export default function DashboardPage() {
 	const todosPhase = todosPhaseOf(dash, dashLoadFailed);
 	const dashLoading = todosPhase === "loading";
 	const todosUnknown = todosPhase === "unknown";
-	// Just the `.total` for the onboarding progress card — shares the seller
-	// products cache and refetches when ProductsPage/InventoryPage mutate.
 	const { data: productsList } = useSellerProducts({
 		page: 1,
 		pageSize: 1,
 		status: ProductStatus.ACTIVE,
 	});
 	const productCount = productsList?.total ?? null;
-	// shipping shares its seller-scoped query with WalletClient /
-	// ShippingClient / SkuShippingEditor (same payload, no params → deduped).
 	const { rows: shippingRows } = useShippingOnboardings();
-	// Keep the badge lightweight, but fetch a small sample so provider failure
-	// details can be surfaced without loading the full orders table.
 	const { stats: anomalyStats } = useSellerShipmentAnomalyStats();
 	const { records: anomalyRecords, loading: anomalyRecordsLoading } =
 		useSellerShipmentAnomalies({ pageSize: 3 });
@@ -114,8 +102,6 @@ export default function DashboardPage() {
 		return deadline ? `最近出貨期限：${deadline}` : undefined;
 	}, [nearestPendingShipDeadline]);
 
-	// 售後案件也屬於「待處理」——撈賣家售後案件，只留需要賣家動作的
-	// (待處理 / 已收退貨待確認)，最新的排前面。
 	const afterSales = useSellerAfterSales();
 	const pendingAfterSales = React.useMemo(
 		() =>
@@ -129,10 +115,7 @@ export default function DashboardPage() {
 		[pendingAfterSales],
 	);
 
-	// Shipment anomalies surface as a 今日待辦 item (rather than a standalone
-	// banner) so all "needs action today" lives in one list. Prepended as the
 	// most urgent entry; independent of the dash rollup so it shows even before
-	// `dash` resolves.
 	const todos = React.useMemo(() => {
 		const list = buildTodos(dash, {
 			afterSalesDescription: afterSalesTodoDescription,
@@ -181,9 +164,7 @@ export default function DashboardPage() {
 				</Button>
 			</header>
 
-			{/* 收款帳戶 banner is sticky between the head and main content.
-			    （商家認證 banner 已移除 — 認證狀態由 OnboardingProgressCard 與
-			    待辦清單導流，dashboard 不再置頂提示。） */}
+
 
 			{paymentBanner?.badge && (
 				<div className="seller-banner">
@@ -223,7 +204,6 @@ export default function DashboardPage() {
 				onboarding={onboarding}
 				onboardingLoading={onboardingLoading}
 				shippingRows={shippingRows}
-				// GetMyStore 沒有商品數：商品清單的 total 是唯一來源。
 				productCount={productCount}
 			/>
 
@@ -360,9 +340,7 @@ export default function DashboardPage() {
 	);
 }
 
-/* ------------------------------------------------------------------ */
 
-/* ------------------------------------------------------------------ */
 
 type ActionRow =
 	| { kind: "order"; order: Order }
@@ -377,14 +355,11 @@ function PendingOrderTable({
 	afterSales: AfterSaleCase[];
 	loading: boolean;
 }) {
-	// 售後優先（較急），其後接待出貨訂單；整體取前 5 筆。
 	const rows: ActionRow[] = [
 		...afterSales.map((c) => ({ kind: "aftersale", case: c }) as const),
 		...orders.map((o) => ({ kind: "order", order: o }) as const),
 	];
 	if (loading && rows.length === 0) {
-		// Match the 8-col layout of the loaded table below so the column
-		// widths stay stable when data arrives.
 		return (
 			<div className="seller-table-wrap seller-mobile-disclosure-desktop">
 				<table className="seller-table">
@@ -423,7 +398,7 @@ function PendingOrderTable({
 
 	return (
 		<>
-			{/* Desktop: full 8-column table */}
+
 			<div className="seller-table-wrap seller-mobile-disclosure-desktop">
 				<table className="seller-table">
 					<thead>
@@ -519,8 +494,6 @@ function PendingOrderTable({
 	);
 }
 
-/* Normalised row shared by the desktop table and the mobile card list, so the
- * order-vs-aftersale branching lives in one place. */
 interface DisplayRow {
 	key: string;
 	id: string;
@@ -588,9 +561,6 @@ function toDisplayRow(row: ActionRow): DisplayRow {
 	};
 }
 
-/* ------------------------------------------------------------------ */
-/* Helpers                                                              */
-/* ------------------------------------------------------------------ */
 
 /**
  * 賣家儀表板抬頭的「今天」。以**台北**牆上時間計算，不是裝置時區：這是台灣商家

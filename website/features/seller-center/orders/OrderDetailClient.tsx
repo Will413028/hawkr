@@ -142,15 +142,11 @@ export default function OrderDetailClient({
 	const { order, loading, error, refresh } = useOrder(orderNo, {
 		view: "seller",
 	});
-	// 抽屜模式：出貨 / 取號 / 取消等操作成功後即時通知父頁訂單工作區同步；
-	// 全頁模式（/orders/[orderNo]）為 no-op，僅靠自身 refresh。
 	const { active: drawerActive, notify: notifyDrawer } = useDrawerMutated();
 	const openChat = useChatDrawerStore((state) => state.openChat);
 	const { lookup: afterSaleLookup } = useSellerAfterSales();
 	const aftersaleCase = afterSaleLookup.get(orderNo);
 	const aftersaleNeedsAction = afterSaleNeedsSeller(aftersaleCase);
-	// 配送異常的訂單在列表的「訂單狀態」欄顯示「異常」徽章；點進詳情時在這裡把
-	// 異常原因（類型／嚴重度／偵測時間）顯示給賣家。
 	const { lookup: anomalyLookup } = useSellerShipmentAnomalies();
 	const anomaly = anomalyLookup.get(orderNo);
 
@@ -178,16 +174,12 @@ export default function OrderDetailClient({
 
 	const showBanner = React.useCallback((b: BannerState) => {
 		setBanner(b);
-		// 帶引導的錯誤需要賣家閱讀步驟並點連結，不自動關閉；其餘 6 秒後淡出。
 		if (b.guidance) return;
 		window.setTimeout(() => {
 			setBanner((prev) => (prev === b ? null : prev));
 		}, 6000);
 	}, []);
 
-	// 將物流錯誤統一轉成 banner：沿用 classifyShipmentError 的 tone / 訊息，並補上
-	// 可行動的引導（如黑貓寄件地址不在收件範圍）。未處理的碼才加動作前綴。
-	// shouldReload 仍由各 catch 處理（避免重整把錯誤橫幅蓋掉的時機差異）。
 	const showShipmentError = React.useCallback(
 		(o: ShipmentErrorOutcome, fallbackPrefix: string) => {
 			showBanner({
@@ -215,9 +207,6 @@ export default function OrderDetailClient({
 	const tcatReservationSyncing =
 		tcatReservationProcessing && shipmentOperation?.phase === "syncing";
 
-	// The list page owns realtime reconciliation while this detail is inside its
-	// drawer. On the standalone detail route, release the lock as soon as its
-	// focused order query advances.
 	React.useEffect(() => {
 		pruneExpiredShipmentOperations();
 		if (!order || !shipmentOperation) return;
@@ -233,9 +222,6 @@ export default function OrderDetailClient({
 		shipmentOperation,
 	]);
 
-	// Mutation success already performs an immediate focused refresh. The
-	// standalone route gets only one delayed fallback request in case the
-	// backend event/read model lagged; drawer mode delegates this to the list.
 	const standaloneFallbackKey =
 		!drawerActive && tcatReservationSyncing && shipmentOperation
 			? `${orderNo}:${shipmentOperation.phase}:${shipmentOperation.updatedAt}`
@@ -251,7 +237,6 @@ export default function OrderDetailClient({
 		return () => window.clearTimeout(timer);
 	}, [pruneExpiredShipmentOperations, standaloneFallbackKey]);
 
-	// Local-only expiry unlock; this timer never calls the backend.
 	const shipmentOperationExpiryAt =
 		shipmentOperation && !isShipmentOperationExpired(shipmentOperation)
 			? shipmentOperationExpiresAt(shipmentOperation)
@@ -266,11 +251,8 @@ export default function OrderDetailClient({
 		return () => window.clearTimeout(timer);
 	}, [pruneExpiredShipmentOperations, shipmentOperationExpiryAt]);
 
-	// 配送方式原碼。**不再算 isTaqbin 這個布林** —— 它只答得出「是不是黑貓」，
-	// 而畫面拿它當二分法用（不是黑貓就當 7-11），3003／3005 全被畫成 7-11。
 	const shippingMethod = order?.shipping?.method ?? "";
 
-	/* ===== Action handlers ===== */
 
 	const handleTcatReserve = async (
 		result: TcatReservationResult,
@@ -341,10 +323,6 @@ export default function OrderDetailClient({
 			});
 			await refreshAfterMutation();
 		} catch (e) {
-			// 黑貓叫件失敗（5044，PayUni E072 等真因）已由 classifyShipmentError
-			// 透傳實際原因（handled:true），不再吞成籠統文案或猜成假日。未知碼
-			// 才走 fallback，並保留後端訊息而非整段丟棄。寄件地址不在收件範圍時，
-			// showShipmentError 會再補上「修正地址 / 找站所 / 自行預約」的引導。
 			const o = classifyShipmentError(e, orderNo);
 			showShipmentError(o, "呼叫黑貓取件失敗");
 			if (o.shouldReload) await refreshAfterMutation();
@@ -376,7 +354,6 @@ export default function OrderDetailClient({
 				showBanner({ tone: "error", message: "無法取得交貨便代碼" });
 				return;
 			}
-			// Local override fallback for B-147 (list endpoint lag)
 			setLocalOdnoOverride(orderNo, label.odno, label.validationNo);
 			showBanner({
 				tone: "success",
@@ -410,11 +387,8 @@ export default function OrderDetailClient({
 		}
 	};
 
-	/* ===== Render guards ===== */
 
 	if (loading && !order) {
-		// 固定形狀骨架取代單行「載入中…」：抽屜/頁面內容從一行跳成整頁
-		// 會讓底部大幅跳動（捲軸也跟著出現/消失），骨架把落差降到最小。
 		return (
 			<div className="seller-order-detail">
 				<DrawerSkeleton rows={3} className="p-4" />
@@ -452,18 +426,14 @@ export default function OrderDetailClient({
 		0,
 	);
 
-	// 出貨/取消期限 + 託運單到期 + 出貨照片 — 對齊列表頁與 App OrderInfoColumn。
-	// 待出貨(paid/preparing) 顯示「出貨期限」(amber)，其餘顯示「取消期限」(red)。
 	const isShipDeadline =
 		order.status === "paid" || order.status === "preparing";
 	const deadlineLabel = formatDeadline(order.autoCancelAt);
 	const labelExpireLabel = formatLabelExpire(order.shipping?.labelExpireAt);
-	// 取號後 4 天失效（對齊 App）：失效的託運單一律不再提供下載。
 	const labelExpired = isLabelExpired(order.shipping);
 	const shipmentPhotos = order.shipping?.shipmentPhotoUrls ?? [];
 	const receiptPhotos = order.shipping?.receiptPhotoUrls ?? [];
 
-	/* ===== Action button ===== */
 
 	let primaryCta: React.ReactNode = null;
 	if (action.kind === "tcat-reserve") {
@@ -535,8 +505,6 @@ export default function OrderDetailClient({
 			</Button>
 		);
 	} else if (action.kind === "unsupported") {
-		// 🔴 未知配送方式：不猜成黑貓也不猜成 7-11，明說不支援＋原碼。
-		// 舊版在這裡會畫出「預約取號」，按下去真的打超商取號 API。
 		primaryCta = (
 			<p className="seller-order-detail__tracking-error" role="alert">
 				此配送方式（{action.method || "未指定"}
@@ -551,8 +519,6 @@ export default function OrderDetailClient({
 		order.shipping?.validationNo,
 	);
 
-	// Build the timeline-event map from whatever timestamps the order
-	// record carries. Missing stamps just don't render under their step.
 	const paidStamp = order.paidAt ?? order.payment?.paidAt ?? null;
 	const timelineEvents: Partial<Record<string, number>> = {};
 	if (order.createdAt) timelineEvents.pending_payment = order.createdAt;
@@ -981,13 +947,7 @@ export default function OrderDetailClient({
 							</dl>
 						</section>
 
-						{/*
-						 * 58 號電子發票 S07（58A §S07）。插在付款卡之後、售後卡之前。
-						 *
-						 * 🔴 只吃 `orderNo` 一個 prop、不回傳任何 state ——「發票異常
-						 * disable 出貨鍵」在結構上就不可能發生。加 callback prop 之前
-						 * 先讀該元件的檔頭。
-						 */}
+
 						<SellerOrderInvoiceCard orderNo={orderNo} />
 
 						{aftersaleCase && !aftersaleNeedsAction ? (
@@ -1151,7 +1111,6 @@ function CopyButton({
 			setCopied(true);
 			window.setTimeout(() => setCopied(false), 1500);
 		} catch {
-			/* clipboard unavailable — no-op */
 		}
 	};
 	return (
@@ -1165,9 +1124,6 @@ function CopyButton({
 	);
 }
 
-/* ============================================================
- *               LogisticsTracking subcomponent
- * ============================================================ */
 
 function LogisticsTracking({
 	orderNo,
@@ -1181,12 +1137,8 @@ function LogisticsTracking({
 }) {
 	const [info, setInfo] = React.useState<LogisticsInfo | null>(null);
 	const [loading, setLoading] = React.useState(false);
-	// shipTradeNo 是物流追蹤的天然 session boundary:同 component 切換不同
-	// 物流單號時用 resetKey 確保前次錯誤不殘留。
 	const [error, setError] = useResettableError(shipTradeNo);
 
-	// 🔴 認不得的配送方式回 null。舊寫法 `isTaqbin ? HOME : C2C`
-	// 讓 3003／3005 走 7-11 的進度表 —— 型別對、不拋例外、只有進度條是錯的。
 	const lgsType = lgsTypeForShippingMethod(method);
 
 	const fetchInfo = React.useCallback(async () => {
@@ -1203,7 +1155,6 @@ function LogisticsTracking({
 		}
 	}, [orderNo]);
 
-	// lgsType 為 null（未知配送方式）時進度未知：不畫進度條，改顯示說明。
 	const percent =
 		info && lgsType
 			? info.progressPercent ||
@@ -1280,9 +1231,7 @@ function SellerReviewCard({ review }: { review: OrderReview }) {
 				<h2>商品評價</h2>
 			</header>
 			<div className="seller-order-detail__info">
-				{/* display:flex overrides the inherited `.seller-order-detail__info
-				    > div` 2-column info grid (80px 1fr) — without it the five star
-				    spans + "5 / 5" flow into grid cells and wrap 2-2-1. */}
+
 				<div
 					style={{
 						display: "flex",

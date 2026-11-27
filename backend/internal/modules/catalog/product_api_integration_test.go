@@ -47,7 +47,6 @@ func TestStaleEtagIsRejectedAndStockChangesDoNotMoveIt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// 非零且不等於目前的版本（Version+1）：不符回衝突，沒寫入。
 	if _, err := f.m.UpdateProduct(f.ct, storeID, up, p.ID, p.Version+1, f.input("改名")); !errors.Is(err, ErrVersionConflict) {
 		t.Fatalf("a stale etag on update must be rejected: %v", err)
 	}
@@ -64,7 +63,6 @@ func TestStaleEtagIsRejectedAndStockChangesDoNotMoveIt(t *testing.T) {
 		t.Fatalf("a rejected write must leave the product alone: %+v", got)
 	}
 
-	// 庫存調整、設定、扣減與銷量不改 etag：用舊版本仍可修改。
 	sku := p.Skus[0].ID
 	key := func(s string) string { return uuid.NewV7().String() + s }
 	f.must(f.m.AdjustStock(f.ct, storeID, key("a"), sku, 5))
@@ -85,7 +83,6 @@ func TestStaleEtagIsRejectedAndStockChangesDoNotMoveIt(t *testing.T) {
 		t.Fatalf("an update leaves the stock alone: %d", updated.Skus[0].StockQty)
 	}
 
-	// 狀態切換加一，同狀態 no-op 不加。
 	f.must(f.m.SetProductStatus(f.ct, storeID, p.ID, updated.Version, StatusActive))
 	active := f.mustProduct(storeID, p.ID)
 	if active.Version != updated.Version+1 {
@@ -95,7 +92,6 @@ func TestStaleEtagIsRejectedAndStockChangesDoNotMoveIt(t *testing.T) {
 	if got := f.mustProduct(storeID, p.ID); got.Version != active.Version {
 		t.Fatalf("a no-op status change must not bump the version: %d -> %d", active.Version, got.Version)
 	}
-	// 重送：用切換前的舊 etag 再送同一個目標狀態仍成功（冪等），etag 不變。
 	f.must(f.m.SetProductStatus(f.ct, storeID, p.ID, updated.Version, StatusActive))
 	if got := f.mustProduct(storeID, p.ID); got.Version != active.Version {
 		t.Fatalf("a retried status change must leave the etag alone: %d -> %d", active.Version, got.Version)
@@ -143,7 +139,6 @@ func TestCreateIsIdempotentByRequestID(t *testing.T) {
 	if n := f.count(`SELECT count(*) FROM catalog.products WHERE store_id = $1`, storeID); n != 1 {
 		t.Fatalf("a replay must not create a second product, got %d", n)
 	}
-	// 重送回的是目前的樣子。
 	f.activate(storeID, first.ID)
 	if got, _ := f.m.CreateProduct(f.ct, storeID, up, key, in); got.Status != StatusActive {
 		t.Fatalf("a replay shows the product as it is now: %s", got.Status)
@@ -158,7 +153,6 @@ func TestCreateIsIdempotentByRequestID(t *testing.T) {
 		t.Fatalf("a rejected replay must not create a product, got %d", n)
 	}
 
-	// 鍵的範圍是店家：別家店用同一個鍵建立自己的商品，也探不到這家店的。
 	mine, err := f.m.CreateProduct(f.ct, other, media.Uploader{ID: otherAcct}, key, f.input("別家"))
 	if err != nil || mine.ID == first.ID {
 		t.Fatalf("another store's key is its own: %v %v", mine.ID, err)
@@ -168,7 +162,6 @@ func TestCreateIsIdempotentByRequestID(t *testing.T) {
 		t.Fatalf("a create without a request id is a client error: %v", err)
 	}
 
-	// 已刪除的商品，同鍵重送回 not found，不復活。
 	f.must(f.m.DeleteProduct(f.ct, storeID, first.ID, 0))
 	if _, err := f.m.CreateProduct(f.ct, storeID, up, key, in); !errors.Is(err, ErrProductNotFound) {
 		t.Fatalf("a replay of a deleted product is not found: %v", err)
@@ -240,7 +233,6 @@ func TestSetStockChecksTheExpectedQuantityAndWritesTheLedger(t *testing.T) {
 	if got := f.count(`SELECT m.delta FROM catalog.stock_movements m JOIN catalog.stock_operations o ON o.id = m.operation_id WHERE o.idempotency_key = 'set:1' AND o.kind = 'SET'`); got != 15 {
 		t.Fatalf("the ledger records the difference, got %d", got)
 	}
-	// 設成現值：沒有差額，只有操作列，同鍵重送仍成功。
 	f.must(f.m.SetStock(f.ct, 501, "set:same", sku, 25, 25))
 	if n := f.count(`SELECT count(*) FROM catalog.stock_operations WHERE idempotency_key = 'set:same'`); n != 1 {
 		t.Fatalf("a no-change set still records its operation: %d", n)
@@ -268,7 +260,7 @@ func TestSetStockReplaysOnceAndRejectsADifferentRequest(t *testing.T) {
 	f := newFixture(t)
 	sku, other := f.sku(10), f.sku(10)
 	f.must(f.m.SetStock(f.ct, 501, "set:r", sku, 30, 10))
-	f.must(f.m.SetStock(f.ct, 501, "set:r", sku, 30, 10)) // 重送：現值已不是 10，仍回成功，不再設定
+	f.must(f.m.SetStock(f.ct, 501, "set:r", sku, 30, 10))
 	if got := f.stockOf(sku); got != 30 {
 		t.Fatalf("stock = %d", got)
 	}
@@ -285,7 +277,6 @@ func TestSetStockReplaysOnceAndRejectsADifferentRequest(t *testing.T) {
 			t.Errorf("a different %s under the same key is rejected: %v", name, err)
 		}
 	}
-	// 同鍵不能先 ADJUST 再 SET。
 	f.must(f.m.AdjustStock(f.ct, 501, "adj:k", sku, 1))
 	if err := f.m.SetStock(f.ct, 501, "adj:k", sku, 31, 31); !errors.Is(err, ErrIdempotencyKeyReused) {
 		t.Fatalf("a SET under an ADJUST key is rejected: %v", err)
@@ -368,23 +359,23 @@ func TestLowStockCountIsPerSkuActiveOnlyWithPerProductThreshold(t *testing.T) {
 	ten := int32(10)
 	zero := int32(0)
 
-	low := f.active(storeID, acct, stocked(f.input("偏低"), 3))         // 3 <= 5
-	atDefault := f.active(storeID, acct, stocked(f.input("剛好門檻"), 5)) // 5 <= 5
-	enough := f.active(storeID, acct, stocked(f.input("充足"), 6))      // 6 > 5
-	soldOut := f.active(storeID, acct, stocked(f.input("售完"), 0))     // 另計
-	f.create(storeID, acct, stocked(f.input("草稿偏低"), 1))              // 草稿不算
+	low := f.active(storeID, acct, stocked(f.input("偏低"), 3))
+	atDefault := f.active(storeID, acct, stocked(f.input("剛好門檻"), 5))
+	enough := f.active(storeID, acct, stocked(f.input("充足"), 6))
+	soldOut := f.active(storeID, acct, stocked(f.input("售完"), 0))
+	f.create(storeID, acct, stocked(f.input("草稿偏低"), 1))
 	archived := f.active(storeID, acct, stocked(f.input("下架偏低"), 1))
 	f.must(setStatusP(f.m, f.ct, storeID, archived.ID, StatusArchived))
 	withThreshold := stocked(f.input("自訂門檻"), 8)
-	withThreshold.LowStockThreshold = &ten // 8 <= 10
+	withThreshold.LowStockThreshold = &ten
 	custom := f.active(storeID, acct, withThreshold)
 	neverLow := stocked(f.input("門檻零"), 1)
-	neverLow.LowStockThreshold = &zero // 門檻 0：只有售完才提醒，1 不算偏低
+	neverLow.LowStockThreshold = &zero
 	f.active(storeID, acct, neverLow)
 	multi := f.input("多規格")
 	multi.Axes = []Axis{{Name: "尺寸", Values: []string{"S", "M"}}}
 	multi.Skus = []SkuInput{{Option1: "S", Price: 100, StockQty: 50}, {Option1: "M", Price: 100, StockQty: 2}}
-	multiP := f.active(storeID, acct, multi) // 只要一個 SKU 偏低就算
+	multiP := f.active(storeID, acct, multi)
 	f.active(other, otherAcct, stocked(f.input("別家偏低"), 1))
 
 	count := func(f2 SellerFilter) int32 {
@@ -528,7 +519,6 @@ func TestPublicSearchFindsAndPagesWithoutRepeatOrGap(t *testing.T) {
 			t.Errorf("sort %s: search must hit exactly the visible matches once each over several pages: %v want %v", sort, sorted, want)
 		}
 	}
-	// 價格由低到高：每頁接起來是非遞減。
 	var prices []int64
 	for _, id := range walk(PublicFilter{Query: "蘋果"}, SortPriceAsc, 2) {
 		p, err := f.m.PublicProduct(f.ct, id, f.clock())

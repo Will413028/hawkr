@@ -20,7 +20,6 @@ export default function PaymentGlyph({
 	value: string;
 	label?: string;
 }) {
-	// Every method shares one wallet mark; the label carries the name.
 	return (
 		<AppIcon
 			name="wallet"

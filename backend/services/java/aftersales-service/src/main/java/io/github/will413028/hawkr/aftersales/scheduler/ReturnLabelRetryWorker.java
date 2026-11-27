@@ -89,10 +89,8 @@ public class ReturnLabelRetryWorker {
 
         for (AfterSaleCaseEntity caseEntity : exhaustedCases) {
             try {
-                // CAS 優先：先標記為 2（count=1→2），成功才記 audit log，避免同一 case 跨輪重複記 log
                 int rows = caseMapper.markLabelRetryExhausted(caseEntity.getCaseNo());
                 if (rows == 0) {
-                    // 已被 ops reset 或他人處理，跳過
                     continue;
                 }
 

@@ -34,11 +34,9 @@ func TestNormalize_FoldsOnlyIdentityPreservingNoise(t *testing.T) {
 		{"LLC 後綴", "Acme Road LLC", "acmeroad"},
 		{"Corp. 後綴", "Acme Road Corp.", "acmeroad"},
 		{"尾端逗號視為雜訊", "範例生鮮有限公司，", "範例生鮮"},
-		// 只有公司型態 ⇒ 正規化後為空，代表「這個名稱不帶身分資訊」
 		{"只有有限公司", "有限公司", ""},
 		{"只有股份有限公司", "股份有限公司", ""},
 		{"只有 LLC", "LLC", ""},
-		// 以下釘住「不可以做的事」——這些若被折疊掉就是把冒用放行的破口
 		{"不去除公司型態以外的詞", "範例生鮮嚴選", "範例生鮮嚴選"},
 		{"不去除中間的公司型態字樣", "有限公司範例生鮮", "有限公司範例生鮮"},
 		{"英文一般字不因結尾像後綴而被截", "Rock Corporate", "rockcorporate"},
@@ -98,8 +96,6 @@ func TestMatch(t *testing.T) {
 			wantMatched: true, wantField: CertHolderCompanyName, wantHasReference: true,
 		},
 		{
-			// 2026-08-27 實測：真實存在的有機編號 1-009-300022 持有人是 Acme Road LLC，
-			// 被填到別的賣家的文旦禮盒上而自動核准。這一列就是那個缺口。
 			name:   "真實案例 1-009-300022：他人證書不得相符",
 			holder: "Acme Road LLC", companyName: "範例生鮮優選有限公司",
 			wantMatched: false, wantField: CertHolderNone, wantHasReference: true,
@@ -120,14 +116,11 @@ func TestMatch(t *testing.T) {
 			wantMatched: false, wantField: CertHolderNone, wantHasReference: false,
 		},
 		{
-			// company_name 只填了公司型態 ⇒ 正規化後為空，不得與任何東西相符，
-			// 也不算 reference（否則「無從判斷」會被誤報成「有比過、不符」）。
 			name:   "company_name 只有「有限公司」⇒ 不相符且不算 reference",
 			holder: "有限公司", companyName: "有限公司",
 			wantMatched: false, wantField: CertHolderNone, wantHasReference: false,
 		},
 		{
-			// 政府回空字串時不得因為「雙方都空」而判成相符。
 			name:   "holder 為空 ⇒ 不相符",
 			holder: "", companyName: "範例生鮮",
 			wantMatched: false, wantField: CertHolderNone, wantHasReference: true,
@@ -138,7 +131,6 @@ func TestMatch(t *testing.T) {
 			wantMatched: false, wantField: CertHolderNone, wantHasReference: true,
 		},
 		{
-			// 明令禁止子字串包含比對。
 			name:   "子字串不得相符",
 			holder: "甲乙丙", companyName: "甲",
 			wantMatched: false, wantField: CertHolderNone, wantHasReference: true,
@@ -149,7 +141,6 @@ func TestMatch(t *testing.T) {
 			wantMatched: false, wantField: CertHolderNone, wantHasReference: true,
 		},
 		{
-			// 明令禁止編輯距離模糊比對。
 			name:   "一字之差不得相符",
 			holder: "範例生鮮", companyName: "範例生先",
 			wantMatched: false, wantField: CertHolderNone, wantHasReference: true,

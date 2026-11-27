@@ -21,7 +21,6 @@ type Clock struct {
 // NewClock 回一個以系統時間為基準、偏移為 0 的 Clock。
 func NewClock() *Clock { return &Clock{now: time.Now} }
 
-// newClockWithSource 供測試注入時間來源。
 func newClockWithSource(now func() time.Time) *Clock { return &Clock{now: now} }
 
 // Now 回補償後的時間。
@@ -36,7 +35,6 @@ func (c *Clock) Unix() int64 { return c.Now().Unix() }
 // OffsetSeconds 回目前偏移，供 |offset| > 30s 持續 10 分鐘的 NTP 告警使用。
 func (c *Clock) OffsetSeconds() int64 { return c.offsetSec.Load() }
 
-// applyServerTime 依一次成功的校時結果更新偏移。
 func (c *Clock) applyServerTime(serverUnix int64) {
 	c.offsetSec.Store(serverUnix - c.now().Unix())
 }

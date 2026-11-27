@@ -51,7 +51,6 @@ enum PresentationIoRule {
               r'''import\s+['"]package:shared_preferences/shared_preferences\.dart['"]''',
             ).hasMatch(source) ||
             RegExp(r'\bSharedPreferences\.getInstance\s*\(').hasMatch(source),
-      // proto 的訊息型別（*.pb.dart）是資料，可以用；client 與 transport 是 I/O。
       PresentationIoRule.connect =>
         RegExp(
               r'''import\s+['"][^'"]*core/networking/connect_provider\.dart['"]''',

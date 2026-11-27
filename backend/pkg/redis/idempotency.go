@@ -33,7 +33,6 @@ func NewIdempotencyService(rdb *redis.Client, ttl time.Duration) *IdempotencySer
 	}
 }
 
-// buildKey constructs the idempotency key
 func (s *IdempotencyService) buildKey(eventType, eventId string) string {
 	return fmt.Sprintf("%s:%s:%s", IdempotencyKeyPrefix, eventType, eventId)
 }
@@ -59,12 +58,6 @@ func (s *IdempotencyService) MarkProcessed(ctx context.Context, eventType, event
 func (s *IdempotencyService) TryProcess(ctx context.Context, eventType, eventId string) (bool, error) {
 	key := s.buildKey(eventType, eventId)
 
-	// Use SETNX to atomically check and set. staticcheck SA1019 suggests
-	// SetArgs{Mode:"NX"} instead, but that returns *StatusCmd (redis.Nil on
-	// conflict) rather than SetNX's *BoolCmd (false on conflict) — swapping
-	// it would change this method's bool-return contract for every caller.
-	// SetNX itself is only soft-deprecated (still fully implemented, not
-	// removed) — deferred rather than risked in an unrelated change.
 	set, err := s.rdb.SetNX(ctx, key, "1", s.ttl).Result() //nolint:staticcheck
 	if err != nil {
 		return false, fmt.Errorf("idempotency set failed: %w", err)
@@ -75,20 +68,16 @@ func (s *IdempotencyService) TryProcess(ctx context.Context, eventType, eventId 
 
 // WithIdempotency wraps a handler function with idempotency protection
 func (s *IdempotencyService) WithIdempotency(ctx context.Context, eventType, eventId string, handler func() error) error {
-	// Try to acquire the idempotency lock
 	shouldProcess, err := s.TryProcess(ctx, eventType, eventId)
 	if err != nil {
 		return err
 	}
 
 	if !shouldProcess {
-		// Already processed, skip
 		return nil
 	}
 
-	// Execute handler
 	if err := handler(); err != nil {
-		// On failure, remove the idempotency key to allow retry
 		s.rdb.Del(ctx, s.buildKey(eventType, eventId))
 		return err
 	}
@@ -106,7 +95,7 @@ func WithIdempotencyResult[T any](s *IdempotencyService, ctx context.Context, ev
 	}
 
 	if !shouldProcess {
-		return zero, false, nil // Already processed
+		return zero, false, nil
 	}
 
 	result, err := handler()

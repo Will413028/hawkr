@@ -95,11 +95,6 @@ const PostCardV2 = React.memo(function PostCardV2({
 	);
 	const openLoginRequired = useLoginRequiredOverlay(loginPayload);
 	const { authGate, authWaiting } = useAuthGate(openLoginRequired);
-	// Stale wire data is common here: the DB keeps post image URLs whose OSS
-	// files have since been purged, so the CDN 404s. Swap to the placeholder
-	// via STATE (a new src through next/image), not by mutating img.src —
-	// the optimizer's srcset outranks src, so a direct mutation leaves the
-	// browser stuck on the dead srcset entries and the card stays broken.
 	const [imageFailed, setImageFailed] = React.useState(false);
 	const fallbackImage = buildImageUrl(FALLBACK_POST_IMAGE, "card");
 	const imageSrc =
@@ -109,9 +104,6 @@ const PostCardV2 = React.memo(function PostCardV2({
 
 	const toggleLike = (e: React.MouseEvent) => {
 		e.stopPropagation();
-		// Liking writes to the buyer's account, so gate it behind login —
-		// guests get the login prompt instead of an optimistic like that
-		// would silently fail server-side.
 		authGate(() => {
 			const next = !liked;
 			onLike?.(post, next);
@@ -153,8 +145,6 @@ const PostCardV2 = React.memo(function PostCardV2({
 						loading={imagePriority ? undefined : imageLoading}
 						fetchPriority={imagePriority ? undefined : "low"}
 						sizes="(max-width: 768px) 50vw, 320px"
-						// Once we're already showing the placeholder, let AppImage's
-						// built-in "圖片無法顯示" fallback take over on a second failure.
 						onError={
 							imageSrc === fallbackImage
 								? undefined
@@ -194,7 +184,6 @@ const PostCardV2 = React.memo(function PostCardV2({
 							isIconOnly
 							className={`hkui-feed-card__like h-auto w-auto${liked ? " is-liked" : ""}`}
 							onClick={toggleLike}
-							/* Optimistic-only, same as the detail viewer — see the note there. */
 							aria-pressed={liked}
 							disabled={authWaiting}
 							aria-busy={likeBusy || authWaiting || undefined}

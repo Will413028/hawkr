@@ -1,6 +1,5 @@
 package handler
 
-// docsLoginTemplate 登入頁面
 const docsLoginTemplate = `<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -49,7 +48,6 @@ const docsLoginTemplate = `<!DOCTYPE html>
 </body>
 </html>`
 
-// docsLoginErrorTemplate 登入失敗頁面
 const docsLoginErrorTemplate = `<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -104,7 +102,6 @@ const docsLoginErrorTemplate = `<!DOCTYPE html>
 </body>
 </html>`
 
-// docsifyIndexHTML Docsify 單頁應用入口
 const docsifyIndexHTML = `<!DOCTYPE html>
 <html lang="zh-TW">
 <head>

@@ -8,9 +8,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
-// 以下是 discovery 擁有的 port（消費端定義形狀）。上游搬進單體之前由 cmd/hawkr 以 internal/legacy 的 client 實作，
-// ordering、review、catalog 搬進來後換成它們的公開 API。任何一個 port 失敗都回 error：重算整次失敗、保留上一份快照，
-// 不把失敗當成空資料。
 
 // Orders 是訂單統計的 port。
 type Orders interface {

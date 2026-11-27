@@ -9,7 +9,6 @@ import (
 
 type loggedKey struct{}
 
-// markLogged 告訴 LogUnhandled 這個請求已經由 interceptor 記過 log。
 func markLogged(ctx context.Context) {
 	if done, ok := ctx.Value(loggedKey{}).(*atomic.Bool); ok {
 		done.Store(true)
@@ -39,7 +38,6 @@ func LogUnhandled(log *slog.Logger, next http.Handler) http.Handler {
 	})
 }
 
-// statusWriter 記下回應的 HTTP status。串流要能 flush，所以實作 Flush 與 Unwrap。
 type statusWriter struct {
 	http.ResponseWriter
 	status int

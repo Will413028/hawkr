@@ -16,7 +16,7 @@ export interface StatsCardProps {
 	value: string | number;
 	icon?: MaterialSymbolName;
 	variant?: StatCardVariant;
-	valueClassName?: string; // Optional class for value styling
+	valueClassName?: string;
 }
 
 /**
@@ -37,7 +37,6 @@ const StatsCard: React.FC<StatsCardProps> = ({
 	variant = "store",
 	valueClassName,
 }) => {
-	// Determine if value should be colored (warning and danger variants)
 	const valueColorClass =
 		variant === "warning" || variant === "danger" ? variant : "";
 

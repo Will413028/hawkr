@@ -6,8 +6,6 @@ import {
 	type GrainientRenderer,
 } from "./grainient-renderer";
 
-// Mock only browser/GPU boundaries. All scheduling, sizing, timekeeping and
-// disposal below execute the production renderer; shader pixels need real GPU QA.
 function createFakeGl() {
 	let nextShader = 0;
 	const uniforms = new Map<string, WebGLUniformLocation>();
@@ -187,8 +185,6 @@ beforeEach(() => {
 	vi.spyOn(parent, "getBoundingClientRect").mockReturnValue(
 		new DOMRect(0, 0, 800, 600),
 	);
-	// Replace only this instance's browser boundary. The partial fake is checked
-	// against WebGL2 above; production code still calls the real renderer API.
 	Object.defineProperty(canvas, "getContext", {
 		configurable: true,
 		value: vi.fn((_kind: string) => gl),

@@ -13,7 +13,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// streamLifetime 是一條串流的最長壽命（估計值，不是量測值）：session 被撤銷或店家換了，最慢這麼久後連線結束、client 重連時重新驗證。
 const streamLifetime = 15 * time.Minute
 
 // WatchNotifications 訂閱呼叫者在指定受眾的訊號：連線建立先送一則 inbox 訊號，之後每有變化再送；STORE 受眾另外承載賣家工作區事件。
@@ -50,7 +49,6 @@ func (h *App) WatchNotifications(ctx context.Context, req *connect.Request[pb.Wa
 	}
 }
 
-// classifyEnd 把模組結束串流的原因對到對外的錯誤：服務關閉是 unavailable（client 依 backoff 重連），其餘原樣回傳。
 func classifyEnd(err error) error {
 	if errors.Is(err, notification.ErrClosed) {
 		return apperr.WithCause(apperr.Unavailable("服務重新啟動中，請稍後重連"), err)

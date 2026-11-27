@@ -16,26 +16,26 @@ const _fruitIcons = <IconData>[
 ];
 
 const _fruitColors = <Color>[
-  Color(0x4DFF3B30), // 鮮亮苹果紅
-  Color(0x4DFF453A), // 活力深紅
-  Color(0x4DFF5752), // 柔和果紅
-  Color(0x4D34C759), // 青苹果綠
-  Color(0x4DFFCC00), // 柠檬亮黃
-  Color(0x4DFFD60A), // 鲜榨鲜黃
-  Color(0x4DFFC000), // 暖金黃
-  Color(0x4D30D158), // 青柠绿
-  Color(0x4DFF9500), // 蜜橘橙
-  Color(0x4DFF9F0A), // 活力亮橙
-  Color(0x4DFFAA33), // 浅橘橙
-  Color(0x4DFFE433), // 香蕉暖黄
-  Color(0x4DFFDE1A), // 成熟焦黄
-  Color(0x4D66D464), // 芭乐果绿
-  Color(0x4DFF4F64), // 西瓜浅红
-  Color(0x4D28CD41), // 西瓜皮绿
-  Color(0x4D5856D6), // 蓝莓靛蓝
-  Color(0x4DA2D729), // 牛油果浅绿
-  Color(0x4DFF2D55), // 草莓鲜粉红
-  Color(0x4DFF375F), // 草莓玫红
+  Color(0x4DFF3B30),
+  Color(0x4DFF453A),
+  Color(0x4DFF5752),
+  Color(0x4D34C759),
+  Color(0x4DFFCC00),
+  Color(0x4DFFD60A),
+  Color(0x4DFFC000),
+  Color(0x4D30D158),
+  Color(0x4DFF9500),
+  Color(0x4DFF9F0A),
+  Color(0x4DFFAA33),
+  Color(0x4DFFE433),
+  Color(0x4DFFDE1A),
+  Color(0x4D66D464),
+  Color(0x4DFF4F64),
+  Color(0x4D28CD41),
+  Color(0x4D5856D6),
+  Color(0x4DA2D729),
+  Color(0x4DFF2D55),
+  Color(0x4DFF375F),
 ];
 
 const _kCircleSize = 48.0;
@@ -72,12 +72,9 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
 
   _RefreshPhase _phase = _RefreshPhase.idle;
 
-  // ── 動畫控制器 ─────────────────────────────────────────────
 
-  // 手勢進度 0→1，直接賦值同步手勢，松手後 animateTo() 緩動
   late final AnimationController _pullAnim = AnimationController(vsync: this);
 
-  // 順時針自轉（出現時持續）
   late final AnimationController _spinCtrl = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 800),
@@ -95,7 +92,6 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
     _currentColor = _fruitColors[_random.nextInt(_fruitColors.length)];
   }
 
-  // ── 刷新回調 ────────────────────────────────────────────────
 
   Future<void> _handleRefresh() async {
     setState(() => _phase = _RefreshPhase.refreshing);
@@ -115,7 +111,6 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
     if (mounted) setState(() => _phase = _RefreshPhase.idle);
   }
 
-  // ── 未達閾值松手：立即開始收起 ─────────────────────────────
 
   void _startCanceling() {
     if (_phase != _RefreshPhase.dragging) return;
@@ -133,7 +128,6 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
         });
   }
 
-  // ── ScrollNotification 處理 ─────────────────────────────────
 
   bool _handleScrollNotification(ScrollNotification n) {
     if (n is ScrollEndNotification) {
@@ -159,7 +153,7 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
           _pickRandomFruit();
         });
         _pullAnim.value = progress;
-        _spinCtrl.repeat(); // 下拉出现时就开始顺时针自转
+        _spinCtrl.repeat();
       } else if (progress >= 1.0 && _phase == _RefreshPhase.dragging) {
         setState(() => _phase = _RefreshPhase.triggered);
       } else if (progress < 1.0 && _phase == _RefreshPhase.triggered) {
@@ -170,7 +164,6 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
     return false;
   }
 
-  // ── Build ───────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -187,7 +180,6 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
             strokeWidth: 0,
             child: widget.child,
           ),
-          // AnimatedBuilder 只重建水果 Widget，不觸發整棵樹 rebuild
           AnimatedBuilder(
             animation: Listenable.merge([_pullAnim, _spinCtrl]),
             builder: (_, __) {
@@ -202,17 +194,12 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
     );
   }
 
-  // ── 水果 Widget ─────────────────────────────────────────────
 
   Widget _buildFruit(double progress) {
-    // 從小到大漸變出现
     final scale = progress.clamp(0.0, 1.0);
     final opacity = progress.clamp(0.0, 1.0);
 
-    // 计算跟随下拉空白区域的相对位置
     final pulledDistance = progress * _kThreshold;
-    // 基础位置：拉满时 (80px) → 中心在 40px，向上偏 12px → 距顶 4px
-    // 加上 topOffset 使水果落在可视内容区（NestedScrollView 中 header 之下）
     final topPos = widget.topOffset + (pulledDistance - _kCircleSize) / 2 - 12;
 
     return Positioned(
@@ -230,7 +217,6 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
               decoration: BoxDecoration(
                 color: _currentColor,
                 shape: BoxShape.circle,
-                // 同色系光暈：讓圓形在白色背景上更有立體感
                 boxShadow: [
                   BoxShadow(
                     color: _currentColor.withValues(alpha: 0.55),
@@ -257,28 +243,6 @@ class _FruitRefreshIndicatorState extends State<FruitRefreshIndicator>
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// FruitRefreshListView
-//
-// 封裝「下拉刷新 + 觸底加載更多 + ListView」三層組合，
-// 避免各頁面重複手寫 FruitRefreshIndicator > NotificationListener > ListView.builder。
-//
-// 基本用法（純刷新，無分頁）：
-//   FruitRefreshListView(
-//     itemCount: items.length,
-//     itemBuilder: (_, i) => ItemCard(item: items[i]),
-//     onRefresh: controller.refresh,
-//   )
-//
-// 帶分頁：
-//   FruitRefreshListView(
-//     itemCount: items.length,
-//     itemBuilder: (_, i) => ItemCard(item: items[i]),
-//     onRefresh: controller.refresh,
-//     onLoadMore: controller.loadMore,
-//     hasMore: controller.hasMore,
-//   )
-// ─────────────────────────────────────────────────────────────
 
 class FruitRefreshListView extends StatelessWidget {
   const FruitRefreshListView({

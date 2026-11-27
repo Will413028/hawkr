@@ -57,10 +57,6 @@ for (const route of PUBLIC_ROUTES) {
 		});
 
 		test("every <img> carries an alt attribute", async ({ page }) => {
-			// Snapshot all <img> alts atomically in the browser. A count()+nth(i)
-			// loop races page hydration (the live img set mutates between awaits, so
-			// a now-detached nth(i) times out); evaluateAll reads them in one pass.
-			// alt="" is valid for decorative imgs — a MISSING alt attr (null) fails.
 			const missing = await page
 				.locator("img")
 				.evaluateAll((els) =>

@@ -60,7 +60,6 @@ export function taipeiDaysUntil(
 	const deadline = taipeiParts(deadlineAt);
 	const today = taipeiParts(now);
 	if (!deadline || !today) return null;
-	// Date.UTC 只用來把「台北的某一天」轉成一個可相減的整數日序，時區在此已消掉。
 	const deadlineDay = Date.UTC(deadline.year, deadline.month - 1, deadline.day);
 	const todayDay = Date.UTC(today.year, today.month - 1, today.day);
 	return Math.round((deadlineDay - todayDay) / 86_400_000);

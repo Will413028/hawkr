@@ -53,7 +53,6 @@ public final class HashtagInputValidator {
             String canonical = norm.canonical();
             requireValidChars(canonical);
             requireValidLength(canonical);
-            // 同 canonical 取輸入序首個 display
             dedup.putIfAbsent(canonical, norm);
         }
         if (dedup.size() > MAX_HASHTAGS_PER_PRODUCT) {
@@ -92,11 +91,9 @@ public final class HashtagInputValidator {
      * 拒絕：空白、#、ASCII 標點/符號、emoji、其他控制字元。
      */
     private static boolean isAllowedCodePoint(int cp) {
-        // ASCII letter / digit
         if ((cp >= '0' && cp <= '9') || (cp >= 'a' && cp <= 'z') || (cp >= 'A' && cp <= 'Z')) {
             return true;
         }
-        // CJK Unified Ideographs（基本 + 擴展 A/B/C/D/E/F/G/H）
         Character.UnicodeBlock block = Character.UnicodeBlock.of(cp);
         if (block == null) return false;
         return block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS

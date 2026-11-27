@@ -14,7 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// 讀取與對話管理的欄位違規：模組的欄位名（請求欄位名）對到請求的 proto 路徑。
 var (
 	listPaths   = rpc.FieldPaths{"page_size": "page_size", "page_token": "page_token"}
 	renamePaths = rpc.FieldPaths{"title": "title"}
@@ -158,7 +157,6 @@ func (h *App) GetCandidateSearch(ctx context.Context, req *connect.Request[pb.Ge
 	return connect.NewResponse(out), nil
 }
 
-// storeCards 依 seller 的批次上限分批讀店家卡片並轉成契約的 StoreCard；沒公開過與不存在的店不在回傳裡。
 func (h *App) storeCards(ctx context.Context, ids []int64) (map[int64]*commonpb.StoreCard, error) {
 	out := make(map[int64]*commonpb.StoreCard, len(ids))
 	for start := 0; start < len(ids); start += seller.MaxBatchSize {

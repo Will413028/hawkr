@@ -144,7 +144,6 @@ func LeadFindingOf(cited []Violation) (lead Violation, ok bool) {
 	return lead, ok
 }
 
-// leadsOver 回報 a 是否比 b 更該當主要依據。
 func leadsOver(a, b Violation) bool {
 	if ra, rb := a.Severity.Rank(), b.Severity.Rank(); ra != rb {
 		return ra > rb

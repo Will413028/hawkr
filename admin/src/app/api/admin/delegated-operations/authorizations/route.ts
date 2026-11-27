@@ -63,8 +63,6 @@ export async function POST(request: NextRequest) {
 		return invalidRequest("INVALID_STORE_ID", "商店識別碼格式不正確");
 	}
 	if (!isValidAuthorizationIdempotencyKey(idempotencyKey)) {
-		// 重試必須沿用同一把鍵：開通已生效但回應沒送到時，換一把新鍵會讓後端把
-		// 重試當成第二次開通，而第二次會撞上「已有有效授權」回 9285。
 		return invalidRequest(
 			"IDEMPOTENCY_KEY_REQUIRED",
 			"開通代行授權需要有效的 Idempotency-Key",
@@ -91,8 +89,6 @@ export async function POST(request: NextRequest) {
 		);
 		if (!parsed) return contractViolation("開通代行授權回應無法驗證");
 		if (parsed.authorization.storeId !== storeId) {
-			// 回的是另一家店的授權列：畫面會把它當成「這家店已開通」而顯示一份不屬於
-			// 它的範圍，管理員接著會對著它按下撤回。
 			return contractViolation("開通結果與請求對象不符");
 		}
 		return ok(parsed);

@@ -135,13 +135,11 @@ class _NotificationBannerState extends State<NotificationBanner>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // ── 主內容 ─────────────────────────────────
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 16, 12, 12),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          // 左側 icon
                           Container(
                             width: 42,
                             height: 42,
@@ -152,7 +150,6 @@ class _NotificationBannerState extends State<NotificationBanner>
                             child: Icon(_icon, color: _accentColor, size: 21),
                           ),
                           const SizedBox(width: 11),
-                          // 標題 + 內文
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,7 +182,6 @@ class _NotificationBannerState extends State<NotificationBanner>
                               ],
                             ),
                           ),
-                          // 右側大頭照（選填）
                           if (widget.imageUrl != null &&
                               widget.imageUrl!.isNotEmpty) ...[
                             ClipRRect(
@@ -201,7 +197,6 @@ class _NotificationBannerState extends State<NotificationBanner>
                             ),
                             const SizedBox(width: 6),
                           ],
-                          // 關閉按鈕
                           GestureDetector(
                             onTap: widget.onClose,
                             behavior: HitTestBehavior.opaque,
@@ -219,7 +214,6 @@ class _NotificationBannerState extends State<NotificationBanner>
                         ],
                       ),
                     ),
-                    // ── 倒數進度條 ─────────────────────────────
                     _CountdownBar(
                       duration: _autoDismissDuration,
                       color: _accentColor,
@@ -235,7 +229,6 @@ class _NotificationBannerState extends State<NotificationBanner>
   }
 }
 
-// ── 倒數進度條 ────────────────────────────────────────────────────
 
 /// 橫幅底部的倒數進度條，與 5 秒自動消失同步。
 class _CountdownBar extends StatefulWidget {

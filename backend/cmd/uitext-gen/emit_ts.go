@@ -20,10 +20,9 @@ func jsString(s string) string {
 
 const tsHeader = "// 由 backend/cmd/uitext-gen 生成，不得手改；重新生成：在 backend 目錄執行 make uitext。\n"
 
-// tsImports 管理列舉型別的 import：同名但來自不同檔的用別名。
 type tsImports struct {
-	names map[string]string // 全名 → 在檔案裡使用的名稱
-	used  map[string]string // 使用的名稱 → 全名
+	names map[string]string
+	used  map[string]string
 	enums []*EnumInfo
 }
 
@@ -122,7 +121,6 @@ func (m *Model) EmitTSKeys() []byte {
 		fmt.Fprintf(&b, "\t| %s\n", jsString(k))
 	}
 	b.WriteString("\t;\n\n")
-	// 值號 → 值名（select 參數用）。
 	for _, e := range m.selectEnums() {
 		fmt.Fprintf(&b, "/** %s 的值號到值名；ICU select 的分支用值名。 */\nexport const %s_NAME: Readonly<Record<number, string>> = {\n", e.Path, constName(e.Path))
 		for _, v := range e.Values {
@@ -136,7 +134,6 @@ func (m *Model) EmitTSKeys() []byte {
 	return []byte(b.String())
 }
 
-// tsKeyTable 回 f 在受眾 a 的「值號 → key」表（omit 的值不在表裡）。
 func (m *Model) tsKeyTable(b *strings.Builder, f *Func, a Audience, name string) {
 	fmt.Fprintf(b, "const %s: Readonly<Partial<Record<number, UiTextKey>>> = {\n", name)
 	for _, c := range f.Cases {
@@ -232,7 +229,6 @@ func (m *Model) tsFunc(b *strings.Builder, f *Func, imp *tsImports, aud Audience
 	}
 }
 
-// tsCompile 把訊息編成 zh-TW 格式化函式的運算式（values 的每個值已是字串或數字，名詞參數已解成文字）。
 func tsCompile(nodes []icu.Node, ps map[string]Param) string {
 	if len(nodes) == 0 {
 		return `""`
@@ -259,7 +255,6 @@ func tsCompile(nodes []icu.Node, ps map[string]Param) string {
 			fmt.Fprintf(&b, "default:\nreturn %s;\n}\n})()", other)
 			parts = append(parts, b.String())
 		case icu.Plural:
-			// zh-TW 的 plural 只有 other（icu.Categories）。
 			for _, br := range n.Branches {
 				if br.Selector == "other" {
 					parts = append(parts, tsCompile(br.Body, ps))

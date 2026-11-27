@@ -16,7 +16,6 @@ const (
 	methodB = "/hawkr.seller.SellerService/GetSellerSimple"
 )
 
-// runWithCarrier 起一個掛了 Middleware 的最小 engine，把 fn 當成 handler 跑一次。
 func runWithCarrier(t *testing.T, fn gin.HandlerFunc) *httptest.ResponseRecorder {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
@@ -54,7 +53,6 @@ func TestEmitPredicateIsTheCodeNotTheCaller(t *testing.T) {
 	runWithCarrier(t, func(c *gin.Context) {
 		Arm(c.Request.Context(), methodA, 9331, "x")
 
-		// 非零：不改寫，且不得消化掉不同碼的 arm。
 		if _, _, ok := Emit(c, 400); ok {
 			t.Error("emittedCode=400 不該觸發改寫")
 		}
@@ -62,7 +60,6 @@ func TestEmitPredicateIsTheCodeNotTheCaller(t *testing.T) {
 			t.Fatalf("非零出口不得吃掉別碼的 arm，pending=%v", got)
 		}
 
-		// 零：必須改寫。
 		code, _, ok := Emit(c, 0)
 		if !ok || code != 9331 {
 			t.Fatalf("emittedCode=0 必須改寫成 9331，得到 (%d,%v)", code, ok)
@@ -119,7 +116,7 @@ func TestEmitWithoutRequestIsSafe(t *testing.T) {
 	if _, _, ok := Emit(c, 0); ok {
 		t.Error("沒有 Request 的 context 不該回報 armed")
 	}
-	EmitNonSuccess(c) // 不得 panic
+	EmitNonSuccess(c)
 	if Accept(c, 9331) {
 		t.Error("沒有 Request 的 context 上 Accept 不該命中")
 	}
@@ -137,12 +134,12 @@ func TestDisarmIsScopedToTheSameMethod(t *testing.T) {
 	runWithCarrier(t, func(c *gin.Context) {
 		Arm(c.Request.Context(), methodA, 9331, "憑證驗證失敗")
 
-		Disarm(c.Request.Context(), methodB) // 別支 RPC 成功
+		Disarm(c.Request.Context(), methodB)
 		if code, armed := Armed(c); !armed || code != 9331 {
 			t.Fatalf("別支 RPC 的成功不得抹掉 9331，得到 (%d, %v)", code, armed)
 		}
 
-		Disarm(c.Request.Context(), methodA) // 同一支 RPC 重試成功
+		Disarm(c.Request.Context(), methodA)
 		if _, armed := Armed(c); armed {
 			t.Error("同一支 method 回報成功之後，它自己掛的 arm 必須解除")
 		}
@@ -211,7 +208,7 @@ func TestEscapeDetectionCountsAndDoesNotRewriteBody(t *testing.T) {
 	before := testutil.ToFloat64(bizcodeEscapedTotal.WithLabelValues("9331", "/probe"))
 	w := runWithCarrier(t, func(c *gin.Context) {
 		Arm(c.Request.Context(), methodA, 9331, "憑證驗證失敗")
-		c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success"}) // 繞過 internal/response
+		c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success"})
 	})
 	var body map[string]any
 	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
@@ -231,7 +228,7 @@ func TestEmitSuppressesEscapeDetection(t *testing.T) {
 	before := testutil.ToFloat64(bizcodeEscapedTotal.WithLabelValues("9331", "/probe"))
 	runWithCarrier(t, func(c *gin.Context) {
 		Arm(c.Request.Context(), methodA, 9331, "x")
-		Emit(c, 4001) // 非零出口：留痕跡但不消化 9331
+		Emit(c, 4001)
 		c.Status(http.StatusOK)
 	})
 	if after := testutil.ToFloat64(bizcodeEscapedTotal.WithLabelValues("9331", "/probe")); after != before {
@@ -282,7 +279,7 @@ func TestEscapeDetectionSurvivesPanic(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.Use(gin.Recovery()) // 生產鏈上有它；沒有的話 panic 會炸穿 ServeHTTP
+	r.Use(gin.Recovery())
 	r.Use(Middleware())
 	r.GET("/probe", func(c *gin.Context) {
 		if !Arm(c.Request.Context(), "/inv.Invoice/Probe", 9331, "credential invalid") {

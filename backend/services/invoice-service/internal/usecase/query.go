@@ -27,29 +27,12 @@ type Query struct {
 	operations domain.OperationRepository
 	complaints domain.ComplaintRepository
 	audit      domain.AuditRepository
-	// adjustments 只為了一件事：ALLOWANCE_APPLIED 的判準**不在 status 欄上**
-	// （折讓不改原件 status，只累加 allowance_total_amount）⇒ 沒有它，
-	// 買家的 state 投影與文件時間軸上的「已折讓」永遠不會出現，而且不報錯（§6.1.3）。
 	adjustments domain.AdjustmentRepository
 	corrections domain.CorrectionRequestRepository
-	// overview 服務端點 16／37 的計數。它獨立成介面是因為兩支各自橫跨 3–4 張表，
-	// 歸到任何一張的 repository 都是錯的。
 	overview domain.OverviewRepository
-	// businessDay 只服務一件事：B07／S09／A07 的「剩餘 X 個工作天」。它是**唯讀**的
-	// 鏡像（§5.1.14），與 Query 沒有 TxManager 這條規則不衝突。
 	businessDay domain.BusinessDayRepository
-	// cutovers 服務端點 46（自動開立切點歷史）。唯讀，寫入面在 ProviderAccount。
 	cutovers domain.ProviderCutoverRepository
-	// unlocks 服務端點 51 的 manualUnlock 卡。唯讀，寫入面在 AdminJob。
 	unlocks domain.ManualUnlockRepository
-	// cancelledOrders 只服務一件事：端點 8 在「這張訂單沒有任何 document」時，
-	// 要不要說「付款完成後會立即開立發票」（#2904）。已取消的訂單不會再被付款，
-	// 那句話對它永遠不成真，而本 service 的讀路徑看不到訂單狀態。
-	//
-	// 🔴 它是**建構子參數**而不是 setter，理由是失效方向：忘了 wire 的話，
-	// setter 版本會留下一個 nil 欄位，而唯一安全的處置（nil 就跳過）正好等於
-	// 「靜默退回舊的錯誤文案」——零錯誤、零 log、畫面看起來很正常。
-	// 列進簽章讓那件事變成編譯錯。
 	cancelledOrders domain.CancelledOrderRepository
 	cfg             IssuanceConfig
 	now             func() time.Time
@@ -106,33 +89,17 @@ func (u *Query) WithClock(now func() time.Time) *Query {
 	return u
 }
 
-// ---------------------------------------------------------------------------
-// 稽核：ADM 揭露 P 類資料
-// ---------------------------------------------------------------------------
 
 const (
-	// auditActionPIIReveal 是 §8.1.3(c) 裁定 2 指定的 action 字面值，對應告警
-	// InvoicePiiRevealSpike（§8.2.4 ⑩）與指標 invoice_admin_pii_reveal_total（M13）。
 	auditActionPIIReveal = "INVOICE_PII_REVEAL"
 
 	auditResourceDocument  = "INVOICE_DOCUMENT"
 	auditResourceComplaint = "INVOICE_COMPLAINT"
 
-	// invoice_admin_audit_logs.reason_code／reason_detail 都是 NOT NULL，而讀取沒有
-	// 使用者填的理由 ⇒ 用固定值標明它是「讀取造成的揭露」而不是某個 ADM 動作。
 	auditReasonRead       = "READ"
 	auditReasonDetailRead = "ADM 讀取含 P 類欄位的發票詳情（58 §8.1.3(c) 裁定 2）"
 )
 
-// recordPIIReveal 在 ADM 揭露 P 類資料前留一列稽核。
-//
-// 🔴 **fail-closed：稽核寫不進去就不揭露**。§8.1.3(c) 的裁定是「ADM 一律不遮罩，代價由
-// 稽核承擔」——稽核寫失敗而照樣回明文，等於把裁定的代價那一半刪掉，而畫面上完全正常。
-//
-// 🔴 request_id 一律傳 nil：uq_invadmaudit_client_request(actor_account_id, action,
-// request_id) WHERE request_id IS NOT NULL 會把「同一個 ADM、同一個 action、同一把
-// request_id」摺成一列 ⇒ 帶了它，同一個 ADM 的第二次揭露就不留痕。correlation_id
-// 沒有這個唯一索引，可以帶。
 func (u *Query) recordPIIReveal(ctx context.Context, actorAccountID int64, resourceType string, resourceID int64) error {
 	corr := interceptor.CorrelationIDFromContext(ctx)
 	var corrPtr *string
@@ -153,24 +120,11 @@ func (u *Query) recordPIIReveal(ctx context.Context, actorAccountID int64, resou
 			zap.String("resource_type", resourceType), zap.Int64("resource_id", resourceID), zap.Error(err))
 		return err
 	}
-	// M13 在稽核列寫成功**之後**才遞增：fail-closed 的語意是「寫不進去就不揭露」，
-	// 提前遞增會把沒有發生的揭露算進去。
 	observeAdminPIIReveal()
 	return nil
 }
 
-// ---------------------------------------------------------------------------
-// 買家：B08 常用發票資料列表（端點 5）
-// ---------------------------------------------------------------------------
 
-// buyerProfileCap 是 9303 定的每位買家常用發票資料上限。
-//
-// 它同時是本查詢的 SQL LIMIT：ListBuyerInvoicePreferences 沒有 OFFSET，分頁在 Go 端切。
-// 這在**這一支**是正確的而不是偷懶——存活列數由 9303 硬性封頂在 20，取 cap+1 就能同時
-// 得到精確的 total 與「是否已越界」的訊號。
-//
-// 🔴 這個做法**不可複製**到 invoice_documents／invoice_operations 那些沒有上限的表：
-// 那裡的 Go 端分頁會在資料長大之後靜默漏列（見交付回報的缺 query 清單）。
 const buyerProfileCap = 20
 
 const (
@@ -195,8 +149,6 @@ type BuyerProfilePage struct {
 func (u *Query) ListBuyerProfiles(ctx context.Context, buyerID int64, page, pageSize int32) (BuyerProfilePage, error) {
 	normPage, normSize, offset := pagination.NormalizePage(page, pageSize, buyerProfileDefaultPageSize, buyerProfileMaxPageSize)
 
-	// cap+1：拿到第 21 列代表存活列數已超過 9303 的上限，那是寫入路徑的不變式被破壞，
-	// 不是分頁問題 ⇒ 記一筆讓它顯眼，回應仍以實際取到的列為準（不靜默截斷成 20）。
 	rows, err := u.prefs.ListByBuyer(ctx, buyerID, buyerProfileCap+1)
 	if err != nil {
 		return BuyerProfilePage{}, err
@@ -209,8 +161,6 @@ func (u *Query) ListBuyerProfiles(ctx context.Context, buyerID int64, page, page
 	total := int32(len(rows)) //nolint:gosec // 上限 cap+1，不可能溢位
 	out := BuyerProfilePage{Records: []CheckoutProfile{}, Total: total, Page: normPage, PageSize: normSize}
 	if offset >= total {
-		// 越界頁回空 records ＋ 正確的 total，不是 404：前端翻到最後一頁之後刪掉一列
-		// 就會落在這裡，回錯誤會讓畫面炸掉而不是回到第一頁。
 		return out, nil
 	}
 	end := offset + normSize
@@ -223,9 +173,6 @@ func (u *Query) ListBuyerProfiles(ctx context.Context, buyerID int64, page, page
 	return out, nil
 }
 
-// ---------------------------------------------------------------------------
-// 申訴：B07（買家）與 A07/A08（ADM）
-// ---------------------------------------------------------------------------
 
 // ComplaintView 是一件申訴案的完整投影。
 //
@@ -285,10 +232,6 @@ func (u *Query) GetComplaintForAdmin(ctx context.Context, actorAccountID, compla
 	if err != nil {
 		return ComplaintView{}, err
 	}
-	// A08 的「賣家：{storeId}」（#3054 的稽查）：這一欄原本恆為空字串，於是管理員從
-	// 列表（那一支有值）點進詳情，賣家那一段整個消失。
-	// 取不到 issuer 時留 0 而不是回錯：申訴本身的資料完全健康，不該因為一個顯示欄位
-	// 讓整頁打不開（與 ExpectedDocKind 同一個處置）。
 	if issuer, ierr := u.issuers.GetByID(ctx, c.IssuerID); ierr == nil {
 		v.StoreID = issuer.IssuerRefID
 	}
@@ -301,8 +244,6 @@ func (u *Query) complaintView(ctx context.Context, c domain.Complaint) (Complain
 		return ComplaintView{}, err
 	}
 	now := u.now()
-	// 工作天倒數與 sla_due_at 是同一套曆制（domain.BusinessCalendar）：前端禁止自算
-	// （§6.1.6 第 1 條），而它算不出來時**保持 nil**，由型別邊界回空字串。
 	cal, err := loadBusinessCalendar(ctx, u.businessDay, minTime(now, c.SlaDueAt), maxTime(now, c.SlaDueAt))
 	if err != nil {
 		return ComplaintView{}, err
@@ -312,16 +253,7 @@ func (u *Query) complaintView(ctx context.Context, c domain.Complaint) (Complain
 	return v, nil
 }
 
-// expectedDocKind 取被申訴文件的 document_kind（#3031）。
-//
-// memo 非 nil 時當快取用：一頁申訴常常指向同一份文件（同一張發票被重開申訴），
-// 而 complaintViews 本來就是逐列查詢的形狀。
-//
-// 🔴 失敗回空字串、不往上拋：這是申訴卡上的一行顯示文字，讓整個佇列因為它打不開
-// 是本末倒置（同 resolveStoreNames 的處置）。
 func (u *Query) expectedDocKind(ctx context.Context, documentID int64, memo map[int64]string) string {
-	// documents 可能是 nil（買家面的部分讀取視圖不注入它）⇒ 與 documentID==0 同樣回空字串。
-	// 少了這道守衛的症狀是 panic 不是空欄位，而 panic 會讓整個端點 500。
 	if documentID == 0 || u.documents == nil {
 		return ""
 	}
@@ -358,9 +290,6 @@ func complaintNotFound() error {
 	return pkgerrors.NewBusiness(bizcode.InvoiceComplaintNotFound, bizcode.Message(bizcode.InvoiceComplaintNotFound))
 }
 
-// ---------------------------------------------------------------------------
-// 賣家稅務資格（S02／S04）與 ADM 審核詳情（A03）
-// ---------------------------------------------------------------------------
 
 // SellerTaxProfileView 是稅務資格的投影。賣家面與 ADM 面讀的是同一份資料
 // （proto 的 GetTaxReviewForAdminResponse 直接回 SellerTaxProfileData），差別只在
@@ -399,9 +328,6 @@ func (u *Query) GetTaxReviewForAdmin(ctx context.Context, storeID int64) (Seller
 	return u.GetSellerTaxProfile(ctx, storeID)
 }
 
-// ---------------------------------------------------------------------------
-// AMEGO 憑證帳號（S03／A04）
-// ---------------------------------------------------------------------------
 
 // ProviderAccountView 是 provider 帳號的投影。
 //
@@ -434,14 +360,11 @@ func (u *Query) GetSellerProviderAccount(ctx context.Context, storeID int64) (Pr
 		return ProviderAccountView{}, err
 	}
 	view := ProviderAccountView{StoreID: storeID, Account: account}
-	// 沒有稅務資格列不是錯誤：pending_order_count 就不填（見上方欄位註解）。
 	if profile, perr := u.profiles.GetByIssuer(ctx, issuer.ID); perr == nil {
 		view.Profile, view.HasProfile = profile, true
 	} else if !isBizCode(perr, bizcode.SellerTaxProfileNotFound) {
 		return ProviderAccountView{}, perr
 	}
-	// #3031：last_request_id。取不到**不中止**——它是給客服追查用的識別欄，
-	// 讓 S05 整頁因為它打不開是本末倒置。與 pending_order_count 同一個處置。
 	if rid, rerr := u.audit.LatestProviderCorrelationID(ctx, issuer.ID); rerr == nil {
 		view.LastRequestID = rid
 	}
@@ -454,30 +377,19 @@ func (u *Query) GetProviderAccountForAdmin(ctx context.Context, storeID int64) (
 	return u.GetSellerProviderAccount(ctx, storeID)
 }
 
-// providerAMEGO 是 invoice_provider_accounts.provider 的唯一值（Phase 1）。
 const providerAMEGO = "AMEGO"
 
-// sellerIssuer 由 store_id 解出賣家 issuer，並把「查無」統一成呼叫端指定的業務碼。
-//
-// notFoundCode 由呼叫端給，是因為同一個「這個 store 還沒有 issuer」在稅務資格頁要讀成
-// 9320、在 provider 頁要讀成 9330 —— 每一頁內部一致即可，跨頁不必同碼。
 func (u *Query) sellerIssuer(ctx context.Context, storeID int64, notFoundCode int32) (domain.Issuer, error) {
 	issuer, err := u.issuers.GetByRef(ctx, codemeta.InvoiceIssuerTypeSeller.Value, storeID)
 	if err == nil {
 		return issuer, nil
 	}
-	// 只翻譯 GetByRef 對 pgx.ErrNoRows 產生的那一個碼。用 `errors.As(*DomainError)`
-	// 當條件會把「連線斷了」也翻成「這個 store 還沒設定」，而那兩件事的正確處置相反
-	// （重試 vs 不重試）——同一個判準見 isBizCode 的註解。
 	if isBizCode(err, bizcode.InvoiceProviderAccountNotFound) {
 		return domain.Issuer{}, pkgerrors.NewBusiness(notFoundCode, bizcode.Message(notFoundCode))
 	}
 	return domain.Issuer{}, err
 }
 
-// ---------------------------------------------------------------------------
-// ADM：發票文件詳情（端點 48）與開票作業詳情（端點 51）
-// ---------------------------------------------------------------------------
 
 // AdminDocumentView 是 ADM 的發票詳情（A06 的四層）。
 //
@@ -495,8 +407,6 @@ type AdminDocumentView struct {
 	RevealedEmail     string
 }
 
-// adminAuditLogLimit 是詳情頁一次載入的 ADM 稽核列數上限。
-// ListInvoiceAdminAuditLogsByResource 依 occurred_at DESC ⇒ 取最近 N 筆。
 const adminAuditLogLimit = 50
 
 // GetDocumentForAdmin 回一份發票的 ADM 詳情（端點 48）。
@@ -513,8 +423,6 @@ func (u *Query) GetDocumentForAdmin(ctx context.Context, actorAccountID, documen
 	}
 
 	view := AdminDocumentView{Document: doc}
-	// issuer 只為了填 store_id（InvoiceJobInfo.store_id／賣家名稱）：invoice_documents
-	// 只有 issuer_id，而「issuer_ref_id ＝ store_id」那一步在 invoice_issuers 上。
 	if view.Issuer, err = u.issuers.GetByID(ctx, doc.IssuerID); err != nil {
 		return AdminDocumentView{}, err
 	}
@@ -538,8 +446,6 @@ func (u *Query) GetDocumentForAdmin(ctx context.Context, actorAccountID, documen
 		return AdminDocumentView{}, err
 	}
 
-	// 沒有載具也沒有 email 的文件（打統編／捐贈）不需要解密：WithDecryptedRecipient
-	// 會走 KeyRing，對一列全 NULL 的密文欄呼叫它只是白花一次 DB 往返。
 	if doc.CarrierId1Ciphertext != nil || doc.RecipientEmailCiphertext != nil {
 		if err := u.documents.WithDecryptedRecipient(ctx, doc.ID, func(s domain.RecipientSecrets) error {
 			view.RevealedCarrierID = s.CarrierID1
@@ -619,9 +525,6 @@ func (u *Query) logger() *zap.Logger {
 	return u.log
 }
 
-// ---------------------------------------------------------------------------
-// 由狀態推導的旗標與參數（給 gRPC mapper 用；判準的 SSOT 一律是 SQL 的 allowed-from）
-// ---------------------------------------------------------------------------
 
 // RetryPolicyView 是 T-I12 要求進 job DTO 的退避參數（前端不得自行猜測）。
 type RetryPolicyView struct {
@@ -642,23 +545,12 @@ type RetryPolicyView struct {
 func (u *Query) RetryPolicy() RetryPolicyView {
 	return RetryPolicyView{
 		InitialIntervalSeconds: int64(u.cfg.BaseBackoff / time.Second),
-		BackoffMultiplier:      2, // submit.go backoffFor：d *= 2
+		BackoffMultiplier:      2,
 		MaxIntervalSeconds:     int64(u.cfg.MaxBackoff / time.Second),
 		MaxAttempts:            u.cfg.MaxAttempts,
 	}
 }
 
-// 可取消的來源狀態集合。
-//
-// 🔴 SSOT 是 db/queries/invoice_operations.sql 的 CAS 述詞，不是「看起來像失敗的狀態」：
-//   - RequestInvoiceOperationCancel ← status IN (READY, RETRY_SCHEDULED, FAILED_PERMANENT,
-//     FAILED_RETRY_EXHAUSTED, SELLER_ACTION_REQUIRED)
-//
-// 這份清單放寬了，按鈕就會亮在一個 CAS 必定 rows=0 的狀態上——而 rows=0 是**靜默**的
-// （§7.3.0 規則 4），ADM 按下去什麼事都不會發生也不會有錯誤訊息。
-//
-// ⚠️ 可**重試**的那一份不在這裡：它與寫端 applyRetry 共用 adminRetryKindOf
-// （admin_job.go）。曾經在這裡另存一份 map，兩邊就漂移了（#3089 第 8 項）。
 var cancellableOperationStatuses = map[string]struct{}{
 	"READY":                  {},
 	"RETRY_SCHEDULED":        {},
@@ -690,7 +582,6 @@ const (
 	FileUnavailableNotApplicable = "NOT_APPLICABLE"
 )
 
-// providerFileRetention 是 AMEGO invoice_file／invoice_query 的查詢期限（§8.1.5 K2）。
 const providerFileRetention = 180 * 24 * time.Hour
 
 // FileAvailability 判斷這份文件有沒有可下載的 PDF，沒有的話為什麼。
@@ -704,27 +595,8 @@ func (u *Query) FileAvailability(doc domain.Document) (available bool, reason st
 	return false, documentFileUnavailableReason(doc, u.now())
 }
 
-// documentFileUnavailableReason 是「為什麼沒有檔案」的唯一判準。
-//
-// 抽成純函式而不是留在 FileAvailability 裡，是因為它有**第二個消費者**：
-// DocumentFile（§6.1.4 的三條 /file/content）。兩份實作會漂移，而漂移的症狀是
-// 「列表說可以下載、按下去說載具未中獎」——兩句話都是後端講的，使用者無從判斷。
-//
-// ⚠️ 呼叫端必須自己先判 pdf_object_key：已落地的自有儲存一律優先，
-// 它不受 AMEGO 180 天限制（§8.1.5 K2∧K3）。
 func documentFileUnavailableReason(doc domain.Document, now time.Time) string {
 	switch {
-	// 🔴 **NOT_APPLICABLE 要排在載具之前**（#3089 第 13 項）。
-	//
-	// 這格是「平台不會為這張訂單開票」——那張憑證從頭到尾不存在，
-	// 談不上「載具中獎後才提供」。而載具是**買家在結帳時就選好的**，
-	// 與平台後來決定不開票無關 ⇒ 排在後面的話，每一張帶載具的
-	// NOT_APPLICABLE 文件都會回 CARRIER_NOT_WON。
-	//
-	// 買家看到的症狀（dev 實測 N=2）：對一張「平台不會開票」的單子，
-	// 畫面寫「使用載具的發票在中獎後才會提供 PDF」＋一顆「查看發票」——
-	// 兩句都在暗示「之後會有」，而正確答案是「不會有」。
-	// #3026 修的是 RECEIPT 那一格、#3084 是 B2B 載具那一格，這是同族第三格。
 	case doc.Status == codemeta.InvoiceDocumentStatusNotApplicable.Value:
 		return FileUnavailableNotApplicable
 	case doc.CarrierType != nil:

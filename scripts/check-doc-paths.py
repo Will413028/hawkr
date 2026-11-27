@@ -26,7 +26,6 @@ from urllib.parse import unquote
 
 CHECKED_DIRS = ("docs/adr/", "docs/共通規範/", "docs/plans/", "docs/modules/")
 README = "docs/README.md"
-# This checker and its tests hold sample paths that intentionally do not exist.
 SELF = {"scripts/check-doc-paths.py", "scripts/test_check_doc_paths.py"}
 MAX_BYTES = 2_000_000
 

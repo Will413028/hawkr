@@ -18,7 +18,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
-// admin 以第一次認證建立管理員（零角色），回傳 ID 與之後認證用的 token。
 func (f *fixture) admin(t *testing.T, subject, email string) (int64, string) {
 	t.Helper()
 	f.admins.users[subject] = AdminIdentity{Email: email}
@@ -79,7 +78,6 @@ func TestGrantAndRevokeAdminRoleWriteEventsAndTakeEffectImmediately(t *testing.T
 		t.Fatalf("事件 = %s %q %s %s %v %v", action, reason, source, dbUser, osUser, occurred)
 	}
 
-	// 重複授予回錯誤、不寫事件、角色列不變。
 	_, err = f.m.GrantAdminRole(ctx, change(id))
 	wantKind(t, err, apperr.KindAlreadyExists)
 	if n := f.roleEvents(t, id); n != 1 {
@@ -104,14 +102,12 @@ func TestGrantAndRevokeAdminRoleWriteEventsAndTakeEffectImmediately(t *testing.T
 		t.Fatalf("撤銷後事件 = %d", n)
 	}
 
-	// 撤銷沒有的角色回錯誤、不寫事件。
 	_, err = f.m.RevokeAdminRole(ctx, change(id))
 	wantKind(t, err, apperr.KindFailedPrecondition)
 	if n := f.roleEvents(t, id); n != 2 {
 		t.Fatalf("撤銷不存在的角色後事件 = %d", n)
 	}
 
-	// 撤掉最後一個 OWNER 是允許的，結果告知沒有人持有。
 	res, err = f.m.RevokeAdminRole(ctx, change(second))
 	if err != nil || res.HolderRemains {
 		t.Fatalf("撤銷最後一個 OWNER = %+v, %v", res, err)

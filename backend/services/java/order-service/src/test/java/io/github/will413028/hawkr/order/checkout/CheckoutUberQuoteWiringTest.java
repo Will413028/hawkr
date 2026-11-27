@@ -87,7 +87,6 @@ class CheckoutUberQuoteWiringTest {
                                 .build())
                         .build());
 
-        // 跨賣家／溫層都通過，且交集含本車的溫層——否則 uberQuote 會在打閘門之前就短路
         when(checkoutValidator.validate(anyList(), any()))
                 .thenReturn(new ValidationResult(true, Set.of(FROZEN), List.of(), List.of(), 0));
 
@@ -142,7 +141,6 @@ class CheckoutUberQuoteWiringTest {
         assertThat(data.getCurrency()).isEqualTo("TWD");
         assertThat(data.getExpiresAt()).isEqualTo("2026-09-12T08:30:00Z");
 
-        // 🔴 一次都不自己打 shipping：報價只能從閘門那一次呼叫裡出來
         verify(shippingGrpcClient, never()).getUberQuoteForCheckout(any());
         verify(shippingGrpcClient, never()).validateUberQuoteForCheckout(any());
     }
@@ -172,7 +170,6 @@ class CheckoutUberQuoteWiringTest {
         assertThat(probe.items().get(0).skuId()).isEqualTo(TestIds.id(5001L));
         assertThat(probe.items().get(0).quantity()).isEqualTo(2);
         assertThat(probe.items().get(0).unitPrice()).isEqualTo(500L);
-        // 報價階段不落任何狀態
         assertThat(probe.quoteId()).isEmpty();
         assertThat(probe.accept()).isFalse();
     }
@@ -188,7 +185,6 @@ class CheckoutUberQuoteWiringTest {
 
         assertThat(data.getAvailable()).isFalse();
         assertThat(data.getUnavailableReason()).isEqualTo("UBER_STORE_NOT_MAPPED");
-        // 用 fee=0 表示不可用會與「0 元運費」（平台補貼）逐位元無法區分
         assertThat(data.getQuoteId()).isEmpty();
         assertThat(data.getFeeAmount()).isEmpty();
     }

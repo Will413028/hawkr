@@ -59,9 +59,7 @@ export function SellerPageShell({
 		<div className={cn("flex flex-col gap-[var(--hkui-space-6)]", className)}>
 			<header className="flex justify-between items-end gap-[var(--hkui-space-4)] flex-wrap m-0">
 				<div className="flex flex-col gap-1 min-w-0">
-					{/* 12px floor (was 11px). `--hkui-foreground-muted` is defined in
-					    both themes in ui-kit.css, so the old inline fallback chain only
-					    made the token look unreliable. */}
+
 					{eyebrow ? (
 						<small className="text-[length:var(--hkui-text-tiny)] font-bold tracking-[0.12em] uppercase text-[var(--hkui-foreground-muted)]">
 							{eyebrow}

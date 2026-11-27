@@ -53,7 +53,6 @@ export default function OrderQuickActionDrawer({
 	const [busy, setBusy] = React.useState(false);
 	const [error, setError] = React.useState<string | null>(null);
 
-	// Reset transient state whenever the drawer targets a different order.
 	const orderNo = order?.orderNo ?? null;
 	// biome-ignore lint/correctness/useExhaustiveDependencies: orderNo is the intended trigger — clear busy/error when the drawer switches orders, even though the body only calls stable setters.
 	React.useEffect(() => {

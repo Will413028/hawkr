@@ -150,11 +150,9 @@ class ShippingServiceTest {
         entity.setShippingMethod(ShippingMethod.TAQBIN.value());
         when(shipmentMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(entity);
 
-        // (a) 建單結果回報：沒有貨態欄位 ⇒ 一個字都不准寫
         shippingService.processWebhookStatusUpdate("T777", "", null, null);
         verify(shipmentMapper, never()).updateProviderStatus(any(), any(), any());
 
-        // (b) 對照組：有值但映射不出來 ⇒ 必須保存 raw
         when(statusMapper.mapPayUniStatus("9999")).thenReturn(null);
         shippingService.processWebhookStatusUpdate("T777", "9999", "PayUni 新貨態", null);
         verify(shipmentMapper).updateProviderStatus(77L, "9999", "PayUni 新貨態");
@@ -186,30 +184,24 @@ class ShippingServiceTest {
         entity.setShippingMethod(ShippingMethod.TAQBIN.value());
         when(shipmentMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(entity);
 
-        // 🔴 預先展開：告警用 counter 在**任何事發生之前**就必須存在，否則第一筆
-        //    未知貨態是「序列從不存在跳到 1」——increase() 不算那一跳，告警靜默。
         assertEquals(0.0, unknownCount(ShippingMethod.TAQBIN.value()),
                 "建構子必須把 5 個配送方式的 counter 預先展開成 0");
 
-        // 出口 ①：回調不帶貨態欄位 —— 正常流量，**不得**進告警用的那支
         shippingService.processWebhookStatusUpdate("T888", "", null, null);
         assertEquals(1.0, notStatusEventCount(),
                 "回調不帶貨態欄位要有自己的計數（趨勢用）");
         assertEquals(0.0, unknownCount(ShippingMethod.TAQBIN.value()),
                 "🔴 它是 PayUni 建單結果回報這種正常流量，混進告警指標會讓每次正常建單都告警");
 
-        // 出口 ②：有值但映射不出來 —— 這才是告警要看的
         when(statusMapper.mapPayUniStatus("9999")).thenReturn(null);
         when(shipmentMapper.updateProviderStatus(anyLong(), any(), any())).thenReturn(1);
         shippingService.processWebhookStatusUpdate("T888", "9999", "PayUni 新貨態", null);
         assertEquals(1.0, unknownCount(ShippingMethod.TAQBIN.value()),
                 "真的看不懂的貨態必須計數，否則告警沒有生產者");
 
-        // 🔴 陰性：沒發生的配送方式維持 0（證明上面那個 1.0 不是「一律回 1」）
         assertEquals(0.0, unknownCount(ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP.value()),
                 "沒發生的產品線不得被計數");
 
-        // 🔴 label 基數紀律：raw 狀態值不得成為 label（母體由第三方決定，無上界）
         meterRegistry.get("hawkr_shipping_provider_status_unknown").counters()
                 .forEach(c -> c.getId().getTags().forEach(tag -> assertFalse(
                         "9999".equals(tag.getValue()),
@@ -237,13 +229,11 @@ class ShippingServiceTest {
         entity.setShippingMethod(ShippingMethod.TAQBIN.value());
         when(shipmentMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(entity);
 
-        // (a) 哨兵：一個字都不准寫，也不准進告警指標
         shippingService.processWebhookStatusUpdate("T999", "-", "-", null);
         verify(shipmentMapper, never()).updateProviderStatus(any(), any(), any());
         assertEquals(0.0, unknownCount(ShippingMethod.TAQBIN.value()),
                 "🔴 `-` 是「尚無貨態」不是「看不懂的貨態」——計進去會讓告警被正常流量淹沒");
 
-        // (b) 對照組：真的看不懂的值必須寫、必須計數
         when(statusMapper.mapPayUniStatus("9999")).thenReturn(null);
         when(shipmentMapper.updateProviderStatus(anyLong(), any(), any())).thenReturn(1);
         shippingService.processWebhookStatusUpdate("T999", "9999", "新貨態", null);
@@ -264,7 +254,6 @@ class ShippingServiceTest {
 
     @Test
     void inTransit_publishCarriesBuyerId() {
-        // Arrange — 模擬從 PayUni Webhook 收到 IN_TRANSIT (31) 狀態，當前 entity 在 TCAT_CALLED
         ShipmentEntity entity = new ShipmentEntity();
         entity.setId(1L);
         entity.setShipmentNo("S100");
@@ -284,11 +273,9 @@ class ShippingServiceTest {
 
         ArgumentCaptor<ShippingEventPayload> captor = ArgumentCaptor.forClass(ShippingEventPayload.class);
 
-        // Act — 走 webhook 公開入口，內部觸發 updateStatus 中央 publish
         shippingService.processWebhookStatusUpdate(
                 "T123", "31", "運送中", "2026-04-30 10:00:00");
 
-        // Assert — payload 帶 buyerId、status 為 IN_TRANSIT
         verify(eventPublisher).publishShipmentStatusChanged(captor.capture());
         ShippingEventPayload payload = captor.getValue();
         assertEquals(999L, payload.buyerId());
@@ -298,7 +285,7 @@ class ShippingServiceTest {
     @Test
     void inTransit_notifyBuyerAccountId_resolvesToPrincipalAccountId() {
         long buyerId = 999L;
-        long resolvedAccountId = 5001L; // 刻意 != buyerId
+        long resolvedAccountId = 5001L;
 
         ShipmentEntity entity = new ShipmentEntity();
         entity.setId(1L);
@@ -356,7 +343,6 @@ class ShippingServiceTest {
 
         ArgumentCaptor<ShippingEventPayload> captor = ArgumentCaptor.forClass(ShippingEventPayload.class);
 
-        // Act — 不應拋例外
         shippingService.processWebhookStatusUpdate("T123", "31", "運送中", "2026-04-30 10:00:00");
 
         verify(eventPublisher).publishShipmentStatusChanged(captor.capture());
@@ -370,7 +356,7 @@ class ShippingServiceTest {
     @Test
     void delivered_notifyBuyerAccountId_resolvesToPrincipalAccountId() {
         long buyerId = 999L;
-        long resolvedAccountId = 5002L; // 刻意 != buyerId
+        long resolvedAccountId = 5002L;
 
         ShipmentEntity entity = new ShipmentEntity();
         entity.setId(1L);
@@ -428,7 +414,6 @@ class ShippingServiceTest {
 
         ArgumentCaptor<ShippingEventPayload> captor = ArgumentCaptor.forClass(ShippingEventPayload.class);
 
-        // Act — 不應拋例外
         shippingService.processWebhookStatusUpdate("T123", "11", "已取貨", "2026-04-30 10:00:00");
 
         verify(eventPublisher).publishShipmentDelivered(captor.capture());
@@ -438,7 +423,7 @@ class ShippingServiceTest {
     @Test
     void delivered_publishesResolvedAccountId_notRawStoreId() {
         long storeId = 9999L;
-        long resolvedAccountId = 1001L; // 刻意 != storeId
+        long resolvedAccountId = 1001L;
 
         ShipmentEntity entity = new ShipmentEntity();
         entity.setId(1L);
@@ -468,7 +453,6 @@ class ShippingServiceTest {
 
         verify(eventPublisher).publishShipmentDelivered(captor.capture());
         assertEquals(resolvedAccountId, captor.getValue().sellerAccountId());
-        // issue #2707 Phase A：raw storeId 必須無條件透傳，不受 sellerAccountId 解析結果影響。
         assertEquals(storeId, captor.getValue().storeId());
     }
 
@@ -542,18 +526,6 @@ class ShippingServiceTest {
         return entity;
     }
 
-    // ==================== 賣家身分未解析時的降級（issue #2789 階段 B2） ====================
-    //
-    // updateStatus 底下分岔成三條 publish，而「解析不到時該不該回吐 store_id」逐條不同。
-    // 下面四支測試把那張對照表釘成可執行的斷言 —— 只驗其中一條會讓「兩個入口」退化成
-    // 「一個入口 + 一個沒人走的分支」，所以四條分支各要一支。
-    //
-    //   publish 目標                       | baseline 的賣家向 template          | 未解析時
-    //   ----------------------------------|-----------------------------------|--------
-    //   shipment.created                   | id=2，push_mode=visible「買家已下單」 | 保守（echo）
-    //   shipment.delivered                 | shipment.delivered.seller           | 保守（echo）
-    //   shipment.status.changed            | 無（baseline 只有買家向 id=3）        | 0
-    //   return.shipment.status.changed     | 無（baseline 完全沒有 template）      | 0
 
     /**
      * <b>語意已翻轉（issue #2789 階段 B2）</b>：原名
@@ -594,12 +566,10 @@ class ShippingServiceTest {
 
         ArgumentCaptor<ShippingEventPayload> captor = ArgumentCaptor.forClass(ShippingEventPayload.class);
 
-        // Act — 不應拋例外
         shippingService.processWebhookStatusUpdate("T123", "31", "運送中", "2026-04-30 10:00:00");
 
         verify(eventPublisher).publishShipmentStatusChanged(captor.capture());
         assertEquals(0L, captor.getValue().sellerAccountId());
-        // issue #2707 Phase A：raw storeId 不受 sellerAccountId 解析失敗降級影響，仍是原始值。
         assertEquals(storeId, captor.getValue().storeId());
     }
 
@@ -640,7 +610,6 @@ class ShippingServiceTest {
 
         verify(eventPublisher).publishReturnShipmentStatusChanged(captor.capture());
         assertEquals(0L, captor.getValue().sellerAccountId());
-        // issue #2707 Phase A：raw storeId 不受 sellerAccountId 解析失敗降級影響，仍是原始值。
         assertEquals(storeId, captor.getValue().storeId());
     }
 
@@ -728,7 +697,7 @@ class ShippingServiceTest {
     @Test
     void publishShipmentCreatedEvent_publishesResolvedAccountId_notRawStoreId() throws Exception {
         long storeId = 9999L;
-        long resolvedAccountId = 1001L; // 刻意 != storeId
+        long resolvedAccountId = 1001L;
 
         ShipmentEntity entity = new ShipmentEntity();
         entity.setId(1L);
@@ -754,11 +723,8 @@ class ShippingServiceTest {
         ArgumentCaptor<ShipmentCreatedPayload> captor = ArgumentCaptor.forClass(ShipmentCreatedPayload.class);
         verify(eventPublisher).publishShipmentCreated(captor.capture());
         assertEquals(String.valueOf(resolvedAccountId), captor.getValue().sellerAccountId());
-        // issue #2707 Phase A：raw storeId 必須無條件透傳，不受 sellerAccountId 解析結果影響。
         assertEquals(String.valueOf(storeId), captor.getValue().storeId());
 
-        // issue #2174：買家側刻意帶裸 buyer_id（本事件無買家向 template），
-        // 且 wire key 必須是 buyer_id，不能是會誤導成「已解析登入身分」的 buyer_account_id。
         assertEquals("999", captor.getValue().buyerId());
         com.fasterxml.jackson.databind.JsonNode wire =
                 new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(captor.getValue());
@@ -775,10 +741,6 @@ class ShippingServiceTest {
         m.invoke(service, entity, orderInfo);
     }
 
-    // ==================== #1491 shipDate/deliveryDate 雙格式解析 ====================
-    //
-    // parseFlexibleDate / toPayUniDateFormat 為 private helper（無外部依賴的純函式），
-    // 用 reflection 直接測試三態，避免為了觸發它們而搭建 generateHomeLabelPdf 整條鏈路的 mock。
 
     private static Object invokeParseFlexibleDate(ShippingService service, String rawDate, String fieldLabel)
             throws NoSuchMethodException, IllegalAccessException, InvocationTargetException {
@@ -805,7 +767,6 @@ class ShippingServiceTest {
     void parseFlexibleDate_acceptsIsoYyyyDashMmDashDd() throws Exception {
         LocalDate parsed = (LocalDate) invokeParseFlexibleDate(shippingService, "2026-08-15", "出貨日期");
         assertEquals(LocalDate.of(2026, 8, 15), parsed);
-        // 兩種輸入格式 normalize 後必須得到相同的 PayUni 送出格式
         assertEquals("20260815", invokeToPayUniDateFormat(shippingService, parsed));
     }
 

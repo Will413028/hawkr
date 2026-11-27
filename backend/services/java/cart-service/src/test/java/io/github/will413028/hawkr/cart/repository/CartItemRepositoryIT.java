@@ -63,22 +63,10 @@ class CartItemRepositoryIT {
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-        // common-core DatabaseBootstrapAutoConfiguration 預設 enabled=true 且
-        // hawkr.db.bootstrap.target-database=${DB_NAME}（無預設值，本機/CI 未
-        // export DB_NAME 時直接 IllegalStateException）。本測試用 testcontainers 全新
-        // container，DB 已存在、不需要「確保 DB 存在」的 bootstrap 邏輯，關掉即可。
         registry.add("hawkr.db.bootstrap.enabled", () -> "false");
-        // application.yml 的 spring.flyway.url/user/password 是獨立於 spring.datasource.*
-        // 的硬編碼預設值（指向本機真實 hawkr_cart DB）。本測試已在 @BeforeAll 手動
-        // 對 testcontainers 跑過一次 migration，這裡索性關掉 Spring 自己的 FlywayAutoConfiguration，
-        // 避免它改用真實本機 DB 的帳密連線（會因密碼不符而噴 BeanCreationException）。
         registry.add("spring.flyway.enabled", () -> "false");
         registry.add("hawkr.tsid.enabled", () -> "false");
-        // gRPC server port=0 = 隨機 port，避免與本機 dev container（9927）衝突
-        // -1 關掉對外 gRPC server（本測試用不到）。0 是「先找空 port 再綁」，
-        // 中間可能被 testcontainers 的 port 映射搶走（CI 實測 Address already in use）。
         registry.add("grpc.server.port", () -> "-1");
-        // 跳過 Nacos / Spring Cloud（測試不需要服務註冊）
         registry.add("spring.cloud.nacos.discovery.enabled", () -> "false");
         registry.add("spring.cloud.discovery.enabled", () -> "false");
         registry.add("spring.cloud.service-registry.auto-registration.enabled", () -> "false");
@@ -116,16 +104,15 @@ class CartItemRepositoryIT {
         jdbc.execute("TRUNCATE TABLE cart_items RESTART IDENTITY CASCADE");
     }
 
-    // ==================== deleteSelfOwnedGuestItems（MergeCart 自買過濾，§5.3）====================
 
     @Test
     @DisplayName("deleteSelfOwnedGuestItems: deletes only rows matching guestId + one of the given storeIds + NORMAL status")
     void deleteSelfOwnedGuestItems_deletesOnlyMatchingRows() {
-        insertCartItem(1001L, "guest-A", 9001L, "0"); // 自買 store 9001, NORMAL -> 應刪除
-        insertCartItem(1002L, "guest-A", 9002L, "0"); // 自買 store 9002, NORMAL -> 應刪除
-        insertCartItem(1003L, "guest-A", 7777L, "0"); // 非自買（不同 store）-> 必須存活
-        insertCartItem(1004L, "guest-A", 9001L, "1"); // 自買但 LOCKED -> 必須存活
-        insertCartItem(1005L, "guest-B", 9001L, "0"); // 不同 guestId -> 必須存活
+        insertCartItem(1001L, "guest-A", 9001L, "0");
+        insertCartItem(1002L, "guest-A", 9002L, "0");
+        insertCartItem(1003L, "guest-A", 7777L, "0");
+        insertCartItem(1004L, "guest-A", 9001L, "1");
+        insertCartItem(1005L, "guest-B", 9001L, "0");
 
         int affected = repository.deleteSelfOwnedGuestItems("guest-A", List.of(9001L, 9002L));
 
@@ -200,7 +187,6 @@ class CartItemRepositoryIT {
         assertEquals(1, countById(4003L));
     }
 
-    // ==================== helpers ====================
 
     private void insertBuyerItem(long id, long buyerId, java.util.UUID skuId) {
         jdbc.update("""

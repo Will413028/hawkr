@@ -40,7 +40,6 @@ public class HolidayService implements ComponentReadiness {
         this.holidayMapper = holidayMapper;
     }
 
-    // ==================== 快取 ====================
 
     @PostConstruct
     public void loadCache() {
@@ -81,7 +80,6 @@ public class HolidayService implements ComponentReadiness {
         return "shipping-holiday";
     }
 
-    // ==================== 工作天驗證 ====================
 
     /**
      * 檢查日期是否為工作天（不在 holidays 表）
@@ -120,7 +118,6 @@ public class HolidayService implements ComponentReadiness {
      */
     public List<LocalDate> getNextBusinessDays(int count) {
         List<LocalDate> result = new ArrayList<>();
-        // §10.4 D6: 用台北時區避免 UTC 容器跨日邊界
         LocalDate today = DateTimeUtils.todayInTaipei();
         LocalDate cursor = today.plusDays(1);
         LocalDate safetyLimit = today.plusDays(60);

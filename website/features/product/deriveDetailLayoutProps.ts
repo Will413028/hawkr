@@ -62,9 +62,6 @@ export interface DerivedLayoutProps {
 	descriptionBlocks: Array<Record<string, unknown>>;
 }
 
-/* ============================================================
- * 小工具（與 ProductDetailLayout 內部 helpers 同邏輯）
- * ============================================================ */
 
 export function textOrEmpty(value: unknown): string {
 	return typeof value === "string" ? value.trim() : "";
@@ -83,8 +80,6 @@ export function asRecord(value: unknown): Record<string, unknown> {
 }
 
 export function descriptionImageRaw(block: Record<string, unknown>): string {
-	// description.blocks[] 的圖片欄是 imageKey/imageUrl（gateway
-	// seller_product.go:200 與 product.go:434，backend#2235 起與 gallery 同名）。
 	return textOrEmpty(block.imageUrl) || textOrEmpty(block.imageKey);
 }
 
@@ -224,16 +219,11 @@ export function mapLiveReviews(
 		text: rv.content,
 		photos: rv.imageUrls,
 		created_at: rv.createdAt,
-		// 這個字串在 server component（ReviewsAsync）算完才序列化下傳，
-		// 固定台北偏移才是正確日期。
 		date: formatTaipeiDate(rv.createdAt),
 	}));
 	return { reviews, total };
 }
 
-/* ============================================================
- * Entry
- * ============================================================ */
 
 export function deriveDetailLayoutProps(
 	input: DeriveInput,
@@ -242,8 +232,6 @@ export function deriveDetailLayoutProps(
 
 	const sellerStoreId = getProductSellerStoreId(product);
 
-	// description blocks：原物件 reference 保留，layout 端的 descriptionImageDims
-	// Map 必須用同一份物件 lookup（identity key）。
 	const rawDescriptionBlocks: unknown[] = Array.isArray(
 		(product.description as Record<string, unknown> | undefined)?.blocks,
 	)
@@ -253,11 +241,6 @@ export function deriveDetailLayoutProps(
 
 	const descriptionImageDims = new Map(input.descriptionImageDimEntries);
 
-	// 縮圖：seller 沒上傳多角度 → 退回單張 `imageKey`；都無 → 走下面的 gallery。
-	// §231：`imageKeys`/`imageKey`（裸 objectKey）是 SSOT，成對的
-	// `imageUrls`/`imageUrl` 是 `mediaurl.BuildURL(base, imageKey…)`
-	// （gateway product.go:1119-1123）——由同一把 key 推導出來的，不可能補上 key
-	// 沒有的圖，所以不讀；舊單欄 `images` 後端也從來沒回過。
 	const asStringArray = (v: unknown): string[] =>
 		Array.isArray(v)
 			? (v as unknown[]).filter(
@@ -268,8 +251,6 @@ export function deriveDetailLayoutProps(
 	if (thumbnails.length === 0 && typeof product.imageKey === "string") {
 		if (product.imageKey) thumbnails.push(product.imageKey);
 	}
-	// gallery 條目：正式商品（handler.GalleryItem / PublicGalleryItem）的
-	// `imageKey`，是平台 objectKey，下游可以套 preset。
 	if (thumbnails.length === 0 && Array.isArray(product.gallery)) {
 		for (const g of product.gallery as unknown[]) {
 			const rec = asRecord(g);
@@ -277,11 +258,7 @@ export function deriveDetailLayoutProps(
 			if (src) thumbnails.push(src);
 		}
 	}
-	// Intentionally left empty when the product has no imagery — ProductGallery
-	// renders the design-system ImageFallback (folder-image) for an empty
-	// gallery instead of a branded stand-in.
 
-	// SKU 組合（handler.SkuItem 形狀）。
 	const toPositiveNumber = (value: unknown): number => {
 		if (value == null || value === "") return 0;
 		const n = typeof value === "number" ? value : Number(value);
@@ -295,8 +272,6 @@ export function deriveDetailLayoutProps(
 		const s = asRecord(rawSku);
 		const regularPrice = toPositiveNumber(s.price);
 		const salePrice = toPositiveNumber(s.salePrice);
-		// 商品詳情是 `listPrice`（handler.SkuItem），賣家草稿轉出的是
-		// `originalPrice`（productFormAdapter）——兩個真實來源，不是新舊退路。
 		const originalPrice = toPositiveNumber(s.listPrice ?? s.originalPrice);
 
 		const onSale = salePrice > 0 && salePrice < regularPrice;
@@ -307,7 +282,6 @@ export function deriveDetailLayoutProps(
 				? originalPrice
 				: 0;
 
-		// 商品詳情 handler.SkuItem 的欄名是 `skuName` / `stockQty`。
 		const stockNum = Number.parseInt(textOrEmpty(s.stockQty), 10);
 		const nameStr = typeof s.skuName === "string" ? s.skuName.trim() : "";
 		const fallbackName = rawSkus.length === 1 ? "預設" : `規格 ${i + 1}`;
@@ -332,9 +306,6 @@ export function deriveDetailLayoutProps(
 	);
 	const reviews: ProductReview[] =
 		liveReviews.length > 0 ? liveReviews : productReviews;
-	// 標題評論數優先 product.reviewCount（#1156 後端聚合已可靠）：SSR 首屏 reviewsResult
-	// 尚未載入（liveReviewTotal=0）時，過去退回內嵌 reviews.length（detail 內嵌 reviews 為空 → 0），
-	// 現改用權威的 product.reviewCount，避免「★4.8 (0則評價)」不一致。
 	const reviewTotal = Object.hasOwn(product, "reviewCount")
 		? parseReviewCount(product.reviewCount)
 		: liveReviewTotal > 0
@@ -346,9 +317,6 @@ export function deriveDetailLayoutProps(
 	const firstSkuUnit = formatUnitLabel(
 		textOrEmpty(firstSkuRecord.unit) || undefined,
 	);
-	// 與正式 PDP 行為一致：缺 SKU unit 時 fallback「件」（ProductPurchaseBox
-	// 預設值對齊）。注意 — 這是「商品詳情頁購買盒」的 unit fallback，與「商城
-	// 列表卡 origin/unit」的寫死 placeholder 是兩回事；後者預覽不該注入。
 	const purchaseUnit =
 		typeof firstSkuUnit === "string" && firstSkuUnit ? firstSkuUnit : "件";
 	const categoryName = getProductCategoryName(product);

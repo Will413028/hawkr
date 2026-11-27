@@ -154,8 +154,6 @@ test("every backend rejection has a matching client-side rule", () => {
 });
 
 test("each rule fires only for its own violation", () => {
-	// Otherwise a rule could "pass" the check above by firing on everything —
-	// e.g. a validator that always appends every message.
 	const clean = completeDraft();
 	for (const rule of RULES) {
 		assert.ok(
@@ -166,9 +164,6 @@ test("each rule fires only for its own violation", () => {
 });
 
 test("a bare new product reports all of its missing fields in one go", () => {
-	// The state the seller is actually in: the create form as it mounts, with a
-	// name typed in. Nothing else has been filled, and this is exactly the draft
-	// that used to need five submits to get through.
 	const bare: SellerProductDetail = { ...emptyDraft(), name: "測試商品" };
 	const problems = validateDraft(bare);
 
@@ -201,7 +196,6 @@ test("with several SKUs every message says which one it is about", () => {
 });
 
 test("an empty SKU list is the only problem worth reporting", () => {
-	// Per-SKU rules have nothing to run against, so listing them would be noise.
 	assert.deepEqual(validateDraft({ ...completeDraft(), skus: [] }), [
 		"至少要一個規格 (SKU)",
 	]);

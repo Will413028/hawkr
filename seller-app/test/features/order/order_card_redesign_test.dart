@@ -90,7 +90,6 @@ void main() {
       ),
     );
 
-    // 內層操作要贏得手勢競爭，不能連帶觸發卡片展開。
     await tester.tap(find.byTooltip('複製訂單編號'));
     await tester.pump();
     expect(find.bySemanticsLabel('展開訂單 O125369895'), findsOneWidget);

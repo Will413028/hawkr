@@ -76,7 +76,7 @@ void main() {
   });
 
   test('the three layouts: date, date and time, time of day (24-hour)', () {
-    final afternoon = DateTime.utc(2026, 7, 30, 7, 5); // Taipei 15:05
+    final afternoon = DateTime.utc(2026, 7, 30, 7, 5);
     expect(
       taipeiDeviceDisplay.format(afternoon, TaipeiFormat.dateTime),
       '2026/07/30 15:05',

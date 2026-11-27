@@ -29,11 +29,6 @@ interface Props {
 	presetBuyer?: { id: string; name?: string };
 }
 
-// Coupon timestamps wire as Unix seconds; DatePicker speaks ISO YYYY-MM-DD.
-// Read the calendar date with UTC getters to mirror isoToUnix (which parses
-// date-only ISO as UTC midnight) and the toCouponDateTime sender (which anchors
-// to ...00:00:00Z / ...23:59:59Z). Local getters would shove a stored
-// 2026-05-31T23:59:59Z end date to 2026-06-01 in UTC+8.
 function unixToIso(ts?: number): string {
 	if (!ts) return "";
 	const d = new Date(ts * 1000);
@@ -115,19 +110,12 @@ export default function CouponFormClient({
 		value: 50,
 		min_spend: 500,
 		usage_limit: 100,
-		// A preset buyer (from the CRM「發優惠券」CTA) lands the form on the
-		// 指定買家 path with that customer already selected.
 		targetType: presetBuyer ? "specific" : "all",
 		buyerAccountIds: presetBuyer ? [presetBuyer.id] : undefined,
 	}));
 	const [loading, setLoading] = React.useState(mode === "edit");
 	const [submitting, setSubmitting] = React.useState(false);
-	// mode + couponId 是優惠券表單的 session boundary:從新增切到編輯某張、
-	// 或從一張編輯切到另一張時,前次錯誤訊息不該殘留到新的表單 session。
 	const [error, setError] = useResettableError(`${mode}:${couponId ?? ""}`);
-	// Cache buyer id → display name so chips can render names without
-	// re-fetching the customer list every render. Populated by the picker
-	// on confirm; on edit mode it starts empty and falls back to "買家 #id".
 	const [buyerNames, setBuyerNames] = React.useState<Map<string, string>>(() =>
 		presetBuyer?.name
 			? new Map([[presetBuyer.id, presetBuyer.name]])
@@ -144,8 +132,6 @@ export default function CouponFormClient({
 					return;
 				}
 				setDraft(c);
-				// Seed the chip name cache from the targeted accounts so a
-				// 指定買家 coupon shows real nicknames instead of "買家 #id".
 				if (c.targetAccounts?.length) {
 					setBuyerNames((prev) => {
 						const next = new Map(prev);
@@ -163,9 +149,6 @@ export default function CouponFormClient({
 			.finally(() => setLoading(false));
 	}, [mode, couponId]);
 
-	// Coupons are immutable once created — the backend exposes no seller-side
-	// update endpoint, only revoke + recreate. So "edit" mode is a read-only
-	// 檢視 view: every control is populated but locked, and there is no save.
 	const readOnly = mode === "edit";
 
 	const update = (patch: Partial<SellerCoupon>) =>
@@ -180,8 +163,6 @@ export default function CouponFormClient({
 		? "輸入 1–99 的整數，例如 9 代表 91% 折"
 		: "直接折抵的新台幣金額";
 
-	// 前端先擋：對齊 backend 優惠券微服務 §5.1 SellerCreateTemplate 參數驗證，
-	// 讓賣家在送出前就看到問題，而非等後端回 400。後端仍為最終把關（同一份規則）。
 	const validateDraft = (): string | null => {
 		if (!(draft.name ?? "").trim()) return "請輸入優惠券名稱。";
 
@@ -221,8 +202,6 @@ export default function CouponFormClient({
 		setSubmitting(true);
 		setError(null);
 		try {
-			// Only create reaches here — "edit" mode is a read-only 檢視 view
-			// (no backend update endpoint) and bails out above.
 			await createSellerCoupon({
 				name: draft.name || "未命名優惠券",
 				type: kind,
@@ -248,10 +227,6 @@ export default function CouponFormClient({
 	};
 
 	if (!hydrationSafeClientRender || loading) {
-		// 4-section skeleton that mirrors the real form's silhouette
-		// (header + 基本資訊 / 折抵設定 / 發行對象 / 發行設定) so the
-		// loading state visually fills the whole content column instead
-		// of collapsing into a single small card at the top.
 		return (
 			<div className="flex flex-col gap-5 pb-12" aria-busy="true" role="status">
 				<header className="flex flex-col gap-[6px]">

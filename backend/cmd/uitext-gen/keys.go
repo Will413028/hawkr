@@ -39,7 +39,6 @@ type Key struct {
 
 var lowerSnake = regexp.MustCompile(`^[a-z][a-z0-9]*(_[a-z0-9]+)*$`)
 
-// connectCodes 是 Connect 的 code（proto 名），依 code 值排序；CANCELED 不顯示文字，不在目錄。
 var connectCodes = []string{
 	"UNKNOWN", "INVALID_ARGUMENT", "DEADLINE_EXCEEDED", "NOT_FOUND", "ALREADY_EXISTS", "PERMISSION_DENIED",
 	"RESOURCE_EXHAUSTED", "FAILED_PRECONDITION", "ABORTED", "OUT_OF_RANGE", "UNIMPLEMENTED", "INTERNAL",

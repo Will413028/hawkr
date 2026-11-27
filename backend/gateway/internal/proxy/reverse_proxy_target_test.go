@@ -13,8 +13,6 @@ import (
 // 內部 nil dereference，被 gin Recovery() 接成 500 + 空 body（沒有 envelope、沒有
 // traceId、ErrorHandler 也不會進）。這支測試守住「配置壞掉要在開機就炸」。
 func TestMustParseTargetPanicsOnUnparsableUpstream(t *testing.T) {
-	// port 帶非數字且不含 "//"，url.Parse 會判 "invalid port" 而回 err + nil URL。
-	// 這正是把 k8s service-link 注入的值誤當成 port 時可能出現的形狀。
 	cfg := ServiceConfig{Name: "broken-service", Host: "broken-service", Port: "tcp"}
 
 	defer func() {
@@ -27,8 +25,6 @@ func TestMustParseTargetPanicsOnUnparsableUpstream(t *testing.T) {
 		if !ok {
 			t.Fatalf("panic 值應為 string，實際 %T", p)
 		}
-		// panic 訊息必須帶足排障線索：是哪個 service、實際的 host/port 是什麼。
-		// #2813 的整輪成本就花在「日誌裡沒有任何指向配置的線索」。
 		for _, want := range []string{"broken-service", "tcp", "port="} {
 			if !strings.Contains(msg, want) {
 				t.Errorf("panic 訊息缺少排障線索 %q：%s", want, msg)
@@ -73,10 +69,9 @@ func TestMustParseTargetAcceptsValidUpstream(t *testing.T) {
 // 一旦有人加了，mustParseTarget 會在**開機**就炸並印出實際值，而不是留下一個
 // 沒有線索的 500。
 func TestServiceLinkStyleUpstreamFailsToParse(t *testing.T) {
-	const port = "tcp://10.43.144.51:10021" // dev pod /proc/1/environ 實測值
+	const port = "tcp://10.43.144.51:10021"
 	cfg := ServiceConfig{Name: "seller-service", Host: "seller-service", Port: port}
 
-	// 先釘住底層 url.Parse 的行為，這是整個 bug 的起點。
 	u, err := url.Parse("http://" + cfg.Host + ":" + cfg.Port)
 	if err == nil {
 		t.Fatalf("前提改變了：service-link 形式的值現在 parse 成功了 (host=%q)。"+
@@ -87,7 +82,6 @@ func TestServiceLinkStyleUpstreamFailsToParse(t *testing.T) {
 		t.Errorf("url.Parse 失敗時應回 nil URL，實際 %#v", u)
 	}
 
-	// 而 mustParseTarget 必須把它變成開機期 panic，不是請求期 nil deref。
 	defer func() {
 		if p := recover(); p == nil {
 			t.Fatal("service-link 形式的上游位址必須在開機就 panic")

@@ -45,7 +45,6 @@ public class DefaultProviderCallExecutor implements ProviderCallExecutor {
                 log.error("ProviderCallExecutor.markFailed.error kind={} resourceId={} (markFailed itself threw)",
                         ctx.callKind(), ctx.resourceId(), t2);
             }
-            // 必須重新拋出原 exception 讓上層感知，否則 caller 認為操作成功
             if (t instanceof RuntimeException re) {
                 throw re;
             }
@@ -58,8 +57,6 @@ public class DefaultProviderCallExecutor implements ProviderCallExecutor {
         try {
             markSucceeded.accept(result);
         } catch (Throwable t) {
-            // markSucceeded 失敗代表 invoke 已成功但 DB transition 失敗（極少見）
-            // 不拋例外覆蓋成功訊號，由 reconciliation 補正
             log.error("ProviderCallExecutor.markSucceeded.error kind={} resourceId={}",
                     ctx.callKind(), ctx.resourceId(), t);
         }

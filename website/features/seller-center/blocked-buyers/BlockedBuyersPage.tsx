@@ -78,7 +78,6 @@ export default function BlockedBuyersPage() {
 		},
 	});
 
-	// 連點的第二下在 React 重繪前就到了，`unblock.isPending` 還是舊值；用同步設定的 ref 擋。
 	const unblocking = React.useRef(false);
 	const confirmUnblock = async () => {
 		const target = confirming;

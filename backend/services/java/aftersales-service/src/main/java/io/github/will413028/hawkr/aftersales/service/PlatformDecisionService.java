@@ -74,12 +74,10 @@ public class PlatformDecisionService {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_NOT_FOUND);
         }
 
-        // A2：appeal_state 必須為 APPEALED
         if (!AfterSaleAppealState.APPEALED.value().equals(caseEntity.getAppealState())) {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_APPEAL_STATE_MISMATCH);
         }
 
-        // 驗證 outcome × refund_amount 組合
         AfterSalePlatformDecisionOutcome outcomeEnum = AfterSalePlatformDecisionOutcome.fromValue(outcome);
         Long finalAmount = computeFinalAmount(outcomeEnum, refundAmount, caseEntity);
 
@@ -88,25 +86,21 @@ public class PlatformDecisionService {
             case REJECT_APPEAL -> AfterSaleCaseStatus.CLOSED.value();
         };
 
-        // 樂觀鎖 CAS：appeal_state=APPEALED → RESOLVED
         java.time.LocalDateTime now = DateTimeUtils.nowUtc();
         int affected = caseMapper.markAppealResolved(caseNo, targetStatus, now);
         if (affected != 1) {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_APPEAL_STATE_MISMATCH);
         }
 
-        // INSERT aftersale_platform_decisions
         AfterSalePlatformDecisionEntity decision = new AfterSalePlatformDecisionEntity();
         decision.setCaseNo(caseNo);
         decision.setOutcome(outcome);
         decision.setRefundAmount(finalAmount);
         decision.setReason(reason);
         decision.setDecidedByAdminId(adminAccountId);
-        // decided_at 不走 MetaObjectHandler（非標準 createdAt 命名），顯式填入
         decision.setDecidedAt(now);
         platformDecisionMapper.insert(decision);
 
-        // INSERT aftersale_resolutions（source=PLATFORM，歷史記錄；不觸發退款）
         AfterSaleResolutionEntity resolution = new AfterSaleResolutionEntity();
         resolution.setId(TsidUtil.generate());
         resolution.setCaseNo(caseNo);
@@ -117,7 +111,6 @@ public class PlatformDecisionService {
         resolution.setNegotiationReason(reason);
         resolutionMapper.insert(resolution);
 
-        // INSERT appeal_events
         AfterSaleAppealEventEntity event = new AfterSaleAppealEventEntity();
         event.setCaseNo(caseNo);
         event.setEventType(AfterSaleAppealEventType.DECISION_MADE.value());
@@ -127,12 +120,10 @@ public class PlatformDecisionService {
         event.setDescription(outcomeDescription(outcomeEnum, finalAmount) + "：" + reason);
         appealEventMapper.insert(event);
 
-        // FULL/PARTIAL_REFUND: 建 refund_tasks
         if (outcomeEnum != AfterSalePlatformDecisionOutcome.REJECT_APPEAL) {
             createRefundTask(caseEntity, finalAmount, outcomeEnum);
         }
 
-        // publish MQ
         eventPublisher.publishPlatformDecisionMade(caseNo, caseEntity.getOrderNo(),
                 caseEntity.getBuyerId(), caseEntity.getStoreId(),
                 outcome, finalAmount);

@@ -43,16 +43,8 @@ export function useSellerSelf(): UseSellerSelfResult {
 	const query = useQuery({
 		queryKey: scope.keys.storefront(),
 		queryFn: () => scope.repos.storefront.fetchMyStore(),
-		// Fire whenever the account carries the seller role — matches the old
-		// `useSellerIdentity` gate (the navbar reads this even while a dual-role
-		// user browses as a buyer) and holds on every seller-center page.
-		// 代行下這條由 scope 換成 capability，且工作區的 chrome 不掛這支 hook：側欄
-		// 每頁都渲染，讓它讀店面等於每次換頁都多落一列 STOREFRONT_READ 稽核（§6.5.3
-		// 那四個 READ action 的用途是「有人試圖跨店讀取」的安全訊號，會被灌成噪音）。
 		enabled: scope.canRead("storefront", hasSeller),
 		staleTime: 30_000,
-		// 還沒開店（not_found）是預期狀態，不是故障：沒有這個 meta，每個還沒開店的
-		// 帳號都會往 Sentry 灌一筆噪音。
 		meta: { isExpectedError: isStoreMissing },
 	});
 	return {
@@ -109,7 +101,6 @@ function useMyKycQuery<T>(
 		select,
 		enabled: scope.mode === "seller" && hasSeller && (enabledOption ?? true),
 		staleTime: 30_000,
-		// 審核結果由伺服器更新，沒有賣家端的刷新動作：回到分頁時重新讀一次。
 		refetchOnWindowFocus: true,
 	});
 }

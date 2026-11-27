@@ -49,7 +49,6 @@ const (
 	headerActiveRole         = "X-Active-Role"
 )
 
-// 連 gateway 的逾時。SSE 與 WebSocket 會長時間佔著連線，所以不設整體的逾時，只限制連線與等到回應 header 的時間。
 const (
 	dialTimeout           = 5 * time.Second
 	responseHeaderTimeout = 60 * time.Second
@@ -79,9 +78,6 @@ type SellerLookup interface {
 	CurrentStore(context.Context, int64) (seller.Store, error)
 }
 
-// suspensionCode 是現任店家停權在舊契約 X-Seller-Suspended 的值：未停權是空字串，依據風險類型的停權（舊契約的管理員停權）是
-// 原因碼 9603，只依據認定的停權（舊契約的違規停權）是 SUSPENDED_GOVERNANCE；沒有推導過停權狀態、不認得的措施都回錯誤，
-// 不當成有效值往下傳。
 func suspensionCode(st seller.Store) (string, error) {
 	class, err := sellerreason.Classify(st.Sanctions)
 	if err != nil {
@@ -98,8 +94,6 @@ func suspensionCode(st seller.Store) (string, error) {
 	return "", nil
 }
 
-// currentStoreOf 把 seller 模組的讀取轉成 Caller 的店家欄位。能力只放啟用的動作類能力（statuses 是 CapabilitiesOf 的結果；
-// 狀態 CapPublicListing 不進 header）。店家與能力要成對：沒有能力的店家（已關閉）不會以現任店家出現，出現時是不變量被破壞，回錯誤。
 func currentStoreOf(st seller.Store, statuses []seller.CapabilityStatus, c *Caller) error {
 	suspended, err := suspensionCode(st)
 	if err != nil {
@@ -119,8 +113,6 @@ func currentStoreOf(st seller.Store, statuses []seller.CapabilityStatus, c *Call
 	return nil
 }
 
-// capabilitiesHeader 是 X-Seller-Capabilities 的值。seller 的能力名稱與 gateway 的 authz 能力 token 是同一組字串，
-// 對應只在這一處（gateway 對照由 TestCapabilityTokensMatchGateway 守）。
 func capabilitiesHeader(caps []seller.Capability) string {
 	tokens := make([]string, len(caps))
 	for i, cp := range caps {
@@ -144,11 +136,8 @@ func (f *forwarder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c.BuyerID, c.StoreID, c.SellerSuspended, c.SellerCapabilities = 0, 0, "", nil
 	var err error
 	if ok && c.Principal.Kind == identity.PrincipalAccount {
-		// 每個帳號都是買家：gateway 以 X-Buyer-Id 缺省表示「沒有買家」、不再查 RPC，所以每個轉發的帳號請求都要解析。
 		c.BuyerID, err = f.buyers.CurrentBuyerID(r.Context(), c.Principal.ID)
 		if apperr.KindOf(err) == apperr.KindNotFound {
-			// 帳號活著 ⇔ 買家活著（ADR 2026-09-30-account-created-provisions-buyer）：認證過的帳號沒有現任買家是
-			// 不變量被破壞，不以「沒有買家」轉發。
 			f.log.ErrorContext(r.Context(), "gatewayproxy：存活的帳號沒有現任買家", "account_id", c.Principal.ID, "path", r.URL.Path)
 			internalError(w)
 			return
@@ -157,7 +146,6 @@ func (f *forwarder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			var st seller.Store
 			st, err = f.sellers.CurrentStore(r.Context(), c.Principal.ID)
 			if apperr.KindOf(err) == apperr.KindNotFound {
-				// SELLER 角色 ⇔ 有現任店家（關店在同一個 transaction 移除角色）：沒有現任店家是不變量被破壞，不以「沒有店家」轉發。
 				f.log.ErrorContext(r.Context(), "gatewayproxy：有賣家角色的帳號沒有現任店家", "account_id", c.Principal.ID, "path", r.URL.Path)
 				internalError(w)
 				return
@@ -169,7 +157,7 @@ func (f *forwarder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		if r.Context().Err() != nil {
-			return // client 自己斷線
+			return
 		}
 		f.log.ErrorContext(r.Context(), "gatewayproxy：解析業務身分失敗", "path", r.URL.Path, "error", err)
 		unavailable(w)
@@ -219,14 +207,12 @@ func New(gatewayURL string, callerOf CallerOf, buyers BuyerLookup, sellers Selle
 			StripSessionCredentials(pr.Out.Header)
 			SetIdentity(pr.Out.Header, c, ok)
 		},
-		// 串流（SSE）逐筆送出。
 		FlushInterval: -1,
-		// 以 W3C Trace Context 把入口的 trace 接給 gateway。
 		Transport: otelhttp.NewTransport(transport,
 			otelhttp.WithTracerProvider(tp), otelhttp.WithPropagators(propagation.TraceContext{})),
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
 			if errors.Is(err, context.Canceled) {
-				return // client 自己斷線
+				return
 			}
 			log.ErrorContext(r.Context(), "gatewayproxy：轉給 gateway 失敗", "path", r.URL.Path, "error", err)
 			unavailable(w)
@@ -267,7 +253,6 @@ func StripSessionCredentials(h http.Header) {
 // SetIdentity 刪掉 h 裡 client 帶來的身分 header，登入時（ok）再依入口認證過的呼叫者與解析的業務身分設上（#1859）。
 // 沒有登入時不設，gateway 當成訪客。
 func SetIdentity(h http.Header, c Caller, ok bool) {
-	// X-Active-Role 是舊 REST client 的工作區提示，先讀出來再連同其他身分 header 一起刪；gateway 只收到解析後的 X-Login-Role。
 	hint := h.Get(headerActiveRole)
 	for _, k := range []string{HeaderAccountID, HeaderAccountType, HeaderLoginRole, headerActiveRole, HeaderBuyerID, HeaderStoreID, HeaderSellerSuspended, HeaderSellerCapabilities} {
 		h.Del(k)
@@ -281,7 +266,6 @@ func SetIdentity(h http.Header, c Caller, ok bool) {
 		h.Set(HeaderLoginRole, strconv.Itoa(accounttype.Admin))
 		return
 	}
-	// 買家位元與 X-Buyer-Id 由這裡合成（accounttype）：identity 不把買家存成角色。
 	if c.BuyerID > 0 {
 		h.Set(HeaderBuyerID, strconv.FormatInt(c.BuyerID, 10))
 	}

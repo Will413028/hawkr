@@ -1,7 +1,5 @@
-/* ========== 賣家管理頁面樣式 ========== */
 
 .merchant-management {
-	/* Colors */
 	--gray-50: #fbfaf5;
 	--gray-100: #f0f1ea;
 	--gray-200: var(--color-ink-100);
@@ -16,18 +14,15 @@
 	--primary-orange-hover: var(--admin-primary-strong-hover);
 	--primary-orange-light: rgba(184, 68, 31, 0.12);
 
-	/* Design Tokens */
 	--token-gray-100: #5f675b;
 	--token-orange-100: var(--admin-primary-strong);
 	--token-red-10: #b3261e;
 	--token-primary-100: var(--admin-primary);
 	--white: #fffdf7;
 
-	/* Spacing */
 	--page-padding: 32px;
 	--grid-gap: 24px;
 
-	/* Shadows */
 	--shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 	--shadow-card:
 		0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
@@ -39,7 +34,6 @@
 	-webkit-font-smoothing: antialiased;
 }
 
-/* 5 欄統計卡片 - Figma: justify-between */
 .merchant-stats-row {
 	display: flex;
 	justify-content: space-between;
@@ -47,7 +41,6 @@
 	margin-bottom: 24px;
 }
 
-/* 可點擊的統計卡片 */
 .stat-card-clickable {
 	cursor: pointer;
 	border-radius: 16px;
@@ -58,7 +51,6 @@
 	transform: translateY(-2px);
 }
 
-/* 選中狀態 - 淺綠色背景 */
 .stat-card-clickable.active .stat-card-v2 {
 	background: var(--color-ink-100);
 	border-color: var(--color-ink-200);
@@ -68,7 +60,6 @@
 	background: white;
 	border-radius: 16px;
 	padding: 32px;
-	/* Increased padding */
 	position: relative;
 	border: 1px solid var(--gray-200);
 	box-shadow: var(--shadow-card);
@@ -89,43 +80,34 @@
 	display: flex;
 	flex-direction: column;
 	gap: 16px;
-	/* Increased gap */
 }
 
 .merchant-stat-label {
 	font-size: 20px;
-	/* Increased from 14px */
 	font-weight: 700;
 	color: var(--gray-600);
 }
 
 .merchant-stat-value {
 	font-size: 36px;
-	/* Increased from 32px */
 	font-weight: 700;
 	color: var(--gray-900);
 	line-height: 1;
 	letter-spacing: -0.02em;
 }
 
-/* 統計卡片右上角圖標 - Flag Shape Refinement */
 .merchant-stat-icon {
 	position: absolute;
 	top: 0;
-	/* Fully flush */
 	right: 24px;
 	width: 44px;
-	/* Slightly refined */
 	height: 52px;
-	/* Aspect ratio check */
 	border-radius: 0 0 12px 12px;
-	/* Tighter curve for "tag" look */
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	padding-bottom: 8px;
 	box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.15);
-	/* Slightly deeper shadow */
 	z-index: 10;
 }
 
@@ -135,33 +117,26 @@
 	filter: brightness(0) invert(1);
 }
 
-/* Token Alignment */
-/* 1. Store (Total) -> brand/primary/gray1/100 */
 .merchant-stat-icon.store {
 	background: var(--token-gray-100);
 }
 
-/* 2. Warning (Pending) -> brand/sencoy/orange/100 */
 .merchant-stat-icon.warning {
 	background: var(--token-orange-100);
 }
 
-/* 3. Danger (Rejected) -> Color 10 */
 .merchant-stat-icon.danger {
 	background: var(--token-red-10);
 }
 
-/* 4. Success (Active) -> admin-primary */
 .merchant-stat-icon.success {
 	background: var(--token-primary-100);
 }
 
-/* 5. Trending (Added) -> brand/primary/gray1/100 */
 .merchant-stat-icon.trending {
 	background: var(--token-gray-100);
 }
 
-/* Text Color Alignment ("Orange and Red must follow the flag") */
 .merchant-stat-value.warning {
 	color: var(--token-orange-100);
 }
@@ -174,7 +149,6 @@
 	color: var(--gray-900);
 }
 
-/* 搜尋和篩選工具列 - Figma: 白底圓角容器 */
 .merchant-toolbar {
 	display: flex;
 	align-items: center;
@@ -226,7 +200,6 @@
 	color: rgba(10, 10, 10, 0.5);
 }
 
-/* 分段式控制項樣式 - Figma: 灰底圓角容器 */
 .merchant-filter-tabs {
 	display: flex;
 	gap: 0;
@@ -237,7 +210,6 @@
 	box-sizing: border-box;
 }
 
-/* Layout: Search takes remaining space, tabs + export on right */
 .merchant-toolbar .merchant-search-input {
 	flex: 1;
 	margin-right: 16px;
@@ -273,7 +245,6 @@
 	letter-spacing: 0;
 }
 
-/* 表格容器 - Figma: 白底圓角 + 邊框 + 陰影 */
 .merchant-table-container {
 	background: var(--white);
 	border-radius: 15px;
@@ -282,7 +253,6 @@
 	box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* 商家表格 */
 .merchant-table {
 	width: 100%;
 	border-collapse: separate;
@@ -290,7 +260,6 @@
 	table-layout: auto;
 }
 
-/* 表頭：淺灰藍 - --color-ink-100，表格容器白底上可見 */
 .merchant-table thead {
 	background: var(--color-ink-100);
 }
@@ -343,23 +312,16 @@
 	border-right: none;
 }
 
-/* 最後一行無底部邊框（容器已有邊框） */
 .merchant-table tbody tr:last-child td {
 	border-bottom: none;
 }
 
-/* 註冊成 <color> 才有補間；否則自訂屬性預設是「不可動畫」的 token，上色從 <tr>
-   移到儲存格之後，原本掛在 <tr> 的 background-color transition 會變成死碼、
-   hover 的 0.15s 淡入無聲消失。不支援 @property 的瀏覽器退化成瞬間換色，
-   與拿掉 transition 相同，不會壞掉。 */
 @property --merchant-row-tint {
 	syntax: "<color>";
 	inherits: true;
 	initial-value: transparent;
 }
 
-/* 列的狀態色改以 token 表達，四個狀態的色值各自只出現一次；真正上色的是下方
-   那一條「畫在儲存格上」的規則。 */
 .merchant-table tbody tr {
 	--merchant-row-tint: transparent;
 	transition: --merchant-row-tint 0.15s ease;
@@ -370,35 +332,15 @@
 	--merchant-row-tint: var(--gray-50);
 }
 
-/* 點擊/選中狀態 - 淺橘色背景 */
 .merchant-table tbody tr:active,
 .merchant-table tbody tr.selected {
 	--merchant-row-tint: var(--primary-orange-light);
 }
 
-/* 換膚（`004f27d`）把 `--primary-orange-light` 從橘改綠，但**這裡是字面值**、不是
-   變數，於是整份檔案只剩這一個橘色沒被換掉 ⇒ 同一個 selected 狀態，滑鼠移入時
-   從綠底跳成橘底（Chrome 實測畫出來的列色 hue 68° → 30°，色值本身 85° → 28°）。
-   色相對齊 `--primary-orange-light`，只把 alpha 從 12% 提到 18%（沿用換膚前
-   10%→15% 的 1.5 倍加深比例）。 */
 .merchant-table tbody tr.selected:hover {
 	--merchant-row-tint: rgba(184, 68, 31, 0.18);
 }
 
-/* 列的底色畫在**儲存格**上，不畫在 `<tr>` 上。
-   ⚠️ 這一點不是風格選擇，是 sticky 的必要條件：
-   ① `AdminVisualRefresh.css:749-752` 的 `.page-content table tbody tr:hover`
-      特異性 (0,2,3)，比任何合理的 `.merchant-table tbody tr` 選擇器都強
-      （`src/app/admin/layout.tsx:74` 的 `<main class="page-content">` 讓它命中本表）。
-      它用的是 `background` **簡寫**，會把 background-color 與 background-image
-      一起換掉。若列由 `<tr>` 上色、而釘住的欄自己另畫一份，hover 到已選取的列時
-      兩者就分岔 —— 實測接縫剛好落在 sticky 邊界，「我選了哪一列」的提示在滑鼠
-      移上去的當下消失。
-   ② `.page-content table td` 只設 padding／border／color，**不設 background**，
-      所以畫在儲存格上沒有競爭者；釘住的欄與其餘欄用的是同一條宣告，
-      不可能不一致。
-   兩層（不透明底 ＋ 狀態色）則是為了擋住捲到 sticky 欄下面的內容：selected 是
-   12%、selected:hover 是 18% 的半透明色，單獨一層擋不住底下的文字。 */
 .merchant-management .merchant-table tbody td {
 	background-color: var(--white);
 	background-image: linear-gradient(
@@ -408,13 +350,6 @@
 	);
 }
 
-/* 「操作」欄釘在右緣 —— 賣家管理是本表唯一會橫向溢出的頁面（`.merchant-management`
-   把容器改成 overflow-x:auto），而溢出時被切掉的一定是最右邊那一欄，也就是唯一
-   一欄可以做事的。實測 1440：表格 1197.8px、容器 1079px，「代行營運」按鈕落在
-   x=1382.8~1482.8 而容器右緣 1381 ⇒ 該座標 elementFromPoint 回 null，不橫捲 120px
-   根本點不到。釘住之後，不論欄位再長、再加幾欄，操作永遠在畫面上。
-
-   `.merchant-management` 與 `.merchant-table` 目前只有賣家管理頁使用（SEO 健診頁已刪除）。 */
 .merchant-management .merchant-table th:last-child,
 .merchant-management .merchant-table td:last-child {
 	position: sticky;
@@ -422,16 +357,10 @@
 }
 
 .merchant-management .merchant-table thead th:last-child {
-	/* 與其他表頭儲存格同色。值來自 AdminVisualRefresh.css 的
-	   `.page-content table th`（0,1,2）—— 它勝過 `.merchant-table thead` 的 --color-ink-100，
-	   所以看得見的表頭其實是 #f4f3ec；這裡曾寫成 --color-ink-100，最右一格因此變色。
-	   兩處字面值由 tests/delegated-operations-ui-contract.test.ts 綁在一起。 */
 	background: #f4f3ec;
-	/* 表頭要蓋過本欄的 tbody 儲存格（同為 sticky，預設 z-index 相同）。 */
 	z-index: 1;
 }
 
-/* 賣家資訊儲存格 */
 .merchant-info-cell {
 	display: flex;
 	align-items: center;
@@ -491,7 +420,6 @@
 	font-size: 14px;
 }
 
-/* 商店代號 - 16px Regular #565656 */
 .merchant-shop-code {
 	font-size: 16px;
 	font-weight: 400;
@@ -499,7 +427,6 @@
 	font-variant-numeric: tabular-nums;
 }
 
-/* 操作按鈕：品牌色實心 */
 .btn-action-primary {
 	padding: 8px 16px;
 	border: none;
@@ -523,7 +450,6 @@
 	box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
-/* 類型儲存格 */
 .merchant-type-cell {
 	display: flex;
 	flex-direction: column;
@@ -549,7 +475,6 @@
 	gap: 6px;
 }
 
-/* 分類標籤：低飽和度配色 */
 .category-tag {
 	display: inline-block;
 	padding: 4px 10px;
@@ -561,13 +486,11 @@
 	border: 1px solid transparent;
 }
 
-/* 狀態標籤 */
 .merchant-status-badge {
 	display: inline-flex;
 	align-items: center;
 	padding: 4px 12px;
 	border-radius: 9999px;
-	/* Full rounded pill */
 	font-size: 12px;
 	font-weight: 600;
 	line-height: 1.5;
@@ -603,7 +526,6 @@
 	color: var(--gray-400);
 }
 
-/* 數量與營收 - 16px Regular #565656 */
 .merchant-count,
 .merchant-revenue,
 .merchant-date {
@@ -613,7 +535,6 @@
 	font-weight: 400;
 }
 
-/* ========== 操作按鈕 - Figma: 16px Bold, padding 6px 10px ========== */
 .btn-action {
 	padding: 6px 10px;
 	border: none;
@@ -636,7 +557,6 @@
 	box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
-/* 綠色 - 營業中（已通過）商家 - 與 StatusBadge success 同色 */
 .btn-action.success {
 	background: var(--admin-primary-strong);
 }
@@ -645,7 +565,6 @@
 	background: var(--admin-primary-strong-hover);
 }
 
-/* 橘色 - 待審核商家 - 與 StatusBadge warning 同色 */
 .btn-action.warning {
 	background: #ee964b;
 }
@@ -654,7 +573,6 @@
 	background: #d97f3a;
 }
 
-/* 紅色 - 審核失敗商家 - 與 StatusBadge danger 同色 */
 .btn-action.danger {
 	background: #e7000b;
 }
@@ -663,7 +581,6 @@
 	background: #c5000a;
 }
 
-/* 灰色 - 未啟用商家 - 與 StatusBadge gray 同色 */
 .btn-action.gray {
 	background: rgba(86, 86, 86, 0.5);
 }
@@ -672,7 +589,6 @@
 	background: rgba(86, 86, 86, 0.7);
 }
 
-/* 分頁 */
 .merchant-pagination {
 	display: flex;
 	justify-content: center;
@@ -724,9 +640,6 @@
 	border: 1px solid var(--gray-100);
 }
 
-/* 響應式 */
-/* 名稱與信箱的截斷寬度隨視窗收斂：1440 這一級的筆電，表格塞不下時先讓最寬的
-   「賣家資訊」欄讓步，而不是讓右邊的操作欄被推出去。完整值都留在 title。 */
 @media (max-width: 1600px) {
 	.merchant-management .merchant-table th,
 	.merchant-management .merchant-table td {

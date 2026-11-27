@@ -50,7 +50,7 @@ class AutoRefundWorkerTest {
         t.setOrderNo("O400280260");
         t.setTransactionId("T123");
         t.setAmount(500L);
-        t.setPaymentMethod(PaymentMethod.CREDIT_CARD.value());  // 非 ATM → 走 createRefund
+        t.setPaymentMethod(PaymentMethod.CREDIT_CARD.value());
         t.setStatus(OrderConstants.TASK_STATUS_PENDING);
         t.setRetryCount(0);
         t.setMaxRetryCount(3);
@@ -62,16 +62,13 @@ class AutoRefundWorkerTest {
         AutoRefundTaskEntity task = nonAtmPendingTask();
         when(autoRefundTaskRepository.findRetryable(anyInt())).thenReturn(List.of(task));
         when(autoRefundTaskRepository.claimTask(anyLong(), any())).thenReturn(1);
-        // wrapper 在 envelope code≠0 時拋 IllegalStateException（修復後行為）
         when(paymentGrpcClient.createRefund(anyString(), anyLong(), anyString(), anyString()))
                 .thenThrow(new IllegalStateException("createRefund 失敗: code=500, message=退款失敗: PayUni 拒退"));
 
         worker.process();
 
-        // 關鍵不變式：失敗不得標 DONE、不得進完成事務（markDone + financial_log 已抽 AutoRefundTxHandler）
         verify(autoRefundTaskRepository, never()).markDoneByStatus(anyLong(), any());
         verify(autoRefundTxHandler, never()).completeAutoRefund(any(), any());
-        // 應走失敗重試路徑
         verify(autoRefundTaskRepository, times(1)).updateFailed(eq(123456789L), any(), any(), anyInt());
     }
 

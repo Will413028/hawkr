@@ -63,13 +63,6 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUpAll(() async {
-    // PushNotificationManager is a static singleton whose field initializer calls
-    // FirebaseMessaging.instance (→ Firebase.app()), which throws [core/no-app]
-    // unless a Firebase app is registered first. setupFirebaseCoreMocks() installs
-    // a pigeon mock that satisfies initializeCore/initializeApp, then
-    // Firebase.initializeApp() registers the DEFAULT app so Firebase.app() works.
-    // Initialize Flavor so config-dependent code can access F.appFlavor
-    // without throwing. Guard avoids the assert-once constraint when re-running tests.
     if (!F.isInitialized) F.init(Flavor.dev);
 
     setupFirebaseCoreMocks();
@@ -120,7 +113,6 @@ void main() {
       ),
     );
     await tester.pump();
-    // 未登入時店家狀態讀完（null）會排一個 provider 刷新的 timer，推進到它結束。
     await tester.pump(const Duration(milliseconds: 1));
     expect(find.byType(AuthScreen), findsOneWidget);
     expect(find.text('過期停權訊息'), findsNothing);
@@ -269,7 +261,7 @@ void main() {
       expect(
         container.read(sellerStoreIdProvider),
         kSellerId.toString(),
-      ); // 登入時已同步 GetMyStore
+      );
       expect(container.read(needsOnboardingProvider), isFalse);
       expect(redirectFrom(container, AuthRoutes.auth), MainRoutes.dashboard);
     },
@@ -314,7 +306,6 @@ void main() {
       meGate: gate.future,
     );
     final locations = <String?>[];
-    // 同 router：聽 session 與店家的衍生狀態，通知時 redirect 讀到的是重算後的值。
     void record(Object? previous, Object? next) =>
         locations.add(redirectFrom(container, AuthRoutes.auth));
     container
@@ -367,7 +358,7 @@ void main() {
       final repo = accountRepo();
       final container = makeLoginContainer(
         repo: repo,
-        auth: FakeAuthSession()..signInResult = false, // 取消
+        auth: FakeAuthSession()..signInResult = false,
       );
       final controller = container.read(authControllerProvider.notifier);
 
@@ -616,18 +607,15 @@ void main() {
       expect(c1.read(sessionProvider).isLoggedIn, isTrue);
       c1.dispose();
 
-      // 第二個 container（模擬 app 重啟，沿用同一份 mock 持久層與 session token 保存的登入）
       final c2 = makeLoginContainer(repo: accountRepo(), auth: auth);
       await c2.read(sessionProvider.notifier).initialize();
 
       final restored = c2.read(sessionProvider);
       expect(restored.isLoggedIn, isTrue);
       expect(restored.accountId, 'acc-1');
-      // GetMyStore 還沒回答：不導頁，停在載入狀態。
       expect(c2.read(needsOnboardingProvider), isNull);
       expect(redirectFrom(c2, AuthRoutes.auth), isNull);
 
-      // onSessionRestored 同步賣家之後才進主畫面。
       await c2.read(currentStoreProvider.future);
       expect(redirectFrom(c2, AuthRoutes.auth), MainRoutes.dashboard);
     },

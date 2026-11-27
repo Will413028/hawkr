@@ -41,7 +41,6 @@ export interface SellerInvoiceDocumentsResult
 	shipmentStatusDegraded: boolean;
 }
 
-/* ===== 端點 16｜總覽 ===== */
 
 /**
  * 稅務審核未完成期間的接單上限（58 §7.3.1）。
@@ -85,7 +84,6 @@ export interface SellerInvoiceOverview {
 	recentDocuments: InvoiceDocumentSummary[];
 }
 
-/* ===== 端點 17｜稅務身分 ===== */
 
 /** 稅籍資料（`SellerTaxIdentity`）。 */
 export interface SellerTaxIdentity {
@@ -198,7 +196,6 @@ export interface SellerTaxExtensionRequest {
 	reason: string;
 }
 
-/* ===== 端點 30／31｜發票與收據紀錄 ===== */
 
 /** 端點 30 的一列（`SellerInvoiceDocumentItem`）。 */
 export interface SellerInvoiceDocumentItem {
@@ -270,7 +267,6 @@ export interface SellerInvoiceDocumentDetail {
 	latestJobId: string;
 }
 
-/* ===== 端點 33／62R｜開票作業（job） ===== */
 
 /**
  * 系統自動重試的政策（`RetryPolicy`）。四欄都是**數字字串**。
@@ -286,7 +282,6 @@ export interface InvoiceRetryPolicy {
 	maxAttempts: string;
 }
 
-/* ===== 端點 62R｜本訂單的自行開立案件 ===== */
 
 /**
  * 端點 62R `GET /orders/{order_no}/external_issuances` 的一列（`InvoiceJobInfo`）。
@@ -337,7 +332,6 @@ export interface InvoiceJobInfo {
 	documentKind: string;
 }
 
-/* ===== 端點 34／35｜買家發票申訴 ===== */
 
 /**
  * 申訴的一則處理紀錄（`ComplaintResponseItem`）。**追加語意**：端點是
@@ -408,7 +402,6 @@ export interface SellerInvoiceComplaint {
 	reopenAllowedAfter: string;
 }
 
-/* ===== 端點 72｜進項發票（平台開給賣家的） ===== */
 
 /**
  * 端點 72 `GET /app/seller/invoices/received_documents` 的一列

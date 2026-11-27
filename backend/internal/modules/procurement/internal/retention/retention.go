@@ -15,21 +15,17 @@ type Service struct{ db *db.DB }
 // New 建立 Service。
 func New(d *db.DB) *Service { return &Service{db: d} }
 
-// step 是清除的一步；tables 是它處理的含 buyer_id 的表（守門測試用它對 schema 檢查）。
 type step struct {
 	name   string
 	tables []string
 	run    func(ctx context.Context, q *store.Queries, buyerID int64) (int64, error)
 }
 
-// exempt 是含 buyer_id、但不需要自己的清除步驟的表，值是理由。
 var exempt = map[string]string{
 	"turns": "對話與需求刪除時 ON DELETE CASCADE 連帶刪除（conversation_id、request_id 都是 CASCADE）",
 }
 
 var steps = []step{
-	// run 最先刪（A9-D20 R4）：子表（輸入、事件、產出、interrupt）隨 run CASCADE；agent_runs.buyer_id 維持 NOT NULL，
-	// 所以不能留到匿名步驟，之後的步驟不再碰到 run。
 	{"run", []string{"agent_runs"}, func(ctx context.Context, q *store.Queries, b int64) (int64, error) { return q.DeleteBuyerRuns(ctx, b) }},
 	{"對話", []string{"conversations"}, func(ctx context.Context, q *store.Queries, b int64) (int64, error) {
 		return q.DeleteBuyerConversations(ctx, b)
@@ -40,7 +36,6 @@ var steps = []step{
 	{"未發布的需求", []string{"requests"}, func(ctx context.Context, q *store.Queries, b int64) (int64, error) {
 		return q.DeleteUnpublishedBuyerRequests(ctx, &b)
 	}},
-	// 候選集排在未發布的需求之後：沒發布過的核准已隨需求刪除，剩下被核准引用的候選集保留並匿名（approvals.candidate_set_id 是 RESTRICT）。
 	{"候選集", []string{"candidate_sets"}, func(ctx context.Context, q *store.Queries, b int64) (int64, error) {
 		n, err := q.DeleteBuyerCandidateSets(ctx, b)
 		if err != nil {

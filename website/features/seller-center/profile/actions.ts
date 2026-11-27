@@ -27,7 +27,6 @@ async function hasLiveSession(): Promise<boolean> {
 		).getSession({});
 		return Boolean(res.account?.id);
 	} catch {
-		// 「沒登入」與「單體暫時答不出來」都不放行；後者讓使用者重試。
 		return false;
 	}
 }

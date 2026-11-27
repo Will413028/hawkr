@@ -30,7 +30,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
 
-// steppingClock 是注入的時鐘：從固定時刻起，每讀一次前進一毫秒，讓先建立的公告的建立時間一定早於後建立的，排序不靠真實時間或 sleep。
 type steppingClock struct {
 	mu  sync.Mutex
 	now time.Time

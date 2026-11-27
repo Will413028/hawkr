@@ -6,20 +6,6 @@ import (
 	"github.com/Will413028/hawkr/go-pkg/timeutil"
 )
 
-// 申訴 SLA 的工作天曆（§7.3.5「3 個工作天」的定義 ＋ §5.1.14 的唯讀鏡像）。
-//
-// 🔴 與 StatutoryDeadline 是**兩套曆制、兩個函式**（§9 X 表逐字）：法定存證期限走自然日、
-// 末日不因週六日或國定假日延長；申訴 SLA 扣週六日與國定假日。共用一個函式的那一刻，
-// 其中一邊就錯了——而錯的那一邊不會有任何東西轉紅，只會讓賣家在連假期間被誤判逾期，
-// 逾期計進 C1 的 90 天違規窗口，3 次即停權建議。
-//
-// 本檔全部是純函式：假日集合由呼叫端從 invoice_business_day_mirror 取出後傳入
-// （§7.3.5 接法③逐字「不碰 DB、不碰網路」）。
-//
-// ⚠️ 設計書把算式指名放在 `pkg/bizcalendar`。本波沒有第二個消費者（全 repo 只有
-// invoice-service 需要工作天曆），依重複實作防護的反面——「跨服務共用不等於把 domain
-// logic 塞進無邊界的 common package」——先留在本層。要抽上去時整個檔案照搬即可：
-// 它對 invoice-service 零相依。缺口登記在交付回報。
 
 const (
 	// ComplaintSlaBusinessDays 是賣家回覆申訴的 SLA（§0.1 關鍵參數：3 工作天）。
@@ -40,7 +26,6 @@ const (
 // 呼叫端忘了載入鏡像時，得到的是偏晚的硬上限而不是偏早的自然日。
 type BusinessCalendar struct {
 	holidays map[string]struct{}
-	// coveredFrom／coveredTo 是台北日界的閉區間；covered=false 代表鏡像從未同步過。
 	coveredFrom time.Time
 	coveredTo   time.Time
 	covered     bool
@@ -126,7 +111,6 @@ func (c BusinessCalendar) ComplaintSlaDueAt(createdAt time.Time) time.Time {
 			continue
 		}
 		if !started {
-			// 這一天是起算日本身（次一個工作日），不計入 3 天。
 			started = true
 			continue
 		}
@@ -166,10 +150,6 @@ func (c BusinessCalendar) RemainingBusinessDays(now, dueAt time.Time) (int32, bo
 	return n, true
 }
 
-// taipeiMidnight 把任一時刻收斂成它所屬台北日的 00:00。
-//
-// 🔴 日界是台北不是 UTC：直接用 UTC 日界會讓每天 00:00–08:00（UTC+8）建立的申訴
-// 落到前一天，而錯誤只在每天的前八小時出現（同一個坑見 ParseInvoiceDateRange）。
 func taipeiMidnight(t time.Time) time.Time {
 	d := t.In(timeutil.LocationTaipei)
 	return time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, timeutil.LocationTaipei)

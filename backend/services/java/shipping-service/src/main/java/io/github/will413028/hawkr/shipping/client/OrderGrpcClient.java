@@ -43,7 +43,6 @@ public class OrderGrpcClient {
                 .getOrderForShipping(GetOrderForShippingRequest.newBuilder()
                 .setOrderNo(orderNo)
                 .build());
-        // 22 號設計書 §2.7 共通規範：非 SUCCESS 拋業務例外，避免 caller 僅以 !hasData() 防護不完整
         if (resp.getCode() != GrpcResponseCode.SUCCESS.code()) {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_ORDER_QUERY_FAILED, resp.getMessage());
         }

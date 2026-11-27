@@ -139,8 +139,6 @@ export default function FeedStories({
 		if (!ensureBuyerSession()) return;
 		onTabChange(nextKey);
 		if (nextKey === "follow") {
-			// Rail stays as-is; the post grid below does the actual filtering.
-			// Empty-state copy is owned by InfiniteFeed when the filter yields zero.
 			setEmptyMessage(null);
 			return;
 		}

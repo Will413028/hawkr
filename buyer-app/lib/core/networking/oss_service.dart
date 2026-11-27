@@ -4,9 +4,6 @@ import '../../config/media_image.dart';
 class OssService {
   const OssService._();
 
-  // ---------------------------------------------------------------------------
-  // Image URL resolution (static, no network calls)
-  // ---------------------------------------------------------------------------
 
   /// Resolve an image source to a displayable URL.
   ///

@@ -12,7 +12,6 @@ import (
 
 func ptr[T any](v T) *T { return &v }
 
-// refNow 是 2026-08-07 00:00 UTC，即台北 08:00，同一個日曆日。
 var refNow = time.Date(2026, 8, 7, 0, 0, 0, 0, time.UTC)
 
 func day(y int, m time.Month, d int) *time.Time {
@@ -126,15 +125,14 @@ func TestApplyBounds(t *testing.T) {
 
 // 到貨日的「今天」以台北日曆日為界（platform/twtime.Day），不是 UTC。
 func TestApplyDateBoundariesUseTaipeiCalendarDay(t *testing.T) {
-	// 2026-08-06 18:00 UTC 是台北 08-07 02:00。
 	now := time.Date(2026, 8, 6, 18, 0, 0, 0, time.UTC)
 	cases := []struct {
 		date   string
 		reject []Rejection
 	}{
-		{"2026-08-06", []Rejection{{DeliveryDate, ReasonDatePast}}}, // 台北的昨天
-		{"2026-08-07", nil}, // 台北的今天
-		{"2027-08-07", nil}, // 今天加 365 天
+		{"2026-08-06", []Rejection{{DeliveryDate, ReasonDatePast}}},
+		{"2026-08-07", nil},
+		{"2027-08-07", nil},
 		{"2027-08-08", []Rejection{{DeliveryDate, ReasonDateTooFar}}},
 	}
 	for _, c := range cases {

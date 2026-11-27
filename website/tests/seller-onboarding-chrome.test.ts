@@ -117,9 +117,6 @@ test("seller onboarding drops stale profile cache before entering the workspace"
 	const documentReplacements =
 		onboarding.match(/commitDocumentNavigation\(redirect, true\)/g) ?? [];
 
-	// One replacement admits an already-completed seller; the other exits right
-	// after a successful application. Both must start a fresh QueryClient so an
-	// old needs_onboarding=true/404 result cannot bounce the seller back here.
 	assert.equal(documentReplacements.length, 2);
 	assert.doesNotMatch(onboarding, /router\.replace\(redirect\)/);
 });

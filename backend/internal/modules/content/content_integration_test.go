@@ -29,9 +29,6 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// fakeMedia 是 model.Media 的替身：每個 staged token 對應固定的資產 ID，token 以 "bad" 開頭時 Confirm 失敗，以 "gone" 開頭時回
-// FailedPrecondition（media 的「暫存已失效」）。真正的 transaction 語意由
-// media_integration_test.go 以真的 media 模組守。
 type fakeMedia struct {
 	mu        sync.Mutex
 	ids       map[string]uuid.UUID
@@ -76,7 +73,6 @@ func (f *fakeMedia) MarkDeleted(_ context.Context, ids []uuid.UUID) error {
 	return nil
 }
 
-// fakeSocial 以測試設定的集合回答「貼文公開可讀」（規則本身由 social 的整合測試守）。
 type fakeSocial struct {
 	mu       sync.Mutex
 	readable map[uuid.UUID]bool
@@ -100,7 +96,6 @@ func (s *fakeSocial) PubliclyReadablePosts(_ context.Context, ids []uuid.UUID) (
 	return out, nil
 }
 
-// fakeProducts 以測試設定的集合回答「商品公開可見」（規則本身由 catalog 的整合測試守）：不在集合裡的回 catalog.ErrProductNotFound。
 type fakeProducts struct {
 	mu     sync.Mutex
 	public map[uuid.UUID]bool
@@ -129,7 +124,6 @@ func (p *fakeProducts) PublicProduct(_ context.Context, id uuid.UUID, at time.Ti
 	return catalog.Product{ID: id}, nil
 }
 
-// publicProduct 是每個 fixture 預設就公開可見的商品，bannerInput 指向它。
 var publicProduct = uuid.MustParse("018f0000-0000-7000-8000-0000000000a1")
 
 type fixture struct {
@@ -168,7 +162,6 @@ func wantKind(t *testing.T, err error, want apperr.Kind) {
 	}
 }
 
-// ==================== banner ====================
 
 func bannerInput() content.BannerInput {
 	return content.BannerInput{
@@ -263,7 +256,6 @@ func TestUpdateBannerMarksExactlyTheReplacedImagesDeleted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// 只換預覽圖：只有被換掉的預覽圖標記刪除，沿用的彈窗圖照舊。
 	in := bannerInput()
 	in.PreviewImageToken, in.PopupImageToken = "p2", ""
 	b, err = f.m.UpdateBanner(ctx, content.UpdateBannerInput{AdminID: adminID, ID: b.ID, Version: b.Version, Banner: in})
@@ -277,7 +269,6 @@ func TestUpdateBannerMarksExactlyTheReplacedImagesDeleted(t *testing.T) {
 		t.Fatalf("只換預覽圖之後的資產 = %v", got)
 	}
 
-	// 兩張都換：舊的兩張都標記刪除。
 	f.media.deleted = nil
 	in.PreviewImageToken, in.PopupImageToken = "p3", "q3"
 	got, err := f.m.UpdateBanner(ctx, content.UpdateBannerInput{AdminID: adminID, ID: b.ID, Version: b.Version, Banner: in})
@@ -367,7 +358,6 @@ func TestListLiveBannersRespectsActiveFlagAndSchedule(t *testing.T) {
 	create("進行中", true, &past, &future)
 	create("還沒開始", true, &future, nil)
 	create("已結束", true, nil, &past)
-	// 排程是 [開始, 結束)：開始的那一刻已上架，結束的那一刻已下架。
 	create("剛好開始", true, &now, nil)
 	create("剛好結束", true, nil, &now)
 
@@ -403,7 +393,6 @@ func TestBannersCanOnlyBeActivatedUpToTheLimit(t *testing.T) {
 		t.Fatal("超過上限仍確認了圖片")
 	}
 
-	// 下架的可以新增，但把它改成上架也受上限限制。
 	off := bannerInput()
 	off.IsActive = false
 	inactive, err := f.m.CreateBanner(ctx, adminID, off)
@@ -415,7 +404,6 @@ func TestBannersCanOnlyBeActivatedUpToTheLimit(t *testing.T) {
 	_, err = f.m.UpdateBanner(ctx, content.UpdateBannerInput{AdminID: adminID, ID: inactive.ID, Version: inactive.Version, Banner: keep})
 	wantKind(t, err, apperr.KindFailedPrecondition)
 
-	// 已經上架的修改其他欄位不受影響；下架一則之後就能上架另一則。
 	edit := keep
 	edit.Title = "改標題"
 	last, err = f.m.UpdateBanner(ctx, content.UpdateBannerInput{AdminID: adminID, ID: last.ID, Version: last.Version, Banner: edit})
@@ -479,13 +467,11 @@ func TestListBannersPagesInDisplayOrder(t *testing.T) {
 			break
 		}
 	}
-	// 顯示順序相同時依建立時間。
 	if want := []uuid.UUID{created[1], created[3], created[2], created[0]}; !slices.Equal(got, want) {
 		t.Fatalf("逐頁讀完 = %v，預期 %v", got, want)
 	}
 }
 
-// ==================== 版本（etag） ====================
 
 func TestUpdateBannerRejectsAStaleVersionBeforeFinalizing(t *testing.T) {
 	t.Parallel()
@@ -506,7 +492,6 @@ func TestUpdateBannerRejectsAStaleVersionBeforeFinalizing(t *testing.T) {
 		t.Fatalf("修改後的版本 = %d", first.Version)
 	}
 
-	// 第二個人從同一個版本開始改，還換了圖：在轉正之前就被拒。
 	f.media.confirmed = nil
 	in.Title = "第二個人改的"
 	in.PreviewImageToken = "p2"
@@ -543,7 +528,6 @@ func TestDeleteChecksTheVersionWhenGiven(t *testing.T) {
 	wantKind(t, f.m.DeleteBanner(ctx, b.ID, b.Version), apperr.KindNotFound)
 }
 
-// ==================== 版本門檻 ====================
 
 func TestCheckAppVersion(t *testing.T) {
 	t.Parallel()

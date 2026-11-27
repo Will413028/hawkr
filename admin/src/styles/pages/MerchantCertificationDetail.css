@@ -1,11 +1,9 @@
-/* ========== Merchant Certification Detail - Figma Design Match ========== */
 
 .certification-detail-page {
 	padding: 0;
 	font-family: "Inter", system-ui, -apple-system, sans-serif;
 }
 
-/* Loading & Error States */
 .loading-container,
 .error-container {
 	display: flex;
@@ -37,7 +35,6 @@
 	margin-bottom: 16px;
 }
 
-/* ========== Header Card ========== */
 .detail-header {
 	display: flex;
 	flex-direction: row;
@@ -86,7 +83,6 @@
 	color: #374151;
 }
 
-/* Avatar: 80px round per Figma */
 .merchant-avatar {
 	width: 80px;
 	height: 80px;
@@ -136,7 +132,6 @@
 	margin: 0;
 }
 
-/* Header Meta Row */
 .header-meta {
 	display: flex;
 	align-items: center;
@@ -155,7 +150,6 @@
 	color: #9ca3af;
 }
 
-/* Header Action Buttons - Figma style */
 .header-actions {
 	display: flex;
 	flex-wrap: wrap;
@@ -164,26 +158,6 @@
 	flex-shrink: 0;
 }
 
-/* 左側識別區只拿「剩下的」寬度，不再把溢出推出卡片外。
- *
- * `.header-actions` 是 `flex-shrink: 0`（刻意：按鈕不該被壓成兩個字），所以它一旦變寬，
- * 全部壓力都轉給 `.header-left`；而 `.header-left` 的 flex 自動最小尺寸是 min-content
- * （約 418px：頭像＋返回鍵＋最長那一欄 meta），撐不下時整個 header 就溢出卡片右緣，
- * 被切掉的是最右邊的「刪除帳號」。實測：代行失敗的錯誤帶掛進這一列時店名折成
- * 「十八養／場」、六個 meta 欄各自折行、分隔的「·」孤立成一行，`SOME_UNKNOWN_CODE_XYZ`
- * 那張連「刪除帳號」整顆都不見。
- *
- * `flex: 1 1 0` 把它的 hypothetical main size 從 max-content 降為 0，`min-width: 0`
- * 解除自動最小尺寸 ⇒ 它永遠恰好等於「容器寬 − 操作列寬」，溢出在結構上不可能發生。
- * 無錯誤帶時的版面與修前逐像素相同（操作列 flex-shrink: 0 ⇒ 分配結果不變），
- * 這條只是兜底：真正防止錯誤帶無限變寬的上限在 `DelegatedOperations.css` 的
- * `.adm-operation-entry`，兩者是一組。
- *
- * ⚠️ 不用 flex-wrap 換行：`.header-left` 的 max-content 是那排 meta 攤成一行的寬度
- * （>1300px），永遠大於容器 ⇒ 換行會**無條件**把操作列踢到第二行，連正常狀態也一起改。
- *
- * 選擇器綁 `.certification-detail-page`：`.detail-header` 這個類名在 `globals.css`
- * 另有一份給商品詳情頁用（那頁子元素叫 `.detail-header-left/-actions`），不該被波及。 */
 .certification-detail-page .header-left {
 	flex: 1 1 0;
 	min-width: 0;
@@ -239,7 +213,6 @@
 	cursor: not-allowed;
 }
 
-/* ========== Delete Account / Close Store Buttons (destructive outline) ========== */
 .btn-delete-account,
 .btn-close-store {
 	display: flex;
@@ -263,7 +236,6 @@
 	background: #fef2f2;
 }
 
-/* ========== Approved Stats Row ========== */
 .approved-stats-row {
 	display: flex;
 	gap: 24px;
@@ -317,7 +289,6 @@
 	color: black;
 }
 
-/* ========== Approved Tabs ========== */
 .approved-tabs {
 	display: flex;
 	gap: 12px;
@@ -360,7 +331,6 @@
 	color: black;
 }
 
-/* ========== Audit Notice - Yellow/Orange Banner ========== */
 .audit-notice {
 	display: flex;
 	align-items: flex-start;
@@ -405,7 +375,6 @@
 	font-weight: 600;
 }
 
-/* 審核失敗 - 紅色版本 */
 .audit-notice.rejected {
 	background: #fef2f2;
 	border-color: #fecaca;
@@ -444,7 +413,6 @@
 	flex-shrink: 0;
 }
 
-/* ========== Content Grid ========== */
 .detail-content-grid {
 	display: grid;
 	grid-template-columns: 55% 1fr;
@@ -458,7 +426,6 @@
 	gap: 20px;
 }
 
-/* ========== Detail Card - tokens ========== */
 .detail-card {
 	background: white;
 	border: 1px solid #dadada;
@@ -467,7 +434,6 @@
 	box-shadow: 0px 2px 20px rgba(0, 0, 0, 0.04);
 }
 
-/* Section Title - header bar */
 .section-title {
 	display: flex;
 	align-items: center;
@@ -491,14 +457,12 @@
 	padding: 16px 24px 24px;
 }
 
-/* ========== Info Grid ========== */
 .info-grid {
 	display: grid;
 	grid-template-columns: repeat(2, 1fr);
 	gap: 12px;
 }
 
-/* Field Container - tokens */
 .info-field {
 	display: flex;
 	flex-direction: column;
@@ -525,7 +489,6 @@
 	color: black;
 }
 
-/* ========== 文件影像占位 ========== */
 .id-card-placeholder {
 	width: 100%;
 	height: 100%;
@@ -546,7 +509,6 @@
 	font-size: 13px;
 }
 
-/* ========== Document List ========== */
 .document-list {
 	display: flex;
 	flex-direction: column;
@@ -605,7 +567,6 @@
 	font-size: 14px;
 }
 
-/* Empty state for documents */
 .empty-state-small {
 	display: flex;
 	flex-direction: column;
@@ -624,9 +585,6 @@
 	font-size: 14px;
 }
 
-/* 治理操作結果提示（取代原生 alert）。外觀完全沿用 `DelegatedOperations.css` 的
-   `.adm-authorization-notice` / `.adm-operation-error`，這裡只補外距——那兩個 class
-   原本都長在有 `gap` 的 flex/grid 容器裡，換到這兩個位置就沒有間距來源了。 */
 .certification-detail-page > .adm-authorization-notice,
 .certification-detail-page > .adm-operation-error {
 	margin-bottom: 20px;
@@ -662,7 +620,6 @@
 	box-shadow: 0 0 0 3px rgb(var(--color-ink-900-rgb) / 0.1);
 }
 
-/* ========== Responsive ========== */
 @media (max-width: 1024px) {
 	.detail-content-grid {
 		grid-template-columns: 1fr;
@@ -710,7 +667,6 @@
 	}
 }
 
-/* ========== Tab Content Card ========== */
 .tab-content-card {
 	background: white;
 	border: 1px solid #dadada;
@@ -719,7 +675,6 @@
 	box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* ========== Tab Table ========== */
 .tab-table {
 	width: 100%;
 	border-collapse: collapse;
@@ -753,7 +708,6 @@
 	border-bottom: none;
 }
 
-/* Product thumbnail in table */
 .product-thumb {
 	width: 80px;
 	height: 60px;
@@ -762,7 +716,6 @@
 	background: #f3f4f6;
 }
 
-/* Table action buttons */
 .tab-table-actions {
 	display: flex;
 	gap: 8px;
@@ -803,7 +756,6 @@
 	background: var(--admin-primary-strong-hover);
 }
 
-/* ========== Order Buyer Cell ========== */
 .order-buyer {
 	display: flex;
 	align-items: center;
@@ -831,14 +783,12 @@
 	object-fit: cover;
 }
 
-/* ========== Order Logistics Cell ========== */
 .order-logistics {
 	display: flex;
 	flex-direction: column;
 	gap: 4px;
 }
 
-/* ========== Order Status Cell ========== */
 .order-status-cell {
 	display: flex;
 	flex-direction: column;
@@ -850,7 +800,6 @@
 	color: #6b7280;
 }
 
-/* ========== Tab Empty State ========== */
 .tab-empty-state {
 	display: flex;
 	flex-direction: column;
@@ -870,7 +819,6 @@
 	color: #565656;
 }
 
-/* ========== Lightbox 圖片放大預覽 ========== */
 .lightbox-overlay {
 	position: fixed;
 	top: 0;
@@ -925,7 +873,6 @@
 	text-align: center;
 }
 
-/* ========== 賣家停權（Governance） ========== */
 .btn-suspend-seller {
 	display: flex;
 	align-items: center;
@@ -953,7 +900,6 @@
 	cursor: not-allowed;
 }
 
-/* 停權狀態卡:沿用 audit-notice.rejected 紅色語彙,右側掛解除按鈕 */
 .suspension-banner {
 	align-items: center;
 }
@@ -999,8 +945,6 @@
 	margin: 0;
 }
 
-/* ========== KYC：商業登記（GCIS）並列、審核紀錄 ========== */
-/* 商業登記（GCIS）並列：沿用 info-grid／info-field，只多一列欄頭與間距。 */
 .kyc-gcis {
 	margin-top: 20px;
 	display: flex;
@@ -1115,7 +1059,6 @@
 	color: var(--admin-warning);
 }
 
-/* 收款帳戶卡（PaymentAccountCard）：detail-content-grid 之外的獨立區塊，不靠 .detail-left-column 的 flex gap 取得間距，需要自己的 margin-bottom。 */
 .payment-account-card {
 	margin-bottom: 20px;
 }

@@ -96,9 +96,6 @@ func TestRunPool_ContextCancelledAbandonsUndispatchedItems(t *testing.T) {
 	started := make(chan struct{})
 	done := make(chan []Item[int, int], 1)
 
-	// Single worker: it parks on item 1 until the test cancels ctx, so no
-	// other item can be dispatched to it in the meantime (unbuffered jobs
-	// channel) — that's what lets us assert some items were abandoned.
 	go func() {
 		done <- RunPool(ctx, items, 1, func(c context.Context, n int) (int, error) {
 			if n == 1 {

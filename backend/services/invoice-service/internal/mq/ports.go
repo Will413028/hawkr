@@ -10,9 +10,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/usecase"
 )
 
-// ---------------------------------------------------------------------------
-// consumer 需要的三份事實（§7.1.2 步驟 5）與一個尚未落地的業務出口
-// ---------------------------------------------------------------------------
 
 // ErrPeerClientUnavailable 是 peer gRPC client 尚未落地時的 fail-loud 訊號。
 //
@@ -185,9 +182,6 @@ type IssuancePreparer interface {
 	Prepare(ctx context.Context, in usecase.OrderPaidInput) (usecase.PrepareResult, error)
 }
 
-// ---------------------------------------------------------------------------
-// 尚未落地的預設實作：一律 fail-loud
-// ---------------------------------------------------------------------------
 
 // UnavailableOrderFactsClient 在 peer client 落地前佔位。
 type UnavailableOrderFactsClient struct{}

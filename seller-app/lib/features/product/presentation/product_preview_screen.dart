@@ -269,7 +269,6 @@ class ProductPreviewScreen extends HookConsumerWidget {
 
     Future<void> loadProductDetails() async {
       final p = product;
-      // `ProductItem` 的賣家鍵是 `storeId`（§6 身分分離）。
       final String? sellerId = (p['storeId'] ?? ref.read(sellerStoreIdProvider))
           ?.toString();
 
@@ -288,7 +287,6 @@ class ProductPreviewScreen extends HookConsumerWidget {
       );
 
       try {
-        // 商品評分摘要（`/public/products/{id}/rating`）與評論都讀公開端點。
         final results = await Future.wait([
           ref.read(productRepositoryProvider).getProductDetail(productId),
           ref
@@ -399,7 +397,6 @@ class ProductPreviewScreen extends HookConsumerWidget {
 
         imageUrls.value = resolvedImageUrls;
         grades.value = loadedGrades;
-        // 評分與評價數只取自 GetProductReviewStats；讀取失敗時留空，不顯示成 0。
         final stats = results[1] as ReviewStats?;
         avgRating.value = stats?.average;
         reviewCount.value = stats?.count;
@@ -532,8 +529,6 @@ class ProductPreviewScreen extends HookConsumerWidget {
       final mName = mine?.storeName ?? '';
       final rating = mine?.ratingAverage;
 
-      // This is the seller's own preview, not a navigation target. Keeping a
-      // bounce gesture with an empty callback made the card look actionable.
       return Container(
         margin: EdgeInsets.symmetric(horizontal: 24.w),
         padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
@@ -739,7 +734,6 @@ class ProductPreviewScreen extends HookConsumerWidget {
               ),
             ),
             SizedBox(height: 8.h),
-            // 商品分類：L2 - L3 合併單行顯示（移除原本的「詳細分類」獨立欄位）
             Text(
               '商品分類：${_joinCategoryDisplay(category.toString(), subCategory.toString())}',
               style: TextStyle(fontSize: 16.sp, color: AppColors.textPrimary),
@@ -1041,7 +1035,6 @@ class ProductPreviewScreen extends HookConsumerWidget {
       final selectedGrade = selIdx != null && selIdx < gradesVal.length
           ? gradesVal[selIdx]
           : null;
-      // PayUni #758: effective = salePrice ?? price；salePrice 有效時顯示原價刪除線
       final rawSkuPrice =
           selectedGrade?['price'] ?? p['price'] ?? p['priceMin'];
       final rawSkuSalePrice =
@@ -1265,8 +1258,6 @@ class _DescriptionImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // imageUrl || imageKey：兩個欄位都是 omitempty，個別 block 可能只有 key。
-    // MediaRepository.resolveUrl 兩種輸入都吃，但優先用 URL 可避免多餘的 CDN 拼接。
     final key = url.isNotEmpty ? url : imageKey;
     final resolvedUrl = MediaRepository.resolveUrl(key);
 

@@ -78,10 +78,8 @@ func (noDashboardOrders) StatusCounts(context.Context, int64) (httpseller.OrderS
 	return httpseller.OrderStatusCounts{}, errors.New("not used")
 }
 
-// 圖片參照是全數字的 token，確認一律成功。
 func newMedia() *media.Fake { return media.NewFake() }
 
-// exposableStore 為帳號開一家可以公開曝光的店（直接寫 seller 的表，最小的列；與 social 的 integration fixture 相同，KYC 的約束先放寬）。
 func exposableStore(t *testing.T, d *db.DB, accountID int64) {
 	t.Helper()
 	ctx := context.Background()
@@ -102,14 +100,12 @@ func exposableStore(t *testing.T, d *db.DB, accountID int64) {
 	if err := d.Conn(ctx).QueryRow(ctx, "SELECT store_id FROM seller.stores WHERE account_id = $1", accountID).Scan(&storeID); err != nil {
 		t.Fatal(err)
 	}
-	// 店家的公告列開店時與店家列一起建立；撤銷措施會重算停權並重新公告，沒有這一列會回 internal。
 	exec(`INSERT INTO seller.store_exposures (store_id) VALUES ($1)`, storeID)
 	exec(`INSERT INTO seller.kyc_applications (application_id, store_id, status, seller_type, created_at, updated_at, decided_at)
 		VALUES ($3, $1, 'APPROVED', 'INDIVIDUAL', $2, $2, $2)`, storeID, now, uuid.NewV7())
 	exec(`INSERT INTO seller.payout_capabilities (store_id, provider, transfers_active, updated_at) VALUES ($1, 'fake', true, $2)`, storeID, now)
 }
 
-// monolith 是單體的 Connect 入口加它的資料庫與 identity：handler 與 production 一樣由 httpapi.NewHandler 組出，資料庫是 testdb 的真實 Postgres。
 type monolith struct {
 	db         *db.DB
 	identity   *identity.Module
@@ -178,7 +174,6 @@ func startMonolith(t *testing.T) *monolith {
 	return &monolith{db: d, identity: id, srv: srv, adminToken: adminToken}
 }
 
-// newCustomer 建立一個 dev session 帳號；withStore 為真時再為它開一家可曝光的店。
 func (m *monolith) newCustomer(t *testing.T, withStore bool) string {
 	t.Helper()
 	account, token, err := m.identity.DevNewSession(t.Context())
@@ -195,7 +190,6 @@ func (m *monolith) newCustomer(t *testing.T, withStore bool) string {
 // 全部情境共用一個資料庫，每個情境用自己的帳號與店家。
 func TestMonolith(t *testing.T) {
 	m := startMonolith(t)
-	// 情境會留下封鎖等狀態，每個情境用自己的一組帳號與店家，彼此不影響。
 	for _, sc := range scenarios {
 		tokens := map[ch.Caller]string{ch.Admin: m.adminToken}
 		for _, c := range []ch.Caller{ch.Buyer, ch.Buyer2, ch.Seller, ch.Seller2} {
@@ -210,7 +204,6 @@ type noAccountOrders struct{}
 func (noAccountOrders) HasOpenOrders(context.Context, int64) (bool, error)      { return false, nil }
 func (noAccountOrders) HasOpenStoreOrders(context.Context, int64) (bool, error) { return false, nil }
 
-// ownerMedia 是 social 的 media 替身：每個 staged token 都確認成功，資產 ID 每次新產生。
 type ownerMedia struct{}
 
 func (ownerMedia) Confirm(_ context.Context, _ media.Uploader, token string, _ media.Visibility) (media.ConfirmedAsset, error) {

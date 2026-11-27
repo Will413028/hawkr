@@ -55,7 +55,6 @@ func TestModuleSentences(t *testing.T) {
 			t.Errorf("text_gen.go 缺 %q\n%s", want, src)
 		}
 	}
-	// 來源檔也被正規化。
 	files, err := m.SourceFiles()
 	if err != nil || len(files[moduleDir+"/zh-TW.json"]) == 0 || string(files[moduleDir+"/en.json"]) != "{}\n" {
 		t.Errorf("模組來源檔：%v %q", err, files[moduleDir+"/en.json"])
@@ -79,7 +78,6 @@ func TestModuleEnglishOverridesAndPlural(t *testing.T) {
 			t.Errorf("text_gen.go 缺 %q", want)
 		}
 	}
-	// 有 en 的句子標 en；en 缺字的句子即使請求 en，也標實際使用的 zh-TW（ADR D3）。
 	if strings.Contains(src, `uitext.Message{Text: "這筆措施已撤銷", Locale: uitext.EN}`) {
 		t.Error("zh-TW 的文字不能標成 en")
 	}

@@ -27,7 +27,6 @@ test("homepage renders exactly nine food-category chips with a registry glyph ea
 	assert.match(nav, /<FoodCategoryIcon categoryId=\{item\.categoryId\} \/>/);
 	assert.match(nav, /data-seasonal-category=\{item\.categoryId\}/);
 	assert.doesNotMatch(nav, /season=|home-design\/mascots|\.json/);
-	// Every category id has a glyph, and the box is decorative.
 	for (const id of categoryIds) {
 		assert.match(foodIcon, new RegExp(`"?${id}"?: "[a-z-]+"`));
 	}

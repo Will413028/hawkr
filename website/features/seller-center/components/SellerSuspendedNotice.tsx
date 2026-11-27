@@ -75,8 +75,6 @@ const WHITELIST_LINKS = [
 		title: "通知",
 		description: "查看訂單與平台通知，掌握必要動態。",
 	},
-	// 稅務身分＝補齊或重新送出稅務件，正是解除停權的路徑；買家申訴＝逾期未回覆會
-	// 再累積違規，鎖住等於讓停權自我延長。
 	{
 		href: "/seller-center/invoices/tax-status",
 		title: "稅務身分",
@@ -91,7 +89,6 @@ const WHITELIST_LINKS = [
 
 export default function SellerSuspendedNotice() {
 	const { isPendingDeletion, isSuspended } = useSellerIdentity();
-	// 等待刪除不讀措施：只有停權（含終止合作）才有生效中的措施。
 	return isPendingDeletion && !isSuspended ? (
 		<NoticeFrame pendingOnly terminated={false} measures={null} />
 	) : (
@@ -136,7 +133,6 @@ function NoticeFrame({
 			kind: MeasureKind.TERMINATION,
 		}) ?? commonUnknown(),
 	);
-	// 措施讀取中或失敗：還不知道有沒有終止，停權專屬文字都不顯示。
 	const unresolved =
 		!pendingOnly &&
 		!terminated &&

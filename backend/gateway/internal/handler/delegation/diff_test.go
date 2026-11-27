@@ -40,8 +40,6 @@ func TestDiff_ComparesRawValuesNotFormattedOnes(t *testing.T) {
 	if fields[0].GetBefore() == "" || fields[0].GetAfter() == "" {
 		t.Error("before/after 不得為空字串")
 	}
-	// 顯示值在此刻意相同（都被截到 60 字），這是接受的取捨：寧可顯示一列看不出差別的
-	// 變更，也不要讓一次真實的內容修改在稽核上消失。
 	if fields[0].GetBefore() != fields[0].GetAfter() {
 		t.Logf("顯示值不同（截斷邊界之內），仍屬正確")
 	}
@@ -192,7 +190,6 @@ func TestDiff_OrderRuleTableIsEmpty(t *testing.T) {
 	}
 }
 
-// ==================== 比較範圍（SnapshotFields / Scope*） ====================
 
 // 這是本 bug 的最小重現：before 是完整投影、after 只有一個鍵（媒體端點的寫入回應就
 // 是這個形狀），於是缺席的每一欄都被記成「被清空」。dev 實測換一次 logo 得到 10 列，
@@ -204,8 +201,6 @@ func TestDiff_UnscopedComparisonInventsChangesForAbsentKeys(t *testing.T) {
 	})
 	after := Project("storefront", map[string]any{"logoKey": "new.jpg"})
 
-	// 反面事實先坐實：不收窄比較範圍時，這個形狀必然虛報。若這一段有一天不再成立，
-	// 代表 Diff 的缺鍵語意被改過，下面那條「收窄才對」的斷言也要跟著重新評估。
 	if got := len(Diff("storefront", before, after, nil)); got != 5 {
 		t.Fatalf("未收窄時 changed_fields 長度 = %d, want 5（1 真 + 4 假）", got)
 	}
@@ -334,9 +329,6 @@ func TestDiff_UnknownCertificationSegmentSurvivesAlongsideKnownOnes(t *testing.T
 // 當時連 enum 都沒登記。⚠️ 判準用「解析後 != 原碼值」而不是「switch 有沒有這個字串」：
 // 後者可以靠寫一個回傳 value 的 case 騙過去。
 func TestDiff_EveryRegisteredEnumNameResolves(t *testing.T) {
-	// 每個 enum 名給一個該 enum 確實存在的碼值（值取自 pkg/codemeta/labels.go 的生成表）。
-	// 新增 enum 到規則表時這裡要一起加，漏加會在下面轉紅並指名要補什麼。
-	// ⚠️ 探針值寫錯會讓斷言誤報成「switch 缺 case」。探針要照生成表抄。
 	probes := map[string]string{
 		"ProductStatus":         "4004",
 		"OrderStatus":           "10",
@@ -365,7 +357,6 @@ func TestDiff_EveryRegisteredEnumNameResolves(t *testing.T) {
 		}
 	}
 
-	// 鑑別力：規則表真的掃到了 enum 欄位（掃不到的話上面整段是空跑）。
 	if len(seen) == 0 {
 		t.Fatal("規則表裡一個 FormatterEnum 都沒掃到 —— 斷言空過")
 	}

@@ -82,7 +82,6 @@ type Chunk struct {
 
 func (c Chunk) valid() bool { return c.Count > 0 && c.Index < c.Count }
 
-// aad 是 header ＋資產 ID ＋段序號 ＋段總數。
 func (c Chunk) aad(header []byte) []byte {
 	out := make([]byte, 0, len(header)+16+8)
 	out = append(out, header...)

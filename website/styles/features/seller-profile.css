@@ -1,13 +1,6 @@
-/* ============================================================
-   13. SELLER PROFILE V2 — compact horizontal layout (Twitter-style)
-   ============================================================ */
 .hkui-seller-profile {
 	position: relative;
 	z-index: 2;
-	/* Old rule pulled the banner UP with a -88px..-120px margin to
-	 * tuck under the previous 140px navbar clearance. The global
-	 * clearance is now ~5px, so a negative pull just makes the banner
-	 * overlap the floating pill. Reset to a small positive offset. */
 	margin: 0 auto var(--hkui-space-5);
 	max-width: 1440px;
 	font-family: var(--hkui-font-sans);
@@ -59,9 +52,6 @@
 	align-items: end;
 	gap: var(--hkui-space-5);
 	padding: 0 var(--hkui-space-8);
-	/* Overlap tuned so the bottom-aligned store name clears the cover by
-	 * ~20px — with `align-items: end`, padding on the title can't move
-	 * the text; this margin is the only lever. */
 	margin-top: -42px;
 }
 .hkui-seller-profile__avatar {
@@ -121,8 +111,6 @@
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
-/* 賣家自填獎項（後端 `prize` free-text）— harvest-gold 獎章 pill，
- * 與評分星星同一 warning 色系；文字過長時單行截斷（title 有全文）。 */
 .hkui-seller-profile__prize {
 	display: inline-flex;
 	align-items: center;
@@ -207,9 +195,6 @@
 	white-space: nowrap;
 	background: var(--hkui-primary);
 	color: var(--hkui-primary-foreground);
-	/* 1px transparent border so toggling between unsubscribed (no border)
-	 * and subscribed (visible sage outline) doesn't shift the layout by
-	 * 2px sideways. */
 	border: 1px solid transparent;
 	border-radius: var(--hkui-radius-full);
 	font-family: inherit;
@@ -245,11 +230,6 @@
 	border-color: var(--hkui-foreground-soft);
 }
 
-/* Subscribed state — colour is the ONLY signal that separates it from the
- * unsubscribed CTA. The label keeps the same megaphone icon and a fixed
- * width (see `__subscribe` min-width below), so toggling 訂閱⇄已訂閱 never
- * reshapes the pill or nudges the chat/名片 buttons beside it. Solid green
- * call-to-action → soft sage "confirmed status". */
 .hkui-seller-profile__cta[aria-pressed="true"] {
 	background: color-mix(in oklab, var(--hkui-primary) 12%, transparent);
 	color: var(--hkui-primary);
@@ -275,8 +255,6 @@
 	align-self: end;
 	justify-self: end;
 }
-/* Reserve the wider "已訂閱" footprint and centre the label so the pill keeps
- * one fixed size across both states — no width jitter on toggle. */
 .hkui-seller-profile__subscribe .hkui-seller-profile__cta {
 	min-width: 104px;
 	justify-content: center;
@@ -330,18 +308,8 @@
 	text-decoration: underline;
 }
 
-/* Description — two lines, optional, expandable when it overruns.
- *
- * `-webkit-line-clamp` is gone on purpose: its ellipsis is painted hard against
- * the end of the last line, so there is nowhere for a toggle to sit and putting
- * one on top would simply eat the words underneath. Clipping by height instead
- * lets a float reserve the tail of the second line, and the toggle drops into
- * that gap — correct at every width, with no character counting and no opaque
- * patch over the text. The ellipsis then belongs to the button (see
- * SellerProfileDescription), not to the browser. */
 .hkui-seller-profile__desc-wrap {
 	position: relative;
-	/* Contains the expanded state's float so the tabs below still clear it. */
 	display: flow-root;
 	margin-top: var(--hkui-space-2);
 }
@@ -351,15 +319,9 @@
 	font-size: var(--hkui-text-small);
 	line-height: 1.5;
 	color: var(--hkui-foreground-muted);
-	/* Two lines of `line-height: 1.5`. `em` (not `lh`) so the maths still holds
-	 * on engines without the `lh` unit; whole line boxes clip cleanly. */
 	max-height: calc(2 * 1.5em);
 	overflow: hidden;
 }
-/* The notch the toggle lands in: one line tall, pushed down by one line so it
- * only bites into the LAST visible line. Width comes from the button's measured
- * width; the em fallback covers the first paint before that measurement lands.
- * The extra 0.3em is the gap between the text and the ellipsis. */
 .hkui-seller-profile__desc-wrap[data-expanded="false"]
 .hkui-seller-profile__desc::before {
 	content: "";
@@ -368,10 +330,6 @@
 	height: 1.5em;
 	margin-top: 1.5em;
 }
-/* Block, so a ResizeObserver can watch the un-clipped text: the paragraph
- * itself is pinned to two lines and never reports a change, and an inline box
- * reports nothing usable either. Still an ordinary block in the paragraph's
- * formatting context, so its line boxes keep wrapping around the float. */
 .hkui-seller-profile__desc-text {
 	display: block;
 }
@@ -380,10 +338,6 @@
 	max-height: none;
 	overflow: visible;
 }
-/* Plain text affordance, not the feed viewer's pill: that pill has a border and
- * a surface because it floats over a photo, whereas this one continues a
- * sentence. Inheriting the paragraph's size and line-height is what lets
- * `bottom: 0` land it on the text's own baseline grid. */
 .hkui-seller-profile__desc-toggle {
 	position: absolute;
 	right: var(--hkui-space-4);
@@ -405,24 +359,18 @@
 	color: var(--hkui-foreground-muted);
 	font-weight: var(--hkui-weight-regular);
 }
-/* Expanded there is no clipped line to sit in, so the control follows the text
- * and keeps the same right-hand column — open and close stay under one thumb. */
 .hkui-seller-profile__desc-wrap[data-expanded="true"]
 .hkui-seller-profile__desc-toggle {
 	position: static;
 	float: right;
 	margin-right: var(--hkui-space-4);
 }
-/* Stretch the ~21px label to a 44px touch target. Asymmetric on purpose: the
- * description above is inert, the tabs below are not, and `--hkui-space-3`
- * (12px) is all the clearance there is down there. */
 .hkui-seller-profile__desc-toggle::after {
 	content: "";
 	position: absolute;
 	inset: -13px -6px -10px -10px;
 }
 
-/* Tabs — flush left, tight */
 .hkui-seller-profile__tabs {
 	display: flex;
 	align-items: center;
@@ -460,9 +408,6 @@
 
 @media (max-width: 640px) {
 	.hkui-seller-profile {
-		/* Container units keep the three header CTAs at 60px on the narrowest
-		 * phone and cap them at a compact 80px on wider phones. The cover's
-		 * 返回 control intentionally reuses the public product-detail contract. */
 		container-type: inline-size;
 		--hkui-seller-profile-mobile-action-width: clamp(
 			60px,
@@ -472,11 +417,6 @@
 		--hkui-seller-profile-mobile-action-visual-inline-inset: 4px;
 		--hkui-seller-profile-mobile-head-cover-offset: 38px;
 		--hkui-seller-profile-mobile-cover-action-gap: var(--hkui-space-2);
-		/* Was `margin-top: -48px` — tucked the cover under the sticky
-		 * navbar so the cover image bled to the top of the viewport,
-		 * but it also hid the absolutely-positioned 返回 button (top: 12px
-		 * inside the cover landed under the navbar). Reset to 0 so the
-		 * cover sits cleanly below the nav and the back chip is visible. */
 		margin-top: 0;
 	}
 	.hkui-seller-profile__cover {
@@ -497,13 +437,6 @@
 		height: 78px;
 	}
 	.hkui-seller-profile__subscribe {
-		/* This wrapper lives INSIDE `__actions` — a 3-col grid with no
-		   named areas — so the old `grid-area: cta` pointed at a line that
-		   doesn't exist here. That spawned a phantom implicit column + a
-		   second row: 聊天/名片 stayed on row 1 (and, pulled up by the
-		   head's negative margin, spilled over the cover) while 訂閱
-		   dropped to row 2 and overflowed right. Flow it as the normal
-		   third column instead. */
 		justify-self: stretch;
 	}
 	.hkui-seller-profile__actions {
@@ -516,9 +449,6 @@
 		justify-content: end;
 		width: 100%;
 		gap: 6px;
-		/* Keep the avatar overlapping the cover, but move the action rail below
-		 * the media edge. Because this margin participates in the grid track,
-		 * the title also clears the lowered buttons instead of overlapping them. */
 		margin-block-start: calc(
 			var(--hkui-seller-profile-mobile-head-cover-offset) +
 			var(--hkui-seller-profile-mobile-cover-action-gap)
@@ -554,8 +484,6 @@
 		background: transparent;
 		border-color: transparent;
 		isolation: isolate;
-		/* The visual surface now lives on ::before. Do not animate the outer
-		 * loading fill back to transparent or it briefly flashes as a 44px pill. */
 		transition:
 			color var(--hkui-dur-fast) var(--hkui-ease),
 			box-shadow var(--hkui-dur-fast) var(--hkui-ease),
@@ -571,9 +499,6 @@
 		outline: 2px solid var(--hkui-focus);
 		outline-offset: 2px;
 	}
-	/* The 3-col grid already equalises the three buttons here, so drop the
-	 * desktop "已訂閱" min-width — otherwise it would widen the subscribe
-	 * track and overflow the row. */
 	.hkui-seller-profile__subscribe .hkui-seller-profile__cta {
 		min-width: 0;
 	}
@@ -716,10 +641,6 @@
 	.hkui-seller-profile .hkui-seller-profile__cta[aria-busy="true"] {
 		--hkui-seller-profile-mobile-action-background: var(--hkui-default-300);
 		--hkui-seller-profile-mobile-action-border: var(--hkui-default-400);
-		/* Button's loading surface is an important utility-layer declaration,
-		 * so an unlayered transparent override cannot win the cascade. Clip that
-		 * temporary surface to the same visual pill instead; the disabled loading
-		 * control does not need the surrounding hit gutter until it is interactive. */
 		clip-path: inset(
 			2px var(--hkui-seller-profile-mobile-action-visual-inline-inset) round
 				var(--hkui-radius-full)

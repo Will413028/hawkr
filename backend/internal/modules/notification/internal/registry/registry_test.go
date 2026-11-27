@@ -17,8 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// wholeRegistries 是整份註冊表檢查要跑的兩份清單：正式清單，以及加上一組 Broadcast 母意圖與它的 Spawned 子型別的清單
-// （正式清單還沒有 fan-out 型別，第一個真的 fan-out 型別加進來時要與後者走同一條規則，不能讓整份註冊表的測試先紅）。
 func wholeRegistries() map[string][]Entry {
 	return map[string][]Entry{
 		"正式清單":                  All(),
@@ -26,7 +24,6 @@ func wholeRegistries() map[string][]Entry {
 	}
 }
 
-// pipelineTypes 是走意圖管線、自己有冪等鍵的型別：排除 Fanout 型別（沒有冪等鍵與收件人）與 Spawned 型別（冪等鍵由派送決定）。
 func pipelineTypes(entries []Entry) []Entry {
 	return slices.DeleteFunc(slices.Clone(entries), func(e Entry) bool { return e.Spec().Fanout || e.Spec().Spawned })
 }
@@ -170,13 +167,10 @@ func TestSelfCheckRejectsBrokenDefinitions(t *testing.T) {
 	}
 }
 
-// 參數快照不存第三方個資：欄位名稱不得是名稱、頭像、聯絡方式，actor 與其他第三方只存 ID。檢查會往巢狀的結構、切片、map 與指標裡走；
-// 身分與物件 key（名稱以 ID、Key 結尾，或 json tag 以 _id、_ids、_key 結尾）只是參照，不算內容，例如 ImageKey。
 var thirdPartyField = regexp.MustCompile(`(?i)(name|nick|avatar|photo|image|picture|email|mail|phone|mobile|address|text|body|title|content)`)
 
 var referenceField = regexp.MustCompile(`(ID|IDs|Id|Key)$|_(id|ids|key)$`)
 
-// publicCatalogNames 是明確的例外：商品名稱是公開目錄資料，不是個人姓名（D28）；仍受 180 天保留期約束。只列「型別.欄位」的完整路徑，其他型別的同名欄位照擋。
 var publicCatalogNames = map[string]bool{"ProductRestockedParams.ProductName": true}
 
 func isThirdPartyField(name, tag string) bool {
@@ -188,7 +182,6 @@ func isThirdPartyField(name, tag string) bool {
 	return false
 }
 
-// paramsProblems 回傳參數型別 t 的違規；根一定要是結構（快照的欄位名要固定）。
 func paramsProblems(t reflect.Type) []string {
 	for t.Kind() == reflect.Pointer {
 		t = t.Elem()

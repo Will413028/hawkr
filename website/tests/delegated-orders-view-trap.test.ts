@@ -40,7 +40,6 @@ test("createOrderRepo 會把 view 送進 query —— 代行 BFF 白名單不收
 			"的 OrderRepo 介面註解（它現在寫著「代行實作並沒有忽略 view」）",
 	);
 
-	// BFF 白名單（LIST_QUERY）逐字對照。多一個 key 就是 400。
 	const allowed = new Set([
 		"page",
 		"page_size",

@@ -68,10 +68,6 @@ public class BuyerGrpcClient {
     public Map<Long, BuyerDisplay> batchGetBuyerDisplayByBuyerIds(List<Long> buyerIds) {
         log.info("BuyerGrpcClient.batchGetBuyerDisplayByBuyerIds.start",
                 "批量查詢買家資訊(PK)", "count", String.valueOf(buyerIds.size()));
-        // #2830：改打 Display 版。Meta 版底層帶 `deleted_at IS NULL`（刻意的 PII 邊界），
-        // 買家註銷後解不出來 ⇒ 賣家訂單列表／詳情的 buyerNickname 變成空字串，而
-        // gateway 帶 omitempty ⇒ 該欄位整個從 JSON 消失。Display 版讓已註銷的 stint
-        // 也解得出來，但只回墓碑字串「已刪除帳號」、頭像清空，真名不離開 buyer-service。
         BatchGetBuyerDisplayByBuyerIDsRequest request = BatchGetBuyerDisplayByBuyerIDsRequest.newBuilder()
                 .addAllBuyerIds(buyerIds)
                 .build();

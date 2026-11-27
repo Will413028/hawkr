@@ -14,11 +14,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
-// errIncompleteSuccess 標示快照說已入帳、卻還沒有 charge 或入帳時間：provider 的資料通常稍後補齊，是暫時性的不一致，不是永久失敗（不包 ErrPermanent）。
-// 不寫入、不標記事件已處理，job 重試，掃描也會重排。
 var errIncompleteSuccess = errors.New("charge: 入帳的快照還沒有 charge 或入帳時間")
 
-// checkSucceededSnapshot 檢查入帳的快照帶齊 charge 與入帳時間；不是入帳的快照回 nil。
 func checkSucceededSnapshot(snap Snapshot) error {
 	if snap.State == StateSucceeded && (snap.ChargeID == "" || snap.PaidAt.IsZero()) {
 		return errIncompleteSuccess
@@ -26,7 +23,6 @@ func checkSucceededSnapshot(snap Snapshot) error {
 	return nil
 }
 
-// attemptState 是快照狀態在 payment_attempts.state 的值（與 payment_attempts_state_check 相同）；不是有效狀態時回空字串。
 func attemptState(s State) string {
 	switch s {
 	case StateAwaitingPayment:
@@ -42,26 +38,19 @@ func attemptState(s State) string {
 	return ""
 }
 
-// attemptClosed 回傳嘗試的 PaymentIntent 是否已經結案（入帳或取消）；沒讀過的（nil）不算。
 func attemptClosed(state *string) bool {
 	return state != nil && (*state == string(model.PaymentSucceeded) || *state == string(model.PaymentCanceled))
 }
 
-// lateOutcome 是被取代的（舊的）嘗試讀到快照之後，對付款列的處置。
 type lateOutcome int
 
 const (
-	// lateRecord 只記在嘗試列，付款列不動。
 	lateRecord lateOutcome = iota
-	// lateCancel 付款列已經入帳，這個舊 PaymentIntent 還沒結案：排取消它。
 	lateCancel
-	// lateAdopt 付款列還沒入帳、舊 PaymentIntent 入帳了：付款列記成功（成功優先於取消），這個嘗試成為有效的，原本有效的那個排取消。
 	lateAdopt
-	// lateExcess 付款列已經以另一個 PaymentIntent 入帳、這個也入帳了：重複入帳，標記給後台查，不自動退款（D5 修訂：退款由訂單一方發起）。
 	lateExcess
 )
 
-// lateOutcomeOf 依付款列目前的狀態與舊嘗試的快照狀態決定處置。
 func lateOutcomeOf(row model.PaymentStatus, snap State) lateOutcome {
 	switch {
 	case snap == StateSucceeded && row == model.PaymentSucceeded:
@@ -74,12 +63,10 @@ func lateOutcomeOf(row model.PaymentStatus, snap State) lateOutcome {
 	return lateRecord
 }
 
-// newPaymentParams 是建立付款時寫「建立中」群組列的參數：金額是各訂單應收的總額，說明存在列上（payments_description_check 不接受空字串；N 張訂單時用第一張的商品名稱）。
 func newPaymentParams(id uuid.UUID, buyerID int64, orders []Order, provider string, now time.Time) store.InsertPaymentParams {
 	return store.InsertPaymentParams{ID: id, BuyerID: buyerID, Amount: totalOf(orders), Provider: provider, Description: paymentDescription(orders[0]), Now: now}
 }
 
-// totalOf 是各訂單應收的總額。
 func totalOf(orders []Order) int64 {
 	var total int64
 	for _, o := range orders {
@@ -88,7 +75,6 @@ func totalOf(orders []Order) int64 {
 	return total
 }
 
-// applyLate 處理被取代的嘗試的快照（呼叫方已鎖付款列、已把狀態記進嘗試列）：付款列只在舊 PaymentIntent 晚到成功時才動。
 func (s *Service) applyLate(ctx context.Context, q *store.Queries, locked store.PaymentPayment, att store.PaymentPaymentAttempt, snap Snapshot, startedAt time.Time) (applyResult, error) {
 	switch lateOutcomeOf(model.PaymentStatus(locked.Status), snap.State) {
 	case lateCancel:

@@ -21,8 +21,8 @@ public class CommentDeletedEvent extends BaseEvent {
 
     private Long commentId;
     private Long postId;
-    private Long deleterId;  // Who deleted (author or moderator)
-    private String reason;  // user_request, moderation
+    private Long deleterId;
+    private String reason;
 
     public static CommentDeletedEvent create(Long commentId, Long postId, Long deleterId, String reason) {
         CommentDeletedEvent event = CommentDeletedEvent.builder()

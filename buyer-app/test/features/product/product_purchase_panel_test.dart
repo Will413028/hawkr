@@ -45,8 +45,6 @@ void main() {
       expect(specs[1].containsKey('salePrice'), isFalse);
     });
 
-    // 回歸鎖：後端 `SkuItem` 只吐 camelCase。只給舊 snake 拼寫時，
-    // 正規化結果不得憑空生出特價欄 —— 任何 `sale_price` fallback 復活即轉紅。
     test('legacy snake_case sku keys are not read back', () {
       final specs = normalizeProductPurchaseSpecs(<Object?>[
         <String, dynamic>{
@@ -61,7 +59,6 @@ void main() {
       expect(specs, hasLength(1));
       expect(specs.first.containsKey('salePrice'), isFalse);
       expect(specs.first.containsKey('sale_price'), isFalse);
-      // sku_id 不再被當成 id 來源，id 落回空字串。
       expect(specs.first['id'], '');
     });
 

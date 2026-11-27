@@ -133,7 +133,6 @@ var (
 
 var interactionChannels = []model.Channel{model.ChannelInbox, model.ChannelPush}
 
-// storeCodeLoad 讀取一批參數裡店家的 store_code（一批一次查詢）；店家號碼不合法或查不到的店留 0，深連結因此留空，不讓一列壞資料拖垮整頁。
 func storeCodeLoad[P any](storeID func(P) int64) func(context.Context, Sources, []P) ([]Loaded, error) {
 	return func(ctx context.Context, src Sources, ps []P) ([]Loaded, error) {
 		ids := make([]int64, 0, len(ps))
@@ -323,7 +322,6 @@ var storeFollowed = Define(Definition[StoreFollowedParams]{
 	Example: StoreFollowedParams{EventID: exampleEventID, OccurredAt: exampleAt, StoreID: exampleStoreID, BuyerID: exampleBuyerID},
 })
 
-// 賣家端沒有評價頁，沒有深連結。
 var reviewCreated = Define(Definition[ReviewCreatedParams]{
 	Name:              "review_created",
 	Audiences:         []model.Audience{model.AudienceStore},
@@ -384,7 +382,6 @@ var postPublishedItem = Define(Definition[PostPublishedItemParams]{
 	ExampleLoaded:  exampleStore,
 })
 
-// 聊天只推播、不寫收件匣（D3）；深連結的 targetId 是對方：買家端是店家 ID，賣家端是買家 ID。
 var chatMessageBuyer = Define(Definition[ChatMessageParams]{
 	Name:              "chat_message_buyer",
 	Audiences:         []model.Audience{model.AudienceBuyer},
@@ -449,7 +446,6 @@ var productRestocked = Define(Definition[ProductRestockedParams]{
 	},
 })
 
-// contentTypes 是內容側型別（social、buyer 追蹤與補貨、review、im）。
 var contentTypes = []Entry{
 	commentCreated, commentRepliedBuyer, commentRepliedStore, commentLikedBuyer, commentLikedStore, postLiked, storeFollowed,
 	reviewCreated, postPublished, postPublishedItem, chatMessageBuyer, chatMessageStore,

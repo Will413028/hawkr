@@ -33,9 +33,6 @@ export default function BannerPopupDialog({
 					className={ctaClass}
 					rel="noopener noreferrer"
 					target="_blank"
-					// Same dismissal as the internal branch: leaving the dialog open
-					// behind a new tab means coming back to a modal the user already
-					// finished with.
 					onClick={onClose}
 				>
 					{label}

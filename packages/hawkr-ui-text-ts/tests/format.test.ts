@@ -64,7 +64,6 @@ describe("建構函式", () => {
 		expect(zhOf(sellerMeasureState(2, { kind: MeasureKind.UNSPECIFIED }))).toBe(
 			"生效中",
 		);
-		// 「停權中」只由 SUSPENSION 選出；內容下架的狀態是 ISSUED，萬一是 ACTIVE 也不能顯示成停權中。
 		expect(
 			zhOf(sellerMeasureState(2, { kind: MeasureKind.CONTENT_TAKEDOWN })),
 		).toBe("生效中");
@@ -142,7 +141,6 @@ describe("格式化", () => {
 			expect(typeof value, key).toBe("string");
 			expect((value as string).length, key).toBeGreaterThan(0);
 		}
-		// 還沒有英文的 key 用 zh-TW 的文字；之後補了英文，這一行仍成立（取得非空文字）。
 		const eng = createUiText(translator("en"));
 		expect(
 			eng(sellerMeasureKind(MeasureKind.TERMINATION) ?? commonUnknown()),

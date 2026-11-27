@@ -56,7 +56,7 @@ func TestClassifyIgnoresStatementsThatDoNotLockExistingRows(t *testing.T) {
 		"INSERT INTO seller.reports (id) VALUES ($1)",
 		"INSERT INTO seller.reports (id) VALUES ($1) ON CONFLICT DO NOTHING",
 		"SELECT pg_advisory_xact_lock(hashtextextended('seller.product_views', 0))",
-		"WITH s AS (SELECT * FROM seller.stores) SELECT * FROM s FOR UPDATE OF s", // CTE 不帶 schema，鎖的是 CTE 的結果
+		"WITH s AS (SELECT * FROM seller.stores) SELECT * FROM s FOR UPDATE OF s",
 	} {
 		got, err := Classify(sql)
 		if err != nil {
@@ -99,14 +99,12 @@ func TestCheckerAcceptsBottomUpOrderAndIgnoresStatementsOutsideTransactions(t *t
 	c.observe(a, "UPDATE buyer.buyers SET x = 1")
 	c.observe(a, "UPDATE seller.stores SET x = 1")
 	c.observe(a, "UPDATE social.posts SET x = 1")
-	c.observe(a, "UPDATE social.posts SET y = 1") // 同一層再鎖不算倒退（模組內的順序不在這裡檢查）
+	c.observe(a, "UPDATE social.posts SET y = 1")
 	c.observe(a, "commit")
 
-	// 另一條連線不在 transaction 裡：每句各自 commit，沒有順序。
 	c.observe(b, "UPDATE social.posts SET x = 1")
 	c.observe(b, "UPDATE identity.accounts SET x = 1")
 
-	// 上一個 transaction 結束之後，同一條連線的新 transaction 從頭算。
 	c.observe(a, "begin")
 	c.observe(a, "UPDATE identity.accounts SET x = 1")
 	c.observe(a, "rollback")
@@ -121,11 +119,11 @@ func TestCheckerAllowsReturningToAModuleLockedEarlierInTheSameTransaction(t *tes
 	c := NewChecker()
 	conn := new(int)
 	c.observe(conn, "begin")
-	c.observe(conn, "-- name: LockLiveAccount :one\nSELECT 1 FROM identity.accounts WHERE account_id = $1 FOR UPDATE") // 根列
+	c.observe(conn, "-- name: LockLiveAccount :one\nSELECT 1 FROM identity.accounts WHERE account_id = $1 FOR UPDATE")
 	c.observe(conn, "-- name: LockAccountStores :many\nSELECT 1 FROM seller.stores WHERE account_id = $1 FOR UPDATE")
-	c.observe(conn, "-- name: RevokeAccountRole :exec\nDELETE FROM identity.account_roles WHERE account_id = $1") // identity 已經鎖過
-	c.observe(conn, "-- name: ClearVisit :exec\nDELETE FROM buyer.visit_history WHERE buyer_id = $1")             // buyer 第一次被鎖：倒退
-	c.observe(conn, "-- name: LockBuyer :one\nSELECT 1 FROM buyer.buyers WHERE buyer_id = $1 FOR UPDATE")         // buyer 已經鎖過，不再記
+	c.observe(conn, "-- name: RevokeAccountRole :exec\nDELETE FROM identity.account_roles WHERE account_id = $1")
+	c.observe(conn, "-- name: ClearVisit :exec\nDELETE FROM buyer.visit_history WHERE buyer_id = $1")
+	c.observe(conn, "-- name: LockBuyer :one\nSELECT 1 FROM buyer.buyers WHERE buyer_id = $1 FOR UPDATE")
 	c.observe(conn, "commit")
 
 	vs := c.Violations()
@@ -141,8 +139,8 @@ func TestCheckerFlagsOrchestratorRowLockedBeforeBuyerAndSeller(t *testing.T) {
 	c.observe(conn, "begin")
 	c.observe(conn, "-- name: LockLiveAccount :one\nSELECT 1 FROM identity.accounts WHERE account_id = $1 FOR UPDATE")
 	c.observe(conn, "-- name: PendingRequest :one\nSELECT * FROM accountdeletion.deletion_requests WHERE account_id = $1 FOR UPDATE")
-	c.observe(conn, "-- name: LockBuyer :one\nSELECT 1 FROM buyer.buyers WHERE buyer_id = $1 FOR UPDATE")             // 倒退，沒有豁免
-	c.observe(conn, "-- name: LockAccountStores :many\nSELECT 1 FROM seller.stores WHERE account_id = $1 FOR UPDATE") // 倒退，沒有豁免
+	c.observe(conn, "-- name: LockBuyer :one\nSELECT 1 FROM buyer.buyers WHERE buyer_id = $1 FOR UPDATE")
+	c.observe(conn, "-- name: LockAccountStores :many\nSELECT 1 FROM seller.stores WHERE account_id = $1 FOR UPDATE")
 	c.observe(conn, "commit")
 
 	vs := c.Violations()
@@ -157,8 +155,8 @@ func TestCheckerIgnoresNonWaitingAcquisitionsAndUnknownSchemas(t *testing.T) {
 	conn := new(int)
 	c.observe(conn, "begin")
 	c.observe(conn, "UPDATE social.posts SET x = 1")
-	c.observe(conn, "SELECT 1 FROM identity.accounts FOR UPDATE SKIP LOCKED") // 不等，不會卡在別人手上
-	c.observe(conn, "UPDATE river.river_job SET state = 'available'")         // 不是模組
+	c.observe(conn, "SELECT 1 FROM identity.accounts FOR UPDATE SKIP LOCKED")
+	c.observe(conn, "UPDATE river.river_job SET state = 'available'")
 	c.observe(conn, "commit")
 	if vs := c.Violations(); len(vs) != 0 {
 		t.Fatalf("violations = %v，預期沒有", vs)
@@ -293,7 +291,7 @@ func TestClassifyOrderIsDeterministicAcrossSiblingClauses(t *testing.T) {
 		"SELECT 1 FROM (SELECT 1 FROM identity.accounts FOR UPDATE) a WHERE EXISTS (SELECT 1 FROM seller.stores FOR UPDATE)"
 	want := []Lock{{"identity", "accounts", "FOR UPDATE", true}, {"seller", "stores", "FOR UPDATE", true}, {"buyer", "buyers", "DELETE", true}}
 	for i := range 200 {
-		got, err := Classify(base + strings.Repeat(" ", i+1)) // 不同的文字，避開快取
+		got, err := Classify(base + strings.Repeat(" ", i+1))
 		if err != nil {
 			t.Fatal(err)
 		}

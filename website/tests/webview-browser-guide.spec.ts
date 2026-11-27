@@ -151,9 +151,6 @@ for (const browserCase of CASES) {
 			});
 
 			const guide = page.locator('[data-webview-guide="sheet"]');
-			// The login route streams behind Suspense: until React's reveal script
-			// runs, a hidden `body > div#S:n` copy of the page coexists with the
-			// hydrated one, so scope to the live page under `main`.
 			const googleTrigger = page.locator(
 				'main [data-webview-guide-trigger="google"]',
 			);
@@ -182,9 +179,6 @@ for (const browserCase of CASES) {
 			await expect(menuHint).toContainText(`選「${browserCase.actionLabel}」`);
 			await expect(menuHint.locator("svg")).toHaveCount(1);
 
-			// 🔴 序列取樣、且等版面定下來——見 `settledBoundingBox` 的檔頭。
-			// 三個框不並行量：`Promise.all` 會讓三次量測落在不同的取樣時點上，
-			// 而下面的 `intersectionArea` 斷言比較的正是它們之間的相對位置。
 			const hintBox = await settledBoundingBox(page, menuHint);
 			const spotlightBox = await settledBoundingBox(
 				page,

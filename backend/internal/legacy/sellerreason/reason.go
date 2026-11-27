@@ -14,7 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// legacyText 是舊契約通知的名詞來源：舊契約固定 zh-TW、預設受眾（共用文案目錄，與 api 契約的名詞同源），不隨請求語系變。
 var legacyText = uitext.For(uitext.ZhTW)
 
 // Class 是帳號停權在舊契約的種類。
@@ -59,7 +58,6 @@ func Classify(sanctions *seller.Sanctions) (Class, error) {
 
 var errNotDerived = errors.New("sellerreason：店家沒有推導過停權狀態")
 
-// adminCode 是舊契約管理員停權的「其他」原因碼：新模型的風險類型在舊契約沒有對應的原因，一律用 9603，標籤是風險類型的名稱。
 const adminCode = "9603"
 
 // Of 是帳號生效中的停權措施在舊契約的原因碼與中文標籤：有終止合作時是 9603 與最新那一個終止合作的事由名稱（優先於 RISK）；沒有終止合作而有

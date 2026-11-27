@@ -13,7 +13,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
 )
 
-// versionString 是版本號對外的不透明字串；0（沒有這個版本）是空字串。
 func versionString(v int32) string {
 	if v == 0 {
 		return ""
@@ -21,7 +20,6 @@ func versionString(v int32) string {
 	return strconv.FormatInt(int64(v), 10)
 }
 
-// codeOf 把 proto 列舉轉成模組的代碼（值名去掉前綴）；UNSPECIFIED 是空字串（沒填），不認得的數值留給模組以「不是有效的值」擋下。
 func codeOf(name, prefix string, zero bool) string {
 	if zero {
 		return ""
@@ -29,7 +27,6 @@ func codeOf(name, prefix string, zero bool) string {
 	return strings.TrimPrefix(name, prefix)
 }
 
-// timeOf 取出選填的時間戳；沒設是 nil，不是合法時間戳回 INVALID_ARGUMENT，指向 path。
 func timeOf(path string, ts *timestamppb.Timestamp) (*time.Time, error) {
 	if ts == nil {
 		return nil, nil
@@ -41,7 +38,6 @@ func timeOf(path string, ts *timestamppb.Timestamp) (*time.Time, error) {
 	return &t, nil
 }
 
-// quoteInputFromProto 把請求的報價內容轉成模組的輸入；prefix 是它在請求裡的欄位路徑（draft 或 quote）。內容的驗證（草稿只驗形狀與長度、正式回價驗完整）在模組。
 func quoteInputFromProto(q *pb.SellerQuote, prefix string) (procurement.SellerQuoteInput, error) {
 	promised, err := timeOf(prefix+".promised_delivery_time", q.GetPromisedDeliveryTime())
 	if err != nil {
@@ -63,7 +59,6 @@ func quoteInputFromProto(q *pb.SellerQuote, prefix string) (procurement.SellerQu
 	}, nil
 }
 
-// quoteInputToProto 把草稿的內容轉回 proto（沒填的欄位是零值，讓 client 預填表單）；儲存的代碼不認得是不變量被破壞。
 func quoteInputToProto(q procurement.SellerQuoteInput) (*pb.SellerQuote, error) {
 	out := &pb.SellerQuote{
 		SpecNote: q.SpecNote, OfferedQuantity: q.OfferedQuantity, OfferedQuantityUnit: q.OfferedQuantityUnit, ConversionBasis: q.ConversionBasis,

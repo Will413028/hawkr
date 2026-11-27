@@ -49,14 +49,12 @@ class SellerInformationScreen extends HookConsumerWidget {
     final termsAccepted = useState(false);
     final submitRefusal = useState<StoreOpeningBlock?>(null);
 
-    // 有措施紀錄才顯示入口；讀取失敗或沒有資料都不顯示，也不擋開店。
     final accountId = signedInAccountId(ref.watch(sessionProvider));
     final hasMeasures = accountId == null
         ? false
         : ref.watch(accountHasMeasuresProvider(accountId)).value ?? false;
 
     final needsTerms = snapshot?.hasStore != true;
-    // 還沒有店家才問能不能開店（有店家走更新流程）；讀取失敗不擋，送出時由 ApplyStore 的 ErrorReason 後備。
     final opening = needsTerms && accountId != null
         ? ref.watch(storeOpeningBlockForProvider(accountId))
         : null;
@@ -76,12 +74,9 @@ class SellerInformationScreen extends HookConsumerWidget {
       return hasName && hasAddress && termsReady;
     }
 
-    // 顯示的拒絕：開店可用性的答案有句子就用它，否則是送出被擋下的回應（兩者都沒有句子時不顯示文字，仍擋送出）。
     final refusal = openingBlock?.message != null
         ? openingBlock
         : submitRefusal.value;
-    // 輸入監聽器只在第一次 build 掛上，所以伺服器的開店答案不放進 canSubmit，在按鈕上直接判斷：
-    // 讀取中與「不能開店」（不論有沒有認得的原因）都停用。
     final canPress = canSubmit.value && openingBlock == null && !openingLoading;
 
     void checkInput() => canSubmit.value = inputReady();

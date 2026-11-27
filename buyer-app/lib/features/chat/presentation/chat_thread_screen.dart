@@ -193,7 +193,6 @@ class ChatThreadScreen extends HookConsumerWidget {
       showFloatingToast(context, message, isSuccess: false);
     }
 
-    // 只有 App 在前景且這個路由在最上面才自動標記已讀；回到可見時補標記。
     final lifecycle = useAppLifecycleState();
     final routeCurrent = ModalRoute.of(context)?.isCurrent ?? true;
     final viewing =
@@ -204,14 +203,12 @@ class ChatThreadScreen extends HookConsumerWidget {
       return null;
     }, [viewing]);
 
-    // 進入時標記目前的聊天對象，避免橫幅與前景推播重複通知。
     useEffect(() {
       final gate = ref.read(activeChatGateProvider.notifier);
       gate.enter(storeId: arg.storeId, conversationId: thread.conversationId);
       return gate.clear;
     }, [thread.conversationId]);
 
-    // 沒有對話可讀店家卡片時（對話還不存在），改用店家資料讀頭像與名稱。
     useEffect(() {
       final id = arg.storeId;
       if (id == null) return null;
@@ -226,7 +223,6 @@ class ChatThreadScreen extends HookConsumerWidget {
       return () => cancelled = true;
     }, const []);
 
-    // 對方在線狀態：載入完成後輪詢。
     useEffect(() {
       if (thread.conversationId == null) return null;
       void poll() =>
@@ -236,7 +232,6 @@ class ChatThreadScreen extends HookConsumerWidget {
       return timer.cancel;
     }, [thread.conversationId]);
 
-    // 新進來的訊息：入場動畫、未讀計數、在底部時自動捲到最新。
     ref.listen<ChatThreadState>(provider, (prev, next) {
       if (prev == null || prev.loadStatus != ChatLoadStatus.loaded) return;
       final before = prev.maxSeq;
@@ -315,7 +310,6 @@ class ChatThreadScreen extends HookConsumerWidget {
         final upload = await ref
             .read(mediaRepositoryProvider)
             .uploadImage(file: file);
-        // 伺服器在圖片就緒前沒有網址可顯示，送出中的氣泡用本機檔案的預覽。
         final preview = await localImagePreviewDataUri(file);
         await notifier.sendImage(upload.stagedToken, preview);
       } catch (e) {

@@ -69,8 +69,6 @@ function ScopeChangeCell({
 }) {
 	const { added, removed } = delegationScopeDelta(before, after);
 	const unchanged = added.length === 0 && removed.length === 0;
-	// 差異已經等於全貌時就不掛展開鈕：首次開通（before 為空 ⇒ added ≡ after）與撤回
-	// （after 為空 ⇒ removed ≡ before）沒有任何東西被收起來，那顆鈕只會白佔一行。
 	const hidesAnything = before.length > 0 && after.length > 0;
 	return (
 		<>
@@ -141,8 +139,6 @@ export default function MerchantDelegationAuthorizationPanel({
 	const [revokeOpen, setRevokeOpen] = useState(false);
 	const [notice, setNotice] = useState<string | null>(null);
 	const [historyPage, setHistoryPage] = useState(1);
-	// 一次只展開一列完整範圍（同 SessionAuditConsole 的 selectedId）：多列同時展開
-	// 就把剛剛收掉的那面高度牆又蓋回來。
 	const [expandedScopeId, setExpandedScopeId] = useState<string | null>(null);
 
 	const authorizationQuery = useQuery({
@@ -154,8 +150,6 @@ export default function MerchantDelegationAuthorizationPanel({
 	const lookup = authorizationQuery.data;
 	const authorization = lookup?.authorization ?? null;
 
-	// 歷程只在確定有授權列時才查：從未開通過的店回 9286／404，照打會在畫面上生出
-	// 一則與「尚未開通」互相矛盾的錯誤。
 	const historyQuery = useQuery({
 		queryKey: ["delegation-authorization", storeId, "history", historyPage],
 		queryFn: () =>
@@ -435,15 +429,11 @@ export default function MerchantDelegationAuthorizationPanel({
 												動作
 											</th>
 											<th scope="col">操作者</th>
-											{/* 全表唯一可收縮的那一欄（CSS 註解同此）。⚠️ 這個 class 只能掛在
-											    「一」欄上：掛兩欄會讓它們各自宣告 width:100%，auto layout 把
-											    剩餘壓力全丟給沒宣告的欄，「動作」就被壓成一字一行。 */}
+
 											<th scope="col" className="adm-audit-col-summary">
 												範圍變更
 											</th>
-											{/* 這一張的理由欄是 td:last-child ⇒ 吃到那條 nowrap，而
-											    operationReason 上限 200 字，一則長理由會被拉成一整行、
-											    把整張表推進橫捲。同一個 class 一併把它換回可換行。 */}
+
 											<th scope="col" className="adm-audit-col-reason">
 												理由
 											</th>

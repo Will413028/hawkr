@@ -47,7 +47,6 @@ public final class AfterSaleCaseStatusRules {
         if (!terminalOrRejected) {
             return true;
         }
-        // 60 / 33 申訴中視為活躍（Admin 裁決前案件凍結，訂單款項不可撥付）
         boolean appealed = isAppealed(appealState);
         if (appealed && (status == AfterSaleCaseStatus.REJECTED
                 || status == AfterSaleCaseStatus.AUTO_COMPLETED_RETURN_PENDING_TIMEOUT)) {
@@ -78,24 +77,18 @@ public final class AfterSaleCaseStatusRules {
      */
     public static PayoutBlock payoutBlock(AfterSaleCaseStatus status, String appealState) {
         if (status == null) {
-            // 讀不出 status ＝ 看不到 ⇒ 擋（deny-by-default）
             return PayoutBlock.INDEFINITE;
         }
-        // ① 確定結束：退款已完成／已發券結案（50）、買家取消（70）、確認收貨取消（71）
-        //    50 只會由 REFUND_PROCESSING(40) 或 33/60＋APPEALED 的 Admin 裁決進入，都是終局。
         if (status == AfterSaleCaseStatus.CLOSED
                 || status == AfterSaleCaseStatus.CANCELLED
                 || status == AfterSaleCaseStatus.CANCELLED_BY_CONFIRM_RECEIPT) {
             return PayoutBlock.NONE;
         }
-        // ② 尚可申訴：60 / 33 且從未申訴 ⇒ 擋到申訴截止為止（有時間界，不會永久卡死）
         if ((status == AfterSaleCaseStatus.REJECTED
                 || status == AfterSaleCaseStatus.AUTO_COMPLETED_RETURN_PENDING_TIMEOUT)
                 && AfterSaleAppealState.NONE.value().equals(nvlAppealState(appealState))) {
             return PayoutBlock.UNTIL_APPEAL_DEADLINE;
         }
-        // ③ 其餘：退款管線進行中（0/20/25/26/27/28/30/31/32/40）、
-        //    或 60/33 已申訴（等 Admin 裁決）⇒ 無時間界，等業務終結
         return PayoutBlock.INDEFINITE;
     }
 

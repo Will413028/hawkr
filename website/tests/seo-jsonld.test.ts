@@ -13,10 +13,8 @@ import {
 } from "../lib/seo/jsonld";
 import { siteUrl } from "../lib/seo/urls";
 
-// The prod flavor requires the browser API base on the web origin; a relative base is.
 process.env.NEXT_PUBLIC_API_BASE_URL = "/api/v1";
 
-// The prod flavor requires its own web origin (NEXT_PUBLIC_WEB_ORIGIN); these cases describe a deployment at this one.
 process.env.NEXT_PUBLIC_WEB_ORIGIN = "https://example.com";
 
 function withProdEnv(fn: () => void) {
@@ -122,8 +120,6 @@ test("productSchema with a single price emits a plain Offer in TWD", () => {
 		assert.equal(offer.priceCurrency, "TWD");
 		assert.equal(offer.availability, "https://schema.org/InStock");
 		assert.equal(p.description, "宜蘭三星有機紅蘿蔔，整箱 1 公斤。");
-		// The seller is the merchant, not the product's brand: no Brand is
-		// fabricated from the store name.
 		assert.equal("brand" in p, false);
 	});
 });
@@ -137,7 +133,6 @@ test("productSchema leaves availability out when the wire reports no stock", () 
 		});
 		const offer = p.offers as { price: number; availability?: string };
 		assert.equal(offer.price, 120);
-		// Unknown is not "in stock": nothing is claimed either way.
 		assert.equal("availability" in offer, false);
 	});
 });
@@ -237,7 +232,6 @@ test("sellerSchema wraps an Organization in a ProfilePage", () => {
 			image: "https://img.example/cover.jpg",
 		});
 		assert.equal(s["@type"], "ProfilePage");
-		// the seller's own text is zh-TW whatever the page locale: no language claim either way
 		assert.equal("inLanguage" in s, false);
 		const org = s.mainEntity as {
 			"@type": string;

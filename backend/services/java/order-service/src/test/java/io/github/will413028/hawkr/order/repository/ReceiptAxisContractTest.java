@@ -79,8 +79,6 @@ class ReceiptAxisContractTest {
                     return u.value()[0];
                 }
             }
-            // 🔴 找不到目標必須 FAIL 不是 SKIP：方法被改名或搬走的那天，
-            //    SKIP 會讓本測試靜默轉綠，而它守的東西已經不見了。
             throw new AssertionError("找不到帶 @Update 的方法 " + methodName
                     + "——它被改名或搬走了？本測試對「目標不存在」一律 FAIL，"
                     + "因為 SKIP 會讓守護在目標消失的那一刻靜默失效");

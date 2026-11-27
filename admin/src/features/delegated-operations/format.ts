@@ -11,8 +11,6 @@ import { DELEGATED_SESSION_STATUS_LABELS } from "./labels";
  */
 export function formatClockTime(iso: string | null): string {
 	if (!iso) return "—";
-	// 台北釘死（backend#3053 的稽查）：代行營運的時間軸是稽核用的，
-	// 讀的人在哪個時區都必須看到同一個值。
 	return formatDateTime(iso);
 }
 
@@ -108,7 +106,6 @@ export function sessionRevokedByText(
 ): string {
 	const name = revokedByAdminDisplayName;
 	const id = revokedByAdminId;
-	// 全形括號結尾後不再補半形空格；純西文/中文結尾才補。
 	const actor =
 		name && id
 			? `${name}（${id}）撤銷`

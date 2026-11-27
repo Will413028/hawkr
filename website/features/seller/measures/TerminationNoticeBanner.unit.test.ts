@@ -68,7 +68,6 @@ const scheduled = (id: string, kind = MeasureKind.TERMINATION) =>
 		basis: MeasureBasis.CONTRACT,
 		state: MeasureState.SCHEDULED,
 		period: { startTime: START },
-		// 建立時間與生效時間不差 30 天：生效時間只能讀 period.startTime。
 		createTime: timestampFromDate(new Date("2026-09-20T02:00:00Z")),
 	});
 

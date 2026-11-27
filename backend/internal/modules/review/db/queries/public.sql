@@ -1,8 +1,3 @@
--- 公開可讀的評價讀取。這個檔的每一支查詢都以同一段述詞（公開可讀：沒有未還原的隱藏、作者不在 buyer.pub_inactive_buyers()，別名 r）過濾，
--- testdata/public_predicate.sql 是那段述詞的 golden，TestEveryPublicQueryCarriesThePublicPredicate 逐支比對；
--- 沒有述詞的讀取不得放在這個檔。觀看者的封鎖另有一支查詢（匿名與有觀看者分兩支，不用 `$v IS NULL OR …` 開關）：
--- 買家之間任一方向的封鎖與觀看者封鎖店，在 keyset 之前過濾，所以被擋的列不佔頁。統計不過濾觀看者。
--- 觀看者參數寫成 `sqlc.arg(viewer_buyer_id)::bigint`：sqlc 對「pub_* 函式別名的欄位 = 裸 sqlc.arg」會誤報 table alias does not exist，加型別轉換即可。
 
 -- name: ListProductReviewsAnonymous :many
 SELECT r.* FROM review.reviews AS r
@@ -111,7 +106,6 @@ WHERE r.store_id = sqlc.arg(store_id)
   AND NOT EXISTS (SELECT 1 FROM buyer.pub_inactive_buyers() AS ib WHERE ib.buyer_id = r.buyer_id);
 
 -- name: StoreRatingStats :many
--- 只回有可見評價的店（沒有評價的店沒有列），依 store_id 升冪。
 SELECT
     r.store_id,
     COUNT(*)::bigint                          AS total_count,

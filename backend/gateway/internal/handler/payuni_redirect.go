@@ -10,28 +10,17 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// payUniRedirectForm 承載 PayUni auto-submit 中轉頁的動態欄位。
-//
-// #1394：舊實作把 client round-trip 回來的 base64 `?data=` 以 fmt.Sprintf 拼進
-// HTML，無 escape / 無來源驗證 → 反射型 XSS + open form-action。現改為 GET `?id=`
-// → gRPC 依 id 取回後端 canonical record → 這裡以 html/template context-aware escape
-// 安全 render。所有欄位值皆來自後端 canonical record（非 client 可控），並疊加
-// action host allowlist（isAllowedPayUniActionURL）作深度防禦。
 type payUniRedirectForm struct {
-	Title       string // 靜態文案（正在跳轉付款 / 開啟門市），非 client 可控
-	FormID      string // 靜態表單 id（payuniForm / storeMapForm）
-	ActionURL   string // Form POST 目標；render 前必經 host allowlist 驗證
+	Title       string
+	FormID      string
+	ActionURL   string
 	MerID       string
 	Version     string
 	EncryptInfo string
 	HashInfo    string
-	IsPlatForm  string // 已由 handler 依 canonical 值決定（payment: bool→"1"/"0"；storemap: 固定 "1"）
+	IsPlatForm  string
 }
 
-// payUniRedirectTemplate 是 auto-submit 中轉頁模板。靜態部分（spinner 動畫 CSS、
-// auto-submit JS）保持原功能；所有動態欄位走 {{.Field}}，由 html/template 依所在
-// context（action="" 的 URL context、value="" 的 attribute context、<script> 的
-// JS context）自動 escape，杜絕反射 XSS。
 var payUniRedirectTemplate = template.Must(template.New("payuniRedirect").Parse(`<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -60,8 +49,6 @@ var payUniRedirectTemplate = template.Must(template.New("payuniRedirect").Parse(
 </body>
 </html>`))
 
-// payUniActionHosts 由 pkg/payuni 的 base URL 常數推導出合法 host 白名單，避免另行
-// 硬編碼字面（§26 精神 + #1394 深度防禦）。
 var payUniActionHosts = func() map[string]struct{} {
 	hosts := make(map[string]struct{})
 	for _, base := range []string{payuni.SandboxBaseURL, payuni.ProdBaseURL} {
@@ -72,9 +59,6 @@ var payUniActionHosts = func() map[string]struct{} {
 	return hosts
 }()
 
-// isAllowedPayUniActionURL 斷言 Form POST 目標為 https 且 host 屬 PayUni 白名單。
-// 即使 actionURL 來自後端 canonical record，仍在 render 前驗證（深度防禦），
-// 阻擋 open form-action（例：http://evil.com、https://evil.com、javascript:）。
 func isAllowedPayUniActionURL(raw string) bool {
 	u, err := url.Parse(raw)
 	if err != nil {
@@ -87,8 +71,6 @@ func isAllowedPayUniActionURL(raw string) bool {
 	return ok
 }
 
-// renderPayUniRedirect 驗證 action host → html/template 安全 render 中轉頁。
-// 先 render 進 buffer 再輸出，確保驗證/render 失敗時仍能回受控錯誤頁（不半寫）。
 func renderPayUniRedirect(c *gin.Context, form payUniRedirectForm) {
 	if !isAllowedPayUniActionURL(form.ActionURL) {
 		renderPayUniRedirectError(c, http.StatusBadRequest, "無效的付款目標位址")
@@ -105,8 +87,6 @@ func renderPayUniRedirect(c *gin.Context, form payUniRedirectForm) {
 	c.String(http.StatusOK, buf.String())
 }
 
-// renderPayUniRedirectError 回受控錯誤頁（明確 4xx/5xx，非 500 leak、非空白）。
-// message 皆為靜態常數，額外 HTMLEscapeString 為 belt-and-suspenders。
 func renderPayUniRedirectError(c *gin.Context, status int, message string) {
 	c.Header("Content-Type", "text/html; charset=utf-8")
 	c.String(status, `<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><title>頁面無法顯示</title></head>`+

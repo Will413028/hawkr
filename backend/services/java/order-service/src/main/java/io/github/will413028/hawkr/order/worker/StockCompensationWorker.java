@@ -76,18 +76,14 @@ public class StockCompensationWorker {
      */
     @Scheduled(fixedDelay = 60000, initialDelay = 30000)
     public void compensate() {
-        // 處理 INIT/FAILED 的 DEDUCT 記錄
         List<StockTxRecordEntity> pendingRecords = stockTxRecordRepository.findPendingCompensation(BATCH_SIZE);
         for (StockTxRecordEntity record : pendingRecords) {
-            // issue #2294 H5：搶佔閘門在副作用（restoreStock gRPC）之前；回 0 即 skip，
-            // 一個副作用都不做（含 markManualIntervention）。
             if (!claim(record)) {
                 continue;
             }
             processCompensation(record);
         }
 
-        // 處理 FAILED 的 RESTORE 記錄
         List<StockTxRecordEntity> failedRestores = stockTxRecordRepository.findFailedRestores(BATCH_SIZE);
         for (StockTxRecordEntity record : failedRestores) {
             if (!claim(record)) {
@@ -122,7 +118,6 @@ public class StockCompensationWorker {
     }
 
     private void processCompensation(StockTxRecordEntity record) {
-        // 停損檢查
         if (record.getRetryCount() >= MAX_RETRY_COUNT) {
             stockTxRecordRepository.markManualIntervention(
                     record.getStockTxId(), record.getPhase());
@@ -152,14 +147,11 @@ public class StockCompensationWorker {
             boolean noop = StockOperationStatus.NOOP_NOT_FOUND.value().equals(response.getStatus());
 
             if (restored || noop) {
-                // restored：庫存已歸還 → 冪等寫 RESTORE 記錄（防 PK DuplicateKey，03 §8.1）。
-                // noop：因果閘門判定從未扣減 → 無庫存被還，不寫 RESTORE 記錄。
                 if (restored) {
                     stockTxRecordRepository.insertRestoreIfAbsent(record.getStockTxId(), record.getOrderNo(),
                             OrderConstants.STOCK_TX_PHASE_RESTORE, OrderConstants.STOCK_TX_STATUS_SUCCESS, "{}");
                 }
 
-                // DEDUCT 改終態 COMPENSATED → 退出掃描範圍 B，不再重撈（修死循環根因，03 §8.1）
                 stockTxRecordRepository.updateStatus(record.getStockTxId(),
                         OrderConstants.STOCK_TX_PHASE_DEDUCT, OrderConstants.STOCK_TX_STATUS_COMPENSATED);
 
@@ -182,7 +174,6 @@ public class StockCompensationWorker {
     }
 
     private void retryRestore(StockTxRecordEntity record) {
-        // 停損檢查
         if (record.getRetryCount() >= MAX_RETRY_COUNT) {
             stockTxRecordRepository.markManualIntervention(
                     record.getStockTxId(), record.getPhase());
@@ -195,7 +186,6 @@ public class StockCompensationWorker {
         log.info("StockCompensationWorker.retryRestore.start", "重試庫存歸還",
                 "stockTxId", record.getStockTxId());
 
-        // 從同一 stockTxId 的 DEDUCT 記錄取得 payload
         StockTxRecordEntity deductRecord = stockTxRecordRepository.findByStockTxIdAndPhase(
                 record.getStockTxId(), OrderConstants.STOCK_TX_PHASE_DEDUCT);
         if (deductRecord == null) {
@@ -246,7 +236,6 @@ public class StockCompensationWorker {
                             .build())
                     .toList();
         } catch (JsonProcessingException | IllegalArgumentException e) {
-            // skuId 不是 UUID（空、舊的數字 ID）也當解析失敗：不把不合法的 ID 當成有效值送去歸還。
             log.error("StockCompensationWorker.parsePayload.error", "解析 payload 失敗", e);
             return List.of();
         }

@@ -45,8 +45,6 @@ class CheckoutServiceInvoiceInputSpecTest {
         assertThat(spec.getCarrierType()).isEqualTo(InvoiceCarrierType.TAX_ID.value());
         assertThat(spec.getBuyerTaxId()).isEqualTo("77777177");
         assertThat(spec.getBuyerName()).isEqualTo("範例測試股份有限公司");
-        // TAX_ID 的 value 必須留空（§6.1.1）：帶了值會被 validateIdentityShape 判成
-        // 「前端把載具塞進了統編那一格」。
         assertThat(spec.getValue()).isEmpty();
     }
 

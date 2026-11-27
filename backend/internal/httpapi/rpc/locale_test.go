@@ -18,7 +18,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// localeProbe 記下 handler 裡讀到的請求語系；failPublic 時回錯誤，用來看錯誤回應。
 type localeProbe struct {
 	publicconnect.UnimplementedContentPublicServiceHandler
 	contentv1alpha1connect.UnimplementedContentAdminServiceHandler
@@ -41,7 +40,6 @@ func (p *localeProbe) ListBanners(ctx context.Context, _ *connect.Request[adminp
 	return connect.NewResponse(&adminpb.ListBannersResponse{}), nil
 }
 
-// localeServer 把 probe 掛在正式的 rpc.NewInterceptor 後面；admin 的呼叫者由外層 middleware 放進 ctx。
 func localeServer(t *testing.T, p *localeProbe) *httptest.Server {
 	t.Helper()
 	opt := connect.WithInterceptors(NewInterceptor(slog.New(slog.DiscardHandler)))

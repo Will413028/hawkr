@@ -13,8 +13,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-// fakeSellerAuth 模擬已登入且具賣家權限的 middleware（測試用）
-// 從 X-Account-Id header 取得 accountId，並將 accountType 設為 2（SELLER）
 func fakeSellerAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		idStr := c.GetHeader("X-Account-Id")
@@ -27,12 +25,11 @@ func fakeSellerAuth() gin.HandlerFunc {
 			accountID = accountID*10 + int64(ch-'0')
 		}
 		c.Set("accountId", accountID)
-		c.Set("accountType", 2) // SELLER
+		c.Set("accountType", 2)
 		c.Next()
 	}
 }
 
-// ==================== GetSellerProducts ====================
 
 // TestGetSellerProducts_LogoCanonicalFields proves /public/sellers/:id/products
 // exposes the canonical logo_key/logo_url fields (issue #1782/B-238) on
@@ -87,18 +84,15 @@ func TestGetSellerProducts_LogoCanonicalFields(t *testing.T) {
 	}
 	seller := records[0].(map[string]interface{})["seller"].(map[string]interface{})
 
-	// Exact-value key check
 	if got := seller["logoKey"]; got != "public/seller/777/logo.png" {
 		t.Errorf("records[0].seller.logoKey = %v, want %q", got, "public/seller/777/logo.png")
 	}
 
-	// Non-empty check for the canonical camelCase URL (49 §6.1)
 	logoURL := seller["logoUrl"]
 	if logoURL == nil || logoURL == "" {
 		t.Errorf("records[0].seller.logoUrl = %v, want a non-empty built URL", logoURL)
 	}
 
-	// Deprecated camelCase fields must still exist (additive-only)
 	if seller["logoKey"] == nil {
 		t.Errorf("records[0].seller.logoKey (deprecated) should still exist")
 	}

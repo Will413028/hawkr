@@ -8,7 +8,6 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// remoteParent 建一個「遠端、可選 sampled」的 parent context，模擬前端傳進來的 traceparent。
 func remoteParent(sampled bool) context.Context {
 	var flags trace.TraceFlags
 	if sampled {

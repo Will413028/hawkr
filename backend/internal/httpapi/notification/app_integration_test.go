@@ -32,7 +32,6 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// aliveAccounts 讓每個帳號都存活（身分模組不在這個測試的 database 裡）。
 type aliveAccounts struct{}
 
 func (aliveAccounts) ShareLockAccount(context.Context, int64) (bool, error) { return false, nil }
@@ -41,7 +40,6 @@ func (aliveAccounts) SetPreferredLocale(context.Context, int64, uitext.Locale) (
 	return false, nil
 }
 
-// fakeStores 是帳號此刻的店：只有 stores 裡的帳號有店，沒有的回 not_found（同 seller.ActingStore）。
 type fakeStores struct{ stores map[int64]int64 }
 
 func (f fakeStores) ActingStore(_ context.Context, accountID int64, c seller.Capability) (seller.Store, error) {
@@ -68,8 +66,6 @@ type stack struct {
 	now    time.Time
 }
 
-// setup 起真的 notification 模組（只套用本模組的 migration）與 interceptor 鏈；測試以 X-Test-Principal 指定登入者
-// （account:<ID> 或 admin:<ID>，沒有就是沒登入）。帳號 9 有店 90，帳號 10 有店 100。
 func setup(t *testing.T) *stack {
 	t.Helper()
 	d := pg.NewDB(t, testdb.Migrations(migrate.Module{Name: "notification", Dir: notification.Migrations()}))
@@ -111,7 +107,6 @@ func cutPrincipal(v string) (kind string, id int64, ok bool) {
 	return "", 0, false
 }
 
-// as 把請求標成帳號 account 登入；lang 非空時帶 Accept-Language。
 func as[T any](req *connect.Request[T], account int64, lang ...string) *connect.Request[T] {
 	req.Header().Set("X-Test-Principal", "account:"+strconv.FormatInt(account, 10))
 	if len(lang) > 0 {
@@ -136,7 +131,6 @@ func (s *stack) count(t *testing.T, sql string, args ...any) int {
 	return n
 }
 
-// item 在收件匣放一列；storeID 為 0 是 BUYER 列。updated 越大越新。
 func (s *stack) item(t *testing.T, account int64, audience string, storeID int64, typ, params string, updated int, readAt *time.Time) string {
 	t.Helper()
 	id := uuid.NewV7()
@@ -147,7 +141,6 @@ func (s *stack) item(t *testing.T, account int64, audience string, storeID int64
 	at := epoch.Add(time.Duration(updated) * time.Minute)
 	var announcementID *uuid.UUID
 	if audience == "STORE" {
-		// 型別註冊表裡只有公告同時屬於 STORE 受眾（停權通知只給 BUYER），STORE 列一律放成公告列：先放它指向的公告。
 		aid := uuid.NewV7()
 		s.exec(t, `INSERT INTO notification.announcements (id, audiences, title, body, admin_id, created_at)
 			VALUES ($1, ARRAY['STORE'], 'Store notice', 'Store body', 1, $2)`, aid, at)
@@ -172,7 +165,6 @@ func wantCode(t *testing.T, err error, code connect.Code) {
 	_ = errCode(t, err, code)
 }
 
-// invalidField 要求 err 是 invalid_argument 並回傳它指出的第一個欄位路徑。
 func invalidField(t *testing.T, err error) string {
 	t.Helper()
 	ce := errCode(t, err, connect.CodeInvalidArgument)

@@ -24,7 +24,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// fakeSub 是假的即時來源：測試經 events 逐筆交出事件，Next 在 ctx 取消時返回。
 type fakeSub struct {
 	events      chan im.Event
 	closed      chan struct{}
@@ -53,7 +52,6 @@ func (s *fakeSub) Revalidate(_ context.Context, p im.Party) error {
 
 func (s *fakeSub) Close() { s.closeOnce.Do(func() { close(s.closed) }) }
 
-// fakeStreams 記下 Subscribe 收到的 Party 與游標。
 type fakeStreams struct {
 	mu      sync.Mutex
 	sub     *fakeSub
@@ -80,7 +78,6 @@ func (f *fakeStreams) snapshot() (int, im.Party, map[uuid.UUID]int64) {
 	return f.calls, f.party, f.cursors
 }
 
-// fakeAuth 是重新驗證的來源：記下收到的 token。
 type fakeAuth struct {
 	mu     sync.Mutex
 	err    error
@@ -97,7 +94,6 @@ func (f *fakeAuth) Authenticate(_ context.Context, token string) (identity.Authe
 	return identity.Authenticated{Principal: identity.Principal{Kind: identity.PrincipalAccount, ID: callerAccount}}, nil
 }
 
-// streamEnv 是經真的 Connect handler 與 httptest server 的串流環境（身分以中介層放進 ctx，與入口的 withSession 等價）。
 type streamEnv struct {
 	*env
 	streams *fakeStreams
@@ -124,7 +120,7 @@ func newStreamEnv(t *testing.T, store *seller.Store) *streamEnv {
 	}))
 	t.Cleanup(srv.Close)
 	hc := *srv.Client()
-	hc.Timeout = 5 * time.Second // 只防測試卡死：任何讓串流沒有回應的 mutant 都在這裡變成失敗
+	hc.Timeout = 5 * time.Second
 	se.client = chatv1alpha1connect.NewChatAppServiceClient(&hc, srv.URL)
 	return se
 }
@@ -157,7 +153,6 @@ func reasonFromClient(err error) string {
 	return ""
 }
 
-// open 開買家串流並收下 Ready；sub 用 push 交出事件。
 func (se *streamEnv) openBuyer(t *testing.T, cursors map[string]int64) *connect.ServerStreamForClient[pb.StreamEventsResponse] {
 	t.Helper()
 	req := connect.NewRequest(&pb.StreamEventsRequest{Cursors: cursors})
@@ -173,7 +168,7 @@ func (se *streamEnv) push(t *testing.T, ev im.Event) {
 	t.Helper()
 	select {
 	case se.streams.sub.events <- ev:
-	case <-time.After(5 * time.Second): // 只防測試卡死
+	case <-time.After(5 * time.Second):
 		t.Fatal("串流沒有取走事件")
 	}
 }
@@ -190,7 +185,7 @@ func waitClosed(t *testing.T, s *fakeSub) {
 	t.Helper()
 	select {
 	case <-s.closed:
-	case <-time.After(5 * time.Second): // 只防測試卡死
+	case <-time.After(5 * time.Second):
 		t.Fatal("handler 返回前沒有呼叫 Subscription.Close")
 	}
 }
@@ -383,7 +378,7 @@ func TestStreamGuardReauthenticatesWithTheRequestTokenAndRevalidatesTheParty(t *
 	select {
 	case p := <-se.streams.sub.revalidated:
 		assertBuyerParty(t, p)
-	case <-time.After(5 * time.Second): // 只防測試卡死
+	case <-time.After(5 * time.Second):
 		t.Fatal("重驗成功後沒有呼叫 Revalidate")
 	}
 	se.auth.mu.Lock()

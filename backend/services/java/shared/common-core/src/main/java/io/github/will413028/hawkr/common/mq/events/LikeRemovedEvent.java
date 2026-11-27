@@ -21,7 +21,7 @@ public class LikeRemovedEvent extends BaseEvent {
 
     private Long likeId;
     private Long likerId;
-    private String targetType;  // POST, COMMENT
+    private String targetType;
     private Long targetId;
 
     public static LikeRemovedEvent create(Long likeId, Long likerId, String targetType, Long targetId) {

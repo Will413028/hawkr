@@ -37,7 +37,6 @@ func TestCodeMetaProjectionMatchesTheModule(t *testing.T) {
 	}
 }
 
-// codeMetaSection 回傳 CodeMeta Markdown 裡 `## name` 那一段的擁有者屬性與表格的 Value 欄。
 func codeMetaSection(md, name string) (owner string, values []string) {
 	lines := strings.Split(md, "\n")
 	start := slices.Index(lines, "## "+name)

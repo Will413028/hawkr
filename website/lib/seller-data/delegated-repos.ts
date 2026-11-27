@@ -196,8 +196,6 @@ export function mapDelegatedProductItem(raw: unknown): SellerProductListItem {
 		stock: numOrUndefined(r.stockQty),
 		sales_count: numOrUndefined(r.salesCount),
 		status: str(r.status),
-		// D5：狀態文字一律是 CodeMeta 的 Label（4004＝`啟用`，不是意譯的「上架中」），
-		// 而後端已經在 DTO 裡送了它。
 		status_label: str(r.statusLabel),
 	};
 }
@@ -296,7 +294,6 @@ export function createDelegatedProductRepo(
 			const records = Array.isArray(data.records) ? data.records : [];
 			return {
 				records: records.map(mapDelegatedProductItem),
-				// 數字對外一律 string（`"total": "12"`），Number() 之後才是這裡的契約。
 				total: Number(data.total ?? records.length),
 				page: Number(data.page ?? page),
 				pageSize: Number(data.pageSize ?? pageSize),
@@ -340,7 +337,6 @@ export function createDelegatedProductRepo(
 			const env = await fetcher<unknown>(root, {
 				method: "POST",
 				json: mutationBody(
-					// 只取兩欄：整個 meta 進來會把 expectedVersion 一起帶進 body。
 					{
 						operationReason: checked.operationReason,
 						notifySeller: checked.notifySeller,
@@ -359,9 +355,6 @@ export function createDelegatedProductRepo(
 				),
 				idempotencyKey: newIdempotencyKey(),
 			});
-			// ⚠️ 建立後的資源在 `resource` 之下（統一 mutation envelope）。直接讀頂層
-			// `data.productId` 拿到的是 `undefined`：沒有例外、HTTP 200、稽核照樣
-			// SUCCEEDED，只有接續的 `/publish` 被靜默跳過 —— 貼文那一面真的發生過。
 			const data = asRecord(env.data);
 			return {
 				id: str(mutationResource(data).productId),
@@ -385,9 +378,6 @@ export function createDelegatedProductRepo(
 					idempotencyKey: newIdempotencyKey(),
 				},
 			);
-			// 上架也好下架也好，每一次都把版本推進一格。不帶它回去，同一次載入內
-			// 接著做的第二次上下架就拿著過期的 `expectedVersion` 送出 ⇒ 必 9266
-			// （`ProductWriteResult`）。
 			return { version: str(asRecord(env.data).version) };
 		},
 
@@ -404,7 +394,6 @@ export function createDelegatedProductRepo(
 			}
 			const env = await fetcher<unknown>(`${root}/batch-unpublish`, {
 				method: "POST",
-				// notifySeller 是整批一個旗標、不逐項（L3126）。
 				json: mutationBody(
 					{
 						operationReason: checked.operationReason,
@@ -442,8 +431,6 @@ export function mapDelegatedPost(raw: unknown, storeId: string): PostListItem {
 	return {
 		id: str(r.postId) ?? "",
 		sellerId: storeId,
-		// 代行 DTO 沒有 storeCode／店名／頭像：那是買家面的展示欄，代行的貼文列表
-		// 是店家自己的內容管理視圖，不渲染店面連結。空字串是既有契約的「查不到」值。
 		storeCode: "",
 		sellerName: "",
 		logoKey: "",
@@ -451,8 +438,6 @@ export function mapDelegatedPost(raw: unknown, storeId: string): PostListItem {
 		imageKeys: Array.isArray(r.imageKeys) ? (r.imageKeys as string[]) : [],
 		tags: Array.isArray(r.tags) ? (r.tags as string[]) : [],
 		product: null,
-		// 互動計數不在代行 DTO 內。0 在這裡是「沒有這個數字」的佔位，而列表本來就
-		// 不以它排序或篩選；渲染端在代行模式下不畫互動列（§13 定案）。
 		commentCount: 0,
 		likeCount: 0,
 		shareCount: 0,
@@ -465,8 +450,6 @@ export function mapDelegatedPost(raw: unknown, storeId: string): PostListItem {
 			? { takedownMeasureId: String(r.takedownMeasureId) }
 			: {}),
 		...(str(r.version) ? { etag: String(r.version) } : {}),
-		// 草稿與已發布在列表上原本長得一樣（草稿沒有任何標記），而代行者正是靠這個
-		// 列表判斷這家店的經營狀態。上游 backend#2470 一系列補了這一欄。
 		...(str(r.publishStatus) ? { publishStatus: String(r.publishStatus) } : {}),
 	};
 }
@@ -568,8 +551,6 @@ export function createDelegatedPostRepo(
 				}),
 				idempotencyKey: newIdempotencyKey(),
 			});
-			// 代行回 `resource.postId`（string TSID）＋頂層 `version`；兩者都是接著
-			// 打 `/publish` 的必要輸入 —— 那一支的 `expectedVersion` 沒有第二個來源。
 			const data = asRecord(env.data);
 			const postId = mutationResource(data).postId;
 			return {

@@ -47,7 +47,6 @@ class PushNotificationManager {
   /// （init / requestPermission / getToken / onUserLoggedIn）全部 no-op。
   static bool e2eDisabled = false;
 
-  // ── 依賴 ──────────────────────────────────────────────────
 
   /// 第一次使用時才取 [FirebaseMessaging.instance]：Firebase 沒有設定時它會拋
   /// `core/no-app`，所有入口先以 [isFirebaseInitialized] 擋掉。
@@ -57,7 +56,6 @@ class PushNotificationManager {
   NotificationDeviceRegistrar? _registrar;
   ProviderContainer? _container;
 
-  // ── 狀態 ──────────────────────────────────────────────────
 
   /// session 層通知的登入狀態（[onUserLoggedIn] / [onUserLoggedOut]）。manager 不持有 session token。
   bool _isUserLoggedIn = false;
@@ -102,7 +100,6 @@ class PushNotificationManager {
     const [],
   );
 
-  // ── FCM 訊息總線（供 UI 層監聽刷新） ─────────────────────
   final StreamController<RemoteMessage> _inboxController =
       StreamController<RemoteMessage>.broadcast();
 
@@ -110,13 +107,11 @@ class PushNotificationManager {
   /// UI 層（通知頁、訂單頁等）訂閱後可即時刷新列表。
   Stream<RemoteMessage> get onInboxMessage => _inboxController.stream;
 
-  // ── StreamSubscription ────────────────────────────────────
 
   StreamSubscription<RemoteMessage>? _onMessageSub;
   StreamSubscription<RemoteMessage>? _onMessageOpenedSub;
   StreamSubscription<String>? _onTokenRefreshSub;
 
-  // ── 初始化 ────────────────────────────────────────────────
 
   /// 初始化推播通知，在 main.dart runApp() 之前呼叫
   Future<void> init({bool requestPermissionOnInit = true}) async {
@@ -137,29 +132,22 @@ class PushNotificationManager {
     try {
       HKLog.logI('[FCM] 開始初始化');
 
-      // iOS 前台通知顯示選項
-      // alert:false → 前台時由 Flutter Overlay Banner 接管，抑制 iOS 系統通知
-      // 後台/終止狀態下，OS 依 notification 欄位顯示系統通知（可見通知，不經背景 isolate）
       await _messaging.setForegroundNotificationPresentationOptions(
         alert: false,
         badge: true,
         sound: false,
       );
 
-      // 設置監聽器
       _setupListeners();
 
-      // 檢查冷啟動來源
       await _checkInitialLaunch();
 
       _initialized = true;
       HKLog.logI('[FCM] 初始化完成');
 
       if (requestPermissionOnInit) {
-        // 呼叫端可延後到啟動過場結束後再詢問，避免權限視窗打斷品牌動畫。
         await requestPermission();
 
-        // 取得 FCM Token（供 Debug Overlay 顯示及裝置註冊使用）
         await getToken();
       }
     } catch (e, s) {
@@ -167,21 +155,17 @@ class PushNotificationManager {
     }
   }
 
-  // ── 監聽器 ────────────────────────────────────────────────
 
   void _setupListeners() {
-    // Token 更新
     _onTokenRefreshSub = _messaging.onTokenRefresh.listen((newToken) {
       HKLog.logI('[FCM] Token 已更新');
       _fcmToken = newToken;
       _registerDevice(newToken);
     }, onError: (err) => HKLog.logE('[FCM] Token 更新錯誤', err));
 
-    // 前台訊息
     _onMessageSub = FirebaseMessaging.onMessage.listen((m) {
       HKLog.logD('[FCM] onMessage: ${m.notification?.title}');
 
-      // 過濾 Firebase Auth 靜默推播（Phone Auth 專用，由原生 SDK 處理）
       if (m.data.containsKey('com.google.firebase.auth')) return;
 
       _recordDebugMessage(m, source: 'onMessage');
@@ -189,7 +173,6 @@ class PushNotificationManager {
       _inboxController.add(m);
     });
 
-    // 後台點擊（App 在後台時，用戶點擊通知將 App 帶回前台）
     _onMessageOpenedSub = FirebaseMessaging.onMessageOpenedApp.listen((m) {
       HKLog.logD('[FCM] onMessageOpenedApp: ${m.notification?.title}');
       _recordDebugMessage(m, source: 'onMessageOpenedApp');
@@ -200,7 +183,6 @@ class PushNotificationManager {
     HKLog.logD('[FCM] 監聽器設置完成');
   }
 
-  // ── 冷啟動檢查 ────────────────────────────────────────────
 
   Future<void> _checkInitialLaunch() async {
     final initialMessage = await _messaging.getInitialMessage();
@@ -212,7 +194,6 @@ class PushNotificationManager {
     }
   }
 
-  // ── 權限 & Token ──────────────────────────────────────────
 
   /// 請求通知權限
   Future<AuthorizationStatus> requestPermission({
@@ -261,7 +242,6 @@ class PushNotificationManager {
     }
   }
 
-  // ── 裝置註冊 ──────────────────────────────────────────────
 
   /// 向後端註冊裝置 FCM Token
   ///
@@ -281,12 +261,10 @@ class PushNotificationManager {
     }
   }
 
-  // ── 訊息處理 ──────────────────────────────────────────────
 
   /// 前台訊息處理：顯示 Overlay Banner。標題、內文與圖片都是伺服器組好的（FCM `notification` 欄位），
   /// 不在這裡組字。
   void _handleForegroundMessage(RemoteMessage message) {
-    // 狀態重讀提示不依賴有沒有可見文字，先叫訂單、售後畫面重讀。
     dispatchStateRefreshHints(stateRefreshHintsFromPush(message.data));
     if (_isViewingChatOf(message.data)) {
       HKLog.logD(
@@ -344,7 +322,6 @@ class PushNotificationManager {
 
   /// 後台點擊 / 冷啟動訊息處理
   void _handleMessageOpenedApp(RemoteMessage message) {
-    // 非 prod 下，含 "Test" 關鍵字的訊息直接彈 Dialog 展示 payload
     if (F.appFlavor != Flavor.prod && _isTestMessage(message)) {
       _showTestDialog(message);
       return;
@@ -352,7 +329,6 @@ class PushNotificationManager {
     _onNotificationTapped(message.data, message.messageId);
   }
 
-  // ── Overlay Banner ────────────────────────────────────────
 
   /// 顯示 App 內前台通知 Banner（同時只顯示一張，舊的自動替換）
   void _showBanner({
@@ -402,7 +378,6 @@ class PushNotificationManager {
     Future.delayed(const Duration(seconds: 5), removeSafely);
   }
 
-  // ── Debug ─────────────────────────────────────────────────
 
   /// 記錄訊息到 debug bus（僅非 prod，最多保留 50 條）
   void _recordDebugMessage(RemoteMessage message, {required String source}) {
@@ -542,7 +517,6 @@ class PushNotificationManager {
         ),
       );
 
-  // ── 生命週期 ──────────────────────────────────────────────
 
   /// 用戶登入後呼叫：取得 Token 並向後端註冊裝置
   Future<void> onUserLoggedIn() async {

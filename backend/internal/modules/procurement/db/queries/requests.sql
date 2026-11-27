@@ -3,31 +3,25 @@ INSERT INTO procurement.requests (id, buyer_id, status, created_at, updated_at)
 VALUES (@id, @buyer_id, 'CLARIFYING', @now, @now);
 
 -- name: LockRequestForBuyer :one
--- 鎖需求列（在現行版本之後鎖）：不經 run 的寫入（SubmitAnswer、Rewind、ToggleSelection）與搜尋提交、TURN 提交串行。
 SELECT * FROM procurement.requests WHERE id = @id AND buyer_id = @buyer_id FOR UPDATE;
 
 -- name: GetRequestForBuyer :one
--- 不屬於呼叫者的需求與不存在的回同一個沒有列（呼叫端回 NOT_FOUND）。
 SELECT * FROM procurement.requests WHERE id = @id AND buyer_id = @buyer_id;
 
 -- name: SetRequestStatus :execrows
--- 條件式轉移（S2：requests 沒有 version）：只有目前狀態是 from_status 時才改。
 UPDATE procurement.requests SET status = @status, updated_at = @now
 WHERE id = @id AND buyer_id = @buyer_id AND status = @from_status;
 
 -- name: SetRequestStatusFromAny :execrows
--- 條件式轉移到 to：目前狀態在 from_statuses 之內才改（搜尋成功時來源可以是 REQUIREMENT_READY 或 MATCHING）。
 UPDATE procurement.requests SET status = @to_status, updated_at = @now
 WHERE id = @id AND buyer_id = @buyer_id AND status = ANY(@from_statuses::text[]);
 
 -- name: LockActiveRevision :one
--- 鎖需求的現行版本列：候選搜尋的提交在 run 之後、需求列之前鎖它，與 TURN 的版本寫入（取代現行版本）串行；等鎖期間現行版本被取代時沒有列。
 SELECT v.* FROM procurement.request_revisions v WHERE v.request_id = @request_id AND v.status = 'ACTIVE'
   AND EXISTS (SELECT 1 FROM procurement.requests r WHERE r.id = v.request_id AND r.buyer_id = @buyer_id)
 FOR UPDATE OF v;
 
 -- name: InsertRevision :execrows
--- 經擁有的需求寫入：不屬於 buyer_id 的需求回 0 列，呼叫端回 NOT_FOUND。
 INSERT INTO procurement.request_revisions (
     id, request_id, revision_no, parent_revision_id, status,
     item, item_resolution_kind, item_resolution_label, item_resolution_category_id, quantity, unit, packaging,
@@ -40,7 +34,6 @@ FROM procurement.requests r
 WHERE r.id = @request_id AND r.buyer_id = @buyer_id;
 
 -- name: SupersedeActiveRevision :execrows
--- 新版本寫入前先把現行版本轉成 SUPERSEDED（partial unique 擋雙頭）。
 UPDATE procurement.request_revisions v SET status = 'SUPERSEDED'
 WHERE v.request_id = @request_id AND v.status = 'ACTIVE'
   AND EXISTS (SELECT 1 FROM procurement.requests r WHERE r.id = v.request_id AND r.buyer_id = @buyer_id);
@@ -54,7 +47,6 @@ SELECT * FROM procurement.request_revisions v WHERE v.id = @id AND v.request_id 
   AND EXISTS (SELECT 1 FROM procurement.requests r WHERE r.id = v.request_id AND r.buyer_id = @buyer_id);
 
 -- name: NextRevisionNo :one
--- 從需求出發：需求不屬於 buyer_id（或不存在）時沒有列（ErrNoRows），不會被聚合函數補成一列。
 SELECT (COALESCE(MAX(v.revision_no), 0) + 1)::int AS next_no
 FROM procurement.requests r
 LEFT JOIN procurement.request_revisions v ON v.request_id = r.id
@@ -74,7 +66,6 @@ VALUES (@id, @buyer_id, @request_id, @now, @now);
 SELECT * FROM procurement.conversations WHERE id = @id AND buyer_id = @buyer_id AND deleted_at IS NULL;
 
 -- name: GetConversationByRequest :one
--- 一個需求最多一個對話（conversations_request 唯一）；已刪除的對話不回（呼叫端回 NOT_FOUND）。
 SELECT * FROM procurement.conversations WHERE request_id = @request_id AND buyer_id = @buyer_id AND deleted_at IS NULL;
 
 -- name: ListConversations :many
@@ -84,23 +75,19 @@ ORDER BY updated_at DESC, id DESC
 LIMIT @page_size;
 
 -- name: ListConversationsAfter :many
--- 第一頁之後的頁：keyset (updated_at DESC, id DESC)，走索引 conversations_buyer_active；游標是上一頁最後一列的 (updated_at, id)。
 SELECT * FROM procurement.conversations
 WHERE buyer_id = @buyer_id AND deleted_at IS NULL AND (updated_at, id) < (@after_updated_at::timestamptz, @after_id::uuid)
 ORDER BY updated_at DESC, id DESC
 LIMIT @page_size;
 
 -- name: GetConversationIncludingDeleted :one
--- 只用來分辨「自己的、已刪除」與「不存在或不是自己的」：刪除重送回成功，後者回 NOT_FOUND。
 SELECT * FROM procurement.conversations WHERE id = @id AND buyer_id = @buyer_id;
 
 -- name: RenameConversation :execrows
--- 目標狀態的方法（S4）：重送結果相同，不建收據。
 UPDATE procurement.conversations SET title = @title, title_source = 'USER', updated_at = @now
 WHERE id = @id AND buyer_id = @buyer_id AND deleted_at IS NULL;
 
 -- name: SoftDeleteConversation :execrows
--- 目標狀態的方法（S4）：已刪除的不再更新時間，重送結果相同。
 UPDATE procurement.conversations SET deleted_at = @now, updated_at = @now
 WHERE id = @id AND buyer_id = @buyer_id AND deleted_at IS NULL;
 
@@ -109,7 +96,6 @@ UPDATE procurement.conversations SET last_message_preview = @preview, updated_at
 WHERE id = @id AND buyer_id = @buyer_id AND deleted_at IS NULL;
 
 -- name: InsertTurn :execrows
--- 冪等鍵在實體上（S4）：同一位買家的同一個 client_request_id 已有輪次時回 0 列，呼叫端改讀既有的輪次。
 INSERT INTO procurement.turns (
     id, request_id, conversation_id, buyer_id, result_revision_id, source,
     buyer_message, assistant_reply, steps, recorded_this_turn, optional_streak, skipped_slots, turn_result, command_slot, client_request_id, created_at)
@@ -125,10 +111,8 @@ SELECT * FROM procurement.turns WHERE buyer_id = @buyer_id AND client_request_id
 SELECT * FROM procurement.turns WHERE request_id = @request_id AND buyer_id = @buyer_id ORDER BY created_at, id;
 
 -- name: GetLatestTurnByRequest :one
--- 上一輪的選填進度（optional_streak、skipped_slots）從這裡讀；沒有輪次回 ErrNoRows（新需求）。
 SELECT * FROM procurement.turns WHERE request_id = @request_id AND buyer_id = @buyer_id ORDER BY created_at DESC, id DESC LIMIT 1;
 
 -- name: SetConversationAutoTitle :exec
--- 自動標題只在買家沒改過標題（title_source = 'AUTO'）時更新；買家改名之後不覆寫。
 UPDATE procurement.conversations SET title = @title, updated_at = @now
 WHERE id = @id AND buyer_id = @buyer_id AND deleted_at IS NULL AND title_source = 'AUTO';

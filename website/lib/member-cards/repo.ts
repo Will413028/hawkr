@@ -44,11 +44,7 @@ export function normalizeMemberCard(input: unknown): MemberCard {
 	return {
 		sellerId: String(raw.sellerId ?? ""),
 		sellerName: String(raw.sellerName ?? ""),
-		// B-238: member-card seller identity uses only the canonical URL.
 		sellerLogo: typeof raw.logoUrl === "string" ? raw.logoUrl.trim() : "",
-		// §231: the bare objectKey is the SSOT. The paired `coverUrl` is
-		// `buildURL(base, CoverKey)` (member_card.go:20-21) — derived from this
-		// key, so reading it as a fallback could only ever mask a contract break.
 		coverUrl: String(raw.coverKey ?? ""),
 		storeCode: String(raw.storeCode ?? ""),
 		totalSpending: String(raw.totalSpending ?? "0"),

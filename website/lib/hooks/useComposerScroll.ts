@@ -97,8 +97,6 @@ const AXES: Record<ComposerAxis, AxisOps> = {
 		scrollTo: (el, next) => el.scrollTo({ left: next, behavior: "smooth" }),
 		viewport: (el) => el.clientWidth,
 		content: (el) => el.scrollWidth,
-		// Advance by most of a screenful, keeping a sliver of overlap so the eye
-		// can carry the sentence across the jump.
 		stride: (el) => Math.max(48, el.clientWidth * 0.6),
 		caretExtent: () => CARET_LOOKAHEAD_PX,
 		caret: (m, style) =>
@@ -107,7 +105,6 @@ const AXES: Record<ComposerAxis, AxisOps> = {
 	},
 };
 
-/* ── Idle reveal ────────────────────────────────────────────────────────── */
 
 /**
  * A one-line box cannot show an overflowing draft, so when the composer is
@@ -148,14 +145,11 @@ function useIdleReveal(
 		const step = () => {
 			if (stopped || document.activeElement === el) return;
 			const maxScroll = ops.content(el) - ops.viewport(el);
-			// One stride further, or back to the start once the end has been held.
 			const atEnd = ops.get(el) >= maxScroll - 1;
 			const next = atEnd ? 0 : Math.min(ops.get(el) + stride, maxScroll);
 			ops.scrollTo(el, next);
 			timer = window.setTimeout(
 				step,
-				// The end earns the longer pause — it carries whatever the buyer
-				// typed most recently.
 				next >= maxScroll - 1 ? END_HOLD_MS : LINE_HOLD_MS,
 			);
 		};
@@ -170,7 +164,6 @@ function useIdleReveal(
 			timer = window.setTimeout(step, IDLE_START_MS);
 		};
 
-		// Any sign of attention cancels the motion and hands the scroll back.
 		el.addEventListener("focus", stop);
 		el.addEventListener("pointerenter", stop);
 		el.addEventListener("pointerdown", stop);
@@ -202,23 +195,16 @@ function measureCaret(
 		mirror = document.createElement("div");
 		mirror.setAttribute("aria-hidden", "true");
 		marker = document.createElement("span");
-		// Zero-width space: occupies a caret position without adding width.
 		marker.textContent = "​";
 		document.body.appendChild(mirror);
 	}
 
-	// No padding and no border on the mirror, so the offsets come back purely
-	// content-relative; the textarea's own padding is added back by the axis.
-	// Copying the padding onto the mirror instead made `offsetTop` include it
-	// and the caret landed ~11px off.
 	mirror.style.cssText =
 		"position:absolute;top:-9999px;left:0;visibility:hidden;pointer-events:none;" +
 		"margin:0;padding:0;border:0;box-sizing:content-box;" +
 		`font:${style.font};letter-spacing:${style.letterSpacing};` +
 		`text-transform:${style.textTransform};` +
 		AXES[axis].mirrorCss(el, style);
-	// Everything up to the caret, then the marker: the marker sits exactly
-	// where the caret does.
 	mirror.textContent = el.value.slice(0, el.selectionEnd);
 	mirror.appendChild(marker);
 
@@ -234,9 +220,6 @@ export function useComposerScroll(
 ): void {
 	useIdleReveal(ref, value, axis);
 
-	// While an IME is composing, the committed value and the caret disagree
-	// (注音 / 拼音 candidates are still provisional). Scrolling on those
-	// intermediate states fights the input method, so hold until it commits.
 	const composingRef = React.useRef(false);
 
 	React.useEffect(() => {
@@ -256,13 +239,9 @@ export function useComposerScroll(
 		};
 	}, [ref]);
 
-	// Layout effect: the scroll lands in the same frame as the character that
-	// caused it, so the caret never flashes out of view.
 	// biome-ignore lint/correctness/useExhaustiveDependencies: value is the re-run trigger, not a value read inside — the text itself lives in the DOM node. It must stay: React's write to `.value` is what resets the scroll offset, and this is what undoes it.
 	React.useLayoutEffect(() => {
 		const el = ref.current;
-		// No caret to follow when the composer isn't focused, and nothing to
-		// measure when it has no layout box.
 		if (!el || composingRef.current) return;
 		if (document.activeElement !== el || el.clientWidth === 0) return;
 

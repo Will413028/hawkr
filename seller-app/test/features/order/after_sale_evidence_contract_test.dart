@@ -48,7 +48,6 @@ void main() {
     });
 
     test('回的是 objectKey 而不是組好的顯示 URL', () {
-      // SSOT 是 key；顯示 URL 交回 buildImageUrl 唯一組裝入口（49 §6.1）。
       final keys = buyerIssueEvidenceImageKeys([_decode(_realEvidenceJson)]);
       expect(keys.single.startsWith('http'), isFalse);
     });
@@ -79,10 +78,6 @@ void main() {
       ]);
     });
 
-    // ── 防復發：已刪的候選鍵單獨給值，必須解不出任何圖 ──────────────
-    //
-    // 這是本組測試真正的鑑別力所在。任何一個 fallback 復活，
-    // 對應那條就會從 isEmpty 變成有值而轉紅。
     test('已刪的 4 個圖片候選鍵單獨給值都解不出圖', () {
       for (final deadKey in const ['url', 'images', 'imageUrls', 'photoUrls']) {
         final evidence = <String, dynamic>{
@@ -168,9 +163,6 @@ void main() {
     });
 
     test('unitPrice / listPrice / shareDiscount 在售後端點恆為空', () {
-      // 不是 bug，是契約差異：Gateway 的售後 item DTO 沒有這三個欄位
-      // （訂單 item 才有）。寫成測試是為了讓「哪天後端補上了」這件事
-      // 由這條轉紅來通知，而不是靠人回頭發現 fallback 一直沒被用到。
       final item = AfterSaleItem.fromJson(_decode(_realItemJson));
       expect(item.unitPrice, isEmpty);
       expect(item.listPrice, isEmpty);

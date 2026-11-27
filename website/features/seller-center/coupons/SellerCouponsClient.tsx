@@ -75,7 +75,6 @@ export default function SellerCouponsClient() {
 	const error =
 		deleteError ?? (query.error instanceof Error ? query.error.message : null);
 
-	// Optimistically drop the row from the cache; roll back if the delete fails.
 	const deleteMutation = useMutation({
 		mutationFn: (id: string) => deleteSellerCoupon(id),
 		onMutate: async (id: string) => {

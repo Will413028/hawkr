@@ -76,7 +76,6 @@ class OrderRefundFinalizedOutboxTxIT {
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-        // application.yml 的 spring.flyway.* 指向本機真實 hawkr_order；不覆寫會跑到那裡去
         registry.add("spring.flyway.url", POSTGRES::getJdbcUrl);
         registry.add("spring.flyway.user", POSTGRES::getUsername);
         registry.add("spring.flyway.password", POSTGRES::getPassword);
@@ -147,7 +146,6 @@ class OrderRefundFinalizedOutboxTxIT {
         try {
             TsidUtil.init(300, 0);
         } catch (IllegalStateException ignored) {
-            // 已初始化
         }
     }
 
@@ -181,7 +179,6 @@ class OrderRefundFinalizedOutboxTxIT {
                 "SELECT payload FROM order_outbox WHERE aggregate_id = ?", String.class, ORDER_NO))
                 .contains("\"refund_ref\":\"AS_CANCEL_CXL_IT_1\"")
                 .contains("\"refund_source\":\"SELLER_CANCEL\"");
-        // E3 同時補上了那筆從來沒被寫過的資金流水
         assertThat(financialLogCount()).isEqualTo(1);
     }
 

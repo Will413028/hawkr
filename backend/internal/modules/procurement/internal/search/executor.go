@@ -21,14 +21,12 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
-// 需求的狀態（與 schema 的 CHECK 相同）。
 const (
 	statusClarifying       = "CLARIFYING"
 	statusRequirementReady = "REQUIREMENT_READY"
 	statusMatching         = "MATCHING"
 )
 
-// searchable 是可以開始或完成搜尋的需求狀態。
 var searchable = []string{statusRequirementReady, statusMatching}
 
 // Searchable 回傳需求狀態是否可以開始或完成搜尋；詢價發布預覽與執行用同一個判斷（A9-D35）。
@@ -84,14 +82,11 @@ func (e Executor) Execute(ctx context.Context, r store.ProcurementAgentRun) erro
 	return e.commit(ctx, ld, f.hits)
 }
 
-// found 是 transaction 外的搜尋結果：確認的分類已不是末層，或候選命中。
 type found struct {
 	hits         []candidate.Hit
 	categoryGone bool
 }
 
-// find 在 transaction 外做分類確認與搜尋。分類一律以「不早於候選集所指版本建立時間（notBefore）」的新鮮分類樹確認：
-// 快取的樹可能早於分類的建立，過期或較舊的否定答案若直接清掉買家確認的分類會誤清，肯定答案也不能信任過期很久的快取；拿不到這樣的樹就回錯誤（run 收斂 SEARCH_FAILED，不清解析）。
 func (e Executor) find(ctx context.Context, buyerID int64, q candidate.Query, notBefore time.Time) (found, error) {
 	if q.CategoryID != uuid.Nil() {
 		_, leaf, err := e.Resolver.LeafAsOf(ctx, q.CategoryID, notBefore)
@@ -112,7 +107,6 @@ func (e Executor) find(ctx context.Context, buyerID int64, q candidate.Query, no
 	return found{hits: hits}, nil
 }
 
-// ctxOr 在 ctx 已結束時回 ctx 的錯誤（Dispatcher 依它收斂成 WORKER_LOST 或 CANCELLED），否則原樣回傳。
 func ctxOr(ctx context.Context, err error) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
@@ -120,7 +114,6 @@ func ctxOr(ctx context.Context, err error) error {
 	return err
 }
 
-// queryOf 依需求版本的品項解析決定搜尋輸入（A9-D29(1)）：確認過的分類只用分類 ID，不帶關鍵字；買家自述的用自述文字當關鍵字。
 func queryOf(rev store.ProcurementRequestRevision) (candidate.Query, error) {
 	if rev.ItemResolutionKind == nil || rev.ItemResolutionLabel == nil {
 		return candidate.Query{}, fmt.Errorf("search：需求版本 %s 沒有品項解析", rev.ID)
@@ -154,8 +147,6 @@ func (e Executor) load(ctx context.Context, r store.ProcurementAgentRun) (loaded
 	return loaded{run: r, set: set, revision: rev}, nil
 }
 
-// lockForCommit 在 commit 的 transaction 內依模組的鎖順序（run、版本列、需求列，與 TURN 相同）先鎖自己的 run（取消搶先時整筆回滾），
-// 再鎖現行版本列並確認它仍是搜尋當時的版本；需求列由之後的條件式 UPDATE 鎖。to 是這次要轉成的終態。
 func (e Executor) lockForCommit(ctx context.Context, q *store.Queries, ld loaded, to string) (store.ProcurementRequestRevision, error) {
 	cur, err := q.LockRun(ctx, ld.run.ID)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -181,7 +172,6 @@ func (e Executor) lockForCommit(ctx context.Context, q *store.Queries, ld loaded
 	return active, nil
 }
 
-// commit 在單一 transaction 內寫完搜尋結果：版本守衛、各候選、需求轉 MATCHING、run 轉 SUCCEEDED。零結果也是成功。
 func (e Executor) commit(ctx context.Context, ld loaded, hits []candidate.Hit) error {
 	now := e.Now()
 	return e.DB.InTx(ctx, func(ctx context.Context) error {
@@ -209,9 +199,6 @@ func (e Executor) commit(ctx context.Context, ld loaded, hits []candidate.Hit) e
 	})
 }
 
-// failCategoryUnavailable 處理已確認的分類不再是末層（A9-D29(7)）：單一 transaction 內寫一個清掉品項解析的新版本（品項文字保留）、
-// 需求退回 CLARIFYING、run 轉 FAILED（ITEM_CATEGORY_UNAVAILABLE）。CANDIDATE_SEARCH 不扣額度，沒有額度可退。
-// 回傳 nil：run 已由這裡轉到終態，Dispatcher 不再收斂。
 func (e Executor) failCategoryUnavailable(ctx context.Context, ld loaded) error {
 	now := e.Now()
 	return e.DB.InTx(ctx, func(ctx context.Context) error {
@@ -249,7 +236,6 @@ func (e Executor) failCategoryUnavailable(ctx context.Context, ld loaded) error 
 	})
 }
 
-// withoutResolution 把版本的內容複製成新版本的寫入參數，品項解析清掉。
 func withoutResolution(v store.ProcurementRequestRevision, p store.InsertRevisionParams) store.InsertRevisionParams {
 	p.Item, p.Quantity, p.Unit, p.Packaging, p.BudgetPerUnit = v.Item, v.Quantity, v.Unit, v.Packaging, v.BudgetPerUnit
 	p.DeliveryCity, p.DeliveryDate, p.ExactMatchRequired = v.DeliveryCity, v.DeliveryDate, v.ExactMatchRequired

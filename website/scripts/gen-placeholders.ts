@@ -75,7 +75,6 @@ function one(icon: MaterialSymbolName, color: BrandToken): readonly Cell[] {
 }
 
 export const PLACEHOLDERS: readonly PlaceholderSpec[] = [
-	// Avatars and generic image slots.
 	{
 		name: "avatar",
 		width: 200,
@@ -118,7 +117,6 @@ export const PLACEHOLDERS: readonly PlaceholderSpec[] = [
 		iconRatio: 0.4,
 	},
 
-	// Screens of the product: one placeholder per frame size.
 	{
 		name: "phone-screen",
 		width: 640,
@@ -144,7 +142,6 @@ export const PLACEHOLDERS: readonly PlaceholderSpec[] = [
 		label: "網頁畫面",
 	},
 
-	// Illustrated scenes of the home and seller story trails.
 	...(
 		[
 			["scene-sunrise", "wb_twilight"],
@@ -165,7 +162,6 @@ export const PLACEHOLDERS: readonly PlaceholderSpec[] = [
 		}),
 	),
 
-	// Seller recruitment scroll world: one poster per stage.
 	...(
 		[
 			["birth", "groups"],

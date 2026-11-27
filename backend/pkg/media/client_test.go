@@ -10,7 +10,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-// stubMediaServiceClient 是 pb.MediaServiceClient 的 hand-rolled mock。
 type stubMediaServiceClient struct {
 	finalizeImagesFn    func(ctx context.Context, req *pb.FinalizeImagesRequest) (*pb.FinalizeImagesResponse, error)
 	linkImagesCalled    bool

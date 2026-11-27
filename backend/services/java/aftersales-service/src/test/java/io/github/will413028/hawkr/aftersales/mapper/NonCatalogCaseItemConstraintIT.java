@@ -54,13 +54,9 @@ class NonCatalogCaseItemConstraintIT {
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-        // 以下四組與 AfterSaleCaseMapperIT 同因：bootstrap 需要 DB_NAME、application.yml 的
-        // flyway 指向本機真實 DB、TSID 與 gRPC port 會撞本機 dev container、測試不需服務註冊。
         registry.add("hawkr.db.bootstrap.enabled", () -> "false");
         registry.add("spring.flyway.enabled", () -> "false");
         registry.add("hawkr.tsid.enabled", () -> "false");
-        // -1 關掉對外 gRPC server（本測試用不到）。0 是「先找空 port 再綁」，
-        // 中間可能被 testcontainers 的 port 映射搶走（CI 實測 Address already in use）。
         registry.add("grpc.server.port", () -> "-1");
         registry.add("spring.cloud.nacos.discovery.enabled", () -> "false");
         registry.add("spring.cloud.discovery.enabled", () -> "false");
@@ -126,7 +122,7 @@ class NonCatalogCaseItemConstraintIT {
         item.setId(9103L);
         item.setCaseNo("AS_NC_003");
         item.setOrderItemId(7001L);
-        item.setSkuId(null);   // 產線對空字串 sku_id 寫 NULL（AfterSaleCaseService）
+        item.setSkuId(null);
         item.setSkuName("文旦柚 200 公斤");
         item.setQuantity(1);
         item.setOriginalPrice(30000L);

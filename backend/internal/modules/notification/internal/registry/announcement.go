@@ -14,8 +14,6 @@ type AnnouncementParams struct {
 	AnnouncementID uuid.UUID `json:"announcement_id"`
 }
 
-// 公告發給兩個受眾，收件人由公告的派送 job 展開（Fanout），所以沒有冪等鍵與收件人；渠道是收件匣與推播，沒有 email。
-// 文字只有英文，不依請求語系，所以請求 zh-TW 也是同一份英文。
 var (
 	exampleAnnouncementID = uuid.MustParse("0190a000-0000-7000-8000-0000000000a1")
 	announcement          = Define(Definition[AnnouncementParams]{

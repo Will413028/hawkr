@@ -150,7 +150,6 @@ export function useMainTabActivationRefresh({
 				});
 		};
 
-		// Let hydration/layout restoration commit before the head request starts.
 		scheduled = window.setTimeout(maybeRefresh, 0);
 		const onVisibilityChange = () => {
 			if (document.visibilityState === "hidden") {

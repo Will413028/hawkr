@@ -53,10 +53,6 @@ import { resolveCdnUrl } from "@/lib/media/cdn";
 import { useObservedRouter } from "@/lib/navigation/use-observed-router";
 import { queryKeys } from "@/lib/query/keys";
 
-// 結帳錯誤狀態：訊息與輔助動作必須同進同出。原本拆成 error / errorAction
-// 兩個獨立 useState 會讓不同失敗路徑漏改其中一個（例如成功下單後付款失敗的
-// 路徑會給 "view_orders"；一般 4006 過期則不應該給），需要 reducer 強制
-// 兩個欄位在每個事件中一起切換。
 type CheckoutErrorAction = "view_orders" | null;
 
 interface CheckoutErrorState {
@@ -69,14 +65,6 @@ const INITIAL_CHECKOUT_ERROR: CheckoutErrorState = {
 	action: null,
 };
 
-// 一次「結帳 attempt」內所有 transient state 集中於此型別。
-// ── 新增 transient state 必須加進這個型別 ──
-// 這是強制契約:NEW_ATTEMPT 與 BFCache 還原時透過 INITIAL_TRANSIENT 一次
-// 全清,不會漏 reset 任何欄位。也讓 reviewer 必須在 type 層面看到全部
-// transient state 而非散在 1000+ 行裡的 useState。
-//
-// 不歸於此的 state (繼續用獨立 useState):
-//   · draftLoaded / draft  — storage mirror,跨 attempt 仍有意義
 interface CheckoutSessionTransient {
 	submitting: boolean;
 	orderConfirmed: boolean;
@@ -98,15 +86,11 @@ const INITIAL_TRANSIENT: CheckoutSessionTransient = {
 };
 
 type CheckoutTransientEvent =
-	// 一次 attempt 結束(新 attempt 開始 / BFCache 還原):全 reset
 	| { type: "NEW_ATTEMPT" }
-	// 通用 partial patch:對應原有的 setXxx(value) 直接呼叫
 	| { type: "SET"; patch: Partial<CheckoutSessionTransient> }
-	// errorState reducer events 維持原 API
 	| { type: "RESET_ERROR" }
 	| { type: "FAIL"; message: string }
 	| { type: "FAIL_WITH_VIEW_ORDERS"; message: string }
-	// previewNonce functional setter — 改 dedicated event 避免 stale closure
 	| { type: "INCREMENT_PREVIEW_NONCE" };
 
 export function transientReducer(
@@ -231,20 +215,11 @@ export default function CheckoutClient() {
 	const [draftLoaded, setDraftLoaded] = React.useState(false);
 	const [draft, setDraft] = React.useState<CheckoutDraft | null>(null);
 
-	// B02（發票方式選擇 Sheet）的開關與買家的選擇。
-	//
-	// 🔴 undefined ＝「買家沒有動過」⇒ confirm **整包省略 invoice**，後端走
-	// USE_BUYER_DEFAULT。這與「買家明確選了不使用載具」是兩件事，後者送
-	// { kind: "none" } 但同樣省略 invoice —— 差別只在畫面顯示，不在 payload。
 	const [invoiceSheetOpen, setInvoiceSheetOpen] = React.useState(false);
 	const [invoiceSelection, setInvoiceSelection] = React.useState<
 		InvoiceMethodSelection | undefined
 	>(undefined);
 
-	// 一次 attempt 內所有 transient state 集中於此 reducer。
-	// 設計理由見 CheckoutSessionTransient 型別註解。透過保留同名 setter
-	// shim,既有引用點不必動,內部統一走 reducer,新 attempt / BFCache
-	// 還原時 NEW_ATTEMPT 一次全清。
 	const [transient, dispatchTransient] = React.useReducer(
 		transientReducer,
 		INITIAL_TRANSIENT,
@@ -259,8 +234,6 @@ export default function CheckoutClient() {
 	} = transient;
 	const error = transient.error.message;
 	const errorAction = transient.error.action;
-	// 既有 setXxx API 形狀不變,呼叫端不需要逐處改寫。內部走 reducer。
-	// useCallback 穩定 identity,避免 useEffect / useMemo deps 觸發 lint。
 	const setSubmitting = React.useCallback(
 		(value: boolean) =>
 			dispatchTransient({ type: "SET", patch: { submitting: value } }),
@@ -271,9 +244,6 @@ export default function CheckoutClient() {
 			dispatchTransient({ type: "SET", patch: { orderConfirmed: value } }),
 		[],
 	);
-	// 訂單一旦確認成立（confirmCheckout 成功 → orderConfirmed=true），就讓
-	// buyer.orders 這組 query 失效：之後都是 router.push soft-nav，TanStack in-memory cache
-	// 不會重置，30s staleTime 內看不到新單。invalidate 為冪等，重複觸發無害。
 	React.useEffect(() => {
 		if (!orderConfirmed) return;
 		void queryClient.invalidateQueries({
@@ -295,8 +265,6 @@ export default function CheckoutClient() {
 			dispatchTransient({ type: "SET", patch: { previewError: value } }),
 		[],
 	);
-	// dispatchError 維持原 API (FAIL / FAIL_WITH_VIEW_ORDERS / RESET),
-	// 直接 forward 進 transient reducer 的對應 event。
 	const dispatchError = React.useCallback(
 		(
 			evt:
@@ -312,8 +280,6 @@ export default function CheckoutClient() {
 		},
 		[],
 	);
-	// ── 一次 attempt 內所有 ref 在這裡集中宣告 ──
-	// 新增 ref 必須同時加進 resetAttemptRefs() 列表。
 	const submittingRef = React.useRef(false);
 	const previewRequestedRef = React.useRef<string | null>(null);
 	const beginCheckoutFiredRef = React.useRef(false);
@@ -323,20 +289,8 @@ export default function CheckoutClient() {
 		beginCheckoutFiredRef.current = false;
 	}, []);
 
-	// attempt id 用 ref 釘住「component 首次認識的 attempt」,不對齊 draft
-	// 存在性 (draft 在 confirm 成功後會被 clearCheckoutDraft 清掉,但 attempt
-	// 還活著,使用者可能在看「已建單但付款失敗」訊息或等 native sheet)。
-	// 只有真的看到「新的 draft.createdAt」才視為新 attempt 開始。
 	const attemptIdRef = React.useRef<number | null>(null);
 
-	// 偵測新 attempt 開始:
-	//   · 第一次看到 draft → 認識它,僅記下 ref;state 已是 initial,不 reset
-	//   · 同一 attempt id → 不做事
-	//   · 新 attempt id   → 一次清光 transient state + refs
-	//
-	// dep 刻意只看 draft?.createdAt 不看整個 draft:draft 從 T1 → undefined
-	// (clearCheckoutDraft 後) 不該觸發 reset,符合「attempt 還活著」業務
-	// 語意;從 T1 → T2 才觸發。
 	// biome-ignore lint/correctness/useExhaustiveDependencies: 故意只訂閱 createdAt 變化,draft 物件其他欄位變化不該觸發 reset
 	React.useEffect(() => {
 		if (!draft) return;
@@ -351,10 +305,6 @@ export default function CheckoutClient() {
 		resetAttemptRefs();
 	}, [draft?.createdAt, resetAttemptRefs]);
 
-	// BFCache 還原(瀏覽器返回鍵)時,transient state 一律不該保留 —— 上一
-	// 次的 submitting / errorState 若帶回新一輪會卡使用者(典型:跳 success
-	// 後按返回鍵回 checkout,submitting=true 卡按鈕)。attemptIdRef 也清,
-	// 讓後續 effect 重新認識下一個 attempt id。
 	useBFCacheReset(() => {
 		attemptIdRef.current = null;
 		dispatchTransient({ type: "NEW_ATTEMPT" });
@@ -366,8 +316,6 @@ export default function CheckoutClient() {
 		setDraftLoaded(true);
 	}, []);
 
-	// 跨分頁同步：另一分頁 confirm 成功 / 清掉 draft 時，本分頁也跟著 reset。
-	// 避免「分頁 A 已下單，分頁 B 還用舊 draft 重送 confirm」造成 4092 / 6005。
 	React.useEffect(() => {
 		if (typeof window === "undefined") return;
 		const onStorage = (e: StorageEvent) => {
@@ -384,9 +332,6 @@ export default function CheckoutClient() {
 		return () => window.removeEventListener("storage", onStorage);
 	}, [setPreview, setPreviewError]);
 
-	// Items 來源:後端 cart 經 draft.selectedSkuIds 過濾。useCart 已在 mount
-	// 時 fetch backend cart 並訂閱 CART_UPDATED_EVENT,checkout 期間自動同步。
-	// 對齊 buyer-app:後端是唯一真實來源,draft 只記「選擇」不記「快照」。
 	const selectedSkuIdSet = React.useMemo(
 		() => new Set(draft?.selectedSkuIds ?? []),
 		[draft?.selectedSkuIds],
@@ -406,8 +351,6 @@ export default function CheckoutClient() {
 	const isStorePickup = draft
 		? isStorePickupMethod(draft.shipping.method)
 		: false;
-	// 「要不要收件地址」的判準是 `destinationKind`，與購物車的
-	// `writeFrozenCheckoutDraft` 同一個判準。
 	const destinationKind = shippingDestinationKind(draft?.shipping.method);
 	const needsAddress = destinationKind === "address";
 	const hasRequiredRecipient = !draft || hasRequiredRecipientFor(draft);
@@ -437,10 +380,6 @@ export default function CheckoutClient() {
 
 	React.useEffect(() => {
 		setPreviewError(null);
-		// Invariant: effect 不打 fetch 時 previewLoading 必為 false。任何
-		// 早期 return 都要先清掉 loading,否則前一輪 in-flight fetch 被
-		// cancelled 守衛攔下後,UI 會永卡「計算中」。新增 early-return 條件
-		// 時也必須沿用此 invariant。
 		if (
 			!draft ||
 			selectedItems.length === 0 ||
@@ -461,8 +400,6 @@ export default function CheckoutClient() {
 			items: checkoutItems,
 			shippingMethod: draft.shipping.method,
 			deliveryTemp: draft.shipping.deliveryTemp,
-			// 🔴 與 confirm 同一個閘門（`needsAddress`）：preview 與 confirm 對**同一筆訂單**
-			//    送不同的欄位，就會出現「preview 沒看過的值被寫進訂單」。
 			...(needsAddress && resolvedZipCode
 				? { receiverZipCode: resolvedZipCode }
 				: {}),
@@ -476,14 +413,6 @@ export default function CheckoutClient() {
 				? { couponTemplateId: draft.coupon.templateId }
 				: {}),
 		};
-		// Always fire a fresh preview — previously this went through a
-		// module-scope `previewRequestCache` that persisted across
-		// navigations and re-served the same `checkoutId`. That cache was
-		// a likely culprit for the 「資源衝突 / cart 已消耗」 409, because
-		// returning the same checkoutId on a re-entry meant the next
-		// confirm tried to lock an already-emptied cart row. Re-firing
-		// preview every time the token changes pays a single extra
-		// roundtrip but guarantees a fresh checkoutId.
 		void previewCheckout(previewBody)
 			.then((result) => {
 				if (cancelled) return;
@@ -506,11 +435,6 @@ export default function CheckoutClient() {
 			});
 		return () => {
 			cancelled = true;
-			// React StrictMode in dev intentionally runs effect cleanup and
-			// re-runs the effect. If we keep the token marked as requested
-			// after that cleanup, the second pass skips the preview request
-			// while the first request is no longer allowed to update state,
-			// leaving previewLoading stuck at 「計算中」.
 			if (previewRequestedRef.current === previewToken) {
 				previewRequestedRef.current = null;
 			}
@@ -598,14 +522,6 @@ export default function CheckoutClient() {
 		setSubmitting(false);
 	};
 
-	// Build the gRPC-shaped confirm payload from draft + preview. Pure
-	// transform — caller (handlePlaceOrder) narrows the nullable state and
-	// passes non-null inputs explicitly.
-	// 🔴 **B02 的入口只有這一個**。2026-09-01 dev 實測抓到：Sheet 已經渲染在頁尾、
-	// state 也在，但 `<CheckoutInvoiceSection>` 少了 `onChangeMethod`
-	// ⇒ 沒有任何東西呼叫 setInvoiceSheetOpen(true) ⇒ **整個 B02 在 bundle 裡但打不開**。
-	// TypeScript 不會叫（那是選填 prop）、測試不會紅、畫面看起來也正常——
-	// 只有真的去看一眼結帳頁才會發現「變更發票方式」那顆鍵不在。
 	const buildConfirmPayload = (
 		d: CheckoutDraft,
 		p: CheckoutPreviewResult,
@@ -619,7 +535,6 @@ export default function CheckoutClient() {
 			deliveryTemp: d.shipping.deliveryTemp,
 			shippingNote: orderRemark,
 			orderRemark,
-			// 閘門是 `needsAddress`（收件目標是地址），與 preview 同一個。
 			...(needsAddress && d.recipient
 				? {
 						...(resolvedZipCode ? { receiverZipCode: resolvedZipCode } : {}),
@@ -639,8 +554,6 @@ export default function CheckoutClient() {
 			...(d.coupon?.templateId
 				? { couponTemplateId: d.coupon.templateId }
 				: {}),
-			// 58 §7.1.2 步驟 1：買家的發票選擇。**沒選就整包省略**（後端走
-			// USE_BUYER_DEFAULT）——已上架的 App 就是這樣送的，那條路必須永遠成立。
 			...(confirmInvoiceOf(invoiceSelection)
 				? { invoice: confirmInvoiceOf(invoiceSelection) }
 				: {}),
@@ -672,9 +585,6 @@ export default function CheckoutClient() {
 		console.warn(
 			`[checkout] place order failed — stage=${stage} status=${status} code=${code} reason=${reason}`,
 		);
-		// Dev-only: the backend error payload can carry order/PII fields, so keep
-		// it out of the production console (buyer's own devtools). stage/status/
-		// code/reason above are non-sensitive and stay.
 		if (getEnv().enableApiLogging) {
 			try {
 				console.warn(
@@ -687,9 +597,6 @@ export default function CheckoutClient() {
 		}
 	};
 
-	// Confirm-time errors: order has NOT been created yet. Map known backend
-	// codes to user-friendly copy (4092 pending order, 6005 lock race, 4006
-	// expired, etc.) and reset submitting state.
 	const handleConfirmError = (e: unknown) => {
 		logFailure("confirm", e);
 		const status =
@@ -703,7 +610,6 @@ export default function CheckoutClient() {
 		const reason = e instanceof Error ? e.message : "未知錯誤";
 
 		if (code === 4092) {
-			// 後端 03 §5.1.2：buyer 已有 PENDING_PAYMENT 訂單包含這些 sku。
 			const orderNoMatch = reason.match(/(O\d{6,})/);
 			const pendingOrderNo = orderNoMatch ? orderNoMatch[1] : null;
 			dispatchError({
@@ -723,8 +629,6 @@ export default function CheckoutClient() {
 			finishSubmitting();
 			return;
 		}
-		// 46 §7.2：賣家停權收斂點（訂單尚未建立）。單一賣家結帳下這會擋下整張單，
-		// 但沿用既定文案；refresh 讓購物車盡快反映（見 CartClient 對稱處理）。
 		if (code === 9241) {
 			dispatchError({
 				type: "FAIL",
@@ -734,7 +638,6 @@ export default function CheckoutClient() {
 			finishSubmitting();
 			return;
 		}
-		// 8026 訂單金額過高（L1）/ 8021 付款方式金額不符（L2，理論上前端 gating 已擋，保留 fallback）
 		if (code === 8026) {
 			dispatchError({
 				type: "FAIL",
@@ -778,9 +681,6 @@ export default function CheckoutClient() {
 		finishSubmitting();
 	};
 
-	// 確認訂單（舊 REST）之後：金額為零的訂單沒有付款步驟，直接進成功頁；
-	// 其餘進付款步驟（`/orders/{orderNo}`，Stripe Payment Element）。付款結果由付款步驟以 GetPayment 確認。
-	// 一次確認可能拆成多張單，付款只對第一張（`orderNos[0]`）。
 	const runCheckout = async (payload: CheckoutConfirmRequest) => {
 		try {
 			const confirm = await confirmCheckout(payload);
@@ -816,7 +716,6 @@ export default function CheckoutClient() {
 			return;
 		}
 
-		// Validate cart items synchronously (no network roundtrip).
 		const selectedItemSkuSet = new Set(selectedItems.map((it) => it.skuId));
 		const missingIds = draft.selectedSkuIds.filter(
 			(id) => !selectedItemSkuSet.has(id),
@@ -922,16 +821,7 @@ export default function CheckoutClient() {
 						</div>
 					</section>
 
-					{/*
-					 * 3 · 發票與收據（58A §B01）。
-					 *
-					 * 🔴 `preview.invoice` 為 null 時整個區塊不渲染：後端拿不到發票服務時
-					 * 不回這個 key（gateway 的 DTO 是指標 + omitempty）。渲染一張空卡片
-					 * 會讓買家以為系統壞了，而那比少一個區塊更糟。
-					 *
-					 * ⚠️ 區塊編號是**動態的**：沒有發票區時付款方式仍是 3。寫死 4 會讓
-					 * 降級路徑上出現「1 2 4」。
-					 */}
+
 					{preview?.invoice ? (
 						<CheckoutInvoiceSection
 							invoice={preview.invoice}
@@ -1134,10 +1024,7 @@ export default function CheckoutClient() {
 				</aside>
 			</div>
 
-			{/*
-			 * B02（發票方式選擇 Sheet，58A §B02）。
-			 * 只在後端回了 invoice 區塊時才掛載——沒有發票服務就沒有可選的東西。
-			 */}
+
 			{preview?.invoice ? (
 				<InvoiceMethodSheet
 					open={invoiceSheetOpen}

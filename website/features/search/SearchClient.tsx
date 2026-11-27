@@ -37,8 +37,7 @@ export default function SearchClient({
 				staleMs={MAIN_TAB_STALE_MS.search}
 				enabled={isLanding}
 			/>
-			{/* Slim header — search box is the primary surface; the editorial
-			 *  headline shrinks so results dominate the page. */}
+
 			<section className="w-[min(1440px,calc(100%-48px))] mx-auto max-md:w-[min(100%-28px,680px)] pt-[28px] pb-6 max-[840px]:pt-[38px]">
 				<span className="inline-flex w-fit mb-3.5 text-hk-primary-strong text-xs font-bold tracking-[0.12em] uppercase">
 					搜尋

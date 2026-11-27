@@ -40,7 +40,6 @@ func GetPublisher() (*Publisher, error) {
 	return defaultPublisher, initErr
 }
 
-// publisherOpts collects optional NewPublisher configuration.
 type publisherOpts struct {
 	confirmTimeout time.Duration
 }
@@ -58,9 +57,6 @@ func WithConfirmTimeout(d time.Duration) Option {
 	}
 }
 
-// defaultConfirmTimeout bounds confirm.WaitContext when the caller did
-// not pass WithConfirmTimeout, so a stuck broker cannot hang publishers
-// indefinitely.
 const defaultConfirmTimeout = 30 * time.Second
 
 // NewPublisher creates a new publisher. Options default to a 30s
@@ -92,10 +88,6 @@ func NewPublisher(url string, opts ...Option) (*Publisher, error) {
 	return p, nil
 }
 
-// dialPublisherChannel dials url, opens a channel, and enables publisher
-// confirms. Shared by NewPublisher and watchReconnect so both the initial
-// connect and every reconnect attempt produce an identically-configured
-// channel.
 func dialPublisherChannel(url string) (*amqp.Connection, *amqp.Channel, error) {
 	conn, err := amqp.Dial(url)
 	if err != nil {
@@ -117,13 +109,6 @@ func dialPublisherChannel(url string) (*amqp.Connection, *amqp.Channel, error) {
 	return conn, ch, nil
 }
 
-// watchReconnect blocks until the publisher's current connection or channel closes,
-// then redials with backoff (reconnectBackoff, shared with
-// ResilientConsumer) until it reconnects or Close is called. Any node in a
-// clustered broker can accept a publish, so a fresh dial against the same
-// url — the k8s Service name, whose Endpoints fan out across every cluster
-// node — transparently lands on a healthy node without this code needing
-// to know which nodes exist.
 func (p *Publisher) watchReconnect() {
 	for {
 		p.mu.RLock()
@@ -162,10 +147,6 @@ func (p *Publisher) watchReconnect() {
 				}
 			}
 
-			// Check if Close() was called while this dial was in progress,
-			// making the check atomic with the swap by holding the lock.
-			// If p.closed is already closed, close the newly-dialed connection
-			// (and its channels cascade-close internally) to avoid leaking a live connection.
 			p.mu.Lock()
 			select {
 			case <-p.closed:
@@ -178,14 +159,6 @@ func (p *Publisher) watchReconnect() {
 			p.channel = newCh
 			p.mu.Unlock()
 
-			// conn (captured before this reconnect attempt) is no longer
-			// referenced by p.conn/p.channel once the swap above lands. On a
-			// channel-only close (protocol exception, connection stays healthy)
-			// conn would otherwise leak its socket + amqp091-go's internal
-			// reader/heartbeat goroutines. On a connection-level close, conn is
-			// already dead and Close() on it is a safe no-op — so this is safe
-			// to call unconditionally regardless of which kind of close
-			// triggered this reconnect.
 			_ = conn.Close()
 			log.Printf("[MQ] Publisher reconnected")
 			break
@@ -212,8 +185,8 @@ func (p *Publisher) PublishRaw(ctx context.Context, exchange, routingKey string,
 		ctx,
 		exchange,
 		routingKey,
-		false, // mandatory
-		false, // immediate
+		false,
+		false,
 		amqp.Publishing{
 			ContentType:  "application/json",
 			DeliveryMode: amqp.Persistent,
@@ -225,11 +198,6 @@ func (p *Publisher) PublishRaw(ctx context.Context, exchange, routingKey string,
 		return fmt.Errorf("failed to publish message: %w", err)
 	}
 
-	// Wait for confirmation with a bounded background deadline
-	// （publisher confirm 規則見 docs/開發規範/MQ 與事件管理規範.md）：
-	// 故意 NOT 傳 caller ctx — 訊息已進 broker channel，caller 取消（如 HTTP
-	// request cancellation）不應導致「明明 broker 即將 ack」的誤判失敗。bound 透過
-	// publisherConfirmTimeout 限制最大等待時間，避免 broker 卡死 hang。
 	confirmCtx, cancel := context.WithTimeout(context.Background(), p.confirmTimeout)
 	defer cancel()
 	acked, err := confirm.WaitContext(confirmCtx)
@@ -273,8 +241,6 @@ func (p *Publisher) PublishDelayed(ctx context.Context, exchange, routingKey str
 		return fmt.Errorf("failed to publish delayed message: %w", err)
 	}
 
-	// 同 PublishRaw 的鎖定理由（docs/開發規範/MQ 與事件管理規範.md）：訊息已上 channel，caller ctx 取消
-	// 不應導致誤判失敗；改用 bounded background ctx 防 broker 卡死。
 	confirmCtx, cancel := context.WithTimeout(context.Background(), p.confirmTimeout)
 	defer cancel()
 	acked, err := confirm.WaitContext(confirmCtx)
@@ -288,9 +254,7 @@ func (p *Publisher) PublishDelayed(ctx context.Context, exchange, routingKey str
 	return nil
 }
 
-// ==================== Shipping/Fulfillment Events ====================
 
-// ==================== Marketing Events (Coupon) ====================
 
 // Close closes the publisher and stops its reconnect watcher.
 func (p *Publisher) Close() error {

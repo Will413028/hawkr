@@ -8,7 +8,6 @@ import { requiredAccessForPath } from "../lib/auth/redirect";
 import { surfaceOfPath } from "../lib/intl/paths";
 import { siteMiddleware } from "../middleware";
 
-// 賣家 App 在外部瀏覽器開金流商的連結，完成後回到這一頁：瀏覽器沒有 hawkr 的登入。
 const PATHS = [
 	"/seller-app/payment-return?state=done",
 	"/seller-app/payment-return?state=expired",

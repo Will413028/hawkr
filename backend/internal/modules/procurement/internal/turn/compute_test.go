@@ -73,7 +73,6 @@ func resolved() slots.Set {
 	}
 }
 
-// match 組一個末層命中；大類取路徑的第一段，大類 ID 由大類名固定算出（路徑空白時沒有大類資訊）。
 func match(id int64, name, path string) resolver.Match {
 	m := resolver.Match{CategoryID: catID(id), Name: name, Path: path, Via: resolver.ViaExact, Leaf: true}
 	if path != "" {
@@ -83,8 +82,6 @@ func match(id int64, name, path string) resolver.Match {
 	return m
 }
 
-// rootID 是大類名固定算出的大類 ID（與 catID 的空間分開，不會撞到）。
-// nilIDMatch 是分類 ID 為零值的命中（不合法，不能被確認）。
 func nilIDMatch(name, path string) resolver.Match {
 	m := match(1, name, path)
 	m.CategoryID = uuid.Nil()
@@ -97,12 +94,10 @@ func rootID(name string) uuid.UUID {
 	return uuid.MustParse(fmt.Sprintf("00000000-0000-7000-9000-%012d", h.Sum32()%100000+1))
 }
 
-// catID 是測試用的確定性分類 ID：同一個數字永遠得到同一個 UUID，且不是零值。
 func catID(n int64) uuid.UUID {
 	return uuid.MustParse(fmt.Sprintf("00000000-0000-7000-8000-%012d", n))
 }
 
-// optID 是分類 n 在卡上的選項 ID。
 func optID(n int64) string { return "category-" + catID(n).String() }
 
 func decideOK(t *testing.T, rs Resolver, prior priorState, patch slots.Patch) decision {

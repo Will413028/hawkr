@@ -90,10 +90,6 @@ export default function ChatContextPanel({ sellerId }: { sellerId: string }) {
 				{seller.href ? (
 					<Link
 						href={seller.href}
-						// `.chat-context__cta` is a filled pill with a
-						// `--hkui-primary-foreground` label (0-1-0); without this marker
-						// `[data-theme="dark"] body a:not([data-hkui-button])` (0-2-2)
-						// repaints it olive `--color-ink-200`.
 						data-hkui-button=""
 						className="chat-context__cta"
 					>

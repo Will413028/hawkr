@@ -30,9 +30,6 @@ test("names the resource Chrome complained about", () => {
 });
 
 test("a stylesheet hint the router added for another route is a warm-up, not a defect", () => {
-	// 首頁的商家 rail 用 router.prefetch() 為 storefront 暖身，連帶預載了
-	// storefront 的 CSS。訪客沒點進去，Chrome 就報 unused —— 但那支 CSS 本來
-	// 就不屬於這一頁，這條 gate 不該因此紅。
 	const { defects, routeWarmups } = partitionStabilityWarnings(
 		[unusedPreloadWarning(CSS)],
 		hints({ styleHints: [CSS] }),
@@ -43,7 +40,6 @@ test("a stylesheet hint the router added for another route is a warm-up, not a d
 });
 
 test("a stylesheet this page actually applied stays a defect", () => {
-	// 掛成 rel=stylesheet 就代表是本頁的 CSS，預載到卻沒用上是真問題。
 	const { defects, routeWarmups } = partitionStabilityWarnings(
 		[unusedPreloadWarning(CSS)],
 		hints({ styleHints: [CSS], appliedStylesheets: [CSS] }),
@@ -54,7 +50,6 @@ test("a stylesheet this page actually applied stays a defect", () => {
 });
 
 test("a hand-authored stylesheet preload stays a defect", () => {
-	// 文件解析完成當下就存在 = 寫在 layout 裡的提示，沒被用到就是寫錯了。
 	const { defects, routeWarmups } = partitionStabilityWarnings(
 		[unusedPreloadWarning(CSS)],
 		hints({ styleHints: [CSS], authoredPreloads: [CSS] }),
@@ -65,7 +60,6 @@ test("a hand-authored stylesheet preload stays a defect", () => {
 });
 
 test("an unused preload that is not a stylesheet stays a defect", () => {
-	// script / font / image 預載不到就是寫錯了，一律照舊。
 	const { defects, routeWarmups } = partitionStabilityWarnings(
 		[unusedPreloadWarning(IMG)],
 		hints({ styleHints: [CSS] }),
@@ -76,7 +70,6 @@ test("an unused preload that is not a stylesheet stays a defect", () => {
 });
 
 test("warnings that are not about unused preloads stay defects", () => {
-	// 圖片幾何與 `as` 值寫錯這兩類警告完全不經過暖身判斷。
 	const geometry =
 		"Image with src https://web.example/a.png has either width or height modified, but not the other.";
 	const badAs =

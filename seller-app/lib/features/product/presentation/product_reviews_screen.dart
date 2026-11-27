@@ -104,7 +104,6 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
         _isLoading = false;
       });
     } catch (raw, stackTrace) {
-      // 並行讀取任一邊失敗時 `.wait` 丟 ParallelWaitError：取出第一個真正的錯誤，錯誤文字才依原因顯示。
       final error = _firstCause(raw);
       debugPrint('[ProductReviewsScreen] $error\n$stackTrace');
       if (!mounted) return;

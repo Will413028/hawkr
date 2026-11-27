@@ -12,46 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// ---------------------------------------------------------------------------
-// INV.dl —— 期限與兜底掃描（§4.3.3 第 7 組、§7.2.5「到期重試」）
-//
-// 🔴 **本波只跑 inbox 的 ORDER_PAID 兜底掃描一件事。** 設計書指派給 INV.dl 的其餘工作
-// （K04／K05／K06 申訴 SLA、I8 REISSUE_FAILED 唯讀掃描）落地時**必須併進同一個 tick**：
-// 另開一支排程器會在 `outbox.NewMetrics("invoice_deadline")` 同名時 boot 期直接 panic
-// （promauto 重複註冊），而那個 panic 出現在部署當下、不是編譯期。
-//
-// 這支存在的理由（不是「多一層保險」，是補上一個**從來沒有執行者**的機制）：
-// order.paid 的 handler 先 Insert（→RECEIVED）再讀兩支 gRPC、再 Prepare。中間任一步失敗
-// 就回 error，而 pkg/mq 的重投會在 Insert 的去重那一步 return nil（ACK）什麼都不重做
-// ⇒ 該列**永遠**停在 RECEIVED、發票永遠不會開、DLQ 是空的、沒有任何告警。
-// 程式註解與 SQL 都寫著「由兜底掃描重試」，而 FetchDueInboxEvents 的 Go 呼叫端是零。
-// dev 上因此卡了 4 筆 ORDER_PAID（對應訂單 invoice_documents 各 0 列）。
-//
-// 掃兩種 event_type，走**不同的 SQL**（#3073 起）：
-//
-//	ORDER_PAID              → FetchDueByType           （RECEIVED／DEFERRED／FAILED）
-//	ORDER_REFUND_FINALIZED  → FetchDueActionableByType （RECEIVED／FAILED，**排除 DEFERRED**）
-//
-// 🔴 **退款那一邊排除 DEFERRED 不是最佳化，是正確性**：DEFERRED 的歸宿是反向認領
-// （order.paid 到達時 reclaimDeferred 撿走）。兜底掃描碰它就會在失敗時翻成 FAILED
-// ⇒ `WHERE status='DEFERRED'` 的述詞永久不成立 ⇒ 該筆退款再也不會被認領，
-// 而且完全無聲（症狀是「某一筆退款沒有折讓單」，要對帳才看得出來）。
-// 守它的是 TestDeadlineWorker_RefundScanNeverTouchesDeferred。
-//
-// ⚠️ 「先補租約／CAS 再打開退款掃描」這個前置條件，實際處置與原本設想的不同：
-// **沒有補租約，因為唯一鍵比租約更強**。兩道機制取代它——
-// (a) 兩條路徑的候選集合不相交（上面那格）；
-// (b) 就算相交，`uq_invadj_allowance_refund`／`uq_invadj_void_once` 會讓第二次
-//     Insert 走 ON CONFLICT DO NOTHING ⇒ RefundAdjustment.Apply 讀到 inserted=false
-//     就 return nil。租約會過期（崩潰、時鐘漂移、GC 停頓），唯一鍵不會。
-// 全文在 internal/mq/di_test.go 的 TestAdjustmentApplierIsWired。
-//
-// 仍然「不掃」的一格：
-//   - **不自己標狀態**：MarkProcessed／MarkFailed／UpdateAttempt 全部由 pkg/outbox.Worker
-//     依 Process 的回傳值決定，ProcessFunc 內動狀態會讓 Worker 的簿記打在空集合上。
-// ---------------------------------------------------------------------------
 
-// inboxRow 把 domain.InboxEvent 套進 pkg/outbox.Row。
 type inboxRow struct{ ev domain.InboxEvent }
 
 func (r inboxRow) OutboxID() int64         { return r.ev.ID }
@@ -78,11 +39,8 @@ type InboxRefundReprocessor interface {
 	ReprocessFromInbox(ctx context.Context, ev domain.InboxEvent) error
 }
 
-// deadlineInboxRepo 是 pkg/outbox.Repository[inboxRow] 的實作。
 type deadlineInboxRepo struct {
 	repo domain.InboxRepository
-	// parkInterval 是「打滿 MaxAttempts 之後多久再試一次」。見 NewDeadlineWorker 的說明：
-	// 本表沒有真正的終態，MarkFailed 必須自己帶退避，否則會變成每 tick 重撈的熱迴圈。
 	parkInterval time.Duration
 	log          *zap.Logger
 }
@@ -98,19 +56,11 @@ func (r *deadlineInboxRepo) FetchPendingDue(ctx context.Context, now time.Time, 
 	if err != nil {
 		return nil, err
 	}
-	// 🔴 退款走 **Actionable** 那一支（排除 DEFERRED）。用 FetchDueByType 的話，
-	// 亂序落 DEFERRED 的那些列會被撈進來，失敗時翻成 FAILED ⇒
-	// ListDeferredByAggregateRef 的反向認領述詞永久不成立、該筆退款再也不會被認領，
-	// 而且完全無聲。這一格是本次擴充唯一真正危險的地方。
 	refunds, err := r.repo.FetchDueActionableByType(ctx, string(pkgmq.EventTypeOrderRefundFinalized), now, int32(limit)) //nolint:gosec // limit 是常數
 	if err != nil {
 		return nil, err
 	}
 
-	// 合併後依 next_attempt_at 排序再截斷：兩種型別各自有 LIMIT，合併取最早到期的
-	// 才不會讓一種的積壓吃光另一種的處理量（那正是 FetchDueInboxEventsByType 檔頭
-	// 「型別過濾在 SQL 不在 Go 端」要防的事——差別在於這裡每一列都會被處理，
-	// 不是被 skip 掉之後還佔著名額）。
 	evs := make([]domain.InboxEvent, 0, len(paid)+len(refunds))
 	evs = append(evs, paid...)
 	evs = append(evs, refunds...)
@@ -191,13 +141,7 @@ type DeadlineWorker struct {
 	refund InboxRefundReprocessor
 	log    *zap.Logger
 	obs    *outbox.Metrics
-	// K05：申訴逾 3 工作天未回覆（#3055 的橫向稽查）。
-	//
-	// 🔴 併進**本 worker 的同一個 tick**，不另開排程器 —— 檔頭那條約束不是風格問題：
-	// 另一支用同名 `outbox.NewMetrics("invoice_deadline")` 會在 promauto 重複註冊時
-	// boot 期直接 panic，而那個 panic 出現在部署當下、不是編譯期。
 	overdue OverdueComplaintSweeper
-	// statutory 是 §5.2.1 的逾期分類（#3261 的延伸，2026-09-09）。可以是 nil ⇒ 跳過。
 	statutory StatutoryDeadlineSweeper
 }
 
@@ -266,12 +210,6 @@ func NewDeadlineWorker(
 				if markErr == nil {
 					obs.FailedTotal().Inc()
 				}
-				// 一則 order.paid 事件停泊 ＝ 有一張訂單的發票沒有開、也沒有留檔文件。
-				// 它會在 parkInterval 之後自己回到候選集合（本表無終態），但在那之前
-				// 需要有人看見——`invoice_inbox_stranded_rows`（M30）＋ 告警
-				// InvoiceInboxStranded 就是為此。
-				// ⚠️ 這裡曾經寫「M29 invoice_inbox_stuck 與告警 ㉒」：M29 不存在，
-				// 而 ㉒ 是 InvoiceTrackExhausted（字軌用盡），與 inbox 無關。
 				l.Error("invoice.dl.parked",
 					zap.Int64("inbox_id", row.ev.ID),
 					zap.Stringp("order_no", row.ev.AggregateRef),
@@ -290,16 +228,8 @@ func NewDeadlineWorker(
 func (w *DeadlineWorker) RunOnce(ctx context.Context) error {
 	inboxErr := w.w.RunOnce(ctx)
 
-	// 🔴 **三件事各自獨立、任何一件的錯誤都不得吃掉後面那件**（2026-09-08 修）。
-	//
-	// 原本的寫法在 K04 失敗且 inbox 成功時直接 `return err` ⇒ 後面新增的任何一段
-	// 都會被靜默跳過。那不是假想的風險：K05 就是接在它後面的，而 K04 最可能失敗的
-	// 時候（DB 不穩、通知 outbox 寫不進去）正是申訴最需要被升級的時候。
-	//
-	// sweeper 沒 wire 時安靜跳過（測試與部分組裝路徑不掛它），而不是 panic。
 	var sweepErr error
 	if w.overdue != nil {
-		// K04：逾 3 工作天未回覆的申訴 → OVERDUE ＋ 通知賣家。
 		n, err := w.overdue.SweepOverdueComplaints(ctx, time.Now().UTC())
 		switch {
 		case err != nil:
@@ -309,8 +239,6 @@ func (w *DeadlineWorker) RunOnce(ctx context.Context) error {
 			w.log.Info("invoice.dl.overdue_swept", zap.Int("count", n))
 		}
 
-		// K05：OVERDUE 滿 24 小時仍無人回覆 → ESCALATED_TO_ADM，平台接手。
-		// 它處理的是**既有**的 OVERDUE，與 K04 這一輪標到幾筆完全無關。
 		m, eerr := w.overdue.EscalateOverdueComplaints(ctx, time.Now().UTC())
 		switch {
 		case eerr != nil:
@@ -322,8 +250,6 @@ func (w *DeadlineWorker) RunOnce(ctx context.Context) error {
 			w.log.Info("invoice.dl.overdue_escalated", zap.Int("count", m))
 		}
 
-		// K06：賣家已回覆、買家異議期屆滿仍未表態 → RESOLVED（逾期視為接受）。
-		// 與前兩支各自獨立：它處理的是**已經有賣家回覆**的案件，與逾期未回覆那條軸無關。
 		k, rerr := w.overdue.ResolveExpiredBuyerReviews(ctx, time.Now().UTC())
 		switch {
 		case rerr != nil:
@@ -336,8 +262,6 @@ func (w *DeadlineWorker) RunOnce(ctx context.Context) error {
 		}
 	}
 
-	// §5.2.1：已逾法定上傳期限的文件轉 AWAITING_MANUAL ＋ DEADLINE_MISSED。
-	// 與申訴那三支各自獨立（不同的軸、不同的 usecase），錯誤同樣不互相吃掉。
 	if w.statutory != nil {
 		n, serr := w.statutory.SweepOverdueStatutoryDeadlines(ctx, time.Now().UTC())
 		switch {
@@ -357,16 +281,7 @@ func (w *DeadlineWorker) RunOnce(ctx context.Context) error {
 	return sweepErr
 }
 
-// process 是 ProcessFunc：重跑 §7.1.2 步驟 5–9。
-//
-// 🔴 **這個函式裡不得出現任何 Mark\***。標記由 pkg/outbox.Worker 在本函式回 nil 之後做；
-// 把它挪進來等於自己決定「處理完了沒有」，而 Worker 的 attempt 簿記會打在一列已經離開
-// 候選集合的資料上（rows=0 靜默）。
 func (w *DeadlineWorker) process(ctx context.Context, row inboxRow) (any, error) {
-	// 🔴 分派錨在 event_type。走錯的後果不是錯誤而是**靜默成功**：
-	// 兩個 payload struct 的欄名沒有交集 ⇒ unmarshal 全部拿到零值 ⇒
-	// 一筆金額 0 的退款會安靜地跑完，或一張沒有 order_no 的發票被 fail-loud 擋掉
-	// （後者還算好的）。所以 default 一律回 error，不 fallback。
 	switch row.ev.EventType {
 	case string(pkgmq.EventTypeOrderPaid):
 		if err := w.uc.ReprocessFromInbox(ctx, row.ev); err != nil {

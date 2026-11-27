@@ -14,10 +14,8 @@ import {
 	socialImages,
 } from "../lib/seo/metadata";
 
-// The prod flavor requires the browser API base on the web origin; a relative base is.
 process.env.NEXT_PUBLIC_API_BASE_URL = "/api/v1";
 
-// The prod flavor requires its own web origin (NEXT_PUBLIC_WEB_ORIGIN); these cases describe a deployment at this one.
 process.env.NEXT_PUBLIC_WEB_ORIGIN = "https://example.com";
 
 /**
@@ -105,7 +103,6 @@ function describeImages(og: ts.ObjectLiteralExpression): string {
 			}
 			return init.getText().replace(/\s+/g, " ").slice(0, 60);
 		}
-		// A spread hides whether `images` is present, so it cannot be accepted.
 		if (ts.isSpreadAssignment(prop)) return `...${prop.expression.getText()}`;
 	}
 	return "<missing>";
@@ -158,10 +155,6 @@ test("every page-declared openGraph names its images via socialImages()", () => 
 });
 
 test("the scan reaches the openGraph blocks it is meant to guard", () => {
-	// A scanner that silently matched nothing would pass the assertion above.
-	// Six blocks live under app/ and features/ today (the two product templates,
-	// the storefront index, and the three storefront tabs); every other page
-	// goes through buildPageMetadata, which is covered below.
 	assert.ok(
 		blocks.length >= 6,
 		`expected the openGraph scan to reach the hand-written blocks under ` +
@@ -173,8 +166,6 @@ test("socialImages falls back to the site card, never to an empty list", () => {
 	assert.deepEqual(socialImages(), [{ url: SOCIAL_IMAGE_PATH }]);
 	assert.deepEqual(socialImages(null), [{ url: SOCIAL_IMAGE_PATH }]);
 	assert.deepEqual(socialImages(undefined), [{ url: SOCIAL_IMAGE_PATH }]);
-	// buildImageUrl() returns "" for a record with no picture — the exact input
-	// the old `x ? [{url:x}] : []` shape turned into an empty array.
 	assert.deepEqual(socialImages(""), [{ url: SOCIAL_IMAGE_PATH }]);
 	assert.deepEqual(socialImages("   "), [{ url: SOCIAL_IMAGE_PATH }]);
 	assert.deepEqual(socialImages("https://img.example/a.jpg"), [
@@ -253,10 +244,6 @@ function opengraphImageRoute(): {
 }
 
 test("the root names the site card itself: the file convention sits one segment above its layouts", () => {
-	// buildRootMetadata is called by app/[locale]/layout.tsx and
-	// app/(delegated)/layout.tsx, below the directory that holds
-	// app/opengraph-image.tsx. Their `openGraph` replaces the parent's resolved
-	// one, so without `images` here the pages that inherit it ship no picture.
 	__setFlavorForTest("prod");
 	__setEnvForTest(null);
 	const route = opengraphImageRoute();
@@ -290,11 +277,6 @@ test("the root's picture is described in the page's language", () => {
 });
 
 test("the root names no twitter images: a card follows the og:image of its own page", () => {
-	// Next fills `twitter.images` from `openGraph.images` only while the card has
-	// none of its own (postProcessMetadata). A root `twitter.images` would be
-	// inherited by every page that declares no `twitter` — a product page with
-	// its own photo among them — and pin its twitter:image to the site card while
-	// its og:image is the photo.
 	__setFlavorForTest("prod");
 	__setEnvForTest(null);
 	const twitter = buildRootMetadata("zh-TW").twitter as Record<string, unknown>;
@@ -308,8 +290,6 @@ test("the root names no twitter images: a card follows the og:image of its own p
 
 test("the one root in the file's own segment leaves the picture to the file convention", () => {
 	// app/global-not-found.tsx sits next to app/opengraph-image.tsx: Next folds
-	// the file in there (content-hashed URL) only while the metadata declares no
-	// `images` key at all.
 	__setFlavorForTest("prod");
 	__setEnvForTest(null);
 	const og = buildRootMetadata("zh-TW", { shareImage: false })

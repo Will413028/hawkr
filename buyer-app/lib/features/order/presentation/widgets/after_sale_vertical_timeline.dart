@@ -152,7 +152,6 @@ class AfterSaleVerticalTimeline extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Dot + vertical line column ──
           SizedBox(
             width: 20.w,
             child: Column(
@@ -187,7 +186,6 @@ class AfterSaleVerticalTimeline extends StatelessWidget {
             ),
           ),
           SizedBox(width: 10.w),
-          // ── Label + timestamp column ──
           Expanded(
             child: Padding(
               padding: EdgeInsets.only(bottom: isLast ? 0 : 12.h),

@@ -56,20 +56,14 @@ public class ReviewEventConsumer {
                 return;
             }
 
-            // 1. 訂單層級已評標記（冪等：已 TRUE 不重複更新）
             orderRepository.markReviewed(orderNo);
 
-            // 2. 訂單層級評論快照（most-recent-wins，僅較新評論覆寫）
-            // rating 範圍防呆：僅顯示用快照（低危），範圍外跳過覆寫 + warn，不拋例外
-            // （markReviewed 已完成，照常 ack；權威評分在 review-service）
             String createdAt = payload.path("created_at").asText("");
             int rating = payload.path("rating").asInt(0);
             if (rating < 1 || rating > 5) {
                 log.warn("ReviewEventConsumer.reviewCreated.ratingOutOfRange",
                         "rating 超出 1-5 範圍，跳過評論快照覆寫: rating=" + rating, "orderNo", orderNo);
             } else {
-                // review.created payload key = image_keys，值為 objectKey（49 §5.3/§6.3）；
-                // 落入 ReviewSnapshot.imageKeys，顯示 URL 由 Gateway 組
                 ReviewSnapshot snapshot = new ReviewSnapshot(
                         rating,
                         payload.path("content").asText(""),

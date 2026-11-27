@@ -53,7 +53,6 @@ class SetupBottomBar extends StatelessWidget {
           ? Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // 上一步
                 GestureDetector(
                   onTap: onBack,
                   child: Container(
@@ -76,7 +75,6 @@ class SetupBottomBar extends StatelessWidget {
                     ),
                   ),
                 ),
-                // 下一步 / 完成
                 GestureDetector(
                   onTap: onNext,
                   child: Container(

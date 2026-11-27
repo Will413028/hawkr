@@ -352,7 +352,6 @@ void main() {
       final notifier = container.read(paymentOnboardingProvider.notifier);
       expect(await notifier.start(), PaymentOnboardingOutcome.launched);
 
-      // 賣家在瀏覽器裡的時候，已經有一輪重讀在進行（還沒讀完）。
       final gate = Completer<void>();
       server.gates[server.paymentCalls + 1] = gate;
       final inFlight = container

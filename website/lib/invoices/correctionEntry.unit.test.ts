@@ -12,9 +12,6 @@ describe("correctionEntry", () => {
 	});
 
 	it("後端說不能改時，不論有沒有發票文件都不顯示", () => {
-		// 🔴 這條是本檔的核心：前端若改用「有沒有開過發票」當判準，這裡會轉紅。
-		// canRequestCorrection 涵蓋開票狀態、法定作廢窗口、是否已有進行中的申請
-		// 三件事，只看其中一件必然漂移。
 		expect(
 			correctionEntry({ ...base, canRequestCorrection: false }).visible,
 		).toBe(false);

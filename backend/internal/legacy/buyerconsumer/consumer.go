@@ -107,7 +107,6 @@ func (w *orderCompletedWorker) Work(ctx context.Context, job *river.Job[OrderCom
 	return err
 }
 
-// completeAccountOf 解析帳號後完成它等待中的刪除；找不到帳號、沒有待完成的刪除都不是錯誤。
 func (w *orderCompletedWorker) completeAccountOf(ctx context.Context, resolve func(context.Context) (int64, error)) error {
 	accountID, err := resolve(ctx)
 	if apperr.KindOf(err) == apperr.KindNotFound {

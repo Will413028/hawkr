@@ -27,7 +27,6 @@ Map<String, dynamic> _normalizeOrderItemKeys(Map<String, dynamic> json) {
 /// 頂層欄位），以及把評分統一成 int。
 Map<String, dynamic> _normalizeOrderKeys(Map<String, dynamic> json) {
   final m = Map<String, dynamic>.from(json);
-  // 後端把評分放在 review 物件裡（review.rating / review.content）— 平鋪到頂層
   final review = m['review'];
   if (review is Map) {
     if (!m.containsKey('reviewRating') && review['rating'] != null) {
@@ -37,7 +36,6 @@ Map<String, dynamic> _normalizeOrderKeys(Map<String, dynamic> json) {
       m['reviewContent'] = review['content'];
     }
   }
-  // reviewRating 後端可能回字串「4」「4.0」— freezed 預設不會自動轉 int，先處理。
   final r = m['reviewRating'];
   if (r is String) {
     final n = num.tryParse(r);
@@ -57,7 +55,6 @@ abstract class OrderItem with _$OrderItem {
     @Default('') String skuId,
     @Default('') String skuName,
     @Default('') String quantity,
-    // PayUni #758: 新欄位（成交單價 / 原價快照）
     @Default('') String unitPrice,
     @Default('') String listPrice,
 
@@ -155,7 +152,6 @@ abstract class Order with _$Order {
     @Default('') String odno,
     @Default('') String validationNo,
     @Default('') String paymentMethod,
-    // 付款期限（ISO 8601 UTC，僅 status='0' 時有值；超過後訂單會被系統自動取消，cancelReason 9101）
     @Default('') String paymentDeadline,
     @Default('') String itemCount,
     @Default('') String sellerName,

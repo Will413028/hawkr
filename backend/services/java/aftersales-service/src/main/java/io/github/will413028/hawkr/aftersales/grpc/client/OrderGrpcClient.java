@@ -49,8 +49,6 @@ public class OrderGrpcClient {
             GetOrderForAfterSalesRequest.newBuilder().setOrderNo(orderNo).build()
         );
         log.info("OrderGrpcClient.getOrderForAfterSales.done", "查詢售後訂單資訊完成, code=" + resp.getCode(), "orderNo", orderNo);
-        // 22 號設計書 §2.7 共通規範：caller 不可僅依 typed data 預設值判斷成敗，
-        // 必須先檢 response.code；非 SUCCESS 拋業務例外以避免空 OrderAfterSalesView 觸發後續 parseLongRequired 噴 INVALID_PARAM
         if (resp.getCode() != GrpcResponseCode.SUCCESS.code()) {
             throw new AfterSalesBusinessException(GrpcResponseCode.ORDER_QUERY_FAILED, resp.getMessage());
         }

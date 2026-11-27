@@ -9,7 +9,6 @@ import { dom, React, requireFromTest } from "./fixtures/dom-harness";
  * 「沒有人繞過它」由 dialog-skeleton-guard.test.ts 守。
  */
 
-// JSDOM 不排版，offsetParent 恆為 null，useFocusTrap 會把每個元素都當成看不見。
 Object.defineProperty(dom.window.HTMLElement.prototype, "offsetParent", {
 	configurable: true,
 	get(this: HTMLElement) {
@@ -416,15 +415,12 @@ test("堆疊：Tab 循環只由最上層處理，下層的 focus trap 不介入"
 	const [low, top] = [
 		...doc.querySelectorAll('[role="dialog"]'),
 	] as HTMLElement[];
-	// 上層開啟後焦點在上層第一個可聚焦元素（標題列的關閉鍵）。
 	assert.ok(top.contains(doc.activeElement), "焦點在上層");
 	const lowLast = doc.getElementById("low-last") as HTMLElement;
-	// 對下層的最後一個元素送 Tab：下層不是最上層，不得把焦點繞回下層第一個元素。
 	lowLast.focus();
 	const before = doc.activeElement;
 	await key("Tab");
 	assert.equal(doc.activeElement, before, "下層的 trap 不處理 Tab");
-	// 上層自己的最後一個元素 Tab 會繞回上層第一個。
 	(doc.getElementById("top-last") as HTMLElement).focus();
 	await key("Tab");
 	assert.ok(
@@ -497,8 +493,6 @@ test("CSS：兩套面板都限高、直欄，只有內容區 overflow-y: auto", 
 });
 
 test("樣式不依賴祖先：沒有任何 CSS 規則把對話框骨架限定在某個頁面祖先底下", async () => {
-	// 對話框 portal 到 body，不在頁面的 DOM 子樹裡；`.某頁 .modal-content` 這種規則一律不會命中。
-	// 對話框的樣式只能用骨架自己的 class（.modal-*、.adm-operation-dialog-*）。
 	const { readdir } = await import("node:fs/promises");
 	const files = (await readdir("src", { recursive: true, withFileTypes: true }))
 		.filter((e) => e.isFile() && e.name.endsWith(".css"))
@@ -515,8 +509,6 @@ test("樣式不依賴祖先：沒有任何 CSS 規則把對話框骨架限定在
 		for (const m of css.matchAll(/([^{}]+)\{/gu)) {
 			for (const selector of m[1].split(",")) {
 				const compounds = selector.trim().split(/\s*[>+~]\s*|\s+/u);
-				// 第一個複合選擇器是對話框骨架 class，才是「自己的規則」；骨架出現在後面的位置，
-				// 而且前面有不屬於骨架的祖先 ⇒ 依賴祖先。
 				const classesOf = (c: string) =>
 					[...c.matchAll(/\.([\w-]+)/gu)].map((x) => x[1]);
 				const first = classesOf(compounds[0]);
@@ -691,7 +683,6 @@ test("堆疊：外層與它的內層在同一個 commit 掛載（內層 effect �
 	assert.equal(isInert(inner), false, "最上層的內層不能 inert");
 	await key("Escape");
 	assert.deepEqual(closes, ["內層"], "Escape 只關內層");
-	// 內層與外層同在一個 commit 一起卸載後，隔離完整還原。
 	await React.act(async () => root.unmount());
 	assert.equal(doc.body.style.overflow, "");
 });
@@ -801,7 +792,6 @@ test("toast：對話框開著時進最上層對話框面板內的 live region，
 		"訊息必須在 aria-modal 面板內，面板外的內容可能不進無障礙樹",
 	);
 	assert.equal(reachable(region), true);
-	// body 那份不該同時顯示。
 	const bodyHost = [...doc.body.children].find((c) =>
 		c.hasAttribute("data-modal-exempt"),
 	) as HTMLElement;
@@ -842,7 +832,6 @@ test("toast：手機導覽抽屜是最上層的 modal 時，進抽屜內的 live
 	const { useModalStack } = requireFromTest("../src/lib/a11y") as {
 		useModalStack: (ref: unknown, enabled?: boolean) => unknown;
 	};
-	// 與 admin layout 相同的接法：導覽層登記進 modal 堆疊，抽屜（aria-modal 的 aside）裡放 ToastRegions。
 	const { useRef } = requireFromTest("react") as {
 		useRef: <T>(v: T) => { current: T };
 	};

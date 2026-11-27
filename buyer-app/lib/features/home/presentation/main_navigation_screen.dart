@@ -67,7 +67,6 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   @override
   void initState() {
     super.initState();
-    // 優先用路由傳入的 tab，否則恢復上次記住的 tab
     _currentIndex =
         widget.initialIndex?.clamp(0, _pagesCount - 1) ??
         ref.read(currentTabProvider).clamp(0, _pagesCount - 1);
@@ -96,7 +95,6 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
         showTopBar: false,
       ),
     ];
-    // 首幀後所有 IndexedStack 子頁面 State 均已建立，刷新 topbar 快取
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       setState(() {});
@@ -106,7 +104,6 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   @override
   void didUpdateWidget(covariant MainNavigationScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // null 代表路由未指定 tab，沿用目前狀態；0 是明確的首頁指令。
     final requestedTab = widget.initialIndex?.clamp(0, _pagesCount - 1);
     final oldRequestedTab = oldWidget.initialIndex?.clamp(0, _pagesCount - 1);
     final explicitTabChange =
@@ -154,24 +151,15 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   }
 
   Future<bool> _requestMainTab(int index) async {
-    // Apple App Review 合規：tab 2 (錢包) / 3 (訂單) / 4 (個人) 都是帳號相關，
-    // 訪客點擊時導向登入；首頁(0) / 分類(1) 開放。
     const protectedTabs = {2, 3, 4};
     if (protectedTabs.contains(index)) {
       if (!await requireLogin(context, ref)) return false;
       if (!mounted) return false;
     }
-    // 切換至訂單 tab 時主動刷新，確保資料是最新的
     if (index == 3) {
       ref.read(orderListControllerProvider.notifier).refresh();
     }
 
-    // Deep links such as `/?tab=1&sort=LATEST` make the route query the
-    // authoritative tab selection in BuyerNavigationFrame. Keep that URI in
-    // sync before moving the PageView; otherwise the frame immediately
-    // re-selects the stale route tab and navigating back to the same URI is a
-    // GoRouter no-op. This path also covers LogoHomeButton and the wordmark,
-    // because every tabSwitchRequest is funneled through this method.
     final routeUri = GoRouterState.of(context).uri;
     final routeTab = int.tryParse(routeUri.queryParameters['tab'] ?? '');
     if (routeUri.path == '/' && routeTab != null && routeTab != index) {
@@ -193,9 +181,6 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
     setState(() => _currentIndex = index);
     ref.read(currentTabProvider.notifier).state = index;
 
-    // The persistent PageView and the root URI are two views of the same main
-    // destination. Keep them in lock-step after an in-app tab request so the
-    // outer Navbar cannot be pinned to an older explicit `?tab=` value.
     final uri = GoRouterState.of(context).uri;
     if (uri.path == '/' && uri.queryParameters['tab'] != '$index') {
       context.go('/?tab=$index');
@@ -204,16 +189,13 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Listen for tab switch requests from LogoHomeButton or other widgets
     ref.listen<int>(tabSwitchRequestProvider, (prev, next) {
       if (next >= 0 && next < _pages.length) {
         unawaited(_requestMainTab(next));
-        // Reset so the same tab can be requested again
         ref.read(tabSwitchRequestProvider.notifier).state = -1;
       }
     });
 
-    // 所有頁面都使用共用 AppBar，避免切換時導航欄掉下來的問題
     return Scaffold(
       appBar: _buildSharedTopBar(context),
       body: PageView(
@@ -236,7 +218,6 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
       _orderKey.currentState,
       _settingsKey.currentState,
     ];
-    // 每個 tab 獨立快取自己的 topbar，互不覆蓋
     for (int i = 0; i < states.length; i++) {
       final s = states[i];
       if (s is TopBarProvider) {

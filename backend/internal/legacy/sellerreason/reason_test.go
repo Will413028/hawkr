@@ -8,7 +8,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-// 核准文案（step10e-L0-copy.md）逐字的常值：期望值不經過被測的目錄查詢，改文案就必須同時改這裡。
 var terminationGroundText = map[seller.TerminationGround]string{
 	seller.GroundNotice:             "預告終止（第 21.2 條）",
 	seller.GroundMaterialBreach:     "重大違約未改善",
@@ -138,12 +137,10 @@ func TestTerminationIsTheLegacyAdminSuspensionAndItsGroundIsTheLabel(t *testing.
 			t.Errorf("%s：Of=%q %q %v", ground, code, label, err)
 		}
 	}
-	// 終止事由優先於同時存在的風險措施的標籤。
 	code, label, err := Of(seller.SanctionedBy(risk(seller.RiskFraud), termination(seller.BasisContract, seller.GroundBankruptcy)))
 	if err != nil || code != "9603" || label != "破產" {
 		t.Errorf("標籤優先用終止事由：%q %q %v", code, label, err)
 	}
-	// 依據認定的終止不是違規停權。
 	if class, err := Classify(seller.SanctionedBy(termination(seller.BasisViolation, seller.GroundMaterialBreach), violation())); err != nil || class != Admin {
 		t.Errorf("依據認定的終止要是 Admin：%v %v", class, err)
 	}

@@ -8,7 +8,7 @@ part 'order_list_controller.g.dart';
 
 @riverpod
 class OrderListController extends _$OrderListController {
-  String _status = '0'; // 預設待付款
+  String _status = '0';
   int _page = 1;
   static const int _pageSize = 10;
   int _total = 0;
@@ -18,12 +18,10 @@ class OrderListController extends _$OrderListController {
   @override
   Future<List<Order>> build() async {
     ref.keepAlive();
-    _status = '0'; // 預設待付款 tab
+    _status = '0';
     _page = 1;
     _allOrders = [];
     _isLoadingMore = false;
-    // Apple App Review 合規：訪客（無 token）打 /app/orders 必 401，回空不打。
-    // tab 在 IndexedStack 內會被 eager build，這裡守住避免訪客觸發 401。
     final session = ref.watch(sessionProvider).value;
     if (!hasUsableSession(session)) {
       return const [];
@@ -46,9 +44,6 @@ class OrderListController extends _$OrderListController {
   }
 
   Future<List<Order>> _fetchPage() async {
-    // Apple App Review 合規：訪客（無 token）不打 /app/orders。_fetchPage 是
-    // 唯一打 API 的 choke point（build / switchTab / refresh / loadMore 都經這），
-    // 守在這裡涵蓋 OrderListScreen.initState 直接呼叫 switchTab 的情況。
     final session = ref.read(sessionProvider).value;
     if (!hasUsableSession(session)) {
       return _allOrders;
@@ -61,7 +56,6 @@ class OrderListController extends _$OrderListController {
           pageSize: _pageSize,
         );
     _total = result.total;
-    // 過濾已過期的待付款訂單（backend 尚未自動取消時的安全網）
     final filteredRecords = result.records
         .where((o) => !_isExpiredPendingPayment(o))
         .toList();
@@ -70,7 +64,6 @@ class OrderListController extends _$OrderListController {
     } else {
       _allOrders = [..._allOrders, ...filteredRecords];
     }
-    // 若本頁回傳空，強制結束分頁
     if (result.records.isEmpty) {
       _total = _allOrders.length;
     }
@@ -103,7 +96,6 @@ class OrderListController extends _$OrderListController {
     _page = 1;
     _allOrders = [];
     _isLoadingMore = false;
-    // 下拉刷新時不設 AsyncLoading，避免觸發 TruckLoadingOverlay
     state = await AsyncValue.guard(() => _fetchPage());
   }
 }

@@ -30,7 +30,6 @@ const (
 	kindChargeSync   = "payment.charge_sync"
 )
 
-// chargeOrders 是訂單一方的 port 的測試替身：只回登記過的訂單；記下呼叫是否在 DB transaction 內。
 type chargeOrders struct {
 	mu     sync.Mutex
 	orders map[string]PaymentOrder
@@ -64,10 +63,8 @@ type chargeFixture struct {
 	module  *Module
 	now     time.Time
 	changes []PaymentChanged
-	// anomalies 是同 transaction 內收到的 MoneyAnomaly（告警事件），anomalyInTx 記下是否真的在 transaction 內。
 	anomalies   []MoneyAnomaly
 	anomalyInTx []bool
-	// refundChanges 與 autoDone 是同 transaction 內收到的 RefundChanged 與 AutoRefundCompleted，refundEventInTx 記下兩者是否真的在 transaction 內。
 	refundChanges   []RefundChanged
 	autoDone        []AutoRefundCompleted
 	refundEventInTx []bool
@@ -80,7 +77,6 @@ func setupCharge(t *testing.T) *chargeFixture {
 	return setupChargeWith(t, nil)
 }
 
-// setupChargeWith 以 wrap 包住付款 provider（nil 就用 ChargeFake 本身）；收款帳戶的 Fake 同時登記，證明兩個 provider 的名稱不衝突。
 func setupChargeWith(t *testing.T, wrap func(*ChargeFake) ChargeProvider) *chargeFixture {
 	t.Helper()
 	steps := []testdb.Step{testdb.Migrations(migrate.Module{Name: inbox.Schema, Dir: inbox.Migrations()}, migrate.Module{Name: adminaudit.Schema, Dir: adminaudit.Migrations()}, migrate.Module{Name: "payment", Dir: Migrations()})}
@@ -742,8 +738,6 @@ VALUES ($1, (SELECT id FROM payment.payment_orders WHERE payment_id = $2), 7, 10
 	}
 	must(t, exec("UPDATE payment.transfers SET status = 'SUCCEEDED', external_transfer_id = 'tr_1', called_at = now(), reversed_amount = 60 WHERE status = 'PENDING'"))
 	ptr := func(s string) *string { return &s }
-	// insertRefund 寫一筆退款列：status 與撤回彙總狀態 reversalStatus 各自獨立；ext 是 provider 的退款 ID（有就同時寫呼叫時刻），reason 是撤回的原因，
-	// recovered 非 nil 表示撤回額已全部成立（reversal_recovered 等於預留額），nil 是 0。
 	insertRefund := func(key, status, reversalStatus string, reversalAmount int64, ext, reason, recovered *string) error {
 		return exec(`INSERT INTO payment.refunds (id, payment_order_id, request_key, amount, status, reversal_status, reversal_amount, reversal_reason, reversal_recovered,
 	external_refund_id, refund_called_at, failure_reason, created_at, updated_at)

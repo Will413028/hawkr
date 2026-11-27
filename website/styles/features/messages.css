@@ -1,45 +1,16 @@
-/* Extracted from styles/globals.css.
- * Buyer messages list and chat thread UI.
- * Keep import order in styles/globals.css unless intentionally changing cascade.
- */
 
-/* ============================================================
-   Phase 4 — Chat (messages list + thread)
-   ============================================================ */
 body .page-content:has(.chat-page) {
 	background: transparent;
-	/* The chat owns a fixed viewport-fit height (`.chat-shell`), so the
-	 * global `.page-content { min-height: 100dvh }` floor only adds dead
-	 * space below it before the footer. Drop the floor here so the
-	 * wrapper shrink-wraps the chat and the footer sits right beneath it.
-	 * Scoped via `:has(.chat-page)` — during streaming nav the chat isn't
-	 * mounted yet, so the base 100dvh floor still guards footer-jump. */
 	min-height: 0;
 }
 
 .chat-page {
-	/* Aligned with the navbar: `.site-nav` is `px-6` (24px) around a
-	 * `max-w-[1440px]` inner pill, so the chat column uses the same
-	 * 24px gutters and a 1440 + 48 cap — the conversation surface
-	 * starts and ends exactly where the navbar does. Bottom padding
-	 * fixed to 16px so the shell sits 16px from the page foot. */
 	width: 100%;
 	max-width: 1488px;
 	margin: 0 auto;
 	padding: var(--page-start-gap, var(--hkui-space-4)) 24px 16px;
 }
 
-/**
- * In the seller workspace, .seller-shell is already a grid with its
- * own 44px outer gutter + 24px sidebar/main grid gap, so other
- * seller-center pages (SellerPageShell wrapped) sit flush against
- * the grid track's left edge. The buyer-side .chat-page defaults
- * (width-cap + clamp(16,3vw,48) inner padding) stack on top of that
- * and shove the chat-shell another ~48px to the right — visually
- * the messages page ends up with MORE inset than every other
- * seller-center page. Strip those buyer-flavoured constraints so
- * .chat-shell aligns with insights / orders / posts / etc.
- */
 .seller-shell .chat-page {
 	width: 100%;
 	max-width: none;
@@ -48,13 +19,6 @@ body .page-content:has(.chat-page) {
 	padding-right: 0;
 }
 
-/* Desktop only: `.seller-main` stretches to the (tall) workspace sidebar's
- * height, but `.chat-shell`'s viewport-fit `calc(100dvh - 160px)` is shorter,
- * leaving a dead band between the compose bar and the footer. Let the chat
- * fill the column instead of its viewport-derived height so it ends flush
- * with the rest of the workspace, just above the footer. Scoped to >=960px:
- * below that `.seller-shell` collapses to `display:block` with no definite
- * height to flex against, so the chat keeps its `calc(100dvh - 140px)` fit. */
 @media (min-width: 960px) {
 	.seller-shell .chat-page {
 		flex: 1;
@@ -71,45 +35,19 @@ body .page-content:has(.chat-page) {
 .chat-shell {
 	display: grid;
 	grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
-	/* Force the single grid row to fill the shell height instead of
-	 * defaulting to `auto` (which would size to content and let the
-	 * thread body grow past the viewport — preventing the inner
-	 * `overflow-y: auto` from kicking in). `minmax(0, 1fr)` also
-	 * gives the row a 0 min-track so its flex-column children can
-	 * shrink and scroll independently. */
 	grid-template-rows: minmax(0, 1fr);
-	/* `dvh` over `vh` so the shell shrinks correctly on iOS Safari /
-	 * Android Chrome where the URL bar collapses. Subtracts navbar +
-	 * page top padding + topbar + 16px bottom padding so the shell
-	 * fits the viewport exactly with no trailing whitespace.
-	 * `--keyboard-inset` (set by useKeyboardInset on the chat thread) is
-	 * the soft-keyboard height — 0 unless a field is focused — so the
-	 * shell collapses flush above the keyboard instead of letting the
-	 * browser scroll the footer into the gap below the compose bar. */
 	height: calc(100dvh - 160px - var(--keyboard-inset, 0px));
 	min-height: 480px;
-	/* A restrained workspace frame keeps list and conversation related without
-	 * laying a white elevated sheet over the site's paper surface. Inner controls,
-	 * selected rows, bubbles and the sidebar tint carry the hierarchy. */
 	background: var(--surface-page);
 	border: 1px solid var(--hkui-divider);
 	border-radius: var(--hkui-radius-2xl);
 	box-shadow: var(--hkui-shadow-sm);
 	overflow: hidden;
 }
-/* When the soft keyboard is open the shell must shrink past its
- * min-height floor (a closed-state guard) to sit flush above the
- * keyboard — otherwise the floor wins and the compose bar stays
- * trapped behind the keyboard with the footer showing above it. */
 :root[data-keyboard-open] .chat-shell {
 	min-height: 0;
 }
 .chat-sidebar {
-	/* Mirror the thread column's flex-column + min-height:0 setup so
-	 * the inner `.chat-sidebar__list` can scroll within the sidebar
-	 * column rather than letting all rows push the grid taller than
-	 * the viewport. A quiet tonal surface separates navigation from
-	 * the conversation without turning each row into a card. */
 	min-width: 0;
 	min-height: 0;
 	overflow: hidden;
@@ -179,10 +117,6 @@ body .page-content:has(.chat-page) {
 	outline: none;
 	box-shadow: var(--hkui-focus-ring, var(--shadow-focus-ring));
 }
-/* Search pill — App parity: same `#F3F3F5` light-gray fill as the
- * compose input, full pill radius, 44px tall. Container hugs the
- * sidebar's inner width so the pill stretches edge-to-edge, matching
- * the navbar's full-width pill above it. */
 .chat-sidebar__search {
 	position: relative;
 	padding: var(--hkui-space-3) var(--hkui-space-3) var(--hkui-space-2);
@@ -242,16 +176,10 @@ body .page-content:has(.chat-page) {
 	background: color-mix(in srgb, var(--hkui-content2) 76%, transparent);
 }
 .chat-sidebar__filters button {
-	/* Fixed height + zero vertical padding + flex-center keeps the
-	 * label visually symmetric regardless of line-height / Chinese
-	 * glyph metrics. Padding-only didn't centre cleanly because CJK
-	 * glyphs don't sit on the same baseline as the line-box mid. */
 	display: inline-flex;
 	position: relative;
 	align-items: center;
 	justify-content: center;
-	/* 視覺仍是 32px 膠囊，但命中區補到 44px（DESIGN.md §觸控）。
-	 * ScPill 的 32px 是既有 divergence，明列為不得在新工作複製。 */
 	height: 32px;
 	box-sizing: border-box;
 	border: 1px solid transparent;
@@ -309,9 +237,6 @@ body .page-content:has(.chat-page) {
 	:is(.chat-sidebar__filter-icon, .chat-sidebar__filter-agent-mark) {
 	transform: translateY(-1px) scale(1.04);
 }
-/* 選中態是「被選到的篩選」，不是頁面的主要動作。實心深底＋白字會讓兩顆
- * 分頁比真正的主要動作（＋ 新對話）還搶眼。參照 WhatsApp 的 chip rail：
- * 只有選中項有淡色底，字色轉品牌色，其餘維持外框。 */
 .chat-sidebar__filters button[data-active="true"] {
 	background: var(--theme-primary-subtle);
 	border-color: var(--theme-primary-border);
@@ -319,8 +244,6 @@ body .page-content:has(.chat-page) {
 	box-shadow: inset 0 1px 0
 		color-mix(in srgb, var(--hkui-content1) 72%, transparent);
 }
-/* 分頁上的筆數：讓「搜到的東西在另一個分頁」這件事看得出來，
- * 使用者才不會以為整個收件匣都沒東西。 */
 .chat-sidebar__filter-count {
 	margin-left: 6px;
 	font-variant-numeric: tabular-nums;
@@ -335,7 +258,6 @@ body .page-content:has(.chat-page) {
 	position: absolute;
 	inset: -6px 0;
 }
-/* 安靜的次要動作：跨分頁「另一邊有 N 筆符合」用它，不跟主要動作搶。 */
 .chat-sidebar__empty-action.chat-sidebar__empty-action--quiet {
 	border: 1px solid var(--theme-primary-border);
 	background: var(--theme-primary-subtle);
@@ -392,9 +314,6 @@ body .page-content:has(.chat-page) {
 	background: rgb(var(--color-status-danger-rgb) / 0.16);
 	color: #ffd0bd;
 }
-/* 空狀態沒有框。虛線框在通用介面語彙裡代表「拖放區／尚未填滿的佔位」，
- * 用在靜止的空收件匣上會讓人以為是元件載入失敗。參照 Notion Updates 與
- * Gmail 收件匣：圖示＋一句標題＋一句說明，置中、留白，沒有容器。 */
 .chat-sidebar__empty {
 	display: flex;
 	flex: 1 1 auto;
@@ -423,8 +342,6 @@ body .page-content:has(.chat-page) {
 	max-width: 30ch;
 	line-height: 1.6;
 }
-/* 空狀態自己帶主要動作，而不是叫使用者回頭去找上面的另一個控制項
- * （Gmail 的 Compose 就在空畫面上）。 */
 .chat-sidebar__empty-action {
 	display: inline-flex;
 	min-height: 44px;
@@ -448,9 +365,6 @@ body .page-content:has(.chat-page) {
 	overflow: hidden;
 	flex-direction: column;
 }
-/* 清單底部的「顯示 1 - 6 / 6」。是側欄的頁尾而不是清單的最後一列——它講的
- * 是整份清單的規模，跟著列一起捲走就永遠只在捲到底時看得到。`flex-shrink: 0`
- * 讓它在短視窗下仍守住自己的高度，被壓掉的是上面可捲動的面板。 */
 .chat-sidebar__range {
 	flex-shrink: 0;
 	margin: 0;
@@ -518,17 +432,10 @@ body .page-content:has(.chat-page) {
 .chat-sidebar__empty-action:hover {
 	background: var(--theme-action-primary-hover, var(--hkui-primary));
 }
-/* List rows — Airbnb-flat: rows are transparent and contiguous; a
- * soft tint appears on hover and a slightly stronger olive tint marks
- * the active thread. Default rows have no borders, shadows, or lift;
- * the active row keeps one low-contrast inset outline as a non-color cue. */
 .chat-sidebar__list {
 	list-style: none;
 	margin: 0;
 	padding: var(--hkui-space-2) var(--hkui-space-3) var(--hkui-space-4);
-	/* `flex: 1` + `min-height: 0` lets the list claim the remaining
-	 * sidebar height and scroll internally, instead of growing to fit
-	 * all rows and pushing the column past the viewport. */
 	flex: 1 1 0;
 	min-height: 0;
 	overflow-y: auto;
@@ -635,22 +542,6 @@ body .page-content:has(.chat-page) {
 	justify-content: center;
 }
 
-/* ============================================================
- * Sidebar collapsed (icon-rail) state — mid-width band ONLY.
- *
- * Triggered by `data-sidebar-collapsed="true"` on `.chat-shell`
- * (`useChatSidebarCollapsed`, persisted in localStorage). Shrinks
- * the column from 320px to 72px and switches each conversation row
- * to an avatar-only target with the unread badge floating top-right.
- *
- * Scoped to 960–1199px: that's the only range where the thread is
- * genuinely cramped and trading the list for width is a fair deal.
- * At >=1200px the conversation list is the chat's navigation — an
- * icon rail there just strands the user in a single thread with no
- * context (the screenshot-famous "lonely arrow" state) — so the
- * stored preference is ignored and the sidebar stays expanded.
- * Below 960px the shell is single-column and collapse is moot.
- * ============================================================ */
 .chat-shell {
 	transition: grid-template-columns 260ms cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -667,7 +558,6 @@ body .page-content:has(.chat-page) {
 	.chat-shell[data-sidebar-collapsed="true"] .chat-sidebar__main,
 	.chat-shell[data-sidebar-collapsed="true"] .chat-sidebar__item-head,
 	.chat-shell[data-sidebar-collapsed="true"] .chat-sidebar__preview,
-	/* 72px 的 rail 裝不下一段中文計數，硬塞會擠成三行。 */
 	.chat-shell[data-sidebar-collapsed="true"] .chat-sidebar__range {
 		display: none;
 	}
@@ -699,9 +589,6 @@ body .page-content:has(.chat-page) {
 	.chat-shell[data-sidebar-collapsed="true"]
 		.chat-sidebar__filters[data-kind="sections"]
 		button::before {
-		/* Expanded tabs use this pseudo-element to enlarge a 32px visual pill.
-		 * Compact tabs are already real 44px targets, so extending it would make
-		 * the two vertical hit areas overlap. */
 		inset: 0;
 	}
 	.chat-shell[data-sidebar-collapsed="true"]
@@ -747,8 +634,6 @@ body .page-content:has(.chat-page) {
 	.chat-shell[data-sidebar-collapsed="true"] .chat-sidebar__item:focus-visible {
 		outline-offset: -2px;
 	}
-	/* Badge floats over the avatar in collapsed mode so the unread count
-	 * is still visible without the row text. */
 	.chat-shell[data-sidebar-collapsed="true"] .chat-sidebar__badge {
 		position: absolute;
 		top: 2px;
@@ -776,9 +661,6 @@ body .page-content:has(.chat-page) {
 		transform: none;
 	}
 }
-/* The toggle only renders meaningfully inside the collapse band —
- * everywhere else the sidebar is locked expanded (or full-width on
- * mobile) and the button would be a no-op, so hide it. */
 .chat-sidebar__collapse {
 	display: none;
 }
@@ -788,14 +670,6 @@ body .page-content:has(.chat-page) {
 	}
 }
 
-/* ============================================================
- * Context panel — third grid column (buyer↔seller threads only,
- * rendered by ThreadClient as a `.chat-shell` sibling of
- * `.thread-page`). The Airbnb "Reservation" slot: shop card +
- * a few catalog products + storefront CTA, keeping the commerce
- * context next to the conversation. Hidden below 1440px so the
- * thread keeps its width on smaller desktops.
- * ============================================================ */
 .chat-context {
 	display: none;
 }
@@ -810,8 +684,6 @@ body .page-content:has(.chat-page) {
 		min-width: 0;
 		min-height: 0;
 		overflow-y: auto;
-		/* Reserve the scrollbar track so content never reflows/compresses
-		 * against the right edge once the rail overflows. */
 		scrollbar-gutter: stable;
 		padding: var(--hkui-space-5) var(--hkui-space-4);
 		border-left: 1px solid var(--hkui-divider);
@@ -853,8 +725,6 @@ body .page-content:has(.chat-page) {
 	font-size: 0.875rem;
 	font-weight: 700;
 	line-height: 1;
-	/* CJK has no word boundaries, so any width pressure breaks 前往賣場 across
-	 * two lines — keep it on one. */
 	white-space: nowrap;
 	color: var(--hkui-primary-foreground);
 	text-decoration: none;
@@ -899,9 +769,6 @@ body .page-content:has(.chat-page) {
 [data-theme="dark"] .chat-context__product:hover {
 	background: rgb(var(--color-neutral-white-rgb) / 0.06);
 }
-/* Shared box for both the thumbnail <img> and the AppImage empty-state
- * fallback (folder-image), so a product with no image keeps the same
- * footprint as one with a photo. */
 .chat-context__thumb {
 	width: 52px;
 	height: 52px;
@@ -929,22 +796,6 @@ body .page-content:has(.chat-page) {
 	color: var(--hkui-primary);
 }
 
-/* ============================================================
- * Empty states — shared "stage" wrapper holding a soft layered
- * background, a halo glow, three orbiting brand-color sparkles,
- * and a centered card with icon + copy. Used by both
- *   - `.chat-empty-panel`  (no thread selected, only on >=960px)
- *   - `.thread-empty`      (thread open, no messages yet)
- *
- * Motion grammar (mirrors GSAP `back.out(1.7)` — see
- * cubic-bezier(0.34, 1.56, 0.64, 1)):
- *   1. Card scales 0.86 → 1 with overshoot, 600ms.
- *   2. Title / copy / chips stagger up 8px with power3.out feel.
- *   3. Halo "breathes" 1 → 1.06 forever, 6s ease-in-out.
- *   4. Sparkles drift with desync delays so the panel feels alive.
- * Honours `prefers-reduced-motion`: cuts all idle motion and lands
- * the card at its final transform with no entrance jump.
- * ============================================================ */
 .chat-empty-panel {
 	position: relative;
 	min-width: 0;
@@ -952,8 +803,6 @@ body .page-content:has(.chat-page) {
 	align-items: center;
 	justify-content: center;
 	padding: clamp(40px, 6vw, 72px) clamp(24px, 4vw, 56px);
-	/* Flat — shares the page background; the wallpaper ::before (see
-	 * the thread-page block) plus halo/dots carry the visual interest. */
 	background: transparent;
 	overflow: hidden;
 	isolation: isolate;
@@ -967,15 +816,9 @@ body .page-content:has(.chat-page) {
 	padding: clamp(24px, 3vw, 36px) clamp(24px, 3vw, 40px) clamp(28px, 3vw, 36px);
 	text-align: center;
 	color: var(--hkui-foreground-muted);
-	/* No card chrome — the content sits directly on the panel's gradient
-	 * stage. The old white card-on-wash-on-shell stack read as "a box
-	 * inside a box inside a box"; the halo + dots already give the
-	 * content enough figure/ground separation. */
 	animation: chat-empty-pop 600ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
-/* Halo behind the icon — radial sage glow that breathes. The
- * icon sits on top of it so the icon feels lit-from-behind. */
 .chat-empty-panel__icon {
 	position: relative;
 	width: 168px;
@@ -1020,9 +863,6 @@ body .page-content:has(.chat-page) {
 	color: var(--page-chat-empty-copy);
 }
 
-/* Quick-reply chips — populates the compose textarea in
- * `.thread-empty`. In `.chat-empty-panel` they're decorative tips
- * rendered as `<span>`s (no click target). Both share the pill look. */
 .chat-empty-chips {
 	margin: 18px 0 0;
 	padding: 0;
@@ -1142,10 +982,6 @@ body .page-content:has(.chat-page) {
 	box-shadow: 0 0 0 3px rgb(var(--color-brand-primary-rgb) / 0.25);
 }
 
-/* Entrance: scale + opacity with GSAP `back.out(1.7)` overshoot —
- * cubic-bezier(0.34, 1.56, 0.64, 1) approximates the curve so the
- * card lands with a satisfying "pop". `both` keeps the starting
- * state on first paint to avoid a flash of full-size content. */
 @keyframes chat-empty-pop {
 	from {
 		opacity: 0;
@@ -1193,15 +1029,7 @@ body .page-content:has(.chat-page) {
 	}
 }
 
-/* Thread page — chat bubbles */
 .thread-page {
-	/* `min-height: 0` lets the flex column's body child claim the
-	 * remaining space and scroll internally; without it the body's
-	 * `flex: 1` measures against intrinsic content size and grows
-	 * past the grid cell. `overflow: hidden` clips so the inner
-	 * scroller is the only thing that can move. Transparent +
-	 * isolate so the ::before wallpaper below can sit at z-index -1
-	 * inside this column without escaping behind the page. */
 	position: relative;
 	isolation: isolate;
 	min-width: 0;
@@ -1212,16 +1040,6 @@ body .page-content:has(.chat-page) {
 	background: transparent;
 }
 
-/* Ambient produce wallpaper — a 280px line-art tile (leaf, pea pod,
- * primary, strawberry, orange slice, berry, cherries, watermelon
- * slice, grapes, pear, apple, scattered seeds). Keep this bounded conversation
- * texture static: the shared site canvas owns the ambient animation.
- * Drawn at full stroke opacity
- * inside the SVG and faded via layer `opacity` so the strength is
- * tunable from one number per theme. Fixed to the column (not the
- * scroller) so messages glide over a stable room. Shared with the
- * "no thread selected" panel so both right-pane states live in the
- * same room. */
 .thread-page::before,
 .chat-empty-panel::before {
 	content: "";
@@ -1238,10 +1056,6 @@ body .page-content:has(.chat-page) {
 	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280' viewBox='0 0 280 280'%3E%3Cg fill='none' stroke='%23f1cd70' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 58c0-15 11-26 26-26 0 15-11 26-26 26z'/%3E%3Cpath d='M20 56c5-11 13-18 22-21'/%3E%3Cpath d='M84 18c12 2 20 10 22 20-10-2-18-10-22-20z'/%3E%3Ccircle cx='92' cy='26' r='2.5'/%3E%3Ccircle cx='98' cy='31' r='2.5'/%3E%3Cpath d='M170 56V40'/%3E%3Cpath d='M170 40c0-9-6-13-12-13 0 9 6 13 12 13z'/%3E%3Cpath d='M170 40c0-9 6-13 12-13 0 9-6 13-12 13z'/%3E%3Cpath d='M235 44c8 0 13 4 13 10 0 8-7 15-13 18-6-3-13-10-13-18 0-6 5-10 13-10z'/%3E%3Cpath d='M235 44v-7'/%3E%3Cpath d='M229 41c2-3 4-4 6-4s4 1 6 4'/%3E%3Ccircle cx='230' cy='57' r='1'/%3E%3Ccircle cx='240' cy='57' r='1'/%3E%3Ccircle cx='235' cy='64' r='1'/%3E%3Ccircle cx='64' cy='142' r='12'/%3E%3Cpath d='M64 142h11'/%3E%3Cpath d='M64 142l-6 9'/%3E%3Cpath d='M64 142l-5-10'/%3E%3Ccircle cx='112' cy='92' r='6'/%3E%3Cpath d='M112 86c1-5 4-8 8-9'/%3E%3Ccircle cx='128' cy='132' r='5.5'/%3E%3Ccircle cx='142' cy='130' r='5.5'/%3E%3Cpath d='M128 127c2-9 7-13 12-15'/%3E%3Cpath d='M142 125c-1-8-1-11-2-13'/%3E%3Cpath d='M138 110c4-2 7-1 8 2-3 2-6 1-8-2z'/%3E%3Cpath d='M192 142a18 18 0 0 1 36 0z'/%3E%3Cpath d='M197 142a13 13 0 0 1 26 0'/%3E%3Ccircle cx='204' cy='148' r='1'/%3E%3Ccircle cx='216' cy='148' r='1'/%3E%3Ccircle cx='210' cy='154' r='1'/%3E%3Ccircle cx='34' cy='224' r='5.5'/%3E%3Ccircle cx='46' cy='224' r='5.5'/%3E%3Ccircle cx='40' cy='234' r='5.5'/%3E%3Cpath d='M40 218v-9'/%3E%3Cpath d='M40 209c4-3 8-2 9 1-3 3-7 2-9-1z'/%3E%3Cpath d='M125 218c3 0 5 2 5 5 0 3 1 5 3 8 2 3 3 6 3 9 0 7-5 11-11 11s-11-4-11-11c0-3 1-6 3-9 2-3 3-5 3-8 0-3 2-5 5-5z'/%3E%3Cpath d='M125 218c0-4 2-6 4-7'/%3E%3Ccircle cx='200' cy='240' r='10'/%3E%3Cpath d='M200 230c0-4 2-6 4-8'/%3E%3Cpath d='M204 223c4-3 8-2 9 1-3 3-7 2-9-1z'/%3E%3Ccircle cx='262' cy='210' r='2'/%3E%3Ccircle cx='90' cy='182' r='2'/%3E%3Ccircle cx='160' cy='14' r='1.5'/%3E%3Ccircle cx='268' cy='110' r='1.5'/%3E%3C/g%3E%3C/svg%3E");
 	opacity: 0.045;
 }
-/* Thread header — uses the same cream/primary surface as the sidebar
- * so the two columns read as one continuous panel. The APP used the
- * brand-olive AppBar; on web the sidebar already carries the brand
- * presence so a tonal match feels less heavy. */
 .thread-page__head {
 	flex-shrink: 0;
 	display: flex;
@@ -1253,9 +1067,6 @@ body .page-content:has(.chat-page) {
 	color: var(--hkui-foreground);
 	border-bottom: 1px solid var(--page-chat-thread-head-border);
 }
-/* Back-to-list affordance — hidden on desktop (the sidebar is always
- * visible alongside the thread) and shown on mobile where the
- * sidebar collapses out of view once a thread opens. */
 .thread-page__back {
 	display: none;
 	width: 44px;
@@ -1327,7 +1138,6 @@ body .page-content:has(.chat-page) {
 	background: var(--page-chat-online);
 	box-shadow: 0 0 0 2px var(--page-chat-online-ring);
 }
-/* Peer offline — quiet grey dot, no ring. */
 .thread-page__head-status[data-state="offline"]::before {
 	background: var(--hkui-foreground-soft);
 }
@@ -1346,9 +1156,6 @@ body .page-content:has(.chat-page) {
 	}
 }
 
-/* Thread body — fully transparent: the room's atmosphere comes from
- * the static wallpaper on `.thread-page::before`, so the scroller
- * itself adds no surface of its own (Airbnb-flat). */
 .thread-page__body {
 	flex: 1;
 	overflow-y: auto;
@@ -1385,22 +1192,6 @@ body .page-content:has(.chat-page) {
 	gap: 6px;
 }
 
-/* Bubbles — Telegram-style:
- *   - Asymmetric 6px corner on the speaker side (bottom-left for
- *     theirs, bottom-right for mine), rest at 16px so the bubble
- *     reads as a "pointed" speech container without a separate tail
- *     element fighting the underlying gradient bg
- *   - Curved tail blob (`::before`) at the speaker corner using an
- *     SVG mask so the bubble silhouette matches the Telegram
- *     desktop client. Tail uses a solid token-derived color (not
- *     the bubble's gradient) so light/dark switches stay clean
- *   - Inline timestamp (`<small>`) is float-right inside the
- *     bubble: short messages get "text · time" on one line, long
- *     ones wrap the time to a trailing slot — same trick the
- *     Telegram web client uses
- *   - Image bubbles drop the text padding, frame the media with a
- *     14px radius matching the bubble, and overlay the timestamp at
- *     the bottom-right with a dark scrim for legibility */
 .thread-page__bubble {
 	position: relative;
 	max-width: min(75%, 540px);
@@ -1425,13 +1216,6 @@ body .page-content:has(.chat-page) {
 	box-shadow: var(--page-chat-bubble-mine-shadow);
 }
 
-/* Tail blob — Telegram-style curved protrusion at the speaker
- * corner. Drawn via a CSS mask so we can color it independently
- * from the bubble's gradient without seams. 9×14px matches the
- * proportions of the desktop client's tail. The mask path: start
- * at top-right (touching the bubble corner), down the right edge,
- * across the bottom, then curve back up with a concave swoop —
- * carving the classic "tear-drop" shape. */
 .thread-page__bubble:not(.thread-page__bubble--card)::before {
 	content: "";
 	position: absolute;
@@ -1466,11 +1250,6 @@ body .page-content:has(.chat-page) {
 	word-break: break-word;
 }
 
-/* Date / time separator pill — APP parity (chat_room_screen.dart
- * 1262-1284). Shown between consecutive messages with >5min gap.
- * Centred in the list, soft 8% wash, gray text. Visually a "rest
- * stop" in the conversation flow without stealing focus from the
- * bubbles. */
 .thread-page__separator {
 	align-self: center;
 	margin: 16px 0 4px;
@@ -1496,12 +1275,6 @@ body .page-content:has(.chat-page) {
 	color: rgb(255 255 255 / 0.55);
 }
 
-/* Card bubble — when the message body is a `.chat-card` we drop the
- * bubble chrome (background, padding, shadow, tail) so the card owns
- * its own surface. Mirrors the Flutter app's `_ProductCardMsg` which
- * rendered the card directly without a wrapping bubble. The bubble
- * still controls alignment (left for peer, right for mine) and the
- * trailing timestamp `<small>` stays beneath the card. */
 .thread-page__bubble--card,
 .thread-page__bubble.is-mine.thread-page__bubble--card {
 	background: transparent;
@@ -1525,27 +1298,8 @@ body .page-content:has(.chat-page) {
 	text-align: right;
 }
 
-/* ============================================================
- * Structured-payload card (product / order) — Figma-aligned.
- *
- * Two visual variants, switched by `[data-self="true"]`:
- *   - peer: white card (light) / ink-frosted (dark), olive-grey
- *     border, dark text, APP-orange price for product
- *   - self: brand-primary-strong --color-ink-300 bg, cream text, no border
- *
- * Product card uses a 50px media block (APP Figma 10022:101654).
- * Order card omits the media block — APP renders 3 text rows + a
- * chevron / actions row (Figma 10022:101541 / 10022:101595).
- * ============================================================ */
 
-/* APP parity: warning-yellow 50% pill, text inherits
- * the card's color so self (cream) and peer (dark) both read clean. */
 
-/* ===== Order card chrome — 3 rows + actions ====================
- * Figma 10022:101595 (peer) / 10022:101541 (self). No media block;
- * radius 16 (peer) / 20 (self); padding 10/12; chevron is replaced
- * by the action row in web (matches the buyer's mental model where
- * the buttons ARE the affordance). */
 .chat-card--order {
 	border-radius: var(--radius-lg);
 }
@@ -1553,20 +1307,9 @@ body .page-content:has(.chat-page) {
 	border-radius: 20px;
 }
 
-/* Action row — peer cards get a hairline divider; self cards drop
- * it (background contrast is enough). */
 
-/* Peer (received) buttons — outline = transparent + dark border,
- * solid = brand-secondary accent so the primary action pops on white. */
 
-/* Self (sent) buttons — outline = transparent + cream border,
- * solid = cream bg + brand-primary-strong text. Keeps high contrast on the
- * olive surface and ties back to the buyer's own bubble palette. */
 
-/* Timestamp — floats right inside the bubble. With `<p>` inline,
- * short text + time share a line; longer text wraps and the time
- * lands on its own trailing slot. Negative margins pull it tight
- * to the bubble's bottom-right corner so it visually anchors. */
 .thread-page__bubble small {
 	float: right;
 	margin: 6px -2px -2px 8px;
@@ -1580,12 +1323,6 @@ body .page-content:has(.chat-page) {
 	color: var(--page-chat-bubble-mine-time);
 }
 
-/* Read receipt — LINE-style 既読 glyph that floats outside the bubble's
- * left edge (right-aligned bubbles, so this lands between bubble and
- * peer column). Anchored to the bottom of the bubble so the eye sits
- * level with the timestamp inside. Colour is the peer-time muted
- * gray — readable against the cream / dark thread bg without
- * competing with the bubble's own contents. */
 .thread-page__read {
 	position: absolute;
 	left: -22px;
@@ -1601,11 +1338,6 @@ body .page-content:has(.chat-page) {
 	color: rgb(var(--color-ink-100-rgb) / 0.45);
 }
 
-/* Image / media bubble — when the body is an `<img>` instead of
- * a `<p>`, drop the text padding and let the image fill the
- * bubble. Tail still sits at the speaker corner via the rules
- * above. Timestamp gets a dark scrim so it's legible over any
- * image (light or dark). */
 .thread-page__bubble:has(img) {
 	padding: 3px;
 	max-width: min(60%, 320px);
@@ -1634,16 +1366,6 @@ body .page-content:has(.chat-page) {
 	backdrop-filter: blur(4px);
 }
 
-/* Image attachment fallback — rendered when an image URL 404s or
- * is empty. Sized like a normal chat image (200×140) so the
- * conversation rhythm doesn't collapse to a tiny inline line.
- * Soft grain-tinted surface + dashed border reads as "frame with
- * no picture". Icon + label both use currentColor so the
- * placeholder adapts to the bubble foreground (primary on peer,
- * white on mine). The wrapping bubble's `:has(img)` rule doesn't
- * fire (no actual `<img>` in DOM), so the bubble keeps standard
- * text padding and the trailing `<small>` floats to the
- * bottom-right naturally. */
 .thread-page__bubble-attachment {
 	display: inline-flex;
 	flex-direction: column;
@@ -1672,9 +1394,6 @@ body .page-content:has(.chat-page) {
 	color: inherit;
 	opacity: 0.72;
 }
-/* Mine — white-on-green bubble. Use translucent white surface +
- * subtle outline so the placeholder still reads as "missing
- * frame" against the primary fill. */
 .thread-page__bubble.is-mine .thread-page__bubble-attachment {
 	color: var(--color-neutral-white);
 	background: rgb(var(--color-neutral-white-rgb) / 0.14);
@@ -1719,11 +1438,6 @@ body .page-content:has(.chat-page) {
 	}
 }
 
-/* Quick-reply chips strip — sits directly above the composer (where
- * the chips actually act: tapping one fills the textarea below) on the
- * same compose surface. Only rendered while the thread has no
- * messages. The following `.thread-page__compose` drops its top
- * border so strip + bar read as one surface. */
 .thread-page__chips {
 	flex-shrink: 0;
 	display: flex;
@@ -1734,8 +1448,6 @@ body .page-content:has(.chat-page) {
 	background: transparent;
 }
 
-/* Expectation-management line — peer offline / realtime paused. Sits
- * on the compose surface directly above the input. */
 .thread-page__notice {
 	flex-shrink: 0;
 	margin: 0;
@@ -1747,9 +1459,6 @@ body .page-content:has(.chat-page) {
 	background: transparent;
 }
 
-/* Whichever of notice / chips / compose comes first owns the hairline
- * top border; the rest stack borderless so the strips read as one
- * compose surface. */
 .thread-page__notice + .thread-page__notice,
 .thread-page__notice + .thread-page__chips,
 .thread-page__notice + .thread-page__compose,
@@ -1758,12 +1467,6 @@ body .page-content:has(.chat-page) {
 	box-shadow: none;
 }
 
-/* Compose bar — App parity:
- *   - Cream container bg (sage wash) with hairline top border + lift
- *   - Single pill input field (44px tall, full radius, light-gray fill)
- *   - Circular send button (44px, olive bg, white icon) on the right
- *     of the pill — replaces the rectangular "傳送" button. The send
- *     button text is hidden via class but stays in DOM for a11y. */
 .thread-page__compose {
 	flex-shrink: 0;
 	display: flex;
@@ -1775,8 +1478,6 @@ body .page-content:has(.chat-page) {
 	position: relative;
 }
 
-/* Attach (+) / image buttons — quiet icons inside the field pill;
- * they only grow a tint on hover so the pill stays one calm surface. */
 .thread-page__attach {
 	flex-shrink: 0;
 	width: 38px;
@@ -1804,20 +1505,9 @@ body .page-content:has(.chat-page) {
 	background: rgba(255, 255, 255, 0.16);
 }
 
-/* === Attachment picker ============================================
- * Floating panel anchored above the compose toolbar on desktop;
- * collapses to a bottom-sheet on mobile so the touch hit area covers
- * the full width. Backdrop is a soft scrim — chat stays visible
- * underneath so the user keeps context while picking.
- * ============================================================ */
 .attachment-picker__backdrop {
 	position: fixed;
 	inset: 0;
-	/* Was rgba(.., 0.18) + 2px blur — barely a tint. When the page is
-	 * scrolled far enough for the dark footer (with the "Hawkr
-	 * HAWKR" wordmark) to enter the viewport, that wordmark
-	 * stayed readable through the backdrop. Bumping the dim to ~0.5
-	 * and the blur to 12px so anything behind reads as a soft wash. */
 	background: rgb(var(--color-ink-950-rgb) / 0.5);
 	z-index: 90;
 	-webkit-backdrop-filter: blur(12px);
@@ -1826,28 +1516,12 @@ body .page-content:has(.chat-page) {
 .attachment-picker {
 	position: fixed;
 	left: 50%;
-	/* 讓開底部導覽列。這裡曾寫死 `calc(80px + env(safe-area-inset-bottom))`——
-	 * 80px 對不上導覽列任何一版的實際佔用（68px 高 + 10px 離底距離 = 78px），
-	 * 是本 repo 第六份互相漂移的導覽列常數（web#417）。改為引用變數之後，
-	 * 「位移 == 實際幾何」由 tests/mobile-bottom-nav-geometry.spec.ts 那一端保證。
-	 *
-	 * fallback 是必要的：變數只宣告在 navigation-final.css 的
-	 * `@media not (min-width: 840px)` 內，≥840px 沒有導覽列、變數也不存在，
-	 * 少了 fallback 整條 calc() 會變成無效值、`bottom` 直接掉回 auto。
-	 * fallback 值必須逐字等於宣告值，由 tests/mobile-bottom-nav-tokens.test.ts 釘住。
-	 *
-	 * `env(safe-area-inset-bottom)` 一併移除：本站 viewport 沒有 `viewport-fit: cover`，
-	 * 該值在任何環境（含真機）都解析為 0，是死碼（web#417）。 */
 	bottom: calc(
 		var(--mobile-bottom-nav-height, 68px) +
 		var(--mobile-bottom-nav-bottom, 10px)
 	);
 	transform: translateX(-50%);
 	width: min(420px, calc(100vw - 32px));
-	/* Cap height so the picker never extends under the floating navbar
-	 * pill (top) or the bottom-anchored compose toolbar — matches the
-	 * safe-area handling on the product modal. The viewport-derived ceiling
-	 * is tighter than the absolute 520px on short screens. */
 	max-height: min(
 		60vh,
 		520px,
@@ -1861,25 +1535,15 @@ body .page-content:has(.chat-page) {
 	);
 	display: flex;
 	flex-direction: column;
-	/* Hard-code the surface to a fully opaque cream instead of going
-	 * through `--surface-card`. In dark mode that token resolves to
-	 * `--color-ink-850` (78% opaque) — fine for cards stacked on a
-	 * theme-tinted page, but for a floating picker the dark footer's
-	 * brand wordmark bled through. Picker is its own opaque surface. */
 	background: var(--color-neutral-cream, #fffdf7);
 	border: 1px solid var(--border-soft, rgb(var(--color-ink-950-rgb) / 0.1));
 	border-radius: var(--radius-lg, 16px);
 	box-shadow: var(--shadow-2xl);
 	z-index: 100;
 	overflow: hidden;
-	/* Establish a stacking context so children can't escape into the
-	 * page tree's z-order and so the backdrop blur compositing stays
-	 * contained. */
 	isolation: isolate;
 }
 [data-theme="dark"] .attachment-picker {
-	/* Was --color-ink-950 — 4% transparency was enough for the
-	 * bright footer brand mark to read through on long pages. */
 	background: var(--color-ink-950);
 	border-color: rgba(245, 222, 165, 0.16);
 }
@@ -2002,9 +1666,6 @@ body .page-content:has(.chat-page) {
 	justify-content: center;
 	font-size: 1.375rem;
 }
-/* Empty / no-image product thumb — replaces the legacy `seller_cover.png`
- * fallback which was bleeding the "Hawkr" brand wordmark
- * into every product row that lacked an imageUrl. */
 .attachment-picker__thumb--empty {
 	display: inline-flex;
 	align-items: center;
@@ -2062,23 +1723,6 @@ body .page-content:has(.chat-page) {
 	.attachment-picker {
 		left: 0;
 		right: 0;
-		/* Lift above the mobile bottom-nav pill instead of sitting flush to the
-		 * bottom — the tab bar was eating the picker's last row + "選擇" CTA.
-		 * The chat compose toolbar also occupies ~64px above the tab bar but
-		 * it's already hidden by AttachmentPicker (z-index 100 > compose z 1),
-		 * so we only need to clear the tab bar.
-		 *
-		 * 位移**引用**導覽列那兩個變數，不再抄一份數字：這裡曾寫死
-		 * `calc(84px + env(safe-area-inset-bottom))`，其中 84px = 遷移前的
-		 * 74px 高 + 10px 離底距離，導覽列改版後靜靜漂成第四份過期常數
-		 * （web#386）。變數宣告在 navigation-final.css 的
-		 * `@media not (min-width: 840px)`，涵蓋本區塊的 ≤540px，且由
-		 * tests/mobile-bottom-nav-geometry.spec.ts 釘在元件的實際渲染幾何上
-		 * ——所以這個位移永遠等於導覽列真正佔掉的高度，不需要有人記得同步。
-		 *
-		 * `env(safe-area-inset-bottom)` 也一併移除：MobileBottomNav 用的是
-		 * `bottom-2.5`，**從未套用 safe-area**（實測探針恆為 0），加上去只會讓
-		 * 真機再多讓 24px 以上，而瀏覽器模擬環境永遠量不到。 */
 		bottom: calc(
 			var(--mobile-bottom-nav-height) +
 			var(--mobile-bottom-nav-bottom)
@@ -2099,10 +1743,6 @@ body .page-content:has(.chat-page) {
 [data-theme="dark"] .thread-page__compose {
 	border-top-color: var(--theme-border-input);
 }
-/* Single-pill field — attach / image / textarea / send share one
- * bordered container so the composer reads as one control instead of
- * four scattered circles. `align-items: flex-end` keeps the icons
- * anchored to the bottom edge while a multi-line draft grows. */
 .thread-page__field {
 	flex: 1;
 	min-width: 0;
@@ -2139,20 +1779,10 @@ body .page-content:has(.chat-page) {
 	font-family: inherit;
 	color: var(--hkui-foreground);
 }
-/* Hawkr Agent 的輸入框不換行：草稿是一條長行，橫向溢出，由
- * `useComposerScroll(ref, draft, "inline")` 負責打字時跟隨游標、閒置時橫向
- * 逐段揭示。使用者 2026-08-14 明確同意「換行變成不換行」。
- *
- * 只掛在 Agent 那一顆，不改基底規則：一般聊天室的 composer 共用
- * `.thread-page__compose textarea`，把它一起改成不換行沒有取得授權。
- *
- * `overflow-y: hidden` 與隱藏捲軸不是裝飾：框高固定 40px，一條水平捲軸會從
- * 裡面吃掉高度，把唯一那行文字壓掉。捲動能力本身沒有移除。 */
 .thread-page__compose textarea.thread-page__input--nowrap {
 	white-space: nowrap;
 	overflow-x: auto;
 	overflow-y: hidden;
-	/* 永遠一行，垂直上限成為死碼——留著會讓人以為它還會長高。 */
 	max-height: none;
 	scrollbar-width: none;
 }
@@ -2166,9 +1796,6 @@ body .page-content:has(.chat-page) {
 	border-color: transparent;
 	box-shadow: none;
 }
-/* SendButton uses a static icon glyph so the affordance remains visible
- * before any animation code loads. `color` also feeds Button's monochrome
- * loading mark, keeping idle/loading contrast on the same token pairing. */
 .thread-page__send {
 	flex-shrink: 0;
 	width: 44px;
@@ -2207,9 +1834,6 @@ body .page-content:has(.chat-page) {
 	box-shadow: none;
 }
 
-/* 深色模式：可按時深綠底配白色圖示；不能按（反灰）時整組倒過來，
- * 米白底配深綠。白色在 primary 與 primary hover 上都維持 graphical UI 所需
- * 的 3:1 對比，不能沿用品牌米白 logo token。 */
 [data-theme="dark"] .thread-page__send {
 	background: var(--color-brand-primary-strong);
 	color: var(--color-neutral-white);
@@ -2224,16 +1848,9 @@ body .page-content:has(.chat-page) {
 [data-theme="dark"] .thread-page__send:disabled {
 	background: var(--color-brand-secondary-soft);
 	color: var(--color-brand-ink);
-	/* 反灰態自己就是低彩度的一組配色，不再疊 opacity——疊了會把米白底洗成
-	 * 半透明、深綠商標也跟著掉對比。 */
 	opacity: 1;
 }
 
-/* ============================================================
- * Seller message workbench — supported by the current Chat + Seller CRM +
- * Orders contracts. This is the `/seller-center/messages` index page; the
- * route-level thread still uses `.chat-shell` above.
- * ============================================================ */
 .seller-messages {
 	width: 100%;
 	min-width: 0;
@@ -2359,8 +1976,6 @@ body .page-content:has(.chat-page) {
 	color: var(--theme-text-inverse);
 }
 
-/* Message filters are selection controls, not primary actions. Keep this
- * selector specific enough to win over the shared order-status chip theme. */
 .seller-shell .seller-messages__filters
 	.seller-messages__chip-row
 	button.seller-orders__chip.is-selected[aria-pressed="true"] {
@@ -2612,16 +2227,11 @@ body .page-content:has(.chat-page) {
 }
 
 .seller-message-chat-sheet .thread-page {
-	/* Share the drawer's flex row with the context rail (buyer side) instead
-	 * of eating 100% and squishing it; alone (seller side) flex:1 still fills. */
 	flex: 1;
 	min-width: 0;
 	height: 100%;
 }
 .seller-message-chat-sheet .chat-context {
-	/* The drawer has no `.chat-shell` grid, so pin the rail width here — the
-	 * full-page route gets the same width from its grid column. (Hidden below
-	 * 1440px via `.chat-context`'s own rule, so it only takes space when shown.) */
 	flex: 0 0 304px;
 }
 
@@ -2736,9 +2346,6 @@ body .page-content:has(.chat-page) {
 		box-shadow: var(--shadow-sm);
 	}
 
-	/* The shared orders table freezes its second column. Messages own a
-	 * different first-column freeze; reset the shared rule so two cells never
-	 * overlap at left:0 while the seller swipes horizontally. */
 	.seller-messages__table.seller-orders__table thead th:nth-child(2),
 	.seller-messages__table.seller-orders__table tbody td:nth-child(2) {
 		position: static;
@@ -2777,27 +2384,15 @@ body .page-content:has(.chat-page) {
 	}
 	.chat-shell {
 		display: block;
-		/* Same dvh-based fit as desktop, smaller subtraction because the
-		 * topbar collapses tighter on narrow screens. `--keyboard-inset`
-		 * collapses the shell above the soft keyboard (see the base rule).
-		 * At rest `--keyboard-inset` is 0, so the resting height is unchanged. */
 		height: calc(100dvh - 140px - var(--keyboard-inset, 0px));
 		min-height: 420px;
 	}
-	/* Buyer threads suppress the global bottom nav, so remove the clearance that
-	 * navigation-final.css reserves for it. The message list keeps that space and
-	 * keeps the nav. */
 	body
 	.page-content:has(
 		.chat-page[data-chat-workspace="buyer"][data-chat-view="thread"]
 	) {
 		padding-bottom: 0;
 	}
-	/* The generic 140px subtraction above is calibrated for Seller Center's
-	 * mobile bar and shell padding. Buyer threads instead sit below the shared
-	 * floating top navbar: navbar height + navbar top gap + 12px chat top + 16px
-	 * chat bottom. Keeping the terms explicit lets the <=768px token overrides
-	 * produce 84px while tablet widths produce 128px. */
 	.chat-page[data-chat-workspace="buyer"][data-chat-view="thread"] .chat-shell {
 		height: calc(
 			100dvh -
@@ -2809,16 +2404,6 @@ body .page-content:has(.chat-page) {
 		);
 		min-height: 0;
 	}
-	/* When the soft keyboard is open, iOS Safari scrolls the whole document up
-	 * to lift the focused input above the keyboard — and with the marketing
-	 * footer sitting below the chat in flow, that scroll drags the footer into
-	 * the gap above the keyboard (the dark band under the compose bar). Only
-	 * while the keyboard is open: lock the document and drop that footer so the
-	 * focus-scroll has nothing to reveal; the shell's `--keyboard-inset` shrink
-	 * (height above) lifts the compose bar itself above the keyboard. Scoped to
-	 * `data-keyboard-open` so the resting layout and chat height stay untouched.
-	 * `.thread-page` is matched under `.page-content` so the app-wide chat
-	 * drawer (rendered outside `.page-content`) keeps its own scroll handling. */
 	:root[data-keyboard-open] body:has(.page-content .thread-page) {
 		overflow: hidden;
 	}
@@ -2837,17 +2422,6 @@ body .page-content:has(.chat-page) {
 		height: 100%;
 		min-height: 0;
 	}
-	/* 手機是單欄：在對話路由上只顯示對話、收起清單。
-	 *
-	 * 判斷依據是「現在在哪條路由」（layout 已經算好並掛在 .chat-page 上），
-	 * 不是「隔壁那個元素叫什麼 class」。舊寫法 `:has(+ .thread-page)` 綁在
-	 * 內容欄的 class 名上，而 Hawkr Agent 的 workspace 一進 thread 根節點就是
-	 * .hawkr-agent-workspace（.thread-page 變成它的子層）——選擇器當場失配，
-	 * 清單留在畫面上蓋住對話，看起來就是「點了對話進不去」。
-	 * 內容欄長什麼樣是它自己的事，版面歸屬只能由路由決定。
-	 *
-	 * 那個「進入候選階段才換根節點」的舊時機在右欄面板常駐後已提前到進 thread；
-	 * 規則本身不用改，正是因為它綁的是路由不是 class。 */
 	.chat-page[data-chat-view="thread"] > .chat-shell > .chat-sidebar {
 		display: none;
 	}
@@ -2876,13 +2450,7 @@ body .page-content:has(.chat-page) {
 		padding: var(--hkui-space-3);
 	}
 
-	/* Collapsed (icon-rail) rules are scoped to 960–1199px above, so no
-	 * mobile "undo" block is needed — the stored preference simply never
-	 * applies at this width. */
 
-	/* Sidebar head sits flush with the rounded card top — tighter
-	 * vertical padding so the title doesn't push the search pill off
-	 * the first viewport. */
 	.chat-sidebar__head {
 		padding: var(--hkui-space-4) var(--hkui-space-4) var(--hkui-space-2);
 	}
@@ -2901,10 +2469,6 @@ body .page-content:has(.chat-page) {
 		gap: 10px;
 	}
 
-	/* Phone conversation summaries follow the seller record-list density:
-	 * exactly 58px, one line, with the original avatar and unread badge kept.
-	 * Selecting a row opens that one thread directly; adding an accordion before
-	 * navigation would turn the primary chat action into an unnecessary two taps. */
 	.chat-sidebar__item {
 		height: 58px;
 		min-height: 58px;

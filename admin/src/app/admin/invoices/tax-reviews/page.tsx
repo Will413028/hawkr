@@ -28,15 +28,6 @@ import { api } from "@/services/api";
 import "@/styles/pages/Invoice.css";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 
-// A02｜稅務身分審核佇列（58A §A02，端點 38 `GET /api/v1/admin/invoices/tax_reviews`）。
-//
-// 唯讀頁：只導頁、不寫入。三件刻意不做的事：
-//   - **不做批次核准**：58 需求明令「不預設大量核准」。稅務資格是逐案判斷。
-//   - **不做表頭排序**：端點 38 沒有 sort query，後端固定依 deadlineAt 遞增。
-//     做一個只排當前頁的前端排序，會讓管理員以為看到的是全域排序。
-//   - **不做自動輪詢**：一律「手動更新」鍵。
-//
-// `entityType` 只是顯示欄位，**不得**拿來做任何自動判斷或「建議核准」提示。
 
 const TAX_REVIEWS_ENDPOINT = "/api/v1/admin/invoices/tax_reviews";
 const PAGE_SIZE = 20;
@@ -45,13 +36,10 @@ export default function TaxReviewQueuePage() {
 	const router = useRouter();
 	const searchParams = useSearchParams();
 
-	// 篩選存在 URL query 而不是 localStorage：連結可以貼給同事、可以加書籤、重整不
-	// 失效。localStorage 會讓兩個管理員點同一條連結卻看到不同清單。
 	const initialFilter = searchParams.get("filter") ?? "";
 	const [filter, setFilter] = useState(
 		TAX_REVIEW_FILTER_VALUES.includes(initialFilter) ? initialFilter : "",
 	);
-	// 兩層 keyword：輸入框即時更新，實際查詢只在 Enter／按搜尋時才換，避免逐鍵 refetch。
 	const [keywordInput, setKeywordInput] = useState("");
 	const [keyword, setKeyword] = useState("");
 	const [page, setPage] = useState(1);
@@ -121,11 +109,7 @@ export default function TaxReviewQueuePage() {
 			<div className="invoice-filter-bar">
 				<div className="filter-search">
 					<MaterialSymbol name="search" />
-					{/* 文案逐字對齊後端述詞（backend #3089 第 16 項）：
-					    ListTaxReviewsForAdmin 比對 legal_name／tax_id／issuer_ref_id(store_id)。
-					    原文案寫「店名」而後端比的是**法定名稱** —— 店名（store_name）
-					    在 seller 模組，本服務搜不到，照螢幕上的字去搜必然 0 筆。
-					    store_id 那一格是同一批補上的（在那之前述詞裡根本沒有它）。 */}
+
 					<input
 						type="text"
 						aria-label="搜尋法定名稱、統一編號或 store_id"
@@ -139,7 +123,7 @@ export default function TaxReviewQueuePage() {
 						}}
 					/>
 				</div>
-				{/* ADM 既有的 filter tab 沒有掛 tablist 語意，這裡是刻意補強。 */}
+
 				<div
 					className="merchant-filter-tabs"
 					role="tablist"
@@ -209,14 +193,14 @@ export default function TaxReviewQueuePage() {
 											<div className="cell-main">
 												{item.storeName || item.storeId}
 											</div>
-											{/* storeId 是 TSID，永遠以字串處理——轉 number 會截斷精度。 */}
+
 											<div className="cell-sub">{item.storeId}</div>
 										</td>
 										<td>
 											{codeLabel(SELLER_TAX_ENTITY_TYPE_LABEL, item.entityType)}
 										</td>
 										<td>
-											{/* 賣家自述，不是判定結果（判定結果是 reviewStatus）。 */}
+
 											{codeLabel(
 												SELLER_TAX_OBLIGATION_LABEL,
 												item.claimedStatus,
@@ -248,11 +232,7 @@ export default function TaxReviewQueuePage() {
 												{item.selfIssueAccepted ? "已接受" : "未接受"}
 											</StatusBadge>
 										</td>
-										{/*
-										 * 收據代製授權：T08「核定免用統一發票」的前置條件。
-										 * 未授權時點進 A03 只會看到一顆 disabled 的按鈕，
-										 * 所以要在佇列上就看得出來。
-										 */}
+
 										<td>
 											<StatusBadge
 												variant={item.receiptAuthorized ? "success" : "warning"}

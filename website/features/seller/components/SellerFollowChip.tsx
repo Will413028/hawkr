@@ -63,7 +63,6 @@ export default function SellerFollowChip({
 		return () => window.clearTimeout(timer);
 	}, [roleNotice]);
 
-	// Local toggle wins (it is the freshest), then the shared set, then 未追蹤.
 	const active = localActive ?? followedFlag ?? false;
 
 	const handleClick = () => {
@@ -83,8 +82,6 @@ export default function SellerFollowChip({
 			setFollowed(sellerId, !previous);
 			void (async () => {
 				try {
-					// toggleFollow re-checks server state first, so a stale shared
-					// set can't cause a double-subscribe error.
 					const next = await toggleFollow(sellerId, "seller");
 					setLocalActive(next);
 					setFollowed(sellerId, next);

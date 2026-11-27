@@ -74,7 +74,6 @@ public class AutoRefundWorker {
     }
 
     private void processTask(AutoRefundTaskEntity task) {
-        // 檢查是否超過最大重試次數
         if (task.getRetryCount() >= task.getMaxRetryCount()) {
             autoRefundTaskRepository.markManualIntervention(task.getTaskId());
             log.info("AutoRefundWorker.manualIntervention", "超過最大重試次數，轉人工處理",
@@ -82,7 +81,6 @@ public class AutoRefundWorker {
             return;
         }
 
-        // Claim（lease）後自動退款。claim 回 0 ⇒ 另一個 pod 持有租約 ⇒ 一個副作用都不做。
         int claimed = autoRefundTaskRepository.claimTask(
                 task.getTaskId(), DateTimeUtils.nowUtc().plusSeconds(CLAIM_LEASE_SEC));
         if (claimed == 0) {
@@ -94,7 +92,6 @@ public class AutoRefundWorker {
 
         try {
             String reason = "訂單取消自動退款: " + task.getOrderNo();
-            // 冪等鍵 AUTO:{orderNo}:{tradeNo}：同一張訂單的自動退款重送得到同一筆；payment 模組以 AUTO: 前綴辨識自動退款（與 PaymentEventHandler 的預建同一慣例）
             String refundNo = paymentGrpcClient.createRefund(
                     task.getTransactionId(), task.getAmount(), reason,
                     "AUTO:" + task.getOrderNo() + ":" + task.getTransactionId());

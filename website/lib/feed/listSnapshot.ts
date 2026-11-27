@@ -50,7 +50,6 @@ export function saveFeedListSnapshot(snapshot: FeedListSnapshot): void {
 			JSON.stringify({ ...snapshot, savedAt: Date.now() }),
 		);
 	} catch {
-		// Quota / privacy mode: feed back-restore degrades to a fresh first page.
 	}
 }
 
@@ -84,7 +83,6 @@ export function takeFeedListSnapshot(key: string): FeedListSnapshot | null {
 	try {
 		window.sessionStorage.removeItem(STORAGE_KEY);
 	} catch {
-		// Storage may be blocked. The validated in-memory value is still usable.
 	}
 	return snapshot;
 }

@@ -26,7 +26,6 @@ func NewAdmin(m *content.Module, images rpc.Images) *Admin {
 	return &Admin{m: m, images: images}
 }
 
-// ==================== banner ====================
 
 func (h *Admin) ListBanners(ctx context.Context, req *connect.Request[adminpb.ListBannersRequest]) (*connect.Response[adminpb.ListBannersResponse], error) {
 	scope := contentv1alpha1connect.ContentAdminServiceListBannersProcedure
@@ -137,7 +136,6 @@ func (h *Admin) toAdminBanner(b content.Banner) *adminpb.Banner {
 	}
 }
 
-// bannerInput 組成模組的輸入。圖片有 staged token 就換新，沒有就沿用現在的圖（由模組決定）。
 func bannerInput(msg *adminpb.Banner) content.BannerInput {
 	return content.BannerInput{
 		Title:             msg.GetTitle(),
@@ -153,7 +151,6 @@ func bannerInput(msg *adminpb.Banner) content.BannerInput {
 	}
 }
 
-// ==================== 版本門檻 ====================
 
 func (h *Admin) ListAppVersionGates(ctx context.Context, _ *connect.Request[adminpb.ListAppVersionGatesRequest]) (*connect.Response[adminpb.ListAppVersionGatesResponse], error) {
 	gates, err := h.m.ListAppVersionGates(ctx)

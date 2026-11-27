@@ -44,7 +44,6 @@ func New(d Deps) *Service { return &Service{d: d} }
 
 func (s *Service) q(ctx context.Context) *store.Queries { return store.New(s.d.DB.Conn(ctx)) }
 
-// checkReason 檢查理由的欄位。reason 與 sourceRef 要先經 trimtext.Trim（單體規則 9：DB 的 CHECK 拒絕頭尾有空白的值）。
 func checkReason(category, reason, sourceRef string, adminID int64) error {
 	if !policy.Category(category).CommunityAssessable() {
 		return apperr.InvalidInputOn([]string{"Category"}, "%s", text.HideReasonCategoryInvalid())
@@ -237,8 +236,6 @@ func deref(s *string) string {
 	return *s
 }
 
-// lockTarget 鎖住隱藏的目標列（與刪除、編輯同一把鎖），讓之後的 Owner 檢查和寫入看到同一個已提交的狀態：與並行的刪除序列化後，隱藏一則剛被刪除的
-// 內容回 NotFound，而不是對一則已經不存在的內容寫隱藏。計數的正確性不靠它（trigger 的 reevaluate 自己先鎖內容列）。目標不存在時不鎖，由 Owner 回 NotFound。
 func (s *Service) lockTarget(ctx context.Context, t model.Target) error {
 	q := s.q(ctx)
 	var err error
@@ -287,7 +284,6 @@ func toHide(r store.SocialHide, created bool) model.Hide {
 	return h
 }
 
-// bust 排入隱藏與還原的快取失效：留言的計數在貼文列表裡，討論區在店面頁。
 func (s *Service) bust(ctx context.Context, t model.Target, o model.ContentOwner, postID func() (uuid.UUID, error)) error {
 	if t.Kind == model.TargetForumEntry {
 		return s.d.Cache.BustStore(ctx, o.StoreID)

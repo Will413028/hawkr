@@ -32,12 +32,6 @@ String? resolveAuthRedirect({
   bool storeUnavailable = false,
   bool accountRestricted = false,
 }) {
-  // App 版本低於後端設定的最低可用版本（`packages/hawkr_app_update/docs/spec.md`）：**先於所有其他
-  // 判斷**。未登入者也要被攔——否則會先被導去 /login，在一個後端已宣告不再
-  // 支援的版本上繼續操作。/force-update 自身放行，否則 redirect 自我循環。
-  //
-  // 刻意**不**併進能力表（[routeCapabilities]）：能力表的語意是「能力被收回時仍可用的
-  // 頁面」，強更沒有任何可用頁。
   if (needsForceUpdate) {
     return location == SellerRoutes.forceUpdate
         ? null
@@ -49,47 +43,34 @@ String? resolveAuthRedirect({
       location.startsWith('/auth') ||
       location == AuthRoutes.onboard;
 
-  // 未登入：只允許白名單路徑，其餘踢回登入頁。
   if (!isLoggedIn) {
     return isWhitelisted ? null : AuthRoutes.auth;
   }
 
-  // 帳號被停權：只能待在受限頁（刪除帳號、登出），先於店家狀態判斷；未登入者不受影響。
   if (accountRestricted) {
     return location == SellerRoutes.accountRestricted
         ? null
         : SellerRoutes.accountRestricted;
   }
 
-  // 已登入、GetMyStore 讀取失敗而且沒有上一次的快照：不知道有沒有店家，不能放行進主畫面（fail-closed），
-  // 顯示重試頁。
   if (storeUnavailable) {
     return location == SellerRoutes.storeUnavailable
         ? null
         : SellerRoutes.storeUnavailable;
   }
 
-  // 已登入、GetMyStore 還沒回答（needsOnboarding 是 null）：還不知道該去 onboarding 還是主畫面，不導頁，
-  // 停在目前的載入狀態（登入頁的按鈕、welcome 的 splash），等 GetMyStore 的答案。
   if (needsOnboarding == null) return null;
 
-  // 已登入但尚未完成 onboarding（新申請 / 刪除後重登）：
-  // 除了沒有店家也能進的頁面（[routesAllowedWithoutStore]：onboarding 本身、welcome 的 splash、帳號層級的措施與申覆）
-  // 外，一律擋去 onboarding——涵蓋重登後停在 /auth、以及任何主畫面穿透。
   if (needsOnboarding) {
     return routesAllowedWithoutStore.contains(location)
         ? null
         : AuthRoutes.onboard;
   }
 
-  // 已登入且已完成 onboarding：這個頁面需要的能力被收回（停權、等待刪除；46 號設計書
-  // 「賣家能力權限層」§7.2）就導公告頁。能力來自 GetMyStore，頁面對應的能力在
-  // [routeCapabilities]。
   if (isBlockedByCapabilities(myStore, location)) {
     return SellerRoutes.suspensionNotice;
   }
 
-  // 已登入且已完成 onboarding：停在登入頁時推進主畫面，其餘放行。
   if (location == AuthRoutes.auth ||
       location == SellerRoutes.storeUnavailable ||
       location == SellerRoutes.accountRestricted) {

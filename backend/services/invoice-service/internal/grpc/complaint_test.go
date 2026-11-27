@@ -16,12 +16,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// 本檔驗 B07 寫入面的**型別邊界與 Tier A 出口形狀**；業務規則本身在
-// internal/usecase/complaint_test.go。
-//
-// 🔴 核心斷言是「越權與查無的回應逐位元相同」，而且用 proto.Marshal 比對不是比 code：
-// 比 code 只證明兩者同碼，證明不了 message、data 或任何未來新增的欄位沒有洩漏
-// 「這件案子存在，只是不是你的」。
 
 const (
 	xBuyerA int64 = 2623900520
@@ -69,7 +63,6 @@ func (xOutbox) Insert(context.Context, domain.NewOutboxEvent) (domain.OutboxEven
 	return domain.OutboxEvent{}, nil
 }
 
-// xComplaints 照 SQL 述詞回應：id ＋ complainant_buyer_id 缺一即「查不到」。
 type xComplaints struct {
 	domain.ComplaintRepository
 	rows map[int64]domain.Complaint
@@ -164,7 +157,6 @@ func newComplaintServer(rows ...domain.Complaint) *InvoiceServer {
 	return NewInvoiceServer(nil, nil, nil, uc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 }
 
-// xIssuers 回一列 issuer_ref_id ≠ id 的 issuer：出向事件的 store_id 必須是前者。
 type xIssuers struct{ domain.IssuerRepository }
 
 func (xIssuers) GetByID(_ context.Context, id int64) (domain.Issuer, error) {
@@ -181,9 +173,6 @@ func xRow(id, buyerID int64, status string, version int64) domain.Complaint {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tier A：越權與查無逐位元相同
-// ---------------------------------------------------------------------------
 
 // 🔴 這是本檔最重要的一支。三支動作端點都必須通過——比 code 相同是不夠的。
 func TestComplaintActionsForeignAndMissingAreByteIdentical(t *testing.T) {
@@ -212,7 +201,6 @@ func TestComplaintActionsForeignAndMissingAreByteIdentical(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			// 6001 真的存在，但屬於買家 B。
 			s := newComplaintServer(xRow(foreignID, xBuyerB, codemeta.InvoiceComplaintStatusSellerResponded.Value, 0))
 
 			foreign, err := tc.call(s, "6001")
@@ -269,9 +257,6 @@ func TestCreateComplaintForeignOrderIsByteIdenticalToMissingOrder(t *testing.T) 
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 陽性路徑與回應形狀
-// ---------------------------------------------------------------------------
 
 func TestCreateComplaintSuccessShape(t *testing.T) {
 	s := newComplaintServer()
@@ -289,14 +274,12 @@ func TestCreateComplaintSuccessShape(t *testing.T) {
 	if d.GetComplaintId() == "" || d.GetStatus() != codemeta.InvoiceComplaintStatusOpen.Value {
 		t.Fatalf("data = %+v", d)
 	}
-	// dueAt 是 ISO 8601 UTC；remaining 是可為負的數字字串（B07 的 SlaCountdown 讀它）。
 	if d.GetDueAt() == "" {
 		t.Fatal("due_at 不得為空：sla_due_at 是 NOT NULL")
 	}
 	if d.GetRemainingBusinessDays() == "" {
 		t.Fatal("行事曆已同步時 remaining_business_days 必須算得出來")
 	}
-	// 買家可見的欄位裡不得出現 provider 細節；本 message 型別上就沒有那些欄位（reserved）。
 	if d.GetOrderNo() != xOrder {
 		t.Fatalf("order_no = %q", d.GetOrderNo())
 	}
@@ -333,7 +316,6 @@ func TestComplaintActionsReturnTransitionedRecord(t *testing.T) {
 	if resp.GetCode() != 0 {
 		t.Fatalf("code = %d", resp.GetCode())
 	}
-	// 回的必須是**轉移後**那一版：前端據此直接覆蓋 cache，不再打一次端點 15。
 	if resp.GetData().GetStatus() != codemeta.InvoiceComplaintStatusEscalatedToAdm.Value {
 		t.Fatalf("status = %s", resp.GetData().GetStatus())
 	}
@@ -342,9 +324,6 @@ func TestComplaintActionsReturnTransitionedRecord(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 型別邊界
-// ---------------------------------------------------------------------------
 
 func TestComplaintActionsRejectMalformedArguments(t *testing.T) {
 	s := newComplaintServer(xRow(6300, xBuyerA, codemeta.InvoiceComplaintStatusSellerResponded.Value, 0))

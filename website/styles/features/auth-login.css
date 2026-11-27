@@ -1,12 +1,4 @@
-/* Migrated unchanged from ui-kit.css. LoginShell owns this auth-only
- * stylesheet synchronously, including SSR. Keep selectors unlayered and
- * ordered until an independently verified Tailwind migration is complete.
- * Shared hint defaults remain in ui-kit.css for cart/checkout/address users.
- */
 
-/* ============================================================
-   17. LOGIN FLOW
-   ============================================================ */
 .hkui-login {
 	min-height: calc(100vh - 140px);
 	display: flex;
@@ -34,8 +26,6 @@
 	margin-bottom: var(--hkui-space-2);
 }
 
-/* Hero slot for the panel — key glyph sits centered inside a
- * tinted circle. */
 .hkui-login__hero {
 	display: flex;
 	justify-content: center;
@@ -183,18 +173,7 @@
 	text-decoration-thickness: 2px;
 }
 
-/* ============================================================
- * Login surface — dark mode
- *
- * Most internals already consume `--hkui-*` tokens (panel surface,
- * text, dividers), so the dark palette flip handles them
- * for free. This block targets the handful of rules that bake in
- * light-only values: the hero button's `primary-50` fill, the OAuth buttons that share
- * `--hkui-content1` with the panel and so would disappear, and the
- * role-tab avatar's hardcoded white circle.
- * ============================================================ */
 [data-theme="dark"] .hkui-login {
-	/* Keep the shared site background as the single route canvas. */
 	background: transparent;
 }
 [data-theme="dark"] .hkui-login__hero-mark {
@@ -211,15 +190,10 @@
 	border-color: rgb(var(--color-ink-100-rgb) / 0.2);
 }
 [data-theme="dark"] .hkui-login__panel {
-	/* Token already flips, but explicit shadow keeps the panel reading
-	 * as "elevated" against the dark sky. */
 	box-shadow:
 		0 12px 32px rgba(0, 0, 0, 0.42),
 		0 2px 8px rgba(0, 0, 0, 0.28);
 }
-/* Role tabs — pill bg + active tab share dark tokens automatically;
- * the avatar circle inside hardcodes a white fill that we need to
- * flip to a dark surface so the brand-coloured icon reads cleanly. */
 
 @media (max-width: 480px) {
 	.hkui-login__panel {

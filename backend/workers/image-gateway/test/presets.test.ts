@@ -8,8 +8,6 @@ import {
   isTransformPreset,
 } from "../src/presets";
 
-// 對照 49 號設計書 §4.4 preset 白名單表格，逐值核對——本檔是全平台唯一定義點，
-// 任何數值 drift 都代表與設計書失去同步。
 describe("PRESETS 對照 49 號設計書 §4.4", () => {
   it("avatar", () => {
     expect(PRESETS.avatar).toEqual({ transform: { width: 160, height: 160, fit: "cover" }, quality: 60 });
@@ -94,7 +92,6 @@ describe("動圖 preset 的兩個前提（本機唯一驗得到的部分）", ()
       null,
     ]) {
       const format = negotiateFormat(accept, true);
-      // 反面斷言才是保證本身：jpeg/avif 會把動圖壓成單張。
       expect(format).not.toBe("image/jpeg");
       expect(format).not.toBe("image/avif");
       expect(["image/webp", "image/gif"]).toContain(format);

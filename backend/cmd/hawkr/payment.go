@@ -21,13 +21,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/stripe"
 )
 
-// readPayment 讀收款開通的 provider：PAYMENT_PROVIDER 為空表示沒有設定（核准不建立收款帳戶，開通相關的方法回 failed_precondition），
-// fake 是記憶體內的 provider（所有帳戶都回轉帳能力已啟用，只能在 requireDevEnvironment 成立的 dev 環境選到，否則啟動失敗），stripe 是 Stripe Connect（Accounts v2）；其他值讓啟動失敗。
-// stripe 讀 STRIPE_SECRET_KEY（沒有設定時等於沒有 provider，serve 照常啟動）、STRIPE_WEBHOOK_SECRET（有金鑰卻沒有它，啟動失敗）與
-// STRIPE_REQUIREMENT_COLLECTION（新建帳戶列的收件方式：provider 是 Stripe 收件，預設；platform 是平台收件；其他值啟動失敗。開通 session 的形狀由 ChooseSession 決定，不看這個設定）與
-// STRIPE_PUBLISHABLE_KEY（內嵌 session 的公開金鑰，不是 secret；有金鑰卻沒有它，啟動失敗，與收件方式無關：既有的平台收件帳戶仍會開內嵌 session）與
-// STRIPE_ACCOUNT_NAMESPACE（這個環境的帳戶命名空間，寫進外部帳戶的 metadata.hawkr_namespace、對帳時與 store_id 一起比對；每個環境不同，兩個環境共用同一個 Stripe 帳號時才不會互相關閉對方的帳戶；
-// 有金鑰卻沒有它或格式不合——小寫英數、連字號、底線，1 到 40 個字元，開頭是英數——啟動失敗）。
 func readPayment(e *config.Env, log *slog.Logger) payment.Provider {
 	switch name := e.StringOr("PAYMENT_PROVIDER", ""); name {
 	case "":
@@ -97,10 +90,6 @@ func readStripe(e *config.Env, log *slog.Logger) payment.Provider {
 	return provider
 }
 
-// readCharge 讀付款（PaymentIntent、退款、轉帳）的 provider：PAYMENT_CHARGE_PROVIDER 為空表示沒有設定（付款的呼叫回 failed_precondition，付款 webhook 回 503，與收款開通同一規則）；
-// stripe 讀 STRIPE_SECRET_KEY（沒有設定時等於沒有 provider）與 STRIPE_PAYMENT_WEBHOOK_SECRET（有金鑰卻沒有它，啟動失敗）。付款事件走自己的 Stripe event destination
-// （snapshot，路由 POST /webhooks/stripe-payments），一個 destination 一把簽章密鑰，所以密鑰與收款帳戶的 STRIPE_WEBHOOK_SECRET 分開，兩者相同啟動失敗。
-// 還要 STRIPE_ACCOUNT_NAMESPACE（與收款開通同一個變數與規則：client 建立時驗證它）。付款的 client 與收款開通的是兩個實例（各自的 webhook 密鑰），共用金鑰。
 func readCharge(e *config.Env, log *slog.Logger) payment.ChargeProvider {
 	switch name := e.StringOr("PAYMENT_CHARGE_PROVIDER", ""); name {
 	case "":
@@ -128,14 +117,12 @@ func readCharge(e *config.Env, log *slog.Logger) payment.ChargeProvider {
 	}
 }
 
-// chargeStripeConfig 是 Stripe 付款 adapter 的設定；WebhookSecret 只簽付款事件的 destination。
 type chargeStripeConfig struct {
 	SecretKey     string
 	WebhookSecret string
 	Namespace     string
 }
 
-// readChargeStripeConfig 讀並驗證 Stripe 付款的設定；沒有 STRIPE_SECRET_KEY 時 ok 是 false 且不算錯誤（等於沒有 provider）。
 func readChargeStripeConfig(e *config.Env, log *slog.Logger) (cfg chargeStripeConfig, ok bool) {
 	cfg.SecretKey = e.StringOr("STRIPE_SECRET_KEY", "")
 	if cfg.SecretKey == "" {
@@ -163,9 +150,6 @@ func readChargeStripeConfig(e *config.Env, log *slog.Logger) (cfg chargeStripeCo
 	return cfg, true
 }
 
-// sellerOwners 以 seller 與 identity 的公開 API 實作 payment 的擁有者查詢（payment 是葉節點，不讀上層）：店家存在而且沒有關閉才算營運中；
-// 聯絡信箱是店家所屬帳號的聯絡信箱（identity 已驗證的信箱優先，其次自填，與送審檢查同一條路徑）。
-// payment 先於 seller 組裝（seller 依賴 payment），所以 seller 在組裝之後才設定（bind）。
 type sellerOwners struct{ m *seller.Module }
 
 func (o *sellerOwners) bind(m *seller.Module) { o.m = m }
@@ -186,32 +170,23 @@ func (o *sellerOwners) OwnerActive(ctx context.Context, storeID int64) (bool, er
 	return s.Status != seller.Closed, nil
 }
 
-// newInbox 組裝 platform 的 webhook inbox（D29）。serve（入口寫入）與 worker（派送、補掃與清理）共用同一個組裝；模組在自己的 New 裡登記 provider。
 func newInbox(d *db.DB, jc jobs.Enqueuer, log *slog.Logger) *inbox.Inbox {
 	return inbox.New(inbox.Deps{DB: d, Jobs: jc, Now: time.Now, Logger: log})
 }
 
-// newPayment 組裝 payment 模組（收款開通 ADR D28）。回傳的 sellerOwners 要在 seller 組裝之後 bind；PayoutAccountChanged 的訂閱者由
-// subscribeSellerPayout 接上（serve 與 worker 都要：同步 job 在 worker 發布，seller 的種子在子命令發布）。
 func newPayment(d *db.DB, bus *events.Bus, jc jobs.Enqueuer, box *inbox.Inbox, provider payment.Provider, charge payment.ChargeProvider, orders payment.PaymentOrders, log *slog.Logger) (*payment.Module, *sellerOwners) {
 	owners := &sellerOwners{}
 	return payment.New(payment.Deps{DB: d, Events: bus, Jobs: jc, Inbox: box, Audit: adminaudit.New(d, time.Now), Provider: provider, Charge: charge, PaymentOrders: orders, Owners: owners, Now: time.Now, Logger: log}), owners
 }
 
-// subscribeSellerPayout 讓 seller 在 payment 同步的 transaction 內更新開通閘門的副本與防詐 hash（收款開通 ADR D12、D28）。seller 依賴 payment，
-// 下層通知上層的接線只在這裡。
 func subscribeSellerPayout(bus *events.Bus, module *seller.Module) {
 	events.Subscribe(bus, module.OnPayoutAccountChanged)
 }
 
-// discardJobs 是種子用的排入：種子直接執行建立與同步，不把 job 排進 River（worker 若用別的 provider，不會去碰 fake 的帳戶）。
 type discardJobs struct{}
 
 func (discardJobs) Enqueue(context.Context, river.JobArgs, *river.InsertOpts) error { return nil }
 
-// seedPaymentAccounts 讓種子店家有「可以收款」的收款帳戶（收款開通 ADR D28）：以 payment 的 fake provider（AutoActive）走正式的核准寫入、建立與同步，
-// 同步發的 PayoutAccountChanged 經 seller 的訂閱者寫入開通閘門的副本。聯絡信箱由建立時向店家所屬帳號讀（種子帳號的 identity 信箱，D50）。已有帳戶列的店家沿用（D19）；帳戶是別的 provider 的（例如本機
-// 接過 Stripe sandbox）時 fake 不碰它，只印出提醒，那家店的閘門照該帳戶的狀態。
 func seedPaymentAccounts(ctx context.Context, c *sellerCommand, fake *payment.Fake, storeIDs []int64, out io.Writer) error {
 	jc := discardJobs{}
 	m := payment.New(payment.Deps{DB: c.DB, Audit: adminaudit.New(c.DB, time.Now), Events: c.Bus, Jobs: jc, Inbox: newInbox(c.DB, jc, c.Logger), Provider: fake, Owners: c.Owners, Now: time.Now, Logger: c.Logger})

@@ -84,7 +84,6 @@ public class FavoriteCountConsumer {
                 return;
             }
 
-            // 驗證 UUID 格式但繼續以字串傳遞（::uuid cast 於 SQL）
             java.util.UUID.fromString(eventIdStr);
             Long productId = Long.parseLong(productIdStr);
 
@@ -94,7 +93,7 @@ public class FavoriteCountConsumer {
         } catch (IllegalArgumentException e) {
             log.warn("FavoriteCountConsumer.parse.fail",
                     "payload 格式錯誤 body=" + body + " error=" + e.getMessage());
-            channel.basicAck(deliveryTag, false);   // 不重試
+            channel.basicAck(deliveryTag, false);
         } catch (Exception e) {
             log.error("FavoriteCountConsumer.handle.fail",
                     "處理失敗，進 DLQ body=" + body, e);

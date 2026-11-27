@@ -58,14 +58,6 @@ test("guide draws its arrows and entry mark with the shared static icon registry
 	assert.match(source, /name="discovery"/);
 	assert.match(source, /getInAppBrowserNativeMenuGuide/);
 	assert.match(source, /isTopMenuGuide/);
-	// 底部選單指引時，聚光層要留出下緣淨空讓提示卡不被自己的內容擠掉。
-	// 這裡曾是 `max(6.5rem, 安全區 + 5.5rem)`：安全區那項在本站永遠是 0
-	// （viewport 無 `viewport-fit: cover`），於 web#417 移除後 max() 只剩
-	// 6.5rem 這一項，直接寫成常數。
-	//
-	// ⚠️ 上面刻意不寫出完整的 Tailwind class 字面值：Tailwind v4 的候選字掃描是
-	// 純正則、不跳過註解也會掃 tests/，寫出來就會把那個已經沒人用的 utility
-	// 重新編進 CSS（web#417 實測，死碼從註解裡復活）。
 	assert.match(source, /pb-\[6\.5rem\]/);
 	assert.doesNotMatch(source, /safe-area-inset/);
 	assert.doesNotMatch(source, /點右上角/);

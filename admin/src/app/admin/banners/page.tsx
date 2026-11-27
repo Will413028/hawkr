@@ -34,7 +34,6 @@ const BannerList: React.FC = () => {
 		[transport],
 	);
 
-	// 依顯示順序分頁，「載入更多」讀下一頁。
 	const {
 		data,
 		isLoading: loading,
@@ -57,8 +56,6 @@ const BannerList: React.FC = () => {
 	);
 	const error = queryError ? errorMessage(queryError) : null;
 
-	// 預覽：此刻在 App 首頁輪播的 banner（前台的 ListLiveBanners，啟用中而且在排程期間內；最多 20 則，一頁就是
-	// 全部）。不從上面的清單篩：清單分頁，啟用中的可能還沒載入。
 	const { data: live } = useQuery(
 		ContentPublicService.method.listLiveBanners,
 		{},
@@ -81,7 +78,6 @@ const BannerList: React.FC = () => {
 			}),
 		]);
 
-	// 切換啟用狀態：只改 active，帶著清單讀到的 etag；別人先改過就回版本衝突、不覆蓋。
 	const toggleMutation = useMutation({
 		mutationFn: (vars: { banner: AdminBanner }) =>
 			client.updateBanner({
@@ -126,7 +122,6 @@ const BannerList: React.FC = () => {
 	const getImageUrl = (banner: { previewImage?: ApiImage }): string | null =>
 		imageUri(banner.previewImage, "banner") ?? null;
 
-	// Loading skeleton
 	if (loading) {
 		return (
 			<div className="space-y-6 font-['Roboto','Noto_Sans_JP',sans-serif]">
@@ -145,7 +140,6 @@ const BannerList: React.FC = () => {
 		);
 	}
 
-	// Error state
 	if (error) {
 		return (
 			<div className="space-y-6 font-['Roboto','Noto_Sans_JP',sans-serif]">
@@ -167,7 +161,7 @@ const BannerList: React.FC = () => {
 
 	return (
 		<div className="flex flex-col gap-[16px] font-['Roboto','Noto_Sans_JP',sans-serif]">
-			{/* Page Header */}
+
 			<div className="flex items-center justify-between mb-[8px]">
 				<div>
 					<h2 className="text-[28px] font-bold text-black leading-[36px]">
@@ -185,7 +179,7 @@ const BannerList: React.FC = () => {
 					onClick={() => router.push("/admin/banners/editor")}
 					className="inline-flex items-center gap-[6px] px-[12px] py-[12px] bg-[var(--color)] hover:opacity-90 text-white rounded-[8px] text-[18px] font-bold transition-opacity"
 				>
-					{/* Plus icon */}
+
 					<svg
 						aria-hidden="true"
 						className="w-[24px] h-[24px]"
@@ -204,17 +198,17 @@ const BannerList: React.FC = () => {
 				</button>
 			</div>
 
-			{/* Preview Section - Figma Design */}
+
 			<div
 				className="rounded-[14px] border border-[var(--border-color)] shadow-[0px_4px_4px_0px_rgba(0,0,0,0.1)] p-[20px] flex flex-col gap-[16px]"
 				style={{
 					background: "linear-gradient(to right, var(--bgapp), var(--white))",
 				}}
 			>
-				{/* Card Header */}
+
 				<div className="flex flex-col gap-[8px]">
 					<div className="flex items-center gap-[8px]">
-						{/* Grid icon */}
+
 						<svg
 							aria-hidden="true"
 							className="w-[20px] h-[20px] text-[var(--brand-primary-gray1)]"
@@ -252,7 +246,7 @@ const BannerList: React.FC = () => {
 					</p>
 				</div>
 
-				{/* Banner Preview - horizontally scrollable */}
+
 				<div className="flex gap-[16px] pb-[4px] overflow-x-auto">
 					{liveBanners.length > 0
 						? liveBanners.map((banner, index) => {
@@ -268,7 +262,7 @@ const BannerList: React.FC = () => {
 											animation: `bannerFadeIn 0.6s ease-out ${index * 0.15}s both`,
 										}}
 									>
-										{/* Background Image */}
+
 										{imgUrl ? (
 											<Image
 												src={imgUrl}
@@ -288,7 +282,7 @@ const BannerList: React.FC = () => {
 											/>
 										)}
 
-										{/* Gradient Overlay - from bottom */}
+
 										<div
 											className="absolute inset-0"
 											style={{
@@ -297,13 +291,13 @@ const BannerList: React.FC = () => {
 											}}
 										/>
 
-										{/* Text Content - positioned at bottom */}
+
 										<div className="absolute left-[25px] bottom-[16px] right-[16px]">
-											{/* Title */}
+
 											<p className="font-bold text-[18px] text-white leading-[28px] tracking-[-0.44px] mb-[0px]">
 												{banner.title}
 											</p>
-											{/* Action label */}
+
 											{action.actionType !== "popup" && (
 												<div className="flex items-center gap-[4px] mt-[0px]">
 													<svg
@@ -338,7 +332,7 @@ const BannerList: React.FC = () => {
 									</div>
 								);
 							})
-						: // Empty state - 3 placeholder cards
+						:
 							[1, 2, 3].map((index) => (
 								<div
 									key={index}
@@ -374,7 +368,7 @@ const BannerList: React.FC = () => {
 				</div>
 			</div>
 
-			{/* Table Section */}
+
 			<div className="bg-white rounded-[15px] border border-[var(--border-color)] shadow-[0px_4px_4px_0px_rgba(0,0,0,0.1)] overflow-hidden">
 				<table className="w-full border-collapse">
 					<thead className="bg-[var(--color-11)]">
@@ -432,7 +426,7 @@ const BannerList: React.FC = () => {
 										key={banner.id}
 										className="bg-white hover:bg-gray-50 transition-colors h-[100px]"
 									>
-										{/* 拖拉排序 */}
+
 										<td className="px-[18px] border border-[var(--border-color)] align-middle">
 											<div className="flex items-center justify-center">
 												<span className="inline-flex items-center gap-[4px] px-[8px] py-[4px] rounded-[8px] bg-[var(--color-11)] text-[var(--brand-gray1-100)] cursor-grab hover:brightness-95 transition-all">
@@ -452,7 +446,7 @@ const BannerList: React.FC = () => {
 											</div>
 										</td>
 
-										{/* 圖片 */}
+
 										<td className="px-[32px] border border-[var(--border-color)] align-middle">
 											<div className="flex items-center justify-center">
 												<div className="w-[150px] h-[75px] rounded-[8px] overflow-hidden">
@@ -487,7 +481,7 @@ const BannerList: React.FC = () => {
 											</div>
 										</td>
 
-										{/* 標題/連結 */}
+
 										<td className="px-[32px] border border-[var(--border-color)] align-middle">
 											<div className="flex flex-col gap-[6px]">
 												<span className="text-[18px] font-bold text-black leading-[1.23]">
@@ -503,7 +497,7 @@ const BannerList: React.FC = () => {
 											</div>
 										</td>
 
-										{/* 排程時間 */}
+
 										<td className="px-[32px] border border-[var(--border-color)] align-middle">
 											<div className="flex flex-col gap-[6px]">
 												<div className="flex items-center gap-[6px]">
@@ -527,7 +521,7 @@ const BannerList: React.FC = () => {
 											</div>
 										</td>
 
-										{/* 狀態 */}
+
 										<td className="px-[32px] border border-[var(--border-color)] align-middle">
 											<div className="flex items-center gap-[12px]">
 												<button
@@ -553,7 +547,7 @@ const BannerList: React.FC = () => {
 											</div>
 										</td>
 
-										{/* 操作 */}
+
 										<td className="px-[32px] border border-[var(--border-color)] align-middle">
 											<div className="flex items-center gap-[13px]">
 												<button

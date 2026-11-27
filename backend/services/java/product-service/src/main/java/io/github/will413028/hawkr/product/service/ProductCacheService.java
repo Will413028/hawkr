@@ -45,7 +45,6 @@ public class ProductCacheService {
         this.objectMapper = objectMapper;
     }
 
-    // ==================== 商品詳情快取（02 §2.7.2 含 onboarding 指紋） ====================
 
     /**
      * 取得商品詳情快取（key 含 onboarding 指紋）
@@ -56,7 +55,6 @@ public class ProductCacheService {
         try {
             json = redisTemplate.opsForValue().get(key);
         } catch (DataAccessException e) {
-            // Redis 失聯 → 降級視同 cache miss，由 caller 走 DB（02 §2.7.3 graceful degradation）
             log.warn("unavailable", "Redis 失聯，詳情快取降級走 DB: " + e.getMessage(), "product_id", productId);
             return Optional.empty();
         }
@@ -68,7 +66,6 @@ public class ProductCacheService {
             ProductDetailDTO dto = objectMapper.readValue(json, ProductDetailDTO.class);
             if (dto.getPublicationState() == null || dto.getPublicationState().isBlank()
                     || dto.getPurchasable() == null) {
-                // Contract shape changed: do not serve pre-publication-state cache entries after rollout.
                 safeDelete(key);
                 return Optional.empty();
             }
@@ -76,7 +73,6 @@ public class ProductCacheService {
             return Optional.of(dto);
         } catch (JsonProcessingException e) {
             log.warn("parseFailed", "解析快取失敗: " + e.getMessage(), "product_id", productId);
-            // 解析失敗，best-effort 刪除無效快取（redis 同時失聯不得二次拋）
             safeDelete(key);
             return Optional.empty();
         }
@@ -94,7 +90,6 @@ public class ProductCacheService {
         } catch (JsonProcessingException e) {
             log.error("failed", "序列化失敗: " + e.getMessage(), "product_id", productId);
         } catch (DataAccessException e) {
-            // Redis 失聯 → log.warn 不影響當次回應（資料已從 DB 取得，02 §2.7.3）
             log.warn("unavailable", "Redis 失聯，詳情快取寫回略過: " + e.getMessage(), "product_id", productId);
         }
     }
@@ -105,18 +100,15 @@ public class ProductCacheService {
     public void evictProductDetail(String productId) {
         String pattern = CacheKeyConstants.detailKeyPattern(productId);
         try {
-            // 非阻塞 SCAN + UNLINK 取代阻塞式 KEYS + DEL（清除範圍不變，見 RedisPatternEvictor）
             long removed = RedisPatternEvictor.scanUnlink(redisTemplate, pattern);
             if (removed > 0) {
                 log.info("success", "清除快取成功，刪除 " + removed + " 筆", "product_id", productId);
             }
         } catch (DataAccessException e) {
-            // Redis 失聯 → log.warn 不阻斷觸發清除的寫入業務（02 §2.7.3）
             log.warn("unavailable", "Redis 失聯，清除詳情快取略過: " + e.getMessage(), "product_id", productId);
         }
     }
 
-    // ==================== 商品列表快取 ====================
 
     /**
      * 取得商品列表快取
@@ -126,7 +118,6 @@ public class ProductCacheService {
         try {
             json = redisTemplate.opsForValue().get(cacheKey);
         } catch (DataAccessException e) {
-            // Redis 失聯 → 降級視同 cache miss，由 caller 走 DB（02 §2.7.3）
             log.warn("unavailable", "Redis 失聯，列表快取降級走 DB: " + e.getMessage(), "cache_key", cacheKey);
             return Optional.empty();
         }
@@ -166,7 +157,6 @@ public class ProductCacheService {
     public void evictProductList(Long storeId) {
         String pattern = CacheKeyConstants.productListPattern(storeId);
         try {
-            // 非阻塞 SCAN + UNLINK 取代阻塞式 KEYS + DEL（清除範圍不變，見 RedisPatternEvictor）
             long removed = RedisPatternEvictor.scanUnlink(redisTemplate, pattern);
             if (removed > 0) {
                 log.info("success", "清除列表快取成功，刪除 " + removed + " 筆", "store_id", String.valueOf(storeId));
@@ -224,7 +214,6 @@ public class ProductCacheService {
     public void evictAllProductLists() {
         String pattern = CacheKeyConstants.PRODUCT_LIST_PREFIX + "*";
         try {
-            // 非阻塞 SCAN + UNLINK 取代阻塞式 KEYS + DEL（清除範圍不變，見 RedisPatternEvictor）
             long removed = RedisPatternEvictor.scanUnlink(redisTemplate, pattern);
             if (removed > 0) {
                 log.info("success", "清除所有列表快取成功，刪除 " + removed + " 筆");
@@ -234,7 +223,6 @@ public class ProductCacheService {
         }
     }
 
-    // ==================== 公開產地聚合快取（02 §5.13） ====================
 
     private static final Duration ORIGINS_SUMMARY_TTL = Duration.ofMinutes(5);
 
@@ -248,7 +236,6 @@ public class ProductCacheService {
         try {
             json = redisTemplate.opsForValue().get(cacheKey);
         } catch (DataAccessException e) {
-            // Redis 失聯 → 降級視同 cache miss，由 caller 走 DB（02 §2.7.3）
             log.warn("originsSummary.unavailable", "Redis 失聯，產地聚合快取降級走 DB: " + e.getMessage(), "key", cacheKey);
             return Optional.empty();
         }
@@ -298,7 +285,6 @@ public class ProductCacheService {
         }
     }
 
-    // ==================== 輔助方法 ====================
 
     /**
      * best-effort 刪除壞快取：Redis 失聯時 log.warn 不拋（02 §2.7.3）。
@@ -318,11 +304,9 @@ public class ProductCacheService {
      * 由 ProductService 在 cache 取出後逐項套 onboarding filter — 避免 cache lookup 與 sig 計算雞生蛋問題）
      */
     public String generateListCacheKey(ProductQueryDTO query) {
-        // storeId 優先（公開 API 篩選指定賣家），否則用 ownerStoreId（賣家管理）
         Long ownerId = query.getStoreId() != null ? query.getStoreId()
                 : (query.getOwnerStoreId() != null ? query.getOwnerStoreId() : 0L);
         String queryHash = hashQuery(query);
-        // 留空 listOnboardingSig 占位 — 統一 key 結構，但 list 路徑不放真正 sig
         return CacheKeyConstants.productListKey(ownerId, queryHash, "all");
     }
 
@@ -331,7 +315,6 @@ public class ProductCacheService {
      */
     private String hashQuery(ProductQueryDTO query) {
         StringBuilder sb = new StringBuilder();
-        // 02 §5.3.1 多值聯集：cache key 需含完整排序後 id 序列
         sb.append("cat:");
         if (query.getCategoryIds() != null && !query.getCategoryIds().isEmpty()) {
             java.util.List<Long> sortedCats = new java.util.ArrayList<>(query.getCategoryIds());
@@ -346,17 +329,13 @@ public class ProductCacheService {
         sb.append(",size:").append(query.getPageSize());
         sb.append(",sort:").append(query.getSort() != null ? query.getSort() : "");
         sb.append(",status:").append(query.getStatus() != null ? query.getStatus() : "");
-        // 公開視角只列可曝光店家的商品，賣家／admin 視角不受限；兩者不得共用同一筆快取
         sb.append(",pub:").append(query.isPublicApi() ? 1 : 0);
-        // Hashtag filter 必須納入快取 key，否則無 hashtag / 有 hashtag 會 hit 同一 cached entry（02 §5.3）
         if (query.getHashtags() != null && !query.getHashtags().isEmpty()) {
-            // 排序後 join 確保不同輸入序產生同一 key
             java.util.List<String> sorted = new java.util.ArrayList<>(query.getHashtags());
             java.util.Collections.sort(sorted);
             sb.append(",ht:").append(String.join("|", sorted));
             sb.append(",htm:").append(query.isHashtagMatchAll() ? "all" : "any");
         }
-        // 02 §5.3.4 server-side filter — 全部納入 cache key，避免不同 filter 共享 cache 回錯資料
         if (query.getDeliveryTempFilter() != null && !query.getDeliveryTempFilter().isEmpty()) {
             java.util.List<String> sortedTemps = new java.util.ArrayList<>(query.getDeliveryTempFilter());
             java.util.Collections.sort(sortedTemps);
@@ -383,12 +362,9 @@ public class ProductCacheService {
             }
         }
         if (query.isFollowedProductOnly()) {
-            // followed_product_only 依賴 favoritedIds（隨買家變動），key 必須含 viewerBuyerId
             sb.append(",fp:").append(query.getViewerBuyerId() != null ? query.getViewerBuyerId() : 0);
         }
         if (query.isFollowedSellerOnly()) {
-            // followed_seller_only 解析為 storeIds，但仍需把 viewerBuyerId 納入 key，
-            // 避免不同 viewer 的 cache 互染（即使解析後 sellerIds 一樣，意涵不同）
             sb.append(",fs:").append(query.getViewerBuyerId() != null ? query.getViewerBuyerId() : 0);
         }
 
@@ -403,10 +379,8 @@ public class ProductCacheService {
                 }
                 hexString.append(hex);
             }
-            // 取前 8 位足夠區分
             return hexString.substring(0, 8);
         } catch (NoSuchAlgorithmException e) {
-            // MD5 一定存在，不會發生
             return String.valueOf(sb.toString().hashCode());
         }
     }

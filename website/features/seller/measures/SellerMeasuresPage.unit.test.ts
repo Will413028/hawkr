@@ -104,7 +104,6 @@ const render = (
 	options?: Parameters<typeof renderWithoutIntl>[1],
 ) => renderWithoutIntl(ui, { ...options, wrapper: IntlTestWrapper });
 
-// 伺服器判斷的 can_appeal 才是依據：這兩筆都是生效中的停權，只有 canAppeal 不同。
 function measure(canAppeal: boolean): Measure {
 	return create(MeasureSchema, {
 		id: canAppeal ? "can" : "cannot",
@@ -142,7 +141,7 @@ describe("SellerMeasuresPage 的申覆入口", () => {
 		mocks.records = [measure(true)];
 		render(React.createElement(SellerMeasuresPage));
 		const links = screen.getAllByRole("link", { name: "提出申覆" });
-		expect(links).toHaveLength(2); // 桌面卡片與手機展開內容
+		expect(links).toHaveLength(2);
 		for (const link of links) {
 			expect(link.getAttribute("href")).toBe("/seller/measures/can/appeal");
 		}
@@ -199,7 +198,6 @@ describe("SellerMeasuresPage 的狀態標籤", () => {
 		const requests = screen.getAllByText("申覆審核中");
 		expect(states.length).toBeGreaterThan(0);
 		expect(requests.length).toBe(states.length);
-		// 同一張卡片內：狀態在前、請求在後，兩者同一個容器
 		expect(states[0].parentElement?.parentElement).toBe(
 			requests[0].parentElement?.parentElement,
 		);
@@ -244,7 +242,7 @@ describe("SellerMeasuresPage 的解除請求入口", () => {
 	it("RISK 生效中且 canRequestRemediation：是連到該措施解除請求頁的連結", () => {
 		mocks.records = [risk({ canRequestRemediation: true })];
 		render(React.createElement(SellerMeasuresPage));
-		expect(links()).toHaveLength(2); // 桌面卡片與手機展開內容
+		expect(links()).toHaveLength(2);
 		expect(buttons()).toHaveLength(0);
 		for (const link of links()) {
 			expect(link.getAttribute("href")).toBe("/seller/measures/r1/remediation");
@@ -315,8 +313,7 @@ describe("SellerMeasuresPage 的解除請求入口", () => {
 		render(React.createElement(SellerMeasuresPage));
 		expect((buttons()[0] as HTMLButtonElement).disabled).toBe(true);
 		expect(reasonOf(buttons()[0])).toBe(REMEDIATION_SENTENCE.COOLDOWN);
-		// 冷卻時間只在按鈕的原因，不在說明行（說明行留給裁定理由）
-		expect(screen.getAllByText(/後可再提出/)).toHaveLength(2); // 桌面與手機各一個按鈕原因
+		expect(screen.getAllByText(/後可再提出/)).toHaveLength(2);
 	});
 
 	it("伺服器說 NOT_ACTIVE 或 NOT_RISK：不顯示；沒有原因也不能請求時同樣不顯示", () => {

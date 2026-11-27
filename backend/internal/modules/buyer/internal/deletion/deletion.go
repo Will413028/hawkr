@@ -138,7 +138,6 @@ func (service *Service) close(ctx context.Context, queries *store.Queries, curre
 	})
 }
 
-// retireAvatar 關閉是頭像的終態：在關閉的 transaction 內把目前的頭像標記刪除（實體刪除由 media 的 job 做）。
 func (service *Service) retireAvatar(ctx context.Context, current store.BuyerBuyer) error {
 	if current.AvatarAssetID == nil {
 		return nil

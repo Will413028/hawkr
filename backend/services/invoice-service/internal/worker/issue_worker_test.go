@@ -11,9 +11,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// ---------------------------------------------------------------------------
-// fakes
-// ---------------------------------------------------------------------------
 
 type fakeOps struct {
 	domain.OperationRepository
@@ -61,7 +58,6 @@ func (f *fakeOps) GetByID(_ context.Context, id int64) (domain.Operation, error)
 
 func (f *fakeOps) MarkDone(_ context.Context, id int64, _ time.Time) (bool, error) {
 	f.markedDone = append(f.markedDone, id)
-	// 回 false 模擬 ③ 的 `AND status='SENDING'` 守衛在 ProcessFunc 已寫定終態時的 rows=0。
 	return false, nil
 }
 
@@ -100,12 +96,10 @@ type fakeSubmitter struct {
 	submitted  []int64
 	submitErr  error
 	beforeExit func()
-	// strict=true 時任何呼叫都是測試失敗（給作廢／折讓軸的分派測試用）。
 	strict bool
 	t      *testing.T
 }
 
-// strictSubmitter 回一個「被呼叫到就判失敗」的開票軸替身。
 func strictSubmitter(t *testing.T) *fakeSubmitter {
 	t.Helper()
 	return &fakeSubmitter{strict: true, t: t}
@@ -134,12 +128,6 @@ func testIssueCfg(lease time.Duration) outbox.Config {
 	}
 }
 
-// sendingOp 建一筆開票 operation。
-//
-// 🔴 OperationType 必須填：DB 那一欄是 NOT NULL ＋ chk_invop_type（六值），
-// 空字串在真實資料裡不存在。替身產出一個不可能的值，等於讓分派邏輯在測試裡
-// 走一條 production 走不到的路 —— 本檔曾因此讓 default fallthrough 的洞
-// （非 VOID／ALLOWANCE 一律送去開票）在測試上完全看不出來。
 func sendingOp(id int64, docID int64) domain.Operation {
 	return domain.Operation{
 		ID: id, DocumentID: docID,
@@ -149,9 +137,6 @@ func sendingOp(id int64, docID int64) domain.Operation {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 搶佔規範：租約基準逐筆取
-// ---------------------------------------------------------------------------
 
 // TestIssueWorker_LeaseBaselineIsPerRow 是**變異③的靶心**。
 //
@@ -183,12 +168,6 @@ func TestIssueWorker_LeaseBaselineIsPerRow(t *testing.T) {
 		t.Fatalf("兩筆的租約基準只差 %v（第一筆的處理花了 %v）—— 基準被提到批次迴圈外算了一次，"+
 			"不變式已退化成「批次總耗時 < 租約」", gap, processDelay)
 	}
-	// 租約長度本身仍必須是設定值（gap 來自基準推移，不是租約變長）。
-	//
-	// ⚠️ 這裡量的是 leaseUntil − claimableBefore，而 claimableBefore 是**批次的 tickNow**
-	// （CAS 上界，刻意共用），leaseUntil 是**逐筆的 now + ClaimLease** ⇒ 兩者的差是
-	// 「租約 ＋ 該筆之前已經花掉的時間」，只有下界是 120s。這正是搶佔規範要的形狀：
-	// 上界共用不影響正確性，基準逐筆取才影響。
 	for i, c := range sub.claims {
 		d := c.leaseUntil.Sub(c.now)
 		if d < 120*time.Second {
@@ -288,17 +267,12 @@ func TestIssueResultOf(t *testing.T) {
 	}
 }
 
-// fakeVoider 是作廢軸的 worker fake。
-//
-// 🔴 預設**拒絕**：既有的開票軸測試沒有一支應該打到作廢路徑。回 nil 會讓分派
-// 寫反（開票單被送去作廢）在測試裡完全看不出來——fake 的鑑別力來自它拒絕什麼。
 type fakeVoider struct {
 	claims    []claimRecord
 	submitted []int64
 	claimOK   bool
 	claimErr  error
 	submitErr error
-	// strict=true 時任何呼叫都是測試失敗（給開票軸的測試用）。
 	strict bool
 	t      *testing.T
 }
@@ -319,17 +293,11 @@ func (f *fakeVoider) SubmitVoid(_ context.Context, id int64) error {
 	return f.submitErr
 }
 
-// strictVoider 給既有開票軸測試用：被呼叫到就是分派錯誤。
 func strictVoider(t *testing.T) *fakeVoider {
 	t.Helper()
 	return &fakeVoider{strict: true, t: t}
 }
 
-// fakeAllowancer 是折讓軸的替身（#3073），形狀與 fakeVoider 逐字相同。
-//
-// strict=true 時任何呼叫都是測試失敗：開票軸與作廢軸的測試都不該走到折讓路徑，
-// 走到就代表 isAllowanceOperation 的分派寫反了 —— 而那個錯的後果是把一張折讓單
-// 拿去走開票或作廢流程。
 type fakeAllowancer struct {
 	claims    []claimRecord
 	submitted []int64
@@ -361,18 +329,13 @@ func strictAllowancer(t *testing.T) *fakeAllowancer {
 	return &fakeAllowancer{strict: true, t: t}
 }
 
-// ---------------------------------------------------------------------------
-// 三軸分派（#3073 折讓軸落地後補）
-// ---------------------------------------------------------------------------
 
-// allowanceOp 造一筆 SENDING 的折讓 operation。
 func allowanceOp(id, docID int64) domain.Operation {
 	op := sendingOp(id, docID)
 	op.OperationType = codemeta.InvoiceOperationTypeAllowance.Value
 	return op
 }
 
-// voidOp 造一筆 SENDING 的作廢 operation。
 func voidOp(id, docID int64) domain.Operation {
 	op := sendingOp(id, docID)
 	op.OperationType = codemeta.InvoiceOperationTypeVoid.Value
@@ -423,7 +386,6 @@ func TestIssueWorker_AllowanceNeverGoesToIssueAxis(t *testing.T) {
 	ops := newFakeOps(allowanceOp(7, 107))
 	al := &fakeAllowancer{claimOK: true}
 
-	// 開票軸與作廢軸都用 strict 版：被呼叫到就是測試失敗。
 	w := NewIssueWorker(ops, &fakeDocsRepo{byID: map[int64]domain.Document{}},
 		strictSubmitter(t), strictVoider(t), al, testIssueCfg(120*time.Second), testMetrics, testObsA, nil)
 	if err := w.RunOnce(context.Background()); err != nil {
@@ -457,8 +419,6 @@ func TestIssueWorker_UnroutableOperationTypeFailsClosed(t *testing.T) {
 			w := NewIssueWorker(ops, &fakeDocsRepo{byID: map[int64]domain.Document{}},
 				iss, strictVoider(t), strictAllowancer(t),
 				testIssueCfg(120*time.Second), testMetrics, testObsA, nil)
-			// RunOnce 不因單筆分派失敗而整輪失敗（其他列還要跑），但那一筆
-			// 絕不可以被開票軸接走。
 			_ = w.RunOnce(context.Background())
 			if len(iss.claims) != 0 || len(iss.submitted) != 0 {
 				t.Fatalf("%s 被開票軸接走了（claims=%v submits=%v）——"+

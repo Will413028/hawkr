@@ -68,8 +68,6 @@ class PrincipalResolveDeadlineTest {
         deadlineBuyerStub = mock(BuyerServiceGrpc.BuyerServiceBlockingStub.class);
         readDeadlineSellerStub = mock(SellerServiceGrpc.SellerServiceBlockingStub.class);
 
-        // 只有「帶對 deadline」的那次 withDeadlineAfter 才會拿到 deadlineStub；
-        // 其餘（含完全不呼叫）都會停在 rawStub 上 ⇒ 下面的 verify 轉紅。
         when(rawSellerStub.withDeadlineAfter(
                 SellerGrpcClient.PRINCIPAL_RESOLVE_DEADLINE_SEC, TimeUnit.SECONDS))
                 .thenReturn(deadlineSellerStub);
@@ -89,7 +87,6 @@ class PrincipalResolveDeadlineTest {
         buyerGrpcClient = new BuyerGrpcClient(buyerFactory);
     }
 
-    // ==================== 1. 結構：RPC 必須發在帶 deadline 的 stub 上 ====================
 
     @Test
     @DisplayName("SellerGrpcClient.getSellerProfiles：結果以 store_id 建索引，不以 account_id 建索引")
@@ -108,9 +105,6 @@ class PrincipalResolveDeadlineTest {
         assertTrue(result.containsKey(STORE_ID), "結果應以 store_id 建索引");
         assertTrue(!result.containsKey(42L), "不得再以 principal account_id 建索引");
 
-        // issue #3332：RPC 必須發在帶 deadline 的 stub 上。拿掉 withDeadlineAfter ⇒
-        // getSellerBatch 落在 rawSellerStub（未 stub，回 null）⇒ catch 降級成空 map
-        // ⇒ 上面兩行先轉紅；這一行則直接指出成因。
         verify(rawSellerStub).withDeadlineAfter(
                 SellerGrpcClient.INTERNAL_READ_DEADLINE_SEC, TimeUnit.SECONDS);
         verify(rawSellerStub, org.mockito.Mockito.never()).getSellerBatch(any());
@@ -140,7 +134,6 @@ class PrincipalResolveDeadlineTest {
         verify(rawSellerStub).withDeadlineAfter(
                 SellerGrpcClient.PRINCIPAL_RESOLVE_DEADLINE_SEC, TimeUnit.SECONDS);
         verify(deadlineSellerStub).resolvePrincipals(any());
-        // 拿掉 withDeadlineAfter ⇒ RPC 打在 rawSellerStub 上 ⇒ 這一行轉紅
         verify(rawSellerStub, org.mockito.Mockito.never()).resolvePrincipals(any());
     }
 
@@ -173,13 +166,10 @@ class PrincipalResolveDeadlineTest {
         sellerGrpcClient.resolveAccountIdForStore(STORE_ID);
         sellerGrpcClient.resolveAccountIdForStore(STORE_ID);
 
-        // withDeadlineAfter 是以「呼叫當下」換算成絕對 deadline。若被挪進建構子（只換算一次），
-        // 服務啟動 N 秒後所有呼叫一律 DEADLINE_EXCEEDED —— 這一行是它的機械防線。
         verify(rawSellerStub, org.mockito.Mockito.times(2)).withDeadlineAfter(
                 SellerGrpcClient.PRINCIPAL_RESOLVE_DEADLINE_SEC, TimeUnit.SECONDS);
     }
 
-    // ==================== 2. 數值邊界 ====================
 
     /** 那兩支排程（AutoConfirmReceiptScheduler／StorePickupTimeoutScheduler）的 BATCH_LIMIT。 */
     private static final int SCHEDULER_BATCH_LIMIT = 200;
@@ -220,14 +210,10 @@ class PrincipalResolveDeadlineTest {
     @Test
     @DisplayName("下界：不得低於本 repo 既有先例（cart-service 2s，且該處還有一次重試）")
     void principalResolveDeadline_notBelowExistingPrecedent() {
-        // cart-service SellerGrpcClient.CALL_DEADLINE_SECONDS = 2s，配 MAX_ATTEMPTS=2 ⇒ 實質 4s。
-        // 本呼叫點沒有重試，一次就得涵蓋 channel 重建 + GC 停頓 + 一次慢查詢，
-        // 調到 2s 以下會開始製造假的 DEADLINE_EXCEEDED（strict 路徑＝整筆延後一個 10 分鐘 tick）。
         assertTrue(SellerGrpcClient.PRINCIPAL_RESOLVE_DEADLINE_SEC >= 2L,
                 "反解 deadline 不得低於 2 秒");
     }
 
-    // ==================== 3. 失敗語意：DEADLINE_EXCEEDED 之後怎麼走 ====================
 
     @Test
     @DisplayName("seller 逾時：client 內部吸收回 null（不拋），永遠只有這一種 failure mode")

@@ -13,7 +13,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// ==================== DTO ====================
 
 // DelegatedAuditActor / Target are repeated on every audit row rather than derived
 // from the session summary. Two independent reasons: ① the names on an audit row are
@@ -190,7 +189,6 @@ type DelegatedOperationSessionRecord struct {
 	RevokeReason              *string `json:"revokeReason"`
 }
 
-// ==================== A｜audit-logs ====================
 
 // ListDelegatedAuditLogs handles GET /api/v1/admin/delegated-operations/:session_id/audit-logs.
 // Mounted with requireAdmin(): this is a governance query over any session, and the
@@ -228,8 +226,6 @@ func (h *Holder) ListDelegatedAuditLogs(c *gin.Context) {
 		return
 	}
 	if h.Account == nil {
-		// 9289 而不是 9280（#2744）：未接線是永久失敗，重試不會好。見 admin_delegated_media.go
-		// 同形分支的完整理由。
 		zap.L().Error("Delegation.dependency.unwired", zap.String("dep", "Account"), zap.String("path", c.FullPath()))
 		response.BizStatus(c, bizcode.DelegationInternalContractMismatch, "代行營運服務設定異常，重試無效")
 		return
@@ -319,7 +315,6 @@ func delegatedAuditEntryDTO(e *accountpb.AuditLogEntry) DelegatedAuditLogEntry {
 	return out
 }
 
-// ==================== B｜{sessionId}/summary ====================
 
 // GetDelegatedSessionSummary handles GET .../{sessionId}/summary (requireAdmin).
 // It stays a governance query over ANY session and must NOT be widened to also accept
@@ -335,7 +330,6 @@ func (h *Holder) GetDelegatedSessionSummary(c *gin.Context) {
 	h.respondSessionSummary(c, sessionID)
 }
 
-// ==================== C｜current/summary ====================
 
 // GetCurrentDelegatedSessionSummary handles GET .../current/summary.
 //
@@ -359,8 +353,6 @@ func (h *Holder) GetCurrentDelegatedSessionSummary(c *gin.Context) {
 		return
 	}
 	if h.Account == nil {
-		// 9289 而不是 9280（#2744）：未接線是永久失敗，重試不會好。見 admin_delegated_media.go
-		// 同形分支的完整理由。
 		zap.L().Error("Delegation.dependency.unwired", zap.String("dep", "Account"), zap.String("path", c.FullPath()))
 		response.BizStatus(c, bizcode.DelegationInternalContractMismatch, "代行營運服務設定異常，重試無效")
 		return
@@ -372,7 +364,6 @@ func (h *Holder) GetCurrentDelegatedSessionSummary(c *gin.Context) {
 		return
 	}
 	if current.GetCode() != 0 {
-		// cookie 保留、不宣稱已結束：憑證解不開才是 9274，工作階段的終態不是。
 		response.BizStatus(c, current.GetCode(), current.GetMessage())
 		return
 	}
@@ -384,15 +375,10 @@ func (h *Holder) GetCurrentDelegatedSessionSummary(c *gin.Context) {
 	h.respondSessionSummary(c, sessionID)
 }
 
-// headerDelegationOperationCredential mirrors the router's header constant. The two
-// are separate declarations because handler must not import router; the value is the
-// contract, and the contract test asserts they agree.
 const headerDelegationOperationCredential = "X-HK-Operation-Session"
 
 func (h *Holder) respondSessionSummary(c *gin.Context, sessionID string) {
 	if h.Account == nil {
-		// 9289 而不是 9280（#2744）：未接線是永久失敗，重試不會好。見 admin_delegated_media.go
-		// 同形分支的完整理由。
 		zap.L().Error("Delegation.dependency.unwired", zap.String("dep", "Account"), zap.String("path", c.FullPath()))
 		response.BizStatus(c, bizcode.DelegationInternalContractMismatch, "代行營運服務設定異常，重試無效")
 		return
@@ -458,7 +444,6 @@ func (h *Holder) respondSessionSummary(c *gin.Context, sessionID string) {
 	response.OK(c, out)
 }
 
-// ==================== D｜跨工作階段治理列表（§11.3 P1） ====================
 
 // ListDelegatedOperations 列出代行工作階段（跨工作階段治理查詢）
 // GET /api/v1/admin/delegated-operations
@@ -621,15 +606,8 @@ func (h *Holder) ListAllDelegatedAuditLogs(c *gin.Context) {
 	response.Page(c, records, resp.GetTotal(), resp.GetPage(), resp.GetPageSize())
 }
 
-// delegatedDisplayCodeRE mirrors chk_dos_display_code_format. Rejecting a malformed
-// code with 9260 rather than passing it through matters: an unvalidated typo comes
-// back as an empty page, which reads as "no such session" instead of "you typed it
-// wrong".
 var delegatedDisplayCodeRE = regexp.MustCompile(`^OPS-[0-9A-Z]{13}$`)
 
-// delegationIDFilter reads one optional numeric-id filter, empty string meaning no
-// filter. Malformed is 9260, never silently dropped — a dropped filter hands back
-// every session on the platform while the operator believes he narrowed to one store.
 func delegationIDFilter(c *gin.Context, name string) (string, bool) {
 	raw := c.Query(name)
 	if raw == "" {
@@ -692,13 +670,7 @@ func delegatedSessionRecordDTO(r *accountpb.DelegatedOperationSessionRecord) Del
 	return out
 }
 
-// ==================== query 值域 ====================
 
-// auditFilterValue reads one single-valued filter.
-//
-// 單值，不支援逗號分隔：proto 的三個 filter 都是單一 string 且註解明寫「空字串 =
-// 不篩選」，要支援多值就得改成 repeated，那是契約變更而非實作細節。出現逗號一律
-// 9260，理由與「值不在值域內回 9260」相同——靜默忽略會讓前端以為篩選生效而實際回全集。
 func auditFilterValue(c *gin.Context, name string, valid func(string) bool) (string, bool) {
 	raw := c.Query(name)
 	if raw == "" {
@@ -714,6 +686,3 @@ func auditFilterValue(c *gin.Context, name string, valid func(string) bool) (str
 	}
 	return raw, true
 }
-
-// date_from／date_to 的解析在 admin_delegated_common.go 的 delegatedDateRange——它與
-// 訂單列表（§6.1.10）共用同一份契約。

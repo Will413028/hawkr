@@ -5,7 +5,6 @@ import (
 	"testing"
 )
 
-// mapResolver 讓測試表達 Phase 2 的逐 SKU 稅別（例 2 需要）。
 type mapResolver struct {
 	byS map[string]TaxCategory
 	def TaxCategory
@@ -34,7 +33,6 @@ func buildExample(t *testing.T, items []exItem, shippingFee, discount int64, buy
 	return d
 }
 
-// newExampleDraft 只組草稿、不驗證，供變異測試注入違反用。
 func newExampleDraft(t *testing.T, items []exItem, shippingFee, discount int64, buyerID string) *IssueDraft {
 	t.Helper()
 	snap := OrderSnapshot{

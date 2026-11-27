@@ -20,8 +20,6 @@ function buyerQuoteFailure(
 const STALE_RESPONSE_DETAIL =
 	"這家賣家已經送出新的報價版本。系統不會自動幫你接受新版本，請重新比較之後再決定。";
 
-// 付款入口是 `Button href`（共用 <Link>），它經 `@/lib/intl/use-router` 取 router；
-// 測試不掛 App Router，改用靜態 router。
 vi.mock("@/lib/intl/use-router", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("@/lib/intl/use-router")>();
 	const { staticRouter } = await import("@/tests/browser/static-router");
@@ -147,7 +145,6 @@ function setup(overrides: Partial<Props> = {}) {
 		onRefresh: vi.fn(),
 		...overrides,
 	};
-	// 付款入口的 <Link> 要有 root layout 的 ViewTransitions provider。
 	const view = renderWithIntl(
 		<ViewTransitions>
 			<div style={{ width: "100%", maxWidth: 1100, padding: 16 }}>
@@ -169,20 +166,17 @@ describe("BuyerQuoteComparison", () => {
 		await expect
 			.element(page.getByText("收到 3 份正式回價", { exact: true }))
 			.toBeVisible();
-		// 計價基準不同（KG vs CATTY）時必須明講不可直接比單價。
 		await expect
 			.element(
 				page.getByText("各家的計價基準不同，單價不可直接相比", { exact: true }),
 			)
 			.toBeVisible();
-		// 不可接受的版本留在清單裡，只是按不下去。
 		await expect
 			.element(page.getByText("已被新版本取代", { exact: true }))
 			.toBeVisible();
 		await expect.poll(() => acceptButton().elements().length).toBe(3);
 		await expect.element(acceptButton().nth(0)).toBeEnabled();
 		await expect.element(acceptButton().nth(2)).toBeDisabled();
-		// 沒有任何自算單價：18900 / 500 = 37.8。
 		await expect.element(page.getByText(/37\.8/)).not.toBeInTheDocument();
 	});
 
@@ -210,7 +204,6 @@ describe("BuyerQuoteComparison", () => {
 	it("confirms before accepting and freezes the price without a payment link", async () => {
 		const { props } = setup({ responses: [response()] });
 		await userEvent.click(acceptButton());
-		// 確認對話框走 portal 掛在 document.body 上；page 查整份 document。
 		const confirm = confirmButton();
 		await expect.element(confirm).toBeVisible();
 		expect(props.onAcceptQuote).not.toHaveBeenCalled();
@@ -223,7 +216,6 @@ describe("BuyerQuoteComparison", () => {
 			)
 			.toBeVisible();
 		await expect.element(page.getByText(/正在建立待付款訂單/)).toBeVisible();
-		// ACK 不帶 orderNo，畫面就不得出現付款入口。
 		await expect
 			.element(page.getByRole("link", { name: "前往付款", exact: true }))
 			.not.toBeInTheDocument();

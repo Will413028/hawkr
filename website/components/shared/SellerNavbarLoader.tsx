@@ -147,7 +147,6 @@ export function SellerHeaderLoader({
 		try {
 			await signOut();
 		} catch {
-			// signOut owns the toast; keep this fail-closed rail available to retry.
 			return;
 		} finally {
 			signOutPendingRef.current = false;
@@ -167,7 +166,6 @@ export function SellerHeaderLoader({
 			aria-label="賣家工作區導覽"
 			className={cn(
 				"root-nav-layout-reservation flex w-full items-center justify-end gap-2 px-4",
-				// Match navigation-shell.css's existing narrow onboarding account rail.
 				onboarding && "max-[640px]:h-[72px]",
 			)}
 			data-onboarding={onboarding || undefined}
@@ -229,7 +227,6 @@ export function SellerMenuLoader({
 		try {
 			await onSignOut();
 		} catch {
-			// Keep the fail-closed escape rail mounted; the owner reports the error.
 			return;
 		} finally {
 			signOutPendingRef.current = false;
@@ -251,9 +248,7 @@ export function SellerMenuLoader({
 		>
 			{isError ? (
 				<>
-					{/* The alert is its own node: nesting role="alert" INSIDE the
-					    button made the failure message double as the button's label,
-					    so assistive tech read the error and the action as one string. */}
+
 					<span role="alert" className="sr-only">
 						賣家選單載入失敗
 					</span>

@@ -4,8 +4,6 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 image="${1:?sqlc image required}"
 stage="$(mktemp -d "$root/.sqlc-stage.XXXXXX")"
 trap 'rm -rf "$stage"' EXIT
-# 先把所有模組的 db/ 複製進 stage，再逐一 generate：模組的 sqlc.yaml 可以讀依賴表允許的模組的 ../../<模組>/db/pub.sql
-# （ADR 2026-09-24-go-modular-monolith 文末修訂），字母序在後的擁有者也要已經在 stage 裡。
 for db in "$root"/internal/modules/*/db; do
   [ -d "$db" ] || continue
   module="$(basename "$(dirname "$db")")"

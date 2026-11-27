@@ -173,9 +173,6 @@ export function clampGrid(grid: string[][]): {
 	const rows = grid.slice(0, TABLE_MAX_ROWS).map((row) => {
 		if (row.length > TABLE_MAX_COLS) clamped = true;
 		return row.slice(0, TABLE_MAX_COLS).map((cell) => {
-			// 上限以純文字長度計（與 backend validator 一致），截斷時退回純文字
-			// 避免砍斷 inline 標籤產生破損 HTML。cell 內文字已是轉義字串，先
-			// 反解再量長度/截斷，最後重新轉義——否則二次轉義會顯示字面實體。
 			const text = unescapeHtml(cell.replace(/<[^>]*>/g, ""));
 			if (text.length <= TABLE_MAX_CELL_LEN) return cell;
 			clamped = true;

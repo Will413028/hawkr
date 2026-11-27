@@ -78,7 +78,6 @@ const ORDER_PROVISIONING_COPY: Record<
 	BuyerQuoteAcceptanceResponse["orderProvisioningState"],
 	string
 > = {
-	// ⛔ 這三句都不得出現「成交」「已下單」。價格凍結 ≠ 訂單成立。
 	CREATING_ORDER: "正在建立待付款訂單，完成後這裡會出現訂單編號與付款期限。",
 	ORDER_CREATED: "待付款訂單已建立，請在期限前完成付款。",
 	ORDER_FAILED:
@@ -155,7 +154,7 @@ function QuoteDetail({ response }: { response: BuyerFacingSellerResponse }) {
 			</div>
 			<div>
 				<dt>換算依據</dt>
-				{/* 空字串＝賣家沒有給換算依據。⛔ 不要在這裡自己乘除補一個出來。 */}
+
 				<dd>{quote.conversionBasis || "賣家未提供換算依據"}</dd>
 			</div>
 			<div>
@@ -223,13 +222,9 @@ export default function BuyerQuoteComparison({
 	const [pendingShortlist, setPendingShortlist] = React.useState<string | null>(
 		null,
 	);
-	// 同一個版本的重試必須沿用同一個 client_request_id，否則伺服器上會多出第二筆接受。
-	// 換一個版本就是換一次送出動作，各自一個。
 	const clientRequestIds = React.useRef(new Map<string, string>());
 
 	const accepted = flow.status === "accepted" ? flow.ack : null;
-	// 有一筆接受成立之後這張詢價就鎖住了：伺服器對第二次會回
-	// RFQ_CHECKOUT_ALREADY_ACTIVE／RFQ_ALREADY_AWARDED，畫面先誠實反映。
 	const locked = accepted !== null;
 	const comparable = hasComparableUnitBasis(responses);
 	const missingSellerFacingHash = sellerFacingHash === "";

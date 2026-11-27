@@ -6,7 +6,6 @@ const RESERVED_EXACT_HEADERS = new Set([
 	"x-operation-session-id",
 	"x-delegated-store-id",
 	"x-impersonated-user-id",
-	// Browser-supplied rate-limit identity assertions are never accepted.
 	"x-hk-origin-auth",
 ]);
 
@@ -21,7 +20,6 @@ const GENERIC_BFF_FORWARDED_HEADERS = new Set([
 	"accept",
 	"accept-language",
 	"baggage",
-	// 對外 API（Connect，/{service}/{method}）的協定 header：版本與 client 的 deadline。
 	"connect-protocol-version",
 	"connect-timeout-ms",
 	"content-type",

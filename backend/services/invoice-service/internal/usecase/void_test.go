@@ -14,12 +14,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// ---------------------------------------------------------------------------
-// 作廢軸的測試替身
-//
-// 🔴 每一支 fake 的預設都是**拒絕**，不是回零值：本軸的錯誤形態幾乎全是靜默的
-// （狀態沒推、票沒送、確認沒做），回零值會讓那些漏接在測試裡看起來完全正常。
-// ---------------------------------------------------------------------------
 
 type voidDocs struct {
 	domain.DocumentRepository
@@ -82,7 +76,6 @@ type voidOps struct {
 	failCalls int
 	waitCalls int
 	doneCalls int
-	// recheckDoneCalls 與 doneCalls 分開計，兩者才分得出走了哪一條 lane。
 	recheckDoneCalls int
 	cancelCalls      []int64
 	promoted         []int64
@@ -91,7 +84,6 @@ type voidOps struct {
 	exhaustCalls     int
 	unresolved       []string
 	order            *[]string
-	// gotProviderCode 是 #3082 的斷言材料。
 	gotProviderCode string
 }
 
@@ -181,14 +173,8 @@ func (f *voidOps) setStatus(id int64, status string) {
 	f.byID[id] = op
 }
 
-// settledCalls 是「operation 真的被推到 SUCCEEDED」的次數，**不分 lane**。
-// 斷言用它而不是 doneCalls：後者會把「走錯 lane」誤判成沒收尾，
-// 前者才是呼叫端真正關心的不變式。
 func (f *voidOps) settledCalls() int { return f.doneCalls + f.recheckDoneCalls }
 
-// enterRecheckLane 模擬 INV.rc 的真實時序：ClaimInvoiceRecheck 先把 DB 上的 status
-// 蓋成 PROVIDER_STATUS_RECHECK，**再**把 claim 之前讀到的快照傳進 ConfirmVoid。
-// 回傳的就是那個快照 —— 它的 Status 停在 claim 之前的值，這是常態不是 fixture 寫錯。
 func (f *voidOps) enterRecheckLane(id int64) domain.Operation {
 	snapshot := f.byID[id]
 	snapshot.Status = codemeta.InvoiceOperationStatusWaitingConfirmation.Value
@@ -253,10 +239,6 @@ func (f *voidProvider) QueryInvoiceByNumber(_ context.Context, _ amego.Credentia
 	return f.detail, f.detailErr
 }
 
-// bizNotFound／bizNotFoundCorrection 產生 repo 層對「查無列」用的業務碼錯誤。
-//
-// 用真的業務碼而不是 errors.New：usecase 靠 isBizCode 分辨「沒有」與「查詢失敗」，
-// 而那兩者的處置相反（前者略過、後者整筆失敗）。fake 回錯型別的話這個分支永遠測不到。
 func bizNotFound() error {
 	return pkgerrors.NewBusiness(bizcode.InvoiceDocumentNotFound, "not found")
 }
@@ -265,7 +247,6 @@ func bizNotFoundCorrection() error {
 	return pkgerrors.NewBusiness(bizcode.InvoiceCorrectionNotAllowed, "no open correction")
 }
 
-// voidHarness 把作廢軸接起來。
 type voidHarness struct {
 	uc     *Voiding
 	adjs   *voidAdjs
@@ -285,20 +266,14 @@ const (
 	voidAdjID = int64(7001)
 )
 
-// voidAdjIDVar 是 voidAdjID 的可取址版本（Operation.AdjustmentID 是 *int64）。
 var voidAdjIDVar = voidAdjID
 
-// voidAdjs 記下作廢軸把 adjustment 推到哪幾格（#3073）。
-//
-// 🔴 這一段在 #3073 之前不存在，而症狀是：dev 上 12 筆 VOID adjustment 全部停在
-// PENDING，operation 早就進了終態、document 也已經 VOIDED —— 那張表的狀態機
-// 從來沒有被驅動過，且沒有任何東西看得到。
 type voidAdjs struct {
 	domain.AdjustmentRepository
 	adj      domain.Adjustment
 	steps    []string
 	reasons  []string
-	markFail bool // true ⇒ 每一格都回 rows=0
+	markFail bool
 }
 
 func (f *voidAdjs) GetByID(context.Context, int64) (domain.Adjustment, error) { return f.adj, nil }
@@ -366,8 +341,6 @@ func newVoidHarness(t *testing.T) *voidHarness {
 		&fakeAccountRepo{account: domain.ProviderAccount{ID: 42}, taxID: "12345678", appKey: "k"},
 		&fakeAudit{}, prov,
 		outbox,
-		// issuer_ref_id 與 PK 刻意取不同的值：P3 的 payload 只能用前者（store_id），
-		// 用 PK 頂替的症狀是下游解析不到賣家而全程零錯誤。
 		&fakeIssuerRepo{issuer: domain.Issuer{ID: 700001, IssuerRefID: 2636840881}},
 		adjs,
 		IssuanceConfig{MaxAttempts: 13, BaseBackoff: 30 * time.Second, MaxBackoff: 30 * time.Minute,
@@ -377,9 +350,6 @@ func newVoidHarness(t *testing.T) *voidHarness {
 	return &voidHarness{uc: uc, adjs: adjs, docs: docs, ops: ops, corrs: corrs, prov: prov, outbox: outbox, calls: seq}
 }
 
-// ---------------------------------------------------------------------------
-// SubmitVoid
-// ---------------------------------------------------------------------------
 
 // 受理（f0501 回 code:0）⇒ operation 進 WAITING_CONFIRMATION，document **留在 VOIDING**。
 //
@@ -495,9 +465,6 @@ func TestSubmitVoid_RejectedCancelsPendingReissue(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ConfirmVoid
-// ---------------------------------------------------------------------------
 
 // invoice_type 還是 C0401 ⇒ 還在 wait[] 佇列裡，這是**正常**的中間狀態。
 func TestConfirmVoid_StillPendingReschedules(t *testing.T) {
@@ -541,9 +508,6 @@ func TestConfirmVoid_EmitsVoidedEvent(t *testing.T) {
 		t.Fatalf("routing key／event_type／exchange = %q／%q／%q",
 			ev.RoutingKey, ev.EventType, ev.Exchange)
 	}
-	// 🔴 store_id 必須是 issuer_ref_id（2636840881），不是 issuer PK（700001）：
-	// dispatcher 拿它去 ResolveSellerAccountID，填 PK 的症狀是解析失敗、
-	// notify_seller_account_id 恆 "0"、通知靜默不送，全程零錯誤零 DLQ。
 	if !containsBytes(ev.Payload, `"store_id":"2636840881"`) {
 		t.Errorf("store_id 不是 issuer_ref_id：%s", ev.Payload)
 	}
@@ -680,7 +644,7 @@ func (f *voidOps) MarkRecheckUnresolved(_ context.Context, in domain.MarkRecheck
 func TestConfirmVoid_GivesUpAfterWindow(t *testing.T) {
 	h := newVoidHarness(t)
 	h.prov.detail = &amego.InvoiceDetail{InvoiceNumber: voidInvNo, InvoiceType: "C0401"}
-	old := testNow.Add(-25 * time.Hour) // > recheckGiveUpAfter（24h）
+	old := testNow.Add(-25 * time.Hour)
 	op := h.ops.byID[voidOpID]
 	op.UnknownSince = &old
 	h.ops.byID[voidOpID] = op
@@ -694,11 +658,9 @@ func TestConfirmVoid_GivesUpAfterWindow(t *testing.T) {
 	if h.ops.unresolved[0] != codemeta.InvoiceOperationStatusFailedUnknown.Value {
 		t.Errorf("落點 = %q, want FAILED_UNKNOWN", h.ops.unresolved[0])
 	}
-	// 🔴 不得還原成 ISSUED：AMEGO 可能其實已經作廢了，還原會讓帳上有一張「有效」的廢票。
 	if h.docs.restoreCalls != 0 {
 		t.Error("結果未明卻把 document 還原成 ISSUED —— 那是在宣稱一件我方並不知道的事")
 	}
-	// 也不得寫 VOIDED：同理，反方向。
 	if h.docs.voidedCalls != 0 {
 		t.Error("結果未明卻把 document 寫成 VOIDED")
 	}
@@ -724,9 +686,6 @@ func TestConfirmVoid_WithinWindowKeepsWaiting(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// adjustment 狀態機（#3073）
-// ---------------------------------------------------------------------------
 
 // TestVoidAxis_AdvancesAdjustmentAlongsideOperation 守「作廢軸要推進 adjustment」。
 //
@@ -761,8 +720,6 @@ func TestVoidAxis_AdvancesAdjustmentAlongsideOperation(t *testing.T) {
 
 	t.Run("被拒 ⇒ FAILED_PERMANENT ＋ 理由碼", func(t *testing.T) {
 		h := newVoidHarness(t)
-		// 3050141「已存在折讓單則不得作廢」是 Permanent，走 settleVoidRejected；
-		// 本 harness 沒有 open correction ⇒ 走「退款作廢路徑」那一支。
 		h.prov.voidErr = &amego.APIError{Code: "3050141", Class: amego.ClassPermanent, KnownCode: true}
 
 		if err := h.uc.SubmitVoid(context.Background(), voidOpID); err != nil {
@@ -771,7 +728,6 @@ func TestVoidAxis_AdvancesAdjustmentAlongsideOperation(t *testing.T) {
 		if got := h.adjs.steps; len(got) != 1 || got[0] != "FAILED_PERMANENT" {
 			t.Fatalf("adjustment 走到 %v，want [FAILED_PERMANENT]", got)
 		}
-		// chk_invadj_blocked_reason：FAILED_PERMANENT ⇒ blocked_reason_code 不得為空。
 		if len(h.adjs.reasons) != 1 || h.adjs.reasons[0] == "" {
 			t.Errorf("理由碼 = %v，不得為空 —— chk_invadj_blocked_reason 會當場 23514",
 				h.adjs.reasons)
@@ -800,9 +756,6 @@ func TestVoidAxis_AdjustmentNoRowsIsNotAnError(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ConfirmVoid：document 已經越過 VOIDING（2026-09-03）
-// ---------------------------------------------------------------------------
 
 // 作廢確認過（VOIDED）之後又被重開票取代（SUPERSEDED），而這個 operation 因為某種
 // 原因回到 recheck ⇒ MarkVoided 的 allowed-from 只有 VOIDING ⇒ rows=0。
@@ -817,7 +770,7 @@ func TestConfirmVoid_SupersededDocumentSettlesInsteadOfLooping(t *testing.T) {
 	doc := h.docs.byID[voidDocID]
 	doc.Status = codemeta.InvoiceDocumentStatusSuperseded.Value
 	h.docs.byID[voidDocID] = doc
-	h.docs.markVoidedOK = false // allowed-from 只有 VOIDING
+	h.docs.markVoidedOK = false
 	h.prov.detail = &amego.InvoiceDetail{InvoiceNumber: voidInvNo, InvoiceType: "C0501"}
 
 	if err := h.uc.ConfirmVoid(context.Background(), h.ops.enterRecheckLane(voidOpID)); err != nil {
@@ -831,7 +784,6 @@ func TestConfirmVoid_SupersededDocumentSettlesInsteadOfLooping(t *testing.T) {
 	if len(h.adjs.steps) == 0 || h.adjs.steps[len(h.adjs.steps)-1] != "COMPLETED" {
 		t.Errorf("adjustment 沒有到終點，steps=%v", h.adjs.steps)
 	}
-	// 事件不得重發：走過 VOIDED 的那一次事務裡已經發過了。
 	if len(h.outbox.inserted) != 0 {
 		t.Errorf("重發了 %d 筆 invoice.voided —— document 早就過了那一格，"+
 			"當初那個事務就發過了", len(h.outbox.inserted))
@@ -868,7 +820,6 @@ func TestConfirmVoid_AlreadyVoidedStillSettlesOperation(t *testing.T) {
 	if got := h.ops.byID[voidOpID].Status; got != codemeta.InvoiceOperationStatusSucceeded.Value {
 		t.Errorf("operation status = %q，want SUCCEEDED", got)
 	}
-	// 陰性：這條路不得再打一次 AMEGO（作廢早就確認過了），也不得重發事件。
 	if len(h.prov.queried) != 0 {
 		t.Errorf("重投分支打了 %d 次 AMEGO（%v）—— document 已 VOIDED，沒有東西需要再查",
 			len(h.prov.queried), h.prov.queried)
@@ -884,7 +835,7 @@ func TestConfirmVoid_AlreadyVoidedStillSettlesOperation(t *testing.T) {
 func TestConfirmVoid_UnexpectedStatusStillErrorsOnZeroRows(t *testing.T) {
 	h := newVoidHarness(t)
 	doc := h.docs.byID[voidDocID]
-	doc.Status = codemeta.InvoiceDocumentStatusIssued.Value // 既不是 VOIDED 也不是 SUPERSEDED
+	doc.Status = codemeta.InvoiceDocumentStatusIssued.Value
 	h.docs.byID[voidDocID] = doc
 	h.docs.markVoidedOK = false
 	h.prov.detail = &amego.InvoiceDetail{InvoiceNumber: voidInvNo, InvoiceType: "C0501"}

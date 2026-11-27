@@ -23,8 +23,6 @@ export default function HomeCompactNewArrivals({
 		() => ({ listId: "home_new_arrivals", listName: title }),
 		[title],
 	);
-	// Mouse drag-to-scroll. `moved` gates the post-drag click so a pull
-	// doesn't navigate into a product. Touch is left to native scrolling.
 	const drag = React.useRef({
 		active: false,
 		moved: false,
@@ -75,9 +73,6 @@ export default function HomeCompactNewArrivals({
 		drag.current.active = false;
 	};
 
-	// Capture phase: if the pointer dragged, swallow the click before it
-	// reaches the <Link> (preventDefault kills native nav, stopPropagation
-	// kills Next.js' router push).
 	const onClickCapture = (e: React.MouseEvent<HTMLDivElement>) => {
 		if (drag.current.moved) {
 			e.preventDefault();
@@ -91,14 +86,7 @@ export default function HomeCompactNewArrivals({
 			className="home-fixed-section relative z-[2]"
 			aria-label={ariaLabel ?? title}
 		>
-			{/* The rail is a scroll container (`overflow-x: auto` forces
-			    `overflow-y: auto` too), so its padding box is a hard clip edge —
-			    the cards' 30px-blur drop shadow gets chopped mid-blur no matter
-			    how much padding sits on the OUTSIDE of the rail. Hence the
-			    breathing room lives on the rail itself: `pb-5` here (bottom
-			    padding moved off this container) and `-mx-4 px-4` sideways,
-			    where the negative margin keeps the cards and the arrows at
-			    exactly the same position while pushing the clip edge out. */}
+
 			<div className="home-section-surface rounded-[24px] border border-[rgba(58,42,26,0.07)] bg-hk-home-postcard px-[18px] pt-[18px] shadow-[0_1px_0_rgba(255,255,255,0.6)_inset,0_12px_36px_-22px_rgba(76,50,20,0.18)] dark:border-[rgba(245,222,165,0.12)] dark:shadow-[0_12px_36px_-22px_rgba(0,0,0,0.55)]">
 				<header className="mb-4 flex items-center justify-between gap-3 px-1">
 					<h2 className="m-0 text-[1.625rem] font-black leading-tight text-hk-heading">

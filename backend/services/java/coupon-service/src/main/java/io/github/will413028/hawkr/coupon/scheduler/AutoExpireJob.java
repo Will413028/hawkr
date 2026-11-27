@@ -34,14 +34,12 @@ public class AutoExpireJob {
             return;
         }
         try {
-            // 1. 過期模板
             int expiredTemplates = templateService.expireTemplates();
             if (expiredTemplates > 0) {
                 log.info("AutoExpireJob.expireTemplates.done", "自動過期模板",
                         "expiredCount", String.valueOf(expiredTemplates));
             }
 
-            // 2. 過期未使用的 Instance（依已過期模板批次處理）
             int expiredInstances = instanceService.expireInstancesByTemplate();
             if (expiredInstances > 0) {
                 log.info("AutoExpireJob.expireInstances.done", "自動過期優惠券",

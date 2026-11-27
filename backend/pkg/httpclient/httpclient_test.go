@@ -30,10 +30,6 @@ func TestNewProducesClientSpan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
-	// otelhttp 的 client span 在 body 被讀到 EOF 或 Close() 時才 End()（見
-	// otelhttp transport.go 的 wrappedBody），不是在 RoundTrip 回傳時就結束。
-	// 用 t.Cleanup 延後關閉會讓下面的斷言在 span 結束前執行、恆為 0——這裡改成
-	// 立即 Close，讓斷言驗到的是「span 真的結束了」而不是「lifecycle 剛好還沒跑到」。
 	if err := resp.Body.Close(); err != nil {
 		t.Fatalf("Body.Close: %v", err)
 	}

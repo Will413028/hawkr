@@ -11,8 +11,6 @@ void main() {
       '/category',
       '/search',
       '/social/post/1',
-      // 強制更新是攔截頁，未登入者也必須看得到（`packages/hawkr_app_update/docs/spec.md`）——
-      // 若它需要登入，router 會先把訪客導去 /login，強更畫面永遠出不來。
       '/force-update',
     ]) {
       expect(

@@ -11,21 +11,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// 本檔守 M2／M3／M4／M14 的兩件事，兩件都是「不會有任何別的東西轉紅」的形狀：
-//
-//	① 序列在第一次觀測之前就存在（不存在 ⇒ 告警的 selector 永遠不會 fire）
-//	② `do()` 真的會觀測它們（有註冊、零觀測 ⇒ 序列存在但恆為 0，
-//	   在 `> 0` 與比率型告警上與「一切正常」完全一樣）
-//
-// ② 是 2026-09-05 第 6 輪稽核抓到的那一格：三支指標宣告完整、預先展開完整、
-// /metrics 上看得到，而全服務沒有任何一處 `.Inc()`。**只驗 ① 的測試會全綠。**
 
-// metricsOwnedHere 是本 package 註冊的指標，逐名對拍 §8.2.3。
 var metricsOwnedHere = []string{
-	"invoice_amego_request_duration_seconds", // M2
-	"invoice_amego_response_code_total",      // M3
-	"invoice_amego_rate_limited_total",       // M4
-	"invoice_audit_write_failed_total",       // M14
+	"invoice_amego_request_duration_seconds",
+	"invoice_amego_response_code_total",
+	"invoice_amego_rate_limited_total",
+	"invoice_audit_write_failed_total",
 }
 
 func TestAmegoMetricsArePreRegistered(t *testing.T) {
@@ -77,7 +68,7 @@ func TestOutcomeForSeparatesBizFromTransport(t *testing.T) {
 		{ErrorKindTimeout, outcomeTimeout},
 		{ErrorKindConn, outcomeTransportError},
 		{ErrorKindDecode, outcomeTransportError},
-		{"", outcomeTransportError}, // ENV_GUARD／斷路器：一個字都沒送出去
+		{"", outcomeTransportError},
 	}
 	for _, c := range cases {
 		if got := outcomeFor(&APIError{Kind: c.kind}); got != c.want {
@@ -103,8 +94,6 @@ func TestDoObservesEveryCall(t *testing.T) {
 	durBefore := counterValue(t, durSeries)
 
 	h := newHarness(t, Options{AllowRealInvoice: true}, okJSON(`{"code":0,"msg":"","invoice_number":"AA00000001","random_number":"1234","invoice_time":1787578776}`))
-	// 回傳值刻意不斷言：本測試問的是「這一次往返有沒有被觀測到」，
-	// 而觀測掛在 do() 的 defer 上 —— 它在解析回應之前就已經發生。
 	_, _ = h.client.IssueInvoice(context.Background(), testCred(realInvoiceBAN), sampleIssueRequest())
 
 	if after := counterValue(t, codeSeries); after != codeBefore+1 {
@@ -181,7 +170,6 @@ func scrapeAmegoMetrics(t *testing.T) string {
 	return rec.Body.String()
 }
 
-// counterValue 從文字格式的 /metrics 取一條序列的值。找不到回 0（＝尚未展開）。
 func counterValue(t *testing.T, series string) float64 {
 	t.Helper()
 	for _, line := range strings.Split(scrapeAmegoMetrics(t), "\n") {

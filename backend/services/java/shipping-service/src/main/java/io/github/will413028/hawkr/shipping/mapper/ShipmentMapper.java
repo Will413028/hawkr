@@ -69,9 +69,6 @@ public interface ShipmentMapper extends BaseMapper<ShipmentEntity> {
             @Param("providerStatusTime") LocalDateTime providerStatusTime
     );
 
-    // ====================================================================
-    // ProviderCallStatus — label_print_status 狀態機（§2.4.5.1）
-    // ====================================================================
 
     /**
      * 列印 acquireRequested：transition (NONE | FAILED) → REQUESTED
@@ -191,9 +188,6 @@ public interface ShipmentMapper extends BaseMapper<ShipmentEntity> {
             @Param("errorMessage") String errorMessage
     );
 
-    // ====================================================================
-    // ProviderCallStatus — tcat_call_status 狀態機（§2.4.5.2）
-    // ====================================================================
 
     /**
      * 黑貓 acquireRequested：transition (NONE | FAILED) → REQUESTED + 寫入賣家備註
@@ -266,9 +260,6 @@ public interface ShipmentMapper extends BaseMapper<ShipmentEntity> {
             @Param("errorMessage") String errorMessage
     );
 
-    // ====================================================================
-    // 出貨照片 / Webhook 通用
-    // ====================================================================
 
     /**
      * 出貨照片獨立更新
@@ -284,9 +275,6 @@ public interface ShipmentMapper extends BaseMapper<ShipmentEntity> {
             @Param("shipmentPhotos") List<ShipmentEntity.ShipmentPhoto> shipmentPhotos
     );
 
-    // ====================================================================
-    // §5.19 Reconciliation 補收排程
-    // ====================================================================
 
     /**
      * §5.19.3.A 物流貨態補收候選人
@@ -429,9 +417,6 @@ public interface ShipmentMapper extends BaseMapper<ShipmentEntity> {
         """)
     int touchLastReconciledAt(@Param("id") Long id, @Param("now") LocalDateTime now);
 
-    // ====================================================================
-    // §5.20 賣家處理期限掃描
-    // ====================================================================
 
     /**
      * §5.20 找出逾期且未處理的正向物流單。
@@ -495,9 +480,6 @@ public interface ShipmentMapper extends BaseMapper<ShipmentEntity> {
         """)
     int clearProcessingDeadline(@Param("id") Long id);
 
-    // ====================================================================
-    // PayUni 錯誤訊息落地（callTcat / 其他通用入口；新框架已取代大部分用途）
-    // ====================================================================
 
     /**
      * PayUni 呼叫失敗落地 provider_status / provider_message。
@@ -515,9 +497,6 @@ public interface ShipmentMapper extends BaseMapper<ShipmentEntity> {
                              @Param("providerStatus") String providerStatus,
                              @Param("providerMessage") String providerMessage);
 
-    // ====================================================================
-    // §5.21 配送異常偵測：expected_delivery_date
-    // ====================================================================
 
     /**
      * §5.21.8 寫入 expected_delivery_date（黑貓宅配建單成功 / 超商到店時呼叫）。

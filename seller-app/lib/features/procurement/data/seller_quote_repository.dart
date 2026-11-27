@@ -119,7 +119,6 @@ class SellerQuoteRepository {
           publication: _publication(i.publication),
           sellerFacingPayload: _payload(i.sellerFacingPayload),
         ),
-        // 有回價但狀態不認得時是 UNSPECIFIED（畫面顯示「請更新 App」），沒有回價是 null。
         latestResponseStatus: i.hasLatestResponseStatus()
             ? i.latestResponseStatus
             : null,
@@ -255,7 +254,7 @@ Timestamp? _timestamp(String raw) {
 }
 
 String _rfc3339(Timestamp t) {
-  final utc = t.toDateTime(); // UTC
+  final utc = t.toDateTime();
   String two(int n) => n.toString().padLeft(2, '0');
   return '${utc.year.toString().padLeft(4, '0')}-${two(utc.month)}-'
       '${two(utc.day)}T${two(utc.hour)}:${two(utc.minute)}:'

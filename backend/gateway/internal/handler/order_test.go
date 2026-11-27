@@ -16,7 +16,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// ==================== router ====================
 
 func setupOrderRouter(h *Holder) *gin.Engine {
 	r := gin.New()
@@ -33,15 +32,12 @@ func setupOrderRouter(h *Holder) *gin.Engine {
 	return r
 }
 
-// setupAdminSearchOrdersRouter：SearchOrders 是 admin-only 端點，handler 本身
-// 不驗證身分（沿用既有慣例，見 ListAbnormalOrdersForAdmin），故不掛 fakeJWTAuth。
 func setupAdminSearchOrdersRouter(h *Holder) *gin.Engine {
 	r := gin.New()
 	r.GET("/api/v1/admin/orders", h.SearchOrders)
 	return r
 }
 
-// ==================== GetMyOrders ====================
 
 func TestGetMyOrders_Success(t *testing.T) {
 	mock := &mockOrderServiceClient{
@@ -99,7 +95,6 @@ func TestGetMyOrders_Success(t *testing.T) {
 	if first["orderNo"] != "ORD20260301001" {
 		t.Errorf("orderNo = %v, want ORD20260301001", first["orderNo"])
 	}
-	// Verify canonical logoKey/logoUrl camelCase fields (49 §6.1)
 	if got := first["logoKey"]; got != "public/seller/123/avatar.jpg" {
 		t.Errorf("logoKey = %v, want %q", got, "public/seller/123/avatar.jpg")
 	}
@@ -108,7 +103,6 @@ func TestGetMyOrders_Success(t *testing.T) {
 	}
 }
 
-// ==================== GetMyOrderStatusCounts ====================
 
 func TestGetMyOrderStatusCounts_Success(t *testing.T) {
 	mock := &mockOrderServiceClient{
@@ -159,7 +153,6 @@ func TestGetMyOrderStatusCounts_Success(t *testing.T) {
 func TestGetMyOrderStatusCounts_Empty(t *testing.T) {
 	mock := &mockOrderServiceClient{
 		GetMyOrderStatusCountsFn: func(ctx context.Context, in *orderpb.GetMyOrderStatusCountsRequest, opts ...grpc.CallOption) (*orderpb.GetMyOrderStatusCountsResponse, error) {
-			// Total 留 proto3 預設空字串，驗 gateway 兜 "0"（正常鏈路 order-service 0 筆時明確回 "0"）
 			return &orderpb.GetMyOrderStatusCountsResponse{Code: 0, Message: "success"}, nil
 		},
 	}
@@ -212,14 +205,12 @@ func TestGetMyOrders_Unauthorized(t *testing.T) {
 	h := &Holder{}
 	router := setupOrderRouter(h)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/app/orders", nil)
-	// No X-Account-Id header
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
 	assertHTTPStatus(t, w, http.StatusUnauthorized)
 }
 
-// ==================== GetOrder ====================
 
 func TestGetOrder_Success(t *testing.T) {
 	mock := &mockOrderServiceClient{
@@ -312,7 +303,6 @@ func TestGetOrderDetail_SellerLogoURLField(t *testing.T) {
 	}
 }
 
-// ==================== CancelOrder ====================
 
 func TestCancelOrder_Success(t *testing.T) {
 	mock := &mockOrderServiceClient{
@@ -365,11 +355,9 @@ func TestCancelOrder_GrpcError(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	// Non-gRPC error → GrpcErr maps to ServiceUnavailable (503)
 	assertHTTPStatus(t, w, http.StatusServiceUnavailable)
 }
 
-// ==================== ConfirmReceipt ====================
 
 func TestConfirmReceipt_Success(t *testing.T) {
 	mock := &mockOrderServiceClient{
@@ -439,7 +427,6 @@ func TestGetMyOrders_SellerView_BuyerIDIsTheCRMSurrogateNotAnAccountID(t *testin
 			return &orderpb.GetSellerOrdersResponse{Code: 0, Meta: &orderpb.PageMeta{TotalItems: "0", CurrentPage: "1"}}, nil
 		},
 	}
-	// 任何帳號代碼都會被解析成 5555：若 handler 還去解析，BuyerId 會變成 5555。
 	h := &Holder{Order: grpcclient.NewOrderClientForTest(orderMock), Store: storeResolverForTest(7001), BuyerID: buyerResolverForTest(5555)}
 	r := setupOrderRouter(h)
 
@@ -535,7 +522,6 @@ func TestGetOrder_SellerView_NoCurrentSeller403(t *testing.T) {
 	assertCode(t, parseJSON(t, w.Body), 403)
 }
 
-// ==================== ② buyer store-stint re-key: surrogate pinning ====================
 
 func TestCreateOrder_UsesResolvedBuyerID(t *testing.T) {
 	var captured *orderpb.CreateOrderRequest
@@ -760,7 +746,6 @@ func TestConvertOrderDetail_PhotoAndReviewDualField(t *testing.T) {
 	if len(r.ShipmentPhotoUrls) != 1 || r.ShipmentPhotoUrls[0] != base+"/i/original/public/shipping/1/a.jpg" {
 		t.Errorf("ShipmentPhotoUrls = %v, want composed URL", r.ShipmentPhotoUrls)
 	}
-	// 收貨照片：本平台 key 組 URL；外部 http（Google）passthrough 不重複組
 	if r.ReceiptPhotoUrls[0] != base+"/i/original/public/order/1/r.jpg" {
 		t.Errorf("ReceiptPhotoUrls[0] = %q, want composed", r.ReceiptPhotoUrls[0])
 	}

@@ -34,7 +34,6 @@ describe("revalidateOwnSellerProfile asks the monolith who the visitor is (read-
 		mocks.getSession.mockResolvedValue({ account: { id: "9", roles: [] } });
 		await revalidateOwnSellerProfile({ accountId: "9", storeCode: "12" });
 		expect(mocks.revalidateTag).toHaveBeenCalledTimes(2);
-		// the visitor's cookie goes to the monolith through the transport (GET only there)
 		expect(mocks.authedTransport).toHaveBeenCalledWith({
 			locale: "zh-TW",
 			cookie: "__Host-hk_session=opaque",

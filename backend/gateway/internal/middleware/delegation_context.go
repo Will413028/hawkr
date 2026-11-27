@@ -8,14 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ctxDelegationSession is the gin context key under which the delegated operation
-// guard parks the session snapshot it already resolved. Handlers read it instead of
-// calling GetCurrentSession again: a second call would be a second round trip AND a
-// second answer, and the two could disagree (the first one may have slid
-// last_active_at, the second one is judged against a different now()).
-//
-// It lives in middleware rather than in router because both router (writer) and
-// handler (readers) import this package, while handler must not import router.
 const ctxDelegationSession = "delegationSession"
 
 // SetDelegationSession stores the resolved session snapshot on the request and puts

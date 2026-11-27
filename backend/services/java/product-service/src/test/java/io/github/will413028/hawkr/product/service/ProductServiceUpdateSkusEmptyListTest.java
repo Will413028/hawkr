@@ -95,9 +95,6 @@ class ProductServiceUpdateSkusEmptyListTest {
     void listedSkusStillPruneTheRest() throws Exception {
         when(productSkuRepository.findByProductId(1L))
                 .thenReturn(new ArrayList<>(List.of(existingSku(101L), existingSku(102L))));
-        // 這一測會真的走進寫入迴圈。未 stub 的 mock 回 int 預設值 0，而 0 列在 #2545 之後
-        // 的語意是「樂觀鎖 CAS 未命中」⇒ 會拋 9266（本測原本只是碰巧沒被這個預設值絆到）。
-        // 真實 DB 對「PK 存在且 entity.version 為 null（MyBatis-Plus 跳過樂觀鎖）」回的是 1。
         when(productSkuRepository.updateById(any())).thenReturn(1);
 
         List<ProductSkuDTO> dtos = List.of(ProductSkuDTO.builder().id("101").build());
@@ -119,7 +116,6 @@ class ProductServiceUpdateSkusEmptyListTest {
         when(productSkuRepository.findByProductId(1L))
                 .thenReturn(new ArrayList<>(List.of(existingSku(101L), existingSku(102L))));
 
-        // 唯一一筆是非法 id：舊實作在這裡靜默略過 → keepIds 為空 → 101/102 全被刪 → stock 歸零
         Throwable cause = causeOf(List.of(ProductSkuDTO.builder().id("999").build()));
 
         assertInstanceOf(ProductBusinessException.class, cause,
@@ -127,7 +123,6 @@ class ProductServiceUpdateSkusEmptyListTest {
         assertEquals(GrpcResponseCode.PRODUCT_SKU_NOT_FOUND.code(),
                 ((ProductBusinessException) cause).code());
 
-        // 核心不變式：既有 SKU 原封不動（不是只看回傳碼）
         verify(productSkuRepository, never()).deleteByIdIn(org.mockito.ArgumentMatchers.anyList());
         verify(productSkuRepository, never()).deleteByProductId(anyLong());
     }
@@ -138,14 +133,9 @@ class ProductServiceUpdateSkusEmptyListTest {
         when(productSkuRepository.findByProductId(1L))
                 .thenReturn(new ArrayList<>(List.of(existingSku(101L), existingSku(102L))));
 
-        // 這一測刻意不斷言「有沒有拋例外」——它只守「既有 SKU 不能不見」這個不變式本身。
-        // 上面 unknownSkuIdRejectsRequestAndKeepsExistingSkus 斷言的是「必須拋業務碼 3024」，
-        // 但那個 assertThrows 會在舊實作上先失敗、看不到真正的損害；分開兩測，
-        // 把修復還原時的紅字直接指向 deleteByIdIn([101, 102]) 這個實際後果。
         try {
             invoke(List.of(ProductSkuDTO.builder().id("999").build()));
         } catch (Exception rejected) {
-            // 拒絕是正解，這裡吞掉不影響下方不變式檢查
         }
 
         verify(productSkuRepository, never()).deleteByIdIn(org.mockito.ArgumentMatchers.anyList());
@@ -158,7 +148,6 @@ class ProductServiceUpdateSkusEmptyListTest {
         when(productSkuRepository.findByProductId(1L))
                 .thenReturn(new ArrayList<>(List.of(existingSku(101L))));
 
-        // 101 合法且排在前面；若驗證寫在寫入迴圈裡，101 會先 UPDATE 出去才拋
         Throwable cause = causeOf(List.of(
                 ProductSkuDTO.builder().id("101").build(),
                 ProductSkuDTO.builder().id("999").build()));
@@ -172,18 +161,11 @@ class ProductServiceUpdateSkusEmptyListTest {
     @Test
     @DisplayName("結構性不變式：updateSkus 的結果集恆非空（商品永遠至少一個 SKU）")
     void resultIsNeverEmpty() throws Exception {
-        // 這條不變式沒有任何一行程式碼表述它——它是兩個分支交互作用出來的湧現性質：
-        //   ① 空／null 清單 → 直接回既有 SKU（no-op）
-        //   ② 非空清單 → 刪除範圍是 existingSkus - keepIds，而清單裡每一筆都會進 resultSkus
-        // ⇒ 兩條路都不可能回空集合。搭配 createProduct 的 skus_count 守衛（建立側恆 ≥1），
-        //   product.price_min IS NULL ⟺ 零 SKU 這個狀態在線上不可達。
-        //
-        // 下面三種輸入涵蓋全部分支組合。若哪天有人加了「清空」分支，這一測就會轉紅。
         List<List<ProductSkuDTO>> inputs = new ArrayList<>();
-        inputs.add(null);                                                  // 未提供
-        inputs.add(new ArrayList<>());                                     // 空陣列
-        inputs.add(List.of(ProductSkuDTO.builder().id("101").build()));    // 更新既有
-        inputs.add(List.of(ProductSkuDTO.builder().id("").build()));       // 新增
+        inputs.add(null);
+        inputs.add(new ArrayList<>());
+        inputs.add(List.of(ProductSkuDTO.builder().id("101").build()));
+        inputs.add(List.of(ProductSkuDTO.builder().id("").build()));
 
         for (List<ProductSkuDTO> input : inputs) {
             when(productSkuRepository.findByProductId(1L))
@@ -203,7 +185,6 @@ class ProductServiceUpdateSkusEmptyListTest {
                 .thenReturn(new ArrayList<>(List.of(existingSku(101L))));
         when(productSkuConverter.toEntity(any(), anyLong())).thenReturn(existingSku(103L));
 
-        // id 為空字串（proto3 string 缺席時的預設值）＝新增，不是「查無的既有 SKU」
         invoke(List.of(ProductSkuDTO.builder().id("").build()));
 
         verify(productSkuRepository).insert(any());

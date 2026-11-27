@@ -25,7 +25,6 @@ func (noFollowers) SubscriberCounts(context.Context, []int64) (map[int64]int64, 
 	return map[int64]int64{}, nil
 }
 
-// testStats 建立測試用的 StatsSource（來源與 logger 都是必要的；買家清單只用到評價）。
 func testStats(ratings httpseller.Ratings) *httpseller.StatsSource {
 	s, err := httpseller.NewStatsSource(noFollowers{}, ratings, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
@@ -34,7 +33,6 @@ func testStats(ratings httpseller.Ratings) *httpseller.StatsSource {
 	return s
 }
 
-// countedRatings 是評價來源的替身：記錄每次呼叫收到的店家，只回 stats 裡有的店（沒有評價的店不在回傳裡）。
 type countedRatings struct {
 	stats map[int64]httpseller.RatingStats
 	err   error
@@ -55,7 +53,6 @@ func (f *countedRatings) StoreRatingStats(_ context.Context, ids []int64) (map[i
 	return out, nil
 }
 
-// followModule 回固定的追蹤清單。
 type followModule struct {
 	fakeModule
 	items []model.Item

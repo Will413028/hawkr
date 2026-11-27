@@ -83,10 +83,6 @@ export function useSellerCustomers(
 export function useInvalidateSellerCustomers(): () => Promise<void> {
 	const queryClient = useQueryClient();
 	const identity = useQueryIdentity();
-	// Stable ref: CustomersClient feeds this into `closeDrawer` → the detail
-	// drawer's `onClose`, which the overlay tracks as an effect dependency. An
-	// unstable callback would re-bind that effect (and steal focus) on any
-	// re-render while the drawer is open.
 	return useCallback(
 		() =>
 			queryClient.invalidateQueries({

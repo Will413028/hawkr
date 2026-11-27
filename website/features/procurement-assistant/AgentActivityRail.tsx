@@ -55,8 +55,6 @@ function renderActivityRow(
 	event: AgentActivityEvent,
 	motion: AgentMotionState,
 ) {
-	// 「還在跑」只能看 status 軸。舊版用 `text === ""` 推導，而 T23 候選搜尋 run
-	// 整條沒有 narrator、四列的 text 恆空，於是每一列都被判成進行中，永遠不會完成。
 	const running = event.status === "RUNNING";
 	return (
 		<div
@@ -64,10 +62,7 @@ function renderActivityRow(
 			data-status={event.status}
 			data-row-id={event.rowId}
 		>
-			{/* 同一個位置的兩段時間：**正在跑**的那一列是會動的標誌，跑完就固定成
-			 * 該步驟的 AppIcon glyph。所以「哪一列還在動」本身就是進度，不必靠顏色
-			 * 分辨。標誌動態只出現在 RUNNING 這一列——§V.10.10-12 禁止讓當前 run 的表情
-			 * 擴散出去，已完成的列屬於既成事實，不該還在呼吸。 */}
+
 			{running ? (
 				<HawkrAgentSprite
 					state={motion}
@@ -78,14 +73,11 @@ function renderActivityRow(
 				<AppIcon name={stepIcon(event.code)} size={16} aria-hidden="true" />
 			)}
 			<span className="hawkr-agent-rail__copy">{activityLabel(event)}</span>
-			{/* §V.11.1：狀態要有**非色彩**線索，而且每一列都要有——只標進行中那一列
-			 * 的話，「已完成」與「等待中」在灰階、色弱與高對比模式下無從分辨。 */}
+
 			<em className="hawkr-agent-rail__state">
 				{activityStatusLabel(event.status)}
 			</em>
-			{/* count 缺席 ≠ 0 家：後端只在該列真的有計數概念時才送這個欄位，
-			 * `count: "0"` 是「真的一家都沒找到」。所以判斷式看 undefined，不看真假值。
-			 * 進行中的 lane 寫「已整理 N 家」——那個數字還會再長，不該長得像最終值。 */}
+
 			{event.count !== undefined ? (
 				<span className="hawkr-agent-rail__count">
 					{running ? `已整理 ${event.count} 家` : `${event.count} 家`}
@@ -113,8 +105,7 @@ export default function AgentActivityRail({
 					? groupActivityRows(activity).map((row) => (
 							<li key={row.rowId} className="hawkr-agent-rail__group">
 								{renderActivityRow(row, motion)}
-								{/* 設計稿 01：兩條 lane 掛在「搜尋候選供應商」底下。巢狀清單
-								 * 只有一層，跟後端的保證一致（父列不得帶 parentRowId）。 */}
+
 								{row.children.length > 0 ? (
 									<ol className="hawkr-agent-rail__children">
 										{row.children.map((child) => (
@@ -134,12 +125,7 @@ export default function AgentActivityRail({
 									className="hawkr-agent-rail__row"
 									data-status={step.status}
 								>
-									{/* 同一個位置的兩段時間：**正在跑**的那一列是會動的標誌，
-									 * 跑完就固定成該步驟的 AppIcon glyph。所以「哪一列還在動」
-									 * 本身就是進度，不必靠顏色分辨。
-									 *
-									 * 標誌動態只出現在 RUNNING 這一列——§V.10.10-12 禁止讓當前 run
-									 * 的表情擴散出去，已完成的列屬於既成事實，不該還在呼吸。 */}
+
 									{running ? (
 										<HawkrAgentSprite
 											state={motion}
@@ -156,8 +142,7 @@ export default function AgentActivityRail({
 									<span className="hawkr-agent-rail__copy">
 										{stepLabel(step)}
 									</span>
-									{/* §V.11.1：進行中那一列要有**非色彩**線索。只靠品牌色標示
-									 * 「還在跑」在色弱、灰階列印與高對比模式下全部消失。 */}
+
 									{running ? (
 										<em className="hawkr-agent-rail__state">進行中</em>
 									) : null}

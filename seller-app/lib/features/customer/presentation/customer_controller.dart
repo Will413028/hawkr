@@ -137,7 +137,6 @@ class CustomerList extends _$CustomerList {
   }
 }
 
-// ─── 顧客詳情相關 ────────────────────────────────────────────────────────────
 
 /// 客戶的訂單（店家訂單列表以 `buyer_id` 篩選）一頁的筆數；讀到不足一頁就是沒有下一頁。
 const customerOrdersPageSize = 50;
@@ -218,7 +217,6 @@ class CustomerOrders extends _$CustomerOrders {
   }
 }
 
-// ─── 商家標籤 ────────────────────────────────────────────────────────────────
 
 @Riverpod(retry: _noRetry)
 Future<List<CustomerTag>> sellerTags(Ref ref) {

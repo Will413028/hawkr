@@ -44,8 +44,6 @@ function deferred<T>() {
 	return { promise, resolve, reject };
 }
 
-// FIXTURE components make the role handoff observable without importing the
-// real seller UI (and its auth/data dependencies) into this loader test.
 function FixtureSellerHeader() {
 	return React.createElement(
 		"nav",

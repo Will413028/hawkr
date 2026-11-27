@@ -146,7 +146,6 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (model.Campaign, e
 	return out, err
 }
 
-// checkQuota 鎖住店家的配額列（沒有列先建預設值），讓同一家店的配額檢查與插入串行。
 func (s *Service) checkQuota(ctx context.Context, q *store.Queries, storeID int64, now time.Time) error {
 	if err := q.InsertQuotaIfAbsent(ctx, store.InsertQuotaIfAbsentParams{StoreID: storeID, Now: now}); err != nil {
 		return err

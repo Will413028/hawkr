@@ -13,7 +13,6 @@ type Recorded struct {
 	Value string
 }
 
-// order 決定 RecordedThisTurn 輸出的固定順序，與 proto Slots 的欄位順序一致。
 var order = []model.SlotKey{
 	Item, ItemResolution, Quantity, Unit, Packaging,
 	BudgetPerUnit, DeliveryCity, DeliveryDate, ExactMatchRequired,
@@ -40,7 +39,6 @@ func changed(key model.SlotKey, p Patch, cur, next Set) (string, bool) {
 		}
 		return deref(next.Item), true
 	case ItemResolution:
-		// 它由伺服器而不是買家原話填入，仍要出現：它決定報價的價格基準，買家看不到就沒機會發現系統挑錯。
 		if p.Resolution == nil || equalPtr(cur.Resolution, next.Resolution) || next.Resolution == nil {
 			return "", false
 		}

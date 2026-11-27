@@ -16,10 +16,8 @@ import (
 
 const maxSeq = math.MaxInt64
 
-// messagePageSize 是補洞時每次向 MessagesAfter 要的筆數（不超過 model.MaxPageSize）。
 const messagePageSize = model.MaxPageSize
 
-// pend 是同一個對話合併後的待處理訊號。msg 的 minQ、maxQ 是新訊息的最小與最大 seq；vis 是可見度改變的 seq 集合（各自保留）。
 type pend struct {
 	msg        bool
 	minQ, maxQ int64
@@ -61,7 +59,6 @@ type Subscription struct {
 	stopCtx   func() bool
 	wake      chan struct{}
 
-	// out 只由 Next 使用。
 	out []Event
 }
 
@@ -74,7 +71,6 @@ func (s *Subscription) wakeLocked() {
 	}
 }
 
-// overflowLocked 清空待處理與已交出的游標並要求 client 重取：合併不夠用時的最後防線。
 func (s *Subscription) overflowLocked() {
 	s.overflow = true
 	s.pending, s.peer = map[uuid.UUID]*pend{}, map[uuid.UUID]int64{}
@@ -82,7 +78,6 @@ func (s *Subscription) overflowLocked() {
 	s.wakeLocked()
 }
 
-// markMessage 在監聽 goroutine 呼叫，永不阻塞：只在互斥鎖下合併訊號再喚醒，不寫任何緩衝、不等消費者。
 func (s *Subscription) markMessage(c uuid.UUID, q int64, visible bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -137,8 +132,6 @@ func (s *Subscription) markUnread() {
 	s.wakeLocked()
 }
 
-// epoch 在監聽連線連上之後呼叫：已交出游標的對話都視為有訊號（從游標讀到最新），並交 Resync{conversation}（中斷期間的隱藏、還原、已讀不經游標補得回來，
-// client 重取該對話）；不在游標裡的對話只對中斷期間有訊息的交 Resync。
 func (s *Subscription) epoch(since time.Time) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -164,7 +157,6 @@ func (s *Subscription) epoch(since time.Time) {
 	s.wakeLocked()
 }
 
-// work 是一輪要處理的快照。
 type work struct {
 	pending   map[uuid.UUID]*pend
 	peer      map[uuid.UUID]int64
@@ -179,7 +171,6 @@ func (w work) any() bool {
 	return len(w.pending) > 0 || len(w.peer) > 0 || w.overflow || w.dirty || !w.since.IsZero() || w.needReady
 }
 
-// take 取走目前待處理的訊號；訂閱已結束時回該錯誤。
 func (s *Subscription) take() (work, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -192,7 +183,6 @@ func (s *Subscription) take() (work, error) {
 	return w, nil
 }
 
-// requeue 在一輪處理失敗時把快照併回待處理，下一次 Next 重做；處理期間沒有改動 delivered，所以不會丟也不會重複。
 func (s *Subscription) requeue(w work) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -236,7 +226,6 @@ func (s *Subscription) Next(ctx context.Context) (Event, error) {
 	}
 }
 
-// poll 處理所有目前待處理的訊號並回傳下一個事件；沒有事件可交時 ok 為假，不阻塞。
 func (s *Subscription) poll(ctx context.Context) (ev Event, ok bool, err error) {
 	for {
 		s.mu.Lock()
@@ -267,7 +256,6 @@ func (s *Subscription) poll(ctx context.Context) (ev Event, ok bool, err error) 
 	}
 }
 
-// result 是一輪處理要提交的狀態變更：全部成功才提交。
 type result struct {
 	evs       []Event
 	delivered map[uuid.UUID]int64
@@ -291,7 +279,6 @@ func sortedConvs[V any](m map[uuid.UUID]V) []uuid.UUID {
 	return ids
 }
 
-// process 對有訊號的每個對話經 Reader.MessagesAfter 讀取（授權與內容規則同 unary 讀取），交出訊息、可見度更新、對方已讀與總未讀。
 func (s *Subscription) process(ctx context.Context, w work) error {
 	r := &result{delivered: map[uuid.UUID]int64{}, forget: map[uuid.UUID]struct{}{}}
 	dirty := w.dirty
@@ -337,8 +324,6 @@ func (s *Subscription) process(ctx context.Context, w work) error {
 	return nil
 }
 
-// activeResync 在監聽中斷之後交 Resync：已交出游標的每個對話（隱藏、還原、已讀的變化不經游標），加上中斷期間有新訊息、而且不在游標裡的對話；
-// 對話過多就整體 Resync。回傳是否有交出整體 Resync。
 func (s *Subscription) activeResync(ctx context.Context, w work, r *result) (bool, error) {
 	limit := s.h.cfg.MaxPending
 	ids, err := s.h.reader.ActiveSince(ctx, w.party, w.since, limit+1)
@@ -369,12 +354,10 @@ func (s *Subscription) deliveredSnapshot() map[uuid.UUID]int64 {
 	return maps.Clone(s.delivered)
 }
 
-// readConversation 回傳這個對話是否交出了別人寄的訊息（總未讀可能改變）。
 func (s *Subscription) readConversation(ctx context.Context, party model.Party, c uuid.UUID, p *pend, r *result) (bool, error) {
 	fromOthers := false
 	d, inDelivered := s.deliveredOf(c)
 	if p.msg && (!inDelivered || p.maxQ > d) {
-		// 不在游標裡時從合併後的最小 seq - 1 讀：取最大 seq 會讓合併悄悄丟掉較舊的訊息。
 		base := p.minQ - 1
 		if inDelivered {
 			base = d
@@ -470,7 +453,6 @@ func (s *Subscription) Revalidate(ctx context.Context, p model.Party) error {
 	return &Ended{Reason: EndLostEligibility}
 }
 
-// finish 以 reason 結束訂閱：移出 Hub、喚醒 Next；deleteRow 為真時刪存活標記（endAll 已一次刪完時為假）。
 func (s *Subscription) finish(reason EndReason, deleteRow bool) {
 	s.mu.Lock()
 	if s.err != nil {

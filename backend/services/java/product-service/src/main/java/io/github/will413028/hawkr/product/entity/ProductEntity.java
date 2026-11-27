@@ -313,7 +313,6 @@ public class ProductEntity implements Serializable {
          */
         private String id;
 
-        // === text 類型欄位 ===
         /**
          * 文字內容（type=text 時使用）
          */
@@ -324,7 +323,6 @@ public class ProductEntity implements Serializable {
          */
         private Map<String, Object> style;
 
-        // === image 類型欄位 ===
         /**
          * 暫存 Token（新增圖片時傳入，Finalize 後替換為 assetId）
          */
@@ -350,7 +348,6 @@ public class ProductEntity implements Serializable {
          */
         private String alt;
 
-        // === inline-run 模型欄位（02 §3.6）===
         /**
          * 行內 runs（type=text；取代 legacy content）
          */

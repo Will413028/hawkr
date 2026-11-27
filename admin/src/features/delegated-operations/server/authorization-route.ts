@@ -111,8 +111,6 @@ export function parseAuthorizationScopeBody(
 		hasAsciiControlCharacters(sourceReference) ||
 		!/\d/u.test(sourceReference)
 	) {
-		// 「至少含一個數字」是 `chk_sda_source_reference`：它要的是依據**編號**，
-		// 不是「賣家說要開通」這種說明文字。
 		return {
 			ok: false,
 			response: invalidRequest(
@@ -167,7 +165,6 @@ export function parseAuthorizationScopeBody(
 			source,
 			sourceReference,
 			grantedCapabilities,
-			// 明確送 null 而不是省略：復權時舊列的期限一律被本欄取代（含取代成無期限）。
 			effectiveUntil: typeof rawUntil === "string" ? rawUntil : null,
 			operationReason,
 		},

@@ -75,7 +75,6 @@ class OrderInvoiceSnapshotReviseTest {
         try {
             TsidUtil.init(300, 0);
         } catch (IllegalStateException alreadyInitialized) {
-            // 同 JVM 的其他測試類先跑過了，維持原設定即可
         }
     }
 

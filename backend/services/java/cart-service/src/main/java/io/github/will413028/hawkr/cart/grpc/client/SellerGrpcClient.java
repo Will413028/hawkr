@@ -77,8 +77,6 @@ public class SellerGrpcClient {
 
                 BatchGetSellerMetaResponse response = stub.batchGetSellerMeta(request);
                 if (response.getCode() != GrpcResponseCode.SUCCESS.code()) {
-                    // 對側把業務錯誤放在 code 欄位、gRPC status 仍是 OK，直接讀 sellersMap
-                    // 會拿到空 Map 並當成「這些賣家都不存在」。
                     throw Status.INTERNAL
                             .withDescription("BatchGetSellerMeta code=" + response.getCode()
                                     + " message=" + response.getMessage())
@@ -92,8 +90,6 @@ public class SellerGrpcClient {
             }
         }
 
-        // 降級：Seller Service 失敗不影響 GetCart（購物車仍可結帳），但賣家欄位會缺值，
-        // 必須留下可查的訊號，不然它會退化成「靜默吐空字串」。
         log.error("SellerGrpcClient.batchGetSellerMeta.degraded",
                 "重試後仍失敗，降級為空；store_code 等賣家欄位將缺值 storeIds=" + storeIds, lastFailure);
         return Collections.emptyMap();
@@ -145,8 +141,6 @@ public class SellerGrpcClient {
                 .withDeadlineAfter(PRINCIPAL_RESOLVE_DEADLINE_SEC, TimeUnit.SECONDS)
                 .resolvePrincipals(request);
         if (response.getCode() != 0) {
-            // 非 0 code（業務碼錯誤，非 transport 失敗）同樣視為失敗、fail-closed，
-            // 避免呼叫端拿到空 map 後 getOrDefault 悄悄退化成錯誤比對（final review follow-up）
             throw Status.INTERNAL.withDescription(response.getMessage()).asRuntimeException();
         }
         return PrincipalResolution.of(response.getPrincipalsMap(), response.getUnresolvedIdsList());

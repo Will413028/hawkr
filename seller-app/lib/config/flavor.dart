@@ -109,11 +109,11 @@ extension FlavorExtension on Flavor {
   int get apiTimeout {
     switch (this) {
       case Flavor.dev:
-        return 30000; // 開發環境 30 秒
+        return 30000;
       case Flavor.stage:
-        return 20000; // 預發布 20 秒
+        return 20000;
       case Flavor.prod:
-        return 15000; // 生產環境 15 秒
+        return 15000;
     }
   }
 

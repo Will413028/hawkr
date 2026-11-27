@@ -33,7 +33,6 @@ const CARD = "features/seller-center/invoices/SellerOrderInvoiceCard.tsx";
 describe("賣家面複用共用判準（backend#3084 / fileUnavailableReason）", () => {
 	it("載具列必須用 carrierRowKindOf 判別，不得只看 carrierSummary", () => {
 		const src = read(DETAIL);
-		// 對照組：先證明讀到的是對的檔案。
 		expect(src).toContain("SellerInvoiceDetailPage");
 		expect(src).toContain("carrierRowKindOf(summary.carrierSummary");
 	});
@@ -42,7 +41,6 @@ describe("賣家面複用共用判準（backend#3084 / fileUnavailableReason）"
 		for (const p of [DETAIL, CARD]) {
 			const src = read(p);
 			expect(src).toContain("invoiceFileUnavailableHint");
-			// 直出的形態：把 reason 本身放進 JSX 的 {} 裡。
 			expect(src).not.toMatch(
 				/\{\s*detail\.summary\.fileUnavailableReason\s*\}/,
 			);

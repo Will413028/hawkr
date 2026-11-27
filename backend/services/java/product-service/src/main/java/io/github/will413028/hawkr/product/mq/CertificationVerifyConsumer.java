@@ -73,7 +73,6 @@ public class CertificationVerifyConsumer {
             JsonNode root = MAPPER.readTree(new String(message.getBody(), StandardCharsets.UTF_8));
             applicationIdRaw = root.path("application_id").asText("");
             if (applicationIdRaw.isEmpty()) {
-                // 沒有 applicationId 的訊息重試幾次也不會變好 ⇒ 直接丟棄，不佔 DLQ
                 log.warn("CertificationVerifyConsumer.invalid", "payload 缺 application_id，丟棄訊息");
                 channel.basicAck(deliveryTag, false);
                 return;
@@ -89,8 +88,6 @@ public class CertificationVerifyConsumer {
                 return;
             }
 
-            // 冪等第一道：離開 SUBMITTED 的申請一律 no-op（重複訊息／期間已被人工裁決）。
-            // 這一格就是「重複訊息不得重複核准、不得重複發通知」的守門員。
             if (!ProductCertificationStatus.SUBMITTED.value().equals(found.get().getStatus())) {
                 log.info("CertificationVerifyConsumer.skipNotSubmitted",
                         "申請已離開 SUBMITTED，略過背景查驗 status=" + found.get().getStatus(),
@@ -99,15 +96,11 @@ public class CertificationVerifyConsumer {
                 return;
             }
 
-            // 查驗 ＋ 以「讀取當下的 version」CAS 回寫三個查驗欄位（不改 status）
             ProductCertificationApplicationEntity verified =
                     applicationService.runBackgroundVerify(applicationId);
 
             boolean approved = false;
             if (isAutoApproveCandidate(verified)) {
-                // 資格的最終判定在 approveBySystem 內（持 FOR UPDATE 重讀，另含
-                // 「該 type 是否允許自動核准」）；這裡只是省下一次無謂的鎖。
-                // approveBySystem 成功時會發 product.certification.approved 通知賣家。
                 approved = applicationService.approveBySystem(applicationId);
             }
 

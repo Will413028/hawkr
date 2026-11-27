@@ -36,14 +36,12 @@ func New(cfg Config) (*S3, error) {
 		Credentials: aws.CredentialsProviderFunc(func(context.Context) (aws.Credentials, error) {
 			return creds, nil
 		}),
-		// 只在操作要求時才算 checksum：預簽網址除 Content-MD5 外不多綁 x-amz-checksum-*，R2 已實測；S3 相容替身由整合測試驗證。
 		RequestChecksumCalculation: aws.RequestChecksumCalculationWhenRequired,
 		ResponseChecksumValidation: aws.ResponseChecksumValidationWhenRequired,
 	})
 	return &S3{bucket: cfg.Bucket, client: client, presign: s3.NewPresignClient(client)}, nil
 }
 
-// md5DigestSize 是 Content-MD5 解碼後的位元組數。
 const md5DigestSize = 16
 
 func validatePresign(in PresignPutInput) error {
@@ -206,7 +204,6 @@ func remainingLen(r io.ReadSeeker) (int64, error) {
 	return end - cur, nil
 }
 
-// isNotFound 只認 key 不存在：NoSuchKey、NotFound，以及 HEAD 沒有 body 的 404；NoSuchBucket 等其他錯誤碼一律是錯誤。
 func isNotFound(err error) bool {
 	var nsk *s3types.NoSuchKey
 	if errors.As(err, &nsk) {

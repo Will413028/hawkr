@@ -53,7 +53,6 @@ func TestRateLimiterKeepsCountsWhenFull(t *testing.T) {
 	if ok, _ := l.allow("victim", 3); ok {
 		t.Fatal("滿了之後既有的計數被歸零")
 	}
-	// 時間窗過了：過期的列清掉，新的身分重新計數。
 	now = now.Add(rateWindow)
 	if ok, _ := l.allow("newcomer", 1); !ok {
 		t.Fatal("新的時間窗應該放行")
@@ -111,7 +110,6 @@ func TestAccountLimiterFailsClosedWhenTheTableIsFull(t *testing.T) {
 	if ok, _ := l.Allow(httpseller.Limit{Key: "newcomer", Quota: 5, Window: time.Hour}); !ok {
 		t.Fatal("時間窗過了，過期的列清掉之後新的帳號應該可以計數")
 	}
-	// IP 層維持放行。
 	ip := newRateLimiter(func() time.Time { return now })
 	for i := range maxRateKeys {
 		ip.allow(fmt.Sprintf("flood-%d", i), 3)

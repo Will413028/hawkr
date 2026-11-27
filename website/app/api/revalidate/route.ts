@@ -40,8 +40,6 @@ import {
 export async function POST(req: NextRequest) {
 	const secretHeader = req.headers.get("x-revalidate-secret");
 	const expectedSecret = process.env.REVALIDATE_SECRET;
-	// Authenticate before reading the body so an unauthorised caller cannot make
-	// the Worker parse an arbitrarily large JSON payload.
 	if (!isRevalidationSecretAuthorized(secretHeader, expectedSecret)) {
 		return NextResponse.json(
 			{ code: 401, message: "unauthorized" },
@@ -72,7 +70,6 @@ export async function POST(req: NextRequest) {
 	try {
 		body = rawBody ? JSON.parse(rawBody) : null;
 	} catch {
-		// The parser below returns the same stable 400 contract as an absent body.
 	}
 	const result = parseRevalidateRequest(secretHeader, body, expectedSecret);
 	if (!result.ok) {

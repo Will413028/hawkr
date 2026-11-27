@@ -57,8 +57,6 @@ class SearchResultsScreen extends HookConsumerWidget {
     final debounce = useRef<Timer?>(null);
     final currentKeyword = useRef(query);
 
-    // Bumped on every restart and on dispose; a request that started under an
-    // older value is stale and must not alter paging or fire tracking.
     final generation = useRef(0);
     final controllerRef = useRef<PagingController<int, ProductItem>?>(null);
 
@@ -74,7 +72,6 @@ class SearchResultsScreen extends HookConsumerWidget {
           final c = controllerRef.value!;
           c.value = c.value.copyWith(hasNextPage: false);
         }
-        // GA4: view_item_list — fired once per displayed page, not on every rebuild
         if (items.isNotEmpty) {
           final startIndex = (pageKey - 1) * ctrl.SearchController.pageSize;
           final ga4Items = items.indexed
@@ -90,8 +87,6 @@ class SearchResultsScreen extends HookConsumerWidget {
       } on Exception {
         rethrow;
       } catch (e) {
-        // The controller rethrows non-Exception errors; keep them in the
-        // error state instead of escaping to the zone.
         throw _SearchFetchFailure(e);
       }
     }

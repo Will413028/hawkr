@@ -95,11 +95,9 @@ class ChatConversations extends _$ChatConversations {
             ...page.items,
             ...cur.items.where((c) => !ids.contains(c.id)),
           ],
-          // 續頁的 token 以目前的為準（第一頁的 token 指向已載入的第二頁）。
         ),
       );
     } on Object {
-      // 背景更新失敗不蓋掉已有的列表。
     }
   }
 

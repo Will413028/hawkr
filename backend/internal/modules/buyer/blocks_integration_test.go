@@ -98,11 +98,9 @@ func TestBlockRejectsSelfAndInvalidTargets(t *testing.T) {
 	if _, err := f.module.BlockBuyer(ctx, a.BuyerID, a.BuyerID+9999); apperr.KindOf(err) != apperr.KindNotFound {
 		t.Fatalf("封鎖不存在的買家要 NotFound：%v", err)
 	}
-	// 資料庫層也拒絕封鎖自己（繞過 use case 的寫入）。
 	if _, err := f.database.Conn(ctx).Exec(ctx, "INSERT INTO buyer.blocked_buyers (blocker_buyer_id, blocked_buyer_id, created_at) VALUES ($1, $1, now())", a.BuyerID); err == nil {
 		t.Fatal("DB CHECK 要拒絕封鎖自己")
 	}
-	// 店 ID 與買家 ID 是不同的號碼空間：店號等於自己的買家號碼不是封鎖自己。
 	if changed, err := f.module.BlockStore(ctx, a.BuyerID, a.BuyerID); err != nil || !changed {
 		t.Fatalf("封鎖與自己同號的店不是封鎖自己：%v %v", changed, err)
 	}
@@ -164,7 +162,6 @@ func TestIsBlockedBetweenCoversBothDirections(t *testing.T) {
 	if isBlockedBetween(t, f, a.BuyerID, c.BuyerID) || isBlockedBetween(t, f, c.BuyerID, b.BuyerID) {
 		t.Fatal("無關的買家不受影響")
 	}
-	// 反方向另外封鎖：解除其一之後另一個方向仍成立。
 	if _, err := f.module.BlockBuyer(ctx, b.BuyerID, a.BuyerID); err != nil {
 		t.Fatal(err)
 	}
@@ -340,7 +337,6 @@ func TestPubBlocksIsInlinedAndUsesTheIndexes(t *testing.T) {
 		t.Fatal("pub_blocked_buyers 要依 (發起者, 對象) 回列")
 	}
 
-	// 大量資料（對象買家在 buyers 沒有列，這個連線略過外鍵檢查）。
 	err := f.database.InTx(ctx, func(ctx context.Context) error {
 		conn := f.database.Conn(ctx)
 		for _, q := range []string{
@@ -462,7 +458,6 @@ func TestBlockingWhileTargetClosesLeavesNoRowForClosedBuyer(t *testing.T) {
 	ctx := context.Background()
 	for round := 0; round < 100; round++ {
 		target := profile(t, f, int64(91000+round))
-		// 偶數輪發起者 ID 大於對象、奇數輪小於對象，兩個 lockPair 分支各賽一半。
 		initiatorID := int64(181000 + round)
 		if round%2 == 1 {
 			initiatorID = int64(1000 + round)

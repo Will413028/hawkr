@@ -81,12 +81,6 @@ export default function CategorySelector({
 		null,
 	);
 
-	// `localPath` is the source of truth for what the three dropdowns show.
-	// It must NOT be derived from `value`, because `value` stays undefined
-	// until the user reaches a leaf (L3) — driving the options off `value`
-	// leaves L2/L3 permanently empty (and therefore disabled) the moment
-	// L1 is picked. `value` only *seeds* this path (see the effect below)
-	// so an existing product opens with its category pre-filled in edit mode.
 	const [localPath, setLocalPath] = React.useState<[string, string, string]>([
 		"",
 		"",
@@ -125,7 +119,6 @@ export default function CategorySelector({
 			: [];
 
 	const handleL1 = (id: string) => {
-		// Reset L2 / L3 — emit undefined until the user drills down to a leaf.
 		onChange(undefined);
 		const path: [string, string, string] = [id, "", ""];
 		setLocalPath(path);
@@ -321,10 +314,6 @@ export default function CategorySelector({
 		}
 	};
 
-	// Seed the dropdowns from `value` when it resolves to a real category
-	// (edit mode). Guarded on a non-empty L1 so it never clobbers an
-	// in-progress selection: while the user is partway through, `value` is
-	// undefined → path is empty → we leave `localPath` untouched.
 	React.useEffect(() => {
 		const [l1Id, l2Id, l3Id] = findCategoryPath(tree, value);
 		if (

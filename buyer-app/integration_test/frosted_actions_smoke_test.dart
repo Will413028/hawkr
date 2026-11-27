@@ -27,7 +27,6 @@ void main() {
     expect(find.text('刪除'), findsOneWidget);
     expect(fixture.currentState!.selected, isNull);
 
-    // Dismiss by tapping the actual modal barrier, without choosing an action.
     await tester.tapAt(const Offset(20, 240));
     await tester.pumpAndSettle();
     expect(find.text('回覆'), findsNothing);

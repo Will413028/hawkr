@@ -32,8 +32,6 @@ test("sellerPath gives a falsy value without a code", () => {
 	assert.equal(sellerPath(""), "");
 	assert.equal(sellerPath(null), "");
 	assert.equal(sellerPath(undefined), "");
-	// And it still builds the canonical path when a code IS present, so guarding
-	// costs nothing in the normal case.
 	assert.equal(sellerPath("2605576172"), "/sellers/2605576172");
 });
 
@@ -53,9 +51,6 @@ test("post-facing callers pass storeCode alone", async () => {
 });
 
 test("post-facing callers guard on the empty result", async () => {
-	// Passing one argument is only half of it: the caller must also branch, or it
-	// renders `href=""`, which resolves to the current page — a link that looks
-	// alive and goes nowhere, which is worse than the 404 it replaced.
 	for (const [name, path] of Object.entries(componentPaths)) {
 		const source = await readFile(path, "utf8");
 		assert.match(
@@ -67,15 +62,7 @@ test("post-facing callers guard on the empty result", async () => {
 });
 
 test("dropping the anchor does not move anything on screen", async () => {
-	// The two branches must lay out identically — same flex box, same gap — so a
-	// seller whose link is withheld looks the same as one whose link is present,
-	// minus the affordance. Only anchor-specific classes may differ: `no-underline`
-	// (nothing to underline without an <a>) and `group` (it exists solely to drive
-	// `group-hover:text-hk-primary`, and a non-link must not offer hover feedback).
 	const home = await readFile(componentPaths["HomeStageFeedCard.tsx"], "utf8");
-	// Scoped to the sellerHref ternary. Searching the whole file finds an earlier
-	// `) : (` — the image placeholder — and silently compares the wrong element,
-	// which is how this assertion first "failed" on a correct component.
 	const ternary = home.slice(home.indexOf("{sellerHref ?"));
 	const linked = ternary.match(
 		/<Link\s+href=\{sellerHref\}[\s\S]*?className="([^"]+)"/,
@@ -96,8 +83,6 @@ test("dropping the anchor does not move anything on screen", async () => {
 });
 
 test("the seller's name and avatar are not withheld along with the link", async () => {
-	// The snapshot social-service carries is still good; hiding the identity would
-	// turn a missing link into a broken-looking card. Only the anchor goes away.
 	const home = await readFile(componentPaths["HomeStageFeedCard.tsx"], "utf8");
 	const branch = home.slice(home.indexOf("{sellerHref ?"));
 	const elseArm = branch.slice(branch.indexOf(") : ("));

@@ -100,8 +100,6 @@ export default function SellerOnboardingClient() {
 	>(null);
 	const [error, setError] = React.useState<string | null>(null);
 	const [refusal, setRefusal] = React.useState<StoreOpeningNotice | null>(null);
-	// 開店可用性（GetMyStoreOpening）：帳號沒有目前店家（會呼叫 ApplyStore）時送出前先讀；有店家走更新流程，不讀。
-	// 讀不到不擋，ApplyStore 的 ErrorReason 是後備。
 	const [opening, setOpening] = React.useState<
 		| { status: "loading" }
 		| { status: "failed" }
@@ -122,9 +120,6 @@ export default function SellerOnboardingClient() {
 		return sellerWorkspaceRedirect(r);
 	}, [searchParams]);
 
-	// 入口 gate：未登入導去登入。有賣家角色不能直接踢去工作區 —— App 註冊到
-	// 一半的帳號（拿到角色、店家沒建）GetMyStore 會回 not_found，dashboard
-	// 整頁壞掉；只有店家真的存在且 onboarding 完成才導走，否則留在精靈補完。
 	React.useEffect(() => {
 		if (status === "unknown" || status === "unavailable") return;
 		if (step !== "store") return;
@@ -141,11 +136,6 @@ export default function SellerOnboardingClient() {
 			.then((res) => {
 				if (cancelled) return;
 				if (res.store?.id && !needsOnboarding(res)) {
-					// This page and SellerHeader can briefly disagree when the
-					// shared seller-self query still holds the pre-onboarding
-					// result. A document replacement creates a fresh QueryClient
-					// before SellerCenterShell evaluates the profile, preventing
-					// dashboard ↔ onboarding ping-pong.
 					commitDocumentNavigation(redirect, true);
 					return;
 				}
@@ -158,9 +148,6 @@ export default function SellerOnboardingClient() {
 					setSellerLookupState("ready");
 					return;
 				}
-				// Only a confirmed not_found means "no store yet". Treating a temporary
-				// 5xx/network failure as a new store could submit the application
-				// twice, so hold the form until the status can be checked again.
 				setSellerLookupState("failed");
 				setError(STORE_STATE_UNKNOWN_MESSAGE);
 			});
@@ -171,7 +158,6 @@ export default function SellerOnboardingClient() {
 
 	React.useEffect(() => {
 		if (!signedIn || step !== "store") return;
-		// 有賣家角色時等店家查詢有結果；帳號有店家就不查（送出走更新流程）。
 		if (hasSeller && sellerLookupState !== "ready") return;
 		if (storeExists) return;
 		let cancelled = false;
@@ -214,8 +200,6 @@ export default function SellerOnboardingClient() {
 				},
 			},
 		);
-		// ApplyStore 改了 DB 的角色集 —— 重新解析一次；拿得到新角色就直接切進
-		// 工作區，拿不到就停在完成頁請使用者重新登入。
 		const id = await fetchSession();
 		if (id === null) {
 			await signOut(loginPath({ role: "seller", redirect }), true).catch(
@@ -223,14 +207,8 @@ export default function SellerOnboardingClient() {
 			);
 			return;
 		}
-		// SESSION_UNAVAILABLE（後端短暫不可用，B-199）視同「確認不了新角色」，
-		// 一樣走完成頁的重新登入路徑。
 		if (id !== SESSION_UNAVAILABLE && id?.isSeller) {
 			switchRole("seller", id);
-			// Hard replace is intentional: SellerHeader may still have the old
-			// `needsOnboarding=true` / 404 result cached for 30 seconds. Keeping
-			// that QueryClient across a soft route would send the completed seller
-			// straight back here and create an endless redirect loop.
 			commitDocumentNavigation(redirect, true);
 			return;
 		}
@@ -285,25 +263,16 @@ export default function SellerOnboardingClient() {
 		setPendingAction("relogin");
 		setSubmitting(true);
 		try {
-			// role=seller 讓登入頁預選賣家分頁 —— 重新登入後 switchRole("seller")
-			// 才會生效、直接落地賣家中心（否則雙角色帳號預設買家，WorkspaceAlign
-			// 會把人從 /seller-center 踢回首頁）。
 			await signOut(loginPath({ role: "seller", redirect }), true);
 		} catch {
-			// 撤銷失敗＝session 仍有效（signOut 已跳 toast）。導去登入頁只會拿同一
-			// 個仍生效的 session 直接彈回來，等於什麼都沒換——留在原地讓人重試。
 			setSubmitting(false);
 			setPendingAction(null);
 		}
 	};
 
-	// Existing sellers must wait for the admission lookup to resolve before the
-	// form can mutate anything. This closes the slow-network window where a user
-	// could submit while we still did not know whether a completed store existed.
 	const sellerStatusReady =
 		signedIn && (!hasSeller || sellerLookupState === "ready");
 	const willApplyStore = !storeExists;
-	// 伺服器說不能開店時擋送出並顯示第一個原因；已有店家走更新，不經 ApplyStore，不受影響。
 	const openingReady = willApplyStore && opening.status === "ready";
 	const openingBlocked = openingReady && opening.blocked;
 	const openingBlock = openingReady && opening.blocked ? opening.notice : null;
@@ -356,8 +325,7 @@ export default function SellerOnboardingClient() {
 				</Card>
 			)}
 
-			{/* 注意：這張卡不能加 backdrop-filter（blur）— 它會把 Dropdown 的
-			    position:fixed 選單改成以卡片定位，整個選單就飄離欄位。 */}
+
 			<section className="rounded-[28px] border border-white/70 bg-white/90 p-5 shadow-[0_24px_64px_-32px_rgb(var(--color-ink-700-rgb)/0.18)] sm:rounded-[36px] sm:p-10 dark:border-white/10 dark:bg-[rgb(var(--color-ink-900-rgb)/0.92)] dark:shadow-[0_24px_64px_-32px_rgba(0,0,0,0.5)]">
 				{step === "store" && (
 					<form

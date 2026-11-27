@@ -11,9 +11,6 @@ import type {
 import { goTrimmedRuneCount, trimGoSpace } from "@hawkr/api/text/server-text";
 import { fromLocalInput } from "@/app/admin/merchants/[id]/measure";
 
-// 案件詢問的對話框：輸入的驗證、請求組裝、失敗句（3c-b 設計書 §5.3、§5.4 (b)）。能不能做來自伺服器（Case.can_create_inquiry、
-// CaseInquiry.can_record_reply、can_withdraw）；欄位的長度與範圍由伺服器判斷並回已核准的句子（inquiry.kind_required、message_length、
-// channel_required、body_length、receive_time_range、due_range），這裡只擋有核准文案的「沒填給賣家的說明」。
 
 /** 詢問、記下回覆、撤回失敗（網路層，J15）：沒有寫入。 */
 export const INQUIRY_FAILED_TEXT =
@@ -39,8 +36,6 @@ export const INQUIRY_LATE_REPLY_TEXT =
 export const CLOSE_WITH_OPEN_INQUIRY_TEXT =
 	"還有一筆詢問在等賣家回覆；結案會撤回它。";
 
-// ---------------------------------------------------------------------------
-// 詢問賣家
 
 export interface InquiryForm {
 	kind: CaseInquiryKind;
@@ -88,8 +83,6 @@ export function buildCreateInquiry(
 	};
 }
 
-// ---------------------------------------------------------------------------
-// 記下回覆
 
 export interface InquiryReplyForm {
 	channel: CaseInquiryReplyChannel;

@@ -81,7 +81,6 @@ class OrderGrpcServiceDelegatedReadTest {
         OrderEntity order = new OrderEntity();
         order.setOrderNo("ORD1");
         order.setStoreId(STORE_ID);
-        // 80 = CANCELLED，刻意選在所有 provider 狀態聚合來源之外，讓斷言只反映投影本身
         order.setStatus("80");
         order.setBuyerId(500L);
         order.setRecipientName("王小明");
@@ -139,7 +138,6 @@ class OrderGrpcServiceDelegatedReadTest {
     @DisplayName("賣家本人路徑逐位元不變：不帶 delegation 一律回原值")
     void sellerOwnPath_unchanged() {
         seedOrder();
-        // 不帶 delegation 走的仍是 requireAccountType(SELLER)，身分由 gRPC Context 注入
         Context ctx = Context.current()
                 .withValue(GrpcAuthContext.ACCOUNT_ID, STORE_ID)
                 .withValue(GrpcAuthContext.ACCOUNT_TYPE, AccountType.SELLER.code());
@@ -172,7 +170,6 @@ class OrderGrpcServiceDelegatedReadTest {
 
         assertEquals("0912341234", detail.getRecipientPhone());
         assertEquals("台北市大安區信義路四段 123 號 5 樓之 3", detail.getShippingAddress());
-        // 揭露的是收件資訊，不是履約與金流
         assertTrue(detail.getTransactionId().isEmpty());
         assertTrue(detail.getLabelKey().isEmpty());
     }
@@ -193,8 +190,6 @@ class OrderGrpcServiceDelegatedReadTest {
         ArgumentCaptor<GetSellerOrderDetailResponse> captor =
                 ArgumentCaptor.forClass(GetSellerOrderDetailResponse.class);
         verify(observer).onNext(captor.capture());
-        // #2744：兩者的主體都是「Gateway 組錯 DelegationContext」，不是操作者填錯（9260）
-        // 也不是他權限不足（9262）—— 後者還會讓稽核列指控一位沒做錯事的管理員。
         assertEquals(9289, captor.getValue().getCode());
         assertTrue(captor.getValue().getData().getRecipientPhone().isEmpty());
     }
@@ -214,8 +209,6 @@ class OrderGrpcServiceDelegatedReadTest {
         ArgumentCaptor<GetSellerOrderDetailResponse> captor =
                 ArgumentCaptor.forClass(GetSellerOrderDetailResponse.class);
         verify(observer).onNext(captor.capture());
-        // #2744：兩者的主體都是「Gateway 組錯 DelegationContext」，不是操作者填錯（9260）
-        // 也不是他權限不足（9262）—— 後者還會讓稽核列指控一位沒做錯事的管理員。
         assertEquals(9289, captor.getValue().getCode());
     }
 }

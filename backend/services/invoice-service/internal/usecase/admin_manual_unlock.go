@@ -13,40 +13,16 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// 本檔是 A4 受控人工出口的**雙人解鎖**（§6.1.14 端點 54 發起／55 覆核）。
-//
-// 它與同檔案家族的 admin_job.go 共用同一組守衛形狀（必填理由 ＋ expectedVersion ＋
-// Idempotency-Key 落稽核 request_id），但多了一條 admin_job.go 沒有的規則：
-//
-//	🔴 **雙人確認有兩道守衛，兩道都在 SQL 的 WHERE**
-//	   ① invoice_manual_unlocks：`requested_by_account_id <> $approver` ⇒ 9345
-//	   ② invoice_operations（J29）：`cancel_requested_by <> $approver` ⇒ 同樣是 9345
-//	   兩個「第一人」未必是同一位 ADM（提出取消的與發起解鎖的可以不同），所以兩道都要。
-//	   本層的 pre-read 只負責把 rows=0 翻成**可分辨**的碼，它不是防線——兩個分頁同時
-//	   送出時，先讀後判的窗口擋不住任何東西。
-//
-//	🔴 **逾期不由排程器收斂**（§5.1.16 紅字）。端點 54 進來時在同一交易內先把過期那一列
-//	   就地轉 EXPIRED，才騰得出 uq_invmu_open_per_operation 的名額；讀取面另以
-//	   domain.ProjectManualUnlockStatus 投影。少了前者，一個 job 逾期一次之後就永遠
-//	   再也發起不了第二次解鎖，而症狀是 23505 不是任何業務碼。
 
 const (
-	// unlockEvidenceMaxRunes 是 providerCheckEvidence 的上限（§6.2.1 逐字 1–1000）。
-	// DB 端 chk_invmu_evidence_len 守同一件事；兩道都要，理由同 externalInvoiceNoPattern：
-	// DB 那道回 23514（對 ADM 是一句 500），本層這道才回得出「查證說明過長」。
 	unlockEvidenceMaxRunes = 1000
 
-	// invoice_status_history.reason_code 與 invoice_admin_audit_logs.reason_code 的解鎖軸。
 	unlockReasonRequested = "ADMIN_MANUAL_UNLOCK_REQUESTED"
 	unlockReasonApproved  = "ADMIN_MANUAL_UNLOCK_APPROVED"
 	unlockReasonRejected  = "ADMIN_MANUAL_UNLOCK_REJECTED"
 
-	// J28（CANCEL_BLOCKED_UNKNOWN → CANCELLED_BY_ADMIN）那一列狀態歷程的 reason_code。
-	// 與 unlockReasonApproved 分開：同一次覆核會寫兩列歷程（先 J28 再 J29），兩列用同一個
-	// reason_code 的話事後看不出哪一列是「確認取消」、哪一列是「解鎖」。
 	unlockReasonCancelConfirmed = "ADMIN_CANCEL_CONFIRMED"
 
-	// invoice_admin_audit_logs.action。
 	unlockAuditActionRequest = "INVOICE_MANUAL_UNLOCK_REQUEST"
 	unlockAuditActionApprove = "INVOICE_MANUAL_UNLOCK_APPROVE"
 )
@@ -66,13 +42,6 @@ var (
 	ErrUnlockEvidenceKeyConflict  = errors.New("invoice: cancel_evidence_object_key and cancel_evidence_staged_token are mutually exclusive")
 )
 
-// j28EvidenceKinds 是 **J28 收得下的證據種類**，比 CodeMeta InvoiceCancelEvidenceKind
-// 的四值窄兩個——理由與 DB 的 chk_invmu_evidence_kind 同一條（見 schema.sql 紅字）：
-// PROVIDER_QUERY_71／PROVIDER_LIST_ABSENT 是 provider 直接作證、由 J24 自動落地，
-// 沒有第二個人；本層若收下它們，就是讓 ADM 替系統蓋一個系統自己蓋得了的章。
-//
-// 🔴 它不是 CodeMeta 的拷貝，是 CodeMeta 的**子集合**。所以它從 codemeta 的常數取值
-// （拼錯字會編譯失敗），而不是自己寫兩個字串字面值。
 var j28EvidenceKinds = map[string]bool{
 	codemeta.InvoiceCancelEvidenceKindMofPlatformScreenshot.Value: true,
 	codemeta.InvoiceCancelEvidenceKindAmegoReconcileFile.Value:    true,
@@ -149,13 +118,11 @@ func (u *AdminJob) RequestManualUnlock(ctx context.Context, in RequestManualUnlo
 	err := u.tx.WithTx(ctx, func(ctx context.Context) error {
 		op, err := u.ops.GetByID(ctx, in.JobID)
 		if err != nil {
-			return err // repository 已把查無映成 9340
+			return err
 		}
 		if op.Version != in.ExpectedVersion {
 			return jobBiz(bizcode.InvoiceJobVersionConflict)
 		}
-		// allowed-from ＝ **兩個值**（見函式註解）。CANCEL_BLOCKED_UNKNOWN 那條要帶證據，
-		// 它在同一次覆核裡會先走 J28 再走 J29。
 		blocked := op.Status == codemeta.InvoiceOperationStatusCancelBlockedUnknown.Value
 		if op.Status != codemeta.InvoiceOperationStatusCancelledByAdmin.Value && !blocked {
 			return pkgerrors.NewBusiness(bizcode.InvoiceJobVersionConflict,
@@ -168,17 +135,6 @@ func (u *AdminJob) RequestManualUnlock(ctx context.Context, in RequestManualUnlo
 			in.CancelEvidenceObjectKey+in.CancelEvidenceStagedToken); err != nil {
 			return err
 		}
-		// 🔴 人工出口解鎖只對**開立類**有意義（#3112，2026-09-04）。
-		//
-		// A4 的完整鏈路是「查證未開立 → 受控取消 → 雙人解鎖 → **賣家自行開立並回報號碼**」，
-		// 最後一步就是端點 56。而 VOID／ALLOWANCE／VOID_ALLOWANCE／QUERY 沒有
-		// 「自行開立的發票號碼」這回事 ⇒ 解鎖之後**沒有任何出口**：
-		// job 會永遠停在 MANUAL_PROCESS_ALLOWED，佔著積壓指標而沒有人推得走它
-		// （dev 上實測到的正是這個，見 #3112）。
-		//
-		// ⚠️ 在這裡擋而不是只在端點 56 擋：端點 56 那道是「已經走進死路才告訴你」，
-		// 而這一道讓 job 停在 CANCELLED_BY_ADMIN——對作廢類而言那**就是**終局
-		// （這件作廢工作被 ADM 取消了），不需要再解鎖。
 		if !isIssuanceOperation(op.OperationType) {
 			return pkgerrors.NewBusiness(bizcode.InvoiceExternalIssuanceNotAllowed,
 				"這件工作不是開立類（作廢／折讓／查詢），不需要人工出口解鎖；"+
@@ -190,13 +146,10 @@ func (u *AdminJob) RequestManualUnlock(ctx context.Context, in RequestManualUnlo
 			return err
 		}
 
-		// ① 名額釋放：把過期而仍掛著的那一列就地轉 EXPIRED（見檔頭紅字）。
 		if _, err := u.unlocks.ExpireStale(ctx, op.ID, now); err != nil {
 			return err
 		}
 
-		// ② 已經有人發起且尚未逾期 ⇒ 200 ＋ 9344 ＋ 既有那一列的 unlockId。
-		//    回 code 0 的話 ADM 會以為自己剛剛發起了一個新請求，而實際上什麼都沒建立。
 		if existing, found, err := u.unlocks.GetOpen(ctx, op.ID, now); err != nil {
 			return err
 		} else if found {
@@ -205,12 +158,6 @@ func (u *AdminJob) RequestManualUnlock(ctx context.Context, in RequestManualUnlo
 			return nil
 		}
 
-		// 證據檔換發（#3108）：ADM 上傳後拿到的 staged token 在這裡變成 objectKey。
-		//
-		// 🔴 放在交易**內**、Create 之前：換發會建立 asset_reference，而若 Create
-		// 撞唯一鍵（另一位 ADM 搶先）整筆 rollback ⇒ 那個 reference 會變成孤兒。
-		// 這是已知的取捨——media 的 GC 會回收沒有引用的資產，而反過來（先建列後換發）
-		// 會讓一列已經送出的解鎖請求指向一個還沒轉正的 token，覆核者下載不到。
 		evidenceKey := in.CancelEvidenceObjectKey
 		if in.CancelEvidenceStagedToken != "" {
 			if u.unlockEvidence == nil {
@@ -233,8 +180,6 @@ func (u *AdminJob) RequestManualUnlock(ctx context.Context, in RequestManualUnlo
 			ProviderCheckedAt:     in.ProviderCheckedAt,
 			ExpiresAt:             now.Add(domain.ManualUnlockExpiry),
 			Now:                   now,
-			// 空字串存 NULL：DB 的 chk_invmu_evidence_kind 用 IS NULL 當豁免，
-			// 存進去一個空字串會直接違反它（23514 ⇒ 500）。
 			CancelEvidenceKind:      nilIfBlank(in.CancelEvidenceKind),
 			CancelEvidenceObjectKey: nilIfBlank(evidenceKey),
 		})
@@ -242,16 +187,10 @@ func (u *AdminJob) RequestManualUnlock(ctx context.Context, in RequestManualUnlo
 			return err
 		}
 		if taken {
-			// 撞 uq_invmu_open_per_operation：另一位 ADM 在 ② 與這一句之間搶先建了一列。
-			// 🔴 交易此刻已 aborted（25P02）⇒ **不得再下任何一句 SQL**（包含「回去把那一列
-			// 讀出來回 9344」）。整筆 rollback，讓 ADM 重新整理後看到對方那一列。
 			return pkgerrors.NewBusiness(bizcode.InvoiceJobVersionConflict,
 				"另一位管理員剛剛已發起解鎖請求，請重新整理後改為覆核")
 		}
 
-		// ③ 稽核。before/after 只放狀態相關欄位——providerCheckEvidence 是自由文字，
-		//    可能寫進光貿客服姓名／電話，而本表保存 5 年（§9.5）。它的落點是
-		//    invoice_manual_unlocks 那一欄本身，不是稽核列。
 		if _, err := u.appendAudit(ctx, adminAuditInput{
 			ActorAccountID: in.ActorAccountID,
 			Action:         unlockAuditActionRequest,
@@ -314,22 +253,18 @@ func (u *AdminJob) ApproveManualUnlock(ctx context.Context, in ApproveManualUnlo
 		}
 		unlock, err := u.unlocks.GetByID(ctx, in.UnlockID)
 		if err != nil {
-			return err // 查無 ⇒ 9340
+			return err
 		}
 		if unlock.OperationID != op.ID {
-			// 這把 unlock_id 不屬於這個 job。與「不存在」同回 9340：對 ADM 而言下一步
-			// 相同，而分開回會洩漏「這個 id 存在但掛在別的 job 上」。
 			return jobBiz(bizcode.InvoiceJobNotFound)
 		}
 
 		now := u.now()
 
-		// ── 三個 pre-read 只為了回**可分辨**的碼；真正的守衛是底下那兩句 CAS ──
 		if unlock.RequestedByAccountID == in.ActorAccountID {
 			return jobBiz(bizcode.InvoiceManualUnlockSameActor)
 		}
 		if op.CancelRequestedBy != nil && *op.CancelRequestedBy == in.ActorAccountID {
-			// J29 的第二道雙人守衛：覆核的人不得是當初提出取消的那一位。
 			return jobBiz(bizcode.InvoiceManualUnlockSameActor)
 		}
 		if unlock.Status != domain.ManualUnlockAwaitingSecondApproval {
@@ -366,12 +301,6 @@ func (u *AdminJob) ApproveManualUnlock(ctx context.Context, in ApproveManualUnlo
 
 		jobStatusAfter := op.Status
 		if in.Approved {
-			// ── J28（只有從 CANCEL_BLOCKED_UNKNOWN 發起的解鎖才有這一段）──
-			//
-			// 🔴 **版本會在這裡 +1**：J28 的 UPDATE 有 `version = version + 1`，所以下面
-			// 那句 J29 必須用 op.Version+1。兩句都傳 op.Version 的話 J29 會 rows=0，
-			// 而 rows=0 在這裡是**靜默**的——ADM 看到「已核准」、job 卻停在
-			// CANCELLED_BY_ADMIN，端點 56／62 繼續回 9349，兩邊各自都自洽。
 			jobVersion := op.Version
 			if op.Status == codemeta.InvoiceOperationStatusCancelBlockedUnknown.Value {
 				kind := ""
@@ -379,8 +308,6 @@ func (u *AdminJob) ApproveManualUnlock(ctx context.Context, in ApproveManualUnlo
 					kind = *unlock.CancelEvidenceKind
 				}
 				if !j28EvidenceKinds[kind] {
-					// 只可能發生在「發起時還允許空證據的舊列」上。回可分辨的碼而不是讓
-					// chk_invop_admin_cancel_needs_confirm 吐 23514（對 ADM 是一句 500）。
 					return pkgerrors.NewBusiness(bizcode.InvoiceJobVersionConflict,
 						"本解鎖請求沒有可採信的取消證據，請重新發起並附上證據")
 				}
@@ -412,8 +339,6 @@ func (u *AdminJob) ApproveManualUnlock(ctx context.Context, in ApproveManualUnlo
 				return err
 			}
 			if !allowed {
-				// allowed-from 不符或 J29 的雙人述詞不成立。上面的 pre-read 已把後者翻成
-				// 9345，走到這裡的多半是狀態被搶先改走。
 				return jobBiz(bizcode.InvoiceJobVersionConflict)
 			}
 			jobStatusAfter = codemeta.InvoiceOperationStatusManualProcessAllowed.Value
@@ -423,9 +348,6 @@ func (u *AdminJob) ApproveManualUnlock(ctx context.Context, in ApproveManualUnlo
 			}
 		}
 
-		// 稽核：approval_actor_account_id 是本表**唯一**為雙人確認保留的欄位
-		// （chk_invadmaudit_two_person 保證它 ≠ actor）。這裡的 actor 是第二位，
-		// 所以第二人欄填的是**第一位**（發起人）——反過來填會讓稽核上看不出誰先誰後。
 		if _, err := u.appendAudit(ctx, adminAuditInput{
 			ActorAccountID: in.ActorAccountID,
 			Action:         unlockAuditActionApprove,
@@ -443,7 +365,6 @@ func (u *AdminJob) ApproveManualUnlock(ctx context.Context, in ApproveManualUnlo
 			ReasonDetail:   in.Reason,
 			IdempotencyKey: in.IdempotencyKey,
 			Now:            now,
-			// 第二人欄填的是**第一位**（發起人）：本列的 actor 已經是第二位。
 			ApprovalActorAccountID: &unlock.RequestedByAccountID,
 		}); err != nil {
 			return err
@@ -475,7 +396,6 @@ func (u *AdminJob) LatestManualUnlock(ctx context.Context, operationID int64) (M
 	return toManualUnlockView(row, u.now()), true, nil
 }
 
-// toManualUnlockView 把 domain 列折成回應，並把逾期投影成 EXPIRED。
 func toManualUnlockView(u domain.ManualUnlock, now time.Time) ManualUnlockView {
 	return ManualUnlockView{
 		UnlockID:                u.ID,
@@ -491,11 +411,6 @@ func toManualUnlockView(u domain.ManualUnlock, now time.Time) ManualUnlockView {
 	}
 }
 
-// validateUnlockEvidence 驗 1–1000 字。
-//
-// 用 RuneCount 不是 len：查證說明幾乎一定是中文，用 byte 數會讓 334 個中文字就被擋下來，
-// 而 DB 那道 CHECK 用的是 length()（PostgreSQL 的字元數）——兩邊口徑必須一致，否則會出現
-// 「應用層放行、DB 回 23514」的 500。
 func validateUnlockEvidence(s string) error {
 	if isBlank(s) {
 		return ErrUnlockEvidenceRequired
@@ -506,13 +421,6 @@ func validateUnlockEvidence(s string) error {
 	return nil
 }
 
-// validateUnlockEvidenceKind 驗 J28 的證據種類。
-//
-// 兩個方向都要擋，這是本函式存在的理由：
-//   - blocked=true 而沒帶 ⇒ 那一列到了覆核時無法滿足 chk_invop_admin_cancel_needs_confirm，
-//     而**第一個人早就送出了**，錯誤要等第二個人按核准才爆。
-//   - blocked=false 卻帶了 ⇒ 那份證據不會被任何一句 SQL 讀到（CANCELLED_BY_ADMIN 的證據
-//     在 operation 上），收下它就是靜默失效。
 func validateUnlockEvidenceKind(blocked bool, kind, objectKey string) error {
 	if !blocked {
 		if !isBlank(kind) || !isBlank(objectKey) {
@@ -526,13 +434,9 @@ func validateUnlockEvidenceKind(blocked bool, kind, objectKey string) error {
 	if !j28EvidenceKinds[kind] {
 		return ErrUnlockEvidenceKindInvalid
 	}
-	// objectKey 是選填的（截圖／對帳檔才有），但**只收 objectKey 不收 URL**：
-	// 49 號規範的 DB 只存 objectKey。這裡不再驗前綴——與端點 62 的證據上傳共用同一條
-	// 路徑，驗證在那裡（media 的 upload_session 已經保證了 key 的形狀）。
 	return nil
 }
 
-// nilIfBlank 把空白字串折成 NULL（DB 的 CHECK 用 IS NULL 當豁免，空字串不是豁免）。
 func nilIfBlank(s string) *string {
 	if isBlank(s) {
 		return nil
@@ -540,10 +444,6 @@ func nilIfBlank(s string) *string {
 	return &s
 }
 
-// validateUnlockCheckedAt 驗查證時間。
-//
-// 未來時間一律 400：它是「我在某個時點向光貿確認過沒開出去」的事實紀錄，而一個還沒到的
-// 時點不可能發生過。放行它等於讓一列 5 年期的證據自我矛盾。
 func validateUnlockCheckedAt(t, now time.Time) error {
 	if t.IsZero() {
 		return ErrUnlockCheckedAtRequired
@@ -592,7 +492,6 @@ func (u *AdminJob) ReadUnlockEvidence(ctx context.Context, jobID, unlockID int64
 		return UnlockEvidenceFile{}, err
 	}
 	if len(data) == 0 {
-		// media 回了空內容 ⇒ 當成查無，不要把 0 bytes 當附件送出去。
 		return UnlockEvidenceFile{}, jobBiz(bizcode.InvoiceJobNotFound)
 	}
 	if contentType == "" {

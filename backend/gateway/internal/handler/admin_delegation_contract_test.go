@@ -16,13 +16,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// 56 號代行營運工作階段端點（S1–S6）的回應形狀契約。
-//
-// 這裡守的每一條，壞掉之後後端都仍然回 200：前端在 parser 階段就把整份回應判成契約
-// 錯誤（502），操作者看到的是「代行不可用」或「工作階段與剛建立的稽核上下文不相符」，
-// 而 log 裡什麼都沒有。這種失敗只有機械斷言擋得住。
 
-// newDelegationTestContext 建一個可直接餵給 handler 的 gin context。
 func newDelegationTestContext(t *testing.T, method, target, body string) (*httptest.ResponseRecorder, *gin.Context) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
@@ -39,8 +33,6 @@ func newDelegationTestContext(t *testing.T, method, target, body string) (*httpt
 	return w, c
 }
 
-// decodeDelegationEnvelope 取出 envelope 的 code 與 data（data 保留原始 bytes 才驗得了「欄位在
-// 不在」——先解成 map 再看，null 與缺席就分不出來了）。
 func decodeDelegationEnvelope(t *testing.T, body []byte) (int32, json.RawMessage) {
 	t.Helper()
 	var env struct {
@@ -53,7 +45,6 @@ func decodeDelegationEnvelope(t *testing.T, body []byte) (int32, json.RawMessage
 	return env.Code, env.Data
 }
 
-// delegationJSONKeys 回傳 JSON object 的 key 集合（排序後）。
 func delegationJSONKeys(t *testing.T, raw json.RawMessage) []string {
 	t.Helper()
 	var m map[string]json.RawMessage
@@ -93,7 +84,7 @@ func sampleSessionSummary() *accountpb.OperationSessionSummary {
 // 鑑別力：把 DelegationSessionData.CaseReference 的 tag 改成 `json:"caseReference,omitempty"`，
 // 本測試必須失敗。欄位消失（undefined）＝前端 502 ＝操作者進不了工作區。
 func TestDelegationSessionData_CaseReferenceNullSurvives(t *testing.T) {
-	summary := sampleSessionSummary() // 未設定 case_reference
+	summary := sampleSessionSummary()
 	b, err := json.Marshal(toDelegationSessionData(summary))
 	if err != nil {
 		t.Fatalf("序列化失敗：%v", err)
@@ -137,7 +128,6 @@ func TestDelegationSessionData_KeySet(t *testing.T) {
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("SessionSummary 欄位集合漂移：\ngot  %v\nwant %v", got, want)
 	}
-	// 九欄對帳所依賴的欄位逐個點名：漏任一個，操作者建立完就進不了工作區。
 	for _, k := range []string{"caseReference", "issuedAt", "expiresAt", "status", "revision"} {
 		if !strings.Contains(string(b), `"`+k+`"`) {
 			t.Fatalf("九欄對帳欄位 %s 不在回應內；JSON=%s", k, b)
@@ -263,7 +253,7 @@ func TestDelegationAdminEndpoints_RequireAdminIdentity(t *testing.T) {
 
 // S2 的逐欄值域：每一列都是「照 mockup 或照直覺送就會踩到」的那一種。
 func TestCreateDelegatedOperation_BodyValidation(t *testing.T) {
-	const goodKey = "8f0e1c9a-2b74-4c11-9a1e-5d6f7a8b9c01" // gitleaks:allow（UUID 形式的冪等鍵範例）
+	const goodKey = "8f0e1c9a-2b74-4c11-9a1e-5d6f7a8b9c01"
 	body := func(extra string) string {
 		return `{"storeId":"2685914682","reasonCode":"seller_request","capabilities":["storefront.read"],"ttlSeconds":1800` + extra + `}`
 	}
@@ -287,13 +277,6 @@ func TestCreateDelegatedOperation_BodyValidation(t *testing.T) {
 		{"ttlSeconds 越界", goodKey, `{"storeId":"2685914682","reasonCode":"seller_request","capabilities":["storefront.read"],"ttlSeconds":1801,"caseReference":null}`, bizcode.DelegationInvalidCommand},
 		{"ttlSeconds 送 string", goodKey, `{"storeId":"2685914682","reasonCode":"seller_request","capabilities":["storefront.read"],"ttlSeconds":"1800","caseReference":null}`, bizcode.DelegationInvalidCommand},
 
-		// 依賴閉包（#2744）：授權列端一直有這道檢查，工作階段端沒有 —— 而它只驗
-		// 「已知／不重複」，子集本身可以不自洽。9287 而不是 9260：前端要據此自動補上
-		// 缺的那幾項，而 9260 只告訴他「參數不正確」。
-		//
-		// 沒有這道檢查的後果不是「少一道」，是**把失敗延後並換掉主體**：工作階段建得
-		// 起來、憑證發出去，操作者進到編輯畫面才被 orchestrator 的 ReadBefore 以 9262
-		// 擋下，而 9262 的文案是「此代行工作階段未取得該項操作權限」。
 		{"只勾 products.write（缺 products.read）→ 9287", goodKey,
 			`{"storeId":"2685914682","reasonCode":"seller_request","capabilities":["products.write"],"ttlSeconds":1800,"caseReference":null}`,
 			bizcode.DelegationCapabilityDependencyIncomplete},
@@ -333,7 +316,7 @@ func TestRevokeDelegatedOperation_PathAndBody(t *testing.T) {
 			"/api/v1/admin/delegated-operations/abc/revoke", `{"revokeReason":"測試"}`)
 		c.Set("accountId", int64(2701338845))
 		c.Params = gin.Params{{Key: "session_id", Value: "abc"}}
-		c.Request.Header.Set("Idempotency-Key", "8f0e1c9a-2b74-4c11-9a1e-5d6f7a8b9c01") // gitleaks:allow（UUID 形式的冪等鍵範例）
+		c.Request.Header.Set("Idempotency-Key", "8f0e1c9a-2b74-4c11-9a1e-5d6f7a8b9c01")
 		h := &Holder{}
 		h.RevokeDelegatedOperation(c)
 
@@ -351,7 +334,7 @@ func TestRevokeDelegatedOperation_PathAndBody(t *testing.T) {
 			"/api/v1/admin/delegated-operations/2701445580000003/revoke", `{"revokeReason":"   "}`)
 		c.Set("accountId", int64(2701338845))
 		c.Params = gin.Params{{Key: "session_id", Value: "2701445580000003"}}
-		c.Request.Header.Set("Idempotency-Key", "8f0e1c9a-2b74-4c11-9a1e-5d6f7a8b9c01") // gitleaks:allow（UUID 形式的冪等鍵範例）
+		c.Request.Header.Set("Idempotency-Key", "8f0e1c9a-2b74-4c11-9a1e-5d6f7a8b9c01")
 		h := &Holder{}
 		h.RevokeDelegatedOperation(c)
 
@@ -432,7 +415,6 @@ func TestDelegationPreflightData_DeniedFieldsOnlyWhenDenied(t *testing.T) {
 	if !strings.Contains(string(denied), `"deniedCode":9272`) {
 		t.Fatalf("allowed:false 必須帶 deniedCode：%s", denied)
 	}
-	// ttlSeconds／idleSeconds 是 JSON number（值域安全例外）：送 string 直接 502。
 	if !strings.Contains(string(denied), `"ttlSeconds":1800`) || !strings.Contains(string(denied), `"idleSeconds":900`) {
 		t.Fatalf("ttlSeconds／idleSeconds 必須是 JSON number：%s", denied)
 	}
@@ -461,7 +443,6 @@ func TestDelegationCreateAndRedeem_CredentialExposureIsOnlyRedeem(t *testing.T) 
 	if keys := delegationJSONKeys(t, redeem); strings.Join(keys, ",") != "operationCredential,session" {
 		t.Fatalf("redeem data 必須是 credential ＋ session（summary 不攤平），實際 keys=%v", keys)
 	}
-	// session 這一層絕不得帶出憑證。
 	session, _ := json.Marshal(toDelegationSessionData(sampleSessionSummary()))
 	for _, forbidden := range []string{"operationCredential", "handoffCode", "accessToken", "refreshToken", "sellerToken"} {
 		if strings.Contains(string(session), forbidden) {

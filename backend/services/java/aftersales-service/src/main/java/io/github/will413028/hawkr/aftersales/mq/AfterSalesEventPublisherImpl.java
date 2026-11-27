@@ -108,7 +108,6 @@ public class AfterSalesEventPublisherImpl implements AfterSalesEventPublisher {
                     "publishRefundCompleted: REJECT_APPEAL 不應觸發 refund.completed，caseNo=" + caseNo);
         }
         EventPrincipals principals = resolveBestEffort(storeId, buyerId);
-        // 退款完成（REFUND_PROCESSING 40 → CLOSED 50）：發 domain event + 補發賣家工作區 realtime（#1226）
         publishCaseEvent(AfterSalesEventType.REFUND_COMPLETED.value(),
                 buildRefundCompletedPayload(caseNo, orderNo, storeId, buyerId, outcome,
                         refundAmount, paymentMethod, externalRefId, principals),
@@ -191,7 +190,6 @@ public class AfterSalesEventPublisherImpl implements AfterSalesEventPublisher {
                 reason,
                 nowIso8601());
 
-        // 買家提交申訴（→ APPEALED）：發 domain event + 補發賣家工作區 realtime（#1226）
         publishCaseEvent(AfterSalesEventType.APPEAL_SUBMITTED.value(),
                 payload,
                 MqConstants.EVENT_TYPE_AFTERSALES_APPEAL_SUBMITTED,
@@ -202,7 +200,6 @@ public class AfterSalesEventPublisherImpl implements AfterSalesEventPublisher {
     public void publishCaseAutoRejected(String caseNo, String orderNo, Long buyerId,
                                          Long storeId, int originalDeadlineHours) {
         EventPrincipals principals = resolveBestEffort(storeId, buyerId);
-        // 賣家處理逾時自動拒絕（→ REJECTED 60）：發 domain event + 補發賣家工作區 realtime（#1226）
         publishCaseEvent(AfterSalesEventType.CASE_AUTO_REJECTED.value(),
                 buildCaseAutoRejectedPayload(caseNo, orderNo, buyerId, originalDeadlineHours, principals),
                 MqConstants.EVENT_TYPE_AFTERSALES_CASE_AUTO_REJECTED,
@@ -246,7 +243,6 @@ public class AfterSalesEventPublisherImpl implements AfterSalesEventPublisher {
     public void publishCaseAutoEscalated(String caseNo, String orderNo, Long buyerId,
                                           Long storeId, int originalDeadlineHours) {
         EventPrincipals principals = resolveBestEffort(storeId, buyerId);
-        // 賣家處理逾時自動升級（→ APPEALED）：發 domain event + 補發賣家工作區 realtime（#1226）
         publishCaseEvent(AfterSalesEventType.CASE_AUTO_ESCALATED.value(),
                 buildCaseAutoEscalatedPayload(caseNo, orderNo, buyerId, storeId, originalDeadlineHours, principals),
                 MqConstants.EVENT_TYPE_AFTERSALES_CASE_AUTO_ESCALATED,
@@ -304,7 +300,6 @@ public class AfterSalesEventPublisherImpl implements AfterSalesEventPublisher {
                                                   String actor,
                                                   Map<String, Object> extraPayload) {
         EventPrincipals principals = resolveBestEffort(storeId, buyerId);
-        // [B-207] #1181 + #1226：案件狀態流轉 — 發 domain event + 補發賣家工作區 realtime
         publishCaseEvent(routingKey,
                 buildCaseTransitionPayload(caseNo, orderNo, buyerId, storeId, actor, extraPayload, principals),
                 eventType, storeId, orderNo, caseNo);
@@ -375,14 +370,12 @@ public class AfterSalesEventPublisherImpl implements AfterSalesEventPublisher {
                 refundAmount != null ? String.valueOf(refundAmount) : null,
                 nowIso8601());
 
-        // [B-207] #1181 + #1226：平台仲裁決策（非賣家自身操作，需即時刷新）— 發 domain event + 補發賣家工作區 realtime
         publishCaseEvent(AfterSalesEventType.PLATFORM_DECISION_MADE.value(),
                 payload,
                 MqConstants.EVENT_TYPE_AFTERSALES_PLATFORM_DECISION_MADE,
                 storeId, orderNo, caseNo);
     }
 
-    // ==================== 身分欄位解析（issue #2294 P1-2） ====================
 
     /**
      * {@inheritDoc}
@@ -392,8 +385,6 @@ public class AfterSalesEventPublisherImpl implements AfterSalesEventPublisher {
     @Override
     public EventPrincipals resolveEventPrincipals(Long storeId, Long buyerId) {
         Long sellerAccountId = sellerGrpcClient.resolveAccountIdForStore(storeId);
-        // SellerGrpcClient 對非 null storeId 的成功呼叫必回非 null（查無存活店家回 0L），
-        // 因此「storeId 非 null 但結果為 null」⇔「該次 gRPC 失敗」（該 client 內部 catch → 回 null）。
         if (storeId != null && sellerAccountId == null) {
             throw new PrincipalResolutionFailedException("store_id -> seller account_id", storeId);
         }
@@ -437,7 +428,6 @@ public class AfterSalesEventPublisherImpl implements AfterSalesEventPublisher {
         return resolveBestEffort(storeId, buyerId);
     }
 
-    // ==================== 私有方法 ====================
 
     /**
      * 統一 case 事件發送（#1226 根治覆蓋缺口）：發 domain event 到 {@code aftersales.events}
@@ -476,14 +466,6 @@ public class AfterSalesEventPublisherImpl implements AfterSalesEventPublisher {
         if (storeId == null || storeId <= 0) {
             return;
         }
-        // sellerId 直接帶 store_id：gateway 的 SSE 訂閱端
-        // （notification_inbox.go#resolveNotificationUserID）自 2026-08-30、commit 57cefff9f
-        // 起對賣家回傳 current store_id，訂閱 topic 因此是 notification:user:{store_id}，
-        // 而 seller_workspace_channel.go#ResolveTopic 直接拿本 payload 的 sellerId 組發布 topic。
-        //
-        // 這裡曾經把 storeId 反解析成登入 account_id（理由是「SSE topic 是 account_id」——
-        // 該前提已於上述 commit 失效）。兩端空間不同的後果是對 store_id != account_id 的賣家
-        // 100% 送不到，且 Hub 以精確鍵 fan-out ⇒ 查無訂閱者不產生任何錯誤或 log。
         SellerAfterSaleUpdatedPayload payload = new SellerAfterSaleUpdatedPayload(
                 storeId, orderNo, caseNo, "after_sale", null, nowIso8601());
         publish(MqConstants.EXCHANGE_SELLER_WORKSPACE,

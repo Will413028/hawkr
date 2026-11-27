@@ -12,9 +12,6 @@ import 'hk_tap_target.dart';
 /// 舊名稱保留相容；實際為 iOS 26 cream glass chrome。
 const Color kGreenHeaderColor = AppColors.topBarGlass;
 
-// ============================================================================
-// Header 圖示按鈕元件
-// ============================================================================
 
 /// 聊天圖示按鈕
 class HeaderChatIcon extends StatelessWidget {
@@ -65,9 +62,6 @@ class HeaderTextButton extends StatelessWidget {
   }
 }
 
-// ============================================================================
-// 綠色頂部搜尋/導航欄
-// ============================================================================
 
 /// 綠色頂部搜尋/導航欄
 ///
@@ -342,7 +336,6 @@ class GreenHeaderBar extends StatelessWidget {
   Widget _buildRowLayout(BuildContext context) {
     return Row(
       children: [
-        // 左側區域
         if (leading != null)
           leading!
         else if (showBackButton)
@@ -355,12 +348,10 @@ class GreenHeaderBar extends StatelessWidget {
             tooltip: '返回',
           ),
 
-        // 中間區域
         Expanded(
           child: showSearchBar ? _buildSearchBar(context) : _buildTitle(),
         ),
 
-        // 右側區域
         ...?trailing,
       ],
     );

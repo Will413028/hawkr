@@ -40,7 +40,6 @@ test("間隔達到門檻就另起一組", () => {
 	const first = turn(T0730);
 	const later = turn(T0730 + TRANSCRIPT_GROUP_GAP_MS);
 	assert.equal(shouldStartGroup(later, first), true);
-	// 差一毫秒還不算。
 	assert.equal(
 		shouldStartGroup(turn(T0730 + TRANSCRIPT_GROUP_GAP_MS - 1), first),
 		false,
@@ -48,7 +47,6 @@ test("間隔達到門檻就另起一組", () => {
 });
 
 test("跨日一律另起一組，即使只差幾分鐘", () => {
-	// 台北 2026-08-17 23:58 → 2026-08-18 00:03，只差 5 分鐘但換日了。
 	const before = turn(Date.UTC(2026, 7, 17, 15, 58));
 	const after = turn(Date.UTC(2026, 7, 17, 16, 3));
 	assert.ok(after.createdAt - before.createdAt < TRANSCRIPT_GROUP_GAP_MS);
@@ -59,7 +57,6 @@ test("createdAt 為 0（還原的舊對話沒有時間）不插分隔線，也�
 	const unknown = turn(0);
 	assert.equal(shouldStartGroup(unknown, undefined), false);
 	assert.equal(shouldStartGroup(unknown, turn(T0730)), false);
-	// 前一則沒有時間、這一則有 → 這一則自己開一組。
 	assert.equal(shouldStartGroup(turn(T0730), unknown), true);
 });
 
@@ -82,7 +79,6 @@ test("氣泡裡不再各自掛時間戳——時間只存在於分組分隔線",
 	assert.match(chat, /shouldStartGroup\(turn, turns\[index - 1\]\)/);
 	assert.match(chat, /className="thread-page__separator"/);
 
-	// workspace 不再印寫死的「今天」——那是一個不看資料的假標籤。
 	const workspace = readFileSync(
 		path.join(root, "features/procurement-assistant/AssistantWorkspace.tsx"),
 		"utf8",

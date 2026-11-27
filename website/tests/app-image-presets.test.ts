@@ -52,9 +52,6 @@ test("home origin stories preserve still-image ratios and GIF animation", () => 
 		originStory,
 		/preset=\{postCardPresetForMedia\(imageSrc, "detail"\)\}/,
 	);
-	// 6ea7a4e3 起照片改由自身尺寸決定（intrinsic width/height + max-w/max-h），
-	// 不再是 fill 填滿固定框。斷言收斂成本測真正要守的那件事——still image 仍走
-	// object-contain 不被裁切——而不是整串 className 的字面值。
 	assert.match(originStory, /max-h-full w-auto max-w-full[^"]*object-contain/);
 	assert.match(
 		originStory,
@@ -77,8 +74,6 @@ test("home origin stories preserve still-image ratios and GIF animation", () => 
 test("seller covers and campaign banners retain the banner derivative", () => {
 	const bannerSurfaces = [
 		["features/seller/components/SellerCoverMedia.tsx", 2],
-		// Recommended-seller cards render the same canonical 4:1 cover as the
-		// storefront. The 4:3 `card` transform would crop it before layout.
 		["features/home/components/HomeCompactMerchants.tsx", 1],
 		["components/shared/banner/BannerCarousel.tsx", 1],
 		["components/shared/banner/BannerPopupDialog.tsx", 1],

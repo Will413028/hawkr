@@ -9,20 +9,12 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// streamConfig 是串流傳輸的常數。全部是估計值，不是量測值（step-2b-design.md 的常數段）；經 web host 反代與 Cloudflare 的實際行為需另行實測。
 type streamConfig struct {
-	// HeartbeatEvery：來源閒置這麼久就寫一個 Heartbeat（每次寫出任何 frame 後重新計時）。與三端 client 舊 WebSocket 的 15 秒相同，
-	// client 的「30 秒沒有任何 frame 判定半開」容忍錯過一個心跳（step-2b-design.md §5.2）。
 	HeartbeatEvery time.Duration
-	// RecheckEvery：重新驗證 session 與身分的間隔（step-5-design.md §5.3）。
 	RecheckEvery time.Duration
-	// MaxLifetime：串流的最長壽命（step-5-design.md §5.3），到期正常結束，client 用最後的 seq 重連。
 	MaxLifetime time.Duration
-	// LifetimeJitter：壽命的抖動比例（±10%），每條串流各取一次，避免同時開的串流同時重連。
 	LifetimeJitter float64
-	// WriteTimeout：每次寫 frame 的期限；逾時結束串流，慢 client 不佔著連線。server 不設全域 WriteTimeout（會切斷所有串流）。
 	WriteTimeout time.Duration
-	// MaxGuardFailures：重新驗證連續暫時失敗幾次就以 unavailable 結束。
 	MaxGuardFailures int
 }
 
@@ -33,14 +25,12 @@ func defaultStreamConfig() streamConfig {
 	}
 }
 
-// streamTimer 是 time.Timer 的最小介面，測試換成手動到期的假計時器。
 type streamTimer interface {
 	C() <-chan time.Time
 	Reset(d time.Duration)
 	Stop()
 }
 
-// streamClock 是串流用到的時間來源。
 type streamClock struct {
 	Now      func() time.Time
 	NewTimer func(d time.Duration) streamTimer
@@ -56,28 +46,19 @@ func realClock() streamClock {
 	return streamClock{Now: time.Now, NewTimer: func(d time.Duration) streamTimer { return realTimer{time.NewTimer(d)} }}
 }
 
-// streamSpec 是一條串流的輸入，與 im 無關：事件型別 E 由來源決定。
 type streamSpec[E any] struct {
 	Config streamConfig
 	Clock  streamClock
-	// Jitter 回傳 [0, 1) 的亂數，壽命以它取抖動。
 	Jitter func() float64
-	// Next 阻塞到下一個事件；ctx 取消要返回，且取消時不得丟掉待處理的事件（Subscription.Next 的語意）。只由 runStream 的單一 goroutine 呼叫。
 	Next func(ctx context.Context) (E, error)
-	// Write 寫出一個事件的 frame（info 是這一條串流的實際設定，Ready 要帶）；Heartbeat 寫出心跳 frame。
 	Write     func(E, streamInfo) error
 	Heartbeat func() error
-	// Guard 重新驗證呼叫者（session、身分、店家），成功後自己把新身分交給來源；回 unauthenticated 結束串流，其他錯誤算暫時失敗。
 	Guard func(ctx context.Context) error
-	// SetWriteDeadline 設定底層連線的寫入期限（零值是取消）。
 	SetWriteDeadline func(time.Time) error
-	// Close 釋出來源（一定會呼叫，且早於 runStream 返回）。
 	Close func()
-	// Classify 判斷錯誤是不是來源自己的結束（例如模組的 Ended），是的話回對外的錯誤與 true。
 	Classify func(error) (error, bool)
 }
 
-// streamInfo 是這一條串流的實際值：壽命已含抖動。
 type streamInfo struct {
 	HeartbeatEvery time.Duration
 	MaxLifetime    time.Duration
@@ -88,12 +69,6 @@ type pulled[E any] struct {
 	err error
 }
 
-// runStream 跑一條串流直到結束；回 nil 表示壽命到期的正常結束。
-//
-// 並行結構：一個 pump goroutine 專門呼叫 Next（Next 只能單一 goroutine 呼叫）並經不緩衝的 channel 交給主迴圈；主迴圈以 select
-// 同時等事件、閒置計時、重驗計時與壽命，寫 frame 與 Guard 都在主迴圈（不與 Next 並行）。Guard 與 Close 可以和 Next 並行，
-// 所以 Guard 期間 pump 照常拉取。計時不靠「Next 帶短 timeout 輪詢」：Next 在 ctx 取消時待處理事件留在訂閱裡（take 之後處理失敗會 requeue、
-// 已備好的 out 不會被取走），所以只在結束時取消 pump 的 ctx，不會丟事件。
 func runStream[E any](ctx context.Context, s streamSpec[E]) error {
 	cfg := s.Config
 	pumpCtx, stop := context.WithCancel(ctx)
@@ -188,5 +163,4 @@ func runStream[E any](ctx context.Context, s streamSpec[E]) error {
 	}
 }
 
-// 壽命的亂數來源（正式用 math/rand/v2）。
 func randFloat() float64 { return rand.Float64() } //nolint:gosec // 壽命抖動只用來錯開重連時間，不是安全用途

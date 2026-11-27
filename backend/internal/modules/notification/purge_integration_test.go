@@ -14,13 +14,11 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
-// recipient 是測試裡的一個收件人（帳號、受眾、店）與它的通知資料：每個收件人有收件匣列、帶送出文字的投遞紀錄與一個意圖。
 type recipient struct {
 	name     string
 	account  int64
 	audience string
 	storeID  int64
-	// intents 是這個收件人的意圖冪等鍵。
 	intents []string
 }
 
@@ -64,9 +62,6 @@ func prefCount(t *testing.T, f *fixture, account int64, audience string) int {
 	return f.count(t, `SELECT count(*) FROM notification.preference_overrides WHERE account_id = $1 AND audience = $2`, account, audience)
 }
 
-// seedRecipients 建 5 個收件人的資料，全部走真正的管線：
-// A/BUYER、A/STORE 店 11、A/STORE 店 12（同帳號的另一間店）、B/BUYER、B/STORE 店 21；
-// 每個收件人都有收件匣與帶送出文字的投遞紀錄，每個帳號與受眾有一列偏好覆寫。
 func seedRecipients(t *testing.T, f *fixture) (a, b int64, rs map[string]recipient) {
 	t.Helper()
 	a, b = f.newAccount(t), f.newAccount(t)
@@ -114,10 +109,8 @@ func seedRecipients(t *testing.T, f *fixture) (a, b int64, rs map[string]recipie
 func TestPurgeAfterEachDeletionEvent(t *testing.T) {
 	type scenario struct {
 		name string
-		// publish 發布事件並回傳預期排出的 job 範圍。
 		publish func(t *testing.T, f *fixture, a int64) purge.RecipientArgs
 		gone    []string
-		// prefsGone 是偏好被刪的 (帳號, 受眾)：偏好是帳號與受眾的，沒有店別。
 		prefsGone []string
 	}
 	scenarios := []scenario{
@@ -163,7 +156,7 @@ func TestPurgeAfterEachDeletionEvent(t *testing.T) {
 				return purge.RecipientArgs{AccountID: a, Audience: "STORE", StoreID: 11}
 			},
 			gone:      []string{"A/STORE11"},
-			prefsGone: nil, // 偏好沒有店別：同帳號重開的店仍在用，StoreRetired 不刪偏好。
+			prefsGone: nil,
 		},
 	}
 	for _, sc := range scenarios {
@@ -236,7 +229,6 @@ func TestPurgeAfterEachDeletionEvent(t *testing.T) {
 					t.Errorf("%s 的偏好覆寫 %d 列，預期 %d", p.key, n, want)
 				}
 			}
-			// 重跑不改變結果、不出錯（job 重試）。
 			if err := f.module.purge.Recipient(context.Background(), jobs[0]); err != nil {
 				t.Fatalf("重跑清除：%v", err)
 			}
@@ -272,7 +264,6 @@ func TestIntentProcessedAfterBuyerDeletedOrStoreRetiredCreatesNothing(t *testing
 		if f.inboxCount(t, kept) != 1 || f.count(t, `SELECT count(*) FROM notification.deliveries WHERE account_id = $1`, kept) != 2 {
 			t.Fatal("其他買家的通知要照常寫入")
 		}
-		// 略過的意圖沒有收件匣連結與投遞紀錄，清除 job 找不到它，Process 略過時自己把參數換成 '{}'（D16）；寫入的那筆保留參數。
 		if n := f.count(t, `SELECT count(*) FROM notification.intents WHERE params <> '{}'::jsonb`); n != 1 {
 			t.Fatalf("買家關閉後才處理的意圖參數要清掉，還有 %d 筆非空（預期只剩寫入的那一筆）", n)
 		}
@@ -299,7 +290,6 @@ func TestIntentProcessedAfterBuyerDeletedOrStoreRetiredCreatesNothing(t *testing
 	})
 }
 
-// retentionFixture 在固定時鐘下直接寫資料：每筆的年齡是相對 now 的天數。
 type retentionFixture struct {
 	f   *fixture
 	now time.Time
@@ -328,7 +318,6 @@ func (r *retentionFixture) delivery(t *testing.T, intent uuid.UUID, ageDays int)
 	return id
 }
 
-// inbox 寫一列收件匣：建立得很早，保留期看 updatedDays（最後一次合併）。
 func (r *retentionFixture) inbox(t *testing.T, updatedDays int, linked ...uuid.UUID) uuid.UUID {
 	id := uuid.NewV7()
 	r.f.mustExec(t, `INSERT INTO notification.inbox_items (id, account_id, audience, type, params, occurred_at, created_at, updated_at) VALUES ($1, 1, 'BUYER', 'test_push', '{}', $2, $2, $3)`, id, r.ago(400), r.ago(updatedDays))
@@ -386,7 +375,6 @@ func TestRetentionSweepDeletesExpiredRowsOnly(t *testing.T) {
 	if n := r.f.count(t, `SELECT count(*) FROM notification.inbox_item_intents`); n != 0 {
 		t.Errorf("意圖被刪時連結要跟著刪，還剩 %d 筆", n)
 	}
-	// 第二次沒有東西可刪。
 	again, err := r.svc.Sweep(context.Background())
 	if err != nil || again != (purge.Swept{}) {
 		t.Fatalf("重跑 = %+v、%v，預期什麼都不刪", again, err)

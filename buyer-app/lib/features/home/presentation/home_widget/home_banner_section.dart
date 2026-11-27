@@ -125,8 +125,6 @@ class _HomeBannerSectionState extends State<HomeBannerSection> {
         final cardWidth = (width - gutter * 2)
             .clamp(0.0, double.infinity)
             .toDouble();
-        // 卡片固定 16:9；高度隨卡片寬度換算，不再 clamp，
-        // 避免高度被壓扁成扁條、圖片被 BoxFit.cover 裁掉上下。
         const bannerAspectRatio = 16 / 9;
         final bannerHeight = cardWidth / bannerAspectRatio;
 

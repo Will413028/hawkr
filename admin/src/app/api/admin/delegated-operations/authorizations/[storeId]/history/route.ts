@@ -49,8 +49,6 @@ export async function GET(request: NextRequest, context: Context) {
 	const adminToken = await adminSession.token(request);
 	if (!adminToken) return unauthorized();
 
-	// gateway 對越界分頁明確回 9260 而不是靜默夾值，這一層跟著擋：把一個必然被拒的
-	// 請求送出去，只換來一句與分頁無關的通用錯誤。
 	const page = boundedPageParam(
 		request.nextUrl.searchParams.get("page"),
 		999999,

@@ -156,7 +156,6 @@ export async function settleReplyFailure(
 			const latest = await reload(inquiryId);
 			if (!latest.canReply) return { kind: "closed", latest };
 		} catch {
-			// 重讀失敗：維持原本的伺服器文字。
 		}
 	}
 	if (failure.kind === "fields") {

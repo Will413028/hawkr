@@ -68,7 +68,5 @@ public class OkHttpUberTransport implements UberHttpTransport {
             String contentType = response.header("Content-Type");
             return new UberHttpResponse(response.code(), contentType, bytes);
         }
-        // 🔴 逾時在 OkHttp 是 InterruptedIOException（IOException 的子類）⇒ 原樣往上拋。
-        //    包成假的 5xx 或吞掉都會讓呼叫端分不出「確定失敗」與「不知道」。
     }
 }

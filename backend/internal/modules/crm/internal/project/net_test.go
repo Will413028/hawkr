@@ -7,11 +7,10 @@ import (
 )
 
 type ev struct {
-	kind   string // "order" | "partial" | "full"
+	kind   string
 	amount int64
 }
 
-// replay 依序套用事件（同一單、同一位客戶），回傳最後的 state 與累計的 total_spent（每一步加 Delta，與 SQL 的 total_spent + delta 相同）。
 func replay(events []ev) (state, int64, int64) {
 	var s state
 	var total int64

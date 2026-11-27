@@ -67,7 +67,6 @@ function estimateDelivery(method: string): string {
 	} else {
 		return "";
 	}
-	// 「+N 天」是純毫秒位移（與時區無關），呈現才固定台北牆上時間。
 	const from = formatTaipeiMonthDay(now + minDays * 86400000);
 	const to = formatTaipeiMonthDay(now + maxDays * 86400000);
 	return `${from} – ${to}`;
@@ -92,16 +91,9 @@ export function ShippingMethodGroup({
 	const grouped = React.useMemo(() => groupOptions(options), [options]);
 	const groupKeys = Array.from(grouped.keys());
 
-	// 預估到貨日只在 client 掛載後計算：estimateDelivery 用 new Date()，
-	// server 端 render 與 client 端 render 取到的「今天」會不同，直接算會造成
-	// hydration mismatch。故 server 端一律不算、等 client 掛載後才填。
 	const [mounted, setMounted] = React.useState(false);
 	React.useEffect(() => setMounted(true), []);
 
-	// Row identity matches BOTH method and deliveryTemp — TAQBIN returns
-	// three rows sharing the same method, so a method-only compare
-	// activated all three rows (and the cart summary picked the first
-	// match's fee, which is why a frozen NT$290 pick rendered as 205).
 	const isRowActive = React.useCallback(
 		(o: AvailableShippingOption) =>
 			o.shippingMethod === selectedMethod &&
@@ -109,7 +101,6 @@ export function ShippingMethodGroup({
 		[selectedMethod, selectedDeliveryTemp],
 	);
 
-	// First render: expand the group containing the selected method, or the first.
 	const initialExpand = React.useMemo(() => {
 		const own = groupKeys.find((k) =>
 			(grouped.get(k) ?? []).some((o) => o.shippingMethod === selectedMethod),

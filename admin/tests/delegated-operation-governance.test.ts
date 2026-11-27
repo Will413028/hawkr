@@ -10,7 +10,6 @@ import {
 	parseDelegatedSessionRevocation,
 } from "../src/features/delegated-operations/governance";
 
-// 後端契約（56 §6.1.11）。這是契約證據，不是開發用假資料。
 const auditEntry = {
 	auditLogId: "7494008268352651264",
 	createdAt: "2026-08-14T12:33:23Z",
@@ -83,7 +82,6 @@ test("稽核列 parser 收下全部治理欄位，並保留後端下發的 label
 	assert.equal(entry.actionLabel, "更新店面資料");
 	assert.equal(entry.changedFields[0].label, "聯絡電話");
 	assert.equal(entry.notifiedAt, null);
-	// beforeSnapshot／afterSnapshot 沒有 API 出口，DTO 也不得長出這兩欄。
 	assert.equal("beforeSnapshot" in entry, false);
 	assert.equal("afterSnapshot" in entry, false);
 });
@@ -127,7 +125,6 @@ test("失敗列帶著後端下發的業務碼說明，前端不自建碼→文�
 });
 
 test("bizCodeLabel 缺席退回空字串（gateway 尚未 promote 的窗口），型別錯仍整頁失敗", () => {
-	// 缺欄整頁報錯的代價不對等：為了一行補充說明擋掉整份稽核紀錄。畫面退回只顯示原碼。
 	const { bizCodeLabel: _omitted, ...withoutLabel } = auditEntry;
 	const page = parseDelegatedAuditLogPage({
 		records: [withoutLabel],
@@ -206,8 +203,6 @@ test("摘要 parser 是冪等的：同一份資料會被 BFF 與瀏覽器各解�
 	assert.ok(first);
 	assert.equal(first.pendingAuditCount, 1);
 	assert.equal(first.auditRetentionDays, 730);
-	// 第二次看到的是第一次的產物（計數已是 number）。不冪等的症狀是治理頁永遠
-	// 顯示「摘要格式不完整」，而兩邊各自單看都正確。
 	const second = parseDelegatedSessionReport(first);
 	assert.deepEqual(second, first);
 });
@@ -284,7 +279,6 @@ test("篩選為空時不送出該參數——送空值會被值域檢查判為 9
 	assert.equal(filtered.get("resource_type"), "product");
 	assert.equal(filtered.get("result"), "PENDING");
 	assert.equal(filtered.get("date_from"), "2026-08-14T00:00:00Z");
-	// 超上限夾到 50：後端對超上限回 9260，前端不該用一個必被拒絕的值去問。
 	assert.equal(filtered.get("page_size"), "50");
 });
 
@@ -354,12 +348,9 @@ test("三支治理端點都經專用 BFF，並打到 requireAdmin 的 gateway �
 	assert.match(upstream, /\/summary/u);
 	assert.match(upstream, /\/revoke/u);
 	for (const route of [auditRoute, summaryRoute, revokeRoute]) {
-		// 治理三支的身分是 ADM session；帶 operation credential 就會把跨工作階段的
-		// 讀取面交給憑證持有者。
 		assert.doesNotMatch(route, /operationSession/u);
 		assert.match(route, /adminSession\.token\(request\)/u);
 	}
-	// 撤銷是 mutation：同源 ＋ XHR ＋ 冪等鍵，三者缺一不可。
 	assert.match(revokeRoute, /isSameOriginSubmission/u);
 	assert.match(revokeRoute, /x-requested-with/u);
 	assert.match(revokeRoute, /idempotencyKey/u);

@@ -1,5 +1,4 @@
 -- name: InsertCase :one
--- 開案（分案或移動時，這家店的這個類別沒有進行中的案件）；cases_one_open 是保底：呼叫方已鎖住店家列，同一家店的分案、移動、結案彼此串行。
 INSERT INTO seller.cases (id, store_id, category, severity, opened_at, opened_by_admin_id, updated_at)
 VALUES (sqlc.arg(id), sqlc.arg(store_id), sqlc.arg(category), sqlc.arg(severity), sqlc.arg(now), sqlc.arg(admin_id), sqlc.arg(now))
 RETURNING *;
@@ -16,7 +15,6 @@ WHERE id = $1
 FOR UPDATE;
 
 -- name: LockCases :many
--- 依 id 升序鎖定一批案件（鎖順序：店家列、通報列、案件列（id 升序）、措施列）。
 SELECT *
 FROM seller.cases
 WHERE id = ANY(sqlc.arg(ids)::uuid[])
@@ -24,40 +22,34 @@ ORDER BY id
 FOR UPDATE;
 
 -- name: LockOpenCase :one
--- 鎖定這家店這個類別進行中的案件（沒有時 0 列）。
 SELECT *
 FROM seller.cases
 WHERE store_id = sqlc.arg(store_id) AND category = sqlc.arg(category) AND closed_at IS NULL
 FOR UPDATE;
 
 -- name: OpenCaseOf :one
--- 這家店這個類別進行中的案件（不鎖；呼叫方已鎖住店家列，所有改案件的指令都先鎖店家，所以讀到之後不會被別人關閉或另開）。
 SELECT *
 FROM seller.cases
 WHERE store_id = sqlc.arg(store_id) AND category = sqlc.arg(category) AND closed_at IS NULL;
 
 -- name: OpenCasesOfStore :many
--- 這家店全部進行中的案件（每個類別最多一個；不鎖，同 OpenCaseOf）：分案與移動的去處。
 SELECT *
 FROM seller.cases
 WHERE store_id = sqlc.arg(store_id) AND closed_at IS NULL;
 
 -- name: CaseReportIDs :many
--- 案件的成員，舊到新。
 SELECT id
 FROM seller.reports
 WHERE case_id = $1
 ORDER BY created_at, id;
 
 -- name: BumpCase :exec
--- 案件層級的處理（成員進出、成員有了結果）：版本加一，updated_at 是上一次處理的時間。
 UPDATE seller.cases
 SET version = version + 1,
     updated_at = sqlc.arg(now)::timestamptz
 WHERE id = sqlc.arg(id);
 
 -- name: DecideCase :one
--- 決定即結案；只在進行中、版本相符時寫入，否則 0 列。
 UPDATE seller.cases
 SET closed_at = sqlc.arg(now)::timestamptz,
     closed_by_admin_id = sqlc.arg(admin_id)::bigint,
@@ -70,7 +62,6 @@ WHERE id = sqlc.arg(id) AND version = sqlc.arg(expected_version)::bigint AND clo
 RETURNING *;
 
 -- name: CloseEmptyCase :one
--- 通報都移走的案件以 NO_REPORTS 自動關閉（不算決定）；案件還有成員或已結案時 0 列。呼叫方已鎖住案件列。
 UPDATE seller.cases c
 SET closed_at = sqlc.arg(now)::timestamptz,
     closed_by_admin_id = sqlc.arg(admin_id)::bigint,
@@ -81,7 +72,6 @@ WHERE c.id = sqlc.arg(id) AND c.closed_at IS NULL AND NOT EXISTS (SELECT 1 FROM 
 RETURNING *;
 
 -- name: ChangeCaseSeverity :one
--- 改嚴重度；只在進行中、版本相符時寫入，否則 0 列。
 UPDATE seller.cases
 SET severity = sqlc.arg(severity)::text,
     version = version + 1,
@@ -90,7 +80,6 @@ WHERE id = sqlc.arg(id) AND version = sqlc.arg(expected_version)::bigint AND clo
 RETURNING *;
 
 -- name: CasesByIDs :many
--- 一批案件加上店名（個資清理之後是 NULL）、店家是否已關閉與個資是否已清理。
 SELECT sqlc.embed(c),
        s.store_name AS store_name,
        (s.status = 'CLOSED')::bool AS store_closed,
@@ -101,8 +90,6 @@ WHERE c.id = ANY(sqlc.arg(ids)::uuid[])
 ORDER BY c.opened_at DESC, c.id DESC;
 
 -- name: AdminCases :many
--- admin 的案件清單：開案時間新到舊（keyset），篩選條件為 NULL 時不篩；state 是 OPEN 或 CLOSED（與 model.Case.Open 同一個定義）；
--- awaiting_seller 為 true 只列進行中而且有還沒結束的詢問的案件（與 model.Case.AwaitingSeller、OpenCaseInquiries 同一個定義）。
 SELECT sqlc.embed(c),
        s.store_name AS store_name,
        (s.status = 'CLOSED')::bool AS store_closed,
@@ -124,7 +111,6 @@ ORDER BY c.opened_at DESC, c.id DESC
 LIMIT sqlc.arg(page_size);
 
 -- name: CaseReportCounts :many
--- 每個案件的成員數、還沒有結果的成員數、結果是已採取措施的成員數，與有補充還沒被管理員看過的成員數（還沒有結果，而且存在編號大於通報的 supplements_seen_seq 的補充；與 model.Report.HasUnseenSupplements 同一個定義）。
 SELECT c.id AS case_id,
        agg.report_count,
        agg.unresolved_count,
@@ -143,9 +129,6 @@ CROSS JOIN LATERAL (
 WHERE c.id = ANY(sqlc.arg(case_ids)::uuid[]);
 
 -- name: CaseMeasureCounts :many
--- 每個案件導出的措施數（不論狀態）與其中未撤銷的數目。措施 m 是案件 C 導出的 ⇔ m.source_case_id = C，或 m 依據的認定（含引用的既有認定）以 C 的通報為來源
--- （measure_findings → finding_reports → reports.case_id）。這個定義有兩處 SQL：這裡與 ListMeasures 的 source_case_id 篩選（measures.sql），由資料集測試鎖住一致。
--- 沒有導出措施的案件不出現在結果裡（呼叫方當成 0）。
 SELECT d.case_id,
        count(*)::int AS resulting_measures,
        (count(*) FILTER (WHERE d.status = 'ENFORCED'))::int AS unrevoked_measures
@@ -168,16 +151,12 @@ INSERT INTO seller.report_case_moves (id, report_id, store_id, from_case_id, to_
 VALUES (sqlc.arg(id), sqlc.arg(report_id), sqlc.arg(store_id), sqlc.arg(from_case_id), sqlc.arg(to_case_id), sqlc.arg(admin_id), sqlc.arg(now));
 
 -- name: CaseMoves :many
--- 移入或移出這個案件的移動，舊到新。
 SELECT *
 FROM seller.report_case_moves
 WHERE from_case_id = $1 OR to_case_id = $1
 ORDER BY moved_at, id;
 
 -- name: ReviewCaseDecisionByIDs :many
--- 這些案件的「待決定」開始時間與期限（資源的 decide_deadline）。規則只有 seller.review_case_decision(at)（objects.sql）；不是待決定的案件
--- （已結案、等賣家回覆）沒有列。
--- 輸出欄位的轉型是給 sqlc 的（它不型別化複合型別函式的輸出欄位，沒有轉型會在生成時報 column does not exist）。
 SELECT r.case_id::uuid AS case_id, r.start_at::timestamptz AS start_at, r.due_at::timestamptz AS due_at
 FROM seller.review_case_decision(sqlc.arg(at)::timestamptz) r
 WHERE r.case_id = ANY(sqlc.arg(ids)::uuid[]);

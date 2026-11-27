@@ -50,7 +50,6 @@ class FloatingToast {
     bool isSuccess = true,
     Duration duration = const Duration(seconds: 2),
   }) {
-    // 移除現有的 toast（避免重疊）
     _currentEntry?.remove();
     _currentEntry = null;
 
@@ -98,7 +97,6 @@ class FloatingToast {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Icon 在上方 (24x24)
                     Icon(
                       icon ??
                           (isSuccess ? AppIcons.check : AppIcons.errorOutline),
@@ -108,7 +106,6 @@ class FloatingToast {
                           : AppIconColors.danger,
                     ),
                     const SizedBox(height: 12),
-                    // 文字在下方
                     Text(
                       message,
                       textAlign: TextAlign.center,
@@ -210,7 +207,6 @@ class FloatingToast {
     Color iconColor = AppColors.textPrimary,
     Duration duration = const Duration(seconds: 2),
   }) {
-    // 移除現有的 toast（避免重疊）
     _currentEntry?.remove();
     _currentEntry = null;
 
@@ -258,10 +254,8 @@ class FloatingToast {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Icon 在上方
                     Icon(icon, size: iconSize, color: iconColor),
                     const SizedBox(height: 12),
-                    // 文字在下方
                     Text(
                       message,
                       textAlign: TextAlign.center,

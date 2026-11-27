@@ -34,7 +34,6 @@ void main() {
     expect(find.byKey(const Key('ready-application')), findsOneWidget);
     expect(completionCount, 0);
 
-    // Let the post-frame bootstrap continuation start the fade controller.
     await tester.pump(const Duration(milliseconds: 1));
     await tester.pump(const Duration(milliseconds: 100));
     await tester.pump();

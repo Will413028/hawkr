@@ -17,7 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/seal/sealtest"
 )
 
-// purgeHold 停住一次清理：某一段清理的第一個語句鎖住候選之後（hook）停在那裡，直到 release。
 type purgeHold struct {
 	locked  chan struct{}
 	proceed chan struct{}
@@ -26,13 +25,11 @@ type purgeHold struct {
 	err     error
 }
 
-// holdPurgeAfterCandidates 在背景跑一次 PurgePII，停在第一段清理（退場）「候選已鎖住、再判斷之前」；回傳時清理已經停在那裡。
 func (f *fixture) holdPurgeAfterCandidates(t *testing.T) *purgeHold {
 	t.Helper()
 	return f.holdPurgeStage(t, f.module.SetPurgeAfterCandidates)
 }
 
-// holdPurgeStageTwoAfterCandidates 同上，停在第二段清理（個資）。
 func (f *fixture) holdPurgeStageTwoAfterCandidates(t *testing.T) *purgeHold {
 	t.Helper()
 	return f.holdPurgeStage(t, f.module.SetPurgeAfterPurgeCandidates)
@@ -61,7 +58,6 @@ func (f *fixture) holdPurgeStage(t *testing.T, set func(func())) *purgeHold {
 	return h
 }
 
-// release 放行清理並等它結束。
 func (h *purgeHold) release(t *testing.T) {
 	t.Helper()
 	close(h.proceed)
@@ -73,13 +69,11 @@ func (h *purgeHold) release(t *testing.T) {
 	must(t, h.err)
 }
 
-// lockWaiters 是此刻在等鎖的連線數。
 func (f *fixture) lockWaiters(t *testing.T) int64 {
 	t.Helper()
 	return f.count(t, "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'")
 }
 
-// waitBlocked 等到有一條連線在等鎖，或 done 結束（沒有被擋住）；回傳是否被擋住。
 func (f *fixture) waitBlocked(t *testing.T, done <-chan struct{}) bool {
 	t.Helper()
 	deadline := time.After(10 * time.Second)
@@ -108,30 +102,28 @@ func TestPurgeRechecksTheAppealHoldAfterLockingTheCandidates(t *testing.T) {
 	_, err := f.module.CloseCurrent(ctx, accountID)
 	must(t, err)
 	closedAt := f.now
-	f.now = closedAt.Add(10 * 24 * time.Hour) // 終止晚於舊 stint 關店：申覆期限（生效後 184 天）才晚於保留期（關店後 184 天，同值）
+	f.now = closedAt.Add(10 * 24 * time.Hour)
 	second, err := f.module.Apply(ctx, validApply(accountID))
 	must(t, err)
 	m := f.terminate(t, second.StoreID, GroundOtherSerious)
 	f.effect(t, m)
-	f.now = closedAt.Add(StoreRetention + time.Hour) // 舊 stint 關閉超過保留期，終止的申覆期限還沒到
+	f.now = closedAt.Add(StoreRetention + time.Hour)
 
-	writer, err := f.db.Pool().Begin(ctx) // 連線 B：插入待處理的申覆，不鎖店家列、不 commit
+	writer, err := f.db.Pool().Begin(ctx)
 	must(t, err)
 	defer func() { _ = writer.Rollback(ctx) }()
 	_, err = writer.Exec(ctx, `INSERT INTO seller.measure_requests (id, measure_id, kind, state, reason, revision, submitted_at, basis)
 		SELECT gen_random_uuid(), id, 'APPEAL', 'PENDING', '異議', current_revision, $2, basis FROM seller.measures WHERE id = $1`, m.ID, f.now)
 	must(t, err)
 
-	h := f.holdPurgeAfterCandidates(t) // 連線 A：第一個語句看不到 B 的插入，鎖住舊 stint
-	must(t, writer.Commit(ctx))        // B 在 A 的第一個語句之後 commit
+	h := f.holdPurgeAfterCandidates(t)
+	must(t, writer.Commit(ctx))
 	h.release(t)
 	if h.n != 0 || f.purged(t, old.StoreID) {
 		t.Fatalf("再判斷看到 hold，舊 stint 不能被清（n=%d）", h.n)
 	}
 }
 
-// pushBackAppealDeadline 以另一條連線 commit 一個「帳號上更晚才生效的終止合作」（把唯一一筆終止的 starts_at 與 created_at 移到現在），讓時間條件
-// （關店後 hours 與帳號上最晚的申覆期限，RetireDueStores 的 due_after）變成不成立；它不碰店家列，所以不被清理鎖住的候選擋住。
 func (f *fixture) pushBackAppealDeadline(t *testing.T, measureID any) {
 	t.Helper()
 	_, err := f.db.Pool().Exec(context.Background(), "UPDATE seller.measures SET starts_at = $2, created_at = $2 WHERE id = $1", measureID, f.now)
@@ -145,7 +137,7 @@ func TestRetireRechecksTheDueTimeAfterLockingTheCandidates(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	_, s, m := f.terminated(t, GroundCeasedBusiness)
-	f.now = m.StartsAt.Add(4416*time.Hour + time.Hour) // 申覆期限與關店後的期間都已過：到期
+	f.now = m.StartsAt.Add(4416*time.Hour + time.Hour)
 	h := f.holdPurgeAfterCandidates(t)
 	f.pushBackAppealDeadline(t, m.ID)
 	h.release(t)
@@ -161,7 +153,7 @@ func TestPurgeRechecksTheDueTimeAfterLockingTheCandidates(t *testing.T) {
 	f := setup(t)
 	_, s, m := f.terminated(t, GroundCeasedBusiness)
 	f.now = m.StartsAt.Add(4416*time.Hour + time.Hour)
-	h := f.holdPurgeStageTwoAfterCandidates(t) // 同一輪先退場（第一段，到期時間相同），再停在第二段
+	h := f.holdPurgeStageTwoAfterCandidates(t)
 	f.pushBackAppealDeadline(t, m.ID)
 	h.release(t)
 	if !f.retired(t, s.StoreID) {
@@ -183,7 +175,7 @@ func TestAppealAfterTheRetirementLockedTheStoreSeesItRetired(t *testing.T) {
 	deadline := m.StartsAt.Add(4416 * time.Hour)
 	mac := sealtest.MAC(t)
 	early := f.newModuleClock(t, f.jobs, mac, func() time.Time { return deadline.Add(-time.Hour) })
-	f.now = deadline.Add(time.Millisecond) // A 的時鐘：申覆期限已過，清理到期
+	f.now = deadline.Add(time.Millisecond)
 
 	h := f.holdPurgeAfterCandidates(t)
 	var appealErr error
@@ -303,12 +295,12 @@ func TestLinkedSourceAppealBlocksThePurgeOfTheLinkedAccount(t *testing.T) {
 	_, err := f.module.CloseCurrent(ctx, accountB)
 	must(t, err)
 	closedAt := f.now
-	f.now = closedAt.Add(10 * 24 * time.Hour) // 來源的終止晚於 B 關店：來源的申覆期限（生效後 184 天）才晚於 B 的保留期（關店後 184 天，同值）
+	f.now = closedAt.Add(10 * 24 * time.Hour)
 	source := f.terminate(t, sA.StoreID, GroundFraud)
 	_, err = f.createTermination(sB.StoreID, GroundLinkedAccount, func(in *CreateMeasureInput) { in.Termination.SourceMeasureID = &source.ID })
 	must(t, err)
 	f.effect(t, source)
-	f.now = closedAt.Add(StoreRetention + time.Hour) // B 的舊 stint 關閉超過保留期；來源的申覆期限還沒到
+	f.now = closedAt.Add(StoreRetention + time.Hour)
 
 	done := make(chan struct{})
 	f.module.SetPurgeBeforePurgeBatch(func() {
@@ -352,7 +344,7 @@ func TestLinkedSourceAppealLockedFirstMakesThePurgeSkipTheLinkedAccount(t *testi
 	_, err := f.module.CloseCurrent(ctx, accountB)
 	must(t, err)
 	closedAt := f.now
-	f.now = closedAt.Add(10 * 24 * time.Hour) // 來源的終止晚於 B 關店：來源的申覆期限（生效後 184 天）才晚於 B 的保留期（關店後 184 天，同值）
+	f.now = closedAt.Add(10 * 24 * time.Hour)
 	source := f.terminate(t, sA.StoreID, GroundFraud)
 	_, err = f.createTermination(sB.StoreID, GroundLinkedAccount, func(in *CreateMeasureInput) { in.Termination.SourceMeasureID = &source.ID })
 	must(t, err)
@@ -433,13 +425,12 @@ func TestAppealRetriesWhenALinkedTerminationAppearsAfterThePreRead(t *testing.T)
 	var lockErr error
 	f.module.SetRequestHooks(func() {
 		preReads++
-		if preReads == 1 { // 第一次預讀之後、鎖之前：新增關聯終止（自己的 transaction，commit）
+		if preReads == 1 {
 			_, err := f.createTermination(sB.StoreID, GroundLinkedAccount, func(in *CreateMeasureInput) { in.Termination.SourceMeasureID = &source.ID })
 			must(t, err)
 		}
 	}, func() {
 		locks++
-		// 鎖都成功之後：被關聯帳號的店家列要已被這個 transaction 鎖住（另一條連線 NOWAIT 拿不到）
 		conn, err := f.db.Pool().Begin(ctx)
 		must(t, err)
 		defer func() { _ = conn.Rollback(ctx) }()

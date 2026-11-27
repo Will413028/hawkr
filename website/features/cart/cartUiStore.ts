@@ -137,9 +137,6 @@ export const useCartUiStore = createLocalPrivateStore<
 			shippingMethod: state.shippingMethod,
 		}),
 		persistOptions: {
-			// SSR-safe：跳過建立時同步 rehydrate，改由 CartClient 掛載後手動 rehydrate，
-			// 讓 client 首次渲染與 server 一致（避免 hydration mismatch / 閃爍）。
-			// 不 bump version：:ui 持久 schema 未變，移除的只是從未寫入 :ui 的舊散 key。
 			skipHydration: true,
 		},
 	},

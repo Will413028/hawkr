@@ -22,19 +22,16 @@ const SOURCE = readFileSync(
 );
 
 test("B02 的 Sheet 有人打得開（onChangeMethod 真的接到 CheckoutInvoiceSection）", () => {
-	// ① Sheet 有渲染
 	assert.match(
 		SOURCE,
 		/<InvoiceMethodSheet/,
 		"結帳頁沒有渲染 InvoiceMethodSheet",
 	);
-	// ② 有人把它打開——**這一條才是重點**
 	assert.match(
 		SOURCE,
 		/onChangeMethod=\{\(\) => setInvoiceSheetOpen\(true\)\}/,
 		"CheckoutInvoiceSection 沒有接 onChangeMethod：Sheet 在 bundle 裡但打不開",
 	);
-	// ③ 選擇會回流到卡片上（不然買家選完看不出來有沒有生效）
 	assert.match(
 		SOURCE,
 		/selection=\{invoiceSelection\}/,
@@ -43,13 +40,11 @@ test("B02 的 Sheet 有人打得開（onChangeMethod 真的接到 CheckoutInvoic
 });
 
 test("買家的選擇會進 confirm payload，且沒選時整包省略", () => {
-	// 🔴 「整包省略」是已上架買家 App 的送法，那條路必須恆成立。
 	assert.match(
 		SOURCE,
 		/\.\.\.\(confirmInvoiceOf\(invoiceSelection\)/,
 		"confirm payload 沒有帶上買家的發票選擇",
 	);
-	// confirmInvoiceOf 對 undefined 與 kind:"none" 都回 undefined ⇒ 展開後不產生 invoice 欄
 	assert.match(
 		SOURCE,
 		/case "none":\s*\n\s*return undefined;/,

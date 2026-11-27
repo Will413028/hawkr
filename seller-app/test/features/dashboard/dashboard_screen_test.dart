@@ -166,8 +166,6 @@ void main() {
         .length;
     final readsBefore = scheduledReads();
 
-    // 下拉手勢在有預告卡時內容比視窗高，測試環境的捲動物理不會產生負的 pixels；直接呼叫下拉元件的 onRefresh，
-    // 與手勢放手後呼叫的是同一個函式。
     server.scheduled = [];
     await tester
         .widget<FruitRefreshIndicator>(find.byType(FruitRefreshIndicator))
@@ -364,14 +362,12 @@ void main() {
     await _settle(tester);
     expect(server.calls, 1);
 
-    // 30 秒內：沒有推播時會跳過，有推播就一定讀。
     server.now = server.now.add(const Duration(seconds: 5));
     tickers.value = true;
     await _settle(tester);
     expect(server.calls, 2);
     expect(find.text('待出貨 2'), findsOneWidget);
 
-    // 旗標只用一次：再隱藏、30 秒內再顯示就照舊跳過。
     tickers.value = false;
     await tester.pump();
     server.now = server.now.add(const Duration(seconds: 5));

@@ -9,10 +9,7 @@ import (
 	"time"
 )
 
-// 發布的 seller.pub_review_items(at)（step10e-3d-design.md §2.1、§6.2）：11 支 review_<種類>(at) 的 UNION ALL，規則只在那些函式。
-// 這個檔的測試：集合 ⇔ 逐一套用 Go 判定式的集合、每一列等於對應函式的那一列（16 個欄位全部）、沒有多出的種類或重複的列。
 
-// pubReviewItems 以 at 呼叫 pub_review_items，欄位同 reviewOf（seller.pub_review_item 與 review_item 同形）。
 func (f *fixture) pubReviewItems(t *testing.T, at time.Time) []reviewRow {
 	t.Helper()
 	ctx := context.Background()
@@ -39,7 +36,6 @@ func ptrStr[T any](p *T) string {
 	return fmt.Sprint(*p)
 }
 
-// rowKey 把一列的 15 個欄位全部寫成字串（時間以 UTC、ns 精度），用來整列比較。
 func rowKey(r reviewRow) string {
 	ts := func(t *time.Time) string {
 		if t == nil {
@@ -86,7 +82,6 @@ func TestPubReviewItemsIsTheUnionOfTheReviewFunctions(t *testing.T) {
 		for _, k := range reviewKinds {
 			fnRows := f.reviewSet(t, k.fn, tt.at)
 			total += len(fnRows)
-			// 集合 ⇔ Go 判定式。
 			if len(pubSets[k.kind]) != len(goSets[k.kind]) {
 				t.Errorf("%s／%s：pub_review_items %d 個，判定式 %d 個", tt.name, k.kind, len(pubSets[k.kind]), len(goSets[k.kind]))
 			}
@@ -100,7 +95,6 @@ func TestPubReviewItemsIsTheUnionOfTheReviewFunctions(t *testing.T) {
 					t.Errorf("%s／%s：%s 判定式說是，pub_review_items 裡沒有", tt.name, k.kind, id)
 				}
 			}
-			// 每一列等於對應函式的那一列（開始、期限、店家與對象的鍵全部）。
 			for id, got := range pubSets[k.kind] {
 				fr, ok := fnRows[id]
 				if !ok {
@@ -118,7 +112,6 @@ func TestPubReviewItemsIsTheUnionOfTheReviewFunctions(t *testing.T) {
 		if len(pub) != total {
 			t.Errorf("%s：pub_review_items %d 列，10 支函式合計 %d 列", tt.name, len(pub), total)
 		}
-		// 10 種都有期限（E3）：due_at、start_at 沒有 NULL，期限不早於開始。
 		for _, r := range pub {
 			if r.Start == nil || r.Due == nil || r.Due.Before(*r.Start) {
 				t.Errorf("%s：%s %s 的開始 %s、期限 %s", tt.name, r.Kind, r.ItemID, fmtTime(r.Start), fmtTime(r.Due))

@@ -27,10 +27,8 @@ var _ Provider = (*Stripe)(nil)
 
 const whsecret = "whsec_test"
 
-// clock 是測試開始時的真實時間：SDK 以系統時間驗 webhook 簽章的時間戳。
 var clock = time.Now()
 
-// fixtures 是 platform/stripe/testdata 的實測回應（{status, body}，遮罩過）。
 func fixtureResponder(t *testing.T, name string) http.HandlerFunc {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "platform", "stripe", "testdata", name+".json"))
@@ -63,7 +61,6 @@ func fixtureID(t *testing.T, name string) string {
 	return b.ID
 }
 
-// twoStepResponder 重播兩步建立的實測回應：POST /v2/core/accounts 回建立的那一個，其餘（更新）回更新的那一個。
 func twoStepResponder(t *testing.T) http.HandlerFunc {
 	t.Helper()
 	shell, update := fixtureResponder(t, "create_shell_provider"), fixtureResponder(t, "update_provider")
@@ -355,7 +352,6 @@ func TestStripeOnboardingSessionFollowsTheRequestedKind(t *testing.T) {
 	})
 	in := SessionInput{ExternalAccountID: "acct_1", ReturnURL: "https://a.test/r", RefreshURL: "https://a.test/f"}
 
-	// 形狀取自 Kind（ChooseSession 的結果），不是 adapter 的行程設定：adapter 設定成相反的收件方式，結果仍跟著 Kind 走。
 	in.Kind = SessionHosted
 	hosted, err := stripeProvider(t, model.CollectionPlatform, handler).CreateOnboardingSession(context.Background(), in)
 	if h, ok := hosted.(model.HostedSession); err != nil || !ok || h.URL != "https://connect.stripe.com/x" {

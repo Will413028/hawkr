@@ -15,7 +15,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
-// createResult 是一次建立嘗試之後的列；clientSecret 只在這次拿到 PaymentIntent 而且列處於 AWAITING_PAYMENT 時有值（請求內建立回給買家用，不存）。
 type createResult struct {
 	row          store.PaymentPayment
 	clientSecret string
@@ -59,8 +58,6 @@ func (s *Service) create(ctx context.Context, paymentID uuid.UUID, timeout time.
 	}
 	now := s.d.Now().UTC()
 	if row.Provider != p.Name() {
-		// 設定換了 provider：只有舊 provider 的呼叫從沒送出（沒有東西可能已建在它那邊）才改成目前的（新嘗試、換新鍵、重新起算）。
-		// 呼叫過的列：同一時間只設定一個 provider，舊的已無法查回，不能證明沒有建出 PaymentIntent，所以進 ANOMALY 由人工核對，不依時間換鍵（D68）。
 		rebound, err := s.rebind(ctx, paymentID, p.Name(), now)
 		if err != nil {
 			return createResult{}, err
@@ -119,8 +116,6 @@ func (s *Service) create(ctx context.Context, paymentID uuid.UUID, timeout time.
 	return s.acceptCreated(ctx, paymentID, attempt.ID, p.Name(), snap, startedAt)
 }
 
-// acceptCreated 把建立的結果（呼叫的回應或查回找到的）寫進列。寫結果的 ctx 在呼叫之後才建：呼叫佔用的時間不算進寫入的上限，job 的 ctx 逾時被取消後仍要能寫入。
-// 快照與列對不起來（ErrAnomaly）讓列進 ANOMALY；入帳缺 charge 或不認得的狀態是暫時性的，回錯誤由 job 重試。
 func (s *Service) acceptCreated(ctx context.Context, paymentID, attemptID uuid.UUID, provider string, snap Snapshot, startedAt time.Time) (createResult, error) {
 	wctx, cancelWrite := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancelWrite()
@@ -139,7 +134,6 @@ func (s *Service) acceptCreated(ctx context.Context, paymentID, attemptID uuid.U
 	return out, err
 }
 
-// lookupCreate 是過了 ResendWindow 的建立：不再呼叫 provider，只依嘗試 ID 查回。
 func (s *Service) lookupCreate(ctx context.Context, row store.PaymentPayment, now time.Time, timeout time.Duration) (createResult, error) {
 	q := store.New(s.d.DB.Conn(ctx))
 	attempt, err := q.EffectiveAttempt(ctx, row.ID)
@@ -170,14 +164,12 @@ func (s *Service) lookupCreate(ctx context.Context, row store.PaymentPayment, no
 	return s.failCreate(ctx, row.ID, failedNotFound)
 }
 
-// inShortTx 在獨立的 transaction 內做一次小寫入（呼叫之後 ctx 可能已逾時，所以用自己的上限）。
 func (s *Service) inShortTx(ctx context.Context, fn func(context.Context) error) error {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
 	return s.d.DB.InTx(wctx, fn)
 }
 
-// createLookupFailed 記一次查回失敗；連續失敗到上限進 ANOMALY，否則回錯誤由 job 重試。
 func (s *Service) createLookupFailed(ctx context.Context, row store.PaymentPayment, cause error) (createResult, error) {
 	var n int32
 	err := s.inShortTx(ctx, func(ctx context.Context) error {
@@ -198,7 +190,6 @@ func (s *Service) createLookupFailed(ctx context.Context, row store.PaymentPayme
 	return createResult{}, fmt.Errorf("charge: 付款 %s 查回失敗：%w", row.ID, cause)
 }
 
-// rotateCreateKey 在 provider 已知拒絕之後換新冪等鍵：付款列換鍵、有效嘗試記被取代、新嘗試另寫一列；已被別的呼叫換過或列已不在建立中時什麼都不做。
 func (s *Service) rotateCreateKey(ctx context.Context, paymentID, oldKey uuid.UUID, now time.Time) error {
 	return s.inShortTx(ctx, func(ctx context.Context) error {
 		q := store.New(s.d.DB.Conn(ctx))
@@ -215,8 +206,6 @@ func (s *Service) rotateCreateKey(ctx context.Context, paymentID, oldKey uuid.UU
 	})
 }
 
-// anomalyPayment 讓建立中、沒有外部 ID 的列進 ANOMALY 並在同一個 transaction 發 MoneyAnomaly；列已不是那樣（別的呼叫已建好）時回目前的列。
-// 列上只存原因碼 reason；provider 的外部 ID（detail）只進 log 與事件（failure_reason 上限 200 字）。
 func (s *Service) anomalyPayment(ctx context.Context, paymentID uuid.UUID, reason, detail string) (createResult, error) {
 	s.d.Logger.ErrorContext(ctx, "payment：建立付款進 ANOMALY，待人工核對 provider", "payment_id", paymentID.String(), "reason", reason, "external_id", detail)
 	var row store.PaymentPayment
@@ -236,7 +225,6 @@ func (s *Service) anomalyPayment(ctx context.Context, paymentID uuid.UUID, reaso
 	return createResult{row: row}, err
 }
 
-// rebind 在獨立的 transaction 把建立中、沒有外部 ID、從沒呼叫過的列改成目前的 provider（舊嘗試記為被取代、新嘗試用新的冪等鍵）；條件不成立（列已不是那樣，或已呼叫過）時回目前的列。
 func (s *Service) rebind(ctx context.Context, paymentID uuid.UUID, provider string, now time.Time) (store.PaymentPayment, error) {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
@@ -261,8 +249,6 @@ func (s *Service) rebind(ctx context.Context, paymentID uuid.UUID, provider stri
 	return row, err
 }
 
-// markCalled 在獨立的 transaction 記下「呼叫過」的時刻（呼叫 provider 之前提交），付款列與有效嘗試各記一份，回傳列與這次呼叫對應的嘗試。
-// 列已不在建立中（別的呼叫已寫入結果）時回目前的列，嘗試是零值。
 func (s *Service) markCalled(ctx context.Context, paymentID uuid.UUID, now time.Time) (store.PaymentPayment, store.PaymentPaymentAttempt, error) {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
@@ -272,7 +258,6 @@ func (s *Service) markCalled(ctx context.Context, paymentID uuid.UUID, now time.
 		q := store.New(s.d.DB.Conn(ctx))
 		r, err := q.MarkPaymentCreateCalled(ctx, store.MarkPaymentCreateCalledParams{ID: paymentID, Now: now})
 		if errors.Is(err, pgx.ErrNoRows) {
-			// 列已不在建立中（別的呼叫已寫入結果）：回目前的列。
 			row, err = q.PaymentByID(ctx, paymentID)
 			return err
 		}
@@ -289,7 +274,6 @@ func (s *Service) markCalled(ctx context.Context, paymentID uuid.UUID, now time.
 	return row, attempt, err
 }
 
-// failCreate 讓還在建立中、沒有外部 ID 的列進終局 CREATE_FAILED；列已不是那樣（別的呼叫已建好）時回目前的列。
 func (s *Service) failCreate(ctx context.Context, paymentID uuid.UUID, reason string) (createResult, error) {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()
@@ -306,21 +290,12 @@ func (s *Service) failCreate(ctx context.Context, paymentID uuid.UUID, reason st
 	return createResult{row: row}, err
 }
 
-// applyResult 是 applySnapshot 的結果：written 為 true 表示快照寫進了付款列；judged 為 true 表示這份快照已經被判斷過、不需要再讀一次
-// （寫進了列或嘗試列，或與列的終局狀態衝突而保留列）。兩者都不是表示讀取過期（較新的讀取已寫入）或沒有可對的嘗試。
 type applyResult struct {
 	row     store.PaymentPayment
 	written bool
 	judged  bool
 }
 
-// applySnapshot 在呼叫方的 transaction 內鎖付款列、驗證快照、把狀態記進這次讀的那一個嘗試（paymentID 底下的 attemptID），再依嘗試是不是有效的決定付款列：
-//   - 有效的嘗試：推導狀態並寫付款列，狀態與寫入之前不同時發布 PaymentChanged（同一個狀態的重複讀取不重發）；
-//   - 被取代的（舊的）嘗試：只更新嘗試列，付款列不動（舊 ID 不會寫回剛重設的列）；舊 PaymentIntent 晚到成功的處置見 applyLate。
-//
-// provider 是回這份快照的 provider：與嘗試的 provider 不同就丟棄（別的設定寫的嘗試）。快照與列對不起來（外部 ID 換了、金額不符、狀態不是有效值）回 ErrAnomaly 或不認得狀態的錯誤，不寫入；
-// 入帳的快照缺 charge 或入帳時間回 errIncompleteSuccess（暫時性）；衝突（列已入帳、快照不是入帳）不寫入並記警示。
-// 只在這次讀取的開始時間不早於嘗試列已存的 fetched_at 時寫入：較早開始的讀取被擋下時 written 與 judged 都是 false。
 func (s *Service) applySnapshot(ctx context.Context, paymentID, attemptID uuid.UUID, provider string, snap Snapshot, startedAt time.Time) (applyResult, error) {
 	q := store.New(s.d.DB.Conn(ctx))
 	locked, err := q.LockPayment(ctx, paymentID)
@@ -366,7 +341,6 @@ func (s *Service) applySnapshot(ctx context.Context, paymentID, attemptID uuid.U
 	return s.writeRow(ctx, q, locked, stored, snap, startedAt)
 }
 
-// writeRow 把有效嘗試的快照寫進付款列：由列目前的狀態與快照推導下一個狀態，狀態改變才發布 PaymentChanged。
 func (s *Service) writeRow(ctx context.Context, q *store.Queries, locked store.PaymentPayment, att store.PaymentPaymentAttempt, snap Snapshot, startedAt time.Time) (applyResult, error) {
 	next, keep, err := Next(model.PaymentStatus(locked.Status), snap)
 	if err != nil {

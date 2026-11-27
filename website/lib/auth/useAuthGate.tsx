@@ -34,8 +34,6 @@ export function useAuthGate(onGuest: () => void): {
 	const signedIn = status === "signedIn";
 	const decided = status === "signedIn" || status === "guest";
 	const [pending, setPending] = React.useState<GatedAction | null>(null);
-	// Latest-callback ref: callers pass inline closures, and renders can
-	// happen between the click and hydration completing.
 	const onGuestRef = React.useRef(onGuest);
 	onGuestRef.current = onGuest;
 

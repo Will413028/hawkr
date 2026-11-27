@@ -70,8 +70,6 @@ class GrantPaymentWorkerTest {
     private void stubOneClaimedTask() {
         when(grantPaymentTaskRepository.findPendingTasks(anyInt())).thenReturn(List.of(task()));
         when(grantPaymentTaskRepository.claimTask(eq(1L), any())).thenReturn(1);
-        // backend#3262：本檔驗的是「已放行之後」的終態分流，撥款資格閘門一律放行。
-        // 閘門本身的行為由 GrantPaymentWorkerPayoutHoldTest 覆蓋。
         when(afterSalesGrpcClient.getPayoutHold("O123")).thenReturn(
                 new io.github.will413028.hawkr.order.grpc.client.AfterSalesGrpcClient.PayoutHold(
                         false, null,
@@ -173,7 +171,6 @@ class GrantPaymentWorkerTest {
                 .build());
         when(grantPaymentTaskRepository.markGrantTaskDone(1L)).thenReturn(1);
         when(orderRepository.findStoreIdByOrderNo("O123")).thenReturn(storeId);
-        // 舊 seller-service 會把輸入回填進 principals；unresolved_ids 才是真相。
         when(sellerGrpcClient.resolvePrincipals(List.of(storeId)))
                 .thenReturn(PrincipalResolution.of(Map.of(storeId, storeId), List.of(storeId)));
 

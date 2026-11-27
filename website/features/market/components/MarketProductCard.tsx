@@ -58,9 +58,6 @@ function MarketProductCard({
 	const imageSrc = resolveCdnUrl(product.image);
 	const [quantity, setQuantity] = React.useState(0);
 
-	// 已售出 hides at 0 (new listings shouldn't open with a zero); 剩餘 hides only
-	// when the data source carries no stock at all — 0 stock is a real state and
-	// renders as 已售完.
 	const soldLabel =
 		product.salesCount > 0
 			? `已售出 ${formatCompactCount(product.salesCount)}`
@@ -78,8 +75,6 @@ function MarketProductCard({
 				? "已售完"
 				: `剩餘 ${formatCompactCount(product.stock)} 件`;
 
-	// Cap the stepper at remaining stock when the list carries it, so the buyer
-	// can't queue more than the seller has (checkout would reject it anyway).
 	const maxQuantity = Math.min(99, product.stock ?? 99);
 	const decreaseQuantity = () => setQuantity((value) => Math.max(0, value - 1));
 	const increaseQuantity = () =>
@@ -114,7 +109,6 @@ function MarketProductCard({
 					try {
 						trackSelectItem(product, listContext, index);
 					} catch {
-						// Analytics must never block the product's native link contract.
 					}
 				}}
 			>
@@ -148,16 +142,9 @@ function MarketProductCard({
 						alt={product.name}
 						fill
 						preset="card"
-						// Cards sit in an auto-fill minmax(220px) grid / rail, so they
-						// stay ~220-360px wide on desktop — they never grow to 33vw.
-						// Cap the desktop slot so Next requests the ~750px candidate
-						// (360px × 2 DPR) instead of rounding 33vw up to w_1920.
 						sizes="(max-width: 360px) 100vw, (max-width: 680px) 50vw, (max-width: 1120px) 33vw, 360px"
 						priority={priority}
 						loading={priority ? undefined : imageLoading}
-						// 首頁三個貨架與市集列表都用這張卡，且貨架會重複渲染同一批商品。
-						// React 19 SSR 對每個非 lazy、非 low 的 <img> 自動塞 preload，一頁
-						// 就是幾十條；只有 priority 那張是 LCP 候選，其餘 eager 但 low。
 						fetchPriority={priority ? undefined : "low"}
 						className="object-cover"
 					/>
@@ -179,8 +166,7 @@ function MarketProductCard({
 				) : null}
 			</div>
 			<div className="market-product-card__body p-[0_16px_16px] max-[840px]:p-[0_8px_10px]">
-				{/* User-entered product name → system body stack, not the brand
-				    face (its subset only covers fixed project strings). */}
+
 				<h2 className="[font-family:var(--font-primary)] m-[12px_0_6px] text-hk-heading text-base leading-[1.45] tracking-normal max-[840px]:m-[8px_0_4px] max-[840px]:text-sm max-[840px]:leading-[1.3] line-clamp-2 min-h-[2.6em] max-[840px]:min-h-[2.6em]">
 					{product.name}
 				</h2>
@@ -258,26 +244,7 @@ function MarketProductCard({
 					) : null}
 				</div>
 				<div className="market-product-card__buy-row mt-3 flex items-center gap-2 max-[840px]:mt-1.5">
-					{/*
-					  ⚠️ 下面兩顆按鈕都必須帶 `disabled:pointer-events-auto`。
 					
-					  共用 Button 的基底類別是 shadcn 慣例（components/ui/Button.tsx 的
-					  `disabled:pointer-events-none`），而那個慣例在「disabled 控制項疊在
-					  可點擊覆蓋層之上」時是錯的：整張卡是一條 `absolute inset-0 z-10` 的
-					  商品連結，按鈕 z-20 在它上面。disabled 時若 pointer-events 為 none，
-					  點擊會**穿透**到那條連結。
-					
-					  實測後果（2026-08-27，本機正式建置）：quantity 預設 0（:61 useState(0)）
-					  ⇒ 加入購物車按鈕預設 disabled ⇒ 使用者按下去不是「沒反應」，而是**被
-					  靜默導去商品頁**，完全不知道自己該先選數量。實測 15 秒後仍 disabled，
-					  點擊使 /market/products → /products/{id}。
-					
-					  改 auto 之後按鈕自己吃掉那次點擊：不觸發任何事件（disabled 本來就不
-					  派發 click），但游標是 not-allowed，使用者看得出來它現在不能按。
-					
-					  守它的是 tests/e2e/reliability.spec.ts:312 的
-					  「favorite/seller/quantity/cart controls must stay independent」。
-					*/}
 					{soldOut && !previewMode ? (
 						<div className="market-product-card__qty m-0 inline-flex h-10 min-w-0 flex-1 items-center justify-center overflow-hidden rounded-hk-pill border border-hk-border-soft bg-hk-surface-glass p-0 text-base font-extrabold text-hk-muted shadow-[inset_0_1px_0_rgb(255_255_255_/_0.28)]">
 							已售完
@@ -365,8 +332,4 @@ function MarketProductCard({
 	);
 }
 
-// Appending a page preserves existing product references. Let masonry update
-// positions without re-running unchanged cards. Use React's complete shallow
-// prop comparison: changed business data, context and local state must still
-// update normally (never compare only the product ID).
 export default React.memo(MarketProductCard);

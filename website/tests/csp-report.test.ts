@@ -46,9 +46,6 @@ test("the policy omits upgrade-insecure-requests; only the enforcing header adds
 	);
 });
 
-// 模式改為「每環境獨立」：由 build 期的 CSP_MODE 決定，未設值 fail-safe 回
-// report-only。這道測試釘住 fail-safe 預設，避免有人把它改成「未設值即攔截」，
-// 讓本機 build / CI E2E harness 意外進入攔截模式。
 test("CSP mode is env-driven and defaults to report-only when unset", () => {
 	const config = readFileSync(join(projectRoot, "next.config.ts"), "utf8");
 	assert.match(
@@ -57,8 +54,6 @@ test("CSP mode is env-driven and defaults to report-only when unset", () => {
 	);
 });
 
-// Presigned-upload PUTs go to a deploy-specific origin (MEDIA_UPLOAD_ORIGINS): it is on
-// connect-src when configured, and nothing stands in for it when it is not.
 test("connect-src carries the configured upload origins and nothing wider", () => {
 	const origins = parseUploadOrigins(
 		"https://*.uploads.example.org, https://uploads.example.org",
@@ -122,8 +117,6 @@ test("a malformed upload origin fails the build instead of widening the policy",
 	assert.deepEqual(parseUploadOrigins("  "), []);
 });
 
-// API gateway、media gateway 與 Sentry ingest 的 origin 取自 app 讀的同一組 env，
-// connect-src 不寫死任何自家主機；env 沒設的來源就不出現在清單裡。
 test("connect-src takes the app's own origins from its input, deduplicated, with no websocket origins", () => {
 	const origins = uniqueOrigins([
 		"https://api.example.org",
@@ -148,8 +141,6 @@ test("connect-src takes the app's own origins from its input, deduplicated, with
 	);
 });
 
-// Stripe Payment Element：Stripe.js 連 api.stripe.com，3DS 驗證 frame 在 hooks.stripe.com；
-// wallet 由 Stripe 的 iframe 承載，CSP 不留 PayUni 時期原生 Apple／Google Pay 的來源。
 test("CSP allows the Payment Element hosts and none of the native wallet hosts", () => {
 	const value = policy();
 	assert.ok(directive(value, "connect-src").includes("https://api.stripe.com"));
@@ -161,8 +152,6 @@ test("CSP allows the Payment Element hosts and none of the native wallet hosts",
 	);
 });
 
-// 登入改由單體發起、整頁導向 provider（302），瀏覽器不再載入第三方登入 SDK、也不開 bot protection 的 iframe：
-// CSP 不該為登入留任何 Clerk 或 challenges.cloudflare.com 的來源。
 test("CSP carries no Clerk or Clerk bot-protection origin", () => {
 	const value = policy();
 	assert.doesNotMatch(value, /clerk/i);
@@ -247,8 +236,6 @@ test("csp-report endpoint reports a same-origin eval whose sample is not a known
 	assert.equal(captured.length, 1);
 });
 
-// zod v4 的 allowsEval 能力偵測（new Function("")）。enforce 之後每個跑到 zod 驗證
-// 的頁面都會擋掉它一次；它自己包 try/catch 退回解譯版驗證，行為不變，不該進 Sentry。
 test("csp-report endpoint ignores the zod allowsEval capability probe", async () => {
 	captured.length = 0;
 	const res = await POST(
@@ -269,7 +256,6 @@ test("csp-report endpoint ignores the zod allowsEval capability probe", async ()
 	assert.equal(captured.length, 0);
 });
 
-// 同樣長相但來自外部來源＝可能是注入，必須照報。
 test("csp-report endpoint still reports an anonymous-function eval from an external source", async () => {
 	captured.length = 0;
 	const res = await POST(
@@ -332,8 +318,6 @@ test("csp-report endpoint still reports eval from an external source", async () 
 });
 
 // webpack 打包進 @editorjs/image 的 global polyfill：new Function("return this")，
-// 原始碼帶 catch → window 的 fallback，被擋之後行為不變。函式體非空，所以它跟上面
-// 那條 zod 空函式體探測是不同形狀——只比對空函式體會讓它天天進 Sentry。
 test("csp-report endpoint ignores the bundled `return this` global probe", async () => {
 	captured.length = 0;
 	const res = await POST(
@@ -354,8 +338,6 @@ test("csp-report endpoint ignores the bundled `return this` global probe", async
 	assert.equal(captured.length, 0);
 });
 
-// 放寬只到「已知會自癒的探測」為止：同一支 chunk 裡任何帶真實函式體的 eval 仍要照報，
-// 否則這個過濾器就從「降噪」變成「把注入藏起來」。
 test("csp-report endpoint still reports an eval with a real function body", async () => {
 	captured.length = 0;
 	const res = await POST(

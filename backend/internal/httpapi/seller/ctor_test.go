@@ -16,7 +16,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 )
 
-// 沒有指定封鎖來源的測試：來源都在，但不會被呼叫（呼叫就是測試寫錯了）。
 type unusedBlocking struct{}
 
 func (unusedBlocking) ContentAuthorFor(context.Context, social.Caller, social.Target) (social.ContentAuthor, error) {
@@ -55,7 +54,6 @@ func mustAgreementURL(t testing.TB, ref string) string {
 	return u
 }
 
-// mustApp 與 mustPublic 是測試的建構：StatsSource 是必要的（零值被建構子擋下），其餘照 NewApp、NewPublic。
 func mustApp(t testing.TB, m Module, followers Followers, images rpc.Images, dash Dashboard, stats *StatsSource) *App {
 	t.Helper()
 	h, err := NewApp(m, &paymentModule{}, followers, images, dash, stats, fakeLinks{}, mustWebOrigin(t), unusedSources(), nil)

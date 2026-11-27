@@ -12,7 +12,6 @@ import io.github.will413028.hawkr.payuni.shipping.ShippingClient;
 import io.github.will413028.hawkr.payuni.shipping.request.PrintCvsLabelRequest;
 import io.github.will413028.hawkr.payuni.shipping.request.ScheduleHomeLabelRequest;
 import io.github.will413028.hawkr.payuni.shipping.response.PrintCvsLabelDirectResponse;
-// ScheduleHomeLabelResponse 不再使用（PayUni 回傳 HTML，改用 scheduleHomeLabelHtml）
 import io.github.will413028.hawkr.shipping.audit.ShippingPayUniAuditLogger;
 import io.github.will413028.hawkr.shipping.client.MediaGrpcClient;
 import okhttp3.OkHttpClient;
@@ -69,7 +68,6 @@ public class ShipmentLabelService {
     public LabelUploadResult scheduleAndUploadLabel(String merId, String shipTradeNo, String shipmentNo,
                                                      String goodsType, String lgsType, String shipType,
                                                      String shipDate, String deliveryDate, String spec) {
-        // 1. 呼叫 PayUni 預約宅配取號（PayUni 回傳 HTML form，非 JSON）
         String html = shippingClient.scheduleHomeLabelHtml(
                 merId, new ScheduleHomeLabelRequest(shipTradeNo, goodsType, lgsType, shipType,
                         shipDate, deliveryDate, spec, null, null));
@@ -78,19 +76,16 @@ public class ShipmentLabelService {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_LABEL_SCHEDULE_EMPTY);
         }
 
-        // 1.5 檢查是否為錯誤回應（window.alert）
         if (html.contains("window.alert")) {
             String errorMsg = html.replaceAll(".*window\\.alert\\(\"(.*)\"\\).*", "$1");
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_LABEL_SCHEDULE_FAILED, errorMsg);
         }
 
-        // 2. 解析 HTML form → 二次 POST 下載 PDF
         byte[] pdfBytes = downloadPdfFromHtmlForm(html);
 
         log.info("ShipmentLabelService.scheduleLabel.success",
                 "預約取號+PDF下載成功 size=" + pdfBytes.length, "shipTradeNo", shipTradeNo);
 
-        // 3. 上傳至 OSS（透過 Media Service）
         String filename = shipmentNo + ".pdf";
         ServerUploadAndFinalizeResponse uploadResp = mediaGrpcClient.serverUploadAndFinalize(
                 pdfBytes, filename, "application/pdf", REF_TYPE_SHIPPING);
@@ -171,7 +166,6 @@ public class ShipmentLabelService {
     public LabelUploadResult printAndUploadCvsLabel(String merId, String shipmentNo,
                                                      String shipTradeNo, String goodsType,
                                                      String lgsType, String shipType, String shipDate) {
-        // 1. 呼叫 PayUni print_label API → 取得標籤圖片 URL
         PrintCvsLabelDirectResponse labelResp = shippingClient.printCvsLabel(
                 merId, new PrintCvsLabelRequest(shipTradeNo, goodsType, lgsType, shipType, shipDate));
 
@@ -179,10 +173,8 @@ public class ShipmentLabelService {
         log.info("ShipmentLabelService.printCvsLabel.success",
                 "超商標籤列印成功", "shipTradeNo", shipTradeNo);
 
-        // 2. 下載標籤圖片 bytes
         byte[] imageBytes = downloadBytes(imageUrl);
 
-        // 3. 上傳至 OSS（透過 Media Service）
         String filename = shipmentNo + ".png";
         ServerUploadAndFinalizeResponse uploadResp = mediaGrpcClient.serverUploadAndFinalize(
                 imageBytes, filename, "image/png", REF_TYPE_SHIPPING);
@@ -209,13 +201,11 @@ public class ShipmentLabelService {
      * </form>
      */
     private byte[] downloadPdfFromHtmlForm(String html) {
-        // 提取 form action URL
         String actionUrl = extractAttribute(html, "action");
         if (actionUrl == null || actionUrl.isBlank()) {
             throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_LABEL_FORM_ACTION_MISSING);
         }
 
-        // 提取所有 hidden input 參數（同時保留一份供稽核落庫）
         okhttp3.FormBody.Builder formBuilder = new okhttp3.FormBody.Builder();
         Map<String, String> formParams = new LinkedHashMap<>();
         java.util.regex.Pattern inputPattern = java.util.regex.Pattern.compile(
@@ -235,14 +225,11 @@ public class ShipmentLabelService {
         log.info("ShipmentLabelService.downloadPdf.post",
                 "二次 POST 下載 PDF，actionUrl=" + actionUrl + " params=" + paramCount);
 
-        // POST form 下載 PDF
         Request request = new Request.Builder()
                 .url(actionUrl)
                 .post(formBuilder.build())
                 .build();
 
-        // §10.4：此二次 POST 不經 PayUniHttpClient，onExchange hook 覆蓋不到，手動補一筆稽核。
-        // CustomerToken 由 helper 遮罩；PDF 二進位只記 metadata（response_raw=null）；失敗路徑也記。
         long t0 = System.currentTimeMillis();
         PayUniExchangeContext auditCtx = new PayUniExchangeContext(
                 formParams.get("MerID"), PayUniShippingEndpoint.PATH_CAT_FILE_DOWNLOAD, formParams);
@@ -257,7 +244,6 @@ public class ShipmentLabelService {
             }
             byte[] bytes = response.body().bytes();
             if (bytes.length < 100) {
-                // PDF 至少數 KB，太小可能是錯誤回應（文字，非二進位 → 保留原文供稽核）
                 String bodyStr = new String(bytes);
                 auditCtx.setErrorCode("INVALID_RESPONSE");
                 auditCtx.setErrorMessage("PDF 下載回應太小，可能為錯誤");
@@ -266,7 +252,6 @@ public class ShipmentLabelService {
                         "PDF 下載回應太小，可能為錯誤: " + bodyStr);
                 throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_LABEL_PDF_RESPONSE_INVALID);
             }
-            // 成功：二進位 PDF 不落內容，僅記 metadata
             auditCtx.setOuterMessage("(PDF " + bytes.length + " bytes, application/pdf)");
             return bytes;
         } catch (IOException e) {

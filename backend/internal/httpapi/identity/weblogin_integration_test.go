@@ -66,17 +66,14 @@ const (
 	lineSecret    = "line-channel-secret-0123456789ab"
 	googleClient  = "google-web-client"
 	lineChannelID = "line-channel"
-	// googleAppClient 是 App 原生登入的 Google ID token 的 azp 允許清單裡的 client。
 	googleAppClient = "android-client"
 )
 
-// grant 是假 provider 在授權步驟記下的東西：code 綁定 nonce、PKCE challenge 與 redirect URI，token 端點照真的 provider 驗證。
 type grant struct {
 	nonce, challenge, redirect string
 	claims                     map[string]any
 }
 
-// fakeIdP 是假的 Google 或 LINE：授權由測試扮演瀏覽器完成（authorize），token 端點與 JWKS 是真的 HTTP。
 type fakeIdP struct {
 	t        *testing.T
 	srv      *httptest.Server
@@ -133,13 +130,11 @@ func (f *fakeIdP) issuer() string {
 	return "https://accounts.google.com"
 }
 
-// authorize 扮演使用者在 provider 同意授權：檢查授權網址的參數，回傳綁定好的 code。claims 覆寫 ID token 的內容（值為 nil 表示刪掉）。
 func (f *fakeIdP) authorize(authURL string, claims map[string]any) (code string) {
 	f.t.Helper()
 	return f.authorizeWith(authURL, claims, "")
 }
 
-// authorizeWith 與 authorize 相同，challenge 不是空字串時 code 綁定這個 PKCE challenge，而不是授權網址上的（模擬 verifier 對不上）。
 func (f *fakeIdP) authorizeWith(authURL string, claims map[string]any, challenge string) (code string) {
 	f.t.Helper()
 	u, err := url.Parse(authURL)
@@ -216,7 +211,6 @@ func (f *fakeIdP) sign(claims map[string]any) string {
 	return raw
 }
 
-// testClock 是 identity 模組與入口共用的時鐘：測試把它往後撥，驗證逾時與重新驗證的期限。
 type testClock struct {
 	mu sync.Mutex
 	t  time.Time
@@ -243,7 +237,6 @@ type webFixture struct {
 	gwSeen chan http.Header
 }
 
-// setupWeb 起 identity、假的 Google 與 LINE、舊 gateway 的替身與單體的入口。來源 IP 由請求的 X-Test-Client-IP 決定，各測試用自己的 IP，不互相佔用 /api/auth/* 的限流。
 func setupWeb(t *testing.T) *webFixture {
 	t.Helper()
 	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(
@@ -333,7 +326,6 @@ func (noBusiness) CurrentStore(context.Context, int64) (seller.Store, error) {
 	return seller.Store{}, apperr.NotFound("沒有現任店家")
 }
 
-// browser 是不跟轉址、手動管理 cookie 的瀏覽器：Secure 的 cookie 在 http 的測試伺服器上 cookiejar 不會送，所以自己帶。
 type browser struct {
 	t       *testing.T
 	f       *webFixture
@@ -347,7 +339,6 @@ func (f *webFixture) browser(t *testing.T, ip string) *browser {
 	return &browser{t: t, f: f, cookies: map[string]string{}, ip: ip}
 }
 
-// reply 是回應的狀態、header 與 cookie；body 在 get 內讀完關閉，測試不看 body。
 type reply struct {
 	StatusCode int
 	Header     http.Header
@@ -395,12 +386,11 @@ func setCookie(resp *reply, name string) *http.Cookie {
 	return nil
 }
 
-// login 走完 start 與（扮演使用者在 provider 同意之後的）callback；overrides 讓測試改動 callback 的 query 與 ID token 的 claims。
 type loginOpts struct {
 	returnTo  string
 	claims    map[string]any
-	callback  func(q url.Values) // 改 callback 的 query
-	callbackP identity.Provider  // 打另一家的 callback（mix-up）
+	callback  func(q url.Values)
+	callbackP identity.Provider
 }
 
 func (b *browser) login(p identity.Provider, o loginOpts) (start, callback *reply) {
@@ -523,7 +513,6 @@ func TestWebLoginRefusesBrokenFlows(t *testing.T) {
 		challenge string
 		cookie    func(*browser)
 		want      string
-		// stateKept 是這個 callback 的 state 不屬於任何流程（沒帶或亂填），真正的流程不會因此作廢，留到逾時。
 		stateKept bool
 	}{
 		"state 不是我們發的":                  {opts: loginOpts{callback: func(q url.Values) { q.Set("state", strings.Repeat("A", 43)) }}, want: httpidentity.ErrorInvalidFlow, stateKept: true},
@@ -566,7 +555,6 @@ func TestWebLoginRefusesBrokenFlows(t *testing.T) {
 			cb := b.get("/api/auth/" + httpidentity.PathOf(target) + "/callback?" + q.Encode())
 			wantLoginError(t, cb, tc.want)
 			f.nothingCreated(t)
-			// 帶著屬於某個流程的 state 的失敗都已作廢該流程（單次使用）。
 			want := 0
 			if tc.stateKept {
 				want = 1
@@ -591,7 +579,6 @@ func TestWebLoginRefusesAReplayedCallback(t *testing.T) {
 	if setCookie(first, rpc.SessionCookie) == nil {
 		t.Fatalf("第一次 = %d %s", first.StatusCode, first.Header.Get("Location"))
 	}
-	// 重放：連登入前 cookie 也放回去，只剩 state 單次使用擋住它。
 	b.cookies[httpidentity.LoginCookie] = binding
 	replay := b.get("/api/auth/google/callback?" + q.Encode())
 	wantLoginError(t, replay, httpidentity.ErrorInvalidFlow)
@@ -690,7 +677,6 @@ func TestOnlyBearerAndTheSessionCookieAreCredentials(t *testing.T) {
 			}
 		}
 	})
-	// query：token 放在網址上不收。
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, f.url+identityv1alpha1connect.IdentityAppServiceGetSessionProcedure+"?connect=v1&encoding=json&message=%7B%7D&token="+tok+"&"+rpc.SessionCookie+"="+tok, nil)
 	if err != nil {
 		t.Fatal(err)

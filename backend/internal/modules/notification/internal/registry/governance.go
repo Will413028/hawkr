@@ -13,9 +13,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// 治理與交易側型別：賣家店家面（措施、停權、KYC、詢問、撥款、代行、詢價）、作者與檢舉人的通知、刪帳確認信。
-// 參數只存 ID、列舉值與事件時間，不存第三方的名稱或自由文字；列舉值是擁有模組的字串值（見各常數），文案在讀取時由列舉組成。
-// 店家面型別的收件人由 worker 以 StoreRecipient 解析（店家已關閉不寫），買家面以 BuyerRecipient。
 
 var governanceTypes = []Entry{
 	storeSuspended, storeUnsuspended, storeContentTakenDown,
@@ -90,10 +87,8 @@ func badParams(format string, a ...any) error {
 	return fmt.Errorf("%w："+format, append([]any{ErrBadParams}, a...)...)
 }
 
-// messageTime 是內文裡的時間：台北時間、到分鐘。
 func messageTime(l uitext.Locale, t time.Time) string { return uitext.FormatDateTime(l, t) }
 
-// withStore 補上店家面型別共同的欄位：受眾 STORE、分類 ACCOUNT、呈現 ACCOUNT。
 func withStore[P any](d Definition[P], channels []model.Channel) Definition[P] {
 	d.Audiences = []model.Audience{model.AudienceStore}
 	d.Category = model.CategoryAccount
@@ -553,7 +548,6 @@ type DelegationOperationCompletedParams struct {
 	OccurredAt            time.Time `json:"occurred_at"`
 }
 
-// delegationActionText 是代行動作（delegation.AuditAction 的值）的片語；TestEveryDelegationActionHasText 對照擁有者的全部動作。
 var delegationActionText = map[string]func(uitext.Locale) uitext.Message{
 	"STOREFRONT_UPDATE":       text.DelegationActionStorefrontUpdate,
 	"STOREFRONT_LOGO_UPDATE":  text.DelegationActionStorefrontLogoUpdate,
@@ -787,7 +781,6 @@ func reportReceivedKey(p ReportReceivedParams) string {
 	return p.ReportID.String()
 }
 
-// reportPath 只有賣家來源的檢舉有可去的畫面（website 的 /account/reports/{id} 讀賣家檢舉）。
 func reportPath(source string, id uuid.UUID) string {
 	if source == ReportSourceSeller {
 		return "/account/reports/" + id.String()
@@ -977,7 +970,6 @@ func moderationOutcome(outcome string) (string, error) {
 	return "", badParams("案件結果 %q 不是 VIOLATION 或 NO_VIOLATION", outcome)
 }
 
-// caseReporterTargets 分頁展開案件 audience 那一邊的檢舉人：Target.ID 與游標是檢舉人號碼（buyer_id 或 store_id，遞增），每個母意圖只讀自己那一邊。
 func caseReporterTargets(ctx context.Context, r Resolver, p ModerationCaseClosedParams, req PageRequest, audience model.Audience) (TargetPage, error) {
 	outcome, err := moderationOutcome(p.Outcome)
 	if err != nil {

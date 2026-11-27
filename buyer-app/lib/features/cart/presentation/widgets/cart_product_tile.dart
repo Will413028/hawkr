@@ -30,7 +30,6 @@ class CartProductTile extends StatelessWidget {
   final ValueChanged<bool> onCheckChanged;
   final ValueChanged<int> onQuantityChanged;
 
-  // 後端 issue #1127：cart 透過 purchasable + unavailableReason 表達 row 級可購買性。
   static const Map<String, String> _unavailableLabel = {
     'DELISTED': '已下架',
     'OUT_OF_STOCK': '已售完',
@@ -66,7 +65,6 @@ class CartProductTile extends StatelessWidget {
 
     if (!unavailable) return tileContent;
 
-    // 不可購買商品仍保留外層 IosSwipeAction，讓使用者可以左滑移除。
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -135,8 +133,6 @@ class CartProductTile extends StatelessWidget {
     double maxWidth,
     bool unavailable,
   ) {
-    // QuantityStepper keeps its 48px buttons and scaled count; give it its
-    // actual text width before sharing the remaining space with the thumbnail.
     final countPainter = TextPainter(
       text: TextSpan(
         text: '${item.count}',
@@ -149,8 +145,6 @@ class CartProductTile extends StatelessWidget {
         HkControl.minTap * 2 +
         math.max(32, countPainter.width + HkSpace.xs * 2);
     countPainter.dispose();
-    // Keep the thumbnail and controls inline only when their measured widths fit.
-    // A very large count gets its own row, with a stacked stepper if necessary.
     if (stepperWidth + HkSpace.sm + 48 > maxWidth) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -393,8 +387,6 @@ class CartProductTile extends StatelessWidget {
       count: item.count,
       countTextStyle: CartTypography.button,
       stacked: stacked,
-      // A retained sold-out row can report zero stock; the disabled stepper
-      // still renders its existing quantity with a valid minimum of one.
       maxCount: remainingStock != null && remainingStock! < 1
           ? 1
           : remainingStock,

@@ -27,7 +27,6 @@ import (
 
 const reverseAction = "/test/ReverseHide"
 
-// reviewBy 讓買家對店家寫一則評價（訂單由替身提供，已完成一天）。
 func (f *fixture) reviewBy(t *testing.T, b buyer.Profile, storeID int64, rating int, content string, tokens ...string) review.Review {
 	t.Helper()
 	n := f.next() + 1000
@@ -55,7 +54,6 @@ func (f *fixture) buyerProfile(t *testing.T) buyer.Profile {
 	return p
 }
 
-// seedChat 直接寫一個對話與 n 則訊息（seq 1..n，單數是買家寄、雙數是店家寄，文字是 m<seq>）；imageSeq 大於 0 的那一則改成圖片訊息（引用真的 media 裡一筆已確認的資產，ID 放在 f.chatAsset，它是來源，快照指向的是 moderation 自己的複本，B1-D20）。
 func (f *fixture) seedChat(t *testing.T, buyerID, storeID int64, n, imageSeq int) (conv uuid.UUID, ids map[int64]uuid.UUID) {
 	t.Helper()
 	conv = uuid.NewV7()
@@ -98,8 +96,6 @@ func (f *fixture) hideMessage(t *testing.T, id uuid.UUID) {
 	}
 }
 
-// openChatCase 直接建立一個進行中的聊天訊息案件與它的快照：買家單方檢舉下，聊天案件的作者全是店家（設計 §0.4.1 第 2 點），買家寄的訊息沒有檢舉入口（店家檢舉人在 A6-4c），
-// 但處置路徑（作者取自快照）要被走到。
 func (f *fixture) openChatCase(t *testing.T, messageID uuid.UUID, c snapshot.Content) Case {
 	t.Helper()
 	id := uuid.NewV7()
@@ -110,7 +106,6 @@ func (f *fixture) openChatCase(t *testing.T, messageID uuid.UUID, c snapshot.Con
 	return mustV[CaseDetail](t)(f.module.Case(context.Background(), id)).Case
 }
 
-// cloneCase 直接建立同一個內容的第二個案件並複製快照：內容已被隱藏，不能再經 SubmitReport 檢舉（§1.1／§1.2，已隱藏回 NotFound）。
 func (f *fixture) cloneCase(t *testing.T, src Case) Case {
 	t.Helper()
 	id := uuid.NewV7()

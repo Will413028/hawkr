@@ -49,11 +49,8 @@ type Deps struct {
 // Service 是暫存上傳的服務。
 type Service struct {
 	d Deps
-	// secureSlots 限制同時處理中的機敏段（PutSecureChunk 與 PutSecure 內部切的段，model.SecureUploadConcurrency）。
 	secureSlots chan struct{}
-	// publicSlots 限制同時在請求內解碼的 PutPublic（model.PublicPutConcurrency）。
 	publicSlots chan struct{}
-	// afterRewrapUploads 只給測試：RewrapDEKs 掃完 UPLOADING 暫存列、掃資產之前呼叫，用來在兩階段之間完成一次上傳。
 	afterRewrapUploads func(context.Context)
 }
 
@@ -120,17 +117,14 @@ func hashToken(token string) []byte {
 
 func newToken() string {
 	var b [tokenBytes]byte
-	// crypto/rand.Read 不會回傳錯誤（失敗時直接終止程式）。
 	_, _ = rand.Read(b[:])
 	return base64.RawURLEncoding.EncodeToString(b[:])
 }
 
-// wellFormed 回報 token 的形狀是不是 newToken 產生的；形狀不對的不查資料庫。
 func wellFormed(token string) bool {
 	return len(token) == base64.RawURLEncoding.EncodedLen(tokenBytes) && !strings.ContainsAny(token, "+/=")
 }
 
-// normalizeContentType 解析宣告的 Content-Type：去掉參數、轉小寫、把 image/jpg 視為 image/jpeg，回傳白名單內的正規值。
 func normalizeContentType(ct string) (string, bool) {
 	mt, _, err := mime.ParseMediaType(ct)
 	if err != nil {
@@ -149,7 +143,6 @@ func normalizeContentType(ct string) (string, bool) {
 
 func loc(ctx context.Context) uitext.Locale { return uitext.LocaleFrom(ctx) }
 
-// validate 驗證宣告並回傳 Content-Type 已正規化的輸入；簽章與回傳的 header 都用正規值。
 func validate(ctx context.Context, in BeginInput) (BeginInput, error) {
 	if in.Size <= 0 {
 		return in, apperr.InvalidInputOn([]string{"size"}, "%s", text.MediaUploadSizeZero(loc(ctx)))
@@ -173,7 +166,6 @@ func notFound(ctx context.Context) error {
 	return apperr.NotFound("%s", text.MediaUploadNotFound(loc(ctx)))
 }
 
-// checkUploader 檢查上傳者的形狀：ID 為正；代行店家（Store 非 0）只屬於管理員，帶 Store 的非管理員是呼叫方的程式錯誤。
 func checkUploader(ctx context.Context, u model.Uploader) error {
 	if u.ID <= 0 || u.Store != 0 && !u.Admin {
 		return apperr.InvalidInputOn([]string{"uploader"}, "%s", text.MediaUploaderInvalid(loc(ctx)))
@@ -181,7 +173,6 @@ func checkUploader(ctx context.Context, u model.Uploader) error {
 	return nil
 }
 
-// delegatedStore 是要寫進暫存列的代行店家：非代行是 NULL。
 func delegatedStore(u model.Uploader) *int64 {
 	if u.Store == 0 {
 		return nil
@@ -189,7 +180,6 @@ func delegatedStore(u model.Uploader) *int64 {
 	return &u.Store
 }
 
-// storeOf 是暫存列綁定的代行店家，非代行是 0。
 func storeOf(row store.MediaStagedUpload) int64 {
 	if row.DelegatedStoreID == nil {
 		return 0
@@ -197,12 +187,10 @@ func storeOf(row store.MediaStagedUpload) int64 {
 	return *row.DelegatedStoreID
 }
 
-// ownedBy 是暫存列屬於這個上傳者：帳號或管理員的 ID 與種類相同，且代行店家相同（非代行兩邊都是 0）。
 func ownedBy(row store.MediaStagedUpload, u model.Uploader) bool {
 	return row.UploaderID == u.ID && row.UploaderAdmin == u.Admin && storeOf(row) == u.Store
 }
 
-// own 回傳 token 對應的暫存列；不存在或上傳者（含代行店家）不符都回同一個 NotFound，不洩漏 token 是否存在。
 func (s *Service) own(ctx context.Context, uploader model.Uploader, token string) (store.MediaStagedUpload, error) {
 	if !wellFormed(token) {
 		return store.MediaStagedUpload{}, notFound(ctx)
@@ -348,7 +336,6 @@ func (s *Service) Confirm(ctx context.Context, uploader model.Uploader, token st
 	return s.assetOf(ctx, *claim.AssetID, true)
 }
 
-// visibilityMismatch 是暫存的可見性不是擁有者要的：訊息指出要的是公開圖片或機敏檔。
 func visibilityMismatch(ctx context.Context, want model.Visibility) error {
 	if want == model.VisibilitySecure {
 		return apperr.InvalidInput("%s", text.MediaVisibilitySecureRequired(loc(ctx)).Text)
@@ -356,7 +343,6 @@ func visibilityMismatch(ctx context.Context, want model.Visibility) error {
 	return apperr.InvalidInput("%s", text.MediaVisibilityPublicRequired(loc(ctx)).Text)
 }
 
-// notConfirmable 把「不能確認」的暫存列翻成呼叫端看得到的錯誤。
 func notConfirmable(ctx context.Context, row store.MediaStagedUpload, now time.Time) error {
 	switch model.UploadState(row.State) {
 	case model.StateRejected:
@@ -374,7 +360,6 @@ func notConfirmable(ctx context.Context, row store.MediaStagedUpload, now time.T
 	return apperr.FailedPrecondition("%s", text.MediaUploadNotReady(loc(ctx)))
 }
 
-// assetOf 回傳資產（欄位不變、不加鎖）；requireActive 時推導的狀態不是 ACTIVE（例如同 transaction 已被請求刪除）回 FailedPrecondition。
 func (s *Service) assetOf(ctx context.Context, assetID uuid.UUID, requireActive bool) (ConfirmedAsset, error) {
 	a, err := s.q(ctx).GetAssetView(ctx, assetID)
 	if err != nil {
@@ -386,7 +371,6 @@ func (s *Service) assetOf(ctx context.Context, assetID uuid.UUID, requireActive 
 	return ConfirmedAsset{ID: a.ID, ObjectKey: a.ObjectKey, Visibility: model.Visibility(a.Visibility), ContentType: a.ContentType, SizeBytes: a.SizeBytes}, nil
 }
 
-// deriveState 是 GetAssetView 一列的推導狀態，唯一經 model.DeriveAssetState。
 func deriveState(a store.GetAssetViewRow) model.AssetState {
 	return model.DeriveAssetState(model.AssetState(a.State), a.Confirmed, a.DeleteRequested)
 }
@@ -424,8 +408,6 @@ func CountAssetsInState(ctx context.Context, d *db.DB, want model.AssetState) (i
 	return n, nil
 }
 
-// acquire 取一個名額並回傳放回的函式。wait 為 false 時滿了立即回 ResourceExhausted（client 上傳：有人可以稍後重試）；
-// 為 true 時等到有名額，ctx 結束就回 ctx 的錯誤（伺服器內部呼叫：沒有人能重試）。
 func acquire(ctx context.Context, slots chan struct{}, wait bool, busy error) (func(), error) {
 	release := func() { <-slots }
 	if !wait {

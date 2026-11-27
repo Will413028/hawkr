@@ -31,7 +31,6 @@ export default function TrackingClient({ orderNo }: { orderNo: string }) {
 			const r = await queryLogistics(orderNo);
 			setTrack(r);
 		} catch (e) {
-			// 原始 HTTP 碼不外露，但**可行動性**要外露：403 再重試幾次都不會變。
 			const status =
 				e != null && typeof e === "object" && "status" in e
 					? (e as { status?: number }).status
@@ -54,7 +53,6 @@ export default function TrackingClient({ orderNo }: { orderNo: string }) {
 		void load();
 	}, [load]);
 
-	// 後端回傳但無託運單號（例：尚未交運）
 	const hasTracking = Boolean(track?.shipTradeNo);
 	const subtitleTrackingNo = track?.shipTradeNo || trackingNo;
 

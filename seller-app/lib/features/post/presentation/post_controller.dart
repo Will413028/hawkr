@@ -56,7 +56,6 @@ class PostList extends _$PostList {
   Future<void> deletePost(int postId) async {
     if (!_pendingDeletes.add(postId)) return;
 
-    // Optimistic update
     final prevState = state;
     if (prevState is AsyncData<List<Post>>) {
       final newList = prevState.value.where((p) => p.id != postId).toList();
@@ -66,7 +65,6 @@ class PostList extends _$PostList {
     try {
       await ref.read(postRepositoryProvider).deletePost(postId);
     } catch (error, stackTrace) {
-      // Revert on error
       state = prevState;
       Error.throwWithStackTrace(error, stackTrace);
     } finally {

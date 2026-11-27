@@ -25,16 +25,8 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// tTermsVersion 是本檔用的自行開票責任條款版本字串。
-//
-// 刻意**不 import internal/usecase 的 SelfIssueTermsVersion**：repository 層對版本值
-// 沒有任何語意，它只負責「傳什麼寫什麼」；反向 import 會把依賴方向倒過來。
-// 「Go 端傳的是不是當期版本」由 usecase 那層的測試守。
 const tTermsVersion = "2026-10-25"
 
-// newTaxFixture 建一列 issuer ＋ 一列 seller_tax_profiles，回 repository 與 profile。
-// tAttestedBy 是簽署人的 account_id（#3031）。非 0 才驗得到「三元組一起寫」——
-// 傳 0 會被 nzp 折成 NULL，那一格就退化成與修這件事之前相同。
 const tAttestedBy int64 = 987654321
 
 func newTaxFixture(t *testing.T, status string) (*SellerTaxProfileRepository, context.Context, *pgxpool.Pool, int64, int64) {
@@ -54,15 +46,6 @@ func newTaxFixture(t *testing.T, status string) (*SellerTaxProfileRepository, co
 	return repo, ctx, pool, issuerID, profile.ID
 }
 
-// seedTaxStatus 直接把列推到指定狀態。
-//
-// 🔴 一併補上該狀態需要的時鐘欄位：chk_stp_pending_window 對 SELF_ISSUE_PENDING 與
-// SUPPLEMENT_REQUIRED 要求 submitted_at ＋ pending_valid_until 皆非空，少寫就 23514
-// ——那正是本檔要驗的其中一條，seed 自己踩到會變成 seed 失敗而不是測試失敗。
-//
-// 🔴 同理，chk_stp_attested_when_committed 對 SUBMITTED 與 SELF_ISSUE_PENDING 要求
-// 簽署記錄兩欄皆非空（裁決 C 的不變式）⇒ seed 也得寫。**這正是那條 CHECK 的價值**：
-// 「把列推到已送審而沒有簽署記錄」在 DB 層就辦不到，連測試 seed 都繞不過去。
 func seedTaxStatus(ctx context.Context, t *testing.T, pool *pgxpool.Pool, id int64, status string) {
 	t.Helper()
 	now := time.Now().UTC()
@@ -120,7 +103,6 @@ func TestIntegration_TaxProfile_CreateIsIdempotent(t *testing.T) {
 	if inserted {
 		t.Fatal("uq_seller_tax_profiles_issuer 應該擋下第二列")
 	}
-	// 交易沒有 aborted：後續查詢仍然可用。
 	if taxRow(ctx, t, pool, first).ReviewStatus != "DRAFT" {
 		t.Fatal("建列後狀態應為 DRAFT（DDL DEFAULT）")
 	}
@@ -133,12 +115,10 @@ func TestIntegration_TaxProfile_SubmitCASAndClock(t *testing.T) {
 	now := time.Now().UTC()
 	until := now.Add(60 * 24 * time.Hour)
 
-	// 陰性①：版本不符 ⇒ rows=0。
 	ok, err := repo.Submit(ctx, id, 99, tTermsVersion, tAttestedBy, until, now)
 	if err != nil || ok {
 		t.Fatalf("版本不符應 rows=0：ok=%v err=%v", ok, err)
 	}
-	// 陽性。
 	ok, err = repo.Submit(ctx, id, 0, tTermsVersion, tAttestedBy, until, now)
 	if err != nil || !ok {
 		t.Fatalf("DRAFT → SUBMITTED 應成功：ok=%v err=%v", ok, err)
@@ -150,9 +130,6 @@ func TestIntegration_TaxProfile_SubmitCASAndClock(t *testing.T) {
 	if row.SubmittedAt == nil || row.PendingValidUntil == nil {
 		t.Fatal("單一時鐘的兩欄必須同一句寫，否則 T04／T05 當場 23514")
 	}
-	// 🔴 裁決 C 的不變式在 **SQL 層**的實證：狀態、兩個時鐘欄與條款兩欄由同一句
-	// UPDATE 寫 ⇒ 真實 PostgreSQL 上不存在「已 SUBMITTED 但沒簽條款」的中間態。
-	// 這一支與 usecase 那支不重複：那邊驗的是 fake，這邊驗的是實際跑的 SQL。
 	if row.AttestationVersion == nil || *row.AttestationVersion != tTermsVersion {
 		t.Fatalf("attestation_version = %v，want %q（同一句沒寫到）",
 			row.AttestationVersion, tTermsVersion)
@@ -160,7 +137,6 @@ func TestIntegration_TaxProfile_SubmitCASAndClock(t *testing.T) {
 	if row.AttestedAt == nil {
 		t.Fatal("attested_at 必須與狀態同一句寫")
 	}
-	// 陰性②：已經 SUBMITTED 再送一次 ⇒ allowed-from 不符 ⇒ rows=0。
 	ok, _ = repo.Submit(ctx, id, row.Version, tTermsVersion, tAttestedBy, until, now)
 	if ok {
 		t.Fatal("SUBMITTED 不是 T02 的來源狀態")
@@ -182,13 +158,6 @@ func TestIntegration_TaxProfile_AttestStillReachableAfterSubmitWithTerms(t *test
 	}
 	row := taxRow(ctx, t, pool, id)
 
-	// 🔴 端到端的中段：送審之後、具結之前，**條款已簽但責任尚未生效**。
-	// 這一格是裁決 C 造出來的新狀態，也是整條鏈最容易被判錯的一格：
-	//   ① `SelfIssueEffective()` 必須是 false —— true 代表判準退回讀 attested_at，
-	//      S01／S02 會在後端還是 LEGACY_MANUAL 的時候宣告「發票由你自行開立」。
-	//   ② 列必須停在 SUBMITTED —— 那正是 58A §S04 主 CTA 的渲染條件
-	//      （`taxReviewStatus === "SUBMITTED"`）。若這裡不是 SUBMITTED，
-	//      S04 的 CTA 不渲染 ⇒ 端點 22 按不到 ⇒ SELF_ISSUE_PENDING 不可達。
 	if row.AttestedAt == nil {
 		t.Fatal("送審那一句就該把條款簽好（裁決 C）")
 	}
@@ -207,11 +176,9 @@ func TestIntegration_TaxProfile_AttestStillReachableAfterSubmitWithTerms(t *test
 	if after.ReviewStatus != "SELF_ISSUE_PENDING" {
 		t.Fatalf("status=%s，want SELF_ISSUE_PENDING", after.ReviewStatus)
 	}
-	// 端到端的末段：走完 T04 之後，責任才生效。
 	if !after.SelfIssueEffective() {
 		t.Fatal("SELF_ISSUE_PENDING：自行開票責任必須生效（S01 的琥珀 pill 就靠它）")
 	}
-	// 60 天窗口不得因為補簽而重算（決策 C4 的單一時鐘，裁決 C 明令不動）。
 	if !after.PendingValidUntil.Equal(*row.PendingValidUntil) {
 		t.Fatalf("pending_valid_until 被重算了：%v → %v", row.PendingValidUntil, after.PendingValidUntil)
 	}
@@ -302,7 +269,6 @@ func TestIntegration_TaxProfile_AttestationInvariantsAreEnforcedBySchema(t *test
 		})
 	}
 
-	// 鑑別力：合法的那一組必須寫得進去，否則上面五條全紅只是因為語法壞掉。
 	if _, err := pool.Exec(ctx,
 		`UPDATE seller_tax_profiles SET review_status='SUBMITTED',
 		   submitted_at=$2, pending_valid_until=$2,
@@ -349,7 +315,6 @@ func TestIntegration_TaxProfile_ResetToDraftHonoursCooldown(t *testing.T) {
 	repo, ctx, pool, _, id := newTaxFixture(t, "DRAFT")
 	now := time.Now().UTC()
 
-	// 走完整條 T09 讓 cooldown_until 由 SQL 寫入（而不是 seed 直接塞）。
 	seedTaxStatus(ctx, t, pool, id, "UNDER_REVIEW")
 	row := taxRow(ctx, t, pool, id)
 	if ok, err := repo.Reject(ctx, id, row.Version, "統編不符", now.Add(7*24*time.Hour), now); err != nil || !ok {
@@ -359,11 +324,9 @@ func TestIntegration_TaxProfile_ResetToDraftHonoursCooldown(t *testing.T) {
 		t.Fatal("T09 必須寫 cooldown_until，少了它被駁回的賣家可以立刻無限重送")
 	}
 
-	// 陰性：冷卻未到 ⇒ rows=0。
 	if ok, err := repo.ResetToDraft(ctx, id, now); err != nil || ok {
 		t.Fatalf("冷卻未到應 rows=0：ok=%v err=%v", ok, err)
 	}
-	// 陽性：時間走到冷卻之後。
 	if ok, err := repo.ResetToDraft(ctx, id, now.Add(8*24*time.Hour)); err != nil || !ok {
 		t.Fatalf("冷卻屆滿應可重申：ok=%v err=%v", ok, err)
 	}
@@ -371,8 +334,6 @@ func TestIntegration_TaxProfile_ResetToDraftHonoursCooldown(t *testing.T) {
 	if after.ReviewStatus != "DRAFT" {
 		t.Fatalf("status=%s，want DRAFT", after.ReviewStatus)
 	}
-	// 回 DRAFT 必須清空上一輪的時鐘欄：留著會讓 T02 算出的新 60 天窗口與舊值並存，
-	// 而 chk_stp_pending_window 只檢查非空、不檢查新鮮度。
 	if after.SubmittedAt != nil || after.PendingValidUntil != nil || after.CooldownUntil != nil {
 		t.Fatalf("重申時時鐘欄沒清乾淨：%+v", after)
 	}
@@ -388,7 +349,6 @@ func TestIntegration_TaxProfile_ApproveIsGuardedByChecks(t *testing.T) {
 	now := time.Now().UTC()
 	seedTaxStatus(ctx, t, pool, id, "UNDER_REVIEW")
 
-	// 沒有統編／法定名稱卻核定成 APPROVED_INVOICE_REQUIRED ⇒ 23514。
 	row := taxRow(ctx, t, pool, id)
 	_, err := repo.Approve(ctx, domain.ApproveSellerTaxProfile{ID: id, ExpectedVersion: row.Version, NextStatus: "APPROVED_INVOICE_REQUIRED", ApprovalValidUntil: now.Add(365 * 24 * time.Hour), Now: now})
 	if err == nil {
@@ -409,7 +369,6 @@ func TestIntegration_TaxProfile_ApproveExemptRejectsTaxID(t *testing.T) {
 		t.Fatal("chk_stp_exempt_no_taxid 應該擋下「帶統編卻核定免用統一發票」")
 	}
 
-	// 對照組：統編清掉之後同一句成功 ⇒ 證明剛才擋下的是 CHECK 不是別的東西。
 	mustExec(ctx, t, pool, `UPDATE seller_tax_profiles SET tax_id = NULL WHERE id = $1`, id)
 	row = taxRow(ctx, t, pool, id)
 	if ok, err := repo.Approve(ctx, domain.ApproveSellerTaxProfile{ID: id, ExpectedVersion: row.Version, NextStatus: "APPROVED_INVOICE_EXEMPT", ApprovalValidUntil: now.Add(365 * 24 * time.Hour), Now: now}); err != nil || !ok {
@@ -438,7 +397,6 @@ func TestIntegration_TaxProfile_ExtendOnlyOnce(t *testing.T) {
 	if after.ExtensionCount != 1 || after.ReviewStatus != "SELF_ISSUE_PENDING" {
 		t.Fatalf("T11 應只改期限與次數，實際 count=%d status=%s", after.ExtensionCount, after.ReviewStatus)
 	}
-	// 第二次：述詞 extension_count = 0 不成立 ⇒ rows=0，期限不得再被推遲。
 	if ok, err := repo.ExtendPending(ctx, id, after.Version, now.Add(120*24*time.Hour), "再延", now); err != nil || ok {
 		t.Fatalf("第二次延長應 rows=0：ok=%v err=%v", ok, err)
 	}
@@ -498,7 +456,6 @@ func TestIntegration_TaxProfile_ReopenRejectsOtherStates(t *testing.T) {
 // extension_count 不動），只把 version +1 與 review_note 寫進去。
 func TestIntegration_TaxProfile_KeepUnderReviewTouchesNoClock(t *testing.T) {
 	repo, ctx, pool, _, id := newTaxFixture(t, "SELF_ISSUE_PENDING")
-	// 先延長一次，讓時鐘欄位有可觀察的非預設值。
 	now := time.Now().UTC()
 	row := taxRow(ctx, t, pool, id)
 	if ok, _ := repo.ExtendPending(ctx, id, row.Version, now.Add(90*24*time.Hour), "延長", now); !ok {
@@ -529,13 +486,11 @@ func TestIntegration_TaxProfile_RevokeOnlyFromApproved(t *testing.T) {
 	repo, ctx, pool, _, id := newTaxFixture(t, "DRAFT")
 	now := time.Now().UTC()
 
-	// 陰性：UNDER_REVIEW 不是來源狀態。
 	seedTaxStatus(ctx, t, pool, id, "UNDER_REVIEW")
 	row := taxRow(ctx, t, pool, id)
 	if ok, err := repo.Revoke(ctx, id, row.Version, "撤銷", now); err != nil || ok {
 		t.Fatalf("UNDER_REVIEW 不得被撤銷：ok=%v err=%v", ok, err)
 	}
-	// 陽性。
 	seedTaxStatus(ctx, t, pool, id, "APPROVED_INVOICE_REQUIRED")
 	row = taxRow(ctx, t, pool, id)
 	if ok, err := repo.Revoke(ctx, id, row.Version, "資格不符", now); err != nil || !ok {
@@ -552,14 +507,12 @@ func TestIntegration_TaxProfile_RequestSupplementNeedsPendingWindow(t *testing.T
 	repo, ctx, pool, _, id := newTaxFixture(t, "DRAFT")
 	now := time.Now().UTC()
 
-	// 沒有 submitted_at／pending_valid_until 的 UNDER_REVIEW（ADM 直接建列的情境）。
 	mustExec(ctx, t, pool, `UPDATE seller_tax_profiles SET review_status = 'UNDER_REVIEW' WHERE id = $1`, id)
 	row := taxRow(ctx, t, pool, id)
 	if _, err := repo.RequestSupplement(ctx, id, row.Version, "請補稅籍證明", now); err == nil {
 		t.Fatal("chk_stp_pending_window 應擋下「沒有時鐘欄位卻要求補件」")
 	}
 
-	// 對照組：補上時鐘欄位之後同一句成功。
 	mustExec(ctx, t, pool,
 		`UPDATE seller_tax_profiles SET submitted_at = $2, pending_valid_until = $3 WHERE id = $1`,
 		id, now.Add(-24*time.Hour), now.Add(30*24*time.Hour))
@@ -571,7 +524,6 @@ func TestIntegration_TaxProfile_RequestSupplementNeedsPendingWindow(t *testing.T
 	if after.ReviewStatus != "SUPPLEMENT_REQUIRED" {
 		t.Fatalf("status=%s，want SUPPLEMENT_REQUIRED", after.ReviewStatus)
 	}
-	// **不重算 60 天**：ADM 每要一次補件就等於送賣家一次延期。
 	if !after.PendingValidUntil.Equal(now.Add(30*24*time.Hour).UTC().Truncate(time.Microsecond)) &&
 		after.PendingValidUntil.Sub(now.Add(30*24*time.Hour)).Abs() > time.Millisecond {
 		t.Fatalf("補件不得重算期限：%v", after.PendingValidUntil)
@@ -606,7 +558,6 @@ func TestIntegration_TaxProfile_UpdateDraftNullsEmptyStrings(t *testing.T) {
 		t.Fatalf("evidence_object_keys = %s", row.EvidenceObjectKeys)
 	}
 
-	// 陰性：非 DRAFT 不得就地改內容。
 	seedTaxStatus(ctx, t, pool, id, "UNDER_REVIEW")
 	cur := taxRow(ctx, t, pool, id)
 	if ok, err := repo.UpdateDraft(ctx, domain.UpdateSellerTaxDraft{
@@ -635,7 +586,6 @@ func TestIntegration_Issuer_CreateAndDisplayName(t *testing.T) {
 	if err != nil || !inserted {
 		t.Fatalf("建列失敗：inserted=%v err=%v", inserted, err)
 	}
-	// 第二次 ⇒ ON CONFLICT DO NOTHING（不是 23505）。
 	if _, inserted, err = repo.Create(ctx, domain.NewIssuer{
 		ID: nextID(), IssuerType: "SELLER", IssuerRefID: storeID,
 		DisplayName: "另一個名字", Now: now,
@@ -647,7 +597,6 @@ func TestIntegration_Issuer_CreateAndDisplayName(t *testing.T) {
 	if err != nil || !changed {
 		t.Fatalf("同步法定名稱失敗：changed=%v err=%v", changed, err)
 	}
-	// 值相同時 rows=0 ⇒ **no-op 不是守衛不成立**：重複存檔不空轉 version。
 	if changed, err = repo.UpdateDisplayName(ctx, first.ID, "範例生鮮股份有限公司", now); err != nil || changed {
 		t.Fatalf("同值應為 no-op：changed=%v err=%v", changed, err)
 	}
@@ -657,11 +606,6 @@ func TestIntegration_Issuer_CreateAndDisplayName(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// S05 收據代製授權（§5.1.2 四欄、端點 29）
-//
-// 三條 CHECK 與一句 CAS 的述詞，單元測試（fake 沒有 CHECK）一條都驗不到。
-// ---------------------------------------------------------------------------
 
 // 🔴 資格守衛必須在 CAS 的 WHERE：allowed-from 之外 ⇒ rows=0（可回 9335），
 // 而不是靠 CHECK（那會回 23514 ＝ 一句 500），也不是靠應用層的 if（擋不住併發）。
@@ -689,7 +633,6 @@ func TestIntegration_ReceiptAuth_NonEligibleStatusCannotAuthorize(t *testing.T) 
 		t.Fatal("守衛不成立時不得留下任何寫入")
 	}
 
-	// 鑑別力：換成 EXEMPT 就過得去（上面的 false 不是因為別的原因）。
 	seedTaxStatus(ctx, t, pool, id, "APPROVED_INVOICE_EXEMPT")
 	ok, err = repo.ConfirmReceiptAuthorization(ctx, domain.ConfirmReceiptAuthorization{
 		ID: id, AuthorizedAt: &now, ConsentVersion: &ver,
@@ -733,7 +676,6 @@ func TestIntegration_ReceiptAuth_InReviewSellerCanAuthorizeBeforeApproval(t *tes
 				t.Fatalf("兩欄必須同時寫入，實得 %+v／%v",
 					row.ReceiptAuthorizedAt, row.ReceiptConsentVersion)
 			}
-			// 核定尚未發生 —— 授權不得順手把狀態往前推。
 			if row.ReviewStatus != st {
 				t.Fatalf("授權不得改動 review_status，實得 %q", row.ReviewStatus)
 			}
@@ -788,8 +730,6 @@ func TestIntegration_ReceiptAuth_BasisPairCheck(t *testing.T) {
 		t.Fatal("只有 asset id 沒有 key ⇒ §25 的「objectKey 是 SSOT」就斷了，必須被擋下")
 	}
 
-	// 指名走的是端點 40 的核定那一句 CAS（§6.1.9：由 ADM 在核定決策中指名，
-	// 不另開一句 UPDATE）⇒ 先把列推回可核定的來源狀態。
 	seedTaxStatus(ctx, t, pool, id, "UNDER_REVIEW")
 	ok, err := repo.Approve(ctx, domain.ApproveSellerTaxProfile{
 		ID: id, ExpectedVersion: taxRow(ctx, t, pool, id).Version,
@@ -806,9 +746,6 @@ func TestIntegration_ReceiptAuth_BasisPairCheck(t *testing.T) {
 		t.Fatalf("兩欄必須同時寫入，實得 %+v", row)
 	}
 
-	// 取消指名：再核定一次但不帶依據文件 ⇒ 兩欄一起清成 NULL
-	// （端點 28 於是回 NOT_DESIGNATED）。這也是「同一句 CAS」的必然結果：
-	// 核定寫什麼，依據文件就是什麼，不會留下上一次的殘值。
 	seedTaxStatus(ctx, t, pool, id, "UNDER_REVIEW")
 	ok, err = repo.Approve(ctx, domain.ApproveSellerTaxProfile{
 		ID: id, ExpectedVersion: taxRow(ctx, t, pool, id).Version,
@@ -841,5 +778,4 @@ func TestIntegration_ReceiptAuth_RevokingApprovalDoesNotBlockFutureUpdates(t *te
 	if row.ReceiptAuthorizedAt == nil {
 		t.Fatal("撤銷資格不會抹掉授權紀錄——那是曾經發生過的事實")
 	}
-	// 而讀取面會把它投影成 ineligible（APPROVAL_REVOKED），資格與授權紀錄是兩件事。
 }

@@ -61,7 +61,6 @@ class AfterSalesPropertiesBindingTest {
                 }
             }
         }
-        // 對照組：讀不到任何 key 的話，下面的迴圈會空轉而「通過」——那是假綠。
         assertTrue(aftersales.size() >= 3,
                 "aftersales.* 只讀到 " + aftersales.size() + " 個 key，查詢本身可疑");
 

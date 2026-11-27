@@ -70,7 +70,7 @@ export interface SseClientOptions {
 	handlers: SseClientHandlers;
 }
 
-const DEFAULT_HEARTBEAT_TIMEOUT_MS = 35_000; // 30s heartbeat + 5s grace
+const DEFAULT_HEARTBEAT_TIMEOUT_MS = 35_000;
 const DEFAULT_MAX_DOWNTIME_MS = 30_000;
 const BACKOFF_INITIAL_MS = 800;
 const BACKOFF_MAX_MS = 8_000;
@@ -152,18 +152,9 @@ export class SseClient {
 
 		const headers = new Headers({
 			Accept: "text/event-stream",
-			// Avoid intermediary caches buffering the stream.
 			"Cache-Control": "no-cache",
 		});
 		if (this.lastEventId) headers.set("Last-Event-ID", this.lastEventId);
-		// Authed streams mirror the apiClient.dispatch() header policy: the
-		// stored UI workspace is sent so the gateway scopes notifications to
-		// the same role the REST list / unread-count endpoints use. Without
-		// this header, a dual-role account in seller view would receive a
-		// stream that doesn't match what `/app/notifications/unread-count`
-		// returns. The role is re-read on every (re)connect, and role
-		// switching restarts the stream via the hook's `resetSignal`, so the
-		// header always tracks the current selection.
 		if (this.mode === "authed") {
 			const role = roleToHeader(getStoredActiveRole());
 			if (role) headers.set("X-Active-Role", role);
@@ -182,9 +173,6 @@ export class SseClient {
 		try {
 			response = await fetch(url, request);
 		} catch (err) {
-			// AbortError from `close()` is terminal (closed flag set), but
-			// AbortError from the heartbeat watchdog should fall through to
-			// scheduleReconnect — `scheduleReconnect` itself bails when closed.
 			if ((err as Error)?.name === "AbortError" && this.closed) return;
 			this.scheduleReconnect();
 			return;
@@ -195,12 +183,6 @@ export class SseClient {
 			return;
 		}
 		if (response.status === 429 || response.status === 503) {
-			// Per-account connection-cap or gateway shed — design book §11.6 /
-			// §10 says we surface "請重新整理頁面" and stop hitting the gateway.
-			// One Retry-After-honouring retry first, though: the commonest 429
-			// here is the 3-streams-per-account cap hit transiently while
-			// another page's stream is still tearing down (e.g. fast viewer
-			// paging). A second consecutive 429 is treated as real.
 			if (response.status === 429 && !this.rateLimitRetried && !this.closed) {
 				this.rateLimitRetried = true;
 				const after = Number(response.headers.get("retry-after"));
@@ -232,8 +214,6 @@ export class SseClient {
 		try {
 			await this.readStream(response.body);
 		} catch (err) {
-			// User close: closed flag is set → don't reconnect.
-			// Watchdog abort: closed=false → fall through to scheduleReconnect.
 			if ((err as Error)?.name === "AbortError" && this.closed) return;
 		}
 		this.clearHeartbeatTimer();
@@ -265,7 +245,7 @@ export class SseClient {
 		let id: string | null = null;
 		const dataLines: string[] = [];
 		for (const line of raw.split("\n")) {
-			if (!line || line.startsWith(":")) continue; // comments / heartbeats lacking event:
+			if (!line || line.startsWith(":")) continue;
 			if (line.startsWith("event:")) {
 				eventName = line.slice(6).trim();
 			} else if (line.startsWith("data:")) {
@@ -280,13 +260,11 @@ export class SseClient {
 			try {
 				parsed = JSON.parse(dataRaw);
 			} catch {
-				// Plain string payload — leave as-is.
 			}
 		}
 		if (id) this.lastEventId = id;
 
 		if (eventName === "heartbeat") {
-			// Already rearmed the watchdog in readStream(); nothing else to do.
 			return;
 		}
 		if (eventName === "ready") {
@@ -299,15 +277,6 @@ export class SseClient {
 			});
 			return;
 		}
-		// 註解 frame（`: ping` 之類的 keepalive）沒有任何 data: 行，依 SSE 規格
-		// 「data buffer 是空的就不 dispatch」，它根本不是一個事件。分派出去會讓
-		// 呼叫端收到 data 為空字串的假事件——呼叫端若靠 switch default 吞掉未知事件還好，
-		// 但會拿 "" 去跑 schema 驗證的呼叫端會判定契約不符而收線，
-		// gateway 的 20 秒 keepalive 就足以殺掉整條訂閱。
-		// 注意 `data:`（有這行但值是空的）不算註解，dataLines 會有一個空字串，
-		// 仍然要照常分派——所以判斷的是「有沒有 data: 行」，不是 dataRaw 是否為空。
-		// watchdog 的 rearm 在 readStream 就做完了，keepalive 的 liveness 訊號
-		// 不會因為這裡提早 return 而漏掉。
 		if (dataLines.length === 0) return;
 
 		this.handlers.onEvent(eventName, parsed, id);
@@ -316,7 +285,6 @@ export class SseClient {
 	private armHeartbeatTimer() {
 		this.clearHeartbeatTimer();
 		this.heartbeatTimer = setTimeout(() => {
-			// No data within the heartbeat window — abort + reconnect.
 			this.abort();
 		}, this.heartbeatTimeoutMs);
 	}
@@ -364,7 +332,6 @@ export class SseClient {
 			try {
 				this.abortController.abort();
 			} catch {
-				/* noop */
 			}
 			this.abortController = null;
 		}
@@ -376,13 +343,6 @@ export class SseClient {
 		this.handlers.onStatusChange?.(next);
 	}
 
-	// A stream that exhausted its 30s downtime budget (or hit 429/503) lands in
-	// "unavailable" and stops retrying — correct while the tab is backgrounded or
-	// the network is down, but it must not stay dead once the user returns or the
-	// connection recovers, or realtime (notifications / 留言) silently freezes for
-	// the rest of the session. Network-back and tab-visible are both fresh chances:
-	// reset the downtime window so the reconnect gets the full budget again rather
-	// than inheriting the exhausted one.
 	private reviveFromDeadState() {
 		if (this.closed) return;
 		if (this.status !== "unavailable" && this.status !== "offline") return;
@@ -415,8 +375,6 @@ export class SseClient {
 		if (typeof window === "undefined") return;
 		window.addEventListener("online", this.onOnline);
 		window.addEventListener("offline", this.onOffline);
-		// Refocusing a backgrounded tab is the commonest way a user meets a stream
-		// that died while hidden; revive it on visibility too, not just network.
 		if (typeof document !== "undefined") {
 			document.addEventListener("visibilitychange", this.onVisibilityChange);
 		}

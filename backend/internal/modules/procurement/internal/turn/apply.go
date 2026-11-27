@@ -48,7 +48,6 @@ type Outcome struct {
 	Reason     InvalidReason
 	Resolution *slots.Resolution
 	Next       *InterruptPayload
-	// card 是 Next 對應的完整卡（含 planner 的問題），回答的 executor 用它接著規劃這一輪。
 	card *pendingCard
 }
 
@@ -91,7 +90,6 @@ func ApplyAnswer(ctx context.Context, rs Resolver, l uitext.Locale, now time.Tim
 	if p.Stage == StageGroup {
 		return applyGroup(ctx, rs, l, now, p, c)
 	}
-	// 卡是當時算的：確認前以分類 ID 查現行分類樹，該分類已不是末層品項就不確認，改用現在的命中重新出卡。
 	m, ok, err := rs.Leaf(ctx, c.CategoryID)
 	if err != nil {
 		return Outcome{}, fmt.Errorf("turn：查分類：%w", err)
@@ -121,7 +119,6 @@ func ApplyAnswer(ctx context.Context, rs Resolver, l uitext.Locale, now time.Tim
 	return decideMatches(l, p.Query, current), nil
 }
 
-// applyGroup：買家選了大類。只在該大類底下找與原詞相符的末層命中；沒有就列該大類的末層。不直接以大類當結果。
 func applyGroup(ctx context.Context, rs Resolver, l uitext.Locale, now time.Time, p InterruptPayload, group PayloadCandidate) (Outcome, error) {
 	res, err := rs.Resolve(ctx, p.Query)
 	if err != nil {
@@ -148,7 +145,6 @@ func applyGroup(ctx context.Context, rs Resolver, l uitext.Locale, now time.Time
 	return decideMatches(l, p.Query, ms), nil
 }
 
-// applyText：買家打字，用新字詞重新解析。
 func applyText(ctx context.Context, rs Resolver, l uitext.Locale, now time.Time, p InterruptPayload, text string) (Outcome, error) {
 	res, err := rs.Resolve(ctx, text)
 	if err != nil {
@@ -169,7 +165,6 @@ func applyText(ctx context.Context, rs Resolver, l uitext.Locale, now time.Time,
 	return interrupt(l, describeCard(p.Query)), nil
 }
 
-// decideMatches：1 個確認，多個出卡（呼叫端保證 ms 非空且都是 Apply 收得下的）。
 func decideMatches(l uitext.Locale, query string, ms []confirmed) Outcome {
 	if len(ms) == 1 {
 		return resolvedOutcome(*ms[0].set.Resolution)
@@ -183,7 +178,6 @@ func resolvedOutcome(r slots.Resolution) Outcome {
 	return Outcome{Kind: OutcomeResolved, Resolution: &r}
 }
 
-// interrupt 把卡渲染成送出語系的文字並放進 payload。
 func interrupt(l uitext.Locale, c *pendingCard) Outcome {
 	p := c.payload
 	p.Question = *questionWire(reply.Question(l, c.card))
@@ -208,7 +202,6 @@ func candidateOf(p InterruptPayload, id string) (PayloadCandidate, bool) {
 	return PayloadCandidate{}, false
 }
 
-// accept 回傳 slots 驗證收下的解析（標籤依規則截斷；標籤空白、分類 ID 不合法的不收）。
 func accept(query string, r slots.Resolution, now time.Time) (slots.Resolution, bool) {
 	applied, _ := slots.Set{Item: &query}.Apply(slots.Patch{Resolution: &r}, now)
 	if applied.Resolution == nil {
@@ -217,7 +210,6 @@ func accept(query string, r slots.Resolution, now time.Time) (slots.Resolution, 
 	return *applied.Resolution, true
 }
 
-// usable 只留下 slots 驗證會收下為品項解析的命中（連同收下後的欄位組）。
 func usable(query string, ms []resolver.Match, now time.Time) []confirmed {
 	return confirmable(slots.Set{Item: &query}, ms, now)
 }

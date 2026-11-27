@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ==================== §5.21 配送異常賣家通知 — DTO ====================
 
 // ShipmentAnomalyRecordResp 賣家配送異常列表單筆
 // 資料來源：shipments LEFT JOIN shipment_anomaly_acknowledgments（SQL 推導，不寫第二份狀態表）
@@ -80,7 +79,6 @@ type ListShipmentAnomaliesForAdminResponse struct {
 	PageSize string                           `json:"pageSize"`
 }
 
-// ==================== §5.21 配送異常賣家通知 — Handler ====================
 
 // ListSellerShipmentAnomalies 列賣家配送異常 dashboard
 //

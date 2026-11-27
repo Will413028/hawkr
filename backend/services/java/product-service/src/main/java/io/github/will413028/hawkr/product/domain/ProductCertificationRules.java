@@ -3,8 +3,6 @@ package io.github.will413028.hawkr.product.domain;
 import io.github.will413028.hawkr.common.utils.code.CertificationType;
 import io.github.will413028.hawkr.common.utils.code.ProductCertificationSource;
 import io.github.will413028.hawkr.common.utils.code.ProductCertificationStatus;
-// 嚴格類的字元白名單與長度上限唯一來源。設計書 §6.2.1 ③ 明令「不得再新增第三份字面值」，
-// 因此這裡引用 service 層的 static（純函式、無執行期耦合），而不是把 regex 再抄一份到 domain。
 import io.github.will413028.hawkr.product.service.GovCertificationService;
 
 import java.util.Map;
@@ -121,7 +119,6 @@ public final class ProductCertificationRules {
             return null;
         }
         if (CertificationTypeRules.isVerifiable(type)) {
-            // 嚴格類：原值直接餵同一支 static，不 trim、不改寫
             return GovCertificationService.isValidCertNo(rawCertNo) ? rawCertNo : null;
         }
         if (rawCertNo == null) {
@@ -137,8 +134,6 @@ public final class ProductCertificationRules {
         }
         for (int i = 0; i < normalized.length(); ) {
             int cp = normalized.codePointAt(i);
-            // 控制字元（含 tab／換行／零寬控制）與角括號一律擋：前者讓值在 log 與 ADM 畫面上失真，
-            // 後者是 ADM 詳情頁渲染時的注入面（政府原始資料已有未跳脫 HTML 的前例）。
             if (Character.isISOControl(cp) || cp == '<' || cp == '>') {
                 return null;
             }

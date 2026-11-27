@@ -84,16 +84,9 @@ type QuoteState = "idle" | "loading" | "ready" | "error";
 export default function SkuShippingEditor({ sku, index, onUpdate }: Props) {
 	const selected = sku.shipping_methods ?? [];
 
-	// 後端 product_sku.unit 本身即為重量單位（公斤/台斤/公克），
-	// 結帳依此換算成公克算運費，故 label 與運費試算單位都以 sku.unit 為準，
-	// 單位選擇器放在重量輸入旁，避免 label 與實際儲存單位不一致。
 	const unitCode = coerceWeightUnitCode(sku.unit);
 	const unitLabel = WEIGHT_UNIT_LABEL[unitCode];
 
-	// Seller's 物流設定 onboarding rows — so an unavailable combination reads
-	// 「尚未開通」when the carrier isn't opened, instead of always blaming
-	// size / weight. Until the fetch resolves we treat everything as opened so a
-	// pending load can't flash a wrong「未開通」on every row.
 	const { rows: onboardingRows, loaded: onboardingLoaded } =
 		useShippingOnboardings();
 
@@ -101,8 +94,6 @@ export default function SkuShippingEditor({ sku, index, onUpdate }: Props) {
 	const [state, setState] = React.useState<QuoteState>("idle");
 	const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
-	// Debounced quote fetch. A monotonically-increasing request id makes sure a
-	// slow earlier response can't overwrite a newer one (last-write-wins).
 	const reqId = React.useRef(0);
 	const length = sku.length_cm ?? "";
 	const width = sku.width_cm ?? "";
@@ -125,7 +116,6 @@ export default function SkuShippingEditor({ sku, index, onUpdate }: Props) {
 				width,
 				height,
 				weight,
-				// 後端依重量旁選擇的 sku.unit 換算運費（issue #1316）。
 				weightUnit: unitCode,
 			})
 				.then((res) => {
@@ -169,9 +159,6 @@ export default function SkuShippingEditor({ sku, index, onUpdate }: Props) {
 			selected.map((m) => (m.type === type ? { ...m, ...patch } : m)),
 		);
 
-	// Every listed carrier + any already-selected carrier outside the list (e.g.
-	// an option created on mobile with a carrier we don't list), so nothing the
-	// seller saved silently disappears.
 	const cards = [
 		...CARRIERS,
 		...selected.map((m) => m.type).filter((t) => !CARRIERS.includes(t)),
@@ -179,9 +166,6 @@ export default function SkuShippingEditor({ sku, index, onUpdate }: Props) {
 
 	const selectedCount = selected.length;
 
-	// Controlled `open` (seeded from whether shipping is already set) with an
-	// onToggle sync — otherwise a re-render mid-typing would yank a manually
-	// expanded <details> shut.
 	const [open, setOpen] = React.useState(selectedCount > 0);
 
 	return (
@@ -204,7 +188,7 @@ export default function SkuShippingEditor({ sku, index, onUpdate }: Props) {
 			</summary>
 
 			<div className="mt-2 flex flex-col gap-3">
-				{/* 包裝尺寸 */}
+
 				<div className="grid grid-cols-3 gap-2 items-end">
 					<DimField
 						label="長 (cm)"
@@ -222,7 +206,7 @@ export default function SkuShippingEditor({ sku, index, onUpdate }: Props) {
 						onChange={(v) => onUpdate(index, { height_cm: v })}
 					/>
 				</div>
-				{/* 重量與單位一起填寫，運費試算依此換算 */}
+
 				<div className="grid grid-cols-[minmax(0,2fr)_minmax(120px,1fr)] gap-2 items-end">
 					<DimField
 						label={`重量 (${unitLabel})`}
@@ -236,7 +220,7 @@ export default function SkuShippingEditor({ sku, index, onUpdate }: Props) {
 					/>
 				</div>
 
-				{/* 狀態提示（矩陣永遠顯示在下方，可選的會亮起） */}
+
 				{state === "idle" && (
 					<p className="text-xs text-hk-muted m-0">
 						填寫包裝長寬高與重量（{unitLabel}
@@ -280,9 +264,6 @@ export default function SkuShippingEditor({ sku, index, onUpdate }: Props) {
 										fee_payer: sellerPays
 											? ShippingFeePayer.SELLER
 											: ShippingFeePayer.BUYER,
-										// A buyer-paid method must never carry an orphaned
-										// threshold. A seller-paid method with 0 is
-										// intentionally unconditional free shipping.
 										free_threshold: sellerPays
 											? method?.fee_payer === ShippingFeePayer.SELLER
 												? method.free_threshold || "0"
@@ -371,13 +352,9 @@ function ShippingOptionCard({
 	onThreshold: (v: string) => void;
 }) {
 	const isSelected = !!method;
-	// A carrier the seller hasn't opened in 物流設定 can never ship this
-	// product, so block it regardless of the size / weight quote — and say why.
 	const blockedByOnboarding =
 		openState === "not_opened" || openState === "disabled";
 	const effectiveAvailable = available && !blockedByOnboarding;
-	// Can't pick a combo that doesn't fit or isn't opened; a previously-selected
-	// one stays toggleable so the seller can remove it.
 	const disabled = !effectiveAvailable && !isSelected;
 	const sellerPays = method?.fee_payer === ShippingFeePayer.SELLER;
 	const fundingName = React.useId();

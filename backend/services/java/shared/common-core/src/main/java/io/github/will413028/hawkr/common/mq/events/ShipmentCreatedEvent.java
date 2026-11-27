@@ -24,7 +24,7 @@ public class ShipmentCreatedEvent extends BaseEvent {
     private String orderSn;
     private Long memberId;
     private Long sellerAccountId;
-    private String carrier;  // 7-11, TCAT
+    private String carrier;
     private String trackingNumber;
     private String shipTradeNo;
 

@@ -127,7 +127,6 @@ func TestATransferForARowThatIsNoLongerPendingIsReportedNotSilent(t *testing.T) 
 	}
 }
 
-// anomalousTransfer 讓一筆結果不明的轉帳因查回連續失敗進 ANOMALY。
 func (f *chargeFixture) anomalousTransfer(t *testing.T, orderNo string, lost bool) PaymentTransfer {
 	t.Helper()
 	var tr PaymentTransfer

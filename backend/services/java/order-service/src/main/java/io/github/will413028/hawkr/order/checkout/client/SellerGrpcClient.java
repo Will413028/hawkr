@@ -73,7 +73,6 @@ public class SellerGrpcClient {
                 .addAllStoreIds(List.of(storeId))
                 .build();
 
-        // seller-service 失敗時會拋 StatusRuntimeException，由上層 RPC catch-all 處理
         BatchGetSellerMetaResponse response = sellerStub
                 .withDeadlineAfter(INTERNAL_READ_DEADLINE_SEC, TimeUnit.SECONDS)
                 .batchGetSellerMeta(request);
@@ -130,13 +129,10 @@ public class SellerGrpcClient {
         ResolvePrincipalsRequest request = ResolvePrincipalsRequest.newBuilder()
                 .addAllIds(storeIds)
                 .build();
-        // seller-service 失敗時會拋 StatusRuntimeException，由呼叫端決定 fail-closed 處理
         ResolvePrincipalsResponse response = sellerStub
                 .withDeadlineAfter(INTERNAL_READ_DEADLINE_SEC, TimeUnit.SECONDS)
                 .resolvePrincipals(request);
         if (response.getCode() != 0) {
-            // 非 0 code（業務碼錯誤，非 transport 失敗）同樣視為失敗、fail-closed，
-            // 避免呼叫端拿到空 map 後 getOrDefault 悄悄退化成錯誤比對（final review follow-up）
             throw Status.INTERNAL.withDescription(response.getMessage()).asRuntimeException();
         }
         return PrincipalResolution.of(response.getPrincipalsMap(), response.getUnresolvedIdsList());

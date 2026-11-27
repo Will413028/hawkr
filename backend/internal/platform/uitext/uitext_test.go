@@ -95,14 +95,12 @@ func TestUnknownValuesHaveNoText(t *testing.T) {
 			t.Errorf("SellerMeasureKind(%q) = %q, %v", v, got, ok)
 		}
 	}
-	// 名詞參數不認得時整個函式沒有文字，不拼出半句。
 	if got, ok := For(ZhTW).SellerMeasureTitleRisk("NOPE"); ok || got != "" {
 		t.Errorf("SellerMeasureTitleRisk(NOPE) = %q, %v", got, ok)
 	}
 	if got, ok := For(ZhTW).SellerMeasureTitleRisk("FRAUD"); !ok || got != "風險：詐欺" {
 		t.Errorf("SellerMeasureTitleRisk(FRAUD) = %q, %v", got, ok)
 	}
-	// 「停權中」只由 SUSPENSION 選出；不認得的 kind 與沒有指定的 kind（other）不能被說成停權中，內容下架尤其不能。
 	for kind, want := range map[string]string{"SUSPENSION": "停權中", "TERMINATION": "合作已終止", "NOPE": "生效中", "": "生效中", "CONTENT_TAKEDOWN": "生效中"} {
 		if got, _ := For(ZhTW).SellerMeasureState("ACTIVE", kind); got != want {
 			t.Errorf("ACTIVE + %q = %q，要 %q", kind, got, want)

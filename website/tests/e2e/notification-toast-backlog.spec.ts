@@ -63,9 +63,6 @@ function envelope(flags: number, json: unknown): Buffer {
 test("stale unread backlog never resurfaces as a toast alongside a genuinely new notification", {
 	tag: ["@ui"],
 }, async ({ page, baseURL }) => {
-	// Middleware gates protected routes on the cookie's mere presence before
-	// any client-side mock applies — same reason `protected-static-routes.spec.ts`
-	// sets this alongside the gateway session mock below.
 	await page
 		.context()
 		.addCookies([{ name: "hk_session", value: "opaque", url: baseURL }]);
@@ -83,11 +80,6 @@ test("stale unread backlog never resurfaces as a toast alongside a genuinely new
 		identity: { accountId: "1", roles: ["buyer"] },
 	});
 
-	// Registered after setupGatewayMocks so these win over its empty defaults.
-	//
-	// ListInboxItems — newest first, matching the real inbox order. Both the
-	// notifications list and the toast bridge read this page; the bridge picks
-	// only the ids the stream signal names.
 	await page.route(method("ListInboxItems"), (route) => {
 		void fulfillConnect(route, {
 			items: [NEW_ITEM, OLD_ITEM],
@@ -100,10 +92,6 @@ test("stale unread backlog never resurfaces as a toast alongside a genuinely new
 		void fulfillConnect(route, { unreadCount: 2 });
 	});
 
-	// First connection carries the signal for the genuinely new notification and
-	// then ends normally; reconnects get no answer. Replaying the signal on every
-	// reconnect would hand the assertions an unbounded number of chances to come
-	// true, which is exactly how an ordering bug could stay hidden.
 	let streamConnections = 0;
 	await page.route(method("WatchNotifications"), async (route) => {
 		if (streamConnections++ > 0) return;
@@ -125,17 +113,8 @@ test("stale unread backlog never resurfaces as a toast alongside a genuinely new
 
 	await page.goto("/account/notifications");
 
-	// Scope to the toast cards — the notifications LIST on this same page
-	// legitimately renders both rows; only the toast popup is what this bug is
-	// about.
 	const toasts = page.locator(".hk-notification-toast");
 	await expect(toasts.filter({ hasText: NEW_TITLE })).toBeVisible();
-	// A short, explicit timeout — well under the toast's own 5s auto-dismiss
-	// (see NotificationToast.tsx's DEFAULT_DURATION). Without capping this,
-	// `toHaveCount(0)`'s eventually-true polling would pass regardless of the
-	// bug: every toast disappears on its own within 5s, so waiting out to
-	// Playwright's default 15s timeout can't tell "never appeared" from
-	// "appeared, then auto-dismissed."
 	await expect(toasts.filter({ hasText: OLD_TITLE })).toHaveCount(0, {
 		timeout: 2000,
 	});

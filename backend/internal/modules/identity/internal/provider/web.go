@@ -21,7 +21,6 @@ const (
 	lineAuthURL       = "https://access.line.me/oauth2/v2.1/authorize"
 	lineExchangeURL   = "https://api.line.me/oauth2/v2.1/token"
 
-	// webLoginTimeout 是 web 登入對 provider 的外部呼叫（換 token、抓公鑰）的時間上限。
 	webLoginTimeout = 10 * time.Second
 )
 

@@ -211,9 +211,6 @@ func (r *DocumentRepository) RecordUploadRecheckResult(ctx context.Context, id i
 	return err
 }
 
-// ---------------------------------------------------------------------------
-// 寫入面（§7.1.2 步驟 8–9、步驟 14）
-// ---------------------------------------------------------------------------
 
 // Create 建立一列文件。inserted=false 代表這份文件已建過（重複消費 order.paid）。
 //
@@ -375,7 +372,6 @@ func (r *DocumentRepository) DeleteLines(ctx context.Context, documentID int64) 
 // rows=0 ⇒ 版本被推進，或 status 已離開 PENDING／AWAITING_MANUAL。
 // **不是錯誤，但絕不能當成成功**——那代表這份文件可能已經送出去了。
 func (r *DocumentRepository) ReviseSnapshot(ctx context.Context, in domain.ReviseDocumentSnapshot) (bool, error) {
-	// 明文進、密文出：與 Create 走同一個金鑰環，呼叫端永遠碰不到密文。
 	emailCT, err := r.ring.encryptOptional(in.RecipientEmail)
 	if err != nil {
 		return false, err
@@ -559,13 +555,6 @@ func (r *DocumentRepository) GetByProviderRequestNo(ctx context.Context, provide
 	return toDocument(row)
 }
 
-// ---------------------------------------------------------------------------
-// 作廢軸（M1 的 VOIDING 三條邊 ＋ 重開的 SUPERSEDED）
-//
-// 四支都是 thin adapter，守衛全在 SQL 的 WHERE 述詞裡。rows==0 一律回 false 而不是
-// error：那代表「來源狀態已經不是我預期的那個」，是**合法**的併發結果，該由呼叫端
-// 依自己的語意決定要不要當成失敗（作廢是要的，重新 claim 到已在 VOIDING 的則不是）。
-// ---------------------------------------------------------------------------
 
 // MarkVoiding 是 ISSUED → VOIDING。
 func (r *DocumentRepository) MarkVoiding(ctx context.Context, id int64, now time.Time) (bool, error) {

@@ -36,8 +36,6 @@ class SellerAvatarWidget extends StatelessWidget {
     }
     return _clip(
       OptimizedNetworkImage(
-        // key=URL — URL 一變就強制重新 mount，避免 CachedNetworkImage 內部
-        // State 黏住舊 stream（已知 cached_network_image 行為，prop 換不夠）。
         key: ValueKey(url),
         imageUrl: url,
         scene: ImageScene.avatarMedium,

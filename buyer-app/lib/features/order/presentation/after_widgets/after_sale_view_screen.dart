@@ -108,8 +108,6 @@ class AfterSaleViewScreen extends HookConsumerWidget {
     ValueNotifier<bool> cancelling,
   ) {
     final reasonLabel = AfterSaleReason.label(c.reason);
-    // 優先使用 evidence（新契約）中買家舉證的 imageUrl，
-    // fallback 至舊欄位 shipmentPhotoUrls 保持向後相容
     final buyerPhotos = c.evidence
         .where(
           (e) =>
@@ -119,7 +117,6 @@ class AfterSaleViewScreen extends HookConsumerWidget {
         .map((e) => e.imageUrl)
         .toList();
     final photos = buyerPhotos.isNotEmpty ? buyerPhotos : c.shipmentPhotoUrls;
-    // 可取消售後的狀態：待處理(0)
     final canCancel = c.status == AfterSaleStatus.pending;
 
     return Column(
@@ -130,19 +127,16 @@ class AfterSaleViewScreen extends HookConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 案件編號
                 Text('案件編號', style: _titleStyle),
                 SizedBox(height: 4.h),
                 Text(c.caseNo, style: _valueStyle),
                 SizedBox(height: 16.h),
 
-                // 訂單編號
                 Text('訂單編號', style: _titleStyle),
                 SizedBox(height: 4.h),
                 Text(c.orderNo, style: _valueStyle),
                 SizedBox(height: 16.h),
 
-                // 退貨原因
                 Text('退貨原因', style: _titleStyle),
                 SizedBox(height: 4.h),
                 Text(
@@ -151,7 +145,6 @@ class AfterSaleViewScreen extends HookConsumerWidget {
                 ),
                 SizedBox(height: 16.h),
 
-                // 詳細說明（有資料才顯示）
                 if (c.description.isNotEmpty) ...[
                   Text('詳細說明', style: _titleStyle),
                   SizedBox(height: 4.h),
@@ -159,7 +152,6 @@ class AfterSaleViewScreen extends HookConsumerWidget {
                   SizedBox(height: 16.h),
                 ],
 
-                // 上傳照片（有資料才顯示）
                 if (photos.isNotEmpty) ...[
                   Text('上傳照片', style: _titleStyle),
                   SizedBox(height: 8.h),
@@ -185,7 +177,6 @@ class AfterSaleViewScreen extends HookConsumerWidget {
                   SizedBox(height: 16.h),
                 ],
 
-                // 詳細說明（唯讀灰底框，帶入原本提交的文字，有資料才顯示）
                 if (c.description.isNotEmpty) ...[
                   RichText(
                     text: TextSpan(
@@ -225,7 +216,6 @@ class AfterSaleViewScreen extends HookConsumerWidget {
           ),
         ),
 
-        // 取消售後按鈕（僅待處理狀態）
         if (canCancel)
           SafeArea(
             top: false,

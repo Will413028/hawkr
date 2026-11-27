@@ -21,7 +21,6 @@ test("有 Sec-Fetch-Site 時只看它：same-origin 與 none 放行，same-site 
 	const cases: [string, boolean][] = [
 		["same-origin", false],
 		["none", false],
-		// 同一個網站的其他子網域（例如前台）：cookie 會跟著送，正是要擋的情況。
 		["same-site", true],
 		["cross-site", true],
 	];

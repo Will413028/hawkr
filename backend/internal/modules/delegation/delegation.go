@@ -58,7 +58,6 @@ type Deps struct {
 	Logger   *slog.Logger
 }
 
-// auditor 是 Module 對稽核子領域（*audit.Module）的全部需求：正式與單元測試共用同一個欄位；測試嵌入它、只實作用到的方法，讓不碰資料庫的路徑不需要 audit.Module。
 type auditor interface {
 	LookupOperation(ctx context.Context, in model.OperationAuditInput) (model.AuditLog, bool, error)
 	RecordOperation(ctx context.Context, in model.OperationAuditInput, outcome model.OperationOutcome) error
@@ -80,10 +79,6 @@ type Module struct {
 	session              *session.Module
 }
 
-// storeStateOf 讀店家此刻的狀態：只有 seller 回 NotFound 時才是找不到（Found 為 false）；已關閉的店家存在，Found 為 true、Closed 為 true。可營運與原因
-// 都來自 seller 的 StoreActionDelegate（Store.ActionUnavailableReasons，由 CapStorefrontWrite 缺的條件對應：已關閉、等待刪除、停權），句子是
-// seller.StoreActionUnavailableText，清單上的原因與 StartDelegation 被拒時的錯誤是同一句；seller 的其他錯誤原樣回傳（seller 在行程內，
-// 沒有跨服務的「暫時讀不到」），不當成拒絕。
 func storeStateOf(s Seller) func(context.Context, int64) (model.StoreState, error) {
 	return func(ctx context.Context, storeID int64) (model.StoreState, error) {
 		_, out, err := readStore(ctx, s, storeID)
@@ -91,7 +86,6 @@ func storeStateOf(s Seller) func(context.Context, int64) (model.StoreState, erro
 	}
 }
 
-// readStore 讀店家與它此刻的可代行狀態（storeStateOf 的語意）；店家本身交給需要它的呼叫方（代行元件把它交給資源模組）。
 func readStore(ctx context.Context, s Seller, storeID int64) (seller.Store, model.StoreState, error) {
 	st, err := s.Store(ctx, storeID)
 	switch {
@@ -470,7 +464,6 @@ func (m *Module) OnStorePendingDeletion(ctx context.Context, e seller.StorePendi
 	return m.storeNotDelegable(ctx, e.StoreID)
 }
 
-// storeNotDelegable 先取消該店待發布的代行排程（鎖 social 的列，必須在改 delegation 的列之前，單體規則 4），再結束進行中的 session。
 func (m *Module) storeNotDelegable(ctx context.Context, storeID int64) error {
 	if err := m.cancelStoreSchedules(ctx, storeID); err != nil {
 		return err
@@ -496,7 +489,6 @@ func (m *Module) OnPostPublished(ctx context.Context, e social.PostPublished) er
 	})
 }
 
-// scheduleAuthorizer 是 social 的排程授權 port 的 delegation 實作（發起者種類 DELEGATION，ref 是 session ID）。
 type scheduleAuthorizer struct{ session *session.Module }
 
 // AuthorizeScheduledPublish 在 social 的排程 job 內（貼文列已被鎖）重驗代行發起的排程：session 沒被撤銷、session 的店家就是排程的店家，加上開始代行用的

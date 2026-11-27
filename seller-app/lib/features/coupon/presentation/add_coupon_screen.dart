@@ -57,12 +57,10 @@ class AddCouponScreen extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // ── Form controllers ──
     final nameCtrl = useTextEditingController();
     final discountCtrl = useTextEditingController();
     final thresholdCtrl = useTextEditingController();
 
-    // ── Local state ──
     final discountType = useState(CouponType.percent.code);
     final selectedDays = useState<int?>(30);
     final useCustomDate = useState(false);
@@ -70,7 +68,6 @@ class AddCouponScreen extends HookConsumerWidget {
     final selectedTargetGroup = useState('指定會員');
     final saving = useState(false);
 
-    // TAG 標籤相關狀態
     final allTags = useState<List<CustomerTag>>([]);
     final selectedTagIds = useState<Set<String>>({});
     final tagCustomers = useState<List<Customer>>([]);
@@ -92,7 +89,6 @@ class AddCouponScreen extends HookConsumerWidget {
       ),
     );
 
-    // Selected users
     final selectedUsers = useState<List<Map<String, String>>>(() {
       if (preselectedUser != null) {
         return [
@@ -102,7 +98,6 @@ class AddCouponScreen extends HookConsumerWidget {
       return <Map<String, String>>[];
     }());
 
-    // Force rebuild on text changes
     final formVersion = useState(0);
     useEffect(() {
       void onChange() => formVersion.value++;
@@ -115,10 +110,8 @@ class AddCouponScreen extends HookConsumerWidget {
         thresholdCtrl.removeListener(onChange);
       };
     }, [nameCtrl, discountCtrl, thresholdCtrl]);
-    // Touch formVersion to stay reactive
     formVersion.value;
 
-    // ── Helpers ──
     String fmtDate(DateTime d) =>
         '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
@@ -141,7 +134,6 @@ class AddCouponScreen extends HookConsumerWidget {
       saving.value = true;
       try {
         final type = discountType.value;
-        // targetType: 1=ALL 全體買家, 2=MEMBER 賣家會員, 3=DESIGNATED 指定買家, 4=COMPENSATION 補償券
         final String targetType;
         if (selectedTargetGroup.value == '消費過會員') {
           targetType = '2';
@@ -158,10 +150,8 @@ class AddCouponScreen extends HookConsumerWidget {
           'startAt': fmtDate(DateTime.now()),
         };
 
-        // Expiry
         body['endAt'] = fmtDate(selectedDate.value);
 
-        // Discount value
         final disc = discountCtrl.text.trim();
         if (disc.isNotEmpty) {
           if (type == CouponType.percent.code) {
@@ -171,13 +161,9 @@ class AddCouponScreen extends HookConsumerWidget {
           }
         }
 
-        // Threshold
         final min = thresholdCtrl.text.trim();
         if (min.isNotEmpty) body['thresholdAmount'] = min;
 
-        // targetType=3 (DESIGNATED) 時附帶 buyerIds——TAG 顧客與手動查詢結果
-        // 皆為 CRM/lookup 已解析好的現任 buyer_id，不是 account_id，故送
-        // buyerIds（gateway 只驗證格式、不重複解析），不是 buyerAccountIds。
         if (targetType == '3') {
           if (selectedTargetGroup.value == 'TAG 標籤') {
             body['buyerIds'] = tagCustomers.value
@@ -192,7 +178,6 @@ class AddCouponScreen extends HookConsumerWidget {
           }
         }
 
-        // Create coupon (new API creates + issues in one call)
         final notifier = ref.read(couponListControllerProvider.notifier);
         HKLog.logE('[Coupon] create coupon body: $body');
         await notifier.create(body);
@@ -228,7 +213,6 @@ class AddCouponScreen extends HookConsumerWidget {
       ];
     }
 
-    // ── Build ──
     const themeColor = AppColors.primary;
     const bgColor = AppColors.bgPrimary;
     final bottomPad = MediaQuery.of(context).padding.bottom;
@@ -241,14 +225,12 @@ class AddCouponScreen extends HookConsumerWidget {
           children: [
             CouponTopBar(title: '新增優惠券', onBack: () => context.pop()),
 
-            // Content
             Expanded(
               child: SingleChildScrollView(
                 padding: EdgeInsets.all(16.w),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Preview card
                     _PreviewCard(
                       nameCtrl: nameCtrl,
                       discountCtrl: discountCtrl,
@@ -260,7 +242,6 @@ class AddCouponScreen extends HookConsumerWidget {
                     ),
                     SizedBox(height: 16.h),
 
-                    // Form card
                     _AddCouponFormCard(
                       nameCtrl: nameCtrl,
                       discountCtrl: discountCtrl,
@@ -270,7 +251,6 @@ class AddCouponScreen extends HookConsumerWidget {
                     ),
                     SizedBox(height: 16.h),
 
-                    // Validity card
                     _ValidityCard(
                       selectedDays: selectedDays.value,
                       useCustomDate: useCustomDate.value,
@@ -294,14 +274,12 @@ class AddCouponScreen extends HookConsumerWidget {
                     ),
                     SizedBox(height: 16.h),
 
-                    // Target group card
                     _TargetGroupCard(
                       selectedGroup: selectedTargetGroup.value,
                       onGroupChanged: (v) => selectedTargetGroup.value = v,
                     ),
                     SizedBox(height: 16.h),
 
-                    // Specify user / tags section
                     if (selectedTargetGroup.value == '指定會員')
                       _SpecifyUserSection(
                         selectedUsers: selectedUsers.value,
@@ -352,7 +330,6 @@ class AddCouponScreen extends HookConsumerWidget {
               ),
             ),
 
-            // Bottom button
             Container(
               padding: EdgeInsets.only(
                 left: 16.w,
@@ -402,9 +379,6 @@ class AddCouponScreen extends HookConsumerWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// Sub-widgets
-// ═══════════════════════════════════════════════════════════════════
 
 class _PreviewCard extends StatelessWidget {
   const _PreviewCard({

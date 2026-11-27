@@ -28,11 +28,6 @@ const TAB_LABELS: Record<string, string> = {
 	sellers: "追蹤賣家",
 };
 
-// Kept as a named constant (not inline JSX text) so this new alert doesn't
-// collide with tests/account-overview-favorites-degraded.test.ts's byte-
-// identical literal-text check, which is pinned to the product-tab message
-// only (see that file's `literalAlert` helper — it only counts non-
-// interpolated `<p role="alert">` text).
 const SELLER_DEGRADED_MESSAGE =
 	"部分追蹤的賣家資訊暫時載入不到，稍後重新整理即可；你的追蹤並沒有異動。";
 
@@ -75,12 +70,6 @@ export default function FavoritesClient() {
 
 	const visibleProducts = browsableFavorites(favorites.items);
 	const visibleSellers = following.items;
-	// Seller-side counterpart: the backend degrades-not-propagates when the
-	// seller source fails (rows come back with empty title/imageUrl and
-	// degraded:true). isBrowsableSavedItem never filters seller rows out, so
-	// without this they'd render as blank, nameless rows with no explanation —
-	// a regression vs. the old FollowUseCase.GetSubscriptionList's propagate-
-	// and-show-error behaviour.
 	const hasUnloadableSellers = React.useMemo(
 		() => visibleSellers.some((it) => it.store === undefined),
 		[visibleSellers],

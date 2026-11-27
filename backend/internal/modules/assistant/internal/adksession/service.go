@@ -114,7 +114,6 @@ func (s *Service) Create(ctx context.Context, req *session.CreateRequest) (*sess
 		if n == 0 {
 			return fmt.Errorf("session %q already exists", id)
 		}
-		// 鎖順序：session 列、app 列、user 列；AppendEvent 同序。
 		if len(appDelta) > 0 {
 			if err := q.MergeAppState(ctx, req.AppName, appJSON, now); err != nil {
 				return fmt.Errorf("寫入 app state：%w", err)
@@ -172,7 +171,6 @@ func (s *Service) Get(ctx context.Context, req *session.GetRequest) (*session.Ge
 	return &session.GetResponse{Session: live}, nil
 }
 
-// getInSnapshot 在同一份快照內讀 session 列與 events（backend/AGENTS.md 規則 3）。
 func (s *Service) getInSnapshot(ctx context.Context, req *session.GetRequest) (*liveSession, error) {
 	q := s.q
 	row, err := q.GetSession(ctx, req.AppName, req.UserID, req.SessionID)
@@ -306,9 +304,8 @@ func (s *Service) AppendEvent(ctx context.Context, cur session.Session, ev *sess
 	return nil
 }
 
-// appendEncoding 是 AppendEvent 要寫進資料庫的內容，在開 transaction 之前算好（純函式，不碰資料庫）。
 type appendEncoding struct {
-	stored    *session.Event // 已剝除 temp: key 的 event，也是放進 live session 的版本
+	stored    *session.Event
 	eventJSON []byte
 	sessJSON  []byte
 	appJSON   []byte

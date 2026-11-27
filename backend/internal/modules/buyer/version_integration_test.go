@@ -82,7 +82,6 @@ func TestAddressKeysetPaging(t *testing.T) {
 	ctx := context.Background()
 	p := profile(t, f, 1)
 	input := buyer.AddressInput{BuyerID: p.BuyerID, ReceiverName: "王小明", ReceiverPhone: "0912345678", TownCode: "63000050", AddressDetail: "忠孝東路一號"}
-	// 上限 20 筆（W4）以內，頁大小取不整除的 7，走完三頁。
 	for range buyer.MaxAddresses {
 		_, err := f.module.AddAddress(ctx, input)
 		must(t, err)
@@ -146,7 +145,6 @@ func TestNoOpUpdateDoesNotBumpVersion(t *testing.T) {
 	ctx := context.Background()
 	p := profile(t, f, 1)
 
-	// Profile no-op 更新：值沒有變動時不遞增版本
 	sameProfile, err := f.module.UpdateProfile(ctx, buyer.UpdateProfileInput{
 		BuyerID:         p.BuyerID,
 		ExpectedVersion: p.Version,
@@ -157,7 +155,6 @@ func TestNoOpUpdateDoesNotBumpVersion(t *testing.T) {
 		t.Fatalf("profile version bumped on no-op: got %d, want %d", sameProfile.Version, p.Version)
 	}
 
-	// Address no-op 更新：值沒有變動時不遞增版本
 	addr, err := f.module.AddAddress(ctx, buyer.AddressInput{
 		BuyerID:       p.BuyerID,
 		ReceiverName:  "測試人",
@@ -200,7 +197,6 @@ func TestAvatarAndTextInOneUpdate(t *testing.T) {
 		t.Fatalf("avatar + text update incomplete: %+v", updated)
 	}
 	if updated.Version != p.Version+2 {
-		// text update bumps version by 1, avatar update bumps version by 1 in the same transaction
 		t.Fatalf("expected version %d, got %d", p.Version+2, updated.Version)
 	}
 	ds, err := f.module.BatchDisplay(ctx, []int64{p.BuyerID})

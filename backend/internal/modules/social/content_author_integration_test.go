@@ -9,7 +9,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 )
 
-// ContentAuthorFor（A7-2e）：從留言、討論區封鎖作者前的解析，套用與列表相同的觀看者規則。
 
 func (f *fixture) authorFor(t *testing.T, c social.Caller, kind social.TargetKind, id [16]byte) social.ContentAuthor {
 	t.Helper()
@@ -56,8 +55,8 @@ func TestContentAuthorForFollowsTheViewersReadRules(t *testing.T) {
 		}
 	})
 
-	f.blockBuyer(t, a, x) // A 封鎖 X
-	f.blockBuyer(t, w, a) // W 封鎖 A
+	f.blockBuyer(t, a, x)
+	f.blockBuyer(t, w, a)
 
 	t.Run("自己封鎖的買家的頂層仍讀得到（重複封鎖要能解析）", func(t *testing.T) {
 		got := f.authorFor(t, f.asBuyer(a), social.TargetComment, cX.ID)

@@ -16,8 +16,6 @@ export function galleryImagePreset(
 
 export function useGalleryImagePreset() {
 	const ref = useRef<HTMLElement>(null);
-	// Render the reusable thumbnail first; never start a speculative large
-	// image request before we know this particular gallery's rendered size.
 	const [preset, setPreset] = useState<GalleryImagePreset>("card");
 	useEffect(() => {
 		const element = ref.current;

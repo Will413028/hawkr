@@ -43,9 +43,7 @@ func TestGrpcErrRestoresDelegationBizCodes(t *testing.T) {
 		{"InvalidArgument 帶 9260", codes.InvalidArgument, "[9260] 代行操作原因為必填", http.StatusBadRequest, bizcode.DelegationInvalidCommand, "代行操作原因為必填"},
 		{"PermissionDenied 帶 9262", codes.PermissionDenied, "[9262] 此工作階段未取得該能力", http.StatusForbidden, bizcode.DelegationCapabilityDenied, "此工作階段未取得該能力"},
 		{"PermissionDenied 帶 9275", codes.PermissionDenied, "[9275] 資源不屬於代行對象", http.StatusForbidden, bizcode.DelegationResourceNotOwned, "資源不屬於代行對象"},
-		// 登錄表決定 status：同一個 gRPC 分支也可以吐 422，這正是 §6.5.2 要的分流。
 		{"PermissionDenied 帶 9272 走登錄表的 422", codes.PermissionDenied, "[9272] 店家狀態不允許代行", http.StatusUnprocessableEntity, bizcode.DelegationStoreNotOperable, "店家狀態不允許代行"},
-		// 無前綴時逐位元維持既有行為。
 		{"InvalidArgument 無前綴", codes.InvalidArgument, "bad request", http.StatusBadRequest, 400, "bad request"},
 		{"PermissionDenied 無前綴", codes.PermissionDenied, "forbidden", http.StatusForbidden, 403, "forbidden"},
 	}
@@ -87,7 +85,6 @@ func TestStatusForBizCode(t *testing.T) {
 		}
 	}
 
-	// 未登錄者塌縮 409（含刻意不登錄的四個衝突碼與 9279）。
 	for _, code := range []int32{
 		bizcode.DelegationResourceVersionConflict,
 		bizcode.DelegationIdempotencyKeyReused,
@@ -101,7 +98,6 @@ func TestStatusForBizCode(t *testing.T) {
 		}
 	}
 
-	// 9276 的 HTTP 是 200 且走 response.Biz，刻意不進這張「業務拒絕」表。
 	if _, listed := bizHTTPStatus[bizcode.DelegationBatchPartialFailed]; listed {
 		t.Error("9276 不得登錄進 bizHTTPStatus")
 	}

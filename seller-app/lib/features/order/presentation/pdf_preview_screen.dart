@@ -41,7 +41,6 @@ class _PdfPreviewScreenState extends State<PdfPreviewScreen> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onNavigationRequest: (request) {
-            // 阻擋非 http(s) scheme（如自訂 deeplink / intent://），避免被導向外部 App。
             final uri = Uri.tryParse(request.url);
             if (uri != null && uri.scheme != 'http' && uri.scheme != 'https') {
               return NavigationDecision.prevent;

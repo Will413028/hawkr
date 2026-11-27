@@ -43,15 +43,11 @@ class StepIndicator extends StatelessWidget {
   final int currentStep;
   final Color? activeColor;
 
-  // ── Figma 常量 ──
   static const double _circleSize = 32;
   static const double _iconSize = 16;
   static const double _lineH = 3;
   static const Color _inactiveColor = AppIconColors.disabled;
 
-  // ═══════════════════════════════════════════════════════════════
-  // 預設步驟組
-  // ═══════════════════════════════════════════════════════════════
 
   /// 售後流程 4 步（Figma 10108:94700）— 正常完成分支
   static const afterSaleSteps = [
@@ -102,9 +98,6 @@ class StepIndicator extends StatelessWidget {
     StepDef(label: '已送達', icon: AppIcons.location),
   ];
 
-  // ═══════════════════════════════════════════════════════════════
-  // status → step 轉換
-  // ═══════════════════════════════════════════════════════════════
 
   /// 售後狀態碼 → 進度步驟 index（0-3）
   ///
@@ -115,13 +108,13 @@ class StepIndicator extends StatelessWidget {
   /// - step 3「完成/拒絕處理」— CLOSED(50) / CANCELLED(70) → 完成
   ///                            / REJECTED(60) → 拒絕處理（搭配 [afterSaleStepsFor] 切換 label）
   static int afterSaleStepFromStatus(String status) => switch (status) {
-    '0' => 1, // PENDING → 審核中
-    '20' || '25' || '30' => 2, // RETURN_PENDING / SHIPPING / RECEIVED → 審核結果
-    '40' => 2, // REFUND_PROCESSING → 審核結果
+    '0' => 1,
+    '20' || '25' || '30' => 2,
+    '40' => 2,
     '50' ||
     '70' ||
-    '71' => 3, // CLOSED / CANCELLED / CANCELLED_BY_CONFIRM_RECEIPT → 完成
-    '60' => 3, // REJECTED → 拒絕處理（最後一步，搭配 rejected 步驟組）
+    '71' => 3,
+    '60' => 3,
     _ => 0,
   };
 
@@ -130,7 +123,6 @@ class StepIndicator extends StatelessWidget {
     '20' => 2,
     '30' || '32' => 2,
     '40' => 3,
-    // 80 已取消改用 cancelledSteps 顯示，這裡的值僅在誤傳時 fallback。
     '50' || '60' || '70' || '80' => 3,
     _ => 0,
   };
@@ -138,13 +130,10 @@ class StepIndicator extends StatelessWidget {
   /// 已取消訂單 step：固定停在「已取消」（index 1）。
   static int cancelledStepIndex() => 1;
 
-  // ═══════════════════════════════════════════════════════════════
-  // Build
-  // ═══════════════════════════════════════════════════════════════
 
   @override
   Widget build(BuildContext context) {
-    const double labelSize = 12; // 統一 12sp（卡片展開 + 詳情頁）
+    const double labelSize = 12;
     final stepCount = steps.length;
     final lineCount = stepCount - 1;
     if (stepCount == 0) return const SizedBox.shrink();

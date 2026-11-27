@@ -3,8 +3,6 @@ import { isConfiguredMediaUrl } from "@/lib/media/cdn";
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
-// The proxy fetches server-side, so the only allowed host is the configured
-// media origin (isConfiguredMediaUrl); anything else would make it an open image proxy.
 export async function GET(request: NextRequest) {
 	const rawUrl = request.nextUrl.searchParams.get("url");
 	if (!rawUrl) {

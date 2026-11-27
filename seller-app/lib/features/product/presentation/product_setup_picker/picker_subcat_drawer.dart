@@ -62,7 +62,6 @@ class PickerSubcatDrawer extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // 遮罩：抽屜展開時覆蓋右側，點擊收起
         if (sidebarWidth > 90.0.w)
           Positioned(
             left: sidebarWidth + kPickerHandleWidth,
@@ -87,7 +86,6 @@ class PickerSubcatDrawer extends StatelessWidget {
             ),
           ),
 
-        // 左側子分類清單
         Positioned(
           left: 0,
           top: 0,
@@ -156,7 +154,6 @@ class PickerSubcatDrawer extends StatelessWidget {
           ),
         ),
 
-        // 拖拉把手
         Positioned(
           left: sidebarWidth,
           top: 0,

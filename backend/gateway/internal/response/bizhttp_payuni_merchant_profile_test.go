@@ -25,9 +25,9 @@ import (
 // 的預設值苟活，讀表的人要能一眼看到「這三個碼是同一組治理語意，全部經過審視」。
 func TestStatusForBizCode_PayuniMerchantProfile(t *testing.T) {
 	want := map[int32]int{
-		bizcode.PayuniMerchantProfileVersionConflict:      http.StatusPreconditionFailed, // 9234 → 412
-		bizcode.PayuniMerchantProfileIdempotencyKeyReused: http.StatusConflict,           // 9235 → 409
-		bizcode.PayuniMerchantProfileNotActive:            http.StatusConflict,           // 9236 → 409
+		bizcode.PayuniMerchantProfileVersionConflict:      http.StatusPreconditionFailed,
+		bizcode.PayuniMerchantProfileIdempotencyKeyReused: http.StatusConflict,
+		bizcode.PayuniMerchantProfileNotActive:            http.StatusConflict,
 	}
 	for code, status := range want {
 		if got := StatusForBizCode(code); got != status {
@@ -35,8 +35,6 @@ func TestStatusForBizCode_PayuniMerchantProfile(t *testing.T) {
 		}
 	}
 
-	// 鑑別力：9234 必須跟 9235/9236 是不同的 status，否則前端無法分辨「版本衝突該
-	// 重抓最新值但保留草稿」跟「client bug 級別的異常，請重新操作」。
 	if StatusForBizCode(bizcode.PayuniMerchantProfileVersionConflict) == StatusForBizCode(bizcode.PayuniMerchantProfileIdempotencyKeyReused) {
 		t.Error("9234 與 9235 的 HTTP status 相同 —— 登錄表沒有產生任何分流效果")
 	}

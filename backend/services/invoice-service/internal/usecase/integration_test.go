@@ -36,8 +36,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/repository/postgres"
 )
 
-// 本 package 共用一顆 postgres 容器，每支測試拿到一個從已 migrate 的 template
-// 複製出來的獨立 database——機制見 pkg/testutil/dbtest 的套件註解。
 var pg = dbtest.New(dbtest.Config{
 	TemplateDB:    "invoice_usecase_test",
 	MigrationsDir: filepath.Join("..", "..", "db", "migrations"),
@@ -73,10 +71,6 @@ func itKeyRing(t *testing.T) *postgres.KeyRing {
 	return &postgres.KeyRing{Current: cur, CurrentVersion: 1, LookupHMACKey: "integration-lookup-key"}
 }
 
-// fakeAmego 是 AMEGO 的替身。
-//
-// requests 是 atomic 計數器：「沒有任何請求送出去」這種陰性宣稱只有數它才算數 ——
-// 用「有沒有回應」或「document 是不是 ISSUED」去推論，遇到「送出去但回應遺失」就會答錯。
 type fakeAmego struct {
 	srv      *httptest.Server
 	requests atomic.Int64
@@ -110,8 +104,6 @@ func (f *fakeAmego) client(t *testing.T) amego.Client {
 	c, err := amego.New(amego.Options{
 		BaseURL:    f.srv.URL,
 		HTTPClient: f.srv.Client(),
-		// 走「測試統編放行」而不是 AllowRealInvoice=true：順帶讓環境閘門的**正向**分支
-		// 也被走過一次（§4.5.8 第二層）。
 		AllowRealInvoice: false,
 		TestInvoice:      itTaxID,
 		RateLimitQPS:     50,
@@ -133,7 +125,6 @@ type itEnv struct {
 	ops      *postgres.OperationRepository
 }
 
-// setupEnv 建一位「已核定應開發票、AMEGO 帳戶 ACTIVE 且已過切點」的賣家。
 func setupEnv(t *testing.T, reviewStatus string, taxCategory int16) *itEnv {
 	t.Helper()
 	ctx := context.Background()
@@ -153,7 +144,6 @@ func setupEnv(t *testing.T, reviewStatus string, taxCategory int16) *itEnv {
 
 	var taxIDArg, legalArg any = itTaxID, "整合測試股份有限公司"
 	if reviewStatus == codemeta.SellerTaxReviewStatusApprovedInvoiceExempt.Value {
-		// chk_stp_exempt_no_taxid：免用統一發票的賣家不得有統編。
 		taxIDArg = nil
 	}
 	if _, err := pool.Exec(ctx,
@@ -174,7 +164,6 @@ func setupEnv(t *testing.T, reviewStatus string, taxCategory int16) *itEnv {
 	}); err != nil {
 		t.Fatalf("seed provider account: %v", err)
 	}
-	// verified_at 是 chk_ipa_active_verified 與 chk_ipa_cutover_requires_verified 的前提。
 	if _, err := pool.Exec(ctx,
 		`UPDATE invoice_provider_accounts
 		    SET status='ACTIVE', verified_at=NOW() - interval '1 day',
@@ -183,8 +172,6 @@ func setupEnv(t *testing.T, reviewStatus string, taxCategory int16) *itEnv {
 		t.Fatalf("activate provider account: %v", err)
 	}
 
-	// 不寫逐表 DELETE 的 cleanup：每支測試拿到的是自己的 database，dbtest 會在測試結束時
-	// 整個 drop 掉。逐表刪除除了多餘，還會在新增一張表時靜默漏掉它。
 
 	fa := newFakeAmego(t)
 	docs := postgres.NewDocumentRepository(pool, ring)
@@ -232,9 +219,6 @@ func mustStoreID(env *itEnv) int64 {
 	return v
 }
 
-// ---------------------------------------------------------------------------
-// 路徑 1：happy path —— 訂單快照 → 決策樹 → 建文件＋明細＋operation → 送件 → ISSUED → outbox
-// ---------------------------------------------------------------------------
 
 func TestIntegration_Issuance_HappyPath(t *testing.T) {
 	ctx := context.Background()
@@ -283,7 +267,6 @@ func TestIntegration_Issuance_HappyPath(t *testing.T) {
 		t.Errorf("號碼未回填：%q/%q", invoiceNo, randomCode)
 	}
 
-	// outbox 恰一列，且 routing key 是 P1。
 	var nOutbox int
 	var routingKey string
 	if err := env.pool.QueryRow(ctx,
@@ -296,12 +279,6 @@ func TestIntegration_Issuance_HappyPath(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 「同一交易內」的鑑別力：外層交易 rollback ⇒ 連 outbox 一起消失
-//
-// 🔴 這一支是變異①（把 outbox 寫入移到交易外）唯一會轉紅的地方。用「commit 之後有一列」
-// 是驗不到的：outbox 寫在交易外時它照樣有一列。
-// ---------------------------------------------------------------------------
 
 func TestIntegration_Issuance_OutboxIsInsideTheBusinessTransaction(t *testing.T) {
 	ctx := context.Background()
@@ -317,7 +294,6 @@ func TestIntegration_Issuance_OutboxIsInsideTheBusinessTransaction(t *testing.T)
 
 	tm := database.NewTxManager(env.pool)
 	sentinel := fmt.Errorf("deliberate rollback")
-	// TxManager 支援巢狀（ctx 帶交易時直接執行 callback）⇒ Submit 內部的 WithTx 會沿用這一個。
 	err = tm.WithTx(ctx, func(ctx context.Context) error {
 		if serr := env.uc.Submit(ctx, res.OperationID); serr != nil {
 			return serr
@@ -336,7 +312,6 @@ func TestIntegration_Issuance_OutboxIsInsideTheBusinessTransaction(t *testing.T)
 	if nOutbox != 0 {
 		t.Fatalf("rollback 之後仍有 %d 列 outbox —— 事件寫入沒有跟隨業務交易", nOutbox)
 	}
-	// 同一個 rollback 也必須把 ISSUED 帶走（否則就是「發票開了、事件沒了」的另一半）。
 	assertDocStatus(t, env, res.DocumentID, codemeta.InvoiceDocumentStatusIssuing.Value)
 }
 
@@ -356,7 +331,6 @@ func TestIntegration_Issuance_OutboxRollsBackWhenDocumentTransitionFails(t *test
 	if _, err := env.uc.ClaimForSubmit(ctx, res.OperationID); err != nil {
 		t.Fatalf("ClaimForSubmit: %v", err)
 	}
-	// 模擬「這一列已被別人改走」：document 離開 ISSUING。
 	if _, err := env.pool.Exec(ctx,
 		`UPDATE invoice_documents SET status='PENDING' WHERE id=$1`, res.DocumentID); err != nil {
 		t.Fatalf("move document out of ISSUING: %v", err)
@@ -376,14 +350,10 @@ func TestIntegration_Issuance_OutboxRollsBackWhenDocumentTransitionFails(t *test
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 路徑 2：可重試錯誤 ⇒ RETRY_SCHEDULED ＋ next_attempt_at 被推遲
-// ---------------------------------------------------------------------------
 
 func TestIntegration_Issuance_RetryableSchedulesBackoff(t *testing.T) {
 	ctx := context.Background()
 	env := setupEnv(t, codemeta.SellerTaxReviewStatusApprovedInvoiceRequired.Value, 1)
-	// code 10 ＝ 系統停機維護中（RETRYABLE）。
 	env.amego.respond = func(w http.ResponseWriter) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"code": 10, "msg": "系統停機維護中"})
 	}
@@ -414,11 +384,9 @@ func TestIntegration_Issuance_RetryableSchedulesBackoff(t *testing.T) {
 	if attempt != 1 {
 		t.Errorf("attempt_count = %d, want 1", attempt)
 	}
-	// §7.5.3：第 1 次失敗之後退避 2^1 × 30s ＝ 60s。租約被換成「下次可執行時間」。
 	if !nextAt.After(before.Add(50 * time.Second)) {
 		t.Errorf("next_attempt_at = %v，未被推遲（退避沒生效 ⇒ 下一輪立刻重打 AMEGO）", nextAt)
 	}
-	// document 退回 PENDING，讓賣家看到的是「待開立」而不是永遠的「開立中」。
 	assertDocStatus(t, env, res.DocumentID, codemeta.InvoiceDocumentStatusPending.Value)
 
 	var nOutbox int
@@ -428,27 +396,19 @@ func TestIntegration_Issuance_RetryableSchedulesBackoff(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 路徑 3：§5A.11 斷言失敗 ⇒ AWAITING_MANUAL ＋ 理由碼，且**一次請求都沒送出去**
-// ---------------------------------------------------------------------------
 
 func TestIntegration_Issuance_InvariantFailureNeverReachesProvider(t *testing.T) {
 	ctx := context.Background()
 	env := setupEnv(t, codemeta.SellerTaxReviewStatusApprovedInvoiceRequired.Value, 1)
 
 	in := itInput(env)
-	in.Snapshot.TotalActualAmount = 999 // A1：Σ line.gross(100) != total_actual(999)
+	in.Snapshot.TotalActualAmount = 999
 
 	res, err := env.uc.Prepare(ctx, in)
 	if err != nil {
 		t.Fatalf("Prepare: %v", err)
 	}
 
-	// 🔴 整條鏈都跑完再數請求數，而且**這個斷言排在最前面**。
-	//
-	// 只數 Prepare 之後的話，「拿掉 Validate 呼叫」這個變異會讓 document 停在 PENDING、
-	// operation 停在 READY —— 兩者都還沒送出去，計數仍是 0，測試照樣綠。本斷言的保證是
-	// 「壞資料**不會被送出去**」，而那句話的反面必須由整條鏈來否證。
 	if res.OperationID != 0 {
 		if claimed, cerr := env.uc.ClaimForSubmit(ctx, res.OperationID); cerr == nil && claimed {
 			_ = env.uc.Submit(ctx, res.OperationID)
@@ -468,7 +428,6 @@ func TestIntegration_Issuance_InvariantFailureNeverReachesProvider(t *testing.T)
 		t.Fatalf("AWAITING_MANUAL 不應建立 operation（§7.1.3 的 AM 節點明文「operation 不建」）")
 	}
 
-	// chk_invdoc_manual_reason 是 DB 端的第二道：理由碼與狀態必須同一句寫。
 	var status, reason string
 	if err := env.pool.QueryRow(ctx,
 		`SELECT status, coalesce(manual_reason_code,'') FROM invoice_documents WHERE id=$1`,
@@ -480,9 +439,6 @@ func TestIntegration_Issuance_InvariantFailureNeverReachesProvider(t *testing.T)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 冪等：同一則 order.paid 消費兩次只建一張發票
-// ---------------------------------------------------------------------------
 
 func TestIntegration_Issuance_DuplicateOrderPaidCreatesOneDocument(t *testing.T) {
 	ctx := context.Background()
@@ -510,9 +466,6 @@ func TestIntegration_Issuance_DuplicateOrderPaidCreatesOneDocument(t *testing.T)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// PLATFORM_RECEIPT：收據編號必須與 document_kind 同一句寫（chk_invdoc_receipt 雙向等式）
-// ---------------------------------------------------------------------------
 
 func TestIntegration_Issuance_ReceiptGetsReceiptNoAndNoDeadline(t *testing.T) {
 	ctx := context.Background()

@@ -119,7 +119,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
         this.uberDeliveryQueryService = uberDeliveryQueryService;
     }
 
-    // ==================== 賣家端（安排出貨）====================
 
     @Override
     public void printCvsLabel(PrintCvsLabelRequest request,
@@ -267,12 +266,11 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
             String labelKey = shippingService.generateHomeLabelPdf(
                     storeId, orderNo, shipDate, deliveryDate, stagedTokens);
 
-            // 查詢 shipmentNo
             ShipmentEntity entity = shippingService.getShipmentByOrderNo(orderNo);
             String shipmentNo = (entity != null) ? entity.getShipmentNo() : "";
 
             HomeLabelData data = HomeLabelData.newBuilder()
-                    .setLabelKey(labelKey) // 49 §6.6：只填 objectKey，Gateway 組 labelUrl
+                    .setLabelKey(labelKey)
                     .setShipmentNo(shipmentNo)
                     .build();
 
@@ -335,7 +333,7 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
                 dataBuilder.addResults(BatchHomeLabelResult.newBuilder()
                         .setOrderNo(ir.orderNo())
                         .setShipmentNo(ir.shipmentNo() != null ? ir.shipmentNo() : "")
-                        .setLabelKey(ir.labelKey() != null ? ir.labelKey() : "") // 49 §6.6：只填 objectKey
+                        .setLabelKey(ir.labelKey() != null ? ir.labelKey() : "")
                         .setSuccess(ir.success())
                         .setMessage(ir.message() != null ? ir.message() : "")
                         .build());
@@ -378,7 +376,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
                     storeId, orderNo,
                     request.getIsContact(), request.getIsTrolley(), request.getMemo());
 
-            // 查詢 shipmentNo
             ShipmentEntity entity = shippingService.getShipmentByOrderNo(orderNo);
             String shipmentNo = (entity != null) ? entity.getShipmentNo() : "";
 
@@ -404,7 +401,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
         }
     }
 
-    // ==================== 服務間呼叫 ====================
 
     @Override
     public void getShipmentsByOrderNos(GetShipmentsByOrderNosRequest request,
@@ -430,8 +426,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
     @Override
     public void getShipmentByOrderNo(GetShipmentByOrderNoRequest request,
                                       StreamObserver<GetShipmentResponse> responseObserver) {
-        // #1871 OBS-09：order_no 進 MDC，讓這個方法內所有 log 行都能被 Loki structured
-        // metadata 查到（見 k8s/monitoring/promtail-daemonset.yaml）。
         MDC.put("order_no", request.getOrderNo());
         try {
             ShipmentEntity entity = shippingService.getShipmentByOrderNo(request.getOrderNo());
@@ -534,7 +528,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
         }
     }
 
-    // ==================== 建店開通 ====================
 
     @Override
     public void onboardCvsShipping(OnboardCvsShippingRequest request,
@@ -658,7 +651,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
         }
     }
 
-    // ==================== 啟用/停用切換 ====================
 
     @Override
     public void toggleShippingOnboarding(ToggleShippingOnboardingRequest request,
@@ -688,7 +680,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
         }
     }
 
-    // ==================== 賣家配送方式查詢 ====================
 
     @Override
     public void listSellerShippingMethods(ListSellerShippingMethodsRequest request,
@@ -732,7 +723,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
         }
     }
 
-    // ==================== 超商門市地圖 ====================
 
     @Override
     public void getStoreMapParams(GetStoreMapParamsRequest request,
@@ -745,8 +735,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
             String appType = request.getAppType();
             String mobileTag = request.getMobileTag();
 
-            // 🔴 門市地圖是 provider 能力，不是本層的知識：參數怎麼加密、表單打去哪、
-            //    版本號是什麼，全部由 StoreLocatorCapability 決定，本層只做 key→proto 的搬運。
             Map<String, String> params = requireStoreLocator().buildRedirectParams(
                     new StoreLocatorCapability.StoreMapRequest(
                             accountId, appType, !"N".equalsIgnoreCase(mobileTag)));
@@ -796,8 +784,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
                 return;
             }
 
-            // fail-closed：解不出門市代碼時 capability 丟 IllegalArgumentException，
-            // 由下方既有的 catch 組錯誤導回頁——遷移前那條路徑是帶著空門市代碼往下走的。
             StoreLocatorCapability.StoreSelection result = requireStoreLocator().parseResult(Map.of(
                     StoreLocatorCapability.RESULT_PAYLOAD, encryptInfo,
                     StoreLocatorCapability.RESULT_SIGNATURE, hashInfo,
@@ -842,7 +828,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
     @Override
     public void getStoreMapRedirectForm(GetStoreMapRedirectFormRequest request,
                                          StreamObserver<GetStoreMapRedirectFormResponse> responseObserver) {
-        // 公開端點：門市中轉頁以 opaque id 一次性取回 canonical 表單（不可猜 + 短效 + 一次性；#1394）
         Optional<StoreMapRedirectFormStore.RedirectForm> opt =
                 storeMapService.consumeRedirectForm(request.getRedirectId());
         if (opt.isEmpty()) {
@@ -868,7 +853,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
         return value == null ? "" : value;
     }
 
-    // ==================== 買家常用門市管理 ====================
 
     @Override
     public void addBuyerStorePickup(AddBuyerStorePickupRequest request,
@@ -1027,7 +1011,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
         }
     }
 
-    // ==================== 回應組裝 ====================
 
     private ShippingOnboardingView buildOnboardingView(SellerShipmentSettingEntity entity) {
         String createdAt = "";
@@ -1054,7 +1037,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
                 .setReturnStoreName(nullToEmpty(entity.getReturnStoreName()))
                 .setReturnStoreAddress(nullToEmpty(entity.getReturnStoreAddress()))
                 .setEnabled(entity.getEnabled() != null && entity.getEnabled() ? "true" : "false")
-                // 寄件人/退貨資訊（物流設定獨立化）
                 .setSenderName(nullToEmpty(entity.getSenderName()))
                 .setSenderPhone(nullToEmpty(entity.getSenderPhone()))
                 .setSenderCity(nullToEmpty(entity.getSenderCity()))
@@ -1089,7 +1071,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
     }
 
     private ShipmentDetailView buildDetailView(ShipmentEntity entity) {
-        // 49 §6.6：只填 objectKey，Gateway 組 labelUrl
         String labelKey = "";
         if (entity.getLabelObjectKey() != null && !entity.getLabelObjectKey().isBlank()) {
             labelKey = entity.getLabelObjectKey();
@@ -1116,10 +1097,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
                 .setRecipientName(nullToEmpty(entity.getRecipientName()))
                 .setRecipientPhone(nullToEmpty(entity.getRecipientPhone()))
                 .setRecipientAddress(nullToEmpty(entity.getRecipientAddress()))
-                // 語意債收斂：本欄裝的是**超商門市代號**，而同一支 proto 內 Admin 那組的 store_id
-                // 裝的是**賣家 store 代理鍵**——同名兩種語意。proto 的 store_id(11) 已 reserved。
-                // 實查零外露消費者（gateway 的 OrderLogisticsResp、賣家追蹤 DTO、order-service 的
-                // ShippingGrpcClient 皆未讀 GetStoreId）⇒ 可直接切，不需相容窗口。
                 .setCvsStoreCode(nullToEmpty(entity.getCvsStoreCode()))
                 .setStoreName(nullToEmpty(entity.getStoreName()))
                 .setLabelKey(labelKey)
@@ -1132,9 +1109,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
                 .setValidationNo(nullToEmpty(entity.getValidationNo()))
                 .addAllShipmentPhotoKeys(buildPhotoKeys(entity))
                 .setStatusLabel(resolveStatusLabel(entity.getStatus()))
-                // 🔴 前端不得自行從 status 推導可做什麼——本欄是唯一出口。
-                //    遷移前這一格從未被填過（proto 有欄位、gateway 有路由表，中間沒有人算），
-                //    於是對外契約上它永遠是空陣列。
                 .addAllAllowedActions(toProtoActions(allowedActionResolver.resolve(entity)))
                 .build();
     }
@@ -1153,9 +1127,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
                         .setEnabled(a.enabled())
                         .setDisabledReasonCode(
                                 a.disabledReasonCode() == null ? "" : String.valueOf(a.disabledReasonCode()))
-                        // 🔴 actor 集合恆非空（record 的建構子擋住空集合）：Gateway 靠它決定
-                        //    這一項要不要進買家端／賣家端的回應。少了它，買家會拿到賣家的動作。
-                        //    是集合不是單值——track/view_only 買賣家都能做，只是端點不同。
                         .addAllActorAccountTypes(a.actorAccountTypes())
                         .build())
                 .toList();
@@ -1183,7 +1154,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
                 .toList();
     }
 
-    // ==================== 運費計算（服務間呼叫）====================
 
     @Override
     public void getShippingFeeConfigs(GetShippingFeeConfigsRequest request,
@@ -1315,7 +1285,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
                     .setMessage(GrpcResponseCode.SUCCESS.message());
 
             for (SellerShippingMethodSlot slot : slots) {
-                // 查詢對應的 setting 以取得 sender_postal_code
                 String postalCode = "";
                 String city = "";
                 String district = "";
@@ -1381,7 +1350,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
             long weightGrams = ProtoConversionUtils.parseLongRequired(weightStr, "weightGrams");
             String deliveryZone = request.getDeliveryZone();
 
-            // 賣家開通狀態過濾（物流設定獨立化）
             Set<String> sellerAvailableMethods = null;
             long storeId = request.getStoreId();
             if (storeId > 0) {
@@ -1390,7 +1358,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
                         onboardingService.listSellerShippingMethods(storeId);
                 for (SellerShippingMethodSlot slot : slots) {
                     if (slot.available()) {
-                        // 宅配 key="TAQBIN:", 超商 key="SEVEN_ELEVEN_STORE_PICKUP:AMBIENT"
                         sellerAvailableMethods.add(slot.shippingMethod() + ":" + slot.goodsType());
                     }
                 }
@@ -1431,9 +1398,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
                 builder.addTemperatureGroups(groupBuilder.build());
             }
 
-            // 無任何可用選項時，回報「真正原因」的錯誤碼 + 訊息供上游透傳（避免一律誤指尺寸）：
-            // sellerAvailableMethods 為空集合 = 賣家一個配送方式都沒開通 → SELLER_NOT_ONBOARDED，引導去物流設定；
-            // 已開通但全被材積/重量擋下 → SHIPPING_ALL_METHODS_EXCEED_LIMITS。
             if (result.temperatureGroups().isEmpty()) {
                 boolean noneOnboarded = sellerAvailableMethods != null && sellerAvailableMethods.isEmpty();
                 if (noneOnboarded) {
@@ -1488,7 +1452,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
                 .build();
     }
 
-    // ==================== 假日管理 ====================
 
     @Override
     public void listBusinessDays(ListBusinessDaysRequest request,
@@ -1504,7 +1467,7 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
                     .setMessage(GrpcResponseCode.SUCCESS.message());
 
             for (java.time.LocalDate day : days) {
-                int dow = day.getDayOfWeek().getValue(); // 1=Monday...7=Sunday
+                int dow = day.getDayOfWeek().getValue();
                 builder.addBusinessDays(BusinessDay.newBuilder()
                         .setDate(day.toString())
                         .setDayOfWeek(dayNames[dow])
@@ -1524,7 +1487,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
         }
     }
 
-    // ==================== 商品配送驗證 ====================
 
     @Override
     public void validateProductShipping(ValidateProductShippingRequest request,
@@ -1550,7 +1512,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
                 return;
             }
 
-            // 建立賣家已開通配送方式集合（同 calculateShippingOptions 邏輯）
             Set<String> sellerAvailableMethods = new HashSet<>();
             List<SellerShippingMethodSlot> slots =
                     onboardingService.listSellerShippingMethods(storeId);
@@ -1560,9 +1521,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
                 }
             }
 
-            // 轉換 Proto → Service DTO
-            // dim/weight 容忍十進位字串（如 "18.00"），由 ProtoConversionUtils 統一向 0 truncate；
-            // 見 22 號設計書 §2.7。
             List<ShippingFeeService.ValidationItem> items = new java.util.ArrayList<>();
             for (ValidateShippingItem protoItem : request.getItemsList()) {
                 items.add(new ShippingFeeService.ValidationItem(
@@ -1576,11 +1534,9 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
                 ));
             }
 
-            // 執行驗證
             ShippingFeeService.ValidationResult result =
                     shippingFeeService.validateProductShipping(items, sellerAvailableMethods);
 
-            // 組裝回應
             ValidateProductShippingResponse.Builder builder = ValidateProductShippingResponse.newBuilder()
                     .setCode(GrpcResponseCode.SUCCESS.code())
                     .setMessage(GrpcResponseCode.SUCCESS.message())
@@ -1628,7 +1584,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
         }
     }
 
-    // ==================== 退貨物流（AfterSales Service 呼叫）====================
 
     @Override
     public void createReturnCvsShipment(CreateReturnCvsShipmentRequest request,
@@ -1754,14 +1709,12 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
                 dataBuilder.setAvailable(true);
 
                 if (ShippingType.CVS_C2C.value().equals(shippingType)) {
-                    // 超商退貨設定
                     dataBuilder.setReturnStoreCode(nullToEmpty(setting.getReturnStoreCode()))
                             .setReturnStoreName(nullToEmpty(setting.getReturnStoreName()))
                             .setReturnStoreAddress(nullToEmpty(setting.getReturnStoreAddress()))
                             .setReturnName(nullToEmpty(setting.getSenderName()))
                             .setReturnPhone(nullToEmpty(setting.getSenderPhone()));
                 } else {
-                    // 宅配退貨設定（優先用退貨專用地址）
                     String returnName = (setting.getReturnName() != null && !setting.getReturnName().isBlank())
                             ? setting.getReturnName() : setting.getSenderName();
                     String returnPhone = (setting.getReturnPhone() != null && !setting.getReturnPhone().isBlank())
@@ -1834,7 +1787,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
         }
     }
 
-    // ==================== 開發工具（Webhook 模擬器）====================
 
     @Override
     public void lookupShipTradeNo(LookupShipTradeNoRequest request,
@@ -1877,7 +1829,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
         }
     }
 
-    // ==================== 批次 provider 狀態聚合（收斂規範 §6.3）====================
 
     @Override
     public void batchGetProviderStatusByOrderIds(BatchGetProviderStatusByOrderIdsRequest request,
@@ -1910,7 +1861,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
         }
     }
 
-    // ==================== Admin 異常查詢 API（§29）====================
 
     @Override
     public void listShipmentsForAdmin(ListShipmentsForAdminRequest request,
@@ -1977,19 +1927,12 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
         }
     }
 
-    // ==================== Uber 配送查詢（66；W6-3 賣家面／W6-4 Admin 面）====================
-    //
-    // 🔴 四支 RPC 而不是兩支帶旗標：§5.1 角色分離。賣家面與 Admin 面的差別
-    //    （store_id 強制過濾、timeline、provider raw payload）正是最需要被型別分開的部分，
-    //    共用一條路徑等於讓「誰看得到什麼」變成一個 if。
 
     @Override
     public void listSellerUberDeliveries(ListSellerUberDeliveriesRequest request,
                                          StreamObserver<ListSellerUberDeliveriesResponse> responseObserver) {
         try {
             GrpcAuthContext.requireAccountType(AccountType.SELLER, AccountType.SELLER_AND_BUYER);
-            // 🔴 歸屬只認 request.getStoreId()（Gateway 的 sellerid resolver 由 JWT 解析後注入），
-            //    而真正的過濾在 UberDeliveryQueryMapper 的 SQL 述詞——本層不做第二份判定。
             ListSellerUberDeliveriesData data = uberDeliveryQueryService.listSellerDeliveries(request);
             responseObserver.onNext(ListSellerUberDeliveriesResponse.newBuilder()
                     .setCode(GrpcResponseCode.SUCCESS.code())
@@ -2018,8 +1961,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
             var detail = uberDeliveryQueryService.getSellerDelivery(
                     request.getStoreId(), request.getDeliveryNo());
             if (detail.isEmpty()) {
-                // ⚠️ 「不存在」與「不是你的」刻意回同一個碼：能區分就等於給了賣家一個
-                //    可列舉全平台配送是否存在的 oracle。
                 responseObserver.onNext(GetSellerUberDeliveryResponse.newBuilder()
                         .setCode(GrpcResponseCode.SHIPMENT_NOT_FOUND.code())
                         .setMessage(GrpcResponseCode.SHIPMENT_NOT_FOUND.message())
@@ -2092,7 +2033,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
         }
     }
 
-    // ==================== §5.21 配送異常賣家通知 ====================
 
     @Override
     public void listSellerShipmentAnomalies(ListSellerShipmentAnomaliesRequest request,
@@ -2447,13 +2387,11 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
         }
     }
 
-    // ==================== Helper ====================
 
     private String nullToEmpty(String value) {
         return value != null ? value : "";
     }
 
-    // ==================== Uber 即時報價（Stage 8B W2-2）====================
 
     /**
      * 取得（或沿用）一筆 Uber 報價。
@@ -2506,7 +2444,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
             if (r.unavailableReason() != null) {
                 data.setValid(false).setUnavailableReason(r.unavailableReason());
             } else if (r.priceChanged()) {
-                // 🔴 不 capture。金額不同必須讓使用者重新確認（INV-U1）。
                 data.setValid(false)
                         .setPriceChanged(true)
                         .setQuoteId(nullSafe(r.quote().getQuoteId()))
@@ -2557,8 +2494,6 @@ public class ShippingGrpcServiceImpl extends ShippingServiceGrpc.ShippingService
     private static UberQuoteData toQuoteData(UberQuoteService.Outcome outcome) {
         UberQuoteData.Builder b = UberQuoteData.newBuilder();
         if (!outcome.available()) {
-            // 🔴 不可用時 quote_id／fee 一律留空：用「fee=0」表示不可用會與
-            //    「0 元運費」（平台補貼）逐位元無法區分。
             return b.setAvailable(false)
                     .setUnavailableReason(nullSafe(outcome.unavailableReason()))
                     .build();

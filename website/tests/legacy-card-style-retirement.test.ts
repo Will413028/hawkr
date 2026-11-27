@@ -91,9 +91,6 @@ const RETIRED_LITERAL_PATTERNS = [
 		name,
 		pattern: exactTokenPattern(name),
 	})),
-	// Catch template/concatenation families such as `store-card__${variant}`.
-	// The left boundary deliberately excludes active names like
-	// `prd-store-card__media`.
 	{
 		name: "store-card__*",
 		pattern: /(?<![A-Za-z0-9_-])store-card__/,
@@ -249,8 +246,6 @@ test("live glass and cart rules preserve their complete semantic contract", () =
 	);
 	assert.equal(
 		semanticDigest(css),
-		// Baseline live rules before the retirement. Intentional restyling must
-		// review the whole ordered rule contract before updating this digest.
 		"69e7d42ef8589cadd0afbc104e8cc8602597323522888cc4f9bb04a9d79c45a9",
 	);
 });

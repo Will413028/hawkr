@@ -33,7 +33,6 @@ public final class WeightConverter {
         if (parsed <= 0) {
             throw new IllegalArgumentException("重量必須大於 0");
         }
-        // 先乘以換算係數再四捨五入，避免小數被提前截斷（如 0.5 KG 應為 500g）
         double grams = switch (unit) {
             case KG -> parsed * KG_TO_GRAMS;
             case CATTY -> parsed * CATTY_TO_GRAMS;

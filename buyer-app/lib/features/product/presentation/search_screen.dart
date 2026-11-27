@@ -29,7 +29,6 @@ class SearchScreen extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = useTextEditingController();
-    // Trigger rebuild on text changes
     useListenable(controller);
     final isSearching = useState(false);
     final hasSearched = useState(false);
@@ -43,7 +42,6 @@ class SearchScreen extends HookConsumerWidget {
       const [],
     );
 
-    // 進場預載：個人化商品推薦
     final recommendedProducts = useState<List<_SearchResult>>([]);
     final isLoadingRecommended = useState(false);
 
@@ -81,7 +79,7 @@ class SearchScreen extends HookConsumerWidget {
           dio: dio,
         );
 
-        if (mapped == null) return; // stale or context gone
+        if (mapped == null) return;
         results.value = mapped;
         isSearching.value = false;
       } catch (_) {
@@ -106,18 +104,13 @@ class SearchScreen extends HookConsumerWidget {
       resultsError.value = null;
       results.value = [];
 
-      // 注音 IME 中間狀態（含 ㄅ-ㄦ 或聲調符號 ˊˇˋ˙ˉ）直接跳過，不打 API。
-      // 之前每按一個鍵 — 「ㄈ → ㄈㄢ → ㄈㄢˉ → ㄈㄢˉ ㄑ ...」— 都會丟一次
-      // 搜尋出去，全部查無結果。
       if (_isImeComposingText(kw)) {
         searchDebounce.value?.cancel();
         return;
       }
 
-      // 一般輸入 debounce ~400ms，避免每個 keystroke 都打 API。
       searchDebounce.value?.cancel();
       searchDebounce.value = Timer(const Duration(milliseconds: 400), () {
-        // 使用者已經繼續打或清掉了，這次 timer 就 stale，不打
         if (controller.text.trim() != kw) return;
         performSearch(kw);
       });
@@ -184,7 +177,6 @@ class SearchScreen extends HookConsumerWidget {
   }
 }
 
-// ─── Internal helpers (top-level functions) ───
 
 Future<void> _loadRecommendedProducts({
   required ValueNotifier<bool> isLoading,
@@ -194,7 +186,6 @@ Future<void> _loadRecommendedProducts({
   if (isLoading.value) return;
   isLoading.value = true;
   try {
-    // 推薦商品：依銷量排序的公開商品列表，訪客與已登入共用，不需要 token。
     final resp = await dio.get<Map<String, dynamic>>(
       '/public/products',
       queryParameters: const {'sort': 'SALES', 'page': 1, 'page_size': 12},
@@ -212,7 +203,6 @@ Future<void> _loadRecommendedProducts({
     for (final p in flat) {
       if (recommended.length >= 6) break;
 
-      // records[] 是 gateway ProductItem，欄名全 camelCase。
       final skuId = (p['id'] ?? '').toString().trim();
       if (skuId.isEmpty || !seenIds.add(skuId)) continue;
 
@@ -220,9 +210,7 @@ Future<void> _loadRecommendedProducts({
       if (skuName.isEmpty) continue;
       if (skuName.contains('-')) skuName = skuName.split('-').first.trim();
 
-      // 49 §6.1 成對契約：imageKey（objectKey）優先，imageUrl 退路。
       final imageUrl = (p['imageKey'] ?? p['imageUrl'] ?? '').toString().trim();
-      // ProductItem 的店名同時出現在 flat 層（sellerName）與巢狀 seller.name。
       final nestedSeller = p['seller'] is Map ? p['seller'] as Map : null;
       final merchantName = (p['sellerName'] ?? nestedSeller?['name'] ?? '')
           .toString()
@@ -250,15 +238,11 @@ Future<void> _loadRecommendedProducts({
     }
     products.value = recommended;
   } catch (_) {
-    // ignore — 推薦失敗不擋整個畫面
   } finally {
     isLoading.value = false;
   }
 }
 
-// OpenAPI spec (預設模組.openapi.json → /public/search/products) 規定的 query 是
-// `keyword`/`q`、`page`、`page_size`、`sort_by`、`sort_order`、`category_id`。
-// 舊版誤傳 `size`（規格無此鍵）跟 `date`（spec 也沒有），backend 會默默忽略。
 Future<List<dynamic>> _fetchProductsPage({
   required int page,
   required int pageSize,
@@ -284,7 +268,6 @@ Future<List<dynamic>> _fetchProductsPage({
     if (resp.statusCode == 200 && resp.data != null) {
       final data = resp.data!['data'];
       if (data is List) return data;
-      // 分頁 key 是 `records`（§16；見 product_repository.searchProducts 同樣 wire）。
       if (data is Map && data['records'] is List) {
         return data['records'] as List;
       }
@@ -293,11 +276,6 @@ Future<List<dynamic>> _fetchProductsPage({
   return [];
 }
 
-// /public/search/products response 內嵌的 storeId / priceMin / priceMax /
-// imageUrl 已足夠建出 _SearchResult；原本 flow 為每個 product 再打
-// /public/products/markets 取 merchant，但該 endpoint 後端不存在（會 400
-// `For input string: "markets"`，被路由匹配到 /public/products/{id} 後 parse Long 失敗），
-// 整段 N+1 aggregation 都是死路。直接用內嵌欄位即可。
 _SearchResult? _resultFromProductMap(Map<String, dynamic> map) {
   final skuId = (map['id'] ?? '').toString().trim();
   String skuName = (map['name'] ?? '').toString().trim();
@@ -309,7 +287,6 @@ _SearchResult? _resultFromProductMap(Map<String, dynamic> map) {
   final merchantName = (map['sellerName'] ?? nestedSeller?['name'] ?? '')
       .toString()
       .trim();
-  // 49 §6.1 成對契約：imageKey（objectKey）優先，imageUrl 退路。
   final imageUrl = (map['imageKey'] ?? map['imageUrl'] ?? '').toString().trim();
 
   final (priceLabel, unitPrice) = PriceDisplay.priceLabelAndUnit(
@@ -382,7 +359,6 @@ Future<List<_SearchResult>?> _fetchSearchResults({
   return mapped;
 }
 
-// ─── Widgets ───
 
 class _TopBar extends StatelessWidget {
   const _TopBar({

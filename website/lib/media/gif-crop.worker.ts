@@ -153,9 +153,6 @@ function validateRequest(
 	}
 }
 
-// gifenc's installed pnnquant2.js nearest-neighbour work grows with occupied
-// histogram bins squared. Smooth resizing can turn a 256-colour GIF into tens
-// of thousands of colours, so keep both quantization paths within 4,096 bins.
 const MAX_QUANTIZATION_BINS = 4_096;
 
 export function makeIndexedFrame(rgba: Uint8ClampedArray): {
@@ -176,7 +173,6 @@ export function makeIndexedFrame(rgba: Uint8ClampedArray): {
 	for (let offset = 0; offset < rgba.length; offset += 4) {
 		if (rgba[offset + 3] <= 127) continue;
 		if (seenColors && quantizationFormat === "rgb565") {
-			// Match gifenc/src/rgb-packing.js exactly; invisible RGB never creates bins.
 			const bin =
 				((rgba[offset] << 8) & 0xf800) |
 				((rgba[offset + 1] << 2) & 0x03e0) |
@@ -199,8 +195,6 @@ export function makeIndexedFrame(rgba: Uint8ClampedArray): {
 		format: quantizationFormat,
 	});
 	const palette: number[][] = [[0, 0, 0], ...opaquePalette];
-	// quantize returns ordinary RGB triples for either histogram format. Keep the
-	// existing finer RGB565 nearest-colour mapping rather than coarsening it too.
 	const opaqueIndexes = applyPalette(rgba, opaquePalette, "rgb565");
 	const indexed = new Uint8Array(opaqueIndexes.length);
 	for (let index = 0; index < opaqueIndexes.length; index += 1) {
@@ -258,9 +252,6 @@ function processGif(request: GifCropWorkerRequest): ArrayBuffer {
 			error instanceof Error ? error.message : "GIF 編輯設定無效，請重新調整。",
 		);
 	}
-	// A retained frame depends on every preceding delta/disposal, including the
-	// trimmed-away lead-in. Reject excessive selected work before gifuct allocates
-	// its parsed tree or the first decompressed patch.
 	const selectedDecodedPixels =
 		preflight.decodedPixelPrefixes[editPlan.decodeThroughIndex];
 	if (
@@ -319,8 +310,6 @@ function processGif(request: GifCropWorkerRequest): ArrayBuffer {
 		output.width,
 		output.height,
 	);
-	// A GIF delay is an unsigned 16-bit centisecond value. Sampling may combine
-	// long delays, so split such holds instead of allowing the encoder to wrap.
 	const maxFrameDelayMs = 655_350;
 	const encodedFrameCount = editPlan.frames.reduce(
 		(sum, frame) =>
@@ -391,7 +380,6 @@ function processGif(request: GifCropWorkerRequest): ArrayBuffer {
 			0,
 		);
 		logicalContext.drawImage(patchCanvas, dims.left, dims.top);
-		// Always update source disposal, even for trimmed or sampled-out patches.
 		previous = {
 			disposalType: frame.disposalType ?? 0,
 			dims,

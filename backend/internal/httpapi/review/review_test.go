@@ -31,7 +31,6 @@ const (
 
 var at = time.Date(2026, 11, 2, 3, 4, 5, 0, time.UTC)
 
-// fakeReads 記下每個讀取的參數並回固定的結果。
 type fakeReads struct {
 	page   review.Page
 	one    review.Review
@@ -47,7 +46,6 @@ type fakeReads struct {
 	size   int32
 	gotID  uuid.UUID
 	hidden bool
-	// product 是最近一次商品讀取收到的商品 ID。
 	product uuid.UUID
 }
 
@@ -107,7 +105,6 @@ func (f *fakeReads) ProductStats(_ context.Context, productID uuid.UUID) (review
 	return f.pstats, f.err
 }
 
-// fakeWrites 記下寫入的輸入。
 type fakeWrites struct {
 	review review.Review
 	err    error
@@ -190,7 +187,6 @@ func codeOf(err error) connect.Code {
 	return connect.CodeOf(rpc.ConnectError(context.Background(), err))
 }
 
-// reasonOf 回傳錯誤帶的 ErrorInfo.reason；沒有時是空字串。
 func reasonOf(err error) string {
 	for _, d := range rpc.ConnectError(context.Background(), err).Details() {
 		v, e := d.Value()
@@ -214,7 +210,6 @@ type env struct {
 	app    *App
 }
 
-// withReason 是帶業務原因的模組錯誤的替身：reasonOf 的測試版本只認這個型別。
 type reasonedError struct {
 	error
 	reason review.Reason
@@ -607,7 +602,6 @@ func TestReplyReviewIsCheckedAgainstTheModulesMarketingCapability(t *testing.T) 
 	suspended.Sanctions = seller.SanctionedBy(seller.EffectiveMeasure{MeasureID: uuid.NewV7()})
 	suspended.Conditions = seller.Conditions{Derived: true, Active: true, NotPendingDeletion: true, KYCApproved: true, TransfersActive: true, StoreName: true, Logo: true, TownCode: true}
 	wantBlocked := seller.Authorize(*suspended, declared.capability) != nil
-	// 沒有資料庫的模組：能力檢查在碰資料庫之前，被擋的回模組的錯誤，通過的會走到資料庫而 panic。
 	h, err := NewApp(&fakeReads{one: sampleReview(1)}, moduleWrites{&review.Module{}}, &fakeBuyers{}, fakeStores{own: suspended}, images(t), slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
@@ -618,7 +612,6 @@ func TestReplyReviewIsCheckedAgainstTheModulesMarketingCapability(t *testing.T) 
 	}
 }
 
-// moduleWrites 把真的模組當寫入來源；通過能力檢查的呼叫會在沒有資料庫的模組裡 panic，這裡接住並回 errReached。
 type moduleWrites struct{ m *review.Module }
 
 var errReached = errors.New("通過了能力檢查")

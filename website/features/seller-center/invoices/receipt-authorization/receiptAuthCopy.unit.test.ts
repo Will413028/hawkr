@@ -29,19 +29,16 @@ describe("ReceiptAuthPage 的核定／審核中文案", () => {
 	});
 
 	it("用 approvedAt 分辨已核定與審核進行中", () => {
-		// 端點 28 不回 taxReviewStatus，approvedAt 是唯一分得出來的欄位。
 		expect(src).toContain("const approved = Boolean(authorization.approvedAt)");
 	});
 
 	it("副標不得無條件宣稱「已核定」", () => {
-		// 舊寫法：subtitle="你已經平台核定免用統一發票，…"（寫死，對審核中的人是假的）。
 		expect(src).not.toMatch(/subtitle="[^"]*核定/);
 		expect(src).toContain("稅務身分審核中");
 	});
 
 	it("核定狀態 Chip 有第三態「審核中」，不是只有已核定與已失效", () => {
 		expect(src).toContain('"審核中"');
-		// 已核定那一態仍要在，不能為了修這件事把它拿掉。
 		expect(src).toContain('"已核定免用統一發票"');
 	});
 });

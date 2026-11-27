@@ -14,7 +14,6 @@ interface AccessClass {
 	owns: (account: { signedIn: boolean; hasSeller: boolean }) => boolean;
 }
 
-// 每個登入的帳號都是買家；賣家區要有 ROLE_SELLER；`account` 登入即可、不分工作區。
 export const ACCESS_CLASSES: Record<RequiredAccess, AccessClass> = {
 	buyer: { workspace: "buyer", owns: ({ signedIn }) => signedIn },
 	seller: { workspace: "seller", owns: ({ hasSeller }) => hasSeller },
@@ -39,14 +38,8 @@ export function roleLabel(slot: RoleSlot) {
 
 export function safeRedirectPath(value: string | null | undefined) {
 	if (!value?.startsWith("/")) return "";
-	// Protocol-relative ("//host") resolves to an off-origin host.
 	if (value.startsWith("//")) return "";
-	// Backslashes normalise to "/" in the WHATWG URL parser, so "/\host"
-	// becomes "//host" — a protocol-relative off-origin redirect that would
-	// otherwise slip past the leading-slash check.
 	if (value.includes("\\")) return "";
-	// Browsers strip control chars (tab/newline/CR) before re-parsing the URL,
-	// which can likewise turn a "safe" path into a protocol-relative one.
 	for (let i = 0; i < value.length; i++) {
 		const code = value.charCodeAt(i);
 		if (code <= 0x1f || code === 0x7f) return "";
@@ -78,7 +71,6 @@ export function loginPath(
 }
 
 export function requiredAccessForPath(pathname: string): RequiredAccess | null {
-	// The rules are written on locale-free paths; `/en/account` is `/account` in English.
 	const path = stripLocale(pathname);
 	for (const { access, prefixes } of ACCESS_RULES) {
 		if (
@@ -108,9 +100,6 @@ export function redirectForRole(
 ) {
 	const safeRedirect = safeRedirectPath(redirect);
 	if (!safeRedirect) return defaultPathForRole(slot);
-	// Role matching is a pathname contract. Passing the full redirect through
-	// made exact protected roots such as `/account?tab=orders` look public,
-	// because they no longer equalled `/account` or started with `/account/`.
 	const pathname = new URL(safeRedirect, "https://hawkr.local").pathname;
 	const workspace = workspaceOfPath(pathname);
 	if (workspace && workspace !== slot) {

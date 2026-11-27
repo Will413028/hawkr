@@ -1,15 +1,8 @@
--- accountdeletion 模組的 desired state（Atlas）。改完在本目錄執行 `atlas migrate diff <名稱> --env dev`
--- 產生 migration，再在 backend/ 跑 `make sqlc`；兩者都讀這個檔。
---
--- public 不屬於本模組：寫在這裡只是讓 Atlas 知道它存在，否則 Atlas 會產生 DROP SCHEMA public。
--- 表一律寫完整名稱（accountdeletion.<表>），不建跨 schema 的 FK；實體的主鍵是應用層產生的 UUIDv7、不設 DEFAULT
--- （ADR 2026-09-25-row-identity-by-data-kind）；慣例見 PostgreSQL 設計規範。
 
 CREATE SCHEMA IF NOT EXISTS public;
 
 CREATE SCHEMA accountdeletion;
 
--- 刪帳申請是帳號層級的流程紀錄；同一帳號可有歷史申請，但同時只能有一筆待訂單完成。
 CREATE TABLE accountdeletion.deletion_requests (
     id UUID PRIMARY KEY,
     account_id BIGINT NOT NULL,
@@ -22,7 +15,6 @@ CREATE TABLE accountdeletion.deletion_requests (
 );
 CREATE UNIQUE INDEX deletion_requests_one_pending ON accountdeletion.deletion_requests (account_id) WHERE status = 'PENDING_ORDERS';
 
--- 每次成功受理的 Request 都留一筆不可變的申請紀錄；重送與管理員接續本人申請也不覆寫舊紀錄。
 CREATE TABLE accountdeletion.request_attempts (
     id UUID PRIMARY KEY,
     request_id UUID NOT NULL REFERENCES accountdeletion.deletion_requests (id),

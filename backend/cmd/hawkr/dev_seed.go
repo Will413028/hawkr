@@ -6,17 +6,10 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
-// 本機開發的種子店家（明文）：dev-seed 以執行中的 KYC 金鑰加密後寫入，種子檔不含密文。識別欄位用明顯是假的值。
-//
-// store_id 與 store_code 固定：infra/seed-data 的 04、05、06 寫死 store_id（Java 的資料庫），06 的 mer_id 是 HAWK 加 store_code，
-// account_id 與 store_id 刻意不同值（9、4 是帳號，store_id 取 1009、1004），
-// 互換 ID 的缺陷才藏不住（同 01 的 buyer_id 規則）。logo 是固定、明顯是種子的 key 與 asset ID，不經 media。
 const (
 	devSeedStoreA, devSeedStoreB = 1009, 1004
 )
 
-// devSeedAccountIDs 是 infra/seed-data/01-account.sql 以固定 ID upsert 的帳號（賣家 9、4，買家 2001、2002，還沒開店的買家 3001）：
-// 它們有未完成的刪帳申請時 dev-seed 在前提檢查（-check）與寫入時都拒絕。dev_seed_test.go 檢查它與 01 的 SQL 一致。
 var devSeedAccountIDs = []int64{4, 9, 2001, 2002, 3001}
 
 func devSeedStores() []seller.DevSeedStore {

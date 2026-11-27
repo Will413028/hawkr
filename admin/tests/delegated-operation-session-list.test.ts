@@ -22,7 +22,6 @@ import {
  *   ③ BFF 的身分是 ADM session，不吃 operation credential
  */
 
-// 後端契約（gateway `DelegatedOperationSessionRecord`）。數字一律字串。
 const SESSION_RECORD = {
 	sessionId: "7494008076136087552",
 	displayCode: "OPS-1KXP05J5SRQPS",
@@ -56,9 +55,6 @@ const SESSION_PAGE = {
 	pageSize: "20",
 };
 
-// ---------------------------------------------------------------------------
-// parser
-// ---------------------------------------------------------------------------
 
 test("列表 parser 收下整列治理欄位，並保留後端推導的 status", () => {
 	const parsed = parseDelegatedOperationSessionPage(SESSION_PAGE);
@@ -79,8 +75,6 @@ test("列表 parser 收下整列治理欄位，並保留後端推導的 status",
 test("列表 parser 是冪等的：同一份資料會被 BFF 與瀏覽器各解析一次", () => {
 	const first = parseDelegatedOperationSessionPage(SESSION_PAGE);
 	assert.ok(first);
-	// 第二次看到的是第一次的產物（total／page 已是 number）。不冪等的症狀是列表頁
-	// 永遠顯示「格式不完整」，而兩邊各自單看都正確。
 	const second = parseDelegatedOperationSessionPage(first);
 	assert.deepEqual(second, first);
 });
@@ -109,8 +103,6 @@ test("單列不合契約時整頁失敗，不是靜默跳過那一列", () => {
 	for (const broken of [
 		{ ...SESSION_RECORD, status: "ended" },
 		{ ...SESSION_RECORD, sessionId: "not-a-tsid" },
-		// 代號形狀由 DB CHECK 與 gateway 兩處守著；前端收下一個不合形狀的值，等於
-		// 讓畫面顯示一個貼回查詢框必被 9260 拒絕的代號。
 		{ ...SESSION_RECORD, displayCode: "OPS-1KXP05J5SRQ" },
 		{ ...SESSION_RECORD, displayCode: "" },
 		{ ...SESSION_RECORD, issuedAt: "2026-08-14T12:32:37+08:00" },
@@ -160,8 +152,6 @@ test("分頁數字缺席或超上限一律失敗，空字串不得被當成 0 �
 });
 
 test("列表列與摘要是兩種形狀，不得互相冒充", () => {
-	// 摘要（`/{sessionId}/summary`）沒有 expiresAt／reason／capabilities，餵進列表
-	// parser 必須整頁失敗；反之若列表列被當成摘要，畫面會顯示一排 0。
 	assert.equal(
 		parseDelegatedOperationSessionPage({
 			records: [
@@ -185,9 +175,6 @@ test("列表列與摘要是兩種形狀，不得互相冒充", () => {
 	);
 });
 
-// ---------------------------------------------------------------------------
-// ② 查詢框收兩種識別碼
-// ---------------------------------------------------------------------------
 
 /**
  * 這一支是「查詢框的接受條件」的唯一判定處。把 `OPS-` 那一支拿掉就會紅 —— 而這正是
@@ -205,7 +192,6 @@ test("② 查詢框兩種識別碼都收：數字跳詳情頁、OPS 代號套成
 		displayCode: "OPS-1KXP05J5SRQPS",
 	});
 
-	// 前後空白與小寫都正規化：代號多半是從 log 或聊天視窗貼過來的，權威形態才是全大寫。
 	assert.deepEqual(resolveDelegatedLookup("  ops-1kxp05j5srqps  "), {
 		kind: "displayCode",
 		displayCode: "OPS-1KXP05J5SRQPS",
@@ -214,11 +200,11 @@ test("② 查詢框兩種識別碼都收：數字跳詳情頁、OPS 代號套成
 	for (const bad of [
 		"",
 		"   ",
-		"OPS-1KXP05J5SRQ", // 12 碼
-		"OPS-1KXP05J5SRQPSX", // 14 碼
-		"OPS1KXP05J5SRQPS", // 缺連字號
-		"O005001417", // 訂單編號
-		"12345678901234567890", // 20 位數
+		"OPS-1KXP05J5SRQ",
+		"OPS-1KXP05J5SRQPSX",
+		"OPS1KXP05J5SRQPS",
+		"O005001417",
+		"12345678901234567890",
 		"7494008076136087552; DROP TABLE",
 	]) {
 		assert.deepEqual(
@@ -242,9 +228,6 @@ test("代號值域與 gateway／DB CHECK 同一份形狀", () => {
 	}
 });
 
-// ---------------------------------------------------------------------------
-// query string
-// ---------------------------------------------------------------------------
 
 test("篩選為空或格式不合時不送出該參數，且 page_size 夾在上限內", () => {
 	const empty = buildDelegatedSessionSearch({ page: 1, pageSize: 20 });
@@ -274,8 +257,6 @@ test("篩選為空或格式不合時不送出該參數，且 page_size 夾在上
 	assert.equal(filtered.get("date_from"), "2026-08-14T00:00:00Z");
 	assert.equal(filtered.get("page_size"), "50");
 
-	// 半截的識別碼不送：gateway 對它回 9260。真正的守門在後端與送出前的表單檢查，
-	// 這裡只是不要拿一個必被拒絕的值去問。
 	const partial = buildDelegatedSessionSearch({
 		page: 1,
 		pageSize: 20,
@@ -304,9 +285,6 @@ test("query key 就是送出去的 query string，兩者不可能漂移", () => 
 	);
 });
 
-// ---------------------------------------------------------------------------
-// ① 列表真的由資料渲染
-// ---------------------------------------------------------------------------
 
 const requireFromTest = createRequire(__filename);
 requireFromTest.extensions[".css"] = () => {};
@@ -439,14 +417,11 @@ test("① 列表由資料渲染：每一列帶代號、店家、操作者與進�
 		},
 	});
 
-	// 打的是專用 same-origin BFF，不是泛用 catch-all 代理（後者不經 parser／no-store）。
 	assert.equal(requested.length, 1);
 	assert.match(requested[0], /^\/api\/admin\/delegated-operations\?/u);
 
 	const html = renderConsole(client);
 	const rows = html.match(/<tr>[\s\S]*?<\/tr>/gu) ?? [];
-	// 表頭 1 ＋ 兩列資料。只有表頭＝渲染得出表格但永遠是空的，正是修前那個查詢框
-	// 換個外殼——它不會報錯、不會 crash，只是永遠查不到東西。
 	assert.equal(
 		rows.length,
 		3,
@@ -458,9 +433,7 @@ test("① 列表由資料渲染：每一列帶代號、店家、操作者與進�
 	assert.match(html, /梨山盛花園/u);
 	assert.match(html, /陳記/u);
 	assert.match(html, /alexischen/u);
-	// 數字 ID 也要看得見：它是查詢框與維運 SQL 認的那一個。
 	assert.match(html, /7494008076136087552/u);
-	// 每一列都點得進詳情頁 —— 沒有連結的話，列表只是把「拿不到 ID」換成「看得到但用不了」。
 	assert.match(
 		html,
 		/href="\/admin\/delegated-operations\/7494008076136087552"/u,
@@ -471,11 +444,9 @@ test("① 列表由資料渲染：每一列帶代號、店家、操作者與進�
 		/href="\/admin\/delegated-operations\/7494008076136087553"/u,
 	);
 
-	// 授權範圍逐項列出（回看時第一個要問的問題），中文出自既有的能力對照表。
 	assert.match(html, /查看店面內容/u);
 	assert.match(html, /編輯店面內容/u);
 
-	// 狀態由後端推導的 status 決定，不是前端拿 expiresAt 再算一次。
 	assert.match(html, /進行中/u);
 	assert.match(html, /已撤銷/u);
 });
@@ -487,7 +458,6 @@ test("① 真的沒有資料時說的是「還沒有任何代行工作階段」�
 	});
 	const html = renderConsole(client);
 	assert.match(html, /平台上還沒有任何代行工作階段/u);
-	// 空集合不得出現分頁列（「顯示第 1 至 0 筆」）。
 	assert.doesNotMatch(html, /顯示第/u);
 });
 
@@ -497,15 +467,10 @@ test("① 上游壞掉時說得出是壞掉，不是顯示成一份空列表", a
 		502,
 	);
 	const html = renderConsole(client);
-	// 一份「看起來是空的」列表與一份真的沒有代行活動的列表，在畫面上長得一模一樣，
-	// 而後者正是治理最想確認的結論。
 	assert.doesNotMatch(html, /平台上還沒有任何代行工作階段/u);
 	assert.match(html, /代行營運服務暫時無法使用/u);
 });
 
-// ---------------------------------------------------------------------------
-// 接線：入口頁、BFF 身分、以及那句不再成立的註解
-// ---------------------------------------------------------------------------
 
 test("入口頁掛的是列表本體，不是一個自己持有查詢狀態的查詢框", async () => {
 	const page = await readFile(
@@ -513,8 +478,6 @@ test("入口頁掛的是列表本體，不是一個自己持有查詢狀態的�
 		"utf8",
 	);
 	assert.match(page, /<SessionListConsole/u);
-	// 修前這一頁自己持有 `sessionId` state 與 `router.push`，整頁就是一個輸入框。
-	// 退化回去的形狀就是這兩者其中之一重新出現在**頁面**上。
 	assert.doesNotMatch(
 		page,
 		/useState/u,
@@ -526,7 +489,6 @@ test("入口頁掛的是列表本體，不是一個自己持有查詢狀態的�
 		"src/features/delegated-operations/components/SessionListConsole.tsx",
 		"utf8",
 	);
-	// 查詢框的判定只有一處（純函式），元件不得自己再寫一份值域。
 	assert.match(console_, /resolveDelegatedLookup\(/u);
 	assert.doesNotMatch(
 		console_.replace(/\/\*[\s\S]*?\*\//gu, ""),
@@ -542,15 +504,12 @@ test("③ 列表 BFF 的身分是 ADM session，不吃 operation credential", as
 	]);
 	assert.match(route, /export async function GET\(/u);
 	assert.match(route, /adminSession\.token\(request\)/u);
-	// 帶 operation credential 就是把「列得出全平台代行活動」的治理視角交給憑證持有者。
 	const getBody = route.slice(
 		route.indexOf("export async function GET("),
 		route.indexOf("export async function POST("),
 	);
 	assert.doesNotMatch(getBody, /operationSession/u);
 	assert.match(getBody, /DELEGATED_OPERATION_UPSTREAM\.sessions/u);
-	// 上游路徑第一段必須是 `delegated-operations`：`bff-boundary.ts` 只認這個字面值
-	// 來拒絕 catch-all 代理。
 	assert.match(upstream, /sessions: SESSIONS_PATH/u);
 	assert.match(
 		upstream,

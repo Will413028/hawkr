@@ -32,8 +32,6 @@ public class UberStoreResolver {
      *         呼叫端必須以 {@code UBER_STORE_NOT_MAPPED} 語意擋下，<b>不得</b>當成「Uber 暫時有問題」
      */
     public Optional<UberStoreMappingEntity> activeMapping(long sellerStoreId) {
-        // ⚠️ selectList + 取第一筆而不是 selectOne：一個賣家可有多個 external_store_id
-        //    （66 §7.4 道 1「同賣家 ≠ 同取件地址」），selectOne 命中多列會直接拋。
         return storeMappingMapper.selectList(Wrappers.<UberStoreMappingEntity>lambdaQuery()
                         .eq(UberStoreMappingEntity::getSellerStoreId, sellerStoreId)
                         .eq(UberStoreMappingEntity::getActive, true)

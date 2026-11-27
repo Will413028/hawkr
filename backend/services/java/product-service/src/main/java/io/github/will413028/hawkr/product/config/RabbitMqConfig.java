@@ -8,7 +8,6 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMqConfig {
 
-    // ==================== 消費端（來自 Order Service — 訂單取消庫存歸還）====================
 
     /**
      * hawkr.order 由 order-service 宣告，此處 declare=false 避免覆蓋
@@ -25,7 +24,6 @@ public class RabbitMqConfig {
         return new TopicExchange(MqConstants.EXCHANGE_PRODUCT_DLX, true, false);
     }
 
-    // ==================== 發佈端（hawkr.product 由本服務宣告）====================
 
     /**
      * 02 §5.13b / 36 §3.6h / 39 §5.5a / #942 — 補貨 transition event 之 exchange。
@@ -64,7 +62,6 @@ public class RabbitMqConfig {
                 .with(MqConstants.QUEUE_PRODUCT_ORDER_CANCELLED_DLQ);
     }
 
-    // ==================== 消費端（來自 Order Service — 付款成功銷量累計，35 設計書） ====================
 
     @Bean
     public Queue productOrderSalesAccumulatedQueue() {
@@ -93,7 +90,6 @@ public class RabbitMqConfig {
                 .with(MqConstants.QUEUE_PRODUCT_ORDER_SALES_ACCUMULATED_DLQ);
     }
 
-    // ==================== 消費端（來自 Buyer Service — 收藏計數同步，02 §5.14） ====================
 
     /**
      * hawkr.buyer exchange。
@@ -165,7 +161,6 @@ public class RabbitMqConfig {
                 .with(MqConstants.QUEUE_PRODUCT_BUYER_FAVORITE_REMOVED_DLQ);
     }
 
-    // ==================== 消費端（來自 Seller Service — 賣家刪除下架商品） ====================
 
     /**
      * hawkr.seller exchange（既有 {@link MqConstants#EXCHANGE_SELLER_BIZ}）。
@@ -204,7 +199,6 @@ public class RabbitMqConfig {
                 .with(MqConstants.QUEUE_PRODUCT_SELLER_DELETED_DLQ);
     }
 
-    // ==================== 消費端（來自 Seller Service — 店家可曝光狀態，seller.exposure.changed） ====================
 
     @Bean
     public Queue productSellerExposureChangedQueue() {
@@ -233,7 +227,6 @@ public class RabbitMqConfig {
                 .with(MqConstants.QUEUE_PRODUCT_SELLER_EXPOSURE_CHANGED_DLQ);
     }
 
-    // ==================== 消費端（來自 Review Service — 評論聚合同步，02 §5.14a，#1156） ====================
 
     /**
      * hawkr.review exchange。
@@ -284,7 +277,6 @@ public class RabbitMqConfig {
                 .with(MqConstants.QUEUE_PRODUCT_REVIEW_STATS_DLQ);
     }
 
-    // ==================== 消費端（來自本服務自己 — 認證背景查驗，19 §12 / 36 §3.6h.1，#2755） ====================
 
     /**
      * product.certification.verify queue：綁<b>自家</b> exchange {@code hawkr.product} 的

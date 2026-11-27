@@ -31,9 +31,6 @@ public final class MqErrorHandler {
     private static final String RETRY_COUNT_HEADER = "x-retry-count";
     private static final int MAX_RETRY_COUNT = 3;
 
-    // Set once at startup by MqErrorHandlerMetricsAutoConfiguration. Nullable so
-    // handleFailure stays usable where no Spring MeterRegistry bean exists (e.g.
-    // plain unit tests calling this static method directly).
     private static volatile MeterRegistry meterRegistry;
 
     private MqErrorHandler() {}
@@ -57,13 +54,11 @@ public final class MqErrorHandler {
         String queueName = message.getMessageProperties().getConsumerQueue();
 
         if (retryCount >= MAX_RETRY_COUNT) {
-            // 超過最大重試次數，送入 DLQ
             log.error("[{}] 超過最大重試次數({})，訊息進入 DLQ: {}",
                     consumerName, MAX_RETRY_COUNT, e.getMessage());
             recordOutcome(queueName, "dlq");
             channel.basicReject(deliveryTag, false);
         } else {
-            // ACK 原訊息，重新發布到同一 queue 並遞增 retry count
             log.warn("[{}] 消費失敗，將重試({}/{})：{}",
                     consumerName, retryCount + 1, MAX_RETRY_COUNT, e.getMessage());
             recordOutcome(queueName, "retry");
@@ -101,7 +96,6 @@ public final class MqErrorHandler {
 
     private static void republishWithRetryCount(Channel channel, String queueName,
                                                  Message originalMessage, int retryCount) throws IOException {
-        // 複製原始 headers 並加入 retry count
         MessageProperties originalProps = originalMessage.getMessageProperties();
         Map<String, Object> headers = new HashMap<>();
         if (originalProps.getHeaders() != null) {
@@ -111,11 +105,10 @@ public final class MqErrorHandler {
 
         AMQP.BasicProperties props = new AMQP.BasicProperties.Builder()
                 .contentType(originalProps.getContentType())
-                .deliveryMode(2)  // persistent
+                .deliveryMode(2)
                 .headers(headers)
                 .build();
 
-        // 透過 default exchange（""）直接發送到指定 queue
         channel.basicPublish("", queueName, props, originalMessage.getBody());
     }
 }

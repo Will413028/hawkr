@@ -61,7 +61,6 @@ func versionConflict(ctx context.Context) error {
 	return apperr.VersionConflict("%s", text.CommentVersionConflict(uitext.LocaleFrom(ctx)))
 }
 
-// withStats 補上討論區項目此刻的回覆數。
 func withStats(ctx context.Context, q *store.Queries, out model.ForumEntry) (model.ForumEntry, error) {
 	n, err := q.GetForumEntryReplyCount(ctx, out.ID)
 	if err != nil {
@@ -71,8 +70,6 @@ func withStats(ctx context.Context, q *store.Queries, out model.ForumEntry) (mod
 	return out, nil
 }
 
-// currentOf 是重送命中時回的項目：列表讀取算出的目前狀態（已刪除、被隱藏、作者停用後是佔位）與計數，不是第一次建立當下的樣子。
-// row 是剛讀到的列，內文與版本直接用它。
 func (s *Service) currentOf(ctx context.Context, q *store.Queries, row store.SocialForumEntry) (model.ForumEntry, error) {
 	st, err := reads.One[reads.StateRow](ctx, s.d.DB.Conn(ctx), reads.ForumEntryState(row.ID))
 	if err != nil {
@@ -166,7 +163,6 @@ func (s *Service) Create(ctx context.Context, c model.Caller, in model.ForumInpu
 			ActorKind: string(a.Kind), ActorID: a.ID, Body: body, Now: now, RequestID: in.RequestID, RequestHash: hash,
 		})
 		if errors.Is(err, pgx.ErrNoRows) {
-			// 同一個 (互動者, request_id) 在上面的查詢之後才出現（並行的重送）：INSERT 等到對方 commit 才回 0 列，這時讀得到它。
 			row, ok, rerr := s.replay(ctx, q, a, in.RequestID, hash)
 			if rerr != nil {
 				return rerr
@@ -186,7 +182,6 @@ func (s *Service) Create(ctx context.Context, c model.Caller, in model.ForumInpu
 	if err != nil {
 		return model.ForumEntry{}, err
 	}
-	// 討論區可讀可寫是寫入的前置檢查，成功的寫入（含重送命中）就是 true，不再查。
 	if isReplay {
 		replayed.Readable = true
 		return replayed, nil
@@ -196,7 +191,6 @@ func (s *Service) Create(ctx context.Context, c model.Caller, in model.ForumInpu
 	return out, nil
 }
 
-// replay 查 (互動者, request_id)：命中且內容相同回傳第一次建立的那一則；內容不同是 InvalidInput；沒帶 request_id 或沒命中回 false。
 func (s *Service) replay(ctx context.Context, q *store.Queries, a model.Actor, requestID *uuid.UUID, hash []byte) (store.SocialForumEntry, bool, error) {
 	if requestID == nil {
 		return store.SocialForumEntry{}, false, nil
@@ -226,7 +220,6 @@ func (s *Service) Update(ctx context.Context, c model.Caller, id uuid.UUID, vers
 	var updated model.ForumEntry
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
-		// 鎖的順序 identity → buyer → seller → social：作者在鎖之前用不加鎖的讀取確認（作者不會變），買家列的共享鎖先於討論區留言列的鎖（A7-1a R3）。
 		pre, err := q.GetForumEntry(ctx, id)
 		if errors.Is(err, pgx.ErrNoRows) || err == nil && pre.DeletedAt != nil {
 			return entryNotFound(ctx)
@@ -266,7 +259,6 @@ func (s *Service) Update(ctx context.Context, c model.Caller, id uuid.UUID, vers
 		if err != nil {
 			return err
 		}
-		// 修改不要求討論區可讀，回應的 viewer_can_reply 要用，所以求值。
 		updated.Readable, err = s.Readable(ctx, c, pre.StoreID, now)
 		return err
 	})
@@ -323,7 +315,6 @@ func toEntry(r reads.EntryRow) model.ForumEntry {
 	return out
 }
 
-// finish 把（可能多取一列的）列轉成一頁，並帶這家店的討論區對呼叫者可不可以讀寫：有列就是（列的查詢帶同一個條件），空頁才查一次。
 func (s *Service) finish(ctx context.Context, c model.Caller, storeID int64, rows []reads.EntryRow, size int32, now time.Time) (model.ForumPage, error) {
 	out := pageOf(rows, size)
 	if len(rows) == 0 {
@@ -335,7 +326,6 @@ func (s *Service) finish(ctx context.Context, c model.Caller, storeID int64, row
 	return out, nil
 }
 
-// pageOf 把（可能多取一列的）列轉成一頁；Readable 只在有列時為真，空頁的可讀性由呼叫端決定。
 func pageOf(rows []reads.EntryRow, size int32) model.ForumPage {
 	more := len(rows) > int(size)
 	if more {
@@ -405,7 +395,6 @@ func (s *Service) GetThread(ctx context.Context, c model.Caller, storeID int64, 
 	if len(rows) == 0 {
 		return model.ForumThreadView{}, entryNotFound(ctx)
 	}
-	// 頂層讀得到才讀回覆，兩者用同一個可讀條件。
 	replyRows, err := reads.Many[reads.EntryRow](ctx, s.d.DB.Conn(ctx), reads.ListForumReplies(threadID, now, actor.ViewerFor(c, storeID), reads.CommentPage{Limit: int64(size) + 1}))
 	if err != nil {
 		return model.ForumThreadView{}, fmt.Errorf("social：列出討論區回覆：%w", err)

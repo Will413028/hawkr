@@ -48,7 +48,6 @@ func NewApp(writes Writes, authored Authored, owner Owner, buyers Buyers, stores
 	return newApp(declarations, writes, authored, owner, buyers, stores, products, images, webOrigin, log)
 }
 
-// newApp 的宣告表由參數給（測試用缺一列的表驗證啟動檢查）。
 func newApp(table map[string]declaration, writes Writes, authored Authored, owner Owner, buyers Buyers, stores Stores, products Products, images rpc.Images, webOrigin rpc.WebOrigin, log *slog.Logger) (*App, error) {
 	if log == nil {
 		return nil, fmt.Errorf("httpapi/social：需要 logger")
@@ -62,7 +61,6 @@ func newApp(table map[string]declaration, writes Writes, authored Authored, owne
 	return &App{presenter: &presenter{buyers: buyers, stores: stores, products: products, ownerView: true, images: images, webOrigin: webOrigin, log: log, liked: noViewerLikes}, writes: writes, authored: authored, owner: owner}, nil
 }
 
-// noViewerLikes 是店主路徑的 liked：店主的回應不帶買家的讚，永遠是空的。
 func noViewerLikes(context.Context, int64, []uuid.UUID) (map[uuid.UUID]bool, error) {
 	return nil, nil
 }
@@ -73,7 +71,6 @@ var (
 	updateEntryPaths   = rpc.FieldPaths{"Body": "entry.body"}
 )
 
-// account 回傳呼叫者與他的互動身分；只有顧客帳號能呼叫，沒有登入由 interceptor 擋（unauthenticated），管理員回 permission_denied。
 func (h *App) account(ctx context.Context) (social.Caller, error) {
 	if _, err := rpc.RequireAccount(ctx); err != nil {
 		return social.Caller{}, err
@@ -81,7 +78,6 @@ func (h *App) account(ctx context.Context) (social.Caller, error) {
 	return h.caller(ctx)
 }
 
-// optionalUUID 解析選填的 ID；沒設是 nil。
 func optionalUUID(path string, raw *string) (*uuid.UUID, error) {
 	if raw == nil {
 		return nil, nil
@@ -93,7 +89,6 @@ func optionalUUID(path string, raw *string) (*uuid.UUID, error) {
 	return &id, nil
 }
 
-// bodyUpdate 解析 Update 請求：資源的 id、必填的 etag、update_mask 要列 body（內文是唯一可以修改的欄位）；field 是資源在請求裡的欄位名。
 func bodyUpdate(field string, resource proto.Message, mask *fieldmaskpb.FieldMask, id, etag, body string) (uuid.UUID, int64, string, error) {
 	if !resource.ProtoReflect().IsValid() {
 		return uuid.UUID{}, 0, "", rpc.RequiredField(field, field+" 必填")

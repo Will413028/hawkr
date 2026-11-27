@@ -20,10 +20,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class CheckoutValidatorFreeShippingTest {
 
-    private static final String METHOD = "3001";   // TAQBIN value
-    private static final String TEMP = "3201";     // AMBIENT value
-    private static final String SELLER = ShippingFeePayer.SELLER.value(); // "3102"
-    private static final String BUYER = ShippingFeePayer.BUYER.value();   // "3101"
+    private static final String METHOD = "3001";
+    private static final String TEMP = "3201";
+    private static final String SELLER = ShippingFeePayer.SELLER.value();
+    private static final String BUYER = ShippingFeePayer.BUYER.value();
 
     private final CheckoutValidator validator = new CheckoutValidator(null, new UberOrderEligibilityGuard());
 
@@ -35,11 +35,9 @@ class CheckoutValidatorFreeShippingTest {
                 "img", true);
     }
 
-    // ===== §4.7.0-A 無條件免運 =====
 
     @Test
     void sellerPaysWithoutThreshold_unconditionallyFree() {
-        // feePayer=SELLER + freeThreshold=0 → 無條件免運（tentative，無折扣）
         var items = List.of(item(1L, 50, 1, 0L, SELLER));
         FreeShippingResult fsr = validator.checkFreeShipping(items, METHOD, TEMP, null);
         assertThat(fsr.eligible()).isTrue();
@@ -49,14 +47,12 @@ class CheckoutValidatorFreeShippingTest {
 
     @Test
     void sellerPaysWithoutThreshold_stillFreeAfterFullCoupon() {
-        // feePayer=SELLER + freeThreshold=0 + 全額券折到 0 → 仍免運（final，折扣後不翻轉）
         var items = List.of(item(1L, 50, 1, 0L, SELLER));
-        Map<java.util.UUID, Long> discount = Map.of(TestIds.id(1L), 50L); // 商品折到 0
+        Map<java.util.UUID, Long> discount = Map.of(TestIds.id(1L), 50L);
         FreeShippingResult fsr = validator.checkFreeShipping(items, METHOD, TEMP, discount);
-        assertThat(fsr.eligible()).isTrue(); // issue #1147 核心：0 元訂單路徑不被運費阻斷
+        assertThat(fsr.eligible()).isTrue();
     }
 
-    // ===== §4.7.0-B 門檻免運（折扣後判定，維持不變）=====
 
     @Test
     void sellerPaysWithThreshold_eligibleWhenSubtotalMeetsThreshold() {
@@ -68,14 +64,12 @@ class CheckoutValidatorFreeShippingTest {
 
     @Test
     void sellerPaysWithThreshold_flipsOffAfterDiscountBelowThreshold() {
-        // 1500 − 600 = 900 < 1000 → 折扣後失去免運（§4.7.0-B 維持）
         var items = List.of(item(1L, 1500, 1, 1000L, SELLER));
         Map<java.util.UUID, Long> discount = Map.of(TestIds.id(1L), 600L);
         FreeShippingResult fsr = validator.checkFreeShipping(items, METHOD, TEMP, discount);
         assertThat(fsr.eligible()).isFalse();
     }
 
-    // ===== feePayer=BUYER 不免運 =====
 
     @Test
     void buyerPays_neverFree() {
@@ -85,13 +79,12 @@ class CheckoutValidatorFreeShippingTest {
         assertThat(fsr.feePayer()).isEqualTo(BUYER);
     }
 
-    // ===== 多商品：任一無條件免運 → 整筆免運 =====
 
     @Test
     void mixedItems_anyUnconditionalSellerMakesWholeOrderFree() {
         var items = List.of(
-                item(1L, 50, 1, 0L, SELLER),      // 無條件免運
-                item(2L, 30, 1, 0L, BUYER));      // 買家負擔
+                item(1L, 50, 1, 0L, SELLER),
+                item(2L, 30, 1, 0L, BUYER));
         FreeShippingResult fsr = validator.checkFreeShipping(items, METHOD, TEMP, null);
         assertThat(fsr.eligible()).isTrue();
     }

@@ -17,7 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// txQuota 記錄額度是在 transaction 內讀的（買家的送出鎖之後）。
 type txQuota struct {
 	conn     func(context.Context) db.DBTX
 	inTx     bool
@@ -47,7 +46,7 @@ func newSubmitter(f *fixture, q turn.QuotaSource) turn.Submitter {
 	return turn.Submitter{Submitter: run.Submitter{DB: f.d, Ledger: f.ledger(), Jobs: f.jobs}, Quota: q}
 }
 
-func TestSubmitReadsTheQuotaInsideTheTransaction(t *testing.T) { // A9-D24：額度與扣額度同一個 transaction、買家鎖之後
+func TestSubmitReadsTheQuotaInsideTheTransaction(t *testing.T) {
 	f := newFixture(t)
 	q := &txQuota{conn: f.d.Conn}
 	if _, err := newSubmitter(f, q).Submit(context.Background(), turn.SubmitInput{BuyerID: buyer, Message: "要蘋果", ClientRequestID: uuid.NewV7(), Locale: uitext.ZhTW}); err != nil {

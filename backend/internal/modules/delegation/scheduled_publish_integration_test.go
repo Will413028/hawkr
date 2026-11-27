@@ -17,7 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
 )
 
-// 排程發布：代行 session 排的貼文到點由 social 的 job 發布；授權在到點時重驗，四個授權失效的觸發點在同一個 transaction 內先取消排程。
 
 func (f *fixture) next() int64 {
 	f.nextID++
@@ -31,7 +30,6 @@ func (f *fixture) exec(t *testing.T, sql string, args ...any) {
 	}
 }
 
-// exposableStore 直接寫出 social 要的最小店家（營運中、可曝光）。
 func (f *fixture) exposableStore(t *testing.T) int64 {
 	t.Helper()
 	account := f.next() + 5000
@@ -60,7 +58,6 @@ func (f *fixture) draftPost(t *testing.T, storeID int64) social.Post {
 	return p
 }
 
-// scheduledPost 為店家建一篇草稿，並以 session 的名義排在 lead 之後發布。
 func (f *fixture) scheduledPost(t *testing.T, storeID, sessionID int64, lead time.Duration) (social.Post, social.Schedule) {
 	t.Helper()
 	p := f.draftPost(t, storeID)
@@ -110,7 +107,6 @@ func (f *fixture) scheduleAudits(t *testing.T, scheduleID uuid.UUID) int {
 	return f.count(t, `SELECT count(*) FROM delegation.admin_operation_audit_logs WHERE idempotency_key = $1`, "schedule:"+scheduleID.String())
 }
 
-// publishDue 讓時間走到 publish_at 再跑到點的 job。
 func (f *fixture) publishDue(t *testing.T, s social.Schedule) {
 	t.Helper()
 	if f.now.Before(s.PublishAt) {
@@ -121,7 +117,6 @@ func (f *fixture) publishDue(t *testing.T, s social.Schedule) {
 	}
 }
 
-// sessionWithAuthority 建一位開通的管理員、店家授權（含 posts.publish）與進行中的 session。
 type scheduler struct {
 	storeID int64
 	admin   int64
@@ -184,11 +179,9 @@ func TestScheduledPublishOfAnEndedSessionPublishesWithOneSucceededAudit(t *testi
 	if e := f.completed[len(f.completed)-1]; e.Action != AuditPostPublish || e.TargetStoreID != sc.storeID || e.SessionID != sc.session.Session.ID || e.CorrelationID != "schedule:"+sched.ID.String() {
 		t.Fatalf("完成通知 = %+v", e)
 	}
-	// job 重跑：排程已經不是 PENDING，什麼都不做。
 	if err := f.realSocial.PublishScheduled(ctx, sched.ID); err != nil {
 		t.Fatal(err)
 	}
-	// 事件重送：撞唯一鍵當成功。
 	ev := social.PostPublished{
 		EventID: uuid.NewV7(), PostID: post.ID, StoreID: sc.storeID, Origin: social.OriginScheduled, ScheduleID: sched.ID,
 		ScheduledBy: social.ScheduledBy{Kind: social.ScheduleByDelegation, Ref: fmt.Sprint(sc.session.Session.ID)},
@@ -204,7 +197,6 @@ func TestScheduledPublishOfAnEndedSessionPublishesWithOneSucceededAudit(t *testi
 	if len(f.completed) != completedBefore+1 {
 		t.Fatalf("重送不再發完成通知：%d", len(f.completed)-completedBefore)
 	}
-	// 直接發布與店主自己的排程不寫代行稽核。
 	direct := ev
 	direct.Origin, direct.ScheduleID = social.OriginDirect, uuid.UUID{}
 	owner := ev
@@ -314,7 +306,6 @@ func TestTriggersCancelSchedulesIncludingEndedSessions(t *testing.T) {
 			mine := f.newScheduler(t, "mine")
 			theirs := f.newScheduler(t, "theirs")
 			_, minePending := f.scheduledPost(t, mine.storeID, mine.session.Session.ID, 2*time.Hour)
-			// 同一位管理員、同一家店的第二篇，也屬於已結束的 session。
 			_, mineSecond := f.scheduledPost(t, mine.storeID, mine.session.Session.ID, 3*time.Hour)
 			_, theirPending := f.scheduledPost(t, theirs.storeID, theirs.session.Session.ID, 2*time.Hour)
 
@@ -325,7 +316,6 @@ func TestTriggersCancelSchedulesIncludingEndedSessions(t *testing.T) {
 			c.fire(t, f, mine, governor)
 			f.wantSchedule(t, minePending.ID, "CANCELED", "AUTHORITY_LOST")
 			f.wantSchedule(t, mineSecond.ID, "CANCELED", "AUTHORITY_LOST")
-			// 對照組：另一位管理員與另一家店的排程不受影響（撤銷管理員角色等只針對這位管理員或這家店）。
 			f.wantSchedule(t, theirPending.ID, "PENDING", "")
 		})
 	}
@@ -411,7 +401,6 @@ func TestRevokeAndScheduledJobDoNotDeadlock(t *testing.T) {
 				if !published && !lost {
 					t.Fatalf("第 %d 輪：排程要是 PUBLISHED 或 AUTHORITY_LOST：%s %s", i, state, reason)
 				}
-				// 發布與稽核同生同滅：發布了就有一列稽核，被取消就沒有。
 				want := 0
 				if state == "PUBLISHED" {
 					want = 1

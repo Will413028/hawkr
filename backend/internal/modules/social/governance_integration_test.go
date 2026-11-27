@@ -105,7 +105,6 @@ func TestContentSnapshotReturnsBodyMediaAndAuthor(t *testing.T) {
 	if !got.Exists || got.Body != "貼文本文" || got.Author != (social.Actor{Kind: social.ActorStore, ID: storeID}) || !got.Readable || len(got.MediaRefs) != 1 || got.MediaRefs[0] == "" {
 		t.Fatalf("貼文 %+v", got)
 	}
-	// 發文時間與連結目標：貼文連到自己，留言連到所屬貼文，討論區留言連到店家加討論串（頂層留言的討論串是自己）。
 	postAuthored := f.timeOf(t, "SELECT COALESCE(published_at, created_at) FROM social.posts WHERE id = $1", p.ID)
 	commentAuthored := f.timeOf(t, "SELECT created_at FROM social.comments WHERE id = $1", c.ID)
 	entryAuthored := f.timeOf(t, "SELECT created_at FROM social.forum_entries WHERE id = $1", e.ID)
@@ -175,7 +174,6 @@ func TestRevalidateIsEnqueuedInTheSameTransaction(t *testing.T) {
 	if got := f.jobs.revalidations(); len(got) != 3 {
 		t.Fatalf("編輯已發布的貼文、下架、刪除各一個：%v", got)
 	}
-	// 討論區的隱藏與還原沿用店面頁的 tag。
 	e := mustV[social.ForumEntry](t)(f.module.CreateForumEntry(ctx, f.asBuyer(b), social.ForumInput{StoreID: storeID, Body: "討論"}))
 	f.jobs.reset()
 	_, err = f.module.Hide(ctx, social.HideInput{Target: social.Target{Kind: social.TargetForumEntry, ID: e.ID}, Category: "HATE", AdminID: 1})

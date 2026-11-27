@@ -5,18 +5,9 @@ import (
 	"sync"
 )
 
-// The route registry records `(method, path, capability)` for every seller route
-// declared via requireSeller(cap) (46 §3.2 / §3.8). Registration is driven by the
-// router mount helper (sellerHandle) so declaration and mounting are one act — a
-// route that carries requireSeller is, by construction, in this registry. The boot
-// assertion (router.assertSellerRouteCoverage) then uses this registry to verify
-// deny-by-default coverage: every /api/v1/app route must resolve to a declared
-// capability, an explicit exemption, or the buyer-facing default.
 
 var (
 	registryMu sync.Mutex
-	// registry maps "METHOD PATH" → capability. A map (not a slice) so re-building
-	// the router in tests is idempotent rather than accumulating duplicates.
 	registry = map[string]Capability{}
 )
 
@@ -42,16 +33,6 @@ func LookupRoute(method, path string) (Capability, bool) {
 	return cap, ok
 }
 
-// The admin registry is the same idea for ADM 代行營運 (56 §6.1.0 / §8.1.2): the
-// delegatedHandle mount helper records (method, path, adminCapability) so that
-// declaration and mounting are again one act, and the boot assertion can then walk
-// the registry rather than a path prefix. Prefix would be the wrong scope — S1
-// preflight lives under the same /api/v1/admin/sellers/:store_id/… shape yet has no
-// capability to declare (deciding whether one can be granted IS its job), so a
-// prefix-based check would panic the Gateway at boot.
-//
-// It is a SEPARATE map from the seller registry, not a merged one: the two token
-// vocabularies must not be able to satisfy each other's Register call.
 
 var (
 	adminRegistryMu sync.Mutex
@@ -122,7 +103,6 @@ func Registered() []RegisteredRoute {
 	registryMu.Lock()
 	out := make([]RegisteredRoute, 0, len(registry))
 	for k, cap := range registry {
-		// k = "METHOD PATH"; split on first space.
 		for i := 0; i < len(k); i++ {
 			if k[i] == ' ' {
 				out = append(out, RegisteredRoute{Method: k[:i], Path: k[i+1:], Cap: cap})

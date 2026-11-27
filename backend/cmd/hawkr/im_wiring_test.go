@@ -13,7 +13,6 @@ import (
 	"time"
 )
 
-// funcBody 回傳 main.go 裡名為 name 的函式本體。
 func funcBody(t *testing.T, name string) *ast.BlockStmt {
 	t.Helper()
 	file, err := parser.ParseFile(token.NewFileSet(), "main.go", nil, 0)
@@ -29,12 +28,10 @@ func funcBody(t *testing.T, name string) *ast.BlockStmt {
 	return nil
 }
 
-// runsIMThrough 回報函式本體是否把 imModule.Run 交給 serveWithRun（直接，或經 joinRuns）。
 func runsIMThrough(body *ast.BlockStmt) (servesWithRun, referencesRun bool) {
 	return runsModuleThrough(body, "imModule")
 }
 
-// runsModuleThrough 回報函式本體是否把 <module>.Run 交給 serveWithRun（直接，或在 joinRuns 的參數裡），以及是否引用了它。
 func runsModuleThrough(body *ast.BlockStmt, module string) (servesWithRun, referencesRun bool) {
 	isRun := func(e ast.Expr) bool {
 		sel, ok := e.(*ast.SelectorExpr)
@@ -157,7 +154,6 @@ func TestServeWithRunEndsRunWhenTheContextEnds(t *testing.T) {
 	<-ended
 }
 
-// failingListener 在 fail 關閉後讓 Accept 回錯誤，模擬 server 自己失敗。
 type failingListener struct {
 	net.Listener
 	fail chan struct{}

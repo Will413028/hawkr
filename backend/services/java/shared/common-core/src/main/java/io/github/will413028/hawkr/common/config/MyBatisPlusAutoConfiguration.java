@@ -52,7 +52,6 @@ public class MyBatisPlusAutoConfiguration {
     public ConfigurationCustomizer timestampTzTypeHandlerCustomizer() {
         return configuration -> {
             TimestampTzTypeHandler handler = new TimestampTzTypeHandler();
-            // 註冊為 LocalDateTime 的預設 handler（覆蓋所有 JdbcType 場景）
             configuration.getTypeHandlerRegistry().register(LocalDateTime.class, handler);
         };
     }

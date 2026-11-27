@@ -6,7 +6,6 @@ import { __setFlavorForTest } from "../lib/config/flavor";
 import { isCanonicalHost } from "../lib/seo/canonical-host";
 import { compiledMatcher } from "./helpers/middleware-matcher";
 
-// The prod flavor requires the browser API base on the web origin; a relative base is.
 process.env.NEXT_PUBLIC_API_BASE_URL = "/api/v1";
 
 /** 登入與否只看 session cookie 在不在（middleware.ts）。 */
@@ -53,7 +52,6 @@ test("preview and look-alike hosts are not canonical", () => {
 	for (const host of [
 		PREVIEW_HOST,
 		"hawkr-abc123-example.vercel.app",
-		// Suffix/prefix look-alikes: a substring match would wrongly admit these.
 		"evil-example.com",
 		"example.com.attacker.example",
 		"web-dev.example.com",
@@ -65,8 +63,6 @@ test("preview and look-alike hosts are not canonical", () => {
 			`${host || "<empty>"} must not be treated as canonical`,
 		);
 	}
-	// A request with no Host header at all is an unidentifiable client, not a
-	// licence to index.
 	assert.equal(isCanonicalHost(null, PROD_ORIGIN), false);
 });
 
@@ -83,7 +79,6 @@ test("any *.vercel.app host is non-canonical, even when it is the configured web
 			`${host} must not be indexable`,
 		);
 	}
-	// The rule is a suffix match on a label boundary, not a substring match.
 	assert.equal(
 		isCanonicalHost("vercel.app.example.com", "https://vercel.app.example.com"),
 		true,
@@ -171,8 +166,6 @@ test("middleware stays off the asset layer and the API proxy", () => {
 });
 
 test("a path that only looks like an asset is judged like any other unknown path", () => {
-	// Nothing serves these, so left to the router they would reach the dynamic [locale] route:
-	// a 404 that ISR stores per URL, and for a guarded [param] route no login guard at all.
 	const regex = matcherRegex();
 	for (const pathname of [
 		"/favicon.ico",
@@ -256,7 +249,6 @@ test("the login bounce still fires for a guarded path on the canonical host", as
 		assert.equal(location.pathname, "/login");
 		assert.equal(location.searchParams.get("role"), "buyer");
 		assert.equal(location.searchParams.get("redirect"), "/account/orders");
-		// Canonical host — the redirect must NOT be de-indexed.
 		assert.equal(response.headers.get("x-robots-tag"), null);
 	} finally {
 		reset();

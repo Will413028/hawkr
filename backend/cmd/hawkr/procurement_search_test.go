@@ -19,10 +19,9 @@ func searchUUID(n int) uuid.UUID {
 	return uuid.MustParse(fmt.Sprintf("00000000-0000-7000-8000-%012d", n))
 }
 
-// fakeCatalog 是依 (排序鍵, ID) 遞減排列的商品清單，游標語意與 catalog 的 keyset 相同：回傳游標之後的 size 筆，還有更多時帶 Next。
 type fakeCatalog struct {
 	items []catalog.ProductSummary
-	keys  []int64 // items[i] 的排序鍵，與 items 同長；遞減，同鍵的以 ID 遞減
+	keys  []int64
 	err   error
 
 	gotAt     time.Time

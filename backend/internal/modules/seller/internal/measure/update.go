@@ -19,7 +19,6 @@ func errExpectedVersion() error {
 	return apperr.InvalidInputOn([]string{"ExpectedVersion"}, "必須提供讀取時的版本")
 }
 
-// endsChange 是結束時間的修改方向：延長、縮短，或沒有改變。
 type endsChange int
 
 const (
@@ -28,7 +27,6 @@ const (
 	endsShortened
 )
 
-// compareEnds 比較目前與新的結束時間（nil 是沒有固定期間，等於無限晚）。
 func compareEnds(current, next *time.Time) endsChange {
 	switch {
 	case current == nil && next == nil:
@@ -138,9 +136,6 @@ func (s *Service) Update(ctx context.Context, in model.UpdateMeasureInput) (mode
 	return result, err
 }
 
-// requestedEnds 回傳套用要求的結束時間（nil 是清除）後的值。結束時間不能調的措施（警告、終止合作、不在生效中的停權）先走可用性：
-// 要求與目前不同就是延長或縮短，回 errActionUnavailable，文字與 API 的 message 同一句；與目前相同不算改變。
-// 能調的措施才驗證值本身：依據認定的停權必須有結束時間；設定的值必須晚於現在。
 func requestedEnds(current model.Measure, requested *time.Time, now time.Time) (*time.Time, error) {
 	if len(current.ShortenUnavailableReasons()) > 0 {
 		switch compareEnds(current.EndsAt, requested) {
@@ -161,13 +156,10 @@ func requestedEnds(current model.Measure, requested *time.Time, now time.Time) (
 	return requested, nil
 }
 
-// errMeasureRevoked 是對已撤銷的措施做動作的錯誤；不經過原因清單，狀態本身就是判斷，文字與 REVOKED 原因相同。
 func errMeasureRevoked() error {
 	return apperr.FailedPrecondition("%s", model.ActionUnavailableText(model.ActionReasonRevoked, model.MeasureActionUpdateStatement).Text)
 }
 
-// errActionUnavailable 說出第一個（最優先的）不能執行 action 的原因，文字是 model.ActionUnavailableText，與 API 的
-// MeasureActionUnavailability.message 同一個函式；錯誤的 LocalizedMessage 就是這句。
 func errActionUnavailable(m model.Measure, action model.MeasureAction) error {
 	reasons := m.ActionUnavailableReasons(action)
 	if len(reasons) == 0 {
@@ -213,8 +205,6 @@ func (s *Service) End(ctx context.Context, in model.EndMeasureInput) (model.Meas
 	return result, err
 }
 
-// endNow 是結束措施在同一個 transaction 要做的事（End 與接受解除請求共用，不經 CanEnd）：寫一版結束時間是現在的新版本（給賣家的
-// 理由 statement 不變，作者是 adminID）、重算帳號的停權期間、發 MeasureEnded（requestID 是接受的解除請求，End 是零值）。呼叫方已鎖住帳號與措施列，且已確認版本與狀態。
 func (s *Service) endNow(ctx context.Context, q *store.Queries, locked store.SellerStore, row store.SellerMeasure, statement string, adminID int64, requestID uuid.UUID, now time.Time) (store.SellerMeasure, error) {
 	updated, err := q.AdvanceMeasureRevision(ctx, store.AdvanceMeasureRevisionParams{
 		ID: row.ID, ExpectedVersion: row.Version, StatementToSeller: statement, EndsAt: &now, AdminID: &adminID, Now: now,

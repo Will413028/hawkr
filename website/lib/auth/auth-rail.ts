@@ -17,9 +17,6 @@ export function resolveAuthRailMode({
 	status,
 	activeRole,
 }: AuthRailInput): AuthRailMode {
-	// Neither `unknown` nor `unavailable` (B-199) is a claim that the visitor is a
-	// guest or a member: hold the neutral skeleton instead of a sign-in button or
-	// an avatar.
 	if (status === "unknown" || status === "unavailable") return "skeleton";
 	if (status === "guest") return "guest";
 	return activeRole === "buyer" ? "buyer" : "seller";

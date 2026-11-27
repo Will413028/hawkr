@@ -178,9 +178,6 @@ class _SellerQuoteFormBody extends HookConsumerWidget {
   }
 }
 
-// -----------------------------------------------------------------------------
-// 橫幅
-// -----------------------------------------------------------------------------
 
 class _NoticeBanner extends StatelessWidget {
   const _NoticeBanner({
@@ -223,7 +220,6 @@ class _NoticeBanner extends StatelessWidget {
                   ),
               ],
             ),
-            // ⛔ 依據已過期時只給「重新載入」這一條路：不得靜默改成送最新版。
             if (notice.requiresReload) ...[
               const SizedBox(height: HkSpace.sm),
               Align(
@@ -241,9 +237,6 @@ class _NoticeBanner extends StatelessWidget {
   }
 }
 
-// -----------------------------------------------------------------------------
-// 需求摘要（白名單）
-// -----------------------------------------------------------------------------
 
 class _PublicationContextCard extends StatelessWidget {
   const _PublicationContextCard({required this.payload});
@@ -311,9 +304,6 @@ class _BuyerNoteBlock extends StatelessWidget {
   }
 }
 
-// -----------------------------------------------------------------------------
-// 回應方式
-// -----------------------------------------------------------------------------
 
 class _ResponseTypeCard extends StatelessWidget {
   const _ResponseTypeCard({
@@ -334,7 +324,6 @@ class _ResponseTypeCard extends StatelessWidget {
         children: [
           Text('回應方式', style: AppTypography.sectionTitle),
           const SizedBox(height: HkSpace.xs),
-          // ⛔ 兩個值的必填欄位完全相同，UI 不得在選了第二個之後少問任何金額。
           Text(
             context.l10n.quoteResponseTypeHelp,
             style: AppTypography.metaMuted,
@@ -395,9 +384,6 @@ class _RadioTile extends StatelessWidget {
   }
 }
 
-// -----------------------------------------------------------------------------
-// 實際品相
-// -----------------------------------------------------------------------------
 
 class _SpecNoteCard extends StatelessWidget {
   const _SpecNoteCard({required this.value, required this.onChanged});
@@ -416,7 +402,6 @@ class _SpecNoteCard extends StatelessWidget {
             style: AppTypography.sectionTitle,
           ),
           const SizedBox(height: HkSpace.xs),
-          // ⛔ 不得由平台或 LLM 代填，也沒有「帶入上次報價」。
           Text(context.l10n.quoteSpecNoteHelp, style: AppTypography.metaMuted),
           const SizedBox(height: HkSpace.md),
           _QuoteTextField(
@@ -432,9 +417,6 @@ class _SpecNoteCard extends StatelessWidget {
   }
 }
 
-// -----------------------------------------------------------------------------
-// 數量與計價基準
-// -----------------------------------------------------------------------------
 
 typedef _QuoteEdit =
     void Function(SellerQuotePayload Function(SellerQuotePayload));
@@ -509,9 +491,6 @@ class _QuantityCard extends StatelessWidget {
   }
 }
 
-// -----------------------------------------------------------------------------
-// 金額
-// -----------------------------------------------------------------------------
 
 class _AmountCard extends StatelessWidget {
   const _AmountCard({
@@ -594,7 +573,6 @@ class _AmountCard extends StatelessWidget {
             onChanged: (value) =>
                 onChanged((q) => q.copyWith(totalAmount: value)),
           ),
-          // ⛔ 只提示，不覆寫。使用者填什麼就送什麼，server 才是權威。
           if (computed != null)
             Text(
               validation.amountIdentityHolds
@@ -612,9 +590,6 @@ class _AmountCard extends StatelessWidget {
   }
 }
 
-// -----------------------------------------------------------------------------
-// 交期與有效期
-// -----------------------------------------------------------------------------
 
 class _ScheduleCard extends StatelessWidget {
   const _ScheduleCard({
@@ -663,9 +638,6 @@ class _ScheduleCard extends StatelessWidget {
   }
 }
 
-// -----------------------------------------------------------------------------
-// 備註
-// -----------------------------------------------------------------------------
 
 class _NotesCard extends StatelessWidget {
   const _NotesCard({required this.quote, required this.onChanged});
@@ -702,9 +674,6 @@ class _NotesCard extends StatelessWidget {
   }
 }
 
-// -----------------------------------------------------------------------------
-// 動作列
-// -----------------------------------------------------------------------------
 
 class _ActionBar extends StatelessWidget {
   const _ActionBar({required this.state, required this.notifier});
@@ -796,9 +765,6 @@ class _ActionBar extends StatelessWidget {
   }
 }
 
-// -----------------------------------------------------------------------------
-// 欄位元件
-// -----------------------------------------------------------------------------
 
 class _QuoteTextField extends HookWidget {
   const _QuoteTextField({

@@ -97,7 +97,6 @@ test("店面：請求照樣送出，503 原樣交給呼叫端，不轉換任何�
 			`POST /storefront/${STORE_ID}/cover`,
 		],
 	);
-	// 沒有欄位轉換：PATCH 只有共通欄位，店名之類的輸入不會被轉成代行 DTO 送出。
 	assert.deepEqual(sent[1].json, {
 		operationReason: "協助完成新品上架",
 		notifySeller: true,
@@ -157,7 +156,6 @@ test("商品：上下架打的是兩支命令端點，body 只有共通三欄", 
 			`POST /products/${STORE_ID}/905/unpublish`,
 		],
 	);
-	// `status` 是 PATCH 明令拒收的欄位；命令端點也只收共通三欄。
 	assert.deepEqual(sent[0].json, {
 		expectedVersion: "12",
 		operationReason: META.operationReason,
@@ -176,9 +174,6 @@ test("商品：刪除與編輯在代行沒有出口，會 reject 而不是靜默
 });
 
 test("商品：建立打 POST .../products，body 是代行契約的形狀", async () => {
-	// 建立回應與其他寫入同形（`{auditLogId, version, resource}`）。mock 成頂層
-	// `{productId}` 會替「讀不到 id ⇒ 接續的 /publish 被靜默跳過」背書 —— 貼文那一面
-	// 真的這樣壞過。
 	const { sent, fetcher } = recorder({
 		auditLogId: "8100",
 		version: "0",
@@ -197,7 +192,6 @@ test("商品：建立打 POST .../products，body 是代行契約的形狀", asy
 					{
 						type: "image",
 						imageKey: "product/a.jpg",
-						// 後端由 imageKey 組出來的顯示值。回送它 ⇒ DisallowUnknownFields ⇒ 9260。
 						imageUrl: "https://cdn.example/i/original/product/a.jpg",
 					},
 				],
@@ -234,7 +228,6 @@ test("商品：建立打 POST .../products，body 是代行契約的形狀", asy
 		images: [{ stagedToken: "stg_1" }],
 		skus: [
 			{
-				// `skuName` ↔ `spec`：整條鏈上最容易接錯的一欄。
 				spec: "3 台斤裝",
 				price: "300",
 				salePrice: "",
@@ -248,13 +241,10 @@ test("商品：建立打 POST .../products，body 是代行契約的形狀", asy
 		],
 		origin: "台灣 梨山",
 	});
-	// 建立沒有版本可帶；帶了就是 9260（create 的 DTO 根本沒有這個欄位）。
 	assert.ok(!("expectedVersion" in (sent[0].json ?? {})));
-	// 賣家端 body 專有的三欄一個都不能漏出去。
 	for (const forbidden of ["status", "updateHashtags", "idempotencyKey"]) {
 		assert.ok(!(forbidden in (sent[0].json ?? {})), forbidden);
 	}
-	// 接著上架的 `expectedVersion` 只有這兩個值拿得到。
 	assert.equal(created.id, "9100");
 	assert.equal(created.version, "0");
 });
@@ -333,7 +323,6 @@ test("商品批次下架：整批一個旗標、逐項 expectedVersion、上限 
 			{ productId: "2", expectedVersion: "7" },
 		],
 	});
-	// 部分失敗時頂層 code 仍是 0：成敗只能看 failed，逐項結果要留得住。
 	assert.equal(result.failed, 1);
 	assert.equal(result.results[1].code, 9266);
 
@@ -349,10 +338,6 @@ test("商品批次下架：整批一個旗標、逐項 expectedVersion、上限 
 });
 
 test("貼文：建立一律是未發布，發布是第二支端點", async () => {
-	// ⚠️ 回應形狀必須與 gateway 的 `respondDelegatedMutation` 一致
-	// （`{auditLogId, version, resource}`，`admin_delegated_common.go:214`）。
-	// 這裡曾經 mock 成頂層 `{postId}`，於是「repo 讀不到 postId ⇒ 第二支 /publish
-	// 被靜默跳過」這個真實缺陷一路測得過 —— 假形狀的 mock 會替錯誤背書。
 	const { sent, fetcher } = recorder({
 		auditLogId: "8001",
 		version: "0",
@@ -369,7 +354,6 @@ test("貼文：建立一律是未發布，發布是第二支端點", async () =>
 		},
 		META,
 	);
-	// `/publish` 必填 `expectedVersion`，值只有建立那一次的回應拿得到。
 	assert.equal(created.version, "0");
 	await repo.publish(
 		String(created.id),
@@ -386,12 +370,10 @@ test("貼文：建立一律是未發布，發布是第二支端點", async () =>
 		tags: ["梨山"],
 		productIds: ["9001"],
 	});
-	// 建立 body 不得出現 publishMode／scheduledPublishAt（出現即 9260）。
 	assert.ok(!("publishMode" in (sent[0].json ?? {})));
 	assert.equal(sent[1].path, `/posts/${STORE_ID}/7001/publish`);
 	assert.equal(sent[1].json?.publishMode, "immediate");
 	assert.equal(sent[1].json?.expectedVersion, "0");
-	// 兩支呼叫 ＝ 兩筆稽核列，冪等鍵必須各自一把。
 	assert.notEqual(sent[0].idempotencyKey, sent[1].idempotencyKey);
 });
 
@@ -422,7 +404,6 @@ test("逐面路由是薄殼，內容 import 既有賣家中心元件", () => {
 			"utf8",
 		);
 		assert.match(file, new RegExp(source.replace(/\//g, "\\/")), face);
-		// 薄殼不自己取資料：任何 fetch／repo import 都代表畫面開始分岔。
 		assert.doesNotMatch(
 			file,
 			/useQuery|fetch\(|authedFetch|delegatedFetch/u,
@@ -507,23 +488,19 @@ test("建立商品：兩個入口、具名路由、資料層，四者對得起�
 		"utf8",
 	);
 
-	// ① 頂部導覽的 CTA：存在、指向具名路由、由 products.write 決定渲染。
 	assert.match(topNav, /＋ 上架新商品/u);
 	assert.match(topNav, /products\/new/u);
 	assert.match(topNav, /hasCapability\("products\.write"\)/u);
 
-	// ② 列表的同一顆按鈕：同一個 capability，不是 disabled 而是不渲染。
 	assert.match(list, /＋ 上架新商品/u);
 	assert.match(list, /hasCapability\("products\.write"\)/u);
 	assert.match(list, /delegated && canWrite/u);
 
-	// ③ 具名路由存在（少了它會落進 `[...area]` 的「不在本次代行授權範圍」）。
 	assert.ok(
 		existsSync("app/(delegated)/adm/[storeId]/products/new/page.tsx"),
 		"缺具名路由 ⇒ CTA 會落到空狀態頁",
 	);
 
-	// ④ 資料層不再 throw NotWired（那正是 ② 當初不渲染的依據）。
 	const repos = readFileSync("lib/seller-data/delegated-repos.ts", "utf8");
 	assert.doesNotMatch(
 		repos,
@@ -557,7 +534,6 @@ test("版本衝突 9266：編輯頁與單筆上下架都提供兩個出口", () 
 		assert.match(source, /複製我的內容/u, name);
 	}
 
-	// 列表要真的判得出 9266（與一般錯誤分開呈現），不是把它併進 setError。
 	assert.match(list, /e\.code === 9266/u);
 	assert.match(list, /setStatusConflict/u);
 });
@@ -582,8 +558,6 @@ test("/adm/{storeId} 的導向在 next.config，不在 server component", () => 
 		"別名頁回來了 ⇒ 導向又會降級成 200 包 RSC payload",
 	);
 	const config = readFileSync("next.config.ts", "utf8");
-	// `(\d+)` 是必要的：redirects() 在 filesystem routes 之前求值，裸 `:storeId`
-	// 會把 /adm/enter（交接碼兌換，代行唯一入口）與 /adm/unavailable 一起吃掉。
 	assert.match(
 		config,
 		/source:\s*"\/adm\/:storeId\(\\\\d\+\)",\s*destination:\s*"\/adm\/:storeId\/products",\s*permanent:\s*false/u,

@@ -50,7 +50,6 @@ public class CategoryCacheService {
      * @return Map&lt;categoryId, CategoryEntity&gt;
      */
     public Map<Long, CategoryEntity> getAllCategoryMap() {
-        // 1. 查快取
         try {
             String json = redisTemplate.opsForValue().get(CacheKeyConstants.CATEGORY_ALL);
             if (json != null) {
@@ -63,17 +62,14 @@ public class CategoryCacheService {
             log.warn("parseFailed", "分類快取解析失敗: " + e.getMessage());
             safeDelete(CacheKeyConstants.CATEGORY_ALL);
         } catch (DataAccessException e) {
-            // Redis 失聯 → 降級走 DB（02 §2.7.3 graceful degradation），落到 step 2
             log.warn("unavailable", "Redis 失聯，分類快取降級走 DB: " + e.getMessage());
         }
 
-        // 2. 快取未命中（或 Redis 失聯），查 DB
         log.info("miss", "分類快取未命中，查詢 DB");
         List<CategoryEntity> all = categoryRepository.findAll();
         Map<Long, CategoryEntity> map = all.stream()
                 .collect(Collectors.toMap(CategoryEntity::getId, c -> c));
 
-        // 3. 寫入快取
         try {
             String json = objectMapper.writeValueAsString(map);
             redisTemplate.opsForValue().set(CacheKeyConstants.CATEGORY_ALL, json, CATEGORY_TTL);
@@ -81,7 +77,6 @@ public class CategoryCacheService {
         } catch (JsonProcessingException e) {
             log.error("serializeFailed", "分類快取序列化失敗: " + e.getMessage());
         } catch (DataAccessException e) {
-            // Redis 失聯 → log.warn 不影響當次回應（資料已從 DB 取得，02 §2.7.3）
             log.warn("unavailable", "Redis 失聯，分類快取寫回略過: " + e.getMessage());
         }
 

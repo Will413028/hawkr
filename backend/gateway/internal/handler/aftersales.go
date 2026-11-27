@@ -9,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ==================== DTO ====================
 
 // CreateAfterSaleCaseRequest 申請售後請求
 type CreateAfterSaleCaseRequest struct {
@@ -175,7 +174,6 @@ type CancelShipmentResultResponse struct {
 	RefundAmount string `json:"refundAmount"`
 }
 
-// ==================== 轉換函式 ====================
 
 func convertAfterSaleSummary(s *pb.AfterSaleCaseSummary, mediaBase string) AfterSaleCaseSummaryResponse {
 	if s == nil {
@@ -292,12 +290,10 @@ func convertAfterSaleDetail(d *pb.AfterSaleCaseDetailView, mediaBase string) Aft
 		ReturnDeliveredAt:     d.GetReturnDeliveredAt(),
 		ReturnProviderStatus:  d.GetReturnProviderStatus(),
 		ReturnProviderMessage: d.GetReturnProviderMessage(),
-		// 2026-05-22 逆物流退貨政策修訂欄位
 		StoreArrivedAt:        d.GetStoreArrivedAt(),
 		StorePickupDeadlineAt: d.GetStorePickupDeadlineAt(),
 		SellerPickedUpAt:      d.GetSellerPickedUpAt(),
 		AutoCompleteAtStamp:   d.GetAutoCompleteAtStamp(),
-		// 2026-06-15 待寄回逾時政策修訂
 		ShipBackDeadlineAt: d.GetShipBackDeadlineAt(),
 	}
 }
@@ -306,7 +302,6 @@ func mapResolutionType(s string) string {
 	return s
 }
 
-// ==================== 買家端 Handler ====================
 
 // CreateAfterSaleCase 申請售後
 // @Summary      申請售後
@@ -532,7 +527,6 @@ func (h *Holder) CancelAfterSaleCase(c *gin.Context) {
 	response.GrpcResult(c, resp.Code, resp.Message, nil)
 }
 
-// ==================== 賣家端 Handler ====================
 
 // GetSellerAfterSaleCases 賣家售後列表
 // @Summary      賣家售後列表
@@ -699,7 +693,6 @@ func (h *Holder) ConfirmReturnReceipt(c *gin.Context) {
 		return
 	}
 
-	// optional body：空 body 走全額退款路徑（向後相容）
 	var req ConfirmReturnReceiptRequest
 	if c.Request.ContentLength > 0 {
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -813,10 +806,8 @@ func (h *Holder) CancelShipment(c *gin.Context) {
 	})
 }
 
-// 避免 import 未使用警告
 var _ = strconv.Itoa
 
-// ==================== §10 申訴與平台裁決 ====================
 
 // SubmitAppealRequest 買家申訴 Request
 type SubmitAppealRequest struct {
@@ -873,7 +864,6 @@ type AppealSummaryResponse struct {
 	SellerAvatarUrl string `json:"logoUrl"` // 商家 logo 顯示 URL（Gateway 組）
 }
 
-// ==================== §10.6.6 Admin 單案詳情 DTO ====================
 
 // AdminAppealDetailResponse Admin 單案詳情四層結構（§29 加 providerContext）
 type AdminAppealDetailResponse struct {
@@ -921,7 +911,6 @@ type DecideAppealResponse struct {
 	RefundAmount string `json:"refundAmount,omitempty"`
 }
 
-// convertArbitration 組裝買家 / 賣家的 arbitration response
 func convertArbitration(data *pb.ArbitrationData) ArbitrationResponse {
 	if data == nil {
 		return ArbitrationResponse{}
@@ -941,7 +930,6 @@ func convertArbitration(data *pb.ArbitrationData) ArbitrationResponse {
 		Timeline: timeline,
 	}
 
-	// state=RESOLVED 時 decision 才有效（proto3 預設值判斷：outcome 非空字串）
 	if d := data.GetDecision(); d != nil && d.GetOutcome() != "" {
 		resp.Decision = &PlatformDecisionResponse{
 			Outcome:      d.GetOutcome(),
@@ -1075,15 +1063,10 @@ func (h *Holder) GetSellerArbitration(c *gin.Context) {
 	response.GrpcResult(c, resp.GetCode(), resp.GetMessage(), convertArbitration(resp.GetData()))
 }
 
-// appealStateFilterAll 代表不限 appeal_state（含已裁決）；非 CodeMeta 值，是本端點專屬的 filter 關鍵字。
 const appealStateFilterAll = "all"
 
-// allowedAppealStateFilters 是 /admin/after_sales/appeals 的 appeal_state 合法值集合。
-// 一律使用 AfterSaleAppealState 的 Value——回應欄位 appealState 與 DB 都是 Value，
-// 請求端沒有理由用 Name（收 Name 回 Value 的不對稱正是 #2104 的成因）。
-// NONE(0) 不在集合內：申訴列表本身就排除未申訴案件。
 var allowedAppealStateFilters = map[string]struct{}{
-	"":                                    {}, // 未帶 → 由 aftersales-service 套預設 APPEALED(10)
+	"":                                    {},
 	codemeta.AfterSaleAppealStateAppealed: {},
 	codemeta.AfterSaleAppealStateInvestigating: {},
 	codemeta.AfterSaleAppealStateResolved:      {},

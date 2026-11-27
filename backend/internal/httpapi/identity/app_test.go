@@ -26,7 +26,6 @@ import (
 
 var appNow = time.Date(2026, 10, 30, 12, 0, 0, 0, time.UTC)
 
-// appModule 照 identity 模組的契約實作 App 登入與 session 管理：nonce 單次使用，session 屬於帳號。
 type appModule struct {
 	nonces   map[string]bool
 	consumed []string
@@ -127,7 +126,6 @@ func (m *appModule) Account(context.Context, int64) (identity.Account, error) {
 	return identity.Account{}, nil
 }
 
-// appVerifier 驗證 ID token：只有 "good-token" 有效，nonce 必須等於 wantNonce。
 type appVerifier struct {
 	p        identity.Provider
 	identity identity.ProviderIdentity
@@ -159,7 +157,6 @@ type appEnv struct {
 	logs     *bytes.Buffer
 }
 
-// fakeProfiles 是買家模組的公開讀取：回 profile，或回 err。
 type fakeProfiles struct {
 	profile buyer.Profile
 	err     error
@@ -192,7 +189,6 @@ func newAppEnv(t *testing.T) *appEnv {
 	return e
 }
 
-// kindOf 回傳錯誤的分類；傳輸層自己判斷的 invalid_argument（rpc.Error）不是 apperr，以 Connect 的錯誤碼字串辨認。
 func kindOf(err error) apperr.Kind {
 	if strings.HasPrefix(err.Error(), "invalid_argument") {
 		return apperr.KindInvalidInput
@@ -493,7 +489,7 @@ func sessionAt(account int64, created time.Time, last time.Time) identity.Sessio
 func TestListSessionsMarksTheCurrentOneAndSkipsExpiredOnes(t *testing.T) {
 	t.Parallel()
 	e := newAppEnv(t)
-	oldest := sessionAt(42, appNow.Add(-30*24*time.Hour), appNow.Add(-20*24*time.Hour)) // 閒置超過 7 天
+	oldest := sessionAt(42, appNow.Add(-30*24*time.Hour), appNow.Add(-20*24*time.Hour))
 	idle := sessionAt(42, appNow.Add(-3*24*time.Hour), appNow.Add(-2*time.Hour))
 	cur := sessionAt(42, appNow.Add(-time.Hour), appNow.Add(-time.Minute))
 	cur.Client = identity.ClientApp
@@ -522,7 +518,6 @@ func TestListSessionsPagesWithoutRepeatsOrGaps(t *testing.T) {
 	for i := range 5 {
 		all = append(all, sessionAt(42, appNow.Add(-time.Duration(i)*time.Hour), appNow))
 	}
-	// 同一時間建立的兩個：以 ID 排序。
 	same := appNow.Add(-10 * time.Hour)
 	a, b := sessionAt(42, same, appNow), sessionAt(42, same, appNow)
 	if a.ID.Compare(b.ID) < 0 {
@@ -834,7 +829,7 @@ func TestGetSessionKeepsTheSuspensionTimeWhenTheRecordCannotBeRead(t *testing.T)
 func TestGetSessionWithoutASuspensionDoesNotReadTheRecord(t *testing.T) {
 	t.Parallel()
 	e := newAppEnv(t)
-	e.m.suspended = true // 若被讀了，回應就會帶 suspension
+	e.m.suspended = true
 	e.m.suspension = identity.AccountSuspension{Category: "SPAM"}
 	resp, err := e.app.GetSession(callerContext(t, 42, uuid.New(), rpc.CredentialCookie), connect.NewRequest(&pb.GetSessionRequest{}))
 	if err != nil || resp.Msg.Suspension != nil {

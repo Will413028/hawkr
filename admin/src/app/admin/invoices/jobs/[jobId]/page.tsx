@@ -46,54 +46,10 @@ import { formatAmount, formatDateTime } from "@/lib/format";
 import { request } from "@/services/api";
 import { ApiClientError } from "@/services/api-error";
 import { uploadImageToMedia } from "@/services/media-upload";
-// 對話框骨架（overlay、面板、標題列）在共用 Dialog 自己的 Dialog.css；這裡的 DelegatedOperations.css 只放
-// `.adm-operation-field*` 等欄位與版面 class（58A 陷阱 C07：少 import 不會報錯也不會轉紅）。
 import "@/styles/pages/DelegatedOperations.css";
 import "@/styles/pages/Invoice.css";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 
-// A06｜發票異常詳情（58A §A06，端點 51 `GET /api/v1/admin/invoices/jobs/{job_id}`）。
-//
-// ## 五個操作已接上（2026-09-02）
-//
-// 52 安全重試／53 受控取消／54 發起人工解鎖／55 覆核人工解鎖／56 回報賣家自行開立結果，
-// 五支 RPC 在 invoice-service 都已實作（`internal/grpc/admin_write.go` 與
-// `internal/grpc/manual_unlock.go` 的 receiver 清單），dev 實測全部回業務層驗證訊息
-// （`expected_version: must not be empty`）而不是 5xx。
-//
-// 舊版這裡寫「七個操作全部不渲染，因為 RPC 都沒有實作」——那個判斷是錯的，來源是拿
-// 猜的路徑名去打 dev（`jobs/{id}/external_issuances` 回 404，真名是 `.../manual_results`）。
-//
-// **代價不是「少一顆按鈕」**：端點 52 是 R09 的唯一觸發者。訂單一旦落進 R08（原發票
-// 已作廢、新發票開不出來），後端救得了，而 ADM 按不到那顆鍵 ⇒ 那張稅務憑證永遠停在
-// 「作廢了但沒有新票」。
-//
-// ## 「重新寄送通知」不在這一頁，而且不是漏做
-//
-// 端點 49 的路徑是 `documents/{document_id}/notification_resends`（gateway
-// `AdminInvoiceDocumentResend`），**掛在 document 上不是 job 上**；而端點 51 的回應
-// （`AdminInvoiceJobDetail`）沒有任何 `documentId` 欄位 ⇒ 這一頁組不出那條路徑。
-// 憑語意猜一個 id 去打會寄到別人的發票。⇒ 那顆鍵的正確位置是 A13（已接上）。
-//
-// ## 按鈕的渲染條件一律取自**後端下發的布林**，不從 status 推
-//
-// `canRetry`／`canCancel`／`canReportExternal` 由後端算，其中 `canRetry` 包含一個前端
-// 看不到的事實（該冪等鍵在 AMEGO 已確認未產生文件）。自己從 status 推 ⇒ 推錯的後果是
-// 開出第二張發票。條件不成立時**不渲染**（不是 disabled）。
-//
-// ## 仍然照 58A 做的事
-//
-//   - 固定警示常駐頁頂（「請勿以手動開票取代系統工作；此操作不會變更出貨狀態」）。
-//   - `orderSnapshotJson` 當**字串**呈現，不解析（解析等於讓前端綁死一個歷史結構）。
-//   - `providerCode` 與 `providerMessage` **成對**顯示：AMEGO 的 `53` 在官方錯誤表出現
-//     兩次且語意不同，只看 code 會導向錯誤的下一步。
-//   - `masked*Body` 原樣印出：遮罩在 invoice-service **寫入時**就完成了，前端零遮罩
-//     邏輯、零「顯示完整」切換（沒有完整值可顯示）。
-//   - 技術內容用原生 `<details>`：ADM 查無 Accordion primitive，原生元素最小新增且
-//     天然可鍵盤操作，不為此引入折疊元件庫。
-//   - **副標不寫「開啟本頁會記錄一筆存取紀錄」**（陷阱 T30）：本頁主資料是端點 51，
-//     它不落 `INVOICE_PII_REVEAL`。宣告與事實不符會把嚇阻變成假保證。那句話只屬於
-//     A08（端點 59）與 A13（端點 48）。
 
 /**
  * 這一頁六個對話框的識別。
@@ -202,13 +158,9 @@ export default function InvoiceJobDetailPage() {
 		error instanceof ApiClientError &&
 		error.code === JOB_NOT_FOUND_CODE;
 
-	// 返回用 router.back()：A05 的分頁與篩選狀態留在上一個 history entry 裡，
-	// router.push 會把管理員丟回預設分頁的第 1 頁。
 	const detail = data ?? null;
 	const job = detail?.job;
 	const amount = detail?.amountBreakdown;
-	// manualUnlock 在 proto 上是 message 不是 optional ⇒ JSON 永遠是物件；
-	// 「沒有解鎖請求」的判準是 unlockId 為空字串。
 	const unlock = detail?.manualUnlock;
 	const hasUnlock = (unlock?.unlockId ?? "") !== "";
 	/**
@@ -255,9 +207,6 @@ export default function InvoiceJobDetailPage() {
 			return true;
 		}
 		if (code === MANUAL_UNLOCK_NEEDS_SECOND_APPROVAL_CODE) {
-			// 🔴 9344 不是失敗：它是「已經有一位管理員發起過了」，data 帶著既有那一列的
-			// unlockId。回應是 HTTP 200 而 code 非零（preserveData 家族），所以只會走到
-			// 這裡——把畫面切到「覆核」而不是顯示紅字。
 			setOpenDialog(null);
 			const existing = caught.data as ManualUnlockInfo | null;
 			setBanner({
@@ -304,8 +253,6 @@ export default function InvoiceJobDetailPage() {
 		(result: InvoiceEnvelope<InvoiceJobMutationData> | null) => {
 			setIdempotencyKey(createInvoiceAdminIdempotencyKey());
 			setOpenDialog(null);
-			// `nextStep` 是後端下發的一句話，原樣接在後面不改寫：同一個 status 在不同
-			// operationType 下的下一步不同，前端推不出來。
 			const nextStep = result?.data?.nextStep
 				? `　${result.data.nextStep}`
 				: "";
@@ -319,8 +266,6 @@ export default function InvoiceJobDetailPage() {
 			postAction<InvoiceJobMutationData>("retries", {
 				reason,
 				expectedVersion,
-				// 空字串合法（多數 job 沒有這一格要裁決）；needsFundingDecision 為真時
-				// 送空字串會被後端擋下並回一句看得懂的話，所以這裡不自己補預設值。
 				fundingDecision: job?.needsFundingDecision ? fundingDecision : "",
 			}),
 		onSuccess: finishJobMutation("已送出安全重試。"),
@@ -330,9 +275,6 @@ export default function InvoiceJobDetailPage() {
 	const cancel = useMutation({
 		mutationFn: (reason: string) =>
 			postAction<InvoiceJobMutationData>("cancellations", {
-				// `reasonCode` 刻意不送：後端 `normalizeAdminCancelReason` 把空字串正規化成
-				// `ADM_MANUAL`，而 ADM 手動取消**只准**這一個值（送別的一律 400）。
-				// 在前端寫死一個 CodeMeta 碼值只會多一份會漂移的拷貝。
 				reasonDetail: reason,
 				allowManualAfterCancellation: allowManualAfterCancel,
 				expectedVersion,
@@ -345,17 +287,10 @@ export default function InvoiceJobDetailPage() {
 		mutationFn: (reason: string) =>
 			postAction<ManualUnlockInfo>("manual_unlocks", {
 				providerCheckEvidence: checkEvidence.trim(),
-				// `<input type="datetime-local">` 給的是本地時間且沒有時區 ⇒ 交給 Date
-				// 轉成 UTC 的 ISO 8601。直接把那個字串送出去會被後端當成 UTC，於是
-				// 台北時間會整整早八小時，而「查證時點」是一列保存 5 年的證據。
 				providerCheckedAt: new Date(checkedAt).toISOString(),
 				reason,
 				expectedVersion,
-				// 只有 CANCEL_BLOCKED_UNKNOWN 那條路徑帶；另一條帶了會被後端擋成 400
-				// （那份證據不會被任何一句 SQL 讀到，收下它就是靜默失效）。
 				cancelEvidenceKind: isCancelBlockedUnknown ? evidenceKind : "",
-				// objectKey 與 stagedToken 二擇一（後端兩者並存回 400）。
-				// 有上傳檔案就送 token，否則送手貼的 key。
 				cancelEvidenceObjectKey:
 					isCancelBlockedUnknown && !evidenceToken
 						? evidenceObjectKey.trim()
@@ -610,11 +545,7 @@ export default function InvoiceJobDetailPage() {
 										) : null}
 									</div>
 								)}
-								{/*
-								 * 「重新寄送通知」不在這一頁。端點 49 掛在 document 上
-								 * （`documents/{document_id}/notification_resends`），而端點 51 的回應
-								 * 沒有 documentId ⇒ 這一頁組不出那條路徑。入口在 A13。
-								 */}
+
 								<p className="invoice-field__note">
 									要重新寄送發票通知，請到該張發票的「發票文件詳情」——那個動作掛在文件上，這一頁沒有文件編號可用。
 								</p>
@@ -690,8 +621,7 @@ export default function InvoiceJobDetailPage() {
 												<span className="invoice-exchange__endpoint">
 													{ex.endpoint || "—"}
 												</span>
-												{/* code 與 message 成對：同一個 code 在官方錯誤表可能出現
-												    多次且語意不同，只看 code 會導向錯誤的下一步。 */}
+
 												<span>
 													代碼 {ex.providerCode || "—"}：
 													{ex.providerMessage || "—"}
@@ -766,8 +696,7 @@ export default function InvoiceJobDetailPage() {
 											<span className="invoice-code">{unlock?.unlockId}</span>
 										</Field>
 										<Field label="狀態">
-											{/* 這四個值不是 CodeMeta enum（`domain/manual_unlock.go` 的 Go
-											    常數）⇒ 中文查 admin-actions 的對照表，查不到就原樣顯示碼值。 */}
+
 											{MANUAL_UNLOCK_STATUS_LABEL[unlock?.status ?? ""] ??
 												unlock?.status ??
 												"—"}
@@ -787,11 +716,7 @@ export default function InvoiceJobDetailPage() {
 										<Field label="向服務商查證的時間">
 											{formatDateTime(unlock?.providerCheckedAt)}
 										</Field>
-										{/*
-										 * J28 的證據只在 CANCEL_BLOCKED_UNKNOWN 那條路徑上有值。
-										 * **覆核者要看得到它**——覆核放行會在同一筆交易裡順帶確認
-										 * 「這張票確實沒開出去」，看不到證據就等於對看不見的東西按同意。
-										 */}
+
 										{unlock?.cancelEvidenceKind ? (
 											<Field label="取消證據來源">
 												{codeLabel(
@@ -802,11 +727,7 @@ export default function InvoiceJobDetailPage() {
 										) : null}
 										{unlock?.cancelEvidenceObjectKey ? (
 											<Field label="證據檔案">
-												{/*
-												 * 🔴 覆核者要**打得開**才算看得到證據——只顯示 objectKey
-												 * 等於要他相信一串他打不開的字。J28 的後端註解逐字：
-												 * 「沒有它，第二個人是在對一份看不見證據的請求按同意」。
-												 */}
+
 												<a
 													href={`/api/v1${JOBS_ENDPOINT}/${encodeURIComponent(jobId)}/manual_unlocks/${encodeURIComponent(unlock.unlockId)}/evidence/content?disposition=inline`}
 													target="_blank"
@@ -971,7 +892,6 @@ export default function InvoiceJobDetailPage() {
 						}
 						if (!checkedAt) return "請填寫向服務商查證的時間。";
 						if (new Date(checkedAt).getTime() > Date.now()) {
-							// 後端也擋（未來時點不可能發生過），這裡先擋是為了不浪費一次往返。
 							return "查證時間不能是未來時間。";
 						}
 						if (isCancelBlockedUnknown && !evidenceKind) {
@@ -1012,12 +932,7 @@ export default function InvoiceJobDetailPage() {
 											disabled={disabled}
 										>
 											<option value="">請選擇</option>
-											{/*
-											 * 只列**需人判讀**的兩個。另外兩個
-											 * （PROVIDER_QUERY_71／PROVIDER_LIST_ABSENT）是服務商
-											 * 直接作證、由系統自動落地，人不該替系統蓋章
-											 * ——後端也會擋（400）。
-											 */}
+
 											<option
 												value={
 													InvoiceCancelEvidenceKind.MOF_PLATFORM_SCREENSHOT
@@ -1058,8 +973,6 @@ export default function InvoiceJobDetailPage() {
 												if (!file) return;
 												setEvidenceUploading(true);
 												try {
-													// 🔴 isSecure: true —— 財政部截圖／對帳檔含賣家稅籍資訊，
-													// 走公開資產等於放到任何人拿到網址就看得到的地方。
 													const token = await uploadImageToMedia(file, {
 														isSecure: true,
 													});

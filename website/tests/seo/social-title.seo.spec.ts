@@ -35,13 +35,10 @@ const BRAND_SUFFIX = ` | ${SITE_NAME}`;
  * directory-wide exemption is how the 84 hid in the first place.
  */
 const ROOT_TITLE_IS_CORRECT = new Set<string>([
-	// The home page's own title IS the root default (title.absolute), so its
-	// card matching the root's is the correct answer, not a missing one.
 	"/",
 ]);
 
 const ROUTES = [
-	// Public, indexable.
 	"/",
 	"/about",
 	"/feed",
@@ -51,14 +48,11 @@ const ROUTES = [
 	"/seller",
 	"/seller/pricing",
 	"/seller-guide",
-	// Public, indexable, and previously wrong: these four set their own
-	// description but inherited the root's og:description as well.
 	"/privacy",
 	"/terms",
 	"/return-policy",
 	"/user-policy",
 	"/seller-terms",
-	// Private / noindex. Not indexed, but they ARE pasted into chats and tickets.
 	"/search?q=test",
 	"/login",
 	"/cart",
@@ -66,13 +60,8 @@ const ROUTES = [
 	"/account/orders",
 	"/seller-center/dashboard",
 	"/seller-center/orders",
-	// Redirect-only aliases. They answer 200 with a full document because the
-	// response has already begun streaming when redirect() throws, so they need
-	// (and now have) titles of their own — see the two page.tsx files.
 	"/seller-center",
 	"/seller-center/shipments/anomalies",
-	// Miss branches. The route-level 404 and the app-wide one both used to serve
-	// the home page's title while answering "this does not exist".
 	"/products/99999999",
 	"/this-route-does-not-exist",
 ] as const;
@@ -83,8 +72,6 @@ for (const route of ROUTES) {
 			headers: { cookie: "hk_session=seo-route-contract" },
 			maxRedirects: 0,
 		});
-		// 404 is a real document for the two miss branches; anything else must be
-		// a 200, or we are asserting against the wrong page.
 		expect(
 			[200, 404],
 			`${route} answered ${response.status()} — expected a rendered document`,
@@ -99,17 +86,10 @@ for (const route of ROUTES) {
 		expect(og, `${route} has no og:title`).toBeTruthy();
 		expect(twitter, `${route} has no twitter:title`).toBeTruthy();
 
-		// The twitter card is filled from openGraph. If these ever diverge, a
-		// twitter title has been declared somewhere and the fill is suppressed.
 		expect(twitter, `${route}: twitter:title no longer mirrors og:title`).toBe(
 			og,
 		);
 
-		// og:title is emitted verbatim while <title> runs through the root
-		// "%s | Hawkr" template, so the two agree in one of exactly two shapes:
-		// the page handed Next a full title (they match), or it handed a bare one
-		// and let the template add the brand (og is <title> minus the suffix).
-		// Anything else means og:title came from somewhere other than this page.
 		expect(
 			og === title || title === `${og}${BRAND_SUFFIX}`,
 			`${route}: og:title ${JSON.stringify(og)} does not correspond to ` +
@@ -126,15 +106,6 @@ for (const route of ROUTES) {
 }
 
 test("the route list still reaches the site it is meant to cover", () => {
-	// Every assertion above is registered per route, so an emptied ROUTES leaves
-	// this file reporting "passed" while checking nothing — measured: truncating
-	// the list to zero still exits green, because the exception check below is
-	// the only test registered unconditionally. A floor makes that loud.
-	//
-	// The 25 routes are hand-picked to span the four shapes the 84 hid across
-	// (public indexable, private/noindex, redirect alias, miss branch), so
-	// losing two is a deletion rather than an edit. Adding routes is always
-	// fine; this only guards the other direction.
 	expect(
 		ROUTES.length,
 		"ROUTES has shrunk — a social-title regression can now hide in the gap",
@@ -146,7 +117,5 @@ test("the route list still reaches the site it is meant to cover", () => {
 });
 
 test("the exception list has not quietly grown", () => {
-	// A guard whose exception list can be appended to is a guard that will be
-	// appended to. Exactly one route on this site is the site itself.
 	expect([...ROOT_TITLE_IS_CORRECT]).toEqual(["/"]);
 });

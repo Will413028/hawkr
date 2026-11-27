@@ -23,7 +23,6 @@ type RewindInput struct {
 	Locale             uitext.Locale
 }
 
-// rewindSlot 回倒回的欄位（UNIT 折進 QUANTITY）；不是可倒回的欄位回 INVALID_ARGUMENT（slot_key）。
 func rewindSlot(k model.SlotKey) (model.SlotKey, error) {
 	if k == slots.Unit {
 		k = slots.Quantity
@@ -38,9 +37,6 @@ func errNothingToRewind() error {
 	return apperr.FailedPrecondition("這個欄位沒有可以倒回的內容")
 }
 
-// rewindTarget 沿內容祖先鏈從現行版本往上找倒回的目標版（A9-D33(3)）：最近一個改動了這一格的版本的祖先。
-// 現況這一格沒有值，或改動它的版本沒有祖先（第一個寫入）時沒有東西可倒回（FAILED_PRECONDITION，沒有 reason）。
-// 倒回產生的新版本內容同目標版、祖先是目標版，所以再倒回同一格會沿鏈繼續往前退，不會在兩個值之間來回。
 func rewindTarget(revs []store.ProcurementRequestRevision, active store.ProcurementRequestRevision, slot model.SlotKey) (*store.ProcurementRequestRevision, error) {
 	if !slotHasValue(slot, setFromRevision(active)) {
 		return nil, errNothingToRewind()
@@ -88,7 +84,6 @@ func slotHasValue(k model.SlotKey, s slots.Set) bool {
 	return false
 }
 
-// sameSlot 比較兩個內容在這一格的值。品項只比原詞（解析由伺服器補上，不算買家改動這一格）；數量連單位一起比；到貨日比日曆日。
 func sameSlot(k model.SlotKey, a, b slots.Set) bool {
 	switch k {
 	case slots.Item:
@@ -114,8 +109,6 @@ func samePtr[T comparable](a, b *T) bool {
 	return *a == *b
 }
 
-// rewindDecision 把倒回接成這一輪的 decision：沒有 I/O。內容是目標版的內容，問題是倒回那一格的問題（planner.BuildFor 以目標內容決定型態），
-// 連續選填計數歸零，倒回的欄位不再算被略過。
 func rewindDecision(l uitext.Locale, prior priorState, next slots.Set, slot model.SlotKey) decision {
 	d := render(l, prior, slots.Patch{}, next, nil, nil, planner.BuildFor(slot, next), false)
 	d.plan.OptionalStreak = 0

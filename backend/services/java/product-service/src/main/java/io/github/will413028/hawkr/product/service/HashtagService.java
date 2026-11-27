@@ -96,12 +96,10 @@ public class HashtagService {
     public HashtagApplyResult applyProductHashtags(
             Long productId,
             List<UpsertedHashtag> targets) {
-        // 當前綁定（依 position 升序）
         List<ProductHashtagEntity> currentRows = productHashtagRepository.findByProductId(productId);
         Map<Long, ProductHashtagEntity> currentMap = currentRows.stream()
                 .collect(Collectors.toMap(ProductHashtagEntity::getHashtagId, r -> r));
 
-        // 目標：依輸入序產生 hashtag_id → (display, position)
         Map<Long, UpsertedHashtag> targetMap = new LinkedHashMap<>();
         for (int i = 0; i < targets.size(); i++) {
             targetMap.putIfAbsent(targets.get(i).id(), targets.get(i));
@@ -115,15 +113,11 @@ public class HashtagService {
         Set<Long> removedSet = new HashSet<>(currentIds);
         removedSet.removeAll(targetIds);
 
-        // 1. 移除舊綁定
         if (!removedSet.isEmpty()) {
             List<Long> removedSorted = removedSet.stream().sorted().toList();
             productHashtagRepository.deleteByProductAndHashtags(productId, removedSorted);
         }
 
-        // 2. 新增 + kept 的 position/display 更新（採全清新增策略以保證 position 與 display 一致）
-        // 為簡化邏輯：對 kept 採 (delete + insert) 也可，但會增加 counter 維護成本；
-        // 此處改採 row-by-row UPDATE 對 kept；INSERT 對 added。
         short pos = 0;
         List<ProductHashtagEntity> toInsert = new ArrayList<>();
         for (Map.Entry<Long, UpsertedHashtag> e : targetMap.entrySet()) {
@@ -139,7 +133,6 @@ public class HashtagService {
                 toInsert.add(row);
             } else if (!u.display().equals(existing.getDisplayName()) || existing.getPosition() == null
                     || existing.getPosition() != pos) {
-                // 複合主鍵 (product_id, hashtag_id) 不能 updateById，用自訂 SQL
                 productHashtagRepository.updateBinding(productId, hid, u.display(), pos);
             }
             pos++;

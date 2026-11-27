@@ -171,7 +171,6 @@ export default function SellerRecruitmentScrollWorld({
 			if (sessionStorage.getItem("seller-scroll-world-hint-seen")) return;
 			sessionStorage.setItem("seller-scroll-world-hint-seen", "1");
 		} catch {
-			// If session storage is unavailable, show once for this page mount.
 		}
 
 		setShowScrollHint(true);
@@ -242,9 +241,6 @@ export default function SellerRecruitmentScrollWorld({
 				const copy = copyRefs.current[index];
 				if (copy) {
 					copy.style.opacity = copyOpacity.toFixed(4);
-					// 這段位移是給浮在畫面上的文案卡用的。收尾那一幕是滿版卡面，
-					// 位移只會讓舞台底色從它上下緣露出一條約 8px 的異色（深色模式
-					// 更明顯），所以滿版的那一幕只淡入、不位移。
 					if (sceneData.kind !== "end") {
 						copy.style.transform = `translate3d(0, ${(0.5 - local) * 20}px, 0)`;
 					}

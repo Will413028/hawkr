@@ -96,7 +96,6 @@ func TestCaseClosedFanoutRejectsAnUnknownOutcomeAndANonIncreasingReporter(t *tes
 	}
 }
 
-// staleReporters 忽略游標、每次都從頭回：caseReporterTargets 要擋下不遞增的號碼。
 type staleReporters struct{ fakeResolver }
 
 func (s staleReporters) CaseReporters(ctx context.Context, caseID uuid.UUID, audience model.Audience, _ int64, limit int) ([]ReporterRef, error) {

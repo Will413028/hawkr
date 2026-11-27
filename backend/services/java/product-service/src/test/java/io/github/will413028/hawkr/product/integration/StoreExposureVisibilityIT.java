@@ -212,7 +212,6 @@ class StoreExposureVisibilityIT extends AbstractProductPostgresIT {
             jdbc.update("INSERT INTO product_hashtag (product_id, hashtag_id, display_name) VALUES (?, 9101, '有機蔬菜')",
                     productId);
         }
-        // 9102 只掛在不可曝光的店：公開路徑不得出現
         for (long productId : new long[] {B_ACTIVE, C_ACTIVE}) {
             jdbc.update("INSERT INTO product_hashtag (product_id, hashtag_id, display_name) VALUES (?, 9102, '有機隱藏')",
                     productId);
@@ -241,7 +240,6 @@ class StoreExposureVisibilityIT extends AbstractProductPostgresIT {
         io.github.will413028.hawkr.product.service.HashtagService service =
                 new io.github.will413028.hawkr.product.service.HashtagService(hashtagRepository, productHashtagRepository);
 
-        // 可曝光店 A 的 ACTIVE 商品 2 個；B、C 不可曝光、A_INACTIVE 非 ACTIVE 都不計
         assertThat(service.findHashtagsByProductId(A_ACTIVE_1))
                 .extracting(io.github.will413028.hawkr.product.service.HashtagService.HashtagDisplayItem::productCount)
                 .containsExactly("2");

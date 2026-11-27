@@ -68,7 +68,6 @@ function taipeiParts(raw: DateLike): {
 		ms = raw < SECONDS_TO_MS_THRESHOLD ? raw * 1000 : raw;
 	} else {
 		const n = Number(raw);
-		// 純數字字串同樣可能是 unix 秒（`products/page.tsx` 的 `unixSeconds`）。
 		ms =
 			Number.isFinite(n) && raw.trim() !== "" && /^\d+$/.test(raw.trim())
 				? n < SECONDS_TO_MS_THRESHOLD

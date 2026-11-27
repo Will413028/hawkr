@@ -14,14 +14,12 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog"
 )
 
-// fakeCatalog 照 catalog 的庫存規則記帳：冪等鍵全域唯一（扣減與歸還共用一個空間）、同鍵同內容重送不再改庫存、歸還指向原扣減、庫存不足整次不生效。
 type fakeCatalog struct {
 	stock map[uuid.UUID]int32
 	ops   map[string]fakeOp
 	snaps map[uuid.UUID]catalog.SkuSnapshot
 	calls int
 	err   error
-	// SkuCartInfo 與 CheckoutSnapshot 收到的 ID（每次呼叫累加）。
 	queried []uuid.UUID
 }
 
@@ -122,7 +120,6 @@ func server(f *fakeCatalog) *Server {
 	return New(f, slog.New(slog.NewTextHandler(io.Discard, nil)))
 }
 
-// line 是一個品項：SKU 與數量（數字字串）。
 type line struct {
 	sku uuid.UUID
 	qty string

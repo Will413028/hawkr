@@ -78,9 +78,6 @@ public class MediaGrpcClient {
         ServerUploadSecureAndFinalizeResponse response = executeWithRetry("ServerUploadSecureAndFinalize",
                 () -> getStub().serverUploadSecureAndFinalize(request));
 
-        // ⚠️ objectKey 本身是**憑證等級**的值（：拿到它就取得到那張圖）
-        //    ⇒ 這裡只記 assetId 與長度，不記 objectKey 本身。
-        //    （對照上面那支 public 的：它記了 objectKey，而 public 前綴本來就沒有秘密。）
         log.info("MediaGrpcClient.serverUploadSecureAndFinalize.success",
                 "機敏檔上傳成功，assetId=" + response.getAssetId(), "refId", refId);
         return response;
@@ -197,7 +194,6 @@ public class MediaGrpcClient {
             }
         }
 
-        // 重試耗盡 → 轉換為本服務業務異常（依 Status 對應 GrpcResponseCode）
         throw GrpcClientErrorTranslator.translate(lastException, ShippingBusinessException::new);
     }
 

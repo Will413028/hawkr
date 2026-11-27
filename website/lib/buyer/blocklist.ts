@@ -28,7 +28,6 @@ export async function listBlockedStores(
 		pageToken,
 	});
 	return {
-		// 沒有店家 id 的項目無法解除封鎖，不是可操作的資料。
 		items: res.blockedStores.filter((s) => s.storeId !== ""),
 		nextPageToken: res.nextPageToken,
 	};

@@ -74,7 +74,6 @@ class UberOrderCreationGuardWiringTest {
         try {
             TsidUtil.init(300, 0);
         } catch (Exception ignored) {
-            // 已初始化
         }
     }
 
@@ -82,8 +81,6 @@ class UberOrderCreationGuardWiringTest {
     void setUp() {
         cartGrpcClient = mock(CartGrpcClient.class);
         productGrpcClient = mock(ProductGrpcClient.class);
-        // 鎖車成功（0）：讓「非 3003 會往下走」這件事在陰性測試裡真的走得到，
-        // 否則陰性測試會因為鎖車失敗而提早拋，看起來也像被擋住。
         when(cartGrpcClient.checkoutLock(anyLong(), anyString(), any())).thenReturn(0);
 
         orderService = new OrderService(
@@ -116,7 +113,6 @@ class UberOrderCreationGuardWiringTest {
                 TestIds.id(1L), "sku-1", 1, 500L, 500L, 0L, "img", TestIds.id(1001L), "product-1"));
     }
 
-    // ===== 入口 1／2：gRPC CreateOrder（購物車外建單）=====
 
     @Test
     @DisplayName("🔴 簡版 createOrder(3003)：拋 9503，且在鎖車／扣庫存之前")
@@ -136,19 +132,15 @@ class UberOrderCreationGuardWiringTest {
     @Test
     @DisplayName("🔴 陰性：簡版 createOrder(3001) 不被閘門擋，會走到鎖車")
     void simpleCreateOrderAllowsNonUber() {
-        // 後續會因為其餘 collaborator 都是 no-op mock 而失敗，本測試只關心「有沒有走到鎖車」——
-        // 那是「閘門沒有誤擋」的可指認證據。
         try {
             orderService.createOrder(
                     2623900520L, 2685914682L, items(), 500L, 500L,
                     CHECKOUT_ID, "3201", TAQBIN, 0L, "3101");
         } catch (Exception ignored) {
-            // 預期：mock 不足以跑完整條建單流程
         }
         verify(cartGrpcClient).checkoutLock(anyLong(), anyString(), any());
     }
 
-    // ===== 入口 2／2：結帳主路徑 createOrderFromCheckout → 擴展版 createOrder =====
 
     @Test
     @DisplayName("🔴 擴展版 createOrder(3003)：拋 9503，且在鎖車／扣庫存之前")
@@ -199,7 +191,6 @@ class UberOrderCreationGuardWiringTest {
                     30, "HAWK2685914682", 0L, null,
                     new OrderPolicyResolver().resolve(TAQBIN));
         } catch (Exception ignored) {
-            // 預期：mock 不足以跑完整條建單流程
         }
         verify(cartGrpcClient).checkoutLock(anyLong(), anyString(), any());
     }

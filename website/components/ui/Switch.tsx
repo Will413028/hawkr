@@ -36,9 +36,6 @@ export function Switch({
 			aria-label={ariaLabel}
 			aria-busy={busy || undefined}
 			className={cn(
-				// The root is HeroUI's focusable node, so removing its outline
-				// outright left keyboard users with no visible focus at all.
-				// Paint an explicit ring here instead of erasing one.
 				"hk-heroui-brand-scope min-h-11 shrink-0 justify-end rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--hkui-focus)]",
 				className,
 			)}

@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 class AppColors {
   AppColors._();
 
-  // ── Hawkr 品牌色票（brand/hawkr/README.md） ────────────────
   static const Color brandPrimary = Color(0xFFE4572E);
   static const Color brandPrimaryStrong = Color(0xFFB8441F);
   static const Color brandPrimaryDeep = Color(0xFF8F3315);
@@ -16,7 +15,6 @@ class AppColors {
   static const Color brandPrimarySoft = Color(0xFFFCEBE6);
   static const Color brandSecondarySoft = Color(0xFFFDF1E1);
 
-  // ── Ink ramp：以 brandInk（900）與 brandInkOnDark（50）為兩端的中性藍灰階 ──
   static const Color ink50 = brandInkOnDark;
   static const Color ink100 = Color(0xFFE4E7EB);
   static const Color ink200 = Color(0xFFCBD2D9);
@@ -30,7 +28,6 @@ class AppColors {
   static const Color ink900 = brandInk;
   static const Color ink950 = Color(0xFF161C23);
 
-  // ── 網頁 neutral palette ──────────────────────────────────
   static const Color neutralWhite = Color(0xFFFFFFFF);
   static const Color neutralCream = Color(0xFFFFFDF7);
   static const Color neutralPage = Color(0xFFF8F6EF);
@@ -44,7 +41,6 @@ class AppColors {
   static const Color neutral300 = Color(0xFFC8C8C8);
   static const Color neutralBlack = Color(0xFF000000);
 
-  // ── 品牌／互動語意 ───────────────────────────────────────
   static const Color primary = brandPrimaryStrong;
   static const Color actionPrimary = brandPrimaryStrong;
   static const Color primaryDark = brandPrimaryDeep;
@@ -58,7 +54,6 @@ class AppColors {
   /// 外部支付品牌色；不參與一般 UI 配色。
   static const Color externalVisa = Color(0xFF1A1F71);
 
-  // ── 表面色 Surface ────────────────────────────────────────
   static const Color surfaceCream = neutralCream;
   static const Color surfacePage = neutralPage;
   static const Color surfaceMuted = neutralMuted;
@@ -82,8 +77,6 @@ class AppColors {
   static const Color navBarBackground = surfaceCream;
   static const Color navBarGlass = Color(0xF0FFFDF7);
 
-  // ── Storefront semantic palette ────────────────────────────
-  // 與買家店舖頁共用相同角色，讓賣家自有店舖與公開頁保持一致。
   static const Color storefrontProfileSurface = neutralCream;
   static const Color storefrontControlSurface = Color(0xEBFFFDF7);
   static const Color storefrontPageSurface = neutralPage;
@@ -100,7 +93,6 @@ class AppColors {
   static const Color bgOverlay = Color(0x6B1F2933);
   static const Color bgOverlaySoft = Color(0x2E191C18);
 
-  // ── 舊名稱相容 aliases ────────────────────────────────────
   static const Color cream = neutralCream;
   static const Color red = danger;
   static const Color textDark = neutralInk;
@@ -128,7 +120,6 @@ class AppColors {
   static const Color black = neutralBlack;
   static Color get black80 => black.withValues(alpha: 0.8);
 
-  // ── 語意色 Semantic ───────────────────────────────────────
   static const Color success = Color(0xFF2D7F50);
   static const Color successSoft = Color(0x1A2D7F50);
   static const Color danger = Color(0xFFEA6021);
@@ -153,7 +144,6 @@ class AppColors {
   static const Color accentFill = brandSecondary;
   static Color get disabled => gray1_30;
 
-  // ── 邊框與 elevation ──────────────────────────────────────
   static Color get border => gray1_20;
   static Color get divider => gray1_20;
   static const Color dividerLight = neutralPanel;
@@ -166,7 +156,6 @@ class AppColors {
   static const Color borderInput = Color(0xFFDED8CB);
   static const Color dragHandle = neutralPanel;
 
-  // ── 文字色 Text ───────────────────────────────────────────
   static const Color textPrimary = neutralBody;
   static const Color textEmphasis = neutralInk;
 
@@ -181,12 +170,10 @@ class AppColors {
   /// primary 在這些底上低於 4.5:1，改用加深一階的 brandPrimaryDeep。
   static const Color textAccentOnTint = brandPrimaryDeep;
 
-  // ── 按鈕色 ────────────────────────────────────────────────
   static const Color buttonPrimary = actionPrimary;
   static const Color buttonSecondary = secondary;
   static const Color buttonDanger = error;
 
-  // ── 第三方登入 ─────────────────────────────────────────────
   /// LINE 登入按鈕的底色：LINE 品牌規範的 LINE Green，不屬於官網 palette。
   static const Color lineBrand = Color(0xFF06C755);
 }

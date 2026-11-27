@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// onboardingOf 以真實的來源讀店家的開通任務：條件來自讀店家（view）、KYC 與收款帳戶各自讀。
 func (f *fixture) onboardingOf(t *testing.T, storeID int64) (Store, Onboarding) {
 	t.Helper()
 	ctx := context.Background()

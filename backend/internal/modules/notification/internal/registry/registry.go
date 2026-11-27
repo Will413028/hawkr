@@ -29,7 +29,6 @@ type Content struct {
 	Fragments []uitext.Message
 }
 
-// locale 回傳 Content 實際使用的語系；各部分的語系不一致時回錯誤。
 func (c Content) locale() (uitext.Locale, error) {
 	l := c.Title.Locale
 	for _, m := range append([]uitext.Message{c.Body}, c.Fragments...) {
@@ -214,7 +213,6 @@ type Entry interface {
 	ExampleParams() (json.RawMessage, any, error)
 	// ExampleLoaded 回傳範例參數對應的 Load 結果（沒有 Load 的型別是零值）。
 	ExampleLoaded() Loaded
-	// validate 檢查型別定義本身；回傳全部違規。
 	validate() []error
 }
 
@@ -234,8 +232,6 @@ type Spawned struct {
 // MaxIdempotencyKeyLen 是冪等鍵與聚合鍵的長度上限，與 db/schema.sql 的 CHECK（intents.idempotency_key、inbox_items.aggregation_key）一致。
 const MaxIdempotencyKeyLen = 200
 
-// scopedKey 把型別內的鍵加上型別名稱前綴，不同型別不會撞鍵。超過上限時改存「型別名稱:來源的 sha256 十六進位」（決定性、長度固定，
-// 型別名稱最長 63 字元，合計不超過 128），而不是讓寫入時才被 CHECK 擋下。
 func scopedKey(typeName, source string) string {
 	key := typeName + ":" + source
 	if len(key) <= MaxIdempotencyKeyLen {
@@ -420,7 +416,6 @@ func (e *entry[P]) deepLink(p P, ld Loaded) string {
 	return ""
 }
 
-// localizedLink 依文字語系加深連結的語系前綴（D20）：en 加 /en，zh-TW 不加；空連結維持空。
 func localizedLink(l uitext.Locale, link string) string {
 	if link == "" || l != uitext.EN {
 		return link
@@ -560,7 +555,6 @@ func (e *entry[P]) Spawn(ctx context.Context, r Resolver, params json.RawMessage
 	return out, nil
 }
 
-// aggregationKey 是儲存用的聚合鍵：型別內的鍵加型別名稱前綴（兩個型別的同名鍵不會合併成一列），沒有聚合鍵時是空字串。
 func (e *entry[P]) aggregationKey(p P) string {
 	if e.d.AggregationKey == nil {
 		return ""
@@ -705,7 +699,6 @@ func (e *entry[P]) validate() []error {
 	return errs
 }
 
-// echoResolver 是自檢用的 Resolver：每個買家與店家都存活、帳號等於自己的號碼，沒有封鎖也沒有追蹤者。
 type echoResolver struct{}
 
 func (echoResolver) echo(ids []int64) map[int64]int64 {
@@ -737,7 +730,6 @@ func (echoResolver) CaseReporters(context.Context, uuid.UUID, model.Audience, in
 	return nil, nil
 }
 
-// checkExampleExpands 用 echoResolver 展開範例參數：Example 的 ID 要能解出一位形狀合法的收件人（含 actor）。
 func (e *entry[P]) checkExampleExpands() []error {
 	d := e.d
 	bad := func(format string, a ...any) []error {
@@ -756,7 +748,6 @@ func (e *entry[P]) checkExampleExpands() []error {
 	return nil
 }
 
-// validateBroadcast 檢查 fan-out 母意圖：只有冪等鍵、事件時間與 Broadcast，沒有收件人、文案、渠道與聚合。
 func (e *entry[P]) validateBroadcast() []error {
 	d := e.d
 	var errs []error

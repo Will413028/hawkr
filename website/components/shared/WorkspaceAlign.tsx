@@ -8,8 +8,6 @@ import { getActiveRole, type RoleSlot } from "@/lib/auth/storage";
 import { useHydrationSafeClientRender } from "@/lib/hooks/useHydrationSafeClientRender";
 import { commitDocumentNavigation } from "@/lib/navigation/document-location";
 
-// Per-tab latch: at most one auto workspace switch per admission attempt
-// (sessionStorage survives the reload below but is not shared across tabs).
 const AUTO_SWITCHED_KEY = "hkui:role-zone:auto-switched";
 
 function autoSwitchLatched(): boolean {

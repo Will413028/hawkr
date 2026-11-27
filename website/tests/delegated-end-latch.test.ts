@@ -35,10 +35,8 @@ function fakeStore(initial: Record<string, string> = {}) {
 test("F5 之後封鎖仍然成立（本檔的核心）", () => {
 	const store = fakeStore();
 
-	// document #1：按下「結束代行」，回應沒有證明終止。
 	writeEndPendingSessionId("SESSION-1", store);
 
-	// document #2：重新整理，記憶體那一半全沒了，只剩 sessionStorage。
 	const pendingSessionId = readEndPendingSessionId(store);
 	assert.equal(
 		isEndLatched({
@@ -54,7 +52,6 @@ test("換一個工作階段就解除封鎖（唯一需要的出路）", () => {
 	const store = fakeStore();
 	writeEndPendingSessionId("SESSION-1", store);
 
-	// 操作者回 ADM 撤銷後重建，新的 sessionId 對不上舊旗標。
 	assert.equal(
 		isEndLatched({
 			blockedInMemory: false,
@@ -82,7 +79,6 @@ test("記憶體旗標單獨成立；沒有旗標或還沒拿到 summary 時不�
 		}),
 		false,
 	);
-	// summary 還沒回來：畫面此刻是「正在確認…」，不該由這裡蓋一層看不懂的理由。
 	assert.equal(
 		isEndLatched({
 			blockedInMemory: false,
@@ -137,13 +133,9 @@ test("provider 真的接了持久化封鎖", () => {
 	);
 
 	for (const needle of [
-		// 掛載時讀回上一輪 document 的旗標
 		"readEndPendingSessionId()",
-		// 按下結束、結果未證明 → 寫進 sessionStorage
 		"writeEndPendingSessionId(",
-		// 結束被證明 → 清掉
 		"clearEndPendingSessionId()",
-		// 封鎖的推導只有這一個來源
 		"isEndLatched({",
 	]) {
 		assert.ok(
@@ -152,8 +144,6 @@ test("provider 真的接了持久化封鎖", () => {
 		);
 	}
 
-	// 畫面狀態與寫入閘門都必須讀 isEndLatched 的結果，不能任一邊繞回舊的
-	// writesBlockedByEnd（繞回去＝那一邊 F5 後就解鎖）。
 	const blockedOnlyUses = source.match(/writesBlockedByEnd/g) ?? [];
 	assert.equal(
 		blockedOnlyUses.length,

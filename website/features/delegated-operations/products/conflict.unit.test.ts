@@ -89,7 +89,6 @@ describe("版本衝突的合流", () => {
 	it("分類還沒選出來（樹未載完）時退回最新版本的分類，不清成空", () => {
 		const latest = detail();
 		const merged = keepMyEdits(latest, { ...mine, categoryId: "" });
-		// 空的 categoryId 不會被送出，畫面卻空著 —— 兩邊對不上就是靜默的不一致。
 		expect(merged.categoryId).toBe("527");
 	});
 
@@ -116,7 +115,6 @@ describe("版本衝突的合流", () => {
 		const merged = keepMyEdits(latest, mine);
 
 		expect(Object.keys(merged.skus).sort()).toEqual(["184", "185"]);
-		// 我沒碰過的那一筆，值取自最新版本而不是空白。
 		expect(merged.skus["185"].price).toBe("480");
 	});
 

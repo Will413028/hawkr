@@ -14,10 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
-// newDiscovery 組裝 discovery 模組。worker 用它重算分數（AddWorkers、PeriodicJobs），serve 用它讀排行（對外的
-// DiscoveryPublicService）；只有重算會呼叫上游，讀取只用 seller。order 的各店統計還在舊服務，由 internal/legacy 的 client 實作 port（ordering 搬進單體後改呼叫它的公開 API）；
-// 「有公開商品的店家」是 catalog 模組（*catalog.Module 直接滿足 discovery.Products）；評價統計直接讀 review 模組；店家的
-// 曝光資格是 seller 模組（*seller.Module 直接滿足 discovery.Stores）。
 func newDiscovery(d *db.DB, orders *orderservice.Client, products *catalog.Module, reviews *review.Module, sellers *seller.Module, log *slog.Logger) *discovery.Module {
 	return discovery.New(discovery.Deps{
 		DB: d, Orders: discoveryOrders{orders}, Products: products, Reviews: discoveryReviews{reviews}, Stores: sellers,
@@ -25,8 +21,6 @@ func newDiscovery(d *db.DB, orders *orderservice.Client, products *catalog.Modul
 	})
 }
 
-// discoveryOrders 以舊的 order-service 實作 discovery 的訂單統計 port（成立訂單的口徑由 order-service 定義，
-// 見 orderservice.StoreOrderStats）。
 type discoveryOrders struct{ client *orderservice.Client }
 
 func (o discoveryOrders) StoreOrderStats(ctx context.Context, days int) ([]discovery.OrderStats, error) {
@@ -41,13 +35,10 @@ func (o discoveryOrders) StoreOrderStats(ctx context.Context, days int) ([]disco
 	return out, nil
 }
 
-// storeRatings 是三個評價統計 port 共用的來源；正式組裝傳 *review.Module。
 type storeRatings interface {
 	StoreRatingStats(ctx context.Context, storeIDs []int64) (map[int64]review.StoreRating, error)
 }
 
-// ratingStats 是 review 模組的批次評價統計（沒有公開評價的店不在回傳裡，讀取失敗回錯誤），轉成消費端自己的型別：discovery
-// 與店面頁各自擁有 port 的形狀（兩個型別欄位相同），轉換只在這裡寫一次。review 不接受空清單，空清單在這裡回空 map。
 func ratingStats[T ~struct {
 	Count   int64
 	Average float64
@@ -66,14 +57,12 @@ func ratingStats[T ~struct {
 	return out, nil
 }
 
-// discoveryReviews 以 review 模組實作 discovery 的批次評價統計 port。
 type discoveryReviews struct{ client storeRatings }
 
 func (r discoveryReviews) StoreRatingStats(ctx context.Context, storeIDs []int64) (map[int64]discovery.RatingStats, error) {
 	return ratingStats[discovery.RatingStats](ctx, r.client, storeIDs)
 }
 
-// sellerRatings 以 review 模組實作店面頁的評價統計 port（httpseller.Ratings）。
 type sellerRatings struct{ client storeRatings }
 
 func (r sellerRatings) StoreRatingStats(ctx context.Context, storeIDs []int64) (map[int64]httpseller.RatingStats, error) {

@@ -27,11 +27,6 @@ import (
 	ch "github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
 )
 
-// connectDriver 以單體的 Connect API 操作 social（SocialPublicService、SocialAppService，封鎖在 BuyerAppService 與 SellerAppService）。
-// 每個呼叫者一組帶著自己 Bearer token 的 client；錯誤只以 ch.ConnectKind 分類，不在這裡改寫。
-//
-// Connect 的更新與狀態切換要帶 etag，業務情境不認識 etag：driver 記下每個資源最後一次回應裡的 etag，之後任何呼叫者的請求都帶它，
-// 非店主的呼叫才走得到授權檢查。留言的所屬貼文與父留言、討論區留言的所屬店家也由回應記下，供只給留言 ID 的方法使用。
 type connectDriver struct {
 	clients map[ch.Caller]*connectClients
 
@@ -40,7 +35,6 @@ type connectDriver struct {
 	postOf  map[string]string
 	parent  map[string]string
 	storeOf map[string]string
-	// measureOf 與 measureEtag 是 ModeratePost 建立的內容下架措施（貼文 ID 對措施 ID、措施 ID 對最後一次回應的 etag），還原時撤銷它。
 	measureOf   map[string]string
 	measureEtag map[string]string
 }
@@ -50,13 +44,11 @@ type connectClients struct {
 	app    socialv1alpha1connect.SocialAppServiceClient
 	buyer  buyerconnect.BuyerAppServiceClient
 	seller sellerconnect.SellerAppServiceClient
-	// governance 是後台的措施 service（SellerGovernanceAdminService）：管理員以 CreateMeasure 的內容下架、RevokeMeasure 取代舊的隱藏與還原。
 	governance adminsellerconnect.SellerGovernanceAdminServiceClient
 }
 
 var _ Driver = (*connectDriver)(nil)
 
-// newConnectDriver 以 base 為單體位址、tokens 為各呼叫者的 session token（沒有 token 的呼叫者是匿名）建立 driver。
 func newConnectDriver(httpClient *http.Client, base string, tokens map[ch.Caller]string) *connectDriver {
 	d := &connectDriver{
 		clients: map[ch.Caller]*connectClients{},
@@ -86,7 +78,6 @@ func newConnectDriver(httpClient *http.Client, base string, tokens map[ch.Caller
 
 func (d *connectDriver) of(c ch.Caller) *connectClients { return d.clients[c] }
 
-// pageSize 是 driver 走分頁時每頁的筆數。
 const pageSize = 50
 
 // ModeratePost 是平台下架或還原貼文（A7-D5′：平台下架是賣家的內容下架措施，A7-D28 第 8 點）：hide 以 CreateMeasure 的內容下架建立措施
@@ -135,7 +126,6 @@ func (d *connectDriver) forget(m map[string]string, k string) {
 	delete(m, k)
 }
 
-// hiddenReason 是店主讀到的下架理由：貼文帶下架措施的 ID 時，經賣家的 GetMyMeasure 讀措施的 statement（理由不在 social，A7-D28 第 1 點）；沒被下架是空字串。
 func (d *connectDriver) hiddenReason(ctx context.Context, c ch.Caller, p *pb.Post) (string, error) {
 	if p.TakedownMeasureId == nil {
 		return "", nil
@@ -225,7 +215,6 @@ func (d *connectDriver) comment(c *pb.Comment) Comment {
 	}
 }
 
-// placeholderState 只有佔位項目（DELETED、HIDDEN）有值，可見的留言是空字串。
 func placeholderState(s pb.CommentState) string {
 	if s == pb.CommentState_COMMENT_STATE_VISIBLE {
 		return ""
@@ -242,7 +231,6 @@ func (d *connectDriver) entry(e *pb.ForumEntry) ForumEntry {
 	}
 }
 
-// etagOf 回傳資源最後一次回應的 etag；沒有記錄是情境的寫法超出 driver 能代勞的範圍，回 harness 的錯誤，不送出沒有 etag 的寫入。
 func (d *connectDriver) etagOf(id string) (string, error) {
 	if v, ok := d.lookup(d.etag, id); ok {
 		return v, nil
@@ -496,7 +484,6 @@ func (d *connectDriver) ToggleCommentLike(ctx context.Context, c ch.Caller, id s
 	return true, nil
 }
 
-// listComments 列出貼文的頂層留言（parent 為 nil）或某則頂層留言的回覆，走完全部游標。
 func (d *connectDriver) listComments(ctx context.Context, c ch.Caller, postID string, parent *string) ([]Comment, error) {
 	return collect(func(token string) ([]Comment, string, error) {
 		res, err := d.of(c).public.ListComments(ctx, connect.NewRequest(&pb.ListCommentsRequest{PostId: postID, PageSize: pageSize, PageToken: token, ParentId: parent}))

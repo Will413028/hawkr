@@ -29,10 +29,8 @@ export default function SearchForm({ query, sort }: SearchFormProps) {
 		if (submittedIndex >= 0) {
 			const submitted = submittedDrafts.current[submittedIndex];
 			submittedDrafts.current.splice(0, submittedIndex + 1);
-			// A URL commit acknowledges its submitted text, not newer keystrokes.
 			if (submitted.revision !== draftRevision.current) return;
 		} else {
-			// Tags and browser history still replace the form's current query.
 			submittedDrafts.current = [];
 		}
 		setValue(query);
@@ -94,8 +92,7 @@ export default function SearchForm({ query, sort }: SearchFormProps) {
 					搜尋
 				</Button>
 			</form>
-			{/* class 是讓位規則的鉤子：0 結果時空態那顆才是主要 CTA，這顆隱藏
-			 * （見 procurement-assistant.css 的 :has 規則）。 */}
+
 			{HAWKR_AGENT_ENABLED ? (
 				<AssistantEntryLink
 					variant="page"

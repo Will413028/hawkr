@@ -63,7 +63,6 @@ test("variable-delay sampling retains slow holds and sums omitted delays", () =>
 		{ sourceFrameIndex: 4, delayMs: 100 },
 	]);
 	assert.equal(plan.durationMs, 700);
-	// The final dropped deltas do not affect any later retained output frame.
 	assert.equal(plan.decodeThroughIndex, 4);
 });
 
@@ -268,7 +267,6 @@ test("metadata inspection reads GIF timing without needing browser canvas APIs",
 		frameCount: 3,
 		durationMs: 230,
 	});
-	// The structural scanner still reports the GIF's raw timing metadata.
 	assert.equal(preflightAnimatedGif(await file.arrayBuffer()).durationMs, 130);
 	const controller = new AbortController();
 	controller.abort();

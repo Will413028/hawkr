@@ -50,7 +50,6 @@ func TestClearingTheSeedDeletesWholeAuthorityOrdersAndNeverLeavesAGap(t *testing
 	exec(`INSERT INTO seller.authority_order_targets (order_id, position, account_id) VALUES ($1, 0, 101)`, otherID)
 	exec(`INSERT INTO seller.authority_order_prepurged_stores (order_id, store_id) VALUES ($1, $2)`, bothID, seedStore)
 
-	// 結構保證：位置 2 沒有位置 1 的對象不能存在，刪掉中間的位置也不行。
 	if _, err := d.Pool().Exec(ctx, `INSERT INTO seller.authority_order_targets (order_id, position, account_id) VALUES ($1, 3, 102)`, bothID); err == nil {
 		t.Fatal("位置缺號必須被資料庫擋下")
 	}
@@ -111,7 +110,6 @@ func TestCheckRefusesMixedAuthorityOrdersAndListsTheirIDs(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	// 種子帳號較早的 stint（已關閉的店家，不是種子店家）：它的措施、認定與指名它的對象都是非種子資料；只指名種子帳號（不指定店家）的對象不構成混合。
 	var oldStore int64
 	closeTx, err := d.Pool().Begin(ctx)
 	if err != nil {
@@ -130,12 +128,12 @@ func TestCheckRefusesMixedAuthorityOrdersAndListsTheirIDs(t *testing.T) {
 	const order = `INSERT INTO seller.authority_orders (id, agency, document_no, received_at, kind, summary, due_at, hold_until, registered_at, registered_by_admin_id)
 		VALUES ($1::uuid, 'x', 'y', $2::timestamptz, 'DATA_REQUEST', 's', $2::timestamptz + interval '1 hour', $2::timestamptz + interval '184 days', $2::timestamptz, 31)`
 	const (
-		pureID     = "00000000-0000-7000-8000-000000000001" // 只指名種子帳號
-		targetsID  = "00000000-0000-7000-8000-000000000002" // 種子帳號加非種子帳號，沒有依附資料
-		measureID  = "00000000-0000-7000-8000-000000000003" // 種子帳號較早 stint（非種子店家）的措施引用
-		findingID  = "00000000-0000-7000-8000-000000000004" // 非種子店家的認定引用
-		untouchID  = "00000000-0000-7000-8000-000000000005" // 沒碰到種子
-		oldStintID = "00000000-0000-7000-8000-000000000006" // 種子帳號加指名它較早 stint 的對象，沒有依附資料
+		pureID     = "00000000-0000-7000-8000-000000000001"
+		targetsID  = "00000000-0000-7000-8000-000000000002"
+		measureID  = "00000000-0000-7000-8000-000000000003"
+		findingID  = "00000000-0000-7000-8000-000000000004"
+		untouchID  = "00000000-0000-7000-8000-000000000005"
+		oldStintID = "00000000-0000-7000-8000-000000000006"
 		measureUID = "00000000-0000-7000-8000-0000000000a1"
 		violation  = "00000000-0000-7000-8000-0000000000b1"
 	)
@@ -166,7 +164,6 @@ func TestCheckRefusesMixedAuthorityOrdersAndListsTheirIDs(t *testing.T) {
 	if err := tx.Commit(ctx); err != nil {
 		t.Fatal(err)
 	}
-	// 認定：violations 的來源措施外鍵可延遲，認定與措施成對建立。
 	tx, err = d.Pool().Begin(ctx)
 	if err != nil {
 		t.Fatal(err)

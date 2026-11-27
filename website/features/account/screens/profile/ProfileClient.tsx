@@ -42,7 +42,6 @@ export default function ProfileClient() {
 		const file = e.target.files?.[0];
 		e.target.value = "";
 		if (!file || avatarBusy) return;
-		// Crop first (circular framing), upload on confirm.
 		setPendingAvatar(file);
 	};
 
@@ -50,8 +49,6 @@ export default function ProfileClient() {
 		setAvatarError(null);
 		setAvatarBusy(true);
 		try {
-			// Finalize via the dedicated endpoint so we store a permanent
-			// objectKey, not the temporary upload preview URL.
 			const asset = await uploadImageFile(file);
 			await updateAvatar(asset.stagedToken);
 			await refresh();

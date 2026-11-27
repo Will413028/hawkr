@@ -1,6 +1,3 @@
-/* Shared seller-center phone disclosure contract.
- * Desktop keeps each feature's richer table/feed. Phones get a fixed 58px
- * scan row and reveal secondary fields only on demand. */
 .seller-mobile-disclosure-list {
 	display: none;
 }

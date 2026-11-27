@@ -8,7 +8,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
 void main() {
-  // App 只發 iOS：每個平台（含測試主機預設的 android）都走 Cupertino drill-down。
   for (final platform in [
     TargetPlatform.android,
     TargetPlatform.iOS,

@@ -6,16 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// 賣家端的商品認證申請（19 號設計書 §9.1）。
-//
-// 🔴 為什麼是獨立檔案而不是併進 seller_product.go：scripts/seller-identity-ratchet.sh
-// 對 seller_product.go 的 `getAccountID(c)` 出現次數只准下降，把這三支寫進那個檔會讓
-// 計數上升、CI 直接紅。賣家歸屬鍵一律走 resolveStoreIDFor 解析出來的 store surrogate，
-// account_id 只作為登入 principal 傳給下游（product.proto §10.3 例外第 1 條）。
-//
-// 🔴 賣家 DTO 不含 internalNote、不含 govVerifyPayload 原文、不含 submittedByAccountId：
-// 那是 ADM 內部註記與政府原始資料，隔離靠**兩個型別**而不是執行期清空欄位——後者會讓
-// swagger 宣告與實際輸出對不上，而且下一個複製這段 code 的人不會知道要清。
 
 // SellerProductCertificationApplicationItem 是賣家看到的一筆認證申請。
 //
@@ -36,7 +26,6 @@ type SellerProductCertificationApplicationItem struct {
 	Version           string  `json:"version" example:"1"`
 }
 
-// toSellerCertificationApplication 把 proto 投影成賣家 DTO（Admin-only 欄位一律不映射）。
 func toSellerCertificationApplication(app *pb.ProductCertificationApplication) SellerProductCertificationApplicationItem {
 	if app == nil {
 		return SellerProductCertificationApplicationItem{}
@@ -57,7 +46,6 @@ func toSellerCertificationApplication(app *pb.ProductCertificationApplication) S
 	}
 }
 
-// nilIfEmptyStr 把 proto 的 string 欄位還原成可選輸出（空字串 = 未設定 = JSON null）。
 func nilIfEmptyStr(s string) *string {
 	if s == "" {
 		return nil
@@ -92,8 +80,6 @@ type WithdrawProductCertificationRequest struct {
 	IdempotencyKey  string `json:"idempotencyKey" binding:"required" example:"cert-wd-2f0c1f2e"`
 }
 
-// sellerCertificationIdentity 解析出「登入 principal ＋ 當前 store surrogate」。
-// 兩者分開：account_id 是 accounts PK，store_id 才是賣家的營運鍵（44 號設計書）。
 func (h *Holder) sellerCertificationIdentity(c *gin.Context) (accountID int64, storeID int64, ok bool) {
 	accountID, ok = getAccountID(c)
 	if !ok {
@@ -107,7 +93,6 @@ func (h *Holder) sellerCertificationIdentity(c *gin.Context) (accountID int64, s
 	return accountID, int64(store), true
 }
 
-// sellerProductIDParam 取路由上的商品 ID（app 路由用 :id）。
 func sellerProductIDParam(c *gin.Context) (string, bool) {
 	productID := c.Param("product_id")
 	if productID == "" {
@@ -160,11 +145,6 @@ func (h *Holder) ListSellerProductCertificationApplications(c *gin.Context) {
 		return
 	}
 	if resp.GetCode() != 0 {
-		// BizStatus 而不是 GrpcResult：3025（不存在／非本人商品）必須是 404，靠 200＋碼
-		// 會讓前端把「查不到」畫成一個空列表。未登錄的碼仍塌縮成 409，與既有行為一致。
-		//
-		// ⚠️ 與 admin_product_certification.go 同註：EnvelopeGuardInterceptor 讓業務碼
-		// 從 err 那側回來，這條分支只有 envelopeCodePreserveData 的碼走得到（#2755）。
 		response.BizStatus(c, resp.GetCode(), resp.GetMessage())
 		return
 	}

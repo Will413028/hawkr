@@ -44,10 +44,6 @@ test("price validation and import field labels use the same seller terminology",
 		],
 	};
 
-	// validateDraft reports every problem at once (#435), so these drafts also
-	// trip 分類 / 重量 / 包裝尺寸. What this test owns is the WORDING of the two
-	// price rules — that they say 原價 and 售價, matching the input labels above
-	// and the import pipeline's own labels below.
 	assert.ok(
 		validateDraft(negativeOriginal).includes("原價需大於 0"),
 		"a non-positive list price is reported in 原價 terms",

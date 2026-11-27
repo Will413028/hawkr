@@ -167,7 +167,6 @@ void main() {
         find.byKey(ValueKey('market-product-$id')),
       );
 
-      // 檢查還沒回來：使用者先收藏再取消收藏商品 1。
       expect(favorites.checks, 1);
       card('1').onFavoriteTap!();
       await tester.pump();
@@ -179,7 +178,6 @@ void main() {
       expect(card('1').isFavorited, isFalse);
       expect(favorites.writes, ['+1', '-1']);
 
-      // 回應是在使用者取消之前讀到的伺服器狀態：1、2 都有收藏。
       favorites.pendingCheck.complete({1, 2});
       await tester.pump();
       await tester.pump();
@@ -742,7 +740,6 @@ Future<_MarketAdapter> _pumpMarket(
     ],
   );
   addTearDown(container.dispose);
-  // 已登入的 App 在進市集前 session 早已解析完成。
   if (signedInFavorites != null) await container.read(sessionProvider.future);
   await tester.pumpWidget(
     UncontrolledProviderScope(

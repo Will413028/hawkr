@@ -13,11 +13,6 @@ import { localeFromParam } from "@/lib/seo/metadata";
  * canonical URL per section instead of two that render the same thing.
  */
 
-// A redirect route still needs a title. `redirect()` throws NEXT_REDIRECT, but
-// the response has already begun streaming by then, so this route answers
-// 200 with a complete document (head included) and hands the navigation to the
-// client — measured, not assumed. Without this the seller sees the marketing
-// site's title on a workspace URL for as long as the hop takes.
 export const metadata = { title: "賣家中心" };
 
 export default async function Page({

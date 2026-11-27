@@ -105,7 +105,6 @@ class OrderInfoColumn extends ConsumerWidget {
               if (displayTime.isNotEmpty) time,
             ],
 
-            // 地址使用自己的完整寬度，不能被長門市名擠掉。
             if (displayAddress.isNotEmpty)
               Text(
                 displayAddress,
@@ -115,7 +114,6 @@ class OrderInfoColumn extends ConsumerWidget {
                 ),
               ),
 
-            // ③ 期限提示：獨立一行，避免與下單時間塞在同一列。
             if (deadlineText.isNotEmpty)
               Padding(
                 padding: EdgeInsets.only(top: 4.h),
@@ -150,7 +148,6 @@ class OrderInfoColumn extends ConsumerWidget {
                 ),
               ),
 
-            // 配送品牌與門市保留原圖示；空間不足時自然換行。
             if (order.shippingMethod.isNotEmpty)
               Wrap(
                 spacing: 8.w,

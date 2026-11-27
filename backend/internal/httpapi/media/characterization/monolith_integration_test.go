@@ -47,8 +47,6 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// monolith 起單體完整的 HTTP 層（自己的空 database，handler 與 production 一樣由 httpapi.NewHandler 組出）；media 是真的模組
-// 加記憶體的物件儲存與測試用的 KEK 金鑰環。呼叫者的身分是 identity 的 dev session：每個買家一個新帳號。
 func monolith(t *testing.T) *connectDriver {
 	t.Helper()
 	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(
@@ -78,7 +76,6 @@ func monolith(t *testing.T) *connectDriver {
 	h, err := httpapi.NewHandler(httpapi.Deps{
 		Ready: d.Ping, Identity: id, Delegation: del, Media: mediaModule, Logger: log,
 		Procurement: &procurement.Module{}, Catalog: &catalogmod.Module{}, ImageAI: &imageai.Module{}, Assistant: &assistant.Module{}, Review: &review.Module{}, CRM: &crm.Module{}, Coupon: &coupon.Module{}, IM: &im.Module{}, BizCalendar: &bizcalendar.Store{},
-		// NewHandler 要求的其他模組：特性測試只打 media 的端點，這些以零值或替身佔位，不會被呼叫。
 		Buyer: &buyer.Module{}, Deletion: &accountdeletion.Module{}, Seller: &seller.Module{}, Discovery: &discovery.Module{},
 		ReviewQueue: &reviewqueue.Module{}, Payment: &payment.Module{}, Moderation: &moderation.Module{}, Notification: &notification.Module{}, Social: &social.Module{}, Stats: ch.Stats(t), WebOrigin: ch.WebOrigin(t), Images: ch.Images(t), DashboardOrders: noDashboardOrders{},
 	})

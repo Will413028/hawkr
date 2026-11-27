@@ -1,11 +1,8 @@
 import '../../../core/codemeta/code_meta.dart';
 import 'order_model.dart';
 
-// status 10=已付款, 20=待出貨 → 都進待出貨 tab
 const pendingOrderStatuses = {10, 20};
-const inTransitOrderStatuses = {30, 32, 35, 40}; // 40=已送達，待買家確認收貨
-// 第三桶：50=已完成、60=部分退款、70=全額退款、80=已取消。
-// ⚠️ 含 80/70，所以這一桶**不是成交數**，語意是「賣家無需再動作」→ 顯示名見 sellerOrderTabLabels。
+const inTransitOrderStatuses = {30, 32, 35, 40};
 const completedOrderStatuses = {50, 60, 70, 80};
 
 /// 賣家訂單三個 tab 的顯示名（`OrderListScreen` 的 tab bar 與儀表板「訂單進度」共用）。
@@ -56,8 +53,6 @@ int tabForOrder(OrderSummary order) {
   if (completedOrderStatuses.contains(code)) return 2;
   if (inTransitOrderStatuses.contains(code)) return 1;
 
-  // 宅配：呼叫黑貓後 shipmentStatus='210' 時，後端主狀態可能尚未同步到 30，
-  // 這段期間先暫時歸到「配送中」避免賣家看不到訂單。
   if (order.shipmentStatus == ShippingStatus.tcatCalled.value &&
       order.shippingMethod == ShippingMethod.taqbin.value) {
     return 1;

@@ -81,7 +81,6 @@ func (s *Service) accountsWithEndedRemediation(ctx context.Context) ([]int64, er
 	return slices.Compact(accounts), err
 }
 
-// closeEndedOf 在帳號已鎖住的 transaction 內，把帳號已結束的措施上待處理的解除請求結案並讓那些措施的後台版本加一。
 func (s *Service) closeEndedOf(ctx context.Context, q *store.Queries, accountID int64, now time.Time) (int, error) {
 	active, err := stint.ActiveMeasureIDs(ctx, q, accountID, now)
 	if err != nil {
@@ -150,7 +149,6 @@ func (PurgeContentSnapshotsArgs) InsertOpts() river.InsertOpts {
 	return jobs.SweepOpts(12 * time.Hour)
 }
 
-// contentSnapshotBatch 是每個 transaction 清空的列數：分批做，不在一個 statement 持有大量列鎖。
 const contentSnapshotBatch = 500
 
 // PurgeContentSnapshots 清空撤銷滿 model.ContentSnapshotRetention 的內容下架措施留著的內容快照（內容下架沒有結束時間，保留期只從 revoked_at 起算；

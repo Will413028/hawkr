@@ -12,10 +12,6 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-// 單體每個發送點（見 publish_routes_test.go）的 (exchange, routing key) 經真的 Publisher 送進 broker 後，要落在
-// infra/mq/topology/topology.yaml 宣告的 queue，而且 body 一字不差。exchange 照 topology 宣告；queue 不用 topology 的名字：
-// 每個 topology queue 對應一個本次執行專用（唯一名稱、exclusive、auto-delete）的鏡像 queue，掛上同一組 binding，所以指向共用 broker
-// （HAWKR_TEST_AMQP_URL）時不會撞到真 queue 的參數，也不會吃掉真訊息。
 
 func TestPublishedRoutesReachTopologyQueues(t *testing.T) {
 	doc := loadTopologyDoc(t)
@@ -37,7 +33,7 @@ func TestPublishedRoutesReachTopologyQueues(t *testing.T) {
 		}
 	}
 	runID := fmt.Sprintf("%d", time.Now().UnixNano())
-	mirror := make([]string, len(doc.Queues)) // doc.Queues[i] 的鏡像 queue 名稱
+	mirror := make([]string, len(doc.Queues))
 	for i, q := range doc.Queues {
 		mirror[i] = fmt.Sprintf("routetest.%s.%d", runID, i)
 		if _, err := ch.QueueDeclare(mirror[i], false, true, true, false, nil); err != nil {

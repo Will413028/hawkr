@@ -81,7 +81,6 @@ class HomeProduct {
     return HomeProduct(
       id: id,
       name: (json['name'] ?? '').toString().trim(),
-      // 49 §6.1 成對契約：imageKey（objectKey）優先，imageUrl 退路。
       imageUrl: _firstNonEmpty([json['imageKey'], json['imageUrl']]),
       priceMin: _firstNonEmpty([json['priceMin']]),
       priceMax: _firstNonEmpty([json['priceMax']]),
@@ -89,7 +88,6 @@ class HomeProduct {
       listPriceMax: _firstNonEmpty([json['listPriceMax']]),
       salePriceMin: _firstNonEmpty([json['salePriceMin']]),
       salePriceMax: _firstNonEmpty([json['salePriceMax']]),
-      // ProductItem 的 flat 層與巢狀 seller 物件都有店名；flat 層優先。
       sellerName: _firstNonEmpty([json['sellerName'], seller['name']]),
       sellerAvatarUrl: _firstNonEmpty([
         json['sellerLogoKey'],
@@ -98,8 +96,6 @@ class HomeProduct {
         seller['logoUrl'],
       ]),
       sellerAccountId: _firstNonEmpty([json['storeId'], seller['storeId']]),
-      // Keep the legacy description-block fallback in the data layer. The UI
-      // receives only a normalized list of labels.
       hashtags: BuyerHashtagExtractor.fromProduct(json),
     );
   }

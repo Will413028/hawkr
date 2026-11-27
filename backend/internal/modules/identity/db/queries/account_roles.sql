@@ -1,5 +1,4 @@
 -- name: GrantAccountRole :exec
--- 授予角色；已經有這個角色時不變。
 INSERT INTO identity.account_roles (account_id, role, granted_at)
 VALUES (sqlc.arg(account_id), sqlc.arg(role), sqlc.arg(now))
 ON CONFLICT (account_id, role) DO NOTHING;

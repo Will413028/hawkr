@@ -44,7 +44,6 @@ func wantField(t *testing.T, what string, err error, field string) {
 	}
 }
 
-// newConversation 為買家寫一個需求與它的對話，updated_at 是 at。
 func newConversation(ctx context.Context, t *testing.T, d *db.DB, buyerID int64, at time.Time) uuid.UUID {
 	t.Helper()
 	q := store.New(d.Conn(ctx))
@@ -131,7 +130,6 @@ func TestGetSnapshotIsKeyedByRequestAndRecomputesTheHash(t *testing.T) {
 	wantKind(t, "對話已刪除的需求", err, apperr.KindNotFound)
 }
 
-// partialRequest 寫一個只有品項的需求與它的對話，必填的城市與單位還缺。
 func partialRequest(ctx context.Context, t *testing.T, d *db.DB, buyerID int64) uuid.UUID {
 	t.Helper()
 	q := store.New(d.Conn(ctx))
@@ -240,15 +238,15 @@ func TestListConversationsTokenPagingHasNoGapsOrDuplicatesEvenWithEqualUpdatedAt
 	var all []uuid.UUID
 	same := epoch.Add(time.Minute)
 	for i := range 9 {
-		at := same // 一半的列有相同的 updated_at，翻頁邊界落在同時間戳之間
+		at := same
 		if i%2 == 0 {
 			at = epoch.Add(time.Duration(i) * time.Second)
 		}
 		all = append(all, newConversation(ctx, t, d, 7, at))
-		newConversation(ctx, t, d, 8, at) // 別的買家的對話與每一筆交錯在同一時間戳：翻頁不得帶出
+		newConversation(ctx, t, d, 8, at)
 	}
 	gone := newConversation(ctx, t, d, 7, same)
-	newConversation(ctx, t, d, 8, same) // 別的買家、相同的 updated_at：翻頁不得帶出
+	newConversation(ctx, t, d, 8, same)
 	if err := m.DeleteConversation(ctx, 7, gone); err != nil {
 		t.Fatal(err)
 	}

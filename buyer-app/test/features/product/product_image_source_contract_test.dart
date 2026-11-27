@@ -29,7 +29,6 @@ class _StubAdapter implements HttpClientAdapter {
     requestedPaths.add(options.path);
     final body = responses[options.path];
     if (body == null) {
-      // 模擬 gin 對未註冊路由的回應：純文字，不是 JSON envelope。
       return ResponseBody.fromString('404 page not found', 404);
     }
     return ResponseBody.fromString(

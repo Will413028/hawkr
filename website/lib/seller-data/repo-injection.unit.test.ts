@@ -87,7 +87,6 @@ describe("② 賣家路徑：同一批函式一個都不能 throw", () => {
 			code: 0,
 			data: { records: [] },
 		});
-		// fetchMyStore、fetchSellerPosts 走 Connect（`/api/connect/...`），不在這一組的 REST 斷言裡。
 		const restEntryPoints = sellerEntryPoints.filter(
 			([name]) => name !== "fetchMyStore" && name !== "fetchSellerPosts",
 		);
@@ -139,7 +138,7 @@ describe("③ 注入的 fetcher：代行執行期照常運作", () => {
 				undefined,
 				{ compress: false },
 			)
-			.catch(() => undefined); // 缺 stagedToken，只驗它打到了注入的路徑
+			.catch(() => undefined);
 
 		expect(seen.map((call) => call.path)).toEqual([
 			"/products?page=2&page_size=10",

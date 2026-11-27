@@ -70,7 +70,6 @@ class CoalescingRefresher {
   }
 
   Future<bool> _start(bool settledOnly) {
-    // 先登記這一輪再開始讀：[round] 同步執行的部分（例如觸發 provider 重建）就已經看得到「進行中」。
     final completer = Completer<bool>();
     final started = completer.future;
     _track(started);
@@ -78,7 +77,6 @@ class CoalescingRefresher {
     try {
       running = _round(settledOnly);
     } catch (error, stackTrace) {
-      // [round] 同步丟出時這一輪就此結束：失敗交給等這一輪的人，並清掉「進行中」，不留下永遠不會完成的 future。
       completer.completeError(error, stackTrace);
       return started;
     }

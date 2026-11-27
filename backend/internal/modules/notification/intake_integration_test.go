@@ -35,7 +35,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// recorder 記下排入的 job，由測試決定何時展開（等同 River 取件）；渠道 job 另外記，不展開（這一步它什麼都不做）。
 type recorder struct {
 	mu         sync.Mutex
 	args       []intake.ProcessArgs
@@ -43,7 +42,6 @@ type recorder struct {
 	fanoutOpts []*river.InsertOpts
 	deliveries []intake.DeliverArgs
 	purges     []purge.RecipientArgs
-	// deliverUnique 記錄每個渠道 job 是否以參數（投遞紀錄 ID）唯一。
 	deliverUnique []bool
 }
 
@@ -97,14 +95,12 @@ func (r *recorder) take() []intake.ProcessArgs {
 	return out
 }
 
-// 測試專用的型別：真正的兩個型別都不可聚合、也沒有 actor。
 type likeParams struct {
 	AccountID int64  `json:"account_id"`
 	EventID   string `json:"event_id"`
 	PostID    string `json:"post_id"`
 	ActorID   int64  `json:"actor_id"`
 	Note      string `json:"note"`
-	// At 是事件發生時間；零值時用 epoch。
 	At time.Time `json:"at"`
 }
 
@@ -126,7 +122,6 @@ var testPush = registry.Define(registry.Definition[pushParams]{
 	Example: pushParams{AccountID: 1, EventID: "e"},
 })
 
-// testPushImage 是帶圖片 key 的推播型別（商品類型別的形狀，D14）。
 const testImageKey = "public/product/p1/a.jpg"
 
 var testPushImage = registry.Define(registry.Definition[pushParams]{
@@ -164,7 +159,6 @@ var testLike = registry.Define(registry.Definition[likeParams]{
 	Example: likeParams{AccountID: 1, EventID: "e", PostID: "p", ActorID: 2},
 })
 
-// testTwin 與 testLike 的原始聚合鍵相同，驗證聚合鍵以型別名稱為前綴。
 var testTwin = registry.Define(registry.Definition[likeParams]{
 	Name: "test_agg_twin", Audiences: []model.Audience{model.AudienceBuyer}, Category: model.CategoryLike, Presentation: model.PresentationSocial,
 	Channels:          []model.Channel{model.ChannelInbox},
@@ -187,7 +181,6 @@ type storeNoteParams struct {
 	EventID   string `json:"event_id"`
 }
 
-// testStoreNote 是 STORE 受眾、有收件匣與推播的測試型別；testStorePushOnly 只有推播（意圖只經投遞紀錄找得到）。
 var testStoreNote = registry.Define(registry.Definition[storeNoteParams]{
 	Name: "test_store_note", Audiences: []model.Audience{model.AudienceStore}, Category: model.CategoryOrder, Presentation: model.PresentationOrder,
 	Channels:          []model.Channel{model.ChannelInbox, model.ChannelPush},
@@ -218,10 +211,8 @@ var testStorePushOnly = registry.Define(registry.Definition[storeNoteParams]{
 	Example: storeNoteParams{AccountID: 1, StoreID: 1, EventID: "e"},
 })
 
-// testSuppressionKeys 是 email suppression 的測試密鑰（目前加輪替用的舊密鑰）。
 var testSuppressionKeys = SuppressionKeys{Current: []byte("test-suppression-key-current-0000000"), Previous: []byte("test-suppression-key-previous-000000")}
 
-// testImageURL 與 cmd/hawkr 組裝的形狀相同：{MEDIA_ORIGIN}/i/{push preset}/{key}。
 func testImageURL(key string) string { return "https://media.example/i/card/" + key }
 
 type testRegistry struct{}
@@ -251,7 +242,6 @@ func (testRegistry) All() []registry.Entry {
 	return append(append(registry.All(), resolutionTestEntries()...), testLike, testPush, testPushImage, testTwin, testStoreNote, testStorePushOnly)
 }
 
-// fakeStores 取代 seller：測試只需要「店家是否已退場」。沒登記的店視為存在、營運中。
 type fakeStores struct {
 	mu      sync.Mutex
 	retired map[int64]bool
@@ -288,7 +278,6 @@ type fixture struct {
 	mail     *resend.Fake
 	contacts *fakeContacts
 	resolver Resolver
-	// sellerMod 只有 setupResolution 建（真的 seller 模組）；其餘測試用 stores 替身。
 	sellerMod *seller.Module
 }
 
@@ -374,7 +363,6 @@ func (f *fixture) accept(t *testing.T, typ string, p any) {
 	}
 }
 
-// run 展開目前排著的全部 job 並回傳 job 數。
 func (f *fixture) run(t *testing.T) int {
 	t.Helper()
 	jobs := f.jobs.take()
@@ -442,7 +430,6 @@ func TestSuspendedEventCreatesTheInboxRow(t *testing.T) {
 	if err != nil || r.Title != "帳號已被停權" {
 		t.Fatalf("參數快照組不出停權通知：%v %+v", err, r)
 	}
-	// email 渠道是 PENDING 的投遞紀錄加一個以投遞紀錄 ID 唯一的渠道 job；job 這一步不送出，紀錄留在 PENDING。
 	jobs, unique := f.jobs.deliverJobs()
 	var deliveryID uuid.UUID
 	if err := f.db.Pool().QueryRow(context.Background(), `SELECT id FROM notification.deliveries WHERE account_id = $1 AND channel = 'EMAIL'`, acct).Scan(&deliveryID); err != nil {
@@ -481,7 +468,6 @@ func TestSameEventTwiceMakesOneIntentAndOneInboxRow(t *testing.T) {
 	if n := f.run(t); n != 1 {
 		t.Fatalf("job %d 個，預期 1（重複事件不再排）", n)
 	}
-	// job 重試（at-least-once）：同一個意圖再展開一次，收件匣與投遞紀錄都不增加。
 	var intentID uuid.UUID
 	if err := f.db.Pool().QueryRow(context.Background(), `SELECT id FROM notification.intents`).Scan(&intentID); err != nil {
 		t.Fatal(err)
@@ -500,9 +486,7 @@ func TestSameEventTwiceMakesOneIntentAndOneInboxRow(t *testing.T) {
 func TestPreferencesDisableOnlyDisableableCategories(t *testing.T) {
 	f := setupIntake(t)
 	acct := f.newAccount(t)
-	// 互動分類 LIKE 的收件匣可關。
 	f.mustExec(t, `INSERT INTO notification.preference_overrides (account_id, audience, category, channel, enabled, updated_at) VALUES ($1, 'BUYER', 'LIKE', 'INBOX', false, $2)`, acct, epoch)
-	// 交易必要的 ACCOUNT 即使有覆寫列也不可關。
 	f.mustExec(t, `INSERT INTO notification.preference_overrides (account_id, audience, category, channel, enabled, updated_at) VALUES ($1, 'BUYER', 'ACCOUNT', 'INBOX', false, $2)`, acct, epoch)
 	f.accept(t, "test_like", likeParams{AccountID: acct, EventID: "like-1", PostID: "p1", ActorID: acct + 100})
 	f.publish(t, suspended(acct, uuid.NewV7()))
@@ -558,7 +542,6 @@ func TestUnreadNotificationsWithTheSameAggregationKeyMerge(t *testing.T) {
 	if len(actors) != 2 || actors[0] != min(a, b) || actors[1] != max(a, b) {
 		t.Fatalf("合併後的 actor 是 %v，預期 [%d %d]", actors, a, b)
 	}
-	// 已讀之後的新意圖另開一列。
 	f.mustExec(t, `UPDATE notification.inbox_items SET read_at = $2 WHERE account_id = $1 AND aggregation_key = 'test_like:post:p1'`, acct, epoch)
 	f.accept(t, "test_like", likeParams{AccountID: acct, EventID: "l4", PostID: "p1", ActorID: c})
 	f.run(t)
@@ -616,7 +599,6 @@ func TestDeliveryChannelsEachGetARecordAndAJobInTheSameTransaction(t *testing.T)
 			t.Fatalf("渠道 job %s 沒有對應的 PENDING 投遞紀錄", j.DeliveryID)
 		}
 	}
-	// 重試：紀錄已存在，不再排渠道 job。
 	var intentID uuid.UUID
 	if err := f.db.Pool().QueryRow(context.Background(), `SELECT id FROM notification.intents`).Scan(&intentID); err != nil {
 		t.Fatal(err)

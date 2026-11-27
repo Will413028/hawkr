@@ -53,7 +53,7 @@ function storeOf(
 const FULL_STORE = storeOf({
 	contactName: "王小明",
 	contactMobile: "0912345678",
-	townCode: "63000050", // 臺北市中正區
+	townCode: "63000050",
 	addressDetail: "重慶南路一段 122 號",
 });
 

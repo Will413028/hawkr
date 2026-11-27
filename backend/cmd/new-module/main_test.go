@@ -12,8 +12,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/arch"
 )
 
-// scaffold 在暫存目錄裡模擬 backend/：放一份真的 cmd/hawkr/modules.go，產生 invoice（依賴表裡有、還沒
-// 搬進來的模組）的模組與特性測試骨架。
 func scaffold(t *testing.T, legacy string) string {
 	t.Helper()
 	root := t.TempDir()
@@ -47,7 +45,6 @@ func scaffold(t *testing.T, legacy string) string {
 	return root
 }
 
-// templateAction 是沒有被渲染掉的模板動作；Go 的 composite literal（{{Name: …}}）不算。
 var templateAction = regexp.MustCompile(`\{\{(\.|if |end|else|")`)
 
 // 產生的 Go 檔都要是合法而且已經 gofmt 過的：模板改壞時在這裡失敗，不必等下一個模組搬遷才發現。
@@ -152,7 +149,6 @@ func TestGeneratedGraph(t *testing.T) {
 	}
 }
 
-// buildGeneratedCharacterization 產生 content 的特性測試骨架並編譯成 integration 的測試執行檔，回傳它的路徑與測試的工作目錄。
 func buildGeneratedCharacterization(t *testing.T) (bin, dir string) {
 	t.Helper()
 	root := t.TempDir()
@@ -261,7 +257,6 @@ func TestGeneratedAgentsPointsToTheSpec(t *testing.T) {
 	if !strings.Contains(agents, "`"+spec+"`") {
 		t.Errorf("AGENTS.md 要指向模組規格 %s", spec)
 	}
-	// 子領域的 AGENTS.md 是選用的（同一份 ADR 的決策 4）：模板說明規則，但骨架不產生它。
 	if !strings.Contains(agents, "`internal/<子領域>/AGENTS.md`（選用") {
 		t.Error("不變量節的註解要說明子領域 AGENTS.md 的規則")
 	}

@@ -21,7 +21,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/lockorder"
 )
 
-// sqlRecorder 記下經連線池送出的每一句 SQL（B1-D25 的 append-only 守門）。
 type sqlRecorder struct {
 	mu  sync.Mutex
 	sql []string
@@ -48,7 +47,6 @@ func (r *sqlRecorder) statements() []string {
 	return append([]string(nil), r.sql...)
 }
 
-// recordedModule 建一個連線池掛著 recorder 的 Module（同一個資料庫與儲存）。
 func recordedModule(t *testing.T, f *fixture) (*media.Module, *db.DB, *sqlRecorder) {
 	t.Helper()
 	rec := &sqlRecorder{}
@@ -64,7 +62,6 @@ func recordedModule(t *testing.T, f *fixture) (*media.Module, *db.DB, *sqlRecord
 	return m, d, rec
 }
 
-// assertAppendOnly：錄到的每一句 SQL 都不加列鎖（lockorder.Classify 為空），也沒有碰 river schema（不 Enqueue）。
 func assertAppendOnly(t *testing.T, rec *sqlRecorder, what string) {
 	t.Helper()
 	stmts := rec.statements()
@@ -206,7 +203,6 @@ func TestConfirmThenMarkDeletedSameTxDeletionWins(t *testing.T) {
 		t.Fatal("物件應該已刪、資產應該是 DELETED")
 	}
 
-	// rollback 版：認領與請求一起消失，資產留給 GC。
 	res2 := ready(t, f, owner)
 	errRollback := errors.New("rollback")
 	err = f.d.InTx(t.Context(), func(ctx context.Context) error {
@@ -305,7 +301,6 @@ func TestConfirmFieldsAndGCNeverDeadlockOrStall(t *testing.T) {
 		if _, err := media.ConfirmFields(ctx, confirmer, owner, items, media.VisibilityPublic); err != nil {
 			return err
 		}
-		// 擁有者握著三個還沒提交的認領：GC 必須在 lock_timeout 內放棄這幾列、不拖住也不死結。
 		start := time.Now()
 		got, err := collector.CollectGarbage(t.Context())
 		gcDone <- err
@@ -335,7 +330,6 @@ func TestApplyDeletionsIdempotent(t *testing.T) {
 	if err := markDeletedInTx(f, a.ID, b.ID); err != nil {
 		t.Fatal(err)
 	}
-	// 兩個 worker 並行：恰好各請求只套用一次。
 	var wg sync.WaitGroup
 	counts := make([]int, 2)
 	for i := range counts {
@@ -371,7 +365,6 @@ func TestApplyDeletionsIdempotent(t *testing.T) {
 	if _, err := f.m.DeleteAssets(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	// 請求指向已 DELETED 的資產：請求隨物理刪除一起刪，再請求也不會把資產改回 DELETING。
 	if err := markDeletedInTx(f, a.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -395,7 +388,6 @@ func TestOrphanDeletingInvariantHoldsAndTheCheckIsNotVacuous(t *testing.T) {
 	}
 	assertNoOrphanDeleting(t, f)
 	_ = staged
-	// 反例：不經請求就把已確認的資產標成物理 DELETING，檢查必須抓到。
 	b, _ := confirmed(t, f)
 	if _, err := f.d.Pool().Exec(t.Context(), `UPDATE media.assets SET state = 'DELETING' WHERE id = $1`, b.ID); err != nil {
 		t.Fatal(err)
@@ -418,7 +410,7 @@ func TestReadsAfterMarkDeletedCommit(t *testing.T) {
 	if err := markDeletedInTx(f, a.ID); err != nil {
 		t.Fatal(err)
 	}
-	_, err = f.m.CopyPublic(t.Context(), owner, a.ID) // job 還沒跑，已經 NotFound
+	_, err = f.m.CopyPublic(t.Context(), owner, a.ID)
 	wantKind(t, err, apperr.KindNotFound)
 	if got := physicalAssetState(t, f, a.ID); got != "STAGED" {
 		t.Fatalf("物理 state = %s，job 還沒跑應該仍是 STAGED", got)
@@ -430,7 +422,7 @@ func TestMarkDeleted_IgnoresAssetsOfReclaimedUploads(t *testing.T) {
 	res := ready(t, f, owner)
 	assetID := assetIDOf(t, f, res.ID)
 	_, final, _ := uploadKeys(t, f, res.ID)
-	f.store.setDeleteFailure(*final, errors.New("r2 unavailable")) // 讓 RECLAIMED 認領留著
+	f.store.setDeleteFailure(*final, errors.New("r2 unavailable"))
 	f.clock.Advance(media.UploadTTL + time.Minute)
 	if _, err := f.m.CollectGarbage(t.Context()); err == nil {
 		t.Fatal("刪物件失敗應該回錯誤")

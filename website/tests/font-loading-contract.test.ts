@@ -92,7 +92,6 @@ test("every brand font shard swaps in after loading and keeps the original weigh
 	const manifest = JSON.parse(
 		read("assets/fonts/hawkr-rounded-v2/manifest.json"),
 	);
-	// A cached base face must not leave late cold glyphs on fallback permanently.
 	assert.equal(manifest.css.font_display, "swap");
 	const css = postcss.parse(read("styles/foundation/openhuninn.generated.css"));
 	let faces = 0;
@@ -136,7 +135,6 @@ test("font shard artifacts and CSS preserve the pinned complete upstream cmap", 
 		manifest.source.sha256,
 		"eec8b0b68c34b9166ae37bed839b6126116b225d97f21a5954bb542b9fd1e68c",
 	);
-	// Independently read from the pinned upstream TTF, not a page text scan.
 	const fullCmapDigest =
 		"e6eb428cc2488f1b4c6ac93e4b093df4924ed3bde47f2635dc69a1ce9015828f";
 	assert.equal(manifest.source.cmap_codepoints, 11345);

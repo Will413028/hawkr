@@ -15,7 +15,6 @@ class _ServerTextController extends NotificationListController {
   Future<NotificationListState> build() async => NotificationListState(
     unreadCount: 2,
     notifications: [
-      // 呈現分類是 REFUND，但標題與內文含「賣家」「店家」：照伺服器給的顯示，不替換。
       inboxItem(
         'a',
         title: 'Server composed title 賣家',

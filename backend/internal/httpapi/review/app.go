@@ -31,7 +31,6 @@ func NewApp(reads Reads, writes Writes, buyers Buyers, stores Stores, images rpc
 	return newApp(declarations, reads, writes, buyers, stores, images, log)
 }
 
-// newApp 的宣告表由參數給（測試用缺一列的表驗證啟動檢查）。
 func newApp(table map[string]declaration, reads Reads, writes Writes, buyers Buyers, stores Stores, images rpc.Images, log *slog.Logger) (*App, error) {
 	p, err := newPresenter(buyers, images, log)
 	if err != nil {
@@ -46,7 +45,6 @@ func newApp(table map[string]declaration, reads Reads, writes Writes, buyers Buy
 	return &App{presenter: p, reads: reads, writes: writes, stores: stores}, nil
 }
 
-// buyerID 回傳呼叫者的買家身分；只有顧客帳號能呼叫（沒有登入由 interceptor 擋，管理員回 permission_denied）。
 func (h *App) buyerID(ctx context.Context) (int64, error) {
 	p, err := rpc.RequireAccount(ctx)
 	if err != nil {
@@ -59,7 +57,6 @@ func (h *App) buyerID(ctx context.Context) (int64, error) {
 	return id, nil
 }
 
-// store 回傳呼叫者此刻的店（seller.CurrentStore）；沒有店回 not_found。賣家能力不在這裡檢查：由模組檢查，宣告見 declarations。
 func (h *App) store(ctx context.Context) (seller.Store, error) {
 	p, err := rpc.RequireAccount(ctx)
 	if err != nil {
@@ -68,9 +65,6 @@ func (h *App) store(ctx context.Context) (seller.Store, error) {
 	return h.stores.CurrentStore(ctx, p.ID)
 }
 
-// replyStore 由評價所屬的店推導回覆的店家（讀取不套公開述詞）：評價不存在回 not_found；呼叫者不是那間店的店主（包含沒有店）時，
-// 評價公開可讀回 permission_denied，不公開（隱藏、作者停用）回 not_found，不洩漏存在性；店主一律交給模組，不能回覆的由模組回 REVIEW_NOT_REPLYABLE。
-// 賣家能力與店家一致的檢查仍在模組。
 func (h *App) replyStore(ctx context.Context, reviewID uuid.UUID) (seller.Store, error) {
 	p, err := rpc.RequireAccount(ctx)
 	if err != nil {

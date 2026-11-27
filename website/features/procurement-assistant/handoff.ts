@@ -26,9 +26,6 @@ export interface HawkrAgentHandoff {
 
 let memoryHandoff: HawkrAgentHandoff | null = null;
 
-// sessionStorage 之外還有一份記憶體副本（storage 被擋時的 fallback），清除
-// storage 不會動到它——登出／換帳號時若只清 storage，consume() 仍會吐出上一位
-// 的搜尋字串。同 zustand store 的理由，一併登記進 reset 註冊表。
 registerLocalPrivateReset(HAWKR_AGENT_HANDOFF_STORAGE_KEY, () => {
 	memoryHandoff = null;
 });
@@ -102,8 +99,6 @@ export function writeHawkrAgentHandoff(
 	try {
 		storage?.setItem(HAWKR_AGENT_HANDOFF_STORAGE_KEY, JSON.stringify(handoff));
 	} catch {
-		// Same-document navigation still has the in-memory fallback. If login causes
-		// a full reload and storage is unavailable, the chat opens with a blank draft.
 	}
 	return true;
 }
@@ -120,7 +115,6 @@ export function consumeHawkrAgentHandoff(
 		);
 		storage?.removeItem(HAWKR_AGENT_HANDOFF_STORAGE_KEY);
 	} catch {
-		// Fall through to the in-memory copy.
 	}
 	const handoff = stored ?? memoryHandoff;
 	memoryHandoff = null;

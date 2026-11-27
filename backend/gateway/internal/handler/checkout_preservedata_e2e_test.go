@@ -20,46 +20,14 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-// ---------------------------------------------------------------------------
-// 這個檔案守的是什麼：結帳熱路徑（紅線 10）的 preserveData 契約
-// ---------------------------------------------------------------------------
-//
-// envelopeCodePreserveData 名單上有 **4001 / 4091 / 4092** —— 那不是發票，那是結帳。
-// bizcarrier 把 EnvelopeGuardInterceptor 的契約從
-//
-//	if preserveData[code] { return nil }                    // 無條件
-//
-// 改成
-//
-//	if preserveData[code] && bizcarrier.Arm(...) { return nil }   // Arm 成功才放行
-//
-// ⇒ 契約真的變了：Arm 拿不到 carrier 時，這三個碼會落到 status.Error 走一般錯誤映射，
-// data 在 gRPC 邊界蒸發、HTTP 從 200 變 409。買家會看到「結帳失敗」而不是
-// 「以下商品已下架，請先返回購物車移除」的對話框。
-//
-// 既有的 checkout_test.go 證明不了這件事：它用 grpcclient.NewOrderClientForTest(mock)
-// 注入 mock proto client，**整條 dial option 鏈都不跑**（見 internal/grpc/testing.go
-// 的 NOTE），interceptor 與 carrier 的存在與否對它完全不可見 —— handler 怎麼寫它都綠。
-//
-// 所以本檔用三樣 production 真貨組裝：
-//
-//	bufconn 上的真 gRPC server（鏡射 order-service 回「gRPC OK ＋ 非零 envelope code」）
-//	+ grpcclient.EnvelopeGuardInterceptor()（真的那支）
-//	+ bizcarrier.Middleware()（真的那支）
-//	+ h.CheckoutPreview / h.CheckoutConfirm（真的 handler，不是 probe）
-//
-// 斷言錨在**買家實際收到的 body**：HTTP status、envelope code、data 逐欄。
 
 const (
-	checkoutCodeUnavailable   int32 = 4001 // INSUFFICIENT_STOCK / 商品不可購買
-	checkoutCodePriceChanged  int32 = 4091 // CHECKOUT_PRICE_CHANGED
-	checkoutCodeAlreadyOrder  int32 = 4092 // ORDER_ALREADY_CREATED
+	checkoutCodeUnavailable   int32 = 4001
+	checkoutCodePriceChanged  int32 = 4091
+	checkoutCodeAlreadyOrder  int32 = 4092
 	checkoutPendingOrderNoMsg       = "您已有未付款訂單：O20260831001，請先完成付款或取消後再下單"
 )
 
-// checkoutPreserveServer 是 order-service 的替身：對 Preview / Confirm 回覆
-// 「gRPC OK ＋ 腳本指定的 envelope」。gRPC 層一律成功，非零碼只活在 envelope 裡
-// —— 那正是 preserveData 這個概念存在的前提。
 type checkoutPreserveServer struct {
 	orderpb.UnimplementedOrderServiceServer
 	preview *orderpb.CheckoutPreviewResponse
@@ -74,7 +42,6 @@ func (s *checkoutPreserveServer) CheckoutConfirm(context.Context, *orderpb.Check
 	return s.confirm, nil
 }
 
-// newCheckoutPreserveRouter 組裝上述四件真貨。
 func newCheckoutPreserveRouter(t *testing.T, srvImpl *checkoutPreserveServer) http.Handler {
 	t.Helper()
 
@@ -88,7 +55,6 @@ func newCheckoutPreserveRouter(t *testing.T, srvImpl *checkoutPreserveServer) ht
 			return lis.DialContext(ctx)
 		}),
 		gogrpc.WithTransportCredentials(insecure.NewCredentials()),
-		// 🔴 production 的那支。少了它，preserveData 這個概念在測試裡根本不存在。
 		gogrpc.WithChainUnaryInterceptor(grpcclient.EnvelopeGuardInterceptor()),
 	)
 	if err != nil {
@@ -103,8 +69,6 @@ func newCheckoutPreserveRouter(t *testing.T, srvImpl *checkoutPreserveServer) ht
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	// 🔴 production 掛在 newEngine 的全域鏈上（infrastructure/di.go）。
-	// 那件事由 internal/infrastructure 的 wiring test 守；這裡只是重現同樣的位置。
 	r.Use(bizcarrier.Middleware())
 	app := r.Group("/api/v1/app/checkout")
 	app.Use(fakeJWTAuth())
@@ -155,7 +119,6 @@ func unavailableItemsFixture() []*orderpb.UnavailableItem {
 	}}
 }
 
-// assertCheckoutEnvelope 斷言 HTTP status ＋ envelope code，並回傳 body。
 func assertCheckoutEnvelope(t *testing.T, w *httptest.ResponseRecorder, wantHTTP int, wantCode int32) map[string]any {
 	t.Helper()
 	if w.Code != wantHTTP {
@@ -172,7 +135,6 @@ func assertCheckoutEnvelope(t *testing.T, w *httptest.ResponseRecorder, wantHTTP
 	return body
 }
 
-// dataObj 取出 data 物件；nil 直接 fail（preserveData 的全部價值就是 data 還在）。
 func dataObj(t *testing.T, body map[string]any) map[string]any {
 	t.Helper()
 	d, ok := body["data"].(map[string]any)
@@ -182,9 +144,6 @@ func dataObj(t *testing.T, body map[string]any) map[string]any {
 	return d
 }
 
-// ---------------------------------------------------------------------------
-// 4001：Preview / Confirm 的 unavailableItems
-// ---------------------------------------------------------------------------
 
 func TestCheckoutPreview_4001_UnavailableItemsSurviveTheGrpcBoundary(t *testing.T) {
 	r := newCheckoutPreserveRouter(t, &checkoutPreserveServer{
@@ -234,9 +193,6 @@ func TestCheckoutConfirm_4001_UnavailableItemsSurviveTheGrpcBoundary(t *testing.
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 4091：Confirm 的 priceChanged
-// ---------------------------------------------------------------------------
 
 func TestCheckoutConfirm_4091_PriceChangedDetailSurvives(t *testing.T) {
 	r := newCheckoutPreserveRouter(t, &checkoutPreserveServer{
@@ -272,9 +228,6 @@ func TestCheckoutConfirm_4091_PriceChangedDetailSurvives(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 4092：Confirm 走 GrpcResult（非 Biz）—— 這一支的 payload 在 message 不在 data
-// ---------------------------------------------------------------------------
 
 func TestCheckoutConfirm_4092_MessageCarriesOrderNoAndStaysHTTP200(t *testing.T) {
 	r := newCheckoutPreserveRouter(t, &checkoutPreserveServer{
@@ -285,9 +238,6 @@ func TestCheckoutConfirm_4092_MessageCarriesOrderNoAndStaysHTTP200(t *testing.T)
 	})
 
 	w := postCheckout(t, r, "/api/v1/app/checkout/confirm", confirmBody())
-	// 🔴 HTTP 200，不是 409。4092 從 preserveData 名單走 return nil ⇒ 抵達 handler
-	// ⇒ response.GrpcResult 的非零分支（HTTP 200 ＋ 業務碼 ＋ 無 data）。
-	// Arm 失敗時才會落到 status.Error ⇒ GrpcErr ⇒ HTTP 409，那是降級不是設計。
 	body := assertCheckoutEnvelope(t, w, http.StatusOK, checkoutCodeAlreadyOrder)
 
 	if body["message"] != checkoutPendingOrderNoMsg {
@@ -296,31 +246,24 @@ func TestCheckoutConfirm_4092_MessageCarriesOrderNoAndStaysHTTP200(t *testing.T)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 邊界：非零碼但沒有結構化 data ⇒ 走 GrpcResult，不得被誤改寫成別的形狀
-// ---------------------------------------------------------------------------
 
 func TestCheckoutPreview_4001_WithoutItemsFallsToGrpcResultShape(t *testing.T) {
 	r := newCheckoutPreserveRouter(t, &checkoutPreserveServer{
 		preview: &orderpb.CheckoutPreviewResponse{
 			Code:    checkoutCodeUnavailable,
 			Message: "商品不可購買",
-			Data:    &orderpb.CheckoutPreviewData{}, // UnavailableItems 為空 ⇒ 不走 Biz 分支
+			Data:    &orderpb.CheckoutPreviewData{},
 		},
 	})
 
 	w := postCheckout(t, r, "/api/v1/app/checkout/preview", previewBody())
 	body := assertCheckoutEnvelope(t, w, http.StatusOK, checkoutCodeUnavailable)
 
-	// envelope.GrpcResult 的非零分支不帶 data —— 這是既有行為，carrier 不得改變它。
 	if _, exists := body["data"]; exists {
 		t.Errorf("GrpcResult 的非零分支不該帶 data（既有行為），得到 %v", body["data"])
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 成功路徑：code=0 一切照舊（carrier idle ⇒ 零行為改變）
-// ---------------------------------------------------------------------------
 
 func TestCheckoutPreview_SuccessUnchangedByCarrier(t *testing.T) {
 	r := newCheckoutPreserveRouter(t, &checkoutPreserveServer{
@@ -369,13 +312,7 @@ func TestCheckoutConfirm_SuccessUnchangedByCarrier(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 結帳不依賴安全網：swallowed / escaped 兩個計數器都必須不動
-// ---------------------------------------------------------------------------
 
-// bizcarrierCounterSum 讀 default registry 上某個 counter family 的總和。
-// 錨在計數器本身而不是「測試作者記得」：漏了守衛的出口 body 完全不變，
-// 只有計數器會動（見 bizcarrier.EscapedCounterFor 的註解）。
 func bizcarrierCounterSum(t *testing.T, name string) float64 {
 	t.Helper()
 	families, err := prometheus.DefaultGatherer.Gather()

@@ -120,8 +120,6 @@ export function useOrderList(
 		enabled: seller
 			? scope.canRead("orders", identity.activeRole !== null)
 			: undefined,
-		// Keep the previous status tab's orders on screen while the next tab
-		// loads, instead of flashing an empty list.
 		placeholderData: keepPreviousData,
 		getNextPageParam: (lastPage) => {
 			const loaded = lastPage.page * lastPage.pageSize;
@@ -202,8 +200,6 @@ export function useAllSellerOrders(
 				const pageSize = 100;
 				const all: Order[] = [];
 				let page = 1;
-				// Hard page cap so a misbehaving backend pagination contract can't
-				// spin this into an unbounded fetch loop.
 				for (let guard = 0; guard < 100; guard += 1) {
 					const res = seller
 						? await scope.repos.orders.fetchOrders({
@@ -254,14 +250,14 @@ const AFTER_SALE_KEY = "after_sale";
  *  the 退款中 todo bucket only counts cases still needing attention. The
  *  backend splits this CSV per status (AfterSalesGrpcService statusFilter). */
 const AFTER_SALE_IN_PROGRESS_CSV = [
-	AfterSaleCaseStatus.PENDING, // 0 待處理
-	AfterSaleCaseStatus.RETURN_PENDING, // 20 待退貨
-	AfterSaleCaseStatus.RETURN_SHIPPING, // 25 退貨運送中
-	AfterSaleCaseStatus.RETURN_AT_STORE, // 26 退貨已到店待取
-	AfterSaleCaseStatus.RETURN_DELIVERED, // 27 退貨已送達
-	AfterSaleCaseStatus.RETURN_FAILED, // 28 退貨物流失敗
-	AfterSaleCaseStatus.RETURN_RECEIVED, // 30 已收退貨
-	AfterSaleCaseStatus.REFUND_PROCESSING, // 40 退款處理中
+	AfterSaleCaseStatus.PENDING,
+	AfterSaleCaseStatus.RETURN_PENDING,
+	AfterSaleCaseStatus.RETURN_SHIPPING,
+	AfterSaleCaseStatus.RETURN_AT_STORE,
+	AfterSaleCaseStatus.RETURN_DELIVERED,
+	AfterSaleCaseStatus.RETURN_FAILED,
+	AfterSaleCaseStatus.RETURN_RECEIVED,
+	AfterSaleCaseStatus.REFUND_PROCESSING,
 ].join(",");
 
 /**
@@ -294,16 +290,11 @@ export function useOrderStatusCounts(
 	const authStatus = useAccountStatus();
 	const identity = useQueryIdentity();
 	const scope = useSellerDataScope();
-	// 代行沒有 `/orders/status_counts` 對應端點（§6.1.10 只有列表與明細），所以在
-	// 代行 scope 下這支恆不啟用；總覽的數字改由列表的 `total` 自繪。
 	const enabled =
 		view === "seller"
 			? scope.mode === "seller" && identity.activeRole !== null
 			: true;
 
-	// Callers pass a module-scope constant for `statusCsvList` (see
-	// `COUNT_KEYS` in OrdersClient) so the array identity stays stable
-	// across renders and this effect doesn't re-fire on every paint.
 	const query = useQuery({
 		queryKey:
 			view === "seller"
@@ -322,10 +313,7 @@ export function useOrderStatusCounts(
 			authStatus,
 			async ({ signal }: { signal?: AbortSignal }) => {
 				// One rollup call for every real OrderStatus bucket, plus (only when a
-				// caller actually asks for it) one after-sale count. The after-sale
-				// fetch soft-degrades to 0 so a flaky /app/after_sales can't blank the
 				// whole order-count panel; the rollup itself is the primary signal and
-				// its failure surfaces through query.error.
 				const needsAfterSale = statusCsvList.some((csv) =>
 					csv.split(",").some((token) => token.trim() === AFTER_SALE_KEY),
 				);
@@ -347,9 +335,6 @@ export function useOrderStatusCounts(
 					if (csv.split(",").some((token) => token.trim() === AFTER_SALE_KEY)) {
 						return [csv, afterSaleTotal] as const;
 					}
-					// `denormalizeStatus` turns semantic names AND already-numeric CSVs
-					// into a numeric-code CSV (reusing repo.ts's single name↔code
-					// table); sum every raw OrderStatus bucket this tab spans.
 					const sum = denormalizeStatus(csv)
 						.split(",")
 						.reduce(

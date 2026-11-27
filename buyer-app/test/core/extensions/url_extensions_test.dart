@@ -25,7 +25,6 @@ void main() {
     });
 
     test('未知格式（含已移除的 OSS legacy 前綴）回原值 fallback', () {
-      // OSS legacy 分支已移除（#1675 dead code）；這些輸入現在一律回原值。
       const legacy = 'avatars/merchant/abc.png';
       expect(legacy.normalizeAvatarUrl(), legacy);
       const member = 'member-avatars/x.png';

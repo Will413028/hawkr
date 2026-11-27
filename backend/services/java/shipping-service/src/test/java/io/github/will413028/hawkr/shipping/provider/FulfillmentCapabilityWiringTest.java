@@ -128,9 +128,6 @@ class FulfillmentCapabilityWiringTest {
         return e;
     }
 
-    // ==================================================================
-    // ① CreateCapability.requiresOnboarding() 取代 `!UBER_INSTANT → 必須已建店`
-    // ==================================================================
 
     /**
      * 兩個 assertion 是<b>同一個判斷點的兩面</b>，分開看都證明不了什麼：
@@ -167,12 +164,6 @@ class FulfillmentCapabilityWiringTest {
         void uberSkipsOnboardingGate() {
             orderWithMethod(ShippingMethod.UBER_INSTANT);
 
-            // 🔴 斷言改寫（2026-09-10 BLOCKER 5）。
-            //    舊版斷言「會收到 SHIPMENT_UNSUPPORTED_METHOD」，並註解「走到查無 strategy＝已越過建店閘門」。
-            //    那個訊號來自**測試自己餵的空 strategyMap**（`Collections.emptyList()`），
-            //    不是產線行為——建單改走 adapter 的 CreateCapability 之後，Uber 的 adapter
-            //    create() 是 present 的，於是它往下走進 mock 的 strategy 而拿到 null。
-            //    要驗的事情本身沒變：**Uber 不該被建店閘門擋下**，所以直接斷言那件事。
             Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(
                     () -> shippingService.createShipmentFromOrder("O1"));
 
@@ -207,9 +198,6 @@ class FulfillmentCapabilityWiringTest {
         }
     }
 
-    // ==================================================================
-    // ② DispatchCapability.requiresSellerConfirmation() 取代 `!SEVEN_ELEVEN → 硬擋`
-    // ==================================================================
 
     @Nested
     @DisplayName("② 確認出貨：這個 provider 的流程裡有沒有賣家確認這一步")
@@ -222,10 +210,6 @@ class FulfillmentCapabilityWiringTest {
             e.setLabelPrintStatus(LabelPrintStatus.NONE.value());
             when(shipmentMapper.selectOne(any())).thenReturn(e);
 
-            // 🔴 拒絕碼必須就是契約給前端的 disabledReasonCode（9527），不是 400 參數錯誤。
-            //    改動前這三支斷言的是 IllegalArgumentException ＋ 中文訊息 ——
-            //    而 GrpcErrorHandler 把它翻成 INVALID_PARAM(400)，與契約的 9527 是兩個碼、
-            //    兩條 log event，那正是 BLOCKER 3 要消滅的「兩套規則」殘留形態。
             assertThatThrownBy(() ->
                     shippingService.confirmCvsShipment(2685914682L, "O1", List.of()))
                     .isInstanceOf(ShippingBusinessException.class)
@@ -264,9 +248,6 @@ class FulfillmentCapabilityWiringTest {
         }
     }
 
-    // ==================================================================
-    // ③ TrackCapability 取代 `UBER_INSTANT 早退` ＋ `deriveLgsType`
-    // ==================================================================
 
     @Nested
     @DisplayName("③ 主動回查：有沒有回查能力，以及送出去的 LgsType")
@@ -359,9 +340,6 @@ class FulfillmentCapabilityWiringTest {
         }
     }
 
-    // ==================================================================
-    // ④ LabelCapability.usesThreeSegmentCode() 取代 `SEVEN_ELEVEN → 偵測三段碼`
-    // ==================================================================
 
     @Nested
     @DisplayName("④ B-143 三段碼缺失偵測：這個 provider 的標籤帶不帶三段碼")
@@ -369,7 +347,6 @@ class FulfillmentCapabilityWiringTest {
 
         @BeforeEach
         void webhookWritesNothing() {
-            // 讓 markLabelPrintSucceededByWebhook 回 0（冪等跳過），把測試收斂在偵測這一段
             when(shipmentMapper.markLabelPrintSucceededByWebhook(
                     any(), any(), any(), any(), anyString())).thenReturn(0);
         }
@@ -414,13 +391,7 @@ class FulfillmentCapabilityWiringTest {
         }
     }
 
-    // ==================================================================
-    // ⑤ OnboardCapability.shippingTypeValue() 取代 mapShippingMethodToType
-    // ==================================================================
 
-    // ==================================================================
-    // ⑥ 四份重複的「賣家當下意願防線」收斂成 OnboardingService.requireActiveSetting
-    // ==================================================================
 
     /**
      * 這一組不是 provider 分支，是<b>去重</b>：同樣三行守衛原本在
@@ -445,7 +416,6 @@ class FulfillmentCapabilityWiringTest {
                     .isInstanceOf(ShippingBusinessException.class)
                     .satisfies(ex -> assertThat(((ShippingBusinessException) ex).code())
                             .isEqualTo(GrpcResponseCode.SHIPMENT_SELLER_NOT_ONBOARDED.code()));
-            // 守衛在最前面：連物流單都還沒查
             verify(shipmentMapper, never()).selectOne(any());
         }
 

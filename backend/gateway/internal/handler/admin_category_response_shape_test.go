@@ -8,8 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// assertMessageNoMsg verifies an emitter has converged to the canonical envelope:
-// it carries the "message" field and no legacy "msg" field.
 func assertMessageNoMsg(t *testing.T, body map[string]interface{}) {
 	t.Helper()
 	if _, ok := body["message"]; !ok {
@@ -26,14 +24,10 @@ func assertMessageNoMsg(t *testing.T, body map[string]interface{}) {
 func TestCategoryEmitter_MessageShape(t *testing.T) {
 	r := gin.New()
 	v1 := r.Group("/api/v1")
-	// GetCategoryByID with empty id → response.BadRequest (400).
 	v1.GET("/public/categories/:id", (&Holder{}).GetCategoryByID)
-	// CreateCategory without auth → response.Err(401) with verbatim message.
 	v1.POST("/app/categories", (&Holder{}).CreateCategory)
 
 	t.Run("BadRequest message shape", func(t *testing.T) {
-		// Route param ":id" can't be empty via path, so hit the param-empty branch
-		// by registering a no-param variant inline.
 		rr := gin.New()
 		rr.GET("/c", func(c *gin.Context) { (&Holder{}).GetCategoryByID(c) })
 		req := httptest.NewRequest("GET", "/c", nil)

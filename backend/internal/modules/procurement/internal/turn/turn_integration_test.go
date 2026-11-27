@@ -57,12 +57,10 @@ func (j *jobs) CancelJob(context.Context, int64) (rivertype.JobState, bool, erro
 	return rivertype.JobStateRunning, true, nil
 }
 
-// catID 是測試用的確定性分類 ID：同一個數字永遠得到同一個 UUID，且不是零值。
 func catID(n int) uuid.UUID {
 	return uuid.MustParse(fmt.Sprintf("00000000-0000-7000-8000-%012d", n))
 }
 
-// optID 是分類 n 在卡上的選項 ID。
 func optID(n int) string { return "category-" + catID(n).String() }
 
 func parentOf(n int) *uuid.UUID {
@@ -70,7 +68,6 @@ func parentOf(n int) *uuid.UUID {
 	return &id
 }
 
-// taxonomy 是替身分類樹：小白菜只有一個、蘋果有兩個（跨大類）。
 type taxonomy struct{}
 
 func (taxonomy) CategoryTree(context.Context) ([]resolver.Node, error) {
@@ -81,7 +78,6 @@ func (taxonomy) CategoryTree(context.Context) ([]resolver.Node, error) {
 	}, nil
 }
 
-// wideTaxonomy 是替身分類樹：「梨」在兩個大類底下各有三個末層（共 6 個命中，跨大類）。
 type wideTaxonomy struct{}
 
 func (wideTaxonomy) CategoryTree(context.Context) ([]resolver.Node, error) {
@@ -94,7 +90,6 @@ func (wideTaxonomy) CategoryTree(context.Context) ([]resolver.Node, error) {
 	return nodes, nil
 }
 
-// scripted 是替身 model.LLM：依序回應，最後一個重複；onCall 在每次呼叫時執行（斷言、模擬取消）。
 type scripted struct {
 	steps  []func(ctx context.Context) (*adkmodel.LLMResponse, error)
 	calls  atomic.Int32
@@ -176,7 +171,6 @@ func llmExtractor(l adkmodel.LLM) turn.SlotExtractor {
 	return extract.New(l, "fake", extract.ShapeSchema)
 }
 
-// runWith 以 Dispatcher 執行一個 run（含失敗收斂）。
 func (f *fixture) runWith(ctx context.Context, id uuid.UUID, e turn.Executor) error {
 	f.t.Helper()
 	return run.Dispatcher{DB: f.d, Ledger: f.ledger(), Executors: map[string]run.Executor{run.RunTypeTurn: e}, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}.
@@ -239,7 +233,6 @@ func (f *fixture) noWrites(id uuid.UUID, why string) {
 	}
 }
 
-// requireStoredTurnResult 確認 run 的輪次存的 turn_result 與串流的 turn_result 事件內容相同（A9-D33(2)：任何來源的 commit 都寫它）。
 func (f *fixture) requireStoredTurnResult(runID uuid.UUID) {
 	f.t.Helper()
 	var stored, event string
@@ -259,12 +252,12 @@ func (f *fixture) requireStoredTurnResult(runID uuid.UUID) {
 
 const ok = `{"item":"小白菜","unit":"KG","delivery_city":"臺北市","quantity":20}`
 
-func TestSuccessWritesRevisionTurnEventsAndKeepsUsageConsumed(t *testing.T) { // I1
+func TestSuccessWritesRevisionTurnEventsAndKeepsUsageConsumed(t *testing.T) {
 	ctx := context.Background()
 	f := newFixture(t)
 	id := f.submit("我要20公斤小白菜送臺北", uitext.ZhTW)
 	var inTx atomic.Bool
-	l := &scripted{steps: []func(context.Context) (*adkmodel.LLMResponse, error){say(ok)}, onCall: func(ctx context.Context) { // I10
+	l := &scripted{steps: []func(context.Context) (*adkmodel.LLMResponse, error){say(ok)}, onCall: func(ctx context.Context) {
 		if _, has := db.TxFrom(ctx); has {
 			inTx.Store(true)
 		}
@@ -287,7 +280,7 @@ func TestSuccessWritesRevisionTurnEventsAndKeepsUsageConsumed(t *testing.T) { //
 		t.Fatalf("revisions = %+v %v", revs, err)
 	}
 	rev := revs[0]
-	if rev.ItemResolutionKind == nil || *rev.ItemResolutionKind != "CATEGORY_CONFIRMED" || rev.ItemResolutionCategoryID == nil || *rev.ItemResolutionCategoryID != catID(18) { // item_resolution_category_id 寫入
+	if rev.ItemResolutionKind == nil || *rev.ItemResolutionKind != "CATEGORY_CONFIRMED" || rev.ItemResolutionCategoryID == nil || *rev.ItemResolutionCategoryID != catID(18) {
 		t.Errorf("resolution = %v %v %v", rev.ItemResolutionKind, rev.ItemResolutionLabel, rev.ItemResolutionCategoryID)
 	}
 	turns, _ := store.New(f.d.Conn(ctx)).ListTurnsByRequest(ctx, store.ListTurnsByRequestParams{RequestID: f.request, BuyerID: buyer})
@@ -311,7 +304,7 @@ func TestSuccessWritesRevisionTurnEventsAndKeepsUsageConsumed(t *testing.T) { //
 	f.requireStoredTurnResult(id)
 }
 
-func TestSecondTurnSupersedesCarriesProgressAndChainsRevisions(t *testing.T) { // I1 後半、A9-D25(1)
+func TestSecondTurnSupersedesCarriesProgressAndChainsRevisions(t *testing.T) {
 	ctx := context.Background()
 	f := newFixture(t)
 	first := f.submit("a", uitext.ZhTW)
@@ -338,7 +331,7 @@ func TestSecondTurnSupersedesCarriesProgressAndChainsRevisions(t *testing.T) { /
 	}
 }
 
-func TestAmbiguousItemInterruptsWithMatchingInterruptID(t *testing.T) { // I2
+func TestAmbiguousItemInterruptsWithMatchingInterruptID(t *testing.T) {
 	ctx := context.Background()
 	f := newFixture(t)
 	id := f.submit("蘋果", uitext.ZhTW)
@@ -378,7 +371,7 @@ func TestAmbiguousItemInterruptsWithMatchingInterruptID(t *testing.T) { // I2
 	_ = next
 }
 
-func TestManyMatchesAcrossGroupsInterruptWithAGroupCard(t *testing.T) { // A9-D28(1)
+func TestManyMatchesAcrossGroupsInterruptWithAGroupCard(t *testing.T) {
 	ctx := context.Background()
 	f := newFixture(t)
 	id := f.submit("梨", uitext.ZhTW)
@@ -405,7 +398,7 @@ func TestManyMatchesAcrossGroupsInterruptWithAGroupCard(t *testing.T) { // A9-D2
 	}
 }
 
-func TestCancelWhileTheModelIsRunningEndsCancelledWithoutWritesOrRefund(t *testing.T) { // I3
+func TestCancelWhileTheModelIsRunningEndsCancelledWithoutWritesOrRefund(t *testing.T) {
 	ctx, stop := context.WithCancel(context.Background())
 	defer stop()
 	f := newFixture(t)
@@ -415,7 +408,7 @@ func TestCancelWhileTheModelIsRunningEndsCancelledWithoutWritesOrRefund(t *testi
 		if _, err := c.Cancel(context.Background(), buyer, id); err != nil {
 			return nil, err
 		}
-		stop() // River 取消 job 會取消它的 ctx
+		stop()
 		<-ctx.Done()
 		return nil, ctx.Err()
 	}}}
@@ -444,7 +437,7 @@ func (e cancelRacingExtractor) Extract(context.Context, string, slots.Set) (slot
 	return slots.Patch{Item: &item}, nil
 }
 
-func TestCancelLandingBeforeTheCommitRollsEverythingBack(t *testing.T) { // I4
+func TestCancelLandingBeforeTheCommitRollsEverythingBack(t *testing.T) {
 	f := newFixture(t)
 	id := f.submit("x", uitext.ZhTW)
 	if err := f.runWith(context.Background(), id, f.executor(cancelRacingExtractor{f: f, id: id})); err != nil {
@@ -459,7 +452,7 @@ func TestCancelLandingBeforeTheCommitRollsEverythingBack(t *testing.T) { // I4
 	}
 }
 
-func TestModelFailureFailsWithPipelineErrorAndRefundsOnce(t *testing.T) { // I5
+func TestModelFailureFailsWithPipelineErrorAndRefundsOnce(t *testing.T) {
 	for name, c := range map[string]struct {
 		llm  *scripted
 		want string
@@ -489,7 +482,7 @@ func TestModelFailureFailsWithPipelineErrorAndRefundsOnce(t *testing.T) { // I5
 	}
 }
 
-func TestDisabledModelFailsWithPipelineErrorAndRefunds(t *testing.T) { // I6
+func TestDisabledModelFailsWithPipelineErrorAndRefunds(t *testing.T) {
 	f := newFixture(t)
 	id := f.submit("x", uitext.ZhTW)
 	disabled := llm.New(llm.Procurement, llm.Config{}, slog.New(slog.NewTextHandler(io.Discard, nil)))
@@ -502,7 +495,7 @@ func TestDisabledModelFailsWithPipelineErrorAndRefunds(t *testing.T) { // I6
 	}
 }
 
-func TestJobContextCancelledByShutdownIsWorkerLostAndRefunds(t *testing.T) { // I7
+func TestJobContextCancelledByShutdownIsWorkerLostAndRefunds(t *testing.T) {
 	ctx, stop := context.WithCancel(context.Background())
 	f := newFixture(t)
 	id := f.submit("x", uitext.ZhTW)
@@ -521,7 +514,7 @@ func TestJobContextCancelledByShutdownIsWorkerLostAndRefunds(t *testing.T) { // 
 }
 
 // 中斷寫入失敗（這裡讓同需求已有 PENDING 中斷，唯一索引擋下）要讓 run 失敗退額度，不得退回成功。
-func TestInterruptWriteFailureFailsTheRunInsteadOfSucceeding(t *testing.T) { // I8
+func TestInterruptWriteFailureFailsTheRunInsteadOfSucceeding(t *testing.T) {
 	ctx := context.Background()
 	f := newFixture(t)
 	other := uuid.NewV7()
@@ -540,7 +533,6 @@ func TestInterruptWriteFailureFailsTheRunInsteadOfSucceeding(t *testing.T) { // 
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 送出時等待中的舊 run 被取代取消，所以再造一筆 PENDING 中斷擋唯一索引。
 	if _, err := f.d.Pool().Exec(ctx, `UPDATE procurement.agent_run_interrupts SET status = 'PENDING', closed_at = NULL WHERE run_id = $1`, other); err != nil {
 		t.Fatal(err)
 	}
@@ -555,12 +547,11 @@ func TestInterruptWriteFailureFailsTheRunInsteadOfSucceeding(t *testing.T) { // 
 	f.noWrites(id, "中斷失敗要整筆回滾")
 }
 
-func TestExistingTurnForTheSameClientRequestFailsTheRun(t *testing.T) { // I9
+func TestExistingTurnForTheSameClientRequestFailsTheRun(t *testing.T) {
 	ctx := context.Background()
 	f := newFixture(t)
 	id := f.submit("x", uitext.ZhTW)
 	r := f.run(id)
-	// 先造一個同 (buyer, client_request_id) 的輪次：需要一個版本當結果。
 	rev := uuid.NewV7()
 	if _, err := f.d.Pool().Exec(ctx, `INSERT INTO procurement.request_revisions (id, request_id, revision_no, status, item, created_at) VALUES ($1, $2, 1, 'SUPERSEDED', '舊', $3)`, rev, f.request, now); err != nil {
 		t.Fatal(err)

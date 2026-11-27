@@ -57,55 +57,6 @@ import "@/styles/pages/DelegatedOperations.css";
 import "@/styles/pages/Invoice.css";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 
-// A11｜手動開立發票（58A §A11，端點 57 `POST /api/v1/admin/invoices/issuances`）。
-//
-// ## 這一頁的東西全部是不可逆的
-//
-// 送出即產生一張真實的稅務憑證，之後只能作廢或折讓。頁頂的紅框警示是常駐的，
-// 送出前一定要經過確認框（明文 checkbox），而理由是必填且會寫進發票稽核紀錄。
-//
-// ## `Idempotency-Key` 走 header，所以不能用 `api.post`
-//
-// gateway 的 `middleware.RequireIdempotencyKey` 掛在整個 `/admin/invoices` 群組上，
-// POST 少了這個 header 一律 400。而 `services/api.ts` 的 `api.post` 不接受自訂
-// header ⇒ 本頁直接用它底下的 `request()`（同一支實作、同一套 envelope 處理）。
-// BFF 的轉送白名單已經含 `idempotency-key`
-// （`features/delegated-operations/server/bff-boundary.ts` 的
-// `GENERIC_BFF_FORWARDED_HEADERS`），不需要另外開洞。
-//
-// ## `ORDER_SNAPSHOT` 本波不可選
-//
-// 矩陣第一列（賣家 → 買家 → 訂單快照）在契約上合法，但 invoice-service 的
-// `AdminIssuance.Create` 對它回 `ErrIssuanceOrderSnapshotUnavailable`
-// （`internal/usecase/admin_issuance.go`）⇒ `codes.Unimplemented` ⇒ Gateway 5xx。
-// 原因寫在那個 error 的註解：ORD 的訂單快照回應不帶 `store_id` / `buyer_id`，
-// 本服務無法驗「訂單的賣家 ＝ issuer.storeId」，也拿不到 I-47 要求的 `buyer_id`；
-// 拿 ADM 手填的 buyerId 頂替是明令禁止的（那會讓本頁變成 IDOR 入口）。
-// ⇒ 這個來源與只能搭配它的「受票人＝買家」都渲染成不可選並附原因，另加一則
-// `UnavailableOperationsNotice`。**不是靜默省略**：從 A05／A06 帶 `?order_no=`
-// 進來的人必須看得到「為什麼這裡沒有訂單快照」。
-//
-// ## 載具本波不可選
-//
-// `carrierType` / `carrierValue` 在 proto、Gateway DTO 與 usecase 的
-// `ManualIssuanceRecipient` 都存在，**但 `AdminIssuance.buildDocument` 一個 `Carrier*`
-// 欄位都沒有設**（實查 `internal/usecase/admin_issuance.go`：`Carrier` 在該檔只出現在
-// struct 宣告的兩行，`domain.NewDocument` 的 `CarrierType` / `CarrierId1Ciphertext` /
-// `CarrierValueHash` 全部沒被填）⇒ 送過去的載具**會被靜默丟掉**，開出來的是一張無載具
-// 的發票。
-//
-// ⇒ 這一波把載具欄位渲染成不可選並附原因，而不是收一個沒有人會用的值。
-// 收了才是最糟的：`carrierValue` 是 P 類個資，而它換不到任何東西——58A §2.0 記過同一個
-// 形狀（「強制收集一個永遠不會被顯示的欄位」）。
-//
-// ⚠️ 附帶查證：gateway access log 的遮罩是 **allowlist**（`middleware/logger.go` 的
-// `allowedKeys`，「Anything not here defaults to redacted」）⇒ `carrierValue` 本來就會被
-// 遮，本節的理由是「值被丟掉」不是「值會外洩」。
-//
-// ## 前端不算稅
-//
-// 金額卡只回顯輸入值的合計。表頭三欄與稅額一律由後端依 58 §5A.6 計算（含尾差的
-// 最大餘數處理）——前端算一份就是第二個真相，而發票金額算錯是不可回收的。
 
 const ISSUANCES_ENDPOINT = "/api/v1/admin/invoices/issuances";
 
@@ -124,9 +75,6 @@ function newLine(): LineDraft {
 		name: "",
 		quantity: "1",
 		unitPrice: "",
-		// 預設稅別取碼表的第一個 **Code**（`TAXABLE`）。不寫死字面值也不用
-		// `InvoiceTaxCategory.TAXABLE`——後者給的是 Value（`"1"`），而端點 57 收的是
-		// Code（`admin_issuance.go` 的 `InvoiceTaxCategoryFromCode`），送錯整張表單被拒。
 		taxCategory: TAX_CATEGORY_OPTIONS[0][0],
 	};
 }
@@ -239,9 +187,6 @@ export default function ManualIssuancePage() {
 	const [notice, setNotice] = useState<GovernanceNotice | null>(null);
 	const [result, setResult] = useState<ManualIssuanceResultData | null>(null);
 
-	// 冪等鍵在整頁生命週期內固定，只有 9350（同鍵不同內容）才換一把。
-	// 失敗重送一律沿用同一把：它落進稽核列的 request_id，換掉等於把同一個操作
-	// 在稽核上斷成兩截。
 	const [idempotencyKey, setIdempotencyKey] = useState(
 		createInvoiceIdempotencyKey,
 	);
@@ -269,8 +214,6 @@ export default function ManualIssuancePage() {
 	const mixedTax = hasMixedTaxCategories(draft);
 	const isManualLines = sourceKind === SOURCE_KIND_MANUAL_LINES;
 
-	// 矩陣是後端契約，前端只是提早給回饋。最後一列（訂單賣家 ≠ issuer.storeId）
-	// 前端判斷不了 ⇒ 9346 仍必須處理。
 	const recipientOptions = Object.values(InvoiceRecipientType).map((kind) => {
 		const rows = ALLOWED_COMBOS.filter(
 			(c) => c.issuer === issuerKind && c.recipient === kind,
@@ -381,9 +324,6 @@ export default function ManualIssuancePage() {
 		},
 		onError: (caught) => {
 			if (!(caught instanceof ApiClientError)) return;
-			// 9347（HTTP 200，preserveData）：同一份內容已經開過了 ⇒ 導向那一份，
-			// **不是顯示錯誤**。漏了這一條的症狀是「送出後看到一則像錯誤的訊息，但
-			// 發票其實已經開好了」，而管理員很可能因此再送一次。
 			if (caught.code === 9347) {
 				const documentId = (caught.data as ManualIssuanceResultData | undefined)
 					?.documentId;
@@ -395,8 +335,6 @@ export default function ManualIssuancePage() {
 					return;
 				}
 			}
-			// 9350：同一把鍵配到不同內容 ⇒ 內容真的改了，換一把新的重來。
-			// （這是本頁唯一該換鍵的情況；其餘失敗一律沿用同一把。）
 			if (caught.code === 9350) {
 				setIdempotencyKey(createInvoiceIdempotencyKey());
 			}
@@ -447,11 +385,7 @@ export default function ManualIssuancePage() {
 								</div>
 							</div>
 							<div>
-								{/*
-								 * `status` 在 code === 0 時是 **operation** 狀態（READY），
-								 * 9347 時才是 document 狀態——而 9347 已經導頁走了，
-								 * 所以這裡查的一定是 operation 表。
-								 */}
+
 								<div className="invoice-field__label">開立工作狀態</div>
 								<div className="invoice-field__value">
 									<StatusBadge
@@ -586,10 +520,7 @@ export default function ManualIssuancePage() {
 					onChange={changeRecipient}
 					options={recipientOptions}
 				/>
-				{/*
-				 * 切換受票人種類時整組欄位會換掉 ⇒ 用 aria-live 容器包住，
-				 * 否則螢幕閱讀器使用者不會知道畫面上多了或少了哪些欄位。
-				 */}
+
 				<div aria-live="polite">
 					{recipientKind === InvoiceRecipientType.BUYER ? (
 						<div className="form-group">
@@ -673,11 +604,7 @@ export default function ManualIssuancePage() {
 							}
 						/>
 					</div>
-					{/*
-					 * 載具本波不可選：後端 `buildDocument` 不寫任何 `Carrier*` 欄位，
-					 * 送過去會被靜默丟掉（理由見檔頭）。選項照畫出來但整組 disabled，
-					 * 這樣「為什麼不能設載具」有答案，而不是一個看起來能用、實際無效的欄位。
-					 */}
+
 					<div className="form-group">
 						<label className="form-label" htmlFor="carrier-type">
 							載具
@@ -769,11 +696,7 @@ export default function ManualIssuancePage() {
 															}
 														/>
 													</td>
-													{/*
-													 * `type="text" inputMode="numeric"` 不是 `type="number"`：
-													 * 金額與數量一律以字串過線，`type="number"` 會在輸入當下
-													 * 就把值轉成 number 而失去精度與前導字元。
-													 */}
+
 													<td>
 														<input
 															className="form-control"
@@ -830,12 +753,7 @@ export default function ManualIssuancePage() {
 														{net === null ? "—" : formatAmount(String(net))}
 													</td>
 													<td>
-														{/*
-														 * 原生 <button> 不是共用的 `Button`：這一顆需要
-														 * `aria-label`（同一頁有 N 顆「刪除」，沒有序號的話
-														 * 螢幕閱讀器讀到的是 N 個一模一樣的鍵），而 `Button`
-														 * 的 props 不轉發 aria-*。
-														 */}
+
 														<button
 															type="button"
 															className="invoice-line-delete"
@@ -907,8 +825,6 @@ export default function ManualIssuancePage() {
 					收據只適用於已核准「免用統一發票」的賣家；三聯式必須填受票人統一編號。
 				</p>
 				{mixedTax ? (
-					// 不擋送出：後端會 fail-closed 成 AWAITING_MANUAL（理由碼
-					// B2B_MIXED_TAX_UNVERIFIED）。前端擋掉等於做了一個後端沒有承諾的規則。
 					<div className="invoice-page-notice" role="status">
 						<MaterialSymbol name="error" />
 						<div>
@@ -920,10 +836,7 @@ export default function ManualIssuancePage() {
 
 			{isManualLines ? (
 				<Card title="金額">
-					{/*
-					 * 這裡刻意沒有「稅額」與「未稅金額」欄位：表頭三欄與稅額的拆分一律由
-					 * 後端依 58 §5A.6 算（含尾差的最大餘數處理），前端算一份就是第二個真相。
-					 */}
+
 					<dl className="invoice-amount-summary" aria-live="polite">
 						<div>
 							<dt>品項小計</dt>

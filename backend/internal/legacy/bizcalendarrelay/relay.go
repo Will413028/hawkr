@@ -22,14 +22,11 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 )
 
-// 推送給 invoice-service 的窗口：今天往前 30 天到往後 400 天（台北日）。窗口常數只由這裡擁有：invoice-service 只儲存收到的涵蓋區間，
-// 窗口不在它那邊。
 const (
 	pastDays   = 30
 	futureDays = 400
 )
 
-// reconcileInterval 是對帳推送的間隔；monitoring 的警報（business-alerts.yml）假設每天推送一次。
 const reconcileInterval = 24 * time.Hour
 
 // Client 是推送的對象（internal/legacy/invoiceservice）。from、to 是涵蓋區間（含兩端的台北日曆日），holidays 是區間內的放假日；
@@ -43,10 +40,8 @@ type Loader interface {
 	Load(ctx context.Context) (*bizcalendar.Calendar, error)
 }
 
-// pushRounds 是一次 Push 內「推送後重讀並比對」最多重推的次數。
 const pushRounds = 3
 
-// pushMaxAttempts 讓失敗的 job 在一天內放棄（River 預設的退避是第 n 次失敗後等 n^4 秒，10 次的累計約 4.3 小時），之後由每天的對帳 job 重新排入。
 const pushMaxAttempts = 10
 
 // PushArgs 是一次推送。沒有參數：推送的內容永遠是執行當下的行事曆；不設唯一鍵，匯入隨時可以排入新的推送，由 Push 收斂。
@@ -117,7 +112,6 @@ func (w *Worker) AddWorkers(workers *river.Workers) {
 	river.AddWorker(workers, &pushWorker{w: w})
 }
 
-// periodicID 是對帳 job 的週期 ID。
 const periodicID = "legacy.bizcalendar_push"
 
 func periodicSchedule() river.PeriodicSchedule { return river.PeriodicInterval(reconcileInterval) }
@@ -133,7 +127,6 @@ func PeriodicJobs() []*river.PeriodicJob {
 	return []*river.PeriodicJob{river.NewPeriodicJob(periodicSchedule(), periodicArgs, periodicOpts())}
 }
 
-// payload 是一次推送的內容。
 type payload struct {
 	from, to time.Time
 	holidays []time.Time

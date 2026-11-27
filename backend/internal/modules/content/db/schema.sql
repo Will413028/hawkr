@@ -1,20 +1,14 @@
--- content 模組的 desired state（Atlas）。改完在本目錄執行 `atlas migrate diff <名稱> --env dev`
--- 產生 migration，再在 backend/ 跑 `make sqlc`；兩者都讀這個檔。
---
--- public 不屬於本模組：寫在這裡只是讓 Atlas 知道它存在，否則 Atlas 會產生 DROP SCHEMA public。
 
 CREATE SCHEMA IF NOT EXISTS public;
 
 CREATE SCHEMA content;
 
--- 首頁 banner。id 是 UUIDv7，由應用層產生、不設 DEFAULT：寫入前就產生（ADR 2026-09-25-row-identity-by-data-kind）。
 CREATE TABLE content.banners (
     id                UUID         PRIMARY KEY,
     title             TEXT         NOT NULL,
     button_text       TEXT         NOT NULL DEFAULT '',
     preview_image_key TEXT         NOT NULL,
     popup_image_key   TEXT         NOT NULL,
-    -- 兩張圖的 media asset ID（UUID v7）：與 key 成對，圖片必填所以不可為 NULL；寫入在同一個 transaction 內 Confirm 新資產、MarkDeleted 被換掉的資產。
     preview_image_asset_id UUID         NOT NULL,
     popup_image_asset_id   UUID         NOT NULL,
     canvas_json       TEXT         NOT NULL DEFAULT '',
@@ -27,10 +21,7 @@ CREATE TABLE content.banners (
     version           BIGINT       NOT NULL DEFAULT 1,
     created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    -- 排程是 [開始, 結束)：結束必須晚於開始（模組的 BannerInput.validate 是第一道）。
     CONSTRAINT banners_schedule_check CHECK (start_date IS NULL OR end_date IS NULL OR start_date < end_date),
-    -- 點擊行為一定完整（模組的 BannerAction.validate 是第一道）：POPUP 不帶值；URL 是 http(s) 網址；
-    -- PRODUCT 與 POST 帶小寫的標準 UUID（儲存的是標準形式，模組寫入時已正規化，這裡讓直接寫入的列也守住）。
     CONSTRAINT banners_action_check CHECK (
         (action_type = 'POPUP' AND action_target = '')
         OR (action_type = 'URL' AND action_target ~ '^https?://')
@@ -43,9 +34,7 @@ COMMENT ON COLUMN content.banners.version IS '樂觀鎖的版本，對外是 eta
 COMMENT ON COLUMN content.banners.action_type IS '點擊行為（設計書 25）：POPUP、URL、PRODUCT、POST；沒有預設值';
 COMMENT ON COLUMN content.banners.action_target IS '點擊行為的值：URL 的網址、PRODUCT 與 POST 的 ID；POPUP 是空字串';
 
--- banner 由後台維護、筆數少，全表掃描加排序就夠快，所以除了主鍵不建索引：索引要等 EXPLAIN 證明需要才加。
 
--- App 版本門檻：每種 App 一組（App 只發 iOS，沒有平台維度），以 app_type 為主鍵，不對外暴露 id。
 CREATE TABLE content.app_version_gates (
     app_type        TEXT         NOT NULL,
     minimum_version TEXT         NOT NULL,

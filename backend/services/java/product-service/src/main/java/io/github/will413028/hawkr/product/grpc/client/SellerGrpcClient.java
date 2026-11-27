@@ -76,8 +76,6 @@ public class SellerGrpcClient {
     public HolderMatch matchCertificateHolder(long storeId, String holderName) {
         try {
             var stub = grpcStubFactory.blocking(SELLER_TARGET, SellerServiceGrpc::newBlockingStub)
-                    // ⚠️ deadline 必須加在**呼叫點**：withDeadlineAfter 以「呼叫當下」換算絕對時間，
-                    //    寫在建構子會從服務啟動起算 ⇒ 啟動幾秒後全部 DEADLINE_EXCEEDED。
                     .withDeadlineAfter(HOLDER_MATCH_DEADLINE_SEC, TimeUnit.SECONDS);
             MatchCertificateHolderResponse response = stub.matchCertificateHolder(
                     MatchCertificateHolderRequest.newBuilder()
@@ -133,7 +131,6 @@ public class SellerGrpcClient {
             BatchGetSellerMetaResponse response = stub
                     .withDeadlineAfter(INTERNAL_READ_DEADLINE_SEC, TimeUnit.SECONDS)
                     .batchGetSellerMeta(request);
-            // 失敗時 seller-service 會拋 StatusRuntimeException，由下方 catch 降級為空 Map
             return response.getSellersMap();
         } catch (Exception e) {
             log.error("SellerGrpcClient.batchGetSellerMetas.fail",
@@ -159,7 +156,6 @@ public class SellerGrpcClient {
         var request = BatchGetSellerMetaRequest.newBuilder()
                 .addAllStoreIds(List.of(storeId))
                 .build();
-        // 失敗時 seller-service 會拋 StatusRuntimeException，不 catch，交由呼叫端 fail-closed 處理
         BatchGetSellerMetaResponse response = stub
                 .withDeadlineAfter(INTERNAL_READ_DEADLINE_SEC, TimeUnit.SECONDS)
                 .batchGetSellerMeta(request);
@@ -186,10 +182,8 @@ public class SellerGrpcClient {
             BatchGetSellerMetaResponse response = stub
                     .withDeadlineAfter(INTERNAL_READ_DEADLINE_SEC, TimeUnit.SECONDS)
                     .batchGetSellerMeta(request);
-            // 失敗時 seller-service 會拋 StatusRuntimeException，由下方 catch 降級為 null
             return response.getSellersMap().get(storeId);
         } catch (Exception e) {
-            // 降級：Seller Service 失敗不阻斷運費計算，預設為本島
             log.error("SellerGrpcClient.getSellerMeta.fail",
                     "Seller Service 呼叫失敗: " + e.getClass().getName() + ": " + e.getMessage(),
                     e);

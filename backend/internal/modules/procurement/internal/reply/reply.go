@@ -119,7 +119,6 @@ func TextFallback(blocks []Block) string {
 	return strings.Join(texts, " ")
 }
 
-// nextStep 是更正之後仍待處理的下一步：品項消歧的問題、必填缺項、選填問題，依序取第一個有的。
 func nextStep(l uitext.Locale, p planner.Plan, a Args) string {
 	switch {
 	case isItemDisambiguation(p):
@@ -132,7 +131,6 @@ func nextStep(l uitext.Locale, p planner.Plan, a Args) string {
 	return ""
 }
 
-// isItemDisambiguation 是這一輪停在品項消歧（執行器已中斷，文字要接上這個問題）。
 func isItemDisambiguation(p planner.Plan) bool {
 	return p.Question != nil && p.Question.Slot == slots.ItemDisambiguation
 }

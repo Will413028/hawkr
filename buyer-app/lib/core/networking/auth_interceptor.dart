@@ -65,18 +65,12 @@ class AuthInterceptor extends Interceptor {
         await _ref.read(accountRestrictionProvider.notifier).rejected();
       }
     } catch (_) {
-      // 判斷與狀態更新的失敗不能吞掉原本的請求錯誤。
     } finally {
       handler.next(err);
     }
   }
 
   void _triggerForceLogout() {
-    // Apple App Review 合規：純訪客（從未登入、無 session）不該被「登入已過期」
-    // 強制登出攔截。force-logout 只對「原本有 session、session 已失效」有意義；
-    // 訪客頁面背景請求（orders / after_sales / member-cards 等）打到 authed
-    // endpoint 回 401 時，若仍 trigger 會彈「登入已過期」並讓 ForceLogoutListener
-    // 用無 Navigator 的 context 導頁而拋例外。
     final session = _ref.read(sessionProvider).value;
     if (session == null) return;
     _ref.read(forceLogoutProvider.notifier).trigger();

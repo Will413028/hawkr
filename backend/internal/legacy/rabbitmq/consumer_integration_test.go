@@ -20,7 +20,6 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-// startBroker 回傳 broker 網址：有設 HAWKR_TEST_AMQP_URL 就用既有的 broker，否則起一個容器。
 func startBroker(t *testing.T) string {
 	t.Helper()
 	if url := os.Getenv("HAWKR_TEST_AMQP_URL"); url != "" {
@@ -50,7 +49,6 @@ func startBroker(t *testing.T) string {
 	return fmt.Sprintf("amqp://guest:guest@%s:%s/", host, port.Port())
 }
 
-// waitFor 每 20ms 檢查一次 cond，最多等 10 秒。
 func waitFor(t *testing.T, what string, cond func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(10 * time.Second)
@@ -62,7 +60,6 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 	}
 }
 
-// recorder 記錄一個 queue 的 handler：成功處理過的訊息（以 body 區分，重送只算一次）、失敗次數與正在執行的數量。
 type recorder struct {
 	mu       sync.Mutex
 	handled  map[string]bool
@@ -106,7 +103,7 @@ func TestRunDrainsInFlightAndReturnsAfterCancel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = admin.Close() }) // 先註冊、最後執行：各輪的清除要用這條連線
+	t.Cleanup(func() { _ = admin.Close() })
 	adminCh, err := admin.Channel()
 	if err != nil {
 		t.Fatal(err)
@@ -146,7 +143,6 @@ func TestRunDrainsInFlightAndReturnsAfterCancel(t *testing.T) {
 			for _, q := range queues {
 				info, err := adminCh.QueueDeclarePassive(q, true, false, false, false, nil)
 				if err != nil {
-					// passive declare 找不到 queue 會關掉 channel，重開再試。
 					if adminCh, err = admin.Channel(); err != nil {
 						t.Fatal(err)
 					}
@@ -172,7 +168,7 @@ func TestRunDrainsInFlightAndReturnsAfterCancel(t *testing.T) {
 		cancel()
 		select {
 		case <-done:
-		case <-time.After(3 * time.Second): // 低於 closeTimeout，關閉卡住才會被抓到，不會被逾時上限遮住
+		case <-time.After(3 * time.Second):
 			t.Fatalf("第 %d 次：ctx 取消後 Run 超過 3 秒沒有返回", i)
 		}
 		for qi, r := range recorders {
@@ -186,7 +182,6 @@ func TestRunDrainsInFlightAndReturnsAfterCancel(t *testing.T) {
 			if handled == messages {
 				t.Fatalf("第 %d 次：%s 取消前已處理完全部訊息，沒有打到處理中取消的情況", i, queues[qi])
 			}
-			// 未 ack 的預取訊息在連線關閉後才由 broker 放回 queue，輪詢等它到齊。
 			waitFor(t, queues[qi]+" 的訊息守恆（已處理＋留在 queue＝送出）", func() bool {
 				info, err := adminCh.QueueDeclarePassive(queues[qi], true, false, false, false, nil)
 				return err == nil && handled+info.Messages == messages
@@ -273,7 +268,6 @@ func TestRunOnceCancelsHandlerAfterDrain(t *testing.T) {
 	cancel()
 	select {
 	case at := <-cancelledAt:
-		// 下限：關機不能直接取消 handler；上限：是 drain 計時取消的，不是等消費者逾時後的收尾取消。
 		if d := at.Sub(shutdownAt); d < drain || d >= drain+ackMargin-100*time.Millisecond {
 			t.Fatalf("handler 在關機後 %v 被取消，要在 [%v, %v) 內", d, drain, drain+ackMargin-100*time.Millisecond)
 		}

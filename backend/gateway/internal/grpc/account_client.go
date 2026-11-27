@@ -15,19 +15,15 @@ import (
 type AccountClient struct {
 	conn   *grpc.ClientConn
 	client pb.AccountServiceClient
-	// delegation shares the same connection: DelegationService is served by
-	// account-service, so a second dial would only add a second failure mode.
 	delegation pb.DelegationServiceClient
 }
 
 // NewAccountClient creates a new account gRPC client
 func NewAccountClient() (*AccountClient, error) {
-	// Default port for account-service
 	host := getEnvOrDefault("ACCOUNT_SERVICE_HOST", "127.0.0.1")
 	port := getEnvOrDefault("ACCOUNT_SERVICE_GRPC_PORT", "9941")
 	target := fmt.Sprintf("%s:%s", host, port)
 
-	// Use a shorter timeout to avoid blocking too long during request
 	conn, err := grpcclient.Dial(target, DefaultDialOpts()...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to account service at %s: %w", target, err)
@@ -74,9 +70,6 @@ func (c *AccountClient) GetCurrentDelegationSession(ctx context.Context, credent
 	})
 }
 
-// withDelegationDeadline applies a per-hop deadline. deadlineMs <= 0 leaves the
-// caller's deadline untouched — test holders carry no config, and a zero there must
-// not turn into an already-expired context.
 func withDelegationDeadline(ctx context.Context, deadlineMs int) (context.Context, context.CancelFunc) {
 	if deadlineMs <= 0 {
 		return ctx, func() {}

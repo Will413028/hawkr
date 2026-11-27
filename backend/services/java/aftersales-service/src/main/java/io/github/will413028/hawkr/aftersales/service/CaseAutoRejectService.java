@@ -107,7 +107,6 @@ public class CaseAutoRejectService {
                 Map.of("rejectReason", AfterSaleRejectReason.SELLER_NO_RESPONSE.value(),
                         "trigger", "PROCESS_TIMEOUT"));
 
-        // issue #2294 B2：publish 收進本 tx，失敗即 rollback（原本在 worker、tx 之外 best-effort）
         boolean published = eventPublisher.tryPublishCaseAutoRejected(
                 caseNo, orderNo, buyerId, storeId, hours, principals);
         if (!published) {

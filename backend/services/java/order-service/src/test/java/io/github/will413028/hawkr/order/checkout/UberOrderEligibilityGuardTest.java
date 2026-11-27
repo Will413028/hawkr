@@ -107,7 +107,6 @@ class UberOrderEligibilityGuardTest {
         return new UberOrderEligibilityGuard(FixedAssessor.answering(answer));
     }
 
-    // ===== 🔴 陽性：shipping 說可用 ⇒ 放行 =====
 
     @Test
     @DisplayName("🔴 陽性：報價可用 ⇒ applicable=true、allowed=true、六項全 PASSED、不拋")
@@ -125,13 +124,12 @@ class UberOrderEligibilityGuardTest {
                 .hasSize(Check.values().length)
                 .allSatisfy(o -> assertThat(o.status()).isEqualTo(Status.PASSED));
 
-        // 報價本體要帶回呼叫端——結帳頁要的是 quote_id 與運費，不是一個布林
         assertThat(decision.assessment().quoteId()).isEqualTo("dqt_abc123");
         assertThat(decision.assessment().feeAmount()).isEqualTo("115");
         assertThat(decision.assessment().currency()).isEqualTo("TWD");
         assertThat(decision.assessment().expiresAt()).isEqualTo("2026-09-12T08:30:00Z");
 
-        guard.requireEligible(Context.of(UBER, probe())); // 不拋即通過
+        guard.requireEligible(Context.of(UBER, probe()));
     }
 
     @Test
@@ -145,12 +143,9 @@ class UberOrderEligibilityGuardTest {
         assertThat(assessor.calls).isEqualTo(1);
     }
 
-    // ===== 🔴 陰性一：報價不可用／過期 ⇒ 拒絕，且理由指向正確的那一項 =====
 
     @ParameterizedTest(name = "reason={0} ⇒ 只有 {1} 是 blocking")
     @CsvSource({
-            // 理由碼硬寫字面值：它們是跨服務 wire 契約，抄自 shipping 原始碼，
-            // 不從被測物的 ProviderReason 常數取（那會跟著被測物一起變）。
             "UBER_DISABLED,              PROVIDER_DISABLED",
             "UBER_METHOD_NOT_ENABLED,    PROVIDER_DISABLED",
             "UBER_STORE_NOT_MAPPED,      SELLER_NOT_ENABLED",
@@ -177,8 +172,6 @@ class UberOrderEligibilityGuardTest {
         assertThat(decision.providerReason()).isEqualTo(reason);
         assertThat(decision.denyReason()).contains(reason);
 
-        // 其餘五項必須是 PASSED——全部拒絕也會讓 blockingChecks 含正確那一項，
-        // 所以上面那一句對「一律全拒」零鑑別力，要靠這一句。
         assertThat(decision.outcomes())
                 .filteredOn(o -> o.check() != Check.valueOf(expectedCheck))
                 .hasSize(Check.values().length - 1)
@@ -193,7 +186,6 @@ class UberOrderEligibilityGuardTest {
                         .requireEligible(Context.of(UBER, probe())),
                 OrderBusinessException.class);
         assertThat(ex).isNotNull();
-        // 硬寫字面值：9503 是跨 repo 契約（gateway bizhttp 已登錄為 403），不從 enum 取
         assertThat(ex.code()).isEqualTo(9503);
     }
 
@@ -208,7 +200,6 @@ class UberOrderEligibilityGuardTest {
         assertThat(ex.code()).isNotIn(9510, 4008, 9504);
     }
 
-    // ===== 🔴 取不到證據的三種來源，處置一律相同：六項全拒 =====
 
     @Test
     @DisplayName("🔴 沒有 probe（methodOnly）⇒ 六項全 DENIED_NO_EVIDENCE，不是靜默放行")
@@ -245,7 +236,6 @@ class UberOrderEligibilityGuardTest {
         assertThat(decision.allowed()).isFalse();
         assertThat(decision.blockingChecks()).hasSize(Check.values().length);
         assertThat(decision.denyReason()).contains("IllegalStateException");
-        // 具名理由碼：回空字串會讓前端只能顯示「不可用」、維運也查不到是哪一段斷了
         assertThat(decision.providerReason()).isEqualTo("UBER_QUOTE_ASSESSOR_UNAVAILABLE");
     }
 
@@ -272,14 +262,12 @@ class UberOrderEligibilityGuardTest {
         assertThat(decision.blockingChecks()).hasSize(Check.values().length);
     }
 
-    // ===== 🔴 陰性二：非 3003 完全不受影響 =====
 
     @ParameterizedTest(name = "shipping_method={0} 不受本閘門影響")
     @ValueSource(strings = {"3001", "3002", "3005", "9999", "", "UBER_INSTANT", "30031", "003"})
     @NullSource
     @DisplayName("非 3003（含 null／值域外／相近字串）：applicable=false、allowed=true、六項全 NOT_APPLICABLE")
     void nonUberIsUntouched(String shippingMethod) {
-        // 用「會拒絕的」assessor：非 3003 若誤入判定路徑，這一支就紅
         Decision decision = guardAnswering(Assessment.unavailable("UBER_DISABLED"))
                 .evaluate(Context.methodOnly(shippingMethod));
 
@@ -298,7 +286,7 @@ class UberOrderEligibilityGuardTest {
     @DisplayName("requireEligible 對非 3003 靜默放行——本閘門不兼任配送方式合法性驗證（那是 OrderPolicyResolver 的 9504）")
     void requireEligibleDoesNotThrowForNonUber(String shippingMethod) {
         guardAnswering(Assessment.unavailable("UBER_DISABLED"))
-                .requireEligible(Context.methodOnly(shippingMethod)); // 不拋即通過
+                .requireEligible(Context.methodOnly(shippingMethod));
     }
 
     @Test
@@ -312,7 +300,6 @@ class UberOrderEligibilityGuardTest {
         assertThat(assessor.calls).isZero();
     }
 
-    // ===== 對照表本身的結構保證 =====
 
     @Test
     @DisplayName("🔴 ProviderReason 的每一個常數都被歸到某一項（ASSESSOR_UNAVAILABLE 例外且必須是例外）")
@@ -366,7 +353,6 @@ class UberOrderEligibilityGuardTest {
             assertThat(outcome.evidence()).doesNotContainIgnoringCase("TODO");
             assertThat(outcome.check().evidenceSource()).isNotBlank();
             assertThat(outcome.check().evidenceSource()).doesNotContainIgnoringCase("TODO");
-            // 🔴 接上之後不得留下指向未來的敘述：evidenceSource 講的是「現在誰給的答案」
             assertThat(outcome.check().evidenceSource())
                     .as("%s 的證據來源仍寫成待辦", outcome.check())
                     .doesNotContain("W2 ")
@@ -376,7 +362,6 @@ class UberOrderEligibilityGuardTest {
         }
     }
 
-    // ===== fail-closed 的結構保證 =====
 
     @Test
     @DisplayName("Status 的 blocking 旗標：兩種 DENIED 都擋，PASSED／NOT_APPLICABLE 不擋")
@@ -397,8 +382,6 @@ class UberOrderEligibilityGuardTest {
         decision.outcomes().forEach(o -> reported.add(o.check()));
         assertThat(reported).containsExactlyElementsOf(Arrays.asList(Check.values()));
 
-        // 🔴 上面那一行對「漏接」零鑑別力——decide() 會補一筆 fail-closed outcome，
-        //    所以集合永遠是完整的。真正有鑑別力的是下面這一句。
         assertThat(decision.outcomes())
                 .as("Check 常數新增後必須在 evaluate() 內 put 一筆帶具體 evidence 的 outcome")
                 .allSatisfy(o -> assertThat(o.evidence())
@@ -408,9 +391,6 @@ class UberOrderEligibilityGuardTest {
     @Test
     @DisplayName("🔴 fail-closed 分支：完全沒接線的表送進 decide()，六項仍全部拒絕（不是靜默放行）")
     void unwiredChecksAreDeniedNotPassed() throws Exception {
-        // 用反射直接打 decide()——這是這條分支唯一測得到的方式：
-        // evaluate() 的每一條路徑都把六項接滿了，走不到 null 分支。
-        // 反射在本專案有既有慣例（CollectionModelGuardContractTest.invokeResolve）。
         Method decide = UberOrderEligibilityGuard.class
                 .getDeclaredMethod("decide", EnumMap.class, Assessment.class);
         decide.setAccessible(true);

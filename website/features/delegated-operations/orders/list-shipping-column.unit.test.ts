@@ -35,8 +35,6 @@ describe("shippingStatusText", () => {
 		expect(shippingStatusText("99999", "")).toBe("99999");
 	});
 
-	// 還沒建立物流單的訂單 `shippingStatus` 就是空的。退到「待出貨」會與訂單狀態的
-	// 「待出貨」同字，看起來像物流單已經建好了——而這一欄存在的理由正是分辨那件事。
 	it("空碼回空字串，呼叫端據此顯示破折號", () => {
 		expect(shippingStatusText("", "")).toBe("");
 	});

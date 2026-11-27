@@ -31,7 +31,6 @@ class ProductSkuVersionConversionTest {
     private final ProductProtoConverter protoConverter = new ProductProtoConverter();
     private final ProductSkuConverter skuConverter = new ProductSkuConverter();
 
-    // ── Entity → DTO（下發方向的第一段）────────────────────────────────────
 
     @Test
     @DisplayName("Entity.version → DTO.version：不下發，client 就沒有東西可以在下次寫回時回送")
@@ -54,7 +53,6 @@ class ProductSkuVersionConversionTest {
         assertNull(skuConverter.toDTO(entity).getVersion());
     }
 
-    // ── DTO → Proto（下發方向的第二段）────────────────────────────────────
 
     @Test
     @DisplayName("DTO.version → proto version：Gateway 要靠它才有 skus[].version 可以吐給前端")
@@ -68,7 +66,6 @@ class ProductSkuVersionConversionTest {
         assertEquals("7", proto.getSkus(0).getVersion());
     }
 
-    // ── Proto → DTO（上行方向）────────────────────────────────────────────
 
     @Test
     @DisplayName("proto expected_version → DTO.expectedVersion：漏了的話 client 送了也到不了 CAS")

@@ -444,8 +444,6 @@ void main() {
       ),
     );
     await tester.pump(const Duration(milliseconds: 50));
-    // The stale request is not the last page; if it leaked it would change
-    // paging and trigger a page-2 request.
     pending['高麗菜']!.complete(
       ProductListResult(
         records: [_item('高麗菜商品')],
@@ -556,8 +554,6 @@ Dio _searchDio({List<RequestOptions>? requests}) {
                 'data': {
                   'records': [
                     {
-                      // DEV /public/search/products ProductHitData contract:
-                      // int64 identifiers and numeric values cross as strings.
                       'id': '871936508549696815',
                       'name': '台灣有機高山高麗菜',
                       'categoryId': '7',

@@ -6,17 +6,7 @@ import (
 	"github.com/Will413028/hawkr/gateway/internal/response"
 )
 
-// 本檔是 58 號《電子發票服務》§6.1 對外 REST 的 DTO 層。
-//
-// 為什麼每個 endpoint 都要有自己的 Gateway DTO、不能把 proto struct 直接放進 `data`：
-// protoc-gen-go 產生的 tag 是 `json:"foo_bar,omitempty"` ⇒ 直出等於欄名 snake_case
-// ＋ 任何零值（false／""／0）整個欄位從回應消失，前端拿到 undefined（§6.1.0(7)、
-// 10 檔 §2）。本檔的 DTO 一律不帶 omitempty，「data key 必須存在」才成立。
-//
-// 型別規約（§6.1.0(8)）：ID、金額、計數、版本、頁碼一律 string；時間 string 且為
-// ISO 8601 UTC 秒精度。proto 側已全部宣告成 string，這裡逐欄照抄不做二次轉型。
 
-// ==================== 回應 payload DTO（§6.1.0(15) 的 Success `data` 欄）====================
 
 type ActOnInvoiceComplaintForAdminData struct {
 	ComplaintId    string                   `json:"complaintId"`
@@ -579,9 +569,7 @@ type TaxReviewNote struct {
 	CreatedAt string `json:"createdAt"`
 }
 
-// ==================== proto → DTO 轉換 ====================
 
-// convInvActOnInvoiceComplaintForAdminData 把 proto payload 轉成對外 DTO。
 func convInvActOnInvoiceComplaintForAdminData(m *pb.ActOnInvoiceComplaintForAdminData) ActOnInvoiceComplaintForAdminData {
 	var d ActOnInvoiceComplaintForAdminData
 	if m == nil {
@@ -595,7 +583,6 @@ func convInvActOnInvoiceComplaintForAdminData(m *pb.ActOnInvoiceComplaintForAdmi
 	return d
 }
 
-// convInvAdminInvoiceDocumentDetail 把 proto payload 轉成對外 DTO。
 func convInvAdminInvoiceDocumentDetail(m *pb.AdminInvoiceDocumentDetail) AdminInvoiceDocumentDetail {
 	var d AdminInvoiceDocumentDetail
 	if m == nil {
@@ -616,7 +603,6 @@ func convInvAdminInvoiceDocumentDetail(m *pb.AdminInvoiceDocumentDetail) AdminIn
 	return d
 }
 
-// convInvAdminInvoiceJobDetail 把 proto payload 轉成對外 DTO。
 func convInvAdminInvoiceJobDetail(m *pb.AdminInvoiceJobDetail) AdminInvoiceJobDetail {
 	var d AdminInvoiceJobDetail
 	if m == nil {
@@ -640,7 +626,6 @@ func convInvAdminInvoiceJobDetail(m *pb.AdminInvoiceJobDetail) AdminInvoiceJobDe
 	return d
 }
 
-// convInvBuyerInvoiceDocumentItem 把 proto payload 轉成對外 DTO。
 func convInvBuyerInvoiceDocumentItem(m *pb.BuyerInvoiceDocumentItem) BuyerInvoiceDocumentItem {
 	var d BuyerInvoiceDocumentItem
 	if m == nil {
@@ -651,7 +636,6 @@ func convInvBuyerInvoiceDocumentItem(m *pb.BuyerInvoiceDocumentItem) BuyerInvoic
 	return d
 }
 
-// convInvComplaintResponseItem 把 proto payload 轉成對外 DTO。
 func convInvComplaintResponseItem(m *pb.ComplaintResponseItem) ComplaintResponseItem {
 	var d ComplaintResponseItem
 	if m == nil {
@@ -665,7 +649,6 @@ func convInvComplaintResponseItem(m *pb.ComplaintResponseItem) ComplaintResponse
 	return d
 }
 
-// convInvCreateManualIssuanceForAdminData 把 proto payload 轉成對外 DTO。
 func convInvCreateManualIssuanceForAdminData(m *pb.CreateManualIssuanceForAdminData) CreateManualIssuanceForAdminData {
 	var d CreateManualIssuanceForAdminData
 	if m == nil {
@@ -678,7 +661,6 @@ func convInvCreateManualIssuanceForAdminData(m *pb.CreateManualIssuanceForAdminD
 	return d
 }
 
-// convInvDeactivateProviderAccountForAdminData 把 proto payload 轉成對外 DTO。
 func convInvDeactivateProviderAccountForAdminData(m *pb.DeactivateProviderAccountForAdminData) DeactivateProviderAccountForAdminData {
 	var d DeactivateProviderAccountForAdminData
 	if m == nil {
@@ -693,7 +675,6 @@ func convInvDeactivateProviderAccountForAdminData(m *pb.DeactivateProviderAccoun
 	return d
 }
 
-// convInvDecideTaxReviewForAdminData 把 proto payload 轉成對外 DTO。
 func convInvDecideTaxReviewForAdminData(m *pb.DecideTaxReviewForAdminData) DecideTaxReviewForAdminData {
 	var d DecideTaxReviewForAdminData
 	if m == nil {
@@ -707,7 +688,6 @@ func convInvDecideTaxReviewForAdminData(m *pb.DecideTaxReviewForAdminData) Decid
 	return d
 }
 
-// convInvGetInvoiceOverviewForAdminData 把 proto payload 轉成對外 DTO。
 func convInvGetInvoiceOverviewForAdminData(m *pb.GetInvoiceOverviewForAdminData) GetInvoiceOverviewForAdminData {
 	var d GetInvoiceOverviewForAdminData
 	if m == nil {
@@ -724,7 +704,6 @@ func convInvGetInvoiceOverviewForAdminData(m *pb.GetInvoiceOverviewForAdminData)
 	return d
 }
 
-// convInvInvoiceAmountBreakdown 把 proto payload 轉成對外 DTO。
 func convInvInvoiceAmountBreakdown(m *pb.InvoiceAmountBreakdown) InvoiceAmountBreakdown {
 	var d InvoiceAmountBreakdown
 	if m == nil {
@@ -738,7 +717,6 @@ func convInvInvoiceAmountBreakdown(m *pb.InvoiceAmountBreakdown) InvoiceAmountBr
 	return d
 }
 
-// convInvInvoiceAuditLogItem 把 proto payload 轉成對外 DTO。
 func convInvInvoiceAuditLogItem(m *pb.InvoiceAuditLogItem) InvoiceAuditLogItem {
 	var d InvoiceAuditLogItem
 	if m == nil {
@@ -760,7 +738,6 @@ func convInvInvoiceAuditLogItem(m *pb.InvoiceAuditLogItem) InvoiceAuditLogItem {
 	return d
 }
 
-// convInvInvoiceComplaintInfo 把 proto payload 轉成對外 DTO。
 func convInvInvoiceComplaintInfo(m *pb.InvoiceComplaintInfo) InvoiceComplaintInfo {
 	var d InvoiceComplaintInfo
 	if m == nil {
@@ -789,7 +766,6 @@ func convInvInvoiceComplaintInfo(m *pb.InvoiceComplaintInfo) InvoiceComplaintInf
 	return d
 }
 
-// convInvInvoiceCorrectionData 把 proto payload 轉成對外 DTO。
 func convInvInvoiceCorrectionData(m *pb.InvoiceCorrectionData) InvoiceCorrectionData {
 	var d InvoiceCorrectionData
 	if m == nil {
@@ -804,7 +780,6 @@ func convInvInvoiceCorrectionData(m *pb.InvoiceCorrectionData) InvoiceCorrection
 	return d
 }
 
-// convInvInvoiceDocumentDetail 把 proto payload 轉成對外 DTO。
 func convInvInvoiceDocumentDetail(m *pb.InvoiceDocumentDetail) InvoiceDocumentDetail {
 	var d InvoiceDocumentDetail
 	if m == nil {
@@ -831,7 +806,6 @@ func convInvInvoiceDocumentDetail(m *pb.InvoiceDocumentDetail) InvoiceDocumentDe
 	return d
 }
 
-// convInvInvoiceDocumentSummary 把 proto payload 轉成對外 DTO。
 func convInvInvoiceDocumentSummary(m *pb.InvoiceDocumentSummary) InvoiceDocumentSummary {
 	var d InvoiceDocumentSummary
 	if m == nil {
@@ -851,7 +825,6 @@ func convInvInvoiceDocumentSummary(m *pb.InvoiceDocumentSummary) InvoiceDocument
 	return d
 }
 
-// convInvInvoiceFileData 把 proto payload 轉成對外 DTO。
 func convInvInvoiceFileData(m *pb.InvoiceFileData) InvoiceFileData {
 	var d InvoiceFileData
 	if m == nil {
@@ -864,7 +837,6 @@ func convInvInvoiceFileData(m *pb.InvoiceFileData) InvoiceFileData {
 	return d
 }
 
-// convInvInvoiceJobInfo 把 proto payload 轉成對外 DTO。
 func convInvInvoiceJobInfo(m *pb.InvoiceJobInfo) InvoiceJobInfo {
 	var d InvoiceJobInfo
 	if m == nil {
@@ -896,7 +868,6 @@ func convInvInvoiceJobInfo(m *pb.InvoiceJobInfo) InvoiceJobInfo {
 	return d
 }
 
-// convInvInvoiceJobMutationData 把 proto payload 轉成對外 DTO。
 func convInvInvoiceJobMutationData(m *pb.InvoiceJobMutationData) InvoiceJobMutationData {
 	var d InvoiceJobMutationData
 	if m == nil {
@@ -912,7 +883,6 @@ func convInvInvoiceJobMutationData(m *pb.InvoiceJobMutationData) InvoiceJobMutat
 	return d
 }
 
-// convInvInvoiceKpiItem 把 proto payload 轉成對外 DTO。
 func convInvInvoiceKpiItem(m *pb.InvoiceKpiItem) InvoiceKpiItem {
 	var d InvoiceKpiItem
 	if m == nil {
@@ -925,7 +895,6 @@ func convInvInvoiceKpiItem(m *pb.InvoiceKpiItem) InvoiceKpiItem {
 	return d
 }
 
-// convInvInvoiceLine 把 proto payload 轉成對外 DTO。
 func convInvInvoiceLine(m *pb.InvoiceLine) InvoiceLine {
 	var d InvoiceLine
 	if m == nil {
@@ -940,7 +909,6 @@ func convInvInvoiceLine(m *pb.InvoiceLine) InvoiceLine {
 	return d
 }
 
-// convInvInvoiceProfileInfo 把 proto payload 轉成對外 DTO。
 func convInvInvoiceProfileInfo(m *pb.InvoiceProfileInfo) InvoiceProfileInfo {
 	var d InvoiceProfileInfo
 	if m == nil {
@@ -958,7 +926,6 @@ func convInvInvoiceProfileInfo(m *pb.InvoiceProfileInfo) InvoiceProfileInfo {
 	return d
 }
 
-// convInvInvoiceTimelineItem 把 proto payload 轉成對外 DTO。
 func convInvInvoiceTimelineItem(m *pb.InvoiceTimelineItem) InvoiceTimelineItem {
 	var d InvoiceTimelineItem
 	if m == nil {
@@ -970,7 +937,6 @@ func convInvInvoiceTimelineItem(m *pb.InvoiceTimelineItem) InvoiceTimelineItem {
 	return d
 }
 
-// convInvManualUnlockInfo 把 proto payload 轉成對外 DTO。
 func convInvManualUnlockInfo(m *pb.ManualUnlockInfo) ManualUnlockInfo {
 	var d ManualUnlockInfo
 	if m == nil {
@@ -989,7 +955,6 @@ func convInvManualUnlockInfo(m *pb.ManualUnlockInfo) ManualUnlockInfo {
 	return d
 }
 
-// convInvOrderInvoiceData 把 proto payload 轉成對外 DTO。
 func convInvOrderInvoiceData(m *pb.OrderInvoiceData) OrderInvoiceData {
 	var d OrderInvoiceData
 	if m == nil {
@@ -1014,7 +979,6 @@ func convInvOrderInvoiceData(m *pb.OrderInvoiceData) OrderInvoiceData {
 	return d
 }
 
-// convInvProviderAccountItem 把 proto payload 轉成對外 DTO。
 func convInvProviderAccountItem(m *pb.ProviderAccountItem) ProviderAccountItem {
 	var d ProviderAccountItem
 	if m == nil {
@@ -1030,7 +994,6 @@ func convInvProviderAccountItem(m *pb.ProviderAccountItem) ProviderAccountItem {
 	return d
 }
 
-// convInvProviderCutoverItem 把 proto payload 轉成對外 DTO。
 func convInvProviderCutoverItem(m *pb.ProviderCutoverItem) ProviderCutoverItem {
 	var d ProviderCutoverItem
 	if m == nil {
@@ -1046,7 +1009,6 @@ func convInvProviderCutoverItem(m *pb.ProviderCutoverItem) ProviderCutoverItem {
 	return d
 }
 
-// convInvProviderExchangeItem 把 proto payload 轉成對外 DTO。
 func convInvProviderExchangeItem(m *pb.ProviderExchangeItem) ProviderExchangeItem {
 	var d ProviderExchangeItem
 	if m == nil {
@@ -1063,7 +1025,6 @@ func convInvProviderExchangeItem(m *pb.ProviderExchangeItem) ProviderExchangeIte
 	return d
 }
 
-// convInvResendInvoiceNotificationData 把 proto payload 轉成對外 DTO。
 func convInvResendInvoiceNotificationData(m *pb.ResendInvoiceNotificationData) ResendInvoiceNotificationData {
 	var d ResendInvoiceNotificationData
 	if m == nil {
@@ -1075,7 +1036,6 @@ func convInvResendInvoiceNotificationData(m *pb.ResendInvoiceNotificationData) R
 	return d
 }
 
-// convInvRetryPolicy 把 proto payload 轉成對外 DTO。
 func convInvRetryPolicy(m *pb.RetryPolicy) RetryPolicy {
 	var d RetryPolicy
 	if m == nil {
@@ -1088,7 +1048,6 @@ func convInvRetryPolicy(m *pb.RetryPolicy) RetryPolicy {
 	return d
 }
 
-// convInvRevokeProviderAccountForAdminData 把 proto payload 轉成對外 DTO。
 func convInvRevokeProviderAccountForAdminData(m *pb.RevokeProviderAccountForAdminData) RevokeProviderAccountForAdminData {
 	var d RevokeProviderAccountForAdminData
 	if m == nil {
@@ -1103,7 +1062,6 @@ func convInvRevokeProviderAccountForAdminData(m *pb.RevokeProviderAccountForAdmi
 	return d
 }
 
-// convInvSelfIssueAttestationInfo 把 proto payload 轉成對外 DTO。
 func convInvSelfIssueAttestationInfo(m *pb.SelfIssueAttestationInfo) SelfIssueAttestationInfo {
 	var d SelfIssueAttestationInfo
 	if m == nil {
@@ -1118,7 +1076,6 @@ func convInvSelfIssueAttestationInfo(m *pb.SelfIssueAttestationInfo) SelfIssueAt
 	return d
 }
 
-// convInvSellerIntakeLimit 把 proto payload 轉成對外 DTO。
 func convInvSellerIntakeLimit(m *pb.SellerIntakeLimit) SellerIntakeLimit {
 	var d SellerIntakeLimit
 	if m == nil {
@@ -1132,7 +1089,6 @@ func convInvSellerIntakeLimit(m *pb.SellerIntakeLimit) SellerIntakeLimit {
 	return d
 }
 
-// convInvSellerInvoiceDocumentDetail 把 proto payload 轉成對外 DTO。
 func convInvSellerInvoiceDocumentDetail(m *pb.SellerInvoiceDocumentDetail) SellerInvoiceDocumentDetail {
 	var d SellerInvoiceDocumentDetail
 	if m == nil {
@@ -1164,7 +1120,6 @@ type InvoiceDocumentsPageData struct {
 	ShipmentStatusDegraded bool `json:"shipmentStatusDegraded"`
 }
 
-// convInvSellerInvoiceDocumentItem 把 proto payload 轉成對外 DTO。
 func convInvSellerInvoiceDocumentItem(m *pb.SellerInvoiceDocumentItem) SellerInvoiceDocumentItem {
 	var d SellerInvoiceDocumentItem
 	if m == nil {
@@ -1181,7 +1136,6 @@ func convInvSellerInvoiceDocumentItem(m *pb.SellerInvoiceDocumentItem) SellerInv
 	return d
 }
 
-// convInvSellerInvoiceOverviewData 把 proto payload 轉成對外 DTO。
 func convInvSellerInvoiceOverviewData(m *pb.SellerInvoiceOverviewData) SellerInvoiceOverviewData {
 	var d SellerInvoiceOverviewData
 	if m == nil {
@@ -1205,7 +1159,6 @@ func convInvSellerInvoiceOverviewData(m *pb.SellerInvoiceOverviewData) SellerInv
 	return d
 }
 
-// convInvSellerProviderAccountData 把 proto payload 轉成對外 DTO。
 func convInvSellerProviderAccountData(m *pb.SellerProviderAccountData) SellerProviderAccountData {
 	var d SellerProviderAccountData
 	if m == nil {
@@ -1226,7 +1179,6 @@ func convInvSellerProviderAccountData(m *pb.SellerProviderAccountData) SellerPro
 	return d
 }
 
-// convInvSellerReceiptAuthorizationData 把 proto payload 轉成對外 DTO。
 func convInvSellerReceiptAuthorizationData(m *pb.SellerReceiptAuthorizationData) SellerReceiptAuthorizationData {
 	var d SellerReceiptAuthorizationData
 	if m == nil {
@@ -1247,7 +1199,6 @@ func convInvSellerReceiptAuthorizationData(m *pb.SellerReceiptAuthorizationData)
 	return d
 }
 
-// convInvSellerReceivedInvoiceItem 把 proto payload 轉成對外 DTO。
 func convInvSellerReceivedInvoiceItem(m *pb.SellerReceivedInvoiceItem) SellerReceivedInvoiceItem {
 	var d SellerReceivedInvoiceItem
 	if m == nil {
@@ -1259,7 +1210,6 @@ func convInvSellerReceivedInvoiceItem(m *pb.SellerReceivedInvoiceItem) SellerRec
 	return d
 }
 
-// convInvSellerTaxIdentity 把 proto payload 轉成對外 DTO。
 func convInvSellerTaxIdentity(m *pb.SellerTaxIdentity) SellerTaxIdentity {
 	var d SellerTaxIdentity
 	if m == nil {
@@ -1276,7 +1226,6 @@ func convInvSellerTaxIdentity(m *pb.SellerTaxIdentity) SellerTaxIdentity {
 	return d
 }
 
-// convInvSellerTaxProfileData 把 proto payload 轉成對外 DTO。
 func convInvSellerTaxProfileData(m *pb.SellerTaxProfileData) SellerTaxProfileData {
 	var d SellerTaxProfileData
 	if m == nil {
@@ -1303,8 +1252,6 @@ func convInvSellerTaxProfileData(m *pb.SellerTaxProfileData) SellerTaxProfileDat
 	d.IntakeLimit = convInvSellerIntakeLimit(m.GetIntakeLimit())
 	d.ReceiptAuthorized = m.GetReceiptAuthorized()
 	d.ReceiptAuthorizedAt = m.GetReceiptAuthorizedAt()
-	// nil 要原樣傳成 null，不得折成一個每欄皆空的物件——前端靠「有沒有這個物件」
-	// 決定要不要渲染「賣家已申請展延」那一塊，空物件會讓它對每個賣家都渲染。
 	if r := m.GetPendingExtensionRequest(); r != nil {
 		d.PendingExtensionRequest = &TaxExtensionRequestInfo{
 			RequestedAt: r.GetRequestedAt(),
@@ -1314,7 +1261,6 @@ func convInvSellerTaxProfileData(m *pb.SellerTaxProfileData) SellerTaxProfileDat
 	return d
 }
 
-// convInvSuspensionRecommendation 把 proto payload 轉成對外 DTO。
 func convInvSuspensionRecommendation(m *pb.SuspensionRecommendation) SuspensionRecommendation {
 	var d SuspensionRecommendation
 	if m == nil {
@@ -1329,7 +1275,6 @@ func convInvSuspensionRecommendation(m *pb.SuspensionRecommendation) SuspensionR
 	return d
 }
 
-// convInvTaxDocumentInfo 把 proto payload 轉成對外 DTO。
 func convInvTaxDocumentInfo(m *pb.TaxDocumentInfo) TaxDocumentInfo {
 	var d TaxDocumentInfo
 	if m == nil {
@@ -1345,7 +1290,6 @@ func convInvTaxDocumentInfo(m *pb.TaxDocumentInfo) TaxDocumentInfo {
 	return d
 }
 
-// convInvTaxReviewItem 把 proto payload 轉成對外 DTO。
 func convInvTaxReviewItem(m *pb.TaxReviewItem) TaxReviewItem {
 	var d TaxReviewItem
 	if m == nil {
@@ -1366,7 +1310,6 @@ func convInvTaxReviewItem(m *pb.TaxReviewItem) TaxReviewItem {
 	return d
 }
 
-// convInvTaxReviewNote 把 proto payload 轉成對外 DTO。
 func convInvTaxReviewNote(m *pb.TaxReviewNote) TaxReviewNote {
 	var d TaxReviewNote
 	if m == nil {
@@ -1378,9 +1321,7 @@ func convInvTaxReviewNote(m *pb.TaxReviewNote) TaxReviewNote {
 	return d
 }
 
-// ==================== DTO → proto 轉換（入站 body 的子 message）====================
 
-// toPbInvInvoiceInputSpec 把入站 DTO 轉成 proto request 的子 message。
 func toPbInvInvoiceInputSpec(d InvoiceInputSpec) *pb.InvoiceInputSpec {
 	m := &pb.InvoiceInputSpec{}
 	m.ProfileId = d.ProfileId
@@ -1393,7 +1334,6 @@ func toPbInvInvoiceInputSpec(d InvoiceInputSpec) *pb.InvoiceInputSpec {
 	return m
 }
 
-// toPbInvInvoiceLine 把入站 DTO 轉成 proto request 的子 message。
 func toPbInvInvoiceLine(d InvoiceLine) *pb.InvoiceLine {
 	m := &pb.InvoiceLine{}
 	m.LineType = d.LineType
@@ -1405,7 +1345,6 @@ func toPbInvInvoiceLine(d InvoiceLine) *pb.InvoiceLine {
 	return m
 }
 
-// toPbInvIssuanceIssuer 把入站 DTO 轉成 proto request 的子 message。
 func toPbInvIssuanceIssuer(d IssuanceIssuer) *pb.IssuanceIssuer {
 	m := &pb.IssuanceIssuer{}
 	m.Kind = d.Kind
@@ -1413,7 +1352,6 @@ func toPbInvIssuanceIssuer(d IssuanceIssuer) *pb.IssuanceIssuer {
 	return m
 }
 
-// toPbInvIssuanceRecipient 把入站 DTO 轉成 proto request 的子 message。
 func toPbInvIssuanceRecipient(d IssuanceRecipient) *pb.IssuanceRecipient {
 	m := &pb.IssuanceRecipient{}
 	m.Kind = d.Kind
@@ -1427,7 +1365,6 @@ func toPbInvIssuanceRecipient(d IssuanceRecipient) *pb.IssuanceRecipient {
 	return m
 }
 
-// toPbInvIssuanceSource 把入站 DTO 轉成 proto request 的子 message。
 func toPbInvIssuanceSource(d IssuanceSource) *pb.IssuanceSource {
 	m := &pb.IssuanceSource{}
 	m.Kind = d.Kind
@@ -1438,7 +1375,6 @@ func toPbInvIssuanceSource(d IssuanceSource) *pb.IssuanceSource {
 	return m
 }
 
-// toPbInvSellerTaxIdentity 把入站 DTO 轉成 proto request 的子 message。
 func toPbInvSellerTaxIdentity(d SellerTaxIdentity) *pb.SellerTaxIdentity {
 	m := &pb.SellerTaxIdentity{}
 	m.EntityType = d.EntityType

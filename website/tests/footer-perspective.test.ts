@@ -63,9 +63,6 @@ test("buyer perspective resolves to the canonical marketplace footer", () => {
 	const buyerFooter = source("../components/shared/Footer.tsx");
 
 	assert.match(roleAwareFooter, /import LegacyFooter from .*Footer/);
-	// The 商品分類 / 熱門話題 columns are read on the server and handed in as an
-	// element, because this component is client-only (see
-	// tests/e2e/footer-columns-server-rendered.spec.ts).
 	assert.match(
 		roleAwareFooter,
 		/return <LegacyFooter categoryColumns=\{categoryColumns\} \/>/,
@@ -75,7 +72,6 @@ test("buyer perspective resolves to the canonical marketplace footer", () => {
 	assert.match(buyerFooter, /聯絡資訊/);
 	assert.match(buyerFooter, /supports@example\.com/);
 	assert.match(buyerFooter, /<AppDownloadCTA variant="icon" \/>/);
-	// 商品分類 / 熱門話題 ship as one client island between 快速連結 and 客戶服務.
 	assert.match(buyerFooter, /\{categoryColumns\}/);
 });
 

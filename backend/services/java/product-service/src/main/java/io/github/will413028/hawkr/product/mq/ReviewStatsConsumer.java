@@ -61,10 +61,6 @@ public class ReviewStatsConsumer {
                 return;
             }
             Long productId = Long.parseLong(productIdStr);
-            // fail-loud：統計欄位缺失或非數字 → IllegalStateException → 下方 catch(Exception) NACK 進 DLQ。
-            // 不得以 0 預設值覆寫 product.rating / review_count（malformed event 會把權威統計清零）；
-            // 「真 0」（無評論）是合法 JSON 數字值，isNumber() 放行。
-            // publisher 為 pkg/mq ReviewCreatedEvent / ReviewHiddenEvent（float64 / int64 → JSON number）。
             JsonNode ratingNode = payload.get("product_avg_rating");
             JsonNode countNode = payload.get("product_review_count");
             if (ratingNode == null || !ratingNode.isNumber()) {
@@ -75,7 +71,6 @@ public class ReviewStatsConsumer {
                 throw new IllegalStateException("product_review_count 缺失或非數字: " + countNode
                         + ", productId=" + productId);
             }
-            // productAvgRating 為 float（0~5）；product.rating 為 decimal(3,2)，四捨五入 2 位
             BigDecimal rating = BigDecimal.valueOf(ratingNode.asDouble())
                     .setScale(2, RoundingMode.HALF_UP);
             long reviewCount = countNode.asLong();
@@ -86,7 +81,7 @@ public class ReviewStatsConsumer {
         } catch (IllegalArgumentException e) {
             log.warn("ReviewStatsConsumer.parse.fail",
                     "payload 格式錯誤 body=" + body + " error=" + e.getMessage());
-            channel.basicAck(deliveryTag, false);   // 不重試
+            channel.basicAck(deliveryTag, false);
         } catch (Exception e) {
             log.error("ReviewStatsConsumer.handle.fail", "處理失敗，進 DLQ body=" + body, e);
             channel.basicNack(deliveryTag, false, false);

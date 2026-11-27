@@ -6,8 +6,6 @@ import {
 } from "@hawkr/api/gen/hawkr/admin/seller/v1alpha1/case_inquiry_pb";
 import { unknownText } from "@/lib/ui-text";
 
-// 案件詢問的名稱（3c-b 設計書 §5.4 (a)(b) I6、I7、I10、I13）。這些列舉只有 admin 用，不在共用文案目錄裡，所以是 admin 的單端表
-// （UNSPECIFIED 不在表裡）；不認得的值與 UNSPECIFIED 顯示「未知」。
 
 function textOf<E extends number>(
 	table: Partial<Record<E, string>>,

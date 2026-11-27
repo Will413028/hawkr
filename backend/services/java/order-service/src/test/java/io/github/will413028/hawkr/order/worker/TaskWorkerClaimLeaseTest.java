@@ -39,7 +39,6 @@ import static org.mockito.Mockito.when;
  */
 class TaskWorkerClaimLeaseTest {
 
-    // ==================== C3 CartCleanupRetryWorker ====================
 
     private static CartCleanupRetryTaskEntity cartTask() {
         CartCleanupRetryTaskEntity t = new CartCleanupRetryTaskEntity();
@@ -91,7 +90,6 @@ class TaskWorkerClaimLeaseTest {
         verify(repo).markDone(1001L);
     }
 
-    // ==================== C5 CouponConsumptionWorker ====================
 
     private static CouponConsumptionTaskEntity couponTask() {
         CouponConsumptionTaskEntity t = new CouponConsumptionTaskEntity();

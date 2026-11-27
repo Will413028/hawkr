@@ -54,7 +54,6 @@ void main() {
     await tester.pump();
     expect(completions, 1);
 
-    // A validation failure can leave the sheet open; the control must reset.
     await tester.drag(find.byType(SwipeToPay), const Offset(300, 0));
     await tester.pump();
     expect(completions, 2);

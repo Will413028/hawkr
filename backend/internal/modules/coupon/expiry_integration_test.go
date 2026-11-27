@@ -25,8 +25,6 @@ type expiryFixture struct {
 	got    []coupon.VoucherExpiring
 }
 
-// expirySetup 在 fixture 的資料庫上另建一個帶 Events 的模組，並在測試接線具名的 VoucherExpiring 訂閱者（cmd/hawkr 不登記）。
-// fail 回傳非 nil 時，那張券的 handler 失敗（在記錄事件之前，失敗的券不會出現在收到的事件裡）。
 func expirySetup(t *testing.T, batch int32, fail func(uuid.UUID) error) *expiryFixture {
 	t.Helper()
 	f := &expiryFixture{fixture: setup(t)}
@@ -52,7 +50,6 @@ func (f *expiryFixture) newModule(bus *events.Bus, batch int32) *coupon.Module {
 
 func (f *expiryFixture) setNow(t time.Time) { f.clock.Store(t.UnixNano()) }
 
-// run 執行一次提醒並回傳這次新發布的事件。
 func (f *expiryFixture) run() []coupon.VoucherExpiring {
 	f.t.Helper()
 	f.mu.Lock()
@@ -68,7 +65,6 @@ func (f *expiryFixture) run() []coupon.VoucherExpiring {
 	return slices.Clone(f.got[before:])
 }
 
-// runErr 執行一次提醒，回傳錯誤與這次新發布的事件。
 func (f *expiryFixture) runErr() ([]coupon.VoucherExpiring, error) {
 	f.t.Helper()
 	f.mu.Lock()
@@ -193,9 +189,9 @@ func TestExpiryReminderCoversLateClaimsWithEnoughLeadButNotShortWindowClaims(t *
 	f := expirySetup(t, 0, nil)
 	c := f.campaign(endAt(base.Add(72 * time.Hour)))
 	f.setNow(base.Add(40 * time.Hour))
-	early := f.claim(c, buyer1) // 離到期 32 小時
+	early := f.claim(c, buyer1)
 	f.setNow(base.Add(60 * time.Hour))
-	late := f.claim(c, buyer2) // 離到期 12 小時
+	late := f.claim(c, buyer2)
 	f.setNow(base.Add(49 * time.Hour))
 	sameIDs(t, "晚領但提前量足夠", f.run(), early)
 	f.setNow(base.Add(61 * time.Hour))
@@ -245,7 +241,7 @@ func TestExpiryReminderIsolatesAFailingVoucher(t *testing.T) {
 	v1, v2, v3 := f.claim(c, buyer1), f.claim(c, buyer2), f.claim(c, buyer3)
 	vs := []coupon.Voucher{v1, v2, v3}
 	slices.SortFunc(vs, func(a, b coupon.Voucher) int { return a.ID.Compare(b.ID) })
-	poison := vs[0].ID // 排在最前面，後面的券要不被它擋住
+	poison := vs[0].ID
 	bad.Store(&poison)
 	f.setNow(base.Add(7 * time.Hour))
 	got, err := f.runErr()

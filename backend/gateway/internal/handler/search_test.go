@@ -12,7 +12,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-// ==================== Router Setup ====================
 
 func setupSearchRouter(h *Holder) *gin.Engine {
 	r := gin.New()
@@ -25,7 +24,6 @@ func setupSearchRouter(h *Holder) *gin.Engine {
 	return r
 }
 
-// ==================== SearchProductsViaES ====================
 
 // TestSearchProductsViaES_SellerLogoURLField proves the nested seller object
 // in /public/search/products responses exposes the seller logo as the canonical
@@ -210,7 +208,6 @@ func TestSearchProductsViaES_JSONKeysAreCamelCase(t *testing.T) {
 		t.Fatal("products[0] is not an object")
 	}
 
-	// 正面：每個 camelCase key 都要帶到值（值互不相同，欄位對調會在這裡失敗）。
 	for key, want := range map[string]interface{}{
 		"categoryId":    "7",
 		"categoryName":  "蔬果",
@@ -230,7 +227,6 @@ func TestSearchProductsViaES_JSONKeysAreCamelCase(t *testing.T) {
 	if got, ok := hit["deliveryTemp"].([]interface{}); !ok || len(got) != 1 || got[0] != "3201" {
 		t.Errorf("products[0][\"deliveryTemp\"] = %v, want [\"3201\"]", hit["deliveryTemp"])
 	}
-	// 分頁四欄一律 string（§4），型別斷言直接寫 string——數字化回歸會轉紅。
 	for field, want := range map[string]string{
 		"total": "1", "page": "1", "pageSize": "20", "totalPages": "1",
 	} {
@@ -239,12 +235,10 @@ func TestSearchProductsViaES_JSONKeysAreCamelCase(t *testing.T) {
 			t.Errorf("data[%q] = %v (%T), want string %q", field, data[field], data[field], want)
 		}
 	}
-	// 分頁 key 用 records（§16），舊的 products 必須零命中。
 	if v, present := data["products"]; present {
 		t.Errorf("data 仍帶舊分頁 key \"products\" = %v；已改為 records", v)
 	}
 
-	// 反面：舊的 snake_case key 在 hit 與分頁層都必須零命中。
 	for _, stale := range []string{
 		"category_id", "category_name", "price_min", "price_max", "created_at",
 		"review_count", "store_id", "account_id", "sales_count", "favorite_count",

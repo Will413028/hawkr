@@ -185,7 +185,6 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
               SizedBox(height: AppSpacing.sm),
               _build711ReturnCodeBox(c),
             ],
-            // PR #983 D-1 警示：寄回截止 < 24h 時提醒，逾時將解除退款資格
             if (_showShipBackUrgentBanner(c)) ...[
               SizedBox(height: AppSpacing.sm),
               _buildShipBackUrgentBanner(c),
@@ -316,11 +315,6 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
           '退貨代碼',
           c.returnShipmentNo,
         ),
-      // 物流單號只在買家「實際已寄出」之後才顯示。
-      // 賣家同意退貨（status=20 awaitingReturn）後端會預配寄件單號，但在
-      // 買家還沒寄之前顯示「物流單號」會讓人誤以為已寄出 — 等到 status
-      // 進入 25 returnInTransit / 30 returnReceived / 40 refundProcessing /
-      // 50 closed 才把它列出來，並改名「退貨物流單號」避免跟原訂單出貨混淆。
       if (c.shipTradeNo.isNotEmpty &&
           const {'25', '30', '40', '50'}.contains(c.status))
         _infoRow(AppIcons.localOfferOutlined, '退貨物流單號', c.shipTradeNo),
@@ -330,7 +324,6 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
           '申訴期限',
           _formatTime(c.appealDeadline, context.taipeiDisplay),
         ),
-      // PR #983 待寄回 7 天倒數：賣家已同意（status=20）且後端回填 deadline 才顯示
       if (c.status == AfterSaleStatus.awaitingReturn &&
           c.shipBackDeadlineAt.isNotEmpty)
         LiveCountdownLine(
@@ -484,13 +477,10 @@ class AfterSaleDetailScreen extends HookConsumerWidget {
     Future<void> Function() reload,
   ) {
     final canCancel = c.status == AfterSaleStatus.pending;
-    // PR #983：status=33（待寄回逾時自動關案）／status=60（賣家拒絕）
-    // 兩種情境後端皆已開放申訴 API，appealState='0' 表示尚未申訴。
     final isAppealableStatus =
         c.status == AfterSaleStatus.autoCompletedReturnPendingTimeout ||
         c.status == AfterSaleStatus.rejected;
     final canAppeal = isAppealableStatus && c.appealState == '0' && c.canAppeal;
-    // 已提交過申訴 → 顯示查看仲裁進度按鈕（status 33/60 + appealState != '0'）
     final hasAppealed =
         isAppealableStatus && c.appealState.isNotEmpty && c.appealState != '0';
 

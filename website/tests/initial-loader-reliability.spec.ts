@@ -45,8 +45,6 @@ test(
 			});
 			await expect(page.locator(".page-wrapper")).toBeVisible();
 			expect(stalledScripts.length).toBeGreaterThan(0);
-			// Visual readiness is deliberately NOT permission for analytics/toast
-			// code to imperatively mutate the still-unhydrated document.
 			await expect(page.locator("html")).toHaveClass(/initial-loader-active/);
 			await expect(
 				page.locator('[data-auth-status]:not([data-auth-status="unknown"])'),
@@ -155,18 +153,6 @@ test("initial loader never owns pointer input across repeated hard navigations",
 			waitUntil: "domcontentloaded",
 		});
 
-		// 預算**從元件的常數推導**，不寫死。
-		//
-		// ⚠️ 這裡原本寫死 500ms，而 `InitialPageLoader` 的 MIN_SHOWN_MS 是 700 ——
-		// 預算低於元件自己宣告的最短顯示時間，於是它只有在**暖導航**（hide()
-		// 執行時 elapsed 已超過 MIN_SHOWN_MS，remainingMs 歸零）才碰巧會過。
-		// 實測 8 次硬導航的釋放時間是 504/255/161/49/4/73/15/568 ms：兩次超出
-		// 500ms，而 loader 的行為完全正確 —— 紅的是預算，不是產品。
-		//
-		// 正確上限是「最短顯示 ＋ 淡出」再加一點執行期餘裕。它仍然遠低於
-		// INITIAL_LOADER_WATCHDOG_MS（6s）那條真正的失效線，所以「loader 卡住
-		// 不放開指標輸入」這個真缺陷照樣會被抓到。
-		// 8 次 × 約 1.3s 上限 ≈ 10s，仍在本測試 30s 預算內。
 		const releaseBudgetMs = MIN_SHOWN_MS + FADE_MS + 250;
 		await expect(async () => {
 			expect(
@@ -195,11 +181,6 @@ test("slow images cannot keep the visual loader open", {
 	const domReadyAt = Date.now();
 	const visualDeadline = INITIAL_LOADER_WATCHDOG_MS + 1_000;
 
-	// Hydration can begin after DOMContentLoaded on a cold, single-worker CI run.
-	// The document-level CSS/watchdog contract is the actual hard bound: the
-	// splash must disappear by the hard deadline even if React has not mounted,
-	// with 1s allowed
-	// here for the browser/expect polling scheduler under load.
 	await expect(page.locator(".initial-loader")).toBeHidden({
 		timeout: visualDeadline,
 	});
@@ -237,10 +218,6 @@ test("script failure cannot make the visual loader intercept pointer input", {
 		delay: `${INITIAL_LOADER_WATCHDOG_MS / 1_000}s`,
 	});
 
-	// The loader and application tree have independent CSS-only escape
-	// animations. Exercise the actual handoff, not only the animation metadata,
-	// so a future timing/name mismatch cannot leave users on a blank document
-	// when the Next bootstrap fails.
 	await expect(page.locator(".initial-loader")).toBeHidden({
 		timeout: INITIAL_LOADER_WATCHDOG_MS + 1_000,
 	});
@@ -278,28 +255,12 @@ test(
 
 		await page.goto("/", { waitUntil: "domcontentloaded" });
 		const loader = page.locator(".initial-loader");
-		// Gate convergence (#338): the deadline hands the viewport to whatever the
-		// server rendered instead of flipping into a blocking retry screen. The
-		// page tree stays visible and interactive.
 		await expect(loader).toBeHidden({
 			timeout: INITIAL_LOADER_WATCHDOG_MS + 1_000,
 		});
 		await expect(page.locator(".page-wrapper")).toBeVisible();
 		expect(await loaderBlocksPointer(page)).toBe(false);
 
-		// whenDocumentSettled() (lib/hydration/document-settled.ts) gates every
-		// third-party mount — GA4's <Script>, Sonner's toaster — on the same
-		// `initial-loader-active` removal `hide()` just performed above. Assert it
-		// directly rather than only inferring it from the splash's own visibility,
-		// so a future change that decouples the two (e.g. a new escape hatch that
-		// hides the splash without releasing this barrier) fails here first.
-		// whenDocumentSettled() 的 trySettle() 要求 `readyState === "complete"`
-		// **並且** loader 已釋放（lib/hydration/document-settled.ts）。這裡 splash
-		// 走的是 watchdog 逾時路徑，會早於 `load` 就釋放，所以剩下的那個條件是
-		// `load` —— 而首頁的動圖原檔（10 MB，eager）會把 `load` 拖到 ~28 秒。
-		// 先等 `load` 再斷言，而不是把 3 秒窗口膨脹成 30 秒：這裡要守的是「splash
-		// 釋放與這道柵欄不會被拆開」，那是幀等級的交接，把窗口放大會讓它失去鑑別力
-		// —— 真的被拆開時，30 秒內多半也還是會通過。
 		await page.waitForLoadState("load", { timeout: 45_000 });
 		await expect(page.locator("html")).toHaveAttribute(
 			"data-hk-document-settled",
@@ -318,13 +279,6 @@ test(
 			"one browser covers the timeout",
 		);
 
-		// #1819: the splash latches onto the entry route's content marker for the
-		// whole document lifetime. A client-side redirect away from that route (in
-		// production, SellerWorkspaceLock bouncing a seller off "/" to
-		// /seller-center/dashboard) unmounts the page that would have emitted the
-		// marker, so the marker can never arrive and the splash used to sit until
-		// the deadline — on a page that had loaded perfectly well. Soft navigations
-		// belong to PageTransition, not the splash.
 		await page.addInitScript(() => {
 			const target = window as Window & {
 				__hkReadyMarkerBlocker?: MutationObserver;
@@ -345,16 +299,10 @@ test(
 
 		await page.goto("/", { waitUntil: "domcontentloaded" });
 
-		// The loader adds this class from its own effect, so it is the precise
-		// "this component has hydrated and latched the entry route" signal. Leaving
-		// before it lands would let the redirect become the entry route and make the
-		// assertion below pass for the wrong reason.
 		await page.waitForFunction(() =>
 			document.documentElement.classList.contains("initial-loader-active"),
 		);
 
-		// App Router syncs usePathname with native history.pushState, which is how a
-		// client-side route change reaches the loader.
 		await page.evaluate(() => {
 			window.history.pushState({}, "", "/about");
 		});
@@ -363,8 +311,6 @@ test(
 		await expect(loader).toBeHidden({ timeout: 3_000 });
 		expect(await loaderBlocksPointer(page)).toBe(false);
 
-		// The deadline must stay quiet afterwards too — a released splash that later
-		// reappears is the same user-visible bug, just delayed.
 		await page.waitForTimeout(INITIAL_LOADER_WATCHDOG_MS + 1_000);
 		await expect(loader).toBeHidden();
 		expect(await loaderBlocksPointer(page)).toBe(false);

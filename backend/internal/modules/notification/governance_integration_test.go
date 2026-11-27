@@ -35,7 +35,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
 
-// fakeReporters 取代 moderation 的檢舉人讀取：與 moderation.CaseReporters 同一個形狀（一邊、依檢舉人號碼由小到大、從游標之後讀）；afters 記下每次讀的游標。
 type fakeReporters struct {
 	items  []moderation.Reporter
 	afters []int64
@@ -69,7 +68,6 @@ func (f *fakeReporters) CaseReporters(_ context.Context, _ uuid.UUID, side moder
 	return page, nil
 }
 
-// setupGovernance 組真的 buyer 與 seller、正式註冊表與正式的治理訂閱者：事件走 events.Publish，渠道 job 走真的 deliver（email 寄到 fake）。
 func setupGovernance(t *testing.T, reporters CaseReporters) *fixture {
 	t.Helper()
 	t.Parallel()
@@ -112,7 +110,6 @@ func (f *fixture) governanceIntake(chunk int) *intake.Service {
 	})
 }
 
-// emit 在一個 transaction 內發布事件（來源模組的寫入 transaction 的替身），再把排著的意圖展開。
 func emit[E any](t *testing.T, f *fixture, e E) {
 	t.Helper()
 	if err := f.db.InTx(context.Background(), func(ctx context.Context) error { return events.Publish(ctx, f.bus, e) }); err != nil {
@@ -162,7 +159,6 @@ func (f *fixture) channels(t *testing.T, account int64) []string {
 	return out
 }
 
-// storeOwner 開一間店並回傳 (店主帳號, store_id)。
 func (f *fixture) storeOwner(t *testing.T) (account, storeID int64) {
 	t.Helper()
 	account, _ = f.newBuyer(t)
@@ -533,7 +529,6 @@ func TestCaseClosedFansOutToBuyerAndStoreReportersAcrossPages(t *testing.T) {
 	if fromStart != 2 || len(reporters.afters) < 4 {
 		t.Fatalf("每個母意圖只有第一頁從頭讀，之後從上一頁最後一位的號碼接著讀：%v", reporters.afters)
 	}
-	// 買家與店家的號碼來自不同序列、會重疊，所以光看收件匣分不出店家母意圖讀錯邊；直接看兩邊都被讀過。
 	if !slices.Contains(reporters.sides, moderation.ReporterSideBuyer) || !slices.Contains(reporters.sides, moderation.ReporterSideStore) {
 		t.Fatalf("兩個母意圖各讀自己那一邊的檢舉人：%v", reporters.sides)
 	}

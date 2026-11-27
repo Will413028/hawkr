@@ -122,7 +122,6 @@ class ProductServiceSkuOptimisticLockTest {
         when(productSkuRepository.findByProductId(1L)).thenReturn(new ArrayList<>(List.of(entity)));
     }
 
-    // ── ⓪ 攔截器開關 ─────────────────────────────────────────────────────────
 
     @Test
     @DisplayName("⓪ ProductSkuEntity.version 必須帶 @Version —— 少了它，本檔其餘每一測都是裝飾品")
@@ -137,7 +136,6 @@ class ProductServiceSkuOptimisticLockTest {
                         + "分辨不出真實述詞在不在 ⇒ 拿掉註解後那些測試照樣全綠。");
     }
 
-    // ── ① 賣家帶舊 version 寫回 ────────────────────────────────────────────────
 
     @Test
     @DisplayName("① 表單開著期間被扣了庫存 → 賣家帶舊 version 寫回，必須 409 而不是把庫存復活")
@@ -145,7 +143,6 @@ class ProductServiceSkuOptimisticLockTest {
         skuInDbIs(skuAtVersion(101L, VERSION_AFTER_STOCK_DEDUCTED));
         dbIsAtVersion(VERSION_AFTER_STOCK_DEDUCTED);
 
-        // 賣家表單裡的 stockQty 還是開表單那一刻的 30（實際已經賣掉一部分）
         Throwable cause = causeOf(List.of(ProductSkuDTO.builder()
                 .id("101")
                 .stockQty(30)
@@ -163,7 +160,7 @@ class ProductServiceSkuOptimisticLockTest {
     @DisplayName("① 核心機制：送去 CAS 的 entity 必須帶 client 的 expectedVersion，不是剛讀到的新版本")
     void clientExpectedVersionReachesTheCas() throws Exception {
         skuInDbIs(skuAtVersion(101L, VERSION_AFTER_STOCK_DEDUCTED));
-        casAlwaysHits();   // 這一測不看 CAS 結果，只看送去 CAS 的是哪個版本
+        casAlwaysHits();
 
         invoke(List.of(ProductSkuDTO.builder()
                 .id("101")
@@ -182,18 +179,16 @@ class ProductServiceSkuOptimisticLockTest {
 
         Throwable cause = causeOf(List.of(ProductSkuDTO.builder()
                 .id("101")
-                .expectedVersion("999")     // 任何對不上的值
+                .expectedVersion("999")
                 .build()));
 
         assertInstanceOf(DelegationDeniedException.class, cause);
     }
 
-    // ── ② 不得製造新的 409 風暴 ──────────────────────────────────────────────
 
     @Test
     @DisplayName("② 只改 product 其他欄位（skus 未帶）→ 一條 SKU CAS 都不做，扣過庫存也不會 409")
     void productOnlyEditNeverTouchesSkuVersion() {
-        // 前提：庫存剛被扣過，SKU 版本已經前進；product.version 依設計不動
         skuInDbIs(skuAtVersion(101L, VERSION_AFTER_STOCK_DEDUCTED));
 
         assertDoesNotThrow(() -> invoke(new ArrayList<>()),
@@ -216,7 +211,6 @@ class ProductServiceSkuOptimisticLockTest {
                 "未提供時 entity 保持剛讀到的版本 ⇒ CAS 必命中 ⇒ 行為與本次修改前完全相同");
     }
 
-    // ── 邊界 ────────────────────────────────────────────────────────────────
 
     @Test
     @DisplayName("CAS 成功後回傳的 entity 版本要 +1，才不會把舊版本再下發給 client")

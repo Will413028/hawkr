@@ -81,7 +81,6 @@ export default function PaymentLandingClient({
 		[],
 	);
 
-	// 訪客不付款：導到訂單詳情，由受保護區帶去登入，登入後從那裡的「再次付款」回到這一步。
 	React.useEffect(() => {
 		if (status === "guest") {
 			router.replace(`/account/orders/${encodeURIComponent(orderNo)}`);

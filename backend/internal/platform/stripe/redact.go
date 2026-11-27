@@ -13,13 +13,9 @@ import (
 
 const (
 	redacted = "[REDACTED]"
-	// maxLogBodyBytes 是記錄裡單一本文（遮罩後）的長度上限，超過截斷。
 	maxLogBodyBytes = 16 << 10
 )
 
-// 欄位名稱的遮罩表，依類別分組，一個名稱一行（mutation 清單逐行拿掉驗證）。比對的是路徑上任一層的名稱（不分大小寫）：
-// 表單的 a[b][c] 與 JSON 的巢狀物件都一樣，命中就整個子樹換成 [REDACTED]。
-// 設計是 deny 表加上「個資容器整包遮」：容器底下新增的欄位不需要列名也會被遮。
 var (
 	credentialKeys = []string{
 		"authorization",
@@ -61,7 +57,6 @@ var (
 		"name",
 		"surname",
 	}
-	// 個資容器：底下任何欄位都不記。
 	containerKeys = []string{
 		"individual",
 		"person",
@@ -77,7 +72,6 @@ var (
 		"ip",
 		"user_agent",
 	}
-	// 名稱以這些結尾的欄位一律遮（client_secret、contact_email、receipt_email、first_name、given_name 等），所以這些全名不必再列在上面。
 	sensitiveSuffixes = []string{
 		"_secret",
 		"_email",
@@ -111,7 +105,6 @@ func sensitiveKey(k string) bool {
 	return false
 }
 
-// 值的遮罩：不論欄位名稱，字串裡長得像密鑰、信箱、卡號、電話的片段都換掉（欄位名稱沒涵蓋到的漏網防線）。
 var valuePatterns = []*regexp.Regexp{
 	regexp.MustCompile(`\b[sr]k_[A-Za-z0-9_]+`),
 	regexp.MustCompile(`\bwhsec_[A-Za-z0-9]+`),
@@ -136,7 +129,6 @@ func truncate(s string) string {
 	return strings.ToValidUTF8(s[:maxLogBodyBytes], "") + "…[truncated]"
 }
 
-// redactJSON 遞迴遮 JSON 本文；解析不了就整份不記（fail-safe），只留長度。
 func redactJSON(body []byte) string {
 	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.UseNumber()
@@ -178,7 +170,6 @@ func redactValue(v any) any {
 	}
 }
 
-// redactForm 遮表單編碼本文（a[b][c]=v）：路徑上任一層命中就遮值；鍵依字母序輸出，記錄穩定可比對。
 func redactForm(raw string) string {
 	form, err := url.ParseQuery(raw)
 	if err != nil {
@@ -217,7 +208,6 @@ func omitted(body []byte) string {
 	return "[body omitted, " + strconv.Itoa(utf8.RuneCount(body)) + " chars]"
 }
 
-// redactBody 依 Content-Type 選遮罩方式；不認得的類型整份不記。
 func redactBody(contentType string, body []byte) string {
 	if len(body) == 0 {
 		return ""

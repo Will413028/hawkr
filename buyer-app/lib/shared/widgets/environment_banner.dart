@@ -11,7 +11,6 @@ class EnvironmentBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Production 與 Dev（TEST）環境不顯示標籤；僅 Stage 顯示
     if (F.appFlavor == Flavor.prod || F.appFlavor == Flavor.dev) return child;
 
     return Banner(

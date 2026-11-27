@@ -6,10 +6,6 @@ import (
 	"strings"
 )
 
-// 儲存的代碼是 UPPER_SNAKE（ADR 2026-09-25-codemeta-retirement D3：DB 的值＝Go 常數的值＝proto 值名去掉型別前綴）。
-// CheckStoredCodeCase 讀一份 schema.sql 或 objects.sql（content），回報 CHECK 裡 `IN ('…')` 與 `ARRAY['…']` 值清單中帶小寫字母的值。
-// 只看 CHECK 的值清單：這是 D3 規定「DB 欄位是 text 加 CHECK」的值域宣告處；單值比對（`col = 'x'`）跟著值清單走，不另掃。
-// 不掃 migrations/：已套用的 migration 不得修改，現況由 schema.sql 代表（TestSchemaFileMatchesMigrations 保證兩者相同）。
 
 // StoredCodeException 是一個有理由的例外，以（模組、constraint 名）為鍵：同一個 CHECK 的所有值都豁免。
 type StoredCodeException struct {
@@ -31,7 +27,7 @@ func CheckStoredCodeCase(module, file, content string, exceptions []StoredCodeEx
 	sql := StripSQLComments(content)
 	var out []string
 	for _, loc := range checkOpen.FindAllStringSubmatchIndex(sql, -1) {
-		start := loc[1] // CHECK ( 之後
+		start := loc[1]
 		depth, end := 1, start
 		for end < len(sql) && depth > 0 {
 			switch sql[end] {

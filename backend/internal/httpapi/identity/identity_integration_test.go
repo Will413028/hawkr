@@ -69,16 +69,14 @@ type fixture struct {
 	buyers *buyer.Module
 
 	mu       sync.Mutex
-	accounts map[string]int64 // customerToken 的名稱 → 帳號 ID：同一個名稱是同一個帳號
+	accounts map[string]int64
 }
 
 type options struct {
 	access identity.AdminVerifier
-	// legacy 是轉給舊 gateway 的 handler；nil 時不掛。
 	legacy http.Handler
 }
 
-// setup 起 identity 與單體的入口，後台的身分用本機金鑰簽的 dev token，顧客的身分是 dev session。
 func setup(t *testing.T, o options) *fixture {
 	t.Helper()
 	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(
@@ -100,7 +98,6 @@ func setup(t *testing.T, o options) *fixture {
 		DB: d, Events: bus, Providers: providers,
 		Now: time.Now, Logger: log,
 	})
-	// 與正式組裝相同：buyer 在建帳的 transaction 內建立買家並授予 BUYER（cmd/hawkr 的 subscribeBuyerLifecycle）。
 	buyers := buyer.New(buyer.Deps{DB: d, Events: bus, Now: time.Now, Logger: log})
 	events.Subscribe(bus, buyers.OnAccountCreated)
 	del := delegation.New(delegation.Deps{DB: d, Identity: m, Events: bus, Seller: &seller.Module{}, Social: noSchedules{}, Now: time.Now, Logger: log})
@@ -135,8 +132,6 @@ func (f *fixture) customerToken(t *testing.T, user string) string {
 		if id, err = f.m.DevNewAccount(t.Context()); err != nil {
 			t.Fatal(err)
 		}
-		// dev 帳號沒有登入身分，所以沒有 email；後台列表與 email 篩選讀 accounts.email（provider 回報的 email 的位置），這裡直接寫入，
-		// 讓測試以 user 名稱認得帳號。
 		if _, err := f.db.Pool().Exec(t.Context(), `UPDATE identity.accounts SET email = $1 WHERE id = $2`, user+"@dev.localhost", id); err != nil {
 			t.Fatal(err)
 		}
@@ -209,14 +204,12 @@ func TestGetSessionCreatesTheAccountAsABuyer(t *testing.T) {
 	if err := f.db.Pool().QueryRow(ctx, `SELECT count(*) FROM buyer.buyers`).Scan(&buyers); err != nil || buyers != 2 {
 		t.Fatalf("買家列數 = %d, %v", buyers, err)
 	}
-	// 再次登入不會再建。
 	if _, err := f.app(headers("Authorization", "Bearer "+f.customerToken(t, "dev_buyer"))).GetSession(ctx, connect.NewRequest(&pb.GetSessionRequest{})); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.db.Pool().QueryRow(ctx, `SELECT count(*) FROM buyer.buyers`).Scan(&buyers); err != nil || buyers != 2 {
 		t.Fatalf("再次登入後買家列數 = %d, %v", buyers, err)
 	}
-	// 成為賣家之後：roles 只列 SELLER；Connect 不讀 X-Active-Role，帶不帶回應都一樣。
 	seller := f.customerToken(t, "dev_seller")
 	s, err := f.app(headers("Authorization", "Bearer "+seller)).GetSession(ctx, connect.NewRequest(&pb.GetSessionRequest{}))
 	if err != nil {
@@ -255,7 +248,7 @@ func TestConnectIgnoresTheOldSessionCookieAndCrossOriginWriteIsDenied(t *testing
 	}
 	crossSite := f.app(headers("Authorization", "Bearer "+tok, "Sec-Fetch-Site", "cross-site", "Origin", "https://evil.example"))
 	_, err = crossSite.SignOut(ctx, connect.NewRequest(&pb.SignOutRequest{}))
-	wantCode(t, err, connect.CodePermissionDenied) // CSRF（http.CrossOriginProtection）回 403
+	wantCode(t, err, connect.CodePermissionDenied)
 	sameOrigin := f.app(headers("Authorization", "Bearer "+tok, "Sec-Fetch-Site", "same-origin"))
 	if _, err := sameOrigin.SignOut(ctx, connect.NewRequest(&pb.SignOutRequest{})); err != nil {
 		t.Fatalf("同源的寫入 = %v", err)
@@ -270,7 +263,6 @@ func TestServicesAreSeparatedByAudience(t *testing.T) {
 	wantCode(t, err, connect.CodeUnauthenticated)
 	_, err = f.app(headers("Authorization", "Bearer not-a-token")).GetSession(ctx, connect.NewRequest(&pb.GetSessionRequest{}))
 	wantCode(t, err, connect.CodeUnauthenticated)
-	// 管理員不能呼叫登入後（買家、賣家）的 service；買家不能呼叫後台。
 	_, err = f.app(headers("Authorization", "Bearer "+f.adminToken(t, "dev_ops"))).GetSession(ctx, connect.NewRequest(&pb.GetSessionRequest{}))
 	wantCode(t, err, connect.CodePermissionDenied)
 	_, err = f.admin(headers("Authorization", "Bearer "+f.customerToken(t, "dev_buyer"))).ListAccounts(ctx, connect.NewRequest(&adminpb.ListAccountsRequest{}))
@@ -364,7 +356,6 @@ func TestAdminSessionAccountListAndSignOut(t *testing.T) {
 	if a := s.Msg.GetAdmin(); err != nil || a.GetEmail() != "dev_ops@dev.localhost" {
 		t.Fatalf("管理員的 session = %v, %v", s, err)
 	}
-	// 每個帳號都是買家：不帶角色篩選（ROLE_UNSPECIFIED）就是全部的買家。
 	page, err := admin.ListAccounts(ctx, connect.NewRequest(&adminpb.ListAccountsRequest{PageSize: 2}))
 	if err != nil || len(page.Msg.GetAccounts()) != 2 || page.Msg.GetTotalSize() != 3 || page.Msg.GetNextPageToken() == "" {
 		t.Fatalf("第一頁 = %v, %v", page, err)
@@ -391,7 +382,6 @@ func TestAdminSessionAccountListAndSignOut(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// email 完全相符（不分大小寫）：只找到那一個帳號。
 	exact, err := admin.ListAccounts(ctx, connect.NewRequest(&adminpb.ListAccountsRequest{Email: " DEV_A@dev.localhost "}))
 	if err != nil || len(exact.Msg.GetAccounts()) != 1 || exact.Msg.GetAccounts()[0].GetEmail() != "dev_a@dev.localhost" || exact.Msg.GetTotalSize() != 1 {
 		t.Fatalf("email 完全相符 = %v, %v", exact, err)
@@ -399,13 +389,10 @@ func TestAdminSessionAccountListAndSignOut(t *testing.T) {
 	if none, err := admin.ListAccounts(ctx, connect.NewRequest(&adminpb.ListAccountsRequest{Email: "dev_a@dev"})); err != nil || len(none.Msg.GetAccounts()) != 0 {
 		t.Fatalf("email 部分相符不該命中 = %v, %v", none, err)
 	}
-	// 換了 email 篩選也不能沿用 page token。
 	_, err = admin.ListAccounts(ctx, connect.NewRequest(&adminpb.ListAccountsRequest{PageSize: 2, Email: "x@y.z", PageToken: page.Msg.GetNextPageToken()}))
 	wantCode(t, err, connect.CodeInvalidArgument)
-	// 換了篩選就不能沿用 page token。
 	_, err = admin.ListAccounts(ctx, connect.NewRequest(&adminpb.ListAccountsRequest{PageSize: 2, Query: "x", PageToken: page.Msg.GetNextPageToken()}))
 	wantCode(t, err, connect.CodeInvalidArgument)
-	// 登出前結束代行（不是撤銷）；沒有代行時也成功。
 	if _, err := admin.SignOut(ctx, connect.NewRequest(&adminpb.SignOutRequest{})); err != nil {
 		t.Fatal(err)
 	}
@@ -428,7 +415,6 @@ func TestEnumsMatchTheModule(t *testing.T) {
 	}
 }
 
-// noDashboardOrders 是這個測試不讀儀表板的訂單時的替身：NewHandler 要求提供儀表板訂單的來源。
 type noDashboardOrders struct{}
 
 func (noDashboardOrders) SalesStats(context.Context, int64, []httpseller.SalesWindow) ([]httpseller.SalesStats, error) {
@@ -464,16 +450,12 @@ func TestAdminGetAccountFindsALiveAccountAndHidesTheDeadOnes(t *testing.T) {
 	if aID == "" {
 		t.Fatalf("列表裡找不到 dev_a：%v", page.Msg.GetAccounts())
 	}
-	// 存在：回傳的是同一個帳號。
 	got, err := admin.GetAccount(ctx, connect.NewRequest(&adminpb.GetAccountRequest{AccountId: aID}))
 	if err != nil || got.Msg.GetAccount().GetId() != aID || got.Msg.GetAccount().GetEmail() != "dev_a@dev.localhost" {
 		t.Fatalf("存活的帳號 = %v, %v", got, err)
 	}
-	// 不存在。
 	_, err = admin.GetAccount(ctx, connect.NewRequest(&adminpb.GetAccountRequest{AccountId: "999999999"}))
 	wantCode(t, err, connect.CodeNotFound)
-	// 已刪除：墓碑由 identity.DeleteAccount 寫入（accountdeletion 完成刪除時呼叫的也是它）。這個套件的 fixture 把 accountdeletion
-	// 接成零值替身，所以不走刪除申請的 HTTP 路徑；刪除流程本身由 accountdeletion 與 httpapi/seller 的整合測試守。
 	id, err := strconv.ParseInt(aID, 10, 64)
 	if err != nil {
 		t.Fatal(err)
@@ -485,8 +467,6 @@ func TestAdminGetAccountFindsALiveAccountAndHidesTheDeadOnes(t *testing.T) {
 	wantCode(t, err, connect.CodeNotFound)
 }
 
-// noSchedules 是沒有 social 資料的測試組裝給 delegation 的 Social：這個測試不建排程，取消沒有東西可取消。
-// 內嵌的 *social.Module 是 nil：這些測試不寫代行貼文，只滿足 delegation.Social 的方法集合，被呼叫就 panic。
 type noSchedules struct{}
 
 func (noSchedules) CancelScheduledBy(context.Context, social.ScheduleKind, []string, social.CancelReason) ([]uuid.UUID, error) {

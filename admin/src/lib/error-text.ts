@@ -16,9 +16,7 @@ export function errorMessage(err: unknown): string {
  * 沒有時用呼叫端的文字。不以訊息字串比對做特判（K1）；VERSION_CONFLICT 與欄位錯誤這些本頁不會用到，照目錄的預設文字顯示。
  */
 export function connectErrorText(caught: unknown, fallback: string): string {
-	// 網路層失敗（沒有收到回應）換成呼叫端的文字。
 	if (isNoResponse(caught)) return fallback;
-	// 本頁自己拋出的前置條件錯誤（例如帳號 ID 還沒載入）是一般的 Error：照它的訊息講。
 	if (caught instanceof Error && !(caught instanceof ConnectError)) {
 		return caught.message || fallback;
 	}

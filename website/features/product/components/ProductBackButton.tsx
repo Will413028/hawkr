@@ -16,9 +16,6 @@ export default function ProductBackButton() {
 	const router = useObservedRouter("product_back_button");
 
 	const handleBack = () => {
-		// `history.length > 1` ≈ arrived via an in-app navigation, so `back()`
-		// returns to the originating list (and runs the reverse zoom). Otherwise
-		// send the user to the market list explicitly.
 		if (typeof window !== "undefined" && window.history.length > 1) {
 			router.back();
 		} else {
@@ -30,8 +27,6 @@ export default function ProductBackButton() {
 		<button
 			type="button"
 			onClick={handleBack}
-			// PageTransition's capture-phase click listener keys off this to snapshot
-			// the PDP for the reverse zoom before `router.back()` swaps the route.
 			data-zoom-back=""
 			aria-label="返回"
 			className={COMPACT_BACK_CONTROL_CLASSNAME}

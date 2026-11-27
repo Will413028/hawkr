@@ -40,7 +40,6 @@ class ProductCard extends StatefulWidget {
   final String name;
   final String price;
   final String priceMax;
-  // PayUni #758: 原價區間（刪除線）。當 listPriceMin/Max > priceMin/Max 才顯示。
   final String listPriceMin;
   final String listPriceMax;
   final String imageUrl;
@@ -161,9 +160,6 @@ class _ProductCardState extends State<ProductCard> {
     key: const ValueKey('product-card-favorite-surface'),
     surfaceKey: const ValueKey('product-card-favorite-glass-fill'),
     variant: HkLiquidGlassVariant.clear,
-    // Keep the clear material's compact blur and specular highlight, while a
-    // real material tint keeps busy product photos from showing through too
-    // strongly.
     surfaceOpacity: HkGlass.regularSurfaceOpacity,
     paintSurfaceColorBeneathGradient: true,
     width: dimension,
@@ -205,9 +201,6 @@ class _ProductCardState extends State<ProductCard> {
     final displayHashtags = _displayHashtags;
     final compactMedia = MediaQuery.sizeOf(context).width <= 840;
     final cardRadius = compactMedia ? HkRadius.md : HkRadius.lg;
-    // Keep component geometry in logical pixels. Only the text panel grows a
-    // little with the system text scale so a wrapped original price does not
-    // overflow at the app-supported 1.4x accessibility setting.
     final textScale = ProductCard.effectiveTextScale(context);
     final textPanelHeight = 72.0 + ((textScale - 1.0) * 20.0);
     final showListPrice =
@@ -217,8 +210,6 @@ class _ProductCardState extends State<ProductCard> {
         (MediaQuery.maybeDisableAnimationsOf(context) ?? false) ||
         View.of(context).platformDispatcher.accessibilityFeatures.reduceMotion;
 
-    // 商家名稱 / 頭像一律由呼叫端給（三個列表 API 都成對回 sellerName +
-    // sellerLogoKey）；此處不再有任何 per-card 網路補撈。
     final String resolvedSellerName = widget.sellerName;
     final String resolvedSellerAvatarUrl = widget.sellerAvatarUrl;
 
@@ -279,7 +270,6 @@ class _ProductCardState extends State<ProductCard> {
           ? Duration.zero
           : const Duration(milliseconds: 150),
       curve: HkMotion.ease,
-      // 媒體、文字與操作共用單一外層卡面；不再為圖片或下方資訊加第二層卡片。
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -316,7 +306,6 @@ class _ProductCardState extends State<ProductCard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ── 4:3 媒體區：貼齊卡面，與下方資訊形成單一連續表面。──
                       AspectRatio(
                         key: const ValueKey('product-card-media'),
                         aspectRatio: 4 / 3,
@@ -369,11 +358,9 @@ class _ProductCardState extends State<ProductCard> {
                                   ),
                                 ),
                               ),
-                            // ── Hashtag chips（Web parity：最多兩顆、空間不足往上換行）──
                             if (displayHashtags.isNotEmpty)
                               Positioned(
                                 left: 8,
-                                // 保留完整 48dp 給右側加購操作，兩者永不重疊。
                                 right: 56,
                                 bottom: 8,
                                 child: IgnorePointer(
@@ -403,7 +390,6 @@ class _ProductCardState extends State<ProductCard> {
                           ],
                         ),
                       ),
-                      // ── 文字區（下方）──
                       SizedBox(
                         key: const ValueKey('product-card-body'),
                         height: textPanelHeight,
@@ -413,14 +399,8 @@ class _ProductCardState extends State<ProductCard> {
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            // Four equal spaces: media→seller,
-                            // seller→product, product→price and price→card.
-                            // This remains proportional when accessibility
-                            // text scaling changes each row's intrinsic height.
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: [
-                              // 商家資訊從圖片移到圖文分界，讓照片保持原色。
-                              // 右側預留加購鈕跨界的 40dp 視覺面，避免大字級文字重疊。
                               if (resolvedSellerName.isNotEmpty) ...[
                                 Padding(
                                   padding: const EdgeInsets.only(right: 44),
@@ -509,11 +489,6 @@ class _ProductCardState extends State<ProductCard> {
                                     crossAxisAlignment: CrossAxisAlignment.end,
                                     children: [
                                       Flexible(
-                                        // Narrow two-column cards must preserve
-                                        // the current price range first.  The
-                                        // struck-through list price is secondary
-                                        // metadata and yields space before the
-                                        // actionable price is truncated.
                                         flex: 4,
                                         child: Text.rich(
                                           TextSpan(
@@ -540,21 +515,11 @@ class _ProductCardState extends State<ProductCard> {
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
-                                      // On a two-column phone card the full
-                                      // active range is more important than
-                                      // squeezed or ellipsized comparison
-                                      // metadata. Wider layouts have room for
-                                      // both values, matching the Web card.
                                       if (showListPrice) ...[
                                         const SizedBox(width: HkSpace.xs),
                                         Flexible(
                                           flex: 2,
                                           child: Text(
-                                            // The active price already carries
-                                            // the NT$ unit. Repeating a currency
-                                            // symbol here wastes scarce width on
-                                            // two-column cards and can turn a
-                                            // complete range into an ellipsis.
                                             _listPriceDisplay,
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
@@ -610,10 +575,8 @@ class _ProductCardState extends State<ProductCard> {
                 ),
               ),
             ),
-          // 「+ 加購」的中心精準對齊圖文分界，但仍留在同一張卡面內。
           Positioned(
             right: 0,
-            // 48dp 點擊範圍的中心在 seam：body 72dp - 半徑 24dp。
             bottom: textPanelHeight - (HkControl.minTap / 2),
             child: Semantics(
               button: true,
@@ -630,8 +593,6 @@ class _ProductCardState extends State<ProductCard> {
                     child: Center(
                       child: Container(
                         key: const ValueKey('product-card-add-surface'),
-                        // Keep the floating control visually compact while the
-                        // surrounding gesture target remains a full 48dp.
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(

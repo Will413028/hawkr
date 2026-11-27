@@ -51,7 +51,6 @@ func errVersionConflict() error { return apperr.VersionConflict("業者資料已
 
 func errNotFound() error { return apperr.NotFound("找不到業者") }
 
-// notFound 把查無資料轉成 NotFound。
 func notFound(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return errNotFound()
@@ -59,7 +58,6 @@ func notFound(err error) error {
 	return err
 }
 
-// uniqueViolation 回傳違反唯一性的約束名。寫入在 transaction 內撞唯一性時，呼叫方立刻回業務錯誤、不再下任何 SQL。
 func uniqueViolation(err error) (string, bool) {
 	var pg *pgconn.PgError
 	if errors.As(err, &pg) && pg.Code == "23505" {
@@ -68,7 +66,6 @@ func uniqueViolation(err error) (string, bool) {
 	return "", false
 }
 
-// conflictError 把撞唯一性轉成業務錯誤：轉成店家的認領有明確的說法，沒有登記的約束照原樣傳回。
 func conflictError(err error) error {
 	if name, ok := uniqueViolation(err); ok && name == "prospects_converted_store" {
 		return apperr.AlreadyExists("此店家已被其他業者認領")
@@ -96,7 +93,6 @@ func toProspects(rows []store.SellerProspect) []model.Prospect {
 	return out
 }
 
-// load 補上單筆讀取才帶的聯絡方式與分類。
 func load(ctx context.Context, q *store.Queries, row store.SellerProspect) (model.Prospect, error) {
 	p := toProspect(row)
 	var err error
@@ -312,7 +308,6 @@ func (s *Service) List(ctx context.Context, in model.ProspectListInput) (model.P
 
 func ptr[T any](v T) *T { return &v }
 
-// updatePlan 是 Update 在讀到的列上算出來的結果：要寫什麼、要記下哪些「不是同一家」，或什麼都不用寫。
 type updatePlan struct {
 	row               store.SellerProspect
 	fields            model.ProspectFields
@@ -324,9 +319,6 @@ type updatePlan struct {
 	noop              bool
 }
 
-// planUpdate 在 row 上做 Update 所有不需要寫入就能判斷的檢查與計算：狀態、版本、合併後的驗證、統編、聯絡方式的比對。換圖的
-// 轉正之前先呼叫一次（被拒絕的請求不消耗 staged token），transaction 內以列鎖內的資料再呼叫一次，以後者為準。contacts 與
-// categories 是已正規化的輸入（nil 保留）。
 func planUpdate(ctx context.Context, q *store.Queries, row store.SellerProspect, in model.UpdateProspectInput, contacts *[]model.ContactPoint, categories []string) (updatePlan, error) {
 	if row.Status != string(model.ProspectStatusActive) {
 		return updatePlan{}, apperr.FailedPrecondition("只有進行中的業者可以修改")
@@ -481,7 +473,6 @@ func (s *Service) Update(ctx context.Context, in model.UpdateProspectInput) (mod
 	return out, nil
 }
 
-// lockOne 鎖定一個業者；找不到回 NotFound。
 func lockOne(ctx context.Context, q *store.Queries, id int64) (store.SellerProspect, error) {
 	rows, err := q.LockProspects(ctx, []int64{id})
 	if err != nil {

@@ -114,7 +114,6 @@ export async function PUT(request: NextRequest, context: Context) {
 				method: "PUT",
 				adminToken,
 				idempotencyKey,
-				// storeId 只走 path，不進 body：同一個值出現在兩處，遲早有一次不一致。
 				body: scope.value,
 			},
 		);

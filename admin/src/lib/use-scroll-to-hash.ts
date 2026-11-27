@@ -16,7 +16,6 @@ export function useScrollToHash(ready: boolean): void {
 		try {
 			id = decodeURIComponent(raw);
 		} catch {
-			// 不合法的編碼照原字串找。
 		}
 		document.getElementById(id)?.scrollIntoView({ block: "start" });
 	}, [ready]);

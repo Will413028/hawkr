@@ -107,37 +107,29 @@ public class StockService {
      */
     @Transactional
     public StockResult deductStock(String stockTxId, List<StockItemParam> items) {
-        // 冪等檢查（按 txId + 操作類型判斷）
         if (stockTxRepository.existsByStockTxIdAndOperation(stockTxId, StockTxPhase.DEDUCT.value())) {
             log.info("StockService.deductStock.idempotent", "重複請求，忽略", "stockTxId", stockTxId);
             return StockResult.ALREADY_APPLIED;
         }
 
-        // 按 skuId 升序排序（避免死鎖）
         List<StockItemParam> sorted = items.stream()
                 .sorted(Comparator.comparingLong(StockItemParam::skuId))
                 .toList();
 
-        // 逐一扣減
         for (StockItemParam item : sorted) {
             int affected = skuRepository.deductStock(item.skuId(), item.quantity());
             if (affected == 0) {
-                // 庫存不足 → 交易回滾（@Transactional 自動回滾 RuntimeException）
                 log.warn("StockService.deductStock.insufficient",
                         "庫存不足", "skuId", String.valueOf(item.skuId()));
                 throw new InsufficientStockException(item.skuId(), item.quantity());
             }
         }
 
-        // product.stock_qty 反正規化欄位 cascade（02 §3.2 / §5.8）
-        // 同事務內按 product_id ASC 排序，避免多訂單併發死鎖（docs/開發規範/後端服務責任邊界規範.md §三）
         cascadeProductStock(sorted, -1);
 
-        // 記錄冪等交易
         String payload = toJson(sorted);
         stockTxRepository.insertIfAbsent(stockTxId, StockTxPhase.DEDUCT.value(), payload);
 
-        // 觸發 frontend SSR cache bust（後端服務責任邊界規範 §9.3）— 庫存影響 PDP 顯示
         revalidateAffectedProducts(sorted);
 
         log.info("StockService.deductStock.success", "庫存扣減成功",
@@ -152,43 +144,34 @@ public class StockService {
      */
     @Transactional
     public StockResult restoreStock(String stockTxId, List<StockItemParam> items) {
-        // 冪等檢查（按 txId + 操作類型判斷）
         if (stockTxRepository.existsByStockTxIdAndOperation(stockTxId, StockTxPhase.RESTORE.value())) {
             log.info("StockService.restoreStock.idempotent", "重複請求，忽略", "stockTxId", stockTxId);
             return StockResult.ALREADY_APPLIED;
         }
 
-        // over-restore 因果閘門（02 §5.8）：無同 txId 已 commit 的 DEDUCT → 無可歸還，直接 NOOP。
-        // 防止補償一個 rollback 掉的 deduct（Bug A / INSUFFICIENT_STOCK 從未扣減）灌水 SKU 真值。
         if (!stockTxRepository.existsByStockTxIdAndOperation(stockTxId, StockTxPhase.DEDUCT.value())) {
             log.warn("StockService.restoreStock.noDeduct",
                     "無對應 DEDUCT 記錄，視為補償成功 NOOP", "stockTxId", stockTxId);
             return StockResult.NOOP_NOT_FOUND;
         }
 
-        // 按 skuId 升序排序（避免死鎖）
         List<StockItemParam> sorted = items.stream()
                 .sorted(Comparator.comparingLong(StockItemParam::skuId))
                 .toList();
 
-        // 逐一歸還
         for (StockItemParam item : sorted) {
             int affected = skuRepository.restoreStock(item.skuId(), item.quantity());
             if (affected == 0) {
                 log.warn("StockService.restoreStock.notFound",
                         "SKU 不存在", "skuId", String.valueOf(item.skuId()));
-                // 歸還時 SKU 不存在不阻塞（避免補償失敗）
             }
         }
 
-        // product.stock_qty 反正規化欄位 cascade（02 §3.2 / §5.8）
         cascadeProductStock(sorted, +1);
 
-        // 記錄冪等交易
         String payload = toJson(sorted);
         stockTxRepository.insertIfAbsent(stockTxId, StockTxPhase.RESTORE.value(), payload);
 
-        // 觸發 frontend SSR cache bust（後端服務責任邊界規範 §9.3）— 庫存恢復同樣影響 PDP
         revalidateAffectedProducts(sorted);
 
         log.info("StockService.restoreStock.success", "庫存歸還成功",
@@ -205,23 +188,19 @@ public class StockService {
      * @param sign  +1（restore）或 -1（deduct）
      */
     private void cascadeProductStock(List<StockItemParam> items, int sign) {
-        // 一次查詢出全部 SKU 的 product_id（避免 N+1）
         List<Long> skuIds = items.stream().map(StockItemParam::skuId).toList();
         List<SkuProductRef> skus = skuRepository.findSkuProductRefs(skuIds);
         Map<Long, Long> skuToProduct = skus.stream()
                 .collect(Collectors.toMap(SkuProductRef::skuId, SkuProductRef::productId));
 
-        // 收集受影響 product_id（TreeSet 保證 product_id ASC 鎖序，避免多訂單併發死鎖）
         TreeSet<Long> productIds = new TreeSet<>();
         for (StockItemParam item : items) {
             Long productId = skuToProduct.get(item.skuId());
-            if (productId == null) continue;     // SKU 不存在 → 跳過（restore 場景允許）
+            if (productId == null) continue;
             productIds.add(productId);
         }
         if (productIds.isEmpty()) return;
 
-        // 02 §5.13b 補貨 transition 偵測：僅 sign>0（restoreStock）路徑可能造成 0→>0 transition；
-        // deductStock 路徑只會由正轉小，無需查詢 old 值
         Map<Long, RestockTransitionProjection> projectionMap;
         if (sign > 0) {
             projectionMap = productRepository.findRestockTransitionFields(List.copyOf(productIds)).stream()
@@ -230,12 +209,9 @@ public class StockService {
             projectionMap = Map.of();
         }
 
-        // 逐 product 全量重算 stock_qty = SUM(sku)（02 §5.8，結構上 ≥0）
-        // detail cache 失效收斂到 afterCommit（見文末 registerCacheEvictionAfterCommit），消除 evict-inside-txn race
         for (Long productId : productIds) {
             productRepository.reaggregateStockFromSku(productId);
 
-            // 02 §5.13b 補貨 transition：oldStock=0 AND newStock>0 AND status=4004 AND deleted_at IS NULL
             RestockTransitionProjection proj = projectionMap.get(productId);
             if (proj != null
                     && proj.stockQty() != null && proj.stockQty() == 0L
@@ -249,18 +225,11 @@ public class StockService {
             }
         }
 
-        // stock_qty 反正規化欄位亦出現在 ProductListItemDTO（02 §3.2 / §5.13a，列表卡「售完/現貨」判斷）
-        // → 列表快取必須與 detail 同步失效，否則列表最長陳舊至 LIST_TTL（#1426）。
-        // 反查各 product 的 owner（store_id）後批次清 owner bucket + 公開聚合 bucket 0。
         List<Long> ownerIds = productRepository.findProductSellerRefs(List.copyOf(productIds)).stream()
                 .map(ProductSellerRef::sellerId)
                 .filter(java.util.Objects::nonNull)
                 .toList();
 
-        // detail + list 快取失效收斂為單一 post-commit hook（#1455）：
-        // afterCommit 在交易 commit 後才 evict → race-free（消除舊 evict-inside-txn 讀到未提交狀態的窗口），
-        // 且三條寫路徑（deduct gRPC / restore gRPC / OrderCancelledConsumer）共用同一入口，
-        // 取代原 ProductGrpcService.evictCacheBySkuIds 的冗餘 post-commit 二次清除。
         registerCacheEvictionAfterCommit(productIds, ownerIds);
     }
 
@@ -297,7 +266,6 @@ public class StockService {
                 }
             });
         } else {
-            // 無 active transaction（防禦路徑）→ 直接 evict
             evictTask.run();
         }
     }

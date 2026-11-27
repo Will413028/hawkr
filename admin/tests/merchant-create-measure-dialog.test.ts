@@ -177,7 +177,6 @@ async function settle(m: { queryClient: QueryClient }) {
 		return (
 			queries.length > 0 &&
 			m.queryClient.isFetching() === 0 &&
-			// 停用的查詢（帳號還不知道時的 skipToken）會一直停在 pending，不算還沒完成。
 			queries.every(
 				(q) => q.state.status !== "pending" || q.state.fetchStatus === "idle",
 			)
@@ -557,7 +556,6 @@ test("從發票的停權建議開啟：種類、結束時間與理由已預填�
 		(byId("create-violation-measure-statement") as HTMLTextAreaElement).value,
 		initial.statement,
 	);
-	// 類別與嚴重度不預填：只補上其餘必填欄位仍送不出去。
 	assert.equal(
 		(byId("create-violation-measure-category") as HTMLSelectElement).value,
 		String(PolicyCategory.UNSPECIFIED),
@@ -572,7 +570,6 @@ test("從發票的停權建議開啟：種類、結束時間與理由已預填�
 	await click("確認建立");
 	assert.equal(d.requests.length, 0, "沒選類別不得送出");
 	assert.match(bodyText(), /請選擇類別/u);
-	// 預填的每一欄都可以改，送出的是改過的值。
 	await React.act(async () => {
 		setValue(
 			byId("create-violation-measure-category"),
@@ -801,7 +798,6 @@ test("來源通報與引用的認定換勾選順序（取消再勾回）是同�
 	await toggle(FINDING_ID);
 	await click("確認建立");
 	assert.equal(d.requests.length, 1);
-	// 取消勾選再勾回：集合不變，勾選順序變成 PENDING、VERIFIED。
 	await toggle(ACTION_TAKEN_ID);
 	await toggle(ACTION_TAKEN_ID);
 	await click("確認建立");

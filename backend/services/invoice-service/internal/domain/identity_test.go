@@ -99,11 +99,11 @@ func TestIsBusinessTaxID(t *testing.T) {
 		"36333333":   true,
 		"12345678":   true,
 		"":           false,
-		"0000000000": false, // B2C 佔位值不是統編
+		"0000000000": false,
 		"3633333":    false,
 		"363333330":  false,
 		"3633333a":   false,
-		"3633 3333":  false, // 含空白（IsBusinessTaxID 只收 8 位純數字）
+		"3633 3333":  false,
 	}
 	for in, want := range cases {
 		if got := IsBusinessTaxID(in); got != want {

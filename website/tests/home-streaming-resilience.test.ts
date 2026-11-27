@@ -16,10 +16,6 @@ test("homepage data cannot reopen a server-streaming blank state", async () => {
 	assert.match(source, /enabled: isBrowser/);
 	assert.match(source, /staleTime: HOME_SNAPSHOT_STALE_MS/);
 	assert.match(source, /gcTime: HOME_SNAPSHOT_GC_MS/);
-	// SEO restore (#338): the server builds the snapshot and hands it down as a
-	// prop; HomeContent seeds it as react-query initialData so the crawlable HTML
-	// carries content and the browser query only reconciles afterwards. The
-	// browser refetch reshapes its payload with the same pure builder.
 	assert.match(
 		source,
 		/export default function HomePage\(\{(?=[^}]*\bsnapshot\b)[^}]*\}/,
@@ -30,7 +26,6 @@ test("homepage data cannot reopen a server-streaming blank state", async () => {
 		/<HomeContent\b(?=[^>]*\binitialSnapshot=\{snapshot\})[^>]*\/>/,
 	);
 	assert.match(source, /return buildHomeSnapshot\(bootstrap\)/);
-	// Pending renders null; only the isError terminal branch may render.
 	assert.match(
 		source,
 		/if \(!homeQuery\.data\) \{[\s\S]*?if \(homeQuery\.isError\) \{[\s\S]*?return null;\s*\}/,
@@ -49,8 +44,6 @@ test("homepage data cannot reopen a server-streaming blank state", async () => {
 test("homepage leaves pending content to the single initial loader", async () => {
 	const homeSource = await readFile(homePagePath, "utf8");
 
-	// The non-error pending branch must stay null — ErrorState is an error
-	// terminal, not a pending surface, so it must be isError-gated.
 	assert.match(
 		homeSource,
 		/if \(!homeQuery\.data\) \{[\s\S]*?if \(homeQuery\.isError\) \{[\s\S]*?return null;\s*\}/,

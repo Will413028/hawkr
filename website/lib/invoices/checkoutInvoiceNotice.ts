@@ -31,9 +31,6 @@ export function checkoutPaidInvoiceNotice(invoiceMode: string): string {
 			return "付款完成，系統正在處理發票";
 		case "PLATFORM_RECEIPT":
 			return "付款完成，收據將顯示在訂單詳情";
-		// LEGACY_MANUAL 與 SELLER_SELF_ISSUE 的責任歸屬相同（都在賣家手上），
-		// 買家可見的措辭因此一致；兩者的差別只在平台內部有沒有串接，說給買家聽
-		// 沒有意義。
 		case "SELLER_SELF_ISSUE":
 		case "LEGACY_MANUAL":
 			return "付款完成，賣家將依訂單資訊自行開立發票";

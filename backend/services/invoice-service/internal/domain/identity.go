@@ -9,13 +9,6 @@ import (
 	"github.com/Will413028/hawkr/go-pkg/codemeta"
 )
 
-// 衍生識別字（§5.3.2）。三個共同性質：**可重建**、**逾時重試不換號**、**純函式**。
-//
-// 需求書建議的 `issue:{store_id}:{order_no}:{snapshot_version}` 在作廢重開情境會撞鍵
-// （買家只改通知 Email ⇒ snapshot_version 不變 ⇒ 算出同一個 OrderId ⇒ AMEGO 回 3040171
-// 而我方以為「已成功」⇒ 原票已作廢、新票沒開出來，買家手上一張發票都沒有）。
-// ⇒ 兩個正交的版本軸：內容軸 snapshot_version（order-service 寫）＋ 實體軸
-// issue_attempt_seq（本服務寫，作廢重開必 +1）。
 
 // ProviderRequestNoForOrder 組出 ORDER 來源的 AMEGO OrderId（＝ provider_request_no）。
 //
@@ -112,8 +105,6 @@ func RequestSnapshotHash(d *IssueDraft) string {
 	}
 	b, err := json.Marshal(payload)
 	if err != nil {
-		// payload 只含 string／整數／slice，Marshal 不可能失敗；真的失敗時回一個
-		// 恆不相等的值比回空字串好——空字串會讓「沒算過」與「算出來是空的」混為一談。
 		return "unmarshalable"
 	}
 	sum := sha256.Sum256(b)

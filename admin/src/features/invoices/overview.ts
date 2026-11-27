@@ -84,7 +84,6 @@ export const KPI_META: Record<string, KpiMeta> = {
 		label: "因發票違規停權",
 		icon: "block",
 		variant: "danger",
-		// 沒有 `/admin/violations` 這條路由；`merchants?filter=suspended` 是支援的 deep-link（商家清單的停權篩選）。
 		href: "/admin/merchants?filter=suspended",
 		note: "點擊後看到的是全部停權中的賣家；個別賣家的措施請到商家詳情的「措施歷史」查看。",
 	},

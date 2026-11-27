@@ -28,8 +28,6 @@ describe("delegatedProductKpi", () => {
 			lowStock: null,
 			draft: 0,
 		});
-		// 一家真的沒有商品的店，四格必須是 "0" 而不是破折號 —— 否則這個修法就把
-		// 「已知為零」也一起藏掉了，那是反方向的同一個謊。
 		expect(formatNullableCount(kpi.active)).toBe("0");
 		expect(formatNullableCount(kpi.total)).toBe("0");
 	});
@@ -49,9 +47,6 @@ describe("delegatedProductKpi", () => {
 		expect(formatNullableCount(kpi.active)).toBe("—");
 		expect(formatNullableCount(kpi.off)).toBe("—");
 		expect(formatNullableCount(kpi.draft)).toBe("—");
-		// 總商品數也一起 —— 四格同生共死。舊實作以清單 `total` 兜底，於是畫出
-		// 「總數 15、其餘 0」這種自相矛盾的一列（而清單的 total 是「當前篩選」的
-		// 總數，點過任何一張卡之後它連總數都不是）。
 		expect(formatNullableCount(kpi.total)).toBe("—");
 	});
 

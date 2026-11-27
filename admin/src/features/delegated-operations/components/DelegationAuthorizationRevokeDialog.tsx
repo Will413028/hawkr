@@ -76,9 +76,6 @@ export default function DelegationAuthorizationRevokeDialog({
 				revokeReason: trimmed,
 				idempotencyKey,
 			});
-			// 已撤回是冪等成功，不是失敗；但也不能宣稱這一次中止了工作階段。
-			// 實際中止筆數以回應的 `revokedSessionIds` 為準，不是按下之前查到的數字
-			//（中間可能有人自行結束）。
 			onRevoked(
 				result.alreadyRevoked
 					? "這家店的代行授權先前已被撤回，本次沒有變更。"

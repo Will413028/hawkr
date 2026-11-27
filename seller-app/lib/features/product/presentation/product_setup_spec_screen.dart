@@ -48,7 +48,6 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
     required this.subCategory,
     this.catalogId,
     this.isCandidateCategory = false,
-    // 完整分類資訊
     this.l1Id,
     this.l1Name,
     this.l2Id,
@@ -67,10 +66,9 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
   final String productName;
   final String category;
   final String subCategory;
-  final int? catalogId; // 分類 ID（可能是正式或暫時）
+  final int? catalogId;
   final bool
-  isCandidateCategory; // true=來自 category_candidate, false=來自 category
-  // 完整分類資訊
+  isCandidateCategory;
   final int? l1Id;
   final String? l1Name;
   final int? l2Id;
@@ -142,25 +140,17 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 編輯模式載入現有資料
     final isLoadingExisting = useState(isEditMode);
 
-    // 多規格列表
     final specs = useState<List<_SpecData>>([_SpecData()]);
 
-    // 運送方式選擇（多選）— 從 POST /app/shipping_quotes API 取得
     final selectedShippingMethods = useState<Set<String>>({});
-    // 每個運送方式的 feePayer: per-spec List，index 對應 specs index，內層 key = method
     final specFeePayers = useState<List<Map<String, String>>>([{}]);
-    // 每個運送方式的 freeThreshold: per-spec List，index 對應 specs index，內層 key = method
     final specFreeThresholds = useState<List<Map<String, String>>>([{}]);
     final shippingOptions = useState<List<Map<String, dynamic>>>([]);
     final shippingLoading = useState(false);
     final shippingError = useState<String?>(null);
 
-    // 賣家當前已開通（available=true）的配送方式 key 集合，
-    // 由 GET /app/shipping_methods 載入，用來過濾 shipping_quotes 回傳的選項，
-    // 避免顯示「賣家未開通卻送出後被後端 400 退」的選項。
     final onboardedMethodKeys = useState<Set<String>>({});
     final onboardedFetched = useState(false);
 
@@ -180,8 +170,6 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
           }
           onboardedMethodKeys.value = keys;
         } catch (_) {
-          // fetch 失敗保持空集合 — 嚴格模式：寧可暫不顯示也不顯示無法用的方式。
-          // 使用者會看到「請先至物流設定開通」引導，可手動跳轉重整。
         } finally {
           if (context.mounted) onboardedFetched.value = true;
         }
@@ -191,10 +179,8 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
       return null;
     }, const []);
 
-    // Debounce timer for shipping quotes
     final debounceTimer = useRef<Timer?>(null);
 
-    // 根據尺寸與重量查詢配送報價
     Future<void> fetchShippingQuotes(_SpecData spec) async {
       if (!context.mounted) return;
 
@@ -255,7 +241,6 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
       shippingLoading.value = false;
     }
 
-    // Debounced fetch — 尺寸/重量變更時觸發
     void onDimensionOrWeightChanged(_SpecData spec) {
       debounceTimer.value?.cancel();
       debounceTimer.value = Timer(const Duration(milliseconds: 600), () {
@@ -263,39 +248,31 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
       });
     }
 
-    // Cleanup debounce timer
     useEffect(() {
       return () => debounceTimer.value?.cancel();
     }, const []);
 
-    // Rebuild trigger for text field changes
     final rebuild = useState(0);
 
     final pageController = usePageController();
     final currentSpecIndex = useState(0);
 
     void applyExistingProduct(Map<String, dynamic> p) {
-      // Unit code mapping from API to UI
       String mapUnit(String? unitStr) {
         return WeightUnit.fromValue(unitStr ?? '')?.value ??
-            WeightUnit.kg.value; // Default to kg if unknown
+            WeightUnit.kg.value;
       }
 
-      // Pre-fill specs from skus array
       final skusList = p['skus'];
       if (skusList is List && skusList.isNotEmpty) {
         final newSpecs = skusList.whereType<Map>().map((sku) {
           final spec = _SpecData();
-          // id / version 回填：存檔時分別當 skus[].id 與 skus[].expectedVersion 送回。
-          // 沒帶 id 的來源（例如列表卡片帶進來的精簡 product）留 null，
-          // 由下方的 hasSkus 判定去補拉完整詳情。
           final rawSkuId = (sku['id'] ?? '').toString().trim();
           spec.skuId = rawSkuId.isEmpty ? null : rawSkuId;
           final rawSkuVersion = (sku['version'] ?? '').toString().trim();
           spec.skuVersion = rawSkuVersion.isEmpty ? null : rawSkuVersion;
           spec.gradeController.text = (sku['skuName'] ?? '').toString();
           spec.priceController.text = (sku['price'] ?? '').toString();
-          // PayUni #758: prefill salePrice（空/0 不填）
           final rawSalePrice = sku['salePrice'] ?? sku['sale_price'];
           final salePriceStr = (rawSalePrice ?? '').toString().trim();
           final salePriceNum = int.tryParse(salePriceStr) ?? 0;
@@ -315,7 +292,6 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
         specs.value = newSpecs;
       }
 
-      // 用第一個 spec 的尺寸重量觸發 shipping quotes
       final firstSpec = specs.value.first;
       if (firstSpec.lengthController.text.isNotEmpty &&
           firstSpec.widthController.text.isNotEmpty &&
@@ -324,7 +300,6 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
         fetchShippingQuotes(firstSpec);
       }
 
-      // Pre-fill shipping methods
       final existingShipping = p['shippingMethods'];
       if (existingShipping is List && existingShipping.isNotEmpty) {
         final selectedKeys = <String>{};
@@ -355,18 +330,11 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
       }
     }
 
-    // 從 API 重新拉一次完整詳情並整份覆寫表單（含 SKU 的 id 與 version）。
-    //
-    // 兩個消費者：① 初次進入編輯時補齊卡片沒帶的欄位 ② 存檔撞到版本衝突（9266）後
-    // 讓使用者取得新版本。② 少了它，衝突就是死路——手上的 expectedVersion 永遠過期，
-    // 再按幾次存檔都是同一個錯。
     Future<bool> reloadDetailFromServer() async {
       final p = existingProduct;
       final productIdVal =
           p?['id'] ?? p?['skuId'] ?? p?['sku_id'] ?? p?['_productId'] ?? skuId;
       if (productIdVal == null) return false;
-      // 覆寫表單之前先取消運費試算的 debounce：它捕捉的是**舊的** _SpecData，
-      // 覆寫後才觸發等於拿一份已經不在畫面上的規格去更新運費選項。
       debounceTimer.value?.cancel();
       try {
         final detail = await ref
@@ -391,14 +359,8 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
       }
       final p = existingProduct!;
 
-      // 先用已有的 data 預填（如果從卡片帶了）
       applyExistingProduct(p);
 
-      // 若沒有 skus 或 shippingMethods，從 API 補拉完整 detail
-      //
-      // 「有 skus」的判準包含**每一筆都帶 id**：列表卡片帶進來的精簡 product 可能有
-      // skus 卻沒有 id，那種預填一路走到存檔會讓後端把既有 SKU 全刪重建
-      // （見 SpecData.skuId）。少一個 id 就補拉一次詳情，成本遠低於靜默重建。
       final rawSkus = p['skus'];
       final hasSkus =
           rawSkus is List &&
@@ -456,7 +418,6 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // ========== 第一張卡片：7-11 店到店 ==========
                   Container(
                     width: double.infinity,
                     decoration: BoxDecoration(
@@ -553,7 +514,6 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
 
                   SizedBox(height: 12.h),
 
-                  // ========== 第二張卡片：黑貓宅急便 ==========
                   Container(
                     width: double.infinity,
                     decoration: BoxDecoration(
@@ -660,7 +620,6 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
         return;
       }
 
-      // PayUni #758: 特價驗證
       for (var i = 0; i < specs.value.length; i++) {
         final s = specs.value[i];
         if (!s.hasData) continue;
@@ -745,8 +704,6 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
         }).toList(),
       );
 
-      // 顯示阻擋式 loading，等候上傳結果 — 不再 fire-and-forget，
-      // 避免上傳失敗時 UI 已 pop、錯誤訊息被吞掉。
       showDialog<void>(
         context: context,
         barrierDismissible: false,
@@ -771,9 +728,6 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
 
       if (task.status == UploadStatus.failed &&
           task.errorCode == kVersionConflictBizCode) {
-        // 樂觀鎖擋下來了：表單開著的期間有人（另一台裝置、代行營運、或買家下單扣庫存）
-        // 動過這個商品。吐司在這裡不夠——使用者手上的 expectedVersion 已永久過期，
-        // 再按幾次存檔都是同一個錯，必須給「重新載入」這條出路。
         final reload = await showDialog<bool>(
           context: context,
           barrierDismissible: false,
@@ -879,7 +833,6 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
                 ],
               ),
             ),
-          // Row 1: 規格等級 | 商品重量 | 單位 (三欄並排，符合 Figma 設計)
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -974,7 +927,6 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
             ],
           ),
           SizedBox(height: 12.h),
-          // ── PayUni #758: 特價區塊 ──────────────────────────────
           _SalePriceSection(spec: spec, onChanged: () => rebuild.value++),
           SizedBox(height: 12.h),
           Row(
@@ -1213,7 +1165,6 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
                                       const ProductSetupProgressBar(
                                         currentStep: 4,
                                       ),
-                                    // ── Spec fields ──────────────────────────────────
                                     Padding(
                                       padding: EdgeInsets.all(16.w),
                                       child: buildSpecCard(spec, idx),
@@ -1222,7 +1173,6 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
                                       height: 1,
                                       color: AppColors.gray100,
                                     ),
-                                    // ── Shipping section ─────────────────────────────
                                     Padding(
                                       padding: EdgeInsets.fromLTRB(
                                         16.w,
@@ -1330,7 +1280,6 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
                                                     onboardedMethodKeys.value,
                                                   );
 
-                                              // 賣家完全沒開通任何配送方式（fetch 完成且集合為空）
                                               if (onboardedFetched.value &&
                                                   onboardedMethodKeys
                                                       .value
@@ -1529,7 +1478,6 @@ class ProductSetupSpecScreen extends HookConsumerWidget {
                                         ],
                                       ),
                                     ),
-                                    // ── Hint + add button ────────────────────────────
                                     Container(
                                       height: 1,
                                       color: AppColors.gray100,
@@ -1624,14 +1572,12 @@ class _SpecData {
   final TextEditingController gradeController;
   final TextEditingController weightController;
   final TextEditingController priceController;
-  // PayUni #758: 特價（選填）
   final TextEditingController salePriceController;
   final TextEditingController stockController;
   final TextEditingController lengthController;
   final TextEditingController widthController;
   final TextEditingController heightController;
-  String unitCode; // WeightUnit.value
-  // PayUni #758: 是否啟用特價（toggle 開關），關閉時不送 salePrice。
+  String unitCode;
   bool saleEnabled;
 
   _SpecData()
@@ -1686,11 +1632,11 @@ class _SpecData {
   String? get saleValidationError {
     if (!saleEnabled) return null;
     final s = salePriceController.text.trim();
-    if (s.isEmpty) return null; // 啟用但留空 = 不送，視同無特價，合法。
+    if (s.isEmpty) return null;
     final sp = int.tryParse(s);
     if (sp == null || sp <= 0) return '特價需大於 0';
     final p = int.tryParse(priceController.text.trim());
-    if (p == null) return null; // 等使用者填原價再判斷
+    if (p == null) return null;
     if (sp >= p) return '特價需低於原價';
     return null;
   }
@@ -1860,9 +1806,6 @@ class _UnitDropdownState extends State<_UnitDropdown> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Shipping Method Card — 運送方式選擇卡片
-// ─────────────────────────────────────────────────────────────────────────────
 class _ShippingMethodCard extends StatefulWidget {
   const _ShippingMethodCard({
     super.key,
@@ -1926,7 +1869,6 @@ class _ShippingMethodCardState extends State<_ShippingMethodCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Row 1: checkbox | name | price
             Row(
               children: [
                 Container(
@@ -1977,7 +1919,6 @@ class _ShippingMethodCardState extends State<_ShippingMethodCard> {
               ],
             ),
             SizedBox(height: 6.h),
-            // Row 2: estimated delivery days
             Padding(
               padding: EdgeInsets.only(left: 24.w),
               child: Row(
@@ -1999,7 +1940,6 @@ class _ShippingMethodCardState extends State<_ShippingMethodCard> {
               ),
             ),
             SizedBox(height: 6.h),
-            // Row 3: free threshold + fee payer toggle
             Padding(
               padding: EdgeInsets.only(left: 24.w),
               child: Row(
@@ -2070,9 +2010,6 @@ class _ShippingMethodCardState extends State<_ShippingMethodCard> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PayUni #758: 特價區塊（toggle + 原價/特價 + 折扣徽章 + 促銷期間）
-// ─────────────────────────────────────────────────────────────────────────────
 class _SalePriceSection extends StatefulWidget {
   const _SalePriceSection({required this.spec, required this.onChanged});
 
@@ -2150,7 +2087,6 @@ class _SalePriceSectionState extends State<_SalePriceSection> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: 啟用特價 + toggle
           Row(
             children: [
               Expanded(
@@ -2179,7 +2115,6 @@ class _SalePriceSectionState extends State<_SalePriceSection> {
                   setState(() {
                     spec.saleEnabled = v;
                     if (!v) {
-                      // 關閉時清空特價（避免送到後端）
                       spec.salePriceController.clear();
                     }
                   });

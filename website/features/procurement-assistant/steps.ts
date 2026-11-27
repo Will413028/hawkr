@@ -43,8 +43,6 @@ export interface AgentStep {
 export const STEP_ICON: Record<string, AppIconName> = {
 	UNDERSTAND_INPUT: "message",
 	EXTRACT_SLOTS: "document",
-	// 逐欄位抽取：每個欄位給自己的 glyph，否則 8 行全落到 clock 降級、
-	// 長得一模一樣，就失去「一行字＋icon」的意義。
 	CAPTURE_ITEM: "leaf",
 	CAPTURE_QUANTITY: "cubes",
 	CAPTURE_UNIT: "category",
@@ -54,22 +52,16 @@ export const STEP_ICON: Record<string, AppIconName> = {
 	CAPTURE_DATE: "calendar",
 	CAPTURE_EXACT_MATCH: "scan",
 	VALIDATE_SLOTS: "filter",
-	// 這一步跟 VALIDATE_SLOTS 同輪相鄰出現，glyph 必須明顯不同才看得出是兩件事。
-	// folder＝分類，語意直指「把買家講的品項對到哪一個作物分類」。
 	CROP_GATE: "folder",
 	SLOTS_REJECTED: "info",
 	PICK_NEXT_QUESTION: "info",
 	REQUIREMENT_READY: "check",
-	// 候選搜尋階段的父列（T23）。子列是 search，父列
-	// 必須明顯不同——三個 glyph 疊在同一組巢狀列裡，長得像就等於沒有分層。
 	SEARCH_CANDIDATES: "people",
 	SEARCH_PLATFORM: "search",
 	READ_SELLER: "user",
-	// 暫代：待天平／比較 glyph。
 	COMPARE: "reorder",
 	VERIFY_ORIGIN: "location",
 	CHECK_STOCK: "stock",
-	// 暫代：待排序／排名 glyph。
 	RANK_CANDIDATES: "graph",
 	SUMMARIZE: "clipboard",
 	DEGRADED_FALLBACK: "info",
@@ -139,9 +131,6 @@ const DYNAMIC_LABEL_TEMPLATES: Record<
 export function stepLabel(
 	step: Pick<AgentStep, "code" | "label" | "safeArgs" | "text">,
 ): string {
-	// 後端敘述優先——那是「這一步實際發生了什麼」，比任何前端模板都具體。
-	// 沒有敘述才退回既有的動態模板／固定短句（narrator 逾時或被 guard 擋下
-	// 時就會走到這裡，所以這條退路必須留著）。
 	if (step.text) return step.text;
 	const dynamic =
 		step.safeArgs && DYNAMIC_LABEL_TEMPLATES[step.code]?.(step.safeArgs);

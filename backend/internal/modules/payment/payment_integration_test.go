@@ -40,7 +40,6 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// createIdleForTest 讓「已呼叫」的列夠舊，週期掃描才會選到它（createIdle 之後）。
 const createIdleForTest = 11 * time.Minute
 
 const (
@@ -57,16 +56,13 @@ var (
 	rejectedSnapshot    = Snapshot{Transfers: CapabilityRejected, Details: []StatusDetail{{Resolution: ResolutionPlatformAction, Reason: "rejected.fraud"}}}
 )
 
-// queue 記下排入的 job（不執行）；排入必須在 transaction 內（River 的 InsertTx 也是）。
 type queue struct {
 	mu   sync.Mutex
 	args []river.JobArgs
 	opts []river.InsertOpts
 	out  []bool
-	// fail 不是 nil 時，排入這個種類的 job 回 fail（只有一次）：模擬 handler 在 Go 端失敗而 transaction 本身沒有壞。
 	failKind string
 	fail     error
-	// before 不是 nil 時，每次排入先呼叫它（在取鎖之前，所以它可以阻塞而不擋住別的排入）：測試用它讓一個 transaction 停在已持有鎖、尚未提交的位置。
 	before func(args river.JobArgs)
 }
 
@@ -95,7 +91,6 @@ func (q *queue) Enqueue(ctx context.Context, args river.JobArgs, opts *river.Ins
 	return nil
 }
 
-// storeIDs 是某個種類的 job 排入過的擁有者（依排入順序，不去重）。
 func (q *queue) storeIDs(t *testing.T, kind string) []int64 {
 	t.Helper()
 	q.mu.Lock()
@@ -116,7 +111,6 @@ func (q *queue) storeIDs(t *testing.T, kind string) []int64 {
 	return out
 }
 
-// scheduledAt 是某個種類的 job 排入時帶的 ScheduledAt（依排入順序；零值是立刻執行）。
 func (q *queue) scheduledAt(kind string) []time.Time {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -147,7 +141,6 @@ func (q *queue) outsideTx() bool {
 	return slices.Contains(q.out, true)
 }
 
-// owners 是擁有者查詢的 fake：預設營運中，closed 裡的不是；聯絡信箱是 emails 裡「現在」的值（沒有就是沒有信箱）。
 type owners struct {
 	mu     sync.Mutex
 	closed map[int64]bool
@@ -206,7 +199,6 @@ func setup(t *testing.T, steps ...testdb.Step) *fixture {
 	return f
 }
 
-// build 以 jc 組模組與 inbox（同一個 DB、bus 與 provider）。
 func (f *fixture) build(t *testing.T, jc jobs.Enqueuer) {
 	t.Helper()
 	log := slog.New(slog.NewTextHandler(&f.logs, nil))
@@ -216,7 +208,6 @@ func (f *fixture) build(t *testing.T, jc jobs.Enqueuer) {
 	f.module = New(Deps{DB: f.db, Events: f.bus, Jobs: jc, Inbox: f.inbox, Audit: f.audit, Provider: f.fake, Owners: f.owners, Now: clock, Logger: log})
 }
 
-// 後台紀錄的動作名稱（真實的 procedure 名稱由 httpapi 的 handler 帶進來；這裡只要模組原樣寫進紀錄）。
 const (
 	actionRetryCreate   = "/hawkr.admin.payment.v1alpha1.PaymentAdminService/RetryPaymentAccountCreate"
 	actionRetryPurge    = "/hawkr.admin.payment.v1alpha1.PaymentAdminService/RetryPaymentAccountPurge"
@@ -240,10 +231,8 @@ func (f *fixture) count(t *testing.T, sql string, args ...any) int64 {
 	return n
 }
 
-// nextStore 是平行測試共用的擁有者 ID 來源（atomic：每次取到不同的值）。
 var nextStore atomic.Int64
 
-// request 模擬擁有者核准的 transaction：寫「建立中」的帳戶列並排入建立 job。email 是擁有者此刻的聯絡信箱（空字串是沒有），不傳給 payment。
 func (f *fixture) request(t *testing.T, storeID int64, email string) {
 	t.Helper()
 	f.owners.setEmail(storeID, email)
@@ -272,7 +261,6 @@ func (f *fixture) account(t *testing.T, storeID int64) Account {
 	return a
 }
 
-// ensure 執行建立 job 一輪，回傳外部帳戶 ID。
 func (f *fixture) ensure(t *testing.T, storeID int64) string {
 	t.Helper()
 	must(t, f.module.EnsureAccount(context.Background(), storeID, false))
@@ -283,7 +271,6 @@ func (f *fixture) ensure(t *testing.T, storeID int64) string {
 	return *a.ExternalAccountID
 }
 
-// set 讓外部帳戶回這個快照並執行同步一輪（還沒有外部帳戶時先建立）。
 func (f *fixture) set(t *testing.T, storeID int64, s Snapshot) {
 	t.Helper()
 	external := ""
@@ -306,7 +293,6 @@ func event(id, external string) (http.Header, []byte) {
 	return h, []byte(external)
 }
 
-// receive 收一個事件並執行它的派送 job（webhook 入口與 worker 的派送）。
 func (f *fixture) receive(t *testing.T, id, external string) {
 	t.Helper()
 	ctx := context.Background()
@@ -945,7 +931,6 @@ func TestOnboardingSessionKeepsThePreconditionsWhateverTheCallerDeclares(t *test
 	}
 }
 
-// stripeSessionCalls 回傳一個 Stripe 的假伺服器（重播實測回應）與它收到的路徑紀錄。
 func stripeSessionCalls(t *testing.T) (client *stripe.Client, paths func() []string) {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("..", "..", "platform", "stripe", "testdata", "account_session_platform.json"))
@@ -990,7 +975,6 @@ func TestOnboardingSessionShapeComesFromTheAccountRowNotTheCurrentConfiguration(
 	_, err := f.db.Conn(ctx).Exec(ctx, "UPDATE payment.accounts SET provider = 'stripe' WHERE store_id = ANY($1)", []int64{platformRow, providerRow})
 	must(t, err)
 
-	// 每個模組用自己的 inbox：同一個 inbox 登記兩次 stripe 會 panic（組裝錯誤）。
 	embedded := []EmbeddedRuntime{RuntimeStripeConnectJS}
 	client, paths := stripeSessionCalls(t)
 	configured, err := NewStripe(client, CollectionProvider, "pk_test_x")
@@ -1164,7 +1148,6 @@ func TestAPurgeThatCannotReachTheProviderForSevenDaysEntersTheTerminalState(t *t
 	f := setup(t)
 	noProvider := New(Deps{DB: f.db, Audit: f.audit, Events: f.bus, Jobs: f.jobs, Now: func() time.Time { return f.now }, Logger: slog.Default()})
 
-	// 呼叫過、沒有外部 ID、沒有設定 provider：期限內留著，7 天後進終局。
 	called := f.newStore(t)
 	f.fake.FailAcquire(errors.New("down"))
 	_ = f.module.EnsureAccount(ctx, called, false)
@@ -1178,7 +1161,6 @@ func TestAPurgeThatCannotReachTheProviderForSevenDaysEntersTheTerminalState(t *t
 		t.Fatal("逾期仍問不到 provider，應該進終局（provider_unconfigured）")
 	}
 
-	// 有外部 ID、provider 可用但關閉一直暫時性失敗：期限內回傳錯誤重試，逾期進終局。
 	flaky := f.newStore(t)
 	f.ensure(t, flaky)
 	boom := errors.New("provider down")
@@ -1193,8 +1175,6 @@ func TestAPurgeThatCannotReachTheProviderForSevenDaysEntersTheTerminalState(t *t
 	}
 }
 
-// calledRow 回傳一家「呼叫過 provider、沒有外部 ID」的店家：建立的第一次呼叫在 provider 那邊建好帳戶但回應遺失（結果不明），列上有「已呼叫」的時刻、沒有外部 ID。
-// provider 那邊的帳戶 ID 一併回傳。
 func (f *fixture) calledRow(t *testing.T) (storeID int64, providerID string) {
 	t.Helper()
 	storeID = f.newStore(t)
@@ -1426,7 +1406,6 @@ func TestTheFirstStepIDIsKeptWhenTheSecondStepFailsAndAHalfCreatedRowIsNotOnboar
 		t.Fatal("半建立的列被同步改寫")
 	}
 
-	// 重試從第二步接續：不再取得 ID，同一個帳戶，完成之後才可以開通與同步。
 	acquires := len(f.fake.AcquireKeys())
 	must(t, f.module.EnsureAccount(ctx, s, false))
 	done := f.account(t, s)
@@ -1496,7 +1475,6 @@ func TestAdminRetryPurgeAndDeleteMappingActOnlyOnTheTerminalStateAndLeaveARecord
 		t.Fatal("重試關閉成功後應該刪列")
 	}
 
-	// 刪除對應：再做一次終局，再由管理員確認已在金流商處理。
 	s2 := f.newStore(t)
 	external2 := f.ensure(t, s2)
 	f.fake.FailClose(fmt.Errorf("%w：拒絕", ErrPermanent))
@@ -1699,7 +1677,6 @@ func TestSellerTriggeredRereadIsDebouncedAndFailsLoudly(t *testing.T) {
 		t.Fatalf("永久失敗是 %v，要 FailedPrecondition", err)
 	}
 
-	// 還沒有外部帳戶的列：什麼都不做、不算失敗。
 	must(t, f.module.SyncAccountUnlessFresh(ctx, f.newStore(t)))
 }
 
@@ -1822,7 +1799,6 @@ func TestASellerRefreshRejectedByTheGuardQueuesASyncForLaterEvents(t *testing.T)
 	if f.processed(t, "evt_after_newer_read") {
 		t.Fatal("被擋下的重讀把較晚到的事件標為已處理")
 	}
-	// receive 的 handler 排了一個同步 job；賣家路徑要再排一個（唯一鍵在 River 合併），共 +2。
 	if got := len(f.jobs.storeIDs(t, kindSync)) - syncs; got != 2 {
 		t.Fatalf("排入 %d 個同步 job，要 2 個（事件 handler 一個、賣家路徑的 again 一個）", got)
 	}
@@ -1966,7 +1942,6 @@ func TestAnEventForAHalfCreatedRowEnqueuesNoSyncAndIsMarkedProcessed(t *testing.
 	}
 }
 
-// cancelOnClose 在關閉時取消 job 的 ctx 並回 ctx 的錯誤，模擬 job 自己逾時被取消。
 type cancelOnClose struct {
 	*Fake
 	cancel context.CancelFunc
@@ -1995,7 +1970,6 @@ func TestAJobCancelledPastTheDeadlineIsNotRecordedAsDeadlineExceeded(t *testing.
 	defer cancel()
 	log := slog.New(slog.NewTextHandler(&f.logs, nil))
 	clock := func() time.Time { return f.now }
-	// 第二個模組實例要有自己的 inbox：同一個 inbox 登記同一個 provider 的路由兩次會 panic（platform/inbox）。
 	m := New(Deps{DB: f.db, Audit: f.audit, Events: f.bus, Jobs: f.jobs, Inbox: inbox.New(inbox.Deps{DB: f.db, Jobs: f.jobs, Now: clock, Logger: log}), Provider: &cancelOnClose{Fake: f.fake, cancel: cancel}, Owners: f.owners, Now: clock, Logger: log})
 	if err := m.PurgeAccount(jobCtx, s, false); !errors.Is(err, context.Canceled) {
 		t.Fatalf("err=%v，預期回傳取消的錯誤給 River 重試", err)
@@ -2031,7 +2005,6 @@ func TestSweepResolvesACalledRowWithoutAnIDForANonOperatingOwnerWithTheSameKey(t
 	if keys := f.fake.AcquireKeys(); len(keys) != 2 || keys[0] != keys[1] || keys[0] != key {
 		t.Fatalf("重送的冪等鍵=%v", keys)
 	}
-	// 已有外部 ID 之後不再選到。
 	before := f.jobs.count(kindResolve)
 	if _, _, err := f.module.SweepAccounts(ctx); err != nil {
 		t.Fatal(err)
@@ -2135,7 +2108,6 @@ func TestAnUnresolvedCreatePast7DaysReachesTheTerminalStateAndNothingIsEverRepla
 	if kinds[create] != "PAYMENT_ACCOUNT_CREATE_FAILED" || kinds[purge] != "PAYMENT_ACCOUNT_PURGE_STUCK" {
 		t.Fatalf("待辦=%v", kinds)
 	}
-	// 之後的掃描與重跑，包括超過冪等鍵保存期，都不送任何呼叫。
 	for _, advance := range []time.Duration{time.Hour, IdempotencyRetention} {
 		f.now = f.now.Add(advance)
 		if _, _, err := f.module.SweepAccounts(ctx); err != nil {
@@ -2151,7 +2123,6 @@ func TestAnUnresolvedCreatePast7DaysReachesTheTerminalStateAndNothingIsEverRepla
 	if a := f.account(t, create); a.ExternalAccountID != nil || !a.CreateUnresolved {
 		t.Fatalf("逾期的列=%+v，預期沒有外部 ID，且超過冪等鍵保存期後 create_unresolved 為真", a)
 	}
-	// 結果不明的清理終局不能「重試關閉」（不會有結果），只能確認後刪除對應。
 	if _, err := f.module.RetryAccountPurge(ctx, admin(actionRetryPurge), purge); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("結果不明的終局重試關閉 err=%v，預期 failed_precondition", err)
 	}
@@ -2180,7 +2151,6 @@ func TestRetryCreateWithinTheKeyRetentionReplaysTheSameKeyWithoutAcknowledgement
 	if f.key(t, s) != key || retried.CreateFailedAt == nil || f.jobs.count(kindResolve) != resolves+1 || f.jobs.count(kindEnsure) != ensures {
 		t.Fatalf("重試後=%+v 鍵變了=%v：預期同一把鍵、仍是建立失敗、只排了重送 job", retried, f.key(t, s) != key)
 	}
-	// 週期掃描在重送完成前不會把列再標成終局，也不會自己重送。
 	f.now = f.now.Add(createIdleForTest)
 	if _, _, err := f.module.SweepAccounts(ctx); err != nil {
 		t.Fatal(err)
@@ -2219,13 +2189,11 @@ func TestRetryCreateOfAnUnresolvedTerminalRowNeedsAcknowledgementAndRotatesTheKe
 	f := setup(t)
 	s, _ := f.calledRow(t)
 	key := f.key(t, s)
-	// 期限內：記建立失敗之後重試，不需要確認、沿用同一把鍵（排入建立 job）。
 	f.fake.FailAcquire(ErrPermanent)
 	must(t, f.module.EnsureAccount(ctx, s, true))
 	if a, err := f.module.RetryAccountCreate(ctx, admin(actionRetryCreate), s, false); err != nil || f.key(t, s) != key || a.CreateUnresolved {
 		t.Fatalf("期限內重試 err=%v key 變了=%v", err, f.key(t, s) != key)
 	}
-	// 超過冪等鍵保存期：進終局，create_unresolved 為真。
 	f.now = f.now.Add(IdempotencyRetention).Add(time.Hour)
 	must(t, f.module.ResolveUnresolvedAccount(ctx, s, false))
 	if !f.account(t, s).CreateUnresolved {
@@ -2450,7 +2418,6 @@ func TestRetryPurgeOfAnUnresolvedTerminalRowReplaysTheSameKeyWithinTheRetentionA
 	if !slices.Contains(f.fake.Closes(), id) || f.count(t, "SELECT count(*) FROM payment.accounts WHERE store_id = $1", within) != 0 {
 		t.Fatalf("清理應關閉 %s 並刪列，關閉=%v", id, f.fake.Closes())
 	}
-	// 超過保存期：拒絕、不重送、不留紀錄、create_unresolved 為真。
 	f.now = f.now.Add(IdempotencyRetention)
 	acquires := len(f.fake.AcquireKeys())
 	if !f.account(t, past).CreateUnresolved {
@@ -2556,7 +2523,6 @@ func TestRetryCreateAuditRecordsTheAcknowledgementOnlyWhenItWasRequiredAndActedO
 	}
 }
 
-// unresolvedPurgeTerminal 造一列「呼叫過、沒有外部 ID、清理超過 7 天進 unresolved_creation 終局」的列（還在冪等鍵保存期內），回傳店家與 provider 那邊的帳戶 ID。
 func (f *fixture) unresolvedPurgeTerminal(t *testing.T) (int64, string) {
 	t.Helper()
 	s, id := f.calledRow(t)
@@ -2606,7 +2572,6 @@ func TestDeleteMappingAndRetryPurgeAreRejectedWhileAnAdminReplayIsPendingAndAllo
 	if f.account(t, s).PurgeReplayPending || f.account(t, s).PurgeBlockedAt == nil {
 		t.Fatal("永久失敗後標記應清除、列留在終局")
 	}
-	// 結束後可以再要求一次；取回 ID 重啟清理時標記一併清除。
 	if _, err := f.module.RetryAccountPurge(ctx, admin(actionRetryPurge), s); err != nil {
 		t.Fatal(err)
 	}
@@ -2614,7 +2579,6 @@ func TestDeleteMappingAndRetryPurgeAreRejectedWhileAnAdminReplayIsPendingAndAllo
 	if a := f.account(t, s); a.PurgeReplayPending || a.PurgeBlockedAt != nil || a.ExternalAccountID == nil || *a.ExternalAccountID != id {
 		t.Fatalf("取回 ID 後應清除終局與標記：%+v", a)
 	}
-	// 最後一次嘗試仍失敗也清除，這時可以刪除對應。
 	other, _ := f.unresolvedPurgeTerminal(t)
 	_, err = f.module.RetryAccountPurge(ctx, admin(actionRetryPurge), other)
 	must(t, err)

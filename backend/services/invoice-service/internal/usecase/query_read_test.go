@@ -25,8 +25,6 @@ func TestCanRequestTaxExtension_MatchesEndpoint20Guard(t *testing.T) {
 		{"SELF_ISSUE_PENDING ＋ 尚未延長 → 可申請", pending, 0, true},
 		{"SELF_ISSUE_PENDING ＋ 已延長一次 → 不可（T11 只給一次）", pending, 1, false},
 
-		// 🔴 這一格就是 #3021：送審中平台正在審，補件期限不是賣家自己能動的。
-		// 舊實作在這裡回 true ⇒ 畫面渲染 CTA ⇒ 按下去必回 9321。
 		{"SUBMITTED → 不可（#3021）", codemeta.SellerTaxReviewStatusSubmitted.Value, 0, false},
 		{"DRAFT → 不可", codemeta.SellerTaxReviewStatusDraft.Value, 0, false},
 		{"APPROVED_INVOICE_REQUIRED → 不可", codemeta.SellerTaxReviewStatusApprovedInvoiceRequired.Value, 0, false},
@@ -73,8 +71,6 @@ func TestDocumentFileUnavailableReason_NotApplicableBeatsCarrier(t *testing.T) {
 			want: FileUnavailableNotApplicable,
 		},
 		{
-			// 🔴 陽性對照：真的開出來、真的有載具的票仍要回 CARRIER_NOT_WON。
-			// 只驗前一格分不清「順序修好了」與「載具那一格被關掉」。
 			name: "ISSUED ＋ 有載具 ⇒ CARRIER_NOT_WON",
 			doc: domain.Document{
 				Status:      codemeta.InvoiceDocumentStatusIssued.Value,
@@ -114,7 +110,6 @@ func TestIntakeLimitApplies_PredicateIsReviewStatusNotFieldPresence(t *testing.T
 	for _, st := range codemeta.AllSellerTaxReviewStatuss {
 		p := domain.SellerTaxProfile{
 			ReviewStatus: st.Value,
-			// 刻意帶 DB 預設值：舊述詞在這組值下對每一個狀態都回 true。
 			PendingOrderLimitCount: 50, PendingOrderLimitAmount: 100000,
 		}
 		want := st.Value == codemeta.SellerTaxReviewStatusSelfIssuePending.Value ||
@@ -123,7 +118,6 @@ func TestIntakeLimitApplies_PredicateIsReviewStatusNotFieldPresence(t *testing.T
 			t.Errorf("IntakeLimitApplies(%s) = %v，want %v", st.Value, got, want)
 		}
 	}
-	// 讀端與結帳端必須是同一份判準——intakeLimitOf 走的就是它。
 	pending := domain.SellerTaxProfile{
 		ReviewStatus:           codemeta.SellerTaxReviewStatusSelfIssuePending.Value,
 		PendingOrderLimitCount: 50, PendingOrderLimitAmount: 100000,

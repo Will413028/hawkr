@@ -16,10 +16,6 @@ const _sensitiveHeaderKeys = {
 SentryEvent scrubSentryEvent(SentryEvent event, Hint hint) {
   final request = event.request;
   if (request != null) {
-    // Mutate request in place via copyWith with removeCookies flag.
-    // This is safe because removeCookies is a dedicated flag that correctly nulls
-    // cookies while preserving every other field (fragment/apiTarget/env/etc.) via
-    // copyWith's ?? this.field fallback.
     // ignore: deprecated_member_use
     event.request = request.copyWith(
       url: _redactUrl(request.url),
@@ -78,7 +74,6 @@ SentryEvent scrubSentryEvent(SentryEvent event, Hint hint) {
 
   final user = event.user;
   if (user != null) {
-    // Mutate user fields in place
     user.email = null;
     user.ipAddress = null;
   }

@@ -38,11 +38,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// maxAttempts 是遇到並行競爭（案件在掛上檢舉前被結掉、同一位檢舉人並行重送）時整個 transaction 重來的上限。
 const maxAttempts = 4
 
-// maxCopyRounds 是證據圖片複製的輪數上限：圖片要在 transaction 外複製，所以 transaction 發現要建新快照、而複本還沒備好時回滾，複製完再重來；
-// 內容在兩輪之間又換了圖片才會多一輪。
 const maxCopyRounds = 3
 
 var errRetry = errors.New("moderation：並行競爭，重來")
@@ -78,7 +75,6 @@ type Media interface {
 	Confirm(ctx context.Context, uploader media.Uploader, token string, want media.Visibility) (media.ConfirmedAsset, error)
 }
 
-// needCopies 讓 transaction 回滾：要建新快照，而這些來源圖片還沒有複本。
 type needCopies struct{ sources []string }
 
 func (needCopies) Error() string { return "moderation：快照的圖片還沒有複本" }
@@ -160,7 +156,6 @@ func (s *Service) Submit(ctx context.Context, in model.SubmitInput) (model.Submi
 	return model.SubmitResult{}, fmt.Errorf("moderation：送出檢舉連續 %d 次遇到並行競爭", maxAttempts)
 }
 
-// copyRoundsExhausted 是複製輪數用盡的錯誤：曾有來源圖片複製時回 NotFound、內容卻仍引用它（圖片已被刪除），對檢舉人而言是內容不存在；否則是內容一直在變動。
 func copyRoundsExhausted(ctx context.Context, sourceGone bool) error {
 	if sourceGone {
 		return apperr.NotFound("%s", moderationtext.ReportContentNotFound(uitext.LocaleFrom(ctx)))
@@ -168,7 +163,6 @@ func copyRoundsExhausted(ctx context.Context, sourceGone bool) error {
 	return fmt.Errorf("moderation：送出檢舉連續 %d 輪複製證據圖片，內容仍在變動", maxCopyRounds)
 }
 
-// uploader 是複本在 media 的上傳者：檢舉人本人的帳號 ID（買家由 stint 解析、店家取店家的帳號），複製與 Confirm 用同一個值。
 func (s *Service) uploader(ctx context.Context, in model.SubmitInput) (media.Uploader, error) {
 	accountID, err := s.accountOf(ctx, in)
 	if err != nil {
@@ -188,7 +182,6 @@ func (s *Service) reporterAccountID(ctx context.Context, in model.SubmitInput) (
 	return s.d.Buyer.AccountIDByBuyerID(ctx, in.ReporterBuyerID)
 }
 
-// copySources 在 transaction 外把來源圖片各複製一份，token 記進 copies。來源已經不是已確認的資產（內容在檢舉當下被換掉或刪除）時回 NotFound，由呼叫方重來、重新凍結內容。
 func (s *Service) copySources(ctx context.Context, in model.SubmitInput, sources []string, copies map[string]string) error {
 	up, err := s.uploader(ctx, in)
 	if err != nil {
@@ -211,7 +204,6 @@ func (s *Service) copySources(ctx context.Context, in model.SubmitInput, sources
 	return nil
 }
 
-// ownCopies 在建快照的 transaction 內把每張來源圖片的複本 Confirm 成 moderation 自己的資產，回傳換掉圖片參照的內容與複本的 ID；複本還沒備好回 needCopies。
 func (s *Service) ownCopies(ctx context.Context, in model.SubmitInput, content snapshot.Content, sources []string, copies map[string]string) (snapshot.Content, []uuid.UUID, error) {
 	var missing []string
 	for _, src := range sources {
@@ -240,7 +232,6 @@ func (s *Service) ownCopies(ctx context.Context, in model.SubmitInput, content s
 	return content.ReplaceAssets(to), owned, nil
 }
 
-// lockReporter 以 FOR KEY SHARE 鎖檢舉人的擁有者列：買家尚未關閉（刪除中放行）、店家尚未退場；否則回檢舉人專屬的 NotFound。
 func (s *Service) lockReporter(ctx context.Context, in model.SubmitInput) error {
 	var err error
 	if in.ReporterStoreID > 0 {
@@ -255,8 +246,6 @@ func (s *Service) lockReporter(ctx context.Context, in model.SubmitInput) error 
 }
 
 func (s *Service) attempt(ctx context.Context, in model.SubmitInput, copies map[string]string) (model.SubmitResult, error) {
-	// 檢舉人的擁有者守門鎖先於 moderation 的任何列（buyer、seller 先於 moderation）：關閉或退場的訂閱者清檢舉人資料時，並行的送出與轉移在擁有者列上序列化。
-	// 必要條件：店家檢舉人已退場時，新檢舉在凍結內容（CapChatRead）已回 NotFound，鎖要擋的是凍結之前就返回、卻會寫 report_requests 的路徑（併入進行中案件的 recordRequest）與重送；買家檢舉人沒有這道前置擋，鎖是唯一的守門。
 	if err := s.lockReporter(ctx, in); err != nil {
 		return model.SubmitResult{}, err
 	}
@@ -264,7 +253,6 @@ func (s *Service) attempt(ctx context.Context, in model.SubmitInput, copies map[
 	var hash []byte
 	if in.RequestID != nil {
 		hash = requestHash(in)
-		// request_id 先於一切（A7-D28 第 3 點）：同一位檢舉人的同一個 request_id 一律回第一次的結果，不看案件現在是進行中還是已結案。
 		first, err := q.ReportByRequest(ctx, store.ReportByRequestParams{ReporterBuyerID: buyerPtr(in), ReporterStoreID: storePtr(in), RequestID: *in.RequestID})
 		switch {
 		case err == nil:
@@ -281,7 +269,6 @@ func (s *Service) attempt(ctx context.Context, in model.SubmitInput, copies map[
 	})
 	switch {
 	case err == nil:
-		// 併入進行中案件裡已有的那一筆：也記下這個 request_id，結案後同一個 request_id 重送才仍回這一筆。
 		if err := s.recordRequest(ctx, q, in, existing.ID, hash); err != nil {
 			return model.SubmitResult{}, err
 		}
@@ -310,7 +297,6 @@ func (s *Service) attempt(ctx context.Context, in model.SubmitInput, copies map[
 	}
 	attached := c
 	if !created {
-		// 掛進別人開的案件：版本加一並鎖住案件列，管理員讀到的檢舉集合就不是結案時的集合；自己剛開的案件版本就是 1（開案的那筆檢舉）。
 		attached, err = q.AttachToCase(ctx, c.ID)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return model.SubmitResult{}, errRetry
@@ -322,7 +308,6 @@ func (s *Service) attempt(ctx context.Context, in model.SubmitInput, copies map[
 
 	stored, owned := content, []uuid.UUID{}
 	if sources := content.AssetIDs(); len(sources) > 0 {
-		// 同一案同一份內容（雜湊取自檢舉當下的內容）已有快照就沿用它，不再複製圖片；要建新快照才複製。
 		_, err := q.SnapshotIDByHash(ctx, store.SnapshotIDByHashParams{CaseID: c.ID, ContentSha256: sum[:]})
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
@@ -343,7 +328,6 @@ func (s *Service) attempt(ctx context.Context, in model.SubmitInput, copies map[
 		return model.SubmitResult{}, fmt.Errorf("moderation：寫入快照：%w", err)
 	}
 	if n == 0 && len(owned) > 0 {
-		// 並行的另一筆檢舉搶先建了同一份快照：這一輪確認的複本沒有任何列指著，整輪回滾（複本回到未確認，由 media 回收），重來時沿用對方的快照。
 		return model.SubmitResult{}, errRetry
 	}
 	if n == 0 {
@@ -391,7 +375,6 @@ func storePtr(in model.SubmitInput) *int64 {
 	return nil
 }
 
-// bump 扣檢舉人當天的額度：買家與店家各自一份計數，上限相同（model.DailyReportLimit）；到上限回 pgx.ErrNoRows。
 func (s *Service) bump(ctx context.Context, q *store.Queries, in model.SubmitInput, now time.Time) (int32, error) {
 	if in.ReporterStoreID > 0 {
 		return q.BumpStoreDailyCount(ctx, store.BumpStoreDailyCountParams{ReporterStoreID: &in.ReporterStoreID, Day: twtime.Day(now), DailyLimit: model.DailyReportLimit})
@@ -399,8 +382,6 @@ func (s *Service) bump(ctx context.Context, q *store.Queries, in model.SubmitInp
 	return q.BumpDailyCount(ctx, store.BumpDailyCountParams{ReporterBuyerID: &in.ReporterBuyerID, Day: twtime.Day(now), DailyLimit: model.DailyReportLimit})
 }
 
-// recordRequest 記下 request_id 對應的檢舉（沒帶 request_id 時什麼都不做）。同一個 (檢舉人, request_id) 已被並行的請求記下時回 errRetry：
-// 這一輪的交易整個放棄，重試時從頭讀到對方的紀錄並比對內容雜湊。
 func (s *Service) recordRequest(ctx context.Context, q *store.Queries, in model.SubmitInput, reportID uuid.UUID, hash []byte) error {
 	if in.RequestID == nil {
 		return nil
@@ -415,7 +396,6 @@ func (s *Service) recordRequest(ctx context.Context, q *store.Queries, in model.
 	return nil
 }
 
-// requestHash 是送出輸入（對象、類別、說明；已正規化）的 SHA-256：同一個 request_id 重送時比對內容是否相同的唯一定義。
 func requestHash(in model.SubmitInput) []byte {
 	id := in.Target.ContentID.String()
 	if in.Target.Kind == model.TargetBuyer {
@@ -477,7 +457,6 @@ func reportItem(r store.ModerationReport, targetKind string, contentID *uuid.UUI
 	return model.ReportItem{Report: view.Report(r, decision), Target: t, ClosedAt: closedAt}
 }
 
-// reportPage 組一頁：還有下一頁（more）時游標是這頁最後一列的 (created_at, id)。
 func reportPage[R any](items []model.ReportItem, rows []R, more bool, report func(R) store.ModerationReport) model.ReportPage {
 	out := model.ReportPage{Items: items}
 	if more {
@@ -487,7 +466,6 @@ func reportPage[R any](items []model.ReportItem, rows []R, more bool, report fun
 	return out
 }
 
-// replay 回傳既有的檢舉與它的案件。
 func (s *Service) replay(ctx context.Context, q *store.Queries, r store.ModerationReport) (model.SubmitResult, error) {
 	row, err := q.GetCase(ctx, r.CaseID)
 	if err != nil {
@@ -496,7 +474,6 @@ func (s *Service) replay(ctx context.Context, q *store.Queries, r store.Moderati
 	return model.SubmitResult{Report: view.Report(r, row.Decision), Case: view.Case(row)}, nil
 }
 
-// openCase 取得對象進行中的案件，沒有就開一個（created 為真）：INSERT ON CONFLICT DO NOTHING 之後讀進行中的案件（並行開案時等對方提交再讀得到）。
 func (s *Service) openCase(ctx context.Context, q *store.Queries, t model.Target, now time.Time) (row store.ModerationCase, created bool, err error) {
 	if t.Kind == model.TargetBuyer {
 		row, err = q.InsertBuyerCase(ctx, store.InsertBuyerCaseParams{ID: s.d.NewID(), BuyerID: &t.BuyerID, OpenedAt: now})
@@ -519,7 +496,6 @@ func (s *Service) openCase(ctx context.Context, q *store.Queries, t model.Target
 	return row, false, nil
 }
 
-// freeze 驗證對象並取得要凍結的內容：全部是不鎖列的讀取。
 func (s *Service) freeze(ctx context.Context, in model.SubmitInput) (snapshot.Content, error) {
 	switch in.Target.Kind {
 	case model.TargetBuyer:
@@ -536,7 +512,6 @@ func (s *Service) freeze(ctx context.Context, in model.SubmitInput) (snapshot.Co
 	return snapshot.Content{}, apperr.InvalidInputOn([]string{"Target"}, "%s", moderationtext.ReportTargetInvalid(uitext.LocaleFrom(ctx)))
 }
 
-// freezeSocial 向 social 讀貼文、留言或討論區留言。
 func (s *Service) freezeSocial(ctx context.Context, in model.SubmitInput) (snapshot.Content, error) {
 	l := uitext.LocaleFrom(ctx)
 	st := social.Target{Kind: social.TargetKind(in.Target.Kind), ID: in.Target.ContentID}
@@ -556,7 +531,6 @@ func (s *Service) freezeSocial(ctx context.Context, in model.SubmitInput) (snaps
 	}}, nil
 }
 
-// notSelf 擋掉檢舉自己的內容（含同一帳號的其他身分）。
 func (s *Service) notSelf(ctx context.Context, in model.SubmitInput, author social.Actor) error {
 	same, err := s.sameAccount(ctx, in, author)
 	if err != nil {
@@ -568,7 +542,6 @@ func (s *Service) notSelf(ctx context.Context, in model.SubmitInput, author soci
 	return nil
 }
 
-// contentNotFound 把擁有者模組的 NotFound（不存在、不可讀、對話不屬於檢舉人）統一成檢舉的 NotFound 句子，不洩漏原因；其他錯誤原樣回傳。
 func contentNotFound(ctx context.Context, err error) error {
 	if apperr.KindOf(err) == apperr.KindNotFound {
 		return apperr.NotFound("%s", moderationtext.ReportContentNotFound(uitext.LocaleFrom(ctx)))
@@ -576,7 +549,6 @@ func contentNotFound(ctx context.Context, err error) error {
 	return err
 }
 
-// freezeReview 向 review 讀評價（可讀規則同顯示：公開可讀、觀看者封鎖），作者永遠是買家。
 func (s *Service) freezeReview(ctx context.Context, in model.SubmitInput) (snapshot.Content, error) {
 	r, err := s.d.Review.ReviewForReport(ctx, in.Target.ContentID, in.ReporterBuyerID)
 	if err != nil {
@@ -595,7 +567,6 @@ func (s *Service) freezeReview(ctx context.Context, in model.SubmitInput) (snaps
 	return snapshot.Content{Kind: model.TargetReview, Review: &out}, nil
 }
 
-// freezeChatMessage 向 im 讀被檢舉的訊息與前後各 ChatContextWindow 則（一句 SQL）；檢舉人要是對話的一方，訊息已隱藏或抹除都是 NotFound。
 func (s *Service) freezeChatMessage(ctx context.Context, in model.SubmitInput) (snapshot.Content, error) {
 	party := im.Party{Kind: im.PartyBuyer, BuyerID: in.ReporterBuyerID}
 	if in.ReporterStoreID > 0 {
@@ -631,7 +602,6 @@ func (s *Service) freezeChatMessage(ctx context.Context, in model.SubmitInput) (
 	return snapshot.Content{Kind: model.TargetChatMessage, Chat: &out}, nil
 }
 
-// freezeReviewReply 向 review 讀評價與店家回覆（可讀規則同評價；回覆被下架或沒有回覆都是 NotFound），作者是評價所屬的店家。
 func (s *Service) freezeReviewReply(ctx context.Context, in model.SubmitInput) (snapshot.Content, error) {
 	r, err := s.d.Review.ReviewForReport(ctx, in.Target.ContentID, in.ReporterBuyerID)
 	if err != nil {
@@ -680,7 +650,6 @@ func (s *Service) freezeBuyer(ctx context.Context, in model.SubmitInput) (snapsh
 	return snapshot.Content{Kind: model.TargetBuyer, Buyer: &c}, nil
 }
 
-// reporterAccount 是檢舉人的帳號：買家檢舉人取買家的帳號，店家檢舉人取店家所屬的帳號。
 func (s *Service) reporterAccount(ctx context.Context, in model.SubmitInput) (int64, error) {
 	if in.ReporterStoreID > 0 {
 		st, err := s.d.Seller.Store(ctx, in.ReporterStoreID)
@@ -692,7 +661,6 @@ func (s *Service) reporterAccount(ctx context.Context, in model.SubmitInput) (in
 	return s.d.Buyer.AccountIDByBuyerID(ctx, in.ReporterBuyerID)
 }
 
-// sameAccount 說明作者是不是檢舉人自己：買家作者比對帳號（同一個帳號的歷史 stint 也算自己），店家作者比對店家所屬的帳號。
 func (s *Service) sameAccount(ctx context.Context, in model.SubmitInput, author social.Actor) (bool, error) {
 	reporter, err := s.reporterAccount(ctx, in)
 	if err != nil {
@@ -721,7 +689,6 @@ func (s *Service) sameAccount(ctx context.Context, in model.SubmitInput, author 
 	return false, nil
 }
 
-// uuidString 回傳 id 的字串；零值是空字串（快照 JSON 不輸出）。
 func uuidString(id uuid.UUID) string {
 	if id == uuid.Nil() {
 		return ""

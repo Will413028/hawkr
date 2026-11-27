@@ -12,17 +12,13 @@ import {
 export function useSellerIdentity() {
 	const { data: self, error, loading } = useSellerSelf();
 
-	// 有賣家角色但還沒有店家（GetMyStore 回 not_found）：SellerCenterShell 用這個旗標把人導去
-	// onboarding 補建店家，而不是讓整個工作區對著錯誤擺爛。
 	const profileMissing =
 		isStoreMissing(error) ||
 		(!loading && !error && self !== null && !self.store?.id);
 
 	const store = self?.store;
 	const storeName = store?.storeName || "我的商店";
-	// 賣家名稱就是店名（沒有另一個欄位）。
 	const ownerName = store?.storeName || "";
-	// 賣家後台 chrome 顯示用 ID：storeCode（10 碼對外顯示碼）。
 	const sellerId = store?.storeCode || store?.id || "";
 	const avatar = storeImageUrls(store).logoUrl ?? null;
 

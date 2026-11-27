@@ -115,7 +115,6 @@ public class CouponExpiringWarningJob {
                 PrincipalResolution resolvedPrincipals;
                 boolean resolveFailed;
                 try {
-                    // 通知類：未解析帶 0（略過收件人），不回吐 buyer_id 冒充 account_id。
                     resolvedPrincipals = buyerGrpcClient.resolvePrincipals(ownerBuyerIds);
                     resolveFailed = false;
                 } catch (Exception e) {

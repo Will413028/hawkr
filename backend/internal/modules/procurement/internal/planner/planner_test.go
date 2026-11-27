@@ -16,7 +16,6 @@ var base = struct {
 	date                  time.Time
 }{"水果禮盒", "桃園市", "KG", "簡易", 10, 500, time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)}
 
-// required 是兩個必填都滿足的需求（單位與數量都還沒填）。
 func required() slots.Set { return slots.Set{Item: &base.item, DeliveryCity: &base.city} }
 
 func ready() slots.Set {
@@ -41,7 +40,7 @@ func TestPickNextParity(t *testing.T) {
 		missing []model.SlotKey
 		skipped map[model.SlotKey]bool
 		streak  int
-		want    model.SlotKey // "" 表示沒有問題
+		want    model.SlotKey
 		capHit  bool
 	}{
 		{"required wins over optional", slots.Set{}, []model.SlotKey{slots.DeliveryCity}, nil, 0, slots.DeliveryCity, false},

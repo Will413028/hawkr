@@ -60,9 +60,6 @@ export function HomePostDetailViewerBoundary({
 	}, [returnFocusTarget]);
 
 	React.useLayoutEffect(() => {
-		// Read the offset before overflow:hidden can clamp the document to 0.
-		// A warm viewer takes its own passive-effect lock, so this session must
-		// pin the original offset first on both the cold and cached paths.
 		const releaseScrollLock = acquireBodyScrollLock({
 			preserveScrollPosition: true,
 			scrollY: window.scrollY,
@@ -77,9 +74,6 @@ export function HomePostDetailViewerBoundary({
 		void attempt;
 		const cached = resource.peek();
 		if (cached) {
-			// The imported viewer captures document.activeElement for its own
-			// close transition. Put the original card back in focus first, rather
-			// than letting it remember the temporary loading-shell close button.
 			restoreOpener();
 			setState((current) =>
 				current.status === "ready" && current.Component === cached

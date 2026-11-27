@@ -24,13 +24,6 @@ import {
 	STALE_CHUNK_RELOAD_PENDING_CLASS,
 } from "@/lib/loading/stale-chunk-reload";
 
-// Render the brand splash in the initial HTML. Eligible guest public routes
-// hand its visual fade to the document bootstrap as soon as SSR content is
-// ready; React separately owns the hydration/document-settled barrier.
-// Most routes fade once the DOM is interactive; request-time landing/detail
-// routes additionally publish a content marker after their complete first tree
-// is committed. `window.load` also waits for images, fonts and third-party
-// resources, so it is not a stable signal for when users can interact.
 /**
  * 非公開快路徑的最短顯示時間；公開訪客內容就緒後不追加固定等待。
  *
@@ -49,9 +42,6 @@ export default function InitialPageLoader() {
 	const [leaving, setLeaving] = useState(false);
 
 	useEffect(() => {
-		// Keep every async handle local to this exact effect setup. React Strict
-		// Mode deliberately runs setup → cleanup → setup in development; a shared
-		// ref lets an old setup cancel or append work owned by the new one.
 		const timers: number[] = [];
 		const frames: number[] = [];
 		const root = document.documentElement;
@@ -105,18 +95,10 @@ export default function InitialPageLoader() {
 					: Math.max(MIN_SHOWN_MS - elapsed, 0);
 
 			scheduleTimeout(() => {
-				// Reveal the already-complete application tree while the splash is
-				// still fully opaque. Give the browser one frame to paint that tree
-				// behind the loader, then begin the fade. Keeping the page hidden
-				// until the end of the opacity transition exposes the bare body
-				// through a progressively transparent splash and finishes with a
-				// one-frame content pop.
 				root.classList.remove("initial-loader-active");
 				const revealFrame = window.requestAnimationFrame(() => {
 					if (disposed) return;
 					setLeaving(true);
-					// Adopt a bootstrap fade already in progress; never restart it
-					// when delayed hydration or a Strict Mode replay arrives.
 					const publicReadyAt = Number(
 						root.getAttribute(INITIAL_PUBLIC_CONTENT_READY_AT),
 					);
@@ -136,10 +118,6 @@ export default function InitialPageLoader() {
 
 		const releaseGateAtDeadline = () => {
 			if (disposed || finished) return;
-			// Telemetry only — the message text and fingerprint are kept stable so
-			// existing Sentry issues keep aggregating (#338 closeout metric).
-			// Fingerprint by route kind (not the full dynamic path) so e.g. every
-			// slow seller page groups into one issue instead of one per seller id.
 			const routeKind =
 				stripLocale(window.location.pathname).split("/").filter(Boolean)[0] ||
 				"home";
@@ -157,9 +135,6 @@ export default function InitialPageLoader() {
 					),
 				},
 			});
-			// Gate convergence (#338): a missing marker must never hold the page.
-			// Release the splash and expose the server-rendered tree as-is; failed
-			// data belongs to error boundaries, not to this overlay.
 			finished = true;
 			contentObserver?.disconnect();
 			publicHandoffObserver?.disconnect();
@@ -214,25 +189,6 @@ export default function InitialPageLoader() {
 			finish();
 		};
 
-		// A client-side navigation away from `entryPathname` voids the content
-		// gate: the route it was waiting on has unmounted, so its marker can never
-		// render and the splash would sit until the deadline — on a page that had
-		// loaded fine. Soft navigations belong to PageTransition's contract, not
-		// this document splash's, so release the content half and let `finish()`
-		// apply the document half as usual.
-		// (#1819: SellerWorkspaceLock bounces a seller landing on "/" to
-		// /seller-center/dashboard, and the home marker never arrives.)
-		//
-		// Event-driven, not polled: a client-side navigation always commits new
-		// DOM, so the same MutationObserver that watches for content markers also
-		// observes the route change — no interval needed.
-		//
-		// Read the URL directly rather than `usePathname()`. This always-mounted
-		// splash renders in the root layout OUTSIDE any <Suspense> so it ships in
-		// the initial HTML; keeping it decoupled from next/navigation avoids
-		// coupling first paint to the router (and, historically under Cache
-		// Components, a dynamic read here made every route blocking). The URL is
-		// the same fact the hook would report.
 		const checkRouteChanged = () => {
 			if (disposed || finished || routeContentReady) return;
 			if (window.location.pathname === entryPathname) return;
@@ -241,9 +197,6 @@ export default function InitialPageLoader() {
 			finish();
 		};
 
-		// The inline bootstrap can finish before this effect or while its content
-		// observer is waiting. It never clears initial-loader-active: only this
-		// mounted React effect may release the third-party DOM-injection barrier.
 		const adoptPublicHandoff = () => {
 			if (
 				disposed ||
@@ -265,22 +218,9 @@ export default function InitialPageLoader() {
 			adoptPublicHandoff();
 		}
 
-		// These request-time routes can become DOM-ready while their first content
-		// tree is still resolving. Wait for both signals there. Other routes leave
-		// as soon as the DOM is interactive; slow images/fonts never gate the
-		// splash. The deadline below remains an escape hatch for failed
-		// data/hydration.
 		if (waitForRouteContent && !finished) {
 			checkRouteContent();
 			if (!routeContentReady) {
-				// Deliberately `subtree: true` on <html>, and deliberately NOT
-				// narrowed to `childList` on <body>: the markers this waits for are
-				// published deep inside the route tree (a route-ready <span>, a
-				// `hidden` flip on the public handoff), not as direct children of
-				// anything stable. It is the widest observer in the app and it runs
-				// during hydration — but it is also disconnected the moment the
-				// splash finishes, and every cheaper scope was tried and misses the
-				// signal. Do not narrow it without moving the markers first.
 				contentObserver = new MutationObserver(() => {
 					checkRouteChanged();
 					checkRouteContent();
@@ -295,9 +235,6 @@ export default function InitialPageLoader() {
 			}
 		}
 
-		// A route with no complete content at the deadline releases the gate
-		// instead of locking it (#338): report to Sentry, then fade the splash and
-		// hand the viewport to whatever the server rendered.
 		scheduleTimeout(releaseGateAtDeadline, INITIAL_LOADER_REACT_FALLBACK_MS);
 
 		document.documentElement.classList.add("initial-loader-active");
@@ -326,9 +263,6 @@ export default function InitialPageLoader() {
 	}, []);
 
 	useEffect(() => {
-		// Keep the first-paint CSS guard until React has actually removed the
-		// loader node. Clearing it in the same effect as setVisible(false) can
-		// expose a one-frame flash between the state update and commit.
 		if (!visible) {
 			document.documentElement.classList.remove(STALE_CHUNK_RELOAD_CLASS);
 		}
@@ -344,16 +278,10 @@ export default function InitialPageLoader() {
 			aria-label="Hawkr 載入中"
 		>
 			<div className="initial-loader__mark" aria-hidden="true">
-				{/* Two stacked layers: the line-art outline stays put while each of
-			    the colour blocks (awning, then counter) blooms out of the dead
-			    centre — see `.il-blade` / `@keyframes ilBlade*`.
-			    Markup lives in the shared BrandLogoLoader (no size prop here:
-			    the `.il-logo` CSS default is this splash's 104px). */}
+
 				<BrandLogoLoader />
 			</div>
-			{/* Wordmark: a faint dark-grey base with its real two-tone green
-		    colour wiping in left → right, like a loading bar. Decorative — the
-		    wrapper's `aria-label` already names this surface once. */}
+
 			<BrandWordmark reveal />
 		</div>
 	);

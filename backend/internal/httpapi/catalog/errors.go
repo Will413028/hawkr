@@ -10,10 +10,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// 模組回報的欄位名（Go 風格，索引寫成 [n]）對到請求的 proto 路徑；[] 依序填入模組回報的索引（rpc.FieldPaths）。
-// 寫入商品的請求把 ProductInput 放在 product。
 
-// inputPaths 是 ProductInput 內的欄位，prefix 是 ProductInput 在請求裡的路徑（"product."）。
 func inputPaths(prefix string) rpc.FieldPaths {
 	p := map[string]string{
 		"Title":                       "title",
@@ -64,7 +61,6 @@ var (
 	deletePaths = rpc.FieldPaths{"Etag": "etag"}
 	adjustPaths = rpc.FieldPaths{"RequestID": "request_id", "Delta": "delta"}
 	setPaths    = rpc.FieldPaths{"RequestID": "request_id", "Quantity": "quantity"}
-	// 列表與計數的篩選：賣家的在 filter，公開的 Sort 與標籤在請求上。
 	sellerListPaths = rpc.FieldPaths{"Status": "filter.status", "StockStatus": "filter.stock_status"}
 	publicListPaths = rpc.FieldPaths{"Sort": "sort", "Hashtags": "filter.hashtags"}
 	noPaths         = rpc.FieldPaths{}
@@ -80,11 +76,8 @@ func merge(a, b rpc.FieldPaths) rpc.FieldPaths {
 	return out
 }
 
-// imageRefIndex 是「圖庫與描述裡同一張圖出現兩次」的欄位 Description.Image[n]：n 是描述裡第幾張圖，不是第幾個區塊，沒有對得上的請求索引，
-// 所以指向整個 description。
 var imageRefIndex = regexp.MustCompile(`^Description\.Image\[\d+\]$`)
 
-// reasonText 是模組回報的欄位原因（catalog.Reason*）的使用者面文字，整句是「<欄位>」之後接的描述。
 var reasonText = map[string]string{
 	catalog.ReasonRequired:   "必填",
 	catalog.ReasonTooLong:    "太長",
@@ -95,8 +88,6 @@ var reasonText = map[string]string{
 	catalog.ReasonInvalid:    "格式不正確",
 }
 
-// failure 把 catalog 模組的錯誤轉成對外的錯誤；paths 是這個方法的欄位對應。沒有分類的錯誤原樣回傳（interceptor 記為 internal）。
-// 商品不存在與商品不是這家店的都回 not_found（防枚舉，規範 §二）。
 func failure(err error, paths rpc.FieldPaths) error {
 	if err == nil {
 		return nil
@@ -135,7 +126,6 @@ func failure(err error, paths rpc.FieldPaths) error {
 	return err
 }
 
-// fieldLabel 是欄位給使用者看的名稱前綴；請求路徑已經指出是哪個欄位，這裡只給一個可讀的名字，不含索引。
 func fieldLabel(field string) string {
 	name, _, _ := strings.Cut(field, "[")
 	name, _, _ = strings.Cut(name, ".")

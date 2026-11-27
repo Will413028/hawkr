@@ -34,7 +34,6 @@ func dartString(s string) string {
 	return b.String()
 }
 
-// dartLocale 是 UiLocale 的成員名稱：zh-TW → zhTW，en → en。
 func dartLocale(loc string) string {
 	parts := strings.Split(loc, "-")
 	out := strings.ToLower(parts[0])
@@ -119,7 +118,6 @@ func (g *dartGen) compile(nodes []icu.Node, loc string, ps map[string]Param) str
 	return strings.Join(parts, " + ")
 }
 
-// dartCase 是一個 case 在各語系的運算式，相同的語系合併成一個 pattern。
 type dartArm struct {
 	locs []string
 	expr string
@@ -176,7 +174,6 @@ func (m *Model) EmitDart() []byte {
 	g := &dartGen{}
 	enums := m.usedEnums()
 	var body strings.Builder
-	// 名詞、變體依列舉分組成 extension；訊息句、通用文字是頂層函式。
 	byEnum := map[string][]*Func{}
 	var enumOrder []string
 	var tops []*Func
@@ -227,7 +224,6 @@ func (m *Model) dartEnum(g *dartGen, b *strings.Builder, funcs []*Func) {
 	e := funcs[0].Enum
 	typ := g.typeName(e)
 	ext := pascal(e.Path) + "UiText"
-	// 沒有 staff 的 Dart 只生成預設受眾。
 	var methods strings.Builder
 	for _, f := range funcs {
 		helper := "_" + lowerFirst(pascal(f.ID))
@@ -235,7 +231,6 @@ func (m *Model) dartEnum(g *dartGen, b *strings.Builder, funcs []*Func) {
 		for _, p := range f.Params {
 			ps[p.Name] = p
 		}
-		// helper
 		var sig []string
 		sig = append(sig, "UiLocale l", "int value")
 		for _, p := range f.Params {
@@ -255,7 +250,6 @@ func (m *Model) dartEnum(g *dartGen, b *strings.Builder, funcs []*Func) {
 			}
 		}
 		b.WriteString("_ => null,\n};\n}\n\n")
-		// method
 		named := dartParamNamed(f, g)
 		args := "l, value"
 		if p := dartParamPass(f); p != "" {

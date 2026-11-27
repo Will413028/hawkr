@@ -1,4 +1,3 @@
-/* Keep the shared mobile-nav label token above AA on this light surface. */
 html:has(.seller-pricing-page) nav[aria-label="手機底部導覽"] {
 	--theme-text-muted: var(--ink-body);
 }
@@ -169,11 +168,6 @@ html:has(.seller-pricing-page) nav[aria-label="手機底部導覽"] {
 	outline-offset: 3px;
 }
 
-/*
- * Interaction patterns adapted from React Bits' AnimatedContent and
- * SpotlightCard. Source and license details live in
- * third_party/react-bits/NOTICE.md.
- */
 .seller-pricing-page [data-sp-reveal] {
 	--sp-reveal-delay: 0ms;
 }

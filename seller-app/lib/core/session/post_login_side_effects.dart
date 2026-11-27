@@ -38,8 +38,6 @@ class RealPostLoginSideEffects implements PostLoginSideEffects {
     _ref.read(chatSessionProvider).start();
     _ref.read(notificationSignalServiceProvider).start();
     PushNotificationManager.instance.onUserLoggedIn();
-    // 由 Session.initialize() 呼叫：等 currentStoreProvider 讀完 GetMyStore。它只依賴 session 的帳號，
-    // 不會重新進入 initialize()。
     await _ref.read(currentStoreProvider.future);
   }
 }

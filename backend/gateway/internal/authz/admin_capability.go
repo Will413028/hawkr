@@ -79,27 +79,7 @@ func IsKnownAdmin(cap AdminCapability) bool {
 	return false
 }
 
-// ==================== 依賴閉包與風險等級 ====================
 
-// adminCapabilityDependencies 是「授予 X 就必須同時授予哪些」的直接依賴表。
-//
-// 它與封閉十值同檔，因為兩者是同一個 SSOT 的兩半：值域說「有哪些能力」，本表說
-// 「哪些組合是自洽的」。分兩個檔就會出現「新增了 capability，但沒有人被迫回答
-// 它依賴什麼」——而那個漏答不會讓任何東西轉紅。
-//
-// ⚠️ 這條規則在 DB 層**不存在**：chk_sda_capabilities_closed 的十個 CASE 是去重加總
-// （PG 的 CHECK 不能有子查詢，做不出 DISTINCT），不是依賴檢查。授權建立路徑的
-// fail-closed 保證因此完全落在 Gateway：MissingAdminCapabilityDependencies 不齊即
-// 9287，在送出 gRPC 之前。前端 hawkr-admin 的 policy.ts 另有一份同內容的表，
-// 那一份只用來收窄 UI 顯示（方向 fail-safe），不是保證。
-//
-// 依賴的語意是「沒有它，這個能力做出來的事在畫面上看不見也對不了帳」：編輯必須看得到
-// 現況才知道自己改了什麼，發布必須能編輯才有東西可發。orders.read 沒有依賴——它是唯讀
-// 的終點；風險高是因為 PII 揭露，與依賴無關。
-//
-// 表是**直接**依賴，不是遞移閉包；閉包由 MissingAdminCapabilityDependencies 展開。
-// 現況兩者恰好相同（products.publish 直接列了 read 與 write），刻意如此：讀表的人不必
-// 在腦中算一次遞移就知道完整答案。
 var adminCapabilityDependencies = map[AdminCapability][]AdminCapability{
 	AdminCapStorefrontRead:  {},
 	AdminCapStorefrontWrite: {AdminCapStorefrontRead},
@@ -120,11 +100,6 @@ const (
 	AdminCapRiskHigh   = "high"
 )
 
-// adminCapabilityRisks 是勾選介面用來標示危險度的等級，取自 §6.1.1 的能力表。
-//
-// orders.read 是十值中唯一「唯讀卻是 high」的一項：它每一次揭露都會落一列
-// ORDER_PII_REVEAL 稽核，風險來自個資而不是寫入。把它按「唯讀＝low」歸類，勾選畫面
-// 就不會提醒任何人。
 var adminCapabilityRisks = map[AdminCapability]string{
 	AdminCapStorefrontRead:  AdminCapRiskLow,
 	AdminCapStorefrontWrite: AdminCapRiskMedium,
@@ -168,8 +143,6 @@ func MissingAdminCapabilityDependencies(caps []AdminCapability) []AdminCapabilit
 	}
 
 	missing := make(map[AdminCapability]struct{})
-	// 佇列展開遞移閉包。封閉十值且表無環，迴圈必然停止；即便有人寫出環，
-	// visited 也讓它停在有限步而不是掛住一個 request。
 	queue := append([]AdminCapability(nil), caps...)
 	visited := make(map[AdminCapability]struct{}, len(caps))
 	for len(queue) > 0 {

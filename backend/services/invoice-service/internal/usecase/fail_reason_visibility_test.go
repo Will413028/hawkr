@@ -65,7 +65,6 @@ func TestFailDocumentPersistsReasonForSeller(t *testing.T) {
 					"而通知逐字叫他去那裡「查看原因」", got, tc.want)
 			}
 
-			// P2 事件也必須帶它：ADM 與下游消費者靠 FailureReasonCode 分流。
 			if len(h.outbox.inserted) != 1 {
 				t.Fatalf("outbox 列數 = %d, want 1", len(h.outbox.inserted))
 			}
@@ -99,15 +98,12 @@ func TestMarkIssuedClearsStaleFailureReason(t *testing.T) {
 		t.Error("MarkInvoiceDocumentIssued 沒有清 manual_reason_code —— " +
 			"重試後成功的發票會掛著上一次的失敗理由，畫面上會出現「已開立 ＋ 原因：賣家字軌不足」")
 	}
-	// 陰性對照：失敗那一句必須**寫**它（否則本檔第一支測試守的東西就不存在了）。
 	failStmt := statementOf(t, body, "MarkInvoiceDocumentIssueFailed")
 	if !strings.Contains(failStmt, "manual_reason_code = sqlc.arg(manual_reason_code)") {
 		t.Error("MarkInvoiceDocumentIssueFailed 沒有寫 manual_reason_code")
 	}
 }
 
-// statementOf 取某支 query 的 SQL 本文。找不到一律 t.Fatalf 不 t.Skip：
-// query 被改名時 SKIP 會讓這道檢查靜默消失。
 func statementOf(t *testing.T, body, name string) string {
 	t.Helper()
 	marker := "-- name: " + name + " "

@@ -132,10 +132,6 @@ describe("CROP_GATE：新接進 steps[] 的品項分類判定", () => {
 	});
 });
 
-// T23 為候選搜尋階段新增了父列碼 SEARCH_CANDIDATES（backend domain/steps.go），
-// 同一批把 FAILED 移出 code 軸（失敗只住 status 軸，T23 D3）。前端這兩張表當時
-// 沒跟上：SEARCH_CANDIDATES 不在白名單 ⇒ stepFromProto 靜默丟掉整列；不在
-// STEP_ICON ⇒ 設計稿 01 的「搜尋候選供應商」父列拿到 clock 退化圖示。
 describe("T23 對 step 碼表的增刪", () => {
 	it("SEARCH_CANDIDATES 是公開碼，不會被 stepFromProto 丟掉", () => {
 		expect(isPublicAgentStepCode("SEARCH_CANDIDATES")).toBe(true);

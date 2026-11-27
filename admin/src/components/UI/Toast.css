@@ -1,4 +1,3 @@
-/* Toast：色調只走 AdminVisualRefresh.css 的 semantic token，不寫 hex。 */
 .adm-toast-host {
 	position: fixed;
 	top: 24px;

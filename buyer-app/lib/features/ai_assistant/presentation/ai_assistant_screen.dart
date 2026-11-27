@@ -41,7 +41,6 @@ class AiAssistantScreen extends HookConsumerWidget {
     final unreadWhileAway = useState(0);
     final lastAnimatedCount = useState(0);
 
-    // 初次進入：載入歷史對話，若無對話則顯示歡迎訊息
     useEffect(() {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         await controller.loadLatestSession();
@@ -53,7 +52,6 @@ class AiAssistantScreen extends HookConsumerWidget {
       return null;
     }, const []);
 
-    // 新訊息：捲到最底
     useEffect(() {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!scrollCtrl.hasClients) return;
@@ -73,7 +71,6 @@ class AiAssistantScreen extends HookConsumerWidget {
       return null;
     }, [messages.length]);
 
-    // 捲動 FAB 顯示邏輯
     useEffect(() {
       void listener() {
         if (!scrollCtrl.hasClients) return;
@@ -175,13 +172,11 @@ class AiAssistantScreen extends HookConsumerWidget {
             ),
           ),
 
-          // ── Message area + FAB + typing indicator ──
           Expanded(
             child: Stack(
               children: [
                 const Positioned.fill(child: ChatConversationDotPattern()),
 
-                // 訊息列表
                 ListView.builder(
                   controller: scrollCtrl,
                   physics: const AlwaysScrollableScrollPhysics(),
@@ -291,7 +286,6 @@ class AiAssistantScreen extends HookConsumerWidget {
                   },
                 ),
 
-                // 捲到最底 FAB（實心綠色，跟普通聊天室一樣）
                 if (showScrollFab.value)
                   Positioned(
                     right: 16.w,
@@ -360,7 +354,6 @@ class AiAssistantScreen extends HookConsumerWidget {
   }) {
     final maxW = MediaQuery.of(context).size.width * 0.72;
 
-    // AI 頭像槽（跟普通聊天室的 avatarSlot 邏輯一樣）
     Widget avatarSlot;
     if (!isUser) {
       if (!hasNext) {
@@ -453,7 +446,6 @@ BorderRadius _smartBorderRadius(bool isSelf, bool isFirst, bool hasNext) {
   }
 }
 
-// ── 助理回覆 loading 三點動畫（跟賣家版完全相同，內嵌在助理 bubble 中）──
 class _AssistantReplyLoadingDots extends StatefulWidget {
   const _AssistantReplyLoadingDots();
   @override
@@ -517,7 +509,6 @@ class _AssistantReplyLoadingDotsState extends State<_AssistantReplyLoadingDots>
   }
 }
 
-// ── 訊息入場動畫（滑入 + 淡入，跟 chat_thread_screen 完全相同）──
 class _MessageEntrance extends StatefulWidget {
   const _MessageEntrance({required this.isSelf, required this.child});
   final bool isSelf;

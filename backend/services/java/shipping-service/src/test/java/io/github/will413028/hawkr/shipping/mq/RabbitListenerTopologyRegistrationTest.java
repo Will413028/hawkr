@@ -55,15 +55,12 @@ class RabbitListenerTopologyRegistrationTest {
     @DisplayName("每一條 @RabbitListener 的 queue 都登記在 topology.yaml")
     void everyListenerQueueIsRegistered() throws IOException {
         Set<String> declaredQueues = topologyQueueNames();
-        // 🔴 對照組：先證明「讀 topology」這件事是有效的。
-        //    少了這一條，檔案讀不到／路徑錯／解析失敗都會讓本測試變成恆真。
         assertTrue(declaredQueues.contains("shipping.payuni.webhook"),
                 "對照組失敗：topology.yaml 讀不到既有的 shipping.payuni.webhook，"
                         + "本測試的結論全部不可信。解析到的 queue 數=" + declaredQueues.size()
                         + " 路徑=" + TOPOLOGY.toAbsolutePath());
 
         Set<String> listenerQueues = listenerQueueNames();
-        // 🔴 對照組二：先證明「掃 listener」這件事是有效的。
         assertTrue(listenerQueues.contains("shipping.payuni.webhook"),
                 "對照組失敗：掃不到既有的 ShippingWebhookConsumer，掃到的=" + listenerQueues);
 
@@ -99,20 +96,9 @@ class RabbitListenerTopologyRegistrationTest {
                 inQueues = true;
                 continue;
             }
-            // 🔴 **註解不是區段結束**（2026-09-17 修）。原本的判準是
-            //    「非空白開頭、非 `-` 開頭 ⇒ 離開 queues:」，而頂格的 `#` 註解三個條件全中
-            //    ⇒ 解析在第一條頂格註解就停下來，後面的 queue 一個都讀不到。
-            //
-            //    ⚠️ 這個 bug 的可怕之處在於它**兩個方向都會錯**：
-            //      * 要找的 queue 排在截斷點之後 ⇒ 誤報「未登記」（假紅）
-            //      * 要找的 queue 排在截斷點之前 ⇒ 照樣通過，而**後面那些根本沒被檢查**（假綠）
-            //    本檔的對照組（找得到既有的 shipping.payuni.webhook 嗎）是唯一擋住它的東西
-            //    ——它在 Batch A 新增 topology 註解的當下就讓整支測試宣告「結論不可信」。
-            //    🔴 那正是對照組存在的理由：**擋不住錯誤，但擋得住「錯誤被當成結論」**。
             if (line.startsWith("#")) {
                 continue;
             }
-            // 下一個頂層區段開始（非空白開頭、非 "- " 開頭）⇒ 離開 queues:
             if (inQueues && !line.isEmpty() && !line.startsWith(" ") && !line.startsWith("-")) {
                 inQueues = false;
             }

@@ -111,8 +111,6 @@ export function isQuickViewOpener(href: string): boolean {
 }
 
 export function readQuickViewOrigin(): QuickViewOrigin | null {
-	// Honour only a very recent capture (the click that opened this modal) so a
-	// stale origin can't anchor an unrelated open.
 	const now = typeof performance !== "undefined" ? performance.now() : 0;
 	if (
 		origin &&

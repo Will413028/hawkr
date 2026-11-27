@@ -134,7 +134,6 @@ public class PayUniConfig {
         PayUniHttpClient client = credentialsConfigured()
                 ? new PayUniHttpClient(cryptoService, baseUrl)
                 : new CredentialGuardedPayUniHttpClient(cryptoService, baseUrl);
-        // 06 §10.3 audit logging：注入 onExchange logger 將每次 PayUni exchange 寫入 payuni_audit_logs 專表
         client.setRequestLogger(auditLogger);
         return client;
     }

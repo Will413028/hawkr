@@ -55,9 +55,6 @@ public class RefundSyncWorker {
 
     @Scheduled(cron = "0 30 * * * ?")
     public void syncRefundEvents() {
-        // 查詢已完成但超過 1 小時的退款任務（可能 MQ 發佈失敗）
-        // ⚠️ R4-P1-2（2026-08-08）：這個 now 只用於「候選述詞」與「租約未到期判定」。
-        // 租約的**基準**不在這裡取（見下方迴圈內），否則整批共用同一個到期時間。
         var now = DateTimeUtils.nowUtc();
         var cutoff = now.minusHours(1);
 
@@ -65,7 +62,6 @@ public class RefundSyncWorker {
                 new LambdaQueryWrapper<RefundTaskEntity>()
                         .eq(RefundTaskEntity::getStatus, WorkerTaskStatus.DONE.value())
                         .lt(RefundTaskEntity::getUpdatedAt, cutoff)
-                        // issue #2294 L5：租約未到期的列由別的 pod 持有，本輪不撈
                         .and(lease -> lease
                                 .isNull(RefundTaskEntity::getResyncAt)
                                 .or()
@@ -82,15 +78,7 @@ public class RefundSyncWorker {
 
         for (RefundTaskEntity task : tasks) {
             try {
-                // ⚠️ R4-P1-2（2026-08-08）：租約基準取 **claim 當下**而非 tick 起點的 now。
-                // 取 tick 起點 ⇒ 全批共用同一個到期時間 ⇒ 第 k 筆的**有效**租約
-                // = RESYNC_LEASE_HOURS − (前 k−1 筆的耗時)，不變式退化成
-                // 「批次總耗時 < 租約」（會隨 LIMIT 50 這個 batchSize 一起破）。
-                // 改在這裡取之後，不變式降為「**單筆**最壞耗時 < 租約」——與 batchSize 無關，
-                // 是結構保證而非參數巧合。述詞用的 now/cutoff 維持 tick 起點：那個方向讓
-                // 候選集合與可搶佔集合更小，是保守的。
                 var leaseUntil = DateTimeUtils.nowUtc().plusHours(RESYNC_LEASE_HOURS);
-                // issue #2294 L5：lease claim —— 搶到才 publish（0 = 另一個 pod 已搶走）
                 int claimed = refundTaskMapper.claimForResync(
                         task.getId(), WorkerTaskStatus.DONE.value(), now, leaseUntil);
                 if (claimed == 0) {
@@ -100,10 +88,8 @@ public class RefundSyncWorker {
                 }
 
                 if (task.getCaseNo() != null) {
-                    // 售後案件退款完成事件；outcome 從 task 取出（case_no path 必填）
                     AfterSalePlatformDecisionOutcome outcome = AfterSalePlatformDecisionOutcome.fromValue(
                             task.getRefundOutcome());
-                    // #1226：補發賣家工作區 realtime 需 storeId，task 不帶，由 caseNo 反查
                     Long storeId = caseMapper.findStoreIdByCaseNo(task.getCaseNo());
                     Long buyerId = caseMapper.findBuyerIdByCaseNo(task.getCaseNo());
                     eventPublisher.publishRefundCompleted(
@@ -117,7 +103,6 @@ public class RefundSyncWorker {
                             task.getExternalRefId()
                     );
                 } else if (task.getCancelId() != null) {
-                    // 賣家取消完成事件
                     eventPublisher.publishCancelCompleted(
                             task.getOrderNo(),
                             task.getCancelId()

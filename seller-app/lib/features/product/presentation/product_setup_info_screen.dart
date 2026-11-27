@@ -27,7 +27,6 @@ class ProductSetupInfoScreen extends HookConsumerWidget {
     this.initialSubCategory,
     this.initialCatalogId,
     this.isCandidateCategory = false,
-    // 完整分類資訊
     this.l1Id,
     this.l1Name,
     this.l2Id,
@@ -43,17 +42,16 @@ class ProductSetupInfoScreen extends HookConsumerWidget {
   final String? initialDescription;
   final String? initialCategory;
   final String? initialSubCategory;
-  final int? initialCatalogId; // 分類 ID（可能是正式或暫時）
+  final int? initialCatalogId;
   final bool
-  isCandidateCategory; // true=來自 category_candidate, false=來自 category
-  // 完整分類資訊
+  isCandidateCategory;
   final int? l1Id;
   final String? l1Name;
   final int? l2Id;
   final String? l2Name;
   final String? l3Name;
   final bool isEditMode;
-  final Map<String, dynamic>? existingProduct; // 編輯模式時的現有商品資料
+  final Map<String, dynamic>? existingProduct;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -65,7 +63,6 @@ class ProductSetupInfoScreen extends HookConsumerWidget {
     final descriptionBlocks = useState<List<Map<String, dynamic>>?>(null);
     final descriptionStagedTokens = useState<List<String>>([]);
 
-    // 監聽必填欄位，讓 Widget 在文字變動時重建以更新按鈕狀態
     useListenable(nameController);
     useListenable(categoryController);
     useListenable(subCategoryController);
@@ -77,7 +74,6 @@ class ProductSetupInfoScreen extends HookConsumerWidget {
         subCategoryController.text.trim().isNotEmpty &&
         originController.text.trim().isNotEmpty;
 
-    // 分類選擇相關
     final l2Categories = useState<List<String>>([]);
     final l3Categories = useState<List<String>>([]);
     final selectedL1 = useState<String?>(null);
@@ -85,7 +81,6 @@ class ProductSetupInfoScreen extends HookConsumerWidget {
     final l3ByL2 = useState<Map<String, List<String>>>({});
     final l3NameToId = useState<Map<String, int>>({});
 
-    // 下拉選單相關
     final categoryOverlay = useState<OverlayEntry?>(null);
     final subCategoryOverlay = useState<OverlayEntry?>(null);
     final categoryFieldKey = useMemoized(() => GlobalKey());
@@ -122,22 +117,16 @@ class ProductSetupInfoScreen extends HookConsumerWidget {
               .toList();
           descriptionController.text = descriptionBlocks.value!
               .where((b) => b['type'] == 'text')
-              // runs 優先、legacy content 相容——只認 content 在 inline-run
-              // 格式下摘要欄會顯示成空（issue #1246）
               .map(HashtagExtractor.blockPlainText)
               .where((s) => s.isNotEmpty)
               .join('\n');
         } else {
-          // Map 但沒 blocks：可能是 {text: "..."} 或空 Map {}
-          // 不能用 desc.toString()，空 Map 會變成字面字串 "{}"
           final textField = desc['text']?.toString() ?? '';
           if (textField.isNotEmpty) {
             descriptionController.text = textField;
           }
-          // 空 Map 就保持 controller 為空字串，不要汙染
         }
       } else if (desc is String) {
-        // 過濾後端/舊資料殘留的 empty JSON dump
         final trimmed = desc.trim();
         if (trimmed.isNotEmpty &&
             trimmed != '{}' &&
@@ -526,7 +515,6 @@ class ProductSetupInfoScreen extends HookConsumerWidget {
             subtitle: '商品資訊設定',
           ),
 
-          // 主要內容
           Expanded(
             child: SingleChildScrollView(
               child: Column(
@@ -536,7 +524,6 @@ class ProductSetupInfoScreen extends HookConsumerWidget {
                     padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 16.h),
                     child: Column(
                       children: [
-                        // 商品資訊卡片
                         Container(
                           width: double.infinity,
                           decoration: BoxDecoration(
@@ -611,7 +598,6 @@ class ProductSetupInfoScreen extends HookConsumerWidget {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    // 商品名稱
                                     _buildRequiredLabel('商品名稱'),
                                     SizedBox(height: 8.h),
                                     _buildTextField(
@@ -619,7 +605,6 @@ class ProductSetupInfoScreen extends HookConsumerWidget {
                                       hintText: '例：紐西蘭奇異果',
                                     ),
                                     SizedBox(height: 16.h),
-                                    // 商品分類 和 詳細分類
                                     Row(
                                       children: [
                                         Expanded(
@@ -659,7 +644,6 @@ class ProductSetupInfoScreen extends HookConsumerWidget {
                                       ],
                                     ),
                                     SizedBox(height: 16.h),
-                                    // 產地
                                     _buildRequiredLabel('產地'),
                                     SizedBox(height: 8.h),
                                     _buildTextField(
@@ -673,7 +657,6 @@ class ProductSetupInfoScreen extends HookConsumerWidget {
                           ),
                         ),
                         SizedBox(height: 16.h),
-                        // 商品說明卡片（可點擊跳轉）
                         GestureDetector(
                           onTap: onDescriptionTap,
                           child: Container(
@@ -1185,7 +1168,7 @@ class _CategoryDropdownOverlay extends StatefulWidget {
 
 class _CategoryDropdownOverlayState extends State<_CategoryDropdownOverlay> {
   String? _hoveredCategory;
-  bool _isLongPressActive = false; // 長按模式是否啟動
+  bool _isLongPressActive = false;
   final TextEditingController _searchController = TextEditingController();
   List<String> _filteredCategories = [];
   final GlobalKey _listKey = GlobalKey();
@@ -1269,7 +1252,6 @@ class _CategoryDropdownOverlayState extends State<_CategoryDropdownOverlay> {
         _isOnAddNewButton(details.globalPosition)) {
       widget.onAddNew();
     }
-    // 不關閉選單，只重置狀態（如果沒選到任何東西）
     setState(() {
       _isLongPressActive = false;
       _hoveredCategory = null;
@@ -1286,16 +1268,14 @@ class _CategoryDropdownOverlayState extends State<_CategoryDropdownOverlay> {
         );
 
     return GestureDetector(
-      onTap: widget.onDismiss, // 點擊背景關閉
+      onTap: widget.onDismiss,
       onLongPressStart: _onLongPressStart,
       onLongPressMoveUpdate: _onLongPressMoveUpdate,
       onLongPressEnd: _onLongPressEnd,
       behavior: HitTestBehavior.opaque,
       child: Stack(
         children: [
-          // 背景
           Positioned.fill(child: Container(color: Colors.transparent)),
-          // 下拉選單
           Positioned(
             left: widget.position.dx,
             top: widget.position.dy + widget.fieldHeight + 4,
@@ -1320,7 +1300,6 @@ class _CategoryDropdownOverlayState extends State<_CategoryDropdownOverlay> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // 搜尋欄
                     Padding(
                       padding: EdgeInsets.all(8.w),
                       child: Container(
@@ -1362,7 +1341,6 @@ class _CategoryDropdownOverlayState extends State<_CategoryDropdownOverlay> {
                         ),
                       ),
                     ),
-                    // 分類列表
                     Flexible(
                       child: ListView.builder(
                         key: _listKey,
@@ -1374,10 +1352,9 @@ class _CategoryDropdownOverlayState extends State<_CategoryDropdownOverlay> {
                         ),
                         itemCount:
                             _filteredCategories.length +
-                            1, // +1 for add new button
+                            1,
                         itemBuilder: (context, index) {
                           if (index == _filteredCategories.length) {
-                            // 新增分類按鈕
                             _itemKeys[-1] ??= GlobalKey();
                             return GestureDetector(
                               onTap: widget.onAddNew,
@@ -1418,7 +1395,6 @@ class _CategoryDropdownOverlayState extends State<_CategoryDropdownOverlay> {
                             );
                           }
 
-                          // 為每個項目建立唯一的 key
                           _itemKeys[index] ??= GlobalKey();
                           final category = _filteredCategories[index];
                           final isHovered = _hoveredCategory == category;

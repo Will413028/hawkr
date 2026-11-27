@@ -97,7 +97,6 @@ func (h *App) SendAssistantMessage(ctx context.Context, req *connect.Request[pb.
 	return connect.NewResponse(&pb.SendAssistantMessageResponse{TurnId: ref.TurnID, SessionId: ref.SessionID}), nil
 }
 
-// sendError 把送出的模組錯誤對應到 Connect 的分類與 reason；沒有列出的（建立對話失敗、transaction 內送出）是沒有分類的 internal。
 func sendError(err error) error {
 	switch {
 	case errors.Is(err, model.ErrInvalidTopic):
@@ -179,7 +178,6 @@ func eventToProto(ev model.TurnEvent) (*pb.WatchAssistantTurnResponse, error) {
 	case model.EventFinished:
 		out.Event = &pb.WatchAssistantTurnResponse_Finished{Finished: &pb.AssistantFinished{SessionId: ev.SessionID}}
 	case model.EventError:
-		// 失敗的細分（FailureKind）不外流，對外一律 ASSISTANT_TURN_FAILED。
 		out.Event = &pb.WatchAssistantTurnResponse_Error{Error: &pb.AssistantStreamError{
 			Reason:           commonpb.ErrorReason_ASSISTANT_TURN_FAILED,
 			LocalizedMessage: ev.Message,

@@ -24,11 +24,7 @@
 import { ApiClientError, authedFetch } from "@/lib/api/client";
 import { normalizeShippingMethod, ShippingMethod } from "@/lib/codemeta/enums";
 
-/* ===== Code-meta enums (mirrors Flutter codemeta) ===== */
 
-// 配送方式的值域**只有一個來源**：`lib/codemeta/generated.ts` 的 `ShippingMethod`
-// （CodeMeta SSOT 生成，含 3001～3005）。本檔曾自帶一份手寫的 `SHIPPING_METHOD`
-// 三值副本，於是後端加 3005 時本檔完全不會知道。
 
 /**
  * Carrier shipment-status values — sourced from the seller App's authoritative
@@ -50,10 +46,10 @@ export const SHIPMENT_STATUS = {
 } as const;
 
 export const LGS_TYPE = {
-	B2C: "B2C", // 超商大宗寄倉
-	C2C: "C2C", // 超商店到店
-	HOME: "HOME", // 黑貓宅配
-	C2B: "C2B", // 超商退貨便
+	B2C: "B2C",
+	C2C: "C2C",
+	HOME: "HOME",
+	C2B: "C2B",
 } as const;
 export type LgsType = (typeof LGS_TYPE)[keyof typeof LGS_TYPE];
 
@@ -80,7 +76,6 @@ export function lgsTypeForShippingMethod(
 	}
 }
 
-/* ===== API response types ===== */
 
 export interface BusinessDay {
 	/** yyyy-MM-dd */
@@ -113,7 +108,7 @@ export interface LogisticsInfo {
 	shipTradeNo: string;
 	odno: string;
 	lgsType: string;
-	shipType: number; // 1 7-ELEVEN / 2 黑貓
+	shipType: number;
 	serviceType: number;
 	shipAmt: number;
 	consignee: string;
@@ -131,7 +126,6 @@ export interface LogisticsInfo {
 	isErrorStatus: boolean;
 }
 
-/* ===== HTTP calls ===== */
 
 /** GET /app/shipping_business_days — 明日起 7 個工作天（排週日 + 國定假日） */
 export async function fetchShippingBusinessDays(): Promise<BusinessDay[]> {
@@ -205,9 +199,6 @@ export async function printCvsLabel(orderNo: string): Promise<CvsLabelResult> {
 	const yyyy = tomorrow.getFullYear();
 	const mm = String(tomorrow.getMonth() + 1).padStart(2, "0");
 	const dd = String(tomorrow.getDate()).padStart(2, "0");
-	// 後端規格 PrintCvsLabelReq.shipDate 要 YYYYMMDD（無連字號）—— 與宅配
-	// generate_home_label 一致。先前誤送 "YYYY-MM-DD" 會讓 PayUni 取號失敗，
-	// 鎖殘留後續重試一律噴 [5047] 物流商呼叫進行中。
 	const body = { shipDate: `${yyyy}${mm}${dd}` };
 
 	const env = await authedFetch<Record<string, unknown>>(
@@ -283,7 +274,6 @@ export async function queryLogistics(
 	};
 }
 
-/* ===== Logistics status code helpers ===== */
 
 const SHIP_STATUS_TEXT: Record<number, string> = {
 	0: "初始狀態",
@@ -340,7 +330,6 @@ export function progressPercentFor(
 		case LGS_TYPE.C2C:
 			return cvsC2cProgressPercent(code);
 		default:
-			// 未知配送軸：進度未知。呼叫端顯示「處理中」＋原碼，不畫假進度。
 			return null;
 	}
 }
@@ -399,7 +388,6 @@ function cvsC2cProgressPercent(code: number): number {
 	}
 }
 
-/* ===== Error / business code helpers (mirrors shipment_error_dispatch.dart) ===== */
 
 const BIZ_CODE_PREFIX = /^\[(\d+)\]/;
 
@@ -438,11 +426,9 @@ export function friendlyShipmentMessage(err: unknown): string {
 
 	const arrowIdx = raw.lastIndexOf("-> ");
 	if (arrowIdx !== -1) {
-		// 取最後一個 "-> " 之後的真因，去尾端括號 / 句號，去 "E072-" 之類代碼前綴。
 		let reason = raw.slice(arrowIdx + 3);
 		reason = reason.replace(/[）)。.\s]+$/u, "").trim();
 		reason = reason.replace(/^[A-Za-z]\d{2,}\s*[-:：]\s*/u, "").trim();
-		// 保留動作前綴（首個全形冒號前，如「呼叫黑貓失敗：」），讓賣家知道是哪個動作。
 		const colonIdx = raw.indexOf("：");
 		const prefix = colonIdx !== -1 ? raw.slice(0, colonIdx + 1) : "";
 		const composed = (prefix + reason).trim();
@@ -516,9 +502,6 @@ export function classifyShipmentError(
 				message:
 					"物流單還在後端建檔中，請稍候刷新後再預約取號；若持續失敗請聯絡客服",
 			};
-		// stale-state：狀態已往前 / 重複動作 / 併發。重整即可換成正確的下一步
-		// 按鈕（已叫件 → 下載 PDF），訊息直接透傳後端說明（如「已呼叫過黑貓，
-		// 不可重複呼叫」），比舊版籠統的「可能已處理過」精準。
 		case 5003:
 		case 5012:
 		case 5013:
@@ -535,8 +518,6 @@ export function classifyShipmentError(
 				markShipmentCreated(orderNo);
 				incrementShipmentRetryCount(orderNo);
 			}
-			// 5047 物流商處理中：後端會自行補同步，重整可看到最新狀態；
-			// 5046 建立未滿 30 秒：只是太快，維持畫面等冷卻，不需重整。
 			const shouldReload = bizCode === 5047;
 			if (orderNo && isShipmentBackendStuck(orderNo)) {
 				return {
@@ -573,9 +554,6 @@ export function classifyShipmentError(
 						: "系統處理中，請稍候再試",
 			};
 		}
-		// 黑貓叫件失敗（5044）：PayUni 真因（E072 寄件地址不在簽約可收貨範圍 /
-		// 假日不收件 / 配額等）直接透傳給賣家，讓賣家知道要改寄件地址或改時段。
-		// E072 是多因通用碼，不再猜測成「假日」——以 PayUni 實際回傳的文字為準。
 		case 5044:
 			return {
 				handled: true,
@@ -593,8 +571,6 @@ export function classifyShipmentError(
 				message: friendlyShipmentMessage(err),
 			};
 		default:
-			// 其他物流業務碼（5004 未開通 / 5011 未取號 / 日期驗證…）後端訊息本身
-			// 即可行動，交給 caller 補上動作前綴後顯示。
 			return {
 				handled: false,
 				bizCode,
@@ -652,7 +628,6 @@ export function shipmentErrorGuidance(
 	return null;
 }
 
-/* ===== 5046 / 5047 cooldown + odno override (in-memory, per-tab) ===== */
 
 const SHIPMENT_COOLDOWN_MS = 30_000;
 const SHIPMENT_BACKEND_STUCK_THRESHOLD = 3;
@@ -739,7 +714,6 @@ export function effectiveValidationNo(
 	return localOdnoOverride.get(orderNo)?.validationNo ?? "";
 }
 
-/* ===== Button state machine — shared by list row + detail page ===== */
 
 export type ShipmentAction =
 	| { kind: "tcat-reserve" }
@@ -848,24 +822,15 @@ export function nextShipmentAction(
 	orderStatus: string,
 ): ShipmentAction {
 	if (!shipping) return { kind: "none" };
-	// 出貨 CTA 只在訂單仍由賣家負責出貨時才有意義 —— status 10(已付款)/20(待出貨)。
-	// 一旦進入配送中/已送達/完成/取消，殘留的 odno 或 labelUrl 不能再讓
-	// 「出貨確認」「呼叫黑貓」按鈕復活（對齊 App order_list_screen.dart 只在
-	// 10/20 顯示出貨按鈕）。黑貓已叫件的訂單 status 仍停在 preparing(20) 直到司機
-	// 取件，因此其「下載 PDF」CTA 仍會通過此 gate。
 	if (orderStatus !== "paid" && orderStatus !== "preparing") {
 		return { kind: "none" };
 	}
-	// 🔴 provider 分流一律 switch + default。舊版是
-	// `if (isTaqbinMethod) {黑貓} else {超商}` —— 那個 else 吞掉了 3003、
-	// 3005 商家自送與後端未來新增的每一個 provider。
 	switch (normalizeShippingMethod(shipping.method)) {
 		case ShippingMethod.TAQBIN:
 			return taqbinAction(shipping);
 		case ShippingMethod.SEVEN_ELEVEN_STORE_PICKUP:
 			return cvsAction(orderNo, shipping);
 		default:
-			// 未知配送方式：不猜、不隱藏，交給畫面顯示「尚未支援」＋原碼。
 			return { kind: "unsupported", method: shipping.method ?? "" };
 	}
 }
@@ -874,23 +839,12 @@ export function nextShipmentAction(
 function taqbinAction(shipping: ShipmentLike): ShipmentAction {
 	const labelUrl = shipping.labelUrl ?? "";
 	const ss = shipping.shipmentStatus ?? "";
-	// 已叫件 → 只剩下載託運單 PDF。代碼 4 天內有效（對齊 App）：過期就
-	// 不再提供下載 —— 點了也只會拿到失效的託運單。
 	if (ss === SHIPMENT_STATUS.TCAT_CALLED) {
 		if (labelUrl && !isLabelExpired(shipping)) {
 			return { kind: "tcat-pdf", labelUrl };
 		}
 		return { kind: "none" };
 	}
-	// 尚未取號就不能呼叫黑貓：後端會回 5011「尚未取號，請先產生 PDF」。
-	// 取號完成（= generateHomeLabel 成功）才會有出貨單編號 + 託運單，且狀態
-	// 會離開「未處理(91)」。因此只有「託運單已產生 **且** 已取號」才顯示
-	// 呼叫黑貓；否則一律先走「預約出貨」產生 PDF 並取號。
-	//
-	// 注意：不能只靠 labelUrl，後端清單可能在尚未取號時就帶回 labelUrl，
-	// 導致誤顯示呼叫黑貓。狀態未知(空字串)時也偏向「預約出貨」——重跑
-	// generateHomeLabel 在已取號時只會被後端擋下(已取號/5046)並可復原，
-	// 比硬噴 5011 安全。
 	const numbered =
 		labelUrl !== "" && ss !== "" && ss !== SHIPMENT_STATUS.UNPROCESSED;
 	if (numbered) return { kind: "tcat-call" };

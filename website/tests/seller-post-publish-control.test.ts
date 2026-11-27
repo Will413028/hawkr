@@ -105,7 +105,6 @@ test("兩個動詞不同（否則下面每一條互斥斷言都恆真，等於�
 	assert.notEqual(PUBLISH_LABEL, UNPUBLISH_LABEL);
 });
 
-// ① 未發布（4401）——這正是 bug 的現場：pill 說「未發布」，而畫面上沒有出口。
 test("① 未發布的貼文有「發布」入口", () => {
 	const html = render({ publishStatus: PostPublishStatus.DRAFT });
 	assert.ok(
@@ -121,7 +120,6 @@ test("① 未發布的貼文有「發布」入口", () => {
 	);
 });
 
-// ② 已發布（4402）
 test("② 已發布的貼文有「下架」入口", () => {
 	const html = render({ publishStatus: PostPublishStatus.PUBLISHED });
 	assert.ok(
@@ -137,7 +135,6 @@ test("② 已發布的貼文有「下架」入口", () => {
 	);
 });
 
-// 已下架（4403）可以再發布 —— 值域不對稱的另一半：回得到 4402，回不到 4401。
 test("已下架的貼文可以再次發布", () => {
 	const html = render({ publishStatus: PostPublishStatus.UNPUBLISHED });
 	assert.ok(
@@ -222,15 +219,12 @@ test("無圖只擋擴張方向：已發布貼文仍可下架", () => {
 	assert.equal(toggled, PostPublishStatus.UNPUBLISHED);
 });
 
-// ③ 停權：發布＝擴張型（CAP_MARKETING，停權不可）／下架＝收縮型（CAP_CONTENT_CONTRACT，
-//    停權仍可自清）。兩個方向必須分開驗，只驗一邊會讓「整顆都不渲染」也通過。
 test("③ 停權賣家看不到發布入口", () => {
 	for (const status of [
 		PostPublishStatus.DRAFT,
 		PostPublishStatus.UNPUBLISHED,
 	]) {
 		const html = render({ publishStatus: status, suspended: true });
-		// 整顆不渲染：沒有核發的能力就不出現 CTA（不是停用一顆按不下去的按鈕）。
 		assert.equal(html, "", `停權賣家在 ${status} 仍看得到發布入口：${html}`);
 	}
 });
@@ -247,8 +241,6 @@ test("③ 停權賣家仍看得到下架入口（收縮型自清不可被拿走�
 	assert.equal(actionButton(html)?.disabled, false, "停權時下架鍵不得被停用");
 });
 
-// ④ 值域不對稱：賣家回不到「未發布」。窮舉每一個輸入狀態 × 停權/未停權 ×
-//    平台下架/未下架，斷言 4401 這個目標從來沒有出口。
 test("④ 任何狀態組合都不提供「改回未發布」的選項", () => {
 	const draftLabel = "未發布";
 	for (const publishStatus of [
@@ -266,7 +258,6 @@ test("④ 任何狀態組合都不提供「改回未發布」的選項", () => {
 					!html.includes(draftLabel),
 					`(${publishStatus}/${suspended}/${hidden}) 畫出了「${draftLabel}」入口：${html}`,
 				);
-				// 述詞層同樣不得吐出 4401。
 				assert.notEqual(
 					postPublishToggleTarget(publishStatus),
 					PostPublishStatus.DRAFT,
@@ -281,9 +272,6 @@ test("缺值不畫任何東西（上游沒給 ≠ 已發布）", () => {
 	assert.equal(render({ publishStatus: "" }), "");
 });
 
-// 平台強制下架與發布狀態是兩件事：發布得出去，但買家仍看不到（social 的
-// UpdatePublishStatus 對 hidden 的貼文 delta = 0）。所以停用並說明，而不是藏起來 ——
-// 藏起來就等於再造一次「摸不到的入口」。
 test("平台下架的貼文：發布鍵停用並說明，下架鍵照常", () => {
 	const blocked = render({
 		publishStatus: PostPublishStatus.DRAFT,

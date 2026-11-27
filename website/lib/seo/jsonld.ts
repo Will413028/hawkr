@@ -40,17 +40,12 @@ export function organizationSchema(
 
 /** Sitewide WebSite + sitelinks search box, for the site's `locale` version. */
 export function webSiteSchema(locale: AppLocale): WithContext<WebSite> {
-	// schema-dts 2.x does not model the "query-input" annotation property
-	// (hyphenated key, not a standard schema.org prop). Cast the potentialAction
-	// value to the closest schema-dts type and add the extra key via an
-	// intersection so the public return type stays WithContext<WebSite>.
 	const searchAction = {
 		"@type": "SearchAction" as const,
 		target: {
 			"@type": "EntryPoint" as const,
 			urlTemplate: `${absoluteUrl("/search", locale)}?q={search_term_string}`,
 		},
-		// schema.org requires the literal hyphenated key here.
 		"query-input": "required name=search_term_string",
 	} as unknown as SearchAction;
 	return {
@@ -87,8 +82,6 @@ export interface ProductSchemaInput {
 }
 
 export function productSchema(input: ProductSchemaInput): WithContext<Product> {
-	// schema-dts requires ItemAvailability (a branded union), not a plain string.
-	// Cast the constructed full-URL string to satisfy the type checker.
 	const effectiveAvailability =
 		input.purchasable === false ? "OutOfStock" : input.availability;
 	const availability =
@@ -96,8 +89,6 @@ export function productSchema(input: ProductSchemaInput): WithContext<Product> {
 			? undefined
 			: (`https://schema.org/${effectiveAvailability}` as ItemAvailability);
 
-	// Build offers only when price data is actually present — never fabricate a
-	// price of 0 when neither price nor priceRange was supplied.
 	let offers:
 		| {
 				"@type": "AggregateOffer";
@@ -144,9 +135,6 @@ export function productSchema(input: ProductSchemaInput): WithContext<Product> {
 	if (offers !== undefined) schema.offers = offers;
 	if (input.description) schema.description = input.description;
 	if (input.image) schema.image = input.image;
-	// No `brand`: the seller is the merchant, not the product's brand, and the
-	// wire has no brand field. Emitting the store name as a Brand told Google
-	// every 文旦 was branded "Hawkr" — a claim the page itself never makes.
 	if (input.rating && input.rating.count > 0) {
 		schema.aggregateRating = {
 			"@type": "AggregateRating",

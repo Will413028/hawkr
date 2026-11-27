@@ -11,10 +11,8 @@ import (
 	orderpb "github.com/Will413028/hawkr/backend/internal/legacy/gen/order"
 )
 
-// statusPendingPayment 是舊契約 OrderStatus 的 0（待付款）：只有它可以建立付款。
 const statusPendingPayment = "0"
 
-// maxPaymentOrderNoRunes 與 payment.payments 的 order_no 上限相同。
 const maxPaymentOrderNoRunes = 64
 
 // PaymentOrder 是 GetOrderForPayment 的已解析投影：付款依它寫成快照。

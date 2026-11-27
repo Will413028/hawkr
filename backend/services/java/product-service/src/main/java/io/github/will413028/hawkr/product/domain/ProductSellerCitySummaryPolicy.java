@@ -56,8 +56,6 @@ public final class ProductSellerCitySummaryPolicy {
         List<Summary> result = new ArrayList<>(cities.size());
         for (PublicCityStores city : cities) {
             long productCount = 0;
-            // Order is seller-service's (`ORDER BY city, store_id`), and filtering
-            // preserves it, so the preview stays deterministic across calls.
             List<String> storesWithProducts = new ArrayList<>();
             for (String rawStoreId : city.getStoreIdsList()) {
                 long count;

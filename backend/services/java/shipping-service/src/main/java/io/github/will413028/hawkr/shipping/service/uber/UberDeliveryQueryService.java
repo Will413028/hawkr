@@ -94,7 +94,6 @@ public class UberDeliveryQueryService {
         this.allowedActionResolver = allowedActionResolver;
     }
 
-    // ==================== 賣家面 ====================
 
     /** 列賣家自己的 Uber 配送。歸屬由 SQL 述詞強制，本方法只轉交 {@code store_id}。 */
     public ListSellerUberDeliveriesData listSellerDeliveries(ListSellerUberDeliveriesRequest req) {
@@ -140,8 +139,6 @@ public class UberDeliveryQueryService {
         }
         SellerUberDeliveryDetail.Builder b = SellerUberDeliveryDetail.newBuilder()
                 .setSummary(toSummary(row))
-                // 🔴 只有遮罩值。DB 裡沒有明碼可回（66 §5.1.5：原值不落庫），
-                //    要回明碼就得先把明碼寫進 DB——本方法不是能做那個決定的地方。
                 .setCourierPhoneMasked(nullToEmpty(row.getCourierPhoneMasked()))
                 .setCourierLocationJson(nullToEmpty(row.getCourierLocation()))
                 .setRelatedDeliveriesJson(nullToEmpty(row.getRelatedDeliveries()))
@@ -151,7 +148,6 @@ public class UberDeliveryQueryService {
         return Optional.of(b.build());
     }
 
-    // ==================== Admin 面 ====================
 
     /** Admin 列平台全部 Uber 配送（W6-4 的九個篩選維度）。 */
     public ListUberDeliveriesForAdminData listAdminDeliveries(ListUberDeliveriesForAdminRequest req) {
@@ -206,7 +202,6 @@ public class UberDeliveryQueryService {
         return Optional.of(b.build());
     }
 
-    // ==================== 組裝 ====================
 
     private UberDeliverySummary toSummary(UberDeliveryRow row) {
         return UberDeliverySummary.newBuilder()
@@ -220,7 +215,6 @@ public class UberDeliveryQueryService {
                 .setIsReturn(Boolean.TRUE.equals(row.getIsReturn()) ? "true" : "false")
                 .setStatus(nullToEmpty(row.getStatus()))
                 .setStatusLabel(resolveStatusLabel(row.getStatus()))
-                // 🔴 raw：與上面的 status 是兩個欄位，不得互相填充。
                 .setProviderStatus(nullToEmpty(row.getProviderStatus()))
                 .setOutcome(nullToEmpty(row.getOutcome()))
                 .setUndeliverableReason(nullToEmpty(row.getUndeliverableReason()))
@@ -250,7 +244,6 @@ public class UberDeliveryQueryService {
         }
         return Optional.of(UberDeliveryQuoteView.newBuilder()
                 .setQuoteId(nullToEmpty(q.getQuoteId()))
-                // 元整數字串（禁 BigDecimal／Double）
                 .setFeeAmount(q.getFeeAmount() == null ? "" : String.valueOf(q.getFeeAmount()))
                 .setCurrency(nullToEmpty(q.getCurrency()))
                 .setStatus(nullToEmpty(q.getStatus()))
@@ -281,7 +274,6 @@ public class UberDeliveryQueryService {
             boolean available = a.getFetchedAt() != null && StringUtils.hasText(a.getObjectKey());
             out.add(UberPodArtifactView.newBuilder()
                     .setArtifactType(nullToEmpty(a.getArtifactType()))
-                    // 🔴 只給 objectKey（secure/ 前綴），不組 URL——理由見 proto 註解。
                     .setObjectKey(nullToEmpty(a.getObjectKey()))
                     .setFetchedAt(formatIso(a.getFetchedAt()))
                     .setFetchAttempts(String.valueOf(
@@ -360,7 +352,6 @@ public class UberDeliveryQueryService {
                 .toList();
     }
 
-    // ==================== 小工具 ====================
 
     /** 未知 value 回空字串，避免 {@code fromValue} 對髒資料拋例外把整個查詢打掉。 */
     private String resolveStatusLabel(String statusValue) {

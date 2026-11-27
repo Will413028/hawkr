@@ -27,7 +27,6 @@ export function useChatSidebarCollapsed() {
 				setCollapsed(true);
 			}
 		} catch {
-			/* ignore */
 		}
 	}, []);
 
@@ -37,7 +36,6 @@ export function useChatSidebarCollapsed() {
 			try {
 				window.localStorage.setItem(STORAGE_KEY, next ? "1" : "0");
 			} catch {
-				/* ignore */
 			}
 			return next;
 		});

@@ -33,7 +33,6 @@ interface RouteCase {
 }
 
 const ROUTES: RouteCase[] = [
-	// ── session（3 支，10s 檔）─────────────────────────────────────────────
 	{
 		module: "session/current",
 		method: "GET",
@@ -50,9 +49,7 @@ const ROUTES: RouteCase[] = [
 		bff: "/adm/api/session/summary",
 		gateway: "/admin/delegated-operations/current/summary",
 	},
-	// session/end 是兩跳（先 GET current 驗 target 再 DELETE），單獨測。
 
-	// ── storefront（4 支）──────────────────────────────────────────────────
 	{
 		module: "storefront/[storeId]",
 		method: "GET",
@@ -86,7 +83,6 @@ const ROUTES: RouteCase[] = [
 		gateway: "/admin/sellers/4/storefront/cover",
 	},
 
-	// ── products（7 支）────────────────────────────────────────────────────
 	{
 		module: "products/[storeId]",
 		method: "GET",
@@ -144,9 +140,7 @@ const ROUTES: RouteCase[] = [
 		gateway: "/admin/sellers/4/products/77/unpublish",
 	},
 
-	// ── posts：Connect（`SocialDelegatedService`），見檔尾的 CONNECT_POST_ROUTES ──
 
-	// ── orders（3 支，唯讀）───────────────────────────────────────────────
 	{
 		module: "orders/[storeId]",
 		method: "GET",
@@ -172,7 +166,6 @@ const ROUTES: RouteCase[] = [
 		gateway: "/admin/sellers/4/orders/HK260728001/recipient-contact",
 	},
 
-	// 媒體 upload session 是 Connect（MediaDelegatedService），見 delegated-media-bff-routes.test.ts。
 ];
 
 type Handler = (
@@ -269,7 +262,6 @@ test("每一支 BFF 都轉到它自己那一條 gateway 路徑（禁 catch-all �
 				call.url.endsWith(route.gateway),
 				`${route.bff} → ${call.url}，預期結尾 ${route.gateway}`,
 			);
-			// credential 只走這一個 header，且絕不出現在 URL 裡。
 			const sent = new Headers(call.init.headers);
 			assert.equal(sent.get("X-HK-Operation-Session"), CREDENTIAL, route.bff);
 			assert.ok(!call.url.includes(CREDENTIAL), route.bff);
@@ -308,7 +300,6 @@ test("非 GET 缺 X-Requested-With 或 Origin 不符：403，且不打 gateway",
 			{ xhr: false },
 			{ origin: null },
 			{ origin: "https://evil.example" },
-			// 同名前綴不算同源：`…food.evil` 與 `…food` 是兩個 host。
 			{ origin: `${LOCAL_ORIGIN}.evil.example` },
 		]) {
 			const fetchStub = stubFetch(() => {
@@ -334,8 +325,6 @@ test("非 GET 缺 X-Requested-With 或 Origin 不符：403，且不打 gateway",
 });
 
 test("GET 也受同源保護以外的那道：保留 header 出現即拒絕", async () => {
-	// 瀏覽器自己送 x-hk-operation-session ＝ 想繞過 httpOnly 直接指定憑證；
-	// x-hk-origin-auth ＝ 想指定這次請求要計給誰的限流桶。
 	for (const header of ["x-hk-operation-session", "x-hk-origin-auth"]) {
 		const route = ROUTES[0];
 		const handler = await loadHandler(route);
@@ -409,8 +398,6 @@ test("query allow-list：列表鍵原樣轉送，未登記的鍵 400", async () 
 		allowed.restore();
 	}
 
-	// 訂單列表的六個鍵（§6.1.10 的 Query 契約全集）原樣轉送。日期是 ISO 8601 UTC
-	// 不是台北曆日——展開在 repo 層，這一層一個字都不折。
 	const orders = ROUTES.find(
 		(r) => r.module === "orders/[storeId]",
 	) as RouteCase;
@@ -441,9 +428,6 @@ test("query allow-list：列表鍵原樣轉送，未登記的鍵 400", async () 
 		forwardedOrders.restore();
 	}
 
-	// 白名單之外的鍵仍當場 400：靜默丟棄會讓使用者看到「條件送出去了、清單完全沒篩、
-	// 也沒有任何錯誤」。`view` 是最容易誤送的一個（賣家側的 createOrderRepo 會送它，
-	// 見 tests/delegated-orders-view-trap.test.ts）。
 	const rejected = stubFetch(() => {
 		throw new Error("未登記的 query 被轉到 gateway");
 	});
@@ -527,7 +511,6 @@ test("上游業務碼原碼原狀態轉出；message 一律不透傳", async () 
 		const response = await handler(buildRequest(route), contextOf(route));
 		assert.equal(response.status, 410);
 		const body = (await response.json()) as Record<string, unknown>;
-		// 9271 是終態碼：塌成單一錯誤碼會讓工作區顯示「暫時性錯誤，請重試」。
 		assert.equal(body.code, 9271);
 		assert.equal(body.traceId, "trace-abc");
 		assert.ok(!("message" in body), "message 不得透傳");
@@ -654,12 +637,6 @@ test("session/end：target 相符 → DELETE，且只有拿到終止證明才清
 		proven.restore();
 	}
 
-	// 上游沒有明確證明終止（9280「服務暫時不可用」）→ 不清 cookie。狀態不明時丟掉一把
-	// 可能還活著的憑證，等於讓管理員以為已經結束、而代行仍在有效期內。
-	//
-	// ⚠️ status 在這一條只是佈景（判定看的是 `isDelegatedEndProven`，與狀態碼無關），
-	// 但仍寫成 **424** ——9280 的 HTTP 鏡射已由 502 改為 424，而這裡是全 repo 最後一處
-	// 把兩者綁在一起的地方；留著 502 不會紅，卻會讓日後拿它當契約參考的人接錯。
 	const unproven = stubFetch((call) =>
 		call.init.method === "GET"
 			? Response.json({
@@ -679,7 +656,6 @@ test("session/end：target 相符 → DELETE，且只有拿到終止證明才清
 	}
 });
 
-// ── posts：BFF 打單體的 Connect（SocialDelegatedService），不是 gateway 的 REST ─────────
 
 const SERVICE = "hawkr.social.v1alpha1.SocialDelegatedService";
 const POST_ID = "5f0c9a52-7a4e-4f0b-8d2e-3b7c2a1d9e11";
@@ -880,7 +856,6 @@ test("代行貼文的 BFF 打的是 SocialDelegatedService 的 Connect 方法，
 				`${route.name} → ${call.url}`,
 			);
 			assert.ok(!call.url.includes("/admin/sellers/"), route.name);
-			// 憑證只走這一個 header，絕不出現在 URL 或 body。
 			const sent = new Headers(call.init.headers);
 			assert.equal(sent.get("X-HK-Operation-Session"), CREDENTIAL, route.name);
 			assert.ok(!call.url.includes(CREDENTIAL), route.name);
@@ -904,7 +879,6 @@ test("代行貼文寫入：Idempotency-Key 轉成 request_id、原因與 etag �
 			connectContext(route),
 		);
 		const raw = stub.calls[1].init.body;
-		// Connect 的 JSON 編碼：請求本文是 JSON 文字的位元組。
 		const text =
 			raw instanceof Uint8Array ? new TextDecoder().decode(raw) : String(raw);
 		const sent = fromJson(

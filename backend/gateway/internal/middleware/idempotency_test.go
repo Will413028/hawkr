@@ -14,24 +14,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// 本檔守的是 issue #3015：`Idempotency-Key` 曾經是 36 條寫入路由的必填 header，
-// 而它**不做任何事**。
-//
-// 🔴 **有鑑別力的那一組是「同鍵 ＋ 不同 body」**（TestIdempotency_SameKeyDifferentBody_*）。
-// 只測「同鍵 ＋ 同 body」會看到第二次被下游的業務去重擋掉（發票那組是 9306
-// 「已存在相同的常用發票資料」），**看起來像冪等生效，實際上是巧合** —— 原始
-// 回報就差點這樣判成 PASS。所以本檔的 handler 一律**計次**：斷言的是
-// 「handler 有沒有被再跑一次」，不是「回應長什麼樣」。
 
 const testAccountID = int64(2623900520)
 
-// countingHandler 回一個 2xx，並記錄自己被叫了幾次、每次收到什麼 body。
 type countingHandler struct {
 	calls   atomic.Int64
 	bodies  []string
 	mu      sync.Mutex
 	status  int
-	release chan struct{} // 非 nil 時 handler 會卡住，用來製造「進行中」
+	release chan struct{}
 }
 
 func (h *countingHandler) handle(c *gin.Context) {
@@ -51,8 +42,6 @@ func (h *countingHandler) handle(c *gin.Context) {
 	c.JSON(st, gin.H{"code": 0, "message": "success", "data": gin.H{"profileId": fmt.Sprintf("%d", 7500000000000000000+n)}})
 }
 
-// newIdempotencyEngine 組一條與 routes_invoice.go 相同形狀的鏈：
-// 先注入 accountId（正式鏈上由 JWTAuth 做），再掛 requireIdempotencyKey。
 func newIdempotencyEngine(store *IdempotencyStore, h *countingHandler, accountID *int64) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -163,15 +152,9 @@ func TestIdempotency_ConcurrentSameKey_ReturnsInProgress(t *testing.T) {
 	h := &countingHandler{release: make(chan struct{})}
 	acc := testAccountID
 	r := newIdempotencyEngine(NewIdempotencyStore(0, 0), h, &acc)
-	// Cleanup 而不是函式尾端 close：本測試在「冪等被拿掉」的變異下第二個請求會真的
-	// 進到 handler 並卡在 <-release，若只在尾端 close，t.Fatalf 就會讓它永遠卡住 ——
-	// 變異驗證會變成 40 秒逾時 panic 而不是一則清楚的 FAIL。
 	var once sync.Once
 	closeRelease := func() { once.Do(func() { close(h.release) }) }
 	t.Cleanup(closeRelease)
-	// 逃生閥：在「冪等被拿掉」的變異下，第二個請求會真的進到 handler 並卡在
-	// <-release，而主 goroutine 正卡在 ServeHTTP 裡 ⇒ 沒有這個計時器，變異驗證
-	// 會退化成整包測試逾時 panic，而不是一則指得出哪裡壞掉的 FAIL。
 	time.AfterFunc(2*time.Second, closeRelease)
 
 	started := make(chan struct{})

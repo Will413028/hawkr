@@ -25,7 +25,6 @@ class PillButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 實心底時，淺色底（如 warning 金）需改用深字，否則白字對比不足
     final fillForeground = color.computeLuminance() > 0.4
         ? AppColors.onWarning
         : AppColors.bgCard;
@@ -34,8 +33,6 @@ class PillButton extends StatelessWidget {
       color: outlined ? color : fillForeground,
     );
 
-    // A Wrap gives each child the whole available width. Bound the tap target
-    // to its content so its Center does not turn every action into a full row.
     return IntrinsicWidth(
       child: HkTapTarget(
         semanticLabel: label,

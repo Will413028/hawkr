@@ -15,14 +15,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 )
 
-// 限流的身分（subject）回答「這個請求算在誰頭上」，與額度是兩個問題。網頁的 SSR 與 CI 各以一個位址
-// 代表很多人，所以它們以 origin-auth 自己簽出身分（#2264）：
-//
-//	X-HK-Origin-Auth: base64url(payload) "." base64url(HMAC-SHA256(key, "hkorigin1:" || base64url(payload)))
-//	payload = {"v":1,"p":"visitor"|"ssr"|"ci","ip":<訪客 IP，p=visitor 時>,"ts":<unix 秒>,"m":<method>,"u":<path>}
-//
-// 簽章綁定這個請求的 method 與 path，時間誤差 ±60 秒。驗證不過或沒有簽章時，身分是連線的 IP（v:<IP>）。
-// 格式與 website 的簽章端（origin-auth）相同，搬自 gateway 的 ratelimit_subject.go。
 const (
 	originAuthHeader  = "X-HK-Origin-Auth"
 	originAuthDomain  = "hkorigin1:"
@@ -58,7 +50,6 @@ func (c ClientIP) of(r *http.Request) string {
 	return host
 }
 
-// withSubject 判定限流的身分，放進 ctx（rpc.WithSubject），並把連線端 IP 放進 ctx（rpc.WithClientIP，已登入的請求也有）。
 func withSubject(keys OriginAuth, clientIP ClientIP, now func() time.Time, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := clientIP.of(r)
@@ -79,8 +70,6 @@ func withSubject(keys OriginAuth, clientIP ClientIP, now func() time.Time, next 
 	})
 }
 
-// visitorSubject 是訪客的限流身分：IPv4 是完整位址；IPv6 以 /64 聚合（RFC 4291：一個 /64 是一個子網，通常就是
-// 一個使用者或一條線路，逐位址計數等於每人有 2^64 份額度）。
 func visitorSubject(ip string) string {
 	parsed := net.ParseIP(ip)
 	if parsed == nil {

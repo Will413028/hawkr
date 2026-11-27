@@ -143,9 +143,6 @@ final class OrderServiceTestHarness {
             OrderEventPublisher eventPublisher,
             OrderOutboxMapper orderOutboxMapper
     ) {
-        // completeOrder() 走 orderCompletionTxHandler.completeOrderInTx 才會往下發 MQ 事件；
-        // 預設 stub 為 true，讓呼叫 completeOrder(...) 的測試能到達本次要驗證的通知 payload 組裝邏輯，
-        // 不因未 stub 的 mock 預設回傳 false 而提早短路。
         OrderCompletionTxHandler orderCompletionTxHandler = mock(OrderCompletionTxHandler.class);
         when(orderCompletionTxHandler.completeOrderInTx(any(), any(), any())).thenReturn(true);
 

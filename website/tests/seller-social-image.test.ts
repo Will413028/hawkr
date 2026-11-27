@@ -71,8 +71,6 @@ test("a seller's share picture is cover → banner, else logo → avatar", () =>
 			"no cover falls back to the logo at the square avatar preset",
 		);
 
-		// A whitespace-only cover is the same thing as no cover. Without the trim
-		// this returns the banner preset applied to "   ", i.e. a broken image.
 		assert.equal(
 			sellerSocialImage({
 				coverImage: "   ",
@@ -87,8 +85,6 @@ test("a seller with neither picture falls through to the site card", () => {
 	withMediaGateway(() => {
 		const resolved = sellerSocialImage({ coverImage: null, logo_url: null });
 		assert.equal(resolved, "", "nothing to build a URL from");
-		// The empty string is load-bearing: socialImages() turns it into the site
-		// card rather than an empty images array (see tests/seo-social-image.test.ts).
 		assert.deepEqual(socialImages(resolved), [{ url: "/opengraph-image" }]);
 	});
 });
@@ -101,8 +97,6 @@ test("every seller route takes its share picture from the shared resolver", () =
 			/sellerSocialImage\(s\)/,
 			`${route} must resolve its share picture through sellerSocialImage`,
 		);
-		// The whole point is that the cascade exists once. A route that spells
-		// buildImageUrl(...) itself has started a fifth copy.
 		assert.doesNotMatch(
 			text,
 			/buildImageUrl\(\s*s\.(?:coverImage|logo_url|bannerUrl)/,
@@ -127,8 +121,6 @@ test("openGraph.images is fed by sellerSocialImage on all four routes", () => {
 			ts.ScriptKind.TSX,
 		);
 
-		// `const socialImage = sellerSocialImage(s)` — the binding each route's
-		// openGraph block hands to socialImages().
 		let socialImageIsShared = false;
 		let imagesArgument: string | null = null;
 

@@ -81,10 +81,6 @@ class ProductGrpcServiceVerifyCertificationGuardTest {
                 .withValue(GrpcAuthContext.ACCOUNT_TYPE, AccountType.SELLER.value())
                 .attach();
 
-        // 守衛之後的 happy path 也 stub 齊：守衛被拿掉時請求要能一路跑到底並回 code 0，
-        // 紅字才會指向真正的後果（爛 cert_no 真的被送去組 URL 了）。
-        // §9.4：handler 改走 verifyDetailed()（結構化結果是 validity 的唯一載體），
-        // exists 由 found && validity==VALID 導出，不再是獨立的 boolean 呼叫。
         when(govCertificationService.verifyDetailed(anyString(), any())).thenAnswer(inv ->
                 new GovCertificationService.GovVerifyResult(
                         CertificationType.ORGANIC.value(), inv.getArgument(0), "2026-08-26T00:00:00Z",
@@ -129,20 +125,19 @@ class ProductGrpcServiceVerifyCertificationGuardTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-            "1-008 131005",       // 空白：URI.create 直接丟含整條 URL 的例外
-            "1-008-131005<x>",    // 角括號
-            "abc{}",              // 大括號
-            "abc|def",            // 直線
-            "abc^def",            // caret
-            "%41",                // 裸百分號
-            "abc&api_key=stolen", // 想在查詢字串裡多塞一個參數
-            "有機認證",             // 非 ASCII
+            "1-008 131005",
+            "1-008-131005<x>",
+            "abc{}",
+            "abc|def",
+            "abc^def",
+            "%41",
+            "abc&api_key=stolen",
+            "有機認證",
     })
     @DisplayName("含非白名單字元的 cert_no → INVALID_PARAM，且絕不能已經送去組 URL")
     void invalidCertNoIsRejectedBeforeReachingGovApi(String certNo) {
         VerifyCertificationResponse response = call(certNo);
 
-        // 這一條先斷言：外洩發生在送出去的那一刻。
         verify(govCertificationService, never()).verifyDetailed(anyString(), any());
 
         assertEquals(GrpcResponseCode.INVALID_PARAM.code(), response.getCode());
@@ -193,9 +188,6 @@ class ProductGrpcServiceVerifyCertificationGuardTest {
     void nonVerifiableTypeIsNotRejectedByWhitelist(String type, String certNo) {
         VerifyCertificationResponse response = call(certNo, CertificationType.fromCode(type));
 
-        // 這三型的 certNo 從不離開系統（下面這條斷言就是理由），所以白名單對它們零安全效益；
-        // 擺在類型判斷之前只會把 `ISO 22000:2018` 這種常見合法編號誤判成 400，
-        // 無故改掉設計書 19 §13 測試計畫第 4 條的對外契約。
         verify(govCertificationService, never()).verifyDetailed(anyString(), any());
 
         assertEquals(GrpcResponseCode.CERT_TYPE_NOT_VERIFIABLE.code(), response.getCode(),

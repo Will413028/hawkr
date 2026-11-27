@@ -30,7 +30,7 @@ func TestDecideHealthOutcome(t *testing.T) {
 		wantBreakerNil  bool
 		wantRecovered   bool
 		wantReopened    bool
-		wantBreakerAtIs *time.Time // nil ＝ 不檢查
+		wantBreakerAtIs *time.Time
 	}{
 		{
 			name:          "ACTIVE ＋ 成功 → 維持 ACTIVE 並清掉 status_reason",
@@ -40,17 +40,12 @@ func TestDecideHealthOutcome(t *testing.T) {
 			wantReasonNil: true,
 		},
 		{
-			// 🔴 刻意**不降級**：§7.3.4 進入 DEGRADED 的條件是「連續 5 次失敗」，
-			// 而那個計數器在 amego client 的 gobreaker 裡不在本層。單次巡檢失敗
-			// 就降級會與那條規則衝突。
 			name:       "ACTIVE ＋ 失敗 → 仍是 ACTIVE，只記 status_reason",
 			acct:       domain.ProviderAccount{ID: 2, Status: active},
 			err:        boom,
 			wantStatus: active,
 		},
 		{
-			// open 未滿 60 秒 ⇒ 還沒進 half-open，這一輪的成功不算探測。
-			// 算進去的話冷卻形同虛設，DEGRADED 會在 open 後三輪內就回 ACTIVE。
 			name:       "DEGRADED ＋ 冷卻中（open 才 10 秒）＋ 成功 → 探測不加",
 			acct:       domain.ProviderAccount{ID: 3, Status: degraded, BreakerOpenedAt: ptr(-10 * time.Second), BreakerProbeSuccess: 1},
 			wantStatus: degraded,
@@ -86,8 +81,6 @@ func TestDecideHealthOutcome(t *testing.T) {
 		got := decideHealthOutcome(c.acct, at, c.err)
 		r := got.record
 
-		// 🔴 不論走哪一格，巡檢週期一律寫回 now+15min。少了它，claim 推上去的
-		// 120s 租約會變成事實上的巡檢週期，呼叫量瞬間變 7.5 倍（§9.2.1 的容量前提）。
 		if want := at.Add(15 * time.Minute); !r.NextCheckAt.Equal(want) {
 			t.Errorf("%s: NextCheckAt=%v want %v", c.name, r.NextCheckAt, want)
 		}
@@ -131,7 +124,6 @@ func TestDecideHealthOutcome_NilBreakerOpenedAtCountsAsHalfOpen(t *testing.T) {
 	acct := domain.ProviderAccount{
 		ID:     9,
 		Status: codemeta.InvoiceProviderAccountStatusDegraded.Value,
-		// BreakerOpenedAt 為 nil
 		BreakerProbeSuccess: 2,
 	}
 	got := decideHealthOutcome(acct, at, nil)

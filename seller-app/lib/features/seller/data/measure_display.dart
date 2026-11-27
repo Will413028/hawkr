@@ -194,7 +194,6 @@ String? rejectionCooldownWarning(Measure measure, UiLocale l) {
       : '';
   final terminated = measure.kind == MeasureKind.MEASURE_KIND_TERMINATION;
   final state = measure.state;
-  // 合約：終止合作的 period.start_time 一定有（立即生效是建立時間，預告終止是建立後 30 日）；沒有就不顯示（不寫 1970）。
   final showsEffective =
       terminated &&
       const {
@@ -217,7 +216,6 @@ String? rejectionCooldownWarning(Measure measure, UiLocale l) {
     final effective = t.labeled(
       sellerMeasureTerminationEffective(l, start: start),
     );
-    // 合約：只有預告終止會是預定生效（見 MEASURE_STATE_SCHEDULED 的註解）。
     if (state == MeasureState.MEASURE_STATE_SCHEDULED) {
       return (text: effective, active: false);
     }

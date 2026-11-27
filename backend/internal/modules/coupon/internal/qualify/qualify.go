@@ -30,7 +30,6 @@ type Service struct{ d Deps }
 // New 建立資格判定。
 func New(d Deps) *Service { return &Service{d: d} }
 
-// storeCache 在一個請求內記住每家店的停權查詢結果（不併發使用），列表一輪的多張券共用同一次查詢。
 type storeCache struct {
 	inner     Stores
 	suspended map[int64]bool

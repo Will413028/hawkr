@@ -27,8 +27,8 @@ func TestAllowedActionsViewerIsPinnedPerEndpoint(t *testing.T) {
 	}
 
 	want := map[string]string{
-		"GetOrderLogistics":         "ViewerBuyer",  // 買家端：/app/orders/{no}/logistics
-		"GetSellerShipmentTracking": "ViewerSeller", // 賣家端：/app/shipments/{no}/tracking
+		"GetOrderLogistics":         "ViewerBuyer",
+		"GetSellerShipmentTracking": "ViewerSeller",
 	}
 	found := map[string]string{}
 
@@ -59,8 +59,6 @@ func TestAllowedActionsViewerIsPinnedPerEndpoint(t *testing.T) {
 		})
 	}
 
-	// 🔴 對「目標不存在」FAIL 而不是 skip：handler 改名／allowedActionsOf 被包一層，
-	// 都會讓這道釘樁靜默失效，而失效的症狀就是它守的那個 bug 回來了。
 	for fn, expect := range want {
 		got, ok := found[fn]
 		if !ok {

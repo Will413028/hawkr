@@ -13,9 +13,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-// 只為 legacy SellerService 存在的公開讀取（遷移計畫 A3b 步驟 9a）。
 
-// legacyWorld 是各種狀態的店家：可曝光、剛開店、停權、等待刪除、已關閉（帳號之後又開了新的 stint）。
 type legacyWorld struct {
 	exposed, pending, suspended, deleting, closed, reopened Store
 	closedAccount                                           int64
@@ -95,7 +93,6 @@ func TestStoresWithExposureAgreesWithExposableStores(t *testing.T) {
 			t.Errorf("%d: %+v", ids[i], e)
 		}
 	}
-	// 能力：停權、等待刪除、已關閉都不能管理商品；沒有核准的新店可以。
 	for id, want := range map[int64]bool{w.exposed.StoreID: true, w.pending.StoreID: true, w.suspended.StoreID: false, w.deleting.StoreID: false, w.closed.StoreID: false} {
 		for _, e := range got {
 			if e.Store.StoreID == id && e.Store.Can(CapProductManage) != want {
@@ -145,11 +142,9 @@ func TestExposableStoreIDsByCountyAppliesTheExposureRule(t *testing.T) {
 	w := f.legacyWorld(t)
 	got, err := f.module.ExposableStoreIDsByCounty(ctx, []string{"63000", "64000"})
 	must(t, err)
-	// 63000（臺北市）只有可曝光的那一家：停權、等待刪除、已關閉、沒有核准的都不在；64000 沒有店家但有鍵。
 	if len(got) != 2 || !slices.Equal(got["63000"], []int64{w.exposed.StoreID}) || got["64000"] == nil || len(got["64000"]) != 0 {
 		t.Fatalf("got=%v", got)
 	}
-	// 與 ExposableStores 同一個規則：停權解除之後回來，依 store_id 排序。
 	_, err = f.lift(ctx, w.suspension)
 	must(t, err)
 	got, err = f.module.ExposableStoreIDsByCounty(ctx, []string{"63000"})
@@ -167,7 +162,6 @@ func TestExposableStoreIDsByCountyAppliesTheExposureRule(t *testing.T) {
 	}
 }
 
-// approvedCompanyStore 核准一家企業賣家（公司名稱是 matchingRegistration 的名稱）。
 func (f *fixture) approvedCompanyStore(t *testing.T, taxID string) Store {
 	t.Helper()
 	_, s, sub := f.submittedCompany(t, taxID)
@@ -194,7 +188,6 @@ func TestMatchCertificateHolder(t *testing.T) {
 	if got := match(company.StoreID, "陳大明"); got.Matched || got.Field != "NONE" || !got.HasReference {
 		t.Fatalf("other holder: %+v", got)
 	}
-	// 沒有基準：個人賣家、沒有申請、已關閉的 stint、不存在的店。（停權的企業店仍有基準：核准的名稱沒有變。）
 	for name, id := range map[string]int64{"individual": w.exposed.StoreID, "no application": w.pending.StoreID, "closed": w.closed.StoreID, "reopened": w.reopened.StoreID, "unknown": 999999} {
 		if got := match(id, "範例小農有限公司"); got.Matched || got.HasReference || got.Field != "NONE" {
 			t.Errorf("%s: %+v", name, got)
@@ -214,7 +207,7 @@ func TestMatchCertificateHolderDoesNotNeedAnEnabledPaymentAccount(t *testing.T) 
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	s := f.approvedCompanyStore(t, taxIDOne) // KYC 核准，收款帳戶還沒啟用。
+	s := f.approvedCompanyStore(t, taxIDOne)
 	got, err := f.module.MatchCertificateHolder(ctx, s.StoreID, "範例小農有限公司")
 	must(t, err)
 	if !got.Matched || got.Field != "COMPANY_NAME" || !got.HasReference {
@@ -224,7 +217,6 @@ func TestMatchCertificateHolderDoesNotNeedAnEnabledPaymentAccount(t *testing.T) 
 	if got, err = f.module.MatchCertificateHolder(ctx, s.StoreID, "範例小農有限公司"); err != nil || !got.Matched || !got.HasReference {
 		t.Fatalf("收款帳戶停用後：%+v %v", got, err)
 	}
-	// 申請送出但還沒人工核准：賣家自己填的名稱不能當基準。
 	_, submittedStore, _ := f.submittedCompany(t, taxIDTwo)
 	if got, err = f.module.MatchCertificateHolder(ctx, submittedStore.StoreID, "範例小農有限公司"); err != nil || got.Matched || got.HasReference {
 		t.Fatalf("未核准的申請：%+v %v", got, err)
@@ -237,7 +229,7 @@ func TestStoreCarriesTheEffectiveMeasuresOfTheSameRead(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	_, gov := f.exposable(t) // 措施建立之後同一個身分不能再通過認證，所以先建好
+	_, gov := f.exposable(t)
 	w := f.legacyWorld(t)
 	got, err := f.module.Store(ctx, w.suspended.StoreID)
 	must(t, err)
@@ -250,7 +242,6 @@ func TestStoreCarriesTheEffectiveMeasuresOfTheSameRead(t *testing.T) {
 	if got.Suspended() || len(got.EffectiveMeasures()) != 0 {
 		t.Fatalf("got=%+v", got)
 	}
-	// 依據認定的停權：帶主要依據的類別，沒有風險類型。
 	ends := f.now.Add(30 * 24 * time.Hour)
 	f.violate(t, gov.StoreID, SeverityHigh, MeasureSuspension, &ends)
 	got, err = f.module.Store(ctx, gov.StoreID)
@@ -259,7 +250,6 @@ func TestStoreCarriesTheEffectiveMeasuresOfTheSameRead(t *testing.T) {
 		got.EffectiveMeasures()[0].LeadCategory == nil || *got.EffectiveMeasures()[0].LeadCategory != policy.MisleadingInfo {
 		t.Fatalf("got=%+v", got)
 	}
-	// Current 與 by-id 一致。
 	cur, err := f.module.CurrentStore(ctx, w.suspended.AccountID)
 	must(t, err)
 	if cur.StoreID != w.suspended.StoreID || !cur.Suspended() || len(cur.EffectiveMeasures()) != 1 || cur.EffectiveMeasures()[0].MeasureID != w.suspension.ID {
@@ -271,7 +261,6 @@ func TestStoreCarriesTheEffectiveMeasuresOfTheSameRead(t *testing.T) {
 	if _, err := f.module.Store(ctx, 999999); apperr.KindOf(err) != apperr.KindNotFound {
 		t.Fatalf("err=%v", err)
 	}
-	// 批次讀取帶同一份推導。
 	batch, err := f.module.BatchStores(ctx, []int64{w.suspended.StoreID, gov.StoreID})
 	must(t, err)
 	if len(batch) != 2 || len(batch[0].EffectiveMeasures()) != 1 || batch[0].EffectiveMeasures()[0].Basis != BasisRisk || batch[1].EffectiveMeasures()[0].Basis != BasisViolation {
@@ -288,7 +277,6 @@ func TestStoreFindsAMeasureRecordedOnAnEarlierStint(t *testing.T) {
 	record := f.suspend(t, old.StoreID)
 	_, err := f.module.CloseCurrent(ctx, accountID)
 	must(t, err)
-	// Apply 在停權中會拒絕，所以直接寫一個新的 stint 重現「新 stint 繼承停權」。
 	var newID int64
 	must(t, f.db.Conn(ctx).QueryRow(ctx,
 		`INSERT INTO seller.stores (store_code, account_id, store_name, created_at, updated_at) VALUES ($1, $2, '新店', $3, $3) RETURNING store_id`,

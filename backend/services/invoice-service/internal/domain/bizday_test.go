@@ -7,21 +7,16 @@ import (
 	"github.com/Will413028/hawkr/go-pkg/timeutil"
 )
 
-// 本檔守的是「3 個工作天」這條算式（§7.3.5）。它錯了不會有任何東西轉紅：
-// 算偏早 ⇒ 賣家被誤判逾期 ⇒ 違規計數 +1 ⇒ 90 天 3 次即停權建議。
 
-// tpe 是台北時區的整點；period_test.go 已有一個六參數的 taipei，不重複定義。
 func tpe(y int, m time.Month, d, hh int) time.Time {
 	return time.Date(y, m, d, hh, 0, 0, 0, timeutil.LocationTaipei)
 }
 
-// syncedNear 給一個以 t 為中心（−30 天 ～ +400 天，日期硬寫在這裡）的涵蓋區間，讓它一定罩得住測試用的日期。
 func syncedNear(t time.Time) *BusinessDayCoverage {
 	return &BusinessDayCoverage{From: t.AddDate(0, 0, -30), To: t.AddDate(0, 0, 400), SyncedAt: t}
 }
 
 func TestComplaintSlaDueAtPlainWeek(t *testing.T) {
-	// 2026-03-02 是週一。建案週一 10:00 ⇒ 起算週二 00:00 ⇒ 推 3 個工作天 ⇒ 週五 00:00。
 	created := tpe(2026, 3, 2, 10)
 	cal := NewBusinessCalendar(nil, syncedNear(created))
 
@@ -33,7 +28,6 @@ func TestComplaintSlaDueAtPlainWeek(t *testing.T) {
 }
 
 func TestComplaintSlaDueAtSkipsWeekend(t *testing.T) {
-	// 週四建案 ⇒ 起算週五 ⇒ 週一(1)、週二(2)、週三(3)。
 	created := tpe(2026, 3, 5, 23)
 	cal := NewBusinessCalendar(nil, syncedNear(created))
 
@@ -46,7 +40,6 @@ func TestComplaintSlaDueAtSkipsWeekend(t *testing.T) {
 
 func TestComplaintSlaDueAtSkipsHolidays(t *testing.T) {
 	created := tpe(2026, 3, 2, 10)
-	// 週二、週三放假 ⇒ 起算日順延到週四，再推週五(1)、下週一(2)、下週二(3)。
 	cal := NewBusinessCalendar([]time.Time{
 		tpe(2026, 3, 3, 0), tpe(2026, 3, 4, 0),
 	}, syncedNear(created))
@@ -61,10 +54,10 @@ func TestComplaintSlaDueAtSkipsHolidays(t *testing.T) {
 // 🔴 未涵蓋的日期一律視為假日 ⇒ 落在硬上限（偏晚），**不得**退化成 3 自然日。
 func TestComplaintSlaDueAtFallsBackToHardCapWhenMirrorEmpty(t *testing.T) {
 	created := tpe(2026, 3, 2, 10)
-	cal := NewBusinessCalendar(nil, nil) // 鏡像從未同步
+	cal := NewBusinessCalendar(nil, nil)
 
 	got := cal.ComplaintSlaDueAt(created)
-	want := tpe(2026, 3, 16, 0).UTC() // 建案日 00:00 + 14 自然日
+	want := tpe(2026, 3, 16, 0).UTC()
 	if !got.Equal(want) {
 		t.Fatalf("due = %s, want %s（硬上限）", got, want)
 	}
@@ -75,7 +68,6 @@ func TestComplaintSlaDueAtFallsBackToHardCapWhenMirrorEmpty(t *testing.T) {
 
 // 台北日界：UTC 前八小時建立的申訴必須算進台北的當天，不是前一天。
 func TestComplaintSlaDueAtUsesTaipeiDayBoundary(t *testing.T) {
-	// 2026-03-03 01:00 台北 ＝ 2026-03-02 17:00 UTC。起算週三 ⇒ 週四(1)週五(2)下週一(3)。
 	created := tpe(2026, 3, 3, 1)
 	cal := NewBusinessCalendar(nil, syncedNear(created))
 
@@ -123,7 +115,6 @@ func TestRemainingBusinessDaysUncoveredReturnsNotOK(t *testing.T) {
 
 	synced := tpe(2026, 3, 3, 9)
 	covered := NewBusinessCalendar(nil, syncedNear(synced))
-	// 超出 +400 天的窗口。
 	if _, ok := covered.RemainingBusinessDays(synced, synced.AddDate(0, 0, 401)); ok {
 		t.Fatal("超出同步窗口時應回 ok=false")
 	}
@@ -131,7 +122,7 @@ func TestRemainingBusinessDaysUncoveredReturnsNotOK(t *testing.T) {
 
 // 兩套曆制不可互相代入：同一個起點，自然日與工作天必須給出不同答案。
 func TestBusinessDaysAndNaturalDaysDiverge(t *testing.T) {
-	created := tpe(2026, 3, 5, 10) // 週四
+	created := tpe(2026, 3, 5, 10)
 	cal := NewBusinessCalendar(nil, syncedNear(created))
 
 	business := cal.ComplaintSlaDueAt(created)
@@ -147,12 +138,12 @@ func TestNewBusinessCalendarUsesStoredRangeNotSyncedAt(t *testing.T) {
 	cal := NewBusinessCalendar(nil, &BusinessDayCoverage{
 		From:     tpe(2026, 12, 1, 0),
 		To:       tpe(2026, 12, 31, 0),
-		SyncedAt: tpe(2026, 6, 1, 9), // 若誤用 synced_at±窗口，12 月以外的日期會被當成已涵蓋
+		SyncedAt: tpe(2026, 6, 1, 9),
 	})
 	if cal.Covers(tpe(2026, 7, 1, 0), tpe(2026, 7, 10, 0)) {
 		t.Fatal("儲存區間之外（即使在 synced_at 的窗口內）必須是未涵蓋")
 	}
-	if cal.IsBusinessDay(tpe(2026, 7, 6, 0)) { // 週一
+	if cal.IsBusinessDay(tpe(2026, 7, 6, 0)) {
 		t.Fatal("未涵蓋的日子不得是工作天")
 	}
 	if !cal.Covers(tpe(2026, 12, 1, 0), tpe(2026, 12, 31, 0)) {
@@ -161,7 +152,7 @@ func TestNewBusinessCalendarUsesStoredRangeNotSyncedAt(t *testing.T) {
 	if cal.Covers(tpe(2026, 12, 1, 0), tpe(2027, 1, 1, 0)) {
 		t.Fatal("超出儲存區間迄日一天就是未涵蓋")
 	}
-	if !cal.IsBusinessDay(tpe(2026, 12, 14, 0)) { // 週一
+	if !cal.IsBusinessDay(tpe(2026, 12, 14, 0)) {
 		t.Fatal("區間內的平日（非假日）是工作天")
 	}
 }

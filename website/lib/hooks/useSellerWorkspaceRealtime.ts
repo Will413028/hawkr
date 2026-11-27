@@ -48,9 +48,6 @@ export function useSellerWorkspaceRealtime(
 	const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	const invalidateWorkspace = React.useCallback(() => {
-		// queryKeys.seller.X(identity) 末位為 params slot；slice 掉得到 family prefix，
-		// TanStack 前綴比對同時涵蓋 list 與 detail/drawer（如 [...,"orders"] 同時命中
-		// 訂單列與單筆 order detail [...,"orders",orderNo,{}]）。
 		const family = (key: readonly unknown[]) => key.slice(0, -1);
 		queryClient.invalidateQueries({
 			queryKey: family(queryKeys.seller.orders(identity)),
@@ -90,7 +87,6 @@ export function useSellerWorkspaceRealtime(
 					invalidateWorkspace();
 				}, SELLER_WORKSPACE_DEBOUNCE_MS);
 			} else if (detail?.kind === "reconnected") {
-				// 壽命到期的正常結束（立刻重連）不必重讀；錯誤結束的斷線期間可能漏訊號。
 				clearTimer();
 				invalidateWorkspace();
 			}

@@ -67,8 +67,6 @@ class PrintWebhookWritePathContractTest {
     void printWebhookStillPersistsSegmentCodesOnTerminalShipments() throws Exception {
         String sql = printWebhookSql();
 
-        // 🔴 這一支是上一支的反面：正解是「狀態不動、證據照留」，
-        //    而不是把終態排除在 WHERE 之外（那會連 provider 證據一起丟）。
         assertThat(sql)
                 .as("WHERE 只該守 label_print_status；把 status 加進 WHERE 等於連三段碼一起不寫")
                 .contains("WHERE id = #{id} AND label_print_status IN ('4102', '4101', '4104')");

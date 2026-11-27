@@ -25,7 +25,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-// kycModule 記下收到的輸入，回傳設定好的結果。
 type kycModule struct {
 	Module
 	draft      model.KYCDraftInput
@@ -145,12 +144,10 @@ func TestSaveKYCDraftSendsOnlyTheFieldsInTheMask(t *testing.T) {
 	if in.SellerType == nil || *in.SellerType != model.KYCCompany {
 		t.Fatalf("mask 列到 business 的欄位，賣家型態就是 company：%v", in.SellerType)
 	}
-	// 更新時 mask 沒有列到那一支：不送賣家型態。
 	m = &kycModule{}
 	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "4", ProductType: "改", Subject: individualOf()}, "product_type"); err != nil || m.draft.SellerType != nil {
 		t.Fatalf("err=%v type=%v", err, m.draft.SellerType)
 	}
-	// individual 沒有欄位（D22）：型態的切換靠 mask 直接列 individual 或 business。
 	m = &kycModule{}
 	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "4", Subject: individualOf()}, "individual"); err != nil || m.draft.SellerType == nil || *m.draft.SellerType != model.KYCIndividual {
 		t.Fatalf("mask 直接列 individual：err=%v type=%v", err, m.draft.SellerType)
@@ -182,12 +179,10 @@ func TestSaveKYCDraftClearsSelectedEmptyFieldsAndIgnoresOutputOnlyOnes(t *testin
 	if _, err := saveKYC(t, m, &pb.KYCApplication{ProductType: "沒有選型態"}); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("建立時沒有設定 individual 或 business：err=%v", err)
 	}
-	// 沒有 mask 的建立：subject 設定的那一支就是型態（空的 individual 也算）。
 	if _, err := saveKYC(t, m, &pb.KYCApplication{Subject: &pb.KYCApplication_Individual{Individual: &pb.IndividualKYC{}}}); err != nil || *m.draft.SellerType != model.KYCIndividual {
 		t.Fatalf("err=%v input=%+v", err, m.draft)
 	}
 
-	// business.company_address 列在 mask 但沒有值時清成空字串。
 	m = &kycModule{}
 	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "1", Subject: businessOf(&pb.BusinessKYC{})}, "business.company_address"); err != nil {
 		t.Fatal(err)
@@ -196,7 +191,6 @@ func TestSaveKYCDraftClearsSelectedEmptyFieldsAndIgnoresOutputOnlyOnes(t *testin
 		t.Fatalf("clearing company_address failed: %+v", in)
 	}
 
-	// 只有鄉鎮沒有明細時正常送出，明細為空字串。
 	m = &kycModule{}
 	if _, err := saveKYC(t, m, &pb.KYCApplication{
 		Etag: "1",
@@ -291,7 +285,6 @@ func TestSaveKYCDraftWildcardMaskCoversTheSetBranch(t *testing.T) {
 	if _, err := saveKYC(t, m, &pb.KYCApplication{Etag: "1"}, "individual", "business.tax_id"); err == nil {
 		t.Fatal("同時列到兩支的欄位通過了")
 	}
-	// mask 列了某一支、subject 卻沒設：不是靜默成功，是 invalid_argument。
 	for _, branch := range []string{"individual", "business", "business.tax_id"} {
 		before := m.draft
 		_, err := saveKYC(t, m, &pb.KYCApplication{Etag: "1"}, branch)
@@ -328,7 +321,7 @@ func TestKYCDraftFieldPathsCoverTheModuleInput(t *testing.T) {
 			continue
 		}
 		_, plain := kycPaths[name]
-		_, repeated := kycPaths[name+"[]"] // repeated 欄位只列一筆 X[]，同時涵蓋 X 與 X[i]
+		_, repeated := kycPaths[name+"[]"]
 		if !plain && !repeated {
 			t.Errorf("KYCDraftInput.%s 沒有對應到請求的欄位", name)
 		}
@@ -381,7 +374,6 @@ func fullKYC(t model.KYCSellerType) model.KYCApplication {
 	}
 }
 
-// onlyInputFields 回傳訊息（含巢狀）裡有值的 INPUT_ONLY 欄位路徑。
 func inputOnlyFieldsSet(m protoreflect.Message, prefix string) (out []string) {
 	m.Range(func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
 		if rpc.HasBehavior(fd, annotations.FieldBehavior_INPUT_ONLY) {
@@ -513,7 +505,6 @@ func TestKYCAndGovernanceEnumsMatchTheModule(t *testing.T) {
 	}
 }
 
-// lookupModule 是統編查詢的模組替身（登記資料來源、現況分類與地址拆分都在模組，這裡只測 handler 的格式檢查與回應對照）。
 type lookupModule struct {
 	Module
 	reg    model.Registration
@@ -565,14 +556,13 @@ func TestLookupBusinessRegistrationMapsTheRegistrationAndValidatesTheTaxID(t *te
 		got.GetSetupDate().GetYear() != 1987 || got.GetSetupDate().GetMonth() != 2 || got.GetSetupDate().GetDay() != 21 {
 		t.Fatalf("registration=%v", got)
 	}
-	// 地址拆不開時只有原文。
 	m.reg.TownCode, m.reg.AddressDetail = "", ""
 	resp, err = lookup(t, m, "33330333")
 	if err != nil || resp.GetRegistration().GetPostalAddress() != nil || resp.GetRegistration().GetAddress() == "" {
 		t.Fatalf("resp=%v err=%v", resp, err)
 	}
 	m.called = nil
-	for _, bad := range []string{"", "1234567", "abcdefgh", "123456789", "12345678"} { // 最後一個：格式對、檢查碼不對
+	for _, bad := range []string{"", "1234567", "abcdefgh", "123456789", "12345678"} {
 		_, err := lookup(t, m, bad)
 		if apperr.KindOf(err) != apperr.KindInvalidInput {
 			t.Errorf("%q：err=%v", bad, err)

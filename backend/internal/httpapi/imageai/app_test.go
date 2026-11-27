@@ -268,7 +268,6 @@ func TestNonSellerPermissionDeniedUsesTheCatalogTextAndItsLocale(t *testing.T) {
 		if len(msgs) != 1 {
 			t.Fatalf("%s：LocalizedMessage %d 筆", lang, len(msgs))
 		}
-		// en 目錄沒有 common.error.PERMISSION_DENIED：文字退回 zh-TW，標籤要同樣是 zh-TW。
 		if msgs[0].GetMessage() != "無權操作" || msgs[0].GetLocale() != "zh-TW" {
 			t.Errorf("%s：%q（%s）", lang, msgs[0].GetMessage(), msgs[0].GetLocale())
 		}

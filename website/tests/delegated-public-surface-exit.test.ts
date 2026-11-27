@@ -99,7 +99,6 @@ function publicRouteRoots(): Set<string> {
 		for (const entry of readdirSync(join(ROOT, "app", "[locale]", group), {
 			withFileTypes: true,
 		})) {
-			// `@modal`＝parallel route、`(x)`＝巢狀群組、`_x`＝私有目錄：都不是 URL 段。
 			if (!entry.isDirectory()) continue;
 			if (/^[@(_[]/.test(entry.name)) continue;
 			roots.add(`/${entry.name}`);
@@ -138,8 +137,6 @@ function publicNavHits(file: string, roots: ReadonlySet<string>): NavHit[] {
 	const hits: NavHit[] = [];
 	for (const match of text.matchAll(NAV_SINK)) {
 		const index = match.index ?? 0;
-		// sink 之後最近的一個字串字面值。跨行的屬性值不會出現在這裡（JSX 的
-		// href 值一定與 `href=` 同行或緊接其後）。
 		const literal = text.slice(index, index + 200).match(/["'`]([^"'`\n]*)/);
 		if (!literal) continue;
 		const target = literal[1];
@@ -157,7 +154,6 @@ function publicNavHits(file: string, roots: ReadonlySet<string>): NavHit[] {
 
 test("代行 scope 之下沒有通往買家公開面的字面值導航", () => {
 	const roots = publicRouteRoots();
-	// 反向自檢：禁區清單推導不出東西時，下面的斷言會空過。
 	assert.ok(
 		roots.has("/products") && roots.has("/cart") && roots.size >= 10,
 		`公開路由禁區推導失敗（${roots.size} 條），這條斷言已失去鑑別力`,

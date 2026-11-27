@@ -35,7 +35,7 @@ test("marketItemToGA4 maps fields and uses numeric priceValue", () => {
 	assert.equal(item.price, 120);
 	assert.equal(item.item_brand, "陽光農場");
 	assert.equal(item.index, 3);
-	assert.equal(item.item_variant, undefined); // no SKU in list context
+	assert.equal(item.item_variant, undefined);
 });
 
 test("cartItemToGA4 carries skuId variant and int64 id as string", () => {

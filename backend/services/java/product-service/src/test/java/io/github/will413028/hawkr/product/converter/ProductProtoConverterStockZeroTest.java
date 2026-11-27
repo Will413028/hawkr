@@ -60,8 +60,6 @@ class ProductProtoConverterStockZeroTest {
     @Test
     @DisplayName("stockQty=\"\"（未提供）→ null，維持 partial-update 語意")
     void absentStockStaysNull() {
-        // 這一條與上一條是一組：沒有它，把 "0"→0 修好的同時可能把「沒填」也變成 0，
-        // 那會讓每一次不帶庫存的部分更新都把庫存洗成 0 —— 比原本的 bug 更糟。
         assertNull(onlySku(converter.toUpdateDTO(requestWithSkuStock(""))).getStockQty());
     }
 

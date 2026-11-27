@@ -151,12 +151,10 @@ async function expectAligned(textarea: HTMLTextAreaElement) {
 			);
 		}
 		const tokens = backdrop.querySelectorAll<HTMLElement>("span");
-		// 內容含標籤時高亮 span 必須存在，不能讓逐一比對對零個元素通過。
 		if (textarea.value.includes("#")) expect(tokens.length).toBeGreaterThan(0);
 		for (const token of tokens) {
 			expect(renderedStyle(token).fontWeight).toBe(inputStyle.fontWeight);
 		}
-		// 捲動範圍相等，才能偵測實際換行的差異（含長英數標籤的粗體字形偏移）。
 		expect(
 			Math.abs(backdrop.scrollHeight - textarea.scrollHeight),
 		).toBeLessThanOrEqual(1);

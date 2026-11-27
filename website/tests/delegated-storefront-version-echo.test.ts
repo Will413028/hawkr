@@ -29,9 +29,6 @@ function read(file: string): string {
 	return readFileSync(join(ROOT, file), "utf8");
 }
 
-/* ============================================================
-   一、呼叫端接線：版本只准從「自己這一次寫入的回應」更新
-   ============================================================ */
 
 /**
  * 這個 repo 沒有 DOM 測試環境（`vitest.config.ts` 是 `environment: "node"`，也沒有
@@ -66,7 +63,6 @@ function etagEffectCode(source: string): string {
 test("商店設定：背景 refetch 的 etag 只在第一次載入與版本衝突之後才被採用", () => {
 	const code = etagEffectCode(read(PROFILE_CLIENT));
 
-	// 反向自檢：確認擷取到的真的是那一段。
 	assert.match(code, /setEtag\(serverEtag\)/);
 	assert.match(
 		code,
@@ -84,21 +80,18 @@ test("商店設定：背景 refetch 的 etag 只在第一次載入與版本衝�
 test("商店設定：兩條寫入路徑都用自己那一次的回應更新版本", () => {
 	const source = read(PROFILE_CLIENT);
 
-	// ① 儲存商店資訊：回傳值要接住，不能只 await。
 	assert.match(
 		source,
 		/const written = await scope\.repos\.storefront\.updateMyStore\(/,
 		"updateMyStore 的回傳值被丟掉 ⇒ 第二次儲存必版本衝突",
 	);
 
-	// ② 換頭像／換封面：版本經由 onSaved 的參數回到這一頁。
 	assert.match(
 		source,
 		/onSaved=\{async \(written\) =>/,
 		"onSaved 不收參數 ⇒ finalize 推進的那一格版本回不來",
 	);
 
-	// 兩條路徑各更新一次，一次都不能少。
 	assert.equal(
 		source.match(/if \(written\.etag\) setEtag\(written\.etag\)/g)?.length,
 		2,

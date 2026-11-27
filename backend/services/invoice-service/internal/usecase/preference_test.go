@@ -12,9 +12,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// ---------------------------------------------------------------------------
-// harness
-// ---------------------------------------------------------------------------
 
 const (
 	prefBuyerA int64 = 2623900520
@@ -23,18 +20,12 @@ const (
 
 var prefNow = time.Date(2026, 8, 30, 3, 4, 5, 0, time.UTC)
 
-// memPrefRepo 照 buyer_invoice_preferences.sql 的**述詞形狀**實作，不是照介面語意。
-//
-// 🔴 每一支都逐字帶四條述詞（id／buyer_id／deleted_at IS NULL／superseded_at IS NULL）：
-// 把 buyer_id 從 fake 裡拿掉，Tier A 的測試就會全部變成「驗了個寂寞」——fake 放行，
-// 而真正的 SQL 才是攔截點。fake 與 SQL 的述詞不一致時，測試綠而線上破。
 type memPrefRepo struct {
 	domain.BuyerPreferenceRepository
 
 	rows  map[int64]domain.BuyerPreference
 	calls []string
 
-	// lastCreate 留給「明碼與遮罩是不是照規則交到 repository」那一格。
 	lastCreate domain.NewBuyerPreference
 }
 
@@ -83,8 +74,6 @@ func (r *memPrefRepo) ListByBuyer(_ context.Context, buyerID int64, limit int32)
 func (r *memPrefRepo) Create(_ context.Context, in domain.NewBuyerPreference, now time.Time) (domain.BuyerPreference, bool, error) {
 	r.calls = append(r.calls, "Create")
 	r.lastCreate = in
-	// ON CONFLICT DO NOTHING：uq_bip_carrier_dedup（買家×載具型別×值）與
-	// uq_bip_taxid_dedup（買家×統編），兩者的述詞都只涵蓋存活列。
 	for _, row := range r.rows {
 		if row.BuyerID != in.BuyerID || !aliveRow(row) {
 			continue
@@ -180,12 +169,6 @@ func (r *memPrefRepo) SoftDelete(_ context.Context, id, buyerID int64, now time.
 	return true, nil
 }
 
-// rollbackTx 是會**真的 rollback** 的 TxManager：callback 回錯時把 repo 還原成進入
-// 交易前的狀態。
-//
-// 🔴 directTx 在這裡不夠用：本檔要驗的不變式之一是「SetDefault 打一個不屬於你的 id
-// 時，你原本的預設不能被清掉」，而那件事只有在 rollback 真的發生時才成立。用
-// directTx 測會得到一個**綠燈的假保證**——清掉了，但測試看不到。
 type rollbackTx struct{ repo *memPrefRepo }
 
 func (t rollbackTx) WithTx(ctx context.Context, fn func(ctx context.Context) error) error {
@@ -208,10 +191,6 @@ func newPreferenceHarness(t *testing.T, rows ...domain.BuyerPreference) (*Prefer
 	return uc, repo
 }
 
-// stubBarcodeVerifier 是 #3256 入口層驗證的替身。
-//
-// **記下被驗的值不只記次數**：只記次數的替身對「驗錯了東西」（例如把 label 或空字串
-// 送去驗）零鑑別力。
 type stubBarcodeVerifier struct {
 	calls []string
 	err   error
@@ -249,7 +228,6 @@ func TestPreferenceCreate_RejectsNonExistentBarcode(t *testing.T) {
 			if len(v.calls) != 1 || v.calls[0] != "/ZZZZZZZ" {
 				t.Fatalf("應驗 value 本身一次，實得 %v", v.calls)
 			}
-			// 🔴 擋下來就**不得落庫**：只回錯誤但留下一列，等於驗了個寂寞。
 			if n := len(repo.rows); n != 0 {
 				t.Fatalf("驗證未過不得建立 profile，實得 %d 列", n)
 			}
@@ -303,7 +281,6 @@ func TestPreferenceCreate_NonBarcodeSkipsVerification(t *testing.T) {
 	}
 }
 
-// carrierRow 造一列存活的手機條碼常用發票資料。
 func carrierRow(id, buyerID int64, mask string, isDefault bool) domain.BuyerPreference {
 	return domain.BuyerPreference{
 		ID:               id,
@@ -317,7 +294,6 @@ func carrierRow(id, buyerID int64, mask string, isDefault bool) domain.BuyerPref
 	}
 }
 
-// countAliveDefaults 是「恰好一個預設」不變式的量測（uq_bip_default 的 Go 端影子）。
 func countAliveDefaults(repo *memPrefRepo, buyerID int64) int {
 	n := 0
 	for _, row := range repo.rows {
@@ -328,9 +304,6 @@ func countAliveDefaults(repo *memPrefRepo, buyerID int64) int {
 	return n
 }
 
-// ---------------------------------------------------------------------------
-// 端點 2：Create
-// ---------------------------------------------------------------------------
 
 func TestPreference_Create_MobileBarcode(t *testing.T) {
 	uc, repo := newPreferenceHarness(t)
@@ -349,18 +322,15 @@ func TestPreference_Create_MobileBarcode(t *testing.T) {
 	}
 
 	in := repo.lastCreate
-	// chk_bip_shape 要求 MOBILE_BARCODE 的 carrier_type 恆為 '3J0002'。
 	if in.CarrierType != "3J0002" {
 		t.Fatalf("carrier_type 必須是 AMEGO 原值 3J0002，實際 %q", in.CarrierType)
 	}
-	// 明碼要原樣交到 repository（加密在那一層），遮罩由本層算。
 	if in.CarrierValue != "/T7R3U+P" {
 		t.Fatalf("明碼必須原樣交給 repository（加密收斂在該層），實際 %q", in.CarrierValue)
 	}
 	if in.CarrierMask != maskCarrierValue("/T7R3U+P") || in.CarrierMask == "/T7R3U+P" {
 		t.Fatalf("carrier_value_mask 必須是遮罩後的值，實際 %q", in.CarrierMask)
 	}
-	// 🔴 回應恆為遮罩：明碼一個字都不得出服務邊界（§6.1.1 遮罩段）。
 	if got.DisplayValue == "/T7R3U+P" {
 		t.Fatalf("displayValue 吐出了明碼：%q", got.DisplayValue)
 	}
@@ -384,7 +354,6 @@ func TestPreference_Create_SetDefaultClearsPrevious(t *testing.T) {
 	if !repo.rows[101].IsDefault == false {
 		t.Fatalf("舊的預設沒有被清掉")
 	}
-	// 先清後設：順序反過來會撞 uq_bip_default。
 	if idx := callIndex(repo.calls, "ClearDefault"); idx < 0 || idx > callIndex(repo.calls, "Create") {
 		t.Fatalf("ClearDefault 必須在 Create 之前，實際呼叫序 %v", repo.calls)
 	}
@@ -454,9 +423,6 @@ func TestPreference_Create_LimitIsPerBuyer(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 端點 3：Update（supersede 語意）
-// ---------------------------------------------------------------------------
 
 func TestPreference_Update_SupersedesAndInheritsDefault(t *testing.T) {
 	uc, repo := newPreferenceHarness(t, carrierRow(401, prefBuyerA, "/AAA***1", true))
@@ -481,15 +447,12 @@ func TestPreference_Update_SupersedesAndInheritsDefault(t *testing.T) {
 	if old.IsDefault {
 		t.Fatalf("被取代的列不得仍是預設（chk_bip_default_alive）")
 	}
-	// 🔴 預設必須被繼承：編輯自己的預設載具之後預設消失，下一次結帳會靜默退成
-	// 無載具發票，而買家什麼都沒改。
 	if !repo.rows[got.ProfileID].IsDefault {
 		t.Fatalf("新列必須繼承 is_default")
 	}
 	if n := countAliveDefaults(repo, prefBuyerA); n != 1 {
 		t.Fatalf("存活列的預設必須恰好一個，實際 %d", n)
 	}
-	// 先建新列、再 supersede：fk_bip_superseded 不是 DEFERRABLE，反過來會 23503。
 	if callIndex(repo.calls, "Create") > callIndex(repo.calls, "Supersede") {
 		t.Fatalf("Create 必須在 Supersede 之前（fk_bip_superseded），實際呼叫序 %v", repo.calls)
 	}
@@ -498,7 +461,6 @@ func TestPreference_Update_SupersedesAndInheritsDefault(t *testing.T) {
 func TestPreference_Update_ValidatesAgainstStoredKind(t *testing.T) {
 	uc, _ := newPreferenceHarness(t, carrierRow(402, prefBuyerA, "/AAA***1", false))
 
-	// 舊列是手機條碼 ⇒ 新值必須通過手機條碼的正則，不是「隨便一個字串都行」。
 	_, err := uc.Update(context.Background(), UpdateProfileInput{
 		BuyerID:   prefBuyerA,
 		ProfileID: 402,
@@ -509,9 +471,6 @@ func TestPreference_Update_ValidatesAgainstStoredKind(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 端點 4：Delete
-// ---------------------------------------------------------------------------
 
 func TestPreference_Delete(t *testing.T) {
 	uc, repo := newPreferenceHarness(t, carrierRow(501, prefBuyerA, "/AAA***1", false))
@@ -539,9 +498,6 @@ func TestPreference_Delete_DefaultIsBlocked(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 端點 5：SetDefault / ClearDefault
-// ---------------------------------------------------------------------------
 
 func TestPreference_SetDefault_ExactlyOneDefault(t *testing.T) {
 	uc, repo := newPreferenceHarness(t,
@@ -575,7 +531,7 @@ func TestPreference_SetDefault_ForeignIDKeepsMyDefault(t *testing.T) {
 		carrierRow(702, prefBuyerB, "/BBB***2", false),
 	)
 
-	_, err := uc.SetDefault(context.Background(), prefBuyerA, 702) // 別人的列
+	_, err := uc.SetDefault(context.Background(), prefBuyerA, 702)
 	if !isBizCode(err, bizcode.InvoiceProfileNotFound) {
 		t.Fatalf("越權必須回 9302（與查無不可分辨），實際 err = %v", err)
 	}
@@ -604,15 +560,12 @@ func TestPreference_ClearDefault(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tier A：越權與查無不可分辨（usecase 層的形狀，逐位元比對在 grpc 層）
-// ---------------------------------------------------------------------------
 
 func TestPreference_TierA_ForeignAndMissingAreIdentical(t *testing.T) {
 	uc, _ := newPreferenceHarness(t, carrierRow(901, prefBuyerB, "/BBB***2", false))
 
-	foreign := uc.Delete(context.Background(), prefBuyerA, 901)   // 存在但不是我的
-	missing := uc.Delete(context.Background(), prefBuyerA, 90199) // 不存在
+	foreign := uc.Delete(context.Background(), prefBuyerA, 901)
+	missing := uc.Delete(context.Background(), prefBuyerA, 90199)
 
 	if !isBizCode(foreign, bizcode.InvoiceProfileNotFound) || !isBizCode(missing, bizcode.InvoiceProfileNotFound) {
 		t.Fatalf("兩者都必須是 9302，實際 foreign=%v missing=%v", foreign, missing)

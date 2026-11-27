@@ -69,7 +69,7 @@ class PayUniInboundWireContractTest {
     @DisplayName("未知貨態：raw 值保留、normalized 為 empty（fail-closed 的可查詢形式）")
     void unknownStatusIsReportedAsQueryableUnknown() throws IOException {
         Map<String, String> payload = payloadFromApiDoc();
-        payload.put("ShipStatus", "9999");   // 值域外
+        payload.put("ShipStatus", "9999");
 
         InboundCapability.InboundStatusEvent event = inbound().parseStatusEvent(fp(payload));
 
@@ -103,11 +103,6 @@ class PayUniInboundWireContractTest {
     @Test
     @DisplayName("建單結果回報（只有 TradeStatus、沒有 ShipStatus）不得被當成未知貨態")
     void createResultEventIsNotAnUnknownStatus() {
-        // 🔴 上游 EventKeyBuilder 的註解逐字寫著：
-        //    「建單回傳無 ShipStatus（有 TradeStatus），貨態回傳有 ShipStatus」
-        //    ⇒ 這是**另一種事件**，不是「看不懂的貨態」。
-        //    2026-09-10 dev 實測：把它當成未知貨態，呼叫端會把 provider_status 寫成 null
-        //    ——用「保存證據」的名義銷毀證據。
         Map<String, String> createResult = new LinkedHashMap<>();
         createResult.put("MerID", "HAWK2675237784");
         createResult.put("ShipTradeNo", "S0011789042138064014");
@@ -131,12 +126,10 @@ class PayUniInboundWireContractTest {
         createResult.put("ShipTradeNo", "S0011789042138064014");
         createResult.put("TradeStatus", "0");
 
-        // 上游實際算出的鍵（dev Loki 逐字）：HAWK2675237784:S0011789042138064014:STATUS:0
         assertThat(inbound().dedupKey(fp(createResult)))
                 .isEqualTo("HAWK2675237784:S0011789042138064014:STATUS:0");
     }
 
-    // ==================== helpers ====================
 
     /** PayUni 是 form-encoded provider ⇒ 只有 formParams，rawBody 為 null（ADR-012）。 */
     private static InboundPayload fp(Map<String, String> formParams) {
@@ -195,7 +188,6 @@ class PayUniInboundWireContractTest {
     /** 由 module 目錄往上找到 repo root（存在 `.git` 的那一層）。 */
     private static Path repoRoot() {
         Path p = Path.of("").toAbsolutePath();
-        // backend 根目錄以 go.work 為錨：monorepo 裡 .git 在上一層，不是 backend/。
         while (p != null && !Files.exists(p.resolve("go.work"))) {
             p = p.getParent();
         }

@@ -78,7 +78,7 @@ export function MaskedSecretField({
 				<span className="text-[0.625rem] font-extrabold text-hk-accent tracking-[0.05em]">
 					{label}
 				</span>
-				{/* 🔴 span 不是 input —— 見檔頭。 */}
+
 				<span className="text-xs font-extrabold text-foreground font-mono">
 					{last4 ? `已設定 ••••••••${last4}` : "尚未設定"}
 				</span>

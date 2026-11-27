@@ -84,7 +84,6 @@ func (s *Service) ApplyMissingTakedowns(ctx context.Context, measureID uuid.UUID
 	})
 }
 
-// inserted 是一次寫入複本實際新增的列：n 是全部的列數，posts 是其中貼文的 ID（只有它們的排程要取消）。
 type inserted struct {
 	n     int
 	posts []uuid.UUID
@@ -100,7 +99,6 @@ func insertedOf[R any](rows []R, post func(R) *uuid.UUID) inserted {
 	return out
 }
 
-// applyTakedowns 是 ApplyTakedowns 與對帳補漏共用的寫入：before（對帳先鎖 seller 的列）、鎖內容列、check（建立入口核對歸屬；對帳不核對，措施已經生效）、insert 寫複本、求值。
 func (s *Service) applyTakedowns(ctx context.Context, measureID uuid.UUID, at time.Time, contents []Content, check func(context.Context, contentSet) (contentSet, error), before func(context.Context, *store.Queries) error, insert func(context.Context, *store.Queries, store.InsertTakedownsParams) (inserted, error)) error {
 	set, err := splitContents(contents)
 	if err != nil {
@@ -261,8 +259,6 @@ func (s *Service) afterTakedownChange(ctx context.Context, set contentSet) error
 	return nil
 }
 
-// syncTakedowns 是對帳的一步：seller.pub_content_takedowns() 有而複本沒有的補上，複本有而 seller 沒有的刪掉（訂閱者漏了的漂移，正常是 0）。
-// 每個措施一個 transaction。
 func (s *Service) syncTakedowns(ctx context.Context, rep *Report) error {
 	q := store.New(s.d.DB.Conn(ctx))
 	missing, err := q.MissingTakedowns(ctx)

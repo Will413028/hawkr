@@ -22,11 +22,6 @@ function formatAmount(raw: string): string {
 }
 
 function formatDate(raw: string): string {
-	// `orderDate` 的契約是**台北牆上時間的字串**（gateway
-	// `SpendingRecordResponse.OrderDate`：`YYYY/MM/DD（Asia/Taipei）`），不是
-	// instant。`toEpochMs` 會把這一族當台北牆上時間還原，所以輸出與瀏覽器時區
-	// 脫鉤 —— 在此之前它走 `Date.parse` 的本地時區解讀，UTC+8 以東的使用者
-	// （例：日本）看到的日期會少一天。無法解讀的值仍原字串照登。
 	return formatTaipeiDate(raw) || raw;
 }
 
@@ -57,13 +52,8 @@ export default function MemberCardDetailClient({
 	const loading = accountQueryPending(status, query.isLoading);
 	const error = query.error instanceof Error ? query.error.message : null;
 
-	// Spending rows are slim (orderSn only), so clicking one opens the shared
-	// order drawer and fetches the full order on demand — same UX as the orders
-	// list, where a row opens the drawer first and only the「查看訂單詳情」
-	// button navigates to the full page.
 	const [activeOrderSn, setActiveOrderSn] = React.useState<string | null>(null);
 	const { order: activeOrder } = useOrder(activeOrderSn ?? undefined);
-	// Guard against showing a stale order while a newly-clicked one is loading.
 	const drawerOrder =
 		activeOrder && activeOrder.orderNo === activeOrderSn ? activeOrder : null;
 

@@ -13,17 +13,6 @@ import '../../../address/data/address_model.dart';
 
 import 'package:hawkr_buyer/shared/widgets/hk_brand_loader.dart';
 
-// ---------------------------------------------------------------------------
-// 配送方式區塊。
-//
-// 白色圓角卡片，包含：
-// - 驗證錯誤提示面板（無地址 / 超重超材積）
-// - 分組可折疊的配送選項（黑貓宅急便 / 7-11 超取 等）
-// - 每組內的 Radio 選擇行
-// - 收件地址顯示 / 超商取貨門市選擇
-//
-// 所有狀態由外部傳入，互動透過回調通知主畫面。
-// ---------------------------------------------------------------------------
 
 /// 購物車的配送方式區塊。
 ///
@@ -93,7 +82,6 @@ class _ShippingSectionState extends State<ShippingSection> {
   @override
   void didUpdateWidget(covariant ShippingSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // 自動展開包含已選選項的分組
     if (widget.shippingOptions.isNotEmpty && _expandedGroups.isEmpty) {
       final selectedOpt = _safeSelectedOption();
       final method = selectedOpt['shippingMethod']?.toString() ?? '';
@@ -106,7 +94,6 @@ class _ShippingSectionState extends State<ShippingSection> {
   @override
   void initState() {
     super.initState();
-    // 初始展開
     if (widget.shippingOptions.isNotEmpty) {
       final selectedOpt = _safeSelectedOption();
       final method = selectedOpt['shippingMethod']?.toString() ?? '';
@@ -131,11 +118,9 @@ class _ShippingSectionState extends State<ShippingSection> {
     int minDays;
     int maxDays;
     if (methodKey == ShippingMethod.taqbin.value) {
-      // 黑貓宅急便：1–3 個工作天
       minDays = 1;
       maxDays = 3;
     } else if (methodKey == ShippingMethod.sevenElevenStorePickup.value) {
-      // 7-11 超商取貨：2–4 個工作天
       minDays = 2;
       maxDays = 4;
     } else {
@@ -199,7 +184,6 @@ class _ShippingSectionState extends State<ShippingSection> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 標題
           Row(
             children: [
               Icon(
@@ -213,7 +197,6 @@ class _ShippingSectionState extends State<ShippingSection> {
           ),
           const SizedBox(height: HkSpace.md),
 
-          // 狀態互斥：避免「請先設定地址」警示與提示文字同時出現。
           if (widget.checkedSkuIds.isEmpty) ...[
             _buildSelectionPrompt(),
           ] else if (needsAddress) ...[
@@ -233,7 +216,6 @@ class _ShippingSectionState extends State<ShippingSection> {
               );
 
               return [
-                // 分組分隔線
                 if (groupEntry.key != groupedOptions.keys.first)
                   Divider(
                     height: 16,
@@ -241,22 +223,16 @@ class _ShippingSectionState extends State<ShippingSection> {
                     color: AppColors.dividerLight,
                   ),
 
-                // 分組標題行
                 _buildGroupHeader(methodKey, groupName, isExpanded, options),
 
-                // 收合時仍以標準選項列顯示已選項目，讓各配送方式 UI 一致。
                 if (!isExpanded && groupHasSelected)
                   _buildSelectedOptionRow(options),
 
-                // 展開時顯示 Radio 選項 + 地址/門市
                 if (isExpanded) ...[
                   SizedBox(height: 8),
                   ...options.map((entry) => _buildOptionRow(entry)),
                   if (groupHasSelected) ...[
                     SizedBox(height: 4),
-                    // 明確分派：超商顯示門市清單、宅配顯示地址卡；
-                    // 未支援的配送方式已被 _groupOptions() 濾掉，這裡是第二道防線
-                    // （不得因為「不是超商」就預設要地址）。
                     if (shippingPresentationOf(methodKey) ==
                         ShippingPresentation.cvsStorePickup)
                       ..._buildStorePickupList()
@@ -282,7 +258,6 @@ class _ShippingSectionState extends State<ShippingSection> {
     );
   }
 
-  // ── 子組件 ──
 
   Widget _buildAddressRequiredCard() {
     return Semantics(
@@ -490,7 +465,6 @@ class _ShippingSectionState extends State<ShippingSection> {
                         Text(groupName, style: CartTypography.subtitle),
                         Builder(
                           builder: (_) {
-                            // 優先使用 API 回傳的預估時間，否則用客戶端計算
                             final estDelivery =
                                 options.first.value['estimatedDelivery']
                                     ?.toString() ??

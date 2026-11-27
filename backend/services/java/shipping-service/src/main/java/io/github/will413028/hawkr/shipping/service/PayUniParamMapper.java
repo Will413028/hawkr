@@ -41,7 +41,6 @@ public final class PayUniParamMapper {
         if (dimensionSum <= 60) return "1";
         if (dimensionSum <= 90) return "2";
         if (dimensionSum <= 120) return "3";
-        // 150 cm 僅限常溫（goodsType "1"）
         if (dimensionSum <= 150 && GoodsType.NORMAL.code().equals(goodsType)) return "4";
         throw new IllegalArgumentException(
                 "不支援的材積規格: dimensionSum=" + dimensionSum + ", goodsType=" + goodsType);

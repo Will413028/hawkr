@@ -12,12 +12,6 @@ import 'package:go_router/go_router.dart';
 import '../../../../shared/widgets/truck_loading_overlay.dart';
 import 'coupon_helpers.dart';
 
-// ---------------------------------------------------------------------------
-// 優惠券選擇 BottomSheet。
-//
-// 以 FutureBuilder 非同步載入可用優惠券列表，
-// 使用者點選後 pop 回選中的 coupon Map，呼叫端再套用。
-// ---------------------------------------------------------------------------
 
 /// 優惠券選擇彈窗 — 用於 showModalBottomSheet。
 ///
@@ -49,7 +43,6 @@ class CouponSelectionSheet extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 標題列
             Row(
               children: [
                 Expanded(child: Text('選擇優惠券', style: CartTypography.section)),
@@ -62,7 +55,6 @@ class CouponSelectionSheet extends StatelessWidget {
             ),
             const SizedBox(height: HkSpace.sm),
 
-            // 優惠券列表
             Expanded(
               child: FutureBuilder<List<Map<String, dynamic>>>(
                 future: couponsFuture,
@@ -116,9 +108,6 @@ class CouponSelectionSheet extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// 單張優惠券卡片
-// ---------------------------------------------------------------------------
 
 /// 優惠券列表中的單張卡片 — 顯示名稱、折扣、有效期限、適用商家。
 class _CouponListTile extends StatelessWidget {
@@ -161,7 +150,6 @@ class _CouponListTile extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 名稱 + 選中 icon
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -175,7 +163,6 @@ class _CouponListTile extends StatelessWidget {
           ),
           const SizedBox(height: HkSpace.sm),
 
-          // 折扣描述
           if (discount.isNotEmpty) ...[
             Text(
               discount,
@@ -188,20 +175,17 @@ class _CouponListTile extends StatelessWidget {
             const SizedBox(height: HkSpace.xs),
           ],
 
-          // 適用商家
           if (merchant.isNotEmpty) ...[
             Text(merchant, style: CartTypography.support),
             const SizedBox(height: HkSpace.xs),
           ],
 
-          // 有效期限
           if (expire.isNotEmpty) ...[
             Text(expire, style: CartTypography.supportMuted),
             const SizedBox(height: HkSpace.md),
           ] else
             const SizedBox(height: HkSpace.md),
 
-          // 套用按鈕
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(

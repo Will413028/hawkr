@@ -67,15 +67,8 @@ public class UberWebhookController {
                                                         @RequestHeader Map<String, String> headers) {
         log.info("UberWebhookController.receive.start", "收到 Uber Webhook");
         try {
-            // 其餘例外刻意不 catch：往上拋 → 500 → Uber 重送（catch 成 4xx ＝ 事件永久丟失）
             receiveService.receive(rawBody, headers);
         } catch (UberWebhookSignatureException e) {
-            // 🔴 **唯一允許的 4xx**。不記 body、不記簽章（66 §8.6）。
-            //
-            // ⚠️ 一連串 401 有**兩種完全不同的成因**，而它們在 log 上長得一樣：
-            //    ① 有人在打我們 ② 我方 UBER_WEBHOOK_SIGNING_KEYS 沒設好。
-            //    分辨的依據是 UberWebhookSignatureConfig 開機時記的
-            //    `webhook_uber_signing_key_count` gauge：0 把 ⇒ 是 ②，事件正在全數遺失。
             log.warn("UberWebhookController.receive.unauthorized",
                     "Uber webhook 驗簽失敗，已拒絕（未寫入 inbox）");
             return ResponseEntity.status(401).body("UNAUTHORIZED");

@@ -1,5 +1,4 @@
 -- name: Current :one
--- 讀取帳號目前存活的買家 stint。
 SELECT *
 FROM buyer.buyers
 WHERE account_id = $1 AND status <> 'CLOSED';
@@ -10,50 +9,40 @@ FROM buyer.buyers
 WHERE account_id = $1 AND status <> 'CLOSED';
 
 -- name: ByID :one
--- 讀取指定 stint，包含已關閉資料。
 SELECT *
 FROM buyer.buyers
 WHERE buyer_id = $1;
 
 -- name: LockBuyer :one
--- 鎖定指定 stint，序列化其業務寫入（FOR NO KEY UPDATE）：與別的業務寫入互斥，與 LockBuyerShared 的 FOR KEY SHARE 不互斥。
--- 只能搭配不改 buyers 的唯一鍵欄位（buyer_id、account_id）的更新使用；狀態轉換與刪帳用 LockBuyerForTransition。
 SELECT *
 FROM buyer.buyers
 WHERE buyer_id = $1
 FOR NO KEY UPDATE;
 
 -- name: LockBuyerForTransition :one
--- 鎖定指定 stint 以做狀態轉換或刪除（FOR UPDATE）：與 LockBuyerShared 的 FOR KEY SHARE 互斥，其他模組的買家寫入守門因此要等它。
 SELECT *
 FROM buyer.buyers
 WHERE buyer_id = $1
 FOR UPDATE;
 
 -- name: LockBuyerShared :one
--- 以 FOR KEY SHARE 讀取指定 stint：與 BeginDeletion 等狀態轉換的 FOR UPDATE 互斥，與別的 KEY SHARE 及業務寫入的 FOR NO KEY UPDATE 不互斥。
--- 其他模組的買家寫入用它與刪帳序列化；它只擋「買家列被刪或轉換狀態」，不擋業務欄位的更新。
 SELECT *
 FROM buyer.buyers
 WHERE buyer_id = $1
 FOR KEY SHARE;
 
 -- name: LockBuyerSharedByAccount :one
--- 以 FOR KEY SHARE 讀取帳號唯一的買家列（一個帳號一生一個買家）：只與狀態轉換、刪帳的 FOR UPDATE 互斥（同 LockBuyerShared），不擋業務寫入的
--- FOR NO KEY UPDATE，持有到呼叫方的 transaction 結束。給只需要「買家在寫入完成前沒有關閉」的讀者（例如 notification 把通知寫給收件買家）。
 SELECT status, pii_cleared_at
 FROM buyer.buyers
 WHERE account_id = $1
 FOR KEY SHARE;
 
 -- name: CreateBuyer :one
--- 建帳時建立帳號唯一的買家；同一帳號再建立違反 buyers_account，視為不變量被破壞。
 INSERT INTO buyer.buyers (account_id, display_name, created_at, updated_at)
 VALUES ($1, $2, $3, $3)
 RETURNING *;
 
 -- name: UpdateProfile :one
--- 寫入已在列鎖內合併的 profile 欄位。
 UPDATE buyer.buyers
 SET display_name = $2,
     phone = $3,
@@ -67,7 +56,6 @@ WHERE buyer_id = $1 AND version = $9
 RETURNING *;
 
 -- name: UpdateAvatar :one
--- 寫入已轉正的頭像 object key。
 UPDATE buyer.buyers
 SET avatar = sqlc.arg(avatar),
     avatar_asset_id = sqlc.arg(avatar_asset_id),
@@ -77,41 +65,35 @@ WHERE buyer_id = sqlc.arg(buyer_id) AND version = sqlc.arg(version)
 RETURNING *;
 
 -- name: BatchProfiles :many
--- 批次讀取未關閉且未清除個資的 profile。
 SELECT *
 FROM buyer.buyers
 WHERE buyer_id = ANY($1::bigint[]) AND status <> 'CLOSED' AND pii_cleared_at IS NULL
 ORDER BY buyer_id;
 
 -- name: BatchDisplay :many
--- 回傳原始 nullable 個資與 Deleted；模組對已關閉 stint 隱藏個資。
 SELECT buyer_id, display_name, avatar, avatar_asset_id, (status = 'CLOSED')::boolean AS deleted
 FROM buyer.buyers
 WHERE buyer_id = ANY($1::bigint[])
 ORDER BY buyer_id;
 
 -- name: Principals :many
--- 只解析存活的 stint；未回傳的 ID 由呼叫方列為 unresolved。
 SELECT buyer_id, account_id
 FROM buyer.buyers
 WHERE buyer_id = ANY($1::bigint[]) AND status <> 'CLOSED'
 ORDER BY buyer_id;
 
 -- name: BuyerIDs :many
--- 列出帳號所有歷史與目前 stint。
 SELECT buyer_id
 FROM buyer.buyers
 WHERE account_id = $1
 ORDER BY buyer_id;
 
 -- name: Stats :one
--- 計算目前存活的買家數量。
 SELECT count(*)
 FROM buyer.buyers
 WHERE status <> 'CLOSED';
 
 -- name: Pending :exec
--- 將買家標記為等待訂單結束。
 UPDATE buyer.buyers
 SET status = 'PENDING_DELETION',
     updated_at = $2,
@@ -119,7 +101,6 @@ SET status = 'PENDING_DELETION',
 WHERE buyer_id = $1;
 
 -- name: Close :exec
--- 關閉 stint 並釋放 current 位置。
 UPDATE buyer.buyers
 SET status = 'CLOSED',
     deleted_at = $2,
@@ -128,7 +109,6 @@ SET status = 'CLOSED',
 WHERE buyer_id = $1;
 
 -- name: CleanupBatch :many
--- 按 buyer_id 鎖定已關閉超過保留期限的個資批次。
 SELECT buyer_id
 FROM buyer.buyers
 WHERE status = 'CLOSED' AND deleted_at < $1 AND pii_cleared_at IS NULL
@@ -137,7 +117,6 @@ LIMIT $2
 FOR UPDATE SKIP LOCKED;
 
 -- name: ClearPII :exec
--- 只清理指定 closed stint 的個資。
 UPDATE buyer.buyers
 SET display_name = NULL,
     phone = NULL,
@@ -153,7 +132,6 @@ SET display_name = NULL,
 WHERE buyer_id = $1 AND status = 'CLOSED' AND pii_cleared_at IS NULL;
 
 -- name: ListLiveAccounts :many
--- 尚未關閉的買家（營運中與刪除中）的 (buyer_id, account_id)，依 buyer_id 由小到大的 keyset 分頁；只給跨模組的大量派送（通知公告）。
 SELECT buyer_id, account_id
 FROM buyer.buyers
 WHERE status <> 'CLOSED' AND buyer_id > sqlc.arg(after_buyer_id)

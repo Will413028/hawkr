@@ -34,9 +34,6 @@ import jakarta.annotation.PostConstruct;
  * Auto-configuration for observability library. Automatically registers all
  * required beans based on classpath availability.
  */
-// 自動設定的處理順序預設依類別全名排序；obsTextMapPropagator 的 @ConditionalOnMissingBean 與
-// obsRabbitPublisher 的 @Qualifier("obsTextMapPropagator") 要求本類別先於 Spring Boot 的 OTel 傳遞設定
-// （它會註冊 noopTextMapPropagator）。順序明寫，不靠套件名的字母序。
 @AutoConfiguration(before = OpenTelemetryAutoConfiguration.class)
 @EnableConfigurationProperties(ObsProperties.class)
 @PropertySource("classpath:observability-defaults.properties")
@@ -48,8 +45,6 @@ public class ObsAutoConfiguration {
         return new ObsContext();
     }
 
-    // obsTracer 已移除：改由 Spring Boot OpenTelemetryAutoConfiguration 提供
-    // 正確接線到 OTLP exporter pipeline，避免 noop Tracer 黑洞
 
     @Bean
     @ConditionalOnMissingBean

@@ -14,7 +14,7 @@ AfterSaleRepository afterSaleRepository(Ref ref) =>
 class ResolveResult {
   final String caseNo;
   final String status;
-  final String returnShipmentNo; // 退貨物流單號（7-11退貨代碼 / 黑貓託運單號）
+  final String returnShipmentNo;
 
   const ResolveResult({
     required this.caseNo,
@@ -61,7 +61,6 @@ class AfterSaleRepository {
       if (e.response?.statusCode == 401) {
         throw const UnauthorizedException(message: '未授權');
       }
-      // 404 = API 尚未部署，回傳空列表
       if (e.response?.statusCode == 404) {
         return (records: <AfterSaleCase>[], total: 0);
       }
@@ -142,9 +141,6 @@ class AfterSaleRepository {
       if (e.response?.statusCode == 404) {
         throw const ServerException(message: '售後服務功能即將上線', statusCode: 404);
       }
-      // 透傳後端 envelope message（業務碼如 9025 補償券發放失敗 / 9011 退貨建單失敗 /
-      // 9006 退款金額超限 / 9007 優惠券規則違反 等，後端已帶具體原因），而非 Dio 的 HTTP
-      // status 文字 —— 否則賣家只看到「Http status error [409]」無法得知業務失敗原因（#1150）。
       final body = e.response?.data;
       if (body is Map<String, dynamic> && body['message'] != null) {
         throw ServerException(

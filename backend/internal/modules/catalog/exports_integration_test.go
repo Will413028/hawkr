@@ -181,7 +181,6 @@ func TestCheckoutSnapshotReportsArchivedAndDeletedSkuAsInactive(t *testing.T) {
 	if err := f.m.DeleteProduct(f.ct, storeID, gone.ID, 0); err != nil {
 		t.Fatal(err)
 	}
-	// 只刪 SKU：多 SKU 商品改成只剩一個組合，另一個 SKU 被標刪除。
 	two := f.active(storeID, acct, func() ProductInput {
 		x := f.input("兩個 SKU")
 		x.Axes = []Axis{{Name: "尺寸", Values: []string{"S", "M"}}}
@@ -299,7 +298,6 @@ func TestFavoriteCountOnMissingAndDeletedProducts(t *testing.T) {
 	if err := f.m.RemoveFavorite(f.ct, p.ID); err != nil {
 		t.Fatalf("Remove on a deleted product = %v, the count follows the favorite row", err)
 	}
-	// AdminProduct 不讀已刪除的商品，所以直接讀列上的收藏數。
 	var favorites int32
 	if err := f.d.Pool().QueryRow(f.ct, `SELECT favorite_count FROM catalog.products WHERE id = $1`, p.ID).Scan(&favorites); err != nil {
 		t.Fatal(err)

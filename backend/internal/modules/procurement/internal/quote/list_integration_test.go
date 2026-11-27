@@ -24,18 +24,18 @@ func byID(rs []model.BuyerSellerResponse) map[uuid.UUID]model.BuyerSellerRespons
 func TestListShowsEachSellersCurrentVersionWithStatusAcceptabilityAndRange(t *testing.T) {
 	f := newFixture(t)
 	past := start.Add(-time.Hour)
-	active := f.respond(f.publication, 11, version{goods: 400}) // 3 KG × 100~200 = 300~600：區間內
+	active := f.respond(f.publication, 11, version{goods: 400})
 	expired := f.respond(f.publication, 12, version{goods: 400, validUntil: past})
 	withdrawn := f.respond(f.publication, 13, version{goods: 400})
 	f.exec(`UPDATE procurement.seller_responses SET withdrawn_version = 1, withdrawn_at = $2 WHERE id = $1`, withdrawn, start)
-	superseded := f.respond(f.publication, 14, version{goods: 400}, version{goods: 700}) // 目前版是 2，貨款 700 超出區間
+	superseded := f.respond(f.publication, 14, version{goods: 400}, version{goods: 700})
 	closed := f.respond(f.publication, 15, version{goods: 400})
 	f.exec(`UPDATE procurement.seller_responses SET write_closed_at = $2, write_closed_reason = 'DECLINED' WHERE id = $1`, closed, start)
 	low := f.respond(f.publication, 16, version{goods: 299})
 	otherUnit := f.respond(f.publication, 17, version{goods: 1, unit: "G", quantity: "4"})
-	fractional := f.respond(f.publication, 19, version{goods: 250, quantity: "2.5"}) // 2.5 KG × 100~200 = 250~500：不是整數倍也比較
+	fractional := f.respond(f.publication, 19, version{goods: 250, quantity: "2.5"})
 	fractionalLow := f.respond(f.publication, 20, version{goods: 249, quantity: "2.5"})
-	noVersions := uuid.NewV7() // 還沒送出任何版本的回價身分列不列
+	noVersions := uuid.NewV7()
 	f.exec(`INSERT INTO procurement.seller_responses (id, publication_id, request_id, store_id, created_at, updated_at) VALUES ($1, $2, $3, 18, $4, $4)`, noVersions, f.publication, f.request, start)
 
 	page, err := f.service().List(t.Context(), f.listIn())
@@ -73,7 +73,6 @@ func TestListShowsEachSellersCurrentVersionWithStatusAcceptabilityAndRange(t *te
 		t.Errorf("報價內容 = %+v", q)
 	}
 
-	// 這張需求有進行中的成交之後，進行中的版本不能再接受。
 	_, err = f.service().Accept(t.Context(), f.acceptIn(active, 1))
 	must(t, err)
 	page, err = f.service().List(t.Context(), f.listIn())
@@ -114,7 +113,7 @@ func TestListPaginatesByIdentityCreationTimeThenIDWithoutDuplicatesOrGaps(t *tes
 	}
 	var rows []row
 	for i := range 7 {
-		at := start.Add(time.Duration(i/2) * time.Minute) // 兩兩同時間，靠回價 ID 排序
+		at := start.Add(time.Duration(i/2) * time.Minute)
 		id := f.respondAt(at, f.publication, int64(100+i), version{goods: 400})
 		rows = append(rows, row{id, at})
 	}
@@ -164,7 +163,6 @@ func TestListPaginationSurvivesASellerRevisingBetweenPages(t *testing.T) {
 	for i := range 4 {
 		ids = append(ids, f.respondAt(start.Add(time.Duration(i)*time.Minute), f.publication, int64(100+i), version{goods: 400}))
 	}
-	// 回價依建立時間由新到舊：ids[3]、ids[2]、ids[1]、ids[0]。
 	in := f.listIn()
 	in.PageSize = 2
 	first, err := f.service().List(t.Context(), in)
@@ -172,7 +170,6 @@ func TestListPaginationSurvivesASellerRevisingBetweenPages(t *testing.T) {
 	if len(first.Responses) != 2 || first.Responses[0].ID != ids[3] || first.Responses[1].ID != ids[2] || first.NextPageToken == "" {
 		t.Fatalf("第一頁 = %+v", first.Responses)
 	}
-	// 第二頁還沒取之前，後面那一則回價改版，新版本的送出時間晚於其他所有版本。
 	f.exec(`UPDATE procurement.seller_responses SET latest_version = 2 WHERE id = $1`, ids[0])
 	f.exec(`INSERT INTO procurement.seller_response_versions (
 			id, seller_response_id, version, response_type, spec_note, unit_basis_quantity, unit_basis_unit,
@@ -251,7 +248,6 @@ func TestListOnlyShowsTheRequestedPublicationOfTheBuyersOwnRequest(t *testing.T)
 	_, err = f.service().List(t.Context(), wrongRequest)
 	wantKind(t, err, apperr.KindNotFound)
 
-	// 別的買家的需求與發布，同一個資料庫裡也看不到。
 	g := f.sibling(2)
 	g.respond(g.publication, 11, version{goods: 400})
 	cross := g.listIn()

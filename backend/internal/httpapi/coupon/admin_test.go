@@ -29,7 +29,6 @@ import (
 
 const callerAdmin = int64(77)
 
-// fakeAdminModule 記下每支方法收到的輸入與 actor。
 type fakeAdminModule struct {
 	err   error
 	calls []string
@@ -109,7 +108,6 @@ func adminAs(p identity.Principal) func(http.Handler) http.Handler {
 	}
 }
 
-// newAdminRig 把 Admin 掛在真的 Connect handler 後面（req.Spec().Procedure 才有值），呼叫者由 principal 決定。
 func newAdminRig(t *testing.T, p identity.Principal) *adminRig {
 	t.Helper()
 	m := &fakeAdminModule{}
@@ -537,7 +535,6 @@ func TestAdminListBuyerVouchersMapsEveryVoucherField(t *testing.T) {
 	}
 }
 
-// wireReason 取出 Connect 錯誤帶的 ErrorInfo.reason。
 func wireReason(err error) string {
 	var ce *connect.Error
 	if !errors.As(err, &ce) {

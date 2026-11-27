@@ -47,7 +47,7 @@ func TestValidateEquivalenceFixtures(t *testing.T) {
 		declared   Capability
 		requestKey string
 		hasReqKey  bool
-		wantCode   int32 // 0 = expect pass
+		wantCode   int32
 		wantGRPC   codes.Code
 	}{
 		{

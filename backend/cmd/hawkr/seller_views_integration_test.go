@@ -27,14 +27,12 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 )
 
-// noRegistry 是登記資料來源的替身：這個測試不送公司型申請，來源不會被呼叫。
 type noRegistry struct{}
 
 func (noRegistry) Lookup(context.Context, string) (gcis.Registration, bool, error) {
 	return gcis.Registration{}, false, nil
 }
 
-// noMedia 是 seller 的 media port 的替身：這些測試不上傳也不讀檔案。
 type noMedia struct{}
 
 func (noMedia) Confirm(context.Context, media.Uploader, string, media.Visibility) (media.ConfirmedAsset, error) {
@@ -49,7 +47,6 @@ type noOrders struct{}
 
 func (noOrders) HasOpenStoreOrders(context.Context, int64) (bool, error) { return false, nil }
 
-// productStoresStub 是商品→店家 port 的替身；err 非 nil 時失敗，並記下被呼叫的次數。
 type productStoresStub struct {
 	stores map[uuid.UUID]int64
 	err    error
@@ -83,7 +80,7 @@ func TestLoggedInProductViewSucceedsWithoutProductServiceAndIsRolledUpLater(t *t
 		t.Fatal(err)
 	}
 	bus := events.NewBus()
-	now := time.Date(2026, 10, 7, 12, 0, 0, 0, twtime.Taipei) // 週三
+	now := time.Date(2026, 10, 7, 12, 0, 0, 0, twtime.Taipei)
 	clock := func() time.Time { return now }
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	accounts := identity.New(identity.Deps{DB: d, Events: bus, Now: clock, Logger: logger})
@@ -97,7 +94,6 @@ func TestLoggedInProductViewSucceedsWithoutProductServiceAndIsRolledUpLater(t *t
 	})
 	subscribeSellerViews(bus, sellers)
 
-	// 先建幾個帳號，讓 account_id 與 store_id 是不同的數字。
 	var ids []int64
 	for range 5 {
 		var id int64
@@ -107,7 +103,6 @@ func TestLoggedInProductViewSucceedsWithoutProductServiceAndIsRolledUpLater(t *t
 		ids = append(ids, id)
 	}
 	buyerAccount, sellerAccount := ids[4], ids[2]
-	// 先開三家別人的店：我們的 store_id 因此不等於買家的 buyer_id（兩者都從 1 開始發號，不先錯開就分不出鍵用錯）。
 	for i, id := range []int64{ids[0], ids[1], ids[3]} {
 		if _, err := sellers.Apply(ctx, seller.ApplyInput{AcceptedAgreements: seller.CurrentApplyAcceptances(), AccountID: id, StoreName: "別家" + string(rune('甲'+i)), ContactPhone: "0912345678", TownCode: "63000050", AddressDetail: "測試路一號"}); err != nil {
 			t.Fatal(err)
@@ -128,7 +123,6 @@ func TestLoggedInProductViewSucceedsWithoutProductServiceAndIsRolledUpLater(t *t
 		t.Fatalf("fixture must keep store_id %d, seller account %d, buyer_id %d and buyer account %d apart", store.StoreID, sellerAccount, profile.BuyerID, buyerAccount)
 	}
 
-	// 商品服務不通：同一個商品看兩次、另一個商品看一次（總次數、不去重），瀏覽都成功，也沒有碰商品 port。
 	productA, productB := uuid.NewV7(), uuid.NewV7()
 	for _, productID := range []uuid.UUID{productA, productA, productB} {
 		if err := buyers.RecordVisit(ctx, profile.BuyerID, productID); err != nil {
@@ -142,7 +136,6 @@ func TestLoggedInProductViewSucceedsWithoutProductServiceAndIsRolledUpLater(t *t
 	if err := d.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM seller.product_view_events WHERE processed_at IS NULL").Scan(&events); err != nil || events != 3 {
 		t.Fatalf("pending events=%d err=%v, want 3", events, err)
 	}
-	// 彙總 job 遇到商品服務不通：沒有標記、儀表板仍是 0，重試之後才記進 store_id。
 	if _, err := sellers.RollupProductViews(ctx); err == nil {
 		t.Fatal("rollup swallowed the product service error")
 	}

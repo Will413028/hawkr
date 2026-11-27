@@ -108,8 +108,6 @@ public final class UberWebhookVerifier {
         boolean matched = false;
         for (String key : signingKeys) {
             byte[] expected = hmacSha256(key, rawBody);
-            // 🔴 不得在命中時 break：提早退出讓「第幾把命中」變成可觀測的時間差。
-            //    逐把都算完的成本是固定的幾微秒，而金鑰只有個位數把。
             matched |= MessageDigest.isEqual(expected, providedBytes);
         }
         return matched;
@@ -141,7 +139,6 @@ public final class UberWebhookVerifier {
             mac.init(new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), HMAC_SHA256));
             return mac.doFinal(body);
         } catch (Exception e) {
-            // 演算法固定為 JDK 內建，走到這裡代表執行環境本身壞了。
             throw new IllegalStateException("HMAC-SHA256 不可用", e);
         }
     }

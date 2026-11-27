@@ -67,7 +67,6 @@ class ProductItem {
       name: (json['name'] ?? '').toString(),
       categoryId: json['categoryId']?.toString(),
       categoryName: json['categoryName']?.toString(),
-      // 49 §6.1 成對契約：imageKey（objectKey）優先，imageUrl 退路。
       imageUrl: (json['imageKey'] ?? json['imageUrl'])?.toString(),
       images: _parseImages(json),
       origin: json['origin']?.toString(),
@@ -178,8 +177,6 @@ class ProductItem {
   }
 
   static List<String> _parseImages(Map<String, dynamic> json) {
-    // 49 §6.1 成對契約：優先讀 key 陣列 imageKeys，其次 url 陣列 imageUrls。
-    // 值一律過 buildImageUrl dual-mode 顯示，key 或 url 皆可。
     for (final field in const ['imageKeys', 'imageUrls']) {
       final value = json[field];
       if (value is List) {
@@ -195,11 +192,6 @@ class ProductItem {
     return [];
   }
 
-  // 價格顯示不在本 model —— `ProductItem` 的唯一渲染路徑是 `ProductCard`
-  // （category_screen.dart `_buildProductCard`），而那張卡把 `NT$` 前綴另起
-  // 一個 TextSpan 渲染，需要的是「不含前綴的區間」而非成品字串。曾經在此
-  // 掛過 `displayPrice` / `displayListPrice` / `hasSale` 三個 getter，零呼叫
-  // 點、與卡片內的判準各寫一份，已移除；判準的唯一來源是 `PriceDisplay`。
 
   String get displayImage {
     if (imageUrl != null && imageUrl!.isNotEmpty && imageUrl != 'null') {

@@ -42,11 +42,9 @@ class ShippingSettingsScreen extends HookConsumerWidget {
         );
     final saving = useState(false);
 
-    // 黑貓宅急便狀態
     final taqbinExpanded = useState(true);
     final taqbinSelected = useState(false);
-    final taqbinLocked = useState(false); // 寄件資料已交給 PayUni（4302、4303）
-    // backend-payuni#666 四態：'' / '4301' NONE / '4302' REQUESTED / '4303' SUCCEEDED / '4304' FAILED
+    final taqbinLocked = useState(false);
     final taqbinPayuniStatus = useState<String>('');
     final taqbinProviderMessage = useState<String>('');
     final homeNameCtrl = useTextEditingController();
@@ -55,19 +53,16 @@ class ShippingSettingsScreen extends HookConsumerWidget {
     final homeDistrict = useState<String?>(null);
     final homeAddressCtrl = useTextEditingController();
 
-    // 7-11店到店狀態
     final cvsExpanded = useState(true);
     final cvsSelected = useState(false);
-    final cvsEnabled = useState(false); // 7-11是否已启用
-    final cvsSenderLocked = useState(false); // 參考列已交給 PayUni（4302、4303）
-    final cvsProcessing = useState(false); // 參考列 4302 處理中
+    final cvsEnabled = useState(false);
+    final cvsSenderLocked = useState(false);
+    final cvsProcessing = useState(false);
     final cvsNameCtrl = useTextEditingController();
     final cvsPhoneCtrl = useTextEditingController();
     final selectedStoreName = useState<String?>(null);
     final selectedStoreCode = useState<String?>(null);
     final cvsInitialSnapshot = useState<String>('');
-    // 已建店後啟停改用 toggle endpoint，所以要記 onboarding_id
-    // 與初始啟用狀態，才能跟使用者目前勾選比對出 enable / disable。
     final cvsOnboardingId = useState<String?>(null);
     final cvsInitialEnabled = useState(false);
     final shippingController = ref.read(
@@ -90,7 +85,6 @@ class ShippingSettingsScreen extends HookConsumerWidget {
       ].join('|');
     }
 
-    // 載入現有建店設定
     Future<void> loadData() async {
       loading.value = true;
       try {
@@ -109,17 +103,11 @@ class ShippingSettingsScreen extends HookConsumerWidget {
             'payuniSubmitStatus=${o['payuniSubmitStatus']} '
             'onboardingStatus=${o['onboardingStatus']} senderName=${o['senderName']}',
           );
-          // 後端回 codemeta value（3651=CVS_C2C, 3652=HOME_DELIVERY），
-          // 也相容舊的字串 code 以防契約調整。
           final onboardingType =
               ShippingType.fromValue(type) ?? ShippingType.fromCode(type);
           if (onboardingType == ShippingType.homeDelivery) {
             homeRow ??= o;
           } else if (onboardingType == ShippingType.cvsC2c) {
-            // 後端有兩個獨立維度：
-            //  - payuniSubmitStatus 4303 且有 onboardingId = 已建店（一次性，跟 PayUni 對接結果）
-            //  - enabled "true"/"false" = toggle 狀態（用 toggle endpoint 切換）
-            // checkbox 應反映 enabled 字串，而非從 payuniSubmitStatus 推算。
             final actualEnabled = o['enabled']?.toString() == 'true';
             final onboardingId =
                 o['onboardingId']?.toString() ??
@@ -132,14 +120,8 @@ class ShippingSettingsScreen extends HookConsumerWidget {
             }
             cvsInitialEnabled.value = actualEnabled;
             cvsSelected.value = actualEnabled;
-            // 已建店 → 後續 add/remove 走 toggle endpoint
             if (isShippingRowToggleable(o)) cvsToggleable = true;
           } else {
-            // 🔴 本畫面只有「黑貓宅配」「7-11 店到店」兩張硬編卡片，
-            // 其餘 ShippingType（3654 商家自送 / 後端新增值）
-            // 沒有對應的區塊可以承載 —— 原本是**靜默忽略**（既不顯示也不報錯），
-            // 這裡至少讓它在 log 留痕。
-            // 真正的修法是 registry + slot，本波不做。
             HKLog.logW(
               '[ShippingSettings] 未支援的 onboarding shippingType=$type '
               '（本版僅支援 3651 CVS_C2C / 3652 HOME_DELIVERY），該筆設定不會顯示',
@@ -147,14 +129,12 @@ class ShippingSettingsScreen extends HookConsumerWidget {
           }
         }
 
-        // 狀態、訊息、鎖定與寄件人都取自同一筆黑貓 onboarding。
         if (homeRow != null) {
           final payuniStatus = homeRow['payuniSubmitStatus']?.toString() ?? '';
           if (payuniStatus.isNotEmpty) taqbinPayuniStatus.value = payuniStatus;
           if (homeRow['providerMessage'] != null) {
             taqbinProviderMessage.value = homeRow['providerMessage'].toString();
           }
-          // 只有 4302、4303 鎖定；失敗與其他狀態可以重新送出。
           if (isShippingRowLocked(homeRow)) {
             taqbinSelected.value = true;
             taqbinLocked.value = true;
@@ -179,8 +159,6 @@ class ShippingSettingsScreen extends HookConsumerWidget {
       loading.value = false;
     }
 
-    // 寄件人：該物流商有紀錄就用紀錄，沒有才用店家。店家晚到也補上；
-    // 每個物流商只套用一次，且只填使用者還沒輸入的欄位。
     final store = ref.watch(myStoreSnapshotProvider);
     final homeApplied = useRef(false);
     final cvsApplied = useRef(false);
@@ -220,7 +198,6 @@ class ShippingSettingsScreen extends HookConsumerWidget {
       return null;
     }, const []);
 
-    // 門市選擇
     Future<void> pickStore() async {
       try {
         final resp = await shippingController.loadStoreMapSession();
@@ -271,7 +248,6 @@ class ShippingSettingsScreen extends HookConsumerWidget {
       cvsExpanded.value = !cvsExpanded.value;
     }
 
-    // 開通黑貓物流
     Future<void> onActivateTaqbin() async {
       final confirmed = await showAppConfirmDialog(
         context,
@@ -283,7 +259,6 @@ class ShippingSettingsScreen extends HookConsumerWidget {
       if (!context.mounted) return;
       if (!confirmed) return;
 
-      // 驗證黑貓必填（寄件人姓名顯示長度 ≤ 30，對齊 backend-payuni#1187 PayUni 約束）
       final taqbinNameError = TextLengthValidator.validateName(
         homeNameCtrl.text,
         maxDisplayLength: taqbinSenderNameMaxDisplayLength,
@@ -322,7 +297,6 @@ class ShippingSettingsScreen extends HookConsumerWidget {
       saving.value = true;
 
       try {
-        // 黑貓建店（帶完整寄件人資訊）
         final result = await shippingController.activateHomeDelivery({
           'productCategory': '0001',
           'senderName': homeNameCtrl.text.trim(),
@@ -348,23 +322,14 @@ class ShippingSettingsScreen extends HookConsumerWidget {
       saving.value = false;
     }
 
-    // 開通7-11物流
-    //
-    // 規則：
-    // - 第一次啟用（沒有 onboarding_id）→ POST /shipping_onboardings/cvs 建店
-    // - 已建店後啟停 → POST /shipping_onboardings/{onboarding_id}/toggle 切換啟用
     Future<void> onActivateCvs() async {
       if (saving.value || cvsMutationCoordinator.isRunning) return;
 
-      // 驗證7-11必填
       if (selectedStoreCode.value == null || selectedStoreCode.value!.isEmpty) {
         FloatingToast.error(context, '請選擇退貨 7-11 門市');
         return;
       }
 
-      // 驗證退貨收件人姓名顯示長度 ≤ 10（對齊 backend-payuni#1187 超商約束）。
-      // 尚未開通（首次建店）時為必填；已開通的純 toggle 不送 senderName，
-      // 故僅在有輸入時驗證長度上限。
       final cvsNameTrimmed = cvsNameCtrl.text.trim();
       if (!cvsEnabled.value || cvsNameTrimmed.isNotEmpty) {
         final cvsNameError = TextLengthValidator.validateName(
@@ -472,7 +437,6 @@ class ShippingSettingsScreen extends HookConsumerWidget {
                             ),
                             const SizedBox(height: HkSpace.lg),
 
-                            // 黑貓宅急便設定組件
                             TaqbinShippingSection(
                               expanded: taqbinExpanded,
                               onToggleExpanded: toggleTaqbinExpanded,
@@ -517,11 +481,6 @@ class ShippingSettingsScreen extends HookConsumerWidget {
                               ),
                               const SizedBox(height: HkSpace.md),
 
-                              // backend-payuni#666 四態 button：
-                              // 4303 SUCCEEDED → 不顯示（已開通）
-                              // 4302 REQUESTED → 「處理中…」disabled + spinner
-                              // 4304 FAILED → 顯示 PayUni 錯誤訊息 + 「重新嘗試」紅字按鈕
-                              // 其他（4301 NONE / 舊資料無狀態）→ 「開通黑貓物流」
                               if (taqbinPayuniStatus.value ==
                                   payuniSubmitRequested) ...[
                                 const SaveButton(
@@ -576,7 +535,6 @@ class ShippingSettingsScreen extends HookConsumerWidget {
                               ],
                             ],
 
-                            // 7-11店到店設定組件
                             CvsShippingSection(
                               expanded: cvsExpanded,
                               onToggleExpanded: toggleCvsExpanded,
@@ -601,7 +559,6 @@ class ShippingSettingsScreen extends HookConsumerWidget {
                                 SizedBox(height: 16.h),
                               ] else if (!cvsEnabled.value || cvsDirty) ...[
                                 SaveButton(
-                                  // 已開通後，即使取消勾選也要允許 toggle save
                                   canSave: cvsEnabled.value || hasCvs,
                                   saving: saving.value,
                                   onSave: onActivateCvs,

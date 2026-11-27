@@ -13,12 +13,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-// 跨工作階段治理查詢（§11.3 P1）的兩支端點契約。
-//
-// 這兩支與其他代行端點的差別在於「誰看得到什麼」：它們列的是**全平台**的代行活動，
-// 一頁裡的每一列是不同的 admin 與不同的店家。因此除了形狀之外，這裡守的是
-// 「篩選條件不得被靜默丟掉」—— 一個被丟掉的 store_id 篩選會讓操作者以為自己看的是
-// 一家店，實際拿到的是全部，而回應長得完全正常。
 
 type governanceListStub struct {
 	accountpb.DelegationServiceClient
@@ -78,7 +72,6 @@ func sampleSessionRecord() *accountpb.DelegatedOperationSessionRecord {
 	}
 }
 
-// ==================== 1｜值域：越界一律 9260，不夾值、不忽略 ====================
 
 func TestListDelegatedOperations_QueryValidation(t *testing.T) {
 	cases := []struct {
@@ -148,7 +141,6 @@ func TestListAllDelegatedAuditLogs_QueryValidation(t *testing.T) {
 	}
 }
 
-// ==================== 2｜篩選條件必須真的送到上游 ====================
 
 // 這一條守的是靜默失效：handler 讀了 query 卻沒填進 request，回應仍是 200 ＋ 一份看起來
 // 正常的清單，只是內容是全平台的。沒有任何東西會轉紅，而操作者拿到的是別家店的資料。
@@ -215,7 +207,6 @@ func TestListAllDelegatedAuditLogs_ForwardsEveryFilter(t *testing.T) {
 	}
 }
 
-// ==================== 3｜分頁 envelope 與列形狀 ====================
 
 // 分頁一律走 response.Page：data 恰為 {records,total,page,pageSize}。handler 自組 gin.H
 // 必然漂出 page_size 這種 snake 變體，前端讀通用 data.pageSize 就拿到 undefined。
@@ -243,7 +234,6 @@ func TestListDelegatedOperations_PageEnvelopeAndRecordShape(t *testing.T) {
 	if len(payload.Records) != 1 {
 		t.Fatalf("records 長度 = %d, want 1", len(payload.Records))
 	}
-	// 撤銷四件套要真的到得了前端 —— #2483 A9 的整個要點就是它們從來沒有出口。
 	for _, key := range []string{"revokedAt", "revokedByAdminId", "revokedByAdminDisplayName", "revokeReason"} {
 		v, ok := payload.Records[0][key]
 		if !ok {

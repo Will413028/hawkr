@@ -217,8 +217,6 @@ export function deriveRfqProgress(input: RfqProgressInput): RfqProgressStep[] {
 		];
 	}
 
-	// ⛔ 有 ACK 也只到「已凍結成交價格」為止。CREATING_ORDER 是買家看得到的
-	// 中間狀態，不是「已下單」；ORDER_FAILED 是明確的失敗，不能畫成待進行。
 	const orderState: RfqProgressStepState =
 		acceptance.orderProvisioningState === "ORDER_CREATED"
 			? "done"

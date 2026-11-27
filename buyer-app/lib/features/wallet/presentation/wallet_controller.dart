@@ -13,8 +13,6 @@ class CouponController extends _$CouponController {
   @override
   Future<List<WalletCouponCardState>> build({int status = 0}) async {
     ref.keepAlive();
-    // 未登入（訪客／登出後）不打需登入的 API，避免 401 風暴；
-    // session 變動會自動重建。
     final session = ref.watch(sessionProvider).value;
     if (!hasUsableSession(session)) {
       return const [];

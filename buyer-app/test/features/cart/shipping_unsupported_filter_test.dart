@@ -31,9 +31,6 @@ void main() {
   ) async {
     await _pump(
       tester,
-      // 🔴 三個選項的 label 刻意互不相同，且 supported 與 unsupported 各有其一：
-      //    過濾若整個失效（全顯示）或反向（只顯示 unsupported），兩種都會被抓到。
-      //    若三者共用同一個 label，這支測試對「濾錯邊」零鑑別力。
       const [
         {'shippingMethod': '3001', 'label': '黑貓宅配', 'fee': 100},
         {'shippingMethod': '3003', 'label': 'UberInstant', 'fee': 150},
@@ -41,11 +38,8 @@ void main() {
       ],
     );
 
-    // supported：3001 必須出現
     expect(find.textContaining('黑貓宅配'), findsWidgets);
 
-    // unsupported：兩個都不得出現。分開寫而不是合成一條，
-    // 是為了讓失敗訊息直接指出「哪一個碼值漏濾了」。
     expect(find.textContaining('UberInstant'), findsNothing);
     expect(find.textContaining('MerchantSelf'), findsNothing);
   });
@@ -58,8 +52,6 @@ void main() {
 
     expect(find.textContaining('UberInstant'), findsNothing);
     expect(find.textContaining('MerchantSelf'), findsNothing);
-    // ⚠️ 這一條是上一個 case 的反面：確認「全部濾掉」走的是空清單分支，
-    //    而不是把最後一個 unsupported 當成 fallback 顯示出來。
     expect(tester.takeException(), isNull);
   });
 
@@ -93,9 +85,6 @@ void main() {
       {'shippingMethod': '3001', 'label': '黑貓宅配', 'fee': 100},
     ], validateValid: false);
 
-    // ⚠️ 斷言的是面板標題而不是 `errorMessage`：`_buildValidateErrorPanel`
-    //    今天用的是固定文案、不讀後端的 errorMessage（那是另一個缺口，
-    //    不在本次範圍）。拿 errorMessage 當錨會驗到一個不存在的行為。
     expect(find.text('無法配送'), findsOne);
     expect(tester.takeException(), isNull);
   });

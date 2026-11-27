@@ -96,11 +96,6 @@ function PreferencesContent({
 	const invalidatePreferences = useInvalidateNotificationPreferences();
 	const displayError = error ?? loadError;
 
-	// Seed the editable list from the shared read ONCE per role (per mount). We
-	// own the optimistic toggle locally, so we must NOT re-seed when the shared
-	// query refetches — the post-toggle invalidate would otherwise clobber the
-	// just-flipped value or, on a stale GET-after-PUT, revert it. The cache stays
-	// the source of truth for the NEXT mount.
 	const seededRoleRef = React.useRef<string | null>(null);
 	React.useEffect(() => {
 		if (loading || remoteEntries == null || seededRoleRef.current === role)
@@ -118,14 +113,10 @@ function PreferencesContent({
 			),
 		);
 
-	// Optimistic toggle: flip the UI immediately, call the RPC, roll back on
-	// failure. One switch per (category, channel).
 	const handleToggle = async (
 		target: PreferenceEntry,
 		nextEnabled: boolean,
 	) => {
-		// The input is disabled for locked entries, but a click that races a
-		// re-render could still call this; bail out before hitting the API.
 		if (!target.canDisable) return;
 		setEnabled(target, nextEnabled);
 		const key = entryKey(target.category, target.channel);
@@ -140,8 +131,6 @@ function PreferencesContent({
 				enabled: nextEnabled,
 			});
 			setSavedAt(Date.now());
-			// Sync the shared cache so a remount (or the notifications list) sees
-			// the new value instead of the stale pre-toggle list.
 			void invalidatePreferences(role);
 		} catch (e) {
 			setEnabled(target, !nextEnabled);
@@ -258,7 +247,6 @@ function ChannelSwitch({
 	onToggle: (next: boolean) => void;
 }) {
 	const locked = !entry.canDisable;
-	// Locked entries are always delivered: show them on whatever the stored flag.
 	const effectiveEnabled = locked ? true : entry.enabled;
 	return (
 		<label

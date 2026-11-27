@@ -16,8 +16,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// 本檔驗端點 28／29 的 Layer 5：兩支必須回**完全一樣**的形狀，
-// 以及 fail-closed 三態不得在 mapper 這一層被抹平。
 
 const (
 	raStoreID  = int64(2685914682)
@@ -91,9 +89,6 @@ func raServer(p domain.SellerTaxProfile) *InvoiceServer {
 	return NewInvoiceServer(nil, q, nil, nil, tp, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, zap.NewNop())
 }
 
-// ---------------------------------------------------------------------------
-// 端點 28
-// ---------------------------------------------------------------------------
 
 func TestGetSellerReceiptAuthorization_EligibleWithBasis(t *testing.T) {
 	s := raServer(raProfile(codemeta.SellerTaxReviewStatusApprovedInvoiceExempt.Value, raBasisKey))
@@ -155,9 +150,6 @@ func TestGetSellerReceiptAuthorization_RejectsMissingStore(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 端點 29
-// ---------------------------------------------------------------------------
 
 func TestConfirmSellerReceiptAuthorization_Success(t *testing.T) {
 	s := raServer(raProfile(codemeta.SellerTaxReviewStatusApprovedInvoiceExempt.Value, raBasisKey))

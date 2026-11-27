@@ -165,9 +165,7 @@ class _BuyerFloatingNavigationLayoutState
       return false;
     }
 
-    // A fast real-device flick can leave the top threshold during ballistic
     // scrolling, where ScrollUpdateNotification.dragDetails is null. Capture
-    // ownership at ScrollStart so that continuation still moves the Navbar.
     if (notification is ScrollStartNotification) {
       if (notification.dragDetails != null) {
         _beginUserScroll();
@@ -186,9 +184,6 @@ class _BuyerFloatingNavigationLayoutState
     }
 
     if (notification is ScrollUpdateNotification) {
-      // 程式性 jumpTo／animateTo 不具有 dragDetails；忽略它們，避免頁面還原
-      // 捲動位置時把 Navbar 誤判成使用者下滑。手指放開後的慣性捲動仍屬於
-      // 同一個使用者手勢，持續追蹤到 ScrollEnd。
       if (notification.dragDetails != null) _beginUserScroll();
       if (!_userScrollActive) return false;
       _consumeUserScrollDelta(notification.scrollDelta ?? 0);

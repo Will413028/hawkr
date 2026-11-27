@@ -18,9 +18,7 @@ func TestStatutoryDeadline_B2CFallsBetween48And72Hours(t *testing.T) {
 		paidUTC time.Time
 		wantH   float64
 	}{
-		// 台北 2026-08-30 00:00:00 ＝ UTC 2026-08-29 16:00:00
 		{"收款在台北當日 00:00（最寬鬆）", time.Date(2026, 8, 29, 16, 0, 0, 0, time.UTC), 72},
-		// 台北 2026-08-30 23:59:59
 		{"收款在台北當日 23:59:59（最保守）", time.Date(2026, 8, 30, 15, 59, 59, 0, time.UTC), 48},
 	}
 	for _, tc := range cases {
@@ -43,7 +41,7 @@ func TestStatutoryDeadline_B2CFallsBetween48And72Hours(t *testing.T) {
 }
 
 func TestStatutoryDeadline_KindDrivesDaysAndPresence(t *testing.T) {
-	d := InvoiceDateTaipei(time.Date(2026, 8, 29, 16, 0, 0, 0, time.UTC)) // 台北 08-30
+	d := InvoiceDateTaipei(time.Date(2026, 8, 29, 16, 0, 0, 0, time.UTC))
 
 	b2c, ok := StatutoryDeadline(d, codemeta.InvoiceDocumentKindB2c.Value)
 	if !ok {
@@ -56,7 +54,6 @@ func TestStatutoryDeadline_KindDrivesDaysAndPresence(t *testing.T) {
 	if diff := b2b.Sub(b2c); diff != 5*24*time.Hour {
 		t.Errorf("B2B 與 B2C 相差 %v，want 5 個自然日（7 − 2）", diff)
 	}
-	// chk_invdoc_deadline_presence 的另一半：RECEIPT 無法定期限。
 	if _, ok := StatutoryDeadline(d, codemeta.InvoiceDocumentKindReceipt.Value); ok {
 		t.Error("RECEIPT 不得有法定期限，否則 chk_invdoc_deadline_presence 當場 23514")
 	}
@@ -64,7 +61,6 @@ func TestStatutoryDeadline_KindDrivesDaysAndPresence(t *testing.T) {
 
 // 跨月／跨年不得因為「同月加天數」而算錯（time.Date 會自動進位，這一支釘住它）。
 func TestStatutoryDeadline_CrossesMonthAndYear(t *testing.T) {
-	// 台北 2026-12-31
 	d := InvoiceDateTaipei(time.Date(2026, 12, 30, 16, 0, 0, 0, time.UTC))
 	got, ok := StatutoryDeadline(d, codemeta.InvoiceDocumentKindB2b.Value)
 	if !ok {

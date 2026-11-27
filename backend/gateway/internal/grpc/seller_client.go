@@ -14,7 +14,7 @@ import (
 // SellerClient is the gRPC client for seller service
 type SellerClient struct {
 	conn   *grpc.ClientConn
-	client pb.SellerServiceClient // Reusing SellerServiceClient as proto is shared
+	client pb.SellerServiceClient
 }
 
 // NewSellerClient creates a new seller gRPC client

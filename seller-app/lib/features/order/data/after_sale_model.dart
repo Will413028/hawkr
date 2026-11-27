@@ -60,7 +60,6 @@ abstract class AfterSaleCase with _$AfterSaleCase {
     @Default([]) List<String> shipmentPhotoUrls,
     @Default([]) List<Map<String, dynamic>> evidence,
     @Default([]) List<AfterSaleResolution> resolutions,
-    // B-130 / backend issue #568：處理時限與平台接手狀態
     @Default('') String processDeadline,
     @Default(false) bool autoEscalated,
     @Default(0) int processDeadlineHours,
@@ -83,7 +82,6 @@ abstract class AfterSaleItem with _$AfterSaleItem {
     @Default('') String skuId,
     @Default('') String skuName,
     @Default('') String quantity,
-    // PayUni #758: 新欄位（成交單價 / 原價）
     @Default('') String unitPrice,
     @Default('') String listPrice,
 
@@ -163,7 +161,7 @@ class AfterSaleStatus {
   static final String rejected = AfterSaleCaseStatus.rejected.value;
   static final String cancelled = AfterSaleCaseStatus.cancelled.value;
   static final String cancelledByConfirmReceipt =
-      AfterSaleCaseStatus.cancelledByConfirmReceipt.value; // #1225
+      AfterSaleCaseStatus.cancelledByConfirmReceipt.value;
 
   /// 「已收退貨」終態集合 — 含手動 confirm(30) + 系統自動完成 (31/32)。
   /// 賣家側「已完成 tab」/ 退貨流程展開區應用此集合判斷，避免漏掉自動完成 case。

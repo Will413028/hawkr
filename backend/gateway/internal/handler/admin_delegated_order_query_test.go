@@ -17,13 +17,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-// §6.1.10 的 Query 契約是 page／page_size／status／keyword／date_from／date_to，但
-// Gateway 曾經只讀 status ——其餘三個被 gin 靜默丟掉：請求回 200、列表是全集、沒有任何
-// 錯誤訊號，操作者只會覺得「搜尋沒有作用」。沒有任何既有測試釘住這個參數集合，所以漏
-// 掉一個不會有東西轉紅（漏了三個也一樣）。
-//
-// 這支測試從「Gateway 真的送了什麼」下手，而不是看回應長什麼樣——後者在漏帶時完全
-// 正常，正是這個缺口無聲的原因。
 
 func newDelegatedOrderListRouter(t *testing.T) (*gin.Engine, *[]*orderpb.GetSellerOrdersRequest) {
 	t.Helper()
@@ -33,11 +26,6 @@ func newDelegatedOrderListRouter(t *testing.T) (*gin.Engine, *[]*orderpb.GetSell
 	})
 }
 
-// newDelegatedOrderListRouterReturning 讓呼叫端決定上游回什麼，給那些要驗**回應內容**
-// （而不只是驗送出去的請求）的測試用。
-//
-// 參數化而不是另起一份 router：session 落點與路由形狀是代行列表成立的前提，複製一份
-// 出去就會有兩份各自漂移的前提，而漂掉的那一份會安靜地測到另一條路徑上。
 func newDelegatedOrderListRouterReturning(t *testing.T, resp *orderpb.GetSellerOrdersResponse) (*gin.Engine, *[]*orderpb.GetSellerOrdersRequest) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
@@ -53,7 +41,6 @@ func newDelegatedOrderListRouterReturning(t *testing.T, resp *orderpb.GetSellerO
 
 	r := gin.New()
 	g := r.Group("/api/v1/admin")
-	// 真實路徑上 session 由 requireDelegated guard 放進 context；測試只需要同一個落點。
 	g.Use(func(c *gin.Context) {
 		middleware.SetDelegationSession(c, &accountpb.OperationSessionSummary{
 			SessionId: "2701445580000001",

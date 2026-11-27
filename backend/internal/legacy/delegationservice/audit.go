@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 )
 
-// 兩階段稽核與唯讀的查詢。
 
 func toIntentInput(m *pb.RecordAuditIntentRequest) (delegation.AuditIntentInput, bool) {
 	sessionID, ok := parseID(m.GetSessionId())
@@ -169,7 +168,6 @@ func (s *Server) ConfirmAuditResultBatch(ctx context.Context, req *connect.Reque
 	return connect.NewResponse(out), nil
 }
 
-// auditFilter 解析兩支稽核清單共用的篩選與分頁；失敗時回傳給操作者的訊息。
 func auditFilter(action, resourceType, result, from, to, page, pageSize string) (delegation.AuditLogFilter, delegation.DelegationPaging, string) {
 	f := delegation.AuditLogFilter{
 		Action: delegation.AuditAction(action), ResourceType: fromWire[delegation.AuditResourceType](resourceType), Result: delegation.AuditResult(result),
@@ -334,8 +332,6 @@ func (s *Server) ListSessions(ctx context.Context, req *connect.Request[pb.ListS
 	return connect.NewResponse(out), nil
 }
 
-// toAuditEntries 是稽核列對外的投影。action_label 由動作推導（表沒有這一欄）；resource_image_key 恆為空字串（舊的
-// intent 從來沒有寫入它，欄位已經拿掉）。resource_id 原樣回傳（訂單是訂單號；原本存不進 bigint 而是空字串）。
 func toAuditEntries(logs []delegation.AuditLog) []*pb.AuditLogEntry {
 	out := make([]*pb.AuditLogEntry, 0, len(logs))
 	for _, l := range logs {
@@ -384,8 +380,6 @@ func deref(s *string) string {
 	return *s
 }
 
-// failureReasonOfBizCode 是舊 gateway 送來的業務碼對應的 failure_reason：拒絕的碼對到拒絕的代碼（9265 是店家不存在；已關閉只在
-// 新路徑），其他（gateway 自己的業務碼）沒有對應的原因，寫 INTERNAL；原始數字另存在 biz_code 欄位，舊讀取照舊回它。
 func failureReasonOfBizCode(code int32) string {
 	if code == 0 {
 		return delegation.FailureReasonInternal
@@ -401,8 +395,6 @@ func failureReasonOfBizCode(code int32) string {
 	return delegation.FailureReasonInternal
 }
 
-// bizCodeOfLog 是稽核列回給舊 gateway 的業務碼：舊路徑寫的數字原樣回；新路徑的列沒有數字，由 failure_reason 的拒絕代碼對回舊碼
-// （ErrorReason 與 INTERNAL 沒有舊碼，回 0）。
 func bizCodeOfLog(l delegation.AuditLog) int32 {
 	if l.BizCode != nil {
 		return *l.BizCode

@@ -86,7 +86,6 @@ class CheckoutServiceStoreCodeTest {
         OrderGroupPreview group = previewSingleGroup(service);
 
         assertThat(group.getStoreCode()).isEqualTo(STORE_CODE);
-        // store_id 仍要在（結帳鏈後續步驟吃它），只是不再是連結的來源。
         assertThat(group.getStoreId()).isEqualTo(String.valueOf(STORE_ID));
     }
 
@@ -117,7 +116,6 @@ class CheckoutServiceStoreCodeTest {
     }
 
     private CheckoutService newServiceWithSellerMeta(SellerMeta sellerMeta) {
-        // 商品解析：單一可購買 SKU，賣家 = STORE_ID
         when(productGrpcClient.batchGetProductForCheckout(anyList()))
                 .thenReturn(BatchGetProductForCheckoutResponse.newBuilder()
                         .putData(SKU_ID, ProductForCheckoutInfo.newBuilder()
@@ -131,13 +129,11 @@ class CheckoutServiceStoreCodeTest {
                                 .build())
                         .build());
 
-        // 自買防護：賣家 principal 與買家不同；買家軸同樣要解析（issue #2789 階段 B2）
         when(sellerGrpcClient.resolvePrincipals(anyList()))
                 .thenReturn(PrincipalResolution.allResolved(Map.of(STORE_ID, STORE_ID)));
         when(buyerGrpcClient.resolvePrincipals(anyList()))
                 .thenReturn(PrincipalResolution.allResolved(Map.of(BUYER_ID, BUYER_ID)));
 
-        // 賣家已開通 7-11（requireSellerOnboarded 比對 "<method>:" 前綴）
         when(shippingGrpcClient.getSellerShippingConfig(anyLong()))
                 .thenReturn(GetSellerShippingConfigResponse.newBuilder()
                         .setCode(0)
@@ -161,8 +157,6 @@ class CheckoutServiceStoreCodeTest {
 
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
-        // preview 會呼叫 §6.2.4 order ② 的發票模式解析；本測試不驗發票區，
-        // 回 null 走「拿不到就不設 invoice 欄」那條路（與 invoice-service 不可用時同路徑）。
         when(invoiceGrpcClient.resolveOrderInvoiceMode(any())).thenReturn(null);
 
         return new CheckoutService(productGrpcClient, sellerGrpcClient, buyerGrpcClient, shippingGrpcClient,

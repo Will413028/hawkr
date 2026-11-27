@@ -107,17 +107,11 @@ func (c *Client) FinalizeEvidence(ctx context.Context, stagedTokens []string, ta
 	keys := make([]string, 0, len(stagedTokens))
 	assetIDs := make([]string, 0, len(stagedTokens))
 	for _, token := range stagedTokens {
-		// 一顆一顆換：pkg/media.FinalizeAndLink 是「finalize 一顆 ＋ link 一顆」的組合，
-		// 而 link 帶三次重試。批次一次送進 FinalizeImages 可以少幾次往返，但那條路上
-		// 沒有現成的「哪一顆失敗了」回報 ⇒ 部分成功會變成整批看起來失敗，而已轉正的
-		// 那幾顆已經有 asset_reference、不會被 GC 回收。
 		info, err := pkgmedia.FinalizeAndLink(ctx, c.stub, token, RefType, refID)
 		if err != nil {
 			return nil, nil, fmt.Errorf("invoice: finalize tax evidence: %w", err)
 		}
 		if info.ObjectKey == "" {
-			// 空 objectKey 寫進 evidence_object_keys 會讓 T02 的守衛（至少一項）成立，
-			// 而那一項下載不到任何東西 ⇒ 當成失敗，不要放行。
 			return nil, nil, fmt.Errorf("invoice: media returned empty object_key for staged token")
 		}
 		keys = append(keys, info.ObjectKey)
@@ -150,8 +144,6 @@ func (c *Client) FinalizeUnlockEvidence(ctx context.Context, stagedToken string,
 		return "", fmt.Errorf("invoice: finalize unlock evidence (operation %d): %w", operationID, err)
 	}
 	if info.ObjectKey == "" {
-		// 空 objectKey 落進 cancel_evidence_object_key 會讓覆核者看到一個
-		// 下載不到任何東西的證據——那比沒有證據更糟（它看起來有）。
 		return "", fmt.Errorf("invoice: media returned empty object_key for unlock evidence (operation %d)", operationID)
 	}
 	return info.ObjectKey, nil
@@ -215,8 +207,6 @@ func (c *Client) UploadSecure(ctx context.Context, data []byte, filename, conten
 		return "", fmt.Errorf("media: ServerUploadSecureAndFinalize code=%d msg=%s", resp.GetCode(), resp.GetMessage())
 	}
 	if resp.GetObjectKey() == "" {
-		// code=0 但沒有 key ＝ 對端契約破了。回錯誤而不是存一個空 key——後者會讓
-		// pdf_object_key 變成空字串，而「有值但下載不到」比「沒有值」更難診斷。
 		return "", fmt.Errorf("media: ServerUploadSecureAndFinalize 回 code=0 但 object_key 為空")
 	}
 	return resp.GetObjectKey(), nil
@@ -271,12 +261,6 @@ func (c *Client) readSecure(ctx context.Context, objectKey, refType, refID strin
 	if err != nil {
 		return nil, "", "", err
 	}
-	// 🔴 media 把業務失敗放在**回應的 code**（gRPC 狀態是 OK）：MediaServiceException 被
-	// MediaGrpcService 接住後回 code=404／400，不會是 gRPC NOT_FOUND。判斷必須看 body code。
-	// 「物件不存在」與「media 掛了」對呼叫端是兩件事：前者代表 asset_reference 沒建成、
-	// GC 已經刪掉實體（§8.1.5(e)），是 M15 的定義；後者是暫時性故障。
-	// 查無與三元組不符對端回同一個碼（403／404），與單體 media adapter 同一個映射；
-	// 不是機敏資產（400）是另一件事——資料錯置而不是缺件。
 	switch code := resp.GetCode(); code {
 	case 0:
 	case 403, 404:
@@ -287,8 +271,6 @@ func (c *Client) readSecure(ctx context.Context, objectKey, refType, refID strin
 		return nil, "", "", fmt.Errorf("media: ServerReadSecureAsset code=%d msg=%s", code, resp.GetMessage())
 	}
 	if len(resp.GetFileData()) == 0 {
-		// code=0 但零位元組 ＝ 對端契約破了。回錯誤而不是把空檔往下送——
-		// 後者的症狀是「買家下載到一個 0 bytes 的 PDF」，比 5xx 難診斷得多。
 		return nil, "", "", fmt.Errorf("media: ServerReadSecureAsset 回 code=0 但 file_data 為空")
 	}
 	return resp.GetFileData(), resp.GetContentType(), resp.GetFilename(), nil

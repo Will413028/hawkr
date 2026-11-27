@@ -10,23 +10,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// ---------------------------------------------------------------------------
-// INV.trk —— 字軌餘量巡檢（§4.5.10、§7.5.3、§8.2.3 M9／M10／M21／M24）
-//
-// 這支是「向第三方取回我方沒有的資訊」（§乙類），**不是** reconciliation：它不比對
-// 兩份資料、不回填、不修正，只把光貿那側的字軌狀態變成我方的指標。
-//
-// 🔴 它先前**完全不存在**，而 SQL、repository 方法、config env、告警規則全都寫好了
-// ⇒ 三條告警（InvoiceTrackBalanceLow／Exhausted／NextPeriodInsufficient）從上線那天
-// 起就結構上不可能觸發（#2969／#2959）。
-//
-// 為什麼沒有候選集合租約（§4.3.3 line 850 逐字）：它掃的是 invoice_provider_accounts
-// 中 status='ACTIVE' 的**全集**，不帶租約欄。§7.5.4 給的 ClaimLease=10min 避免的是
-// 「同一輪掃描被重複啟動」，**不承擔正確性** —— 多副本同時跑最多是多打幾次 AMEGO，
-// 指標是 Set 不是 Add，不會疊加。
-// ---------------------------------------------------------------------------
 
-// 一本字軌 50 張（財政部配號單位）。M24 的「下期本數 × 50」逐字用它。
 const numbersPerBooklet = 50
 
 // TrackScanner 是 INV.trk 需要的出站面。用窄介面讓測試不必架整個 amego client。
@@ -89,13 +73,6 @@ func NewTrack(
 	}
 }
 
-// remainingNumbers 逐字取自 §4.5.10 的規格碼。
-//
-// `now == ""` 代表**尚未配過號**（實測會出現），此時整段都還沒用 ⇒ end-start+1。
-// 已配過號時 `now` 是「下一張要用的號碼」的前一張 ⇒ 剩餘是 end-now。
-//
-// 🔴 不要改成用 TotalBooklet-UsedBooklet 推算：那兩欄在 track_all 的 layer 3 上
-// 不保證有值（官方的平坦欄位表沒有表達巢狀結構），而 Start/End/Now 是必有的。
 func remainingNumbers(t amego.Track) int64 {
 	start, _ := strconv.ParseInt(t.Start, 10, 64)
 	end, _ := strconv.ParseInt(t.End, 10, 64)
@@ -106,11 +83,6 @@ func remainingNumbers(t amego.Track) int64 {
 	return end - now
 }
 
-// autoAssignedTracks 從 track_all 的三層巢狀結構裡挑出「自動配號」那一類。
-//
-// 三層是 1 財政部配給 → 2 給光貿用 → 3 發票字軌列表；自動配號的字軌是
-// **layer 3 且 category == 1**（§4.5.10）。官方的平坦欄位表沒有表達這個結構，
-// 直接把頂層當清單用會把「財政部配給總量」誤當成「可用字軌」。
 func autoAssignedTracks(roots []amego.Track) []amego.Track {
 	var out []amego.Track
 	var walk func([]amego.Track)
@@ -128,7 +100,6 @@ func autoAssignedTracks(roots []amego.Track) []amego.Track {
 	return out
 }
 
-// exhausted 判定當期字軌已用盡（M21）：剩餘為 0，或字軌 status ∈ {3 過期, 9 用畢}。
 func exhausted(t amego.Track) bool {
 	return remainingNumbers(t) <= 0 || t.Status == 3 || t.Status == 9
 }
@@ -147,11 +118,10 @@ func (u *Track) RunOnce(ctx context.Context) error {
 
 	now := u.now()
 	curYear, curPeriod := domain.AmegoPeriod(now)
-	// 下一期：往後推兩個月再換算，避開自己做 period+1 的跨年進位。
 	nextYear, nextPeriod := domain.AmegoPeriod(now.AddDate(0, 2, 0))
 
 	var (
-		remainingMin  int64 = -1 // -1 ＝ 還沒有任何一家成功量到
+		remainingMin  int64 = -1
 		low           int64
 		exhaustedCnt  int64
 		nextInsuff    int64
@@ -182,16 +152,6 @@ func (u *Track) RunOnce(ctx context.Context) error {
 		if res.nextInsufficient {
 			nextInsuff++
 		}
-		// J33：這位 issuer 的字軌餘量恢復了 ⇒ 把他卡在 SELLER_ACTION_REQUIRED 的
-		// 票推回 READY（#3089 A 組第 3 項：在此之前這條邊零執行者）。
-		//
-		// 🔴 判準是「**現在**量得到餘量」而不是「這次掃描沒失敗」：掃描失敗那一支已經
-		// `continue` 掉了，走到這裡代表 remaining 是真的量出來的數（memory
-		// `feedback_no_blind_measurement`：量不到不等於量到 0）。
-		//
-		// **不需要 claim／lease**：集合式 UPDATE、無外部副作用（AMEGO 的字軌查詢是
-		// scanOne 本職、已經做完），推出候選集合的寫入就是狀態轉移本身 ⇒ 第二個副本
-		// rows=0。《多副本排程搶佔規範》例外 A，形態同 J05／J09。
 		promoted += u.promoteRecovered(ctx, acct.IssuerID, res, now)
 	}
 
@@ -211,10 +171,6 @@ func (u *Track) RunOnce(ctx context.Context) error {
 	return nil
 }
 
-// promoteRecovered 執行 J33。回推回去的列數（0 是常態：多數賣家從來沒卡過）。
-//
-// 🔴 **失敗不中止整輪掃描**：J33 是附加的復原動作，它壞掉不該讓字軌監控（本 worker
-// 的主職）連帶停擺。但**必須留痕**，否則「票沒有被放行」在下一次發生時無從診斷。
 func (u *Track) promoteRecovered(ctx context.Context, issuerID int64, res trackScanResult, now time.Time) int64 {
 	if u.ops == nil || res.exhausted || res.remaining <= 0 {
 		return 0
@@ -242,10 +198,6 @@ type trackScanResult struct {
 	nextInsufficient bool
 }
 
-// scanOne 打兩次 track_all（本期與下期），算出這一家的三個判定。
-//
-// 🔴 AppKey 明文的活動範圍只到 WithDecryptedCredential 的 callback：不回傳、不 log、
-// 不進任何 struct 欄位（同 submit.go 的紀律）。
 func (u *Track) scanOne(
 	ctx context.Context, acct domain.ProviderAccount,
 	curYear, curPeriod, nextYear, nextPeriod int,
@@ -260,8 +212,6 @@ func (u *Track) scanOne(
 		}
 		curTracks := autoAssignedTracks(cur)
 
-		// 本期剩餘＝所有自動配號字軌的剩餘和；已用盡＝**每一段都用盡**。
-		// 用 all 而不是 any：一家可以同時持有多段字軌，其中一段用完不代表開不了票。
 		var remaining int64
 		allExhausted := len(curTracks) > 0
 		for _, t := range curTracks {
@@ -274,7 +224,6 @@ func (u *Track) scanOne(
 			}
 		}
 		out.remaining = remaining
-		// 一段都沒有 ⇒ 也是用盡（而且是更糟的一種：連配號都沒有）。
 		out.exhausted = allExhausted || len(curTracks) == 0
 
 		next, err := u.amego.ListTracks(ctx, cred, nextYear, nextPeriod)
@@ -285,8 +234,6 @@ func (u *Track) scanOne(
 		for _, t := range autoAssignedTracks(next) {
 			nextBooklets += int64(t.TotalBooklet)
 		}
-		// M24：下期本數 × 50 < 本期實際開立 ×(1＋headroom)。
-		// 本期實際開立＝本期配到的總量 − 剩餘。
 		var curTotal int64
 		for _, t := range curTracks {
 			s, _ := strconv.ParseInt(t.Start, 10, 64)

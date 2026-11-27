@@ -15,13 +15,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// #2444 授權列治理七支端點的契約。
-//
-// 這裡守的每一條，壞掉之後後端仍然回 200：ADM 的 parser 會在解析階段把整份回應判成
-// 契約錯誤（502），管理員看到的是「載入失敗」而 log 裡什麼都沒有。純靠 review 看不出
-// 少一個 omitempty 的後果，只有機械斷言擋得住。
 
-// ==================== stub ====================
 
 type authorizationStub struct {
 	accountpb.DelegationServiceClient
@@ -137,7 +131,6 @@ func validGrantBody(extra string) string {
 		`"grantedCapabilities":["products.read","products.write"],"operationReason":"依合約開通商品代管"` + extra + `}`
 }
 
-// ==================== 形狀契約 ====================
 
 // 欄位集合全等。多一欄：任何憑證／PII 被誰加進來時這裡轉紅。少一欄：ADM 的 parser
 // 在必填欄缺席時整份判 502，面板打不開。
@@ -176,7 +169,6 @@ func TestDelegationAuthorizationData_NullableFieldsSurvive(t *testing.T) {
 		}
 	}
 
-	// 有值時原樣帶出，不得被改寫成別的形狀。
 	withValues := sampleAuthorization()
 	withValues.EffectiveUntil = proto.String("2026-12-31T23:59:59Z")
 	withValues.RevokedAt = proto.String("2026-09-01T00:00:00Z")
@@ -244,7 +236,6 @@ func TestDelegationAuthorizationHistoryEntry_KeySet(t *testing.T) {
 	}
 }
 
-// ==================== 1｜能力目錄 ====================
 
 // 目錄必須涵蓋全部九值、依宣告順序、每一項都帶 risk 與 dependsOn（後者恆為陣列）。
 // 少任何一項，ADM 的勾選畫面就少一個能力而沒有任何錯誤；dependsOn 是 null 的話連動
@@ -282,13 +273,11 @@ func TestListDelegationCapabilities_Catalog(t *testing.T) {
 	if got := byValue["media.upload"]; got.Risk != "low" || len(got.DependsOn) != 0 {
 		t.Errorf("media.upload 必須是 low 且無依賴，實際 %+v", got)
 	}
-	// 無依賴者序列化成 []，不是 null。
 	if !strings.Contains(string(data), `"value":"orders.read","risk":"high","dependsOn":[]`) {
 		t.Errorf("無依賴的能力必須輸出 dependsOn:[]；JSON=%s", data)
 	}
 }
 
-// ==================== 身分 ====================
 
 // 七支全部掛在 ADM host 組：身分缺席一律 9261／401，絕不出現 www host 組的 9274。
 func TestDelegationAuthorizationEndpoints_RequireAdminIdentity(t *testing.T) {
@@ -322,7 +311,6 @@ func TestDelegationAuthorizationEndpoints_RequireAdminIdentity(t *testing.T) {
 	}
 }
 
-// ==================== 4｜開通的值域 ====================
 
 func TestGrantDelegationAuthorization_BodyValidation(t *testing.T) {
 	cases := []struct {
@@ -432,7 +420,6 @@ func TestGrantDelegationAuthorization_BodyValidation(t *testing.T) {
 			if code != tc.wantCode {
 				t.Fatalf("業務碼應為 %d，實際 %d", tc.wantCode, code)
 			}
-			// 被擋下的請求一律不得抵達領域服務：驗證的意義正是「在稽核與寫入之前失敗」。
 			if len(stub.grants) != 0 {
 				t.Fatalf("驗證失敗的請求仍被送往 delegation 模組：%v", stub.grants[0])
 			}
@@ -513,7 +500,6 @@ func TestGrantDelegationAuthorization_AbsentEffectiveUntilStaysUnset(t *testing.
 	}
 }
 
-// ==================== 3｜單店詳情 ====================
 
 func TestGetDelegationAuthorization_LookupShape(t *testing.T) {
 	w, c := newDelegationTestContext(t, http.MethodGet,
@@ -556,7 +542,6 @@ func TestGetDelegationAuthorization_NotGrantedIsNotAnError(t *testing.T) {
 	}
 }
 
-// emptyLookupStub 只覆寫單店查詢，回一個沒有授權列也沒有計數的回應。
 type emptyLookupStub struct {
 	accountpb.DelegationServiceClient
 }
@@ -568,7 +553,6 @@ func (s *emptyLookupStub) GetDelegationAuthorization(ctx context.Context, in *ac
 	}, nil
 }
 
-// ==================== 2／7｜分頁與篩選 ====================
 
 func TestListDelegationAuthorizations_QueryValidation(t *testing.T) {
 	cases := []struct {
@@ -650,7 +634,6 @@ func TestListDelegationAuthorizations_ForwardsFilters(t *testing.T) {
 	}
 }
 
-// ==================== 5／6｜寫入路徑的共通值域 ====================
 
 func TestUpdateAndRevokeDelegationAuthorization_Validation(t *testing.T) {
 	t.Run("update 的 storeId 走 path，格式錯即 9260", func(t *testing.T) {
@@ -737,7 +720,6 @@ func TestUpdateAndRevokeDelegationAuthorization_Validation(t *testing.T) {
 		if keys := delegationJSONKeys(t, data); strings.Join(keys, ",") != "alreadyRevoked,authorization,revokedSessionIds" {
 			t.Fatalf("撤回回應欄位集合漂移，實際 keys=%v", keys)
 		}
-		// 上游沒給時仍必須是 []：UI 要拿它算「已同時中止 N 個工作階段」。
 		if !strings.Contains(string(data), `"revokedSessionIds":[]`) {
 			t.Fatalf("revokedSessionIds 必須是 []，實際 %s", data)
 		}
@@ -768,8 +750,6 @@ func TestUpdateAndRevokeDelegationAuthorization_Validation(t *testing.T) {
 func TestDelegationCapabilityCatalogIsAdminOnlyByDesign(t *testing.T) {
 	h := &Holder{}
 
-	// 有身分即可取得完整目錄——不需要任何 allowlist，也不需要任何 gRPC client
-	// （h.deps 為零值，若實作偷偷加了下游呼叫，這裡會 panic 或非 200）。
 	w, c := newDelegationTestContext(t, http.MethodGet,
 		"/api/v1/admin/delegated-operations/capabilities", "")
 	c.Set("accountId", int64(2661027599))

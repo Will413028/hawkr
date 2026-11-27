@@ -109,7 +109,6 @@ func TestBuyerPortsVIPComesFromTheCRMModule(t *testing.T) {
 		}
 		return true
 	})
-	// httpapi.Deps.CRM（對外入口）、httpbuyer.Ports.CRM 與 worker 的 crmconsumer.Consumer.CRM。
 	if found != 3 {
 		t.Fatalf("main.go 的 CRM 欄位收到 crmModule 的次數是 %d，預期 3（Deps.CRM、Ports.CRM、crmconsumer.Consumer.CRM）", found)
 	}

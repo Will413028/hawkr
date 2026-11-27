@@ -140,10 +140,7 @@ class SellerQuoteForm extends _$SellerQuoteForm {
     return SellerQuoteFormState(
       publication: detail.publication,
       sellerFacingPayload: detail.sellerFacingPayload,
-      // 讀回優先序：草稿 → 最新正式回價 → 空白表單。
-      // ⛔ 空白表單就是空白：不帶入任何「上次報價的品相」。
       quote: draft ?? existing ?? const SellerQuotePayload(),
-      // 兩個 CAS 都由詳情推導，缺 key 就是空字串。
       draftVersion: detail.expectedDraftVersion,
       latestResponse: detail.latestResponse,
     );
@@ -153,9 +150,6 @@ class SellerQuoteForm extends _$SellerQuoteForm {
 
   void _set(SellerQuoteFormState next) => state = AsyncData(next);
 
-  // ---------------------------------------------------------------------------
-  // 表單編輯
-  // ---------------------------------------------------------------------------
 
   /// 換掉整份 payload（欄位 widget 的 onChanged 都走這裡）。
   ///
@@ -198,9 +192,6 @@ class SellerQuoteForm extends _$SellerQuoteForm {
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // 命令
-  // ---------------------------------------------------------------------------
 
   /// 存草稿。可不限次改；不計正式一次，也不驗金額恆等式。
   ///
@@ -346,9 +337,6 @@ class SellerQuoteForm extends _$SellerQuoteForm {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------
 
   void _afterCommandFailure(
     SellerQuoteFormState current,
@@ -387,7 +375,6 @@ class SellerQuoteForm extends _$SellerQuoteForm {
         ? '這次送出與先前那一次是同一筆，已回到第 $version 版。'
         : '已送出第 $version 版報價。';
     if (!response.outsideBuyerRequestedRange) return base;
-    // ⛔ 只標示。不得據此篡改賣家金額，也不得阻擋送出。
     return '$base你的報價落在買家原本說明的範圍之外，仍然已經送出，買家會看到它。';
   }
 
@@ -401,7 +388,6 @@ class SellerQuoteForm extends _$SellerQuoteForm {
     return SellerQuoteNotice(
       message: errorText(e, defaults: ref.read(defaultErrorTextProvider)),
       tone: SellerQuoteNoticeTone.error,
-      // 依據已過期（詢價或報價已改版、報價已過有效期）：必須先重新載入，不得靜默改送最新版。
       requiresReload:
           reason == ErrorReason.VERSION_CONFLICT ||
           reason == ErrorReason.RFQ_RESPONSE_EXPIRED,

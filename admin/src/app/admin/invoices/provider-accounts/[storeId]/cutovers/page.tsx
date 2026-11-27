@@ -20,26 +20,6 @@ import { ApiClientError } from "@/services/api-error";
 import "@/styles/pages/Invoice.css";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 
-// A09｜AMEGO 啟用切點與版本歷程（58A §A09，端點 46
-// `GET /api/v1/admin/invoices/provider_accounts/{store_id}/cutovers`）。
-//
-// ## 完全唯讀，而且「不畫」比「畫成 disabled」重要
-//
-// 這一頁一顆會發出寫入請求的按鈕都沒有，也**完全不提供「批次重分類」入口**——不是
-// 做成 disabled 的按鈕，是根本不畫。disabled 會讓人去問「怎樣才能啟用它」，而正確
-// 答案是「永遠不行」：已付款訂單的開票方式在付款當下就寫死了，不隨賣家後續狀態回溯
-// 改寫（`InvoiceFulfillmentMode` 的碼表描述逐字）。修改切點的入口在 A04。
-//
-// 本頁也**完全不碰 `pendingOrderCount`**：那是 A04 停用流程的數字，出現在這裡會被
-// 讀成「這些訂單會被重新分類」。
-//
-// ## 排序：後端給什麼就照什麼順序畫
-//
-// 58A 寫「依 `cutoverAt` 遞減」，而後端的 SQL 是 `ORDER BY created_at DESC, id DESC`
-// （`services/invoice-service/db/queries/invoice_provider_cutovers.sql`）。
-// 前端**不重排**：端點是分頁的，前端排序只排得到當前頁，做出來的是一個看起來像
-// 全域排序、其實不是的東西（A04 列表頁「不做表頭排序」記的是同一件事）。
-// 兩個時間欄都印出來，差異在畫面上看得見。
 
 const PROVIDER_ACCOUNTS_ENDPOINT = "/api/v1/admin/invoices/provider_accounts";
 const PAGE_SIZE = 20;
@@ -83,9 +63,6 @@ export default function ProviderCutoversPage() {
 		},
 	});
 
-	// 9330（404）＝ 這個賣家根本沒設過 AMEGO 連線，與「設過但還沒設切點」是兩件事
-	// （後端 `ListProviderCutoversForAdmin` 的註解逐字）：前者要去看 A04 的串接狀態，
-	// 後者是空清單。回一句共用的「查無資料」會把前者顯示成後者。
 	const notFound =
 		isError && error instanceof ApiClientError && error.code === 9330;
 
@@ -201,11 +178,7 @@ export default function ProviderCutoversPage() {
 										{item.createdByAccountId
 											? `管理員（${item.createdByAccountId}）`
 											: "未記錄操作者"}
-										{/*
-										 * ADM 沒有 displayName 查詢端點 ⇒ 照代行系列
-										 * `sessionRevokedByText` 的既有做法印數字 id。
-										 * email 會換、id 不會，所以 id 才是可追溯的那一個。
-										 */}
+
 									</>
 								),
 								body: (

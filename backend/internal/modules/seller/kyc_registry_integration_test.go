@@ -22,13 +22,11 @@ import (
 	. "github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
-// fakeRegistry 是登記資料來源的替身：回應照順序消耗（沒有排定的回應是查無），每次呼叫都確認不在 DB transaction 內、有 deadline。
 type fakeRegistry struct {
 	t       *testing.T
 	mu      sync.Mutex
 	replies []registryReply
 	calls   []string
-	// onLookup 在呼叫進行中執行，用來製造「呼叫期間別的查詢先寫入」的交錯。
 	onLookup func()
 }
 
@@ -75,7 +73,6 @@ func (r *fakeRegistry) callCount() int {
 
 var errRegistryDown = errors.New("連線被重設")
 
-// matchingRegistration 是與 companySubmission 填的申請完全一致的登記資料（名稱、地址、日期都用另一種寫法：臺、全形數字）。
 func matchingRegistration() gcis.Registration {
 	return gcis.Registration{
 		Source: gcis.SourceCompany, TaxID: taxIDOne, Name: "範例小農有限公司", Address: "臺北市中正區中山路２號", SetupDate: time.Date(2015, 3, 4, 0, 0, 0, 0, time.UTC),
@@ -83,7 +80,6 @@ func matchingRegistration() gcis.Registration {
 	}
 }
 
-// companySubmission 開店、建立並送出一份公司型申請（名稱、型態、設立日期、地址都填，對得上 matchingRegistration）。
 func (f *fixture) companySubmission(t *testing.T, mutate func(*KYCDraftInput)) (int64, Store, KYCApplication) {
 	t.Helper()
 	accountID, s := f.open(t)
@@ -98,7 +94,6 @@ func (f *fixture) companySubmission(t *testing.T, mutate func(*KYCDraftInput)) (
 	return accountID, s, sub
 }
 
-// checkIDs 回傳申請的全部登記資料查詢，依 seq。
 func (f *fixture) checkIDs(t *testing.T, applicationID uuid.UUID) []uuid.UUID {
 	t.Helper()
 	ctx := context.Background()
@@ -117,7 +112,6 @@ func (f *fixture) checkIDs(t *testing.T, applicationID uuid.UUID) []uuid.UUID {
 	return out
 }
 
-// requery 是後台重新查詢，只看有沒有錯誤（回傳的進行中的查詢另有測試看）。
 func (f *fixture) requery(ctx context.Context, in RequeryKYCRegistrationInput) error {
 	_, err := f.module.RequeryKYCRegistration(ctx, in)
 	return err
@@ -165,7 +159,6 @@ func TestCompanySubmitCreatesAPendingCheckAndEnqueuesTheJob(t *testing.T) {
 	if f.jobs.count("seller.kyc_registry_check") != 1 {
 		t.Fatal("個人型排入了查詢 job")
 	}
-	// 查詢還沒完成：後台沒有結果可顯示，但標示查詢中；etag 的查詢序號是 0。
 	view := f.adminView(t, sub.ID)
 	if view.RegistrationCheck != nil || view.PendingRegistrationCheck == nil {
 		t.Fatalf("view=%+v pending=%v", view.RegistrationCheck, (view.PendingRegistrationCheck != nil))
@@ -206,7 +199,6 @@ func TestRegistryCheckFoundStoresTheSnapshotAndComparesField(t *testing.T) {
 func TestRegistryCheckRecordsMismatchedAndUnverifiableFields(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
-	// 申請：名稱與登記不同、設立日期與登記不同、地址的鄉鎮市區與登記不同。
 	_, _, sub := f.companySubmission(t, func(in *KYCDraftInput) {
 		in.CompanyName = ptr("範例農產有限公司")
 		in.CompanyRegisterDate = ptr("2015-03-05")
@@ -227,7 +219,6 @@ func TestRegistryCheckRecordsMismatchedAndUnverifiableFields(t *testing.T) {
 	if c.Registration.OrganizationType != matchingRegistration().OrganizationType {
 		t.Fatalf("快照保留登記的組織型態：%+v", c.Registration)
 	}
-	// 無法比對：地址拆不開（科學園區）、來源沒有設立日期；來源沒有組織型態也不產生比對結果（申請不填組織型態）。
 	_, _, sub2 := f.companySubmission(t, nil)
 	reg := matchingRegistration()
 	reg.Address, reg.SetupDate, reg.OrganizationType = "新竹科學園區新竹市力行六路8號", time.Time{}, ""
@@ -240,7 +231,6 @@ func TestRegistryCheckRecordsMismatchedAndUnverifiableFields(t *testing.T) {
 	if c.Registration.TownCode != "" || c.Registration.AddressDetail != "" || c.Registration.Address != "新竹科學園區新竹市力行六路8號" {
 		t.Fatalf("拆不開時只有原文：%+v", c.Registration)
 	}
-	// 申請沒有填的欄位（日期、地址）也是無法比對，不是不一致。
 	_, _, sub3 := f.companySubmission(t, func(in *KYCDraftInput) {
 		in.CompanyRegisterDate, in.CompanyTownCode, in.CompanyAddressDetail = nil, nil, nil
 	})
@@ -268,7 +258,6 @@ func TestRegistryCheckUnknownStatusKeepsTheTextAndNeverChangesTheApplication(t *
 	if view.Status != KYCStatusSubmitted || view.Version != sub.Version {
 		t.Fatalf("比對改動了申請：status=%s version=%d", view.Status, view.Version)
 	}
-	// 對照以外的值（空字串）不是有效的分類：落在 UNKNOWN。
 	_, _, sub2 := f.companySubmission(t, nil)
 	reg.StatusText = ""
 	f.registry.reply(reg, true, nil)
@@ -310,7 +299,6 @@ func TestRegistryCheckRetriesTransientFailuresAndWritesUnavailableOnTheFinalAtte
 	if c := view.RegistrationCheck; c == nil || c.Outcome != RegistrationUnavailable || c.Registration != nil {
 		t.Fatalf("check=%+v", c)
 	}
-	// 沒有分類的錯誤與呼叫方取消：不是最後一次時不寫入（由 River 重試），最後一次一律寫 UNAVAILABLE，不留 PENDING。
 	for name, cause := range map[string]error{"未分類的錯誤": errRegistryDown, "呼叫方取消": context.Canceled} {
 		_, _, sub2 := f.companySubmission(t, nil)
 		id2 := f.checkIDs(t, sub2.ID)[0]
@@ -360,14 +348,13 @@ func TestRegistryCheckResultIsNeverOverwritten(t *testing.T) {
 	late := matchingRegistration()
 	late.Name = "後來才到的另一個名稱有限公司"
 	f.registry.reply(late, true, nil)
-	f.runCheck(t, id) // 已經不是 PENDING：認領就結束，不呼叫資料來源
+	f.runCheck(t, id)
 	if got := f.adminView(t, sub.ID).RegistrationCheck.Registration.Name; got != "範例小農有限公司" {
 		t.Fatalf("結果被覆寫：%q", got)
 	}
 	if f.registry.callCount() != 1 {
 		t.Fatalf("已完成的查詢又呼叫了資料來源：%d", f.registry.callCount())
 	}
-	// 呼叫期間（認領之後、寫入之前）別人先寫入了結果：這次的結果擋下。
 	_, _, sub2 := f.companySubmission(t, nil)
 	id2 := f.checkIDs(t, sub2.ID)[0]
 	slow := matchingRegistration()
@@ -407,7 +394,6 @@ func TestAdminViewShowsTheLatestCompletedCheckAndRequerySupersedesAPendingOne(t 
 	if view.RegistrationCheck != nil || view.PendingRegistrationCheck == nil {
 		t.Fatalf("第二個查詢中：check=%+v pending=%v", view.RegistrationCheck, (view.PendingRegistrationCheck != nil))
 	}
-	// 被取代的舊 job 之後認領：不是 PENDING，直接結束，不呼叫資料來源，也不覆寫。
 	calls := f.registry.callCount()
 	f.runCheck(t, first)
 	if f.registry.callCount() != calls || f.checkOutcome(t, first) != "CANCELLED" {
@@ -546,7 +532,7 @@ func TestRequeryRegistrationRules(t *testing.T) {
 	f.registry.reply(matchingRegistration(), true, nil)
 	f.runCheck(t, f.checkIDs(t, sub.ID)[0])
 	before := f.jobs.count("seller.kyc_registry_check")
-	must(t, requery(sub.ID)) // 沒有查詢中的 → 新增第二個（沒有東西可取代）
+	must(t, requery(sub.ID))
 	if got := f.checkIDs(t, sub.ID); len(got) != 2 || f.jobs.count("seller.kyc_registry_check") != before+1 {
 		t.Fatalf("checks=%v jobs=%d", got, f.jobs.count("seller.kyc_registry_check"))
 	}
@@ -556,7 +542,7 @@ func TestRequeryRegistrationRules(t *testing.T) {
 	if kind != "ADMIN_REQUERY" || admin != 7 {
 		t.Fatalf("kind=%s admin=%d", kind, admin)
 	}
-	must(t, requery(sub.ID)) // 這一輪已有查詢中的 → 取代它（CANCELLED）再新增第三個
+	must(t, requery(sub.ID))
 	got := f.checkIDs(t, sub.ID)
 	if len(got) != 3 || f.checkOutcome(t, got[1]) != "CANCELLED" || f.checkOutcome(t, got[2]) != "PENDING" {
 		t.Fatalf("取代失敗：%v", got)
@@ -564,7 +550,6 @@ func TestRequeryRegistrationRules(t *testing.T) {
 	if err := f.requery(ctx, RequeryKYCRegistrationInput{ApplicationID: sub.ID}); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("沒有管理員：%v", err)
 	}
-	// 核准之後不能再查。
 	view := f.adminView(t, sub.ID)
 	_, err := f.module.ApproveKYC(ctx, ApproveKYCInput{ApplicationID: sub.ID, ExpectedVersion: view.Version, ExpectedCheckSeq: view.RegistrationCheckSeq(), AdminID: 9})
 	must(t, err)
@@ -581,11 +566,10 @@ func TestApproveWithAStaleCheckSeqConflictsAndTheNewOneRecordsTheCheck(t *testin
 	_, _, sub := f.companySubmission(t, nil)
 	f.registry.reply(matchingRegistration(), true, nil)
 	f.runCheck(t, f.checkIDs(t, sub.ID)[0])
-	seen := f.adminView(t, sub.ID) // 審核員看到 seq 1
+	seen := f.adminView(t, sub.ID)
 	if seen.RegistrationCheckSeq() != 1 {
 		t.Fatalf("seq=%d", seen.RegistrationCheckSeq())
 	}
-	// 之後重新查詢完成了 seq 2。
 	must(t, f.requery(ctx, RequeryKYCRegistrationInput{ApplicationID: sub.ID, AdminID: 7}))
 	f.registry.reply(gcis.Registration{}, false, nil)
 	f.runCheck(t, f.checkIDs(t, sub.ID)[1])
@@ -615,7 +599,6 @@ func TestApproveWithAStaleCheckSeqConflictsAndTheNewOneRecordsTheCheck(t *testin
 	if refSeq != 2 {
 		t.Fatalf("核准依據的查詢 seq=%d", refSeq)
 	}
-	// 其他審核紀錄（送件）沒有引用；核准的那一筆帶出依據的序號與查詢時間。
 	var approve KYCReview
 	for _, r := range approved.Reviews {
 		if r.Action == ReviewApprove {
@@ -637,7 +620,7 @@ func TestApproveAndRejectWithoutAFinishedCheckRecordNoReference(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	_, _, sub := f.companySubmission(t, nil) // 查詢還在 PENDING
+	_, _, sub := f.companySubmission(t, nil)
 	_, err := f.module.RejectKYC(ctx, RejectKYCInput{ApplicationID: sub.ID, ExpectedVersion: sub.Version, ExpectedCheckSeq: 0, AdminID: 9, Issues: anIssue(), Reason: "資料不齊"})
 	must(t, err)
 	_, _, individual := f.submitted(t)
@@ -692,7 +675,6 @@ func TestPurgeDeletesRegistrationChecksAndKeepsTheReviews(t *testing.T) {
 	if got := f.count(t, "SELECT count(*) FROM seller.kyc_reviews WHERE application_id=$1 AND registration_check_id IS NULL", sub.ID); got < 2 {
 		t.Fatalf("審核紀錄被刪或引用沒有置 NULL：%d", got)
 	}
-	// 已清理的申請上還在途的 job 找不到查詢列：結束，不呼叫資料來源、不是錯誤。
 	calls := f.registry.callCount()
 	must(t, f.module.RunKYCRegistryCheck(ctx, checkID, false))
 	if f.registry.callCount() != calls {
@@ -720,14 +702,12 @@ func TestRegistryCheckJobsAreUniqueByCheckIDAndDuplicateDeliveryIsHarmless(t *te
 		t.Fatalf("唯一鍵：%+v", args.UniqueOpts)
 	}
 	ids := f.checkIDs(t, sub.ID)
-	// 掃描：第二筆閒置超過門檻，但它的 job 還在排隊，River 的唯一鍵讓補排不重複。
 	f.now = f.now.Add(4 * time.Minute)
 	_, resynced, err := f.module.SweepKYCRegistryChecks(ctx)
 	must(t, err)
 	if resynced != 0 || f.count(t, registryJobs) != 2 {
 		t.Fatalf("job 還在，補排被唯一鍵略過、不該新增也不該計入：resynced=%d jobs=%d", resynced, f.count(t, registryJobs))
 	}
-	// job 被丟棄（River 用盡重試或 rescuer 丟棄）：PENDING 還在，補排會新增一個 job。
 	if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE river.river_job SET state='discarded', finalized_at=now() WHERE kind='seller.kyc_registry_check' AND args->>'check_id' = $1", ids[1].String()); err != nil {
 		t.Fatal(err)
 	}
@@ -739,7 +719,6 @@ func TestRegistryCheckJobsAreUniqueByCheckIDAndDuplicateDeliveryIsHarmless(t *te
 	if n := f.count(t, "SELECT count(*) FROM river.river_job WHERE kind='seller.kyc_registry_check' AND args->>'check_id' = '"+ids[1].String()+"' AND state='available'"); n != 1 {
 		t.Fatalf("被丟棄的 job 沒有補排：%d", n)
 	}
-	// 同一個 check_id 重複投遞（兩次執行）：第二次已不是 PENDING，結果不變。
 	id := ids[1]
 	f.registry.reply(matchingRegistration(), true, nil)
 	f.runCheck(t, id)
@@ -785,7 +764,6 @@ func TestRegistryCheckSchemaConstraints(t *testing.T) {
 		}
 	}
 	_ = individual
-	// Go 的每個現況分類都是 DB 接受的值（FOUND 的 status 沒有第二份清單）。
 	for _, status := range RegistrationStatusValues() {
 		query := "UPDATE seller.kyc_registration_checks SET outcome='FOUND', queried_at=now(), tax_id='33330333', name='x', address_text='x', status_text='', status='" + string(status) + "'"
 		if _, err := f.db.Conn(ctx).Exec(ctx, query); err != nil {
@@ -812,7 +790,6 @@ func TestFoundCheckRequiresTheTaxIDNameAndStatus(t *testing.T) {
 	}
 }
 
-// resubmit 讓申請被退回、賣家改一個欄位後重送（時鐘往前走：送出時間是這次送件的身分）。
 func (f *fixture) resubmit(t *testing.T, accountID int64, sub KYCApplication) KYCApplication {
 	t.Helper()
 	ctx := context.Background()
@@ -850,7 +827,6 @@ func TestResubmittedApplicationDoesNotShowThePreviousRoundsSnapshot(t *testing.T
 	if view.RegistrationCheck != nil || view.RegistrationCheckSeq() != 0 || view.PendingRegistrationCheck == nil {
 		t.Fatalf("第二輪完成前顯示了舊的快照：%+v pending=%v", view.RegistrationCheck, (view.PendingRegistrationCheck != nil))
 	}
-	// 第二輪完成前核准：etag 的查詢序號是 0，引用是 NULL。
 	approved, err := f.module.ApproveKYC(ctx, ApproveKYCInput{ApplicationID: again.ID, ExpectedVersion: view.Version, ExpectedCheckSeq: 0, AdminID: 9})
 	must(t, err)
 	if n := f.count(t, "SELECT count(*) FROM seller.kyc_reviews WHERE application_id=$1 AND action='APPROVE' AND registration_check_id IS NULL", again.ID); n != 1 {
@@ -883,7 +859,6 @@ func TestClaimingAQueryAfterTheRoundEndedCancelsIt(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	// 退回之後（申請是 REJECTED）才認領。
 	_, _, sub := f.companySubmission(t, nil)
 	first := f.checkIDs(t, sub.ID)[0]
 	view := f.adminView(t, sub.ID)
@@ -900,7 +875,6 @@ func TestClaimingAQueryAfterTheRoundEndedCancelsIt(t *testing.T) {
 	if v := f.adminView(t, sub.ID); v.RegistrationCheck != nil {
 		t.Fatalf("CANCELLED 的查詢出現在檢視：%+v", v.RegistrationCheck)
 	}
-	// 退回、重送之後才認領上一輪的查詢（送出時間與查詢的不同）：同樣 CANCELLED，新一輪的查詢不受影響。
 	account2, _, sub2 := f.companySubmission(t, nil)
 	stale := f.checkIDs(t, sub2.ID)[0]
 	f.resubmit(t, account2, sub2)
@@ -928,7 +902,7 @@ func TestRequeryAfterResubmitIsNotBlockedByThePreviousRoundsPendingCheck(t *test
 	f := setup(t)
 	ctx := context.Background()
 	accountID, _, sub := f.companySubmission(t, nil)
-	f.resubmit(t, accountID, sub) // 第一輪的查詢仍是 PENDING；第二輪排了自己的
+	f.resubmit(t, accountID, sub)
 	ids := f.checkIDs(t, sub.ID)
 	if len(ids) != 2 {
 		t.Fatalf("checks=%v", ids)
@@ -1001,11 +975,11 @@ func TestPendingFlagIgnoresThePreviousRoundsPendingCheck(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	accountID, _, sub := f.companySubmission(t, nil) // 第一輪的查詢永遠停在 PENDING
+	accountID, _, sub := f.companySubmission(t, nil)
 	f.resubmit(t, accountID, sub)
 	ids := f.checkIDs(t, sub.ID)
 	f.registry.reply(gcis.Registration{}, false, gcis.ErrUnavailable)
-	must(t, f.module.RunKYCRegistryCheck(ctx, ids[1], true)) // 第二輪完成（UNAVAILABLE）
+	must(t, f.module.RunKYCRegistryCheck(ctx, ids[1], true))
 	if f.checkOutcome(t, ids[0]) != "PENDING" {
 		t.Fatal("測試前提：上一輪的查詢仍是 PENDING")
 	}
@@ -1013,7 +987,6 @@ func TestPendingFlagIgnoresThePreviousRoundsPendingCheck(t *testing.T) {
 	if v.RegistrationCheck == nil || v.RegistrationCheck.Seq != 2 || v.PendingRegistrationCheck != nil {
 		t.Fatalf("check=%+v pending=%v", v.RegistrationCheck, (v.PendingRegistrationCheck != nil))
 	}
-	// 這一輪沒有完成的查詢、也沒有查詢中的（第二輪的查詢被放棄）：上一輪停在 PENDING 的不算。
 	if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.kyc_registration_checks SET outcome='CANCELLED' WHERE check_id = $1", ids[1]); err != nil {
 		t.Fatal(err)
 	}
@@ -1022,8 +995,6 @@ func TestPendingFlagIgnoresThePreviousRoundsPendingCheck(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 查詢是有期限的資源，伺服器保證在期限前到終態（掃描 job seller.kyc_registry_sweep）。
 
 // 進行中的查詢帶要求時間與期限；期限在重試的最壞總長（約 94 分鐘）之後。
 func TestAPendingCheckCarriesItsRequestTimeAndDeadline(t *testing.T) {
@@ -1042,7 +1013,6 @@ func TestAPendingCheckCarriesItsRequestTimeAndDeadline(t *testing.T) {
 	if !stored.Equal(*p.Deadline) {
 		t.Fatalf("後台的期限不是資料列的 deadline_at：%v ≠ %v", p.Deadline, stored)
 	}
-	// 已完成的查詢不帶期限。
 	f.registry.reply(matchingRegistration(), true, nil)
 	f.runCheck(t, f.checkIDs(t, sub.ID)[0])
 	if c := f.adminView(t, sub.ID).RegistrationCheck; c == nil || c.Deadline != nil || !c.RequestedAt.Equal(p.RequestedAt) {
@@ -1085,7 +1055,6 @@ func TestSweepClosesALostPendingCheckAsUnavailableOnlyAfterItsDeadline(t *testin
 	p := f.adminView(t, sub.ID).PendingRegistrationCheck
 	requested, deadline := p.RequestedAt, *p.Deadline
 
-	// 期限之前（掃描提前一個掃描間隔收，所以離期限還有兩分鐘以上）的 PENDING 可能還在正常重試，掃描不能動它。
 	f.now = requested.Add(10 * time.Minute)
 	expired, _, err := f.module.SweepKYCRegistryChecks(ctx)
 	must(t, err)
@@ -1093,7 +1062,6 @@ func TestSweepClosesALostPendingCheckAsUnavailableOnlyAfterItsDeadline(t *testin
 		t.Fatalf("期限之前被收掉了：expired=%d outcome=%s", expired, f.checkOutcome(t, id))
 	}
 
-	// 掃描最晚在期限之前的最後一次執行收掉它（終態在期限之前）：離期限不到一個掃描間隔時就收成終態。
 	f.now = deadline.Add(-30 * time.Second)
 	expired, _, err = f.module.SweepKYCRegistryChecks(ctx)
 	must(t, err)
@@ -1105,7 +1073,6 @@ func TestSweepClosesALostPendingCheckAsUnavailableOnlyAfterItsDeadline(t *testin
 		view.RegistrationCheck.QueriedAt == nil || view.RegistrationCheck.Registration != nil {
 		t.Fatalf("view check=%+v pending=%+v", view.RegistrationCheck, view.PendingRegistrationCheck)
 	}
-	// 再掃一次不重複處理。
 	expired, _, err = f.module.SweepKYCRegistryChecks(ctx)
 	must(t, err)
 	if expired != 0 {
@@ -1193,7 +1160,6 @@ func TestAJobThatRunsAfterTheDeadlineWritesUnavailableWithoutCallingTheRegistry(
 	deadline := *f.adminView(t, sub.ID).PendingRegistrationCheck.Deadline
 	f.now = deadline.Add(-time.Second)
 	f.registry.reply(matchingRegistration(), true, nil)
-	// 期限之前：照常呼叫（這裡讓它失敗以便留下 PENDING，由重試接手）。
 	f.registry.replies = nil
 	f.registry.reply(gcis.Registration{}, false, gcis.ErrUnavailable)
 	if err := f.module.RunKYCRegistryCheck(context.Background(), id, false); !errors.Is(err, gcis.ErrUnavailable) {
@@ -1203,7 +1169,6 @@ func TestAJobThatRunsAfterTheDeadlineWritesUnavailableWithoutCallingTheRegistry(
 	if calls != 1 || f.checkOutcome(t, id) != "PENDING" {
 		t.Fatalf("calls=%d outcome=%s", calls, f.checkOutcome(t, id))
 	}
-	// 期限到了：重試的下一次執行（不是最後一次嘗試）直接收成終態，不呼叫資料來源。
 	f.now = deadline
 	f.registry.reply(matchingRegistration(), true, nil)
 	must(t, f.module.RunKYCRegistryCheck(context.Background(), id, false))

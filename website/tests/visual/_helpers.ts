@@ -20,27 +20,13 @@ export async function gotoThemed(
 			try {
 				localStorage.setItem(key, value);
 			} catch {
-				/* Safari private mode etc. — boot script falls back to light */
 			}
 		},
 		[THEME_STORAGE_KEY, theme] as const,
 	);
 
-	// 首頁／/feed／/search／/sellers/:id/posts 的貼文卡片會送動圖原檔（10 MB，
-	// card preset 的 312 倍），而它在首頁是 eager 載入 ⇒ 直接擋 `load` 與
-	// `networkidle`。2026-08-27 main run 33093420954 實測：含動圖的四個面
-	// 26～28.5 秒 settle，不含的 9.2～9.7 秒 —— 差距全落在這一顆上。
-	// 預設的 15 秒導航預算因此不夠。放寬而不是把動畫關掉：卡片會動是刻意的
-	// 產品行為（GIF 逐幀取景是 2026-08-26 的功能），體積的正解是給它一個有界的
-	// 動圖 derivative，追在 website#528。**#528 落地後這裡要跟著調回去。**
 	await page.goto(url, { waitUntil: "networkidle", timeout: 45_000 });
 
-	// Server Components stream in behind a route-level Suspense skeleton, and
-	// networkidle can fire while that skeleton (viewport height, ~720px) is
-	// still up — capturing a stub. Wait until the real content has expanded the
-	// document well past the viewport. Every covered route is >1300px tall once
-	// loaded, so 1000px cleanly separates content from skeleton; if content
-	// genuinely never loads this fails loudly instead of snapshotting the stub.
 	await page.waitForFunction(
 		() => document.documentElement.scrollHeight > 1000,
 		{ timeout: 20_000, polling: 200 },
@@ -48,8 +34,6 @@ export async function gotoThemed(
 
 	await page.evaluate(() => document.fonts.ready);
 
-	// Next <Image> lazy-loads on scroll; walk the page to force every image in,
-	// then return to the top so the full-page capture starts from the same place.
 	await page.evaluate(async () => {
 		await new Promise<void>((resolve) => {
 			let y = 0;

@@ -20,7 +20,6 @@ func TestPeriodicConfiguration(t *testing.T) {
 		{"seller.product_views_rollup", 5 * time.Minute, (RollupArgs{}).InsertOpts().UniqueOpts.ByPeriod},
 		{"seller.product_views_purge", time.Hour, (PurgeArgs{}).InsertOpts().UniqueOpts.ByPeriod},
 	} {
-		// River 不提供設定讀取 API；只讀 reflection 固定重啟與間隔，不修改其內部值。
 		configuration := reflect.ValueOf(periodicJobs[i]).Elem()
 		options := configuration.FieldByName("opts").Elem()
 		if !options.FieldByName("RunOnStart").Bool() || options.FieldByName("ID").String() != want.id {

@@ -49,7 +49,6 @@ func NewApp(m Module, stores Stores, log *slog.Logger) (*App, error) {
 	return newApp(declarations, m, stores, log)
 }
 
-// newApp 的宣告表由參數給（測試用缺一列的表驗證啟動檢查）。
 func newApp(table map[string]seller.Capability, m Module, stores Stores, log *slog.Logger) (*App, error) {
 	switch {
 	case log == nil:
@@ -65,7 +64,6 @@ func newApp(table map[string]seller.Capability, m Module, stores Stores, log *sl
 	return &App{m: m, stores: stores, log: log}, nil
 }
 
-// storeID 推導呼叫者目前的店家：沒有登入由 interceptor 擋，管理員回 permission_denied，呼叫者沒有店回 not_found。賣家能力（停權、前置條件）由模組檢查。
 func (h *App) storeID(ctx context.Context) (int64, error) {
 	p, err := rpc.RequireAccount(ctx)
 	if err != nil {
@@ -78,7 +76,6 @@ func (h *App) storeID(ctx context.Context) (int64, error) {
 	return st.StoreID, nil
 }
 
-// 模組欄位違規的欄位名對到請求的 proto 路徑；報價內容在草稿的 draft 底下、正式回價的 quote 底下。
 func paths(quotePrefix string) rpc.FieldPaths {
 	p := rpc.FieldPaths{
 		"PageSize": "page_size", "page_token": "page_token", "expected_draft_version": "expected_draft_version",
@@ -109,7 +106,6 @@ var (
 	declinePaths  = paths("")
 )
 
-// clientRequestID 解析必填的冪等鍵：UUIDv4。
 func clientRequestID(raw string) (uuid.UUID, error) {
 	if raw == "" {
 		return uuid.UUID{}, rpc.RequiredField("client_request_id", "client_request_id 不能是空的")

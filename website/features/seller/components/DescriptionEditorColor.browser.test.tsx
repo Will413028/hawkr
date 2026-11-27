@@ -54,8 +54,6 @@ function selectText(element: HTMLElement) {
 }
 
 async function waitForPalette(dialog: HTMLElement) {
-	// The portal mounts before positioning and focus are ready. Expanded mode
-	// also animates its parent dialog; existence alone does not mean visible.
 	return waitFor(() => {
 		const panel = within(dialog).getByRole("dialog", { name: "文字顏色" });
 		expect(panel).toBeVisibleSync();
@@ -286,9 +284,6 @@ describe("DescriptionEditorColor", () => {
 			const expectState = async (index: number, phase: string) => {
 				try {
 					await waitFor(() => {
-						// History publishes its snapshot before the final busy-state
-						// update. Check the current rendered text after that update,
-						// rather than retaining a node from an intermediate render.
 						expect(dialog).toHaveAttributeSync("aria-busy", "false");
 						const next = args.onChange.mock.lastCall?.[0];
 						expect(next?.blocks[0].runs).toEqual([states[index]]);
@@ -319,8 +314,6 @@ describe("DescriptionEditorColor", () => {
 				{ name: /^底線/, phase: "Underline" },
 			];
 			for (const [index, { name, phase }] of actions.entries()) {
-				// No reselection: applying one format must keep the selection ready
-				// for the next toolbar command in the same editing session.
 				await userEvent.click(ui.getByRole("button", { name }));
 				await expectState(index + 2, `apply${phase}`);
 			}

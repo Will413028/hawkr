@@ -25,7 +25,6 @@ import (
 
 const testAccountID = int64(1001)
 
-// catalogBuyerFixture 是 buyer 與 catalog 的真實接線（subscribeCatalogFavorites、catalogRestock、buyerSkus），資料庫是真的。
 type catalogBuyerFixture struct {
 	t       *testing.T
 	d       *db.DB
@@ -60,7 +59,6 @@ func newCatalogBuyerFixture(t *testing.T) *catalogBuyerFixture {
 	return f
 }
 
-// seedExposableStore 直接寫 seller 的最小列，建一家可以公開曝光的店（只關心 catalog 讀的 seller.pub_exposable_stores；它自己的規則在 seller 的測試）。
 func (f *catalogBuyerFixture) seedExposableStore() int64 {
 	f.t.Helper()
 	ctx := context.Background()
@@ -88,7 +86,6 @@ func (f *catalogBuyerFixture) exec(ctx context.Context, sql string, args ...any)
 	}
 }
 
-// newBuyer 建一個買家（建帳時同 transaction 建立）。
 func (f *catalogBuyerFixture) newBuyer(ctx context.Context) int64 {
 	f.t.Helper()
 	f.logins++
@@ -110,7 +107,6 @@ func (f *catalogBuyerFixture) newBuyer(ctx context.Context) int64 {
 	return profile.BuyerID
 }
 
-// product 建立並上架一個商品：每個 stock 一個 SKU（庫存依序）。
 func (f *catalogBuyerFixture) product(ctx context.Context, stocks ...int32) catalog.Product {
 	f.t.Helper()
 	f.seq++
@@ -248,7 +244,7 @@ func TestCatalogRestockNotifiesOnlyTheSKUAndPurgesSubscriptions(t *testing.T) {
 	})
 	notifier := catalogRestock{buyer: f.buyers}
 	occurred := time.Date(2026, 12, 1, 9, 5, 0, 0, time.UTC)
-	for range 2 { // 重送是 no-op：一次性訂閱通知過就沒有了
+	for range 2 {
 		if err := notifier.NotifyRestocked(ctx, catalog.RestockedSKU{ProductID: product.ID, SKUID: skuA, StoreID: f.storeID, Name: "蘋果", ImageKey: "public/apple", OccurredAt: occurred}); err != nil {
 			t.Fatal(err)
 		}

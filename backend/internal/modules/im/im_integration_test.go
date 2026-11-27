@@ -220,7 +220,6 @@ func TestConversationAuthorizationIsByIDAndSide(t *testing.T) {
 	ctx := context.Background()
 	f.say(t, f.buyerParty(b1), s1, "hi")
 	conv := f.conversation(t, b1, s1)
-	// 買家 22、店家 11：數字與對話的 (11, 22) 對調。
 	wrong := []im.Party{f.buyerParty(b2), f.buyerParty(s1), f.storeParty(t, s2), f.storeParty(t, b1)}
 	for i, p := range wrong {
 		if _, err := f.m.ListMessages(ctx, conv, p, 0, 10); kindOf(err) != apperr.KindNotFound {
@@ -335,7 +334,6 @@ func TestPreviewIsDerivedFromTheLastMessage(t *testing.T) {
 	}
 }
 
-// buyerDeleted 關閉買家（buyer 的 CloseForDeletion，事實的唯一來源）；buyer 在同 transaction 發 BuyerDeleted，im 的訂閱者排抹除 job。
 func (f *fixture) buyerDeleted(t *testing.T, buyerID int64) {
 	t.Helper()
 	ctx := context.Background()
@@ -344,7 +342,6 @@ func (f *fixture) buyerDeleted(t *testing.T, buyerID int64) {
 	}
 }
 
-// storeRetired 讓店家退場（seller 的 retired_at 是事實的唯一來源，最小的列）並在同 transaction 發 StoreRetired。
 func (f *fixture) storeRetired(t *testing.T, storeID, accountID int64) {
 	t.Helper()
 	ctx := context.Background()
@@ -370,7 +367,6 @@ func TestErasureIsPerIdentity(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	// 帳號 5000 同時是買家 11 與店家 22（店家 22 與買家 12 對話，買家 11 與店家 23 對話：自己不跟自己聊）。
 	f.buyers.accounts[b1] = 5000
 	f.stores.byID[s1] = activeStore(s1, 5000)
 	f.say(t, f.buyerParty(b1), s2, "buyer identity message")
@@ -527,7 +523,6 @@ func TestEraseJobBatchesAndIsRerunnable(t *testing.T) {
 	ctx := context.Background()
 	f.say(t, f.buyerParty(b1), s1, "seed")
 	conv := f.conversation(t, b1, s1)
-	// 直接寫 450 則買家訊息與 10 則店家訊息：超過兩批（每批 200）。
 	f.exec(t, `INSERT INTO im.messages (id, conversation_id, seq, sender_kind, message_type, content, created_at, request_id)
 		SELECT uuidv7(), $1, 1 + g, 'BUYER', 'TEXT', 'bulk ' || g, now(), gen_random_uuid() FROM generate_series(1, 450) AS g`, conv)
 	f.exec(t, `INSERT INTO im.messages (id, conversation_id, seq, sender_kind, message_type, content, created_at, request_id)
@@ -566,7 +561,7 @@ func TestSweepRequeuesDroppedEraseJobs(t *testing.T) {
 	ctx := context.Background()
 	f.say(t, f.buyerParty(b1), s1, "hi")
 	f.buyerDeleted(t, b1)
-	f.jobs.reset() // 模擬 job 用完重試被丟棄
+	f.jobs.reset()
 	n, err := f.m.SweepErase(ctx)
 	if err != nil || n != 1 || f.jobs.count("im.erase_party") != 1 {
 		t.Fatalf("補排 n=%d jobs=%d err=%v", n, f.jobs.count("im.erase_party"), err)
@@ -686,7 +681,6 @@ func TestImageSendRefusesATokenStagedByAnotherAccount(t *testing.T) {
 	}
 }
 
-// holdSend 啟動一個 Send（買家 b1 寄給店家 s1），讓它的 transaction 停在已持有買家與店家守門鎖之後（stores.afterLock）；回傳放行函式與結果 channel。
 func (f *fixture) holdSend(t *testing.T) (release func(), done <-chan error) {
 	t.Helper()
 	held, rel := make(chan struct{}), make(chan struct{})
@@ -712,7 +706,6 @@ func (f *fixture) holdSend(t *testing.T) (release func(), done <-chan error) {
 	return func() { close(rel) }, res
 }
 
-// waitLockWaiter 等到有連線等在鎖上（每個整合測試有自己的資料庫）；等的過程中 done 先回傳就是失敗（沒有等在鎖上）。
 func (f *fixture) waitLockWaiter(t *testing.T, done <-chan error) {
 	t.Helper()
 	deadline := time.Now().Add(10 * time.Second)

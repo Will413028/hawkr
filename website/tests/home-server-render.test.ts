@@ -12,17 +12,11 @@ const bootstrapServerPath = new URL(
 	import.meta.url,
 );
 
-// #338 SEO restore: the homepage main content (product / seller / post cards)
-// is server-rendered into the initial HTML for crawlers, not fetched client-side
-// into an empty shell. These assertions lock the wiring that makes that true.
 
 test("home page is a server component that renders the snapshot into HTML", async () => {
 	const source = await readFile(pagePath, "utf8");
 
-	// A client directive here would move the whole tree back off the server.
 	assert.doesNotMatch(source, /^"use client";/);
-	// Async server component that awaits the strict bootstrap and reshapes it with
-	// the shared pure builder before handing it to the client view as a prop.
 	assert.match(
 		source,
 		/export default async function Page\(\{\s*params,?\s*\}/,
@@ -31,14 +25,9 @@ test("home page is a server component that renders the snapshot into HTML", asyn
 	assert.match(source, /buildHomeSnapshot\(bootstrap\)/);
 	assert.match(source, /<HomePage snapshot=\{snapshot\} \/>/);
 
-	// Cache Components: the live-commerce window is the `cacheLife` of the cached
-	// reads the page awaits (a segment `revalidate` is rejected), and the client
-	// route-cache tree is kept for instant BFCache revisits.
 	assert.doesNotMatch(source, /export const revalidate\b/);
 	assert.match(source, /export const unstable_dynamicStaleTime = 300/);
 
-	// ItemList JSON-LD for the products the HTML lists (same contract as
-	// /market/products), skipped when the fallback snapshot is empty.
 	assert.match(source, /itemListSchema\(productUrls\)/);
 	assert.match(
 		source,
@@ -53,12 +42,8 @@ test("home page keeps the strict-throw / prerenderSafe freshness contract", asyn
 		readFile(bootstrapServerPath, "utf8"),
 	]);
 
-	// Build phase softens (no prior prerender to keep); runtime re-throws so an
-	// empty homepage is never cached as fresh — ISR keeps the last good page.
 	assert.match(page, /prerenderSafe\(EMPTY_HOME_BOOTSTRAP\)/);
 
-	// The server bootstrap uses the strict cached helpers with the exact same args
-	// as the browser route, and must NOT swallow errors into an empty payload.
 	assert.match(bootstrap, /import "server-only"/);
 	assert.match(bootstrap, /getCachedHotProducts\(8\)/);
 	assert.match(bootstrap, /getCachedProductsFirstPage\(100\)/);
@@ -70,8 +55,6 @@ test("home page keeps the strict-throw / prerenderSafe freshness contract", asyn
 test("home snapshot builder stays a pure, client-safe module", async () => {
 	const source = await readFile(snapshotPath, "utf8");
 
-	// Shared by the server page and the client refetch, so it must not be a client
-	// module and must not drag the server-only data cache into the client graph.
 	assert.doesNotMatch(source, /^"use client";/);
 	assert.doesNotMatch(source, /from "@\/lib\/api\/cached"/);
 	assert.doesNotMatch(source, /from "next\/cache"/);

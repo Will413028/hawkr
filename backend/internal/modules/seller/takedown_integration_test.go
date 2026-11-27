@@ -28,7 +28,6 @@ func takedownContents(n int) []ContentRef {
 
 var snapshotAuthored = time.Date(2026, 11, 1, 3, 4, 5, 123456000, time.UTC)
 
-// withSnapshots 給每個對象一份格式正確的快照（連結依種類）。
 func withSnapshots(refs []ContentRef) []TakedownContent {
 	out := make([]TakedownContent, len(refs))
 	for i, r := range refs {

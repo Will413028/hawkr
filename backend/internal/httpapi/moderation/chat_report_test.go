@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	callerBuyer = 7  // fakeBuyers 把登入的帳號對到這個買家
-	callerStore = 11 // 測試裡呼叫者此刻的店
+	callerBuyer = 7
+	callerStore = 11
 	otherBuyer  = 99
 	otherStore  = 12
 )

@@ -127,11 +127,9 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
     @Override
     public void createProduct(CreateProductRequest request, StreamObserver<CreateProductResponse> responseObserver) {
         try {
-            // 授權：賣家本人或代行（products.write）
             GrpcAuthContext.requireSellerOrDelegated(delegationOrNull(request.hasDelegation(), request.getDelegation()),
                     request.getStoreId(), DelegationCapability.PRODUCTS_WRITE, request.getIdempotencyKey());
 
-            // 驗證必填欄位
             if (request.getIdempotencyKey().isEmpty()) {
                 responseObserver.onNext(CreateProductResponse.newBuilder()
                         .setCode(GrpcResponseCode.INVALID_PARAM.code())
@@ -150,9 +148,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                 return;
             }
 
-            // 至少一個 SKU：商品的價格 / 庫存 / 材積全部掛在 SKU 上，零 SKU 商品建出來就是
-            // 上架但不可購買（priceMin=0、stock=0）。此檢查放在收斂點（gRPC 入口）而非只在
-            // Gateway，避免「賭 Gateway 是唯一入口」。
             if (request.getSkusCount() == 0) {
                 responseObserver.onNext(CreateProductResponse.newBuilder()
                         .setCode(GrpcResponseCode.INVALID_PARAM.code())
@@ -162,20 +157,13 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                 return;
             }
 
-            // 轉換 Proto → DTO
             CreateProductDTO dto = protoConverter.toCreateDTO(request);
 
-            // 呼叫 Service
             ProductWriteOutcome outcome = productService.createProductWithWarnings(dto);
             ProductDetailDTO result = outcome.detail();
 
-            // 轉換 DTO → Proto
             ProductDetail productDetail = protoConverter.toProductDetailProto(result);
 
-            // 19 號設計書 §9.5：本次未被採用的認證。product-service 只填 CONCURRENT_CONFLICT
-            // 與 gRPC 直呼時被第二道防線剔除的非法輸入；Gateway 把自己 filter 掉的併進同一陣列。
-            // ⚠️ 無警告時回空陣列（proto3 repeated 天然為空），不得省略欄位——省略會讓前端
-            // 分不出「後端沒實作」與「這次沒有警告」。
             CreateProductResponse.Builder responseBuilder = CreateProductResponse.newBuilder()
                     .setCode(GrpcResponseCode.SUCCESS.code())
                     .setMessage("商品建立成功")
@@ -198,8 +186,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                     .setMessage(e.getMessage())
                     .build());
         } catch (ProductBusinessException e) {
-            // 業務碼透傳：hashtag/description 校驗（3014-3018）、category 不存在等帶有專屬 GrpcResponseCode 直接回
-            // INTERNAL_ERROR 視為 Media client 失敗，加「圖片處理失敗:」前綴並降為 SERVICE_UNAVAILABLE
             int code = e.code();
             String msg = e.getMessage();
             if (e.responseCode() == GrpcResponseCode.INTERNAL_ERROR) {
@@ -239,11 +225,9 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
     @Override
     public void updateProduct(UpdateProductRequest request, StreamObserver<UpdateProductResponse> responseObserver) {
         try {
-            // 授權：賣家本人或代行（products.write）
             GrpcAuthContext.requireSellerOrDelegated(delegationOrNull(request.hasDelegation(), request.getDelegation()),
                     request.getStoreId(), DelegationCapability.PRODUCTS_WRITE, request.getIdempotencyKey());
 
-            // 驗證必填欄位
             if (request.getIdempotencyKey().isEmpty()) {
                 responseObserver.onNext(UpdateProductResponse.newBuilder()
                         .setCode(GrpcResponseCode.INVALID_PARAM.code())
@@ -262,18 +246,13 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                 return;
             }
 
-            // 轉換 Proto → DTO
             UpdateProductDTO dto = protoConverter.toUpdateDTO(request);
 
-            // 呼叫 Service
             ProductWriteOutcome outcome = productService.updateProductWithWarnings(dto);
             ProductDetailDTO result = outcome.detail();
 
-            // 轉換 DTO → Proto
             ProductDetail productDetail = protoConverter.toProductDetailProto(result);
 
-            // 19 號設計書 §9.5，同 CreateProductResponse。⚠️ 這是兩個不同的 message，
-            // 各補一次；漏掉任一個，對應端點的那個欄位就會恆空且無任何訊號。
             UpdateProductResponse.Builder responseBuilder = UpdateProductResponse.newBuilder()
                     .setCode(GrpcResponseCode.SUCCESS.code())
                     .setMessage("商品更新成功")
@@ -302,7 +281,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                     .setMessage(e.getMessage())
                     .build());
         } catch (ProductBusinessException e) {
-            // 用 exception 自帶的 GrpcResponseCode 與 message（涵蓋 Media 失敗、編輯狀態守門 §2.8.5 等）
             log.warn("ProductGrpcService.updateProduct.businessException",
                     "業務例外 code=" + e.code() + " msg=" + e.getMessage());
             responseObserver.onNext(UpdateProductResponse.newBuilder()
@@ -339,7 +317,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
     @Override
     public void getProduct(GetProductRequest request, StreamObserver<GetProductResponse> responseObserver) {
         try {
-            // 驗證必填欄位
             if (request.getProductId().isEmpty()) {
                 responseObserver.onNext(GetProductResponse.newBuilder()
                         .setCode(GrpcResponseCode.INVALID_PARAM.code())
@@ -349,28 +326,19 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                 return;
             }
 
-            // 取得 store_id：一律讀 request 欄位（gateway 已解析重開店後的
-            // store surrogate id），不可用 GrpcAuthContext——那是請求進入時的
-            // 原始 JWT accountId，重開過店的賣家會跟 entity.getStoreId() 對不上
-            // （對齊 getProductList / deleteProduct 等既有擁有權判斷慣例）
             long storeId = request.getStoreId();
 
-            // 代行判定（products.read）。本 RPC 同時服務公開頁與匿名呼叫，所以不得整支收斂成
-            // 賣家專屬——判定以 delegation 欄位是否存在做分支；未帶即維持現狀不動。
             DelegationContext delegation = delegationOrNull(request.hasDelegation(), request.getDelegation());
             if (delegation != null) {
                 GrpcAuthContext.requireSellerOrDelegated(delegation, storeId, DelegationCapability.PRODUCTS_READ);
             }
 
-            // 呼叫 Service（含權限檢查；代行路徑另加 Q4 歸屬斷言）
             ProductDetailDTO result = delegation != null
                     ? productService.getProduct(request.getProductId(), storeId, true)
                     : productService.getProduct(request.getProductId(), storeId);
 
-            // 轉換 DTO → Proto
             ProductDetail productDetail = protoConverter.toProductDetailProto(result);
 
-            // 自買標記（§2.2.1）：請求者的 storeId 為商品 owner 時為 true，匿名固定 false
             boolean selfOwned = storeId > 0 && Long.valueOf(storeId).equals(result.getStoreId());
             productDetail = productDetail.toBuilder().setSelfOwned(selfOwned).build();
 
@@ -397,7 +365,7 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
         } catch (ProductAccessDeniedException e) {
             log.warn("ProductGrpcService.getProduct.accessDenied", "無權存取商品: " + e.getMessage());
             responseObserver.onNext(GetProductResponse.newBuilder()
-                    .setCode(GrpcResponseCode.NOT_FOUND.code())  // 回傳 404 而非 403，避免洩漏商品存在
+                    .setCode(GrpcResponseCode.NOT_FOUND.code())
                     .setMessage("商品不存在")
                     .build());
         } catch (Exception e) {
@@ -416,7 +384,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
     @Override
     public void getPublicProduct(GetPublicProductRequest request, StreamObserver<GetProductResponse> responseObserver) {
         try {
-            // 驗證必填欄位
             if (request.getProductId().isEmpty()) {
                 responseObserver.onNext(GetProductResponse.newBuilder()
                         .setCode(GrpcResponseCode.INVALID_PARAM.code())
@@ -426,10 +393,8 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                 return;
             }
 
-            // 呼叫 Service（含 Redis 快取，依 publication contract 判斷可見性）
             ProductDetailDTO result = productService.getPublicProduct(request.getProductId());
 
-            // 轉換 DTO → Proto
             ProductDetail productDetail = protoConverter.toProductDetailProto(result);
 
             responseObserver.onNext(GetProductResponse.newBuilder()
@@ -463,28 +428,22 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
     @Override
     public void getProductList(GetProductListRequest request, StreamObserver<GetProductListResponse> responseObserver) {
         try {
-            // 代行判定（products.read）。owner_store_id 為零會讓下方 isPublic 分支把整份查詢
-            // 轉成公開列表 ⇒ 代行者拿到的是全站 ACTIVE 商品，故此處必須先擋（S4 同時也擋一次）。
             DelegationContext delegation = delegationOrNull(request.hasDelegation(), request.getDelegation());
             if (delegation != null) {
                 GrpcAuthContext.requireSellerOrDelegated(delegation, request.getOwnerStoreId(),
                         DelegationCapability.PRODUCTS_READ);
             }
 
-            // 轉換 Proto → DTO
             ProductQueryDTO query = protoConverter.toQueryDTO(request);
 
-            // ownerStoreId == 0（無擁有者篩選）= 公開 API → 強制 ACTIVE + 填充商家資訊
             boolean isPublic = request.getOwnerStoreId() <= 0;
             if (isPublic) {
                 query.setStatus(ProductStatus.ACTIVE.value());
                 query.setPublicApi(true);
             }
 
-            // 呼叫 Service
             ProductListResultDTO result = productService.getProductList(query);
 
-            // 組建回應
             GetProductListResponse.Builder responseBuilder = GetProductListResponse.newBuilder()
                     .setCode(GrpcResponseCode.SUCCESS.code())
                     .setMessage("查詢成功")
@@ -492,7 +451,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                     .setPage(String.valueOf(result.getPage()))
                     .setPageSize(String.valueOf(result.getPageSize()));
 
-            // 轉換商品列表
             for (ProductListItemDTO item : result.getProducts()) {
                 ProductListItem protoItem = protoConverter.toProductListItemProto(item);
                 responseBuilder.addProducts(protoItem);
@@ -509,7 +467,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                     .setMessage(e.getMessage())
                     .build());
         } catch (io.github.will413028.hawkr.product.grpc.client.BuyerGrpcClient.BuyerServiceUnavailableException e) {
-            // followed_product_only / followed_seller_only filter 失敗（buyer service 不可用）→ 503 SERVICE_UNAVAILABLE，由 Gateway 翻成 HTTP 503
             log.warn("ProductGrpcService.getProductList.buyerUnavailable",
                     "buyer service 不可用，followed filter 失敗: " + e.getMessage());
             GetProductListResponse resp = GetProductListResponse.newBuilder()
@@ -531,10 +488,8 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
     public void getProductForAdmin(GetProductForAdminRequest request,
             StreamObserver<GetProductResponse> responseObserver) {
         try {
-            // 授權：僅 ADMIN 可使用此 RPC
             GrpcAuthContext.requireAccountType(AccountType.ADMIN);
 
-            // 驗證必填欄位
             if (request.getProductId().isEmpty()) {
                 responseObserver.onNext(GetProductResponse.newBuilder()
                         .setCode(GrpcResponseCode.INVALID_PARAM.code())
@@ -544,10 +499,8 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                 return;
             }
 
-            // 呼叫 Service（不檢查擁有者，不限狀態）
             ProductDetailDTO result = productService.getProductForAdmin(request.getProductId());
 
-            // 轉換 DTO → Proto
             ProductDetail productDetail = protoConverter.toProductDetailProto(result);
 
             responseObserver.onNext(GetProductResponse.newBuilder()
@@ -585,10 +538,8 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
     public void updateProductStatus(UpdateProductStatusRequest request,
             StreamObserver<UpdateProductResponse> responseObserver) {
         try {
-            // 授權：僅 ADMIN 可更新商品狀態
             GrpcAuthContext.requireAccountType(AccountType.ADMIN);
 
-            // 驗證必填欄位
             if (request.getProductId().isEmpty()) {
                 responseObserver.onNext(UpdateProductResponse.newBuilder()
                         .setCode(GrpcResponseCode.INVALID_PARAM.code())
@@ -607,11 +558,9 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                 return;
             }
 
-            // 呼叫 Service
             ProductDetailDTO result = productService.updateProductStatus(
                     request.getProductId(), request.getStatus());
 
-            // 轉換 DTO → Proto
             ProductDetail productDetail = protoConverter.toProductDetailProto(result);
 
             responseObserver.onNext(UpdateProductResponse.newBuilder()
@@ -655,11 +604,9 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
     public void updateSellerProductStatus(UpdateSellerProductStatusRequest request,
             StreamObserver<UpdateProductResponse> responseObserver) {
         try {
-            // 授權：賣家本人或代行（products.publish）
             GrpcAuthContext.requireSellerOrDelegated(delegationOrNull(request.hasDelegation(), request.getDelegation()),
                     request.getStoreId(), DelegationCapability.PRODUCTS_PUBLISH, request.getIdempotencyKey());
 
-            // 驗證必填欄位
             if (request.getProductId().isEmpty()) {
                 responseObserver.onNext(UpdateProductResponse.newBuilder()
                         .setCode(GrpcResponseCode.INVALID_PARAM.code())
@@ -678,12 +625,10 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                 return;
             }
 
-            // 呼叫 Service
             ProductDetailDTO result = productService.updateSellerProductStatus(
                     request.getProductId(), request.getStoreId(), request.getStatus(),
                     request.getExpectedVersion());
 
-            // 轉換 DTO → Proto
             ProductDetail productDetail = protoConverter.toProductDetailProto(result);
 
             responseObserver.onNext(UpdateProductResponse.newBuilder()
@@ -759,8 +704,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                     BatchGetSellerProductsForDelegationResponse.newBuilder()
                             .setCode(GrpcResponseCode.SUCCESS.code())
                             .setMessage("查詢成功");
-            // withDetail=true：稽核的 before_snapshot 取自這一份 detail。傳 false 的話
-            // 批次下架的 before_snapshot 只會有 status 一個鍵，而單筆版存的是完整 12 欄。
             for (ProductSnapshotDTO snapshot : productService.getProductSnapshotsForDelegation(
                     request.getStoreId(), request.getProductIdsList(), true)) {
                 BatchProductSnapshot.Builder item = BatchProductSnapshot.newBuilder()
@@ -888,7 +831,7 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
             BatchProductStatusItem item) {
         BatchProductStatusResult.Builder result = BatchProductStatusResult.newBuilder()
                 .setProductId(item.getProductId())
-                .setAuditLogId(item.getAuditLogId());   // 請求帶進來的值原樣回音，非服務端產生
+                .setAuditLogId(item.getAuditLogId());
         try {
             ProductDetailDTO updated = productService.updateSellerProductStatus(
                     item.getProductId(), request.getStoreId(), request.getStatus(), item.getExpectedVersion());
@@ -964,12 +907,10 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
     @Override
     public void purgeProductCache(PurgeProductCacheRequest request, StreamObserver<PurgeProductCacheResponse> responseObserver) {
         try {
-            // 授權：僅 ADMIN 可清除快取
             GrpcAuthContext.requireAccountType(AccountType.ADMIN);
 
             String scope = request.getScope();
 
-            // 驗證 scope 參數
             if (scope == null || scope.isEmpty()) {
                 responseObserver.onNext(PurgeProductCacheResponse.newBuilder()
                         .setCode(GrpcResponseCode.INVALID_PARAM.code())
@@ -984,11 +925,9 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
 
             switch (scope.toLowerCase()) {
                 case "all" -> {
-                    // 清除所有商品快取（Redis 失聯時 best-effort 略過，不 500，02 §2.7.3）
                     purgedKeys += safePurgeByPattern("prod:detail:*");
                     purgedKeys += safePurgeByPattern("prod:list:*");
 
-                    // 同時清除分類快取
                     categoryCacheService.evict();
                     purgedKeys++;
 
@@ -996,7 +935,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                     log.info("ProductGrpcService.purgeProductCache.success", "清除所有快取成功", "purged_keys", String.valueOf(purgedKeys));
                 }
                 case "detail" -> {
-                    // 清除特定商品詳情快取
                     String productId = request.getProductId();
                     if (productId == null || productId.isEmpty()) {
                         responseObserver.onNext(PurgeProductCacheResponse.newBuilder()
@@ -1013,15 +951,12 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                     log.info("ProductGrpcService.purgeProductCache.success", "清除商品詳情快取成功", "product_id", productId);
                 }
                 case "list" -> {
-                    // 清除列表快取
                     Long storeId = request.getStoreId();
                     if (storeId > 0) {
-                        // 清除特定賣家的列表快取（Redis 失聯時 best-effort 略過，不 500）
                         purgedKeys = safePurgeByPattern("prod:list:" + storeId + ":*");
                         description = "已清除賣家 " + storeId + " 的列表快取";
                         log.info("ProductGrpcService.purgeProductCache.success", "清除列表快取成功", "store_id", String.valueOf(storeId));
                     } else {
-                        // 清除所有列表快取
                         cacheService.evictAllProductLists();
                         purgedKeys = safePurgeByPattern("prod:list:*");
                         description = "已清除所有商品列表快取";
@@ -1029,7 +964,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                     }
                 }
                 case "category" -> {
-                    // 清除分類快取
                     categoryCacheService.evict();
                     purgedKeys = 1;
                     description = "已清除分類快取";
@@ -1045,7 +979,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                 }
             }
 
-            // 建立回應
             PurgeCacheResult result = PurgeCacheResult.newBuilder()
                     .setScope(scope)
                     .setPurgedKeys(String.valueOf(purgedKeys))
@@ -1078,7 +1011,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
      */
     private int safePurgeByPattern(String pattern) {
         try {
-            // 非阻塞 SCAN + UNLINK 取代阻塞式 KEYS + DEL（清除範圍不變，見 RedisPatternEvictor）
             return (int) RedisPatternEvictor.scanUnlink(redisTemplate, pattern);
         } catch (DataAccessException e) {
             log.warn("ProductGrpcService.purgeProductCache.unavailable", "Redis 失聯，清除快取略過: " + e.getMessage(), "pattern", pattern);
@@ -1086,7 +1018,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
         }
     }
 
-    // ========== 庫存操作 ==========
 
     /**
      * 扣減庫存（Order Service 呼叫，冪等）
@@ -1094,7 +1025,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
     @Override
     public void deductStock(DeductStockRequest request, StreamObserver<StockOperationResponse> responseObserver) {
         try {
-            // 驗證必填欄位
             if (request.getStockTxId().isEmpty()) {
                 responseObserver.onNext(StockOperationResponse.newBuilder()
                         .setStatus(StockOperationStatus.SYSTEM_ERROR.value())
@@ -1112,23 +1042,19 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                 return;
             }
 
-            // 轉換 Proto → Service 參數
             List<StockService.StockItemParam> items = request.getItemsList().stream()
                     .map(item -> new StockService.StockItemParam(
                             parseLong(item.getSkuId()),
                             parseInt(item.getQuantity())))
                     .toList();
 
-            // 呼叫 Service
             StockService.StockResult result = stockService.deductStock(request.getStockTxId(), items);
 
-            // 映射結果
             responseObserver.onNext(StockOperationResponse.newBuilder()
                     .setStatus(mapStockStatus(result))
                     .setMessage(result == StockService.StockResult.SUCCESS ? "庫存扣減成功" : "重複請求，已忽略")
                     .build());
 
-            // 快取失效已收斂至 StockService afterCommit 單一入口（#1455），此處不再二次清除
 
             log.info("ProductGrpcService.deductStock.success", "庫存扣減完成",
                     "stockTxId", request.getStockTxId());
@@ -1137,7 +1063,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
             log.warn("ProductGrpcService.deductStock.insufficient", e.getMessage(),
                     "skuId", String.valueOf(e.getSkuId()));
 
-            // 查詢實際剩餘庫存，填入結構化回傳
             int availableQty = 0;
             try {
                 var skuOpt = skuRepository.findById(e.getSkuId());
@@ -1180,7 +1105,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
     @Override
     public void restoreStock(RestoreStockRequest request, StreamObserver<StockOperationResponse> responseObserver) {
         try {
-            // 驗證必填欄位
             if (request.getStockTxId().isEmpty()) {
                 responseObserver.onNext(StockOperationResponse.newBuilder()
                         .setStatus(StockOperationStatus.SYSTEM_ERROR.value())
@@ -1198,23 +1122,19 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                 return;
             }
 
-            // 轉換 Proto → Service 參數
             List<StockService.StockItemParam> items = request.getItemsList().stream()
                     .map(item -> new StockService.StockItemParam(
                             parseLong(item.getSkuId()),
                             parseInt(item.getQuantity())))
                     .toList();
 
-            // 呼叫 Service
             StockService.StockResult result = stockService.restoreStock(request.getStockTxId(), items);
 
-            // 映射結果
             responseObserver.onNext(StockOperationResponse.newBuilder()
                     .setStatus(mapStockStatus(result))
                     .setMessage(result == StockService.StockResult.SUCCESS ? "庫存歸還成功" : "重複請求，已忽略")
                     .build());
 
-            // 快取失效已收斂至 StockService afterCommit 單一入口（#1455），此處不再二次清除
 
             log.info("ProductGrpcService.restoreStock.success", "庫存歸還完成",
                     "stockTxId", request.getStockTxId());
@@ -1241,7 +1161,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
     @Override
     public void getStock(GetStockRequest request, StreamObserver<GetStockResponse> responseObserver) {
         try {
-            // 驗證必填欄位
             if (request.getSkuIdsList().isEmpty()) {
                 responseObserver.onNext(GetStockResponse.newBuilder()
                         .setCode(GrpcResponseCode.INVALID_PARAM.code())
@@ -1251,15 +1170,12 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                 return;
             }
 
-            // 轉換 Proto string → Long
             List<Long> skuIds = request.getSkuIdsList().stream()
                     .map(this::parseLong)
                     .toList();
 
-            // 呼叫 Service
             Map<Long, Integer> stockMap = stockService.getStock(skuIds);
 
-            // 組建回應
             GetStockResponse.Builder responseBuilder = GetStockResponse.newBuilder()
                     .setCode(GrpcResponseCode.SUCCESS.code())
                     .setMessage("查詢成功");
@@ -1289,7 +1205,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
         responseObserver.onCompleted();
     }
 
-    // ========== 型別轉換工具方法（委派至 ProtoConversionUtils） ==========
 
     private Long parseLong(String value) {
         return ProtoConversionUtils.parseLongRequired(value, "數字欄位");
@@ -1331,7 +1246,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
         };
     }
 
-    // ==================== CalculateShippingOptions（運費計算） ====================
 
     /**
      * 計算可用配送選項與運費（依溫層分組）
@@ -1341,15 +1255,12 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
     public void calculateShippingOptions(CalculateShippingOptionsRequest request,
                                           StreamObserver<CalculateShippingOptionsResponse> responseObserver) {
         try {
-            // 授權：僅 SELLER 可使用
             GrpcAuthContext.requireAccountType(AccountType.SELLER);
 
-            // 驗證並解析必填欄位（支援小數字串，四捨五入為整數 cm）
             int lengthCm = parseDimensionCm(request.getLength(), "length");
             int widthCm = parseDimensionCm(request.getWidth(), "width");
             int heightCm = parseDimensionCm(request.getHeight(), "height");
 
-            // 解析重量單位
             String weightUnitStr = request.getWeightUnit();
             if (weightUnitStr == null || weightUnitStr.isEmpty()) {
                 responseObserver.onNext(CalculateShippingOptionsResponse.newBuilder()
@@ -1369,19 +1280,14 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
             }
             WeightUnit weightUnit = WeightUnit.fromValue(weightUnitStr);
 
-            // 轉換重量為公克
             long weightGrams = WeightConverter.convertToGrams(request.getWeight(), weightUnit);
 
-            // 透過 Seller Service 取得賣家 zip_code → 推導出貨地區
             long storeId = request.getStoreId();
             SellerMeta sellerMeta = sellerGrpcClient.getSellerMeta(storeId);
-            // TODO: 待 seller.proto SellerMeta 新增 zip_code 欄位後，改用 sellerMeta.getZipCode()
             String zipCode = (sellerMeta != null) ? "" : "";
             ShippingArea senderArea = ShippingAreaResolver.resolve(zipCode);
-            // 收件地區固定為本島（Phase 1 僅支援寄送至台灣本島）
             ShippingArea receiverArea = ShippingArea.MAIN_ISLAND;
 
-            // 透過 ShippingRoute 推導 DeliveryZoneKey value（與 ShippingFeeCacheClient.toDeliveryZone 對應）
             io.github.will413028.hawkr.common.utils.code.ShippingRoute route =
                     io.github.will413028.hawkr.common.utils.code.helper.ShippingRouteRules.resolve(senderArea, receiverArea);
             String deliveryZone = switch (route) {
@@ -1390,21 +1296,14 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                 case OFFSHORE_TO_OFFSHORE -> io.github.will413028.hawkr.common.utils.code.DeliveryZoneKey.INTER_ISLAND.value();
             };
 
-            // 呼叫 Shipping Service 計算配送選項（傳入 storeId，只回傳賣家已開通的配送方式）
             io.github.will413028.hawkr.shipping.grpc.CalculateShippingOptionsResponse shippingResp =
                     shippingGrpcClient.calculateShippingOptions(
                             String.valueOf(lengthCm), String.valueOf(widthCm), String.valueOf(heightCm),
                             String.valueOf(weightGrams), deliveryZone, storeId);
 
-            // shipping-service 失敗時會拋 StatusRuntimeException，由 catch-all 處理；
-            // 此處只需檢查業務結果是否為空
-            // 檢查是否有可用選項；無選項時透傳 shipping-service 回報的真正原因碼 + 訊息
-            // （SELLER_NOT_ONBOARDED 未開通 / SHIPPING_ALL_METHODS_EXCEED_LIMITS 超尺寸重量），
-            // 避免一律誤指「商品尺寸超過限制」。
             if (shippingResp.getTemperatureGroupsList().isEmpty()) {
                 int reasonCode = shippingResp.getCode();
                 String reasonMsg = shippingResp.getMessage();
-                // shipping 未回報具體原因時（版本 skew）的保底
                 if (reasonCode == GrpcResponseCode.SUCCESS.code()) {
                     reasonCode = GrpcResponseCode.SHIPPING_ALL_METHODS_EXCEED_LIMITS.code();
                 }
@@ -1420,24 +1319,20 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                 return;
             }
 
-            // 計算材積 L×W×H÷27000
             String volumeSize = String.format("%.2f", (double)(lengthCm * widthCm * heightCm) / 27000.0);
 
-            // 將 Shipping Service 回應映射到 Product Service 的 Proto 格式
             ShippingCalculationData.Builder dataBuilder = ShippingCalculationData.newBuilder()
                     .setVolumeSize(volumeSize)
                     .setWeightGrams(shippingResp.getWeightGrams())
                     .setDimensionSum(shippingResp.getDimensionSum())
                     .setLongestSide(shippingResp.getLongestSide());
 
-            // 收集可配送溫層
             for (io.github.will413028.hawkr.shipping.grpc.ShippingOptionGroup group : shippingResp.getTemperatureGroupsList()) {
                 dataBuilder.addAvailableTemperatures(AvailableTemperatureProto.newBuilder()
                         .setTemperature(group.getTemperature())
                         .setDisplayName(group.getDisplayName())
                         .build());
 
-                // 攤平運送方式：每個 method × temperature 組合一筆
                 for (io.github.will413028.hawkr.shipping.grpc.ShippingOptionDetail detail : group.getMethodsList()) {
                     dataBuilder.addShippingOptions(ShippingOptionProto.newBuilder()
                             .setShippingMethod(detail.getShippingMethod())
@@ -1485,7 +1380,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
         responseObserver.onCompleted();
     }
 
-    // ==================== GetProductSimple（Cart Service 呼叫） ====================
 
     @Override
     public void getProductSimple(GetProductSimpleRequest request,
@@ -1503,7 +1397,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
 
             Long skuId = parseLong(skuIdStr);
 
-            // 查詢 product_sku
             var skuOpt = productService.findSkuById(skuId);
             if (skuOpt.isEmpty()) {
                 responseObserver.onNext(GetProductSimpleResponse.newBuilder()
@@ -1516,7 +1409,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
 
             var sku = skuOpt.get();
 
-            // 查詢 product（取 name、status、store_id）
             var productOpt = productService.findProductById(sku.getProductId());
             if (productOpt.isEmpty()) {
                 responseObserver.onNext(GetProductSimpleResponse.newBuilder()
@@ -1529,10 +1421,8 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
 
             var product = productOpt.get();
 
-            // is_active = product.status == ACTIVE 且未軟刪除
             boolean isActive = ProductStatus.ACTIVE.value().equals(product.getStatus()) && product.getDeletedAt() == null;
 
-            // 取得商品主圖 objectKey（gallery[0]）
             String imageObjectKey = "";
             if (product.getGallery() != null && !product.getGallery().isEmpty()) {
                 var firstImage = product.getGallery().get(0);
@@ -1541,15 +1431,14 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                 }
             }
 
-            // 02 設計書 §2.8.6 / §4.2.2：實際成交單價 = salePrice ?? price，list_price = price（原價）
             Long effectivePrice = sku.getSalePrice() != null ? sku.getSalePrice() : sku.getPrice();
             var info = ProductSimpleInfo.newBuilder()
                     .setSkuId(skuIdStr)
                     .setStoreId(formatLongOrZero(product.getStoreId()))
                     .setIsActive(isActive)
                     .setName(product.getName())
-                    .setPrice(formatLongOrZero(effectivePrice))         // 實際成交單價（特價優先）
-                    .setListPrice(formatLongOrZero(sku.getPrice()))     // 原價快照（永遠 = SKU.price）
+                    .setPrice(formatLongOrZero(effectivePrice))
+                    .setListPrice(formatLongOrZero(sku.getPrice()))
                     .setMaxLimit(formatInt(sku.getStockQty()))
                     .setProductId(formatLongOrZero(product.getId()))
                     .setSkuName(sku.getSkuName() != null ? sku.getSkuName() : "")
@@ -1571,12 +1460,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
         }
     }
 
-    // ==================== BatchGetSkuCartInfo（Cart Service GetCart 呼叫） ====================
-    // 02 設計書 §5.5.3：單階段 LEFT JOIN 一次拿 SKU + Product 一個 PG snapshot，
-    // 取代既有兩階段「findSkusByIds + findProductsByIds」查詢，避免並行
-    // UpdateProductStatus / DeductStock 期間 snapshot 漂移造成 cart 假 DELISTED（#1133）。
-    // Product 找不到（projection.productStatus == null）= product orphan，從 response 排除
-    // 該 SKU（caller 自動走 LOOKUP_FAILED 分支），禁止 silent collapse 成 is_active=false。
 
     @Override
     public void batchGetSkuCartInfo(BatchGetSkuCartInfoRequest request,
@@ -1602,7 +1485,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                 return;
             }
 
-            // 解析 ID
             List<Long> skuIds = new java.util.ArrayList<>();
             for (String idStr : rawIds) {
                 Long id = ProtoConversionUtils.parseLongOrNull(idStr);
@@ -1611,10 +1493,8 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                 }
             }
 
-            // 單階段 LEFT JOIN 查詢 SKU + Product 必要欄位（02 §5.5.3）
             List<SkuCartProjection> projections = productService.findSkuCartInfoByIds(skuIds);
 
-            // 組裝結果
             BatchGetSkuCartInfoResponse.Builder responseBuilder = BatchGetSkuCartInfoResponse.newBuilder()
                     .setCode(GrpcResponseCode.SUCCESS.code())
                     .setMessage("查詢成功");
@@ -1622,7 +1502,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
             int includedCount = 0;
             int orphanCount = 0;
             for (SkuCartProjection p : projections) {
-                // product orphan（sku.product_id 指向不存在 / 已硬刪 product）→ 從 response 排除（caller 走 LOOKUP_FAILED）
                 if (p.productStatus() == null) {
                     orphanCount++;
                     log.warn("productOrphan",
@@ -1636,7 +1515,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                         && p.productDeletedAt() == null;
                 int stockQty = p.stockQty() != null ? p.stockQty() : 0;
 
-                // 不可購買時補診斷 log（含 productStatus / deletedAt / stockQty），供事後對齊
                 if (!isActive || stockQty <= 0) {
                     log.info("unpurchasable",
                             String.format("SKU 即時判定為不可購買 skuId=%d productId=%d status=%s deletedAt=%s stockQty=%d",
@@ -1645,10 +1523,8 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                             "skuId", String.valueOf(p.skuId()));
                 }
 
-                // 提取配送溫層（從 shipping_method JSONB 去重，保留 JSONB 出現順序）
                 Set<String> temps = parseDeliveryTemps(p.shippingMethodJson(), p.skuId());
 
-                // 02 設計書 §4.2.2：price = effective price（特價優先），list_price = 原價
                 Long effectivePrice = p.salePrice() != null ? p.salePrice() : p.price();
                 SkuCartInfo info = SkuCartInfo.newBuilder()
                         .setStockQty(ProtoConversionUtils.formatInt(stockQty))
@@ -1701,9 +1577,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
         }
     }
 
-    // ==================== BatchGetProductForCheckout（Order Service Checkout 呼叫） ====================
-    // 02 設計書 §5.5.2：結帳鏈路批次商品查詢，接受 inactive，回完整 weight/dimension/shipping_methods。
-    // 取代 GetPublicProduct 在 checkout flow 內的呼叫（後者對 inactive throw 致 unavailable_items 永遠空）。
 
     @Override
     public void batchGetProductForCheckout(BatchGetProductForCheckoutRequest request,
@@ -1727,7 +1600,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                 return;
             }
 
-            // 解析 SKU ID
             List<Long> skuIds = new java.util.ArrayList<>();
             for (String idStr : rawIds) {
                 Long id = ProtoConversionUtils.parseLongOrNull(idStr);
@@ -1736,10 +1608,8 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                 }
             }
 
-            // 批次查 SKU（不過濾 status / deleted_at）
             List<ProductSkuEntity> skus = productService.findSkusByIds(skuIds);
 
-            // 批次查對應 Product（不過濾 status / deleted_at）
             Set<Long> productIds = new java.util.HashSet<>();
             for (ProductSkuEntity sku : skus) {
                 productIds.add(sku.getProductId());
@@ -1758,17 +1628,14 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
             for (ProductSkuEntity sku : skus) {
                 ProductEntity product = productMap.get(sku.getProductId());
                 if (product == null) {
-                    // SKU 存在但對應 product 缺失 → key 缺席（caller 視為 LOOKUP_FAILED）
                     continue;
                 }
 
                 boolean isActive = ProductStatus.ACTIVE.value().equals(product.getStatus())
                         && product.getDeletedAt() == null;
 
-                // price = sale_price 優先，否則 list price
                 Long effectivePrice = sku.getSalePrice() != null ? sku.getSalePrice() : sku.getPrice();
 
-                // image_object_key：取 product.gallery[0].objectKey
                 String imageObjectKey = "";
                 if (product.getGallery() != null && !product.getGallery().isEmpty()) {
                     var first = product.getGallery().get(0);
@@ -1777,7 +1644,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                     }
                 }
 
-                // 將 SKU shipping_methods JSONB 轉成 proto ShippingMethod；同時取 temperature
                 ProductForCheckoutInfo.Builder infoBuilder = ProductForCheckoutInfo.newBuilder()
                         .setSkuId(ProtoConversionUtils.formatLong(sku.getId()))
                         .setProductId(ProtoConversionUtils.formatLong(product.getId()))
@@ -1828,7 +1694,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
         }
     }
 
-    // ==================== GetProductsByIDs（Buyer Service 瀏覽紀錄呼叫） ====================
 
     @Override
     public void getProductsByIDs(GetProductsByIDsRequest request,
@@ -1836,7 +1701,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
         try {
             List<String> rawIds = request.getProductIdsList();
 
-            // 空列表 → 直接回傳空結果
             if (rawIds.isEmpty()) {
                 responseObserver.onNext(GetProductsByIDsResponse.newBuilder()
                         .setCode(GrpcResponseCode.SUCCESS.code())
@@ -1846,7 +1710,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                 return;
             }
 
-            // 超過上限 → 回傳錯誤
             if (rawIds.size() > 100) {
                 responseObserver.onNext(GetProductsByIDsResponse.newBuilder()
                         .setCode(GrpcResponseCode.INVALID_PARAM.code())
@@ -1856,23 +1719,19 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                 return;
             }
 
-            // 解析 ID，跳過無效格式
             List<Long> productIds = new java.util.ArrayList<>();
             for (String idStr : rawIds) {
                 try {
                     productIds.add(Long.parseLong(idStr));
                 } catch (NumberFormatException ignored) {
-                    // 跳過無效 ID
                 }
             }
 
-            // 批次查詢；includeInactive=false（預設）僅回 ACTIVE，true 含 inactive（02 §5.5.1）
             boolean includeInactive = request.getIncludeInactive();
             log.info("ProductGrpcService.getProductsByIDs.start",
                     "開始批次查詢商品，product_ids=" + productIds + "，include_inactive=" + includeInactive);
             List<ProductListItemDTO> items = productService.getProductsByIds(productIds, includeInactive);
 
-            // 組建回應
             GetProductsByIDsResponse.Builder responseBuilder = GetProductsByIDsResponse.newBuilder()
                     .setCode(GrpcResponseCode.SUCCESS.code())
                     .setMessage("查詢成功");
@@ -1909,7 +1768,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                 return;
             }
 
-            // 解析上限（預設 8）
             int limit = 8;
             if (!request.getLimit().isEmpty()) {
                 try {
@@ -1918,16 +1776,13 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                         limit = parsed;
                     }
                 } catch (NumberFormatException ignored) {
-                    // 使用預設值
                 }
             }
 
-            // 取得商品的分類 ID
             ProductDetailDTO product;
             try {
                 product = productService.getPublicProduct(productId);
             } catch (ProductNotFoundException e) {
-                // 商品不存在，回傳空列表
                 responseObserver.onNext(GetRelatedProductsResponse.newBuilder()
                         .setCode(GrpcResponseCode.SUCCESS.code())
                         .setMessage("查詢成功")
@@ -1936,7 +1791,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                 return;
             }
 
-            // 查詢同分類的 ACTIVE 商品（多取一筆以便排除自身後仍有足夠數量）
             ProductQueryDTO query = ProductQueryDTO.builder()
                     .categoryIds(product.getCategoryId() != null
                             ? java.util.List.of(product.getCategoryId())
@@ -1944,12 +1798,11 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                     .status(ProductStatus.ACTIVE.value())
                     .page(1)
                     .pageSize(limit + 1)
-                    .publicApi(true) // 02 §2.7.2：公開讀路徑，套 onboarding filter
+                    .publicApi(true)
                     .build();
 
             ProductListResultDTO result = productService.getProductList(query);
 
-            // 轉換並排除自身
             GetRelatedProductsResponse.Builder responseBuilder = GetRelatedProductsResponse.newBuilder()
                     .setCode(GrpcResponseCode.SUCCESS.code())
                     .setMessage("查詢成功");
@@ -1984,10 +1837,8 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
     @Override
     public void deleteProduct(DeleteProductRequest request, StreamObserver<DeleteProductResponse> responseObserver) {
         try {
-            // 授權：僅 SELLER 可刪除商品
             GrpcAuthContext.requireAccountType(AccountType.SELLER);
 
-            // 驗證必填欄位
             if (request.getProductId().isEmpty()) {
                 responseObserver.onNext(DeleteProductResponse.newBuilder()
                         .setCode(GrpcResponseCode.INVALID_PARAM.code())
@@ -1997,7 +1848,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                 return;
             }
 
-            // 呼叫 Service
             productService.softDeleteProduct(request.getProductId(), request.getStoreId());
 
             responseObserver.onNext(DeleteProductResponse.newBuilder()
@@ -2014,7 +1864,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                     .setMessage("商品不存在")
                     .build());
         } catch (ProductAccessDeniedException e) {
-            // 越權防枚舉（API 設計規範 §14.1）：回應與「商品不存在」一致，對齊 getProduct
             responseObserver.onNext(DeleteProductResponse.newBuilder()
                     .setCode(GrpcResponseCode.NOT_FOUND.code())
                     .setMessage("商品不存在")
@@ -2051,7 +1900,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
             String certNo = request.getCertNo();
             String type = request.getType();
 
-            // 驗證參數
             if (certNo == null || certNo.isBlank()) {
                 responseObserver.onNext(VerifyCertificationResponse.newBuilder()
                         .setCode(GrpcResponseCode.CERT_NO_REQUIRED.code())
@@ -2073,7 +1921,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
 
             CertificationType certType = CertificationType.fromValue(type);
 
-            // 第二類認證暫不支援
             if (!CertificationTypeRules.isVerifiable(certType)) {
                 responseObserver.onNext(VerifyCertificationResponse.newBuilder()
                         .setCode(GrpcResponseCode.CERT_TYPE_NOT_VERIFIABLE.code())
@@ -2083,16 +1930,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                 return;
             }
 
-            // 字元白名單，規則與 gateway product.go 的 certNoPattern 同一組。
-            // certNo 會被 GovCertificationService 原字串接進政府 API 的查詢字串，而該 URL
-            // 尾端帶 api_key；放行 URI 保留字元等於讓呼叫端隨手把金鑰逼進例外訊息。
-            // 這裡不把 certNo 本身寫進 log——值由呼叫端控制。
-            //
-            // ⚠️ 必須擺在「類型可線上驗證」判斷之後：HACCP/ISO/GMP 的 certNo 永遠不會被送進
-            // 政府 API，白名單對它們沒有任何安全效益，卻會把 `ISO 22000:2018` 這種合法編號
-            // 從 501（暫不支援線上驗證）改判成 400，等於無故改掉對外契約。
-            // 真正的安全邊界在 GovCertificationService.verify() 開頭的同一道檢查，這裡只是
-            // 可驗證類型的提前退場。
             if (!GovCertificationService.isValidCertNo(certNo)) {
                 log.warn("verifyCertification.invalidCertNo", "認證編號含不合法字元或超出長度上限");
                 responseObserver.onNext(VerifyCertificationResponse.newBuilder()
@@ -2103,10 +1940,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                 return;
             }
 
-            // §9.4：回應由 {exists} 擴充為結構化。
-            // 🔴 exists 欄位必須保留（= found && validity == VALID），漏了就等於直接對舊 App
-            // 做了破壞性變更；新前端一律讀 result.validity——「已失效」會讓 exists=false，
-            // 塌成「查無此編號」會給賣家錯誤的文案（§8.6）。
             GovCertificationService.GovVerifyResult verifyResult =
                     govCertificationService.verifyDetailed(certNo, certType);
 
@@ -2141,7 +1974,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
         responseObserver.onCompleted();
     }
 
-    // ==================== Admin 分類管理 ====================
 
     /**
      * 取分類底下所有商品（admin 用，含分頁，依層級判斷）
@@ -2299,7 +2131,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
             io.github.will413028.hawkr.product.grpc.GetPublicOriginsSummaryRequest request,
             StreamObserver<io.github.will413028.hawkr.product.grpc.GetPublicOriginsSummaryResponse> responseObserver) {
         try {
-            // category_id: "0" 或空字串 = 全部
             Long categoryId = null;
             String rawCat = request.getCategoryId();
             if (rawCat != null && !rawCat.isEmpty() && !"0".equals(rawCat)) {
@@ -2397,12 +2228,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
         responseObserver.onCompleted();
     }
 
-    // ==================== 農產品認證申請與審核（19 號設計書 §9 / §10.1） ====================
-    //
-    // 角色分離（§5.1 gRPC 設計）：賣家 3 支、Admin 7 支，各自獨立 RPC，
-    // 不以 flag 分流角色；賣家版與 Admin 版連 Entity→Proto 的轉換方法都是分開的兩支
-    // （toSellerProto / toAdminProto），gov_verify_payload 與 internal_note
-    // 在賣家路徑上是「結構上拿不到」，不是靠記得別填。
 
     /**
      * 賣家送出單筆認證申請（§9.1）。
@@ -2586,7 +2411,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
                             .setTotal(String.valueOf(paged.total()))
                             .setPage(String.valueOf(page))
                             .setPageSize(String.valueOf(pageSize));
-            // 商品名與公開狀態由 Service 另行補齊（Repository 不把它 JOIN 進 Entity，partial projection 禁令）
             Map<Long, ProductPublicationBriefProjection> productBriefs = loadProductBriefsForAdmin(paged.records());
             for (io.github.will413028.hawkr.product.entity.ProductCertificationApplicationEntity app : paged.records()) {
                 builder.addRecords(certificationConverter.toAdminProto(
@@ -2756,7 +2580,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
         responseObserver.onCompleted();
     }
 
-    // ---------- 認證 RPC 的共用 helper ----------
 
     /** approve / reject / revoke 的共用外殼（動作由 RPC 名稱區分，不用 flag 分流角色或動作）。 */
     @FunctionalInterface
@@ -2774,7 +2597,6 @@ public class ProductGrpcService extends ProductServiceGrpc.ProductServiceImplBas
             Long applicationId = requireApplicationId(request.getApplicationId());
             Long expectedVersion = ProtoConversionUtils.parseLongOrNull(request.getExpectedVersion());
             if (expectedVersion == null) {
-                // 缺 expectedVersion ＝ 沒有樂觀鎖保護，會靜默覆蓋掉別人的裁決 ⇒ 直接擋
                 responseObserver.onNext(ProductCertificationApplicationAdminResponse.newBuilder()
                         .setCode(GrpcResponseCode.INVALID_PARAM.code())
                         .setMessage("expected_version 為必填欄位且必須為數字字串")

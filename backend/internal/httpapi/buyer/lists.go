@@ -59,8 +59,6 @@ func encodeCursor[C any](scope string, c *C) string {
 	return rpc.TokenFor(scope, c)
 }
 
-// storeCards 讀取店家卡片，key 是 store_id；沒有卡片（從沒公開過或不存在）的店家不在 map 裡，client 看到 store 不設。
-// 評分由 httpseller.StatsSource 對整批卡片批次讀取一次，讀不到時只有評分不設：不影響卡片，也不轉成 Unavailable。
 func (h *App) storeCards(ctx context.Context, storeIDs []int64) (map[int64]*commonpb.StoreCard, error) {
 	cards, err := h.ports.Stores.StoreCards(ctx, storeIDs)
 	if err != nil {
@@ -198,7 +196,6 @@ func (h *App) CheckFavorite(ctx context.Context, req *connect.Request[pb.CheckFa
 	return connect.NewResponse(&pb.CheckFavoriteResponse{Favorited: yes}), nil
 }
 
-// batchIDs 只把字串 ID 解析成數字；批次上限是模組的規則（model.BatchIDs），在這裡不重複檢查。
 func batchIDs(values []string, field string) ([]int64, error) {
 	ids := make([]int64, len(values))
 	for i, value := range values {
@@ -211,7 +208,6 @@ func batchIDs(values []string, field string) ([]int64, error) {
 	return ids, nil
 }
 
-// batchUUIDs 只把字串 ID 解析成 UUID；批次上限是模組的規則（model.BatchUUIDs），在這裡不重複檢查。
 func batchUUIDs(values []string, field string) ([]uuid.UUID, error) {
 	ids := make([]uuid.UUID, len(values))
 	for i, value := range values {

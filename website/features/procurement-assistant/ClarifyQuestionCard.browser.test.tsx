@@ -28,7 +28,6 @@ const choiceQuestion: ClarifyQuestion = {
 	],
 };
 
-// 模擬後端逐輪回傳的白名單，不代表現行行情目錄或真實價格。
 const broadQuestion: ClarifyQuestion = {
 	...customQuestion,
 	prompt: "先確認你要採購的大品項，請選擇一項，或輸入品項名稱：",

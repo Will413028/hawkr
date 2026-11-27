@@ -36,7 +36,6 @@ func TestAccountCreationProvisionsBuyerInSameTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 買家不是角色（W5）：建帳之後沒有任何角色，買家由訂閱 AccountCreated 在同一個 transaction 建立。
 	if len(authenticated.Principal.Roles) != 0 {
 		t.Fatalf("created roles=%v", authenticated.Principal.Roles)
 	}

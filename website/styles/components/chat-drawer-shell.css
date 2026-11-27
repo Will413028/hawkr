@@ -1,10 +1,3 @@
-/* Root-eager geometry for the app-wide chat drawer's loading/error boundary.
- *
- * ThreadClient is intentionally loaded on interaction. These rules mirror the
- * matching selectors in messages.css so the drawer keeps its final dimensions
- * and branded room while that feature chunk is in flight. Keep declarations
- * identical; the focused ownership test guards the compatibility copy.
- */
 .thread-page {
 	position: relative;
 	isolation: isolate;

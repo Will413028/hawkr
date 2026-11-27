@@ -48,8 +48,6 @@ async function prepareSellerPosts(
 	baseURL: string,
 	imageStatus: 200 | 404,
 ): Promise<void> {
-	// Lowest-priority catch-all for secondary seller-shell requests. The gateway
-	// helper and exact fixtures below are registered later, so they win.
 	await page.route("**/api/v1/**", (route) =>
 		route.fulfill({
 			status: 200,

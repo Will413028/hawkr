@@ -24,7 +24,6 @@ test("calculateCenterCrop：已經是 16:9 的圖片原樣保留", () => {
 
 test("calculateCenterCrop：較寬的圖片（例如 2:1 / 1200x600）置中裁切左右兩側", () => {
 	const crop = calculateCenterCrop(1200, 600);
-	// 600 * (16 / 9) = 1066.6666666666667
 	const expectedWidth = (600 * 16) / 9;
 	const expectedSx = (1200 - expectedWidth) / 2;
 
@@ -37,7 +36,6 @@ test("calculateCenterCrop：較寬的圖片（例如 2:1 / 1200x600）置中裁�
 
 test("calculateCenterCrop：較高的圖片（例如 4:3 / 1200x900）置中裁切上下兩側", () => {
 	const crop = calculateCenterCrop(1200, 900);
-	// 1200 / (16 / 9) = 675
 	const expectedHeight = 675;
 	const expectedSy = (900 - expectedHeight) / 2;
 

@@ -8,15 +8,12 @@ import { renderWithIntl } from "@/tests/browser/render";
 import { AssistantEntrySkeleton } from "./AssistantEntryLayout";
 import AssistantEntryLink from "./AssistantEntryLink";
 
-// 測試不掛 App Router：next/navigation 的 useRouter 在它之外會丟錯。mock 專案自己的
-// `@/lib/intl/use-router`（所有 router 出口都經過它），不 mock 預先打包的 next/navigation。
 vi.mock("@/lib/intl/use-router", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("@/lib/intl/use-router")>();
 	const { staticRouter } = await import("@/tests/browser/static-router");
 	return { ...actual, useRouter: () => staticRouter };
 });
 
-// 入口連結依 HAWKR_AGENT_ENABLED（建置時決定的旗標）渲染；固定為開，測試不依賴 flavor 預設。
 vi.mock("./availability", () => ({ HAWKR_AGENT_ENABLED: true }));
 
 const GUEST_SESSION = Promise.resolve<SessionState>({ status: "guest" });

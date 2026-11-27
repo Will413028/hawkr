@@ -21,13 +21,10 @@ const ERROR_SHELL =
 	/Application error|Internal Server Error|NEXT_NOT_FOUND|This page could not be found|商品已下架|糟糕，火箭偏離了航道|暫時迷航|這頁不在貨架上/i;
 const ALLOWED_CONSOLE = [
 	/Download the React DevTools/i,
-	// The URL-less browser line is classified by the response/requestfailed
-	// monitors below, which include all Hawkr media origins.
 	/Failed to load resource/i,
 	/\[Fast Refresh\]/i,
 	/Content Security Policy directive 'upgrade-insecure-requests' is ignored/i,
 ];
-// The media host the build under test was configured with (NEXT_PUBLIC_MEDIA_BASE_URL).
 const HAWKR_MEDIA_HOSTS = new Set(
 	[process.env.NEXT_PUBLIC_MEDIA_BASE_URL]
 		.filter((value): value is string => Boolean(value?.trim()))
@@ -101,8 +98,6 @@ async function discoverFixtureIds(
 				};
 			};
 			const record = envelope.data?.records?.[0];
-			// (a) Empty catalog is a deterministic, legitimate state — signal skip
-			// rather than retrying an answer that will not change.
 			if (!record) return null;
 			const productId = asNumericId(record.id);
 			const storeId = asNumericId(
@@ -112,18 +107,11 @@ async function discoverFixtureIds(
 					record.seller?.store_id ??
 					record.seller?.id,
 			);
-			// (b) A real record that cannot expose numeric ids is a broken contract,
-			// not an empty catalog — keep failing.
 			if (!productId || !storeId) {
 				lastFailure =
 					"product fixture record present but omitted numeric product/seller ids";
 				continue;
 			}
-			// `null` here means the backend answered and this seller has no
-			// store_code — middleware only redirects a key it could resolve, so it
-			// serves its document straight from the store_id path. A lookup that
-			// never got an answer throws instead of reaching this `??`, because
-			// middleware would still resolve the code server-side and 308 us.
 			const sellerId =
 				(await canonicalSellerSegment(request, storeId)) ?? storeId;
 			return { productId, sellerId };
@@ -205,9 +193,6 @@ async function assertNoUnresolvedLinks(page: Page, route: string) {
 		if (/(?:^|[/=?#])(?:undefined|null)(?:$|[/&#])/i.test(href)) {
 			return true;
 		}
-		// 未解析的動態片段（`/products/[id]`）只可能出現在 path 上。整條 href 一起掃
-		// 會誤傷第三方分享連結的 query —— Facebook 的 `__cft__[0]=` 就長這樣，而那是
-		// 商品描述裡的正常外連，不是渲染失敗。
 		const pathname = (() => {
 			try {
 				return new URL(href, "https://placeholder.invalid").pathname;
@@ -279,15 +264,8 @@ test.describe("public dynamic route browser health", () => {
 		test(`${entry.pattern} hard-loads and hydrates`, {
 			tag: ["@contract", "@live"],
 		}, async ({ page, request }) => {
-			// Resolve data-backed IDs only for routes that actually need them.
-			// Keeping this out of a describe-level beforeAll lets deterministic
-			// order callback tests run even when the current public catalog is
-			// legitimately empty (as production was during this audit).
 			fixturesPromise ??= discoverFixtureIds(request);
 			const fixtures = await fixturesPromise;
-			// An empty public catalog (pre-launch prod) leaves nothing to
-			// materialize — skip these data-backed routes; they resume
-			// automatically once the catalog carries a product.
 			test.skip(
 				fixtures === null,
 				"public catalog legitimately empty (pre-launch prod)",
@@ -306,11 +284,6 @@ test.describe("public dynamic route browser health", () => {
 		);
 		if (!entry) throw new Error("payment callback route is missing");
 		const route = materializeDynamicRoute(entry);
-		// This callback intentionally redirects a guest into /login. Install the
-		// provider bridge before the document loads so GSI sees a complete local
-		// implementation and never requests accounts.google.com with CI's dummy
-		// client id. Keep this scoped to the one login-producing route rather than
-		// suppressing genuine console errors across the route inventory.
 		await installProviderMocks(page);
 		const issues = attachRuntimeMonitors(page);
 		const response = await gotoStreamed(page, route);

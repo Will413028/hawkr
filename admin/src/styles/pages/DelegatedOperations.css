@@ -1,10 +1,3 @@
-/* 按鈕在上、錯誤帶在下。
- *
- * 原本兩者橫排：錯誤帶是**不定長的上游文字**（未知碼會退回「…（代碼 X）。」，
- * 碼本身可到 80 字），橫排時它的 max-content 就是這一列的寬度，而商家詳情頁的
- * `.header-actions` 是 `flex-shrink: 0` ⇒ 壓力全部轉給 `.header-left`：店名折成
- * 「十八養／場」、meta 六欄各自折行、分隔用的「·」被留在自己一行，右端的
- * 「刪除帳號」直接被推出可視區。上下排列讓文字自己折行，不去定義工具列的寬度。 */
 .adm-operation-entry {
 	display: inline-flex;
 	flex-direction: column;
@@ -24,10 +17,6 @@
 	gap: 8px;
 }
 
-/* 多了「代行營運」按鈕之後這張表在 1440 會溢出，容器因此改成可橫捲。
-   ⚠️ 可橫捲只保證「捲得到」，不保證「看得到」——「操作」欄本身釘在右緣的規則在
-   `MerchantManagement.css`（`.merchant-management .merchant-table td:last-child`），
-   兩者是一組，改一邊要看另一邊。 */
 .merchant-management .merchant-table-container {
 	overflow-x: auto;
 }
@@ -163,10 +152,6 @@
 	transform: translateY(0);
 }
 
-/* 不可代行的列上，這顆按鈕的 label 就是原因。停用態必須自己有一組中性色：沿用
-   金色底等於把「說明」畫成「可以按」，而 `disabled` 不改變任何顏色。
-   `:hover` 在停用按鈕上照樣命中（指標事件沒被關掉），所以上面兩條要排除它，
-   否則游標一移過去就浮起來、變回可按的樣子。 */
 .adm-operation-trigger:disabled {
 	border-color: var(--gray-200);
 	background: var(--gray-100);
@@ -631,10 +616,6 @@
 	font-size: 18px;
 }
 
-/* 商家頁／列表頁入口內的錯誤帶另有寬度上限：只靠 `.adm-operation-entry` 的上下排列，
-   它仍會以 max-content 撐寬整個入口，而入口所在的 `.header-actions` 是 flex-shrink: 0
-   ⇒ 壓力轉給店名與 meta 那一側（見 `MerchantCertificationDetail.css` 的 `.header-left`）。
-   上限只給這個位置：對話框內、治理頁與撤銷視窗裡的同一個元件是整列寬的告示，該撐滿。 */
 .adm-operation-entry .adm-operation-error {
 	max-width: 34ch;
 }
@@ -644,12 +625,6 @@
 	margin-top: 4px;
 	font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
 	font-size: 11px;
-	/* 追蹤編號是一整串不含空白的字元（`safeUpstreamError` 收 `[A-Za-z0-9._:-]{1,128}`），
-	   純英數的那種**一個正常換行點都沒有**。它必須在窄容器裡也能斷 —— 這條與上面的
-	   `max-width: 34ch` 是一組：加了上限卻沒讓它斷，128 字的編號會直接穿出錯誤帶
-	   （實測 64 字純十六進位在 1440 下溢出 174.7px、右緣 1453.7 已超出視窗），
-	   等於把「錯誤帶撐爆 header」換成「文字自己跑出去」。
-	   截斷不是選項：追蹤編號存在的唯一目的就是整串拿去查 log。 */
 	overflow-wrap: anywhere;
 }
 
@@ -919,7 +894,6 @@
 	}
 }
 
-/* ── 代行紀錄（治理視角）：mockup image11 主區 ＋ 稽核內容面板 ───────────── */
 .adm-audit-console {
 	display: flex;
 	flex-direction: column;
@@ -991,8 +965,6 @@
 	gap: 16px;
 }
 
-/* 工作階段代號是 17 字的 base36，用 KPI 卡的字級會被裁掉；開始時間同理帶日期。
-   兩張改用可換行的較小字級，數字卡維持原樣。 */
 .adm-audit-summary-cards > .stat-card:nth-child(-n + 2) .stat-value {
 	font-size: 18px;
 	line-height: 1.4;
@@ -1038,8 +1010,6 @@
 	font-size: 14px;
 }
 
-/* 三態攤開那一列比其他列長，佔滿整行才不會把數字擠成兩行看不出對應；
-   值改為緊跟標籤左對齊（其餘列的值就在標籤旁邊，靠右會讀成另一欄的資料）。 */
 .adm-audit-close-rows li.adm-audit-close-rows__wide {
 	grid-column: 1 / -1;
 	grid-template-columns: auto auto minmax(0, 1fr);
@@ -1075,11 +1045,6 @@
 	color: var(--admin-danger);
 }
 
-/* 撤銷紀錄（誰／何時／為什麼中止這個工作階段）。
- *
- * 刻意不像 `.adm-audit-safety--breached` 那樣整塊鋪 danger 底色：撤銷是正常的治理
- * 動作，整塊紅會與「三層鎖定被打穿」那個 P0 訊號同一個視覺重量。只有左緣、圖示與
- * 標題吃 danger 色，與右上角「已撤銷」徽章對得上。 */
 .adm-audit-revocation {
 	display: flex;
 	gap: 10px;
@@ -1109,9 +1074,6 @@
 	color: var(--admin-muted-aa);
 }
 
-/* 理由是使用者輸入的自由文字（最長 200 字）。沒有空白的長字串（貼上的工單網址、
-   一整串日文或中文）在預設 `overflow-wrap` 下不會斷行，會把卡片撐寬並讓整頁產生
-   橫向捲動。 */
 .adm-audit-revocation__reason {
 	overflow-wrap: anywhere;
 }
@@ -1122,13 +1084,6 @@
 	font-size: 12px;
 }
 
-/* 主表獨佔整個寬度。稽核內容是 modal（`AuditDetailDialog`），不再是側欄。
- *
- * 曾經有過兩版側欄：`grid-template-columns: minmax(0,1fr) 340px`（面板永遠吃掉
- * 340px，1440 筆電上主欄只剩 673px 而表格 min-content 是 765px ⇒「結果」欄被裁到
- * 可視區外），以及之後的 `flex-wrap: wrap`（塞不下就換行到表格下方）。後者不裁切，
- * 但換行之後面板開在畫面外，按「查看前後差異」看起來像沒反應。
- * 兩版的共同錯誤是讓一個「點某列之後才有內容的下鑽視圖」跟主表搶同一條水平空間。 */
 .adm-audit-main {
 	display: flex;
 	flex-direction: column;
@@ -1152,13 +1107,6 @@
 }
 
 .adm-audit-table-wrap {
-	/* 「變更摘要」與「理由」兩欄的下限，都**只宣告在這裡**。
-	   兩者只被表格內的 `.adm-audit-col-summary` / `.adm-audit-col-reason` 讀，而使用
-	   本 wrap 的三張表（治理台稽核表、代行授權歷程）全都包在本 wrap 之下，一份就夠。
-	   ⚠️ 曾經還有第二份 `--adm-audit-summary-min` 宣告在 `.adm-audit-layout` 上，供
-	   側欄版的主欄算換行門檻；稽核內容改成 modal、側欄拆掉之後那份已隨之移除。
-	   別再複製第二份 —— 那等於多一個會漂移的數字（2026-08-19 就是因為某張表拿不到
-	   外層那份，min-width computed 成 auto，240px 下限整條靜默失效）。 */
 	--adm-audit-summary-min: 240px;
 	--adm-audit-reason-min: 200px;
 	overflow-x: auto;
@@ -1198,31 +1146,15 @@
 	font-weight: 600;
 }
 
-/* 唯一可換行的欄。兩件事一起做：
-   ① `width: 100%` 讓它吃下所有剩餘寬度（其餘欄都是 nowrap／內容極短，auto layout
-      本來會反過來把剩餘壓力全丟給這一欄，1440 實測被壓到 84.5px 寬 / 911px 高）；
-   ② `min-width` 是下限，連它都給不起時才讓容器橫捲，而不是先把這欄壓扁。
-   ⚠️ 這裡曾寫 `max-width: 520px` 想擋超寬螢幕的長行 —— **那是死碼**：`table-layout:
-   auto` 下瀏覽器依 CSS 2.1 §17.5.2 忽略儲存格的 max-width（實測 computed 回報
-   520px、實際仍量到 595.1px）。要限寬只能包一層 block 容器，不要把它加回這裡。
-   `min-width` 這一半是有效的（1440／1536 兩種情境都量到精準落在 240px）。 */
 .adm-audit-col-summary {
 	width: 100%;
 	min-width: var(--adm-audit-summary-min);
 }
 
-/* 動作欄：唯一既沒有 nowrap 也沒有 min-width 的欄，因此 `.adm-audit-col-summary` 的
-   `width: 100%` 吃掉剩餘寬度之後，壓力全部落在它身上 —— 2026-08-19 在 1440／1600／1920
-   三個寬度實測欄寬**恆為 58.3px**，把「調整授權範圍」壓成一字一行的直排六行，而右側還
-   留著大片空白。時間與理由沒事，是因為 `td:first-child`／`td:last-child` 有 nowrap 守著。
-   ⚠️ 用具名 class 而不是 nth-child：欄位增刪時 nth-child 會靜默指到別欄（同 col-summary）。
-   放不下時退回 `.adm-audit-table-wrap` 的 `overflow-x: auto` 橫捲，不會有東西看不到。 */
 .adm-audit-col-action {
 	white-space: nowrap;
 }
 
-/* 授權歷程「範圍變更」欄的差異列。＋／－ 兩個記號才是可讀的區別，顏色只是加強
-   ——只靠顏色的話，色覺障礙與灰階列印都讀不出增減。 */
 .adm-scope-delta {
 	line-height: 1.6;
 }
@@ -1298,7 +1230,6 @@
 	color: var(--admin-danger);
 }
 
-/* PENDING 刻意是中性樣式：既非綠勾也非紅字，它是「還不知道」。 */
 .adm-audit-result--pending {
 	background: var(--admin-control);
 	color: var(--admin-body);
@@ -1320,20 +1251,6 @@
 	white-space: nowrap;
 }
 
-/* 理由欄。兩張表的病相反，同一個 class 一起治：
-   ① 稽核台（第 4 欄）—— 全表唯一既沒 nowrap 也沒下限的欄（上面那條只護得到時間與
-      結果），`.adm-audit-col-summary` 的 `width: 100%` 吃掉剩餘寬度後壓力全落在它身
-      上，被壓成一行一兩個字的窄柱；而同列那個吃走大片寬度的「變更摘要」多半只寫著
-      「未寫入」四個字。理由是這張表最該被讀的一欄，下限得由它自己持有。
-   ② 授權歷程表（第 5 欄＝`td:last-child`）—— 反過來吃到上面那條 nowrap，而
-      `operationReason` 上限 200 字（authorization.ts），一則長理由被拉成一整行就
-      把整張表推進橫捲、右端直接被裁掉。
-   ⚠️ 兩件事都是特異性問題，缺一都會靜默失效：
-     · 選擇器必須帶 `td` —— `.adm-audit-table td:last-child` 是 (0,2,1)，只寫
-       `.adm-audit-col-reason`（0,1,0）連比都不用比。
-     · 位置必須在上面那條**之後** —— 兩者同為 (0,2,1)，勝負只由源碼順序決定。
-       2026-08-20 實測：放在前面時 `min-width` 生效（那一半沒有競爭者）而
-       `white-space` computed 仍是 `nowrap`，看起來像修好了一半。 */
 .adm-audit-table th.adm-audit-col-reason,
 .adm-audit-table td.adm-audit-col-reason {
 	min-width: var(--adm-audit-reason-min);
@@ -1362,9 +1279,6 @@
 	cursor: pointer;
 }
 
-/* 授權歷程那一欄的展開鈕不要上面那條的 `display: block` ＋ 6px 上緣：每一列都多一
-   行，等於把靠差異省下來的高度又還回去。改成隨最後一行差異文字流動，塞不下才換行。
-   ⚠️ 必須排在 `.adm-audit-detail-trigger` **之後** —— 兩者同為 (0,1,0)，順序就是勝負。 */
 .adm-scope-full-toggle {
 	display: inline;
 	margin-top: 0;
@@ -1421,7 +1335,6 @@
 	word-break: break-word;
 }
 
-/* badge 在直式 flex 容器裡會被拉成滿寬，看起來像色塊而不是標籤。 */
 .adm-audit-detail-value .adm-audit-result,
 .adm-audit-detail-value .adm-audit-risk {
 	align-self: flex-start;
@@ -1455,8 +1368,6 @@
 	word-break: break-all;
 }
 
-/* 選擇器綁在複製鍵自己的類名上，不是綁在 `.adm-audit-copyable` 底下的 button：
-   同一顆鍵現在也掛在摘要卡的值旁邊（工作階段 ID），那裡沒有這層外框。 */
 .adm-audit-copy-button {
 	border: 0;
 	background: none;
@@ -1465,8 +1376,6 @@
 	line-height: 1;
 }
 
-/* 摘要卡的值是 18px／800（見上方 nth-child 規則），全域 `button { font: inherit }`
-   會讓複製鍵跟著放大到壓過代號本身。 */
 .adm-audit-summary-cards .adm-audit-copy-button {
 	margin-left: 6px;
 	font-size: 14px;
@@ -1474,8 +1383,6 @@
 	vertical-align: middle;
 }
 
-/* 摘要列（工作階段 ID）的值是 600 粗體，同一個 `font: inherit` 會讓複製鍵跟著變粗
-   ——同一顆鍵在兩處看起來必須是同一顆，否則讀者會以為它們是不同的動作。 */
 .adm-audit-close-rows .adm-audit-copy-button {
 	margin-left: 6px;
 	font-weight: 400;
@@ -1548,13 +1455,6 @@
 	}
 }
 
-/* ==========================================================================
-   代行授權（商家詳情頁「代行授權」分頁，backend#2444）
-
-   全部延伸既有 token 與既有 class：狀態底色沿用 `--admin-success` / `--hk-border`
-   一系，卡片與表格直接重用 `.adm-audit-*`。這一區只補「授權面才有」的三件事：
-   能力勾選列、授權事實清單、撤回連帶影響。
-   ========================================================================== */
 .adm-authorization-panel {
 	display: flex;
 	flex-direction: column;
@@ -1714,8 +1614,6 @@
 	line-height: 1.6;
 }
 
-/* 能力勾選列。停用態是「由別項連帶」而不是「你沒有權限」，所以維持可讀對比、
-   由列內的說明句承載原因 —— 只靠 disabled 暗示授權是 DESIGN.md 明文禁止的。 */
 .adm-authorization-capability-list {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

@@ -29,9 +29,6 @@ import ts from "typescript-compiler-api";
 const root = process.cwd();
 const failures: string[] = [];
 
-// 中日韓字元與全形標點。含 CJK 標點（、。「」）與全形形式（，：！？），因為
-// 「，換行」正是本 class 最常見的形狀。刻意不含 U+3000 表意空格——它本身就是
-// 刻意排版用的空白，多一個半形空白對它沒有可辨識的差別。
 const CJK = /[、-〿ㄅ-ㄯ㐀-䶿一-鿿豈-﫿︰-﹏！-｠￠-￦]/;
 
 /**
@@ -70,7 +67,7 @@ function scan(path: string): void {
 		path,
 		source,
 		ts.ScriptTarget.Latest,
-		/* setParentNodes */ true,
+		 true,
 		ts.ScriptKind.TSX,
 	);
 
@@ -109,7 +106,6 @@ function walk(dir: string, match: RegExp): string[] {
 			continue;
 		}
 		const rel = relative(root, join(root, dir, entry));
-		// 掃描中被刪掉的檔案 / 壞掉的 symlink 要退化成「跳過」，不能讓整條 lint 崩掉。
 		let isDirectory: boolean;
 		try {
 			isDirectory = statSync(join(root, rel)).isDirectory();
@@ -122,10 +118,6 @@ function walk(dir: string, match: RegExp): string[] {
 	return out;
 }
 
-// Self-check。
-// 必攔：全形逗號跨行、斷在詞中間、中間夾一整行空白的兩段中文——最後那組同時證明
-// 「空行先丟掉再判相鄰」這條 Babel 規則有實作到，漏掉它會讓夾空行的段落靜靜漏網。
-// 必放：英文跨行（本來就需要那個空白）、單行中文、中英兩種交界、純空白節點。
 const selfCaught = [
 	"\n\t\t\t\t\t這是本次代行唯一會取得未遮罩收件資訊的動作，\n\t\t\t\t\t並計入結束摘要。\n\t\t\t\t",
 	"\n\t\t\t\t\t要等商品\n\t\t\t\t\t上架之後才看得到。\n\t\t\t\t",

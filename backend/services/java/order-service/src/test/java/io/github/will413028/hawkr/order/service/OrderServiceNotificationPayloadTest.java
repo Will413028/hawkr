@@ -35,11 +35,9 @@ class OrderServiceNotificationPayloadTest {
 
     @org.junit.jupiter.api.BeforeAll
     static void initTsid() {
-        // completeOrderInTx 內建撥款任務會 TsidUtil.generate()
         try {
             io.github.will413028.hawkr.common.utils.TsidUtil.init(300, 0);
         } catch (IllegalStateException ignored) {
-            // 已由其他測試初始化
         }
     }
 

@@ -62,9 +62,6 @@ export default function ReportDetailPage() {
 	const triage = useMutation(G.triageReport, { onSuccess: invalidate });
 	const resolve = useMutation(G.resolveReport, { onSuccess: invalidate });
 	const move = useMutation(G.moveReport, { onSuccess: invalidate });
-	// 明確的已讀：頁面顯示補充時記下這筆通報的補充看過了（GetReport 本身不改狀態）。帶讀到的 etag；etag 過時（讀到之後又有新的補充）就重讀，
-	// 重讀到的新 etag 會讓下面的 effect 再記一次。標記不讓 etag 前進，所以不會讓分案、設定結果等對話框裡的 etag 過時。其他失敗不重試：標記留著，
-	// 案件頁的「新的補充」仍然如實顯示還沒看過。
 	const markSeen = useMutation(G.markReportSupplementsSeen, {
 		onSuccess: invalidate,
 		onError: () => void detail.refetch(),

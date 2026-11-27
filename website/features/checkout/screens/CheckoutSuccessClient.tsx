@@ -28,7 +28,6 @@ function Inner() {
 			setCopied(true);
 			window.setTimeout(() => setCopied(false), 1600);
 		} catch {
-			// clipboard blocked — silently ignore, user can long-press to copy
 		}
 	};
 

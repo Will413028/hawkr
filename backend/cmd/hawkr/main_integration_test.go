@@ -27,9 +27,6 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// migratedURL 建一個套用好 migrate 子命令全部 migration 的 database（River 的表與 migrations() 的每個模組，
-// 順序同 runMigrate），從 template 複製，不必每支測試重跑 migration。migrate 子命令本身由
-// TestMigrateIsRepeatableAgainstARealDatabase 對空的 database 驗證。
 func migratedURL(t *testing.T) string {
 	t.Helper()
 	return pg.NewURL(t, testdb.Jobs(), testdb.Migrations(migrations()...))
@@ -96,8 +93,6 @@ func TestSchemaFileMatchesMigrations(t *testing.T) {
 					t.Fatalf("%s 無法套用：%v", name, err)
 				}
 			}
-			// sqlc 讀的是 schema.sql：它若建立別的模組的表，參照別的模組的 query 就能通過生成，
-			// 而 migration 沒變，下面的比對也看不出來。
 			foreign, err := migrate.ForeignObjects(ctx, fromSchema, m.Name)
 			if err != nil {
 				t.Fatal(err)
@@ -116,7 +111,6 @@ func TestSchemaFileMatchesMigrations(t *testing.T) {
 			if want == "" {
 				t.Fatal("schema.sql 沒有建立任何東西，比對沒有意義")
 			}
-			// 單體規則 6：模組的每個函式都是 BEGIN ATOMIC、回傳型別不是表或 view 的整列（pub_* 與內部函式都算）。
 			broken, err := migrate.FunctionsBreakingRule6(ctx, fromMigrations, m.Name)
 			if err != nil {
 				t.Fatal(err)
@@ -195,12 +189,10 @@ func TestWorkerRunsQueuedJobs(t *testing.T) {
 	t.Setenv("WEB_REVALIDATE_SECRET", "test")
 	t.Setenv("KYC_HASH_KEYS", "test1:dGVzdC1reWMtaGFzaC1obWFjLWtleS0wMDAwMDAwMDE=")
 	t.Setenv("SMS_SENDER", "log")
-	// 連線在第一次送出時才建立；這個測試不送事件。
 	t.Setenv("RABBITMQ_URL", "amqp://guest:guest@127.0.0.1:1/")
 	setMediaEnv(t, "dev1:ZGV2LW9ubHktbWVkaWEta2VrLTAwMDAwMDAwMDAwMDA=")
 	t.Setenv("ORDER_SERVICE_ADDR", "127.0.0.1:1")
 	t.Setenv("INVOICE_SERVICE_ADDR", "127.0.0.1:1")
-	// 通知的 provider 替身只在 dev 環境（DEV_AUTH_KEY_FILE）選到，與 Makefile 的 MONOLITH_ENV 同一組；推播圖片網址要 MEDIA_ORIGIN。
 	t.Setenv("DEV_AUTH_KEY_FILE", writeDevKey(t))
 	t.Setenv("MEDIA_ORIGIN", "http://localhost:8787")
 	ctx := context.Background()
@@ -238,10 +230,8 @@ func TestWorkerRunsQueuedJobs(t *testing.T) {
 	}
 }
 
-// platformDirs 是 platformData 每個 schema 的套件目錄（相對於 backend/）。
 var platformDirs = map[string]string{inbox.Schema: "internal/platform/inbox", adminaudit.Schema: "internal/platform/adminaudit", bizcalendar.Schema: "internal/platform/bizcalendar"}
 
-// sourceDir 是 schema 的原始碼目錄（相對於 backend/）：platform 的在 platformDirs，模組的是 internal/modules/<名稱>。
 func sourceDir(name string) string {
 	if dir, ok := platformDirs[name]; ok {
 		return dir

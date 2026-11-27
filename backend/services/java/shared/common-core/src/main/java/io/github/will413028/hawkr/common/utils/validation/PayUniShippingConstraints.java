@@ -27,7 +27,6 @@ public final class PayUniShippingConstraints {
 
     private PayUniShippingConstraints() {}
 
-    // ==================== 收件人姓名（前端可控，源頭驗證） ====================
 
     /** 超商 7-11 收件人姓名顯示長度下限（2 中文 / 4 英文）。 */
     public static final int CVS_RECIPIENT_NAME_MIN = 4;
@@ -38,7 +37,6 @@ public final class PayUniShippingConstraints {
     /** 黑貓宅配收件人姓名顯示長度上限（無官方下限，僅以非空驗證）。 */
     public static final int HOME_RECIPIENT_NAME_MAX = 30;
 
-    // ==================== 寄件人姓名（賣家開通物流設定，前端可控，源頭驗證） ====================
 
     /** 超商 7-11 建店寄件人/聯絡人姓名（ContactName）顯示長度上限。 */
     public static final int CVS_SENDER_NAME_MAX = 10;
@@ -46,12 +44,10 @@ public final class PayUniShippingConstraints {
     /** 黑貓宅配建店寄件人姓名（SenderName）顯示長度上限。 */
     public static final int HOME_SENDER_NAME_MAX = 30;
 
-    // ==================== 收件人地址（前端可控，源頭驗證） ====================
 
     /** 黑貓宅配收件人地址顯示長度上限。 */
     public static final int RECIPIENT_ADDRESS_MAX = 120;
 
-    // ==================== 商品名稱（系統背景填寫，截斷適配） ====================
 
     /** 黑貓宅配商品名稱顯示長度上限。 */
     public static final int HOME_GOODS_NAME_MAX = 20;

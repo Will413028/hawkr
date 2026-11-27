@@ -22,27 +22,21 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 )
 
-// dashSources 同時是儀表板的三個來源。每個來源可以注入錯誤、卡住直到逾時，或回傳指定的值；
-// 每個 goroutine 只寫自己那一組欄位（銷售、訂單狀態、粉絲、瀏覽數各一組），所以不需要鎖。
 type dashSources struct {
-	// 銷售
 	sales       []SalesStats
 	salesErr    error
 	salesHangs  bool
 	salesWindow []SalesWindow
 	salesStore  int64
-	// 訂單狀態
 	counts      OrderStatusCounts
 	countsErr   error
 	countsHangs bool
-	// 粉絲
 	followers       buyer.SubscriberStats
 	followersErr    error
 	followersHangs  bool
 	followerWindows []buyer.TimeWindow
 	followerStore   int64
 	followerCalls   int
-	// 瀏覽數
 	viewsCurrent int64
 	viewsPrev    int64
 	viewsErr     error
@@ -93,7 +87,6 @@ func (f *dashSources) ProductViewsBetween(ctx context.Context, _ int64, start, e
 	return f.viewsPrev, nil
 }
 
-// healthy 回傳每個欄位都不同的來源，欄位對調時測試會看出來。
 func healthy() *dashSources {
 	return &dashSources{
 		sales:        []SalesStats{{Orders: 12, Customers: 7, Revenue: 1000}, {Orders: 10, Customers: 6, Revenue: 900}},
@@ -104,7 +97,7 @@ func healthy() *dashSources {
 	}
 }
 
-var clockAtTaipeiDayBoundary = time.Date(2026, 10, 4, 0, 30, 0, 0, twtime.Taipei) // = 2026-10-03 16:30 UTC
+var clockAtTaipeiDayBoundary = time.Date(2026, 10, 4, 0, 30, 0, 0, twtime.Taipei)
 
 func dashboardHandler(t *testing.T, src *dashSources, now time.Time) *App {
 	return mustApp(t, &fakeModule{}, nil, rpc.Images{}, Dashboard{

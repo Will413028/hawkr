@@ -70,7 +70,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/revalidate"
 )
 
-// shutdownTimeout 是收到停止訊號後，給進行中請求收尾的時間。
 const shutdownTimeout = 30 * time.Second
 
 const usage = "可用的子命令：serve、worker、migrate、dev-token、dev-seed、reannounce-exposures、delegation-eligibility、admin-role、admin-audit、social-recount"
@@ -121,7 +120,6 @@ func run(ctx context.Context, args []string) error {
 	}
 }
 
-// dbConfig 讀取資料庫設定。
 func dbConfig(e *config.Env) db.Config {
 	return db.Config{
 		URL:                e.String("DATABASE_URL"),
@@ -134,19 +132,12 @@ func runServe(ctx context.Context) error {
 	e := config.NewEnv()
 	addr := e.StringOr("HTTP_ADDR", ":8080")
 	dbc := dbConfig(e)
-	// 舊服務的 gRPC 以服務間簽章認證；沒設定時不簽章，只有對方的 INTERNAL_AUTH_MODE 不是 enforcing 時能用。
 	internalSecret := e.StringOr("INTERNAL_SERVICE_HMAC_SECRET", "")
-	// 對外圖片的網域（image gateway），client 不持有它（ADR 2026-09-25-api-image-uri-template）。
 	mediaOrigin := e.String("MEDIA_ORIGIN")
-	// 網站的網域：API 回給 client 的網站網址（入駐文件）一律是絕對網址，由 internal/httpapi 以它組成。
 	webOrigin := e.String("PUBLIC_WEB_ORIGIN")
-	// 單體是對外的入口（遷移計畫 A2）：還沒搬的路徑轉給 gateway。
 	gatewayURL := e.String("GATEWAY_URL")
-	// 單體替舊服務提供 account-service 的 gRPC（h2c），舊服務的 ACCOUNT_SERVICE_* 指向這裡。
 	legacyAddr := e.String("LEGACY_GRPC_ADDR")
 	orderAddr := e.String("ORDER_SERVICE_ADDR")
-	// 直接呼叫單體的 web 的 origin（CSRF 與 gateway 的 WebSocket 比對；後台經自己的 BFF 呼叫，不在這裡）；限流的身分（origin-auth 的金鑰、
-	// CDN 帶的 client IP header）。
 	origins := e.List("CORS_ALLOWED_ORIGINS")
 	originAuth := httpapi.OriginAuth{
 		Main: []byte(e.StringOr("ORIGIN_AUTH_SECRET", "")),
@@ -161,7 +152,6 @@ func runServe(ctx context.Context) error {
 	kycMAC := readKYCHashKeys(e)
 	paymentProvider := readPayment(e, log)
 	chargeProvider := readCharge(e, log)
-	// 買家付款的 client 初始化用的公開金鑰（不是 secret）；與收款開通的 STRIPE_PUBLISHABLE_KEY 是同一把平台金鑰。
 	paymentPublishableKey := e.StringOr("STRIPE_PUBLISHABLE_KEY", "")
 	notificationConfig := readNotificationProviders(ctx, e, log)
 	registry := readGCIS(e)
@@ -220,7 +210,6 @@ func runServe(ctx context.Context) error {
 	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{catalog: catalogModule}, kycMAC, payments, registry, log)
 	owners.bind(sellerModule)
 	subscribeSellerPayout(bus, sellerModule)
-	// 資料庫參照的 HMAC 金鑰（防詐保存的 blind index、處分的身分快照）都要在設定的金鑰環裡，缺了就不啟動。
 	if err := sellerModule.CheckKYCKeys(ctx); err != nil {
 		return err
 	}
@@ -259,16 +248,13 @@ func runServe(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// 店面頁、賣家自己的店與所有清單上的店家卡片共用同一份統計組裝（粉絲來自 buyer，評價來自 review）。
 	stats, err := httpseller.NewStatsSource(buyerModule, sellerRatings{reviewModule}, log)
 	if err != nil {
 		return err
 	}
 	deletion := accountdeletion.New(accountdeletion.Deps{DB: d, Buyer: buyerModule, Seller: sellerModule, Identity: id, Orders: orders, Now: time.Now, NewID: uuid.NewV7, Logger: log})
 	del := newDelegation(bus, delegationDeps)
-	// 買家助理的 LLM 只經單一建構點（internal/platform/llm）；沒有 API key 時回停用的 LLM，輪次以失敗結束。
 	assistantModule := assistant.New(assistant.Deps{DB: d, LLM: llm.New(llm.Assistant, llmConfig, log).LLM(), Orders: assistantOrders{orders}, Now: time.Now})
-	// 收到停止訊號就讓進行中的輪次以失敗結束：WatchAssistantTurn 的串流最長 100 秒，不等輪次結束 HTTP 的收尾會被它拖到逾時。
 	stopAssistant := context.AfterFunc(ctx, func() {
 		sc, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
@@ -341,30 +327,23 @@ func runServe(ctx context.Context) error {
 	legacyMux.Handle(paymentconnect.NewPaymentServiceHandler(paymentserver.New(payments)))
 	legacyMux.Handle(sellerconnect.NewSellerServiceHandler(sellerserver.New(sellerModule, legacySellerRatings{reviewModule}, buyerModule, log)))
 	legacyMux.Handle(accountconnect.NewDelegationServiceHandler(delegationservice.New(del, log)))
-	// im 的即時通道（LISTEN 連線與存活標記）與 server 同一個生命週期：ctx 結束時 Run 返回、所有串流以 Shutdown 結束，Shutdown 才不會被開著的串流卡滿。
-	// Run 的連線是專用的（Deps.ListenConnConfig 為 nil：以主連線池的設定另開），所以 DATABASE_URL 必須是直連或 session 模式的 Postgres，不能經 transaction pooling。
-	// notification 的串流 hub 同理：每個 serve 行程一條專用 LISTEN 連線（worker 只 pg_notify，不跑 Run），Deps.ListenConnConfig 同樣是 nil。
 	serveErr := serveWithRun(ctx, joinRuns(imModule.Run, notificationModule.Run), listening{ln, newServer(h)}, listening{legacyLn, newServer(legacyMux)})
 	sc, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	return errors.Join(serveErr, assistantModule.Shutdown(sc))
 }
 
-// workerConcurrency 是 default queue 同時執行的 job 上限。
 const workerConcurrency = 10
 
 func runWorker(ctx context.Context) error {
 	e := config.NewEnv()
 	dbc := dbConfig(e)
-	// website 的快取失效沒有設定時不送出，但照常啟動（本機通常沒有 website；§9.5）。
 	rv := revalidate.Config{
 		BaseURL: e.StringOr("WEB_REVALIDATE_BASE_URL", ""),
 		Secret:  e.StringOr("WEB_REVALIDATE_SECRET", ""),
 	}
-	// 送給舊服務的事件（RabbitMQ）：還在 RabbitMQ 上的消費者搬進單體之前需要。
 	rabbitURL := e.String("RABBITMQ_URL")
 	orderAddr := e.String("ORDER_SERVICE_ADDR")
-	// 工作日行事曆推給還在舊服務的 invoice-service 當鏡像（bizcalendarrelay；A5 搬進單體後刪除）。
 	invoiceAddr := e.String("INVOICE_SERVICE_ADDR")
 	internalSecret := e.StringOr("INTERNAL_SERVICE_HMAC_SECRET", "")
 	log := newLogger()
@@ -375,7 +354,6 @@ func runWorker(ctx context.Context) error {
 	paymentProvider := readPayment(e, log)
 	chargeProvider := readCharge(e, log)
 	notificationConfig := readNotificationProviders(ctx, e, log)
-	// 推播圖片的網域：與 serve 同一個 MEDIA_ORIGIN（ADR 2026-09-25-api-image-uri-template D6：推播由組推播的 worker 組完整的 URL）。
 	mediaOrigin := e.String("MEDIA_ORIGIN")
 	registry := readGCIS(e)
 	mediaCfg := readMedia(e)
@@ -435,7 +413,6 @@ func runWorker(ctx context.Context) error {
 	sellerModule := newSeller(d, bus, jc, id, med, orders, sellerProducts{catalog: catalogModule}, kycMAC, payments, registry, log)
 	owners.bind(sellerModule)
 	subscribeSellerPayout(bus, sellerModule)
-	// 資料庫參照的 HMAC 金鑰（防詐保存的 blind index、處分的身分快照）都要在設定的金鑰環裡，缺了就不啟動。
 	if err := sellerModule.CheckKYCKeys(ctx); err != nil {
 		return err
 	}
@@ -528,7 +505,6 @@ func runWorker(ctx context.Context) error {
 	}
 	consumerCtx, stopConsumer := context.WithCancel(ctx)
 	defer stopConsumer()
-	// 單體自己的 queue（hawkr.monolith 前綴）的 consumer：買家的訂單完成與補貨、crm 的訂單完成與退款完成（單體是這兩類 crm 事件唯一的 consumer）。
 	consumerDone := make(chan struct{})
 	crmDone := make(chan struct{})
 	go func() {
@@ -546,7 +522,6 @@ func runWorker(ctx context.Context) error {
 	return err
 }
 
-// newLogger 是各角色共用的 log：JSON 寫到 stderr。
 func newLogger() *slog.Logger {
 	return slog.New(slog.NewJSONHandler(os.Stderr, nil))
 }
@@ -569,13 +544,10 @@ func runMigrate(ctx context.Context) error {
 	return migrate.Apply(ctx, d, migrations())
 }
 
-// serve 在 ctx 結束前持續服務；ctx 結束後停止接新連線，並等進行中的請求收尾。
 func serve(ctx context.Context, ln net.Listener, h http.Handler) error {
 	return serveAll(ctx, listening{ln, newServer(h)})
 }
 
-// newServer 建出公開 HTTP listener 用的 server，除 HTTP/1.1 外也收未加密的 HTTP/2（h2c）：App 的 Connect client
-// 只說 HTTP/2，開發時直連 http://；部署時 TLS 在反向代理終止，這裡只收內部流量。
 func newServer(h http.Handler) *http.Server {
 	srv := &http.Server{Handler: h, ReadHeaderTimeout: 10 * time.Second, Protocols: new(http.Protocols)}
 	srv.Protocols.SetHTTP1(true)
@@ -583,9 +555,6 @@ func newServer(h http.Handler) *http.Server {
 	return srv
 }
 
-// serveWithRun 在 serveAll 之外跑一個與 server 同生命週期的背景元件（im 的即時通道）：任何一方（ctx 結束、server 失敗、run 失敗）觸發收尾時，先取消 run 的 ctx 再 Shutdown，
-// 讓開著的串流以 run 的收尾結束，而不是讓 Shutdown 等滿逾時；
-// run 在 ctx 沒結束時返回（含 nil）都是失敗，會讓 server 停止並讓 serve 回錯誤（process 退出，由平台重啟），不靜默吞掉。
 func serveWithRun(ctx context.Context, run func(context.Context) error, servers ...listening) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -608,7 +577,6 @@ func serveWithRun(ctx context.Context, run func(context.Context) error, servers 
 	return errors.Join(serveErr, <-runDone)
 }
 
-// joinRuns 把多個背景元件併成一個 serveWithRun 的 run：全部同時跑；任何一個返回（ctx 結束或失敗）就取消其餘的，等全部返回後回傳合併的錯誤。
 func joinRuns(runs ...func(context.Context) error) func(context.Context) error {
 	return func(ctx context.Context) error {
 		ctx, cancel := context.WithCancel(ctx)
@@ -634,19 +602,15 @@ func joinRuns(runs ...func(context.Context) error) func(context.Context) error {
 	}
 }
 
-// listening 是一個在 listener 上服務的 server。
 type listening struct {
 	ln  net.Listener
 	srv *http.Server
 }
 
-// serveAll 讓每個 server 在自己的 listener 上服務，直到 ctx 結束或其中一個失敗；之後全部停止接新連線，並等
-// 進行中的請求收尾。
 func serveAll(ctx context.Context, servers ...listening) error {
 	return serveAllThen(ctx, nil, servers...)
 }
 
-// serveAllThen 同 serveAll；beforeShutdown 非 nil 時，在觸發收尾之後、Shutdown 之前呼叫一次。
 func serveAllThen(ctx context.Context, beforeShutdown func(), servers ...listening) error {
 	errc := make(chan error, len(servers))
 	for _, s := range servers {

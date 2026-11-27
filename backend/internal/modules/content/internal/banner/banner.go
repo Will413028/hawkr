@@ -62,10 +62,6 @@ func (m *Service) q(ctx context.Context) *store.Queries {
 	return store.New(m.d.DB.Conn(ctx))
 }
 
-// validate 要求行為完整：型別合法，而且帶著該型別需要的值。
-//
-// 修改 banner 是整筆覆寫，空的或不完整的行為必須在寫入端拒絕。url 只接受 http、https，
-// 避免後台對 App 觸發任意 scheme。
 func validateAction(a model.BannerAction) error {
 	switch a.Type {
 	case model.BannerActionPopup:
@@ -92,12 +88,10 @@ func validateAction(a model.BannerAction) error {
 	}
 }
 
-// hasEntityTarget 回報點擊行為的目標是 UUID 實體（貼文或商品）。
 func hasEntityTarget(a model.BannerAction) bool {
 	return a.Type == model.BannerActionPost || a.Type == model.BannerActionProduct
 }
 
-// canonicalEntityTarget 把貼文與商品目標轉成儲存用的正規形（去掉前後空白、小寫的標準 UUID 字串），一併回傳解析出的 ID；其他點擊行為原樣回傳、ID 是零值。
 func canonicalEntityTarget(a model.BannerAction) (model.BannerAction, uuid.UUID, error) {
 	if !hasEntityTarget(a) {
 		return a, uuid.UUID{}, nil
@@ -114,7 +108,6 @@ func canonicalEntityTarget(a model.BannerAction) (model.BannerAction, uuid.UUID,
 	return a, id, nil
 }
 
-// checkEntityTarget 在貼文或商品目標寫入前確認它存在：貼文要公開可讀，商品要公開可見。
 func (m *Service) checkEntityTarget(ctx context.Context, a model.BannerAction, id uuid.UUID) error {
 	if a.Type == model.BannerActionProduct {
 		return m.checkProductTarget(ctx, id)
@@ -122,7 +115,6 @@ func (m *Service) checkEntityTarget(ctx context.Context, a model.BannerAction, i
 	return m.checkPostTarget(ctx, id)
 }
 
-// checkProductTarget 在商品目標寫入前確認商品公開可見（catalog 的 PublicProduct，時間用模組的 clock）。
 func (m *Service) checkProductTarget(ctx context.Context, id uuid.UUID) error {
 	if _, err := m.d.Products.PublicProduct(ctx, id, m.d.Now()); err != nil {
 		if errors.Is(err, catalog.ErrProductNotFound) {
@@ -133,7 +125,6 @@ func (m *Service) checkProductTarget(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-// checkPostTarget 在貼文目標寫入前確認貼文 id 存在而且公開可讀（A7-D28 第 7 點）。
 func (m *Service) checkPostTarget(ctx context.Context, id uuid.UUID) error {
 	readable, err := m.d.Social.PubliclyReadablePosts(ctx, []uuid.UUID{id})
 	if err != nil {
@@ -145,7 +136,6 @@ func (m *Service) checkPostTarget(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-// normalized 去掉 popup 不該有的值（表單殘留）。
 func normalizeAction(a model.BannerAction) model.BannerAction {
 	if a.Type == model.BannerActionPopup {
 		return model.BannerAction{Type: a.Type}
@@ -153,15 +143,11 @@ func normalizeAction(a model.BannerAction) model.BannerAction {
 	return a
 }
 
-// maxButtonTextRunes 是 banner 按鈕文字的上限（字元數），與後台 banner 編輯器的輸入上限相同。
 const maxButtonTextRunes = 12
 
-// banner 清單每頁筆數的預設值與上限。
 const (
 	defaultBannerPage = 50
 	maxBannerPage     = 100
-	// maxActiveBanners 是啟用中的 banner 上限，上架時檢查。遠小於前台 ListLiveBanners 的預設頁大小，client
-	// 讀第一頁就拿到全部；兩個人同時上架可能超過一兩則，仍在一頁之內。
 	maxActiveBanners = 20
 )
 
@@ -172,7 +158,6 @@ func validateInput(in model.BannerInput) error {
 	if utf8.RuneCountInString(in.ButtonText) > maxButtonTextRunes {
 		return apperr.InvalidInputOn([]string{"ButtonText"}, "按鈕文字不可超過 %d 個字", maxButtonTextRunes)
 	}
-	// 排程是 [開始, 結束)：結束的那一刻就下架，所以結束必須晚於開始。
 	if in.StartsAt != nil && in.EndsAt != nil && !in.EndsAt.After(*in.StartsAt) {
 		return apperr.InvalidInputOn([]string{"EndsAt"}, "結束時間必須晚於開始時間")
 	}
@@ -218,8 +203,6 @@ func (m *Service) ListLiveBanners(ctx context.Context, after *model.BannerCursor
 	return page, nil
 }
 
-// dropUnreadablePostTargets 去掉貼文目標已不公開可讀（下架、刪除、取消發布等）的 banner（A7-D23 O5）；一次問 social，不是每則一次。
-// 只過濾已切好的這一頁：游標與有沒有下一頁以過濾前為準，所以一頁可能少於 size 筆（甚至是空的），下一頁照常接續。
 func (m *Service) dropUnreadablePostTargets(ctx context.Context, banners []model.Banner) ([]model.Banner, error) {
 	if !slices.ContainsFunc(banners, isPostBanner) {
 		return banners, nil
@@ -246,12 +229,10 @@ func (m *Service) dropUnreadablePostTargets(ctx context.Context, banners []model
 	return out, nil
 }
 
-// postBannerTarget 解析貼文 banner 的目標；資料庫的 CHECK（banners_action_check）保證儲存的貼文目標是小寫 UUID。
 func postBannerTarget(b model.Banner) uuid.UUID { return uuid.MustParse(b.Action.Target) }
 
 func isPostBanner(b model.Banner) bool { return b.Action.Type == model.BannerActionPost }
 
-// toBannerPage 把多取一筆的結果切成一頁：多出來的那筆存在，就表示還有下一頁。
 func toBannerPage(rows []store.ContentBanner, size int32) model.BannerPage {
 	var next *model.BannerCursor
 	if len(rows) > int(size) {
@@ -290,7 +271,6 @@ func (m *Service) CreateBanner(ctx context.Context, adminID int64, in model.Bann
 		}
 		return model.Banner{}, apperr.InvalidInputOn(fields, "新增 banner 必須上傳預覽圖與彈窗圖")
 	}
-	// 先驗證再轉正：驗證失敗時不該讓圖片掛在一則永遠不會建立的 banner 上。
 	if err := validateInput(in); err != nil {
 		return model.Banner{}, err
 	}
@@ -364,7 +344,6 @@ func (m *Service) UpdateBanner(ctx context.Context, input model.UpdateBannerInpu
 	if cur.Version != input.Version {
 		return model.Banner{}, bannerConflict()
 	}
-	// 貼文與商品目標只在換掉目標時檢查：目標沒變的 banner（例如貼文後來下架）仍可修改其他欄位或停用。
 	if input.Banner.Action != cur.Action {
 		canonical, targetID, err := canonicalEntityTarget(input.Banner.Action)
 		if err != nil {
@@ -377,7 +356,6 @@ func (m *Service) UpdateBanner(ctx context.Context, input model.UpdateBannerInpu
 			}
 		}
 	}
-	// 只有「上架」這個動作要檢查上限；已經上架的 banner 修改其他欄位不受影響。
 	if input.Banner.IsActive && !cur.IsActive {
 		if err := m.checkActiveBannerLimit(ctx, input.ID); err != nil {
 			return model.Banner{}, err
@@ -464,7 +442,6 @@ func (m *Service) DeleteBanner(ctx context.Context, id uuid.UUID, version int64)
 	})
 }
 
-// bannerWriteMissed 在條件式的修改或刪除沒有碰到任何列時，分辨是 banner 不存在還是版本不符。
 func (m *Service) bannerWriteMissed(ctx context.Context, id uuid.UUID) error {
 	if _, err := m.Banner(ctx, id); err != nil {
 		return err
@@ -472,7 +449,6 @@ func (m *Service) bannerWriteMissed(ctx context.Context, id uuid.UUID) error {
 	return bannerConflict()
 }
 
-// checkActiveBannerLimit 在上架前確認啟用中的 banner（不含 except）還沒到上限。
 func (m *Service) checkActiveBannerLimit(ctx context.Context, except uuid.UUID) error {
 	n, err := m.q(ctx).CountActiveBanners(ctx, except)
 	if err != nil {

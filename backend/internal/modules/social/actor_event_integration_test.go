@@ -24,7 +24,6 @@ func TestPostWritesPublishOneGeneralEventEachAndFailClosedWithoutASubscriber(t *
 	actor := &delegatedactor.Actor{SessionID: 7, StoreID: storeID, RequestID: "r-1", Reason: "測試"}
 	ctx := context.Background()
 
-	// 別的訂閱者在也不算數：指名的稽核 handler 不在，代行寫入照樣失敗關閉（A7-D27）。
 	events.Subscribe(f.bus, func(context.Context, social.PostCreated) error { return nil })
 	before := f.scalar(t, `SELECT count(*) FROM social.posts WHERE store_id = $1`, storeID)
 	if _, err := f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "沒有訂閱者", ImageToken: fmt.Sprintf("tok-%d", f.next())}, actor); !errors.Is(err, events.ErrNoSubscriber) {
@@ -65,7 +64,6 @@ func TestPostWritesPublishOneGeneralEventEachAndFailClosedWithoutASubscriber(t *
 	var published []social.PostPublished
 	events.SubscribeNamed(f.bus, delegatedactor.AuditHandler, func(_ context.Context, e social.PostPublished) error { published = append(published, e); return nil })
 
-	// 店主的寫入：一樣發事件，Actor 是 nil。
 	own, err := f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "店主自己的", ImageToken: fmt.Sprintf("tok-%d", f.next())}, nil)
 	must(t, err)
 	if len(got) != 1 || got[0].kind != "created" || got[0].actor != nil || got[0].w.PostID != own.ID {
@@ -93,7 +91,6 @@ func TestPostWritesPublishOneGeneralEventEachAndFailClosedWithoutASubscriber(t *
 	must(t, err)
 
 	want := []string{"created", "updated", "publish-repeated", "unpublished", "unpublish-repeated", "scheduled"}
-	// 發布本身（PublishPost 的轉態）走既有的 PostPublished，帶代行者；重複發布才是 publish-repeated。
 	if len(got) != len(want) {
 		t.Fatalf("事件 %d 個，預期 %d：%+v", len(got), len(want), got)
 	}

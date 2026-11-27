@@ -7,8 +7,6 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-// fixture 取自 2026-08-05 實打 dev 的 `PostProductData`（貼文列表的單數
-// `product`／詳情的 `products[0]`）：只有 id / name / price / imageKey / imageUrl。
 const String _key =
     'public/product/2685914682/20260719/cd527201-0b42-417d-8476-98d780c92a47.jpg';
 const String _mediaBase = 'http://localhost:8080';

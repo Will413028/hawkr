@@ -129,8 +129,6 @@ export default function CouponBuyerPicker({
 		[customerType, tagId],
 	);
 
-	// Reset internal state whenever the dialog re-opens so a stale
-	// selection from a previous session doesn't bleed into the new one.
 	React.useEffect(() => {
 		if (!open) return;
 		setSelected(new Set(initialSelected));
@@ -140,7 +138,6 @@ export default function CouponBuyerPicker({
 		setCustomerType(CustomerType.UNSPECIFIED);
 		setTagId(null);
 		setError(null);
-		// `initialSelected` intentionally a snapshot per open
 	}, [open, initialSelected]);
 
 	React.useEffect(() => {
@@ -156,7 +153,6 @@ export default function CouponBuyerPicker({
 				setSelectedRows((prev) => mergeRowsIntoMap(prev, page.customers));
 			})
 			.catch((e: unknown) => {
-				// 讀取失敗：清掉列表，錯誤文字取代「沒有客戶」的空狀態。
 				if (!alive) return;
 				setList([]);
 				setNextPageToken("");
@@ -189,8 +185,6 @@ export default function CouponBuyerPicker({
 		}
 	};
 
-	// Esc to close, lock body scroll while open — same pattern as
-	// CertGateDialog so the workspace feels coherent.
 	React.useEffect(() => {
 		if (!open) return;
 		const onKey = (e: KeyboardEvent) => {

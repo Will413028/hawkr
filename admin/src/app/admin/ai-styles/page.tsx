@@ -95,12 +95,10 @@ const AiStyleManagement: React.FC = () => {
 		[transport],
 	);
 
-	// 風格管理
 	const [editingStyle, setEditingStyle] = useState<AiStyle | null>(null);
 	const [showForm, setShowForm] = useState(false);
 	const [saving, setSaving] = useState(false);
 
-	// 表單
 	const [formName, setFormName] = useState("");
 	const [formLabel, setFormLabel] = useState("");
 	const [formPrompt, setFormPrompt] = useState("");
@@ -112,7 +110,6 @@ const AiStyleManagement: React.FC = () => {
 	const [formEnabled, setFormEnabled] = useState(true);
 	const thumbnailInputRef = useRef<HTMLInputElement>(null);
 
-	// 額度管理
 	const [quotaStoreId, setQuotaStoreId] = useState("");
 	const [quotaData, setQuotaData] = useState<QuotaData | null>(null);
 	const [quotaLoading, setQuotaLoading] = useState(false);
@@ -120,14 +117,11 @@ const AiStyleManagement: React.FC = () => {
 	const [quotaMemo, setQuotaMemo] = useState("");
 	const [quotaSaving, setQuotaSaving] = useState(false);
 
-	// 目前 tab
 	const [activeTab, setActiveTab] = useState<"styles" | "quotas">("styles");
 
-	// 分類篩選（風格 Prompt 管理 tab 內）
 	const [categoryFilter, setCategoryFilter] =
 		useState<CategoryFilter>("product");
 
-	// 風格列表（display read）。environment 進 queryKey：切環境 api baseUrl 改變須重抓。
 	const { data: styles = [], isLoading: loading } = useQuery({
 		queryKey: [
 			"ai_styles",
@@ -282,7 +276,6 @@ const AiStyleManagement: React.FC = () => {
 		}
 	};
 
-	// 額度查詢
 	const handleQueryQuota = async () => {
 		if (!quotaStoreId.trim()) return;
 		setQuotaLoading(true);
@@ -351,7 +344,7 @@ const AiStyleManagement: React.FC = () => {
 				AI 修圖管理
 			</h1>
 
-			{/* Tab 切換 */}
+
 			<div
 				style={{
 					display: "flex",
@@ -404,7 +397,7 @@ const AiStyleManagement: React.FC = () => {
 
 			{activeTab === "styles" && (
 				<div>
-					{/* 分類篩選 */}
+
 					<div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
 						{(["product", "post"] as CategoryFilter[]).map((cat) => (
 							<button
@@ -430,7 +423,7 @@ const AiStyleManagement: React.FC = () => {
 						))}
 					</div>
 
-					{/* 新增按鈕 */}
+
 					<div style={{ marginBottom: "16px" }}>
 						<button
 							type="button"
@@ -450,7 +443,7 @@ const AiStyleManagement: React.FC = () => {
 						</button>
 					</div>
 
-					{/* 風格列表 */}
+
 					{loading ? (
 						<p style={{ color: "#999" }}>載入中...</p>
 					) : (
@@ -623,7 +616,7 @@ const AiStyleManagement: React.FC = () => {
 
 			{activeTab === "quotas" && (
 				<div>
-					{/* 賣家搜尋 */}
+
 					<div
 						style={{
 							display: "flex",
@@ -818,7 +811,7 @@ const AiStyleManagement: React.FC = () => {
 				</div>
 			)}
 
-			{/* 新增/編輯 Modal */}
+
 			{showForm && (
 				<Dialog
 					busy={saving}
@@ -984,7 +977,7 @@ const AiStyleManagement: React.FC = () => {
 								{formPrompt.length}/2000
 							</span>
 						</div>
-						{/* 縮圖上傳區塊 */}
+
 						<div>
 							<label
 								htmlFor="form-thumbnail"

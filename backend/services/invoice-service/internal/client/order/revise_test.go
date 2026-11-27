@@ -13,11 +13,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// ReviseOrderInvoiceSnapshot（58 號 §6.2.5、§7.3.5 R03 的跨服務那一步）。
-//
-// 這支的每一條 fail-loud 都在防同一件事：**呼叫端拿到一個假的新版本號**。
-// snapshot_version 是內容軸，而它同時是開票冪等鍵的組成之一 ⇒ 拿錯號碼的後果是
-// 「同一份內容被算成不同的內容」或反之，兩個方向都會通到重複開票或漏開。
 
 func reviseInput() domain.ReviseSnapshotInput {
 	return domain.ReviseSnapshotInput{
@@ -76,7 +71,6 @@ func TestReviseOrderInvoiceSnapshot_VersionConflictIsDistinguishable(t *testing.
 }
 
 func TestReviseOrderInvoiceSnapshot_CodeZeroWithEmptyVersionIsError(t *testing.T) {
-	// 對方宣稱成功卻沒給版本號。放行的話呼叫端會拿空字串去更新 document。
 	srv := &fakeOrder{reviseResp: &pb.ReviseOrderInvoiceSnapshotInternalResponse{
 		Code: 0, Message: "success", SnapshotVersion: "",
 	}}
@@ -86,17 +80,12 @@ func TestReviseOrderInvoiceSnapshot_CodeZeroWithEmptyVersionIsError(t *testing.T
 	if err == nil {
 		t.Fatal("code=0 ＋ 空 snapshot_version 必須是錯誤")
 	}
-	// ⚠️ 這一條斷言的是**訊息**不只是「有錯」：拿掉顯式的空字串檢查之後，
-	// strconv.ParseInt("") 一樣會 error（實測 invalid syntax）⇒ 只斷言 err != nil 的話，
-	// 這個變異不會轉紅。而兩者的診斷價值不同——
-	// 「對方回 code=0 卻沒給版本」是對端違約，「版本號解析失敗」讀起來像格式問題。
 	if !strings.Contains(err.Error(), "code=0 with empty snapshot_version") {
 		t.Fatalf("error = %v，want 明確指出對端回了 code=0 卻沒給版本", err)
 	}
 }
 
 func TestReviseOrderInvoiceSnapshot_NotNewerVersionIsError(t *testing.T) {
-	// 對方宣稱成功，卻回了一個不比舊版新的號碼 ⇒ 內容軸倒退。
 	for _, v := range []string{"1", "0"} {
 		srv := &fakeOrder{reviseResp: &pb.ReviseOrderInvoiceSnapshotInternalResponse{
 			Code: 0, Message: "success", SnapshotVersion: v,
@@ -110,8 +99,6 @@ func TestReviseOrderInvoiceSnapshot_NotNewerVersionIsError(t *testing.T) {
 }
 
 func TestReviseOrderInvoiceSnapshot_EmptyIdempotencyKeyNeverReachesWire(t *testing.T) {
-	// 空冪等鍵在 order-service 側是 NULL，partial unique index 對 NULL 不生效
-	// ⇒ 每次重試都會變成一次新的更正。要在送出前就擋掉。
 	srv := &fakeOrder{reviseResp: &pb.ReviseOrderInvoiceSnapshotInternalResponse{
 		Code: 0, SnapshotVersion: "2",
 	}}

@@ -23,7 +23,6 @@ public final class GrpcStatusToResponseCode {
             case UNAUTHENTICATED -> GrpcResponseCode.UNAUTHORIZED;
             case PERMISSION_DENIED -> GrpcResponseCode.PERMISSION_DENIED;
             case UNAVAILABLE, DEADLINE_EXCEEDED -> GrpcResponseCode.SERVICE_UNAVAILABLE;
-            // INTERNAL, UNKNOWN, DATA_LOSS, RESOURCE_EXHAUSTED, UNIMPLEMENTED, CANCELLED
             default -> GrpcResponseCode.INTERNAL_ERROR;
         };
     }

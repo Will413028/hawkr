@@ -63,9 +63,6 @@ type ProviderAccount struct {
 	CredentialUpdatedAt *time.Time
 }
 
-// ============================================================================
-// 實體（gen row 的框架無關鏡射）
-// ============================================================================
 
 // Issuer mirrors the InvoiceIssuer row with framework-free types.
 type Issuer struct {
@@ -491,9 +488,6 @@ type AdminAuditLogEntry struct {
 	OccurredAt             time.Time
 }
 
-// ============================================================================
-// 寫入參數（domain 側）
-// ============================================================================
 
 // NewProviderAccount 是首次綁定憑證的輸入。AppKey 是**明文**，方向是往內（§8.1.1(h) 第 3 段）；
 // repository 負責加密、算 fingerprint 與 last4，呼叫端不得自己算其中任何一個。
@@ -611,11 +605,6 @@ type ProviderAccountRepository interface {
 	PromoteCredential(ctx context.Context, in PromoteCredential) error
 	UpdateStatus(ctx context.Context, in UpdateProviderAccountStatus) error
 
-	// ── §6.1.8／§6.1.13 的狀態轉移（端點 24／25／26／27／44／45／66／67）──
-	//
-	// 🔴 七支的 allowed-from **全部寫在 SQL 的 WHERE**（db/queries/invoice_provider_accounts.sql），
-	// 本層與 usecase 都不重述那份清單。回 false ＝ 守衛不成立（allowed-from 不符或版本被
-	// 搶先），呼叫端必須回明確業務碼——把 false 當成功往下走就是 §7.3.0 規則 4 的靜默失敗。
 
 	// ResubmitCredential 是端點 24 的覆寫分支（既有列）。落地即 CREDENTIAL_VERIFYING。
 	// taken=true ＝ 撞 uq_ipa_fingerprint（這組統編＋AppKey 已被另一個同時有效的 issuer
@@ -740,15 +729,6 @@ type SellerTaxProfileRepository interface {
 	ListReviewsForAdmin(ctx context.Context, in AdminTaxReviewQuery) ([]AdminTaxReviewItem, error)
 	CountReviewsForAdmin(ctx context.Context, in AdminTaxReviewQuery) (int64, error)
 
-	// ── 寫入面：M3 稅務資格狀態機（§7.3.3 T01–T16）──
-	//
-	// 🔴 每一支回的 bool 是 **CAS 的 rows>0**，不是「有沒有出錯」。allowed-from、
-	// expectedVersion、冷卻、延長次數全部寫在 SQL 的 WHERE（db/queries/seller_tax_profiles.sql）
-	// ⇒ false ＝ 守衛不成立，呼叫端必須回明確業務碼。**把 false 當成功往下走就是靜默失敗**：
-	// ADM 按下去沒反應、賣家送出後狀態沒動，兩者都不會有任何錯誤訊號。
-	//
-	// 🔴 這一組**不重複判斷守衛**：Go 端先讀一次是為了回可分辨的碼（9321／9322／9323），
-	// 不是正確性防線——兩個分頁同時送出時，應用層的 if 會各自讀到舊值再各自寫。
 
 	// Create 建 DRAFT（T01 的 `[*]` 形態）。inserted=false ＝ 該 issuer 已有 profile。
 	Create(ctx context.Context, id, issuerID int64, now time.Time) (SellerTaxProfile, bool, error)
@@ -816,9 +796,6 @@ type UpdateSellerTaxDraft struct {
 	Now                time.Time
 }
 
-// ============================================================================
-// 開票主鏈的寫入參數（§7.1.2 步驟 8–9、步驟 14）
-// ============================================================================
 
 // NewDocument 是建立一列 invoice_documents 的輸入。
 //
@@ -1050,11 +1027,6 @@ type DocumentRepository interface {
 	// ResumeFromManual 是 AWAITING_MANUAL → PENDING（ADM 給出判定，回自動線）。
 	// expectedVersion 是 **document 自己的**版本，與 job 的版本是兩列各自遞增的值。
 	ResumeFromManual(ctx context.Context, id, expectedVersion int64, now time.Time) (bool, error)
-	// ── 作廢軸（M1 的 VOIDING 三條邊）────────────────────────────────────
-	//
-	// 三支各守自己的來源狀態，**不共用一個「改狀態」的通用方法**：作廢的三條邊
-	// 各自帶不同的欄位等式（`voided_at` 與 VOIDED 由 chk_invdoc_voided_pair 綁成
-	// 雙向），一個通用 setter 會讓那些等式落到呼叫端去記，而呼叫端記不住。
 
 	// MarkVoiding 是 ISSUED → VOIDING，觸發者是 VOID operation 的 READY→SENDING。
 	// 守衛「本 document 無生效 ALLOWANCE」在 usecase（要看 invoice_adjustments），
@@ -1318,11 +1290,6 @@ type OperationRepository interface {
 	// 且仍有非終態 VOID／ALLOWANCE／VOID_ALLOWANCE operation 的筆數。唯讀。
 	CountCrossPeriodPending(ctx context.Context, now time.Time) (int64, error)
 
-	// ── ADM 寫入面（§6.1.14 端點 52／53／56）──
-	//
-	// 🔴 四支回的 bool 一律是 **CAS 的 rows>0**，不是「有沒有出錯」：allowed-from 與
-	// expectedVersion 都寫在 SQL 的 WHERE ⇒ false ＝ 守衛不成立，呼叫端必須回明確業務碼。
-	// 把 false 當成功往下走，就是 §7.3.0 規則 4 說的靜默失敗。
 
 	// AdminRetryAfterFix 是 J18（FAILED_PERMANENT → READY）。attempt_count **不歸零**。
 	AdminRetryAfterFix(ctx context.Context, id, expectedVersion int64, requestSnapshotHash string, now time.Time) (bool, error)
@@ -1640,12 +1607,6 @@ type AdjustmentRepository interface {
 	ListStaleBlocked(ctx context.Context, staleBefore time.Time, limit int32) ([]Adjustment, error)
 	ListLines(ctx context.Context, adjustmentID int64) ([]AdjustmentLine, error)
 
-	// ── M7 的執行軸（§7.3.7 G08–G15）───────────────────────────────────
-	//
-	// 🔴 每一支都是 CAS（allowed-from 寫在 SQL 的 WHERE 裡），回 false 代表
-	// 「這一列已經不在我以為的狀態」——呼叫端必須把它當衝突處理，不可當成功。
-	// SQL 早就寫好了（db/queries/invoice_adjustments.sql，19 支），缺的一直是
-	// 這一層 adapter 與上面的執行者。
 
 	// InsertLines 建折讓明細（G01 的一部分，與 adjustment 同交易）。
 	InsertLines(ctx context.Context, adjustmentID int64, lines []NewAdjustmentLine, now time.Time) error
@@ -1736,14 +1697,6 @@ type DecideComplaint struct {
 type ComplaintRepository interface {
 	GetByID(ctx context.Context, id int64) (Complaint, error)
 
-	// ── 買家發起的寫入（K01／K07／K11／K13，§6.1.6 端點 13／63／64／65）──
-	//
-	// 🔴 四支的擁有者述詞全部在 SQL 的 WHERE 裡（K01 是建列、其餘三支帶
-	// complainant_buyer_id）：Tier A 的「越權與不存在不可分辨」不能靠 Go 端的 if——
-	// 那會多出一個可以回不同 code／message 的分支（§8.1.4(b)）。
-	//
-	// 🔴 三支狀態轉移回 false 一律代表**守衛不成立**（allowed-from 不符、版本被人搶先、
-	// 重開次數用完、冷卻未到），不得當成功往下走：那正是 rows=0 靜默失敗的形狀。
 
 	// Create 走 ON CONFLICT DO NOTHING（不指名 target）。inserted=false ⇒ 這份 document
 	// 已有一件未結案的申訴（uq_invcomp_open_per_document），呼叫端改回 9310 並帶既有 id。
@@ -1765,24 +1718,12 @@ type ComplaintRepository interface {
 	// 同時按下（各自讀到 0 再各自寫 1）。
 	Reopen(ctx context.Context, id, buyerID, expectedVersion int64, slaDueAt, now time.Time) (bool, error)
 
-	// ── ADM 發起的寫入（K08／K09／K10，§6.1.16 端點 60）──
-	//
-	// 沒有 buyerID 述詞：ADM 本來就看得到全部案件，Tier A 在這條路上不成立。
-	// 兩支回 false 的意義與買家側三支完全相同（守衛不成立，回 9336）。
 
 	// DecideEscalated 是 K08（→ RESOLVED）與 K09（→ VIOLATION_CONFIRMED），共用一句。
 	DecideEscalated(ctx context.Context, in DecideComplaint) (bool, error)
 	// ReturnToSeller 是 K10（ESCALATED_TO_ADM → OPEN），sla_due_at 由呼叫端以工作天曆重算。
 	ReturnToSeller(ctx context.Context, id, expectedVersion int64, slaDueAt, now time.Time) (bool, error)
 
-	// ── 賣家發起的寫入（K02／K03，§6.1.11 端點 36）──
-	//
-	// 🔴 兩支的擁有者述詞（經 invoice_issuers 解析的 store_id）與 expectedVersion 都在
-	// SQL 的 WHERE，與買家側三支同一條規則：先 SELECT 再 UPDATE 的寫法在兩句之間有窗口，
-	// 而且把 Tier A 的保證搬到了呼叫端的 if 上（§8.1.4(b)）。
-	//
-	// 🔴 **兩條邊不可合併**：K02 收 OPEN／OVERDUE，K03 只收 OPEN。合成一句 2 值
-	// allowed-from ⇒「逾期之後才請求平台協助」會靜默成功而狀態沒變。
 
 	// MarkSellerResponded 是 K02（OPEN／OVERDUE → SELLER_RESPONDED）。
 	// buyerReviewDueAt 由呼叫端算（now + 72h）：它是 K06「逾期視為接受」唯一的觸發依據，
@@ -2183,25 +2124,6 @@ type BusinessDayRepository interface {
 	Snapshot(ctx context.Context, from, to time.Time) ([]time.Time, *BusinessDayCoverage, error)
 }
 
-// ============================================================================
-// 讀取視圖（分頁列表 ＋ owner-scoped 明細）
-//
-// 本區塊只放**唯讀**的查詢入參與投影型別。三條規則：
-//
-//	① 擁有者（BuyerID／StoreID）是**述詞的一部分**，不是「查回來之後才比對」的欄位。
-//	   每一支帶擁有者的方法，其 SQL 的 WHERE 內就有它（§8.1.4(b)）——所以查不到與
-//	   越權在這一層長得一樣，**沒有第二個分支可以回不同的東西**。
-//	   🔴 不得用「不帶擁有者的 GetByID ＋ Go 端 if」代替任何一支：那正是 Tier A
-//	   防枚舉失效而所有測試照樣綠的形狀。
-//
-//	② 狀態集合一律由呼叫端以 []string 傳入（禁硬編碼）。UI 分頁名（AWAITING_SELLER／
-//	   NEEDS_MANUAL／NEW…）與 DB 狀態值是兩張碼表，展開表的 SSOT 在 CodeMeta ＋
-//	   設計書 §6.1.11／§6.1.12／§6.1.14／§6.1.16，不在 SQL 也不在本檔。
-//
-//	③ 每一支 List 都有一支述詞逐字相同的 Count。改任一支必須同批改另一支，
-//	   否則 total 與 records 分屬兩個母體（症狀：總數說有 30 筆、翻到第二頁是空的，
-//	   而沒有任何東西會報錯）。
-// ============================================================================
 
 // Page 是 OFFSET 分頁的入參。
 //
@@ -2587,9 +2509,6 @@ type OverviewRepository interface {
 	AdminCounts(ctx context.Context, in AdminOverviewCountsQuery) (AdminOverviewCounts, error)
 }
 
-// ---------------------------------------------------------------------------
-// §5.1.16 invoice_manual_unlocks｜A4 人工出口的雙人解鎖（端點 54／55）
-// ---------------------------------------------------------------------------
 
 // ManualUnlock 是一列 invoice_manual_unlocks。
 //
@@ -2682,9 +2601,6 @@ type ManualUnlockRepository interface {
 	Decide(ctx context.Context, in DecideManualUnlock) (bool, error)
 }
 
-// ---------------------------------------------------------------------------
-// §5.1.15 invoice_provider_cutovers｜自動開立切點歷史（端點 46）
-// ---------------------------------------------------------------------------
 
 // ProviderCutover 是一列 invoice_provider_cutovers。
 //
@@ -2758,9 +2674,6 @@ type ApproveSellerTaxProfile struct {
 	Now                  time.Time
 }
 
-// ---------------------------------------------------------------------------
-// 冪等鍵（#3015 裁決 A）
-// ---------------------------------------------------------------------------
 
 // ClaimIdempotency 是認領一把冪等鍵所需的全部輸入。
 type ClaimIdempotency struct {

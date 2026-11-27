@@ -94,9 +94,6 @@ export default function InvoiceActionDialog({
 			setError("請填寫理由，這一欄會寫入發票稽核紀錄。");
 			return;
 		}
-		// 用 Array.from 數字元而不是 `.length`：後端擋的是**符文數**
-		// （`utf8.RuneCountInString`），而 JS 的 `.length` 是 UTF-16 code unit
-		// ⇒ 表情符號與部分罕用字會讓兩邊對同一段文字得到不同的數字。
 		if (Array.from(reason.trim()).length > maxReasonRunes) {
 			setError(`理由請控制在 ${maxReasonRunes} 字以內。`);
 			return;

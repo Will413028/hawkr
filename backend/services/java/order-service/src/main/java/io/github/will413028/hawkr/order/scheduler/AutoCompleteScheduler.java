@@ -59,10 +59,6 @@ public class AutoCompleteScheduler {
         int skippedActiveCase = 0;
         for (OrderEntity order : orders) {
             try {
-                // #1228 收斂點縱深防禦：完成當下反查活躍售後 case。countdown_paused_at IS NULL 只能擋
-                // 「已正確 pause 的訂單」，無法擋「pause / resume 事件漏發或亂序」殘留窗口；在完成前對
-                // 活躍 case 做最終一次反查，擋掉所有此類情境（hasActiveCase 失敗時保守回 true → skip）。
-                // 正常情況此反查恆 false（倒數暫停已先攔下），僅作縱深防禦兜底。
                 if (afterSalesGrpcClient.hasActiveCase(order.getOrderNo())) {
                     skippedActiveCase++;
                     log.info("AutoCompleteScheduler.complete.skipActiveCase",

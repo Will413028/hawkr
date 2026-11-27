@@ -34,7 +34,6 @@ func (f fakeStores) Store(_ context.Context, id int64) (seller.Store, error) {
 }
 
 func ids() Identities {
-	// 帳號 100 擁有買家 1 與店 10；帳號 200 擁有買家 2 與店 20。
 	return Identities{Buyers: fakeBuyers{1: 100, 2: 200}, Stores: fakeStores{10: 100, 20: 200}}
 }
 
@@ -46,7 +45,6 @@ func TestRejectSamePersonRejectsABuyerBlockingTheirOwnStore(t *testing.T) {
 }
 
 func TestRejectSamePersonRejectsAStoreBlockingTheOwnersBuyerIdentity(t *testing.T) {
-	// 店 20 的店主（帳號 200）的買家身分是 2：同一個函式、另一個方向的入口。
 	err := ids().RejectSamePerson(context.Background(), 2, 20)
 	if apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("店家封鎖店主本人的買家身分要 invalid_argument：%v", err)

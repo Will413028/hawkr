@@ -302,9 +302,6 @@ export async function enhanceImage(
 			weeklyUsage: res.weeklyUsage,
 		};
 	} catch (e) {
-		// A caller-initiated abort (dialog re-run / close / unmount) is not a
-		// failure — rethrow it untouched so callers can keep filtering on
-		// `name === "AbortError"` instead of showing a phantom error.
 		if (opts.signal?.aborted) throw e;
 		throw toEnhanceError(e, opts.defaults);
 	}

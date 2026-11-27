@@ -54,7 +54,6 @@ func (s Service) check() error {
 	return nil
 }
 
-// authorize 檢查店家有 RequiredCapability；已關閉回 NOT_FOUND，停權回 PERMISSION_DENIED，其他前置條件沒滿足回 FAILED_PRECONDITION（seller.Authorize）。
 func (s Service) authorize(ctx context.Context, storeID int64) error {
 	st, err := s.Stores.Store(ctx, storeID)
 	if err != nil {
@@ -63,8 +62,6 @@ func (s Service) authorize(ctx context.Context, storeID int64) error {
 	return seller.Authorize(st, RequiredCapability)
 }
 
-// guardWrite 是寫入的守門，要在 transaction 內、先於 procurement 的任何列：鎖店家列（已退場回 NOT_FOUND）後再讀店家此刻的狀態檢查能力，
-// 所以檢查與寫入之間提交的停權會被看到（fail-closed）。
 func (s Service) guardWrite(ctx context.Context, storeID int64) error {
 	if err := s.Stores.LockNotRetired(ctx, storeID); err != nil {
 		return err
@@ -78,7 +75,6 @@ func recipientClosed(msg string) error {
 	return apperr.FailedPrecondition("%s", msg).WithReason(apperr.ReasonRfqRecipientClosed)
 }
 
-// view 是一筆發給這家店的詢價：賣家看得到的內容與它的 hash 都由核准與需求版本重算（S5、A9-D35）。
 type view struct {
 	pub     store.ProcurementRfqPublication
 	payload model.SellerFacing
@@ -99,7 +95,6 @@ func (v view) summary() model.SellerPublicationSummary {
 	}
 }
 
-// loadView 讀一筆發給這家店的詢價；沒有邀請列（不存在、別家的、沒被邀請）回 NOT_FOUND。
 func loadView(ctx context.Context, q *store.Queries, storeID int64, publicationID uuid.UUID) (view, error) {
 	row, err := q.GetSellerPublicationView(ctx, store.GetSellerPublicationViewParams{PublicationID: publicationID, StoreID: storeID})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -111,7 +106,6 @@ func loadView(ctx context.Context, q *store.Queries, storeID int64, publicationI
 	return newView(row.ProcurementRfqPublication, row.ProcurementRfqPublicationApproval, row.ProcurementRequestRevision)
 }
 
-// versionOf 把一個回價版本的列轉成回應：狀態、hash 與是否超出區間都由列推導（區間在發布核准，已隨賣家可見內容帶來）。
 func versionOf(resp store.ProcurementSellerResponse, v store.ProcurementSellerResponseVersion, payload model.SellerFacing, now time.Time) (model.SellerResponseVersion, error) {
 	qt, err := quote.QuoteOf(v)
 	if err != nil {
@@ -141,7 +135,6 @@ func draftOf(d store.ProcurementSellerResponseDraft) (*model.SellerDraft, error)
 	return &model.SellerDraft{Version: d.Version, UpdatedAt: d.UpdatedAt, Quote: q}, nil
 }
 
-// closureOf 把身分列轉成結案狀態。
 func closureOf(r store.ProcurementSellerResponse) model.ResponseClosure {
 	c := model.ResponseClosure{ResponseID: r.ID, PublicationID: r.PublicationID, LatestVersion: r.LatestVersion, WriteClosedAt: r.WriteClosedAt}
 	if r.WithdrawnVersion != nil {
@@ -153,7 +146,6 @@ func closureOf(r store.ProcurementSellerResponse) model.ResponseClosure {
 	return c
 }
 
-// ensureAndLock 建立身分列（只有被邀請的店會建立）並鎖住它；沒有邀請列回 NOT_FOUND。要在 loadView 之後呼叫（沒被邀請的店已先回 NOT_FOUND）。
 func (s Service) ensureAndLock(ctx context.Context, q *store.Queries, storeID int64, publicationID uuid.UUID) (store.ProcurementSellerResponse, error) {
 	if err := q.EnsureSellerResponse(ctx, store.EnsureSellerResponseParams{ID: uuid.NewV7(), PublicationID: publicationID, StoreID: storeID, Now: s.Now()}); err != nil {
 		return store.ProcurementSellerResponse{}, fmt.Errorf("sellerside：建立回價身分列：%w", err)
@@ -161,7 +153,6 @@ func (s Service) ensureAndLock(ctx context.Context, q *store.Queries, storeID in
 	return s.lock(ctx, q, storeID, publicationID)
 }
 
-// lock 鎖住這家店對這筆詢價的身分列；沒有列回 NOT_FOUND。
 func (s Service) lock(ctx context.Context, q *store.Queries, storeID int64, publicationID uuid.UUID) (store.ProcurementSellerResponse, error) {
 	r, err := q.LockSellerResponseForStore(ctx, store.LockSellerResponseForStoreParams{PublicationID: publicationID, StoreID: storeID})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -173,8 +164,6 @@ func (s Service) lock(ctx context.Context, q *store.Queries, storeID int64, publ
 	return r, nil
 }
 
-// checkWritable 檢查寫入的四個停止條件（A9-D45(3)）：已婉拒、買家已刪除、這張需求有 ACTIVE 的接受單、回價期限已過。
-// 先看身分列與發布列已有的事實，最後才查接受單。
 func checkWritable(ctx context.Context, q *store.Queries, resp store.ProcurementSellerResponse, v view, now time.Time) error {
 	buyerID, err := q.LockPublicationBuyer(ctx, v.pub.ID)
 	if err != nil {

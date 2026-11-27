@@ -156,7 +156,6 @@ export interface DelegationAuthorizationHistoryPage {
 	pageSize: number;
 }
 
-// ==================== parsers ====================
 
 /**
  * 能力機器名。**刻意不比對 `policy.ts` 的封閉九值**：那份清單是為 preflight 寫的，
@@ -174,7 +173,6 @@ function parseCapabilityList(value: unknown): string[] | null {
 	const seen = new Set<string>();
 	for (const raw of value) {
 		const capability = parseCapabilityValue(raw);
-		// 重複值會讓「勾了幾項」與「送出幾項」對不上，是契約錯不是可容忍的雜訊。
 		if (capability === null || seen.has(capability)) return null;
 		seen.add(capability);
 		parsed.push(capability);
@@ -203,11 +201,7 @@ export function parseDelegationCapabilityCatalog(
 		seen.add(descriptorValue);
 		capabilities.push({ value: descriptorValue, risk: raw.risk, dependsOn });
 	}
-	// 空目錄不是「沒有能力可選」，是「這一版後端沒回東西」。放行會畫出一個永遠
-	// 送不出去的表單（至少要勾一項），而畫面上看起來像是設定被清空了。
 	if (capabilities.length === 0) return null;
-	// 依賴指向目錄外的值 ⇒ 連動規則算不完整，勾選介面會給出一個後端必然以 9287
-	// 拒絕的組合。fail-closed 比畫一個會被拒絕的表單誠實。
 	for (const descriptor of capabilities) {
 		for (const dependency of descriptor.dependsOn) {
 			if (!seen.has(dependency)) return null;
@@ -245,8 +239,6 @@ export function parseDelegationAuthorization(
 		sourceReference === null ||
 		sourceReference.length === 0 ||
 		grantedCapabilities === null ||
-		// 授權列的 cardinality 下界是 1：空集合＝一列不授權任何東西的授權，
-		// 畫面會顯示「已開通」卻沒有任何範圍。
 		grantedCapabilities.length === 0 ||
 		effectiveFrom === null ||
 		!effectiveUntil.ok ||
@@ -291,8 +283,6 @@ export function parseDelegationAuthorizationLookup(
 	const activeSessionCount = parseCountString(value.activeSessionCount);
 	if (activeSessionCount === null) return null;
 	if (!value.exists) {
-		// exists=false 是正常狀態（尚未開通），不是錯誤；但同時帶著一列授權就是一份
-		// 自相矛盾的回應，照著畫會出現「尚未開通」配上一份範圍。
 		if (value.authorization !== null && value.authorization !== undefined) {
 			return null;
 		}
@@ -342,7 +332,6 @@ export function parseDelegationAuthorizationRevocation(
 		if (!isSafeOpaqueId(raw)) return null;
 		revokedSessionIds.push(raw);
 	}
-	// 宣稱「已撤回過、什麼都沒動」卻同時回報中止了工作階段＝一份假的撤回證明。
 	if (value.alreadyRevoked && revokedSessionIds.length > 0) return null;
 	return {
 		authorization,
@@ -446,7 +435,6 @@ export function parseDelegationAuthorizationHistoryPage(
 	return { records, total, page, pageSize };
 }
 
-// ==================== 能力連動（目錄驅動，無本地依賴表） ====================
 
 function directDependencies(
 	catalog: DelegationCapabilityCatalog,
@@ -468,7 +456,6 @@ function orderByCatalog(
 	const ordered = catalog.capabilities
 		.map((descriptor) => descriptor.value)
 		.filter((value) => wanted.has(value));
-	// 目錄外的值不丟掉（丟掉＝在送出時靜默縮小授權範圍），排在後面且保持穩定。
 	const extras = [...wanted].filter((value) => !ordered.includes(value)).sort();
 	return [...ordered, ...extras];
 }
@@ -589,7 +576,6 @@ export function unknownDelegationCapabilities(
 	return [...new Set(selected)].filter((value) => !known.has(value)).sort();
 }
 
-// ==================== 表單值轉換 ====================
 
 /**
  * `<input type="datetime-local">` 給的是本地時間、無時區；gateway 只收
@@ -628,7 +614,6 @@ export function isDelegationOperationReason(value: string): boolean {
 	return length >= 1 && length <= DELEGATION_REASON_MAX_LENGTH;
 }
 
-// ==================== 錯誤分派（業務碼，不看 HTTP status） ====================
 
 /**
  * 業務碼 → 下一步。**一律以碼分派，不看 HTTP status**：9286（找不到授權設定）就是
@@ -639,37 +624,16 @@ export function isDelegationOperationReason(value: string): boolean {
  * 這裡。碼本身仍一併顯示，客服／工單據它追。
  */
 export const DELEGATION_AUTHORIZATION_ERROR_MESSAGES: Record<number, string> = {
-	// 401 是 envelope 的 `code`，不是 HTTP status —— 兩個來源都送得出它：
-	//   ① BFF 本地攔截（server/governance-route.ts 的 unauthorized()，`{code:401}`）
-	//   ② gateway 的 JWT 中介層（middleware/auth.go 的 `response.Err(…, 401, …)`），
-	//      經 `safeUpstreamError` 保留數值碼後過線。
-	// 漏了它 ⇒ ① 顯示英文 "Unauthorized"、② 顯示「代行營運服務暫時無法使用」，而兩者
-	// 的正解都是回去重新登入 —— 後者尤其糟：它把「該重新登入」講成「該等一等」。
-	// 與 9261 是兩個不同的碼，不可互相取代（9261 是 requireAdmin 過了但取不到
-	// accountID 的窄路徑，gateway admin_delegation.go 的 delegationAdminID）。
 	401: "管理員登入已失效，請重新登入後再試。",
 	9260: "送出的內容不符合授權設定的格式要求，請檢查後重試。",
 	9261: "管理員登入狀態已失效，請重新登入後再試。",
-	// 「或已到期」不是贅字：治理端只在 revoked_at 有值時送 9264，但 preflight／
-	// 建立工作階段那條路徑對「有效期間已過」也送同一個碼（delegation 模組的
-	// `authorizationVerdict`），而兩者的下一步一樣是重新開通。少了它，一個因到期
-	// 而失效的授權會被說成「被撤回」，管理員會去查一件從未發生的治理動作。
 	9264: "這家店的代行授權已撤回或已到期，請改用「重新開通」。",
-	// 9277 與 9280 的下一步相反，而 BFF 的 safeUpstreamError 對兩者送的 message
-	// 一字不差（它刻意不透傳上游訊息）⇒ 不在這裡按碼分派的話，畫面對兩者都說
-	// 「服務暫時無法使用，請稍後再試」。9277 的正解是「這個 ID 不對，回列表重挑」，
-	// 而「稍後再試」會讓人去找維運等一個永遠不會好的服務——過期的工作階段 ID
-	// 再等一萬年也還是不存在。
 	9277: "找不到這個代行工作階段：它可能已經結束或被撤銷，也可能 ID 有誤。請回代行紀錄列表重新選取。",
 	9280: "代行營運服務暫時無法使用，請稍後再試。",
 	9285: "這家店已有有效的代行授權，請改用「調整授權範圍」。",
-	// 收下這個碼的有兩個畫面（授權面板與代行入口），措辭因此不綁任一邊的動作：
-	// 「請先開通後再調整」在入口那邊會叫人去調整一件他沒有要調整的東西。
 	9286: "這家店尚未開通代行授權，請先於「代行授權」分頁開通。",
 	9287: "所選能力的相依關係不完整：選擇編輯或發布時必須同時包含對應的檢視權限。",
 	9288: "你的管理員帳號不在代行營運的允許名單內。",
-	// #2744 一碼多義拆分。三者的共同點是「操作者的下一步」各不相同 —— 這正是分碼的判準。
-	// 9289 不寫「請稍後再試」是刻意的：它與 9280 的差別就在重試永遠不會好。
 	9289: "代行營運服務的設定有誤，重試不會改善。請聯絡技術人員並附上這個畫面的時間。",
 	9290: "這個資源已經是你要求的狀態，不需要再改一次。請重新整理確認。",
 	9291: "這個環境尚未啟用代行營運功能。這與店家和你的權限無關，請洽維運確認設定。",

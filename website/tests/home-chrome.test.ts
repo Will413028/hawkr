@@ -43,7 +43,6 @@ test("buttonClasses: primary md (defaults)", () => {
 	assert.ok(c.includes("rounded-full"));
 	assert.ok(c.includes("hover:-translate-y-px"));
 	assert.ok(c.includes("py-3.5 px-6"));
-	// 2026-09-10 px→rem for the text-scale setting
 	assert.ok(c.includes("text-[0.9375rem]"));
 	assert.ok(c.includes("bg-hk-home-accent-500"));
 	assert.ok(c.includes("hover:bg-hk-home-primary-deep"));
@@ -113,7 +112,7 @@ test("HomeEyebrow: renders dot + children, light tone", () => {
 		React.createElement(HomeEyebrow, null, "今日市集"),
 	);
 	assert.ok(html.includes("bg-white/70"));
-	assert.ok(html.includes("bg-hk-brand-secondary")); // the dot
+	assert.ok(html.includes("bg-hk-brand-secondary"));
 	assert.ok(html.includes("今日市集"));
 });
 
@@ -169,10 +168,10 @@ test("HomeSectionHeader: between with description + more link", () => {
 	assert.ok(html.includes("justify-between"));
 	assert.ok(html.includes("<h2"));
 	assert.ok(html.includes("今天想買什麼？"));
-	assert.ok(html.includes("<p")); // description present
+	assert.ok(html.includes("<p"));
 	assert.ok(html.includes('href="/market/products"'));
-	assert.ok(html.includes("border-b-[1.5px]")); // the more link
-	assert.ok(html.includes("mb-3")); // h2 spacing with description
+	assert.ok(html.includes("border-b-[1.5px]"));
+	assert.ok(html.includes("mb-3"));
 });
 
 test("HomeSectionHeader: center, no description, no more", () => {
@@ -185,9 +184,9 @@ test("HomeSectionHeader: center, no description, no more", () => {
 	);
 	assert.ok(html.includes("text-center"));
 	assert.ok(html.includes("<h2"));
-	assert.ok(!html.includes("<p")); // no description
-	assert.ok(!html.includes("border-b-[1.5px]")); // no more link
-	assert.ok(!html.includes("mb-3")); // h2 has no bottom margin without description
+	assert.ok(!html.includes("<p"));
+	assert.ok(!html.includes("border-b-[1.5px]"));
+	assert.ok(!html.includes("mb-3"));
 });
 
 test("HomeSectionHeader: between with description but no more link (DEMO case)", () => {
@@ -201,9 +200,9 @@ test("HomeSectionHeader: between with description but no more link (DEMO case)",
 			"從想吃什麼，到送到家",
 		),
 	);
-	assert.ok(html.includes("justify-between")); // between layout
-	assert.ok(html.includes("<p")); // description present
-	assert.ok(html.includes("mb-3")); // h2 spacing with description
-	assert.ok(!html.includes("border-b-[1.5px]")); // no more link rendered
-	assert.ok(!html.includes("href=")); // no link at all
+	assert.ok(html.includes("justify-between"));
+	assert.ok(html.includes("<p"));
+	assert.ok(html.includes("mb-3"));
+	assert.ok(!html.includes("border-b-[1.5px]"));
+	assert.ok(!html.includes("href="));
 });

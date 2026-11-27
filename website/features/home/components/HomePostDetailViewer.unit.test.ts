@@ -58,8 +58,6 @@ function FakeViewer({ onClose }: HomePostDetailViewerProps) {
 		document.activeElement?.getAttribute("data-home-post-test-opener") ===
 		"true";
 
-	// Mirrors PostDetailViewer's own passive-effect lock. The home boundary must
-	// capture the real offset first so this nested lock cannot observe a clamped 0.
 	React.useEffect(
 		() => acquireBodyScrollLock({ preserveScrollPosition: true }),
 		[],

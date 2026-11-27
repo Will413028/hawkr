@@ -29,7 +29,6 @@ func TestTaxCategoryToDBAndBack(t *testing.T) {
 }
 
 func TestTaxCategoryFromDB_UnknownIsFailClosed(t *testing.T) {
-	// 轉換失敗不得 fallback 成 1（應稅）—— 那會把一張免稅發票靜默開成應稅。
 	if meta, ok := TaxCategoryFromDB(9); ok {
 		t.Fatalf("TaxCategoryFromDB(9) = %+v, want ok=false（9 只能出現在表頭）", meta)
 	}

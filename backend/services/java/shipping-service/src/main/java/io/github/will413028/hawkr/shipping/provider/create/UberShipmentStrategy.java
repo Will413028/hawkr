@@ -46,7 +46,6 @@ public class UberShipmentStrategy implements ShipmentStrategy {
         entity.setShippingMethod(ShippingMethod.UBER_INSTANT.value());
         entity.setStatus(ShippingStatus.UNPROCESSED.value());
         entity.setTradeAmt(ProtoConversionUtils.parseLongRequired(orderInfo.getTotalActualAmount(), "totalActualAmount"));
-        // Uber Phase 1: 寄件人資訊暫不填（Uber 有自己的取件流程）
         entity.setSenderName("");
         entity.setSenderPhone("");
         entity.setRecipientName(orderInfo.getRecipientName());

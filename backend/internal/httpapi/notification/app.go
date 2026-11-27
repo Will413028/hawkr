@@ -52,7 +52,6 @@ type App struct {
 	stores        Stores
 	images        rpc.Images
 	log           *slog.Logger
-	// lifetime 是一條串流的最長壽命：到期正常結束，client 重連時重新驗證 session 與身分。
 	lifetime func() time.Duration
 }
 
@@ -79,7 +78,6 @@ const (
 	maxPageSize     = 50
 )
 
-// recipient 由登入的帳號與請求的受眾推導收件人：STORE 要帳號此刻有店且有 CapNotification（沒有店回 not_found）；受眾沒給或不認得是 invalid_argument。
 func (h *App) recipient(ctx context.Context, audience pb.NotificationAudience) (notification.Recipient, error) {
 	p, err := rpc.RequireAccount(ctx)
 	if err != nil {
@@ -136,7 +134,6 @@ func (h *App) ListInboxItems(ctx context.Context, req *connect.Request[pb.ListIn
 	return connect.NewResponse(resp), nil
 }
 
-// count32 把筆數放進契約的 int32；超過上限時取上限（收件匣不會有這麼多列）。
 func count32(n int64) int32 {
 	if n > math.MaxInt32 {
 		return math.MaxInt32

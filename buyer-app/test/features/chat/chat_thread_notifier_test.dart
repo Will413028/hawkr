@@ -228,7 +228,6 @@ void main() {
     expect(_state(t.container, _byStore).conversationId, isNull);
     expect(_state(t.container, _byStore).loadStatus, ChatLoadStatus.loaded);
 
-    // 店家開了新對話並送出第一則。
     t.repo.conversations = [chatConversation('conv-x', storeId: '7')];
     t.repo.addMessages('conv-x', [chatMessage('conv-x', 1, text: '嗨')]);
     t.repo.lastStream.add(messageEvent(chatMessage('conv-x', 1, text: '嗨')));

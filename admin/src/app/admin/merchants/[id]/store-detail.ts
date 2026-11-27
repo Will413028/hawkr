@@ -10,11 +10,7 @@ import { StoreStatus } from "@hawkr/api/gen/hawkr/seller/v1alpha1/seller_pb";
 import { goTrimmedRuneCount, trimGoSpace } from "@hawkr/api/text/server-text";
 import { formatAddress } from "@hawkr/twaddr/lookup";
 
-// 商家詳情（SellerAdminService.GetStore）的顯示判斷與文案。畫面只管呈現；哪個操作在哪個狀態可用、停權原因怎麼
-// 顯示、違規停權去哪裡、輸入怎麼驗證都在這裡，才能不靠畫面測試（決策簡報 K10、D4 第 2、3、13 點）。
 
-// ---------------------------------------------------------------------------
-// D4 的文案（已核准，照原文；標註「實作者補」的是 D4 沒有原文的部分）
 
 export const SUSPEND_WARNING_TEXT =
 	"停權後買家看不到這家店與它的商品，未付款訂單會被取消，優惠券會停用。";
@@ -51,8 +47,6 @@ export function deletionOutcome(
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 生效中的措施與狀態卡
 
 /** 結束措施後的成功訊息：重讀後帳號仍有生效中的措施就照實說；沒有時用 D4 第 2 點的原文。 */
 export const END_SUCCESS_STILL_SUSPENDED_TEXT =
@@ -67,8 +61,6 @@ export function endSuccessText(remaining: readonly Measure[]): string {
 		: LIFT_SUCCESS_TEXT;
 }
 
-// ---------------------------------------------------------------------------
-// 店家的生命週期（呈現）。動作能不能做與不能的原因都來自伺服器（GetStore 的 can_*、*_unavailabilities），不在這裡推導。
 
 /** 列表與詳情頁共用的生命週期徽章；營運中不另外顯示。 */
 export function lifecycleBadge(
@@ -105,8 +97,6 @@ export function addressText(address: PostalAddress | undefined): string {
 	return formatAddress(address.townCode, address.addressDetail) || "-";
 }
 
-// ---------------------------------------------------------------------------
-// 輸入驗證（刪帳號與顯示全文的理由上限 1000 字；措施的欄位上限在 measure.ts）
 
 export const REASON_MAX_LENGTH = 1000;
 
@@ -123,8 +113,6 @@ export function validateReason(
 	return undefined;
 }
 
-// ---------------------------------------------------------------------------
-// 登入信箱
 
 /**
  * 登入信箱（IdentityAdminService.GetAccount）的讀取狀態。notFound 是帳號不存在或已刪除；ready 且 email 為空字串時，

@@ -78,8 +78,6 @@ func InjectStoreIDHeader(r *storeid.Resolver) gin.HandlerFunc {
 	}
 }
 
-// accountIDFromContext 讀 JWTAuth 放進 gin context 的 accountId（型別可能是 int64
-// 或 float64，視 claim 解析路徑而定），統一收斂成 int64。
 func accountIDFromContext(c *gin.Context) (int64, bool) {
 	v, exists := c.Get("accountId")
 	if !exists {

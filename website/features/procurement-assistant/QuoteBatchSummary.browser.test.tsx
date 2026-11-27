@@ -90,7 +90,6 @@ describe("QuoteBatchSummary", () => {
 				page.getByRole("button", { name: "比較供應商回價", exact: true }),
 			)
 			.toBeDisabled();
-		// 沒有回價就不得出現任何成交語氣。
 		expect(container.textContent).not.toMatch(/已成交|已下單/);
 	});
 
@@ -101,7 +100,6 @@ describe("QuoteBatchSummary", () => {
 		await expect.element(text("2026/08/20 20:36")).toBeVisible();
 		await expect.element(text("等待供應商正式回價")).toBeVisible();
 		await expect.element(text("付款成功後正式成立")).toBeVisible();
-		// 第一步沒有伺服器時間戳可寫，所以是「已完成」而不是補出來的時間。
 		await expect.poll(() => text("已完成").elements().length).toBe(1);
 	});
 
@@ -113,7 +111,6 @@ describe("QuoteBatchSummary", () => {
 				page.getByRole("button", { name: "比較供應商回價", exact: true }),
 			)
 			.toBeEnabled();
-		// 成交價格仍未成立：接受回執才是唯一來源。
 		await expect.element(text("尚未成立")).toBeVisible();
 	});
 
@@ -124,7 +121,6 @@ describe("QuoteBatchSummary", () => {
 		});
 		await expect.element(text("NT$18,900")).toBeVisible();
 		await expect.element(text("建立中")).toBeVisible();
-		// CREATING_ORDER 不得渲染成已成交或已下單。
 		expect(container.textContent).not.toMatch(/已成交|已下單/);
 	});
 
@@ -134,7 +130,6 @@ describe("QuoteBatchSummary", () => {
 		await expect
 			.element(text("這三個數字是發布當下的收件人分布，不是投遞結果。"))
 			.toBeVisible();
-		// queuedCount 不得被講成「已送出」；面板上也沒有任何撤回動作。
 		expect(container.textContent).not.toMatch(/已送出|已寄送/);
 		expect(container.textContent).not.toMatch(/撤回|撤銷/);
 	});
@@ -146,7 +141,6 @@ describe("QuoteBatchSummary", () => {
 			exact: true,
 		});
 		await expect.element(recipients).toBeVisible();
-		// 範圍鎖在這一區：第三張卡的 shortlist 也是 0，不能混進來當證據。
 		await expect
 			.poll(() => recipients.getByText("0", { exact: true }).elements().length)
 			.toBe(3);

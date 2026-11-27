@@ -232,7 +232,6 @@ class CertificationVerifyConsumerTest {
         verify(channel, never()).basicAck(anyLong(), anyBoolean());
     }
 
-    // ==================== helper ====================
 
     private void givenApplication(String status, String govState, boolean manualReview) {
         when(applicationRepository.findById(APPLICATION_ID))

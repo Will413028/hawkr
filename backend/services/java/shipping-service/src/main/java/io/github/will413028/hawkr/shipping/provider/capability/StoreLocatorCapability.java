@@ -5,7 +5,6 @@ import java.util.Map;
 /** 門市地圖能力（買家選店）。只有超商軸有。 */
 public interface StoreLocatorCapability {
 
-    // ── buildRedirectParams 的回傳鍵名（呼叫端一律引用常數，不得自己打字串） ──────────
     /** provider 表單的提交位址 */
     String PARAM_FORM_ACTION = "formAction";
     /** provider 端的商家識別 */
@@ -19,7 +18,6 @@ public interface StoreLocatorCapability {
     /** 我方中轉頁的一次性導向網址（瀏覽器實際打開的位址） */
     String PARAM_REDIRECT_URL = "redirectUrl";
 
-    // ── parseResult 的輸入鍵名 ────────────────────────────────────────────────
     /** provider 導回的加密內容 */
     String RESULT_PAYLOAD = "payload";
     /** provider 導回的簽章 */

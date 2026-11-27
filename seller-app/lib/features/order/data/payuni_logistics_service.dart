@@ -21,10 +21,10 @@ class PayuniLogisticsService {
   final Dio _dio;
 
   /// 物流類型
-  static const String lgsTypeB2C = 'B2C'; // 超商大宗寄倉
-  static const String lgsTypeC2C = 'C2C'; // 超商店到店
-  static const String lgsTypeHOME = 'HOME'; // 黑貓宅配
-  static const String lgsTypeC2B = 'C2B'; // 超商退貨便
+  static const String lgsTypeB2C = 'B2C';
+  static const String lgsTypeC2C = 'C2C';
+  static const String lgsTypeHOME = 'HOME';
+  static const String lgsTypeC2B = 'C2B';
 
   /// 查詢物流狀態
   ///
@@ -41,7 +41,6 @@ class PayuniLogisticsService {
     try {
       HKLog.logD('[PayuniLogistics] Querying logistics: $lgsType');
 
-      // 建立請求 body
       final Map<String, dynamic> body = {'lgsType': lgsType};
 
       if (shipTradeNo != null && shipTradeNo.isNotEmpty) {
@@ -56,7 +55,6 @@ class PayuniLogisticsService {
         body['returnOdno'] = returnOdno;
       }
 
-      // 發送請求
       final response = await _dio.post(
         '/api/v1/app/logistics',
         data: body,
@@ -88,7 +86,6 @@ class PayuniLogisticsService {
         return LogisticsQueryResult.error('回傳資料為空');
       }
 
-      // 檢查後端返回的 status
       final status = data['status']?.toString() ?? '';
       if (status != 'SUCCESS' && status.isNotEmpty) {
         return LogisticsQueryResult.error(
@@ -135,32 +132,29 @@ class LogisticsInfo {
   final String merTradeNo;
   final String tradeNo;
   final String shipTradeNo;
-  final String odno; // 出貨單編號/宅配託運單號
-  final String lgsType; // B2C, C2C, HOME
-  final int shipType; // 1=7-ELEVEN, 2=黑貓宅配
-  final int serviceType; // 1=取貨付款, 3=取貨不付款
-  final int shipAmt; // 代收金額
-  final String consignee; // 收件人 (隱碼)
-  final String consigneeMobile; // 收件人手機 (隱碼)
-  final int shipStatus; // 物流貨態狀態碼
-  final int? pickupStoreType; // 關轉門市類型
-  final String shipStatusDesc; // 貨態說明
-  final String shipStatusTime; // 貨態日期
-  final int? progressPercent; // 進度百分比 0-100；null = 未知（無對應流程的進度表）
+  final String odno;
+  final String lgsType;
+  final int shipType;
+  final int serviceType;
+  final int shipAmt;
+  final String consignee;
+  final String consigneeMobile;
+  final int shipStatus;
+  final int? pickupStoreType;
+  final String shipStatusDesc;
+  final String shipStatusTime;
+  final int? progressPercent;
 
-  // 超商相關
-  final String? storeID; // 取件門市代碼
-  final String? storeName; // 取件門市名稱
-  final String? validationNo; // 驗證碼 (C2C)
+  final String? storeID;
+  final String? storeName;
+  final String? validationNo;
 
-  // 黑貓宅配相關
-  final String? fileNo; // 託運單PDF檔序號
-  final int? tradeType; // 1=正物流, 2=逆物流
-  final String? consigneeAddress; // 收件人地址
+  final String? fileNo;
+  final int? tradeType;
+  final String? consigneeAddress;
 
-  // 狀態標記
-  final bool isFinalStatus; // 是否為最終狀態
-  final bool isErrorStatus; // 是否為異常狀態
+  final bool isFinalStatus;
+  final bool isErrorStatus;
 
   LogisticsInfo({
     required this.status,
@@ -222,8 +216,6 @@ class LogisticsInfo {
           .toString(),
       shipStatusTime: (map['shipStatusTime'] ?? map['ShipStatusTime'] ?? '')
           .toString(),
-      // 後端沒給、且本 App 無對應進度表（B2C／C2B／未知 lgsType）時留 null，
-      // 由呈現層決定怎麼顯示「進度未知」，不得借用別條流程的百分比。
       progressPercent:
           _parseInt(map['progressPercent']) ??
           LogisticsStatusCode.getProgressPercent(shipStatus, lgsType),
@@ -308,7 +300,6 @@ class LogisticsInfo {
 /// 物流貨態狀態碼對照表
 class LogisticsStatusCode {
   static const Map<int, String> statusMap = {
-    // 7-ELEVEN 超商
     0: '初始狀態',
     1: '已取號',
     2: '已列印',
@@ -323,7 +314,6 @@ class LogisticsStatusCode {
     81: '門市關轉',
     99: '異常',
 
-    // 黑貓宅配
     30: '已收件',
     31: '配送中',
     32: '配達完成',
@@ -362,8 +352,6 @@ class LogisticsStatusCode {
         return _homeProgressPercent(code);
       case PayuniLogisticsService.lgsTypeC2C:
         return _cvsProgressPercent(code);
-      // B2C（大宗寄倉）／C2B（退貨便）流程與 C2C 不同，本 App 沒有對應的進度表；
-      // 回 null 而不是借用 C2C 的百分比。
       case PayuniLogisticsService.lgsTypeB2C:
       case PayuniLogisticsService.lgsTypeC2B:
         return null;

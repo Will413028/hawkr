@@ -9,12 +9,9 @@ describe("MSW test setup", () => {
 	});
 
 	it("refuses an unhandled external request and records it, so the test that made it fails", async () => {
-		// Not a synthetic 500 the code under test could swallow: the request is refused by the network
-		// guard (tests/setup/hermetic.mjs), and tests/setup-msw.ts fails the test in afterEach.
 		await expect(fetch("https://hawkr.test/unhandled")).rejects.toThrow(
 			/hermetic test|fetch failed/,
 		);
-		// what afterEach would have thrown for this test; taken here so this test can pass
 		expect(() => unhandledRequests.assertNone()).toThrow(
 			/GET https:\/\/hawkr\.test\/unhandled/,
 		);

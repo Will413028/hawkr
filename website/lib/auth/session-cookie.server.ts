@@ -17,8 +17,6 @@ export async function sessionCookieHeader(): Promise<string | null> {
 		const value = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
 		return value ? `${SESSION_COOKIE_NAME}=${value}` : null;
 	} catch (error) {
-		// Next 用帶 `digest` 的錯誤把「這個頁面是動態的」告訴 renderer，必須原樣往上丟；
-		// 其他錯誤是在 request scope 之外呼叫（腳本、單元測試），那裡沒有瀏覽器的 cookie。
 		if (error instanceof Error && "digest" in error) throw error;
 		return null;
 	}

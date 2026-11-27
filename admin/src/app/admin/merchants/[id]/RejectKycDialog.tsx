@@ -61,7 +61,6 @@ export default function RejectKycDialog({
 	const [error, setError] = useState<string | null>(null);
 	const [addError, setAddError] = useState<string | null>(null);
 	const [submitting, setSubmitting] = useState(false);
-	// 「加入一項問題」的表單：加入之後清空。
 	const [field, setField] = useState<KYCField>(KYCField.KYC_FIELD_UNSPECIFIED);
 	const [assetId, setAssetId] = useState("");
 	const [code, setCode] = useState<KYCIssueCode>(
@@ -118,7 +117,6 @@ export default function RejectKycDialog({
 		setError(null);
 		setSubmitting(true);
 		const result = await onConfirm();
-		// 成功時頁面會關掉對話框；失敗留在原地，問題、理由與備註都還在。
 		if (!result.ok) setError(result.text);
 		setSubmitting(false);
 	};
@@ -250,7 +248,6 @@ export default function RejectKycDialog({
 						onChange={(event) => {
 							const next = Number(event.target.value) as KYCIssueCode;
 							setCode(next);
-							// 缺少文件指的是整個位置：不能同時指定某一張。
 							if (issueAssetForbidden(next)) setAssetId("");
 							setAddError(null);
 						}}
@@ -333,7 +330,7 @@ export default function RejectKycDialog({
 				</span>
 			</div>
 
-			{/* 伺服器的句子（完整一句、以「。」結尾）與固定的一句分開排，client 不拼接也不加標點。 */}
+
 			<GovernanceNoticeBanner
 				notice={
 					blocked

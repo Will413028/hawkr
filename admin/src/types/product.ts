@@ -8,14 +8,13 @@ export interface InlineRun {
 }
 
 export interface DescriptionBlock {
-	type: string; // "text" | "table" | "list" | "image"
+	type: string;
 	id?: string;
 	runs?: InlineRun[];
 	content?: string;
 	tableJson?: string;
 	listJson?: string;
 	assetId?: string;
-	// 49 §6.1：帶一張圖的物件一律 imageKey（objectKey SSOT）+ imageUrl（Gateway 組）。
 	imageKey?: string;
 	imageUrl?: string;
 	width?: string;
@@ -30,10 +29,6 @@ export interface ProductDescription {
 
 export interface GalleryItem {
 	assetId?: string;
-	// 49 §6.1：imageKey 是 objectKey SSOT，imageUrl 是 Gateway 由它組出的顯示 URL
-	// （固定 `/i/original/`）。兩欄在 gateway `GalleryItem` 都帶 omitempty，且成對
-	// 產生（imageUrl 由 imageKey 組），所以顯示一律讀 imageKey 過 buildImageUrl 取
-	// 需要的 preset；讀 imageUrl 等於先拉原圖 URL 再剝回 key，多一次無謂轉換。
 	imageKey?: string;
 	imageUrl?: string;
 }

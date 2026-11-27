@@ -32,7 +32,6 @@ func (s *Service) CreateNote(ctx context.Context, in model.CreateMeasureNoteInpu
 	if err != nil {
 		return model.GovernanceNote{}, err
 	}
-	// 回應取資料庫存下的值（微秒），之後 Notes 讀到的才會完全相同
 	return model.GovernanceNote{ID: row.NoteID, AdminID: row.AdminID, Body: row.Body, CreatedAt: row.CreatedAt}, nil
 }
 

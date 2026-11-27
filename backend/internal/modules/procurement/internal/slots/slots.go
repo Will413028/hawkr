@@ -43,7 +43,6 @@ const (
 // AllowedUnits 只允許重量單位：KG、CATTY、GRAM 都有公斤換算係數，詢價的計價基準據此決定。
 var AllowedUnits = []string{"KG", "CATTY", "GRAM"}
 
-// 必填欄位：形成詢價規格的最小集合，順序固定。
 var requiredSlots = []model.SlotKey{Item, DeliveryCity, Unit}
 
 // ItemResolutionKind 是品項被判定的方式，值等於資料表的 item_resolution_kind。
@@ -140,8 +139,6 @@ func (s Set) Apply(p Patch, now time.Time) (Set, []Rejection) {
 	}
 	applyText(Packaging, p.Packaging, &out.Packaging)
 
-	// 品項一變動就清掉舊解析：解析結果與品項原話同生命週期，這裡是唯一的守點。判準是 Apply 前後的值不同，不是 p.Item 非 nil——
-	// patch 的品項被驗證退回時 request 沒變，不該連帶清掉仍然正確的解析。
 	if !equalPtr(s.Item, out.Item) {
 		out.Resolution = nil
 	}
@@ -215,7 +212,6 @@ func (s Set) Apply(p Patch, now time.Time) (Set, []Rejection) {
 	return out, rejected
 }
 
-// boundedText 去頭尾空白、拒絕空值，超過 MaxTextLen 的截斷（以 rune 計）並回報。截斷後再去一次頭尾空白，資料表的 CHECK 不收尾端空白。
 func boundedText(raw string, reject func(model.SlotKey, Reason), key model.SlotKey) (string, bool) {
 	v := trimtext.Trim(raw)
 	if v == "" {

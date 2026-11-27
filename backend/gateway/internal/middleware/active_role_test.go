@@ -18,13 +18,11 @@ func TestPickActiveRole(t *testing.T) {
 		{"seller-only derives 2", AccountTypeSeller, 0, 2},
 		{"buyer-only ignores seller", AccountTypeBuyer, 2, 1},
 		{"seller-only ignores buyer", AccountTypeSeller, 1, 2},
-		// 解析後的角色一樣限制在帳號的角色內：7 或 3（bitmask 被誤當成角色）不是任何消費端能解讀的值。
 		{"dual out-of-range", AccountTypeSellerAndBuyer, 7, 0},
 		{"dual bitmask-3 is not a role", AccountTypeSellerAndBuyer, 3, 0},
 		{"dual negative", AccountTypeSellerAndBuyer, -3, 0},
 		{"buyer-only ignores poisoned", AccountTypeBuyer, 7, 1},
 		{"seller-only ignores poisoned", AccountTypeSeller, 7, 2},
-		// 管理員（4）沒有買家或賣家的視角：單體送 4，往下游仍是 0。
 		{"admin login role 4", AccountTypeAdmin, 4, 0},
 		{"admin claiming seller", AccountTypeAdmin, 2, 0},
 		{"no roles", 0, 1, 0},
@@ -67,13 +65,13 @@ func TestSanitizeActiveRole(t *testing.T) {
 		{role: 2, accountType: AccountTypeSellerAndBuyer, want: 2},
 		{role: 1, accountType: AccountTypeBuyer, want: 1},
 		{role: 2, accountType: AccountTypeSeller, want: 2},
-		{role: 0, accountType: AccountTypeSellerAndBuyer, want: 0}, // already "none"
-		{role: 2, accountType: AccountTypeBuyer, want: 0},          // role removed / never held
+		{role: 0, accountType: AccountTypeSellerAndBuyer, want: 0},
+		{role: 2, accountType: AccountTypeBuyer, want: 0},
 		{role: 1, accountType: AccountTypeSeller, want: 0},
-		{role: 3, accountType: AccountTypeSellerAndBuyer, want: 0}, // bitmask, not a role
+		{role: 3, accountType: AccountTypeSellerAndBuyer, want: 0},
 		{role: 7, accountType: AccountTypeSellerAndBuyer, want: 0},
 		{role: -3, accountType: AccountTypeSellerAndBuyer, want: 0},
-		{role: 1, accountType: 4, want: 0}, // admin holds neither role
+		{role: 1, accountType: 4, want: 0},
 		{role: 2, accountType: 4, want: 0},
 	} {
 		if got := sanitizeActiveRole(tc.role, tc.accountType); got != tc.want {

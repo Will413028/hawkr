@@ -32,7 +32,6 @@ type InvoiceServiceClient struct {
 	client pb.InvoiceServiceClient
 }
 
-// invoiceDeadlines 由 env 決定，boot 時讀一次；值域與預設見 §12.1.2。
 var (
 	invoiceDeadline               = envDurationMs("INVOICE_GRPC_DEADLINE_MS", 3000)
 	invoiceCredentialTestDeadline = envDurationMs("INVOICE_GRPC_DEADLINE_CREDENTIAL_TEST_MS", 15000)
@@ -78,7 +77,6 @@ func (c *InvoiceServiceClient) Close() error {
 	return nil
 }
 
-// ==================== 買家端 ====================
 
 // ListBuyerInvoiceProfiles （端點 1）
 func (c *InvoiceServiceClient) ListBuyerInvoiceProfiles(ctx context.Context, req *pb.ListBuyerInvoiceProfilesRequest) (*pb.ListBuyerInvoiceProfilesResponse, error) {
@@ -201,7 +199,6 @@ func (c *InvoiceServiceClient) GetInvoiceComplaint(ctx context.Context, req *pb.
 	return c.client.GetInvoiceComplaint(ctx, req)
 }
 
-// ==================== 賣家端 ====================
 
 // GetSellerInvoiceOverview （端點 16）
 func (c *InvoiceServiceClient) GetSellerInvoiceOverview(ctx context.Context, req *pb.GetSellerInvoiceOverviewRequest) (*pb.GetSellerInvoiceOverviewResponse, error) {
@@ -350,7 +347,6 @@ func (c *InvoiceServiceClient) RespondSellerInvoiceComplaint(ctx context.Context
 	return c.client.RespondSellerInvoiceComplaint(ctx, req)
 }
 
-// ==================== ADM ====================
 
 // GetInvoiceOverviewForAdmin （端點 37）
 func (c *InvoiceServiceClient) GetInvoiceOverviewForAdmin(ctx context.Context, req *pb.GetInvoiceOverviewForAdminRequest) (*pb.GetInvoiceOverviewForAdminResponse, error) {
@@ -534,7 +530,6 @@ func (c *InvoiceServiceClient) ListInvoiceAuditLogsForAdmin(ctx context.Context,
 	return c.client.ListInvoiceAuditLogsForAdmin(ctx, req)
 }
 
-// ==================== 賣家端 ====================
 
 // ReportExternalIssuance （端點 62）
 func (c *InvoiceServiceClient) ReportExternalIssuance(ctx context.Context, req *pb.ReportExternalIssuanceRequest) (*pb.GetSellerInvoiceJobResponse, error) {
@@ -543,7 +538,6 @@ func (c *InvoiceServiceClient) ReportExternalIssuance(ctx context.Context, req *
 	return c.client.ReportExternalIssuance(ctx, req)
 }
 
-// ==================== 買家端 ====================
 
 // RejectInvoiceComplaintResponse （端點 63）
 func (c *InvoiceServiceClient) RejectInvoiceComplaintResponse(ctx context.Context, req *pb.RejectInvoiceComplaintResponseRequest) (*pb.InvoiceComplaintResponse, error) {
@@ -566,7 +560,6 @@ func (c *InvoiceServiceClient) ReopenInvoiceComplaint(ctx context.Context, req *
 	return c.client.ReopenInvoiceComplaint(ctx, req)
 }
 
-// ==================== ADM ====================
 
 // ReactivateProviderAccountForAdmin （端點 66；連線測試 deadline）
 func (c *InvoiceServiceClient) ReactivateProviderAccountForAdmin(ctx context.Context, req *pb.ReactivateProviderAccountForAdminRequest) (*pb.GetProviderAccountForAdminResponse, error) {
@@ -582,7 +575,6 @@ func (c *InvoiceServiceClient) RevokeProviderAccountForAdmin(ctx context.Context
 	return c.client.RevokeProviderAccountForAdmin(ctx, req)
 }
 
-// ==================== 賣家端 ====================
 
 // ListOrderExternalIssuances （端點 62R）
 func (c *InvoiceServiceClient) ListOrderExternalIssuances(ctx context.Context, req *pb.ListOrderExternalIssuancesRequest) (*pb.ListOrderExternalIssuancesResponse, error) {

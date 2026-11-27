@@ -15,8 +15,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// errRemediationUnavailable 是請求解除的前置條件不成立時的失敗，訊息是 RemediationUnavailabilities 的第一筆（與 can_request_remediation、API 的
-// remediation_unavailabilities 同一個規則與同一份文字）。原因清單是空的是程式錯誤，回內部錯誤。
 func errRemediationUnavailable(l uitext.Locale, m model.Measure) error {
 	us := m.RemediationUnavailabilities(l)
 	if len(us) == 0 {

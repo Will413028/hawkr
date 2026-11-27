@@ -89,14 +89,6 @@ export default function MarketProductsList({
 	React.useEffect(() => setHydrated(true), []);
 	const hydrationSafeClientRender = useHydrationSafeClientRender();
 
-	// SSR delivers page 1; subsequent pages are appended after an explicit
-	// request from the buyer. The follow tab is the one
-	// exception: SSR skips the products fetch (no JWT), so we kick off
-	// page 1 from `loadMore` on mount.
-	// Back-navigation restore (卡片→詳情→返回). Browser state must never alter a
-	// hard document's first hydration tree. A list mounted later by client
-	// navigation can still peek synchronously and render the restored cards on
-	// its first paint, preserving scroll continuity without a page-1 flash.
 	const [restored, setRestored] = React.useState<MarketListSnapshot | null>(
 		() =>
 			marketListSnapshotForInitialRender(hydrationSafeClientRender, () =>
@@ -111,10 +103,6 @@ export default function MarketProductsList({
 	React.useLayoutEffect(() => {
 		if (previewMode || snapshotConsumedRef.current) return;
 		snapshotConsumedRef.current = true;
-		// Consume only after the SSR-matching hydration commit. Client-only mounts
-		// already seeded `restored` above; a hard Back can now apply the same
-		// snapshot in this pre-paint layout phase instead of discarding it and
-		// flashing page 1 at the top.
 		const snapshot = takeMarketListSnapshot(
 			window.location.pathname + window.location.search,
 		);
@@ -146,15 +134,8 @@ export default function MarketProductsList({
 			currentSort === "推薦",
 		enableScopedActivationRefresh: !previewMode,
 	});
-	// Re-assert the saved scroll while the restored list lays out. The masonry
-	// computes its height asynchronously (ResizeObserver after paint), so the page
-	// is briefly short and a single scrollTo would land at the top, then jump down
-	// once the height settles — the flicker on back. Pin the target every frame
-	// until it actually sticks (height grew enough) so the view tracks straight to
-	// the saved position with no visible jump, then stop.
 	React.useEffect(() => {
 		if (!restored) return;
-		// Restored items were already tracked on the way in — don't re-emit.
 		lastTrackedCountRef.current = restored.products.length;
 		const targetY = restored.scrollY;
 		let raf = 0;
@@ -168,12 +149,7 @@ export default function MarketProductsList({
 			root.style.scrollBehavior = previousBehavior;
 			frames += 1;
 			settled = Math.abs(window.scrollY - targetY) < 2 ? settled + 1 : 0;
-			// Stop once the position has held for a few frames (layout settled) or
-			// after a safety cap (~1s) so we never pin against a genuine user scroll.
 			if ((settled >= 3 && frames > 4) || frames > 60) {
-				// Tell the card→detail reverse zoom the background is settled, so it
-				// can start the shrink and uncover a stable list (no flash). See
-				// runReverseZoom in components/shared/PageTransition.tsx.
 				window.dispatchEvent(new Event("hk:market-list-restored"));
 				return;
 			}
@@ -183,8 +159,6 @@ export default function MarketProductsList({
 		return () => window.cancelAnimationFrame(raf);
 	}, [restored]);
 
-	// Snapshot the list whenever the buyer clicks through to a detail page
-	// (product card or its seller link) so the back navigation can restore it.
 	const snapshotStateRef = React.useRef({ products, page, done });
 	snapshotStateRef.current = { products, page, done };
 	React.useEffect(() => {
@@ -203,9 +177,6 @@ export default function MarketProductsList({
 			const anchor = event.target.closest<HTMLAnchorElement>("a[href]");
 			if (!anchor) return;
 			const href = anchor.getAttribute("href") ?? "";
-			// 進詳情（返回時還原）與底部 Tab 切走（切回時像 App Tab 原地接續，
-			// 見 PageTransition 的 tabKeyFor）都要存快照；還原端以 key 精確比對
-			// 且有時效，對不上就自動作廢，多存無害。
 			const isDetailNav = /^\/(products|sellers)\//.test(href);
 			const isTabNav = href === "/" || href === "/feed" || href === "/search";
 			if (!isDetailNav && !isTabNav) return;
@@ -224,9 +195,6 @@ export default function MarketProductsList({
 		return () => document.removeEventListener("click", onClickCapture, true);
 	}, [previewMode]);
 
-	// Follow tab arrives without SSR products (no JWT in server fetch);
-	// trigger page-1 load on mount + whenever the filter snapshot changes
-	// while still empty.
 	React.useEffect(() => {
 		if (previewMode) return;
 		if (page === 0 && !done && !loading) {
@@ -255,10 +223,8 @@ export default function MarketProductsList({
 	const lastTrackedCountRef = React.useRef(0);
 	React.useEffect(() => {
 		if (previewMode) return;
-		// Client-only emission (SSR shell + load-more would double-count); fire
-		// the newly-appended slice each time the list grows.
 		if (products.length <= lastTrackedCountRef.current) {
-			lastTrackedCountRef.current = products.length; // reset on filter change
+			lastTrackedCountRef.current = products.length;
 			return;
 		}
 		const fresh = products.slice(lastTrackedCountRef.current);
@@ -266,15 +232,9 @@ export default function MarketProductsList({
 		trackViewItemList(fresh, listContext);
 	}, [products, listContext, previewMode]);
 
-	// Wait for the first fetch to resolve before showing the follow empty
-	// state so we don't flash "no products" before the BFF responds.
 	const followPending = isFollowMode && page === 0;
 	const followEmpty =
 		isFollowMode && !loading && page > 0 && visibleProducts.length === 0;
-	// A client-applied filter fetches its own page 1 (no SSR seed). Hold a
-	// placeholder while that first page loads so we don't flash "no results"
-	// before it resolves. The canonical route is seeded, so this stays false
-	// there — the ready marker below is unaffected on the default page.
 	const initialPending =
 		!isFollowMode &&
 		!previewMode &&
@@ -283,9 +243,7 @@ export default function MarketProductsList({
 
 	return (
 		<>
-			{/* A streamed list can paint before its client handlers hydrate. This
-			    readiness marker lets navigation tests (and future loading chrome)
-			    distinguish a visible card from one that is actually interactive. */}
+
 			<span data-hk-market-products-hydrated={hydrated} hidden />
 			{hydrated && !followPending && !initialPending ? (
 				<span data-hk-tab-content-ready="market" hidden />
@@ -329,10 +287,6 @@ export default function MarketProductsList({
 					<span aria-hidden="true">排序：</span>
 					{sortLinks.map((opt) =>
 						previewMode ? (
-							// 預覽模式：用 <a> + preventDefault 取代 <Link>，繼承
-							// `.market-list-main__sort a` 的 CSS（padding / 顏色 /
-							// active 高亮），避免整排被 opacity-60 打成「全部褪色」
-							// 而與正式視覺不一致。
 							// biome-ignore lint/a11y/useValidAnchor: preview mode no-op
 							<a
 								key={opt.value}

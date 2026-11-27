@@ -35,8 +35,6 @@ export default function ChatPeerAvatar({
 	const [loaded, setLoaded] = React.useState(false);
 	const [broken, setBroken] = React.useState(false);
 
-	// Reset load/error state whenever the source changes so switching threads
-	// shows the icon default again until the new image arrives.
 	const [lastSrc, setLastSrc] = React.useState(resolved);
 	if (lastSrc !== resolved) {
 		setLastSrc(resolved);

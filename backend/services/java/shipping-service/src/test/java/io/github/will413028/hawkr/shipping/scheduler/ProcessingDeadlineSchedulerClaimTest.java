@@ -94,8 +94,6 @@ class ProcessingDeadlineSchedulerClaimTest {
         inOrder.verify(shipmentMapper).leaseProcessingDeadline(anyLong(), any(), any());
         inOrder.verify(eventPublisher).publishProcessingCleared("O100");
         inOrder.verify(eventPublisher).publishProcessingTimeout(any(), any(), any());
-        // clear 是 SET processing_deadline = NULL（永久標記），必須留在 publish **之後**：
-        // 上移到 publish 之前 ⇒ publish 拋例外或 pod 崩潰時事件永久遺失且無告警。
         inOrder.verify(shipmentMapper).clearProcessingDeadline(1L);
     }
 
@@ -113,7 +111,6 @@ class ProcessingDeadlineSchedulerClaimTest {
         when(shipmentMapper.findExpiredUnprocessedShipments(any(), anyInt()))
                 .thenReturn(List.of(shipment(1L, "O100"), shipment(2L, "O200")));
         when(shipmentMapper.leaseProcessingDeadline(anyLong(), any(), any())).thenReturn(1);
-        // 讓第一筆 claim 之後的工作耗掉一段可觀測的時間
         org.mockito.Mockito.doAnswer(inv -> {
             Thread.sleep(40L);
             return null;
@@ -155,7 +152,6 @@ class ProcessingDeadlineSchedulerClaimTest {
 
         assertTrue(leaseSeconds > 0,
                 "租約必須是未來時間（0 或負 ⇒ 任何人都搶得到 ⇒ 等於沒有搶佔）");
-        // interval-ms 預設 300000 = 5 分鐘（ProcessingDeadlineScheduler 的 @Scheduled 預設值）
         long oneTickSeconds = 300L;
         assertTrue(leaseSeconds <= oneTickSeconds + 5,
                 "租約 = pod 崩潰後的恢復窗口，實測 " + leaseSeconds + " 秒 > 一個 tick("

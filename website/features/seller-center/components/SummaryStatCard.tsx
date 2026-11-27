@@ -63,7 +63,7 @@ export function SummaryStatCard({
 	const inner = (
 		<>
 			<span className={`seller-inventory__stat-icon is-${tint}`}>{icon}</span>
-			{/* ` ` keeps the line-height when the card has no value to show. */}
+
 			<strong>{value || " "}</strong>
 			<small>{label}</small>
 		</>

@@ -10,9 +10,6 @@ const CARD_RADIUS = 64;
 const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10] as const;
 const FONT_FAMILY =
 	'"Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif';
-// Bound each remote image fetch so one slow/hung asset can't stall the whole
-// share-card export behind Promise.all — a timeout just drops that image to its
-// canvas fallback (the surrounding try/catch already treats it as unavailable).
 const SHARE_CARD_IMAGE_TIMEOUT_MS = 12_000;
 
 function blobToDataUrl(blob: Blob): Promise<string> {
@@ -313,7 +310,6 @@ function drawIdentity(
 	ctx.font = `800 ${nameSize}px ${FONT_FAMILY}`;
 	ctx.fillText(ellipsizeText(ctx, data.name, 650), 342, CARD_COVER_HEIGHT + 98);
 
-	// 沒有地點就不畫這顆 badge：空字串照樣會留下一個 56px 寬的色塊。
 	if (!data.location) return;
 	ctx.font = `700 34px ${FONT_FAMILY}`;
 	const location = ellipsizeText(ctx, data.location, 560);
@@ -447,7 +443,6 @@ export async function createSellerShareCardBlob(
 	try {
 		await document.fonts?.ready;
 	} catch {
-		// System fonts remain available when a web font is blocked or slow.
 	}
 
 	const qrSvg = element.querySelector<SVGElement>(
@@ -523,7 +518,5 @@ export function downloadSellerShareCardBlob(blob: Blob, filename: string) {
 	document.body.appendChild(link);
 	link.click();
 	link.remove();
-	// Safari may defer reading the Blob until the save sheet is confirmed.
-	// Keeping it alive avoids zero-byte or broken files on slower devices.
 	window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }

@@ -220,7 +220,6 @@ public interface AfterSaleCaseMapper extends BaseMapper<AfterSaleCaseEntity> {
             """)
     int markLabelRetryExhausted(@Param("caseNo") String caseNo);
 
-    // ==================== §10 申訴與平台裁決 ====================
 
     /**
      * 買家提交申訴：樂觀鎖 CAS，條件必須 status IN (REJECTED(60), AUTO_COMPLETED_RETURN_PENDING_TIMEOUT(33))
@@ -387,7 +386,6 @@ public interface AfterSaleCaseMapper extends BaseMapper<AfterSaleCaseEntity> {
             """)
     long countAppealsForAdmin(@Param("appealStateValue") String appealStateValue);
 
-    // ==================== §5.10 賣家處理逾時自動升級 ====================
 
     /**
      * §5.10 CaseProcessTimeoutWorker：掃描賣家處理逾時且尚未升級的案件。
@@ -587,7 +585,6 @@ public interface AfterSaleCaseMapper extends BaseMapper<AfterSaleCaseEntity> {
     int closeIfNotClosed(@Param("caseNo") String caseNo,
                          @Param("closedAt") java.time.LocalDateTime closedAt);
 
-    // ==================== §2.1 INV-3 / INV-4：賣家決議 / 買家動作 / 退貨確認 transition ====================
 
     /**
      * §2.1 / §5.2.1 RETURN_REFUND：PENDING(0) → RETURN_PENDING(20)。
@@ -697,7 +694,6 @@ public interface AfterSaleCaseMapper extends BaseMapper<AfterSaleCaseEntity> {
     java.util.List<String> findAutoConfirmExpired(@Param("cutoff") java.time.LocalDateTime cutoff,
                                                   @Param("limit") int limit);
 
-    // ==================== 2026-05-22 逆物流退貨政策修訂：scheduler 掃描 + auto-complete CAS ====================
 
     /**
      * §5.3.10.2 StorePickupTimeoutScheduler 掃描：找 status='26' 且 store_pickup_deadline_at 已到期的 case。
@@ -1002,7 +998,6 @@ public interface AfterSaleCaseMapper extends BaseMapper<AfterSaleCaseEntity> {
             """)
     int markCancelledByConfirmReceipt(@Param("caseNo") String caseNo);
 
-    // ==================== Order Service 反查（§4.4.1 訂單倒數恢復） ====================
 
     /**
      * 訂單活躍 case 計數：用於 Order Service 自動完成倒數恢復前反查（03 §5.8 / 09 §4.4.1）。

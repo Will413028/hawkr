@@ -30,7 +30,6 @@ class _FakeSession extends Session {
 void main() {
   setUpAll(() async {
     if (!F.isInitialized) F.init(Flavor.dev);
-    // 初始化 header（版本與 App 類型），才分得出「不送 X-Active-Role」與「根本沒初始化」。
     PackageInfo.setMockInitialValues(
       appName: 'hawkr',
       packageName: 'io.github.will413028.hawkr.buyer',

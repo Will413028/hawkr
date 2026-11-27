@@ -79,8 +79,6 @@ const cards = requireFromTest(
 const render = (component: unknown, props: Record<string, unknown>): string =>
 	renderToStaticMarkup(createElement(component, props));
 
-// ---------------------------------------------------------------------------
-// 測試資料
 
 const COMPANY = KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS;
 
@@ -129,7 +127,7 @@ function businessApplication(
 	});
 }
 
-const QUERY_TIME = new Date("2026-10-11T04:30:00Z"); // 台北 12:30
+const QUERY_TIME = new Date("2026-10-11T04:30:00Z");
 
 function foundCheck(
 	patch: MessageInitShape<typeof KYCRegistrationCheckSchema> = {},
@@ -159,8 +157,6 @@ const noop = () => {};
 /** 判斷「查詢是否超過期限」用的固定現在時間（早於 deadline）。 */
 const NOW = new Date("2026-10-11T04:31:00Z");
 
-// ---------------------------------------------------------------------------
-// 核准、退回與重新查詢：只讀伺服器的旗標與原因（前提 2026-10-15）
 
 const U = StoreActionUnavailableReason;
 const why = (reason: StoreActionUnavailableReason, message?: string) =>
@@ -169,7 +165,6 @@ const why = (reason: StoreActionUnavailableReason, message?: string) =>
 		message: message ? { message, locale: "zh-TW" } : undefined,
 	});
 
-// 伺服器真的會送的句子（model.StoreActionUnavailableText）。
 const CLOSED_TEXT =
 	"店家已關閉，這份商家認證申請暫停審核，店家恢復營業後才能審核或重新查詢。";
 const PENDING_DELETION_TEXT = "店家等待刪除，這份商家認證申請不再審核。";
@@ -297,7 +292,6 @@ test("重新查詢只讀 can_requery_registration：公司型審核中的申請�
 	});
 	assert.equal(reviewActions(business).canRequery, true);
 	assert.equal(reviewActions(reviewable()).canRequery, false);
-	// 旗標是唯一來源：申請狀態與賣家型態不參與。
 	assert.equal(
 		reviewActions(
 			businessApplication({
@@ -309,8 +303,6 @@ test("重新查詢只讀 can_requery_registration：公司型審核中的申請�
 	);
 });
 
-// ---------------------------------------------------------------------------
-// 版本衝突：輸入保留
 
 /** 一份填到一半的退回草稿。 */
 function aDraft(): ReviewDraft {
@@ -438,8 +430,6 @@ test("成功才清空草稿", async () => {
 	assert.equal(draftAfter(aDraft(), result), EMPTY_REVIEW_DRAFT);
 });
 
-// ---------------------------------------------------------------------------
-// 退回欄位對應 KYCField
 
 test("退回欄位的文字窮舉 KYCField：每個非 UNSPECIFIED 的值都有文字，新增 enum 值時這裡會失敗", () => {
 	const fields = Object.values(KYCField).filter(
@@ -456,7 +446,6 @@ test("退回欄位的文字窮舉 KYCField：每個非 UNSPECIFIED 的值都有�
 	}
 	assert.equal(kycFieldLabel(KYCField.KYC_FIELD_UNSPECIFIED), "未知");
 	assert.equal(kycFieldLabel(9999 as KYCField), "未知");
-	// 與賣家端同一組名詞（L0 A1 收斂字）。
 	assert.equal(kycFieldLabel(KYCField.KYC_FIELD_WEBSITE_URL), "官方網站");
 	assert.equal(
 		kycFieldLabel(KYCField.KYC_FIELD_BUSINESS_COMPANY_DOCUMENTS),
@@ -476,8 +465,6 @@ test("文件類的欄位只有補充文件：申請上的文件與退回的問�
 	assert.equal(isDocumentField(KYCField.KYC_FIELD_UNSPECIFIED), false);
 });
 
-// ---------------------------------------------------------------------------
-// 公司補充文件：檢視網址與 asset_id 直接來自申請
 
 test("補充文件：初次 render 只列文件與「查看原圖」按鈕，不含任何 view_uri 的網址或 <img>（讀取才會留紀錄）", () => {
 	const app = businessApplication();
@@ -563,8 +550,6 @@ test("補充文件的 view_uri 不合法：該位置顯示「無法檢視」，�
 	assert.match(html, /無法檢視/u);
 });
 
-// ---------------------------------------------------------------------------
-// GCIS 並列（併在基本資料卡的右欄）
 
 const STORE = create(StoreSchema, {
 	id: "100",
@@ -708,7 +693,7 @@ test("沒有查到（NOT_FOUND、UNAVAILABLE）：欄頭說明結果，登記值
 });
 
 test("欄頭：查詢中帶「最晚 HH:mm 會有結果」、超過期限提示重新查詢、沒有登記資料（含 outcome 是 UNSPECIFIED）；個人申請沒有並列", () => {
-	const deadline = new Date("2026-10-11T05:00:00Z"); // 台北 13:00
+	const deadline = new Date("2026-10-11T05:00:00Z");
 	const pending = gcisView(
 		businessApplication({ pendingRegistrationCheck: pendingCheck(deadline) }),
 		NOW,
@@ -732,7 +717,6 @@ test("欄頭：查詢中帶「最晚 HH:mm 會有結果」、超過期限提示�
 		"查詢時間 2026/10/11 12:30・查到",
 		"查詢中時上一筆仍標明",
 	);
-	// 到了期限還沒有終態：不再說「查詢中」，提示重新查詢。
 	const overdue = gcisView(
 		businessApplication({ pendingRegistrationCheck: pendingCheck(deadline) }),
 		deadline,
@@ -803,7 +787,6 @@ test("登記現況警示：非核准設立、或伺服器標記查詢當天在�
 		undefined,
 		"停業期間已結束且現況是核准設立：不警示",
 	);
-	// 日期落在期間內但伺服器沒有標記：只信伺服器（日期的判斷只有一處）。
 	const datesInsideButNotFlagged = foundCheck({
 		registration: {
 			status: KYCRegistrationStatus.KYC_REGISTRATION_STATUS_ACTIVE,
@@ -859,7 +842,7 @@ test("「重新查詢」只在 canRequery 時出現；查詢中不能再按（�
 
 test("進行中的查詢依伺服器的期限退避輪詢：間隔隨已等待的時間成長、有上限、不晚於期限後一秒；終態與超過期限不再輪詢", () => {
 	const request = new Date("2026-10-11T04:31:00Z");
-	const deadline = new Date("2026-10-11T06:11:00Z"); // 100 分鐘後
+	const deadline = new Date("2026-10-11T06:11:00Z");
 	const pending = pendingCheck(deadline);
 	const at = (secondsAfterRequest: number) =>
 		registrationPollInterval(
@@ -870,9 +853,7 @@ test("進行中的查詢依伺服器的期限退避輪詢：間隔隨已等待�
 	assert.equal(at(60), 15_000, "等越久間隔越長（已等待時間的 1/4）");
 	assert.equal(at(600), 60_000, "上限 60 秒");
 	assert.equal(at(3600), 60_000);
-	// 離期限不到一個間隔：下一次讀取落在期限之後一秒，才看得到期限那一刻的終態。
 	assert.equal(at(100 * 60 - 10), 11_000);
-	// 期限到了還沒有終態（伺服器的錯誤）：不再輪詢，畫面提示重新查詢。
 	assert.equal(at(100 * 60), false);
 	assert.equal(at(100 * 60 + 1), false);
 	assert.equal(
@@ -880,7 +861,6 @@ test("進行中的查詢依伺服器的期限退避輪詢：間隔隨已等待�
 		false,
 	);
 	assert.equal(registrationOverdue(pending, deadline), true);
-	// 沒有進行中的查詢（已有終態）、或沒有期限（不該發生）都不輪詢。
 	assert.equal(registrationPollInterval(undefined, request), false);
 	assert.equal(
 		registrationPollInterval(
@@ -895,8 +875,6 @@ test("進行中的查詢依伺服器的期限退避輪詢：間隔隨已等待�
 	);
 });
 
-// ---------------------------------------------------------------------------
-// 申請的讀取狀態與評分
 
 test("申請的讀取狀態：沒有摘要不發請求；not_found 是沒有申請；成功卻沒有申請是錯誤", () => {
 	assert.deepEqual(
@@ -944,8 +922,6 @@ test("評分卡：只顯示讀到且大於 0 的平均分；讀不到、沒有�
 	assert.equal(ratingText({ ratingAverage: Number.NaN }), undefined);
 });
 
-// ---------------------------------------------------------------------------
-// 核准的提示、審核備註與聯絡資料
 
 test("核准鈕上方的小字與核准成功的提示是同一句新文案，不再提 PayUni", async () => {
 	const copy = "核准後系統會建立收款帳戶，賣家再到金流商完成收款設定";
@@ -996,8 +972,6 @@ test("聯絡人姓名與手機顯示在基本資料卡；沒有值時照卡片�
 	);
 });
 
-// ---------------------------------------------------------------------------
-// 接線（頁面與 hook 讀的是契約的哪個方法）
 
 test("接線：核准與退回帶 etag；重新查詢走自己的方法；評分讀公開的 GetStore", async () => {
 	const { readFile } = await import("node:fs/promises");
@@ -1049,7 +1023,6 @@ test("接線：核准與退回帶 etag；重新查詢走自己的方法；評分
 		/\{ storeCode \}/u,
 		"公開的 GetStore 以 store_code 讀，不是 id",
 	);
-	// 舊 REST 全部不再出現。
 	assert.doesNotMatch(page, /\/api\/v1\/admin\/(sellers|certifications)/u);
 	assert.doesNotMatch(
 		page,
@@ -1079,17 +1052,14 @@ test("重新查詢成功：回應那筆進行中的查詢直接寫進申請的�
 	assert.ok(next?.application);
 	assert.equal(next.application.pendingRegistrationCheck?.seq, BigInt(2));
 	assert.equal(next.application.pendingRegistrationCheck, check);
-	// 其餘（etag、審核中的狀態、已完成的查詢）原樣保留；原快取物件不被改動。
 	assert.equal(next.application.etag, cached.application.etag);
 	assert.equal(
 		next.application.registrationCheck,
 		cached.application.registrationCheck,
 	);
 	assert.equal(cached.application.pendingRegistrationCheck, undefined);
-	// 沒有快取、或回應沒有查詢時原樣回傳（交給正常的讀取）。
 	assert.equal(applyRequeryResult(undefined, check), undefined);
 	assert.equal(applyRequeryResult(cached, undefined), cached);
-	// 寫進去之後頁面立刻是查詢中，輪詢以伺服器的期限接手。
 	assert.equal(
 		gcisView(next.application, NOW)?.header.kind,
 		"pending",

@@ -102,7 +102,6 @@ func NewApp(m Module, payments Payments, followers Followers, images rpc.Images,
 	return &App{m: m, payments: payments, followers: followers, blocking: blocking, images: images, dash: dash, stats: stats, links: links, web: web, log: log}, nil
 }
 
-// deref 是可選文字的值：沒有值是空字串（契約以空字串表示沒有填）。
 func deref(s *string) string {
 	if s == nil {
 		return ""
@@ -110,10 +109,8 @@ func deref(s *string) string {
 	return *s
 }
 
-// errNoPrincipal 是請求通過了 rpc 的授權卻沒有呼叫者：授權鏈壞了，沒有分類（internal），不是使用者的錯。
 var errNoPrincipal = errors.New("httpapi/seller：ctx 裡沒有呼叫者")
 
-// 模組輸入的欄位對應到請求的路徑。
 var (
 	applyPaths = rpc.FieldPaths{
 		"StoreName": "store_name", "Description": "description", "ContactPhone": "contact_phone",
@@ -129,7 +126,6 @@ var (
 	}
 )
 
-// acceptances 轉成模組的同意：UNSPECIFIED 與不認得的值轉成模組不認得的種類，由模組回 invalid_argument。
 func acceptances(in []*pb.AgreementAcceptance) []model.AgreementAcceptance {
 	out := make([]model.AgreementAcceptance, 0, len(in))
 	for _, a := range in {
@@ -210,8 +206,6 @@ func (h *App) GetMyStore(ctx context.Context, _ *connect.Request[pb.GetMyStoreRe
 	if err != nil {
 		return nil, err
 	}
-	// 統計是附屬資訊（各自有 statsBudget，讀不到的欄位不設），不論店是否公開都讀：賣家預覽自己的店。suspended 與 capabilities 的
-	// NOT_SUSPENDED 缺項都由 current.Suspended()（stint.Derive 的同一個結果）產生。
 	out := &pb.GetMyStoreResponse{Store: h.toStore(current), Stats: h.stats.Store(ctx, current.StoreID), Suspended: current.Suspended()}
 	statuses := model.CapabilitiesOf(current)
 	out.Capabilities = make([]*pb.CapabilityStatus, 0, len(statuses))
@@ -238,7 +232,6 @@ func (h *App) UpdateMyStore(ctx context.Context, req *connect.Request[pb.UpdateM
 	if err != nil {
 		return nil, err
 	}
-	// 契約沒有「清掉 logo 或封面」：列在 mask 卻沒有 token 是請求的錯，不當成沒有改。
 	for _, t := range []struct{ path, token string }{
 		{"logo_staged_token", msg.GetLogoStagedToken()}, {"cover_staged_token", msg.GetCoverStagedToken()},
 	} {
@@ -372,7 +365,6 @@ func (h *App) CloseMyStore(ctx context.Context, _ *connect.Request[pb.CloseMySto
 	return connect.NewResponse(&pb.CloseMyStoreResponse{Store: h.toStore(closed)}), nil
 }
 
-// capabilityPB 把模組的能力（CAP_ACCOUNT_SELF_READ）轉成契約的列舉（SELLER_CAPABILITY_ACCOUNT_SELF_READ）。
 func capabilityPB(c model.Capability) pb.SellerCapability {
 	return rpc.EnumToProto[pb.SellerCapability](strings.TrimPrefix(string(c), "CAP_"))
 }

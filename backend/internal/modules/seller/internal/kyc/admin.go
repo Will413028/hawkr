@@ -77,7 +77,6 @@ func (s *Service) AdminList(ctx context.Context, in model.KYCListInput) (model.K
 	}
 	if hasMore {
 		last := page.Items[len(page.Items)-1]
-		// 佇列只有送出過的申請，SubmittedAt 一定有值。
 		page.Next = &model.KYCCursor{SubmittedAt: *last.SubmittedAt, ApplicationID: last.ID}
 	}
 	return page, nil
@@ -97,7 +96,6 @@ func (s *Service) AdminGet(ctx context.Context, applicationID uuid.UUID) (model.
 	return s.adminView(ctx, q, row)
 }
 
-// adminView 組一筆申請的後台檢視（讀的人決定在哪個 transaction 內），顯示申請目前這一輪送件（submission_seq）seq 最大的已完成登記資料查詢。
 func (s *Service) adminView(ctx context.Context, q *store.Queries, row store.SellerKycApplication) (model.KYCAdminApplication, error) {
 	shown, err := s.latestCheck(ctx, q, row)
 	if err != nil {
@@ -106,8 +104,6 @@ func (s *Service) adminView(ctx context.Context, q *store.Queries, row store.Sel
 	return s.adminViewWith(ctx, q, row, shown)
 }
 
-// adminViewWith 是 adminView，顯示的登記資料查詢由呼叫方給（核准與退回在寫入的同一個 transaction 內，顯示的就是記進審核紀錄
-// 的那一筆，不會因為 job 在這之間寫入了更新的結果而兩者不同）。
 func (s *Service) adminViewWith(ctx context.Context, q *store.Queries, row store.SellerKycApplication, shown shownCheck) (model.KYCAdminApplication, error) {
 	owner, err := q.StoreByID(ctx, row.StoreID)
 	if err != nil {
@@ -129,7 +125,6 @@ func (s *Service) adminViewWith(ctx context.Context, q *store.Queries, row store
 		RequeryUnavailable: model.KYCActionUnavailableReasons(st, state, model.StoreActionRequeryKYC),
 	}
 	if row.Status == string(model.KYCStatusCancelled) {
-		// 取消的申請沒有目前的文件（取消時全部記成退場並解除引用；kyc_documents 的列還在，圖片已經不能讀）：不給文件。
 		out.Documents = nil
 	}
 	refs, err := q.KYCReviewRegistrationChecks(ctx, row.ApplicationID)
@@ -162,7 +157,6 @@ func (s *Service) adminViewWith(ctx context.Context, q *store.Queries, row store
 	return out, nil
 }
 
-// requireVisible 確認申請存在而且後台看得到（不是草稿），否則 NotFound。
 func requireVisible(ctx context.Context, q *store.Queries, applicationID uuid.UUID) error {
 	row, err := q.KYCApplicationByID(ctx, applicationID)
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && row.Status == string(model.KYCStatusDraft)) {
@@ -235,8 +229,6 @@ func (s *Service) ForStore(ctx context.Context, storeID int64) (view model.KYCAp
 	return one[0], true, nil
 }
 
-// loadDeadlines 一次讀出這批申請的審核期限（DecideDeadline）。成員、開始與期限只在 seller.review_kyc_application(at)（db/objects.sql）；
-// 不是審核中的申請不在函式的結果裡，期限維持 nil。
 func (s *Service) loadDeadlines(ctx context.Context, q *store.Queries, apps []model.KYCApplication) error {
 	if len(apps) == 0 {
 		return nil
@@ -259,10 +251,7 @@ func (s *Service) loadDeadlines(ctx context.Context, q *store.Queries, apps []mo
 	return nil
 }
 
-// lockApplication 鎖住申請所在帳號的全部 stint（鎖順序與處分的寫入相同：先 stint.LockAccountOf），再鎖申請列。草稿是賣家自己的，
-// 後台讀不到（NotFound）。
 func (s *Service) lockApplication(ctx context.Context, q *store.Queries, applicationID uuid.UUID) (store.SellerStore, store.SellerKycApplication, error) {
-	// store_id 不會改變，不鎖就讀是安全的。
 	probe, err := q.KYCApplicationByID(ctx, applicationID)
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && probe.Status == string(model.KYCStatusDraft)) {
 		return store.SellerStore{}, probe, apperr.NotFound("找不到這筆申請")
@@ -278,9 +267,6 @@ func (s *Service) lockApplication(ctx context.Context, q *store.Queries, applica
 	return locked, row, err
 }
 
-// lockForReview 先 lockApplication，最後在鎖內重新確認版本、顯示的登記資料查詢與狀態（盤點 D6：審核的鎖要在 transaction 內
-// 才有作用）。後台 etag 是申請的版本加顯示的查詢的序號：兩者都要與讀到的相同，否則審核員看到的比對結果不是現在的；順序是版本、
-// 查詢、狀態（etag 不符一律先於狀態檢查）。回傳目前顯示的查詢（沒有已完成的查詢時 ok 為 false）：核准與退回把它記進審核紀錄。
 func (s *Service) lockForReview(ctx context.Context, q *store.Queries, applicationID uuid.UUID, expectedVersion, expectedCheckSeq int64, action model.StoreAction) (store.SellerStore, store.SellerKycApplication, shownCheck, error) {
 	locked, row, err := s.lockApplication(ctx, q, applicationID)
 	if err != nil {
@@ -306,8 +292,6 @@ func (s *Service) lockForReview(ctx context.Context, q *store.Queries, applicati
 	return locked, row, shown, nil
 }
 
-// reviewFacts 是推導核准、退回、重新查詢的原因要用的事實：店家以 stint.Load 載入（含停權）、申請的狀態與賣家型態。讀取（adminViewWith 的 can_*）與
-// 方法的前置檢查（reviewReasons）都經它，事實只有一種組法。
 func (s *Service) reviewFacts(ctx context.Context, q *store.Queries, owner store.SellerStore, row store.SellerKycApplication) (model.Store, model.KYCApplicationState, error) {
 	st, err := stint.Load(ctx, q, owner, s.d.Now().UTC())
 	if err != nil {
@@ -316,7 +300,6 @@ func (s *Service) reviewFacts(ctx context.Context, q *store.Queries, owner store
 	return st, model.KYCApplicationState{Status: model.KYCStatus(row.Status), SellerType: model.KYCSellerType(row.SellerType)}, nil
 }
 
-// reviewReasons 是不能對申請做 action 的原因（model.KYCActionUnavailableReasons），鎖已由呼叫方持有。讀取與核准、退回、重新查詢的前置檢查是同一個函式。
 func (s *Service) reviewReasons(ctx context.Context, q *store.Queries, locked store.SellerStore, row store.SellerKycApplication, action model.StoreAction) ([]model.StoreActionUnavailableReason, error) {
 	st, state, err := s.reviewFacts(ctx, q, locked, row)
 	if err != nil {
@@ -456,7 +439,6 @@ func (s *Service) ReadDocument(ctx context.Context, in model.ReadKYCDocumentInpu
 		q := store.New(s.d.DB.Conn(ctx))
 		now := s.d.Now().UTC()
 		row, err := q.KYCApplicationByID(ctx, in.ApplicationID)
-		// 個資已清除與已取消的申請（文件已記成退場、引用已解除，列還在）沒有可讀的文件：不寫讀取紀錄（只有讀得到的才記）。
 		if errors.Is(err, pgx.ErrNoRows) || (err == nil && (row.PiiPurgedAt != nil || row.Status == string(model.KYCStatusDraft) || row.Status == string(model.KYCStatusCancelled))) {
 			return apperr.NotFound("找不到這份文件")
 		}

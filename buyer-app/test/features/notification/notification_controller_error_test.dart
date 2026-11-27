@@ -78,7 +78,6 @@ void main() {
         expect(failedPage.isLoadingMore, isFalse);
         expect(failedPage.hasMore, isTrue);
 
-        // Scroll-driven loadMore is paused after an error. Retry is explicit.
         await controller.loadMore();
         expect(repository.notificationCalls, 2);
 

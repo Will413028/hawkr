@@ -71,19 +71,6 @@ func WithAuditContext(ctx context.Context, operationID int64, attemptSeq int) co
 	return context.WithValue(ctx, auditCtxKey{}, auditCtxValue{operationID: operationID, attemptSeq: attemptSeq})
 }
 
-// auditFirstAttempt 是 attempt_seq 的下限。
-//
-// 🔴 **不是 0**：`chk_invpaudit_attempt` 是 `attempt_seq >= 1`，而
-// `repoAuditSink.record` 的失敗只會被 `logFail` 記成一行 error 就吞掉
-// （吞掉本身是對的——稽核寫不進去不該讓開票失敗）。兩者相乘的結果是
-// **整張 invoice_provider_audit_logs 一列都沒有，而沒有任何東西會紅**。
-//
-// 2026-09-01 實測：上線至今 0 列，同 DB 的 invoice_status_history 有 89 列、
-// invoice_admin_audit_logs 有 3 列（對照組，證明查得到）。成因是沒有任何
-// production 呼叫端呼叫過 WithAuditContext ⇒ 這裡回 0 ⇒ 每一筆都違反 CHECK。
-//
-// 語意上這個預設也是對的：不繫在可重試 operation 上的呼叫（連線測試、健康檢查）
-// 就是它自己的第一次嘗試。
 const auditFirstAttempt = 1
 
 func auditFromContext(ctx context.Context) (int64, int) {
@@ -92,17 +79,11 @@ func auditFromContext(ctx context.Context) (int64, int) {
 		return 0, auditFirstAttempt
 	}
 	if v.attemptSeq < auditFirstAttempt {
-		// 呼叫端算錯（例如把 0-based 的 op.AttemptCount 直接傳進來）也不能讓
-		// 整列稽核消失 —— 落一列 attempt_seq=1 遠勝於落 0 列。
 		return v.operationID, auditFirstAttempt
 	}
 	return v.operationID, v.attemptSeq
 }
 
-// safeRecord 保證 sink 的任何 panic 都不會外洩到開票路徑上。
-//
-// ctx 一律用 context.WithoutCancel：外呼逾時時 ctx 已取消，直接沿用會讓
-// **最需要留下證據的那一筆反而寫不進去**（同一手法見 pkg/database 的 rollback 路徑）。
 func safeRecord(ctx context.Context, sink AuditSink, ex Exchange) {
 	if sink == nil {
 		return
@@ -113,16 +94,6 @@ func safeRecord(ctx context.Context, sink AuditSink, ex Exchange) {
 	sink.Record(context.WithoutCancel(ctx), ex)
 }
 
-// ensureCorrelationID 保證 ctx 帶著這一次往返的識別碼（#3031）。
-//
-// 取值順序，前兩者是「真的可以拿去別處追」的：
-//
-//	① gRPC 請求路徑由 CorrelationInterceptor 種進來的 correlation id
-//	② OTel 的 trace id（本服務目前沒有任何地方起 span，所以實務上不會命中；
-//	   留著是因為哪天 worker 起了 span，這一格會自動變成真的 trace key）
-//	③ 都沒有 ⇒ 現生一個。它只識別這一次往返本身。
-//
-// 已經有值時**不覆蓋**：同一次請求打多次 AMEGO（例如開票後立刻查詢）應該共用同一個 id。
 func ensureCorrelationID(ctx context.Context) context.Context {
 	if interceptor.CorrelationIDFromContext(ctx) != "" {
 		return ctx

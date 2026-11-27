@@ -28,15 +28,12 @@ public class PayUniWebhookParser {
      * @throws WebhookVerifyException 簽章驗證失敗
      */
     public WebhookParseResult parse(String encryptInfo, String hashInfo) {
-        // 1. 驗簽
         if (!cryptoService.verifyHash(encryptInfo, hashInfo)) {
             throw new WebhookVerifyException("Webhook 簽章驗證失敗");
         }
 
-        // 2. 解密
         Map<String, String> rawMap = cryptoService.decrypt(encryptInfo);
 
-        // 3. 判斷類型並建立事件
         WebhookType type = resolveType(rawMap);
         PayUniWebhookEvent event = buildEvent(type, rawMap);
 
@@ -53,17 +50,14 @@ public class PayUniWebhookParser {
      * 三者都走 SHIPPING_STATUS routing key，由下游 ShippingWebhookConsumer 按 ApiType 分流。
      */
     private WebhookType resolveType(Map<String, String> data) {
-        // 超商列印結果（ApiType=Print，必須最先判斷）
         if ("Print".equals(data.get("ApiType"))) {
             return WebhookType.SHIPPING_PRINT;
         }
 
-        // 含 ShipTradeNo + LgsType → 物流（建單結果 / 貨態更新）
         if (data.containsKey("ShipTradeNo") && data.containsKey("LgsType")) {
             return WebhookType.SHIPPING_STATUS;
         }
 
-        // 含 NotifyType → 代理商通知
         if (data.containsKey("NotifyType")) {
             return WebhookType.AGENT_NOTIFY;
         }

@@ -70,8 +70,6 @@ describe("代行建立商品頁：管理員可見文案", () => {
 	}
 
 	it("鑑別力：同一組判定式在未剝註解的原始碼上會命中", () => {
-		// 註解裡本來就寫著 product-service（解釋逐條驗、第一條失敗就 return），
-		// 命中它證明這組 token 搜得到東西，`not.toContain` 不是因為搜錯而空過。
 		expect(raw).toContain("product-service");
 	});
 
@@ -94,10 +92,6 @@ describe("代行建立商品頁：兩條路徑都要顯性", () => {
 	});
 
 	it("「暫不上架」是主要按鈕，「並上架」是次要", () => {
-		// 主／次靠 variant 表達：次要那顆帶 bordered，主要那顆不帶。把上架畫成主要
-		// 會讓一次誤點就對買家可見，而那是 products.publish 才有的權力。
-		// 兩個字串在「發布狀態」卡片的說明裡也各出現一次，所以取**最後**一次 ——
-		// 底部工具列在檔案最下方，那才是按鈕本身。
 		const publish = rendered.lastIndexOf("儲存並上架");
 		expect(publish).toBeGreaterThan(-1);
 		const publishButton = rendered.slice(
@@ -116,8 +110,6 @@ describe("代行建立商品頁：兩條路徑都要顯性", () => {
 	});
 
 	it("缺 products.publish 時補一句說明，而不是靜默少一顆按鈕", () => {
-		// 上架鍵在缺 capability 時**不渲染**（L3857：停用的按鈕仍在宣稱這件事做得到），
-		// 但少了說明，畫面就退回「只有一顆按鈕」＝ 看起來又沒有選擇。
 		expect(rendered).toMatch(/\{canPublish \? null : \(/);
 		expect(rendered).toContain("本次工作階段沒有「商品上架」授權");
 	});

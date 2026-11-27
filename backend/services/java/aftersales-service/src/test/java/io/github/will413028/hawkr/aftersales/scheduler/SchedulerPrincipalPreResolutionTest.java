@@ -59,13 +59,11 @@ class SchedulerPrincipalPreResolutionTest {
 
     @BeforeAll
     static void initLambdaCache() {
-        // ReturnTimeoutWorker 用 LambdaQueryWrapper，需要 MyBatis-Plus 的 lambda column cache
         MybatisConfiguration config = new MybatisConfiguration();
         MapperBuilderAssistant assistant = new MapperBuilderAssistant(config, "");
         TableInfoHelper.initTableInfo(assistant, AfterSaleCaseEntity.class);
     }
 
-    // ==================== B2 CaseProcessTimeoutWorker（AUTO_REJECT） ====================
 
     @Test
     @DisplayName("B2：反解失敗 → 不進 tx（autoReject 一次都沒被呼叫），同批下一筆照常處理")
@@ -79,10 +77,8 @@ class SchedulerPrincipalPreResolutionTest {
 
         worker.scanProcessTimeouts();
 
-        // 沒進 tx ⇒ 沒有 CAS、沒有 audit、沒有事件；候選述詞未變 ⇒ 下一 tick 重撈
         verify(autoRejectService, never())
                 .autoReject(eq("BAD"), any(), anyInt(), any(), any(), any(), any());
-        // 單筆失敗不得中斷整批
         verify(autoRejectService)
                 .autoReject(eq("GOOD"), any(), anyInt(), any(), any(), any(), eq(OK));
     }
@@ -102,7 +98,6 @@ class SchedulerPrincipalPreResolutionTest {
                 .autoReject(eq("GOOD"), any(), anyInt(), any(), any(), any(), eq(OK));
     }
 
-    // ==================== B3 CaseProcessTimeoutWorker（AUTO_ESCALATE） ====================
 
     @Test
     @DisplayName("B3：反解失敗 → 不進 tx（escalate 一次都沒被呼叫），同批下一筆照常處理")
@@ -120,7 +115,6 @@ class SchedulerPrincipalPreResolutionTest {
         verify(escalationService).escalate(eq("GOOD"), any(), any(), any(), any(), eq(OK));
     }
 
-    // ==================== B1 ReturnTimeoutWorker ====================
 
     @Test
     @DisplayName("B1：反解失敗 → 不進 tx（closeExpiredCase 一次都沒被呼叫），同批下一筆照常處理")
@@ -135,7 +129,6 @@ class SchedulerPrincipalPreResolutionTest {
 
         worker.checkReturnTimeout();
 
-        // status 仍是 '20'、ship_back_deadline_at 仍到期 ⇒ 下一 tick（cron 10 分鐘）必然重撈
         verify(closeService, never()).closeExpiredCase(eq(bad), any(), any());
         verify(closeService).closeExpiredCase(eq(good), any(), eq(OK));
     }
@@ -155,7 +148,6 @@ class SchedulerPrincipalPreResolutionTest {
         order.verify(closeService).closeExpiredCase(eq(good), any(), eq(OK));
     }
 
-    // ==================== fixtures ====================
 
     private CaseProcessTimeoutWorker processTimeoutWorker(AfterSalesProperties.TimeoutPolicy policy) {
         AfterSalesProperties properties = new AfterSalesProperties();

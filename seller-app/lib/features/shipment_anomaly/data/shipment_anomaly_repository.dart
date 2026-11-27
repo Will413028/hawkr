@@ -29,7 +29,6 @@ class ShipmentAnomalyRepository {
     bool showAcknowledged = false,
   }) async {
     try {
-      // Gateway 期望 snake_case query params（gateway/internal/handler/shipment_anomaly.go）
       final params = <String, dynamic>{'show_acknowledged': showAcknowledged};
       if (anomalyType != null && anomalyType.isNotEmpty) {
         params['anomaly_type'] = anomalyType;

@@ -1,6 +1,4 @@
-// 色盤：色值會交給 fabric 並存進 banner JSON，必須是字面 #rrggbb
 export const COLOR_SWATCHES = [
-	// Row 1: earth tones
 	[
 		"#000000",
 		"#434343",
@@ -13,7 +11,6 @@ export const COLOR_SWATCHES = [
 		"#f3f3f3",
 		"#ffffff",
 	],
-	// Row 2: browns/warm
 	[
 		"#7f6000",
 		"#783f04",
@@ -26,7 +23,6 @@ export const COLOR_SWATCHES = [
 		"#4a154b",
 		"#3d0000",
 	],
-	// Row 3: vivid
 	[
 		"#bf9000",
 		"#b45f06",
@@ -39,7 +35,6 @@ export const COLOR_SWATCHES = [
 		"#f6b26b",
 		"#ffd966",
 	],
-	// Row 4: bright
 	[
 		"#ff0000",
 		"#ff9900",

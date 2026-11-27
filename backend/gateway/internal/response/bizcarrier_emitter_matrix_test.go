@@ -23,28 +23,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// ---------------------------------------------------------------------------
-// 「行為零改變」的證據 —— 這一份有鑑別力，上一份沒有
-// ---------------------------------------------------------------------------
-//
-// 2026-08-31 的第一版證據是一支叫 TestSuccessShapesUnchangedWhenCarrierIdle 的測試，
-// 函式名自己就寫著它只跑 idle。實測：把 bizcarrier 的取碼函式改成恆回 false（＝整個
-// 機制關掉），`go build` exit=0 而**那支測試照樣 PASS** —— 它分辨不出「機制在」與
-// 「機制不在」。同一個變異讓 9 支 bypass 測試轉紅，證明變異本身是真的。
-//
-// 本檔的三件事讓它有鑑別力：
-//
-//  1. **矩陣的母體由 AST 決定，不是由我記得幾支**（TestEmitterTableCoversEveryExportedEmitter）。
-//     新增一支 exported 出口而沒進表 ⇒ FAIL。
-//  2. **每一支出口在 idle 與 armed 兩種狀態下各跑一次**。idle 要與改動前逐位元相同；
-//     armed 要與手寫 Biz 逐位元相同（零碼出口）或完全不變（非零出口）。
-//  3. **非零出口另外對帳逃逸計數器**：忘了守衛的出口不會改變 body，只會讓
-//     Middleware 收尾把它記成「繞過 response 層」。不查那個計數器，漏守衛就是靜默的。
-//
-// ⚠️ 母體不含 SetRateLimitHeaders：它只寫 header 不寫 body，不是出口。這是本檔唯一
-// 的豁免，寫在 nonEmitters 裡並附理由；豁免清單長出第二筆時要有人回答為什麼。
 
-// runEmit 起一個掛了 bizcarrier.Middleware 的最小 engine，跑一次 fn。
 func runEmit(t *testing.T, fn gin.HandlerFunc) *httptest.ResponseRecorder {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
@@ -56,7 +35,6 @@ func runEmit(t *testing.T, fn gin.HandlerFunc) *httptest.ResponseRecorder {
 	return w
 }
 
-// runEmitArmed 同上，但在 handler 跑之前先掛一個未消化的業務碼。
 func runEmitArmed(t *testing.T, code int32, msg string, fn gin.HandlerFunc) *httptest.ResponseRecorder {
 	t.Helper()
 	return runEmit(t, func(c *gin.Context) {
@@ -95,9 +73,6 @@ func bodyCode(t *testing.T, w *httptest.ResponseRecorder) (int32, bool) {
 	return *env.Code, true
 }
 
-// ---------------------------------------------------------------------------
-// 出口矩陣
-// ---------------------------------------------------------------------------
 
 type sample struct {
 	ID   string `json:"id"`
@@ -107,27 +82,17 @@ type sample struct {
 
 var payload = sample{ID: "2685914682", Name: "測試店", Flag: false}
 
-// emitterCase 是一支出口在一組引數下的完整規格。
-//
-// declaredCode 是這支出口在這組引數下**實際寫進 envelope 的 Code**（nonZeroDownstream
-// 代表「碼由下游決定但恆非零」，只有 GrpcErr 家族適用）。測試會實跑並比對，宣告錯
-// 就是 FAIL —— 這是「宣告的碼 == 真的寫出去的碼」唯一的保證，其餘都只是註解。
 type emitterCase struct {
-	fn       string // 對應的 exported 函式名，供 AST 覆蓋率檢查對帳
+	fn       string
 	name     string
 	declared int32
 	invoke   gin.HandlerFunc
-	// legacy 是「改動前那一版」的逐位元行為：轉發型出口直呼 pkg/envelope，
-	// Gateway 專屬出口手寫同一份 c.JSON。idle 狀態下新舊必須一致。
 	legacy gin.HandlerFunc
-	// rewriteData 是 declared==0 時，改寫成 Biz 應該帶走的 data。
 	rewriteData interface{}
 }
 
 const nonZeroDownstream int32 = -1
 
-// legacyBiz／legacyBizDeny／legacyBizStatus 是三個 Gateway 專屬出口在加上守衛**之前**
-// 的函式體，逐行照抄。它們是 idle 對照組 —— 沒有它們，「行為零改變」就只是宣稱。
 func legacyBiz(c *gin.Context, code int32, message string, data interface{}) {
 	c.JSON(http.StatusOK, Envelope{Code: code, Message: message, Data: data, TraceID: envelope.ExtractTraceID(c)})
 }
@@ -154,7 +119,6 @@ var fieldErrs = []FieldError{{Field: "contactPhone", Message: "必填"}}
 func emitterCases() []emitterCase {
 	protoMsg := timestamppb.New(time.Unix(1756600000, 0).UTC())
 	return []emitterCase{
-		// ---- 會寫出 code==0 的出口（carrier 必須改寫）----
 		{fn: "OK", name: "OK", declared: 0,
 			invoke:      func(c *gin.Context) { OK(c, payload) },
 			legacy:      func(c *gin.Context) { envelope.OK(c, payload) },
@@ -198,7 +162,6 @@ func emitterCases() []emitterCase {
 			legacy:      func(c *gin.Context) { envelope.Err(c, http.StatusOK, 0, "success") },
 			rewriteData: nil},
 
-		// ---- 恆非零的出口（carrier 不得改寫，但必須留下痕跡）----
 		{fn: "BadRequest", name: "BadRequest", declared: 400,
 			invoke: func(c *gin.Context) { BadRequest(c, "invalid") },
 			legacy: func(c *gin.Context) { envelope.BadRequest(c, "invalid") }},
@@ -251,7 +214,6 @@ func emitterCases() []emitterCase {
 			invoke: func(c *gin.Context) { Err(c, http.StatusConflict, 409, "conflict") },
 			legacy: func(c *gin.Context) { envelope.Err(c, http.StatusConflict, 409, "conflict") }},
 
-		// ---- 碼由下游決定但恆非零 ----
 		{fn: "GrpcErr", name: "GrpcErr(FailedPrecondition)", declared: nonZeroDownstream,
 			invoke: func(c *gin.Context) {
 				GrpcErr(c, "invoice", grpcstatus.Error(codes.FailedPrecondition, "[9332] provider 不可用"))
@@ -265,14 +227,7 @@ func emitterCases() []emitterCase {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ① 母體：表必須蓋住每一支 exported 出口
-// ---------------------------------------------------------------------------
 
-// nonEmitters 是「第一個參數是 *gin.Context 但不寫 body」的例外。每一筆都要附理由。
-//
-// ⚠️ 這是本檔唯一的豁免清單。它與舊 AST gate 的 fail-OPEN 不同：這裡的預設是
-// **在名單外就必須進矩陣**（找不到＝FAIL），而不是「看不到就放行」。
 var nonEmitters = map[string]string{
 	"SetRateLimitHeaders": "只寫 Retry-After / X-RateLimit-* header，不寫 body，沒有 envelope code 可言",
 }
@@ -284,12 +239,6 @@ func TestEmitterTableCoversEveryExportedEmitter(t *testing.T) {
 		covered[cse.fn] = true
 	}
 
-	// 🔴 掃**整個 package 目錄**，不是寫死的檔名清單。
-	//
-	// 這一版是被變異抓出來的：第一版寫死 []string{"response.go", "bizhttp.go"}，
-	// 於是「在新檔案裡新增一支 exported 出口」完全看不到 —— 實測加一支
-	// MutationProbeEmitter 到 mutation_probe_emitter.go，本檢查照樣 PASS。
-	// 那正是舊 AST gate 的病（看不到就當安全）在我自己寫的檢查裡復發。
 	paths, err := filepath.Glob("*.go")
 	if err != nil {
 		t.Fatalf("列 package 檔案失敗：%v", err)
@@ -308,7 +257,6 @@ func TestEmitterTableCoversEveryExportedEmitter(t *testing.T) {
 	for _, path := range srcPaths {
 		f, err := parser.ParseFile(fset, path, nil, 0)
 		if err != nil {
-			// 目標讀不到一律 FAIL 不 SKIP：靜默跳過等於把檢查關掉。
 			t.Fatalf("解析 %s 失敗：%v", path, err)
 		}
 		for _, d := range f.Decls {
@@ -349,7 +297,6 @@ func TestEmitterTableCoversEveryExportedEmitter(t *testing.T) {
 			"確定它不寫 body 的話，加進 nonEmitters 並寫下理由。", missing)
 	}
 
-	// 反向：矩陣裡不得有已經不存在的函式（表腐化 ⇒ 覆蓋率是假的）。
 	declaredSet := map[string]bool{}
 	for _, n := range declared {
 		declaredSet[n] = true
@@ -363,9 +310,6 @@ func TestEmitterTableCoversEveryExportedEmitter(t *testing.T) {
 		len(srcPaths), len(declared), len(emitterCases()), len(nonEmitters))
 }
 
-// ---------------------------------------------------------------------------
-// ② idle：逐位元零改變
-// ---------------------------------------------------------------------------
 
 func TestEmitterMatrix_IdleShapesUnchanged(t *testing.T) {
 	for _, cse := range emitterCases() {
@@ -399,12 +343,6 @@ func TestEmitterMatrix_DeclaredCodeMatchesBody(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ④ armed：零碼出口必須被改寫，且與手寫 Biz 逐位元相同
-// ---------------------------------------------------------------------------
-//
-// 🔴 這一組就是上一版缺的鑑別力。把 bizcarrier.Emit 的改寫分支神經切斷（恆回 false）
-// ⇒ 每一個 case 都會轉紅，因為 body 還是 code:0。
 
 func TestEmitterMatrix_ZeroCodeEmittersAreRewritten(t *testing.T) {
 	n := 0
@@ -462,7 +400,7 @@ func TestEmitterMatrix_NonZeroEmittersNeverGoUndetected(t *testing.T) {
 func TestEscapeCounterActuallyFiresOnRealBypass(t *testing.T) {
 	before := testutil.ToFloat64(bizcarrier.EscapedCounterFor(armCode, "/e"))
 	runEmitArmed(t, armCode, armMsg, func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success"}) // 完全繞過 internal/response
+		c.JSON(http.StatusOK, gin.H{"code": 0, "message": "success"})
 	})
 	if after := testutil.ToFloat64(bizcarrier.EscapedCounterFor(armCode, "/e")); after != before+1 {
 		t.Fatalf("真的繞過 response 層時逃逸計數器沒有跳（%v → %v）——"+
@@ -470,9 +408,6 @@ func TestEscapeCounterActuallyFiresOnRealBypass(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ⑦ GrpcErr 家族恆非零（guardNonSuccess 的全部依據）
-// ---------------------------------------------------------------------------
 
 func TestGrpcErrNeverWritesZeroCode(t *testing.T) {
 	allCodes := []codes.Code{
@@ -489,7 +424,6 @@ func TestGrpcErrNeverWritesZeroCode(t *testing.T) {
 	for _, c := range allCodes {
 		probes = append(probes,
 			probe{"status/" + c.String(), grpcstatus.Error(c, "boom")},
-			// 帶 "[NNNN] " 前綴：走登錄表還原路徑（writeBizCodeEnvelopeMapped）。
 			probe{"status/" + c.String() + "/bizprefix", grpcstatus.Error(c, "[9262] 能力不足")},
 		)
 	}
@@ -522,9 +456,6 @@ func TestGrpcErrNeverWritesZeroCode(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ⑧ payload 形狀矩陣：零值／空集合／nil 是「加一層包裝會改變位元」的唯一可能來源
-// ---------------------------------------------------------------------------
 
 func TestEmitterMatrix_PayloadKindsUnchanged(t *testing.T) {
 	kinds := []struct {
@@ -561,22 +492,18 @@ func TestEmitterMatrix_PayloadKindsUnchanged(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ⑨ 作用域：跨 method 的失敗不會被抹掉（A1 在 response 層的端到端證據）
-// ---------------------------------------------------------------------------
 
 func TestZeroCodeEmitIsBlockedByAnotherMethodsPendingFailure(t *testing.T) {
 	const otherMethod = "/hawkr.seller.SellerService/GetSellerSimple"
 	w := runEmit(t, func(c *gin.Context) {
-		bizcarrier.Arm(c.Request.Context(), armMethod, armCode, armMsg) // RPC#1 失敗
-		bizcarrier.Disarm(c.Request.Context(), otherMethod)             // RPC#2 成功（別支）
-		OK(c, payload)                                                  // handler 照常回成功
+		bizcarrier.Arm(c.Request.Context(), armMethod, armCode, armMsg)
+		bizcarrier.Disarm(c.Request.Context(), otherMethod)
+		OK(c, payload)
 	})
 	code, _ := bodyCode(t, w)
 	if code != armCode {
 		t.Fatalf("別支 RPC 的成功抹掉了 %d，body code=%d —— 這正是根因 A 搬家後的住所", armCode, code)
 	}
-	// 而「同一支重試成功」仍然要解除。
 	w2 := runEmit(t, func(c *gin.Context) {
 		bizcarrier.Arm(c.Request.Context(), armMethod, armCode, armMsg)
 		bizcarrier.Disarm(c.Request.Context(), armMethod)

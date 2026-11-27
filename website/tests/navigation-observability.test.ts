@@ -406,7 +406,7 @@ for (const event of [
 
 test("a new click is captured before its own navigation intent is created", (t) => {
 	t.mock.timers.enable({ apis: ["setTimeout"] });
-	markNavigationCommitted(location.href); // mount lifecycle listeners
+	markNavigationCommitted(location.href);
 	emitWindow("click", { isTrusted: true });
 	const id = beginNavigationIntent({ target: "/account", trigger: "link" });
 	assert.equal(isNavigationIntentCurrent(id), true);
@@ -545,7 +545,6 @@ test("the automatic recovery allowance survives a document boundary until a new 
 	beginNavigationIntent({ target: "/account", trigger: "router" });
 	t.mock.timers.tick(10_000);
 	assert.equal(assigned, "https://shop.test/account");
-	// Model a new document or server redirect back to the source, preserving storage.
 	__resetNavigationObservabilityForTest();
 	assigned = null;
 	beginNavigationIntent({ target: "/account", trigger: "router" });
@@ -607,7 +606,7 @@ test("a document I/O exception releases the latch so the next navigation can rec
 test("a visible user action can navigate again after a cancelled beforeunload prompt", (t) => {
 	t.mock.timers.enable({ apis: ["setTimeout"] });
 	navigateDocument("/seller");
-	assigned = null; // browser kept the current document after beforeunload was cancelled
+	assigned = null;
 	emitWindow("click", { isTrusted: true });
 	beginNavigationIntent({ target: "/account", trigger: "link" });
 	t.mock.timers.tick(10_000);

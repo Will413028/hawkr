@@ -9,10 +9,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// CheckAuthState is the one Redis round-trip that answers both "is the account
-// cut off?" and "does this credential still count?". Its tri-states are what
-// let the gateway rebuild from the source of truth instead of guessing, so the
-// cases that matter most here are the ones that must come back UNKNOWN.
 
 // The two axes answer with different authority, and this is the test that says
 // so. A missing blacklist key IS "not blocked" — its writers mirror `accounts`
@@ -55,10 +51,6 @@ func TestCheckAuthState_EpochVoidsOlderTokensOnly(t *testing.T) {
 	if _, cred := pkgredis.CheckAuthState(ctx, rdb, 7003, "hash-old", epoch.Add(-time.Hour)); cred != pkgredis.CredentialRevoked {
 		t.Fatalf("older-than-epoch cred = %v, want CredentialRevoked", cred)
 	}
-	// The token minted after the revocation is the one the user just logged back
-	// in with; convicting it too would make logout-all a permanent lockout. It
-	// is Unknown rather than Valid because the epoch clearing it says nothing
-	// about whether its own per-token key was evicted.
 	if _, cred := pkgredis.CheckAuthState(ctx, rdb, 7003, "hash-new", epoch.Add(time.Hour)); cred == pkgredis.CredentialRevoked {
 		t.Fatal("a token issued after the epoch must not be convicted by it")
 	}
@@ -86,8 +78,6 @@ func TestCheckAuthState_EpochComparisonIsSecondPrecision(t *testing.T) {
 func TestCheckAuthState_NoTokenHash_SkipsTheCredentialLists(t *testing.T) {
 	rdb := newTestClient(t)
 	ctx := context.Background()
-	// Even with an epoch that would void everything, a caller with no bearer
-	// credential is unaffected by it.
 	if err := pkgredis.SetAuthEpoch(ctx, rdb, 7005, time.Now().Add(time.Hour), time.Hour); err != nil {
 		t.Fatal(err)
 	}

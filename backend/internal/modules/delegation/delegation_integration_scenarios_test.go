@@ -49,11 +49,9 @@ func fromCapabilities(caps []Capability) []string {
 	return out
 }
 
-// 代行（設計書 56）的 integration 測試。時間由 fixture 的 f.now 控制，不用 sleep。
 
 const testStore = int64(2685914682)
 
-// delegationAdmin 建立一位管理員；enabled 時開通代行。
 func (f *fixture) delegationAdmin(t *testing.T, email string, enabled bool) int64 {
 	t.Helper()
 	ctx := context.Background()
@@ -70,7 +68,6 @@ func (f *fixture) delegationAdmin(t *testing.T, email string, enabled bool) int6
 func storeOf(id int64, status seller.Status, suspended bool) seller.Store {
 	var st seller.Store
 	st.StoreID, st.AccountID, st.StoreName, st.Status, st.Sanctions = id, id+7, "梨山盛花園", status, sanctionsOf(suspended)
-	// seller 讀店家時由 SQL 帶上的條件（Store.Conditions）：生命週期照 status，其餘都滿足。
 	st.Conditions = seller.Conditions{
 		Derived: true, Active: status != seller.Closed, NotPendingDeletion: status != seller.PendingDeletion, KYCApproved: true, TransfersActive: true,
 		StoreName: true, Logo: true, TownCode: true,
@@ -90,7 +87,6 @@ var errSellerDown = errors.New("seller 沒有回應")
 
 func downFn(int64) (seller.Store, error) { return seller.Store{}, errSellerDown }
 
-// wantSellerError：seller 的錯誤原樣傳出（不是拒絕，也不改成 Unavailable：seller 在行程內，Internal 就是 Internal）。
 func wantSellerError(t *testing.T, err error) {
 	t.Helper()
 	if !errors.Is(err, errSellerDown) || apperr.KindOf(err) != apperr.KindInternal {
@@ -152,7 +148,6 @@ func (f *fixture) start(t *testing.T, in StartDelegationInput) issuedSession {
 	return issuedSession{StartedDelegation: s, Credential: r.Credential}
 }
 
-// wantDenial 確認 err 是代行的拒絕 d（對外的業務碼由 internal/legacy 對應）。
 func wantDenial(t *testing.T, err error, d DelegationDenial) {
 	t.Helper()
 	got, ok := DelegationDenialOf(err)
@@ -191,7 +186,6 @@ func TestDelegationLifecycle(t *testing.T) {
 		t.Fatalf("只有兌換時的 hash 落庫：%d 列", n)
 	}
 
-	// 輪詢不寫入：連續兩次讀到逐位元相同的摘要。
 	a, err := f.m.ResolveDelegation(ctx, r.Credential, false)
 	if err != nil {
 		t.Fatal(err)
@@ -202,13 +196,11 @@ func TestDelegationLifecycle(t *testing.T) {
 		t.Fatalf("兩次讀取不同：%+v %+v", a, b)
 	}
 
-	// 同一把 handoff code 只能兌換一次。
 	_, err = f.m.RedeemDelegationHandoff(ctx, started.HandoffCode)
 	wantDenial(t, err, DenialHandoffInvalid)
 	_, err = f.m.RedeemDelegationHandoff(ctx, "garbage")
 	wantDenial(t, err, DenialHandoffInvalid)
 
-	// 結束：立刻到期、revision 加一；再結束一次、對不到的 credential 都成功。
 	f.now = f.now.Add(50 * time.Second)
 	if err := f.m.EndDelegation(ctx, r.Credential); err != nil {
 		t.Fatal(err)
@@ -261,25 +253,21 @@ func TestPreflightDenials(t *testing.T) {
 	}
 	wantDenied := func(p DelegationPreflight, d DelegationDenial) {
 		t.Helper()
-		// 不允許時選項與能力仍然非空（前端在看 allowed 之前就檢查）。
 		if p.Allowed || p.Denial != d || p.DeniedLabel == "" || len(p.ReasonOptions) != 3 || len(p.Capabilities) == 0 {
 			t.Fatalf("= %+v，預期拒絕 %d", p, d)
 		}
 	}
 
-	// 沒有開通的管理員：在讀店家之前就拒絕，讀不到店家也一樣。
 	f.storeFn = downFn
 	p := preflight(outsider, testStore)
 	wantDenied(p, DenialAdminNotAllowlisted)
 	if p.TargetKnown || p.Target.StoreID != testStore || len(p.Capabilities) != 10 {
 		t.Fatalf("還沒讀到店家 = %+v", p)
 	}
-	// 讀不到店家不是拒絕。
 	_, err := f.m.DelegationPreflight(ctx, DelegationPreflightInput{AdminID: admin, StoreID: testStore})
 	wantSellerError(t, err)
 	f.storeFn = missingFn
 	wantDenied(preflight(admin, testStore), DenialStoreNotDelegable)
-	// 已關閉的店家存在：新拒絕 DenialStoreClosed（舊碼 9265 只在 legacy 轉接層），標籤是 seller 給的句子（N2），而且知道是哪家店（顯示店名與授權的集合）。
 	f.storeFn = fixedFn(seller.Closed, false)
 	p = preflight(admin, testStore)
 	wantDenied(p, DenialStoreClosed)
@@ -312,7 +300,6 @@ func TestPreflightDenials(t *testing.T) {
 		t.Fatalf("= %+v", p)
 	}
 
-	// 已到期與已撤回都是 9264（與從來沒有開通的 9286 分開）。
 	f.now = f.now.Add(time.Minute)
 	until := f.now.Add(time.Hour)
 	if _, err := f.m.UpdateDelegationAuthorization(ctx, DelegationAuthorizationChange{
@@ -324,14 +311,12 @@ func TestPreflightDenials(t *testing.T) {
 	f.now = until
 	wantDenied(preflight(admin, testStore), DenialAuthorizationRevoked)
 
-	// 管理員或店家已經在代行：9268、9269。
 	const store2 = testStore + 1
 	f.grant(t, admin, store2)
 	f.start(t, startInput(admin, store2, "ik-1"))
 	wantDenied(preflight(admin, store2), DenialActorBusy)
 	wantDenied(preflight(other, store2), DenialStoreBusy)
 
-	// 全域列：沒有店家層級的列時才用它；店家層級的列存在就遮蔽它（即使已撤回）。
 	const store3, store4 = testStore + 2, testStore + 3
 	if _, err := f.db.Pool().Exec(ctx, `INSERT INTO delegation.seller_delegation_authorizations
 		(id, target_store_id, source, source_reference, granted_capabilities, effective_from, approved_by_admin_id, approved_at)
@@ -377,7 +362,6 @@ func TestStartDelegationValidatesAndReevaluatesTheGrant(t *testing.T) {
 			t.Errorf("%s = %v，預期 9260", name, err)
 		}
 	}
-	// 能力由伺服端重新評估：不在授權內的能力是 9262，不會被悄悄丟掉。
 	_, err = f.m.StartDelegation(ctx, startInput(admin, testStore, "ik-1", model.CapabilityProductsRead, CapabilityProductsWrite))
 	wantDenial(t, err, DenialCapabilityDenied)
 	if n := f.count(t, `SELECT count(*) FROM delegation.delegated_operation_sessions`); n != 0 {
@@ -397,9 +381,8 @@ func TestStartDelegationReplay(t *testing.T) {
 	in := startInput(admin, testStore, "ik-1")
 	first := f.create(t, in)
 
-	// 同一把 key：同一個 session，handoff code 換新、舊的當場失效。
 	f.now = f.now.Add(5 * time.Second)
-	in.Capabilities = []Capability{CapabilityProductsWrite, model.CapabilityProductsRead} // 順序不是內容
+	in.Capabilities = []Capability{CapabilityProductsWrite, model.CapabilityProductsRead}
 	again := f.create(t, in)
 	if again.Session.ID != first.Session.ID || again.HandoffCode == first.HandoffCode {
 		t.Fatalf("重放 = %+v", again)
@@ -412,16 +395,13 @@ func TestStartDelegationReplay(t *testing.T) {
 	}
 	_, err = f.m.RedeemDelegationHandoff(ctx, again.HandoffCode)
 	wantDenial(t, err, DenialHandoffInvalid)
-	// 同一把 key、不同的內容。
 	changed := startInput(admin, testStore, "ik-1")
 	changed.CaseReference = ptr("HK-2026-0928")
 	_, err = f.m.StartDelegation(ctx, changed)
 	wantDenial(t, err, DenialIdempotencyKeyReused)
-	// 不同的 key：管理員已經在代行（不回既有的 session）。
 	_, err = f.m.StartDelegation(ctx, startInput(admin, testStore, "ik-2"))
 	wantDenial(t, err, DenialActorBusy)
 
-	// 已兌換後重放只回同一個 session，不再發出 handoff code。
 	replayed := f.create(t, startInput(admin, testStore, "ik-1"))
 	if replayed.Session.ID != first.Session.ID || replayed.HandoffCode != "" {
 		t.Fatalf("已兌換後重放 = %+v", replayed)
@@ -468,9 +448,7 @@ func TestIdleTimeout(t *testing.T) {
 	f.grant(t, admin, store2)
 	other := f.delegationAdmin(t, "other@hawkr.example", true)
 
-	// 輪詢（activity=false）不算活動：15 分鐘後閒置逾時。
 	polled := f.start(t, startInput(admin, testStore, "ik-1"))
-	// 代行資源的路由（activity=true）每次都順延。
 	active := f.start(t, startInput(other, store2, "ik-2"))
 	for range 5 {
 		f.now = f.now.Add(4 * time.Minute)
@@ -487,12 +465,10 @@ func TestIdleTimeout(t *testing.T) {
 	if s, _ := f.m.ResolveDelegation(ctx, active.Credential, false); s.Status != model.DelegationActive || s.Revision != 0 {
 		t.Fatalf("代行資源的路由要順延，而且不動 revision：%+v", s)
 	}
-	// 已經閒置逾時的 session 不會被下一個請求救回來。
 	s, err := f.m.ResolveDelegation(ctx, polled.Credential, true)
 	if err != nil || s.Status != model.DelegationExpired {
 		t.Fatalf("= %+v, %v", s, err)
 	}
-	// 閒置逾時、還沒結束的列不是衝突：preflight 允許，建立時在同一個 transaction 內把它收掉。
 	if p, err := f.m.DelegationPreflight(ctx, DelegationPreflightInput{AdminID: admin, StoreID: testStore}); err != nil || !p.Allowed {
 		t.Fatalf("preflight = %+v, %v", p, err)
 	}
@@ -507,7 +483,6 @@ func TestIdleTimeout(t *testing.T) {
 	if n := f.count(t, `SELECT count(*) FROM delegation.delegated_operation_sessions WHERE id = $1 AND ended_at IS NOT NULL`, polled.Session.ID); n != 1 {
 		t.Fatal("閒置逾時的列要被結束，否則它繼續佔著 partial unique index")
 	}
-	// hard 到期不順延：一直有活動的 session 在 30 分鐘時照樣到期。
 	f.now = active.Session.ExpiresAt
 	if s, _ := f.m.ResolveDelegation(ctx, active.Credential, true); s.Status != model.DelegationExpired {
 		t.Fatalf("hard 到期 = %s", s.Status)
@@ -522,11 +497,9 @@ func TestRedeemHandoffRefusesAnExpiredSession(t *testing.T) {
 	in := startInput(admin, testStore, "ik-1")
 	in.TTLSeconds = 10
 	s := f.create(t, in)
-	// session 已經 hard 到期，handoff code 本身還在 60 秒內。
 	f.now = f.now.Add(20 * time.Second)
 	_, err := f.m.RedeemDelegationHandoff(ctx, s.HandoffCode)
 	wantDenial(t, err, DenialHandoffInvalid)
-	// 只有四個述詞的版本會兌換成功：到期的兩個述詞不可省略的證明。
 	if n := f.count(t, `WITH r AS (UPDATE delegation.delegated_operation_sessions SET handoff_code_hash = NULL
 		WHERE handoff_code_hash = $1 AND handoff_expires_at > $2 AND status = 'ACTIVE' AND ended_at IS NULL RETURNING id)
 		SELECT count(*) FROM r`, tokenHash(s.HandoffCode), f.now); n != 1 {
@@ -538,7 +511,6 @@ func TestRevokeDelegation(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	admin := f.delegationAdmin(t, "ops@hawkr.example", true)
-	// 撤銷不看 allowlist：它只會讓權限變少，也是緊急剎車。
 	governor := f.delegationAdmin(t, "governor@hawkr.example", false)
 	f.grant(t, admin, testStore)
 	s := f.start(t, startInput(admin, testStore, "ik-1"))
@@ -554,13 +526,11 @@ func TestRevokeDelegation(t *testing.T) {
 		*revoked.RevokedByAdminID != governor || *revoked.RevokeReason != "賣家要求中止" {
 		t.Fatalf("撤銷 = %+v, %v", revoked, err)
 	}
-	// 重放：第一次的撤銷時刻，revision 不再加一。
 	f.now = f.now.Add(time.Minute)
 	again, err := f.m.RevokeDelegation(ctx, RevokeDelegationInput{SessionID: s.Session.ID, AdminID: admin, Reason: "再撤一次"})
 	if err != nil || !again.RevokedAt.Equal(*revoked.RevokedAt) || again.Revision != 1 || *again.RevokeReason != "賣家要求中止" {
 		t.Fatalf("重放 = %+v, %v", again, err)
 	}
-	// 撤銷寫 ended_at：摘要的時長不隨查詢時刻長大。
 	first, err := f.m.DelegationSessionSummary(ctx, s.Session.ID)
 	if err != nil || first.Duration != 90*time.Second || first.Session.RevokedByDisplayName == nil ||
 		*first.Session.RevokedByDisplayName != "governor@hawkr.example" {
@@ -570,7 +540,6 @@ func TestRevokeDelegation(t *testing.T) {
 	if second, _ := f.m.DelegationSessionSummary(ctx, s.Session.ID); second.Duration != first.Duration {
 		t.Fatalf("時長 %v → %v", first.Duration, second.Duration)
 	}
-	// 代行資源的路由也救不回撤銷的 session。
 	if r, err := f.m.ResolveDelegation(ctx, s.Credential, true); err != nil || r.Status != DelegationRevoked {
 		t.Fatalf("= %+v, %v", r, err)
 	}
@@ -609,7 +578,6 @@ func TestSummaryDurationStopsAtIdleTimeout(t *testing.T) {
 	if err != nil || first.Session.Status != model.DelegationExpired || first.Session.EndedAt != nil || first.Duration != time.Minute {
 		t.Fatalf("右端是最後活動（1 分鐘），不是現在也不是最後活動加閒置：%+v, %v", first, err)
 	}
-	// 閒置逾時之後才撤銷：三個候選取最早的，仍然停在最後活動。
 	if _, err := f.m.RevokeDelegation(ctx, RevokeDelegationInput{SessionID: s.Session.ID, AdminID: admin, Reason: "閒置之後撤銷"}); err != nil {
 		t.Fatal(err)
 	}
@@ -649,7 +617,6 @@ func TestAdminSignOutEndsItsDelegations(t *testing.T) {
 	if s, _ := f.m.ResolveDelegation(ctx, theirs.Credential, false); s.Status != model.DelegationActive {
 		t.Fatalf("別人的代行不受影響：%+v", s)
 	}
-	// 冪等：再登出一次沒有事。
 	if err := f.m.EndDelegationsOfAdmin(ctx, admin); err != nil {
 		t.Fatal(err)
 	}
@@ -703,7 +670,6 @@ func TestDisablingAdminEligibilityRevokesSessionsAtomically(t *testing.T) {
 	}
 }
 
-// ---- 稽核 ----
 
 func intentInput(sessionID int64, key string) AuditIntentInput {
 	return AuditIntentInput{
@@ -751,7 +717,6 @@ func TestAuditIntentAndConfirm(t *testing.T) {
 	if first.Replayed || first.Result != model.AuditPending {
 		t.Fatalf("= %+v", first)
 	}
-	// 同一把 key：回既有的列。
 	if again := f.intent(t, in); !again.Replayed || again.AuditLogID != first.AuditLogID {
 		t.Fatalf("重放 = %+v", again)
 	}
@@ -765,7 +730,6 @@ func TestAuditIntentAndConfirm(t *testing.T) {
 		len(confirmed.ChangedFields) != 1 || *confirmed.ResourceID != "2701445588392017" || *confirmed.ResourceVersionAfter != 13 {
 		t.Fatalf("確認 = %+v, %v", confirmed, err)
 	}
-	// 完成事件在同一個 transaction 內發出，帶寫入當下的快照。
 	if len(f.completed) != 1 {
 		t.Fatalf("事件 %d 則", len(f.completed))
 	}
@@ -776,20 +740,17 @@ func TestAuditIntentAndConfirm(t *testing.T) {
 		e.CorrelationID != "corr-ik-notify" || e.RiskLevel != RiskMedium || !e.NotifiedAt.Equal(*confirmed.NotifiedAt) {
 		t.Fatalf("事件 = %+v", e)
 	}
-	// 再確認一次：既有的結論不被覆蓋，也不再發事件。
 	again, err := f.m.ConfirmDelegationAudit(ctx, AuditConfirmInput{AuditLogID: first.AuditLogID, Result: model.AuditFailed, BizCode: 9280})
 	if err != nil || again.Result != model.AuditSucceeded || again.BizCode != nil || len(f.completed) != 1 {
 		t.Fatalf("第二次確認 = %+v, %v", again, err)
 	}
 
-	// 沒有勾選通知：稽核照寫、沒有事件（漏填的 gateway 在這裡沒有錯誤訊號，這是契約）。
 	silent := intentInput(s.Session.ID, "ik-silent")
 	silent.NotifySeller = false
 	i := f.intent(t, silent)
 	if l, err := f.m.ConfirmDelegationAudit(ctx, AuditConfirmInput{AuditLogID: i.AuditLogID, Result: model.AuditSucceeded}); err != nil || l.NotifiedAt != nil {
 		t.Fatalf("= %+v, %v", l, err)
 	}
-	// 失敗的列記業務碼、不通知。
 	failed := f.intent(t, intentInput(s.Session.ID, "ik-failed"))
 	if l, err := f.m.ConfirmDelegationAudit(ctx, AuditConfirmInput{AuditLogID: failed.AuditLogID, Result: model.AuditFailed, BizCode: 9266}); err != nil ||
 		*l.BizCode != 9266 || l.NotifiedAt != nil {
@@ -819,7 +780,6 @@ func TestPIIRevealCannotNotifyTheSeller(t *testing.T) {
 	if err != nil || l.NotifySeller || l.NotifiedAt != nil || len(f.completed) != 0 {
 		t.Fatalf("PII 揭露恆不通知賣家：%+v, %v", l, err)
 	}
-	// 訂單以訂單號指稱，原樣存進 resource_id（原本的 bigint 存不進去而是 NULL，這一列指不回它的訂單）。
 	if l.ResourceID == nil || *l.ResourceID != "O123456789" || l.ResourceName != nil || l.RiskLevel != model.RiskHigh {
 		t.Fatalf("= %+v", l)
 	}
@@ -856,11 +816,9 @@ func TestConfirmChecksTheCapabilityOnlyOnSuccess(t *testing.T) {
 	i := f.intent(t, in)
 	_, err := f.m.ConfirmDelegationAudit(ctx, AuditConfirmInput{AuditLogID: i.AuditLogID, Result: model.AuditSucceeded})
 	wantDenial(t, err, DenialCapabilityDenied)
-	// 失敗的列正是「要了沒有授予的能力」的證據。
 	if l, err := f.m.ConfirmDelegationAudit(ctx, AuditConfirmInput{AuditLogID: i.AuditLogID, Result: model.AuditFailed, BizCode: 9262}); err != nil || l.Result != model.AuditFailed {
 		t.Fatalf("= %+v, %v", l, err)
 	}
-	// 封閉值域外的能力連 intent 都寫不進去（DB 的 CHECK 是機械兜底）。
 	bad := intentInput(s.Session.ID, "ik-refund")
 	bad.Capability = "orders.refund"
 	if _, err := f.m.RecordDelegationAuditIntent(ctx, bad); err == nil || apperr.KindOf(err) != apperr.KindInternal {
@@ -892,7 +850,6 @@ func TestIntentRequiresAUsableSessionAndAValidInput(t *testing.T) {
 			t.Errorf("%s = %v", name, err)
 		}
 	}
-	// 被拒絕的讀取可以沒有理由。
 	read := intentInput(s.Session.ID, "")
 	read.Action, read.Capability, read.OperationReason = model.AuditProductRead, model.CapabilityProductsRead, ""
 	f.intent(t, read)
@@ -900,7 +857,6 @@ func TestIntentRequiresAUsableSessionAndAValidInput(t *testing.T) {
 	_, err := f.m.RecordDelegationAuditIntent(ctx, intentInput(999999999, "ik-x"))
 	wantDenial(t, err, DenialSessionNotFound)
 
-	// 到期：互動的 intent 拒絕，排程執行照常；撤銷兩者都拒絕。
 	f.now = s.Session.ExpiresAt
 	_, err = f.m.RecordDelegationAuditIntent(ctx, intentInput(s.Session.ID, "ik-late"))
 	wantDenial(t, err, DenialSessionExpired)
@@ -934,7 +890,6 @@ func TestScheduledIntentInheritsTheReason(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// 排程執行時 session 早就到期；呼叫方給的理由不採用。
 	f.now = s.Session.ExpiresAt.Add(time.Hour)
 	run := AuditIntentInput{
 		SessionID: s.Session.ID, Capability: model.CapabilityPostsPublish, Action: model.AuditPostPublish, ResourceType: model.ResourcePost,
@@ -945,7 +900,6 @@ func TestScheduledIntentInheritsTheReason(t *testing.T) {
 	if l := f.auditRow(t, published.AuditLogID); l.OperationReason == nil || *l.OperationReason != reason || l.Origin != model.AuditScheduled {
 		t.Fatalf("繼承的理由 = %+v", l)
 	}
-	// 找不到可以繼承的理由：拒絕，不留下任何稽核列。
 	run.ResourceID, run.IdempotencyKey = orphanID, "schedule:"+orphanID+":1760000000"
 	_, err := f.m.RecordDelegationAuditIntent(ctx, run)
 	wantDenial(t, err, DenialAuditIntentFailed)
@@ -975,14 +929,13 @@ func TestAuditBatches(t *testing.T) {
 		wantDenial(t, err, DenialInvalidCommand)
 	}
 
-	// confirm 的批次全有或全無。
 	a, c := outcomes[0].Intent.AuditLogID, outcomes[2].Intent.AuditLogID
 	_, err = f.m.ConfirmDelegationAudits(ctx, []AuditConfirmInput{{AuditLogID: a, Result: model.AuditSucceeded}, {AuditLogID: c, Result: "DONE"}})
 	wantDenial(t, err, DenialInvalidCommand)
 	if l := f.auditRow(t, a); l.Result != model.AuditPending || l.NotifiedAt != nil {
 		t.Fatal("失敗的批次不得留下部分確認")
 	}
-	f.completed = nil // 訂閱者在 rollback 的 transaction 內收到過第一項；真正的訂閱者排入的 job 跟著 rollback
+	f.completed = nil
 	logs, err := f.m.ConfirmDelegationAudits(ctx, []AuditConfirmInput{{AuditLogID: a, Result: model.AuditSucceeded}, {AuditLogID: c, Result: model.AuditSucceeded}})
 	if err != nil || len(logs) != 2 || logs[0].ID != a || logs[1].Result != model.AuditSucceeded || len(f.completed) != 2 {
 		t.Fatalf("= %+v, %v，事件 %d 則", logs, err, len(f.completed))
@@ -1047,7 +1000,6 @@ func TestAuditLogsAndSummary(t *testing.T) {
 		sum.FulfillmentActionCount != 0 || sum.FinanceActionCount != 0 || sum.AuditRetentionDays != 730 || sum.Session.Status != model.DelegationActive {
 		t.Fatalf("摘要 = %+v, %v", sum, err)
 	}
-	// 沒有登錄的動作寫不進稽核表（設計書 56 §6.5.3），履約、金流的計數因此結構上恆為 0。
 	insert := func(action, result string) error {
 		_, err := f.db.Pool().Exec(ctx, `INSERT INTO delegation.admin_operation_audit_logs
 			(id, session_id, actor_admin_id, actor_display_name, target_store_id, target_seller_account_id, target_store_name,
@@ -1061,7 +1013,6 @@ func TestAuditLogsAndSummary(t *testing.T) {
 	if err := insert("ORDER_SHIPMENT_CREATE", "SUCCEEDED"); err == nil || !strings.Contains(err.Error(), "admin_operation_audit_logs_action_check") {
 		t.Fatalf("沒有登錄的動作 = %v", err)
 	}
-	// 但計數是數出來的，不是寫死的零：模擬封鎖被打穿（拿掉 CHECK）時，那些列要被數到，PENDING 的也算。
 	if _, err := f.db.Pool().Exec(ctx, `ALTER TABLE delegation.admin_operation_audit_logs DROP CONSTRAINT admin_operation_audit_logs_action_check`); err != nil {
 		t.Fatal(err)
 	}
@@ -1130,7 +1081,6 @@ func TestMissingRevokerDoesNotBreakSessionReads(t *testing.T) {
 	}
 }
 
-// ---- 授權的治理 ----
 
 func (f *fixture) history(t *testing.T, admin, storeID int64) AuthorizationHistoryPage {
 	t.Helper()
@@ -1156,7 +1106,6 @@ func TestGrantAndReinstateUseOneRow(t *testing.T) {
 	if err != nil || first.Outcome != model.GrantCreated || !first.Authorization.Effective || first.Authorization.ApprovedByDisplayName != "ops@hawkr.example" {
 		t.Fatalf("開通 = %+v, %v", first, err)
 	}
-	// 已經有有效的授權：9285，而且 transaction 沒有中止（不是接唯一鍵的錯誤）。
 	_, err = f.m.GrantDelegationAuthorization(ctx, change(admin, testStore, "g2", model.CapabilityPostsRead))
 	wantDenial(t, err, DenialAuthorizationAlreadyActive)
 	if p, _ := f.m.DelegationAuthorizationOfStore(ctx, admin, testStore); !p.Exists || !slices.Equal(p.Authorization.Capabilities, first.Authorization.Capabilities) {
@@ -1216,16 +1165,13 @@ func TestAuthorizationReplays(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 同一把 key 重放：第一次的答案（不是 9285），不多寫一列歷史。
-	in.OperationReason = "換個說法重試" // 理由不是內容
+	in.OperationReason = "換個說法重試"
 	if replay, err := f.m.GrantDelegationAuthorization(ctx, in); err != nil || replay.Outcome != model.GrantCreated || replay.Authorization.ID != first.Authorization.ID {
 		t.Fatalf("重放 = %+v, %v", replay, err)
 	}
-	// 同一把 key、不同的內容：9267。
 	_, err = f.m.GrantDelegationAuthorization(ctx, change(admin, testStore, "g1", model.CapabilityPostsRead))
 	wantDenial(t, err, DenialIdempotencyKeyReused)
 
-	// 調整的重放不再套用一次（updated_at 不動、不多一列歷史）。
 	f.now = f.now.Add(time.Minute)
 	upd := change(admin, testStore, "u1", model.CapabilityOrdersRead, model.CapabilityPostsRead)
 	updated, err := f.m.UpdateDelegationAuthorization(ctx, upd)
@@ -1236,10 +1182,8 @@ func TestAuthorizationReplays(t *testing.T) {
 	if replay, err := f.m.UpdateDelegationAuthorization(ctx, upd); err != nil || !replay.UpdatedAt.Equal(updated.UpdatedAt) {
 		t.Fatalf("調整的重放 = %+v, %v", replay, err)
 	}
-	// 用過開通的 key 來調整：9267，整個調整 rollback。
 	_, err = f.m.UpdateDelegationAuthorization(ctx, change(admin, testStore, "g1", model.CapabilityOrdersRead))
 	wantDenial(t, err, DenialIdempotencyKeyReused)
-	// 再調整一次（新的 key）：歷史的 before 是真的變更前。
 	if _, err := f.m.UpdateDelegationAuthorization(ctx, change(admin, testStore, "u2", model.CapabilityOrdersRead)); err != nil {
 		t.Fatal(err)
 	}
@@ -1249,7 +1193,6 @@ func TestAuthorizationReplays(t *testing.T) {
 		t.Fatalf("歷史 = %+v", h)
 	}
 
-	// 撤回的重放：已經撤回、保留第一次、只有一列 REVOKE。
 	f.now = f.now.Add(time.Minute)
 	r1, err := f.m.RevokeDelegationAuthorization(ctx, DelegationAuthorizationRevocation{AdminID: admin, StoreID: testStore, Reason: "合約到期", IdempotencyKey: "r1"})
 	if err != nil || r1.AlreadyRevoked || r1.RevokedSessions == nil || len(r1.RevokedSessions) != 0 {
@@ -1304,7 +1247,6 @@ func TestRevokingTheAuthorizationEndsRunningSessions(t *testing.T) {
 	if s.Status != DelegationRevoked || *s.RevokeReason != "authorization_revoked" || *s.RevokedByAdminID != governor || s.EndedAt == nil {
 		t.Fatalf("連帶撤銷 = %+v", s)
 	}
-	// 由 session 找回是哪一次治理動作：同一個時刻。
 	if n := f.count(t, `SELECT count(*) FROM delegation.delegation_authorization_audit_logs
 		WHERE target_store_id = $1 AND action = 'REVOKE' AND date_trunc('second', created_at) = $2`, testStore, *s.RevokedAt); n != 1 {
 		t.Fatal("撤回的歷史與 session 的 revoked_at 要是同一個時刻")
@@ -1364,7 +1306,6 @@ func TestGrantNeedsAStoreThatExists(t *testing.T) {
 	f.storeFn = missingFn
 	_, err := f.m.GrantDelegationAuthorization(ctx, change(admin, testStore, "", model.CapabilityPostsRead))
 	wantDenial(t, err, DenialStoreNotDelegable)
-	// 已關閉：開通授權也是 DenialStoreClosed，訊息是同一句（N2）；店家不存在才是 DenialStoreNotDelegable。
 	f.storeFn = fixedFn(seller.Closed, false)
 	_, err = f.m.GrantDelegationAuthorization(ctx, change(admin, testStore, "", model.CapabilityPostsRead))
 	wantDenial(t, err, DenialStoreClosed)
@@ -1391,9 +1332,9 @@ func TestStatusFilterIsATotalPartition(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	admin := f.delegationAdmin(t, "ops@hawkr.example", true)
-	f.grant(t, admin, testStore)   // 有效
-	f.grant(t, admin, testStore+1) // 撤回
-	until := f.now.Add(time.Hour)  // 到期
+	f.grant(t, admin, testStore)
+	f.grant(t, admin, testStore+1)
+	until := f.now.Add(time.Hour)
 	in := change(admin, testStore+2, "", model.CapabilityPostsRead)
 	in.EffectiveUntil = &until
 	if _, err := f.m.GrantDelegationAuthorization(ctx, in); err != nil {
@@ -1402,7 +1343,6 @@ func TestStatusFilterIsATotalPartition(t *testing.T) {
 	if _, err := f.m.RevokeDelegationAuthorization(ctx, DelegationAuthorizationRevocation{AdminID: admin, StoreID: testStore + 1, Reason: "撤回"}); err != nil {
 		t.Fatal(err)
 	}
-	// 生效時間在未來的列（維運 SQL 仍可能建）：兩分法不能漏掉它。
 	if _, err := f.db.Pool().Exec(ctx, `INSERT INTO delegation.seller_delegation_authorizations
 		(id, target_store_id, source, source_reference, granted_capabilities, effective_from, approved_by_admin_id, approved_at)
 		VALUES ($1, $2, 'TICKET', 'TICKET-2026-1', '{posts.read}', $3, $4, $3)`, uuid.NewV7(), testStore+3, f.now.Add(24*time.Hour), admin); err != nil {
@@ -1495,7 +1435,6 @@ func TestAuditIntentKeyIsBoundToTheCommandTheResourceAndThePayload(t *testing.T)
 	in.PayloadHash = "hash-1"
 	first := f.intent(t, in)
 
-	// 設計書 56 §6.6.1：同一把鍵用在不同的動作、資源或內容上是 9267，不是重放。
 	for name, mut := range map[string]func(*AuditIntentInput){
 		"不同的內容": func(in *AuditIntentInput) { in.PayloadHash = "hash-2" },
 		"沒有內容":  func(in *AuditIntentInput) { in.PayloadHash = "" },
@@ -1513,7 +1452,6 @@ func TestAuditIntentKeyIsBoundToTheCommandTheResourceAndThePayload(t *testing.T)
 		t.Fatalf("同一個請求 = %+v", again)
 	}
 
-	// 建立類：intent 沒有資源的 ID，confirm 補上之後，同一個請求的重放照樣是重放。
 	create := intentInput(s.Session.ID, "ik-create")
 	create.Action, create.ResourceID, create.PayloadHash = model.AuditProductCreate, "", "hash-create"
 	c := f.intent(t, create)

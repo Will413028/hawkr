@@ -14,8 +14,6 @@ import {
 	KNOWN_DELEGATED_OPERATION_CAPABILITIES,
 } from "../src/features/delegated-operations/policy";
 
-// This is the proposed production backend contract. It is contract evidence,
-// not a development fixture and never makes the runtime report fake success.
 const summary = {
 	target: {
 		storeId: "store_123",
@@ -92,8 +90,6 @@ test("unknown, duplicate, and dependency-less capabilities are dropped one by on
 		parseDelegatedOperationSessionSummary({ ...summary, capabilities })
 			?.capabilities ?? null;
 
-	// One unusable entry must not void the rest of the grant: the backend CHECK
-	// closes the value domain but never enforces the dependency closure.
 	assert.deepEqual(grantedOf(["products.read", "shipment.write"]), [
 		"products.read",
 	]);
@@ -190,7 +186,6 @@ test("non-canonical, impossible, and missing expiry values fail closed", () => {
 		}),
 		null,
 	);
-	// 1800s + 1ms: the session lifetime ceiling, not a formatting problem.
 	assert.equal(
 		parseDelegatedOperationSessionSummary({
 			...summary,
@@ -308,8 +303,6 @@ test("state derivation blocks mismatch/revocation/expiry and warns for the final
 		),
 		"active",
 	);
-	// The fourth independent guard on the TTL ceiling: a full-length session
-	// must derive as usable, not as "invalid".
 	assert.equal(
 		deriveDelegatedOperationState(
 			{ ...parsed, expiresAt: "2026-08-06T04:35:00.000Z" },

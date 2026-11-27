@@ -44,7 +44,6 @@ func New(d Deps) *Service { return &Service{d: d} }
 
 func (s *Service) q(ctx context.Context) *store.Queries { return store.New(s.d.DB.Conn(ctx)) }
 
-// postIsPublic 回貼文對觀看者是不是公開可讀（草稿與下架的貼文、店家不可曝光、觀看者封鎖了這家店時都不是）。
 func (s *Service) postIsPublic(ctx context.Context, postID uuid.UUID, now time.Time, v visibility.Viewer) (bool, error) {
 	return reads.Flag(ctx, s.d.DB.Conn(ctx), reads.PostIsPublic(postID, now, v))
 }
@@ -70,7 +69,6 @@ func visibleComment(c store.SocialComment, postStore int64) model.Comment {
 	}
 }
 
-// withStats 補上留言此刻的讚數與回覆數，以及呼叫者（依貼文歸屬推導的互動者）有沒有讚過。
 func (s *Service) withStats(ctx context.Context, q *store.Queries, c model.Caller, out model.Comment) (model.Comment, error) {
 	counts, err := q.GetCommentCounts(ctx, out.ID)
 	if err != nil {
@@ -87,8 +85,6 @@ func (s *Service) withStats(ctx context.Context, q *store.Queries, c model.Calle
 	return out, nil
 }
 
-// currentOf 是重送命中時回的留言：列表讀取算出的目前狀態（已刪除、被隱藏、作者停用後是佔位）與計數，不是第一次建立當下的樣子。
-// row 是剛讀到的列，內文與版本直接用它。
 func (s *Service) currentOf(ctx context.Context, q *store.Queries, c model.Caller, row store.SocialComment, postStore int64) (model.Comment, error) {
 	st, err := reads.One[reads.StateRow](ctx, s.d.DB.Conn(ctx), reads.CommentState(row.ID))
 	if err != nil {
@@ -192,7 +188,6 @@ func (s *Service) Create(ctx context.Context, c model.Caller, in model.CommentIn
 			ActorKind: string(a.Kind), ActorID: a.ID, Body: body, Now: now, RequestID: in.RequestID, RequestHash: hash,
 		})
 		if errors.Is(err, pgx.ErrNoRows) {
-			// 同一個 (互動者, request_id) 在上面的查詢之後才出現（並行的重送）：INSERT 等到對方 commit 才回 0 列，這時讀得到它。
 			row, ok, rerr := s.replay(ctx, q, a, in.RequestID, hash)
 			if rerr != nil {
 				return rerr
@@ -221,7 +216,6 @@ func (s *Service) Create(ctx context.Context, c model.Caller, in model.CommentIn
 	if err != nil {
 		return model.Comment{}, err
 	}
-	// 貼文公開可讀是寫入的前置檢查，成功的寫入（含重送命中）就是 true，不再查。
 	if isReplay {
 		replayed.PostReadable = true
 		return replayed, nil
@@ -231,7 +225,6 @@ func (s *Service) Create(ctx context.Context, c model.Caller, in model.CommentIn
 	return out, nil
 }
 
-// replay 查 (互動者, request_id)：命中且內容相同回傳那一則（呼叫方補上目前的狀態）；內容不同是 InvalidInput；沒帶 request_id 或沒命中回 false。
 func (s *Service) replay(ctx context.Context, q *store.Queries, a model.Actor, requestID *uuid.UUID, hash []byte) (store.SocialComment, bool, error) {
 	if requestID == nil {
 		return store.SocialComment{}, false, nil
@@ -259,8 +252,6 @@ func (s *Service) Update(ctx context.Context, c model.Caller, id uuid.UUID, vers
 	var updated model.Comment
 	err = s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
-		// 鎖的順序 identity → buyer → seller → social：作者與歸屬在鎖之前用不加鎖的讀取確認（作者不會變），買家列的共享鎖先於留言列的鎖。
-		// 反過來（先鎖留言、再鎖買家）會與刪帳申請（持有買家列的排他鎖，再由訂閱者鎖作者的內容）互相等待而死結。
 		pre, err := q.GetComment(ctx, id)
 		if errors.Is(err, pgx.ErrNoRows) || err == nil && pre.SocialComment.DeletedAt != nil {
 			return commentNotFound(ctx)
@@ -300,7 +291,6 @@ func (s *Service) Update(ctx context.Context, c model.Caller, id uuid.UUID, vers
 		if err != nil {
 			return err
 		}
-		// 修改不要求貼文公開，只有貼文所屬的店用得到這個旗標（viewer_can_reply），才求值。
 		if c.OwnsStore(row.PostStoreID) {
 			updated.PostReadable, err = reads.Flag(ctx, s.d.DB.Conn(ctx), reads.PostIsPublic(row.SocialComment.PostID, now, visibility.Anonymous))
 			if err != nil {
@@ -363,11 +353,9 @@ func toComment(r reads.CommentRow) model.Comment {
 	return out
 }
 
-// scope 是讀取留言時對貼文的要求：公開讀取要貼文對觀看者公開可讀（觀看者封鎖了這家店時讀不到）；店主讀自己的貼文不必公開，也不套個人封鎖。
 type scope struct {
-	ownerStore int64 // > 0：店主讀取
+	ownerStore int64
 	post       store.GetPostRow
-	// readable 是貼文匿名觀看者讀得到：公開讀取由前置檢查保證（觀看者讀得到就是匿名也讀得到），店主讀取才求值一次。
 	readable bool
 }
 
@@ -397,7 +385,6 @@ func (s *Service) scope(ctx context.Context, c model.Caller, postID uuid.UUID) (
 	return scope{post: post, readable: true}, nil
 }
 
-// finish 把（可能多取一列的）列轉成一頁；readable 是這些留言所屬的貼文之中匿名觀看者讀得到的（nil 時全部不可讀）。
 func (s *Service) finish(ctx context.Context, c model.Caller, storeID int64, rows []reads.CommentRow, size int32, readable func(postID uuid.UUID) bool) (model.CommentPage, error) {
 	more := len(rows) > int(size)
 	if more {
@@ -495,7 +482,6 @@ func (s *Service) ListForStore(ctx context.Context, st seller.Store, postID *uui
 	return s.finish(ctx, c, st.StoreID, rows, size, func(id uuid.UUID) bool { return readable[id] })
 }
 
-// readablePosts 是 rows 所屬的貼文之中匿名觀看者讀得到的（一次批次查詢）：店主的留言列表跨多篇貼文，其中可能有草稿與下架的。
 func (s *Service) readablePosts(ctx context.Context, rows []reads.CommentRow) (map[uuid.UUID]bool, error) {
 	seen := map[uuid.UUID]bool{}
 	ids := make([]uuid.UUID, 0, len(rows))

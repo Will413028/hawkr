@@ -44,7 +44,6 @@ func (c *AftersalesClient) Close() error {
 	return nil
 }
 
-// ==================== 買家端 ====================
 
 // CreateAfterSaleCase 申請售後
 func (c *AftersalesClient) CreateAfterSaleCase(ctx context.Context, req *pb.CreateAfterSaleCaseRequest) (*pb.CreateAfterSaleCaseResponse, error) {
@@ -81,7 +80,6 @@ func (c *AftersalesClient) CancelAfterSaleCase(ctx context.Context, req *pb.Canc
 	return c.client.CancelAfterSaleCase(ctx, req)
 }
 
-// ==================== 賣家端 ====================
 
 // GetSellerAfterSaleCases 賣家售後列表
 func (c *AftersalesClient) GetSellerAfterSaleCases(ctx context.Context, req *pb.GetSellerAfterSaleCasesRequest) (*pb.GetSellerAfterSaleCasesResponse, error) {
@@ -125,7 +123,6 @@ func (c *AftersalesClient) RetryPrintReturnLabel(ctx context.Context, req *pb.Re
 	return c.client.RetryPrintReturnLabel(ctx, req)
 }
 
-// ==================== §10 申訴與平台裁決 ====================
 
 // SubmitAppeal 買家提交申訴
 func (c *AftersalesClient) SubmitAppeal(ctx context.Context, req *pb.SubmitAppealRequest) (*pb.SubmitAppealResponse, error) {

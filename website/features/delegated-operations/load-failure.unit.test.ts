@@ -89,7 +89,6 @@ describe("delegatedProductLoadFailureCopy", () => {
 		const copy = delegatedProductLoadFailureCopy("temporary");
 		expect(copy.retryable).toBe(true);
 		expect(copy.title).not.toContain("找不到");
-		// 「資料沒有變動」是操作者此刻最需要知道的一件事。
 		expect(copy.hint).toContain("沒有任何變動");
 	});
 

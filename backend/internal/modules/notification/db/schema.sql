@@ -1,19 +1,8 @@
--- notification 模組的 desired state（Atlas）。改完在本目錄執行 `atlas migrate diff <名稱> --env dev`
--- 產生 migration，再在 backend/ 跑 `make sqlc`；兩者都讀這個檔。這裡只放表、約束與索引：view、函式與複合型別放 db/objects.sql
--- （Atlas 社群版在 desired state 裡遇到 view 就報錯；手寫 migration、sqlc.yaml 的 schema 加 objects.sql，見單體規則 6）。
---
--- public 不屬於本模組：寫在這裡只是讓 Atlas 知道它存在，否則 Atlas 會產生 DROP SCHEMA public。
--- 表一律寫完整名稱（notification.<表>），不建跨 schema 的 FK；實體的主鍵是應用層產生的 UUIDv7、不設 DEFAULT
--- （ADR 2026-09-25-row-identity-by-data-kind）；慣例見 PostgreSQL 設計規範。
 
 CREATE SCHEMA IF NOT EXISTS public;
 
 CREATE SCHEMA notification;
 
--- 通知意圖：來源 transaction 排的一件「某事件要通知」的紀錄。idempotency_key 是事件來源身分（型別註冊表每個型別宣告它的來源），
--- UNIQUE 保證同一事件投遞兩次只有一個意圖；它只為冪等存在，保留期與收件匣同為 180 天（超過 River 重試期即無用）。
--- params 是型別的 typed 參數快照（JSON）：只存 ID 與事件事實，不存第三方的名稱或頭像。
--- occurred_at 是來源事件發生的時間（取自事件，不是 job 處理的時間）：聚合合併時以它判斷參數誰比較新。
 CREATE TABLE notification.intents (
     id              UUID        PRIMARY KEY,
     type            TEXT        NOT NULL,
@@ -27,11 +16,6 @@ CREATE TABLE notification.intents (
 );
 CREATE INDEX intents_created ON notification.intents (created_at);
 
--- 後台公告：公告是資料，型別 `announcement` 是註冊表的 Fanout 型別（收件匣列的參數只存公告 ID，文字讀取時解析）。建立時一列、一個意圖列（id 與公告相同，只為讓 deliveries 的 intent_id 有對象）與兩條派送 job 鏈：
--- 收件匣與推播分開，各自逐受眾、逐頁（以 keyset 游標）展開，所以沒有 device token 的帳號也收得到收件匣那份，一個 job 的工作量有上限。
--- audiences 是已排序、不重複的受眾（只有三種合法組合）。title 與 body 一律英文、單一份。
--- (admin_id, request_id) UNIQUE 是建立的冪等鍵（AIP-155）：重送回第一次的那一列，內容不同回 invalid_argument；沒有 request_id 的建立不受限。
--- inbox_count 與收件匣列同 transaction 遞增（只算真正新寫的列）；inbox_done_at、push_done_at 是各自的 job 鏈處理完所有受眾的時間，兩者都有才算派送完成。
 CREATE TABLE notification.announcements (
     id            UUID        PRIMARY KEY,
     audiences     TEXT[]      NOT NULL,
@@ -52,11 +36,6 @@ CREATE TABLE notification.announcements (
 );
 CREATE INDEX announcements_listing ON notification.announcements (created_at DESC, id DESC);
 
--- 收件匣列：型別＋參數快照＋聚合鍵，讀取時依請求語系組字（收件匣不是投遞渠道，這一列本身就是「已進收件匣」的紀錄）。
--- 收件人是 (account_id, audience, store_id)：BUYER 沒有 store_id，STORE 一定有。actor_account_ids 只存帳號 ID（讀取時向擁有模組解析名稱）。
--- 有聚合鍵的未讀列同一個收件人（含 store_id）只有一列（unique index，NULLS NOT DISTINCT 涵蓋 BUYER 的 NULL store_id），後來的意圖合併進去（A8-1b 的 upsert）；已讀之後的新意圖另開一列。
--- 保留期以 updated_at（最後一次合併）起算。occurred_at 是目前參數所屬事件的發生時間（合併時只有較新的事件才換參數）。
--- 哪些意圖已經寫進這一列由 inbox_item_intents 記（worker 重試的冪等依據）。
 CREATE TABLE notification.inbox_items (
     id                UUID        PRIMARY KEY,
     account_id        BIGINT      NOT NULL,
@@ -83,21 +62,14 @@ CREATE INDEX inbox_items_recipient ON notification.inbox_items (account_id, audi
 CREATE INDEX inbox_items_unread ON notification.inbox_items (account_id, audience, store_id) WHERE read_at IS NULL;
 CREATE UNIQUE INDEX inbox_items_unread_aggregation ON notification.inbox_items (account_id, audience, store_id, aggregation_key) NULLS NOT DISTINCT WHERE aggregation_key IS NOT NULL AND read_at IS NULL;
 CREATE INDEX inbox_items_updated ON notification.inbox_items (updated_at);
--- 公告的收件匣列：announcement_id 非空時 type 一定是 announcement（params 存同一個公告 ID，文案讀取時由公告型別向公告表解析），同一個收件人同一則公告只有一列（派送 job 重試的冪等依據）。
 CREATE UNIQUE INDEX inbox_items_announcement_recipient ON notification.inbox_items (announcement_id, account_id, audience, store_id) NULLS NOT DISTINCT WHERE announcement_id IS NOT NULL;
 
--- 意圖與收件匣列的連結：一個意圖（只有一個收件人）寫進或合併進哪一列。intent_id 是主鍵，worker 重試時以它判斷這個意圖已經處理過，
--- 即使它先前合併進的列之後被讀過、不再是聚合目標也不會重複建列。意圖被清除時只刪連結（收件匣列留著），收件匣列被清除時連結跟著刪。
 CREATE TABLE notification.inbox_item_intents (
     intent_id     UUID PRIMARY KEY REFERENCES notification.intents (id) ON DELETE CASCADE,
     inbox_item_id UUID NOT NULL REFERENCES notification.inbox_items (id) ON DELETE CASCADE
 );
 CREATE INDEX inbox_item_intents_item ON notification.inbox_item_intents (inbox_item_id);
 
--- 每渠道投遞紀錄：只記推播與 email，是每筆觸達與否的唯一來源。UNIQUE (intent, 收件人, 渠道) 是投遞冪等鍵；收件人含 store_id（一個帳號可以先後擁有已關閉的店與新店，兩間店各是一個收件人；BUYER 的 store_id 是 NULL，NULLS NOT DISTINCT 讓它也受唯一鍵約束）。
--- 送出之後 locale、sent_title、sent_body 是「實際送出的文字」（送出時的事實，保留期內可由個資清除處理，所以清除後可為 NULL）；
--- 還沒送出或永久失敗的列沒有送出文字。保留期以 created_at 起算。
--- intent_id 是 RESTRICT：投遞紀錄的 created_at 晚於意圖，刪過期意圖不能連帶刪掉還在保留期內的投遞紀錄；清除 job 先刪過期投遞，再刪已無投遞的過期意圖。
 CREATE TABLE notification.deliveries (
     id             UUID        PRIMARY KEY,
     intent_id      UUID        NOT NULL REFERENCES notification.intents (id) ON DELETE RESTRICT,
@@ -128,8 +100,6 @@ CREATE INDEX deliveries_recipient ON notification.deliveries (account_id, audien
 CREATE INDEX deliveries_status ON notification.deliveries (status, created_at) WHERE status <> 'SENT';
 CREATE INDEX deliveries_created ON notification.deliveries (created_at);
 
--- 裝置 token：token 是主鍵，同一個 token 同時只綁一個帳號與一支 App（登入時 upsert 改綁）；沒有 platform（兩支 App 只有 iOS）。
--- app 決定推播目標：BUYER 受眾只推 BUYER App，STORE 受眾只推 SELLER App。last_registered_at 是 App 每次啟動註冊的時間，超過 60 天未更新的由 A8-3 的 job 清除。
 CREATE TABLE notification.device_tokens (
     token              TEXT        PRIMARY KEY,
     account_id         BIGINT      NOT NULL,
@@ -142,8 +112,6 @@ CREATE TABLE notification.device_tokens (
 CREATE INDEX device_tokens_account ON notification.device_tokens (account_id, app);
 CREATE INDEX device_tokens_last_registered ON notification.device_tokens (last_registered_at);
 
--- 偏好覆寫列：只存與註冊表預設不同的值（沒有列就是預設）。category 與 channel 的合法值與「不可關」規則在型別註冊表（Go），
--- 這裡只擋格式，因為分類隨型別增加（偏好 API 只接受註冊表列出的值）。
 CREATE TABLE notification.preference_overrides (
     account_id BIGINT      NOT NULL,
     audience   TEXT        NOT NULL,
@@ -158,10 +126,6 @@ CREATE TABLE notification.preference_overrides (
     CONSTRAINT preference_overrides_channel_check CHECK (channel IN ('INBOX', 'PUSH', 'EMAIL'))
 );
 
--- email suppression 名單（通知計畫 D22）：Resend 回報永久退信或收件人投訴的位址，之後不再寄（寄給它們會傷寄件網域的信譽）。
--- 只存 emailaddr.Normalize 之後位址的 HMAC-SHA256（伺服器密鑰；查詢時以同一把密鑰雜湊，輪替期間再加舊密鑰），不存位址本身，所以沒有個資、無限期保留。
--- reason：HARD_BOUNCE 永久退信（管理員可移除）、COMPLAINT 投訴（不可移除）；暫時性退信不進名單。只由 Resend 的退信與投訴 webhook（經 platform/inbox）寫入，
--- email 渠道 job 送出前查。
 CREATE TABLE notification.email_suppressions (
     address_hash BYTEA       PRIMARY KEY,
     reason       TEXT        NOT NULL,

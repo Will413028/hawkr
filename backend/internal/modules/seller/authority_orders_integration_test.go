@@ -19,14 +19,12 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// 主管機關來函（step10e-3cb-design §7.3、§7.4）。管理員 31 登記、32 完成。
 
 const (
 	authorityRegistrar = 31
 	authorityCompleter = 32
 )
 
-// orderIn 是以 f.now 收文的來函輸入，對象是 targets。
 func (f *fixture) orderIn(kind AuthorityOrderKind, targets ...AuthorityTargetInput) CreateAuthorityOrderInput {
 	return CreateAuthorityOrderInput{
 		AdminID: authorityRegistrar, Agency: "臺北市政府衛生局", DocumentNo: "北市衛食字第1150000001號", ReceivedAt: f.now, Kind: kind,
@@ -41,7 +39,6 @@ func (f *fixture) createOrder(t *testing.T, in CreateAuthorityOrderInput) AdminA
 	return r.Order
 }
 
-// holdOrder 登記一份調取資料的來函，指名帳號全部的店家。
 func (f *fixture) holdOrder(t *testing.T, accountID int64) AdminAuthorityOrder {
 	t.Helper()
 	return f.createOrder(t, f.orderIn(AuthorityDataRequest, AuthorityTargetInput{AccountID: accountID}))
@@ -54,7 +51,6 @@ func (f *fixture) orderOf(t *testing.T, id uuid.UUID) AdminAuthorityOrder {
 	return o
 }
 
-// notifyAll 是完成來函時每個對象都已告知的輸入。
 func (f *fixture) notifyAll(o AdminAuthorityOrder) []TargetNoticeInput {
 	at := f.now
 	out := make([]TargetNoticeInput, len(o.Targets))
@@ -70,7 +66,6 @@ func (f *fixture) completeOrder(o AdminAuthorityOrder, provide *time.Time, notic
 	})
 }
 
-// closedStore 開店並關店，回傳帳號與店家；關店之後 f.now 不動。
 func (f *fixture) closedStore(t *testing.T) (int64, Store) {
 	t.Helper()
 	accountID, s := f.open(t)
@@ -120,7 +115,6 @@ func TestCreateAuthorityOrderDefaultsAndCoverage(t *testing.T) {
 	if !second.NoSellerData || len(second.Stores) != 0 {
 		t.Fatalf("沒有店家的帳號要標 no_seller_data：%+v", second)
 	}
-	// 往後的新 stint 也在不指定店家的對象裡；指定店家的不算。
 	if got := f.orderOf(t, o.ID); len(got.Targets) != 2 || got.HoldExtensions != nil {
 		t.Fatalf("讀回：%+v", got)
 	}
@@ -165,7 +159,6 @@ func TestCreateAuthorityOrderRejectsBadInput(t *testing.T) {
 	missing := int64(987_654)
 	wantInvalid(t, in(func(i *CreateAuthorityOrderInput) { i.Targets[0].StoreID = &missing }), "Targets[0].StoreID", "這個店家不屬於這個帳號")
 	wantInvalid(t, in(func(i *CreateAuthorityOrderInput) { i.Targets = append(i.Targets, i.Targets[0]) }), "Targets[1].AccountID", "同一個帳號或店家重複了")
-	// 重疊：整個帳號加上它的店家（兩個順序都拒絕），核准的句子。
 	overlap := "這個帳號已經整個列為對象，不用再列它的店家。"
 	wantInvalid(t, in(func(i *CreateAuthorityOrderInput) {
 		i.Targets = append(i.Targets, AuthorityTargetInput{AccountID: accountID, StoreID: &s.StoreID})
@@ -173,7 +166,6 @@ func TestCreateAuthorityOrderRejectsBadInput(t *testing.T) {
 	wantInvalid(t, in(func(i *CreateAuthorityOrderInput) {
 		i.Targets = []AuthorityTargetInput{{AccountID: accountID, StoreID: &s.StoreID}, {AccountID: accountID}}
 	}), "Targets[0].StoreID", overlap)
-	// 同一個帳號列不同店家不是重疊。
 	if f.count(t, "SELECT count(*) FROM seller.authority_orders") != 0 {
 		t.Fatal("被拒絕的登記什麼都沒有寫")
 	}
@@ -195,7 +187,7 @@ func TestCreateAuthorityOrderRequestIDIsScopedToTheAdmin(t *testing.T) {
 	if !again.Replayed || again.Order.ID != first.Order.ID || f.count(t, "SELECT count(*) FROM seller.authority_orders") != 1 {
 		t.Fatalf("重送要回原本那一份：%+v", again)
 	}
-	f.now = f.now.Add(time.Minute) // 重送時「現在」已經不同，不影響內容的比對
+	f.now = f.now.Add(time.Minute)
 	again, err = f.module.CreateAuthorityOrder(ctx, in)
 	must(t, err)
 	if !again.Replayed {
@@ -229,14 +221,13 @@ func TestAuthorityHoldStopsThePurgeOnlyForTheNamedStoreOrAccount(t *testing.T) {
 	must(t, err)
 	_, free := f.closedStore(t)
 	expiredAccount, expiredStore := f.closedStore(t)
-	// 來函在關店一天之後收文：保存期限（收文後 184 天）才晚於保留期（關店後 184 天，同值）；與關店同時收文的來函保存不會比保留期更久。
 	closedAt := f.now
 	f.now = closedAt.Add(24 * time.Hour)
 
 	named := f.createOrder(t, f.orderIn(AuthorityDataRequest,
 		AuthorityTargetInput{AccountID: wholeAccount}, AuthorityTargetInput{AccountID: storeAccount, StoreID: &firstStint.StoreID}))
 	old := f.orderIn(AuthorityDataRequest, AuthorityTargetInput{AccountID: expiredAccount})
-	old.ReceivedAt = f.now.Add(-200 * 24 * time.Hour) // 保存期限（收文後 184 天）已在 16 天前到期
+	old.ReceivedAt = f.now.Add(-200 * 24 * time.Hour)
 	f.createOrder(t, old)
 
 	f.now = closedAt.Add(StoreRetention + time.Hour)
@@ -247,12 +238,10 @@ func TestAuthorityHoldStopsThePurgeOnlyForTheNamedStoreOrAccount(t *testing.T) {
 		t.Fatalf("只有被指名的不清：n=%d whole=%v first=%v second=%v free=%v expired=%v", n,
 			f.purged(t, wholeStore.StoreID), f.purged(t, firstStint.StoreID), f.purged(t, secondStint.StoreID), f.purged(t, free.StoreID), f.purged(t, expiredStore.StoreID))
 	}
-	// 逐家的涵蓋狀態照實顯示。
 	o := f.orderOf(t, named.ID)
 	if got := o.Targets[1].Stores; len(got) != 1 || got[0].StoreID != firstStint.StoreID || got[0].Coverage != CoverageHeld {
 		t.Fatalf("指名店家的涵蓋：%+v", got)
 	}
-	// 邊界：hold_until 之前一微秒不清，到了那一刻清。
 	f.now = named.HoldUntil.Add(-time.Microsecond)
 	if n, err := f.module.PurgePII(ctx); err != nil || n != 0 {
 		t.Fatalf("保存期限之前不清：n=%d err=%v", n, err)
@@ -281,13 +270,13 @@ func TestPurgeRechecksTheAuthorityHoldAfterLockingTheCandidates(t *testing.T) {
 	accountID, s := f.closedStore(t)
 	f.now = f.now.Add(StoreRetireAfter + time.Hour)
 
-	writer, err := f.db.Pool().Begin(ctx) // 連線 B：插入來函與對象，不鎖店家列、不 commit
+	writer, err := f.db.Pool().Begin(ctx)
 	must(t, err)
 	defer func() { _ = writer.Rollback(ctx) }()
 	f.insertRawOrder(t, writer, accountID, f.now.Add(24*time.Hour))
 
-	h := f.holdPurgeAfterCandidates(t) // 連線 A：第一個語句看不到 B 的插入，鎖住店家
-	must(t, writer.Commit(ctx))        // B 在 A 的第一個語句之後 commit
+	h := f.holdPurgeAfterCandidates(t)
+	must(t, writer.Commit(ctx))
 	h.release(t)
 	if f.retired(t, s.StoreID) || f.purged(t, s.StoreID) {
 		t.Fatal("鎖住之後看到保存，店家不能退場")
@@ -356,7 +345,6 @@ func TestPurgeStageTwoRechecksTheAppealHoldAfterLockingTheCandidates(t *testing.
 	}
 }
 
-// insertRawOrder 在 tx 裡直接寫一份指名 accountID 的來函（不經模組、不鎖店家列）：模擬最壞的寫入方。
 func (f *fixture) insertRawOrder(t *testing.T, tx pgx.Tx, accountID int64, holdUntil time.Time) {
 	t.Helper()
 	ctx := context.Background()
@@ -411,7 +399,6 @@ func TestAuthorityOrderRegisteredAfterThePurgeShowsAlreadyPurged(t *testing.T) {
 	if !stores[0].PurgedAt.After(created.Order.RegisteredAt) {
 		t.Fatalf("測試前提：清理的時間要晚於登記的時間（時鐘差）：purged=%v registered=%v", stores[0].PurgedAt, created.Order.RegisteredAt)
 	}
-	// 之後讀取、延長保存都不改變這個事實。
 	later := f.orderOf(t, created.Order.ID)
 	if got := later.Targets[0].Stores[0].Coverage; got != CoveragePurgedBeforeRegistration {
 		t.Fatalf("重讀的涵蓋狀態：%s", got)
@@ -427,7 +414,7 @@ func TestExtendingTheHoldAfterThePurgeKeepsTheStoreShownPurged(t *testing.T) {
 	ctx := context.Background()
 	accountID, s := f.closedStore(t)
 	o := f.holdOrder(t, accountID)
-	f.now = o.HoldUntil.Add(time.Hour) // 保存期限已過，保留期也滿了
+	f.now = o.HoldUntil.Add(time.Hour)
 	if n, err := f.module.PurgePII(ctx); err != nil || n != 1 || !f.purged(t, s.StoreID) {
 		t.Fatalf("保存期限過後清理：n=%d err=%v", n, err)
 	}
@@ -457,13 +444,11 @@ func TestReopenIgnoresTheAuthorityHold(t *testing.T) {
 	heldAccount, held, heldMeasure := f.terminated(t, GroundCeasedBusiness)
 	_, control, controlMeasure := f.terminated(t, GroundCeasedBusiness)
 	o := f.holdOrder(t, heldAccount)
-	// 延長到一年之後：保存期限遠比終止的保留期（申覆期限）長。
 	_, err := f.module.ExtendAuthorityOrderHold(ctx, ExtendAuthorityOrderHoldInput{
 		ID: o.ID, AdminID: authorityRegistrar, ExpectedVersion: o.Version, HoldUntil: f.now.Add(365 * 24 * time.Hour), Reason: "進入訴訟",
 	})
 	must(t, err)
 
-	// 保留期已滿、清理還沒跑：兩家都只撤銷紀錄、不恢復；被保存的這家不被清理，對照組被清。
 	f.now = heldMeasure.StartsAt.Add(4416*time.Hour + time.Hour)
 	f.revoke(t, heldMeasure)
 	f.revoke(t, controlMeasure)
@@ -481,7 +466,6 @@ func TestReopenIgnoresTheAuthorityHold(t *testing.T) {
 		t.Fatalf("保存的店家還沒被清，對照組被清：n=%d", n)
 	}
 
-	// 保留期內撤銷：被保存的店家照常恢復營業。
 	again, againStore, againMeasure := f.terminated(t, GroundCeasedBusiness)
 	f.holdOrder(t, again)
 	f.now = againMeasure.StartsAt.Add(40 * 24 * time.Hour)
@@ -514,7 +498,6 @@ func TestCompletingADataRequestExtendsTheHoldToSixMonthsAfterProvision(t *testin
 		t.Fatalf("延長歷史：%+v", done.HoldExtensions)
 	}
 
-	// 提供時間就是收文時間：沒有比目前晚，不延長、不記。
 	equal := f.orderIn(AuthorityDataRequest, AuthorityTargetInput{AccountID: accountID})
 	equal.ReceivedAt = f.now.Add(-3 * 24 * time.Hour)
 	o2 := f.createOrder(t, equal)
@@ -524,7 +507,6 @@ func TestCompletingADataRequestExtendsTheHoldToSixMonthsAfterProvision(t *testin
 	if !d2.HoldUntil.Equal(o2.HoldUntil) || len(d2.HoldExtensions) != 0 {
 		t.Fatalf("提供時間等於收文不延長：%+v", d2.HoldExtensions)
 	}
-	// 管理員已延得更遠：完成不縮短。
 	o3 := f.createOrder(t, f.orderIn(AuthorityDataRequest, AuthorityTargetInput{AccountID: accountID}))
 	far := f.now.Add(800 * 24 * time.Hour)
 	o3b, err := f.module.ExtendAuthorityOrderHold(ctx, ExtendAuthorityOrderHoldInput{ID: o3.ID, AdminID: authorityRegistrar, ExpectedVersion: o3.Version, HoldUntil: far, Reason: "訴訟"})
@@ -535,7 +517,6 @@ func TestCompletingADataRequestExtendsTheHoldToSixMonthsAfterProvision(t *testin
 		t.Fatalf("完成不縮短保存：%v %+v", d3.HoldUntil, d3.HoldExtensions)
 	}
 
-	// 範圍與種類。
 	o4 := f.createOrder(t, f.orderIn(AuthorityDataRequest, AuthorityTargetInput{AccountID: accountID}))
 	before, after := o4.ReceivedAt.Add(-time.Second), f.now.Add(time.Second)
 	_, err = f.completeOrder(o4, &before, f.notifyAll(o4))
@@ -576,7 +557,6 @@ func TestCompletingAnOrderRequiresAndValidatesEveryTargetNotice(t *testing.T) {
 	early := o.ReceivedAt.Add(-time.Second)
 	_, err = f.completeOrder(o, nil, []TargetNoticeInput{notified[0], {Position: 1, Notice: AuthorityNoticeInput{Kind: AuthorityNoticeNotified, NotifiedAt: &early}}})
 	wantInvalid(t, err, "TargetNotices[1].Notice.NotifiedAt", "告知的時間不能早於收文")
-	// 由措施告知：還沒有導出的措施 → 拒絕；建立之後（對象 A 有、對象 B 沒有）A 可以、B 不行。
 	byMeasure := TargetNoticeInput{Position: 0, Notice: AuthorityNoticeInput{Kind: AuthorityNoticeMeasure}}
 	_, err = f.completeOrder(o, nil, []TargetNoticeInput{byMeasure, notified[1]})
 	wantInvalid(t, err, "TargetNotices[0].Notice.Kind", "只有暫停帳號或限制商品的來函、而且已建立措施時")
@@ -589,7 +569,6 @@ func TestCompletingAnOrderRequiresAndValidatesEveryTargetNotice(t *testing.T) {
 	bToo := TargetNoticeInput{Position: 1, Notice: AuthorityNoticeInput{Kind: AuthorityNoticeMeasure}}
 	_, err = f.completeOrder(o, nil, []TargetNoticeInput{byMeasure, bToo})
 	wantInvalid(t, err, "TargetNotices[1].Notice.Kind", "只有暫停帳號或限制商品的來函、而且已建立措施時")
-	// 調取資料不能選。
 	data := f.createOrder(t, f.orderIn(AuthorityDataRequest, AuthorityTargetInput{AccountID: accountA}))
 	_, err = f.completeOrder(data, nil, []TargetNoticeInput{byMeasure})
 	wantInvalid(t, err, "TargetNotices[0].Notice.Kind", "只有暫停帳號或限制商品的來函、而且已建立措施時")
@@ -597,12 +576,10 @@ func TestCompletingAnOrderRequiresAndValidatesEveryTargetNotice(t *testing.T) {
 	if got := f.orderOf(t, o.ID); !got.Open() || got.Version != 1 || f.count(t, "SELECT count(*) FROM seller.authority_order_targets WHERE notice IS NOT NULL") != 0 {
 		t.Fatal("被拒絕的完成什麼都沒有寫")
 	}
-	// 版本過時。
 	stale := o
 	stale.Version = 99
 	_, err = f.completeOrder(stale, nil, []TargetNoticeInput{byMeasure, notified[1]})
 	wantKind(t, err, apperr.KindVersionConflict)
-	// 成功：A 由措施告知、B 暫不告知。
 	recheck := day(2026, 10, 20)
 	withheld := TargetNoticeInput{Position: 1, Notice: AuthorityNoticeInput{Kind: AuthorityNoticeWithheld, RecheckOn: &recheck, Note: "偵查不公開"}}
 	done, err := f.completeOrder(o, nil, []TargetNoticeInput{byMeasure, withheld})
@@ -650,7 +627,6 @@ func TestWithheldNoticeCanBeReplacedAndKeepsHistory(t *testing.T) {
 	if f.count(t, "SELECT count(*) FROM seller.authority_target_notice_history WHERE order_id=$1 AND seq=2 AND recheck_on=$2 AND replaced_by_admin_id=33", o.ID, next) != 1 {
 		t.Fatal("第二列歷史是被取代的新確認日期")
 	}
-	// 已告知的不能再改；不是暫不告知；版本過時；位置不存在；方式不合法。
 	_, err = record(notified, 0, AuthorityNoticeInput{Kind: AuthorityNoticeWithheld, RecheckOn: &next})
 	wantBlocked(t, err, "這個對象不是暫不告知的狀態，不能再記下告知")
 	_, err = record(done, 0, AuthorityNoticeInput{Kind: AuthorityNoticeWithheld, RecheckOn: &next})
@@ -710,7 +686,6 @@ func TestExtendingTheHoldIsOnlyForwardAndKeepsHistory(t *testing.T) {
 	f.assertHoldInvariant(t)
 }
 
-// J5：hold_until 等於最後一列延長的 to_until；沒有延長時等於收文加預設保存期。
 func (f *fixture) assertHoldInvariant(t *testing.T) {
 	t.Helper()
 	if n := f.count(t, `SELECT count(*) FROM seller.authority_orders o WHERE o.hold_until <> COALESCE(
@@ -741,7 +716,7 @@ func TestListAuthorityOrdersOrderingAndFilters(t *testing.T) {
 		if i%2 == 1 {
 			in.Targets[0].AccountID = a2
 		}
-		due := f.now.Add(time.Duration(20-3*i) * time.Hour) // 後登記的期限比較早
+		due := f.now.Add(time.Duration(20-3*i) * time.Hour)
 		in.DueAt = &due
 		o := f.createOrder(t, in)
 		all = append(all, o)
@@ -768,21 +743,20 @@ func TestListAuthorityOrdersOrderingAndFilters(t *testing.T) {
 		}
 	}
 	openState, doneState := AuthorityStateOpen, AuthorityStateCompleted
-	wantOpen := []uuid.UUID{open[3].ID, open[2].ID, open[1].ID, open[0].ID} // 期限舊到新
+	wantOpen := []uuid.UUID{open[3].ID, open[2].ID, open[1].ID, open[0].ID}
 	if got := ids(&openState, 0); !slices.Equal(got, wantOpen) {
 		t.Fatalf("處理中依期限舊到新：%v 預期 %v", got, wantOpen)
 	}
 	if got := ids(&doneState, 0); !slices.Equal(got, []uuid.UUID{all[3].ID}) {
 		t.Fatalf("已完成：%v", got)
 	}
-	wantAll := []uuid.UUID{all[4].ID, all[3].ID, all[2].ID, all[1].ID, all[0].ID} // 收文時間新到舊
+	wantAll := []uuid.UUID{all[4].ID, all[3].ID, all[2].ID, all[1].ID, all[0].ID}
 	if got := ids(nil, 0); !slices.Equal(got, wantAll) {
 		t.Fatalf("全部依收文時間新到舊：%v", got)
 	}
 	if got := ids(nil, a2); !slices.Equal(got, []uuid.UUID{all[3].ID, all[1].ID}) {
 		t.Fatalf("指名帳號 a2：%v", got)
 	}
-	// ListAuthorityOrders(state=OPEN) 的集合等於 Open()。
 	for _, id := range ids(&openState, 0) {
 		if !f.orderOf(t, id).Open() {
 			t.Fatalf("%s 不是處理中", id)
@@ -816,7 +790,6 @@ func TestMeasureSourceAuthorityOrderNamingAndListFilter(t *testing.T) {
 			Risk: &RiskBasis{Ground: RiskFraud}, SourceAuthorityOrderID: order,
 		})
 	}
-	// 沒有指名這個帳號 / 指名店家時另一個 stint / 來函不存在 → invalid_argument。
 	_, err = risk(stranger.StoreID, &wholeAccount.ID)
 	wantInvalid(t, err, "SourceAuthorityOrderID", "這筆來函沒有指名這個帳號")
 	_, err = risk(s2.StoreID, &firstStintOnly.ID)
@@ -824,7 +797,6 @@ func TestMeasureSourceAuthorityOrderNamingAndListFilter(t *testing.T) {
 	missing := uuid.NewV7()
 	_, err = risk(s2.StoreID, &missing)
 	wantInvalid(t, err, "SourceAuthorityOrderID", "這筆來函沒有指名這個帳號")
-	// request hash 含來函：同一個 request_id 帶不同的來函是不同的請求。
 	reqID := uuid.NewV4()
 	withReq := func(order uuid.UUID) (CreateMeasureResult, error) {
 		return f.module.CreateMeasure(ctx, CreateMeasureInput{
@@ -838,7 +810,6 @@ func TestMeasureSourceAuthorityOrderNamingAndListFilter(t *testing.T) {
 	_, err = withReq(other.ID)
 	wantInvalid(t, err, "RequestID", "這個 request_id 已經用在內容不同的請求")
 
-	// 資料集：明確連結（RISK 停權）、認定引用、引用既有認定的措施、別的來函、沒有來源。
 	linked, err := risk(s2.StoreID, &wholeAccount.ID)
 	must(t, err)
 	viaFinding, err := f.module.CreateMeasure(ctx, CreateMeasureInput{
@@ -886,7 +857,6 @@ func TestMeasureSourceAuthorityOrderNamingAndListFilter(t *testing.T) {
 	if got := list(other.ID); !slices.Equal(got, []uuid.UUID{viaOther.Measure.ID}) {
 		t.Fatalf("別的來函：%v", got)
 	}
-	// 認定引用的形狀：重複、空 ID、太多。
 	dup := []uuid.UUID{wholeAccount.ID, wholeAccount.ID}
 	_, err = f.module.CreateMeasure(ctx, CreateMeasureInput{
 		AdminID: 7, StoreID: s2.StoreID, Kind: MeasureWarning, StatementToSeller: "警告", Note: "n",
@@ -902,13 +872,11 @@ func TestMeasureSourceAuthorityOrderNamingAndListFilter(t *testing.T) {
 		Violation: &ViolationBasis{Finding: &NewFinding{Category: policy.Fraud, Severity: SeverityLow, SourceAuthorityOrderIDs: six}},
 	})
 	wantInvalid(t, err, "Violation.Finding.SourceAuthorityOrderIDs", "一個認定最多引用 5 份來函")
-	// 引用的來函沒有指名這個帳號。
 	_, err = f.module.CreateMeasure(ctx, CreateMeasureInput{
 		AdminID: 7, StoreID: stranger.StoreID, Kind: MeasureWarning, StatementToSeller: "警告", Note: "n",
 		Violation: &ViolationBasis{Finding: &NewFinding{Category: policy.Fraud, Severity: SeverityLow, SourceAuthorityOrderIDs: []uuid.UUID{wholeAccount.ID}}},
 	})
 	wantInvalid(t, err, "Violation.Finding.SourceAuthorityOrderIDs[0]", "這筆來函沒有指名這個帳號")
-	// 「由措施告知」的定義與清單一致：導出的措施所在的帳號與店家。
 	suspend := f.createOrder(t, f.orderIn(AuthoritySuspendAccount, AuthorityTargetInput{AccountID: account}))
 	_, err = risk(s2.StoreID, &suspend.ID)
 	must(t, err)
@@ -946,7 +914,6 @@ func TestPreservationPredicateDecidesWhichOrdersCount(t *testing.T) {
 		_, err := f.module.CloseCurrent(ctx, sc.account)
 		must(t, err)
 	}
-	// 來函在關店十天之後收文：保存期限（收文後 184 天）才晚於保留期（關店後 184 天，同值）。
 	closedAt := f.now
 	f.now = closedAt.Add(10 * 24 * time.Hour)
 	for _, sc := range scenarios {
@@ -970,7 +937,6 @@ func TestPreservationPredicateDecidesWhichOrdersCount(t *testing.T) {
 	}
 }
 
-// holdOrderAt 登記一份調取資料的來函：指名帳號（storeID 為 nil）或店家，收文時間是現在加 receivedOffset。
 func (f *fixture) holdOrderAt(t *testing.T, accountID int64, storeID *int64, receivedOffset time.Duration) AdminAuthorityOrder {
 	t.Helper()
 	in := f.orderIn(AuthorityDataRequest, AuthorityTargetInput{AccountID: accountID, StoreID: storeID})
@@ -1008,7 +974,6 @@ func TestAuthorityOrderSchemaConstraints(t *testing.T) {
 			values += ", " + cols[k]
 		}
 		if extra != "" {
-			// extra 是 ", 欄位, 值" 的重複；拆成兩串。
 			parts := strings.Split(strings.TrimPrefix(extra, ", "), ", ")
 			for i := 0; i+1 < len(parts); i += 2 {
 				names += ", " + parts[i]
@@ -1056,7 +1021,6 @@ func TestAuthorityOrderSchemaConstraints(t *testing.T) {
 	} {
 		f.wantViolates(t, v.name, v.constraint, v.sql)
 	}
-	// 指名店家與整個帳號是不同的鍵（NULLS NOT DISTINCT 只擋兩個都不指定店家）；同一個店家列兩次被擋。
 	_, err := f.db.Conn(context.Background()).Exec(context.Background(), target(1, accountID, fmt.Sprint(s.StoreID), "", ""))
 	must(t, err)
 	f.wantViolates(t, "同一個店家列兩次", "authority_order_targets_unique", target(2, accountID, fmt.Sprint(s.StoreID), "", ""))
@@ -1134,10 +1098,8 @@ func TestRevokeAuthorityOrderReleasesTheHoldAndKeepsTheRecord(t *testing.T) {
 	}
 	_, err = revoke(authorityCompleter, got.Version, "x")
 	wantBlocked(t, err, "這筆來函已撤銷登記。")
-	// 第二位管理員拿的是撤銷之前讀到的 etag（實際的並行情形）：回 failed_precondition，不是版本衝突（先問能不能撤銷、再比 etag）。
 	_, err = revoke(authorityCompleter, o.Version, "x")
 	wantBlocked(t, err, "這筆來函已撤銷登記。")
-	// 撤銷之後逐家的涵蓋狀態：保存期限還沒到，不能寫「保存期限已過」。
 	for _, st := range got.Targets[0].Stores {
 		if st.Coverage != CoverageHoldReleasedByRevocation || !got.HoldUntil.After(f.now) {
 			t.Fatalf("撤銷之後的涵蓋狀態：%+v hold_until=%s now=%s", st, got.HoldUntil, f.now)
@@ -1148,11 +1110,9 @@ func TestRevokeAuthorityOrderReleasesTheHoldAndKeepsTheRecord(t *testing.T) {
 	_, err = f.module.ExtendAuthorityOrderHold(ctx, ExtendAuthorityOrderHoldInput{ID: o.ID, AdminID: authorityRegistrar, ExpectedVersion: got.Version, HoldUntil: got.HoldUntil.Add(time.Hour), Reason: "訴訟"})
 	wantBlocked(t, err, "這筆來函已撤銷登記。")
 
-	// 不能再當作措施的來源。
 	_, err = f.module.CreateMeasure(ctx, f.riskFromOrder(s.StoreID, o.ID))
 	wantInvalid(t, err, "SourceAuthorityOrderID", "這筆來函已撤銷登記，不能當作措施的來源。")
 
-	// 清單：處理中不含它，REVOKED 只有它。
 	open, revokedState := AuthorityStateOpen, AuthorityStateRevoked
 	page, err := f.module.AuthorityOrders(ctx, AuthorityOrderListInput{State: &open})
 	must(t, err)
@@ -1165,7 +1125,6 @@ func TestRevokeAuthorityOrderReleasesTheHoldAndKeepsTheRecord(t *testing.T) {
 		t.Fatalf("REVOKED 清單：%+v", page.Items)
 	}
 
-	// 已完成的來函不能撤銷（完成之後的錯誤寫在處理摘要）。
 	other := f.holdOrder(t, accountID)
 	done, err := f.completeOrder(other, nil, f.notifyAll(other))
 	must(t, err)
@@ -1205,7 +1164,6 @@ func TestTargetNoticeAndMeasureEntryAvailabilityAreServerDerived(t *testing.T) {
 			}
 		}
 	}
-	// 與 CreateMeasure 一致：關閉的店建立停權被拒。
 	_, err = f.module.CreateMeasure(ctx, f.riskFromOrder(closedStore.StoreID, o.ID))
 	if err == nil {
 		t.Fatal("關閉的店不能建立停權")
@@ -1231,7 +1189,6 @@ func TestTargetNoticeAndMeasureEntryAvailabilityAreServerDerived(t *testing.T) {
 	must(t, err)
 }
 
-// riskFromOrder 是從來函建立的風險停權（RISK）的輸入。
 func (f *fixture) riskFromOrder(storeID int64, order uuid.UUID) CreateMeasureInput {
 	review := f.now.Add(7 * 24 * time.Hour)
 	return CreateMeasureInput{

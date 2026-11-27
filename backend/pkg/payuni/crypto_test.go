@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	testKey = "test-only-do-not-use-in-prod!!!!" // 32 bytes
-	testIV  = "test-iv-only!!!!"                 // 16 bytes
+	testKey = "test-only-do-not-use-in-prod!!!!"
+	testIV  = "test-iv-only!!!!"
 )
 
 func TestEncryptDecryptRoundTrip(t *testing.T) {
@@ -37,7 +37,6 @@ func TestEncryptDecryptRoundTrip(t *testing.T) {
 }
 
 func TestEncryptDeterministic(t *testing.T) {
-	// AES-GCM with same key/iv/plaintext should produce same ciphertext
 	plainText := "MerID=HAWK0000000001&Name=Test"
 
 	enc1, err := EncryptString(plainText, testKey, testIV)
@@ -60,7 +59,6 @@ func TestGenerateHashConsistency(t *testing.T) {
 
 	got := GenerateHash(encryptInfo, testKey, testIV)
 
-	// Manual calculation
 	raw := testKey + encryptInfo + testIV
 	hash := sha256.Sum256([]byte(raw))
 	want := strings.ToUpper(hex.EncodeToString(hash[:]))
@@ -71,7 +69,6 @@ func TestGenerateHashConsistency(t *testing.T) {
 }
 
 func TestEncryptHashVerification(t *testing.T) {
-	// Full flow: encrypt → generate hash → verify hash matches re-calculation
 	plainText := "ContactMobile=0912345678&Email=test%40example.com&MerID=HAWK0000000001&Name=Test"
 
 	encryptInfo, err := EncryptString(plainText, testKey, testIV)
@@ -81,7 +78,6 @@ func TestEncryptHashVerification(t *testing.T) {
 
 	hashInfo := GenerateHash(encryptInfo, testKey, testIV)
 
-	// Re-calculate hash independently
 	raw := testKey + encryptInfo + testIV
 	hash := sha256.Sum256([]byte(raw))
 	expectedHash := strings.ToUpper(hex.EncodeToString(hash[:]))
@@ -90,21 +86,18 @@ func TestEncryptHashVerification(t *testing.T) {
 		t.Errorf("hash verification failed:\n  expected: %s\n  got:      %s", expectedHash, hashInfo)
 	}
 
-	// Verify hash is uppercase hex
 	if hashInfo != strings.ToUpper(hashInfo) {
 		t.Error("hash is not uppercase")
 	}
 
-	// Verify hash length (SHA256 = 64 hex chars)
 	if len(hashInfo) != 64 {
 		t.Errorf("hash length: want 64, got %d", len(hashInfo))
 	}
 }
 
 func TestEncryptMatchesPHPSDK(t *testing.T) {
-	// PHP 官方範例 reference test vector（來自 Java CryptoTest.java）
-	phpKey := "12345678901234567890123456789012" // 32 bytes
-	phpIV := "1234567890123456"                  // 16 bytes
+	phpKey := "12345678901234567890123456789012"
+	phpIV := "1234567890123456"
 	phpPlainText := "MerID=AAA&MerTradeNo=BBB"
 	phpExpected := "47396636346f66735853533167396942344f587a3775696b34752b596e70452b3a3a3a4373354a5a5143306b7153467531354c6e6f554a69773d3d"
 
@@ -116,14 +109,12 @@ func TestEncryptMatchesPHPSDK(t *testing.T) {
 	if goEncrypted != phpExpected {
 		t.Errorf("Go output does not match PHP SDK:\n  PHP:  %s\n  Go:   %s", phpExpected, goEncrypted)
 
-		// 額外 debug: decode 兩者比較
 		phpDecoded, _ := hex.DecodeString(phpExpected)
 		goDecoded, _ := hex.DecodeString(goEncrypted)
 		t.Logf("PHP decoded: %s", string(phpDecoded))
 		t.Logf("Go  decoded: %s", string(goDecoded))
 	}
 
-	// 也驗證 hash 一致
 	goHash := GenerateHash(goEncrypted, phpKey, phpIV)
 	phpHash := GenerateHash(phpExpected, phpKey, phpIV)
 	t.Logf("Go  EncryptInfo hash: %s", goHash)
@@ -141,13 +132,11 @@ func TestEncryptOutputFormat(t *testing.T) {
 		t.Fatalf("Encrypt failed: %v", err)
 	}
 
-	// Output should be hex-encoded
 	_, err = hex.DecodeString(encrypted)
 	if err != nil {
 		t.Fatalf("output is not valid hex: %v", err)
 	}
 
-	// Decoded hex should contain ":::" separator
 	decoded, _ := hex.DecodeString(encrypted)
 	if !strings.Contains(string(decoded), ":::") {
 		t.Error("decoded output missing ':::' separator")
@@ -184,13 +173,11 @@ func TestEncryptWithStructData(t *testing.T) {
 		t.Fatalf("Encrypt struct failed: %v", err)
 	}
 
-	// Verify we can decrypt it back
 	decrypted, err := Decrypt(encrypted, testKey, testIV)
 	if err != nil {
 		t.Fatalf("Decrypt failed: %v", err)
 	}
 
-	// Decrypted should be URL-encoded query string containing our values
 	if !strings.Contains(decrypted, "MerID=HAWK0000000001") {
 		t.Errorf("decrypted missing MerID, got: %s", decrypted[:100])
 	}

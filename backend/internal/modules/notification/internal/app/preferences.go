@@ -80,7 +80,6 @@ func (s *Service) UpdatePreference(ctx context.Context, r Recipient, c model.Pre
 		return Preference{Category: c, Channel: ch, Enabled: true}, nil
 	}
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
-		// 鎖順序：identity 帳號列最先。帳號刪除的清除 job 只清它看得到的列，所以寫入偏好前先鎖住存活的帳號直到 commit。
 		if err := s.lockAccount(ctx, r.AccountID); err != nil {
 			return err
 		}

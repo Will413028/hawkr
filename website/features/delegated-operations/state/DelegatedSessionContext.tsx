@@ -106,10 +106,6 @@ export function DelegatedSessionProvider({
 	const queryClient = useQueryClient();
 	const [now, setNow] = React.useState(() => Date.now());
 	const [writesBlockedByEnd, setWritesBlockedByEnd] = React.useState(false);
-	// 上一輪 document 留下的封鎖旗標（見 end-pending-latch）。讀取放在 effect 而不是
-	// useState 初值：sessionStorage 在 SSR 不存在，首次 render 讀它會與伺服器輸出
-	// 不一致。首抓未回之前工作區只畫「正在確認…」、不渲染 children，所以這一拍不會
-	// 露出未封鎖的畫面。
 	const [endPendingSessionId, setEndPendingSessionId] = React.useState<
 		string | null
 	>(null);
@@ -123,8 +119,6 @@ export function DelegatedSessionProvider({
 		setEndPendingSessionId(readEndPendingSessionId());
 	}, []);
 
-	// 代行執行期旗標：為真時任何未切換的賣家資料層呼叫會當場 throw，而不是靜默
-	// 打到 /app/* 用管理員自己的賣家身分成功（lib/api/delegated-runtime.ts）。
 	React.useEffect(() => enterDelegatedRuntime(), []);
 
 	const currentQuery = useQuery({
@@ -166,9 +160,6 @@ export function DelegatedSessionProvider({
 		writeControllersRef.current.clear();
 	}, []);
 
-	// removeQueries 不是 invalidateQueries：那是別家店的資料，管理員回到 ADM 之後
-	// 不該還留在這個瀏覽器的記憶體裡。cancelQueries 必須在前 —— in-flight 的請求
-	// 回來時會把資料寫回已清空的快取。
 	const purgeDelegatedCache = React.useCallback(async () => {
 		await queryClient.cancelQueries({ queryKey: DELEGATED_QUERY_ROOT });
 		queryClient.removeQueries({ queryKey: DELEGATED_QUERY_ROOT });
@@ -189,11 +180,9 @@ export function DelegatedSessionProvider({
 	);
 
 	const endMutation = useMutation({
-		// storeId 是工作區路由上的那一個；BFF 用它驗 target 綁定（不符即 409）。
 		mutationFn: () => endDelegatedSession(storeId),
 		onMutate: async () => {
 			setWritesBlockedByEnd(true);
-			// 落到 sessionStorage 才活得過重新整理；成功時（onSuccess）才清掉。
 			const sessionId = sessionIdRef.current;
 			if (sessionId) {
 				writeEndPendingSessionId(sessionId);
@@ -204,11 +193,9 @@ export function DelegatedSessionProvider({
 			await purgeDelegatedCache();
 		},
 		onSuccess: async () => {
-			// 結束已被證明（`ended === true`），封鎖沒有理由再活著。
 			clearEndPendingSessionId();
 			setEndPendingSessionId(null);
 			await purgeDelegatedCache();
-			// 整頁導航而非 soft push：目的地是另一個 origin（ADM）。
 			commitDocumentNavigation(returnUrl);
 		},
 	});
@@ -219,15 +206,12 @@ export function DelegatedSessionProvider({
 		!endMutation.isPending;
 	writableRef.current = writesAllowed;
 
-	// 倒數只在工作階段仍有效時跑；到期後畫面已切阻擋，繼續每秒重繪沒有意義。
 	React.useEffect(() => {
 		if (!summary || summary.status !== "active") return;
 		const timer = window.setInterval(() => setNow(Date.now()), 1000);
 		return () => window.clearInterval(timer);
 	}, [summary]);
 
-	// 工作階段身分變了（換管理員／換店家／同一組合的前後兩次工作階段）＝ 上一份
-	// 快取全部作廢。這是「A 店的商品出現在 B 店工作區」的唯一防線。
 	const identity = summary
 		? delegatedIdentityKey(delegatedIdentityOf(summary))
 		: null;
@@ -247,8 +231,6 @@ export function DelegatedSessionProvider({
 		void purgeDelegatedCache();
 	}, [abortRegisteredWrites, effectiveState, purgeDelegatedCache]);
 
-	// 旗標屬於上一個工作階段（操作者已經回 ADM 重建）⇒ 清掉殘值。留著不會誤鎖（比對
-	// 的是 id，不是布林），但會讓這個分頁一直帶著一筆再也讀不到的資料。
 	const currentSessionId = summary?.sessionId ?? null;
 	React.useEffect(() => {
 		if (endPendingSessionId === null || currentSessionId === null) return;

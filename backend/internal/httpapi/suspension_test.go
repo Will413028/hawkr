@@ -29,7 +29,6 @@ import (
 
 var suspendedSince = time.Date(2026, 10, 1, 8, 0, 0, 0, time.UTC)
 
-// suspendedAuth：suspended 是停權的帳號，good 是沒有停權的帳號。
 type suspendedAuth struct{}
 
 func (suspendedAuth) Authenticate(_ context.Context, token string) (identity.Authenticated, error) {
@@ -44,7 +43,6 @@ func (suspendedAuth) Authenticate(_ context.Context, token string) (identity.Aut
 	return a, nil
 }
 
-// seen 是 handler 看到的請求。
 type seen struct {
 	Called    bool      `json:"called"`
 	Principal bool      `json:"principal"`
@@ -52,7 +50,6 @@ type seen struct {
 	At        time.Time `json:"at"`
 }
 
-// suspendedEntry 在 withSession 之後掛一個回報 ctx 內容的 handler。
 func suspendedEntry() http.Handler {
 	probe := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, principal := rpc.PrincipalFrom(r.Context())
@@ -78,7 +75,6 @@ func callAs(t *testing.T, h http.Handler, token, method, path string) (*httptest
 	return rec, s
 }
 
-// reasonOf 讀 Connect 錯誤 JSON 的 code 與 ErrorInfo.reason。
 func reasonOf(t *testing.T, body []byte) (code, reason string) {
 	t.Helper()
 	var e struct {
@@ -140,7 +136,6 @@ func TestSuspendedAccountIsAuthorizedByTheNatureOfTheAction(t *testing.T) {
 			t.Fatalf("%s：%d %+v，預期以訪客執行（ctx 沒有 principal）", proc, rec.Code, s)
 		}
 	}
-	// 沒有宣告的顧客 procedure 當寫入：預設拒絕。
 	rec, _ := callAs(t, h, "suspended", http.MethodPost, "/hawkr.buyer.v1alpha1.BuyerAppService/NotDeclared")
 	if _, reason := reasonOf(t, rec.Body.Bytes()); rec.Code != http.StatusForbidden || reason != "ACCOUNT_SUSPENDED" {
 		t.Fatalf("沒有宣告的 procedure：%d %q", rec.Code, rec.Body)

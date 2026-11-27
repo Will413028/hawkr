@@ -70,8 +70,6 @@ function measure(
 	});
 }
 
-// ---------------------------------------------------------------------------
-// 原因文字
 
 test("原因的文字直接取自伺服器的 message，不查原因對照表", () => {
 	assert.deepEqual(
@@ -127,8 +125,6 @@ test("沒有 message 的原因（含 UNSPECIFIED）顯示通用文字，只列�
 	assert.deepEqual(unavailableLabels([]), [GENERIC_UNAVAILABLE_LABEL]);
 });
 
-// ---------------------------------------------------------------------------
-// 操作列
 
 test("操作列：全部 can_* 都是 true 時所有動作可用、沒有原因文字", () => {
 	const bar = actionBar(
@@ -266,8 +262,6 @@ test("操作列：can_revoke 是 true 時不看原因欄（伺服器說可以就
 	assert.deepEqual(bar.revoke, { visible: true, enabled: true, reasons: [] });
 });
 
-// ---------------------------------------------------------------------------
-// 修改措施
 
 test("理由欄：can_update_statement 為 false 時不能編輯，旁邊列出伺服器的原因", () => {
 	assert.deepEqual(
@@ -362,7 +356,6 @@ test("update_mask 只列實際改過的欄位", () => {
 		updatePaths(m, { statement: "新的理由", endTime: later }, base),
 		["statement", "end_time"],
 	);
-	// 前後空白不算改；結束時間清空不算改（不支援清除）。
 	assert.deepEqual(
 		updatePaths(m, { statement: "  原本的理由  ", endTime: "" }, base),
 		[],
@@ -466,8 +459,6 @@ test("修改的驗證：只能縮短時不能晚於目前的結束時間；只�
 	);
 });
 
-// ---------------------------------------------------------------------------
-// 裁定
 
 test("裁定的標題與選項文字", () => {
 	assert.equal(decideTitle("appeal"), "裁定申覆");
@@ -568,7 +559,6 @@ test("DecideRemediation 請求：沒有 revoke_findings 欄位", () => {
 });
 
 test("一併撤銷認定只看伺服器的 can_revoke_findings：client 不從依據或認定推導", () => {
-	// 違規依據、認定也是自己建立的，但伺服器說不行（例如認定已撤銷）：不送。
 	const serverSaysNo = measure({
 		basis: MeasureBasis.VIOLATION,
 		canRevokeFindings: false,
@@ -586,7 +576,6 @@ test("一併撤銷認定只看伺服器的 can_revoke_findings：client 不從�
 		}).revokeFindings,
 		false,
 	);
-	// 風險依據、沒有認定，但伺服器說可以：照伺服器。
 	const serverSaysYes = measure({
 		basis: MeasureBasis.RISK,
 		canRevokeFindings: true,
@@ -607,7 +596,6 @@ test("update_mask 只列管理員自己改過的欄位：版本衝突重讀之�
 	const later = toLocalInput(new Date(END.getTime() + 24 * HOUR));
 	const form = { ...baseline, endTime: later };
 	assert.deepEqual(editedFields(baseline, form), ["end_time"]);
-	// 別的管理員在這之間改了理由；重讀後的措施理由與表單裡舊的理由不同。
 	const refreshed = measure({
 		etag: "etag-2",
 		statement: "別人改過的理由",
@@ -619,7 +607,6 @@ test("update_mask 只列管理員自己改過的欄位：版本衝突重讀之�
 	assert.deepEqual(request.updateMask, { paths: ["end_time"] });
 	assert.equal(request.measure?.statement, undefined, "沒改的理由不送");
 	assert.equal(request.measure?.etag, "etag-2");
-	// 改回基準的值不算改。
 	assert.deepEqual(editedFields(baseline, baseline), []);
 });
 
@@ -643,8 +630,6 @@ test("重讀後把沒動過的欄位對到新措施，動過的欄位保留輸�
 	assert.deepEqual(editedFields(next.baseline, next.form), ["statement"]);
 });
 
-// ---------------------------------------------------------------------------
-// 撤銷、延後複審、註記
 
 test("撤銷原因的選項取自契約的 AdminRevokeReason（不含 UNSPECIFIED）；系統寫入的原因在契約裡表示不出來", () => {
 	assert.deepEqual(REVOKE_REASON_OPTIONS, [
@@ -700,7 +685,6 @@ test("重讀後伺服器不再允許改的欄位：管理員改過的輸入還�
 	const edit = toLocalInput(new Date(END.getTime() + 24 * HOUR));
 	const form = { statement: "我改的理由", endTime: edit };
 	assert.deepEqual(editedFields(baseline, form), ["statement", "end_time"]);
-	// 別人在這之間撤銷了措施：三個 can_* 都變成 false，理由與結束時間也是新的值。
 	const revoked = measure({
 		etag: "etag-2",
 		statement: "撤銷時的理由",
@@ -712,7 +696,6 @@ test("重讀後伺服器不再允許改的欄位：管理員改過的輸入還�
 	assert.deepEqual(next.form, initialUpdateForm(revoked));
 	assert.deepEqual(next.baseline, initialUpdateForm(revoked));
 	assert.deepEqual(editedFields(next.baseline, next.form), []);
-	// 只剩結束時間不許改：理由的輸入保留，結束時間還原。
 	const onlyStatement = rebaseForm(
 		measure({ canUpdateStatement: true }),
 		baseline,
@@ -720,7 +703,6 @@ test("重讀後伺服器不再允許改的欄位：管理員改過的輸入還�
 	);
 	assert.equal(onlyStatement.form.statement, "我改的理由");
 	assert.equal(onlyStatement.form.endTime, baseline.endTime);
-	// 結束時間只能縮短時保留輸入（方向由 validateUpdate 擋，不在這裡靜默丟掉）。
 	const shortenOnly = rebaseForm(measure({ canShorten: true }), baseline, form);
 	assert.equal(shortenOnly.form.endTime, edit);
 	assert.equal(shortenOnly.form.statement, baseline.statement);
@@ -773,8 +755,6 @@ test("註記請求只帶 body（去掉前後空白），不帶 etag", () => {
 	});
 });
 
-// ---------------------------------------------------------------------------
-// 待處理請求
 
 test("提出時的版本文字與差異對照", () => {
 	assert.equal(

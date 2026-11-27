@@ -61,7 +61,6 @@ export function orderStatusTone(
 		case OrderStatus.COMPLETED:
 			return "complete";
 		default:
-			// 物流異常／退款／取消都走同一個「需要注意」的色調。
 			return "cancelled";
 	}
 }
@@ -235,10 +234,6 @@ export function hasMoreThanOneItem(itemCount: string): boolean {
  * 「異常」是「物流異常」。
  */
 export const DELEGATED_ORDER_STAT_CARDS = [
-	// ⚠️ 第一張是「全部」（`status` 空字串＝不帶篩選）。少了它，四張單一狀態的卡在
-	// 一家沒有進行中訂單的店裡會全部是 0，而列表就在下面滿滿一頁 —— 操作者看到的是
-	// 「統計壞了」，實際上四張卡加起來本來就涵蓋不了已取消／退款／待付款那些狀態。
-	// 它不多打一支端點類型：同樣是列表 `total`（B15 明列的唯一合法作法）。
 	{ status: "", label: "全部訂單", icon: "document", tint: "primary" },
 	{ status: OrderStatus.PENDING_SHIPMENT, icon: "bag", tint: "accent" },
 	{ status: OrderStatus.IN_TRANSIT, icon: "truck", tint: "info" },

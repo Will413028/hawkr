@@ -219,7 +219,6 @@ class Session extends _$Session {
       state = const SessionModel();
       ref.read(accountRestrictionStateProvider.notifier).clear();
 
-      // 停止聊天串流、通知串流與訂單輪詢
       ref.read(chatSessionProvider).stop();
       ref.read(notificationSignalServiceProvider).stop();
       OrderStatusNotifier.instance.stopListening();

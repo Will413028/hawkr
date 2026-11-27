@@ -26,21 +26,21 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
  */
 class AfterSaleCaseStatusRulesPayoutBlockTest {
 
-    private static final String NONE_STATE = AfterSaleAppealState.NONE.value();        // "0"
-    private static final String APPEALED = AfterSaleAppealState.APPEALED.value();      // "10"
-    private static final String INVESTIGATING = AfterSaleAppealState.INVESTIGATING.value(); // "20"
-    private static final String RESOLVED = AfterSaleAppealState.RESOLVED.value();      // "30"
+    private static final String NONE_STATE = AfterSaleAppealState.NONE.value();
+    private static final String APPEALED = AfterSaleAppealState.APPEALED.value();
+    private static final String INVESTIGATING = AfterSaleAppealState.INVESTIGATING.value();
+    private static final String RESOLVED = AfterSaleAppealState.RESOLVED.value();
 
     /** 確定不會再生出退款的三個終態。 */
     private static final Set<AfterSaleCaseStatus> RELEASED = EnumSet.of(
-            AfterSaleCaseStatus.CLOSED,                        // 50
-            AfterSaleCaseStatus.CANCELLED,                     // 70
-            AfterSaleCaseStatus.CANCELLED_BY_CONFIRM_RECEIPT); // 71
+            AfterSaleCaseStatus.CLOSED,
+            AfterSaleCaseStatus.CANCELLED,
+            AfterSaleCaseStatus.CANCELLED_BY_CONFIRM_RECEIPT);
 
     /** 尚可申訴（有時間界）的兩個狀態。 */
     private static final Set<AfterSaleCaseStatus> APPEALABLE = EnumSet.of(
-            AfterSaleCaseStatus.REJECTED,                              // 60
-            AfterSaleCaseStatus.AUTO_COMPLETED_RETURN_PENDING_TIMEOUT);// 33
+            AfterSaleCaseStatus.REJECTED,
+            AfterSaleCaseStatus.AUTO_COMPLETED_RETURN_PENDING_TIMEOUT);
 
     @Test
     @DisplayName("窮舉全部 status × appeal_state=NONE：只有 50/70/71 放行，60/33 有時間界，其餘無時間界")

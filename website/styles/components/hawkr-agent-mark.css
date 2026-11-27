@@ -1,10 +1,3 @@
-/* Shared Hawkr Agent identity mark.
- *
- * This small surface is intentionally component-owned: the mark appears in
- * Messages, public search/home entry points, and the standalone RFQ preview.
- * Keep these values in sync with the compatibility copy at the top of
- * procurement-assistant.css while that stylesheet remains a single file.
- */
 .assistant-mark {
 	position: relative;
 	display: inline-grid;
@@ -29,7 +22,6 @@
 	font-size: 0.5625rem;
 }
 
-/* AI badge targets <small>. */
 .assistant-mark small {
 	position: absolute;
 	right: -3px;

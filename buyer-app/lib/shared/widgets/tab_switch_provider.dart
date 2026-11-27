@@ -1,4 +1,4 @@
-import 'package:hooks_riverpod/legacy.dart'; // StateProvider 在 Riverpod 3.0 移到 legacy
+import 'package:hooks_riverpod/legacy.dart';
 
 /// A simple provider that signals a tab switch request to MainNavigationScreen.
 /// Write a tab index to trigger navigation; MainNavigationScreen listens and resets to -1.

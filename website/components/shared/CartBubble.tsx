@@ -10,9 +10,6 @@ import { useCart } from "@/lib/hooks/useCart";
 
 const itemsLabel = (display: string) => `${display} 件商品`;
 
-// Landing pad for the add-to-cart flight (lib/cart/flyToCart.ts). It sits on
-// the inner icon box, not the link: the link carries the nav's own padding and
-// label, so its centre is off the glyph.
 const FLY_TARGET_PROPS = { [CART_FLY_TARGET_ATTR]: "" };
 const FLY_BADGE_PROPS = { [CART_FLY_BADGE_ATTR]: "" };
 

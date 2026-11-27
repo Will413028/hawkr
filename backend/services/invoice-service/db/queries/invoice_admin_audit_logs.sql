@@ -1,18 +1,5 @@
--- invoice_admin_audit_logs｜ADM 操作稽核
--- SSOT：設計書 58 號 §5.1.13
--- 本波放骨架 ＋ 一支 append。reason_code／reason_detail 都是 NOT NULL——**那個 NOT NULL 就是
--- 「強制填理由」這條規則的執行者**，不要在應用層再造一份可被繞過的檢查。
 
 -- name: InsertInvoiceAdminAuditLog :one
--- uq_invadmaudit_client_request（actor_account_id, action, request_id）WHERE request_id IS NOT NULL
--- ⇒ 同一個 ADM 對同一動作重送同一 request_id 只留一列。
--- ON CONFLICT DO NOTHING 不指名 target（本表只有這一個唯一索引，但不指名一樣正確，
--- 且未來加第二個唯一約束時不會突然開始拋 23505）。
---
--- 🔴 回 id 而不是 rows：回應的 auditLogId 是 ADM 連回稽核列的唯一線索。本句原本是
--- :execrows，於是那個欄位恆為 "1"——**一個長得像合法 id 的錯值**，ADM 拿去查只會
--- 查不到而不知道為什麼。重送（衝突）時 INSERT 不回列，所以用 UNION ALL 從既有列
--- 撈回同一個 id：重送要拿到的正是第一次那一列，不是新的一列。
 WITH ins AS (
 INSERT INTO invoice_admin_audit_logs (
   actor_account_id, action, resource_type, resource_id, before_state, after_state,
@@ -43,23 +30,6 @@ ORDER BY occurred_at DESC
 LIMIT sqlc.arg(row_limit);
 
 -- name: ListInvoiceAuditLogsForAdmin :many
--- 端點 61（A10 稽核查詢），九個 filter。
---
--- 🔴 invoice_admin_audit_logs 只有 (resource_type, resource_id) 這一對多型指標，
---    **沒有 store_id／order_no／operation_type 欄**。那三個 filter 因此只能靠把
---    resource_id 解析回實體再 join；五條 LEFT JOIN 各自被 resource_type 夾住，
---    沒有任何一條會在 resource_type 不符時誤配到別張表的同號 id
---    （bigserial 與 TSID 混用 ⇒ 不夾 resource_type 幾乎必然誤配）。
---    resource_type 的字面值由呼叫端傳入（proto `target_kind` 五值：
---    TAX_PROFILE／PROVIDER_ACCOUNT／JOB／DOCUMENT／COMPLAINT），不寫死在此。
---
--- document 這一條走 COALESCE 三選一：直接指向 DOCUMENT 的、經 JOB 帶出來的、
---    經 COMPLAINT 帶出來的。issuer 再由 document／tax_profile／provider_account
---    三者擇一解析 ⇒ store_id filter 對五種 resource_type 都成立。
---
--- ⚠️ `before_state`／`after_state` 的遮罩在**寫入時**完成（§6.1.14）：查詢時遮罩
---    表示 DB 裡存著明文，而本表保存 5 年 ＝ 一個五年期的明文 PII 倉庫。本查詢
---    原樣回傳，不做任何遮罩。
 SELECT sqlc.embed(l),
        d.source_ref     AS document_source_ref,
        d.id             AS resolved_document_id,
@@ -100,8 +70,6 @@ ORDER BY l.occurred_at DESC, l.id DESC
 LIMIT sqlc.arg(row_limit) OFFSET sqlc.arg(row_offset);
 
 -- name: CountInvoiceAuditLogsForAdmin :one
--- 端點 61 的 total。**五條 LEFT JOIN 與述詞必須與 List 逐字相同**：少一條 join
--- 就少一種 resource_type 解析得出 store_id／order_no，total 會比 records 少。
 SELECT COUNT(*)::bigint
 FROM invoice_admin_audit_logs l
 LEFT JOIN invoice_operations o

@@ -9,7 +9,6 @@ import (
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
-// wantWire 斷言 emitter 把模組給的期限原樣轉成 Deadline（開始與期限各自對應，不對調、不自己算時長）；want 為 nil 時欄位不設。
 func wantWire(t *testing.T, label string, got *commonpb.Deadline, want *model.Deadline) {
 	t.Helper()
 	if want == nil {
@@ -30,26 +29,22 @@ func wantWire(t *testing.T, label string, got *commonpb.Deadline, want *model.De
 // 每個 *_deadline 在義務還在時有值（開始與期限互不相同，對調會被抓到），義務結束後（模組沒有給）沒有。
 func TestEveryDeadlineFieldIsEmittedOnlyWhileTheObligationExists(t *testing.T) {
 	start := governanceNow
-	// 每一個欄位用不同的偏移，其中一個欄位的值放到另一個欄位會被發現。
 	dl := func(startOffset, dueOffset time.Duration) *model.Deadline {
 		return &model.Deadline{Start: start.Add(startOffset), Due: start.Add(dueOffset)}
 	}
 
-	// 通報
 	report := foodSafetyReport()
 	report.TriageDeadline = dl(time.Minute, 4*time.Hour)
 	wantWire(t, "Report.triage_deadline", toReport(report).GetTriageDeadline(), report.TriageDeadline)
 	report.TriageDeadline = nil
 	wantWire(t, "Report.triage_deadline（分案後）", toReport(report).GetTriageDeadline(), nil)
 
-	// 案件：決定期限。
 	c := caseFixture(model.CaseFacts{})
 	c.DecideDeadline = dl(2*time.Minute, 72*time.Hour)
 	wantWire(t, "Case.decide_deadline", toCase(c).GetDecideDeadline(), c.DecideDeadline)
 	c.DecideDeadline = nil
 	wantWire(t, "Case.decide_deadline（結案後）", toCase(c).GetDecideDeadline(), nil)
 
-	// 措施的複審期限與請求的裁定期限。
 	m := riskMeasureFixture()
 	m.ReviewDeadline = dl(4*time.Minute, 7*24*time.Hour)
 	wantWire(t, "Measure.review_deadline", toAdminMeasure(m).GetReviewDeadline(), m.ReviewDeadline)

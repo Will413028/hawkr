@@ -229,9 +229,6 @@ function safeAttributionQuery(query: string): string {
 		if (!isUtm && !CLICK_ATTRIBUTION_QUERY_KEYS.has(key)) {
 			continue;
 		}
-		// Campaign values are user-controlled URL input. Manual UTM values must match
-		// a reviewed categorical allowlist; click IDs must match a provider-shaped
-		// grammar. Property-level email/query redaction remains a second defence.
 		if (!value || value.length > 256) continue;
 		if (EMAIL_LIKE_VALUE.test(value)) continue;
 		let safeValue = value;
@@ -287,8 +284,6 @@ function privacySafeAppPathname(pathname: string): string {
 		) {
 			return normalizedPathname;
 		}
-		// Only exact static paths are public. Collapse the complete remainder so a
-		// future nested route cannot accidentally expose a second identifier.
 		return `${ASSISTANT_ROUTE_ROOT}/:conversationId`;
 	}
 	if (STATIC_ANALYTICS_ROUTES.has(normalizedPathname))

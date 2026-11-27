@@ -1852,21 +1852,10 @@ export function useProcurementSession(
 		[],
 	);
 
-	// 只在 turn 執行中讀，而且讀兩次。
-	//
-	// 只讀一次不夠：送出的當下那一列 run 可能還沒寫進快照，讀回 null 之後按鈕
-	// 就整輪都按不下去。`turnStartObserved`（伺服器已開始輸出這一輪的公開進度）
-	// 之後那一列一定在了，所以它一翻成 true 就再讀一次。
-	//
-	// 不涵蓋 `stage === "searching"`：候選搜尋是脫離 graph 的背景 goroutine，
-	// 後端的取消觀察器掛在 turn pipeline 上，而 `activeRunId` 本來就排除
-	// `CANDIDATE_SEARCH`。搜尋中按鈕維持不可用是這件事的正確呈現，不是缺口。
 	// biome-ignore lint/correctness/useExhaustiveDependencies: turnStartObserved is the re-read trigger (the run row exists once the server starts emitting this turn's public progress), not a value read inside the effect body.
 	React.useEffect(() => {
 		const conversationId = state.conversationId;
 		if (!state.pendingTurn || !conversationId) {
-			// 沒在跑就沒有可取消的 run。連同上一輪的回執一起清掉——讓「正在停止」
-			// 停在一個已經結束的輪次上，比不顯示更糟。
 			setState((s) =>
 				s.activeRun === null && s.cancelState.status === "idle"
 					? s
@@ -1881,8 +1870,6 @@ export function useProcurementSession(
 			setState((s) =>
 				s.pendingTurn &&
 				s.conversationId === conversationId &&
-				// 使用者已經按下停止之後就不再覆寫：第二次讀回來的 token 會把
-				// 已經送出的那次命令的結果蓋掉。
 				s.cancelState.status === "idle"
 					? { ...s, activeRun: run }
 					: s,

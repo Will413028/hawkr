@@ -39,9 +39,7 @@ import { normalizeMemberCard } from "../lib/member-cards/repo";
 import { normalizeOrder } from "../lib/orders/repo";
 import { restockFromConnect } from "../lib/restock-subscriptions/repo";
 
-/* ------------------------------------------------------------------ orders */
 
-// GET /app/orders?view=seller — one live record, trimmed to the media fields.
 const LIVE_SELLER_ORDER = {
 	orderNo: "O578806254",
 	status: "50",
@@ -86,20 +84,15 @@ test("order item + buyer avatar read the objectKey, not the composed URL", () =>
 });
 
 test("orders ignore the item/root/nested image names the wire has never carried", () => {
-	// D2 + D4-R10/R11/R12. `skuImage…cover` (12 names) were the item candidate
-	// list; `image…cover` at the ROOT was `rootImage`; `buyer.headImg/profileImage/
-	// logo` was a nested object `OrderDetailResponse` does not have at all.
 	const order = normalizeOrder({
 		orderNo: "O-guessing",
 		status: "10",
-		// former root-image candidates
 		image: "https://cdn/root-image.jpg",
 		img: "https://cdn/root-img.jpg",
 		imageUrl: "https://cdn/root-imageurl.jpg",
 		pic: "https://cdn/root-pic.jpg",
 		picUrl: "https://cdn/root-picurl.jpg",
 		cover: "https://cdn/root-cover.jpg",
-		// former nested buyer object
 		buyer: {
 			name: "巢狀買家",
 			avatar: "https://cdn/nested-avatar.jpg",
@@ -107,12 +100,8 @@ test("orders ignore the item/root/nested image names the wire has never carried"
 			profileImage: "https://cdn/nested-profile.jpg",
 			logo: "https://cdn/nested-logo.jpg",
 		},
-		// the subject-prefixed pair the wire carried until backend#2216 flattened
-		// every buyer-avatar field to `avatarKey`/`avatarUrl`. Reading either of
-		// these again — as a fallback or otherwise — turns this red.
 		buyerAvatarKey: "public/buyer_avatar/2623900520/retired-key.png",
 		buyerAvatarUrl: "https://cdn/retired-url.png",
-		// former per-item candidate list
 		items: [
 			{
 				id: "1",
@@ -153,9 +142,7 @@ test("shipment / receipt photos come from the *Keys arrays", () => {
 	assert.deepEqual(order.shipping?.receiptPhotoUrls, ["public/shipment/b.png"]);
 });
 
-/* -------------------------------------------------------------------- cart */
 
-// GET /public/carts → groups[0].items[0], verbatim.
 test("cart item image comes from imageKey; `image` stays a LOCAL-cache-only field", () => {
 	const [item] = flattenGroups([
 		{
@@ -184,8 +171,6 @@ test("cart item image comes from imageKey; `image` stays a LOCAL-cache-only fiel
 		"public/product/2685914682/20260718/f8d18047-9b3a-4c1b-8a21-7b8f2fdabecc.png",
 	);
 
-	// A guest cart persisted before the wire rename only has `image`; that path
-	// is a localStorage compatibility need, not a backend field guess.
 	const [legacy] = flattenGroups([
 		{
 			sellerName: "陳記",
@@ -203,9 +188,7 @@ test("cart item image comes from imageKey; `image` stays a LOCAL-cache-only fiel
 	assert.equal(legacy.image, "public/product/legacy-local-cache.png");
 });
 
-/* -------------------------------------------------------------- after-sale */
 
-// GET /app/after_sales/A724174691 — evidence[] + items[], verbatim.
 test("after-sale evidence and items read imageKey", () => {
 	const detail = normalizeDetail({
 		caseNo: "A724174691",
@@ -241,9 +224,6 @@ test("after-sale evidence and items read imageKey", () => {
 });
 
 test("after-sale ignores evidences/photos/photoUrls and url/previewUrl", () => {
-	// D4-R13/R14: `AfterSaleCaseDetailResponse` only has `evidence`, and an
-	// `EvidenceResponse` only has assetId / imageKey / imageUrl / evidenceType /
-	// createdAt.
 	const viaDeadContainer = normalizeDetail({
 		caseNo: "A-guess",
 		evidences: [{ imageKey: "public/a.png" }],
@@ -265,10 +245,8 @@ test("after-sale ignores evidences/photos/photoUrls and url/previewUrl", () => {
 	assert.equal(viaDeadField.items[0].image, undefined);
 });
 
-/* ------------------------------------------------------ list-shaped repos */
 
 test("member card cover/logo read the *Key members; `cover`/`banner` are gone", () => {
-	// GET /app/buyers/me/member-cards → records[0], verbatim.
 	const card = normalizeMemberCard({
 		seller_id: "2685914682",
 		seller_name: "陳記",
@@ -340,24 +318,7 @@ test("chat conversation avatar reads the buyer's Image, not an object key", () =
 	);
 });
 
-/* ------------------------------------------- product cards (#430 D4 residual)
- *
- * The four §231 product-image fields are NOT four independent candidates. The
- * gateway composes the URL twins from the very keys we already read —
- *   ImageURL  = mediaurl.BuildURL(base, p.ImageKey)
- *   ImageUrls = buildMediaURLs(base, p.ImageKeys)
- * (product.go:323-326 / 1119-1123, search.go:226-229) — so `imageUrl`/
- * `imageUrls` can never carry an image the keys lack, and `image`/`images` are
- * not on the wire at all. Every card mapper reads the key and only the key.
- *
- * Live-verified 2026-08-05 across /public/products, /public/marketplace,
- * /public/search/products, /public/sellers/{id}/products, /app/products and
- * /public/products/{id}: imageKey === imageKeys[0] and imageKey empty ⟺
- * imageUrl empty, in 30/30 records.
- */
 
-// GET /public/products?page=1&page_size=10 → the first record with imagery,
-// verbatim (media + identity fields only).
 const LIVE_PRODUCT_CARD = {
 	id: "871936508549696815",
 	name: "高麗菜",
@@ -512,14 +473,6 @@ test("PDP review photos come from the normalized imageUrls", () => {
 	]);
 });
 
-/* ------------------------------ derived-URL twins are not fallbacks (#430 D4)
- *
- * These three surfaces each read `xxxKey ?? xxxUrl`. The second operand is
- * `buildURL(base, xxxKey)` on the gateway side (favorite.go:92-93,
- * restock_subscription.go:145-146, member_card.go:77-78) — composed from the
- * very key being read — so a payload that carries ONLY the URL is a shape the
- * gateway cannot emit, and honouring it could only ever mask a contract break.
- */
 
 test("generated favorite without an Image has no product image", () => {
 	const fav = create(FavoriteSchema, { product: { id: "3" } });

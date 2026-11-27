@@ -15,16 +15,9 @@ import (
 	"go.uber.org/zap"
 )
 
-// 本檔的每一支陰性測試都在驗同一件事：**守衛不成立時什麼都不能發生**。
-// 只斷言「回了哪個碼」不夠——rows=0 的危險形狀是「回了錯誤，但前面已經寫了一半」。
-// 所以每一支陰性都額外數 repo 的呼叫次數。
 
 var adminNow = time.Date(2026, 8, 30, 3, 0, 0, 0, time.UTC)
 
-// jobAdjs 記下 ADM 對 job 操作時 adjustment 有沒有跟著動（G16／G19，#3073）。
-//
-// 它真的維護狀態並鏡射 SQL 的 allowed-from：G16 只認 FAILED_PERMANENT、
-// G19 不認 SENDING。只記 calls 的替身驗不出「該不動的時候有沒有不動」。
 type jobAdjs struct {
 	domain.AdjustmentRepository
 	adj      domain.Adjustment
@@ -57,16 +50,8 @@ func (f *jobAdjs) AdminCancel(_ context.Context, _ int64, _ int64, reasonCode st
 	return false, nil
 }
 
-// jobCorrs 是 R09 連動的替身。
-//
-// 🔴 **鏡射 SQL 的述詞，不是無條件回 true**：RetryInvoiceCorrectionReissue 的
-// allowed-from 是 `status = 'REISSUE_FAILED' AND version = @expected_version`。
-// 一個無條件回 true 的替身會讓「usecase 傳錯 version」「correction 根本不在
-// REISSUE_FAILED」兩種真實缺陷都測不出來——那正是本輪要清的「替身沒鏡射真實守衛」
-// 這個缺陷類（第 3 輪的 5 個修復中有 4 個的單元測試原本全綠，成因都是這個）。
 type jobCorrs struct {
 	domain.CorrectionRequestRepository
-	// byDocument 的 key 是**原始** document id（correction 掛在原票上，不是替代票）。
 	byDocument map[int64]domain.CorrectionRequest
 	lookups    []int64
 	retried    int
@@ -89,7 +74,6 @@ func (f *jobCorrs) RetryReissue(_ context.Context, id, expectedVersion int64, _ 
 		if c.ID != id {
 			continue
 		}
-		// SQL 的兩道述詞逐字鏡射。
 		if c.Status != codemeta.InvoiceCorrectionStatusReissueFailed.Value || c.Version != expectedVersion {
 			return false, nil
 		}
@@ -153,8 +137,6 @@ type jobFixture struct {
 	unlocks *fakeUnlockRepo
 }
 
-// testIDs 產出可預期的 TSID 替身：解鎖測試要斷言「回應帶的就是剛建立的那一列」，
-// 而隨機 id 讓那個斷言只能寫成「非零」——非零連「回了別人的那一列」都攔不下來。
 func testIDs() func() int64 {
 	n := int64(9_000_000)
 	return func() int64 { n++; return n }
@@ -176,8 +158,6 @@ func newJobFixture(op domain.Operation, doc domain.Document) *jobFixture {
 
 func opAt(status string, version int64) domain.Operation {
 	return domain.Operation{
-		// 🔴 OperationType 必填：DB 的 chk_invop_type 不接受空字串，而空字串的
-		// fixture 讓「依型別分流」的守衛在測試裡完全失明（#3112）。
 		ID: 7001, DocumentID: 8001, Status: status, Version: version,
 		OperationType:       codemeta.InvoiceOperationTypeIssue.Value,
 		RequestSnapshotHash: "hash-v1", ProviderRequestNo: "ORD-1-1",
@@ -199,9 +179,6 @@ func docAt(status string, manualReason string) domain.Document {
 	return d
 }
 
-// ---------------------------------------------------------------------------
-// 端點 52
-// ---------------------------------------------------------------------------
 
 func TestAdminJob_Retry_FailedPermanent(t *testing.T) {
 	fx := newJobFixture(opAt("FAILED_PERMANENT", 5), docAt("ISSUE_FAILED", ""))
@@ -216,7 +193,6 @@ func TestAdminJob_Retry_FailedPermanent(t *testing.T) {
 	if got.Status != "READY" {
 		t.Fatalf("狀態應為 READY，實得 %q", got.Status)
 	}
-	// J18 走 AdminRetryAfterFix（attempt_count 不歸零），不是 AdminResetAttempts。
 	if len(fx.ops.retryAfterFix) != 1 || len(fx.ops.resetAttempts) != 0 {
 		t.Fatalf("應只呼叫 AdminRetryAfterFix 一次，實得 fix=%d reset=%d",
 			len(fx.ops.retryAfterFix), len(fx.ops.resetAttempts))
@@ -224,7 +200,6 @@ func TestAdminJob_Retry_FailedPermanent(t *testing.T) {
 	if fx.ops.retryAfterFix[0].Version != 5 {
 		t.Fatalf("CAS 必須帶 expectedVersion=5，實得 %d", fx.ops.retryAfterFix[0].Version)
 	}
-	// document 不在 AWAITING_MANUAL ⇒ 不得動它。
 	if len(fx.docs.resumed) != 0 {
 		t.Fatalf("document 不在 AWAITING_MANUAL 卻被 resume 了 %d 次", len(fx.docs.resumed))
 	}
@@ -346,8 +321,6 @@ func TestAdminJob_Retry_ResetAttemptsEdges(t *testing.T) {
 			}); err != nil {
 				t.Fatalf("Retry 失敗：%v", err)
 			}
-			// J19／J34 走 AdminResetAttempts（attempt_count 歸零）。走錯一支的後果是
-			// 重試預算沒有重置，而畫面上完全看不出來。
 			if len(fx.ops.resetAttempts) != 1 || len(fx.ops.retryAfterFix) != 0 {
 				t.Fatalf("應走 AdminResetAttempts，實得 reset=%d fix=%d",
 					len(fx.ops.resetAttempts), len(fx.ops.retryAfterFix))
@@ -410,7 +383,6 @@ func TestAdminJob_Retry_PlatformFundedDiscount(t *testing.T) {
 					t.Fatalf("SELLER_FUNDED 應放行，實得 %v", err)
 				}
 			}
-			// 陰性分支必須**什麼都沒寫**：只回錯誤但已經改了一半，比不回錯誤更難查。
 			if len(fx.ops.retryAfterFix) != c.wantCAS {
 				t.Fatalf("operation CAS 應為 %d 次，實得 %d", c.wantCAS, len(fx.ops.retryAfterFix))
 			}
@@ -469,7 +441,6 @@ func TestAdminJob_Retry_CASRowsZero(t *testing.T) {
 
 func TestAdminJob_Retry_ReasonRequired(t *testing.T) {
 	fx := newJobFixture(opAt("FAILED_PERMANENT", 5), docAt("ISSUE_FAILED", ""))
-	// 一格空白不算填了理由：DB 的 chk_invadmaudit_reason（length >= 1）擋不住它。
 	if _, err := fx.uc.Retry(context.Background(), RetryJobInput{
 		ActorAccountID: 42, JobID: 7001, Reason: "   ", ExpectedVersion: 5,
 	}); !errors.Is(err, ErrJobReasonRequired) {
@@ -477,9 +448,6 @@ func TestAdminJob_Retry_ReasonRequired(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 端點 53
-// ---------------------------------------------------------------------------
 
 func TestAdminJob_Cancel_Success(t *testing.T) {
 	fx := newJobFixture(opAt("FAILED_PERMANENT", 5), docAt("ISSUE_FAILED", ""))
@@ -496,7 +464,6 @@ func TestAdminJob_Cancel_Success(t *testing.T) {
 	if len(fx.ops.cancels) != 1 {
 		t.Fatalf("應呼叫 RequestCancel 一次，實得 %d", len(fx.ops.cancels))
 	}
-	// reasonCode 一律 ADM_MANUAL：寫成別的值會讓 A05 的分類統計出現查不出來源的資料。
 	if fx.ops.cancels[0].ReasonCode != codemeta.InvoiceCancelReasonAdmManual.Value {
 		t.Fatalf("reason_code 應為 ADM_MANUAL，實得 %q", fx.ops.cancels[0].ReasonCode)
 	}
@@ -520,7 +487,6 @@ func TestAdminJob_Cancel_BlockedWhenProviderResultUnknown(t *testing.T) {
 			if !got.Blocked {
 				t.Fatal("結果不明時必須回絕取消")
 			}
-			// preserveData 的三個欄位是 ADM 的下一步；少了它們前端只剩一句紅字。
 			if got.LastProviderCheckAt == nil || got.ProviderRequestID == "" || got.NextStep == "" {
 				t.Fatalf("9342 必須帶 preserveData，實得 %+v", got)
 			}
@@ -533,7 +499,6 @@ func TestAdminJob_Cancel_BlockedWhenProviderResultUnknown(t *testing.T) {
 
 func TestAdminJob_Cancel_ReasonCodeMustBeAdmManual(t *testing.T) {
 	fx := newJobFixture(opAt("READY", 5), docAt("PENDING", ""))
-	// 其餘三個 InvoiceCancelReason 值是系統路徑專用；從 A06 送進來即為契約違規。
 	if _, err := fx.uc.Cancel(context.Background(), CancelJobInput{
 		ActorAccountID: 42, JobID: 7001,
 		ReasonCode:   codemeta.InvoiceCancelReasonFullyRefundedBeforeIssue.Value,
@@ -555,13 +520,7 @@ func TestAdminJob_Cancel_DetailRequired(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 端點 56
-// ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// 端點 56／62：外部開立的憑證**本身是一張重開票**時的鏈路收尾
-// ---------------------------------------------------------------------------
 
 // TestAdminJob_ReportManualResult_ReissueSettlesChain 守 2026-09-08 dev 實測抓到的缺口。
 //
@@ -586,7 +545,6 @@ func TestAdminJob_ReportManualResult_ReissueSettlesChain(t *testing.T) {
 
 	fx := newJobFixture(op, doc)
 	fx.docs.byID = map[int64]domain.Document{
-		// 真實情境：更正申請把原票作廢了，替代票開立失敗才走到人工。
 		originalID: {ID: originalID, Status: codemeta.InvoiceDocumentStatusVoided.Value},
 	}
 	fx.corrs.byDocument[originalID] = domain.CorrectionRequest{
@@ -598,11 +556,9 @@ func TestAdminJob_ReportManualResult_ReissueSettlesChain(t *testing.T) {
 		t.Fatalf("ReportManualResult: %v", err)
 	}
 
-	// ① 原票必須離開 VOIDED，否則 I8 永遠熄不掉。
 	if got := fx.docs.byID[originalID].Status; got != codemeta.InvoiceDocumentStatusSuperseded.Value {
 		t.Fatalf("原票應轉 SUPERSEDED，實得 %q", got)
 	}
-	// ② correction 必須收尾，且 reissued_document_id 指向**替代票**不是原票。
 	corr := fx.corrs.byDocument[originalID]
 	if corr.Status != codemeta.InvoiceCorrectionStatusCompleted.Value {
 		t.Fatalf("correction 應轉 COMPLETED，實得 %q", corr.Status)
@@ -610,7 +566,6 @@ func TestAdminJob_ReportManualResult_ReissueSettlesChain(t *testing.T) {
 	if corr.ReissuedDocumentID == nil || *corr.ReissuedDocumentID != doc.ID {
 		t.Fatalf("reissued_document_id 應為替代票 %d，實得 %v", doc.ID, corr.ReissuedDocumentID)
 	}
-	// ③ 稽核軌跡：原票與 correction 各要留一列，否則下一個人看到的軌跡是假的。
 	if !hasHistory(fx.audit, subjectDocument, originalID,
 		codemeta.InvoiceDocumentStatusSuperseded.Value) {
 		t.Fatalf("原票缺 SUPERSEDED 歷程，實得 %v", historySummary(fx.audit))
@@ -627,7 +582,6 @@ func TestAdminJob_ReportManualResult_ReissueSettlesChain(t *testing.T) {
 // 也會讓上面那支通過，而那會在一般的開票失敗轉外部開立上動到不該動的表。
 func TestAdminJob_ReportManualResult_NonReissueLeavesChainAlone(t *testing.T) {
 	fx := newJobFixture(opAt("MANUAL_PROCESS_ALLOWED", 5), docAt("AWAITING_MANUAL", "PROVIDER_RESULT_UNKNOWN"))
-	// docAt 不帶 OriginalDocumentID ⇒ 這是一般的首次開票失敗轉外部開立。
 
 	if _, err := fx.uc.ReportManualResult(context.Background(), reportInput()); err != nil {
 		t.Fatalf("ReportManualResult: %v", err)
@@ -641,11 +595,6 @@ func TestAdminJob_ReportManualResult_NonReissueLeavesChainAlone(t *testing.T) {
 	}
 }
 
-// hasHistory 問「這一軸上有沒有落到這個狀態的那一列」。
-//
-// 🔴 比對 **subject_type ＋ subject_id ＋ to_status 三者**：只比 to_status 會讓
-// 「寫在 DOCUMENT 軸卻宣稱 CORRECTION 軸有留痕」通過（`06-no-small-tails.md` §3.10.1
-// 記載的那次真實誤判，dev 上 CORRECTION_REQUEST 軸一列都沒有卻被判成已覆蓋）。
 func hasHistory(a *fakeAudit, subjectType string, subjectID int64, toStatus string) bool {
 	for _, e := range a.entries {
 		if e.SubjectType == subjectType && e.SubjectID == subjectID && e.ToStatus == toStatus {
@@ -681,18 +630,14 @@ func TestAdminJob_ReportManualResult_Success(t *testing.T) {
 	if got.Status != "RESOLVED_EXTERNALLY" {
 		t.Fatalf("job 應走向 RESOLVED_EXTERNALLY（不是 SUCCEEDED），實得 %q", got.Status)
 	}
-	// operation 與 document 必須同一交易一起轉：只轉一邊，賣家 S08 會同時看到
-	// 「已由賣家開立」與「處理中」。
 	if len(fx.ops.resolvedExternally) != 1 || len(fx.docs.resolvedExternally) != 1 {
 		t.Fatalf("op/doc 兩邊都要轉，實得 op=%d doc=%d",
 			len(fx.ops.resolvedExternally), len(fx.docs.resolvedExternally))
 	}
-	// 三個 external_* 欄同進同出（chk_invdoc_external_no）。
 	w := fx.docs.resolvedExternally[0]
 	if w.ExternalInvoiceNo != "AB12345678" || w.ExternalInvoiceDate.IsZero() || w.ExternalReportedAt.IsZero() {
 		t.Fatalf("三個 external_* 欄必須一起寫，實得 %+v", w)
 	}
-	// P12。
 	if len(fx.outbox.inserted) != 1 {
 		t.Fatalf("應發一則 invoice.resolved_externally，實得 %d", len(fx.outbox.inserted))
 	}
@@ -700,8 +645,6 @@ func TestAdminJob_ReportManualResult_Success(t *testing.T) {
 	if err := json.Unmarshal(fx.outbox.inserted[0].Payload, &payload); err != nil {
 		t.Fatalf("payload 解不開：%v", err)
 	}
-	// 🔴 wire 名必須是 external_invoice_no。用 invoice_no 的後果是下游把賣家自行開立的
-	// 號碼當成平台開的——那是平台冒充開立人，不只是欄名錯。
 	if payload["external_invoice_no"] != "AB12345678" {
 		t.Fatalf("P12 的 wire 欄名必須是 external_invoice_no，實得 %v", payload)
 	}
@@ -711,14 +654,12 @@ func TestAdminJob_ReportManualResult_Success(t *testing.T) {
 	if payload["notification_ref_id"] != "INVEXT:8001" {
 		t.Fatalf("冪等鍵應為 INVEXT:{document_id}，實得 %q", payload["notification_ref_id"])
 	}
-	// store_id 走 issuer_ref_id 不是 issuer_id。
 	if payload["store_id"] != "2685914682" {
 		t.Fatalf("store_id 應為 issuer_ref_id，實得 %q", payload["store_id"])
 	}
 	if _, bad := payload["random_code"]; bad {
 		t.Fatal("payload 禁止帶 random_code（那是憑證不是資料）")
 	}
-	// 兩列狀態歷程（operation ＋ document），各帶 actor。
 	if len(fx.audit.entries) != 2 {
 		t.Fatalf("應寫兩列狀態歷程，實得 %d", len(fx.audit.entries))
 	}
@@ -750,7 +691,6 @@ func TestAdminJob_ReportManualResult_FormatGuards(t *testing.T) {
 		{"日期格式", func(i *ReportManualResultInput) { i.InvoiceDate = "2026/08/25" }, ErrExternalInvoiceDateInvalid},
 		{"金額空字串", func(i *ReportManualResultInput) { i.TotalAmount = "" }, ErrExternalTotalAmountInvalid},
 		{"金額負數", func(i *ReportManualResultInput) { i.TotalAmount = "-1" }, ErrExternalTotalAmountInvalid},
-		// 發票日早於付款日（doc.issue_not_before = 2026-08-20 UTC ⇒ 台北 08-20）。
 		{"發票日早於付款日", func(i *ReportManualResultInput) { i.InvoiceDate = "2026-08-19" }, ErrExternalInvoiceDateTooEarly},
 	}
 	for _, c := range cases {
@@ -785,10 +725,6 @@ func TestAdminJob_ReportManualResult_DocumentDriftFailsLoud(t *testing.T) {
 	}
 }
 
-// assertNoPIIInAudit 驗稽核的 before/after 只放狀態相關欄位。
-//
-// 🔴 invoice_admin_audit_logs 保存 5 年（§9.5）。把統編／抬頭／email 複製進去等於
-// 憑空造一個五年期的 PII 倉庫，而稽核要回答的問題只是「誰把它從什麼狀態改成什麼狀態」。
 func assertNoPIIInAudit(t *testing.T, e domain.NewAdminAuditLogEntry) {
 	t.Helper()
 	for _, raw := range []json.RawMessage{e.BeforeState, e.AfterState} {
@@ -814,9 +750,6 @@ func assertNoPIIInAudit(t *testing.T, e domain.NewAdminAuditLogEntry) {
 // 兩份定義的後果沒有錯誤訊息：清單說「不需要裁決」而重試時被擋，或反過來——
 // 使用者看到的只是「按鈕點了沒反應」。
 func TestNeedsFundingDecision(t *testing.T) {
-	// 🔴 狀態碼一律取自 CodeMeta 常數，**不得寫死字面值**：寫死的話碼值改動時
-	// 這支測試會靜默失準（第一版寫了 "5205"，實際上 InvoiceDocumentStatus 的 Value
-	// 是 "AWAITING_MANUAL" —— 猜錯的成本正好被下面那條對齊斷言擋下來）。
 	awaiting := codemeta.InvoiceDocumentStatusAwaitingManual.Value
 	other := codemeta.InvoiceDocumentStatusPending.Value
 	cases := []struct {
@@ -826,8 +759,6 @@ func TestNeedsFundingDecision(t *testing.T) {
 		want   bool
 	}{
 		{"待人工＋平台出資折扣", awaiting, codemeta.InvoiceManualReasonPlatformFundedDiscount.Value, true},
-		// 🔴 兩個條件都必要：只中一個就回 true 的實作會讓 ADM 對一堆不相干的案件
-		// 被要求做資金裁決，而那個裁決一旦選 PLATFORM_FUNDED 會直接拒絕重試。
 		{"待人工＋別的理由", awaiting, "SOMETHING_ELSE", false},
 		{"別的狀態＋平台出資折扣", other, codemeta.InvoiceManualReasonPlatformFundedDiscount.Value, false},
 		{"兩個都不是", other, "", false},
@@ -840,17 +771,12 @@ func TestNeedsFundingDecision(t *testing.T) {
 		})
 	}
 
-	// 兩個狀態必須真的不同，否則「別的狀態」那兩格與第一格是同一個輸入 ⇒ 零鑑別力。
 	if awaiting == other {
 		t.Fatal("awaiting 與 other 取到同一個碼值，陰性案例失效")
 	}
 }
 
-// ---------------------------------------------------------------------------
-// G16／G19：ADM 對 job 操作時 adjustment 的同一事務內連動（#3073）
-// ---------------------------------------------------------------------------
 
-// adjustmentOpAt 造一筆服務某個 adjustment 的 VOID／ALLOWANCE operation。
 func adjustmentOpAt(status string, version int64, adjID int64) domain.Operation {
 	op := opAt(status, version)
 	op.OperationType = codemeta.InvoiceOperationTypeAllowance.Value
@@ -936,20 +862,7 @@ func TestAdminJob_CancelLeavesSendingAdjustmentAlone(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// R09：ADM 對重開票按端點 52 時，付款後修改請求要跟著回 VOID_REISSUE_IN_PROGRESS
-//
-// #3089 A 組第 1 項。在 2026-09-04 之前 RetryInvoiceCorrectionReissue 全 repo
-// 零呼叫端（連 adapter 都不存在），而 SQL 檔頭寫著「沒有第二個觸發者」——
-// 那個唯一的觸發者從來沒有被接上，於是 REISSUE_FAILED（設計書自稱「最嚴重的單一
-// 狀態」）沒有任何出口。dev 上曾有 3 列卡了 1–2 天，而 invoice_correction_requests
-// 在 monitoring/ 全域零命中 ⇒ 沒有任何告警看得到。
-//
-// 🔴 測試從 Retry 的**外緣**進，不直接呼叫 advanceCorrectionForAdmin：
-// 後者會讓 fixture 直接把前提設成想要的值，而真正的缺陷正是「那條路從來沒被走過」。
-// ---------------------------------------------------------------------------
 
-// reissueDocAt 造一張**替代票**：它的 OriginalDocumentID 指向被作廢的原票。
 func reissueDocAt(status string, originalID int64) domain.Document {
 	d := docAt(status, "")
 	d.ID = 8002
@@ -972,8 +885,6 @@ func TestAdminJob_Retry_AdvancesReissueFailedCorrection(t *testing.T) {
 		t.Fatalf("Retry 失敗：%v", err)
 	}
 
-	// 🔴 查的必須是**原票** id，不是替代票：correction 掛在原票上。
-	// 查錯那一邊的症狀是「什麼都沒發生」——最難察覺的一種。
 	if len(fx.corrs.lookups) != 1 || fx.corrs.lookups[0] != originalDocID {
 		t.Fatalf("R09 應以原票 id %d 查 correction，實得 %v", originalDocID, fx.corrs.lookups)
 	}
@@ -981,7 +892,6 @@ func TestAdminJob_Retry_AdvancesReissueFailedCorrection(t *testing.T) {
 	if got.Status != codemeta.InvoiceCorrectionStatusVoidReissueInProgress.Value {
 		t.Fatalf("correction 應回 VOID_REISSUE_IN_PROGRESS，實得 %q", got.Status)
 	}
-	// 稽核軌跡：operation 與 correction 各一列。少了後者，下一個人看到的軌跡是假的。
 	var corrHistory int
 	for _, h := range fx.audit.entries {
 		if h.SubjectType == subjectCorrectionRequest {
@@ -1053,16 +963,12 @@ func TestAdminJob_Retry_NoCorrectionIsNotAnError(t *testing.T) {
 // ⚠️ 本測試斷言的是**現狀**（回 error）。#3112 決定 VOID／ALLOWANCE 類型該落哪一格
 // 之後，這裡要改成斷言那個可分辨的業務碼，而不是繼續容忍 500。
 func TestAdminJob_ReportManualResult_DocumentRejects(t *testing.T) {
-	// operation 可以轉，document 不行——這正是 #3112 的組合。
-	// 型別仍是開立類（ISSUE），所以走得過上面那道 9349 守衛，落在真正的 drift。
 	fx := newJobFixture(opAt("MANUAL_PROCESS_ALLOWED", 5), docAt("VOIDED", ""))
 
 	_, err := fx.uc.ReportManualResult(context.Background(), reportInput())
 	if err == nil {
 		t.Fatal("document 的 allowed-from 不含 VOIDED，必須失敗而不是靜默成功")
 	}
-	// 🔴 兩邊同一交易：document 拒絕時 operation 那一步也不得留下已轉的痕跡。
-	// （fake 不模擬 rollback，所以這裡驗的是「呼叫端沒有把它當成功回傳」。）
 	if fx.docs.stored.Status == "RESOLVED_EXTERNALLY" {
 		t.Fatal("document 不該被推到 RESOLVED_EXTERNALLY")
 	}
@@ -1079,7 +985,6 @@ func TestAdminJob_ReportManualResult_NonIssuanceTypeReturns9349(t *testing.T) {
 
 	_, err := fx.uc.ReportManualResult(context.Background(), reportInput())
 	assertBizCode(t, err, bizcode.InvoiceExternalIssuanceNotAllowed)
-	// 守衛在最前面 ⇒ 兩邊都不得被碰到。
 	if len(fx.ops.resolvedExternally) != 0 || len(fx.docs.resolvedExternally) != 0 {
 		t.Fatalf("守衛不成立時不得寫入，實得 op=%d doc=%d",
 			len(fx.ops.resolvedExternally), len(fx.docs.resolvedExternally))

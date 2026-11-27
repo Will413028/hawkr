@@ -50,12 +50,7 @@ const ORDERS_GATE = [
 ];
 
 const COVERAGE: Record<string, Coverage> = {
-	// 工作區根（`.`）不在本表：它已無 page.tsx。「沒有獨立落地頁」這件事現在由
-	// next.config.ts 的 redirects() 在 HTTP 層表達（307 → /products），而純轉址
-	// 不進渲染管線，也就沒有「缺 capability 的分支」要交代。守它的是
-	// tests/delegated-workspace-faces.test.ts 的「導向在 next.config」那條。
 
-	// 它**就是**那個空狀態頁本身，沒有東西需要被擋。
 	"[...area]": {
 		kind: "exempt",
 		why: "catch-all 本身就是「本期未開放」的空狀態頁",
@@ -191,9 +186,6 @@ function discoverRoutes(): string[] {
  */
 test("代行工作區的每一條路由都在本表交代過缺 capability 的分支", () => {
 	const discovered = discoverRoutes();
-	// 掃描器自己壞掉時要紅，不能靜靜地掃到 0 個檔然後全綠。
-	// 由 12 降為 11：工作區根的轉址別名頁（`[storeId]/page.tsx`）退場，導向改由
-	// next.config.ts 的 redirects() 在 HTTP 層完成，那一條不再是 App Router 路由。
 	assert.ok(
 		discovered.length >= 11,
 		`只掃到 ${discovered.length} 條路由 —— 目錄搬家或掃描器壞了，要同步改這支測試而不是刪掉它`,
@@ -215,7 +207,6 @@ test("路由層閘門：capability 對得上，且真的包住賣家中心元件
 		const file = source(`${WORKSPACE}/${route}/page.tsx`);
 		assert.match(file, /<DelegatedCapabilityGate\b/u, route);
 		assert.match(file, new RegExp(`capability="${spec.capability}"`), route);
-		// 擺在元件旁邊不算：閘門要包住它，deny 時 children 才會整個不出現。
 		assert.ok(
 			file.indexOf("<DelegatedCapabilityGate") <
 				file.indexOf(`<${spec.client} `),
@@ -237,7 +228,6 @@ test("元件層閘門：路由確實接到那支元件，而元件在發請求�
 			page.includes(owner.replace(/^features\//, "@/features/")),
 			`${route}：路由沒有接到 ${owner}，這張表指錯了對象`,
 		);
-		// 元件與它的 hook 合成一份再比對：`orders` 的 capability 判斷住在 hook 裡。
 		const bundle = spec.files.map(source).join("\n");
 		assert.match(
 			bundle,
@@ -299,7 +289,6 @@ test("免閘門的路由，每一項的理由都仍然成立", () => {
 			assert.match(source(file), pattern, `${route}：${spec.why} —— 已不成立`);
 		}
 	}
-	// 總覽的豁免直接綁在 nav-policy 的宣告上：改成單一 capability 就該回去掛閘門。
 	assert.equal(
 		DELEGATED_AREA_CAPABILITY["/seller-center/dashboard"],
 		null,

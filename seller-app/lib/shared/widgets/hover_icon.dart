@@ -163,23 +163,19 @@ class HoverIconState extends State<HoverIcon>
     }
   }
 
-  // ─── slideThrough: 向右滑出 → 瞬移左 → 滑回 ───
 
   Widget _slideThrough(Widget child) {
     final t = _ctrl.value;
     final double dx;
     final double opacity;
     if (t <= 0.45) {
-      // Phase 1: exit right
       final p = Curves.easeIn.transform(t / 0.45);
       dx = 30 * p;
       opacity = 1.0 - p;
     } else if (t <= 0.55) {
-      // Phase 2: hidden, reset to left
       dx = -30;
       opacity = 0;
     } else {
-      // Phase 3: enter from left
       final p = Curves.easeOut.transform((t - 0.55) / 0.45);
       dx = -30 + 30 * p;
       opacity = p;
@@ -190,7 +186,6 @@ class HoverIconState extends State<HoverIcon>
     );
   }
 
-  // ─── launch: 右上飛出 → 瞬移左下 → 飛回 ───
 
   Widget _launch(Widget child) {
     final t = _ctrl.value;
@@ -216,7 +211,6 @@ class HoverIconState extends State<HoverIcon>
     );
   }
 
-  // ─── pulse: 心跳 [1, 1.15, 1, 1.25, 1] ───
 
   Widget _pulse(Widget child) {
     final t = _ctrl.value;
@@ -233,16 +227,13 @@ class HoverIconState extends State<HoverIcon>
     return Transform.scale(scale: scale, child: child);
   }
 
-  // ─── roll: 水平來回 [0, 10, 0] ───
 
   Widget _roll(Widget child) {
     final t = _ctrl.value;
-    // Smooth sine-based back-and-forth
     final dx = 10.0 * math.sin(t * math.pi);
     return Transform.translate(offset: Offset(dx, 0), child: child);
   }
 
-  // ─── swing: 鈴鐺擺動 [0°, -15°, 15°, -10°, 10°, 0°] ───
 
   Widget _swing(Widget child) {
     final t = _ctrl.value;
@@ -260,16 +251,14 @@ class HoverIconState extends State<HoverIcon>
     }
     return Transform.rotate(
       angle: angle * math.pi / 180,
-      alignment: Alignment.topCenter, // 鈴鐺頂端為支點
+      alignment: Alignment.topCenter,
       child: child,
     );
   }
 
-  // ─── bounce: 向上彈起再落下 ───
 
   Widget _bounce(Widget child) {
     final t = _ctrl.value;
-    // Up phase: 0→0.4, Down phase: 0.4→0.7, Small bounce: 0.7→1.0
     final double dy;
     if (t <= 0.4) {
       dy = -12 * Curves.easeOut.transform(t / 0.4);
@@ -283,7 +272,6 @@ class HoverIconState extends State<HoverIcon>
     return Transform.translate(offset: Offset(0, dy), child: child);
   }
 
-  // ─── spin: 旋轉一圈 ───
 
   Widget _spin(Widget child) {
     final angle = Curves.easeInOut.transform(_ctrl.value) * 2 * math.pi;

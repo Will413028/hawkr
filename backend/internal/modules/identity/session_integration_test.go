@@ -14,7 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-// who 是登入的 provider 身分，測試用最少的欄位描述。
 type who struct {
 	provider Provider
 	subject  string
@@ -64,7 +63,6 @@ func (f *fixture) accountEmail(t *testing.T, id int64) string {
 	return acc.Email
 }
 
-// failOn 讓對 table 的 op（INSERT、UPDATE 或 DELETE）一律丟錯，用來逼一個 transaction 的後一句失敗。
 func (f *fixture) failOn(t *testing.T, op, table string) {
 	t.Helper()
 	ctx := context.Background()
@@ -93,7 +91,6 @@ func TestLoginCreatesAnAccountForEachProvider(t *testing.T) {
 	if a.Principal.Kind != PrincipalAccount || a.Principal.ID != g.AccountID || len(a.Principal.Roles) != 0 || a.SuspendedAt != nil {
 		t.Fatalf("session 解析 = %+v", a)
 	}
-	// 已驗證的 email 成為寄件地址；建帳事件帶姓名（買家模組以它建立 profile）。
 	if got := f.accountEmail(t, g.AccountID); got != "alice@gmail.com" {
 		t.Fatalf("寄件地址 = %q", got)
 	}
@@ -101,7 +98,6 @@ func TestLoginCreatesAnAccountForEachProvider(t *testing.T) {
 		t.Fatalf("建帳事件 = %+v", f.created)
 	}
 
-	// LINE 沒有 email 照樣建帳，也沒有寄件地址。
 	l := f.loginAs(t, lineBob, ClientApp)
 	if !l.Created || l.AccountID == g.AccountID {
 		t.Fatalf("LINE 第一次登入 = %+v", l)
@@ -113,7 +109,6 @@ func TestLoginCreatesAnAccountForEachProvider(t *testing.T) {
 		t.Fatal("LINE 的 session 解析到別的帳號")
 	}
 
-	// 同一個身分再登入是同一個帳號，不再建帳，而且是新的 session。
 	again := f.loginAs(t, googleAlice, ClientWeb)
 	if again.Created || again.Linked || again.AccountID != g.AccountID || again.Token == g.Token || again.SessionID == g.SessionID {
 		t.Fatalf("第二次登入 = %+v（第一次 %+v）", again, g)
@@ -121,7 +116,6 @@ func TestLoginCreatesAnAccountForEachProvider(t *testing.T) {
 	if n := f.count(t, `SELECT count(*) FROM identity.accounts`); n != 2 {
 		t.Fatalf("帳號數 = %d", n)
 	}
-	// 登入拿到的是原文 token，資料庫只存 SHA-256。
 	if n := f.count(t, `SELECT count(*) FROM identity.sessions WHERE token_hash = sha256(convert_to($1, 'UTF8'))`, g.Token); n != 1 {
 		t.Fatalf("以 SHA-256 找到 %d 個 session", n)
 	}
@@ -190,7 +184,6 @@ func TestAutoLinking(t *testing.T) {
 			f := setup(t)
 			var existing []int64
 			for i, w := range c.existing {
-				// 兩個目標要落在不同帳號：先用各自的 email 建帳，再用同一個 subject 登入把身分的 email 改成相符的值。
 				first := w
 				first.email = "setup-" + w.subject + "@gmail.com"
 				res := f.loginAs(t, first, ClientWeb)
@@ -226,7 +219,6 @@ func TestAutoLinking(t *testing.T) {
 					}
 				}
 			}
-			// 連結之後同一個身分以後直接登入該帳號，不再比對 email。
 			if next := f.loginAs(t, c.login, ClientWeb); next.AccountID != res.AccountID || next.Created || next.Linked {
 				t.Fatalf("再登入 = %+v，預期仍是帳號 %d", next, res.AccountID)
 			}
@@ -278,7 +270,6 @@ func TestEachLoginUpdatesTheSenderAddressFromVerifiedEmailsOnly(t *testing.T) {
 	if got := f.accountEmail(t, first.AccountID); got != "alice.new@gmail.com" {
 		t.Fatalf("寄件地址 = %q，預期跟上已驗證的新 email", got)
 	}
-	// 未驗證的 email 不動寄件地址，但身分記錄照實記下。
 	unverified := changed
 	unverified.email, unverified.verified = "typo@gmail.com", false
 	f.loginAs(t, unverified, ClientWeb)
@@ -297,7 +288,6 @@ func TestLinkIdentityConflict(t *testing.T) {
 	a := f.loginAs(t, googleAlice, ClientWeb)
 	b := f.loginAs(t, lineBob, ClientWeb)
 
-	// 把 Bob 的 LINE 身分連到 Alice：已屬於 Bob 的帳號，回錯誤，什麼都不改。
 	err := f.m.LinkIdentity(ctx, a.AccountID, lineBob.identity())
 	wantKind(t, err, apperr.KindAlreadyExists)
 	wantReason(t, err, apperr.ReasonIdentityAlreadyLinked)
@@ -305,7 +295,6 @@ func TestLinkIdentityConflict(t *testing.T) {
 	if err := f.db.Pool().QueryRow(ctx, `SELECT account_id FROM identity.account_identities WHERE provider = 'LINE' AND subject = 'line-bob'`).Scan(&owner); err != nil || owner != b.AccountID {
 		t.Fatalf("身分的擁有者 = %d, %v，預期仍是 %d", owner, err, b.AccountID)
 	}
-	// 連結一個新的身分：之後用它登入就是 Alice 的帳號。
 	second := who{provider: ProviderLine, subject: "line-alice"}
 	if err := f.m.LinkIdentity(ctx, a.AccountID, second.identity()); err != nil {
 		t.Fatal(err)
@@ -313,7 +302,6 @@ func TestLinkIdentityConflict(t *testing.T) {
 	if res := f.loginAs(t, second, ClientApp); res.AccountID != a.AccountID || res.Created {
 		t.Fatalf("以連結的 LINE 登入 = %+v", res)
 	}
-	// 重複連結同一個帳號：成功、不重複。
 	if err := f.m.LinkIdentity(ctx, a.AccountID, second.identity()); err != nil {
 		t.Fatal(err)
 	}
@@ -428,7 +416,7 @@ func TestSignOutDeletesOnlyThatSession(t *testing.T) {
 		t.Fatalf("登出後 = %v", err)
 	}
 	f.authenticated(t, app.Token)
-	for _, tok := range []string{web.Token, "", "junk", strings.Repeat("x", 43)} { // 冪等，亂給的 token 也成功
+	for _, tok := range []string{web.Token, "", "junk", strings.Repeat("x", 43)} {
 		if err := f.m.SignOut(ctx, tok); err != nil {
 			t.Fatalf("SignOut(%q) = %v", tok, err)
 		}
@@ -452,7 +440,6 @@ func TestSessionsCanBeListedAndRevokedOnlyByTheirOwner(t *testing.T) {
 	if !list[1].AuthTime.Equal(list[1].CreatedAt) || !list[1].AbsoluteExpiresAt.Equal(list[1].CreatedAt.Add(90*24*time.Hour)) {
 		t.Fatalf("auth_time／絕對到期 = %+v", list[1])
 	}
-	// 別人的 session 不能終止。
 	wantKind(t, f.m.RevokeSession(ctx, a1.AccountID, b.SessionID), apperr.KindNotFound)
 	f.authenticated(t, b.Token)
 
@@ -475,13 +462,12 @@ func TestSessionIdleAndAbsoluteExpiry(t *testing.T) {
 		return apperr.KindOf(err) == apperr.KindUnauthenticated
 	}
 
-	// 閒置逾時：web 7 天、App 14 天；差一秒還有效，到期那一刻失效，失效的列同時被清掉。
 	web := f.loginAs(t, googleAlice, ClientWeb)
 	app := f.loginAs(t, lineBob, ClientApp)
 	f.now = f.now.Add(7*day - time.Second)
 	f.authenticated(t, web.Token)
 	f.authenticated(t, app.Token)
-	f.now = f.now.Add(time.Second) // 距 web 上次使用（上一行的續期）還不到 7 天
+	f.now = f.now.Add(time.Second)
 	f.authenticated(t, web.Token)
 	idleWeb := f.loginAs(t, who{provider: ProviderGoogle, subject: "idle-web"}, ClientWeb)
 	f.now = f.now.Add(7 * day)
@@ -499,7 +485,6 @@ func TestSessionIdleAndAbsoluteExpiry(t *testing.T) {
 		t.Fatal("App session 閒置滿 14 天要失效")
 	}
 
-	// 絕對逾時：每 10 天使用一次（永遠沒閒置逾時），第 90 天還是失效。
 	start := f.now
 	forever := f.loginAs(t, who{provider: ProviderLine, subject: "forever"}, ClientApp)
 	for i := 1; i <= 8; i++ {
@@ -567,7 +552,7 @@ func TestSuspensionEndsSessionsAndTheNextLoginSeesTheSuspension(t *testing.T) {
 	}
 	second := f.loginAs(t, link, ClientApp)
 
-	for range 2 { // 冪等：已經停權時不再動 session
+	for range 2 {
 		if _, _, err := f.m.SuspendAccount(ctx, SuspendInput{AccountID: res.AccountID, Category: policy.Other, Reason: "檢舉成立"}); err != nil {
 			t.Fatal(err)
 		}
@@ -577,13 +562,11 @@ func TestSuspensionEndsSessionsAndTheNextLoginSeesTheSuspension(t *testing.T) {
 			t.Fatalf("停權後原本的 session = %v，預期失效", err)
 		}
 	}
-	f.authenticated(t, other.Token) // 別的帳號不受影響
-	// 停權者可以重新登入（A7-D18），session 解析時讀到停權狀態。
+	f.authenticated(t, other.Token)
 	again := f.loginAs(t, googleAlice, ClientWeb)
 	if a := f.authenticated(t, again.Token); a.SuspendedAt == nil || !a.SuspendedAt.Equal(f.now) || a.Principal.ID != res.AccountID {
 		t.Fatalf("停權後重新登入 = %+v", a)
 	}
-	// 重複停權不會把停權後新建的 session 刪掉。
 	if _, created, err := f.m.SuspendAccount(ctx, SuspendInput{AccountID: res.AccountID, Category: policy.Other}); err != nil || created {
 		t.Fatalf("重複停權 = %v, %v", created, err)
 	}
@@ -711,13 +694,11 @@ func TestLoginFlowIsSingleUse(t *testing.T) {
 	if err != nil || flow.Provider != ProviderGoogle || flow.Nonce != s.Nonce || flow.CodeVerifier != s.CodeVerifier || flow.ReturnPath != "/orders?x=1" || flow.LinkAccountID != nil {
 		t.Fatalf("callback = %+v, %v", flow, err)
 	}
-	// state 重放被拒。
 	_, err = f.m.ConsumeLoginFlow(ctx, s.State, s.Binding, ProviderGoogle)
 	wantKind(t, err, apperr.KindUnauthenticated)
 	if n := f.count(t, `SELECT count(*) FROM identity.login_flows`); n != 0 {
 		t.Fatalf("留下 %d 列", n)
 	}
-	// 驗證失敗也作廢：之後即使帶對的值也不行。
 	for name, bad := range map[string]func(LoginFlowStart) (string, string, Provider){
 		"provider 與 start 不同（mix-up）": func(s LoginFlowStart) (string, string, Provider) { return s.State, s.Binding, ProviderLine },
 		"登入前 cookie 不符（login CSRF）":   func(s LoginFlowStart) (string, string, Provider) { return s.State, "forged", ProviderGoogle },
@@ -733,7 +714,6 @@ func TestLoginFlowIsSingleUse(t *testing.T) {
 			t.Errorf("%s：失敗之後 state 還能用：%v", name, err)
 		}
 	}
-	// 逾時（10 分鐘）無效，而且那一列被清掉。
 	s = begin(ProviderLine)
 	f.now = f.now.Add(10*time.Minute - time.Second)
 	s2 := begin(ProviderLine)
@@ -743,7 +723,6 @@ func TestLoginFlowIsSingleUse(t *testing.T) {
 	f.now = f.now.Add(time.Second)
 	_, err = f.m.ConsumeLoginFlow(ctx, s.State, s.Binding, ProviderLine)
 	wantKind(t, err, apperr.KindUnauthenticated)
-	// 手動連結的流程帶要連結的帳號。
 	acc := f.loginAs(t, googleAlice, ClientWeb)
 	ls, err := f.m.BeginLoginFlow(ctx, LoginFlowInput{Provider: ProviderLine, ReturnPath: "/", LinkAccountID: &acc.AccountID})
 	if err != nil {
@@ -773,7 +752,6 @@ func TestLoginFlowRefusesUnsafeReturnPathsAndUnknownProviders(t *testing.T) {
 	if n := f.count(t, `SELECT count(*) FROM identity.login_flows`); n != 0 {
 		t.Fatalf("被拒絕的 start 留下 %d 列", n)
 	}
-	// 資料庫也擋：就算程式漏檢，返回網址不是站內相對路徑的列寫不進去。
 	_, err := f.db.Pool().Exec(ctx, `INSERT INTO identity.login_flows (state_hash, provider, code_verifier, nonce, return_path, binding_hash, created_at, expires_at)
 		VALUES (sha256('a'), 'GOOGLE', 'v', 'n', '//evil.example', sha256('b'), now(), now() + interval '1 minute')`)
 	if err == nil {
@@ -795,7 +773,7 @@ func TestAppNonceIsSingleUseAndShortLived(t *testing.T) {
 	if err := f.m.ConsumeAppNonce(ctx, nonce); err != nil {
 		t.Fatal(err)
 	}
-	wantKind(t, f.m.ConsumeAppNonce(ctx, nonce), apperr.KindUnauthenticated) // 重放
+	wantKind(t, f.m.ConsumeAppNonce(ctx, nonce), apperr.KindUnauthenticated)
 	wantKind(t, f.m.ConsumeAppNonce(ctx, "junk"), apperr.KindUnauthenticated)
 	wantKind(t, f.m.ConsumeAppNonce(ctx, strings.Repeat("A", 43)), apperr.KindUnauthenticated)
 
@@ -815,7 +793,6 @@ func TestSessionTokensComeOnlyFromLogin(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	res := f.loginAs(t, googleAlice, ClientWeb)
-	// session ID、截短、加長的值都不是憑證。
 	for name, tok := range map[string]string{
 		"雜湊的十六進位":    strings.Repeat("a", 43),
 		"session ID": res.SessionID.String(),
@@ -844,7 +821,6 @@ func TestListLinkedIdentitiesReturnsOnlyTheAccountsOwn(t *testing.T) {
 	if err != nil || len(got) != 2 || got[0].Provider != ProviderGoogle || got[1].Provider != ProviderLine || !got[1].LinkedAt.After(got[0].LinkedAt) {
 		t.Fatalf("alice = %+v, %v，預期 Google 與 LINE 各一筆，連結時間舊到新", got, err)
 	}
-	// 別帳號的身分不回。
 	other, err := f.m.ListLinkedIdentities(ctx, b.AccountID)
 	if err != nil || len(other) != 1 || other[0].Provider != ProviderLine {
 		t.Fatalf("bob = %+v, %v，預期只有自己的 LINE", other, err)

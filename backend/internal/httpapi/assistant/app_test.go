@@ -26,7 +26,6 @@ import (
 
 const (
 	reqID = "11111111-1111-4111-8111-111111111111"
-	// accountID 與 buyerID 刻意不同：handler 要經買家對應取 buyer_id，不能把帳號 ID 當買家 ID。
 	accountID = int64(7)
 	buyerID   = int64(4242)
 )
@@ -43,7 +42,6 @@ func (buyerLookup) CurrentBuyerID(_ context.Context, account int64) (int64, erro
 	return 0, fmt.Errorf("沒有買家")
 }
 
-// fakeModule 是 Module 的替身；Watch 的擁有者檢查與真實的輪次執行器相同：不是自己的輪次回 ErrTurnNotFound。
 type fakeModule struct {
 	mu        sync.Mutex
 	submitted []assistant.SubmitTurnInput
@@ -53,7 +51,7 @@ type fakeModule struct {
 	watchErr  error
 	history   assistant.History
 	historyBy []int64
-	live      chan assistant.TurnEvent // 非 nil 時 Watch 阻塞等它
+	live      chan assistant.TurnEvent
 	aborted   []string
 }
 

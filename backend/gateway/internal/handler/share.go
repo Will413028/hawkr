@@ -85,6 +85,6 @@ func (h *Holder) getProductShareURL(c *gin.Context, id string) {
 		URL:         fmt.Sprintf("%s/products/%s", websiteBaseURL, p.Id),
 		Title:       title,
 		Description: description,
-		ImageURL:    mediaurl.BuildURL(h.MediaBaseURL, p.ImageKey), // 49 §6.6：分享圖走 /i/original（S6），Gateway 由 objectKey 組
+		ImageURL:    mediaurl.BuildURL(h.MediaBaseURL, p.ImageKey),
 	})
 }

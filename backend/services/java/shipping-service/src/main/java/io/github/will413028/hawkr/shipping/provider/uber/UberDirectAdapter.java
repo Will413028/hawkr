@@ -140,9 +140,6 @@ public class UberDirectAdapter implements FulfillmentProviderAdapter {
         return Set.of();
     }
 
-    // ==================================================================
-    // create：E1 報價前置（消費結帳已接受的報價）＋ E2 Create Delivery
-    // ==================================================================
 
     @Override
     public Optional<CreateCapability> create(FulfillmentContext ctx) {
@@ -152,7 +149,6 @@ public class UberDirectAdapter implements FulfillmentProviderAdapter {
                                                   SellerShipmentSettingEntity onboardingSetting) {
                 ShipmentEntity entity = createStrategy.createShipmentFromOrder(orderNo, orderInfo, onboardingSetting);
                 if (entity == null) {
-                    // strategy 的契約：回 null 代表它自己沒組出東西，這裡不代它決定。
                     return null;
                 }
                 submitDelivery(entity);
@@ -200,13 +196,6 @@ public class UberDirectAdapter implements FulfillmentProviderAdapter {
      */
     void submitDelivery(ShipmentEntity entity) {
         requireUsable();
-        // 🔴 門市對應缺席寫 990 而不是拋例外。
-        //    兩者的差別是「誰會發現」：拋例外 ⇒ order.paid 的 consumer 重試耗盡進 DLQ
-        //    ⇒ 買家付了錢、連一列 shipment 都沒有、訂單卡住，而 DLQ 沒有人盯；
-        //    寫 990 ⇒ 有一列帶著 provider_error_code 的單，Admin 看得到，
-        //    且 990 有既有的出口（Admin 重建／Admin 取消＋退款鏈）。
-        //    ⚠️ 它是確定性的（重試一百次都一樣）——結帳時的承載檢查道 1 本來就該擋掉它，
-        //    走到這裡代表門市在「結帳 → 付款」之間被停用，那需要人看一眼。
         Optional<UberStoreMappingEntity> mappingOpt =
                 storeResolver.activeMapping(entity.getStoreId() == null ? 0L : entity.getStoreId());
         if (mappingOpt.isEmpty()) {
@@ -217,8 +206,6 @@ public class UberDirectAdapter implements FulfillmentProviderAdapter {
         UberStoreMappingEntity mapping = mappingOpt.get();
         UberQuoteEntity quote = acceptedQuote(entity.getOrderNo());
         if (quote == null) {
-            // 確定性：沒有已被結帳確認的報價就建不出單，重試一百次都一樣。
-            // （uber_quotes 的 CONSUMED allowed-from 只允許 CHECKOUT_ACCEPTED，66 §5.1.4。）
             markCreateFailed(entity, "UBER_QUOTE_NOT_ACCEPTED",
                     "找不到已被結帳確認的 Uber 報價（order_no=" + entity.getOrderNo() + "）");
             return;
@@ -236,20 +223,6 @@ public class UberDirectAdapter implements FulfillmentProviderAdapter {
             DeliveryResult result = apiClient.createDelivery(mapping.getCustomerId(), request);
             entity.setUberDeliveryId(result.id());
             entity.setStatus(ShippingStatus.UNPROCESSED.value());
-            // 🔴 **刻意不在這裡寫 provider_status**（V12 的 C4 判準，static gate 擋）。
-            //
-            //    `shipments.provider_status` 只有一條寫入路徑：mapper 的
-            //    `updateProviderStatus`，它是唯一不要求狀態轉移合法性的寫入點，
-            //    也是「未知 provider 原生值」統一 fail-closed 的落點
-            //    （ShippingService.persistUnknownProviderStatus）。
-            //    在建單成功這一格用 entity setter 塞一份，等於開第二條寫入路徑 ——
-            //    而第二條路徑**不會**經過未知值處置，下一個 provider 進來時就會在
-            //    這裡靜默寫進一個沒有人認得的原生值。
-            //
-            //    ⚠️ 不寫並沒有遺失資訊：建單當下 Uber 回的是 `pending`，
-            //    它映射到的正是上面那一行已經寫下的 91 UNPROCESSED；
-            //    真正的原生值會由 webhook 或 T-8 回查經 canonical ingress 補上。
-            //    result.status() 仍保留在回應物件上供 log 與測試斷言使用。
             log.info("UberDirectAdapter.create.providerStatus",
                     "Uber 建單回應原生狀態（不落 provider_status，由 canonical ingress 寫入）",
                     "providerStatus", result.status());
@@ -262,9 +235,8 @@ public class UberDirectAdapter implements FulfillmentProviderAdapter {
 
     private void applyCreateFailure(ShipmentEntity entity, UberApiException e) {
         switch (e.kind()) {
-            case AUTH -> throw e;                       // 請求沒送出去（見 submitDelivery javadoc）
+            case AUTH -> throw e;
             case NON_DETERMINISTIC, RATE_LIMITED -> {
-                // 🔴 991 不是 990：可能已經建成功了。收斂交給 T-8 回查（66 §7.7）。
                 entity.setStatus(ShippingStatus.CREATE_UNKNOWN.value());
                 setProviderError(entity, e);
                 log.warn("UberDirectAdapter.create.unknown",
@@ -293,9 +265,6 @@ public class UberDirectAdapter implements FulfillmentProviderAdapter {
         entity.setProviderErrorAt(nowUtc());
     }
 
-    // ==================================================================
-    // dispatch：E2（Uber 的「派車」就是建單本身）
-    // ==================================================================
 
     /**
      * 🔴 <b>present</b>：66 §4.5.0 E2 第二列——「由 {@code order.paid} 自動觸發」與賣家手動重試
@@ -310,14 +279,9 @@ public class UberDirectAdapter implements FulfillmentProviderAdapter {
     @Override
     public Optional<DispatchCapability> dispatch(FulfillmentContext ctx) {
         return Optional.of((shipment, sellerSetting, options) -> {
-            // ⚠️ sellerSetting 對 Uber 恆為 null（requiresOnboarding()=false，沒有建店槽位）。
-            //    取件人資訊來自 uber_store_mapping 的快照，不是 seller_shipment_settings。
             submitDelivery(shipment);
             if (ShippingStatus.CREATE_FAILED.value().equals(shipment.getStatus())
                     || ShippingStatus.CREATE_UNKNOWN.value().equals(shipment.getStatus())) {
-                // 🔴 DispatchCapability 的契約逐字：「失敗以例外表達，不回 outcome」——
-                //    呼叫端的 ProviderCallExecutor 正是靠例外分辨 markSucceeded／markFailed，
-                //    回一個「失敗的 outcome」會讓搶佔狀態機把失敗記成成功。
                 throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_PROVIDER_CALL_FAILED,
                         shipment.getProviderErrorMessage() == null
                                 ? "Uber 建單未成功" : shipment.getProviderErrorMessage());
@@ -327,9 +291,6 @@ public class UberDirectAdapter implements FulfillmentProviderAdapter {
         });
     }
 
-    // ==================================================================
-    // cancel：E6（四個 provider 裡唯一真的打 provider 的取消）
-    // ==================================================================
 
     @Override
     public Optional<CancelCapability> cancel(FulfillmentContext ctx) {
@@ -339,17 +300,9 @@ public class UberDirectAdapter implements FulfillmentProviderAdapter {
             String deliveryId = requireDeliveryId(shipment);
             try {
                 DeliveryResult result = apiClient.cancelDelivery(mapping.getCustomerId(), deliveryId);
-                // provider 已給出終局答案 ⇒ 呼叫端可直接落終態 41（66 §4.5.0 E6：寫 992 → 打 E6 → 成功 41）。
                 return new CancelCapability.CancelOutcome(true, true, result.status());
             } catch (UberApiException e) {
                 if (e.kind() == UberFailureKind.NONCANCELABLE) {
-                    // 🔴 取消失敗、**留原狀態**（不寫 992 → 41）、回 9522（66 §4.5.4／§7.6）。
-                    //
-                    //    ⚠️ 為什麼是拋例外而不是回 CancelOutcome：那個 record 只有
-                    //    (accepted, terminal) 兩個布林，而它們表達不出「被拒絕，請還原成原本的狀態」——
-                    //    terminal=true 的註解逐字是「可直接落終態」（會對買家宣告取消而貨照送），
-                    //    terminal=false 是「落 992 等回調」（會卡在一個等不到的狀態）。
-                    //    兩個都是錯的答案，所以不能用那個通道。已登記在交付報告的「與設計書不符」節。
                     throw new ShippingBusinessException(GrpcResponseCode.SHIPMENT_CANCEL_NOT_CANCELLABLE);
                 }
                 throw e;
@@ -357,9 +310,6 @@ public class UberDirectAdapter implements FulfillmentProviderAdapter {
         });
     }
 
-    // ==================================================================
-    // track：E4
-    // ==================================================================
 
     @Override
     public Optional<TrackCapability> track(FulfillmentContext ctx) {
@@ -367,8 +317,6 @@ public class UberDirectAdapter implements FulfillmentProviderAdapter {
             requireUsable();
             String deliveryId = shipment.getUberDeliveryId();
             if (deliveryId == null || deliveryId.isBlank()) {
-                // 🔴 陷阱 B2：991 沒有 delivery_id，用 E4 回查會每次 404、永不收斂。
-                //    那條路徑的正解是 E3 ＋ 我方 external_id 反查（66 §7.7），不是這裡。
                 return new TrackCapability.TrackResult(null, null,
                         "尚無 Uber delivery_id，不以 E4 回查（991 的收斂走 E3 反查）", null);
             }
@@ -377,15 +325,11 @@ public class UberDirectAdapter implements FulfillmentProviderAdapter {
             return new TrackCapability.TrackResult(
                     UberStatusMapper.normalize(result.status()).map(ShippingStatus::value).orElse(null),
                     result.status(),
-                    // 外送員電話一律遮罩後才進任何我方欄位／log（66 §8.6）
                     UberFieldFormat.maskPhone(result.courierPhone()),
                     toLocalDateTime(result.statusAt()));
         });
     }
 
-    // ==================================================================
-    // pod：E7 ＋ 轉存 media secure/
-    // ==================================================================
 
     @Override
     public Optional<PodCapability> pod(FulfillmentContext ctx) {
@@ -404,15 +348,11 @@ public class UberDirectAdapter implements FulfillmentProviderAdapter {
                     if (doc.content() == null || doc.content().length == 0) {
                         return Optional.empty();
                     }
-                    // 🔴 走 secure/ 前綴（陷阱 A6：public 上傳沒有任何訊號，
-                    //    而 POD 的內容是收件地址與門口實景）。
                     String objectKey = podStorage.store(deliveryId, doc.content(), doc.contentType());
                     return Optional.of(new PodCapability.PodResult(
                             objectKey, null, toLocalDateTime(Instant.now(clock))));
                 } catch (UberApiException e) {
                     if (e.kind() == UberFailureKind.NOT_FOUND) {
-                        // 窗口未到或該筆沒有這一種 POD（leave_at_door 只有 picture、需簽收才有 signature）。
-                        // ⚠️ INV-U5 因此是「≥1 筆」而不是「三種都要有」（66 §7.8）。
                         return Optional.empty();
                     }
                     throw e;
@@ -426,9 +366,6 @@ public class UberDirectAdapter implements FulfillmentProviderAdapter {
         });
     }
 
-    // ==================================================================
-    // onboard：uber_store_mapping 的狀態（🔴 沒有 provider 端點）
-    // ==================================================================
 
     /**
      * 🔴 <b>present，但它不打任何 Uber API</b>。
@@ -477,7 +414,6 @@ public class UberDirectAdapter implements FulfillmentProviderAdapter {
         long storeId = setting == null || setting.getStoreId() == null ? 0L : setting.getStoreId();
         return storeResolver.activeMapping(storeId)
                 .map(m -> new OnboardCapability.OnboardOutcome(
-                        // 🔴 external_store_id 是憑證等級的值（66 §8.6）⇒ 回傳遮罩後的形式。
                         UberFieldFormat.maskStoreId(m.getExternalStoreId()),
                         m.getHealthStatus(),
                         "Uber 門市對應已啟用"))
@@ -486,9 +422,6 @@ public class UberDirectAdapter implements FulfillmentProviderAdapter {
                         "尚未建立可用的 Uber 門市對應（未設定、已關閉，或被 Uber 封鎖）"));
     }
 
-    // ==================================================================
-    // inbound：webhook 驗簽 ＋ 狀態映射
-    // ==================================================================
 
     @Override
     public Optional<InboundCapability> inbound(FulfillmentContext ctx) {
@@ -506,16 +439,10 @@ public class UberDirectAdapter implements FulfillmentProviderAdapter {
                 String message = firstText(body, "kind", "event_type");
 
                 if (rawStatus == null || rawStatus.isBlank()) {
-                    // 沒有 status 的事件（例：courier_update 的位置更新）不是「未知貨態」。
-                    // raw 回 null 讓呼叫端分辨得出「沒有東西可保存」與「有值但看不懂」
-                    // ——把它寫成未知貨態會用「保存證據」的名義把 provider_status 覆蓋成 null。
                     return InboundStatusEvent.unknown(null, message, at);
                 }
                 Optional<ShippingStatus> normalized = UberStatusMapper.normalize(rawStatus);
                 if (normalized.isEmpty()) {
-                    // 🔴 fail-closed：raw 值**一律保存**，不推進狀態機（INV-U7）。
-                    //    ⚠️ 容忍值（shopping_completed）與真未知值在這裡長得一樣，
-                    //    呼叫端用 UberStatusMapper.isTolerated 分辨：容忍值只計 counter、**不建 case**。
                     return InboundStatusEvent.unknown(rawStatus, message, at);
                 }
                 return new InboundStatusEvent(
@@ -575,15 +502,10 @@ public class UberDirectAdapter implements FulfillmentProviderAdapter {
         try {
             return objectMapper.readTree(raw.rawBody());
         } catch (IOException e) {
-            // 驗簽過了但內容不是 JSON ⇒ 對方送了我們看不懂的東西。
-            // 🔴 不得回 4xx（Uber 不重試 4xx ⇒ 事件靜默丟失，66 §0.3），讓它往上成為 5xx。
             throw new IllegalStateException("Uber webhook 驗簽通過但 body 不是合法 JSON", e);
         }
     }
 
-    // ==================================================================
-    // 永久 empty 的三個 capability —— 🔴 這不是缺口
-    // ==================================================================
 
     /** ❌ 永久 empty：即時配送無標籤概念。 */
     @Override
@@ -610,9 +532,6 @@ public class UberDirectAdapter implements FulfillmentProviderAdapter {
         return Optional.empty();
     }
 
-    // ==================================================================
-    // helpers
-    // ==================================================================
 
     /**
      * 🔴 fail-closed（66 §8.5／§4.5.1）：總開關關著或憑證缺席時<b>不送出任何位元組</b>。
@@ -708,12 +627,9 @@ public class UberDirectAdapter implements FulfillmentProviderAdapter {
         try {
             return Instant.parse(raw);
         } catch (RuntimeException ignored) {
-            // DaaS 的 created 與 dapi 的 event_time 都是 Unix 時間戳（總覽 §6.2／§7.2）。
         }
         try {
             long epoch = Long.parseLong(raw.trim());
-            // 秒 vs 毫秒：總覽 §3.1 的 created_at 逐字是「Unix 毫秒」，而 webhook 的
-            // event_time 是秒 ⇒ 以位數判別，不猜。
             return epoch > 99_999_999_999L ? Instant.ofEpochMilli(epoch) : Instant.ofEpochSecond(epoch);
         } catch (NumberFormatException ignored) {
             return null;

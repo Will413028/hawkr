@@ -9,28 +9,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// Credential revocation for STATELESS bearer JWTs (#2035).
-//
-// A web session has a row to delete, so revoking it is just a DELETE. A mobile
-// or admin JWT has no server-side record at all: it is valid because it is
-// signed, so the only way to end it early is to keep a list of credentials that
-// no longer count and consult that list on every request.
-//
-// Two lists, because they answer two different questions:
-//
-//   - jwt:revoked:<sha256(token)> — THIS token is void. That is what pressing
-//     "log out" means: end this device's credential, leave the others alone.
-//   - auth:epoch:<accountID> — every token this account was issued BEFORE this
-//     instant is void. That is "log out everywhere", and it is also the only
-//     revocation that can be aimed at a credential nobody holds a copy of any
-//     more: role removal, a suspected leak, an incident.
-//
-// Both are CACHES over rows in the identity module (revoked_tokens.token_hash and
-// accounts.auth_epoch / admin_accounts.auth_epoch), for the same reason #2050
-// gave the blacklist a rebuild path: a revocation that lives only in Redis
-// disappears when Redis does, and a bearer JWT has nothing else to fall back
-// on. The tri-state below is what makes the rebuild possible — "Redis could not
-// answer" must never be reported as "this credential is fine".
 const (
 	revokedTokenPrefix = "jwt:revoked:"
 	authEpochPrefix    = "auth:epoch:"
@@ -178,23 +156,8 @@ func CheckAuthState(ctx context.Context, rdb *redis.Client, accountID int64, tok
 	if tokenHash != "" {
 		revoked = pipe.Exists(ctx, RevokedTokenKey(tokenHash))
 		epoch = pipe.Get(ctx, AuthEpochKey(accountID))
-		// Fetched in the SAME pipeline, not a second round-trip: the whole
-		// point of this function is that a degraded Redis costs one timeout,
-		// not one per question.
 		rolesEpoch = pipe.Get(ctx, RolesEpochKey(accountID))
 	}
-	// Exec's error MUST be consulted, and this is not obvious: when a pipeline
-	// never reaches Redis, go-redis v9 reports the failure ONLY from Exec — the
-	// individual commands are left looking like clean zero values (Exists
-	// answers n=0, err=nil), which is byte-for-byte what a healthy Redis returns
-	// for an account that is fine. Reading the commands alone would therefore
-	// turn an outage into "not blocked, not revoked" and silently disable both
-	// checks for its whole duration: the #2050 defect, reproduced one layer down.
-	//
-	// redis.Nil is the exception, not a failure: an epoch GET missing is the
-	// ordinary case (almost no account has one), and Exec surfaces it as the
-	// first "error" it saw. Treating it as an outage would send every healthy
-	// request to the SSOT rebuild.
 	if _, err := pipe.Exec(ctx); err != nil && !errors.Is(err, redis.Nil) {
 		return AccountBlockUnknown, CredentialUnknown
 	}
@@ -213,35 +176,8 @@ func blockStateFromExists(cmd *redis.IntCmd) AccountBlockState {
 	return AccountNotBlocked
 }
 
-// credentialStateFrom reads the two lists as a POSITIVE-ONLY oracle: Redis can
-// prove that a credential is void, and it can never prove that one is valid.
-//
-// That asymmetry is not fussiness, it is the only reading these keys support.
-// An absent key has three indistinguishable causes:
-//
-//   - nothing was ever revoked for this credential (the common case);
-//   - the revocation was never written — Redis was accepting reads but refusing
-//     writes, the 2026-07-29 MISCONF shape this codebase already has a test for;
-//   - the revocation WAS written and has since been evicted. The instance runs
-//     maxmemory + allkeys-lru, and these keys share that eviction budget with
-//     every cache in the system.
-//
-// Reading absence as "valid" makes the second case a logout that silently did
-// not happen, and the third case an already-effective revocation that reverses
-// itself. Both are correctness failures produced by a CACHE, which is exactly
-// what a cache must never be able to do (§28).
-//
-// So absence returns CredentialUnknown, and the caller resolves it against the
-// Postgres source of truth (bounded by a per-pod TTL cache, singleflight and a
-// token bucket — see the gateway's credentialRevokedPerSSOT). Eviction then
-// degrades to a performance question rather than a correctness one, which is
-// the whole point.
 func credentialStateFrom(revoked *redis.IntCmd, epoch, rolesEpoch *redis.StringCmd, issuedAt time.Time) CredentialState {
 	if revoked == nil || epoch == nil {
-		// No bearer credential was presented, so there is nothing for these
-		// lists to refuse and nothing to resolve. This is the one "valid" this
-		// function may return, and it is "no question asked", not "asked and
-		// cleared" — see CheckAuthState.
 		return CredentialValid
 	}
 
@@ -249,30 +185,13 @@ func credentialStateFrom(revoked *redis.IntCmd, epoch, rolesEpoch *redis.StringC
 		return CredentialRevoked
 	}
 
-	// Both epochs convict, because both mean "do not trust this token as it
-	// stands". They differ in what the holder can do next, and that difference
-	// lives entirely in the identity module: a credential predating auth_epoch
-	// cannot even be refreshed (RefreshTokenUseCase), while one predating only
-	// roles_epoch refreshes normally and comes back carrying the new role set.
-	// Collapsing them here would be harmless; collapsing them THERE is what
-	// turns a role grant into a forced logout.
 	if epochConvicts(epoch, issuedAt) || epochConvicts(rolesEpoch, issuedAt) {
 		return CredentialRevoked
 	}
 
-	// Redis had nothing to convict this credential with. That is not an
-	// acquittal: ask the source of truth.
 	return CredentialUnknown
 }
 
-// epochConvicts reports whether a published epoch places this credential before
-// it. A nil command (no bearer credential presented), an absent key, or an
-// unparseable value all answer "no" — this oracle is positive-only, exactly
-// like the one it serves.
-//
-// Second precision: all a JWT iat carries. Comparing finer would invent a
-// difference the credential cannot express and could void a token minted in the
-// same second as the bump.
 func epochConvicts(epoch *redis.StringCmd, issuedAt time.Time) bool {
 	if epoch == nil || issuedAt.IsZero() {
 		return false

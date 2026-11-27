@@ -59,7 +59,6 @@ func (s Starter) Start(ctx context.Context, in StartInput) (Started, error) {
 	return Started{RunID: r.ID, CandidateSetID: *r.CandidateSetID, Status: r.Status}, nil
 }
 
-// check 在買家的送出鎖之內、上限檢查之前驗證需求屬於買家且狀態允許搜尋。
 func (s Starter) check(ctx context.Context, q *store.Queries, in StartInput) error {
 	buyer := in.BuyerID
 	req, err := q.GetRequestForBuyer(ctx, store.GetRequestForBuyerParams{ID: in.RequestID, BuyerID: &buyer})
@@ -80,7 +79,6 @@ func (s Starter) check(ctx context.Context, q *store.Queries, in StartInput) err
 	return nil
 }
 
-// prepare 在上限檢查之後讀需求的現行版本並建候選集，候選集指向需求當下的現行版本。
 func (s Starter) prepare(ctx context.Context, q *store.Queries, in StartInput) (uuid.UUID, error) {
 	buyer := in.BuyerID
 	rev, err := q.GetActiveRevision(ctx, store.GetActiveRevisionParams{RequestID: in.RequestID, BuyerID: &buyer})

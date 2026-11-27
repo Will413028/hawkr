@@ -42,7 +42,6 @@ class ImageProcessingService {
         '[ImageProcessing] Processing avatar, input size: ${imageBytes.length} bytes',
       );
 
-      // 1. 取得原始圖片尺寸
       final ui.Codec codec = await ui.instantiateImageCodec(imageBytes);
       final ui.FrameInfo frame = await codec.getNextFrame();
       final ui.Image image = frame.image;
@@ -55,10 +54,6 @@ class ImageProcessingService {
         '[ImageProcessing] Original size: ${originalWidth}x$originalHeight',
       );
 
-      // 2. 壓縮並調整大小為正方形
-      // flutter_image_compress 的 minWidth/minHeight 會保持比例縮放
-      // 對於非正方形圖片，後端媒體模組只重新編碼、不裁切，比例由前端決定
-      // 如果需要前端精確裁切，可使用 image_cropper 套件
       final result = await FlutterImageCompress.compressWithList(
         imageBytes,
         minWidth: avatarSize,

@@ -10,9 +10,6 @@ export function shouldRetryQuery(failureCount: number, error: unknown) {
 	return !(error instanceof ConnectError) && failureCount < 1;
 }
 
-// Admin is single-role (one admin audience), so query keys are not
-// identity-scoped the way the buyer/seller website's are. Login is a full
-// page load, so there is no soft-nav cross-account leak to defend against.
 export function createAppQueryClient() {
 	return new QueryClient({
 		defaultOptions: {

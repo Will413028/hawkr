@@ -83,15 +83,9 @@ public class MediaGrpcClient {
                         .finalizeImages(request)
         );
 
-        // media 的業務拒絕是 onNext(code≠0) 而不是 StatusRuntimeException，executeWithRetry
-        // 看不到它。原本這裡只讀 assets 清單，於是「一張都沒轉正」與「全部轉正」在呼叫端
-        // 完全同形——本方法照樣回傳、log 照樣記 success，圖片靜默消失（56 P0-1：代行上傳的
-        // 圖永遠掛不上去，且因為 images 是整份替換，既有圖片一併被清空，而請求回 code: 0）。
         if (response.getCode() != GrpcResponseCode.SUCCESS.code()) {
             throw new ProductBusinessException(finalizeFailureCode(response.getCode()), response.getMessage());
         }
-        // 張數不符即失敗：媒體轉正是 all-or-nothing（media 對任一 token 不合格就整批拋），
-        // 少一張代表回傳與請求對不上，此時繼續往下組 gallery 只會沉默地少掛一張。
         if (response.getAssetsCount() != stagedTokens.size()) {
             throw new ProductBusinessException(GrpcResponseCode.INTERNAL_ERROR,
                     "圖片轉正結果與請求不符，requested=" + stagedTokens.size()
@@ -185,7 +179,6 @@ public class MediaGrpcClient {
         log.info("success", "資產引用釋放成功，released_count=" + response.getReleasedCount() + "，ref_type=" + refType);
     }
 
-    // ==================== 私有輔助方法 ====================
 
     /**
      * 取得 gRPC stub（使用 GrpcStubFactory，自動注入 trace context）
@@ -224,7 +217,6 @@ public class MediaGrpcClient {
 
         log.error("exhausted", "重試次數已用盡，operation=" + operation + "，max_retries=" + MAX_RETRIES);
 
-        // 重試耗盡 → 轉換為本服務業務異常（依 Status 對應 GrpcResponseCode）
         throw GrpcClientErrorTranslator.translate(lastException, ProductBusinessException::new);
     }
 

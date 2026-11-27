@@ -91,7 +91,7 @@ class CouponGrpcServiceSellerIdentityTest {
                     .setStoreId(resolvedStoreId)
                     .setTitle("週末優惠")
                     .setType("CASH")
-                    .setTargetType("1") // ALL
+                    .setTargetType("1")
                     .setDiscountAmount("100")
                     .setStartAt("2026-04-01T00:00:00Z")
                     .setEndAt("2026-04-07T23:59:59Z")
@@ -151,7 +151,7 @@ class CouponGrpcServiceSellerIdentityTest {
 
         CouponTemplateEntity template = new CouponTemplateEntity();
         template.setTemplateId(999L);
-        template.setIssuerStoreId(resolvedStoreId); // 這張模板屬於 555，不是 100
+        template.setIssuerStoreId(resolvedStoreId);
         template.setIssuerType(IssuerType.SELLER.value());
         template.setTargetType("1");
         template.setTitle("週末優惠");
@@ -176,11 +176,6 @@ class CouponGrpcServiceSellerIdentityTest {
             GrpcAuthContext.setSkipAccountTypeCheck(false);
         }
 
-        // 若回歸讀 GrpcAuthContext（100），擁有權比對會用 100 != 555 → COUPON_NOT_FOUND，
-        // 就不會走到 instanceService 查詢，也不會回 code=0。
-        // 注意：sellerGetTemplateDetail 正常流程本就會呼叫 countByTemplateAndStatus 兩次
-        // （USED 與 RESERVED 各一次），brief 原給的 verify(instanceService)（隱含 times(1)）
-        // 與此不符，改用 atLeastOnce() 驗證「有沒有走到這段」而非精確次數。
         verify(instanceService, atLeastOnce()).countByTemplateAndStatus(eq(999L), anyString());
         ArgumentCaptor<SellerGetTemplateDetailResponse> captor = ArgumentCaptor.forClass(SellerGetTemplateDetailResponse.class);
         verify(detailResponseObserver).onNext(captor.capture());
@@ -192,9 +187,6 @@ class CouponGrpcServiceSellerIdentityTest {
     void sellerGetTemplateDetail_rejectsAdminIssuedTemplate_evenWhenIssuerStoreIdCoincidentallyMatches() {
         long resolvedStoreId = 555L;
 
-        // 這張模板是 admin 建立的（issuer_type=ADMIN），issuer_store_id 欄位存的其實是
-        // admin 的 account_id，只是數值巧合跟賣家目前的 store_id 相同。沒有 issuer_type
-        // 過濾的話，純數值比對會誤判成「這是我的模板」。
         CouponTemplateEntity adminTemplate = new CouponTemplateEntity();
         adminTemplate.setTemplateId(999L);
         adminTemplate.setIssuerStoreId(resolvedStoreId);
@@ -218,7 +210,6 @@ class CouponGrpcServiceSellerIdentityTest {
             GrpcAuthContext.setSkipAccountTypeCheck(false);
         }
 
-        // 未過濾 issuer_type 的舊邏輯會誤判擁有權成立，一路查到 instanceService 並回 code=0。
         verify(instanceService, never()).countByTemplateAndStatus(any(), anyString());
         ArgumentCaptor<SellerGetTemplateDetailResponse> captor = ArgumentCaptor.forClass(SellerGetTemplateDetailResponse.class);
         verify(detailResponseObserver).onNext(captor.capture());

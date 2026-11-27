@@ -25,10 +25,6 @@ export async function checkFollowed(
 	type?: string,
 ): Promise<boolean> {
 	void type;
-	// backend#2198 起 `GET /app/buyers/me/subscriptions/{storeId}` 回統一
-	// envelope：`{ code, message, data: { subscribed } }`。旗標只在 `data`
-	// 之下 —— 舊的頂層 `subscribed` 與 `followed` / `is_subscribed` 別名都已從
-	// wire 消失，一次切不留相容層（10 檔 §14.5.1）。
 	const result = await buyerAppClient().checkFollow({ storeId: String(id) });
 	return result.following;
 }
@@ -69,9 +65,6 @@ export async function toggleFollow(
 		await buyerAppClient().unfollowStore({ storeId: String(id) });
 		return false;
 	}
-	// gateway `SubscribeReq` 收 `storeId`（subscription.go:151）。這裡以前送
-	// `seller_id`，與 setSellerFollow 送的 `store_id` 兩邊不一致，binding 收不到
-	// 值——收斂成同一個名字，順手把那個窗口關掉。
 	await buyerAppClient().followStore({ storeId: String(id) });
 	return true;
 }

@@ -113,7 +113,6 @@ func TestOrderCompletedAlsoCompletesTheStoresAccount(t *testing.T) {
 		t.Fatalf("completed=%v storeLookups=%v", completed, storeLookups)
 	}
 
-	// 買家那一側失敗，店家那一側仍然完成，整體回錯誤讓 River 重試。
 	completed = nil
 	worker.complete = func(_ context.Context, id int64) error {
 		completed = append(completed, id)
@@ -126,20 +125,17 @@ func TestOrderCompletedAlsoCompletesTheStoresAccount(t *testing.T) {
 		t.Fatalf("err=%v completed=%v", err, completed)
 	}
 
-	// 不在單體的店家（舊服務）不是錯誤。
 	worker.complete = func(context.Context, int64) error { return nil }
 	worker.storeAccount = func(context.Context, int64) (int64, error) { return 0, apperr.NotFound("store") }
 	if err := worker.Work(t.Context(), job); err != nil {
 		t.Fatalf("unknown store: %v", err)
 	}
 
-	// 事件有店家、卻沒有設定解析器是組裝錯誤，不能默默略過。
 	worker.storeAccount = nil
 	if err := worker.Work(t.Context(), job); err == nil {
 		t.Fatal("missing store resolver was ignored")
 	}
 
-	// 沒有 store_id 的事件只處理買家；store_id 不合法是永久錯誤。
 	noStore := &river.Job[OrderCompletedArgs]{Args: OrderCompletedArgs{EventID: "evt-2", BuyerID: 71}}
 	if err := worker.Work(t.Context(), noStore); err != nil {
 		t.Fatal(err)

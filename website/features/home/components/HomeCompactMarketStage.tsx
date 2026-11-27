@@ -24,10 +24,6 @@ function productImage(product: MarketProductItem) {
 	return resolveCdnUrl(product.image) || product.image;
 }
 
-// Directional slide+fade for the carousel. `direction` is +1 when moving to a
-// newer item (next / auto-rotate) and -1 when going back, so the outgoing card
-// slides the opposite way to the incoming one. `distance` is zeroed out under
-// prefers-reduced-motion to leave a plain cross-fade.
 function makeSlideVariants(distance: number) {
 	return {
 		enter: (direction: number) => ({
@@ -42,7 +38,6 @@ function makeSlideVariants(distance: number) {
 	};
 }
 
-// Expo-out easing — quick start, soft settle.
 const SLIDE_TRANSITION = { duration: 0.34, ease: [0.22, 1, 0.36, 1] } as const;
 const FEED_SWIPE_THRESHOLD = 48;
 
@@ -157,16 +152,10 @@ export default function HomeCompactMarketStage({
 			if (feedDragStartX.current === null) return;
 			let dx = event.clientX - feedDragStartX.current;
 			if (Math.abs(dx) <= 6) return;
-			// Pointer capture changes the eventual mouse click target. Capturing
-			// immediately on pointerdown made a plain desktop click land on this
-			// outer track instead of HomeStageFeedCard. Capture only once the
-			// gesture has clearly become a drag.
 			setFeedDragging(true);
 			if (!event.currentTarget.hasPointerCapture?.(event.pointerId)) {
 				event.currentTarget.setPointerCapture?.(event.pointerId);
 			}
-			// Match the Hawkr 動態 dropdown carousel: dragging past the first/last
-			// card still gives a little resistance, without revealing empty space.
 			if (
 				(feedIndex === 0 && dx > 0) ||
 				(feedIndex === feedItems.length - 1 && dx < 0)
@@ -187,9 +176,6 @@ export default function HomeCompactMarketStage({
 			if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
 				event.currentTarget.releasePointerCapture(event.pointerId);
 			}
-			// Only consume the click emitted after a real carousel swipe. Mouse
-			// clicks often have a few pixels of pointer jitter, which used to set
-			// the old 6px "moved" flag and make the post appear unclickable.
 			feedSuppressClickRef.current = Math.abs(dx) >= FEED_SWIPE_THRESHOLD;
 			if (dx <= -FEED_SWIPE_THRESHOLD) moveFeed(1);
 			else if (dx >= FEED_SWIPE_THRESHOLD) moveFeed(-1);
@@ -221,8 +207,6 @@ export default function HomeCompactMarketStage({
 	);
 
 	React.useEffect(() => {
-		// Pause rotation while the login modal is open so the card the user is
-		// acting on doesn't slide out from under the prompt.
 		if (!canMoveFeed || loginOpen || feedDragging || openFeedIndex !== null)
 			return;
 		const id = window.setInterval(() => {
@@ -386,12 +370,7 @@ export default function HomeCompactMarketStage({
 						</Link>
 					</div>
 				</header>
-				{/* Fixed-height stage = 3 product cards (86px each) + 2 gaps (8px) =
-				    274px. Pinning the height on this stable wrapper (not the
-				    per-page motion.div) stops the row from collapsing while
-				    AnimatePresence swaps pages, and reserves all three slots so a
-				    short last page (e.g. 2 items) doesn't shrink the block. The
-				    left feed column matches via the grid's items-stretch. */}
+
 				<div className="min-h-[274px] flex-1">
 					<AnimatePresence mode="wait" custom={productDir} initial={false}>
 						{activeProducts.length > 0 ? (
@@ -420,14 +399,9 @@ export default function HomeCompactMarketStage({
 												preset="thumb"
 												sizes="64px"
 												loading="eager"
-												// 64px 縮圖不是 LCP 候選；low 只拿掉 React 19 SSR 自動
-												// 產生的 preload 與抓取優先權，仍在首次繪製就下載。
 												fetchPriority="low"
 												className="size-full object-cover"
 												// The unlayered global img baseline uses height:auto. Pin
-												// both axes inline for this intentionally square crop so it
-												// cannot fall back to the source's 4:3 ratio (64×48) or emit
-												// Next's one-axis aspect-ratio warning.
 												style={{ width: "100%", height: "100%" }}
 											/>
 										</div>

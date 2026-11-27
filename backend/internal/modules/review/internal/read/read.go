@@ -29,7 +29,6 @@ func New(d Deps) *Service { return &Service{d: d} }
 
 func (s *Service) q(ctx context.Context) *store.Queries { return store.New(s.d.DB.Conn(ctx)) }
 
-// pageSize 把呼叫端要的頁大小收斂到 [1, MaxPageSize]（AIP-158：0 或負數是預設，過大是上限）。
 func pageSize(n int32) int32 {
 	switch {
 	case n <= 0:
@@ -47,7 +46,6 @@ func cursorParams(after *model.Cursor) (*time.Time, *uuid.UUID) {
 	return &after.CreatedAt, &after.ID
 }
 
-// ratingArg 檢查評分篩選（0 是不篩，1 到 5）並轉成查詢的參數型別。
 func ratingArg(ctx context.Context, f model.Filter) (int16, error) {
 	if f.Rating < 0 || f.Rating > model.MaxRating {
 		return 0, apperr.InvalidInputOn([]string{"Filter.Rating"}, "%s", text.ReviewFilterRatingInvalid(uitext.LocaleFrom(ctx)))
@@ -55,7 +53,6 @@ func ratingArg(ctx context.Context, f model.Filter) (int16, error) {
 	return int16(f.Rating), nil
 }
 
-// page 把多取一筆的結果切成一頁：多出來的那筆只用來判斷有沒有下一頁，Next 是這頁最後一筆的位置。
 func (s *Service) page(ctx context.Context, list []store.ReviewReview, size int32) (model.Page, error) {
 	more := len(list) > int(size)
 	if more {
@@ -182,7 +179,6 @@ func (s *Service) GetReview(ctx context.Context, id uuid.UUID, viewerBuyerID int
 	return out, nil
 }
 
-// takenDownReplies 回傳店家回覆被內容下架措施下架的評價 ID；讀取時回覆換成沒有回覆。
 func (s *Service) takenDownReplies(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]bool, error) {
 	got, err := s.q(ctx).TakenDownReplyIDs(ctx, ids)
 	if err != nil {

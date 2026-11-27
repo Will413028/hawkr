@@ -14,11 +14,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/twtime"
 )
 
-// dashboardBudget 是儀表板讀每一個來源（訂單統計、訂單狀態、粉絲、瀏覽數）的時間上限。儀表板是賣家登入後才看的一頁，
-// 不在公開的熱路徑上，所以比店面頁的 statsBudget（300 ms）寬鬆：寧可多等一下，也不要因為來源稍慢就讓區塊消失。
 const dashboardBudget = time.Second
 
-// dashboardDays 是儀表板每個期間的天數。
 const dashboardDays = 7
 
 // SalesWindow 是訂單統計的時間窗 [Start, End)，以付款時間比對。
@@ -86,14 +83,12 @@ func (d Dashboard) budget() time.Duration {
 	return d.Budget
 }
 
-// dashboardPeriod 是一個期間：[start, end) 的台北 00:00，共 dashboardDays 個日曆日。
 type dashboardPeriod struct {
 	start, end time.Time
 }
 
 func (p dashboardPeriod) window() SalesWindow { return SalesWindow{Start: p.start, End: p.end} }
 
-// proto 回報含頭含尾的台北日曆日。
 func (p dashboardPeriod) proto() *pb.DashboardPeriod {
 	return &pb.DashboardPeriod{FirstDate: protoDate(p.start), LastDate: protoDate(p.end.AddDate(0, 0, -1))}
 }
@@ -103,7 +98,6 @@ func protoDate(t time.Time) *date.Date {
 	return &date.Date{Year: int32(y), Month: int32(m), Day: int32(d)} //nolint:gosec // 年月日在 int32 範圍內
 }
 
-// dashboardPeriods 回傳 now 當下的兩個期間：current 是最近 7 個完整的台北日曆日（不含今天），previous 是它前面緊鄰的 7 日。
 func dashboardPeriods(now time.Time) (current, previous dashboardPeriod) {
 	today := twtime.Midnight(now)
 	current = dashboardPeriod{start: today.AddDate(0, 0, -dashboardDays), end: today}
@@ -143,7 +137,6 @@ func (h *App) dashboardLog() *slog.Logger {
 	return h.dash.Log
 }
 
-// periodCount 把兩個期間的計數放進契約的 int32；任何一個放不下（或為負）時整組不設。
 func periodCount(current, previous int64) *pb.PeriodCount {
 	c, p := count32(current), count32(previous)
 	if c == nil || p == nil {

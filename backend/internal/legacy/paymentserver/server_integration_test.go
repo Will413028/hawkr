@@ -128,7 +128,6 @@ func (f *fixture) count(t *testing.T, sql string, args ...any) int64 {
 	return n
 }
 
-// paid 讓 O-PAID 入帳（金額 500，店 7）並回傳它的付款 ID。
 func (f *fixture) paid(t *testing.T) {
 	t.Helper()
 	ctx := context.Background()
@@ -206,7 +205,6 @@ func TestGrantPaymentWritesOneTransferRowAndQueuesItsJob(t *testing.T) {
 	f := setup(t)
 	f.paid(t)
 
-	// 賣家收款帳戶還沒開通：gRPC 錯誤（order 的 worker 重試），不是業務碼，也不寫轉帳列。
 	_, err := f.client.GrantPayment(ctx, connect.NewRequest(&pb.GrantPaymentRequest{OrderNo: "O-PAID"}))
 	if connect.CodeOf(err) != connect.CodeFailedPrecondition || f.count(t, "SELECT count(*) FROM payment.transfers") != 0 {
 		t.Fatalf("before the account is enabled: err=%v transfers=%d", err, f.count(t, "SELECT count(*) FROM payment.transfers"))
@@ -306,7 +304,6 @@ func TestClosePaymentByOrderNoQueuesACancelOnlyForAnUnpaidPayment(t *testing.T) 
 		t.Fatalf("open order = %v, close jobs=%d", resp.Msg, f.jobs.count("payment.charge_close"))
 	}
 
-	// job 在 transaction 外向 provider 取消，結果照一般路徑寫成 CANCELED。
 	var id string
 	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT id::text FROM payment.payments WHERE id = (SELECT payment_id FROM payment.payment_orders WHERE order_no = 'O-OPEN')").Scan(&id))
 	paymentID, err := uuid.Parse(id)

@@ -21,7 +21,6 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 TIMEOUT_SECONDS = 15 * 60
-# 測試框架自己的逾時要比 runner 的長，否則先到期的框架逾時會被算成 KILLED。
 FRAMEWORK_TIMEOUT_SECONDS = TIMEOUT_SECONDS + 5 * 60
 REQUIRED = ("id", "stack", "file", "old", "new", "test", "why")
 FLUTTER_PREFIX = "flutter:"
@@ -217,7 +216,6 @@ def build_command(stack: str, selector: str, repo: Path = REPO) -> Command:
         env["GOWORK"] = "off"
         return Command(argv, repo / moddir, env, stack)
     if stack == "admin":
-        # node:test 的旗標要放在測試檔之前，放在後面會被忽略（整個檔案照跑）。
         argv = package_script(repo, "admin", "test:file")
         if rest:
             argv += ["--test-name-pattern", rest]

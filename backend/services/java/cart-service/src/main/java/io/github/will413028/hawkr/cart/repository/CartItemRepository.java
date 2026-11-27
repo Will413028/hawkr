@@ -16,7 +16,6 @@ import java.util.List;
  */
 public interface CartItemRepository extends BaseMapper<CartItemEntity> {
 
-    // ==================== AddItem 原子 Upsert ====================
 
     default int upsertMemberItem(CartItemEntity entity) {
         return upsertMemberItemInternal(entity, CartItemStatus.NORMAL.value());
@@ -72,7 +71,6 @@ public interface CartItemRepository extends BaseMapper<CartItemEntity> {
     int upsertGuestItemInternal(@Param("entity") CartItemEntity entity,
                                  @Param("statusNormal") String statusNormal);
 
-    // ==================== 查詢 ====================
 
     /** 查詢會員購物車所有項目（依 store_id 排序） */
     @Select("SELECT * FROM cart_items WHERE buyer_id = #{buyerId} ORDER BY store_id, created_at")
@@ -141,7 +139,6 @@ public interface CartItemRepository extends BaseMapper<CartItemEntity> {
     @Select("SELECT * FROM cart_items WHERE guest_id = #{guestId} AND sku_id = #{skuId}")
     CartItemEntity findByGuestIdAndSkuId(@Param("guestId") String guestId, @Param("skuId") UUID skuId);
 
-    // ==================== SetItemQuantity ====================
 
     /** 更新會員項目數量（需檢查 status=NORMAL） */
     default int updateQuantityByBuyerSku(Long buyerId, UUID skuId, int quantity) {
@@ -191,7 +188,6 @@ public interface CartItemRepository extends BaseMapper<CartItemEntity> {
                                   @Param("skuId") UUID skuId,
                                   @Param("statusNormal") String statusNormal);
 
-    // ==================== CheckoutLock / Unlock / Remove ====================
 
     default int lockItemsByBuyerAndSkus(Long buyerId, String checkoutId,
                                          LocalDateTime lockExpireTime, List<UUID> skuIds) {
@@ -264,7 +260,6 @@ public interface CartItemRepository extends BaseMapper<CartItemEntity> {
                            @Param("checkoutId") String checkoutId,
                            @Param("skuIds") List<UUID> skuIds);
 
-    // ==================== MergeCart ====================
 
     /** 查詢訪客所有 NORMAL 項目（合併用） */
     default List<CartItemEntity> findNormalByGuestIdForMerge(String guestId) {
@@ -304,7 +299,6 @@ public interface CartItemRepository extends BaseMapper<CartItemEntity> {
     @Delete("DELETE FROM cart_items WHERE guest_id = #{guestId}")
     int deleteAllByGuestId(@Param("guestId") String guestId);
 
-    // ==================== 背景 Job ====================
 
     /** 解鎖過期的 LOCKED 項目（設計書 §7.1） */
     default int unlockExpiredItems() {

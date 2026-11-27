@@ -311,7 +311,6 @@ class _AppBottomNavigationBarState extends State<AppBottomNavigationBar> {
 
   /// 預設點擊行為：導航到主頁面對應 tab
   void _defaultOnTap(BuildContext context, int index) {
-    // 如果點擊的是當前 tab，不做任何事
     if (index == widget.currentIndex.value) return;
 
     const paths = [

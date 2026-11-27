@@ -334,18 +334,13 @@ export function createDelegatedOrderRepo(
 			dateTo,
 			signal,
 		}: DelegatedOrderListParams = {}) {
-			// ⚠️ 只送 Gateway handler 真的讀的鍵。BFF 對未列入的 key 回 400 而不是靜默
-			// 丟棄，所以這裡多送一個鍵會當場現形，而不是變成「篩選沒作用也沒錯誤」。
 			const query: Record<string, string> = {
 				page: String(page),
 				page_size: String(pageSize),
 			};
 			if (status) query.status = status;
-			// trim 之後為空就不送：只打了幾個空白鍵，送出去會變成「搜尋了空字串」而
-			// 命中全部，與使用者以為的「我還沒搜」剛好相反。
 			const trimmed = (keyword ?? "").trim();
 			if (trimmed) query.keyword = trimmed;
-			// 日期在這裡才從台北曆日展開成 UTC instant（§4：wire 上一律 ISO 8601 UTC）。
 			const from = dateFrom ? taipeiDayStartUtc(dateFrom) : "";
 			const to = dateTo ? taipeiDayEndUtc(dateTo) : "";
 			if (from) query.date_from = from;
@@ -372,7 +367,6 @@ export function createDelegatedOrderRepo(
 		},
 
 		async revealRecipientContact(orderNo, operationReason, opts = {}) {
-			// GET 沒有 body，理由走 query（snake_case，trim 後 1–100 字，後端必填）。
 			const env = await fetcher<unknown>(
 				`${root}/${encodeURIComponent(orderNo)}/recipient-contact`,
 				{ query: { operation_reason: operationReason }, signal: opts.signal },

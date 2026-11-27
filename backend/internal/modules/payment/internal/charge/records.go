@@ -13,10 +13,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/pagination"
 )
 
-// maxCursor 是第一頁的排序鍵：主鍵是 UUIDv7，清單依 ID 由大到小，第一頁從最大的 UUID 之前開始。
 var maxCursor = uuid.MustParse("ffffffff-ffff-ffff-ffff-ffffffffffff")
 
-// pageWindow 回傳清單查詢要用的每頁筆數與起點；orderNo 長度不合時回 InvalidInput。
 func pageWindow(size int32, after *model.RecordCursor, orderNo string) (int32, uuid.UUID, error) {
 	size, err := pagination.PageSize(size, model.DefaultRecordPageSize, model.MaxRecordPageSize)
 	if err != nil {
@@ -32,7 +30,6 @@ func pageWindow(size int32, after *model.RecordCursor, orderNo string) (int32, u
 	return size, start, nil
 }
 
-// next 回傳下一頁的排序鍵：多讀的那一筆存在才有，排序鍵是這一頁最後一筆的 ID。
 func next(more bool, lastID uuid.UUID) *model.RecordCursor {
 	if !more {
 		return nil

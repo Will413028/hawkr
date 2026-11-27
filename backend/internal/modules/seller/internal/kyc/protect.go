@@ -10,12 +10,10 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/seal"
 )
 
-// protector 計算統編的 blind index（防詐保存與處分比對；平台不加密保存個資，收款開通 ADR D22）。
 type protector struct {
 	mac *seal.MAC
 }
 
-// hashes 以金鑰環裡的每一把金鑰計算 value 的 blind index，查詢時比對全部。
 func (p protector) hashes(input []byte) [][]byte {
 	all := p.mac.SumAll(input)
 	out := make([][]byte, 0, len(all))

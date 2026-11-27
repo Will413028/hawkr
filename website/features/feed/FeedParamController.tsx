@@ -28,11 +28,6 @@ function postDetailToListItem(detail: PostDetail): PostListItem {
 	return {
 		id: detail.id,
 		sellerId: detail.sellerId,
-		// `/public/posts/{id}` does NOT carry storeCode — unlike the list, it
-		// makes no seller lookup to lift the segment off, so filling it would
-		// cost this endpoint an RPC it does not currently make (#2098 phase 3).
-		// Empty on purpose: sellerPath then links the store_id and eats one 308,
-		// which is correct-but-slower rather than broken.
 		storeCode: "",
 		sellerName: detail.sellerName?.trim() || "Hawkr 選品",
 		logoKey: detail.logoKey?.trim() ?? "",
@@ -96,7 +91,6 @@ export default function FeedParamController({
 			try {
 				return postDetailToListItem(await fetchPostDetailForViewer(postId));
 			} catch {
-				// 讀不到的貼文（不存在、未公開、被封鎖）不開檢視器。
 				return null;
 			}
 		},

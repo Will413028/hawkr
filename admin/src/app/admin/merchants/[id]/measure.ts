@@ -35,11 +35,7 @@ import { formatStaff } from "@hawkr/ui-text/zh-TW";
 import { formatDateTimeShort } from "@/lib/format";
 import { staffTextOrUnknown, unknownText } from "@/lib/ui-text";
 
-// 商家詳情的措施（SellerGovernanceAdminService：CreateMeasure、EndMeasure、ListMeasures；GetStore.active_measures）的顯示判斷、
-// 輸入驗證與請求組裝（設計 step10e-2c-design §3.3、§3.6、§4「admin」）。畫面只接結果。時間一律由呼叫端傳入（now），這裡不讀時鐘。
 
-// ---------------------------------------------------------------------------
-// 風險類型
 
 /** 風險類型下拉的選項順序（不含 UNSPECIFIED；UNSPECIFIED 不是有效的送出值）。 */
 export const RISK_GROUND_OPTIONS: readonly RiskGround[] = [
@@ -58,8 +54,6 @@ export function riskGroundLabel(ground: RiskGround): string {
 	return staffTextOrUnknown(sellerRiskGround(ground));
 }
 
-// ---------------------------------------------------------------------------
-// 措施的狀態與依據
 
 const STATE_VARIANT: Readonly<
 	Partial<Record<MeasureState, "danger" | "warning" | "gray">>
@@ -99,7 +93,6 @@ export function measureBasisText(
 ): string {
 	const kindMessage = sellerMeasureKind(measure.kind);
 	const basisMessage = sellerMeasureBasis(measure.basis);
-	// 種類或依據是目錄不認得的值（含 UNSPECIFIED）時整句是「未知」，不組出「未知・…」的半句。
 	if (kindMessage === undefined || basisMessage === undefined) {
 		return unknownText();
 	}
@@ -114,7 +107,6 @@ export function measureBasisText(
 		case MeasureBasis.VIOLATION:
 			return `${kind}・${basis}`;
 		default:
-			// CONTRACT 只配終止合作；其他種類配 CONTRACT 不是有效資料。
 			return unknownText();
 	}
 }
@@ -128,8 +120,6 @@ export function measureKindLabel(kind: MeasureKind): string {
 	return staffTextOrUnknown(sellerMeasureKind(kind));
 }
 
-// ---------------------------------------------------------------------------
-// 終止合作（條款第 21 條）
 
 /**
  * 伺服器此刻允許建立的終止合作（GetStoreResponse.available_terminations）對應的對話框選項：順序與內容都照伺服器給的（伺服器依 TerminationGround 的
@@ -249,8 +239,6 @@ export function revokeDetailText(
 	return `${time}・${revokeReasonLabel(measure.revokeReason)}`;
 }
 
-// ---------------------------------------------------------------------------
-// 建立風險措施：輸入、驗證、請求
 
 export const STATEMENT_MAX_LENGTH = 2000;
 export const NOTE_MAX_LENGTH = 2000;
@@ -429,8 +417,6 @@ export function buildCreateRiskMeasure(
 	};
 }
 
-// ---------------------------------------------------------------------------
-// 建立終止合作：輸入、驗證、請求、說明文字（條款第 21.2、21.3 條；W9 的關聯帳號終止也走這裡）
 
 /**
  * 選到的終止合作，記住選項從哪裡來：`available` 是店家詳情的 available_terminations（一般的事由），依據的認定依選項的
@@ -621,8 +607,6 @@ export function scheduledTerminationText(
 	return earliest ? `預定終止：${formatDateTimeShort(earliest)}` : undefined;
 }
 
-// ---------------------------------------------------------------------------
-// request_id（AIP-155）：同一份內容的重送沿用同一個，內容變了換新的
 
 /** 目前這個 request_id 是為哪一份內容產生的。 */
 export interface RequestIdSlot {
@@ -662,14 +646,10 @@ export function requestIdFor(
 	return { key, id: generate() };
 }
 
-// ---------------------------------------------------------------------------
-// 措施操作的失敗處理
 
 export const MEASURE_CONFLICT_TEXT =
 	"這個措施剛被更新，頁面已重新載入；請確認最新狀態後再操作。";
 
-// ---------------------------------------------------------------------------
-// 措施詳情：關聯帳號（W9）
 
 /** 建立終止合作成功後的頁首提示；生效時間用伺服器回的 period.start_time（不自己推算）。 */
 export function terminationCreatedText(

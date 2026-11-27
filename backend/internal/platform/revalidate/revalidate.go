@@ -26,11 +26,7 @@ import (
 )
 
 const (
-	// timeout 是一次送出的時間上限（§9.5）。
 	timeout = 5 * time.Second
-	// maxAttempts 是含第一次在內的送出次數。River 預設的退避是 attempt^4 秒：第 2～5 次約在 1 秒、
-	// 17 秒、98 秒、6 分鐘後，第 6 次會在 16 分鐘後，已經超過貼文相關快取在 website 最長的 TTL
-	// （website 的 CACHE_TTL.DISCOVERY，900 秒），那時快取自己就過期了，重試沒有意義。
 	maxAttempts = 5
 )
 
@@ -130,7 +126,6 @@ func (w *Worker) send(ctx context.Context, tags []string) error {
 	return &statusError{code: resp.StatusCode, body: string(preview)}
 }
 
-// statusError 是 website 回了非 2xx。
 type statusError struct {
 	code int
 	body string
@@ -140,14 +135,11 @@ func (e *statusError) Error() string {
 	return fmt.Sprintf("revalidate：status %d：%s", e.code, e.body)
 }
 
-// transportError 是請求沒有得到任何回應的錯誤。
 type transportError struct{ err error }
 
 func (e *transportError) Error() string { return "revalidate：送出：" + e.err.Error() }
 func (e *transportError) Unwrap() error { return e.err }
 
-// retryable 回報失敗是否是暫時性的：沒有得到回應（連線錯誤、timeout）、website 暫時不可用（5xx）
-// 或限流（429）。其他非 2xx（400、401 secret 不符、404 網址錯）是設定錯誤，重試也不會好。
 func retryable(err error) bool {
 	var te *transportError
 	if errors.As(err, &te) {

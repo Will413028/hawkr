@@ -50,7 +50,6 @@ func RecordedValue(l uitext.Locale, r slots.Recorded) string {
 	return r.Value
 }
 
-// unitLabel 是單位代碼的顯示名稱；不認得的代碼原樣回傳，不讓買家看到空字串。
 func unitLabel(l uitext.Locale, code string) string {
 	switch code {
 	case "KG":

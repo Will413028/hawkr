@@ -65,8 +65,6 @@ test("legacy content strings and list items count as text too", () => {
 });
 
 test("an image-only description falls back to the record's own facts", () => {
-	// The prod sample: four説明圖, no text. The summary must still say
-	// something the title does not — and only what the record states.
 	const description = {
 		version: "1.0",
 		blocks: [
@@ -79,7 +77,6 @@ test("an image-only description falls back to the record's own facts", () => {
 		summary,
 		"[範例優選] 文旦禮盒｜產地 屏東｜分類 水果／柚子／文旦｜由 範例優選 供應",
 	);
-	// Never the seller's address as the product's origin, never invented claims.
 	assert.doesNotMatch(summary, /基隆|有機|免運/);
 });
 
@@ -92,7 +89,6 @@ test("no description and no facts degrades to the bare name, not to filler", () 
 });
 
 test("a fragment too short to stand alone joins the fact line instead", () => {
-	// test-api has products whose whole description is "AAA".
 	const summary = productSeoDescription({
 		name: "AA",
 		origin: "台東",

@@ -81,7 +81,6 @@ class StorePickupTimeoutSchedulerTest {
         when(returnReceiptService.autoCompleteFromAtStore("A002", OK)).thenReturn(true);
         when(returnReceiptService.autoCompleteFromAtStore("A003", OK)).thenReturn(false);
 
-        // 第一筆 throw 不應中斷 — A002 / A003 仍要被處理
         scheduler.checkStorePickupTimeout();
 
         verify(returnReceiptService).autoCompleteFromAtStore("A001", OK);
@@ -89,7 +88,6 @@ class StorePickupTimeoutSchedulerTest {
         verify(returnReceiptService).autoCompleteFromAtStore("A003", OK);
     }
 
-    // ==================== issue #2294 B6：反解必須在 tx 之外、且走 strict ====================
 
     @Test
     void resolvesPrincipalsBeforeEnteringTx() {
@@ -107,7 +105,6 @@ class StorePickupTimeoutSchedulerTest {
 
     @Test
     void principalResolutionFails_skipsCaseWithoutEnteringTx() {
-        // strict：不進 tx ⇒ status='26' 與 store_pickup_deadline_at 未變 ⇒ 下一 tick 重撈
         when(caseMapper.findStorePickupExpired(any(LocalDateTime.class), eq(200)))
                 .thenReturn(List.of("BAD", "A002"));
         when(returnReceiptService.resolvePrincipalsForCaseStrict("BAD"))

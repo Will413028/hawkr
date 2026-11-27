@@ -11,9 +11,6 @@ import {
 test.describe("procurement assistant — RFQ publication approval recovery", {
 	tag: ["@ui"],
 }, () => {
-	// 確認快照這一步已移除（A9-D35）；唯一會寫入的前一步是取得發布核准（PreviewRfqPublication），
-	// 它帶 client_request_id，回應遺失時要用同一個身分重送。transport 的重試攔截器對帶 client_request_id
-	// 的方法也會自己重送，所以回應要持續遺失到重試用盡，畫面才會出現錯誤。
 	test("a lost publication-approval response replays the exact same command without publishing", async ({
 		page,
 	}) => {
@@ -48,7 +45,6 @@ test.describe("procurement assistant — RFQ publication approval recovery", {
 		await page.getByRole("button", { name: "確認並準備發布" }).click();
 		await expect(page.getByText("無法取得發布核准")).toBeVisible();
 
-		// 同一份內容再按一次：沿用同一個 client_request_id。
 		responseLost = false;
 		const lostAttempts = bodies.length;
 		await page.getByRole("button", { name: "確認並準備發布" }).click();

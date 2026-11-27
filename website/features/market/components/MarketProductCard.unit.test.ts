@@ -7,8 +7,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MarketProductItem } from "@/lib/market/types";
 import MarketProductCard from "./MarketProductCard";
 
-// Exercise the real card, image and icon boundary. Business actions are test
-// doubles: no cart/favourite writes, and no claim of authenticated acceptance.
 vi.mock("@/components/shared/Link", () => ({
 	default: (props: React.AnchorHTMLAttributes<HTMLAnchorElement>) =>
 		React.createElement("a", props),

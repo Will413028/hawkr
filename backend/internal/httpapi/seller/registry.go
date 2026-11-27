@@ -16,7 +16,6 @@ import (
 // 入口）。外部呼叫在模組、不在任何 transaction 內；查無是回應沒有 registration，資料來源沒有給出可用的答案是 unavailable（兩者不混為
 // 一談，畫面才能分辨「沒有這家公司」與「稍後再試」）。限流與格式檢查在這裡與入口。
 func (h *App) LookupBusinessRegistration(ctx context.Context, req *connect.Request[pb.LookupBusinessRegistrationRequest]) (*connect.Response[pb.LookupBusinessRegistrationResponse], error) {
-	// 格式與檢查碼先在這裡擋下，不打外部（輸入框打錯一碼是常態，不該消耗政府的公開 API）；額度已經在入口計過一次。
 	taxID, ok := model.NormalizeTaxID(req.Msg.GetTaxId())
 	if !ok {
 		return nil, rpc.RequiredField("tax_id", "統一編號不正確：必須是 8 碼數字，而且檢查碼要符合規則")

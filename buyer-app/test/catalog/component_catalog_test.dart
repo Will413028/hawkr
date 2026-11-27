@@ -39,8 +39,6 @@ void main() {
               findsOneWidget,
             );
             expect(tester.takeException(), isNull);
-            // SingleChildScrollView eagerly lays out every actual widget, including
-            // below-fold examples. Moving to the bottom also checks scroll bounds.
             await tester.drag(
               find.byKey(ValueKey('catalog-scroll-$section')),
               const Offset(0, -1600),

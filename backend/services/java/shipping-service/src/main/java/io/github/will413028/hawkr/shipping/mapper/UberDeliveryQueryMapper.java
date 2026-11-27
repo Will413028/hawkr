@@ -110,7 +110,6 @@ public interface UberDeliveryQueryMapper {
             </choose>
             """;
 
-    // ==================== 賣家面 ====================
 
     @Select({"<script>",
             "SELECT", SELECT_COLUMNS,
@@ -172,7 +171,6 @@ public interface UberDeliveryQueryMapper {
     UberDeliveryRow selectSellerDeliveryDetail(@Param("storeId") long storeId,
                                                @Param("deliveryNo") String deliveryNo);
 
-    // ==================== Admin 面 ====================
 
     /**
      * Admin 列表。九個篩選維度逐項對應 W6-4「Uber Delivery List」。
@@ -193,14 +191,11 @@ public interface UberDeliveryQueryMapper {
             "<if test='storeId != null'>AND s.store_id = #{storeId}</if>",
             "<if test='shipmentNo != null and shipmentNo != \"\"'>AND s.shipment_no = #{shipmentNo}</if>",
             "<if test='deliveryId != null and deliveryId != \"\"'>",
-            //  provider id 兩處都可能有值：uber_deliveries 是主體，shipments.uber_delivery_id 是
-            //  月結對帳用的鏡射。只比對其中一邊，會在另一邊先寫入時查不到（而那正是出事時的狀態）。
             "  AND (d.delivery_id = #{deliveryId} OR s.uber_delivery_id = #{deliveryId})",
             "</if>",
             "<if test='failureOnly'>",
             "  AND (d.outcome IS NOT NULL OR NULLIF(s.provider_error_code, '') IS NOT NULL)",
             "</if>",
-            //  '991' = ShippingStatus.CREATE_UNKNOWN
             "<if test='unknownOnly'>AND s.status = '991'</if>",
             COMMON_FILTERS,
             ORDER_BY,

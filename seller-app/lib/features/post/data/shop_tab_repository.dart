@@ -36,7 +36,6 @@ class RemoteShopTabRepository implements ShopTabRepository {
     try {
       await _localService.writeProducts(sellerId, products);
     } catch (_) {
-      // Cache writes are best effort and never hide fresh remote data.
     }
     return _freezeProducts(products);
   }

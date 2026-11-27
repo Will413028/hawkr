@@ -20,7 +20,6 @@ class RunsDeltaAdapter {
         delta.insert(text, attrs.isEmpty ? null : attrs);
       }
     }
-    // 確保結尾換行（Quill Document 要求）
     delta.insert('\n');
     return delta;
   }
@@ -30,8 +29,7 @@ class RunsDeltaAdapter {
     final raw = <Map<String, dynamic>>[];
     for (final op in delta.toList()) {
       final data = op.data;
-      if (data is! String) continue; // 略過 embed（圖片等，本編輯器不會有）
-      // 去掉文件結尾強制換行；段內換行轉為空白（單段落 block）
+      if (data is! String) continue;
       final text = data.replaceAll('\n', ' ');
       if (text.isEmpty) continue;
       final run = <String, dynamic>{'text': text};

@@ -42,7 +42,6 @@ class NotificationService: UNNotificationServiceExtension {
         let attachment = try UNNotificationAttachment(identifier: "image", url: target)
         self.bestAttemptContent?.attachments = [attachment]
       } catch {
-        // Deliver without the image.
       }
     }
     downloadTask = task

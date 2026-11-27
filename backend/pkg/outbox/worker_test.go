@@ -36,7 +36,7 @@ type updateCall struct {
 type fakeRepo struct {
 	pending []*fakeRow
 
-	claimClaimed int64 // 0 = default to "claimed" (1) unless claimErr is set
+	claimClaimed int64
 	claimErr     error
 	claimCalls   []claimCall
 
@@ -119,9 +119,8 @@ func TestWorker_ProcessSuccess_MarksDoneAndFiresOnDone(t *testing.T) {
 }
 
 func TestWorker_ClaimLost_SkipsProcessAndHooks(t *testing.T) {
-	repo := &fakeRepo{pending: []*fakeRow{{id: 1, attempt: 0}}, claimClaimed: -1} // sentinel handled below
+	repo := &fakeRepo{pending: []*fakeRow{{id: 1, attempt: 0}}, claimClaimed: -1}
 	repo.claimClaimed = 0
-	// Force "lost" by making Claim return 0 explicitly via a wrapper repo.
 	lostRepo := &lostClaimRepo{fakeRepo: repo}
 	processCalled := false
 	attemptFailedCalled := false
@@ -145,8 +144,6 @@ func TestWorker_ClaimLost_SkipsProcessAndHooks(t *testing.T) {
 	}
 }
 
-// lostClaimRepo wraps fakeRepo so Claim always reports "another replica won"
-// (rows affected = 0) while still recording the call for assertions.
 type lostClaimRepo struct{ *fakeRepo }
 
 func (l *lostClaimRepo) Claim(ctx context.Context, id int64, leaseUntil, claimableBefore time.Time) (int64, error) {
@@ -322,7 +319,7 @@ func TestWorker_ProcessFails_BumpsAttemptWithBackoff(t *testing.T) {
 }
 
 func TestWorker_AttemptCapReached_MarksFailedAndFiresOnTerminalFailed(t *testing.T) {
-	repo := &fakeRepo{pending: []*fakeRow{{id: 1, attempt: 4}}} // one more failure hits MaxAttempts=5
+	repo := &fakeRepo{pending: []*fakeRow{{id: 1, attempt: 4}}}
 	var gotAttempt int
 	var gotLastErr string
 	var gotMarkErr error
@@ -345,7 +342,6 @@ func TestWorker_AttemptCapReached_MarksFailedAndFiresOnTerminalFailed(t *testing
 	if err := w.RunOnce(context.Background()); err != nil {
 		t.Fatalf("RunOnce: %v", err)
 	}
-	// A terminal failure is still an attempt failure: both hooks fire.
 	if attemptFailedCount != 1 {
 		t.Fatalf("OnAttemptFailed fired %d times, want 1", attemptFailedCount)
 	}
@@ -428,7 +424,7 @@ func TestBackoffFor_ExponentialCappedAtMax(t *testing.T) {
 		{2, 4 * time.Minute},
 		{3, 8 * time.Minute},
 		{4, 16 * time.Minute},
-		{10, time.Hour}, // capped
+		{10, time.Hour},
 	}
 	for _, c := range cases {
 		if got := backoffFor(c.attempt, base, maxD); got != c.want {

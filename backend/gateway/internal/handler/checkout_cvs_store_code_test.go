@@ -65,7 +65,6 @@ func TestResolveCvsStore(t *testing.T) {
 			wantOK:         true,
 		},
 		{
-			// 這一格就是 dev 上那 79 列髒訂單的形狀：宅配單帶著賣家 store_id。
 			name:           "home delivery rejects a platform store_id posing as a branch code",
 			shippingMethod: "3001",
 			legacyStoreID:  "7487768729113814280",
@@ -84,14 +83,12 @@ func TestResolveCvsStore(t *testing.T) {
 			wantOK:         false,
 		},
 		{
-			// 門市名稱單獨留著會寫出「有店名沒店號」的訂單列，一併丟掉。
 			name:            "home delivery drops a stray store name",
 			shippingMethod:  "3001",
 			legacyStoreName: "大安門市",
 			wantOK:          true,
 		},
 		{
-			// 買家先選 3002 看運費、再挑門市——preview 這一步代號還是空的，必須放行。
 			name:           "CVS pickup before a branch is picked is allowed",
 			shippingMethod: "3002",
 			wantOK:         true,

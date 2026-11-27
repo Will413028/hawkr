@@ -13,20 +13,16 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// 已算進轉帳金額的退款之後失敗，賣家少收了那筆錢，補一筆轉帳給賣家（D11 補充）：補差額的狀態記在退款列（topup_*），不是轉帳列，
-// 所以不佔 transfers_active_payment、不動轉帳的 amount；結果依 D68 三分收斂。
 
 const kindTransferTopup = "payment.transfer_topup"
 
 var errRefundDeclined = fmt.Errorf("%w：卡片已失效", ErrChargePermanent)
 
-// topupOf 讀退款列的補差額狀態。
 func (f *chargeFixture) topupOf(t *testing.T, refundID interface{ String() string }) string {
 	t.Helper()
 	return f.text(t, "SELECT topup_status FROM payment.refunds WHERE id = $1::uuid", refundID.String())
 }
 
-// topupSending 建立一筆已入帳 100 的付款：轉帳送出前已有一筆 30 的退款（算進轉帳金額，賣家收 70），轉帳成立之後這筆退款被 provider 拒絕，補差額進 SENDING。
 func (f *chargeFixture) topupSending(t *testing.T, orderNo string) (PaymentTransfer, PaymentRefund) {
 	t.Helper()
 	f.paidPayment(t, orderNo, 100)

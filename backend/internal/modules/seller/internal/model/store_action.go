@@ -62,20 +62,17 @@ type KYCApplicationState struct {
 	SellerType KYCSellerType
 }
 
-// storeActionFacts 是推導需要的事實；各動作只填它用得到的部分。
 type storeActionFacts struct {
 	Store Store
 	KYC   KYCApplicationState
 }
 
-// storeActionRule 是有效組合表的一列：原因、成立的條件、給員工的句子。句子、種類與組合因此只有這一份。
 type storeActionRule struct {
 	Reason  StoreActionUnavailableReason
 	Applies func(storeActionFacts) bool
 	Text    func() uitext.Message
 }
 
-// 各動作共用的條件。
 var (
 	whenStoreClosed = func(f storeActionFacts) bool { return f.Store.Status == Closed }
 	whenPending     = func(f storeActionFacts) bool { return f.Store.Status == PendingDeletion }
@@ -83,13 +80,10 @@ var (
 	whenKYCNotSub   = func(f storeActionFacts) bool { return f.KYC.Status != KYCStatusSubmitted }
 )
 
-// missesDelegating 回報店家缺 CapStorefrontWrite 的哪個條件（代行營運看的就是店家能不能寫店面）。
 func missesDelegating(r Requirement) func(storeActionFacts) bool {
 	return func(f storeActionFacts) bool { return slices.Contains(missingFor(CapStorefrontWrite, f.Store), r) }
 }
 
-// storeActionRules 是有效組合表，也是規則與句子本身：每個動作是一串依先後排列的 (原因, 條件, 句子)，推導就是依序跑條件、成立的原因依表的順序收集。
-// 每個動作有哪些原因、什麼順序、說什麼只有這一份；四支推導函式只組 facts，不另寫條件、順序與句子。
 var storeActionRules = map[StoreAction][]storeActionRule{
 	StoreActionCreateMeasure: {
 		{StoreReasonStoreClosed, func(f storeActionFacts) bool {
@@ -120,7 +114,6 @@ var storeActionRules = map[StoreAction][]storeActionRule{
 	},
 }
 
-// unavailableReasons 依表的順序跑 a 的條件，回傳成立的原因（空表示可以做）；未知的動作回 nil。
 func unavailableReasons(a StoreAction, f storeActionFacts) []StoreActionUnavailableReason {
 	var out []StoreActionUnavailableReason
 	for _, rule := range storeActionRules[a] {

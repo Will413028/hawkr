@@ -26,9 +26,7 @@ import {
  *  - 正向段釘住固定台北日期字串；以 `TZ=<任意值> vitest` 跑都必須一致
  */
 
-// 2026-07-30T16:30:00Z：UTC 是 7/30、台北是 7/31 —— 跨日窗口的代表值。
 const CROSS_MIDNIGHT_ISO = "2026-07-30T16:30:00Z";
-// 2026-07-30T02:00:00Z：UTC 與台北同一天 —— 對照組。
 const SAME_DAY_ISO = "2026-07-30T02:00:00Z";
 
 describe("反向驗證：舊寫法（locale + runtime 時區）確實會飄", () => {
@@ -41,7 +39,6 @@ describe("反向驗證：舊寫法（locale + runtime 時區）確實會飄", ()
 			timeZone: "Asia/Taipei",
 		}).format(instant);
 
-		// 這就是 #374 的來源：UTC runtime 與台北使用者看到的日期不同。
 		expect(asUtc).not.toBe(asTaipei);
 	});
 });
@@ -56,15 +53,12 @@ describe("formatTaipeiDate", () => {
 	});
 
 	it("以 UTC 欄位計算，因此不呼叫任何 local-time getter", () => {
-		// 若實作誤用 getFullYear/getMonth/getDate，把 process.env.TZ 換掉就會炸。
-		// 這裡直接以「同一 instant 的多種輸入型別」交叉核對輸出恆等。
 		const iso = CROSS_MIDNIGHT_ISO;
 		const ms = new Date(iso).getTime();
 
 		expect(formatTaipeiDate(iso)).toBe("2026/07/31");
 		expect(formatTaipeiDate(ms)).toBe("2026/07/31");
 		expect(formatTaipeiDate(new Date(iso))).toBe("2026/07/31");
-		// unix 秒（評價 / 優惠券 / 客戶列表的 wire 形狀）與純數字字串（會員卡明細）
 		expect(formatTaipeiDate(Math.floor(ms / 1000))).toBe("2026/07/31");
 		expect(formatTaipeiDate(String(ms))).toBe("2026/07/31");
 		expect(formatTaipeiDate(String(Math.floor(ms / 1000)))).toBe("2026/07/31");
@@ -75,11 +69,8 @@ describe("formatTaipeiDate", () => {
 	});
 
 	it("台北時間的月／年邊界不會被偏移算錯", () => {
-		// 2025-12-31T16:00:00Z = 2026-01-01 00:00 台北
 		expect(formatTaipeiDate("2025-12-31T16:00:00Z")).toBe("2026/01/01");
-		// 2026-01-31T16:00:00Z = 2026-02-01 00:00 台北
 		expect(formatTaipeiDate("2026-01-31T16:00:00Z")).toBe("2026/02/01");
-		// 閏年 2/29 也在偏移後成立
 		expect(formatTaipeiDate("2028-02-28T16:00:00Z")).toBe("2028/02/29");
 	});
 
@@ -129,7 +120,6 @@ describe("formatTaipeiIsoDate（YYYY-MM-DD，表單控制項的值）", () => {
  */
 describe("formatTaipeiDateTime（YYYY/MM/DD HH:mm）", () => {
 	it("跨日窗口的日期與時間都以台北牆上時間計算", () => {
-		// 16:30Z → 台北 00:30（隔天）：日期進位、時間歸零附近，兩邊同時驗證。
 		expect(formatTaipeiDateTime(CROSS_MIDNIGHT_ISO)).toBe("2026/07/31 00:30");
 	});
 
@@ -138,7 +128,6 @@ describe("formatTaipeiDateTime（YYYY/MM/DD HH:mm）", () => {
 	});
 
 	it("24 小時制、時分補零，且不含秒", () => {
-		// 舊寫法在這個 instant 會產出 `2026/7/30 下午3:05:09`（依 runtime 而定）。
 		expect(formatTaipeiDateTime("2026-07-30T07:05:09Z")).toBe(
 			"2026/07/30 15:05",
 		);
@@ -237,7 +226,6 @@ describe("formatTaipeiTime（HH:mm）", () => {
 
 describe("taipeiParts（自訂排版用的逃生門）", () => {
 	it("回傳台北牆上時間的年月日時分與星期", () => {
-		// 2026-07-30T16:30:00Z → 台北 2026/07/31 00:30，2026-07-31 是週五(5)。
 		expect(taipeiParts(CROSS_MIDNIGHT_ISO)).toEqual({
 			year: 2026,
 			month: 7,
@@ -249,7 +237,6 @@ describe("taipeiParts（自訂排版用的逃生門）", () => {
 	});
 
 	it("weekday 以台北的日期為準，不是 UTC 的日期", () => {
-		// 同一個 instant 在 UTC 還是 7/30（週四=4），台北已跨到 7/31（週五=5）。
 		expect(new Date(CROSS_MIDNIGHT_ISO).getUTCDay()).toBe(4);
 		expect(taipeiParts(CROSS_MIDNIGHT_ISO)?.weekday).toBe(5);
 	});
@@ -280,8 +267,6 @@ describe("taipeiParts（自訂排版用的逃生門）", () => {
 
 describe("反向驗證：四個輸出都與 runtime 時區脫鉤", () => {
 	it("以 UTC 欄位計算，所以 process.env.TZ 換掉不會改變輸出", () => {
-		// 這一段是「守住了什麼」的證明：舊寫法在 UTC runtime 會產出 7/30，
-		// 這裡四個輸出全部固定在台北的 7/31 —— 與 vitest 進程的 TZ 無關。
 		const asUtcText = new Intl.DateTimeFormat("zh-TW", {
 			timeZone: "UTC",
 			dateStyle: "short",
@@ -297,9 +282,6 @@ describe("反向驗證：四個輸出都與 runtime 時區脫鉤", () => {
 	});
 
 	it("反向對照：local-time getter 在 UTC runtime 下會產出不同的日／時", () => {
-		// 這是 #391 第二輪要根除的寫法。vitest 進程的 TZ 由外部指定，這裡只斷言
-		// 「兩者在非台北 runtime 下不相等」——TZ=Asia/Taipei 時本來就會相等，
-		// 所以用 UTC 欄位當固定的對照組，不依賴進程 TZ。
 		const d = new Date(CROSS_MIDNIGHT_ISO);
 		const utcRendered = `${d.getUTCFullYear()}/${String(
 			d.getUTCMonth() + 1,
@@ -311,7 +293,6 @@ describe("反向驗證：四個輸出都與 runtime 時區脫鉤", () => {
 });
 
 describe("toEpochMs（秒／毫秒判別收斂點）", () => {
-	// 期望值一律由 ISO 反推，不寫死憑印象的 epoch 數字。
 	const MS = Date.parse(CROSS_MIDNIGHT_ISO);
 	const SECONDS = Math.floor(MS / 1000);
 

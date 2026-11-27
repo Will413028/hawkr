@@ -82,15 +82,12 @@ func TestUpdateQuotaVersionRules(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 帶目前的版本：更新並加一。
 	got, err := h.s.UpdateQuota(ctx, model.UpdateQuotaInput{Actor: actor, StoreID: 11, WeeklyLimit: 40, Version: created.Version})
 	if err != nil || got.WeeklyLimit != 40 || got.Version != created.Version+1 {
 		t.Fatalf("got=%+v err=%v", got, err)
 	}
-	// 過期的版本：ABORTED（VersionConflict）。
 	_, err = h.s.UpdateQuota(ctx, model.UpdateQuotaInput{Actor: actor, StoreID: 11, WeeklyLimit: 50, Version: created.Version})
 	wantKind(t, err, apperr.KindVersionConflict)
-	// 帶了版本但個別設定已被刪除：也是過期。
 	if err := h.s.DeleteQuota(ctx, actor, 11, 0); err != nil {
 		t.Fatal(err)
 	}

@@ -12,7 +12,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
 )
 
-// compiled 是一份核准對賣家與受眾的內容，與它的兩個 hash：全部由核准參照的不可變列重算（核准只存參照）。
 type compiled struct {
 	payload      model.SellerFacing
 	sellerHash   string
@@ -20,7 +19,6 @@ type compiled struct {
 	storeIDs     []int64
 }
 
-// compile 讀核准對應的需求版本與受眾名單，連同核准凍結的單價範圍、補充說明與回價期限組出賣家看得到的內容並重算 hash；任何一列讀不到是資料不一致。
 func compile(ctx context.Context, q *store.Queries, buyerID int64, a store.ProcurementRfqPublicationApproval) (compiled, error) {
 	owner := buyerID
 	rev, err := q.GetRevision(ctx, store.GetRevisionParams{ID: a.RequestRevisionID, RequestID: a.RequestID, BuyerID: &owner})
@@ -41,7 +39,6 @@ func compile(ctx context.Context, q *store.Queries, buyerID int64, a store.Procu
 	return assemble(a, rev, c)
 }
 
-// assemble 由核准、它的需求版本與受眾名單組出賣家看得到的內容並重算兩個 hash（純函式，沒有 I/O）：賣家可見的每個欄位不是來自核准凍結的欄位就是來自不可變的需求版本。
 func assemble(a store.ProcurementRfqPublicationApproval, rev store.ProcurementRequestRevision, c compiled) (compiled, error) {
 	var err error
 	if c.payload, c.sellerHash, err = SellerFacingOf(a, rev); err != nil {
@@ -96,7 +93,6 @@ func deref(s *string) string {
 	return *s
 }
 
-// dateOnly 把時間正規化成當日 UTC 午夜（DATE 欄位的值）。
 func dateOnly(t time.Time) time.Time {
 	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
 }

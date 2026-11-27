@@ -69,7 +69,6 @@ void main() {
               )
               .build(),
         ),
-        // GetSession 經過真的身分 interceptor：驗證登入之後的請求帶 session token。
         identityClientProvider.overrideWith(
           (ref) => IdentityAppServiceClient(
             FakeTransportBuilder()

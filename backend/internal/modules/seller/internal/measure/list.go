@@ -13,7 +13,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// listRow 是各個列表查詢的共同形狀。
 type listRow struct {
 	row    store.SellerMeasure
 	sortAt time.Time
@@ -51,8 +50,6 @@ func validState(state *model.MeasureState) (*string, error) {
 	return (*string)(state), nil
 }
 
-// stateIDs 回傳此刻生效中與預定生效的措施 ID（state 是 ACTIVE、SCHEDULED 或 ENDED 的篩選用；其餘狀態只看儲存的欄位，不需要。ENDED 是「不在生效中
-// 也不在預定生效」，所以兩個集合都要）：與列表查詢在同一個快照，「生效中」的定義仍只有 EffectiveMeasures，「預定生效」只有 ScheduledMeasureIDs。
 func (s *Service) stateIDs(ctx context.Context, q *store.Queries, accountID int64, state *string, force bool, now time.Time) (active, scheduled []uuid.UUID, err error) {
 	if !force && (state == nil || (*state != string(model.StateActive) && *state != string(model.StateScheduled) && *state != string(model.StateEnded))) {
 		return []uuid.UUID{}, []uuid.UUID{}, nil
@@ -155,7 +152,6 @@ func (s *Service) AdminMeasures(ctx context.Context, in model.AdminMeasureListIn
 		if in.After != nil {
 			after, afterID = &in.After.SortAt, &in.After.ID
 		}
-		// 請求對外的狀態要看措施是否生效中，所以有請求篩選時 active_ids 一定要取（「生效中」的定義只有 EffectiveMeasures）。
 		active, scheduled, err := s.stateIDs(ctx, q, in.AccountID, state, requestState != nil, now)
 		if err != nil {
 			return err

@@ -44,13 +44,10 @@ test("4403 畫出 CodeMeta 的「已下架」pill", () => {
 		html.includes(UNPUBLISHED_LABEL),
 		`4403 應畫出 ${UNPUBLISHED_LABEL} pill，實得：${html}`,
 	);
-	// 平台強制下架是另一顆（danger tone、文字「平台下架」），不得混用。
 	assert.ok(!html.includes("平台下架"), "4403 不是平台強制下架");
 	assert.ok(!html.includes(DRAFT_LABEL), `4403 不是${DRAFT_LABEL}`);
 });
 
-// 這一顆曾經是裸字串「草稿」，於是 CodeMeta 把 4401 的 Label 改成「未發布」時，
-// 後端回「未發布」而畫面仍寫「草稿」。斷言綁 Label 而非字面值才擋得住下一次。
 test("4401 畫出 CodeMeta 的 Label，不是寫死的中文", () => {
 	const html = render(PostPublishStatus.DRAFT);
 	assert.ok(
@@ -58,7 +55,6 @@ test("4401 畫出 CodeMeta 的 Label，不是寫死的中文", () => {
 		`4401 應畫出 ${DRAFT_LABEL} pill，實得：${html}`,
 	);
 	assert.ok(!html.includes(UNPUBLISHED_LABEL), "4401 不是已下架");
-	// 元件不得留著任何與 CodeMeta 脫鉤的舊字面值。
 	const source = readFileSync(
 		new URL(
 			"../features/seller-center/posts/PostDraftBadge.tsx",
@@ -102,10 +98,7 @@ test("列表與詳情彈窗都走單一分派點", () => {
 });
 
 test("已發布與缺值一律不畫（含不留空外框）", () => {
-	// 已發布是常態，標記它只會讓真正需要注意的兩態淹掉。
 	assert.equal(render(PostPublishStatus.PUBLISHED), "");
-	// 缺值＝「這條資料路徑的上游沒給」，不是「已發布」。現在兩條清單路徑都帶
-	// publishStatus，但述詞的防線守的是「任何一條漏帶」，不隨路徑補齊而撤除。
 	assert.equal(render(undefined), "");
 	assert.equal(render(""), "");
 });

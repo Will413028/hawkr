@@ -1,8 +1,5 @@
 import { expect } from "vitest";
 
-// 同步 DOM matcher：`expect(element)` 直接檢查一個已取得的元素，用在 waitFor 的重試迴圈裡。
-// 名稱都帶 Sync 後綴，不覆蓋 vitest/browser 內建（只用在 `expect.element`、自己重試）的同名 matcher。
-// 只有 import 本檔的測試檔才註冊。
 
 declare module "vitest" {
 	interface Assertion {

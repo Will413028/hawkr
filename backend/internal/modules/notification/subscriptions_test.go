@@ -8,8 +8,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/notification/internal/registry"
 )
 
-// 事件裁決表（backend/docs/plans/2026-11-23-a8-notification/event-adjudication.md）裡每個沒標「不做」的單體事件，與它登記的型別。
-// 覆蓋測試以這份清單對照 subscriptions() 這張表：表少一列、多一列、或某列的型別不同，都會紅。
 var adjudicatedEvents = map[string][]string{
 	"accountsuspension.Suspended":             {"account_suspended"},
 	"accountsuspension.Unsuspended":           {"account_unsuspended"},
@@ -52,7 +50,6 @@ var adjudicatedEvents = map[string][]string{
 	"procurement.RfqPublished":                {"rfq_invited"},
 }
 
-// 裁決表標「不做」的單體事件：不能有登記通知型別的訂閱者（個資清除的訂閱者不算）。
 var notNotifiedEvents = []string{
 	"identity.AccountDeleted", "buyer.BuyerDeleted", "seller.StoreRetired",
 	"buyer.FavoriteAdded", "buyer.FavoriteRemoved", "buyer.ProductViewed",
@@ -60,7 +57,6 @@ var notNotifiedEvents = []string{
 	"seller.MeasureRequestSubmitted", "seller.MeasureRequestClosed", "seller.KYCSubmitted", "seller.KYCCancelled",
 }
 
-// 清除訂閱者訂閱的事件：刪帳、刪買家、店家退場、停權（裝置 token）。
 var erasureEvents = []string{"identity.AccountDeleted", "buyer.BuyerDeleted", "seller.StoreRetired", "accountsuspension.Suspended"}
 
 func subscribedTypes(subs []subscription) map[string][]string {

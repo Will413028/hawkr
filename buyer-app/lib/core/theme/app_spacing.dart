@@ -22,7 +22,6 @@ import 'hk_tokens.dart';
 class AppSpacing {
   AppSpacing._();
 
-  // ── 固定間距 (用於 SizedBox / Padding) ─────────────────────
   /// 同組元素間最小距（icon 與 text）
   static double get xs => 4.w;
 
@@ -44,25 +43,21 @@ class AppSpacing {
   /// 大區塊分隔、空狀態垂直間距
   static double get xxxl => 48.w;
 
-  // ── 頁面標準水平 Padding ─────────────────────────────────
   static EdgeInsets get page => EdgeInsets.symmetric(horizontal: 16.w);
   static EdgeInsets get pageVertical => EdgeInsets.symmetric(vertical: 16.h);
   static EdgeInsets get pageBoth =>
       EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h);
 
-  // ── 卡片內距 ───────────────────────────────────────────
   static EdgeInsets get card => EdgeInsets.all(16.w);
   static EdgeInsets get cardCompact =>
       EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h);
 
-  // ── 觸控目標 Touch Target ──────────────────────────────
   /// Apple HIG 強制下限。所有可點擊元件實際尺寸必須 ≥ 此值。
   static const double minTouchTarget = HkControl.minTap;
 
   /// Material 標準建議
   static const double recommendedTouchTarget = 48;
 
-  // ── 元件高度 Component Heights ─────────────────────────
   /// Pill / chip 按鈕高度
   static double get buttonHeightSm => 36.h;
 

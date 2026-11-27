@@ -17,7 +17,7 @@ func TestNormalize(t *testing.T) {
 		{"Fruit", "fruit", "Fruit", true},
 		{"  #Fruit　", "fruit", "Fruit", true},
 		{"##有機", "有機", "有機", true},
-		{"é", "é", "é", true}, // 顯示是 NFC；名稱在字元集驗證時被拒絕（é 不是 a-z）
+		{"é", "é", "é", true},
 		{"", "", "", false},
 		{"#", "", "", false},
 		{" \t ", "", "", false},
@@ -64,7 +64,6 @@ func TestRequireSet(t *testing.T) {
 	if _, err := RequireSet(uitext.ZhTW, many[:MaxCount]); err != nil {
 		t.Errorf("剛好 %d 個可以：%v", MaxCount, err)
 	}
-	// 重複的不算數量。
 	dup := []string{"a", "A", "a"}
 	if got, err := RequireSet(uitext.ZhTW, dup); err != nil || len(got) != 1 {
 		t.Errorf("%v %v", got, err)

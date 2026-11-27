@@ -36,14 +36,11 @@ const (
 	MaxPageSize     int32 = 50
 )
 
-// resendable 是可以重送的失敗原因：問題在收件人的設定或外部服務，事後可能已經不同。其餘的原因（來源事實已不成立、位址在停寄名單、
-// 收件人已刪除或退場、意圖或型別不在了、組字失敗、渠道不支援）重送不會有不同結果或不該送，一律不重送；新增的原因預設不可重送。
 var resendable = []string{
 	deliver.ReasonNoDeviceToken, deliver.ReasonTokenGone, deliver.ReasonPushRejected,
 	deliver.ReasonNoEmailAddress, deliver.ReasonEmailRejected, deliver.ReasonRetriesExhausted,
 }
 
-// notReached 是不算「未觸達」的失敗原因：刻意不送（來源事實已不成立）與收件人已刪除。
 var notReached = []string{deliver.ReasonNoLongerValid, deliver.ReasonRecipientGone}
 
 // Resendable 回傳可重送的失敗原因（每次回傳新的切片）。

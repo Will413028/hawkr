@@ -20,7 +20,6 @@ func (s *Service) ReadEvidence(ctx context.Context, in model.ReadEvidenceInput) 
 	if err := model.Positive(in.AdminID); err != nil {
 		return model.FileContent{}, err
 	}
-	// 序號的上界：通報的佐證是原通報加全部補充的，申覆的請求與詢問的回覆只有一次送出。
 	limit := model.MaxEvidence
 	if in.Kind == model.EvidenceReport {
 		limit = model.MaxReportEvidence
@@ -36,7 +35,6 @@ func (s *Service) ReadEvidence(ctx context.Context, in model.ReadEvidenceInput) 
 			return err
 		}
 		evidence = found.Evidence
-		// 讀取紀錄以佐證列的鍵指向它：通報的是 (通報, 第幾次送出, 次內位置)，請求的是 (請求, 位置)，詢問回覆的附件是 (詢問, 位置)。
 		if in.Kind == model.EvidenceInquiry {
 			return q.InsertInquiryEvidenceAccess(ctx, store.InsertInquiryEvidenceAccessParams{
 				AccessID: uuid.NewV7(), InquiryID: &in.RefID, Position: found.rowPosition, AdminID: in.AdminID, Now: s.d.Now().UTC(),
@@ -58,14 +56,12 @@ func (s *Service) ReadEvidence(ctx context.Context, in model.ReadEvidenceInput) 
 	return model.ReadSecure(ctx, s.d.Media, evidence.AssetID)
 }
 
-// evidenceRow 是讀到的一張佐證與它在表裡的鍵（讀取紀錄用）：submissionSeq 只有通報的佐證有意義，rowPosition 通報的是次內位置、請求的是位置。
 type evidenceRow struct {
 	model.Evidence
 	submissionSeq int16
 	rowPosition   int32
 }
 
-// evidenceAt 讀一筆通報、請求（申覆）或詢問回覆的第 n 張佐證（通報的依送出的順序與次內位置編號，同 Report.evidence 的順序）；紀錄不存在、或沒有第 n 張是 NotFound。
 func evidenceAt(ctx context.Context, q *store.Queries, kind model.EvidenceKind, refID uuid.UUID, n int) (evidenceRow, error) {
 	switch kind {
 	case model.EvidenceReport:

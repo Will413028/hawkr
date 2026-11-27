@@ -38,11 +38,9 @@ func ParseROCDate(s string) (*time.Time, error) {
 		return nil, fmt.Errorf("invalid ROC date format: %q (expected YYY/MM/DD)", s)
 	}
 
-	// 驗證年份為三位數
 	if len(parts[0]) != 3 {
 		return nil, fmt.Errorf("invalid ROC date format: %q (year must be 3 digits)", s)
 	}
-	// 驗證月日為兩位數
 	if len(parts[1]) != 2 || len(parts[2]) != 2 {
 		return nil, fmt.Errorf("invalid ROC date format: %q (month/day must be 2 digits)", s)
 	}

@@ -26,8 +26,6 @@ test("buttonClasses: bordered has 2px border (hkui --bordered)", () => {
 });
 
 test("buttonClasses: bordered default carries dark override", () => {
-	// The three literals moved to --page-button-bordered-* in
-	// styles/foundation/00-color-config.css (same values, now tokenised).
 	const c = buttonClasses({ variant: "bordered", color: "default" });
 	assert.ok(c.includes("dark:border-[var(--page-button-bordered-border)]"));
 	assert.ok(c.includes("dark:text-[var(--page-button-bordered-fg)]"));
@@ -207,8 +205,6 @@ test("Brand button loader has a static reduced-motion state", () => {
 });
 
 test("buttonClasses: warning text uses -700 shade (hkui contrast)", () => {
-	// hkui-btn uses var(--hkui-warning-700) for warning text on bordered/light
-	// (transparent bg needs the darker shade); solid keeps the -foreground token.
 	assert.ok(
 		buttonClasses({ variant: "bordered", color: "warning" }).includes(
 			"text-[var(--hkui-warning-700)]",

@@ -11,7 +11,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 )
 
-// hideRow 繞過服務層（服務層的 Hide 會先鎖內容列）直接寫一筆隱藏，測 trigger 與 reevaluate 自己的鎖。
 func (f *fixture) hideRow(ctx context.Context, comment uuid.UUID) error {
 	_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO social.hides (id, comment_id, reason_category, reason_text, admin_id, hidden_at)
 		VALUES ($1, $2, 'SPAM', 'x', 1, $3)`, uuid.NewV7(), comment, f.clock())
@@ -34,7 +33,6 @@ func TestConcurrentReevaluatesDoNotCountTwice(t *testing.T) {
 	b := f.newBuyer(t)
 	p := f.publishedPost(t, storeID, "貼文")
 	cm := mustV[social.Comment](t)(f.module.CreateComment(ctx, f.asBuyer(b), social.CommentInput{PostID: p.ID, Body: "留言"}))
-	// 旗標漂移：事實是計入，旗標與計數卻是不計入（計數與旗標一致，所以兩次加一的錯會看得出來）。
 	f.exec(t, "UPDATE social.comments SET counted = FALSE WHERE id = $1", cm.ID)
 	f.exec(t, "UPDATE social.post_stats SET comment_count = 0 WHERE post_id = $1", p.ID)
 	reevaluate := func(ctx context.Context) error {
@@ -156,7 +154,6 @@ func TestReevaluateIsIdempotentAndRepairsAFlag(t *testing.T) {
 	if n := changed(); n != 0 {
 		t.Fatalf("旗標正確時重新求值改變了 %d 筆", n)
 	}
-	// 旗標被改成假（模擬維護漏了）：重新求值把它修回真，並把貼文的留言數補回。
 	f.exec(t, "UPDATE social.comments SET counted = FALSE WHERE id = $1", cm.ID)
 	f.exec(t, "UPDATE social.post_stats SET comment_count = 0 WHERE post_id = $1", p.ID)
 	if n := changed(); n != 1 {

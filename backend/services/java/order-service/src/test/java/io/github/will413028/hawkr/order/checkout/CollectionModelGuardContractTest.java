@@ -192,9 +192,6 @@ class CollectionModelGuardContractTest {
         @Test
         @DisplayName("未知配送方式 fail-closed：不得 default 成平台履約")
         void unknownShippingMethodFailsClosed() {
-            // 🔴 BLOCKER 6：「Missing / unknown / inconsistent → BLOCK」。
-            //    舊版對任何非 3005 的輸入一律回 PLATFORM_LOGISTICS，包含打錯的字串與未來新增的碼。
-            //    這一欄會成為撥款與開票的法源，猜錯不會有任何東西發現。
             for (String bogus : new String[]{"3099", "", "  ", "TAQBIN", "9999"}) {
                 assertThatThrownBy(() -> resolver.resolve(bogus))
                         .as("配送方式 '" + bogus + "' 應被擋下")

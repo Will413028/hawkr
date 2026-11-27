@@ -92,7 +92,6 @@ class PostFeedController extends _$PostFeedController with ViewerScoped {
         seed: page.posts,
       );
     } catch (_) {
-      // 失敗保留 page token，下次仍可重試；過期的結果也走這裡丟棄。
     } finally {
       if (scope.isCurrent) _loadingMore = false;
     }

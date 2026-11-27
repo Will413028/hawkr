@@ -35,8 +35,6 @@ class AppToggleSwitch extends StatefulWidget {
 
 class _AppToggleSwitchState extends State<AppToggleSwitch>
     with SingleTickerProviderStateMixin {
-  // ── 尺寸常數（跟原 Figma 36×20 spec 的比例）──
-  // width = h × 1.8   thumb = h × 0.8   padding = h × 0.1
   static const double _defaultHeight = 20;
 
   double get _h => widget.height ?? _defaultHeight;
@@ -45,14 +43,12 @@ class _AppToggleSwitchState extends State<AppToggleSwitch>
   double get _thumbSize => _h * 0.8;
   double get _padding => _h * 0.1;
 
-  // 可拖拉的水平距離 (track 內扣掉 padding + thumb 寬度)
   double get _maxTranslate => _trackW.w - _thumbSize.w - _padding.w * 2;
 
   late final AnimationController _controller;
   bool _isDragging = false;
   bool _isPressed = false;
 
-  // Spring: stiffness 500 + damping 26 大約是「有點 bounce 但不誇張」的黏手感
   static const _spring = SpringDescription(
     mass: 1,
     stiffness: 500,
@@ -72,7 +68,6 @@ class _AppToggleSwitchState extends State<AppToggleSwitch>
   @override
   void didUpdateWidget(AppToggleSwitch oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // 拖拉中時由 drag handler 自己控制，避免 parent setState 打斷手感
     if (!_isDragging && oldWidget.value != widget.value) {
       _springTo(widget.value ? 1.0 : 0.0, velocity: 0);
     }
@@ -109,7 +104,6 @@ class _AppToggleSwitchState extends State<AppToggleSwitch>
   void _handleDragEnd(DragEndDetails d) {
     _isDragging = false;
     final vxPx = d.velocity.pixelsPerSecond.dx;
-    // 甩動速度 > 800 px/s → 直接決定方向；否則依當前位置靠哪一邊
     final bool targetOn;
     if (vxPx.abs() > 800) {
       targetOn = vxPx > 0;
@@ -117,7 +111,6 @@ class _AppToggleSwitchState extends State<AppToggleSwitch>
       targetOn = _controller.value > 0.5;
     }
     final targetValue = targetOn ? 1.0 : 0.0;
-    // 把手指甩動速度 normalize 成 controller 0..1 單位
     final normalizedVelocity = vxPx / _maxTranslate;
     _springTo(targetValue, velocity: normalizedVelocity);
 
@@ -146,14 +139,12 @@ class _AppToggleSwitchState extends State<AppToggleSwitch>
         animation: _controller,
         builder: (context, _) {
           final t = _controller.value.clamp(0.0, 1.0);
-          // 顏色走 easeOut，讓起始顏色變化較快（更有回應感）
           final colorT = Curves.easeOut.transform(t);
           final trackColor = Color.lerp(
             AppColors.gray300,
             AppColors.primary,
             colorT,
           )!;
-          // 按壓時 thumb 微微放大 1.1x（黏手觸感）
           final thumbScale = _isPressed || _isDragging ? 1.1 : 1.0;
 
           return Container(

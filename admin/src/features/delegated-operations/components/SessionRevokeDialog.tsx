@@ -70,9 +70,6 @@ export default function SessionRevokeDialog({
 		}
 	};
 
-	// `noValidate`（Dialog 固定開啟）：同 `OperationPreflightDialog` —— `required` 的原生氣泡會在
-	// submit 之前攔下，`handleSubmit` 裡的「請填寫撤銷理由，它會寫入治理紀錄。」
-	// 因此永遠不會出現，而那句話說明的正是「為什麼要填」。
 	return (
 		<Dialog
 			variant="operation"

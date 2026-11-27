@@ -45,7 +45,6 @@ func toRevision(r model.MeasureRevision) *adminpb.MeasureRevision {
 	return out
 }
 
-// toAdminViolation 轉成後台看到的認定（只讀）。
 func toAdminViolation(v model.Violation) *adminpb.Violation {
 	out := &adminpb.Violation{
 		Id: v.ID.String(), StoreId: rpc.FormatID(v.StoreID), AccountId: rpc.FormatID(v.AccountID),
@@ -67,7 +66,6 @@ func toAdminViolation(v model.Violation) *adminpb.Violation {
 	return out
 }
 
-// toActionUnavailabilities 轉出 admin 不能做 action 的每個原因與它的文字（model.ActionUnavailableText，與被拒絕時錯誤的 LocalizedMessage 同一個函式）。
 func toActionUnavailabilities(m model.Measure, action model.MeasureAction) []*adminpb.MeasureActionUnavailability {
 	var out []*adminpb.MeasureActionUnavailability
 	for _, r := range m.ActionUnavailableReasons(action) {
@@ -79,7 +77,6 @@ func toActionUnavailabilities(m model.Measure, action model.MeasureAction) []*ad
 	return out
 }
 
-// toAdminMeasure 轉成後台看到的措施：etag 由後台的版本產生；can_* 與各動作的前置檢查是 model.Measure 的同一組方法。
 func toAdminMeasure(m model.Measure) *adminpb.Measure {
 	out := &adminpb.Measure{
 		Id: m.ID.String(), StoreId: rpc.FormatID(m.StoreID), AccountId: rpc.FormatID(m.AccountID),
@@ -154,12 +151,10 @@ func toAdminMeasure(m model.Measure) *adminpb.Measure {
 	return out
 }
 
-// toTerminationOption 轉出可建立的終止合作的生效時機與說明句（model.TerminationEffect.Message，admin RPC 固定 zh-TW）與依據的需求。
 func toTerminationOption(e model.TerminationEffect) *adminpb.TerminationOption {
 	out := &adminpb.TerminationOption{
 		Ground:      rpc.EnumToProto[pb.TerminationGround](e.Ground),
 		Explanation: rpc.LocalizedMessage(e.Message()),
-		// 與 CreateMeasure 的驗證是同一個規則（model.TerminationGround.ViolationRequirement）。
 		ViolationRequirement: rpc.EnumToProto[adminpb.TerminationViolationRequirement](e.Ground.ViolationRequirement()),
 	}
 	if e.EffectiveAt != nil {
@@ -186,7 +181,6 @@ func toLinkedAccount(l model.LinkedAccount) *adminpb.LinkedAccount {
 	return out
 }
 
-// toAdminRequest 轉成後台看到的請求（申覆或解除請求，r 是 Measure.EffectiveRequests 的結果，不是儲存值）：帶佐證的檔案路徑、提出時的版本與裁定或結案的管理員（系統結案沒有）。
 func toAdminRequest(r model.MeasureRequest) *adminpb.MeasureRequest {
 	out := &adminpb.MeasureRequest{
 		Id: r.ID.String(), Kind: rpc.EnumToProto[pb.MeasureRequestKind](r.Kind), State: rpc.EnumToProto[pb.MeasureRequestState](r.State), Reason: r.Reason,
@@ -227,7 +221,6 @@ func optionalTime(t *timestamppb.Timestamp) *time.Time {
 	return &v
 }
 
-// violationBasisFrom 轉換請求裡的違規依據；prefix 是它在請求裡的路徑（解析失敗時指出哪個欄位）。
 func violationBasisFrom(msg *adminpb.ViolationBasis, prefix string) (*model.ViolationBasis, error) {
 	v := &model.ViolationBasis{}
 	if f := msg.GetFinding(); f != nil {
@@ -369,8 +362,6 @@ func (h *Governance) CreateMeasure(ctx context.Context, req *connect.Request[adm
 	return connect.NewResponse(&adminpb.CreateMeasureResponse{Measure: measure}), nil
 }
 
-// takedownContents 先檢查清單的形狀（筆數、種類、重複；壞請求不讀 social），再核對每一則內容現在存在（沒有刪除）、作者是這家店，並用同一次讀取取得處分依據的內容快照；後台處理的是現存的內容，已刪除與不存在的都拒絕。
-// 種類不符或不存在的內容讀不到快照，同樣拒絕；moderation 一律有案件快照，所以快照必填。
 func (h *Governance) takedownContents(ctx context.Context, storeID int64, refs []model.ContentRef) ([]model.TakedownContent, error) {
 	if err := model.ValidateContentRefs("Takedown.Contents", refs); err != nil {
 		return nil, rpc.WithFieldPaths(err, createTakedownPaths)
@@ -390,7 +381,6 @@ func (h *Governance) takedownContents(ctx context.Context, storeID int64, refs [
 	return out, nil
 }
 
-// takedownContentError 把 social 訂閱者回的歸屬錯誤對到請求裡那一則內容的欄位路徑；找不到對應的項目時原樣回傳。
 func takedownContentError(err error, contents []model.TakedownContent) (error, bool) {
 	var bad *social.TakedownContentError
 	if !errors.As(err, &bad) {
@@ -467,7 +457,6 @@ func (h *Governance) ListMeasures(ctx context.Context, req *connect.Request[admi
 		}
 		in.SourceAuthorityOrderID = &id
 	}
-	// page token 只能用在同一組篩選：換了篩選就從第一頁開始。
 	scope := rpc.FilterScope(sellerv1alpha1connect.SellerGovernanceAdminServiceListMeasuresProcedure, msg.GetStoreId(), msg.GetAccountId(),
 		msg.GetState().String(), msg.GetBasis().String(), msg.GetRequestState().String(), msg.GetRequestKind().String(), boolScope(msg.GetReviewDue()),
 		msg.GetSourceCaseId(), msg.GetSourceReportId(), msg.GetSourceAuthorityOrderId())
@@ -535,7 +524,6 @@ func (h *Governance) UpdateMeasure(ctx context.Context, req *connect.Request[adm
 	return connect.NewResponse(&adminpb.UpdateMeasureResponse{Measure: measure}), nil
 }
 
-// sameInstant 比較合併前的結束時間與合併後的時間（兩者都可能不設）。
 func sameInstant(before *time.Time, after *timestamppb.Timestamp) bool {
 	if before == nil || after == nil {
 		return before == nil && after == nil

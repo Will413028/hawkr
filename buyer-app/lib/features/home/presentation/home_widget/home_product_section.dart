@@ -237,7 +237,6 @@ class _InitialErrorCard extends StatelessWidget {
   }
 }
 
-// ── 骨架屏卡片 ──────────────────────────────────────────────────────────────
 
 class _ProductCardSkeleton extends StatelessWidget {
   const _ProductCardSkeleton();

@@ -16,31 +16,13 @@ import (
 	pkgmq "github.com/Will413028/hawkr/go-pkg/mq"
 )
 
-// ---------------------------------------------------------------------------
-// 跨語言 producer↔consumer 契約：Go 的 wire struct 對 Java 的 record 逐欄對拍
-//
-// 🔴 這一組測試存在的理由是一個實際發生過、而且**在別處完全看不見**的失效：
-// order-service 的 `OrderRefundFinalizedPayload` 16 個 component 全是 `String`，
-// 本 package 的 `orderRefundFinalizedPayload` 卻把 store_id / buyer_id / refund_amount
-// 宣告成 `int64` ⇒ `json.Unmarshal` 每一則都失敗 ⇒ dev 上 5.4 秒內 40 則退款事件消失，
-// DB 零痕跡、`mq_consume_total{result="dlq"}` 為 0、inbox 沒有列。
-//
-// 為什麼不能用手寫 fixture 驗：手寫的 fixture 是「我以為 producer 會發成這樣」，
-// 而這四個缺陷能活下來正是因為兩邊都由同一份想像產生 —— 自己跟自己對必然全綠。
-// 所以 fixture 的欄位名與型別**從 Java 原始碼讀出來**，不從註解、不從記憶。
-//
-// 這組測試在 Java 檔搬家／改名時會 fail-loud（找不到檔案就是失敗），那是刻意的：
-// 契約的一端消失了，consumer 這一端不該繼續綠。
-// ---------------------------------------------------------------------------
 
-// javaComponent 是 Java record 的一個 component。
 type javaComponent struct {
-	Type string // Java 型別字面（String / Long / long …）
-	Name string // Java 欄名（camelCase）
-	Wire string // @JsonNaming(SnakeCaseStrategy) 之後的 wire 欄名
+	Type string
+	Name string
+	Wire string
 }
 
-// repoRoot 從本 package 往上找到 repo 根（以 go.work 為錨）。
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	dir, err := os.Getwd()
@@ -66,10 +48,6 @@ var (
 	componentRe    = regexp.MustCompile(`^([\w.<>\[\]]+)\s+(\w+)$`)
 )
 
-// parseJavaRecord 讀一個 Java record 檔，回傳它的 component 清單（依宣告順序）。
-//
-// 只取**第一個** `public record X(...)` 的 header：同一檔內的便利建構子長得幾乎一樣，
-// 取錯會少一個欄位而且不會有任何症狀。
 func parseJavaRecord(t *testing.T, relPath string) []javaComponent {
 	t.Helper()
 	full := filepath.Join(repoRoot(t), relPath)
@@ -79,7 +57,6 @@ func parseJavaRecord(t *testing.T, relPath string) []javaComponent {
 			"（檔案搬家或改名時本測試必須 fail-loud —— 契約的 producer 端消失了，consumer 端不該繼續綠）", full, err)
 	}
 	src := string(raw)
-	// 逐行剝掉行註解，避免註解內的括號干擾 header 擷取。
 	var b strings.Builder
 	for _, line := range strings.Split(src, "\n") {
 		if i := strings.Index(line, "//"); i >= 0 {
@@ -88,7 +65,6 @@ func parseJavaRecord(t *testing.T, relPath string) []javaComponent {
 		b.WriteString(line)
 		b.WriteString("\n")
 	}
-	// 剝掉 block comment（JavaDoc 內含 `record`、括號與型別字樣）。
 	stripped := regexp.MustCompile(`(?s)/\*.*?\*/`).ReplaceAllString(b.String(), "")
 
 	m := recordHeaderRe.FindStringSubmatch(stripped)
@@ -113,8 +89,6 @@ func parseJavaRecord(t *testing.T, relPath string) []javaComponent {
 	return out
 }
 
-// snakeCase 複製 Jackson `PropertyNamingStrategies.SnakeCaseStrategy` 對
-// lowerCamelCase 的行為：每個大寫字母前插一個底線並轉小寫。
 func snakeCase(s string) string {
 	var b strings.Builder
 	for i, r := range s {
@@ -130,7 +104,6 @@ func snakeCase(s string) string {
 	return b.String()
 }
 
-// goWireFields 用 reflect 讀一個 wire struct 的 (json tag → Go 型別) 對照。
 func goWireFields(v any) map[string]string {
 	rt := reflect.TypeOf(v)
 	out := map[string]string{}
@@ -145,10 +118,6 @@ func goWireFields(v any) map[string]string {
 	return out
 }
 
-// javaTypeToGo 是「Java component 型別 → 本 repo 允許的 Go wire 型別」。
-//
-// 🔴 `String` 只能對 `string`。這正是踩過的那一格：Jackson 送出 `"2685914682"`，
-// Go 宣告 int64 時 `json.Unmarshal` 直接回錯（它不會幫你把數字字串轉成 int64）。
 var javaTypeToGo = map[string]string{
 	"String":  "string",
 	"Long":    "int64",
@@ -158,13 +127,6 @@ var javaTypeToGo = map[string]string{
 	"boolean": "bool",
 }
 
-// assertWireContract 是三條檢查的共用本體。
-//
-//	① Go 宣告的每一個 json tag 都必須是 producer 真的會發的欄名
-//	② 型別必須與 producer 的 component 型別相容
-//	③ producer 有、Go 沒宣告的欄位，必須逐欄登記在 deliberatelyIgnored ——
-//	   「少宣告幾欄」是完全靜默的（不編譯錯、不測試紅），而少掉的那幾欄可能正是
-//	   §6.3.5.4 步驟 3 拿來判 VOID/ALLOWANCE 的值
 func assertWireContract(t *testing.T, javaPath string, goStruct any, deliberatelyIgnored map[string]string) {
 	t.Helper()
 	comps := parseJavaRecord(t, javaPath)
@@ -174,7 +136,6 @@ func assertWireContract(t *testing.T, javaPath string, goStruct any, deliberatel
 	}
 	goFields := goWireFields(goStruct)
 
-	// ① ＋ ②
 	for tag, goType := range goFields {
 		c, ok := byWire[tag]
 		if !ok {
@@ -196,7 +157,6 @@ func assertWireContract(t *testing.T, javaPath string, goStruct any, deliberatel
 		}
 	}
 
-	// ③
 	for _, c := range comps {
 		if _, declared := goFields[c.Wire]; declared {
 			continue
@@ -223,14 +183,6 @@ func jsonShapeOf(javaType string) string {
 	return "數字"
 }
 
-// wireContractByRoutingKey 把每一條訂閱的 routing key 綁到「它的 payload 由哪一份
-// producer 原始碼定義」。
-//
-// 為什麼要有這張表，而不是把路徑寫在各自的測試裡：**契約的歸屬必須是可稽核的**。
-// 路徑散在各處時，「這個 routing key 有沒有被對拍過」只能靠人讀完整個檔案回答；
-// 有這張表，它是一次 map lookup —— 下面的 TestEverySubscribedRoutingKeyHasAWireContract
-// 就是拿它跟 Subscriptions() 的真實清單對帳，新訂一條而忘了對拍會當場轉紅。
-// repo 層的同一問題由 scripts/check-mq-wire-contract.py 的 W1 守。
 var wireContractByRoutingKey = map[string]string{
 	pkgmq.RoutingKeyOrderPaid:            "services/java/order-service/src/main/java/io/github/will413028/hawkr/order/mq/dto/OrderPaidPayload.java",
 	pkgmq.RoutingKeyOrderRefundFinalized: "services/java/order-service/src/main/java/io/github/will413028/hawkr/order/mq/dto/OrderRefundFinalizedPayload.java",
@@ -276,7 +228,7 @@ func TestOrderRefundFinalizedPayloadMatchesJavaProducer(t *testing.T) {
 	assertWireContract(t,
 		wireContractByRoutingKey[pkgmq.RoutingKeyOrderRefundFinalized],
 		orderRefundFinalizedPayload{},
-		map[string]string{}) // 16 欄全宣告，沒有刻意不讀的
+		map[string]string{})
 }
 
 // TestOrderPaidPayloadMatchesJavaProducer 對 C1 做同一件事。
@@ -312,7 +264,6 @@ func TestJavaRecordParserHasDiscriminatingPower(t *testing.T) {
 				c.Name, c.Type)
 		}
 	}
-	// 名稱轉換也要驗：`refundRef` → `refund_ref`、`caseNo` → `case_no`。
 	got := map[string]bool{}
 	for _, c := range comps {
 		got[c.Wire] = true
@@ -323,8 +274,6 @@ func TestJavaRecordParserHasDiscriminatingPower(t *testing.T) {
 		}
 	}
 
-	// 反例：一個「長得像正例」的 Go struct —— 命名正確、tag 正確、能編譯、
-	// 下游讀得到，唯一的問題是三個欄位的型別跟 wire 對不上。
 	type looksRightButWrong struct {
 		EventID      string `json:"event_id"`
 		OrderNo      string `json:"order_no"`
@@ -370,7 +319,6 @@ func TestRefundFixtureCoversEveryProducerField(t *testing.T) {
 			t.Errorf("fixture 多了 producer 不會發的 %q —— 這種欄位會讓測試證明一件不存在的事", k)
 		}
 	}
-	// 型別面：producer 每一欄都是 String ⇒ fixture 的每一個非 null 值都必須是 JSON 字串。
 	for k, v := range fixture {
 		if v == nil {
 			continue
@@ -451,8 +399,6 @@ func TestOrderCancelledParserAndCounterexample(t *testing.T) {
 			"⚠️ 同檔還有一個巢狀的 `public record StockItemPayload(...)`；解析器若抓到它會得到 2，"+
 			"若把便利建構子當成 header 會得到 11", len(comps))
 	}
-	// 型別必須解得出「不是全都一樣」——這份 record 是 String 與 Long 混合的，
-	// 而解析器若把型別欄整個讀錯（例如永遠回 String），上面那支會靜默轉綠。
 	byName := map[string]string{}
 	for _, c := range comps {
 		byName[c.Name] = c.Type
@@ -469,7 +415,6 @@ func TestOrderCancelledParserAndCounterexample(t *testing.T) {
 			t.Errorf("component %s 的型別解成 %q，want %q —— 解析器讀錯了", name, got, want)
 		}
 	}
-	// 名稱轉換：`stockTxId` → `stock_tx_id`、`sellerAvatarKey` → `seller_avatar_key`。
 	gotWire := map[string]bool{}
 	for _, c := range comps {
 		gotWire[c.Wire] = true
@@ -480,7 +425,6 @@ func TestOrderCancelledParserAndCounterexample(t *testing.T) {
 		}
 	}
 
-	// 反例①：buyer_id 宣告成 string（＝把 refund 的慣例抄過來）。
 	type looksRightButWrong struct {
 		EventID string `json:"event_id"`
 		OrderNo string `json:"order_no"`
@@ -496,10 +440,9 @@ func TestOrderCancelledParserAndCounterexample(t *testing.T) {
 		t.Fatal("反例①沒有被抓到：把 buyer_id 宣告成 string（＝ refund payload 的形狀）竟然通過了")
 	}
 
-	// 反例②：宣告一個 producer 根本不會發的欄名（那種欄位永遠是零值，且完全靜默）。
 	type ghostField struct {
 		OrderNo     string `json:"order_no"`
-		CancelledAt string `json:"cancelled_at"` // producer 送的是 occurred_at
+		CancelledAt string `json:"cancelled_at"`
 	}
 	sub2 := &testing.T{}
 	assertWireContract(sub2, path, ghostField{}, map[string]string{

@@ -13,7 +13,6 @@ export function setPendingPurchase(orderNos: string[]): void {
 	try {
 		sessionStorage.setItem(PENDING_KEY, JSON.stringify(orderNos));
 	} catch {
-		// storage blocked — purchase falls back to the URL order param
 	}
 }
 
@@ -33,7 +32,6 @@ export function clearPendingPurchase(): void {
 	try {
 		sessionStorage.removeItem(PENDING_KEY);
 	} catch {
-		/* ignore */
 	}
 }
 

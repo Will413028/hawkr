@@ -34,7 +34,6 @@ func secureService(t *testing.T) (*Service, *db.DB, *storage.Fake) {
 	return svc, d, st
 }
 
-// secureServiceWith 讓測試把 Fake 包一層（注入失敗、觀察 ctx 或在 Put 後改列）。
 func secureServiceWith(t *testing.T, wrap func(*storage.Fake) storage.Store) (*Service, *db.DB, *storage.Fake) {
 	t.Helper()
 	t.Parallel()
@@ -109,7 +108,6 @@ func TestAbortDirect_RowAlreadyDeletingReturnsExpiredAndKeepsObject(t *testing.T
 	}
 }
 
-// hookStore 包一層 Fake：afterPut 在 Put 成功後執行，putErr 讓 Put 失敗，Delete 記下收到的 ctx 是否有 deadline。
 type hookStore struct {
 	*storage.Fake
 	afterPut    func()
@@ -155,7 +153,7 @@ func TestPutSecureChunk_PutFailureCleanupRunsWithADeadlineEvenWhenTheRequestIsCa
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithCancel(t.Context())
-	hs.onPut = cancel // 暫存列建好之後、Put 時 request 才被取消
+	hs.onPut = cancel
 	if _, err := svc.PutSecureChunk(ctx, model.Uploader{ID: 1001}, b.Token, 0, bytes.NewReader(data), int64(len(data))); err == nil {
 		t.Fatal("預期 Put 失敗的錯誤")
 	}
@@ -205,7 +203,6 @@ func TestPutSecureChunk_LosingToGCReturnsExpiredAndDeletesItsOwnObject(t *testin
 	}
 }
 
-// countingBody 記下 body 被讀走的位元組數。
 type countingBody struct {
 	r io.Reader
 	n atomic.Int64

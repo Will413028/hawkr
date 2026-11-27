@@ -59,7 +59,6 @@ function measure(patch: MessageInitShape<typeof MeasureSchema> = {}): Measure {
 	});
 }
 
-// 動作的可用性（建立措施、結束、核准、退回、刪帳號）都來自伺服器的旗標，store-detail.ts 沒有推導它們；接線在下面的原始碼斷言與各自的純邏輯測試。
 
 test("生命週期徽章：已關閉、等待刪除有徽章，營運中沒有", () => {
 	assert.deepEqual(lifecycleBadge(StoreStatus.CLOSED), {
@@ -102,8 +101,6 @@ test("地址：縣市＋鄉鎮市區＋明細；沒有地址回 -", () => {
 	assert.equal(addressText(create(PostalAddressSchema, {})), "-");
 });
 
-// ---------------------------------------------------------------------------
-// 理由與文案
 
 test("關店與刪帳號的理由：去掉空白後必填，上限 1000 字", () => {
 	assert.equal(validateReason("   ", "請填寫關店理由。"), "請填寫關店理由。");
@@ -282,7 +279,6 @@ test("建立的接線：CreateMeasure 的請求原樣送出（request_id 由對�
 	assert.match(page, /createMeasureMutation\.mutateAsync\(request\)/u);
 	assert.match(page, /<CreateRiskMeasureDialog\s+storeId=\{store\.id\}/u);
 	assert.match(page, /<CreateTerminationDialog\s+storeId=\{store\.id\}/u);
-	// 關聯終止改在措施詳情頁建立（/admin/measures/[id]）：目標是該列帳號的店家，來源措施帶入。
 	const measurePage = await readFile(
 		"src/app/admin/measures/[id]/page.tsx",
 		"utf8",

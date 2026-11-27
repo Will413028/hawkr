@@ -7,9 +7,6 @@ part 'shipment_anomaly_model.g.dart';
 int _parseInt(dynamic value) =>
     value is int ? value : int.tryParse(value?.toString() ?? '') ?? 0;
 
-// ============================================================
-// 配送異常類型（與 backend ShipmentAnomalyType 對齊，§5.21）
-// ============================================================
 
 /// ⚠️ 這裡**不再**有手抄的 `ShipmentAnomalyType`。
 ///
@@ -40,9 +37,6 @@ class ShipmentAnomalyAckAction {
   static const String ignored = 'IGNORED';
 }
 
-// ============================================================
-// 異常項目
-// ============================================================
 
 @freezed
 abstract class ShipmentAnomaly with _$ShipmentAnomaly {
@@ -57,7 +51,6 @@ abstract class ShipmentAnomaly with _$ShipmentAnomaly {
     @Default('') String shipmentStatus,
     @Default('') String detectedAt,
     @Default('') String ackAction,
-    // Backend Gateway 回的欄位是 `actedAt`（非 ackedAt），對齊 gateway/internal/handler/shipment_anomaly.go
     @Default('') String actedAt,
   }) = _ShipmentAnomaly;
 
@@ -80,8 +73,6 @@ abstract class ShipmentAnomalyListResult with _$ShipmentAnomalyListResult {
 abstract class ShipmentAnomalyStats with _$ShipmentAnomalyStats {
   const factory ShipmentAnomalyStats({
     @Default(0) @JsonKey(fromJson: _parseInt) int total,
-    // Backend Gateway 實際回的欄位是 highSeverityCount / mediumSeverityCount / lowSeverityCount
-    // (gateway/internal/handler/shipment_anomaly.go DTO + shipping-service proto)
     @Default(0)
     @JsonKey(name: 'highSeverityCount', fromJson: _parseInt)
     int highCount,

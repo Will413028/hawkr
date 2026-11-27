@@ -72,7 +72,6 @@ public class BuyerGrpcClient {
         BatchGetBuyerDisplayByBuyerIDsRequest request = BatchGetBuyerDisplayByBuyerIDsRequest.newBuilder()
                 .addAllBuyerIds(buyerIds)
                 .build();
-        // 不能挪到建構子——理由見 INTERNAL_READ_DEADLINE_SEC 的最後一段。
         BatchGetBuyerDisplayByBuyerIDsResponse response = buyerStub
                 .withDeadlineAfter(INTERNAL_READ_DEADLINE_SEC, TimeUnit.SECONDS)
                 .batchGetBuyerDisplayByBuyerIDs(request);
@@ -104,8 +103,6 @@ public class BuyerGrpcClient {
         ResolvePrincipalsRequest request = ResolvePrincipalsRequest.newBuilder()
                 .addAllIds(buyerIds)
                 .build();
-        // issue #2294 P1-C：deadline 必須在**每次呼叫時**套用（絕對時間以此刻起算），
-        // 不能挪到建構子——理由見 SellerGrpcClient.PRINCIPAL_RESOLVE_DEADLINE_SEC 的最後一段。
         ResolvePrincipalsResponse response = buyerStub
                 .withDeadlineAfter(PRINCIPAL_RESOLVE_DEADLINE_SEC, TimeUnit.SECONDS)
                 .resolvePrincipals(request);

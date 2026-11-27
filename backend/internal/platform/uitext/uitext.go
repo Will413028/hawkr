@@ -85,7 +85,6 @@ type Message struct {
 // String 回 Text，讓 %s 與 %v 印出的是文字而不是整個結構。
 func (m Message) String() string { return m.Text }
 
-// dateTimeLayouts 是各語系的日期時間版面；沒有列出的語系用 DefaultLocale 的。
 var dateTimeLayouts = map[Locale]string{ZhTW: "2006/01/02 15:04"}
 
 // FormatDateTime 是伺服器文字裡的日期時間：台北時間、到分鐘。伺服器文字的時間版面只有這一處；

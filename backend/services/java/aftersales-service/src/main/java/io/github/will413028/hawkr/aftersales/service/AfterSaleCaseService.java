@@ -74,26 +74,20 @@ public class AfterSaleCaseService {
     @Transactional
     public AfterSaleCaseEntity createCase(Long buyerId, String orderNo, String reason,
                                            String description, List<String> photoTokens) {
-        // 1. 驗證退款原因
         CodeMetaValidator.requireValidValue(RefundReason.class, reason, "reason");
 
-        // 2. 查詢訂單資訊
         GetOrderForAfterSalesResponse orderResp = orderGrpcClient.getOrderForAfterSales(orderNo);
-        // order-service 失敗時會拋 StatusRuntimeException，由上層 RPC catch-all 處理
         OrderAfterSalesView order = orderResp.getData();
 
-        // 3. 驗證買家身分
         Long orderBuyerId = ProtoConversionUtils.parseLongRequired(order.getBuyerId(), "buyerId");
         if (!orderBuyerId.equals(buyerId)) {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_NOT_OWNER);
         }
 
-        // 4. 驗證訂單狀態（僅已送達；確認收貨後不可申請）
         if (!APPLY_ALLOWED_ORDER_STATUSES.contains(order.getStatus())) {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_INVALID_STATUS);
         }
 
-        // 5. 驗證送達時間 + 截止時限
         if (order.getDeliveredAt().isEmpty()) {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_INVALID_STATUS);
         }
@@ -103,7 +97,6 @@ public class AfterSaleCaseService {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_EXPIRED);
         }
 
-        // 6. 檢查是否已有進行中的售後案件
         Long existingCount = caseMapper.selectCount(
                 new LambdaQueryWrapper<AfterSaleCaseEntity>()
                         .eq(AfterSaleCaseEntity::getOrderNo, orderNo)
@@ -115,14 +108,11 @@ public class AfterSaleCaseService {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_DUPLICATE);
         }
 
-        // 7. 生成案件編號
         String caseNo = "A" + String.format("%09d", Math.abs(TsidUtil.generate() % 1_000_000_000L));
 
-        // 8. 計算可退款金額 = orders.total_actual_amount（= PayUni 實收，已含運費與折扣，見 §2.5）
         Long refundableAmount = ProtoConversionUtils.parseLongRequired(order.getTotalActualAmount(), "totalActualAmount");
         Long shippingFee = ProtoConversionUtils.parseLongOrDefault(order.getShippingFee(), 0L);
 
-        // 9. 建立案件 Entity
         AfterSaleCaseEntity caseEntity = new AfterSaleCaseEntity();
         caseEntity.setId(TsidUtil.generate());
         caseEntity.setCaseNo(caseNo);
@@ -146,43 +136,34 @@ public class AfterSaleCaseService {
         caseEntity.setMerId(order.getMerId());
         caseEntity.setShippingMethod(order.getShippingMethod());
         caseEntity.setDeliveredAt(deliveredAt);
-        // §5.10 賣家處理期限：建立後 N 小時內未決策由系統自動升級至 admin
         caseEntity.setProcessDeadline(DateTimeUtils.nowUtc()
                 .plusHours(properties.getCaseConfig().getProcessDeadlineHours()));
         caseEntity.setAutoEscalated(Boolean.FALSE);
 
         caseMapper.insert(caseEntity);
 
-        // 10. 建立案件商品明細
         for (OrderItemForAfterSales item : order.getItemsList()) {
             AfterSaleCaseItemEntity itemEntity = new AfterSaleCaseItemEntity();
             itemEntity.setId(TsidUtil.generate());
             itemEntity.setCaseNo(caseNo);
             itemEntity.setOrderItemId(ProtoConversionUtils.parseLongRequired(item.getId(), "orderItemId"));
-            // non-catalog line（RFQ 成交）沒有平台 SKU ⇒ order-service 對 NULL 輸出空字串
-            // （ProtoConversionUtils.formatUuid 是 null-safe 的），這裡必須容忍並寫回 NULL。
-            // ⚠️ 只有 sku_id 可缺（空字串）；有值卻不是 UUID 是上游壞了，不吞成 NULL（不用 parseUuidOrNull）。
             itemEntity.setSkuId(item.getSkuId().isEmpty() ? null : ProtoConversionUtils.parseUuidRequired(item.getSkuId(), "skuId"));
             itemEntity.setSkuName(item.getSkuName());
             itemEntity.setQuantity(ProtoConversionUtils.parseIntRequired(item.getQuantity(), "quantity"));
-            // 從 OrderItemForAfterSales.unit_price（重命名自 original_price）讀取，aftersales 內部 entity 仍稱為 originalPrice
             itemEntity.setOriginalPrice(ProtoConversionUtils.parseLongRequired(item.getUnitPrice(), "unitPrice"));
             itemEntity.setActualPayAmount(ProtoConversionUtils.parseLongRequired(item.getActualPayAmount(), "actualPayAmount"));
             itemEntity.setImageObjectKey(item.getImageObjectKey());
             caseItemMapper.insert(itemEntity);
         }
 
-        // 11. 處理舉證圖片
         evidenceService.finalizeAndInsert(caseNo, buyerId, photoTokens, AfterSaleEvidenceType.PHOTO.value());
 
-        // 12. 稽核日誌
         auditService.log(caseNo, null, buyerId, AfterSaleAuditActor.BUYER.value(), AfterSaleAuditAction.CREATE_CASE.value(),
                 Map.of("orderNo", orderNo, "reason", reason));
 
         log.info("AfterSaleCaseService.createCase.success",
                 "售後案件建立成功, orderNo=" + orderNo + ", buyerId=" + buyerId, "caseNo", caseNo);
 
-        // 發布主流程狀態變更事件供 notification-service 推播（best-effort）
         eventPublisher.publishCaseTransition(
                 AfterSalesEventType.CASE_APPLIED.value(),
                 MqConstants.EVENT_TYPE_AFTERSALES_CASE_APPLIED,
@@ -204,12 +185,10 @@ public class AfterSaleCaseService {
     @Transactional
     public void supplementEvidence(Long buyerId, String caseNo,
                                     List<String> photoTokens, String additionalDesc) {
-        // 1. 查詢案件並驗證
         AfterSaleCaseEntity caseEntity = getCaseForBuyer(buyerId, caseNo);
         assertNotUnderAppeal(caseEntity);
         validateModifiableStatus(caseEntity);
 
-        // 2. 檢查舉證數量上限
         int maxEvidence = properties.getCaseConfig().getMaxEvidenceCount();
         Long existingCount = evidenceMapper.selectCount(
                 new LambdaQueryWrapper<AfterSaleEvidenceEntity>()
@@ -221,10 +200,8 @@ public class AfterSaleCaseService {
                     String.format("舉證圖片數量超過上限（最多 %d 張，目前已有 %d 張）", maxEvidence, existingCount));
         }
 
-        // 3. 處理新圖片
         evidenceService.finalizeAndInsert(caseNo, buyerId, photoTokens, AfterSaleEvidenceType.PHOTO.value());
 
-        // 4. 補充描述（§2.1 INV-3：mapper 自訂 SQL，WHERE status IN ('0','65') 防 §5.10 worker race）
         if (additionalDesc != null && !additionalDesc.isBlank()) {
             String updatedDesc = (caseEntity.getDescription() == null ? "" : caseEntity.getDescription() + "\n")
                     + additionalDesc;
@@ -234,7 +211,6 @@ public class AfterSaleCaseService {
             }
         }
 
-        // 5. 稽核日誌
         auditService.log(caseNo, null, buyerId, AfterSaleAuditActor.BUYER.value(), AfterSaleAuditAction.SUPPLEMENT_EVIDENCE.value(),
                 Map.of("newPhotoCount", newCount, "hasAdditionalDesc", additionalDesc != null));
 
@@ -251,7 +227,6 @@ public class AfterSaleCaseService {
         assertNotUnderAppeal(caseEntity);
         validateModifiableStatus(caseEntity);
 
-        // §2.1 INV-3：mapper 自訂 SQL transition（PENDING → CANCELLED）
         int updated = caseMapper.markCancelledByBuyer(caseNo);
         if (updated == 0) {
             throw new AfterSalesBusinessException(GrpcResponseCode.AFTERSALE_INVALID_STATUS);
@@ -289,7 +264,6 @@ public class AfterSaleCaseService {
      */
     @Transactional
     public ConfirmReceiptCancelResult cancelActiveCaseOnConfirmReceipt(Long buyerId, String orderNo) {
-        // 撈該訂單所有 case，記憶體以 canonical isActive 過濾出唯一活躍 case（同訂單歷史可有多筆終態 case + ≤1 活躍）
         List<AfterSaleCaseEntity> cases = caseMapper.selectList(
                 new LambdaQueryWrapper<AfterSaleCaseEntity>().eq(AfterSaleCaseEntity::getOrderNo, orderNo));
         AfterSaleCaseEntity active = cases.stream()
@@ -301,7 +275,6 @@ public class AfterSaleCaseService {
         }
 
         String caseNo = active.getCaseNo();
-        // A 桶 CAS（WHERE status IN '0','65'）為 A 桶權威定義，無需另查 status set
         int updated = caseMapper.markCancelledByConfirmReceipt(caseNo);
         if (updated == 1) {
             auditService.log(caseNo, null, buyerId, AfterSaleAuditActor.BUYER.value(),
@@ -318,7 +291,6 @@ public class AfterSaleCaseService {
             return new ConfirmReceiptCancelResult(ConfirmReceiptCancelOutcome.TERMINATED, caseNo, null);
         }
 
-        // affected=0：非 A 桶 或 競態剛離開 0/65。重讀分類（§8.2.1 競態矩陣）
         AfterSaleCaseEntity reread = caseMapper.selectOne(
                 new LambdaQueryWrapper<AfterSaleCaseEntity>().eq(AfterSaleCaseEntity::getCaseNo, caseNo));
         if (reread == null || !AfterSaleCaseStatusRules.isActive(
@@ -375,7 +347,6 @@ public class AfterSaleCaseService {
         return caseEntity;
     }
 
-    // ==================== 私有方法 ====================
 
     /**
      * 驗證案件是否處於可修改狀態（待處理 / 已重啟）。

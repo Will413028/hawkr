@@ -22,7 +22,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// testStats 建立測試用的 StatsSource（來源與 logger 都是必要的）。
 func testStats(followers FollowerCounts, ratings Ratings) *StatsSource {
 	s, err := NewStatsSource(followers, ratings, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
@@ -301,7 +300,6 @@ func TestRecordProductViewRejectsABadIDAndReportsWriteFailures(t *testing.T) {
 
 func protoName(s string) protoreflect.Name { return protoreflect.Name(s) }
 
-// ratingsThatHang 開始讀取之後一直等到 ctx 結束；deadline 記下它收到的時間上限。
 type ratingsThatHang struct {
 	started  chan struct{}
 	deadline chan time.Duration
@@ -316,7 +314,6 @@ func (r ratingsThatHang) StoreRatingStats(ctx context.Context, _ []int64) (map[i
 	return nil, ctx.Err()
 }
 
-// followersAfter 等到評價的讀取已經開始才回答：兩項統計是同時讀的，序列讀取時它等不到而逾時。
 type followersAfter struct{ started chan struct{} }
 
 func (f followersAfter) SubscriberCounts(ctx context.Context, _ []int64) (map[int64]int64, error) {

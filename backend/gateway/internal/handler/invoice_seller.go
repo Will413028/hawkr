@@ -7,10 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// 58 號《電子發票服務》賣家面 handler（§6.1.7–§6.1.11）。
-//
-// 身分：h.resolveStoreID（store surrogate）。能力層（requireSeller(cap)）在 router
-// 掛載，這裡不再自行判斷停權——§46 規範明令停權判斷只准出現在 authz package。
 
 // GetSellerInvoiceOverview 賣家發票總覽
 // @Summary      賣家發票總覽
@@ -41,7 +37,6 @@ func (h *Holder) GetSellerInvoiceOverview(c *gin.Context) {
 	}
 
 	data := convInvSellerInvoiceOverviewData(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -78,7 +73,6 @@ func (h *Holder) GetSellerTaxProfile(c *gin.Context) {
 	}
 
 	data := convInvSellerTaxProfileData(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -108,8 +102,6 @@ func (h *Holder) SaveSellerTaxProfileDraft(c *gin.Context) {
 	if !ok {
 		return
 	}
-	// 稅籍資料被誰改過屬保存 5 年的稽核軌跡（§8.1.3）；一個店有多個可登入帳號時，
-	// 只有 account 層答得出人（同端點 19／22 的形狀，backend#3048）。
 	accountID, actorOK := getAccountID(c)
 	if !actorOK {
 		response.Unauthorized(c)
@@ -137,7 +129,6 @@ func (h *Holder) SaveSellerTaxProfileDraft(c *gin.Context) {
 	}
 
 	data := convInvSellerTaxProfileData(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -167,9 +158,6 @@ func (h *Holder) SubmitSellerTaxProfile(c *gin.Context) {
 	if !ok {
 		return
 	}
-	// 裁決 C 之後送審**同時是條款簽署**，而簽署要留下「是誰按的」——那是 account 層的
-	// 事實不是 store 層的（同端點 22 的形狀）。缺它，這份「責任在賣家」的書面憑據
-	// 查不到自然人。
 	accountID, actorOK := getAccountID(c)
 	if !actorOK {
 		response.Unauthorized(c)
@@ -195,8 +183,6 @@ func (h *Holder) SubmitSellerTaxProfile(c *gin.Context) {
 	}
 
 	data := convInvSellerTaxProfileData(resp.GetData())
-	// §6.1.0(13) 的 preserveData 碼：EnvelopeGuardInterceptor 對它們不轉 error，
-	// data 必須原樣透傳（HTTP 恆 200），否則前端拿不到導向用的 id／時間。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -226,8 +212,6 @@ func (h *Holder) RequestSellerTaxExtension(c *gin.Context) {
 	if !ok {
 		return
 	}
-	// 延長會把平台補件期限往後推（一次最多 30 天、只能一次）⇒「是誰推的」必須留痕
-	// （backend#3048）。
 	accountID, actorOK := getAccountID(c)
 	if !actorOK {
 		response.Unauthorized(c)
@@ -253,7 +237,6 @@ func (h *Holder) RequestSellerTaxExtension(c *gin.Context) {
 	}
 
 	data := convInvSellerTaxProfileData(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -289,7 +272,6 @@ func (h *Holder) GetSelfIssueAttestation(c *gin.Context) {
 	}
 
 	data := convInvSelfIssueAttestationInfo(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -319,7 +301,6 @@ func (h *Holder) AcceptSelfIssueAttestation(c *gin.Context) {
 	if !ok {
 		return
 	}
-	// 條款同意要留下「是誰按的」，那是 account 層的事實，不是 store 層的。
 	accountID, actorOK := getAccountID(c)
 	if !actorOK {
 		response.Unauthorized(c)
@@ -345,7 +326,6 @@ func (h *Holder) AcceptSelfIssueAttestation(c *gin.Context) {
 	}
 
 	data := convInvSelfIssueAttestationInfo(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -383,7 +363,6 @@ func (h *Holder) GetSellerProviderAccount(c *gin.Context) {
 	}
 
 	data := convInvSellerProviderAccountData(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -435,7 +414,6 @@ func (h *Holder) PutSellerProviderCredentials(c *gin.Context) {
 	}
 
 	data := convInvSellerProviderAccountData(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -483,8 +461,6 @@ func (h *Holder) VerifySellerProviderAccount(c *gin.Context) {
 	}
 
 	data := convInvSellerProviderAccountData(resp.GetData())
-	// §6.1.0(13) 的 preserveData 碼：EnvelopeGuardInterceptor 對它們不轉 error，
-	// data 必須原樣透傳（HTTP 恆 200），否則前端拿不到導向用的 id／時間。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -533,7 +509,6 @@ func (h *Holder) ActivateSellerProviderAccount(c *gin.Context) {
 	}
 
 	data := convInvSellerProviderAccountData(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -582,8 +557,6 @@ func (h *Holder) RotateSellerProviderCredentials(c *gin.Context) {
 	}
 
 	data := convInvSellerProviderAccountData(resp.GetData())
-	// §6.1.0(13) 的 preserveData 碼：EnvelopeGuardInterceptor 對它們不轉 error，
-	// data 必須原樣透傳（HTTP 恆 200），否則前端拿不到導向用的 id／時間。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -620,7 +593,6 @@ func (h *Holder) GetSellerReceiptAuthorization(c *gin.Context) {
 	}
 
 	data := convInvSellerReceiptAuthorizationData(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -670,7 +642,6 @@ func (h *Holder) ConfirmSellerReceiptAuthorization(c *gin.Context) {
 	}
 
 	data := convInvSellerReceiptAuthorizationData(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -738,8 +709,6 @@ func (h *Holder) ListSellerInvoiceDocuments(c *gin.Context) {
 	for _, it := range data.GetRecords() {
 		records = append(records, convInvSellerInvoiceDocumentItem(it))
 	}
-	// #3019：分頁 data 多帶一個 shipmentStatusDegraded ⇒ 不能走 response.Page
-	// （它只組四個欄位）。內嵌 response.PageData 讓四個 key 逐字沿用同一份 tag。
 	pageData := InvoiceDocumentsPageData{
 		PageData: response.PageData{
 			Records:  records,
@@ -749,7 +718,6 @@ func (h *Holder) ListSellerInvoiceDocuments(c *gin.Context) {
 		},
 		ShipmentStatusDegraded: data.GetShipmentStatusDegraded(),
 	}
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), pageData)
 		return
@@ -795,7 +763,6 @@ func (h *Holder) GetSellerInvoiceDocument(c *gin.Context) {
 	}
 
 	data := convInvSellerInvoiceDocumentDetail(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -851,7 +818,6 @@ func (h *Holder) ListSellerReceivedInvoiceDocuments(c *gin.Context) {
 	for _, it := range data.GetRecords() {
 		records = append(records, convInvSellerReceivedInvoiceItem(it))
 	}
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), response.PageData{
 			Records:  records,
@@ -904,7 +870,6 @@ func (h *Holder) ResendSellerInvoiceNotification(c *gin.Context) {
 	}
 
 	data := convInvResendInvoiceNotificationData(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -950,7 +915,6 @@ func (h *Holder) GetSellerInvoiceJob(c *gin.Context) {
 	}
 
 	data := convInvInvoiceJobInfo(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -1004,7 +968,6 @@ func (h *Holder) ListSellerInvoiceComplaints(c *gin.Context) {
 	for _, it := range data.GetRecords() {
 		records = append(records, convInvInvoiceComplaintInfo(it))
 	}
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), response.PageData{
 			Records:  records,
@@ -1054,7 +1017,6 @@ func (h *Holder) GetSellerInvoiceComplaint(c *gin.Context) {
 	}
 
 	data := convInvInvoiceComplaintInfo(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -1113,7 +1075,6 @@ func (h *Holder) RespondSellerInvoiceComplaint(c *gin.Context) {
 	}
 
 	data := convInvInvoiceComplaintInfo(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -1174,7 +1135,6 @@ func (h *Holder) ReportExternalIssuance(c *gin.Context) {
 	}
 
 	data := convInvInvoiceJobInfo(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -1232,7 +1192,6 @@ func (h *Holder) ListOrderExternalIssuances(c *gin.Context) {
 	for _, it := range data.GetRecords() {
 		records = append(records, convInvInvoiceJobInfo(it))
 	}
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), response.PageData{
 			Records:  records,

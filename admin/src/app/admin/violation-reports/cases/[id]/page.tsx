@@ -238,7 +238,6 @@ export default function CaseDetailPage() {
 				sourceCaseClosed = res.sourceCaseClosed;
 			},
 			MOVE_FAILED_TEXT,
-			// 對話框拿的是開啟時讀的那一筆（etag 與去處的案件版本都在裡面）：衝突時連它一起重讀，重送才不會帶過時的意圖。
 			() =>
 				Promise.all([reports.refetch(), rereadMoveReport(request.id ?? "")]),
 		);

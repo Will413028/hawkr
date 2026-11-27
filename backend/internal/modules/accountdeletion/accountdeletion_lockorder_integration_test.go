@@ -45,7 +45,6 @@ func (noProductChecks) VerifyProduct(context.Context, uuid.UUID, int64) error {
 	return social.ErrProductNotAvailable
 }
 
-// lockedNow 回報一列現在是不是被別的 transaction 鎖著（NOWAIT 拿不到，SQLSTATE 55P03）。
 func (f *fixture) lockedNow(t *testing.T, sql string, args ...any) bool {
 	t.Helper()
 	var n int64
@@ -96,7 +95,6 @@ func TestDeletionLocksBuyerAndSellerBeforeSocialRows(t *testing.T) {
 				return f.lockedNow(t, "SELECT 1 FROM social.comments WHERE id = $1 FOR NO KEY UPDATE NOWAIT", commentID)
 			}
 			f.requestHeldOnStoreRow(t, id, buyerID, s.StoreID, "social 的留言列", socialTouched)
-			// 事件確實派發了：複本在，否則上面的順序什麼也沒證明。
 			var n int64
 			if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM social.inactive_authors WHERE buyer_id = $1", buyerID).Scan(&n); err != nil || n != 1 {
 				t.Fatalf("social 的複本 %d %v", n, err)
@@ -327,12 +325,9 @@ func TestStoreRetiredLocksSellerBeforeCrmRows(t *testing.T) {
 	}
 }
 
-// requestHeldOnStoreRow 讓帳號刪除停在店家列上（另一個 transaction 先鎖住它），此時量兩件事：買家列已鎖、上層模組的列還沒碰
-// （touched 回報上層模組是否已經動到自己的資料），再放開店家列並要求帳號刪除完成。
 func (f *fixture) requestHeldOnStoreRow(t *testing.T, accountID, buyerID, storeID int64, upper string, touched func() bool) {
 	t.Helper()
 	ctx := context.Background()
-	// 另一個 transaction 先鎖住店家列，讓帳號刪除停在店家列上。
 	held, release, holdDone := make(chan struct{}), make(chan struct{}), make(chan error, 1)
 	go func() {
 		holdDone <- f.db.InTx(ctx, func(ctx context.Context) error {
@@ -401,12 +396,10 @@ func TestCompletePendingOnDeletedAccountToleratesConcurrentCompletion(t *testing
 	if state, err := f.module.Request(ctx, adminRequest(id)); err != nil || state != PendingOrders {
 		t.Fatalf("state=%s err=%v", state, err)
 	}
-	// 帳號被另一條路徑刪除了，待辦申請還在 PENDING_ORDERS。
 	if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE identity.accounts SET deleted_at = now(), deletion_pending_at = NULL, email = NULL, suspended_at = NULL WHERE id = $1", id); err != nil {
 		t.Fatal(err)
 	}
 
-	// 另一個 transaction 先鎖住待辦申請列；CompletePending 的一般讀取仍讀得到它，之後的 UPDATE 停在這一列上。
 	held, release, holdDone := make(chan struct{}), make(chan struct{}), make(chan error, 1)
 	go func() {
 		holdDone <- f.db.InTx(ctx, func(ctx context.Context) error {
@@ -479,7 +472,6 @@ func TestRequestOnDeletedAccountRecordsAttemptOnTheConcurrentlyCompletedRequest(
 	if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE identity.accounts SET deleted_at = now(), deletion_pending_at = NULL, email = NULL, suspended_at = NULL WHERE id = $1", id); err != nil {
 		t.Fatal(err)
 	}
-	// 一筆更晚的已完成申請：LatestRequest 會回它，不是待辦的那一筆。
 	if _, err := f.db.Conn(ctx).Exec(ctx, "INSERT INTO accountdeletion.deletion_requests (id, account_id, status, requested_at, completed_at) VALUES ($1, $2, 'COMPLETED', now() + interval '1 hour', now() + interval '1 hour')", uuid.NewV7(), id); err != nil {
 		t.Fatal(err)
 	}
@@ -529,7 +521,6 @@ func TestRequestOnDeletedAccountRecordsAttemptOnTheConcurrentlyCompletedRequest(
 	if err := f.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM accountdeletion.request_attempts WHERE request_id = $1", pendingID).Scan(&n); err != nil {
 		t.Fatal(err)
 	}
-	// 第一次 Request 的 attempt 也在這一筆上，所以是 2；掛到最新那一筆的話只有 1。
 	if n != 2 {
 		t.Fatalf("待辦申請上的 attempt = %d，預期 2（第一次與並行完成後的這一次）", n)
 	}

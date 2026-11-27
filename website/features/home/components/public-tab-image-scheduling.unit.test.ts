@@ -35,8 +35,6 @@ vi.mock("framer-motion", () => ({
 		}) => React.createElement("div", { className }, children),
 	},
 }));
-// Probe the scheduling props at the real carousel's card boundary. No image
-// needs to resolve before the carousel controls can select another story.
 vi.mock("@/features/home/components/HomeStageFeedCard", () => ({
 	default: ({
 		post,

@@ -10,26 +10,7 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// ---------------------------------------------------------------------------
-// P0-1：I5 序列閘門的兩半
-//
-// dev 實測（2026-09-05，evidence/A6/P0-orphan/）：同一張發票上有一筆
-// FAILED_PERMANENT 的折讓 operation（AMEGO 永久拒絕、等 ADM 處理）時，
-// 第二筆退款會建出 adjustment `7501688835508535296`（單號 A000000000010、PENDING）
-// 而 **operation 一列都沒有**，inbox 標 PROCESSED、last_error 為 NULL ⇒ 完全靜默。
-//
-// 兩個成因，兩邊都要修：
-//   ① 應用層閘門 correctionInFlight 只涵蓋 partial 索引 operation_type 述詞
-//      4 種裡的 2 種（缺 ALLOWANCE／VOID_ALLOWANCE）⇒ 決策樹放行到取號與建列。
-//   ② createOperation 對 Create 回 rows=0 一律當冪等 return nil ⇒ 撞序列閘門
-//      這一半被靜默吞掉。
-//
-// 對照組（來自同一份 dev 證據）：`operation_key='allowance:7501686487977558016'`
-// 命中 0（⇒ 不是同一把 key 重送），而 ALW-05 那筆的 key 命中 1（⇒ 查詢有效）。
-// ---------------------------------------------------------------------------
 
-// gateOp 造一列佔閘門用的 operation。狀態值硬寫字面值：期望值引用 codemeta 的話，
-// 碼值被改掉測試照樣綠。
 func gateOp(opType, status string) domain.Operation {
 	return domain.Operation{ID: 9001, DocumentID: 5101, OperationType: opType, Status: status}
 }
@@ -47,25 +28,20 @@ func TestAdjustmentInFlightMatchesPartialIndexTypes(t *testing.T) {
 		wantCorrection bool
 		wantAdjustment bool
 	}{
-		// ALLOWANCE：只有 adjustmentInFlight 看得到它。
 		{"ALLOWANCE", "FAILED_PERMANENT", false, true},
 		{"ALLOWANCE", "PENDING", false, true},
 		{"ALLOWANCE", "WAITING_CONFIRMATION", false, true},
 		{"ALLOWANCE", "PROVIDER_STATUS_RECHECK", false, true},
 		{"ALLOWANCE", "FAILED_UNKNOWN", false, true},
-		// VOID_ALLOWANCE 在索引述詞內，即使今天沒有路徑建得出它。
 		{"VOID_ALLOWANCE", "READY", false, true},
-		// 五個排除值 ⇒ 兩邊都不擋。
 		{"ALLOWANCE", "SUCCEEDED", false, false},
 		{"ALLOWANCE", "NOT_APPLICABLE", false, false},
 		{"ALLOWANCE", "CANCELLED_BEFORE_ISSUE", false, false},
 		{"ALLOWANCE", "RESOLVED_EXTERNALLY", false, false},
 		{"ALLOWANCE", "CANCELLED_BY_ADMIN", false, false},
-		// correction 那一半維持原樣。
 		{"VOID", "SENDING", true, false},
 		{"REISSUE", "CREATED", true, false},
 		{"VOID", "SUCCEEDED", false, false},
-		// ISSUE 不在索引述詞內 ⇒ 兩邊都不擋（它走的是註 A 那條路）。
 		{"ISSUE", "SENDING", false, false},
 	}
 	for _, tc := range cases {
@@ -85,7 +61,7 @@ func TestAdjustmentInFlightMatchesPartialIndexTypes(t *testing.T) {
 // TestPlanRefundAdjustment_AdjustmentInFlightRetriesLater 守決策樹的新閘門。
 func TestPlanRefundAdjustment_AdjustmentInFlightRetriesLater(t *testing.T) {
 	f := voidableFacts()
-	f.Doc.AllowanceTotalAmount = 300 // 已有折讓 ⇒ 本來會走 B 節點建列
+	f.Doc.AllowanceTotalAmount = 300
 	f.AdjustmentInFlight = true
 
 	got := planRefundAdjustment(f)
@@ -127,7 +103,7 @@ func TestPlanRefundAdjustment_InFlightGateDoesNotShadowSkip(t *testing.T) {
 func TestCreateOperation_SequenceGateHeldIsNotIdempotent(t *testing.T) {
 	h := newRefundHarness(t)
 	ctx := context.Background()
-	h.ops.gateHeld = true // ON CONFLICT 命中 partial 索引：沒有任何列被插入
+	h.ops.gateHeld = true
 
 	err := h.uc.createOperation(ctx, 5101, 7101,
 		codemeta.InvoiceOperationTypeAllowance.Value, refundTestNow)
@@ -155,7 +131,6 @@ func TestCreateOperation_SameKeyReplayStaysIdempotent(t *testing.T) {
 		t.Fatalf("第一次沒有 promote 到 READY（promoted=%d）", len(h.ops.promoted))
 	}
 
-	// 同一組 (documentID, adjustmentID) ⇒ 同一把 operation_key，那一列存在。
 	if err := h.uc.createOperation(ctx, 5101, 7101,
 		codemeta.InvoiceOperationTypeAllowance.Value, refundTestNow); err != nil {
 		t.Fatalf("同一把 key 重送回了 error: %v —— 重投本來就該冪等", err)

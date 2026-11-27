@@ -50,10 +50,6 @@ test("seller storefront keeps critical media and server-owned content", async ()
 	assert.doesNotMatch(showcaseWarmer, /<script|dangerouslySetInnerHTML/);
 });
 
-// Opening the 貼文 tab must show the posts the server already fetched. A scoped
-// feed query that drops its seed stays pending, and a pending feed renders the
-// full-page skeleton — the loading surface that replaces delivered content and
-// that the soft-navigation E2E forbids.
 test("the seller posts tab keeps the page one its own server render fetched", async () => {
 	const [postsPage, feed, hook] = await Promise.all([
 		source("features/sellers/posts/SellerPostsPage.tsx"),
@@ -61,13 +57,9 @@ test("the seller posts tab keeps the page one its own server render fetched", as
 		source("lib/hooks/useFeedPosts.ts"),
 	]);
 
-	// The page fetches page one for this very seller, then declares that seed as
-	// belonging to the feed's scoped query.
 	assert.match(postsPage, /getCachedStorePosts\(\s*storeId,\s*POSTS_PAGE_SIZE/);
 	assert.match(postsPage, /initialPostsMatchQuery/);
 	assert.match(feed, /initialPostsMatchQuery,/);
-	// Trusting a scoped seed stays opt-in: the canonical feed seeds itself, and
-	// no other caller may seed from posts fetched for a different key.
 	assert.match(
 		hook,
 		/const seedMatchesQuery = isCanonical \|\| initialPostsMatchQuery;/,
@@ -76,6 +68,5 @@ test("the seller posts tab keeps the page one its own server render fetched", as
 		hook,
 		/hasInitialData =\s*restored !== null \|\|\s*\(!initialSeedFailed && seedMatchesQuery && !viewer\);/,
 	);
-	// The skeleton branch this protects is driven by the query's pending state.
 	assert.match(hook, /initialLoading: query\.isPending/);
 });

@@ -92,21 +92,6 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
 				: defaultValue != null
 					? String(defaultValue).length > 0
 					: false;
-		// Uncontrolled inputs (e.g. react-hook-form's register) keep their value
-		// in the DOM, not in props — read it from the node so the floating label
-		// still lifts off a pre-filled field (edit forms) instead of overlapping
-		// the text.
-		//
-		// This used to be a dependency-LESS effect: it re-read the DOM and
-		// called setState on every single render of every uncontrolled field,
-		// relying on React's same-value bailout to avoid a loop. Now it syncs
-		// on mount / value identity and subscribes to the node's own `input`
-		// event, which also covers programmatic population (RHF `reset()`)
-		// without touching the DOM on unrelated renders.
-		// `value`/`defaultValue` below are deliberate re-sync TRIGGERS, not
-		// values read inside the effect: an edit form that swaps `defaultValue`
-		// once its data lands must re-read the node, and a field that flips
-		// controlled/uncontrolled must re-subscribe.
 		// biome-ignore lint/correctness/useExhaustiveDependencies: re-sync triggers
 		React.useEffect(() => {
 			if (isControlled) return;
@@ -121,9 +106,6 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
 				node.removeEventListener("change", sync);
 			};
 		}, [isControlled, value, defaultValue]);
-		// Date/time pickers always paint a browser placeholder (年/月/日,
-		// HH:MM, etc.) — treat them as "filled" for floating-label purposes
-		// so the label doesn't sit on top of the format hint.
 		const browserPaintsPlaceholder = [
 			"date",
 			"datetime-local",
@@ -146,10 +128,6 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
 			wrapperClassName,
 		});
 
-		// In floating-label mode the label IS the placeholder while the field is
-		// empty, and once it floats up it still names the field — so an
-		// externally-passed placeholder stays suppressed either way (it would
-		// read as duplicated label text under the floated label).
 		const effectivePlaceholder = floatingLabel ? undefined : placeholder;
 
 		return (
@@ -305,9 +283,6 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
 		const [focused, setFocused] = React.useState(false);
 		const invalid = isInvalid || Boolean(errorMessage);
 
-		// Highlight-overlay plumbing: keep an internal handle to the textarea (in
-		// addition to the forwarded ref) so we can mirror its scroll onto the
-		// backdrop, keeping coloured tokens aligned with the real glyphs.
 		const innerRef = React.useRef<HTMLTextAreaElement | null>(null);
 		const backdropRef = React.useRef<HTMLDivElement | null>(null);
 		const setTextareaRef = React.useCallback(
@@ -333,8 +308,6 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
 			const backdrop = backdropRef.current;
 			if (!renderHighlight || !textarea || !backdrop) return;
 			const syncViewport = () => {
-				// These borderless layers fill the same container. Subtract only
-				// native scrollbars, preserving fractional dimensions at text zoom.
 				backdrop.style.width = `calc(100% - ${textarea.offsetWidth - textarea.clientWidth}px)`;
 				backdrop.style.height = `calc(100% - ${textarea.offsetHeight - textarea.clientHeight}px)`;
 				syncBackdropScroll();
@@ -355,8 +328,6 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
 				: defaultValue != null
 					? String(defaultValue).length > 0
 					: false;
-		// Same uncontrolled DOM read as Input: without it a textarea populated
-		// by `reset()` kept its floating label sitting on top of the text.
 		const [uncontrolledFilled, setUncontrolledFilled] = React.useState(false);
 		// biome-ignore lint/correctness/useExhaustiveDependencies: re-sync triggers
 		React.useEffect(() => {
@@ -444,8 +415,6 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
 									if (renderHighlight) syncBackdropScroll();
 									onScroll?.(e);
 								}}
-								// Highlight mode: hide the real glyphs (the aligned backdrop
-								// shows them), but keep the caret + selection visible.
 								style={
 									renderHighlight
 										? {

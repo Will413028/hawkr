@@ -116,19 +116,10 @@ function orDegraded<T>(
 	return empty;
 }
 
-// This aggregate is the sole cache owner for the live wave. Calling raw, strict
-// anonymous fetchers avoids nested SWR windows re-caching stale price/stock data
-// for an additional cycle. The `'use cache'` entry is shared across sessions
-// and tag-invalidated by POST /api/revalidate; the COMMERCE_LIVE tier is the
-// TTL safety net for a missed invalidation, not the freshness path.
 async function readHomeLiveBootstrap() {
 	"use cache";
 	cacheTag(PUBLIC_CACHE_TAGS.products);
 	applyCacheTier("COMMERCE_LIVE");
-	// Timed as one unit: the raw fetchers below deliberately bypass the
-	// per-domain cached wrappers (where slow-miss timing normally lives), so
-	// without this the home live fan-out could stall past a client loader
-	// timeout and emit no slow-cache-miss beacon / cache-health signal.
 	return fillFetch(
 		"home-live-bootstrap",
 		async () => {
@@ -147,9 +138,6 @@ async function readHomeLiveBootstrap() {
 
 async function readHomeDiscoveryBootstrap() {
 	"use cache";
-	// A post write busts this entry through the posts tag; the DISCOVERY tier
-	// is only the safety net for a missed invalidation, as it is for sellers
-	// and the category tree.
 	cacheTag(
 		PUBLIC_CACHE_TAGS.sellers,
 		PUBLIC_CACHE_TAGS.posts,
@@ -167,8 +155,6 @@ async function readHomeDiscoveryBootstrap() {
 			return {
 				recommendedSellers,
 				posts,
-				// Rolled up here, not in the browser: the shelves need only the
-				// lv1 → descendant-id index, never the ~200KB tree itself.
 				categoryGroups: categoryGroupsFromTree(categoryTree),
 			};
 		},
@@ -265,10 +251,6 @@ async function fallbackDiscoveryBootstrap(
  */
 export async function GET() {
 	await connection();
-	// One budget for the whole request, shared by both attempts. The primary and
-	// the cache fallback are consecutive tries at the same data, so the fallback
-	// inherits what the primary left rather than opening a second allowance —
-	// otherwise a stalled upstream costs a visitor two full waits for one answer.
 	const budget = homeBootstrapBudget();
 	const deadlineAt = Date.now() + budget.totalMs;
 	const intact = <T>(value: T): Degradable<T> => ({ value, degraded: [] });
@@ -294,10 +276,6 @@ export async function GET() {
 		LIVE_DOMAINS.includes(domain),
 	);
 	if (unavailable.length > 0) {
-		// No source could supply the commerce wave. Answering 200 with empty
-		// records would be indistinguishable from a genuinely empty catalogue and
-		// would overwrite the snapshot the visitor is already looking at; an
-		// explicit outage lets the caller keep what it has and retry.
 		return Response.json(
 			{ error: "bootstrap_unavailable", unavailable },
 			{
@@ -311,10 +289,6 @@ export async function GET() {
 		);
 	}
 
-	// Discovery is recoverable rather than load-bearing: an absent story rail is a state
-	// the page renders normally. So a missing discovery wave stays a 200 — but it
-	// is labelled, and `lib/api/tab-bootstrap.ts` reads the label to keep the rail
-	// it already holds instead of caching the gap as the new truth.
 	const payload: HomeTabBootstrapV1 & { degraded?: BootstrapDomain[] } = {
 		schemaVersion: "home.v2",
 		...live.value,

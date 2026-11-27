@@ -13,28 +13,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// 本檔是 M3 稅務資格狀態機寫入面的 Layer 5：賣家側 §6.1.7 的端點 18／19／20／22，
-// ADM 側 §6.1.12 的端點 40／41。讀取面（端點 17／21／39）在 query.go。
-//
-// 四條規則：
-//
-//	① **業務錯誤走 envelope、故障走 gRPC error**。GetCode() 是 Gateway 的
-//	   EnvelopeGuardInterceptor 唯一的判定依據——回 gRPC error 的那些會變成 5xx，
-//	   而「你的狀態不允許送審」不是故障。
-//	② **Tier A 的回應必須與「不存在」逐位元相同**：四支賣家 RPC 在越權（別人的
-//	   store_id）與查無時都回同一個 9320 envelope，因為那個判定發生在
-//	   `invoice_issuers.issuer_ref_id` 的 WHERE，本層沒有第二個分支可以回不同的東西。
-//	③ **必填／長度／值域是契約違規不是業務結果** ⇒ 回 InvalidArgument（400），不借
-//	   業務碼。§6.1.12 對 confirmed 缺席逐字要求 400 且**不得用 9348**（那是狀態不相容，
-//	   語意不同：一個要再按一次確認、一個要換個決策）。
-//	④ **9324 是唯一帶 data 的非零碼**（端點 19 的 7 天冷卻，preserveData／HTTP 200）：
-//	   前端要靠 data.reapplyCooldownUntil 顯示倒數。少了 data，賣家只看到一句紅字而
-//	   不知道什麼時候可以再試。
-//
-// ⚠️ **端點 18 沒有「非零碼 ＋ data」的出口**：gateway 的 SaveSellerTaxProfileDraft
-// handler 無條件走 response.OK（不看 resp.GetCode()）⇒ preserveData 類的碼在那條路上
-// 會被寫成 code 0。所以 SaveDraft 的冷卻分支回 9321 而不是 9324——它是端點 18 碼表
-// （9321／9322）之內的值，且冷卻到期時刻本來就在 S02 讀得到的 reapplyCooldownUntil 上。
 
 // SaveSellerTaxProfileDraft 儲存稅務資格草稿（端點 18 ＝ T01 ＋ 草稿存檔）。
 func (s *InvoiceServer) SaveSellerTaxProfileDraft(
@@ -91,20 +69,13 @@ func (s *InvoiceServer) SubmitSellerTaxProfile(
 
 	res, err := s.taxProfiles.Submit(ctx, usecase.SubmitTaxProfileInput{
 		StoreID: storeID, ExpectedVersion: version,
-		// 裁決 C：條款勾選與送審是同一個動作。未勾 ⇒ 9325（envelope，HTTP 409），
-		// 不是 InvalidArgument——賣家的下一步是「去讀條款並勾選」，前端要據此
-		// 就地彈出條款連結（58A §S02 的 9325 列）。
 		AcceptedTerms: req.GetAcceptedTerms(),
-		// 簽署的自然人。**不 requirePrincipal**：它缺席時要記成「查不到簽署人」
-		// 而不是讓整支送審 InvalidArgument——舊版 client 還在線時那會直接鎖死送審。
-		// Gateway 已在入口擋掉無 account 的請求（401），這裡是縱深防禦不是唯一防線。
 		AcceptedByAccountID: req.GetAcceptedByAccountId(),
 	})
 	if err != nil {
 		return s.taxProfileErr(ctx, "invoice.tax_profile.submit.failed", err)
 	}
 	if res.CooldownBlocked {
-		// 9324 ＋ 當前單筆。code 非零但 data 必須在（envelopeCodePreserveData，HTTP 200）。
 		return &pb.SellerTaxProfileResponse{
 			Code:    bizcode.SellerTaxReapplyCooldown,
 			Message: bizcode.Message(bizcode.SellerTaxReapplyCooldown),
@@ -206,8 +177,6 @@ func (s *InvoiceServer) DecideTaxReviewForAdmin(
 		ApprovalValidUntil: validUntil,
 		Confirmed:          req.GetConfirmed(),
 		ExpectedVersion:    version,
-		// §6.1.9：核定免用統一發票時由 ADM 指名收據代製授權的核定依據文件。
-		// 兩欄同進同出、且必須是該賣家自己上傳的那幾份之一——驗證在 usecase。
 		ApprovalBasisKey:     req.GetApprovalBasisKey(),
 		ApprovalBasisAssetID: req.GetApprovalBasisAssetId(),
 	})
@@ -235,9 +204,6 @@ func (s *InvoiceServer) DecideTaxExtensionForAdmin(
 	if err != nil {
 		return nil, err
 	}
-	// extend_days 缺席 ⇒ 0，由 usecase 折成預設的 30（§6.1.12 逐字）。
-	// 在這裡就折會讓「沒帶」與「帶了 30」在 usecase 端不可分辨，而預設值日後要改時
-	// 會有兩處。
 	days, err := parseOptionalCount(req.GetExtendDays())
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "extend_days: %v", err)
@@ -259,14 +225,7 @@ func (s *InvoiceServer) DecideTaxExtensionForAdmin(
 	}, nil
 }
 
-// ---------------------------------------------------------------------------
-// 型別邊界與錯誤映射
-// ---------------------------------------------------------------------------
 
-// parseExpectedVersion 解析樂觀鎖版本。
-//
-// 🔴 空字串 ⇒ 0 **而不是錯誤**：新建的 seller_tax_profiles 版本就是 0（DDL DEFAULT），
-// 前端第一次存草稿時沒有版本可帶。負數是契約違規（version 有 chk_stp_counters_nonneg）。
 func parseExpectedVersion(s string) (int64, error) {
 	if s == "" {
 		return 0, nil
@@ -278,7 +237,6 @@ func parseExpectedVersion(s string) (int64, error) {
 	return v, nil
 }
 
-// parseOptionalCount 解析可缺席的非負計數（extend_days）。
 func parseOptionalCount(s string) (int, error) {
 	if s == "" {
 		return 0, nil
@@ -293,10 +251,6 @@ func parseOptionalCount(s string) (int, error) {
 	return v, nil
 }
 
-// parseOptionalISO8601 解析可缺席的 ISO 8601 UTC 時間（approval_valid_until）。
-//
-// 只收 RFC3339：收寬一點（例如同時接受 "YYYY-MM-DD"）會讓「2027-01-01」被讀成
-// UTC 午夜，而 ADM 想的是台北時間的那一天——8 小時的差在核定效期上不會有人發現。
 func parseOptionalISO8601(s string) (*time.Time, error) {
 	if s == "" {
 		return nil, nil
@@ -309,21 +263,16 @@ func parseOptionalISO8601(s string) (*time.Time, error) {
 	return &utc, nil
 }
 
-// toTaxDecisionData 折出端點 40／41 共用的回應。
 func toTaxDecisionData(res usecase.TaxDecisionResult) *pb.DecideTaxReviewForAdminData {
 	return &pb.DecideTaxReviewForAdminData{
 		StoreId:      fmtID(res.StoreID),
 		ReviewStatus: res.ReviewStatus,
 		Version:      fmtInt64(res.Version),
-		// audit_log_id 是 bigserial（不是 TSID）⇒ 用 fmtID 讓 0 變空字串，
-		// 而不是回一個看起來像 id 的 "0"。
 		AuditLogId: fmtID(res.AuditLogID),
-		// 只有 REVOKE 有值（T-C04 的分界時點）；其餘決策省略。
 		RevokedEffectiveAt: fmtTime(res.RevokedEffectiveAt),
 	}
 }
 
-// taxProfileErr 把 usecase 的錯誤折成「賣家側四支」的回應。
 func (s *InvoiceServer) taxProfileErr(ctx context.Context, event string, err error) (*pb.SellerTaxProfileResponse, error) {
 	if st, ok := taxInvalidArgument(err); ok {
 		return nil, st
@@ -334,7 +283,6 @@ func (s *InvoiceServer) taxProfileErr(ctx context.Context, event string, err err
 	return nil, s.internal(ctx, event, err)
 }
 
-// taxDecisionErr 把 usecase 的錯誤折成「ADM 側兩支」的回應。
 func (s *InvoiceServer) taxDecisionErr(ctx context.Context, event string, err error) (*pb.DecideTaxReviewForAdminResponse, error) {
 	if st, ok := taxInvalidArgument(err); ok {
 		return nil, st
@@ -345,10 +293,6 @@ func (s *InvoiceServer) taxDecisionErr(ctx context.Context, event string, err er
 	return nil, s.internal(ctx, event, err)
 }
 
-// taxInvalidArgument 把契約違規映成 InvalidArgument。
-//
-// 🔴 清單是白名單不是黑名單：漏掉一個具名錯誤的後果是它掉進 s.internal ⇒ 500，
-// 而賣家看到的是「系統錯誤」而不是「請至少上傳一份稅籍證明文件」。
 func taxInvalidArgument(err error) (error, bool) {
 	switch {
 	case errors.Is(err, usecase.ErrTaxEvidenceRequired),

@@ -27,13 +27,11 @@ import java.util.HexFormat;
  */
 public final class UberWebhookParser {
 
-    // ---- §7.2 DaaS webhook 頂層欄位 ----
     static final String F_ID = "id";
     static final String F_KIND = "kind";
     static final String F_CREATED = "created";
     static final String F_DELIVERY_ID = "delivery_id";
 
-    // ---- §6.2 Eats 家族欄位（fallback 讀取，我方不訂閱其事件） ----
     static final String F_EVENT_ID = "event_id";
     static final String F_EVENT_TYPE = "event_type";
     static final String F_EVENT_TIME = "event_time";
@@ -95,11 +93,9 @@ public final class UberWebhookParser {
         String eventKey;
         UberWebhookEvent.KeyTier tier;
         if (!providerEventId.isEmpty()) {
-            // 66 §6.3.3 級 1（首選）：provider event id
             eventKey = providerEventId;
             tier = UberWebhookEvent.KeyTier.PROVIDER_EVENT_ID;
         } else {
-            // 66 §6.3.3 級 2：{delivery_id}:{event_type}:{provider_timestamp}:{sha256(raw_body)[0:16]}
             String timestamp = text(root, F_CREATED);
             if (timestamp.isEmpty()) {
                 timestamp = text(root, F_EVENT_TIME);
@@ -119,22 +115,9 @@ public final class UberWebhookParser {
     static UberWebhookEvent.Route routeOf(String kind) {
         String bare = kind == null ? "" : kind.startsWith(PREFIX) ? kind.substring(PREFIX.length()) : kind;
         return switch (bare) {
-            // 核心：狀態軸（§7.3.2）
             case KIND_DELIVERY_STATUS -> UberWebhookEvent.Route.PUBLISH;
-            // 🔴 每 20 秒一發；全進 MQ ＝ 流量放大 14 倍而零 consumer 需要它（陷阱 A3）
             case KIND_COURIER_UPDATE -> UberWebhookEvent.Route.INBOX_ONLY;
-            // 66 §6.3.6：只建 compensation case，落點是 fulfillment_exception_cases。
-            // 🔴 落點已隨架構裁決 DEC-20260912-184025 搬家（不是被刪）：
-            //    該表現在屬 payment-service 的 Logistics Finance module（io.github.will413028.hawkr.payment.logistics.**），
-            //    DDL 在 payment-service 的 V9__add_logistics_finance_tables.sql；設計仍見 65 §5.5 與 70 號。
-            // 🔴 但**寫入路徑仍不存在**，所以本 route 維持 IGNORE：
-            //    V9 只建了表，payment-service 內零 entity／mapper／repository 碰它
-            //    （實查：fulfillment_exception_cases 在 services 底下的 .java 檔只命中本註解這一處）。
-            //    ⇒ 進 MQ 只會讓 consumer 沒地方放而丟掉／進 DLQ。
-            //    留在 inbox ＋ 告警級 log，是「錢的事不自動化」與「不建半條路徑」兩者的交集。
-            // ⚠️ 改這條 route 之前先確認寫入路徑真的接上了——「表存在」不等於「有人寫得進去」。
             case KIND_REFUND_REQUEST -> UberWebhookEvent.Route.IGNORE;
-            // Pick & Pack 不在範圍：收到即 200 ＋ counter，不報錯
             case KIND_SHOPPING_PROGRESS -> UberWebhookEvent.Route.IGNORE;
             default -> UberWebhookEvent.Route.IGNORE;
         };

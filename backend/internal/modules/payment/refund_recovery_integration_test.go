@@ -16,10 +16,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// 退款先退、再向賣家收回（計畫步驟 3c′，D11、ADR D69）的整合測試：轉帳金額在每把鍵第一次送出時鎖付款列算定，退款不看轉帳狀態，
-// 撤回只在 provider 接受退款且轉帳成立之後開始，預留額在退款失敗或撤回終局時釋出。
 
-// duringTransfer 包住付款 provider：CreateTransfer 在委派給 provider 之前先執行 during（轉帳已 claim、provider 尚未回應的那一刻）。
 type duringTransfer struct {
 	ChargeProvider
 	during func()
@@ -30,7 +27,6 @@ func (d *duringTransfer) CreateTransfer(ctx context.Context, in ChargeTransferIn
 	return d.ChargeProvider.CreateTransfer(ctx, in)
 }
 
-// reversalOf 讀退款列的收回狀態。
 func (f *chargeFixture) reversalOf(t *testing.T, refundID interface{ String() string }) string {
 	t.Helper()
 	return f.text(t, "SELECT reversal_status FROM payment.refunds WHERE id = $1::uuid", refundID.String())
@@ -227,7 +223,6 @@ func TestARefundAcceptedWhileTheTransferIsPendingStartsTheReversalWhenTheTransfe
 		t.Fatalf("撤回不該等退款成功：%s，reversed %d，退款 %s", f.reversalOf(t, r.ID), f.reversedOf(t, tr.ID), f.refundText(t, "status", r.ID))
 	}
 
-	// 另一個順序：轉帳先成立，退款在 provider 接受（pending）時才排撤回。
 	f.paidPayment(t, "RR-4b", 100)
 	tr2 := f.requestTransfer(t, "RR-4b")
 	must(t, f.runTransfer(tr2.ID, false))
@@ -248,7 +243,6 @@ func TestARefundAcceptedWhileTheTransferIsPendingStartsTheReversalWhenTheTransfe
 		t.Fatalf("退款被接受的 transaction 沒有排撤回 job：%v", ids)
 	}
 
-	// 轉帳成立時退款還沒被 provider 接受：預留留在 WAITING、不排撤回 job；退款被接受之後才開始。
 	f.paidPayment(t, "RR-4c", 100)
 	tr3 := f.requestTransfer(t, "RR-4c")
 	f.fake.FailTransferAfterCreate(errLost)
@@ -318,7 +312,6 @@ func TestARefundThatFailsBeforeTheReversalStartsReleasesTheReservationAndNeverRe
 		t.Fatalf("不該有撤回或告警：撤回呼叫 %d，事件 %+v", f.fake.ReversalCalls(), f.anomalies)
 	}
 
-	// 先被接受、轉帳還沒成立時變成失敗：預留在 WAITING 釋出，之後轉帳成立也不撤回。
 	f.paidPayment(t, "RR-5b", 100)
 	tr2 := f.requestTransfer(t, "RR-5b")
 	f.fake.FailTransferAfterCreate(errLost)
@@ -447,7 +440,6 @@ func TestResolvingATransferAnomalyAsSucceededCapsTheWaitingReversalsByTheVerifie
 		t.Fatalf("撤回列沒有依核實的額度建立：%d 列", f.count(t, "SELECT count(*) FROM payment.refund_reversals WHERE refund_id = $1", r.ID))
 	}
 
-	// 結案成失敗：等待中的預留釋出。
 	f.paidPayment(t, "RR-8b", 100)
 	tr2 := f.requestTransfer(t, "RR-8b")
 	f.fake.FailTransfer(errLost)

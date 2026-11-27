@@ -80,7 +80,6 @@ class ShippingWebhookConsumerIngressTest {
                 .as("consumer 必須交出 adapter 正規化的結果；自己解析就拿不到這個值")
                 .contains(STUB_NORMALIZED.value());
 
-        // 🔴 legacy 自解路徑必須零呼叫——這一條才是「不得存在兩份 status processing SSOT」的斷言
         verify(shippingService, never())
                 .processWebhookStatusUpdate(anyString(), anyString(), anyString(), anyString());
     }
@@ -169,7 +168,6 @@ class ShippingWebhookConsumerIngressTest {
         verify(waitingRegistry).complete(anyString(), any());
     }
 
-    // ==================== helpers ====================
 
     private static Message msg(Map<String, String> payload) {
         StringBuilder json = new StringBuilder("{");
@@ -225,8 +223,6 @@ class ShippingWebhookConsumerIngressTest {
 
             @Override
             public boolean isLabelEvent(InboundPayload raw) {
-                // stub 也用 provider 專屬欄名——但那是**在 adapter 這一側**，
-                // 正是本波要把它移到的地方。consumer 只拿中性結論。
                 return "Print".equals(raw.formParams().get("ApiType"));
             }
 

@@ -26,7 +26,6 @@ test("對象種類的篩選選項涵蓋契約的每個種類（不含 UNSPECIFIE
 	}
 });
 
-// 與伺服器 `Action.AllowedOn`（moderation/internal/model/model.go）逐種類一致。
 test("每種對象可用的處置與伺服器的 AllowedOn 一致", () => {
 	const hwb = [CaseAction.HIDE, CaseAction.WARN, CaseAction.BAN];
 	const want = new Map<ReportTargetKind, readonly CaseAction[]>([

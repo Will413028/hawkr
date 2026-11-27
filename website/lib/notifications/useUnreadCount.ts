@@ -41,7 +41,6 @@ export function useUnreadCount({
 	const [settledSignal, setSettledSignal] = React.useState<unknown>(null);
 	const resetSignalRef = React.useRef(resetSignal);
 	resetSignalRef.current = resetSignal;
-	// 單調遞增的世代：每個比較舊的回應都永久作廢（布林旗標會被下一個 effect 重設）。
 	const generationRef = React.useRef(0);
 	const settle = React.useCallback(() => {
 		setLoading(false);
@@ -61,7 +60,6 @@ export function useUnreadCount({
 			const next = await fetchUnreadCount(audience);
 			if (generation === generationRef.current) setCountState(next);
 		} catch {
-			// 暫時性錯誤保留上一個已知的數字，鈴鐺不閃爍；登入失效由 transport 發事件。
 		} finally {
 			if (generation === generationRef.current) settle();
 		}

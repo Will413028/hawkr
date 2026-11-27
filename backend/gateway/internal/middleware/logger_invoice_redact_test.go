@@ -17,7 +17,6 @@ import "testing"
 // forced-redact 勝過 allowedKeys 與 diagnostic escape hatch，而那要用 shouldRedact
 // 的第三個參數才驗得出來。
 func TestInvoiceCredentials_ForcedRedactBeatsAllowlist(t *testing.T) {
-	// 模擬「有人日後把它加進 allowlist」與「診斷模式臨時放行」兩種情形。
 	escapeHatch := map[string]struct{}{"appkey": {}, "carrierid": {}}
 	for _, k := range []string{"appkey", "carrierid"} {
 		t.Run(k, func(t *testing.T) {

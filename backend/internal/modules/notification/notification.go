@@ -49,7 +49,7 @@ var migrationFiles embed.FS
 func Migrations() fs.FS {
 	sub, err := fs.Sub(migrationFiles, "db/migrations")
 	if err != nil {
-		panic(err) // 只有 embed 的路徑寫錯才會發生，編譯後的 binary 不可能遇到
+		panic(err)
 	}
 	return sub
 }
@@ -160,7 +160,6 @@ func newModule(d Deps, reg app.Registry) *Module {
 	}
 }
 
-// inboxReader 讀串流訊號的內容：未讀數與最新一則都走 app 用例，與 UnreadCount 同一條規則（只算註冊的型別，含公告）。
 func inboxReader(a *app.Service) func(context.Context, stream.Key, int64) (stream.Inbox, error) {
 	return func(ctx context.Context, key stream.Key, storeID int64) (stream.Inbox, error) {
 		r := app.Recipient{AccountID: key.AccountID, Audience: key.Audience, StoreID: storeID}
@@ -176,7 +175,6 @@ func inboxReader(a *app.Service) func(context.Context, stream.Key, int64) (strea
 	}
 }
 
-// dbSignals 把 worker 的收件匣變化轉成同 transaction 的 pg_notify（intake 不依賴 stream）。
 type dbSignals struct{ db *db.DB }
 
 func (s dbSignals) InboxChanged(ctx context.Context, accountID int64, audience model.Audience, storeID int64, hint model.StateHint, itemID uuid.UUID) error {

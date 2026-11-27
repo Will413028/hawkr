@@ -40,23 +40,13 @@ func TestGenerator_SequenceOverflowRollsToNextMillisecond(t *testing.T) {
 		defer close(done)
 
 		g := &generator{}
-		// Seed call: takes the normal path (zero-value lastMs/seq), so the
-		// resulting id's timestamp portion is exactly what g itself
-		// recorded as lastMs — no separately-read wall clock involved.
 		seedID = g.next()
 		lastMsAtStart = seedID >> 22
 
-		// Prime seq to two calls away from overflow, in-place on the same
-		// instance that just made the seed call, so lastMs is still that
-		// self-recorded value.
 		g.seq = (1 << 22) - 2
 
-		// seq: (1<<22)-2 -> (1<<22)-1, same millisecond, no overflow yet.
 		firstID = g.next()
-		// seq: (1<<22)-1 -> (1<<22), hits the overflow branch: busy-waits
-		// for the next millisecond, then resets seq to 0.
 		secondID = g.next()
-		// first call after rollover: should be seq=1 in the new millisecond.
 		thirdID = g.next()
 	}()
 
@@ -73,9 +63,6 @@ func TestGenerator_SequenceOverflowRollsToNextMillisecond(t *testing.T) {
 	if firstTs != lastMsAtStart {
 		t.Fatalf("pre-overflow call: expected timestamp %d, got %d", lastMsAtStart, firstTs)
 	}
-	// The overflow call must have genuinely waited for wall-clock time to
-	// advance past lastMs, not fabricated a value while still in the same
-	// millisecond.
 	if secondTs <= lastMsAtStart {
 		t.Fatalf("overflow call did not roll to a later millisecond: lastMsAtStart=%d secondTs=%d", lastMsAtStart, secondTs)
 	}
@@ -84,8 +71,6 @@ func TestGenerator_SequenceOverflowRollsToNextMillisecond(t *testing.T) {
 		t.Fatalf("expected seq to reset to 0 right after overflow, got %d", secondSeq)
 	}
 
-	// Subsequent calls stay in (or move past) that same later millisecond,
-	// with seq continuing to increment from 0.
 	if thirdTs < secondTs {
 		t.Fatalf("timestamp regressed after overflow: secondTs=%d thirdTs=%d", secondTs, thirdTs)
 	}

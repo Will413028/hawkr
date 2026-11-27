@@ -99,7 +99,6 @@ public class OrderCompletionTxHandler {
             return false;
         }
 
-        // 建立撥款指示任務：一律 PENDING（03 §5.4 階段 1）；轉帳金額扣掉已退款的部分由 payment 在送出時計算。
         GrantPaymentTaskEntity task = new GrantPaymentTaskEntity();
         task.setTaskId(TsidUtil.generate());
         task.setOrderNo(orderNo);
@@ -109,13 +108,10 @@ public class OrderCompletionTxHandler {
         task.setMaxRetryCount(OrderConstants.DEFAULT_MAX_RETRY_COUNT);
         grantPaymentTaskRepository.insert(task);
 
-        // issue #2294 B8（例外 A）：兩則事件與上面的 CAS 同事務落 order_outbox，
-        // 取代原本 OrderService.completeOrder 在 tx 外的 best-effort 直發。
         insertCompletionOutbox(orderNo, confirmType);
 
         log.info("OrderCompletionTxHandler.completeOrder.success",
                 "訂單完成，撥款任務已建立，confirmType=" + confirmType, "orderNo", orderNo);
-        // [B-207] #1181：賣家工作區 realtime — 完成（自動完成 + 確認收貨共用此 sink，afterCommit）
         eventPublisher.emitSellerOrderUpdated(orderNo, OrderEventPublisher.SRC_SYSTEM,
                 OrderStatus.DELIVERED.value(), OrderStatus.COMPLETED.value());
         return true;
@@ -144,9 +140,9 @@ public class OrderCompletionTxHandler {
         OrderCompletedPayload completed = new OrderCompletedPayload(
                 orderNo,
                 String.valueOf(order.getBuyerId()),
-                null,                                   // notifyBuyerAccountId：派送時 enrich 反解析
-                String.valueOf(order.getStoreId()),     // storeId：本地事實（crm 統計以此為 key）
-                null,                                   // notifySellerAccountId：派送時 enrich 反解析
+                null,
+                String.valueOf(order.getStoreId()),
+                null,
                 String.valueOf(order.getTotalActualAmount()),
                 confirmType,
                 DateTimeUtils.nowUtc().toString());
@@ -170,7 +166,6 @@ public class OrderCompletionTxHandler {
         try {
             outbox.setPayload(MAPPER.writeValueAsString(corePayload));
         } catch (JsonProcessingException e) {
-            // 固定結構序列化理論上不會失敗；拋出讓完成事務 rollback，避免狀態已轉但事件遺失
             throw new IllegalStateException(
                     eventType + " payload 序列化失敗 orderNo=" + orderNo, e);
         }

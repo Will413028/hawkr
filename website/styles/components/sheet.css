@@ -1,6 +1,3 @@
-/* Bottom-sheet shell — shared sheet primitive rendered via CartSheetPortal.
-   Lives with the component (imported by CartSheetPortal.tsx) so every
-   consumer route gets the styles. Moved out of features/cart.css. */
 
 .cart-sheet {
 	position: fixed;
@@ -204,7 +201,6 @@
 	color: var(--cart-danger);
 }
 
-/* Pickup form */
 
 .cart-sheet__form {
 	margin-top: 14px;
@@ -215,8 +211,6 @@
 	gap: 10px;
 }
 
-/* Form taking over the body (no existing-list above it) — drop the
-   dashed separator + top margin so the modal hugs its content. */
 .cart-sheet__form--standalone {
 	margin-top: 0;
 	padding-top: 0;
@@ -259,9 +253,6 @@
 	user-select: none;
 }
 
-/* The broad `.cart-sheet__form input` rule above paints text-input padding +
-   border onto the 預設 checkbox; reset it so the native control renders clean
-   and aligned with its label. */
 .cart-sheet__form-check input[type="checkbox"] {
 	width: 18px;
 	height: 18px;
@@ -295,7 +286,6 @@
 	font-size: 0.75rem;
 }
 
-/* PayUni 7-11 map store-pick block */
 
 .cart-sheet__store-pick {
 	display: flex;
@@ -382,7 +372,6 @@
 	}
 }
 
-/* Buyer cart controls follow the shared 44px / 48px button hierarchy. */
 .cart-sheet--buyer-cart .cart-sheet__close {
 	display: inline-grid;
 	place-items: center;

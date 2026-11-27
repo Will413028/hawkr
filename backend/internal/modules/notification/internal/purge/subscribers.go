@@ -9,8 +9,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
-// 這個檔案只放同步訂閱者：它們在來源的 transaction 內執行，失敗會讓來源 rollback，所以只排清除 job（enqueue），
-// 不碰 notification 的表、不讀別的模組（subscribers_test.go 守住）。
 
 // OnAccountDeleted 訂閱 identity.AccountDeleted：清除帳號的全部受眾。
 func (s *Service) OnAccountDeleted(ctx context.Context, e identity.AccountDeleted) error {

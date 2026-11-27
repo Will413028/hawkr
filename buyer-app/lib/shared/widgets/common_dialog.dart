@@ -81,12 +81,9 @@ class CommonDialog extends StatelessWidget {
                   ),
                 ),
               ),
-              // 分隔線
               if (showDivider)
                 const Divider(height: 1, color: AppColors.gray300),
-              // 按鈕區
               if (hasCancel)
-                // 雙按鈕（取消 + 確定）
                 IntrinsicHeight(
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -152,7 +149,6 @@ class CommonDialog extends StatelessWidget {
                   ),
                 )
               else
-                // 單按鈕（確定）
                 SizedBox(
                   width: double.infinity,
                   child: TextButton(

@@ -36,14 +36,10 @@ class AuthScreen extends HookConsumerWidget {
       }
       return null;
     }, [displayMessage]);
-    // --- State hooks ---
     final appVersionFuture = useMemoized(fetchAppVersion);
-    // 進行中的登入方式；一次只進行一個。
     final loadingProvider = useState<OAuthProvider?>(null);
 
-    // --- Local closures ---
 
-    // onboarding 由登入時讀到的 GetMyStore 決定（currentStoreProvider）。
     void navigateAfterAuth(BuildContext ctx) {
       if (!ctx.mounted) return;
       if (ref.read(needsOnboardingProvider) == true) {

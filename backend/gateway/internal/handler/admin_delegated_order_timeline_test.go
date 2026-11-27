@@ -7,16 +7,6 @@ import (
 	orderpb "github.com/Will413028/hawkr/go-pkg/proto/order"
 )
 
-// 代行訂單詳情的時間軸曾經與訂單狀態完全無關：它逐欄判「這個時間戳非空就加一個節點」，
-// 於是一筆 `status=80`（已取消）、`pay_time IS NULL`、`ship_time` 有值的真實訂單被渲染成
-// 「待付款 → 配送中」——既宣告了它從來沒到過的狀態，也完全不提它已經取消。
-//
-// 這支測試把兩條不變式釘住：
-//  1. 時間軸的最後一個節點恆為訂單**當下**的狀態
-//  2. 沒有任何節點的狀態超過當下狀態能證明的進度（正向流程上）
-//
-// 鑑別力：把 buildOrderTimeline 改回「時間戳非空就加」，cancelledOrderWithStrayShipTime
-// 與 pendingShipmentWithStrayShipTime 兩例立刻轉紅（前者尾節點變 30、後者多出 30）。
 
 func timelineStatuses(entries []DelegatedOrderTimelineEntry) []string {
 	out := make([]string, 0, len(entries))
@@ -44,7 +34,7 @@ func TestBuildOrderTimeline_LastNodeIsAlwaysCurrentStatus(t *testing.T) {
 			view: &orderpb.OrderDetailView{
 				Status:     strconv.Itoa(80),
 				CreateTime: created,
-				ShipTime:   shipped, // 未付款卻有出貨時間 = 資料雜訊
+				ShipTime:   shipped,
 			},
 			want:   []string{"0", "80"},
 			reason: "未付款的訂單不可能出貨；已取消必須自己現身，不能被略過",
@@ -55,7 +45,7 @@ func TestBuildOrderTimeline_LastNodeIsAlwaysCurrentStatus(t *testing.T) {
 				Status:     strconv.Itoa(20),
 				CreateTime: created,
 				PayTime:    paid,
-				ShipTime:   shipped, // 待出貨卻有出貨時間 = 資料雜訊
+				ShipTime:   shipped,
 			},
 			want:   []string{"0", "10", "20"},
 			reason: "當下狀態是待出貨，時間軸不得出現配送中",
@@ -123,7 +113,6 @@ func TestBuildOrderTimeline_LastNodeIsAlwaysCurrentStatus(t *testing.T) {
 					t.Fatalf("節點 = %v, want %v（%s）", got, tc.want, tc.reason)
 				}
 			}
-			// 每個節點都要有可顯示的標籤，否則畫面上會出現一個裸碼值。
 			for _, e := range buildOrderTimeline(tc.view) {
 				if e.StatusLabel == "" {
 					t.Errorf("節點 %q 沒有 statusLabel", e.Status)
@@ -228,7 +217,6 @@ func TestBuildOrderTimeline_StatusWithoutOwnColumnHasNoFabricatedTime(t *testing
 			status: "70",
 		},
 		{
-			// 已取消但取消時間為空（V11 之前的舊訂單無法回填）——仍不得回退到別的欄位。
 			name: "cancelledWithoutCancelledAt",
 			view: &orderpb.OrderDetailView{
 				Status: strconv.Itoa(80), CreateTime: created,

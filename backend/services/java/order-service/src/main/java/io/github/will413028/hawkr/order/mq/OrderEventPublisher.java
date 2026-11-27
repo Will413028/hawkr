@@ -56,16 +56,7 @@ public class OrderEventPublisher {
                 payload.orderNo());
     }
 
-    // order.cancelled 改走 order_outbox 可靠投遞（#1368）：取消狀態變更同事務落 outbox，
-    // 由 OrderOutboxPublisherScheduler 保證至少一次投遞（見 OrderService.insertCancelledOutbox +
-    // OrderOutboxPublisher.enrichCancelled）。原事務外 best-effort 直發已移除。
 
-    // order.completed / order.receipt.confirmed 的 best-effort 直發已移除（issue #2294 B8）：
-    // 兩者改走例外 A（狀態變更同事務落 order_outbox，OrderCompletionTxHandler → OrderOutboxPublisher），
-    // 移除當下全 repo 零呼叫端（含測試）。
-    // ⚠️ 不要「為了對稱」把它們加回來：本類的 publish 吞掉所有例外（見本檔最下方），
-    //    任何走回這條路的狀態變更就是「狀態已轉、事件 tx 外 best-effort 直發、失敗被吞」——
-    //    正是 B8 要消滅的形狀。要發這兩個事件請寫 outbox，不要呼叫這裡。
 
     /**
      * 發布撥款完成事件（#1286）——平台撥款指示成功後通知賣家款項已入帳。
@@ -78,14 +69,6 @@ public class OrderEventPublisher {
                 payload.orderNo());
     }
 
-    // order.delivered / order.sales.accumulated 的 best-effort 直發已移除（副作用失敗無訊號修復）：
-    // 兩者改走**例外 A**（狀態變更同事務落 order_outbox）——
-    //   order.delivered        → ShippingEventConsumer.deliveredInTx + OrderOutboxPublisher.enrichDelivered
-    //   order.sales.accumulated→ PaymentEventHandler.handlePendingPaymentOrder（與 order.paid 同一事務）
-    // 移除當下全 repo 零生產呼叫端。
-    // ⚠️ 不要「為了對稱」把它們加回來：本類的 publish 吞掉所有例外（見本檔最下方），
-    //    而這兩個事件的前置狀態轉換都是永久的（DELIVERED 的 allowed-from 不含自己、
-    //    sales.accumulated 由 payment dedup 表擋住重投）——走回這條路就是永久遺失。
 
     /**
      * 發布重試建單事件（Backstop：付款後逾期仍無物流單，請 Shipping 冪等重建，03 §8.11）
@@ -109,7 +92,6 @@ public class OrderEventPublisher {
                 orderNo);
     }
 
-    // ==================== Seller Workspace realtime（[B-207] #1181） ====================
 
     /** seller.order.updated 事件來源（seller workspace SSE，41 §4b.5 source 欄位） */
     public static final String SRC_PAYUNI_WEBHOOK = "payuni_webhook";
@@ -167,9 +149,6 @@ public class OrderEventPublisher {
                             + " storeId=" + storeId + " orderNo=" + orderNo);
             return;
         }
-        // sellerId 直接帶 store_id：訂閱端 topic 也是 store_id 空間（見上方 @param）。
-        // 這裡曾經反解析成 login account_id，並為此付一次 seller-service gRPC —— 那次呼叫
-        // 連同它的 fail-closed 降級一併移除，因為它現在是「把值轉換到一個沒有人訂閱的空間」。
         SellerOrderUpdatedPayload payload = new SellerOrderUpdatedPayload(
                 storeId, orderNo, source, previousStatus, status, shipmentStatus,
                 DateTimeUtils.formatIso8601(DateTimeUtils.nowUtc()));
@@ -200,7 +179,6 @@ public class OrderEventPublisher {
             log.info("OrderEventPublisher.publish.success",
                     "事件發布成功，eventType=" + eventType, "orderNo", orderNo);
         } catch (Exception e) {
-            // best-effort：失敗僅記錄，不影響主流程
             log.error("OrderEventPublisher.publish.error",
                     "事件發布失敗，eventType=" + eventType + ", orderNo=" + orderNo, e);
         }

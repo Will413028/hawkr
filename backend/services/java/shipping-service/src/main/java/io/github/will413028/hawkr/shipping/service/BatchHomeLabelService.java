@@ -33,7 +33,6 @@ public class BatchHomeLabelService {
     }
 
     public BatchResult batchGenerate(long storeId, List<Item> items) {
-        // 寫路徑：賣家當下意願防線（§2.3.1）— 整批共用同一個 seller，預先檢一次
         onboardingService.requireActiveSetting(storeId, ShippingMethod.TAQBIN);
 
         Semaphore semaphore = new Semaphore(properties.getHomeLabelConcurrency());

@@ -127,8 +127,6 @@ test("建立端點的 404 以業務碼分派，不以 HTTP status 分派", async
 	assert.equal(gone, "9264");
 	assert.equal(routeMissing, "DELEGATED_OPERATION_UNAVAILABLE");
 
-	// 三者兩兩不同才是這支測試的重點：把全部 404 壓成同一個碼時，上面三條
-	// 「各自有值」的斷言照樣可以寫成成立的樣子。
 	assert.equal(
 		new Set([neverGranted, gone, routeMissing]).size,
 		3,
@@ -205,8 +203,6 @@ test("代行入口把 9286 與 9264 譯成兩句不同的話", () => {
 	assert.match(gone, /已撤回或已到期/u);
 	assert.match(gone, /重新開通/u);
 
-	// 兩句話必須不同。相同 ⇒ 管理員無從得知該按「開通」還是「重新開通」，
-	// 而上面兩組 match 在共用同一句籠統文案時仍可能各自成立。
 	assert.notEqual(
 		neverGranted,
 		gone,

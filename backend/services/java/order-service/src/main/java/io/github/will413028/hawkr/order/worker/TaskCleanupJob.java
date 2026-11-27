@@ -61,7 +61,6 @@ public class TaskCleanupJob {
         }
 
         try {
-            // 清理已完成的任務記錄
             LocalDateTime threshold = DateTimeUtils.nowUtc().minusDays(taskRetentionDays);
 
             int stockDeleted = stockTxRecordRepository.deleteCompletedBefore(threshold);

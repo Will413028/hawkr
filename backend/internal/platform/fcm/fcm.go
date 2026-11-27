@@ -145,8 +145,6 @@ func (c *Client) Send(ctx context.Context, tokens []string, m Message) ([]Result
 	return out, nil
 }
 
-// cancelled 處理送到一半 ctx 取消：已有 token 被 FCM 收下時回傳已完成批次的結果、其餘 token 記暫時性失敗，
-// 讓呼叫端能把已送出的結果記進帳本，免得重試時對已收到的裝置再推一次；一個都沒送出時回 ctx 的錯誤，重試是安全的。
 func cancelled(done []Result, tokens []string, err error) ([]Result, error) {
 	if !slices.ContainsFunc(done, func(r Result) bool { return r.Outcome == OutcomeSent }) {
 		return nil, err

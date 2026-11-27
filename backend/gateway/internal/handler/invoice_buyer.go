@@ -7,11 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// 58 號《電子發票服務》買家面 handler（§6.1.1–§6.1.6）。
-//
-// 身分：一律 h.resolveBuyerID（44 號的營運鍵 buyer_id，不是 account_id）。越權與查無
-// 走同一個出口（Tier A，§6.1.0(5)）——那個判定在 invoice-service，Gateway 只負責把
-// 正確的 buyer_id 送下去；送 account_id 下去就等於把述詞建在錯的鍵上。
 
 // ListBuyerInvoiceProfiles 買家常用發票資料列表
 // @Summary      買家常用發票資料列表
@@ -54,7 +49,6 @@ func (h *Holder) ListBuyerInvoiceProfiles(c *gin.Context) {
 	for _, it := range data.GetRecords() {
 		records = append(records, convInvInvoiceProfileInfo(it))
 	}
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), response.PageData{
 			Records:  records,
@@ -111,7 +105,6 @@ func (h *Holder) CreateBuyerInvoiceProfile(c *gin.Context) {
 	}
 
 	data := convInvInvoiceProfileInfo(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -170,7 +163,6 @@ func (h *Holder) UpdateBuyerInvoiceProfile(c *gin.Context) {
 	}
 
 	data := convInvInvoiceProfileInfo(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -217,7 +209,6 @@ func (h *Holder) DeleteBuyerInvoiceProfile(c *gin.Context) {
 	}
 
 	data := DeleteBuyerInvoiceProfileData{Deleted: resp.GetDeleted()}
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -264,7 +255,6 @@ func (h *Holder) SetDefaultBuyerInvoiceProfile(c *gin.Context) {
 	}
 
 	data := convInvInvoiceProfileInfo(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -308,7 +298,6 @@ func (h *Holder) GetOrderInvoice(c *gin.Context) {
 	}
 
 	data := convInvOrderInvoiceData(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -359,7 +348,6 @@ func (h *Holder) GetOrderInvoiceDocument(c *gin.Context) {
 	}
 
 	data := convInvInvoiceDocumentDetail(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -414,7 +402,6 @@ func (h *Holder) GetOrderInvoiceDocumentFile(c *gin.Context) {
 	}
 
 	data := convInvInvoiceFileData(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -471,7 +458,6 @@ func (h *Holder) ListBuyerInvoiceDocuments(c *gin.Context) {
 	for _, it := range data.GetRecords() {
 		records = append(records, convInvBuyerInvoiceDocumentItem(it))
 	}
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), response.PageData{
 			Records:  records,
@@ -520,7 +506,6 @@ func (h *Holder) GetBuyerInvoiceDocument(c *gin.Context) {
 	}
 
 	data := convInvInvoiceDocumentDetail(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -559,7 +544,7 @@ func (h *Holder) GetBuyerInvoiceDocumentFile(c *gin.Context) {
 
 	resp, err := h.Invoice.GetInvoiceDocumentFile(c.Request.Context(), &pb.GetInvoiceDocumentFileRequest{
 		BuyerId:    int64(buyerID),
-		OrderNo:    "", /* 端點 70 是 document-scoped：路由上沒有 order_no，共用的 GetInvoiceDocumentFile 卻是 order-scoped。服務端必須改以 buyer_id × document_id 判定擁有者 */
+		OrderNo:    "",
 		DocumentId: documentId,
 		Style:      c.Query("style"),
 	})
@@ -569,7 +554,6 @@ func (h *Holder) GetBuyerInvoiceDocumentFile(c *gin.Context) {
 	}
 
 	data := convInvInvoiceFileData(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -606,8 +590,6 @@ func (h *Holder) ResendBuyerInvoiceNotification(c *gin.Context) {
 		return
 	}
 
-	// 買家專屬 RPC（§5.1 角色分離）。賣家版帶 store_id、本版帶 buyer_id——
-	// 兩者的擁有者述詞不同，而 §8.1.4 的 Tier A 要求擁有者必須進服務端的 WHERE。
 	resp, err := h.Invoice.ResendBuyerInvoiceNotification(c.Request.Context(), &pb.ResendBuyerInvoiceNotificationRequest{
 		BuyerId:        int64(buyerID),
 		DocumentId:     documentId,
@@ -619,7 +601,6 @@ func (h *Holder) ResendBuyerInvoiceNotification(c *gin.Context) {
 	}
 
 	data := convInvResendInvoiceNotificationData(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -677,7 +658,6 @@ func (h *Holder) CreateInvoiceCorrection(c *gin.Context) {
 	}
 
 	data := convInvInvoiceCorrectionData(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -728,7 +708,6 @@ func (h *Holder) GetInvoiceCorrection(c *gin.Context) {
 	}
 
 	data := convInvInvoiceCorrectionData(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -785,8 +764,6 @@ func (h *Holder) CreateInvoiceComplaint(c *gin.Context) {
 	}
 
 	data := convInvInvoiceComplaintInfo(resp.GetData())
-	// §6.1.0(13) 的 preserveData 碼：EnvelopeGuardInterceptor 對它們不轉 error，
-	// data 必須原樣透傳（HTTP 恆 200），否則前端拿不到導向用的 id／時間。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -844,7 +821,6 @@ func (h *Holder) ListOrderInvoiceComplaints(c *gin.Context) {
 	for _, it := range data.GetRecords() {
 		records = append(records, convInvInvoiceComplaintInfo(it))
 	}
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), response.PageData{
 			Records:  records,
@@ -900,7 +876,6 @@ func (h *Holder) GetInvoiceComplaint(c *gin.Context) {
 	}
 
 	data := convInvInvoiceComplaintInfo(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -964,7 +939,6 @@ func (h *Holder) RejectInvoiceComplaintResponse(c *gin.Context) {
 	}
 
 	data := convInvInvoiceComplaintInfo(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -1027,7 +1001,6 @@ func (h *Holder) WithdrawInvoiceComplaint(c *gin.Context) {
 	}
 
 	data := convInvInvoiceComplaintInfo(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return
@@ -1091,7 +1064,6 @@ func (h *Holder) ReopenInvoiceComplaint(c *gin.Context) {
 	}
 
 	data := convInvInvoiceComplaintInfo(resp.GetData())
-	// preserveData 業務碼不會轉成 err（interceptor 對它們 return nil），必須自己看 code。
 	if resp.GetCode() != 0 {
 		response.Biz(c, resp.GetCode(), resp.GetMessage(), data)
 		return

@@ -94,7 +94,6 @@ func MissingExposure(s Store) []Requirement {
 	return missing
 }
 
-// met 把讀出來的條件對應到 r：停權看 Sanctions，其餘看 Conditions；沒有推導過的一律不滿足（fail-closed）。
 func met(r Requirement, s Store) bool {
 	if r == RequirementNotSuspended {
 		return !s.Suspended()

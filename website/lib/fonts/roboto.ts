@@ -21,7 +21,5 @@ export const roboto = localFont({
 	variable: "--font-roboto",
 	display: "optional",
 	// Route-specific brand surfaces replace the base body stack, so a global
-	// preload is unused on those pages. `optional` also prevents a slow cold
-	// font response from swapping metrics after the page loader has left.
 	preload: false,
 });

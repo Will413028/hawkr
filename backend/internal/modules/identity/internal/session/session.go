@@ -38,7 +38,6 @@ const (
 	AppNonceTTL = 5 * time.Minute
 
 	tokenBytes = 32
-	// tokenLen 是 32 bytes 的 base64url（無填充）長度；長度不符的 token 不必雜湊與查詢。
 	tokenLen = 43
 )
 
@@ -65,7 +64,6 @@ func New(d Deps) *Service { return &Service{d: d} }
 
 func (s *Service) q(ctx context.Context) *store.Queries { return store.New(s.d.DB.Conn(ctx)) }
 
-// newSecret 回傳 32 bytes CSPRNG 的 base64url 字串。
 func newSecret() (string, error) {
 	b := make([]byte, tokenBytes)
 	if _, err := rand.Read(b); err != nil {

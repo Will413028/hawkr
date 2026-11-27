@@ -127,7 +127,6 @@ class TcatCallStuckAlertSchedulerClaimTest {
                 "冷卻租約實測 " + leaseMinutes + " 分，超過候選窗口(" + windowMinutes
                         + " 分)的 1/10。租約與窗口等寬 ⇒ 租約到期時該列早已掉出窗口 ⇒ "
                         + "永遠只告警一次 ⇒ at-most-once（這正是 24 小時那個值的錯誤）。");
-        // 下界：必須明顯大於一個 tick（10 分）才有止噪效果
         assertTrue(leaseMinutes >= 10L * 3,
                 "冷卻租約實測 " + leaseMinutes + " 分，不足一個 tick(10 分)的 3 倍，止噪效果不足");
         assertTrue(TcatCallStuckAlertScheduler.ALERT_COOLDOWN_MINUTES == 60L,

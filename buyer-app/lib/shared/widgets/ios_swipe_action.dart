@@ -78,7 +78,6 @@ class _IosSwipeActionState extends State<IosSwipeAction>
   void _onDragUpdate(DragUpdateDetails details) {
     setState(() {
       _dragExtent -= details.delta.dx;
-      // 限制最大滑動距離為 actionWidth，不允許超出
       _dragExtent = _dragExtent.clamp(0.0, widget.actionWidth * 1.1);
       _controller.value = _dragExtent / widget.actionWidth;
     });
@@ -88,19 +87,16 @@ class _IosSwipeActionState extends State<IosSwipeAction>
     _isBeingDragged = false;
     final velocity = details.primaryVelocity ?? 0;
 
-    // 快速向左滑 → 展開
     if (velocity < -300 && !_isOpen) {
       _snapOpen();
       return;
     }
 
-    // 快速向右滑 → 收合
     if (velocity > 300 && _isOpen) {
       _close();
       return;
     }
 
-    // 根據滑動距離決定展開或收合
     if (_dragExtent > widget.actionWidth * 0.4) {
       _snapOpen();
     } else {
@@ -127,7 +123,6 @@ class _IosSwipeActionState extends State<IosSwipeAction>
           child: ClipRect(
             child: Stack(
               children: [
-                // ── 右側刪除按鈕 ──
                 if (offset > 0)
                   Positioned.fill(
                     child: Row(
@@ -157,7 +152,6 @@ class _IosSwipeActionState extends State<IosSwipeAction>
                     ),
                   ),
 
-                // ── 滑動內容 ──
                 Transform.translate(
                   offset: Offset(-offset, 0),
                   child: widget.child,

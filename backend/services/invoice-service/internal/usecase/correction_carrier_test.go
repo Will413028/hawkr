@@ -36,7 +36,6 @@ func TestBuildReissueDocument_CarrierSurvivesReissue(t *testing.T) {
 		TaxRateBps:      domain.TaxRateBps,
 		CarrierType:     &carrier,
 	}
-	// revised 逐字複製 correction_intake.go 建出來的形狀（修好之後：四欄都有值）。
 	const carrierValue = "/GHI+.2"
 	revised := domain.ReviseDocumentSnapshot{
 		RecipientType:  codemeta.InvoiceRecipientTypeBuyer.Value,
@@ -60,7 +59,6 @@ func TestBuildReissueDocument_CarrierSurvivesReissue(t *testing.T) {
 	if got.CarrierID1 == "" {
 		t.Error("🔴 重開票的載具顯碼是空的 —— 買家的載具在作廢重開之後消失了")
 	}
-	// 顯碼＝隱碼是 AMEGO 的硬要求（見 normalizeBuyerIdentity 的紅字）。
 	if got.CarrierID1 != got.CarrierID2 {
 		t.Errorf("顯碼 %q ≠ 隱碼 %q —— AMEGO 會回 3040131，重開票開不出來",
 			got.CarrierID1, got.CarrierID2)
@@ -112,8 +110,6 @@ func TestRevisedCarrierFromIdentity(t *testing.T) {
 		}
 	})
 
-	// 🔴 陰性①：買家補打統編是端點 11 的**主要使用情境**，舊載具必須跟著消失
-	// ——留著就違反 chk_invdoc_exclusive，就地 UPDATE 當場 23514。
 	t.Run("B2B：四欄全清", func(t *testing.T) {
 		id := checkoutIdentity{
 			CarrierType:  codemeta.InvoiceCarrierTypeMobileBarcode.Value,
@@ -127,7 +123,6 @@ func TestRevisedCarrierFromIdentity(t *testing.T) {
 		}
 	})
 
-	// 🔴 陰性②：捐贈時載具兩欄必須空——carrier_type 空而號碼有值同樣會被 AMEGO 拒。
 	t.Run("捐贈：載具空、捐贈碼有值", func(t *testing.T) {
 		id := checkoutIdentity{
 			CarrierType:  codemeta.InvoiceCarrierTypeDonation.Value,
@@ -162,11 +157,9 @@ func TestRevisedCarrierFromIdentity(t *testing.T) {
 //
 // ⇒ 判準改成「兩者同進同出」，並在呼叫端補 openCarrierValueInto 取明文。
 func TestRevisedCarrierFromIdentity_TypeAndValueGoTogether(t *testing.T) {
-	// 明文取不到（常用發票資料的載具尚未解密）⇒ 兩欄都必須留空，
-	// 不得只填類型。放行的話 DB 當場 23514。
 	id := checkoutIdentity{
 		CarrierType:  codemeta.InvoiceCarrierTypeMobileBarcode.Value,
-		CarrierValue: "", // ← 關鍵：解析層沒有解密
+		CarrierValue: "",
 		HasCarrier:   true,
 		PreferenceID: 7501935856077242368,
 	}

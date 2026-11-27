@@ -85,7 +85,6 @@ void main() {
     });
 
     test('售價缺席（"0"）時不單獨掛一條被劃掉的原價', () {
-      // 只印一條刪除線原價，讀者無從得知現在賣多少。
       expect(
         PriceDisplay.formatListPriceRange('200', '200', effectivePrice: '0'),
         '',

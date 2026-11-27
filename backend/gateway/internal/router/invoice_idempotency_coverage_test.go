@@ -10,35 +10,16 @@ import (
 	"testing"
 )
 
-// 本檔守的是 issue #3015 的**復發面**：`Idempotency-Key` 的重放語意現在由
-// `middleware.RequireIdempotencyKey` 執行（格式驗證與去重綁在同一支，見該函式的
-// doc comment）⇒ 只要有一條發票寫入路由沒掛上它，那條路由就又回到「必填但沒作用」，
-// 而**那件事不會編譯錯、不會讓任何既有測試轉紅**。
-//
-// 🔴 **這道 gate 的觀測窗與它擋不住的東西**（`.claude/rules/06-no-small-tails.md` §3.10）：
-//
-//	① 觀測窗 ＝ `routes_invoice.go` 這一個檔的 AST。把發票寫入路由註冊到**別的檔案**
-//	   就在窗外 —— 因此 assertion 之一是「本檔必須找得到既有的那批寫入路由」，
-//	   數量掉下去就轉紅（搬走跟刪掉一樣會被抓到）。
-//	② 它驗的是「有沒有掛上」，不是「掛上之後有沒有效」。後者由
-//	   `internal/middleware/idempotency_test.go` 的行為測試守（那批會計算 handler
-//	   被執行幾次）。兩者缺一都不夠：只有行為測試 ⇒ 新路由忘了掛沒人知道；
-//	   只有本檔 ⇒ middleware 被掏空成 no-op 沒人知道。
-//	③ 檔案讀不到／解析不了／掃出 0 條寫入路由 ⇒ **FAIL 而不是 SKIP**。
-//	   「目標不存在就靜默轉綠」是這類 gate 最常見的死法。
 
 const idempotencyMiddlewareIdent = "RequireIdempotencyKey"
 
-// invoiceWriteRoutePin 是 routes_invoice.go 目前的寫入路由條數（2026-09-02 實測）。
-// 新增寫入路由時**先確認它掛了 RequireIdempotencyKey**，再把這個數字加上去；
-// 數字變小代表有路由被搬走或刪掉，一樣要當成需要解釋的事。
 const invoiceWriteRoutePin = 37
 
 type writeRoute struct {
 	group  string
 	method string
 	path   string
-	inline bool // 該次註冊的參數裡直接帶了 RequireIdempotencyKey
+	inline bool
 }
 
 func TestInvoiceWriteRoutesAllRequireIdempotencyKey(t *testing.T) {
@@ -48,7 +29,7 @@ func TestInvoiceWriteRoutesAllRequireIdempotencyKey(t *testing.T) {
 		t.Fatalf("解析 routes_invoice.go 失敗（觀測窗不存在 ⇒ FAIL，不 SKIP）：%v", err)
 	}
 
-	covered := map[string]bool{} // 整組 .Use(RequireIdempotencyKey) 的群組
+	covered := map[string]bool{}
 	var routes []writeRoute
 
 	ast.Inspect(file, func(n ast.Node) bool {
@@ -56,7 +37,6 @@ func TestInvoiceWriteRoutesAllRequireIdempotencyKey(t *testing.T) {
 		if !ok {
 			return true
 		}
-		// sellerHandle(group, "POST", Path, cap, handler)
 		if id, ok := call.Fun.(*ast.Ident); ok && id.Name == "sellerHandle" && len(call.Args) >= 3 {
 			g := exprName(call.Args[0])
 			m := stringLit(call.Args[1])
@@ -119,7 +99,7 @@ func TestInvoiceWriteRoutesAllRequireIdempotencyKey(t *testing.T) {
 func TestInvoiceIdempotencyCoverageGateHasDiscrimination(t *testing.T) {
 	routes := []writeRoute{
 		{group: "buyerProfiles", method: "POST", path: "X"},
-		{group: "orderInvoices", method: "POST", path: "Y"}, // 沒有整組 Use、也沒有 inline
+		{group: "orderInvoices", method: "POST", path: "Y"},
 	}
 	covered := map[string]bool{"buyerProfiles": true}
 

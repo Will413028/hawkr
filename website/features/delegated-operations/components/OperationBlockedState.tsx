@@ -45,9 +45,7 @@ export default function OperationBlockedState({
 						重試結束代行
 					</Button>
 				)}
-				{/* `data-hkui-button`：`.adm-blocked__link` 自帶實心底＋白字（0-1-0），
-				    會被 `[data-theme="dark"] body a:not([data-hkui-button])`（0-2-2）改成
-				    `--color-ink-200`。這是本畫面唯一的出口鈕，不能讓它讀起來像一行內文連結。 */}
+
 				<a data-hkui-button="" className="adm-blocked__link" href={returnUrl}>
 					← 返回 ADM
 				</a>

@@ -174,9 +174,6 @@ class DeviceRegistrationCoordinator {
       if (_activeToken == fcmToken) return active;
       if (_queuedToken == fcmToken) return _queuedCompleter!.future;
 
-      // Keep at most one rotation behind the active mutation. A newer token
-      // supersedes an older queued token instead of creating another retry
-      // chain and amplifying a transient outage.
       _queuedCompleter?.complete(const DeviceMutationOutcome.skipped());
       _latestRequestedToken = fcmToken;
       _queuedToken = fcmToken;
@@ -274,7 +271,6 @@ class DeviceRegistrationCoordinator {
     try {
       await opposing;
     } catch (_) {
-      // 反向操作自己的失敗已在該路徑記錄，這裡只需要它「結束了」。
     }
   }
 

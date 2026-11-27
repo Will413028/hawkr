@@ -61,7 +61,6 @@ public class HomeShipmentStrategy implements ShipmentStrategy {
         String goodsType = PayUniParamMapper.toGoodsType(orderInfo.getDeliveryTemp());
         String deliveryTimeTag = DEFAULT_DELIVERY_TIME_TAG;
 
-        // 寄件人資訊來自 seller_shipment_settings（物流設定獨立化）
         String senderName = onboardingSetting.getSenderName();
         String senderPhone = onboardingSetting.getSenderPhone();
         String senderCity = onboardingSetting.getSenderCity();
@@ -71,18 +70,14 @@ public class HomeShipmentStrategy implements ShipmentStrategy {
         String senderAddress = senderCity + senderDistrict
                 + AddressNormalizer.normalizeAddressDetail(senderCity, senderDistrict, senderAddressDetail);
 
-        // merId 來自訂單快照
         String merId = orderInfo.getMerId();
 
-        // 收件地址（Order proto 提供合併地址）；買家自由輸入，去里鄰後才符合 PayUni 格式
         String receiverAddress = AddressNormalizer.normalizeFullAddress(orderInfo.getShippingAddress());
         String receiverZipCode = extractZipCode(receiverAddress);
 
-        // 商品名稱為系統背景填寫（訂單商品撈取），送 PayUni 前依黑貓約束截斷（顯示長度上限 20），避免超長建單失敗（06 §2.5）
         String goodsName = InputValidator.truncateByDisplayLength(
                 orderInfo.getProductName(), PayUniShippingConstraints.HOME_GOODS_NAME_MAX);
 
-        // 組裝 PayUni 宅配物流單請求（MerTradeNo 統一使用 orderNo）
         CreateHomeShipmentRequest payUniReq = new CreateHomeShipmentRequest(
                 orderNo,
                 goodsType,
@@ -99,7 +94,6 @@ public class HomeShipmentStrategy implements ShipmentStrategy {
                 goodsName
         );
 
-        // 呼叫 PayUni API 建立宅配單（僅建單，不做 PDF；收斂規範 §8.1：同步 retry 最多一次）
         CreateHomeShipmentResponse payUniResp = shippingClient.createHomeShipment(merId, payUniReq);
         if (!payUniResp.isSuccess()) {
             log.warn("HomeShipmentStrategy.createShipment.retry",
@@ -120,7 +114,6 @@ public class HomeShipmentStrategy implements ShipmentStrategy {
         log.info("HomeShipmentStrategy.createShipment.success",
                 "PayUni 宅配建單成功，shipTradeNo=" + payUniResp.shipTradeNo());
 
-        // 計算 Spec 並存入
         int dimensionSum = 0;
         String dimensionSumStr = orderInfo.getDimensionSum();
         if (dimensionSumStr != null && !dimensionSumStr.isEmpty()) {
@@ -128,7 +121,6 @@ public class HomeShipmentStrategy implements ShipmentStrategy {
         }
         String spec = (dimensionSum > 0) ? PayUniParamMapper.toSpec(dimensionSum, goodsType) : null;
 
-        // 組裝 Entity
         ShipmentEntity entity = new ShipmentEntity();
         entity.setId(shipmentId);
         entity.setShipmentNo(shipmentNo);
@@ -155,7 +147,6 @@ public class HomeShipmentStrategy implements ShipmentStrategy {
         entity.setDeliveryTimeTag(deliveryTimeTag);
         entity.setProdDesc(orderInfo.getProductName());
 
-        // §5.9 賣家處理期限：宅配 3 工作日（台北時間 23:59:59 → 轉 UTC）
         LocalDate createdDateTaipei = DateTimeUtils.todayInTaipei();
         LocalDate deadlineDate = holidayService.nextBusinessDay(createdDateTaipei, 3);
         LocalDateTime deadlineUtc = deadlineDate

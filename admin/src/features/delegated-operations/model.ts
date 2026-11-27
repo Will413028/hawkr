@@ -233,8 +233,6 @@ export function parseDelegatedOperationPreflightDenial(
 	value: unknown,
 ): DelegatedOperationPreflightDenial | null {
 	if (!isRecord(value) || value.allowed !== false) return null;
-	// 與 storeName／displayName 同一支校驗：長度上限＋禁控制字元＋禁前後空白。
-	// 這是上游來的自由文字，會直接進畫面，不能只因為「它是我們自己的服務」就放行。
 	const deniedLabel = parseLabel(value.deniedLabel, 120);
 	if (
 		!deniedLabel ||

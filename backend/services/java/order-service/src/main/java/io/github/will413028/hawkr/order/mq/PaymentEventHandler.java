@@ -96,8 +96,6 @@ public class PaymentEventHandler {
     public void handlePaymentSuccess(JsonNode payload, String rawBody, String payloadHash) {
         String tradeNo = payload.path("trade_no").asText("");
         String orderId = payload.path("order_id").asText("");
-        // fail-loud：amount 缺失 / 非數字 → 拋例外 → PaymentEventConsumer catch → MqErrorHandler → DLQ。
-        // 「值為 0」保留（ZERO_AMOUNT 合法路徑，見下方 §2A.1 檢查），不可用 asLong(0) 把缺失吞成 0。
         long amount = parseRequiredAmount(payload, orderId);
         String payTime = payload.path("pay_time").asText("");
         String paymentType = payload.path("payment_type").asText("");
@@ -111,22 +109,18 @@ public class PaymentEventHandler {
                     "付款金額不合法: amount=" + amount + ", orderId=" + orderId);
             return;
         }
-        // §2A.1：零元僅允許 ZERO_AMOUNT (2900) 付款方式；非 ZERO_AMOUNT 不可為 0 元
         if (amount == 0 && !PaymentMethod.ZERO_AMOUNT.value().equals(paymentType)) {
             log.error("PaymentEventHandler.paymentSuccess.invalidZeroAmount",
                     "非 ZERO_AMOUNT 付款方式金額不可為 0: paymentType=" + paymentType + ", orderId=" + orderId);
             return;
         }
 
-        // 冪等檢查：INSERT ON CONFLICT DO NOTHING
-        // event_type 對齊 publisher 實際送出的字串（PaymentEventType.value() = "payment.success"）
         int inserted = dedupRepository.insertIdempotent(tradeNo, orderId, PaymentEventType.PAYMENT_SUCCESS.value(), payloadHash);
         if (inserted == 0) {
             log.info("PaymentEventHandler.paymentSuccess.duplicate", "重複事件，忽略", "tradeNo", tradeNo);
             return;
         }
 
-        // 鎖定訂單
         OrderEntity order = orderRepository.findByOrderNoForUpdate(orderId);
         if (order == null) {
             log.error("PaymentEventHandler.paymentSuccess.orderNotFound", "訂單不存在: " + orderId);
@@ -173,7 +167,6 @@ public class PaymentEventHandler {
                         + ", checkoutId=" + order.getCheckoutId()
                         + ", couponInstanceId=" + order.getCouponInstanceId());
 
-        // 原子更新狀態 + 付款資訊（避免 updateById 全欄位覆蓋的 race condition）
         LocalDateTime parsedPayTime = parsePayTime(payTime);
         String finalPaymentType = (paymentType != null && !paymentType.isEmpty()) ? paymentType : order.getPaymentMethod();
         int updated = orderRepository.updatePaymentConfirmed(
@@ -189,7 +182,6 @@ public class PaymentEventHandler {
                     "付款確認更新失敗（狀態可能已變更）: orderNo=" + orderId);
             return;
         }
-        // 同步 entity 以供後續邏輯使用
         order.setStatus(OrderStatus.PAID.value());
         order.setTransactionId(tradeNo);
         order.setPayTime(parsedPayTime);
@@ -198,7 +190,6 @@ public class PaymentEventHandler {
         }
         log.info("PaymentEventHandler.handlePending.orderUpdated", "訂單狀態已更新為 PAID", "orderNo", orderId);
 
-        // 冪等寫入 financial_logs
         financialLogRepository.insertIdempotent(
                 TsidUtil.generate(),
                 orderId,
@@ -208,9 +199,7 @@ public class PaymentEventHandler {
         );
         log.info("PaymentEventHandler.handlePending.financialLogInserted", "財務日誌已寫入", "orderNo", orderId);
 
-        // 購物車已在建單時清理（建單即清策略），此處不再建立清理任務
 
-        // 落地優惠券核銷任務
         String couponInstanceId = order.getCouponInstanceId();
         if (couponInstanceId != null && !couponInstanceId.isEmpty()) {
             CouponConsumptionTaskEntity couponTask = new CouponConsumptionTaskEntity();
@@ -232,24 +221,14 @@ public class PaymentEventHandler {
 
         log.info("PaymentEventHandler.paymentSuccess.paid", "訂單付款成功", "orderNo", orderId);
 
-        // [B-207] #1181：賣家工作區 realtime（afterCommit）— 待付款 → 已付款
         orderEventPublisher.emitSellerOrderUpdated(
                 order.getStoreId(), orderId, OrderEventPublisher.SRC_PAYUNI_WEBHOOK,
                 OrderStatus.PENDING_PAYMENT.value(), OrderStatus.PAID.value(), null);
 
-        // order.paid 改走 Outbox 可靠投遞（03 §3.12/§8.10）：事務內寫入，杜絕原 afterCommit best-effort 遺失。
-        // seller/buyer meta 由 OrderOutboxPublisher 於派送時 best-effort 補（payload 形狀與原本一致，下游不受影響）。
-        // notifyBuyerAccountId 同理由 OrderOutboxPublisher.enrich() 於派送前解析並覆寫，此處寫入的 core
-        // payload 帶 null 佔位（buyer_id 8-service rekey Phase 1，鏡像上方 sellerName/buyerNickname 等欄位）。
         String shippingMethod = order.getShippingMethod() != null ? order.getShippingMethod() : "";
-        // 58 §6.3.2.1：correlation_id ＋ invoice_snapshot_id 兩欄在**核心 payload** 落地
-        // （不是 enrich 時才補）——enrich 是 best-effort 且跑在另一個執行緒／另一輪 tick，
-        // 那裡的 ObsContext 已經不是付款這條鏈的了。
         OrderInvoiceSnapshotEntity invoiceSnapshot =
                 orderInvoiceSnapshotRepository.findLatestByOrderNo(orderId);
         if (invoiceSnapshot == null) {
-            // 不 fail：這只是 payload 上的指標，權威讀取走 GetOrderInvoiceSnapshotInternal。
-            // 但要留下訊號——V12 之前建立的訂單本來就沒有快照，之後的訂單沒有就是 bug。
             log.warn("PaymentEventHandler.handlePending.invoiceSnapshotMissing",
                     "訂單無發票快照（V12 之前的訂單屬正常；之後的訂單代表建單路徑漏寫）",
                     "orderNo", orderId);
@@ -270,19 +249,10 @@ public class PaymentEventHandler {
         try {
             paidOutbox.setPayload(MAPPER.writeValueAsString(corePaid));
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            // 固定結構序列化理論上不會失敗；拋出讓事務 rollback，避免付款已記但事件遺失
             throw new IllegalStateException("order.paid payload 序列化失敗 orderNo=" + orderId, e);
         }
         orderOutboxMapper.insert(paidOutbox);
 
-        // 銷量累計事件（觸發 product-service 累計 sales_count，見 35 設計書 §5.3）。
-        //
-        // 原本走 afterCommit + best-effort 直發。那個組合在本方法裡是**永久遺失**的形狀：
-        // 上方 :116 的 dedup INSERT 與本事務同生共死 ⇒ commit 之後同一個 payment.success 重投一律被
-        // dedup 擋掉；而 afterCommit 的 publish 走 OrderEventPublisher.publish（吞掉所有例外）
-        // ⇒ MQ 短暫不可用時「訂單已 PAID、dedup 已寫、事件沒送出」，product.sales_count 永久少算，
-        // 而 docs/開發規範/後端服務責任邊界規範.md 禁止寫 reconciliation job ⇒ 無任何救濟路徑。
-        // ⇒ 改走**例外 A（同 tx outbox）**，與正上方 order.paid 同一個做法與同一個事務。
         Map<UUID, Integer> productQtyMap = orderItemRepository.findByOrderNo(orderId).stream()
                 .filter(item -> item.getProductId() != null)
                 .collect(Collectors.groupingBy(
@@ -307,7 +277,6 @@ public class PaymentEventHandler {
             try {
                 salesOutbox.setPayload(MAPPER.writeValueAsString(salesPayload));
             } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-                // 與 order.paid 同樣處置：拋出讓事務 rollback，避免付款已記但事件遺失
                 throw new IllegalStateException(
                         "order.sales.accumulated payload 序列化失敗 orderNo=" + orderId, e);
             }
@@ -319,9 +288,6 @@ public class PaymentEventHandler {
      * 已取消但收到付款 → 建立自動退款任務
      */
     private void handleCancelledOrderPayment(String orderId, String tradeNo, long amount, String paymentType) {
-        // §2A.1.4 防禦：零元訂單沒有退款概念，不應為 ZERO_AMOUNT 建 auto_refund_task。
-        // 零元訂單直接 PAID 不會經歷「CANCELLED → 收到 payment 成功」這個 race（沒 PayUni webhook），
-        // 此分支僅為極端 race / admin 手動操作的兜底保護。
         if (PaymentMethod.ZERO_AMOUNT.value().equals(paymentType)) {
             log.warn("PaymentEventHandler.cancelledOrderPayment.zeroAmountIgnored",
                     "零元訂單已 CANCELLED 仍收到 payment.success，理論不該發生 — 跳過 auto_refund_task 建立, orderNo=" + orderId);
@@ -378,20 +344,16 @@ public class PaymentEventHandler {
         if (order == null || !OrderStatus.PENDING_PAYMENT.value().equals(order.getStatus())) {
             return null;
         }
-        // 03 §5.3.1：cancel_reason 由呼叫端傳入（PAYMENT_TIMEOUT / SELLER_SUSPENDED 等）+ cancel_by_role='SYSTEM'
         int updated = orderRepository.cancelOrderByPaymentExpireCas(
                 orderNo, OrderStatus.PENDING_PAYMENT.value(), OrderStatus.CANCELLED.value(), cancelReason);
         if (updated == 0) {
             log.info("PaymentEventHandler.cancelExpired.skip", "訂單狀態已變更，跳過取消", "orderNo", orderNo);
             return null;
         }
-        // §5.9 PENDING_PAYMENT 階段尚未建物流單，processing_deadline 必為 NULL；補呼叫天然冪等
         orderRepository.clearProcessingDeadline(orderNo);
-        // #1368：庫存歸還 order.cancelled 與取消狀態同事務落 outbox（取代原 compensateAfterCancel TX 外直發）
         orderService.insertCancelledOutbox(orderNo);
         orderService.enqueueCouponReleaseIfHeld(order);
         log.info("PaymentEventHandler.cancelExpired.success", "超時訂單已取消（TX 內）", "orderNo", orderNo);
-        // [B-207] #1181：賣家工作區 realtime — 逾時取消
         orderEventPublisher.emitSellerOrderUpdated(
                 order.getStoreId(), orderNo, OrderEventPublisher.SRC_SYSTEM,
                 OrderStatus.PENDING_PAYMENT.value(), OrderStatus.CANCELLED.value(), null);
@@ -416,7 +378,6 @@ public class PaymentEventHandler {
         }
 
         if (OrderStatus.PENDING_PAYMENT.value().equals(order.getStatus())) {
-            // 03 §5.3.1：payment 異常 path 視同 payment expire（reason='9101' PAYMENT_TIMEOUT, role='SYSTEM'）
             int updated = orderRepository.cancelOrderByPaymentExpireCas(
                     orderNo, OrderStatus.PENDING_PAYMENT.value(), OrderStatus.CANCELLED.value(),
                     io.github.will413028.hawkr.common.utils.code.OrderCancelReason.PAYMENT_TIMEOUT.value());
@@ -424,10 +385,8 @@ public class PaymentEventHandler {
                 log.info("PaymentEventHandler.cancelOrder.raceCondition", "訂單狀態已變更，跳過取消", "orderNo", orderNo);
                 return false;
             }
-            // §5.9 PENDING_PAYMENT 階段尚未建物流單，deadline 必為 NULL；補呼叫天然冪等
             orderRepository.clearProcessingDeadline(orderNo);
             log.info("PaymentEventHandler.cancelOrder.success", reason + "，取消訂單", "orderNo", orderNo);
-            // [B-207] #1181：賣家工作區 realtime — 異常取消
             orderEventPublisher.emitSellerOrderUpdated(
                     order.getStoreId(), orderNo, OrderEventPublisher.SRC_SYSTEM,
                     OrderStatus.PENDING_PAYMENT.value(), OrderStatus.CANCELLED.value(), null);

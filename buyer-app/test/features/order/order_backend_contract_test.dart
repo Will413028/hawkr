@@ -26,7 +26,6 @@ void main() {
       expect(order.reviewDeadline, '2026-05-31T15:59:59Z');
       expect(order.processingDeadline, '2026-05-10T15:59:59Z');
       expect(order.autoCompleteAt, '2026-05-11T15:59:59Z');
-      // reviewRating / reviewContent 沒有頂層欄位，只能由巢狀 review 平鋪而來。
       expect(order.reviewRating, 4);
       expect(order.reviewContent, '很新鮮');
     });
@@ -44,8 +43,6 @@ void main() {
         'recipient_name': '王小明',
       });
 
-      // isReviewed 的 @Default 是 false ——
-      // 舊 snake 欄位若被讀回來就會變 true，這條才有鑑別力。
       expect(order.isReviewed, isFalse);
       expect(order.reviewDeadline, '');
       expect(order.processingDeadline, '');
@@ -84,13 +81,11 @@ void main() {
     });
 
     test('order item falls back from imageUrl to the bare imageKey', () {
-      // 成對輸出，兩個都在：顯示直接用 URL。
       final paired = OrderItem.fromJson({
         'productName': '台灣紅豆',
         'imageKey': 'products/red-bean.jpg',
         'imageUrl': 'https://media.example/products/red-bean.jpg',
       });
-      // 只有裸 key：顯示端 buildImageUrl dual-mode 吃得下，補進 imageUrl。
       final keyOnly = OrderItem.fromJson({
         'productName': '蟹味棒',
         'imageKey': 'products/crab-stick.jpg',

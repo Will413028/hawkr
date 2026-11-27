@@ -22,7 +22,6 @@ func NewSlot(field, token, current string) Slot {
 	return Slot{Field: field, Token: token, Current: current}
 }
 
-// adminUploader 是管理員上傳圖片時的身分。content 的寫入都是後台操作。
 func adminUploader(adminID int64) media.Uploader {
 	return media.Uploader{ID: adminID, Admin: true}
 }

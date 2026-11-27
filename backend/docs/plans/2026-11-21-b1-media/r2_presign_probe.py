@@ -57,11 +57,9 @@ run = uuid.uuid4().hex[:8]
 k = lambda n: f"tmp/probe-{run}/{n}"
 PNG = "image/png"
 
-# 0. control: nothing extra signed, arbitrary size and type accepted
 case("0 control (only host signed), 2000 bytes text/plain",
      send("PUT", presign("PUT", k("c0"), {}), b"x" * 2000, {"Content-Type": "text/plain"}))
 
-# 1. content-length signed = 1000
 s = {"content-length": "1000", "content-type": PNG}
 case("1a signed len=1000 type=png, send 1000 png",
      send("PUT", presign("PUT", k("c1a"), s), b"x" * 1000, {"Content-Type": PNG}))
@@ -74,11 +72,9 @@ case("1d signed len=1000 type=png, send 1000 text/plain",
 case("1e signed type=png only, send 5000 png",
      send("PUT", presign("PUT", k("c1e"), {"content-type": PNG}), b"x" * 5000, {"Content-Type": PNG}))
 
-# which objects exist afterwards
 for n in ("c0", "c1a", "c1b", "c1c", "c1d", "c1e"):
     case(f"  HEAD {n}", send("HEAD", presign("HEAD", k(n), {})))
 
-# 2. conditional create bound into the signature
 s = {"if-none-match": "*", "content-type": PNG}
 case("2a signed if-none-match:*, first PUT",
      send("PUT", presign("PUT", k("c2"), s), b"a" * 10, {"Content-Type": PNG, "If-None-Match": "*"}))
@@ -87,7 +83,6 @@ case("2b signed if-none-match:*, second PUT same key",
 case("2c signed if-none-match:*, client omits the header",
      send("PUT", presign("PUT", k("c2c"), s), b"c" * 10, {"Content-Type": PNG}))
 
-# 3. Content-MD5 bound into the signature
 import base64
 body = b"m" * 100
 good = base64.b64encode(hashlib.md5(body).digest()).decode()
@@ -97,7 +92,6 @@ case("3a signed content-md5, matching body",
 case("3b signed content-md5, different body same length",
      send("PUT", presign("PUT", k("c3b"), s), b"n" * 100, {"Content-Type": PNG, "Content-MD5": good}))
 
-# cleanup
 for n in ("c0", "c1a", "c1b", "c1c", "c1d", "c1e", "c2", "c2c", "c3a", "c3b", ):
     send("DELETE", presign("DELETE", k(n), {}))
 print("cleanup done; run", run)

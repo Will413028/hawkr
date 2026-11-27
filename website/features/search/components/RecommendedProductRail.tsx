@@ -63,20 +63,13 @@ export default function RecommendedProductRail({
 			<div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-5 max-[680px]:grid-cols-2 max-[680px]:gap-3">
 				{products.map((product, index) => {
 					const id = String(product.id || index);
-					// Empty when absent → MarketProductCard's <AppImage> shows the
-					// design-system ImageFallback (folder-image) instead of a
-					// branded stand-in.
-					// B-238: render seller identity only from the canonical URL.
 					const image = product.imageKey || product.imageKeys?.[0] || "";
 					const sellerName =
 						product.sellerName || product.seller?.name || "Hawkr 選品";
 					const sellerAvatar = product.seller?.logoUrl?.trim() || "";
-					// 兩個來源（marketplace hot_products = handler.ProductItem、搜尋命中
-					// = handler.ProductHitData）都以 storeId 帶 store surrogate。
 					const sellerId =
 						String(product.storeId ?? product.seller?.storeId ?? "") ||
 						undefined;
-					// Don't echo the store name as 產地. Use a real origin/city, else 產地直送.
 					const origin =
 						product.seller?.city ||
 						(product.origin && product.origin !== sellerName
@@ -105,8 +98,6 @@ export default function RecommendedProductRail({
 						rating,
 						reviews,
 						href: `/products/${id}`,
-						// Sort fields aren't read inside the card itself; provide
-						// safe defaults so the type contract holds.
 						priceValue: 0,
 						createdAt: 0,
 						salesCount: 0,

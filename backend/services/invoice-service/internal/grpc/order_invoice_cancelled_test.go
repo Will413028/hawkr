@@ -11,16 +11,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// ---------------------------------------------------------------------------
-// 端點 8：已取消的訂單不得再說「付款完成後會立即開立發票」（#2904）
-//
-// 🔴 這個 bug 的形狀是本檔存在的理由：**沒有任何既有測試會紅**。前端忠實渲染後端
-// 給的 state／stateNotice，後端也「成功」回了 200，DB 沒有任何異常列。它是靠人把
-// 訂單詳情頁的截圖看完才發現的——上方是紅色的「已取消」時間軸，下方的發票區在說
-// 「付款完成後會立即開立發票」。
-//
-// 所以這裡斷言的是**買家真的會讀到的那兩個字串**，不是「有沒有呼叫到 repository」。
-// ---------------------------------------------------------------------------
 
 const (
 	ocOrderNo   = "O320270909"
@@ -28,8 +18,6 @@ const (
 	ocOtherByer = int64(2688637900)
 )
 
-// ocNoDocuments 是「這張訂單沒有任何 invoice_documents 列」——付款前與取消後**完全
-// 一樣**的那個資料狀態。#2904 的本體就是這兩種情況被回同一個答案。
 type ocNoDocuments struct{ domain.DocumentRepository }
 
 func (ocNoDocuments) ListOrderDocumentsForBuyer(context.Context, string, int64) ([]domain.Document, error) {
@@ -78,9 +66,6 @@ func TestGetOrderInvoice_CancelledOrderDoesNotPromiseAnInvoice(t *testing.T) {
 	if got := data.GetStateNotice(); got != "訂單已取消，不會開立發票" {
 		t.Errorf("stateNotice = %q, want 「訂單已取消，不會開立發票」", got)
 	}
-	// 🔴 陰性斷言：那句永遠不會成真的話**不得**出現在回應的任何一格。
-	// 只驗 state 等於新值不夠——把 notice map 的那一格填錯（或忘了填，於是查表落空
-	// 回空字串再被別人補上舊句）都還是會讓買家讀到它。
 	if data.GetStateNotice() == "付款完成後會立即開立發票" {
 		t.Error("🔴 已取消的訂單仍在承諾開立發票 —— 那句話對它永遠不會成真")
 	}
@@ -118,13 +103,11 @@ func TestGetOrderInvoice_CancellationIsNotAnExistenceOracle(t *testing.T) {
 		{orderNo: ocOrderNo, buyerID: ocBuyerID}: true,
 	}})
 
-	// 別人的訂單：回應必須與「這張訂單根本不存在」完全一致。
 	other := ocGet(t, s, ocOtherByer)
 	if other.GetState() != "AWAITING_PAYMENT" {
 		t.Errorf("越權查詢得到 state=%q —— 它洩漏了「這張訂單存在且已取消」", other.GetState())
 	}
 
-	// 位元組層級比對：與一張完全不存在的訂單的回應逐欄相同。
 	fresh := ocServer(t, qCancelled{})
 	baseline := ocGet(t, fresh, ocOtherByer)
 	if other.GetState() != baseline.GetState() || other.GetStateNotice() != baseline.GetStateNotice() {

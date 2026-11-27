@@ -15,16 +15,7 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/usecase"
 )
 
-// ---------------------------------------------------------------------------
-// fakes
-// ---------------------------------------------------------------------------
 
-// fakeInbox 模擬 invoice_inbox_events 的兩道唯一鍵。
-//
-// 兩把鍵都要：uq_invinbox_event_id 擋 RabbitMQ 重投，
-// uq_invinbox_business_key(event_type, business_dedup_key) 擋業務層重複。
-// 只做其中一把的 fake 會讓「換一個 event_id 重送」這個真實情境測不到，
-// 而那正是 aftersales RefundSyncWorker 的行為。
 type fakeInbox struct {
 	byEventID map[string]bool
 	byBizKey  map[string]bool
@@ -56,9 +47,6 @@ func (f *fakeInbox) Insert(_ context.Context, in domain.NewInboxEvent) (int64, b
 		ID: id, EventID: in.EventID, EventType: in.EventType,
 		BusinessDedupKey: in.BusinessDedupKey, AggregateRef: in.AggregateRef,
 		Payload: in.Payload, Status: in.Status, OccurredAt: in.OccurredAt,
-		// 🔴 NextAttemptAt 必須留下來：它是本表的**租約欄**，而「handler 還在跑的時候
-		// 這一列到期了沒有」正是 INV.dl 接上之後唯一會出事的地方。不記它的 fake 會讓
-		// handlerLease 那行改回 `now` 也照樣全綠（見 TestOrderPaid_InsertReservesHandlerLease）。
 		NextAttemptAt: in.NextAttemptAt,
 	})
 	f.nextID++
@@ -77,8 +65,6 @@ func (f *fakeInbox) FetchDue(context.Context, time.Time, int32) ([]domain.InboxE
 func (f *fakeInbox) FetchDueByType(_ context.Context, eventType string, now time.Time, limit int32) ([]domain.InboxEvent, error) {
 	var out []domain.InboxEvent
 	for _, r := range f.rows {
-		// 三個狀態逐字取自 SQL（"FAILED" 在 production code 沒有具名常數，
-		// 它只出現在 MarkInboxEventFailed 的 SET 子句裡）。
 		switch r.Status {
 		case inboxStatusReceived, inboxStatusDeferred, "FAILED":
 		default:
@@ -156,9 +142,6 @@ func (f *fakeInbox) MarkFailed(_ context.Context, id int64, _ string, nextAttemp
 	return true, nil
 }
 
-// setStatus／setNextAttempt 讓 fake 的候選集合會隨標記收縮，與 SQL 的 allowed-from 一致。
-// 少了它們，一列被標成 PROCESSED 之後仍會出現在 FetchDueByType 的結果裡 ⇒ 任何
-// 「標記完就不該再被撈到」的斷言都會是假綠。
 func (f *fakeInbox) setStatus(id int64, status string) {
 	for i := range f.rows {
 		if f.rows[i].ID == id {
@@ -190,7 +173,6 @@ func (f *fakeInbox) PurgeProcessedPayloads(context.Context, time.Time, time.Time
 	return 0, nil
 }
 
-// fakeDocs 只實作 handler 用得到的那兩支，其餘回 not-implemented（呼叫到就是設計偏了）。
 type fakeDocs struct {
 	domain.DocumentRepository
 	bySourceRef map[string]domain.Document
@@ -218,8 +200,6 @@ type fakeOrderFacts struct {
 	calls int
 	facts OrderFacts
 	err   error
-	// gotBuyerID 記下 consumer 傳下來的 buyer_id：I-47 的歸屬驗證靠它，
-	// 而「有沒有真的把訂單上的 buyer_id 傳下去」只有記下來才驗得到。
 	gotBuyerID int64
 }
 
@@ -241,7 +221,6 @@ func (f *fakePayFacts) GetPaymentFacts(context.Context, string) (PaymentFacts, e
 type fakeApplier struct {
 	calls int
 	err   error
-	// skip 非 nil ⇒ 模擬「確定不需要調整」，呼叫端應標 SKIPPED 而不是 PROCESSED。
 	skip *RefundDisposition
 }
 
@@ -252,9 +231,6 @@ func (f *fakeApplier) ApplyRefund(
 	return f.skip, f.err
 }
 
-// recordingApplier 記下 handler 真的傳下來的那一份輸入。
-//
-// 只數 calls 的 fake 驗不出「解得開但欄位全是零值」—— 而那正是漏宣告 7 欄之後的形狀。
 type recordingApplier struct {
 	calls int
 	last  RefundFinalized
@@ -270,9 +246,6 @@ func (f *recordingApplier) ApplyRefund(
 	return f.skip, f.err
 }
 
-// ---------------------------------------------------------------------------
-// C1：order.paid
-// ---------------------------------------------------------------------------
 
 func orderPaidBody(t *testing.T, eventID, orderNo, occurredAt string) []byte {
 	t.Helper()
@@ -391,7 +364,6 @@ func TestOrderPaid_ReclaimsDeferredRefund(t *testing.T) {
 	docs := &fakeDocs{bySourceRef: map[string]domain.Document{}}
 	applier := &fakeApplier{}
 
-	// 退款先到：document 還不存在 ⇒ DEFERRED。
 	refund := NewRefundFinalizedConsumer(inbox, docs, applier, nil)
 	refundBody := producerShapedRefundBody(t, map[string]any{
 		"event_id": "r-1", "order_no": orderNo, "occurred_at": "2026-08-25T09:40:00Z",
@@ -407,7 +379,6 @@ func TestOrderPaid_ReclaimsDeferredRefund(t *testing.T) {
 		t.Fatalf("退款先到時 status 應為 DEFERRED，got %s", inbox.rows[0].Status)
 	}
 
-	// 付款後到：Prepare 成功之後 document 出現，反向認領應該把那一列處理掉。
 	docs.bySourceRef[orderNo] = domain.Document{ID: 42}
 	paid := newPaidConsumer(inbox, &fakePreparer{res: usecase.PrepareResult{DocumentID: 42}}, &fakeOrderFacts{}, docs, applier)
 	if err := paid.Handle(ctx, "order.paid", orderPaidBody(t, "p-1", orderNo, "2026-08-25T09:41:02")); err != nil {
@@ -416,34 +387,12 @@ func TestOrderPaid_ReclaimsDeferredRefund(t *testing.T) {
 	if applier.calls != 1 {
 		t.Fatalf("反向認領應套用 1 筆退款，實際 %d", applier.calls)
 	}
-	// 兩列都要被推出兜底候選集合，順序即發生順序：
-	//   id=2 是本次的 ORDER_PAID 列（Prepare 成功之後標記）
-	//   id=1 是先到的 DEFERRED 退款列（反向認領套用之後標記）
-	// 🔴 少了 id=2 那一次，ORDER_PAID 列會永遠停在 RECEIVED ＋ next_attempt_at=now，
-	//    也就是永久留在 idx_invinbox_due 的候選集合裡，INV.dl 每一輪都白撈它一次。
 	if want := []int64{2, 1}; !slices.Equal(inbox.processed, want) {
 		t.Fatalf("兩列都應被推進 PROCESSED，want %v 實際 %v", want, inbox.processed)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// C2：order.refund.finalized
-// ---------------------------------------------------------------------------
 
-// producerShapedRefundBody 造一則**與 order-service 實際發出的形狀相同**的
-// `order.refund.finalized` body。
-//
-// 🔴 每一個值都是 JSON 字串，因為 `OrderRefundFinalizedPayload` 的 16 個 component
-// 全是 `String`（`@JsonNaming(SnakeCaseStrategy)`）：
-//   - 金額三欄走 `String.valueOf(long)`（OrderRefundFinalizedOutboxWriter.write）
-//   - store_id / buyer_id 走 `str(Long)`
-//   - occurred_at 與 refunded_at 同值，走 `DateTimeUtils.formatIso8601(nowUtc())` ⇒ 帶 Z
-//   - refund_outcome / case_no / cancel_id / correlation_id 走 `blankToNull` ⇒ 可能是 JSON null
-//
-// **欄位集合由 TestRefundFixtureCoversEveryProducerField 對 Java 原始碼逐欄核對**，
-// 不是憑印象列的 —— 這四個缺陷能活下來，正是因為 fixture 與 struct 出自同一份想像。
-//
-// overrides 用來改單一欄；值傳 nil 代表送 JSON null（模擬 blankToNull）。
 func producerShapedRefundBody(t *testing.T, overrides map[string]any) []byte {
 	t.Helper()
 	body := map[string]any{
@@ -583,7 +532,6 @@ func TestRefund_ReclaimUsesTheSameConversion(t *testing.T) {
 	docs := &fakeDocs{bySourceRef: map[string]domain.Document{}}
 	applier := &recordingApplier{}
 
-	// 退款先到 ⇒ DEFERRED。
 	refund := NewRefundFinalizedConsumer(inbox, docs, applier, nil)
 	if err := refund.Handle(ctx, "order.refund.finalized", producerShapedRefundBody(t, nil)); err != nil {
 		t.Fatalf("refund handle: %v", err)
@@ -592,7 +540,6 @@ func TestRefund_ReclaimUsesTheSameConversion(t *testing.T) {
 		t.Fatal("查不到 document 時不得套用調整")
 	}
 
-	// 付款後到 ⇒ 反向認領。
 	docs.bySourceRef[orderNo] = domain.Document{ID: 77}
 	paid := NewOrderPaidConsumer(inbox, &fakePreparer{res: usecase.PrepareResult{DocumentID: 77}},
 		&fakeOrderFacts{}, &fakePayFacts{facts: PaymentFacts{PayTime: time.Now().UTC()}}, applier, docs, nil)
@@ -662,9 +609,6 @@ func TestRefund_ApplierFailureIsNotAcked(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// handler 與 INV.dl 兜底掃描的交界
-// ---------------------------------------------------------------------------
 
 // TestOrderPaid_InsertReservesLeaseWhileHandlerRuns 守 handlerLease。
 //
@@ -687,8 +631,6 @@ func TestOrderPaid_InsertReservesLeaseWhileHandlerRuns(t *testing.T) {
 		UnavailableOrderFactsClient{}, UnavailablePaymentFactsClient{},
 		&fakeApplier{}, &fakeDocs{}, nil).WithClock(func() time.Time { return now })
 
-	// peer client 不可用 ⇒ handler 在步驟 5 失敗，該列留在 RECEIVED —— 正是兜底掃描要
-	// 接手的形狀。
 	if err := c.Handle(ctx, "order.paid", orderPaidBody(t, "e-lease", "O000000010", "2026-08-30T11:59:00Z")); err == nil {
 		t.Fatal("peer client 不可用時必須 fail-loud")
 	}

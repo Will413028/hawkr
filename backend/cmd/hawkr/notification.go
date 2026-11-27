@@ -21,8 +21,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/resend"
 )
 
-// notificationProviders 是推播與 email 的 provider 設定。沒有設定的 provider 只在 dev 環境（requireDevEnvironment 成立）用替身：替身只記一行 log、回成功，
-// 在其他環境會把投遞紀錄誤標為 SENT，所以沒有設定就讓啟動失敗。
 type notificationProviders struct {
 	push          fcm.Sender
 	mail          resend.Sender
@@ -30,15 +28,8 @@ type notificationProviders struct {
 	suppression   notification.SuppressionKeys
 }
 
-// devSuppressionKey 是 dev 環境沒有設定 EMAIL_SUPPRESSION_HMAC_KEY 時的固定密鑰（只在 requireDevEnvironment 成立時選到；不是 secret）。
 const devSuppressionKey = "hawkr-dev-email-suppression-hmac-key"
 
-// readNotificationProviders 讀推播與 email 的設定：
-// FCM_PROJECT_ID 與 FCM_SERVICE_ACCOUNT_JSON（服務帳戶金鑰的內容，不是路徑；secret）要一起設，只設一個啟動失敗，都沒設時 dev 環境用替身、其他環境啟動失敗；
-// RESEND_API_KEY（secret）與 RESEND_FROM（寄件人，例如 `Hawkr <noreply@mail.example.com>`）要一起設，只設一個啟動失敗，都沒設時 dev 環境用替身、其他環境啟動失敗；
-// RESEND_WEBHOOK_SECRET（退信與投訴 webhook 的 Svix 簽章密鑰，secret；`whsec_` 開頭）獨立：沒設時 webhook 回 503；
-// EMAIL_SUPPRESSION_HMAC_KEY（email suppression 名單的位址雜湊密鑰，secret，至少 32 個字元）沒設時 dev 環境用固定的 dev 密鑰、其他環境啟動失敗；
-// EMAIL_SUPPRESSION_HMAC_KEY_PREVIOUS（輪替期間的舊密鑰，同樣至少 32 個字元，不得與目前的相同）只用於查詢，沒有 EMAIL_SUPPRESSION_HMAC_KEY 時不得設。
 func readNotificationProviders(ctx context.Context, e *config.Env, log *slog.Logger) notificationProviders {
 	p := notificationProviders{webhookSecret: e.StringOr("RESEND_WEBHOOK_SECRET", "")}
 	project, saJSON := e.StringOr("FCM_PROJECT_ID", ""), e.StringOr("FCM_SERVICE_ACCOUNT_JSON", "")
@@ -83,9 +74,6 @@ func readNotificationProviders(ctx context.Context, e *config.Env, log *slog.Log
 	return p
 }
 
-// newNotification 組裝 notification 模組；serve 與 worker 都要建：serve 訂閱來源事件並排意圖 job，worker 執行意圖 job 與渠道 job。
-// box 是 webhook inbox：模組在這裡登記 Resend 的退信與投訴事件；images 組推播圖片的絕對網址（與 API 回應同一個 MEDIA_ORIGIN 與 URI 樣板，規格用 rpc.PushImagePreset）。
-// 帳號語系讀 identity（preferred_locale，多語系 ADR D1）。
 func newNotification(d *db.DB, id *identity.Module, b *buyer.Module, sl *seller.Module, coupons *coupon.Module, reporters notification.CaseReporters, jc jobs.Enqueuer, box *inbox.Inbox, p notificationProviders, images rpc.Images, log *slog.Logger) *notification.Module {
 	return notification.New(notification.Deps{
 		DB: d, Identity: id, Buyer: b, Seller: sl, Directory: notification.NewDirectory(b, sl), Resolver: notification.NewResolver(b, sl, reporters), Validity: notification.NewValidity(coupons), StoreCodes: notification.NewStoreCodes(sl), Jobs: jc, Now: time.Now, NewID: uuid.NewV7, Logger: log,
@@ -93,8 +81,6 @@ func newNotification(d *db.DB, id *identity.Module, b *buyer.Module, sl *seller.
 	})
 }
 
-// subscribeNotification 讓來源事件在發布的 transaction 內排成通知意圖 job（D10），刪除與退場事件排成個資清除 job（D16）；
-// 停權與刪帳號另在同一個 transaction 刪掉帳號的裝置 token（唯一不只排 job 的訂閱者，通知 ADR 決策 4）。
 func subscribeNotification(bus *events.Bus, m *notification.Module) { m.Subscribe(bus) }
 
 func readSuppressionKeys(e *config.Env) notification.SuppressionKeys {
@@ -121,7 +107,6 @@ func readSuppressionKeys(e *config.Env) notification.SuppressionKeys {
 	return notification.SuppressionKeys{Current: []byte(cur), Previous: []byte(prev)}
 }
 
-// pushImageURL 把型別的圖片 object key 組成推播用的絕對網址；媒體網域由 rpc.NewImages 驗證過，啟動時一定有。
 func pushImageURL(images rpc.Images) func(key string) string {
 	return func(key string) string { return images.URL(key, rpc.PushImagePreset) }
 }

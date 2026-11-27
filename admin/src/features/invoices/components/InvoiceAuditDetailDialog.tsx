@@ -94,8 +94,7 @@ export default function InvoiceAuditDetailDialog({
 			</DetailRow>
 			<DetailRow label="目標資源">
 				<strong>{entry.targetId || "—"}</strong>
-				{/* targetKind 的五值不是 CodeMeta enum（沒有 SSOT）⇒ 原樣顯示碼值，
-							    不自己寫一張五筆的對照表。同 A03 對 TaxDocumentInfo.kind 的處置。 */}
+
 				<span className="adm-audit-detail-sub">{entry.targetKind || "—"}</span>
 			</DetailRow>
 			<DetailRow label="操作者">
@@ -117,8 +116,7 @@ export default function InvoiceAuditDetailDialog({
 					<span className="adm-audit-detail-empty">—</span>
 				)}
 			</DetailRow>
-			{/* 只有條款相關的操作才有值；空的時候說「不涉及」而不是「—」，
-						    因為這一欄的空與「查不到」不是同一件事。 */}
+
 			<DetailRow label="條款版本">
 				<span>{entry.termsVersion || "此操作不涉及條款"}</span>
 			</DetailRow>

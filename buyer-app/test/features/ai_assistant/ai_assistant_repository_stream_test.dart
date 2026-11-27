@@ -38,7 +38,6 @@ class _Server {
     if (_failed < failures.length) throw failures[_failed++];
     final from = r.cursor.isEmpty ? 0 : int.parse(r.cursor.substring(1));
     final start = r.cursor.isEmpty ? 0 : from;
-    // 接續的連線從 cursor 之後開始；本條串流的 100 秒從這一刻重新計。
     if (duplicateOnResume && r.cursor.isNotEmpty) yield _text(from);
     var elapsed = 0;
     for (var t = start + eventSeconds; t <= turnSeconds; t += eventSeconds) {

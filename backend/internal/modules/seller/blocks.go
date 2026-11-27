@@ -6,9 +6,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/seller/internal/model"
 )
 
-// 店家封鎖（遷移計畫 A7-1b）：店家封鎖一位買家。單向：被封鎖的買家仍看得到店家的公開內容，只是不能在這家店留言、討論區發言與按讚
-// （擋寫入的檢查在 social）；不擋下單。這些方法不做能力檢查：封鎖是保護動作，店家被停權時仍要能封鎖與解除；誰能代表店家操作由呼叫端
-// 的授權（httpapi 的 ActingStore）決定。買家刪帳時由 accountdeletion 在同一個刪帳 transaction 刪掉以他為對象的列（ClearBlocksAgainstBuyer）。不發布 seller.pub_blocks，檢查是依 ID 的查詢。
 
 // BlockedBuyerCursor 是店家封鎖名單的 keyset 位置。
 type BlockedBuyerCursor = model.BlockedBuyerCursor

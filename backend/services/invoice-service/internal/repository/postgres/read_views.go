@@ -13,27 +13,8 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/repository/postgres/gen"
 )
 
-// 本檔是所有**唯讀視圖**（分頁列表 ＋ owner-scoped 明細）的 thin adapter。
-//
-// 為什麼獨立成一檔而不是散進各個 *_repo.go：這一批的正確性條件與寫入面完全不同
-// （擁有者述詞、count↔list 述詞一致、UI 分頁名 → DB 狀態集合的展開），放在一起才
-// 看得出「每一支 List 都配著一支 Count，而且兩者吃的是同一個 Query struct」。
-// 方法仍掛在原本的 repository struct 上——聚合的存取面沒有分裂。
-//
-// 三條本層自己的規則：
-//
-//	① 擁有者參數（buyerID／storeID）**只會被原樣塞進 Params**，本層不做任何比對。
-//	   任何一支若出現 `if got.BuyerID != buyerID` 就代表述詞寫錯了（§8.1.4(b)）。
-//	② 可選篩選一律「旗標 ＋ 值」成對傳。用零值當「不篩」的哨兵會在零值本身合法時
-//	   靜默篩掉正確的資料。
-//	③ Count 與 List 共用同一個 Query struct ⇒ 兩者的參數不可能漂移。
-//	   （述詞本身的一致由 SQL 側保證，見 db/queries 各支的註解。）
 
-// ---------------------------------------------------------------------------
-// 參數轉換
-// ---------------------------------------------------------------------------
 
-// optInt64 把「可選的 int64 篩選」拆成 SQL 需要的 (旗標, 值)。
 func optInt64(v *int64) (bool, int64) {
 	if v == nil {
 		return false, 0
@@ -41,9 +22,6 @@ func optInt64(v *int64) (bool, int64) {
 	return true, *v
 }
 
-// optTime 同上。旗標為 false 時值是 SQL NULL：述詞那一段不會被求值
-// （`NOT false OR <cmp>` 恆真），而 NULL 比較的結果是 NULL 不是 true，
-// 就算被求值也不會誤放行。
 func optTime(v *time.Time) (bool, pgtype.Timestamptz) {
 	if v == nil {
 		return false, ts(time.Time{})
@@ -51,10 +29,6 @@ func optTime(v *time.Time) (bool, pgtype.Timestamptz) {
 	return true, ts(*v)
 }
 
-// derefString 把 nullable text 攤平成空字串。
-//
-// 對外契約本來就用空字串表示「沒有」（proto 全檔沒有 optional，`omitempty` 也只在
-// 少數欄位），所以攤平在這一層做一次，比讓每個呼叫端各自解 nil 安全。
 func derefString(v *string) string {
 	if v == nil {
 		return ""
@@ -62,13 +36,6 @@ func derefString(v *string) string {
 	return *v
 }
 
-// ---------------------------------------------------------------------------
-// operation 讀取視圖的共同列形狀
-//
-// 五支 operation 視圖（賣家單筆／ADM 單筆／62R 列表／ADM 列表／priority 列表）
-// 刻意 SELECT 完全相同的欄位集合，就是為了共用這一個轉換：形狀不同的話每支都要
-// 一個 mapper，而少填一個欄位的症狀是「該欄恆為零值」——零值與真實值無法分辨。
-// ---------------------------------------------------------------------------
 
 type operationViewRow struct {
 	operation                gen.InvoiceOperation
@@ -104,9 +71,6 @@ func toOperationViews(rows []operationViewRow) []domain.OperationView {
 	return out
 }
 
-// ---------------------------------------------------------------------------
-// DocumentRepository：買家面
-// ---------------------------------------------------------------------------
 
 // ListOrderDocumentsForBuyer 回一張訂單底下**全部**屬於這位買家的文件。
 //
@@ -175,9 +139,6 @@ func (r *DocumentRepository) CountForBuyer(ctx context.Context, in domain.BuyerD
 	})
 }
 
-// ---------------------------------------------------------------------------
-// DocumentRepository：賣家面（銷項 ＋ 進項）
-// ---------------------------------------------------------------------------
 
 // GetForSeller 是端點 31／32 的授權讀取，一併帶出 latestJobId。
 func (r *DocumentRepository) GetForSeller(ctx context.Context, id, storeID int64) (domain.SellerDocumentItem, error) {
@@ -303,9 +264,6 @@ func (r *DocumentRepository) CountReceivedForSeller(ctx context.Context, in doma
 	})
 }
 
-// ---------------------------------------------------------------------------
-// DocumentRepository：ADM
-// ---------------------------------------------------------------------------
 
 // ListForAdmin 是端點 47（A12）的列表。StoreID 為 nil ＝ 全平台。
 func (r *DocumentRepository) ListForAdmin(ctx context.Context, in domain.AdminDocumentQuery) ([]domain.AdminDocumentItem, error) {
@@ -362,9 +320,6 @@ func (r *DocumentRepository) CountForAdmin(ctx context.Context, in domain.AdminD
 	})
 }
 
-// ---------------------------------------------------------------------------
-// OperationRepository：五支讀取視圖
-// ---------------------------------------------------------------------------
 
 // GetViewForSeller 是端點 33（S08）。store_id 是述詞的一部分 ⇒ 越權與不存在同回 9340。
 func (r *OperationRepository) GetViewForSeller(ctx context.Context, id, storeID int64) (domain.OperationView, error) {
@@ -538,9 +493,6 @@ func (r *OperationRepository) ListPriorityViewsForAdmin(ctx context.Context, in 
 	return toOperationViews(views), nil
 }
 
-// ---------------------------------------------------------------------------
-// ComplaintRepository
-// ---------------------------------------------------------------------------
 
 // GetForSeller 是端點 35／36 的授權讀取（經 invoice_issuers 解析 store_id）。
 func (r *ComplaintRepository) GetForSeller(ctx context.Context, id, storeID int64) (domain.Complaint, error) {
@@ -644,9 +596,6 @@ func (r *ComplaintRepository) CountForAdmin(ctx context.Context, in domain.Admin
 	})
 }
 
-// ---------------------------------------------------------------------------
-// CorrectionRequestRepository
-// ---------------------------------------------------------------------------
 
 // GetForBuyer 是端點 12 的授權讀取。三段述詞全在 SQL 裡。
 func (r *CorrectionRequestRepository) GetForBuyer(ctx context.Context, id, buyerID int64, sourceRef string) (domain.CorrectionRequest, error) {
@@ -656,17 +605,11 @@ func (r *CorrectionRequestRepository) GetForBuyer(ctx context.Context, id, buyer
 		SourceRef: sourceRef,
 	})
 	if err != nil {
-		// 端點 12 的 not-found 碼是 **9301**（InvoiceDocumentNotFound）而不是另開一個
-		// correction 專用碼：§8.1.4(c) 明令不得為「越權」或這類衍生資源單獨開碼，
-		// 那等於在回應裡放一個可以區分「不存在」與「不屬於你」的旗標。
 		return domain.CorrectionRequest{}, notFound(err, bizcode.InvoiceDocumentNotFound)
 	}
 	return toCorrectionRequest(row), nil
 }
 
-// ---------------------------------------------------------------------------
-// SellerTaxProfileRepository
-// ---------------------------------------------------------------------------
 
 // GetByStoreID 經 invoice_issuers 解析 store_id。
 func (r *SellerTaxProfileRepository) GetByStoreID(ctx context.Context, storeID int64) (domain.SellerTaxProfile, error) {
@@ -714,9 +657,6 @@ func (r *SellerTaxProfileRepository) CountReviewsForAdmin(ctx context.Context, i
 	})
 }
 
-// ---------------------------------------------------------------------------
-// ProviderAccountRepository
-// ---------------------------------------------------------------------------
 
 // GetByStoreID 經 invoice_issuers 解析 store_id。查無列 ⇒ 9330。
 func (r *ProviderAccountRepository) GetByStoreID(ctx context.Context, storeID int64, provider string) (domain.ProviderAccount, error) {
@@ -783,9 +723,6 @@ func (r *ProviderAccountRepository) CountForAdmin(ctx context.Context, in domain
 	})
 }
 
-// ---------------------------------------------------------------------------
-// AuditRepository
-// ---------------------------------------------------------------------------
 
 func adminAuditLogParams(in domain.AdminAuditLogQuery) (hasActor bool, actorID int64, hasStore bool, storeID int64, hasDoc bool, docID int64, hasJob bool, jobID int64, hasFrom bool, from pgtype.Timestamptz, hasTo bool, to pgtype.Timestamptz) {
 	hasActor, actorID = optInt64(in.TargetActorAccountID)
@@ -866,9 +803,6 @@ func (r *AuditRepository) CountAdminAuditLogsForAdmin(ctx context.Context, in do
 	})
 }
 
-// ---------------------------------------------------------------------------
-// OverviewRepository
-// ---------------------------------------------------------------------------
 
 // OverviewRepository 服務兩支總覽端點的計數。
 //

@@ -112,14 +112,9 @@ const STATUS_FILTERS = [
 ] as const;
 
 export function SellerInvoiceDocumentsPage() {
-	// backend#3066 裁決 B：免用統一發票的賣家在這一頁**只會有收據**
-	// ⇒ 叫它「發票與收據紀錄」是在承諾一個他永遠看不到的東西。
-	// 端點 16 走 TanStack 快取（S01／側欄已查過同一把 key），不多打 API。
 	const { overview: framingOverview } = useSellerInvoiceOverview();
 	const receiptOnly = isReceiptOnlySeller(framingOverview);
 	const recordsLabel = documentsPageLabel(receiptOnly);
-	// 走 observed router 而不是裸 useRouter：`tests/navigation-route-contract.test.ts`
-	// 要求所有程式化導航都經過這一層（導航看門狗靠它辨識 stuck navigation）。
 	const router = useObservedRouter("seller_invoice_documents");
 	const pathname = usePathname() ?? OVERVIEW_HREF;
 	const searchParams = useSearchParams();
@@ -149,7 +144,6 @@ export function SellerInvoiceDocumentsPage() {
 				if (value === null || value === "") next.delete(key);
 				else next.set(key, value);
 			}
-			// 改任一條件時 `page` 一律重設為 1，否則會停在一個不存在的頁碼。
 			if (!("page" in patch)) next.delete("page");
 			const qs = next.toString();
 			router.replace(qs ? `${pathname}?${qs}` : pathname);
@@ -176,16 +170,12 @@ export function SellerInvoiceDocumentsPage() {
 		loading,
 		error,
 		refresh,
-		// 進項分頁時整支不發：兩個分頁是兩個資料集，切過去還打端點 30 只是白燒一次
-		// 共用限流額度（§0.4 ④）。
 	} = useSellerInvoiceDocuments(queryParams, {
 		enabled: datesValid && tab === "issued",
 	});
 
 	const records = result?.records ?? [];
 	const shipmentDegraded = result?.shipmentStatusDegraded ?? false;
-	// 🔴 `total` 是總筆數不是頁數（§B-2.0 T25）：直接餵給 Pagination 會得到一個
-	// 長度等於筆數的頁碼列。
 	const totalPages = result
 		? Math.max(1, Math.ceil(result.total / PAGE_SIZE))
 		: 1;
@@ -330,11 +320,7 @@ export function SellerInvoiceDocumentsPage() {
 				<>
 					<section className="seller-card">
 						<ScrollableTableRegion label={recordsLabel}>
-							{/*
-							 * ≥768px 走表格、<768px 走卡片：同一份資料渲染兩份 DOM ＋ Tailwind
-							 * 斷點 `hidden`。`display:none` 讓被隱藏那份不進 accessibility tree，
-							 * 螢幕閱讀器只會讀到一組列表（§S06 Responsive）。
-							 */}
+
 							<table className="hidden seller-table md:table">
 								<caption className="sr-only">{recordsLabel}</caption>
 								<thead>
@@ -519,10 +505,6 @@ function EmptyBody({
 }
 
 /** 出貨狀態與付款時間目前後端恆為空字串（見檔頭）；空值一律 `—`，不猜。 */
-// 出貨狀態的三態 Chip。判定在 lib/invoices/display.ts（有單元測試），這裡只做對應。
-//
-// 🔴 「降級」與「還沒出貨」必須是**看得出差別的兩種畫面**：兩者都畫成 `—`
-// 就是把「我們不知道」說成「還沒出貨」，而那正是這一欄原本不敢畫的理由。
 function ShipmentStatusChip({
 	code,
 	degraded,
@@ -599,7 +581,7 @@ function DocumentRow({
 				</Chip>
 			</td>
 			<td>
-				{/* 獨立的第二顆 Chip——與發票狀態是兩個維度，不可合併（見檔頭）。 */}
+
 				<ShipmentStatusChip
 					code={item.shipmentStatus}
 					degraded={shipmentDegraded}
@@ -618,12 +600,7 @@ function DocumentRow({
 							查看訂單
 						</Link>
 					) : null}
-					{/*
-					 * 🔴 `latestJobId` 為空字串時**整顆不渲染**，不要渲染 disabled 鍵：
-					 * 「這份文件沒有任何 operation」與「你沒有權限」是兩件事。也不得拿
-					 * `documentId` 去組 `/jobs/{jobId}`——打進去會 404＋9340，而那個 404
-					 * 與「不是你的」長得完全一樣（Tier A），沒有人查得出原因（§B-2.0 T06）。
-					 */}
+
 					{item.latestJobId ? (
 						<Link
 							href={`/seller-center/invoices/jobs/${encodeURIComponent(item.latestJobId)}`}
@@ -632,7 +609,7 @@ function DocumentRow({
 							查看異常
 						</Link>
 					) : null}
-					{/* S11：document-scoped 詳情。銷項列不帶 `?kind=`（預設就是銷項）。 */}
+
 					<Link
 						href={`/seller-center/invoices/${encodeURIComponent(item.summary.documentId)}`}
 						className="text-sm underline"

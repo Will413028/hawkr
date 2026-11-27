@@ -14,12 +14,9 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// 共用銀行帳號提醒（收款開通 ADR D45）：待辦 SHARED_BANK_ACCOUNT 由 seller.review_shared_bank_account(at) 推導，成員是處分生效中、
-// 處分建立之後才同步進來的同一個 fingerprint 命中的別的帳號；只存「已檢視」的處置（measure_linked_reviews）。
 
 const sharedBankKind = "SHARED_BANK_ACCOUNT"
 
-// sharedBankItems 回傳 f.now 這一刻 pub_review_items 裡的 SHARED_BANK_ACCOUNT 列。
 func (f *fixture) sharedBankItems(t *testing.T) []reviewRow {
 	t.Helper()
 	var out []reviewRow
@@ -31,7 +28,6 @@ func (f *fixture) sharedBankItems(t *testing.T) []reviewRow {
 	return out
 }
 
-// firstFingerprintAt 是一個店家最早的 BANK_FINGERPRINT 寫入時間（待辦開始時間的預期值；列的 created_at 是同步當下的時鐘）。
 func (f *fixture) firstFingerprintAt(t *testing.T, storeID int64) time.Time {
 	t.Helper()
 	var at time.Time
@@ -40,7 +36,6 @@ func (f *fixture) firstFingerprintAt(t *testing.T, storeID int64) time.Time {
 	return at
 }
 
-// sanctionedThenShared 建立被處分的帳號 S（fingerprint 先於處分就已同步）、處分 M（終止合作），隔一小時之後帳號 O 才同步同一個 fingerprint。
 func (f *fixture) sanctionedThenShared(t *testing.T) (m Measure, accountO int64, sO Store) {
 	t.Helper()
 	_, sS := f.approvedWithFingerprints(t, fpShared)
@@ -73,7 +68,6 @@ func TestSharedBankAccountIsQueuedForAFingerprintSyncedAfterTheSanction(t *testi
 		got.StoreID == nil || *got.StoreID != sO.StoreID || got.StoreName == nil || got.Start == nil || !got.Start.Equal(start) || got.Due == nil || !got.Due.Equal(start.Add(168*time.Hour)) {
 		t.Fatalf("列：%+v 預期店家 %d 開始 %s", got, sO.StoreID, start)
 	}
-	// 重複同步（同一個 fingerprint 再同步一輪）不增加。
 	f.tick(time.Hour)
 	snap := enabledSnapshot
 	snap.BankFingerprints = []string{fpShared}
@@ -211,14 +205,12 @@ func TestSharedBankAccountHitBeforeTheSanctionStaysOutWhenLaterRowsAppear(t *tes
 	ctx := context.Background()
 	snap := enabledSnapshot
 	snap.BankFingerprints = []string{fpShared}
-	// 舊金鑰：S 與 O 各一列，都早於處分。
 	_, sS := f.approvedWithFingerprints(t, fpShared)
 	f.tick(time.Hour)
 	accountO, sO := f.approvedWithFingerprints(t, fpShared)
 	if n := f.fingerprintRows(t, sO.StoreID); n != 1 {
 		t.Fatalf("前提：輪替前 O 一把金鑰一列：%d", n)
 	}
-	// 輪替：S 以兩把金鑰的金鑰環再同步，快照會含兩把金鑰的 hash；之後才處分。
 	f.tick(time.Hour)
 	f.module = f.newModuleWithKeys(t, f.jobs, rotatedMAC(t))
 	f.setPayment(t, sS.StoreID, snap)
@@ -231,7 +223,6 @@ func TestSharedBankAccountHitBeforeTheSanctionStaysOutWhenLaterRowsAppear(t *tes
 	if items := f.sharedBankItems(t); len(items) != 0 {
 		t.Fatalf("前提：處分前已命中的不進待辦：%+v", items)
 	}
-	// 處分之後 O 以金鑰環再同步：多出新金鑰的一列。
 	f.setPayment(t, sO.StoreID, snap)
 	if n := f.fingerprintRows(t, sO.StoreID); n != 2 {
 		t.Fatalf("前提：處分之後 O 補上新金鑰的一列：%d", n)

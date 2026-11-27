@@ -20,7 +20,6 @@ var reachClock = time.Date(2026, 11, 24, 12, 0, 0, 0, time.UTC)
 
 var resendActor = adminaudit.Actor{AdminID: 7, Action: "/hawkr.admin.notification.v1alpha1.NotificationAdminService/ResendDeliveries"}
 
-// reachService 是以固定時鐘（reachClock）運作的重送與未觸達服務，投遞 job 記在 f.jobs。
 func (f *fixture) reachService() *reach.Service {
 	return reach.New(reach.Deps{
 		DB: f.db, Audit: adminaudit.New(f.db, func() time.Time { return reachClock }), Jobs: f.jobs, Registry: testRegistry{},
@@ -35,7 +34,6 @@ func (f *fixture) seedIntent(t *testing.T, typ string, created time.Time) uuid.U
 	return id
 }
 
-// seedDelivery 寫一筆 BUYER 受眾的投遞紀錄；reason 非空表示永久失敗，status 與 reason 對應 deliveries 的 CHECK。
 func (f *fixture) seedDelivery(t *testing.T, intent uuid.UUID, account int64, channel, status, reason string, updated time.Time) uuid.UUID {
 	t.Helper()
 	id := uuid.NewV7()
@@ -48,7 +46,6 @@ func (f *fixture) seedDelivery(t *testing.T, intent uuid.UUID, account int64, ch
 	return id
 }
 
-// stateKey 是投遞狀態與失敗原因的文字（deliveryState 的欄位是指標，不能直接比較）。
 func (f *fixture) stateKey(t *testing.T, id uuid.UUID) string {
 	t.Helper()
 	s := f.state(t, id)

@@ -8,9 +8,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// 主管機關來函（step10e-reports-brief R5；設計 step10e-3cb-design §1.4、§3.1）：主管機關給平台的公文，獨立的收件，不是通報。來函有期限（收文時間起算）、
-// 指名的對象（任何帳號，選填店家與商品）、保存期限（指名的帳號或店家在 seller 的個資在這之前不被關店後的清理刪除；只能延長）與完成時每個對象的告知。
-// 處理狀態（AuthorityOrderState）與可以做的動作（Availability）由事實推導，不存。
 
 // AuthorityOrderKind 是來函要平台做的事；值與 DB 的 authority_orders_kind_check、契約的 AuthorityOrderKind 一致。
 type AuthorityOrderKind string

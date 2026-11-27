@@ -86,14 +86,12 @@ func TestCancelledOrderRestoresStockOnceAgainstTheRealCatalog(t *testing.T) {
 	if err != nil || s.Sku.StockQty != 10 {
 		t.Fatalf("stock = %d (%v), want 10: a resent order.cancelled restores once", s.Sku.StockQty, err)
 	}
-	// 同一筆 stock_tx_id 之後以 gRPC 的 RestoreStock 重送，用同一個歸還鍵，也不再歸還。
 	if err := m.RestoreStock(ctx, catalogserver.RestoreKey("tx-1"), "tx-1", []catalog.StockItem{{SkuID: sku, Quantity: 4}}); err != nil {
 		t.Fatal(err)
 	}
 	if s, _ := m.OwnSku(ctx, storeID, sku); s.Sku.StockQty != 10 {
 		t.Fatalf("stock = %d, want 10: the gRPC path shares the restore key", s.Sku.StockQty)
 	}
-	// 沒有原扣減的取消事件視為補償成功。
 	none := fmt.Appendf(nil, `{"order_no":"O2","stock_tx_id":"never","items":[{"sku_id":%q,"quantity":"1"}]}`, sku.String())
 	if err := c.OrderCancelled(ctx, none); err != nil {
 		t.Fatalf("cancelled order without a deduction: %v", err)
@@ -127,7 +125,6 @@ func TestSalesAreRecordedOncePerOrderNoAgainstTheRealCatalog(t *testing.T) {
 	if err := c.OrderSalesAccumulated(ctx, unknown); err == nil || !isPermanent(err) {
 		t.Fatalf("unknown product = %v, want a permanent error", err)
 	}
-	// 失敗的整筆回滾，包括訂單登記：之後帶著真的商品重送同一個 order_no 仍會記。
 	if err := c.OrderSalesAccumulated(ctx, body("O3", 1)); err != nil {
 		t.Fatal(err)
 	}

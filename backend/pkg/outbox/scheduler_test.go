@@ -143,7 +143,6 @@ func TestScheduler_WithoutInitialDelay_FirstTickWaitsFullInterval(t *testing.T) 
 	}
 }
 
-// ── Stop 是同步的：三個性質各一支斷言 ──────────────────────────────────────────
 
 // Stop 必須等到 loop 的 goroutine 真的收尾才返回。
 //

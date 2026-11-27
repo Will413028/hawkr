@@ -30,7 +30,6 @@ function Controlled(
 	);
 }
 
-// 預覽用 catalog-field 外框：寬 100%、上限 420。
 const frame = { frameMaxWidth: 420 };
 
 describe("AfterSalePhotoUploader", () => {

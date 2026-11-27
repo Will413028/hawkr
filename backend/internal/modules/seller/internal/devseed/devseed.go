@@ -58,20 +58,6 @@ func New(d Deps) *Service {
 	return &Service{d: d}
 }
 
-// 種子的原則：idempotent，只還原自己擁有的資料，不繞過領域的副作用（像 Rails 的 seeds，不是 db:reset）。種子擁有的是這兩家店的 fixture 資料：
-// profile、KYC 與 logo；有下游消費者的生命週期狀態（停權措施、關店、等待刪除、刪帳申請）不是種子的資料，種子不悄悄還原它，
-// 前提檢查發現它們時拒絕執行（見 Check）。還原的方式：
-//   - 店家列 upsert：profile 與個資欄位、版本鎖回到 fixture；status 只因生命週期而變，upsert 不寫它們，只以 WHERE 保證列還在 fixture 的
-//     狀態（ACTIVE、沒有關閉紀錄），不是就整筆失敗；logo 與封面是 media 的資產，不覆寫模組已寫入的資產（見 upsertStoreSQL）；
-//   - profile 有變時發 StoreProfileChanged 並排入快取失效（與模組自己寫 profile 同一個事件、同一個 transaction），舊服務的快取才看得到；
-//     可曝光由最後的全量重新公告（ReannounceExposures）處理；
-//   - 公告列保留、不刪不重設：version 只增不減，全量重新公告把它加一，在途的舊事件版本較低，Java 正確丟棄；
-//   - KYC 申請、通報與案件、違規、瀏覽彙總這些「只因使用而存在」的子列，只刪這幾家店的，再以 fixture 重寫；刪掉的 KYC 證件的 media
-//     資產先在同一個 transaction 內 MarkDeleted，治理佐證的資產不 MarkDeleted；
-//   - 先鎖店家列（與模組的寫入者同一個順序：店家、申請），才刪子列。
-//
-// 它不碰別人的資料：不在種子的店家（含 SELLER 角色）原封不動。前提不成立時拒絕執行：種子帳號若擁有種子以外的未關閉店家，種子店家寫入會撞上
-// 一帳號一家店，Check 在寫入之前就擋下，不自動刪店。已關閉的店家（角色已移除）不受影響。
 var clearChildrenSQL = []string{
 	`DELETE FROM seller.evidence_accesses WHERE report_id IN (SELECT id FROM seller.reports WHERE store_id = ANY($1)) OR request_id IN (SELECT id FROM seller.measure_requests WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1))) OR inquiry_id IN (SELECT id FROM seller.case_inquiries WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.measure_request_evidence WHERE request_id IN (SELECT id FROM seller.measure_requests WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1)))`,
@@ -84,9 +70,6 @@ var clearChildrenSQL = []string{
 	`DELETE FROM seller.measure_contents WHERE measure_id IN (SELECT id FROM seller.measures WHERE store_id = ANY($1))`,
 	`DELETE FROM seller.measures WHERE store_id = ANY($1)`,
 	`DELETE FROM seller.finding_authority_orders WHERE violation_id IN (SELECT id FROM seller.violations WHERE store_id = ANY($1))`,
-	// 主管機關來函只要有一個對象碰到種子店家（或其帳號），整份來函連同全部對象一起刪：對象的位置必須連續（DB 的 prev_position 外鍵保證），不能只刪其中幾個。
-	// 只有純種子的來函會走到這裡：混合的來函（也有非種子的對象、措施或認定）由 Check 在這些語句之前拒絕（mixedOrdersSQL），不刪非種子的資料。
-	// 措施的 source_authority_order_id 隨措施一起刪（上面），認定引用隨認定的清除（上面）。
 	`DELETE FROM seller.authority_target_notice_history WHERE order_id IN (SELECT order_id FROM seller.authority_order_targets WHERE store_id = ANY($1) OR account_id IN (SELECT account_id FROM seller.stores WHERE store_id = ANY($1)))`,
 	`DELETE FROM seller.authority_order_prepurged_stores WHERE order_id IN (SELECT order_id FROM seller.authority_order_targets WHERE store_id = ANY($1) OR account_id IN (SELECT account_id FROM seller.stores WHERE store_id = ANY($1)))`,
 	`DELETE FROM seller.authority_order_hold_extensions WHERE order_id IN (SELECT order_id FROM seller.authority_order_targets WHERE store_id = ANY($1) OR account_id IN (SELECT account_id FROM seller.stores WHERE store_id = ANY($1)))`,
@@ -117,32 +100,22 @@ var clearChildrenSQL = []string{
 	`DELETE FROM seller.product_view_events WHERE store_id = ANY($1)`,
 }
 
-// 公告列：沒有才建立（version 0，與開店同一個結果，queries/exposure.sql 的 InsertStoreExposure）；已有的保留原樣，版本不重設。
 const insertExposureSQL = `INSERT INTO seller.store_exposures (store_id) VALUES ($1) ON CONFLICT (store_id) DO NOTHING`
 
-// profile 的快照：upsert 還原的欄位（不含 status，那是生命週期；不含版本）。前後兩次快照不同才發 StoreProfileChanged。
 const profileExpr = `jsonb_build_array(s.store_name, s.description, s.contact_phone, s.contact_name, s.contact_mobile, s.support_email, s.town_code, s.address_detail, s.logo_key, s.logo_asset_id,
     s.prize, s.website_url, s.onboarding_completed)::text`
 
-// 鎖店家列（依 store_id，與 stint.LockAccountOf 同一個順序）並取得還原前的 profile 快照。
 const lockStoresSQL = `SELECT s.store_id, ` + profileExpr + ` FROM seller.stores s WHERE s.store_id = ANY($1) ORDER BY s.store_id FOR UPDATE`
 
 const profileSnapshotSQL = `SELECT s.store_id, ` + profileExpr + ` FROM seller.stores s WHERE s.store_id = ANY($1)`
 
-// 申請列接著鎖（店家、申請的順序，同模組的寫入者）。
 const lockApplicationsSQL = `SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1) ORDER BY store_id, application_id FOR UPDATE`
 
-// 即將刪除的 KYC 證件的 asset ID。治理佐證（通報、措施上請求、詢問回覆）的資產不在其中：佐證沒有刪除路徑，種子刪掉業務列也不 MarkDeleted。
 const documentAssetsSQL = `
 SELECT d.asset_id FROM seller.kyc_documents d
 WHERE d.application_id IN (SELECT application_id FROM seller.kyc_applications WHERE store_id = ANY($1))
 `
 
-// 店家列 upsert。衝突時把 fixture 擁有的 profile 與個資欄位寫回（版本鎖加一）；first_exposed_at 是歷史事實，保留。
-// status 與 pii_purged_at 只因生命週期（關店、等待刪除、個資清理）而變，不是種子的資料：不寫，只在 WHERE 要求它們還在 fixture 的
-// 狀態（ACTIVE 的 stint 沒有目前的關店紀錄），否則 0 列、呼叫方整筆失敗（前提檢查已經先擋下，這是同一個 transaction 內的保底）。
-// logo、封面是 media 的資產：列上已有 logo 時保留，封面不動，不覆寫模組寫入過的資產；fixture 的 logo 是不經 media 的假資產（media.MarkDeleted
-// 忽略不存在的 ID）。沒有 logo 的列才補上 fixture 的。
 const upsertStoreSQL = `
 INSERT INTO seller.stores (
     store_id, store_code, account_id, store_name, description, contact_phone, town_code, address_detail,
@@ -161,8 +134,6 @@ ON CONFLICT (store_id) DO UPDATE SET
     updated_at = EXCLUDED.updated_at
 WHERE seller.stores.status = 'ACTIVE' AND seller.stores.pii_purged_at IS NULL`
 
-// 把 IDENTITY 序號推到固定 ID 之後，新開的店不會撞到它們（同 01-account.sql）。只往上推：取目前序號、現有最大的 store_id 與 9999 的最大值，
-// 序號永遠不會倒退。
 const advanceSequenceSQL = `
 SELECT setval(seq, GREATEST(
     COALESCE(pg_sequence_last_value(seq::regclass), 0),
@@ -170,19 +141,12 @@ SELECT setval(seq, GREATEST(
     9999))
 FROM (SELECT pg_get_serial_sequence('seller.stores', 'store_id') AS seq) s`
 
-// 種子帳號擁有種子以外的未關閉店家、或種子以外的店家佔用種子的 store_code：一個帳號同時只有一家未關閉的店（stores_current_account 的 UNIQUE）、
-// 種子店家寫入會撞上它；已關閉的店家不在此限。store_code 的 unique index 涵蓋所有狀態，所以那一支不篩選。
-// （$1 種子 store_id、$2 種子 store_code、$3 種子帳號。）
 const conflictingStoresSQL = `
 SELECT store_id, account_id, store_code FROM seller.stores
 WHERE store_id <> ALL($1)
   AND (store_code = ANY($2) OR (status <> 'CLOSED' AND account_id = ANY($3)))
 ORDER BY store_id`
 
-// 種子店家身上還在進行的生命週期狀態：不是 ACTIVE（關閉的有目前的關店紀錄）或個資已清理；還沒結束的停權期間（到期之後要等 worker 的 Recompute 結束它並發
-// StoreUnsuspended）。期間是帳號層級的，所以不只看種子的 store_id，而是種子帳號名下的所有店家：否則種子帳號在別的（已關閉）任期上有進行中的期間時，
-// 種子會替被停權的帳號新開任期。它們都有下游消費者，種子不悄悄還原。（$1 種子 store_id、$2 種子帳號。）
-// 生效中的措施（停權與終止合作）不在這裡寫第二份定義：問 stint.EffectiveMany（EffectiveMeasures 那一支查詢，check 讀它）。
 const lifecycleStatesSQL = `
 SELECT s.store_id, '店家狀態 ' || s.status || CASE WHEN s.current_closed_at IS NOT NULL THEN '（已有關閉紀錄）' ELSE '' END FROM seller.stores s
 WHERE s.store_id = ANY($1) AND (s.status <> 'ACTIVE' OR s.pii_purged_at IS NOT NULL)
@@ -192,11 +156,8 @@ WHERE (p.store_id = ANY($1) OR p.store_id IN (SELECT store_id FROM seller.stores
   AND p.ended_at IS NULL
 ORDER BY 1, 2`
 
-// 種子店家在資料庫裡所屬的帳號（種子的帳號 ID 以外，店家列可能屬於別的帳號）。
 const seedAccountsSQL = `SELECT DISTINCT account_id FROM seller.stores WHERE store_id = ANY($1) ORDER BY 1`
 
-// effectiveLines 列出種子帳號（種子的帳號加種子店家在資料庫裡所屬的帳號）此刻生效中的措施（停權與終止合作），以 stint.EffectiveMany——
-// 「生效中」的定義只有 EffectiveMeasures 一處——判斷，已結束與預定生效的不算。
 func effectiveLines(ctx context.Context, conn db.DBTX, storeIDs, seedAccounts []int64, now time.Time) ([]string, error) {
 	owned, err := lines(ctx, conn, seedAccountsSQL, func(rows scanner) (string, error) {
 		var id int64
@@ -233,12 +194,6 @@ func effectiveLines(ctx context.Context, conn db.DBTX, storeIDs, seedAccounts []
 	return out, nil
 }
 
-// 混合的主管機關來函：碰到種子店家（或其帳號）的來函，同時還有非種子的資料依附在它上面——不碰種子的對象、非種子店家的措施
-// （source_authority_order_id）或非種子店家認定的引用（finding_authority_orders）。種子只能整份刪來函（對象位置必須連續），
-// 刪它會連帶刪掉非種子的對象與延長歷史、並撞上措施與認定的外鍵；種子不擁有這些資料，所以拒絕並列出來函 id（同停權措施的做法）。
-// 「碰到種子」與 clearChildrenSQL 的刪除條件是同一個謂詞。「非種子」與 clearChildrenSQL 擁有的範圍一致，以店家為單位：措施、認定與指名店家的對象
-// 看 store_id 是不是種子店家（種子帳號較早關閉的 stint 不是種子店家，它的資料不歸種子）；不指定店家的對象（store_id 為 NULL）沒有店家可看，
-// 看帳號是不是種子帳號。（$1 種子 store_id。）
 const mixedOrdersSQL = `
 WITH touching AS (
     SELECT DISTINCT order_id FROM seller.authority_order_targets
@@ -262,8 +217,6 @@ func (s *Service) Check(ctx context.Context, stores []Store, seedAccountIDs []in
 	return check(ctx, s.d.DB.Conn(ctx), stores, seedAccountIDs, s.d.Now().UTC())
 }
 
-// seedAccountIDs 是種子的全部帳號（含沒有種子店家的買家帳號）：它們名下種子以外的未關閉店家與生效中的措施同樣擋下，
-// 因為 01-account.sql 以固定 ID 寫這些帳號、種子的帳號不能擁有種子不管的店。種子店家的擁有者必須在其中。
 func check(ctx context.Context, conn db.DBTX, stores []Store, seedAccountIDs []int64, now time.Time) error {
 	if err := validate(stores); err != nil {
 		return err
@@ -419,7 +372,6 @@ func (s *Service) Seed(ctx context.Context, stores []Store, seedAccountIDs []int
 	})
 }
 
-// snapshots 回傳每家店的 profile 快照（lockStoresSQL 同時鎖住那些列）。
 func snapshots(ctx context.Context, conn db.DBTX, query string, ids []int64) (map[int64]string, error) {
 	rows, err := conn.Query(ctx, query, ids)
 	if err != nil {
@@ -438,7 +390,6 @@ func snapshots(ctx context.Context, conn db.DBTX, query string, ids []int64) (ma
 	return out, rows.Err()
 }
 
-// lockApplications 鎖住種子店家的申請列（呼叫方已鎖住店家列）。
 func lockApplications(ctx context.Context, conn db.DBTX, ids []int64) error {
 	rows, err := conn.Query(ctx, lockApplicationsSQL, ids)
 	if err != nil {
@@ -448,8 +399,6 @@ func lockApplications(ctx context.Context, conn db.DBTX, ids []int64) error {
 	return rows.Err()
 }
 
-// retireDocuments 在刪除之前，把種子店家的 KYC 證件的 media 資產 MarkDeleted（與關店的個資清理同一個呼叫）。治理佐證的資產不動：佐證沒有刪除路徑，
-// 種子只刪業務列，不刪資產。
 func (s *Service) retireDocuments(ctx context.Context, conn db.DBTX, ids []int64) error {
 	rows, err := conn.Query(ctx, documentAssetsSQL, ids)
 	if err != nil {
@@ -477,8 +426,6 @@ func (s *Service) retireDocuments(ctx context.Context, conn db.DBTX, ids []int64
 	return nil
 }
 
-// publishProfileChanges 對 profile 在還原之後與之前不同的店家（新建的列沒有「之前」，也算）發 StoreProfileChanged 並排入快取失效：
-// 與 profile.Service.changed 同一組呼叫，同一個 transaction。
 func (s *Service) publishProfileChanges(ctx context.Context, conn db.DBTX, q *store.Queries, stores []Store, ids []int64, before map[int64]string, now time.Time) error {
 	after, err := snapshots(ctx, conn, profileSnapshotSQL, ids)
 	if err != nil {

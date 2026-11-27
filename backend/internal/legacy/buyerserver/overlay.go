@@ -18,14 +18,11 @@ func positiveID(raw string) (int64, bool) {
 	return id, true
 }
 
-// parsedID 是呼叫者送來的一個商品 ID：raw 是原字串（回應以它為 key，大寫輸入也對得上），id 是解析後的 UUID。
 type parsedID struct {
 	raw string
 	id  uuid.UUID
 }
 
-// 商品 ID 已是 UUID（catalog）。舊的 Java 商品服務在切換前仍用整數商品 ID：它們不可能是任何收藏或補貨訂閱的主鍵，所以
-// 不是 UUID 的 ID 一律當作沒有收藏、沒有訂閱，不當成格式錯誤（否則舊 gateway 的商品疊加會整批失敗）。
 func parseUUIDs(raw []string) []parsedID {
 	parsed := make([]parsedID, 0, len(raw))
 	for _, value := range raw {
@@ -36,7 +33,6 @@ func parseUUIDs(raw []string) []parsedID {
 	return parsed
 }
 
-// distinct 回傳解析後不重複的 UUID（大小寫不同的同一個 ID 只問一次）。
 func distinct(parsed []parsedID) []uuid.UUID {
 	seen := make(map[uuid.UUID]bool, len(parsed))
 	ids := make([]uuid.UUID, 0, len(parsed))

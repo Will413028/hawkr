@@ -11,18 +11,6 @@ import (
 	"testing"
 )
 
-// ---------------------------------------------------------------------------
-// M30 的值域必須涵蓋每一個真的會被呼叫的組合
-//
-// 🔴 `observeEventDropped` 對值域外的組合**直接 return**（刻意不造新序列）。那是
-// fail-open：新增一個 consumer、呼叫它、忘了把 event_type 加進 eventDroppedTypes
-// ⇒ 那一整類「事件連 DB 列都沒有」的失效**不會被計數**，而 M30 正是它唯一的觀測點
-// （inbox 沒有列、DLQ 是 0、M8 的基準是「有那一列」）。
-// 症狀是：/metrics 上永遠看不到，dashboard 一切正常。
-//
-// 這一支把「呼叫點」與「值域宣告」兩份材料對帳。兩份都從**原始碼**讀，不從執行期
-// 讀：執行期只看得到被跑過的那些路徑，而沒被跑過的呼叫點正是問題所在。
-// ---------------------------------------------------------------------------
 
 // TestEventDroppedDomainCoversEveryCallSite 是上面那段的機械保證。
 func TestEventDroppedDomainCoversEveryCallSite(t *testing.T) {
@@ -50,7 +38,6 @@ func TestEventDroppedDomainCoversEveryCallSite(t *testing.T) {
 func TestEventDroppedDomainScannerHasDiscriminatingPower(t *testing.T) {
 	callTypes, callReasons := observeEventDroppedCallSites(t)
 
-	// ① 掃描器必須真的認得出本波新增的那一個（不是掃到空集合而恆綠）。
 	for _, want := range []string{"EventTypeOrderCancelled", "EventTypeOrderPaid", "EventTypeOrderRefundFinalized"} {
 		if !callTypes[want] {
 			t.Errorf("掃描器沒找到 observeEventDropped(%s, ...) 的呼叫點", want)
@@ -60,9 +47,6 @@ func TestEventDroppedDomainScannerHasDiscriminatingPower(t *testing.T) {
 		t.Error("掃描器沒找到 reason=empty_buyer_id 的呼叫點 —— 它是 #2904 新增的那一個")
 	}
 
-	// ② 餵一個「呼叫點用了一個沒宣告的值」的來源，掃描器必須讓對帳失敗。
-	//    這裡直接對 assertSetsEqual 餵反例，證明比對本身有鑑別力
-	//    （而不是「兩個空集合相等」那種假綠）。
 	sub := &testing.T{}
 	assertSetsEqual(sub, "event_type",
 		map[string]bool{"EventTypeOrderPaid": true, "EventTypeGhost": true},
@@ -73,19 +57,10 @@ func TestEventDroppedDomainScannerHasDiscriminatingPower(t *testing.T) {
 	}
 }
 
-// observeEventDroppedCallSites 掃本 package 的非測試檔，收集每一個
-// observeEventDropped(arg0, arg1) 的 arg0 選擇子名與 arg1 字串字面值。
-//
-// arg0 的形狀固定是 `string(pkgmq.EventTypeXxx)` ⇒ 取最內層的 Sel 名。刻意**不解析
-// 常數的值**：值要對到 pkgmq 得再引入一份對照，而那份對照又會是手寫的
-// ——本 skill 要防的就是「手寫材料自己跟自己對」。比對識別字本身是純原始碼對原始碼。
 func observeEventDroppedCallSites(t *testing.T) (types, reasons map[string]bool) {
 	t.Helper()
 	types, reasons = map[string]bool{}, map[string]bool{}
 
-	// 不用 parser.ParseDir：Go 1.25 起 deprecated，且它不看 build tag ——
-	// 對「哪些檔屬於這個 package」的判定不精確，而本掃描的鑑別力正好建立在
-	// 「掃到全部生產檔」上。改成自己列檔，掃不到任何檔就 Fatal（fail-closed）。
 	fset := token.NewFileSet()
 	entries, err := os.ReadDir(".")
 	if err != nil {
@@ -133,7 +108,6 @@ func observeEventDroppedCallSites(t *testing.T) (types, reasons map[string]bool)
 	return types, reasons
 }
 
-// innermostSelector 從 `string(pkgmq.EventTypeOrderPaid)` 取出 `EventTypeOrderPaid`。
 func innermostSelector(e ast.Expr) string {
 	for {
 		switch v := e.(type) {
@@ -152,8 +126,6 @@ func innermostSelector(e ast.Expr) string {
 	}
 }
 
-// identsInSliceLiteral 讀 metrics.go 裡某個 []string 變數的元素，回傳每個元素最內層的
-// 選擇子名（元素形狀是 `string(pkgmq.EventTypeXxx)`）。
 func identsInSliceLiteral(t *testing.T, varName string) map[string]bool {
 	t.Helper()
 	out := map[string]bool{}
@@ -168,7 +140,6 @@ func identsInSliceLiteral(t *testing.T, varName string) map[string]bool {
 	return out
 }
 
-// stringsInSliceLiteral 同上，但元素是字串字面值。
 func stringsInSliceLiteral(t *testing.T, varName string) map[string]bool {
 	t.Helper()
 	out := map[string]bool{}

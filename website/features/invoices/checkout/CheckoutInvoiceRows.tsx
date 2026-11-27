@@ -47,23 +47,11 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
  *      記憶體快取。
  */
 export function CheckoutInvoiceRows({ orderNo }: { orderNo: string }) {
-	// 刻意不取 `error`：5xx 與網路失敗在這一頁的處置與「還沒查到」完全相同
-	// （不渲染），拿到手上反而會誘使人在這裡加一段錯誤訊息。
 	const { invoice, loading, notFound } = useOrderInvoice(orderNo);
 
-	// 9301：這筆訂單沒有發票（零元訂單天天都有），或不是你的訂單。整段不渲染。
 	if (notFound) return null;
 
 	if (!invoice) {
-		// 查詢中：值顯示 `—` 而不是 skeleton（既有付款頁 loading 就是顯示字串，且
-		// 資訊卡列高固定）。
-		//
-		// ⚠️ **只佔位「發票處理狀態」這一列**，刻意偏離 58A §B03「三列 value 顯示
-		// `—`」的字面。理由是那句話自己給的：佔位的目的是「不會跳動」。而另外兩列
-		// 在資料到手後都可能整列不渲染（載具在端點 8 只能從 `documents[]` 取，付款
-		// 完成當下多半是空的；通知信箱為空代表還沒寄成功）⇒ 照字面先畫三列，結果
-		// 必然是三列縮成一列，正是那句話要避免的事。只有這一列在 ready 態一定在，
-		// 佔位它才真的守住了不跳動。
 		if (loading) {
 			return (
 				<Row label={T.fieldState}>
@@ -71,7 +59,6 @@ export function CheckoutInvoiceRows({ orderNo }: { orderNo: string }) {
 				</Row>
 			);
 		}
-		// 5xx／網路失敗與「還沒開始查」都走這裡：不渲染，不報錯。
 		return null;
 	}
 
@@ -88,9 +75,7 @@ export function CheckoutInvoiceRows({ orderNo }: { orderNo: string }) {
 					{notice}
 				</span>
 			</Row>
-			{/* 端點 8 沒有訂單層級的載具欄位，唯一來源是 documents[].carrierSummary，
-			    而付款完成當下 documents 多半是空的 ⇒ 取不到就整列不渲染，而不是印一個
-			    猜出來的「無載具」——那會讓有載具的買家以為自己的載具沒帶上。 */}
+
 			{carrier ? (
 				<Row label={T.fieldCarrier}>
 					<MaskedValue
@@ -100,7 +85,7 @@ export function CheckoutInvoiceRows({ orderNo }: { orderNo: string }) {
 					/>
 				</Row>
 			) : null}
-			{/* 為空代表通知還沒寄成功 ⇒ 那一列整列不渲染。 */}
+
 			{invoice.notifiedEmailMasked ? (
 				<Row label={T.fieldNotifiedEmail}>
 					<MaskedValue

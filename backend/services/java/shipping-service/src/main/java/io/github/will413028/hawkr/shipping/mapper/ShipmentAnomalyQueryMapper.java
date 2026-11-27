@@ -166,7 +166,6 @@ public interface ShipmentAnomalyQueryMapper {
                     + "  WHEN a.anomaly_type IN (" + SEVERITY_HIGH_TYPES + ") THEN 'HIGH'\n"
                     + "  WHEN a.anomaly_type IN (" + SEVERITY_MEDIUM_TYPES + ") THEN 'MEDIUM'\n"
                     + "  WHEN a.anomaly_type IN (" + SEVERITY_LOW_TYPES + ") THEN 'LOW'\n"
-                    // fail-closed：不可達；可達即代表 enum 新增後沒同步本片段。
                     + "  ELSE 'HIGH'\n"
                     + "END\n";
 
@@ -187,7 +186,6 @@ public interface ShipmentAnomalyQueryMapper {
             "FROM abnormal_shipments a",
             "LEFT JOIN shipment_anomaly_acknowledgments ack",
             "       ON ack.shipment_id = a.id AND ack.anomaly_type = a.anomaly_type",
-            // issue #1327：賣家 dashboard 只看賣家自己的 ack，看不到 admin 標記
             "      AND ack.actor_type = 'SELLER'",
             "WHERE a.anomaly_type IS NOT NULL",
             "  <if test='anomalyType != null and anomalyType != \"\"'>",
@@ -223,7 +221,7 @@ public interface ShipmentAnomalyQueryMapper {
             "FROM abnormal_shipments a",
             "LEFT JOIN shipment_anomaly_acknowledgments ack",
             "       ON ack.shipment_id = a.id AND ack.anomaly_type = a.anomaly_type",
-            "      AND ack.actor_type = 'SELLER'",  // issue #1327：賣家端只計自己的 ack
+            "      AND ack.actor_type = 'SELLER'",
             "WHERE a.anomaly_type IS NOT NULL",
             "  <if test='anomalyType != null and anomalyType != \"\"'>",
             "    AND a.anomaly_type = #{anomalyType}",
@@ -254,7 +252,7 @@ public interface ShipmentAnomalyQueryMapper {
             "FROM abnormal_shipments a",
             "LEFT JOIN shipment_anomaly_acknowledgments ack",
             "       ON ack.shipment_id = a.id AND ack.anomaly_type = a.anomaly_type",
-            "      AND ack.actor_type = 'SELLER'",  // issue #1327：賣家統計只看自己的 ack
+            "      AND ack.actor_type = 'SELLER'",
             "WHERE a.anomaly_type IS NOT NULL",
             "  AND ack.id IS NULL",
             "GROUP BY a.anomaly_type",
@@ -274,8 +272,6 @@ public interface ShipmentAnomalyQueryMapper {
             "      AND s.store_id = #{sellerId}",
             "    </if>",
             ")",
-            // issue #1327：ack 拆兩路 LEFT JOIN 揭露雙 actor 處置狀態。
-            // ack_action/acted_at = admin 端處置（aa）；seller_ack_action/seller_acted_at = 賣家端處置（sa，唯讀揭露）
             "SELECT a.id AS shipment_id, a.order_no, a.store_id, a.shipment_status,",
             "       a.shipping_method, a.anomaly_type,", CASE_SEVERITY, "AS severity,",
             "       a.updated_at AS detected_at,",
@@ -294,7 +290,7 @@ public interface ShipmentAnomalyQueryMapper {
             "    AND (", CASE_SEVERITY, ") = #{severity}",
             "  </if>",
             "  <if test='!showAcknowledged'>",
-            "    AND aa.id IS NULL",  // 預設隱藏 admin 已處置者
+            "    AND aa.id IS NULL",
             "  </if>",
             "ORDER BY a.updated_at DESC",
             "LIMIT #{limit} OFFSET #{offset}",
@@ -327,7 +323,7 @@ public interface ShipmentAnomalyQueryMapper {
             "    AND (", CASE_SEVERITY, ") = #{severity}",
             "  </if>",
             "  <if test='!showAcknowledged'>",
-            "    AND aa.id IS NULL",  // 預設隱藏 admin 已處置者
+            "    AND aa.id IS NULL",
             "  </if>",
             "</script>"})
     long countAdminAnomalies(@Param("sellerId") Long sellerId,

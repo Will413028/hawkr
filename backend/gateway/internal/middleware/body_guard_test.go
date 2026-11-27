@@ -12,10 +12,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// deadlineTrackingResponseWriter records every SetReadDeadline call so tests
-// can assert BodyGuard sets the read deadline. httptest.NewRecorder() doesn't
-// itself support deadlines, so this fake embeds it and adds just the method
-// BodyGuard needs.
 type deadlineTrackingResponseWriter struct {
 	http.ResponseWriter
 	deadlines []time.Time
@@ -36,7 +32,7 @@ func TestBodyGuard_RejectsOversizedContentLength(t *testing.T) {
 		c.Status(http.StatusOK)
 	})
 
-	body := strings.NewReader(strings.Repeat("a", 3<<20)) // 3MiB > 2MiB default
+	body := strings.NewReader(strings.Repeat("a", 3<<20))
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/app/whatever", body)
 	req.ContentLength = 3 << 20
 	w := httptest.NewRecorder()
@@ -68,9 +64,6 @@ func TestBodyGuard_AllowsWithinDefaultLimit(t *testing.T) {
 }
 
 func TestBodyGuard_RejectsChunkedOversizeWithoutContentLength(t *testing.T) {
-	// ContentLength == -1 (chunked / unknown) must still be capped once the
-	// handler actually reads past the limit — this is what http.MaxBytesReader
-	// guards, independent of the upfront ContentLength fast-path.
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(middleware.BodyGuard())
@@ -86,7 +79,7 @@ func TestBodyGuard_RejectsChunkedOversizeWithoutContentLength(t *testing.T) {
 
 	body := strings.NewReader(strings.Repeat("a", 3<<20))
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/app/whatever", body)
-	req.ContentLength = -1 // simulate chunked transfer, no upfront size known
+	req.ContentLength = -1
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -151,9 +144,6 @@ func TestBodyGuard_SkipsReadDeadlineForBodylessRequest(t *testing.T) {
 }
 
 func TestBodyGuard_StillSetsReadDeadlineForChunkedBody(t *testing.T) {
-	// ContentLength == -1 (chunked/unknown) DOES have a body on the wire —
-	// only ContentLength == 0 (genuinely nothing to read) should skip the
-	// deadline.
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(middleware.BodyGuard())

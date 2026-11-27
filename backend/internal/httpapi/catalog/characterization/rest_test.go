@@ -12,10 +12,6 @@ import (
 	ch "github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
 )
 
-// restDriver 以舊 gateway 的 REST API（統一 envelope）操作舊的 Java product-service：路徑與 wire 型別照
-// gateway/internal/handler 的 product.go、seller_product.go、search.go、hashtag.go、category.go、admin_product.go，
-// r.rest.Do 送出請求並以 ch.RESTKind 分類錯誤。Java 的業務錯誤是 HTTP 200 加 envelope code，先在
-// restBusinessKind 對應。product-service 刪除時一起刪除。
 type restDriver struct {
 	rest ch.REST
 }
@@ -26,7 +22,6 @@ func newRESTDriver(base string, tokens map[ch.Caller]string, client *http.Client
 	return &restDriver{rest: ch.REST{Base: base, Tokens: tokens, HTTP: client, Business: restBusinessKind}}
 }
 
-// restBusinessKind 對應 GrpcResponseCode 裡 product-service 用到的業務碼。
 func restBusinessKind(code int32) error {
 	switch code {
 	case 4002:
@@ -57,7 +52,6 @@ const (
 	listPageSize   = "100"
 )
 
-// statusWire 是 CodeMeta 的商品狀態（4001 草稿、4003 未啟用、4004 啟用）；4002 審核中不在新的生命週期裡（D16）。
 var statusWire = map[Status]string{StatusDraft: "4001", StatusArchived: "4003", StatusActive: "4004"}
 
 func statusFromWire(wire string) Status {
@@ -74,7 +68,6 @@ type wireHashtag struct {
 	ProductCount string `json:"productCount"`
 }
 
-// wireProduct 是詳情（ProductDetailItem）與列表項（SellerProductItem、ProductItem、ProductHitData）共同用到的欄位。
 type wireProduct struct {
 	ID          string        `json:"id"`
 	Name        string        `json:"name"`
@@ -93,7 +86,6 @@ type wireSku struct {
 	ID string `json:"id"`
 }
 
-// numReader 讀數字字串；空字串是 0，其餘解析失敗記下第一個錯誤。
 type numReader struct{ err error }
 
 func (r *numReader) int(s string) int64 {
@@ -179,7 +171,6 @@ func (d *restDriver) Categories(ctx context.Context, c ch.Caller) ([]Category, e
 		}
 	}
 	walk(tree)
-	// 樹可能以平的清單回（子節點只帶 parentId、沒有 children），葉節點以「沒有別的節點指向它」判斷。
 	parents := map[string]bool{}
 	for _, c := range out {
 		parents[c.ParentID] = true
@@ -190,8 +181,6 @@ func (d *restDriver) Categories(ctx context.Context, c ch.Caller) ([]Category, e
 	return out, nil
 }
 
-// wireSkuInput 是 CreateSkuInput／UpdateSkuInput：重量、單位（CodeMeta WeightUnit 3301）與尺寸是 gateway 的必填，情境不看，送固定值。price 是原價、
-// salePrice 是特價：ListPrice 有值時 price 送 ListPrice、salePrice 送 Price。
 type wireSkuInput struct {
 	ID        string `json:"id,omitempty"`
 	SkuName   string `json:"skuName"`

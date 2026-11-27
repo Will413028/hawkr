@@ -105,7 +105,6 @@ test("「未上架」卡不得被 delegated 守衛擋在賣家側之外", () => 
 });
 
 test("掃描器認得出守衛：「庫存預警」確實只在賣家側渲染", () => {
-	// 這支不是在守庫存預警，是在守上面那支的鑑別力：守衛偵測若失效，上面會靜默轉綠。
 	const region = statsRegion(source(PRODUCTS));
 	const at = region.indexOf('label="庫存預警"');
 	assert.ok(at !== -1, "摘要列裡找不到庫存預警那張卡");
@@ -166,8 +165,6 @@ test("五張卡在桌面維持五欄，手機則採用訂單同款緊湊單列",
 		css.slice(variant, variant + 160),
 		/grid-template-columns:\s*repeat\(5, minmax\(0, 1fr\)\);/,
 	);
-	// 桌面變體先被 ≤1100px 的兩欄規則覆蓋；≤960px 再由 opt-in
-	// 水平滑軌接手。三段順序不能顛倒，否則窄螢幕會被扳回五欄或兩欄。
 	const narrow = css.search(
 		/@media \(max-width: 1100px\) \{\s*\.seller-inventory__stats \{/,
 	);

@@ -58,14 +58,11 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
       }
     }
 
-    // 列表 summary.status 推進（例如 30→40）時 detail 也要重抓，否則
-    // 「退貨物流進度」會卡在 step=2（已送達），即使賣家剛按完確認收貨。
     useEffect(() {
       load();
       return null;
     }, [summary.caseNo, summary.status]);
 
-    // 本案件狀態變更（或伺服器要求全部重讀）自動刷新
     ref.listen(afterSaleStatusStreamProvider, (_, next) {
       next.whenData((event) {
         final current = detail.value ?? summary;
@@ -121,7 +118,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     );
   }
 
-  // ─── 摘要區（不依賴詳情 API） ─────────────────────
 
   Widget _buildHeader() {
     return Row(
@@ -145,13 +141,9 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
   }
 
   Widget _buildSummaryCard() {
-    // 物流相關狀態（25/26/27/28）優先顯示 PayUni 原始訊息（providerMessage），
-    // 無則 fallback 通用文案 — 與正向訂單卡 shipStatusDesc pattern 一致。
-    // 非物流狀態（0/20/30/31/32/40/50/60）沒有 PayUni 互動，維持業務文案。
     final providerMsg = summary.providerMessage.trim();
     String fallback(String f) => providerMsg.isNotEmpty ? providerMsg : f;
 
-    // 申訴 / 平台仲裁中覆寫文案（賣家無法自行處理，由平台裁決），優先於 status 文案。
     final underAppeal = AfterSaleStatus.isUnderAppeal(summary.appealState);
     final statusDesc = underAppeal
         ? '案件已進入平台申訴，等待平台裁決'
@@ -233,7 +225,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     );
   }
 
-  // ─── 詳情區（detail API 載入完成後渲染） ────────────
 
   Widget _buildDetailContent(BuildContext context, AfterSaleCase c) {
     final shipTradeNo = _text(c.shipTradeNo);
@@ -350,7 +341,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
         children: [
           _cardHeader(HkIconName.document, '申請資訊'),
           SizedBox(height: 8.h),
-          // 退貨原因用 pill 徽章（淺橘底 + 橘字，對齊截圖「冷凍」標籤）
           Row(
             children: [
               Text(
@@ -382,7 +372,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
             style: AppTypography.meta.copyWith(color: AppColors.textSecondary),
           ),
           SizedBox(height: 4.h),
-          // 說明內容用灰底圓角 block，與截圖中的單號 block 一致
           Container(
             width: double.infinity,
             padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
@@ -518,18 +507,12 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
   }
 
   Widget _buildReturnShipmentSection(BuildContext context, AfterSaleCase c) {
-    // 退貨單號欄位依退貨方式**明確分派**；未知 / 本版未支援者用中性 label，
-    // 不得沿用「退貨物流單」（黑貓語意）或「7-11 退貨代碼」。
     final returnShipping = shippingPresentationOf(c.returnShippingMethod);
     final shipTradeNo = _text(c.shipTradeNo);
     final returnShipmentNo = _text(c.returnShipmentNo);
     final providerStatus = _text(c.providerStatus);
     final providerMessage = _text(c.providerMessage);
 
-    // CVS（7-11）流程：「7-11 退貨代碼」必須是 RS 短碼（returnShipmentNo），
-    // 跟買家 ibon 看到的同一組；後端的 shipTradeNo 是 carrier 內部單號（S001…）
-    // 用法不同，不能拿來當 7-11 代碼秀給賣家。
-    // 黑貓宅配：carrier 單號就是賣家追蹤用的「退貨物流單」，用 shipTradeNo。
     final (primaryNo, primaryLabel) = switch (returnShipping) {
       ShippingPresentation.cvsStorePickup => (returnShipmentNo, '7-11 退貨代碼'),
       ShippingPresentation.homeDelivery => (
@@ -541,7 +524,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
         '退貨單號',
       ),
     };
-    // CVS 場景額外秀 carrier 物流單號（給後台對 carrier 系統用）
     final showSecondaryTradeNo =
         returnShipping == ShippingPresentation.cvsStorePickup &&
         shipTradeNo.isNotEmpty &&
@@ -665,11 +647,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
   ) {
     final code = _text(c.providerStatus);
 
-    // ── 退款任務已建立 → 視同「驗貨完成」(step=3) ──────────
-    // 賣家按下「確認收貨」後，後端先建立 refund task（refundTaskStatus 寫入），
-    // 再非同步推進 case.status 到 40。在 status 還沒推進的這段空窗，
-    // refundTaskStatus 是「已確認收貨」最早的觀測點 — 用來避免 timeline 卡在
-    // step=2 已送達。
     final refundTaskStatus = _text(c.refundTaskStatus);
     final refundStatus = refundTaskStatus.toUpperCase();
     final refundFailureMessage = _text(c.refundFailureMessage);
@@ -692,8 +669,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
       };
       return _ReturnLogisticsStatus(step: 3, title: '驗貨完成', message: msg);
     }
-    // 31 / 32：系統自動完成（與 closed/refundProcessing 並列為 step=3 已完成）
-    // status label 由 CodeMeta lookup（「超商待取逾時自動完成」/「確認收貨逾時自動完成」）
     if (AfterSaleStatus.isAutoCompleted(c.status)) {
       return _ReturnLogisticsStatus(
         step: 3,
@@ -709,78 +684,72 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
       );
     }
 
-    // ── 以 providerStatus code 直接對應 step + 寫清楚的訊息 ─────
-    // 對齊 CodeMeta ShippingStatus；carrier 原文不直接 echo（避免「退貨已取件」
-    // 在 31 配送中 出現時被賣家誤判已可取件）。
     switch (code) {
-      // 在途 — step 1
-      case ReturnShipmentStatus.logisticsCheck: // 22 物流驗收中
+      case ReturnShipmentStatus.logisticsCheck:
         return const _ReturnLogisticsStatus(
           step: 1,
           title: '物流驗收中',
           message: '物流中心驗收退貨包裹中',
         );
-      case ReturnShipmentStatus.inTransit: // 31 配送中
+      case ReturnShipmentStatus.inTransit:
         return const _ReturnLogisticsStatus(
           step: 1,
           title: '配送中',
           message: '物流商已從超商收件，運送中',
         );
-      case ReturnShipmentStatus.returnGeneral: // 51 一般退貨
-      case ReturnShipmentStatus.returnByHomeDelivery: // 56 已轉宅配退回
-      case ReturnShipmentStatus.tcatCalled: // 210 已叫件
+      case ReturnShipmentStatus.returnGeneral:
+      case ReturnShipmentStatus.returnByHomeDelivery:
+      case ReturnShipmentStatus.tcatCalled:
         return const _ReturnLogisticsStatus(
           step: 1,
           title: '退貨運送中',
           message: '退貨包裹運送中',
         );
-      case ReturnShipmentStatus.returnToWarehouse: // 53 廠退
+      case ReturnShipmentStatus.returnToWarehouse:
         return const _ReturnLogisticsStatus(
           step: 1,
           title: '退回物流中心',
           message: '退貨包裹回到物流中心，將續轉至您的取件門市',
         );
 
-      // 已送達 — step 2
-      case ReturnShipmentStatus.awaitingPickup: // 32 待取貨
+      case ReturnShipmentStatus.awaitingPickup:
         return const _ReturnLogisticsStatus(
           step: 2,
           title: '已送達',
           message: '退貨包裹已送達您的取件超商，請盡快前往取件',
         );
-      case ReturnShipmentStatus.pickedUp: // 11 已取貨
+      case ReturnShipmentStatus.pickedUp:
         return const _ReturnLogisticsStatus(
           step: 2,
           title: '已取貨',
           message: '您已取件完成，請確認收貨後觸發退款',
         );
 
-      // 異常 — step 0
-      case ReturnShipmentStatus.abnormal: // 33
+      case ReturnShipmentStatus.abnormal:
         return const _ReturnLogisticsStatus(
           step: 0,
           title: '物流異常',
           message: '退貨物流發生異常，請聯絡客服協助處理',
         );
-      case ReturnShipmentStatus.cancelled: // 41
+      case ReturnShipmentStatus.cancelled:
         return const _ReturnLogisticsStatus(
           step: 0,
           title: '物流已取消',
           message: '退貨物流已取消',
         );
-      case ReturnShipmentStatus.packageLost: // 44
+      case ReturnShipmentStatus.packageLost:
         return const _ReturnLogisticsStatus(
           step: 0,
           title: '包裹遺失',
           message: '退貨包裹遺失，請聯絡客服協助處理',
         );
-      case ReturnShipmentStatus.sellerNotPicked: // 55
+      case ReturnShipmentStatus.sellerNotPicked:
         return const _ReturnLogisticsStatus(
           step: 2,
           title: '逾期未取',
           message: '退貨已配達門市但您未在期限內領取，請聯絡客服',
         );
-      case ReturnShipmentStatus.pendingHomeReturn: // 82
+      case ReturnShipmentStatus.pendingHomeReturn:
         return const _ReturnLogisticsStatus(
           step: 1,
           title: '待轉宅配',
@@ -788,9 +757,7 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
         );
     }
 
-    // ── providerStatus 還沒推 / 為空 → 用 case status 推估 ────
     if (c.status == AfterSaleStatus.returnInTransit) {
-      // status=25 但 providerStatus 為空：物流剛拋單，買家還沒去寄
       return const _ReturnLogisticsStatus(
         step: 0,
         title: '等待買家寄回',
@@ -801,7 +768,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     return _ReturnLogisticsStatus(
       step: 0,
       title: '等待買家寄回',
-      // 未知 / 本版未支援的退貨方式不得說成「已建立退貨代碼」（超商語意）。
       message: switch (shippingPresentationOf(c.returnShippingMethod)) {
         ShippingPresentation.homeDelivery => '已建立黑貓退貨物流，等待買家交付退貨商品',
         ShippingPresentation.cvsStorePickup => '已建立退貨代碼，等待買家寄回商品',
@@ -823,10 +789,6 @@ class AfterSaleExpandedSection extends HookConsumerWidget {
     final providerStatus = _text(c.providerStatus);
     final providerMessage = _text(c.providerMessage);
     final label = ShippingStatus.fromValue(providerStatus)?.label;
-    // 後端 providerMessage 經常是「處理中，等待商店寄貨」這種包含 codemeta
-    // label 的字串。原本只比對等號 (providerMessage != label) 漏掉 substring
-    // 的情況，造成「處理中・處理中，等待商店寄貨」這種重複文字。
-    // 改用 contains 判斷：如果 message 已經涵蓋 label，就只顯示 message。
     if (providerMessage.isNotEmpty &&
         label != null &&
         label.isNotEmpty &&
@@ -958,8 +920,6 @@ class _PhotoThumb extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: OptimizedNetworkImage(
-        // objectKey 或後端顯示 URL 皆直接交給 OptimizedNetworkImage，內部走
-        // buildImageUrl（唯一組裝入口）依 reviewPhoto 場景組 URL。
         imageUrl: url,
         scene: ImageScene.reviewPhoto,
         width: size,

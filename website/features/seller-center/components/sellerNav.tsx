@@ -111,10 +111,6 @@ export const SELLER_NAV_GROUPS: NavGroup[] = [
 				label: "錢包與認證",
 				icon: <SellerSidebarIcon name="wallet" />,
 			},
-			// 58 號電子發票（58A §B-2.1 #1）。子路由（稅務身分、發票紀錄）不進側欄
-			// ——`NavItem` 沒有 `children`、shell 也沒有巢狀渲染，做出五層等於新創一種
-			// 側欄互動模式；子節點改為 S01 頁上的卡片入口。`pathMatchesItem` 預設就做
-			// 前綴比對，所有 /invoices/* 子路由會自動高亮，不必設 `matchPrefix`。
 			{
 				href: "/seller-center/invoices",
 				label: "發票與稅籍",

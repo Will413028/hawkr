@@ -319,9 +319,6 @@ export async function POST(request: Request) {
 	}
 	await upstream.body?.cancel().catch(() => undefined);
 
-	// Unlike a browser no-cors request, a server-side response has an observable
-	// status. Only an explicit successful response from the fixed Google Forms
-	// destination is treated as accepted.
 	if (upstream.type === "opaque" || !upstream.ok) {
 		return jsonError(
 			502,

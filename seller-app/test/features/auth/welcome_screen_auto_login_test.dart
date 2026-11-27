@@ -96,7 +96,6 @@ void main() {
         ),
       ),
     );
-    // 讀 storage 與 GetMyStore 的每一步 await 逐幀推進，直到導頁離開載入畫面。
     for (var i = 0; i < 10; i++) {
       await tester.pump(const Duration(milliseconds: 50));
     }
@@ -143,7 +142,6 @@ void main() {
     await tester.pumpWidget(shell(const WelcomeScreen()));
     await tester.pump();
 
-    // 自動登入卡在 initialize()；此時卸載 WelcomeScreen，模擬恢復完成前已導頁離開。
     await tester.pumpWidget(shell(const SizedBox.shrink()));
 
     initGate.complete();

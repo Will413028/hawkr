@@ -47,9 +47,6 @@ const (
 	peerAppKey = "peer-e2e-app-key"
 )
 
-// ---------------------------------------------------------------------------
-// 對端替身：真的 gRPC server，跑在 bufconn 上
-// ---------------------------------------------------------------------------
 
 type peerOrderServer struct {
 	orderpb.UnimplementedOrderServiceServer
@@ -117,9 +114,6 @@ func newPeerAmego(t *testing.T) *peerAmego {
 	return f
 }
 
-// ---------------------------------------------------------------------------
-// 環境
-// ---------------------------------------------------------------------------
 
 type peerEnv struct {
 	pool     *pgxpool.Pool
@@ -135,8 +129,6 @@ type peerEnv struct {
 	issuerID int64
 }
 
-// peerSnapshot 是 ORD 回的快照：EXPLICIT_PREFERENCE 指向一列**真的**落庫的
-// buyer_invoice_preferences（DONATION kind ⇒ 值是明文欄位，不需要解密路徑）。
 func peerSnapshot(orderNo string, prefID int64) *orderpb.OrderInvoiceSnapshotData {
 	return &orderpb.OrderInvoiceSnapshotData{
 		OrderNo:                  orderNo,
@@ -157,8 +149,6 @@ func peerSnapshot(orderNo string, prefID int64) *orderpb.OrderInvoiceSnapshotDat
 	}
 }
 
-// setupPeerE2E 起一套完整環境。prefOwner 決定那列常用發票資料屬於誰——
-// 傳 env.buyerID ＝ 歸屬正確；傳別人 ＝ I-47 的攻擊形狀。
 func setupPeerE2E(t *testing.T, prefOwner func(buyerID int64) int64) *peerEnv {
 	t.Helper()
 	ctx := context.Background()
@@ -216,8 +206,6 @@ func setupPeerE2E(t *testing.T, prefOwner func(buyerID int64) int64) *peerEnv {
 		t.Fatalf("activate provider account: %v", err)
 	}
 
-	// 🔴 一列**真的** buyer_invoice_preferences：歸屬驗證用的是它的 buyer_id 欄，
-	// 而述詞寫在 GetBuyerInvoicePreferenceByID 的 SQL 裡（不是查回來再比對）。
 	if _, err := pool.Exec(ctx,
 		`INSERT INTO buyer_invoice_preferences (id, buyer_id, preference_kind, donation_code, is_default)
 		 VALUES ($1,$2,'DONATION','9527',false)`, prefID, prefOwner(buyerID)); err != nil {
@@ -259,9 +247,6 @@ func setupPeerE2E(t *testing.T, prefOwner func(buyerID int64) int64) *peerEnv {
 		nil,
 	)
 
-	// 🔴 真的 peer client：走 bufconn 上的真 gRPC server，且 preference reader 是
-	// **真的 repository**（PartialPreferenceReader 只在 GetDefault／解密兩支上 fail-loud，
-	// GetByID ＝ I-47 的歸屬述詞走的是真 SQL）。
 	ordSrv := &peerOrderServer{resp: &orderpb.GetOrderInvoiceSnapshotInternalResponse{
 		Code: 0, Message: "success", Data: peerSnapshot(orderNo, prefID),
 	}}
@@ -304,7 +289,6 @@ func peerPaidBody(t *testing.T, env *peerEnv, eventID string) []byte {
 		"buyer_id":            env.buyerID,
 		"store_id":            env.storeID,
 		"total_actual_amount": 300,
-		// C1 的格式：LocalDateTime.toString()，無 Z、無時區（§6.3.2.2 陷阱表第 1 列）。
 		"occurred_at": time.Now().UTC().Format("2006-01-02T15:04:05.999999999"),
 	})
 	if err != nil {
@@ -322,13 +306,10 @@ func peerCount(t *testing.T, env *peerEnv, q string, args ...any) int {
 	return n
 }
 
-// ---------------------------------------------------------------------------
-// ① happy path：order.paid → 真 ORD／PAY client → ISSUED → outbox 派送
-// ---------------------------------------------------------------------------
 
 func TestIntegration_PeerClients_PaidToOutbox(t *testing.T) {
 	ctx := context.Background()
-	env := setupPeerE2E(t, func(buyerID int64) int64 { return buyerID }) // 歸屬正確
+	env := setupPeerE2E(t, func(buyerID int64) int64 { return buyerID })
 
 	if err := env.paid.Handle(ctx, "order.paid", peerPaidBody(t, env, "peer-evt-1")); err != nil {
 		t.Fatalf("order.paid handle: %v", err)
@@ -351,16 +332,12 @@ func TestIntegration_PeerClients_PaidToOutbox(t *testing.T) {
 		opStatus != codemeta.InvoiceOperationStatusReady.Value {
 		t.Fatalf("consumer 落點錯：doc=%s op=%s", docStatus, opStatus)
 	}
-	// 🔴 金額真的過了一趟 string → int64。它是 mutation ① 的偵測器：
-	// ORD client 若在下游出錯時回零值 ＋ nil error，這裡會是 0。
 	if totalAmount != 300 {
 		t.Fatalf("total_amount = %d，want 300（品項 3 × 100，全部走 proto 的數字字串）", totalAmount)
 	}
-	// 載具解析真的發生了：捐贈碼來自那列 buyer_invoice_preferences，不在 proto 裡。
 	if donation != "9527" {
 		t.Fatalf("donation_code = %q，want 9527（載具解析沒有被插進 ORD adapter）", donation)
 	}
-	// 明細行的 TSID 不得掉精度。
 	var orderItemID int64
 	if err := env.pool.QueryRow(ctx,
 		`SELECT order_item_id FROM invoice_document_lines
@@ -372,7 +349,6 @@ func TestIntegration_PeerClients_PaidToOutbox(t *testing.T) {
 		t.Fatalf("order_item_id = %d，TSID 在某一層掉了精度", orderItemID)
 	}
 
-	// ② INV.op：送 AMEGO → ISSUED
 	if err := env.issue.RunOnce(ctx); err != nil {
 		t.Fatalf("INV.op RunOnce: %v", err)
 	}
@@ -389,7 +365,6 @@ func TestIntegration_PeerClients_PaidToOutbox(t *testing.T) {
 		t.Fatalf("document = %s / %q，want ISSUED / CD87654321", docStatus, invoiceNo)
 	}
 
-	// ③ INV.ob：那一列 outbox 被派送
 	if n := peerCount(t, env, `SELECT count(*) FROM invoice_outbox_events`); n != 1 {
 		t.Fatalf("outbox 列數 = %d，want 1", n)
 	}
@@ -402,13 +377,9 @@ func TestIntegration_PeerClients_PaidToOutbox(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ② I-47：常用發票資料不屬於本訂單的買家 ⇒ AWAITING_MANUAL，不是無載具照常開票
-// ---------------------------------------------------------------------------
 
 func TestIntegration_PeerClients_PreferenceOwnershipMismatch(t *testing.T) {
 	ctx := context.Background()
-	// 那一列屬於別人（buyerID + 1）——這正是 IDOR 的形狀：id 猜得到、擁有者不同。
 	env := setupPeerE2E(t, func(buyerID int64) int64 { return buyerID + 1 })
 
 	if err := env.paid.Handle(ctx, "order.paid", peerPaidBody(t, env, "peer-evt-idor")); err != nil {
@@ -428,9 +399,6 @@ func TestIntegration_PeerClients_PreferenceOwnershipMismatch(t *testing.T) {
 	if manualReason != codemeta.InvoiceManualReasonPreferenceOwnershipMismatch.Value {
 		t.Fatalf("manual_reason_code = %q，want PREFERENCE_OWNERSHIP_MISMATCH", manualReason)
 	}
-	// 🔴 陰性三連：別人的捐贈碼不得外洩、不得建 operation、不得打 AMEGO。
-	// 「fallback 成無載具」的形狀在這裡的表現是 donation="" ＋ status=PENDING，
-	// 上面那一條會先抓到；這裡再釘一次「連值都沒漏出去」。
 	if donation != "" {
 		t.Fatalf("donation_code = %q，別的買家的資料不得寫進這張發票", donation)
 	}
@@ -445,16 +413,10 @@ func TestIntegration_PeerClients_PreferenceOwnershipMismatch(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ③ ORD 回非 0 業務碼（gRPC status 是 OK）⇒ handler 必須 fail-loud，一列都不建
-// ---------------------------------------------------------------------------
 
 func TestIntegration_PeerClients_OrderEnvelopeErrorFailsLoud(t *testing.T) {
 	ctx := context.Background()
 	env := setupPeerE2E(t, func(buyerID int64) int64 { return buyerID })
-	// 🔴 刻意**同時**回一份看起來完整的 data：只有這樣，這支測試才驗得到「client 真的
-	// 讀了 envelope 的 code」。若 data 留空，拿掉 code 檢查之後 handler 仍會因為
-	// snapshot_version=0 撞上 DB 約束而回 error ⇒ 測試照樣綠，鑑別力是假的。
 	env.ordSrv.resp = &orderpb.GetOrderInvoiceSnapshotInternalResponse{
 		Code: 4004, Message: "查無此訂單的發票快照",
 		Data: peerSnapshot(env.orderNo, env.prefID),
@@ -465,11 +427,9 @@ func TestIntegration_PeerClients_OrderEnvelopeErrorFailsLoud(t *testing.T) {
 		t.Fatalf("下游回非 0 業務碼時 handler 必須回 error（→ 重試三次進 DLQ）；" +
 			"回 nil 代表 client 只看了 gRPC status，會拿到一個全零的快照")
 	}
-	// 陰性：一張金額為 0 的發票都不得留下來。
 	if n := peerCount(t, env, `SELECT count(*) FROM invoice_documents`); n != 0 {
 		t.Fatalf("document 列數 = %d，want 0", n)
 	}
-	// inbox 列**要**留著（去重鍵已落庫，重投會走 ON CONFLICT DO NOTHING）。
 	if n := peerCount(t, env, `SELECT count(*) FROM invoice_inbox_events WHERE business_dedup_key = $1`,
 		"ORDER_PAID:"+env.orderNo); n != 1 {
 		t.Fatalf("inbox 列數 = %d，want 1", n)

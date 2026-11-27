@@ -35,8 +35,6 @@ class TextSizeSettingsSheet extends ConsumerWidget {
         ? systemBottomInset
         : HkSpace.xxl;
     return Padding(
-      // The page MediaQuery also reserves space for the floating navbar.
-      // Only the hardware inset belongs inside a modal sheet.
       padding: EdgeInsets.only(bottom: bottomPadding),
       child: SingleChildScrollView(
         key: const ValueKey('text-size-settings-sheet'),

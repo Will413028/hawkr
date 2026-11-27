@@ -67,8 +67,6 @@ class ProductServiceDelegationGuardTest {
     @Test
     @DisplayName("Q4：ACTIVE 商品跨店代行讀取 ⇒ 9275（既有述詞對 ACTIVE 一律放行，靠這一步擋）")
     void getProduct_delegatedCrossStore_denied() {
-        // fixture 刻意完整：拿掉歸屬斷言時這條路徑會一路走到成功回應（那正是漏洞的形狀），
-        // 而不是在半途撞上未 stub 的相依而拋 NPE——後者會讓「轉紅」變成一個假訊號
         ProductEntity e = activeProduct();
         when(productRepository.findById(PID)).thenReturn(Optional.of(e));
         when(productSkuRepository.findByProductId(PID)).thenReturn(List.of());

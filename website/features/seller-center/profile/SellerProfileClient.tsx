@@ -87,23 +87,16 @@ export default function SellerProfileClient() {
 	const identity = useQueryIdentity();
 	const serverStore = serverSelf?.store;
 	const baseline = React.useMemo(() => storeFormOf(serverStore), [serverStore]);
-	// 表單只記使用者改過的欄位，其餘欄位直接顯示伺服器的最新值：版本衝突時使用者的輸入
-	// 原樣保留，沒改的欄位跟著最新版本更新。
 	const [edits, setEdits] = React.useState<Partial<StoreForm>>({});
 	const data: StoreForm = React.useMemo(
 		() => ({ ...baseline, ...edits }),
 		[baseline, edits],
 	);
-	// 寫入帶的 etag：第一次載入的版本，之後只從「自己這一次寫入的回應」或衝突後讀到的
-	// 最新版本更新。背景 refetch（staleTime ＋ refetchOnWindowFocus）回來的版本不能直接
-	// 抄進來，否則別人在這段期間的修改會被當成自己的版本、樂觀鎖從此不會擋。
 	const [etag, setEtag] = React.useState<string | null>(null);
 	const serverEtag = serverStore?.etag;
 	React.useEffect(() => {
 		if (serverEtag && etag === null) setEtag(serverEtag);
 	}, [serverEtag, etag]);
-	// 版本衝突後直接讀一次最新版本取它的 etag：快取可能早已是最新版本（視窗聚焦的
-	// refetch），這時 query 的 etag 不會再變，只靠快取更新會讓每次儲存都繼續衝突。
 	const adoptLatestStore = useVersionConflict({
 		reload: async () => {
 			try {
@@ -130,10 +123,6 @@ export default function SellerProfileClient() {
 		errors: StoreContactErrors;
 	} | null>(null);
 
-	// Login email/phone is page-local — not part of the store.
-	// 代行下不掛：那是**代行者自己**的登入資料（`/app/profile` 走賣家傳輸層，在代行
-	// 執行期會 throw），而且店家的登入 Email／手機是 storefront allow-list 明確排除
-	// 的個資，代行工作區本來就不該顯示它。
 	const accountQuery = useQuery({
 		queryKey: queryKeys.buyer.profile(identity),
 		queryFn: () => fetchProfile({ suppressAuthExpired: true }),
@@ -142,8 +131,6 @@ export default function SellerProfileClient() {
 	const account = accountQuery.data ?? null;
 	const loading = accountQuery.isLoading;
 
-	// Re-render while a save timestamp exists so the relative "N 分鐘前" hint
-	// stays accurate without a user interaction.
 	const [, tick] = React.useReducer((n: number) => n + 1, 0);
 	React.useEffect(() => {
 		if (!savedAt) return;
@@ -175,8 +162,6 @@ export default function SellerProfileClient() {
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-		// 儲存鍵在唯讀下不渲染，但表單仍在：多數瀏覽器對只有單一文字欄的 form 會做
-		// 隱式送出。少了這一行，「不出現 write CTA」就只擋得住滑鼠。
 		if (!canWrite) return;
 		if (!serverStore || etag === null || !hasPendingProfileChanges) return;
 		const websiteUrl = normalizeWebsiteUrl(data.websiteUrl);
@@ -195,16 +180,8 @@ export default function SellerProfileClient() {
 		const submitted: StoreForm = { ...data, websiteUrl };
 		if (data.websiteUrl !== websiteUrl) update({ websiteUrl });
 		const changes = storeFormChanges(submitted, baseline);
-		// 代行下開確認抽屜收齊修改原因／目前版本／通知賣家；賣家路徑立刻放行且不帶
-		// meta，這一段對 `/seller-center` 是零行為變化。
 		const decision = await scope.confirmMutation({
 			title: "檢視變更並儲存",
-			// ⚠️ 店名取伺服器版本而不是表單裡的值：這句話回答的是「我正在對哪
-			// 一家店動手」，而改名正是這個表單能做的事之一 —— 用表單值會讓抽屜以**還
-			// 沒存進去的新名字**指稱目標店家，同一個抽屜的變更摘要卻同時列著舊名。
-			// 拿不到伺服器版本時退店家編號而不是「本店」（`targetStoreLabel`）。
-			// 店名用引號括起：中英混排的店名（`翠綠有機農場 E2E`）直接串接後會與下一個
-			// 中文字黏成「E2E儲存」。
 			intent: `以 ADM 身分替「${targetStoreLabel(serverStore.storeName, scope.ownerStoreId)}」儲存商店資訊`,
 			hint: "請確認以下變更內容無誤後儲存。",
 			reasonPlaceholder: "例：依賣家來信更新營業資訊",
@@ -221,23 +198,15 @@ export default function SellerProfileClient() {
 		if (!decision.ok) return;
 		setSaving(true);
 		try {
-			// Logo/cover are persisted by their own staged-upload writes; this request
-			// carries the text and address fields that changed.
 			const written = await scope.repos.storefront.updateMyStore(
 				{ etag, ...changes },
 				decision.meta,
 			);
-			// 在 `invalidateSelf()` 之前更新，且來源是這一次的回應而不是接下來的
-			// refetch —— 理由見 etag 的說明。
 			if (written.etag) setEtag(written.etag);
 			setEdits({});
 			setServerContactErrors(null);
 			setSavedAt(Date.now());
-			// Navbar / shell read the same store query — refresh them.
 			await invalidateSelf();
-			// 代行下不呼叫：那支 server action revalidate 的是**代行者自己**登入態下的
-			// 賣家頁快取標籤，而代行者在 www 上沒有賣家身分。目標店家的公開頁由後端
-			// 寫入路徑自己失效。
 			if (!delegated) {
 				await revalidateOwnSellerProfile({
 					accountId: serverStore.id,
@@ -250,7 +219,6 @@ export default function SellerProfileClient() {
 		} catch (e2) {
 			const failure = delegated ? null : submitError(e2, defaults);
 			if (failure?.kind === "conflict") {
-				// 保留使用者的輸入，改顯示最新版本：沒改的欄位跟著更新，寫入改用最新的 etag。
 				await adoptLatestStore();
 			} else {
 				if (failure?.kind === "fields") {
@@ -409,9 +377,7 @@ export default function SellerProfileClient() {
 									readOnly={!canWrite}
 									maxLength={SUPPORT_EMAIL_MAX_LENGTH}
 								/>
-								{/* 下拉沒有 `readOnly`（它不是 `<input>`），唯讀下只能
-								    `disabled`。這裡沒有「disabled 與尚未修改長得一樣」
-								    的歧義 —— 那個歧義只發生在儲存鍵上。 */}
+
 								<TownFields
 									countyCode={data.countyCode}
 									townCode={data.townCode}
@@ -496,8 +462,6 @@ export default function SellerProfileClient() {
 								storeEtag={etag ?? serverStore.etag}
 								readOnly={!canWrite}
 								onSaved={async (written) => {
-									// 換圖寫入的回應才是我方剛推進的那一格版本；顯示用的圖片網址
-									// 由 refetch 帶回來。
 									if (written.etag) setEtag(written.etag);
 									setSavedAt(Date.now());
 									await invalidateSelf();
@@ -531,11 +495,8 @@ export default function SellerProfileClient() {
 
 				<div className="seller-profile__save-bar">
 					<small className="seller-profile__save-hint">
-						{/* mockup §4.4.8 左側提示。⚠️「儲存草稿」那顆次要按鈕不得渲染：
-						    店面設定沒有草稿狀態，按下去會當場改掉買家看得到的店面，
-						    而按鈕字面承諾「還沒公開」（B4）。 */}
-						{/* 唯讀時這一句不得再承諾寫入：它旁邊已經沒有儲存鍵了，
-						    留著「將以平台管理員身分寫入」等於指向一個不存在的動作。 */}
+
+
 						{!canWrite
 							? delegated
 								? "本工作階段沒有核發店面編輯權限，這裡只能檢視"

@@ -189,7 +189,6 @@ describe("appealClosedNotice", () => {
 		expect(
 			noticeOf([sentence(AU.APPEAL_WINDOW_ENDED, "伺服器的任意一句")]),
 		).toBe("伺服器的任意一句");
-		// 有申覆請求、已撤銷，但伺服器沒給原因：不自己推導，用通用說明
 		expect(
 			noticeOf([], {
 				requests: [{ kind: MeasureRequestKind.APPEAL }],

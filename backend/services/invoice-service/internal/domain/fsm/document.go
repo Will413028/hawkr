@@ -20,7 +20,6 @@ type DocumentTransition struct {
 	Trigger string
 }
 
-// 為可讀性取的區域別名；值全部來自 CodeMeta 生成常數，禁止字串字面值。
 var (
 	docPending              = codemeta.InvoiceDocumentStatusPending.Value
 	docIssuing              = codemeta.InvoiceDocumentStatusIssuing.Value
@@ -42,8 +41,6 @@ var DocumentTransitions = []DocumentTransition{
 	{From: []string{docPending}, To: docIssuing, Trigger: "ISSUE operation READY→SENDING"},
 	{From: []string{docPending}, To: docCancelledBeforeIssue, Trigger: "累計退款 = 實付總額"},
 	{From: []string{docIssuing}, To: docIssued, Trigger: "f0401 code=0 或 invoice_query 回填"},
-	// ⚠️ SELLER_ACTION_REQUIRED 不叫 FAILED_*，「任一 FAILED_*」這種寫法會漏掉它——
-	// 漏掉的後果是 document 永遠停在 ISSUING，賣家看到「開立中」而系統已停手在等他配字軌。
 	{From: []string{docIssuing}, To: docIssueFailed, Trigger: "operation 進入 FAILED_PERMANENT / FAILED_RETRY_EXHAUSTED / FAILED_UNKNOWN / SELLER_ACTION_REQUIRED"},
 	{From: []string{docIssuing}, To: docPending, Trigger: "operation 退回 RETRY_SCHEDULED"},
 	{From: []string{docIssueFailed}, To: docIssuing, Trigger: "ADM 重試 / worker 重試（operation 已回 READY）"},

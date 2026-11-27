@@ -36,8 +36,6 @@ export function useSellerDashboard(options?: {
 		queryFn: () => fetchSellerDashboard(),
 		enabled,
 		staleTime: 30_000,
-		// 新鮮度靠推播（`useSellerWorkspaceRealtime` 讓快取失效）加回到畫面時重抓，不做固定間隔輪詢；
-		// 本 repo 的預設是不在聚焦時重抓，所以在這裡明設。30 秒內讀過的就跳過（staleTime）。
 		refetchOnWindowFocus: true,
 	});
 	return {

@@ -23,7 +23,6 @@ import (
 
 const oneDay = 24 * time.Hour
 
-// riskMeasure 建立一個依據風險類型的停權（複審期限七天後）；ends 為 nil 是沒有固定期間。
 func (f *fixture) riskMeasure(t *testing.T, storeID int64, ends *time.Time) Measure {
 	t.Helper()
 	review := f.now.Add(7 * oneDay)
@@ -35,14 +34,12 @@ func (f *fixture) riskMeasure(t *testing.T, storeID int64, ends *time.Time) Meas
 	return r.Measure
 }
 
-// remediable 建立帳號、店家與一個沒有固定期間的 RISK 停權。
 func (f *fixture) remediable(t *testing.T) (int64, Store, Measure) {
 	t.Helper()
 	accountID, s := f.open(t)
 	return accountID, s, f.riskMeasure(t, s.StoreID, nil)
 }
 
-// sellerView 讀賣家看到的措施。
 func (f *fixture) sellerView(t *testing.T, accountID int64, id uuid.UUID) Measure {
 	t.Helper()
 	m, err := f.module.AccountMeasure(context.Background(), accountID, id)
@@ -50,7 +47,6 @@ func (f *fixture) sellerView(t *testing.T, accountID int64, id uuid.UUID) Measur
 	return m
 }
 
-// remediationInput 是請求解除的輸入；每個 name 放一份機敏佐證（內容是 evidencePDF(name)，上傳者是這個帳號）。
 func (f *fixture) remediationInput(t *testing.T, accountID int64, id uuid.UUID, reason string, names ...string) RequestRemediationInput {
 	t.Helper()
 	return RequestRemediationInput{
@@ -59,7 +55,6 @@ func (f *fixture) remediationInput(t *testing.T, accountID int64, id uuid.UUID, 
 	}
 }
 
-// remediate 以賣家讀到的版本請求解除，回傳後台看到的措施。
 func (f *fixture) remediate(t *testing.T, accountID int64, id uuid.UUID, reason string, names ...string) Measure {
 	t.Helper()
 	_, err := f.module.RequestRemediation(context.Background(), f.remediationInput(t, accountID, id, reason, names...))
@@ -125,13 +120,11 @@ func TestRequestRemediationSubmitsAPendingRequest(t *testing.T) {
 	if events := submitted.all(); len(events) != 1 || events[0].Kind != RequestKindRemediation || events[0].RequestID != pending.ID || events[0].AccountID != accountID {
 		t.Fatalf("submitted=%+v", events)
 	}
-	// 賣家 etag 沒變，所以請求生效後再送一次（含重送）是 failed_precondition，不是 VERSION_CONFLICT。
 	_, err = f.module.RequestRemediation(ctx, in)
 	wantFailure(t, "重送", err, apperr.KindFailedPrecondition)
 	if n := f.count(t, "SELECT count(*) FROM seller.measure_requests WHERE measure_id = $1", m.ID); n != 1 {
 		t.Fatalf("requests=%d", n)
 	}
-	// 請求的佐證與申覆同一個機制：以請求 ID 為 ref。
 	if n := f.count(t, "SELECT count(*) FROM seller.measure_request_evidence WHERE request_id = $1", pending.ID); n != 2 {
 		t.Fatalf("evidence=%d", n)
 	}
@@ -156,7 +149,6 @@ func TestRequestRemediationValidatesItsInput(t *testing.T) {
 		_, err := f.module.RequestRemediation(ctx, in)
 		wantFailure(t, name, err, apperr.KindInvalidInput)
 	}
-	// 伺服器的錯誤文字原樣顯示給賣家：欄位名稱是「改善說明」，不是內部的「解除請求」。
 	blank := ok
 	blank.Reason = " "
 	_, err := f.module.RequestRemediation(ctx, blank)
@@ -418,7 +410,6 @@ func TestDecideRemediationRules(t *testing.T) {
 	wantFailure(t, "舊 etag", err, apperr.KindVersionConflict)
 	_, err = f.decideRemediation(m.ID, 9, RequestRejected, "佐證不足")
 	must(t, err)
-	// 裁定已經生效後帶舊 etag 再送一次：VERSION_CONFLICT，不寫入。
 	_, err = f.module.DecideRemediation(ctx, DecideRemediationInput{MeasureID: m.ID, AdminID: 9, ExpectedVersion: admin.Version, Outcome: RequestRejected, Reason: "佐證不足"})
 	wantFailure(t, "重送", err, apperr.KindVersionConflict)
 	_, err = f.module.DecideRemediation(ctx, DecideRemediationInput{MeasureID: uuid.NewV7(), AdminID: 9, ExpectedVersion: 1, Outcome: RequestRejected, Reason: "x"})
@@ -473,7 +464,6 @@ func TestPendingRemediationFreezesAggravationButNotShortening(t *testing.T) {
 	}
 	f.now = f.now.Add(3 * time.Hour)
 	must(t, f.module.ExpireMeasure(ctx, m.ID, short))
-	// 到期 job 只重算停權；請求對外的狀態已是 CLOSED（ENDED、結案時間是措施的結束時間），儲存值與通知等結案掃描。
 	got := f.measureOf(t, m.ID)
 	r := remediationsOf(got)[0]
 	if got.State != StateEnded || r.State != RequestClosed || r.CloseCause == nil || *r.CloseCause != CloseCauseEnded || r.DecidedByAdminID != nil || r.DecidedAt == nil ||
@@ -494,7 +484,6 @@ func TestPendingRemediationFreezesAggravationButNotShortening(t *testing.T) {
 	if evs := closed.all(); len(evs) != 1 || evs[0].Cause != CloseCauseEnded || evs[0].Kind != RequestKindRemediation || evs[0].AccountID != accountID {
 		t.Fatalf("closed=%+v", evs)
 	}
-	// job 與掃描重跑是冪等的：不再結案、不再發事件。
 	must(t, f.module.ExpireMeasure(ctx, m.ID, short))
 	n, err = f.module.CloseEndedMeasureRequests(ctx)
 	must(t, err)
@@ -630,7 +619,6 @@ func TestRemediationCooldownTable(t *testing.T) {
 	f.decideAppeal(t, m.ID, RequestRejected, "不成立")
 	check(2, 0, 7*oneDay)
 
-	// CLOSED 不計：寫兩筆系統結案的解除請求，次數與冷卻都不變。
 	for range 2 {
 		_, err := f.db.Conn(ctx).Exec(ctx, `INSERT INTO seller.measure_requests (id, measure_id, kind, state, reason, revision, submitted_at, decided_at, close_cause, basis)
 			VALUES (uuidv7(), $1, 'REMEDIATION', 'CLOSED', 'x', 1, $2, $2, 'ENDED', 'RISK')`, m.ID, f.now)
@@ -650,7 +638,6 @@ func TestRemediationCooldownTable(t *testing.T) {
 		check(4+n, step.next, step.warning)
 	}
 
-	// 冷卻結束的那一刻就可以再提出。
 	next := f.sellerView(t, accountID, m.ID).NextRemediationTime()
 	f.now = next.Add(-time.Microsecond)
 	if f.sellerView(t, accountID, m.ID).CanRequestRemediation() {
@@ -705,7 +692,6 @@ func TestListMeasuresByRequestState(t *testing.T) {
 	bAcc, b := mk()
 	cAcc, c := mk()
 	mk()
-	// a：解除請求駁回後又待處理；b：解除請求待處理（比 a 晚提出）；c：只有被駁回的解除請求；第四個措施沒有請求。
 	f.now = f.now.Add(time.Minute)
 	f.remediate(t, aAcc, a.ID, "a1")
 	f.now = f.now.Add(time.Minute)
@@ -744,7 +730,6 @@ func TestListMeasuresByRequestState(t *testing.T) {
 	pending, rejected, accepted, closed := RequestPending, RequestRejected, RequestAccepted, RequestClosed
 	remediation, appealKind := RequestKindRemediation, RequestKindAppeal
 	same("PENDING 收件匣：依請求提出時間舊到新", list(AdminMeasureListInput{RequestState: &pending}), []uuid.UUID{a.ID, b.ID})
-	// 集合語意：REJECTED 是「有任一筆被駁回」，a 同時有待處理的也算；新到舊（預設排序）。
 	same("REJECTED 集合", list(AdminMeasureListInput{RequestState: &rejected}), []uuid.UUID{c.ID, a.ID})
 	same("ACCEPTED", list(AdminMeasureListInput{RequestState: &accepted}), nil)
 	same("CLOSED", list(AdminMeasureListInput{RequestState: &closed}), nil)
@@ -752,7 +737,6 @@ func TestListMeasuresByRequestState(t *testing.T) {
 	same("只有種類：申訴", list(AdminMeasureListInput{RequestKind: &appealKind}), nil)
 	same("PENDING 與店家篩選合用", list(AdminMeasureListInput{RequestState: &pending, AccountID: bAcc}), []uuid.UUID{b.ID})
 
-	// 申覆與解除請求在同一個收件匣、同一個排序：b 的解除請求駁回後申覆，排在 a 的解除請求之後。
 	_, err = f.decideRemediation(b.ID, 9, RequestRejected, "不足")
 	must(t, err)
 	f.now = f.now.Add(time.Minute)
@@ -763,12 +747,10 @@ func TestListMeasuresByRequestState(t *testing.T) {
 	same("種類加狀態是同一筆請求：b 的補正被駁回", list(AdminMeasureListInput{RequestState: &rejected, RequestKind: &remediation}), []uuid.UUID{c.ID, b.ID, a.ID})
 	same("種類加狀態是同一筆請求：b 沒有被駁回的申訴", list(AdminMeasureListInput{RequestState: &rejected, RequestKind: &appealKind}), nil)
 
-	// review_due 優先：a 的複審到期時，review_due 的排序是 review_by，其餘篩選照 AND。
 	f.now = f.now.Add(8 * oneDay)
 	due := list(AdminMeasureListInput{ReviewDue: true, RequestState: &pending, RequestKind: &remediation})
 	same("review_due 加 request_state=PENDING", due, []uuid.UUID{a.ID})
 
-	// 不合法的值。
 	bad := RequestState("WITHDRAWN")
 	_, err = f.module.AdminMeasures(ctx, AdminMeasureListInput{RequestState: &bad, PageSize: 10})
 	wantFailure(t, "不認得的狀態", err, apperr.KindInvalidInput)

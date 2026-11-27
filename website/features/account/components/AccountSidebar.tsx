@@ -45,7 +45,6 @@ export default function AccountSidebar() {
 		try {
 			await signOut();
 		} catch {
-			// 撤銷失敗＝session 仍有效（signOut 已跳 toast），維持登入畫面。
 			setSigningOut(false);
 		}
 	};
@@ -73,7 +72,7 @@ export default function AccountSidebar() {
 						{displayName}
 					</strong>
 					<small className="text-xs text-foreground-soft dark:text-hk-ink-100/60">
-						{/* TODO(B-189): profile endpoint — phone not on Identity */}
+
 						{"會員中心"}
 					</small>
 				</div>

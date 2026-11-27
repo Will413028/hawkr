@@ -46,7 +46,6 @@ export default function DelegatedCapabilityGate({
 		<DelegatedCapabilityGateView
 			granted={hasCapability(capability)}
 			reason={reason}
-			// storeId 拿不到就不畫出口：一個組不出目的地的按鈕比沒有按鈕更糟。
 			backHref={
 				backSegment && storeId
 					? `/adm/${encodeURIComponent(storeId)}/${backSegment}`

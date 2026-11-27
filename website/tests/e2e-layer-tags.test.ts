@@ -82,9 +82,6 @@ function collectSpecs(suite: ListedSuite, file?: string): ListedSpec[] {
 }
 
 function listMainConfigSpecs(): ListedSpec[] {
-	// `--list` only resolves the test tree: it starts no web server and launches
-	// no browser, so this stays runnable in the lint/unit job that never installs
-	// Playwright browsers. Measured at ~0.7s.
 	const stdout = execFileSync(
 		"node",
 		[

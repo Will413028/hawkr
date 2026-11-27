@@ -16,7 +16,6 @@ import (
 	model "github.com/Will413028/hawkr/backend/internal/modules/seller"
 )
 
-// batchRatings 是評價來源的替身：記錄每次呼叫收到的店家，只回 stats 裡有的店（沒有評價的店不在回傳裡）。
 type batchRatings struct {
 	stats map[int64]RatingStats
 	err   error
@@ -41,7 +40,6 @@ func cardFixture() []model.StoreCard {
 	return []model.StoreCard{
 		{StoreID: 5, StoreCode: 2600000005, Name: ptr("範例小農"), TownCode: ptr("63000050"), Status: model.CardOpen},
 		{StoreID: 6, StoreCode: 2600000006, Name: ptr("無評價"), TownCode: ptr("63000060"), Status: model.CardOpen},
-		// 個資清除之後：沒有店名、沒有所在地。
 		{StoreID: 7, StoreCode: 2600000007, Status: model.CardClosed},
 	}
 }
@@ -99,11 +97,9 @@ func TestBatchGetStoresCardsCarryTownAndRatingsFromOneRead(t *testing.T) {
 	if a.GetTownCode() != "63000050" || a.GetReviewCount() != 12 || a.RatingAverage == nil || *a.RatingAverage != 4.5 {
 		t.Fatalf("a=%v", a)
 	}
-	// 評價來源沒回的店是確實沒有評價：評價數 0，平均不設。
 	if b.GetTownCode() != "63000060" || b.ReviewCount == nil || *b.ReviewCount != 0 || b.RatingAverage != nil {
 		t.Fatalf("b=%v", b)
 	}
-	// 個資清除之後所在地是空字串，不是別的值。
 	if c.GetTownCode() != "" || c.Name != nil {
 		t.Fatalf("c=%v", c)
 	}

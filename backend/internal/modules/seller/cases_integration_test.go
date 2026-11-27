@@ -19,11 +19,9 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// 通報與案件的測試共用的小工具：每個指令都以「此刻讀到的版本」呼叫（過期版本的行為另有測試），回傳模組的後台檢視。
 
 var nextBuyer atomic.Int64
 
-// reportBy 以一位沒用過的買家檢舉 storeID（類別 category），回傳通報。
 func (f *fixture) reportBy(t *testing.T, storeID int64, category policy.Category) Report {
 	t.Helper()
 	buyer := 1000 + nextBuyer.Add(1)
@@ -44,8 +42,6 @@ func (f *fixture) caseOf(t *testing.T, id uuid.UUID) AdminCase {
 	return c
 }
 
-// targetFor 組出去處的意圖，像 client 照 Report.triage_targets 做的：severity 有值是開新案件，nil 是加入（照通報此刻讀到的 triage_targets 取該類別進行中的案件的 id 與版本；
-// 該類別沒有進行中的案件時回空的去處，由指令以欄位錯誤擋下）。
 func (f *fixture) targetFor(t *testing.T, reportID uuid.UUID, category policy.Category, severity *Severity) CaseTarget {
 	t.Helper()
 	if severity != nil {
@@ -57,7 +53,6 @@ func (f *fixture) targetFor(t *testing.T, reportID uuid.UUID, category policy.Ca
 			return CaseTarget{Join: &JoinCase{CaseID: target.Case.ID, ExpectedVersion: target.Case.Version}}
 		}
 	}
-	// 通報此刻不能分案也不能移動時沒有 triage_targets：改讀案件清單，讓指令走到狀態檢查（回不可用的原因）。
 	open := CaseStateOpen
 	page, err := f.module.AdminCases(context.Background(), CaseListInput{State: &open, Category: &category, StoreID: report.StoreID, PageSize: 1})
 	must(t, err)
@@ -67,7 +62,6 @@ func (f *fixture) targetFor(t *testing.T, reportID uuid.UUID, category policy.Ca
 	return CaseTarget{}
 }
 
-// triage 以通報此刻的版本分案（管理員 7）。
 func (f *fixture) triage(t *testing.T, reportID uuid.UUID, category policy.Category, severity *Severity) (AdminReport, error) {
 	t.Helper()
 	return f.module.TriageReport(context.Background(), TriageReportInput{
@@ -82,7 +76,6 @@ func (f *fixture) mustTriage(t *testing.T, reportID uuid.UUID, category policy.C
 	return r
 }
 
-// resolve 以通報此刻的版本設定結果（管理員 8）。
 func (f *fixture) resolve(t *testing.T, reportID uuid.UUID, outcome Outcome, note string) (AdminReport, error) {
 	t.Helper()
 	return f.module.ResolveReport(context.Background(), ResolveReportInput{
@@ -97,7 +90,6 @@ func (f *fixture) mustResolve(t *testing.T, reportID uuid.UUID, outcome Outcome)
 	return r
 }
 
-// move 以通報此刻的版本移到 category（管理員 9）。
 func (f *fixture) move(t *testing.T, reportID uuid.UUID, category policy.Category, severity *Severity) (MoveReportResult, error) {
 	t.Helper()
 	return f.module.MoveReport(context.Background(), MoveReportInput{
@@ -105,7 +97,6 @@ func (f *fixture) move(t *testing.T, reportID uuid.UUID, category policy.Categor
 	})
 }
 
-// decide 以案件此刻的版本決定（管理員 10）。
 func (f *fixture) decide(t *testing.T, caseID uuid.UUID, decision Decision, note string) (AdminCase, error) {
 	t.Helper()
 	return f.module.DecideCase(context.Background(), DecideCaseInput{
@@ -113,7 +104,6 @@ func (f *fixture) decide(t *testing.T, caseID uuid.UUID, decision Decision, note
 	})
 }
 
-// newCase 在 storeID 上開一個進行中的案件（平台判定類別 category，嚴重度 severity），成員是 n 筆不同買家的檢舉（檢舉人選 FRAUD）；回傳案件與成員（舊到新）。
 func (f *fixture) newCase(t *testing.T, storeID int64, category policy.Category, severity Severity, n int) (AdminCase, []AdminReport) {
 	t.Helper()
 	var members []AdminReport
@@ -131,7 +121,6 @@ func (f *fixture) newCase(t *testing.T, storeID int64, category policy.Category,
 	return f.caseOf(t, caseID), members
 }
 
-// riskFromCase 從案件建立一個 RISK 停權（任何依據都可以連到案件；RISK 沒有來源通報，只能這樣連）。
 func (f *fixture) riskFromCase(t *testing.T, storeID int64, caseID uuid.UUID) Measure {
 	t.Helper()
 	review := f.now.Add(7 * 24 * time.Hour)
@@ -143,7 +132,6 @@ func (f *fixture) riskFromCase(t *testing.T, storeID int64, caseID uuid.UUID) Me
 	return r.Measure
 }
 
-// warningCiting 建立一個警告，依據是以 sources 為來源通報的新認定（導出關係由認定推導）。
 func (f *fixture) warningCiting(t *testing.T, storeID int64, sources ...uuid.UUID) Measure {
 	t.Helper()
 	r, err := f.module.CreateMeasure(context.Background(), f.warningFrom(storeID, sources...))
@@ -151,7 +139,6 @@ func (f *fixture) warningCiting(t *testing.T, storeID int64, sources ...uuid.UUI
 	return r.Measure
 }
 
-// invalidFields 回傳錯誤是 invalid_argument 時指到的欄位（模組輸入的欄位名）。
 func invalidFields(t *testing.T, err error) []string {
 	t.Helper()
 	var ae *apperr.Error
@@ -165,7 +152,6 @@ func invalidFields(t *testing.T, err error) []string {
 	return out
 }
 
-// wantBlocked 確認指令被前置條件擋下（failed_precondition，訊息是原因的句子）。
 func wantBlocked(t *testing.T, err error, sentence string) {
 	t.Helper()
 	wantKind(t, err, apperr.KindFailedPrecondition)
@@ -174,9 +160,6 @@ func wantBlocked(t *testing.T, err error, sentence string) {
 	}
 }
 
-// assertCaseInvariants 在每個指令之後對全部案件檢查跨列不變量（DB 保證不了，由模組保證）：
-// I1 進行中的案件至少有一筆通報；I2 已結案（DECIDED）的案件每筆通報都有結果；I3 決定是不採取措施的案件沒有結果是已採取措施的通報；
-// I4 決定是採取措施的案件有導出的措施（不論狀態）或結果是已採取措施的成員；I5 每個進行中的案件至少有一個可以選的決定；I6 有導出措施的案件不會因移動而變空。
 func (f *fixture) assertCaseInvariants(t *testing.T) {
 	t.Helper()
 	ctx := context.Background()
@@ -197,7 +180,6 @@ func (f *fixture) assertCaseInvariants(t *testing.T) {
 			t.Errorf("不變量 %s：%d 筆", name, n)
 		}
 	}
-	// I5：每個進行中的案件至少有一個可以選的決定。
 	open := CaseStateOpen
 	var after *CaseCursor
 	for {
@@ -217,9 +199,6 @@ func (f *fixture) assertCaseInvariants(t *testing.T) {
 
 func severityPtr(s Severity) *Severity { return &s }
 
-// wantViolates 確認語句被資料庫以 constraint 這一條約束（或唯一索引）擋下，而且只違反它：拿掉那一條之後，同一個語句就成功。
-// 兩個條件缺一不可：只看「有錯誤」，參數數量不符之類不是資料庫擋下的錯誤也會算通過；一個語句同時違反兩條約束時，資料庫只回報其中一條，
-// 另一條被拿掉測試仍然通過。拿掉約束在 transaction 裡做，結束就還原。
 func (f *fixture) wantViolates(t *testing.T, name, constraint, sql string, args ...any) {
 	t.Helper()
 	ctx := context.Background()
@@ -238,7 +217,7 @@ func (f *fixture) wantViolates(t *testing.T, name, constraint, sql string, args 
 	defer func() { _ = tx.Rollback(ctx) }()
 	var isConstraint bool
 	must(t, tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = $1 AND conrelid = $2::regclass)", constraint, pgx.Identifier{pg.SchemaName, pg.TableName}.Sanitize()).Scan(&isConstraint))
-	drop := "DROP INDEX " + pgx.Identifier{pg.SchemaName, constraint}.Sanitize() // 唯一索引沒有約束
+	drop := "DROP INDEX " + pgx.Identifier{pg.SchemaName, constraint}.Sanitize()
 	if isConstraint {
 		drop = "ALTER TABLE " + pgx.Identifier{pg.SchemaName, pg.TableName}.Sanitize() + " DROP CONSTRAINT " + pgx.Identifier{constraint}.Sanitize()
 	}
@@ -262,7 +241,6 @@ func TestTriageOpensTheCaseForTheStoreAndCategoryAndLaterReportsJoinIt(t *testin
 	foreign := f.reportBy(t, other.StoreID, policy.Fraud)
 	start := f.reportOf(t, r1.ID)
 
-	// 先做無狀態的驗證：去處沒給或兩個都給、開新案件沒給嚴重度、類別是 OTHER（只給檢舉人選）或不在平台判定的子集、嚴重度不合法；被拒絕的什麼都不寫。
 	openHigh := CaseTarget{OpenNew: severityPtr(SeverityHigh)}
 	for name, c := range map[string]struct {
 		in    TriageReportInput
@@ -299,8 +277,6 @@ func TestTriageOpensTheCaseForTheStoreAndCategoryAndLaterReportsJoinIt(t *testin
 		t.Fatalf("case=%+v", c.Case)
 	}
 
-	// 已有進行中的案件：去處是意圖，要開新案件的意圖不成立（版本衝突，conflictTarget 是 category_case_opened，什麼都不寫），要加入就加入它（案件的版本加一，嚴重度以案件為準、不變）。
-	// 加入時案件的版本前進了（別人先處理過），意圖同樣不成立。
 	before := f.reportOf(t, r2.ID)
 	_, err := f.triage(t, r2.ID, policy.Fraud, severityPtr(SeverityLow))
 	wantKind(t, err, apperr.KindVersionConflict)
@@ -322,18 +298,15 @@ func TestTriageOpensTheCaseForTheStoreAndCategoryAndLaterReportsJoinIt(t *testin
 		t.Fatalf("after=%+v", after.Case)
 	}
 
-	// 平台判定類別不是檢舉人選的類別：檢舉人選仿冒的，也可以判成詐欺加入同一個案件；檢舉人選的類別不會被改掉。
 	counterfeit := f.mustTriage(t, r3.ID, policy.Fraud, nil)
 	if counterfeit.Category != policy.Counterfeit || *counterfeit.AssessedCategory != policy.Fraud || *counterfeit.CaseID != c.ID {
 		t.Fatalf("counterfeit=%+v", counterfeit)
 	}
-	// 另一家店的同類別是另一個案件。
 	foreignCase := f.mustTriage(t, foreign.ID, policy.Fraud, severityPtr(SeverityLow))
 	if *foreignCase.CaseID == c.ID || f.caseOf(t, *foreignCase.CaseID).StoreID != other.StoreID {
 		t.Fatalf("foreign=%+v", foreignCase)
 	}
 
-	// 狀態不允許：已經分案、已有結果（不開案件直接結掉的）；過期的版本先回版本衝突。
 	if _, err := f.triage(t, r1.ID, policy.Fraud, nil); err == nil {
 		t.Fatal("已分案的通報不能再分案")
 	} else {
@@ -368,7 +341,6 @@ func TestResolveRulesFollowTheCaseAndItsMeasures(t *testing.T) {
 	resolved := record[ReportResolved](f)
 	_, s := f.open(t)
 
-	// 不開案件直接結掉。
 	var direct []AdminReport
 	for _, o := range []Outcome{OutcomeNoViolation, OutcomeInsufficient, OutcomeDuplicate, OutcomeAbusive} {
 		r := f.reportBy(t, s.StoreID, policy.Fraud)
@@ -385,7 +357,6 @@ func TestResolveRulesFollowTheCaseAndItsMeasures(t *testing.T) {
 	_, err := f.resolve(t, awaiting.ID, OutcomeActionTaken, "")
 	wantBlocked(t, err, "還沒分案的通報不能設為已採取措施；請先分案。")
 
-	// 結果設定後不能修改；其他驗證。
 	_, err = f.resolve(t, direct[0].ID, OutcomeAbusive, "")
 	wantBlocked(t, err, "這筆通報已經有結果。")
 	for name, in := range map[string]ResolveReportInput{
@@ -402,7 +373,6 @@ func TestResolveRulesFollowTheCaseAndItsMeasures(t *testing.T) {
 	_, err = f.module.ResolveReport(ctx, ResolveReportInput{ReportID: uuid.NewV7(), AdminID: 8, Outcome: OutcomeNoViolation, ExpectedVersion: 1})
 	wantKind(t, err, apperr.KindNotFound)
 
-	// 案件裡：沒有導出的措施、也沒有已採取措施的成員時，已採取措施被擋下，其他結果可以；案件的版本與 updated_at 隨之前進。
 	c, members := f.newCase(t, s.StoreID, policy.Fraud, SeverityMedium, 3)
 	_, err = f.resolve(t, members[0].ID, OutcomeActionTaken, "")
 	wantBlocked(t, err, "案件還沒有從它建立的措施，不能設為已採取措施。")
@@ -414,7 +384,6 @@ func TestResolveRulesFollowTheCaseAndItsMeasures(t *testing.T) {
 	if got.CaseID == nil || *got.CaseID != c.ID || after.Version != before.Version+1 || !after.UpdatedAt.Equal(f.now) || after.UnresolvedReportCount != 2 || after.ReportCount != 3 {
 		t.Fatalf("got=%+v after=%+v", got, after.Case)
 	}
-	// 有從這個案件建立的措施（連結）之後，已採取措施可以設；再有成員是已採取措施，另一筆也可以。
 	f.riskFromCase(t, s.StoreID, c.ID)
 	got, err = f.resolve(t, members[1].ID, OutcomeActionTaken, "")
 	must(t, err)
@@ -447,7 +416,6 @@ func TestMoveReportsBetweenCasesKeepsARecordAndClosesAnEmptiedCase(t *testing.T)
 	c1, members := f.newCase(t, s.StoreID, policy.Fraud, SeverityHigh, 3)
 	a, b, c := members[0], members[1], members[2]
 
-	// 沒有指定去處（這個類別沒有進行中的案件可加入、也沒有選開新案件）；類別和目前相同、類別不合法是 invalid_argument；什麼都不寫。
 	_, err := f.move(t, a.ID, policy.MisleadingInfo, nil)
 	if got := invalidFields(t, err); !slices.Equal(got, []string{"Target"}) {
 		t.Fatalf("沒有去處：%v", got)
@@ -482,7 +450,6 @@ func TestMoveReportsBetweenCasesKeepsARecordAndClosesAnEmptiedCase(t *testing.T)
 		t.Fatalf("目標案件也看得到移入的紀錄：%+v", got)
 	}
 
-	// 目標類別已有進行中的案件：要開新案件的意圖不成立（版本衝突，conflictTarget 是 category_case_opened，什麼都不寫），要加入就加入它。
 	_, err = f.move(t, b.ID, policy.MisleadingInfo, severityPtr(SeverityHigh))
 	wantKind(t, err, apperr.KindVersionConflict)
 	wantConflictTarget(t, err, "category_case_opened")
@@ -492,7 +459,6 @@ func TestMoveReportsBetweenCasesKeepsARecordAndClosesAnEmptiedCase(t *testing.T)
 		t.Fatalf("joined=%+v", joined)
 	}
 
-	// 移走最後一筆：原案件以沒有通報自動關閉，不算決定，不發事件；結果、說明與決定都是空的。
 	events := len(resolved.all())
 	f.now = f.now.Add(time.Hour)
 	last, err := f.move(t, c.ID, policy.MisleadingInfo, nil)
@@ -503,7 +469,6 @@ func TestMoveReportsBetweenCasesKeepsARecordAndClosesAnEmptiedCase(t *testing.T)
 		closed.ReportCount != 0 || len(closed.Availability.DecisionOptions()) != 0 || len(resolved.all()) != events {
 		t.Fatalf("closed=%+v events=%d→%d", closed.Case, events, len(resolved.all()))
 	}
-	// 以沒有通報關閉的案件不是終局的決定：同一家店、同一個類別的新通報開新案件。
 	again := f.reportBy(t, s.StoreID, policy.Fraud)
 	reopened := f.mustTriage(t, again.ID, policy.Fraud, severityPtr(SeverityCritical))
 	if *reopened.CaseID == c1.ID || f.caseOf(t, *reopened.CaseID).State() != CaseStateOpen {
@@ -528,24 +493,20 @@ func TestMoveIsBlockedByTheReportsStateItsFindingsAndTheCasesMeasures(t *testing
 			t.Fatalf("%s：被擋下的移動不得寫入：%+v → %+v", name, before.Report, after.Report)
 		}
 	}
-	// 還沒分案（沒有案件）。
 	awaiting := f.reportOf(t, f.reportBy(t, s.StoreID, policy.Fraud).ID)
 	_, err := f.move(t, awaiting.ID, policy.MisleadingInfo, severityPtr(SeverityLow))
 	assertUnchanged("待分案", awaiting, err, "只有在進行中的案件裡、還沒有結果的通報可以移動。")
 
-	// 已有結果（案件裡先個別設定結果）。
 	_, members := f.newCase(t, s.StoreID, policy.Fraud, SeverityLow, 2)
 	f.mustResolve(t, members[0].ID, OutcomeInsufficient)
 	_, err = f.move(t, members[0].ID, policy.MisleadingInfo, severityPtr(SeverityLow))
 	assertUnchanged("已有結果", f.reportOf(t, members[0].ID), err, "這筆通報已經有結果。")
 
-	// 是認定的來源：認定來源的通報不能移到其他案件。
 	_, sourced := f.newCase(t, s.StoreID, policy.Counterfeit, SeverityLow, 2)
 	f.warningCiting(t, s.StoreID, sourced[0].ID)
 	_, err = f.move(t, sourced[0].ID, policy.Fraud, nil)
 	assertUnchanged("認定的來源", f.reportOf(t, sourced[0].ID), err, "這筆通報已是認定的依據來源，不能移到其他案件。")
 
-	// 案件有導出的措施，而它是最後一筆；案件還有別的成員時可以移走（措施已撤銷也一樣：做過就是導出的）。
 	c, solo := f.newCase(t, s.StoreID, policy.IPInfringement, SeverityLow, 1)
 	m := f.riskFromCase(t, s.StoreID, c.ID)
 	_, err = f.move(t, solo[0].ID, policy.Fraud, nil)
@@ -568,7 +529,7 @@ func TestDecideClosesTheCaseAndCarriesTheDefaultOutcomeIntoUnresolvedReports(t *
 	resolved := record[ReportResolved](f)
 	_, s := f.open(t)
 	c, members := f.newCase(t, s.StoreID, policy.Fraud, SeverityHigh, 3)
-	f.riskFromCase(t, s.StoreID, c.ID) // 採取措施要有導出的措施
+	f.riskFromCase(t, s.StoreID, c.ID)
 	early := f.resolveWithNote(t, members[0].ID, OutcomeInsufficient, "資料不足")
 	events := len(resolved.all())
 
@@ -595,7 +556,6 @@ func TestDecideClosesTheCaseAndCarriesTheDefaultOutcomeIntoUnresolvedReports(t *
 		decided.Version != before.Version+1 || decided.UnresolvedReportCount != 0 || len(decided.Availability.DecisionOptions()) != 0 {
 		t.Fatalf("decided=%+v", decided.Case)
 	}
-	// 沒有結果的兩筆帶入已採取措施與說明（版本各加一）；個別先設定的那筆不變。
 	for _, m := range members[1:] {
 		r := f.reportOf(t, m.ID)
 		if r.Outcome == nil || *r.Outcome != OutcomeActionTaken || r.ResolutionNote == nil || *r.ResolutionNote != "已請賣家處理" || *r.ResolvedByAdminID != 10 ||
@@ -610,7 +570,6 @@ func TestDecideClosesTheCaseAndCarriesTheDefaultOutcomeIntoUnresolvedReports(t *
 	if len(got) != 2 || got[0].Outcome != OutcomeActionTaken || got[0].CaseID == nil || *got[0].CaseID != c.ID {
 		t.Fatalf("每筆帶入結果的通報各發一個 ReportResolved：%+v", got)
 	}
-	// 結案是終態：不能再決定、不能個別設定結果、不能分案或移動。
 	_, err = f.decide(t, c.ID, DecisionNoAction, "")
 	wantBlocked(t, err, "案件已結案。")
 	_, err = f.resolve(t, members[1].ID, OutcomeAbusive, "")
@@ -636,7 +595,6 @@ func TestDecideFollowsTheDerivedMeasuresAndNeverLeavesACaseWithoutAChoice(t *tes
 	actionTakenMember := "案件裡有通報的結果是已採取措施，不能決定不採取措施。"
 	options := func(c uuid.UUID) []Decision { return f.caseOf(t, c).Availability.DecisionOptions() }
 
-	// 沒有導出的措施、沒有已採取措施的成員：只能不採取措施。
 	c1, _ := f.newCase(t, s.StoreID, policy.Fraud, SeverityLow, 1)
 	if got := options(c1.ID); !slices.Equal(got, []Decision{DecisionNoAction}) {
 		t.Fatalf("沒有措施：%v", got)
@@ -644,7 +602,6 @@ func TestDecideFollowsTheDerivedMeasuresAndNeverLeavesACaseWithoutAChoice(t *tes
 	_, err := f.decide(t, c1.ID, DecisionActionTaken, "")
 	wantBlocked(t, err, noBasis)
 
-	// 有未撤銷的導出措施：只能採取措施；撤銷之後兩個都可以（做過就是採取過措施，撤銷是之後的更正）。
 	c2, _ := f.newCase(t, s.StoreID, policy.Counterfeit, SeverityLow, 2)
 	m := f.riskFromCase(t, s.StoreID, c2.ID)
 	if got := options(c2.ID); !slices.Equal(got, []Decision{DecisionActionTaken}) {
@@ -657,7 +614,6 @@ func TestDecideFollowsTheDerivedMeasuresAndNeverLeavesACaseWithoutAChoice(t *tes
 		t.Fatalf("措施撤銷之後：%v", got)
 	}
 
-	// B1：措施 → 成員設為已採取措施 → 措施被撤銷：仍可以採取措施（措施做過、成員是已採取措施），不採取措施被成員擋下。
 	c3, members := f.newCase(t, s.StoreID, policy.Privacy, SeverityLow, 2)
 	m3 := f.riskFromCase(t, s.StoreID, c3.ID)
 	f.mustResolve(t, members[0].ID, OutcomeActionTaken)
@@ -674,7 +630,6 @@ func TestDecideFollowsTheDerivedMeasuresAndNeverLeavesACaseWithoutAChoice(t *tes
 		t.Fatalf("done=%+v", done.Case)
 	}
 
-	// 不採取措施：沒有結果的通報帶入未違規；案件結案。
 	nobasis, err := f.decide(t, c1.ID, DecisionNoAction, "")
 	must(t, err)
 	if *nobasis.Decision != DecisionNoAction || nobasis.DecisionNote != nil {
@@ -730,7 +685,6 @@ func TestChangeCaseSeverityWritesANoteAndOnlyWhileOpen(t *testing.T) {
 		*notes.Items[0].SeverityChange != (SeverityChange{From: SeverityMedium, To: SeverityCritical}) {
 		t.Fatalf("notes=%+v", notes.Items)
 	}
-	// 註記上的改前改後只由這個指令寫：一般的註記沒有，DB 也擋下措施的註記或相同的改前改後。
 	plain, err := f.module.CreateCaseNote(ctx, CreateCaseNoteInput{CaseID: c.ID, AdminID: 12, Body: "電話聯絡過賣家"})
 	must(t, err)
 	if plain.SeverityChange != nil {
@@ -745,7 +699,6 @@ func TestChangeCaseSeverityWritesANoteAndOnlyWhileOpen(t *testing.T) {
 			t.Fatalf("DB accepted: %s", sql)
 		}
 	}
-	// 已結案的案件不能改嚴重度，仍可寫註記。
 	f.riskFromCase(t, s.StoreID, c.ID)
 	_, err = f.decide(t, c.ID, DecisionActionTaken, "")
 	must(t, err)
@@ -803,7 +756,6 @@ func TestCaseNotesAreAppendOnlyAndDoNotBumpTheCase(t *testing.T) {
 	if !slices.Equal(got, ids) {
 		t.Fatalf("舊到新、不漏不重：%v，預期 %v", got, ids)
 	}
-	// 註記只能掛在案件或措施的其中一個。
 	for _, sql := range []string{
 		"INSERT INTO seller.governance_notes (note_id, admin_id, body, created_at) VALUES (uuidv7(), 1, 'x', now())",
 		"INSERT INTO seller.governance_notes (note_id, case_id, measure_id, admin_id, body, created_at) SELECT uuidv7(), $1, id, 1, 'x', now() FROM seller.measures LIMIT 1",
@@ -814,7 +766,6 @@ func TestCaseNotesAreAppendOnlyAndDoNotBumpTheCase(t *testing.T) {
 	}
 }
 
-// anotherStore 開另一個帳號的店。
 func (f *fixture) anotherStore(t *testing.T) Store {
 	t.Helper()
 	_, s := f.open(t)
@@ -848,7 +799,6 @@ func TestReportDetailListsTheTriageTargetsOfTheStore(t *testing.T) {
 			t.Errorf("加入的案件 %+v，預期 %s／%s／版本 %d／2 筆通報", target.Case, c.ID, SeverityHigh, c.Version)
 		}
 	}
-	// 移動：案件裡的成員，去處不含目前的類別。
 	moveTargets := f.reportOf(t, members[0].ID).Targets
 	if len(moveTargets) != len(categories)-1 {
 		t.Fatalf("案件成員：%d 個去處，預期 %d", len(moveTargets), len(categories)-1)
@@ -858,12 +808,10 @@ func TestReportDetailListsTheTriageTargetsOfTheStore(t *testing.T) {
 			t.Errorf("移動的去處不含目前的類別、而且這家店沒有其他進行中的案件：%+v", target)
 		}
 	}
-	// 不能分案也不能移動的（已有結果）沒有去處。
 	f.mustResolve(t, members[1].ID, OutcomeNoViolation)
 	if got := f.reportOf(t, members[1].ID).Targets; len(got) != 0 {
 		t.Errorf("已有結果的通報不帶去處：%+v", got)
 	}
-	// 去處是意圖：照讀到的 triage_targets 加入就成功。
 	fresh := f.reportOf(t, awaiting.ID)
 	fraud := fresh.Targets[slices.Index(categories, policy.Fraud)].Case
 	joined, err := f.module.TriageReport(context.Background(), TriageReportInput{
@@ -899,7 +847,6 @@ func TestSupplementsAreSeenOnlyWhenTheAdminActsOnThatReport(t *testing.T) {
 	if after := f.caseOf(t, c.ID); after.UnseenSupplementReports != 3 || !unseen(members[0].ID) || !unseen(members[1].ID) || !unseen(members[2].ID) {
 		t.Fatalf("三個成員都有沒看過的補充：%+v", after.Case)
 	}
-	// 對成員 A 設定結果：A 的補充看過了（而且有了結果不再提醒），B、C 的還沒；案件仍提醒。這是舊做法（拿案件的 updated_at）會標錯的地方。
 	f.resolveNextMinute(t, members[0].ID)
 	if unseen(members[0].ID) || !unseen(members[1].ID) || !unseen(members[2].ID) {
 		t.Fatalf("只有 A 看過：A=%v B=%v C=%v", unseen(members[0].ID), unseen(members[1].ID), unseen(members[2].ID))
@@ -907,32 +854,27 @@ func TestSupplementsAreSeenOnlyWhenTheAdminActsOnThatReport(t *testing.T) {
 	if after := f.caseOf(t, c.ID); after.UnseenSupplementReports != 2 {
 		t.Fatalf("案件還有 2 個成員的補充沒看過：%+v", after.Case)
 	}
-	// 改案件嚴重度之類的案件層級處理不記任何成員的補充：B、C 仍然沒看過。
 	f.now = f.now.Add(time.Minute)
 	_, err := f.module.ChangeCaseSeverity(ctx, ChangeCaseSeverityInput{CaseID: c.ID, AdminID: 10, Severity: SeverityMedium, Note: "改", ExpectedVersion: f.caseOf(t, c.ID).Version})
 	must(t, err)
 	if !unseen(members[1].ID) || !unseen(members[2].ID) || f.caseOf(t, c.ID).UnseenSupplementReports != 2 {
 		t.Fatal("改嚴重度不記成員的補充已看過")
 	}
-	// 移動 B（帶著 B 的 etag）：B 的補充看過了；原案件還有 C。
 	f.now = f.now.Add(time.Minute)
 	_, err = f.move(t, members[1].ID, policy.Counterfeit, severityPtr(SeverityLow))
 	must(t, err)
 	if unseen(members[1].ID) || !unseen(members[2].ID) || f.caseOf(t, c.ID).UnseenSupplementReports != 1 {
 		t.Fatal("移動記下補充已看過")
 	}
-	// 補充又來了（B 在新案件裡再補充一次）：晚於看過的時間，又是沒看過。
 	supplement(f.reportOf(t, members[1].ID))
 	if !unseen(members[1].ID) {
 		t.Fatal("看過之後新的補充又是沒看過")
 	}
-	// 結案帶入預設結果的成員（C）不再提醒；案件結案後沒有未處理的成員。
 	_, err = f.decide(t, c.ID, DecisionNoAction, "")
 	must(t, err)
 	if unseen(members[2].ID) || f.caseOf(t, c.ID).UnseenSupplementReports != 0 {
 		t.Fatalf("結案之後不再提醒：C=%v case=%+v", unseen(members[2].ID), f.caseOf(t, c.ID).Case)
 	}
-	// 待分案的通報有補充：分案記下已看過。
 	awaiting := f.reportBy(t, s.StoreID, policy.Privacy)
 	supplement(f.reportOf(t, awaiting.ID))
 	if !unseen(awaiting.ID) {
@@ -980,14 +922,12 @@ func TestMarkReportSupplementsSeenRecordsOnlyTheMarkerAndNeverAdvancesTheVersion
 	if got := f.caseOf(t, c.ID); got.Version != caseBefore.Version || got.UnseenSupplementReports != 1 || !f.reportOf(t, members[1].ID).HasUnseenSupplements() {
 		t.Fatalf("案件的版本不變、只少一筆沒看過：%+v", got.Case)
 	}
-	// 冪等：再記一次成功，已看過的編號不動。
 	f.now = f.now.Add(time.Minute)
 	again, err := mark(f.reportOf(t, a.ID))
 	must(t, err)
 	if again.SupplementsSeenSeq != marked.SupplementsSeenSeq || marked.SupplementsSeenSeq != 1 || again.Version != a.Version {
 		t.Fatalf("重複記下不改任何東西：%+v", again.Report)
 	}
-	// 讀到之後又有新的補充：舊 etag 的已讀被拒（那則補充還沒被看到），標記不動；用新 etag 才記得下。
 	b := f.reportOf(t, members[1].ID)
 	supplement(b)
 	_, err = mark(b)
@@ -1001,14 +941,12 @@ func TestMarkReportSupplementsSeenRecordsOnlyTheMarkerAndNeverAdvancesTheVersion
 	if fresh.HasUnseenSupplements() || f.caseOf(t, c.ID).UnseenSupplementReports != 0 {
 		t.Fatalf("新 etag 記得下：%+v", fresh.Report)
 	}
-	// 有了結果的通報不寫入（也不報錯）。
 	resolved := f.mustResolve(t, b.ID, OutcomeNoViolation)
 	got, err := mark(resolved)
 	must(t, err)
 	if got.Version != resolved.Version || got.SupplementsSeenSeq != fresh.SupplementsSeenSeq || fresh.SupplementsSeenSeq != 2 {
 		t.Fatalf("有結果的通報不寫入：%+v", got.Report)
 	}
-	// 通報的版本衝突與案件的版本衝突在 metadata 裡分得出來。
 	_, err = f.module.ResolveReport(ctx, ResolveReportInput{ReportID: a.ID, AdminID: 8, Outcome: OutcomeInsufficient, ExpectedVersion: a.Version - 1})
 	wantConflictTarget(t, err, "report")
 	_, err = f.module.DecideCase(ctx, DecideCaseInput{CaseID: c.ID, AdminID: 8, Decision: DecisionNoAction, ExpectedVersion: caseBefore.Version})
@@ -1017,7 +955,6 @@ func TestMarkReportSupplementsSeenRecordsOnlyTheMarkerAndNeverAdvancesTheVersion
 	wantKind(t, err, apperr.KindNotFound)
 }
 
-// wantConflictTarget 確認錯誤是版本衝突，而且 ErrorInfo.metadata 的 conflictTarget 是 target。
 func wantConflictTarget(t *testing.T, err error, target string) {
 	t.Helper()
 	wantKind(t, err, apperr.KindVersionConflict)
@@ -1027,7 +964,6 @@ func wantConflictTarget(t *testing.T, err error, target string) {
 	}
 }
 
-// resolveNextMinute 在下一分鐘對通報設定結果（未違規）。
 func (f *fixture) resolveNextMinute(t *testing.T, id uuid.UUID) {
 	t.Helper()
 	f.now = f.now.Add(time.Minute)
@@ -1063,7 +999,6 @@ func TestUnseenSupplementsDoNotDependOnTheClock(t *testing.T) {
 	if got := mark(); got.HasUnseenSupplements() || got.SupplementsSeenSeq != 1 {
 		t.Fatalf("看過第 1 則：%+v", got.Report)
 	}
-	// 第 2 則補充的時鐘比標記記下時早 2 小時：時間比較會判成「早於看過的時間」而永遠不提醒。
 	f.now = f.now.Add(-2 * time.Hour)
 	supplement()
 	if !f.reportOf(t, members[0].ID).HasUnseenSupplements() {
@@ -1072,7 +1007,6 @@ func TestUnseenSupplementsDoNotDependOnTheClock(t *testing.T) {
 	if got := mark(); got.HasUnseenSupplements() || got.SupplementsSeenSeq != 2 {
 		t.Fatalf("看過第 2 則：%+v", got.Report)
 	}
-	// 與標記同一個時間（微秒相同）的補充也是沒看過。
 	supplement()
 	if got := f.reportOf(t, members[0].ID); !got.HasUnseenSupplements() || got.SupplementsSeenSeq != 2 || got.SupplementCount != 3 {
 		t.Fatalf("同一時間的補充仍是沒看過：%+v", got.Report)

@@ -112,7 +112,6 @@ export function useGifEditor(file: File | undefined, enabled: boolean) {
 	const { maxOutput, maxFps, startSeconds, endSeconds } = currentInputs;
 	const start = Number(startSeconds);
 	const end = Number(endSeconds);
-	// GIF timing has 10 ms precision; reject ranges that would snap to zero.
 	const startTimeMs = Math.round(start * 100) * 10;
 	const endTimeMs = Math.round(end * 100) * 10;
 	let rangeError: string | null = null;
@@ -189,12 +188,6 @@ export default function GifEditControls({
 	const controlsDisabled = disabled || editor.loading || !editor.metadata;
 	const durationSeconds = (editor.metadata?.durationMs ?? 0) / 1000;
 	const trimDisabled = controlsDisabled || durationSeconds === 0;
-	// Two different failures used to share one paragraph and one describedby:
-	// a file-inspection failure was announced by the paragraph but described by
-	// nothing, while the range error had no message beside the fields at all.
-	// Split them — the inspection failure stays a section-level alert, the range
-	// error becomes the 結束 field's own message (and the 開始 field points at
-	// it, since the constraint spans the pair).
 	const startFieldId = `${sectionId}-start`;
 	const endFieldId = `${sectionId}-end`;
 	const inspectionError =

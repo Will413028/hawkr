@@ -17,7 +17,6 @@ vi.mock("@/components/shared/SellerPageShell", () => ({
 	SellerPageShell: ({ children }: { children?: React.ReactNode }) =>
 		React.createElement("div", null, children),
 }));
-// 空狀態的插圖換成一個純標記：本測試問的是「顯不顯示空狀態」，不是插圖長什麼樣。
 vi.mock("@/features/account/components/AccountEmptyIcon", () => ({
 	AccountEmptyStateIcon: () => React.createElement("span"),
 }));
@@ -87,12 +86,10 @@ describe("TrackingClient 對沒有託運單號的訂單", () => {
 				expect(screen.queryByTestId("tracking-forbidden")).not.toBeNull();
 			});
 			expect(screen.queryByText("重試")).toBeNull();
-			// 原始 HTTP 碼不得外露。
 			expect(screen.queryByText(/403/)).toBeNull();
 		});
 
 		it("[陽性對照] 暫時性失敗（500）⇒ 仍然給重試鍵", async () => {
-			// 沒有這一條，一個「永遠不給重試鍵」的實作會讓上面那條通過。
 			queryLogistics.mockRejectedValue(apiError(500));
 			render(
 				React.createElement(TrackingClient, { orderNo: "O2026091200001" }),

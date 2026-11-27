@@ -1,11 +1,7 @@
-/* Product quick-view modal (intercepted /products/[id]). Full-screen overlay
-   over the still-mounted page; scales out of / into the tapped card. */
 
 .product-modal {
 	position: fixed;
 	inset: 0;
-	/* Above the floating nav (--z-nav: 250) so the modal's close button and the
-	   product page's own 返回 aren't covered by the navbar; below toasts (700). */
 	z-index: var(--z-modal, 400);
 }
 
@@ -53,11 +49,6 @@
 	opacity: 1;
 }
 
-/* The pending skeleton already completed the card-to-viewport zoom. During
-   the first paint of real product content, preserve that exact full-size
-   geometry without replaying the panel transition. The handoff attribute is
-   removed on the following frame while data-open remains true, so closing can
-   still use the normal scale-down transition. */
 .product-modal[data-handoff="true"] .product-modal__backdrop,
 .product-modal[data-handoff="true"] .product-modal__panel {
 	transition: none;
@@ -77,11 +68,6 @@
 	-webkit-overflow-scrolling: touch;
 }
 
-/* The bordered glass card is useful on the standalone PDP, where the whole
- * document can establish its silhouette. Inside the independently scrolling
- * quick-view it is taller than the viewport, so its lower edge is clipped
- * until the user reaches the end and reads as a broken frame. Let the modal
- * panel be the frame and keep the product sections visually continuous. */
 .product-modal__scroll > section > .glass-card {
 	border-color: transparent;
 	background: transparent;
@@ -94,10 +80,6 @@
 	min-height: 100%;
 }
 
-/* Phones present the quick-view as a floating card rather than a full-bleed
- * sheet, matching the post viewer and the buyer app's preview window. Desktop
- * keeps `inset: 0` — there the modal IS the reading surface, and insetting it
- * would just add a cosmetic frame around an already-windowed layout. */
 @media (max-width: 900px) {
 	.product-modal__panel {
 		inset: var(--hkui-card-inset);

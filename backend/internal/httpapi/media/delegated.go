@@ -97,7 +97,6 @@ func (h *Delegated) BeginSecureUpload(ctx context.Context, req *connect.Request[
 	}), nil
 }
 
-// withUploader 授權後以代行 session 的管理員與被代行的店家為上傳者執行 fn；公開圖片的三個方法共用（B1-D21）。
 func (h *Delegated) withUploader(ctx context.Context, fn func(ctx context.Context, u media.Uploader) error) error {
 	c, err := httpdelegation.CallerFrom(ctx)
 	if err != nil {

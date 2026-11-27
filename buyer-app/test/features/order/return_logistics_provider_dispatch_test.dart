@@ -59,15 +59,12 @@ void main() {
         '→ 不得畫成黑貓、也不得畫成 7-11', (tester) async {
       await _pump(tester, _caseWith(unknown));
 
-      // ① 不得掛上任一家物流商的標題
       expect(find.text('黑貓宅配收件流程'), findsNothing);
       expect(find.text('7-11 退貨便流程'), findsNothing);
-      // ② 不得出現物流商專屬步驟文案
       expect(find.text('黑貓確認派車'), findsNothing);
       expect(find.text('司機到府收件'), findsNothing);
       expect(find.text('至門市 ibon 機台選擇「退貨便」'), findsNothing);
       expect(find.text('交付門市人員'), findsNothing);
-      // ③ 不得憑空消失：仍要有 provider-neutral 的進度可看
       expect(find.text('退貨物流進度'), findsOneWidget);
       expect(find.text('退貨運送中'), findsOneWidget);
       expect(find.text('賣家已收到退貨'), findsOneWidget);

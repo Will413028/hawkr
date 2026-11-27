@@ -1,6 +1,3 @@
-/* Seller recruitment feature directory.
- * A text-first index inspired by professional feature catalogues: one paper
- * surface, one navigation column and hairline-separated facts. */
 
 .seller-feature-overview {
 	width: calc(100% - 40px);

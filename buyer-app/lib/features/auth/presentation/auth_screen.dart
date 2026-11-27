@@ -28,7 +28,6 @@ class AuthScreen extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 進行中的登入方式；一次只進行一個。
     final loadingProvider = useState<OAuthProvider?>(null);
     final appVersionFuture = useMemoized(fetchAppVersion);
 
@@ -42,7 +41,6 @@ class AuthScreen extends HookConsumerWidget {
             .read(authControllerProvider.notifier)
             .signInWith(provider);
         if (!signedIn || !context.mounted) return;
-        // session 已由 AuthController 寫入；只負責導頁。
         await ref.read(analyticsEventsProvider).trackLogin(provider.name);
         if (!context.mounted) return;
         context.go(continueUrl ?? '/');
@@ -61,10 +59,8 @@ class AuthScreen extends HookConsumerWidget {
     final bool keyboardVisible = media.viewInsets.bottom > 0;
     final double screenHeight = media.size.height;
     final bool largeTextLayout = media.textScaler.scale(16) / 16 >= 1.1;
-    // Apple Guideline 4.8：提供其他第三方登入就必須提供 SIWA；App 只發 iOS，一律顯示。
 
     void handleBack() {
-      // Apple App Review 合規：訪客可從登入頁返回繼續瀏覽。
       if (context.canPop()) {
         context.pop();
       } else {
@@ -113,8 +109,6 @@ class AuthScreen extends HookConsumerWidget {
                   },
                 ),
                 Positioned(
-                  // The 36dp visual stays at the original 16/8 position while
-                  // the surrounding hit target grows to the 48dp minimum.
                   top: 2.h,
                   left: 10.w,
                   child: AuthBackButton(onTap: handleBack),
@@ -290,8 +284,6 @@ class AuthScreen extends HookConsumerWidget {
   }
 
   Widget _buildFooter(Future<String> appVersionFuture) {
-    // Footer 用 RepaintBoundary 隔離：父層動畫 60fps 重繪不會帶到這層 →
-    // 文字保持像素穩定（解決深色細字 + 動態背景看起來抖動的視覺問題）
     return RepaintBoundary(
       child: AuthFooterCopy(appVersionFuture: appVersionFuture),
     );

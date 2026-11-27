@@ -21,7 +21,6 @@ public final class DateTimeUtils {
     private DateTimeUtils() {
     }
 
-    // ==================== 在地時區常數 ====================
 
     /**
      * 台灣在地時區。
@@ -34,7 +33,6 @@ public final class DateTimeUtils {
      */
     public static final ZoneId TAIWAN_ZONE = ZoneId.of("Asia/Taipei");
 
-    // ==================== PayUni 時區常數與 formatter ====================
 
     /** PayUni / 物流 系統的時區（台灣）；＝ {@link #TAIWAN_ZONE}。 */
     public static final ZoneId PAYUNI_ZONE = TAIWAN_ZONE;
@@ -62,7 +60,6 @@ public final class DateTimeUtils {
     private static final DateTimeFormatter PAYUNI_AUTH_TIME_FMT =
             DateTimeFormatter.ofPattern("HHmmss");
 
-    // ===== 我方 → PayUni（送出日期）=====
 
     /** 取得目前在台北時區的日期（送 PayUni 用，避免 UTC 容器跨日邊界錯一天）。 */
     public static LocalDate todayInTaipei() {
@@ -84,7 +81,6 @@ public final class DateTimeUtils {
         return date.format(PAYUNI_AUTH_DAY_FMT);
     }
 
-    // ===== PayUni → 我方（解析回傳）=====
 
     /**
      * 解析 PayUni {@code yyyy-MM-dd HH:mm:ss} UTC+8 字串為 UTC LocalDateTime。
@@ -124,21 +120,6 @@ public final class DateTimeUtils {
             return taipeiLocal.atZone(PAYUNI_ZONE).withZoneSameInstant(ZoneOffset.UTC)
                     .toLocalDateTime();
         } catch (DateTimeParseException e) {
-            // 🔴 已知的哨兵在上面就回 null 了（不會走到這裡）⇒ 進到這裡代表
-            //    **PayUni 送了一個我們沒見過的格式**，那是要被看見的事。
-            //    這裡不 log（本類別是純工具、不持有 logger），交由呼叫端的
-            //    null 分支留痕——四個呼叫端都有。
-            //
-            // ⚠️ **這道與上面的哨兵判定互為冗餘，是刻意的，但要知道冗餘到什麼程度**
-            //    （2026-09-10 變異實測，四種變異）：
-            //      M1  只拿掉 "-" 哨兵判定        → **不轉紅**（"-" 落到這裡被接住）
-            //      M2  只拿掉本 catch             → 轉紅 1 error（未知格式失去防線）
-            //      M1b 兩道同時拿掉               → 轉紅 3 errors
-            //      M3  整個方法直接 return null   → 轉紅 3 failures（陰性對照有效）
-            //    ⇒ 單看「"-" 有沒有被正確判定」這件事，**測試抓不到**——本 catch 會遮住它。
-            //    保留顯式哨兵判定的理由不是防禦，是**語意**：讓本 catch 的含義維持
-            //    「PayUni 改格式了」這個罕見事件，而不是把每天都會發生的 "-" 也算進去。
-            //    刪掉任何一道之前，先讓另一道的測試轉紅，否則會誤以為它沒用。
             return null;
         }
     }
@@ -169,7 +150,6 @@ public final class DateTimeUtils {
         return date.atTime(23, 59, 59).atZone(PAYUNI_ZONE).withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime();
     }
 
-    // ==================== 取得當前時間 ====================
 
     /**
      * 取得 UTC 當前時間。
@@ -189,7 +169,6 @@ public final class DateTimeUtils {
         return LocalDate.now(ZoneOffset.UTC);
     }
 
-    // ==================== 格式化 ====================
 
     /**
      * LocalDateTime(UTC) → ISO 8601 字串，帶 Z 尾綴。
@@ -206,7 +185,6 @@ public final class DateTimeUtils {
                 .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
     }
 
-    // ==================== 解析 ====================
 
     /**
      * ISO 8601 字串 → LocalDateTime(UTC)。
@@ -235,7 +213,6 @@ public final class DateTimeUtils {
         }
     }
 
-    // ==================== Epoch 轉換 ====================
 
     /**
      * LocalDateTime(UTC) → epoch 毫秒。

@@ -7,13 +7,6 @@ import {
 } from "../lib/products/descriptionEditorJs";
 import type { ProductDescription } from "../lib/products/seller-repo";
 
-// list block（issue #1257）：Editor.js `@editorjs/list` 的 { style, items } 與後端
-// { type:"list", listJson:'{ordered,items:[{runs}]}' } 對稱橋接，項目內複用 runs。
-//
-// 註：此測試在 node 環境（無 DOM）跑，htmlToRuns 會走 stripTags fallback，故不斷言
-// 行內 <b>/<a> → run 旗標的解析（與既有 description-editorjs-align.test.ts 同限制）。
-// 行內粗體 / 連結保留由：(1) toEditorData 的 runs→HTML 產出（下方 href/bold 斷言）
-// (2) 真實瀏覽器 ui-verify (3) 後端 round-trip（listJson 含 href/bold 已驗存取）覆蓋。
 
 test("fromEditorData maps a list block to backend listJson (ordered flag + items)", () => {
 	const saved = fromEditorData({
@@ -49,8 +42,6 @@ test("fromEditorData maps unordered style to ordered:false", () => {
 });
 
 test("external paste: nested { content } list items are flattened to items", () => {
-	// @editorjs/list v2 (or a pasted nested list) yields items as
-	// { content, items } objects — the bridge reads each item's own content.
 	const saved = fromEditorData({
 		blocks: [
 			{

@@ -64,7 +64,6 @@ class CartServiceSellerMetaTest {
     void cacheMiss_fallsBackToSellerService_andCarriesStoreCode() {
         CartCacheService cache = Mockito.mock(CartCacheService.class);
         Mockito.when(cache.getCartCache(BUYER_ID, null)).thenReturn(List.of(item()));
-        // Miss：Redis 沒有這個賣家（或條目殘缺被判為 Miss）
         Mockito.when(cache.getSellerMetaBatch(List.of(STORE_ID))).thenReturn(new HashMap<>());
 
         SellerGrpcClient sellerClient = Mockito.mock(SellerGrpcClient.class);
@@ -124,7 +123,6 @@ class CartServiceSellerMetaTest {
 
         assertThat(result.groups()).hasSize(1);
         assertThat(result.groups().get(0).storeCode()).isEmpty();
-        // 殘缺的 meta 不得寫回快取，否則會被續命 24h
         Mockito.verify(cache, Mockito.never()).setSellerMeta(Mockito.anyLong(), Mockito.any());
     }
 }

@@ -103,8 +103,6 @@ func StoreIDOf(issuer domain.Issuer) StoreID {
 	if issuer.ID == 0 {
 		return StoreID{}
 	}
-	// PLATFORM 開票人的 issuer_ref_id 恆為 0 ⇒ store_id "0" 是正確結果（沒有賣家要通知），
-	// 不是缺漏。
 	return StoreID{v: strconv.FormatInt(issuer.IssuerRefID, 10), set: true}
 }
 

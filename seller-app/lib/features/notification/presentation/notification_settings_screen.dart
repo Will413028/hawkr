@@ -187,7 +187,6 @@ class NotificationSettingsScreen extends HookConsumerWidget {
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // 不可關的 (分類, 渠道)：開關鎖住（IgnorePointer + 半透明，不改 layout）。
                 IgnorePointer(
                   ignoring: !e.canDisable,
                   child: Opacity(

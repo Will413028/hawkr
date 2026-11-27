@@ -15,9 +15,7 @@ import (
 	. "github.com/Will413028/hawkr/backend/internal/modules/payment"
 )
 
-// 一次向賣家收回可以跨多個 provider 轉帳：原轉帳先、成功的補差額轉帳後（依退款 ID 升序），每一次 provider 撤回呼叫一列 refund_reversals，各自收斂。
 
-// topupDone 建立已入帳 100 的付款：轉帳成立 70（送出前有一筆 30 的退款算進去），那筆退款失敗、補差額 30 成功（DONE），賣家共收到 70 + 30 = 100。
 func (f *chargeFixture) topupDone(t *testing.T, orderNo string) (PaymentTransfer, PaymentRefund) {
 	t.Helper()
 	tr, r := f.topupSending(t, orderNo)

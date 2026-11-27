@@ -127,7 +127,6 @@ public class ProductGrpcClient {
         GetPublicProductRequest request = GetPublicProductRequest.newBuilder()
                 .setProductId(productId)
                 .build();
-        // product-service 失敗時會拋 StatusRuntimeException，由上層 RPC catch-all 處理
         GetProductResponse response = productStub
                 .withDeadlineAfter(INTERNAL_READ_DEADLINE_SEC, TimeUnit.SECONDS)
                 .getPublicProduct(request);

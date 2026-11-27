@@ -38,7 +38,7 @@ func TestLogSampler_CallSitesDoNotShareABudget(t *testing.T) {
 // make a 100x incident read as a one-off.
 func TestLogSampler_CountsRepeatsNotOnlyCapOverflow(t *testing.T) {
 	clk := &fakeClock{t: time.Unix(1700000000, 0)}
-	s := newLogSampler(time.Minute, 10) // cap never reached: one key only
+	s := newLogSampler(time.Minute, 10)
 	s.now = clk.Now
 
 	const occurrences = 100

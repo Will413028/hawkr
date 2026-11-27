@@ -52,7 +52,6 @@ const goodOrder = `{"event_id":"evt-1","order_no":"O1","buyer_id":"71","store_id
 const goodPartial = `{"event_id":"e-1","case_no":"C1","order_no":"O1","refund_outcome":"PARTIAL_REFUND","refund_amount":"300","external_ref_id":"REF-1"}`
 
 func field(body, name, value string) string {
-	// 取代 JSON 字串欄位的值（欄位在 body 內一定存在）
 	marker := `"` + name + `":"`
 	i := strings.Index(body, marker)
 	if i < 0 {
@@ -91,7 +90,6 @@ func TestMalformedInputsArePermanentForBothEvents(t *testing.T) {
 	}
 	jobs := &recordedJobs{}
 	c := Consumer{Jobs: jobs}
-	// 輔助函式造出的「缺欄位」輸入必須仍是合法 JSON，否則測的是壞 JSON 而不是缺欄位。
 	for _, in := range inputs[2:] {
 		if !json.Valid([]byte(in.order)) || !json.Valid([]byte(in.refund)) {
 			t.Fatalf("%s：測試輸入不是合法 JSON", in.name)

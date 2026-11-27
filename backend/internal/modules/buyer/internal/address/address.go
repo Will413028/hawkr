@@ -153,8 +153,6 @@ func (service *Service) Add(ctx context.Context, input model.AddressInput) (mode
 		if err != nil {
 			return err
 		}
-		// 已鎖住買家，筆數不會在檢查與寫入之間改變。上限是要等狀態被修正（先刪掉一筆）的前提條件，不是輸入錯誤
-		// （〈API 設計規範（Connect）〉§八）。
 		if len(rows) >= model.MaxAddresses {
 			return apperr.FailedPrecondition("收貨地址最多 %d 筆，請先刪除不用的地址", model.MaxAddresses)
 		}

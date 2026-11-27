@@ -64,8 +64,6 @@ export function ReportExternalIssuanceDialog({
 	const [invoiceDate, setInvoiceDate] = React.useState("");
 	const [note, setNote] = React.useState("");
 
-	// 每次開啟都回到空白：上一次放棄的輸入不該在下一次冒出來，而這一次送出去的
-	// 東西是不可逆的。
 	React.useEffect(() => {
 		if (open) {
 			setInvoiceNumber("");
@@ -131,8 +129,6 @@ export function ReportExternalIssuanceDialog({
 					description="兩碼英文字軌 ＋ 八碼數字，例如 AB12345678。"
 					placeholder="AB12345678"
 					value={invoiceNumber}
-					// 字軌一律大寫：後端的 pattern 只收大寫，讓賣家因為打了小寫而被擋
-					// 是一個沒有意義的失敗。
 					onChange={(e) => setInvoiceNumber(e.target.value.toUpperCase())}
 					isInvalid={numberInvalid}
 					errorMessage={
@@ -175,8 +171,6 @@ export function ReportExternalIssuanceDialog({
 						{copy.description ? ` ${copy.description}` : ""}
 					</p>
 				) : error ? (
-					// 不是發票業務碼（400 的格式錯誤／5xx／網路）⇒ 把後端那句話原樣顯示，
-					// 那是唯一說得出「哪裡不合格」的來源。
 					<p
 						role="alert"
 						className="m-0 text-[0.6875rem] leading-relaxed text-danger-700"

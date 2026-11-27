@@ -14,9 +14,9 @@ type HomeSectionHeaderProps = {
 	eyebrow: ReactNode;
 	align?: SectionAlign;
 	description?: ReactNode;
-	moreHref?: string; // "more →" link — rendered only in the "between" layout
+	moreHref?: string;
 	moreLabel?: ReactNode;
-	children: ReactNode; // <h2> content (allows <br> / <em>)
+	children: ReactNode;
 };
 
 export default function HomeSectionHeader({
@@ -40,8 +40,6 @@ export default function HomeSectionHeader({
 	);
 
 	if (align === "center") {
-		// Centered layout intentionally has no "more" link;
-		// moreHref/moreLabel are not rendered here (only the "between" layout uses them).
 		return (
 			<header className={sectionHeaderClasses("center")}>{heading}</header>
 		);

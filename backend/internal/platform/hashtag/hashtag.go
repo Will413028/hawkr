@@ -62,7 +62,6 @@ func lowerASCII(s string) string {
 	return b.String()
 }
 
-// allowed 是名稱接受的字元：ASCII 小寫字母、數字與漢字（zh-TW 與 en 都夠用）。
 func allowed(r rune) bool {
 	switch {
 	case r >= 'a' && r <= 'z', r >= '0' && r <= '9':

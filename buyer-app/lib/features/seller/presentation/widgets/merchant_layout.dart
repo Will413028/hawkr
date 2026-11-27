@@ -94,9 +94,6 @@ class MerchantLayoutSpec {
     if (aboutSummaryNeedsFullHeight(description: description)) {
       return profileDetailsReadMorePaneHeight;
     }
-    // Without the optional award, the location / rating / subscriber summary
-    // only occupies three rows. Restore the full pane height only when the
-    // general panel really needs a fourth visual row.
     return isWide ? 104 : 120;
   }
 
@@ -158,15 +155,11 @@ class MerchantLayoutSpec {
 
   double get estimatedProfileHeight {
     final scaleDelta = math.max(0, textScale - 1);
-    // Avatar overlap followed by the 2dp gap before profile details.
-    // The store name now lives inside the general-information pane.
     const identity = 28.0;
     if (!stacksProfileDetails) {
       return identity + profileDetailsPaneHeight;
     }
 
-    // Stacked cards must reserve their natural text height because the
-    // FlexibleSpaceBar clips anything outside expandedHeight.
     final generalPanel = 124.0 + scaleDelta * 124;
     final aboutPanel = 148.0 + scaleDelta * 64;
     return identity + generalPanel + 4 + aboutPanel;
@@ -194,8 +187,6 @@ class MerchantLayoutSpec {
   }
 
   int postColumnCount(double availableWidth) {
-    // [availableWidth] excludes the page gutters: a 360dp viewport yields
-    // roughly 328dp here, while a 320dp viewport yields roughly 296dp.
     if (availableWidth < 320) return 2;
     if (availableWidth < 600) return 3;
     if (availableWidth < 840) return 4;

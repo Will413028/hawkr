@@ -10,7 +10,6 @@ Date? parseDate(String value) {
   final match = _isoDate.firstMatch(value);
   if (match == null) return null;
   final year = int.parse(match[1]!);
-  // google.type.Date: year 0 means no year, not year 0000.
   if (year < 1) return null;
   final month = int.parse(match[2]!);
   final day = int.parse(match[3]!);

@@ -21,7 +21,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// blockFake 記下封鎖寫入與批次查詢次數；名單與顯示資料由欄位給。
 type blockFake struct {
 	fakeModule
 	blockedBuyers  [][2]int64
@@ -112,7 +111,6 @@ func (s storesOf) Store(_ context.Context, id int64) (seller.Store, error) {
 
 const callerBuyerID = 5007
 
-// blockEnv 是封鎖測試的環境：呼叫者是帳號 1、買家 5007；帳號 1 擁有店 10，帳號 2 擁有店 20 與買家 6.
 type blockEnv struct {
 	h       *App
 	m       *blockFake
@@ -193,12 +191,10 @@ func TestBlockAuthorOfAnUnreadableReferenceIsNotFoundAndWritesNothing(t *testing
 
 func TestBlockingTheCallersOwnStoreIsRejectedOnEveryEntryPoint(t *testing.T) {
 	e := newBlockEnv(t, card(10, seller.CardOpen))
-	// 從店面頁封鎖。
 	_, err := e.h.BlockStore(e.ctx, connect.NewRequest(&pb.BlockStoreRequest{StoreId: "10"}))
 	if apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("封鎖自己的店要 invalid_argument：%v", err)
 	}
-	// 從自己店的留言封鎖（作者是店家 10）。
 	e.authors.author = social.ContentAuthor{Found: true, Author: social.Actor{Kind: social.ActorStore, ID: 10}, StoreID: 10}
 	_, err = e.h.BlockAuthor(e.ctx, connect.NewRequest(commentRef()))
 	if apperr.KindOf(err) != apperr.KindInvalidInput {
@@ -210,7 +206,7 @@ func TestBlockingTheCallersOwnStoreIsRejectedOnEveryEntryPoint(t *testing.T) {
 }
 
 func TestBlockStoreRejectsAStoreWithoutACardWithoutRevealingItExists(t *testing.T) {
-	e := newBlockEnv(t) // 沒有任何店家卡片：不存在或從沒公開過
+	e := newBlockEnv(t)
 	_, err := e.h.BlockStore(e.ctx, connect.NewRequest(&pb.BlockStoreRequest{StoreId: "20"}))
 	if apperr.KindOf(err) != apperr.KindNotFound || len(e.m.blockedStores) != 0 {
 		t.Fatalf("err=%v writes=%+v", err, e.m.blockedStores)
@@ -246,7 +242,6 @@ func TestListBlockedBuyersShowsClosedBuyersAsDeletedWithOneBatchLookup(t *testin
 		Items: []model.BlockedBuyerItem{{BuyerID: 6, Time: at}, {BuyerID: 7, Time: at.Add(-time.Hour)}, {BuyerID: 8, Time: at.Add(-2 * time.Hour)}},
 		Next:  &model.BlockedBuyerCursor{Time: at.Add(-2 * time.Hour), BuyerID: 8},
 	}
-	// 6 存活、7 已關閉（有個資也不能出現）、8 查不到。
 	e.m.display = []model.Display{{BuyerID: 6, DisplayName: &name}, {BuyerID: 7, DisplayName: &name, Deleted: true}}
 	resp, err := e.h.ListBlockedBuyers(e.ctx, connect.NewRequest(&pb.ListBlockedBuyersRequest{PageSize: 3}))
 	if err != nil {
@@ -267,7 +262,6 @@ func TestListBlockedBuyersShowsClosedBuyersAsDeletedWithOneBatchLookup(t *testin
 	if resp.Msg.GetNextPageToken() == "" {
 		t.Fatal("有下一頁要帶 token")
 	}
-	// token 內容與 scope 往返，下一頁的游標傳進模組。
 	if _, err := e.h.ListBlockedBuyers(e.ctx, connect.NewRequest(&pb.ListBlockedBuyersRequest{PageToken: resp.Msg.GetNextPageToken()})); err != nil || e.m.gotBuyerInput.After == nil || e.m.gotBuyerInput.After.BuyerID != 8 {
 		t.Fatalf("游標：%v %+v", err, e.m.gotBuyerInput.After)
 	}
@@ -347,7 +341,7 @@ func TestBlockAuthorByReviewBlocksTheReplyingStoreAsAStore(t *testing.T) {
 }
 
 func TestBlockAuthorByAnUnreadableReviewIsNotFoundAndWritesNothing(t *testing.T) {
-	e := newBlockEnv(t, card(20, seller.CardOpen)) // fakeReviews 預設讀不到
+	e := newBlockEnv(t, card(20, seller.CardOpen))
 	_, err := e.h.BlockAuthor(e.ctx, connect.NewRequest(reviewRef()))
 	if apperr.KindOf(err) != apperr.KindNotFound {
 		t.Fatalf("看不到的評價要 not_found：%v", err)

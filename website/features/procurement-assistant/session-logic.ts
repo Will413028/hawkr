@@ -82,9 +82,6 @@ export function shouldShowAgentEntry({
 
 const SLOT_LABELS: Record<keyof ProcurementSlots, string> = {
 	item: "品項",
-	// 逐字對齊後端 domain.SlotLabels 的同名項——recordedThisTurn 的 chip label 由
-	// 後端送，這裡是 missingRequired／rejected 走 slotLabel() 時的同一份文案，
-	// 兩邊不一致的話同一個欄位在畫面上會有兩個名字。
 	itemResolution: "品項分類",
 	quantity: "數量",
 	unit: "單位",

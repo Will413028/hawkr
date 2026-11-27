@@ -10,7 +10,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social/internal/visibility"
 )
 
-// 列表項目的狀態（內部的 SQL 常數，對外的型別是 model.CommentState）。
 const (
 	stateVisible = "VISIBLE"
 	stateDeleted = "DELETED"
@@ -45,7 +44,6 @@ func afterComment(created ColumnTimestampz, id ColumnString, pg CommentPage) Boo
 	return ROW(created, id).GT(ROW(TimestampzT(pg.AfterCreated), UUID(pg.AfterID)))
 }
 
-// stateOf 是留言與討論區留言列表項目的狀態算式，列表與單筆讀取共用。
 func stateOf(visible, gone BoolExpression) Expression {
 	return CASE().
 		WHEN(visible).THEN(NewEnumValue(stateVisible)).
@@ -64,13 +62,10 @@ func CommentState(id uuid.UUID) SelectStatement {
 	return SELECT(stateOf(c.Counted(), c.Gone()).AS("state")).FROM(c.T).WHERE(c.T.ID.EQ(UUID(id)))
 }
 
-// placeholderComment 的內文與作者只在 visible 時給，否則是空值。
 func masked(visible BoolExpression, col Expression, empty Expression) Expression {
 	return COALESCE(CASE().WHEN(visible).THEN(col), empty)
 }
 
-// topLevelList 是頂層留言列表的共同形狀：範圍 scope（呼叫方給的條件，要包含「頂層」與貼文的範圍）、哪些項目出現 shown，與佔位項目的遮罩、keyset。
-// 觀看者的規則（被封鎖排除的作者）在入口的 Where：被排除的頂層整則不出現，不變成佔位項目；回覆裡被排除的列不進「有可見回覆」的判斷。
 func topLevelList(v visibility.Viewer, pg CommentPage, scope func(c visibility.Comments) []BoolExpression, shown func(c, r visibility.Comments, visible BoolExpression) BoolExpression) SelectStatement {
 	c := visibility.CommentsOf("c", v)
 	r := visibility.CommentsOf("r", v)
@@ -94,20 +89,17 @@ func topLevelList(v visibility.Viewer, pg CommentPage, scope func(c visibility.C
 		LIMIT(pg.Limit)
 }
 
-// withVisibleReply 是「自己可見，或不可見但底下有可見的回覆」：頂層留言出現的條件，含佔位項目（state 是 DELETED 或 HIDDEN）。
 func withVisibleReply(c, r visibility.Comments, visible BoolExpression) BoolExpression {
 	hasVisibleReply := EXISTS(SELECT(r.T.ID).FROM(r.T).WHERE(r.Where(r.T.ParentID.EQ(c.T.ID), r.Counted())))
 	return visible.OR(hasVisibleReply)
 }
 
-// topLevelComments 是貼文的頂層留言，含佔位項目。容器的規則（貼文公開可讀，或店主讀自己的貼文）對父鍵 postID 只檢查一次，不是每個留言一次。
 func topLevelComments(postID uuid.UUID, v visibility.Viewer, pg CommentPage, container BoolExpression) SelectStatement {
 	return topLevelList(v, pg, func(c visibility.Comments) []BoolExpression {
 		return []BoolExpression{c.T.PostID.EQ(UUID(postID)), c.T.ParentID.IS_NULL(), container}
 	}, withVisibleReply)
 }
 
-// storeScope 是店主讀自己店的頂層留言的範圍：頂層，而且貼文是店家未刪除的貼文（任何狀態，不必公開）；postID 非 nil 時只那一篇。
 func storeScope(storeID int64, postID *uuid.UUID) func(c visibility.Comments) []BoolExpression {
 	return func(c visibility.Comments) []BoolExpression {
 		p := visibility.OwnerPosts("cp", storeID)
@@ -154,8 +146,6 @@ func ListOwnerTopLevelComments(postID uuid.UUID, storeID int64, pg CommentPage) 
 	return topLevelComments(postID, visibility.Anonymous, pg, postContainer(visibility.OwnerPosts("cp", storeID), postID))
 }
 
-// replies 是頂層留言的回覆（父留言可以是佔位項目，但不能被觀看者的封鎖排除：直接帶被封鎖者的頂層 ID 讀不到回覆）：每一列自己可見
-// 而且作者沒被排除；容器 container 由呼叫方給（對 post 的別名 p）。
 func replies(parentID uuid.UUID, v visibility.Viewer, pg CommentPage, post visibility.Posts) SelectStatement {
 	c := visibility.CommentsOf("c", v)
 	s := table.CommentStats.AS("s")

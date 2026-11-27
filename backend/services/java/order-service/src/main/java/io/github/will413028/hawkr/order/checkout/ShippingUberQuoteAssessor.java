@@ -71,8 +71,6 @@ public class ShippingUberQuoteAssessor implements QuoteAssessor {
                         .addAllItems(items(probe.items()))
                         .build());
         if (response.getCode() != GrpcResponseCode.SUCCESS.code()) {
-            // 下游契約是「恆 code=0，業務失敗走 available=false」。收到非零表示契約被改過
-            // ⇒ 當成「問不到」，不猜它的意思。
             log.warn("ShippingUberQuoteAssessor.quote.nonZeroCode",
                     "shipping 回非零 code=" + response.getCode() + " message=" + response.getMessage());
             return Assessment.unavailable(ProviderReason.ASSESSOR_UNAVAILABLE);
@@ -104,12 +102,9 @@ public class ShippingUberQuoteAssessor implements QuoteAssessor {
         }
         ValidateUberQuoteData data = response.getData();
         if (data.getValid()) {
-            // ⚠️ ValidateUberQuoteData 沒有 currency 欄位（報價時才有）——留空，不要編一個 "TWD"。
             return Assessment.eligible(data.getQuoteId(), data.getFeeAmount(), "", data.getExpiresAt());
         }
         if (data.getPriceChanged()) {
-            // 🔴 金額變了不得 capture（INV-U1）。這裡回 PRICE_CHANGED 而不是 unavailable_reason，
-            //    因為 shipping 在這條分支不填 unavailable_reason（原始碼的 else-if 互斥）。
             return Assessment.unavailable(ProviderReason.UBER_QUOTE_PRICE_CHANGED);
         }
         return Assessment.unavailable(data.getUnavailableReason());

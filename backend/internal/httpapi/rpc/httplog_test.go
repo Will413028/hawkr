@@ -14,7 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/content/v1alpha1/contentv1alpha1connect"
 )
 
-// records 收集 log，給測試比對。
 type records struct {
 	mu   sync.Mutex
 	msgs []string
@@ -46,7 +45,6 @@ func TestEveryErrorResponseIsLoggedOnce(t *testing.T) {
 		status int
 		want   string
 	}{
-		// Unimplemented handler 回的是 *connect.Error，經轉換點變成 internal（ADR D5）。
 		{"handler 回的錯誤由 interceptor 記", `{}`, http.StatusInternalServerError, "rpc"},
 		{"請求無法解碼：interceptor 之前", `{"page_size":"x"`, http.StatusBadRequest, "rpc：interceptor 之前的錯誤"},
 	}

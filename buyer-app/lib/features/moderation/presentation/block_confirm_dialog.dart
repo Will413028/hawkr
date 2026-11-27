@@ -41,7 +41,6 @@ class _BlockConfirmDialogState extends ConsumerState<BlockConfirmDialog> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
-      // 停權由 transport 的 interceptor 提示，這裡不再疊一則失敗訊息。
       if (isAccountSuspendedError(e)) return;
       showFloatingToast(
         context,

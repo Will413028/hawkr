@@ -26,7 +26,7 @@ export default function AiSparkleIcon({
 			aria-hidden={ariaLabel ? undefined : true}
 			{...rest}
 		>
-			{/* Wand body + tip line — primary */}
+
 			<path
 				fillRule="evenodd"
 				clipRule="evenodd"
@@ -43,7 +43,7 @@ export default function AiSparkleIcon({
 				strokeLinecap="round"
 				strokeLinejoin="round"
 			/>
-			{/* Sparkle accents — secondary */}
+
 			<path
 				fillRule="evenodd"
 				clipRule="evenodd"

@@ -66,7 +66,6 @@ func TestPreviewPriceBranches(t *testing.T) {
 		_, err := f.service().PreviewPrice(ctx, in)
 		wantInvalid(t, err, "LowerBoundAmount")
 	}
-	// 輸入檢查先於版本檢查：區間不合法又讀到過時的版本，回的是區間的錯誤
 	both := stale
 	both.LowerBoundAmount, both.UpperBoundAmount = 20, 10
 	_, err = f.service().PreviewPrice(ctx, both)

@@ -171,7 +171,6 @@ public class CouponTemplateService {
         entity.setThresholdAmount(minOrderAmount != null ? minOrderAmount : 0L);
         entity.setDiscountAmount(amount);
         entity.setStartAt(DateTimeUtils.nowUtc());
-        // 無到期日：設定一個足夠遠的未來日期
         entity.setEndAt(LocalDateTime.of(2099, 12, 31, 23, 59, 59));
         entity.setUsageLimitPerAccount(1);
         entity.setTotalIssueLimit(1);
@@ -288,7 +287,6 @@ public class CouponTemplateService {
                .le(CouponTemplateEntity::getStartAt, DateTimeUtils.nowUtc())
                .ge(CouponTemplateEntity::getEndAt, DateTimeUtils.nowUtc());
 
-        // 篩選商家：該商家專屬券 + 全平台券（applicableStoreId IS NULL）
         if (storeId != null) {
             wrapper.and(w -> w
                     .eq(CouponTemplateEntity::getApplicableStoreId, storeId)
@@ -318,8 +316,6 @@ public class CouponTemplateService {
         LocalDateTime buyerCreatedAt = LocalDateTime.ofInstant(
                 Instant.ofEpochMilli(buyerCreatedAtMs), ZoneOffset.UTC);
 
-        // 空集合保底：MyBatis foreach 對空 Collection 會產生 IN () 非法 SQL，
-        // 塞入哨兵 -1L（任何 seller_id 都不會等於 -1，type=2 分支自然 false）
         Collection<Long> sellers = (memberSellerIds == null || memberSellerIds.isEmpty())
                 ? List.of(-1L)
                 : new ArrayList<>(memberSellerIds);
@@ -367,7 +363,6 @@ public class CouponTemplateService {
                                          Integer discountPercent,
                                          Long maxDiscountAmount,
                                          LocalDateTime startAt, LocalDateTime endAt) {
-        // thresholdAmount 可省略（=0 表示無門檻），但禁止負數
         if (thresholdAmount != null && thresholdAmount < 0) {
             throw new CouponBusinessException(GrpcResponseCode.INVALID_PARAM,
                     "thresholdAmount 不可為負數");

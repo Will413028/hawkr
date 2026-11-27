@@ -54,7 +54,6 @@ func (s *Service) Sync(ctx context.Context, paymentID uuid.UUID) (again bool, er
 	return again, errors.Join(errs...)
 }
 
-// syncAttempt 重讀一個嘗試的 PaymentIntent 並寫入。
 func (s *Service) syncAttempt(ctx context.Context, p Provider, paymentID uuid.UUID, att store.PaymentPaymentAttempt) (again bool, err error) {
 	external := *att.ExternalPaymentID
 	startedAt := s.d.Now().UTC()
@@ -81,7 +80,6 @@ func (s *Service) syncAttempt(ctx context.Context, p Provider, paymentID uuid.UU
 	})
 	if errors.Is(err, ErrAnomaly) {
 		s.d.Logger.ErrorContext(ctx, "payment：同步讀到與付款列不一致的快照，不寫入", "payment_id", paymentID.String(), "external_payment_id", external, "err", err)
-		// 已告警、列保持原樣可查：把讀取開始前的事件標為已處理，掃描不再為同一批事件反覆排同步直到 inbox 保存期滿。
 		if merr := s.markEventsProcessed(ctx, p.Name(), external, startedAt); merr != nil {
 			return false, errors.Join(err, merr)
 		}
@@ -92,7 +90,6 @@ func (s *Service) syncAttempt(ctx context.Context, p Provider, paymentID uuid.UU
 	return again, err
 }
 
-// markEventsProcessed 在獨立的 transaction 把這個 PaymentIntent 在 startedAt 之前收到的事件標為已處理。
 func (s *Service) markEventsProcessed(ctx context.Context, provider, external string, startedAt time.Time) error {
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
 	defer cancel()

@@ -15,7 +15,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// maxReturnPath 是返回網址的長度上限。
 const maxReturnPath = 2048
 
 func errFlowInvalid() error { return apperr.Unauthenticated("登入流程已失效，請重新登入") }

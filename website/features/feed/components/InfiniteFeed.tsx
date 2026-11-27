@@ -123,15 +123,12 @@ export default function InfiniteFeed({
 		try {
 			await refresh();
 		} catch {
-			// Keep the explicit error state visible; the next tap retries in place.
 		} finally {
 			setManualRetrying(false);
 		}
 	}, [manualRetrying, refresh]);
 	const openPostId = useFeedUiStore((state) => state.openPostId);
 	const setOpenPostId = useFeedUiStore((state) => state.setOpenPostId);
-	// Box of the tapped card's thumbnail, in viewport px. The viewer scales the
-	// whole detail surface out of this box on open (and back into it on close).
 	const [openOrigin, setOpenOrigin] = React.useState<OpenOriginRect | null>(
 		null,
 	);
@@ -205,9 +202,6 @@ export default function InfiniteFeed({
 			const anchor = event.target.closest<HTMLAnchorElement>("a[href]");
 			if (!anchor) return;
 			const href = anchor.getAttribute("href") ?? "";
-			// 進詳情（返回時還原）與底部 Tab 切走（切回時像 App Tab 原地接續，
-			// 見 PageTransition 的 TAB_ROOTS）都要存快照；還原端以 key 精確比對
-			// 且有 5 分鐘時效，對不上就自動作廢，多存無害。
 			const isDetailNav = /^\/(products|sellers)\//.test(href);
 			const isTabNav = href === "/" || href === "/market" || href === "/search";
 			if (!isDetailNav && !isTabNav) return;
@@ -223,9 +217,6 @@ export default function InfiniteFeed({
 			filterMode !== "followed" || !followedIds
 				? posts
 				: posts.filter((p) => followedIds.has(String(p.sellerId)));
-		// A client deep link (`/feed?post=`) may target a post outside the
-		// canonical page; surface it at the top so the viewer can open it and it
-		// reads as a normal card behind the viewer, matching the old server seed.
 		if (!deepLinkPost) return scoped;
 		if (scoped.some((p) => String(p.id) === String(deepLinkPost.id)))
 			return scoped;
@@ -245,18 +236,11 @@ export default function InfiniteFeed({
 		setOpenOrigin(mediaRect ? toOriginRect(mediaRect) : null);
 	};
 
-	// The viewer animates its own close (shrink back into the card) and calls
-	// this once the tween finishes. We refresh the origin to the *currently*
-	// active post's card so paging inside the viewer still shrinks to the right
-	// place; the lookup happens inside the viewer via `data-feed-card-id`.
 	const closeViewer = () => {
 		setOpenOrigin(null);
 		setOpenPostId(null);
 	};
 
-	// Deep-link support: open the viewer on `initialPostId` as soon as
-	// the post appears in `visiblePosts`. Fires once per id so the user
-	// can close the viewer without it re-opening on every re-render.
 	const openedDeepLinkRef = React.useRef<string | null>(null);
 	React.useEffect(() => {
 		if (!initialPostId) return;
@@ -268,9 +252,6 @@ export default function InfiniteFeed({
 		}
 	}, [initialPostId, setOpenPostId, visiblePosts]);
 
-	// Empty-state copy when the followed filter yields no matches.
-	// Wait for the follow set to load before showing it so we don't
-	// flash "no posts" before the first /subscriptions response.
 	const isFollowFilterActive = filterMode === "followed";
 	const showFollowEmpty =
 		isFollowFilterActive &&

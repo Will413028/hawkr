@@ -54,8 +54,6 @@ function walk(dir: string): string[] {
 	return out;
 }
 
-// Self-check: fires on a raw goto, quiet on a call with an allow comment
-// directly above it, and one allow comment never covers a second call.
 const RAW_GOTO = 'await page.goto("/", { waitUntil: "domcontentloaded" });';
 const ALLOW_LINE = "// streamed-goto-allow: asserts loader";
 const selfChecks: Array<[string, number]> = [

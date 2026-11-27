@@ -104,8 +104,6 @@ test("route loading styles preserve the reviewed semantic CSS inventory", () => 
 		media: 1,
 		keyframes: 5,
 	});
-	// Includes the reviewed home composition and data-only product grids, with
-	// feed/market breakpoints matching their current destination layouts.
 	assert.deepEqual(inventory(routeLoadingCss), {
 		styleRules: 221,
 		selectors: 374,
@@ -122,7 +120,6 @@ test("route loading styles preserve the reviewed semantic CSS inventory", () => 
 		media: 13,
 		keyframes: 8,
 	});
-	// 2026-09-10 px→rem for the text-scale setting
 	assert.equal(
 		semanticDigest(recombinedCss),
 		"0b6cbd17cf0f96836bd13b0bd8d426064b6e7c92cafb7086a24778ce7837c8d7",

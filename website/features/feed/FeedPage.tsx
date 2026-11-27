@@ -14,14 +14,9 @@ function buildStories(posts: PostListItem[]): StoryItem[] {
 		seen.add(sellerKey);
 		stories.push({
 			id: p.sellerId,
-			// canonical 定址碼（#2098 階段三）。gateway 查不到賣家時回空字串，
-			// 這裡轉成 undefined 讓 sellerPath 的型別語意一致。
 			storeCode: p.storeCode || undefined,
 			name: p.sellerName,
 			avatar: p.logoKey,
-			// 刻意不設 hasUnread：`!isLiked` 不是「有新動態」訊號（訪客未登入
-			// 時恆為 true），整排都會亮著狀態環 → 環就失去語意，而且 /market
-			// 的同一條 rail 沒有這個欄位，兩個頁面會長得不一樣。
 		});
 		if (stories.length >= 12) break;
 	}
@@ -40,9 +35,6 @@ function buildStories(posts: PostListItem[]): StoryItem[] {
  * per-request dynamic server render.
  */
 export default async function FeedPage() {
-	// A failed seed is explicitly distinguished from a valid empty feed so the
-	// client query retries instead of persisting a false empty state. The cached
-	// reader carries its own upstream timeout.
 	let initialPosts: PostListItem[];
 	let initialNextPageToken = "";
 	let initialSeedFailed = false;

@@ -125,7 +125,6 @@ async function deleteFromBlockMenu(
 ) {
 	const block = target.closest<HTMLElement>(".ce-block");
 	if (!block) throw new Error("找不到要刪除的內容區塊");
-	// Editor.js supplies these controls without a stable accessible name.
 	const settings = dialog.querySelector<HTMLElement>(
 		".ce-toolbar__settings-btn",
 	);
@@ -213,10 +212,6 @@ const listToHeadingValue: ProductDescription = {
 	],
 };
 
-// 讓段落的存檔一直失敗，直到 Editor.js 自己的 onChange 觸發的那次也失敗為止。
-// 每次按鍵會觸發兩次存檔：下一個畫面的即時存檔（連同它的重試在幾十毫秒內），
-// 以及 Editor.js 批次約 400ms 後的 onChange。兩段都失敗才是「最後一次存檔失敗」；
-// 和上一次失敗隔超過 150ms 的那次就是第二段。Saver 會吞掉錯誤並回傳 undefined。
 function failSavesThroughOnChange(editable: HTMLElement) {
 	const descriptor = Object.getOwnPropertyDescriptor(
 		Element.prototype,
@@ -256,8 +251,6 @@ const tableJson = JSON.stringify({
 	],
 });
 
-// 媒體 origin 要在被測模組載入前就設定（getEnv 會記住第一次的結果）；沒設時圖片區塊會被判定資料無效。
-// 與 .github/workflows/website-e2e.yml 的 NEXT_PUBLIC_MEDIA_BASE_URL 相同，fixture 攔的就是這個網域。
 vi.hoisted(() => {
 	process.env.NEXT_PUBLIC_MEDIA_BASE_URL = "https://test-media.example.com";
 });
@@ -485,7 +478,6 @@ describe("DescriptionEditorDeletion", () => {
 	});
 
 	it("區塊選單 · 刪除滑鼠指向的段落", async () => {
-		// Editor.js 在 650px 以下視為手機版，不依滑鼠位置移動區塊工具列。
 		await page.viewport(1280, 800);
 		const { container: canvasElement, args } = mount({
 			value: {
@@ -625,7 +617,6 @@ describe("DescriptionEditorDeletion", () => {
 			);
 			const saveFailed = failSavesThroughOnChange(paragraph);
 			await user.keyboard("存");
-			// 失敗後不再有輸入；沒有補存的話 onChange 會一直停在「第一段補」。
 			await waitFor(
 				() => {
 					expect(saveFailed()).toBe(true);
@@ -749,8 +740,6 @@ describe("DescriptionEditorDeletion", () => {
 				).toEqual(["刪除這段文字", "表格後的文字保留"]);
 			});
 			selectTextRange(target, 0, target, "刪除這段文字".length);
-			// A real held key lets the input save observe Chromium's temporary
-			// <br> before Paragraph's keyup cleanup. Both saves are one action.
 			await user.keyboard("{Backspace>}");
 			await new Promise<void>((resolve) =>
 				requestAnimationFrame(() => resolve()),
@@ -811,7 +800,6 @@ describe("DescriptionEditorDeletion", () => {
 			const target = editableText(dialog, text);
 			await user.click(target);
 			selectTextRange(target, text.length - 2, target, text.length);
-			// One native key sequence: no wait for Editor.js's delayed onChange.
 			await user.keyboard("{Backspace}{Control>}z{/Control}");
 			await waitFor(() => {
 				expect(
@@ -848,8 +836,6 @@ describe("DescriptionEditorDeletion", () => {
 			const target = editableText(dialog, original);
 			await user.click(target);
 			selectTextRange(target, original.length - 2, target, original.length);
-			// The browser continues typing immediately after Undo, while the
-			// asynchronous snapshot apply may still be rebuilding the paragraph.
 			await user.keyboard(`{Backspace}{Control>}z{/Control}${insertion}`);
 			await waitFor(() => {
 				const text = documentText(

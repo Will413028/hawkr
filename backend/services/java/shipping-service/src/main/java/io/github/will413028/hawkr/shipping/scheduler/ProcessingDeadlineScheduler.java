@@ -74,8 +74,6 @@ public class ProcessingDeadlineScheduler {
      */
     @Scheduled(fixedDelayString = "${hawkr.shipping.processing-deadline.interval-ms:300000}", initialDelay = 90_000)
     public void scanExpiredShipments() {
-        // ⚠️ 這個 now 只用於「候選述詞」與「租約未到期判定」。租約的**基準**不在這裡取
-        // （見下方迴圈內），否則整批共用同一個到期時間。
         java.time.LocalDateTime now = DateTimeUtils.nowUtc();
         List<ShipmentEntity> expired = shipmentMapper.findExpiredUnprocessedShipments(
                 now, batchSize);
@@ -98,13 +96,7 @@ public class ProcessingDeadlineScheduler {
         int notifiedCount = 0;
         for (ShipmentEntity shipment : expired) {
             try {
-                // ⚠️ 租約基準取 **claim 當下** 而非 tick 起點的 now。取 tick 起點 ⇒ 全批共用同一個
-                // 到期時間 ⇒ 第 k 筆的**有效**租約 = LEASE_MINUTES − (前 k−1 筆的耗時)，不變式退化成
-                // 「批次總耗時 < 租約」（會隨 batch-size 一起破）。改在這裡取之後，不變式降為
-                // 「**單筆**最壞耗時 < 租約」——與 batchSize 無關，是結構保證而非參數巧合。
-                // 述詞用的 now 維持 tick 起點：那個方向讓候選集合與可搶佔集合更小，是保守的。
                 java.time.LocalDateTime leaseUntil = DateTimeUtils.nowUtc().plusMinutes(LEASE_MINUTES);
-                // issue #2294 L1：lease claim —— 搶到才 publish（0 = 另一個 pod 已搶走）
                 int leased = shipmentMapper.leaseProcessingDeadline(shipment.getId(), now, leaseUntil);
                 if (leased == 0) {
                     log.info("ProcessingDeadlineScheduler.claim.skip",
@@ -112,12 +104,8 @@ public class ProcessingDeadlineScheduler {
                     continue;
                 }
 
-                // §5.9.8 先發 cleared 事件清 Order 端 deadline，避免「已逾期但前端仍顯示倒數」暫態
                 eventPublisher.publishProcessingCleared(shipment.getOrderNo());
 
-                // 發布逾期事件，AfterSales 觸發系統取消+退款；resolve 失敗時帶 0（issue #2789 階段 B2，
-                // 理由見下方 resolveSellerAccountIds 的 javadoc）。
-                // 第三參數傳裸 buyer_id（payload key 為 buyerId），消費端只用 orderNo，不需要解析。
                 Long resolvedSellerAccountId = resolvedAccountIds.getOrDefault(shipment.getStoreId(), 0L);
                 if (!resolvedAccountIds.containsKey(shipment.getStoreId())) {
                     log.warn("ProcessingDeadlineScheduler.resolveSellerAccountId.notFound",
@@ -130,7 +118,6 @@ public class ProcessingDeadlineScheduler {
                         resolvedSellerAccountId,
                         shipment.getBuyerId());
 
-                // 清除 deadline 防止重複掃描
                 shipmentMapper.clearProcessingDeadline(shipment.getId());
                 notifiedCount++;
             } catch (Exception e) {

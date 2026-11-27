@@ -98,8 +98,6 @@ func (s Submitter) Submit(ctx context.Context, in SubmitInput) (Submitted, error
 	return out, nil
 }
 
-// resolve 回這次送出的需求與對話，以及是否為重送（重送回放不讀額度、不扣額度）：重送沿用第一次的（沒指定需求時不新建），指定的需求要屬於買家且有對話，沒指定就新建。
-// 重送但指定了別的需求時回傳指定的，由 run.Submitter 的重送檢查回 INVALID_ARGUMENT。
 func (s Submitter) resolve(ctx context.Context, q *store.Queries, in SubmitInput) (uuid.UUID, uuid.UUID, bool, error) {
 	first, err := q.GetRunByIdempotencyKey(ctx, store.GetRunByIdempotencyKeyParams{BuyerID: in.BuyerID, ClientRequestID: in.ClientRequestID})
 	switch {

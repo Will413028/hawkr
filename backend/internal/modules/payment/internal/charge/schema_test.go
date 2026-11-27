@@ -9,13 +9,11 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/payment/internal/model"
 )
 
-// checkValues 取出 schema.sql 裡某個 CHECK 的 IN (...) 清單。
 func checkValues(t *testing.T, constraint string) []string {
 	t.Helper()
 	return checkColumnValues(t, constraint, "status")
 }
 
-// checkColumnValues 取出 schema.sql 裡某個欄位的 CHECK IN (...) 清單。
 func checkColumnValues(t *testing.T, constraint, column string) []string {
 	t.Helper()
 	raw, err := os.ReadFile("../../db/schema.sql")
@@ -76,7 +74,6 @@ func TestTheFakeProviderNameMatchesTheProviderColumnFormat(t *testing.T) {
 	}
 }
 
-// constraintBody 取出 schema.sql 裡某個 CHECK 的整段內容（到該行結尾）。
 func constraintBody(t *testing.T, constraint string) string {
 	t.Helper()
 	raw, err := os.ReadFile("../../db/schema.sql")
@@ -109,7 +106,6 @@ func TestExternalIDsAreAllowedInEveryStateTheProviderHasAlreadyAnswered(t *testi
 	}
 }
 
-// checkValuesIn 取出某個 CHECK 裡 status IN (...) 的清單。
 func checkValuesIn(t *testing.T, constraint string) []string {
 	t.Helper()
 	body := constraintBody(t, constraint)

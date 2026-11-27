@@ -65,13 +65,10 @@ type Question struct {
 // MaxConsecutiveOptionalQuestions 是連續選填提問的上限；問滿後不再主動問，買家仍可自己打字提供。
 const MaxConsecutiveOptionalQuestions = 3
 
-// optionalSlotOrder 是選填欄位的固定優先序。數量（含單位）與到貨日排最前：它們是寄送報價單的前提，排後面的話
-// 連續選填上限用完前問不到。
 var optionalSlotOrder = []model.SlotKey{
 	slots.Quantity, slots.DeliveryDate, slots.Packaging, slots.BudgetPerUnit,
 }
 
-// quoteRequiredOptional 是選填但寄報價單要有的欄位，不可跳過。
 var quoteRequiredOptional = map[model.SlotKey]bool{
 	slots.Quantity:     true,
 	slots.DeliveryDate: true,
@@ -87,7 +84,6 @@ var prompts = map[model.SlotKey]Prompt{
 	slots.DeliveryDate:  PromptDeliveryDate,
 }
 
-// 固定選項的白名單。沒有列在這裡的欄位是純自由輸入。
 var (
 	cityOptions = []Option{
 		{ID: "city-taipei", Value: "臺北市", Kind: OptionValue},
@@ -155,7 +151,6 @@ func NextOptionalStreak(ready bool, q *Question, capExhausted bool, prev int) in
 
 // BuildFor 直接組出指定欄位的問題卡，不經過優先序與上限（回答、回退時用）。s 是目標狀態：數量這格要靠它決定問複合問題或單位追問。
 func BuildFor(key model.SlotKey, s slots.Set) *Question {
-	// 單位折進數量的複合問題卡，沒有獨立的問題型態：獨立的 UNIT 卡沒有路徑能回答。
 	if key == slots.Quantity || key == slots.Unit {
 		return buildQuantity(s)
 	}
@@ -169,8 +164,6 @@ func BuildFor(key model.SlotKey, s slots.Set) *Question {
 	}
 }
 
-// buildQuantity 決定數量這格的型態。數量與單位是同一個複合值：兩者都缺是複合問（兩個輸入都給）；只缺單位是單位追問
-// （只給單位選項）；只缺數量或兩者都已知（回退到舊版本時）只問數字，不強迫買家重選已確認的單位。
 func buildQuantity(s slots.Set) *Question {
 	needsAmount := s.Quantity == nil
 	needsUnit := s.Unit == nil

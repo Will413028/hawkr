@@ -41,8 +41,6 @@ test("home splash waits for the browser home-content marker", async () => {
 	assert.match(loaderSource, /ROUTE_TERMINAL_READY_SELECTOR/);
 	assert.match(loaderSource, /checkRouteChanged\(\);\s*checkRouteContent\(\);/);
 	assert.match(loaderSource, /scheduleTimeout\(releaseGateAtDeadline/);
-	// Gate convergence (#338): the deadline releases the splash — it must never
-	// flip into a blocking retry screen again.
 	assert.doesNotMatch(loaderSource, /目前無法載入頁面/);
 	assert.doesNotMatch(loaderSource, /window\.location\.reload/);
 	assert.match(loaderSource, /const timers: number\[\] = \[\]/);
@@ -60,11 +58,6 @@ test("home splash waits for the browser home-content marker", async () => {
 	assert.match(homeSource, /data-hk-initial-content-ready="home"/);
 });
 
-// #1819: the selectors are latched once per document, so a client-side redirect
-// off the entry route left the splash waiting for a marker that could never
-// render — a deadline lock on a page that had loaded fine. The behaviour itself
-// is covered end-to-end in tests/initial-loader-reliability.spec.ts; these
-// assertions keep the release wiring from being dropped in a refactor.
 test("splash releases its content gate when the route changes under it", async () => {
 	const loaderSource = await readFile(initialPageLoaderPath, "utf8");
 
@@ -76,25 +69,12 @@ test("splash releases its content gate when the route changes under it", async (
 		loaderSource,
 		/if \(window\.location\.pathname === entryPathname\) return;/,
 	);
-	// Event-driven (#338 zero-debt): the route change rides the same
-	// MutationObserver as the content markers — no interval polling.
 	assert.match(loaderSource, /checkRouteChanged\(\);\s*checkRouteContent\(\);/);
 	assert.doesNotMatch(loaderSource, /setInterval/);
 
-	// This always-mounted splash renders in the root layout outside <Suspense>;
-	// it stays decoupled from next/navigation so first paint never depends on the
-	// router (and, historically under Cache Components, a dynamic read here made
-	// every route blocking). Match the import, not the identifier — the source
-	// explains in prose why usePathname is unusable here.
 	assert.doesNotMatch(loaderSource, /from "next\/navigation"/);
 });
 
-// The PR #344 intent, locked against the converged gate (#338): a loader
-// that never exits used to leave `initial-loader-active` on <html> forever, so
-// `whenDocumentSettled()` never resolved and every settled-gated mount (GA4's
-// <Script>, Sonner) went silent for the whole session. The converged design
-// guarantees release — these assertions keep a refactor from re-breaking the
-// chain on either side.
 test("every splash exit path releases the document-settled gate", async () => {
 	const [loaderSource, settledSource] = await Promise.all([
 		readFile(initialPageLoaderPath, "utf8"),
@@ -104,9 +84,6 @@ test("every splash exit path releases the document-settled gate", async () => {
 		),
 	]);
 
-	// Loader side: the deadline path must end in hide(), and hide()'s reveal
-	// sequence (asserted above) removes `initial-loader-active`; the effect
-	// cleanup removes it too. No exit path may skip the class removal.
 	assert.match(
 		loaderSource,
 		/finished = true;\s*contentObserver\?\.disconnect\(\);\s*publicHandoffObserver\?\.disconnect\(\);\s*hide\(\);/,
@@ -116,8 +93,6 @@ test("every splash exit path releases the document-settled gate", async () => {
 		/document\.documentElement\.classList\.remove\("initial-loader-active"\)/,
 	);
 
-	// Settled side: whenDocumentSettled gates on exactly that class, watching
-	// class-attribute mutations — so the removal above is what releases it.
 	assert.match(settledSource, /classList\.contains\("initial-loader-active"\)/);
 	assert.match(settledSource, /attributeFilter: \["class"\]/);
 });
@@ -182,8 +157,6 @@ test("layout and CSS keep independent loader hard-stop paths wired", async () =>
 	assert.match(layout, /id="hk-initial-loader-watchdog"/);
 	assert.doesNotMatch(layout, /strategy="beforeInteractive"/);
 	assert.match(layout, /initial-loader-active/);
-	// Gate convergence (#338): the application tree is never hidden — the splash
-	// overlay is the only gating surface and carries its own CSS-only timeout.
 	assert.doesNotMatch(styles, /initial-loader-active \.page-wrapper/);
 	assert.doesNotMatch(styles, /initial-content-hard-release/);
 	assert.doesNotMatch(styles, /hk-initial-loader-terminal-error/);
@@ -207,8 +180,6 @@ test("home keeps the initial loader as the only pending surface", async () => {
 	const homeSource = await readFile(homePagePath, "utf8");
 
 	assert.match(homeSource, /^"use client";/);
-	// Pending stays null (single initial-loader surface); only the isError
-	// terminal branch may render — an ErrorState with retry, not a skeleton.
 	assert.match(
 		homeSource,
 		/if \(!homeQuery\.data\) \{[\s\S]*?if \(homeQuery\.isError\) \{[\s\S]*?<ErrorState[\s\S]*?\}[\s\S]*?return null;\s*\}/,

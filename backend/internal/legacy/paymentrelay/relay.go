@@ -32,18 +32,15 @@ import (
 
 const exchangePayment = "payment.events"
 
-// aggregateType 是舊的 PaymentAggregateType。
 const (
 	aggregatePayment = "payment"
 	aggregateRefund  = "refund"
 )
 
-// localDateTime 是 Java LocalDateTime.toString() 的格式（UTC、沒有時區後綴）：消費端以 LocalDateTime.parse 讀。
 const localDateTime = "2006-01-02T15:04:05.999999999"
 
 func at(t time.Time) string { return t.UTC().Format(localDateTime) }
 
-// envelope 是舊 OutboxEventFactory.applyEnvelopeMetadata 補進每則 payload 的五個欄位。
 type envelope struct {
 	EventID       string `json:"event_id"`
 	EventType     string `json:"event_type"`
@@ -52,7 +49,6 @@ type envelope struct {
 	OccurredAt    string `json:"occurred_at"`
 }
 
-// paymentSuccess 是舊 PaymentDomainEvent.PaymentSucceeded 的 payload。
 type paymentSuccess struct {
 	envelope
 	TradeNo         string `json:"trade_no"`
@@ -64,7 +60,6 @@ type paymentSuccess struct {
 	PayTime         string `json:"pay_time"`
 }
 
-// paymentFailed 是舊 PaymentFailed 的 payload；provider_message 是最近一次嘗試的失敗原因碼。
 type paymentFailed struct {
 	envelope
 	TradeNo         string `json:"trade_no"`
@@ -74,7 +69,6 @@ type paymentFailed struct {
 	ProviderMessage string `json:"provider_message"`
 }
 
-// paymentClosed 是舊 PaymentClosed 的 payload。
 type paymentClosed struct {
 	envelope
 	TradeNo  string `json:"trade_no"`
@@ -84,7 +78,6 @@ type paymentClosed struct {
 	ClosedAt string `json:"closed_at"`
 }
 
-// refundSucceeded 是舊 RefundSucceeded 的 payload（camelCase）。
 type refundSucceeded struct {
 	envelope
 	RefundNo         string `json:"refundNo"`
@@ -98,7 +91,6 @@ type refundSucceeded struct {
 	OccurredAtCamel  string `json:"occurredAt"`
 }
 
-// refundFailed 是舊 RefundFailed 的 payload（camelCase，沒有 status：消費端依 routing key 判斷成敗）；失敗原因放在舊的訊息欄位。
 type refundFailed struct {
 	envelope
 	RefundNo        string `json:"refundNo"`
@@ -186,7 +178,6 @@ func OnRefundChanged(q jobs.Enqueuer) func(context.Context, payment.RefundChange
 	}
 }
 
-// enqueuePublish 在呼叫方的 transaction 內排入送出的 job（transactional outbox）；PublishArgs 以 event_id 做 unique。
 func enqueuePublish(ctx context.Context, q jobs.Enqueuer, eventID, exchange, key string, payload any) error {
 	body, err := json.Marshal(payload)
 	if err != nil {

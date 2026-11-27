@@ -13,7 +13,6 @@ void main() {
   );
   final manifest = loadManifest(manifestUri);
 
-  // import 與第一行程式寫在同一行，行號不位移。
   const sellerImport =
       "import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart'; "
       "import 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller.pb.dart' as pb; ";
@@ -25,7 +24,6 @@ void main() {
   String importOf(ManifestEnum e) =>
       "import '${e.dartLibrary!.replaceFirst('.pbenum.dart', '.pb.dart')}'; ";
 
-  // 回傳 `E:<form>:<enum>.<member>@<行>`。
   List<String> scan(
     String source, {
     String imports = sellerImport,
@@ -521,7 +519,6 @@ String j(MeasureKind k) => k == $warn ? x.t : '';
         ),
         [hit('ternary', 'WARNING', 1), hit('ternary', 'TERMINATION', 3)],
       );
-      // 沒有 resolver：只看同檔，匯入的不算。
       expect(
         scan(
           "String f(MeasureKind k) => k == $warn ? t : '';",
@@ -642,7 +639,6 @@ Object f(MeasureKind k, dynamic context) {
           single.name: ['a.dart:1'],
         });
       }
-      // 目錄與伺服器擁有的 enum：條件形式也擋。
       final ownedHits = hits(
         owned,
         "String f(${owned.dartClass} k) => k == ${owned.dartClass}.X ? '文字' : '';",
@@ -663,7 +659,6 @@ Object f(MeasureKind k, dynamic context) {
 
     test('只算從 api 生成檔引入的 enum：同名的非 proto 類別（CodeMeta）不報', () {
       final body = "const m = {$warn: '警告'};";
-      // 同名類別來自 App 自己的 CodeMeta。
       expect(
         scan(
           body,
@@ -671,16 +666,13 @@ Object f(MeasureKind k, dynamic context) {
         ),
         isEmpty,
       );
-      // 沒有任何 import：不報。
       expect(scan(body, imports: ''), isEmpty);
-      // 同一段程式從 api 的 .pb.dart 或 .pbenum.dart 引入就報。
       const pb = 'package:hawkr_api/gen/hawkr/seller/v1alpha1/seller';
       for (final lib in ['$pb.pb.dart', '$pb.pbenum.dart']) {
         expect(scan(body, imports: "import '$lib'; "), [
           hit('key', 'WARNING', 1),
         ]);
       }
-      // show 沒列到或 hide 掉這個類別：不是這個 enum。
       expect(scan(body, imports: "import '$pb.pb.dart' show Other; "), isEmpty);
       expect(
         scan(body, imports: "import '$pb.pb.dart' hide MeasureKind; "),

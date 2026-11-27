@@ -55,7 +55,6 @@ public class UberApiClient {
 
     private static final ObsLogger log = ObsLogger.forClass(UberApiClient.class);
 
-    // ── deadline（66 §0.2 T-3 ~ T-7 ＋ §4.5.2 端點表） ────────────────────
     static final Duration E1_QUOTE_DEADLINE = Duration.ofSeconds(8);
     static final Duration E2_CREATE_DEADLINE = Duration.ofSeconds(15);
     static final Duration E3_LIST_DEADLINE = Duration.ofSeconds(10);
@@ -111,7 +110,6 @@ public class UberApiClient {
         this.sleeper = sleeper;
     }
 
-    // ==================== E1 Create Quote ====================
 
     /** E1：報價。無副作用；失敗／逾時 ⇒ 呼叫端讓選項 {@code available=false}（66 §4.5.0 E1）。 */
     public QuoteResult createQuote(String customerId, QuoteRequest request) {
@@ -125,9 +123,6 @@ public class UberApiClient {
         JsonNode resp = callJson("E1", "POST",
                 customerUrl(customerId) + "/delivery_quotes", body,
                 E1_QUOTE_DEADLINE, READ_ONLY_BACKOFF_MS);
-        // 🔴 入站換算：官方 fee 是 cents，domain 一律元整數（66 邊界規則）。
-        //    ⚠️ 這裡曾經直接取值不換算 ⇒ NT$115 的配送存成 11500，向賣家收款會差 100 倍。
-        //    `fromMinorUnits` 對不整除 fail-closed，不做截斷——理由見該方法 javadoc。
         String quoteCurrency = text(resp, "currency");
         return new QuoteResult(
                 text(resp, "id"),
@@ -137,7 +132,6 @@ public class UberApiClient {
                 text(resp, "dropoff_eta"));
     }
 
-    // ==================== E2 Create Delivery ====================
 
     /**
      * E2：建單。<b>有副作用</b>。
@@ -150,8 +144,6 @@ public class UberApiClient {
         ObjectNode body = objectMapper.createObjectNode();
         body.put("quote_id", request.quoteId());
         body.put("external_store_id", request.externalStoreId());
-        // 🔴 我方 pre-commit 鍵（ADR-014）。官方明載會把它原樣回傳
-        //    （總覽 §3.1 external_order_id／§7.2 external_id）⇒ 991 的反查錨只能是它。
         body.put("external_id", request.externalId());
         if (request.manifestReference() != null) {
             body.set("manifest", objectMapper.createObjectNode()
@@ -168,7 +160,6 @@ public class UberApiClient {
         return toDeliveryResult(resp);
     }
 
-    // ==================== E3 List Deliveries ====================
 
     /**
      * E3：以我方送出的 {@code external_id} 反查。
@@ -193,7 +184,6 @@ public class UberApiClient {
         return List.copyOf(out);
     }
 
-    // ==================== E4 Get Delivery ====================
 
     /** E4：以 {@code delivery_id} 回查。無副作用，重試耗盡 ⇒ 呼叫端「留原狀態，下個 tick 再來」。 */
     public DeliveryResult getDelivery(String customerId, String deliveryId) {
@@ -203,7 +193,6 @@ public class UberApiClient {
         return toDeliveryResult(resp);
     }
 
-    // ==================== E6 Cancel Delivery ====================
 
     /**
      * E6：取消。<b>有副作用</b>。四個 provider 中只有 Uber 有這支（66 §4.5.0）。
@@ -218,7 +207,6 @@ public class UberApiClient {
         return toDeliveryResult(resp);
     }
 
-    // ==================== E7 Get POD ====================
 
     /**
      * E7：取得送達證明（二進位）。
@@ -236,8 +224,6 @@ public class UberApiClient {
         UberHttpTransport.UberHttpResponse resp = callRaw("E7", "POST",
                 customerUrl(customerId) + "/deliveries/" + enc(deliveryId) + "/proof-of-delivery",
                 body.toString(), E7_POD_DEADLINE, READ_ONLY_BACKOFF_MS);
-        // 回應可能是 JSON 包 base64（官方未載於本次實查頁面），也可能直接是二進位。
-        // 🔴 兩種都接，但**不猜**：不是 JSON 就當二進位原樣回，不做任何轉碼。
         String contentType = resp.contentType() == null ? "application/octet-stream" : resp.contentType();
         if (contentType.contains("json")) {
             try {
@@ -254,7 +240,6 @@ public class UberApiClient {
         return new PodDocument(resp.body(), contentType);
     }
 
-    // ==================== 內部：呼叫與分流 ====================
 
     private JsonNode callJson(String endpointCode, String method, String url, JsonNode body,
                               Duration deadline, long[] backoffMs) {
@@ -302,7 +287,6 @@ public class UberApiClient {
     private UberHttpTransport.UberHttpResponse sendOnce(String endpointCode, String method, String url,
                                                         String jsonBody, Duration deadline) {
         Map<String, String> headers = new LinkedHashMap<>();
-        // 🔴 token 取不到就直接拋（fail-closed，66 §4.5.1）——絕不帶空字串上路。
         headers.put("Authorization", "Bearer " + tokenProvider.bearerToken());
         headers.put("Accept", "application/json");
         if (jsonBody != null) {
@@ -312,8 +296,6 @@ public class UberApiClient {
         try {
             resp = transport.send(method, url, headers, jsonBody, deadline);
         } catch (IOException e) {
-            // 🔴 逾時／連線失敗 ＝ **非確定性**：請求可能已經到達對方並產生副作用。
-            //    當成 400 處理就是陷阱 A8 —— 兩趟車、重複計費。
             throw new UberApiException(UberFailureKind.NON_DETERMINISTIC, 0, "UBER_IO",
                     "Uber " + endpointCode + " 呼叫逾時或連線失敗", e);
         }
@@ -338,13 +320,11 @@ public class UberApiClient {
             uberCode = text(node, "code");
             uberMessage = text(node, "message");
         } catch (Exception ignored) {
-            // 錯誤 body 解析不出來不影響分流——分流的主依據是 HTTP status。
         }
         String detail = "Uber " + endpointCode + " 回 " + status
                 + (uberCode == null ? "" : "（code=" + uberCode + "）");
 
         if (status >= 500) {
-            // 🔴 非確定性 ⇒ 重試耗盡後 991 CREATE_UNKNOWN，**不是 990**（66 §4.5.4）
             return new UberApiException(UberFailureKind.NON_DETERMINISTIC, status, uberCode, detail);
         }
         if (status == 429) {
@@ -354,7 +334,6 @@ public class UberApiClient {
             return new UberApiException(UberFailureKind.NOT_FOUND, status, uberCode, detail);
         }
         if ("customer_blocked".equals(uberCode)) {
-            // 官方以 403 回這個 code；不硬綁 status 以免對方調整時整格失效。
             return new UberApiException(UberFailureKind.CUSTOMER_BLOCKED, status, uberCode, detail);
         }
         if ("noncancelable_delivery".equals(uberCode)) {
@@ -363,18 +342,15 @@ public class UberApiClient {
         if (status == 401 || status == 403) {
             return new UberApiException(UberFailureKind.AUTH, status, uberCode, detail);
         }
-        // 其他 4xx（含 400）：確定性 ⇒ 不重試 ⇒ CREATE_FAILED(990)
         return new UberApiException(UberFailureKind.DETERMINISTIC, status, uberCode,
                 detail + (uberMessage == null ? "" : "：" + uberMessage));
     }
 
-    // ==================== 內部：payload 組裝與解析 ====================
 
     private void putWaypoint(ObjectNode body, String prefix, UberWaypoint wp) {
         if (wp == null) {
             return;
         }
-        // 🔴 address 是**結構化物件**（66 §6.5「本節最大落差」），不是單一字串。
         if (wp.structuredAddressJson() != null && !wp.structuredAddressJson().isBlank()) {
             try {
                 body.set(prefix + "_address", objectMapper.readTree(wp.structuredAddressJson()));
@@ -385,7 +361,6 @@ public class UberApiClient {
             }
         }
         body.put(prefix + "_name", wp.name());
-        // 🔴 09xxxxxxxx → +8869xxxxxxxx（66 §6.5）
         body.put(prefix + "_phone_number", UberFieldFormat.toE164(wp.phone()));
         if (wp.latitude() != null) {
             body.put(prefix + "_latitude", wp.latitude());
@@ -393,7 +368,6 @@ public class UberApiClient {
         if (wp.longitude() != null) {
             body.put(prefix + "_longitude", wp.longitude());
         }
-        // 🔴 樓層／門牌補充進 notes **不進 address**——塞進 street 會讓地理編碼失敗（66 §6.5）
         if (wp.notes() != null && !wp.notes().isBlank()) {
             body.put(prefix + "_notes", wp.notes());
         }
@@ -409,7 +383,6 @@ public class UberApiClient {
             n.put("name", item.name());
             n.put("quantity", item.quantity());
             if (item.size() != null) {
-                // 🔴 官方是 string enum（U-K），不是向量
                 n.put("size", item.size());
             }
             if (item.priceMinorUnits() != null) {
@@ -420,7 +393,6 @@ public class UberApiClient {
             }
             arr.add(n);
         }
-        // 🔴 溫層**不送、不假裝**：Uber API 完全沒有溫層欄位（U-M），溫層只活在我方（66 §6.5）。
         return arr;
     }
 
@@ -437,13 +409,11 @@ public class UberApiClient {
         }
         JsonNode courier = n.path("courier");
         if (courier.isMissingNode() || courier.isNull()) {
-            // Eats deliveries 家族把外送員放在 courier_trips[].courier（總覽 §3.1）。
             courier = n.path("courier_trips").path(0).path("courier");
         }
         return new DeliveryResult(
                 text(n, "id"),
                 text(n, "status"),
-                // 🔴 boolean 欄位不是第 8 個狀態（U-I）
                 n.path("courier_imminent").asBoolean(false),
                 firstNonNull(text(n, "external_id"), text(n, "external_order_id")),
                 firstNonNull(text(n, "tracking_url"), text(n, "order_tracking_url")),
@@ -469,8 +439,6 @@ public class UberApiClient {
 
     private static Instant parseInstant(String raw) {
         if (raw == null || raw.isBlank()) {
-            // 🔴 解析不出來就回 null，**不猜一個時間**：一個編出來的 provider 時間
-            //    會讓亂序收斂（66 §6.3.5「provider timestamp 較新者為準」）拿錯的值去比。
             return null;
         }
         try {
@@ -481,7 +449,6 @@ public class UberApiClient {
     }
 
     private String customerUrl(String customerId) {
-        // ⚠️ customer_id 是**路徑參數**不是 header（總覽 §1.3）。
         return baseUrl + "/customers/" + enc(customerId);
     }
 

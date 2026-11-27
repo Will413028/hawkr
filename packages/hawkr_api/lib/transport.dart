@@ -234,7 +234,6 @@ Interceptor timeoutInterceptor(Duration timeout) {
         return next(req);
       }
       final signal = _DeadlineSignal(timeout, parent: req.signal);
-      // transport 在 interceptor 之前就組好 header，這裡補上，伺服器才知道 client 等多久。
       req.headers['connect-timeout-ms'] = '${timeout.inMilliseconds}';
       try {
         return await next(
@@ -294,7 +293,6 @@ final class FailureContext {
   final String traceId;
 }
 
-// 伺服器端的失敗才上報（同 website 的 reportInterceptor）。
 const _reportedCodes = {
   Code.unknown,
   Code.internal,

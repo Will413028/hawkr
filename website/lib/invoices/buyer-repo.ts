@@ -52,7 +52,6 @@ import type {
 
 const BASE = "/app/buyers/me/invoice_profiles";
 
-/* ===== 業務碼 ===== */
 
 /**
  * 58 §6.1.0 (13) 的碼表中，買家常用發票資料會遇到的五個。
@@ -130,7 +129,6 @@ export function invoiceErrorMessage(err: unknown): string {
 	return err.message.replace(BIZ_CODE_PREFIX, "").trim();
 }
 
-/* ===== 冪等鍵 ===== */
 
 /**
  * 一次「使用者意圖」一把（§0.4 ②）。
@@ -147,7 +145,6 @@ function idempotent(key: string): { headers: Record<string, string> } {
 	return { headers: { "Idempotency-Key": key } };
 }
 
-/* ===== normalize ===== */
 
 function str(value: unknown): string {
 	return value == null ? "" : String(value);
@@ -176,7 +173,6 @@ function normalizeProfile(raw: Record<string, unknown>): InvoiceProfile {
 	};
 }
 
-/* ===== 端點 ===== */
 
 /**
  * 每個買家最多 20 筆（invoice-service `buyerProfileCap`），而端點 1 的預設
@@ -269,7 +265,6 @@ export async function setDefaultInvoiceProfile(
 	return normalizeProfile(env.data ?? {});
 }
 
-/* ===== B04／B05：訂單發票與文件詳情 ===== */
 
 function bool(value: unknown): boolean {
 	return value === true;
@@ -438,7 +433,6 @@ export async function resendBuyerInvoiceNotification(
 	};
 }
 
-/* ===== B09：買家發票中心（端點 68） ===== */
 
 /**
  * 端點 68 的 query。日期是 `YYYY-MM-DD`；`status` 與 `documentKind` 是 CodeMeta 值
@@ -509,7 +503,6 @@ export async function listBuyerInvoiceDocuments(
 /** 端點 68 的頁大小。值域 1–50（見 `listBuyerInvoiceDocuments` 第 2 點）。 */
 export const BUYER_DOCUMENTS_PAGE_SIZE = 20;
 
-/* ===== B07：未收到發票／收據申訴 ===== */
 
 const COMPLAINT_BASE = (orderNo: string) =>
 	`/app/orders/${encodeURIComponent(orderNo)}/invoice_complaints`;
@@ -671,7 +664,6 @@ export async function reopenInvoiceComplaint(
 	return normalizeComplaint(env.data ?? {});
 }
 
-/* ===== 付款後修改發票資料（端點 11／12，B06）===== */
 
 const CORRECTION_BASE = (orderNo: string) =>
 	`/app/orders/${encodeURIComponent(orderNo)}/invoice_corrections`;
@@ -704,9 +696,6 @@ export async function createInvoiceCorrection(
 				expectedSnapshotVersion,
 				newInvoice: {
 					profileId: input.profileId ?? "",
-					// 🔴 手動輸入統編時必須明說 carrierType（見 InvoiceCorrectionInput
-					// 的註解）。在 2026-09-04 之前這一欄整個沒送 ⇒ 端點 11 回 9305，
-					// 而買家填的統編完全合法。
 					carrierType: input.carrierType ?? "",
 					buyerTaxId: input.buyerTaxId ?? "",
 					buyerName: input.buyerName ?? "",

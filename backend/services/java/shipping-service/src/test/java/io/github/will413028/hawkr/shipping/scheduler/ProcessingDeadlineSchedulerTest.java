@@ -42,9 +42,6 @@ class ProcessingDeadlineSchedulerTest {
         eventPublisher = mock(ShippingEventPublisher.class);
         sellerGrpcClient = mock(SellerGrpcClient.class);
         scheduler = new ProcessingDeadlineScheduler(shipmentMapper, eventPublisher, sellerGrpcClient);
-        // issue #2294 L1：加了 lease 閘門之後，Mockito 對 int 預設回 0 ⇒ `if (leased == 0) continue;`
-        // ⇒ 一則都不會 publish ⇒ 本檔三支全紅。這裡 stub 成「搶到」，讓原本的斷言回到它們要驗的事；
-        // 閘門本身的兩條分支由 ProcessingDeadlineSchedulerClaimTest 覆蓋。
         when(shipmentMapper.leaseProcessingDeadline(anyLong(), any(), any())).thenReturn(1);
     }
 
@@ -72,7 +69,6 @@ class ProcessingDeadlineSchedulerTest {
 
         scheduler.scanExpiredShipments();
 
-        // 批次解析：不論筆數多少，本輪只打一次 gRPC（防 N+1）
         verify(sellerGrpcClient, times(1)).batchGetSellerMeta(anyList());
 
         ArgumentCaptor<Long> s1AccountIdCaptor = ArgumentCaptor.forClass(Long.class);

@@ -37,8 +37,6 @@ func (r *CancelledOrderRepository) Insert(ctx context.Context, in domain.Cancell
 	rows, err := r.q(ctx).InsertCancelledOrder(ctx, gen.InsertCancelledOrderParams{
 		OrderNo: in.OrderNo,
 		BuyerID: in.BuyerID,
-		// 空字串折成 NULL：producer 對「買家自願取消」這一格送的是 JSON null，
-		// 兩者在本表要是同一個值，否則同一件事會有兩種表示。
 		CancelReason: nilIfBlank(in.CancelReason),
 		OccurredAt:   ts(in.OccurredAt),
 		Now:          ts(in.Now),

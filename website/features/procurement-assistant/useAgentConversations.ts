@@ -95,9 +95,6 @@ export function useAgentConversations(enabled = true) {
 			query.isLoading ||
 			(query.isFetching && query.isPlaceholderData),
 		async rename(conversationId: string, title: string) {
-			// 樂觀改名＋失敗還原；成功後仍 invalidate 讓伺服器版（可能截斷／
-			// 正規化過）覆寫本地樂觀值。先 cancelQueries：in-flight refetch
-			// 落地會蓋掉樂觀值，previous 也要是 post-settlement 快照。
 			await queryClient.cancelQueries({ queryKey });
 			const previous =
 				queryClient.getQueryData<AgentConversationPage>(queryKey);

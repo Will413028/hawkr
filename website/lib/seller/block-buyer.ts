@@ -58,7 +58,6 @@ export async function listBlockedBuyers(
 		pageToken,
 	});
 	return {
-		// 沒有買家 id 的項目無法解除封鎖，不是可操作的資料。
 		items: res.blockedBuyers.flatMap((blocked) =>
 			blocked.buyer?.id
 				? [

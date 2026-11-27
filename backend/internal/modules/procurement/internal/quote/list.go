@@ -43,7 +43,6 @@ func EncodeToken(kind string, t time.Time, id uuid.UUID) string {
 	return base64.RawURLEncoding.EncodeToString(b)
 }
 
-// minTokenMicro 是 Postgres timestamptz 的下界（4713 BC）；範圍外的值送進查詢會變成 INTERNAL。上界不用檢查：int64 微秒最多到 294247 AD，在 timestamptz 的上界之內。
 var minTokenMicro = time.Date(-4712, 1, 2, 0, 0, 0, 0, time.UTC).UnixMicro()
 
 func DecodeToken(kind, raw string) (Token, bool) {

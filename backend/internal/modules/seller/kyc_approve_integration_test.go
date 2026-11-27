@@ -12,7 +12,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
-// approvedStore 建立一間已核准的店家（申請送出並核准；收款帳戶由 payment 的 fake 另外建立）。
 func (f *fixture) approvedStore(t *testing.T) (int64, Store) {
 	t.Helper()
 	accountID, s, sub := f.submitted(t)
@@ -59,7 +58,6 @@ func TestStaleEtagAfterApproveAndRejectConflicts(t *testing.T) {
 	if _, err := f.module.RejectKYC(ctx, RejectKYCInput{ApplicationID: sub.ID, ExpectedVersion: sub.Version, AdminID: 9, Issues: anIssue(), Reason: "資料不符"}); apperr.KindOf(err) != apperr.KindVersionConflict {
 		t.Fatalf("reject after approve: %v", err)
 	}
-	// 帶目前的版本再核准：申請已不是審核中。
 	if _, err := f.module.ApproveKYC(ctx, ApproveKYCInput{ApplicationID: sub.ID, ExpectedVersion: first.Version, AdminID: 9}); apperr.KindOf(err) != apperr.KindFailedPrecondition {
 		t.Fatalf("approve at the current version: %v", err)
 	}
@@ -70,7 +68,6 @@ func TestStaleEtagAfterApproveAndRejectConflicts(t *testing.T) {
 		t.Fatalf("application changed after the stale requests")
 	}
 
-	// 退回生效後帶退回之前的版本：衝突，審核紀錄與事件各只有一筆。
 	_, _, sub2 := f.submitted(t)
 	done, err := f.module.RejectKYC(ctx, RejectKYCInput{ApplicationID: sub2.ID, ExpectedVersion: sub2.Version, AdminID: 9, Issues: anIssue(), Reason: "資料不符"})
 	must(t, err)

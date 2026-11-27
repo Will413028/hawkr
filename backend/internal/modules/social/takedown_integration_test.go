@@ -24,8 +24,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/revalidate"
 )
 
-// takedowns 是內容下架措施在這組測試裡的替身：seller 的措施列（只填 pub_content_takedowns 讀的欄位，CHECK 與外鍵放寬）直接寫；measure_contents_measure_status_fkey 保留，因為撤銷措施時 measure_status 靠它同步，那是這組測試要驗的不變量，
-// 事件由測試依真實 seller 的形狀發布（seller 自己的規則與真實的建立入口在 seller、httpapi 的測試）。
 type takedowns struct {
 	f *fixture
 }
@@ -46,7 +44,6 @@ func (d takedowns) seed(t *testing.T, storeID int64, refs []seller.ContentRef) u
 	return d.seedAt(t, storeID, refs, uuid.NewV7(), d.f.clock())
 }
 
-// seedAt 以指定的 ID 與建立時間寫入 seller 的措施：ID 與建立時間的順序可以相反。
 func (d takedowns) seedAt(t *testing.T, storeID int64, refs []seller.ContentRef, id uuid.UUID, createdAt time.Time) uuid.UUID {
 	t.Helper()
 	d.f.exec(t, `INSERT INTO seller.measures (id, account_id, store_id, kind, basis, statement_to_seller, starts_at, status, current_revision, created_by_admin_id, created_at, updated_at)

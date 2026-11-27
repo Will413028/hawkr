@@ -53,8 +53,6 @@ test.describe("procurement assistant — 已發布成果的重整還原", {
 			.context()
 			.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
 
-		// ⛔ 這兩個方法在這條路徑上一次都不該被呼叫：買家只是重整看成果，
-		// 不是要重跑搜尋，也不是要再發布一次。
 		await mockProcurementUnary(page, "StartCandidateSearch", () => {
 			calls.candidateSearches += 1;
 			return {};
@@ -69,7 +67,6 @@ test.describe("procurement assistant — 已發布成果的重整還原", {
 		}));
 
 		await mockProcurementUnary(page, "GetSnapshot", () =>
-			// 發布完成後 status 仍是需求層的狀態，而且沒有候選集。
 			snapshotReadyJson({ publishedRfq: publishedRfqJson() }),
 		);
 
@@ -97,7 +94,6 @@ test.describe("procurement assistant — 已發布成果的重整還原", {
 		expect(response?.status()).toBeLessThan(400);
 		await expect(page.locator('[data-assistant-mode="live"]')).toBeVisible();
 
-		// 缺陷的本體：開啟鈕只有在 hasResults 為真時才 render。
 		const opener = page.getByTestId("agent-panel-open");
 		await expect(opener).toBeVisible({ timeout: 10_000 });
 
@@ -105,7 +101,6 @@ test.describe("procurement assistant — 已發布成果的重整還原", {
 		await opener.click();
 		await expect(panel).toBeVisible();
 
-		// 關掉再開一次：一次性的可見不算「回得去」。
 		await page.getByRole("button", { name: "回到對話" }).click();
 		await expect(panel).toBeHidden();
 		await opener.click();

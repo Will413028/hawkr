@@ -53,7 +53,6 @@ func New(t *testing.T, pg *testdb.Server) *World {
 	))
 	w := &World{T: t, DB: d, Media: media.NewFake(), now: time.Date(2026, 12, 1, 9, 0, 0, 0, time.UTC)}
 	w.Module = catalog.New(catalog.Deps{DB: d, NewID: uuid.NewV7, Now: w.Now, Media: w.Media, Restock: Notifier{}})
-	// 只關心 catalog 讀 seller 的 pub_exposable_stores：KYC 的表放寬成可以直接寫最小的列（它自己的規則在 seller 的測試）。
 	w.Exec(`DO $$ DECLARE r record; BEGIN
 		FOR r IN SELECT conrelid::regclass AS t, conname FROM pg_constraint
 		         WHERE conrelid = 'seller.kyc_applications'::regclass AND contype = 'c'

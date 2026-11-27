@@ -18,18 +18,16 @@ import { formatDateTimeShort } from "@/lib/format";
 import { api } from "@/services/api";
 import { useEnvironment } from "@/services/environment";
 
-// 後端 GET /admin/orders 回 OrderSummaryResponse（欄位皆 string；數字碼存後端 Value）。
-// paymentMethod 目前僅訂單詳情回傳，列表 summary 未帶 → 列表該欄顯示「—」。
 interface OrderSummary {
 	orderNo: string;
-	status: string; // OrderStatus value：0/10/20/30/32/35/40/50/60/70/80
+	status: string;
 	totalActualAmount: string;
 	buyerId: string;
 	buyerNickname?: string;
 	storeId: string;
 	sellerName?: string;
 	shippingMethod?: string;
-	paymentMethod?: string; // summary 未帶，保留欄位對齊詳情
+	paymentMethod?: string;
 	createTime: string;
 }
 
@@ -54,7 +52,6 @@ interface AdminOrderDetailResponse {
 	};
 }
 
-// status（OrderStatus value）→ badge 樣式 + icon。label 一律走集中常數 ORDER_STATUS_LABEL。
 const STATUS_STYLE: Record<
 	string,
 	{ variant: string; icon: MaterialSymbolName }
@@ -72,11 +69,6 @@ const STATUS_STYLE: Record<
 	"80": { variant: "rejected", icon: "cancel" },
 };
 
-// 篩選 tab：value 為 OrderStatus value（null=全部）。
-//
-// **要顯示哪幾個狀態當 tab** 是 UI 取捨（不是每個狀態都值得一個 tab），所以清單手寫；
-// 但**標籤一律從 ORDER_STATUS_LABEL 查**，不在這裡再抄一次中文。以前這裡是
-// `{ label: "待付款", value: "0" }` 這種成對硬寫，等於同一份碼表在本 repo 存在第二份。
 const STATUS_TAB_VALUES: Array<string | null> = [
 	null,
 	OrderStatus.PENDING_PAYMENT,
@@ -100,8 +92,6 @@ const TransactionList: React.FC = () => {
 	const [statusFilter, setStatusFilter] = useState<string | null>(null);
 	const pageSize = 20;
 
-	// keyword 改用 appliedKeyword（只在手動搜尋/Enter 更新）進 queryKey，輸入時不重抓。
-	// environment 進 queryKey 是刻意的 refetch trigger（api 由 singleton 取 gateway URL）。
 	const {
 		data,
 		isLoading: loading,
@@ -136,10 +126,6 @@ const TransactionList: React.FC = () => {
 	const orders = data?.orders ?? [];
 	const total = data?.total ?? 0;
 
-	// 統計卡數字來源：
-	// - 交易筆數 = 目前列表查詢的 total（隨篩選/搜尋變動）
-	// - 待付款 / 已退款 = 各發一發輕量查詢（page_size=1 只取 envelope total）
-	// 後端無「總交易額」聚合 API，故該卡已移除，不放死承諾的 placeholder。
 	const { data: pendingCount = 0 } = useQuery({
 		queryKey: ["orders", "count", "pending", environment],
 		queryFn: async () => {
@@ -177,8 +163,6 @@ const TransactionList: React.FC = () => {
 		);
 	};
 
-	// 台北釘死（backend#3053 的稽查）：原本走 toLocaleString ⇒ 跟著看的人的瀏覽器
-	// 時區跑，而金流時間讀錯一小時會把對帳切在錯的地方。
 	const formatDateTime = formatDateTimeShort;
 
 	const handleViewDetail = async (orderNo: string) => {
@@ -385,7 +369,7 @@ const TransactionList: React.FC = () => {
 				</table>
 			</div>
 
-			{/* 分頁 */}
+
 			{totalPages > 1 && (
 				<div className="pagination">
 					<button

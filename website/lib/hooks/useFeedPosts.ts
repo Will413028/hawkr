@@ -95,12 +95,9 @@ export function useFeedPosts({
 	initialPostsMatchQuery = false,
 	restoredSnapshot,
 }: UseFeedPostsOptions) {
-	// 同時帶店家與標籤時伺服器不接受（invalid_argument）：店家優先，標籤不套用。
 	const scopedHashtag = sellerId ? undefined : hashtag;
 	const isCanonical = !sellerId && !scopedHashtag && initialPage === 1;
 	const queryClient = useQueryClient();
-	// 登入者的列表依觀看者而定（封鎖的店不出現、viewer_* 欄位），不能用匿名的種子或匿名的共用答案：
-	// 登入後換成自己的 query key，由瀏覽器帶 cookie 重新讀。auth 還沒確定（unknown）先當訪客。
 	const viewer = useAuth().status === "signedIn";
 	const queryKey = React.useMemo(
 		() =>
@@ -121,15 +118,6 @@ export function useFeedPosts({
 		restoredGenerationRef.current === queryGeneration
 			? (restoredSnapshot ?? null)
 			: null;
-	// A server seed is usable only when it was fetched for this very query. The
-	// canonical (unscoped) feed always is: under ISR the route server-renders
-	// canonical page 1 and a seller/hashtag scope is applied on the client, so a
-	// scoped query there must fetch fresh page 1 rather than seed from posts
-	// belonging to a different key. A route that server-renders its own scoped
-	// page one instead declares `initialPostsMatchQuery`; without that, the seed
-	// would be dropped and page one refetched on the client — replacing content
-	// the server already delivered with a full-page loading skeleton. A
-	// back-navigation snapshot still seeds any scope.
 	const seedMatchesQuery = isCanonical || initialPostsMatchQuery;
 	const hasInitialData =
 		restored !== null || (!initialSeedFailed && seedMatchesQuery && !viewer);
@@ -154,7 +142,6 @@ export function useFeedPosts({
 		restored?.savedAt ?? seedTimestampRef.current.updatedAt;
 	const fetchPage = React.useCallback(
 		async (requestedPage: number, token: string, signal?: AbortSignal) => {
-			// 匿名的 canonical 第一頁走同源的 tab 路由；登入者與有範圍的查詢由瀏覽器直接讀。
 			const response =
 				isCanonical && !viewer
 					? await fetchCanonicalFeedPage(token, signal)
@@ -182,8 +169,6 @@ export function useFeedPosts({
 		queryKey,
 		queryFn: ({ pageParam, signal }) =>
 			fetchPage(pageParam.page, pageParam.token, signal),
-		// 第一頁的參數恆是空 token：種子的 token 是它那一頁「之後」的，用來讀或重播會跳過第一頁。
-		// 下一頁的 token 只來自 getNextPageParam。
 		initialPageParam: {
 			page: hasInitialData ? seedPage : initialPage,
 			token: "",
@@ -207,16 +192,10 @@ export function useFeedPosts({
 			lastPage.hasMore
 				? { page: lastPage.page + 1, token: lastPage.nextPageToken }
 				: undefined,
-		// Infinite-query refetch replays every loaded page in TanStack v5. Main
-		// tab activation instead reconciles only page 1 below, preserving the
-		// reader's accumulated pages and scroll position.
 		staleTime: Number.POSITIVE_INFINITY,
 		gcTime: 30 * 60 * 1000,
 		refetchOnMount: false,
 	});
-	// Head refresh, occasional full reconciliation and load-more all write the
-	// same InfiniteData object. One per-hook queue prevents a late page append
-	// from restoring the pre-refresh page-one snapshot.
 	const listWorkQueueRef = React.useRef<Promise<void>>(Promise.resolve());
 	const enqueueListWork = React.useCallback(
 		(work: () => Promise<void>): Promise<void> => {
@@ -260,8 +239,6 @@ export function useFeedPosts({
 				) {
 					throw signal.reason ?? supersededRefreshError();
 				}
-				// Full reconciliation runs first when both windows expired. Check
-				// again inside the shared queue so its success avoids a second page 1.
 				if (
 					onlyIfStale &&
 					Date.now() -
@@ -348,7 +325,6 @@ export function useFeedPosts({
 				const current = queryClient.getQueryData<FeedQueryData>(queryKey);
 				if (!current || current.pages.length === 0) return;
 				const freshPages: FeedPostsPage[] = [];
-				// page_token 要用上一頁回的那一個，所以 1..N 依序讀。
 				let token = "";
 				const pageCount = feedPageCountToReconcile(current.pages);
 				for (let page = 1; page <= pageCount; page += 1) {
@@ -436,8 +412,6 @@ export function useFeedPosts({
 	);
 	const fullActivationRefresh = useMainTabActivationRefresh({
 		scope: `${freshnessScope}:full`,
-		// Seed a scope only once. A remount or head update must not postpone
-		// the independent deadline for reconciling the already-loaded tail.
 		freshAt:
 			readMainTabRuntime(`${freshnessScope}:full`).lastSuccessAt ||
 			query.dataUpdatedAt,

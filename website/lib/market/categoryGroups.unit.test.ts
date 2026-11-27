@@ -5,8 +5,6 @@ import {
 	findCategoryGroupByName,
 } from "./categoryGroups";
 
-// Shape of /public/categories/tree as served by test-api on 2026-09-10: nine
-// lv1 roots, lv2 children, lv3 grandchildren, ids unique across the tree.
 const TREE = [
 	{
 		id: "2",

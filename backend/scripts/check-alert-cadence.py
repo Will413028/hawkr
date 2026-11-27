@@ -66,15 +66,12 @@ def rel(path):
     except ValueError:
         return path
 ISSUE_RE = re.compile(r"#\d{3,}")
-# alertname 白名單降頻的唯一合法例外：它送到 blackhole（完全不送），不是降頻。
 ALERTNAME_ROUTE_EXEMPT = {"Watchdog"}
 
 
 def collect_cadence_alerts(errors):
     """回傳 [(檔名, alertname, cadence, severity, annotations 全文)]。"""
     if not RULES_DIR.is_dir():
-        # 門檻 §3.10 第 4 問：目標不存在時 FAIL 而不是 SKIP——目錄被搬走的那天
-        # 這道 gate 不可以靜默轉綠。
         errors.append(f"[結構] 規則目錄不存在：{rel(RULES_DIR)}")
         return []
 
@@ -90,7 +87,7 @@ def collect_cadence_alerts(errors):
             for rule in group.get("rules") or []:
                 name = rule.get("alert")
                 if not name:
-                    continue  # recording rule
+                    continue
                 labels = rule.get("labels") or {}
                 if "cadence" not in labels:
                     continue
@@ -124,7 +121,6 @@ def collect_am_routes(errors):
             cadences.add(str(m["cadence"]))
         if "env" in m:
             envs.add(str(m["env"]))
-        # 門檻 6：alertname 白名單 + 自訂 repeat_interval ＝ 繞過本 gate 的降頻
         an = m.get("alertname") or me.get("alertname")
         if an and route.get("repeat_interval") and route.get("receiver") != "blackhole":
             if str(an) not in ALERTNAME_ROUTE_EXEMPT:
@@ -166,26 +162,22 @@ def check():
     for fname, name, cadence, severity, anns, labels in alerts:
         used.add(cadence)
         where = f"{fname} :: {name}"
-        # 門檻 1
         if cadence not in ALLOWED_CADENCES:
             errors.append(
                 f"[門檻1] {where}：cadence={cadence!r} 不在允許集合 {sorted(ALLOWED_CADENCES)}。"
                 "打錯字不會報錯，只會讓 label 靜默無效（照原頻率投遞）。"
             )
-        # 門檻 2
         if not ISSUE_RE.search(anns):
             errors.append(
                 f"[門檻2] {where}：annotations 沒有 issue 編號（#NNNN）。"
                 "降頻的正當性來自『有人在追這件事』；沒有票就該讓它吵。"
             )
-        # 門檻 3
         if severity == "critical":
             errors.append(
                 f"[門檻3] {where}：critical 不得降頻。"
                 "critical 的定義就是要立刻處理——需要降頻代表 severity 標錯了，改 severity 而不是改節奏。"
             )
 
-    # 門檻 4：逐條模擬路由。集合比較擋不住「只補了一個 env」——見 docstring。
     if root is not None:
         for fname, name, cadence, severity, _anns, labels in alerts:
             for env in sorted(envs) or [None]:
@@ -201,12 +193,10 @@ def check():
                         f"cadence label 對它完全沒有作用而且靜默。"
                         f"請在 {rel(AM_CONFIG)} 對應的 route 底下補 cadence 子 route。"
                     )
-    # 門檻 5：宣告了卻沒人用 ＝ 死設定
     for c in sorted(declared - used):
         errors.append(
             f"[門檻5] Alertmanager 宣告了 cadence={c!r} 的 route，但沒有任何告警在用 ⇒ 死設定，請移除。"
         )
-    # 門檻 6
     for an in sorted(set(alertname_routes)):
         errors.append(
             f"[門檻6] Alertmanager 用 alertname={an!r} 做降頻 route。"
@@ -216,7 +206,6 @@ def check():
 
 
 SELF_TEST_CASES = [
-    # (說明, 規則 YAML, 期望命中的門檻編號)
     ("值打錯字", {"alert": "X", "labels": {"cadence": "hourly", "severity": "warning"},
                   "annotations": {"description": "見 #1234"}}, "門檻1"),
     ("沒有 issue", {"alert": "X", "labels": {"cadence": "daily", "severity": "warning"},
@@ -258,7 +247,6 @@ def self_test():
                 if not any(want in e for e in errs):
                     failures.append(f"變異「{desc}」未被 {want} 抓到；實際錯誤：{errs}")
 
-        # 門檻 4-a：規則用了但 AM 完全沒宣告
         with tempfile.TemporaryDirectory() as d:
             RULES_DIR = Path(d) / "rules"
             RULES_DIR.mkdir()
@@ -272,9 +260,6 @@ def self_test():
             if not any("門檻4" in e for e in errs):
                 failures.append(f"變異「label 完全沒人接」未被門檻4 抓到；實際：{errs}")
 
-        # 門檻 4-b：**只補了一個 env**。這一格是 2026-09-12 用真實變異測出來的盲點——
-        # 舊版門檻 4 做的是集合比較（「daily 有沒有被宣告過」），dev 有而 prod 沒有時
-        # 集合差為空 ⇒ 放行，而 prod 實際照 30m 投遞。少了這個 case，同一個盲點會回來。
         with tempfile.TemporaryDirectory() as d:
             RULES_DIR = Path(d) / "rules"
             RULES_DIR.mkdir()
@@ -288,7 +273,6 @@ def self_test():
                 {"match": {"channel": "business", "env": "dev"}, "receiver": "dev-ch",
                  "repeat_interval": "2h",
                  "routes": [{"match": {"cadence": "daily"}, "repeat_interval": "24h"}]},
-                # prod 這條刻意沒有 cadence 子 route
                 {"match": {"channel": "business", "env": "prod"}, "receiver": "prod-ch",
                  "repeat_interval": "30m"},
             ]}}), encoding="utf-8")
@@ -298,7 +282,6 @@ def self_test():
             if any("env=dev" in e for e in errs):
                 failures.append(f"門檻4 對已正確設定的 dev 誤報；實際：{errs}")
 
-        # 門檻 6：alertname 白名單降頻
         with tempfile.TemporaryDirectory() as d:
             RULES_DIR = Path(d) / "rules"
             RULES_DIR.mkdir()
@@ -312,7 +295,6 @@ def self_test():
             if not any("門檻6" in e for e in errs):
                 failures.append(f"變異「alertname 降頻」未被門檻6 抓到；實際：{errs}")
 
-        # 陰性對照：合法配置必須零錯誤，否則本 gate 是恆真斷言
         with tempfile.TemporaryDirectory() as d:
             RULES_DIR = Path(d) / "rules"
             RULES_DIR.mkdir()

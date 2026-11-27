@@ -14,7 +14,6 @@ export const GENDER_CHOICES: readonly Gender[] = GenderSchema.values
 /** `undefined` 是沒有填。 */
 export function genderText(ut: UiText, gender: Gender | undefined): string {
 	if (gender === undefined) return ut(buyerProfileGenderUnset());
-	// 沒有文字的值（不認得的值）呈現同沒有設值（API 規範，optional enum）。
 	return optionalText(ut, buyerGender(gender)) ?? ut(buyerProfileGenderUnset());
 }
 

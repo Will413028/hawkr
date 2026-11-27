@@ -31,7 +31,6 @@ func TestCreateSellerProduct_NestedSkuValidationIsEnforced(t *testing.T) {
 		{"skuName 空字串", `[{"skuName":"","unit":"3301","price":"100","stockQty":"5","weight":"1","lengthCm":"10","widthCm":"10","heightCm":"10"}]`, http.StatusBadRequest},
 		{"省略 weight", `[{"skuName":"s1","unit":"3301","price":"100","stockQty":"5","lengthCm":"10","widthCm":"10","heightCm":"10"}]`, http.StatusBadRequest},
 		{"省略 lengthCm", `[{"skuName":"s1","unit":"3301","price":"100","stockQty":"5","weight":"1","widthCm":"10","heightCm":"10"}]`, http.StatusBadRequest},
-		// 零 SKU 商品會被建成「上架但不可購買」（priceMin=0 / stock=0）
 		{"空陣列", `[]`, http.StatusBadRequest},
 	}
 
@@ -61,7 +60,6 @@ func TestCreateSellerProduct_NestedSkuValidationIsEnforced(t *testing.T) {
 			if w.Code != tc.wantStatus {
 				t.Fatalf("HTTP status = %d, want %d; body = %s", w.Code, tc.wantStatus, w.Body.String())
 			}
-			// 被擋下時不得打到 product-service：驗證必須在 Gateway 就結束
 			if tc.wantStatus == http.StatusBadRequest && called {
 				t.Error("請求已被驗證擋下，product-service 不應被呼叫")
 			}

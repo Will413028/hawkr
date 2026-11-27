@@ -10,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ==================== DTO ====================
 
 // SellerSkuListResponse 商品 SKU 列表回應
 type SellerSkuListResponse struct {
@@ -32,7 +31,6 @@ type SellerSkuResponse struct {
 	HeightCm  string `json:"heightCm"`
 }
 
-// ==================== 對外 API ====================
 
 // ListSellerSkus lists all SKUs for a product (public route：viewer identity
 // only, never an owner claim — anonymous/buyer  只用來讓
@@ -117,7 +115,6 @@ func (h *Holder) GetSellerProductSkus(c *gin.Context) {
 	renderSellerSkuList(c, resp)
 }
 
-// skuProductID 從 :id 或 :product_id path 參數取得商品 ID（相容不同路由命名）。
 func skuProductID(c *gin.Context) string {
 	productID := c.Param("product_id")
 	if productID == "" {
@@ -134,16 +131,16 @@ func renderSellerSkuList(c *gin.Context, resp *pb.GetProductResponse) {
 	skus := make([]gin.H, 0, len(resp.Data.Skus))
 	for _, v := range resp.Data.Skus {
 		skus = append(skus, gin.H{
-			"id":        v.Id,         // UUID
-			"productId": resp.Data.Id, // 商品 UUID
-			"skuName":   v.SkuName,    // SKU 名稱
-			"weight":    v.Weight,     // 重量
-			"unit":      v.Unit,       // 單位
-			"price":     v.Price,      // 價格
-			"stockQty":  v.StockQty,   // 庫存
-			"lengthCm":  v.LengthCm,   // 長
-			"widthCm":   v.WidthCm,    // 寬
-			"heightCm":  v.HeightCm,   // 高
+			"id":        v.Id,
+			"productId": resp.Data.Id,
+			"skuName":   v.SkuName,
+			"weight":    v.Weight,
+			"unit":      v.Unit,
+			"price":     v.Price,
+			"stockQty":  v.StockQty,
+			"lengthCm":  v.LengthCm,
+			"widthCm":   v.WidthCm,
+			"heightCm":  v.HeightCm,
 		})
 	}
 

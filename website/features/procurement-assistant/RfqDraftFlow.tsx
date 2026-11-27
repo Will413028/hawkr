@@ -164,10 +164,6 @@ export default function RfqDraftFlow({
 	const publicationInFlightRef = React.useRef(false);
 	const publicationOperationRef = React.useRef(0);
 
-	// 受眾身分：核准是針對「這一份名單」發出的，名單一變，它就不再是核准過的那一份。
-	// ⛔ 有序比較：server 的 audienceHash 涵蓋收件人順序，先 sort 再比會把真實差異抹掉。
-	// responseDeadline 有自己的 reset（handleResponseDeadlineChange），revisionId 由
-	// CandidateCanvas 的 key remount 涵蓋，所以這裡只需要 candidateSet 與收件人清單。
 	const publicationAudienceIdentity = React.useMemo(
 		() =>
 			publicationAudienceIdentityOf(
@@ -177,11 +173,8 @@ export default function RfqDraftFlow({
 		[candidateSetId, candidates],
 	);
 	const previousAudienceIdentityRef = React.useRef(publicationAudienceIdentity);
-	// 核准當下畫面上的那份受眾身分。effect 的清理是**非同步**的，所以這個 ref 才是
-	// 「這份核准屬於誰」的唯一答案；execute 送出前用它再比一次。
 	const publicationApprovalIdentityRef = React.useRef<string | null>(null);
 	const invalidatePublicationApproval = React.useCallback(() => {
-		// ⛔ 遞增 operation：還在路上的 preview 回應不得把作廢掉的核准寫回來。
 		publicationOperationRef.current += 1;
 		publicationApprovalIdentityRef.current = null;
 		setPublicationReconfirmed(false);
@@ -229,7 +222,6 @@ export default function RfqDraftFlow({
 			: null;
 	const desiredRangeBlocking = Boolean(desiredRangeError);
 	const preview = previewState.status === "success" ? previewState.data : null;
-	// 發布一旦送出（或已成功），價格與說明都不能再改：核准已經被用掉。
 	const publicationLocked =
 		executionState.status === "loading" || executionState.status === "success";
 	const confirmableBasis = preview ? hasPriceBasis(preview) : false;
@@ -248,10 +240,6 @@ export default function RfqDraftFlow({
 		invalidatePublicationApproval();
 	}, [invalidatePublicationApproval]);
 
-	// 受眾變了就作廢既有核准。畫面上那條警示條（「任一需求、價格、候選或受眾變更，
-	// 都會使此確認失效並要求重新試算」）承諾的就是這件事；在此之前只有需求與價格那
-	// 一半有實作。⛔ 同時遞增 operation，還在路上的 preview 回應不得把舊核准寫回來。
-	// 名單被清空也走同一條路徑：identity 變了 ⇒ 核准作廢 ⇒ execute CTA 不再 render。
 	React.useEffect(() => {
 		if (previousAudienceIdentityRef.current === publicationAudienceIdentity)
 			return;
@@ -377,7 +365,6 @@ export default function RfqDraftFlow({
 			selectedCandidateIds,
 			responseDeadline: responseDeadline || undefined,
 		};
-		// 同一份內容的重試沿用同一個 client_request_id；內容一變就是新的一次動作。
 		const fingerprint = JSON.stringify(input);
 		const stored = publicationPreviewIdRef.current;
 		const clientRequestId =
@@ -394,10 +381,7 @@ export default function RfqDraftFlow({
 				clientRequestId,
 				...input,
 			});
-			// 晚到的回應對應的是已經被換掉的那一份受眾，丟棄。
 			if (publicationOperationRef.current !== operation) return;
-			// 記下這份核准是對「哪一份名單」發的：用送出去的那份名單，不是
-			// 現在畫面上的值，兩者在這裡相同，但前者才是核准的真正對象。
 			publicationApprovalIdentityRef.current = result.ok
 				? publicationAudienceIdentityOf(candidateSetId, selectedCandidateIds)
 				: null;
@@ -433,11 +417,6 @@ export default function RfqDraftFlow({
 			executionState.status === "success"
 		)
 			return;
-		// ⛔ 送出前再同步比一次。受眾變更的作廢走 passive effect，而 effect 是排進
-		// scheduler 後才跑的：名單已經 commit 上畫面、effect 還沒執行的那個視窗裡，
-		// 舊的 execute CTA 仍然可按。只靠 effect 就會用**上一份名單的核准**送出。
-		// 這裡擋在任何 side effect 之前；已經在飛的 command 由上面的 in-flight 檢查
-		// 保護，保留它自己的 clientRequestId 與核准身分，不因畫面改動重送或作廢。
 		if (
 			publicationApprovalIdentityRef.current !== publicationAudienceIdentity
 		) {
@@ -466,7 +445,6 @@ export default function RfqDraftFlow({
 			);
 			if (outcome.ok) onPublicationExecuted?.();
 			else if (outcome.error.code === "STALE_APPROVAL") {
-				// 核准已不是現行的那一份：作廢它，讓買家重新取得核准再送出。
 				invalidatePublicationApproval();
 			}
 		} finally {

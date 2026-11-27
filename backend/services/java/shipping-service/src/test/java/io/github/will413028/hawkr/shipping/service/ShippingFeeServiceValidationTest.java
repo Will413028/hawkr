@@ -28,12 +28,12 @@ import static org.mockito.Mockito.mock;
  */
 class ShippingFeeServiceValidationTest {
 
-    private static final String TAQBIN = "3001";              // 黑貓宅急便
-    private static final String SEVEN_ELEVEN = "3002";        // 7-11 店到店
-    private static final String UBER = "3003";                // Uber 即時配送 — Phase 1 預留,全系統暫停(無 config row)
-    private static final String AMBIENT = "3201";             // 常溫
-    private static final String CHILLED = "3202";             // 冷藏 — 7-11 不支援
-    private static final String FROZEN = "3203";              // 冷凍
+    private static final String TAQBIN = "3001";
+    private static final String SEVEN_ELEVEN = "3002";
+    private static final String UBER = "3003";
+    private static final String AMBIENT = "3201";
+    private static final String CHILLED = "3202";
+    private static final String FROZEN = "3203";
 
     private ShippingFeeService service;
 
@@ -43,7 +43,6 @@ class ShippingFeeServiceValidationTest {
         ShippingFeeTierMapper tierMapper = mock(ShippingFeeTierMapper.class);
         service = new ShippingFeeService(configMapper, tierMapper);
 
-        // 直接灌 configCache:7-11 常溫 / 7-11 冷凍 / TAQBIN 全溫層 — 不灌 7-11 冷藏(模擬業務不支援)
         Map<String, ShippingMethodConfigEntity> cache = new HashMap<>();
         cache.put(SEVEN_ELEVEN + ":" + AMBIENT, makeConfig(105, 45, 5000));
         cache.put(SEVEN_ELEVEN + ":" + FROZEN, makeConfig(105, 45, 5000));
@@ -57,7 +56,6 @@ class ShippingFeeServiceValidationTest {
 
     @Test
     void temperatureNotOnboarded_messageMentionsBothMethodAndTemperatureLabels() {
-        // 賣家只開通 7-11 常溫 → 試上架冷凍 + 7-11
         Set<String> sellerAvailable = Set.of(SEVEN_ELEVEN + ":" + AMBIENT);
         ShippingFeeService.ValidationResult result = service.validateProductShipping(
                 List.of(item("冷凍商品", SEVEN_ELEVEN, FROZEN)), sellerAvailable);
@@ -73,7 +71,6 @@ class ShippingFeeServiceValidationTest {
 
     @Test
     void methodNotOnboarded_friendlyMessage() {
-        // 賣家完全沒開通任何 method
         ShippingFeeService.ValidationResult result = service.validateProductShipping(
                 List.of(item("常溫商品", SEVEN_ELEVEN, AMBIENT)), Set.of());
 
@@ -87,9 +84,6 @@ class ShippingFeeServiceValidationTest {
 
     @Test
     void methodNotSupported_combinationIsBusinessInvalid() {
-        // 7-11 + 冷藏 業務不支援 — 賣家假設都已開通(雖然開不到),走到 step 2 config check 噴 METHOD_NOT_SUPPORTED
-        // 注意 7-11 + 冷藏 sellerAvailable 不會有此項(SLOT_DEFINITIONS 沒列),所以實務上 step 1 已擋
-        // 這裡用 sellerAvailableMethods=null 略過 step 1 直接驗 step 2
         ShippingFeeService.ValidationResult result = service.validateProductShipping(
                 List.of(item("冷藏商品", SEVEN_ELEVEN, CHILLED)), null);
 
@@ -112,9 +106,7 @@ class ShippingFeeServiceValidationTest {
 
     @Test
     void methodNotAvailable_whenMethodHasNoEnabledConfig() {
-        // Uber Phase 1 預留 — configCache 無 3003 任何 row → hasAnyEnabledConfig(UBER)=false
-        // 即使賣家假裝開通了,系統層級 step 0 就應該擋下
-        Set<String> sellerAvailable = Set.of(UBER + ":" + AMBIENT);  // 故意設「賣家有開通」
+        Set<String> sellerAvailable = Set.of(UBER + ":" + AMBIENT);
         ShippingFeeService.ValidationResult result = service.validateProductShipping(
                 List.of(item("Uber商品", UBER, AMBIENT)), sellerAvailable);
 
@@ -128,24 +120,20 @@ class ShippingFeeServiceValidationTest {
 
     @Test
     void methodNotAvailable_takesPrecedenceOverOnboardingChecks() {
-        // 系統層級暫停的訊息應該優先於賣家 onboarding 訊息
         ShippingFeeService.ValidationResult result = service.validateProductShipping(
-                List.of(item("Uber商品", UBER, FROZEN)), null);  // sellerAvailableMethods=null 也擋
+                List.of(item("Uber商品", UBER, FROZEN)), null);
         assertFalse(result.allValid());
         assertEquals("METHOD_NOT_AVAILABLE", result.results().get(0).rejectionReason());
     }
 
     @Test
     void taqbinUsesEmptyTempInKey_andStillFriendlyMessage() {
-        // 黑貓 key 固定 "TAQBIN:" — 不分溫層
-        // 賣家有 TAQBIN: 則任何溫層都通過 step 1
         Set<String> sellerAvailable = Set.of(TAQBIN + ":");
         ShippingFeeService.ValidationResult result = service.validateProductShipping(
                 List.of(item("冷凍商品", TAQBIN, FROZEN)), sellerAvailable);
 
         assertTrue(result.allValid());
 
-        // 反向:賣家沒開通 TAQBIN → METHOD_NOT_ONBOARDED + 黑貓 label
         ShippingFeeService.ValidationResult result2 = service.validateProductShipping(
                 List.of(item("常溫商品", TAQBIN, AMBIENT)), Set.of(SEVEN_ELEVEN + ":" + AMBIENT));
         assertFalse(result2.allValid());

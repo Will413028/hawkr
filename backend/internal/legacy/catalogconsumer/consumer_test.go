@@ -11,15 +11,14 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/catalog"
 )
 
-// fakeCatalog 照 catalog 的規則記帳：歸還以鍵去重並指向原扣減，銷量以 order_no 去重、商品不存在整筆回滾。
 type fakeCatalog struct {
-	deducted map[string][]catalog.StockItem // 原扣減（以扣減鍵）
-	restored map[string]bool                // 已歸還的鍵
+	deducted map[string][]catalog.StockItem
+	restored map[string]bool
 	stock    map[uuid.UUID]int32
 	sales    map[uuid.UUID]int32
 	orders   map[string]bool
 	products map[uuid.UUID]bool
-	restores []string // 收到的歸還鍵
+	restores []string
 	err      error
 }
 
@@ -159,7 +158,6 @@ func TestCancelledClassifiesCatalogErrors(t *testing.T) {
 	}
 }
 
-// saleLine 是銷量事件的一個品項；quantity 是 JSON 數字。
 type saleLine struct {
 	product string
 	qty     int

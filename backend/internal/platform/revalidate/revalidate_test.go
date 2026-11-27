@@ -67,8 +67,8 @@ func TestWorkRetriesOnlyTransientStatuses(t *testing.T) {
 		{http.StatusServiceUnavailable, true},
 		{http.StatusTooManyRequests, true},
 		{http.StatusBadRequest, false},
-		{http.StatusUnauthorized, false}, // secret 不符
-		{http.StatusNotFound, false},     // 網址設錯
+		{http.StatusUnauthorized, false},
+		{http.StatusNotFound, false},
 	} {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			http.Error(w, "x", c.status)
@@ -90,7 +90,7 @@ func TestWorkRetriesConnectionErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	addr := ln.Addr().String()
-	_ = ln.Close() // 沒有人在聽：連線被拒
+	_ = ln.Close()
 
 	err = NewWorker(Config{BaseURL: "http://" + addr, Secret: "x"}, quietLogger()).Work(context.Background(), job("post:1"))
 	if err == nil || isCancel(err) {
@@ -101,10 +101,10 @@ func TestWorkRetriesConnectionErrors(t *testing.T) {
 func TestWorkRetriesTimeouts(t *testing.T) {
 	release := make(chan struct{})
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-		<-release // 一直不回應，直到測試結束
+		<-release
 	}))
 	defer srv.Close()
-	defer close(release) // 先於 srv.Close 執行：Close 會等所有 handler 返回
+	defer close(release)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()

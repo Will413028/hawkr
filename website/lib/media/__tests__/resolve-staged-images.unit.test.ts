@@ -45,10 +45,6 @@ describe("resolveStagedImages", () => {
 		const fetchSpy = vi.fn();
 		vi.stubGlobal("fetch", fetchSpy);
 
-		// Shape of an edit draft hydrated from GET /app/products/{id}: every
-		// existing gallery entry carries the assetId the backend matches on, plus
-		// one freshly uploaded image. Re-uploading the existing ones would mint
-		// duplicate media assets on every save; omitting them deletes them.
 		const out = await resolveStagedImages([
 			{
 				url: "https://media.example.com/a.jpg",
@@ -77,8 +73,6 @@ describe("resolveStagedImages", () => {
 		}));
 		vi.stubGlobal("fetch", fetchSpy);
 
-		// First url-only upload resolves SLOWER than the second — proves output
-		// order follows input index (Promise.all), not resolution time.
 		mockUpload
 			.mockImplementationOnce(
 				() =>
@@ -94,10 +88,10 @@ describe("resolveStagedImages", () => {
 			);
 
 		const out = await resolveStagedImages([
-			{ url: "u0", stagedToken: "s0" }, // already staged → passthrough
-			{ url: "u1" }, // restage (slow)
-			{ url: "u2", stagedToken: "s2" }, // already staged → passthrough
-			{ url: "u3" }, // restage (fast)
+			{ url: "u0", stagedToken: "s0" },
+			{ url: "u1" },
+			{ url: "u2", stagedToken: "s2" },
+			{ url: "u3" },
 		]);
 
 		expect(out).toEqual([
@@ -106,7 +100,6 @@ describe("resolveStagedImages", () => {
 			{ stagedToken: "s2" },
 			{ stagedToken: "restaged-u3" },
 		]);
-		// only the two url-only images were downloaded + re-uploaded
 		expect(fetchSpy).toHaveBeenCalledTimes(2);
 		expect(fetchSpy).toHaveBeenCalledWith(
 			"https://media.example.com/i/original/u1",
@@ -192,14 +185,11 @@ describe("gallerySignature", () => {
 		);
 	});
 	it("does not collide when url/token boundaries shift", () => {
-		// {url:"a b", token:""} must NOT share a signature with {url:"a", token:"b"}
 		expect(gallerySignature([{ url: "a b" }])).not.toBe(
 			gallerySignature([{ url: "a", stagedToken: "b" }]),
 		);
 	});
 	it("differs when the same url points at a different asset", () => {
-		// Identity of an existing gallery entry is its assetId; two entries could
-		// otherwise share a signature and a swap would read as "untouched".
 		expect(gallerySignature([{ url: "a", assetId: "1" }])).not.toBe(
 			gallerySignature([{ url: "a", assetId: "2" }]),
 		);

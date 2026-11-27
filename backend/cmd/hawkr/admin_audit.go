@@ -15,7 +15,6 @@ import (
 
 const adminAuditUsage = "用法：admin-audit [-admin <ID>] [-action <procedure 名稱>] [-target-type <種類>] [-target-id <ID>] [-since <時間>] [-until <時間>] [-limit <筆數>]（時間是 RFC 3339 或 YYYY-MM-DD，Since 含、Until 不含）"
 
-// parseAdminAudit 解析 admin-audit 的旗標（D62 的讀取端：只有營運子命令，沒有畫面）；全部選填，沒有條件就列最新的。
 func parseAdminAudit(args []string) (adminaudit.Filter, error) {
 	var f adminaudit.Filter
 	flags := flag.NewFlagSet("admin-audit", flag.ContinueOnError)
@@ -65,12 +64,10 @@ func parseAuditTime(flagName, v string) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("admin-audit 的 %s %q 不是 RFC 3339 或 YYYY-MM-DD（%s）", flagName, v, adminAuditUsage)
 }
 
-// auditLister 是 adminaudit.Log 的讀取。
 type auditLister interface {
 	List(context.Context, adminaudit.Filter) ([]adminaudit.Record, error)
 }
 
-// printAdminAudit 列出紀錄，一筆一行（新的在前）：id、時間（UTC）、管理員、動作、對象、detail。
 func printAdminAudit(ctx context.Context, l auditLister, f adminaudit.Filter, out io.Writer) error {
 	recs, err := l.List(ctx, f)
 	if err != nil {

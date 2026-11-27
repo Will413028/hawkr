@@ -38,11 +38,6 @@ export const SHIPMENT_PHOTO_TILE_STYLE = {
 
 const CloseIcon = () => <AppIcon name="close" />;
 
-/* ============================================================
- *        Shared shipping-brand marks + field icons
- *        (exported so the bulk dialog in SellerOrdersPage can
- *         reuse the exact same visual language — 風格統一)
- * ============================================================ */
 
 type ShippingBrand = "tcat" | "711";
 
@@ -154,9 +149,6 @@ function DialogShell({
 	);
 }
 
-/* ============================================================
- *                  Photo picker (shared)
- * ============================================================ */
 
 interface PhotoPickerProps {
 	preview: string | null;
@@ -191,9 +183,6 @@ function PhotoPicker({
 	);
 }
 
-/* ============================================================
- *               TcatReservationDialog (黑貓預約)
- * ============================================================ */
 
 export interface TcatReservationResult {
 	/** yyyyMMdd e.g. "20260512" */
@@ -249,7 +238,6 @@ export function TcatReservationDialog({
 
 	React.useEffect(() => {
 		if (!open) {
-			// reset state when closed
 			setPhotoPreview(null);
 			setStagedToken(undefined);
 			setPreviewUrl(undefined);
@@ -424,9 +412,6 @@ export function TcatReservationDialog({
 	);
 }
 
-/* ============================================================
- *                  CallTcatDialog (黑貓叫件)
- * ============================================================ */
 
 export interface CallTcatParams {
 	isContact: "Y" | "N";
@@ -533,9 +518,6 @@ export function CallTcatDialog({ open, onClose, onSubmit }: CallTcatProps) {
 	);
 }
 
-/* ============================================================
- *               SevenElevenShipDialog (7-11 出貨確認)
- * ============================================================ */
 
 export interface SevenElevenShipResult {
 	stagedToken?: string;

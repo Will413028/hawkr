@@ -202,7 +202,6 @@ func (c *ShippingClient) ListBusinessDays(ctx context.Context, req *pb.ListBusin
 	return c.shippingClient.ListBusinessDays(ctx, req)
 }
 
-// ==================== Admin 異常查詢 API（§29）====================
 
 // ListShipmentsForAdmin 列物流異常
 func (c *ShippingClient) ListShipmentsForAdmin(ctx context.Context, req *pb.ListShipmentsForAdminRequest) (*pb.ListShipmentsForAdminResponse, error) {
@@ -225,7 +224,6 @@ func (c *ShippingClient) ListSellerShipmentSettingsForAdmin(ctx context.Context,
 	return c.shippingClient.ListSellerShipmentSettingsForAdmin(ctx, req)
 }
 
-// ==================== §5.21 配送異常賣家通知 ====================
 
 // ListSellerShipmentAnomalies 列賣家配送異常 dashboard
 func (c *ShippingClient) ListSellerShipmentAnomalies(ctx context.Context, req *pb.ListSellerShipmentAnomaliesRequest) (*pb.ListSellerShipmentAnomaliesResponse, error) {

@@ -14,7 +14,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-// admin 對店家做的動作的可用性與原因（step10e-5b-design.md）：可用性與方法的前置檢查是同一個函式，句子與錯誤是同一句。
 
 func (f *fixture) beginDeletion(t *testing.T, accountID, storeID int64) {
 	t.Helper()
@@ -27,7 +26,6 @@ func (f *fixture) beginDeletion(t *testing.T, accountID, storeID int64) {
 	}))
 }
 
-// kycReviewStarts 是 review_kyc_application(at) 的結果：店家 → 開始時間。
 func (f *fixture) kycReviewStarts(t *testing.T, at time.Time) map[int64]time.Time {
 	t.Helper()
 	out := map[int64]time.Time{}
@@ -40,7 +38,6 @@ func (f *fixture) kycReviewStarts(t *testing.T, at time.Time) map[int64]time.Tim
 	return out
 }
 
-// deadlineOf 是後台詳情（StoreKYC）顯示的審核期限；暫停審核期間是 nil。
 func (f *fixture) deadlineOf(t *testing.T, storeID int64) *Deadline {
 	t.Helper()
 	a, ok, err := f.module.StoreKYC(context.Background(), storeID)
@@ -132,7 +129,6 @@ func TestKYCReviewPausesWhileTheStoreIsClosedAndResumesFromTheReopening(t *testi
 	closedText := "店家已關閉，這份商家認證申請暫停審核，店家恢復營業後才能審核或重新查詢。"
 	approveR, rejectR, requeryR := f.reasonsOf(t, sub)
 	closedOnly := []StoreActionUnavailableReason{StoreReasonStoreClosed}
-	// 生效中的終止合作也是停權（帳號有生效中的措施）：核准的原因是 [已關閉, 停權]，第一個是已關閉；退回與重新查詢不看停權。
 	if !slices.Equal(approveR, []StoreActionUnavailableReason{StoreReasonStoreClosed, StoreReasonAccountSuspended}) || !slices.Equal(rejectR, closedOnly) || !slices.Equal(requeryR, []StoreActionUnavailableReason{StoreReasonKYCNotBusiness, StoreReasonStoreClosed}) {
 		t.Fatalf("approve=%v reject=%v requery=%v", approveR, rejectR, requeryR)
 	}
@@ -142,7 +138,6 @@ func TestKYCReviewPausesWhileTheStoreIsClosedAndResumesFromTheReopening(t *testi
 	if d := f.deadlineOf(t, s.StoreID); d != nil {
 		t.Fatalf("暫停期間沒有審核期限：%+v", d)
 	}
-	// 方法與可用性是同一個函式：同一句。
 	if err := approve(f, sub); apperr.KindOf(err) != apperr.KindFailedPrecondition || !strings.Contains(err.Error(), closedText) {
 		t.Fatalf("approve：%v", err)
 	}
@@ -156,7 +151,6 @@ func TestKYCReviewPausesWhileTheStoreIsClosedAndResumesFromTheReopening(t *testi
 	if got := f.kycReviewStarts(t, f.now); len(got) != 0 {
 		t.Fatalf("暫停期間不在待辦：%v", got)
 	}
-	// 恢復營業：同一個 stint 回到營運中，申請回到待辦，開始時間是恢復的時刻。
 	f.tick(48 * time.Hour)
 	f.revoke(t, m)
 	if f.storeRow(t, s.StoreID).Status != Active {
@@ -259,7 +253,6 @@ func TestKYCReviewPausesDuringSuspensionAndResumesWhenItEnds(t *testing.T) {
 	if err := approve(f, sub); apperr.KindOf(err) != apperr.KindFailedPrecondition || !strings.Contains(err.Error(), "帳號停權中，停權解除之後才能核准商家認證。") {
 		t.Fatalf("approve：%v", err)
 	}
-	// 邊界：到期前 1µs 仍停權，到期的那一刻回到待辦、開始時間是到期時間；兩個定義（effective_measures 與 account_sanction_lifted_at）在邊界一致。
 	before := ends.Add(-time.Microsecond)
 	if !f.effectiveAt(t, accountID, before) || f.liftedAt(t, accountID, before) != nil || len(f.kycReviewStarts(t, before)) != 0 {
 		t.Fatalf("到期前 1µs：effective=%v lifted=%v", f.effectiveAt(t, accountID, before), f.liftedAt(t, accountID, before))
@@ -270,7 +263,6 @@ func TestKYCReviewPausesDuringSuspensionAndResumesWhenItEnds(t *testing.T) {
 	if got := f.kycReviewStarts(t, ends); !got[s.StoreID].Equal(ends) || ends.Equal(submittedAt) {
 		t.Fatalf("到期之後開始是停權結束的時間 %v：%v", ends, got)
 	}
-	// 撤銷也是一種結束：另一家店，停權再撤銷。
 	account2, s2, _ := f.submitted(t)
 	f.tick(time.Hour)
 	risk := f.suspend(t, s2.StoreID)
@@ -312,7 +304,6 @@ func TestASuspensionThatEndedBeforeSubmittingDoesNotMoveTheStart(t *testing.T) {
 	d := f.savedDraft(t, kycDraft(accountID))
 	_, err := f.module.SubmitKYC(context.Background(), SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
 	must(t, err)
-	// 較早結束的停權讓 greatest 取它，但送出時間更晚，所以開始是送出時間。
 	if got := f.kycReviewStarts(t, f.now); !got[s.StoreID].Equal(f.now) {
 		t.Fatalf("開始是送出時間 %v：%v", f.now, got)
 	}
@@ -344,7 +335,6 @@ func TestAwaitingReviewIsOneDefinitionAcrossTheQueueTheListAndTheStats(t *testin
 	f.revoke(t, reopenTerm)
 	_, _, toApprove := sub(6)
 	must(t, approve(f, toApprove))
-	// 身分命中：別的帳號以同一個統編入駐過、之後被停權，這一份在送出時還沒有處分；核准會失敗，但仍留在待辦讓員工退回。
 	otherAccount, otherStore := f.open(t)
 	f.savedDraft(t, companyDraft(otherAccount, taxIDOne))
 	_, hitStore, hitSub := f.submittedCompany(t, taxIDOne)

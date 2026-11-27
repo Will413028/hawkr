@@ -139,7 +139,6 @@ class OrderOutboxPublisherSchedulerClaimTest {
         OrderOutboxEntity second = pendingEvent(11L);
         when(mapper.findDispatchable(any(), anyInt())).thenReturn(List.of(first, second));
         when(mapper.claimForDispatch(anyLong(), any(), any())).thenReturn(1);
-        // 模擬「單筆工作耗時」：真實世界是 enrich gRPC（最壞 30 秒），這裡只需要一段可量測的時間
         org.mockito.Mockito.doAnswer(inv -> {
             Thread.sleep(40L);
             return null;
@@ -186,7 +185,6 @@ class OrderOutboxPublisherSchedulerClaimTest {
 
         assertEquals(OutboxEventStatus.PENDING.value(), pending.getValue());
         assertEquals(OutboxEventStatus.FAILED.value(), failed.getValue());
-        // 反向保證：終態不得出現在候選集合
         assertTrue(!OutboxEventStatus.SENT.value().equals(pending.getValue())
                         && !OutboxEventStatus.SENT.value().equals(failed.getValue())
                         && !OutboxEventStatus.DEAD.value().equals(pending.getValue())

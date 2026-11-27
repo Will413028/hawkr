@@ -28,11 +28,8 @@ interface AddToCartButtonProps {
  */
 function cartErrorMessage(err: unknown): string {
 	if (err instanceof CartError) {
-		// 6002 INVALID_SKU / 6007 CART_PRODUCT_DATA_INVALID
 		if (err.code === 6002 || err.code === 6007) return "商品已下架或暫不可購買";
-		// 6003 CART_ITEM_LOCKED — confirm in flight from another tab/device
 		if (err.code === 6003) return "商品結帳處理中,請稍候片刻後再試";
-		// 6006 CART_SELF_ITEM_NOT_ALLOWED
 		if (err.code === 6006) return "不可購買自己上架的商品";
 		return err.message || "加入購物車失敗,請稍後再試";
 	}
@@ -67,9 +64,6 @@ export default function AddToCartButton({
 	const addedTimerRef = React.useRef<number | null>(null);
 	const hadFocusRef = React.useRef(false);
 
-	// Restore focus the button lost to the pending state (see `onClick`). Only
-	// when nothing else has claimed it — never steal focus back from wherever the
-	// buyer moved on to.
 	React.useEffect(() => {
 		if (showPending || !hadFocusRef.current) return;
 		hadFocusRef.current = false;
@@ -108,10 +102,6 @@ export default function AddToCartButton({
 	const onClick = (event: React.MouseEvent<HTMLButtonElement>) => {
 		if (stopPropagation) event.stopPropagation();
 		if (disabled || pending || authWaiting) return;
-		// The pending skin routes through Button's `isLoading`, which sets the DOM
-		// `disabled` — and a focused element that becomes disabled drops focus to
-		// <body>. Remember that the button owned focus so it can be handed back
-		// when the request settles; a keyboard buyer keeps their place in the grid.
 		hadFocusRef.current =
 			typeof document !== "undefined" &&
 			document.activeElement === buttonRef.current;
@@ -130,8 +120,6 @@ export default function AddToCartButton({
 			const quantity = Math.max(1, Number(resolvedItem.quantity || 1));
 			trackAddToCart(resolvedItem, quantity);
 			setAdded(true);
-			// Fired before the toast so the chip leaves the button the buyer is
-			// still looking at, and lands as the cart badge ticks up.
 			flyToCart(buttonRef.current, quantity);
 			emitCartToast({ message: `已加入購物車：${resolvedItem.name}` });
 			onAdded?.();
@@ -164,12 +152,6 @@ export default function AddToCartButton({
 				type="button"
 				className={`transition-colors motion-reduce:transition-none data-[added=true]:bg-[var(--hkui-secondary)] ${className ?? ""}`.trim()}
 				onClick={onClick}
-				// Double-submit is already blocked by the `pending` guard in
-				// `onClick`, and `aria-disabled` (not `disabled`) is what reports the
-				// in-flight state: it dims and swallows pointer input exactly like
-				// `disabled` while keeping the button focusable, so the tap does not
-				// throw the buyer's keyboard position away. Only a caller-declared
-				// `disabled` (out of stock, etc.) removes the control outright.
 				aria-disabled={showPending || authWaiting || undefined}
 				disabled={disabled}
 				isLoading={showPending}

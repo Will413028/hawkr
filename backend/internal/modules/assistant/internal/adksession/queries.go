@@ -9,7 +9,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/db"
 )
 
-// queries 是四張 ADK 表的 SQL。表在 schema assistant（sessions、events、app_states、user_states），schema 名稱寫死在 SQL 裡。
 type queries struct {
 	insertSession  string
 	getSession     string

@@ -92,7 +92,6 @@ public class ReturnShipmentStatusConsumer {
         try {
             JsonNode payload = MAPPER.readTree(body);
 
-            // 非退貨物流事件，直接跳過
             boolean isReturn = payload.path("is_return").asBoolean(false);
             if (!isReturn) {
                 channel.basicAck(deliveryTag, false);
@@ -110,7 +109,6 @@ public class ReturnShipmentStatusConsumer {
                 return;
             }
 
-            // 查詢進行中的售後案件（依 orderNo）
             AfterSaleCaseEntity caseEntity = caseMapper.selectOne(
                     new LambdaQueryWrapper<AfterSaleCaseEntity>()
                             .eq(AfterSaleCaseEntity::getOrderNo, orderNo)
@@ -129,10 +127,6 @@ public class ReturnShipmentStatusConsumer {
 
             String caseNo = caseEntity.getCaseNo();
 
-            // 🔴 ADR-013：分類走 common-core 的 canonical 分類器，入參是 ShippingStatus 枚舉。
-            //    值域外一律 fail-loud（fromValue 拋例外 → 下方 catch → MqErrorHandler → 重試耗盡進 DLQ），
-            //    **對齊正向 leg**。修復前這裡是 `else` ＋ log.info ＋ ACK ＝ 靜默丟棄，
-            //    而代價是買家已交件卻被判定沒寄回、7 天後自動關成「不退款」終態。
             ShippingStatus normalized = ShippingStatus.fromValue(shippingStatus);
             ReturnShippingRules.Disposition disposition = ReturnShippingRules.dispositionOf(normalized);
 
@@ -143,13 +137,9 @@ public class ReturnShipmentStatusConsumer {
                 case RETURN_ABNORMAL -> handleAbnormal(caseEntity, shippingStatus, shipmentNo, payload);
                 case SELLER_NOT_PICKED -> handleSellerNotPicked(caseEntity, shippingStatus, payload);
                 case NO_OP ->
-                        // 🔴 **明確的 no-op，不是 else**：包裹還在買家手上（例如 Uber 逆向的
-                        //    933 已指派外送員）。要分得出「我們決定不做事」與「我們沒認出這個值」。
                         log.info("ReturnShipmentStatusConsumer.noop",
                                 "逆向 leg 明確不處理此貨態, status=" + shippingStatus, "caseNo", caseNo);
                 case REQUIRES_MANUAL_REVIEW ->
-                        // 🔴 值域內但逆向 leg 無對應售後語意（Uber 逆向 canceled）。
-                        //    誠實標註交人工，**不猜**一個狀態推進去。
                         log.warn("ReturnShipmentStatusConsumer.requiresManualReview",
                                 "逆向 leg 收到無對應售後語意的貨態，需人工處置（66 UP-8）, status="
                                         + shippingStatus + ", orderNo=" + orderNo,
@@ -213,8 +203,6 @@ public class ReturnShipmentStatusConsumer {
                     AfterSaleAuditAction.RETURN_IN_TRANSIT.value(),
                     Map.of("shipmentNo", shipmentNo, "shippingStatus", shippingStatus));
 
-            // #1226：補發 case transition 事件 → 賣家通知「買家已寄出退貨」+ 賣家工作區 realtime
-            // （與 handleStoreArrived / handleDelivered 一致；原本此轉換不發任何 domain event）
             Map<String, Object> extra = new HashMap<>();
             extra.put("shipping_method", caseEntity.getReturnShippingMethod());
             publishOrRollback(
@@ -353,7 +341,6 @@ public class ReturnShipmentStatusConsumer {
             auditService.log(caseNo, null, null, AfterSaleAuditActor.SYSTEM.value(),
                     AfterSaleAuditAction.RETURN_ABNORMAL.value(), auditExtra);
 
-            // extraPayload=null ＝ 原 publishCaseTransition 的等價形式（它就是 WithContext(..., null)）
             publishOrRollback(
                     AfterSalesEventType.CASE_RETURN_FAILED.value(),
                     MqConstants.EVENT_TYPE_AFTERSALES_CASE_RETURN_FAILED,

@@ -215,10 +215,6 @@ export default function HomeProcessCards() {
 				const scale = lerp(1, 0.68, headT);
 				const lift = lerp(0, -24, headT);
 				const alpha = lerp(1, 0.85, headT);
-				// X-centering is owned by the flex wrapper around the head, so
-				// the transform only carries the scroll animation (vertical
-				// lift + scale).  Adding translate(-50%) here would shift the
-				// head by half its width on top of the already-centred parent.
 				stageHeadRef.current.style.transform = `translateY(${lift}px) scale(${scale})`;
 				stageHeadRef.current.style.opacity = alpha.toFixed(2);
 			}
@@ -254,23 +250,16 @@ export default function HomeProcessCards() {
 			className="relative bg-transparent h-[clamp(2450px,330vh,3200px)] mt-0 max-[640px]:h-auto max-[640px]:mt-[18px] max-[640px]:mx-3 max-[640px]:px-4 max-[640px]:pt-9 max-[640px]:pb-[118px]"
 			id="story"
 		>
-			{/* Let the browser own the pinning. Switching this element between
-			    absolute and fixed from the scroll handler produced two viewport-
-			    sized layout shifts as the section entered and left the stage.
-			    Sticky keeps the same visual hold while the containing section
-			    supplies the scroll runway, without changing layout mode. */}
+
 			<div className="sticky top-0 w-full h-screen overflow-hidden max-[640px]:relative max-[640px]:top-auto max-[640px]:h-auto max-[640px]:overflow-visible">
-				{/* Flex centerer pinned to the stage's full width — keeps the
-				 * head reliably horizontally centred regardless of what
-				 * inline transform the scroll animation applies to it. */}
+
 				<div className="absolute top-[6vh] left-0 right-0 flex justify-center z-[4] pointer-events-none max-[640px]:relative max-[640px]:top-auto">
 					<div
 						ref={stageHeadRef}
 						className="stage-head text-center bg-hk-home-paper/[78%] backdrop-blur-[22px] backdrop-saturate-[115%] border border-white/60 rounded-[28px] p-[22px_36px_26px] shadow-[0_20px_40px_-20px_rgba(76,50,20,0.18),0_0_0_1px_rgba(255,255,255,0.4)_inset] [transform-origin:top_center] max-[640px]:w-full max-[640px]:[transform:none] max-[640px]:mb-[18px] max-[640px]:p-[18px_16px_20px] max-[640px]:rounded-[24px] max-[640px]:bg-hk-home-paper max-[640px]:opacity-100"
 					>
 						<HomeEyebrow>品牌故事 · OUR STORY</HomeEyebrow>
-						{/* Section heading for an embeddable marketing block — must be an
-						    h2, not h1, so host pages (e.g. /about) keep a single page h1. */}
+
 						<h2 className="mt-[14px] font-[var(--font-body)] font-black text-[clamp(2.25rem,5.4vw,4.75rem)] leading-[1.05] tracking-[-0.01em] text-hk-home-ink max-[640px]:text-[clamp(2rem,9.6vw,2.625rem)] max-[640px]:leading-[1.04]">
 							從產地出發，
 							<br />

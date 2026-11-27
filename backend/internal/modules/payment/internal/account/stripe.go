@@ -190,7 +190,6 @@ func requirementsObject(raw json.RawMessage) json.RawMessage {
 	return raw
 }
 
-// requirementsDeadline 取 requirements 原始 JSON 的 summary.minimum_deadline.time（Stripe v2 帳戶「最早會讓帳戶受影響的時間」）；沒有這個欄位、不是時間或是零值回 nil。
 func requirementsDeadline(raw json.RawMessage) *time.Time {
 	var env struct {
 		Summary struct {

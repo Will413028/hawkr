@@ -129,12 +129,8 @@ export function createDelegatedCookieOptions(
 	) {
 		return null;
 	}
-	// `ceil` 而不是 `floor`：截掉的那不到一秒全部落在「cookie 比工作階段早死」那一側。
 	const remaining = Math.ceil((Date.parse(expiresAt) - now) / 1000);
 	if (remaining <= 0) return null;
-	// 上界仍然是工作階段本身的壽命（`maxAgeSeconds`／30 分鐘硬頂），grace 加在最後：
-	// 它是「不要早死」的餘裕，不是把 credential 的可用期拉長 —— 那一段時間裡每一次
-	// 呼叫都會被 Gateway 以 9270 擋掉。
 	return {
 		httpOnly: true,
 		secure: nodeEnv === "production",

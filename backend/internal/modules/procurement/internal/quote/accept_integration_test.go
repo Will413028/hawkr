@@ -17,7 +17,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// noAcceptanceOrJob 檢查失敗的接受沒有留下任何東西：沒有接受單、沒有 job。
 func (f *fixture) noAcceptanceOrJob() {
 	f.t.Helper()
 	if n, j := f.count("procurement.buyer_quote_acceptances"), len(f.provisioningJobs()); n != 0 || j != 0 {
@@ -62,7 +61,7 @@ func TestAcceptReplayReturnsTheFirstAcceptanceWithoutANewRowOrJob(t *testing.T) 
 	must(t, err)
 	f.exec(`UPDATE procurement.buyer_quote_acceptances SET order_provisioning_state = 'ORDER_CREATED', order_no = 'HK1', payment_deadline = $2 WHERE id = $1`, first.ID, start.Add(time.Hour))
 
-	f.now = start.Add(48 * time.Hour) // 重送時版本還有效與否都不影響回放（回放先於其餘檢查）
+	f.now = start.Add(48 * time.Hour)
 	again, err := f.service().Accept(t.Context(), in)
 	must(t, err)
 	if !again.Replayed || again.ID != first.ID || again.Provisioning != model.ProvisioningOrderCreated || again.OrderNo == nil || *again.OrderNo != "HK1" || again.PaymentDeadline == nil {
@@ -102,7 +101,6 @@ func TestAcceptRejectsAnExpiredVersion(t *testing.T) {
 	_, err := f.service().Accept(t.Context(), f.acceptIn(r, 1))
 	_ = wantPrecondition(t, err, apperr.ReasonRfqResponseExpired)
 	f.noAcceptanceOrJob()
-	// 剛好在有效期限那一刻仍可接受（過了才算過期）。
 	on := f.respond(f.publication, 12, version{goods: 400, validUntil: start})
 	_, err = f.service().Accept(t.Context(), f.acceptIn(on, 1))
 	must(t, err)
@@ -123,7 +121,6 @@ func TestAcceptRejectsAVersionThatIsNoLongerTheLatest(t *testing.T) {
 	_, err := f.service().Accept(t.Context(), f.acceptIn(r, 1))
 	wantConflict(t, err, quote.TargetSellerResponse)
 	f.noAcceptanceOrJob()
-	// 期望的版本比目前的新也一樣（買家的畫面不可能領先伺服器）。
 	_, err = f.service().Accept(t.Context(), f.acceptIn(r, 3))
 	wantConflict(t, err, quote.TargetSellerResponse)
 	f.noAcceptanceOrJob()
@@ -152,7 +149,6 @@ func TestAcceptComparesTheHashRecomputedFromTheFrozenPublication(t *testing.T) {
 	}
 	f.noAcceptanceOrJob()
 
-	// 需求改版後重新發布：買家在舊分頁帶著新發布的 hash 接受舊發布收到的報價，不符；需求改版本身不影響舊發布的 hash（由核准凍結的需求版本重算）。
 	f.revise()
 	_, newHash := f.publish()
 	if newHash == f.hash {
@@ -192,7 +188,6 @@ func TestAcceptLiveLockCollisionReportsTheCheckoutAndItsOrder(t *testing.T) {
 		t.Fatal("撞 live 鎖的接受不該留下接受單或 job")
 	}
 
-	// 建單重試用盡（ORDER_FAILED）解除鎖，買家可以再接受。
 	f.exec(`UPDATE procurement.buyer_quote_acceptances SET state = 'ORDER_FAILED', order_provisioning_state = 'ORDER_FAILED', order_no = NULL WHERE id = $1`, first.ID)
 	second, err := f.service().Accept(t.Context(), f.acceptIn(b, 1))
 	must(t, err)
@@ -256,7 +251,6 @@ func TestAcceptRollsBackTheAcceptanceWhenTheJobCannotBeEnqueued(t *testing.T) {
 		t.Fatal("job 排不進去要回錯誤")
 	}
 	f.noAcceptanceOrJob()
-	// 同一張需求之後仍能接受（沒有留下 live 鎖）。
 	if _, err := f.service().Accept(t.Context(), f.acceptIn(r, 1)); err != nil {
 		t.Fatal(err)
 	}

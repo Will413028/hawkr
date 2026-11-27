@@ -63,7 +63,6 @@ type Deps struct {
 // Service 是寫入路徑的 use case。
 type Service struct {
 	d Deps
-	// inactive 回報一方是否已關閉（買家）或已退場（店家），讀擁有者的 pub 函式、不取鎖；預設讀資料庫，守門的單元測試以替身取代。
 	inactive func(ctx context.Context, kind model.PartyKind, id int64) (bool, error)
 }
 
@@ -76,7 +75,6 @@ func New(d Deps) *Service {
 	return s
 }
 
-// inTx 開 im 的寫入 transaction 並設時間上限（model.WriteTxTimeout）；ctx 已在外層 transaction 內時加入它，上限由外層決定，不覆寫。
 func (s *Service) inTx(ctx context.Context, fn func(ctx context.Context) error) error {
 	_, nested := db.TxFrom(ctx)
 	return s.d.DB.InTx(ctx, func(ctx context.Context) error {

@@ -62,8 +62,6 @@ class _ConfirmReceiptDialogState extends ConsumerState<ConfirmReceiptDialog> {
   bool _isUploading = false;
 
   Future<void> _pickPhoto() async {
-    // iOS image_picker 對某些 iCloud 還沒下載完的 PNG/HEIC 會拋
-    // PlatformException(invalid_image, ...) — 包 try-catch 給友善提示。
     try {
       final picker = ImagePicker();
       final picked = await picker.pickImage(
@@ -96,7 +94,6 @@ class _ConfirmReceiptDialogState extends ConsumerState<ConfirmReceiptDialog> {
       'photoPath=${_selectedPhoto!.path}',
     );
     try {
-      // Step 1: 上傳照片 → 取得 stagedToken；預覽用本機檔案
       final uploadResult = await ref
           .read(mediaRepositoryProvider)
           .uploadImage(file: _selectedPhoto!);
@@ -121,7 +118,6 @@ class _ConfirmReceiptDialogState extends ConsumerState<ConfirmReceiptDialog> {
         );
       }
 
-      // Step 2: 確認收貨 + 把 stagedToken 帶給後端轉正進 order.receiptPhotoUrls
       await ref
           .read(orderRepositoryProvider)
           .confirmReceipt(
@@ -207,7 +203,6 @@ class _ConfirmReceiptDialogState extends ConsumerState<ConfirmReceiptDialog> {
                         ),
                         const SizedBox(height: HkSpace.xl),
 
-                        // Upload box
                         Semantics(
                           button: true,
                           enabled: !_isUploading,

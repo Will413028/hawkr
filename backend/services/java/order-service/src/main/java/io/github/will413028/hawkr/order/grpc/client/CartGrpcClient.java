@@ -90,7 +90,6 @@ public class CartGrpcClient {
             log.info("CartGrpcClient.checkoutUnlock.call", "解除鎖定", "checkoutId", checkoutId);
             callAsAccount(buyerId, () -> stub().checkoutUnlock(request));
         } catch (Exception e) {
-            // 降級：解鎖失敗不阻擋主流程，背景排程 5 分鐘後自動解鎖
             log.error("CartGrpcClient.checkoutUnlock.fail", "解鎖失敗，將由背景排程自動處理", e);
         }
     }
@@ -108,7 +107,6 @@ public class CartGrpcClient {
             log.info("CartGrpcClient.removeItems.call", "清理購物車", "checkoutId", checkoutId);
             callAsAccount(buyerId, () -> stub().removeItemsByCheckoutId(request));
         } catch (Exception e) {
-            // 降級：清理失敗不影響訂單
             log.error("CartGrpcClient.removeItems.fail", "購物車清理失敗", e);
         }
     }

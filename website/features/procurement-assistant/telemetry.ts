@@ -71,7 +71,6 @@ function dispatchSafely(
 	try {
 		dispatch(eventName, params);
 	} catch {
-		// Product interaction must remain fail-open when analytics is unavailable.
 	}
 }
 

@@ -5,7 +5,6 @@ import (
 	"testing"
 )
 
-// helper: redactBody must hide the value but keep the key visible.
 func assertRedacted(t *testing.T, body, key string) {
 	t.Helper()
 	out := redactBody([]byte(body))
@@ -63,7 +62,6 @@ func TestRedactBody_CertificationPII(t *testing.T) {
 }
 
 func TestRedactBody_KYCNameAndBirthdate(t *testing.T) {
-	// real_name / birth_date 各 case 形態皆須遮蔽（KYC 個資）。
 	cases := []struct{ body, secret string }{
 		{`{"real_name":"王小明"}`, "王小明"},
 		{`{"realName":"王小明"}`, "王小明"},
@@ -134,7 +132,6 @@ func TestRedactBody_Nested(t *testing.T) {
 }
 
 func TestRedactBody_NumericSecret(t *testing.T) {
-	// password as a non-string value must still be redacted.
 	out := redactBody([]byte(`{"password":1234}`))
 	if strings.Contains(out, "1234") {
 		t.Fatalf("numeric secret leaked: %s", out)
@@ -142,7 +139,6 @@ func TestRedactBody_NumericSecret(t *testing.T) {
 }
 
 func TestRedactBody_TruncatedJSON(t *testing.T) {
-	// Body cut off mid-stream (truncation upstream / oversized) must still redact.
 	body := `{"phone":"0912","password":"leakme","extra":"aaaaaaa`
 	out := redactBody([]byte(body))
 	if strings.Contains(out, "leakme") {
@@ -164,12 +160,6 @@ func TestRedactBody_Binary(t *testing.T) {
 
 func TestRedactBody_TruncatesAfterRedaction(t *testing.T) {
 	var sb strings.Builder
-	// "accountId" (not "message") — the whole-branch review for #2506 found
-	// "message" itself leaks free-text AI chat content (ai.go's request
-	// body) and removed it from allowedKeys, so it would now collapse to
-	// "[REDACTED]" before truncation ever triggers. "accountId" is a
-	// business identifier on allowedKeys with no PII shape, so it still
-	// survives long enough for truncateBody to have something to truncate.
 	sb.WriteString(`{"accountId":"`)
 	sb.WriteString(strings.Repeat("x", maxBodyLogSize+500))
 	sb.WriteString(`"}`)
@@ -194,11 +184,6 @@ func TestRedactBody_DashCaseKeys(t *testing.T) {
 // In-place value replacement must preserve the original key text and the
 // whitespace around the colon (single-pass index replacement, not rebuild).
 func TestRedactBody_PreservesFormatting(t *testing.T) {
-	// "accountId" (not "phone") — #2506 (Task 2) made phone default-redact
-	// (it's general PII), so it can no longer stand in as the "survives"
-	// half of this formatting-preservation check; accountId is on
-	// allowedKeys and non-PII, same substitution Step 5 used for the
-	// integration test.
 	out := redactBody([]byte(`{"accountId": "700123456", "password" : "hunter2"}`))
 	if !strings.Contains(out, `"accountId": "700123456"`) {
 		t.Fatalf("benign field formatting changed: %s", out)
@@ -216,10 +201,10 @@ func TestRedactBody_PreservesFormatting(t *testing.T) {
 // secret length, otherwise the closing quote falls outside the scan window and
 // the quoted-string branch fails to match.
 func TestRedactBody_SecretStraddlingTruncationBoundary(t *testing.T) {
-	secret := strings.Repeat("S", 1500) // JWT-sized, crosses the 2000B boundary
+	secret := strings.Repeat("S", 1500)
 	var sb strings.Builder
 	sb.WriteString(`{"pad":"`)
-	sb.WriteString(strings.Repeat("p", maxBodyLogSize-40)) // push id_token's value across the boundary
+	sb.WriteString(strings.Repeat("p", maxBodyLogSize-40))
 	sb.WriteString(`","id_token":"`)
 	sb.WriteString(secret)
 	sb.WriteString(`"}`)
@@ -283,7 +268,6 @@ func TestRedactBody_PresignedUploadURL(t *testing.T) {
 	if strings.Contains(out, "X-Amz-Signature") || strings.Contains(out, "cloudflarestorage.com") {
 		t.Fatalf("presigned upload URL leaked: %s", out)
 	}
-	// session id 必須留著：它才是追這次上傳要用的錨。
 	if !strings.Contains(out, "aacf5737-3501-4d2e-9c1f-0a0") {
 		t.Fatalf("upload session id must survive for debugging: %s", out)
 	}

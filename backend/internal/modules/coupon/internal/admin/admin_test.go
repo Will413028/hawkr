@@ -15,7 +15,6 @@ import (
 
 var errStop = errors.New("stop before the database")
 
-// fakeBuyers 記下每次查詢；stop 為 true 時查完回 errStop，讓測試在碰到資料庫之前結束。
 type fakeBuyers struct {
 	missing map[int64]bool
 	stop    bool
@@ -78,7 +77,6 @@ func TestIssueBoundsTheRawListAndDeduplicatesBeforeTheBatchLimit(t *testing.T) {
 	b := &fakeBuyers{stop: true}
 	s := newService(b, &fakeDirectory{})
 
-	// 全是同一個買家：去重後只剩 1 位，只有原始長度上限能擋下它。
 	_, err := s.Issue(context.Background(), actor, voucher.IssueInput{BuyerIDs: slices.Repeat([]int64{1}, model.MaxIssueRequestBuyers+1)})
 	if apperr.KindOf(err) != apperr.KindInvalidInput || len(b.calls) != 0 {
 		t.Fatalf("原始長度超過上限：err=%v 查詢=%d 次", err, len(b.calls))

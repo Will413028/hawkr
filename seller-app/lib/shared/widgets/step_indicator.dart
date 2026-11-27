@@ -54,9 +54,6 @@ class StepIndicator extends StatelessWidget {
   static const double _stepW = 60;
   static const double _lineH = 3;
 
-  // ═══════════════════════════════════════════════════════════════
-  // 預設步驟組
-  // ═══════════════════════════════════════════════════════════════
 
   /// 售後流程 4 步
   static const afterSaleSteps = [
@@ -119,9 +116,6 @@ class StepIndicator extends StatelessWidget {
     StepDef(label: '驗貨完成', icon: HkIconName.location),
   ];
 
-  // ═══════════════════════════════════════════════════════════════
-  // status → step 轉換
-  // ═══════════════════════════════════════════════════════════════
 
   static int afterSaleStepFromStatus(String status) => switch (status) {
     '0' => 1,
@@ -160,9 +154,6 @@ class StepIndicator extends StatelessWidget {
     _ => 0,
   };
 
-  // ═══════════════════════════════════════════════════════════════
-  // Build
-  // ═══════════════════════════════════════════════════════════════
 
   @override
   Widget build(BuildContext context) {

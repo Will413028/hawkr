@@ -77,7 +77,6 @@ func TestNormalizeRejects(t *testing.T) {
 			t.Errorf("%s: got %s %s, want %s %s", c.name, f, r, c.field, c.reason)
 		}
 	}
-	// 邊界值可以。
 	edge := []model.Block{
 		{Kind: model.BlockParagraph, Text: strings.Repeat("字", model.MaxProductInputDescriptionTotalRunes)},
 		{Kind: model.BlockTable, Rows: [][]string{make([]string, model.MaxTableRowCells)}},
@@ -86,7 +85,6 @@ func TestNormalizeRejects(t *testing.T) {
 	if _, err := Normalize("Description", edge); err != nil {
 		t.Fatalf("edge (exact total, empty cells and alt do not count): %v", err)
 	}
-	// 只差一個字就超過：同一個總數，段落先佔 MaxProductInputDescriptionTotalRunes-1 再一個格子兩字。
 	over := []model.Block{
 		{Kind: model.BlockParagraph, Text: strings.Repeat("字", model.MaxProductInputDescriptionTotalRunes-1)},
 		{Kind: model.BlockTable, Rows: [][]string{{"ab"}}},

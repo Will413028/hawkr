@@ -149,7 +149,7 @@ func TestAudienceShape(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		in    PreviewPublicationInput
-		field string // 空字串表示合法
+		field string
 	}{
 		{"direct", PreviewPublicationInput{CandidateSetID: set, SelectedCandidateIDs: []uuid.UUID{a, b}}, ""},
 		{"direct without a set", PreviewPublicationInput{SelectedCandidateIDs: []uuid.UUID{a}}, "CandidateSetID"},

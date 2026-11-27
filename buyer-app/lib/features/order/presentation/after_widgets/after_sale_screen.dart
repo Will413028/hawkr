@@ -36,11 +36,11 @@ class AfterSaleScreen extends ConsumerStatefulWidget {
 class _AfterSaleScreenState extends ConsumerState<AfterSaleScreen> {
   static const _reasons = ['商品有瑕疵', '收到錯誤商品', '與描述不符', '改變心意', '其他原因'];
   static const _reasonCodes = [
-    '5001', // AfterSaleReason.defective
-    '5002', // AfterSaleReason.wrongItem
-    '5003', // AfterSaleReason.notAsDescribed
-    '5004', // AfterSaleReason.changeOfMind
-    '5005', // AfterSaleReason.other
+    '5001',
+    '5002',
+    '5003',
+    '5004',
+    '5005',
   ];
 
   int? _selectedReason;
@@ -68,7 +68,6 @@ class _AfterSaleScreenState extends ConsumerState<AfterSaleScreen> {
       return;
     }
     try {
-      // 用新的 after_sales API 檢查是否已有進行中的售後單
       final result = await ref
           .read(afterSaleRepositoryProvider)
           .getAfterSaleList();
@@ -126,7 +125,6 @@ class _AfterSaleScreenState extends ConsumerState<AfterSaleScreen> {
     TruckLoadingOverlay.show(context, message: '提交中...');
 
     try {
-      // 上傳照片取得 staged tokens
       final List<String> photoTokens = [];
       if (_photos.isNotEmpty) {
         try {
@@ -136,7 +134,6 @@ class _AfterSaleScreenState extends ConsumerState<AfterSaleScreen> {
             photoTokens.add(result.stagedToken);
           }
         } catch (_) {
-          // 照片上傳失敗不阻擋提交
         }
       }
 
@@ -164,11 +161,9 @@ class _AfterSaleScreenState extends ConsumerState<AfterSaleScreen> {
         duration: const Duration(seconds: 3),
       );
 
-      // 把這張訂單加進售後 lookup（card 馬上切換為售後卡）
       ref
           .read(afterSaleOrderLookupProvider.notifier)
           .addOrderNo(widget.orderSn, status: '0');
-      // 刷新訂單列表，然後回到訂單卡片位置
       ref.read(orderListControllerProvider.notifier).refresh();
       await Future.delayed(const Duration(milliseconds: 800));
       if (mounted) context.pop();
@@ -199,7 +194,6 @@ class _AfterSaleScreenState extends ConsumerState<AfterSaleScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // 標題
                         Text(
                           '填寫退貨資料',
                           style: TextStyle(
@@ -220,7 +214,6 @@ class _AfterSaleScreenState extends ConsumerState<AfterSaleScreen> {
                         ),
                         SizedBox(height: 20.h),
 
-                        // 退貨原因
                         _buildSectionLabel('退貨原因', required: true),
                         SizedBox(height: 8.h),
                         ..._reasons.asMap().entries.map(
@@ -228,7 +221,6 @@ class _AfterSaleScreenState extends ConsumerState<AfterSaleScreen> {
                         ),
                         SizedBox(height: 20.h),
 
-                        // 詳細說明
                         _buildSectionLabel('詳細說明', required: true),
                         SizedBox(height: 8.h),
                         Container(
@@ -261,7 +253,6 @@ class _AfterSaleScreenState extends ConsumerState<AfterSaleScreen> {
                         ),
                         SizedBox(height: 20.h),
 
-                        // 上傳照片
                         _buildSectionLabel('上傳照片（選填）'),
                         SizedBox(height: 4.h),
                         Text(
@@ -275,7 +266,6 @@ class _AfterSaleScreenState extends ConsumerState<AfterSaleScreen> {
                         _buildPhotoRow(),
                         SizedBox(height: 32.h),
 
-                        // 送出申請 / 已提交
                         SizedBox(
                           width: double.infinity,
                           height: 48.h,
@@ -315,7 +305,6 @@ class _AfterSaleScreenState extends ConsumerState<AfterSaleScreen> {
     );
   }
 
-  // ── AppBar ──
   Widget _buildAppBar(BuildContext context) {
     return commonTitleTopBar(
       context,
@@ -325,7 +314,6 @@ class _AfterSaleScreenState extends ConsumerState<AfterSaleScreen> {
     );
   }
 
-  // ── Section label ──
   Widget _buildSectionLabel(String text, {bool required = false}) {
     return RichText(
       text: TextSpan(
@@ -346,7 +334,6 @@ class _AfterSaleScreenState extends ConsumerState<AfterSaleScreen> {
     );
   }
 
-  // ── Radio item ──
   Widget _buildRadioItem(int index, String label) {
     final selected = _selectedReason == index;
     return GestureDetector(
@@ -392,7 +379,6 @@ class _AfterSaleScreenState extends ConsumerState<AfterSaleScreen> {
     );
   }
 
-  // ── Photo row ──
   Widget _buildPhotoRow() {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -499,7 +485,6 @@ class _AfterSaleScreenState extends ConsumerState<AfterSaleScreen> {
             border: Border.all(
               color: AppColors.textPrimary.withValues(alpha: 0.3),
               width: 1.5.w,
-              // TODO: dashed border 需要自訂 painter，暫用 solid
             ),
           ),
           child: Column(

@@ -25,9 +25,7 @@ for (const [name, generateMetadata] of Object.entries({
 				metadata.openGraph?.images?.length,
 				`${name} must keep a share image`,
 			);
-			// the legal pages stay indexable in every locale (they are platform-written)
 			assert.deepEqual(metadata.robots, { index: true, follow: true });
-			// the canonical is the page's own locale's URL
 			const { pathname } = new URL(String(canonical));
 			assert.equal(
 				pathname.startsWith("/en/"),

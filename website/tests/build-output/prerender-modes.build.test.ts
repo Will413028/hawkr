@@ -39,7 +39,6 @@ function readRoutes(): Map<string, string | undefined> {
 	);
 }
 
-// Route handlers and metadata files: no document, no header.
 const NOT_A_PAGE =
 	/^\/(?:api\/|apple-icon|icon\.svg|manifest\.webmanifest|opengraph-image|robots\.txt|sitemap\.xml)/;
 

@@ -242,8 +242,6 @@ const ACTION_LABEL: Record<ShipmentAction["kind"], string> = {
 	"cvs-print": "預約取號",
 	"cvs-confirm": "出貨確認",
 	none: "—",
-	// 未知配送方式沒有可執行的出貨動作 —— 這一格永遠不會被渲染成按鈕
-	// （`isRunnableShipmentAction` 先擋掉），列在這裡只為讓型別窮舉成立。
 	unsupported: "—",
 };
 
@@ -262,8 +260,6 @@ const ACTION_TONE: Record<ShipmentAction["kind"], "primary" | "info"> = {
 	unsupported: "primary",
 };
 
-// 🔴 批次列只收「真的按得下去」的動作。`unsupported`（未知配送方式）不能進來——
-// 一旦進來，賣家可以把一批商家自送的訂單勾起來一次送超商取號。
 type BulkKind = RunnableShipmentActionKind;
 type RunBatchOptions = { skipPhoto?: boolean };
 
@@ -332,9 +328,8 @@ function tabFromQuery(
 	view: string | null | undefined,
 ): TabKey {
 	if (tab) {
-		if (tab === "anomalies") return "in_transit"; // legacy alias
+		if (tab === "anomalies") return "in_transit";
 		if (tab === "exceptions") {
-			// legacy umbrella tab: 配送異常 → 配送中, 售後處理 → 售後處理
 			return view === "anomaly" ? "in_transit" : "aftersale";
 		}
 		if (TAB_KEYS.includes(tab as TabKey)) return tab as TabKey;
@@ -400,9 +395,6 @@ export default function SellerOrdersPage() {
 		"focus",
 		parseAsString,
 	);
-	// Next's shallow-history bridge can briefly replay its previous search-param
-	// snapshot after a URL write. Keep the visible work queue locally controlled;
-	// URL commits and back/forward only sync from the address bar's final value.
 	const [orderView, setOrderView] = React.useState<OrderViewState>(() => ({
 		tab: urlActiveTab,
 		filter: urlQuickFilter,
@@ -449,12 +441,6 @@ export default function SellerOrdersPage() {
 		},
 		[setOrderViewParams],
 	);
-	// One fetch for the WHOLE fulfilment queue (every lifecycle stage). The tabs
-	// are slices of this same set, classified client-side, so a card count can
-	// never disagree with — or jump away from — the rows under it.
-	// `view: "seller"` is the crucial bit — `/app/orders` defaults to the BUYER
-	// view (the account's own purchases). Without it the seller order page shows
-	// what the account BOUGHT, not what it needs to fulfil.
 	const { orders, loading, refreshing, refresh } = useAllSellerOrders({
 		view: "seller",
 	});
@@ -467,17 +453,8 @@ export default function SellerOrdersPage() {
 	const pruneExpiredShipmentOperations = useSellerShipmentOperationStore(
 		(state) => state.pruneExpired,
 	);
-	// Dashboard is the authoritative source for the four status-card counts
-	// (#1188): order-service computes the same four buckets the tabs use —
-	// lifecycle-by-status + after-sale override + self-purchase exclusion — so we
-	// no longer derive the card numbers locally. We still refresh it after a
-	// shipment / cancel action so the sidebar badges (which read it) stay current.
 	const { data: sellerDashboard, refresh: refreshSellerDashboard } =
 		useSellerDashboard();
-	// `/app/orders?view=seller` already excludes true self-purchases (orders where
-	// the same account is both buyer and seller) at the backend (#1188) — the
-	// seller workbench only shows orders this account must fulfil for others. No
-	// client-side self-purchase filter is needed any more; render what it returns.
 	const scopedOrders = orders;
 	const orderByNo = React.useMemo(
 		() => new Map(scopedOrders.map((order) => [order.orderNo, order])),
@@ -507,39 +484,22 @@ export default function SellerOrdersPage() {
 		() => new Set(reservationOperationByOrderNo.keys()),
 		[reservationOperationByOrderNo],
 	);
-	// After-sale cases. `lookup` (keyed by orderNo) feeds the 待處理 chip count
-	// and the order-row red dot; `afterSaleRecords` is the raw list backing the
-	// 售後處理 case table on the 售後處理 tab — one fetch shared by both.
 	const {
 		records: afterSaleRecords,
 		lookup: afterSaleLookup,
 		loading: afterSaleLoading,
 		refresh: refreshAfterSales,
 	} = useSellerAfterSales();
-	// Shipment-anomaly lookup keyed by orderNo. Anomalous orders aren't a
-	// separate tab/panel any more — they ride inline in the 配送中 list and just
-	// surface a 「異常」 badge in the 訂單狀態 column (see `OrderRow`); clicking the
-	// row opens the order-detail drawer, which shows the anomaly reason.
 	const { lookup: anomalyLookup, refresh: refreshAnomalies } =
 		useSellerShipmentAnomalies();
-	// 賣家工作區 realtime：後端 webhook / 物流 / 售後 / 排程改狀態時不重整頁面即同步
-	// （統計卡 / 訂單列 / 售後列 / drawer），由外框的 `useSellerWorkspaceRealtime` 讓快取失效。
-	// 連線狀態必須接出來：連線被 429 回絕或重連預算耗盡時串流會停止供應更新且不報錯，
-	// 丟掉它等於讓賣家在毫無提示的情況下失去即時同步——畫面照常，只是新訂單再也不會自己出現。
 	const realtimeStatus = useSellerWorkspaceRealtimeStatus();
 	// The 配送異常 quick-filter badge must mirror the backend rollup exactly.
-	// Do not derive this number from currently loaded order rows: pagination,
-	// order visibility, or orderNo de-dupe can make the row count differ from
-	// `/app/shipments/anomalies/stats.total`.
 	const { stats: anomalyStats, refresh: refreshAnomalyStats } =
 		useSellerShipmentAnomalyStats();
 	const [anomalyOrderOverrides, setAnomalyOrderOverrides] = React.useState<
 		Map<string, Order>
 	>(() => new Map());
 
-	// 售後處理 tab filters (the case table filters `afterSaleRecords`
-	// client-side; see AfterSalePanel). `顯示已結案` lives in the header so it
-	// sits next to 重新整理.
 	const [afterSaleGroup, setAfterSaleGroup] =
 		React.useState<AfterSaleGroup>("all");
 	const [afterSaleShowClosed, setAfterSaleShowClosed] = React.useState(false);
@@ -548,10 +508,6 @@ export default function SellerOrdersPage() {
 			setAfterSaleGroup("all");
 		}
 	}, [afterSaleGroup, afterSaleShowClosed]);
-	// `scopedOrders` is first filtered by the current seller id. The defensive
-	// `sellerOrderTabFor` re-check catches unexpected statuses so rows are hidden
-	// rather than rendered in the wrong tab. After-sale cases are layered on top
-	// so a delivered order with an active/closed case no longer pollutes 配送中.
 	const tabOrders = React.useMemo(
 		() =>
 			scopedOrders.filter(
@@ -653,9 +609,6 @@ export default function SellerOrdersPage() {
 			return false;
 		});
 	}, [filtered, search]);
-	// The full set is already in memory, so 「載入更多」 just widens an in-memory
-	// window instead of fetching. Reset to the first page whenever the tab /
-	// quick-filter / search changes so a deep scroll doesn't leak across views.
 	const [visibleLimit, setVisibleLimit] = React.useState(ORDER_PAGE_SIZE);
 	// biome-ignore lint/correctness/useExhaustiveDependencies: activeTab/quickFilter/search are the reset signal; we intentionally re-window when any flips.
 	React.useEffect(() => {
@@ -686,12 +639,6 @@ export default function SellerOrdersPage() {
 				(c.buyerName ?? "").toLowerCase().includes(q),
 		);
 	}, [afterSaleGroup, afterSaleRecords, afterSaleShowClosed, search]);
-	// 四張狀態卡 + tab 徽章數字一律取自後端 dashboard（#1188 權威：lifecycle-by-
-	// status + 售後覆蓋 + 自買排除）。後端與本頁列表採同一套分類規則 —— 三桶以
-	// order.status 分類、售後 active case 從生命週期排除並計入售後 queue、自買單
-	// 由後端列表一併排除 —— 故各卡片數 == 對應 tab 的列表筆數。dashboard 尚未載入
-	// 或訂單狀態區塊沒設時為 null，避免閃出誤導的 0。秒級的黑貓叫件樂觀窗口（前端 isTcatCalled 先把
-	// row 移到配送中、後端 order.status 由 MQ 稍後推進）為設計接受的暫態差異。
 	const orderStatusCounts = sellerDashboard?.orderStatusCounts;
 	const displayTabCounts = React.useMemo<SellerOrderTabCounts>(
 		() => ({
@@ -754,8 +701,6 @@ export default function SellerOrdersPage() {
 		refreshAnomalyStats,
 	]);
 
-	// Realtime events are the primary sync path. As soon as the order read model
-	// advances, release the local operation lock; no interval polling is needed.
 	React.useEffect(() => {
 		pruneExpiredShipmentOperations();
 		for (const [orderNo, operation] of Object.entries(shipmentOperations)) {
@@ -777,10 +722,6 @@ export default function SellerOrdersPage() {
 		shipmentOperations,
 	]);
 
-	// The mutation handler already refreshes once, and useSellerWorkspaceRealtime
-	// invalidates the order query when the backend publishes its event. Do one
-	// delayed fallback refresh for the whole pending set in case that event is
-	// missed; a stable key guarantees this never becomes a polling loop.
 	const pendingShipmentFallbackKey = React.useMemo(
 		() =>
 			Object.entries(shipmentOperations)
@@ -809,8 +750,6 @@ export default function SellerOrdersPage() {
 		return () => window.clearTimeout(timer);
 	}, [pendingShipmentFallbackKey, pruneExpiredShipmentOperations]);
 
-	// Expiry is a local safety valve only. Schedule the nearest unlock without
-	// any network request so a missed event can never leave the CTA stuck.
 	const nextShipmentOperationExpiryAt = React.useMemo(() => {
 		const expiries = Object.values(shipmentOperations)
 			.filter((operation) => !isShipmentOperationExpired(operation))
@@ -827,13 +766,6 @@ export default function SellerOrdersPage() {
 		return () => window.clearTimeout(timer);
 	}, [nextShipmentOperationExpiryAt, pruneExpiredShipmentOperations]);
 
-	/* ===== Batch shipping ============================================
-	 * Sellers often clear a queue of 待出貨 orders in one go (especially
-	 * after a big sale day). Desktop keeps persistent table checkboxes; phones
-	 * enter an explicit selection mode so ordinary card scanning stays clean.
-	 * Selection is auto-cleared when the tab/quick filter changes so a hidden
-	 * row never ends up silently in a batch.
-	 * ================================================================ */
 	const [selectedOrderNos, setSelectedOrderNos] = React.useState<Set<string>>(
 		() => new Set(),
 	);
@@ -852,11 +784,6 @@ export default function SellerOrdersPage() {
 	const clearSelection = React.useCallback(() => {
 		setSelectedOrderNos(new Set());
 	}, []);
-	// Clicking a row opens the full order detail in a right-side drawer (over the
-	// list) instead of navigating away or expanding inline — same Sheet primitive
-	// as the customer / after-sales drawers. Only one is open at a time, matching
-	// the APP's per-card drawer feel. The `/orders/[orderNo]` route stays as the
-	// deep-link / refresh fallback.
 	const [detailOrderNo, setDetailOrderNo] = React.useState<string | null>(null);
 	const [dismissedFocusOrderNo, setDismissedFocusOrderNo] = React.useState<
 		string | null
@@ -889,9 +816,6 @@ export default function SellerOrdersPage() {
 		(tab: TabKey) => {
 			if (tab === activeTab) return;
 
-			// A status-card click is one in-page state change. Commit the tab and its
-			// default lens together so React never paints "new tab + old filter" or
-			// lets nuqs restore one setter's stale URL snapshot over the other.
 			setVisibleLimit(ORDER_PAGE_SIZE);
 			clearSelection();
 			setMobileSelectionMode(false);
@@ -935,10 +859,6 @@ export default function SellerOrdersPage() {
 		setMobileSelectionMode(false);
 	}, [activeTab, clearSelection, quickFilter, search]);
 
-	// "Selectable" = a row whose next action is something we can batch.
-	// Rows past 待出貨 (or with no action) are skipped so a tick can only
-	// land on orders the bar can actually act on. Scoped to the rows currently
-	// rendered (the 載入更多 window) so 全選 matches what the seller sees.
 	const selectableOrderNos = React.useMemo(() => {
 		const set = new Set<string>();
 		for (const o of pagedVisible) {
@@ -993,10 +913,6 @@ export default function SellerOrdersPage() {
 	};
 
 	const exportCsv = () => {
-		// Quick CSV export — joins the rendered rows. For richer exports
-		// (with pagination across all filtered orders) we'd need a backend
-		// /app/sellers/me/orders/export endpoint; this covers the
-		// "right-now I want a spreadsheet" case.
 		const rows =
 			activeTab === "aftersale"
 				? [
@@ -1082,8 +998,6 @@ export default function SellerOrdersPage() {
 						: `共 ${visibleOrderTotal.toLocaleString()} 筆訂單`
 			}
 			actions={
-				// Search / refresh / export stay anchored on every tab so switching
-				// modes does not collapse the header actions and create CTA jitter.
 				<>
 					{isAfterSaleTab ? (
 						<label className="seller-orders__toggle">
@@ -1178,7 +1092,7 @@ export default function SellerOrdersPage() {
 				/>
 			</div>
 
-			{/* 統計卡與清單之間：兩者一起停止更新，提示放在中間才同時涵蓋。 */}
+
 			<RealtimeSyncNotice status={realtimeStatus} />
 
 			{isAfterSaleTab ? (
@@ -1253,8 +1167,6 @@ export default function SellerOrdersPage() {
 						setDismissedFocusOrderNo(queryFocusOrderNo);
 						void setFocusOrderNoParam(null);
 					}
-					// A shipment / cancel action inside the drawer changes the order's
-					// row state — refresh the list so it reflects on close.
 					void handleRefresh();
 				}}
 			/>
@@ -1262,12 +1174,6 @@ export default function SellerOrdersPage() {
 	);
 }
 
-/* ===== Orders tab body ============================================
- * The order-centric content (quick filters + bulk bar + table). Split
- * out of `SellerOrdersPage` so the page render can cleanly swap between
- * this and `<AfterSalePanel/>` on the 售後處理 tab without the bulk-dialog
- * and stat-card chrome leaking into the after-sale view.
- * ================================================================== */
 
 interface OrdersTabBodyProps {
 	quickFilter: QuickFilter;
@@ -1582,14 +1488,6 @@ function OrdersTabBody({
 	);
 }
 
-/* ===== Bulk action bar + dialog ====================================
- * Seller batch shipping flow — sellers select multiple 待出貨 rows/cards then
- * fire the same action across all of them (預約出貨 / 呼叫黑貓 / 取號 /
- * 出貨確認 / 下載 PDF). Each kind has its own minimal form so the seller
- * only confirms what's strictly required for that step (e.g. 黑貓
- * 出貨日, 上門取件 Y/N). Execution is sequential to keep API pressure
- * low and let the seller see per-order results.
- * ==================================================================== */
 
 interface BulkActionBarProps {
 	className?: string;
@@ -1749,7 +1647,6 @@ function BulkShipmentDialog({
 		[anomalyLookup, orders],
 	);
 
-	// 黑貓預約出貨：與 APP 一致，只能選後端回傳的工作天（排週日 + 國定假日）
 	React.useEffect(() => {
 		if (kind !== "tcat-reserve") return;
 		setDayError(null);
@@ -1847,9 +1744,6 @@ function BulkShipmentDialog({
 				if (cooldownMsg) {
 					return { orderNo: order.orderNo, ok: false, message: cooldownMsg };
 				}
-				// 對齊單筆詳情頁（OrderDetailClient）：取號成功後 webhook 可能尚未
-				// 回傳交貨便代碼（55 秒內未收到 → 後台自動補拉），此時不算失敗，
-				// 提示稍後刷新即可；拿到 odno 才寫入本地 override（B-147 清單延遲）。
 				const label = await printCvsLabel(order.orderNo);
 				markShipmentCreated(order.orderNo);
 				resetShipmentRetryCount(order.orderNo);
@@ -1884,8 +1778,6 @@ function BulkShipmentDialog({
 			}
 			return { orderNo: order.orderNo, ok: true };
 		} catch (e) {
-			// 與單筆詳情頁一致：用 classifyShipmentError 轉成友善訊息，
-			// 而非直接吐後端原始字串（如「[5002] 物流單尚未取得序號」）。
 			const providerMessage = kind.startsWith("tcat")
 				? null
 				: payuniProviderErrorMessage(e);
@@ -2763,8 +2655,6 @@ function OrderRow({
 		0,
 	);
 	const createdLabel = formatTaipeiDateTime(order.createdAt);
-	// 出貨/取消期限 — 對齊 App OrderInfoColumn：待出貨(paid/preparing) 顯示「出貨
-	// 期限」(amber)，其餘顯示「取消期限」(red)。
 	const isShipDeadline =
 		order.status === "paid" || order.status === "preparing";
 	const deadlineLabel = formatDeadline(order.autoCancelAt);
@@ -2965,32 +2855,24 @@ function OrderRow({
 
 function statusClass(status: string): string {
 	switch (status) {
-		// 待付款 / 已付款 / 準備中 → 賣家還沒出貨，amber
 		case "pending_payment":
 		case "paid":
 		case "preparing":
 			return "seller-orders__status--pending";
-		// 配送異常 → 紅色 urgent，賣家必須立刻處理
 		case "shipping_abnormal":
 			return "seller-orders__status--urgent";
-		// 待取貨 → 7-11 已到店等買家取，amber 提示
 		case "waiting_pickup":
 			return "seller-orders__status--warning";
-		// 一般配送中 / 已送達 → 中性 info
 		case "shipping":
 		case "delivered":
 			return "seller-orders__status--shipping";
-		// 已完成 → 品牌色
 		case "completed":
 			return "seller-orders__status--complete";
-		// 部分退款 → warning（60 僅出現於已完成訂單的部分退款終態）
 		case "partially_refunded":
 			return "seller-orders__status--warning";
-		// 已退款 / 退換貨中 → 紅色 alert
 		case "refunded":
 		case "after_sale":
 			return "seller-orders__status--alert";
-		// 已取消 → 灰色 muted（不是錯誤、不需要動作）
 		case "cancelled":
 			return "seller-orders__status--muted";
 		default:
@@ -3007,12 +2889,6 @@ function shippingMethodLabel(raw: string | undefined): string {
 	return formatShippingMethodLabel(raw);
 }
 
-/* ============================================================
-   Buyer cell — avatar + name + phone + after-sale dot.
-   Mirrors the seller app's order-row buyer column. Avatar
-   falls back to the first character of the buyer's name on a
-   brand-tinted circle if the buyer has no profile image.
-   ============================================================ */
 
 function BuyerCell({
 	avatar,
@@ -3032,13 +2908,9 @@ function BuyerCell({
 	const primary = snapshotName || currentProfile?.name.trim() || "會員";
 	const resolvedAvatar = avatar || currentProfile?.avatar;
 	const initial = primary.charAt(0);
-	// Jump to the buyer's CRM record (the customer list has no keyword search).
-	// Receiver data belongs in the detail drawer only.
 	const crmHref = buyerId
 		? `/seller-center/customers/${encodeURIComponent(buyerId)}`
 		: null;
-	// 配送異常已改在「訂單狀態」欄以「異常」徽章呈現，買家頭像的紅點只保留
-	// 待處理售後提示。
 	const showDot = hasAfterSale;
 	const dotLabel = hasAfterSale ? "待處理售後" : "";
 	return (
@@ -3109,14 +2981,6 @@ function IconMore() {
 	return <AppIcon name="more" />;
 }
 
-/* ===== Row overflow menu (查看詳情 / 列印出貨單 / 聯絡買家 / 取消訂單) =====
- * Mirrors the products table's kebab menu pattern. Items are gated by what
- * the order actually supports so we never render a dead action:
- *   - 列印出貨單  only when 黑貓 has already produced a label PDF
- *   - 聯絡買家    only when we know the buyer's account id (messaging route)
- *   - 取消訂單    only in the 待出貨 lane (paid/preparing) — the backend
- *                seller_cancellations endpoint accepts status 10/20 only.
- * ==================================================================== */
 function OrderActionsMenu({
 	order,
 	onOpenDetail,
@@ -3152,8 +3016,6 @@ function OrderActionsMenu({
 	const canCancel =
 		!shipmentProcessing &&
 		(order.status === "paid" || order.status === "preparing");
-	// 託運單代碼取號後 4 天失效（對齊 App）— 失效就不再給「列印出貨單」，
-	// 點了也只會拿到作廢的 PDF。
 	const labelUrl = isLabelExpired(order.shipping)
 		? undefined
 		: order.shipping?.labelUrl;

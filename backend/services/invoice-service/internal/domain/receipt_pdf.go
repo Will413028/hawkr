@@ -10,22 +10,6 @@ import (
 	"github.com/go-pdf/fpdf"
 )
 
-// ---------------------------------------------------------------------------
-// 平台代製收據的 PDF 產製（#3026，58 §S-6：INV.op 不打 AMEGO，改走本地 PDF 產生）
-//
-// 🔴 **這不是發票**。免用統一發票的小規模營業人依法本來就不開發票（營業稅法 §32 I
-// 但書、統一發票使用辦法 §4 I-1），平台代製的是一份**購買憑證**。§L11 逐字：
-// PLATFORM_RECEIPT「不是延後也不是開票失敗，是完全不同的一條線」。
-//
-// 🔴 **出據人是賣家、不是平台**（58 §Q-B7 已定的那一半）：版面上的銷售人是賣家的
-// 法定名稱，平台只出現在頁尾的產製說明。§335 逐字「所有對外文案禁用『平台開立』
-// 『平台代開』措辭」——`PLATFORM_RECEIPT` 是那條禁令的例外，但例外的是**代製**
-// 這個動作，不是**出據人**。
-//
-// ⚠️ 版面欄位是 DEC-20260902-205712 裁決 A 採用的「最小必要集」，**不是法務定版**：
-// §Q-B7「收據格式」在設計書上仍標為 blocking。改版時連同 ReceiptLayoutVersion 一起改，
-// 那個版本號會落進 receipt_authorization_version 之外的稽核脈絡。
-// ---------------------------------------------------------------------------
 
 // ReceiptLayoutVersion 是收據版面的版本。改版面就改它。
 //
@@ -98,13 +82,7 @@ func (r *ReceiptRenderer) Render(d ReceiptData) ([]byte, error) {
 	pdf.SetMargins(20, 20, 20)
 	pdf.AddPage()
 
-	// 🔴 版面版本進 **PDF metadata**，不印在紙面上。
-	// 買家拿到的是一份對外文件，「版面版本 2026-09-02」對他沒有意義，只會讓它看起來
-	// 像半成品；但改版之後要回答「這張是哪一版畫的」又非它不可 ⇒ 放在讀得到、
-	// 卻不佔版面的地方。
 	pdf.SetTitle("購買證明收據 "+d.ReceiptNo, true)
-	// isUTF8=false：這個值全是 ASCII，傳 true 會被轉成 UTF-16BE 寫進檔案，
-	// 之後任何人（含測試）拿字面值去比對都找不到它。
 	pdf.SetSubject("layout="+ReceiptLayoutVersion, false)
 
 	pdf.SetFontSize(18)
@@ -112,7 +90,6 @@ func (r *ReceiptRenderer) Render(d ReceiptData) ([]byte, error) {
 	pdf.Ln(6)
 
 	pdf.SetFontSize(11)
-	// 出據人在最上面：這份文件是誰出的，是它最重要的一件事。
 	sellerName := d.Seller.LegalName
 	row(pdf, "出據人（銷售人）", sellerName)
 	if d.Seller.TaxID != "" {
@@ -121,14 +98,12 @@ func (r *ReceiptRenderer) Render(d ReceiptData) ([]byte, error) {
 	if d.Seller.Address != "" {
 		row(pdf, "營業地址", d.Seller.Address)
 	}
-	// 買受人恆為「消費者」——本服務不持有買家真名（§5.1.5）。
 	row(pdf, "買受人", "消費者")
 	row(pdf, "收據編號", d.ReceiptNo)
 	row(pdf, "訂單編號", d.OrderNo)
 	row(pdf, "開立日期", d.IssuedAt.Format("2006-01-02"))
 	pdf.Ln(4)
 
-	// 品項明細
 	pdf.SetFontSize(10)
 	pdf.CellFormat(90, 8, "品名", "1", 0, "C", false, 0, "")
 	pdf.CellFormat(20, 8, "數量", "1", 0, "C", false, 0, "")
@@ -153,7 +128,6 @@ func (r *ReceiptRenderer) Render(d ReceiptData) ([]byte, error) {
 		return nil, fmt.Errorf("invoice: render receipt %s: %w", d.ReceiptNo, err)
 	}
 	out := buf.Bytes()
-	// 🔴 自驗：字型出問題時 fpdf 可能吐一個沒有內容的檔而不回 error。
 	if !bytes.HasPrefix(out, []byte("%PDF-")) {
 		return nil, fmt.Errorf("invoice: rendered receipt %s is not a PDF (len=%d)", d.ReceiptNo, len(out))
 	}
@@ -165,7 +139,6 @@ func row(pdf *fpdf.Fpdf, label, value string) {
 	pdf.CellFormat(0, 7, value, "", 1, "L", false, 0, "")
 }
 
-// money 把「元」的整數折成千分位字串。**不做任何浮點運算**（10 檔 §4）。
 func money(v int64) string {
 	s := strconv.FormatInt(v, 10)
 	neg := strings.HasPrefix(s, "-")

@@ -31,10 +31,8 @@ const (
 // Valid 回報 k 是不是已知的身分種類。
 func (k Kind) Valid() bool { return k == Buyer || k == Store }
 
-// batchSize 是每一批刪除的列數。
 const batchSize = 500
 
-// sweepBatch 是保底掃描每一頁的身分數。
 const sweepBatch = 100
 
 // SweepInterval 是保底掃描的間隔。

@@ -216,15 +216,10 @@ export default function InventoryPage() {
 		setLoading(true);
 		setError(null);
 		try {
-			// Products + sales velocity load concurrently. A failed orders fetch
-			// degrades gracefully to "no forecast" rather than breaking the page.
 			const [r, sales] = await Promise.all([
 				fetchSellerProducts({ pageSize: PAGE_SIZE }),
 				buildWeeklySales().catch(() => new Map<string, number[]>()),
 			]);
-			// Fast path: once the list endpoint ships aggregated `stock`
-			// (+ `inventory_value`) per B-192, we can build the whole table from
-			// the single list call — no per-product `/skus` fetch at all.
 			const listHasStock = r.records.every((p) => p.stock != null);
 			let entries: ReadonlyArray<
 				readonly [string, { stock: number; value: number }]
@@ -236,16 +231,11 @@ export default function InventoryPage() {
 							String(p.id),
 							{
 								stock: p.stock ?? 0,
-								// Prefer the server aggregate; fall back to stock × 最低價
-								// (approximate for multi-SKU/mixed-price products).
 								value: p.inventory_value ?? (p.stock ?? 0) * priceOf(p),
 							},
 						] as const,
 				);
 			} else {
-				// Fallback (today): stock lives on the SKUs, not the list row, so
-				// pull each product's SKUs and aggregate. A failed fetch leaves
-				// that product at 0 rather than failing the whole page.
 				entries = await Promise.all(
 					r.records.map(async (p) => {
 						try {
@@ -265,9 +255,6 @@ export default function InventoryPage() {
 					}),
 				);
 			}
-			// Commit list + aggregated stock in the same tick so React batches
-			// them into a single render — the table never flashes fake "0 件 /
-			// 庫存不足 / NT$ 0" rows between the list load and the SKU loads.
 			setSalesMap(sales);
 			setStockMap(new Map(entries));
 			setItems(r.records);
@@ -278,9 +265,6 @@ export default function InventoryPage() {
 		}
 	}, []);
 
-	// After a product edit, refetch this page's list and invalidate the shared
-	// seller-products family (nav badge + dashboard count). Bare `refresh` on
-	// mount/manual-refresh deliberately skips the invalidation.
 	const invalidateSellerProducts = useInvalidateSellerProducts();
 	const handleMutated = React.useCallback(async () => {
 		await refresh();
@@ -296,8 +280,6 @@ export default function InventoryPage() {
 		for (const p of items) {
 			const agg = stockMap.get(String(p.id));
 			const stock = agg?.stock ?? 0;
-			// Safety stock is a recommendation derived from recent sales velocity,
-			// not a flat constant — so "庫存不足" reflects each product's real burn.
 			const safe = suggestedSafeStock(salesMap.get(String(p.id)));
 			map.set(String(p.id), {
 				stock,
@@ -320,9 +302,6 @@ export default function InventoryPage() {
 		[meta],
 	);
 
-	// First load only: keep cards + table on skeleton/dash until the aggregated
-	// data is ready, so we never paint fake zeros. On a manual refresh we keep
-	// the existing (real) rows visible instead.
 	const showSkeleton = loading && items.length === 0;
 
 	const visible = React.useMemo(() => {
@@ -659,8 +638,6 @@ export default function InventoryPage() {
 												<td className="is-center" data-label="操作">
 													<Link
 														href={`/seller-center/products/${p.id}/edit`}
-														// `.seller-orders__action` 的白字（0-1-0）會被 dark 的
-														// `body a:not([data-hkui-button])`（0-2-2）換成 `--color-ink-200`。
 														data-hkui-button=""
 														className="seller-orders__action"
 														onClick={(e) =>

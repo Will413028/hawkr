@@ -1,4 +1,3 @@
-// 期限的顯示：日曆時間，不看工作日。相對時間隨清單每 30 秒更新（`useNow`），絕對時間放在 title 或詳情頁。
 
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import type { Deadline } from "@hawkr/api/gen/hawkr/common/v1alpha1/deadline_pb";

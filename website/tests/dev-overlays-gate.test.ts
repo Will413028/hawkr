@@ -29,14 +29,11 @@ import { devOverlaysEnabled } from "../lib/config/env";
 const repoFile = (path: string) => new URL(`../${path}`, import.meta.url);
 
 test("開關真值表：只有 development 且未被關掉時才開", () => {
-	// 預設開：人工開發時這些工具本來就有用。
 	assert.equal(devOverlaysEnabled("development", undefined), true);
 	assert.equal(devOverlaysEnabled("development", ""), true);
 
-	// 明確關掉（Playwright 注入的值）。
 	assert.equal(devOverlaysEnabled("development", "off"), false);
 
-	// production build 一律關 —— 這是「CI 量到的 DOM 裡沒有這兩顆」的來源。
 	assert.equal(devOverlaysEnabled("production", undefined), false);
 	assert.equal(devOverlaysEnabled("production", "off"), false);
 	assert.equal(devOverlaysEnabled("test", undefined), false);
@@ -78,8 +75,6 @@ async function readSourceFiles(): Promise<Array<[string, string]>> {
 }
 
 test("dev-only 元件的掛載條件一律走 DEV_OVERLAYS_ENABLED，不得各自寫 NODE_ENV", async () => {
-	// 自我保護：掃描器若因重構而抓不到東西，本測試會靜靜地永遠綠。先用一段已知
-	// 違規的字串證明它答得出來（拼接而成，避免自己成為被掃到的那一個）。
 	assert.match(
 		`{process.env.${"NODE_ENV"} === "development" && (<Foo />)}`,
 		JSX_DEV_GATE,
@@ -90,7 +85,6 @@ test("dev-only 元件的掛載條件一律走 DEV_OVERLAYS_ENABLED，不得各�
 	assert.ok(files.length > 50, `只掃到 ${files.length} 個檔 —— 掃描器壞了`);
 
 	const offenders = files
-		// 註解裡會提到這個寫法（說明為何不要用），先抹掉再掃。
 		.filter(([, source]) =>
 			JSX_DEV_GATE.test(
 				source
@@ -156,9 +150,6 @@ test("devtools 停靠樣式依賴的 class 名，在安裝的套件裡仍然存�
 		"feed-components.css 應以 `body .tsqd-open-btn-container` 覆寫 devtools 開關鈕的位置",
 	);
 
-	// 套件產物裡必須找得到同一個 class 字面值。class 是由框架無關的核心套件
-	// `@tanstack/query-devtools` 產生的（react 那層只是 wrapper），所以從 wrapper
-	// 的解析起點往下解，pnpm 的巢狀結構才找得到。
 	const require = createRequire(import.meta.url);
 	const core = createRequire(require.resolve("@tanstack/react-query-devtools"));
 	const entry = core.resolve("@tanstack/query-devtools");
@@ -191,7 +182,6 @@ test("手機停靠帶讓開底部導覽列，且引用導覽列變數而非抄�
 	const breakpoint = nav.match(/max-\[(\d+)px\]:grid/);
 	assert.ok(breakpoint, "MobileBottomNav 應以任意 max-width 斷點宣告 grid");
 
-	// 停靠帶必須關在「導覽列存在」的那個斷點裡，否則桌機也會被收合。
 	assert.ok(
 		css.includes(`@media not (min-width: ${breakpoint[1]}px) {`),
 		`feed-components.css 的 dev 停靠帶應在 \`@media not (min-width: ${breakpoint[1]}px)\` 內` +

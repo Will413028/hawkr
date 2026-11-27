@@ -45,7 +45,6 @@ func TestEnvRejectsInt32Overflow(t *testing.T) {
 }
 
 func TestEnvReportsEveryProblemAtOnce(t *testing.T) {
-	// 空字串視同沒設定：部署設定裡留空的必填值，不能被當成有效值。
 	e := FromMap(map[string]string{"EMPTY": "", "N": "abc", "D": "5"})
 	e.String("MISSING")
 	e.String("EMPTY")

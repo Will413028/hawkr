@@ -24,11 +24,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("Uber webhook 驗簽")
 class UberWebhookVerifierTest {
 
-    // 🔴 金鑰硬寫字面值，不從別的模組引用：本檔的 VALID_SIG 是對「這一把金鑰 × 這一份 body」
-    //    算好的 hex 常數，兩者必須成對。從外部常數取金鑰會讓那一端一改，
-    //    這裡就變成「拿被測物自己算出來的東西驗被測物」。
-    //    ⚠️ shipping-service 的 TestUberAdapters.TEST_SIGNING_KEY 是同一個字面值，
-    //    兩邊各自硬寫是刻意的。
     private static final String KEY = "test-uber-webhook-signing-key";
     private static final String BODY =
             "{\"id\":\"evt_1\",\"kind\":\"event.delivery_status\",\"created\":1789000000,"
@@ -71,8 +66,6 @@ class UberWebhookVerifierTest {
     @Test
     @DisplayName("🔴 signing key 是一組不是一個：第二把命中也要通過（陷阱 C1）")
     void anyRegisteredKeyPasses() {
-        // 66 §8.5：per-webhook signing key ⇒ 只放一把，多註冊一個 webhook 就靜默驗簽失敗，
-        // 而我方回 401 ⇒ Uber 不重試 4xx ⇒ 該 webhook 的事件全丟。
         UberWebhookVerifier multi = new UberWebhookVerifier(List.of("first-webhook-key", KEY));
         assertThat(multi.verify(raw(BODY), Map.of(UberWebhookVerifier.SIGNATURE_HEADER, VALID_SIG))).isTrue();
     }
@@ -150,16 +143,8 @@ class UberWebhookVerifierTest {
                     + "——檔案搬家了，本斷言的錨要跟著改，不能當成通過");
         }
         String code = java.nio.file.Files.readString(source, java.nio.charset.StandardCharsets.UTF_8);
-        // 只看 verify() 這個方法體，避免 javadoc 裡提到的 API 名把斷言變成恆真。
         int start = code.indexOf("public boolean verify(");
         assertThat(start).as("verify() 方法名改了 ⇒ 本斷言的錨失效").isGreaterThan(0);
-        // 🔴 範圍**只到 verify() 自己**，用「下一個 private 方法」當終點而不是某個具名方法。
-        //
-        // ⚠️ 2026-09-12 實測踩到：原本錨在 hmacSha256()，而中間新增了一支
-        //    header()（大小寫不敏感的 header 查找，內含 equalsIgnoreCase）
-        //    ⇒ 掃描範圍多吃了一支與簽章比較無關的方法 ⇒ 否定斷言誤報。
-        //    那**不是誤報該被放寬**，是錨該收窄：本條要守的是「簽章怎麼比」，
-        //    不是「這個檔案裡有沒有出現過 equalsIgnoreCase」。
         int end = code.indexOf("\n    private static ", start);
         assertThat(end).as("verify() 之後沒有 private 方法了 ⇒ 本斷言的範圍失效").isGreaterThan(start);
         String verifyBody = code.substring(start, end);
@@ -176,7 +161,6 @@ class UberWebhookVerifierTest {
     /** 由 module 目錄往上找到 repo root（存在 {@code .git} 的那一層）。 */
     private static java.nio.file.Path repoRoot() {
         java.nio.file.Path p = java.nio.file.Path.of("").toAbsolutePath();
-        // backend 根目錄以 go.work 為錨：monorepo 裡 .git 在上一層，不是 backend/。
         while (p != null && !java.nio.file.Files.exists(p.resolve("go.work"))) {
             p = p.getParent();
         }

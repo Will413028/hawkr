@@ -50,7 +50,6 @@ func TestPreviewOf(t *testing.T) {
 	if p := PreviewOf("BUYER", "IMAGE", nil, nil, false); p.Text != nil || p.Type != model.TypeImage {
 		t.Fatalf("圖片沒有文字：%+v", p)
 	}
-	// ID1：隱藏與抹除的預覽不帶任何內容。
 	if p := PreviewOf("BUYER", "TEXT", ptr("秘密"), nil, true); p.Text != nil || !p.Hidden {
 		t.Fatalf("隱藏的預覽洩漏內容：%+v", p)
 	}

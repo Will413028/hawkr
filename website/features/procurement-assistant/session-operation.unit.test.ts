@@ -73,7 +73,6 @@ describe("session operation identity", () => {
 		expect(oldOperation.signal.aborted).toBe(true);
 		expect(guard.isCurrent(oldOperation)).toBe(false);
 		expect(currentDuringAbort).toHaveReturnedWith(false);
-		// reset/unmount cleanup can safely repeat invalidation.
 		expect(() => guard.invalidate()).not.toThrow();
 	});
 
@@ -115,7 +114,6 @@ describe("session operation identity", () => {
 		).toBe(false);
 		expect(guard.isCurrent(forge({ clientRequestId: "client-b" }))).toBe(false);
 		expect(guard.isCurrent(forge({ requestId: "request-b" }))).toBe(false);
-		// A value-for-value clone is not the frozen token captured by the submit.
 		expect(guard.isCurrent(forge({}))).toBe(false);
 		expect(Object.isFrozen(operation)).toBe(true);
 	});
@@ -166,8 +164,6 @@ describe("session operation identity", () => {
 			if (guard.isCurrent(operation)) state = mutation(state);
 		};
 
-		// Simulate the old SSE step, done, and error all landing while the new
-		// operation is pending. None may clear or overwrite the new session.
 		mutateIfCurrent(oldOperation, (current) => ({
 			...current,
 			steps: [...current.steps, "old step"],

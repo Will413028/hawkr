@@ -21,7 +21,7 @@ public class PostDeletedEvent extends BaseEvent {
 
     private Long postId;
     private Long authorId;
-    private String reason;  // user_request, moderation, account_deleted
+    private String reason;
 
     public static PostDeletedEvent create(Long postId, Long authorId, String reason) {
         PostDeletedEvent event = PostDeletedEvent.builder()

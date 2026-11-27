@@ -11,8 +11,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-// ==================== Mock：只 stub admin 申訴列表 ====================
-// 介面 embed：未 stub 的方法呼叫即 nil-panic（沿用 aftersales_test.go 慣例）。
 
 type mockAftersalesAppealsAdminClient struct {
 	aftersalespb.AfterSalesServiceClient

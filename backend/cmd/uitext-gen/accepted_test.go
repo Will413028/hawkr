@@ -12,7 +12,6 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
-// acceptedDefinitionFiles 是 PolicyCategory 與 accepted_policy_categories 擴充欄位的定義檔。
 func acceptedDefinitionFiles() (policy, ext *descriptorpb.FileDescriptorProto) {
 	policy = &descriptorpb.FileDescriptorProto{
 		Name:    proto.String("hawkr/common/v1alpha1/policy_category.proto"),
@@ -40,8 +39,6 @@ func acceptedDefinitionFiles() (policy, ext *descriptorpb.FileDescriptorProto) {
 	return policy, ext
 }
 
-// acceptedImage 造一個 image：PolicyCategory、accepted_policy_categories 的擴充欄位，以及一個欄位掛了 numbers 的請求訊息。
-// 選項直接寫成 unknown fields（和 buf image 讀進來、沒有編譯進型別的情況相同）；packed 是 repeated enum 在 proto3 的預設編碼。
 func acceptedImage(numbers []int32, packed bool) *descriptorpb.FileDescriptorSet {
 	var raw []byte
 	if packed {

@@ -67,7 +67,6 @@ class AfterSaleLockSqlContractTest {
     @Mock private EvidenceService evidenceService;
     @Mock private AfterSalesEventPublisher eventPublisher;
 
-    // ==================== 共用：從生產路徑取出「它實際呼叫的那一支 mapper 方法」 ====================
 
     /**
      * 取本次執行中，{@code caseMapper} 上第一個<b>由 {@link AfterSaleCaseMapper} 自己宣告</b>的
@@ -97,7 +96,6 @@ class AfterSaleLockSqlContractTest {
         return String.join(" ", select.value()).replaceAll("\\s+", " ").trim();
     }
 
-    // ==================== Guard M5：submitAppeal 的持鎖讀 ====================
 
     @Test
     @DisplayName("M5 guard：submitAppeal 實際使用的鎖查詢必須帶 FOR UPDATE（拿掉＝#3262 P0 復活）")
@@ -136,7 +134,6 @@ class AfterSaleLockSqlContractTest {
                 .doesNotContainIgnoringCase("SKIP LOCKED");
     }
 
-    // ==================== Guard M8：撥款閘門的在途申訴探測 ====================
 
     @Test
     @DisplayName("M8 guard：撥款放行前的探測必須帶 FOR UPDATE SKIP LOCKED（缺 SKIP LOCKED ＝ 探測會等待）")
@@ -146,7 +143,6 @@ class AfterSaleLockSqlContractTest {
         props.getAppeal().setPayoutHoldGraceMinutes(GRACE_MINUTES);
         AfterSalePayoutHoldService service = new AfterSalePayoutHoldService(caseMapper, props);
 
-        // 申訴窗（含 grace）已過的 case ⇒ 走到本 service 唯一的「放行」出口，探測必被執行
         AfterSaleCaseEntity windowClosed = new AfterSaleCaseEntity();
         windowClosed.setCaseNo(CASE_NO);
         windowClosed.setOrderNo(ORDER_NO);

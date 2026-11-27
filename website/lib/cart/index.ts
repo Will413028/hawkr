@@ -162,7 +162,6 @@ export async function clearCart(): Promise<CartItem[]> {
 	if (current.length === 0) {
 		return current;
 	}
-	// No bulk endpoint — fan-out delete. Settle all then re-fetch.
 	await Promise.allSettled(current.map((it) => bRemove(it.skuId)));
 	const fresh = await loadCart();
 	broadcastCartChanged();

@@ -35,8 +35,6 @@ export default function ImageFallback({
 	const iconSize = fill
 		? 64
 		: Math.min(64, Math.max(20, Math.round((finiteBox || 64) * 0.45)));
-	// A caption needs vertical room; hide it on small thumbnails. When we don't
-	// know the size (fill, or no dimensions) assume there is room.
 	const showCaption = fill || finiteBox === 0 || finiteBox >= 120;
 
 	return (
@@ -57,9 +55,7 @@ export default function ImageFallback({
 				className,
 			)}
 		>
-			{/* Decorative: the wrapper above is the `role="img"` that carries the
-			    caption as its accessible name, and a nested name inside it is
-			    unreachable anyway. */}
+
 			<AppIcon name="image" size={iconSize} />
 			{showCaption ? (
 				<span className="px-2 text-center text-xs leading-tight">{label}</span>

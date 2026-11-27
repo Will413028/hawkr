@@ -32,7 +32,6 @@ var (
 	ErrLockNotOwned = errors.New("lock not owned by this instance")
 )
 
-// Lua script for safe lock release (only release if we own the lock)
 const releaseLockScript = `
 if redis.call("GET", KEYS[1]) == ARGV[1] then
     return redis.call("DEL", KEYS[1])
@@ -41,7 +40,6 @@ else
 end
 `
 
-// Lua script for lock extension
 const extendLockScript = `
 if redis.call("GET", KEYS[1]) == ARGV[1] then
     return redis.call("PEXPIRE", KEYS[1], ARGV[2])
@@ -105,7 +103,6 @@ type Lock struct {
 	service *LockService
 }
 
-// buildKey constructs the lock key
 func (s *LockService) buildKey(resource, id string) string {
 	return fmt.Sprintf("%s:%s:%s", LockKeyPrefix, resource, id)
 }
@@ -121,12 +118,6 @@ func (s *LockService) AcquireWithTTL(ctx context.Context, resource, id string, t
 	value := uuid.New().String()
 
 	for i := 0; i <= s.maxRetries; i++ {
-		// staticcheck SA1019 suggests SetArgs{Mode:"NX"} instead, but that
-		// returns *StatusCmd (redis.Nil on conflict) rather than SetNX's
-		// *BoolCmd (false on conflict) — swapping it would change this
-		// method's bool-return contract. SetNX is only soft-deprecated
-		// (still fully implemented, not removed) — deferred rather than
-		// risked in an unrelated change to this lock-acquisition path.
 		set, err := s.rdb.SetNX(ctx, key, value, ttl).Result() //nolint:staticcheck
 		if err != nil {
 			return nil, fmt.Errorf("failed to acquire lock: %w", err)
@@ -145,7 +136,6 @@ func (s *LockService) AcquireWithTTL(ctx context.Context, resource, id string, t
 			case <-ctx.Done():
 				return nil, ctx.Err()
 			case <-time.After(s.retryDelay):
-				// Continue to next retry
 			}
 		}
 	}
@@ -163,12 +153,6 @@ func (s *LockService) TryAcquireWithTTL(ctx context.Context, resource, id string
 	key := s.buildKey(resource, id)
 	value := uuid.New().String()
 
-	// staticcheck SA1019 suggests SetArgs{Mode:"NX"} instead, but that
-	// returns *StatusCmd (redis.Nil on conflict) rather than SetNX's
-	// *BoolCmd (false on conflict) — swapping it would change this
-	// method's bool-return contract. SetNX is only soft-deprecated (still
-	// fully implemented, not removed) — deferred rather than risked in an
-	// unrelated change to this lock-acquisition path.
 	set, err := s.rdb.SetNX(ctx, key, value, ttl).Result() //nolint:staticcheck
 	if err != nil {
 		return nil, fmt.Errorf("failed to acquire lock: %w", err)

@@ -10,7 +10,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 )
 
-// 代行授權的治理（六支）。actorAdminId 不合法是 9261（沒有管理員身分），其他欄位不合法是 9260。
 
 func (s *Server) ListDelegationAuthorizations(ctx context.Context, req *connect.Request[pb.ListDelegationAuthorizationsRequest]) (*connect.Response[pb.ListDelegationAuthorizationsResponse], error) {
 	m := req.Msg
@@ -72,7 +71,6 @@ func (s *Server) GetDelegationAuthorization(ctx context.Context, req *connect.Re
 	return connect.NewResponse(&pb.GetDelegationAuthorizationResponse{Message: success, Data: data}), nil
 }
 
-// authorizationChange 是 Grant 與 Update 共用的請求欄位（兩者的形狀逐項相同）。
 type authorizationChange interface {
 	GetActorAdminId() string
 	GetTargetStoreId() string
@@ -85,7 +83,6 @@ type authorizationChange interface {
 	GetCorrelationId() string
 }
 
-// toChange 解析開通與調整的請求；失敗時回傳業務碼與訊息。
 func toChange(m authorizationChange, effectiveUntil *string) (delegation.DelegationAuthorizationChange, int32, string) {
 	adminID, ok := parseID(m.GetActorAdminId())
 	if !ok {
@@ -106,7 +103,6 @@ func toChange(m authorizationChange, effectiveUntil *string) (delegation.Delegat
 		RequestID:       m.GetRequestId(),
 		CorrelationID:   m.GetCorrelationId(),
 	}
-	// proto3 optional：沒有帶是無期限（重新開通時也不沿用舊值）。
 	if effectiveUntil != nil {
 		t, ok := parseTime(*effectiveUntil)
 		if !ok || t == nil {
@@ -231,7 +227,6 @@ func (s *Server) ListDelegationAuthorizationHistory(ctx context.Context, req *co
 	return connect.NewResponse(out), nil
 }
 
-// toAuthorization 是授權列對外的唯一投影。可空的欄位以 proto3 optional 輸出 null。
 func toAuthorization(a delegation.DelegationAuthorization) *pb.DelegationAuthorization {
 	return &pb.DelegationAuthorization{
 		Id:                         a.ID.String(),

@@ -105,7 +105,6 @@ func (s *Service) Process(ctx context.Context, id uuid.UUID, attempt, maxAttempt
 	case errors.As(err, &perm) && perm.Reason.Valid():
 		return s.reject(ctx, row.ID, perm.Reason)
 	case errors.Is(ctx.Err(), context.Canceled):
-		// worker 關機不是這個 job 的失敗，不消耗最後一次嘗試；River 會重試。job 自己的逾時是 DeadlineExceeded，照一般暫時失敗算。
 		return fmt.Errorf("media：處理暫存上傳 %s 被中斷：%w", row.ID, err)
 	case attempt >= maxAttempts:
 		s.d.Logger.ErrorContext(ctx, "media：處理重試用盡，標記拒絕", "upload_id", row.ID, "error", err)
@@ -117,7 +116,6 @@ func (s *Service) Process(ctx context.Context, id uuid.UUID, attempt, maxAttempt
 
 var errLost = errors.New("media：暫存列已不是 UPLOADED 或已過期")
 
-// finish 以一個 transaction 建資產列並把暫存列轉 READY；輸給對方時依列的現況收尾。
 func (s *Service) finish(ctx context.Context, row store.MediaStagedUpload, res ProcessResult) error {
 	assetID := s.d.NewID()
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
@@ -139,7 +137,6 @@ func (s *Service) finish(ctx context.Context, row store.MediaStagedUpload, res P
 	})
 	switch {
 	case err == nil:
-		// 提交之後才刪暫存物件；刪失敗由 bucket 對 tmp/ 的 lifecycle 兜底（CONFIRMED 的列不進 GC）。
 		if row.TmpKey == nil {
 			return nil
 		}
@@ -154,10 +151,6 @@ func (s *Service) finish(ctx context.Context, row store.MediaStagedUpload, res P
 	}
 }
 
-// lost 處理條件式轉換輸掉：列是 READY 或 CONFIRMED（正式 key 已屬於資產）就什麼都不做；其他情況都要刪掉自己寫的正式物件，
-// 因為沒有資產指向它。列還是 UPLOADED（只可能是過期）時先轉 REJECTED（EXPIRED）帶著 final_key 進 GC，刪失敗交給 GC 再刪；
-// 其他狀態（PENDING、DELETING、DELETED、REJECTED、列不存在）GC 不會再看這個 key，刪失敗就回傳錯誤讓 River 重試，
-// 重試時條件式轉換會再輸一次、再進來刪。物件不存在視為成功。
 func (s *Service) lost(ctx context.Context, row store.MediaStagedUpload) error {
 	cur, err := s.q(ctx).GetUpload(ctx, row.ID)
 	missing := errors.Is(err, pgx.ErrNoRows)
@@ -186,7 +179,6 @@ func (s *Service) lost(ctx context.Context, row store.MediaStagedUpload) error {
 	return nil
 }
 
-// reject 不受 ctx 取消影響：最後一次重試逾時時，列仍要離開 UPLOADED（只有 REJECTED 的列會進 GC）。
 func (s *Service) reject(ctx context.Context, id uuid.UUID, reason model.RejectReason) error {
 	ctx = context.WithoutCancel(ctx)
 	r := string(reason)

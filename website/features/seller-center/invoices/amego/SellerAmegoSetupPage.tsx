@@ -55,8 +55,6 @@ const STEPS = [
 	{ id: "amego-5", label: "完成" },
 ] as const;
 
-// RESUBMITTABLE_STATUSES 逐字對齊後端 ResubmitProviderCredential 的 allowed-from。
-// 兩邊分家的後果是賣家看到一顆按下去必定 rows=0 的按鈕（backend #3089 第 15 項）。
 const RESUBMITTABLE_STATUSES: ReadonlySet<string> = new Set([
 	InvoiceProviderAccountStatus.NOT_CONFIGURED,
 	InvoiceProviderAccountStatus.CREDENTIAL_SUBMITTED,
@@ -96,7 +94,6 @@ export function SellerAmegoSetupPage() {
 	const [confirmOpen, setConfirmOpen] = React.useState(false);
 	const [detailsOpen, setDetailsOpen] = React.useState(false);
 
-	// 驗證失敗（9331）時自動展開技術資訊，讓賣家不必自己找 request id。
 	const verifyCopy = invoiceErrorCopy(actions.verifyError);
 	React.useEffect(() => {
 		if (actions.verifyError) setDetailsOpen(true);
@@ -110,7 +107,6 @@ export function SellerAmegoSetupPage() {
 		);
 	}
 
-	// 🔴 gate 判準只看端點 17 —— 見檔頭。
 	const approved =
 		!taxNotStarted &&
 		profile?.reviewStatus === SellerTaxReviewStatus.APPROVED_INVOICE_REQUIRED;
@@ -156,20 +152,6 @@ export function SellerAmegoSetupPage() {
 
 	const submitCredential = () => {
 		if (!appKey.trim()) return;
-		// 🔴 分流判準是 **status**，不是「有沒有 last4」（backend #3089 第 15 項）。
-		//
-		// 舊條件 `account?.credentialLast4 && !state.credentialEditable` 的註解寫
-		// 「已 ACTIVE／DEGRADED」，但它實際涵蓋了 CREDENTIAL_VERIFYING／
-		// CREDENTIAL_SUBMITTED／PROVIDER_UNAVAILABLE 三態（那些狀態也有 last4）
-		// ⇒ 打錯 AppKey 的賣家被導向端點 27 輪替，而輪替的 allowed-from **只有 ACTIVE**
-		// ⇒ **必然 409／9322「資料已被更新，請重新整理後再送出」**。
-		// 版本其實沒衝突，重整一百次都一樣 —— 他沒有任何自助修復路徑。
-		//
-		// 值域逐字取自後端兩支 CAS 的 allowed-from（db/queries/invoice_provider_accounts.sql）：
-		//   端點 27 StartProviderCredentialRotation ← status = 'ACTIVE'
-		//   端點 24 ResubmitProviderCredential      ← NOT_CONFIGURED / CREDENTIAL_SUBMITTED /
-		//                                             CREDENTIAL_VERIFYING / INVALID_CREDENTIAL /
-		//                                             PROVIDER_REJECTED / PROVIDER_UNAVAILABLE
 		if (account?.status === InvoiceProviderAccountStatus.ACTIVE) {
 			actions.rotate(appKey.trim());
 			return;
@@ -180,11 +162,6 @@ export function SellerAmegoSetupPage() {
 		});
 	};
 
-	// canEditKey ＝ 這個狀態下送出去真的有機會成功。
-	//
-	// ⚠️ DEGRADED／ROTATION_PENDING／SUSPENDED／REVOKED 兩支端點的 allowed-from
-	// **都不含** ⇒ 讓表單可編輯只會給出一顆必然 rows=0 的按鈕（而 rows=0 回的是
-	// 「資料已被更新」，讀起來像是暫時性問題）。這裡不畫它，比畫一顆按不動的誠實。
 	const canEditKey =
 		account?.status === InvoiceProviderAccountStatus.ACTIVE ||
 		RESUBMITTABLE_STATUSES.has(
@@ -198,7 +175,6 @@ export function SellerAmegoSetupPage() {
 			return;
 		}
 		if (new Date(iso).getTime() <= Date.now()) {
-			// 前端就擋下不發請求：切點只能是未來（58A §S03 驗收 2）。
 			setCutoverError(
 				"啟用時間必須晚於現在。較早付款的訂單不會回頭改用新設定。",
 			);
@@ -246,7 +222,7 @@ export function SellerAmegoSetupPage() {
 				</p>
 			) : null}
 
-			{/* ③ 步驟 1：核定統編（唯讀） */}
+
 			<section id="amego-1" className="seller-card mt-4 p-5">
 				<h2 className="text-sm font-extrabold text-foreground">
 					確認商家統一編號
@@ -267,7 +243,7 @@ export function SellerAmegoSetupPage() {
 				</p>
 			</section>
 
-			{/* ④ 步驟 2：AppKey */}
+
 			<section id="amego-2" className="seller-card mt-4 p-5">
 				<h2 className="text-sm font-extrabold text-foreground mb-3">
 					AMEGO AppKey
@@ -284,8 +260,6 @@ export function SellerAmegoSetupPage() {
 					}
 					editing={keyEditing}
 					onStartEdit={() => {
-						// 不可編輯的狀態不開表單（見 canEditKey 的註解）：
-						// 給一顆按下去必定 rows=0 的按鈕，回的訊息還讀起來像暫時性問題。
 						if (canEditKey) setEditingKey(true);
 					}}
 					onCancelEdit={() => {
@@ -326,7 +300,7 @@ export function SellerAmegoSetupPage() {
 				</p>
 			</section>
 
-			{/* ⑤ 步驟 3：連線測試 */}
+
 			<section id="amego-3" className="seller-card mt-4 p-5">
 				<div className="flex items-center gap-3 flex-wrap">
 					<h2 className="text-sm font-extrabold text-foreground flex-1">
@@ -344,14 +318,7 @@ export function SellerAmegoSetupPage() {
 						className="mt-2 text-[0.6875rem] leading-relaxed text-danger-700"
 						role="alert"
 					>
-						{/*
-						 * 🔴 **後端的訊息優先於我的固定文案。**
-						 * 同一個業務碼在不同環境的意思可以差很多：dev 實測 `9332` 回的是
-						 * 「本環境未開放對外開立發票，無法驗證憑證」（環境閘），而我的固定文案
-						 * 寫「AMEGO 服務暫時無法連線，系統稍後會自動重試」——那在 dev 是假的，
-						 * 賣家會一直等一個永遠不會來的重試。API 設計規範也明訂失敗一律透傳
-						 * 微服務 Message、Gateway 不得覆寫。⇒ 後端訊息當事實，我的文案只補「下一步」。
-						 */}
+
 						{invoiceErrorMessage(actions.verifyError) || verifyCopy.title}
 						{verifyCopy.description ? ` ${verifyCopy.description}` : ""}
 					</p>
@@ -368,7 +335,7 @@ export function SellerAmegoSetupPage() {
 				) : null}
 			</section>
 
-			{/* ⑥ 步驟 4：啟用時間 */}
+
 			<section id="amego-4" className="seller-card mt-4 p-5">
 				<h2 className="text-sm font-extrabold text-foreground mb-3">
 					啟用時間
@@ -405,7 +372,7 @@ export function SellerAmegoSetupPage() {
 				) : null}
 			</section>
 
-			{/* ⑦ 步驟 5：完成卡（只有真的設好切點才出現） */}
+
 			{state.activated && account?.automationCutoverAt ? (
 				<section id="amego-5" className="seller-card mt-4 p-5">
 					<h2 className="text-sm font-extrabold text-foreground">
@@ -425,7 +392,7 @@ export function SellerAmegoSetupPage() {
 				<div id="amego-5" />
 			)}
 
-			{/* ⑧ 底部動作列 */}
+
 			<div className="mt-5 flex justify-end gap-2 flex-wrap">
 				<Button
 					variant="bordered"
@@ -469,7 +436,7 @@ export function SellerAmegoSetupPage() {
 					</div>
 				}
 			>
-				{/* 逐字與 ADM A09 版本歷程頁一致，不得改寫。 */}
+
 				<p className="text-xs leading-relaxed text-foreground">
 					自 <strong>{cutoverLocal.replace("T", " ")}</strong>{" "}
 					起付款的訂單，將由這條 AMEGO
@@ -486,7 +453,6 @@ function rotateErrorTitle(actions: {
 }): string | undefined {
 	const copy = invoiceErrorCopy(actions.rotateError);
 	if (!copy) return undefined;
-	// 輪替失敗時最重要的一句：線上的開票沒有壞掉。
 	return `${copy.title} 原有憑證仍然有效，開票不受影響。`;
 }
 
@@ -515,7 +481,6 @@ function Field({
 
 function StatusPill({ tone, label }: { tone: string; label: string }) {
 	return (
-		// 狀態同時用文字表達，不只靠顏色（A11y 基線）。
 		<span
 			className={`shipping-pill shipping-pill--${tone} text-[0.6875rem] font-extrabold`}
 			aria-live="polite"
@@ -558,7 +523,6 @@ function taipeiLocalToIso(local: string): string {
 	const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(local);
 	if (!m) return "";
 	const [, y, mo, d, h, mi] = m;
-	// 台北恆為 UTC+8，無日光節約。
 	const utcMs = Date.UTC(+y, +mo - 1, +d, +h - 8, +mi);
 	return new Date(utcMs).toISOString().replace(/\.\d{3}Z$/, "Z");
 }

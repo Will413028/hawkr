@@ -15,8 +15,6 @@ export const DELEGATED_OPERATION_UPSTREAM = {
 	 * credential —— 讓憑證持有者列得出全平台的代行活動，等於把治理視角交給被治理的人。
 	 */
 	sessions: SESSIONS_PATH,
-	// 治理三支：身分一律是 ADM session（`requireAdmin`），任一支都不接受也不需要
-	// operation credential —— 跨工作階段回看是治理權限，不是代行權限。
 	auditLogs: (sessionId: string) =>
 		`/api/v1/admin/delegated-operations/${encodeURIComponent(sessionId)}/audit-logs`,
 	/**
@@ -30,13 +28,6 @@ export const DELEGATED_OPERATION_UPSTREAM = {
 		`/api/v1/admin/delegated-operations/${encodeURIComponent(sessionId)}/summary`,
 	revoke: (sessionId: string) =>
 		`/api/v1/admin/delegated-operations/${encodeURIComponent(sessionId)}/revoke`,
-	// 授權列七支（backend#2444）：管「這家店可不可以被代行、範圍多大」，發生在任何
-	// 工作階段之前。身分同為 ADM session，不接受也不需要 operation credential。
-	//
-	// ⚠️ 路徑一律含 `delegated-operations` 這個 segment：`bff-boundary.ts` 的
-	// `isDelegatedOperationNamespace` 只認這個字面值來拒絕 catch-all 代理。改成
-	// `delegation-authorizations` 之類的名字，前端就能用泛用 `api.get` 繞過整套
-	// parser／`safeUpstreamError`／no-store 保護，而且不會有任何東西轉紅。
 	capabilities: "/api/v1/admin/delegated-operations/capabilities",
 	authorizations: "/api/v1/admin/delegated-operations/authorizations",
 	authorization: (storeId: string) =>
@@ -142,8 +133,6 @@ export function safeUpstreamError(payload: unknown): {
 		/^[A-Za-z0-9._:-]{1,128}$/u.test(payload.traceId)
 			? payload.traceId
 			: undefined;
-	// Do not forward an upstream message. Unknown services may echo credentials,
-	// request bodies, or internal topology in free-form error text.
 	return {
 		code,
 		message: "代行營運服務暫時無法使用",

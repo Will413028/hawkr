@@ -56,8 +56,6 @@ func (s *Service) List(ctx context.Context, now time.Time, kinds []model.Kind, a
 	}
 	out := make([]model.Item, 0, len(rows))
 	for _, r := range rows {
-		// 查詢的 WHERE 只放行 kinds（每一個都檢查過是有效的種類），所以回來的 kind 一定是已知的值；來源多出的種類在這裡就不會出現，
-		// 不是錯誤，由 TestKindsMatchTheSource 在測試期把關。
 		kind := model.Kind(r.Kind)
 		item := model.Item{
 			Kind: kind, ItemID: r.ItemID,

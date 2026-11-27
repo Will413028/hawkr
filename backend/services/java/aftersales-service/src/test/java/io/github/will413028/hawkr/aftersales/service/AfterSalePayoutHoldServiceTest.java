@@ -86,7 +86,6 @@ class AfterSalePayoutHoldServiceTest {
         when(caseMapper.tryLockCaseForPayoutRelease(fresh.getCaseNo())).thenReturn(fresh);
     }
 
-    // ==================== 無 case：絕大多數訂單 ====================
 
     @Test
     @DisplayName("訂單無售後 case ⇒ 不 hold（撥款 cadence 完全不受本閘門影響）")
@@ -105,7 +104,6 @@ class AfterSalePayoutHoldServiceTest {
         assertFalse(service.getPayoutHold(ORDER_NO).hold());
     }
 
-    // ==================== Case A / E：窗關了就放行，不會永久卡死 ====================
 
     @Test
     @DisplayName("Case A/E：REJECTED(60) 未申訴、last_rejected_at 已超過 72h+grace ⇒ 放行")
@@ -136,7 +134,6 @@ class AfterSalePayoutHoldServiceTest {
         }
     }
 
-    // ==================== 風險窗內：本票要關的洞 ====================
 
     @Test
     @DisplayName("REJECTED(60) 未申訴、仍在 72h 窗內 ⇒ hold 到 deadline+grace（有時間界）")
@@ -156,7 +153,6 @@ class AfterSalePayoutHoldServiceTest {
     @Test
     @DisplayName("grace 有作用：deadline 剛過但仍在 grace 內 ⇒ 還在 hold（關掉 submitAppeal 的 TOCTOU）")
     void withinGrace_stillHeld() {
-        // last_rejected_at = now - 72h - 1min ⇒ deadline 已過 1 分鐘，但 grace 15 分鐘還沒走完
         AfterSaleCaseEntity c = aCase("AS1", AfterSaleCaseStatus.REJECTED, AfterSaleAppealState.NONE.value());
         c.setLastRejectedAt(DateTimeUtils.nowUtc().minusHours(DEADLINE_HOURS).minusMinutes(1));
         givenCases(c);
@@ -173,7 +169,6 @@ class AfterSalePayoutHoldServiceTest {
         AfterSaleCaseEntity c = aCase("AS33", AfterSaleCaseStatus.AUTO_COMPLETED_RETURN_PENDING_TIMEOUT,
                 AfterSaleAppealState.NONE.value());
         c.setClosedAt(closedAt);
-        // last_rejected_at 為 null——33 的起算點必須是 closed_at，取錯欄位會靜默放行
         givenCases(c);
 
         PayoutHold hold = service.getPayoutHold(ORDER_NO);
@@ -181,13 +176,11 @@ class AfterSalePayoutHoldServiceTest {
         assertEquals(closedAt.plusHours(DEADLINE_HOURS).plusMinutes(GRACE_MINUTES), hold.holdUntil());
     }
 
-    // ==================== Case B：申訴中 ====================
 
     @Test
     @DisplayName("Case B：60＋APPEALED ⇒ 無時間界 hold（等 Admin 裁決，不得靠時間自動放行）")
     void caseB_appealed_indefiniteHold() {
         AfterSaleCaseEntity c = aCase("AS1", AfterSaleCaseStatus.REJECTED, AfterSaleAppealState.APPEALED.value());
-        // 即使 last_rejected_at 早就超過窗，只要申訴已成立就不能因為「時間到了」而撥款
         c.setLastRejectedAt(DateTimeUtils.nowUtc().minusDays(30));
         givenCases(c);
 
@@ -217,7 +210,6 @@ class AfterSalePayoutHoldServiceTest {
         assertFalse(service.getPayoutHold(ORDER_NO).hold());
     }
 
-    // ==================== 時間戳缺漏與多 case ====================
 
     @Test
     @DisplayName("REJECTED 但 last_rejected_at 為 null ⇒ submitAppeal 的 A3 也會拒絕 ⇒ 不 hold")
@@ -287,22 +279,14 @@ class AfterSalePayoutHoldServiceTest {
         assertNotNull(hold.caseNo());
     }
 
-    // ==================== backend#3262 P0：在途申訴探測（QA FAIL 後新增）====================
-    //
-    // 這一組取代 grace 成為 correctness 的來源。判準不是「15 分鐘夠不夠久」，
-    // 而是「撥款放行」與「一筆已通過 A3 的申訴落地」在順序上不可能同時成立。
-    // submitAppeal 在做任何資格判定之前先 SELECT … FOR UPDATE 鎖住該 case（持有到 commit），
-    // 本閘門在因窗已過而放行之前先以 FOR UPDATE SKIP LOCKED 探測同一列，探不到就擋。
 
     @Test
     @DisplayName("🔴 P0：窗（含 grace）已過但該 case 正被持鎖 ⇒ fail-closed 不放行（在途申訴）")
     void windowClosedButRowLocked_holdsFailClosed() {
         AfterSaleCaseEntity c = aCase("AS1", AfterSaleCaseStatus.REJECTED, AfterSaleAppealState.NONE.value());
-        // 駁回於 73 小時前：deadline 已過 1 小時、deadline+grace 也已過 45 分
-        // ——舊版在這一刻無條件放行，而 markAppealed 的 WHERE 沒有任何時間述詞
         c.setLastRejectedAt(DateTimeUtils.nowUtc().minusHours(DEADLINE_HOURS + 1));
         givenCases(c);
-        when(caseMapper.tryLockCaseForPayoutRelease("AS1")).thenReturn(null);   // 被別的交易持鎖
+        when(caseMapper.tryLockCaseForPayoutRelease("AS1")).thenReturn(null);
 
         PayoutHold hold = service.getPayoutHold(ORDER_NO);
         assertTrue(hold.hold(),
@@ -322,7 +306,6 @@ class AfterSalePayoutHoldServiceTest {
         AfterSalePayoutHoldService noGrace = new AfterSalePayoutHoldService(caseMapper, zeroGrace);
 
         AfterSaleCaseEntity c = aCase("AS1", AfterSaleCaseStatus.REJECTED, AfterSaleAppealState.NONE.value());
-        // 只超過 deadline 1 秒：舊版在 grace=0 下會立刻放行
         c.setLastRejectedAt(DateTimeUtils.nowUtc().minusHours(DEADLINE_HOURS).minusSeconds(1));
         givenCases(c);
         when(caseMapper.tryLockCaseForPayoutRelease("AS1")).thenReturn(null);
@@ -342,23 +325,19 @@ class AfterSalePayoutHoldServiceTest {
         PayoutHold hold = service.getPayoutHold(ORDER_NO);
         assertTrue(hold.hold());
         assertEquals(HoldReason.APPEAL_WINDOW_OPEN, hold.reason());
-        // 未 stub tryLock 仍不失敗 ⇒ 證明該路徑沒去探；同時避免探測成為每次查詢的固定成本
         verify(caseMapper, never()).tryLockCaseForPayoutRelease(anyString());
     }
 
     @Test
     @DisplayName("🔴 P0：閘門的第一次讀是舊快照（申訴在那之後才 commit）⇒ 持鎖重讀必須抓到，不得放行")
     void staleSnapshotThenAppealCommitted_holdsFailClosed() {
-        // 交錯：① selectList 讀到 appeal_state='0'（當時申訴交易還持鎖未 commit）
-        //       ② 申訴 commit、鎖釋放
-        //       ③ 探測「鎖得到」——若只看可鎖性就會放行，而申訴其實已經成立
         AfterSaleCaseEntity snapshot = aCase("AS1", AfterSaleCaseStatus.REJECTED,
                 AfterSaleAppealState.NONE.value());
         snapshot.setLastRejectedAt(DateTimeUtils.nowUtc().minusHours(DEADLINE_HOURS + 1));
         givenCases(snapshot);
 
         AfterSaleCaseEntity fresh = aCase("AS1", AfterSaleCaseStatus.REJECTED,
-                AfterSaleAppealState.APPEALED.value());     // ← 重讀時已是申訴中
+                AfterSaleAppealState.APPEALED.value());
         fresh.setLastRejectedAt(snapshot.getLastRejectedAt());
         when(caseMapper.tryLockCaseForPayoutRelease("AS1")).thenReturn(fresh);
 

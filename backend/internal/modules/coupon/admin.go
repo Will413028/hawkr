@@ -7,7 +7,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/adminaudit"
 )
 
-// 後台的寫入在 internal/admin：領域變更與 adminaudit.Record 同一個 transaction。
 
 // AdminCreateCampaign 以 actor 為發行者建立平台活動（DRAFT）；in.Issuer 被覆蓋。
 func (m *Module) AdminCreateCampaign(ctx context.Context, actor adminaudit.Actor, in CreateCampaignInput) (Campaign, error) {

@@ -78,8 +78,6 @@ export function useRfqRuntimeSnapshot(
 	});
 	const [counts, setCounts] =
 		React.useState<RfqDealTruthCounts>(UNKNOWN_COUNTS);
-	// 每次 refresh 遞增：晚回來的舊請求不得覆寫新請求的結果（同
-	// useBuyerQuoteComparison 的 generation 手法）。
 	const generationRef = React.useRef(0);
 
 	const refresh = React.useCallback(async () => {

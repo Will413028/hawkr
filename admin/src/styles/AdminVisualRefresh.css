@@ -1,10 +1,3 @@
-/*
- * Hawkr Admin visual foundation
- *
- * The public website is the brand authority. This compatibility layer maps the
- * older admin vocabulary onto the current brick / orange / cream / paper
- * system while the feature-level styles are migrated incrementally.
- */
 
 :root {
 	--admin-primary-strong: #b8441f;
@@ -39,7 +32,6 @@
 	--admin-font-display:
 		var(--font-openhuninn), var(--font-roboto), "Noto Sans TC", sans-serif;
 
-	/* Legacy compatibility mappings. */
 	--hk-primary-strong: var(--admin-primary-strong);
 	--hk-primary: var(--admin-primary);
 	--hk-cream: var(--admin-cream);
@@ -140,7 +132,6 @@ textarea {
 	width: 42px;
 }
 
-/* Application shell */
 .admin-app.show {
 	display: flex;
 	min-height: 100dvh;
@@ -462,7 +453,6 @@ textarea {
 	justify-content: flex-end;
 }
 
-/* Controls */
 .btn {
 	min-height: 44px;
 	justify-content: center;
@@ -519,7 +509,6 @@ textarea {
 	cursor: not-allowed;
 }
 
-/* Dashboard and reusable cards */
 .stats-row-v2 {
 	display: grid;
 	grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -694,7 +683,6 @@ textarea {
 	font-size: 19px;
 }
 
-/* Tables and filters */
 .table-container {
 	overflow: auto;
 }
@@ -812,7 +800,6 @@ textarea {
 	outline: none;
 }
 
-/* Compound controls own their single visible boundary. */
 .page-content .merchant-search-input {
 	height: 44px;
 	padding: 0 13px;
@@ -922,11 +909,6 @@ textarea {
 	font-weight: 700;
 }
 
-/*
- * Dialogs
- * overlay 根明確設與 body 相同的字型、字級、行高與文字色：對話框 portal 到 body，頁面根（.post-mgmt-page、
- * .hcal-page、.certification-detail-page）設的 font-family／color 傳不進來，所以對話框自己定，與從哪一頁開啟無關。
- */
 .modal-overlay,
 .adm-operation-dialog-overlay {
 	color: var(--admin-ink);
@@ -1004,25 +986,16 @@ textarea {
 	color: var(--gray-600);
 }
 
-/* 治理操作的結果提示放在內容區裡：補外距（那兩個 class 原本長在有 gap 的容器裡） */
 .modal-body > .adm-authorization-notice,
 .modal-body > .adm-operation-error {
 	margin-top: 16px;
 }
 
-/* Dialog 的 tone="warning"：不可逆或立即生效的確認 */
 .modal-header.modal-header--warning h3,
 .adm-operation-dialog-header.adm-operation-dialog-header--warning h2 {
 	color: var(--admin-warning);
 }
 
-/*
- * 對話框不超過視窗：外層限高並排成直欄，頁首與頁尾不動，只有 .modal-body 捲動（flex 子項要 min-height: 0 才能縮到比內容小），
- * 所以內容很長的對話框（例如列出 20 筆來源通報的建立措施）頂端與送出鍵都在畫面上、按得到。
- * 包著 body 與 footer 的 <form>（CreateProspectDialog）一起排成直欄。高度上限由這組共用結構負責（calc(100dvh - 40px)），
- * 對話框不在 .modal-body 上另設 max-height 或 overflow（MergeDialog、CreateProspectDialog 的 70vh 已移除），所以不會出現兩層捲軸。
- * 這組結構（.modal-content > .modal-header／.modal-body／.modal-footer）就是之後共用的 Dialog 元件要吃的形狀，不為單一對話框加例外。
- */
 .modal-content {
 	display: flex;
 	flex-direction: column;
@@ -1047,10 +1020,6 @@ textarea {
 	overflow-y: auto;
 }
 
-/*
- * 側欄變體（Dialog 的 variant="side"）：同一組標題列／內容／動作列，面板貼右、整高，從右側滑入。
- * 結構與 .modal-content 相同，所以內容區捲動、標題列與動作列固定都沿用上面的規則；這裡只改 overlay 與面板的外形。
- */
 .modal-overlay.modal-overlay--side {
 	justify-content: flex-end;
 	padding: 0;
@@ -1265,7 +1234,6 @@ textarea {
 	}
 }
 
-/* Merchant metrics keep the long approval label clear of the status icon. */
 .page-content .merchant-stats-grid .stat-card-v2 {
 	height: 100%;
 }
@@ -1274,11 +1242,6 @@ textarea {
 	max-width: calc(100% - 48px);
 }
 
-/*
- * JSON 原文（訂單快照、AMEGO 送件內容、收款帳戶待補條件）。
- *
- * ⚠️ `overflow-x: auto` 是必要的：不讓長 JSON 把整個 document 撐到橫捲。
- */
 .adm-json-pre {
 	max-height: 360px;
 	margin: 8px 0 0;

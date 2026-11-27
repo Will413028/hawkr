@@ -219,7 +219,6 @@ func activeAssets(t *testing.T, f *fixture) int {
 	return n
 }
 
-// notActiveAssets 是推導後不是 ACTIVE 的資產數（STAGED、DELETING、DELETED）。
 func notActiveAssets(t *testing.T, f *fixture) int {
 	t.Helper()
 	total := 0

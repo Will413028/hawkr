@@ -16,8 +16,6 @@ import { ApiClientError, apiClient, authedFetch } from "../api/client";
 import type { DelegatedMutationMeta, RepoFetcher } from "../api/delegated";
 
 export interface SellerProductListItem {
-	// Snowflake IDs exceed Number.MAX_SAFE_INTEGER, so api/json.ts hands them
-	// back as strings — accept either form so consumers can pass through.
 	id: number | string;
 	/**
 	 * 樂觀鎖版本 —— **只有代行路徑有值**（56 號 §6.1.8）。上架／下架／批次下架的
@@ -197,10 +195,6 @@ function str(value: unknown): string | undefined {
 
 function mapWireItem(raw: unknown): SellerProductListItem {
 	const r = (raw ?? {}) as Record<string, unknown>;
-	// §231 flat-pair: the bare objectKey is the SSOT (`imageKeys[0]` for the
-	// multi-image list). The `imageUrl`/`imageUrls` twins are
-	// `mediaurl.BuildURL(base, imageKey…)` (gateway product.go:924-927) —
-	// derived from these very keys, so they are not read.
 	const imageUrl =
 		str(r.imageKey) ?? str((r.imageKeys as unknown[] | undefined)?.[0]);
 	return {
@@ -378,8 +372,6 @@ export function createSellerProductRepo(
 			>(`${at(id)}/skus`, {
 				throwOnHttpError: false,
 			});
-			// Backend wraps SKUs under `data.skus` (handler.SellerSkuListResponse);
-			// keep bare-array / `records` fallbacks for shape drift.
 			const raw = Array.isArray(env.data)
 				? env.data
 				: (env.data?.skus ?? env.data?.records ?? []);
@@ -418,9 +410,6 @@ export function createSellerProductRepo(
 				method: "PUT",
 				json: { status },
 			});
-			// 賣家自助端沒有樂觀鎖版本（`PUT /app/products/{id}/status` 不回它），
-			// `version` 留空 —— 清單那一側的 `patchStatusLocal` 對 undefined 不加欄位，
-			// 這條路徑的行為一格未動。
 			return {};
 		},
 
@@ -464,7 +453,6 @@ export async function fetchSellerSalesCounts(
 			if (id && sales != null) map.set(id, sales);
 		}
 	} catch {
-		/* best-effort backfill — leave 銷量 as "—" on failure */
 	}
 	return map;
 }
@@ -478,7 +466,6 @@ export const fetchSellerProductEdit: SellerProductRepo["fetchSellerProductEdit"]
 function mapWireSku(raw: unknown): ProductSku {
 	const r = (raw ?? {}) as Record<string, unknown>;
 	return {
-		// SKU id 一律 string pass-through（backend TSID 18 位超出 JS Number 安全範圍）
 		id: typeof r.id === "string" ? r.id : r.id != null ? String(r.id) : "",
 		sku_name: str(r.skuName) ?? str(r.sku_name),
 		spec_name: str(r.specName) ?? str(r.spec_name),
@@ -507,8 +494,8 @@ export interface InlineRun {
 	bold?: boolean;
 	italic?: boolean;
 	underline?: boolean;
-	color?: string; // #RRGGBB
-	href?: string; // http(s):// 絕對 URL
+	color?: string;
+	href?: string;
 }
 
 export interface ProductDescriptionBlock {
@@ -516,13 +503,13 @@ export interface ProductDescriptionBlock {
 	id?: string;
 	/** text blocks：行內 runs（取代 legacy content） */
 	runs?: InlineRun[];
-	content?: string; // text blocks（legacy 唯讀相容）
+	content?: string;
 	/** table blocks：`{ withHeadings, rows:[[{runs,textAlign?}]] }` 的 JSON 字串 */
 	tableJson?: string;
 	/** list blocks：`{ ordered, items:[{runs}] }` 的 JSON 字串 */
 	listJson?: string;
-	assetId?: string; // existing image reference
-	stagedToken?: string; // newly uploaded image
+	assetId?: string;
+	stagedToken?: string;
 	/** 圖片 objectKey（wire `imageKey`；讀寫兩面同名，backend#2235 起與 gallery
 	 *  條目、商品卡、購物車項、貼文商品共用同一組欄名，49 §6.1）。 */
 	imageKey?: string;
@@ -675,8 +662,6 @@ function newIdempotencyKey(): string {
 	) {
 		return crypto.randomUUID();
 	}
-	// Fallback for ancient browsers — not cryptographically perfect, fine for
-	// a request key that the server only uses for dedupe.
 	return `key-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
@@ -692,8 +677,6 @@ export function parseDescription(
 	if (typeof input === "string") {
 		const text = input.trim();
 		if (!text) return { version: "1.0", blocks: [] };
-		// Backend used to send JSON-encoded descriptions before the type was
-		// promoted on the wire; try to parse so we don't render literal JSON.
 		if (text.startsWith("{") && text.includes("blocks")) {
 			try {
 				const parsed = JSON.parse(text) as ProductDescription;
@@ -701,7 +684,6 @@ export function parseDescription(
 					return parsed;
 				}
 			} catch {
-				/* fall through to plain-text wrap */
 			}
 		}
 		return {
@@ -726,8 +708,6 @@ export function compactDescription(
 		version: "1.0",
 		blocks: doc.blocks.filter((b) => {
 			if (b.type === "text") {
-				// inline-run 模型：runs 為主、legacy content 相容——兩者皆空才視為
-				// 空 block。只看 content 會把所有 runs 段落當空丟掉（#1246 存檔掉字）。
 				return Boolean(
 					b.runs?.some((r) => r.text?.trim()) || b.content?.trim(),
 				);
@@ -740,7 +720,6 @@ export function compactDescription(
 	};
 }
 
-/* ===== Categories ===== */
 
 export interface CategoryNode {
 	id: string | number;
@@ -885,7 +864,6 @@ export function upsertCategoryNode(
 	return foundParent ? next : tree;
 }
 
-/* ===== Shipping quotes ===== */
 
 /** One carrier option the backend says fits a given package. Mirrors
  *  `handler.ShippingOptionItem` (camelCase, all-string). */
@@ -935,8 +913,6 @@ export async function fetchShippingQuotes(
 	const data = env.data as { shippingOptions?: unknown[] } | null | undefined;
 	const opts = Array.isArray(data?.shippingOptions) ? data.shippingOptions : [];
 	if (opts.length === 0) {
-		// No options → either a real backend error (surface its message) or an
-		// empty result for an out-of-range package.
 		const msg = env.message ?? env.msg;
 		if (msg) throw new Error(msg);
 		return { shippingOptions: [] };
@@ -956,7 +932,6 @@ export async function fetchShippingQuotes(
 	};
 }
 
-/* ===== Product create / update ===== */
 
 /** camelCase SKU exactly as `handler.CreateSkuInput` wants it on the wire. */
 export interface SkuWriteInput {

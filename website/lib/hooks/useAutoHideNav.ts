@@ -90,11 +90,6 @@ export function useAutoHideNav(opts: Options = {}): UseAutoHideNavResult {
 		};
 	}, []);
 
-	// 路由一換就強制顯示、把 delta 基準重設到當下的捲動位置，並開一段
-	// settle 視窗停用「往下捲即隱藏」（見 ROUTE_SETTLE_MS）。沒有這段，
-	// Tab 切換釘回捲動記憶的那一下會被當成使用者往下捲，bar 在換頁瞬間
-	// 縮走、內容長高再釘時又彈回 —— 就是切頁時的抖動。使用者真手勢最多
-	// 晚不到 1 秒才收起，無感。
 	const pathname = usePathname() ?? "";
 	// biome-ignore lint/correctness/useExhaustiveDependencies: re-baseline on route change
 	React.useEffect(() => {
@@ -111,7 +106,6 @@ export function useAutoHideNav(opts: Options = {}): UseAutoHideNavResult {
 			return;
 		}
 
-		// Reduced motion: never auto-hide.
 		if (
 			typeof window === "undefined" ||
 			window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
@@ -141,9 +135,6 @@ export function useAutoHideNav(opts: Options = {}): UseAutoHideNavResult {
 				return;
 			}
 			if (delta > directionDelta) {
-				// scrolling down — but ignore the programmatic scroll burst right
-				// after a route change (scroll-to-top / tab scroll restore), and
-				// respect minVisibleMs after a recent show.
 				if (Date.now() < routeSettleUntil.current) return;
 				if (Date.now() - lastShowAt.current >= minVisibleMs) {
 					setHidden(true);
@@ -161,12 +152,6 @@ export function useAutoHideNav(opts: Options = {}): UseAutoHideNavResult {
 			window.requestAnimationFrame(evaluate);
 		};
 
-		// Overlays (product quick-view, Dialog) commonly freeze
-		// background scroll while open, so no `scroll` event ever arrives to let
-		// `evaluate()` re-run — without this, the nav would stay stuck in
-		// whatever shown/hidden state it happened to be in when the overlay
-		// opened. React to the attribute directly: force visible immediately on
-		// open, and re-evaluate against the live scroll position once it closes.
 		const onOverlayAttrChange = () => {
 			if (overlayOpen()) {
 				setHidden(false);
@@ -182,16 +167,6 @@ export function useAutoHideNav(opts: Options = {}): UseAutoHideNavResult {
 			attributeFilter: ["data-hk-overlay-open"],
 		});
 
-		// Edge proximity: ALWAYS call setHidden(false) inside the zone.
-		// React dedupes identical state, so this is cheap when already shown.
-		// Crucially, the handler does NOT read `hidden` from a closure, so we
-		// can keep `hidden` out of the effect deps and bind these listeners
-		// exactly once for the component's lifetime — that fixes a flicker
-		// where the listener was unbound + rebound on every state flip and
-		// could miss a mousemove fired during the swap window.
-		//
-		// `revealEdge` picks which edge counts: "top" → cursor within the top
-		// `revealZone`; "bottom" → cursor within the bottom `revealZone`.
 		const inRevealZone = (clientY: number) => {
 			if (revealEdge === "none") return false;
 			if (revealEdge === "bottom") {
@@ -206,8 +181,6 @@ export function useAutoHideNav(opts: Options = {}): UseAutoHideNavResult {
 				setHidden(false);
 			}
 		};
-		// pointermove additionally covers pen / Apple Pencil; we ignore touch
-		// to avoid scroll-induced false positives.
 		const onPointerMove = (e: PointerEvent) => {
 			if (overlayOpen()) return;
 			if (e.pointerType !== "mouse" && e.pointerType !== "pen") return;
@@ -216,17 +189,11 @@ export function useAutoHideNav(opts: Options = {}): UseAutoHideNavResult {
 				setHidden(false);
 			}
 		};
-		// Mouse re-enters the document near the watched edge (e.g. came back
-		// from outside the browser): also reveal.
 		const onMouseEnter = (e: MouseEvent) => {
 			if (overlayOpen()) return;
 			if (inRevealZone(e.clientY)) setHidden(false);
 		};
 
-		// Touch swipe-up-from-bottom (bottom edge only): summon the bar even
-		// when the page can't scroll further (e.g. already at the very bottom).
-		// We only start tracking when the finger lands inside the bottom gesture
-		// band, then reveal once it has travelled up past a small threshold.
 		const bottomGestureBand = Math.max(revealZone, 72);
 		const swipeRevealDistance = 24;
 		let touchStartY: number | null = null;
@@ -247,17 +214,13 @@ export function useAutoHideNav(opts: Options = {}): UseAutoHideNavResult {
 			if (touchStartY - t.clientY > swipeRevealDistance) {
 				lastShowAt.current = Date.now();
 				setHidden(false);
-				touchStartY = null; // one reveal per gesture
+				touchStartY = null;
 			}
 		};
 		const onTouchEnd = () => {
 			touchStartY = null;
 		};
 
-		// PageTransition 的 scrollToNow（捲頂 / Tab 捲動記憶釘回）每次程式性
-		// 捲動都廣播這個事件：收到就把 delta 基準對齊到捲動後的位置，讓
-		// 隨後的 scroll 事件讀到 delta≈0 —— 程式性捲動永遠不觸發方向判斷，
-		// 即使它發生在路由 settle 視窗之外（釘捲動會等內容長高才釘到位）。
 		const onProgrammaticScroll = () => {
 			lastY.current = window.scrollY || 0;
 		};

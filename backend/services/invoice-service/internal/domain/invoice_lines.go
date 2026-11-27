@@ -9,7 +9,6 @@ import (
 	"github.com/Will413028/hawkr/go-pkg/codemeta"
 )
 
-// 行類型的 CodeMeta Value。寫 DB 與比對一律用這三個，禁止字串字面值。
 var (
 	lineTypeProduct  = codemeta.InvoiceLineTypeProduct.Value
 	lineTypeShipping = codemeta.InvoiceLineTypeShipping.Value
@@ -115,10 +114,6 @@ func EmittedLines(lines []Line) []Line {
 	return out
 }
 
-// truncateRunes 以 rune 截斷（中文一字算一個）。
-//
-// 禁止 s[:n]：以 byte 切會把中文切成半個字產生無效 UTF-8，而 AMEGO 回的仍是 3040139，
-// 訊息不會告訴你是編碼壞了。
 func truncateRunes(s string, n int) string {
 	if utf8.RuneCountInString(s) <= n {
 		return s
@@ -133,7 +128,6 @@ func truncateRunes(s string, n int) string {
 	return s
 }
 
-// productDescription 組出 PRODUCT 行的品名：sku_name 為空或等於 product_name 時只取 product_name。
 func productDescription(it OrderItem) string {
 	name := it.ProductName
 	if it.SkuName != "" && it.SkuName != it.ProductName {
@@ -186,10 +180,6 @@ func BuildLines(snap OrderSnapshot, resolver TaxCategoryResolver) ([]Line, error
 	}
 	productCount := len(lines)
 
-	// §5A.5.1 分攤基數：只分攤到商品行，運費只吸收溢出。
-	//
-	// shippingDiscount <= F 是證明不是假設：本函式只在 total_actual_amount > 0 時走到這裡，
-	// 即 S + F − D > 0 ⇒ D − S < F。
 	productDiscount := snap.DiscountAmount
 	if productDiscount > productSubtotal {
 		productDiscount = productSubtotal
@@ -204,16 +194,12 @@ func BuildLines(snap OrderSnapshot, resolver TaxCategoryResolver) ([]Line, error
 			Quantity:    1,
 			UnitPrice:   snap.ShippingFee,
 			NetAmount:   snap.ShippingFee,
-			// 運費屬勞務，不在營業稅法第 8 條免稅列舉範圍 ⇒ 恆為應稅，不隨賣家商品稅別變動。
-			// 把運費歸進 FreeTaxSalesAmount ⇒ 應稅銷售額短報，而且表頭與明細自洽、AMEGO 不會拒絕。
 			TaxCategory:       TaxCategoryTaxable,
 			AllocatedDiscount: shippingDiscount,
 			AllowanceableBase: snap.ShippingFee - shippingDiscount,
 		})
 	}
 
-	// 第一層（桶層）：productDiscount 按各稅別桶的 gross 合計比例分攤。
-	// 兩層而不是一次分攤，是為了讓表頭三個銷售額欄位（都是申報數字）不受行順序影響。
 	bucketCats, bucketGross := bucketsOf(lines[:productCount])
 	bucketAlloc, err := AllocateLargestRemainder(bucketGross, productDiscount)
 	if err != nil {
@@ -224,7 +210,6 @@ func BuildLines(snap OrderSnapshot, resolver TaxCategoryResolver) ([]Line, error
 	for bi, cat := range bucketCats {
 		discountByCategory[cat] += bucketAlloc[bi]
 
-		// 第二層（行層）：每個桶的 bucketAlloc 再按該桶內各行 gross 分攤，只取 gross > 0 的行。
 		idx := make([]int, 0, productCount)
 		w := make([]int64, 0, productCount)
 		for i := 0; i < productCount; i++ {
@@ -263,7 +248,6 @@ func BuildLines(snap OrderSnapshot, resolver TaxCategoryResolver) ([]Line, error
 			UnitPrice:   -amount,
 			NetAmount:   -amount,
 			TaxCategory: c,
-			// DISCOUNT 行不是「賣出去的東西」、不能被折讓，故 base 恆為 0。
 			AllocatedDiscount: 0,
 			AllowanceableBase: 0,
 		})
@@ -271,7 +255,6 @@ func BuildLines(snap OrderSnapshot, resolver TaxCategoryResolver) ([]Line, error
 	return lines, nil
 }
 
-// bucketsOf 依 tax_category 分組 PRODUCT 行的 gross 合計，只取 > 0 的桶，依稅別碼升冪。
 func bucketsOf(productLines []Line) ([]TaxCategory, []int64) {
 	sums := make(map[TaxCategory]int64, 3)
 	for _, l := range productLines {

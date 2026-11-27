@@ -19,7 +19,6 @@ import { parseDelegatedSessionReport } from "../src/features/delegated-operation
  *   ③ 未撤銷時整塊不渲染（不得多出一塊空白區）
  */
 
-// 後端契約（gateway `DelegatedSessionSummary`）。數字一律字串。
 const SESSION_ID = "7494008076136087552";
 
 const SESSION_SUMMARY = {
@@ -57,14 +56,10 @@ const REVOKED_SUMMARY = {
 	endedAt: REVOKED_AT,
 	revokedAt: REVOKED_AT,
 	revokedByAdminId: "2661027599",
-	// 後端填的是 `admin_accounts.email`（該表沒有顯示名欄位）。
 	revokedByAdminDisplayName: "ops-admin@example.com",
 	revokeReason: REVOKE_REASON,
 };
 
-// ---------------------------------------------------------------------------
-// ① parser
-// ---------------------------------------------------------------------------
 
 test("① 摘要 parser 收下撤銷四件套", () => {
 	const parsed = parseDelegatedSessionReport(REVOKED_SUMMARY);
@@ -104,13 +99,11 @@ test("缺欄視同沒有；型別錯仍整份 fail closed", () => {
 	assert.equal(parsed.revokeReason, null);
 
 	for (const broken of [
-		// 帶偏移的時間：同一筆紀錄在兩個畫面上會差 8 小時，而讀的人正在比對時序。
 		{ ...REVOKED_SUMMARY, revokedAt: "2026-08-14T20:39:29+08:00" },
 		{ ...REVOKED_SUMMARY, revokedAt: 1_755_175_169 },
 		{ ...REVOKED_SUMMARY, revokedByAdminId: 2_661_027_599 },
 		{ ...REVOKED_SUMMARY, revokedByAdminDisplayName: { email: "x@y.z" } },
 		{ ...REVOKED_SUMMARY, revokeReason: "超".repeat(201) },
-		// 控制字元（此處 BEL）：`hasAsciiControlCharacters` 擋的就是這一類。
 		{ ...REVOKED_SUMMARY, revokeReason: "含控制字元\u0007" },
 	]) {
 		assert.equal(
@@ -126,15 +119,10 @@ test("缺欄視同沒有；型別錯仍整份 fail closed", () => {
 test("摘要 parser 是冪等的：BFF 與瀏覽器會各解析一次同一份資料", () => {
 	const first = parseDelegatedSessionReport(REVOKED_SUMMARY);
 	assert.ok(first);
-	// 第二次看到的是第一次的產物（計數已是 number）。不冪等的症狀是治理頁永遠顯示
-	// 「摘要格式不完整」，而兩邊各自單看都正確。
 	const second = parseDelegatedSessionReport(first);
 	assert.deepEqual(second, first);
 });
 
-// ---------------------------------------------------------------------------
-// 撤銷者那一行的拼接
-// ---------------------------------------------------------------------------
 
 test("撤銷者那一行：全形括號結尾不再補半形空格", () => {
 	const line = sessionRevokedByText(
@@ -143,32 +131,24 @@ test("撤銷者那一行：全形括號結尾不再補半形空格", () => {
 		"2661027599",
 	);
 	assert.match(line, /由 ops-admin@example\.com（2661027599）撤銷$/u);
-	// 修前是 JSX 的 `{expr}{" "}` 換行補的空白 ＋ 全形括號自帶的視覺留白疊在一起，
-	// 看起來像「（2661027599） 撤銷」中間少了一個字。
 	assert.doesNotMatch(line, /）\s撤銷/u);
 });
 
 test("撤銷者缺席時說得出缺了什麼，不是省略整句", () => {
-	// join 落空但仍知道是誰。
 	assert.match(
 		sessionRevokedByText(REVOKED_AT, null, "2661027599"),
 		/由 管理員（2661027599）撤銷$/u,
 	);
-	// 顯示名是 email（西文結尾）→ 這裡才需要半形空格。
 	assert.match(
 		sessionRevokedByText(REVOKED_AT, "ops-admin@example.com", null),
 		/由 ops-admin@example\.com 撤銷$/u,
 	);
-	// 兩者皆缺仍要留下「誰撤的」這個問題被問過的痕跡。
 	assert.match(
 		sessionRevokedByText(REVOKED_AT, null, null),
 		/由 未記錄操作者撤銷$/u,
 	);
 });
 
-// ---------------------------------------------------------------------------
-// ②③ 真的渲染得出來
-// ---------------------------------------------------------------------------
 
 const requireFromTest = createRequire(__filename);
 requireFromTest.extensions[".css"] = () => {};
@@ -263,22 +243,13 @@ function renderConsole(client: unknown): string {
 test("② 已撤銷的工作階段：畫面上讀得到誰撤的、什麼時候、為什麼", async () => {
 	const html = renderConsole(await seedSummary(REVOKED_SUMMARY));
 
-	// 這一句是整張票的標的：修前它在任何畫面都渲染不出來。
 	assert.match(
 		html,
 		new RegExp(REVOKE_REASON, "u"),
 		`撤銷理由沒有渲染出來：${html.slice(0, 1200)}`,
 	);
-	// 撤銷者。後端填的是 email，所以斷言的是 email 而不是姓名。
 	assert.match(html, /ops-admin@example\.com/u);
-	// email 會換，數字 admin id 才是維運 SQL 認的那一個，兩者都要在。
 	assert.match(html, /2661027599/u);
-	// 撤銷時刻用的是 `revokedAt`，不是同一頁上任何別的時間欄位。
-	//
-	// 🔴 預期值**寫死台北**，不用 `toLocaleString` 現算（backend#3053 的稽查）：
-	// 現算等於「用實作驗實作」，而且它會跟著跑測試那台機器的時區走 ——
-	// 同一支測試在 JST 的筆電上綠、在 UTC 的 CI 上紅。
-	// REVOKED_AT = 2026-08-14T12:39:29Z ⇒ 台北 2026/08/14 20:39:29。
 	assert.match(html, /2026\/08\/14 20:39:29/u);
 	assert.match(html, /撤銷紀錄/u);
 	assert.match(html, /adm-audit-revocation/u);
@@ -287,13 +258,11 @@ test("② 已撤銷的工作階段：畫面上讀得到誰撤的、什麼時候�
 test("③ 未撤銷的工作階段不得多出一塊空白區", async () => {
 	const html = renderConsole(await seedSummary(SESSION_SUMMARY));
 
-	// 摘要區本身有渲染（否則下面三條是因為整頁沒渲染而通過的，那是假綠）。
 	assert.match(html, /工作階段摘要/u);
 	assert.match(html, /OPS-1KXP05J5SRQPS/u);
 
 	assert.doesNotMatch(html, /adm-audit-revocation/u);
 	assert.doesNotMatch(html, /撤銷紀錄/u);
-	// 佔位字串也不得出現：一塊寫著「未記錄撤銷理由」的卡片同樣是多出來的空白區。
 	assert.doesNotMatch(html, /未記錄撤銷理由|未記錄操作者/u);
 });
 
@@ -317,7 +286,6 @@ test("gateway 尚未下發四欄時整塊不渲染，不得宣稱「未記錄」
 	const html = renderConsole(await seedSummary(legacy));
 
 	assert.match(html, /工作階段摘要/u);
-	// 狀態徽章照常說「已撤銷」，但不會多出一句沒有根據的「未記錄撤銷理由」。
 	assert.match(html, /已撤銷/u);
 	assert.doesNotMatch(html, /adm-audit-revocation/u);
 	assert.doesNotMatch(html, /未記錄撤銷理由/u);

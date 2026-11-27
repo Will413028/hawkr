@@ -11,7 +11,6 @@ import {
 	previousPage,
 } from "../src/lib/keyset-pages";
 
-// 會員頁以 ListAccounts 的不透明 page token 翻頁（AIP-158）：只能往下拿，所以「上一頁」靠記住走過的 token。
 
 test("第一頁的 token 是空字串", () => {
 	const tokens = firstPage();
@@ -45,7 +44,6 @@ test("總頁數由 total_size 算出", () => {
 });
 
 test("建立時間以台北的日期顯示，沒有值時是 -", () => {
-	// 2026-09-26T16:30:00Z 是台北的 9 月 27 日 00:30。
 	assert.equal(
 		formatCreateDate(timestampFromMs(Date.UTC(2026, 8, 26, 16, 30))),
 		"2026-09-27",

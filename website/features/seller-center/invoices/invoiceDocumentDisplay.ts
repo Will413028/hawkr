@@ -29,17 +29,13 @@ export interface InvoiceDocumentDisplay {
 
 /** 語意群 → 顏色。四群窮盡 11 個值（§S06 的表）。 */
 const COLOR_BY_STATUS: Record<string, ChipColor> = {
-	// 已開立／已完成
 	[InvoiceDocumentStatus.ISSUED]: "success",
 	[InvoiceDocumentStatus.RESOLVED_EXTERNALLY]: "success",
-	// 處理中／待開立
 	[InvoiceDocumentStatus.PENDING]: "warning",
 	[InvoiceDocumentStatus.ISSUING]: "warning",
 	[InvoiceDocumentStatus.VOIDING]: "warning",
-	// 失敗／異常／待人工
 	[InvoiceDocumentStatus.ISSUE_FAILED]: "danger",
 	[InvoiceDocumentStatus.AWAITING_MANUAL]: "danger",
-	// 已作廢／已取代／不適用／開立前取消
 	[InvoiceDocumentStatus.VOIDED]: "default",
 	[InvoiceDocumentStatus.SUPERSEDED]: "default",
 	[InvoiceDocumentStatus.NOT_APPLICABLE]: "default",
@@ -49,8 +45,6 @@ const COLOR_BY_STATUS: Record<string, ChipColor> = {
 export function invoiceDocumentDisplay(status: string): InvoiceDocumentDisplay {
 	const color = COLOR_BY_STATUS[status];
 	if (!color) {
-		// 值域外：顏色中性、label 直接印原始碼。印原始碼而不是「未知狀態」是刻意的
-		// ——賣家截圖給客服時，那串碼是唯一能定位的東西。
 		return { label: status || "—", color: "default", unknown: true };
 	}
 	return {

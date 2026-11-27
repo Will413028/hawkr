@@ -53,8 +53,7 @@ export default async function Page({ params }: Props) {
 	return (
 		<>
 			{jsonLd}
-			{/* Keep exactly one semantic heading in the atomic route subtree.
-			    SellerProfileV2 renders the same visible name as a non-heading. */}
+
 			<h1 className="sr-only">{s?.name ?? "商家"}</h1>
 			{s?.storeId ? <StorefrontPage sellerId={s.storeId} /> : null}
 		</>

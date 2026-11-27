@@ -22,15 +22,11 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 )
 
-// trimmedColumn 是一個頭尾不得有空白的文字欄位（platform/trimtext）。extra 是讓同一張表別的 CHECK 在只填這一欄時成立的欄位值。
 type trimmedColumn struct {
 	table, column, constraint string
 	extra                     map[string]any
 }
 
-// trimmedColumns 是每個模組裡頭尾不得有空白的文字欄位。TestTrimmedTextChecksUseTheCanonicalPattern 要求它與 migration 套用後
-// 用 trimtext.Check 的 CHECK 雙向相同：新的欄位用了 trimtext.Check 卻沒登記在這裡，也會失敗（登記才有下面的 SQL 寫入測試）。
-// hideTarget 讓 social.hides 的 hides_target_check（恰好一個目標）在只填一欄時成立；暫時表沒有外鍵。
 const hideTarget = "00000000-0000-7000-8000-000000000001"
 
 var sellerEpoch = time.Date(2026, 10, 29, 0, 0, 0, 0, time.UTC)
@@ -247,7 +243,6 @@ func TestTrimmedTextChecksUseTheCanonicalPattern(t *testing.T) {
 	}
 }
 
-// spaceOutsidePattern 回報 def（已去掉 trimtext.Check 的展開）裡第一個空白碼位的 \uXXXX 寫法或字元本身（U+0020 與換行除外：SQL 本身就用）。
 func spaceOutsidePattern(def string) (rune, bool) {
 	for _, m := range regexp.MustCompile(`\\u([0-9a-fA-F]{4})`).FindAllStringSubmatch(def, -1) {
 		var r rune

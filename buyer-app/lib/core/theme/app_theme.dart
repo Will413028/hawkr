@@ -44,8 +44,6 @@ abstract final class AppTheme {
         ),
     useMaterial3: true,
     pageTransitionsTheme: HkPageTransitions.theme,
-    // Keep button semantics and custom motion, but remove Flutter's
-    // built-in ripple / pressed overlay from every Material control.
     splashFactory: NoSplash.splashFactory,
     splashColor: Colors.transparent,
     highlightColor: Colors.transparent,

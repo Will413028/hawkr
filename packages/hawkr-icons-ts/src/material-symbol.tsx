@@ -30,7 +30,6 @@ export function MaterialSymbol({
 	return (
 		<svg
 			xmlns="http://www.w3.org/2000/svg"
-			// Spread first: the decorative contract below is this component's own.
 			{...rest}
 			width={size}
 			height={size}
@@ -40,8 +39,7 @@ export function MaterialSymbol({
 			aria-label={title}
 			aria-hidden={title ? undefined : true}
 		>
-			{/* The path carries its own paint so a consumer's `svg { fill: none; stroke: … }`
-					rule for line icons cannot hollow the glyph out. */}
+
 			<path
 				d={fill ? glyph.filled : glyph.outlined}
 				fill="currentColor"

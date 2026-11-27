@@ -79,8 +79,6 @@ function dedupeProducts(pages: MarketProductsPage[]) {
 function marketPagesToReconcile(pages: MarketProductsPage[]): number[] {
 	const onlyPage = pages.length === 1 ? pages[0] : undefined;
 	if (onlyPage && onlyPage.page > 1) {
-		// Back-navigation stores all loaded products as one aggregate snapshot and
-		// keeps the last cursor in `page`. Rebuild 1..N, not only page N.
 		return Array.from({ length: onlyPage.page }, (_, index) => index + 1);
 	}
 	return Array.from(new Set(pages.map((page) => Math.max(1, page.page))));
@@ -167,10 +165,6 @@ export function useMarketProducts({
 }: UseMarketProductsOptions) {
 	const { accountId } = useQueryIdentity();
 	const queryClient = useQueryClient();
-	// Followed-only lists are viewer-specific (favourited products / followed
-	// sellers, resolved from the session cookie). Scope their cache key by viewer
-	// so one buyer's followed list can't be served to another on the same tab.
-	// The default (public) listing stays shared.
 	const queryKey = React.useMemo(
 		() => marketProductsListQueryKey(fetchParams, pageSize, accountId),
 		[fetchParams, pageSize, accountId],
@@ -179,8 +173,6 @@ export function useMarketProducts({
 		() => JSON.stringify(queryKey),
 		[queryKey],
 	);
-	// A restored snapshot belongs to the first complete query key seen by this
-	// mounted list. A filter/viewer change must fetch or reuse its own cache.
 	const restoreOriginRef = React.useRef({
 		generation: queryGeneration,
 		cacheUpdatedAt: queryClient.getQueryState(queryKey)?.dataUpdatedAt ?? 0,
@@ -256,10 +248,6 @@ export function useMarketProducts({
 		queryFn: ({ pageParam, signal }) =>
 			fetchPage(Number(pageParam) || 1, signal),
 		initialPageParam: seedPage,
-		// Only seed when the products are authoritative for this key (canonical
-		// first page or a back-nav snapshot). A client-applied filter leaves this
-		// undefined so TanStack fetches page 1 for the new key instead of showing
-		// the canonical products under a filter that never matched them.
 		initialData: hasSeed
 			? {
 					pages: [
@@ -274,18 +262,11 @@ export function useMarketProducts({
 			: undefined,
 		initialDataUpdatedAt: hasSeed ? initialDataUpdatedAt : undefined,
 		getNextPageParam: nextMarketProductsPage,
-		// Tab activation uses a page-one commerce reconcile below. A normal
-		// infinite-query refetch would replay every page the buyer has loaded.
 		staleTime: Number.POSITIVE_INFINITY,
 		gcTime: 30 * 60 * 1000,
 		refetchOnMount: false,
 	});
 
-	// A hard document must hydrate from the SSR page-1 seed first. If a matching
-	// back-navigation snapshot arrives in the layout phase immediately after that
-	// commit, project it for the next render and synchronously replace the query
-	// cache before paint. This preserves appended pages/pagination without ever
-	// letting sessionStorage alter the HTML React initially hydrates.
 	const restoredData = React.useMemo(
 		() =>
 			restored
@@ -358,8 +339,6 @@ export function useMarketProducts({
 				) {
 					throw signal.reason ?? supersededRefreshError();
 				}
-				// A successful full reconciliation already includes page 1. This
-				// check belongs inside the queue, after the earlier work completes.
 				if (
 					onlyIfStale &&
 					Date.now() -
@@ -543,7 +522,6 @@ export function useMarketProducts({
 		query.data !== undefined;
 	const fullActivationRefresh = useMainTabActivationRefresh({
 		scope: `${freshnessScope}:full`,
-		// Head updates and remounts must not extend the full-list deadline.
 		freshAt:
 			readMainTabRuntime(`${freshnessScope}:full`).lastSuccessAt ||
 			query.dataUpdatedAt,
@@ -615,9 +593,6 @@ export function useMarketProducts({
 		page,
 		done: !query.hasNextPage,
 		loading: query.isFetchingNextPage,
-		// True while a filter's own page 1 is in flight and no products have
-		// arrived yet — lets the grid hold a placeholder instead of flashing the
-		// "no results" empty state before the client fetch resolves.
 		initialLoading: query.isPending,
 		refreshing:
 			activationRefresh.refreshing || fullActivationRefresh.refreshing,

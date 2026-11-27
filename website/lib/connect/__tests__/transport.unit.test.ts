@@ -105,7 +105,6 @@ describe("reportInterceptor", () => {
 		const reported: FailureContext[] = [];
 		const capture = (_: ConnectError, c: FailureContext) =>
 			void reported.push(c);
-		// 網路失敗只發生在 client 端：以內層的 interceptor 模擬 fetch 丟出 TypeError。
 		const networkDown: Interceptor = () => async () => {
 			throw ConnectError.from(new TypeError("fetch failed"));
 		};
@@ -148,7 +147,6 @@ describe("connectBaseUrl", () => {
 			"https://ssr.example.test/api/v1",
 		);
 		expect(connectBaseUrl(true, PAGE)).toBe("https://api.example.test");
-		// 同 host 不同 port 也是不同的 origin。
 		withBases("http://localhost:8080/api/v1", "http://localhost:8080/api/v1");
 		expect(connectBaseUrl(true, "http://localhost:3000")).toBe(
 			"http://localhost:8080",
@@ -510,7 +508,6 @@ describe("authedTransport", () => {
 				}),
 		);
 		vi.stubGlobal("fetch", fetchMock);
-		// 瀏覽器：vitest 的 node 環境沒有 window 與 localStorage。
 		vi.stubGlobal("window", globalThis);
 		vi.stubGlobal("localStorage", {
 			getItem: (k: string) => storage.get(k) ?? null,
@@ -647,7 +644,6 @@ describe("authedTransport", () => {
 				}),
 		);
 		const events: Event[] = [];
-		// window 是 beforeEach 設的 globalThis。
 		vi.stubGlobal("dispatchEvent", (e: Event) => void events.push(e));
 		const app = createClient(
 			IdentityAppService,
@@ -708,7 +704,6 @@ describe("Accept-Language（ADR 2026-10-17 D1：UI 語系由 client transport �
 	});
 
 	it("不讀 DOM：瀏覽器的翻譯把 <html lang> 改成 zh-TW，送出的仍是路由的語系", async () => {
-		// Chrome 把英文頁翻成中文時會改寫 <html lang>；D1 的 preferred_locale 不能因此記成 zh-TW
 		browser("zh-TW");
 		setActiveLocale("en");
 		await createClient(IdentityAppService, authedTransport()).getSession({});
@@ -722,7 +717,6 @@ describe("Accept-Language（ADR 2026-10-17 D1：UI 語系由 client transport �
 
 	it("connect-query 用的 browserTransport 兩條路（公開、登入）都帶，語系取自 provider 傳進來的 locale", async () => {
 		browser();
-		// 目前語系是 zh-TW，但 provider 明確傳 en：明確的值優先（AppProviders 傳它自己的 locale）
 		const transport = browserTransport({ locale: "en" });
 		await createClient(ContentPublicService, transport).listLiveBanners({});
 		expect(acceptLanguage()).toBe("en");

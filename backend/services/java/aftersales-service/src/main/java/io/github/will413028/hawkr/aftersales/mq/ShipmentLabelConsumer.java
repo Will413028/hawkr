@@ -67,7 +67,6 @@ public class ShipmentLabelConsumer {
             JsonNode payload = MAPPER.readTree(body);
             boolean isReturn = payload.path("is_return").asBoolean(false);
 
-            // 正向出貨事件由 Order Service 處理，AfterSales 直接 ACK skip
             if (!isReturn) {
                 channel.basicAck(deliveryTag, false);
                 return;
@@ -89,11 +88,6 @@ public class ShipmentLabelConsumer {
                         "三段碼不完整，發 PAYUNI_LGS_NO_CODE event 並跳過此事件 orderNo=" + orderNo
                                 + " partnerId=" + partnerId + " odno=" + odno
                                 + " validationNo=" + validationNo);
-                // §5.21 B-143 即時偵測：PayUni 回 SUCCESS 但三段碼缺失 → 立即推 PAYUNI_LGS_NO_CODE 給賣家。
-                // **By contract 此偵測限超商**：upstream publisher 為 ShippingService.processWebhookPrint
-                // （超商 ApiType=Print webhook 處理路徑），宅配走 markLabelPrintSucceededHome 同步 PDF 路徑
-                // 不會發送 shipment.label.updated event。payload 本身未帶 shippingMethod 欄位，
-                // 維持既有 contract 不擴充；若未來新增其他 publisher（如非超商來源），務必同步擴充 payload 加守衛。
                 publishPayUniLgsNoCodeAnomaly(orderNo);
                 channel.basicAck(deliveryTag, false);
                 return;
@@ -122,25 +116,16 @@ public class ShipmentLabelConsumer {
      */
     private void publishPayUniLgsNoCodeAnomaly(String orderNo) {
         try {
-            // 從 aftersale_cases 查 seller/buyer 上下文（退貨 webhook 路徑下，case 必定存在）
             AfterSaleCaseEntity acase = caseMapper.selectOne(
                     new LambdaQueryWrapper<AfterSaleCaseEntity>()
                             .eq(AfterSaleCaseEntity::getOrderNo, orderNo)
                             .last("LIMIT 1"));
             Long storeId = acase == null ? null : acase.getStoreId();
             Long buyerId = acase == null ? null : acase.getBuyerId();
-            // Plan C Phase 3 追加：sellerAccountId 對外是「已反解的登入 account_id」（供
-            // notification-service 對地推播），非 aftersale_cases 的 store_id 代理鍵——發布前
-            // 反解一次，未知/查詢失敗降級回 null（notification-service 端無法對地則不送達，
-            // 與既有「seller 缺失即跳過」的降級哲學一致）。
             Long sellerAccountId = sellerGrpcClient.resolveAccountIdForStore(storeId);
-            // 查無存活賣家時 SellerGrpcClient 回 0L（沒有收件人）；本檔的欄位以 null 表示沒有，與買家側相同，
-            // notification 端的 extractUserID 對 null 與 0 都略過。
             if (sellerAccountId != null && sellerAccountId <= 0L) {
                 sellerAccountId = null;
             }
-            // 對稱處理：buyerAccountId 同樣對外是「已反解的登入 account_id」，非 aftersale_cases
-            // 的 buyer_id 代理鍵；與 sellerAccountId 同一降級哲學（查詢失敗回 null）。
             Long buyerAccountId = resolveNotifyBuyerAccountId(buyerId);
 
             ShipmentAnomalyType type = ShipmentAnomalyType.PAYUNI_LGS_NO_CODE;
@@ -148,7 +133,7 @@ public class ShipmentLabelConsumer {
             ShipmentAnomalyDetectedPayload payload = new ShipmentAnomalyDetectedPayload(
                     UUID.randomUUID().toString(),
                     orderNo,
-                    "",            // shipmentId 在 aftersales-service 端不可得，留空字串（notification 端可由 orderNo 反查）
+                    "",
                     sellerAccountId,
                     buyerAccountId,
                     type.value(),

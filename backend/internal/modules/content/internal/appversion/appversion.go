@@ -115,7 +115,6 @@ func (m *Service) CreateAppVersionGate(ctx context.Context, g model.AppVersionGa
 		NoticeBody:     g.NoticeBody,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		// 業務原因與版本衝突相同：有人先建立了，client 保留輸入、顯示最新的設定（ADR 的 D3）。
 		return model.AppVersionGate{}, apperr.AlreadyExists("這組版本門檻已經有人建立，請對照最新的設定後再送出").
 			WithReason(apperr.ReasonVersionConflict)
 	}
@@ -144,7 +143,6 @@ func (m *Service) UpdateAppVersionGate(ctx context.Context, g model.AppVersionGa
 		ExpectedVersion: version,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		// 分辨不存在與版本不符。
 		_, err := q.GetAppVersionGate(ctx, string(g.AppType))
 		if errors.Is(err, pgx.ErrNoRows) {
 			return model.AppVersionGate{}, apperr.NotFound("這組版本門檻不存在")
@@ -160,7 +158,6 @@ func (m *Service) UpdateAppVersionGate(ctx context.Context, g model.AppVersionGa
 	return toGate(row), nil
 }
 
-// validate 檢查寫入的值域，DB 的 CHECK 是第二道。
 func validateGate(g model.AppVersionGate) error {
 	if err := validateAppType(g.AppType); err != nil {
 		return err
@@ -181,8 +178,6 @@ func validateAppType(appType model.AppType) error {
 	return nil
 }
 
-// validStoreURL 限制商店網址的 scheme：這個值會交給 App 的 url_launcher 開啟，
-// 不設限等於讓誤填的任意 scheme 直接送到使用者裝置上。空字串表示沒有設定。
 func validStoreURL(v string) bool {
 	if v == "" {
 		return true
@@ -195,8 +190,6 @@ func validStoreURL(v string) bool {
 	return false
 }
 
-// parseSemver 把 "major.minor.patch" 拆成三個整數，逐段比較，所以 1.0.10 大於 1.0.9。
-// 只接受三段純數字（與 DB 的 CHECK 相同）；build number 不參與（各平台不一致）。
 func parseSemver(v string) ([3]int, bool) {
 	var out [3]int
 	parts := strings.Split(v, ".")
@@ -205,7 +198,7 @@ func parseSemver(v string) ([3]int, bool) {
 	}
 	for i, p := range parts {
 		if p == "" || strings.Trim(p, "0123456789") != "" {
-			return out, false // strconv.Atoi 接受 "+1"，DB 的 CHECK 不接受，兩道防線要一致
+			return out, false
 		}
 		n, err := strconv.Atoi(p)
 		if err != nil {
@@ -216,7 +209,6 @@ func parseSemver(v string) ([3]int, bool) {
 	return out, true
 }
 
-// compareSemver 回傳 -1（a<b）、0 或 1（a>b）。
 func compareSemver(a, b [3]int) int {
 	for i := range 3 {
 		switch {

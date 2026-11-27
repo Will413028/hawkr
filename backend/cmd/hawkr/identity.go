@@ -22,27 +22,14 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/events"
 )
 
-// identityConfig 是 identity 模組的外部 provider。
 type identityConfig struct {
 	providers identity.Providers
-	// webLogin 是 web 聯合登入已設定的 provider 的 client（Google、LINE）；沒設定的 provider，/api/auth/{provider}/start 回 404。
 	webLogin map[identity.Provider]webClient
-	// googleAppClients 是 App 原生登入的 Google ID token 的 azp 允許清單（Android、iOS 的 client ID）；空的時候 Google 的 App 登入不啟用。
 	googleAppClients []string
 }
 
-// webClient 是 web 登入在一家 provider 的 OAuth client。
 type webClient struct{ id, secret string }
 
-// readIdentityConfig 讀 identity 的設定（ADR 2026-10-30-identity-self-hosted-federated-login）。每組設定整組選填：沒有設定時那個功能回
-// unavailable 或無法登入；只設了一部分是設定錯誤。
-//
-//   - CF_ACCESS_TEAM_DOMAIN、CF_ACCESS_ADMIN_AUD：後台的 Access team domain 與 application AUD tag。
-//   - DEV_AUTH_KEY_FILE：本機開發的 dev token 的 RSA 私鑰（make dev-key 產生）；設定時另外接受它簽的後台 token，不能與
-//     Cloudflare Access 同時設定。
-//   - GOOGLE_WEB_CLIENT_ID、GOOGLE_WEB_CLIENT_SECRET：web 登入（/api/auth/google/*）的 Google OAuth client（authorization code ＋ PKCE）；兩個都設才啟用，只設一個是設定錯誤。LINE_CHANNEL_ID、
-//     LINE_CHANNEL_SECRET：web 登入（/api/auth/line/*）的 LINE Login channel，同樣整組選填；LINE 的 web ID token 以 channel secret 驗（HS256）。
-//     redirect URI 是 PUBLIC_WEB_ORIGIN 加 /api/auth/{google,line}/callback，要登記在各家的 console。
 func readIdentityConfig(ctx context.Context, e *config.Env) identityConfig {
 	var c identityConfig
 	if accessConfigured(e) {
@@ -83,13 +70,10 @@ func readIdentityConfig(ctx context.Context, e *config.Env) identityConfig {
 	return c
 }
 
-// accessConfigured 是這個環境設定了 Cloudflare Access（正式的後台登入）。DEV_AUTH_KEY_FILE 不能與它同時使用。
 func accessConfigured(e *config.Env) bool {
 	return anySet(e, "CF_ACCESS_TEAM_DOMAIN", "CF_ACCESS_ADMIN_AUD")
 }
 
-// requireDevEnvironment 是只給本機開發的子命令（dev-seed）的保護，前提與 dev-token、serve 接受 dev token 相同：DEV_AUTH_KEY_FILE 指向
-// 本機的 dev 金鑰（make dev-key 產生，正式環境沒有），而且沒有 Cloudflare Access 設定。
 func requireDevEnvironment(e *config.Env) error {
 	path := e.StringOr("DEV_AUTH_KEY_FILE", "")
 	if path == "" {
@@ -113,7 +97,6 @@ func anySet(e *config.Env, keys ...string) bool {
 	return false
 }
 
-// readDevKey 讀 dev token 的 RSA 私鑰（PKCS#8 或 PKCS#1 的 PEM）。
 func readDevKey(path string) (*rsa.PrivateKey, error) {
 	raw, err := os.ReadFile(path) //nolint:gosec // path is the operator-configured local dev key file
 	if err != nil {
@@ -132,7 +115,6 @@ func readDevKey(path string) (*rsa.PrivateKey, error) {
 	return x509.ParsePKCS1PrivateKey(block.Bytes)
 }
 
-// newIdentity 建立 identity 模組。
 func newIdentity(d *db.DB, bus *events.Bus, c identityConfig, log *slog.Logger) *identity.Module {
 	return identity.New(identity.Deps{
 		DB: d, Events: bus, Providers: c.providers,
@@ -140,17 +122,6 @@ func newIdentity(d *db.DB, bus *events.Bus, c identityConfig, log *slog.Logger) 
 	})
 }
 
-// runDevToken 印出本機開發與特性測試的登入 token，不連任何外部 provider：
-//
-//   - 顧客：在資料庫為既有的帳號建一個 dev session（App 種類）並印出原文 token；dev 使用者以帳號 ID 識別，不建任何登入身分。
-//     帳號不存在時回錯誤（非 0 結束），不帶 -account 時建立一個新帳號（同 serve 一樣建立買家），ID 印到 stderr、token 印到 stdout。
-//     需要 DATABASE_URL，而且 requireDevEnvironment 成立（DEV_AUTH_KEY_FILE 指向本機的 dev 金鑰，沒有正式的 Access 設定）。
-//     session 的效期同正式 session。
-//
-//   - 後台（-admin）：以 DEV_AUTH_KEY_FILE 的金鑰簽 24 小時的 JWT，serve 設了同一個 DEV_AUTH_KEY_FILE 才接受它，管理員在第一個請求時建立。
-//
-//     hawkr dev-token [-account <帳號 ID>]
-//     hawkr dev-token -admin [-user dev_<名稱>]
 func runDevToken(ctx context.Context, args []string, out, errOut io.Writer) error {
 	opts, err := parseDevTokenArgs(args)
 	if err != nil {
@@ -194,8 +165,8 @@ func runDevToken(ctx context.Context, args []string, out, errOut io.Writer) erro
 
 type devTokenOptions struct {
 	admin   bool
-	user    string // 後台的 dev 使用者，以 dev_ 開頭
-	account int64  // 0 是建立新帳號
+	user    string
+	account int64
 }
 
 func parseDevTokenArgs(args []string) (devTokenOptions, error) {
@@ -219,14 +190,11 @@ func parseDevTokenArgs(args []string) (devTokenOptions, error) {
 	return devTokenOptions{admin: *admin, user: *user, account: *account}, nil
 }
 
-// devSessions 是 issueCustomerToken 用到的 identity 能力。
 type devSessions interface {
 	DevSession(ctx context.Context, accountID int64) (string, error)
 	DevNewAccount(ctx context.Context) (int64, error)
 }
 
-// issueCustomerToken 為 accountID 的帳號建 dev session 並把 token 印到 out；accountID 是 0 時先建立新帳號並把 ID 印到 errOut。
-// 帳號不存在是錯誤，不會默默建立。
 func issueCustomerToken(ctx context.Context, m devSessions, accountID int64, out, errOut io.Writer) error {
 	if accountID == 0 {
 		id, err := m.DevNewAccount(ctx)
@@ -246,8 +214,6 @@ func issueCustomerToken(ctx context.Context, m devSessions, accountID int64, out
 	return err
 }
 
-// newWebLogin 建立 web 聯合登入的路由（ADR 2026-10-30-identity-self-hosted-federated-login D3）。redirect URI 是 web 的網域加各家獨立的 callback 路徑。
-// session cookie 的 Max-Age 是 identity.WebSessionCookieMaxAge（等於絕對逾時，ADR D1）；閒置逾時由伺服器判斷。
 func newWebLogin(ctx context.Context, id *identity.Module, web rpc.WebOrigin, c identityConfig, log *slog.Logger) (*httpidentity.WebLogin, error) {
 	var providers []httpidentity.WebProvider
 	for _, p := range identity.LoginProviders() {
@@ -268,8 +234,6 @@ func newWebLogin(ctx context.Context, id *identity.Module, web rpc.WebOrigin, c 
 	return httpidentity.NewWebLogin(httpidentity.WebLoginDeps{Module: id, Providers: providers, SessionMaxAge: identity.WebSessionCookieMaxAge, Logger: log})
 }
 
-// newAppLogin 建立 App 原生登入的 ID token 驗證（ADR 2026-10-30-identity-self-hosted-federated-login D2）：web 登入已設定的 provider 才有，
-// Google 另需 azp 允許清單。
 func newAppLogin(ctx context.Context, id *identity.Module, c identityConfig) (*httpidentity.AppLogin, error) {
 	var verifiers []httpidentity.AppVerifier
 	for _, p := range identity.LoginProviders() {
@@ -286,7 +250,6 @@ func newAppLogin(ctx context.Context, id *identity.Module, c identityConfig) (*h
 	return httpidentity.NewAppLogin(id, verifiers...)
 }
 
-// appParties 是 provider 的 App ID token 的 azp 允許清單：只有 Google 有。
 func appParties(p identity.Provider, c identityConfig) []string {
 	if p == identity.ProviderGoogle {
 		return c.googleAppClients

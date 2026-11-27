@@ -35,7 +35,6 @@ func pngBytes(t *testing.T) []byte {
 	return body.Bytes()
 }
 
-// newMedia 是真的 media 模組（記憶體物件儲存）：Confirm 與 MarkDeleted 與擁有者的寫入同一個 transaction，回滾時一起回滾。
 func (f *fixture) newMedia(t *testing.T) *mediaProbe {
 	t.Helper()
 	return &mediaProbe{Module: media.New(media.Deps{
@@ -52,7 +51,6 @@ func (f *fixture) assetIDOfToken(t *testing.T, token string) uuid.UUID {
 	return assetID
 }
 
-// stagePublic 以 uploader 放一張公開 PNG，回傳可 Confirm 的 token 與資產 ID。
 func (f *fixture) stagePublic(t *testing.T, uploader media.Uploader) (string, uuid.UUID) {
 	t.Helper()
 	put, err := f.media.PutPublic(context.Background(), uploader, bytes.NewReader(pngBytes(t)))
@@ -60,14 +58,12 @@ func (f *fixture) stagePublic(t *testing.T, uploader media.Uploader) (string, uu
 	return put.Token, f.assetIDOfToken(t, put.Token)
 }
 
-// logoToken 以 accountID 放一張公開圖片，回傳可當 LogoToken 的 token。
 func (f *fixture) logoToken(t *testing.T, accountID int64) string {
 	t.Helper()
 	token, _ := f.stagePublic(t, media.Uploader{ID: accountID})
 	return token
 }
 
-// stageSecure 以 uploader 放一份機敏檔（data 要是 PDF 或圖片），回傳可 Confirm 的 token 與資產 ID。
 func (f *fixture) stageSecure(t *testing.T, uploader media.Uploader, data []byte) (string, uuid.UUID) {
 	t.Helper()
 	put, err := f.media.PutSecure(context.Background(), uploader, bytes.NewReader(data), int64(len(data)))
@@ -82,7 +78,6 @@ func (f *fixture) assetState(t *testing.T, assetID uuid.UUID) string {
 	return string(st)
 }
 
-// wantAsset 檢查資產的狀態：ACTIVE（已確認）、DELETING（已標記刪除）或 STAGED（還沒確認）。
 func (f *fixture) wantAsset(t *testing.T, assetID uuid.UUID, want string) {
 	t.Helper()
 	if got := f.assetState(t, assetID); got != want {
@@ -99,7 +94,6 @@ func (f *fixture) objectKey(t *testing.T, assetID uuid.UUID) string {
 
 type storeAssetIDs struct{ logo, cover *uuid.UUID }
 
-// storeAssets 讀店家列目前指著的 logo 與封面資產。
 func (f *fixture) storeAssets(t *testing.T, storeID int64) storeAssetIDs {
 	t.Helper()
 	var out storeAssetIDs
@@ -108,7 +102,6 @@ func (f *fixture) storeAssets(t *testing.T, storeID int64) storeAssetIDs {
 	return out
 }
 
-// mediaProbe 是真的 media 模組外面一層：數 ReadSecure 的呼叫，並可以注入失敗（media 說不是機敏資產、media 掛了）。
 type mediaProbe struct {
 	*media.Module
 	mu          sync.Mutex
@@ -160,7 +153,6 @@ func (f *fixture) readSecureCalls() int {
 	return f.media.reads
 }
 
-// stageDocs 以 accountID 為上傳者放 n 份機敏的 PDF（內容各不同），回傳 token 與資產 ID。
 func (f *fixture) stageDocs(t *testing.T, accountID int64, n int) ([]string, []uuid.UUID) {
 	t.Helper()
 	tokens, assets := make([]string, n), make([]uuid.UUID, n)
@@ -170,12 +162,10 @@ func (f *fixture) stageDocs(t *testing.T, accountID int64, n int) ([]string, []u
 	return tokens, assets
 }
 
-// docBytes 是第 i 份補充文件的內容（開頭是 PDF 的 magic bytes，media 才收）。
 func docBytes(i int) []byte {
 	return []byte(fmt.Sprintf("%%PDF-1.4 document %d", i))
 }
 
-// documentAssets 是申請目前的補充文件的資產 ID（依位置）。
 func (f *fixture) documentAssets(t *testing.T, applicationID string) []uuid.UUID {
 	t.Helper()
 	rows, err := f.db.Conn(context.Background()).Query(context.Background(), "SELECT asset_id FROM seller.kyc_documents WHERE application_id = $1::uuid ORDER BY position", applicationID)
@@ -191,10 +181,8 @@ func (f *fixture) documentAssets(t *testing.T, applicationID string) []uuid.UUID
 	return out
 }
 
-// evidencePDF 是名叫 name 的佐證的內容（PDF 的 magic bytes 開頭，media 才收）。
 func evidencePDF(name string) []byte { return []byte("%PDF-1.4 " + name) }
 
-// evidence 以 uploader 放一組機敏佐證（內容是 evidencePDF(name)），回傳可 Confirm 的 token。
 func (f *fixture) evidence(t *testing.T, uploader media.Uploader, names ...string) []string {
 	t.Helper()
 	tokens := make([]string, len(names))
@@ -204,7 +192,6 @@ func (f *fixture) evidence(t *testing.T, uploader media.Uploader, names ...strin
 	return tokens
 }
 
-// activeEvidenceAssets 是詢問回覆的附件中，media 推導狀態為 ACTIVE 的資產數。
 func (f *fixture) activeEvidenceAssets(t *testing.T, inquiryID uuid.UUID) int {
 	t.Helper()
 	rows, err := f.db.Conn(context.Background()).Query(context.Background(), "SELECT asset_id FROM seller.case_inquiry_reply_evidence WHERE inquiry_id = $1", inquiryID)
@@ -220,7 +207,6 @@ func (f *fixture) activeEvidenceAssets(t *testing.T, inquiryID uuid.UUID) int {
 	return n
 }
 
-// markAssetDeleted 以擁有者的身分（自己的 transaction）請求刪除資產：推導狀態立刻是 DELETING，物件由 media 的套用 job 之後刪。
 func (f *fixture) markAssetDeleted(t *testing.T, ctx context.Context, id uuid.UUID) {
 	t.Helper()
 	must(t, f.db.InTx(ctx, func(ctx context.Context) error { return f.media.MarkDeleted(ctx, []uuid.UUID{id}) }))

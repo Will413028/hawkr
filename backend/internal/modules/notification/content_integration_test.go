@@ -26,12 +26,10 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// contentBase 是內容測試的固定時間；買家模組的時鐘也固定在它，追蹤時間因此在之後發布的事件之前。
 var contentBase = time.Date(2026, 11, 23, 4, 30, 0, 0, time.UTC)
 
 func contentClock() time.Time { return contentBase }
 
-// codeOfStore 是測試用的 store_code 對照：store_code 與 store_id 刻意不同，用 store_id 組連結就對不上。
 func codeOfStore(storeID int64) int64 { return 9_000_000 + storeID }
 
 type fakeStoreCodes struct{ missing map[int64]bool }
@@ -46,7 +44,6 @@ func (f fakeStoreCodes) StoreCodes(_ context.Context, ids []int64) (map[int64]in
 	return out, nil
 }
 
-// setupContent 組真的 buyer 與 seller、正式的註冊表與正式的內容訂閱者；store_code 的來源是替身（NewStoreCodes 只在這個測試以外驗證）。
 func setupContent(t *testing.T, missing map[int64]bool) *fixture {
 	t.Helper()
 	t.Parallel()

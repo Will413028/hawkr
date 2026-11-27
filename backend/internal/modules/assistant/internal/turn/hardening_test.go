@@ -19,7 +19,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// quietLLM 等到 ctx 結束就停止迭代，不回錯誤：模擬一個遇到取消時安靜收工的模型。
 type quietLLM struct{ started chan struct{} }
 
 func (quietLLM) Name() string { return "quiet" }
@@ -48,7 +47,6 @@ func TestCancelledTurnWhoseModelStopsQuietlyEndsAsAnError(t *testing.T) {
 	}
 }
 
-// partialThenQuietLLM 先回一段 partial 文字，再等到 ctx 結束就停止迭代、不回錯誤：事件流在沒有最終回應時正常結束。
 type partialThenQuietLLM struct{ started chan struct{} }
 
 func (partialThenQuietLLM) Name() string { return "partial-quiet" }
@@ -71,7 +69,6 @@ func TestStreamThatEndsWithoutTheFinalResponseIsNotFinished(t *testing.T) {
 		t.Fatal(err)
 	}
 	<-l.started
-	// 半句文字已進緩衝，才取消：否則「已送出部分文字」要看排程。
 	seq, err := e.Watch(context.Background(), buyer, ref.TurnID, "")
 	if err != nil {
 		t.Fatal(err)
@@ -93,7 +90,6 @@ func TestStreamThatEndsWithoutTheFinalResponseIsNotFinished(t *testing.T) {
 	}
 }
 
-// emptyLLM 的回應串流沒有任何事件就正常結束，也沒有取消。
 type emptyLLM struct{}
 
 func (emptyLLM) Name() string { return "empty" }
@@ -136,7 +132,6 @@ func TestSubmitAfterShutdownIsRejectedBeforeAnySessionIsCreated(t *testing.T) {
 	}
 }
 
-// fakeClock 是可調的時鐘。
 type fakeClock struct {
 	mu sync.Mutex
 	t  time.Time
@@ -164,7 +159,7 @@ func TestRetentionSweepDropsEndedTurnsOnlyAfterTheRetentionWindow(t *testing.T) 
 	}
 	collect(t, e, buyer, ref.TurnID, "")
 
-	clock.advance(retention) // 剛好等於保留期：還在
+	clock.advance(retention)
 	if evs := collect(t, e, buyer, ref.TurnID, ""); len(evs) == 0 {
 		t.Fatal("保留期內要還能訂閱")
 	}
@@ -230,7 +225,6 @@ func TestToolPanicIsReportedAsAFailedToolResult(t *testing.T) {
 
 func TestToolObserverSeesTheArgsTheModelSentAndTheEventCarriesNone(t *testing.T) {
 	llm := &scriptedLLM{script: []scriptedCall{
-		// page_size 0 是模型送的；解析成 struct 再序列化會因 omitempty 把它吃掉。
 		{Chunks: []chunk{{FunctionCall: &chunkCall{Name: "get_my_orders", Args: map[string]any{"date_range": "all", "page_size": float64(0)}}}}},
 		{Chunks: []chunk{{Text: "好"}}},
 	}}
@@ -243,7 +237,7 @@ func TestToolObserverSeesTheArgsTheModelSentAndTheEventCarriesNone(t *testing.T)
 			mu.Lock()
 			defer mu.Unlock()
 			calls = append(calls, tc)
-			tc.Args["date_range"] = "tampered" // 觀察點拿到的是拷貝：改它不影響 ADK
+			tc.Args["date_range"] = "tampered"
 		}
 	})
 	ref, err := e.Submit(context.Background(), SubmitInput{BuyerID: buyer, Topic: model.TopicOrders, Message: "查我的訂單"})
@@ -284,7 +278,6 @@ func TestOrderDetailResultIsWrappedInResult(t *testing.T) {
 // 第一段文字就寫不進緩衝時，沒有任何文字送出：以「查詢失敗」（no_output）結束，不是「回應中斷」。
 func TestTurnWhoseFirstTextOverflowsTheBufferEndsAsNoOutput(t *testing.T) {
 	llm := &scriptedLLM{script: []scriptedCall{call("get_my_orders", map[string]any{"date_range": "all"}), say("好")}}
-	// 上限 2：第 1 格給 tool_result，最後一格留給終止事件，文字寫不進去。
 	e := newExecutor(t, llm, sampleOrders(), func(c *Config) { c.BufferCapacity = 2 })
 	ref, err := e.Submit(context.Background(), SubmitInput{BuyerID: buyer, Topic: model.TopicOrders, Message: "查"})
 	if err != nil {
@@ -419,7 +412,6 @@ func TestBlockedFinalResponseWithErrorCodeFails(t *testing.T) {
 	}
 }
 
-// hookLLM 在每次呼叫模型前回報這是第幾次呼叫。
 type hookLLM struct {
 	adkmodel.LLM
 	n      atomic.Int32

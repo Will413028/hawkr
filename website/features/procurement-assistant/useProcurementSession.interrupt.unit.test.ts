@@ -319,7 +319,6 @@ describe("普通選填問句的 snapshot 重試", () => {
 			}),
 			finishedEvent("c3"),
 		);
-		// Turn 已成功，但後續 status 校正失敗；重試只應校正缺少的狀態。
 		const read = snapshots(new Error("snapshot unavailable"));
 		const { result } = renderProcurementSession();
 		await act(async () => {

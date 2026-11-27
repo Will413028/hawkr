@@ -58,7 +58,6 @@ class CategoryServiceRevalidateTest {
         return e;
     }
 
-    // ---- 新增 ----
 
     @Test
     @DisplayName("新增分類：發 category:<新 id>（新分類進入分類樹）")
@@ -90,7 +89,6 @@ class CategoryServiceRevalidateTest {
         verify(categoryRepository, never()).insert(any(CategoryEntity.class));
     }
 
-    // ---- 改名 ----
 
     @Test
     @DisplayName("分類改名：category + cascade 受影響 product 走單次合併 POST")
@@ -106,7 +104,6 @@ class CategoryServiceRevalidateTest {
 
         verify(productRevalidationService)
                 .revalidateCategoryWithProducts(9001L, List.of(1001L, 1002L));
-        // 分別發兩次 = 違反「每 mutation 一次 POST」
         verify(productRevalidationService, never()).revalidateProducts(anyCollection());
         verify(productRevalidationService, never()).revalidateCategory(anyLong());
     }
@@ -138,7 +135,6 @@ class CategoryServiceRevalidateTest {
         verifyNoInteractions(productRevalidationService);
     }
 
-    // ---- 軟刪除 / 還原 ----
 
     @Test
     @DisplayName("批次軟刪除：發被刪的每個 category（分類離開分類樹）")

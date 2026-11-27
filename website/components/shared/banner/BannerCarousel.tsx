@@ -33,14 +33,10 @@ const SWIPE_THRESHOLD = 48;
  * (outside the viewport). `compact` (the megamenu slot) has no room for it.
  */
 const ARROW_CHROME =
-	// geometry — 44×44 touch target, parked on the vertical centre of the slide
 	"absolute top-1/2 z-10 -translate-y-1/2 inline-flex size-11 shrink-0 items-center justify-center rounded-full p-0 cursor-pointer " +
-	// the theme toggle's frosted-glass surface, token for token
 	"bg-[var(--page-theme-toggle-bg)] border border-[var(--page-theme-toggle-border)] text-[var(--page-theme-toggle-fg)] backdrop-blur-[6px] " +
-	// motion: colour feedback only, and none at all under reduced motion
 	"[transition:background_200ms_ease,color_200ms_ease,border-color_200ms_ease] motion-reduce:transition-none " +
 	"hover:bg-[var(--page-theme-toggle-hover-bg)] active:scale-95 motion-reduce:active:scale-100 " +
-	// same focus ring as the toggle
 	"focus-visible:outline-2 focus-visible:outline-[var(--color-brand-primary-strong)] focus-visible:outline-offset-2";
 
 interface BannerCarouselProps {
@@ -81,11 +77,7 @@ export default function BannerCarousel({
 	heading,
 	className,
 }: BannerCarouselProps) {
-	// SSR-prefetched callers (homepage hero) pass `initialBanners` → seeds the
-	// cache and skips the fetch; the lazy (megamenu) path has no seed → fetches.
-	// staleTime:Infinity keeps the SSR seed authoritative (initialData defaults to
 	// dataUpdatedAt=0, which under the global 30s staleTime would trigger a
-	// needless mount refetch) — banners are near-static, fetched once per session.
 	const query = useQuery({
 		queryKey: queryKeys.banners.list(),
 		queryFn: () => fetchBanners(),
@@ -96,29 +88,19 @@ export default function BannerCarousel({
 	const loading = query.isLoading;
 	const [active, setActive] = React.useState(0);
 	const [popupBanner, setPopupBanner] = React.useState<Banner | null>(null);
-	// `aria-controls` target for the dot tablist — the tabs previously claimed
-	// a tablist role while controlling nothing.
 	const slideRegionId = React.useId();
 	const reducedMotion = usePrefersReducedMotion();
 	const [bannerAspectRatios, setBannerAspectRatios] = React.useState<
 		Record<string, number>
 	>({});
-	// Pointer-drag / swipe state — mirrors the Hawkr 動態 carousel so the
-	// banner block reads as the same affordance: the slide follows the
-	// finger, then snaps to the next / previous banner past a threshold.
 	const [drag, setDrag] = React.useState(0);
 	const [dragging, setDragging] = React.useState(false);
 	const startX = React.useRef<number | null>(null);
-	// True once a gesture travels far enough to count as a swipe — lets us
-	// swallow the trailing click so dragging a linked banner never also
-	// navigates.
 	const movedRef = React.useRef(false);
 	const multi = banners.length > 1;
 
 	const step = React.useCallback(
 		(dir: number) => {
-			// Swipe stops at the ends (the track has no slide to reveal past the
-			// first / last banner); autoplay below still wraps to loop.
 			setActive((i) => Math.max(0, Math.min(banners.length - 1, i + dir)));
 		},
 		[banners.length],
@@ -135,8 +117,6 @@ export default function BannerCarousel({
 		if (startX.current === null) return;
 		let dx = e.clientX - startX.current;
 		if (Math.abs(dx) > 6) movedRef.current = true;
-		// Rubber-band resistance at the ends so the track gives only a little
-		// when there's nothing more to slide to.
 		if ((active === 0 && dx > 0) || (active === banners.length - 1 && dx < 0))
 			dx *= 0.3;
 		setDrag(dx);
@@ -154,8 +134,6 @@ export default function BannerCarousel({
 	const advance = React.useCallback(() => {
 		setActive((i) => (i + 1) % banners.length);
 	}, [banners.length]);
-	// Arrow navigation wraps (unlike the swipe, which stops at the ends because
-	// there is no slide left to drag into view).
 	const paginate = React.useCallback(
 		(dir: number) => {
 			if (banners.length < 2) return;
@@ -163,10 +141,6 @@ export default function BannerCarousel({
 		},
 		[banners.length],
 	);
-	// A single-render `paused` pulse: `useCarouselAutoplay` rebuilds its timer
-	// whenever `running` flips, so this hands an arrow click a full fresh
-	// interval before the carousel moves on by itself — no extra hook API, and
-	// nothing to keep in sync with the hook's own hold reasons.
 	const [autoplayRestart, setAutoplayRestart] = React.useState(false);
 	React.useEffect(() => {
 		if (autoplayRestart) setAutoplayRestart(false);
@@ -182,14 +156,10 @@ export default function BannerCarousel({
 		onTick: advance,
 	});
 
-	// If the list shrinks (rare — backend dropping a banner mid-session),
-	// snap back to a valid index.
 	React.useEffect(() => {
 		if (banners.length > 0 && active >= banners.length) setActive(0);
 	}, [active, banners.length]);
 
-	// Loading (lazy path only) shows the brand truck loader; a resolved-but-
-	// empty list renders nothing so missing/disabled banners degrade silently.
 	if (loading) {
 		return size === "compact" ? <BannerLoadingCard heading={heading} /> : null;
 	}
@@ -199,9 +169,7 @@ export default function BannerCarousel({
 		"flex flex-col",
 		size === "hero"
 			? "gap-5 w-full max-w-[1280px] mx-auto px-5"
-			: // compact = megamenu right slot: wear the shared feature-card chrome
-				// so it reads as the same surface as the 本週主題 card, and fade in
-				// when it swaps out from the loader.
+			:
 				`gap-[var(--hkui-space-4)] w-full overflow-hidden p-[var(--hkui-space-5)] animate-hk-fade-in ${FEATURE_CARD_CHROME}`,
 		className,
 	);
@@ -211,9 +179,6 @@ export default function BannerCarousel({
 			? "relative overflow-hidden bg-[var(--page-banner-viewport-bg)] aspect-[16/9] rounded-[var(--radius-lg)] min-[601px]:rounded-[22px]"
 			: FEATURE_CARD_WELL;
 
-	// `duration-400` is not on Tailwind's default duration scale, so the class
-	// emitted nothing and the hover zoom snapped instantly; `duration-300` is
-	// the nearest real step.
 	const imgClass = `block h-full w-full object-center transition-transform duration-300 ease group-hover:scale-[1.02] motion-reduce:transition-none ${
 		size === "hero" ? "object-cover" : "object-contain"
 	}`;
@@ -249,9 +214,6 @@ export default function BannerCarousel({
 							? { aspectRatio: String(compactAspectRatio) }
 							: undefined
 					}
-					// Announcing every slide while it rotates by itself would talk
-					// over the user; announcing a slide the user just chose is
-					// exactly what they asked for. So: live only while stopped.
 					aria-live={autoplay.running ? "off" : "polite"}
 				>
 					<span className="sr-only">
@@ -262,12 +224,9 @@ export default function BannerCarousel({
 					 *  already in the DOM (no "loads after you swipe" gap).
 					 *  biome-ignore lint/a11y/noStaticElementInteractions: swipe is a progressive enhancement; the dot tablist and each banner control remain accessible and keyboard-operable. */}
 					<div
-						// gap-[16px] puts space between slides; the translate offsets by
-						// that same 16px per slide so the active card still lands flush.
 						className="flex h-full w-full gap-[16px] select-none touch-pan-y [&_img]:pointer-events-none"
 						style={{
 							transform: `translate3d(calc(${-active * 100}% - ${active * 16}px + ${drag}px),0,0)`,
-							// Reduced motion still swaps the slide, it just does not slide.
 							transition:
 								dragging || reducedMotion
 									? "none"
@@ -337,8 +296,6 @@ export default function BannerCarousel({
 												aria-label={b.title}
 												draggable={false}
 												onClick={(e) => {
-													// A swipe ends with a synthetic click — swallow it so
-													// dragging the track never navigates.
 													if (consumeBannerSwipeClick(movedRef, e.detail))
 														e.preventDefault();
 												}}

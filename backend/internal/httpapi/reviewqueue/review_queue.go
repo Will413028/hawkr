@@ -23,15 +23,10 @@ import (
 )
 
 const (
-	// defaultPageSize 與 maxPageSize 寫在 proto 的欄位註解（ListReviewQueueRequest.page_size）。
 	defaultPageSize = 50
 	maxPageSize     = 100
 )
 
-// kindPermissions 是種類 → 看這一種待辦所需的既有讀取權限（E13）：待辦只列呼叫者對來源有讀取權的種類。
-// 權限是來源的讀取權：通報、案件（待決定）、案件的詢問、來函（來函與告知被指名者）、措施（申覆、解除請求與複審）、
-// 商家認證、社群檢舉案件各自頁面的 list 權限。
-// 新種類沒有列在這裡，TestKindsAreOneToOneWithTheContract 失敗（它逐種類寫死期望的權限）。
 var kindPermissions = map[rq.Kind]adminperm.Permission{
 	rq.ReportTriage:               adminperm.SellerReportsList,
 	rq.CaseDecision:               adminperm.SellerCasesList,
@@ -63,8 +58,6 @@ type Admin struct {
 	m     Lister
 	names StoreNames
 	now   func() time.Time
-	// allows 回答呼叫者有沒有某個讀取權限；預設是 Principal.AdminAllows（interceptor 與 adminauth.GuardFile 用的同一組）。
-	// 現在只有 OWNER 一個角色（擁有全部權限），測試換掉它才能表達「只有某些來源的讀取權」。
 	allows func(identity.Principal, adminperm.Permission) bool
 }
 
@@ -78,7 +71,6 @@ func NewAdmin(m Lister, names StoreNames, now func() time.Time) *Admin {
 	return &Admin{m: m, names: names, now: now, allows: identity.Principal.AdminAllows}
 }
 
-// fillStoreNames 補上來源沒有給店名的項目（payment 的待辦）：一頁一次批次讀取。
 func (h *Admin) fillStoreNames(ctx context.Context, items []rq.Item) error {
 	var ids []int64
 	for _, item := range items {
@@ -111,8 +103,6 @@ func (h *Admin) ListReviewQueue(ctx context.Context, req *connect.Request[adminp
 	if err != nil {
 		return nil, err
 	}
-	// token 綁的是請求的 kinds（排序去重後），不是與權限取交集之後的：同一個人的權限在翻頁中途改變不會讓 token 失效，
-	// 只是後面的頁看得到的種類跟著變。
 	scope := rpc.FilterScope(reviewqueuev1alpha1connect.ReviewQueueAdminServiceListReviewQueueProcedure, kindNames(requested)...)
 	after, err := rpc.ValidCursor[rq.Cursor](scope, msg.GetPageToken())
 	if err != nil {
@@ -127,7 +117,6 @@ func (h *Admin) ListReviewQueue(ctx context.Context, req *connect.Request[adminp
 	if len(kinds) == 0 {
 		return connect.NewResponse(out), nil
 	}
-	// 取 N＋1：多出來的那一筆只用來知道有沒有下一頁。
 	items, err := h.m.List(ctx, h.now(), kinds, after, size+1)
 	if err != nil {
 		return nil, err
@@ -149,16 +138,13 @@ func (h *Admin) ListReviewQueue(ctx context.Context, req *connect.Request[adminp
 	return connect.NewResponse(out), nil
 }
 
-// kindsPaths 是 kinds 欄位錯誤（模組端的名稱 Kinds[i]）對應到請求的路徑 kinds[i]；handler 的測試以 descriptor 驗證。
 var kindsPaths = rpc.FieldPaths{"Kinds[]": "kinds[]"}
 
-// requestedKinds 把請求的 kinds 轉成模組的種類，排序並去重；UNSPECIFIED 與不認得的數字是 INVALID_ARGUMENT。空的就是空的（展開成有權的全部在 permittedKinds）。
 func requestedKinds(in []adminpb.ReviewQueueItemKind) ([]rq.Kind, error) {
 	out := make([]rq.Kind, 0, len(in))
 	for i, k := range in {
 		kind := rpc.EnumFromProto[rq.Kind](k)
 		if !kind.Valid() {
-			// 欄位錯誤：repeated 單一元素的問題，field 帶索引（AIP-193）。
 			return nil, rpc.WithFieldPaths(
 				apperr.InvalidInputOn([]string{fmt.Sprintf("Kinds[%d]", i)}, "kinds[%d] 必須是有效的待辦種類", i),
 				kindsPaths)
@@ -177,7 +163,6 @@ func kindNames(kinds []rq.Kind) []string {
 	return out
 }
 
-// permittedKinds 是請求的 kinds（空的是全部種類）與呼叫者有讀取權的種類的交集。沒有權限的種類不出現，不是錯誤。
 func (h *Admin) permittedKinds(p identity.Principal, requested []rq.Kind) []rq.Kind {
 	candidates := requested
 	if len(candidates) == 0 {
@@ -192,7 +177,6 @@ func (h *Admin) permittedKinds(p identity.Principal, requested []rq.Kind) []rq.K
 	return out
 }
 
-// toProto 把一列待辦轉成契約：subject 依種類組，種類需要的對象鍵缺了是模組與來源不一致（內部錯誤），不輸出半個 subject。
 func toProto(item rq.Item) (*adminpb.ReviewQueueItem, error) {
 	out := &adminpb.ReviewQueueItem{
 		Kind:      rpc.EnumToProto[adminpb.ReviewQueueItemKind](item.Kind),

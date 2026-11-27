@@ -18,7 +18,6 @@ import (
 type fakeAppModule struct {
 	payment payment.Payment
 	err     error
-	// buyers 與 orders 記下每次呼叫收到的買家 ID 與訂單編號。
 	buyers []int64
 	orders []string
 }
@@ -142,7 +141,6 @@ func TestPaymentEnumsMatchTheModuleValues(t *testing.T) {
 	check("PaymentReversalStatus", rpc.EnumMismatches[paymentpb.PaymentReversalStatus](payment.PaymentReversalStatusValues()))
 	check("PaymentTopupStatus", rpc.EnumMismatches[paymentpb.PaymentTopupStatus](payment.PaymentTopupStatusValues()))
 	check("PaymentAnomalyOutcome", rpc.EnumMismatches[paymentpb.PaymentAnomalyOutcome]([]payment.AnomalyOutcome{payment.AnomalySucceeded, payment.AnomalyFailed}))
-	// 物件種類的對照在 anomalyKinds：契約的每個非零值都要有，且對到不同的模組值。
 	seen := map[payment.AnomalyKind]bool{}
 	vs := paymentpb.PaymentAnomalyKind(0).Descriptor().Values()
 	for i := range vs.Len() {
@@ -158,7 +156,6 @@ func TestPaymentEnumsMatchTheModuleValues(t *testing.T) {
 	}
 }
 
-// codeOf 是 handler 回傳的錯誤經與 interceptor 相同的轉換之後的 Connect 錯誤碼（handler 直接回的是模組的 apperr 或傳輸層錯誤，還不是 connect.Error）。
 func codeOf(err error) connect.Code {
 	return connect.CodeOf(rpc.ConnectError(context.Background(), err))
 }

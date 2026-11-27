@@ -79,7 +79,6 @@ vi.mock("@/features/seller-center/components/SellerPageSkeletons", () => ({
 vi.mock("./useSellerPostsViewport", () => ({
 	useSellerPostsViewport: () => "desktop",
 }));
-// 發布方向由 PostPublishControl 自己負責（它有自己的測試）；這裡只看列表頁的入口。
 vi.mock("./PostPublishControl", () => ({
 	default: (props: { suspended?: boolean }) =>
 		React.createElement(

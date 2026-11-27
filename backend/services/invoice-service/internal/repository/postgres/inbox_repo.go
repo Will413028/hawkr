@@ -59,8 +59,6 @@ func (r *InboxRepository) Insert(ctx context.Context, in domain.NewInboxEvent) (
 	if err != nil {
 		return 0, false, err
 	}
-	// ON CONFLICT DO NOTHING RETURNING id：插入回 1 列、衝突回 0 列。
-	// 回 0 列是正常的去重結果，不是錯誤。
 	if len(rows) == 0 {
 		return 0, false, nil
 	}

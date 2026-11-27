@@ -102,23 +102,10 @@ func BuildServerOptions(cfg ServerConfig, logger *zap.Logger) []grpc.ServerOptio
 	opts = append(opts,
 		grpc.StatsHandler(interceptor.OTelServerStatsHandler()),
 		grpc.ChainUnaryInterceptor(unary...),
-		// EnforcementPolicy.MinTime (10s) MUST stay <= the client's
-		// keepalive.ClientParameters.Time (pkg/grpcclient/dial.go Dial,
-		// currently 20s) or the server treats every legitimate client
-		// keepalive ping as abuse and sends GOAWAY("too_many_pings"),
-		// surfacing as random UNAVAILABLE errors on otherwise-healthy
-		// connections. grpc-go's own default MinTime is 5 minutes, so
-		// leaving this unset while only setting the client's Time would
-		// silently reproduce that failure mode. If you change either value,
-		// check the other file first.
 		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
 			MinTime:             10 * time.Second,
 			PermitWithoutStream: false,
 		}),
-		// ServerParameters mirrors the client's Time/Timeout so either side
-		// can detect a dead peer on an open stream without waiting on an
-		// application-layer guess (see pkg/grpcclient/dial.go's Dial for the
-		// client half of this pair).
 		grpc.KeepaliveParams(keepalive.ServerParameters{
 			Time:    20 * time.Second,
 			Timeout: 10 * time.Second,
@@ -186,9 +173,6 @@ func NewGRPCServer(p GRPCServerParams) *grpc.Server {
 		},
 		OnStop: func(ctx context.Context) error {
 			p.Logger.Info("Stopping gRPC server")
-			// Stop advertising readiness before draining. Long-lived streams are
-			// allowed to finish while the fx stop context still has time left, but
-			// a wedged peer must not hold process shutdown forever.
 			healthController.MarkNotReady()
 			gracefulDone := make(chan struct{})
 			go func() {

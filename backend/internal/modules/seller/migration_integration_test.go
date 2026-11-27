@@ -25,7 +25,6 @@ func TestRegistrationChecksMigrationBackfillsSubmissionSeqOfExistingApplications
 	d := pg.NewDB(t)
 	files, err := fs.Glob(Migrations(), "*.sql")
 	must(t, err)
-	// 以檔名找到這個 migration，套用到它的前一個；它之後新增的 migration 與這個測試無關。
 	at := slices.IndexFunc(files, func(name string) bool { return strings.HasSuffix(name, "_kyc_registration_checks.sql") })
 	if at < 0 {
 		t.Fatalf("找不到 kyc_registration_checks 的 migration：%v", files)
@@ -44,7 +43,6 @@ func TestRegistrationChecksMigrationBackfillsSubmissionSeqOfExistingApplications
 	for _, name := range files[:at] {
 		exec(body(name))
 	}
-	// 套用之前，各種狀態的申請（一個店家一筆；送件過的帶完整的必填欄位）。
 	statuses := []string{"DRAFT", "SUBMITTED", "APPROVED", "REJECTED", "CANCELLED"}
 	for i, status := range statuses {
 		exec("INSERT INTO seller.stores (store_code, account_id, store_name, created_at, updated_at) VALUES ($1, $2, 'x', now(), now())", 2600000100+i, 500+i)
@@ -70,7 +68,6 @@ func TestRegistrationChecksMigrationBackfillsSubmissionSeqOfExistingApplications
 			t.Errorf("%s 的 submission_seq=%d，預期 %d", status, got, want)
 		}
 	}
-	// 回填的輪次可以直接用：已核准的申請插入查詢列（取申請的 submission_seq）合法；草稿的是 0，被 CHECK 擋下。
 	exec(`INSERT INTO seller.kyc_registration_checks (check_id, application_id, seq, request_kind, requested_at, submission_seq)
 		SELECT uuidv7(), application_id, 1, 'SUBMIT', now(), submission_seq FROM seller.kyc_applications WHERE status = 'APPROVED'`)
 	if _, err := d.Pool().Exec(ctx, `INSERT INTO seller.kyc_registration_checks (check_id, application_id, seq, request_kind, requested_at, submission_seq)
@@ -370,7 +367,6 @@ func TestViolationNotesRevisionsMigrationBackfillsFromTheChangeRecords(t *testin
 				appeal_decided_by_admin_id = 6, appeal_decided_at = $3, status = 'REVOKED', revoked_reason = 'OTHER', revoked_by_admin_id = 6, revoked_at = $4
 				WHERE id = $1`, id, ts(3, 0), ts(4, 0), ts(6, 0))
 		case "ACCEPTED":
-			// 接受申覆的撤銷包在裁定那一次，不另外加一。
 			exec(`UPDATE seller.violations SET appeal_status = 'ACCEPTED', appeal_reason = 'r', appeal_submitted_at = $2, appeal_decision_reason = 'yes',
 				appeal_decided_by_admin_id = 6, appeal_decided_at = $3, status = 'REVOKED', revoked_reason = 'APPEAL_ACCEPTED', revoked_by_admin_id = 6, revoked_at = $3
 				WHERE id = $1`, id, ts(3, 0), ts(4, 0))
@@ -387,29 +383,22 @@ func TestViolationNotesRevisionsMigrationBackfillsFromTheChangeRecords(t *testin
 	pt := func(v time.Time) *time.Time { return &v }
 	e0, e1 := ts(20, 0), ts(25, 0)
 
-	// A：沒改過。
 	violation("never", 1, 1, "d0", "s0", e0, "")
-	// B：版本 2 改理由與到期時間，版本 3 只改內部說明，版本 4 是申覆（待裁定）。
 	violation("before", 2, 4, "d1", "s1", e1, "PENDING")
 	change("before", 2, 11, ts(2, 1), nil, text("s0"), pt(e0), pt(e1))
 	change("before", 3, 12, ts(2, 2), text("d0"), nil, nil, nil)
-	// C：版本 2 改理由，版本 3 是申覆、版本 4 是駁回，版本 5 改理由與到期時間，版本 6 只改內部說明。
 	violation("after", 3, 6, "d2", "s2", e1, "REJECTED")
 	change("after", 2, 11, ts(2, 1), nil, text("s0"), nil, nil)
 	change("after", 5, 13, ts(5, 1), nil, text("s1"), pt(e0), pt(e1))
 	change("after", 6, 14, ts(5, 2), text("d0"), nil, nil, nil)
-	// D：只改過兩次內部說明。
 	violation("notes", 4, 3, "d2", "s0", e0, "")
 	change("notes", 2, 15, ts(2, 3), text("d0"), nil, nil, nil)
 	change("notes", 3, 16, ts(2, 4), text("d1"), nil, nil, nil)
-	// E：版本 2 改理由，版本 3 是申覆、版本 4 是駁回，版本 5 是 admin 撤銷（駁回之後的直接撤銷也加一）。
 	violation("revoked", 5, 5, "d0", "s1", e0, "REJECTED_THEN_REVOKED")
 	change("revoked", 2, 11, ts(2, 1), nil, text("s0"), nil, nil)
 
-	// F：版本 2 改理由，版本 3 是申覆、版本 4 是接受申覆（撤銷包在裡面，不再加一）。
 	violation("accepted", 6, 4, "d0", "s1", e0, "ACCEPTED")
 	change("accepted", 2, 11, ts(2, 1), nil, text("s0"), nil, nil)
-	// G：版本 2 改理由，版本 3 是沒有申覆的 admin 直接撤銷。
 	violation("direct", 7, 3, "d0", "s1", e0, "REVOKED_NO_APPEAL")
 	change("direct", 2, 11, ts(2, 1), nil, text("s0"), nil, nil)
 
@@ -522,13 +511,10 @@ func TestViolationNotesRevisionsMigrationRefusesVersionsItCannotExplain(t *testi
 		must(t, exec(`INSERT INTO seller.violations (id, store_id, category, severity, penalty, description, statement_to_seller, version, created_by_admin_id, created_at, updated_at)
 			SELECT $1, store_id, 'FRAUD', 'HIGH', 'WARNING', 'd', 's', $2, 5, $3, $3 FROM seller.stores WHERE store_code = $4`, id, version, at0, 2800000000+store))
 	}
-	// 解釋得了：版本 2 有修改紀錄。
 	violation("explained", 1, 2)
 	must(t, exec(`INSERT INTO seller.violation_changes (change_id, violation_id, version, admin_id, changed_at, statement_before) VALUES (uuidv7(), $1, 2, 11, $2, 's0')`, ids["explained"], at0))
-	// 解釋不了：版本是 3，卻只有版本 2 的修改紀錄（版本 3 的修改發生在 violation_changes 出現之前，或紀錄遺失）。
 	violation("gap", 2, 3)
 	must(t, exec(`INSERT INTO seller.violation_changes (change_id, violation_id, version, admin_id, changed_at, statement_before) VALUES (uuidv7(), $1, 2, 11, $2, 's0')`, ids["gap"], at0))
-	// 解釋不了：版本是 2，沒有任何修改紀錄、也沒有申覆。
 	violation("bare", 3, 2)
 
 	err = exec(body(files[at]))
@@ -552,7 +538,6 @@ func TestViolationNotesRevisionsMigrationRefusesVersionsItCannotExplain(t *testi
 	}
 }
 
-// beforeMeasuresMigration 套用「措施」migration 之前的全部 migration，回傳資料庫與套用那個 migration 的函式。
 func beforeMeasuresMigration(t *testing.T) (*db.DB, func() error) {
 	t.Helper()
 	d := pg.NewDB(t)
@@ -578,7 +563,6 @@ func beforeMeasuresMigration(t *testing.T) (*db.DB, func() error) {
 	}
 }
 
-// legacyViolation 是套用措施的 migration 之前的一筆違規：版本、處分、申覆、佐證與身分快照。
 type legacyViolation struct {
 	name, penalty, status string
 	storeID               int64
@@ -778,7 +762,6 @@ func TestMeasuresMigrationBackfillsViolationsOneToOneWithTheirIDs(t *testing.T) 
 	if n := countOf(t, d, "SELECT count(*) FROM seller.suspension_periods WHERE store_id = $1 AND ended_at IS NULL", store2); n != 1 {
 		t.Errorf("停權期間不動：%d", n)
 	}
-	// 回填之後「生效中」的推導（EffectiveMeasures 的定義）：未撤銷、已開始、結束時間在未來的停權：active 與 rejected。
 	if n := countOf(t, d, `SELECT count(*) FROM seller.measures m
 		WHERE m.status = 'ENFORCED' AND m.kind = 'SUSPENSION' AND m.created_at <= now() AND (m.ends_at IS NULL OR m.ends_at > now())`); n != 2 {
 		t.Errorf("生效中的停權=%d，預期 active 與 rejected", n)
@@ -1253,7 +1236,6 @@ func TestPaymentOnboardingSquashedMigrationDeletesRetiredRowsAndKeepsTheRest(t *
 		exec(`INSERT INTO seller.account_identity_hashes (source_store_id, field, key_id, hash, account_id, created_at)
 			SELECT store_id, $1, 'k1', sha256(convert_to($1::text, 'UTF8')), account_id, now() FROM seller.stores WHERE store_code = 2600000710`, field)
 	}
-	// measures.current_revision 的外鍵是 DEFERRABLE INITIALLY DEFERRED，commit 時才檢查，措施與第 1 版要在同一個 transaction 寫入。
 	tx, err := d.Pool().Begin(ctx)
 	must(t, err)
 	defer func() { _ = tx.Rollback(ctx) }()
@@ -1326,7 +1308,6 @@ func TestPaymentOnboardingSquashedMigrationDeletesRetiredRowsAndKeepsTheRest(t *
 	if n := count(`SELECT count(*) FROM information_schema.columns WHERE table_schema = 'seller' AND table_name = 'kyc_applications' AND column_name IN ('real_name', 'id_card_no_enc', 'bank_account_enc', 'tax_id_hash')`); n != 0 {
 		t.Errorf("被刪的欄位：%d", n)
 	}
-	// 新形狀：同一申請同一位置只能一張；讀取紀錄帶管理員。
 	if _, err := d.Pool().Exec(ctx, `INSERT INTO seller.kyc_documents (application_id, position, asset_id, object_key) VALUES ('0199dddd-0000-7000-8000-000000000001', 0, uuidv7(), 'secure/d')`); err == nil {
 		t.Error("主鍵是 (申請, 位置)，同位置第二張應該被擋下")
 	}
@@ -1364,7 +1345,6 @@ func TestPolicyCategoryMigrationRenamesTheValueAndRefusesOtherFindings(t *testin
 		must(t, exec(body(name)))
 	}
 	must(t, exec("INSERT INTO seller.stores (store_code, account_id, store_name, created_at, updated_at) VALUES (2600000700, 941, 'x', now(), now())"))
-	// 認定的建立措施（origin_measure）與這個 migration 無關：丟掉外鍵，免得為了認定先造措施。
 	must(t, exec("ALTER TABLE seller.violations DROP CONSTRAINT violations_origin_measure_fkey"))
 	report := func(buyer int64, category string) {
 		t.Helper()
@@ -1378,7 +1358,7 @@ func TestPolicyCategoryMigrationRenamesTheValueAndRefusesOtherFindings(t *testin
 	}
 	report(1, "UNAUTHORIZED_SALE")
 	report(2, "FRAUD")
-	report(3, "OTHER") // 通報的 OTHER 是檢舉人選的，合法，不動
+	report(3, "OTHER")
 	finding("0199aaaa-0000-7000-8000-000000000001", "UNAUTHORIZED_SALE")
 	finding("0199aaaa-0000-7000-8000-000000000002", "FRAUD")
 	otherFinding := "0199aaaa-0000-7000-8000-000000000003"
@@ -1400,7 +1380,6 @@ func TestPolicyCategoryMigrationRenamesTheValueAndRefusesOtherFindings(t *testin
 		t.Fatalf("失敗的 migration 不能改任何列：UNAUTHORIZED_SALE 剩 %d 列，預期 2 列", n)
 	}
 
-	// 人工處理掉 OTHER 的認定之後可以重跑。
 	must(t, exec("DELETE FROM seller.violations WHERE id = $1::uuid", otherFinding))
 	must(t, exec(body(files[at])))
 	for _, table := range []string{"reports", "violations"} {
@@ -1417,7 +1396,6 @@ func TestPolicyCategoryMigrationRenamesTheValueAndRefusesOtherFindings(t *testin
 		t.Errorf("通報的 OTHER 要保留：%d", n)
 	}
 
-	// 兩個 CHECK 各接受自己的子集：通報不接受 PLATFORM_ABUSE，認定不接受 OTHER；舊值兩邊都不再接受。
 	for name, tt := range map[string]struct {
 		sql      string
 		accepted bool
@@ -1435,8 +1413,6 @@ func TestPolicyCategoryMigrationRenamesTheValueAndRefusesOtherFindings(t *testin
 	}
 }
 
-// 通報與案件分開（seller_report_cases）之前的資料庫：套用到它的前一個 migration 為止，備好 A、B 兩家店；apply 套用 seller_report_cases。
-// 通報用舊的狀態機（PENDING／INVESTIGATING／VERIFIED／DISMISSED）寫入，時間以 2026-10-01 起算的小時表示（0：沒有）。
 type beforeReportCasesDB struct {
 	t     *testing.T
 	d     *db.DB
@@ -1482,23 +1458,21 @@ func reportCasesTime(hour int) time.Time {
 
 type legacyReport struct {
 	ID           string
-	Store        int64  // stores.store_code
-	Category     string // 政策分類的值
-	Status       string // 舊的狀態
-	Severity     string // 空字串：NULL
-	AckHour      int    // 確認收件的時間；0：沒有
+	Store        int64
+	Category     string
+	Status       string
+	Severity     string
+	AckHour      int
 	AckBy        int64
-	ResolvedHour int // 結案（成立或不成立）的時間；0：沒有
+	ResolvedHour int
 	ResolvedBy   int64
-	Note         string // resolution_note；空字串：NULL
-	FDA          string // "<channel>/<reference_no>"；空字串：沒有轉報
+	Note         string
+	FDA          string
 	FDAHour      int
 	FDABy        int64
-	UpdatedHour  int // 0：和建立時間（第 1 小時）相同
+	UpdatedHour  int
 }
 
-// insert 寫入一筆舊格式的通報。建立時間是第 1 小時、通報人是一個各自不同的登入買家（避開每日去重的唯一索引）；調查中與成立的通報
-// 記調查時間（確認收件後 1 小時），符合舊的 reports_status_times_check。
 func (b *beforeReportCasesDB) insert(r legacyReport) {
 	b.t.Helper()
 	b.buyer++
@@ -1555,34 +1529,24 @@ func TestReportCasesMigrationMapsEveryStatus(t *testing.T) {
 	const A, B = reportCasesStoreA, reportCasesStoreB
 	id := func(n int) string { return fmt.Sprintf("0199cccc-0000-7000-8000-%012d", n) }
 	for _, r := range []legacyReport{
-		// 1：待處理而沒確認收件 → 待分案。
 		{ID: id(1), Store: A, Category: "FRAUD", Status: "PENDING"},
-		// 2、3、4：同店同類別的三筆進行中（待處理已確認收件、調查中）→ 一個案件。2、3 的確認收件時間相同：開案者取 id 小的 2（管理員 12），不是管理員編號小的 3（管理員 11）。
 		{ID: id(2), Store: A, Category: "FRAUD", Status: "PENDING", Severity: "LOW", AckHour: 10, AckBy: 12, UpdatedHour: 20},
 		{ID: id(3), Store: A, Category: "FRAUD", Status: "INVESTIGATING", Severity: "HIGH", AckHour: 10, AckBy: 11, UpdatedHour: 30},
 		{ID: id(4), Store: A, Category: "FRAUD", Status: "PENDING", Severity: "MEDIUM", AckHour: 15, AckBy: 13, UpdatedHour: 25},
-		// 5、6：類別是 OTHER 的已確認收件與調查中 → 待分案（確認收件與嚴重度不留：它們從沒判定過政策類別）。
 		{ID: id(5), Store: A, Category: "OTHER", Status: "PENDING", Severity: "MEDIUM", AckHour: 10, AckBy: 14},
 		{ID: id(6), Store: A, Category: "OTHER", Status: "INVESTIGATING", Severity: "HIGH", AckHour: 11, AckBy: 14},
-		// 7、8：查證屬實，每筆一個已結案的案件（兩筆同店同類別，不合併）。
 		{ID: id(7), Store: A, Category: "FRAUD", Status: "VERIFIED", Severity: "CRITICAL", AckHour: 5, AckBy: 15, ResolvedHour: 40, ResolvedBy: 21, Note: "v1"},
 		{ID: id(8), Store: A, Category: "FRAUD", Status: "VERIFIED", Severity: "LOW", AckHour: 6, AckBy: 16, ResolvedHour: 41, ResolvedBy: 22},
-		// 9、10：不成立 → 沒有案件，結果是未違規；結案者與說明保留。
 		{ID: id(9), Store: A, Category: "FRAUD", Status: "DISMISSED", Severity: "LOW", AckHour: 7, AckBy: 17, ResolvedHour: 42, ResolvedBy: 23, Note: "d1"},
 		{ID: id(10), Store: A, Category: "COUNTERFEIT", Status: "DISMISSED", ResolvedHour: 43, ResolvedBy: 24},
-		// 11、12：食安類別的進行中，11 有 FDA 轉報 → 一個案件，轉報搬到案件。
 		{ID: id(11), Store: A, Category: "FOOD_SAFETY", Status: "INVESTIGATING", Severity: "HIGH", AckHour: 8, AckBy: 18, FDA: "HOTLINE_1919/F-1", FDAHour: 9, FDABy: 31, UpdatedHour: 50},
 		{ID: id(12), Store: A, Category: "FOOD_SAFETY", Status: "PENDING", Severity: "LOW", AckHour: 9, AckBy: 19, UpdatedHour: 45},
-		// 13：食安類別查證屬實並有 FDA 轉報 → 已結案的案件帶轉報。
 		{ID: id(13), Store: A, Category: "FOOD_SAFETY", Status: "VERIFIED", Severity: "MEDIUM", AckHour: 3, AckBy: 20, ResolvedHour: 44, ResolvedBy: 25, Note: "v3", FDA: "ONLINE_FORM/F-2", FDAHour: 4, FDABy: 32},
-		// 14：另一家店同類別 → 自己的案件；updated_at 早於確認收件（舊資料可以），案件的 updated_at 取確認收件的時間（案件的 CHECK 要求不早於開案）。
 		{ID: id(14), Store: B, Category: "FRAUD", Status: "PENDING", Severity: "MEDIUM", AckHour: 12, AckBy: 26},
-		// 15：另一家店沒確認收件 → 待分案。
 		{ID: id(15), Store: B, Category: "PROHIBITED_GOODS", Status: "PENDING"},
 	} {
 		b.insert(r)
 	}
-	// 既有的措施（以前沒有案件，導出關係由認定推導）、配合要求（在進案件的通報上）、佐證。
 	tx, err := b.d.Pool().Begin(ctx)
 	must(t, err)
 	defer func() { _ = tx.Rollback(ctx) }()
@@ -1644,7 +1608,7 @@ func TestReportCasesMigrationMapsEveryStatus(t *testing.T) {
 		return int(p.Sub(reportCasesTime(0)) / time.Hour)
 	}
 	type wantReport struct {
-		group        int // 同一個案件的通報用同一個代表編號；0：沒有案件
+		group        int
 		assessed     string
 		triagedHour  int
 		triagedBy    int64
@@ -1729,7 +1693,6 @@ func TestReportCasesMigrationMapsEveryStatus(t *testing.T) {
 		referral           *wantReferral
 	}
 	wantCases := map[int]wantCase{
-		// 嚴重度取最嚴重的 HIGH、開案取最早的確認收件（第 10 小時，id 小的 2 的管理員 12）、updated_at 取成員最晚的（第 30 小時）。
 		2:  {store: A, category: "FRAUD", severity: "HIGH", openedHour: 10, openedBy: 12, updatedHour: 30},
 		7:  {store: A, category: "FRAUD", severity: "CRITICAL", openedHour: 5, openedBy: 15, closedHour: 40, closedBy: 21, decision: "ACTION_TAKEN", note: "v1", updatedHour: 40},
 		8:  {store: A, category: "FRAUD", severity: "LOW", openedHour: 6, openedBy: 16, closedHour: 41, closedBy: 22, decision: "ACTION_TAKEN", updatedHour: 41},
@@ -1770,7 +1733,6 @@ func TestReportCasesMigrationMapsEveryStatus(t *testing.T) {
 		case w.referral == nil && err == nil:
 			t.Errorf("通報 %d 的案件不該有轉報：%s/%s", rep, channel, reference)
 		case w.referral == nil:
-			// 沒有轉報（no rows）。
 		case err != nil:
 			t.Errorf("通報 %d 的案件要有轉報 %+v：%v", rep, *w.referral, err)
 		case channel != w.referral.channel || reference != w.referral.reference || hourOf(&referredAt) != w.referral.hour || admin != w.referral.admin:
@@ -1781,14 +1743,12 @@ func TestReportCasesMigrationMapsEveryStatus(t *testing.T) {
 		t.Errorf("轉報 %d 筆，預期 2（11 與 13 各一）", n)
 	}
 
-	// 轉換後的資料符合模型的不變量：進行中的案件至少有一筆通報，決定採取措施的案件至少有一筆「已採取措施」的通報（I1、I4 的資料面）。
 	if n := countOf(t, b.d, "SELECT count(*) FROM seller.cases c WHERE NOT EXISTS (SELECT 1 FROM seller.reports r WHERE r.case_id = c.id)"); n != 0 {
 		t.Errorf("%d 個案件沒有任何通報", n)
 	}
 	if n := countOf(t, b.d, "SELECT count(*) FROM seller.cases c WHERE c.decision = 'ACTION_TAKEN' AND NOT EXISTS (SELECT 1 FROM seller.reports r WHERE r.case_id = c.id AND r.outcome = 'ACTION_TAKEN')"); n != 0 {
 		t.Errorf("%d 個決定採取措施的案件沒有「已採取措施」的通報", n)
 	}
-	// 既有措施的 source_case_id 是 NULL；配合要求與佐證不動（supplement_id 是 NULL）；舊欄位消失。
 	if n := countOf(t, b.d, "SELECT count(*) FROM seller.measures WHERE source_case_id IS NULL"); n != 1 {
 		t.Errorf("既有措施的 source_case_id 應該是 NULL：%d 筆，預期 1", n)
 	}
@@ -1816,17 +1776,17 @@ func TestReportCasesMigrationRefusesRowsWithoutAnHonestCase(t *testing.T) {
 	}
 	for name, tt := range map[string]struct {
 		rows    []legacyReport
-		coop    []int // 掛配合要求的通報
-		refused []int // 必須被列出的通報（依 id 排序）
-		spared  []int // 不能被列出的通報
+		coop    []int
+		refused []int
+		spared  []int
 	}{
 		"R-a 查證屬實而類別是 OTHER": {
 			rows: []legacyReport{
 				{ID: id(1), Store: A, Category: "OTHER", Status: "VERIFIED", Severity: "LOW", AckHour: 3, AckBy: 7, ResolvedHour: 9, ResolvedBy: 8},
 				{ID: id(2), Store: A, Category: "FRAUD", Status: "VERIFIED", Severity: "LOW", AckHour: 3, AckBy: 7, ResolvedHour: 9, ResolvedBy: 8},
-				{ID: id(3), Store: A, Category: "OTHER", Status: "DISMISSED", ResolvedHour: 9, ResolvedBy: 8},            // OTHER 的不成立：只留結果
-				{ID: id(4), Store: A, Category: "OTHER", Status: "PENDING", Severity: "LOW", AckHour: 3, AckBy: 7},       // OTHER 的已確認收件：退回待分案
-				{ID: id(5), Store: A, Category: "OTHER", Status: "INVESTIGATING", Severity: "LOW", AckHour: 3, AckBy: 7}, // OTHER 的調查中：退回待分案
+				{ID: id(3), Store: A, Category: "OTHER", Status: "DISMISSED", ResolvedHour: 9, ResolvedBy: 8},
+				{ID: id(4), Store: A, Category: "OTHER", Status: "PENDING", Severity: "LOW", AckHour: 3, AckBy: 7},
+				{ID: id(5), Store: A, Category: "OTHER", Status: "INVESTIGATING", Severity: "LOW", AckHour: 3, AckBy: 7},
 			},
 			refused: []int{1},
 			spared:  []int{2, 3, 4, 5},
@@ -1835,8 +1795,8 @@ func TestReportCasesMigrationRefusesRowsWithoutAnHonestCase(t *testing.T) {
 			rows: []legacyReport{
 				fda(legacyReport{ID: id(1), Store: A, Category: "FOOD_SAFETY", Status: "DISMISSED", ResolvedHour: 9, ResolvedBy: 8}),
 				fda(legacyReport{ID: id(2), Store: A, Category: "FOOD_SAFETY", Status: "PENDING"}),
-				fda(legacyReport{ID: id(3), Store: B, Category: "FOOD_SAFETY", Status: "PENDING", Severity: "LOW", AckHour: 3, AckBy: 7}), // 已確認收件：進案件
-				{ID: id(4), Store: A, Category: "FOOD_SAFETY", Status: "DISMISSED", ResolvedHour: 9, ResolvedBy: 8},                       // 沒有轉報
+				fda(legacyReport{ID: id(3), Store: B, Category: "FOOD_SAFETY", Status: "PENDING", Severity: "LOW", AckHour: 3, AckBy: 7}),
+				{ID: id(4), Store: A, Category: "FOOD_SAFETY", Status: "DISMISSED", ResolvedHour: 9, ResolvedBy: 8},
 			},
 			refused: []int{1, 2},
 			spared:  []int{3, 4},
@@ -1845,9 +1805,9 @@ func TestReportCasesMigrationRefusesRowsWithoutAnHonestCase(t *testing.T) {
 			rows: []legacyReport{
 				fda(legacyReport{ID: id(1), Store: A, Category: "FOOD_SAFETY", Status: "INVESTIGATING", Severity: "LOW", AckHour: 3, AckBy: 7}),
 				fda(legacyReport{ID: id(2), Store: A, Category: "FOOD_SAFETY", Status: "PENDING", Severity: "LOW", AckHour: 4, AckBy: 7}),
-				fda(legacyReport{ID: id(3), Store: B, Category: "FOOD_SAFETY", Status: "PENDING", Severity: "LOW", AckHour: 3, AckBy: 7}),                                  // 另一家店：各自的案件
-				fda(legacyReport{ID: id(4), Store: A, Category: "FOOD_SAFETY", Status: "VERIFIED", Severity: "LOW", AckHour: 3, AckBy: 7, ResolvedHour: 9, ResolvedBy: 8}), // 查證屬實：自己的已結案案件，不合併
-				{ID: id(5), Store: A, Category: "FOOD_SAFETY", Status: "PENDING", Severity: "LOW", AckHour: 5, AckBy: 7},                                                   // 合併進同一個案件但沒有轉報
+				fda(legacyReport{ID: id(3), Store: B, Category: "FOOD_SAFETY", Status: "PENDING", Severity: "LOW", AckHour: 3, AckBy: 7}),
+				fda(legacyReport{ID: id(4), Store: A, Category: "FOOD_SAFETY", Status: "VERIFIED", Severity: "LOW", AckHour: 3, AckBy: 7, ResolvedHour: 9, ResolvedBy: 8}),
+				{ID: id(5), Store: A, Category: "FOOD_SAFETY", Status: "PENDING", Severity: "LOW", AckHour: 5, AckBy: 7},
 			},
 			refused: []int{1, 2},
 			spared:  []int{3, 4, 5},
@@ -1858,9 +1818,9 @@ func TestReportCasesMigrationRefusesRowsWithoutAnHonestCase(t *testing.T) {
 				{ID: id(2), Store: A, Category: "FRAUD", Status: "PENDING"},
 				{ID: id(3), Store: A, Category: "OTHER", Status: "PENDING", Severity: "LOW", AckHour: 3, AckBy: 7},
 				{ID: id(4), Store: A, Category: "OTHER", Status: "INVESTIGATING", Severity: "LOW", AckHour: 3, AckBy: 7},
-				{ID: id(5), Store: A, Category: "FRAUD", Status: "PENDING", Severity: "LOW", AckHour: 3, AckBy: 7},                                  // 進案件
-				{ID: id(6), Store: A, Category: "FRAUD", Status: "VERIFIED", Severity: "LOW", AckHour: 3, AckBy: 7, ResolvedHour: 9, ResolvedBy: 8}, // 進已結案的案件
-				{ID: id(7), Store: A, Category: "FRAUD", Status: "DISMISSED", ResolvedHour: 9, ResolvedBy: 8},                                       // 不成立但沒有配合要求
+				{ID: id(5), Store: A, Category: "FRAUD", Status: "PENDING", Severity: "LOW", AckHour: 3, AckBy: 7},
+				{ID: id(6), Store: A, Category: "FRAUD", Status: "VERIFIED", Severity: "LOW", AckHour: 3, AckBy: 7, ResolvedHour: 9, ResolvedBy: 8},
+				{ID: id(7), Store: A, Category: "FRAUD", Status: "DISMISSED", ResolvedHour: 9, ResolvedBy: 8},
 			},
 			coop:    []int{1, 2, 3, 4, 5, 6},
 			refused: []int{1, 2, 3, 4},
@@ -1895,7 +1855,6 @@ func TestReportCasesMigrationRefusesRowsWithoutAnHonestCase(t *testing.T) {
 					t.Errorf("沒問題的通報 %s 不該被列出：%v", spared, err)
 				}
 			}
-			// 失敗的 migration 什麼都不改：新表沒有建起來、舊欄位還在、通報數不變。
 			if n := countOf(t, b.d, "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'seller' AND c.relname IN ('cases', 'case_referrals', 'report_supplements', 'report_case_moves')"); n != 0 {
 				t.Errorf("失敗的 migration 留下了 %d 張新表", n)
 			}
@@ -1906,7 +1865,6 @@ func TestReportCasesMigrationRefusesRowsWithoutAnHonestCase(t *testing.T) {
 				t.Errorf("通報 %d 筆，預期 %d", n, len(tt.rows))
 			}
 
-			// 人工處理掉被列出的通報（連同它們的配合要求）之後可以重跑。
 			must(t, b.exec("DELETE FROM seller.report_cooperation_requests WHERE report_id = ANY($1::uuid[])", ids(tt.refused)))
 			must(t, b.exec("DELETE FROM seller.reports WHERE id = ANY($1::uuid[])", ids(tt.refused)))
 			if err := b.apply(); err != nil {
@@ -1949,12 +1907,10 @@ func TestSubmissionSeqMigrationRenumbersEvidenceWithinEachSubmission(t *testing.
 		exec(`INSERT INTO seller.reports (id, store_id, category, description, reporter_buyer_id, created_at, updated_at)
 			SELECT $1::uuid, store_id, 'FRAUD', 'x', $2::bigint, $3::timestamptz, $3::timestamptz FROM seller.stores WHERE store_code = 2600000803`, id, 2000+i, reportCasesTime(1))
 	}
-	// 補充的建立時間故意和 id 的順序相反：編號依建立時間。
 	for n, hour := range map[int]int{3: 2, 2: 3, 1: 4} {
 		exec(`INSERT INTO seller.report_supplements (id, report_id, description, created_at) VALUES ($1::uuid, $2::uuid, 'x', $3::timestamptz)`, supplement(n), report, reportCasesTime(hour))
 	}
 	exec(`INSERT INTO seller.report_supplements (id, report_id, description, created_at) VALUES ($1::uuid, $2::uuid, 'x', $3::timestamptz)`, supplement(9), other, reportCasesTime(2))
-	// 原通報 2 張（位置 0、1）；最早的補充（id 3）3 張（2、3、4）；第二則（id 2）沒有佐證；最晚的（id 1）1 張（5）。
 	evidence := func(reportID string, position int, supplementID *string) {
 		exec(`INSERT INTO seller.report_evidence (report_id, position, supplement_id, asset_id, object_key) VALUES ($1::uuid, $2, $3::uuid, $4, 'k')`,
 			reportID, position, supplementID, fmt.Sprintf("%s-%d", reportID[len(reportID)-2:], position))
@@ -1968,7 +1924,6 @@ func TestSubmissionSeqMigrationRenumbersEvidenceWithinEachSubmission(t *testing.
 	evidence(report, 5, &s1)
 	evidence(other, 0, nil)
 	evidence(other, 1, &s9)
-	// 讀取紀錄：通報的第 3 張（補充的第 2 張）與第 5 張，以及另一筆通報的第 1 張。
 	access := func(n int) string { return fmt.Sprintf("0199dddd-0000-7000-8000-0000000002%02d", n) }
 	for n, a := range []struct {
 		reportID string
@@ -2006,13 +1961,11 @@ func TestSubmissionSeqMigrationRenumbersEvidenceWithinEachSubmission(t *testing.
 	if fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Fatalf("佐證 %v，預期 %v", got, want)
 	}
-	// 補充依建立時間編號：id 3（最早）是 1，id 2 是 2，id 1 是 3。
 	for n, seq := range map[int]int{3: 1, 2: 2, 1: 3, 9: 1} {
 		if c := countOf(t, d, "SELECT count(*) FROM seller.report_supplements WHERE id = $1::uuid AND seq = $2", supplement(n), seq); c != 1 {
 			t.Errorf("補充 %d 的 seq 不是 %d", n, seq)
 		}
 	}
-	// 讀取紀錄跟著換鍵、仍指向同一張佐證（asset 相同）。
 	for n, want := range map[int]string{1: "01-3", 2: "01-5", 3: "02-1"} {
 		var asset string
 		must(t, d.Pool().QueryRow(ctx, `SELECT e.asset_id FROM seller.evidence_accesses a JOIN seller.report_evidence e
@@ -2049,7 +2002,6 @@ func TestSupplementsSeenSeqMigrationConvertsTheTimeMarkerToTheLatestSeenSuppleme
 	exec("INSERT INTO seller.stores (store_code, account_id, store_name, created_at, updated_at) VALUES (2600000804, 954, 'x', now(), now())")
 	report := func(n int) string { return fmt.Sprintf("0199eeee-0000-7000-8000-0000000000%02d", n) }
 	supplement := func(r, n int) string { return fmt.Sprintf("0199eeee-0000-7000-8000-00000001%02d%02d", r, n) }
-	// r1：標記落在第 2 則與第 3 則之間；r2：標記與第 2 則同一時間；r3：從沒記過；r4：標記晚於全部；r5：沒有補充但有標記。
 	seen := map[int]*time.Time{}
 	at2 := reportCasesTime(3)
 	late := reportCasesTime(9)
@@ -2157,7 +2109,6 @@ func TestCaseReferralV2KeepsExistingReferralsAsReferred(t *testing.T) {
 	for _, id := range []string{first, second} {
 		must(t, exec(`INSERT INTO seller.cases (id, store_id, category, severity, opened_at, opened_by_admin_id, updated_at)
 			SELECT $1::uuid, store_id, 'FOOD_SAFETY', 'LOW', now() - interval '2 days', 1, now() - interval '2 days' FROM seller.stores WHERE store_code = 2600000950`, id))
-		// 同一家店同類別只有一個進行中的案件：第一個先結案。
 		if id == first {
 			must(t, exec(`UPDATE seller.cases SET closed_at = now() - interval '1 day', closed_by_admin_id = 1, close_reason = 'NO_REPORTS' WHERE id = $1::uuid`, id))
 		}

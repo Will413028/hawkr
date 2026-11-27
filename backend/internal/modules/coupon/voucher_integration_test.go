@@ -291,7 +291,6 @@ func TestRedeemAndReleaseReplayAreIdempotent(t *testing.T) {
 	_, err = f.m.Redeem(context.Background(), "NO-SUCH-ORDER")
 	wantReason(t, err, coupon.ReasonNoVoucherForOrder)
 
-	// 賣家取消已付款訂單：已核銷的券由 Release 還回。
 	rel, err := f.m.Release(context.Background(), "O1")
 	if err != nil || !rel.Released || rel.Voided {
 		t.Fatalf("釋放已核銷的券 = %+v, %v", rel, err)
@@ -413,7 +412,6 @@ func TestCompensationResendCreatesOneVoucher(t *testing.T) {
 		t.Fatalf("補償券 = %+v", again)
 	}
 
-	// 補償券能鎖：收件人在資格名單內，店家範圍與門檻照常檢查。
 	li := f.lockInput(again.Voucher, "O1")
 	li.OrderAmount = 500
 	if r, err := f.m.Lock(context.Background(), li); err != nil || r.Discount != 100 {
@@ -596,7 +594,6 @@ func TestConcurrentLockOfTwoVouchersForOneOrder(t *testing.T) {
 	defer cancel()
 	const order = "O-SAME"
 
-	// 失敗路徑也要放行先到的 transaction：連線池要等它歸還連線才關得掉，否則測試結束時會卡住。
 	release := make(chan struct{})
 	var releaseOnce sync.Once
 	releaseFirst := func() { releaseOnce.Do(func() { close(release) }) }
@@ -634,7 +631,6 @@ func TestConcurrentLockOfTwoVouchersForOneOrder(t *testing.T) {
 		})
 	}()
 
-	// 只看本測試 database 裡卡在 transactionid 鎖上的連線（每支測試各有自己的 database，pg_locks 卻是整個 cluster 共用）。
 	const blocked = `SELECT count(*) FROM pg_locks l JOIN pg_stat_activity a USING (pid)
 		WHERE NOT l.granted AND l.locktype = 'transactionid' AND a.datname = current_database()`
 	for {

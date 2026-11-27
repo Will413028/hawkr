@@ -11,22 +11,10 @@ import (
 	yaml "go.yaml.in/yaml/v2"
 )
 
-// backend/api/openapi/openapi.yaml 是舊 gateway 還在服務的 REST 的清單（ADR
-// 2026-09-26-external-contract-protobuf-connect D5）：新的對外 API 一律用 Connect，REST 只會隨模組搬遷
-// 縮小。這支測試讓 gin 實際註冊的路由與清單一一對上：
-//   - 清單有、路由沒有 → 清單在描述不存在的端點，一律失敗（刪路由時一起刪清單）。
-//   - 路由有、清單沒有 → 新增的 REST 路由，一律失敗；既有的例外登記在 routesNotInSpec。
-//   - 清單的端點數只准變少（maxRESTOperations），新增路由時連同清單一起補也會失敗。
-//   - 規格的 operationId 必須等於 handler 方法名（首字小寫）：scripts/gateway-json-contract-check.py
-//     的 Check B 靠這個對應找到 handler，對不上的 handler 會被靜默跳過。
-//
-// 清單只准變短：登記了卻已經在規格裡的條目也會失敗，避免清單腐化。
 const specPath = "../../../api/openapi/openapi.yaml"
 
-// maxRESTOperations 是清單的端點數上限，只准變少：模組搬遷刪掉 REST 路由後，把它改成新的端點數鎖住新低點。
 const maxRESTOperations = 228
 
-// 分類理由；路由隨模組搬遷刪除時從清單移除，不再補進規格。
 const (
 	notAnnotatedDelegated = "代行營運（delegatedHandle 註冊）的 handler 沒有 swag 註解"
 	binaryProxy           = "反向代理到下游的 binary 串流，沒有 swag 註解"
@@ -35,7 +23,6 @@ const (
 	localDevTool          = "本機開發工具（APP_ENV=local／dev 才註冊），不屬於對外 API"
 )
 
-// routesNotInSpec 是沒有寫進清單的既有路由（method + 以 {} 代表參數的 path），只准變短。
 var routesNotInSpec = map[string]string{
 	"GET /api/v1/admin/delegated-operations/{}/audit-logs":                  notAnnotatedDelegated,
 	"GET /api/v1/admin/delegated-operations/{}/summary":                     notAnnotatedDelegated,
@@ -69,7 +56,6 @@ func routeKey(method, path string) string {
 	return strings.ToUpper(method) + " " + pathParam.ReplaceAllString(path, "/{}")
 }
 
-// specRoutes 回傳規格裡每條路由的 operationId。
 func specRoutes(t *testing.T) map[string]string {
 	t.Helper()
 	raw, err := os.ReadFile(specPath)
@@ -96,17 +82,14 @@ func specRoutes(t *testing.T) map[string]string {
 	return out
 }
 
-// holderMethod 取出 gin 記錄的 handler 名稱裡的方法名，例如
-// ".../handler.(*Holder).ListAdminAccounts-fm" → "ListAdminAccounts"。
 var holderMethod = regexp.MustCompile(`\.\(\*Holder\)\.([A-Za-z0-9_]+)-fm$`)
 
 func TestEveryRouteIsInOpenAPISpec(t *testing.T) {
-	// dev、local 才註冊的路由也要涵蓋：規格描述的是所有環境的聯集。
 	t.Setenv("APP_ENV", "local")
 	r := buildFullRouter(t)
 	spec := specRoutes(t)
 
-	routes := map[string]string{} // route → gin 記錄的 handler 名稱
+	routes := map[string]string{}
 	for _, ri := range r.Routes() {
 		routes[routeKey(ri.Method, ri.Path)] = ri.Handler
 	}

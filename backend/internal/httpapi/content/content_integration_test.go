@@ -65,7 +65,6 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// fakeMedia 讓每個 staged token 都確認成功，object key 由 token 組成；以 "gone" 開頭的 token 回 media 的「暫存已失效」。
 type fakeMedia struct{}
 
 func (f *fakeMedia) Confirm(_ context.Context, _ media.Uploader, token string, _ media.Visibility) (media.ConfirmedAsset, error) {
@@ -81,13 +80,10 @@ type fixture struct {
 	url    string
 	public contentv1alpha1connect.ContentPublicServiceClient
 	admin  adminconnect.ContentAdminServiceClient
-	// adminToken、buyerToken 是管理員與買家的 session（以 Authorization: Bearer 帶）。
 	adminToken string
 	buyerToken string
 }
 
-// setup 起完整的 HTTP 層（httpapi.NewHandler），client 以 JSON 呼叫，讀取走 GET，與 web 相同。
-// 後台的 client 帶著管理員的 dev token（第一個請求時建立管理員）。
 func setup(t *testing.T) *fixture {
 	t.Helper()
 	d := pg.NewDB(t, testdb.Jobs(), testdb.Migrations(
@@ -132,7 +128,6 @@ func setup(t *testing.T) *fixture {
 	}
 }
 
-// adminClient 是後台的 client；token 為空表示沒有登入。
 func adminClient(base, token string) adminconnect.ContentAdminServiceClient {
 	session := connect.UnaryInterceptorFunc(func(next connect.UnaryFunc) connect.UnaryFunc {
 		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
@@ -146,16 +141,13 @@ func adminClient(base, token string) adminconnect.ContentAdminServiceClient {
 		connect.WithProtoJSON(), connect.WithHTTPGet(), connect.WithInterceptors(session))
 }
 
-// mediaOrigin 是測試的媒體網域；回應的圖片以它開頭。
 const mediaOrigin = "https://media.example.test"
 
-// errorDetails 是 client 從錯誤取得的 details。
 type errorDetails struct {
-	localized string   // LocalizedMessage 的文字
-	fields    []string // BadRequest 的欄位路徑
+	localized string
+	fields    []string
 }
 
-// wantError 確認錯誤的 Connect 碼與 ErrorInfo 的業務原因（空字串表示不該有 ErrorInfo），回傳其他 details。
 func wantError(t *testing.T, err error, code connect.Code, reason string) errorDetails {
 	t.Helper()
 	var ce *connect.Error
@@ -331,14 +323,11 @@ func TestRequiredFieldsAreEnforced(t *testing.T) {
 			checked++
 		}
 	}
-	// 下限是目前的實際數量（2026-10-27 刪掉食譜後是 6）。
 	if checked < 6 {
 		t.Fatalf("只找到 %d 個 REQUIRED 欄位，descriptor 的讀取可能失效", checked)
 	}
 }
 
-// requiredPaths 回傳訊息裡標了 REQUIRED 的欄位路徑。欄位是訊息、而且裡面也有 REQUIRED 的欄位時往下找，
-// 否則這個欄位本身就是一條路徑。
 func requiredPaths(desc protoreflect.MessageDescriptor) [][]protoreflect.Name {
 	var out [][]protoreflect.Name
 	fields := desc.Fields()
@@ -375,7 +364,6 @@ func clearPath(m protoreflect.Message, path []protoreflect.Name) {
 	m.Clear(m.Descriptor().Fields().ByName(path[len(path)-1]))
 }
 
-// wantImage 確認圖片是媒體網域上、只有 {preset} 一個變數的樣板，key 以 suffix 結尾。
 func wantImage(t *testing.T, img *commonpb.Image, suffix string) {
 	t.Helper()
 	tpl := img.GetUriTemplate()
@@ -442,7 +430,6 @@ func TestBannerLifecycle(t *testing.T) {
 		t.Fatalf("前台 = %v", live.Msg)
 	}
 
-	// 只停用：其他欄位不變，etag 加一。
 	off, err := f.admin.UpdateBanner(ctx, connect.NewRequest(&adminpb.UpdateBannerRequest{
 		Banner:     &adminpb.Banner{Id: b.GetId(), Etag: b.GetEtag(), Active: false},
 		UpdateMask: mask("active"),
@@ -461,7 +448,6 @@ func TestBannerLifecycle(t *testing.T) {
 		t.Fatalf("停用的 banner 還在前台：%v", live.Msg)
 	}
 
-	// 從舊版本改：版本衝突，不寫入。
 	_, err = f.admin.UpdateBanner(ctx, connect.NewRequest(&adminpb.UpdateBannerRequest{
 		Banner: &adminpb.Banner{Id: b.GetId(), Etag: b.GetEtag(), Title: "晚了一步"}, UpdateMask: mask("title"),
 	}))
@@ -471,7 +457,6 @@ func TestBannerLifecycle(t *testing.T) {
 	}))
 	wantError(t, err, connect.CodeInvalidArgument, "")
 
-	// 只換預覽圖：彈窗圖沿用。
 	swapped, err := f.admin.UpdateBanner(ctx, connect.NewRequest(&adminpb.UpdateBannerRequest{
 		Banner:     &adminpb.Banner{Id: b.GetId(), Etag: "2", PreviewImageStagedToken: "p2"},
 		UpdateMask: mask("preview_image_staged_token"),
@@ -572,7 +557,6 @@ func TestHTTPCaching(t *testing.T) {
 	if first.StatusCode != http.StatusOK || first.Header.Get("Cache-Control") != "public, no-cache" || !strings.HasPrefix(tag, `W/"`) {
 		t.Fatalf("第一次 = %d，Cache-Control %q，ETag %q", first.StatusCode, first.Header.Get("Cache-Control"), tag)
 	}
-	// Public GET 一律帶 Vary: Authorization, Cookie, Accept-Encoding（httpcache.go），語系協商再加 Accept-Language；各出現一次。
 	varyTokens := map[string]int{}
 	for _, line := range first.Header.Values("Vary") {
 		for _, tok := range strings.Split(line, ",") {
@@ -607,7 +591,6 @@ func TestTraceIDAndRequestLimit(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	// 單體是入口：不接續 client 帶來的 traceparent，自己開新的 trace，錯誤的回應也帶著它。
 	const clientTrace = "4bf92f3577b34da6a3ce929d0e0e4736"
 	req := connect.NewRequest(&contentpb.CheckAppVersionRequest{})
 	req.Header().Set("traceparent", "00-"+clientTrace+"-00f067aa0ba902b7-01")
@@ -632,7 +615,6 @@ func TestTraceIDAndRequestLimit(t *testing.T) {
 	}
 }
 
-// noDashboardOrders 是這個測試不讀儀表板的訂單時的替身：NewHandler 要求提供儀表板訂單的來源。
 type noDashboardOrders struct{}
 
 func (noDashboardOrders) SalesStats(context.Context, int64, []httpseller.SalesWindow) ([]httpseller.SalesStats, error) {
@@ -643,7 +625,6 @@ func (noDashboardOrders) StatusCounts(context.Context, int64) (httpseller.OrderS
 	return httpseller.OrderStatusCounts{}, errors.New("not used")
 }
 
-// bannerProduct 是 banner 指向的商品；publicProducts 把它當成公開可見的商品，其餘回 ErrProductNotFound（規則本身由 catalog 的整合測試守）。
 var bannerProduct = uuid.MustParse("018f0000-0000-7000-8000-0000000000a1")
 
 type publicProducts struct{}
@@ -655,7 +636,6 @@ func (publicProducts) PublicProduct(_ context.Context, id uuid.UUID, _ time.Time
 	return catalogmod.Product{ID: id}, nil
 }
 
-// noPosts 是沒有任何公開貼文的 social 替身（這裡的 banner 不指向貼文）。
 type noPosts struct{}
 
 func (noPosts) PubliclyReadablePosts(context.Context, []uuid.UUID) (map[uuid.UUID]bool, error) {

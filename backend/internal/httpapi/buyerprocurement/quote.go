@@ -15,14 +15,12 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement"
 )
 
-// 賣家回價比較與接受（A9-3b-3d）的欄位違規：模組的欄位名對到請求的 proto 路徑（模組直接用請求的欄位名，這裡只是明列）。
 var quotePaths = rpc.FieldPaths{
 	"page_size": "page_size", "page_token": "page_token", "seller_response_version": "seller_response_version",
 	"expected_seller_response_version": "expected_seller_response_version", "expected_seller_facing_hash": "expected_seller_facing_hash",
 	"client_request_id": "client_request_id",
 }
 
-// sellerResponseVersion 解析必填的回價版本號：正整數的十進位字串（版本是不透明的字串，伺服器用整數發）。
 func sellerResponseVersion(path, raw string) (int32, error) {
 	if raw == "" {
 		return 0, rpc.RequiredField(path, path+" 不能是空的")

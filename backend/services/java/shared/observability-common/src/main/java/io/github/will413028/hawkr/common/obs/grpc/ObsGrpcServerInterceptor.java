@@ -50,8 +50,6 @@ public class ObsGrpcServerInterceptor implements ServerInterceptor {
     private static final Metadata.Key<String> KEY_REQUEST_ID =
             Metadata.Key.of(ObsKeys.HEADER_REQUEST_ID, Metadata.ASCII_STRING_MARSHALLER);
 
-    // Duplicate MDC keys to remove (set by other frameworks like micrometer-tracing)
-    // Hard Rule: Only snake_case allowed, remove camelCase duplicates
     private static final String MDC_TRACE_ID_CAMEL = "traceId";
     private static final String MDC_SPAN_ID_CAMEL = "spanId";
 
@@ -81,39 +79,30 @@ public class ObsGrpcServerInterceptor implements ServerInterceptor {
         String grpcServiceFull = parts.length > 0 ? parts[0] : fullMethodName;
         String grpcMethod = parts.length > 1 ? parts[1] : fullMethodName;
 
-        // Extract simple service name (e.g., "hawkr.user.UserService" -> "UserService")
         final String grpcService = extractSimpleName(grpcServiceFull);
 
-        // 1. Extract inbound metadata
         String correlation = headers.get(KEY_CORRELATION_ID);
         String request = headers.get(KEY_REQUEST_ID);
         String traceparent = headers.get(KEY_TRACEPARENT);
 
-        // 2. Extract parent context from traceparent
         Context parentOtelContext = propagator.extract(
                 Context.current(),
                 headers,
                 new MetadataGetter()
         );
 
-        // 3. Start server span
         Span span = tracer.spanBuilder("grpc.server/" + fullMethodName)
                 .setParent(parentOtelContext)
                 .setSpanKind(SpanKind.SERVER)
                 .startSpan();
 
-        // 4. Make span current
         Scope otelScope = span.makeCurrent();
 
-        // 5. Open ObsContext scope (generates correlation if missing)
         ObsScope obsScope = obsContext.open(new ObsCarrier(correlation, request, traceparent));
 
-        // 6. Write MDC (Hard Rule: only snake_case)
-        // Remove camelCase duplicates that may be set by other frameworks (micrometer-tracing)
         MDC.remove(MDC_TRACE_ID_CAMEL);
         MDC.remove(MDC_SPAN_ID_CAMEL);
 
-        // Always put trace_id/span_id (empty string if invalid)
         if (span.getSpanContext().isValid()) {
             MDC.put(ObsKeys.TRACE_ID, span.getSpanContext().getTraceId());
             MDC.put(ObsKeys.SPAN_ID, span.getSpanContext().getSpanId());
@@ -124,24 +113,18 @@ public class ObsGrpcServerInterceptor implements ServerInterceptor {
 
         MDC.put(ObsKeys.SERVICE, obsProperties.getService());
 
-        // 7. Record start time
         long startTimeNanos = System.nanoTime();
 
-        // 8. Emit start log (always)
         emitStartLog(grpcService, grpcMethod);
 
-        // 9. Create context holder for exception tracking
         ExceptionHolder exceptionHolder = new ExceptionHolder();
 
-        // 10. Wrap ServerCall to intercept close()
         ServerCall<ReqT, RespT> wrappedCall = new ForwardingServerCall.SimpleForwardingServerCall<>(call) {
             @Override
             public void close(Status status, Metadata trailers) {
                 try {
-                    // Calculate duration
                     long durationMs = (System.nanoTime() - startTimeNanos) / 1_000_000;
 
-                    // Set span status
                     if (status.isOk()) {
                         span.setStatus(StatusCode.OK);
                     } else {
@@ -151,60 +134,43 @@ public class ObsGrpcServerInterceptor implements ServerInterceptor {
                         }
                     }
 
-                    // gRPC RPC 語意屬性，供 OTel Collector spanmetricsconnector 提升成
-                    // metric dimension（rpc_method / rpc_response_status_code）。
-                    // 命名與值格式對齊 Go 側官方 otelgrpc@v0.67.0（internal/parse.go、
-                    // stats_handler.go canonicalString()）：fullMethodName 已無開頭斜線，
-                    // status.getCode().name() 原生即為 UPPER_SNAKE_CASE，兩邊天生一致，
-                    // 不需要正規化。詳見 docs/superpowers/specs/2026-08-20-grpc-
-                    // observability-spanmetrics-consolidation-design.md §3.4。
                     span.setAttribute("rpc.method", fullMethodName);
                     span.setAttribute("rpc.response.status_code", status.getCode().name());
 
-                    // Record exception from listener if any
                     if (exceptionHolder.exception != null) {
                         span.recordException(exceptionHolder.exception);
                         span.setStatus(StatusCode.ERROR, exceptionHolder.exception.getMessage());
                     }
 
-                    // Access log based on rules (uses event format)
                     emitAccessLog(status, durationMs, grpcService, grpcMethod, exceptionHolder.exception);
 
                 } finally {
-                    // End span
                     span.end();
 
-                    // Close scopes
                     obsScope.close();
                     otelScope.close();
 
-                    // Cleanup MDC (all keys we may have set)
                     MDC.remove(ObsKeys.TRACE_ID);
                     MDC.remove(ObsKeys.SPAN_ID);
                     MDC.remove(ObsKeys.EVENT);
-                    // Also remove camelCase duplicates (Hard Rule: no camelCase in output)
                     MDC.remove(MDC_TRACE_ID_CAMEL);
                     MDC.remove(MDC_SPAN_ID_CAMEL);
 
-                    // Delegate to original call
                     super.close(status, trailers);
                 }
             }
         };
 
-        // 11. Start call with wrapped ServerCall
         ServerCall.Listener<ReqT> listener;
         try {
             listener = next.startCall(wrappedCall, headers);
         } catch (Throwable t) {
-            // Exception during handler setup - record and rethrow
             exceptionHolder.exception = t;
             span.recordException(t);
             span.setStatus(StatusCode.ERROR, t.getMessage());
             throw t;
         }
 
-        // 12. Wrap listener to catch exceptions (Guard pattern - never swallow)
         return new ForwardingServerCallListener.SimpleForwardingServerCallListener<>(listener) {
 
             @Override
@@ -213,7 +179,7 @@ public class ObsGrpcServerInterceptor implements ServerInterceptor {
                     super.onMessage(message);
                 } catch (Throwable t) {
                     handleListenerException(t);
-                    throw t; // Never swallow
+                    throw t;
                 }
             }
 
@@ -223,7 +189,7 @@ public class ObsGrpcServerInterceptor implements ServerInterceptor {
                     super.onHalfClose();
                 } catch (Throwable t) {
                     handleListenerException(t);
-                    throw t; // Never swallow
+                    throw t;
                 }
             }
 
@@ -233,7 +199,7 @@ public class ObsGrpcServerInterceptor implements ServerInterceptor {
                     super.onCancel();
                 } catch (Throwable t) {
                     handleListenerException(t);
-                    throw t; // Never swallow
+                    throw t;
                 }
             }
 
@@ -243,7 +209,7 @@ public class ObsGrpcServerInterceptor implements ServerInterceptor {
                     super.onComplete();
                 } catch (Throwable t) {
                     handleListenerException(t);
-                    throw t; // Never swallow
+                    throw t;
                 }
             }
 
@@ -253,7 +219,7 @@ public class ObsGrpcServerInterceptor implements ServerInterceptor {
                     super.onReady();
                 } catch (Throwable t) {
                     handleListenerException(t);
-                    throw t; // Never swallow
+                    throw t;
                 }
             }
 
@@ -293,7 +259,6 @@ public class ObsGrpcServerInterceptor implements ServerInterceptor {
         ObsProperties.AccessLog config = obsProperties.getAccessLog();
 
         if (!status.isOk()) {
-            // ERROR: Always log with exception details
             String event = grpcService + "." + grpcMethod + ".error";
             MDC.put(ObsKeys.EVENT, event);
             if (ex != null) {
@@ -304,12 +269,10 @@ public class ObsGrpcServerInterceptor implements ServerInterceptor {
                 log.error(status.getDescription() != null ? status.getDescription() : "");
             }
         } else if (durationMs > config.getSlowThresholdMs()) {
-            // SLOW: Always log with empty msg
             String event = grpcService + "." + grpcMethod + ".end";
             MDC.put(ObsKeys.EVENT, event);
             log.warn("");
         } else {
-            // OK: Sample-based logging with empty msg
             if (config.getOkSampleRate() > 0 && ThreadLocalRandom.current().nextDouble() < config.getOkSampleRate()) {
                 String event = grpcService + "." + grpcMethod + ".end";
                 MDC.put(ObsKeys.EVENT, event);

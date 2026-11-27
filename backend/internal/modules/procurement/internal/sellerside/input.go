@@ -16,12 +16,10 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 )
 
-// 欄位違規的欄位名是 QuoteInput 的 Go 欄位名；handler 依請求（草稿在 draft、正式回價在 quote 底下）對到 proto 路徑。
 func invalid(field, format string, args ...any) error {
 	return apperr.InvalidInputOn([]string{field}, format, args...)
 }
 
-// text 去頭尾空白並檢查字元數上限（以 rune 計）、UTF-8 與 NUL（Postgres 的 text 不收）。
 func text(field, v string, max int) (string, error) {
 	v = trimtext.Trim(v)
 	switch {
@@ -44,7 +42,6 @@ func containsNUL(v string) bool {
 	return false
 }
 
-// instant 把時間正規化成 UTC、微秒精度（timestamptz 的精度）：寫入前就截斷，送出的 hash 才與讀回來算的相同。年份要在可編碼與可存的範圍內。
 func instant(field string, t time.Time) (time.Time, error) {
 	if t.IsZero() || t.Year() < 1 || t.Year() > 9999 {
 		return time.Time{}, invalid(field, "%s 不是合法的時間", field)
@@ -52,7 +49,6 @@ func instant(field string, t time.Time) (time.Time, error) {
 	return t.UTC().Truncate(time.Microsecond), nil
 }
 
-// reasonCode 去頭尾空白並檢查長度；空字串回 nil（沒有填）。
 func reasonCode(raw string) (*string, error) {
 	v, err := text("reason_code", raw, model.MaxReasonCodeRunes)
 	if err != nil || v == "" {
@@ -136,15 +132,11 @@ func validResponseType(v string) bool {
 
 func validTaxBasis(v string) bool { return v == model.TaxIncluded || v == model.TaxExcluded }
 
-// normalized 是通過驗證的正式報價：Quote 是 hash 與回應用的內容（數量是固定三位小數、時間是 UTC 微秒、幣別 TWD），兩個 Numeric 是寫進 NUMERIC(14, 3) 的值。
 type normalized struct {
 	Quote                    model.SellerQuote
 	UnitBasisNum, OfferedNum pgtype.Numeric
 }
 
-// normalizeQuote 驗證並正規化正式回價的報價內容；不檢查 valid_until 是否在未來（與時間有關，由呼叫端在冪等重送之後檢查）。
-// 回價方式、稅別要是已知的值；兩個數量是正的十進位字串（最多三位小數、整數最多 11 位）；兩個單位非空；金額不可為負且 total = goods + shipping + tax；
-// 交期不可為負；有效期限必填。
 func normalizeQuote(in model.QuoteInput) (normalized, error) {
 	d, _, err := NormalizeDraft(in)
 	if err != nil {
@@ -197,10 +189,8 @@ func add(vs ...int64) (int64, bool) {
 	return sum, true
 }
 
-// quantityPattern 是正的十進位數：整數最多 11 位（NUMERIC(14, 3) 的整數部分）、小數最多三位；不收正負號、科學記號與前後空白。
 var quantityPattern = regexp.MustCompile(`^[0-9]{1,11}(\.[0-9]{1,3})?$`)
 
-// milli 把十進位字串換成千分位整數；必須是正數。
 func milli(field, raw string) (int64, error) {
 	if !quantityPattern.MatchString(raw) {
 		return 0, invalid(field, "%s 必須是正的十進位數（最多三位小數）", field)

@@ -15,7 +15,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/textfilter"
 )
 
-// 這些測試走到 transaction 之前就會結束（輸入驗證、解析對話與對方、守門），所以不需要資料庫；走到 transaction 的情境在模組的 integration 測試。
 
 const (
 	buyerID   = int64(11)
@@ -144,7 +143,6 @@ func (f *fixture) input(kind model.PartyKind) model.SendInput {
 	return in
 }
 
-// check 跑 Send 在 transaction 之前的全部步驟：輸入驗證、解析對話與對方、守門。
 func (f *fixture) check(kind model.PartyKind, mutate func(*model.SendInput)) error {
 	in := f.input(kind)
 	if mutate != nil {
@@ -334,7 +332,6 @@ func TestReceiverDeletedGuard(t *testing.T) {
 	f = newFixture()
 	f.gone["BUYER:11"] = true
 	wantKind(t, f.check(model.PartyStore, nil), apperr.KindFailedPrecondition, model.ReasonReceiverDeleted)
-	// 寄件人自己的身分不在守門檢查（在 transaction 內持鎖後查）。
 	f = newFixture()
 	f.gone["BUYER:11"] = true
 	if err := f.check(model.PartyBuyer, nil); err != nil {
@@ -397,11 +394,9 @@ func TestInputValidation(t *testing.T) {
 			wantKind(t, f.check(model.PartyBuyer, mut), apperr.KindInvalidInput, "")
 		})
 	}
-	// 字元計長：4096 個中文字（12288 位元組）通過；頭尾空白不佔額度。
 	if err := f.check(model.PartyBuyer, func(in *model.SendInput) { in.Text = "  " + strings.Repeat("字", model.MaxTextRunes) + "\n" }); err != nil {
 		t.Fatalf("4096 個字要通過：%v", err)
 	}
-	// 寄件人身分不完整是程式錯誤，不是 client 錯誤。
 	in := f.input(model.PartyBuyer)
 	in.Sender = model.Party{Kind: model.PartyStore}
 	if _, err := f.s.checkInput("zh-TW", &in); err == nil || apperr.KindOf(err) == apperr.KindInvalidInput {

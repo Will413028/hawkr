@@ -37,7 +37,6 @@ func PublicProcess(ctx context.Context, store storage.Store, in ProcessInput) (P
 	}
 	rc, err := store.Get(ctx, in.TmpKey)
 	if errors.Is(err, storage.ErrNotFound) {
-		// tmp 物件不存在：與大小不符同一個原因碼，見 model.RejectSizeMismatch。
 		return ProcessResult{}, model.Permanent(model.RejectSizeMismatch, err)
 	}
 	if err != nil {
@@ -74,15 +73,12 @@ func PublicProcess(ctx context.Context, store storage.Store, in ProcessInput) (P
 	return ProcessResult{SizeBytes: int64(len(res.Data)), ContentType: ct}, nil
 }
 
-// sanitizePublic 是 public 圖片的辨認與重新編碼，處理 job 與 PutPublic 共用，上限只取自 model。
 func sanitizePublic(ctx context.Context, data []byte) (image.Result, error) {
 	return image.Sanitize(ctx, data, image.Limits{FramePixels: model.MaxImagePixels, AnimatedPixels: model.MaxAnimatedPixels, MaxDimension: model.MaxImageDimension})
 }
 
-// isProcessingFailure 回報錯誤是不是管線自己的永久失敗（不是輸入的問題，也不會因重試而成功）。
 func isProcessingFailure(err error) bool { return errors.Is(err, image.ErrProcessing) }
 
-// rejectionReason 把 Sanitize 的永久失敗對到暫存列的拒絕原因：輸入的問題是 UNRECOGNIZED_FORMAT，管線自己的失敗是 PROCESSING_FAILED；其餘不是永久失敗。
 func rejectionReason(err error) (model.RejectReason, bool) {
 	switch {
 	case isImageRejection(err):
@@ -93,7 +89,6 @@ func rejectionReason(err error) (model.RejectReason, bool) {
 	return "", false
 }
 
-// isImageRejection 回報錯誤是不是輸入本身的問題（辨認不出、無法解碼、超過上限），這類不會因重試而成功。
 func isImageRejection(err error) bool {
 	return errors.Is(err, image.ErrUnrecognized) || errors.Is(err, image.ErrMalformed) || errors.Is(err, image.ErrTooLarge)
 }

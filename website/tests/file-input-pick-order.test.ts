@@ -75,8 +75,6 @@ function clearBeforeUseHits(src: string): number[] {
  * 就會對真正的錯誤形狀失明。
  */
 function liveFileInput(files: File[]): HTMLInputElement {
-	// ⚠️ 清空必須**就地**進行（`length = 0`），不能換一個新陣列：真實 FileList 是
-	// 同一個物件被清空，所以先取走的那個「參考」也會跟著變空 —— 那正是 bug 的來源。
 	const list: File[] = files;
 	return {
 		get files() {
@@ -128,8 +126,6 @@ test("選完檔仍會清空 value（同一個檔案要能再選一次）", () =>
 });
 
 test("假 input 真的會被錯誤順序打到（鑑別力自檢）", () => {
-	// 這是修復前的寫法。假 input 若沒有模擬 live 語意，這裡會拿到 2，上面兩支測試
-	// 就變成「怎麼寫都會綠」。
 	const input = liveFileInput(twoFiles());
 	const live = input.files;
 	input.value = "";

@@ -9,8 +9,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/adminperm"
 )
 
-// 呼叫者的身分是 Bearer token：顧客是資料庫裡的 dev session（BuyerSession），後台是本機金鑰簽的 dev token（DevAuth）。兩種 driver 都以 Authorization: Bearer 帶。REST driver 打單體的入口（/api/v1 由
-// 單體轉給 gateway，身分 header 由單體設上），Connect driver 直接打單體。
 
 // Auth 是直接打單體的測試要裝進 identity 的 dev 驗證，與各呼叫者的 token。
 type Auth struct {

@@ -76,12 +76,9 @@ class UberDirectSchemaContractTest {
                 throw new IllegalStateException("讀不到 " + MIGRATION_PATH, e);
             }
         }
-        // surefire 的工作目錄若不是 module basedir，退回 classpath（main/resources 在測試 classpath 上）。
         try (InputStream in = UberDirectSchemaContractTest.class.getClassLoader()
                 .getResourceAsStream(MIGRATION_RESOURCE)) {
             if (in == null) {
-                // 🔴 對「目標不存在」必須 FAIL 而不是 SKIP：檔案被改名或搬走時，
-                //    SKIP 會讓這支測試靜默轉綠，而那正是它該叫的時候。
                 throw new IllegalStateException(
                         "找不到 migration（檔案系統 " + MIGRATION_PATH + " 與 classpath " + MIGRATION_RESOURCE
                                 + " 都沒有）。檔案被改名／搬走了嗎？本測試拒絕在看不到目標時通過。");
@@ -116,7 +113,6 @@ class UberDirectSchemaContractTest {
         return out.toString();
     }
 
-    // ─────────────────────────── helpers ───────────────────────────
 
     /** 取出某張表的 {@code CREATE TABLE …( … );} 內文（純 DDL）；找不到就 fail（不是回空字串）。 */
     private static String tableBody(String table) {
@@ -144,16 +140,13 @@ class UberDirectSchemaContractTest {
         assertFalse(CODE.contains(needle), why + "\nDDL 裡不該出現的片段：" + needle);
     }
 
-    // ─────────────────────── 剝除器自身的鑑別力 ───────────────────────
 
     @Test
     @DisplayName("註解剝除器：留得住 DDL、吃得掉註解（它自己的鑑別力）")
     void stripperKeepsDdlAndDropsComments() {
-        // 留得住：這三個片段只可能來自真正的 DDL。
         assertTrue(CODE.contains("CREATE TABLE IF NOT EXISTS uber_quotes ("), "剝除器把 DDL 也吃掉了");
         assertTrue(CODE.contains("ALTER TABLE shipments ADD COLUMN"), "剝除器把 ALTER TABLE 也吃掉了");
         assertTrue(CODE.contains("COMMENT ON TABLE uber_quotes IS"), "剝除器把 COMMENT ON 也吃掉了");
-        // 吃得掉：這兩個片段只出現在 -- 註解裡（原始檔有、剝完後不該有）。
         assertTrue(RAW.contains("刻意不做的事"), "原始檔應含這段註解——它是本斷言的對照組");
         assertFalse(CODE.contains("刻意不做的事"), "剝除器沒有真的剝掉 -- 註解");
         assertTrue(RAW.contains("uber_webhook_inbox"), "原始檔的註解應提到 uber_webhook_inbox——對照組");
@@ -161,7 +154,6 @@ class UberDirectSchemaContractTest {
                 "uber_webhook_inbox 只出現在註解裡，剝完後不該還在（否則否定斷言全是假紅）");
     }
 
-    // ─────────────────────────── 表存在性 ───────────────────────────
 
     @Test
     @DisplayName("66 §5.1 指定的八張表全部建立，且沒有多建")
@@ -188,9 +180,6 @@ class UberDirectSchemaContractTest {
     @Test
     @DisplayName("🔴 client_secret 不落任何一張表（66 §5.1.1／§8.5）")
     void neverPersistsClientSecret() {
-        // ⚠️ 這裡只掃 CREATE TABLE 的欄位定義，不掃整份 DDL——COMMENT ON 的字串裡
-        //    刻意寫著「client_secret 不在本表」，掃全文會被自己的說明文字打成假紅。
-        //    要守的不變式是「沒有一個叫 client_secret 的欄位」，不是「這個字串不准出現」。
         for (String table : EXPECTED_TABLES) {
             assertFalse(tableBody(table).contains("client_secret"),
                     table + " 不得有 client_secret 欄位——它只能放 k8s secret "
@@ -198,7 +187,6 @@ class UberDirectSchemaContractTest {
         }
     }
 
-    // ─────────────────────────── 逐表欄位 ───────────────────────────
 
     @Test
     @DisplayName("uber_account 欄位（66 §5.1.1）")
@@ -209,7 +197,6 @@ class UberDirectSchemaContractTest {
         assertColumn(b, "uber_account", "client_id", "VARCHAR(128)");
         assertColumn(b, "uber_account", "organization_id", "VARCHAR(128)");
         assertColumn(b, "uber_account", "enabled", "BOOLEAN");
-        // 停用走 enabled=false，不刪列 ⇒ 預設必須是關的（開啟是一次明確的動作）。
         assertTrue(b.contains("enabled BOOLEAN NOT NULL DEFAULT false"),
                 "uber_account.enabled 預設必須是 false");
     }
@@ -220,7 +207,6 @@ class UberDirectSchemaContractTest {
         String b = tableBody("uber_organization");
         assertColumn(b, "uber_organization", "id", "BIGINT PRIMARY KEY");
         assertColumn(b, "uber_organization", "uber_account_id", "BIGINT");
-        // 🔴 賣家業務鍵是 store_id，不是 account_id（身分分離，設計書 44）
         assertColumn(b, "uber_organization", "store_id", "BIGINT");
         assertFalse(b.contains("seller_account_id"),
                 "66 §5.1.2 逐字要求 store_id（賣家業務鍵），不得用 account_id");
@@ -247,7 +233,6 @@ class UberDirectSchemaContractTest {
         assertColumn(b, "uber_store_mapping", "tax_form_required", "BOOLEAN");
         assertColumn(b, "uber_store_mapping", "health_status", "VARCHAR(20)");
 
-        // 66 §5.1.3 逐字的預設值
         assertTrue(b.contains("supported_temps JSONB NOT NULL DEFAULT '[\"3201\"]'"),
                 "supported_temps 預設必須只有常溫 [\"3201\"]（Uber API 完全沒有溫層欄位，檢查 100% 在我方）");
         assertTrue(b.contains("max_packages INTEGER NOT NULL DEFAULT 30"), "max_packages 預設 30（M-4）");
@@ -258,7 +243,6 @@ class UberDirectSchemaContractTest {
                 "66 §5.1.3 逐字：UNIQUE (seller_store_id, external_store_id)");
         assertTrue(b.contains("CHECK (health_status IN ('HEALTHY', 'DEGRADED', 'BLOCKED', 'UNKNOWN'))"),
                 "health_status 值域必須逐字是 HEALTHY｜DEGRADED｜BLOCKED｜UNKNOWN");
-        // INV-U6：active=true ⇒ blocked=false
         assertTrue(b.contains("CHECK ((NOT active) OR (NOT blocked))"),
                 "INV-U6 必須由 DB CHECK 守：違反的症狀是對已封鎖門市持續建單、每筆 403");
     }
@@ -273,15 +257,12 @@ class UberDirectSchemaContractTest {
         assertColumn(b, "uber_quotes", "buyer_id", "BIGINT");
         assertColumn(b, "uber_quotes", "seller_store_id", "BIGINT");
         assertColumn(b, "uber_quotes", "external_store_id", "VARCHAR(64)");
-        // 🔴 金額一律 BIGINT（新台幣元整數）
         assertColumn(b, "uber_quotes", "fee_amount", "BIGINT");
         assertColumn(b, "uber_quotes", "currency", "VARCHAR(8)");
         assertColumn(b, "uber_quotes", "expires_at", "TIMESTAMPTZ");
         assertColumn(b, "uber_quotes", "pickup_json", "JSONB");
         assertColumn(b, "uber_quotes", "dropoff_json", "JSONB");
         assertColumn(b, "uber_quotes", "items_json", "JSONB");
-        // 🔴 payload_hash：66 A9 的核心。少了它，「換了取件門市但 hash 相同 ⇒ 用舊報價建新門市的單」
-        //    就完全無從偵測，而且是靜默的（運費對得起來、門市是錯的）。
         assertColumn(b, "uber_quotes", "payload_hash", "CHAR(64)");
         assertColumn(b, "uber_quotes", "packing_policy_version", "INTEGER");
         assertColumn(b, "uber_quotes", "status", "VARCHAR(24)");
@@ -301,11 +282,9 @@ class UberDirectSchemaContractTest {
         assertColumn(b, "uber_deliveries", "delivery_id", "VARCHAR(128)");
         assertColumn(b, "uber_deliveries", "shipment_id", "BIGINT");
         assertColumn(b, "uber_deliveries", "quote_id", "VARCHAR(64)");
-        // 🔴 leg 的真相在 is_return，不在 id 前綴（前綴是 provider 的實作細節）
         assertColumn(b, "uber_deliveries", "is_return", "BOOLEAN");
         assertColumn(b, "uber_deliveries", "related_deliveries", "JSONB");
         assertColumn(b, "uber_deliveries", "provider_status", "VARCHAR(32)");
-        // 🔴 courier_imminent 是 boolean 欄位，不是第 8 個狀態
         assertColumn(b, "uber_deliveries", "courier_imminent", "BOOLEAN");
         assertColumn(b, "uber_deliveries", "courier_name", "VARCHAR(128)");
         assertColumn(b, "uber_deliveries", "courier_phone_masked", "VARCHAR(32)");
@@ -315,7 +294,6 @@ class UberDirectSchemaContractTest {
         assertColumn(b, "uber_deliveries", "cancelation_reason", "VARCHAR(64)");
         assertColumn(b, "uber_deliveries", "outcome", "VARCHAR(32)");
 
-        // 🔴 未遮罩的外送員電話不得落庫（66 §5.1.5／§8.6）：Uber 給的是可撥打的臨時號碼。
         assertFalse(Pattern.compile("(?<![0-9a-zA-Z_])courier_phone(?!_masked)").matcher(b).find(),
                 "只准存遮罩後的 courier_phone_masked，原值不落庫也不落 log");
 
@@ -323,15 +301,12 @@ class UberDirectSchemaContractTest {
         assertTrue(b.contains("UNIQUE (shipment_id)"), "INV-U3：shipment_id UNIQUE（違反＝狀態寫不回去）");
         assertTrue(b.contains("UNIQUE (delivery_id)"), "66 §5.3：delivery_id UNIQUE 是建單重試的最後一道");
 
-        // Uber 原生 7 值（U-I）。
         assertTrue(b.contains("provider_status IN ('pending', 'pickup', 'pickup_complete', 'dropoff',"
                         + " 'delivered', 'canceled', 'returned')"),
                 "provider_status 值域必須逐字是 Uber 原生 7 值（66 §7.3.1）");
-        // 容忍值：counter ＋ 不寫入狀態 ⇒ 它不該進值域，否則等於默許把它寫成一個狀態。
         assertFalse(b.contains("shopping_completed"),
                 "shopping_completed 是容忍值：counter ＋ 不寫入狀態（66 §7.3.1），不得進值域");
 
-        // UberDeliveryOutcome 五值（66 C.2 ④）——「41 這一格的錢與責任歸誰」的唯一判準
         assertTrue(b.contains("outcome IN ('PROVIDER_UNDELIVERABLE', 'PROVIDER_CANCELED', 'SELLER_CANCELED',"
                         + " 'ADMIN_CANCELED', 'CREATE_FAILED')"),
                 "outcome 值域必須逐字是 UberDeliveryOutcome 五值");
@@ -345,13 +320,11 @@ class UberDirectSchemaContractTest {
         assertColumn(b, "uber_pod_artifacts", "delivery_id", "VARCHAR(128)");
         assertColumn(b, "uber_pod_artifacts", "artifact_type", "VARCHAR(20)");
         assertColumn(b, "uber_pod_artifacts", "asset_id", "BIGINT");
-        // 🔴 欄名叫 _key、存的是 key（不是 URL）——多媒體規範的命名誠實要求
         assertColumn(b, "uber_pod_artifacts", "object_key", "VARCHAR(512)");
         assertFalse(b.contains("object_url"), "存 key 就叫 _key，禁止 *_url 名存 key 值");
         assertColumn(b, "uber_pod_artifacts", "pincode_value", "VARCHAR(32)");
         assertColumn(b, "uber_pod_artifacts", "fetched_at", "TIMESTAMPTZ");
         assertColumn(b, "uber_pod_artifacts", "fetch_attempts", "INTEGER");
-        // 🔴 租約欄不是「已抓過」旗標
         assertColumn(b, "uber_pod_artifacts", "fetch_lease_until", "TIMESTAMPTZ");
 
         assertTrue(b.contains("UNIQUE (delivery_id, artifact_type)"),
@@ -366,7 +339,6 @@ class UberDirectSchemaContractTest {
         String policy = tableBody("packing_policy");
         assertColumn(policy, "packing_policy", "id", "BIGINT PRIMARY KEY");
         assertColumn(policy, "packing_policy", "version", "INTEGER");
-        // 🔴 void_factor 是「係數不是金額」——本 migration 唯一允許的非整數型別
         assertColumn(policy, "packing_policy", "void_factor", "NUMERIC(4,2)");
         assertColumn(policy, "packing_policy", "packaging_weight_gram", "INTEGER");
         assertColumn(policy, "packing_policy", "max_items_per_package", "INTEGER");
@@ -378,7 +350,6 @@ class UberDirectSchemaContractTest {
                 "max_items_per_package 預設 12");
         assertTrue(policy.contains("UNIQUE (version)"),
                 "version 是 quote 快照指向的業務鍵，必須 UNIQUE");
-        // fail-closed：係數 <= 0 會讓「下界估計 × 係數」恆為 0 ⇒ 體積檢查恆過，而且完全無聲
         assertTrue(policy.contains("CHECK (void_factor > 0)"), "void_factor 必須 > 0（否則體積檢查恆過）");
 
         String plan = tableBody("package_plan");
@@ -406,7 +377,6 @@ class UberDirectSchemaContractTest {
         assertTrue(m.group(2).contains("12"), "初始 max_items_per_package 必須是 66 §5.1.8 的 12");
     }
 
-    // ─────────────────────────── 金額型別紅線 ───────────────────────────
 
     @Test
     @DisplayName("🔴 金額欄一律 BIGINT；NUMERIC 只准出現在 void_factor（係數不是金額）")
@@ -421,12 +391,10 @@ class UberDirectSchemaContractTest {
         }
     }
 
-    // ─────────────────────────── partial index 述詞 ───────────────────────────
 
     @Test
     @DisplayName("🔴 三條 partial index 的 WHERE 述詞與 66 §5.2 逐字相符")
     void partialIndexPredicatesMatchDesignVerbatim() {
-        // ⚠️ 述詞若與 mapper 的查詢不完全相符，PostgreSQL 不會用這個索引，而且不會報錯——只會慢。
         assertDdlContains(
                 "CREATE INDEX IF NOT EXISTS idx_uber_quotes_expiry ON uber_quotes (expires_at) "
                         + "WHERE status = 'CREATED';",
@@ -442,7 +410,6 @@ class UberDirectSchemaContractTest {
                 "66 §5.2：未終態回查候選的 partial index");
     }
 
-    // ─────────────────────────── 既有表擴充 ───────────────────────────
 
     @Test
     @DisplayName("shipments 新增租約欄，且 🔴 不回填（66 §5.4）")
@@ -450,10 +417,8 @@ class UberDirectSchemaContractTest {
         assertDdlContains(
                 "ALTER TABLE shipments ADD COLUMN IF NOT EXISTS uber_status_reconcile_next_at TIMESTAMPTZ;",
                 "66 §5.1.10：shipments 新增回查租約欄");
-        // 租約欄 NULL 的正確語意就是「從未被搶佔、立即可搶」；回填成 NOW() 會讓既有列沉默一個租約週期。
         assertDdlAbsent("UPDATE shipments SET uber_status_reconcile_next_at",
                 "🔴 66 §5.4 逐字：租約欄不得回填");
-        // DEFAULT NOW() 等同於對每一列回填。
         assertDdlAbsent("uber_status_reconcile_next_at TIMESTAMPTZ DEFAULT",
                 "🔴 租約欄不得有 DEFAULT（等同回填）");
     }
@@ -472,15 +437,12 @@ class UberDirectSchemaContractTest {
         String columns = m.group(1);
         String values = m.group(2);
 
-        // 🔴 enabled = false 是本列存在的全部理由（66 §3.4 ①／陷阱 A1′）：
-        //    建列是「要求」，開啟才是那一步不可逆的切換（§12.2 步 9）。
         assertTrue(columns.contains("enabled"), "INSERT 必須顯式指定 enabled（該欄 DB 預設是 true）");
         assertTrue(values.contains("false"),
                 "🔴 3003 列必須以 enabled = false 建立。切成 true 而程式還在 Phase 1 ＝ 陷阱 A1："
                         + "買家付錢、建出沒人送的單、零告警");
         assertFalse(values.contains("true"), "3003 列的 INSERT 不得有任何 true");
 
-        // 值來自 66 §0.1 的 M-1／M-2／M-3
         assertTrue(values.contains("'3003', '3201'"), "配送方式 3003（Uber）／溫層 3201（常溫）");
         assertTrue(values.contains("20000"), "M-1：我方重量上限 20,000 g");
         assertTrue(values.contains("125000"), "M-2：我方體積上限 125,000 cm³");

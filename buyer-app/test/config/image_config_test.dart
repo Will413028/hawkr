@@ -7,7 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   testWidgets('API 的圖片只換掉 {preset}，不經過 buildImageUrl', (tester) async {
-    // /i/{preset}/ 形狀的網址，buildImageUrl 會取出 key、改用 App 設定的媒體網域重組；API 的圖片不能被改寫。
     final image = api.Image(
       uriTemplate: 'https://media.example/i/{preset}/public/banners/1.png',
     );

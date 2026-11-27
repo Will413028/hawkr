@@ -20,10 +20,8 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/trimtext"
 )
 
-// failedResolved 是人工結案成失敗的原因碼（failure_reason）。
 const failedResolved = "admin_resolved"
 
-// evidenceMax 與 provider 外部 ID 的欄位上限相同（CHECK 的 255）。
 const evidenceMax = 255
 
 // ResolveAnomaly 是後台對 ANOMALY 的搬錢物件的人工結案：管理員核對 provider 之後，把它結案成 AnomalySucceeded（provider 確實執行了，evidence 是 provider 物件 ID，必填）
@@ -95,8 +93,6 @@ func (s *Service) ResolveAnomaly(ctx context.Context, actor adminaudit.Actor, ki
 	})
 }
 
-// validateResolution 檢查人工結案的原因代碼與備註：原因必須是已知的值，而且與結果相容（PROVIDER_EXECUTED_NOT_RECORDED 只搭配成功、PROVIDER_NOT_EXECUTED 只搭配失敗）；
-// 備註去頭尾空白後 1 到 ResolutionNoteMaxRunes 個字元。回傳整理過的備註。
 func validateResolution(outcome model.AnomalyOutcome, reason model.AnomalyResolutionReason, note string) (string, error) {
 	if !slices.Contains(model.AnomalyResolutionReasonValues(), reason) {
 		return "", apperr.InvalidInputOn([]string{"Reason"}, "結案原因必填")
@@ -119,8 +115,6 @@ var (
 	errEvidenceChanged  = apperr.FailedPrecondition("核對 provider 之後這筆紀錄又變動了，請重新核對")
 )
 
-// evidenceProof 是核對過證據時用的列上識別：key 是查回用的冪等鍵（嘗試 ID），parent 是退款核對時付款的外部 ID、撤回核對時轉帳的外部 ID；transaction 內鎖列後要確認沒變。
-// 轉帳核對另外帶 provider 核實的轉帳金額 amount 與累計已撤回額 reversed。
 type evidenceProof struct {
 	key      uuid.UUID
 	parent   string
@@ -128,7 +122,6 @@ type evidenceProof struct {
 	reversed int64
 }
 
-// verifyEvidence 在 transaction 外向 provider 查回管理員給的證據：以列上的嘗試 ID 查，找到的物件 ID 與金額都要和證據、列相符。
 func (s *Service) verifyEvidence(ctx context.Context, kind model.AnomalyKind, id uuid.UUID, evidence string) (evidenceProof, error) {
 	q := store.New(s.d.DB.Conn(ctx))
 	callCtx, cancel := context.WithTimeout(ctx, callTimeout)
@@ -251,7 +244,6 @@ func (s *Service) verifyEvidence(ctx context.Context, kind model.AnomalyKind, id
 	return evidenceProof{}, apperr.InvalidInput("不認得的物件種類")
 }
 
-// conflictOrErr 把 provider 外部 ID 的唯一鍵衝突轉成 AlreadyExists（證據指到別的列）。
 func conflictOrErr(err error) error {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -339,8 +331,6 @@ func (s *Service) resolveTransfer(ctx context.Context, q *store.Queries, id uuid
 	return reason, s.startTopups(ctx, q, resolved.PaymentOrderID)
 }
 
-// reassignWaitingReversals 在轉帳人工結案成成功之後，以 provider 核實的轉帳為準重新分配等待中的撤回預留：剩餘可撤額度 = 核實的金額 − provider 上已撤回的額度 − 其他進行中的預留，
-// 依退款建立順序給每筆 min(退款額, 剩餘)，分到 0 的釋出（RELEASED，no_reversible_amount）；分配完讓 provider 已接受退款的撤回開始。呼叫方已鎖付款列與轉帳列。
 func (s *Service) reassignWaitingReversals(ctx context.Context, q *store.Queries, tr store.PaymentTransfer, proof evidenceProof) error {
 	waiting, err := q.WaitingReversals(ctx, tr.PaymentOrderID)
 	if err != nil {
@@ -382,7 +372,6 @@ func (s *Service) reassignWaitingReversals(ctx context.Context, q *store.Queries
 	return s.startReversals(ctx, q, tr.PaymentOrderID)
 }
 
-// resolveRefund 結案退款呼叫的異常（見 ResolveAnomaly）：鎖順序付款列、轉帳列、退款列。失敗時等待中的撤回預留由寫 FAILED 的同一個 statement 釋出。
 func (s *Service) resolveRefund(ctx context.Context, q *store.Queries, id uuid.UUID, outcome model.AnomalyOutcome, evidence string, proof evidenceProof) (string, error) {
 	r, err := q.RefundByID(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -436,7 +425,6 @@ func (s *Service) resolveRefund(ctx context.Context, q *store.Queries, id uuid.U
 	return reason, enqueueRefundSync(ctx, s.d.Jobs, id)
 }
 
-// resolveTopup 結案補差額轉帳的異常（見 ResolveAnomaly）：鎖順序付款列、退款列。成功＝provider 確實補了差額（evidence 是轉帳 ID，進 DONE）；失敗＝確認沒有補，不補了（RELEASED，人工另行處理）。
 func (s *Service) resolveTopup(ctx context.Context, q *store.Queries, id uuid.UUID, outcome model.AnomalyOutcome, evidence string, proof evidenceProof) (string, error) {
 	r, err := q.RefundByID(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -471,8 +459,6 @@ func (s *Service) resolveTopup(ctx context.Context, q *store.Queries, id uuid.UU
 	return reason, nil
 }
 
-// resolveReversal 結案撤回列的異常（見 ResolveAnomaly）：id 是撤回列 ID。鎖順序：付款列、轉帳列（目標是原轉帳時）、退款列（依 ID 升序，含補差額轉帳的擁有者）、撤回列。
-// 成功時累加目標的累計撤回額（不超過目標剩餘可撤額）並重算退款的彙總；失敗釋出這一列並重算彙總。
 func (s *Service) resolveReversal(ctx context.Context, q *store.Queries, id uuid.UUID, outcome model.AnomalyOutcome, evidence string, proof evidenceProof) (string, error) {
 	seg, err := q.RefundReversalByID(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -530,7 +516,6 @@ func (s *Service) resolveReversal(ctx context.Context, q *store.Queries, id uuid
 	return reason, s.settleReversal(ctx, q, locked, evidence, now)
 }
 
-// targetRemaining 讀撤回列目標（已鎖）的剩餘可撤額度：原轉帳是 amount - reversed_amount，補差額轉帳是退款額 - topup_reversed_amount（且必須是 DONE）。
 func (s *Service) targetRemaining(ctx context.Context, q *store.Queries, seg store.PaymentRefundReversal) (int64, error) {
 	if seg.TargetRefundID == nil {
 		tr, err := q.SucceededTransferByOrder(ctx, seg.PaymentOrderID)

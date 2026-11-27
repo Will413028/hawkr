@@ -48,9 +48,6 @@ func (s *InvoiceServer) GetInvoiceDocumentFile(
 		if errors.Is(err, usecase.ErrInvalidFileStyle) {
 			return nil, status.Errorf(codes.InvalidArgument, "style: %v", err)
 		}
-		// 9301／9312／9313 走 envelope（HTTP 仍是 200，gateway 依碼映射），
-		// 其餘走 internal。**不得把 9312 當錯誤**：載具發票中獎前沒有 PDF 是
-		// 正常業務分支，前端據它不渲染下載按鈕（§6.1.4 鐵則 4）。
 		if code, msg, ok := bizOf(err); ok {
 			return &pb.GetInvoiceDocumentFileResponse{Code: code, Message: msg}, nil
 		}

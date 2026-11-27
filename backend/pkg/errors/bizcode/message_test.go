@@ -8,11 +8,11 @@ import "testing"
 // 出來但對不上碼（欄序改了、篩選條件改了）。
 func TestMessage_CoversRepresentativeCodes(t *testing.T) {
 	for _, code := range []int32{
-		InsufficientStock,                        // Order，最小的碼段
-		ShipmentNotFound,                         // Shipping
-		DelegationResourceVersionConflict,        // 代行營運，稽核面板實際會顯示的那一組
-		DelegationUpstreamUnavailable,            // 同上
-		DelegationCapabilityDependencyIncomplete, // 代行營運碼段的尾端
+		InsufficientStock,
+		ShipmentNotFound,
+		DelegationResourceVersionConflict,
+		DelegationUpstreamUnavailable,
+		DelegationCapabilityDependencyIncomplete,
 	} {
 		if Message(code) == "" {
 			t.Errorf("Message(%d) 為空，錯誤碼.md 有登記訊息", code)

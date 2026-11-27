@@ -164,8 +164,6 @@ test("intent 的掃描集合涵蓋六支組確認文案的檔案（鑑別力自�
 	for (const expected of [
 		"features/delegated-operations/products/DelegatedProductCreatePage.tsx",
 		"features/delegated-operations/products/DelegatedProductEditPage.tsx",
-		// 以下四支住在 seller-center／seller 之下，卻同樣被代行工作區渲染 ——
-		// 違規當初能長出來，正是因為守規則的測試只掃 delegated-operations。
 		"features/seller-center/products/ProductsPage.tsx",
 		"features/seller-center/posts/PostComposeClient.tsx",
 		"features/seller-center/profile/SellerProfileClient.tsx",
@@ -174,7 +172,6 @@ test("intent 的掃描集合涵蓋六支組確認文案的檔案（鑑別力自�
 		assert.ok(files.includes(expected), `掃描集合缺少 ${expected}`);
 	}
 
-	// 述詞要抓得到違規形狀，也不得把合法形狀誤判成違規。
 	const bad = intentLiterals(
 		"fake.tsx",
 		`\t\t\tintent: \`以 ADM 身分替本店下架 \${n} 項商品\`,\n`,

@@ -142,7 +142,6 @@ void main() {
     });
 
     test('10-digit seconds and 13-digit milliseconds are epoch', () {
-      // 1785398400 = 2026-07-30T08:00:00Z
       expect(TaipeiDisplay.plainIso('1785398400'), '2026/07/30 16:00');
       expect(TaipeiDisplay.plainIso('1785398400000'), '2026/07/30 16:00');
     });
@@ -159,9 +158,9 @@ void main() {
   group('plainIso (non-time digits are not parsed)', () {
     test('digit runs of other lengths and text with digits are null', () {
       for (final raw in [
-        '17853984000', // 11 digits
-        '178539840000', // 12 digits
-        '17853984000000', // 14 digits
+        '17853984000',
+        '178539840000',
+        '17853984000000',
         'ts=1785398400',
         'order 1785398400000 shipped',
       ]) {
@@ -180,7 +179,7 @@ void main() {
   });
 
   group('TaipeiFormat', () {
-    final t = DateTime.utc(2026, 7, 4, 16, 5); // Taipei 2026-07-05 00:05
+    final t = DateTime.utc(2026, 7, 4, 16, 5);
     test('three layouts, digits and symbols only', () {
       String f(TaipeiFormat x) => TaipeiDisplay.plain(t, x);
       expect(TaipeiFormat.values, hasLength(3));
@@ -204,7 +203,6 @@ void main() {
   });
 
   group('plainSeparator / isBeforeTaipeiToday', () {
-    // now = 2026-07-31 00:10 Taipei.
     final now = DateTime.utc(2026, 7, 30, 16, 10);
     test('same Taipei day shows the time only, else date and time', () {
       expect(
@@ -279,7 +277,7 @@ void main() {
 
   group('picker conversions', () {
     test('initial is one day after now in Taipei wall clock', () {
-      final now = DateTime.utc(2026, 7, 30, 16, 0); // Taipei 07-31 00:00
+      final now = DateTime.utc(2026, 7, 30, 16, 0);
       final base = taipeiPickerInitial(now.add(const Duration(days: 1)));
       expect(base.initialDate, DateTime(2026, 8, 1));
       expect(base.initialTime, (hour: 0, minute: 0));
@@ -296,7 +294,6 @@ void main() {
   });
 
   group('taipeiCalendarDaysAgo / formatTaipeiTimeAgo', () {
-    // 2026-07-30 16:00Z is 2026-07-31 00:00 in Taipei.
     final before = DateTime.utc(2026, 7, 30, 15, 59);
     final after = DateTime.utc(2026, 7, 30, 16, 1);
 
@@ -354,13 +351,11 @@ void main() {
     });
 
     test('over 24h but one Taipei calendar day ago across midnight', () {
-      // now = 2026-07-31 00:10 Taipei; time = 2026-07-30 00:05 Taipei (24h05 earlier).
       final now = DateTime.utc(2026, 7, 30, 16, 10);
       expect(
         taipeiTimeAgo(DateTime.utc(2026, 7, 29, 16, 5), now: now),
         const TimeAgoDays(1),
       );
-      // 7 days boundary: 2026-07-24 00:05 Taipei is 7 calendar days ago.
       expect(
         taipeiTimeAgo(DateTime.utc(2026, 7, 23, 16, 5), now: now),
         const TimeAgoMonthDay(7, 24),
@@ -372,7 +367,6 @@ void main() {
     });
 
     test('year is the Taipei year, not the UTC year', () {
-      // 2026-01-01 00:30 Taipei is still 2025-12-31 UTC.
       final now = DateTime.utc(2025, 12, 31, 16, 30);
       expect(
         taipeiTimeAgo(DateTime.utc(2025, 12, 1), now: now),
@@ -411,7 +405,6 @@ void main() {
     test(
       'an unmarked wall clock reads the same relative label from a UTC-5 device',
       () {
-        // The device offset never enters the pure function: the same wall clock string gives the same instant.
         final instant = tryParseTaipeiInstant('2026-07-30 08:30:00')!;
         final now = DateTime.utc(
           2026,
@@ -419,7 +412,7 @@ void main() {
           30,
           2,
           30,
-        ); // 10:30 Taipei, 21:30 the day before at UTC-5.
+        );
         expect(taipeiTimeAgo(instant, now: now), const TimeAgoHours(2));
       },
     );

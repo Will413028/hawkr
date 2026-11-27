@@ -45,7 +45,6 @@ func (f *fixture) must(err error) {
 	}
 }
 
-// leaf 回傳任一個葉節點的 ID（種子分類）。
 func (f *fixture) leaf() uuid.UUID {
 	f.t.Helper()
 	var id uuid.UUID
@@ -53,7 +52,6 @@ func (f *fixture) leaf() uuid.UUID {
 	return id
 }
 
-// sku 建一個商品與一個預設 SKU，庫存為 qty。
 func (f *fixture) sku(qty int) uuid.UUID {
 	f.t.Helper()
 	pid, sid := uuid.NewV7(), uuid.NewV7()
@@ -130,7 +128,7 @@ func TestReplaySameKeyIsNoOpAndDifferentContentIsRejected(t *testing.T) {
 	f := newFixture(t)
 	a, b := f.sku(10), f.sku(10)
 	f.must(f.m.DeductStock(f.ct, "k", items(a, 2, b, 1)))
-	f.must(f.m.DeductStock(f.ct, "k", items(b, 1, a, 2))) // 順序不同、內容相同
+	f.must(f.m.DeductStock(f.ct, "k", items(b, 1, a, 2)))
 	if f.stockOf(a) != 8 || f.stockOf(b) != 9 {
 		t.Fatalf("重送不得再扣：a=%d b=%d", f.stockOf(a), f.stockOf(b))
 	}
@@ -142,7 +140,6 @@ func TestReplaySameKeyIsNoOpAndDifferentContentIsRejected(t *testing.T) {
 	if f.stockOf(a) != 8 {
 		t.Fatalf("被拒的重送不得改庫存：%d", f.stockOf(a))
 	}
-	// 歸還用同一個鍵：種類不同。
 	if err := f.m.RestoreStock(f.ct, "k", "k", nil); !errors.Is(err, ErrDeductionNotFound) && !errors.Is(err, ErrIdempotencyKeyReused) {
 		t.Errorf("以扣減的鍵歸還自己：%v", err)
 	}
@@ -310,15 +307,15 @@ func TestRestoreFollowsTheOriginalDeduction(t *testing.T) {
 		t.Fatalf("被拒的歸還不得改庫存：a=%d other=%d", f.stockOf(a), f.stockOf(other))
 	}
 
-	f.must(f.m.RestoreStock(f.ct, "r1", "d", items(a, 3))) // 部分歸還
-	f.must(f.m.RestoreStock(f.ct, "r1", "d", items(a, 3))) // 重送：不再歸還
+	f.must(f.m.RestoreStock(f.ct, "r1", "d", items(a, 3)))
+	f.must(f.m.RestoreStock(f.ct, "r1", "d", items(a, 3)))
 	if err := f.m.RestoreStock(f.ct, "r2", "d", items(a, 2)); !errors.Is(err, ErrRestoreExceedsDeduction) {
 		t.Errorf("累計 3+2 超過 4：%v", err)
 	}
 	if err := f.m.RestoreStock(f.ct, "r1", "d", items(a, 1)); !errors.Is(err, ErrIdempotencyKeyReused) {
 		t.Errorf("同鍵不同量：%v", err)
 	}
-	f.must(f.m.RestoreStock(f.ct, "r3", "d", nil)) // 剩下的全部：a 1、b 3
+	f.must(f.m.RestoreStock(f.ct, "r3", "d", nil))
 	if f.stockOf(a) != 10 || f.stockOf(b) != 10 {
 		t.Fatalf("a=%d b=%d，want 10 與 10", f.stockOf(a), f.stockOf(b))
 	}

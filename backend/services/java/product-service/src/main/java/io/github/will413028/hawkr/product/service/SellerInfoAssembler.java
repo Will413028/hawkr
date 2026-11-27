@@ -18,7 +18,6 @@ public class SellerInfoAssembler {
         if (meta.getSellerName() != null && !meta.getSellerName().isEmpty()) {
             builder.name(meta.getSellerName());
         }
-        // 49 §6.6 S9：SellerMeta 內部欄已於批 3 改回 objectKey（logo_key），只填 key，顯示 URL 由 Gateway 組
         if (meta.getLogoKey() != null && !meta.getLogoKey().isEmpty()) {
             builder.logoKey(meta.getLogoKey());
         }

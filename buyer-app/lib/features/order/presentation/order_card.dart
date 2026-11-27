@@ -49,7 +49,6 @@ class _OrderCardState extends ConsumerState<OrderCard> {
   bool _isPayLoading = false;
   final bool _isConfirmLoading = false;
   Order? _detailOrder;
-  // B-185: 待付款倒數每 30 秒刷新一次（不需要每秒 tick，省電 + 視覺穩定）
   Timer? _paymentDeadlineTicker;
 
   Order get order => widget.order;
@@ -70,7 +69,6 @@ class _OrderCardState extends ConsumerState<OrderCard> {
     if (_isPendingPayment) {
       _paymentDeadlineTicker = Timer.periodic(const Duration(seconds: 30), (_) {
         if (!mounted) return;
-        // 重 build 讓 OrderInfoColumn 重算 paymentCountdownLabel。
         setState(() {});
       });
     }
@@ -87,13 +85,9 @@ class _OrderCardState extends ConsumerState<OrderCard> {
     setState(() => _expanded = !_expanded);
   }
 
-  // ─── Build ───────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    // 邊框 / 陰影 / 圓角 — 對齊 Figma node 10632:149278
-    // 用 strokeAlignInside（預設）：邊框畫在 clip path 內側，搭配 Clip.antiAlias
-    // 圓角不會出現不連續。strokeAlignOutside 在 antialias clip 下角落會被切。
     final cardBorderSide = BorderSide(width: 1, color: AppColors.cardBorder);
     final storeCard = ref.watch(storeCardProvider(order.storeId)).value;
     final storeCode = storeCard != null && storeCard.isOpen
@@ -149,7 +143,6 @@ class _OrderCardState extends ConsumerState<OrderCard> {
               children: [
                 _buildStatusHeader(),
 
-                // ── 店家與收件摘要 ──
                 Padding(
                   padding: EdgeInsets.fromLTRB(
                     AppSpacing.lg,
@@ -172,8 +165,6 @@ class _OrderCardState extends ConsumerState<OrderCard> {
                       SizedBox(width: AppSpacing.sm),
                       Expanded(
                         child: OrderInfoColumn(
-                          // 待付款卡片優先吃 detail（含 paymentDeadline）；
-                          // detail 還沒載完先用列表級 order 撐住基本資訊。
                           order: _isPendingPayment
                               ? (_detailOrder ?? order)
                               : order,
@@ -203,8 +194,6 @@ class _OrderCardState extends ConsumerState<OrderCard> {
                   child: _buildDeliverySummary(),
                 ),
 
-                // 待付款必須直接看到操作；其他訂單預設收合，訂單編號與按鈕
-                // 僅在展開後顯示。
                 if (!_canExpand) _buildOrderBottomSection(context),
                 if (_canExpand)
                   AnimatedSize(
@@ -339,8 +328,6 @@ class _OrderCardState extends ConsumerState<OrderCard> {
     final detailFirst = _detailOrder?.items.isEmpty ?? true
         ? null
         : _detailOrder!.items.first;
-    // 列表契約未帶圖片時，使用同一筆訂單詳情的商品快照補齊；
-    // 其他文字仍優先採列表資料，避免等待詳情時整列跳動。
     final first = listFirst?.imageUrl.trim().isNotEmpty == true
         ? listFirst
         : (detailFirst?.imageUrl.trim().isNotEmpty == true
@@ -374,7 +361,6 @@ class _OrderCardState extends ConsumerState<OrderCard> {
                     width: 44.w,
                     height: 44.w,
                     fit: BoxFit.cover,
-                    // 圖片失效時維持乾淨的商品圖示，不顯示破圖符號。
                     errorWidget: productImageFallback,
                   )
                 : productImageFallback,
@@ -475,11 +461,8 @@ class _OrderCardState extends ConsumerState<OrderCard> {
     );
   }
 
-  // ─── 展開內容切換 ───────────────────────────────────────
 
   Widget _buildExpandedContent() {
-    // 僅 watch 最新 snapshot；lookup 的刷新由 [OrderListScreen._refreshCurrentTab]
-    // 統一觸發（下拉刷新 / tab 切換 / FCM / lifecycle resume / 首次挂载）
     final snapshot = ref
         .watch(afterSaleOrderLookupProvider)
         .value?[order.orderSn];
@@ -489,7 +472,6 @@ class _OrderCardState extends ConsumerState<OrderCard> {
     return OrderExpandedSection(order: order);
   }
 
-  // ─── Actions ────────────────────────────────────────────
 
   Future<void> _fetchOrderDetail() async {
     try {
@@ -536,7 +518,6 @@ class _OrderCardState extends ConsumerState<OrderCard> {
 
     showFloatingToast(context, '已確認收貨', isSuccess: true);
     ref.read(orderListControllerProvider.notifier).refresh();
-    // 讓詳情頁也重抓資料，新拍的照片才會被 _PhotosCard 顯示出來
     ref.invalidate(orderDetailControllerProvider(order.orderSn));
     ref.invalidate(memberCardsControllerProvider);
   }

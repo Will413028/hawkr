@@ -155,7 +155,6 @@ describe("preview products tab", () => {
 			items: Array<{ id: string }>;
 			cardPreview: boolean;
 		};
-		// 4004 以數字形式回來的列表項（舊路徑）同樣是上架中。
 		expect(props.items.map((item) => item.id)).toEqual(["1", "4"]);
 		expect(props.cardPreview).toBe(true);
 	});

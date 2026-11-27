@@ -38,7 +38,6 @@ var pg *testdb.Server
 
 func TestMain(m *testing.M) { testdb.Main(m, &pg) }
 
-// queue 記錄排入的 job（必須在 transaction 內，與真正的 jobs.Client 相同）。
 type queue struct {
 	mu   sync.Mutex
 	args []river.JobArgs
@@ -72,13 +71,11 @@ func (q *queue) reset() {
 	q.args = nil
 }
 
-// orders 是 im 的訂單 port 的替身。
 type orders struct {
 	mu    sync.Mutex
 	open  bool
 	err   error
 	calls int
-	// inTx 記錄任何一次呼叫時 ctx 是否帶著 transaction（Send 不得在寫入 transaction 內呼叫 legacy）。
 	inTx bool
 }
 
@@ -92,17 +89,14 @@ func (o *orders) OpenOrderBetween(ctx context.Context, _, _ int64) (bool, error)
 	return o.open, o.err
 }
 
-// buyers 是 im 的 Buyers port 的替身：買家的帳號預設是 1000 + buyer_id，測試可以改（同一個帳號同時有買家與店家身分）。
 type buyers struct {
 	mu       sync.Mutex
 	accounts map[int64]int64
 	blocking bool
 	blockErr error
-	// owner 是真正的 buyer 模組：守門 LockNotClosed 與關閉買家（CloseForDeletion）都走它。
 	owner *buyer.Module
 }
 
-// seedParties 以明確的 ID 建立營運中的買家與店家列（最小的合法列，不經 OnAccountCreated）。守門走真正的 buyer 與 seller 模組，沒有列的 ID 回 NotFound。
 func seedParties(t *testing.T, d *db.DB, buyerIDs, storeIDs []int64) {
 	t.Helper()
 	ctx := context.Background()
@@ -116,7 +110,6 @@ func seedParties(t *testing.T, d *db.DB, buyerIDs, storeIDs []int64) {
 	}
 }
 
-// closeStoreRows 把店家改成已關閉並退場，兩張表的列一起合法（stores_current_closure_fkey 在 commit 時檢查，所以必須在 transaction 內，且先寫關店紀錄）。
 func closeStoreRows(ctx context.Context, d *db.DB, storeID int64) error {
 	if _, ok := db.TxFrom(ctx); !ok {
 		return errors.New("closeStoreRows 必須在 transaction 內呼叫")
@@ -129,7 +122,6 @@ func closeStoreRows(ctx context.Context, d *db.DB, storeID int64) error {
 	return err
 }
 
-// reopenStoreRows 是 closeStoreRows 的反向（測試用：讓同一家店回到營運中），同樣必須在 transaction 內。
 func reopenStoreRows(ctx context.Context, d *db.DB, storeID int64) error {
 	if _, ok := db.TxFrom(ctx); !ok {
 		return errors.New("reopenStoreRows 必須在 transaction 內呼叫")
@@ -164,16 +156,13 @@ func (b *buyers) IsBlockingStore(context.Context, int64, int64) (bool, error) {
 	return b.blocking, b.blockErr
 }
 
-// stores 是 im 的 Stores port 的替身：店家預設是營運中、沒有停權，帳號是 2000 + store_id。
 type stores struct {
 	mu    sync.Mutex
 	owner *seller.Module
 	byID  map[int64]seller.Store
 	err   error
 	block bool
-	// blockErr 讓 StoreBlocksBuyer 回錯誤。
 	blockErr error
-	// afterLock 在 LockNotRetired 取到鎖之後呼叫（Send 的 transaction 此時持有買家與店家的守門鎖），測試用它把 transaction 停在持鎖中。
 	afterLock func()
 }
 
@@ -212,7 +201,6 @@ func (s *stores) BuyersBlockedByStore(_ context.Context, _ int64, ids []int64) (
 	return s.blockedAll(ids)
 }
 
-// blockedAll 依 block 與 blockErr 回答批次封鎖查詢：封鎖時輸入的每個 ID 都算被封鎖。
 func (s *stores) blockedAll(ids []int64) (map[int64]bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -236,7 +224,6 @@ func (*queue) EnqueueReport(context.Context, river.JobArgs, *river.InsertOpts) (
 	return true, nil
 }
 
-// noRegistry、noProducts、noOrders 是 seller 的外部 port 的替身：這裡的測試只用 seller 的守門與表，不會呼叫它們。
 type noRegistry struct{}
 
 func (noRegistry) Lookup(context.Context, string) (gcis.Registration, bool, error) {
@@ -269,7 +256,6 @@ type fixture struct {
 	sent    []im.MessageSent
 }
 
-// clock 每次呼叫前進一毫秒：對話列表的排序鍵與訊息時間在測試中是確定的。
 func (f *fixture) clock() time.Time {
 	f.clockMu.Lock()
 	defer f.clockMu.Unlock()
@@ -317,7 +303,6 @@ func setup(t *testing.T) *fixture {
 	return f
 }
 
-// stage 以 accountID 為上傳者放一張公開 PNG，回傳可 Confirm 的 token 與資產 ID。
 func (f *fixture) stage(t *testing.T, accountID int64) (string, uuid.UUID) {
 	t.Helper()
 	var body bytes.Buffer
@@ -372,7 +357,6 @@ func (f *fixture) storeParty(t *testing.T, id int64) im.Party {
 	return im.Party{Kind: im.PartyStore, Store: &st}
 }
 
-// say 以對方的 ID 送出文字（首則訊息或既有對話都是這條路徑：對話由 (buyer_id, store_id) 決定）。
 func (f *fixture) say(t *testing.T, from im.Party, counterpart int64, text string) im.Message {
 	t.Helper()
 	m, err := f.m.Send(context.Background(), im.SendInput{RequestID: uuid.NewV4(), Sender: from, CounterpartID: counterpart, Type: im.TypeText, Text: text})
@@ -384,7 +368,6 @@ func (f *fixture) say(t *testing.T, from im.Party, counterpart int64, text strin
 
 func kindOf(err error) apperr.Kind { return apperr.KindOf(err) }
 
-// conversation 回傳 (buyer, store) 的對話 ID。
 func (f *fixture) conversation(t *testing.T, buyerID, storeID int64) uuid.UUID {
 	t.Helper()
 	var id uuid.UUID

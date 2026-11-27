@@ -88,18 +88,11 @@ export function useCart(): UseCartResult {
 	const queryClient = useQueryClient();
 	const cartKey = queryKeys.checkout.cart(identity);
 
-	// Mount with empty state; backend response below populates. Cart 模組
-	// 已對齊 buyer-app:沒有 localStorage first-paint cache,避免 stale 資料
-	// 被誤當真相帶進 checkout(這是先前 6005 的根因之一)。Backend RTT
-	// 通常 < 100ms,loading skeleton 體感無感。
 	const [error, setError] = React.useState<CartError | null>(null);
 	const [banner, setBanner] = React.useState<CartBanner | null>(null);
 	const cartQuery = useQuery({
 		queryKey: cartKey,
 		queryFn: accountQueryFn(status, loadCart),
-		// Transactional state is never a discovery snapshot. Keep cached rows on
-		// screen, but reconcile whenever this tab mounts/foregrounds/reconnects so
-		// another browser tab or device cannot leave the checkout entry stale.
 		staleTime: 0,
 		refetchOnMount: "always",
 		refetchOnWindowFocus: "always",
@@ -121,11 +114,6 @@ export function useCart(): UseCartResult {
 
 	const dismissBanner = React.useCallback(() => setBanner(null), []);
 
-	// True while THIS instance is running a mutation. The cart mutation fns
-	// broadcast CART_UPDATED on success; without this guard the echo bounces
-	// straight back into the listener below and fires a redundant refetch
-	// (skeleton flash) over the data onSuccess already wrote. Other instances
-	// (navbar / cart page) aren't mutating, so they still sync on the event.
 	const mutatingRef = React.useRef(false);
 
 	const refetchCart = cartQuery.refetch;
@@ -134,11 +122,10 @@ export function useCart(): UseCartResult {
 		await refetchCart();
 	}, [refetchCart]);
 
-	// Cross-tab / cross-instance sync: a mutation elsewhere → re-fetch backend.
 	React.useEffect(() => {
 		if (typeof window === "undefined") return;
 		const onUpdated = () => {
-			if (mutatingRef.current) return; // skip our own mutation's echo
+			if (mutatingRef.current) return;
 			void refresh();
 		};
 		window.addEventListener(CART_UPDATED_EVENT, onUpdated);
@@ -153,8 +140,6 @@ export function useCart(): UseCartResult {
 	 */
 	const surfaceError = React.useCallback(
 		(err: CartError): CartError => {
-			// 6001 CART_ITEM_NOT_FOUND — typically means the row was cleaned up
-			// by another tab/device that completed checkout. Treat as info.
 			if (err.code === 6001) {
 				setBanner({
 					kind: "info",
@@ -164,9 +149,6 @@ export function useCart(): UseCartResult {
 				void refresh();
 				return err;
 			}
-			// 6003 CART_ITEM_LOCKED — same buyer is mid-confirm somewhere. The
-			// confirm gRPC is server-side sync (< 5s) and the lock auto-expires
-			// after 2 min (CartService.LOCK_TTL_MINUTES). No "cancel" UI exists.
 			if (err.code === 6003) {
 				setBanner({
 					kind: "info",
@@ -176,18 +158,12 @@ export function useCart(): UseCartResult {
 				void refresh();
 				return err;
 			}
-			// Real errors that need user attention.
 			setError(err);
 			return err;
 		},
 		[refresh],
 	);
 
-	// Optimistic cart mutation as a real useMutation: onMutate cancels in-flight
-	// refetches (so a late GET can't clobber the optimistic write), snapshots the
-	// cache for rollback, and predicts the result; onSuccess overwrites with the
-	// backend truth; onError rolls back. `predict`/`call` ride in as variables so
-	// add / updateQty / remove / clear can share one mutation.
 	const cartMutation = useMutation({
 		mutationFn: ({
 			call,
@@ -289,17 +265,12 @@ export function useCart(): UseCartResult {
 	const remove = React.useCallback(
 		async (skuId: string) =>
 			runMutation(
-				// Keep the initiating row mounted until the DELETE settles so its
-				// branded pending button remains visible. The backend response still
-				// replaces the cache on success; failures retain the same snapshot.
 				(prev) => prev,
 				() => removeFromCart(skuId),
 			),
 		[runMutation],
 	);
 
-	// Clearing is a destructive whole-cart mutation. Keep the in-flight promise
-	// in a ref so two clicks in the same render frame can never issue two DELETEs.
 	const clearPendingRef = React.useRef<Promise<MutationOutcome> | null>(null);
 	const clearAll = React.useCallback(() => {
 		if (clearPendingRef.current) return clearPendingRef.current;

@@ -21,7 +21,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-// recorded 記下某一種事件；concurrent 的測試也安全。
 type recorded[E any] struct {
 	mu    sync.Mutex
 	items []E
@@ -44,7 +43,6 @@ func (r *recorded[E]) all() []E {
 	return slices.Clone(r.items)
 }
 
-// everExposed 記下店家曾經公開過（first_exposed_at），讓它可以被通報：通報的對象只能是曾經公開過的店。
 func (f *fixture) everExposed(t *testing.T, storeID int64) {
 	t.Helper()
 	_, err := f.db.Conn(context.Background()).Exec(context.Background(),
@@ -72,7 +70,6 @@ func (f *fixture) foodSafetyReport(t *testing.T, storeID, buyerID int64) SubmitR
 	return r
 }
 
-// violate 以新的認定建立一個依據認定的措施：penalty 是 WARNING 或 SUSPENSION，停權帶結束時間。
 func (f *fixture) violate(t *testing.T, storeID int64, severity Severity, kind MeasureKind, endsAt *time.Time) Measure {
 	t.Helper()
 	r, err := f.module.CreateMeasure(context.Background(), CreateMeasureInput{
@@ -83,7 +80,6 @@ func (f *fixture) violate(t *testing.T, storeID int64, severity Severity, kind M
 	return r.Measure
 }
 
-// riskSuspend 建立沒有固定期間的 RISK 停權（複審期限七天後）。
 func (f *fixture) riskSuspend(t *testing.T, storeID int64) Measure {
 	t.Helper()
 	review := f.now.Add(7 * 24 * time.Hour)
@@ -95,7 +91,6 @@ func (f *fixture) riskSuspend(t *testing.T, storeID int64) Measure {
 	return r.Measure
 }
 
-// endRisk 結束 RISK 措施（風險已排除）。
 func (f *fixture) endRisk(t *testing.T, m Measure) Measure {
 	t.Helper()
 	f.afterCreation(m)
@@ -104,14 +99,12 @@ func (f *fixture) endRisk(t *testing.T, m Measure) Measure {
 	return ended
 }
 
-// afterCreation 讓 fixture 的時鐘晚於措施的建立時間：結束時間一定晚於建立時間（measures_ends_check），而凍結的時鐘會讓兩者相等。
 func (f *fixture) afterCreation(m Measure) {
 	if !f.now.After(m.CreatedAt) {
 		f.now = m.CreatedAt.Add(time.Microsecond)
 	}
 }
 
-// measureOf 讀 admin 看到的措施。
 func (f *fixture) measureOf(t *testing.T, id uuid.UUID) Measure {
 	t.Helper()
 	m, err := f.module.Measure(context.Background(), id)
@@ -119,10 +112,8 @@ func (f *fixture) measureOf(t *testing.T, id uuid.UUID) Measure {
 	return m
 }
 
-// suspend 建立沒有固定期間的 RISK 停權（riskSuspend 的簡寫，給只需要「帳號被停權」的測試）。
 func (f *fixture) suspend(t *testing.T, storeID int64) Measure { return f.riskSuspend(t, storeID) }
 
-// lift 結束 RISK 措施（以措施目前的後台版本）：帳號恢復。
 func (f *fixture) lift(ctx context.Context, m Measure) (Measure, error) {
 	current, err := f.module.Measure(ctx, m.ID)
 	if err != nil {
@@ -132,8 +123,6 @@ func (f *fixture) lift(ctx context.Context, m Measure) (Measure, error) {
 	return f.module.EndMeasure(ctx, EndMeasureInput{MeasureID: m.ID, AdminID: 7, ExpectedVersion: current.Version})
 }
 
-// insertEndedRisk 直接寫一筆已結束的 RISK 措施（結束時間在過去），withSnapshot 時帶一列身分快照：模擬結束 job 遺失、帳號沒有任何
-// 期間可掃的情形。
 func (f *fixture) insertEndedRisk(t *testing.T, storeID, accountID int64, withSnapshot bool) uuid.UUID {
 	t.Helper()
 	ctx := context.Background()
@@ -158,7 +147,6 @@ func (f *fixture) insertEndedRisk(t *testing.T, storeID, accountID int64, withSn
 	return id
 }
 
-// isSuspended 回報店家所屬帳號此刻是否停權（讀店家時的推導）。
 func (f *fixture) isSuspended(t *testing.T, storeID int64) bool {
 	t.Helper()
 	s, err := f.module.Store(context.Background(), storeID)
@@ -194,7 +182,6 @@ func TestSubmitReportValidatesTheInput(t *testing.T) {
 	if foodSafety.Supplemented || foodSafety.Report.ReporterBuyerID != 6 || foodSafety.Report.Outcome != nil || foodSafety.Report.State() != ReportStateAwaitingTriage || foodSafety.Report.Version != 1 {
 		t.Fatalf("foodSafety=%+v", foodSafety)
 	}
-	// 分案期限來自 SQL 的審閱政策（seller.review_report_triage）：通報人選了食安 4 小時，其他類別 72 小時，開始是建立時間。
 	read, err := f.module.Report(ctx, foodSafety.Report.ID)
 	must(t, err)
 	if d := read.TriageDeadline; d == nil || !d.Start.Equal(f.now) || !d.Due.Equal(f.now.Add(4*time.Hour)) {
@@ -250,7 +237,6 @@ func TestReportCategoryIsLimitedToWhatAReporterCanPick(t *testing.T) {
 			t.Errorf("清單篩選的類別 %q：%v，預期 invalid_argument", c, err)
 		}
 	}
-	// 生效的類別：待分案的是檢舉人選的類別；分案之後是平台判定類別（可以是檢舉人不能選的 PLATFORM_ABUSE）。
 	other := policy.Other
 	page, err := f.module.AdminReports(ctx, ReportListInput{Category: &other, PageSize: 10})
 	must(t, err)
@@ -314,7 +300,7 @@ func TestReportDedupUsesTheTaipeiDay(t *testing.T) {
 	f := setup(t)
 	_, s := f.open(t)
 	f.everExposed(t, s.StoreID)
-	f.now = time.Date(2026, 10, 1, 15, 30, 0, 0, time.UTC) // 台北 10/1（四）23:30
+	f.now = time.Date(2026, 10, 1, 15, 30, 0, 0, time.UTC)
 	first := f.buyerReport(t, s.StoreID, 5, policy.Fraud)
 	again := f.buyerReport(t, s.StoreID, 5, policy.Fraud)
 	if !again.Supplemented || again.ReportID != first.ReportID || again.Report == nil || again.Report.ID != first.ReportID {
@@ -323,7 +309,7 @@ func TestReportDedupUsesTheTaipeiDay(t *testing.T) {
 	if other := f.buyerReport(t, s.StoreID, 5, policy.Counterfeit); other.Supplemented {
 		t.Fatal("another category is not a supplement")
 	}
-	f.now = time.Date(2026, 10, 1, 16, 30, 0, 0, time.UTC) // 台北 10/2（五）00:30，UTC 仍是 10/1
+	f.now = time.Date(2026, 10, 1, 16, 30, 0, 0, time.UTC)
 	if next := f.buyerReport(t, s.StoreID, 5, policy.Fraud); next.Supplemented || next.ReportID == first.ReportID {
 		t.Fatal("next Taipei day must be a new report")
 	}
@@ -346,7 +332,6 @@ func TestAReportWithAnOutcomeIsNoLongerDeduplicated(t *testing.T) {
 	if next := f.foodSafetyReport(t, s.StoreID, 6); next.Supplemented || next.ReportID == foodSafety.ReportID {
 		t.Fatalf("食安檢舉也一樣：%+v", next)
 	}
-	// 新的這一筆還沒有結果，再送一次就是補充到它。
 	if third := f.buyerReport(t, s.StoreID, 5, policy.Fraud); !third.Supplemented || third.ReportID != again.ReportID {
 		t.Fatalf("third=%+v", third)
 	}
@@ -372,7 +357,6 @@ func TestSupplementsAttachToTheOriginalReport(t *testing.T) {
 	caseBefore := f.caseOf(t, *c.CaseID)
 	f.jobs.args = nil
 	f.now = f.now.Add(time.Hour)
-	// 暫存有存活期限：時間走過一小時之後才放，補充送出時才還沒過期。
 	e3Token, e3 := f.stageSecure(t, buyer, evidencePDF("e3"))
 	second, err := f.module.SubmitReport(ctx, SubmitReportInput{
 		StoreID: s.StoreID, ReporterBuyerID: 5, AccountID: buyerAccount, Category: policy.Fraud, Description: "  補充：又看到一次  ", EvidenceTokens: []string{e3Token},
@@ -391,27 +375,22 @@ func TestSupplementsAttachToTheOriginalReport(t *testing.T) {
 	for _, id := range []uuid.UUID{e1, e2, e3} {
 		f.wantAsset(t, id, "ACTIVE")
 	}
-	// 補充改通報的版本，不改案件的版本（案件顯示「有新的補充」，直到下一次案件層級的處理）。
 	caseAfter := f.caseOf(t, *c.CaseID)
 	if caseAfter.Version != caseBefore.Version || !caseAfter.UpdatedAt.Equal(caseBefore.UpdatedAt) || caseAfter.UnseenSupplementReports != 1 || !f.reportOf(t, first.ReportID).HasUnseenSupplements() {
 		t.Fatalf("補充不改案件的版本：before=%+v after=%+v", caseBefore.Case, caseAfter.Case)
 	}
-	// 通報的版本前進：之前讀到的版本分案、設定結果會撞版本。
 	_, err = f.module.ResolveReport(ctx, ResolveReportInput{ReportID: first.ReportID, AdminID: 8, Outcome: OutcomeNoViolation, ExpectedVersion: c.Version})
 	wantKind(t, err, apperr.KindVersionConflict)
-	// 案件層級的處理之後，「有新的補充」消失。
 	f.now = f.now.Add(time.Minute)
 	f.mustResolve(t, first.ReportID, OutcomeInsufficient)
 	if f.caseOf(t, *c.CaseID).UnseenSupplementReports != 0 {
 		t.Fatal("處理之後不再有新的補充")
 	}
-	// 事件：每次送出各發一個；補充的事件帶 supplement_id。
 	events := received.all()
 	if len(events) != 2 || events[0].SupplementID != nil || events[1].SupplementID == nil || *events[1].SupplementID != detail.Supplements[0].ID ||
 		events[1].ReportID != first.ReportID || events[1].ReporterBuyerID != 5 || events[1].Category != policy.Fraud {
 		t.Fatalf("events=%+v", events)
 	}
-	// 補充只新增：DB 的補充表沒有檢舉人的聯絡方式欄位。
 	if n := f.count(t, "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'seller' AND table_name = 'report_supplements' AND column_name LIKE 'reporter%'"); n != 0 {
 		t.Fatalf("report_supplements 不存檢舉人的聯絡方式：%d 欄", n)
 	}
@@ -426,7 +405,6 @@ func TestSupplementLimitIsTen(t *testing.T) {
 	accountID, s := f.open(t)
 	f.everExposed(t, s.StoreID)
 
-	// 10 則之後的第 11 次回 failed_precondition，什麼都不存。
 	submit := func(description string, tokens ...string) (SubmitReportResult, error) {
 		return f.module.SubmitReport(ctx, SubmitReportInput{
 			StoreID: s.StoreID, ReporterBuyerID: 5, AccountID: accountID + 1000, Category: policy.Fraud, Description: description, EvidenceTokens: tokens,
@@ -453,7 +431,6 @@ func TestSupplementLimitIsTen(t *testing.T) {
 	if got := len(received.all()); got != 1+MaxSupplements {
 		t.Fatalf("被擋下的第 11 次不發事件：%d", got)
 	}
-	// 版本只隨存下的補充前進。
 	if v := f.reportOf(t, original.ReportID).Version; v != 1+MaxSupplements {
 		t.Fatalf("版本只隨存下的補充前進：%d", v)
 	}
@@ -496,7 +473,6 @@ func TestEventFailuresRollBackTheWholeCommand(t *testing.T) {
 	}
 }
 
-// newCaseForRollback 開一個案件（訂閱者已經會失敗，所以分案不發事件的路徑才走得通）。
 func (f *fixture) newCaseForRollback(t *testing.T, storeID int64) (AdminCase, []AdminReport) {
 	t.Helper()
 	return f.newCase(t, storeID, policy.Counterfeit, SeverityLow, 1)
@@ -541,7 +517,7 @@ func TestAdminInboxKeysetHasNoGapsOrDuplicates(t *testing.T) {
 	var all []uuid.UUID
 	for i := range 9 {
 		if i%3 == 0 {
-			f.now = f.now.Add(time.Minute) // 其餘同一個時間，以 ID 決定順序
+			f.now = f.now.Add(time.Minute)
 		}
 		store := a.StoreID
 		if i%2 == 1 {
@@ -559,7 +535,7 @@ func TestAdminInboxKeysetHasNoGapsOrDuplicates(t *testing.T) {
 		in := ReportListInput{PageSize: 4}
 		if oldestFirst {
 			awaiting := ReportStateAwaitingTriage
-			in.State = &awaiting // 待分案依建立時間舊到新
+			in.State = &awaiting
 		}
 		var seen []uuid.UUID
 		var last *Report
@@ -620,7 +596,7 @@ func TestReportEvidenceIsConfirmedInTheSubmittingTransaction(t *testing.T) {
 	ctx := context.Background()
 	accountID, s := f.open(t)
 	f.everExposed(t, s.StoreID)
-	buyerAccount := accountID + 1000 // 檢舉人的帳號不是店家的擁有者
+	buyerAccount := accountID + 1000
 	buyer := media.Uploader{ID: buyerAccount}
 	e1Token, e1 := f.stageSecure(t, buyer, evidencePDF("e1"))
 	e2Token, e2 := f.stageSecure(t, buyer, evidencePDF("e2"))
@@ -639,7 +615,6 @@ func TestReportEvidenceIsConfirmedInTheSubmittingTransaction(t *testing.T) {
 		t.Fatalf("evidence=%+v", detail.Evidence)
 	}
 
-	// 同一位檢舉人的另一次送出先寫入：這次的送出併入那一筆（補充），佐證接在後面。
 	if _, err := f.module.SubmitReport(ctx, SubmitReportInput{StoreID: s.StoreID, ReporterBuyerID: 6, Category: policy.Fraud, Description: "搶先"}); err != nil {
 		t.Fatal(err)
 	}
@@ -714,7 +689,6 @@ func TestMeasureLocksTheSourceReport(t *testing.T) {
 	}
 }
 
-// maxSourceReports 是一個認定最多的來源通報數（API 契約 NewFinding.source_report_ids 的上限）。
 const maxSourceReports = 20
 
 // 來源通報有任何一筆不合格，整個建立都不寫入：別的店家的（invalid_argument，指到那一筆）、結果被否定的（failed_precondition）、
@@ -834,7 +808,6 @@ func TestAppealEvidenceIsConfirmedInTheSubmittingTransaction(t *testing.T) {
 	}
 }
 
-// warningFrom 是以新的認定建立警告的輸入，來源通報可選（可以多筆）。
 func (f *fixture) warningFrom(storeID int64, sources ...uuid.UUID) CreateMeasureInput {
 	return CreateMeasureInput{
 		AdminID: 7, StoreID: storeID, Kind: MeasureWarning, StatementToSeller: "y", Note: "x",
@@ -893,7 +866,6 @@ func TestCreateMeasureRequestIDIgnoresTheOrderOfSourceReportsAndCitedFindings(t 
 		f.buyerReport(t, s.StoreID, 6, policy.Fraud).Report.ID,
 		f.buyerReport(t, s.StoreID, 7, policy.Fraud).Report.ID,
 	}
-	// 兩筆既有的認定供引用（各由一個警告建立）。
 	var cited []uuid.UUID
 	for range 2 {
 		earlier, err := f.module.CreateMeasure(ctx, f.warningFrom(s.StoreID))
@@ -998,7 +970,6 @@ func TestFindingReportsMigrationMovesTheSingleSourceReport(t *testing.T) {
 	}
 	exec("INSERT INTO seller.stores (store_code, account_id, store_name, created_at, updated_at) VALUES (2600000003, 31, 'a', now(), now())")
 	exec("INSERT INTO seller.reports (id, store_id, category, description, reporter_buyer_id, created_at, updated_at) SELECT uuidv7(), store_id, 'FRAUD', 'x', 5, now(), now() FROM seller.stores WHERE store_code = 2600000003")
-	// 認定的建立措施（origin_measure）與這個 migration 無關：丟掉外鍵，免得為了兩列認定先造措施。
 	exec("ALTER TABLE seller.violations DROP CONSTRAINT violations_origin_measure_fkey")
 	insert := "INSERT INTO seller.violations (id, store_id, account_id, source_report_id, category, severity, origin_measure_id, created_by_admin_id, created_at, updated_at) " +
 		"SELECT uuidv7(), s.store_id, s.account_id, (SELECT id FROM seller.reports LIMIT 1) IF_SOURCE, 'FRAUD', 'LOW', uuidv7(), 7, now(), now() FROM seller.stores s WHERE s.store_code = 2600000003"

@@ -314,8 +314,6 @@ void main() {
       final secondRemoval = await coordinator.remove('fcm-token');
       expect(secondRemoval.disposition, DeviceMutationDisposition.rejected);
 
-      // Budget exhausted: the loop this guards against runs logout → reset →
-      // removal, so reset must not hand the next iteration a fresh budget.
       coordinator.reset();
       final shorted = await coordinator.remove('fcm-token');
       final shortedRegister = await coordinator.register('fcm-token');
@@ -404,7 +402,6 @@ void main() {
       );
 
       final removal = coordinator.remove('fcm-token');
-      // 登出後重新登入：coordinator 是 app 生命週期單例，會跨這個邊界存活。
       coordinator.reset();
       final registration = coordinator.register('fcm-token');
       await Future<void>.delayed(Duration.zero);

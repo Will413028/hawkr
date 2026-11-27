@@ -9,12 +9,7 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-// SQL 的跨模組讀取（ADR 2026-09-24-go-modular-monolith 文末修訂「跨模組讀取改用擁有者發布的 pub_*」的強制機制）：模組的 sqlc 只讀自己的
-// schema.sql（與 objects.sql）加依賴表允許的模組的 db/pub.sql，所以 query 參照別的模組的內部表在 sqlc generate 時就失敗；pub.sql 只宣告擁有者發布的
-// `<owner>.pub_*` 的形狀。這裡檢查兩件事：sqlc.yaml 的 schema 清單（CheckSQLCConfig）與 pub.sql 的內容（CheckPubSQL）。pub.sql 與真實
-// 物件一致由 cmd/hawkr 的契約測試（TestPubContractsMatchMigrations）檢查。
 
-// pubSchemaPath 是 sqlc.yaml（在 internal/modules/<模組>/db）指向別的模組 pub.sql 的唯一寫法。
 var pubSchemaPath = regexp.MustCompile(`^\.\./\.\./([a-z]+)/db/pub\.sql$`)
 
 type sqlcConfig struct {
@@ -202,7 +197,7 @@ func CheckDesiredStateSplit(module, file, content string) []string {
 		}
 		object := desiredStmt.FindStringSubmatch(stmt)
 		if len(object) > 1 && strings.EqualFold(object[1], "TYPE") && enumType.MatchString(stmt) {
-			object = nil // enum 是 Atlas 社群版會 diff 的 desired state，跟表一樣放 schema.sql
+			object = nil
 		}
 		switch file {
 		case "schema.sql":
@@ -218,8 +213,6 @@ func CheckDesiredStateSplit(module, file, content string) []string {
 	return out
 }
 
-// splitStatements 以分號切開 body（dollar quote 已換掉、註解已去掉）。字串裡的分號不切；`BEGIN ATOMIC … END` 的 body 裡的分號也不切：
-// 從 BEGIN ATOMIC 起，CASE 與 END 配對，回到零層的 END 才結束 body。
 func splitStatements(body string) []string {
 	blank := blankStrings(body)
 	keywords := atomicKeyword.FindAllStringSubmatchIndex(blank, -1)

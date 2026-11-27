@@ -674,7 +674,6 @@ it("已經有店家（走更新）：不顯示勾選框，也不需要勾選就�
 			onboardingCompleted: false,
 		},
 	});
-	// 即使伺服器對「再開一間店」回 STORE_EXISTS，有店家時也不查、不擋。
 	mocks.opening.mockImplementation(async () => ({
 		canApplyStore: false,
 		unavailabilities: [

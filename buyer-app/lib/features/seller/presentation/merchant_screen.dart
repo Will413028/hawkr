@@ -41,11 +41,10 @@ class _MerchantScreenState extends ConsumerState<MerchantScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
-  // 商家信息狀態
   bool _isLoading = true;
   bool _merchantNotFound =
-      false; // GetStore 回 not_found（不存在或不公開）→ 顯示 empty state
-  String? _loadError; // 其他失敗（網路、伺服器）→ 顯示可重試的錯誤，不當成店家不存在
+      false;
+  String? _loadError;
   String _merchantName = '';
   String _merchantBannerUrl = '';
   String _merchantAvatarPayload = '';
@@ -53,16 +52,14 @@ class _MerchantScreenState extends ConsumerState<MerchantScreen>
   String _merchantLocation = '';
   String _merchantDescription = '';
   String _merchantAward = '';
-  double? _merchantRating; // 沒有評分（讀不到或還沒有評價）是 null，不當成 0
+  double? _merchantRating;
   int? _merchantRatingCount;
   int _merchantFollowerCount = 0;
   bool _isFollowing = false;
   bool _isTogglingFollow = false;
 
-  // GetStore 回的 store id；商品、貼文、討論區與追蹤都以它為鍵。
   String? _resolvedMerchantId;
 
-  // Prefetch cache for Shop tab
   List<Map<String, dynamic>>? _shopPrefetchedProducts;
   bool _shopPrefetchReady = false;
   bool _shopPrefetchStarted = false;
@@ -173,7 +170,6 @@ class _MerchantScreenState extends ConsumerState<MerchantScreen>
       final mid = _merchantIdOrEmpty;
       if (mid.isEmpty) return;
 
-      // 樂觀更新：先切換 UI，再呼叫 API
       final wasFollowing = _isFollowing;
       final prevCount = _merchantFollowerCount;
 
@@ -191,7 +187,6 @@ class _MerchantScreenState extends ConsumerState<MerchantScreen>
           await ref.read(followRepositoryProvider).follow(mid);
         }
       } catch (e) {
-        // API 失敗 → 回滾
         HKLog.logW('[MerchantScreen] toggleFollow failed, rolling back', e);
         if (!mounted) return;
         setState(() {
@@ -269,7 +264,6 @@ class _MerchantScreenState extends ConsumerState<MerchantScreen>
 
   @override
   Widget build(BuildContext context) {
-    // 讀取失敗（非 not_found）→ 可重試的錯誤，不要讓人以為店家不存在
     final loadError = _loadError;
     if (!_isLoading && loadError != null) {
       return Scaffold(
@@ -311,7 +305,6 @@ class _MerchantScreenState extends ConsumerState<MerchantScreen>
       );
     }
 
-    // 商家不存在 / API 404 → 顯示 empty state，不要 render 整個空白商家頁
     if (!_isLoading && _merchantNotFound) {
       return Scaffold(
         backgroundColor: AppColors.bgPrimary,

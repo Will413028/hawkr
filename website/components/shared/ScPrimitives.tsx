@@ -4,7 +4,6 @@ import * as React from "react";
 import { useDragScroll } from "@/lib/hooks/useDragScroll";
 import { cn } from "@/lib/utils/cn";
 
-// ─── ScFilters ────────────────────────────────────────────────────────────────
 
 interface ScFiltersProps {
 	className?: string;
@@ -30,13 +29,6 @@ export function ScFilters({
 	const ref = React.useRef<HTMLDivElement | null>(null);
 	useDragScroll(ref);
 
-	// Keep the active tab in view without forcing the user to drag. On a
-	// narrow phone the selected status (e.g. 待付款 at the far left, or
-	// 已完成 at the far right) can land clipped at an edge; centre it on
-	// mount and whenever the active pill's aria-selected/-current flips
-	// (tab navigation reuses the same DOM nodes, so a MutationObserver on
-	// those attributes is enough — no need to thread an activeKey prop
-	// through every call site).
 	React.useEffect(() => {
 		const el = ref.current;
 		if (!el) return;
@@ -48,8 +40,6 @@ export function ScFilters({
 			if (!active) return;
 			const elRect = el.getBoundingClientRect();
 			const aRect = active.getBoundingClientRect();
-			// Already fully visible — leave the scroll position alone so we
-			// don't yank the rail on every unrelated re-render.
 			if (aRect.left >= elRect.left && aRect.right <= elRect.right) return;
 			const target =
 				el.scrollLeft +
@@ -60,15 +50,6 @@ export function ScFilters({
 		};
 
 		centerActive();
-		// Re-centre on three triggers:
-		//  • aria-current/-selected flips — tab navigation reuses the same DOM
-		//    nodes, so observing the attributes catches a status change.
-		//  • childList/characterData — the order counts load async and their
-		//    badge <span>s widen the pills *after* mount. Without this the
-		//    centring computed against count-less widths leaves the active tab
-		//    clipped at an edge once the counts arrive — the reported "top tab
-		//    can't be tapped" (a clipped pill is a tiny edge target).
-		//  • ResizeObserver — rotation / responsive width changes re-clip too.
 		const observer = new MutationObserver(centerActive);
 		observer.observe(el, {
 			subtree: true,
@@ -94,18 +75,9 @@ export function ScFilters({
 			ref={ref}
 			className={cn(
 				"flex flex-nowrap gap-[var(--hkui-space-2)] overflow-x-auto cursor-grab select-none [scrollbar-width:none] [overscroll-behavior-x:contain] [&::-webkit-scrollbar]:hidden [&>*]:flex-none",
-				// The scrollbar is hidden and the row is drag-scrolled, which left a
-				// mouse user with no sign that there was more to the right at all.
-				// A mask fade on the trailing edge is that sign, and it costs no
-				// layout: it only appears while the row actually overflows because a
-				// non-overflowing row has nothing under the faded strip.
 				"[mask-image:linear-gradient(to_right,black_0,black_calc(100%-24px),transparent_100%)]",
 				className,
 			)}
-			// NOT `role="tablist"`: these pills are links and toggle buttons, not
-			// tabs — there is no tabpanel to control and arrow keys do not move
-			// between them. A tablist with zero `role="tab"` children announces a
-			// keyboard model that does not exist, which is worse than no role.
 			role="group"
 			aria-label={ariaLabel}
 		>
@@ -114,7 +86,6 @@ export function ScFilters({
 	);
 }
 
-// ─── ScPill ───────────────────────────────────────────────────────────────────
 
 interface ScPillBaseProps {
 	active?: boolean;
@@ -155,7 +126,6 @@ export function ScPill({ active, className, children, ...rest }: ScPillProps) {
 			as: "button";
 		} & React.ButtonHTMLAttributes<HTMLButtonElement>;
 		return (
-			// A toggle pill: pressed state, not a selected tab.
 			<button
 				type="button"
 				aria-pressed={active}
@@ -171,7 +141,6 @@ export function ScPill({ active, className, children, ...rest }: ScPillProps) {
 		as?: "a";
 	} & React.AnchorHTMLAttributes<HTMLAnchorElement>;
 	return (
-		// A navigating pill: the active one IS the current page.
 		<a
 			aria-current={active ? "page" : undefined}
 			{...anchorProps}
@@ -182,7 +151,6 @@ export function ScPill({ active, className, children, ...rest }: ScPillProps) {
 	);
 }
 
-// ─── ScPillCount ──────────────────────────────────────────────────────────────
 
 interface ScPillCountProps {
 	active?: boolean;
@@ -208,7 +176,6 @@ export function ScPillCount({ active, children }: ScPillCountProps) {
 	);
 }
 
-// ─── ScEmpty ──────────────────────────────────────────────────────────────────
 
 interface ScEmptyProps {
 	className?: string;
@@ -234,7 +201,6 @@ export function ScEmpty({ className, children }: ScEmptyProps) {
 	);
 }
 
-// ─── ScEmptyTitle ─────────────────────────────────────────────────────────────
 
 interface ScEmptyTitleProps {
 	children: React.ReactNode;
@@ -252,7 +218,6 @@ export function ScEmptyTitle({ children }: ScEmptyTitleProps) {
 	);
 }
 
-// ─── ScEmptyDesc ──────────────────────────────────────────────────────────────
 
 interface ScEmptyDescProps {
 	children: React.ReactNode;
@@ -270,7 +235,6 @@ export function ScEmptyDesc({ children }: ScEmptyDescProps) {
 	);
 }
 
-// ─── ScSection ────────────────────────────────────────────────────────────────
 
 interface ScSectionProps {
 	className?: string;

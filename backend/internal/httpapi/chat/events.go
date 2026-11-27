@@ -67,7 +67,6 @@ func StreamWriteDeadline(ctx context.Context) func(time.Time) error {
 	return set
 }
 
-// classifyEnd 把模組結束串流的原因對到對外的錯誤：關店是 failed_precondition 與 STORE_CLOSED，伺服器關閉是 unavailable（client 依 backoff 重連）。
 func classifyEnd(err error) (error, bool) {
 	var ended *im.Ended
 	if !errors.As(err, &ended) {
@@ -81,7 +80,6 @@ func classifyEnd(err error) (error, bool) {
 	return apperr.WithCause(apperr.Unavailable("服務重新啟動中，請稍後重連"), err), true
 }
 
-// parseCursors 解析 cursors：key 必須是對話 ID。數量上限由模組守（MaxCursors），超過回 invalid_argument 指向 cursors。
 func parseCursors(raw map[string]int64) (map[uuid.UUID]int64, error) {
 	out := make(map[uuid.UUID]int64, len(raw))
 	for k, v := range raw {
@@ -94,7 +92,6 @@ func parseCursors(raw map[string]int64) (map[uuid.UUID]int64, error) {
 	return out, nil
 }
 
-// toEvent 把模組事件轉成 frame。訊息經 toMessage（墓碑不帶內容、不回 object key）；模組事件沒有的欄位不發明。
 func (h *App) toEvent(ev im.Event, info streamInfo) (*pb.ChatEvent, error) {
 	switch ev.Kind {
 	case im.EventReady:
@@ -123,11 +120,8 @@ func (h *App) toEvent(ev im.Event, info streamInfo) (*pb.ChatEvent, error) {
 	return nil, fmt.Errorf("httpapi/chat：不認得的事件種類 %d", ev.Kind)
 }
 
-// guardTimeout 是一次重新驗證（驗 session、讀身分與店家）的時間上限。
 const guardTimeout = 10 * time.Second
 
-// guard 回傳重新驗證的函式：以請求帶的 token 重新驗證 session（與入口同一個 Authenticate；帳號必須還是原來那個），再用 reparty 重讀身分，
-// 成功後交給 Subscription.Revalidate。session 失效、帳號刪除、買家身分對不上是 unauthenticated，店家的店沒了或換了是 Ended（EndLostEligibility）；身分讀取的暫時錯誤原樣回（算暫時失敗）。
 func (h *App) guard(header http.Header, accountID int64, kind im.PartyKind, sub Subscription, reparty func(context.Context, int64) (im.Party, error), same func(im.Party) bool) func(context.Context) error {
 	return func(ctx context.Context) error {
 		ctx, cancel := context.WithTimeout(ctx, guardTimeout)
@@ -149,17 +143,14 @@ func (h *App) guard(header http.Header, accountID int64, kind im.PartyKind, sub 
 			return sub.Revalidate(ctx, p)
 		case err == nil, apperr.KindOf(err) == apperr.KindNotFound:
 			if kind == im.PartyStore {
-				// 店沒了或換成另一家：這條串流的店已不再有效，與關店同一個結果。
 				return &im.Ended{Reason: im.EndLostEligibility}
 			}
-			// 買家身分對不上屬於 session 或帳號層的失效。
 			return apperr.Unauthenticated("需要登入")
 		}
 		return err
 	}
 }
 
-// serveStream 是兩支串流方法共用的流程：解析 cursors、訂閱、交給 runStream。身分由 party 在入口推導一次，之後由 guard 重驗。
 func (h *App) serveStream(ctx context.Context, header http.Header, rawCursors map[string]int64, out func(*pb.ChatEvent) error,
 	party func(context.Context) (im.Party, error), reparty func(context.Context, int64) (im.Party, error)) error {
 	cursors, err := parseCursors(rawCursors)

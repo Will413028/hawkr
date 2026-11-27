@@ -5,20 +5,6 @@ import (
 	"testing"
 )
 
-// registry.go 由 generate.sh --go-registry 從 CodeMeta Markdown 生成，而 Markdown
-// 是人手維護的表格。這幾條不變式全部被 procurement 契約文件明文倚賴，卻沒有任何
-// 機制擋住打錯：
-//
-//   - Value == Code：這 7 組是字串碼（同 ClientType 慣例），
-//     不是數字碼。但同一份 Markdown 的多數 enum 用數字 Value（OrderStatus 是 0/10/50），
-//     照那個慣例編輯就會產出 Code="SUCCEEDED"、Value="50" 而全綠通過——DB 存的是 Value、
-//     契約比對的是 Code，兩者一分家就是靜默的資料寫錯。
-//   - Code 形狀符合 AIP-193 的 [A-Z][A-Z0-9_]*：契約文件把這條寫成硬規定。
-//   - 組內唯一：表格複製貼上漏改名字時，後者會覆蓋前者的查表結果。
-//   - FromCode 與 FromValue 命中同一筆：兩支查詢函式都是生成的，但只有在 Value==Code
-//     成立時它們才等價；這條測試順便鎖住「用哪一支查都一樣」這個呼叫端假設。
-//
-// 若未來有 procurement 以外的 enum 加進 GO_REGISTRY_ENUMS，把它補進下面的表格。
 
 var codePattern = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
 
@@ -104,11 +90,6 @@ func TestProcurementRegistryLookupsAgree(t *testing.T) {
 	})
 }
 
-// ===== #2450 publication approval 的三組值域 =====
-//
-// 這三組與上面 7 組一樣是字串碼，所以 TestProcurementRegistryInvariants 的
-// Value==Code／AIP-193 形狀等不變式同樣適用；下面三支另外釘住的是**內容**：
-// 值本身與順序被 DB CHECK、狀態機文件與 audienceHash preimage 逐字倚賴。
 
 // approval 的狀態機值域。順序照 doc 64 §4.1 的生命週期敘述，不是字母序——
 // 這份切片會被拿去產 DB CHECK 與前端顯示順序。

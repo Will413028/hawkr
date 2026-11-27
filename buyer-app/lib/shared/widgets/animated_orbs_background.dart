@@ -213,15 +213,15 @@ class _FallingLeaf {
 
 /// 一天內背景色關鍵格 (小時 0~24, color)
 const List<(double, Color)> _dayColorStops = [
-  (0.0, Color(0xFF1A2540)), // 深夜
-  (5.5, Color(0xFF2C3855)), // 黎明前藍
-  (6.5, Color(0xFFFFD9AE)), // 日出
-  (8.0, AppColors.bgPrimary), // 清晨
-  (12.0, AppColors.neutralCream), // 正午
-  (16.0, Color(0xFFFFF4DC)), // 午後
-  (18.0, Color(0xFFFFA877)), // 黃昏
-  (19.5, Color(0xFF55557F)), // 暮光紫
-  (21.0, Color(0xFF1A2540)), // 入夜
+  (0.0, Color(0xFF1A2540)),
+  (5.5, Color(0xFF2C3855)),
+  (6.5, Color(0xFFFFD9AE)),
+  (8.0, AppColors.bgPrimary),
+  (12.0, AppColors.neutralCream),
+  (16.0, Color(0xFFFFF4DC)),
+  (18.0, Color(0xFFFFA877)),
+  (19.5, Color(0xFF55557F)),
+  (21.0, Color(0xFF1A2540)),
   (24.0, Color(0xFF1A2540)),
 ];
 
@@ -249,11 +249,11 @@ double _computeNightIntensity(DateTime now) {
 
 /// 一顆星：固定位置 + 個別閃爍頻率/相位，靠 sin(time) 做明滅
 class _Star {
-  final double x; // 0~1
-  final double y; // 0~1
-  final double size; // 半徑 px
-  final double baseBrightness; // 0.3~1.0
-  final double twinkleAngularVelocity; // 弧度/秒
+  final double x;
+  final double y;
+  final double size;
+  final double baseBrightness;
+  final double twinkleAngularVelocity;
   final double twinklePhase;
   final Color color;
 
@@ -283,7 +283,6 @@ class _StarFieldPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (intensity <= 0.001) return;
     for (final s in stars) {
-      // 0.15 ~ 1.0 大幅明滅，但用 sin⁴ 讓「亮」的時間長、「暗」一閃即過 → 一閃一閃感
       final wave = math.sin(time * s.twinkleAngularVelocity + s.twinklePhase);
       final w2 = wave * wave;
       final twinkle = 0.15 + 0.85 * (w2 * w2);
@@ -308,7 +307,6 @@ class _StarFieldPainter extends CustomPainter {
 /// 一律走 AppColors token，與品牌色系統一致；同時保留四季視覺差異
 List<Color> _seasonalPalette(int month) {
   if (month >= 3 && month <= 5) {
-    // 春：淺橘 + 淡橘 + 暖白 + 淡粉（櫻感）
     return const [
       AppColors.primaryLight,
       AppColors.primarySoft,
@@ -316,7 +314,6 @@ List<Color> _seasonalPalette(int month) {
       AppColors.dangerSoft,
     ];
   } else if (month >= 6 && month <= 8) {
-    // 夏：品牌主色四階
     return const [
       AppColors.primary,
       AppColors.primaryDark,
@@ -324,7 +321,6 @@ List<Color> _seasonalPalette(int month) {
       AppColors.secondary,
     ];
   } else if (month >= 9 && month <= 11) {
-    // 秋：暖橘 + 品牌深色
     return const [
       AppColors.warning,
       AppColors.accentFill,
@@ -332,7 +328,6 @@ List<Color> _seasonalPalette(int month) {
       AppColors.primary,
     ];
   } else {
-    // 冬：雪白 + 淺灰 + 淡藍（雪地反光）
     return const [
       AppColors.white,
       AppColors.gray100,
@@ -351,24 +346,19 @@ class _AnimatedOrbsBackgroundState extends State<AnimatedOrbsBackground>
   bool _tickerEnabled = true;
   bool _animationsDisabled = false;
 
-  // 重力方向（螢幕座標：+x 右 / +y 下），預設直立 = 純下落
   double _gravityX = 0;
   double _gravityY = 1.0;
 
-  // 陣風：水平速度（歸一化/秒），會週期性換方向、平滑漸變
   double _windVelocity = 0;
   double _windTargetVelocity = 0;
   double _gustCooldownSeconds = 0;
 
-  // 動畫經過時間（秒）；只累計 bounded frame delta，不含背景暫停時間。
   double _elapsedSeconds = 0;
   Duration? _lastControllerElapsed;
 
-  // 真實時鐘：每分鐘更新一次，驅動晝夜背景色 / 季節落葉
   DateTime _now = AnimatedOrbsBackground.debugNow();
   Timer? _clockTimer;
 
-  // 繁星：固定位置 + 各自閃爍相位
   late final List<_Star> _stars;
 
   static const List<IconData> _leafIcons = [
@@ -400,9 +390,6 @@ class _AnimatedOrbsBackgroundState extends State<AnimatedOrbsBackground>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // `TickerMode.valuesOf` is only available in newer Flutter SDKs. `of`
-    // registers the same inherited dependency and keeps this widget compatible
-    // with the repo's supported 3.38+ toolchains.
     // ignore: deprecated_member_use
     _tickerEnabled = TickerMode.of(context);
     _animationsDisabled =
@@ -430,7 +417,6 @@ class _AnimatedOrbsBackgroundState extends State<AnimatedOrbsBackground>
     _clockTimer = null;
     _now = widget.currentTime ?? AnimatedOrbsBackground.debugNow();
     if (widget.currentTime != null) return;
-    // 每分鐘 tick 一次：背景色、夜色與新生成落葉的季節 tint 同步更新。
     _clockTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted) setState(() => _now = AnimatedOrbsBackground.debugNow());
     });
@@ -442,8 +428,6 @@ class _AnimatedOrbsBackgroundState extends State<AnimatedOrbsBackground>
     if (shouldAnimate) {
       if (!_controller.isAnimating) {
         _controller.repeat();
-        // AnimationController starts each simulation at elapsed zero. Seed our
-        // matching sample so the first real vsync contributes its wall time.
         _lastControllerElapsed = Duration.zero;
       }
       _startAccelerometer();
@@ -458,29 +442,22 @@ class _AnimatedOrbsBackgroundState extends State<AnimatedOrbsBackground>
 
   void _startAccelerometer() {
     if (_accelSub != null) return;
-    // 訂閱加速度計，把裝置重力投影到螢幕平面 → leaves 跟著 gravity 方向掉。
-    // 桌面 / 模擬器若無感測器會 onError，葉子仍以預設 (0, 1) 下落。
     _accelSub =
         accelerometerEventStream(
           samplingPeriod: SensorInterval.uiInterval,
         ).listen(
           (e) {
-            // sensors_plus 約定：直立靜止 ≈ (0, -9.81, 0)
-            // 螢幕座標 +y 朝下，device +y 朝上 → screen.y = -device.y
             const invG = 1.0 / 9.81;
             double gx = e.x * invG;
             double gy = -e.y * invG;
-            // 平躺時螢幕平面投影 ≈ 0，葉子會停住；磁鐵化到至少 0.3 的下落
             final mag = math.sqrt(gx * gx + gy * gy);
             if (mag < 0.3) {
               gx = 0;
               gy = 0.3;
             } else if (mag > 1.2) {
-              // 大幅晃動裁掉避免暴衝
               gx /= mag;
               gy /= mag;
             }
-            // 低通濾波，去抖
             _gravityX = _gravityX * 0.88 + gx * 0.12;
             _gravityY = _gravityY * 0.88 + gy * 0.12;
           },
@@ -496,19 +473,16 @@ class _AnimatedOrbsBackgroundState extends State<AnimatedOrbsBackground>
     _gustCooldownSeconds = animatedOrbsGustIntervalSeconds(
       _random.nextDouble(),
     );
-    // 舊值為每個 60 Hz frame 的位移；轉成每秒速度保留原有觀感。
     final strengthPerSecond =
         (0.0003 + _random.nextDouble() * 0.0008) * _legacyFramesPerSecond;
     _windTargetVelocity = strengthPerSecond * (_random.nextBool() ? 1 : -1);
   }
 
   void _initStars() {
-    // 80 顆星，遠近混合：depth 1 = 近且亮、0 = 遠且暗。
-    // 顏色 70% 純白、20% 暖黃、10% 冷藍 —— 模擬真實夜空色溫多樣性。
     const starColors = [
       Color(0xFFFFFFFF),
-      Color(0xFFFFE9B8), // 暖黃白
-      Color(0xFFD4E4FF), // 冷藍白
+      Color(0xFFFFE9B8),
+      Color(0xFFD4E4FF),
     ];
     _stars = List.generate(80, (_) {
       final depth = _random.nextDouble();
@@ -519,9 +493,8 @@ class _AnimatedOrbsBackgroundState extends State<AnimatedOrbsBackground>
       return _Star(
         x: _random.nextDouble(),
         y: _random.nextDouble(),
-        size: 0.6 + depth * 1.6, // 0.6 ~ 2.2 px
+        size: 0.6 + depth * 1.6,
         baseBrightness: 0.35 + depth * 0.65,
-        // 非常慢的閃爍：週期 ~12~32 秒（60fps × 2π ÷ freq）
         twinkleAngularVelocity:
             (0.0035 + _random.nextDouble() * 0.0085) * _legacyFramesPerSecond,
         twinklePhase: _random.nextDouble() * 2 * math.pi,
@@ -538,33 +511,25 @@ class _AnimatedOrbsBackgroundState extends State<AnimatedOrbsBackground>
   }
 
   _FallingLeaf _createLeaf({bool randomY = false}) {
-    // 深度層：0=遠(小、淡、模糊)，1=近(大、清晰)
     final depth = _random.nextDouble();
 
-    // 大小：30~120 根據深度
     final size = 30 + depth * 90;
 
-    // 下落速度：遠處慢、近處快（放慢約 55%，讓落葉更從容）
     final fallSpeedPerSecond =
         (0.00018 + depth * 0.00045) *
         widget.speedMultiplier *
         10 *
         _legacyFramesPerSecond;
 
-    // 搖擺幅度：0.04~0.18（加大約 2~2.3 倍，左右紛飛感更強）
     final swayAmplitude = 0.04 + _random.nextDouble() * 0.14;
 
-    // 搖擺頻率：放慢基礎頻率，讓單次擺盪週期更長 → 飄忽感更明顯
     final swayAngularVelocity =
         (0.005 + _random.nextDouble() * 0.012) * _legacyFramesPerSecond;
 
-    // 透明度：遠處淡，近處稍深
     final opacity = 0.15 + depth * 0.35;
 
-    // 不模糊
     const blur = 0.0;
 
-    // 季節 tint：當月調色盤隨機抽一個套到圖示
     final palette = _seasonalPalette(_now.month);
     final tint = palette[_random.nextInt(palette.length)];
 
@@ -608,7 +573,6 @@ class _AnimatedOrbsBackgroundState extends State<AnimatedOrbsBackground>
     final windDisplacement = _advanceWind(dtSeconds);
 
     for (final leaf in _leaves) {
-      // 葉子順著重力方向掉，水平再疊加這段時間內的陣風位移。
       final motion = advanceAnimatedOrbsLeaf(
         x: leaf.x,
         y: leaf.y,
@@ -624,20 +588,16 @@ class _AnimatedOrbsBackgroundState extends State<AnimatedOrbsBackground>
       leaf.y = motion.y;
       leaf.rotation = motion.rotation;
 
-      // 出邊界 → 依重力主方向決定從哪一側重新進場
       final outOfBounds =
           leaf.y > 1.2 || leaf.y < -0.3 || leaf.x < -0.3 || leaf.x > 1.3;
       if (outOfBounds) {
         final newLeaf = _createLeaf();
-        // 進場座標：跟重力反向（從重力的「上游」進來，順著掉）
         if (_gravityY.abs() >= _gravityX.abs()) {
-          // 主要垂直
           leaf.x = newLeaf.x;
           leaf.y = _gravityY >= 0
               ? -0.1 - _random.nextDouble() * 0.3
               : 1.1 + _random.nextDouble() * 0.3;
         } else {
-          // 主要水平（手機橫躺）
           leaf.y = _random.nextDouble();
           leaf.x = _gravityX >= 0
               ? -0.1 - _random.nextDouble() * 0.3
@@ -698,11 +658,8 @@ class _AnimatedOrbsBackgroundState extends State<AnimatedOrbsBackground>
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
 
-    // 背景色按真實時間計算（_now 由 _clockTimer 每分鐘 setState 觸發更新）
     final nightIntensity = _computeNightIntensity(_now);
     final bgColor = _computeBackgroundColor(_now);
-    // 背景亮度（0 黑 ~ 1 白）→ AmbientBrightnessScope 透給前景，方便 child
-    // 自適應文字顏色（亮底用深字、暗底用淺字）
     final luminance = bgColor.computeLuminance();
     return AnimatedBuilder(
       animation: _controller,
@@ -714,7 +671,6 @@ class _AnimatedOrbsBackgroundState extends State<AnimatedOrbsBackground>
             color: bgColor,
             child: Stack(
               children: [
-                // 繁星層（白天 intensity=0 → painter 直接 return，零成本）
                 if (nightIntensity > 0)
                   Positioned.fill(
                     child: IgnorePointer(
@@ -727,7 +683,6 @@ class _AnimatedOrbsBackgroundState extends State<AnimatedOrbsBackground>
                       ),
                     ),
                   ),
-                // 全部落葉隨夜色淡出；完整黑夜不建立落葉 subtree，節省 GPU。
                 if (nightIntensity < 0.95)
                   Positioned.fill(
                     key: const ValueKey('seasonal-leaves-layer'),
@@ -744,7 +699,6 @@ class _AnimatedOrbsBackgroundState extends State<AnimatedOrbsBackground>
                       ],
                     ),
                   ),
-                // 前景獨立成 repaint boundary，背景逐幀更新時不重繪表單內容。
                 if (foreground != null)
                   Positioned.fill(
                     key: const ValueKey('orbs-foreground'),
@@ -764,14 +718,12 @@ class _AnimatedOrbsBackgroundState extends State<AnimatedOrbsBackground>
     double screenHeight,
     double nightIntensity,
   ) {
-    // 水平搖擺
     final swayOffset =
         math.sin(_elapsedSeconds * leaf.swayAngularVelocity + leaf.swayPhase) *
         leaf.swayAmplitude;
     final displayX = (leaf.x + swayOffset) * screenWidth - leaf.size / 2;
     final displayY = leaf.y * screenHeight - leaf.size / 2;
 
-    // 黃昏至黑夜所有葉子一併淡出，避免夜間仍有零星落葉穿過畫面。
     final nightDim = 1.0 - nightIntensity;
     final effOpacity = (leaf.opacity * nightDim).clamp(0.0, 1.0);
 

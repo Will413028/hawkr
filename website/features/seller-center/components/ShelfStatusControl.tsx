@@ -66,9 +66,9 @@ export function resolveStatusCode(
 
 /** 互動開關時，由目前狀態推出「點一下」要切換到的目標狀態碼。 */
 export function shelfToggleTarget(state: ShelfState): "4003" | "4004" | null {
-	if (state === "active") return "4003"; // 上架中 → 下架
-	if (state === "off" || state === "draft") return "4004"; // 下架/草稿 → 上架
-	return null; // 審核中無法手動切換
+	if (state === "active") return "4003";
+	if (state === "off" || state === "draft") return "4004";
+	return null;
 }
 
 type Tone = {
@@ -114,14 +114,12 @@ type Solid = { fg: string; bg: string; hover: string };
 
 const SOLID: Partial<Record<ShelfState, Solid>> = {
 	active: {
-		// 綠底配淡灰字，對比更明顯（白/淡灰在中綠上比深字更清楚、更像主要 CTA）。
 		fg: "text-[var(--color-neutral-whisper)]",
 		bg: "bg-[color-mix(in_srgb,var(--hkui-success)_80%,transparent)]",
 		hover:
 			"hover:bg-[color-mix(in_srgb,var(--hkui-success-600)_80%,transparent)]",
 	},
 	off: {
-		// 琥珀底（warning）較淺，配深墨字最清楚。
 		fg: "text-[var(--color-neutral-ink)]",
 		bg: "bg-[color-mix(in_srgb,var(--hkui-warning)_80%,transparent)]",
 		hover:
@@ -190,7 +188,6 @@ export default function ShelfStatusControl({
 	const target = shelfToggleTarget(state);
 	const interactive = Boolean(onToggle) && target !== null;
 
-	// cta 變體的上架/下架用實心顯眼色；其餘退回柔和底色。
 	const solid = variant === "cta" ? SOLID[state] : undefined;
 	const fgClass = solid?.fg ?? tone.fg;
 	const bgClass = solid?.bg ?? tone.bg;
@@ -208,7 +205,6 @@ export default function ShelfStatusControl({
 	const glyphSize = size === "md" ? 18 : 16;
 
 	const base = cn(
-		// 顏色/底色走 200ms 漸變；載入由共用 Button 契約接管。
 		"inline-flex select-none items-center justify-center rounded-full font-semibold whitespace-nowrap align-middle",
 		"[font-family:var(--hkui-font-sans)] transition-[background,color,box-shadow,transform,opacity] duration-200 ease-[var(--hkui-ease)]",
 		"shelf-status-control",
@@ -237,9 +233,7 @@ export default function ShelfStatusControl({
 		</span>
 	);
 
-	// 純顯示徽章 ───────────────────────────────────────────────
 	if (!interactive) {
-		// icon 變體沒有可見文字，補 role="img" + aria-label；cta 文字已可見。
 		const iconA11y =
 			variant === "icon" ? ({ role: "img", "aria-label": label } as const) : {};
 		return (
@@ -250,7 +244,6 @@ export default function ShelfStatusControl({
 		);
 	}
 
-	// 互動開關 ─────────────────────────────────────────────────
 	const hint = toggleHint(state, label);
 	const pendingLabel = target === "4004" ? "上架商品中…" : "下架商品中…";
 	return (

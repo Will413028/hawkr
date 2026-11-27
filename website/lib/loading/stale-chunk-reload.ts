@@ -2,9 +2,6 @@ export const STALE_CHUNK_RELOAD_MARKER_KEY = "__hk_stale_chunk_reload_at";
 export const STALE_CHUNK_RELOAD_CLASS = "hk-stale-chunk-reload";
 export const STALE_CHUNK_RELOAD_PENDING_CLASS = "hk-stale-chunk-reload-pending";
 
-// The old page remains visible while a slow connection downloads the new
-// document. Give that handoff a full minute so the marker still reaches the
-// boot script on constrained mobile networks; it is consumed on first read.
 const STALE_CHUNK_RELOAD_MARKER_TTL_MS = 60_000;
 
 /**

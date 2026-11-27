@@ -10,7 +10,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/contentkind"
 )
 
-// fakeLinks 回報 posts 與 threads 裡的目標還在；其餘（含沒設定）是已刪除。calls 記錄問了幾次、每次問了哪些目標。
 type fakeLinks struct {
 	posts   map[uuid.UUID]bool
 	threads map[social.ForumThread]bool

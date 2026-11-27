@@ -6,8 +6,6 @@ import { animatedGifBytes, corruptJpegBytes, pdfBytes, samplePngBytes } from "./
 
 const BASE = "https://test-media.example.com";
 
-// wrangler 生成的 `Cloudflare.Env`（worker-configuration.d.ts）把兩個 binding 都標成可選；
-// wrangler.toml 的頂層已宣告兩個 binding，實際跑起來一定有值，這裡轉型成本檔真正用的 Env 型別。
 const env = untypedEnv as unknown as Env;
 
 async function dispatch(request: Request): Promise<Response> {
@@ -202,8 +200,6 @@ describe("Cache-Control", () => {
     const first = await dispatch(url);
     expect(first.status).toBe(200);
 
-    // 快取寫入發生在 ctx.waitUntil 內，dispatch() 已 waitOnExecutionContext 等它完成。
-    // 之後把 R2 物件刪掉：若第二次請求仍是 200，代表是從 edge cache 命中而非重新讀 R2。
     await env.MEDIA_BUCKET.delete(key);
     const second = await dispatch(new Request(`${BASE}/i/original/${key}`));
     expect(second.status).toBe(200);
@@ -231,22 +227,8 @@ describe("motion preset（動圖：有界尺寸 + 保留動畫）", () => {
       }),
     );
     expect(res.status).toBe(200);
-    // jpeg 會把動圖壓成單張——這正是這個 preset 要防的事，所以斷言的是「不是 jpeg」
-    // 而不只是「是 gif」：將來若多一個靜態退路，這條仍然會擋下來。
     expect(res.headers.get("Content-Type")).not.toBe("image/jpeg");
     expect(res.headers.get("Content-Type")).toBe("image/gif");
   });
 
-  // ⚠️ 「輸出真的會動」在這裡驗不到，所以這裡不放那條斷言 —— 一支跑得過卻沒有
-  // 鑑別力的測試比沒有測試更糟，它會讓人以為這件事有人守著。
-  //
-  // 本機 Miniflare Images 模擬器：`image/gif` 直接回
-  // `IMAGES_TRANSFORM_ERROR 9520: GIF output is not supported in local mode`
-  // （於是走 degrade 直出原檔，看起來「是動的」其實根本沒轉換過）；`image/webp`
-  // 會成功但**靜默吐單幀**（無 ANMF chunk）。兩條路都證明不了真 binding 的行為。
-  //
-  // 動畫本身由 `scripts/verify-motion-preset.mjs` 對**已部署**的 worker 實測
-  // （位元組數 + 幀數），見該檔與 49 號設計書 §4.4。這裡守的是我方這一側的兩個
-  // 前提：格式沒落到靜態格式（上面兩條）、`anim` 有真的送出去（outputOptionsFor
-  // 的單元測試）。
 });

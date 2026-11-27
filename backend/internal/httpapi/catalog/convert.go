@@ -33,8 +33,6 @@ func NewPresenter(stores StoreSource, stats *httpseller.StatsSource, images rpc.
 	return &Presenter{stores: stores, stats: stats, images: images}, nil
 }
 
-// storeCards 讀一批店家的卡片，key 是 store_id；沒有卡片（從沒公開過或不存在）的店家不在 map 裡，client 看到 store 不設。
-// 讀取失敗整個請求失敗（不降級成沒有店家）；評分讀不到時只有評分不設。
 func (p *Presenter) storeCards(ctx context.Context, storeIDs []int64) (map[int64]*commonpb.StoreCard, error) {
 	if len(storeIDs) == 0 {
 		return map[int64]*commonpb.StoreCard{}, nil
@@ -111,18 +109,15 @@ func (p *Presenter) Product(ctx context.Context, pr catalog.Product) (*pb.Produc
 	}, nil
 }
 
-// view 是商品的共用輸出片段（圖庫、描述、選項軸、SKU、標籤）與可購買性；三種讀取（公開、賣家、後台）的差別只在外層欄位。
 type view struct {
 	gallery     []*pb.ProductImage
 	description []*pb.ProductDescriptionBlock
 	axes        []*pb.OptionAxis
 	skus        []*pb.Sku
 	hashtags    []*pb.ProductHashtag
-	// available 是商品現在能不能買：上架中而且至少一個 SKU 有庫存。
 	available bool
 }
 
-// newView 組出商品的共用片段。withAsset 是賣家與後台讀取：圖片帶資產 ID（寫入沿用現有的圖時要）；公開讀取不帶。
 func newView(images rpc.Images, p catalog.Product, withAsset bool) (view, error) {
 	var v view
 	var err error
@@ -204,7 +199,6 @@ func toBlocks(images rpc.Images, in []catalog.Block, withAsset bool) ([]*pb.Prod
 	return out, nil
 }
 
-// sellerProduct 是賣家讀自己的商品（含 etag、狀態、低庫存門檻與資產 ID）。
 func sellerProduct(images rpc.Images, p catalog.Product) (*pb.SellerProduct, error) {
 	v, err := newView(images, p, true)
 	if err != nil {
@@ -239,7 +233,6 @@ func sellerSummaries(images rpc.Images, items []catalog.ProductSummary) ([]*pb.S
 	return out, nil
 }
 
-// sellerSku 是庫存調整後回給賣家的 SKU：沒有商品狀態可依，availability 由商品狀態與庫存決定，所以要帶商品現在是不是 ACTIVE。
 func sellerSku(st catalog.SkuState) *pb.Sku {
 	s := st.Sku
 	return &pb.Sku{
@@ -255,7 +248,6 @@ func availability(ok bool) pb.ProductAvailability {
 	return pb.ProductAvailability_PRODUCT_AVAILABILITY_UNAVAILABLE
 }
 
-// rating 是平均評分；沒有評價不設。
 func rating(avg float64, reviews int32) *float32 {
 	if reviews <= 0 {
 		return nil

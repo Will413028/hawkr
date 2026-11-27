@@ -47,9 +47,6 @@ const toStr = (v: unknown): string | undefined =>
  */
 function normaliseSkuFromApi(raw: unknown): ProductSku {
 	const r = (raw ?? {}) as Record<string, unknown>;
-	// Shipping methods (handler.ShippingMethodResponse) wire camelCase
-	// `{ type, feePayer, freeThreshold }`; map onto the draft's snake_case
-	// shape so the 可配送方案 picker re-hydrates on edit.
 	const rawShipping = Array.isArray(r.shippingMethods) ? r.shippingMethods : [];
 	const shipping_methods = rawShipping
 		.map((m) => {
@@ -63,11 +60,7 @@ function normaliseSkuFromApi(raw: unknown): ProductSku {
 		.filter(
 			(m, i, all) => m.type && all.findIndex((o) => o.type === m.type) === i,
 		);
-	// wire 端一律 camelCase（`handler.SellerSkuResponse`，seller_sku.go:22-33，
-	// dev 實測 `GET /app/products/{id}` 的 skus[] key 集合完全吻合）。左手邊的
-	// snake 是本地草稿型別 `ProductSku` 自己的形狀，與 wire 無關。
 	return {
-		// SKU id 一律 string pass-through（backend TSID 18 位超出 JS Number 安全範圍）
 		id: toStr(r.id) ?? "",
 		sku_name: toStr(r.skuName),
 		spec_name: toStr(r.specName),
@@ -102,9 +95,6 @@ export function emptyDraft(): SellerProductDetail {
 		skus: [
 			{
 				id: "",
-				// Start empty so the input shows its placeholder and sellers can
-				// type without clearing seeded text. draftToSubmitBody backfills
-				// "預設規格" on save when a lone SKU is left unnamed.
 				sku_name: "",
 				price: "0",
 				original_price: "",
@@ -131,8 +121,6 @@ export function applyImagesUpdate(
 	return {
 		...prev,
 		images,
-		// `||` 不是 `??`：只帶 assetId 而組不出 URL 的項目 url 是空字串，
-		// `??` 會讓它通過並把主圖清成 ""。同檔 normaliseDraftFromApi 的主圖 fallback 同此。
 		main_image: images[0]?.url || prev.main_image,
 	};
 }
@@ -153,13 +141,7 @@ export function draftToSubmitBody(
 	const status = resolveStatusCode(statusOverride ?? draft.status ?? 0);
 	const description = compactDescription(parseDescription(draft.description));
 	const multiSku = (draft.skus?.length ?? 0) > 1;
-	// Serialise each SKU to the gateway's camelCase `handler.CreateSkuInput`.
-	// The backend binds `skuName` / `unit` / `price` / `stockQty` with
-	// binding:"required" on camelCase keys, so the form's snake_case draft must
-	// be translated here — sending snake_case fails binding and the create 400s.
 	const skus = (draft.skus ?? []).map((sku, i) => {
-		// The 規格名稱 field starts empty (placeholder-only) so sellers can type
-		// directly; backfill a sensible name here rather than persisting "".
 		const skuName =
 			sku.sku_name?.trim() || (multiSku ? `規格 ${i + 1}` : "預設規格");
 		const out: SkuWriteInput = {
@@ -168,14 +150,11 @@ export function draftToSubmitBody(
 			unit: coerceWeightUnitCode(sku.unit),
 		};
 		if (sku.id) out.id = sku.id;
-		// PayUni #758: only send salePrice when it's a valid discount (0/empty
-		// = clear); sending it otherwise would pin the price as a "sale".
 		const sale = Number(sku.sale_price ?? 0);
 		if (sale > 0 && sale < Number(sku.price ?? 0)) out.salePrice = String(sale);
 		if (includeStock) out.stockQty = String(Number(sku.stock ?? 0) || 0);
 		const weight = (sku.weight ?? "").trim();
 		if (weight) out.weight = weight;
-		// 包裝尺寸 — only send positive dimensions (mirrors the seller app).
 		const dim = (v?: string) => {
 			const n = Number(v);
 			return Number.isFinite(n) && n > 0 ? String(n) : undefined;
@@ -186,7 +165,6 @@ export function draftToSubmitBody(
 		if (lengthCm) out.lengthCm = lengthCm;
 		if (widthCm) out.widthCm = widthCm;
 		if (heightCm) out.heightCm = heightCm;
-		// 可配送方案 → camelCase `handler.CreateShippingMethodInput`.
 		const shipping = (sku.shipping_methods ?? []).filter((m) => m.type);
 		if (shipping.length) {
 			out.shippingMethods = shipping.map((m) => {
@@ -197,9 +175,6 @@ export function draftToSubmitBody(
 				return {
 					type: m.type,
 					feePayer,
-					// A threshold is a seller's subsidy condition, never a
-					// buyer-paid shipping rule. Normalise legacy contradictory
-					// drafts at the boundary before they reach the API.
 					freeThreshold:
 						feePayer === ShippingFeePayer.SELLER
 							? m.free_threshold || "0"
@@ -215,9 +190,6 @@ export function draftToSubmitBody(
 		...(images.length ? { images } : {}),
 		categoryId:
 			draft.category_id != null ? String(draft.category_id) : undefined,
-		// Canonical hashtag field. The backend's product endpoint (both public
-		// read and seller write) keys on `hashtags` (matches the Flutter seller's
-		// `ProductUploadService` body and the public list response).
 		hashtags: draft.tags ?? [],
 		origin: draft.origin,
 		skus,
@@ -230,10 +202,6 @@ export function draftToSubmitBody(
 export function normaliseDraftFromApi(
 	raw: SellerProductDetail & Record<string, unknown>,
 ): SellerProductDetail {
-	// Hashtags: backend canonical key is `hashtags` (matches Flutter
-	// `product_upload_service.dart` write and `/public/products` read);
-	// legacy `tags` is the form's old local field name. Accept either
-	// and store under the form draft's `tags` slot.
 	const rawHashtags =
 		(raw as Record<string, unknown>).hashtags ??
 		(raw as Record<string, unknown>).tags;
@@ -252,10 +220,6 @@ export function normaliseDraftFromApi(
 				.filter(Boolean)
 		: [];
 
-	// 商品分類：detail wire is camelCase (`categoryId` + `categoryLv1/2/3Id`) but
-	// the form draft + CategorySelector key on snake_case numeric `category_id`.
-	// Without this bridge the cascade never pre-fills on edit. Prefer the most
-	// specific (leaf) id available so `findPath` resolves the full L1→L2→L3 path.
 	const r = raw as Record<string, unknown>;
 	const category_id =
 		toNum(raw.category_id) ??
@@ -264,29 +228,15 @@ export function normaliseDraftFromApi(
 		toNum(r.categoryLv2Id) ??
 		toNum(r.categoryLv1Id);
 
-	// SKUs also wire camelCase on the detail endpoint — normalise each so the
-	// SKU editor hydrates (規格名稱 / 庫存 / 售價 / 單位) instead of showing
-	// blanks + 庫存 0.
 	const skus = Array.isArray(raw.skus)
 		? raw.skus.map(normaliseSkuFromApi)
 		: raw.skus;
 
-	// Gallery images live under `gallery` — `handler.GalleryItem[]`, i.e.
-	// `{ assetId, imageKey, imageUrl }` (gateway `seller_product.go:22-26`;
-	// 圖片欄自 backend#2235 起統一叫 imageKey/imageUrl，49 §6.1). `assetId`
-	// is the load-bearing field: submit sends it back verbatim and the backend
-	// keeps that image (`ProductService#processImageUpdate`), so an entry without
-	// one cannot round-trip. Keep an entry whenever EITHER identity survives —
-	// dropping a displayable-but-unkeyed image would delete it on the next save,
-	// which is exactly the failure this mapping exists to prevent.
 	const rawGallery = Array.isArray(r.gallery) ? (r.gallery as unknown[]) : [];
 	const images: ProductImageDraft[] = rawGallery
 		.map((g): ProductImageDraft | null => {
 			if (!g || typeof g !== "object") return null;
 			const rec = g as Record<string, unknown>;
-			// imageKey is the objectKey SSOT (49 §6.1); build the display URL from
-			// it rather than trusting the response's pre-built `/i/original/` URL,
-			// so the production media boundary in `buildImageUrl` still applies.
 			const url = resolveCdnUrl(toStr(rec.imageKey));
 			const assetId = toStr(rec.assetId);
 			if (!url && !assetId) return null;
@@ -294,16 +244,12 @@ export function normaliseDraftFromApi(
 		})
 		.filter((x): x is ProductImageDraft => x !== null);
 	if (rawGallery.length > 0 && images.length === 0) {
-		// Source had entries but none mapped — an unexpected wire shape. Surface
-		// it instead of silently dropping the seller's whole gallery on edit.
 		console.warn(
 			"[normaliseDraftFromApi] dropped all gallery images; unexpected shape:",
 			rawGallery,
 		);
 	}
 
-	// 後端 status 是 CodeMeta 字串（4001…），但表單 radio 用 0/1/2（草稿/上架/
-	// 下架）做數字比對。收斂成數字，否則 radio 預選對不上、開編輯頁全落到草稿。
 	const shelf = resolveShelfState(raw.status);
 	const status = shelf === "active" ? 1 : shelf === "off" ? 2 : 0;
 
@@ -314,8 +260,6 @@ export function normaliseDraftFromApi(
 		skus,
 		tags: hashtags,
 		images,
-		// 主圖 = gallery 第一張；後端另有權威的 `imageKey`（主圖 objectKey，49 §6.1）
-		// 當 gallery 缺圖或該筆組不出 URL 時的來源。
 		main_image: images[0]?.url || resolveCdnUrl(toStr(r.imageKey)),
 	};
 }
@@ -365,8 +309,6 @@ export function validateDraft(draft: SellerProductDetail): string[] {
 	const problems: string[] = [];
 
 	if (!draft.name.trim()) problems.push("商品名稱必填");
-	// CategorySelector emits `undefined` until the seller reaches a leaf (L3),
-	// so "has a value" and "is a leaf" are the same check on this form.
 	if (draft.category_id == null) {
 		problems.push("請選擇商品分類（需選到最後一層）");
 	}
@@ -377,9 +319,6 @@ export function validateDraft(draft: SellerProductDetail): string[] {
 		return problems;
 	}
 
-	// A lone SKU may stay nameless — draftToSubmitBody backfills "預設規格".
-	// With multiple SKUs the name disambiguates them, so it's required, and
-	// every message needs to say which SKU it is about.
 	const multiSku = skus.length > 1;
 	skus.forEach((sku, i) => {
 		const named = sku.sku_name?.trim();
@@ -395,9 +334,6 @@ export function validateDraft(draft: SellerProductDetail): string[] {
 			}
 		}
 		if (Number(sku.stock ?? 0) < 0) problems.push(`${where}庫存不可為負`);
-		// 包裝尺寸 + 重量 live behind the 可配送方案 disclosure, which is why they
-		// are the ones sellers miss: the section is collapsed by default on a new
-		// product, so nothing on screen says they are mandatory.
 		if (!isPositive(sku.weight)) problems.push(`${where}重量需大於 0`);
 		if (!isPositive(sku.length_cm)) problems.push(`${where}包裝長度需大於 0`);
 		if (!isPositive(sku.width_cm)) problems.push(`${where}包裝寬度需大於 0`);
@@ -409,8 +345,6 @@ export function validateDraft(draft: SellerProductDetail): string[] {
 
 export const NEW_SKU_TEMPLATE: ProductSku = {
 	id: "",
-	// Empty by default (placeholder-only); a name becomes required once there
-	// is more than one SKU — see validateDraft.
 	sku_name: "",
 	price: "0",
 	original_price: "",

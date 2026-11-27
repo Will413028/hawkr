@@ -28,7 +28,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// 測試用的統編（檢查碼正確，不是真實的公司）。
 const (
 	taxIDOne = "33330333"
 	taxIDTwo = "04595257"
@@ -36,19 +35,16 @@ const (
 
 func individual() *KYCSellerType { return ptr(KYCIndividual) }
 
-// kycDraft 是一份完整、合法的個人賣家草稿（個人賣家沒有必填的身分欄位，也沒有文件）。
 func kycDraft(accountID int64) KYCDraftInput {
 	return KYCDraftInput{AccountID: accountID, SellerType: individual(), ProductType: ptr("蔬果")}
 }
 
-// companyDraft 是一份完整、合法的企業賣家草稿（公司名稱與統編，沒有文件）。
 func companyDraft(accountID int64, taxID string) KYCDraftInput {
 	return KYCDraftInput{
 		AccountID: accountID, SellerType: ptr(KYCCompany), CompanyName: ptr("範例小農有限公司"), TaxID: ptr(taxID), ProductType: ptr("蔬果"),
 	}
 }
 
-// savedDraft 建立草稿；回傳申請。
 func (f *fixture) savedDraft(t *testing.T, in KYCDraftInput) KYCApplication {
 	t.Helper()
 	a, err := f.module.SaveKYCDraft(context.Background(), in)
@@ -56,7 +52,6 @@ func (f *fixture) savedDraft(t *testing.T, in KYCDraftInput) KYCApplication {
 	return a
 }
 
-// submitted 開店、建立並送出一份個人賣家的申請。
 func (f *fixture) submitted(t *testing.T) (int64, Store, KYCApplication) {
 	t.Helper()
 	accountID, s := f.open(t)
@@ -66,7 +61,6 @@ func (f *fixture) submitted(t *testing.T) (int64, Store, KYCApplication) {
 	return accountID, s, a
 }
 
-// submittedCompany 開店、建立並送出一份企業賣家的申請。
 func (f *fixture) submittedCompany(t *testing.T, taxID string) (int64, Store, KYCApplication) {
 	t.Helper()
 	accountID, s := f.open(t)
@@ -93,7 +87,6 @@ func TestKYCDraftSubmitApproveFlow(t *testing.T) {
 	if d.Status != KYCStatusDraft || d.Version != 1 || d.StoreID != s.StoreID || d.AccountID != accountID || len(d.Documents) != 0 {
 		t.Fatalf("draft=%+v", d)
 	}
-	// 沒有送出時管理員看不到草稿。
 	if _, err := f.module.AdminKYCApplication(ctx, d.ID); apperr.KindOf(err) != apperr.KindNotFound {
 		t.Fatalf("admin read a draft: %v", err)
 	}
@@ -116,20 +109,17 @@ func TestKYCDraftSubmitApproveFlow(t *testing.T) {
 	if submitReview.ReviewerAdminID != nil || *approveReview.ReviewerAdminID != 9 || *approveReview.Reason != "資料齊全" {
 		t.Fatalf("reviews=%+v", admin.Reviews)
 	}
-	// 事件帶穩定的 UUIDv7，等於審核紀錄的 ID（relay 重送時不變）。
 	if len(submitted.all()) != 1 || submitted.all()[0].EventID != submitReview.ID || submitted.all()[0].EventID[6]>>4 != 7 {
 		t.Fatalf("submitted=%+v", submitted.all())
 	}
 	if len(approved.all()) != 1 || approved.all()[0].EventID != approveReview.ID || approved.all()[0].AccountID != accountID || approved.all()[0].StoreID != s.StoreID {
 		t.Fatalf("approved=%+v", approved.all())
 	}
-	// 核准 KYC 不碰店家的 profile：店家的版本不動、沒有 profile 事件。
 	after, err := f.module.Store(ctx, s.StoreID)
 	must(t, err)
 	if after.Version != storeBefore.Version || len(profile.all()) != 0 {
 		t.Fatalf("store=%+v profile events=%d", after, len(profile.all()))
 	}
-	// 已核准的不能再核准、退回、取消或修改。
 	if err := approve(f, admin.KYCApplication); apperr.KindOf(err) != apperr.KindFailedPrecondition && apperr.KindOf(err) != apperr.KindVersionConflict {
 		t.Fatalf("approve twice: %v", err)
 	}
@@ -175,17 +165,14 @@ func TestKYCRejectThenResubmitReusesTheApplication(t *testing.T) {
 	if mine.LastRejection == nil || mine.LastRejection.Reason != "資料不完整" || !slices.Equal(mine.LastRejection.Issues, wantIssues) {
 		t.Fatalf("last rejection=%+v", mine.LastRejection)
 	}
-	// 被退回的申請編輯後回到 DRAFT，沿用同一筆（同一個 ID）；不需要重新建立。
 	edited, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: rej.Version, ProductType: ptr("水果")})
 	must(t, err)
 	if edited.ID != sub.ID || edited.Status != KYCStatusDraft || edited.DecidedAt != nil || *edited.ProductType != "水果" {
 		t.Fatalf("edited=%+v", edited)
 	}
-	// 改掉的商品類型算已處理，沒動的網址還在待處理。
 	if !slices.Equal(edited.OutstandingIssues, wantIssues[1:]) {
 		t.Fatalf("outstanding=%+v", edited.OutstandingIssues)
 	}
-	// 最近一次退回在回到草稿與再次送出之後的回應仍在（與 MyKYC 同一份檢視）。
 	if edited.LastRejection == nil || edited.LastRejection.Reason != "資料不完整" || !slices.Equal(edited.LastRejection.Issues, wantIssues) {
 		t.Fatalf("save response last rejection=%+v", edited.LastRejection)
 	}
@@ -194,7 +181,6 @@ func TestKYCRejectThenResubmitReusesTheApplication(t *testing.T) {
 	if again.Status != KYCStatusSubmitted || f.count(t, "SELECT count(*) FROM seller.kyc_applications") != 1 || f.count(t, "SELECT count(*) FROM seller.kyc_reviews") != 3 {
 		t.Fatalf("again=%+v", again)
 	}
-	// 重新送出之後，退回不再是賣家要處理的：回應與 MyKYC 都沒有。
 	if again.LastRejection != nil || len(again.OutstandingIssues) != 0 {
 		t.Fatalf("submit response last rejection=%+v outstanding=%+v", again.LastRejection, again.OutstandingIssues)
 	}
@@ -309,7 +295,6 @@ func TestKYCInvalidDatesAreRejectedNotKept(t *testing.T) {
 	if mine.Version != d.Version || *mine.CompanyRegisterDate != "2015-03-04" || *mine.CompanyName != "範例小農有限公司" {
 		t.Fatalf("a rejected update changed the draft: %+v", mine)
 	}
-	// 今天（台北）本身是有效的日期。
 	ok, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: d.Version, CompanyRegisterDate: ptr("2026-10-01")})
 	must(t, err)
 	if *ok.CompanyRegisterDate != "2026-10-01" {
@@ -331,7 +316,6 @@ func TestOneOpenKYCApplicationPerStoreIsEnforcedByTheDatabase(t *testing.T) {
 			t.Fatalf("a second %s application for the same store was accepted", status)
 		}
 	}
-	// 經模組：已有申請時再「建立」是 AlreadyExists（帶 VERSION_CONFLICT），不會多一筆。
 	if _, err := f.module.SaveKYCDraft(ctx, kycDraft(accountID)); apperr.KindOf(err) != apperr.KindAlreadyExists {
 		t.Fatalf("create twice: %v", err)
 	}
@@ -448,7 +432,6 @@ func TestKYCIdentityMatchBlocksAcrossAccounts(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	// 帳號 B 以統編入駐過、之後被停權。
 	bAccount, bStore := f.open(t)
 	f.savedDraft(t, companyDraft(bAccount, taxIDOne))
 	f.suspend(t, bStore.StoreID)
@@ -464,7 +447,6 @@ func TestKYCIdentityMatchBlocksAcrossAccounts(t *testing.T) {
 	if m := err.Error(); strings.Contains(m, "統") || strings.Contains(m, "停權") {
 		t.Fatalf("錯誤不能透露命中的欄位或原因：%q", m)
 	}
-	// 不相干的統編、沒有身分欄位的個人賣家可以送出。
 	for name, draft := range map[string]func(int64) KYCDraftInput{
 		"不相干的統編": func(a int64) KYCDraftInput { return companyDraft(a, taxIDTwo) },
 		"個人賣家":   func(a int64) KYCDraftInput { return kycDraft(a) },
@@ -484,7 +466,7 @@ func TestKYCApproveRechecksTheIdentityInsideTheTransaction(t *testing.T) {
 	ctx := context.Background()
 	bAccount, bStore := f.open(t)
 	f.savedDraft(t, companyDraft(bAccount, taxIDOne))
-	_, _, sub := f.submittedCompany(t, taxIDOne) // 送出時 B 還沒被處分
+	_, _, sub := f.submittedCompany(t, taxIDOne)
 	f.suspend(t, bStore.StoreID)
 	err := approve(f, sub)
 	if apperr.KindOf(err) != apperr.KindFailedPrecondition || strings.Contains(err.Error(), "統編") {
@@ -507,7 +489,6 @@ func TestKYCLiftedOrExpiredSanctionNoLongerBlocksAndItsSnapshotIsDeleted(t *test
 		_, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
 		return err != nil
 	}
-	// 管理員停權：解除後刪除。
 	aAccount, aStore := f.open(t)
 	f.savedDraft(t, companyDraft(aAccount, taxIDOne))
 	sanction := f.suspend(t, aStore.StoreID)
@@ -522,7 +503,6 @@ func TestKYCLiftedOrExpiredSanctionNoLongerBlocksAndItsSnapshotIsDeleted(t *test
 	if blockedSubmit(taxIDOne) {
 		t.Fatal("解除後不該再擋")
 	}
-	// 違規的停權：有快照；到期後時間一過就不擋（job 還沒跑）；job 之後快照刪除。
 	bAccount, bStore := f.open(t)
 	f.savedDraft(t, companyDraft(bAccount, taxIDTwo))
 	endsAt := f.now.Add(48 * time.Hour)
@@ -557,7 +537,6 @@ func TestReconcileDeletesSnapshotsOfEndedSanctions(t *testing.T) {
 	f.savedDraft(t, kycDraft(accountID))
 	_, err := f.module.CloseCurrent(ctx, accountID)
 	must(t, err)
-	// 沒有目前 stint 的帳號：直接寫一筆已結束的措施與快照（模擬結束 job 遺失）。
 	var storeID int64
 	must(t, f.db.Conn(ctx).QueryRow(ctx, "SELECT store_id FROM seller.stores WHERE account_id=$1", accountID).Scan(&storeID))
 	f.insertEndedRisk(t, storeID, accountID, true)
@@ -666,7 +645,6 @@ func TestKYCDocumentsAreConfirmedWithTheApplicationAndReplacedOnesMarkedDeleted(
 	f.wantAsset(t, assets[0], "ACTIVE")
 	f.wantAsset(t, assets[1], "ACTIVE")
 	f.wantAsset(t, assets[2], "STAGED")
-	// 換第二張。
 	swapped, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: d.Version, CompanyDocuments: &[]KYCDocumentRef{{AssetID: assets[0].String()}, {StagedToken: tokens[2]}}})
 	must(t, err)
 	var got []string
@@ -679,7 +657,6 @@ func TestKYCDocumentsAreConfirmedWithTheApplicationAndReplacedOnesMarkedDeleted(
 	f.wantAsset(t, assets[0], "ACTIVE")
 	f.wantAsset(t, assets[1], "DELETING")
 	f.wantAsset(t, assets[2], "ACTIVE")
-	// 被換掉的文件不能寫回：現有的清單沒有它；同一個 staged token 重新確認會落在已標為刪除的資產上。
 	_, err = f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: swapped.Version, CompanyDocuments: &[]KYCDocumentRef{{AssetID: assets[0].String()}, {AssetID: assets[1].String()}}})
 	if apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("deleted document written back by asset id: %v", err)
@@ -692,7 +669,6 @@ func TestKYCDocumentsAreConfirmedWithTheApplicationAndReplacedOnesMarkedDeleted(
 	must(t, err)
 	f.wantAsset(t, assets[0], "DELETING")
 	f.wantAsset(t, assets[2], "DELETING")
-	// 公司文件只有企業賣家：寫入失敗整筆回滾，新資產仍是暫存。
 	individualAccount, _ := f.open(t)
 	individualDraft := f.savedDraft(t, kycDraft(individualAccount))
 	individualTokens, individualAssets := f.stageDocs(t, individualAccount, 1)
@@ -719,7 +695,6 @@ func TestKYCAuthorizationFollowsTheAccountsCurrentStore(t *testing.T) {
 	if _, err := f.module.MyKYC(ctx, owner); err != nil {
 		t.Fatal(err)
 	}
-	// 另一個帳號只看得到自己店家的（沒有申請）。
 	other, _ := f.open(t)
 	if _, err := f.module.MyKYC(ctx, other); apperr.KindOf(err) != apperr.KindNotFound {
 		t.Fatalf("another store's application: %v", err)
@@ -741,7 +716,6 @@ func TestKYCAuthorizationFollowsTheAccountsCurrentStore(t *testing.T) {
 	if _, err := f.module.MyKYC(ctx, owner); apperr.KindOf(err) != apperr.KindNotFound {
 		t.Fatalf("a closed stint's application is not reachable: %v", err)
 	}
-	// 重新入駐的新 stint 沒有舊申請。
 	_, err = f.module.Apply(ctx, validApply(owner))
 	must(t, err)
 	if _, err := f.module.MyKYC(ctx, owner); apperr.KindOf(err) != apperr.KindNotFound {
@@ -805,7 +779,6 @@ func TestKYCInputValidation(t *testing.T) {
 			t.Errorf("%s：%v", name, err)
 		}
 	}
-	// 送出時一次列出全部缺的欄位。
 	blank, _ := f.open(t)
 	minimal := f.savedDraft(t, KYCDraftInput{AccountID: blank, SellerType: ptr(KYCCompany)})
 	_, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: blank, ExpectedVersion: minimal.Version})
@@ -819,7 +792,6 @@ func TestAdminKYCListFiltersAndPaginates(t *testing.T) {
 	t.Parallel()
 	f := setup(t)
 	ctx := context.Background()
-	// 清單以店名搜尋（D37）。
 	names := []string{"王大明農場", "王小明農場", "李100%農場", "李1000農場", "陳_x農場", "陳ax農場"}
 	for _, name := range names {
 		accountID, s := f.open(t)
@@ -830,10 +802,8 @@ func TestAdminKYCListFiltersAndPaginates(t *testing.T) {
 		_, err = f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accountID, ExpectedVersion: d.Version})
 		must(t, err)
 	}
-	// 一份草稿不在清單。
 	draftAccount, _ := f.open(t)
 	f.savedDraft(t, kycDraft(draftAccount))
-	// 沒有篩選：送出時間新到舊。
 	all := collectKYC(t, f, KYCListInput{PageSize: 2})
 	if len(all) != 6 {
 		t.Fatalf("all=%d（草稿不該在清單）", len(all))
@@ -846,7 +816,6 @@ func TestAdminKYCListFiltersAndPaginates(t *testing.T) {
 	if got := collectKYC(t, f, KYCListInput{Query: "王"}); len(got) != 2 {
 		t.Fatalf("王 = %d", len(got))
 	}
-	// 關鍵字裡的 % 與 _ 是字面，不是萬用字元。
 	if got := collectKYC(t, f, KYCListInput{Query: "100%"}); len(got) != 1 || *got[0].StoreName != "李100%農場" {
 		t.Fatalf("100%% = %+v", got)
 	}
@@ -878,9 +847,8 @@ func TestAdminKYCQueueIsOrderedBySubmitTime(t *testing.T) {
 		accountID, _ := f.open(t)
 		drafts = append(drafts, f.savedDraft(t, kycDraft(accountID)))
 		accounts = append(accounts, accountID)
-		f.now = f.now.Add(time.Minute) // 草稿的建立時間依 0、1、2、3
+		f.now = f.now.Add(time.Minute)
 	}
-	// 送出的順序與建立草稿的順序相反：3、1、0，其中 2 與 0 同一個時間點送出（同刻以申請 ID 定序）。
 	submitAt := func(i int) KYCApplication {
 		a, err := f.module.SubmitKYC(ctx, SubmitKYCInput{AcceptedAgreements: CurrentKYCAcceptances(), AccountID: accounts[i], ExpectedVersion: drafts[i].Version})
 		must(t, err)
@@ -907,13 +875,11 @@ func TestAdminKYCQueueIsOrderedBySubmitTime(t *testing.T) {
 	if got := ids(oldest); !slices.Equal(got, want) {
 		t.Fatalf("審核中的佇列要舊到新（同刻以申請 ID 升冪）：got=%v want=%v", got, want)
 	}
-	// 沒有篩選與其他狀態：新到舊（同刻以申請 ID 降冪）。
 	newest := ids(collectKYC(t, f, KYCListInput{PageSize: 3}))
 	slices.Reverse(want)
 	if !slices.Equal(newest, want) {
 		t.Fatalf("沒有篩選要新到舊：got=%v want=%v", newest, want)
 	}
-	// 核准一筆之後，它離開審核中的佇列、出現在已核准的清單；已核准的清單新到舊。
 	if _, err := f.module.ApproveKYC(ctx, ApproveKYCInput{ApplicationID: third.ID, ExpectedVersion: third.Version, AdminID: 9}); err != nil {
 		t.Fatal(err)
 	}
@@ -928,7 +894,6 @@ func TestAdminKYCQueueIsOrderedBySubmitTime(t *testing.T) {
 	if len(approved) != 2 || approved[0].ID != second.ID || approved[1].ID != third.ID {
 		t.Fatalf("approved list = %v", ids(approved))
 	}
-	// 沒送出就取消的申請不在佇列（它沒有進過審核）；送出之後才取消的在，狀態是 CANCELLED。
 	accountID, _ := f.open(t)
 	d := f.savedDraft(t, kycDraft(accountID))
 	if _, err := f.module.CancelKYC(ctx, CancelKYCInput{AccountID: accountID, ExpectedVersion: d.Version}); err != nil {
@@ -1028,7 +993,6 @@ func TestKYCSubmitAndCancelRecheckTheCapabilityInsideTheLock(t *testing.T) {
 			done := make(chan error, 1)
 			go func() { done <- tc.run(f, accountID, draft) }()
 			f.waitForLockWaiters(t, 1)
-			// 請求已經讀過「沒有停權」、卡在店家列的鎖上；這時另一個交易停權並 commit。
 			measureID := uuid.NewV7()
 			_, err = holder.Exec(ctx, `INSERT INTO seller.measures (id, account_id, store_id, kind, basis, risk_ground, review_by, statement_to_seller, current_revision, created_by_admin_id, created_at, updated_at, starts_at)
 				VALUES ($1, $2, $3, 'SUSPENSION', 'RISK', 'FRAUD', $4, 'x', 1, 7, $5, $5, $5)`, measureID, accountID, s.StoreID, f.now.Add(7*24*time.Hour), f.now)
@@ -1056,7 +1020,7 @@ func TestStartupChecksThatEveryKeyReferencedByTheDatabaseIsConfigured(t *testing
 		t.Fatalf("空的資料庫：%v", err)
 	}
 	_, s, _ := f.submittedCompany(t, taxIDOne)
-	f.suspend(t, s.StoreID) // 處分的身分快照也參照金鑰
+	f.suspend(t, s.StoreID)
 	if err := f.module.CheckKYCKeys(ctx); err != nil {
 		t.Fatalf("同一組金鑰：%v", err)
 	}
@@ -1098,7 +1062,6 @@ func TestKYCDocumentsAreReplacedAsState(t *testing.T) {
 	if got := company(d); len(got) != 2 || got[0] != assets[0].String() || got[1] != assets[1].String() {
 		t.Fatalf("documents=%+v", d.Documents)
 	}
-	// 保留第二張、換上第三張、順序反過來。
 	next, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: d.Version,
 		CompanyDocuments: &[]KYCDocumentRef{{StagedToken: tokens[2]}, {AssetID: assets[1].String()}}})
 	must(t, err)
@@ -1108,7 +1071,6 @@ func TestKYCDocumentsAreReplacedAsState(t *testing.T) {
 	f.wantAsset(t, assets[0], "DELETING")
 	f.wantAsset(t, assets[1], "ACTIVE")
 	f.wantAsset(t, assets[2], "ACTIVE")
-	// 大寫的 UUID 也是同一個 asset。
 	upper, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: next.Version,
 		CompanyDocuments: &[]KYCDocumentRef{{AssetID: strings.ToUpper(assets[2].String())}, {AssetID: strings.ToUpper(assets[1].String())}}})
 	must(t, err)
@@ -1127,7 +1089,6 @@ func TestKYCDocumentsAreReplacedAsState(t *testing.T) {
 			t.Errorf("%s：err=%v", name, err)
 		}
 	}
-	// 空清單清掉全部公司文件。
 	cleared, err := f.module.SaveKYCDraft(ctx, KYCDraftInput{AccountID: accountID, ExpectedVersion: next.Version, CompanyDocuments: &[]KYCDocumentRef{}})
 	must(t, err)
 	if len(cleared.Documents) != 0 {
@@ -1143,11 +1104,11 @@ func TestKYCRejectsATaxIDWithABadChecksum(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	accountID, _ := f.open(t)
-	in := companyDraft(accountID, "12345678") // 檢查碼不符
+	in := companyDraft(accountID, "12345678")
 	if _, err := f.module.SaveKYCDraft(ctx, in); apperr.KindOf(err) != apperr.KindInvalidInput {
 		t.Fatalf("檢查碼不符的統編：err=%v", err)
 	}
-	in = companyDraft(accountID, "10000073") // 第 7 位是 7 的特例
+	in = companyDraft(accountID, "10000073")
 	if _, err := f.module.SaveKYCDraft(ctx, in); err != nil {
 		t.Fatalf("合法的統編被拒絕：%v", err)
 	}
@@ -1275,7 +1236,6 @@ func TestSubmitKYCRequiresTheStoreContactData(t *testing.T) {
 	if n := f.count(t, "SELECT count(*) FROM seller.kyc_reviews WHERE action='SUBMIT'"); n != 0 {
 		t.Fatalf("被拒絕的送出不該留審核紀錄：%d", n)
 	}
-	// 申請自己的缺項先檢查：回 invalid_argument 與欄位違規，不是店家的 failed_precondition。
 	other, _ := f.open(t)
 	blank := f.savedDraft(t, KYCDraftInput{AccountID: other, SellerType: ptr(KYCCompany)})
 	if _, err := f.db.Conn(ctx).Exec(ctx, "UPDATE seller.stores SET support_email = NULL WHERE account_id = $1", other); err != nil {
@@ -1314,7 +1274,6 @@ func TestApproveCommentIsValidatedBeforeTheDatabaseSeesIt(t *testing.T) {
 	if admin.Status != KYCStatusSubmitted || len(admin.Reviews) != 1 {
 		t.Fatalf("a rejected approval must write nothing: %+v", admin)
 	}
-	// 去掉前後空白之後剛好 1000 字可以；空白的 comment 等於沒有。
 	if _, err := f.module.ApproveKYC(ctx, ApproveKYCInput{ApplicationID: sub.ID, ExpectedVersion: sub.Version, AdminID: 9, Comment: " " + strings.Repeat("理", 1000) + " "}); err != nil {
 		t.Fatalf("1000 runes: %v", err)
 	}
@@ -1334,7 +1293,6 @@ func TestApproveCommentIsValidatedBeforeTheDatabaseSeesIt(t *testing.T) {
 	}
 }
 
-// submittedWithDocuments 開店、建立並送出一份帶兩張公司補充文件的企業賣家申請。
 func (f *fixture) submittedWithDocuments(t *testing.T) (int64, Store, KYCApplication) {
 	t.Helper()
 	return f.companySubmission(t, func(in *KYCDraftInput) {
@@ -1343,7 +1301,6 @@ func (f *fixture) submittedWithDocuments(t *testing.T) (int64, Store, KYCApplica
 	})
 }
 
-// accessPages 以每頁一筆走完一筆申請的補充文件讀取紀錄（新到舊），確認頁與頁之間不漏不重。
 func (f *fixture) accessPages(t *testing.T, applicationID uuid.UUID) []KYCDocumentAccess {
 	t.Helper()
 	var out []KYCDocumentAccess
@@ -1384,7 +1341,6 @@ func TestKYCDocumentAccessIsRecordedBeforeTheBytesAreRead(t *testing.T) {
 		t.Fatal("找不到的位置不能留下紀錄或問媒體")
 	}
 
-	// 讀取紀錄寫不進去：不讀、不回傳。
 	_, err := f.db.Conn(ctx).Exec(ctx, "ALTER TABLE seller.kyc_document_accesses ADD CONSTRAINT test_no_writes CHECK (false) NOT VALID")
 	must(t, err)
 	got, err := f.module.ReadKYCDocument(ctx, ReadKYCDocumentInput{AdminID: 9, ApplicationID: sub.ID, Position: 0})
@@ -1394,7 +1350,6 @@ func TestKYCDocumentAccessIsRecordedBeforeTheBytesAreRead(t *testing.T) {
 	_, err = f.db.Conn(ctx).Exec(ctx, "ALTER TABLE seller.kyc_document_accesses DROP CONSTRAINT test_no_writes")
 	must(t, err)
 
-	// 媒體讀失敗：紀錄還在，錯誤原樣交回。
 	f.media.setFailRead(errors.New("media down"))
 	if err := read(sub, 0); err == nil {
 		t.Fatal("media 失敗要回錯誤")
@@ -1403,7 +1358,6 @@ func TestKYCDocumentAccessIsRecordedBeforeTheBytesAreRead(t *testing.T) {
 		t.Fatalf("accesses=%d mediaCalls=%d", n, f.readSecureCalls())
 	}
 	f.media.setFailRead(nil)
-	// 成功的讀取：每一次各寫一列（誰、哪一張、何時）。
 	if err := read(sub, 0); err != nil {
 		t.Fatal(err)
 	}
@@ -1493,7 +1447,6 @@ func TestKYCAuditListsPageAndCheckTheParent(t *testing.T) {
 			t.Fatalf("不是新到舊：%+v", accesses)
 		}
 	}
-	// 申請檢視只內嵌審核紀錄（筆數由人工動作限制），沒有讀取紀錄的欄位：型別上就放不進去。
 	admin, err := f.module.AdminKYCApplication(ctx, sub.ID)
 	must(t, err)
 	if len(admin.Reviews) != 1 {
@@ -1575,7 +1528,6 @@ func TestKYCDocumentReadFailuresAreDistinguished(t *testing.T) {
 	if err := read(); err != nil {
 		t.Fatalf("正常讀取：%v", err)
 	}
-	// 資產在 media 已經不是有效的機敏資產（被標為刪除），列還指著它。
 	docAsset, err := uuid.Parse(sub.Documents[0].AssetID)
 	must(t, err)
 	f.markAssetDeleted(t, ctx, docAsset)
@@ -1600,7 +1552,7 @@ func TestAdminKYCQueueVariantsFilterIdentically(t *testing.T) {
 	ctx := context.Background()
 	type seed struct {
 		name   string
-		action string // approve、reject、cancel、none
+		action string
 	}
 	seeds := []seed{{"甲", "none"}, {"乙", "approve"}, {"丙", "none"}, {"丁", "reject"}, {"戊", "cancel"}, {"己", "none"}}
 	for _, sd := range seeds {
@@ -1625,7 +1577,6 @@ func TestAdminKYCQueueVariantsFilterIdentically(t *testing.T) {
 		}
 		must(t, err)
 	}
-	// 沒有送出的草稿與沒送出就取消的，兩支都不列。
 	draftAccount, _ := f.open(t)
 	f.savedDraft(t, kycDraft(draftAccount))
 	ids := func(items []KYCApplication) []uuid.UUID {
@@ -1766,7 +1717,6 @@ func TestKYCCompanyDocumentElementProblemsAreIndexed(t *testing.T) {
 	}
 }
 
-// editStore 以店家目前的版本寫入店家資料。
 func editStore(f *fixture, t *testing.T, storeID int64, in UpdateProfileInput) (Store, error) {
 	t.Helper()
 	cur, err := f.module.Store(context.Background(), storeID)
@@ -1822,7 +1772,6 @@ func TestRequiredStoreFieldsCannotBeClearedWhileTheApplicationIsSubmittedOrAppro
 			t.Fatal(err)
 		}
 	}
-	// 沒有申請與草稿：地址與信箱可以清。
 	clearOptional("沒有申請")
 	if _, err := editStore(f, t, s.StoreID, UpdateProfileInput{SupportEmail: ptr(""), TownCode: ptr(""), AddressDetail: ptr("")}); err != nil {
 		t.Fatalf("沒有申請時應該可以清：%v", err)
@@ -1839,7 +1788,6 @@ func TestRequiredStoreFieldsCannotBeClearedWhileTheApplicationIsSubmittedOrAppro
 	must(t, approve(f, sub))
 	clearRequired("已核准")
 	clearOptional("已核准")
-	// 換成別的值是允許的，商店電話不是必填、可以清。
 	if _, err := editStore(f, t, s.StoreID, UpdateProfileInput{SupportEmail: ptr("new@example.com"), ContactPhone: ptr("")}); err != nil {
 		t.Fatal(err)
 	}
@@ -1926,13 +1874,11 @@ func TestSavingAndSubmittingDependOnlyOnTheApplicationStatus(t *testing.T) {
 			t.Errorf("%s：要 failed_precondition，得到 %v", label, err)
 		}
 	}
-	// 審核中：兩個都擋下，狀態與版本不變。
 	blocked("審核中儲存", save(sub))
 	blocked("審核中送出", submit(sub))
 	if status, version := statusAndVersion(); status != "SUBMITTED" || version != sub.Version {
 		t.Fatalf("審核中被擋下之後：%s v%d，要 SUBMITTED v%d", status, version, sub.Version)
 	}
-	// 已核准：兩個都擋下，狀態與版本不變。
 	must(t, approve(f, sub))
 	_, approvedVersion := statusAndVersion()
 	approved, err := f.module.MyKYC(ctx, accountID)
@@ -1942,7 +1888,6 @@ func TestSavingAndSubmittingDependOnlyOnTheApplicationStatus(t *testing.T) {
 	if status, version := statusAndVersion(); status != "APPROVED" || version != approvedVersion {
 		t.Fatalf("已核准被擋下之後：%s v%d，要 APPROVED v%d", status, version, approvedVersion)
 	}
-	// 已退回：可以編輯、可以直接重送。
 	otherAccount, _, other := f.submitted(t)
 	_, err = f.module.RejectKYC(ctx, RejectKYCInput{ApplicationID: other.ID, ExpectedVersion: other.Version, AdminID: 9, Issues: anIssue(), Reason: "請確認"})
 	must(t, err)
@@ -1977,7 +1922,6 @@ func TestStoreNameAndDescriptionStayEditableWhileSubmittedAndAfterApproval(t *te
 	}
 }
 
-// fileData 讀完並關閉機敏檔的串流，回傳全部內容。
 func fileData(t *testing.T, c FileContent) []byte {
 	t.Helper()
 	defer func() { _ = c.Body.Close() }()

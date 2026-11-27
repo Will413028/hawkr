@@ -176,9 +176,6 @@ export function AfterSaleDecisionDrawer({
 	const caseNo = summary?.caseNo ?? "";
 	const orderNo = summary?.orderNo ?? "";
 
-	// Case detail (+ arbitration once appeal-locked), keyed by caseNo and gated
-	// on the drawer being open. The summary row supplies header data until it
-	// resolves; confirm-receipt invalidates it instead of an imperative reload.
 	const {
 		data,
 		loading,
@@ -194,9 +191,6 @@ export function AfterSaleDecisionDrawer({
 	const [error, setError] = React.useState<string | null>(null);
 	const [result, setResult] = React.useState<string | null>(null);
 
-	// Decision form fields
-	// Return logistics must match the original order shipping method. Sellers
-	// should not choose a different return method here.
 	const [originalReturnMethod, setOriginalReturnMethod] = React.useState<
 		string | null
 	>(null);
@@ -214,12 +208,8 @@ export function AfterSaleDecisionDrawer({
 		detail?.refundableAmount || summary?.refundableAmount || 0,
 	);
 
-	// Form/validation errors are local; detail-load errors come from the query.
 	const displayError = error ?? detailError;
 
-	// Reset the decision form each time the drawer opens for a case, and read
-	// the original order logistics once. Return shipping must stay identical to
-	// that original method, so this is read-only form state.
 	React.useEffect(() => {
 		if (!(open && caseNo)) return;
 		let cancelled = false;
@@ -252,7 +242,6 @@ export function AfterSaleDecisionDrawer({
 		};
 	}, [open, caseNo, orderNo]);
 
-	// Default the full-refund amount once we know the refundable ceiling.
 	React.useEffect(() => {
 		if (selected === AfterSaleResolutionType.FULL_REFUND_NO_RETURN) {
 			setRefundAmount(String(refundable));
@@ -260,9 +249,6 @@ export function AfterSaleDecisionDrawer({
 	}, [selected, refundable]);
 
 	const status = detail?.status ?? summary?.status ?? "";
-	// Once the buyer escalates to a platform appeal, the case is locked by
-	// arbitration — the seller can no longer resolve/confirm it unilaterally
-	// (the backend rejects such calls). Gate all seller actions on this.
 	const isUnderAppeal = afterSaleIsUnderAppeal(detail?.appealState);
 	const isAppealResolved = afterSaleIsAppealResolved(detail?.appealState);
 	const canResolve = afterSaleCanResolve(status, detail?.appealState);
@@ -372,7 +358,7 @@ export function AfterSaleDecisionDrawer({
 			>
 				{!summary ? null : (
 					<div className="flex flex-col gap-4">
-						{/* Header */}
+
 						<div className="flex items-start justify-between gap-3">
 							<div className="min-w-0">
 								<p className="text-sm font-bold text-foreground break-all">
@@ -413,7 +399,7 @@ export function AfterSaleDecisionDrawer({
 							</section>
 						) : null}
 
-						{/* Buyer application */}
+
 						<section>
 							<h3 className="text-sm font-semibold text-foreground mb-2">
 								買家申請
@@ -441,12 +427,7 @@ export function AfterSaleDecisionDrawer({
 							) : null}
 						</section>
 
-						{/* Seller inspection evidence — `evidence[]` tagged
-						    AfterSaleEvidenceType.INSPECTION_PHOTO ("8602"), uploaded by the
-						    seller at confirm-receipt. The buyer detail page has always had
-						    its own block; the seller had no render point at all, so the
-						    photos backing an inspection deduction were invisible to the
-						    person who took it (#430 A3-c). */}
+
 						{detail?.sellerPhotos && detail.sellerPhotos.length > 0 ? (
 							<section>
 								<h3 className="text-sm font-semibold text-foreground mb-2">
@@ -456,7 +437,7 @@ export function AfterSaleDecisionDrawer({
 							</section>
 						) : null}
 
-						{/* Order snapshot */}
+
 						{detail?.items && detail.items.length > 0 ? (
 							<section>
 								<h3 className="text-sm font-semibold text-foreground mb-2">
@@ -507,7 +488,7 @@ export function AfterSaleDecisionDrawer({
 							</div>
 						) : null}
 
-						{/* Decision area */}
+
 						{loading ? (
 							<p className="text-sm text-foreground-soft">載入中…</p>
 						) : result ? (
@@ -560,8 +541,7 @@ export function AfterSaleDecisionDrawer({
 									})}
 								</div>
 
-								{/* Per-decision fields — animated height so switching CTAs
-								    glides instead of yanking the footer buttons around. */}
+
 								<AnimateHeight className="mt-2">
 									{selected === AfterSaleResolutionType.RETURN_REFUND ? (
 										<section className="rounded-hkui-md border border-divider bg-content2 px-3 py-2">

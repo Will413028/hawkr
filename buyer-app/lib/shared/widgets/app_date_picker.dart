@@ -46,9 +46,6 @@ class AppDatePicker extends StatefulWidget {
       barrierColor: scheme.scrim.withValues(alpha: barrierOpacity),
       builder: (dialogContext) {
         final viewportWidth = MediaQuery.sizeOf(dialogContext).width;
-        // A seven-column calendar cannot provide even 44dp date targets in a
-        // 320dp viewport with the old 32dp margins. Keep a comfortable 16dp
-        // inset on current phones and use a compact 6dp inset only below 375.
         final horizontalInset = viewportWidth < 375 ? 6.0 : HkSpace.lg;
         return BackdropFilter(
           filter: ui.ImageFilter.blur(
@@ -80,12 +77,11 @@ class AppDatePicker extends StatefulWidget {
 }
 
 class _AppDatePickerState extends State<AppDatePicker> {
-  // ── 設計稿顏色 ────────────────────────────────────────────────────
   static const _green = AppColors.primary;
   static const _weekendColor = AppColors.primary;
   static const _weekdayLabelColor = AppColors.textSecondary;
   static const _dateColor = AppColors.textEmphasis;
-  static const _borderColor = AppColors.cardBorder; // rgba(86,86,86,0.2)
+  static const _borderColor = AppColors.cardBorder;
   static const _cancelTextColor = AppColors.textPrimary;
   static const _yearMonthUnselectedColor = AppColors.textSecondary;
 
@@ -130,7 +126,6 @@ class _AppDatePickerState extends State<AppDatePicker> {
   int _toRoc(int year) => year - 1911;
   String _rocLabel(DateTime dt) => '民國 ${_toRoc(dt.year)} 年 ${dt.month} 月';
 
-  // ── Build ───────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -152,7 +147,6 @@ class _AppDatePickerState extends State<AppDatePicker> {
     );
   }
 
-  // ── Header (60px) ───────────────────────────────────────────────────────
   Widget _buildHeader() {
     return Container(
       height: 60.h,
@@ -163,7 +157,6 @@ class _AppDatePickerState extends State<AppDatePicker> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Left nav
           if (!_yearMonthMode)
             _navButton(AppIcons.chevronLeft, '上個月', () {
               setState(() {
@@ -176,7 +169,6 @@ class _AppDatePickerState extends State<AppDatePicker> {
           else
             const SizedBox.square(dimension: HkControl.minTap),
 
-          // Title (tappable to toggle year/month mode)
           Expanded(
             child: HkTapTarget(
               semanticLabel: '${_rocLabel(_displayMonth)}，切換年月選擇',
@@ -189,7 +181,7 @@ class _AppDatePickerState extends State<AppDatePicker> {
                     : EdgeInsets.zero,
                 decoration: _yearMonthMode
                     ? BoxDecoration(
-                        color: const Color(0x0A000000), // rgba(0,0,0,0.04)
+                        color: const Color(0x0A000000),
                         borderRadius: BorderRadius.circular(12.r),
                       )
                     : null,
@@ -211,7 +203,6 @@ class _AppDatePickerState extends State<AppDatePicker> {
                       ),
                     ),
                     SizedBox(width: 6.w),
-                    // Up/Down chevrons (12x25 container with 12x12 icons)
                     SizedBox(
                       width: 12.w,
                       height: 25.h,
@@ -238,7 +229,6 @@ class _AppDatePickerState extends State<AppDatePicker> {
             ),
           ),
 
-          // Right nav
           if (!_yearMonthMode)
             _navButton(AppIcons.chevronRight, '下個月', () {
               setState(() {
@@ -263,7 +253,7 @@ class _AppDatePickerState extends State<AppDatePicker> {
         width: 36.w,
         height: 36.w,
         decoration: const BoxDecoration(
-          color: Color(0x0A000000), // rgba(0,0,0,0.04)
+          color: Color(0x0A000000),
           shape: BoxShape.circle,
         ),
         child: Center(
@@ -275,7 +265,6 @@ class _AppDatePickerState extends State<AppDatePicker> {
 
   void _toggleYearMonthMode() {
     if (!_yearMonthMode) {
-      // Entering year/month mode — re-create controllers at current position.
       _yearWheelCtrl.dispose();
       _monthWheelCtrl.dispose();
       _yearWheelCtrl = FixedExtentScrollController(
@@ -290,8 +279,7 @@ class _AppDatePickerState extends State<AppDatePicker> {
     setState(() => _yearMonthMode = !_yearMonthMode);
   }
 
-  // ── Calendar Grid (RWD + 固定 6 週高度防抖動) ──────────────────────────
-  static const _maxWeeks = 6; // 固定 6 週，避免月份切換時高度跳動
+  static const _maxWeeks = 6;
   static const _rowH = HkControl.minTap;
 
   Widget _buildCalendar() {
@@ -302,19 +290,15 @@ class _AppDatePickerState extends State<AppDatePicker> {
       _displayMonth.month + 1,
       0,
     ).day;
-    final startWeekday = firstOfMonth.weekday % 7; // Sunday = 0
+    final startWeekday = firstOfMonth.weekday % 7;
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // 390dp and wider retain the designed 8dp calendar inset with 48dp+
-        // date cells. Narrow widths spend that inset on target size; at the
-        // 320dp lower bound each date remains 44dp wide and 48dp tall.
         final horizontalPadding = constraints.maxWidth >= 352 ? 8.0 : 0.0;
         return Padding(
           padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
           child: Column(
             children: [
-              // Weekday labels row
               Padding(
                 padding: EdgeInsets.symmetric(vertical: 4.h),
                 child: Row(
@@ -341,7 +325,6 @@ class _AppDatePickerState extends State<AppDatePicker> {
                   }),
                 ),
               ),
-              // Date grid — 固定 6 週高度，用 Expanded 自適應寬度
               ...List.generate(_maxWeeks, (week) {
                 return SizedBox(
                   height: _rowH,
@@ -427,7 +410,6 @@ class _AppDatePickerState extends State<AppDatePicker> {
   bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 
-  // ── Year/Month Picker (wheel style) ─────────────────────────────────────
   Widget _buildYearMonthPicker() {
     const itemExtent = 44.0;
 
@@ -436,7 +418,6 @@ class _AppDatePickerState extends State<AppDatePicker> {
       decoration: const BoxDecoration(color: Color(0x80FFFFFF)),
       child: Stack(
         children: [
-          // 中間選中區域高亮背景
           Center(
             child: Container(
               height: itemExtent,
@@ -449,7 +430,6 @@ class _AppDatePickerState extends State<AppDatePicker> {
           ),
           Row(
             children: [
-              // Year wheel
               Expanded(
                 child: Container(
                   decoration: const BoxDecoration(
@@ -497,7 +477,6 @@ class _AppDatePickerState extends State<AppDatePicker> {
                   ),
                 ),
               ),
-              // Month wheel
               Expanded(
                 child: ListWheelScrollView.useDelegate(
                   controller: _monthWheelCtrl,
@@ -542,10 +521,8 @@ class _AppDatePickerState extends State<AppDatePicker> {
     );
   }
 
-  // ── Footer ──────────────────────────────────────────────────────────────
   Widget _buildFooter() {
     if (_yearMonthMode) {
-      // 年月模式 — Figma: border-top rgba(0,0,0,0.06), pb=20, pt≈13
       return Container(
         padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 20.h),
         decoration: const BoxDecoration(
@@ -575,7 +552,6 @@ class _AppDatePickerState extends State<AppDatePicker> {
       );
     }
 
-    // 日曆模式 — Figma: gap=12, pb=20, pt=12
     return Container(
       padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 20.h),
       decoration: const BoxDecoration(
@@ -583,7 +559,6 @@ class _AppDatePickerState extends State<AppDatePicker> {
       ),
       child: Row(
         children: [
-          // 取消 — border rgba(86,86,86,0.2), Inter Medium 16px, #555
           Expanded(
             child: SizedBox(
               height: HkControl.minTap,
@@ -608,7 +583,6 @@ class _AppDatePickerState extends State<AppDatePicker> {
             ),
           ),
           SizedBox(width: 12.w),
-          // 完成 — bg primary, Inter SemiBold 16px, white
           Expanded(
             child: SizedBox(
               height: HkControl.minTap,

@@ -37,28 +37,6 @@ import { cn } from "@/lib/utils/cn";
  *   brand · workspace nav (商品/訂單/客戶/分析) · search · notifications · avatar
  */
 
-/*
- * Seller-header chrome — Tailwind migration (子刀 5).
- *
- * The seller header renders only on /seller-center/* and its live styling was
- * split: navigation-shell.css (`body .seller-header*`, everywhere) supplied the
- * layout + children, and seller-center.css (`body .page-wrapper:has(.seller-
- * shell) .seller-header__inner` + a dark block) supplied the pill surface and
- * dark colours. PR-B's lessons apply: box-shadow/transform via arbitrary
- * *properties* (`[ box-shadow:… ]`/`[transform:translateY(-1px)]`), and `<a>`
- * dark text via `!` to beat the unlayered dark-link rules in
- * 01-tokens-theme.css (`body a{color:--color-ink-200}` for non-exception links; the
- * `color:inherit` exception for `a.seller-header__nav-item`). Every BEM class is
- * KEPT as a hook (gate selectors, the seller-center `@960` hide + `.auto-nav`
- * position, the `.seller-header__brand-logo` lockup sizing, the
- * `.seller-header__icon-btn .notif-bell__badge` override, and the shared
- * `.site-nav-user__menu*` dropdown deferred to 子刀 6). No backdrop-filter: the
- * pill's computed backdrop has always been `none` (same as the buyer pill).
- *
- * Colours moved to `--page-seller-nav-*` in styles/foundation/00-color-config.css
- * (identical values, light + dark) — the header used to carry 26 lines of raw
- * hex/rgb, including two dark-only hexes with no token at all.
- */
 const SELLER_HEADER =
 	"seller-header relative w-full h-[84px] px-11 max-[768px]:h-[56px] max-[768px]:px-0";
 
@@ -68,8 +46,6 @@ const SELLER_HEADER_INNER = cn(
 	"max-[768px]:h-[56px] max-[768px]:min-h-[56px] max-[768px]:gap-x-3 max-[768px]:rounded-none max-[768px]:px-2.5",
 	"border border-[var(--page-seller-nav-border)]",
 	"text-[var(--page-seller-nav-fg)]",
-	// Pill surface: cream gradient over a translucent solid (gate reads the solid
-	// as background-color); dark = primary gradient over near-black.
 	"bg-[var(--page-seller-nav-pill-bg)] [background-image:var(--page-seller-nav-pill-gradient)]",
 	"[box-shadow:var(--page-seller-nav-pill-shadow)]",
 );
@@ -77,15 +53,6 @@ const SELLER_HEADER_INNER = cn(
 const SELLER_BRAND =
 	"seller-header__brand inline-flex shrink-0 items-center gap-0 no-underline text-[var(--page-seller-nav-brand-fg)]!";
 
-// flex-1 + overflow-x-auto: the links fill the middle and scroll horizontally
-// when the viewport is too narrow, instead of overflowing into the actions/CTA
-// (the brand + actions are shrink-0). scrollbar hidden to match the pill chrome.
-//
-// The scrollbar being hidden left NO affordance that the row scrolls at all, so
-// the last tabs were discoverable only by luck. The mask fades the final 32px:
-// pure CSS, no extra element, and when the row is short the fade lands on the
-// empty tail instead of on a label. (`#000`/`transparent` here are mask ALPHA
-// stops, not UI colour — a mask has no palette to tokenise.)
 const SELLER_NAV = cn(
 	"seller-header__nav flex flex-1 min-w-0 items-center gap-x-1 overflow-x-auto",
 	"[scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-[840px]:hidden",
@@ -115,23 +82,13 @@ const SELLER_CTA = cn(
 	"motion-reduce:hover:[transform:none]",
 );
 
-// An incomplete seller must always have a direct way back to onboarding. On a
-// narrow header this collapses to a 44px edit icon so the brand, theme and
-// account controls keep their intrinsic sizes instead of squeezing/overflowing.
 const SELLER_SETUP_CTA = cn(
 	SELLER_CTA,
 	"seller-header__cta--setup max-[840px]:size-11 max-[840px]:justify-center max-[840px]:gap-0 max-[840px]:px-0",
 );
 
-// The normal workspace CTA is optional chrome on small screens; product
-// creation remains available from the seller navigation/menu.
 const SELLER_CREATE_CTA = cn(SELLER_CTA, "max-[840px]:hidden");
 
-// ≤640px these collapse away entirely. That is deliberate: the header is
-// already carrying brand + setup/create CTA + theme + avatar at 44px each, and
-// a scrolling icon row on a phone header reads as a bug. 訊息中心 and 通知 both
-// have entries in the account menu below, so neither destination is lost —
-// which was the actual defect (通知 previously had NO mobile path at all).
 const SELLER_ICON_BTN = cn(
 	"seller-header__icon-btn grid place-items-center size-11 rounded-[999px] bg-transparent no-underline",
 	"max-[640px]:hidden",
@@ -140,13 +97,9 @@ const SELLER_ICON_BTN = cn(
 	"motion-reduce:hover:[transform:none]",
 );
 
-// 24×24 icon box — mirrors the buyer navbar's `.site-nav-action__icon`
-// sizing so 訊息/通知 render at the exact same icon size across both rails.
 const SELLER_ICON_BOX =
 	"inline-grid place-items-center w-6 h-6 overflow-hidden [line-height:0] [&_svg]:size-6";
 
-// Match the buyer navbar's ThemeToggle so the toggle reads the same size
-// across both rails.
 const SELLER_THEME_BTN = "seller-header__theme-btn size-11";
 
 const SELLER_AVATAR = cn(
@@ -263,9 +216,6 @@ const sellerRailMenuItems = sellerWorkspaceRoutes.filter(
 
 const SETUP_LOCK_HINT = "完成賣場建立後開放";
 
-// 賣場建立未完成時的鎖定樣式：去掉 hover/連結性，降透明度。The element is a real
-// <button aria-disabled>, not a <span>: seven workspace destinations used to
-// vanish from the tab order with nothing explaining why.
 const SELLER_NAV_ITEM_LOCKED = cn(
 	"relative inline-flex items-center justify-center min-h-11 px-[14px] rounded-[999px]",
 	"text-[0.875rem] font-bold whitespace-nowrap select-none cursor-not-allowed opacity-40",
@@ -326,7 +276,6 @@ function SellerAccountMenu({ setupIncomplete }: { setupIncomplete: boolean }) {
 		try {
 			await signOut();
 		} catch {
-			// 撤銷失敗＝session 仍有效（signOut 已跳 toast），保留選單供使用者重試。
 			return;
 		} finally {
 			signOutPendingRef.current = false;
@@ -398,9 +347,7 @@ function SellerAccountMenu({ setupIncomplete }: { setupIncomplete: boolean }) {
 						{sellerMenuItems.map((item) =>
 							setupIncomplete ? (
 								<li key={item.href}>
-									{/* Focusable on purpose: a disabled destination the
-									    keyboard cannot reach is a destination the user is
-									    never told about. */}
+
 									<button
 										type="button"
 										{...menu.menuItemProps}
@@ -471,14 +418,10 @@ function SellerAccountMenu({ setupIncomplete }: { setupIncomplete: boolean }) {
 export function SellerHeader() {
 	const pathname = usePathname() ?? "";
 	const navLockHintId = `${React.useId()}-seller-nav-lock`;
-	// 賣場建立未完成：工作區連結鎖定（dim、不可點），CTA 變成「繼續建立賣場」
-	// 把人導去 /seller/onboarding —— 引導優先於死按鈕。
 	const { hasSeller, status, activeRole } = useAuth();
 	const authPending =
 		resolveAuthRailMode({ status, activeRole }) === "skeleton";
 	const { setupIncomplete: profileSetupIncomplete } = useSellerIdentity();
-	// buyer -> seller 升級在綁定完成前本來就沒有 seller-self 可查；不能把
-	// `self=null` 當成已完成，否則 onboarding header 會洩出可點的工作區入口。
 	const setupIncomplete =
 		!authPending && (!hasSeller || profileSetupIncomplete);
 
@@ -559,9 +502,7 @@ export function SellerHeader() {
 								className="hidden max-[840px]:block"
 								aria-hidden="true"
 							/>
-							{/* Not aria-hidden: the visible label must be part of the
-							    accessible name, and the icon-only ≤840px variant is what
-							    the aria-label above exists for. */}
+
 							<span className="max-[840px]:hidden">繼續建立賣場 →</span>
 						</Link>
 					) : (

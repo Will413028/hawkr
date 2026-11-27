@@ -10,7 +10,6 @@ export const metadata: Metadata = {
 
 export default function SellerOnboardingPage() {
 	return (
-		// useSearchParams（?redirect=）需要 Suspense boundary。
 		<React.Suspense fallback={null}>
 			<SellerOnboardingClient />
 		</React.Suspense>

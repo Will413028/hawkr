@@ -96,12 +96,9 @@ class SellerMeasureRequestFormScreen extends ConsumerWidget {
     }
     final measureProvider = measureByIdProvider(accountId, measureId);
     final measure = ref.watch(measureProvider);
-    // 有讀到的值就用它：重新讀取失敗（帶著上一次的值）不能讓表單被卸載而丟掉已輸入的理由與已上傳的照片（和措施列表一樣）。
     final loaded = measure.value;
     if (loaded == null) {
-      // 重試中（error 狀態被 invalidate 後是讀取中）顯示讀取中，不繼續停在錯誤面板。
       if (measure.hasError && !measure.isLoading) {
-        // 不存在或不是自己的措施（網址帶了別的 id）重讀也一樣：終態，回列表，沒有重試；暫時性的錯誤才可重試。
         final code = ConnectException.from(measure.error!).code;
         if (code == Code.notFound || code == Code.permissionDenied) {
           return _FormShell(
@@ -222,7 +219,6 @@ class _RequestFormBodyState extends ConsumerState<_RequestFormBody> {
   @override
   void didUpdateWidget(_RequestFormBody oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // 重新讀到的措施（版本、狀態變了）換掉表單依據的那份；輸入的理由與照片不動。
     if (oldWidget.measure != widget.measure) _measure = widget.measure;
   }
 
@@ -260,7 +256,6 @@ class _RequestFormBodyState extends ConsumerState<_RequestFormBody> {
               context,
               filenamePrefix: 'appeal',
             ))(context);
-    // 選圖器開著的時候可能已經送出：送出中不再加照片（送出的清單已經定了）。
     if (picked == null || !mounted || _busy) return;
     if (_photos.length >= requestMaxEvidence) return;
     final photo = EvidencePhoto(_nextPhotoId++, picked.bytes);
@@ -277,7 +272,6 @@ class _RequestFormBodyState extends ConsumerState<_RequestFormBody> {
       );
     } catch (error) {
       HKLog.logW('[MeasureRequestForm] evidence upload failed: $error');
-      // 上傳中被移除的照片，結果不再有人要：失敗也不提示。
       if (!mounted || !_photos.contains(photo)) return;
       setState(() => _photos.remove(photo));
       FloatingToast.error(context, evidenceUploadFailedNotice);
@@ -345,7 +339,6 @@ class _RequestFormBodyState extends ConsumerState<_RequestFormBody> {
         :final evidenceMessage,
         :final reasonMessage,
       ):
-        // 送出的 token 清單與 _photos 同序（送出時每張都有 token）。
         final submitted = List.of(_photos);
         setState(() {
           for (final MapEntry(key: index, value: message) in byIndex.entries) {
@@ -355,7 +348,6 @@ class _RequestFormBodyState extends ConsumerState<_RequestFormBody> {
               ..error = message;
           }
           _reasonError = reasonMessage;
-          // 整個欄位的錯誤（沒有索引）顯示在佐證區，不標任何一張。
           _evidenceError = evidenceMessage;
           _notice = byIndex.isEmpty
               ? null

@@ -81,8 +81,6 @@ test("A01：8 個 KPI key 逐字相同且順序固定", () => {
 });
 
 test("A01：四張『集合口徑』的卡不得帶單值篩選", () => {
-	// KPI 的口徑是一組狀態的集合，而列表端點的篩選只吃一個值 ⇒ 帶了會少算，
-	// 而兩個數字對不上這件事沒有任何訊號。
 	for (const key of [
 		"pending_tax_reviews",
 		"provider_errors",
@@ -95,7 +93,6 @@ test("A01：四張『集合口徑』的卡不得帶單值篩選", () => {
 			`${key} 的導向不得帶 query`,
 		);
 	}
-	// 反向：兩張橫切視圖的卡本來就該帶。
 	assert.match(KPI_META.near_deadline.href ?? "", /\?filter=NEAR_DEADLINE$/u);
 	assert.match(KPI_META.overdue_complaints.href ?? "", /\?tab=OVERDUE$/u);
 });
@@ -119,8 +116,6 @@ test("A01：未知 KPI key 落 default 分支（不是白畫面、不是靜默�
 });
 
 test("A01：KPI 空字串是『取不到』不是 0", () => {
-	// suspended_sellers 的權威在 seller 模組，取不到時後端回空字串。
-	// 印成 0 會看起來像「今天沒有人被停權」。
 	assert.equal(kpiDisplayValue("", false), "取不到");
 	assert.equal(kpiDisplayValue("0", false), "0");
 	assert.equal(kpiDisplayValue("12", true), "--");
@@ -138,7 +133,6 @@ test("A02：期限分級與文字（顏色不得是唯一訊號）", () => {
 		text: "已逾期 2 天",
 		tone: "danger",
 	});
-	// 後端算不出來時明說，不得退化成日曆天。
 	assert.deepEqual(deadlineDisplay(""), {
 		text: "處理期限計算中",
 		tone: "",
@@ -146,9 +140,6 @@ test("A02：期限分級與文字（顏色不得是唯一訊號）", () => {
 });
 
 test("A02：佇列顯示收據代製授權，而且未授權要看得出來", async () => {
-	// 🔴 端點 38 的 DTO 在 2026-09-05 之前沒有 receiptAuthorized ⇒ ADM 要逐一點進
-	// A03 才知道哪些賣家已簽，而 T08「核定免用統一發票」的前置條件正是它
-	// ——佇列的用途就是不必逐一點進去。本測試守後端補完之後前端真的用了它。
 	const src = await readFile(
 		new URL("../src/app/admin/invoices/tax-reviews/page.tsx", import.meta.url),
 		"utf8",
@@ -156,8 +147,6 @@ test("A02：佇列顯示收據代製授權，而且未授權要看得出來", as
 	assert.match(src, /item\.receiptAuthorized/u, "A02 沒有讀 receiptAuthorized");
 	assert.match(src, /尚未授權/u, "未授權沒有文字，只有顏色不是可及的訊號");
 	assert.match(src, /已授權/u);
-	// 表頭與 colSpan 必須一起長：漏掉 colSpan 的症狀是空狀態列少一格、版面歪掉，
-	// 而 tsc 與 lint 都不會叫。
 	const headers = [...src.matchAll(/<th>/gu)].length;
 	const colSpan = src.match(/colSpan=\{(\d+)\}/u);
 	assert.ok(colSpan, "找不到空狀態列的 colSpan");
@@ -185,10 +174,6 @@ test("顏色表：job 狀態 20 值與 CodeMeta 鍵集合相等", () => {
 });
 
 test("顏色表：稅務審核狀態 ＝ CodeMeta 的全部值（含 NOT_STARTED）", () => {
-	// 2026-08-30：CodeMeta 已補上 NOT_STARTED（backend `業務狀態碼.md`），所以本條
-	// 依原註解的指示改成單純相等 —— 顏色表不再需要自己補一個合成值。
-	// 它仍然不進 DB（不在 chk_stp_review_status 的 10 值裡），那件事寫在 .md 的
-	// 「DB 儲存欄位」那一行，不由本測試守。
 	assert.deepEqual(
 		Object.keys(TAX_REVIEW_STATUS_BADGE_VARIANT).sort(),
 		Object.keys(SellerTaxReviewStatus).sort(),
@@ -201,9 +186,6 @@ test("A01／A02 不得自動輪詢（限流桶與該管理員的其他請求共�
 		readFile("src/app/admin/invoices/tax-reviews/page.tsx", "utf8"),
 	]);
 	for (const source of sources) {
-		// 比對的是「真的呼叫／設定」的形狀，不是字面出現：兩頁的檔頭註解本來就會
-		// 提到 refetchInterval（在說明為什麼不用它）。抓字面會讓這支測試逼人刪掉
-		// 那段說明，而說明正是防止下一個人加回去的東西。
 		assert.doesNotMatch(source, /refetchInterval\s*:/u);
 		assert.doesNotMatch(source, /setInterval\(/u);
 	}
@@ -223,7 +205,6 @@ test("Sidebar 有登記發票分組，且總覽帶 exact（沒有 gate 守這件
 	]) {
 		assert.ok(sidebar.includes(`href: "${href}"`), `Sidebar 缺 ${href}`);
 	}
-	// exact 少了的症狀：進任何子頁時「發票營運總覽」也會亮。
 	const overviewEntry = sidebar.slice(
 		sidebar.indexOf('href: "/admin/invoices",'),
 	);
@@ -239,7 +220,6 @@ test("StateRow 三態齊全：error 不得被吞成『暫無資料』", async ()
 	assert.match(source, /error: unknown/u, "error 必須是必填參數");
 	assert.match(source, /role="alert"/u);
 	assert.match(source, /onRetry/u);
-	// 兩個佇列頁都要真的把 useQuery 的錯誤交給它，而不是只解構 data / isLoading。
 	for (const path of [
 		"src/app/admin/invoices/page.tsx",
 		"src/app/admin/invoices/tax-reviews/page.tsx",
@@ -256,14 +236,10 @@ test("ApiClientError 帶得動 envelope 的 data（preserveData 家族的價值�
 		readFile("src/services/api.ts", "utf8"),
 	]);
 	assert.match(errorSource, /readonly data\?: unknown/u);
-	// code !== 0 的那個 throw 一定要把 data 帶上，否則按鈕點了沒反應。
 	const bizThrow = apiSource.slice(apiSource.indexOf("if (data.code !== 0)"));
 	assert.match(bizThrow.slice(0, 500), /data\.traceId,\s*\n\s*data\.data,/u);
 });
 
-// ===========================================================================
-// A03–A08（第二波）
-// ===========================================================================
 
 import {
 	COMPLAINT_STATUS_BADGE_VARIANT,
@@ -312,17 +288,6 @@ const A04_DIALOGS = [
  * 斷言才真的在守 code：把 `job.totalAmount` 加進列渲染就會轉紅。
  */
 function stripComments(source: string): string {
-	// 🔴 **不能用正則**。原本的寫法是「先 `replace(/\/\*[\s\S]*?\*\//g)` 再刪掉開頭是
-	// `//` 的行」，而那對「**行註解裡出現 `/*`**」完全失守：A06 頁首有一行
-	// `// …（`internal/grpc/*.proto` 的 rpc 清單）…`，那個 `/*` 開了一個假的區塊註解，
-	// 一路吃到第 301 行才遇到下一個 `*/` ⇒ **整頁 12,671 字裡有 7,643 字（60%）
-	// 對這個檔案的每一條斷言都是隱形的**，包含「不得呼叫未實作端點」那一條。
-	// 實測：在 A06 加一行 `const DEAD = { method: "POST" };` 或 `api.post(...)`，
-	// 兩者都不會轉紅。
-	//
-	// ⇒ 改成逐字掃描，狀態機認得字串／樣板字串／兩種註解。
-	// ⚠️ 已知限制：regex literal 當成一般 code（`/\*/` 這種寫法會誤判）。頁面檔裡
-	// 沒有這種寫法，而要正確處理它得先做 JS 的除法／regex 消歧義——代價遠大於收益。
 	let out = "";
 	let state: "code" | "line" | "block" | "'" | '"' | "`" = "code";
 	for (let i = 0; i < source.length; i++) {
@@ -342,7 +307,6 @@ function stripComments(source: string): string {
 			continue;
 		}
 		if (state === "line") {
-			// 換行本身保留，斷言的錯誤訊息才對得上行數。
 			if (c === "\n") {
 				state = "code";
 				out += c;
@@ -358,7 +322,6 @@ function stripComments(source: string): string {
 			}
 			continue;
 		}
-		// 字串內：原樣保留，跳過跳脫字元。
 		out += c;
 		if (c === "\\") {
 			out += next ?? "";
@@ -447,18 +410,14 @@ test("stripComments 只剝註解，不會多吃真正的 code", () => {
 
 	const out = stripComments(source);
 
-	// 行註解裡的 `/*` 不得開啟區塊註解 —— 開了的話下面整段都會消失。
 	assert.match(out, /method: "POST"/u, "行註解裡的 /* 把後面的 code 吃掉了");
 	assert.match(out, /const tail = 1;/u);
-	// 真的註解要剝掉。
 	assert.doesNotMatch(out, /說明裡提到/u);
 	assert.doesNotMatch(out, /這是真的區塊註解/u);
-	// 字串裡的 `//` 與 `/* */` 都不是註解。
 	assert.match(out, /https:\/\/example\.com/u);
 	assert.match(out, /這在字串裡/u);
 });
 
-// --- A05：六個分頁的分割 -----------------------------------------------------
 
 test("A05：六個分頁的聯集 ＝ InvoiceOperationStatus 的 20 值", () => {
 	const union = JOB_TABS.flatMap((tab) => tab.statuses);
@@ -492,23 +451,18 @@ test("A05：三個容易寫反的歸類", () => {
 	const tabOf = (status: string) =>
 		JOB_TABS.find((tab) => tab.statuses.includes(status))?.value;
 
-	// 「送出去了但不知道結果」不是「正在重試」——歸錯會讓 ADM 以為系統在自己處理。
 	assert.equal(
 		tabOf(InvoiceOperationStatus.WAITING_CONFIRMATION),
 		"NEEDS_MANUAL",
 	);
-	// 要動手的是賣家（去財政部申請字軌），不是平台。
 	assert.equal(
 		tabOf(InvoiceOperationStatus.SELLER_ACTION_REQUIRED),
 		"NEEDS_ATTENTION",
 	);
-	// 取消還沒完成，而且可能卡在「provider 結果未明」。
 	assert.equal(tabOf(InvoiceOperationStatus.CANCEL_REQUESTED), "NEEDS_MANUAL");
 });
 
 test("A05：SELLER_ACTION_REQUIRED 的 badge 必須與 FAILED_PERMANENT 不同色", () => {
-	// NEEDS_ATTENTION 同時裝「ADM 要動手」與「賣家要動手」兩類，唯一的視覺區分就是
-	// badge 顏色 ＋ 中文。兩者同色的話，管理員會把賣家該處理的案子攬過來查。
 	assert.notEqual(
 		INVOICE_OPERATION_STATUS_BADGE_VARIANT[
 			InvoiceOperationStatus.SELLER_ACTION_REQUIRED
@@ -521,8 +475,6 @@ test("A05：SELLER_ACTION_REQUIRED 的 badge 必須與 FAILED_PERMANENT 不同�
 
 test("A05：分頁名只當 tab query 用，不拿去比對 job 狀態", async () => {
 	const source = await readCode(INVOICE_PAGES.a05);
-	// 分頁名不是 chk_invop_status 的值 ⇒ `status === "COMPLETED"` 這種比對恆為 false，
-	// 而恆為 false 看起來就像「今天沒有這類案件」。
 	for (const name of JOB_TAB_VALUES) {
 		assert.doesNotMatch(
 			source,
@@ -534,8 +486,6 @@ test("A05：分頁名只當 tab query 用，不拿去比對 job 狀態", async (
 
 test("A05：五個不在列表 DTO 上的欄名一律不得出現", async () => {
 	const source = await readCode(INVOICE_PAGES.a05);
-	// 端點 50 的 InvoiceJobInfo 沒有這五欄。憑語意造欄名的症狀是渲染 undefined，
-	// TS 不擋、runtime 不擋。鑑別力：把 `job.totalAmount` 加進列渲染 → 本條轉紅。
 	for (const field of [
 		"paidAt",
 		"invoiceMode",
@@ -551,37 +501,28 @@ test("A05：五個不在列表 DTO 上的欄名一律不得出現", async () => 
 	}
 });
 
-// --- A06：不得出現的字面值 ---------------------------------------------------
 
 test("A06：不得把分頁名／結果簡稱當成 job 狀態字面值", async () => {
 	const source = await readCode(INVOICE_PAGES.a06);
-	// 正則帶引號界定：`CANCELLED_BY_ADMIN` / `CANCELLED_BEFORE_ISSUE` 是合法值，
-	// 裸 grep CANCELLED 會失去鑑別力。
 	assert.doesNotMatch(
 		source,
 		/'(SELF_ISSUED_REPORTED|COMPLETED|CANCELLED)'|"(SELF_ISSUED_REPORTED|COMPLETED|CANCELLED)"/u,
 	);
 });
 
-// --- A04／A07：顏色表的值域 --------------------------------------------------
 
 test("A04：provider 顏色表 ＝ CodeMeta 的 13 值，且不含 SUSPENDING", () => {
 	assert.deepEqual(
 		Object.keys(PROVIDER_ACCOUNT_STATUS_BADGE_VARIANT).sort(),
 		Object.values(InvoiceProviderAccountStatus).sort(),
 	);
-	// DRAIN 整條分支已刪除。補一格 SUSPENDING 就是一個永遠不會命中的鍵，
-	// 而下一個維護者會以為那個狀態存在。
 	assert.equal(PROVIDER_ACCOUNT_STATUS_BADGE_VARIANT.SUSPENDING, undefined);
-	// PROVIDER_UNAVAILABLE 是「AMEGO 連不上」不是「這個賣家設定錯了」——
-	// 畫成 danger 會讓 ADM 去跟賣家要 AppKey。
 	assert.equal(
 		PROVIDER_ACCOUNT_STATUS_BADGE_VARIANT[
 			InvoiceProviderAccountStatus.PROVIDER_UNAVAILABLE
 		],
 		"warning",
 	);
-	// 三個「還沒設定好」的值必須是三種不同的呈現，不得被壓成同一態。
 	assert.notEqual(
 		PROVIDER_ACCOUNT_STATUS_BADGE_VARIANT[
 			InvoiceProviderAccountStatus.NOT_STARTED
@@ -619,20 +560,13 @@ test("A07：五個分頁與兩個排序值逐字相同", () => {
 
 test("A07：逾期橫幅的筆數來自獨立查詢，不是數當前分頁的 records", async () => {
 	const source = await readCode(INVOICE_PAGES.a07);
-	// 人不會先切到「已逾期」才知道有逾期 ⇒ 橫幅必須在任何分頁都看得到，
-	// 所以它是同一支端點的獨立查詢（只讀 total）。
 	assert.match(source, /tab=OVERDUE&page=1&page_size=1/u);
 	assert.match(source, /"overdueCount"/u);
-	// 五個分頁互相包含 ⇒ 不得顯示合計、不得用減法算任何一頁。
 	assert.doesNotMatch(source, /合計/u);
 });
 
-// --- 顯示對照一律留 default 分支 ---------------------------------------------
 
 test("四張顏色表都不是 exhaustive：未知值查得到 undefined，由頁面的 ?? 接住", () => {
-	// 後端先上線一個前端還不知道的值時，這四張表回 undefined，頁面的 `?? "gray"`
-	// 接住它 ⇒ badge 灰色但畫面還在。少了 default 分支就是整頁白畫面，而測試用的是
-	// 舊值域所以全綠。
 	for (const map of [
 		INVOICE_OPERATION_STATUS_BADGE_VARIANT,
 		TAX_REVIEW_STATUS_BADGE_VARIANT,
@@ -656,7 +590,6 @@ test("每一頁的 badge 查表都有 ?? 兜底", async () => {
 	}
 });
 
-// --- 每一頁只准打自己那幾支端點 ---------------------------------------------
 
 /**
  * 全部 ADM 發票寫入端點的路徑尾段（逐字取自
@@ -667,20 +600,20 @@ test("每一頁的 badge 查表都有 ?? 兜底", async () => {
  * （gateway 那一側新增路由時同步加，兩邊都在同一個 PR 內。）
  */
 const ADM_INVOICE_WRITE_SEGMENTS = [
-	"actions", // 端點 60　AdminInvoiceComplaintActions
-	"approvals", // 端點 55　AdminInvoiceJobUnlockApproval
-	"cancellations", // 端點 53　AdminInvoiceJobCancellations
-	"deactivations", // 端點 45　AdminInvoiceProviderDeactivate
-	"decisions", // 端點 40　AdminInvoiceTaxDecisions
-	"extensions", // 端點 41　AdminInvoiceTaxExtensions
-	"health_checks", // 端點 44　AdminInvoiceProviderHealth
-	"issuances", // 端點 57　AdminInvoiceIssuances
-	"manual_results", // 端點 56　AdminInvoiceJobManualResults
-	"manual_unlocks", // 端點 54　AdminInvoiceJobManualUnlocks
-	"notification_resends", // 端點 49　AdminInvoiceDocumentResend
-	"reactivations", // 端點 66　AdminInvoiceProviderReactivations
-	"retries", // 端點 52　AdminInvoiceJobRetries
-	"revocations", // 端點 67　AdminInvoiceProviderRevocations
+	"actions",
+	"approvals",
+	"cancellations",
+	"deactivations",
+	"decisions",
+	"extensions",
+	"health_checks",
+	"issuances",
+	"manual_results",
+	"manual_unlocks",
+	"notification_resends",
+	"reactivations",
+	"retries",
+	"revocations",
 ];
 
 /**
@@ -700,11 +633,8 @@ const ADM_INVOICE_WRITE_SEGMENTS = [
 const PAGE_WRITE_TARGETS: Partial<
 	Record<keyof typeof INVOICE_PAGES, string[]>
 > = {
-	// 端點 44／45／66／67（`internal/grpc/provider_account.go`）。
 	a04Detail: ["deactivations", "health_checks", "reactivations", "revocations"],
-	// 端點 40／41（`internal/grpc/tax_profile.go`）。
 	a03: ["decisions", "extensions"],
-	// 端點 52／53／54／55／56（`internal/grpc/admin_write.go`＋`manual_unlock.go`）。
 	a06: [
 		"approvals",
 		"cancellations",
@@ -712,10 +642,7 @@ const PAGE_WRITE_TARGETS: Partial<
 		"manual_unlocks",
 		"retries",
 	],
-	// 端點 60（`internal/grpc/complaint.go`）。
 	a08: ["actions"],
-	// 端點 49（`internal/grpc/notification_resend.go`）。它掛在 document 上不是 job 上，
-	// 所以 A13 是唯一組得出這條路徑的地方（端點 51 的回應沒有 documentId）。
 	a13: ["notification_resends"],
 };
 
@@ -769,8 +696,6 @@ test("有寫入的發票頁，打到的端點集合逐一等於登記值", async
 				"多出來的那一支是沒有人看過的，少掉的那一支是按鈕不見了。",
 		);
 
-		// `api.post` 帶不了 Idempotency-Key header，gateway 的
-		// `RequireIdempotencyKey` 掛在整個 /admin/invoices 群組上 ⇒ 一律 400。
 		assert.doesNotMatch(
 			source,
 			/\bapi\.(?:post|put|patch|delete)\s*[<(]/u,
@@ -837,14 +762,12 @@ test("A03：七個決策的來源狀態逐列對上後端的 allowed-from", () =
 		"與 tax_profile.go 的 taxDecisionAllowedFrom 漂移了——兩個方向都是靜默的",
 	);
 
-	// 顯示順序要蓋滿整張表，否則某個決策在畫面上永遠不會出現。
 	assert.deepEqual(
 		[...TAX_DECISION_ORDER].sort(),
 		Object.keys(TAX_DECISION_ALLOWED_FROM).sort(),
 		"TAX_DECISION_ORDER 沒有蓋滿 allowed-from：漏掉的那個決策永遠不會被渲染",
 	);
 
-	// 每個 key 都必須是 CodeMeta 的值，不能是手打的字串。
 	for (const decision of Object.keys(TAX_DECISION_ALLOWED_FROM)) {
 		assert.ok(
 			Object.values(SellerTaxReviewDecision).includes(
@@ -853,7 +776,6 @@ test("A03：七個決策的來源狀態逐列對上後端的 allowed-from", () =
 			`${decision} 不在 CodeMeta SellerTaxReviewDecision 裡`,
 		);
 	}
-	// 端點 41 專用的 EXTEND 不得混進端點 40 的決策表。
 	assert.ok(
 		!("EXTEND" in TAX_DECISION_ALLOWED_FROM),
 		"EXTEND 是端點 41 的稽核 reason_code，不是端點 40 的決策——放進來會多一顆打錯端點的鍵",
@@ -987,7 +909,6 @@ test("A08：三個會轉狀態的動作只准從 ESCALATED_TO_ADM 出發", () =>
 		Object.keys(COMPLAINT_ACTION_ALLOWED_FROM).sort(),
 		"COMPLAINT_ACTION_ORDER 沒有蓋滿 allowed-from",
 	);
-	// 五個動作都要有中文與後果說明，否則畫面上會出現一顆沒有標籤的鍵。
 	for (const action of COMPLAINT_ACTION_ORDER) {
 		assert.ok(COMPLAINT_ACTION_LABEL[action], `${action} 沒有顯示文字`);
 		assert.ok(COMPLAINT_ACTION_CONSEQUENCE[action], `${action} 沒有後果說明`);
@@ -1004,11 +925,6 @@ test("A08：三個會轉狀態的動作只准從 ESCALATED_TO_ADM 出發", () =>
 test("A03：延長裁決的兩個值不是 SellerTaxReviewDecision 的成員", () => {
 	assert.equal(TAX_EXTENSION_APPROVE, "APPROVE");
 	assert.equal(TAX_EXTENSION_REJECT, "REJECT");
-	// ⚠️ 這裡**不能**斷言「兩個值都不在 SellerTaxReviewDecision 裡」：`REJECT` 兩邊
-	// 恰好同字（`SellerTaxReviewDecision.REJECT` 也是 "REJECT"），但那是巧合不是關係
-	// ——一個是端點 40 的「駁回這筆申請」，一個是端點 41 的「駁回這次延長」。
-	// 真正的不變式是這一條：`APPROVE` 只存在於端點 41，而 `EXTEND`（端點 41 的稽核
-	// reason_code）絕不可被當成端點 41 的 decision 送出去。
 	assert.ok(
 		!Object.values(SellerTaxReviewDecision).includes(
 			TAX_EXTENSION_APPROVE as (typeof SellerTaxReviewDecision)[keyof typeof SellerTaxReviewDecision],
@@ -1020,7 +936,6 @@ test("A03：延長裁決的兩個值不是 SellerTaxReviewDecision 的成員", (
 		SellerTaxReviewDecision.EXTEND,
 		"端點 41 送 EXTEND 會拿到 decision is outside the defined value set（100% 失敗的按鈕）",
 	);
-	// 上界與預設值：APPROVE 時 1–365 之外一律 400。
 	assert.equal(TAX_EXTENSION_DEFAULT_DAYS, 30);
 	assert.equal(TAX_EXTENSION_MAX_DAYS, 365);
 });
@@ -1035,7 +950,6 @@ test("A03：延長裁決的兩個值不是 SellerTaxReviewDecision 的成員", (
 test("A04 詳情頁的寫入只打 44／45／66／67 四支", async () => {
 	const source = await readCode(INVOICE_PAGES.a04Detail);
 
-	// 錨在頁面自己的路徑組裝 helper 上：改名就要同步改這支測試，而不是靜靜地不驗。
 	assert.match(
 		source,
 		/const actionPath = \(action: string\) =>/u,
@@ -1051,7 +965,6 @@ test("A04 詳情頁的寫入只打 44／45／66／67 四支", async () => {
 		`A04 詳情頁打到了非預期的端點：${targets.join(", ")}`,
 	);
 
-	// 每一支寫入都要走 actionPath。數量對不上 ＝ 有人繞過去自己拼了一條路徑。
 	const posts = source.match(/method:\s*"POST"/gu) ?? [];
 	assert.equal(
 		posts.length,
@@ -1085,7 +998,6 @@ test("A04：端點 44／66 帶 130 秒逾時，45／67 不帶", async () => {
 
 	for (const segment of segments) {
 		const action = segment.slice(0, segment.indexOf('"'));
-		// 只看緊接其後的 request options 物件，不要讓 onSuccess／onError 的內容混進來。
 		const options = segment.slice(0, 400);
 		assert.equal(
 			/timeoutMs: PROVIDER_SYNC_TIMEOUT_MS/u.test(options),
@@ -1127,14 +1039,12 @@ test("A04：五顆 CTA 的來源狀態集合逐一對上 58A", () => {
 		"REVOKED",
 	]);
 	assert.deepEqual([...DEACTIVATABLE_STATUSES].sort(), ["ACTIVE", "DEGRADED"]);
-	// 「只有 SUSPENDED」——多一個值就是一顆必死的按鈕。
 	assert.deepEqual([...REACTIVATABLE_STATUSES], ["SUSPENDED"]);
 	assert.deepEqual([...REVOCABLE_STATUSES].sort(), [
 		"ACTIVE",
 		"DEGRADED",
 		"SUSPENDED",
 	]);
-	// 四組都必須是 CodeMeta 的合法值：打錯字的話那顆 CTA 會永遠不出現（靜默）。
 	const legal = new Set<string>(Object.values(InvoiceProviderAccountStatus));
 	for (const set of [
 		HEALTH_CHECK_HIDDEN_STATUSES,
@@ -1182,11 +1092,7 @@ test("A08：只有「依建議建立措施」帶預填（停權、結束時間�
 	const source = await readCode(INVOICE_PAGES.a08);
 	assert.match(source, /<Field label="建議理由" full>/u);
 	assert.doesNotMatch(source, /可直接複製到措施的理由/u);
-	// 預填只經 measureInitialFromSuggestion，在點下去的當下以現在的時間算，只有建議卡的鈕用它。
 	assert.equal(source.match(/measureInitialFromSuggestion\(/gu)?.length, 1);
-	// 對話框的目標只在兩處設定（關閉時的 null 不算），逐一比對傳進去的物件，而不是掃整頁有沒有某個字：
-	// 建議卡的鈕帶店家與建議的預填，常駐的「建立措施」只帶店家，所以兩者都沒有 category；
-	// 類別不預填：發票沒有對應的政策分類，由管理員選。
 	const targets = callArguments(source, "setMeasureTarget").filter(
 		(argument) => argument !== "null",
 	);
@@ -1199,26 +1105,20 @@ test("A08：只有「依建議建立措施」帶預填（停權、結束時間�
 			.map(squash)
 			.toSorted(),
 	);
-	// 對話框收到的初始值就是這個狀態的 initial。
 	assert.match(source, /initial=\{measureTarget\.initial\}/u);
 });
 
 test("A08：措施只經建立措施對話框的 CreateMeasure 建立，不呼叫發票模組或舊的停權端點", async () => {
 	const source = await readCode(INVOICE_PAGES.a08);
-	// 停權狀態的權威是賣家治理模組。發票模組另開一套 ⇒ 兩份狀態、兩個時鐘，
-	// ADM 在一邊解除、另一邊還鎖著：本頁不呼叫舊的停權端點。
 	assert.doesNotMatch(source, /api\/v1\/admin\/violations/u);
 	assert.doesNotMatch(source, /suspensions/u);
-	// 舊的違規建立頁已刪除：不得再導過去。
 	assert.doesNotMatch(source, /\/admin\/violations/u);
-	// 本頁用到的賣家治理方法只有 CreateMeasure（沒有結束、撤銷、註記這類的寫入）。
 	const governanceMethods = new Set(
 		[...source.matchAll(/SellerGovernanceAdminService\.method\.(\w+)/gu)].map(
 			(m) => m[1],
 		),
 	);
 	assert.deepEqual([...governanceMethods], ["createMeasure"]);
-	// 它只在 handleCreateMeasure 裡送出，而 handleCreateMeasure 只交給建立措施對話框的 onConfirm。
 	assert.equal(
 		source.match(/createMeasureMutation\.mutateAsync\(/gu)?.length,
 		1,
@@ -1234,11 +1134,9 @@ test("A08：措施只經建立措施對話框的 CreateMeasure 建立，不呼�
 		source,
 		/from "@\/app\/admin\/merchants\/\[id\]\/CreateMeasureDialog"/u,
 	);
-	// category 不開給發票模組預填：invoice_not_issued 不在認定類別的封閉值域。
 	assert.doesNotMatch(source, /invoice_not_issued/u);
 });
 
-// --- Sidebar 登記（C13：ADM 沒有路由清冊 gate，這裡補一個）-------------------
 
 /**
  * 刻意不進 Sidebar 的非動態發票路由。
@@ -1266,17 +1164,10 @@ async function invoiceStaticRoutes(): Promise<string[]> {
 }
 
 test("每個非動態的發票頁都登記在 Sidebar（豁免清單除外）", async () => {
-	// 58A §0.6 C13：ADM 新增頁面漏了 Sidebar 登記**沒有任何 gate** ⇒ 頁面存在、
-	// 路由通、但沒有人找得到它。這一條就是那個 gate。
-	//
-	// 反方向（Sidebar 有、頁面還沒建）刻意不驗：58A §B-3.1.1 要求 7 項一次登記完，
-	// 而 A10／A12 的頁面在後續波次。
 	const sidebar = await readFile("src/components/Layout/Sidebar.tsx", "utf8");
 	const routes = await invoiceStaticRoutes();
 
 	assert.ok(routes.length >= 5, `掃到的發票路由太少：${routes.join(", ")}`);
-	// 豁免清單裡的路由必須真的存在：留一個已刪頁面的豁免，等於替下一個同名路由
-	// 預先開好一張免死金牌。
 	for (const exempt of SIDEBAR_EXEMPT_ROUTES) {
 		assert.ok(
 			routes.includes(exempt),
@@ -1294,8 +1185,6 @@ test("每個非動態的發票頁都登記在 Sidebar（豁免清單除外）", 
 });
 
 test("Sidebar 豁免的發票頁仍然有入口（不得只靠直接輸入網址）", async () => {
-	// 沒有這一條，`SIDEBAR_EXEMPT_ROUTES` 就是 C13 的後門：把新頁面加進豁免清單
-	// 之後它照樣「存在、路由通、沒有人找得到」，而上面那支測試會是綠的。
 	const sources: string[] = [];
 	for (const root of ["src/app/admin/invoices", "src/features/invoices"]) {
 		const entries = await readdir(root, {
@@ -1305,8 +1194,6 @@ test("Sidebar 豁免的發票頁仍然有入口（不得只靠直接輸入網址
 		for (const entry of entries) {
 			if (!entry.isFile() || !/\.tsx?$/u.test(entry.name)) continue;
 			const path = `${entry.parentPath ?? root}/${entry.name}`;
-			// 走 readCode（去註解）：頁面自己的說明文字裡會出現自己的路由，
-			// 拿原文比對的話「只有註解提到它」也會過關。
 			sources.push(await readCode(path));
 		}
 	}
@@ -1318,9 +1205,6 @@ test("Sidebar 豁免的發票頁仍然有入口（不得只靠直接輸入網址
 	}
 });
 
-// ===========================================================================
-// A10／A12／A13（第三波）
-// ===========================================================================
 
 import {
 	auditActionGroupOf,
@@ -1355,18 +1239,14 @@ const WAVE3_PAGES = {
 	a13: "src/app/admin/invoices/documents/[documentId]/page.tsx",
 } as const;
 
-// --- A12／A13：文件狀態顏色表 ------------------------------------------------
 
 test("A12：文件狀態顏色表 ＝ CodeMeta 的 11 值（VOIDING 與 RESOLVED_EXTERNALLY 不得漏）", () => {
 	assert.deepEqual(
 		Object.keys(DOCUMENT_STATUS_BADGE_VARIANT).sort(),
 		Object.values(InvoiceDocumentStatus).sort(),
 	);
-	// 這兩個是 58A 驗收逐字點名的：漏了會落 `?? "gray"`，而「作廢中」看起來就跟
-	// 「已作廢」一樣，「賣家自行開立」看起來就跟「不由平台開立」一樣。
 	assert.equal(DOCUMENT_STATUS_BADGE_VARIANT.VOIDING, "info");
 	assert.equal(DOCUMENT_STATUS_BADGE_VARIANT.RESOLVED_EXTERNALLY, "success");
-	// 三個值域內零命中的鬼值不得混進來（同 A07 的 PLATFORM_ASSIST_REQUESTED）。
 	for (const ghost of [
 		"SELF_ISSUED_REPORTED",
 		"DELEGATED_TO_ISSUER",
@@ -1374,7 +1254,6 @@ test("A12：文件狀態顏色表 ＝ CodeMeta 的 11 值（VOIDING 與 RESOLVED
 	]) {
 		assert.equal(DOCUMENT_STATUS_BADGE_VARIANT[ghost], undefined);
 	}
-	// default 分支：後端上線新值時回 undefined，由頁面的 ?? 接住，不是白畫面。
 	assert.equal(
 		DOCUMENT_STATUS_BADGE_VARIANT.__A_VALUE_THE_FRONTEND_DOES_NOT_KNOW__,
 		undefined,
@@ -1386,24 +1265,17 @@ test("A12：開票模式顏色表 ＝ CodeMeta 的 4 值，LEGACY_MANUAL 不得�
 		Object.keys(FULFILLMENT_MODE_BADGE_VARIANT).sort(),
 		Object.values(InvoiceFulfillmentMode).sort(),
 	);
-	// 切點之前付款的訂單本來就走人工，那是設計不是故障。畫成紅色會讓 ADM 去追
-	// 一批根本沒有問題的舊訂單。
 	assert.notEqual(FULFILLMENT_MODE_BADGE_VARIANT.LEGACY_MANUAL, "danger");
 });
 
-// --- A13：時間軸中文的來源 ---------------------------------------------------
 
 test("A13：timeline 的中文查文件狀態表（契約給的是 to_status，不是 timeline event）", () => {
-	// invoice-service 的 toDocumentDetail 把 StatusHistoryEntry.ToStatus 填進 event，
-	// 值域是 11 個文件狀態 —— 不是 58A 寫的 InvoiceDocumentTimelineEvent。
 	assert.equal(
 		documentTimelineLabel("AWAITING_MANUAL"),
 		INVOICE_DOCUMENT_STATUS_LABEL.AWAITING_MANUAL,
 	);
 	assert.equal(documentTimelineLabel("VOIDING"), "作廢中");
-	// timeline event 的值域仍然接得住（兩張表都是 CodeMeta 生成物，零手抄中文）。
 	assert.equal(typeof documentTimelineLabel("ALLOWANCE_APPLIED"), "string");
-	// 🔴 default 分支（C11）：後端加一個雙方都沒有的值時原樣顯示碼值，不是白畫面。
 	assert.equal(
 		documentTimelineLabel("A_STATUS_THE_FRONTEND_DOES_NOT_KNOW"),
 		"A_STATUS_THE_FRONTEND_DOES_NOT_KNOW",
@@ -1412,17 +1284,12 @@ test("A13：timeline 的中文查文件狀態表（契約給的是 to_status，�
 });
 
 test("A12：fileUnavailableReason 不寫死中文對照（那個值域沒有 SSOT）", () => {
-	// CARRIER_NOT_WON / EXPIRED / NOT_APPLICABLE 只出現在 proto 註解，不是 CodeMeta enum。
-	// 手寫三筆對照表 ＝ 一份沒有來源的第二碼表 ⇒ 原碼必須留在畫面上。
 	assert.ok(fileUnavailableText("CARRIER_NOT_WON").includes("CARRIER_NOT_WON"));
 	assert.equal(fileUnavailableText(""), "沒有可下載的檔案");
 });
 
-// --- A10：變更摘要只有兩態 ---------------------------------------------------
 
 test("A10：變更摘要沒有 PENDING 分支，且『未寫入』與『無欄位差異』不共用一句", () => {
-	// FAILED ＝ 這次操作根本沒有生效；SUCCESS 且無內容 ＝ 生效了但什麼都沒改。
-	// 對正在判斷「這個管理員動了什麼」的人，兩者的差別就是全部。
 	assert.equal(auditChangeSummary("FAILED", "", ""), "未寫入");
 	assert.equal(auditChangeSummary("FAILED", '{"a":1}', '{"a":2}'), "未寫入");
 	assert.equal(auditChangeSummary("SUCCESS", "", ""), "無欄位差異");
@@ -1430,14 +1297,10 @@ test("A10：變更摘要沒有 PENDING 分支，且『未寫入』與『無欄�
 		auditChangeSummary("SUCCESS", '{"a":1}', '{"a":2}'),
 		"無欄位差異",
 	);
-	// 本 DTO 的 result 值域只有 SUCCESS / FAILED（Gateway InvoiceAuditLogItem）⇒
-	// 照抄代行稽核台的第三態會是一支永遠走不到的死碼。
 	assert.doesNotMatch(auditChangeSummary("PENDING", "", ""), /結果未確認/u);
 });
 
 test("A10：全頁沒有保留天數那一列（端點 61 沒有 retention 欄位）", async () => {
-	// 讀不到就寫死「5 年」＝ 把法遵文字繞過版本控管；退而寫「長期保存」更糟。
-	// 三個檔案都掃：wrapper／本體／明細 dialog。
 	for (const path of [
 		WAVE3_PAGES.a10,
 		WAVE3_PAGES.a10Console,
@@ -1458,14 +1321,11 @@ test("A10：操作類型下拉分組涵蓋 CodeMeta 的六個值，且沒有空�
 		"分組漏掉／重複某個值 ⇒ 那個操作類型在下拉裡消失或出現兩次",
 	);
 	for (const [, options] of groups) assert.ok(options.length > 0);
-	// 最長前綴優先：VOID_ALLOWANCE 屬於「作廢」而不是「折讓」（它作廢的是折讓單，
-	// 動作是作廢）。前綴比對寫成「第一個命中就算」會把它歸錯。
 	assert.equal(auditActionGroupOf("VOID_ALLOWANCE"), "void");
 	assert.equal(auditActionGroupOf("ALLOWANCE"), "allowance");
 	assert.equal(auditActionGroupOf("SOMETHING_NEW_FROM_BACKEND"), "other");
 });
 
-// --- 日期區間：前端是第一道 ---------------------------------------------------
 
 test("端點 47／61 的日期是 YYYY-MM-DD，且 from > to 前端就擋（後端不會報錯）", () => {
 	assert.ok(isWireDate("2026-08-30"));
@@ -1474,21 +1334,14 @@ test("端點 47／61 的日期是 YYYY-MM-DD，且 from > to 前端就擋（後�
 
 	assert.equal(checkDateRange("", "").ok, true);
 	assert.equal(checkDateRange("2026-08-01", "2026-08-30").ok, true);
-	// 同一天是合法區間，不得誤擋。
 	assert.equal(checkDateRange("2026-08-30", "2026-08-30").ok, true);
-	// 🔴 from > to 後端**不會回錯**，它會老實地回一個空集合 —— 而空集合看起來就像
-	// 「這段期間沒有紀錄」。這是本函式最重要的一條。
 	const reversed = checkDateRange("2026-08-30", "2026-08-01");
 	assert.equal(reversed.ok, false);
 	assert.match(reversed.message, /不能晚於/u);
-	// 格式錯是另一條（後端回 400）。
 	assert.equal(checkDateRange("2026-08-30T14:00", "").ok, false);
 });
 
 test('A10／A12 的日期輸入是 type="date" 不是 datetime-local', async () => {
-	// 端點 47／61 的契約是 YYYY-MM-DD。給時間選擇器卻把時間那半丟掉，是一個不會
-	// 發出任何訊號的靜默失效：管理員挑了 14:00，實際查的是一整天。
-	// （這一項刻意偏離 58A §A10 的「四件套」樣板，理由寫在 features/invoices/date-range.ts。）
 	for (const path of [WAVE3_PAGES.a10Console, WAVE3_PAGES.a12]) {
 		const source = await readCode(path);
 		assert.doesNotMatch(
@@ -1500,24 +1353,8 @@ test('A10／A12 的日期輸入是 type="date" 不是 datetime-local', async () 
 	}
 });
 
-// --- 三頁都是唯讀 -------------------------------------------------------------
 
 test("A10／A12 一律唯讀；A13 的寫入只有登記過的那兩條", async () => {
-	// A10／A12 依 58A 本來就完全唯讀。
-	//
-	// 🔴 **A13 已經不是唯讀了**，而原本這支測試看不到那件事：它掃的是 `api.post`，
-	// 而兩條寫入都走 `services/api.ts` 的 `request()`（`api.post` 不收自訂 header，
-	// 而 `/admin/invoices` 整組掛了 `RequireIdempotencyKey`）⇒ 觀測窗在寫入實際
-	// 落地的那條路徑之外。掃不到不等於沒有。
-	//
-	// 改成正面白名單：A13 的 `method: "POST"` 呼叫必須恰好是這兩條，多一條就轉紅。
-	//   - 端點 49 `notification_resends`（重寄通知，2026-09-02 接上）
-	//   - 端點 73 `manual_resolutions`（送回自動線，2026-09-05 接上）
-	//
-	// 端點 73 是「停在人工出口且零 operation」的文件**唯一**的入口：自動線落
-	// AWAITING_MANUAL 時不建 operation，而 A06 的三個動作全部以 job_id 為鍵
-	// ⇒ 那些文件在 A06 組不出請求、在 A05 工作台上根本看不到（工作台是 job-first）。
-	// 它不在下一支測試禁的四個 job 層操作之內。
 	for (const [name, path] of Object.entries(WAVE3_PAGES)) {
 		const source = await readCode(path);
 		for (const verb of ["post", "put", "patch", "delete"]) {
@@ -1555,13 +1392,10 @@ test("A13 不畫作廢／折讓／重開／編輯，連 disabled 的都沒有", 
 	for (const word of ["作廢這張", "開立折讓", "重新開立", "編輯發票"]) {
 		assert.ok(!source.includes(word), `A13 出現了 ${word}`);
 	}
-	// 那些是 job 層的操作，入口在 A06（各有雙人與樂觀鎖保護）。
 	assert.match(source, /查看工作/u, "A13 → A06 的雙向連結不得消失");
 });
 
 test("A12／A13 不自行拼接 PDF 下載路徑（陷阱 T22）", async () => {
-	// 只有端點 48 的回應**應該**帶 downloadPath，而實際契約連它都沒有；
-	// `invoiceFileKey` 是 objectKey，58A 明令不顯示。拼出來的是一條死鍵。
 	for (const path of [WAVE3_PAGES.a12, WAVE3_PAGES.a13]) {
 		const source = await readCode(path);
 		assert.doesNotMatch(source, /file\/content/u, `${path} 拼接了下載路徑`);
@@ -1571,8 +1405,6 @@ test("A12／A13 不自行拼接 PDF 下載路徑（陷阱 T22）", async () => {
 
 test("A12 不做金額加總、不做輪詢", async () => {
 	const source = await readCode(WAVE3_PAGES.a12);
-	// 加總是對帳語意，而月結匯出已移出 Phase 1 ⇒ 給一個沒有匯出、也沒有對帳定義的
-	// 總和只會被當成帳用。
 	assert.doesNotMatch(source, /總計|合計/u);
 	assert.doesNotMatch(source, /refetchInterval\s*:/u);
 	assert.doesNotMatch(source, /setInterval\(/u);
@@ -1582,21 +1414,12 @@ test("A10 不做輪詢，也不畫匯出鍵", async () => {
 	const source = await readCode(WAVE3_PAGES.a10Console);
 	assert.doesNotMatch(source, /refetchInterval\s*:/u);
 	assert.doesNotMatch(source, /setInterval\(/u);
-	// ADM 既有的 merchants/page.tsx 就是一顆 alert("匯出功能開發中...") 的假按鈕，
-	// 存在很久、每個看到的人都會按一次，而它從來沒做過任何事。不要再造第二顆。
 	assert.doesNotMatch(source, /匯出|下載/u);
 });
 
-// --- 契約上不存在的欄名一律不得出現 -------------------------------------------
 
 test("A12／A13 不得出現契約上不存在的欄名（渲染 undefined 沒有東西會轉紅）", async () => {
 	const a12 = await readCode(WAVE3_PAGES.a12);
-	// 端點 47 回的是 []SellerInvoiceDocumentItem，沒有 storeName。
-	//
-	// ⚠️ paidAt / shipmentStatus 曾經也在這份禁列裡（後端從不填 ⇒ 恆為空字串），
-	// backend#3019 之後兩者都有值了，禁列因此縮回只剩 storeName。
-	// 「shipmentStatus 的空字串不得被當成沒出貨」改由本檔最後一支測試守——
-	// 那才是欄位有值之後真正的風險。
 	for (const field of ["storeName"]) {
 		assert.doesNotMatch(
 			a12,
@@ -1605,8 +1428,6 @@ test("A12／A13 不得出現契約上不存在的欄名（渲染 undefined 沒�
 		);
 	}
 	const a13 = await readCode(WAVE3_PAGES.a13);
-	// 詳情 DTO 沒有 fulfillmentMode；idempotencyKey 與 createdBy 從不被填；
-	// downloadPath 根本不存在。
 	for (const field of [
 		"fulfillmentMode",
 		"downloadPath",
@@ -1622,9 +1443,6 @@ test("A12／A13 不得出現契約上不存在的欄名（渲染 undefined 沒�
 });
 
 test("A12／A13 顯示完整發票號碼，且不得自己補遮罩", async () => {
-	// proto 逐字：「完整值，**不遮罩**。§8.1.3 (b) 把它判為 O 類」；invoice-service
-	// 更註明「§8.1.3(c) 裁定 1 逐字推翻 img-05 的遮罩畫法」。58A 兩處寫的
-	// `invoiceNoMasked` 在契約上不存在。前端補遮會蓋掉對獎與報帳的唯一憑據。
 	for (const path of [WAVE3_PAGES.a12, WAVE3_PAGES.a13]) {
 		const source = await readCode(path);
 		assert.match(source, /invoiceNumber/u, `${path} 沒有顯示發票號碼`);
@@ -1635,10 +1453,7 @@ test("A12／A13 顯示完整發票號碼，且不得自己補遮罩", async () =
 
 test("A13 副標宣告存取留痕，而 A06 不得宣告（陷阱 T30）", async () => {
 	const a13 = await readCode(WAVE3_PAGES.a13);
-	// 端點 48 fail-closed 落一列 INVOICE_PII_REVEAL（invoice-service
-	// GetInvoiceDocumentForAdmin），所以這句話是真的。
 	assert.match(a13, /記錄一筆存取紀錄/u);
-	// A06 的主資料是端點 51，不落 PII_REVEAL ⇒ 宣告與事實不符會把嚇阻變成假保證。
 	const a06 = await readCode("src/app/admin/invoices/jobs/[jobId]/page.tsx");
 	assert.doesNotMatch(a06, /記錄一筆存取紀錄/u);
 });
@@ -1646,14 +1461,11 @@ test("A13 副標宣告存取留痕，而 A06 不得宣告（陷阱 T30）", asyn
 test("A13 的 ?from=duplicate 是 info 不是 error", async () => {
 	const source = await readCode(WAVE3_PAGES.a13);
 	assert.match(source, /from=== "duplicate"|from"\) === "duplicate"/u);
-	// 9347 的語意是冪等鍵命中、發票已經開好了。畫成錯誤會讓管理員再送一次，
-	// 而那正是它要防的事。
 	const banner = source.slice(source.indexOf("fromDuplicate ?"));
 	assert.match(banner.slice(0, 400), /role="status"/u);
 	assert.doesNotMatch(banner.slice(0, 400), /role="alert"/u);
 });
 
-// --- 表格 a11y：本波刻意補強 --------------------------------------------------
 
 test("A10／A12 的表格有 sr-only caption，且 .sr-only 真的有宣告", async () => {
 	for (const path of [WAVE3_PAGES.a10Console, WAVE3_PAGES.a12]) {
@@ -1665,8 +1477,6 @@ test("A10／A12 的表格有 sr-only caption，且 .sr-only 真的有宣告", as
 		);
 		assert.match(source, /scope="col"/u, `${path} 的 th 缺 scope`);
 	}
-	// 🔴 ADM 全站原本沒有 .sr-only ⇒ 沒宣告的話 caption 會**照常顯示在表格上方**，
-	// 而沒有任何測試會轉紅（同 §0.6 C07 的形狀）。
 	const css = await readFile("src/styles/pages/Invoice.css", "utf8");
 	assert.match(css, /^\.sr-only \{/mu, "Invoice.css 沒有宣告 .sr-only");
 });
@@ -1709,7 +1519,6 @@ test("發票頁用到 DelegatedOperations.css 專有的 class 時必須 import �
 	for (const page of pages) {
 		const dir = page.slice(0, page.lastIndexOf("/"));
 		const source = await readFile(page, "utf8");
-		// 頁面本身 ＋ 它同目錄下的元件（dialog 都住在這裡）。
 		const bundle = [source];
 		for (const m of source.matchAll(/from\s+"(\.\/[^"]+)"/gu)) {
 			bundle.push(
@@ -1734,8 +1543,6 @@ test("發票頁用到 DelegatedOperations.css 專有的 class 時必須 import �
 
 test("A10 的明細 dialog 用共用 Dialog（portal 是 Dialog 唯一的行為，表格內開 modal 不會被困住）", async () => {
 	const source = await readCode(WAVE3_PAGES.a10Dialog);
-	// sticky 儲存格會建立 stacking context 並困住 modal（2026-08-20 的線上問題）——
-	// 症狀是「按了沒反應」。
 	assert.match(source, /<Dialog\b/u);
 	assert.doesNotMatch(source, /<Dialog\b[^>]*\bportal\b/u);
 	assert.match(
@@ -1744,7 +1551,6 @@ test("A10 的明細 dialog 用共用 Dialog（portal 是 Dialog 唯一的行為�
 	);
 });
 
-// --- 發票模組內部連結必須有目的地 --------------------------------------------
 
 /**
  * ADM **沒有路由清冊 gate**（58A §B-3.1.1），所以「按鈕指向一個不存在的頁面」在這個
@@ -1771,8 +1577,6 @@ test("A10 的明細 dialog 用共用 Dialog（portal 是 Dialog 唯一的行為�
  * 這一步是等價變換，既有斷言不受影響。
  */
 function normaliseInterpolations(source: string): string {
-	// 佔位符**就是要**長成插值的樣子：下面的路徑正規化以 `seg.startsWith("$" + "{")`
-	// 判定動態段，換成別的形狀就對不上了。
 	// biome-ignore lint/suspicious/noTemplateCurlyInString: 見上一行
 	return source.replace(/\$\{[^{}]*\}/gu, "${X}");
 }
@@ -1789,9 +1593,6 @@ test("發票模組內所有指向 /admin/invoices 的連結都有對應的頁面
 			if (!entry.isFile() || !entry.name.endsWith(".ts")) {
 				if (!entry.isFile() || !entry.name.endsWith(".tsx")) continue;
 			}
-			// 走 readCode（去註解）而不是 readFile：說明文字裡本來就會出現路由字面值
-			// （例如「這顆鍵原本指向 /admin/invoices/issuances/new」），拿原文比對會逼人
-			// 為了讓測試變綠去刪掉解釋 —— 而那段解釋正是防止下一個人把死鍵加回來的東西。
 			sources.push(
 				normaliseInterpolations(
 					await readCode(`${entry.parentPath ?? root}/${entry.name}`),
@@ -1801,7 +1602,6 @@ test("發票模組內所有指向 /admin/invoices 的連結都有對應的頁面
 	}
 	assert.ok(sources.length > 0, "一個發票檔案都沒掃到");
 
-	// 檔案系統上真正存在的路由（動態段保留成 `[x]` 的形狀）。
 	const pageEntries = await readdir("src/app/admin/invoices", {
 		withFileTypes: true,
 		recursive: true,
@@ -1823,26 +1623,15 @@ test("發票模組內所有指向 /admin/invoices 的連結都有對應的頁面
 		`掃到的發票路由太少：${[...existing].join(", ")}`,
 	);
 
-	// 負向 lookbehind 排除後端路徑：`/api/v1/admin/invoices/overview`（端點 37）沒有底線，
-	// 光靠下面那條 `_` 過濾攔不住，會被誤判成一條不存在的前端路由。
 	const LINK = /(?<!\/api\/v1)\/admin\/invoices(?:\/[^"'`\s?)]*)?/gu;
 	const missing = new Set<string>();
 	for (const source of sources) {
 		for (const raw of source.match(LINK) ?? []) {
-			// 前端路由 kebab、後端 API snake（58A §B-3.0 刻意兩套）⇒ 帶底線的一律是
-			// API 路徑（`/api/v1/admin/invoices/audit_logs`）或註解裡的端點說明
-			// （`{job_id}` 這種 placeholder），不是這支 gate 的對象。
-			// 🔴 `{` 的判斷要區分兩種：`${…}` 是 JS 插值（**動態路由段，必須驗**），
-			// 而裸 `{job_id}` 是註解裡的 API placeholder（不驗）。
-			// 一開始寫成 `raw.includes("{")` ⇒ **所有帶動態段的連結整批被跳過**，
-			// gate 只剩對靜態字串有效；變異測試（把 documents 打成 document）沒轉紅才發現。
 			if (raw.includes("_") || /(?<!\$)\{/u.test(raw)) continue;
 			const normalised = raw
 				.split("?")[0]
 				.replace(/\/$/u, "")
 				.split("/")
-				// 整段是插值 ＝ 動態路由段（`${jobId}` → `[jobId]`）；
-				// 只是**接在段尾**的插值是 query 串接（`tax-reviews${query}`），砍掉即可。
 				.map((seg) =>
 					seg.startsWith("${") ? "[x]" : seg.replace(/\$\{[^}]*\}$/u, ""),
 				)
@@ -1857,32 +1646,17 @@ test("發票模組內所有指向 /admin/invoices 的連結都有對應的頁面
 	);
 });
 
-// --- #3019：出貨狀態欄的降級語意 -----------------------------------------------
 
-// 🔴 這一欄的風險不在「有沒有畫」，在**空字串代表什麼**。
-//
-// shipping-service 抖動時後端整批回空字串並把 shipmentStatusDegraded 設成 true；
-// 只看 code 的實作會讓每一列都畫成「還沒出貨」——一句我們無從得知的話。那正是這一欄
-// 在 backend#3019 之前不敢畫的理由，修完之後它會換一個形式重演。
-//
-// ⚠️ 這一支刻意驗**行為**不驗字串。第一版是對 page.tsx 做 source grep
-// （assert 檔案裡有 "shipmentStatusDegraded"、有 "暫時無法取得"），實測把
-// `if (degraded)` 整段刪掉之後**四條斷言全部照樣通過**——因為那些字串還活在
-// queryFn 與表格上方的提示裡。零鑑別力的斷言比沒有斷言更糟，它會讓人以為驗過了。
 test("A12：降級與「還沒出貨」必須是兩種顯示，不得塌成同一格", () => {
 	assert.deepEqual(shipmentStatusDisplay("", true), { kind: "degraded" });
 	assert.deepEqual(shipmentStatusDisplay("", false), { kind: "none" });
-	// 有值時走 CodeMeta 查表（前端一個中文字都不手寫）。
 	assert.deepEqual(shipmentStatusDisplay("210", false), {
 		kind: "status",
 		label: "已叫件",
 	});
-	// 判定順序：degraded 必須先判。降級時就算後端漏回了某一列的碼值，
-	// 也不該拿它去說「這一列出貨了」——整批都是不可信的。
 	assert.deepEqual(shipmentStatusDisplay("210", true), { kind: "degraded" });
 });
 
-// 58A §A12：出貨狀態「獨立一欄、獨立 badge，禁止與發票狀態合成一個綜合狀態」。
 test("A12：出貨狀態是獨立一欄，且判定走 shipmentStatusDisplay", async () => {
 	const a12 = await readCode(WAVE3_PAGES.a12);
 	assert.match(

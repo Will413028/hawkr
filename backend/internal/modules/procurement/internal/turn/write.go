@@ -13,26 +13,19 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/procurement/internal/store"
 )
 
-// turnWrite 是一輪要寫進資料庫的內容：run 驅動的提交（Executor.commit）與不經 run 的提交（SubmitAnswer、Rewind）共用。
 type turnWrite struct {
 	ids ids
-	// buyerID 是需求的擁有者；寫入都經擁有的需求，不屬於它時回錯。
 	buyerID int64
-	// parent 是新版本的內容祖先（A9-D33(3)）；沒有現行版本的新需求為 nil。
 	parent          *uuid.UUID
 	d               decision
 	source, message string
 	clientRequestID uuid.UUID
-	// fromStatus 是這一輪開始前讀到的需求狀態，轉移用條件式 UPDATE。
 	fromStatus string
-	// result 是 TurnResult 的 wire JSON，原樣存進 turns.turn_result。
 	result []byte
-	// commandSlot 是 SubmitAnswer 回答、Rewind 倒回的欄位（turns.command_slot）；其他來源為空。
 	commandSlot model.SlotKey
 	now         time.Time
 }
 
-// writeTurn 在呼叫端的 transaction 內寫：取代現行版本、新版本、輪次（含 turn_result）、需求狀態、對話預覽與自動標題。呼叫端已鎖好需求相關的列。
 func writeTurn(ctx context.Context, q *store.Queries, w turnWrite) error {
 	id, d, buyer := w.ids, w.d, w.buyerID
 	streak := d.plan.OptionalStreak

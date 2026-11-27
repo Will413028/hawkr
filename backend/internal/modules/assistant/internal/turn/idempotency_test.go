@@ -43,7 +43,6 @@ func TestIdempotentResendReturnsTheFirstResponseWithoutANewTurn(t *testing.T) {
 	if turns != 1 {
 		t.Fatalf("輪次數 = %d，要 1", turns)
 	}
-	// 輪次結束後重送仍然回放。
 	if again, err := submitKeyed(e, buyer, requestA, "", "你好"); err != nil || again != first {
 		t.Fatalf("結束後重送 = %+v, %v", again, err)
 	}

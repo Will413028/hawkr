@@ -5,19 +5,7 @@ import (
 	"unicode/utf8"
 )
 
-// 遮罩函式（58 號 §8.1.3(d)）。純函式、無 IO，由 usecase 在組回應時呼叫。
-//
-// ⚠️ **落點與設計書不同**：§8.1.3(d) 指定 `internal/domain/masking.go`。本波的可寫範圍
-// 只含 `internal/domain/repository.go`，故暫置於本層。兩者的約束相同（純函式、無 IO、
-// 由組回應的那一層呼叫），搬家時連同 masking_test.go 一起移動即可，呼叫端不受影響。
-//
-// 🔴 遮罩由**後端**產出，前端不做（§8.1.3(c) 裁定 3）：前端遮罩時完整值仍在 response
-// body 裡 ⇒ 會出現在 devtools、Gateway access log 的 resp_body 與前端 Sentry breadcrumb。
-//
-// 🔴 遮罩不適用於 O 類（發票號碼、買受人統編、賣家統編）——那三個值三端皆完整
-// （§8.1.3(b)＋(c) 裁定 1）。看到「號碼」兩個字就順手遮，會直接消滅對獎與核對統編的功能。
 
-// maskFill 是全遮時的固定輸出：不洩漏長度、也不洩漏任何一碼。
 const maskFill = "••••"
 
 // MaskEmail 遮罩發票通知 email（P 類，非資料主體視角）。
@@ -36,7 +24,6 @@ func MaskEmail(s string) string {
 	}
 	at := strings.LastIndex(s, "@")
 	if at <= 0 || at == len(s)-1 {
-		// 不是可辨識的 email 形狀 ⇒ 全遮。回原值等於「格式怪的那些人不受保護」。
 		return maskFill
 	}
 	local, domain := s[:at], s[at:]
@@ -64,10 +51,6 @@ func MaskPhone(s string) string {
 	return string(r[:2]) + strings.Repeat("•", len(r)-6) + string(r[len(r)-4:])
 }
 
-// AMEGO CarrierType 原值（DB 的 buyer_invoice_preferences.carrier_type 與
-// invoice_documents.carrier_type 存的就是這兩個字面值，見 db/schema/schema.sql
-// 的 chk_bip_kind_shape）。CodeMeta 的 MOBILE_BARCODE／CITIZEN_CERT 是**另一組值**
-// （preference_kind／API 值域），不要拿來比對本函式的第一個參數。
 const (
 	amegoCarrierMobileBarcode = "3J0002"
 	amegoCarrierCitizenCert   = "CQ0001"

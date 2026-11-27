@@ -38,7 +38,6 @@ public class CouponClaimService {
                     "新增領取 templateId=" + templateId + " buyerId=" + buyerId);
         }
 
-        // 不論新增或已存在，都查詢回傳 claimed_at
         LambdaQueryWrapper<CouponClaimEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CouponClaimEntity::getTemplateId, templateId)
                 .eq(CouponClaimEntity::getBuyerId, buyerId);

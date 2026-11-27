@@ -55,7 +55,6 @@ export function TaxIdentityForm({
 	) => setForm((prev) => ({ ...prev, [key]: value }));
 
 	const existingCount = profile?.documents.length ?? 0;
-	// 至少要有一份佐證才送得出審核（後端 400）——已落庫的或這次新傳的都算。
 	const hasEvidence = existingCount > 0 || stagedTokens.length > 0;
 
 	const onPickFile = async (file: File | null) => {
@@ -75,7 +74,6 @@ export function TaxIdentityForm({
 	const onSave = () => {
 		draft.save({
 			taxIdentity: form,
-			// 🔴 既有佐證原樣帶回——不帶會被清空。
 			evidenceObjectKeys: (profile?.documents ?? [])
 				.map((d) => d.fileKey)
 				.filter(Boolean),
@@ -83,8 +81,6 @@ export function TaxIdentityForm({
 		});
 	};
 
-	// 存檔成功後把 staged token 清掉：它們已經落庫成 objectKey，留著會在下次存檔時
-	// 被當成「又上傳了一份」重複送出。
 	React.useEffect(() => {
 		if (draft.succeeded) {
 			setStagedTokens([]);
@@ -145,17 +141,7 @@ export function TaxIdentityForm({
 					value={form.responsibleName}
 					onChange={(e) => set("responsibleName", e.target.value)}
 				/>
-				{/*
-				 * 🔴 **只有一個地址欄，不是三個。**
-				 *
-				 * 後端的 `joinAddress(city, district, detail)` 把三欄**串成單一
-				 * `business_address`**，回程只填得出 `addressDetail`（`taxSubmitGate`
-				 * 的註解也記著這件事）⇒ 拆成三格的話，賣家存完再回來會看到縣市與
-				 * 鄉鎮市區永遠空白、而完整地址擠在第三格裡（2026-09-01 dev 實測截圖）。
-				 *
-				 * 送單一欄進 `addressDetail` 產生的 `business_address` 與拆三欄**完全相同**
-				 * （空字串會被 join 濾掉），但它能原樣 round-trip。
-				 */}
+
 				<Input
 					label="營業地址"
 					description="請填完整地址（縣市 ＋ 鄉鎮市區 ＋ 街道門牌）。"

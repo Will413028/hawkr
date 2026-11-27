@@ -116,10 +116,6 @@ class OrderGrpcServiceSellerOrdersTest {
     @Test
     @DisplayName("getSellerOrderDetail denies access when order.store_id != request.getStoreId(), even if login account_id equals the order's resolved store_id")
     void getSellerOrderDetail_ownershipCheck_usesResolvedStoreId() {
-        // login account_id (7001) deliberately equals the order's resolved store_id —
-        // the OLD buggy code (GrpcAuthContext.requireAccountId()) would have read 7001
-        // here too and WRONGLY ALLOWED (7001 == 7001). The fix must reject anyway
-        // because it compares against request.getStoreId() (999), not this context value.
         Context ctx = Context.current()
                 .withValue(GrpcAuthContext.ACCOUNT_ID, 7001L)
                 .withValue(GrpcAuthContext.ACCOUNT_TYPE, AccountType.SELLER.code());
@@ -127,14 +123,7 @@ class OrderGrpcServiceSellerOrdersTest {
         try {
             OrderEntity order = new OrderEntity();
             order.setOrderNo("ORD1");
-            order.setStoreId(7001L); // resolved store surrogate
-            // Fixture completeness note: status/buyerId are set only so that IF the
-            // ownership check were bypassed (the bug), execution could reach a clean 200
-            // SUCCESS response instead of an incidental NPE on an unrelated unset field —
-            // this makes the bug-vs-fix divergence (ALLOW vs DENY) unambiguous in the RED run.
-            // "80" (CANCELLED) is deliberately outside all three provider-status source sets
-            // in resolveProviderStatusMap (no extra gRPC aggregation) and outside the
-            // COMPLETED-only review-deadline branch in OrderProtoConverter.
+            order.setStoreId(7001L);
             order.setStatus("80");
             order.setBuyerId(500L);
 
@@ -143,7 +132,7 @@ class OrderGrpcServiceSellerOrdersTest {
             OrderGrpcService service = buildService();
 
             GetSellerOrderDetailRequest request = GetSellerOrderDetailRequest.newBuilder()
-                    .setStoreId(999L) // attacker's own resolved store id, does NOT match the order's actual store_id
+                    .setStoreId(999L)
                     .setOrderNo("ORD1")
                     .build();
             @SuppressWarnings("unchecked")

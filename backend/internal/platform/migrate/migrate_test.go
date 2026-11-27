@@ -10,7 +10,6 @@ import (
 	"testing/fstest"
 )
 
-// testModule 建一個以 files 為內容的模組，並替它算好正確的 atlas.sum。
 func testModule(name string, files map[string]string) Module {
 	fsys := fstest.MapFS{}
 	var list []file

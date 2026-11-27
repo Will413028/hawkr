@@ -79,8 +79,6 @@ class OrderFlagBanner extends StatelessWidget {
           ),
         ],
       ),
-      // Figma icon inset: top 19.05% / bottom 23.81% — 略偏上。
-      // 用 Align + offset 模擬：icon 中心約在容器垂直 47% 處。
       child: Align(
         alignment: const Alignment(0, -0.1),
         child: SizedBox(

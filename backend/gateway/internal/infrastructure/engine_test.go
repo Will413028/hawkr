@@ -17,10 +17,6 @@ func TestNewEngine_BodyGuardRunsBeforeAnyBodyRead(t *testing.T) {
 	cfg := &config.Config{}
 	r := newEngine(cfg, zap.NewNop(), &handler.Holder{})
 
-	// Even an unmatched route goes through the global middleware chain
-	// (Gin includes Use()-registered middleware in its 404 handling), so
-	// this proves BodyGuard runs ahead of everything else, including on
-	// paths with no registered handler.
 	body := strings.NewReader(strings.Repeat("a", 3<<20))
 	req, _ := http.NewRequest(http.MethodPost, "/api/v1/app/does-not-exist", body)
 	req.ContentLength = 3 << 20

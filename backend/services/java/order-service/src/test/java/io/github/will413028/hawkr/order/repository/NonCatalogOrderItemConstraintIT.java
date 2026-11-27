@@ -90,7 +90,6 @@ class NonCatalogOrderItemConstraintIT {
         Map<String, Object> row = jdbc.queryForMap(
                 "SELECT sku_id, sku_name FROM order_items WHERE id = 9001");
         assertThat(row.get("sku_id")).isNull();
-        // ⚠️ 品名必須原樣存在——它才是 non-catalog line 的識別依據。
         assertThat(row.get("sku_name")).isEqualTo("文旦柚 200 公斤");
     }
 

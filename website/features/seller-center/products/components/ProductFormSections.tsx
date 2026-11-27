@@ -99,9 +99,6 @@ export default function ProductFormSections({ form, variant = "page" }: Props) {
 				isRequired
 				value={form.draft.name}
 				onChange={(e) => form.update({ name: e.target.value })}
-				// `product.name` 是 `VARCHAR(255)`（product-service `V1__init_product_schema.sql:56`）。
-				// 前端自己設一個更嚴的上限，會讓合法的商品名在送出之前就被擋掉，而且
-				// 擋掉的方式是「打不進去」——賣家看不到任何理由。
 				maxLength={255}
 				placeholder="例：埔里高山高麗菜（限量）"
 				description={`${form.draft.name.length} / 255 字`}
@@ -255,7 +252,7 @@ export default function ProductFormSections({ form, variant = "page" }: Props) {
 				</label>
 			</div>
 
-			{/* 半透明遮罩：進階設定尚未開放 */}
+
 			<div
 				className="absolute inset-0 z-10 grid place-items-center rounded-[24px] bg-hk-surface-card/55 backdrop-blur-[1.5px] dark:bg-[#14140f]/45"
 				role="note"
@@ -269,7 +266,6 @@ export default function ProductFormSections({ form, variant = "page" }: Props) {
 		</section>
 	);
 
-	// Drawer：單欄堆疊（基本 → 圖片 → 規格 → 認證 → 進階）。
 	if (variant === "drawer") {
 		return (
 			<div className="flex flex-col gap-5 min-w-0">
@@ -282,29 +278,25 @@ export default function ProductFormSections({ form, variant = "page" }: Props) {
 		);
 	}
 
-	// Page：Shopify 式兩欄 — 左主欄內容、右側欄認證與進階。
 	return (
 		<>
-			{/* ───────── 左主欄：商品內容 ───────── */}
+
 			<div className="flex flex-col gap-5 min-w-0">
 				{basicSection}
 				{imagesSection}
-				{/* 規格 / SKU — wrapped so the wizard can step it */}
+
 				<div data-step={2} className="contents max-[960px]:block">
 					{skuSection}
 				</div>
 				{errorBlock}
 			</div>
 
-			{/* ───────── 右側欄：認證與進階設定 ───────── */}
+
 			<aside className="flex flex-col gap-5 min-w-0">{advancedSection}</aside>
 		</>
 	);
 }
 
-/* ============================================================
- *               Locked surface (上架中)
- * ============================================================ */
 
 /**
  * Applied to the editable surface (form / fields) while a product is 上架中:

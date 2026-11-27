@@ -34,7 +34,6 @@ func TestStoreOperable(t *testing.T) {
 			if code != tc.wantCode {
 				t.Errorf("deniedCode = %d，預期 %d", code, tc.wantCode)
 			}
-			// granted 非空 ⇔ deniedCode == 0：兩個回傳值不得同時有意義。
 			if ok && code != 0 {
 				t.Errorf("放行時 deniedCode 必須為 0，實得 %d", code)
 			}

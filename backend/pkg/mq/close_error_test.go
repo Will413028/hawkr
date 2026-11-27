@@ -36,8 +36,6 @@ func TestCloseError(t *testing.T) {
 			t.Errorf("message = %q, want prefix+reason", got)
 		}
 
-		// 包成值的話這兩個斷言會失敗——errors.As 的目標型別對不上、
-		// errors.Is 比的不是同一個指標。
 		var target *amqp.Error
 		if !errors.As(err, &target) {
 			t.Fatal("應該解得出 *amqp.Error")

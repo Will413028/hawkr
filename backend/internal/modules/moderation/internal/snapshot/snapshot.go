@@ -230,7 +230,7 @@ func body(s string) string {
 	return trimtext.Trim(strings.ReplaceAll(strings.ReplaceAll(s, "\r\n", "\n"), "\r", "\n"))
 }
 
-func at(t time.Time) time.Time { return t.UTC().Truncate(time.Microsecond) } // 資料庫的精度；讀回與重算的雜湊一致
+func at(t time.Time) time.Time { return t.UTC().Truncate(time.Microsecond) }
 
 func refs(in []string) []string {
 	out := slices.Clone(in)
@@ -320,7 +320,7 @@ func Encode(c Content) (text string, sum [sha256.Size]byte) {
 	}
 	b, err := json.Marshal(Normalize(c))
 	if err != nil {
-		panic(err) // 只有基本型別的 struct，不可能失敗
+		panic(err)
 	}
 	return string(b), sha256.Sum256(b)
 }

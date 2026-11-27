@@ -202,7 +202,6 @@ class CategorySearchField extends StatelessWidget {
         ),
       );
     }
-    // 可編輯模式維持 TextField
     return Semantics(
       label: effectiveSemanticLabel,
       hint: effectiveSemanticHint,

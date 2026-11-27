@@ -29,7 +29,7 @@ abstract class AbstractProductPostgresIT {
      * 後面的類別會拿到指向已關閉容器的 context。容器由 Testcontainers 的 Ryuk 在 JVM 結束時回收。
      */
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
-            .withInitScript("product-it/extensions.sql")   // 正式環境由 DB 初始化於 Flyway 之前安裝 pg_trgm
+            .withInitScript("product-it/extensions.sql")
             .withDatabaseName("product_it")
             .withUsername("test")
             .withPassword("test")

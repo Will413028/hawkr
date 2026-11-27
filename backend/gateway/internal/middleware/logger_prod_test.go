@@ -12,8 +12,6 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 )
 
-// panicOnReadBody proves the prod path never even attempts to read the
-// request body — reading it at all, redacted or not, panics the test.
 type panicOnReadBody struct{}
 
 func (panicOnReadBody) Read(p []byte) (int, error) {
@@ -36,7 +34,7 @@ func TestLoggerProd_NeverReadsRequestBody(t *testing.T) {
 	req.Body = panicOnReadBody{}
 	w := httptest.NewRecorder()
 
-	r.ServeHTTP(w, req) // must not panic
+	r.ServeHTTP(w, req)
 
 	entries := logs.All()
 	if len(entries) != 1 {
@@ -105,7 +103,6 @@ func TestLoggerProd_RecordsBoundedAppVersionHeaders(t *testing.T) {
 	longType := longString(headerLogLimitForTest + 20)
 	req.Header.Set("X-App-Version", "1.2.3")
 	req.Header.Set("X-App-Type", longType)
-	// App 只發 iOS，平台不再記（2026-09-26）；舊 App 送來的 header 也不記。
 	req.Header.Set("X-App-Platform", "IOS")
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -123,9 +120,6 @@ func TestLoggerProd_RecordsBoundedAppVersionHeaders(t *testing.T) {
 	}
 }
 
-// headerLogLimitForTest mirrors the middleware package's unexported
-// headerValueLogLimit (32) without importing it — this file is in the
-// middleware_test (external) package.
 const headerLogLimitForTest = 32
 
 type assertError struct{ msg string }

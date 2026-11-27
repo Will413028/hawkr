@@ -13,9 +13,6 @@ import (
 	ch "github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
 )
 
-// restDriver 以舊 gateway 的 REST API（統一 envelope）操作舊的 Java coupon-service：路徑與 wire 型別照
-// gateway/internal/handler/coupon.go，r.rest.Do 送出請求並以 ch.RESTKind 分類錯誤。Java 的業務錯誤是 HTTP 200 加
-// envelope code（7xxx 是 coupon、400 參數、403 權限），先在 restBusinessKind 對應。coupon-service 刪除時一起刪除。
 type restDriver struct {
 	rest ch.REST
 }
@@ -26,7 +23,6 @@ func newRESTDriver(base string, tokens map[ch.Caller]string, client *http.Client
 	return &restDriver{rest: ch.REST{Base: base, Tokens: tokens, HTTP: client, Business: restBusinessKind}}
 }
 
-// restBusinessKind 對應 GrpcResponseCode 的 coupon 業務碼；7015–7017、7019 是建立時的欄位規則。
 func restBusinessKind(code int32) error {
 	switch code {
 	case 7001:
@@ -92,7 +88,6 @@ var (
 	statusWire = map[Status]string{StatusDraft: "0", StatusActive: "1", StatusInactive: "2", StatusExpired: "3", StatusEnded: "4"}
 )
 
-// enumWire 取列舉的 wire 值；不認得的值原樣送出，讓情境能送非法值。
 func enumWire[K ~string](m map[K]string, k K) string {
 	if v, ok := m[k]; ok {
 		return v
@@ -141,7 +136,6 @@ type wireTemplate struct {
 	} `json:"targetAccounts"`
 }
 
-// numReader 讀 proto JSON 的 int64 字串；空字串與 "null"（舊 gateway 對未設定數字的編碼）是 0，其餘解析失敗記下第一個錯誤。
 type numReader struct{ err error }
 
 func (r *numReader) int(s string) int64 {

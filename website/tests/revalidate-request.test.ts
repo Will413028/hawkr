@@ -83,8 +83,6 @@ test("expands each entity to the domains that embed it, and nothing else", () =>
 	assert.deepEqual(expand("post:9"), ["post:9", "posts:list"]);
 	assert.deepEqual(expand("hashtag:9"), ["hashtag:9", "hashtags:list"]);
 	assert.deepEqual(expand("category:9"), ["category:9", "categories"]);
-	// Hashtags / categories embed no product or seller fields, so a
-	// commerce mutation must not reach them.
 	for (const tag of ["product:1", "seller:2"]) {
 		const expanded = expand(tag);
 		for (const absent of ["hashtags:list", "categories"]) {
@@ -94,16 +92,6 @@ test("expands each entity to the domains that embed it, and nothing else", () =>
 });
 
 test("the tags no producer emits are rejected instead of silently no-oping", () => {
-	// Accepting a tag no fetcher reads makes the endpoint answer 200
-	// "invalidated" while doing nothing. A producer that starts emitting one
-	// must get 400, not silence.
-	//
-	// `home` joined this list once prod's product-service actually ran a build
-	// containing 72b2b9a7a — verified by the image sha the pod reports
-	// (884c95a2f), not by the commit being on `main` and not by a deploy run
-	// reporting success. Until that was true, removing it would have 400'd the
-	// whole payload prod still sends and silently dropped the entity tags
-	// travelling with it.
 	for (const tag of [
 		"home",
 		"marketplace",
@@ -150,9 +138,6 @@ test("rejects unknown, non-ASCII and oversized tag contracts", () => {
 });
 
 test("ignores a legacy mode field so in-flight payloads keep working", () => {
-	// Every value has to pass: 400-ing an unknown mode would reject the whole
-	// payload and the valid tags with it, so the invalidation would disappear
-	// instead of merely ignoring a field nobody reads any more.
 	for (const mode of ["soft", "hard", "instant", 5, null]) {
 		assert.deepEqual(
 			parseRevalidateRequest(
@@ -190,17 +175,11 @@ test("rejects event-id aliases that disagree", () => {
 });
 
 test("expires an entity on write instead of opening a stale window", () => {
-	// `{expire: 0}` makes every entry generated before the bust a miss. `"max"`
-	// only marks the entry stale — the next reader gets the pre-mutation copy, and for a single record that reader is usually the
-	// seller who just saved.
 	assert.deepEqual(IMMEDIATE_PROFILE, { expire: 0 });
 	assert.equal(DEFERRED_PROFILE, "max");
 });
 
 test("expires entity tags immediately and leaves aggregates stale-servable", () => {
-	// The split is the whole point: a hard expiry on the lists would make every
-	// concurrent reader render inline and drop stale-if-error, and one edit expands into three list tags — the #338
-	// amplification. Their readers are not the writer.
 	for (const tag of [
 		"product:1",
 		"seller:2",

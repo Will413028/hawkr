@@ -53,7 +53,6 @@ public final class AddressNormalizer {
         }
         String trimmed = detail.trim();
 
-        // 1. strip 重複 city+district 前綴（保留原保守行為：只 strip 完整連續前綴）
         if (city != null && district != null) {
             String prefix = city + district;
             if (trimmed.startsWith(prefix)) {
@@ -66,7 +65,6 @@ public final class AddressNormalizer {
             }
         }
 
-        // 2. strip 里/村、鄰（PayUni 不接受）
         return stripVillageAndNeighborhood(trimmed);
     }
 
@@ -86,7 +84,6 @@ public final class AddressNormalizer {
             String rest = trimmed.substring(m.end());
             return prefix + stripVillageAndNeighborhood(rest);
         }
-        // 無法定位縣市+區前綴：保守只移除「鄰」（不動疑似里的中文，避免誤刪路名）
         return NEIGHBORHOOD.matcher(trimmed).replaceAll("").trim();
     }
 
@@ -96,12 +93,10 @@ public final class AddressNormalizer {
             return s;
         }
         String result = s.trim();
-        // 里/村：只移除開頭（緊接 district 後的村里名），避免誤傷罕見含「里」字的路名
         Matcher village = LEADING_VILLAGE.matcher(result);
         if (village.find()) {
             result = result.substring(village.end()).trim();
         }
-        // 鄰：數字+鄰 特徵明確，全域移除（含開頭與非標準位置）
         result = NEIGHBORHOOD.matcher(result).replaceAll("").trim();
         return result;
     }

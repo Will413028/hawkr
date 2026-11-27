@@ -10,16 +10,7 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// 端點 73：把「停在人工出口而且零 operation」的文件送回自動線。
-//
-// 這條路徑存在的理由寫在 AdminJob.ResumeDocumentFromManual 的紅字：自動線落
-// AWAITING_MANUAL 時 operation 根本不建，而 M1 的三條出邊全部以 operation id 為鍵
-// ⇒ 在它之前那些文件沒有任何角色推得動。
-//
-// 每一支陰性都額外數 repo 的呼叫次數：只斷言「回了哪個碼」不夠——rows=0 的危險形狀
-// 是「回了錯誤，但前面已經寫了一半」（同本 package 其他 ADM 測試的紀律）。
 
-// resumeDoc 造一份「自動線落人工出口」的文件：AWAITING_MANUAL ＋ 理由碼 ＋ 零 operation。
 func resumeDoc(manualReason string) domain.Document {
 	d := docAt(codemeta.InvoiceDocumentStatusAwaitingManual.Value, manualReason)
 	d.IssueAttemptSeq = 1
@@ -27,8 +18,6 @@ func resumeDoc(manualReason string) domain.Document {
 	return d
 }
 
-// newResumeFixture 與 newJobFixture 的差別只有一個：ops.stored 留零值。
-// 端點 73 的前提是「這份文件底下沒有任何 operation」，塞一個進去等於測到別的分支。
 func newResumeFixture(doc domain.Document) *jobFixture {
 	fx := newJobFixture(domain.Operation{}, doc)
 	fx.ops.byDocument = map[int64][]domain.Operation{}
@@ -46,7 +35,6 @@ func TestAdminJob_ResumeDocument_BuildsMissingOperation(t *testing.T) {
 		t.Fatalf("ResumeDocumentFromManual 失敗：%v", err)
 	}
 
-	// ① M1：document 回 PENDING，CAS 帶的是 document 自己的版本。
 	if len(fx.docs.resumed) != 1 {
 		t.Fatalf("應呼叫 ResumeFromManual 一次，實得 %d", len(fx.docs.resumed))
 	}
@@ -57,10 +45,6 @@ func TestAdminJob_ResumeDocument_BuildsMissingOperation(t *testing.T) {
 		t.Fatalf("document 應回 PENDING，實得 %q", fx.docs.stored.Status)
 	}
 
-	// ② 缺席的 operation 被補建並推進 READY。
-	//
-	// 🔴 這一格是本端點的全部價值：只做 ① 的話 document 回 PENDING 而 worker 的候選
-	// 集合是 invoice_operations ⇒ 從「卡在 AWAITING_MANUAL」變成「卡在 PENDING」。
 	if len(fx.ops.created) != 1 {
 		t.Fatalf("應補建 1 件 operation，實得 %d", len(fx.ops.created))
 	}
@@ -68,7 +52,6 @@ func TestAdminJob_ResumeDocument_BuildsMissingOperation(t *testing.T) {
 	if op.OperationType != codemeta.InvoiceOperationTypeIssue.Value {
 		t.Fatalf("operation_type 應為 ISSUE，實得 %q", op.OperationType)
 	}
-	// 期望值硬寫字面值，不呼叫 domain.OperationKeyFor —— 拿被測物算期望值等於沒有斷言。
 	if op.OperationKey != "issue:8001:1" {
 		t.Fatalf("operation_key 應為 issue:8001:1，實得 %q", op.OperationKey)
 	}
@@ -91,8 +74,6 @@ func TestAdminJob_ResumeDocument_BuildsMissingOperation(t *testing.T) {
 		t.Fatalf("回應的 jobId 應是剛建立的那一列（%d），實得 %d", op.ID, got.JobID)
 	}
 
-	// ③ I7：兩個軸各留一列痕跡。DOCUMENT 軸漏掉的話，ADM 之後看到的軌跡會直接從
-	// AWAITING_MANUAL 跳到 ISSUED，說不出中間誰做了什麼。
 	var docHist, opHist int
 	for _, e := range fx.audit.entries {
 		switch e.SubjectType {
@@ -111,14 +92,12 @@ func TestAdminJob_ResumeDocument_BuildsMissingOperation(t *testing.T) {
 	if docHist != 1 || opHist != 1 {
 		t.Fatalf("狀態歷程應為 DOCUMENT 1 列 ＋ OPERATION 1 列，實得 %d/%d", docHist, opHist)
 	}
-	// actor 必須是按下按鈕的那個人，不是 SYSTEM／0（#3048 修的就是這一格）。
 	for _, e := range fx.audit.entries {
 		if e.ActorType != jobActorAdmin || e.ActorAccountID == nil || *e.ActorAccountID != 42 {
 			t.Fatalf("歷程的 actor 應為 ADMIN/42，實得 %q/%v", e.ActorType, e.ActorAccountID)
 		}
 	}
 
-	// ④ ADM 稽核落在 DOCUMENT 軸（這一刻還沒有 job，resource 只能是 document）。
 	if len(fx.audit.admin) != 1 {
 		t.Fatalf("ADM 稽核應寫一列，實得 %d", len(fx.audit.admin))
 	}
@@ -282,7 +261,6 @@ func TestCanResumeDocumentFromManual(t *testing.T) {
 	}
 }
 
-// assertResumeBlocked 斷言「回了指定業務碼」**且什麼都沒寫**。
 func assertResumeBlocked(t *testing.T, fx *jobFixture, err error, want int32) {
 	t.Helper()
 	if !isBizCode(err, want) {

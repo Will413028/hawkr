@@ -78,9 +78,6 @@ func SafeGo(ctx context.Context, f func()) {
 	}()
 }
 
-// recoverPanic runs f, converting any panic into an error instead of letting
-// it propagate. The panic is logged via pkg/logger and, if cb is non-nil,
-// also handed to cb.
 func recoverPanic(ctx context.Context, f func() error, cb func(r any)) (err error) {
 	defer func() {
 		if r := recover(); r != nil {

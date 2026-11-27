@@ -12,7 +12,6 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
-// limitsDefinitionFile 是 Limits 與 limits 擴充欄位的定義檔。
 func limitsDefinitionFile() *descriptorpb.FileDescriptorProto {
 	return &descriptorpb.FileDescriptorProto{
 		Name:       proto.String("hawkr/common/v1alpha1/limits.proto"),
@@ -40,7 +39,6 @@ func limitsDefinitionFile() *descriptorpb.FileDescriptorProto {
 	}
 }
 
-// limitOption 編出 limits 選項的 unknown fields（和 buf image 讀進來、沒有編譯進型別的情況相同）。
 func limitOption(sp limitSpec) *descriptorpb.FieldOptions {
 	var msg []byte
 	for num, v := range []int64{sp.items, sp.runes, sp.totalRunes, sp.imageItems} {
@@ -58,14 +56,12 @@ func limitOption(sp limitSpec) *descriptorpb.FieldOptions {
 	return opts
 }
 
-// limitSpec 描述一個掛了 limits 的欄位：repeated、是否是訊息型別，以及四種上限的值（0 是沒設）。
 type limitSpec struct {
 	name                                 string
 	repeated, message                    bool
 	items, runes, totalRunes, imageItems int64
 }
 
-// limitsImage 造一個 image：catalog.ProductInput 的欄位掛了 specs，另有一個沒掛選項的欄位。
 func limitsImage(specs ...limitSpec) *descriptorpb.FileDescriptorSet {
 	var fs []*descriptorpb.FieldDescriptorProto
 	for i, sp := range specs {

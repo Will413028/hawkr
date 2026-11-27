@@ -118,7 +118,6 @@ export default function StorefrontProductPreviewDrawer({
 					setLoadState({ status: "unavailable" });
 					return;
 				}
-				// 評價讀取失敗讓整個預覽進錯誤狀態（有重試），不當成沒有評價。
 				const [reviewPage, reviewStats] = await Promise.all([
 					fetchProductReviewsPage(productId, { pageSize: 6 }),
 					fetchProductReviewStats(productId),

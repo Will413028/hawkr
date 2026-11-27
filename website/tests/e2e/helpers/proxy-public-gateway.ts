@@ -1,6 +1,5 @@
 import type { Page } from "@playwright/test";
 
-// Loopback by default: a spec run without env must not leave the machine.
 const TEST_GATEWAY_ORIGIN = new URL(
 	process.env.API_BASE_URL ?? "http://127.0.0.1:9/api/v1",
 ).origin;
@@ -30,13 +29,6 @@ export async function proxyPublicGatewayReads(
 		await route.fulfill({ response });
 	});
 
-	// A detail view can start another public read (for example comments) just as
-	// the assertion completes. Drain route handlers before Playwright tears down
-	// the page; otherwise route.fetch rejects against the closed context and turns
-	// a successful interaction into a false-negative E2E failure. But if the page
-	// itself already closed (test navigated away / context torn down first),
-	// unrouteAll throws "Target page, context or browser has been closed" instead
-	// of the fetch rejections `ignoreErrors` is meant to swallow — skip it then.
 	return async () => {
 		if (page.isClosed()) return;
 		await page.unrouteAll({ behavior: "ignoreErrors" });

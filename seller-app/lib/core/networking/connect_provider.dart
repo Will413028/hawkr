@@ -29,9 +29,6 @@ import 'app_version_headers.dart';
 
 part 'connect_provider.g.dart';
 
-// 對外 API（根目錄 api/ 的 Protobuf＋Connect）的 client。已經搬進單體的模組走這裡，其他模組仍走 Dio，
-// 試點期間兩套並存。公開的 service（*PublicService）用 [connectTransport]，不帶身分；登入後的 service
-// （*AppService）用 [connectAuthTransport]，收到 `SELLER_SUSPENDED` 時重讀 `GetMyStore`（`onSellerSuspendedSignal`）。
 
 /// 所有 Connect transport 共用的 HTTP/2 連線。
 @Riverpod(keepAlive: true)

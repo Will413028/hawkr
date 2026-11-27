@@ -23,7 +23,6 @@ class AccountRestrictedScreen extends ConsumerStatefulWidget {
 
   /// 已經在受限狀態頁就不再疊一層。
   static void open(GoRouter router) {
-    // RouteMatchList.uri 不含 push 出來的頁面；最上層的路由取 delegate.state。
     if (router.routerDelegate.state.uri.path == path) return;
     router.push(path);
   }
@@ -61,7 +60,6 @@ class _AccountRestrictedScreenState
   Widget build(BuildContext context) {
     final suspension = ref.watch(accountRestrictionProvider);
     if (suspension == null) {
-      // 沒有停權（已解除或已登出）：這頁沒有內容，回首頁。
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !_busy) context.go('/');
       });

@@ -77,7 +77,7 @@ export interface ShipmentAnomalyItem {
 	anomalyTypeLabel: string;
 	severity: ShipmentAnomalySeverity;
 	severityLabel: string;
-	detectedAt: string; // ISO 8601 UTC
+	detectedAt: string;
 	/** Buyer-facing receiver name surfaced on the row. */
 	buyerName?: string;
 	/** Last status the backend recorded (e.g. `33`, `41`, `44`). */
@@ -233,15 +233,12 @@ export interface ShipmentAnomalyStats {
 
 interface ServerStats {
 	total?: number | string;
-	// Backend Gateway 實際回傳的 camelCase 欄位（gateway/internal/handler/shipment_anomaly.go）
 	highSeverityCount?: number | string;
 	mediumSeverityCount?: number | string;
 	lowSeverityCount?: number | string;
-	// snake_case fallback（若 gateway 未來改格式）
 	high_severity_count?: number | string;
 	medium_severity_count?: number | string;
 	low_severity_count?: number | string;
-	// 簡短 alias / 早期版本 fallback
 	high?: number | string;
 	medium?: number | string;
 	low?: number | string;
@@ -331,9 +328,6 @@ export function buildShipmentAnomalyLookup(
 	const map = new Map<string, ShipmentAnomalyItem>();
 	for (const item of items) {
 		if (!item.orderNo) continue;
-		// Only un-acknowledged rows light up the red dot — once the seller
-		// has acted (ack / ignore), the order card returns to a clean state
-		// even if the underlying shipment is still anomalous.
 		if (item.ackAction) continue;
 		const existing = map.get(item.orderNo);
 		if (

@@ -57,9 +57,6 @@ interface ButtonProps
 	children?: React.ReactNode;
 }
 
-// md is the app-wide default and clears the 44px touch target outright. sm is
-// a deliberately dense desktop size (toolbars, table rows): it keeps its 32px
-// under a mouse and only grows on coarse pointers.
 const buttonSizeClass: Record<ButtonSize, string> = {
 	sm: "h-8 gap-1.5 text-xs pointer-coarse:min-h-11 pointer-coarse:min-w-11",
 	md: "h-11 gap-2 text-sm",
@@ -146,9 +143,7 @@ export function ButtonLoadingContent({
 			aria-atomic={announce ? "true" : undefined}
 		>
 			<span className="inline-flex shrink-0" aria-hidden="true">
-				{/* tone="mono"：按鈕的底色多半就是品牌色，原色商標疊在同色的 solid primary
-				    上等於隱形。改吃 currentColor，讓每顆按鈕用它自己已定義的可讀
-				    前景色，淺底／深色底／深色主題的輔色底都自動正確。動態不變。 */}
+
 				{indicator ?? (
 					<BrandLogoLoader
 						size={buttonLoadingIndicatorSize[size]}
@@ -156,13 +151,7 @@ export function ButtonLoadingContent({
 					/>
 				)}
 			</span>
-			{/* `hkui-button__loading-label` is the hook for buttons whose icon-only
-			    state is decided by CSS rather than by the `isIconOnly` prop — a
-			    container query can't set a React prop, so it collapses this label
-			    the same way it collapses the button's idle label (see
-			    `.market-product-card__cart-btn` in styles/features/market.css).
-			    Hiding it also collapses the idle width reservation that renders
-			    the same node, so a 32px chip reserves 32px, not the text's width. */}
+
 			<span
 				className={cn(
 					"hkui-button__loading-label",
@@ -179,16 +168,6 @@ export function ButtonLoadingContent({
 	);
 }
 
-// These text colours are deliberately NOT `!important`. A solid button is a
-// painted surface, and callers that repaint the surface (`bg-[#c4a93a]`) must
-// be able to repaint the label with it — `!important` here silently pinned
-// every solid button's text to the token colour, so a custom light surface
-// kept white text at ~2.2:1.
-//
-// The dark-mode anchor rule `[data-theme="dark"] body a { color }` is what
-// originally forced the `!`; it is now excluded for `a[data-hkui-button]` in
-// styles/foundation/01-tokens-theme.css, which is the correct place to say
-// "a button is not body text".
 const solidColorClass: Record<ButtonColor, string> = {
 	default:
 		"bg-[var(--hkui-default-100)] text-[var(--hkui-foreground)] hover:bg-[var(--hkui-default-200)]",
@@ -234,8 +213,6 @@ const lightColorClass: Record<ButtonColor, string> = {
 		"bg-transparent text-[var(--hkui-danger-text)] hover:bg-[var(--hkui-danger-50)] dark:hover:bg-[rgb(var(--color-status-danger-rgb)/0.16)]",
 };
 
-// flat / faded / shadow / ghost are unused by migrated call sites (0 uses) but
-// kept as the design-system API surface; reuse solid/bordered/light values.
 const buttonVariantClass: Record<ButtonVariant, Record<ButtonColor, string>> = {
 	solid: solidColorClass,
 	bordered: borderedColorClass,
@@ -257,10 +234,6 @@ export function buttonClasses({
 }: ButtonStyleOpts = {}): string {
 	return cn(
 		"relative inline-flex select-none items-center justify-center whitespace-nowrap border border-transparent font-semibold tracking-normal outline-none [font-family:var(--hkui-font-sans)] transition-[background,border-color,color,box-shadow,transform,opacity] duration-200 ease-[var(--hkui-ease)] motion-reduce:transition-none",
-		// Two rings, deliberately: the box-shadow halo is the brand look, and a
-		// real `outline` is the one a caller cannot erase. Loading (and any
-		// caller passing `shadow-none!`) wipes the box-shadow, which used to
-		// leave the focused button with NO indicator at all.
 		"focus-visible:![box-shadow:var(--hkui-focus-ring)]",
 		"focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--hkui-focus)]",
 		"disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
@@ -271,9 +244,6 @@ export function buttonClasses({
 		radius ? buttonRadiusClass[radius] : buttonDefaultRadiusClass[size],
 		buttonVariantClass[variant][color],
 		fullWidth && "w-full",
-		// Every declaration in this class carries `!`, so it beats caller
-		// decoration wherever it lands — it does NOT need applying a second
-		// time after `className` (which is what the component used to do).
 		isLoading && buttonLoadingStateClass,
 	);
 }
@@ -324,9 +294,6 @@ const Button = React.forwardRef<
 	const resolvedLoadingLabel = loadingLabel ?? "處理中…";
 	const resolvedLoadingReservationLabel =
 		loadingReservationLabel ?? resolvedLoadingLabel;
-	// Explicit loading content participates in layout before the request starts.
-	// The button therefore reserves the larger of its normal and pending labels
-	// and never jumps — or clips a useful status — when the state flips.
 	const reserveLoadingWidth =
 		loadingLabel !== undefined ||
 		loadingReservationLabel !== undefined ||
@@ -336,8 +303,6 @@ const Button = React.forwardRef<
 		loadingIndicator,
 		size,
 	);
-	// The idle sizing clone must not mount a real LOGO/CSS animation.
-	// A same-size inert box preserves geometry without doing invisible work.
 	const loadingIndicatorReservation = (
 		<span
 			className="block shrink-0"
@@ -349,15 +314,6 @@ const Button = React.forwardRef<
 	);
 
 	const inner = (
-		// `grid-cols-[minmax(0,1fr)]`: the reservation clone below is `w-max`, so an
-		// `auto` track floors at its min-content width. Callers that hard-lock the
-		// button's geometry (e.g. `.market-product-card__cart-btn`'s 32/40px
-		// icon-only chip, set from a container query) then get a track wider than
-		// the button — and `justify-items-center` centres the *visible* content in
-		// that oversized track, pushing the icon outside the pill. `minmax(0, …)`
-		// lets the track collapse to the button; an `fr` max still resolves to the
-		// max-content contribution when the button sizes itself, so idle-width
-		// reservation is unaffected.
 		<span className="relative grid min-w-0 grid-cols-[minmax(0,1fr)] items-center justify-items-center">
 			<span
 				className={cn(
@@ -372,10 +328,6 @@ const Button = React.forwardRef<
 			</span>
 			{reserveLoadingWidth && (
 				<span
-					// `max-w-full` keeps the (invisible) clone from spilling out of a
-					// hard-locked button. Percentage max-width is ignored during
-					// intrinsic sizing, so it still reserves its full width whenever
-					// the button is free to size itself.
 					className="pointer-events-none col-start-1 row-start-1 inline-flex max-w-full items-center justify-center text-current opacity-0"
 					aria-hidden="true"
 				>

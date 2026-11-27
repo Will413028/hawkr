@@ -20,7 +20,6 @@ func (f *fakeOpen) OpenStoreIDs(_ context.Context, ids []int64) (map[int64]struc
 	return f.open, f.err
 }
 
-// productID 是測試用的確定性商品 ID：同一個數字永遠得到同一個 UUID，且不是零值。
 func productID(n int64) uuid.UUID {
 	return uuid.MustParse(fmt.Sprintf("00000000-0000-7000-8000-%012d", n))
 }
@@ -93,12 +92,10 @@ func TestKeepOpenDeduplicatesStoresKeepingTheFirst(t *testing.T) {
 	}
 }
 
-// endCursor 標記 fakeSearcher 的一頁是最後一頁；其他頁的 Next 由 fake 依位置產生（"p<下一頁的索引>"）。
 const endCursor Cursor = "end"
 
 type fakeSearcher struct {
 	pages []Page
-	// err 以頁的索引（0 起）指定那一頁失敗。
 	err   map[int]error
 	calls []Cursor
 	query []Query

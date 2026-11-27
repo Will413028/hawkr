@@ -57,7 +57,6 @@ def tracked_files(root: Path, directory: str, pattern: str = "*") -> list[Path]:
 RGBA = tuple[float, float, float, float]
 
 
-# ---------------------------------------------------------------- 色彩運算
 
 
 def parse_hex(text: str) -> RGBA:
@@ -104,7 +103,6 @@ def hexs(c: RGBA) -> str:
     return "#%02x%02x%02x" % tuple(round(x) for x in c[:3])
 
 
-# ---------------------------------------------------------------- CSS
 
 
 def _decls(body: str) -> dict[str, str]:
@@ -117,7 +115,6 @@ def _decls(body: str) -> dict[str, str]:
             break
         m = re.compile(r"(--[\w-]+)\s*:").match(body, i)
         if not m:
-            # 跳過註解與其他宣告
             if body.startswith("/*", i):
                 j = body.find("*/", i)
                 i = n if j < 0 else j + 2
@@ -288,7 +285,6 @@ def _num(s: str) -> float:
     return float(s)
 
 
-# ---------------------------------------------------------------- Dart
 
 
 class Dart:
@@ -312,7 +308,6 @@ class Dart:
         raise ValueError(f"AppColors.{name} 解不出來：{v}")
 
 
-# ---------------------------------------------------------------- 比對表
 
 
 class Report:
@@ -364,19 +359,15 @@ def check_web(css: Css, rep: Report) -> None:
 
         return fn
 
-    # 按鈕：白字 × action.primary / hover / pressed
     for bg_name in ("--theme-action-primary", "--theme-action-primary-hover"):
         rep.safe(g, f"按鈕文字(white) × {bg_name}", lambda b=bg_name: (css.token("--color-neutral-white"), css.token(b)), "text")
         rep.safe(g, f"按鈕文字(cream, text-inverse) × {bg_name}", lambda b=bg_name: (css.token("--theme-text-inverse"), css.token(b)), "text")
     rep.safe(g, "hover 與 primary 可分辨", lambda: (css.token("--theme-action-primary-hover"), css.token("--theme-action-primary")), "ui", enforce=False)
-    # hkui 按鈕
     rep.safe(g, "hkui-primary-foreground × hkui-primary", lambda: (css.token("--hkui-primary-foreground"), css.token("--hkui-primary")), "text")
     rep.safe(g, "hkui-primary-foreground × hkui-primary-700 (hover)", lambda: (css.token("--hkui-primary-foreground"), css.token("--hkui-primary-700")), "text")
     rep.safe(g, "hkui-secondary-foreground × hkui-secondary", lambda: (css.token("--hkui-secondary-foreground"), css.token("--hkui-secondary")), "text")
     rep.safe(g, "hkui-accent-foreground × hkui-accent", lambda: (css.token("--hkui-accent-foreground"), css.token("--hkui-accent")), "text")
-    # 連結與選取文字 × 各 surface
     for s in WEB_SURFACES:
-        # surface-panel 上的強調文字一律用 text-accent-on-tint（primaryStrong 在 panel 上只有 4.48:1）
         on_panel = s == "--theme-surface-panel"
         link = "--theme-text-accent-on-tint" if on_panel else "--theme-action-primary"
         accent = "--theme-text-accent-on-tint" if on_panel else "--theme-text-accent"
@@ -389,11 +380,9 @@ def check_web(css: Css, rep: Report) -> None:
         for t in WEB_TEXT:
             rep.safe(g, f"{t} × {s}", pair(t, s), "text")
         rep.safe(g, f"focus / 邊框元件 action.primary × {s}", pair("--theme-action-primary", s), "ui")
-    # 選取態：強調文字疊在 primary 的半透明填色上（subtle 10%、soft 18%）
     for tint in ("--theme-primary-subtle", "--theme-primary-soft"):
         for s in ("--theme-surface-page", "--theme-surface-card"):
             rep.safe(g, f"選取文字 text-accent-on-tint × {tint} over {s}", lambda tint=tint, s=s: (css.token("--theme-text-accent-on-tint"), over(css.token(tint), css.token(s))), "text")
-    # 品牌色字 × 淡階與輔色
     rep.safe(g, "brand-ink × brand-secondary", lambda: (css.token("--color-brand-ink"), css.token("--color-brand-secondary")), "text")
     rep.safe(g, "brand-ink × brand-secondary-soft", lambda: (css.token("--color-brand-ink"), css.token("--color-brand-secondary-soft")), "text")
     rep.safe(g, "brand-ink × brand-primary-soft", lambda: (css.token("--color-brand-ink"), css.token("--color-brand-primary-soft")), "text")
@@ -411,7 +400,6 @@ def check_web(css: Css, rep: Report) -> None:
     rep.safe(g, "logo brand-primary × 頁面 surface（圖形）", pair("--brand-logo-on-light", "--theme-surface-page"), "ui")
     rep.safe(g, "logo 檯面 brand-ink × 頁面 surface（圖形）", pair("--brand-logo-counter", "--theme-surface-page"), "ui")
     rep.safe(g, "logo on-dark × brand-primary-strong 實心底（圖形）", lambda: (css.token("--brand-logo-on-dark"), css.token("--color-brand-primary-strong")), "ui")
-    # 聊天泡泡、側欄選取、tag 等實際用到的組合
     rep.safe(g, "聊天自己的泡泡 白字 × bubble-mine-bg", lambda: (css.token("--color-neutral-white"), css.token("--page-chat-bubble-mine-bg")), "text")
     rep.safe(g, "聊天標題列 header-fg × header-bg", lambda: (css.token("--page-chat-thread-header-fg"), css.token("--page-chat-thread-header-bg")), "text")
     rep.safe(g, "聊天卡片價格 × 白底", lambda: (css.token("--page-chat-card-price"), css.token("--color-neutral-white")), "text")
@@ -422,7 +410,6 @@ def check_web(css: Css, rep: Report) -> None:
     rep.safe(g, "首頁 accent-500 底 × 白字", lambda: (css.token("--color-neutral-white"), css.token("--color-hk-home-accent-500")), "text")
     rep.safe(g, "首頁 stage-cta 墨字 × brand-secondary 底", lambda: (css.token("--color-brand-ink"), css.token("--color-brand-secondary")), "text")
     rep.safe(g, "首頁 primary-deep 文字 × paper", lambda: (css.token("--color-hk-home-primary-deep"), css.token("--color-hk-home-paper")), "text")
-    # 暗色
     g = "web 暗色"
     dark_surfaces = ["--theme-surface-page", "--theme-surface-card", "--theme-surface-muted", "--theme-surface-panel", "--theme-surface-elevated"]
     rep.safe(g, "按鈕文字(text-inverse) × action.primary", lambda: (css.token("--theme-text-inverse", "dark"), css.token("--theme-action-primary", "dark")), "text")
@@ -435,7 +422,6 @@ def check_web(css: Css, rep: Report) -> None:
         rep.safe(g, f"action.secondary 文字 × {s}", pair("--theme-action-secondary", s, "dark"), "text")
         for t in WEB_TEXT:
             rep.safe(g, f"{t} × {s}", pair(t, s, "dark"), "text")
-        # 品牌色在暗色底上：primary 只作大字或圖形（>= 3:1）；primaryStrong／primary 當一般文字不合格，只列出不判定。
         rep.safe(g, f"brand-primary 大字／圖形 × {s}", lambda s=s: (css.token("--color-brand-primary"), css.token(s, "dark")), "large")
         rep.safe(g, f"brand-primary 當一般文字（不得使用）× {s}", lambda s=s: (css.token("--color-brand-primary"), css.token(s, "dark")), "text", enforce=False)
         rep.safe(g, f"brand-primary-strong 當一般文字（不得使用）× {s}", lambda s=s: (css.token("--color-brand-primary-strong"), css.token(s, "dark")), "text", enforce=False)
@@ -477,7 +463,7 @@ def check_dart(app: str, d: Dart, rep: Report) -> None:
         return d.token(name, bg)
 
     surfaces = ["surfacePage", "surfaceCream", "surfaceMuted", "surfacePanel", "neutralWhite"]
-    on_primary = "textInverse"  # 按鈕上的白字（neutralCream）
+    on_primary = "textInverse"
     for bg in ("actionPrimary", "primaryDark", "brandPrimaryStrong", "brandPrimaryDeep"):
         rep.safe(g, f"按鈕文字({on_primary}) × {bg}", lambda bg=bg: (t(on_primary), t(bg)), "text")
         rep.safe(g, f"白字(neutralWhite) × {bg}", lambda bg=bg: (t("neutralWhite"), t(bg)), "text")
@@ -486,7 +472,6 @@ def check_dart(app: str, d: Dart, rep: Report) -> None:
     if "commerceCartAction" in d.raw:
         rep.safe(g, "commerceCartForeground × commerceCartAction", lambda: (t("commerceCartForeground"), t("commerceCartAction")), "text")
     for s in surfaces:
-        # surfacePanel 上的強調文字一律用 textAccentOnTint（primary 在 panel 上只有 4.48:1）
         fg_link = "textAccentOnTint" if s == "surfacePanel" else "primary"
         rep.safe(g, f"連結／互動文字 {fg_link} × {s}", lambda s=s, f=fg_link: (t(f), t(s)), "text")
         rep.safe(g, f"secondary 文字 {fg_link} × {s}", lambda s=s, f=fg_link: (t("secondary" if f == "primary" else f), t(s)), "text")
@@ -496,7 +481,6 @@ def check_dart(app: str, d: Dart, rep: Report) -> None:
         rep.safe(g, f"textMuted × {s}", lambda s=s: (t("textMuted"), t(s)), "text")
         rep.safe(g, f"textEmphasis × {s}", lambda s=s: (t("textEmphasis"), t(s)), "text")
         rep.safe(g, f"brandInk × {s}", lambda s=s: (t("brandInk"), t(s)), "text")
-    # 淡底上的互動文字（primarySoft 是 primary 的 alpha，疊在 surface 上）
     for soft in ("primarySoft", "primaryHover", "primaryActive"):
         for s in ("surfaceCream", "surfacePage"):
             def fn(soft=soft, s=s):
@@ -527,7 +511,6 @@ def check_dart(app: str, d: Dart, rep: Report) -> None:
         rep.safe(g2, f"{name}：前景 × 底", lambda fg=fg, bg=bg: (t(fg), t(bg)), "text", enforce=False)
 
 
-# ---------------------------------------------------------------- 首頁範圍（.hkh-page 重設語意 token）
 
 
 def check_home_scope(root: Path, rep: Report) -> None:
@@ -551,7 +534,6 @@ def check_home_scope(root: Path, rep: Report) -> None:
             for r in ("--theme-action-primary", "--theme-text-accent", "--theme-text-accent-on-tint"):
                 rep.safe(group, f"{r} × {sname}", pair(r, sname), "text")
             for r in WEB_TEXT:
-                # 亮色首頁的文字是既有的暖棕半透明色，值不在 D11 範圍內：只列出不判定。
                 rep.safe(group, f"{r} × {sname}" + ("（既有暖棕，值未改）" if theme == "light" else ""), pair(r, sname), "text", enforce=theme == "dark")
         for tint in ("--theme-primary-subtle",):
             for sname in ("--theme-surface-page", "--theme-surface-card"):
@@ -559,7 +541,6 @@ def check_home_scope(root: Path, rep: Report) -> None:
     del base
 
 
-# ---------------------------------------------------------------- admin 側欄（深底）
 
 
 def _rule_props(source: str, selector: str) -> dict[str, str]:
@@ -619,7 +600,6 @@ def check_admin_sidebar(root: Path, rep: Report) -> None:
     rep.safe(g, "brand.inkOnDark × brand.ink（logo 檯面，圖形）", lambda: (css.token("--color-ink-50"), css.token("--color-ink-900")), "ui")
 
 
-# ---------------------------------------------------------------- 使用處掃描：淡底上的強調文字
 
 
 TINT_BG = re.compile(r"primary-subtle|primary-soft|surface-panel|--theme-primary-border|color-brand-primary-soft")
@@ -680,7 +660,6 @@ def scan_usage(root: Path, rep: Report) -> list[str]:
     return bad
 
 
-# ---------------------------------------------------------------- 使用處掃描 2：輔色當文字、半透明底、狀態 badge、暗色圖形
 
 
 TW_ALPHA_BG = re.compile(r"(?<![\w-])((?:[a-z0-9\[\]=-]+:)*)!?bg-hk-(primary|brand-primary|primary-strong|primary-hover|secondary|brand-secondary)/(\d+)(?![\w-])")
@@ -743,19 +722,16 @@ def scan_usage_extra(root: Path, css: Css, darts: dict[str, Dart], rep: Report) 
                 need = 3.0 if re.search(r"icon|glyph|dot|badge-ring", sel) else 4.5
                 label = f"{rel}:{line}: {sel.splitlines()[-1].strip()[:50]}"
                 if dark:
-                    # (d) 暗色底上的圖形與文字：fg 對暗色卡片／elevated 要過門檻
                     for surf in (card_dark, elev_dark):
                         r = _ratio_vs(fg, surf)
                         if r + 1e-9 < need and re.search(r"brand-primary-strong|brand-primary-deep", fg_m.group(1)):
                             bad.append(f"(d) 暗色底上 {need:g}:1 不足（{r:.2f}）{label}")
                             break
                     continue
-                # (a) 輔色當文字
                 if abs(fg[0] - css.token("--color-brand-secondary")[0]) < 1 and abs(fg[1] - css.token("--color-brand-secondary")[1]) < 1:
                     bg_decl = re.findall(r"background(?:-color)?\s*:[^;]*", body)
                     if not any("ink" in b for b in bg_decl):
                         bad.append(f"(a) 輔色當文字色 {label}")
-                # (b) 透明度寫法的底，用白與 page 合成
                 for bg_decl in re.findall(r"background(?:-color)?\s*:[^;]*", body):
                     am = CSS_ALPHA_BG.search(bg_decl)
                     if not am:
@@ -800,10 +776,8 @@ def scan_usage_extra(root: Path, css: Css, darts: dict[str, Dart], rep: Report) 
                 back = " ".join(lines[max(0, i - 5) : i + 1])
                 last_text = max(back.rfind(k) for k in DART_TEXT_CTX)
                 last_fill = max(back.rfind(k) for k in DART_FILL_CTX)
-                # (a) 輔色當文字色／圖示色
                 if DART_SECONDARY_TEXT.search(line) and last_text > last_fill:
                     bad.append(f"(a) 輔色當文字色 {rel}: {line.strip()[:70]}")
-                # (a) 輔色底上放淺色字
                 if DART_SECONDARY_BG.search(line) and last_fill >= last_text:
                     for j in range(i + 1, min(len(lines), i + 14)):
                         if DART_LIGHT_FG.search(lines[j]) and any(k in " ".join(lines[max(i, j - 4) : j + 1]) for k in DART_TEXT_CTX):
@@ -811,7 +785,6 @@ def scan_usage_extra(root: Path, css: Css, darts: dict[str, Dart], rep: Report) 
                             break
                         if lines[j].count(")") > lines[j].count("(") + 2:
                             break
-                # (b) Dart 半透明主色底上的主色文字
                 am = DART_ALPHA_PRIMARY_BG.search(line)
                 if am:
                     a = float(am.group(2) or am.group(3))
@@ -825,7 +798,6 @@ def scan_usage_extra(root: Path, css: Css, darts: dict[str, Dart], rep: Report) 
                             if worst + 1e-9 < 4.5:
                                 bad.append(f"(b) 半透明底上對比 {worst:.2f} {path.relative_to(root)}:{j + 1}: {nxt.strip()[:60]}")
                             break
-    # (c) 前景與底成對定義的狀態 badge 表
     table = root / "buyer-app/lib/features/order/order_color_tokens.dart"
     if table.exists():
         raw = {m.group(1): m.group(2) for m in re.finditer(r"static const (\w+) = AppColors\.(\w+);", table.read_text(encoding="utf8"))}
@@ -838,7 +810,6 @@ def scan_usage_extra(root: Path, css: Css, darts: dict[str, Dart], rep: Report) 
                 continue
             if fn is None:
                 continue
-            # foregroundFor 對 attentionFill、neutralSurface 回傳 onAttention，其餘 onPrimary
             expected = "onAttention" if re.search(rf"background == {bg_name}\b", fn.group(1)) else "onPrimary"
             r = _ratio_vs(d.token(raw[expected]), d.token(raw[bg_name]))
             if r + 1e-9 < 4.5:
@@ -848,17 +819,15 @@ def scan_usage_extra(root: Path, css: Css, darts: dict[str, Dart], rep: Report) 
     return bad
 
 
-# ---------------------------------------------------------------- 使用處掃描 3：淺色 token 當文字、無暗色覆寫、Dart 依解析值、admin、TSX dark:
 
 
 ACCENT_FAMILY = re.compile(r"brand-(?:primary|secondary)|--hk-(?:primary|secondary)|admin-primary|--(?:theme|hkui)-(?:text-accent|action|primary|secondary|accent)")
 ON_DARK_NAME = re.compile(r"foreground|-on-|inverse|contrast|ink-on-dark")
 FIXED_TOKEN = re.compile(r"var\(\s*--color-brand-(?:primary|primary-strong|primary-deep|secondary)\s*[,)]")
-DECORATIVE_SELECTORS = {".benefit-num"}  # 純裝飾的序號（base 就是 18% 透明度），不承載資訊
-ON_DARK_FILES = {  # 深色漸層底上的淺色字：檔案 -> 底的 AppColors 名稱（腳本照實算對比）
+DECORATIVE_SELECTORS = {".benefit-num"}
+ON_DARK_FILES = {
     "seller-app/lib/features/coupon/presentation/widgets/preview_card.dart": ("brandPrimaryStrong", "primaryDark"),
 }
-# (4) 的既有缺口（舊綠色時代就沒有暗色覆寫，值只是跟著換成橘）：每個檔的筆數不得增加，新增的規則才會被擋
 KNOWN_DARK_GAPS: dict[str, int] = {
     "website/styles/components/sheet.css": 3,
     "website/styles/components/ui-kit.css": 1,
@@ -870,7 +839,7 @@ KNOWN_DARK_GAPS: dict[str, int] = {
     "website/styles/legacy/prd-v2-commerce.css": 1,
 }
 PRINT_GAPS = False
-ON_DARK_OK = {"#ffffff", "#fffdf7", "#f5f7fa"}  # 明確的「深底上的字」色：白、cream、inkOnDark
+ON_DARK_OK = {"#ffffff", "#fffdf7", "#f5f7fa"}
 CSS_COLOR_PROP = re.compile(r"(?<![-\w])color:\s*(var\([^;{}]*\)|#[0-9a-fA-F]{3,8}|rgba?\([^;{}]*\))\s*(?:!important)?\s*;")
 CSS_BG_DECL = re.compile(r"background(?:-color)?\s*:\s*([^;]*)")
 DART_COLOR_CLAUSE = re.compile(r"(?<![\w])color:\s*([^,;]*)")
@@ -939,7 +908,6 @@ def scan_usage_text(root: Path, css: Css, admin_css: Css, darts: dict[str, Dart]
                     except Exception:  # noqa: BLE001
                         bg = None
                 if not dark:
-                    # (1) 淺色的品牌／狀態 token 當文字：有同規則的不透明底就比對，沒有底就直接不合格
                     if family and _is_light(fg) and not _canonical_on_dark(fg):
                         if bg is None and not bg_decl:
                             bad.append(f"(1) 淺色 token 當文字（{raw[:40]} = {hexs(fg)}，沒有深色底）{label}")
@@ -947,7 +915,6 @@ def scan_usage_text(root: Path, css: Css, admin_css: Css, darts: dict[str, Dart]
                             r = ratio(fg, bg)
                             if r + 1e-9 < need:
                                 bad.append(f"(1) 淺色 token × 同規則底 {r:.2f} < {need:g} {label}")
-                    # (4) 固定色（品牌色、狀態色）的規則沒有暗色覆寫：在暗色 surface（半透明底就疊上去）上也算一次
                     fixed = FIXED_TOKEN.search(raw) is not None
                     if has_dark and fixed and any(part.split()[-1] not in dark_tails for part in sel.split(",") if part.split()) and (bg is None or bg[3] < 1):
                         worst = min(_ratio_vs(fg, over(bg, sf) if bg is not None else sf) for sf in dark_surfs)
@@ -960,7 +927,6 @@ def scan_usage_text(root: Path, css: Css, admin_css: Css, darts: dict[str, Dart]
     if PRINT_GAPS:
         print("KNOWN_DARK_GAPS = " + repr({f: len(v) for f, v in sorted(gaps.items())}))
 
-    # (3) admin TSX：inline style 與 text-[var(...)]
     admin_tsx_color = re.compile(r"""(?:color:\s*["']|text-\[)(var\(--[\w-]+\))""")
     for path in tracked_files(root, "admin/src", "*.tsx"):
         src = path.read_text(encoding="utf8")
@@ -974,7 +940,6 @@ def scan_usage_text(root: Path, css: Css, admin_css: Css, darts: dict[str, Dart]
                 if not re.search(r"background:\s*[\"'](?:var\(--(?:admin-primary|color-ink-[6-9]|color-brand-ink)|#[0-3])", near):
                     bad.append(f"(1) 淺色 token 當文字（{hexs(fg)}）{path.relative_to(root)}:{_line_of(src, m.start())}: {m.group(0)[:50]}")
 
-    # TSX（website）：dark: 群組也比，不只比同一字串的亮色群組
     for path in tracked_files(root, "website", "*.ts*"):
         if "node_modules" in path.parts or ".next" in path.parts or "tests" in path.parts or ".test." in path.name or path.suffix not in (".ts", ".tsx"):
             continue
@@ -998,7 +963,7 @@ def scan_usage_text(root: Path, css: Css, admin_css: Css, darts: dict[str, Dart]
                 if any(f.group(1) == b.group(1) for f in texts) or has_dark_text:
                     fgs = [f for f in texts if f.group(1) == b.group(1)]
                 else:
-                    fgs = [f for f in texts if f.group(1) == variant]  # 沒有 dark: 的字色，在暗色底上沿用
+                    fgs = [f for f in texts if f.group(1) == variant]
                 for f in fgs:
                     try:
                         fgc = css.token(f"--color-hk-{f.group(4)}", "dark")
@@ -1008,7 +973,6 @@ def scan_usage_text(root: Path, css: Css, admin_css: Css, darts: dict[str, Dart]
                     if worst + 1e-9 < 4.5 and not _canonical_on_dark(fgc):
                         bad.append(f"(4) TSX dark: 群組 {worst:.2f} {path.relative_to(root)}:{_line_of(src, m.start())}: {b.group(0)} × {f.group(0)}")
 
-    # (2) Dart：別名先解析到最終色，再判斷
     secondary_values = {app: d.token("brandSecondary") for app, d in darts.items()}
     for app, d in darts.items():
         for path in tracked_files(root, f"{app}-app/lib", "*.dart"):
@@ -1040,7 +1004,6 @@ def scan_usage_text(root: Path, css: Css, admin_css: Css, darts: dict[str, Dart]
                         if worst + 1e-9 < 4.5:
                             bad.append(f"(1) 深色漸層底上的淺色字 {worst:.2f} {rel}")
                         continue
-                    # 往前找同一個 widget 的底；找不到就只放行明確的 on-dark 色
                     fills = []
                     for j in range(max(0, i - 14), i):
                         fm = DART_FILL_LINE.search(lines[j])

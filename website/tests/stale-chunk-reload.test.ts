@@ -73,10 +73,6 @@ test("stale-chunk recovery keeps its reload guard and quiet UI handoff wired", a
 	assert.match(instrumentation, /window\.location\.reload\(\)/);
 	assert.match(layout, /STALE_CHUNK_RELOAD_BOOT_SCRIPT/);
 	assert.match(layout, /<script[\s\S]*id="hk-stale-chunk-reload-boot"/);
-	// Boot scripts intentionally stay native and inline. next/script serializes
-	// beforeInteractive entries into __next_s and emits preload bookkeeping for
-	// scripts that are already inline, which can both delay the earliest guards
-	// and create misleading "preloaded but not used" browser warnings.
 	assert.doesNotMatch(layout, /from "next\/script"/);
 	assert.doesNotMatch(layout, /strategy="beforeInteractive"/);
 	assert.match(loader, /isStaleChunkReload/);

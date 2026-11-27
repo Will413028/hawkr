@@ -18,7 +18,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/gen/hawkr/social/v1alpha1/socialv1alpha1connect"
 )
 
-// takedownFixture 是一家有一篇已發布貼文的店，加上管理員的措施 client：內容下架的各項限制都經單體的 Connect 入口驗證（A7-D28 第 1、2 點）。
 type takedownFixture struct {
 	owner      socialv1alpha1connect.SocialAppServiceClient
 	public     socialv1alpha1connect.SocialPublicServiceClient
@@ -59,7 +58,6 @@ func newTakedownFixture(t *testing.T, m *monolith) *takedownFixture {
 	return f
 }
 
-// takedown 以管理員的 CreateMeasure（內容下架）下架貼文，回措施（含 etag）。
 func (f *takedownFixture) takedown(t *testing.T) *adminsellerpb.Measure {
 	t.Helper()
 	res, err := f.governance.CreateMeasure(t.Context(), connect.NewRequest(&adminsellerpb.CreateMeasureRequest{
@@ -129,7 +127,6 @@ func TestContentTakedownThroughConnect(t *testing.T) {
 		mine := f.mine(t)
 		_, err := f.owner.PublishPost(t.Context(), connect.NewRequest(&pb.PublishPostRequest{PostId: mine.GetId(), Etag: mine.GetEtag()}))
 		wantCode(t, "下架後的發布", err, connect.CodeFailedPrecondition)
-		// 先取消發布再發布也一樣被擋（取消發布照常）。
 		un, err := f.owner.UnpublishPost(t.Context(), connect.NewRequest(&pb.UnpublishPostRequest{PostId: mine.GetId(), Etag: mine.GetEtag()}))
 		if err != nil {
 			t.Fatalf("下架後取消發布要照常：%v", err)
@@ -174,7 +171,6 @@ func TestContentTakedownThroughConnect(t *testing.T) {
 			}
 		}
 		measure := f.takedown(t)
-		// 撤銷之後貼文重新公開：公開讀取要回得來，而且仍不帶措施 ID。
 		if _, err := f.governance.RevokeMeasure(t.Context(), connect.NewRequest(&adminsellerpb.RevokeMeasureRequest{
 			Id: measure.GetId(), Reason: adminsellerpb.AdminRevokeReason_ADMIN_REVOKE_REASON_ADMIN_CORRECTION, Etag: measure.GetEtag(),
 		})); err != nil {

@@ -83,7 +83,6 @@ describe("taxSubmitGate", () => {
 		expect(taxSubmitGate(READY)).toEqual({ visible: true, blocker: null });
 	});
 
-	// 🔴 陰性：不可編輯的狀態整個區塊不出現。渲染一顆必定回 9321 的鍵比缺一顆鍵更糟。
 	it("審核中／已核定 ⇒ 區塊不渲染", () => {
 		expect(taxSubmitGate({ ...READY, editable: false })).toEqual({
 			visible: false,
@@ -91,15 +90,12 @@ describe("taxSubmitGate", () => {
 		});
 	});
 
-	// 新賣家的常態。區塊**要出現**——安靜消失的話他看不到任何入口，
-	// 也就無從得知下一步是先建立草稿。
 	it("尚未建立資料 ⇒ 區塊出現並說明要先建草稿", () => {
 		expect(
 			taxSubmitGate({ ...READY, notStarted: true, profile: null }),
 		).toEqual({ visible: true, blocker: "not-started" });
 	});
 
-	// 對應後端 400 ErrTaxIdentityIncomplete。
 	it("必填欄缺 ⇒ identity-incomplete", () => {
 		expect(
 			taxSubmitGate({
@@ -109,14 +105,12 @@ describe("taxSubmitGate", () => {
 		).toBe("identity-incomplete");
 	});
 
-	// 對應後端 T02 守衛②（400「請至少上傳一份稅籍證明文件」），**不是** 9321。
 	it("沒有任何佐證 ⇒ evidence-missing", () => {
 		expect(
 			taxSubmitGate({ ...READY, profile: profile({ documents: [] }) }).blocker,
 		).toBe("evidence-missing");
 	});
 
-	// 冷卻優先於欄位檢查：冷卻期間資料再齊全也送不出去（後端 9324）。
 	it("冷卻中 ⇒ cooldown 先於欄位檢查", () => {
 		expect(
 			taxSubmitGate({
@@ -142,8 +136,6 @@ describe("isIdentityComplete（逐字對應 usecase validateTaxIdentity）", () 
 		).toBe(false);
 	});
 
-	// 免用統一發票**不需要**統編（DB 的 chk_stp_exempt_no_taxid 甚至禁止它）。
-	// 前端若一併要求統編，自述免用的賣家會永遠送不出去。
 	it("自述免用統一發票時，沒有統編仍算齊全", () => {
 		expect(
 			isIdentityComplete(
@@ -154,8 +146,6 @@ describe("isIdentityComplete（逐字對應 usecase validateTaxIdentity）", () 
 		).toBe(true);
 	});
 
-	// UNKNOWN ＝ 尚未填答（後端 normalizeObligation 把未知值一律折成它），
-	// 送出去必定 400 ⇒ 前端要先擋並說「請選擇」。
 	it("自述值未填（UNKNOWN／空字串）一律不齊", () => {
 		for (const claimedStatus of ["UNKNOWN", ""]) {
 			expect(
@@ -166,8 +156,6 @@ describe("isIdentityComplete（逐字對應 usecase validateTaxIdentity）", () 
 		}
 	});
 
-	// 🔴 地址三欄在後端折成單欄，回程只填得出 addressDetail ⇒ 判準必須是「任一非空」。
-	// 只看 addressDetail 會讓剛存完草稿的賣家被誤判成沒填地址。
 	it("地址三欄任一非空即算填了", () => {
 		expect(
 			isIdentityComplete(

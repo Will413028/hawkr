@@ -80,7 +80,6 @@ export function SellerReceivedInvoicesPanel({
 	} = useSellerReceivedInvoices(queryParams);
 
 	const records = result?.records ?? [];
-	// 🔴 `total` 是總筆數不是頁數（§B-2.0 T25）。
 	const totalPages = result
 		? Math.max(1, Math.ceil(result.total / PAGE_SIZE))
 		: 1;
@@ -127,10 +126,7 @@ export function SellerReceivedInvoicesPanel({
 					</Button>
 				</div>
 				<ScrollableTableRegion label="進項發票表格">
-					{/*
-					 * ≥768px 走表格、<768px 走卡片：同一份資料渲染兩份 DOM ＋ Tailwind
-					 * 斷點 `hidden`。`display:none` 讓被隱藏那份不進 accessibility tree。
-					 */}
+
 					<table className="hidden seller-table md:table">
 						<caption className="sr-only">進項發票</caption>
 						<thead>
@@ -263,8 +259,7 @@ function ReceivedRow({ item }: { item: SellerReceivedInvoiceItem }) {
 		<tr>
 			<td>{dash(formatTaipeiDate(item.summary.issuedAt))}</td>
 			<td className="tabular-nums">
-				{/* 進項的發票號碼**完整不遮**（58 §8.1.3(b) O 類與裁決 1）：它是報帳與
-				    對獎的唯一憑據。 */}
+
 				<Link href={detailHref(item.summary.documentId)} className="underline">
 					{dash(item.summary.invoiceNumber)}
 				</Link>

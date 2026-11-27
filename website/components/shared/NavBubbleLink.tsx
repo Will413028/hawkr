@@ -73,8 +73,6 @@ export default function NavBubbleLink({
 	const hasCount = count > 0;
 	const accessibleName = hasCount ? `${label} ${countLabel(display)}` : label;
 
-	// Announce only transitions. On first render the accessible name already
-	// carries the count, so seeding the region would double-speak it.
 	const [liveMessage, setLiveMessage] = React.useState("");
 	const previousCount = React.useRef(count);
 	React.useEffect(() => {
@@ -115,7 +113,7 @@ export default function NavBubbleLink({
 					onPointerDown?.(event);
 				}}
 			>
-				{/* 不可用 span：`body .site-nav-action span` 會把它解開成可見。 */}
+
 				<small className="sr-only" data-nav-bubble-name="">
 					{accessibleName}
 				</small>
@@ -128,10 +126,7 @@ export default function NavBubbleLink({
 					</span>
 				)}
 			</Link>
-			{/* 即時宣告放在連結外面當兄弟：導覽列的宿主規則 `body .site-nav-action span`
-		    （navigation-final.css）會在桌面寬度把連結內所有 span 解開成可見，
-		    sr-only 會被它蓋掉，未讀數文字就佔了 rail 的寬度（購物車 109→185px）。
-		    絕對定位的兄弟不參與 flex 排版，不影響 gap。 */}
+
 			<span className="sr-only" aria-live="polite" data-nav-bubble-live="">
 				{liveMessage}
 			</span>

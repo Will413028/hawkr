@@ -134,21 +134,15 @@ func OnboardingTasksOf(l uitext.Locale, in OnboardingInput) Onboarding {
 	return Onboarding{Tasks: tasks, Complete: in.Store.Conditions.OnboardingComplete()}
 }
 
-// actionNeedsStorefrontWrite 回報下一步的後續 RPC 是不是需要 CapStorefrontWrite（編輯商店資料、儲存與送出認證、開通 session 與重新整理收款帳戶都是）。
-// 聯絡客服不需要任何賣家能力，沒有下一步更不需要。
 func actionNeedsStorefrontWrite(a OnboardingAction) bool {
 	return a != OnboardingActionNone && a != OnboardingActionContactSupport
 }
 
-// onboardingCover 是一個公開條件由誰處理：tasks 是處理它的開通任務，notice 為 true 表示由公告頁處理（不是任務）；兩者恰好有一個。
 type onboardingCover struct {
 	tasks  []OnboardingTaskID
 	notice bool
 }
 
-// requirementCovers 是每個公開條件（Requirements()）的處理者，也是任務函式的輸入：商店資料任務缺什麼由這張表挑出歸它的條件。
-// 平台審核與收款帳戶一起處理 ONBOARDING_COMPLETE（兩者的 AND）。新增公開條件時必須在這裡有一列，測試
-// TestEveryPublicListingRequirementIsCoveredByATaskOrTheNoticePage 守住。
 var requirementCovers = map[Requirement]onboardingCover{
 	RequirementStoreName:          {tasks: []OnboardingTaskID{OnboardingProfile}},
 	RequirementLogo:               {tasks: []OnboardingTaskID{OnboardingProfile}},
@@ -159,7 +153,6 @@ var requirementCovers = map[Requirement]onboardingCover{
 	RequirementNotPendingDeletion: {notice: true},
 }
 
-// requirementsOf 回傳歸任務 id 處理的公開條件，依 Requirements() 的順序。
 func requirementsOf(id OnboardingTaskID) []Requirement {
 	var out []Requirement
 	for _, r := range Requirements() {
@@ -170,7 +163,6 @@ func requirementsOf(id OnboardingTaskID) []Requirement {
 	return out
 }
 
-// profileTask：歸商店資料處理的條件（requirementCovers）全部滿足才完成；沒有讀過條件時 met 一律不滿足（fail-closed）。
 func profileTask(l uitext.Locale, s Store) OnboardingTask {
 	t := OnboardingTask{ID: OnboardingProfile, Title: text.OnboardingTitleProfile(l)}
 	var missing []string
@@ -214,7 +206,6 @@ func platformReviewTask(l uitext.Locale, c Conditions, k OnboardingKYCRead) Onbo
 	case KYCStatusDraft:
 		return set(OnboardingActionRequired, OnboardingActionSubmitCertification, text.OnboardingPlatformReviewDraft(l))
 	case KYCStatusApproved:
-		// 申請已核准，閘門的欄位卻不是（沒有讀過條件，或兩次讀取之間改變）：以閘門為準，視為進行中。
 		return set(OnboardingInProgress, OnboardingActionNone, text.OnboardingPlatformReviewSubmitted(l))
 	}
 	return set(OnboardingActionRequired, OnboardingActionSubmitCertification, text.OnboardingPlatformReviewNotSubmitted(l))
@@ -246,7 +237,6 @@ func paymentAccountTask(l uitext.Locale, c Conditions, p OnboardingPaymentRead) 
 	case "DISABLED":
 		return set(OnboardingActionRequired, OnboardingActionContactSupport, text.OnboardingPaymentAccountDisabled(l))
 	case "ENABLED":
-		// 帳戶已啟用，seller 的副本還沒有跟上：進行中，等待同步。
 		return set(OnboardingInProgress, OnboardingActionNone, text.OnboardingPaymentAccountSyncing(l))
 	case "UNDER_REVIEW":
 		return set(OnboardingInProgress, OnboardingActionNone, text.OnboardingPaymentAccountUnderReview(l))

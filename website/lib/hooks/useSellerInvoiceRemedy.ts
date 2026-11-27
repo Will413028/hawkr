@@ -79,8 +79,6 @@ export function useSellerTaxProfile(): UseSellerTaxProfileResult {
 		queryKey: queryKeys.seller.invoiceTaxProfile(identity),
 		queryFn: fetchSellerTaxProfile,
 		enabled,
-		// 9320 是「這個賣家還沒建過稅務身分」——新賣家的常態，上報它等於把正常
-		// 狀態灌進 Sentry（形狀照 useOrderInvoice 對 9301 的處理）。
 		meta: { isExpectedError: isTaxProfileMissing },
 	});
 
@@ -298,8 +296,6 @@ export function useRespondSellerInvoiceComplaint(
 		mutationFn: (args: { action: SellerComplaintAction; note: string }) =>
 			respondSellerInvoiceComplaint({ complaintId, expectedVersion, ...args }),
 		onSuccess: async () => {
-			// 詳情、列表、總覽三者都要失效：S09 的「待你處理」筆數與 S01 卡 3 的
-			// 未結申訴數顯示的是同一批案件。
 			await Promise.all([
 				queryClient.invalidateQueries({
 					queryKey: queryKeys.seller.invoiceComplaint(identity, complaintId),

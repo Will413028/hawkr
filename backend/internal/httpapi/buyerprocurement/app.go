@@ -76,7 +76,6 @@ func NewApp(m Module, buyers rpc.BuyerLookup, cards StoreCards, images rpc.Image
 
 func (h *App) caller(ctx context.Context) (int64, error) { return rpc.AccountBuyerID(ctx, h.buyers) }
 
-// 模組欄位違規的欄位名（Go 欄位名或模組的請求欄位名）對到請求的 proto 路徑；ResumeRun 的回答在巢狀的 clarification 底下。
 var (
 	submitPaths = rpc.FieldPaths{"Message": "message", "RequestID": "request_id", "client_request_id": "client_request_id"}
 	searchPaths = rpc.FieldPaths{"client_request_id": "client_request_id"}
@@ -91,7 +90,6 @@ var (
 	rewindPaths = rpc.FieldPaths{"SlotKey": "slot_key", "client_request_id": "client_request_id"}
 )
 
-// clientRequestID 解析必填的冪等鍵：UUIDv4。
 func clientRequestID(raw string) (uuid.UUID, error) {
 	if raw == "" {
 		return uuid.UUID{}, rpc.RequiredField("client_request_id", "client_request_id 不能是空的")
@@ -157,7 +155,6 @@ func (h *App) WatchRun(ctx context.Context, req *connect.Request[pb.WatchRunRequ
 	return rpc.WithFieldPaths(err, watchPaths)
 }
 
-// eventToProto 把事件 payload（proto JSON，欄位與值名由模組的 golden 測試守住）解成 WatchRunResponse，補上 cursor 與事件時間。
 func eventToProto(e procurement.RunEvent) (*pb.WatchRunResponse, error) {
 	out := &pb.WatchRunResponse{}
 	if err := (protojson.UnmarshalOptions{DiscardUnknown: false}).Unmarshal(e.Payload, out); err != nil {
@@ -358,7 +355,6 @@ func (h *App) Rewind(ctx context.Context, req *connect.Request[pb.RewindRequest]
 	return connect.NewResponse(&pb.RewindResponse{Result: result}), nil
 }
 
-// turnResultToProto 把輪次存下的 TurnResult wire JSON（欄位與值名由模組的 golden 測試守住）解成 proto。
 func turnResultToProto(raw []byte) (*pb.TurnResult, error) {
 	out := &pb.TurnResult{}
 	if err := (protojson.UnmarshalOptions{DiscardUnknown: false}).Unmarshal(raw, out); err != nil {

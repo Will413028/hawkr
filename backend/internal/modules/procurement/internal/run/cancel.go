@@ -60,7 +60,6 @@ func (c Canceller) CancelAllOfRequest(ctx context.Context, buyerID int64, reques
 	return nil
 }
 
-// cancelLocked 在呼叫端的 transaction 內鎖 run 並依狀態取消。
 func (c Canceller) cancelLocked(ctx context.Context, buyerID int64, runID uuid.UUID) (CancelOutcome, error) {
 	r, err := c.Ledger.lockRun(ctx, runID)
 	if err != nil {
@@ -97,9 +96,6 @@ func (c Canceller) request(ctx context.Context, r store.ProcurementAgentRun, out
 	return nil
 }
 
-// requestCancel 要求取消一個排隊、執行中或已要求取消的 run（呼叫端已鎖它）：轉 CANCEL_REQUESTED 並取消 River job，同一個 transaction；
-// job 已被 River 直接取消（沒有 executor 會領它）的直接轉 CANCELLED；job 列已不存在的照 reconciler 收斂（A9-D22、A9-D23(3)）：
-// 排隊或執行中是 FAILED／WORKER_LOST 並退額度，已要求取消的是 CANCELLED 不退額度。回傳命令之後 run 的狀態。
 func requestCancel(ctx context.Context, l Ledger, jobs JobQueue, r store.ProcurementAgentRun) (string, error) {
 	if r.JobID == nil {
 		return "", fmt.Errorf("run：%s 沒有 job，無法取消", r.ID)
@@ -132,8 +128,6 @@ func requestCancel(ctx context.Context, l Ledger, jobs JobQueue, r store.Procure
 	return StatusCancelRequested, nil
 }
 
-// cancelWaiting 取消等待輸入的 run（呼叫端已鎖它）：轉 CANCELLED（它的 PENDING 中斷隨之取消），
-// 並要求取消正在回答它的中斷的 run（否則回答 run 會繼續跑、提交時才被拒）。全部在呼叫端的 transaction 內。
 func cancelWaiting(ctx context.Context, d *db.DB, l Ledger, jobs JobQueue, runID uuid.UUID) error {
 	if _, err := l.Transition(ctx, runID, StatusCancelled, ""); err != nil {
 		return err
@@ -150,7 +144,6 @@ func cancelWaiting(ctx context.Context, d *db.DB, l Ledger, jobs JobQueue, runID
 	return nil
 }
 
-// jobCancelledBeforeStart：River 回報 job 已是 cancelled 代表它不會有 executor 領走，run 不必等 reconciler。
 func jobCancelledBeforeStart(state rivertype.JobState) bool {
 	return state == rivertype.JobStateCancelled
 }

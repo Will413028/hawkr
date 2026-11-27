@@ -10,16 +10,16 @@ import { authedFetch } from "../api/client";
 
 export interface LogisticsTrack {
 	orderNo: string;
-	shipTradeNo: string; // 託運單號（PayUni 物流序號）
-	shippingMethod: string; // 物流方式代碼（CONVENIENCE_STORE / HOME_DELIVERY 等）
-	status: string; // 內部物流狀態碼
-	statusLabel: string; // 狀態人類可讀文案
-	providerStatus?: string; // PayUni 原始狀態碼
-	providerMessage?: string; // PayUni 狀態說明
-	statusTime?: string; // 最新狀態更新時間（ISO 8601）
-	storeName?: string; // 超商門市名稱
-	recipientName?: string; // 收件人姓名（買家本人）
-	createdAt?: string; // 物流單建立時間（ISO 8601）
+	shipTradeNo: string;
+	shippingMethod: string;
+	status: string;
+	statusLabel: string;
+	providerStatus?: string;
+	providerMessage?: string;
+	statusTime?: string;
+	storeName?: string;
+	recipientName?: string;
+	createdAt?: string;
 }
 
 export async function queryLogistics(orderNo: string): Promise<LogisticsTrack> {

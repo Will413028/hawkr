@@ -50,7 +50,6 @@ void main() {
     await tester.pump(RefreshCoalescer.defaultWindow);
     await tester.pump(const Duration(milliseconds: 100));
 
-    // 列表畫面重撈 afterSaleOrderLookupProvider 一次，卡片才重讀；卡片自己不監聽訊號。
     expect(adapter.detailRequests, initial);
   });
 }

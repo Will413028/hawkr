@@ -24,12 +24,7 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// 案件的詢問（step10e-reports-brief R4、設計 step10e-3cb-design §3.2）。鎖順序：店家列 → 案件列 → 詢問列（同一家店的結案、發詢問與記下回覆因此串行：
-// 結案先鎖店家，所以不會出現結案之後才寫進回覆的詢問）。詢問只加不改案件的成員，但建立、記下回覆、撤回都讓案件的版本與 updated_at 前進
-// （它們改變「可以決定」與決定的依據）；指令本身不帶 etag。
 
-// errInquiryNotFound 是詢問不存在：不另加伺服器句子，文字是共用文案目錄 Connect code NOT_FOUND 的預設文字（common.error.NOT_FOUND，與傳輸層的 rpc.CommonText 同一個來源）。
-// 這裡固定取 zh-TW 的文字並以 .Text 傳入 apperr（不帶 Message 的語系，標 zh-TW），文字與標籤一致。目錄裡缺這個 key 時 TestInquiryNotFoundTextIsInTheCatalog 失敗（不會在執行期悄悄變成空白）。
 func errInquiryNotFound() error {
 	m, _ := uitext.For(uitext.ZhTW).CommonError("NOT_FOUND")
 	return apperr.NotFound("%s", m.Text)
@@ -58,7 +53,6 @@ func toInquiry(row store.SellerCaseInquiry) model.CaseInquiry {
 	return i
 }
 
-// adminInquiries 把一批詢問列變成後台的檢視：已回覆的載入附件（每批一支固定查詢），並附上此刻可以做的動作。
 func adminInquiries(ctx context.Context, q *store.Queries, rows []store.SellerCaseInquiry) ([]model.AdminInquiry, error) {
 	out := make([]model.AdminInquiry, len(rows))
 	if len(rows) == 0 {
@@ -88,7 +82,6 @@ func adminInquiries(ctx context.Context, q *store.Queries, rows []store.SellerCa
 	return out, nil
 }
 
-// readInquiry 讀一筆詢問的後台檢視；在 q 的連線上執行，所以可以在指令的 transaction 裡讀自己寫的。
 func readInquiry(ctx context.Context, q *store.Queries, id uuid.UUID) (model.AdminInquiry, error) {
 	row, err := q.CaseInquiryByID(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -104,7 +97,6 @@ func readInquiry(ctx context.Context, q *store.Queries, id uuid.UUID) (model.Adm
 	return views[0], nil
 }
 
-// inquiryBlocked 是詢問不能做動作的錯誤：訊息是第一個原因的句子；沒有原因回 nil。
 func inquiryBlocked(blocks []model.InquiryBlock) error {
 	if len(blocks) == 0 {
 		return nil
@@ -112,8 +104,6 @@ func inquiryBlocked(blocks []model.InquiryBlock) error {
 	return apperr.FailedPrecondition("%s", blocks[0].Text().Text)
 }
 
-// inquiryRequestHash 是正規化後的建立輸入（不含 request_id；時間已截到微秒）以固定欄位順序編碼的 SHA-256：冪等重送比對「內容是否相同」的唯一定義，
-// 同 measure 套件的 requestHash。沒有指定期限時編碼 "-"（重送時「現在」已經不同，預設期限不能進 hash）。
 func inquiryRequestHash(in model.CreateCaseInquiryInput, message string, due *time.Time) []byte {
 	h := sha256.New()
 	at := "-"
@@ -174,7 +164,6 @@ func (s *Service) CreateInquiry(ctx context.Context, in model.CreateCaseInquiryI
 		if err != nil {
 			return err
 		}
-		// 兩個同一個 request_id 的並行重送：後到的在這裡等到先到的 commit，再查一次就找到它。
 		if replayed, ok, err := s.replayInquiry(ctx, q, in, hash); err != nil || ok {
 			result = replayed
 			return err
@@ -199,7 +188,6 @@ func (s *Service) CreateInquiry(ctx context.Context, in model.CreateCaseInquiryI
 			DueAt: dueAt, RequestID: in.RequestID, RequestHash: hash,
 		})
 		if errors.Is(err, pgx.ErrNoRows) {
-			// 同一個 (管理員, request_id) 在上面兩次查詢之後才出現：不可能發生在已鎖住案件列之後，除非它屬於別的案件（內容不同）。
 			replayed, ok, rerr := s.replayInquiry(ctx, q, in, hash)
 			if rerr != nil {
 				return rerr
@@ -233,7 +221,6 @@ func (s *Service) CreateInquiry(ctx context.Context, in model.CreateCaseInquiryI
 	return result, err
 }
 
-// replayInquiry 查 (管理員, request_id)：命中且內容相同回傳詢問目前的狀態與案件；內容不同回 InvalidInput；沒帶 request_id 或沒命中回 false。
 func (s *Service) replayInquiry(ctx context.Context, q *store.Queries, in model.CreateCaseInquiryInput, hash []byte) (model.CreateCaseInquiryResult, bool, error) {
 	if in.RequestID == nil {
 		return model.CreateCaseInquiryResult{}, false, nil
@@ -293,7 +280,6 @@ func (s *Service) RecordInquiryReply(ctx context.Context, in model.RecordCaseInq
 		inquiry := toInquiry(locked)
 		blocks := inquiry.Availability().RecordReply
 		if len(blocks) > 0 && blocks[0] == model.InquiryBlockReplied {
-			// 先前已記過：回原本那一則，這次輸入的內容沒有寫入。
 			result, err = s.inquiryResult(ctx, q, inquiry)
 			result.AlreadyRecorded = true
 			return err
@@ -302,8 +288,6 @@ func (s *Service) RecordInquiryReply(ctx context.Context, in model.RecordCaseInq
 			return err
 		}
 		now := s.now()
-		// 收到的時間是管理員讀到的一個時刻，精確度是秒（後台預設填入的現在也是秒）；詢問的建立時間有微秒。下限以秒比較：與詢問建立同一秒的收到時間
-		// 視為建立當下記下（資料庫保證收到不早於建立），所以剛建立就記下的回覆不會因為精確度的差而被擋。
 		if received.Before(inquiry.CreatedAt.Truncate(time.Second)) || received.After(now) {
 			return invalidOn("ReceivedAt", text.InquiryReceiveTimeRange())
 		}
@@ -372,7 +356,6 @@ func (s *Service) WithdrawInquiry(ctx context.Context, in model.WithdrawCaseInqu
 	return result, err
 }
 
-// lockInquiry 依鎖順序鎖住詢問：先讀詢問（店家與案件不會變）→ 店家列 → 案件列 → 詢問列；回傳鎖住之後的詢問列。
 func (s *Service) lockInquiry(ctx context.Context, q *store.Queries, id uuid.UUID) (store.SellerCaseInquiry, error) {
 	found, err := q.CaseInquiryByID(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -394,7 +377,6 @@ func (s *Service) lockInquiry(ctx context.Context, q *store.Queries, id uuid.UUI
 	return locked, err
 }
 
-// inquiryResult 讀詢問與它的案件現在的檢視（指令回應用）。
 func (s *Service) inquiryResult(ctx context.Context, q *store.Queries, inquiry model.CaseInquiry) (model.RecordCaseInquiryReplyResult, error) {
 	view, err := readInquiry(ctx, q, inquiry.ID)
 	if err != nil {
@@ -404,8 +386,6 @@ func (s *Service) inquiryResult(ctx context.Context, q *store.Queries, inquiry m
 	return model.RecordCaseInquiryReplyResult{Inquiry: view, Case: c}, err
 }
 
-// withdrawOpenInquiry 在案件結案（決定，或通報都移走）的 transaction 內，由系統撤回案件還沒結束的詢問（最多一筆）；作者是結案的管理員。呼叫方已鎖住店家列與案件列，
-// 這個 UPDATE 同時鎖住詢問列（鎖順序：店家列 → 案件列 → 詢問列）。
 func withdrawOpenInquiry(ctx context.Context, q *store.Queries, caseID uuid.UUID, adminID int64, now time.Time) error {
 	_, err := q.WithdrawOpenCaseInquiry(ctx, store.WithdrawOpenCaseInquiryParams{Now: now, AdminID: adminID, CaseID: caseID})
 	return err

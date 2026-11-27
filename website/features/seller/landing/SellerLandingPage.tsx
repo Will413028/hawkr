@@ -226,13 +226,7 @@ export default function SellerLandingPage() {
 							<li className="process-step" key={step.title}>
 								<h3>{step.title}</h3>
 								<figure className="process-step__visual">
-									{/* Eager, not lazy: this landing page materialises all of its
-									    showcase imagery up front (see SellerShowcaseImageWarmer +
-									    the eager carousel slides) so nothing loads only because
-									    the user scrolled. process-apply.png is the one process
-									    image not already warmed/eager elsewhere, so a lazy tag
-									    made it fetch mid-scroll — a stability regression the
-									    long-page E2E gate rejects. */}
+
 									<AppImage
 										className="process-step__image"
 										src={step.visual.src}
@@ -401,9 +395,7 @@ export default function SellerLandingPage() {
 							<CharSplit text={SELLER_CTA_HEADING_LINES[2]} />
 						</em>
 					</h2>
-					{/* 「攤商」與「我們」之間原本是 `——`，490f0a80 那次文案改寫把本頁的
-					    破折號一律換成全形逗號（同檔 lede 即是），這一句漏了替換，只剩
-					    JSX 換行折出來的半形空白在頂替標點。補回逗號。 */}
+
 					<p className="seller-p">
 						{
 							"不論你是田裡的小農、職人加工坊，還是想轉型的傳統市場攤商，我們都想認識你。"

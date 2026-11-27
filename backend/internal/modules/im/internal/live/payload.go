@@ -13,7 +13,6 @@ import (
 // Channel 是 NOTIFY 的頻道名稱。
 const Channel = "im_events"
 
-// payloadVersion 是目前的 payload 版本；監聽端遇到不認得的版本丟棄並計數。
 const payloadVersion = 1
 
 // MaxPayloadBytes 是 PostgreSQL NOTIFY payload 的長度上限。
@@ -74,7 +73,7 @@ func ReadBatch(buyer, store int64) Payload {
 func (p Payload) Encode() string {
 	b, err := json.Marshal(p)
 	if err != nil {
-		panic(fmt.Sprintf("im live：編碼通知：%v", err)) // 欄位全是字串與整數，不會失敗
+		panic(fmt.Sprintf("im live：編碼通知：%v", err))
 	}
 	return string(b)
 }

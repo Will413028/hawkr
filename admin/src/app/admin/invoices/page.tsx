@@ -30,17 +30,6 @@ import "@/styles/pages/Invoice.css";
 import "@/styles/pages/DelegatedOperations.css";
 import { MaterialSymbol } from "@hawkr/icons/material-symbol";
 
-// A01｜發票營運總覽（58A §A01，端點 37 `GET /api/v1/admin/invoices/overview`）。
-//
-// 本頁是發票分組的根與排班起點：8 張 KPI 卡各自下鑽到對應佇列，優先工作清單直接
-// 進 A06。唯讀頁，沒有任何寫入動作。
-//
-// 三件刻意不做的事：
-//   - **不做圖表**：`chart.js` 在 package.json 裡但 `src/` 零 import，全站無已實作圖表。
-//   - **不做自動輪詢**：發票端點與該管理員的其他請求共用同一個限流桶，`refetchInterval`
-//     會吃掉額度並打壞同頁其他請求。一律「手動更新」鍵 ＋ 副標明寫快照。
-//   - **不做 per-KPI 重試**：端點 37 一支回全部 8 個 KPI；拆成 8 支會讓 8 個數字來自
-//     8 個時點而互相矛盾。
 
 const OVERVIEW_ENDPOINT = "/api/v1/admin/invoices/overview";
 
@@ -62,7 +51,6 @@ export default function InvoiceOverviewPage() {
 	const kpis: InvoiceKpiItem[] = data?.kpis ?? [];
 	const jobs = data?.priorityJobs ?? [];
 
-	// 後端沒回的 key 不補位（少一張卡看得出來），回了而清單沒有的 key 排在後面。
 	const knownFirst = [
 		...KPI_ORDER.filter((key) => kpis.some((k) => k.key === key)),
 		...kpis.map((k) => k.key).filter((key) => !KPI_ORDER.includes(key)),
@@ -71,7 +59,6 @@ export default function InvoiceOverviewPage() {
 		.map((key) => kpis.find((k) => k.key === key))
 		.filter((k): k is InvoiceKpiItem => Boolean(k));
 
-	// 載入中 / 錯誤時仍畫 8 格版面（值為 "--"），版面不塌。
 	const placeholderKpis: InvoiceKpiItem[] = KPI_ORDER.map((key) => ({
 		key,
 		value: "",
@@ -132,8 +119,6 @@ export default function InvoiceOverviewPage() {
 							key={kpi.key}
 							type="button"
 							className="btn-reset stat-card-clickable"
-							// 只唸得到一個裸數字的卡片對讀屏使用者沒有意義：label ＋ 值 ＋ 口徑
-							// 三者都要進 aria-label。
 							onClick={() => meta.href && router.push(meta.href)}
 							aria-label={`${meta.label}：${value}。${kpi.windowLabel} ${kpi.definition}`.trim()}
 						>
@@ -143,11 +128,7 @@ export default function InvoiceOverviewPage() {
 				})}
 			</div>
 
-			{/*
-			 * 口徑（definition）必須真的渲染出來：A01 是「今天先處理什麼」的排班依據，
-			 * 沒有口徑的數字會讓兩個人看同一個畫面得到不同結論。ADM 沒有 tooltip
-			 * primitive，所以整批列在卡片下方。
-			 */}
+
 			{orderedKpis.length > 0 ? (
 				<dl className="invoice-kpi-definitions">
 					{orderedKpis.map((kpi) => {
@@ -200,11 +181,7 @@ export default function InvoiceOverviewPage() {
 										<tr key={job.jobId}>
 											<td>
 												<div className="cell-main">{job.orderNo}</div>
-												{/*
-												 * 這裡本來要顯示店名，但端點 37 的 `InvoiceJobInfo`
-												 * 只帶 `storeId`（見 58A 與 wire 的落差，已在回報中列出）。
-												 * 造一個不存在的 `storeName` 欄只會渲染出 undefined。
-												 */}
+
 												<div className="cell-sub">賣家 {job.storeId}</div>
 											</td>
 											<td>
@@ -249,17 +226,7 @@ export default function InvoiceOverviewPage() {
 				</div>
 			</div>
 
-			{/*
-			 * 頁尾入口是規格的一部分，不是裝飾：A12 雖然在 Sidebar，但 A01 是排班起點。
-			 *
-			 * 「手動開立發票」（A11）是 **outline 次要樣式**，不得做成主 CTA：它是低頻的
-			 * 例外出口，而 A11 自己的頁頂警示逐字寫著「請勿以手動開票取代系統工作」。
-			 * 同理它也不進 Sidebar——放進選單會讓人以為手動開票是常規動作。
-			 *
-			 * ⚠️ ADM **沒有路由清冊 gate**，指向不存在頁面的按鈕完全靜默 ⇒
-			 * `tests/invoice-adm-contract.test.ts` 的「發票模組內所有指向 /admin/invoices
-			 * 的連結都有對應的頁面」是那個 gate；這顆鍵曾經因為 A11 未建而被它抓到。
-			 */}
+
 			<div className="adm-page-footer-actions">
 				<Button
 					variant="outline"

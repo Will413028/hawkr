@@ -24,7 +24,6 @@ class SessionChangeNotifier extends ChangeNotifier {
       );
       notifyListeners();
     });
-    // redirect 讀的是店家的衍生狀態，所以聽衍生的 provider：它們各自重算完才通知，redirect 不會讀到舊值。
     void notifyStore(Object? previous, Object? next) {
       debugPrint('[SessionChange] store state changed (notifying GoRouter)');
       notifyListeners();

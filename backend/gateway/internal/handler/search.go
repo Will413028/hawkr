@@ -68,11 +68,6 @@ type SearchResultData struct {
 	TotalPages string           `json:"totalPages"`
 }
 
-// mapSortToProduct maps buyer-app sort options to product-service sort values.
-// Unknown sort_by values fall through and let product-service default to
-// created_at DESC (matches the previous behaviour where rating_desc /
-// sales_desc / distance silently degraded to default ordering inside the
-// retired search-service).
 func mapSortToProduct(sortBy, sortOrder string) string {
 	switch sortBy {
 	case "price":
@@ -133,10 +128,6 @@ func (h *Holder) SearchProductsViaES(c *gin.Context) {
 
 	result := buildSearchResult(h.MediaBaseURL, resp)
 
-	// isRestockSubscribed aggregation (issue #1005 / B-203, 39 §5.5b)
-	// buyer_id-first：這裡沒有其他地方已解析過 buyerID，自己做一次 soft-fail 解析
-	// （同 product.go GetProductList 的理由：ErrNoCurrentBuyer 等同無 stint，略過
-	// 聚合、不阻斷搜尋結果）。
 	accountID := getOptionalAccountID(c)
 	if accountID != 0 && len(result.Products) > 0 {
 		ids := make([]string, 0, len(result.Products))
@@ -213,8 +204,6 @@ func (h *Holder) GetSearchSuggestions(c *gin.Context) {
 	response.OK(c, map[string]interface{}{"suggestions": suggestions})
 }
 
-// buildSearchResult converts product-service GetPublicProductList response
-// into the SearchResultData shape /public/search/products clients expect.
 func buildSearchResult(base string, resp *pb.GetProductListResponse) SearchResultData {
 	products := make([]ProductHitData, 0, len(resp.Products))
 	for _, p := range resp.Products {
@@ -244,18 +233,14 @@ func buildSearchResult(base string, resp *pb.GetProductListResponse) SearchResul
 		if len(p.Gallery) > 0 {
 			gallery := make([]PublicGalleryItem, 0, len(p.Gallery))
 			for _, g := range p.Gallery {
-				// 公開搜尋（/public/search/products 匿名可達）無編輯 round-trip 場景，故不吐 assetId
-				// （內部資產識別碼，02 §2.2.2）；imageKey 保留供前端組 preset URL——它是 public/ 前綴的
-				// 公開路徑，且同一筆結果的 imageKeys 已列出全部 objectKey，隱藏它只會讓縮圖被迫載原圖。
 				gallery = append(gallery, PublicGalleryItem{
 					ImageKey: g.ObjectKey,
-					ImageURL: mediaurl.BuildURL(base, g.ObjectKey), // 49 §6.6：Gateway 由 objectKey 組
+					ImageURL: mediaurl.BuildURL(base, g.ObjectKey),
 				})
 			}
 			item.Gallery = gallery
 		}
 
-		// 商家資訊（與 /public/products 對稱；同一支 RPC 已回 seller，補映射避免搜尋結果缺 sellerName）
 		if p.Seller != nil {
 			item.Seller = buildSellerInfoItem(base, p.Seller)
 			item.SellerName, item.SellerLogoKey, item.SellerLogoUrl = flatSellerFields(item.Seller)

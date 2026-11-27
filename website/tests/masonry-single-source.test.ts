@@ -39,8 +39,6 @@ test("readTrackGeometry reports what the engine resolved, not a recomputation", 
 	);
 	assert.ok(geometry);
 	assert.equal(geometry.columns, 4);
-	// Sub-pixel track widths must survive: rounding them here is exactly how a
-	// measured layout drifts away from the grid the fallback painted.
 	assert.equal(geometry.colWidth, 275.5);
 	assert.equal(geometry.gap, 18);
 	assert.deepEqual(geometry.tracks, [275.5, 275.5, 275.5, 275.5]);
@@ -59,9 +57,6 @@ test("readTrackGeometry declines to guess when there is no grid to read", () => 
 });
 
 test("the fallback grid and the probe carry the SAME declaration", () => {
-	// Two occurrences and no more: the container's fallback style and the
-	// probe. If a refactor gives either of them its own track list, the two
-	// stop being the same decision and #423 is back.
 	const occurrences = grid.match(/var\(--masonry-fallback-track\)/g) ?? [];
 	assert.equal(
 		occurrences.length,
@@ -71,8 +66,6 @@ test("the fallback grid and the probe carry the SAME declaration", () => {
 });
 
 test("no JS-side column formula survives in MasonryGrid", () => {
-	// The cap that caused #423 was `Math.ceil((containerWidth + gap) / ...)`.
-	// Column count must come from readTrackGeometry alone.
 	assert.equal(
 		/Math\.(ceil|floor|round)\s*\(/.test(grid),
 		false,

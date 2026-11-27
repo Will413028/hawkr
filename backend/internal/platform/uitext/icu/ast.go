@@ -78,7 +78,6 @@ func (m *Message) Uses() (uses []Use, conflict string) {
 		switch {
 		case uses[i].Kind == kind:
 		case uses[i].Kind == UsePlural && kind == UseArg:
-			// plural 的分支裡用 {n} 顯示同一個數字。
 			return
 		case uses[i].Kind == UseArg && kind == UsePlural:
 			uses[i].Kind = UsePlural

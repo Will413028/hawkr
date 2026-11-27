@@ -32,10 +32,8 @@ class UberWebhookParserTest {
         @Test
         @DisplayName("delivery_status → 進 MQ（唯一一個 PUBLISH）")
         void deliveryStatusPublishes() {
-            // §7.1 逐字：webhook kind = event.delivery_status
             assertEquals(UberWebhookEvent.Route.PUBLISH,
                     UberWebhookParser.routeOf("event.delivery_status"));
-            // §6.3.2 的表列的是不帶前綴的寫法，兩種都要認得
             assertEquals(UberWebhookEvent.Route.PUBLISH,
                     UberWebhookParser.routeOf("delivery_status"));
         }
@@ -103,7 +101,6 @@ class UberWebhookParserTest {
             assertEquals(UberWebhookEvent.KeyTier.FALLBACK_COMPOSITE, e.keyTier());
             assertTrue(e.eventKey().startsWith("del_9:event.courier_update:2026-09-12T03:04:05Z:"),
                     "級 2 前三段必須是 delivery_id:kind:timestamp，實得：" + e.eventKey());
-            // 第四段：16 個 hex 字元
             String hash = e.eventKey().substring(e.eventKey().lastIndexOf(':') + 1);
             assertEquals(16, hash.length(), "sha256 前綴長度必須是 16");
             assertTrue(hash.matches("[0-9a-f]{16}"), "第四段必須是小寫 hex，實得：" + hash);

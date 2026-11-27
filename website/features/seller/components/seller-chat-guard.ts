@@ -70,7 +70,6 @@ export function decideSellerChatAction({
 		return isOwnSellerTarget(targetSellerId, sellerSelf) ? "own_store" : "open";
 	}
 
-	// A seller-role account with no store profile cannot own the target store.
 	if (sellerProfileMissing) return "open";
 	if (sellerSelfLoading) return "checking_identity";
 	return "identity_unavailable";

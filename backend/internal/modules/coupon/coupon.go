@@ -34,7 +34,7 @@ var migrationFiles embed.FS
 func Migrations() fs.FS {
 	sub, err := fs.Sub(migrationFiles, "db/migrations")
 	if err != nil {
-		panic(err) // 只有 embed 的路徑寫錯才會發生，編譯後的 binary 不可能遇到
+		panic(err)
 	}
 	return sub
 }
@@ -164,7 +164,6 @@ type Module struct {
 	voucher  *voucher.Service
 	read     *read.Service
 	expiry   *expiry.Service
-	// expiryReady 表示 Deps.Events 有給。
 	expiryReady bool
 	member      *membership.Service
 	purge       *purge.Service
@@ -190,8 +189,6 @@ func New(d Deps) *Module {
 	}
 }
 
-// 下面所有寫入都在 ctx 的 transaction 內執行（ctx 沒有 transaction 時各自開一個），所以呼叫方可以把它們和自己的狀態變更放進同一個
-// transaction：ordering 在結帳與訂單狀態轉換的 transaction 內呼叫 Lock、Redeem、Release。
 
 // CreateCampaign 建立活動：賣家的直接 ACTIVE 並檢查配額，admin 的是 DRAFT。
 func (m *Module) CreateCampaign(ctx context.Context, in CreateCampaignInput) (Campaign, error) {

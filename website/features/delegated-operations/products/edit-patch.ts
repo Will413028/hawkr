@@ -155,11 +155,6 @@ export function buildProductPatch(
 	if (!sameImages(imageDraftsOf(detail), form.images)) {
 		next.images = toImageInputs(form.images);
 	}
-	// ⚠️ **有任何一個 SKU 改動，就必須把全部 SKU 一起送**：product-service 對
-	// 一個非空的 `skus` 陣列做的是整份對齊 —— 沒出現在陣列裡的既有規格會被
-	// **移除**（本機實打坐實：只送 SKU 184 之後，SKU 183「4兩裝」整列消失，而
-	// 請求合法、回 `code: 0`）。未改的那幾筆只帶 `skuId`，其餘欄位由 Gateway 以
-	// before 快照逐欄回填，等於原值。
 	const skus: DelegatedProductSkuInput[] = [];
 	let skusDirty = false;
 	for (const sku of detail.skus) {

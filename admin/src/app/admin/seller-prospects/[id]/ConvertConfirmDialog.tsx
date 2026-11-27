@@ -67,8 +67,6 @@ export function ConvertConfirmDialog({
 	onConfirm: () => void;
 	onClose: () => void;
 }) {
-	// 沒有反向操作，所以比一般治理框多一道明文勾選——同
-	// `ProviderRevokeDialog.tsx`（撤銷 AMEGO 連線，同樣是唯一終態）的形狀。
 	const [acknowledged, setAcknowledged] = useState(false);
 
 	const descId = "adm-prospect-convert-description";
@@ -148,8 +146,7 @@ export function ConvertConfirmDialog({
 					</span>
 					<strong>{store.storeName || "（未命名）"}</strong>
 					<span>Store ID · {store.storeId}</span>
-					{/* 兩邊呼叫端目前都拿不到 store 的統一編號（賣家搜尋端點沒有這個
-							    欄位、對帳列也只給認證公司名稱），誠實標示查無，不留空白。 */}
+
 					<span>統一編號 · 此處查無資料（此來源未提供統一編號）</span>
 					{hasStoreContact ? (
 						<>

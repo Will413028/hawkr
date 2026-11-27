@@ -56,16 +56,12 @@ export default function SellerProductsClient({
 	initialProducts,
 	initialTotalPages,
 }: SellerProductsClientProps) {
-	// The first page is the ISR/SEO body already in the server HTML; later pages
-	// are fetched client-side (below). `useUrlPageParam` reads `?page` WITHOUT
-	// useSearchParams so the route is not bailed out to client-side rendering.
 	const [currentPage, setPage] = useUrlPageParam();
 
 	const [products, setProducts] = React.useState(initialProducts);
 	const [totalPages, setTotalPages] = React.useState(initialTotalPages);
 
 	React.useEffect(() => {
-		// Page 1 is already in the server HTML — restore it without a fetch.
 		if (currentPage <= 1) {
 			setProducts(initialProducts);
 			setTotalPages(initialTotalPages);
@@ -80,7 +76,6 @@ export default function SellerProductsClient({
 				if (data.totalPages) setTotalPages(data.totalPages);
 			})
 			.catch(() => {
-				// Soft path: keep the current grid on failure / abort.
 			});
 		return () => {
 			active = false;

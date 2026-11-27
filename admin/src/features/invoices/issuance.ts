@@ -295,7 +295,6 @@ export function issuanceBlockers(draft: IssuanceDraft): string[] {
 		out.push("受票人是非平台會員時必須填抬頭。");
 	}
 
-	// 統編／載具／捐贈碼三者互斥（違反 → 9306）。捐贈碼走 carrierType=DONATION。
 	const hasTaxId = draft.recipientTaxId.trim() !== "";
 	const hasCarrier = draft.carrierType !== "";
 	if (hasTaxId && hasCarrier) {
@@ -333,7 +332,6 @@ export function issuanceBlockers(draft: IssuanceDraft): string[] {
 			if (unit === null) out.push(`第 ${seq} 列的單價必須是整數。`);
 			const net = lineNetAmount(line);
 			if (net !== null) {
-				// chk_invline_sign：DISCOUNT 行必須為負，其餘必須非負。
 				if (line.lineType === InvoiceLineType.DISCOUNT && net >= 0) {
 					out.push(`第 ${seq} 列是折抵，金額必須是負數。`);
 				}
@@ -344,8 +342,6 @@ export function issuanceBlockers(draft: IssuanceDraft): string[] {
 		});
 		const totals = summariseLines(draft.lines);
 		if (!totals.incomplete && totals.total <= 0) {
-			// 後端 `ErrIssuanceTotalNotPositive`：零元或負數總額的發票不是「金額 0 的
-			// 發票」，是一張不該存在的發票。
 			out.push("合計金額必須大於 0。");
 		}
 	}

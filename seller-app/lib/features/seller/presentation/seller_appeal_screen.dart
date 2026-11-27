@@ -76,7 +76,6 @@ class SellerAppealScreen extends ConsumerWidget {
                 onRefresh: refresh,
                 child: _MeasureList(measures: list),
               )
-            // 重試中（error 狀態被 invalidate 後是讀取中）顯示讀取中，不繼續停在錯誤面板。
             : measures != null && measures.hasError && !measures.isLoading
             ? ListView(
                 padding: const EdgeInsets.symmetric(vertical: HkSpace.lg),
@@ -250,7 +249,6 @@ class MeasureCard extends StatelessWidget {
               style: AppTypography.caption.copyWith(color: AppColors.textMuted),
             ),
           ],
-          // 申覆入口一律顯示（與 website 相同）：不能申覆時反灰並附伺服器給的原因。
           const SizedBox(height: HkSpace.md),
           Align(
             alignment: Alignment.centerRight,

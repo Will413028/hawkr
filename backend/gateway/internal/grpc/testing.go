@@ -13,7 +13,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-// ==================== Account ====================
 
 // NewAccountClientForTest creates an AccountClient with the given mock proto client.
 //
@@ -50,58 +49,49 @@ func NewAccountClientOverConnForTest(conn *grpc.ClientConn) *AccountClient {
 	return &AccountClient{conn: conn, client: accountpb.NewAccountServiceClient(conn)}
 }
 
-// ==================== Seller ====================
 
 // NewSellerClientForTest creates a SellerClient with the given mock proto client.
 func NewSellerClientForTest(c sellerpb.SellerServiceClient) *SellerClient {
 	return &SellerClient{client: c}
 }
 
-// ==================== Coupon ====================
 
 // NewCouponClientForTest creates a CouponClient with the given mock proto client.
 func NewCouponClientForTest(c couponpb.CouponServiceClient) *CouponClient {
 	return &CouponClient{client: c}
 }
 
-// ==================== Order ====================
 
 // NewOrderClientForTest creates an OrderClient with the given mock proto client.
 func NewOrderClientForTest(c orderpb.OrderServiceClient) *OrderClient {
 	return &OrderClient{orderClient: c}
 }
 
-// ==================== Buyer ====================
 
 // NewBuyerClientForTest creates a BuyerClient with the given mock proto client.
 func NewBuyerClientForTest(c buyerpb.BuyerServiceClient) *BuyerClient {
 	return &BuyerClient{client: c}
 }
 
-// ==================== Cart ====================
 
 // NewCartClientForTest creates a CartClient with the given mock proto client.
 func NewCartClientForTest(c cartpb.CartServiceClient) *CartClient {
 	return &CartClient{client: c}
 }
 
-// ==================== Product ====================
 
 // NewProductClientForTest creates a ProductClient with the given mock proto client.
 func NewProductClientForTest(c productpb.ProductServiceClient) *ProductClient {
 	return &ProductClient{client: c}
 }
 
-// ==================== Aftersales ====================
 
 // NewAftersalesClientForTest creates an AftersalesClient with the given mock proto client.
 func NewAftersalesClientForTest(c aftersalespb.AfterSalesServiceClient) *AftersalesClient {
 	return &AftersalesClient{client: c}
 }
 
-// ==================== Review ====================
 
-// ==================== Shipping ====================
 
 // NewShippingClientForTest creates a ShippingClient with the given mock proto client.
 func NewShippingClientForTest(c shippingpb.ShippingServiceClient) *ShippingClient {

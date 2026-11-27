@@ -26,8 +26,8 @@ public class PostCreatedEvent extends BaseEvent {
     private String authorName;
     private String content;
     private List<String> imageUrls;
-    private List<Long> productIds;  // Tagged products
-    private Integer visibility;  // 0=public, 1=followers only
+    private List<Long> productIds;
+    private Integer visibility;
 
     public static PostCreatedEvent create(Long postId, Long authorId, String authorName,
                                            String content, List<String> imageUrls,

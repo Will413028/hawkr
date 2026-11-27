@@ -35,8 +35,6 @@ export default function PurchaseTracker({
 					const order = await fetchOrder(orderNo);
 					trackPurchase(order);
 				} catch {
-					// order fetch failed — leave dedup flag set (avoids retry storm);
-					// a missed purchase is preferable to a duplicated one.
 				}
 			}
 			clearPendingPurchase();

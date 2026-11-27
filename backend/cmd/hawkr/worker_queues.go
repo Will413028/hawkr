@@ -6,8 +6,6 @@ import (
 	"github.com/riverqueue/river"
 )
 
-// workerQueues 組出 worker 角色的 River queue 設定：default queue 加上各模組宣告的 queue。
-// 名稱重複（模組之間或與 default）是接線錯誤，回錯誤讓啟動失敗，不讓後者靜默蓋掉前者的併發設定；併發必須為正。
 func workerQueues(defaultWorkers int, modules ...map[string]int) (map[string]int, error) {
 	queues := map[string]int{}
 	add := func(name string, n int) error {

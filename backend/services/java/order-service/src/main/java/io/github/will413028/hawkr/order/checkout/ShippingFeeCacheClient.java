@@ -48,7 +48,6 @@ public class ShippingFeeCacheClient {
         this.fetcher = fetcher;
     }
 
-    // ==================== 查詢 API ====================
 
     /**
      * 取得配送方式設定
@@ -72,7 +71,6 @@ public class ShippingFeeCacheClient {
         }
 
         for (TierEntry tier : tiers) {
-            // maxDimensionCm=0 表示統一價
             if (tier.maxDimensionCm() == 0 || dimensionSum <= tier.maxDimensionCm()) {
                 return tier.fee();
             }
@@ -101,7 +99,6 @@ public class ShippingFeeCacheClient {
         };
     }
 
-    // ==================== 內部 ====================
 
     /**
      * 確保 cache 在 TTL 內。stale 時 synchronized 觸發 refresh；
@@ -115,7 +112,6 @@ public class ShippingFeeCacheClient {
             return;
         }
         synchronized (this) {
-            // double-check：另一執行緒可能已 refresh
             if (this.lastSuccessAt != null && Instant.now().isBefore(this.lastSuccessAt.plus(TTL))) {
                 return;
             }
@@ -135,12 +131,10 @@ public class ShippingFeeCacheClient {
                 }
                 log.warn("ShippingFeeCacheClient.refresh.degraded",
                         "運費快取刷新失敗，沿用 stale cache (" + e.getClass().getSimpleName() + "): " + e.getMessage());
-                // 不更新 lastSuccessAt → 下個請求仍會嘗試 refresh（受 CB 速率保護）
             }
         }
     }
 
-    // ==================== Key 工具方法 ====================
 
     private static String configKey(String method, String temp) {
         return method + ":" + temp;
@@ -150,7 +144,6 @@ public class ShippingFeeCacheClient {
         return method + ":" + temp + ":" + zone;
     }
 
-    // ==================== 資料結構 ====================
 
     public record ConfigEntry(
             String shippingMethod,

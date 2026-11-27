@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// getAccountID extracts the authenticated account ID from the request context.
 func getAccountID(c *gin.Context) (int64, bool) {
 	accountIDRaw, exists := c.Get("accountId")
 	if !exists {
@@ -16,7 +15,6 @@ func getAccountID(c *gin.Context) (int64, bool) {
 	return accountID, ok
 }
 
-// Helper to parse int64 from interface
 func parseAccountID(v interface{}) int64 {
 	switch id := v.(type) {
 	case int64:

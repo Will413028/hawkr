@@ -59,7 +59,6 @@ var ErrUnsupportedLocale = errors.New("rpc：不支援的網站語系")
 // ErrUnknownReturnPage 是不認得的回跳頁。
 var ErrUnknownReturnPage = errors.New("rpc：不認得的回跳頁")
 
-// sitePrefix 是語系的網站路徑前綴：預設語系在根路徑，其他語系在 /<locale>（next-intl 的 as-needed）。
 func sitePrefix(locale uitext.Locale) (string, error) {
 	switch locale {
 	case uitext.ZhTW:
@@ -70,7 +69,6 @@ func sitePrefix(locale uitext.Locale) (string, error) {
 	return "", fmt.Errorf("%w：%q", ErrUnsupportedLocale, locale)
 }
 
-// onboardingReturnPaths 是各回跳頁的站內路徑與 query；回跳頁的網站路由必須存在（web_origin_test.go 守門）。
 func onboardingReturnPaths(page ReturnPage, locale uitext.Locale) (done, expired string, err error) {
 	prefix, err := sitePrefix(locale)
 	if err != nil {

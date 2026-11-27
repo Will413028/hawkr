@@ -15,8 +15,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/modules/social"
 )
 
-// 治理與交易側的同步訂閱者，規則同 subscribers.go：在來源的 transaction 內只呼叫 Accept（與純函式決定型別與參數），不讀別的模組、不組文字、不寫收件匣
-// （subscribers_governance_test.go 守住）。收件人與文字在 worker 端解析與組成。
 
 // OnStoreSuspended 訂閱 seller.StoreSuspended。
 func (s *Service) OnStoreSuspended(ctx context.Context, e seller.StoreSuspended) error {

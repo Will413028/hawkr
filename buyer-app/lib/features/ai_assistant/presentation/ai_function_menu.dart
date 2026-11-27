@@ -74,7 +74,6 @@ class _AiFunctionMenuOverlay extends StatelessWidget {
     if (position != null) {
       return Stack(
         children: [
-          // 透明全螢幕點擊關閉
           Positioned.fill(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,

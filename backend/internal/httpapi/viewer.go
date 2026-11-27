@@ -6,10 +6,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/httpapi/rpc"
 )
 
-// publicViewerDependent 宣告每個 *PublicService 的 procedure 的回應會不會依觀看者而不同（讀呼叫者的 session：
-// viewer_can_*、is_mine、封鎖過濾），key 是 procedure（/<service 全名>/<方法>）。依觀看者而定、而且請求帶憑證的 GET，
-// 回應是 private, no-store（cachePolicy）；不依觀看者的照常 public, no-cache。新增的 Public procedure 必須在這裡宣告，
-// 缺宣告、多宣告都不能啟動（checkPublicViewerDependence）。
 var publicViewerDependent = map[string]bool{
 	"/hawkr.identity.v1alpha1.IdentityPublicService/IssueAppLoginNonce": false,
 	"/hawkr.identity.v1alpha1.IdentityPublicService/ExchangeIdToken":    false,
@@ -51,7 +47,6 @@ var publicViewerDependent = map[string]bool{
 
 func isViewerDependent(procedure string) bool { return publicViewerDependent[procedure] }
 
-// checkPublicViewerDependence 對照 publicViewerDependent 與實際掛載的 Public service，缺宣告或多宣告都不能啟動。
 func checkPublicViewerDependence(services []service) error {
 	descriptors, err := serviceDescriptors(services, "公開", func(a rpc.Audience) bool { return a == rpc.AudiencePublic })
 	if err != nil {

@@ -67,9 +67,6 @@ func tagNotFound(ctx context.Context) error {
 	return model.WithReason(apperr.NotFound("%s", text.CrmTagNotFound(uitext.LocaleFrom(ctx))), model.ReasonTagNotFound)
 }
 
-// lockStore 是店家層寫入（標籤）的守門：transaction 的第一句取店家列的 FOR KEY SHARE，已退場或不存在對應 notFound。
-// 取在 LockStoreTags（標籤命名空間的 advisory lock）與 crm 自己的列之前：擁有者轉移的 FOR UPDATE 要等這個 transaction 提交，
-// 所以抹除 job 看不到之後才提交的標籤。
 func (s *Service) lockStore(ctx context.Context, storeID int64, notFound func(context.Context) error) error {
 	if err := s.d.Stores.LockNotRetired(ctx, storeID); err != nil {
 		if apperr.KindOf(err) == apperr.KindNotFound {
@@ -80,8 +77,6 @@ func (s *Service) lockStore(ctx context.Context, storeID int64, notFound func(co
 	return s.authorize(ctx, storeID)
 }
 
-// authorize 在店家列已鎖住的 transaction 內讀店家此刻的狀態並檢查 RequiredCapability：鎖住之後才讀，所以在檢查與寫入之間提交的停權會被看到
-// （停權的 fail-closed）。已關閉回 NotFound，停權回 PermissionDenied（SELLER_SUSPENDED），其他前置條件沒有滿足回 FailedPrecondition。
 func (s *Service) authorize(ctx context.Context, storeID int64) error {
 	st, err := s.d.Stores.Store(ctx, storeID)
 	if err != nil {
@@ -90,7 +85,6 @@ func (s *Service) authorize(ctx context.Context, storeID int64) error {
 	return seller.Authorize(st, model.RequiredCapability)
 }
 
-// lockCustomerParties 是客戶層寫入的守門：依序（買家先於店家，鎖序規則 4）取買家與店家列的 FOR KEY SHARE，已停用或不存在對應客戶 NotFound。
 func (s *Service) lockCustomerParties(ctx context.Context, storeID, buyerID int64) error {
 	if err := s.d.Buyers.LockNotClosed(ctx, buyerID); err != nil {
 		if apperr.KindOf(err) == apperr.KindNotFound {
@@ -114,7 +108,6 @@ func NormalizeTagName(ctx context.Context, name string) (string, error) {
 	return n, nil
 }
 
-// customerOf 組出寫入當下的客戶：列（RETURNING 或同 transaction 的讀取）加上同 transaction 讀到的標籤。
 func customerOf(ctx context.Context, q *store.Queries, storeID, buyerID int64, typ string, spent int64, orders int32, first time.Time) (model.Customer, error) {
 	c := model.Customer{StoreID: storeID, BuyerID: buyerID, Type: model.CustomerType(typ), TotalSpent: spent, OrderCount: orders, FirstOrderAt: first, Tags: []model.Tag{}}
 	tags, err := q.ListCustomerTags(ctx, store.ListCustomerTagsParams{StoreID: storeID, BuyerIds: []int64{buyerID}})
@@ -127,7 +120,6 @@ func customerOf(ctx context.Context, q *store.Queries, storeID, buyerID int64, t
 	return c, nil
 }
 
-// loadCustomer 在 transaction 內讀客戶（寫入之後、提交之前），沒有這位客戶回 NotFound。
 func loadCustomer(ctx context.Context, q *store.Queries, storeID, buyerID int64) (model.Customer, error) {
 	r, err := q.GetCustomer(ctx, store.GetCustomerParams{StoreID: storeID, BuyerID: buyerID})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -245,7 +237,6 @@ func (s *Service) RenameTag(ctx context.Context, storeID int64, tagID uuid.UUID,
 	})
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "tags_store_name_key" {
-		// 唯一鍵違反使 transaction 失敗，InTx 已 rollback；這裡只翻譯錯誤，不在同一個 transaction 繼續下 SQL。
 		return model.Tag{}, nameTaken(ctx)
 	}
 	return out, err
@@ -302,7 +293,6 @@ func (s *Service) AddCustomerTags(ctx context.Context, storeID, buyerID int64, n
 	var out model.Customer
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
 		q := s.q(ctx)
-		// 先取守門（買家、店家），再鎖客戶列（沒有列 = 不是客戶，在 FK 之前就回 NotFound），再鎖店家的標籤建立；全模組都是這個順序。
 		if err := s.lockCustomerParties(ctx, storeID, buyerID); err != nil {
 			return err
 		}

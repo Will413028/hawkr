@@ -7,7 +7,6 @@ public final class MqConstants {
 
     private MqConstants() {}
 
-    // ==================== Exchanges ====================
 
     public static final String EXCHANGE_ORDER = "hawkr.order";
     public static final String EXCHANGE_PAYMENT = "payment.events";
@@ -21,7 +20,6 @@ public final class MqConstants {
 
     /** 帳號領域（account-service Go 服務 publish；39 §5.8.1 / 07 §5.19 / 36 §3.6c） */
     public static final String EXCHANGE_ACCOUNT = "hawkr.account";
-    // 賣家領域 exchange "hawkr.seller" 用既有的 EXCHANGE_SELLER_BIZ；seller.deleted 走該 exchange
 
     /** Coupon Service 私有 DLX（07 §5.19，2026-06-04） */
     public static final String EXCHANGE_COUPON_DLX = "hawkr.coupon.dlx";
@@ -29,10 +27,8 @@ public final class MqConstants {
     /** 商品領域（product-service Java 服務 publish 補貨事件；02 §5.13b / 36 §3.6h，2026-06 #942 新建） */
     public static final String EXCHANGE_PRODUCT = "hawkr.product";
 
-    // Product Service DLX
     public static final String EXCHANGE_PRODUCT_DLX = "hawkr.product.dlx";
 
-    // Dead letter exchanges
     public static final String EXCHANGE_ORDER_DLX = "hawkr.order.dlx";
     public static final String EXCHANGE_PAYMENT_DLX = "hawkr.payment.dlx";
     public static final String EXCHANGE_MARKETING_DLX = "hawkr.marketing.dlx";
@@ -41,9 +37,7 @@ public final class MqConstants {
     /** Cart Service 私有 DLX（#1426：cart 首個 consumer seller.profile.changed 的死信出口） */
     public static final String EXCHANGE_CART_DLX = "hawkr.cart.dlx";
 
-    // ==================== Routing Keys ====================
 
-    // Order routing keys
     public static final String ROUTING_KEY_ORDER_PAID = "order.paid";
     public static final String ROUTING_KEY_ORDER_COMPLETED = "order.completed";
     public static final String ROUTING_KEY_PAYOUT_COMPLETED = "payout.completed";
@@ -60,7 +54,6 @@ public final class MqConstants {
      */
     public static final String ROUTING_KEY_ORDER_REFUND_FINALIZED = "order.refund.finalized";
 
-    // Seller workspace realtime invalidation（order/aftersales → gateway SSE，僅 web 賣家中心，36 §3.6i / 41 §四之二，[B-207] #1181）
     public static final String EXCHANGE_SELLER_WORKSPACE = "hawkr.seller_workspace";
     public static final String ROUTING_KEY_SELLER_ORDER_UPDATED = "seller.order.updated";
     public static final String ROUTING_KEY_SELLER_AFTER_SALE_UPDATED = "seller.after_sale.updated";
@@ -135,22 +128,18 @@ public final class MqConstants {
      *  取代原 coupon.account.deleted 綁定，見 BuyerDeletedConsumer） */
     public static final String QUEUE_COUPON_BUYER_DELETED = "coupon.buyer.deleted";
     public static final String QUEUE_COUPON_BUYER_DELETED_DLQ = "coupon.buyer.deleted.dlq";
-    // §8.11 付款後建單兜底（Backstop）：重試建單 / 建單逾時取消
     public static final String ROUTING_KEY_ORDER_SHIPMENT_CREATE_REQUESTED = "order.shipment.create_requested";
     public static final String ROUTING_KEY_ORDER_SHIPMENT_CREATION_FAILED = "order.shipment.creation_failed";
 
-    // Payment routing keys
     public static final String ROUTING_KEY_PAYMENT_SUCCESS = "payment.success";
     public static final String ROUTING_KEY_PAYMENT_FAILED = "payment.failed";
     public static final String ROUTING_KEY_PAYMENT_EXPIRED = "payment.expired";
     public static final String ROUTING_KEY_PAYMENT_CLOSED = "payment.closed";
     public static final String ROUTING_KEY_PAYMENT_CONFLICT = "payment.conflict";
 
-    // Seller routing keys（賣家審核結果，由 Payment Webhook 觸發）
     public static final String EXCHANGE_SELLER = "seller.events";
     public static final String ROUTING_KEY_SELLER_REVIEW_RESULT = "seller.review.result";
 
-    // User routing keys
     public static final String ROUTING_KEY_MEMBER_REGISTERED = "member.registered";
     public static final String ROUTING_KEY_MEMBER_PROFILE_UPDATED = "member.profile.updated";
     public static final String ROUTING_KEY_MEMBER_PASSWORD_CHANGED = "member.password.changed";
@@ -159,7 +148,6 @@ public final class MqConstants {
     public static final String ROUTING_KEY_MEMBER_AVATAR_CHANGED = "member.avatar.changed";
     public static final String ROUTING_KEY_SELLER_APPROVED = "seller.approved";
 
-    // Catalog routing keys (Product/Review)
     public static final String EXCHANGE_CATALOG = "hawkr.catalog";
     public static final String EXCHANGE_CATALOG_DLX = "hawkr.catalog.dlx";
     public static final String ROUTING_KEY_PRODUCT_CREATED = "product.created";
@@ -167,11 +155,9 @@ public final class MqConstants {
     public static final String ROUTING_KEY_PRODUCT_STATUS_CHANGED = "product.status.changed";
     public static final String ROUTING_KEY_REVIEW_POSTED = "review.posted";
 
-    // Refund routing keys
     public static final String ROUTING_KEY_REFUND_SUCCEEDED = "refund.succeeded";
     public static final String ROUTING_KEY_REFUND_FAILED = "refund.failed";
 
-    // Fulfillment routing keys (Shipping)
     public static final String EXCHANGE_SHIPPING = "hawkr.shipping";
     public static final String EXCHANGE_SHIPPING_DLX = "hawkr.shipping.dlx";
     public static final String ROUTING_KEY_SHIPMENT_CREATED = "shipment.created";
@@ -179,16 +165,9 @@ public final class MqConstants {
     public static final String ROUTING_KEY_SHIPMENT_DELIVERED = "shipment.delivered";
     public static final String ROUTING_KEY_SHIPMENT_PHOTO_UPDATED = "shipment.photo.updated";
 
-    // §5.21 配送異常賣家通知（shipping-service / aftersales-service 共用 publish 至 hawkr.shipping）
     public static final String ROUTING_KEY_SHIPMENT_ANOMALY_DETECTED = "shipment.anomaly.detected";
     public static final String EVENT_TYPE_SHIPMENT_ANOMALY_DETECTED = "SHIPMENT_ANOMALY_DETECTED";
 
-    // ── 履約責任判定（N16／N17，65 §3.3）─────────────────────────
-    // 🔴 producer 是 **payment-service**，不是 shipping-service：fulfillment_exception_cases
-    //    與 fulfillment_case_resolutions 由它擁有（65），而事件必須與那兩筆寫入
-    //    同交易（INV-E1）⇒ shipping-service 無法在同一個交易內寫那兩張表。
-    //    exchange 仍是 hawkr.shipping——值域錨在 routing key ＋ exchange，不在 publisher
-    //    服務（ShippingEventType 值域邊界第 4 條）。
     /** 責任判定未決：證據不足，尚未決定退不退款。🔴 不帶任何 financially-final 語意。 */
     public static final String ROUTING_KEY_FULFILLMENT_RESPONSIBILITY_UNRESOLVED =
             "fulfillment.responsibility.unresolved";
@@ -226,9 +205,7 @@ public final class MqConstants {
     public static final String EVENT_TYPE_LOGISTICS_COST_INCURRED =
             "LOGISTICS_COST_INCURRED";
 
-    // ==================== Shipping Service 常數 ====================
 
-    // Shipping Service 消費（來自 Webhook Service）
     public static final String QUEUE_SHIPPING_PAYUNI_WEBHOOK = "shipping.payuni.webhook";
     public static final String QUEUE_SHIPPING_PAYUNI_WEBHOOK_DLQ = "shipping.payuni.webhook.dlq";
     public static final String EXCHANGE_SHIPPING_WEBHOOK_DLX = "shipping.webhook.dlx";
@@ -236,12 +213,10 @@ public final class MqConstants {
     public static final String QUEUE_SHIPPING_UBER_WEBHOOK = "shipping.uber.webhook";
     public static final String QUEUE_SHIPPING_UBER_WEBHOOK_DLQ = "shipping.uber.webhook.dlq";
 
-    // Shipping Service 發布路由鍵（STATUS_CHANGED，SHIPMENT_CREATED 已存在）
     public static final String ROUTING_KEY_SHIPMENT_STATUS_CHANGED = "shipment.status.changed";
     public static final String ROUTING_KEY_RETURN_SHIPMENT_STATUS_CHANGED = "shipment.return.status_changed";
     public static final String EVENT_TYPE_RETURN_SHIPMENT_STATUS_CHANGED = "RETURN_SHIPMENT_STATUS_CHANGED";
 
-    // §5.9 賣家處理期限自動取消（09 §5.9 / 06 §5.20）
     public static final String ROUTING_KEY_SHIPMENT_PROCESSING_TIMEOUT = "shipment.processing.timeout";
     public static final String ROUTING_KEY_SHIPMENT_PROCESSING_CLEARED = "shipment.processing.cleared";
     public static final String QUEUE_AFTERSALES_SHIPMENT_PROCESSING_TIMEOUT = "aftersales.shipment.processing.timeout";
@@ -249,37 +224,27 @@ public final class MqConstants {
     public static final String EVENT_TYPE_SHIPMENT_PROCESSING_TIMEOUT = "SHIPMENT_PROCESSING_TIMEOUT";
     public static final String EVENT_TYPE_SHIPMENT_PROCESSING_CLEARED = "SHIPMENT_PROCESSING_CLEARED";
 
-    // Shipping Service 事件類型（SHIPMENT_CREATED / SHIPMENT_DELIVERED 已存在）
     public static final String EVENT_TYPE_SHIPMENT_STATUS_CHANGED = "SHIPMENT_STATUS_CHANGED";
 
-    // Order Service 消費 Shipping 事件 Queue
     public static final String QUEUE_ORDER_SHIPPING_CREATED = "order.shipping.created";
     public static final String QUEUE_ORDER_SHIPPING_LABEL = "order.shipping.label";
     public static final String QUEUE_ORDER_SHIPPING_STATUS = "order.shipping.status";
     public static final String QUEUE_ORDER_SHIPPING_DELIVERED = "order.shipping.delivered";
     public static final String QUEUE_ORDER_SHIPPING_PHOTO = "order.shipping.photo";
 
-    // Order Service 發布：訂單已送達事件（通知前端/推播）
     public static final String ROUTING_KEY_ORDER_DELIVERED = "order.delivered";
-    // Order 相關 event type 已遷移至 OrderEventType enum（內部技術碼，使用 routing key 點分式 value），不再宣告為 String 常數
 
-    // Order Service 發布：確認收貨事件（通知 Shipping Service 標記 receipt_confirmed）
     public static final String ROUTING_KEY_ORDER_RECEIPT_CONFIRMED = "order.receipt.confirmed";
 
-    // Shipping Service 消費確認收貨事件 Queue
     public static final String QUEUE_SHIPPING_ORDER_RECEIPT_CONFIRMED = "shipping.order.receipt.confirmed";
 
-    // Shipping Service 消費付款成功事件 Queue（自動建單）
     public static final String QUEUE_SHIPPING_ORDER_PAID = "shipping.order.paid";
     public static final String QUEUE_SHIPPING_ORDER_PAID_DLQ = "shipping.order.paid.dlq";
 
-    // §8.11 Backstop 重試建單（order → shipping）
     public static final String QUEUE_SHIPPING_SHIPMENT_CREATE_REQUESTED = "shipping.shipment.create_requested";
     public static final String QUEUE_SHIPPING_SHIPMENT_CREATE_REQUESTED_DLQ = "shipping.shipment.create_requested.dlq";
-    // §8.11 Backstop 建單逾時取消（order → aftersales；DLQ 走 aftersales 共用 DLX）
     public static final String QUEUE_AFTERSALES_SHIPMENT_CREATION_FAILED = "aftersales.shipment.creation_failed";
 
-    // Engagement routing keys (Content/Social)
     public static final String EXCHANGE_CONTENT = "hawkr.content";
     public static final String EXCHANGE_CONTENT_DLX = "hawkr.content.dlx";
     public static final String ROUTING_KEY_POST_CREATED = "post.created";
@@ -292,12 +257,10 @@ public final class MqConstants {
     public static final String ROUTING_KEY_FOLLOW_ADDED = "follow.added";
     public static final String ROUTING_KEY_FOLLOW_REMOVED = "follow.removed";
 
-    // IM routing keys
     public static final String EXCHANGE_IM = "hawkr.im";
     public static final String EXCHANGE_IM_DLX = "hawkr.im.dlx";
     public static final String ROUTING_KEY_CHAT_MESSAGE_SENT = "chat.message.sent";
 
-    // PayUni Webhook Events（由 payuni-webhook-service 發布）
     public static final String EXCHANGE_PAYUNI_WEBHOOK = "payuni.events";
     public static final String ROUTING_KEY_PAYUNI_SHIPPING_STATUS = "payuni.shipping.status";
 
@@ -321,17 +284,13 @@ public final class MqConstants {
     public static final String EVENT_TYPE_PAYUNI_SHIPPING_STATUS = "PAYUNI_SHIPPING_STATUS";
     public static final String EVENT_TYPE_PAYUNI_AGENT_NOTIFY = "PAYUNI_AGENT_NOTIFY";
 
-    // ==================== Queues ====================
 
-    // Order service queues
     public static final String QUEUE_ORDER_PAYMENT_RESULT = "order.payment.result";
     public static final String QUEUE_ORDER_REFUND_RESULT = "order.refund.result";
 
-    // Order service DLQ queues
     public static final String QUEUE_ORDER_PAYMENT_RESULT_DLQ = "order.payment.result.dlq";
     public static final String QUEUE_ORDER_REFUND_RESULT_DLQ = "order.refund.result.dlq";
 
-    // order-service Shipping consumer DLQ（§23 P2.3-1，2026-05-20）
     public static final String QUEUE_ORDER_SHIPPING_CREATED_DLQ = "order.shipping.created.dlq";
     public static final String QUEUE_ORDER_SHIPPING_STATUS_DLQ = "order.shipping.status.dlq";
     public static final String QUEUE_ORDER_SHIPPING_LABEL_DLQ = "order.shipping.label.dlq";
@@ -339,21 +298,16 @@ public final class MqConstants {
     public static final String QUEUE_ORDER_SHIPPING_PHOTO_DLQ = "order.shipping.photo.dlq";
     public static final String QUEUE_ORDER_SHIPMENT_PROCESSING_CLEARED_DLQ = "order.shipment.processing.cleared.dlq";
 
-    // order-service AfterSales consumer DLQ（§23 P2.3-2，2026-05-20）
     public static final String QUEUE_ORDER_AFTERSALES_REFUND_COMPLETED_DLQ = "order.aftersales.refund.completed.dlq";
     public static final String QUEUE_ORDER_AFTERSALES_CANCEL_COMPLETED_DLQ = "order.aftersales.cancel.completed.dlq";
     public static final String QUEUE_ORDER_AFTERSALES_COUNTDOWN_DLQ = "order.aftersales.countdown.dlq";
-    // order-service Review consumer DLQ（§23 P2.3-3，2026-05-20）
     public static final String QUEUE_ORDER_REVIEW_CREATED_DLQ = "order.review.created.dlq";
 
-    // shipping-service Order consumer DLQ（§23 P2.4，2026-05-20）
     public static final String QUEUE_SHIPPING_ORDER_RECEIPT_CONFIRMED_DLQ = "shipping.order.receipt.confirmed.dlq";
 
-    // Product Service 消費取消訂單事件 Queue（庫存歸還）
     public static final String QUEUE_PRODUCT_ORDER_CANCELLED = "product.order.cancelled";
     public static final String QUEUE_PRODUCT_ORDER_CANCELLED_DLQ = "product.order.cancelled.dlq";
 
-    // Product Service 消費銷量累計事件 Queue（35 設計書）
     public static final String QUEUE_PRODUCT_ORDER_SALES_ACCUMULATED = "product.order.sales.accumulated";
     public static final String QUEUE_PRODUCT_ORDER_SALES_ACCUMULATED_DLQ = "product.order.sales.accumulated.dlq";
 
@@ -369,15 +323,10 @@ public final class MqConstants {
     public static final String QUEUE_PRODUCT_SELLER_DELETED = "product.seller.deleted";
     public static final String QUEUE_PRODUCT_SELLER_DELETED_DLQ = "product.seller.deleted.dlq";
 
-    // ==================== Event Types ====================
 
-    // Order 相關 event type 已遷移至 OrderEventType enum（內部技術碼，使用 routing key 點分式 value），不再宣告為 String 常數
-    // Payment 相關 event type 已遷移至 PaymentEventType enum（內部技術碼），不再宣告為 String 常數
 
-    // Seller event types（賣家審核結果）
     public static final String EVENT_TYPE_SELLER_REVIEW_RESULT_RECEIVED = "SELLER_REVIEW_RESULT_RECEIVED";
 
-    // User event types
     public static final String EVENT_TYPE_MEMBER_REGISTERED = "MEMBER_REGISTERED";
     public static final String EVENT_TYPE_MEMBER_PROFILE_UPDATED = "MEMBER_PROFILE_UPDATED";
     public static final String EVENT_TYPE_MEMBER_PASSWORD_CHANGED = "MEMBER_PASSWORD_CHANGED";
@@ -386,19 +335,16 @@ public final class MqConstants {
     public static final String EVENT_TYPE_MEMBER_AVATAR_CHANGED = "MEMBER_AVATAR_CHANGED";
     public static final String EVENT_TYPE_SELLER_APPROVED = "SELLER_APPROVED";
 
-    // Catalog event types
     public static final String EVENT_TYPE_PRODUCT_CREATED = "PRODUCT_CREATED";
     public static final String EVENT_TYPE_PRODUCT_UPDATED = "PRODUCT_UPDATED";
     public static final String EVENT_TYPE_PRODUCT_STATUS_CHANGED = "PRODUCT_STATUS_CHANGED";
     public static final String EVENT_TYPE_REVIEW_POSTED = "REVIEW_POSTED";
 
-    // Fulfillment event types
     public static final String EVENT_TYPE_SHIPMENT_CREATED = "SHIPMENT_CREATED";
     public static final String EVENT_TYPE_SHIPMENT_LABEL_UPDATED = "SHIPMENT_LABEL_UPDATED";
     public static final String EVENT_TYPE_SHIPMENT_DELIVERED = "SHIPMENT_DELIVERED";
     public static final String EVENT_TYPE_SHIPMENT_PHOTO_UPDATED = "SHIPMENT_PHOTO_UPDATED";
 
-    // Engagement event types (Content/Social)
     public static final String EVENT_TYPE_POST_CREATED = "POST_CREATED";
     public static final String EVENT_TYPE_POST_UPDATED = "POST_UPDATED";
     public static final String EVENT_TYPE_POST_DELETED = "POST_DELETED";
@@ -409,40 +355,28 @@ public final class MqConstants {
     public static final String EVENT_TYPE_FOLLOW_ADDED = "FOLLOW_ADDED";
     public static final String EVENT_TYPE_FOLLOW_REMOVED = "FOLLOW_REMOVED";
 
-    // IM event types
     public static final String EVENT_TYPE_CHAT_MESSAGE_SENT = "CHAT_MESSAGE_SENT";
 
-    // Media event types (OSS cleanup)
 
-    // Seller CRM event types
     public static final String EVENT_TYPE_CUSTOMER_STATUS_CHANGED = "CUSTOMER_STATUS_CHANGED";
     public static final String EVENT_TYPE_CUSTOMER_TAGGED = "CUSTOMER_TAGGED";
     public static final String EVENT_TYPE_BATCH_COUPON_TASK_CREATED = "BATCH_COUPON_TASK_CREATED";
     public static final String EVENT_TYPE_BATCH_COUPON_TASK_COMPLETED = "BATCH_COUPON_TASK_COMPLETED";
 
-    // AfterSales routing keys 已遷至 CodeMeta enum AfterSalesEventType（2026-05-20，docs/開發規範/MQ 與事件管理規範.md）
-    // 取用方式：AfterSalesEventType.XXX.value()
     public static final String EXCHANGE_AFTERSALES = "aftersales.events";
 
-    // Order Service 消費 AfterSales 事件 Queue
     public static final String QUEUE_ORDER_AFTERSALES_REFUND_COMPLETED = "order.aftersales.refund.completed";
     public static final String QUEUE_ORDER_AFTERSALES_CANCEL_COMPLETED = "order.aftersales.cancel.completed";
-    // 自動完成 60h 倒數的暫停/恢復事件（03 §5.8）
     public static final String QUEUE_ORDER_AFTERSALES_COUNTDOWN = "order.aftersales.countdown";
 
-    // AfterSales DLX
     public static final String EXCHANGE_AFTERSALES_DLX = "aftersales.events.dlx";
 
-    // AfterSales Service 消費其他服務事件 Queue
     public static final String QUEUE_AFTERSALES_RETURN_SHIPMENT_STATUS = "aftersales.shipping.return.status";
     public static final String QUEUE_AFTERSALES_SHIPMENT_LABEL = "aftersales.shipping.label";
 
-    // AfterSales 事件類型
     public static final String EVENT_TYPE_AFTERSALES_REFUND_COMPLETED = "AFTERSALES_REFUND_COMPLETED";
     public static final String EVENT_TYPE_AFTERSALES_CANCEL_COMPLETED = "AFTERSALES_CANCEL_COMPLETED";
 
-    // AfterSales routing keys 已全部遷至 AfterSalesEventType enum（取用方式：AfterSalesEventType.XXX.value()）
-    // EVENT_TYPE_AFTERSALES_* metadata 仍保留作為 publish 第 4 個參數的 event_type 字串
     public static final String EVENT_TYPE_AFTERSALES_APPEAL_SUBMITTED = "AFTER_SALE_APPEALED";
     public static final String EVENT_TYPE_AFTERSALES_PLATFORM_DECISION_MADE = "AFTER_SALE_DECISION_MADE";
     public static final String EVENT_TYPE_AFTERSALES_CASE_AUTO_REJECTED = "AFTERSALES_CASE_AUTO_REJECTED";
@@ -453,26 +387,22 @@ public final class MqConstants {
     public static final String EVENT_TYPE_AFTERSALES_CASE_COUPON_COMPENSATED = "AFTERSALES_CASE_COUPON_COMPENSATED";
     public static final String EVENT_TYPE_AFTERSALES_CASE_REJECTED = "AFTERSALES_CASE_REJECTED";
     public static final String EVENT_TYPE_AFTERSALES_CASE_CANCELLED_BY_BUYER = "AFTERSALES_CASE_CANCELLED_BY_BUYER";
-    // #1225 確認收貨自動取消售後
     public static final String EVENT_TYPE_AFTERSALES_CASE_CANCELLED_BY_CONFIRM_RECEIPT = "AFTERSALES_CASE_CANCELLED_BY_CONFIRM_RECEIPT";
     public static final String EVENT_TYPE_AFTERSALES_CASE_RETURN_RECEIVED = "AFTERSALES_CASE_RETURN_RECEIVED";
     public static final String EVENT_TYPE_AFTERSALES_CASE_RETURN_IN_TRANSIT = "AFTERSALES_CASE_RETURN_IN_TRANSIT";
     public static final String EVENT_TYPE_AFTERSALES_CASE_RETURN_DELIVERED = "AFTERSALES_CASE_RETURN_DELIVERED";
     public static final String EVENT_TYPE_AFTERSALES_CASE_RETURN_FAILED = "AFTERSALES_CASE_RETURN_FAILED";
-    // 2026-05-22 逆物流退貨政策修訂新增（5 個事件；CASE_AUTO_RECEIPT_CONFIRMED 已由 _TIMEOUT 細分取代）
     public static final String EVENT_TYPE_AFTERSALES_CASE_RETURN_AT_STORE = "AFTERSALES_CASE_RETURN_AT_STORE";
     public static final String EVENT_TYPE_AFTERSALES_CASE_RETURN_AT_STORE_24H = "AFTERSALES_CASE_RETURN_AT_STORE_24H";
     public static final String EVENT_TYPE_AFTERSALES_CASE_RETURN_DELIVERED_24H = "AFTERSALES_CASE_RETURN_DELIVERED_24H";
     public static final String EVENT_TYPE_AFTERSALES_CASE_AUTO_COMPLETED_STORE_PICKUP_TIMEOUT = "AFTERSALES_CASE_AUTO_COMPLETED_STORE_PICKUP_TIMEOUT";
     public static final String EVENT_TYPE_AFTERSALES_CASE_AUTO_COMPLETED_CONFIRM_RECEIPT_TIMEOUT = "AFTERSALES_CASE_AUTO_COMPLETED_CONFIRM_RECEIPT_TIMEOUT";
-    // 2026-06-15 待寄回逾時政策修訂新增（2 個事件）
     public static final String EVENT_TYPE_AFTERSALES_CASE_RETURN_PENDING_24H = "AFTERSALES_CASE_RETURN_PENDING_24H";
     public static final String EVENT_TYPE_AFTERSALES_CASE_AUTO_COMPLETED_RETURN_PENDING_TIMEOUT = "AFTERSALES_CASE_AUTO_COMPLETED_RETURN_PENDING_TIMEOUT";
 
-    // Review Events
     public static final String EXCHANGE_REVIEW = "hawkr.review";
     public static final String ROUTING_KEY_REVIEW_CREATED = "review.created";
-    public static final String ROUTING_KEY_REVIEW_HIDDEN = "review.hidden"; // #1156：admin 隱藏評論後重算聚合
+    public static final String ROUTING_KEY_REVIEW_HIDDEN = "review.hidden";
     public static final String QUEUE_ORDER_REVIEW_CREATED = "order.review.created";
 
     /** product-service 消費 review.created + review.hidden 更新 product.rating / review_count（02 §5.14a，#1156） */
@@ -488,7 +418,6 @@ public final class MqConstants {
     public static final String QUEUE_PRODUCT_CERTIFICATION_VERIFY = "product.certification.verify";
     public static final String QUEUE_PRODUCT_CERTIFICATION_VERIFY_DLQ = "product.certification.verify.dlq";
 
-    // Seller CRM routing keys
     public static final String ROUTING_KEY_CUSTOMER_STATUS_CHANGED = "seller.customer.status.changed";
     public static final String ROUTING_KEY_CUSTOMER_TAGGED = "seller.customer.tagged";
     public static final String ROUTING_KEY_BATCH_COUPON_TASK_CREATED = "seller.marketing.batch.created";

@@ -83,8 +83,6 @@ function removeVisiblePrefix(html: string, length: number): string {
 
 function bulletMatch(text: string): RegExpMatchArray | null {
 	const match = text.match(BULLET);
-	// A spaced sign before a numeric value may be a temperature/measurement.
-	// Existing content must not silently turn a negative value positive.
 	if (
 		match &&
 		/[-+]/.test(match[1]) &&
@@ -136,8 +134,6 @@ function cleanListItems(items: unknown[]): unknown[] {
 		const children = Array.isArray(record.items)
 			? cleanListItems(record.items)
 			: undefined;
-		// Empty parent items may hold meaningful children, checklist metadata,
-		// or unfamiliar fields. Preserve that structure rather than flatten it.
 		const hasOtherData = Object.keys(record).some(
 			(key) => !["content", "items"].includes(key),
 		);
@@ -190,7 +186,6 @@ function splitInlineLines(html: string): string[] | null {
 
 function structureLines(lines: string[]): OutputBlockData[] | null {
 	const text = lines.map(visibleText);
-	// Do not flatten indented/nested Markdown or interpret a code example.
 	if (
 		text.some(
 			(line) =>
@@ -239,8 +234,6 @@ function structureLines(lines: string[]): OutputBlockData[] | null {
 				);
 				if (visibleText(content).trim()) items.push(content);
 			}
-			// Editor.js v1 ordered lists cannot retain custom start values.
-			// Only convert a complete sequence from 1; leave ambiguous singletons.
 			if (bullet || items.length > 1) {
 				flushParagraph();
 				if (items.length) {

@@ -257,8 +257,6 @@ class CategoryRepository {
                   product.name.trim().isNotEmpty,
             )
             .toList();
-        // 分頁四欄以 string 過線（後端 §4）。用 `as int?` 直接接會靜默拿到
-        // null → 全部退回預設值，畫面看起來正常但總筆數永遠是 0。
         return ProductListResult(
           records: products,
           total: _parsePageInt(inner['total']) ?? 0,

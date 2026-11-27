@@ -1,14 +1,3 @@
-/*
- * 買家端報價比較與接受（issue #2538 A8 前半）。
- *
- * 用 CSS module 而不是往 styles/features/procurement-assistant.css 疊：那支是
- * assistant layout 的全域樣式表，這個面板在三區版面定案前不掛在該 layout 底下，
- * 也不該讓它的 class 名稱進入全域命名空間。
- *
- * 比較表在窄螢幕改成堆疊卡片，用的是同一份 DOM（`td[data-label]` 生出欄名）而
- * 不是「桌機一份表、手機再一份卡」：兩份 DOM 意味著同一筆金額在頁面上出現兩次，
- * 螢幕閱讀器會唸兩遍，測試也會抓到兩個節點。
- */
 
 .panel {
 	display: grid;
@@ -212,10 +201,6 @@
 	color: var(--hkui-warning-700);
 }
 
-/*
- * 可接受性是唯讀的伺服器判定，所以它只有「是／否」兩種底色，沒有依原因分色的
- * 第三種——分色會讓人以為 UI 在替不同原因做不同的判斷。
- */
 .acceptability {
 	display: inline-block;
 	padding: 3px 10px;
@@ -262,11 +247,6 @@
 	gap: 10px;
 }
 
-/*
- * 900px 以下把表格列攤成卡片。`display: block` 會讓瀏覽器移除 table 的隱含
- * ARIA 角色，所以欄名改由 `td::before` 從 `data-label` 印出來，資訊不靠視覺
- * 欄位對齊也讀得懂。
- */
 @media (max-width: 900px) {
 	.tableWrap {
 		overflow-x: visible;

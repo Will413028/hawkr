@@ -47,7 +47,6 @@ func NewProspects(m ProspectModule, images rpc.Images) *Prospects {
 	return &Prospects{m: m, images: images}
 }
 
-// 模組輸入的欄位對應到請求的路徑。
 var (
 	prospectFieldPaths = rpc.FieldPaths{
 		"DisplayName": "prospect.display_name", "VendorType": "prospect.vendor_type", "OutreachStatus": "prospect.outreach_status",
@@ -109,7 +108,6 @@ func (h *Prospects) toProspect(p model.Prospect) (*adminpb.Prospect, error) {
 	return out, nil
 }
 
-// toContacts 把請求的聯絡方式轉成模組的輸入；類型 UNSPECIFIED 轉成空字串，由模組回報不合法。
 func toContacts(in []*adminpb.ProspectContact) []model.ContactPoint {
 	out := make([]model.ContactPoint, len(in))
 	for i, c := range in {
@@ -118,7 +116,6 @@ func toContacts(in []*adminpb.ProspectContact) []model.ContactPoint {
 	return out
 }
 
-// confirmedDistinct 解析請求的 confirmed_distinct_prospect_ids；格式不對的錯誤指到那一個元素（path[i]）。
 func confirmedDistinct(raw []string, path string) ([]int64, error) {
 	var out []int64
 	for i, s := range raw {
@@ -132,7 +129,6 @@ func confirmedDistinct(raw []string, path string) ([]int64, error) {
 	return out, nil
 }
 
-// optionalText 是建立時的文字欄位：空字串是沒有值。
 func optionalText(s string) *string {
 	if s == "" {
 		return nil
@@ -294,7 +290,6 @@ func (h *Prospects) UpdateProspect(ctx context.Context, req *connect.Request[adm
 		in.VendorType = &v
 	}
 	if has("outreach_status") {
-		// 模組把空值當成「回到 NOT_CONTACTED」，所以明列 mask 卻沒有值要在這裡擋下，不能默默重設進度。
 		v := rpc.EnumFromProto[model.OutreachStatus](msg.GetOutreachStatus())
 		if v == "" {
 			return nil, rpc.RequiredField("prospect.outreach_status", "update_mask 列了 outreach_status，必須設定它的值")
@@ -331,7 +326,6 @@ func (h *Prospects) UpdateProspect(ctx context.Context, req *connect.Request[adm
 		if !has(image.path) {
 			continue
 		}
-		// 圖片是狀態、但沒有「清掉」的操作（業者的圖只會被換，或隨封存與合併釋放）：列進 mask 卻沒有上傳是自相矛盾。
 		if image.upload == nil {
 			return nil, rpc.RequiredField("prospect."+image.path, "update_mask 列了 "+image.path+"，必須帶上傳的 staged_token")
 		}

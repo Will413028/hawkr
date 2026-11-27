@@ -102,8 +102,6 @@ func TestOrderNosOf_OnlyOrderSourced(t *testing.T) {
 
 // toSellerDocumentItems：map 內的填值、不在 map 內的回空字串。
 func TestToSellerDocumentItems_FillsShipmentStatus(t *testing.T) {
-	// 用完整 fixture 的 server：toSummary 會走 query.FileAvailability，
-	// 空的 &InvoiceServer{} 在那裡 nil-deref。
 	s := newReadServer(t, nil).server
 	s.shipmentStatuses = nil
 	items := s.toSellerDocumentItems(

@@ -143,7 +143,6 @@ class UberWebhookConsumerTest {
         verify(dedupMapper).insert(dedupCaptor.capture());
         assertThat(dedupCaptor.getValue().getEventKey()).isEqualTo(STUB_DEDUP_KEY);
 
-        // 🔴 legacy 自解路徑零呼叫：不得存在第二份 status processing SSOT
         verify(shippingService, never())
                 .processWebhookStatusUpdate(anyString(), anyString(), anyString(), anyString());
         verify(channel).basicAck(1L, false);
@@ -156,8 +155,6 @@ class UberWebhookConsumerTest {
 
         consumer.onUberWebhook(envelopeMessage(uberBody()), channel, 1L);
 
-        // consumer 沒有任何「先讀目前狀態再決定要不要寫」的動作 —— 那是 applyInboundStatus 內
-        // isValidTransition 的職責（66 §6.3.5 第 ② 道）。
         verify(shippingService).applyInboundStatus(anyString(), any());
         verify(shippingService, never()).findByShipTradeNo(anyString());
     }
@@ -182,8 +179,6 @@ class UberWebhookConsumerTest {
 
         consumer.onUberWebhook(envelopeMessage(uberBody()), channel, 1L);
 
-        // MqErrorHandler 第一次失敗走 ACK＋republish（retry），而不是「處理完成的 ACK」——
-        // 判別點是「有沒有真的套用狀態」與「有沒有重投」。
         verify(shippingService, never()).applyInboundStatus(anyString(), any());
         verify(dedupMapper, never()).insert(any());
         verify(channel).basicPublish(eq(""), any(), any(), any());

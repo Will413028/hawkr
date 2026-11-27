@@ -30,8 +30,6 @@ class GrpcTargetEnvDeclarationTest {
 
         Map<String, Object> invoice = targets.get("invoice");
         assertThat(String.valueOf(invoice.get("host"))).contains("${INVOICE_SERVICE_HOST");
-        // 10041 是 invoice-service 的 gRPC port。10040 是 HTTP（health/metrics）、
-        // 10042 是 PDF 授權下載通道 —— 指到那兩個之中任何一個，症狀都是連得上但講不通 gRPC。
         assertThat(String.valueOf(invoice.get("port"))).contains("${INVOICE_SERVICE_GRPC_PORT:10041}");
     }
 

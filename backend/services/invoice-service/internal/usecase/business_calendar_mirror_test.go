@@ -9,7 +9,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// mirrorRepo 是會交易回滾的記憶體鏡像：mirrorRollbackTx 在 fn 失敗時把狀態還原成進交易前。
 type mirrorState struct {
 	holidays []time.Time
 	coverage *domain.BusinessDayCoverage

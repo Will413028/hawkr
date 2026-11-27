@@ -4,13 +4,8 @@ import { afterEach, beforeEach, test } from "node:test";
 import { __setEnvForTest } from "../lib/config/env";
 import { __setFlavorForTest } from "../lib/config/flavor";
 
-// The prod flavor requires the browser API base on the web origin; a relative base is.
 process.env.NEXT_PUBLIC_API_BASE_URL = "/api/v1";
 
-// Reproduces the React #419 read-hang: an upstream that sends response headers
-// (so fetch() resolves) but then stalls mid-body forever. The transport's
-// AbortSignal.timeout must fire and a softFail GET must degrade to a null-data
-// envelope — NOT throw and NOT hang the SSR stream.
 
 let server: Server;
 const prevApiBase = process.env.API_BASE_URL;
@@ -19,7 +14,7 @@ function startHangServer(): Promise<number> {
 	return new Promise((resolve) => {
 		server = createServer((_req, res) => {
 			res.writeHead(200, { "content-type": "application/json" });
-			res.write('{"code":0,"data"'); // partial body, then hang — never res.end()
+			res.write('{"code":0,"data"');
 		});
 		server.listen(0, "127.0.0.1", () => {
 			const addr = server.address();
@@ -33,7 +28,7 @@ beforeEach(async () => {
 	process.env.API_BASE_URL = `http://127.0.0.1:${port}`;
 	__setEnvForTest(null);
 	__setFlavorForTest("prod");
-	delete (globalThis as { window?: unknown }).window; // server path → serverApiBase
+	delete (globalThis as { window?: unknown }).window;
 });
 
 afterEach(() => {

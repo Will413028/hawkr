@@ -104,7 +104,6 @@ void main() {
     expect(find.text('貼文發布後，買家的留言會顯示在這裡。'), findsOneWidget);
     expect(find.text('買家的留言'), findsOneWidget);
     verify(() => repo.listComments(42)).called(greaterThanOrEqualTo(1));
-    // 輸入列只看伺服器的 viewer_can_comment，不看說明。
     expect(find.byKey(const ValueKey('comments-sheet-close')), findsOneWidget);
     expect(find.byKey(const ValueKey('send-comment-action')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('comments-sheet-close')));

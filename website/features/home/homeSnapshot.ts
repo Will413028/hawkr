@@ -197,9 +197,6 @@ function productSourceName(product: ProductSource): string {
 }
 
 function productSourceSellerName(product: ProductSource): string {
-	// `sellerName` is the flat convenience field on ProductItem; `seller.name`
-	// is the nested block. Both are camelCase and both are genuinely emitted
-	// (list endpoints fill the flat one, detail fills the nested one).
 	return (product.sellerName || product.seller?.name || "").trim();
 }
 
@@ -242,14 +239,10 @@ function toProduct(product: ProductSource, index: number): MarketProductItem {
 	return {
 		id,
 		name: productSourceName(product),
-		// Empty when absent → MarketProductCard's <AppImage> shows the
-		// design-system ImageFallback (folder-image) rather than a branded
-		// stand-in.
 		image: product.imageKey || product.imageKeys?.[0] || "",
 		sellerName: productSourceSellerName(product),
 		sellerId: productSourceSellerId(product),
 		sellerStoreCode: productSourceSellerStoreCode(product),
-		// B-238: seller identity renders only the canonical display URL.
 		sellerAvatar: product.seller?.logoUrl?.trim() || "",
 		origin: product.origin?.trim() || "",
 		price: priceDisplay.effectiveText || "價格未定",
@@ -276,7 +269,6 @@ function toProduct(product: ProductSource, index: number): MarketProductItem {
 
 function toSeller(store: RecommendedStore): HomeMerchantItem {
 	const location = storeLocation(store.townCode);
-	// 標籤（「本週推薦」等）屬呈現層，由 HomeCompactMerchants 依語系渲染；這裡只給地點，沒有就空字串。
 	const place = location ? `${location.city} ${location.district}` : "";
 	return {
 		id: store.id,
@@ -312,7 +304,6 @@ function priceNumber(value: string | number | null | undefined): number {
 }
 
 function savingsValue(product: ProductSource): number {
-	// `handler.ProductItem`（product.go:187-190）只有 camelCase。
 	const list = priceNumber(product.listPriceMin);
 	const effective = priceNumber(product.priceMin);
 	return Math.max(0, list - effective);
@@ -447,8 +438,6 @@ export function buildHomeSnapshot(bootstrap: HomeTabBootstrapV1): HomeSnapshot {
 		.map(toSeller);
 	const feedPosts: PostListItem[] = posts.records ?? [];
 	const compactUpdates = feedPosts.slice(0, 5);
-	// A payload retained from before this field shipped has no `categoryGroups`;
-	// read it as "tree unsupplied" (empty shelves), not as a crash.
 	const categoryGroups = bootstrap.categoryGroups ?? [];
 	const discoveryShelves: HomeDiscoveryShelf[] = discoveryShelfConfigs.map(
 		(shelf) => ({

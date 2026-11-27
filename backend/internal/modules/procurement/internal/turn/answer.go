@@ -67,7 +67,6 @@ func (a AnswerExecutor) Execute(ctx context.Context, r store.ProcurementAgentRun
 	return e.commit(ctx, ld, d, now)
 }
 
-// decideAnswer 把 ApplyAnswer 的結果接成這一輪的 decision：解析成功時只帶品項解析的 patch，再問時沿用新卡；只有 OutcomeInvalid 是 ANSWER_REJECTED，其他結果是一般錯誤。
 func decideAnswer(l uitext.Locale, now time.Time, prior priorState, out Outcome) (decision, error) {
 	switch out.Kind {
 	case OutcomeResolved:
@@ -88,7 +87,6 @@ func decideAnswer(l uitext.Locale, now time.Time, prior priorState, out Outcome)
 	return decision{}, fmt.Errorf("turn：未知的回答結果：%d", out.Kind)
 }
 
-// answerText 是對話裡顯示的買家回答：選項是卡上的標籤，文字是去頭尾空白後的原文。
 func answerText(p InterruptPayload, optionID, freeText string) string {
 	if optionID == "" {
 		return trimtext.Trim(freeText)

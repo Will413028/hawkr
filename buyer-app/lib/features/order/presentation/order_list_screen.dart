@@ -59,7 +59,6 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen>
     ref
         .read(orderListControllerProvider.notifier)
         .switchTab(OrderTabFilter.tabFilters[_selectedTab]);
-    // 售後快照（卡片展開區依賴）背景重撈 — 保留舊資料，避免 UI 短暫看到 null
     ref.read(afterSaleOrderLookupProvider.notifier).refresh();
   }
 
@@ -133,21 +132,18 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen>
     final afterSales =
         afterSaleLookup.value ?? const <String, AfterSaleCaseSnapshot>{};
 
-    // Tab 切換回訂單頁 → 強制刷新
     ref.listen(currentTabProvider, (prev, next) {
       if (next == 3 && prev != 3 && mounted) {
         _refreshCurrentTab();
       }
     });
 
-    // 訂單狀態變更（賣家出貨、後端推進狀態等）→ 自動刷新列表
     ref.listen(orderStatusStreamProvider, (_, next) {
       next.whenData((_) {
         if (mounted) _refreshOnHint();
       });
     });
 
-    // 售後案件狀態變更（賣家回覆售後等）→ 自動刷新列表
     ref.listen(afterSaleStatusStreamProvider, (_, next) {
       next.whenData((_) {
         if (mounted) _refreshOnHint();
@@ -159,7 +155,6 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen>
       child: Column(
         children: [
           SizedBox(height: 6.h),
-          // Tab filter
           _OrderTabs(
             selectedIndex: _selectedTab,
             onTap: (i) {
@@ -177,7 +172,6 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen>
               setState(() => _quickFilter = filter);
             },
           ),
-          // Order list
           Expanded(
             child: ordersAsync.when(
               loading: () => const TruckLoadingOverlay(),

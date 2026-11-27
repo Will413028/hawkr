@@ -184,15 +184,10 @@ type Deps struct {
 	Tracer trace.TracerProvider
 }
 
-// maxRequestBytes 是單一請求的大小上限（API 設計規範（Connect）§十）：模組的文字欄位不設長度上限，
-// 大小由這裡擋，與 gateway 的 BodyGuard 一般路由相同。
 const maxRequestBytes = 2 << 20
 
-// imageAIMaxRequestBytes 是 ImageAiAppService 單一請求的大小上限（API 設計規範（Connect）§十的例外）：原圖最多 2 MiB（模組檢查），
-// JSON／base64 編碼後才放得下。
 const imageAIMaxRequestBytes = 3 << 20
 
-// compressMinBytes 以下的回應不壓縮：壓縮的額外負擔大於省下的傳輸量。
 const compressMinBytes = 1 << 10
 
 // NewHandler 組出對外 HTTP 的 handler：單體是對外的入口（遷移計畫 A2），Connect 在這裡處理，還沒搬的路徑轉給
@@ -277,7 +272,6 @@ func NewHandler(deps Deps) (http.Handler, error) {
 	return assemble(deps, services, fileRoutes(deps)...)
 }
 
-// mediaUploads 把還沒接上的 media（nil 指標）轉成 nil 介面，NewDelegated 的 nil 判斷才成立。
 func mediaUploads(m *media.Module) httpmedia.DelegatedUploads {
 	if m == nil {
 		return nil
@@ -285,7 +279,6 @@ func mediaUploads(m *media.Module) httpmedia.DelegatedUploads {
 	return m
 }
 
-// handlerOptions 是每個 Connect service 共用的 handler 選項：攔截器、讀取上限與壓縮門檻。New 與測試用同一份。
 func handlerOptions(log *slog.Logger) []connect.HandlerOption {
 	return []connect.HandlerOption{
 		connect.WithInterceptors(rpc.NewInterceptor(log), adminauth.NewInterceptor(log)),
@@ -294,17 +287,12 @@ func handlerOptions(log *slog.Logger) []connect.HandlerOption {
 	}
 }
 
-// fileRoute 是不經 Connect 的檔案回應（API 設計規範（Connect）§十三）：樣式含 method，掛在 /api/files/ 底下，與 Connect 同一條入口
-// 中介鏈與限流，授權由 handler 自己做。
 type fileRoute struct {
 	pattern string
 	handler http.Handler
-	// permission 是後台路由（/api/files/admin/…）宣告的權限（platform/adminperm）；後台路由必須有，其他路由不得有。
-	// handler 之前先檢查呼叫者的角色允許它（adminauth.GuardFile），模組自己的授權在那之後。
 	permission adminperm.Permission
 }
 
-// fileRoutes 是單體的檔案端點：顧客的機敏檔分段上傳（B1-D17）與暫存預覽、代行營運的段上傳與暫存預覽（B1-D16，只以有效的代行 session 憑證授權，不是後台路由）；賣家讀自己申請的補充文件（顧客 session，B1-D19）；後台讀 KYC 證件圖片（限時授權、每次讀取寫稽核）與治理佐證（通報、措施上請求與詢問回覆的附件，每次讀取寫紀錄）。
 func fileRoutes(deps Deps) []fileRoute {
 	routes := sellerFileRoutes(deps)
 	if deps.Media != nil {
@@ -347,9 +335,6 @@ func sellerFileRoutes(deps Deps) []fileRoute {
 	}}
 }
 
-// assemble 把 service 掛上入口的中介層：tracing、CSRF、session、限流的身分，以及 Connect 的限流、快取規則
-// 與 interceptor 之前的錯誤 log。Stripe webhook（簽章就是驗證）在 CSRF、session 與限流的身分之外，只經 tracing。測試以它掛上假的 service，驗證中介層本身的性質（例如串流不被緩衝），不必依賴
-// 某個正式的 service。
 func assemble(deps Deps, services []service, files ...fileRoute) (http.Handler, error) {
 	if deps.Now == nil {
 		deps.Now = time.Now
@@ -389,7 +374,6 @@ func assemble(deps Deps, services []service, files ...fileRoute) (http.Handler, 
 		}
 	}
 	if deps.Legacy != nil {
-		// 管理員的請求要有 legacy.gateway.forward 才轉發（ADR 2026-10-04-admin-roles）；其他呼叫者原樣放行。
 		legacy := adminauth.GuardLegacy(deps.Legacy, deps.Logger)
 		for _, prefix := range deps.LegacyPrefixes {
 			mux.Handle(prefix, legacy)
@@ -406,7 +390,6 @@ func assemble(deps Deps, services []service, files ...fileRoute) (http.Handler, 
 	return withTracing(deps.Tracer, h), nil
 }
 
-// withPaymentWebhook 在 next（CSRF、session、限流身分都在裡面）之外掛上 Stripe webhook：簽章就是驗證，沒有 cookie、Origin 與 Bearer。
 func withPaymentWebhook(events httppayment.Events, log *slog.Logger, next http.Handler) http.Handler {
 	root := http.NewServeMux()
 	root.Handle(httppayment.WebhookRoute, httppayment.NewWebhook(events, log))
@@ -414,7 +397,6 @@ func withPaymentWebhook(events httppayment.Events, log *slog.Logger, next http.H
 	return root
 }
 
-// withChargeWebhook 在 next 之外掛上付款事件的 webhook（獨立的路由與簽章密鑰）；理由同 withPaymentWebhook。
 func withChargeWebhook(events httppayment.ChargeEvents, log *slog.Logger, next http.Handler) http.Handler {
 	root := http.NewServeMux()
 	root.Handle(httppayment.ChargeWebhookRoute, httppayment.NewChargeWebhook(events, log))
@@ -422,7 +404,6 @@ func withChargeWebhook(events httppayment.ChargeEvents, log *slog.Logger, next h
 	return root
 }
 
-// withResendWebhook 在 next 之外掛上 Resend 的退信與投訴 webhook；理由同 withPaymentWebhook（簽章就是驗證）。
 func withResendWebhook(events httpnotification.ResendEvents, log *slog.Logger, next http.Handler) http.Handler {
 	root := http.NewServeMux()
 	root.Handle(httpnotification.ResendWebhookRoute, httpnotification.NewResendWebhook(events, log))
@@ -435,8 +416,6 @@ type service struct {
 	handler http.Handler
 }
 
-// connectServices 是單體掛的 Connect service：根目錄 api/ 宣告的每個 service 都要在這裡
-// （TestEveryServiceInTheContractIsMounted）。入口在單體，gateway 不再代理 Connect（遷移計畫 A2）。
 func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error) {
 	var out []service
 	add := func(path string, h http.Handler) { out = append(out, service{path, h}) }
@@ -444,7 +423,6 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	if now == nil {
 		now = time.Now
 	}
-	// 店面頁、賣家自己的店與所有清單上的店家卡片共用同一份統計組裝（deps.Stats，必填）。
 	stats := deps.Stats
 	add(contentv1alpha1connect.NewContentPublicServiceHandler(httpcontent.NewPublic(deps.Content, deps.Images), opts...))
 	add(admincontentconnect.NewContentAdminServiceHandler(httpcontent.NewAdmin(deps.Content, deps.Images), opts...))
@@ -506,7 +484,6 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	blocking := blocks.Sources{Authors: deps.Social, Reviews: deps.Review, Messages: deps.IM, Identities: blocks.Identities{Buyers: deps.Buyer, Stores: deps.Seller}}
 	buyerPorts := deps.BuyerPorts
 	if deps.Catalog != nil {
-		// 商品卡片（公開 service 與買家的「追蹤中」動態共用）的店家卡片與評分組裝。
 		catalogPresenter, err := httpcatalog.NewPresenter(deps.Seller, stats, deps.Images)
 		if err != nil {
 			return nil, err
@@ -547,8 +524,6 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	}
 	add(identityconnect.NewIdentityAppServiceHandler(identityApp, opts...))
 	add(adminidentityconnect.NewIdentityAdminServiceHandler(httpidentity.NewAdmin(deps.Identity, deps.Delegation, deps.Deletion), opts...))
-	// 賣家區每個方法的能力宣告由這支 interceptor 執行，只掛在 SellerAppService、在 rpc.NewInterceptor 之內；宣告與 service
-	// 的方法對不上時不能啟動。
 	accounts := newAccountLimiter(deps.Now)
 	acting, err := httpseller.NewInterceptor(deps.Seller, accounts)
 	if err != nil {
@@ -576,7 +551,6 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 		return nil, err
 	}
 	add(adminsellerconnect.NewSellerGovernanceAdminServiceHandler(governance, opts...))
-	// 通報人是買家或匿名者，不是店家：這兩個 service 不掛賣家能力的 interceptor。
 	reports, err := httpseller.NewReports(deps.Seller, deps.Buyer, accounts)
 	if err != nil {
 		return nil, err
@@ -596,8 +570,6 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	add(procurementv1alpha1connect.NewSellerProcurementAppServiceHandler(sellerProcurementApp, opts...))
 	add(imageaiv1alpha1connect.NewImageAiAppServiceHandler(httpimageai.NewApp(deps.ImageAI, deps.Seller, deps.Images, deps.Logger), append(slices.Clone(opts), connect.WithReadMaxBytes(imageAIMaxRequestBytes))...))
 	add(adminimageaiconnect.NewImageAiAdminServiceHandler(httpimageai.NewAdmin(deps.ImageAI, deps.Images), opts...))
-	// 代行工作區（SocialDelegatedService，A10 起各模組有自己的 <模組>DelegatedService）：憑證是 X-HK-Operation-Session 的代行 session，由 httpapi/delegation 的 interceptor 解析、
-	// 依該 service 的宣告表授權並稽核被拒絕的請求；每個 service 掛自己的一支，在 rpc.NewInterceptor 之內，全域的 adminauth 與顧客身分都不參與。限流與其他 service 一樣由 assemble 的 withRateLimit 包住。
 	socialDelegated, err := httpdelegation.NewInterceptor(deps.Delegation, deps.Logger, httpsocial.DelegatedDeclaration)
 	if err != nil {
 		return nil, err
@@ -624,13 +596,10 @@ func connectServices(deps Deps, opts ...connect.HandlerOption) ([]service, error
 	return out, nil
 }
 
-// adminServiceDescriptors 是掛載的 service 中 audience 為 admin 的 descriptor。
 func adminServiceDescriptors(services []service) ([]protoreflect.ServiceDescriptor, error) {
 	return serviceDescriptors(services, "admin", func(a rpc.Audience) bool { return a == rpc.AudienceAdmin })
 }
 
-// serviceDescriptors 是掛載的 service 中 audience 符合 want 的 descriptor，由路徑上的 service 全名從 protoregistry 查。
-// 查不到的 service 回錯誤：沒有 descriptor 就無法確認它的方法都有授權宣告。
 func serviceDescriptors(services []service, label string, want func(rpc.Audience) bool) ([]protoreflect.ServiceDescriptor, error) {
 	var out []protoreflect.ServiceDescriptor
 	for _, svc := range services {
@@ -651,9 +620,6 @@ func serviceDescriptors(services []service, label string, want func(rpc.Audience
 	return out, nil
 }
 
-// checkAdminDeclarations 對照 adminauth 的宣告表與實際掛載的 admin service（ADR 2026-10-04-admin-roles：宣告＝掛載）：
-// 掛了沒有宣告的 admin 方法、或宣告了沒有掛載的方法，都不能啟動。授權由掛在每個 service 的 adminauth interceptor 執行，
-// 新增的 admin service 不必自己選用它。
 func checkAdminDeclarations(services []service) error {
 	descriptors, err := adminServiceDescriptors(services)
 	if err != nil {
@@ -662,8 +628,6 @@ func checkAdminDeclarations(services []service) error {
 	return adminauth.Check(descriptors)
 }
 
-// mount 掛上一個 Connect service，並依它的使用者類別加上 HTTP 的快取規則。授權跟著 service 的名稱
-// 走（rpc.AudienceOf），名稱不符合規則的 service 在組裝時就 panic，不會以沒有授權的狀態上線。
 func mount(mux *http.ServeMux, path string, h http.Handler) {
 	audience, ok := rpc.AudienceOf(path)
 	if !ok {
@@ -672,10 +636,6 @@ func mount(mux *http.ServeMux, path string, h http.Handler) {
 	mux.Handle(path, cachePolicy(audience, isViewerDependent, h))
 }
 
-// withTracing 為每個請求開一個新的 trace：單體是入口，不接續 client 帶來的 traceparent（client 不可信，而且同一頁
-// 的多個請求會共用 trace id，legacy-backlog 的 L265）。轉給 gateway 時由 gatewayproxy 注入 traceparent，兩邊的 log
-// 以同一個 trace id 對得起來。trace id 寫在回應的 X-Trace-Id（API 設計規範（Connect）§八：不放進錯誤內容），
-// interceptor 的 log 也帶著它。
 func withTracing(tp trace.TracerProvider, next http.Handler) http.Handler {
 	if tp == nil {
 		tp = sdktrace.NewTracerProvider()
@@ -692,8 +652,6 @@ func withTracing(tp trace.TracerProvider, next http.Handler) http.Handler {
 		otelhttp.WithSpanNameFormatter(spanName))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if red, ok := redactedTokenPath(r.URL.Path); ok {
-			// otelhttp 從請求的 URL 取 url.path、http.target 與 url.full 寫進 span：先以遮掉 token 的副本交給它，
-			// 內層再還原真的 URL（restoreURL）。
 			rc := r.Clone(context.WithValue(r.Context(), realURLKey{}, r.URL))
 			u := *r.URL
 			u.Path, u.RawPath = red, ""
@@ -707,7 +665,6 @@ func withTracing(tp trace.TracerProvider, next http.Handler) http.Handler {
 
 type realURLKey struct{}
 
-// restoreURL 在 otelhttp 之內把 URL 換回真的（withTracing 為 token 路徑換成遮罩的副本）。
 func restoreURL(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if u, ok := r.Context().Value(realURLKey{}).(*url.URL); ok {
@@ -724,8 +681,6 @@ const (
 	delegatedSecureUploadsPrefix = "/api/files/delegated/secure_uploads/"
 )
 
-// redactedTokenPath 把機敏上傳端點（顧客的 /api/files/secure_uploads/ 與代行營運的 /api/files/delegated/secure_uploads/）路徑裡的暫存 token 換成 {token}；
-// 不是這類路徑回 false。token 是持有即可預覽的憑據，不進 trace。
 func redactedTokenPath(path string) (string, bool) {
 	if !strings.Contains(path, "secure_uploads") {
 		return "", false
@@ -742,7 +697,6 @@ func redactedTokenPath(path string) (string, bool) {
 	return "/api/files/{redacted}", true
 }
 
-// spanName 以 procedure 命名 Connect 的請求；其他路徑只用 method，掃描器亂打的路徑不會變成大量的 span 名稱。
 func spanName(_ string, r *http.Request) string {
 	if _, ok := rpc.AudienceOf(r.URL.Path); ok {
 		return r.URL.Path
@@ -750,7 +704,6 @@ func spanName(_ string, r *http.Request) string {
 	return r.Method
 }
 
-// sellerStoreNames 以 seller 的店家卡片實作後台待辦的店名來源（payment 的待辦只有店家 ID）。
 type sellerStoreNames struct{ m *seller.Module }
 
 func (s sellerStoreNames) StoreNames(ctx context.Context, storeIDs []int64) (map[int64]string, error) {

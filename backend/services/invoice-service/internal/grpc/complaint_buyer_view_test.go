@@ -25,32 +25,13 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-// 本檔守 #2911：58A §B07「買家面不出現『違規』二字」。
-//
-// 🔴 **陰性斷言的標的是推導出來的，不是列舉出來的。**
-//
-// 第一版掃的是序列化後 payload 裡的「違規」二字，那對 `DECIDED_VIOLATION` 這種
-// **ASCII enum 值**完全失明——中文只在前端查 CodeMeta 對照表時才出現，wire 上一個
-// 中文字都沒有。第一版靠「再補一條字面值檢查 `DECIDED_VIOLATION`」補救，於是
-// `VIOLATION_CONFIRMED`（同一個 CodeMeta 檔裡的**另一個**含「違規」label）就漏了，
-// 而它正是買家實際看到那四個字的路徑。
-//
-// ⇒ 判準改成：**從 CodeMeta 註冊表推導出「所有 label 含『違規』的 (enum, value)」**，
-// 再斷言那些 value 與 label 都不出現在買家視角的任何回應。後端日後新增第三個含
-// 「違規」的 label 時，本測試會自己把它納入，不必有人記得回來改這一支。
 
-// ---------------------------------------------------------------------------
-// fakes
-// ---------------------------------------------------------------------------
 
 const (
 	bvComplaintID int64 = 6900
 	bvStoreID     int64 = 2685914682
 )
 
-// bvPoisonedEvents 是「最壞情況」的時間軸：三列都由平台或賣家寫，其中兩列的自由文字
-// 含有那兩個字。ADM 的 reason 是端點 60 的**必填**欄，而 DECIDE_VIOLATION 的理由
-// 就是「為什麼判違規」⇒ 實務上幾乎必然命中。
 func bvPoisonedEvents() []domain.ComplaintEvent {
 	s := func(v string) *string { return &v }
 	return []domain.ComplaintEvent{
@@ -143,7 +124,6 @@ func (r *bvComplaints) Reopen(_ context.Context, id, buyerID, version int64, _, 
 		codemeta.InvoiceComplaintStatusResolved.Value)
 }
 
-// cas 模仿 SQL 的 allowed-from ＋ 版本述詞：不符即 rows=0（回 false），與正式路徑同形。
 func (r *bvComplaints) cas(id, buyerID, version int64, next string, allowedFrom ...string) (bool, error) {
 	row, ok := r.rows[id]
 	if !ok || row.ComplainantBuyerID != buyerID || row.Version != version {
@@ -176,7 +156,6 @@ func (r *bvComplaints) Create(_ context.Context, in domain.NewComplaint) (domain
 	return row, true, nil
 }
 
-// bvServer 架一台同時掛著買家寫入面（usecase.Complaint）與讀取面（usecase.Query）的 server。
 func bvServer(status string, version int64) *InvoiceServer {
 	order := xOrder
 	repo := &bvComplaints{
@@ -200,12 +179,8 @@ func bvServer(status string, version int64) *InvoiceServer {
 	return NewInvoiceServer(nil, q, nil, uc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 }
 
-// ---------------------------------------------------------------------------
-// 買家面 RPC 覆蓋表（本檔與下方的 protoreflect 閘門共用同一份）
-// ---------------------------------------------------------------------------
 
 type bvCall struct {
-	// status/version 是這支 RPC 的守衛要求的來源狀態。
 	status  string
 	version int64
 	invoke  func(*InvoiceServer) (proto.Message, error)
@@ -215,8 +190,6 @@ func bvBuyerCalls() map[string]bvCall {
 	ctx := context.Background()
 	id := "6900"
 	return map[string]bvCall{
-		// 端點 13：走 9310 分支——它回的是**既有那件案子的完整單筆**，
-		// 是建案路徑上唯一帶得出 ADM 事件的出口（新建案只有買家自己那一列）。
 		"CreateInvoiceComplaint": {
 			status: codemeta.InvoiceComplaintStatusOpen.Value, version: 0,
 			invoke: func(s *InvoiceServer) (proto.Message, error) {
@@ -225,7 +198,6 @@ func bvBuyerCalls() map[string]bvCall {
 				})
 			},
 		},
-		// 端點 14
 		"ListOrderInvoiceComplaints": {
 			status: codemeta.InvoiceComplaintStatusViolationConfirmed.Value, version: 3,
 			invoke: func(s *InvoiceServer) (proto.Message, error) {
@@ -234,7 +206,6 @@ func bvBuyerCalls() map[string]bvCall {
 				})
 			},
 		},
-		// 端點 15
 		"GetInvoiceComplaint": {
 			status: codemeta.InvoiceComplaintStatusViolationConfirmed.Value, version: 3,
 			invoke: func(s *InvoiceServer) (proto.Message, error) {
@@ -243,7 +214,6 @@ func bvBuyerCalls() map[string]bvCall {
 				})
 			},
 		},
-		// 端點 63
 		"RejectInvoiceComplaintResponse": {
 			status: codemeta.InvoiceComplaintStatusSellerResponded.Value, version: 2,
 			invoke: func(s *InvoiceServer) (proto.Message, error) {
@@ -253,7 +223,6 @@ func bvBuyerCalls() map[string]bvCall {
 				})
 			},
 		},
-		// 端點 64
 		"WithdrawInvoiceComplaint": {
 			status: codemeta.InvoiceComplaintStatusOpen.Value, version: 2,
 			invoke: func(s *InvoiceServer) (proto.Message, error) {
@@ -262,7 +231,6 @@ func bvBuyerCalls() map[string]bvCall {
 				})
 			},
 		},
-		// 端點 65
 		"ReopenInvoiceComplaint": {
 			status: codemeta.InvoiceComplaintStatusResolved.Value, version: 2,
 			invoke: func(s *InvoiceServer) (proto.Message, error) {
@@ -274,30 +242,20 @@ func bvBuyerCalls() map[string]bvCall {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 從 CodeMeta 推導「不得出現在買家面的 (enum, value)」
-// ---------------------------------------------------------------------------
 
-// forbiddenBuyerPhrase 是 58A §B07／§E3 明訂不得出現在買家面的字。
-//
-// 它是**推導的輸入**，不是斷言清單本身：下面的 codemetaEntriesWithPhrase 用它去掃
-// CodeMeta 註冊表，掃出哪些碼值的中文 label 含有它。
 const forbiddenBuyerPhrase = "違規"
 
-// codemetaEntry 是 CodeMeta 註冊表裡的一個成員。
 type codemetaEntry struct {
-	Enum  string // 型別名，例：InvoiceComplaintStatus
-	Const string // Go 常數名，例：InvoiceComplaintStatusViolationConfirmed
-	Value string // wire 上會出現的值，例：VIOLATION_CONFIRMED
-	Label string // 前端會印出來的中文，例：判定賣家違規
+	Enum  string
+	Const string
+	Value string
+	Label string
 }
 
 func (e codemetaEntry) String() string {
 	return fmt.Sprintf("%s.%s（value=%q label=%q）", e.Enum, e.Const, e.Value, e.Label)
 }
 
-// bvRepoRoot 從本 package 往上找到 repo 根（以 go.work 為錨）。形狀沿用
-// internal/mq/producer_contract_test.go 的同名 helper。
 func bvRepoRoot(t *testing.T) string {
 	t.Helper()
 	dir, err := os.Getwd()
@@ -318,23 +276,6 @@ func bvRepoRoot(t *testing.T) string {
 	return ""
 }
 
-// codemetaEntriesWithPhrase 推導「所有 label 含 phrase 的 CodeMeta 成員」。
-//
-// # 為什麼用解析原始碼，不用反射
-//
-// Go 的反射列舉不到 package 層級的 var，而 `pkg/codemeta` 是逐 enum 各自一組
-// `var (...)` ＋ `All<Name>s` 切片的生成碼，沒有任何跨 enum 的總索引。要做到
-// 「後端新增第三個含『違規』的 label 時測試自己跟上」，只能從那份生成檔本身推導。
-//
-// 生成檔是 CodeMeta Markdown（SSOT）的直接產物（§8.5：改 .md → generate.sh），
-// 而它同時就是**本服務編譯時真正連進去的那一份** ⇒ 解析它等價於解析 SSOT，
-// 且不會有「解析了一份沒人用的副本」那種假綠。下面的
-// TestViolationWordedCodeMetaEntriesAreDerivedNotEnumerated 會把解析結果與編譯進來的
-// 常數逐字對拍，把這件事釘住。
-//
-// 兩個檔都掃：
-//   - registry.go：`X = EnumType{Code: ..., Value: ..., Label: ...}` 形狀（UPPER_SNAKE 值）
-//   - labels.go：`var xxxLabels = map[string]string{"4001": "草稿"}` 形狀（數字碼值）
 func codemetaEntriesWithPhrase(t *testing.T, phrase string) []codemetaEntry {
 	t.Helper()
 	root := bvRepoRoot(t)
@@ -354,7 +295,6 @@ func codemetaEntriesWithPhrase(t *testing.T, phrase string) []codemetaEntry {
 	return out
 }
 
-// parseCodemetaRegistry 解 registry.go 的 struct 常數。
 func parseCodemetaRegistry(t *testing.T, path, phrase string) []codemetaEntry {
 	t.Helper()
 	file := bvParseGoFile(t, path)
@@ -377,7 +317,7 @@ func parseCodemetaRegistry(t *testing.T, path, phrase string) []codemetaEntry {
 				}
 				enum, ok := lit.Type.(*ast.Ident)
 				if !ok {
-					continue // 切片（All<Name>s）等其他形狀
+					continue
 				}
 				fields := bvStructFields(lit)
 				if !strings.Contains(fields["Label"], phrase) {
@@ -397,10 +337,6 @@ func parseCodemetaRegistry(t *testing.T, path, phrase string) []codemetaEntry {
 	return out
 }
 
-// parseCodemetaLabelMaps 解 labels.go 的 `map[string]string` 對照表。
-//
-// 這一批的 value 是數字碼（"4001"）。它們今天一個都不含「違規」，掃它是為了讓
-// 「後端新增含違規的 label」這件事在**任何一種 CodeMeta 形狀**下都被納入。
 func parseCodemetaLabelMaps(t *testing.T, path, phrase string) []codemetaEntry {
 	t.Helper()
 	file := bvParseGoFile(t, path)
@@ -452,14 +388,12 @@ func bvParseGoFile(t *testing.T, path string) *ast.File {
 	t.Helper()
 	file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
 	if err != nil {
-		// fail-loud：檔案搬家／改名時，這支測試的推導基礎沒了，不該靜靜地推導出空集合。
 		t.Fatalf("讀不到 CodeMeta 生成檔 %s：%v\n"+
 			"（推導不到標的時本測試會恆綠，所以這裡必須 fail 而不是回空）", path, err)
 	}
 	return file
 }
 
-// bvStructFields 把 `T{A: "x", B: "y"}` 的字串欄位攤成 map。
 func bvStructFields(lit *ast.CompositeLit) map[string]string {
 	out := map[string]string{}
 	for _, elt := range lit.Elts {
@@ -490,9 +424,6 @@ func bvStringLit(e ast.Expr) (string, bool) {
 	return s, true
 }
 
-// ---------------------------------------------------------------------------
-// 推導本身的鑑別力
-// ---------------------------------------------------------------------------
 
 // 這一支釘住「推導器壞掉會讓陰性斷言恆綠」那個 bug class。三件事一起驗：
 //
@@ -513,7 +444,6 @@ func TestViolationWordedCodeMetaEntriesAreDerivedNotEnumerated(t *testing.T) {
 		t.Logf("推導到：%s", e)
 	}
 
-	// ② ＋ ③：兩個已知成員，以編譯進來的常數為對照。
 	known := []codemetaEntry{
 		{
 			Enum: "InvoiceComplaintStatus", Const: "InvoiceComplaintStatusViolationConfirmed",
@@ -552,22 +482,12 @@ func TestViolationWordedCodeMetaEntriesAreDerivedNotEnumerated(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// wire 上的字串葉節點
-// ---------------------------------------------------------------------------
 
-// wireLeaf 是回應裡的一個字串（或 bytes）葉節點，帶欄位路徑供錯誤訊息定位。
 type wireLeaf struct {
 	Path  string
 	Value string
 }
 
-// collectWireLeaves 走訪整棵 message，收集**所有深度**的字串葉節點。
-//
-// 為什麼不只掃 proto.Marshal 的位元組：那個做法對 enum **值**只能做子字串比對，而
-// `RESOLVED` 是 `DECIDED_RESOLVED` 的子字串 ⇒ 一旦推導出的標的是個短值就會誤報。
-// 走訪型別樹拿得到「一整格欄位的值」，可以用**完全相等**判定 enum 值、用子字串判定
-// 中文 label，兩種語意各用各的判準。新增欄位不必回頭改這裡。
 func collectWireLeaves(m protoreflect.Message, prefix string, out *[]wireLeaf) {
 	if m == nil || !m.IsValid() {
 		return
@@ -607,9 +527,6 @@ func appendWireLeaf(fd protoreflect.FieldDescriptor, v protoreflect.Value, path 
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 陰性：買家在任何路徑上都拿不到那兩個字
-// ---------------------------------------------------------------------------
 
 // 🔴 本檔最重要的一支。標的來自 CodeMeta 推導，斷言分三層：
 //
@@ -641,7 +558,6 @@ func TestBuyerComplaintPayloadNeverLeaksViolationWording(t *testing.T) {
 			if err != nil {
 				t.Fatalf("marshal: %v", err)
 			}
-			// A
 			if bytes.Contains(raw, []byte(forbiddenBuyerPhrase)) {
 				t.Fatalf("🔴 58A §B07：買家面不得出現「%s」二字，但 %s 的回應裡有。\n完整回應：%+v",
 					forbiddenBuyerPhrase, name, resp)
@@ -655,12 +571,10 @@ func TestBuyerComplaintPayloadNeverLeaksViolationWording(t *testing.T) {
 
 			for _, e := range entries {
 				for _, lf := range leaves {
-					// B
 					if strings.Contains(lf.Value, e.Label) {
 						t.Fatalf("🔴 %s 的 %s = %q 含 CodeMeta label「%s」（%s）",
 							name, lf.Path, lf.Value, e.Label, e)
 					}
-					// C
 					if lf.Value == e.Value {
 						t.Fatalf("🔴 %s 的 %s = %q —— 前端照 58A §0.4 ⑤ 查 CodeMeta 會印出「%s」。\n"+
 							"標的來源：%s\n完整回應：%+v",
@@ -672,9 +586,6 @@ func TestBuyerComplaintPayloadNeverLeaksViolationWording(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 陽性：投影不是「整列不下發」，也不是「把資訊銷毀」
-// ---------------------------------------------------------------------------
 
 // 依 58A §B07 版面結構逐字「角色（賣家／**平台**）」：平台那一列必須還在，
 // 只是動作被投影成對買家安全的那一個。整列刪掉會讓案件從「平台處理中」跳到
@@ -702,7 +613,6 @@ func TestBuyerComplaintKeepsPlatformRowsWithSafeAction(t *testing.T) {
 			}
 		case "SELLER":
 			seller++
-			// 賣家寫給買家的回覆是 B07「請查看下方回覆內容」的內容本身，不得一併清掉。
 			if r.GetNote() == "" {
 				t.Fatal("賣家的回覆內容被清掉了——投影的範圍只有 ADM 的列")
 			}
@@ -718,8 +628,6 @@ func TestBuyerComplaintKeepsPlatformRowsWithSafeAction(t *testing.T) {
 			codemeta.InvoiceComplaintActionDecidedResolved.Value, last.GetAction())
 	}
 
-	// status 投影成 RESOLVED：58A §B07 狀態表 VIOLATION_CONFIRMED 列的「買家面語意」
-	// 逐字就是「已解決」，而那正是 CodeMeta 對 RESOLVED 的 label。
 	if got := resp.GetData().GetStatus(); got != codemeta.InvoiceComplaintStatusResolved.Value {
 		t.Fatalf("status 應投影成 %s，實得 %q",
 			codemeta.InvoiceComplaintStatusResolved.Value, got)
@@ -772,9 +680,6 @@ func TestSellerComplaintViewStillCarriesTheRuling(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 閘門：新增買家面申訴 RPC 而沒套投影時，本測試轉紅
-// ---------------------------------------------------------------------------
 
 // 判定不靠命名也不靠人記得：從 proto 描述子推導「入參帶 buyer_id 且回應可遞移到達
 // InvoiceComplaintInfo」的 RPC 全集，再與上面那張覆蓋表對帳。
@@ -827,7 +732,6 @@ func bvJoin(v []string) string {
 	return out
 }
 
-// bvReachesComplaintInfo 判斷一個 message 能不能遞移到達 InvoiceComplaintInfo。
 func bvReachesComplaintInfo(md protoreflect.MessageDescriptor, seen map[protoreflect.FullName]bool) bool {
 	if md == nil || seen[md.FullName()] {
 		return false

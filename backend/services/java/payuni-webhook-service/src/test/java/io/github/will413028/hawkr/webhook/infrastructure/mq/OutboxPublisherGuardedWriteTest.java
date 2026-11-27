@@ -74,8 +74,6 @@ class OutboxPublisherGuardedWriteTest {
         verify(mapper).markFailedGuarded(eq(7L), eq(1), anyString(), nextRetryAt.capture());
         verify(mapper, never()).markSent(anyLong(), any());
         verify(mapper, never()).updateById(any());
-        // ⚠️ 一律用 DateTimeUtils.nowUtc() 比較：生產碼寫的是 UTC，
-        // 拿本機時區的 LocalDateTime.now() 比會在非 UTC 時區得到假失敗（10 檔 §4）。
         assertTrue(nextRetryAt.getValue()
                         .isAfter(io.github.will413028.hawkr.common.utils.DateTimeUtils.nowUtc().plusSeconds(3)),
                 "退避時間必須指向未來（指數退避第一段 5 秒）");

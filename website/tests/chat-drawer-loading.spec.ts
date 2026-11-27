@@ -27,8 +27,6 @@ for (const failFirst of [false, true]) {
 	test(`global chat drawer ${failFirst ? "recovers from chunk failure with keyboard focus" : "shows a cold shell, restores focus, and reopens in place"}`, {
 		tag: ["@ui"],
 	}, async ({ page, isMobile }) => {
-		// Lowest-priority catch-all makes the surface independent from the shared
-		// gateway. Specific routes below are registered later and win in Playwright.
 		await page.route("**/api/v1/**", (route) => route.fulfill(json({})));
 		await seedStoredActiveRole(page, "seller");
 		await setupGatewayMocks(page, {
@@ -78,9 +76,6 @@ for (const failFirst of [false, true]) {
 		const threadChunkGate = new Promise<void>((resolve) => {
 			releaseThreadChunk = resolve;
 		});
-		// Install after the workspace is ready. Only the post-click ThreadClient
-		// chunk is held; matching source markers work for both dev and minified CI
-		// builds without coupling the test to a content-hashed filename.
 		await page.route(
 			/\/_next\/static\/chunks\/.*\.js(?:\?.*)?$/,
 			async (route) => {
@@ -109,7 +104,6 @@ for (const failFirst of [false, true]) {
 
 		try {
 			if (failFirst) {
-				// Exercise local recovery after the existing one-shot deploy repair.
 				await page.evaluate(() =>
 					sessionStorage.setItem("__chunk_reload_at", String(Date.now())),
 				);

@@ -21,7 +21,6 @@ void main() {
 
   setUp(() {
     repository = _MockPostRepository();
-    // 伺服器計數的校正預設不回來；要驗證校正的測試自己覆寫。
     when(
       () => repository.getMyPost(any()),
     ).thenAnswer((_) => Completer<Post>().future);

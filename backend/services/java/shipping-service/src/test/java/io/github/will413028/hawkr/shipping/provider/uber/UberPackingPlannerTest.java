@@ -48,7 +48,7 @@ class UberPackingPlannerTest {
             var plan = UberPackingPlanner.estimate(
                     List.of(item("A", 5, 10, 100)), policy(2, 150, "1.25"), UNLIMITED);
             assertThat(plan.usable()).isTrue();
-            assertThat(plan.packages()).hasSize(3);   // 2 + 2 + 1
+            assertThat(plan.packages()).hasSize(3);
             assertThat(plan.packages().get(0).getSeq()).isEqualTo(1);
             assertThat(plan.packages().get(2).getSeq()).isEqualTo(3);
         }
@@ -56,7 +56,6 @@ class UberPackingPlannerTest {
         @Test
         @DisplayName("重量超過上限 ⇒ 開新箱（含包材）")
         void splitsByWeight() {
-            // 包材 150g ＋ 每件 500g；上限 1200g ⇒ 一箱最多兩件（150+500+500=1150 ≤ 1200）
             var limits = new UberPackingPlanner.Limits(0, 0, 1200, 0);
             var plan = UberPackingPlanner.estimate(
                     List.of(item("A", 4, 10, 500)), policy(99, 150, "1.25"), limits);
@@ -78,7 +77,6 @@ class UberPackingPlannerTest {
         @Test
         @DisplayName("🔴 體積**不**參與分箱（估計值不該決定對外可見的箱數）")
         void volumeDoesNotSplit() {
-            // 體積上限設成一個很小的值：若它參與分箱，箱數會變多。
             var limits = new UberPackingPlanner.Limits(0, 0, 0, 1);
             var plan = UberPackingPlanner.estimate(
                     List.of(item("A", 3, 10, 100)), policy(99, 150, "1.25"), limits);
@@ -95,7 +93,7 @@ class UberPackingPlannerTest {
         void overDimensionSum() {
             var limits = new UberPackingPlanner.Limits(20, 0, 0, 0);
             var plan = UberPackingPlanner.estimate(
-                    List.of(item("A", 1, 10, 100)), policy(99, 150, "1.25"), limits);   // 10+10+10=30 > 20
+                    List.of(item("A", 1, 10, 100)), policy(99, 150, "1.25"), limits);
             assertThat(plan.usable()).isFalse();
             assertThat(plan.rejectReason()).isEqualTo("ITEM_OVER_DIMENSION_SUM");
         }
@@ -114,7 +112,7 @@ class UberPackingPlannerTest {
         void overWeight() {
             var limits = new UberPackingPlanner.Limits(0, 0, 200, 0);
             var plan = UberPackingPlanner.estimate(
-                    List.of(item("A", 1, 10, 100)), policy(99, 150, "1.25"), limits);   // 100+150=250 > 200
+                    List.of(item("A", 1, 10, 100)), policy(99, 150, "1.25"), limits);
             assertThat(plan.rejectReason()).isEqualTo("ITEM_OVER_WEIGHT");
         }
     }

@@ -32,7 +32,6 @@ class WalletCouponSection extends HookConsumerWidget {
     Widget buildStatusBar() {
       return Row(
         children: [
-          // 兩個篩選放不下時換行（窄螢幕加大字級），右側的按鈕維持靠右。
           Expanded(
             child: Wrap(
               spacing: 12.w,
@@ -45,7 +44,6 @@ class WalletCouponSection extends HookConsumerWidget {
                   selectedIcon: AppIcons.chart,
                   onTap: () {
                     couponFilter.value = 'active';
-                    // 切換篩選時退出刪除模式
                     isDeleteMode.value = false;
                     selectedCoupons.value = {};
                   },
@@ -57,7 +55,6 @@ class WalletCouponSection extends HookConsumerWidget {
                   selectedIcon: AppIcons.checkCircle,
                   onTap: () {
                     couponFilter.value = 'expired';
-                    // 切換篩選時退出刪除模式
                     isDeleteMode.value = false;
                     selectedCoupons.value = {};
                   },
@@ -79,10 +76,8 @@ class WalletCouponSection extends HookConsumerWidget {
             semanticLabel: '刪除優惠券',
             onTap: () {
               HKLog.logD('[Wallet] Delete coupon tapped');
-              // 只有在進行中模式下才能進入刪除模式
               if (couponFilter.value == 'active') {
                 isDeleteMode.value = !isDeleteMode.value;
-                // 退出刪除模式時清空選擇
                 if (!isDeleteMode.value) {
                   selectedCoupons.value = {};
                 }
@@ -121,11 +116,9 @@ class WalletCouponSection extends HookConsumerWidget {
 
       if (!context.mounted) return;
 
-      // 清空選擇並退出刪除模式
       selectedCoupons.value = {};
       isDeleteMode.value = false;
 
-      // 顯示結果
       if (failCount == 0) {
         FloatingToast.success(context, '已刪除 $successCount 張優惠券');
       } else {
@@ -154,7 +147,6 @@ class WalletCouponSection extends HookConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 標題
               Padding(
                 padding: EdgeInsets.only(top: 20.h, bottom: 4.h),
                 child: Text(
@@ -166,7 +158,6 @@ class WalletCouponSection extends HookConsumerWidget {
                   ),
                 ),
               ),
-              // 內容
               Padding(
                 padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 20.h),
                 child: Text(
@@ -179,18 +170,15 @@ class WalletCouponSection extends HookConsumerWidget {
                   ),
                 ),
               ),
-              // 分隔線
               const Divider(
                 height: 0,
                 thickness: 0.5,
                 color: AppColors.gray200,
               ),
-              // 取消 / 確認刪除 按鈕
               SizedBox(
                 height: 44.h,
                 child: Row(
                   children: [
-                    // 取消
                     Expanded(
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
@@ -206,13 +194,11 @@ class WalletCouponSection extends HookConsumerWidget {
                         ),
                       ),
                     ),
-                    // 中間分隔線
                     Container(
                       width: 0.5,
                       height: 44.h,
                       color: AppColors.gray200,
                     ),
-                    // 確認刪除
                     Expanded(
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
@@ -246,7 +232,6 @@ class WalletCouponSection extends HookConsumerWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 標題
           Text(
             '優惠券',
             style: TextStyle(
@@ -256,10 +241,8 @@ class WalletCouponSection extends HookConsumerWidget {
             ),
           ),
           SizedBox(height: 12.h),
-          // 篩選與操作列（使用圖片資源）
           buildStatusBar(),
           SizedBox(height: 16.h),
-          // 優惠券列表
           couponState.when(
             loading: () => const TruckLoadingOverlay(),
             error: (e, _) => Padding(
@@ -271,9 +254,6 @@ class WalletCouponSection extends HookConsumerWidget {
             ),
             data: (couponListState) {
               final filtered = couponListState.coupons.where((c) {
-                // status 已在 _parseCoupon 中規範化為大寫 code
-                // 進行中：UNUSED(未使用) / LOCKED(已鎖定)
-                // 已過期：USED / EXPIRED / REVOKED / ANNUL
                 final isActive = c.status == 'UNUSED' || c.status == 'LOCKED';
                 return couponFilter.value == 'active' ? isActive : !isActive;
               }).toList();
@@ -291,14 +271,11 @@ class WalletCouponSection extends HookConsumerWidget {
 
               return Column(
                 children: [
-                  // 優惠券列表
                   ...filtered.map(
                     (coupon) => Padding(
                       padding: EdgeInsets.only(bottom: 16.h),
                       child: CouponCardWidget(
                         coupon: coupon,
-                        // 點整張卡：刪除模式切換勾選，否則開啟唯讀詳情頁。
-                        // （優惠券模板無更新端點，故詳情頁為唯讀）
                         onTap: () {
                           final inDeleteMode =
                               isDeleteMode.value &&
@@ -320,7 +297,6 @@ class WalletCouponSection extends HookConsumerWidget {
                             context.push(CouponRoutes.detail, extra: coupon);
                           }
                         },
-                        // 刪除模式下顯示 checkbox
                         showCheckbox:
                             isDeleteMode.value &&
                             couponFilter.value == 'active',
@@ -342,22 +318,18 @@ class WalletCouponSection extends HookConsumerWidget {
                     ),
                   ),
 
-                  // 刪除模式下的操作按鈕
                   if (isDeleteMode.value && couponFilter.value == 'active')
                     Padding(
                       padding: EdgeInsets.only(top: 8.h),
                       child: Row(
                         children: [
-                          // 全選 / 取消全選
                           Expanded(
                             child: GestureDetector(
                               onTap: () {
                                 if (selectedCoupons.value.length ==
                                     filtered.length) {
-                                  // 取消全選
                                   selectedCoupons.value = {};
                                 } else {
-                                  // 全選
                                   selectedCoupons.value = filtered
                                       .map((c) => c.templateId)
                                       .toSet();
@@ -386,7 +358,6 @@ class WalletCouponSection extends HookConsumerWidget {
                             ),
                           ),
                           SizedBox(width: 12.w),
-                          // 刪除按鈕
                           Expanded(
                             child: GestureDetector(
                               onTap: showDeleteConfirmDialog,

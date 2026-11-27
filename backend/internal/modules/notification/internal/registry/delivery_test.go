@@ -45,9 +45,7 @@ func TestDeliveredFollowsTheRegisteredTypes(t *testing.T) {
 		{model.AudienceBuyer, model.CategoryLike, model.ChannelInbox, false},
 		{model.AudienceBuyer, model.CategoryAccount, model.ChannelEmail, true},
 		{model.AudienceBuyer, model.CategoryAccount, model.ChannelPush, false},
-		// 受眾沒有的分類，型別再怎麼宣告也不送達。
 		{model.AudienceBuyer, model.CategoryPayout, model.ChannelInbox, false},
-		// 公告是註冊的 fan-out 型別（兩個受眾、收件匣與推播）：由它推導，沒有 email。
 		{model.AudienceBuyer, model.CategoryAnnouncement, model.ChannelInbox, true},
 		{model.AudienceStore, model.CategoryAnnouncement, model.ChannelPush, true},
 		{model.AudienceBuyer, model.CategoryAnnouncement, model.ChannelEmail, false},
@@ -56,7 +54,6 @@ func TestDeliveredFollowsTheRegisteredTypes(t *testing.T) {
 			t.Errorf("Delivered(%s, %s, %s) = %v，預期 %v", c.a, c.cat, c.ch, got, c.want)
 		}
 	}
-	// 型別宣告了分類不允許的渠道（公告不寄 email）時，分類的上限優先。
 	bad := []Entry{deliveryType("bad", model.AudienceBuyer, model.CategoryAnnouncement, model.ChannelEmail)}
 	if Delivered(bad, model.AudienceBuyer, model.CategoryAnnouncement, model.ChannelEmail) {
 		t.Error("公告不寄 email，型別宣告了也不送達")

@@ -424,7 +424,6 @@ class _ScanVisitor extends RecursiveAstVisitor<void> {
       if (en != null && !_unspecified.hasMatch(e.identifier.name)) {
         return _Sel(en, e.identifier.name, e);
       }
-      // p.E 本身（後面還有成員）由 PropertyAccess 處理。
       return null;
     }
     if (e is PropertyAccess) {
@@ -439,8 +438,6 @@ class _ScanVisitor extends RecursiveAstVisitor<void> {
     return null;
   }
 
-  // 作用域（K4、K5 共用）：從使用處往上找函式參數／Block／switch 成員／CompilationUnit；區塊裡只看使用處之前的宣告，
-  // 頂層看全部。參數、`var` 遮住同名的 final／const。
   _Var? _lookup(SimpleIdentifier id) {
     final name = id.name;
     final pos = id.offset;
@@ -615,7 +612,6 @@ class _ScanVisitor extends RecursiveAstVisitor<void> {
               ];
       }
       if (t == TokenType.EQ_EQ || t == TokenType.BANG_EQ) {
-        // `alias != null`（或 `alias == null` 為假）：別名 `cond ? x : null` 有值，等於它的 cond 為真。
         final other = _isNullish(c.rightOperand)
             ? _strip(c.leftOperand)
             : _isNullish(c.leftOperand)
@@ -723,7 +719,6 @@ class _ScanVisitor extends RecursiveAstVisitor<void> {
         );
       }
     } else {
-      // if-case：樣式與 when 成立時才進 then；else 是補集，不算。
       _emit(
         [
           ..._caseSels(caseClause.guardedPattern),
@@ -780,7 +775,6 @@ class _ScanVisitor extends RecursiveAstVisitor<void> {
     var pending = <_Sel>[];
     for (final member in node.members) {
       if (member is SwitchDefault) {
-        // default 可由任何值到達：不是確定相等；它的敘述也不屬於前面 fall-through 進來的成員。
         pending = [];
         continue;
       }
@@ -812,7 +806,6 @@ class _ScanVisitor extends RecursiveAstVisitor<void> {
       final s = _select(e.key);
       if (s != null) _emit([s], [e.value], Form.key);
     }
-    // `{'value': E.M, 'label': '警告'}`：字串 key 對應 enum 值，其他的成員有文字。
     final pairs = entries
         .where((e) => e.key is StringLiteral && _select(e.value) != null)
         .toList();

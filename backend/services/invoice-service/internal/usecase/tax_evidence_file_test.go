@@ -16,8 +16,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// 後台稅籍佐證下載的授權述詞：store 的稅務資格存在、該位置有佐證，才向 media 讀。
-// 這組替身依 store／issuer 區分資料，無條件回同一份的替身會讓「store_id 有沒有被用」零鑑別力。
 
 type taxEvidenceIssuers struct {
 	domain.IssuerRepository
@@ -49,7 +47,6 @@ type taxEvidenceAudit struct {
 	domain.AuditRepository
 	entries []domain.NewAdminAuditLogEntry
 	err     error
-	// order 記錄稽核與 media 的先後，證明「先記錄、再讀內容」。
 	order *[]string
 }
 
@@ -66,7 +63,6 @@ func (f *taxEvidenceAudit) AppendAdminAuditLog(_ context.Context, in domain.NewA
 
 type taxEvidenceMedia struct {
 	order *[]string
-	// allowed 的 key 是 "objectKey|profileID"，與 media 的授權三元組同形。
 	allowed map[string]bool
 	calls   []string
 	err     error

@@ -44,11 +44,6 @@ class OrderRepository {
           : list.length;
       final records = list.map((e) {
         final m = Map<String, dynamic>.from(e as Map);
-        // 49 §6.1 成對契約：gateway `OrderListItemResponse` 只回 logoKey（裸
-        // objectKey，SSOT）+ logoUrl（Gateway 組的顯示 URL）。`Order.sellerAvatarUrl`
-        // 綁的 JSON key 是 logoUrl，顯示端 OssImage 是 dual-mode，所以這裡把裸 key
-        // 覆蓋進去以取得 preset 版而非 /i/original/。其餘八個舊候選（avatar / logo /
-        // sellerLogo / snake 系）wire 上都不存在，已移除。
         final logoKey = (m['logoKey'] ?? '').toString();
         if (logoKey.isNotEmpty) m['logoUrl'] = logoKey;
         return Order.fromJson(m);
@@ -233,11 +228,6 @@ class OrderRepository {
         return '';
       }
 
-      // 以下所有欄名以 gateway `OrderSummaryResponse` 為準
-      // （backend-payuni `gateway/internal/handler/order.go:137-186`）。
-      // 這個 parser 過去對每個值都寫五到八個候選，實際只有一個存在——其中
-      // merchantName / merchantAvatar / price 的候選鏈**整條落空**，商家名、
-      // 商家頭像、金額三欄一直是空的。
       String statusOf(Map<String, dynamic> m) => pickStr(m, const ['status']);
 
       String firstItemName(Map<String, dynamic> m) {
@@ -268,7 +258,6 @@ class OrderRepository {
 
         final merchantId = pickStr(m, const ['storeId']);
         final merchantName = pickStr(m, const ['sellerName']);
-        // 49 §6.1 成對契約：裸 key 優先（顯示端 scene 走 buildImageUrl dual-mode）。
         final merchantAvatar = pickStr(m, const ['logoKey', 'logoUrl']);
 
         final parsedItems = <legacy.OrderItem>[];
@@ -313,11 +302,9 @@ class OrderRepository {
                   return '';
                 }
 
-                // gateway `OrderItemViewResponse`（order.go:195-206）。
                 final name = pickStrItem(const ['productName']);
                 final qty = pickInt(const ['quantity'], def: 1);
                 final price = pickPrice(const ['unitPrice']);
-                // 49 號成對契約：優先裸 key。
                 final imageUrl = pickStrItem(const ['imageKey', 'imageUrl']);
                 final skuId = pickStrItem(const ['skuId']);
                 parsedItems.add(
@@ -335,8 +322,6 @@ class OrderRepository {
           }
         }
 
-        // 訂單摘要 root 沒有圖片／SKU 欄位，兩者只能來自 items[0]
-        // （原本 root 層的八個 / 五個候選 wire 上一個都不存在）。
         final mainImageUrl = parsedItems.isNotEmpty
             ? (parsedItems.first.imageUrl ?? '')
             : '';

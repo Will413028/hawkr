@@ -14,8 +14,6 @@ function compact(relativePath: string) {
 
 test("隱私政策的生效日不早於它引用的生成文件中最新的一次修訂", () => {
 	const privacy = compact("features/legal/pages/PrivacyPage.tsx");
-	// 版本日期取自生成的條款與 KYC 告知（docs/legal 的唯一來源），隱私頁內嵌 KYC 告知，取兩者較新者；
-	// 隱私頁自己的內容（例如貼文瀏覽統計）改動時，生效日可以比這兩份文件更新。
 	const latest = [SELLER_TERMS.version, KYC_PRIVACY_NOTICE.version]
 		.sort()
 		.at(-1) as string;

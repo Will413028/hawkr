@@ -20,7 +20,6 @@ func TestRetirementAtThirtyDaysAndPersonalDataPurgeAtOneHundredEightyFourDays(t 
 	f := setup(t)
 	ctx := context.Background()
 	accountID, s := f.exposable(t)
-	// 公開內容直接寫進 fixture。
 	_, err := f.db.Conn(ctx).Exec(ctx, `UPDATE seller.stores SET description='自家種的蔬果', prize='優良農民', website_url='https://farm.example.invalid' WHERE store_id=$1`, s.StoreID)
 	must(t, err)
 	_, err = f.db.Conn(ctx).Exec(ctx, `UPDATE seller.kyc_applications SET website_url='https://farm.example.invalid' WHERE store_id=$1`, s.StoreID)
@@ -110,7 +109,7 @@ func TestHoldsBlockEachStageAndReleaseWhenTheyEnd(t *testing.T) {
 	appealAccount, appealed := f.closedStore(t)
 	closedAt := f.now
 	f.now = closedAt.Add(time.Hour)
-	order := f.holdOrder(t, heldAccount) // 保存到收文後 184 天：晚於兩段的時間
+	order := f.holdOrder(t, heldAccount)
 
 	f.now = closedAt.Add(StoreRetireAfter + time.Second)
 	_, err := f.module.PurgePII(ctx)
@@ -118,7 +117,6 @@ func TestHoldsBlockEachStageAndReleaseWhenTheyEnd(t *testing.T) {
 	if f.retired(t, held.StoreID) || !f.retired(t, appealed.StoreID) {
 		t.Fatalf("來函的保存擋第一段：held=%v appealed=%v", f.retired(t, held.StoreID), f.retired(t, appealed.StoreID))
 	}
-	// 已退場的店家，帳號上之後才建立的終止合作（21.3，建在已關閉的最近 stint）有待處理的申覆。
 	m := f.terminate(t, appealed.StoreID, GroundOtherSerious)
 	f.appeal(t, appealAccount, f.measureOf(t, m.ID), "異議")
 
@@ -130,7 +128,6 @@ func TestHoldsBlockEachStageAndReleaseWhenTheyEnd(t *testing.T) {
 	if n, err := f.module.PurgePII(ctx); err != nil || n != 1 || !f.purged(t, appealed.StoreID) {
 		t.Fatalf("裁定之後下一輪清理：n=%d err=%v", n, err)
 	}
-	// 撤銷登記（登記錯誤）解除保存：同一輪先退場，再清個資。
 	cur := f.orderOf(t, order.ID)
 	_, err = f.module.RevokeAuthorityOrder(ctx, RevokeAuthorityOrderInput{ID: order.ID, AdminID: authorityRegistrar, ExpectedVersion: cur.Version, Reason: "帳號登記錯了"})
 	must(t, err)
@@ -147,7 +144,7 @@ func TestARetiredStoreIsNeverReopened(t *testing.T) {
 	f := setup(t)
 	ctx := context.Background()
 	_, s, m := f.terminated(t, GroundCeasedBusiness)
-	deadline := m.StartsAt.Add(4416 * time.Hour) // 申覆期限（AppealWindow）
+	deadline := m.StartsAt.Add(4416 * time.Hour)
 	f.now = deadline.Add(time.Second)
 	_, err := f.module.PurgePII(ctx)
 	must(t, err)

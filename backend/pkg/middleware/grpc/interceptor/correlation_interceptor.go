@@ -71,26 +71,21 @@ func StreamCorrelationInterceptor() grpc.StreamServerInterceptor {
 	}
 }
 
-// resolveCorrelationID extracts or generates a correlation ID.
 func resolveCorrelationID(ctx context.Context) string {
-	// 1. Check incoming gRPC metadata
 	if md, ok := metadata.FromIncomingContext(ctx); ok {
 		if ids := md.Get(metadataKeyRequestID); len(ids) > 0 && ids[0] != "" {
 			return ids[0]
 		}
 	}
 
-	// 2. Fall back to OTel trace ID
 	spanCtx := trace.SpanContextFromContext(ctx)
 	if spanCtx.HasTraceID() {
 		return spanCtx.TraceID().String()
 	}
 
-	// 3. Generate a new UUID
 	return uuid.New().String()
 }
 
-// wrappedStream wraps a grpc.ServerStream to override the context.
 type wrappedStream struct {
 	grpc.ServerStream
 	ctx context.Context

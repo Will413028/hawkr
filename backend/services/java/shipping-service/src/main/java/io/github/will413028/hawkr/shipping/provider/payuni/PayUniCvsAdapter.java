@@ -197,8 +197,6 @@ public class PayUniCvsAdapter extends AbstractPayUniAdapter {
             labelService.triggerCvsPrint(shipment.getMerId(), shipment.getShipTradeNo(),
                     shipment.getGoodsType(), lgsTypeCode(), shipment.getShipType(),
                     requireShipDate(request));
-            // 🔴 超商列印的成功訊號是 provider 的 Print Notify，不是這支 API 的回應。
-            //    回 synchronous 會讓呼叫端誤以為可以立刻寫 SUCCEEDED。
             return LabelRequestOutcome.async();
         }
 
@@ -328,17 +326,16 @@ public class PayUniCvsAdapter extends AbstractPayUniAdapter {
                     lgsTypeCode(),
                     goodsType,
                     ServiceType.NO_CASH_ON_DELIVERY.code(),
-                    request.buyerName(),                   // 寄件人 = 買家
+                    request.buyerName(),
                     request.buyerPhone(),
-                    sellerSetting.getSenderName(),         // 收件人 = 賣家退貨聯絡人
+                    sellerSetting.getSenderName(),
                     sellerSetting.getSenderPhone(),
-                    sellerSetting.getReturnStoreCode(),    // 取貨門市 = 退貨門市
-                    String.valueOf(request.tradeAmt()),    // 商品價值（遺失認賠金額）
+                    sellerSetting.getReturnStoreCode(),
+                    String.valueOf(request.tradeAmt()),
                     "退貨商品",
-                    null                                   // 這本身就是退貨單，不需再指定退貨門市
+                    null
             );
 
-            // 收斂規範 §8.1：同步 retry 最多一次
             CreateCvsShipmentResponse resp = shippingClient.createCvsShipment(request.merId(), payUniReq);
             if (!resp.isSuccess()) {
                 resp = shippingClient.createCvsShipment(request.merId(), payUniReq);
@@ -349,9 +346,6 @@ public class PayUniCvsAdapter extends AbstractPayUniAdapter {
                 String providerStatus = resp.apiResponse().status();
                 String providerMessage = resp.apiResponse().message();
                 entity.setStatus(ShippingStatus.CREATE_FAILED.value());
-                // V12：建單失敗是 provider 層失敗，寫 provider_error_*。
-                // provider_status 是「正常貨態證據」欄，把失敗代碼寫進去會讓 ADM 的
-                // 異常判準只能寫成「有值即異常」，於是每張正常單都被撈進異常清單。
                 entity.setProviderErrorCode(providerStatus);
                 entity.setProviderErrorMessage(providerMessage);
                 entity.setProviderErrorAt(io.github.will413028.hawkr.common.utils.DateTimeUtils.nowUtc());

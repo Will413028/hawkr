@@ -12,16 +12,13 @@ import (
 	"uuid"
 )
 
-// 這個檔案是 turn_result 事件與中斷 payload 的線格式：proto JSON 的手工對應（模組不能 import httpapi/gen，arch/check.go），
-// 欄位名與值名依 api/hawkr/procurement/v1alpha1/procurement.proto 的 TurnResult 與 ClarifyQuestion。
-// internal/httpapi 下的 wire_test 以 protojson（DiscardUnknown=false）解析它們，擋住欄位漂移。
 
 type slotsJSON struct {
 	Item               *string         `json:"item,omitempty"`
 	Quantity           *int32          `json:"quantity,omitempty"`
 	Unit               *string         `json:"unit,omitempty"`
 	Packaging          *string         `json:"packaging,omitempty"`
-	BudgetPerUnit      *string         `json:"budgetPerUnit,omitempty"` // int64 在 proto JSON 是字串
+	BudgetPerUnit      *string         `json:"budgetPerUnit,omitempty"`
 	DeliveryCity       *string         `json:"deliveryCity,omitempty"`
 	DeliveryDate       *dateJSON       `json:"deliveryDate,omitempty"`
 	ExactMatchRequired *bool           `json:"exactMatchRequired,omitempty"`
@@ -133,7 +130,6 @@ func questionWire(q *reply.RenderedQuestion) *QuestionJSON {
 	}
 }
 
-// turnResultWire 組這一輪的 TurnResult。interruptID 非零時是停在等待輸入的一輪；ids.run 為零值（不經 run 的回答與倒回）時不填 run_id。
 func turnResultWire(d decision, ids ids, now time.Time, interruptID uuid.UUID) (turnResultJSON, error) {
 	tr := turnResultJSON{
 		RequestID: ids.request.String(), ConversationID: ids.conversation.String(), RevisionID: ids.revision.String(),
@@ -163,7 +159,6 @@ func turnResultWire(d decision, ids ids, now time.Time, interruptID uuid.UUID) (
 	return tr, nil
 }
 
-// turnResultEventOf 把 TurnResult 包成 turn_result 事件的 payload（{"turn_result": {...}}）。
 func turnResultEventOf(tr turnResultJSON) ([]byte, error) {
 	b, err := json.Marshal(map[string]any{run.EventTurnResult: tr})
 	if err != nil {
@@ -172,7 +167,6 @@ func turnResultEventOf(tr turnResultJSON) ([]byte, error) {
 	return b, nil
 }
 
-// turnResultEvent 組 turn_result 事件的 payload。
 func turnResultEvent(d decision, ids ids, now time.Time, interruptID uuid.UUID) ([]byte, error) {
 	tr, err := turnResultWire(d, ids, now, interruptID)
 	if err != nil {

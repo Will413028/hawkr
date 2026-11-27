@@ -90,8 +90,6 @@ function emptySku(): SkuDraft {
 		price: "",
 		salePrice: "",
 		stockQty: "0",
-		// 預設公斤：`unit` 是 CodeMeta 的 WeightUnit **值**（3301／3302／3303），不是
-		// 可自由填寫的中文字。髒值會一路過關到結帳鏈才由 `WeightUnit.fromValue()` 拋。
 		unit: "3301",
 		weight: "",
 		lengthCm: "",
@@ -178,7 +176,6 @@ function toWriteBody(
 		name: name.trim(),
 		categoryId,
 		origin: origin.trim(),
-		// 空文件也送：`blocks: []` 是合法的「沒有描述」，而不送它與送空是同一個結果。
 		description,
 		images: images.map((image) => ({ stagedToken: image.stagedToken })),
 		skus: skuInputs,
@@ -190,9 +187,6 @@ export default function DelegatedProductCreatePage() {
 	const scope = useSellerDataScope();
 	const { summary, hasCapability } = useDelegatedSession();
 	const storeId = scope.ownerStoreId ?? summary?.target.storeId ?? "";
-	// 確認抽屜的提示卡要指名店家（§6.5）。情境列是畫面上唯一寫著店名的地方，而它
-	// 不 sticky —— 捲到下半段再開抽屜時，這一句就是操作者確認「是不是這一家」的
-	// 唯一憑據。
 	const targetStore = targetStoreLabel(summary?.target.storeName, storeId);
 	const productsHref = `/adm/${encodeURIComponent(storeId)}/products`;
 	const canWrite = hasCapability("products.write");
@@ -321,7 +315,6 @@ export default function DelegatedProductCreatePage() {
 			}`,
 			reasonPlaceholder: "例：協助賣家補上季節新品",
 			changes,
-			// ② 的處置：新資源沒有版本，明說而不是留白。
 			versionNote: "不適用（新建商品尚未有版本）",
 			auditNote: publish
 				? "將產生兩筆不可竄改的代行紀錄（建立、上架）"
@@ -340,8 +333,6 @@ export default function DelegatedProductCreatePage() {
 			const productId = created.id == null ? "" : String(created.id);
 			if (publish) {
 				if (productId === "" || !created.version) {
-					// 建立成功但拿不到 id／version：不猜、不重抓後盲目上架 —— 那會讓上架
-					// 打在一個我們沒有讀過的版本上。停在這裡，商品已是草稿、資料沒壞。
 					setError(
 						"商品已建立（未上架），但建立回應沒有版本資訊，無法接著上架。請到商品列表開啟它再執行上架。",
 					);
@@ -361,7 +352,6 @@ export default function DelegatedProductCreatePage() {
 	};
 
 	if (!canWrite) {
-		// 入口在 capability 不足時就不渲染，走到這裡只可能是直接輸入網址。
 		return (
 			<DelegatedAreaUnauthorized
 				reason="本次代行工作階段沒有「商品編輯」能力，無法建立商品。"
@@ -714,10 +704,7 @@ export default function DelegatedProductCreatePage() {
 					操作行為仍為 ADM；所有寫入將綁定本次 Operation Session
 				</span>
 				<span className="adm-product-edit__bar-actions">
-					{/* 上架能力不足時，那顆按鈕**不渲染**（不是 disabled，L3857）：這個工作
-					    階段從頭到尾都不能上架，一顆停用的按鈕仍在宣稱「這件事本來做得到」。
-					    但只是拿掉它會讓畫面退回「只有一顆按鈕」＝看起來沒有選擇，於是這裡
-					    補一句說明：不是操作者沒看到，是這次沒有這個授權。 */}
+
 					{canPublish ? null : (
 						<span className="adm-product-edit__bar-note">
 							本次工作階段沒有「商品上架」授權，只能建立未上架的商品；要讓買家看到，請由賣家自行上架。
@@ -731,8 +718,7 @@ export default function DelegatedProductCreatePage() {
 					>
 						返回
 					</Button>
-					{/* 主要按鈕是「暫不上架」：建立與上架是兩個 capability，把上架畫成預設
-					    會讓一次誤點就對買家可見。 */}
+
 					<Button
 						type="button"
 						disabled={submitting || uploading}

@@ -75,14 +75,6 @@ public class OrderOutboxPublisherScheduler {
                 markDead(event);
                 continue;
             }
-            // issue #2294 H1：搶佔閘門必須在副作用（MQ 投遞）之前，且是 lease 不是永久旗標。
-            // claim 回 0 ⇒ 另一個 pod 已認領（或狀態已變）⇒ 一個副作用都不做。
-            //
-            // ⚠️ R4-P1-2（2026-08-08）：租約基準取 **claim 當下**而非 tick 起點的 now。
-            // 前者才是「這一筆的工作從現在開始算 CLAIM_LEASE_SEC 秒」；用 tick 起點時，
-            // 第 k 筆的有效租約 = CLAIM_LEASE_SEC − (前 k−1 筆的耗時)，批次夠長就變成負數
-            // ⇒ 租約在持有者仍在工作時到期 ⇒ 另一個 pod 合法搶走 ⇒ 重複副作用。
-            // 述詞用的 now 維持 tick 起點：那個方向讓候選集合更小，是保守的。
             int claimed = outboxMapper.claimForDispatch(
                     event.getId(), DateTimeUtils.nowUtc().plusSeconds(CLAIM_LEASE_SEC), now);
             if (claimed == 0) {

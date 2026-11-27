@@ -12,14 +12,12 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class AfterSalesEventMqConfig {
 
-    // ==================== Consumer Queue 常數（引用 MqConstants）====================
 
     public static final String QUEUE_RETURN_STATUS = MqConstants.QUEUE_AFTERSALES_RETURN_SHIPMENT_STATUS;
     public static final String QUEUE_PROCESSING_TIMEOUT = MqConstants.QUEUE_AFTERSALES_SHIPMENT_PROCESSING_TIMEOUT;
     public static final String QUEUE_SHIPMENT_LABEL = MqConstants.QUEUE_AFTERSALES_SHIPMENT_LABEL;
     public static final String QUEUE_SHIPMENT_CREATION_FAILED = MqConstants.QUEUE_AFTERSALES_SHIPMENT_CREATION_FAILED;
 
-    // ==================== Exchange Beans ====================
 
     @Bean
     public TopicExchange aftersalesExchange() {
@@ -41,7 +39,6 @@ public class AfterSalesEventMqConfig {
         return new TopicExchange(MqConstants.EXCHANGE_SELLER_WORKSPACE, true, false);
     }
 
-    // ==================== DLQ ====================
 
     @Bean
     public Queue aftersalesDlq() {
@@ -53,7 +50,6 @@ public class AfterSalesEventMqConfig {
         return BindingBuilder.bind(aftersalesDlq).to(aftersalesDlxExchange).with("dlq");
     }
 
-    // ==================== Consumer Queue: 退貨物流狀態變更 ====================
 
     @Bean
     public Queue returnStatusQueue() {
@@ -70,7 +66,6 @@ public class AfterSalesEventMqConfig {
                 .with(MqConstants.ROUTING_KEY_RETURN_SHIPMENT_STATUS_CHANGED);
     }
 
-    // ==================== Consumer Queue: §5.9 賣家處理逾期 ====================
 
     @Bean
     public Queue processingTimeoutQueue() {
@@ -87,7 +82,6 @@ public class AfterSalesEventMqConfig {
                 .with(MqConstants.ROUTING_KEY_SHIPMENT_PROCESSING_TIMEOUT);
     }
 
-    // ==================== Consumer Queue: §8.11 Backstop 建單逾時取消 ====================
 
     @Bean
     public Queue shipmentCreationFailedQueue() {
@@ -104,9 +98,6 @@ public class AfterSalesEventMqConfig {
                 .with(MqConstants.ROUTING_KEY_ORDER_SHIPMENT_CREATION_FAILED);
     }
 
-    // ==================== Consumer Queue: §5.3.6 7-11 退貨出貨便代碼 ====================
-    // 綁定相同 routing key (shipment.label.updated)，與 order.shipping.label 並行消費。
-    // Consumer 以 payload.isReturn 分流，僅處理 isReturn=true。
 
     @Bean
     public Queue shipmentLabelQueue() {

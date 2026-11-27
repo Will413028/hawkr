@@ -16,20 +16,11 @@ import (
 	"google.golang.org/grpc"
 )
 
-// 19 號設計書 §6.2 / §6.2.1：非法認證輸入一律「剔除該筆 ＋ warn log」，**不回 4xx**。
-//
-// 這一條沒有任何自然訊號會在它壞掉時響：改成 400 之後，後端測試照樣全綠、CI 照樣過，
-// 症狀只出現在**已上架 App** 的 AI 上架流程——助手 patch 的 certNo 繞過畫面驗證原樣送出，
-// 從今天起整個儲存動作失敗。所以這裡把兩個方向都釘死：
-//   ① 非法輸入 → 200 且那一筆不在送往 gRPC 的 request 內（不是 400、也不是照送）
-//   ② 合法輸入 → 照樣送下去（證明 ① 的斷言不是「什麼都被剔掉」造成的恆真）
 
-// certCapturingProductStub 記下最後一次送往 product-service 的 create / update request。
 type certCapturingProductStub struct {
 	productpb.ProductServiceClient
 	lastCreate *productpb.CreateProductRequest
 	lastUpdate *productpb.UpdateProductRequest
-	// upstreamWarnings 模擬收斂點判定出來的 CONCURRENT_CONFLICT。
 	upstreamWarnings []*productpb.CertificationWarning
 }
 
@@ -72,7 +63,6 @@ func doSellerJSON(t *testing.T, r *gin.Engine, method, path, body string) *httpt
 	return w
 }
 
-// certWarningsFromBody 取出 data.certificationWarnings，並回報該 key 是否存在。
 func certWarningsFromBody(t *testing.T, w *httptest.ResponseRecorder) ([]map[string]any, bool) {
 	t.Helper()
 	var env struct {
@@ -104,7 +94,6 @@ func TestCreateSellerProduct_IllegalCertificationIsDroppedNotRejected(t *testing
 	stub := &certCapturingProductStub{}
 	r := newSellerCertRouter(stub)
 
-	// 三筆：一筆合法、一筆 type 非法（送了中文標籤而不是碼值）、一筆 certNo 含空白。
 	body := `{"idempotencyKey":"k-cert-1","name":"有機小松菜","categoryId":"10001",` +
 		`"skus":[` + certValidSku + `],` +
 		`"certifications":[` +
@@ -114,7 +103,6 @@ func TestCreateSellerProduct_IllegalCertificationIsDroppedNotRejected(t *testing
 		`]}`
 	w := doSellerJSON(t, r, http.MethodPost, "/api/v1/app/products", body)
 
-	// ① 非法輸入不得變成 400 —— 這正是會弄壞已上架 App 的那個行為。
 	if w.Code != http.StatusOK {
 		t.Fatalf("HTTP status = %d, want 200（非法認證必須剔除而不是拒絕整個請求）；body = %s", w.Code, w.Body.String())
 	}
@@ -122,7 +110,6 @@ func TestCreateSellerProduct_IllegalCertificationIsDroppedNotRejected(t *testing
 		t.Fatal("CreateProduct 沒有被呼叫，下面的斷言會空過")
 	}
 
-	// ② 被剔掉的那兩筆不得離開 Gateway。
 	got := stub.lastCreate.GetCertifications()
 	if len(got) != 1 {
 		t.Fatalf("送往 gRPC 的 certifications 筆數 = %d, want 1；實際 = %+v", len(got), got)
@@ -131,7 +118,6 @@ func TestCreateSellerProduct_IllegalCertificationIsDroppedNotRejected(t *testing
 		t.Errorf("留下來的應該是合法那筆，實際 = {name:%q certNo:%q}", got[0].GetName(), got[0].GetCertNo())
 	}
 
-	// ③ 每一筆被剔除的輸入都要有一個 warning，且原樣回送賣家送來的值。
 	warnings, present := certWarningsFromBody(t, w)
 	if !present {
 		t.Fatal("回應缺少 certificationWarnings —— 前端分不出「後端沒實作」與「這次沒有警告」")
@@ -170,8 +156,6 @@ func TestCreateSellerProduct_LegalCertificationsPassThroughWithEmptyWarnings(t *
 	if n := len(stub.lastCreate.GetCertifications()); n != 2 {
 		t.Fatalf("合法認證應原樣送下去，實際筆數 = %d", n)
 	}
-	// 3706（GMP）不在可線上驗證的三型內，但它是合法值域——拿 verifiableCertTypes 當
-	// 值域會把它剔掉，這個斷言就是釘住那個錯法。
 	if stub.lastCreate.GetCertifications()[1].GetName() != "3706" {
 		t.Errorf("3706（GMP）被誤剔了：實際第二筆 = %q", stub.lastCreate.GetCertifications()[1].GetName())
 	}
@@ -230,7 +214,6 @@ func TestUpdateSellerProduct_IllegalCertificationIsDroppedNotRejected(t *testing
 	if len(got) != 1 || got[0].GetCertNo() != "TAP-2025-0032" {
 		t.Fatalf("送往 gRPC 的 certifications = %+v, want 只留合法那一筆", got)
 	}
-	// 剔除不得影響「這次要全量取代」的旗標——那個旗標看的是 body 有沒有帶欄位。
 	if !stub.lastUpdate.GetUpdateCertifications() {
 		t.Error("updateCertifications 必須維持 true：body 帶了 certifications 就是要全量取代")
 	}
@@ -261,7 +244,6 @@ func TestCreateSellerProduct_CertificationCountLimitStillRejects(t *testing.T) {
 	}
 }
 
-// ==================== 代行路徑（W3／W4）====================
 
 func newDelegatedCertRouter(stub *certCapturingProductStub) *gin.Engine {
 	gin.SetMode(gin.TestMode)
@@ -288,8 +270,6 @@ func TestDelegatedProductCreate_IllegalCertificationIsDroppedNotRejected(t *test
 	stub := &certCapturingProductStub{}
 	r := newDelegatedCertRouter(stub)
 
-	// 代行走另一個 DTO（DelegatedProductCertification），而 validateProductArrays 只擋
-	// 筆數——值域這一層是本次新加的，漏了它非法值會直接落進申請表與 ADM 佇列。
 	postDelegated(t, r, "/api/v1/admin/sellers/2685914682/products", "ik-cert-delegated-0001",
 		`{"operationReason":"協助新品上架","name":"嘉義布袋鮮蚵","categoryId":"10001",`+
 			`"skus":[{"spec":"600g","price":"350","stockQty":"20","unit":"3301"}],`+
@@ -304,7 +284,6 @@ func TestDelegatedProductCreate_IllegalCertificationIsDroppedNotRejected(t *test
 	}
 }
 
-// ==================== 值域規則本身 ====================
 
 // certificationInputRejection 是賣家與代行兩條路徑共用的唯一規則來源。
 // 它必須引用既有的 certNoPattern / certNoMaxLength，不得再抄一份字面值。
@@ -317,12 +296,10 @@ func TestCertificationInputRejection_Rules(t *testing.T) {
 		certNo     string
 		wantReason string
 	}{
-		// ---- type 值域（兩類共用）----
 		{"type 是中文標籤", "產銷履歷", "58589605051", certWarningInvalidType},
 		{"type 不在 3701–3706", "9999", "1-009-300022", certWarningInvalidType},
 		{"type 空字串", "", "1-009-300022", certWarningInvalidType},
 
-		// ---- 可線上驗證三型：嚴格白名單（值會組進農業部 API 的查詢字串）----
 		{"3701 合法", "3701", "1-009-300022", ""},
 		{"3702 合法", "3702", "TAP-2025-0032", ""},
 		{"3701 certNo 空字串", "3701", "", certWarningInvalidCertNo},
@@ -331,7 +308,6 @@ func TestCertificationInputRejection_Rules(t *testing.T) {
 		{"3701 certNo 超過長度上限", "3701", long, certWarningInvalidCertNo},
 		{"3701 certNo 剛好在長度上限", "3701", long[:certNoMaxLength], ""},
 
-		// ---- 不可線上驗證三型：放寬（值不會離開系統，格式由 ADM 人眼判斷）----
 		{"3705 ISO 帶冒號", "3705", "ISO 22000:2018", ""},
 		{"3704 HACCP 帶空格與斜線", "3704", "HACCP 2026/01 A", ""},
 		{"3706 GMP 中文編號", "3706", "食品GMP認證字第 0047 號", ""},
@@ -373,8 +349,8 @@ func TestCertificationFilter_CertNoRuleSplitsByType(t *testing.T) {
 	body := `{"idempotencyKey":"k-cert-split","name":"有機小松菜","categoryId":"10001",` +
 		`"skus":[` + certValidSku + `],` +
 		`"certifications":[` +
-		`{"name":"3701","certNo":"` + isoNo + `"},` + // 可線上驗證 ⇒ 必須剔除
-		`{"name":"3705","certNo":"` + isoNo + `"}` + // 不可線上驗證 ⇒ 必須保留
+		`{"name":"3701","certNo":"` + isoNo + `"},` +
+		`{"name":"3705","certNo":"` + isoNo + `"}` +
 		`]}`
 	w := doSellerJSON(t, r, http.MethodPost, "/api/v1/app/products", body)
 
@@ -438,8 +414,6 @@ func TestCertificationFilter_UnverifiableTypesAcceptRealWorldFormats(t *testing.
 	}
 }
 
-// certSkuMap 是 certValidSku 的 map 版本，供需要 json.Marshal 組 body 的案例使用：
-// certNo 含控制字元時不能用字串拼接，那些字元必須經過 JSON 轉義才送得出去。
 func certSkuMap() map[string]string {
 	return map[string]string{
 		"skuName": "600g", "unit": "3301", "price": "350", "stockQty": "20",
@@ -496,7 +470,6 @@ func TestCertificationFilter_UnverifiableTypesStillBlockControlCharsAndAngleBrac
 			r := newSellerCertRouter(stub)
 
 			w := postSellerProductWithCert(t, r, "k-cert-block", "3705", certNo)
-			// 仍然是 200（剔除不是拒絕），但那一筆不得離開 Gateway。
 			if w.Code != http.StatusOK {
 				t.Fatalf("HTTP status = %d, want 200；body = %s", w.Code, w.Body.String())
 			}

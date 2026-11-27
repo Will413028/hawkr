@@ -38,8 +38,6 @@ const (
 	delegatedSessID = int64(9)
 )
 
-// fakeSessions 以憑證回 session；沒有的憑證回模組的「憑證無效」拒絕。AuthorizeDelegated 以同樣的規則（非 ACTIVE 或缺能力）拒絕，並記下被拒絕的呼叫
-// （模組為這些寫 FAILED 稽核；稽核本身由模組的 integration 測試守）。
 type fakeSessions struct {
 	sessions map[string]moddelegation.DelegationSession
 	resolved []string
@@ -83,7 +81,6 @@ func delegatedSession(status moddelegation.DelegationStatus, caps ...moddelegati
 
 var allDelegatedCaps = []moddelegation.Capability{moddelegation.CapabilityPostsRead, moddelegation.CapabilityPostsWrite, moddelegation.CapabilityPostsPublish}
 
-// fakeRunner 記錄 handler 交給元件的呼叫，並像元件一樣先授權、再執行 read 與 do；它不寫稽核也不做冪等（那是模組的規則，見模組的 integration 測試）。
 type fakeRunner struct {
 	calls    []string
 	caller   moddelegation.DelegatedCaller
@@ -120,7 +117,6 @@ func (f *fakeRunner) DelegatedWrite(ctx context.Context, c moddelegation.Delegat
 	return moddelegation.DelegatedWriteResult{Store: st, AuditLogID: f.audit}, nil
 }
 
-// fakePosts 記錄 social 的呼叫與收到的輸入，回固定的結果；沒有覆寫的 Owner 方法被呼叫會 panic。
 type fakePosts struct {
 	Owner
 	create social.CreatePostInput
@@ -284,7 +280,6 @@ func goodSessions() map[string]moddelegation.DelegationSession {
 	return map[string]moddelegation.DelegationSession{goodSession: delegatedSession(moddelegation.DelegationActive, allDelegatedCaps...)}
 }
 
-// 每個方法的一個合法請求，用來驗證「進得去 handler」與「被攔下」。
 func delegatedCalls(t *testing.T, e *delegatedEnv, cred string) map[string]func() error {
 	t.Helper()
 	id := uuid.New().String()
@@ -344,13 +339,11 @@ func TestEveryDelegatedMethodReachesTheComponentWithAGoodSession(t *testing.T) {
 			t.Errorf("%s 交給元件的方法宣告 = %+v，預期 %+v", proc, e.runner.caller.Method, want)
 		}
 	}
-	// A7-D27：代行的每個寫入都把元件交來的代行者原樣傳給 social；傳 nil 會被當成店主寫入而不稽核。
 	for _, m := range []string{"CreatePost", "UpdatePost", "PublishPost", "UnpublishPost", "SchedulePost"} {
 		if a := e.posts.actors[m]; a == nil || a.SessionID != delegatedSessID {
 			t.Errorf("代行的 %s 傳給 social 的代行者 = %+v，預期元件交來的那一個", m, a)
 		}
 	}
-	// 每個請求只唯讀解析一次（不回頭再解析），成功之後才順延閒置逾時。
 	if len(e.sessions.activity) != len(all) || slices.Contains(e.sessions.activity, true) {
 		t.Fatalf("解析 %v，預期每個請求唯讀解析 1 次", e.sessions.activity)
 	}
@@ -567,7 +560,6 @@ func TestCreatePassesTheOperationAndTheSessionToTheComponent(t *testing.T) {
 	if e.runner.write.Op.NotifySeller {
 		t.Fatal("notify_seller=false 要傳下去")
 	}
-	// 內容雜湊綁定內容：不同的內容有不同的雜湊（同一個 request_id 才不會被當成重送）。
 	first := e.runner.write.PayloadHash
 	if _, err := e.client.CreateStorePost(t.Context(), withCredential(&pb.CreateStorePostRequest{Operation: o2, Body: "另一篇"}, goodSession)); err != nil {
 		t.Fatal(err)
@@ -663,7 +655,6 @@ func TestListPassesStatusAndCursorAndPages(t *testing.T) {
 	if e.posts.after == nil || e.posts.after.ID != last.ID {
 		t.Fatalf("游標 = %v", e.posts.after)
 	}
-	// page_token 綁定 status：換一個 status 用同一個 token 被擋下。
 	if _, err := e.client.ListStorePosts(t.Context(), withCredential(&pb.ListStorePostsRequest{PageToken: resp.Msg.GetNextPageToken()}, goodSession)); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("換 status 的 token：%v", err)
 	}

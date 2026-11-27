@@ -290,7 +290,6 @@ func (c *Config) Validate() error {
 	if c.Database.Password == "" {
 		missing = append(missing, "DB_PASSWORD")
 	}
-	// 三個 port 是三個不同的面，共用一個值會讓其中兩個面靜默搶不到 listener。
 	if c.Server.HTTPPort == c.Server.GRPCPort ||
 		c.Server.HTTPPort == c.Server.FilePort ||
 		c.Server.GRPCPort == c.Server.FilePort {
@@ -298,27 +297,19 @@ func (c *Config) Validate() error {
 			"HTTP_PORT/GRPC_PORT/INVOICE_SERVICE_FILE_PORT 必須三個互不相同（現值 %s/%s/%s）",
 			c.Server.HTTPPort, c.Server.GRPCPort, c.Server.FilePort))
 	}
-	// AppKey at-rest 加密：缺任一把就等於「賣家憑證明文落庫」或「解不開」，一律 fail-closed。
 	if c.Encryption.MasterKey == "" {
 		missing = append(missing, "INVOICE_ENCRYPTION_MASTER_KEY")
 	}
 	if c.Encryption.LookupHMACKey == "" {
 		missing = append(missing, "INVOICE_LOOKUP_HMAC_KEY")
 	}
-	// 指紋 HMAC 與 at-rest 金鑰共用一把 ⇒ 指紋等於用加密金鑰做的可預測推導，失去分離的意義。
 	if c.Encryption.MasterKey != "" && c.Encryption.MasterKey == c.Encryption.LookupHMACKey {
 		conflicts = append(conflicts, "INVOICE_LOOKUP_HMAC_KEY 不得等於 INVOICE_ENCRYPTION_MASTER_KEY")
 	}
-	// credential_key_version 是 smallint，值域 ^[1-9][0-9]{0,4}$。
-	// 上界是 32767 不是 99999：credential_key_version 是 smallint（§5.1.3）。
-	// 落在 (32767, 99999] 的值在 boot 期會通過，卻在**寫入第一列憑證時**才撞 22003
-	// ——那時錯誤出現在一個與設定無關的地方，而 pod 已經 Ready。
-	// 設計書 §8.5.1／§12.1.2 標的 `^[1-9][0-9]{0,4}$` 同樣過寬（最大 99999），已一併修正。
 	if c.Encryption.MasterKeyVersion < 1 || c.Encryption.MasterKeyVersion > 32767 {
 		conflicts = append(conflicts, fmt.Sprintf(
 			"INVOICE_ENCRYPTION_MASTER_KEY_VERSION 必須在 1~32767（smallint 上限，現值 %d）", c.Encryption.MasterKeyVersion))
 	}
-	// 輪替期的兩個值必須成對出現，且版本不得與現行版本相同（否則解不出該用哪一把）。
 	prevKeySet := c.Encryption.PrevMasterKey != ""
 	if prevKeySet != c.Encryption.prevVersionPresent {
 		conflicts = append(conflicts,
@@ -327,37 +318,13 @@ func (c *Config) Validate() error {
 	if prevKeySet && c.Encryption.PrevMasterKeyVer == c.Encryption.MasterKeyVersion {
 		conflicts = append(conflicts, "INVOICE_ENCRYPTION_MASTER_KEY_PREV_VERSION 不得等於 _VERSION")
 	}
-	// AMEGO base URL 沒有預設值：預填會讓「照抄 template 的 prod .env」看起來已填好，
-	// 而測試與正式共用同一個網域且回應無環境標記 ⇒ 覆蓋錯了不會連不上，只會靜默開出
-	// 不進任何公司帳的發票。
 	if c.Amego.BaseURL == "" {
 		missing = append(missing, "AMEGO_BASE_URL")
 	}
 	if c.Amego.TestInvoice == "" {
 		missing = append(missing, "AMEGO_TEST_INVOICE")
 	}
-	// AMEGO_PLATFORM_INVOICE 刻意**不在**必填清單（#3230）。空值 ＝ 平台自身的開票功能
-	// 尚未開通，那是一個合法狀態：平台 issuer 要等平台開始向賣家收費才會用到。
-	//
-	// 🔴 把它列為必填的實際後果不是「有人補上值」，而是 prod 部署者把 replicas 設成 0
-	// 繞過 boot 失敗 ⇒ 整個服務連同 76 條發票路由一起消失，而 deploy job 全綠、
-	// kubectl 顯示 0/0、沒有任何部署面訊號。#3230 就是這樣發生的：206 次請求全部 503、
-	// 成功率 0%、持續三天無人察覺。
-	//
-	// fail-closed 一個位元都沒有放鬆，只是換了層級：下面兩條 conflict 斷言以
-	// 「TestInvoice 與 PlatformInvoice 皆非空」為前提，空值時自動跳過（空統編既不是
-	// 「用了正式統編」也不是「用了測試統編」）；真正要擋的「拿空統編去開票」由
-	// usecase/admin_issuance.go 的 resolveIssuer PLATFORM 分支在**開票當下**擋下。
 
-	// 環境 fail-closed 的第一層（§4.5.8）。AMEGO 的測試與正式**共用同一個網域，回應
-	// 也沒有任何環境標記** ⇒ 設定填錯不會連不上、不會報錯，只會靜默開出一張性質完全
-	// 相反的真發票，而且不可回收。所以這三條是雙向的，兩個方向各自都是災難：
-	//
-	//   方向 A（未開放真發票卻用正式統編）：對真實公司開出無法回收的真發票
-	//   方向 B（開放真發票卻用測試統編）：開出的發票不進入任何公司的帳
-	//
-	// 判定「准不准開真發票」的是 AMEGO_ALLOW_REAL_INVOICE，**不是 Env == "prod"**
-	// （§4.6 W-21）。Env 只用在第 3 條的反向斷言。
 	if c.Amego.TestInvoice != "" && c.Amego.PlatformInvoice != "" {
 		if !c.Amego.AllowRealInvoice && c.Amego.PlatformInvoice != c.Amego.TestInvoice {
 			conflicts = append(conflicts, fmt.Sprintf(
@@ -373,8 +340,6 @@ func (c *Config) Validate() error {
 				c.Amego.PlatformInvoice))
 		}
 	}
-	// 反向失效：prod 沒開 ALLOW_REAL 的話一張發票都開不出來，而且沒有任何錯誤訊號
-	// ——那正是「靜默」的另一半。與 §8.5.1 (D) 第 ⑨ 條是同一份，改一邊要改兩邊。
 	if env := strings.ToLower(strings.TrimSpace(c.Env)); env == "prod" || env == "production" {
 		if !c.Amego.AllowRealInvoice {
 			conflicts = append(conflicts,
@@ -382,7 +347,6 @@ func (c *Config) Validate() error {
 					"這個環境一張發票都開不出來，且不會有任何錯誤訊號")
 		}
 	}
-	// 租約下界：單筆最壞耗時必須小於租約，否則持有者還在打 AMEGO 就被合法搶走（重複開票）。
 	if c.Schedule.IssueLeaseSeconds*1000 <= c.Amego.TimeoutIssueMS {
 		conflicts = append(conflicts, fmt.Sprintf(
 			"INVOICE_ISSUE_LEASE_SECONDS(%ds) 必須大於 AMEGO_HTTP_TIMEOUT_ISSUE_MS(%dms)",
@@ -393,7 +357,6 @@ func (c *Config) Validate() error {
 			"INVOICE_RECHECK_LEASE_SECONDS(%ds) 必須大於 AMEGO_HTTP_TIMEOUT_QUERY_MS(%dms)",
 			c.Schedule.RecheckLeaseSeconds, c.Amego.TimeoutQueryMS))
 	}
-	// 整條退避序列必須在告警門檻內走完，否則本來會自己成功的列也會先把告警打亮。
 	if c.Schedule.BackoffMaxSeconds < c.Schedule.BackoffBaseSeconds {
 		conflicts = append(conflicts, "INVOICE_BACKOFF_MAX_SECONDS 不得小於 INVOICE_BACKOFF_BASE_SECONDS")
 	}

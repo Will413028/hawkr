@@ -27,7 +27,6 @@ import {
 import { ErrorReason } from "../src/gen/hawkr/common/v1alpha1/error_reason_pb";
 import { ContentPublicService } from "../src/gen/hawkr/content/v1alpha1/content_pb";
 
-// 四個 client 共用的情境表（ADR 2026-09-25-api-error-model 的 D7）。
 const table = JSON.parse(
 	readFileSync(
 		join(import.meta.dirname, "../../../api/testdata/error-dispatch.json"),
@@ -57,7 +56,6 @@ const table = JSON.parse(
 	}>;
 };
 
-// 預設文字由呼叫端從目錄注入；這裡的替身讓「用了預設文字」可以和任何伺服器文字區分。
 const defaults: DefaultErrorText = (code) => `預設:${Code[code]}`;
 
 function codeOf(name: string): Code {
@@ -193,7 +191,6 @@ describe("轉接層", () => {
 		expect(isNoResponse(ConnectError.from(new TypeError("fetch failed")))).toBe(
 			true,
 		);
-		// 伺服器回的錯誤（含 Unavailable、Unknown）沒有 TypeError 的 cause。
 		expect(isNoResponse(new ConnectError("down", Code.Unavailable))).toBe(
 			false,
 		);

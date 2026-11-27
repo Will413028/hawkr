@@ -84,10 +84,7 @@ export function SellerTableSkeletonRows({
 	return (
 		<>
 			{rowKeys.map((rowKey) => (
-				// `aria-busy` on the ancestor `<tbody>`/page already announces the
 				// loading state — keeping it off the rows themselves so Biome's
-				// noAriaHiddenOnFocusable doesn't trip and screen-readers don't
-				// see two competing busy regions.
 				<tr key={rowKey} className="">
 					{colIndices.map((ci) => (
 						<td key={`${rowKey}-${ci}`} data-label={labels?.[ci]}>

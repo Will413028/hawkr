@@ -36,7 +36,6 @@ if (!baseUrl || !objectKey) {
  * chunk 表、只認真正的 ANMF chunk。
  */
 function inspectGif(bytes) {
-  // Header(6) + Logical Screen Descriptor(7)
   if (bytes.length < 13) return null;
   let p = 10;
   const packed = bytes[p];
@@ -54,18 +53,18 @@ function inspectGif(bytes) {
   let frames = 0;
   while (p < bytes.length) {
     const marker = bytes[p++];
-    if (marker === 0x3b) break; // Trailer
+    if (marker === 0x3b) break;
     if (marker === 0x21) {
-      p++; // extension label
+      p++;
       skipSubBlocks();
       continue;
     }
     if (marker === 0x2c) {
       frames++;
-      p += 8; // left/top/width/height
+      p += 8;
       const local = bytes[p++];
-      if (local & 0x80) p += 3 * (1 << ((local & 0x07) + 1)); // Local Color Table
-      p++; // LZW minimum code size
+      if (local & 0x80) p += 3 * (1 << ((local & 0x07) + 1));
+      p++;
       skipSubBlocks();
       continue;
     }
@@ -75,7 +74,6 @@ function inspectGif(bytes) {
 }
 
 function inspectWebp(bytes) {
-  // RIFF____WEBP 之後是 chunk 序列：4 bytes fourCC + 4 bytes size(LE) + payload(偶數對齊)
   let p = 12;
   let anmf = 0;
   const fourCC = (at) => String.fromCharCode(bytes[at], bytes[at + 1], bytes[at + 2], bytes[at + 3]);
@@ -145,7 +143,6 @@ if (!original.animated) failures.push("原檔本身就不是動圖，換一顆�
 for (const r of [motionWebp, motionPlain]) {
   if (r.status !== 200) failures.push(`motion accept=${r.accept} 回 ${r.status}`);
   if (!r.animated) failures.push(`motion accept=${r.accept} 輸出不是動的（${r.container}）`);
-  // degrade 直出時位元組數會與原檔一模一樣——這是「轉換其實沒發生」最明確的指紋。
   if (r.bytes === original.bytes) {
     failures.push(`motion accept=${r.accept} 與原檔位元組數相同，等於 degrade 直出、轉換沒生效`);
   }

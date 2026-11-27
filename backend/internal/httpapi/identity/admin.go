@@ -52,7 +52,6 @@ func (h *Admin) ListAccounts(ctx context.Context, req *connect.Request[adminpb.L
 		return nil, rpc.Error(connect.CodeInvalidArgument, "role %s 不是已知的角色", req.Msg.GetRole())
 	}
 	f := identity.AccountFilter{Role: role, Query: req.Msg.GetQuery(), Email: req.Msg.GetEmail()}
-	// page token 只能用在同一組篩選：換了篩選就從第一頁開始。
 	scope := rpc.FilterScope(identityv1alpha1connect.IdentityAdminServiceListAccountsProcedure, string(f.Role), f.Query, f.Email)
 	key, err := rpc.DecodePageToken(scope, req.Msg.GetPageToken())
 	if err != nil {
@@ -79,7 +78,6 @@ func (h *Admin) ListAccounts(ctx context.Context, req *connect.Request[adminpb.L
 	return connect.NewResponse(out), nil
 }
 
-// accountProto 轉成後台的帳號；ListAccounts 與 GetAccount 共用。
 func accountProto(a identity.Account) *adminpb.Account {
 	roles := make([]pb.Role, len(a.Roles))
 	for j, r := range a.Roles {
@@ -107,7 +105,6 @@ func (h *Admin) GetAccount(ctx context.Context, req *connect.Request[adminpb.Get
 	return connect.NewResponse(&adminpb.GetAccountResponse{Account: accountProto(a)}), nil
 }
 
-// deleteAccountPaths 把 accountdeletion 回報的欄位對應到請求的路徑。
 var deleteAccountPaths = rpc.FieldPaths{"Reason": "reason", "AccountID": "account_id"}
 
 // DeleteAccount 以管理員為申請者刪除整個帳號：accountdeletion 在同一個 transaction 內把買家與目前的店家當參與者關閉並刪帳號，
@@ -121,7 +118,6 @@ func (h *Admin) DeleteAccount(ctx context.Context, req *connect.Request[adminpb.
 	if err != nil {
 		return nil, err
 	}
-	// 理由的驗證與正規化只在 accountdeletion（和關店的理由同一條規則），錯誤帶欄位，這裡只對應到請求的路徑。
 	state, err := h.deletion.Request(ctx, accountdeletion.RequestInput{
 		AccountID: accountID, Requester: accountdeletion.Admin, OperatorAdminID: &adminID, Reason: req.Msg.GetReason(),
 	})
@@ -147,7 +143,6 @@ func (h *Admin) SignOut(ctx context.Context, _ *connect.Request[adminpb.SignOutR
 	return connect.NewResponse(&adminpb.SignOutResponse{}), nil
 }
 
-// 帳號清單的排序鍵是 (created_at, id)：16 bytes，建立時間的 Unix 奈秒加上 ID。
 func encodeAccountCursor(c *identity.AccountCursor) []byte {
 	if c == nil {
 		return nil

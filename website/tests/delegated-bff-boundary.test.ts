@@ -21,9 +21,6 @@ const FORWARDER = `${BFF_ROOT}/api/_upstream.ts`;
 const GATEWAY_BASE_TOKENS = /serverApiBase|apiBaseUrl|gatewayHost|API_BASE/;
 
 test("only _upstream.ts may reach the gateway from the delegated workspace", () => {
-	// fileURLToPath 而不是 .pathname：後者會把路徑裡的空白留成 %20，
-	// 含空白的 checkout 路徑（例如「Hawkr Web」）下 readFileSync 會 ENOENT。
-	// CI 路徑沒空白所以只在本機炸。
 	const root = fileURLToPath(new URL("..", import.meta.url));
 	const offenders = walk(join(root, BFF_ROOT), root).filter(
 		(file) =>
@@ -35,7 +32,6 @@ test("only _upstream.ts may reach the gateway from the delegated workspace", () 
 		[],
 		"a second gateway forwarder skips the timeout / header allow-list / message policy that _upstream.ts owns",
 	);
-	// 反向：那一支必須真的存在且真的在組 gateway URL，否則上面的斷言會空過。
 	assert.match(
 		readFileSync(join(root, FORWARDER), "utf8"),
 		GATEWAY_BASE_TOKENS,

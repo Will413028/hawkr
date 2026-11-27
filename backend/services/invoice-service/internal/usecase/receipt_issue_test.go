@@ -11,10 +11,6 @@ import (
 	"github.com/Will413028/hawkr/invoice-service/internal/domain"
 )
 
-// receiptHarness 擺一張已 claim 到 SENDING 的**收據** operation。
-//
-// 與 submitHarness 的差別逐項都是刻意的：fulfillment_mode=PLATFORM_RECEIPT、
-// document_kind=RECEIPT、receipt_no 非空、**沒有 provider_request_no**（收據不打 AMEGO）。
 func receiptHarness(t *testing.T, authorized bool) *harness {
 	t.Helper()
 	consent := "RECEIPT-TERMS-v1"
@@ -64,9 +60,6 @@ func receiptHarness(t *testing.T, authorized bool) *harness {
 	return h
 }
 
-// ---------------------------------------------------------------------------
-// happy path
-// ---------------------------------------------------------------------------
 
 func TestSubmit_PlatformReceiptProducesPdfAndIssues(t *testing.T) {
 	h := receiptHarness(t, true)
@@ -75,8 +68,6 @@ func TestSubmit_PlatformReceiptProducesPdfAndIssues(t *testing.T) {
 		t.Fatalf("Submit: %v", err)
 	}
 
-	// 🔴 收據線**絕不打 AMEGO**（§7.1.2 S-6 逐字）。這一條是這張票的核心，
-	// 而它同時是「有沒有走錯分支」唯一不靠狀態值就看得出來的訊號。
 	if n := len(h.provider.requests); n != 0 {
 		t.Fatalf("收據線打了 AMEGO %d 次，應為 0", n)
 	}
@@ -87,7 +78,6 @@ func TestSubmit_PlatformReceiptProducesPdfAndIssues(t *testing.T) {
 		t.Fatalf("uploader 呼叫 %d 次，want 1", h.receiptS.calls)
 	}
 
-	// document 落 ISSUED，且走的是**收據專用**那一句（帶不了 provider 欄位）。
 	if len(h.docs.issued) != 0 {
 		t.Error("收據不得走 MarkIssued —— 那一句會寫 provider='AMEGO'，撞 chk_invdoc_receipt_no_provider")
 	}
@@ -98,13 +88,10 @@ func TestSubmit_PlatformReceiptProducesPdfAndIssues(t *testing.T) {
 	if got.PdfObjectKey != "secure/receipt/fake.pdf" {
 		t.Errorf("pdf_object_key = %q，應是 uploader 回的 objectKey", got.PdfObjectKey)
 	}
-	// 授權版本必須在開立當下快照：來源（seller_tax_profiles.receipt_consent_version）
-	// 會被「取消授權」清成 NULL，不快照就再也查不到他同意的是哪一版。
 	if got.AuthorizationVersion != "RECEIPT-TERMS-v1" {
 		t.Errorf("receipt_authorization_version = %q，want RECEIPT-TERMS-v1", got.AuthorizationVersion)
 	}
 
-	// 事件走 P6 而不是 P1：兩者的通知模板不同，收據的文案不得讓買家以為拿到發票。
 	if len(h.outbox.inserted) != 1 {
 		t.Fatalf("outbox 事件 %d 筆，want 1", len(h.outbox.inserted))
 	}
@@ -132,7 +119,6 @@ func TestSubmit_PlatformReceiptRendersCorrectData(t *testing.T) {
 	if in.Seller.Address != "台北市內湖區瑞光路1號" {
 		t.Errorf("營業地址 = %q", in.Seller.Address)
 	}
-	// 免用統一發票的小規模營業人通常沒有統編 ⇒ 空字串是正確值。
 	if in.Seller.TaxID != "" {
 		t.Errorf("統編 = %q，本測試的賣家沒有統編", in.Seller.TaxID)
 	}
@@ -150,20 +136,14 @@ func TestSubmit_PlatformReceiptRendersCorrectData(t *testing.T) {
 		t.Errorf("第 1 行 = %+v", in.Lines[0])
 	}
 
-	// 檔名用收據編號：買家下載下來看到的就是這個。
 	if h.receiptS.filename != "R000000000042.pdf" {
 		t.Errorf("filename = %q", h.receiptS.filename)
 	}
-	// 🔴 mime_type 記的是**明文**型別（#3024 定版）：機敏上傳寫的是密文，
-	// 但下載通道靠這一欄決定 Content-Type，寫成 octet-stream 買家會下載到不會開的檔。
 	if h.receiptS.contentType != "application/pdf" {
 		t.Errorf("contentType = %q，want application/pdf", h.receiptS.contentType)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 陰性對照：這幾條全部**不得**落 ISSUE_FAILED（§5 L11／#3022）
-// ---------------------------------------------------------------------------
 
 // 授權在「建立 document」與「產製」之間被取消 ⇒ 轉人工，不得以賣家名義產出。
 func TestSubmit_PlatformReceiptWithoutAuthorizationGoesManual(t *testing.T) {
@@ -185,9 +165,6 @@ func TestSubmit_PlatformReceiptWithoutAuthorizationGoesManual(t *testing.T) {
 		h.docs.awaitingManual[0] != codemeta.InvoiceManualReasonReceiptAuthMissing.Value {
 		t.Fatalf("awaitingManual = %v，want [RECEIPT_AUTH_MISSING]", h.docs.awaitingManual)
 	}
-	// 🔴 斷言的是「不得發 receipt.issued」而不是「outbox 必須為空」：這條路徑**應該**
-	// 發 P7（invoice.operation.review_required，#3055 的橫向稽查）通知賣家有東西卡住。
-	// 原本寫成「為空」是因為當時這裡一則都不發，而那個寫法會把 P7 也一起禁掉。
 	for _, ev := range h.outbox.inserted {
 		if ev.RoutingKey == pkgmq.RoutingKeyInvoiceReceiptIssued {
 			t.Error("沒有產出收據就不得發 invoice.receipt.issued —— 買家會收到一封指向不存在檔案的通知")

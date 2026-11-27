@@ -38,7 +38,6 @@ function toAction(
 		}
 		case "productId":
 		case "postId": {
-			// ID 是不透明的字串（ADR 2026-09-25-row-identity-by-data-kind D5），組網址時再編碼。
 			const id = kind.value.trim();
 			if (!id) return undefined;
 			return { type: kind.case === "productId" ? "product" : "post", id };

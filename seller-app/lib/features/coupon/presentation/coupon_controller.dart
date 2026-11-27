@@ -32,7 +32,6 @@ class CouponListController extends _$CouponListController {
   /// Create a coupon template and append it to the local list.
   Future<Coupon> create(Map<String, dynamic> body) async {
     final coupon = await _repo.createCoupon(body);
-    // Refresh full list from server to get complete data
     unawaited(refresh());
     return coupon;
   }

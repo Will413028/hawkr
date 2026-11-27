@@ -18,17 +18,12 @@ public final class ShippingAreaResolver {
 
     /** 離島郵遞區號前三碼集合 */
     private static final Set<String> OFFSHORE_ZIP_CODES = Set.of(
-            // 澎湖縣
             "880", "881", "882", "883", "884", "885",
-            // 金門縣
             "890", "891", "892", "893", "894", "895", "896",
-            // 連江縣（馬祖）
             "209", "210", "211", "212",
-            // 台東縣離島
-            "951",  // 綠島
-            "952",  // 蘭嶼
-            // 屏東縣離島
-            "929"   // 小琉球
+            "951",
+            "952",
+            "929"
     );
 
     private ShippingAreaResolver() {
@@ -45,7 +40,6 @@ public final class ShippingAreaResolver {
             return ShippingArea.MAIN_ISLAND;
         }
         String trimmed = zipCode.trim();
-        // 支援五碼郵遞區號（取前三碼）
         if (trimmed.length() > 3) {
             trimmed = trimmed.substring(0, 3);
         }

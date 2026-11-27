@@ -68,8 +68,6 @@ class OrderPaymentDetailsScreen extends StatelessWidget {
             style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16.sp),
           ),
           SizedBox(height: 12.h),
-          // 🔴 這四列原本是硬編碼的 'NT$0'，與真實訂單無關。OrderSummary 上
-          // shippingFee／discountAmount／totalAmount 三個欄位一直都在，只是沒接。
           _summaryRow('商品小計', total),
           _summaryRow('運費', _money(order?.shippingFee)),
           _summaryRow(
@@ -78,7 +76,6 @@ class OrderPaymentDetailsScreen extends StatelessWidget {
             color: AppColors.danger,
           ),
           const Divider(height: 24),
-          // 合計取 totalAmount 而不是沿用商品小計：有運費或折扣時兩者不相等。
           _summaryRow('合計', _money(order?.totalAmount), isTotal: true),
         ],
       ),

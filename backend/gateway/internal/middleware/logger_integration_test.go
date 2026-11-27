@@ -51,12 +51,9 @@ func TestLogger_RedactsRequestAndResponseBodies(t *testing.T) {
 			t.Fatalf("secret %q leaked into access log: req=%q resp=%q", leak, reqLogged, respLogged)
 		}
 	}
-	// #2506: phone is general PII and must now default to redacted — this
-	// assertion is the direct regression test for the issue's finding.
 	if strings.Contains(reqLogged, "0912345678") {
 		t.Fatalf("PII phone field leaked into req_body: %q", reqLogged)
 	}
-	// Non-sensitive fields must still survive for the log to stay useful.
 	if !strings.Contains(reqLogged, "700123456") {
 		t.Fatalf("benign accountId field lost from req_body: %q", reqLogged)
 	}
@@ -70,7 +67,7 @@ func TestLogger_BoundsRequestReadButPreservesFullBodyForHandler(t *testing.T) {
 	r := gin.New()
 	r.Use(middleware.Logger())
 
-	fullBody := strings.Repeat("x", 5<<20) // 5MiB — larger than scanLimit (16KB)
+	fullBody := strings.Repeat("x", 5<<20)
 	var gotLen int
 	r.POST("/upload", func(c *gin.Context) {
 		b, err := io.ReadAll(c.Request.Body)
@@ -135,8 +132,8 @@ func TestLogger_ClientIPFromCloudflareNotForgedXFF(t *testing.T) {
 	r.GET("/ping", func(c *gin.Context) { c.Status(http.StatusOK) })
 
 	req, _ := http.NewRequest(http.MethodGet, "/ping", nil)
-	req.Header.Set("X-Forwarded-For", "203.0.113.77")  // attacker-forged
-	req.Header.Set("CF-Connecting-IP", "198.51.100.5") // CF-attested real client
+	req.Header.Set("X-Forwarded-For", "203.0.113.77")
+	req.Header.Set("CF-Connecting-IP", "198.51.100.5")
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
@@ -182,7 +179,7 @@ func TestLogger_AuthorizationFullyRedacted(t *testing.T) {
 	if auth != "[REDACTED]" {
 		t.Fatalf("auth field must be exactly %q, got %q", "[REDACTED]", auth)
 	}
-	if strings.Contains(auth, "eyJhbGciOiJIUzI1NiJ9") { // gitleaks:allow（測試用的假 token）
+	if strings.Contains(auth, "eyJhbGciOiJIUzI1NiJ9") {
 		t.Fatalf("JWT prefix leaked into auth field: %q", auth)
 	}
 }

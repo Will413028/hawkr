@@ -33,13 +33,13 @@ func TestTownCodeValidation(t *testing.T) {
 		code string
 		ok   bool
 	}{
-		{"63000050", true}, // 臺北市中正區
-		{"65000010", true}, // 新北市板橋區
+		{"63000050", true},
+		{"65000010", true},
 		{"", false},
 		{"invalid", false},
 		{"00000000", false},
-		{"1234567", false},   // 7 碼
-		{"123456789", false}, // 9 碼
+		{"1234567", false},
+		{"123456789", false},
 	} {
 		input := model.AddressInput{
 			ReceiverName:  "王小明",

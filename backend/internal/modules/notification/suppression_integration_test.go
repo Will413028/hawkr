@@ -31,7 +31,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/testdb"
 )
 
-// dispatchJobs 記下 inbox 排的派送 job，由測試決定何時派送（等同 River 取件）。
 type dispatchJobs struct {
 	mu   sync.Mutex
 	args []inbox.DispatchArgs
@@ -116,7 +115,6 @@ const (
 
 const undeterminedBounce = `{"type":"email.bounced","data":{"to":["maybe@example.com"],"bounce":{"type":"Undetermined"}}}`
 
-// dispatchAll 派送目前排的所有 inbox job（等同 River 取件）。
 func (f *webhookFixture) dispatchAll(t *testing.T) {
 	t.Helper()
 	for _, j := range f.jobs.take() {
@@ -226,13 +224,11 @@ func TestHardBounceIsRemovableButComplaintIsNot(t *testing.T) {
 		t.Fatalf("格式不合：removed=%v err=%v，預期 InvalidInput（不同於「名單裡沒有」的 false, nil）", removed, err)
 	}
 
-	// 舊密鑰寫的退信列：移除找得到。
 	f.mustInsertHash(t, testSuppressionKeys.Previous, "old@example.com", "HARD_BOUNCE")
 	if removed, err := f.module.RemoveEmailSuppression(ctx, "old@example.com"); err != nil || !removed {
 		t.Fatalf("舊密鑰的列：removed=%v err=%v", removed, err)
 	}
 
-	// 先永久退信、之後投訴：升級成 COMPLAINT，之後不可移除；已是 COMPLAINT 的不會被退信降級。
 	f.receive(t, "msg_2", `{"type":"email.bounced","data":{"to":["both@example.com"],"bounce":{"type":"Permanent"}}}`)
 	f.dispatchAll(t)
 	f.receive(t, "msg_3", `{"type":"email.complained","data":{"to":["both@example.com"]}}`)

@@ -42,13 +42,13 @@ public final class UberStatusMapper {
      * 它在正向 leg 是<b>失敗</b>（→33→41→退款）。名字容易誤讀成「已退貨完成」。
      */
     private static final Map<String, ShippingStatus> FORWARD = Map.of(
-            "pending", ShippingStatus.UNPROCESSED,              // 91
-            "pickup", ShippingStatus.COURIER_ASSIGNED,          // 933
-            "pickup_complete", ShippingStatus.HANDED_OVER,      // 930
-            "dropoff", ShippingStatus.IN_TRANSIT,               // 31
-            "delivered", ShippingStatus.PICKED_UP,              // 11（T1 終態）
-            "canceled", ShippingStatus.CANCELLED,               // 41（T1 終態）
-            "returned", ShippingStatus.ABNORMAL);               // 33 →（同一次處理內續推 41，§7.3.4）
+            "pending", ShippingStatus.UNPROCESSED,
+            "pickup", ShippingStatus.COURIER_ASSIGNED,
+            "pickup_complete", ShippingStatus.HANDED_OVER,
+            "dropoff", ShippingStatus.IN_TRANSIT,
+            "delivered", ShippingStatus.PICKED_UP,
+            "canceled", ShippingStatus.CANCELLED,
+            "returned", ShippingStatus.ABNORMAL);
 
     /**
      * 逆向 leg（{@code is_return=true}）的售後案件語意（66 §7.3.2 下表）。
@@ -69,10 +69,10 @@ public final class UberStatusMapper {
      * ⇒ <b>買家明明已交件卻被判定沒寄回而拿不到退款</b>。
      */
     private static final Map<String, AfterSaleCaseStatus> RETURN_LEG_CASE = Map.of(
-            "pickup_complete", AfterSaleCaseStatus.RETURN_SHIPPING,   // 25（U5）
-            "dropoff", AfterSaleCaseStatus.RETURN_SHIPPING,           // 25
-            "delivered", AfterSaleCaseStatus.RETURN_DELIVERED,        // 27
-            "returned", AfterSaleCaseStatus.RETURN_FAILED);           // 28
+            "pickup_complete", AfterSaleCaseStatus.RETURN_SHIPPING,
+            "dropoff", AfterSaleCaseStatus.RETURN_SHIPPING,
+            "delivered", AfterSaleCaseStatus.RETURN_DELIVERED,
+            "returned", AfterSaleCaseStatus.RETURN_FAILED);
 
     /** 逆向 leg 上「明確不處理」的 raw 值——與「未識別」分開（66 U6）。 */
     private static final Set<String> RETURN_LEG_EXPLICIT_NO_OP = Set.of("pending", "pickup");

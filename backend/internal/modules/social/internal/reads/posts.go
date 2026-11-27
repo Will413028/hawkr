@@ -24,7 +24,6 @@ type PostPage struct {
 	Limit          int64
 }
 
-// postsWithStats 是貼文入口 join 它的 stats，投影 PostRow 的全部欄位。
 func postsWithStats(src visibility.Posts) SelectStatement {
 	s := table.PostStats.AS("s")
 	cols := project(plain(src.T.AllColumns), plain(s.AllColumns))
@@ -121,7 +120,6 @@ type HashtagCountRow struct {
 	PostCount int64  `db:"post_count"`
 }
 
-// hashtagCounts 是全域彙總：計數不依觀看者（封鎖不影響計數），所以以匿名建入口。
 func hashtagCounts(now time.Time, limit int64, filter func(h *table.PostHashtagsTable, p *table.PostsTable) BoolExpression) SelectStatement {
 	src := visibility.ReadablePosts("p", now, visibility.Anonymous)
 	h := table.PostHashtags.AS("h")

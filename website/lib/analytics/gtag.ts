@@ -90,8 +90,6 @@ export function bootstrapGtag(gaId: string): void {
 	const w = window as unknown as GtagWindow;
 	w.dataLayer ??= [];
 	w.gtag ??= function gtag() {
-		// Google documents gtag as dataLayer.push(arguments). Keep the native
-		// Arguments object instead of substituting a rest-parameter Array.
 		// biome-ignore lint/complexity/noArguments: gtag.js requires the documented native Arguments queue entry.
 		w.dataLayer?.push(arguments);
 	};
@@ -150,9 +148,6 @@ export function track(eventName: string, params: GA4EventParams = {}): void {
 					: typeof document === "undefined"
 						? ""
 						: document.title;
-			// GA automatically attaches page context to every event. Override it at
-			// the single dispatch seam so callers and the browser's raw URL cannot
-			// reintroduce account, order, token or contact identifiers.
 			safeParams = {
 				...params,
 				page_path: pagePath,

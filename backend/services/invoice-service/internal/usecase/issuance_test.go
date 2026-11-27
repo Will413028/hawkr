@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	testNow     = time.Date(2026, 8, 30, 2, 0, 0, 0, time.UTC) // 台北 2026-08-30 10:00
+	testNow     = time.Date(2026, 8, 30, 2, 0, 0, 0, time.UTC)
 	testCutover = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 )
 
@@ -61,7 +61,6 @@ func newHarness(t *testing.T, profile domain.SellerTaxProfile, account domain.Pr
 		receipts: rr, receiptS: ru}
 }
 
-// approvedProfile 是「已核定、應開統一發票」的賣家。
 func approvedProfile(taxCategory int16) domain.SellerTaxProfile {
 	legal := "測試股份有限公司"
 	tax := "12345678"
@@ -83,7 +82,6 @@ func activeAccount() domain.ProviderAccount {
 	}
 }
 
-// baseInput 是一張最單純的 B2C 訂單：一件商品 100 元、無運費、無折扣。
 func baseInput() OrderPaidInput {
 	return OrderPaidInput{
 		OrderNo:         "O000123456",
@@ -106,18 +104,12 @@ func baseInput() OrderPaidInput {
 
 var amegoIssueOK = amegoResult()
 
-// ---------------------------------------------------------------------------
-// §7.1.3 決策樹：逐葉節點
-//
-// 判準不是「有幾個測試」而是「每一個葉節點都有一支測試走到它」。逐葉列表對帳，不數個數：
-// 數個數在新增一格分支時不會轉紅，而那正是決策樹最常見的改法。
-// ---------------------------------------------------------------------------
 
 func TestPrepare_DecisionTreeLeaves(t *testing.T) {
 	exemptCat := int16(domain.TaxCategoryExempt)
 
 	cases := []struct {
-		leaf    string // §7.1.3 mermaid 的節點代號
+		leaf    string
 		profile domain.SellerTaxProfile
 		account domain.ProviderAccount
 		mutate  func(*OrderPaidInput)
@@ -127,7 +119,6 @@ func TestPrepare_DecisionTreeLeaves(t *testing.T) {
 		wantStatus string
 		wantNA     string
 		wantManual string
-		// wantOp 是「這一格會不會建 operation」以及它建完之後的狀態。
 		wantOpStatus string
 	}{
 		{
@@ -153,9 +144,6 @@ func TestPrepare_DecisionTreeLeaves(t *testing.T) {
 				ReceiptAuthorizedAt: &testNow,
 			},
 			account: activeAccount(),
-			// #3026：收據產製已落地 ⇒ 這一葉翻回 PENDING ＋ operation READY。
-			// **READY 是這一格的重點**：它代表 INV.op 會來撿，而 submit.go 的
-			// PLATFORM_RECEIPT 分支會接住它走本地產製（而不是 #3022 那時的 ISSUE_FAILED）。
 			wantMode:     codemeta.InvoiceFulfillmentModePlatformReceipt.Value,
 			wantKind:     codemeta.InvoiceDocumentKindReceipt.Value,
 			wantStatus:   codemeta.InvoiceDocumentStatusPending.Value,
@@ -166,10 +154,8 @@ func TestPrepare_DecisionTreeLeaves(t *testing.T) {
 			profile: domain.SellerTaxProfile{
 				ReviewStatus:       codemeta.SellerTaxReviewStatusApprovedInvoiceExempt.Value,
 				DefaultTaxCategory: 1,
-				// ReceiptAuthorizedAt 為 nil ＝ 賣家沒在 S05 按同意。
 			},
 			account: activeAccount(),
-			// 🔴 operation **不得**是 READY：沒有授權就不該有任何東西去產製它。
 			wantMode:     codemeta.InvoiceFulfillmentModePlatformReceipt.Value,
 			wantKind:     codemeta.InvoiceDocumentKindReceipt.Value,
 			wantStatus:   codemeta.InvoiceDocumentStatusAwaitingManual.Value,
@@ -222,7 +208,6 @@ func TestPrepare_DecisionTreeLeaves(t *testing.T) {
 			account: domain.ProviderAccount{
 				ID:     555,
 				Status: codemeta.InvoiceProviderAccountStatusActive.Value,
-				// cutover 未設定 ＝ 尚未切過去。
 			},
 			wantMode:     codemeta.InvoiceFulfillmentModeLegacyManual.Value,
 			wantKind:     codemeta.InvoiceDocumentKindB2c.Value,
@@ -238,7 +223,6 @@ func TestPrepare_DecisionTreeLeaves(t *testing.T) {
 			wantKind:   codemeta.InvoiceDocumentKindB2c.Value,
 			wantStatus: codemeta.InvoiceDocumentStatusAwaitingManual.Value,
 			wantManual: codemeta.InvoiceManualReasonPlatformFundedDiscount.Value,
-			// AM 節點明文「operation 不建」。
 			wantOpStatus: "",
 		},
 		{
@@ -316,19 +300,15 @@ func TestPrepare_DecisionTreeLeaves(t *testing.T) {
 				t.Errorf("operation.status = %q, want %q", got.OperationStatus, tc.wantOpStatus)
 			}
 
-			// chk_invdoc_deadline_presence 是雙向等式且**與 status 無關**：
-			// 連 NOT_APPLICABLE 的 B2C 也必須有期限，RECEIPT 則必須沒有。
 			doc := h.docs.created[0]
 			wantDeadline := tc.wantKind != codemeta.InvoiceDocumentKindReceipt.Value
 			if (doc.StatutoryDeadlineAt != nil) != wantDeadline {
 				t.Errorf("statutory_deadline_at present = %v, want %v (kind=%s)",
 					doc.StatutoryDeadlineAt != nil, wantDeadline, tc.wantKind)
 			}
-			// chk_invdoc_receipt 是雙向等式：RECEIPT ⇔ receipt_no 非空。
 			if (doc.ReceiptNo != "") != (tc.wantKind == codemeta.InvoiceDocumentKindReceipt.Value) {
 				t.Errorf("receipt_no = %q for kind=%s", doc.ReceiptNo, tc.wantKind)
 			}
-			// chk_invdoc_kind_mode 是雙向等式。
 			if (doc.DocumentKind == codemeta.InvoiceDocumentKindReceipt.Value) !=
 				(doc.FulfillmentMode == codemeta.InvoiceFulfillmentModePlatformReceipt.Value) {
 				t.Errorf("kind=%s mode=%s 違反 chk_invdoc_kind_mode", doc.DocumentKind, doc.FulfillmentMode)
@@ -358,8 +338,6 @@ func TestPrepare_CoversEveryNotApplicableReason(t *testing.T) {
 		{domain.SellerTaxProfile{ReviewStatus: codemeta.SellerTaxReviewStatusDraft.Value}, activeAccount(), nil},
 		{approvedProfile(1), domain.ProviderAccount{ID: 1, Status: codemeta.InvoiceProviderAccountStatusRevoked.Value, AutomationCutoverAt: &testCutover}, nil},
 		{approvedProfile(1), domain.ProviderAccount{ID: 1, Status: codemeta.InvoiceProviderAccountStatusActive.Value}, nil},
-		// R1 免用統一發票（#3022）：這一格在 2026-09-02 之前產不出任何 reason
-		// ——它落 PENDING，而 PENDING 沒有 not_applicable_reason。
 		{domain.SellerTaxProfile{
 			ReviewStatus:       codemeta.SellerTaxReviewStatusApprovedInvoiceExempt.Value,
 			DefaultTaxCategory: 1,
@@ -386,14 +364,10 @@ func TestPrepare_CoversEveryNotApplicableReason(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// §5A.11 fail-closed：斷言失敗一律轉人工，且**沒有任何請求送出去**
-// ---------------------------------------------------------------------------
 
 func TestPrepare_InvariantFailureGoesToAwaitingManualAndNeverSends(t *testing.T) {
 	h := newHarness(t, approvedProfile(1), activeAccount())
 	in := baseInput()
-	// A1：Σ line.gross(100) != total_actual(999)。
 	in.Snapshot.TotalActualAmount = 999
 
 	got, err := h.uc.Prepare(context.Background(), in)
@@ -406,39 +380,27 @@ func TestPrepare_InvariantFailureGoesToAwaitingManualAndNeverSends(t *testing.T)
 	if got.ManualReasonCode != domain.CodeAmountMismatch {
 		t.Fatalf("manual_reason_code = %q, want %q", got.ManualReasonCode, domain.CodeAmountMismatch)
 	}
-	// 陰性斷言：這一格的價值就在「沒有送出去」。
 	if n := len(h.provider.requests); n != 0 {
 		t.Fatalf("provider 收到 %d 次請求，斷言失敗的草稿不得送出", n)
 	}
 	if got.OperationID != 0 {
 		t.Fatalf("AWAITING_MANUAL 不應建立 operation，卻建了 %d", got.OperationID)
 	}
-	// 落庫路徑：先建 PENDING（M1 的建立邊只有兩條），同一交易內接 PENDING → AWAITING_MANUAL。
 	if h.docs.created[0].Status != codemeta.InvoiceDocumentStatusPending.Value {
 		t.Errorf("建立邊寫成 %q，M1 沒有 [*] → AWAITING_MANUAL 這條邊", h.docs.created[0].Status)
 	}
 	if len(h.docs.awaitingManual) != 1 || h.docs.awaitingManual[0] != domain.CodeAmountMismatch {
 		t.Errorf("manual_reason_code 未與狀態同一交易寫入：%v", h.docs.awaitingManual)
 	}
-	// P7：fail-closed 落點必須通知賣家（#3055 的橫向稽查）。
-	//
-	// 🔴 斷言掛在**這一支**（走 Prepare 的外緣）而不是另寫一支直接呼叫 emitter 的：
-	// 直接呼叫 emitter 的測試對「接線被拿掉」完全無感 —— 本波第一版就是那樣，
-	// 變異驗證沒轉紅才發現。
-	// 少了這一則，賣家只會發現發票一直沒開，而系統已經把它掛在 ADM 的人工佇列上等人。
 	if len(h.outbox.inserted) != 1 ||
 		h.outbox.inserted[0].RoutingKey != pkgmq.RoutingKeyInvoiceOperationReviewRequired {
 		t.Fatalf("轉人工必須發 P7，實得 %v", routingKeysOf(h.outbox.inserted))
 	}
-	// store_id 走 issuer_ref_id：dispatcher 拿它解析賣家帳號，填 PK 會讓通知靜默不送。
 	if !containsBytes(h.outbox.inserted[0].Payload, `"review_reason_code":"`+domain.CodeAmountMismatch+`"`) {
 		t.Errorf("review_reason_code 沒帶上：%s", h.outbox.inserted[0].Payload)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 冪等：重複消費 order.paid 不得再建一次
-// ---------------------------------------------------------------------------
 
 func TestPrepare_DuplicateOrderPaidIsIdempotent(t *testing.T) {
 	h := newHarness(t, approvedProfile(1), activeAccount())
@@ -459,9 +421,6 @@ func TestPrepare_DuplicateOrderPaidIsIdempotent(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 冪等鍵與衍生識別字（§5.3.2）
-// ---------------------------------------------------------------------------
 
 func TestPrepare_DerivedIdentifiers(t *testing.T) {
 	h := newHarness(t, approvedProfile(1), activeAccount())
@@ -480,7 +439,6 @@ func TestPrepare_DerivedIdentifiers(t *testing.T) {
 	if op.ProviderRequestNo != doc.ProviderRequestNo {
 		t.Errorf("operation.provider_request_no 必須等於 document 的")
 	}
-	// I-52：operation 的 statutory_deadline_at 是 document 同名欄的副本。
 	if op.StatutoryDeadlineAt == nil || doc.StatutoryDeadlineAt == nil ||
 		!op.StatutoryDeadlineAt.Equal(*doc.StatutoryDeadlineAt) {
 		t.Errorf("statutory_deadline_at 副本未在同一交易內複製")

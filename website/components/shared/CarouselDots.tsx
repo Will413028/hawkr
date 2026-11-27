@@ -90,9 +90,6 @@ export default function CarouselDots({
 					aria-label={dotLabel(index)}
 					tabIndex={index === active ? 0 : -1}
 					data-active={index === active}
-					// `before:-inset-[19px]` grows the 6px dot's hit area to 44×44
-					// without changing a single painted pixel; `relative` is what
-					// the pseudo-element anchors to.
 					className={cn(
 						"relative h-1.5 cursor-pointer rounded-full border-0 p-0",
 						"transition-colors duration-[220ms] ease-[var(--hkui-ease)] motion-reduce:transition-none",

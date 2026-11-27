@@ -44,7 +44,6 @@ type AgreementAcceptance struct {
 	Version string
 }
 
-// agreementsField 是欄位錯誤的欄位名（輸入型別上的欄位）。
 const agreementsField = "AcceptedAgreements"
 
 // CheckAgreements 核對賣家的同意：required 的每一種剛好出現一次、版本是現行版本。缺種類、多出不屬於這個操作的種類
@@ -86,7 +85,6 @@ func containsKind(kinds []AgreementKind, k AgreementKind) bool {
 	return false
 }
 
-// maxUserAgentRunes 是儲存的 User-Agent 長度上限（schema 的 agreement_acceptances_user_agent_check，儲存成本的上限）。
 const maxUserAgentRunes = 512
 
 // ClientIPAddr 把來源 IP 轉成儲存的值（inet）：去掉 zone、IPv4-mapped 轉成 IPv4；取不到或不是 IP 是 nil。

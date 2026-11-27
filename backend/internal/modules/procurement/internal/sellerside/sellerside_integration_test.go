@@ -56,7 +56,6 @@ func TestStoreCannotTouchAnotherStoresResponse(t *testing.T) {
 	ctx := t.Context()
 	mine := f.submit(invitedStore, "", f.validQuote())
 	svc := f.service()
-	// 另一家被邀請的店拿著我的回價 ID 撤回：不是它的回價。
 	if _, err := svc.Withdraw(ctx, otherInvitedStore, f.publication, mine.ResponseID, "1", ""); err == nil {
 		t.Fatal("別家的回價被撤回")
 	} else {
@@ -282,8 +281,6 @@ func TestSubmitReplayReturnsTheFirstVersionBeforeAnyOtherCheck(t *testing.T) {
 	if n := f.count("procurement.seller_response_versions"); n != 1 {
 		t.Fatalf("重送不該多一個版本：%d", n)
 	}
-	// 重送先於版本檢查：expected 版本已不是目前的（空字串卻已有正式回價）也回放，不判成已提交。
-	// 重送先於停止寫入：婉拒之後、有效期限過後、需求成交之後的重送都回放。
 	if _, err := svc.Decline(ctx, invitedStore, f.publication, ""); err != nil {
 		t.Fatal(err)
 	}
@@ -361,7 +358,6 @@ func TestDraftSizeIsMeasuredByTheDatabase(t *testing.T) {
 	if _, err := svc.UpsertDraft(ctx, invitedStore, f.publication, "", amp); err != nil {
 		t.Fatalf("& 很多但 jsonb 在上限內的草稿要收下：%v", err)
 	}
-	// 草稿已存在時，帶空版本又太大的請求先是版本衝突：衝突先於大小。
 	_, err = svc.UpsertDraft(ctx, invitedStore, f.publication, "", over)
 	wantConflict(t, err, sellerside.TargetDraft)
 }
@@ -408,7 +404,6 @@ func TestSubmitReplayWithDifferentContentIsRejected(t *testing.T) {
 	if n := f.count("procurement.seller_response_versions"); n != 1 {
 		t.Fatalf("內容不同的重送不該建版本：%d", n)
 	}
-	// 規格說明是 hash 的一部分：只改它也算內容不同。
 	changed = f.validQuote()
 	changed.SpecNote = "另一份規格"
 	_, err = f.service().Submit(ctx, f.submitIn(invitedStore, cid, "", changed))
@@ -429,13 +424,12 @@ func TestSubmitVersionAndPublicationChecks(t *testing.T) {
 	_, err = svc.Submit(ctx, bad)
 	wantConflict(t, err, quote.TargetPublication)
 	bad = in
-	bad.ExpectedResponseVersion = "1" // 還沒有正式回價
+	bad.ExpectedResponseVersion = "1"
 	_, err = svc.Submit(ctx, bad)
 	wantConflict(t, err, quote.TargetSellerResponse)
 	if _, err := svc.Submit(ctx, in); err != nil {
 		t.Fatal(err)
 	}
-	// 已有正式回價卻帶空字串、帶舊版本。
 	_, err = svc.Submit(ctx, f.submitIn(invitedStore, uuid.NewV7(), "", f.validQuote()))
 	wantConflict(t, err, quote.TargetSellerResponse)
 	v2, err := svc.Submit(ctx, f.submitIn(invitedStore, uuid.NewV7(), "1", f.validQuote()))
@@ -450,7 +444,6 @@ func TestSubmitVersionAndPublicationChecks(t *testing.T) {
 	if d.Latest == nil || d.Latest.Version != 2 {
 		t.Fatalf("目前版本 = %+v", d.Latest)
 	}
-	// 每一次被擋下的送出都沒有留下版本。
 	if n := f.count("procurement.seller_response_versions"); n != 2 {
 		t.Fatalf("版本數 = %d", n)
 	}
@@ -495,7 +488,6 @@ func TestEveryWriteBlockConditionClosesDraftSubmitAndWithdraw(t *testing.T) {
 			}
 		}},
 		{"需求有進行中的成交", func(f *fixture) {
-			// 另一家店的報價被買家接受。
 			r := f.submit(otherInvitedStore, "", f.validQuote())
 			if _, err := f.buyerQuotes().Accept(context.Background(), quote.AcceptInput{
 				BuyerID: f.buyer, RequestID: f.request, ClientRequestID: uuid.NewV7(), ResponseID: r.ResponseID, ExpectedVersion: 1, ExpectedSellerFacingHash: f.hash,
@@ -507,7 +499,6 @@ func TestEveryWriteBlockConditionClosesDraftSubmitAndWithdraw(t *testing.T) {
 			f.exec(`UPDATE procurement.rfq_publications SET buyer_id = NULL WHERE id = $1`, f.publication)
 		}},
 		{"回價期限已過", func(f *fixture) {
-			// f.now 是台北 2026-11-23 11:00；期限 11-22 已過。
 			f.exec(`UPDATE procurement.rfq_publication_approvals SET response_deadline = DATE '2026-11-22'`)
 		}},
 	}
@@ -518,7 +509,6 @@ func TestEveryWriteBlockConditionClosesDraftSubmitAndWithdraw(t *testing.T) {
 			mine := f.submit(invitedStore, "", f.validQuote())
 			b.apply(f)
 			svc := f.service()
-			// 期限改過核准之後賣家可見內容的 hash 會變，讀目前的值再送。
 			d, err := svc.Get(ctx, invitedStore, f.publication)
 			must(t, err)
 			f.hash = d.Summary.SellerFacingHash
@@ -544,7 +534,7 @@ func TestEveryWriteBlockConditionClosesDraftSubmitAndWithdraw(t *testing.T) {
 func TestADeadlineOfTodayStillAllowsWritesAndAFailedOrderReopensThem(t *testing.T) {
 	f := newFixture(t)
 	ctx := t.Context()
-	f.exec(`UPDATE procurement.rfq_publication_approvals SET response_deadline = DATE '2026-11-23'`) // 台北的今天：不算過
+	f.exec(`UPDATE procurement.rfq_publication_approvals SET response_deadline = DATE '2026-11-23'`)
 	d, err := f.service().Get(ctx, invitedStore, f.publication)
 	must(t, err)
 	f.hash = d.Summary.SellerFacingHash
@@ -553,7 +543,6 @@ func TestADeadlineOfTodayStillAllowsWritesAndAFailedOrderReopensThem(t *testing.
 	must(t, err)
 	_, err = f.service().UpsertDraft(ctx, invitedStore, f.publication, "", f.validQuote())
 	wantClosed(t, err)
-	// 建單重試用盡：接受單轉 ORDER_FAILED、live 鎖解除，賣家又能寫入。
 	f.exec(`UPDATE procurement.buyer_quote_acceptances SET state = 'ORDER_FAILED', order_provisioning_state = 'ORDER_FAILED', order_failure_reason = 'RETRY_EXHAUSTED' WHERE id = $1`, a.ID)
 	if _, err := f.service().UpsertDraft(ctx, invitedStore, f.publication, "", f.validQuote()); err != nil {
 		t.Fatalf("建單失敗後賣家要能再寫入：%v", err)
@@ -565,7 +554,7 @@ func TestWithdrawIsATargetStateMethod(t *testing.T) {
 	ctx := t.Context()
 	svc := f.service()
 	_, err := svc.Withdraw(ctx, invitedStore, f.publication, uuid.NewV7(), "1", "")
-	wantKind(t, err, apperr.KindNotFound) // 還沒有回價身分列
+	wantKind(t, err, apperr.KindNotFound)
 	r := f.submit(invitedStore, "", f.validQuote())
 	_, err = svc.Withdraw(ctx, invitedStore, f.publication, r.ResponseID, "", "")
 	wantKind(t, err, apperr.KindInvalidInput)
@@ -598,7 +587,6 @@ func TestWithdrawIsATargetStateMethod(t *testing.T) {
 	if d.Latest == nil || d.Latest.Status != model.ResponseWithdrawn {
 		t.Fatalf("撤回後的狀態 = %+v", d.Latest)
 	}
-	// 撤回之後可以用目前的版本（已撤回）當 expected 送出新版本。
 	v2 := f.submit(invitedStore, "1", f.validQuote())
 	if v2.Version != 2 || v2.Status != model.ResponseActive {
 		t.Fatalf("撤回後重新報價 = %+v", v2)
@@ -630,13 +618,11 @@ func TestDeclineIsIdempotentAndKeepsTheFirstClosure(t *testing.T) {
 	}
 	_, err = svc.Decline(ctx, invitedStore, f.publication, strings.Repeat("a", 65))
 	wantKind(t, err, apperr.KindInvalidInput)
-	// 已送出的正式回價保留，買家不能再接受。
 	page, err := f.buyerQuotes().List(ctx, quote.ListInput{BuyerID: f.buyer, RequestID: f.request, PublicationID: f.publication})
 	must(t, err)
 	if len(page.Responses) != 1 || page.Responses[0].Acceptability != model.AcceptabilityIneligible {
 		t.Fatalf("婉拒後買家端 = %+v", page.Responses)
 	}
-	// 另一家店沒婉拒：不受影響；沒填原因存 NULL。
 	d, err := svc.Decline(ctx, otherInvitedStore, f.publication, "")
 	must(t, err)
 	var n int

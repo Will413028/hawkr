@@ -11,8 +11,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/policy"
 )
 
-// 公開可讀的規則（沒有未還原的隱藏、作者不在 buyer.pub_inactive_buyers()）只寫一份：testdata/public_predicate.sql。這組測試讀 db/queries 的原始檔，
-// 要求公開讀取每一支都帶它（漏掉只會是「少了這段文字」，由這裡擋），而且讀 review.reviews 的查詢不是公開讀取就必須明列。
 
 type query struct{ name, file, body string }
 
@@ -43,7 +41,6 @@ func loadQueries(t *testing.T) []query {
 	return out
 }
 
-// normalize 去掉 -- 註解並把空白收成一個空格，比對不受排版影響。
 func normalize(s string) string {
 	var lines []string
 	for _, l := range strings.Split(s, "\n") {
@@ -92,20 +89,14 @@ func TestEveryPublicQueryCarriesThePublicPredicate(t *testing.T) {
 	}
 }
 
-// 公開讀取以外讀 review.reviews 的查詢（寫入路徑、作者本人、診斷）要明列：新增的讀取預設是公開讀取，放在 public.sql 才有述詞的保證。
 var nonPublicReads = map[string]bool{
 	"InsertReview": true, "ListMyReviews": true, "ReplyToReview": true, "GetReviewForDiagnosis": true, "GetReviewStore": true, "LockReview": true,
-	// 內容下架訂閱者（takedowns.sql）：seller 措施同 transaction 鎖評價列核對歸屬，不回內容。
 	"LockReviewsForTakedown": true,
-	// review.review_images 的非公開讀寫：附圖只經已過可讀述詞的評價列取（ListReviewImages 的呼叫端傳入的 ID 來自公開或作者本人的列），
 	"InsertReviewImage": true, "ListReviewImages": true,
-	// 刪帳清除與 relay（purge.sql）：作者已不是營運中，公開述詞必定排除他的評價；清除要鎖與刪他的全部列，relay 要讀原始列。
 	"LockBuyerReviewBatch": true, "DeleteReviewsByID": true, "ListInactiveBuyersWithReviews": true, "GetReviewByID": true, "IsReviewPublic": true,
-	// 評分全量對帳（rating_queue.sql）：只列哪些商品有評價列、不回內容，與可見性無關（公開統計由 ProductStats 算）。
 	"RequestRatingReconcileBatch": true,
 }
 
-// ReplyToReview 雖然不在 public.sql，仍以公開可讀為回覆的前提。
 var nonPublicWithPredicate = map[string]bool{"ReplyToReview": true}
 
 func TestNonPublicReviewReadsAreListed(t *testing.T) {

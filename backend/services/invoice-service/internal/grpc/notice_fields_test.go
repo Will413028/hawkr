@@ -17,8 +17,6 @@ import (
 // 空字串的後果分別是：B04 底部那條「恆顯示」的 info banner 沒有內容、
 // B06 送出成功的 toast 沒有內文。
 func TestCorrectionStatusNotices_CoversEveryStatus(t *testing.T) {
-	// 🔴 值域窮盡：漏一個狀態的症狀是那個狀態的 toast 沒有內文，
-	// 而它只在跑到那個狀態時才看得到——最嚴重的 REISSUE_FAILED 正是最少見的那一個。
 	for _, s := range codemeta.AllInvoiceCorrectionStatuss {
 		if usecase.CorrectionStatusNotices[s.Value] == "" {
 			t.Errorf("狀態 %s（%s）沒有文案", s.Value, s.Label)
@@ -29,8 +27,6 @@ func TestCorrectionStatusNotices_CoversEveryStatus(t *testing.T) {
 			len(usecase.CorrectionStatusNotices), len(codemeta.AllInvoiceCorrectionStatuss))
 	}
 
-	// 🔴 REISSUE_FAILED 必須說出「原發票已作廢」：買家手上此刻一張憑證都沒有，
-	// 沿用「處理中」的通用文案等於把最嚴重的狀態說成一般等待。
 	got := usecase.CorrectionStatusNotices[codemeta.InvoiceCorrectionStatusReissueFailed.Value]
 	if !contains(got, "已作廢") {
 		t.Errorf("REISSUE_FAILED 的文案沒有說出原發票已作廢：%q", got)
@@ -84,7 +80,6 @@ func TestProviderExchange_FillsRequestIdFromCorrelationId(t *testing.T) {
 	if got.GetRequestId() != cid {
 		t.Fatalf("request_id 沒填或沒取 correlation_id：%q", got.GetRequestId())
 	}
-	// correlation_id 是 narg：沒有值時回空字串，不得 panic 也不得填別的東西。
 	none := toProviderExchange(domain.ProviderAuditLogEntry{ID: 2, Endpoint: "/json/f0401"})
 	if none.GetRequestId() != "" {
 		t.Fatalf("沒有 correlation_id 時應為空字串，實得 %q", none.GetRequestId())
@@ -100,7 +95,6 @@ func TestToComplaintInfo_FillsExpectedDocKind(t *testing.T) {
 	if got.GetExpectedDocKind() != "RECEIPT" {
 		t.Fatalf("expected_doc_kind 沒填：%q —— S09 卡上那一行會是空的", got.GetExpectedDocKind())
 	}
-	// 取不到時留空字串：申訴本身的資料完全健康，不該因為一個顯示欄位出錯。
 	none := toComplaintInfo(usecase.ComplaintView{Complaint: domain.Complaint{ID: 2}})
 	if none.GetExpectedDocKind() != "" {
 		t.Fatalf("沒有來源時應為空字串，實得 %q", none.GetExpectedDocKind())
@@ -120,14 +114,10 @@ func TestToComplaintInfo_FillsCaseNoFromTSID(t *testing.T) {
 		t.Fatalf("case_no = %q，want 該列的 TSID —— 空字串會讓 B07 整個編號區塊消失",
 			got.GetCaseNo())
 	}
-	// 與 complaint_id 同源同值是設計，不是巧合：前者進 URL、後者顯示給人看。
 	if got.GetCaseNo() != got.GetComplaintId() {
 		t.Fatalf("case_no(%q) ≠ complaint_id(%q)：58 §5.1.12 定義兩者同源",
 			got.GetCaseNo(), got.GetComplaintId())
 	}
-	// 陽性對照：換一件申訴要拿到不同編號（證明它不是常數）。
-	// 同一張訂單可以有多次申訴（reopen_count 的存在說明重開是設計內的）⇒
-	// 「每件不同」正是這個欄位的用處。
 	other := toComplaintInfo(usecase.ComplaintView{Complaint: domain.Complaint{ID: id + 1}})
 	if other.GetCaseNo() == got.GetCaseNo() {
 		t.Fatal("兩件不同的申訴拿到同一個案件編號 ⇒ 它是常數，對客服指稱案件沒有用")
@@ -147,7 +137,6 @@ func TestToComplaintInfo_StoreIdIsCallerSupplied(t *testing.T) {
 	if got.GetStoreId() != "" {
 		t.Fatalf("mapper 不該自己填 store_id（它拿不到 issuer_ref_id）：%q", got.GetStoreId())
 	}
-	// 呼叫端覆寫之後才有值，而且是 issuer_ref_id 不是 IssuerID（那是 PK）。
 	got.StoreId = fmtID(2636840881)
 	if got.GetStoreId() != "2636840881" {
 		t.Fatalf("覆寫後 store_id = %q", got.GetStoreId())

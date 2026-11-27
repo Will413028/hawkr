@@ -122,7 +122,6 @@ func New(cfg Config) (*Client, error) {
 const (
 	metaStoreID   = "store_id"
 	metaNamespace = "hawkr_namespace"
-	// maxNamespaceLen 是命名空間的長度上限（保守值，遠小於 Stripe 的 metadata 值上限）。
 	maxNamespaceLen = 40
 )
 
@@ -184,8 +183,6 @@ func (e *APIError) Permanent() bool {
 	return e.Status >= 400 && e.Status < 500
 }
 
-// exchange 是一次非 2xx 回應的狀態、標頭與本文；SDK 的錯誤型別依 API 版本與錯誤種類而異（有的不帶狀態碼），
-// 所以錯誤分類只看 HTTP 層記下的這份。
 type exchange struct {
 	status int
 	header http.Header
@@ -205,8 +202,6 @@ func (e *exchange) apiError() *APIError {
 	return &APIError{Status: e.status, Code: env.Error.Code, Message: env.Error.Message}
 }
 
-// recorder 讀完回應本文（上限 maxResponseBytes）再還給 SDK，非 2xx 時把狀態、標頭與本文記進呼叫的 ctx；
-// 每次往返另寫一筆遮罩後的請求摘要（方法、路徑、冪等鍵、狀態、Request-Id、耗時、請求與回應本文），標頭只取這幾個，Authorization 不會進記錄。
 type recorder struct {
 	next http.RoundTripper
 	log  *slog.Logger
@@ -272,7 +267,6 @@ func (r recorder) requestAttrs(req *http.Request, body []byte, start time.Time) 
 	return attrs
 }
 
-// requestBody 經 GetBody 取一份副本供記錄（上限 maxResponseBytes），不動到 req.Body；沒有 GetBody 就不記本文，避免為了記錄改動要送出的請求。
 func requestBody(req *http.Request) []byte {
 	if req.Body == nil || req.Body == http.NoBody {
 		return nil
@@ -289,8 +283,6 @@ func requestBody(req *http.Request) []byte {
 	return nil
 }
 
-// call 在總上限 timeout 內執行一次 SDK 呼叫：429 依 Retry-After（沒有就指數退避）等待後重送，最多 maxAttempts 次；
-// 其他非 2xx 轉成 *APIError；沒有 HTTP 回應的失敗（連線、逾時、ctx 取消）原樣回傳。
 func (c *Client) call(ctx context.Context, fn func(ctx context.Context) error) error {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
@@ -500,7 +492,6 @@ func (c *Client) RetrieveAccount(ctx context.Context, accountID string) (Account
 		bal = out.Configuration.Recipient.Capabilities.StripeBalance
 	}
 	if bal == nil || bal.StripeTransfers == nil {
-		// 沒有轉帳能力的回應是格式錯誤，不是一個狀態；回一般錯誤讓呼叫方重試，不能當成「審核中」存下來。
 		return Account{}, fmt.Errorf("stripe：帳戶 %s 的回應沒有 stripe_transfers 能力", out.ID)
 	}
 	acct := Account{ID: out.ID, Requirements: rawRequirements(out.LastResponse)}
@@ -521,7 +512,6 @@ func (c *Client) RetrieveAccount(ctx context.Context, accountID string) (Account
 	return acct, nil
 }
 
-// rawRequirements 取回應本文裡 requirements 的原始 JSON（SDK 型別只保留它認得的欄位）。
 func rawRequirements(res *sdk.APIResponse) json.RawMessage {
 	if res == nil {
 		return nil
@@ -584,8 +574,6 @@ func (c *Client) closeWith(ctx context.Context, accountID string, acct *sdk.V2Co
 	})
 }
 
-// closeParams 是關閉請求的本文：SDK 的 V2CoreAccountCloseParams 對 applied_configurations 用 omitempty，空陣列會被省略（Stripe 回 400 configs_must_match_to_close），
-// 所以這裡自己定義，空陣列照送。
 type closeParams struct {
 	sdk.Params            `json:"-"`
 	AppliedConfigurations []string `json:"applied_configurations"`
@@ -607,7 +595,6 @@ func (c *Client) retrieveRaw(ctx context.Context, accountID string) (*sdk.V2Core
 
 const (
 	bankAccountsPageLimit = 100
-	// maxBankAccountPages 是讀外部銀行帳號時最多翻的頁數；超過視為回應異常，不無限翻頁。
 	maxBankAccountPages = 20
 )
 

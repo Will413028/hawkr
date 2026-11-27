@@ -45,11 +45,8 @@ var (
 	schedulePostPaths = rpc.FieldPaths{"PublishAt": "publish_time"}
 )
 
-// updatablePostFields 是 UpdatePost 的 update_mask 可以列的欄位（etag 列進去會略過：它是版本檢查，不是被修改的欄位）。
 var updatablePostFields = []string{"body", "image_staged_token", "product_id", "hashtag_inputs"}
 
-// store 回傳呼叫者此刻的店；只有顧客帳號能呼叫（沒有登入由 interceptor 擋），沒有店回 not_found（seller.CurrentStore 的結果）。
-// 能力不在這裡檢查：由模組檢查，宣告見 declarations。
 func (h *App) store(ctx context.Context) (seller.Store, error) {
 	p, err := rpc.RequireAccount(ctx)
 	if err != nil {
@@ -58,7 +55,6 @@ func (h *App) store(ctx context.Context) (seller.Store, error) {
 	return h.stores.CurrentStore(ctx, p.ID)
 }
 
-// postState 是店主與後台讀貼文才有的三個欄位：狀態、建立時間與下架措施 ID（沒有被下架是 nil）。
 func postState(post social.Post) (pb.PostStatus, *timestamppb.Timestamp, *string) {
 	var takedown *string
 	if post.TakedownMeasureID != nil {
@@ -68,7 +64,6 @@ func postState(post social.Post) (pb.PostStatus, *timestamppb.Timestamp, *string
 	return rpc.EnumToProto[pb.PostStatus](post.Status), timestamppb.New(post.CreatedAt), takedown
 }
 
-// ownPosts 把店主讀自己的貼文轉成回應：公開貼文的欄位加上 status、etag、create_time 與 takedown_measure_id（只有店主讀自己的貼文才設）。
 func (p *presenter) ownPosts(ctx context.Context, st seller.Store, posts []social.Post) ([]*pb.Post, error) {
 	out, err := p.toPosts(ctx, social.Caller{Store: &st}, posts)
 	if err != nil {
@@ -89,7 +84,6 @@ func (p *presenter) ownPost(ctx context.Context, st seller.Store, post social.Po
 	return posts[0], nil
 }
 
-// optionalProductID 解析選填的商品 ID；沒設是 nil。
 func optionalProductID(path string, raw *string) (*uuid.UUID, error) {
 	if raw == nil {
 		return nil, nil
@@ -101,7 +95,6 @@ func optionalProductID(path string, raw *string) (*uuid.UUID, error) {
 	return &id, nil
 }
 
-// postStatusFilter 解析清單的 status 篩選；UNSPECIFIED 是全部（空字串）。
 func postStatusFilter(s pb.PostStatus) (social.PostStatus, error) {
 	if s == pb.PostStatus_POST_STATUS_UNSPECIFIED {
 		return "", nil
@@ -113,8 +106,6 @@ func postStatusFilter(s pb.PostStatus) (social.PostStatus, error) {
 	return status, nil
 }
 
-// updatePostInput 把 UpdatePost 的 post 與 update_mask 轉成模組的輸入：只有 mask 列出的欄位被修改，列了不能修改的欄位或沒有列任何欄位是錯誤。
-// 店主與代行的 UpdatePost 共用。
 func updatePostInput(msg *pb.Post, mask *fieldmaskpb.FieldMask, id uuid.UUID, version int64) (social.UpdatePostInput, error) {
 	paths, err := rpc.WritableFields(msg, mask)
 	if err != nil {
@@ -272,7 +263,6 @@ func (h *App) UpdatePost(ctx context.Context, req *connect.Request[pb.UpdatePost
 	return connect.NewResponse(&pb.UpdatePostResponse{Post: post}), nil
 }
 
-// transition 是發布與下架共同的流程：貼文 ID、必填的 etag、店家，再由 do 呼叫模組。
 func (h *App) transition(ctx context.Context, postID, etag string, do func(context.Context, seller.Store, uuid.UUID, int64, *delegatedactor.Actor) (social.Post, error)) (*pb.Post, error) {
 	id, err := rpc.ParseUUID("post_id", postID)
 	if err != nil {
@@ -415,7 +405,6 @@ func (h *App) GetStoreSocialSummary(ctx context.Context, _ *connect.Request[pb.G
 	return connect.NewResponse(&pb.GetStoreSocialSummaryResponse{ScheduledPostCount: s.Scheduled, PostCounts: postStatusCounts(s)}), nil
 }
 
-// postStatusCounts 每個貼文狀態一項（沒有貼文是 0），店主與代行共用。
 func postStatusCounts(s social.StoreSummary) []*pb.PostStatusCount {
 	var out []*pb.PostStatusCount
 	for _, status := range social.PostStatusValues() {

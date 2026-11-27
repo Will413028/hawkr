@@ -198,7 +198,6 @@ KycForm baselineAfterSave(
   );
 }
 
-/* ===== 表單 → SaveKYCDraft ===== */
 
 bool _docChanged(KycDoc? next, KycDoc? base) {
   if (next == null || base == null) return next != base;
@@ -309,7 +308,6 @@ SaveKYCDraftRequest? buildSaveKycDraftRequest({
     touchesBranch = true;
   }
 
-  // 個人沒有欄位，型態只由 subject 設定的那一支表示：已有申請從企業改成個人時，update_mask 要直接列 individual，並送出空的 individual。
   if (!creating &&
       subject == KycSubject.individual &&
       baselineSubject == KycSubject.business) {
@@ -333,7 +331,6 @@ SaveKYCDraftRequest? buildSaveKycDraftRequest({
   );
 }
 
-/* ===== 版本衝突：保留輸入、顯示最新 ===== */
 
 T _keep<T>(T current, T oldBaseline, T latest) =>
     current != oldBaseline ? current : latest;
@@ -405,7 +402,6 @@ KycDocs adoptSavedDocs(KycDocs current, KycDocs sent, KycDocs saved) {
   );
 }
 
-/* ===== 可編輯 ===== */
 
 /// 表單可以編輯：沒有申請（要建立），或申請是草稿、已退回（審核中與已核准的申請不能改）。
 bool kycEditable(KYCApplication? app) =>
@@ -417,7 +413,6 @@ bool kycEditable(KYCApplication? app) =>
 bool kycCanDiscard(KYCApplication? app) =>
     app != null && app.status == KYCStatus.KYC_STATUS_DRAFT;
 
-/* ===== 日期的顯示（表單存 `YYYY-MM-DD`，畫面是民國年） ===== */
 
 /// `YYYY-MM-DD` 轉成民國年 `YYY/MM/DD`；不是有效日期回空字串。
 String rocDateOfIso(String iso) {

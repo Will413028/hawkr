@@ -249,7 +249,6 @@ class _ConfirmReceiptDialogState extends State<_ConfirmReceiptDialog> {
       );
       if (mounted) Navigator.of(context).pop();
     } catch (_) {
-      // Parent callback is responsible for the toast; keep the dialog open.
     } finally {
       if (mounted) setState(() => _submitting = false);
     }

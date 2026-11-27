@@ -21,7 +21,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
-// batchSize 是每個 transaction 處理的快照與說明數：job 分批做，不在一個 statement 持有大量列鎖。
 const batchSize = 500
 
 // Deps 是保留期清理的依賴，全部必填（Logger 可為空）。
@@ -68,7 +67,6 @@ func (s *Service) PurgeSnapshots(ctx context.Context) (int64, error) {
 	})
 }
 
-// drain 反覆在各自的 transaction 內跑 batch，直到一批不滿 batchSize。
 func (s *Service) drain(ctx context.Context, what string, batch func(q *store.Queries) (int64, error)) error {
 	for {
 		var n int64
@@ -86,7 +84,6 @@ func (s *Service) drain(ctx context.Context, what string, batch func(q *store.Qu
 	}
 }
 
-// purgeBatch 在一個 transaction 內鎖住一批過期的快照再刪除。
 func (s *Service) purgeBatch(ctx context.Context, cutoff time.Time) (int64, error) {
 	var deleted int64
 	err := s.d.DB.InTx(ctx, func(ctx context.Context) error {
@@ -108,7 +105,6 @@ func (s *Service) purgeBatch(ctx context.Context, cutoff time.Time) (int64, erro
 	return deleted, nil
 }
 
-// retireAssets 把刪掉的快照擁有的圖片複本 MarkDeleted（複本是 moderation 自己 Confirm 的資產，保留期滿後沒有人再需要）；沒有資產時不呼叫 media。
 func (s *Service) retireAssets(ctx context.Context, owned [][]uuid.UUID) error {
 	var assets []uuid.UUID
 	for _, ids := range owned {

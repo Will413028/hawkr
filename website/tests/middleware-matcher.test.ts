@@ -39,7 +39,6 @@ test("public/ holds no root-level file the matcher would send through the middle
 		.filter((entry) => entry.isFile())
 		.map((entry) => entry.name)
 		.sort();
-	// The association file is in NON_LOCALIZED_EXACT.
 	assert.deepEqual(rootFiles, ["apple-app-site-association"]);
 });
 
@@ -72,7 +71,6 @@ test("the navigation layer's file lists are the matcher's: what the middleware s
 		[...GENERATED_ROOT_FILES].map((file) => file.slice(1)).sort(),
 		files[1].replaceAll("\\", "").split("|").sort(),
 	);
-	// and behaviorally, through the compiled expression: a path the matcher leaves out is not a page
 	const regex = compiledMatcher();
 	for (const path of [
 		"/robots.txt",

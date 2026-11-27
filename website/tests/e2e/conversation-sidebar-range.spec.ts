@@ -65,8 +65,6 @@ test.describe("訊息側欄 — 清單計數", { tag: ["@ui"] }, () => {
 		await expect(range).toBeVisible({ timeout: 15_000 });
 		await expect(range).toHaveText("顯示 1 - 6 / 6");
 
-		// 它住在可捲動面板外面，所以把清單捲到底之後仍在原位。單元測試看得到
-		// DOM 順序，看不到「捲動之後還在不在畫面上」。
 		const before = await range.boundingBox();
 		await page.locator(".chat-sidebar__panel").evaluate((element) => {
 			element.scrollTop = element.scrollHeight;
@@ -88,7 +86,6 @@ test.describe("訊息側欄 — 清單計數", { tag: ["@ui"] }, () => {
 		await page.getByRole("searchbox").fill("農場");
 		await expect(range).toHaveText("顯示 1 - 1 / 6");
 
-		// 一列都搜不到時整行消失——空狀態已經在講話。
 		await page.getByRole("searchbox").fill("不存在的商家");
 		await expect(range).toHaveCount(0);
 	});

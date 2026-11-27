@@ -9,13 +9,10 @@ import (
 	"testing"
 )
 
-// 舊 publisher 的 struct 在另一個 Go module（pkg、seller-service），單體不能 import：這裡讀它們的原始碼，逐欄位比對 json tag
-// （欄位名、omitempty、,string）與 Go 型別，relay 的 payload struct 只要和舊的有一個欄位不同就失敗。
 const mqEvents = "../../../pkg/mq/events.go"
 
 type wireField struct{ typ, tag string }
 
-// oldFields 展開舊 struct 的欄位（內嵌的 struct 一併展開）：json key 對應型別與 tag 選項。
 func oldFields(t *testing.T, path, name string) map[string]wireField {
 	t.Helper()
 	fset := token.NewFileSet()
@@ -66,7 +63,6 @@ func types(e ast.Expr) string {
 	return "?"
 }
 
-// normalize 把舊碼的具名字串型別（EventType）視為 string。
 func normalize(typ string) string {
 	if typ == "EventType" {
 		return "string"
@@ -101,7 +97,6 @@ func TestPayloadsMatchTheLegacyStructs(t *testing.T) {
 		"seller.profile.changed": {mqEvents, "SellerProfileChangedEvent", reflect.TypeOf(sellerProfileChanged{})},
 	} {
 		want, got := oldFields(t, c.path, c.old), newFields(c.mine)
-		// 舊 BaseEvent 的 correlation_id、metadata 是 omitempty 的空值，從不出現在 wire 上（下面的測試守住這個前提）。
 		delete(want, "correlation_id")
 		delete(want, "metadata")
 		if !reflect.DeepEqual(want, got) {
@@ -116,7 +111,6 @@ func TestExposureChangedIsTheBaseEventPlusTheAnnouncement(t *testing.T) {
 	want["store_id"] = wireField{typ: "int64"}
 	want["exposable"] = wireField{typ: "bool"}
 	want["exposure_version"] = wireField{typ: "int64"}
-	// BaseEvent 的 correlation_id、metadata 是空值，omitempty 之下不出現，relay 的 baseEvent 不帶它們。
 	delete(want, "correlation_id")
 	delete(want, "metadata")
 	got := newFields(reflect.TypeOf(sellerExposureChanged{}))

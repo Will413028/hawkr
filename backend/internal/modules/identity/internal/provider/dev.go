@@ -40,7 +40,6 @@ func NewDevAuth(key *rsa.PrivateKey) (*DevAuth, error) {
 // Admins 是接受 AdminToken 的後台 application。
 func (d *DevAuth) Admins() model.AdminVerifier { return d.admins }
 
-// devTokenTTL 是測試與本機開發的 token 效期。
 const devTokenTTL = 24 * time.Hour
 
 // AdminToken 簽一個後台的 dev token；user 要以 dev_ 開頭。
@@ -60,10 +59,8 @@ func (d *DevAuth) sign(issuer, user string) (string, error) {
 	return tok, nil
 }
 
-// devUserPrefix 是 dev 使用者的 ID 前綴。
 const devUserPrefix = "dev_"
 
-// signDevToken 以本機的金鑰簽一個 dev token（後台用；測試也用它簽缺 audience 的 token）。userID 要以 dev_ 開頭。
 func signDevToken(key *rsa.PrivateKey, issuer, userID string, ttl time.Duration, now time.Time, audience ...string) (string, error) {
 	if !strings.HasPrefix(userID, devUserPrefix) {
 		return "", fmt.Errorf("dev 使用者的 ID 要以 %s 開頭", devUserPrefix)

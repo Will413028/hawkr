@@ -13,7 +13,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// constsOf 讀 model.go 宣告的、型別為 typeName 的常數值；用原始碼而不是手寫清單，新增常數忘了加句子時測試會紅。
 func constsOf(t *testing.T, typeName string) []string {
 	t.Helper()
 	f, err := parser.ParseFile(token.NewFileSet(), "model.go", nil, 0)

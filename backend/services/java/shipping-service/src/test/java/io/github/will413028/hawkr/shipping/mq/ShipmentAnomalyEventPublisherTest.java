@@ -51,7 +51,7 @@ class ShipmentAnomalyEventPublisherTest {
     @Test
     void publishAnomalyDetected_resolvesStoreIdToAccountId_notRawStoreId() throws Exception {
         long storeId = 9999L;
-        long resolvedAccountId = 1001L; // 刻意 != storeId
+        long resolvedAccountId = 1001L;
         long buyerId = 888L;
 
         when(sellerGrpcClient.batchGetSellerMeta(List.of(storeId)))
@@ -111,7 +111,6 @@ class ShipmentAnomalyEventPublisherTest {
 
         ShipmentAnomalyDetectedPayload payload = (ShipmentAnomalyDetectedPayload) payloadCaptor.getValue();
         assertEquals(0L, payload.sellerAccountId());
-        // issue #2707 Phase A：raw storeId 不受 sellerAccountId 解析失敗降級影響，仍是原始值。
         assertEquals(storeId, payload.storeId());
     }
 
@@ -143,7 +142,6 @@ class ShipmentAnomalyEventPublisherTest {
 
         ShipmentAnomalyDetectedPayload payload = (ShipmentAnomalyDetectedPayload) payloadCaptor.getValue();
         assertEquals(0L, payload.sellerAccountId());
-        // issue #2707 Phase A：raw storeId 不受 sellerAccountId 解析失敗降級影響，仍是原始值。
         assertEquals(storeId, payload.storeId());
     }
 
@@ -151,7 +149,7 @@ class ShipmentAnomalyEventPublisherTest {
     void publishAnomalyDetected_resolvesBuyerIdToAccountId_notRawBuyerId() throws Exception {
         long storeId = 9999L;
         long buyerId = 888L;
-        long resolvedBuyerAccountId = 2002L; // 刻意 != buyerId
+        long resolvedBuyerAccountId = 2002L;
 
         when(sellerGrpcClient.batchGetSellerMeta(List.of(storeId)))
                 .thenReturn(BatchGetSellerMetaResponse.newBuilder()
@@ -236,7 +234,6 @@ class ShipmentAnomalyEventPublisherTest {
 
         ShipmentAnomalyDetectedPayload payload = (ShipmentAnomalyDetectedPayload) payloadCaptor.getValue();
         assertEquals(0L, payload.buyerAccountId());
-        // 賣家側正常解析不受影響（釘住「兩軸各自獨立降級」）
         assertEquals(1001L, payload.sellerAccountId());
     }
 }

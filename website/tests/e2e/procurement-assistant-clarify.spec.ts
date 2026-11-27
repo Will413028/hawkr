@@ -229,7 +229,6 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		const textarea = page.locator("#procurement-clarify-input");
 		const sendButton = page.getByRole("button", { name: "送出" });
 
-		// Turn 1 — 只講品項，後端回缺城市。
 		await textarea.fill("我要訂水果禮盒");
 		await sendButton.click();
 		const buyerBubble = page
@@ -242,8 +241,6 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 			}),
 		).toBeVisible({ timeout: 10_000 });
 
-		// §8.1 哨兵：raw chain-of-thought 不得出現在 DOM 的任何角落，
-		// 「查看思考過程」展示已下架。
 		await expect(page.getByText(REASONING_SENTINEL)).toHaveCount(0);
 		await expect(page.getByText("查看思考過程")).toHaveCount(0);
 		const domHasSentinel = await page.evaluate(
@@ -252,20 +249,12 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		);
 		expect(domHasSentinel).toBe(false);
 
-		// 思考步驟只在等待期間顯示：落地後跑條卸載，且不留步驟摘要或回放清單。
-		//
-		// 這裡刻意不寫「畫面上不得有任何 <details>」——那條在合併 #488 之前是
-		// 對的（當時 <details> 只有步驟摘要在用），但推理過程展開現在也用同一個
-		// 元素，一竿子打翻會連它一起擋掉。要擋的是步驟摘要這個東西，就對著它的
-		// testid 擋。
-		// 進度只屬於 active operation；落地後對話與成果面板都不能保留思考快照。
 		await expect(page.getByTestId("agent-activity-rail")).toHaveCount(0);
 		await expect(page.getByTestId("agent-processing")).toHaveCount(0);
 		await expect(page.locator("#hawkr-agent-side-panel")).toHaveCount(0);
 		await expect(page.getByTestId("agent-step-summary")).toHaveCount(0);
 		await expect(page.getByText("正在理解你的需求")).toHaveCount(0);
 
-		// 三段式①確認段：「已記下」chips。
 		const recordedFacts = page.getByRole("list", { name: "已記下的條件" });
 		await expect(recordedFacts.getByText("品項：水果禮盒")).toBeVisible();
 		await expect(
@@ -279,14 +268,11 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 			),
 		).toBe(true);
 
-		// 引導式問題卡：選項 chips＋自由輸入。
 		const questionCard = page.getByTestId("clarify-question-card");
 		await expect(questionCard).toBeVisible();
 		await expect(
 			questionCard.getByRole("button", { name: "台北市" }),
 		).toBeVisible();
-		// 選項本身已用圓形狀態容器表達選中；共享 check glyph 必須維持
-		// 純勾號，不能再疊一層方框形成「圓中有方框」。
 		const taipeiOption = questionCard.getByRole("button", { name: "台北市" });
 		await taipeiOption.hover();
 		const optionMark = taipeiOption.locator(
@@ -296,14 +282,9 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		await expect(checkMark).toHaveCSS("opacity", "1");
 		await expect(checkMark.locator("path")).toHaveCount(1);
 		await expect(checkMark.locator("rect, circle")).toHaveCount(0);
-		// delivery_city 是必填欄位（在 missingRequired 裡）——跳過對它是無效
-		// 動作（backend 只把 skip 套用在選填欄位優先序上，必填缺項的判定不看
-		// skipped set，下一輪還是同一題），前端不得顯示跳過按鈕誤導買家。
 		await expect(
 			questionCard.getByRole("button", { name: "跳過" }),
 		).toHaveCount(0);
-		// 「其他」在原問題卡內展開對應 freeText 欄位，不把使用者丟到底部
-		// composer，回答仍會走同一支 SubmitAnswer。
 		await questionCard.getByRole("button", { name: "其他…" }).click();
 		const customCity = questionCard.getByRole("textbox", {
 			name: "要送到哪個城市呢？的答案",
@@ -311,11 +292,9 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		await expect(customCity).toBeVisible();
 		await expect(customCity).toHaveAttribute("placeholder", "例如：新竹市");
 
-		// 需求快照相關 UI 完全不存在。
 		await expect(page.getByText("需求快照")).toHaveCount(0);
 		await expect(page.locator(".assistant-snapshot")).toHaveCount(0);
 
-		// Turn 2 — 點選項答題（走 SubmitAnswer；mock 在上方登記）。
 		await questionCard.getByRole("button", { name: "桃園市" }).click();
 		await expect(
 			page.getByText(
@@ -330,13 +309,10 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 			page.getByRole("button", { name: "交給 Hawkr Agent 搜尋" }),
 		).toBeVisible();
 		await expect(page.getByText("必要條件都補齊了")).toHaveCount(0);
-		// 答題後 URL 已寫回對話位址（第一輪 conversationId 即寫入）。
 		await expect(page).toHaveURL(
 			/\/account\/messages\/assistant\/9876543210987654321$/,
 		);
 
-		// 320px + 200% 文字縮放不能把 task CTA 裁掉；facts 與 task card 都要
-		// 在自己的可見寬度內完整 reflow。只在 mobile project 做一次即可。
 		if (isMobile) {
 			await page.setViewportSize({ width: 320, height: 800 });
 			await page.evaluate(() => {
@@ -371,10 +347,6 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		test.setTimeout(30_000);
 		await setupShell(page, baseURL ?? "http://localhost:3000");
 
-		// B-244 Ask 3/5 設計核心：REQUIREMENT_READY 之後 question 仍可非
-		// null——pickNextSlot 可以繼續問選填欄位，同時「開始搜尋候選」CTA
-		// 也已可見，兩者不再互斥。stage 的權威來源是 GetSnapshot（必填都齊備 →
-		// REQUIREMENT_READY），讓這個 case 真的驗證到「stage===ready 時 question 與 CTA 並存」。
 		const flow = await mockClarifyFlow(page, {
 			turn: () => ({
 				slots: { item: "水果禮盒", deliveryCity: "桃園市" },
@@ -415,9 +387,6 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		await textarea.fill("我要訂水果禮盒，送桃園");
 		await page.getByRole("button", { name: "送出" }).click();
 
-		// REQUIREMENT_READY 之後 question 仍可非 null（後端繼續問選填欄位）。
-		// 此時只出問題卡——派工卡要等問題清空才出現，不在問題未答完時就誘導
-		// 使用者跳過剩下的補充。
 		await expect(page.getByTestId("clarify-question-card")).toBeVisible();
 		await expect(
 			page.getByRole("button", { name: "交給 Hawkr Agent 搜尋" }),
@@ -442,7 +411,6 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		expect(answerBody.freeText).toBe("30");
 		expect(answerBody.optionId).toBeFalsy();
 
-		// 問完了（後端回 question 不設）→ 派工卡這時候才出現。
 		await expect(page.getByTestId("clarify-question-card")).toHaveCount(0);
 		await expect(
 			page.getByRole("button", { name: "交給 Hawkr Agent 搜尋" }),
@@ -456,9 +424,6 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		test.setTimeout(30_000);
 		await setupShell(page, baseURL ?? "http://localhost:3000");
 
-		// 必填已齊備、question 是選填欄位 packaging（無 options，純自由輸入型——
-		// 6 個選填欄位裡的多數屬此類，正是「fieldset gate 只認 options.length」
-		// 那個 bug 會讓跳過按鈕整個不出現的情境）。
 		const flow = await mockClarifyFlow(page, {
 			turn: () => ({
 				slots: { item: "水果禮盒", deliveryCity: "桃園市" },
@@ -467,9 +432,6 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 				recordedThisTurn: [
 					{ key: SLOT.city, label: "配送城市", value: "桃園市" },
 				],
-				// 用 packaging 而不是 quantity：quantity／delivery_date 是後端的
-				// QuoteRequiredOptionalSlots，canSkip 恆為 false，所以前端本來就
-				// 不該渲染跳過按鈕（另一支測試釘住那件事）。
 				question: {
 					slotKey: SLOT.packaging,
 					prompt: "包裝上有什麼需求嗎？",
@@ -522,8 +484,6 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		test.setTimeout(30_000);
 		await setupShell(page, baseURL ?? "http://localhost:3000");
 
-		// canSkip 不設（false）——quantity 是後端 QuoteRequiredOptionalSlots，
-		// SubmitAnswer 對它的 skip:true 一律被拒。
 		await mockClarifyFlow(page, {
 			turn: () => ({
 				slots: { item: "水果禮盒", deliveryCity: "桃園市" },
@@ -550,11 +510,9 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		const questionCard = page.getByTestId("clarify-question-card");
 		await expect(questionCard).toBeVisible();
 		await expect(questionCard).toContainText("大概需要多少數量？");
-		// 按鈕不存在——不是 disabled，是根本不渲染（呼叫端不傳 onSkip）。
 		await expect(
 			questionCard.getByRole("button", { name: "跳過" }),
 		).toHaveCount(0);
-		// 說明文案也要跟著改口，不能還寫著「或選擇跳過」。
 		await expect(questionCard).not.toContainText("或選擇跳過");
 	});
 
@@ -565,8 +523,6 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		test.setTimeout(30_000);
 		await setupShell(page, baseURL ?? "http://localhost:3000");
 
-		// quantity 未填時（Unit 也未填）：複合問題卡型態，unitOptions 帶單位選項，
-		// allowFreeText:true（數字欄仍要收）。
 		const flow = await mockClarifyFlow(page, {
 			turn: () => ({
 				slots: { item: "水果禮盒", deliveryCity: "桃園市" },
@@ -616,8 +572,6 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 
 		const boxChip = questionCard.getByRole("button", { name: "箱" });
 		await expect(boxChip).toBeDisabled();
-		// 沒有獨立的送出按鈕——這格靠點單位 chip 一次送出，不是打完數字按
-		// Enter／送出。
 		await expect(
 			questionCard.getByRole("button", { name: "送出答案" }),
 		).toHaveCount(0);
@@ -651,8 +605,6 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		test.setTimeout(30_000);
 		await setupShell(page, baseURL ?? "http://localhost:3000");
 
-		// 買家自由對話讓模型只抓到數字、沒抓到單位：Quantity 已填、Unit 未填，
-		// 回「單位追問」型態（allowFreeText:false，只問單位）。
 		const flow = await mockClarifyFlow(page, {
 			turn: () => ({
 				slots: { item: "水果禮盒", deliveryCity: "桃園市", quantity: 50 },
@@ -694,7 +646,6 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		const questionCard = page.getByTestId("clarify-question-card");
 		await expect(questionCard).toBeVisible();
 		await expect(questionCard).toHaveAttribute("data-question-kind", "unit");
-		// 沒有數字輸入欄——這題只問單位。
 		await expect(
 			questionCard.getByRole("textbox", {
 				name: "這批貨要用什麼單位計算？的答案",
@@ -772,7 +723,6 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		const questionCard = page.getByTestId("clarify-question-card");
 		await expect(questionCard).toBeVisible();
 
-		// 底部 composer 直接打完整句子（不透過卡片內的兩段式流程）。
 		await textarea.fill("50箱");
 		await page.getByRole("button", { name: "送出" }).click();
 
@@ -1105,13 +1055,6 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		baseURL,
 		isMobile,
 	}) => {
-		// 這一支驅動的是側欄的控制項。手機在對話視圖是全螢幕 thread，側欄只存
-		// 在於列表視圖（list ↔ thread），所以這個互動在該版型不成立——不是有
-		// bug 被藏起來，是版型本來就沒有這個位置。
-		//
-		// describe 上那句 `browserName !== "chromium"` 擋不到：mobile project 用
-		// 的是 Pixel 5，browserName 一樣是 "chromium"。dev push 只跑 chromium 所
-		// 以看不出來，main 會連 mobile 一起跑。
 		test.skip(!!isMobile, "側欄控制項在手機的 thread 視圖不存在");
 		test.setTimeout(30_000);
 		await setupShell(page, baseURL ?? "http://localhost:3000");
@@ -1135,20 +1078,14 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 				exact: true,
 			}),
 		).toBeVisible({ timeout: 10_000 });
-		// 第一輪後 URL 被 replaceState 改寫成對話位址。
 		await expect(page).toHaveURL(
 			/\/account\/messages\/assistant\/9876543210987654321$/,
 		);
 
-		// 開新對話：同 segment push 不 remount——靠 workspace 的 pathname
-		// 轉場監聽把 session 歸零（審查 CONFIRMED-high 的修復）。
-		// 入口原本是 header 的方框 ＋，已改成「Hawkr Agent」分頁列表頂端的常駐列。
 		await page.getByRole("button", { name: "開新對話" }).click();
 		await expect(page).toHaveURL(
 			/\/account\/messages\/assistant\/procurement$/,
 		);
-		// 歸零後沒有既有 conversation → 回到 entry state（設計書 v6 §V.11.0），
-		// 不是 thread 的空狀態泡泡。
 		await expect(page.locator('[data-assistant-mode="live"]')).toHaveAttribute(
 			"data-assistant-view",
 			"entry",
@@ -1156,7 +1093,6 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		await expect(
 			page.getByRole("heading", { name: "今天想請 Hawkr 幫你完成什麼？" }),
 		).toBeVisible();
-		// 同一個 composer 跟著移回中央，草稿是空的。
 		await expect(page.locator("#procurement-clarify-input")).toHaveCount(1);
 		await expect(textarea).toHaveValue("");
 	});
@@ -1271,11 +1207,6 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 			activeRunId: "",
 		}));
 
-		// Playwright 的 route.fulfill 一次送完整個 body，無法逐塊推送——而這支
-		// 測的正是「一塊一塊到達時畫面有沒有跟著換行」。所以在瀏覽器端包一層
-		// fetch，對 WatchRun 回一個自己控制節奏的 ReadableStream（Connect 的
-		// streaming envelope：1 位元組旗標、4 位元組大端長度、JSON）；其餘請求原樣
-		// 放行給上面的 route mock。
 		await page.addInitScript(() => {
 			const nativeFetch = window.fetch.bind(window);
 			window.fetch = async (input, init) => {
@@ -1340,7 +1271,6 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 						}),
 					],
 				];
-				// 測試逐塊放行，不靠計時搶在下一個 frame 前觀察 DOM。
 				const body = new ReadableStream<Uint8Array>({
 					start(controller) {
 						controller.enqueue(
@@ -1420,8 +1350,8 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		await expect(rail).toContainText("讀你寫的需求");
 		await expect(page.locator(".thread-page__typing")).toHaveCount(0);
 		await expect(rail.locator(".hawkr-agent-rail__row")).toHaveCount(1);
-		await advanceFrame(); // 相同步驟 heartbeat。
-		await advanceFrame(); // step SUCCEEDED 不等於 run terminal。
+		await advanceFrame();
+		await advanceFrame();
 		await expect(rail.locator(".hawkr-agent-rail__row")).toHaveCount(1);
 		await expect(rail.locator(".hawkr-agent-rail__row")).toHaveAttribute(
 			"data-status",
@@ -1435,8 +1365,6 @@ test.describe("procurement assistant — reply/reasoning + no snapshot UI", {
 		await expect(rail.locator(".hawkr-agent-rail__row")).toHaveCount(2);
 
 		await advanceFrame();
-		// 落地：即時狀態軌由父層在同一個 commit 換成無泡泡 Public Narrative。
-		// 終態 payload 即使仍帶 steps，也不得在 transcript 再長成一組氣泡。
 		const finalReply = page.getByText(
 			"好的，番茄記下了。請問要配送到哪個城市呢？",
 			{ exact: true },

@@ -125,7 +125,6 @@ class ShipmentAnomalyDashboardScreen extends ConsumerWidget {
                 },
               ),
             ),
-          // 議題 4：RETURN_STUCK 在 aftersale_cases 不在 shipments，dashboard 不列出但 FCM 會推
           SliverPadding(
             padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 20.h),
             sliver: SliverToBoxAdapter(
@@ -144,7 +143,6 @@ class ShipmentAnomalyDashboardScreen extends ConsumerWidget {
     );
   }
 
-  // ── 分組（依 anomaly_type） ───────────────────────────────────────────
   List<_Item> _groupedItems(List<ShipmentAnomaly> records) {
     final byType = <String, List<ShipmentAnomaly>>{};
     for (final r in records) {
@@ -165,7 +163,6 @@ class ShipmentAnomalyDashboardScreen extends ConsumerWidget {
     return out;
   }
 
-  // ── 統計卡 ───────────────────────────────────────────────────────────
   Widget _statsRow(ShipmentAnomalyStats stats) {
     return Row(
       children: [
@@ -253,7 +250,6 @@ class ShipmentAnomalyDashboardScreen extends ConsumerWidget {
     );
   }
 
-  // ── Filter bar（severity / type / showAcknowledged） ────────────────
   Widget _filterBar(
     BuildContext context,
     WidgetRef ref,
@@ -333,7 +329,6 @@ class ShipmentAnomalyDashboardScreen extends ConsumerWidget {
     );
   }
 
-  // ── Actions ─────────────────────────────────────────────────────────
   Future<void> _onAcknowledge(
     BuildContext context,
     WidgetRef ref,
@@ -367,9 +362,6 @@ class ShipmentAnomalyDashboardScreen extends ConsumerWidget {
   }
 }
 
-// ============================================================
-// 分組項目
-// ============================================================
 
 sealed class _Item {
   const _Item();
@@ -385,9 +377,6 @@ class _AnomalyRow extends _Item {
   const _AnomalyRow(this.anomaly);
 }
 
-// ============================================================
-// Anomaly card
-// ============================================================
 
 class _AnomalyCard extends StatelessWidget {
   const _AnomalyCard({

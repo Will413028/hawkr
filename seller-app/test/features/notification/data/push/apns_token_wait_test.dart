@@ -45,7 +45,6 @@ void main() {
 
       expect(token, isNull);
       expect(calls, 3);
-      // 最後一次嘗試後不應再多等一次 delay。
       expect(delays, hasLength(2));
     });
   });

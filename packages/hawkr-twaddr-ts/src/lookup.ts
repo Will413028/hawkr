@@ -1,5 +1,3 @@
-// 台灣鄉鎮市區代碼的查詢。資料表由 backend/internal/platform/twaddr/generate.go 生成到 twaddr.gen.ts，
-// 這裡只放手寫的型別與查詢（內政部寫法「臺」，順序是郵遞區號）。
 import { COUNTIES as COUNTY_ROWS, TOWNS as TOWN_ROWS } from "./twaddr.gen";
 
 export interface County {
@@ -23,7 +21,6 @@ const COUNTIES_BY_CODE: ReadonlyMap<string, County> = new Map(
 
 export const TOWNS: readonly Town[] = TOWN_ROWS.map((t) => ({
 	...t,
-	// 縣市名稱取自縣市表；每個鄉鎮市區的縣市代碼都在表內（測試保證）。
 	countyName: COUNTIES_BY_CODE.get(t.countyCode)?.name ?? "",
 }));
 

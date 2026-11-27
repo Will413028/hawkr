@@ -11,21 +11,10 @@ import (
 	ch "github.com/Will413028/hawkr/backend/internal/httpapi/characterize"
 )
 
-// scenarios 是 Java product-service 要通過的情境，Driver 的實作各自跑同一份。資料庫可能已經有別的情境建的
-// 商品，所以每個情境只看名稱帶自己 nonce 的那幾筆。期望值來自 ProductService、ProductGrpcService 與 gateway 的
-// handler/product.go、seller_product.go、search.go、hashtag.go，鎖定的是現況，沒有驗證現況是否正確。
-//
-// 標 skipOnLegacy 的是計畫決定要改的行為（D 編號）：舊的一端跳過並附編號，單體的一端照新行為斷言。
-// 單體的契約依 D24 修訂：上架前先準備主圖（D22，listedWith 的 MainImage）、庫存改走 SetStock（D24 Q13）、下架後公開商品頁讀得到
-// 但 availability 不可購買（D24 Q10）、賣家列表的關鍵字由伺服器端比對（D24 Q11）；沒有行為差異的部分兩個 driver 跑同一份斷言。
-// 編輯與刪除都先下架再做：Java 只允許編輯、刪除草稿或已下架的商品（ProductService.java:527、:2759），新的
-// 生命週期（D16）同樣允許，情境不鎖定上架中能不能直接編輯。
 var scenarios = []ch.Scenario[Driver]{
 	{Name: "seller API rejects anonymous callers and non-sellers", Run: func(ctx context.Context, t ch.T, d Driver) {
 		_, err := d.SellerList(ctx, ch.Anonymous, "")
 		ch.WantKind(t, err, ch.ErrUnauthenticated)
-		// 舊的賣家路由對沒有賣家身分的帳號回 403；Connect 的賣家方法以呼叫者此刻的店推導，沒有店回 not_found
-		// （與 coupon 的 "buyers cannot use seller routes" 同一個做法，seller.ActingStore 的契約）。
 		want := ch.ErrPermission
 		if !d.Legacy() {
 			want = ch.ErrNotFound
@@ -77,7 +66,6 @@ var scenarios = []ch.Scenario[Driver]{
 		if !slices.Equal(got.Hashtags, []string{"t" + n}) {
 			t.Errorf("讀回 hashtag %v，預期 [t%s]", got.Hashtags, n)
 		}
-		// 關鍵字由伺服器端比對（D24 Q11）；舊的 REST 也以 keyword 篩選，兩邊同一份斷言。
 		list := ch.Must(t, ch.Ret(d.SellerList(ctx, ch.Seller, n)))
 		if ids(list) != created.ID {
 			t.Errorf("賣家列表 %v，預期只有 %s", ids(list), created.ID)
@@ -115,7 +103,6 @@ var scenarios = []ch.Scenario[Driver]{
 		if got := ids(ch.Must(t, ch.Ret(d.PublicList(ctx, ch.Anonymous, PublicQuery{Keyword: n})))); got != "" {
 			t.Errorf("下架後公開列表 %v，預期沒有", got)
 		}
-		// 下架（ARCHIVED）的商品頁讀得到、availability 是不可購買，不是 not_found（D24 Q10；Java 同樣讀得到）。
 		pub = ch.Must(t, ch.Ret(d.PublicGet(ctx, ch.Anonymous, p.ID)))
 		if pub.Purchasable {
 			t.Errorf("下架後商品頁仍可購買：%+v", pub)
@@ -133,7 +120,6 @@ var scenarios = []ch.Scenario[Driver]{
 		n := ch.Nonce()
 		p := listed(ctx, t, d, ch.Seller, n)
 		ch.Must(t, ch.Ret(struct{}{}, d.SellerSetListed(ctx, ch.Seller, p.ID, false)))
-		// 編輯整體取代內容、庫存不在內容裡（D24 Q13）：庫存另外用 SetStock，以讀到的現值（10）當預期值。舊的 REST 的編輯本來就帶庫存。
 		in := ProductInput{Name: n + " 改名", CategoryID: p.CategoryID, Price: 520, Stock: 10, Hashtags: []string{"u" + n}, MainImage: true}
 		ch.Must(t, ch.Ret(d.SellerUpdate(ctx, ch.Seller, p.ID, in)))
 		ch.Must(t, ch.Ret(struct{}{}, d.SellerSetStock(ctx, ch.Seller, p.ID, 3, 10)))
@@ -334,7 +320,6 @@ var scenarios = []ch.Scenario[Driver]{
 	}},
 }
 
-// wantDenied 確認別家店的寫入被拒：單體回 not_found（越權存取比照不存在，API 設計規範 §二）。
 func wantDenied(t ch.T, d Driver, err error) {
 	t.Helper()
 	if err == nil {
@@ -343,7 +328,6 @@ func wantDenied(t ch.T, d Driver, err error) {
 	ch.WantKind(t, err, ch.ErrNotFound)
 }
 
-// skipOnLegacy 在舊的一端略過計畫決定要改的行為。
 func skipOnLegacy(t ch.T, d Driver, why string) bool {
 	if !d.Legacy() {
 		return false
@@ -356,7 +340,6 @@ func skipOnLegacy(t ch.T, d Driver, why string) bool {
 	return true
 }
 
-// leafOf 回傳一個掛得了商品的葉節點：最深的那一層（D8 是兩層；Java 要第三層，ProductService.java:304-314）。
 func leafOf(t ch.T, cats []Category) string {
 	t.Helper()
 	best, bestDepth := "", 0
@@ -368,7 +351,6 @@ func leafOf(t ch.T, cats []Category) string {
 	return best
 }
 
-// depth 是節點的層數，第一層是 1。
 func depth(cats []Category, id string) int {
 	parent := map[string]string{}
 	for _, c := range cats {
@@ -381,7 +363,6 @@ func depth(cats []Category, id string) int {
 	return n
 }
 
-// createWith 建立商品；沒給分類時掛在第一個葉節點。
 func createWith(ctx context.Context, t ch.T, d Driver, c ch.Caller, in ProductInput) Product {
 	t.Helper()
 	if in.CategoryID == "" {
@@ -395,10 +376,9 @@ func createIn(ctx context.Context, t ch.T, d Driver, c ch.Caller, nonce string) 
 	return createWith(ctx, t, d, c, ProductInput{Name: nonce + " 商品", Price: 200, Stock: 10, MainImage: true})
 }
 
-// listedWith 建立並上架（先準備主圖，D22）；建立後已經上架（Java）就不再上架一次。
 func listedWith(ctx context.Context, t ch.T, d Driver, c ch.Caller, in ProductInput) Product {
 	t.Helper()
-	in.MainImage = true // D22：上架前先準備主圖
+	in.MainImage = true
 	p := createWith(ctx, t, d, c, in)
 	if p.Status != StatusActive {
 		ch.Must(t, ch.Ret(struct{}{}, d.SellerSetListed(ctx, c, p.ID, true)))
@@ -412,7 +392,6 @@ func listed(ctx context.Context, t ch.T, d Driver, c ch.Caller, nonce string) Pr
 	return listedWith(ctx, t, d, c, ProductInput{Name: nonce + " 商品", Price: 200, Stock: 10})
 }
 
-// ids 把商品 ID 排序後以逗號串起，方便比對集合。
 func ids(ps []Product) string {
 	out := make([]string, 0, len(ps))
 	for _, p := range ps {

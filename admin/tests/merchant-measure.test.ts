@@ -42,7 +42,6 @@ import { actionErrorText, runAction } from "../src/lib/connect-action";
  * 結束措施的失敗處理。時間都由測試傳入固定的 now，不讀時鐘。
  */
 
-// 固定的時刻（台北 2026-10-13 10:00）；測試不讀時鐘，也不跟著機器時區。
 const NOW = new Date("2026-10-13T02:00:00Z");
 
 function addDays(d: Date, days: number): Date {
@@ -98,7 +97,6 @@ test("措施狀態窮舉：五個狀態各有徽章（文字取自共用目錄�
 			variant: "gray",
 		});
 	}
-	// 生效中的終止合作不是停權：文字取自目錄的 select。
 	assert.deepEqual(
 		measureStateBadge(MeasureState.ACTIVE, MeasureKind.TERMINATION),
 		{ label: "合作已終止", variant: "danger" },
@@ -131,7 +129,6 @@ test("依據文字：風險帶風險類型，違規指向認定，UNSPECIFIED �
 		measureBasisText({ ...base, basis: MeasureBasis.UNSPECIFIED }),
 		"未知",
 	);
-	// 不認得的種類或依據：整句是「未知」，和 UNSPECIFIED 一致，不組出「未知・…」的半句。
 	assert.equal(
 		measureBasisText({ ...base, basis: 9999 as MeasureBasis }),
 		"未知",
@@ -313,8 +310,6 @@ test("組請求時時間解析不出來就丟例外，不送缺值的請求", ()
 	);
 });
 
-// ---------------------------------------------------------------------------
-// request_id
 
 test("request_id：同一份內容重送沿用同一個；內容改過換新的；去掉前後空白不算改過", () => {
 	let n = 0;
@@ -360,8 +355,6 @@ test("request_id：重新開啟（沒有上一個 slot）一定是新的", () =>
 	assert.notEqual(a.id, b.id);
 });
 
-// ---------------------------------------------------------------------------
-// 失敗處理
 
 function versionConflict(): ConnectError {
 	return new ConnectError("etag mismatch", Code.Aborted, undefined, [
@@ -584,8 +577,6 @@ test("同一份內容的重送不再用現在的時間擋：結束時間、複�
 	assert.equal(isResend({ key: "other", id: "r1" }, key), false);
 });
 
-// ---------------------------------------------------------------------------
-// 從案件建立：來源案件（source_case_id）
 
 test("sourceCaseField：沒有案件（沒給或空字串）時請求不帶這個欄位，有就帶", () => {
 	assert.deepEqual(sourceCaseField(undefined), {});

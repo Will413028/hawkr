@@ -7,14 +7,6 @@ import {
 import { mockProcurementUnary } from "./helpers/mock-procurement-connect";
 import { gotoStreamed } from "./helpers/streamed-navigation";
 
-// V.11.1 對執行中的 composer 有兩條明文要求：停用時要講清楚為什麼不能輸入，
-// 以及右下角必須有一顆「停止處理」。稿 01 的像素逐字畫著 placeholder
-// 「執行中，暫時無法輸入訊息...」與那顆停止鈕。
-//
-// 「規劃中」那個標記已經退場：這顆按鈕是真的能停的，但它仍然只在**拿得到這一輪的
-// runId**（runtime snapshot 的 activeRunId 指到一個未終態的 run）時才按得下去。
-// 所以本檔兩支測試分別鎖住那兩半：runId 拿不到時看得到但按不下去，拿得到時按下去
-// 真的送出 CancelRun。
 const PATH = "/account/messages/assistant/demo";
 /** 帶 conversationId 的深連結；GetRuntimeSnapshot 以它為 key。 */
 const CONVERSATION_ID = "1234567890123456780";
@@ -96,9 +88,6 @@ test.describe("procurement composer — 執行中的停用態", { tag: ["@ui"] }
 			"執行中，暫時無法輸入訊息...",
 		);
 
-		// 這一份 fixture 還沒有對話（SubmitTurn 尚未回應），讀不到 runtime snapshot，
-		// 所以拿不到這一輪的 runId。按鈕必須看得到但按不下去：消失等於讓人以為自己漏看
-		// 了，按得下去則會送出一個沒有對象的取消。
 		const stop = page.getByTestId("agent-stop-run");
 		await expect(stop).toBeVisible();
 		await expect(stop).toBeDisabled();
@@ -108,7 +97,6 @@ test.describe("procurement composer — 執行中的停用態", { tag: ["@ui"] }
 			page.getByText("目前無法確認這一輪的執行狀態，暫時不能停止"),
 		).toBeAttached();
 
-		// V.11.1 A11y 列：觸控區至少 44×44。
 		const box = await stop.boundingBox();
 		expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
 		expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
@@ -140,7 +128,6 @@ test.describe("procurement composer — 執行中的停用態", { tag: ["@ui"] }
 			.context()
 			.addCookies([{ name: "hk_session", value: "opaque", url: appBaseURL }]);
 
-		// 深連結還原：transcript 給 requestId，snapshot 給需求狀態。
 		await mockProcurementUnary(page, "GetConversationMessages", () => ({
 			conversationId: CONVERSATION_ID,
 			requestId: REQUEST_ID,
@@ -158,7 +145,6 @@ test.describe("procurement composer — 執行中的停用態", { tag: ["@ui"] }
 			activeRunId: "",
 		}));
 
-		// 停止鈕的 runId 唯一來源。
 		await mockProcurementUnary(page, "GetRuntimeSnapshot", () => ({
 			conversationId: CONVERSATION_ID,
 			requestId: REQUEST_ID,
@@ -207,7 +193,6 @@ test.describe("procurement composer — 執行中的停用態", { tag: ["@ui"] }
 		await expect(stop).toBeEnabled();
 		await stop.click();
 
-		// 只有 REQUESTED 講「正在停止」——這一句不得出現在三個終態 disposition 上。
 		await expect(page.getByTestId("agent-stop-status")).toContainText(
 			"已送出停止，正在收尾這一輪。",
 		);

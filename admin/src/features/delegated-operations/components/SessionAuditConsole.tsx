@@ -130,8 +130,6 @@ export default function SessionAuditConsole({
 	const [result, setResult] = useState<DelegatedAuditResult | "">("");
 	const [dateFrom, setDateFrom] = useState("");
 	const [dateTo, setDateTo] = useState("");
-	// 稽核內容走 modal（`AuditDetailDialog`），開啟後焦點與背景隔離由那支自己的
-	// a11y 三件套處理，這裡只持有「開哪一列」。
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const [revokeOpen, setRevokeOpen] = useState(false);
 	const [revokeNotice, setRevokeNotice] = useState<string | null>(null);
@@ -142,11 +140,6 @@ export default function SessionAuditConsole({
 		retry: false,
 	});
 
-	// 摘要端點只回成功數（`operation_count` ＝ `count(*) FILTER (WHERE result='SUCCEEDED')`），
-	// 而下方列表的「共 N 筆」是三種結果的全部。兩個數字擺在同一頁卻無從對照，讀者只能
-	// 把成功數當成「這次總共做了幾件事」。失敗數沒有對應的摘要欄位，就用同一份稽核表以
-	// `result=FAILED` 取 `total`（`pageSize=1`，只要那個數）。
-	// 不用「全部 − 成功 − 未確認」的減法：那要跨兩次查詢做算術，中間新寫入的列會讓它算出負數。
 	const failedCountQuery = useQuery({
 		queryKey: ["delegated-governance", sessionId, "failed-count"],
 		queryFn: () =>
@@ -189,7 +182,6 @@ export default function SessionAuditConsole({
 	const totalPages = auditPage
 		? Math.max(1, Math.ceil(auditPage.total / auditPage.pageSize))
 		: 1;
-	// 鏡像只是引導值；只要這一頁看得到某個動作，就用它自己帶的權威中文覆蓋。
 	const actionLabels = useMemo(() => {
 		const labels: Record<string, string> = {
 			...DELEGATION_AUDIT_ACTION_LABEL,
@@ -269,15 +261,7 @@ export default function SessionAuditConsole({
 			)}
 
 			<section className="adm-audit-summary-cards" aria-label="工作階段摘要">
-				{/* 這個代號是要被貼進工單與 log 查詢的東西（設計稿 image11 的
-				    `OPS-240803-0187 ⧉`），而同頁的關聯 ID／冪等鍵／操作能力三處都有複製鍵，
-				    偏偏最常被複製的這個沒有。複製鍵沿用面板那顆，不另寫一顆。
 
-				    ⚠️ 標籤是「代號」不是「ID」：這張卡顯示的是 `displayCode`，而同一頁的
-				    「工作階段 ID」（數字 TSID）是另一個值。兩者都真的會被複製出去用——代號
-				    貼工單、數字 ID 貼查詢框與維運 SQL——所以叫錯名字不是措辭問題：照著卡片
-				    標籤把 `OPS-…` 貼進要求數字 ID 的地方，會直接被擋下來。數字 ID 在下方
-				    「工作階段摘要」有自己的一列。 */}
 				<StatCard
 					label="工作階段代號"
 					value={report?.displayCode ?? "—"}
@@ -308,9 +292,7 @@ export default function SessionAuditConsole({
 				/>
 			</section>
 
-			{/* 這兩張卡都只數 `result='SUCCEEDED'` 的列（風險卡的述詞是 `risk_level='high'
-			    AND result='SUCCEEDED'`）。不寫明口徑，「風險操作 0」會被讀成「沒有人嘗試過
-			    高風險操作」，而實際上可能是嘗試了三次、三次都失敗。 */}
+
 			<p className="adm-audit-summary-note">
 				這兩個計數只含<strong>已成功</strong>
 				的紀錄；失敗與結果未確認不計入，見下方「操作結果」。
@@ -320,11 +302,7 @@ export default function SessionAuditConsole({
 				<section className="adm-audit-close-summary" aria-label="結束摘要">
 					<h2>工作階段摘要</h2>
 					<ul className="adm-audit-close-rows">
-						{/* 數字 ID 先前只存在於網址列。它是**查詢框與維運 SQL 認的那一個**
-						    （代號走的是列表的篩選軸），而上方那張卡給的是代號 ⇒ 想把這次
-						    代行的識別碼交給別人時，畫面上沒有任何地方可以複製。
-						    佔滿整行的理由同下方「操作結果」那列：19 位數字塞不進 220px 的
-						    自動欄，會被擠成兩行而看不出與標籤的對應。 */}
+
 						<li className="adm-audit-close-rows__wide">
 							<MaterialSymbol name="tag" />
 							<span>工作階段 ID</span>
@@ -336,8 +314,7 @@ export default function SessionAuditConsole({
 						<li>
 							<MaterialSymbol name="schedule" />
 							<span>工作時長</span>
-							{/* 為什麼不能直接印 `durationSeconds`：見 `sessionDurationText`，
-							    它與下方「結束時間」是同一個前提的兩半。 */}
+
 							<strong>
 								{sessionDurationText(
 									report.durationSeconds,
@@ -346,8 +323,7 @@ export default function SessionAuditConsole({
 								)}
 							</strong>
 						</li>
-						{/* 三態攤開，相加就是下方列表未篩選時的「共 N 筆」——那兩個數字先前
-						    只差在口徑（成功 vs 全部）卻沒有任何交代，讀者無從得知差額是失敗。 */}
+
 						<li className="adm-audit-close-rows__wide">
 							<MaterialSymbol name="menu" />
 							<span>操作結果</span>
@@ -360,8 +336,7 @@ export default function SessionAuditConsole({
 						<li>
 							<MaterialSymbol name="verified_user" />
 							<span>稽核狀態</span>
-							{/* 三態判定與措辭理由都在 `auditConfirmationText`（純函式、有單元
-							    測試）：JSX 只負責把它掛上「未確認」的視覺強調。 */}
+
 							<strong
 								className={
 									report.pendingAuditCount > 0 ? "is-pending" : undefined
@@ -373,8 +348,7 @@ export default function SessionAuditConsole({
 						<li>
 							<MaterialSymbol name="notifications_active" />
 							<span>賣家通知</span>
-							{/* 語意是「本次至少有一列已發出通知事件」，不是賣家已讀 ——
-							    「賣家已通知」會被讀成每一筆操作都通知過。 */}
+
 							<strong>
 								{report.notifiedSeller
 									? "本次已發送賣家通知"
@@ -384,31 +358,17 @@ export default function SessionAuditConsole({
 						<li>
 							<MaterialSymbol name="event_available" />
 							<span>結束時間</span>
-							{/* 為什麼不能直接印 `endedAt ?? "尚未結束"`：見 `sessionEndText`。 */}
+
 							<strong>{sessionEndText(report.endedAt, report.status)}</strong>
 						</li>
 					</ul>
-					{/* 撤銷紀錄。位置緊接在「結束時間」那一列之下，因為它正是那一列的解釋：
-					    右上角的「已撤銷」徽章說了結局、「結束時間」說了時刻，而「為什麼中止」
-					    在修前**任何畫面都渲染不出來** —— 撤銷理由在 `SessionRevokeDialog` 是
-					    必填的，強制收集一個永遠不會被讀回來的欄位，只會訓練操作者亂填，而它
-					    正是爭議時唯一能舉證中止原因的字串。
 
-					    自成一塊而不是再加一列 `<li>`：理由是自由文字（最長 200 字），而摘要
-					    列表的每一列都是短值，塞進 `grid` 會把整列撐成四五行。
-
-					    ⚠️ 判準是 `revokedAt` 而**不是** `status === "revoked"`：ADM 與 gateway
-					    各自 promote，gateway 還沒帶這四欄的窗口裡照 status 渲染會印出一句
-					    「未記錄撤銷理由」——那是假的，理由一直都在 DB 裡。沒有資料就整塊不
-					    渲染（未撤銷的工作階段也因此不會多出一塊空白區）。 */}
 					{report.revokedAt && (
 						<div className="adm-audit-revocation">
 							<MaterialSymbol name="cancel" />
 							<div>
 								<strong>撤銷紀錄</strong>
-								{/* 後端填的是 `admin_accounts.email`（該表沒有顯示名欄位），所以這裡
-								    不掛「姓名」這個標籤。數字 admin id 一併印出：email 會換，而那個
-								    id 是維運 SQL 認的那一個。拼接與空白規則見 `sessionRevokedByText`。 */}
+
 								<p className="adm-audit-revocation__meta">
 									{sessionRevokedByText(
 										report.revokedAt,
@@ -422,8 +382,7 @@ export default function SessionAuditConsole({
 							</div>
 						</div>
 					)}
-					{/* 這張卡與「稽核狀態」不同源、不得連動：它由兩個結構恆為 0 的計數
-					    保證，一旦非零代表三層鎖定被打穿。 */}
+
 					<div
 						className={`adm-audit-safety${
 							report.fulfillmentActionCount + report.financeActionCount > 0
@@ -572,16 +531,11 @@ export default function SessionAuditConsole({
 									<th scope="col">時間</th>
 									<th scope="col">操作</th>
 									<th scope="col">目標資源</th>
-									{/* 理由是這張表最該被讀的一欄，卻是唯一既沒 nowrap 也沒下限的
-										    欄（時間與結果吃得到 td:first-child／td:last-child 的保護）
-										    ⇒ auto layout 把 col-summary 讓出來的壓力全丟給它，實測壓成
-										    每行一兩個字的窄柱。下限給在 class 上，理由同 col-summary。 */}
+
 									<th scope="col" className="adm-audit-col-reason">
 										理由
 									</th>
-									{/* 這一欄是全表唯一可收縮的（其餘不是 nowrap 就是內容極短），
-										    auto layout 於是把剩餘壓力全丟給它。給它一個具名 class 而不是
-										    nth-child：欄位增刪時 nth-child 會靜默指到別欄。 */}
+
 									<th scope="col" className="adm-audit-col-summary">
 										變更摘要
 									</th>
@@ -656,8 +610,7 @@ export default function SessionAuditConsole({
 
 				{auditPage && auditPage.total > 0 && (
 					<div className="adm-audit-pagination">
-						{/* 有篩選時 total 是篩選後的數，與上方摘要的口徑不同——不講明，
-							    讀者會以為這個工作階段的紀錄總數變少了。 */}
+
 						<span>
 							顯示第 {(auditPage.page - 1) * auditPage.pageSize + 1} 至{" "}
 							{Math.min(auditPage.page * auditPage.pageSize, auditPage.total)}{" "}

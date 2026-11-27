@@ -47,7 +47,6 @@ func (c *ProductClient) Close() error {
 	return nil
 }
 
-// ========== 公開商品查詢 ==========
 
 // GetProductList 取得商品列表
 func (c *ProductClient) GetProductList(ctx context.Context, categoryID string, keyword string, page, pageSize string, sort, status string, ownerID int64) (*pb.GetProductListResponse, error) {
@@ -74,9 +73,6 @@ func (c *ProductClient) GetProductListWithHashtags(ctx context.Context, category
 	return c.client.GetProductList(ctx, req)
 }
 
-// toCategoryIDList 將單一 categoryID 字串轉為 proto 多值 repeated string。
-// 規則（與 02 §5.3.1 對齊）：空字串 / "0" → nil；支援 CSV；trim + 去重 + 過濾 "0" 與空。
-// 上限驗證留在 product-service 入口（INVALID_ARGUMENT）。
 func toCategoryIDList(s string) []string {
 	s = strings.TrimSpace(s)
 	if s == "" || s == "0" {
@@ -154,7 +150,6 @@ func (c *ProductClient) GetPublicProductListFiltered(ctx context.Context, f Publ
 		Sort:             f.Sort,
 		Hashtags:         f.Hashtags,
 		HashtagMatchMode: hashtagMatchMode(f.MatchAll),
-		// 公開 API：owner_store_id 一律 0（不套用 owner filter）
 		OwnerStoreId:        0,
 		ViewerBuyerId:       f.ViewerBuyerID,
 		DeliveryTempFilter:  f.DeliveryTemp,
@@ -290,7 +285,6 @@ func (c *ProductClient) GetPublicSellerProducts(ctx context.Context, ownerID int
 	return c.client.GetProductList(ctx, req)
 }
 
-// ========== 賣家商品管理 ==========
 
 // ListSellerProducts 取得商家的商品列表
 // 透過 GetProductList 並傳入 ownerID 實現
@@ -334,7 +328,6 @@ func (c *ProductClient) DeleteProduct(ctx context.Context, productID string, sto
 	})
 }
 
-// ========== 管理員商品操作 ==========
 
 // GetProductForAdmin 管理員取得商品詳情（不檢查擁有者，不限狀態）
 func (c *ProductClient) GetProductForAdmin(ctx context.Context, productID string) (*pb.GetProductResponse, error) {
@@ -385,7 +378,6 @@ func (c *ProductClient) UpdateSellerProductStatus(ctx context.Context, productID
 	return c.client.UpdateSellerProductStatus(ctx, req)
 }
 
-// ========== 運費計算 ==========
 
 // CalculateShippingOptions 計算可用配送選項與運費（依溫層分組）
 func (c *ProductClient) CalculateShippingOptions(ctx context.Context, req *pb.CalculateShippingOptionsRequest) (*pb.CalculateShippingOptionsResponse, error) {
@@ -395,7 +387,6 @@ func (c *ProductClient) CalculateShippingOptions(ctx context.Context, req *pb.Ca
 	return c.client.CalculateShippingOptions(ctx, req)
 }
 
-// ========== 相關商品 ==========
 
 // GetRelatedProducts 取得相關商品（同分類、排除自身、僅 ACTIVE、上限 8 筆）
 func (c *ProductClient) GetRelatedProducts(ctx context.Context, productID string) (*pb.GetRelatedProductsResponse, error) {
@@ -407,7 +398,6 @@ func (c *ProductClient) GetRelatedProducts(ctx context.Context, productID string
 	})
 }
 
-// ========== 認證驗證 ==========
 
 // VerifyCertification 驗證認證編號是否存在於政府開放資料平台
 func (c *ProductClient) VerifyCertification(ctx context.Context, certNo, certType string) (*pb.VerifyCertificationResponse, error) {
@@ -420,7 +410,6 @@ func (c *ProductClient) VerifyCertification(ctx context.Context, certNo, certTyp
 	})
 }
 
-// ========== 兼容舊 API 的包裝方法 ==========
 
 // ListProducts 兼容舊 API（內部調用 GetProductList）
 func (c *ProductClient) ListProducts(ctx context.Context, categoryID string, keyword string, page, pageSize string) (*pb.GetProductListResponse, error) {
@@ -434,7 +423,6 @@ func (c *ProductClient) GetProductDetail(ctx context.Context, productID string) 
 	return c.GetProduct(ctx, productID, 0)
 }
 
-// ========== 維運管理 ==========
 
 // PurgeProductCache 清除商品快取
 // scope: all（全部）、detail（商品詳情）、list（列表）
@@ -487,11 +475,6 @@ func (c *ProductClient) BatchChangeProductCategoryForAdmin(
 	return c.client.BatchChangeProductCategoryForAdmin(ctx, req)
 }
 
-// ========== 商品認證申請與審核（19 號設計書 §9 / §10.1）==========
-//
-// 十支 wrapper 沿用本檔既有形狀：呼叫端只給業務參數，deadline 在這裡設。
-// 逾時值分兩級——一般 CRUD 用 30s（與本檔其他寫入一致），Reverify 用 90s
-// （19 §9.3：它會同步打農業部 API，繞過同步用斷路器，上游本身就慢）。
 
 // SubmitProductCertification 賣家送出一筆認證申請。
 func (c *ProductClient) SubmitProductCertification(ctx context.Context, req *pb.SubmitProductCertificationRequest) (*pb.ProductCertificationApplicationResponse, error) {

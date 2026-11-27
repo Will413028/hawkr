@@ -40,7 +40,6 @@ export default function UpdateMeasureDialog({
 	const [form, setForm] = useState<UpdateForm>(() =>
 		initialUpdateForm(measure),
 	);
-	// 措施被重讀（版本衝突後 etag 變了）：沒動過的欄位換成新措施的值，管理員改過的欄位保留輸入。
 	const [seenEtag, setSeenEtag] = useState(measure.etag);
 	if (seenEtag !== measure.etag) {
 		const next = rebaseForm(measure, baseline, form);

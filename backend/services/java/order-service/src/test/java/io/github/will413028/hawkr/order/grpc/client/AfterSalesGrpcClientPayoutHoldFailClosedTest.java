@@ -54,7 +54,6 @@ class AfterSalesGrpcClientPayoutHoldFailClosedTest {
     @BeforeEach
     void setUp() {
         stub = mock(AfterSalesServiceGrpc.AfterSalesServiceBlockingStub.class);
-        // withDeadlineAfter 回自己：讓真實 client 的「每次呼叫套 deadline」寫法照原樣跑完
         when(stub.withDeadlineAfter(anyLong(), any(TimeUnit.class))).thenReturn(stub);
 
         GrpcStubFactory factory = mock(GrpcStubFactory.class);
@@ -80,7 +79,6 @@ class AfterSalesGrpcClientPayoutHoldFailClosedTest {
                 situation + " ⇒ 查不到就沒有可信的時間界，必須無時間界（呼叫端定期重問）");
     }
 
-    // ==================== §7 逐項：五種 lookup 失敗 ====================
 
     @Test
     @DisplayName("AfterSales gRPC timeout（DEADLINE_EXCEEDED）⇒ hold，不得撥款")
@@ -121,7 +119,7 @@ class AfterSalesGrpcClientPayoutHoldFailClosedTest {
         givenRpcReturns(GetOrderPayoutHoldResponse.newBuilder()
                 .setCode(GrpcResponseCode.INTERNAL_ERROR.code())
                 .setMessage("撥款資格反查失敗")
-                .build());   // 注意：hold 預設 false，正是 fail-open 最容易溜過去的形狀
+                .build());
         assertFailedClosed(client.getPayoutHold(ORDER_NO), "非 0 業務碼");
     }
 
@@ -143,7 +141,7 @@ class AfterSalesGrpcClientPayoutHoldFailClosedTest {
         givenRpcReturns(GetOrderPayoutHoldResponse.newBuilder()
                 .setCode(0)
                 .setHold(true)
-                .setReasonValue(9999)          // UNRECOGNIZED
+                .setReasonValue(9999)
                 .setCaseNo("ASX")
                 .build());
         PayoutHold hold = client.getPayoutHold(ORDER_NO);
@@ -163,7 +161,6 @@ class AfterSalesGrpcClientPayoutHoldFailClosedTest {
         assertEquals(PayoutHoldReason.ACTIVE_CASE, hold.reason());
     }
 
-    // ==================== 對照組：證明上面那些斷言不是恆真 ====================
 
     @Test
     @DisplayName("對照：正常回 hold=false ⇒ 必須真的放行（否則賣家款項永久卡死）")

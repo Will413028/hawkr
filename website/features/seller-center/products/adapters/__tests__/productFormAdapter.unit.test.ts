@@ -26,7 +26,6 @@ describe("draftToSubmitBody images", () => {
 });
 
 describe("draftToSubmitBody status", () => {
-	// 後端 UpdateProductRequest.status 是 string CodeMeta；送數字會 400。
 	it("maps numeric on-shelf override (1) to CodeMeta '4004'", () => {
 		expect(draftToSubmitBody(emptyDraft(), 1).status).toBe("4004");
 	});
@@ -88,18 +87,12 @@ describe("applyImagesUpdate", () => {
 		expect(next.main_image).toBe("https://cdn/a.jpg");
 	});
 
-	// Regression: a multi-select fires N overlapping uploads that each resolve
-	// and append. With the functional-updater contract every upload accumulates
-	// onto fresh state; the old value-based onChange shared a stale base and
-	// collapsed the gallery to a single (last-resolved) image.
 	it("accumulates every image across overlapping uploads (no last-write-wins clobber)", () => {
 		const uploads = [
 			{ url: "https://cdn/1.jpg", stagedToken: "t1" },
 			{ url: "https://cdn/2.jpg", stagedToken: "t2" },
 			{ url: "https://cdn/3.jpg", stagedToken: "t3" },
 		];
-		// Each upload's completion handler is the functional append; threading
-		// them through the resolver mimics React applying queued state updates.
 		let draft = emptyDraft();
 		for (const asset of uploads) {
 			draft = applyImagesUpdate(draft, (prev) => [...prev, asset].slice(0, 9));
@@ -126,7 +119,6 @@ describe("applyImagesUpdate", () => {
 });
 
 describe("normaliseDraftFromApi status", () => {
-	// 後端回 CodeMeta 字串，radio 用 0/1/2 比對；收斂錯了開編輯頁 radio 預選會錯。
 	const norm = (status: unknown) =>
 		normaliseDraftFromApi({ ...emptyDraft(), status } as never).status;
 	it("coerces 4004 (上架) → 1", () => expect(norm("4004")).toBe(1));
@@ -146,10 +138,6 @@ describe("normaliseDraftFromApi status", () => {
  * 後端從來沒有這個欄位 —— 於是測試一路綠、編輯頁圖庫一路空，賣家一動圖片就把
  * 既有圖整組洗掉（#430 A1）。手寫的 wire shape 會替 bug 背書。
  */
-// `as unknown as`, not a direct cast: the live payload wires `stock` as a
-// string while `SellerProductListItem.stock` is declared `number`, so the two
-// types genuinely do not overlap. That mismatch is a pre-existing type lie
-// tracked under #430 D4, not something this fixture should paper over silently.
 const liveDetail = productDetailFixture.data as unknown as SellerProductDetail &
 	Record<string, unknown>;
 
@@ -184,13 +172,9 @@ describe("normaliseDraftFromApi images (live wire fixture)", () => {
 		);
 
 		expect(draft.images).toHaveLength(wire.length);
-		// assetId is what `resolveStagedImages` sends back so the backend keeps the
-		// image; without it a save replaces the gallery with only the new uploads.
 		expect(draft.images?.map((i) => i.assetId)).toEqual(
 			wire.map((g) => g.assetId),
 		);
-		// Our locally built display URL must agree with the one the gateway built
-		// from the same imageKey (49 §6.5 single entry point).
 		expect(draft.images?.map((i) => i.url)).toEqual(
 			wire.map((g) => g.imageUrl),
 		);
@@ -210,8 +194,6 @@ describe("normaliseDraftFromApi images (live wire fixture)", () => {
 	});
 
 	it("keeps an entry whose URL cannot be built as long as it still has an assetId", () => {
-		// Losing the thumbnail is cosmetic; losing the assetId deletes the image on
-		// the next save. The entry must survive.
 		const draft = normaliseDraftFromApi({
 			...emptyDraft(),
 			gallery: [{ assetId: "872530103878698664", imageKey: "" }],

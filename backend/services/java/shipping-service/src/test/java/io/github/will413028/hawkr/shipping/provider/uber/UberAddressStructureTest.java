@@ -37,7 +37,6 @@ class UberAddressStructureTest {
         @DisplayName("🔴「之」不能當錨：「1之2號」的「之」屬於門牌")
         void hyphenIsNotTheAnchor() {
             var s = UberAddressStructure.of(objectMapper, "台北市", "大安區", "忠孝東路1之2號5樓之3");
-            // 用「之」當錨會切成「忠孝東路1」，把門牌截斷。
             assertThat(s.addressJson()).contains("忠孝東路1之2號");
             assertThat(s.notes()).isEqualTo("5樓之3");
         }
@@ -45,10 +44,6 @@ class UberAddressStructureTest {
         @Test
         @DisplayName("🔴 錨是**第一個**「號」——樓層自己也可以含「號」")
         void anchorIsFirstNumberSign() {
-            // 🔴 這一支是為了讓 indexOf/lastIndexOf 的變異有鑑別力而存在。
-            //    上面那支只有一個「號」⇒ 兩種寫法結果相同 ⇒ 對這個變異完全看不見
-            //    （2026-09-12 實測：把 lastIndexOf 改成 indexOf，全部 11 支照樣綠）。
-            //    真實情境：樓層含「號」的地址（「B1號櫃」「1樓之2號房」）。
             var s = UberAddressStructure.of(objectMapper, "台北市", "信義區", "松高路1號B1號櫃");
             assertThat(s.addressJson())
                     .as("門牌止於第一個「號」")
@@ -83,8 +78,6 @@ class UberAddressStructureTest {
         @Test
         @DisplayName("detail 重複帶了縣市＋區前綴 ⇒ strip 掉，不讓結構化地址出現兩次城市名")
         void duplicatedPrefixIsStripped() {
-            // 真實情境：前端把完整地址塞進 detail 欄。不 strip 的話 state=台北市、
-            // city=大安區，而 street 又是「台北市大安區忠孝東路一段1號」⇒ 地理編碼失敗。
             var s = UberAddressStructure.of(objectMapper, "台北市", "大安區", "台北市大安區忠孝東路一段1號5樓");
             assertThat(s.addressJson())
                     .as("street 不得再帶一次縣市與區")
@@ -161,7 +154,6 @@ class UberAddressStructureTest {
         @Test
         @DisplayName("🔴「大安區」放進縣市欄 ⇒ 拒絕（欄位語意被寫反時必須擋下來）")
         void districtInCountyFieldRejected() {
-            // 這是最可能的真實錯誤：上游把兩欄對調。它不會有任何型別錯誤。
             assertThatThrownBy(() -> UberAddressStructure.of(objectMapper, "大安區", "台北市", "忠孝東路1號"))
                     .isInstanceOf(UberAddressUnparseableException.class);
         }

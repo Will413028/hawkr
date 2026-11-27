@@ -14,18 +14,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-// #2137：五條讀路徑（訂單 / 優惠券 / 瀏覽紀錄 / 對話 / 結帳預覽）的賣家連結先前
-// 只有 store_id，前端只能連 /sellers/{store_id} 再吃一次 middleware 308。五個
-// owning service 為了店名/logo 本來就會查賣家（order/coupon 走
-// batchGetSellerMeta，buyer/im 走 GetSellerBatch，結帳預覽走 getSellerMeta），
-// store_code 就在同一份回應裡、只是組 DTO 時被丟掉，所以補齊是零額外 RPC。
-//
-// 這裡釘的是「Gateway 沒有再把它丟掉一次」：上游 proto 有值 → HTTP JSON 就要
-// 有對應的 key。前端那幾個 surface 已經改成只吃這個 key、不回退 store_id，所以
-// 任何一條靜默斷掉的後果是連結消失，不是變慢。
-//
-// store_code 刻意用與 store_id 不同的值：兩者相等的賣家（由已綁定的 PayUni
-// merchant_code 回填）驗不出「有沒有真的讀對欄位」。
 const (
 	testStoreID   = "2636840881"
 	testStoreCode = "2649605557"
@@ -62,7 +50,6 @@ func TestOrderList_CarriesSellerStoreCode(t *testing.T) {
 
 	order := firstRecord(t, body)
 	assertJSONString(t, order, "storeCode", testStoreCode)
-	// storeId 仍要在（後端寫路徑與站內路由吃它），只是不再是連結的來源。
 	assertJSONString(t, order, "storeId", testStoreID)
 }
 
@@ -143,7 +130,6 @@ func TestMyCoupons_CarrySellerStoreCode(t *testing.T) {
 	if !ok {
 		t.Fatal("data is not an object")
 	}
-	// 可用券與已使用券是兩支不同的轉換函式，各自都會漏，所以兩邊都要斷言。
 	for _, key := range []string{"records", "usedRecords"} {
 		rows, ok := data[key].([]interface{})
 		if !ok || len(rows) == 0 {
@@ -210,11 +196,9 @@ func TestCheckoutPreview_OrderGroupsCarrySellerStoreCode(t *testing.T) {
 		t.Fatal("orderGroups[0] is not an object")
 	}
 	assertJSONString(t, group, "storeCode", testStoreCode)
-	// storeId 仍要在（結帳鏈後續步驟吃它），只是不再是連結的來源。
 	assertJSONString(t, group, "storeId", testStoreID)
 }
 
-// firstRecord 取分頁 envelope（data.records[0]）的第一列。
 func firstRecord(t *testing.T, body map[string]interface{}) map[string]interface{} {
 	t.Helper()
 	data, ok := body["data"].(map[string]interface{})

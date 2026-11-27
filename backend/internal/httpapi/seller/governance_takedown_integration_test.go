@@ -26,7 +26,6 @@ type seededContent struct {
 	buyerEntry, deletedEntry              uuid.UUID
 }
 
-// seedContent 直接寫 social 的列（店家身分的貼文、留言、討論區留言）：這組測試要的是內容存在而且屬於這家店，不經 social 的寫入規則。
 func (f *adminFixture) seedContent(t *testing.T, storeID int64) seededContent {
 	t.Helper()
 	c := seededContent{post: uuid.NewV7(), comment: uuid.NewV7(), entry: uuid.NewV7(), buyerComment: uuid.NewV7(), deletedPost: uuid.NewV7(),
@@ -145,7 +144,6 @@ func TestContentTakedownThroughConnectWritesAndRemovesTheSocialCopy(t *testing.T
 	if n := f.count(t, "SELECT count(*) FROM social.forum_entries WHERE id = $1 AND NOT counted", c.entry); n != 1 {
 		t.Fatal("討論區留言的旗標要同 transaction 變成不計入")
 	}
-	// 同一次讀取核對歸屬並取得快照：存入本文、發文時間、圖片張數與連結（貼文與留言連貼文，討論區留言連店家加討論串）。
 	mid := created.Msg.GetMeasure().GetId()
 	if n := f.count(t, "SELECT count(*) FROM seller.measure_contents WHERE measure_id = $1 AND snapshot_state = 'CAPTURED' AND snapshot_authored_at IS NOT NULL", mid); n != 3 {
 		t.Fatalf("三則內容都存快照：%d", n)
@@ -267,7 +265,6 @@ func TestContentTakedownThroughCreateInTxChecksOnlyWhoseContentItIs(t *testing.T
 	}
 }
 
-// takedownSnapshot 給一個內容參照一份格式正確的快照（連結依種類）。
 func takedownSnapshot(ref seller.ContentRef) seller.TakedownContent {
 	sn := &seller.ContentSnapshot{Body: "本文", AuthoredAt: time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC), Link: seller.ContentLink{PostID: uuid.NewV7()}}
 	if ref.Kind == seller.ContentForumEntry {

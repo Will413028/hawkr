@@ -23,7 +23,6 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-// kek 回傳 `<id>:<base64 的 32 位元組>`，內容由 seed 決定（測試不要隨機，失敗時可重現）。
 func kek(id string, seed byte) string {
 	return id + ":" + base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{seed}, 32))
 }
@@ -37,7 +36,6 @@ func mustKeyring(t *testing.T, s string) *media.Keyring {
 	return k
 }
 
-// withKeyring 建一個共用同一個資料庫與儲存、但金鑰環不同的 Module；ring 為 nil 時沒有金鑰環。
 func (f *fixture) withKeyring(ring *media.Keyring) *media.Module {
 	return media.New(media.Deps{
 		DB: f.d, Jobs: f.jobs, Store: f.store, NewID: uuid.NewV7, Now: f.clock.Now, Keyring: ring,
@@ -46,7 +44,6 @@ func (f *fixture) withKeyring(ring *media.Keyring) *media.Module {
 
 const secretMarker = "TOP-SECRET-PASSPORT-NUMBER-X1234567"
 
-// pdfOf 回傳含明文標記、至少 n 位元組的假 PDF。
 func pdfOf(n int) []byte {
 	b := []byte("%PDF-1.7\n" + secretMarker + "\n")
 	for len(b) < n {
@@ -57,7 +54,6 @@ func pdfOf(n int) []byte {
 
 var pngMagic = append([]byte{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A}, []byte(secretMarker)...)
 
-// uploadSecure 像 client 一樣：BeginSecureUpload，再依回傳的段大小依序送每一段。
 func uploadSecure(t *testing.T, f *fixture, who media.Uploader, data []byte) media.SecureUploadResult {
 	t.Helper()
 	return uploadSecureVia(t, f.m, who, data)
@@ -84,7 +80,6 @@ func uploadSecureVia(t *testing.T, m *media.Module, who media.Uploader, data []b
 	return media.SecureUploadResult{Token: b.Token, ContentType: last.ContentType, SizeBytes: last.SizeBytes, ExpiresAt: last.ExpiresAt}
 }
 
-// secureRow 取得 token 對應的暫存列與資產 ID（資產 ID 不回給上傳者，測試直接以 token_hash 查表，不靠排序）。
 func secureRow(t *testing.T, f *fixture, token string) (uploadID, assetID uuid.UUID) {
 	t.Helper()
 	h := sha256.Sum256([]byte(token))
@@ -94,7 +89,6 @@ func secureRow(t *testing.T, f *fixture, token string) (uploadID, assetID uuid.U
 	return uploadID, assetID
 }
 
-// objectKeyOf 回傳資產列的 object_key（公開資產是單一物件的 key，機敏資產是前綴 secure/<資產 ID>/）。
 func objectKeyOf(t *testing.T, f *fixture, assetID uuid.UUID) string {
 	t.Helper()
 	var k string
@@ -104,7 +98,6 @@ func objectKeyOf(t *testing.T, f *fixture, assetID uuid.UUID) string {
 	return k
 }
 
-// chunkKeys 回傳資產各段的物件 key（依段序號）。
 func chunkKeys(t *testing.T, f *fixture, assetID uuid.UUID) []string {
 	t.Helper()
 	rows, err := f.d.Pool().Query(t.Context(), `SELECT object_key FROM media.secure_chunks WHERE asset_id = $1 ORDER BY idx`, assetID)
@@ -156,9 +149,7 @@ func noWrites(t *testing.T, f *fixture) {
 	}
 }
 
-// ==================== BeginSecureUpload 與 PutSecureChunk ====================
 
-// noObjects 斷言儲存裡沒有任何物件、也沒有任何 Put（被拒的輸入不寫物件）。
 func noObjects(t *testing.T, f *fixture) {
 	t.Helper()
 	if len(f.store.puts) != 0 || len(f.store.Keys()) != 0 {
@@ -166,7 +157,6 @@ func noObjects(t *testing.T, f *fixture) {
 	}
 }
 
-// threeChunkData 是剛好三段的內容：兩個滿段加一個 1 位元組的最後一段，內容隨位置變化（對調的段不會恰好相同）。
 func threeChunkData() []byte {
 	data := make([]byte, 2*media.SecureChunkSize+1)
 	for i := range data {
@@ -346,7 +336,6 @@ func TestSecureUpload_FirstChunkNotPDFOrImageRejectsSessionAndWritesNoObject(t *
 			if assetCount(t, f) != 0 {
 				t.Fatal("被拒的會話建了資產列")
 			}
-			// 被拒之後同一個 token 不再收段。
 			_, err = putChunk(f, owner, b.Token, 0, pdfOf(len(data)))
 			wantKind(t, err, apperr.KindFailedPrecondition)
 		})
@@ -376,7 +365,6 @@ func TestSecureUpload_PutSecureRejectsBadSizeAndSizeMismatch(t *testing.T) {
 	wantKind(t, err, apperr.KindInvalidInput)
 }
 
-// endless 產生以 prefix 開頭、永遠讀不完的內容。
 type endless struct {
 	prefix []byte
 	n      int64
@@ -495,7 +483,6 @@ func TestSecureUpload_ChunkLengthMismatchIsRejectedWithoutWrites(t *testing.T) {
 		}
 	}
 	noObjects(t, f)
-	// 會話沒有被拒：長度對了之後照常收。
 	if _, err := putChunk(f, owner, b.Token, 0, data); err != nil {
 		t.Fatalf("長度對了仍被拒：%v", err)
 	}
@@ -587,7 +574,6 @@ func TestMarkDeleted_RemovesEveryChunkObjectOfASecureAsset(t *testing.T) {
 	}
 }
 
-// gate 在第一次被讀時通知 started，之後阻塞到 release 關閉，讓上傳停在「持有名額」的狀態而不靠 sleep。
 type gate struct {
 	prefix  []byte
 	started chan<- struct{}
@@ -615,7 +601,6 @@ func TestSecureUpload_ConcurrentChunkLimitIsResourceExhausted(t *testing.T) {
 	wantKind(t, err, apperr.KindResourceExhausted)
 	release()
 	wait()
-	// 名額放回後可以再上傳。
 	if _, err := putChunk(f, owner, b.Token, 0, data); err != nil {
 		t.Fatalf("名額放回後仍失敗：%v", err)
 	}
@@ -637,7 +622,6 @@ func TestSecureUpload_ConcurrentSameChunkReadsBackTheWinnerAndDeletesTheLoserObj
 	f.store.setAfterPut(func(key string) {
 		f.store.setAfterPut(nil)
 		loserKey = key
-		// 輸家的物件已寫入、尚未推進：贏家的整個請求在這個空檔跑完。
 		if _, err := putChunk(f, owner, b.Token, 0, winnerData[:b.ChunkSize]); err != nil {
 			t.Errorf("贏家的段：%v", err)
 		}
@@ -682,7 +666,6 @@ func TestAdvanceSecureUpload_SkippedIndexAdvancesNothing(t *testing.T) {
 	}
 }
 
-// stagedIDs 以 token 查暫存列 ID 與預配的資產 ID。
 func stagedIDs(t *testing.T, f *fixture, token string) (uploadID, assetID uuid.UUID) {
 	t.Helper()
 	h := sha256.Sum256([]byte(token))
@@ -714,14 +697,13 @@ func TestSecureUpload_NoPlaintextInAnyPutOrStoredObject(t *testing.T) {
 // 對應 test-map 列 95：密文開銷依 B1-D4 的格式改寫（原名 TestConfirmSecure_PassesWithCipherOverhead）。
 func TestSecureUpload_CiphertextOverheadIsOutsideTheRecordedPlainSize(t *testing.T) {
 	f := setup(t)
-	data := pdfOf(70_000) // 單一上傳段、兩個 AEAD 段
+	data := pdfOf(70_000)
 	res := uploadSecure(t, f, owner, data)
 	_, assetID := secureRow(t, f, res.Token)
 	info, err := f.store.Head(t.Context(), chunkKeys(t, f, assetID)[0])
 	if err != nil {
 		t.Fatal(err)
 	}
-	// header 16 位元組、每個 AEAD 段 16 位元組 tag
 	if want := int64(len(data)) + 16 + 2*16; info.Size != want {
 		t.Fatalf("物件 %d 位元組，預期 %d", info.Size, want)
 	}
@@ -805,7 +787,6 @@ func TestSecureUpload_PutFailureLeavesSessionResumable(t *testing.T) {
 	}
 }
 
-// insertCraftedSecure 以 SQL 建一筆機敏暫存列（測試用：模擬 GC 與處理 job 看到的列）。
 func insertCraftedSecure(t *testing.T, f *fixture, state string) (uploadID, assetID uuid.UUID) {
 	t.Helper()
 	uploadID, assetID = uuid.New(), uuid.New()
@@ -823,7 +804,7 @@ func insertCraftedSecure(t *testing.T, f *fixture, state string) (uploadID, asse
 func TestProcess_SecureRowIsPermanentFailure(t *testing.T) {
 	f := setup(t)
 	id, _ := insertCraftedSecure(t, f, "UPLOADED")
-	m := f.withKeyring(f.keyring) // 內建的處理（NewProcessor），不是 fixture 的 copyProcess
+	m := f.withKeyring(f.keyring)
 	if err := m.ProcessUpload(t.Context(), id, 1, media.ProcessMaxAttempts); err != nil {
 		t.Fatalf("ProcessUpload：%v", err)
 	}
@@ -837,7 +818,6 @@ func TestProcess_SecureRowIsPermanentFailure(t *testing.T) {
 	}
 }
 
-// ==================== ReadSecure ====================
 
 // 對應 test-map 列 9、12（原名 TestReadSecure_ReturnsPlaintextForAsset、TestReadSecure_DecryptsStoredObject）。
 func TestReadSecure_ReturnsPlaintextForAssetAcrossSegments(t *testing.T) {
@@ -899,13 +879,11 @@ func TestReadSecure_RefusesTransaction(t *testing.T) {
 	}
 }
 
-// replaceObject 把資產的密文換成 mutate 之後的內容，模擬儲存層被竄改。
 func replaceObject(t *testing.T, f *fixture, assetID uuid.UUID, mutate func([]byte) []byte) {
 	t.Helper()
 	replaceChunkObject(t, f, chunkKeys(t, f, assetID)[0], mutate)
 }
 
-// replaceChunkObject 把一個段物件換成 mutate 之後的內容。
 func replaceChunkObject(t *testing.T, f *fixture, key string, mutate func([]byte) []byte) {
 	t.Helper()
 	rc, err := f.store.Get(t.Context(), key)
@@ -1037,7 +1015,7 @@ func TestReadSecure_TamperedTruncatedOrTaglessCiphertextFailsBeforeAnyPlaintext(
 	for name, mutate := range cases {
 		t.Run(name, func(t *testing.T) {
 			f := setup(t)
-			res := uploadSecure(t, f, owner, pdfOf(300)) // 單段：任何竄改都在第一段，之前不得交出明文
+			res := uploadSecure(t, f, owner, pdfOf(300))
 			a := confirmSecure(t, f, owner, res.Token)
 			replaceObject(t, f, a.ID, mutate)
 			if n := readFails(t, f, a.ID); n != 0 {
@@ -1070,7 +1048,6 @@ func TestReadSecure_FailsForUnknownKekID(t *testing.T) {
 	}
 }
 
-// ==================== ReadStagedSecure ====================
 
 func TestReadStagedSecure_OnlyTheUploaderCanPreviewBeforeConfirm(t *testing.T) {
 	f := setup(t)
@@ -1112,7 +1089,6 @@ func TestReadStagedSecure_RejectsPublicStaging(t *testing.T) {
 	}
 }
 
-// ==================== RewrapDEKs ====================
 
 func TestRewrapDEKs_AfterRotationOldKekCanBeDropped(t *testing.T) {
 	f := setup(t)
@@ -1122,7 +1098,6 @@ func TestRewrapDEKs_AfterRotationOldKekCanBeDropped(t *testing.T) {
 	before := readAll(t, rc)
 
 	rotated := f.withKeyring(mustKeyring(t, kek("k2", 2)+","+kek("k1", 1)))
-	// 換 primary 之後新上傳用 k2；它不該被重新包裹。
 	fresh := uploadSecureVia(t, rotated, owner, pdfOf(100))
 	_, freshAsset := secureRow(t, f, fresh.Token)
 	var freshWrapped []byte
@@ -1130,7 +1105,7 @@ func TestRewrapDEKs_AfterRotationOldKekCanBeDropped(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	f.store.puts = map[string][]byte{} // 之後任何 Put（含重寫同一個 key）都會留下紀錄
+	f.store.puts = map[string][]byte{}
 	n, err := rotated.RewrapDEKs(t.Context())
 	if err != nil || n != 1 {
 		t.Fatalf("RewrapDEKs = %d, %v，預期只更新舊資產 1 筆", n, err)
@@ -1147,7 +1122,6 @@ func TestRewrapDEKs_AfterRotationOldKekCanBeDropped(t *testing.T) {
 		t.Fatalf("重跑 = %d, %v，預期 0", n, err)
 	}
 
-	// 只留新 KEK 仍可讀，物件位元組不變，沒有任何 Put。
 	onlyNew := f.withKeyring(mustKeyring(t, kek("k2", 2)))
 	rc2, _, err := onlyNew.ReadSecure(t.Context(), old.ID)
 	if err != nil {

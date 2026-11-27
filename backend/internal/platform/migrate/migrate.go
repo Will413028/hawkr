@@ -40,11 +40,6 @@ func (f file) checksum() string {
 	return hex.EncodeToString(s[:])
 }
 
-// extensions 是平台擁有的 Postgres extension（database 層級，裝在 public，不屬於任何模組）。
-//
-// 必要條件：有模組依賴某個 database extension 時才列在這裡（catalog 的商品搜尋用 pg_trgm，D15）。
-// 模組的 schema.sql 與 migration 不寫 CREATE EXTENSION（TestModulesDoNotCreateExtensions）：Atlas 社群版
-// 讀到它就報錯，而且 extension 是 database 的資源，不是模組的 schema 物件。
 var extensions = []string{"pg_trgm"}
 
 // Extensions 回傳平台擁有的 extension 名稱。
@@ -69,7 +64,6 @@ func InstallExtensions(ctx context.Context, d *db.DB) error {
 	return nil
 }
 
-// lockKey 是 migrate 的 advisory lock：同一時間只有一個 migrate 在跑（例如兩個 pod 同時啟動）。
 const lockKey = 7_236_915_402
 
 // Apply 依序套用 mods 裡尚未套用的 migration。任何模組驗證失敗時，什麼都不套用。
@@ -174,7 +168,6 @@ func applyFile(ctx context.Context, conn *pgxpool.Conn, module string, f file) (
 			_ = tx.Rollback(context.WithoutCancel(ctx))
 		}
 	}()
-	// 沒有參數的 Exec 走 simple protocol，一個檔案裡可以有多個 statement。
 	if _, err = tx.Exec(ctx, string(f.body)); err != nil {
 		return fmt.Errorf("migrate：%s/%s：%w", module, f.name, err)
 	}
@@ -189,7 +182,6 @@ func applyFile(ctx context.Context, conn *pgxpool.Conn, module string, f file) (
 	return nil
 }
 
-// load 讀出模組的 migration 檔，並驗證檔名、directive 與 atlas.sum。
 func load(m Module) ([]file, error) {
 	entries, err := fs.ReadDir(m.Dir, ".")
 	if err != nil {
@@ -230,8 +222,6 @@ func load(m Module) ([]file, error) {
 	return files, nil
 }
 
-// directive 回傳檔案開頭的 Atlas directive（例如 `-- atlas:txmode none`）。
-// Atlas 只認檔案開頭、第一個 statement 之前的 directive，所以只檢查那一段。
 func directive(body []byte) string {
 	for _, line := range strings.Split(string(body), "\n") {
 		line = strings.TrimSpace(line)
@@ -247,8 +237,6 @@ func directive(body []byte) string {
 	return ""
 }
 
-// sumFile 以 Atlas 的演算法算出 atlas.sum 的內容：逐檔累加的 SHA-256，最後再對
-// 「檔名＋逐檔雜湊」取一次總雜湊。已用 12 個服務由 Atlas 產生的 atlas.sum 逐位元比對過。
 func sumFile(files []file) string {
 	running := sha256.New()
 	hashes := make([]string, len(files))

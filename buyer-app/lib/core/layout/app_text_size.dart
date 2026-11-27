@@ -50,7 +50,6 @@ class AppTextSizeController extends Notifier<AppTextSize> {
       state = AppTextSize.fromStorage(preferences.getString(storageKey));
       _persistedState = state;
     } catch (_) {
-      // A display preference must never block startup.
       state = AppTextSize.standard;
       _persistedState = state;
     }
@@ -67,7 +66,6 @@ class AppTextSizeController extends Notifier<AppTextSize> {
     state = value;
 
     final operation = _writeTail.then((_) async {
-      // A newer tap already superseded this value before its write started.
       if (revision != _writeRevision) return true;
       try {
         final preferences = await SharedPreferences.getInstance();

@@ -34,7 +34,6 @@ var start = time.Date(2026, 11, 23, 3, 0, 0, 0, time.UTC)
 
 const (
 	buyerID int64 = 1
-	// invitedStore 與 otherInvitedStore 是被邀請的店；outsider 沒有被邀請。
 	invitedStore      int64 = 10
 	otherInvitedStore int64 = 11
 	outsider          int64 = 99
@@ -42,7 +41,6 @@ const (
 
 func ptr[T any](v T) *T { return &v }
 
-// fakeStores 是 seller 的替身：suspended 的店 Sanctions 為 nil（沒推導過，Authorize fail-closed），retired 的店 LockNotRetired 回 NOT_FOUND。
 type fakeStores struct {
 	mu        sync.Mutex
 	suspended bool
@@ -74,7 +72,6 @@ func (f *fakeStores) Store(_ context.Context, id int64) (seller.Store, error) {
 	return st, nil
 }
 
-// fixture 是一位買家的一張需求（小白菜、3 KG）與它的一次發布（邀請 invitedStore 與 otherInvitedStore，買家預期單價 100 到 200 元每 KG），加上賣家端服務。
 type fixture struct {
 	t           *testing.T
 	d           *db.DB
@@ -101,7 +98,6 @@ func newFixture(t *testing.T) *fixture {
 	return f
 }
 
-// sibling 在同一個資料庫為另一位買家建一張需求並發布（發布時間是 at）；邀請同樣的兩家店。
 func (f *fixture) sibling(buyer int64, at time.Time) *fixture {
 	g := &fixture{t: f.t, d: f.d, jobs: f.jobs, bus: f.bus, stores: f.stores, now: at}
 	g.adopt(buyer)
@@ -177,7 +173,6 @@ func (f *fixture) count(sql string, args ...any) int {
 	return n
 }
 
-// validQuote 是通過完整驗證的報價：貨款 1000、運費 50、稅 20，十二點五公斤，有效期限在 f.now 之後三天。
 func (f *fixture) validQuote() model.QuoteInput {
 	until := f.now.Add(72 * time.Hour)
 	return model.QuoteInput{
@@ -194,7 +189,6 @@ func (f *fixture) submitIn(store int64, cid uuid.UUID, expectedResponse string, 
 	}
 }
 
-// submit 以新的冪等鍵送出報價，要成功。
 func (f *fixture) submit(store int64, expectedResponse string, q model.QuoteInput) model.SellerResponseVersion {
 	f.t.Helper()
 	v, err := f.service().Submit(context.Background(), f.submitIn(store, uuid.NewV7(), expectedResponse, q))
@@ -232,7 +226,6 @@ func wantClosed(t *testing.T, err error) {
 	}
 }
 
-// allStores 是替身的 seller：沒有店封鎖買家，每家店都營業中。
 type allStores struct{}
 
 func (allStores) StoreIDsBlockingBuyer(context.Context, int64, []int64) (map[int64]struct{}, error) {

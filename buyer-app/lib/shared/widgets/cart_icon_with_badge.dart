@@ -36,7 +36,6 @@ class CartIconWithBadge extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 彈跳動畫：數量增加時 scale 1.0 → 1.35 → 1.0
     final animCtrl = useAnimationController(
       duration: const Duration(milliseconds: 400),
     );
@@ -66,7 +65,6 @@ class CartIconWithBadge extends HookConsumerWidget {
       await _navigateToCart(context, ref);
     }
 
-    // 追踪上次數量，數量增加時觸發動畫
     final prevCount = useRef<int?>(null);
     useEffect(() {
       if (prevCount.value != null && itemCount > prevCount.value!) {
@@ -76,7 +74,6 @@ class CartIconWithBadge extends HookConsumerWidget {
       return null;
     }, [itemCount]);
 
-    // 用動畫包裹整個圖標
     Widget wrapWithAnimation(Widget child) {
       return AnimatedBuilder(
         animation: scaleAnim,
@@ -85,7 +82,6 @@ class CartIconWithBadge extends HookConsumerWidget {
       );
     }
 
-    // 緊湊模式：使用 GestureDetector + Icon，不帶 padding
     if (compact) {
       return wrapWithAnimation(
         Semantics(
@@ -122,7 +118,6 @@ class CartIconWithBadge extends HookConsumerWidget {
       );
     }
 
-    // 標準模式：使用 IconButton
     return wrapWithAnimation(
       Stack(
         clipBehavior: Clip.none,

@@ -8,12 +8,6 @@ import '../../../../core/theme/hk_tokens.dart';
 import '../../../../shared/widgets/hk_button_label.dart';
 import '../../../address/data/address_model.dart';
 
-// ---------------------------------------------------------------------------
-// 收件地址選擇底部彈窗。
-//
-// 以 Radio List 形式展示使用者的所有收件地址，
-// 底部提供「新增收件地址」按鈕。選取後回傳地址 ID。
-// ---------------------------------------------------------------------------
 
 /// 顯示收件地址選擇器。
 ///
@@ -57,7 +51,6 @@ Future<int?> showAddressPickerSheet({
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // 標題
                   Text('選擇收件地址', style: CartTypography.section),
                   const SizedBox(height: HkSpace.md),
 
@@ -126,7 +119,6 @@ Future<int?> showAddressPickerSheet({
                   ),
                   const SizedBox(height: HkSpace.md),
 
-                  // 新增地址按鈕
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(

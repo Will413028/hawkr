@@ -47,7 +47,6 @@ void main() {
 
   testWidgets('聚焦中間欄 → 刪此欄：刪的是聚焦欄非最後一欄', (tester) async {
     final data = await pumpTable(tester);
-    // 點第二欄的格（產地）
     await tester.tap(find.widgetWithText(TextFormField, '產地'));
     await tester.pumpAndSettle();
     expect(find.text('刪此欄'), findsOneWidget);
@@ -79,7 +78,6 @@ void main() {
 
   testWidgets('格內貼上 tab 資料 → 從錨點展開並自動擴列欄', (tester) async {
     final data = await pumpTable(tester);
-    // 錨點 = 尾格（限定，r2c2）；貼 2x2 → 擴成 4 列 4 欄
     await tester.tap(find.widgetWithText(TextFormField, '限定'));
     await tester.pumpAndSettle();
     await tester.enterText(

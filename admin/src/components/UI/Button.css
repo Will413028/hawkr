@@ -1,4 +1,3 @@
-/* ========== Button Component ========== */
 .hk-btn {
 	display: inline-flex;
 	align-items: center;
@@ -17,7 +16,6 @@
 	white-space: nowrap;
 }
 
-/* Sizes */
 .hk-btn--sm {
 	min-height: 40px;
 	padding: 8px 14px;
@@ -38,7 +36,6 @@
 	line-height: 22px;
 }
 
-/* Variants */
 .hk-btn--primary {
 	background: var(--admin-primary-strong);
 	color: white;
@@ -95,7 +92,6 @@
 	outline-offset: 2px;
 }
 
-/* States */
 .hk-btn--disabled {
 	opacity: 0.5;
 	cursor: not-allowed;
@@ -114,7 +110,6 @@
 	}
 }
 
-/* Icon */
 .hk-btn__icon {
 	display: flex;
 	align-items: center;

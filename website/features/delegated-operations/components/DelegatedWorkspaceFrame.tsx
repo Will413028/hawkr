@@ -76,9 +76,7 @@ export default function DelegatedWorkspaceFrame({
 					/>
 					<div className="seller-main">
 						<OperationContextBar onRequestEnd={() => setEndDialogOpen(true)} />
-						{/* 資料層的注入點包在頁面外面：賣家中心的元件（本工作區的內容全部
-						    來自它們）一律經 `useSellerDataScope()` 取得 repo／快取鍵／
-						    啟用條件，沒有 provider 時拿到的是賣家路徑那一份。 */}
+
 						<DelegatedSellerDataProvider storeId={storeId}>
 							{children}
 						</DelegatedSellerDataProvider>

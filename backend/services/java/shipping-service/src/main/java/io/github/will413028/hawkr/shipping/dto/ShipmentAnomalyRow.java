@@ -19,7 +19,6 @@ public class ShipmentAnomalyRow {
     private LocalDateTime detectedAt;
     private String ackAction;
     private LocalDateTime actedAt;
-    // Admin 端揭露：賣家處置（seller_ack）；賣家 dashboard 查詢不填此兩欄
     private String sellerAckAction;
     private LocalDateTime sellerActedAt;
 

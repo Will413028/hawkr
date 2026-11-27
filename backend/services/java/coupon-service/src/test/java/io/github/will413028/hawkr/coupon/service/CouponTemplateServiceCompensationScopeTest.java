@@ -41,11 +41,9 @@ class CouponTemplateServiceCompensationScopeTest {
 
     @BeforeAll
     static void initTsid() {
-        // coupon-service node-id-base = 500（10 檔 §7.2）
         try {
             TsidUtil.init(500, 0);
         } catch (IllegalStateException alreadyInitialised) {
-            // 同一 JVM 內其他測試已初始化，忽略
         }
     }
 
