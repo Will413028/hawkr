@@ -19,14 +19,14 @@ CREATE SCHEMA social;
 -- 公開要件（恰好一張圖、內文必填）在轉為 PUBLISHED 時由寫入端檢查，草稿可以不完整，所以內文可以是空字串。version 是樂觀鎖，
 -- 對外是 etag（ADR 2026-09-25-optimistic-concurrency-etag）；按讚、瀏覽等計數不在這張表，放在 post_stats，不和編輯搶鎖。
 -- image_key 是顯示用的 object key，image_asset_id 是 media 的資產 ID（UUID v7）：寫入在同一個 transaction 內 Confirm 新資產、MarkDeleted 被換掉或終態的資產。
--- product_id 是商品（Java catalog，B4 前的 BIGINT 業務鍵），寫入時驗證存在、上架中且屬於該店，讀取時不重驗。
+-- product_id 是商品（catalog 的 UUID），寫入時驗證存在、上架中且屬於該店，讀取時不重驗。
 CREATE TABLE social.posts (
     id             UUID        PRIMARY KEY,
     store_id       BIGINT      NOT NULL,
     body           TEXT        NOT NULL DEFAULT '',
     image_key      TEXT,
     image_asset_id UUID,
-    product_id     BIGINT,
+    product_id     UUID,
     status         TEXT        NOT NULL,
     published_at   TIMESTAMPTZ,
     version        BIGINT      NOT NULL DEFAULT 1,
@@ -40,7 +40,7 @@ CREATE TABLE social.posts (
     CONSTRAINT posts_store_check CHECK (store_id > 0),
     CONSTRAINT posts_body_check CHECK (char_length(body) <= 2200 AND body !~ '^[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]|[\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000]$'),
     CONSTRAINT posts_image_check CHECK ((image_key IS NULL) = (image_asset_id IS NULL)),
-    CONSTRAINT posts_product_check CHECK (product_id > 0),
+    CONSTRAINT posts_product_check CHECK (product_id <> '00000000-0000-0000-0000-000000000000'),
     CONSTRAINT posts_status_check CHECK (status IN ('DRAFT', 'PUBLISHED', 'UNPUBLISHED')),
     CONSTRAINT posts_published_at_check CHECK ((status = 'DRAFT') = (published_at IS NULL)),
     CONSTRAINT posts_version_check CHECK (version >= 1)

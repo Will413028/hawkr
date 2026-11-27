@@ -240,29 +240,30 @@ func TestSD24ProductIsVerifiedOnWrite(t *testing.T) {
 	f := setup(t)
 	storeID, _ := f.exposableStore(t)
 	otherStore, _ := f.exposableStore(t)
-	f.products.owner[7] = storeID
-	f.products.owner[8] = otherStore
+	p7, p8, pMissing := uuid.NewV7(), uuid.NewV7(), uuid.NewV7()
+	f.products.owner[p7] = storeID
+	f.products.owner[p8] = otherStore
 	st := f.store(t, storeID)
-	id := func(v int64) *int64 { return &v }
-	p := mustV[social.Post](t)(f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "x", ProductID: id(7)}, nil))
-	if p.ProductID == nil || *p.ProductID != 7 {
+	id := func(v uuid.UUID) *uuid.UUID { return &v }
+	p := mustV[social.Post](t)(f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "x", ProductID: id(p7)}, nil))
+	if p.ProductID == nil || *p.ProductID != p7 {
 		t.Fatalf("%+v", p)
 	}
-	for _, bad := range []int64{9, 8, -1} {
+	for _, bad := range []uuid.UUID{pMissing, p8, uuid.Nil()} {
 		if _, err := f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "x", ProductID: id(bad)}, nil); kindOf(err) != apperr.KindInvalidInput {
-			t.Fatalf("商品 %d：%v", bad, err)
+			t.Fatalf("商品 %s：%v", bad, err)
 		}
 		if _, err := f.module.UpdatePost(ctx, st, social.UpdatePostInput{PostID: p.ID, Version: p.Version, Body: ptr("x"), SetProduct: true, ProductID: id(bad)}, nil); kindOf(err) != apperr.KindInvalidInput {
-			t.Fatalf("更新商品 %d：%v", bad, err)
+			t.Fatalf("更新商品 %s：%v", bad, err)
 		}
 	}
 	// 之後商品下架：讀取不重驗。
-	delete(f.products.owner, 7)
+	delete(f.products.owner, p7)
 	if got := mustV[social.Post](t)(f.module.OwnPost(ctx, storeID, p.ID)); got.ProductID == nil {
 		t.Fatal("讀取時不重驗商品")
 	}
 	f.products.err = apperr.Unavailable("商品服務停擺")
-	if _, err := f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "x", ProductID: id(7)}, nil); kindOf(err) != apperr.KindUnavailable {
+	if _, err := f.module.CreatePost(ctx, st, social.CreatePostInput{Body: "x", ProductID: id(p7)}, nil); kindOf(err) != apperr.KindUnavailable {
 		t.Fatalf("查詢失敗要回錯誤：%v", err)
 	}
 }

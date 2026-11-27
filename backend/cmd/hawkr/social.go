@@ -10,8 +10,8 @@ import (
 	"uuid"
 
 	httpsocial "github.com/Will413028/hawkr/backend/internal/httpapi/social"
-	"github.com/Will413028/hawkr/backend/internal/legacy/productservice"
 	"github.com/Will413028/hawkr/backend/internal/modules/buyer"
+	"github.com/Will413028/hawkr/backend/internal/modules/catalog"
 	"github.com/Will413028/hawkr/backend/internal/modules/delegation"
 	"github.com/Will413028/hawkr/backend/internal/modules/identity"
 	"github.com/Will413028/hawkr/backend/internal/modules/seller"
@@ -22,13 +22,13 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/jobs"
 )
 
-// socialProducts 以還在舊服務的 product-service 實作 social 的商品驗證 port（B4 的 catalog 搬進單體後換成 in-process）：商品要存在、上架中
-// （includeInactive 為假時只回上架中的）而且屬於這家店。回 social 的 ErrProductNotAvailable、ErrProductNotOwned，查詢失敗回原錯誤（social 轉成
-// Unavailable）：不把「查不到」當成「商品不存在」。使用者面的句子在 social 的目錄，這裡不寫。
-type socialProducts struct{ client *productservice.Client }
+// socialProducts 以 catalog 模組實作 social 的商品驗證 port：商品要存在、上架中（店家可曝光）而且屬於這家店。
+// 回 social 的 ErrProductNotAvailable、ErrProductNotOwned，查詢失敗回原錯誤（social 轉成 Unavailable）：
+// 不把「查不到」當成「商品不存在」。使用者面的句子在 social 的目錄，這裡不寫。
+type socialProducts struct{ catalog *catalog.Module }
 
-func (a socialProducts) VerifyProduct(ctx context.Context, productID, storeID int64) error {
-	cards, err := a.client.Cards(ctx, []int64{productID}, false)
+func (a socialProducts) VerifyProduct(ctx context.Context, productID uuid.UUID, storeID int64) error {
+	cards, err := a.catalog.ProductCards(ctx, time.Now(), []uuid.UUID{productID}, false)
 	if err != nil {
 		return err
 	}
@@ -42,17 +42,21 @@ func (a socialProducts) VerifyProduct(ctx context.Context, productID, storeID in
 	return nil
 }
 
-// socialCards 以還在舊服務的 product-service 實作貼文卡片的商品顯示資料 port（B4 的 catalog 搬進單體後換成 in-process）。
-type socialCards struct{ client *productservice.Client }
+// socialCards 以 catalog 模組實作貼文卡片的商品顯示資料 port。
+type socialCards struct{ catalog *catalog.Module }
 
-func (a socialCards) Cards(ctx context.Context, ids []int64, includeInactive bool) (map[int64]httpsocial.ProductInfo, error) {
-	items, err := a.client.Cards(ctx, ids, includeInactive)
+func (a socialCards) Cards(ctx context.Context, ids []uuid.UUID, includeInactive bool) (map[uuid.UUID]httpsocial.ProductInfo, error) {
+	items, err := a.catalog.ProductCards(ctx, time.Now(), ids, includeInactive)
 	if err != nil {
 		return nil, err
 	}
-	out := make(map[int64]httpsocial.ProductInfo, len(items))
+	out := make(map[uuid.UUID]httpsocial.ProductInfo, len(items))
 	for id, item := range items {
-		out[id] = httpsocial.ProductInfo{ID: item.ID, StoreID: item.StoreID, Name: item.Name, ImageKey: item.ImageKey, MinPrice: item.MinPrice, MaxPrice: item.MaxPrice, Available: item.Available}
+		out[id] = httpsocial.ProductInfo{
+			ID: item.ID, StoreID: item.StoreID, Name: item.Title, ImageKey: item.CoverKey,
+			MinPrice: item.MinPrice, MaxPrice: item.MaxPrice,
+			Available: item.Status == catalog.StatusActive && item.TotalStock > 0,
+		}
 	}
 	return out, nil
 }

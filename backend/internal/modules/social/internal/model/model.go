@@ -110,7 +110,7 @@ type Post struct {
 	Body     string
 	ImageKey string
 	// ProductID 是貼文帶的商品，nil 表示沒有。
-	ProductID *int64
+	ProductID *uuid.UUID
 	Status    PostStatus
 	// PublishedAt 是第一次發布的時間，草稿是 nil；之後不變，下架不清它、再發布沿用。
 	PublishedAt *time.Time
@@ -183,7 +183,7 @@ type CreatedPostPage struct {
 type CreatePostInput struct {
 	Body       string
 	ImageToken string
-	ProductID  *int64
+	ProductID  *uuid.UUID
 	Hashtags   []string
 	Publish    bool
 	RequestID  *uuid.UUID
@@ -199,7 +199,7 @@ type UpdatePostInput struct {
 	ImageToken string
 	ClearImage bool
 	SetProduct bool
-	ProductID  *int64
+	ProductID  *uuid.UUID
 	Hashtags   *[]string
 }
 

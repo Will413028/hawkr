@@ -243,16 +243,16 @@ func (f *fakeStores) StoresBlockingBuyer(_ context.Context, _ int64, ids []int64
 
 // fakeProducts 回 cards 裡有的商品（沒有的就是缺少），記錄每次批次查詢的 ID 與 includeInactive。
 type fakeProducts struct {
-	cards map[int64]ProductInfo
-	asked [][]int64
+	cards map[uuid.UUID]ProductInfo
+	asked [][]uuid.UUID
 	incl  []bool
 	err   error
 }
 
-func (f *fakeProducts) Cards(_ context.Context, ids []int64, includeInactive bool) (map[int64]ProductInfo, error) {
+func (f *fakeProducts) Cards(_ context.Context, ids []uuid.UUID, includeInactive bool) (map[uuid.UUID]ProductInfo, error) {
 	f.asked = append(f.asked, ids)
 	f.incl = append(f.incl, includeInactive)
-	out := map[int64]ProductInfo{}
+	out := map[uuid.UUID]ProductInfo{}
 	for _, id := range ids {
 		if c, ok := f.cards[id]; ok {
 			out[id] = c

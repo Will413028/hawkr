@@ -6,6 +6,7 @@ import (
 	"slices"
 	"testing"
 	"time"
+	"uuid"
 
 	"connectrpc.com/connect"
 
@@ -15,38 +16,44 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/apperr"
 )
 
-func withProduct(p social.Post, id int64) social.Post {
+var (
+	prod90  = uuid.UUID{15: 90}
+	prod91  = uuid.UUID{15: 91}
+	prod404 = uuid.UUID{15: 200}
+)
+
+func withProduct(p social.Post, id uuid.UUID) social.Post {
 	p.ProductID = &id
 	return p
 }
 
 func TestPostsCarryTheProductSummaryFromOneBatchCall(t *testing.T) {
 	r := &fakeReads{feed: social.PostPage{Posts: []social.Post{
-		withProduct(post(5), 90), withProduct(post(5), 91), withProduct(post(5), 90), withProduct(post(5), 404), post(5),
+		withProduct(post(5), prod90), withProduct(post(5), prod91), withProduct(post(5), prod90), withProduct(post(5), prod404), post(5),
 	}}}
-	products := &fakeProducts{cards: map[int64]ProductInfo{
-		90: {ID: 90, StoreID: 5, Name: "Tea", ImageKey: "p/90.jpg", MinPrice: 100, MaxPrice: 150, Available: true},
-		91: {ID: 91, StoreID: 5, Name: "Sold out", MinPrice: 200, MaxPrice: 200},
+	products := &fakeProducts{cards: map[uuid.UUID]ProductInfo{
+		prod90: {ID: prod90, StoreID: 5, Name: "Tea", ImageKey: "p/90.jpg", MinPrice: 100, MaxPrice: 150, Available: true},
+		prod91: {ID: prod91, StoreID: 5, Name: "Sold out", MinPrice: 200, MaxPrice: 200},
 	}}
 	h := newPublicWithProducts(t, r, &fakeViews{}, fakeBuyers{id: 7}, &fakeStores{}, products)
 	resp, err := h.ListPosts(asBuyer(t.Context()), connect.NewRequest(&pb.ListPostsRequest{}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(products.asked) != 1 || !slices.Equal(products.asked[0], []int64{90, 91, 404}) {
+	if len(products.asked) != 1 || !slices.Equal(products.asked[0], []uuid.UUID{prod90, prod91, prod404}) {
 		t.Fatalf("商品要一個批次查詢、ID 去重：%v", products.asked)
 	}
 	if products.incl[0] {
 		t.Fatal("公開讀取不補下架的商品")
 	}
 	posts := resp.Msg.GetPosts()
-	if got := posts[0].GetProduct(); got.GetId() != "90" || got.GetName() != "Tea" || got.GetMinPrice() != 100 || got.GetMaxPrice() != 150 || !got.GetAvailable() || got.GetImage() == nil {
+	if got := posts[0].GetProduct(); got.GetId() != prod90.String() || got.GetName() != "Tea" || got.GetMinPrice() != 100 || got.GetMaxPrice() != 150 || !got.GetAvailable() || got.GetImage() == nil {
 		t.Fatalf("商品摘要：%v", got)
 	}
 	if got := posts[1].GetProduct(); got.GetName() != "Sold out" || got.GetAvailable() || got.GetImage() != nil {
 		t.Fatalf("售完的商品：%v", got)
 	}
-	if posts[3].GetProductId() != "404" || posts[3].Product != nil {
+	if posts[3].GetProductId() != prod404.String() || posts[3].Product != nil {
 		t.Fatalf("讀不到的商品：product 不設、product_id 照實回：%v", posts[3])
 	}
 	if posts[4].Product != nil || posts[4].ProductId != nil {
@@ -55,8 +62,8 @@ func TestPostsCarryTheProductSummaryFromOneBatchCall(t *testing.T) {
 }
 
 func TestGetPostCarriesTheProductSummary(t *testing.T) {
-	r := &fakeReads{post: withProduct(post(5), 90)}
-	products := &fakeProducts{cards: map[int64]ProductInfo{90: {ID: 90, Name: "Tea", MinPrice: 100, MaxPrice: 100, Available: true}}}
+	r := &fakeReads{post: withProduct(post(5), prod90)}
+	products := &fakeProducts{cards: map[uuid.UUID]ProductInfo{prod90: {ID: prod90, Name: "Tea", MinPrice: 100, MaxPrice: 100, Available: true}}}
 	h := newPublicWithProducts(t, r, &fakeViews{}, fakeBuyers{id: 7}, &fakeStores{}, products)
 	resp, err := h.GetPost(asBuyer(t.Context()), connect.NewRequest(&pb.GetPostRequest{PostId: r.post.ID.String()}))
 	if err != nil {
@@ -80,7 +87,7 @@ func TestPostsWithoutProductsMakeNoProductCall(t *testing.T) {
 }
 
 func TestProductLookupFailureDegradesTheReadToNoProduct(t *testing.T) {
-	r := &fakeReads{feed: social.PostPage{Posts: []social.Post{withProduct(post(5), 90)}}}
+	r := &fakeReads{feed: social.PostPage{Posts: []social.Post{withProduct(post(5), prod90)}}}
 	products := &fakeProducts{err: apperr.Unavailable("product-service down")}
 	h := newPublicWithProducts(t, r, &fakeViews{}, fakeBuyers{id: 7}, &fakeStores{}, products)
 	resp, err := h.ListPosts(asBuyer(t.Context()), connect.NewRequest(&pb.ListPostsRequest{}))
@@ -88,15 +95,15 @@ func TestProductLookupFailureDegradesTheReadToNoProduct(t *testing.T) {
 		t.Fatalf("商品查詢失敗不能讓讀取失敗：%v", err)
 	}
 	posts := resp.Msg.GetPosts()
-	if len(posts) != 1 || posts[0].Product != nil || posts[0].GetProductId() != "90" {
+	if len(posts) != 1 || posts[0].Product != nil || posts[0].GetProductId() != prod90.String() {
 		t.Fatalf("product 不設、product_id 照實回：%v", posts)
 	}
 }
 
 func TestOwnerReadsAskForInactiveProductsToo(t *testing.T) {
-	products := &fakeProducts{cards: map[int64]ProductInfo{90: {ID: 90, Name: "Hidden", Available: false}}}
+	products := &fakeProducts{cards: map[uuid.UUID]ProductInfo{prod90: {ID: prod90, Name: "Hidden", Available: false}}}
 	h := &presenter{buyers: fakeBuyers{}, stores: &fakeStores{}, products: products, ownerView: true, images: mustImages(t), webOrigin: mustWeb(t), liked: noViewerLikes, log: slog.New(slog.DiscardHandler)}
-	out, err := h.toPosts(t.Context(), social.Caller{}, []social.Post{withProduct(post(5), 90)})
+	out, err := h.toPosts(t.Context(), social.Caller{}, []social.Post{withProduct(post(5), prod90)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,9 +113,9 @@ func TestOwnerReadsAskForInactiveProductsToo(t *testing.T) {
 }
 
 func TestProductWithABadImageKeyKeepsTheSummaryWithoutTheImage(t *testing.T) {
-	r := &fakeReads{feed: social.PostPage{Posts: []social.Post{withProduct(post(5), 90)}}}
-	products := &fakeProducts{cards: map[int64]ProductInfo{
-		90: {ID: 90, Name: "Tea", ImageKey: "https://legacy.example/p.jpg", MinPrice: 100, MaxPrice: 100, Available: true},
+	r := &fakeReads{feed: social.PostPage{Posts: []social.Post{withProduct(post(5), prod90)}}}
+	products := &fakeProducts{cards: map[uuid.UUID]ProductInfo{
+		prod90: {ID: prod90, Name: "Tea", ImageKey: "https://legacy.example/p.jpg", MinPrice: 100, MaxPrice: 100, Available: true},
 	}}
 	h := newPublicWithProducts(t, r, &fakeViews{}, fakeBuyers{id: 7}, &fakeStores{}, products)
 	resp, err := h.ListPosts(asBuyer(t.Context()), connect.NewRequest(&pb.ListPostsRequest{}))
@@ -124,20 +131,20 @@ func TestProductWithABadImageKeyKeepsTheSummaryWithoutTheImage(t *testing.T) {
 // blockingProducts 只在 ctx 結束時回傳，所以逾時降級的測試不靠牆上時鐘斷言。
 type blockingProducts struct{}
 
-func (blockingProducts) Cards(ctx context.Context, _ []int64, _ bool) (map[int64]ProductInfo, error) {
+func (blockingProducts) Cards(ctx context.Context, _ []uuid.UUID, _ bool) (map[uuid.UUID]ProductInfo, error) {
 	<-ctx.Done()
 	return nil, ctx.Err()
 }
 
 func TestProductLookupTimeoutDegradesTheReadToNoProduct(t *testing.T) {
-	r := &fakeReads{feed: social.PostPage{Posts: []social.Post{withProduct(post(5), 90)}}}
+	r := &fakeReads{feed: social.PostPage{Posts: []social.Post{withProduct(post(5), prod90)}}}
 	h := newPublicWithProducts(t, r, &fakeViews{}, fakeBuyers{id: 7}, &fakeStores{}, blockingProducts{})
 	h.productTimeout = time.Millisecond
 	resp, err := h.ListPosts(asBuyer(t.Context()), connect.NewRequest(&pb.ListPostsRequest{}))
 	if err != nil {
 		t.Fatalf("商品查詢逾時不能讓讀取失敗：%v", err)
 	}
-	if posts := resp.Msg.GetPosts(); len(posts) != 1 || posts[0].Product != nil || posts[0].GetProductId() != "90" {
+	if posts := resp.Msg.GetPosts(); len(posts) != 1 || posts[0].Product != nil || posts[0].GetProductId() != prod90.String() {
 		t.Fatalf("逾時降級：%v", posts)
 	}
 }
@@ -167,7 +174,7 @@ type signalingProducts struct {
 	met           bool
 }
 
-func (f *signalingProducts) Cards(ctx context.Context, ids []int64, incl bool) (map[int64]ProductInfo, error) {
+func (f *signalingProducts) Cards(ctx context.Context, ids []uuid.UUID, incl bool) (map[uuid.UUID]ProductInfo, error) {
 	close(f.started)
 	select {
 	case <-f.storesStarted:
@@ -182,7 +189,7 @@ func TestProductLookupRunsConcurrentlyWithTheOtherEnrichmentLookups(t *testing.T
 	storesStarted := make(chan struct{})
 	stores := &rendezvousStores{productsStarted: started, storesStarted: storesStarted}
 	products := &signalingProducts{started: started, storesStarted: storesStarted}
-	r := &fakeReads{feed: social.PostPage{Posts: []social.Post{withProduct(post(5), 90)}}}
+	r := &fakeReads{feed: social.PostPage{Posts: []social.Post{withProduct(post(5), prod90)}}}
 	h := newPublicWithProducts(t, r, &fakeViews{}, fakeBuyers{id: 7}, &stores.fakeStores, products)
 	h.stores = stores
 	if _, err := h.ListPosts(asBuyer(t.Context()), connect.NewRequest(&pb.ListPostsRequest{})); err != nil {

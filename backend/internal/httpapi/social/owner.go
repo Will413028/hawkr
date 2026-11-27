@@ -90,11 +90,11 @@ func (p *presenter) ownPost(ctx context.Context, st seller.Store, post social.Po
 }
 
 // optionalProductID 解析選填的商品 ID；沒設是 nil。
-func optionalProductID(path string, raw *string) (*int64, error) {
+func optionalProductID(path string, raw *string) (*uuid.UUID, error) {
 	if raw == nil {
 		return nil, nil
 	}
-	id, err := rpc.ParseID(path, *raw)
+	id, err := rpc.ParseUUID(path, *raw)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func updatePostInput(msg *pb.Post, mask *fieldmaskpb.FieldMask, id uuid.UUID, ve
 		return social.UpdatePostInput{}, rpc.RequiredField("update_mask", "update_mask 必須列至少一個可以修改的欄位（body、image_staged_token、product_id、hashtag_inputs）")
 	}
 	has := func(p string) bool { return slices.Contains(paths, p) }
-	var productID *int64
+	var productID *uuid.UUID
 	if has("product_id") {
 		if productID, err = optionalProductID("post.product_id", msg.ProductId); err != nil {
 			return social.UpdatePostInput{}, err

@@ -60,9 +60,9 @@ type Stores interface {
 	StoresBlockingBuyer(ctx context.Context, buyerID int64, storeIDs []int64) (map[int64]bool, error)
 }
 
-// ProductInfo 是貼文帶的商品的顯示資料（舊 product-service 的卡片）。
+// ProductInfo 是貼文帶的商品的顯示資料（catalog 的卡片）。
 type ProductInfo struct {
-	ID       int64
+	ID       uuid.UUID
 	StoreID  int64
 	Name     string
 	ImageKey string
@@ -72,10 +72,10 @@ type ProductInfo struct {
 	Available bool
 }
 
-// Products 以一個批次取得商品顯示資料（B4 的 catalog 搬進單體後換成 in-process）；includeInactive 為假時只回上架中的，
+// Products 以一個批次取得商品顯示資料；includeInactive 為假時只回上架中的，
 // 缺少的 ID（已刪除或被排除）不在回傳裡。
 type Products interface {
-	Cards(ctx context.Context, ids []int64, includeInactive bool) (map[int64]ProductInfo, error)
+	Cards(ctx context.Context, ids []uuid.UUID, includeInactive bool) (map[uuid.UUID]ProductInfo, error)
 }
 
 // presenter 是 Public 與 App 共用的組裝：呼叫者的身分，與貼文、留言、討論區項目轉成回應所需的顯示資料（店家卡片、買家名稱、封鎖旗標）。
@@ -591,7 +591,7 @@ type postStores struct {
 	cards    map[int64]seller.StoreCard
 	blocking map[int64]bool
 	liked    map[uuid.UUID]bool
-	products map[int64]ProductInfo
+	products map[uuid.UUID]ProductInfo
 	// buyerDisplay 是這一頁用到的買家顯示資料（作者，以及觀看者自己的買家身分）。
 	buyerDisplay map[int64]buyer.Display
 }
@@ -638,7 +638,7 @@ func (h *presenter) toPosts(ctx context.Context, c social.Caller, posts []social
 		return []*pb.Post{}, nil
 	}
 	// 商品查詢與其他補充查詢互不相依：先丟出去同時跑，最後才收。它自己降級，不會回錯誤。
-	productsCh := make(chan map[int64]ProductInfo, 1)
+	productsCh := make(chan map[uuid.UUID]ProductInfo, 1)
 	go func() { productsCh <- h.postProducts(ctx, posts) }()
 	cards, err := h.storeCards(ctx, storeIDs)
 	if err != nil {
@@ -678,14 +678,14 @@ func postIsCommentable(c social.Caller, p social.Post, stores postStores) bool {
 }
 
 // postProducts 是 posts 帶的商品的顯示資料：整個回應一個批次查詢，沒有商品的貼文不查；查不到的商品不在結果裡，查詢失敗時整批降級；兩者貼文照回，product 不設。
-func (h *presenter) postProducts(ctx context.Context, posts []social.Post) map[int64]ProductInfo {
-	var ids []int64
+func (h *presenter) postProducts(ctx context.Context, posts []social.Post) map[uuid.UUID]ProductInfo {
+	var ids []uuid.UUID
 	for _, p := range posts {
 		if p.ProductID != nil {
 			ids = append(ids, *p.ProductID)
 		}
 	}
-	if ids = uniq(ids); len(ids) == 0 {
+	if ids = uniqUUIDs(ids); len(ids) == 0 {
 		return nil
 	}
 	budget := h.productTimeout
@@ -705,7 +705,7 @@ func (h *presenter) postProducts(ctx context.Context, posts []social.Post) map[i
 // toPostProduct 是貼文帶的商品摘要。商品的圖是選配的顯示資料：圖片 key 不合法時只略過圖（記 warn），
 // 不讓整個貼文讀取失敗。
 func (h *presenter) toPostProduct(info ProductInfo) *pb.PostProduct {
-	out := &pb.PostProduct{Id: rpc.FormatID(info.ID), Name: info.Name, MinPrice: info.MinPrice, MaxPrice: info.MaxPrice, Available: info.Available}
+	out := &pb.PostProduct{Id: info.ID.String(), Name: info.Name, MinPrice: info.MinPrice, MaxPrice: info.MaxPrice, Available: info.Available}
 	if info.ImageKey != "" {
 		if err := rpc.ObjectKey(info.ImageKey); err != nil {
 			h.log.Warn("httpapi/social：商品的圖片 key 不合法，product.image 不設", "product_id", info.ID, "error", err)
@@ -739,7 +739,7 @@ func imageAndProduct(images rpc.Images, p social.Post) (*commonpb.Image, *string
 	}
 	var product *string
 	if p.ProductID != nil {
-		id := rpc.FormatID(*p.ProductID)
+		id := p.ProductID.String()
 		product = &id
 	}
 	return img, product, nil
@@ -864,5 +864,11 @@ func (h *presenter) toActor(a social.Actor, stores postStores) (*pb.Actor, error
 func uniq(ids []int64) []int64 {
 	out := slices.Clone(ids)
 	slices.Sort(out)
+	return slices.Compact(out)
+}
+
+func uniqUUIDs(ids []uuid.UUID) []uuid.UUID {
+	out := slices.Clone(ids)
+	slices.SortFunc(out, uuid.UUID.Compare)
 	return slices.Compact(out)
 }

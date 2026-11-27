@@ -34,13 +34,12 @@ import (
 	"github.com/Will413028/hawkr/backend/internal/platform/uitext"
 )
 
-// ProductVerifier 檢查貼文帶的商品：存在、上架中而且屬於這家店。它是跨行程的呼叫（B4 的 catalog 搬進單體前是舊的 product-service），
-// 所以在開 transaction 之前呼叫（單體規則 5 的精神）。
+// ProductVerifier 檢查貼文帶的商品：存在、上架中而且屬於這家店。由 cmd/hawkr 以 catalog 實作，在 transaction 之前呼叫。
 //
 // 回傳 nil（合格）、ErrProductNotAvailable、ErrProductNotOwned，或其他錯誤（查詢失敗；不能當成商品不存在）。使用者面的句子由 social 的目錄給，
 // port 的實作不產生句子。
 type ProductVerifier interface {
-	VerifyProduct(ctx context.Context, productID, storeID int64) error
+	VerifyProduct(ctx context.Context, productID uuid.UUID, storeID int64) error
 }
 
 // 商品驗證的結果（port 回傳，verifyProduct 轉成使用者面的錯誤）。
@@ -104,11 +103,11 @@ func requirePublishable(ctx context.Context, body string, hasImage bool) error {
 	return apperr.FailedPrecondition("%s", err.Error())
 }
 
-func (s *Service) verifyProduct(ctx context.Context, productID *int64, storeID int64) error {
+func (s *Service) verifyProduct(ctx context.Context, productID *uuid.UUID, storeID int64) error {
 	if productID == nil {
 		return nil
 	}
-	if *productID <= 0 {
+	if *productID == uuid.Nil() {
 		return apperr.InvalidInputOn([]string{"ProductID"}, "%s", text.PostProductInvalid(uitext.LocaleFrom(ctx)))
 	}
 	err := s.d.Products.VerifyProduct(ctx, *productID, storeID)
@@ -224,7 +223,7 @@ func (s *Service) Create(ctx context.Context, st seller.Store, in model.CreatePo
 	}
 	var hash []byte
 	if in.RequestID != nil {
-		hash = model.RequestHash("post", body, in.ImageToken, model.OptionalInt(in.ProductID), tagsKey(tags), fmt.Sprint(in.Publish))
+		hash = model.RequestHash("post", body, in.ImageToken, optionalUUID(in.ProductID), tagsKey(tags), fmt.Sprint(in.Publish))
 		row, ok, err := s.replay(ctx, s.q(ctx), st.StoreID, in.RequestID, hash)
 		if err != nil {
 			return model.Post{}, err
@@ -302,6 +301,13 @@ func (s *Service) Create(ctx context.Context, st seller.Store, in model.CreatePo
 		return model.Post{}, err
 	}
 	return out, nil
+}
+
+func optionalUUID(id *uuid.UUID) string {
+	if id == nil {
+		return ""
+	}
+	return id.String()
 }
 
 // tagsKey 是標籤集合進 RequestHash 的編碼：依輸入順序，名稱與顯示形式都算（顯示形式是使用者看得到的內容）。

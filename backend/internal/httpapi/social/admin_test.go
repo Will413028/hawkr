@@ -106,7 +106,7 @@ func TestListPostsComposesPostsMeasureIDsAndOpenReportCounts(t *testing.T) {
 	published := created.Add(time.Hour)
 	taken, plain := uuid.New(), uuid.New()
 	measure := uuid.New()
-	productID := int64(55)
+	productID := uuid.New()
 	posts := &fakeAdminPosts{page: social.CreatedPostPage{
 		Posts: []social.Post{
 			{ID: taken, StoreID: 7, Body: "下架的", ImageKey: "posts/a.jpg", ProductID: &productID, Status: social.PostStatus("PUBLISHED"), CreatedAt: created, UpdatedAt: created, PublishedAt: &published, TakedownMeasureID: &measure},
@@ -135,7 +135,7 @@ func TestListPostsComposesPostsMeasureIDsAndOpenReportCounts(t *testing.T) {
 		got[0].GetOpenReportCount() != 3 || got[0].GetStatus() != pb.PostStatus_POST_STATUS_PUBLISHED || !got[0].GetPublishTime().AsTime().Equal(published) {
 		t.Fatalf("下架的貼文：%+v", got[0])
 	}
-	if got[0].GetImage().GetUriTemplate() != "https://media.example.test/i/{preset}/posts/a.jpg" || got[0].GetProductId() != "55" || got[1].Image != nil || got[1].ProductId != nil {
+	if got[0].GetImage().GetUriTemplate() != "https://media.example.test/i/{preset}/posts/a.jpg" || got[0].GetProductId() != productID.String() || got[1].Image != nil || got[1].ProductId != nil {
 		t.Fatalf("圖片與商品：%+v / %+v", got[0], got[1])
 	}
 	if got[1].TakedownMeasureId != nil || got[1].GetOpenReportCount() != 0 || got[1].GetStatus() != pb.PostStatus_POST_STATUS_UNPUBLISHED {
